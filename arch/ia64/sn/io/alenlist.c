@@ -201,8 +201,8 @@ zone_t *alenlist_cursor_zone = NULL;
 int alenlist_count=0;		/* Currently allocated Lists */
 int alenlist_chunk_count = 0;	/* Currently allocated chunks */
 int alenlist_cursor_count = 0;	/* Currently allocate cursors */
-#define INCR_COUNT(ptr) atomicAddInt((ptr), 1);
-#define DECR_COUNT(ptr) atomicAddInt((ptr), -1);
+#define INCR_COUNT(ptr) atomic_inc((ptr));
+#define DECR_COUNT(ptr) atomic_dec((ptr));
 #else
 #define INCR_COUNT(ptr)
 #define DECR_COUNT(ptr)

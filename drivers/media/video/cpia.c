@@ -2832,7 +2832,7 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 		DBG("VIDIOCMCAPTURE: %d / %d / %dx%d\n", vm.format, vm.frame,
 		    vm.width, vm.height);
 #endif
-		if (vm.frame<0||vm.frame>FRAME_NUM) {
+		if (vm.frame<0||vm.frame>=FRAME_NUM) {
 			retval = -EINVAL;
 			break;
 		}

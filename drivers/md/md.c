@@ -1063,10 +1063,10 @@ repeat:
 	}
 	printk(".\n");
 	if (err) {
-		printk("errors occured during superblock update, repeating\n");
+		printk("errors occurred during superblock update, repeating\n");
 		if (--count)
 			goto repeat;
-		printk("excessive errors occured during superblock update, exiting\n");
+		printk("excessive errors occurred during superblock update, exiting\n");
 	}
 	return 0;
 }

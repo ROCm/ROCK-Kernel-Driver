@@ -68,13 +68,13 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
- 	#define DEBUG
+ 	static int debug = 1;
 #else
- 	#undef DEBUG
+ 	static int debug;
 #endif
-#include <linux/usb.h>
 
 #include "usb-serial.h"
 #include "belkin_sa.h"
@@ -607,3 +607,7 @@ module_init (belkin_sa_init);
 module_exit (belkin_sa_exit);
 
 MODULE_DESCRIPTION("USB Belkin Serial converter driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

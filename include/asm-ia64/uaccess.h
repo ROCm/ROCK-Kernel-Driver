@@ -25,13 +25,15 @@
  * handler checks to see whether the faulting instruction has a fixup
  * associated and, if so, sets r8 to -EFAULT and clears r9 to 0 and
  * then resumes execution at the continuation point.
- * 
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ *
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/errno.h>
 #include <linux/sched.h>
+
+#include <asm/pgtable.h>
 
 /*
  * For historical reasons, the following macros are grossly misnamed:
@@ -49,16 +51,13 @@
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
 /*
- * When accessing user memory, we need to make sure the entire area
- * really is in user-level space.  In order to do this efficiently, we
- * make sure that the page at address TASK_SIZE is never valid (we do
- * this by selecting VMALLOC_START as TASK_SIZE+PAGE_SIZE).  This way,
- * we can simply check whether the starting address is < TASK_SIZE
- * and, if so, start accessing the memory.  If the user specified bad
- * length, we will fault on the NaT page and then return the
- * appropriate error.
+ * When accessing user memory, we need to make sure the entire area really is in
+ * user-level space.  In order to do this efficiently, we make sure that the page at
+ * address TASK_SIZE is never valid.  We also need to make sure that the address doesn't
+ * point inside the virtually mapped linear page table.
  */
-#define __access_ok(addr,size,segment)	(((unsigned long) (addr)) <= (segment).seg)
+#define __access_ok(addr,size,segment)	(((unsigned long) (addr)) <= (segment).seg		\
+	 && ((segment).seg == KERNEL_DS.seg || rgn_offset((unsigned long) (addr)) < RGN_MAP_LIMIT))
 #define access_ok(type,addr,size)	__access_ok((addr),(size),get_fs())
 
 static inline int
@@ -85,28 +84,28 @@ verify_area (int type, const void *addr, unsigned long size)
  */
 #define __put_user(x,ptr)	__put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 #define __get_user(x,ptr)	__get_user_nocheck((x),(ptr),sizeof(*(ptr)))
-  
+
 extern void __get_user_unknown (void);
 
-#define __get_user_nocheck(x,ptr,size)				\
-({								\
-	register long __gu_err __asm__ ("r8") = 0;		\
-	register long __gu_val __asm__ ("r9") = 0;		\
-	switch (size) {						\
-	  case 1: __get_user_8(ptr); break;			\
-	  case 2: __get_user_16(ptr); break;			\
-	  case 4: __get_user_32(ptr); break;			\
-	  case 8: __get_user_64(ptr); break;			\
-	  default: __get_user_unknown(); break;			\
-	}							\
-	(x) = (__typeof__(*(ptr))) __gu_val;			\
-	__gu_err;						\
+#define __get_user_nocheck(x,ptr,size)		\
+({						\
+	register long __gu_err asm ("r8") = 0;	\
+	register long __gu_val asm ("r9") = 0;	\
+	switch (size) {				\
+	  case 1: __get_user_8(ptr); break;	\
+	  case 2: __get_user_16(ptr); break;	\
+	  case 4: __get_user_32(ptr); break;	\
+	  case 8: __get_user_64(ptr); break;	\
+	  default: __get_user_unknown(); break;	\
+	}					\
+	(x) = (__typeof__(*(ptr))) __gu_val;	\
+	__gu_err;				\
 })
 
 #define __get_user_check(x,ptr,size,segment)			\
 ({								\
-	register long __gu_err __asm__ ("r8") = -EFAULT;	\
-	register long __gu_val __asm__ ("r9") = 0;		\
+	register long __gu_err asm ("r8") = -EFAULT;		\
+	register long __gu_val asm ("r9") = 0;			\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);		\
 	if (__access_ok((long)__gu_addr,size,segment)) {	\
 		__gu_err = 0;					\
@@ -126,46 +125,60 @@ struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(struct __large_struct *)(x))
 
 /* We need to declare the __ex_table section before we can use it in .xdata.  */
-__asm__ (".section \"__ex_table\", \"a\"\n\t.previous");
+asm (".section \"__ex_table\", \"a\"\n\t.previous");
+
+#if __GNUC__ >= 3
+#  define GAS_HAS_LOCAL_TAGS	/* define if gas supports local tags a la [1:] */
+#endif
+
+#ifdef GAS_HAS_LOCAL_TAGS
+# define _LL	"[1:]"
+#else
+# define _LL	"1:"
+#endif
 
 #define __get_user_64(addr)									\
-	__asm__ ("\n1:\tld8 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)|1\n"			\
-		: "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
+	asm ("\n"_LL"\tld8 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
+	     _LL										\
+	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_32(addr)									\
-	__asm__ ("\n1:\tld4 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)|1\n"			\
-		: "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
+	asm ("\n"_LL"\tld4 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
+	     _LL										\
+	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_16(addr)									\
-	__asm__ ("\n1:\tld2 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)|1\n"			\
-		: "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
+	asm ("\n"_LL"\tld2 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
+	     _LL										\
+	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_8(addr)									\
-	__asm__ ("\n1:\tld1 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)|1\n"			\
-		: "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
+	asm ("\n"_LL"\tld1 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
+	     _LL										\
+	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 extern void __put_user_unknown (void);
 
-#define __put_user_nocheck(x,ptr,size)				\
-({								\
-	register long __pu_err __asm__ ("r8") = 0;		\
-	switch (size) {						\
-	  case 1: __put_user_8(x,ptr); break;			\
-	  case 2: __put_user_16(x,ptr); break;			\
-	  case 4: __put_user_32(x,ptr); break;			\
-	  case 8: __put_user_64(x,ptr); break;			\
-	  default: __put_user_unknown(); break;			\
-	}							\
-	__pu_err;						\
+#define __put_user_nocheck(x,ptr,size)		\
+({						\
+	register long __pu_err asm ("r8") = 0;	\
+	switch (size) {				\
+	  case 1: __put_user_8(x,ptr); break;	\
+	  case 2: __put_user_16(x,ptr); break;	\
+	  case 4: __put_user_32(x,ptr); break;	\
+	  case 8: __put_user_64(x,ptr); break;	\
+	  default: __put_user_unknown(); break;	\
+	}					\
+	__pu_err;				\
 })
 
 #define __put_user_check(x,ptr,size,segment)			\
 ({								\
-	register long __pu_err __asm__ ("r8") = -EFAULT;	\
+	register long __pu_err asm ("r8") = -EFAULT;		\
 	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
 	if (__access_ok((long)__pu_addr,size,segment)) {	\
 		__pu_err = 0;					\
@@ -186,27 +199,31 @@ extern void __put_user_unknown (void);
  * any memory gcc knows about, so there are no aliasing issues
  */
 #define __put_user_64(x,addr)								\
-	__asm__ __volatile__ (								\
-		 "\n1:\tst8 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)\n"			\
+	asm volatile (									\
+		"\n"_LL"\tst8 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
+		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_32(x,addr)								\
-	__asm__ __volatile__ (								\
-		 "\n1:\tst4 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)\n"			\
+	asm volatile (									\
+		"\n"_LL"\tst4 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
+		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_16(x,addr)								\
-	__asm__ __volatile__ (								\
-		 "\n1:\tst2 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)\n"			\
+	asm volatile (									\
+		"\n"_LL"\tst2 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
+		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_8(x,addr)								\
-	__asm__ __volatile__ (								\
-		 "\n1:\tst1 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		 "2:\n\t.xdata4 \"__ex_table\", @gprel(1b), (2b-1b)\n"			\
+	asm volatile (									\
+		"\n"_LL"\tst1 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
+		_LL									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 /*
@@ -215,7 +232,7 @@ extern void __put_user_unknown (void);
 extern unsigned long __copy_user (void *to, const void *from, unsigned long count);
 
 #define __copy_to_user(to,from,n)	__copy_user((to), (from), (n))
-#define __copy_from_user(to,from,n) 	__copy_user((to), (from), (n))
+#define __copy_from_user(to,from,n)	__copy_user((to), (from), (n))
 
 #define copy_to_user(to,from,n)   __copy_tofrom_user((to), (from), (n), 1)
 #define copy_from_user(to,from,n) __copy_tofrom_user((to), (from), (n), 0)
@@ -293,10 +310,14 @@ extern unsigned long __strnlen_user (const char *, long);
 
 struct exception_table_entry {
 	int addr;	/* gp-relative address of insn this fixup is for */
-	int skip;	/* number of bytes to skip to get to the continuation point.
-			   Bit 0 tells us if r9 should be cleared to 0*/
+	int cont;	/* gp-relative continuation address; if bit 2 is set, r9 is set to 0 */
 };
 
-extern const struct exception_table_entry *search_exception_table (unsigned long addr);
+struct exception_fixup {
+	unsigned long cont;	/* continuation point (bit 2: clear r9 if set) */
+};
+
+extern struct exception_fixup search_exception_table (unsigned long addr);
+extern void handle_exception (struct pt_regs *regs, struct exception_fixup fixup);
 
 #endif /* _ASM_IA64_UACCESS_H */

@@ -14568,7 +14568,7 @@ end_bstr:
 # made out of the current exception stack frame. 			#
 #	So, we first call restore() which makes sure that any updated	#
 # -(an)+ register gets returned to its pre-exception value and then	#
-# we change the stack to an acess error stack frame.			#
+# we change the stack to an access error stack frame.			#
 #									#
 #########################################################################
 

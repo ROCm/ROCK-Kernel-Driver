@@ -274,7 +274,9 @@ typedef union pi_err_stat1 {
  * The following three macros define all possible error int pends. 
  */
 
-#define PI_FATAL_ERR_CPU_A	(PI_ERR_SYSAD_BAD_DATA_A | \
+#define PI_FATAL_ERR_CPU_A	(PI_ERR_IRB_TIMEOUT_A	| \
+				 PI_ERR_IRB_ERR_A	| \
+				 PI_ERR_PKT_LEN_ERR_A	| \
 				 PI_ERR_SYSSTATE_TAG_A 	| \
 				 PI_ERR_BAD_SPOOL_A 	| \
 				 PI_ERR_SYSCMD_ADDR_A 	| \
@@ -283,17 +285,17 @@ typedef union pi_err_stat1 {
 				 PI_ERR_SYSAD_DATA_A	| \
 				 PI_ERR_SYSSTATE_A)
 
-#define PI_MISC_ERR_CPU_A	(PI_ERR_IRB_TIMEOUT_A   | \
-				 PI_ERR_IRB_ERR_A       | \
-				 PI_ERR_PKT_LEN_ERR_A   | \
-				 PI_ERR_UE_CACHED_A     | \
+#define PI_MISC_ERR_CPU_A	(PI_ERR_UE_CACHED_A	| \
+				 PI_ERR_SYSAD_BAD_DATA_A| \
 				 PI_ERR_UNCAC_UNCORR_A 	| \
 				 PI_ERR_WRB_WERR_A 	| \
 				 PI_ERR_WRB_TERR_A 	| \
 				 PI_ERR_SPUR_MSG_A 	| \
 				 PI_ERR_SPOOL_CMP_A)
 
-#define PI_FATAL_ERR_CPU_B	(PI_ERR_SYSAD_BAD_DATA_B | \
+#define PI_FATAL_ERR_CPU_B	(PI_ERR_IRB_TIMEOUT_B	| \
+				 PI_ERR_IRB_ERR_B	| \
+				 PI_ERR_PKT_LEN_ERR_B	| \
 				 PI_ERR_SYSSTATE_TAG_B 	| \
 				 PI_ERR_BAD_SPOOL_B 	| \
 				 PI_ERR_SYSCMD_ADDR_B 	| \
@@ -302,11 +304,9 @@ typedef union pi_err_stat1 {
 				 PI_ERR_SYSAD_DATA_B	| \
 				 PI_ERR_SYSSTATE_B)
 
-#define PI_MISC_ERR_CPU_B 	(PI_ERR_IRB_TIMEOUT_B   | \
-				 PI_ERR_IRB_ERR_B       | \
-				 PI_ERR_PKT_LEN_ERR_B   | \
-				 PI_ERR_UE_CACHED_B     | \
-				 PI_ERR_UNCAC_UNCORR_B  | \
+#define PI_MISC_ERR_CPU_B	(PI_ERR_UE_CACHED_B	| \
+				 PI_ERR_SYSAD_BAD_DATA_B| \
+				 PI_ERR_UNCAC_UNCORR_B 	| \
 				 PI_ERR_WRB_WERR_B 	| \
 				 PI_ERR_WRB_TERR_B 	| \
 				 PI_ERR_SPUR_MSG_B 	| \

@@ -35,6 +35,15 @@ extern void bringup_set_led_bits(u8 bits, u8 mask);
 static int	inttest=0;
 #endif
 
+#ifdef IA64_SEMFIX_INSN
+#undef IA64_SEMFIX_INSN
+#endif
+#ifdef IA64_SEMFIX
+#undef IA64_SEMFIX
+#endif
+# define IA64_SEMFIX_INSN
+# define IA64_SEMFIX    ""
+
 
 /*
  * Test parameter table for AUTOTEST
@@ -46,22 +55,22 @@ typedef struct {
 } autotest_table_t;
 
 autotest_table_t autotest_table[] = {
-	{1000000,	2,	0x2b4		},
-	{1000000,	16,	0,		},
-	{1000000,	16,	4,		},
-	{1000000,	128,	0x44		},
-	{1000000,	128,	0x84		},
-	{1000000,	128,	0x200		},
-	{1000000,	128,	0x204		},
-	{1000000,	128,	0x2b4		},
-	{1000000,	2,	8*MB+0x2b4	},
-	{1000000,	16,	8*MB+0		},
-	{1000000,	16,	8*MB+4		},
-	{1000000,	128,	8*MB+0x44	},
-	{1000000,	128,	8*MB+0x84	},
-	{1000000,	128,	8*MB+0x200	},
-	{1000000,	128,	8*MB+0x204	},
-	{1000000,	128,	8*MB+0x2b4	},
+	{5000000,	2,	0x2b4		},
+	{5000000,	16,	0,		},
+	{5000000,	16,	4,		},
+	{5000000,	128,	0x44		},
+	{5000000,	128,	0x84		},
+	{5000000,	128,	0x200		},
+	{5000000,	128,	0x204		},
+	{5000000,	128,	0x2b4		},
+	{5000000,	2,	8*MB+0x2b4	},
+	{5000000,	16,	8*MB+0		},
+	{5000000,	16,	8*MB+4		},
+	{5000000,	128,	8*MB+0x44	},
+	{5000000,	128,	8*MB+0x84	},
+	{5000000,	128,	8*MB+0x200	},
+	{5000000,	128,	8*MB+0x204	},
+	{5000000,	128,	8*MB+0x2b4	},
 	{0}};
 
 /*
@@ -134,20 +143,21 @@ static int  clr_lock(uint *, uint);
 static void Speedo(void);
 
 int autotest_enabled=0;
-static int autotest_explicit_flush=0;
 static int llsctest_number=-1;
 static int errstop_enabled=0;
 static int fail_enabled=0;
 static int selective_trigger=0;
+static int dump_block_addrs_opt=0;
+static uint errlock=0;
 
 static int __init autotest_enable(char *str)
 {
         autotest_enabled = 1;
 	return 1;
 }
-static int __init set_llscxflush(char *str)
+static int __init set_llscblkadr(char *str)
 {
-	autotest_explicit_flush = 1;
+	dump_block_addrs_opt = 1;
 	return 1;
 }
 static int __init set_llscselt(char *str)
@@ -179,55 +189,39 @@ static void print_params(void)
 	printk ("  Test options:\n");
 	printk ("     llsctest=<n>\t%d\tTest number to run (all = -1)\n", llsctest_number);
 	printk ("     llscerrstop \t%s\tStop on error\n", errstop_enabled ? "on" : "off");
-	printk ("     llscxflush  \t%s\tEnable explicit FC in test\n", autotest_explicit_flush ? "on" : "off");
 	printk ("     llscfail    \t%s\tForce a failure to test the trigger & error messages\n", fail_enabled ? "on" : "off");
 	printk ("     llscselt    \t%s\tSelective triger on failures\n", selective_trigger ? "on" : "off");
+	printk ("     llscblkadr  \t%s\tDump data block addresses\n", dump_block_addrs_opt ? "on" : "off");
+	printk ("  SEMFIX: %s\n", IA64_SEMFIX);
 	printk ("\n");
 }
 __setup("autotest", autotest_enable);
 __setup("llsctest=", set_llsctest);
 __setup("llscerrstop", set_llscerrstop);
-__setup("llscxflush", set_llscxflush);
 __setup("llscfail", set_llscfail);
 __setup("llscselt", set_llscselt);
+__setup("llscblkadr", set_llscblkadr);
 
 
-extern inline void
-flush_buddy(void *p)
-{
-	long	lp;
-
-	if (autotest_explicit_flush)  {
-		lp = (long)p;
-		lp ^= 0x40;
-		asm volatile ("fc %0" :: "r"(lp) : "memory");
-		ia64_sync_i();
-		ia64_srlz_d();
-	}
-}
-
-static int
+extern inline int
 set_lock(uint *lock, uint id)
 {
 	uint	old;
-	flush_buddy(lock);
 	old = cmpxchg_acq(lock, 0, id);
 	return (old == 0);
 }
 
-static int
+extern inline int
 clr_lock(uint *lock, uint id)
 {
 	uint	old;
-	flush_buddy(lock);
 	old = cmpxchg_rel(lock, id, 0);
 	return (old == id);
 }
 
-static void
+extern inline void
 zero_lock(uint *lock)
 {
-	flush_buddy(lock);
 	*lock = 0;
 }
 
@@ -322,7 +316,6 @@ ran_conf_llsc(int thread)
 					return 1;
 				}
 				if (correct_errors) {
-					flush_buddy(privp);
 					tp->private[linei] = *privp;
 				}
 				errs++;
@@ -343,7 +336,6 @@ ran_conf_llsc(int thread)
 				errs++;
 			}
 			pval++;
-			flush_buddy(privp);
 			*privp = pval;
 			tp->private[linei] = pval;
 			break;
@@ -425,9 +417,7 @@ ran_conf_llsc(int thread)
 				errs++;
 			}
 
-			flush_buddy(sharep);
 			*sharep = lockpat;
-			flush_buddy(sharecopy);
 			*sharecopy = lockpat;
 
 
@@ -471,7 +461,7 @@ getsynerr(void)
 static int
 rerr(capture_t *cap, char *msg, void *lp, void *slp, int thread, int pass, int linei, int exp, int found, int stillbad)
 {
-	int		cpu;
+	int		cpu, i;
 	long 		synerr;
 	int		selt;
 
@@ -487,6 +477,11 @@ rerr(capture_t *cap, char *msg, void *lp, void *slp, int thread, int pass, int l
 	}
 
 	spin(1);
+	i = 100;
+	while (i && set_lock(&errlock, 1) != 1) {
+		spin(1);
+		i--;
+	}
 	printk ("\nDataError!: %-20s, test %ld, thread %d, line:%d, pass %d (0x%x), time %ld expected:%x, found:%x\n",
 	    msg, k_testnumber, thread, linei, pass, pass, jiffies, exp, found);
 
@@ -512,6 +507,7 @@ rerr(capture_t *cap, char *msg, void *lp, void *slp, int thread, int pass, int l
 		printk("SYNERR: Thread %d, Synerr: 0x%lx\n", thread, synerr);
 	spin(2);
 	printk("\n\n");
+	clr_lock(&errlock, 1);
 
 	if (errstop_enabled) {
 		local_irq_disable();
@@ -639,8 +635,10 @@ set_autotest_params(void)
 		testnumber = llsctest_number;
 	} else {
 		testnumber++;
-		if (autotest_table[testnumber].passes == 0)
+		if (autotest_table[testnumber].passes == 0) {
 			testnumber = 0;
+			dump_block_addrs_opt = 0;
+		}
 	}
 	k_passes = autotest_table[testnumber].passes;
 	k_linepad = autotest_table[testnumber].linepad;
@@ -704,6 +702,22 @@ setup_block_addresses(void)
 }
 
 static void
+dump_block_addrs(void)
+{
+	int	i;
+
+	printk("LLSC TestNumber %ld\n", k_testnumber);
+
+	for (i=0; i<k_linecount; i++) {
+		printk("  %lx", blocks[i]);
+		if (i%4 == 3)
+			printk("\n");
+	}
+	printk("\n");
+}
+
+
+static void
 set_thread_state(int cpuid, int state)
 {
 	if (k_threadprivate[cpuid]->threadstate == TS_KILLED) {
@@ -717,6 +731,7 @@ static int
 build_mem_map(unsigned long start, unsigned long end, void *arg)
 {
 	long	lstart;
+	long	align = 8*MB;
 	/*
 	 * HACK - skip the kernel on the first node 
 	 */
@@ -731,9 +746,11 @@ build_mem_map(unsigned long start, unsigned long end, void *arg)
 	while (lstart > start && (!PageReserved(virt_to_page(lstart-PAGE_SIZE)) && virt_to_page(lstart-PAGE_SIZE)->count.counter == 0))
 		lstart -= PAGE_SIZE;
 
-	printk ("     memmap: start 0x%lx, end 0x%lx\n", lstart, end);
+	lstart = (lstart + align -1) /align * align;
+	end = end / align * align;
 	if (lstart >= end)
 		return 0;
+	printk ("     memmap: start 0x%lx, end 0x%lx\n", lstart, end);
 
 	memmap[memmapx].vstart = lstart;
 	memmap[memmapx].vend = end;
@@ -812,6 +829,8 @@ loop:
 		if (k_linecount > MAX_LINECOUNT) k_linecount = MAX_LINECOUNT;
 		k_linecount = k_linecount & ~1;
 		setup_block_addresses();
+		if (dump_block_addrs_opt)
+			dump_block_addrs();
 
 		k_currentpass = pass++;
 		k_go = ST_RUN;

@@ -53,13 +53,13 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
- 	#define DEBUG
+ 	static int debug = 1;
 #else
- 	#undef DEBUG
+ 	static int debug;
 #endif
-#include <linux/usb.h>
 
 #include "usb-serial.h"
 #include "mct_u232.h"
@@ -848,3 +848,7 @@ MODULE_PARM(write_blocking, "i");
 MODULE_PARM_DESC(write_blocking, 
 		 "The write function will block to write out all data");
 #endif
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

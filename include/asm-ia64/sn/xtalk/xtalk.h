@@ -278,6 +278,7 @@ typedef struct xtalk_provider_s {
 
     /* INTERRUPT MANAGEMENT */
     xtalk_intr_alloc_f     *intr_alloc;
+    xtalk_intr_alloc_f     *intr_alloc_nothd;
     xtalk_intr_free_f      *intr_free;
     xtalk_intr_connect_f   *intr_connect;
     xtalk_intr_disconnect_f *intr_disconnect;
@@ -308,6 +309,7 @@ extern xtalk_dmamap_drain_f xtalk_dmamap_drain;
 extern xtalk_dmaaddr_drain_f xtalk_dmaaddr_drain;
 extern xtalk_dmalist_drain_f xtalk_dmalist_drain;
 extern xtalk_intr_alloc_f xtalk_intr_alloc;
+extern xtalk_intr_alloc_f xtalk_intr_alloc_nothd;
 extern xtalk_intr_free_f xtalk_intr_free;
 extern xtalk_intr_connect_f xtalk_intr_connect;
 extern xtalk_intr_disconnect_f xtalk_intr_disconnect;
@@ -342,10 +344,6 @@ extern xtalk_intr_vector_t xtalk_intr_vector_get(xtalk_intr_t xtalk_intr);
 extern iopaddr_t        xtalk_intr_addr_get(xtalk_intr_t xtalk_intr);
 extern devfs_handle_t     xtalk_intr_cpu_get(xtalk_intr_t xtalk_intr);
 extern void            *xtalk_intr_sfarg_get(xtalk_intr_t xtalk_intr);
-
-extern int		xtalk_intr_flags_get(xtalk_intr_t xtalk_intr);
-/* XTALK_INTR flags */
-#define XTALK_INTR_NOTHREAD	1	/* interrupt handler wants to be called at interrupt level */
 
 /* Generic crosstalk pio interfaces */
 extern devfs_handle_t     xtalk_pio_dev_get(xtalk_piomap_t xtalk_piomap);

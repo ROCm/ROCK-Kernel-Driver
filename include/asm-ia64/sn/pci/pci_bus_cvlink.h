@@ -26,4 +26,23 @@ struct sn1_device_sysdata {
 	int		isa64;
 };
 
+struct sn1_dma_maps_s{
+	struct pcibr_dmamap_s dma_map;
+        dma_addr_t      dma_addr;
+};
+
+struct ioports_to_tlbs_s {
+	unsigned long	p:1,
+			rv_1:1,
+			ma:3,
+			a:1,
+			d:1,
+			pl:2,
+			ar:3,
+			ppn:38,
+			rv_2:2,
+			ed:1,
+			ig:11;
+};
+
 #endif				/* _ASM_SN_PCI_CVLINK_H */

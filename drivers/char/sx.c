@@ -1767,6 +1767,20 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 }
 
 
+static void sx_break (struct tty_struct * tty, int flag)
+{
+	struct sx_port *port = tty->driver_data;
+	int rv;
+
+	if (flag) 
+		rv = sx_send_command (port, HS_START, -1, HS_IDLE_BREAK);
+	else 
+		rv = sx_send_command (port, HS_STOP, -1, HS_IDLE_OPEN);
+	if (rv != 1) printk (KERN_ERR "sx: couldn't send break (%x).\n",
+			read_sx_byte (port->board, CHAN_OFFSET (port, hi_hstat)));
+}
+
+
 static int sx_ioctl (struct tty_struct * tty, struct file * filp, 
                      unsigned int cmd, unsigned long arg)
 {
@@ -1835,7 +1849,6 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 			sx_reconfigure_port(port);
 		}
 		break;
-
 	default:
 		rc = -ENOIOCTLCMD;
 		break;
@@ -2215,6 +2228,7 @@ static int sx_init_drivers(void)
 	sx_driver.table = sx_table;
 	sx_driver.termios = sx_termios;
 	sx_driver.termios_locked = sx_termios_locked;
+	sx_driver.break_ctl = sx_break;
 
 	sx_driver.open	= sx_open;
 	sx_driver.close = gs_close;

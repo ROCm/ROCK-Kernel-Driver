@@ -2,6 +2,7 @@
  * IA32 helper functions
  *
  * 06/16/00	A. Mallick	added csd/ssd/tssd for ia32 thread context
+ * 02/19/01	D. Mosberger	dropped tssd; it's not needed
  */
 
 #include <linux/kernel.h>
@@ -22,7 +23,7 @@ extern void die_if_kernel (char *str, struct pt_regs *regs, long err);
 void
 ia32_save_state (struct thread_struct *thread)
 {
-	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd, tssd;
+	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd;
 
 	asm ("mov %0=ar.eflag;"
 	     "mov %1=ar.fsr;"
@@ -31,9 +32,7 @@ ia32_save_state (struct thread_struct *thread)
 	     "mov %4=ar.fdr;"
 	     "mov %5=ar.csd;"
 	     "mov %6=ar.ssd;"
-	     "mov %7=ar.k1"
-	     : "=r"(eflag), "=r"(fsr), "=r"(fcr), "=r"(fir), "=r"(fdr),
-	       "=r"(csd), "=r"(ssd), "=r"(tssd));
+	     : "=r"(eflag), "=r"(fsr), "=r"(fcr), "=r"(fir), "=r"(fdr), "=r"(csd), "=r"(ssd));
 	thread->eflag = eflag;
 	thread->fsr = fsr;
 	thread->fcr = fcr;
@@ -41,14 +40,13 @@ ia32_save_state (struct thread_struct *thread)
 	thread->fdr = fdr;
 	thread->csd = csd;
 	thread->ssd = ssd;
-	thread->tssd = tssd;
 	asm ("mov ar.k0=%0 ;;" :: "r"(thread->old_iob));
 }
 
 void
 ia32_load_state (struct thread_struct *thread)
 {
-	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd, tssd;
+	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd;
 
 	eflag = thread->eflag;
 	fsr = thread->fsr;
@@ -57,7 +55,6 @@ ia32_load_state (struct thread_struct *thread)
 	fdr = thread->fdr;
 	csd = thread->csd;
 	ssd = thread->ssd;
-	tssd = thread->tssd;
 
 	asm volatile ("mov ar.eflag=%0;"
 		      "mov ar.fsr=%1;"
@@ -66,9 +63,7 @@ ia32_load_state (struct thread_struct *thread)
 		      "mov ar.fdr=%4;"
 		      "mov ar.csd=%5;"
 		      "mov ar.ssd=%6;"
-		      "mov ar.k1=%7"
-		      :: "r"(eflag), "r"(fsr), "r"(fcr), "r"(fir), "r"(fdr),
-		         "r"(csd), "r"(ssd), "r"(tssd));
+		      :: "r"(eflag), "r"(fsr), "r"(fcr), "r"(fir), "r"(fdr), "r"(csd), "r"(ssd));
 	asm ("mov %0=ar.k0 ;;" : "=r"(thread->old_iob));
 	asm ("mov ar.k0=%0 ;;" :: "r"(IA32_IOBASE));
 }

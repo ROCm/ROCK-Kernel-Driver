@@ -1,12 +1,26 @@
-/* $Id: serial.c,v 1.6 2000/11/22 16:36:09 bjornw Exp $
+/* $Id: serial.c,v 1.10 2001/03/05 13:14:07 bjornw Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
- *      Copyright (C) 1998, 1999, 2000  Axis Communications AB
+ *      Copyright (C) 1998, 1999, 2000, 2001  Axis Communications AB
  *
  *      Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.10  2001/03/05 13:14:07  bjornw
+ * Another spelling fix
+ *
+ * Revision 1.9  2001/02/23 13:46:38  bjornw
+ * Spellling check
+ *
+ * Revision 1.8  2001/01/23 14:56:35  markusl
+ * Made use of ser1 optional
+ * Needed by USB
+ *
+ * Revision 1.7  2001/01/19 16:14:48  perf
+ * Added kernel options for serial ports 234.
+ * Changed option names from CONFIG_ETRAX100_XYZ to CONFIG_ETRAX_XYZ.
+ *
  * Revision 1.6  2000/11/22 16:36:09  bjornw
  * Please marketing by using the correct case when spelling Etrax.
  *
@@ -176,7 +190,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.6 $";
+static char *serial_version = "$Revision: 1.10 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -252,12 +266,12 @@ static int serial_refcount;
 //#define SERIAL_HANDLE_EARLY_ERRORS
 
 
-#ifndef CONFIG_ETRAX100_SERIAL_RX_TIMEOUT_TICKS
+#ifndef CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS
 /* Default number of timer ticks before flushing rx fifo 
  * When using "little data, low latency applications: use 0
  * When using "much data applications (PPP)" use ~5
  */
-#define CONFIG_ETRAX100_SERIAL_RX_TIMEOUT_TICKS 5 
+#define CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS 5 
 #endif
 
 #define MAX_FLUSH_TIME 8
@@ -367,36 +381,36 @@ static const struct control_pins e100_modem_pins[NR_PORTS] =
 {
 /* Ser 0 */
   {
-#if defined(CONFIG_ETRAX100_SER0_DTR_RI_DSR_CD_ON_PB)
+#if defined(CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB)
     R_PORT_PB_DATA,  &port_pb_data_shadow,  &port_pb_dir_shadow,
-    CONFIG_ETRAX100_SER0_DTR_ON_PB_BIT,
-	  CONFIG_ETRAX100_SER0_RI_ON_PB_BIT, 
-	  CONFIG_ETRAX100_SER0_DSR_ON_PB_BIT, 
-	  CONFIG_ETRAX100_SER0_CD_ON_PB_BIT
+    CONFIG_ETRAX_SER0_DTR_ON_PB_BIT,
+    CONFIG_ETRAX_SER0_RI_ON_PB_BIT, 
+    CONFIG_ETRAX_SER0_DSR_ON_PB_BIT, 
+    CONFIG_ETRAX_SER0_CD_ON_PB_BIT
 #else
     &dummy_ser0, &dummy_ser0, &dummy_dir_ser0, 0, 1, 2, 3
 #endif   
   },
 /* Ser 1 */
   {
-#if defined(CONFIG_ETRAX100_SER1_DTR_RI_DSR_CD_ON_PB)
+#if defined(CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB)
     R_PORT_PB_DATA,  &port_pb_data_shadow,  &port_pb_dir_shadow,
-    CONFIG_ETRAX100_SER1_DTR_ON_PB_BIT,
-	  CONFIG_ETRAX100_SER1_RI_ON_PB_BIT, 
-	  CONFIG_ETRAX100_SER1_DSR_ON_PB_BIT, 
-	  CONFIG_ETRAX100_SER1_CD_ON_PB_BIT
+    CONFIG_ETRAX_SER1_DTR_ON_PB_BIT,
+    CONFIG_ETRAX_SER1_RI_ON_PB_BIT, 
+    CONFIG_ETRAX_SER1_DSR_ON_PB_BIT, 
+    CONFIG_ETRAX_SER1_CD_ON_PB_BIT
 #else
     &dummy_ser1, &dummy_ser1, &dummy_dir_ser1, 0, 1, 2, 3
 #endif   
   },  
 /* Ser 2 */
   {
-#if defined(CONFIG_ETRAX100_SER2_DTR_RI_DSR_CD_ON_PA)
+#if defined(CONFIG_ETRAX_SER2_DTR_RI_DSR_CD_ON_PA)
     R_PORT_PA_DATA,  &port_pa_data_shadow,  &port_pa_dir_shadow,
-    CONFIG_ETRAX100_SER2_DTR_ON_PA_BIT,
-	  CONFIG_ETRAX100_SER2_RI_ON_PA_BIT, 
-	  CONFIG_ETRAX100_SER2_DSR_ON_PA_BIT, 
-	  CONFIG_ETRAX100_SER2_CD_ON_PA_BIT
+    CONFIG_ETRAX_SER2_DTR_ON_PA_BIT,
+    CONFIG_ETRAX_SER2_RI_ON_PA_BIT, 
+    CONFIG_ETRAX_SER2_DSR_ON_PA_BIT, 
+    CONFIG_ETRAX_SER2_CD_ON_PA_BIT
 #else
     &dummy_ser2, &dummy_ser2, &dummy_dir_ser2, 0, 1, 2, 3
 #endif   
@@ -459,7 +473,7 @@ static DECLARE_MUTEX(tmp_buf_sem);
 static struct semaphore tmp_buf_sem = MUTEX;
 #endif
 
-#ifdef CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST
+#ifdef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
 #define TIMER1_IRQ_NBR 3
 
 /* clock select 10 for timer 1 gives 230400 Hz */
@@ -494,7 +508,7 @@ static void _INLINE_ start_flush_timer(void)
 	*R_IRQ_MASK0_SET = IO_STATE(R_IRQ_MASK0_SET, timer1, set);
 	fast_timer_started = 1;
 }
-#endif /* CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST */
+#endif /* CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST */
 
 /*
  * This function maps from the Bxxxx defines in asm/termbits.h into real
@@ -1267,12 +1281,12 @@ rec_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 /* dma fifo/buffer timeout handler
    forces an end-of-packet for the dma input channel if no chars 
-   have been received for CONFIG_ETRAX100_RX_TIMEOUT_TICKS/100 s.
-   If CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST is configured then this
+   have been received for CONFIG_ETRAX_RX_TIMEOUT_TICKS/100 s.
+   If CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST is configured then this
    handler is instead run at 15360 Hz.
 */
 
-#ifndef CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST
+#ifndef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
 static int timeout_divider = 0;
 #endif
 
@@ -1467,7 +1481,7 @@ startup(struct e100_serial * info)
 		info->xmit.buf = (unsigned char *) page;
 		
 #ifdef SERIAL_DEBUG_OPEN
-	printk("starting up ttyS%d (xmit_buf 0x%x)...\n", info->line, info->xmit_buf);
+	printk("starting up ttyS%d (xmit_buf 0x%x)...\n", info->line, info->xmit.buf);
 #endif
 
 	if(info->tty) {
@@ -2688,12 +2702,15 @@ rs_open(struct tty_struct *tty, struct file * filp)
 		return -ENODEV;
 
 	/* dont allow opening ports that are not enabled in the HW config */
-
-#ifndef CONFIG_ETRAX100_SERIAL_PORT2
+#ifndef CONFIG_ETRAX_SERIAL_PORT1
+	if (line == 1)
+		return -ENODEV;
+#endif
+#ifndef CONFIG_ETRAX_SERIAL_PORT2
 	if (line == 2)
 		return -ENODEV;
 #endif
-#ifndef CONFIG_ETRAX100_SERIAL_PORT3
+#ifndef CONFIG_ETRAX_SERIAL_PORT3
 	if (line == 3)
 		return -ENODEV;
 #endif
@@ -2955,7 +2972,7 @@ rs_init(void)
 	for (i = 0, info = rs_table; i < NR_PORTS; i++,info++) {
 		info->line = i;
 		info->tty = 0;
-		info->type = PORT_ETRAX100;
+		info->type = PORT_ETRAX;
 		info->tr_running = 0;
 		info->fifo_magic = 0;
 		info->fifo_didmagic = 0;
@@ -2990,25 +3007,27 @@ rs_init(void)
 	if(request_irq(8, ser_interrupt, SA_INTERRUPT, "serial ", NULL))
 		panic("irq8");
 #endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT1
 	if(request_irq(24, tr_interrupt, SA_INTERRUPT, "serial 1 dma tr", NULL))
 		panic("irq24");
 	if(request_irq(25, rec_interrupt, SA_INTERRUPT, "serial 1 dma rec", NULL))
 		panic("irq25");
-#ifdef CONFIG_ETRAX100_SERIAL_PORT2
+#endif
+#ifdef CONFIG_ETRAX_SERIAL_PORT2
 	/* DMA Shared with par0 (and SCSI0 and ATA) */
 	if(request_irq(18, tr_interrupt, SA_SHIRQ, "serial 2 dma tr", NULL))
 		panic("irq18");
 	if(request_irq(19, rec_interrupt, SA_SHIRQ, "serial 2 dma rec", NULL))
 		panic("irq19");
 #endif
-#ifdef CONFIG_ETRAX100_SERIAL_PORT3
+#ifdef CONFIG_ETRAX_SERIAL_PORT3
 	/* DMA Shared with par1 (and SCSI1 and Extern DMA 0) */
 	if(request_irq(20, tr_interrupt, SA_SHIRQ, "serial 3 dma tr", NULL))
 		panic("irq20");
 	if(request_irq(21, rec_interrupt, SA_SHIRQ, "serial 3 dma rec", NULL))
 		panic("irq21");
 #endif
-#ifdef CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST
+#ifdef CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
 	/* TODO: a timeout_interrupt needs to be written that calls timeout_handler */
 	if(request_irq(TIMER1_IRQ_NBR, timeout_interrupt, SA_SHIRQ,
 		       "fast serial dma timeout", NULL)) {

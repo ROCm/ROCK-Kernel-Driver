@@ -4,8 +4,8 @@
  * Copyright (C) 1998, 1999, 2000 Axis Communications AB
  */
 
-#ifndef _ETRAX100_SERIAL_H
-#define _ETRAX100_SERIAL_H
+#ifndef _ETRAX_SERIAL_H
+#define _ETRAX_SERIAL_H
 
 #include <linux/config.h>
 #include <linux/circ_buf.h>
@@ -64,7 +64,7 @@ struct e100_serial {
 	unsigned long		event;
 	unsigned long		last_active;
 	int			line;
-	int                     type;  /* PORT_ETRAX100 */
+	int                     type;  /* PORT_ETRAX */
 	int			count;	    /* # of fd on device */
 	int			blocked_open; /* # of blocked opens */
 	long			session; /* Session of opening process */
@@ -93,7 +93,7 @@ struct e100_serial {
  * system.
  */
 
-#define PORT_ETRAX100 1
+#define PORT_ETRAX 1
 
 /*
  * Events are used to schedule things to happen at timer-interrupt
@@ -103,4 +103,4 @@ struct e100_serial {
 
 #endif /* __KERNEL__ */
 
-#endif /* !(_ETRAX100_SERIAL_H) */
+#endif /* !(_ETRAX_SERIAL_H) */

@@ -34,6 +34,15 @@
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/pci/pcibr_private.h>
+#include <asm/sn/intr.h>
+
+
+#if defined (CONFIG_SGI_IP35)
+
+#include <asm/sn/pci/pciio.h>		/* For SN1 + pcibr Addressing Limitation */
+#include <asm/sn/pci/pcibr.h>		/* For SN1 + pcibr Addressing Limitation */
+#include <asm/sn/pci/pcibr_private.h>	/* For SN1 + pcibr Addressing Limitation */
+#endif /* SN1 */
 
 #if DEBUG_INTR_TSTAMP_DEBUG
 #include <sys/debug.h>
@@ -64,6 +73,8 @@ extern synergy_da_t	*Synergy_da_indr[];
 extern cpuid_t         master_procid;
 
 extern cnodeid_t master_node_get(devfs_handle_t vhdl);
+
+extern snia_error_intr_handler(int irq, void *devid, struct pt_regs *pt_regs);
 
 
 #define INTR_LOCK(vecblk) \
@@ -99,7 +110,7 @@ int ms1bit(unsigned long x)
 void
 intr_stray(void *lvl)
 {
-    printk("Stray Interrupt - level %ld to cpu %d", (long)lvl, cpuid());
+    PRINT_WARNING("Stray Interrupt - level %ld to cpu %d", (long)lvl, cpuid());
 }
 
 #if defined(DEBUG)
@@ -119,7 +130,7 @@ typedef struct {
 
 intr_dev_targ_map_t 	intr_dev_targ_map[MAX_DEVICES];
 uint64_t		intr_dev_targ_map_size;
-lock_t			intr_dev_targ_map_lock;
+spinlock_t		intr_dev_targ_map_lock;
 
 /* Print out the device - target cpu mapping.
  * This routine is used only in the idbg command
@@ -220,7 +231,7 @@ intr_init_vecblk(nodepda_t *npda, cnodeid_t node, int sn)
 
 	    }
 
-	spinlock_init(&vecblk->vector_lock, "ivecb");
+	mutex_spinlock_init(&vecblk->vector_lock);
 
 	vecblk->vector_count = 0;    
 	for (i = 0; i < CPUS_PER_SUBNODE; i++)
@@ -254,7 +265,7 @@ do_intr_reserve_level(cpuid_t cpu, int bit, int resflags, int reserve,
 {
     intr_vecblk_t	*vecblk;
     hub_intmasks_t 	*hub_intmasks;
-    int s;
+    unsigned long s;
     int rv = 0;
     int ip;
     synergy_da_t	*sda;
@@ -283,8 +294,7 @@ do_intr_reserve_level(cpuid_t cpu, int bit, int resflags, int reserve,
     INTR_LOCK(vecblk);
 
     if (bit <= -1) {
-	// bit = 0;
-	bit = 7;  /* First available on SNIA */
+	bit = 0;
 	ASSERT(reserve == II_RESERVE);
 	/* Choose any available level */
 	for (; bit < N_INTPEND_BITS; bit++) {
@@ -449,9 +459,9 @@ intr_connect_level(cpuid_t cpu, int bit, ilvl_t intr_swlevel,
 {
     intr_vecblk_t	*vecblk;
     hubreg_t		*intpend_masks;
-    int s;
     int rv = 0;
     int ip;
+    unsigned long s;
 
     ASSERT(bit < N_INTPEND_BITS * 2);
 
@@ -530,7 +540,7 @@ intr_disconnect_level(cpuid_t cpu, int bit)
 {
     intr_vecblk_t	*vecblk;
     hubreg_t		*intpend_masks;
-    int s;
+    unsigned long s;
     int rv = 0;
     int ip;
 
@@ -582,8 +592,8 @@ void
 do_intr_block_bit(cpuid_t cpu, int bit, int block)
 {
 	intr_vecblk_t *vecblk;
-	int s;
 	int ip;
+	unsigned long s;
 	hubreg_t *intpend_masks;
 	volatile hubreg_t mask_value;
 	volatile hubreg_t *mask_reg;
@@ -671,7 +681,6 @@ do_intr_cpu_choose(cnodeid_t cnode, int which_subnode)
 		int local_cpu_num;
 
 		cpu = cnode_slice_to_cpuid(cnode, slice);
-		cpu = cpu_logical_id(cpu);
 		if (cpu == CPU_NONE)
 			continue;
 
@@ -711,7 +720,7 @@ intr_cpu_choose_from_node(cnodeid_t cnode, int which_subnode)
 }
 
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 /*
  * Convert a subnode vertex into a (cnodeid, which_subnode) pair.
  * Return 0 on success, non-zero on failure.
@@ -736,7 +745,7 @@ subnodevertex_to_subnode(devfs_handle_t vhdl, cnodeid_t *cnodeidp, int *which_su
 	return(0); /* success */
 }
 
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 /* Make it easy to identify subnode vertices in the hwgraph */
 void
@@ -755,13 +764,14 @@ mark_subnodevertex_as_subnode(devfs_handle_t vhdl, int which_subnode)
 }
 
 
-#ifndef CONFIG_IA64_SGI_IO
 /*
  * Given a device descriptor, extract interrupt target information and
  * choose an appropriate CPU.  Return CPU_NONE if we can't make sense
  * out of the target information.
  * TBD: Should this be considered platform-independent code?
  */
+
+#ifdef	LATER
 static cpuid_t
 intr_target_from_desc(device_desc_t dev_desc, int favor_subnode)
 {
@@ -799,10 +809,10 @@ intr_target_from_desc(device_desc_t dev_desc, int favor_subnode)
 cpuchosen:
 	return(cpuid);
 }
-#endif /* CONFIG_IA64_SGI_IO */
+#endif	/* LATER */
 
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 /*
  * Check if we had already visited this candidate cnode
  */
@@ -824,7 +834,7 @@ intr_cnode_seen(cnodeid_t 	candidate,
 	return(visited_cnodes);
 }
 
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 
 
@@ -915,7 +925,7 @@ intr_heuristic(devfs_handle_t 		dev,
 {
 	cpuid_t		cpuid;				/* possible intr targ*/
 	cnodeid_t 	candidate;			/* possible canidate */
-#ifndef BRINGUP
+#ifdef LATER
 	cnodeid_t	visited_cnodes[MAX_NASIDS], 	/* nodes seen so far */
 		        center,				/* node we are on */
 		        candidate;			/* possible canidate */
@@ -926,10 +936,10 @@ intr_heuristic(devfs_handle_t 		dev,
 							 */
 		        maxradius = physmem_maxradius();
 	void		*rv;
-#endif /* BRINGUP */
+#endif /* LATER */
 	int		which_subnode = SUBNODE_ANY;
 
-#if CONFIG_IA64_SGI_IO /* SN1 + pcibr Addressing Limitation */
+/* SN1 + pcibr Addressing Limitation */
 	{
 	devfs_handle_t pconn_vhdl;
 	pcibr_soft_t pcibr_soft;
@@ -962,9 +972,8 @@ intr_heuristic(devfs_handle_t 		dev,
 		}
 	}
 	}
-#endif /* CONFIG_IA64_SGI_IO */
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	/* 
 	 * If an interrupt target was specified for this
 	 * interrupt allocation, try to use it.
@@ -998,7 +1007,7 @@ intr_heuristic(devfs_handle_t 		dev,
 		 */
 
 	}
-#endif  /* CONFIG_IA64_SGI_IO */
+#endif  /* LATER */
 	
 	/* Check if we can find a valid interrupt target candidate on
 	 * the master node for the device.
@@ -1019,7 +1028,7 @@ intr_heuristic(devfs_handle_t 		dev,
 			intr_unreserve_level(cpuid, *resp_bit);
 	}
 
-	printk("Cannot target interrupts to closest node(%d): %ld (0x%lx)\n",
+	PRINT_WARNING("Cannot target interrupts to closest node(%d): %ld (0x%lx)\n",
 		master_node_get(dev),(long) owner_dev, (unsigned long)owner_dev);
 
 	/* Fall through into the default algorithm
@@ -1076,10 +1085,11 @@ intr_heuristic(devfs_handle_t 		dev,
 #else  /* BRINGUP */
 	{
 	// Do a stupid round-robin assignment of the node.
-		static cnodeid_t last_node = 0;
+		static cnodeid_t last_node = -1;
 
-		if (last_node > numnodes) last_node = 0;
-		for (candidate = last_node; candidate <= numnodes; candidate++) {
+		if (last_node >= numnodes) last_node = 0;
+		for (candidate = last_node + 1; candidate != last_node; candidate++) {
+			if (candidate == numnodes) candidate = 0;
 			cpuid = intr_bit_reserve_test(CPU_NONE,
 					      which_subnode,
 					      candidate,
@@ -1091,18 +1101,18 @@ intr_heuristic(devfs_handle_t 		dev,
 
 			if (cpuid != CPU_NONE) {
 				if (cpu_on_subnode(cpuid, which_subnode)) {
-					last_node++;
+					last_node = candidate;
 					return(cpuid);	/* got a valid interrupt target */
 				}
 				else
 					intr_unreserve_level(cpuid, *resp_bit);
 			}
-			last_node++;
 		}
+		last_node = candidate;
 	}
 #endif
 
-	printk("Cannot target interrupts to any close node: %ld (0x%lx)\n",
+	PRINT_WARNING("Cannot target interrupts to any close node: %ld (0x%lx)\n",
 		(long)owner_dev, (unsigned long)owner_dev);
 
 	/* In the worst case try to allocate interrupt bits on the
@@ -1127,7 +1137,7 @@ intr_heuristic(devfs_handle_t 		dev,
 			intr_unreserve_level(cpuid, *resp_bit);
 	}
 
-	printk("Cannot target interrupts: %ld (0x%lx)\n",
+	PRINT_WARNING("Cannot target interrupts: %ld (0x%lx)\n",
 		(long)owner_dev, (unsigned long)owner_dev);
 
 	return(CPU_NONE);	/* Should never get here */
@@ -1515,6 +1525,7 @@ debug_stop_all_cpus(void *stoplist)
 	}
 }
 
+#endif /* BRINGUP */
 
 struct hardwired_intr_s {
 	signed char level;
@@ -1525,17 +1536,9 @@ struct hardwired_intr_s {
 	{ INT_PEND0_BASELVL + GFX_INTR_A,	0, 	"Gfx A" },
 	{ INT_PEND0_BASELVL + GFX_INTR_B,	0, 	"Gfx B" },
 	{ INT_PEND0_BASELVL + PG_MIG_INTR,	II_THREADED, "Migration" },
-#if defined(SN1) && !defined(DIRECT_L1_CONSOLE)
 	{ INT_PEND0_BASELVL + UART_INTR,	II_THREADED, "Bedrock/L1" },
-#else
-	{ INT_PEND0_BASELVL + UART_INTR,	0,	"Hub I2C" },
-#endif
 	{ INT_PEND0_BASELVL + CC_PEND_A,	0,	"Crosscall A" },
 	{ INT_PEND0_BASELVL + CC_PEND_B,	0,	"Crosscall B" },
-	{ INT_PEND0_BASELVL + MSC_MESG_INTR,	II_THREADED, "MSC Message" },
-	{ INT_PEND0_BASELVL + CPU_ACTION_A,	0,	"CPU Action A" },
-	{ INT_PEND0_BASELVL + CPU_ACTION_B,	0,	"CPU Action B" },
-	{ INT_PEND1_BASELVL + IO_ERROR_INTR,	II_ERRORINT, "IO Error" },
 	{ INT_PEND1_BASELVL + CLK_ERR_INTR,	II_ERRORINT, "Clock Error" },
 	{ INT_PEND1_BASELVL + COR_ERR_INTR_A,	II_ERRORINT, "Correctable Error A" },
 	{ INT_PEND1_BASELVL + COR_ERR_INTR_B,	II_ERRORINT, "Correctable Error B" },
@@ -1546,13 +1549,11 @@ struct hardwired_intr_s {
 	{ INT_PEND1_BASELVL + MSC_PANIC_INTR,	II_ERRORINT, "MSC Panic" },
 	{ INT_PEND1_BASELVL + LLP_PFAIL_INTR_A,	II_ERRORINT, "LLP Pfail WAR" },
 	{ INT_PEND1_BASELVL + LLP_PFAIL_INTR_B,	II_ERRORINT, "LLP Pfail WAR" },
-#ifdef SN1
 	{ INT_PEND1_BASELVL + NACK_INT_A,	0, "CPU A Nack count == NACK_CMP" },
 	{ INT_PEND1_BASELVL + NACK_INT_B,	0, "CPU B Nack count == NACK_CMP" },
 	{ INT_PEND1_BASELVL + LB_ERROR,		0, "Local Block Error" },
 	{ INT_PEND1_BASELVL + XB_ERROR,		0, "Local XBar Error" },
-#endif /* SN1 */	
-	{ -1, 0, (char *)NULL}
+	{ -1, 0, (char *)NULL},
 };
 
 /*
@@ -1567,7 +1568,13 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	int i;
 	char subnode_done[NUM_SUBNODES];
 
-	cpu = cnodetocpu(cnode);
+	// cpu = cnodetocpu(cnode);
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		if (cpuid_to_cnodeid(cpu) == cnode) {
+			break;
+		}
+	}
+	if (cpu == smp_num_cpus) cpu = CPU_NONE;
 	if (cpu == CPU_NONE) {
 		printk("Node %d has no CPUs", cnode);
 		return;
@@ -1576,7 +1583,7 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	for (i=0; i<NUM_SUBNODES; i++)
 		subnode_done[i] = 0;
 
-	for (; cpu<maxcpus && cpu_enabled(cpu) && cputocnode(cpu) == cnode; cpu++) {
+	for (; cpu<smp_num_cpus && cpu_enabled(cpu) && cpuid_to_cnodeid(cpu) == cnode; cpu++) {
 		int which_subnode = cpuid_to_subnode(cpu);
 		if (subnode_done[which_subnode])
 			continue;
@@ -1594,7 +1601,6 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	}
 }
 
-#endif /* BRINGUP */
 
 /*
  * Check and clear interrupts.
@@ -1612,7 +1618,7 @@ intr_clear_bits(nasid_t nasid, volatile hubreg_t *pend, int base_level,
 		for (i = 0; i < N_INTPEND_BITS; i++) {
 			if (bits & (1 << i)) {
 #ifdef INTRDEBUG
-				printk( "Nasid %d interrupt bit %d set in %s",
+				PRINT_WARNING("Nasid %d interrupt bit %d set in %s",
 					nasid, i, name);
 #endif
 				LOCAL_HUB_CLR_INTR(base_level + i);

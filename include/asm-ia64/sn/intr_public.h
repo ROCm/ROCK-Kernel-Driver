@@ -7,9 +7,10 @@
  * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Colin Ngam
  */
-#ifndef __SYS_SN_INTR_PUBLIC_H__
-#define __SYS_SN_INTR_PUBLIC_H__
+#ifndef _ASM_SN_INTR_PUBLIC_H__
+#define _ASM_SN_INTR_PUBLIC_H__
 
+#include <linux/config.h>
 
 /* REMEMBER: If you change these, the whole world needs to be recompiled.
  * It would also require changing the hubspl.s code and SN0/intr.c
@@ -22,7 +23,6 @@
 #define INTPEND0_MAXMASK	(N_INTPEND0_MASKS - 1)
 #define INTPEND1_MAXMASK	(N_INTPEND1_MASKS - 1)
 
-#include <linux/config.h>
 #if _LANGUAGE_C
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/arch.h>
@@ -56,5 +56,4 @@ typedef struct hub_intmasks_s {
 } hub_intmasks_t;
 
 #endif /* _LANGUAGE_C */
-#endif /* __SYS_SN_INTR_PUBLIC_H__ */
-
+#endif /* _ASM_SN_INTR_PUBLIC_H__ */

@@ -10,9 +10,9 @@
 #include <linux/atmdev.h>
 
 
-void reset_addr(struct atm_dev *dev);
-int add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
-int del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
-int get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size);
+void atm_reset_addr(struct atm_dev *dev);
+int atm_add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
+int atm_del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
+int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size);
 
 #endif

@@ -140,7 +140,7 @@ create_elf_tables(char *p, int argc, int envc,
 	 */
 	sp = (elf_addr_t *)((~15UL & (unsigned long)(u_platform)) - 16UL);
 	csp = sp;
-	csp -= ((exec ? DLINFO_ITEMS*2 : 4) + (k_platform ? 2 : 0));
+	csp -= DLINFO_ITEMS*2 + (k_platform ? 2 : 0);
 	csp -= envc+1;
 	csp -= argc+1;
 	csp -= (!ibcs ? 3 : 1);	/* argc itself */
@@ -160,25 +160,20 @@ create_elf_tables(char *p, int argc, int envc,
 		sp -= 2;
 		NEW_AUX_ENT(0, AT_PLATFORM, (elf_addr_t)(unsigned long) u_platform);
 	}
-	sp -= 3*2;
-	NEW_AUX_ENT(0, AT_HWCAP, hwcap);
-	NEW_AUX_ENT(1, AT_PAGESZ, ELF_EXEC_PAGESIZE);
-	NEW_AUX_ENT(2, AT_CLKTCK, CLOCKS_PER_SEC);
-
-	if (exec) {
-		sp -= 10*2;
-
-		NEW_AUX_ENT(0, AT_PHDR, load_addr + exec->e_phoff);
-		NEW_AUX_ENT(1, AT_PHENT, sizeof (struct elf_phdr));
-		NEW_AUX_ENT(2, AT_PHNUM, exec->e_phnum);
-		NEW_AUX_ENT(3, AT_BASE, interp_load_addr);
-		NEW_AUX_ENT(4, AT_FLAGS, 0);
-		NEW_AUX_ENT(5, AT_ENTRY, load_bias + exec->e_entry);
-		NEW_AUX_ENT(6, AT_UID, (elf_addr_t) current->uid);
-		NEW_AUX_ENT(7, AT_EUID, (elf_addr_t) current->euid);
-		NEW_AUX_ENT(8, AT_GID, (elf_addr_t) current->gid);
-		NEW_AUX_ENT(9, AT_EGID, (elf_addr_t) current->egid);
-	}
+	sp -= DLINFO_ITEMS*2;
+	NEW_AUX_ENT( 0, AT_HWCAP, hwcap);
+	NEW_AUX_ENT( 1, AT_PAGESZ, ELF_EXEC_PAGESIZE);
+	NEW_AUX_ENT( 2, AT_CLKTCK, CLOCKS_PER_SEC);
+	NEW_AUX_ENT( 3, AT_PHDR, load_addr + exec->e_phoff);
+	NEW_AUX_ENT( 4, AT_PHENT, sizeof (struct elf_phdr));
+	NEW_AUX_ENT( 5, AT_PHNUM, exec->e_phnum);
+	NEW_AUX_ENT( 6, AT_BASE, interp_load_addr);
+	NEW_AUX_ENT( 7, AT_FLAGS, 0);
+	NEW_AUX_ENT( 8, AT_ENTRY, load_bias + exec->e_entry);
+	NEW_AUX_ENT( 9, AT_UID, (elf_addr_t) current->uid);
+	NEW_AUX_ENT(10, AT_EUID, (elf_addr_t) current->euid);
+	NEW_AUX_ENT(11, AT_GID, (elf_addr_t) current->gid);
+	NEW_AUX_ENT(12, AT_EGID, (elf_addr_t) current->egid);
 #undef NEW_AUX_ENT
 
 	sp -= envc+1;
@@ -694,7 +689,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	  create_elf_tables((char *)bprm->p,
 			bprm->argc,
 			bprm->envc,
-			(interpreter_type == INTERPRETER_ELF ? &elf_ex : NULL),
+			&elf_ex,
 			load_addr, load_bias,
 			interp_load_addr,
 			(interpreter_type == INTERPRETER_AOUT ? 0 : 1));

@@ -175,6 +175,7 @@ static struct async *alloc_async(unsigned int numisoframes)
                 return NULL;
         memset(as, 0, assize);
         as->urb.number_of_packets = numisoframes;
+        spin_lock_init(&as->urb.lock);
         return as;
 }
 
@@ -250,10 +251,6 @@ static void async_completed(purb_t urb)
         struct dev_state *ps = as->ps;
 	struct siginfo sinfo;
 
-#if 1
-	printk(KERN_DEBUG "usbdevfs: async_completed: status %d errcount %d actlen %d pipe 0x%x\n", 
-	       urb->status, urb->error_count, urb->actual_length, urb->pipe);
-#endif
         spin_lock(&ps->lock);
         list_del(&as->asynclist);
         list_add_tail(&as->asynclist, &ps->async_completed);

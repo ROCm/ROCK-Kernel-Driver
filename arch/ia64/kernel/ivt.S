@@ -1,9 +1,9 @@
 /*
  * arch/ia64/kernel/ivt.S
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
  * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 1998-2000 David Mosberger <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 David Mosberger <davidm@hpl.hp.com>
  *
  * 00/08/23 Asit Mallick <asit.k.mallick@intel.com> TLB handling for SMP
  * 00/12/20 David Mosberger-Tang <davidm@hpl.hp.com> DTLB/ITLB handler now uses virtual PT.
@@ -14,7 +14,7 @@
  *
  * External interrupts only use 1 entry. All others are internal interrupts
  *
- * The first 20 entries of the table contain 64 bundles each while the 
+ * The first 20 entries of the table contain 64 bundles each while the
  * remaining 48 entries contain only 16 bundles each.
  *
  * The 64 bundles are used to allow inlining the whole handler for critical
@@ -22,7 +22,7 @@
  *
  *  For each entry, the comment is as follows:
  *
- * 		// 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
+ *		// 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
  *  entry offset ----/     /         /                  /          /
  *  entry number ---------/         /                  /          /
  *  size of the entry -------------/                  /          /
@@ -37,13 +37,31 @@
 
 #include <linux/config.h>
 
+#include <asm/asmmacro.h>
 #include <asm/break.h>
+#include <asm/kregs.h>
 #include <asm/offsets.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+
+#if 1
+# define PSR_DEFAULT_BITS	psr.ac
+#else
+# define PSR_DEFAULT_BITS	0
+#endif
+
+#if 0
+  /*
+   * This lets you track the last eight faults that occurred on the CPU.  Make sure ar.k2 isn't
+   * needed for something else before enabling this...
+   */
+# define DBG_FAULT(i)	mov r16=ar.k2;;	shl r16=r16,8;;	add r16=(i),r16;;mov ar.k2=r16
+#else
+# define DBG_FAULT(i)
+#endif
 
 #define MINSTATE_VIRT	/* needed by minstate.h */
 #include "minstate.h"
@@ -57,8 +75,8 @@
  * As we don't (hopefully) use the space available, we need to fill it with
  * nops. the parameter may be used for debugging and is representing the entry
  * number
- */ 
-#define BREAK_BUNDLE(a) 	break.m (a); \
+ */
+#define BREAK_BUNDLE(a)	break.m (a); \
 				break.i (a); \
 				break.i (a)
 /*
@@ -71,17 +89,15 @@
  */
 #define BREAK_BUNDLE8(a); BREAK_BUNDLE4(a); BREAK_BUNDLE4(a)
 
-	.psr abi64
-	.psr lsb
-	.lsb
-
-	.section __ivt_section,"ax"
+	.section .text.ivt,"ax"
 
 	.align 32768	// align on 32KB boundary
 	.global ia64_ivt
 ia64_ivt:
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0000 Entry 0 (size 64 bundles) VHPT Translation (8,20,47)
+ENTRY(vhpt_miss)
+	DBG_FAULT(0)
 	/*
 	 * The VHPT vector is invoked when the TLB entry for the virtual page table
 	 * is missing.  This happens only as a result of a previous
@@ -103,7 +119,7 @@ ia64_ivt:
 	;;
 	rsm psr.dt				// use physical addressing for data
 	mov r31=pr				// save the predicate registers
-	mov r19=ar.k7				// get page table base address
+	mov r19=IA64_KR(PT_BASE)		// get page table base address
 	shl r21=r16,3				// shift bit 60 into sign bit
 	shr.u r17=r16,61			// get the region number into r17
 	;;
@@ -146,19 +162,21 @@ ia64_ivt:
 (p6)	br.spnt.many page_fault			// handle bad address/page not present (page fault)
 	mov cr.ifa=r22
 
-	// Now compute and insert the TLB entry for the virtual page table.
-	// We never execute in a page table page so there is no need to set
-	// the exception deferral bit.
+	/*
+	 * Now compute and insert the TLB entry for the virtual page table.  We never
+	 * execute in a page table page so there is no need to set the exception deferral
+	 * bit.
+	 */
 	adds r24=__DIRTY_BITS_NO_ED|_PAGE_PL_0|_PAGE_AR_RW,r23
 	;;
 (p7)	itc.d r24
 	;;
 #ifdef CONFIG_SMP
-	//
-	// Re-check L2 and L3 pagetable.  If they changed, we may have received
-	// a ptc.g between reading the pagetable and the "itc".  If so,
-	// flush the entry we inserted and retry.
-	//
+	/*
+	 * Re-check L2 and L3 pagetable.  If they changed, we may have received a ptc.g
+	 * between reading the pagetable and the "itc".  If so, flush the entry we
+	 * inserted and retry.
+	 */
 	ld8 r25=[r21]				// read L3 PTE again
 	ld8 r26=[r17]				// read L2 entry again
 	;;
@@ -173,26 +191,29 @@ ia64_ivt:
 
 	mov pr=r31,-1				// restore predicate registers
 	rfi
-	;;
+END(vhpt_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0400 Entry 1 (size 64 bundles) ITLB (21)
+ENTRY(itlb_miss)
+	DBG_FAULT(1)
 	/*
 	 * The ITLB handler accesses the L3 PTE via the virtually mapped linear
 	 * page table.  If a nested TLB miss occurs, we switch into physical
 	 * mode, walk the page table, and then re-execute the L3 PTE read
 	 * and go on normally after that.
 	 */
-itlb_fault:
 	mov r16=cr.ifa				// get virtual address
 	mov r29=b0				// save b0
 	mov r31=pr				// save predicates
+itlb_fault:
 	mov r17=cr.iha				// get virtual address of L3 PTE
 	movl r30=1f				// load nested fault continuation point
 	;;
 1:	ld8 r18=[r17]				// read L3 PTE
 	;;
+	mov b0=r29
 	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
 (p6)	br.cond.spnt.many page_fault
 	;;
@@ -208,26 +229,29 @@ itlb_fault:
 #endif
 	mov pr=r31,-1
 	rfi
-	;;
+END(itlb_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0800 Entry 2 (size 64 bundles) DTLB (9,48)
+ENTRY(dtlb_miss)
+	DBG_FAULT(2)
 	/*
 	 * The DTLB handler accesses the L3 PTE via the virtually mapped linear
 	 * page table.  If a nested TLB miss occurs, we switch into physical
 	 * mode, walk the page table, and then re-execute the L3 PTE read
 	 * and go on normally after that.
 	 */
-dtlb_fault:
 	mov r16=cr.ifa				// get virtual address
 	mov r29=b0				// save b0
 	mov r31=pr				// save predicates
+dtlb_fault:
 	mov r17=cr.iha				// get virtual address of L3 PTE
 	movl r30=1f				// load nested fault continuation point
 	;;
 1:	ld8 r18=[r17]				// read L3 PTE
 	;;
+	mov b0=r29
 	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
 (p6)	br.cond.spnt.many page_fault
 	;;
@@ -243,24 +267,27 @@ dtlb_fault:
 #endif
 	mov pr=r31,-1
 	rfi
-	;;
+END(dtlb_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0c00 Entry 3 (size 64 bundles) Alt ITLB (19)
+ENTRY(alt_itlb_miss)
+	DBG_FAULT(3)
 	mov r16=cr.ifa		// get address that caused the TLB miss
-	movl r17=__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RWX
+	movl r17=PAGE_KERNEL
 	mov r21=cr.ipsr
 	mov r31=pr
 	;;
 #ifdef CONFIG_DISABLE_VHPT
 	shr.u r22=r16,61			// get the region number into r21
 	;;
-	cmp.gt p8,p0=6,r22			// user mode 
+	cmp.gt p8,p0=6,r22			// user mode
 	;;
 (p8)	thash r17=r16
 	;;
 (p8)	mov cr.iha=r17
+(p8)	mov r29=b0				// save b0
 (p8)	br.cond.dptk.many itlb_fault
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
@@ -277,13 +304,15 @@ dtlb_fault:
 	itc.i r19		// insert the TLB entry
 	mov pr=r31,-1
 	rfi
-	;;
+END(alt_itlb_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
+ENTRY(alt_dtlb_miss)
+	DBG_FAULT(4)
 	mov r16=cr.ifa		// get address that caused the TLB miss
-	movl r17=__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RWX
+	movl r17=PAGE_KERNEL
 	mov r20=cr.isr
 	mov r21=cr.ipsr
 	mov r31=pr
@@ -296,6 +325,7 @@ dtlb_fault:
 (p8)	thash r17=r16
 	;;
 (p8)	mov cr.iha=r17
+(p8)	mov r29=b0				// save b0
 (p8)	br.cond.dptk.many dtlb_fault
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
@@ -316,70 +346,63 @@ dtlb_fault:
 (p7)	itc.d r19		// insert the TLB entry
 	mov pr=r31,-1
 	rfi
-	;;
+END(alt_dtlb_miss)
 
 	//-----------------------------------------------------------------------------------
 	// call do_page_fault (predicates are in r31, psr.dt may be off, r16 is faulting address)
-page_fault:
+ENTRY(page_fault)
 	ssm psr.dt
 	;;
 	srlz.i
 	;;
 	SAVE_MIN_WITH_COVER
-	//
-	// Copy control registers to temporary registers, then turn on psr bits,
-	// then copy the temporary regs to the output regs.  We have to do this
-	// because the "alloc" can cause a mandatory store which could lead to
-	// an "Alt DTLB" fault which we can handle only if psr.ic is on.
-	//
-	mov r8=cr.ifa
-	mov r9=cr.isr
+	alloc r15=ar.pfs,0,0,3,0
+	mov out0=cr.ifa
+	mov out1=cr.isr
 	adds r3=8,r2				// set up second base pointer
 	;;
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interrupt collection is enabled
 	;;
 (p15)	ssm psr.i				// restore psr.i
 	movl r14=ia64_leave_kernel
 	;;
-	alloc r15=ar.pfs,0,0,3,0		// must be first in insn group
-	mov out0=r8
-	mov out1=r9
-	;;
 	SAVE_REST
 	mov rp=r14
 	;;
 	adds out2=16,r12			// out2 = pointer to pt_regs
 	br.call.sptk.many b6=ia64_do_page_fault	// ignore return address
-	;;
+END(page_fault)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
-	//
-	// In the absence of kernel bugs, we get here when the virtually mapped linear page
-	// table is accessed non-speculatively (e.g.,  in the Dirty-bit, Instruction
-	// Access-bit, or Data Access-bit faults).  If the DTLB entry for the virtual page
-	// table is missing, a nested TLB miss fault is triggered and control is transferred
-	// to this point.  When this happens, we lookup the pte for the faulting address
-	// by walking the page table in physical mode and return to the continuation point
-	// passed in register r30 (or call page_fault if the address is not mapped).
-	//
-	// Input:	r16:	faulting address
-	//		r29:	saved b0
-	//		r30:	continuation address
-	//		r31:	saved pr
-	//
-	// Output:	r17:	physical address of L3 PTE of faulting address
-	//		r29:	saved b0
-	//		r30:	continuation address
-	//		r31:	saved pr
-	//
-	// Clobbered:	b0, r18, r19, r21, psr.dt (cleared)
-	//
+ENTRY(nested_dtlb_miss)
+	/*
+	 * In the absence of kernel bugs, we get here when the virtually mapped linear
+	 * page table is accessed non-speculatively (e.g., in the Dirty-bit, Instruction
+	 * Access-bit, or Data Access-bit faults).  If the DTLB entry for the virtual page
+	 * table is missing, a nested TLB miss fault is triggered and control is
+	 * transferred to this point.  When this happens, we lookup the pte for the
+	 * faulting address by walking the page table in physical mode and return to the
+	 * continuation point passed in register r30 (or call page_fault if the address is
+	 * not mapped).
+	 *
+	 * Input:	r16:	faulting address
+	 *		r29:	saved b0
+	 *		r30:	continuation address
+	 *		r31:	saved pr
+	 *
+	 * Output:	r17:	physical address of L3 PTE of faulting address
+	 *		r29:	saved b0
+	 *		r30:	continuation address
+	 *		r31:	saved pr
+	 *
+	 * Clobbered:	b0, r18, r19, r21, psr.dt (cleared)
+	 */
 	rsm psr.dt				// switch to using physical data addressing
-	mov r19=ar.k7				// get the page table base address
+	mov r19=IA64_KR(PT_BASE)		// get the page table base address
 	shl r21=r16,3				// shift bit 60 into sign bit
 	;;
 	shr.u r17=r16,61			// get the region number into r17
@@ -399,7 +422,6 @@ page_fault:
 	shr.u r18=r16,PMD_SHIFT			// shift L2 index into position
 	;;
 	ld8 r17=[r17]				// fetch the L1 entry (may be 0)
-	mov b0=r30
 	;;
 (p7)	cmp.eq p6,p7=r17,r0			// was L1 entry NULL?
 	dep r17=r18,r17,3,(PAGE_SHIFT-3)	// compute address of L2 page table entry
@@ -409,34 +431,41 @@ page_fault:
 	;;
 (p7)	cmp.eq.or.andcm p6,p7=r17,r0		// was L2 entry NULL?
 	dep r17=r19,r17,3,(PAGE_SHIFT-3)	// compute address of L3 page table entry
-	;;
 (p6)	br.cond.spnt.many page_fault
+	mov b0=r30
 	br.sptk.many b0				// return to continuation point
-	;;
+END(nested_dtlb_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1800 Entry 6 (size 64 bundles) Instruction Key Miss (24)
+ENTRY(ikey_miss)
+	DBG_FAULT(6)
 	FAULT(6)
+END(ikey_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
+ENTRY(dkey_miss)
+	DBG_FAULT(7)
 	FAULT(7)
+END(dkey_miss)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
-	//
-	// What we do here is to simply turn on the dirty bit in the PTE.  We need
-	// to update both the page-table and the TLB entry.  To efficiently access
-	// the PTE, we address it through the virtual page table.  Most likely, the
-	// TLB entry for the relevant virtual page table page is still present in
-	// the TLB so we can normally do this without additional TLB misses.
-	// In case the necessary virtual page table TLB entry isn't present, we take
-	// a nested TLB miss hit where we look up the physical address of the L3 PTE
-	// and then continue at label 1 below.
-	//
+ENTRY(dirty_bit)
+	DBG_FAULT(8)
+	/*
+	 * What we do here is to simply turn on the dirty bit in the PTE.  We need to
+	 * update both the page-table and the TLB entry.  To efficiently access the PTE,
+	 * we address it through the virtual page table.  Most likely, the TLB entry for
+	 * the relevant virtual page table page is still present in the TLB so we can
+	 * normally do this without additional TLB misses.  In case the necessary virtual
+	 * page table TLB entry isn't present, we take a nested TLB miss hit where we look
+	 * up the physical address of the L3 PTE and then continue at label 1 below.
+	 */
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
 	;;
@@ -477,11 +506,13 @@ page_fault:
 #endif
 	mov pr=r31,-1				// restore pr
 	rfi
-	;;
+END(idirty_bit)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
+ENTRY(iaccess_bit)
+	DBG_FAULT(9)
 	// Like Entry 8, except for instruction access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -504,14 +535,14 @@ page_fault:
 	mov r28=ar.ccv				// save ar.ccv
 	;;
 1:	ld8 r18=[r17]
+	;;
 # if defined(CONFIG_IA32_SUPPORT) && \
     (defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_B0_SPECIFIC))
-	//
-	// Erratum 85 (Access bit fault could be reported before page not present fault)
-	//   If the PTE is indicates the page is not present, then just turn this into a
-	//   page fault.
-	//
-	;;
+	/*
+	 * Erratum 85 (Access bit fault could be reported before page not present fault)
+	 *   If the PTE is indicates the page is not present, then just turn this into a
+	 *   page fault.
+	 */
 	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
 (p6)	br.sptk page_fault			// page wasn't present
 # endif
@@ -538,11 +569,11 @@ page_fault:
 	;;
 # if defined(CONFIG_IA32_SUPPORT) && \
     (defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_B0_SPECIFIC))
-	//
-	// Erratum 85 (Access bit fault could be reported before page not present fault)
-	//   If the PTE is indicates the page is not present, then just turn this into a
-	//   page fault.
-	//
+	/*
+	 * Erratum 85 (Access bit fault could be reported before page not present fault)
+	 *   If the PTE is indicates the page is not present, then just turn this into a
+	 *   page fault.
+	 */
 	tbit.z p6,p0=r18,_PAGE_P_BIT		// page present bit cleared?
 (p6)	br.sptk page_fault			// page wasn't present
 # endif
@@ -554,11 +585,13 @@ page_fault:
 #endif /* !CONFIG_SMP */
 	mov pr=r31,-1
 	rfi
-	;;
+END(iaccess_bit)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
+ENTRY(daccess_bit)
+	DBG_FAULT(10)
 	// Like Entry 8, except for data access
 	mov r16=cr.ifa				// get the address that caused the fault
 	movl r30=1f				// load continuation point in case of nested fault
@@ -599,11 +632,13 @@ page_fault:
 	mov b0=r29				// restore b0
 	mov pr=r31,-1
 	rfi
-	;;
+END(daccess_bit)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
+ENTRY(break_fault)
+	DBG_FAULT(11)
 	mov r16=cr.iim
 	mov r17=__IA64_BREAK_SYSCALL
 	mov r31=pr		// prepare to save predicates
@@ -613,8 +648,7 @@ page_fault:
 
 	SAVE_MIN				// uses r31; defines r2:
 
-	// turn interrupt collection back on:
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interrupt collection is enabled
 	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
@@ -667,12 +701,12 @@ page_fault:
 	;;
 	st8 [r16]=r18				// store new value for cr.isr
 
-(p8)	br.call.sptk.many b6=b6			// ignore this return addr 
+(p8)	br.call.sptk.many b6=b6			// ignore this return addr
 	br.call.sptk.many rp=ia64_trace_syscall	// rp will be overwritten (ignored)
 	// NOT REACHED
+END(break_fault)
 
-	.proc demine_args
-demine_args:
+ENTRY(demine_args)
 	alloc r2=ar.pfs,8,0,0,0
 	tnat.nz p8,p0=in0
 	tnat.nz p9,p0=in1
@@ -696,16 +730,18 @@ demine_args:
 (p14)	mov in6=-1
 (p15)	mov in7=-1
 	br.ret.sptk.many rp
-	.endp demine_args
+END(demine_args)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3000 Entry 12 (size 64 bundles) External Interrupt (4)
+ENTRY(interrupt)
+	DBG_FAULT(12)
 	mov r31=pr		// prepare to save predicates
 	;;
 
 	SAVE_MIN_WITH_COVER	// uses r31; defines r2 and r3
-	ssm psr.ic		// turn interrupt collection
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	adds r3=8,r2		// set up second base pointer for SAVE_REST
 	srlz.i			// ensure everybody knows psr.ic is back on
@@ -721,41 +757,38 @@ demine_args:
 	;;
 	mov rp=r14
 	br.call.sptk.many b6=ia64_handle_irq
-	;;
+END(interrupt)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3400 Entry 13 (size 64 bundles) Reserved
+	DBG_FAULT(13)
 	FAULT(13)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3800 Entry 14 (size 64 bundles) Reserved
+	DBG_FAULT(14)
 	FAULT(14)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3c00 Entry 15 (size 64 bundles) Reserved
+	DBG_FAULT(15)
 	FAULT(15)
 
-//
-//  Squatting in this space ...
-//
-//  This special case dispatcher for illegal operation faults
-//  allows preserved registers to be modified through a 
-//  callback function (asm only) that is handed back from
-//  the fault handler in r8. Up to three arguments can be
-//  passed to the callback function by returning an aggregate
-//  with the callback as its first element, followed by the
-//  arguments.
-//
-dispatch_illegal_op_fault:
+	/*
+	 * Squatting in this space ...
+	 *
+	 * This special case dispatcher for illegal operation faults allows preserved
+	 * registers to be modified through a callback function (asm only) that is handed
+	 * back from the fault handler in r8. Up to three arguments can be passed to the
+	 * callback function by returning an aggregate with the callback as its first
+	 * element, followed by the arguments.
+	 */
+ENTRY(dispatch_illegal_op_fault)
 	SAVE_MIN_WITH_COVER
-	//
-	// The "alloc" can cause a mandatory store which could lead to
-	// an "Alt DTLB" fault which we can handle only if psr.ic is on.
-	//
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i		// guarantee that interrupt collection is enabled
 	;;
@@ -781,27 +814,30 @@ dispatch_illegal_op_fault:
 	cmp.ne p6,p0=0,r8
 (p6)	br.call.dpnt b6=b6		// call returns to ia64_leave_kernel
 	br.sptk ia64_leave_kernel
-	;;
+END(dispatch_illegal_op_fault)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4000 Entry 16 (size 64 bundles) Reserved
+	DBG_FAULT(16)
 	FAULT(16)
 
 #ifdef CONFIG_IA32_SUPPORT
 
-	// There is no particular reason for this code to be here, other than that
-	// there happens to be space here that would go unused otherwise.  If this
-	// fault ever gets "unreserved", simply moved the following code to a more
-	// suitable spot...
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 */
 
 	// IA32 interrupt entry point
 
-dispatch_to_ia32_handler:
+ENTRY(dispatch_to_ia32_handler)
 	SAVE_MIN
 	;;
 	mov r14=cr.isr
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interrupt collection is enabled
 	;;
@@ -812,7 +848,7 @@ dispatch_to_ia32_handler:
 	;;
 	mov r15=0x80
 	shr r14=r14,16          // Get interrupt number
-	;; 
+	;;
 	cmp.ne p6,p0=r14,r15
 (p6)    br.call.dpnt.many b6=non_ia32_syscall
 
@@ -823,7 +859,7 @@ dispatch_to_ia32_handler:
 	st8 [r15]=r8		// save orignal EAX in r1 (IA32 procs don't use the GP)
 	;;
 	alloc r15=ar.pfs,0,0,6,0	// must first in an insn group
-	;; 
+	;;
 	ld4 r8=[r14],8          // r8 == EAX (syscall number)
 	mov r15=222		// sys_vfork - last implemented system call
 	;;
@@ -842,10 +878,10 @@ dispatch_to_ia32_handler:
 	;;
 	ld4 out4=[r14]           // R15 == edi
 	movl r16=ia32_syscall_table
-	;; 
+	;;
 (p6)    shladd r16=r8,3,r16     // Force ni_syscall if not valid syscall number
 	ld8 r2=[r2]		// r2 = current->ptrace
-	;; 
+	;;
 	ld8 r16=[r16]
 	tbit.z p8,p0=r2,PT_TRACESYS_BIT	// (current->ptrace & PT_TRACESYS) == 0?
 	;;
@@ -857,7 +893,7 @@ dispatch_to_ia32_handler:
 	;;
 	br.call.sptk.many rp=ia32_trace_syscall	// rp will be overwritten (ignored)
 
-non_ia32_syscall:       
+non_ia32_syscall:
 	alloc r15=ar.pfs,0,0,2,0
 	mov out0=r14                            // interrupt #
 	add out1=16,sp                          // pointer to pt_regs
@@ -867,16 +903,17 @@ non_ia32_syscall:
 	;;
 	mov rp=r15
 	br.ret.sptk.many rp
-	;;
+END(dispatch_to_ia32_handler)
 
 #endif /* CONFIG_IA32_SUPPORT */
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4400 Entry 17 (size 64 bundles) Reserved
+	DBG_FAULT(17)
 	FAULT(17)
 
-non_syscall:
+ENTRY(non_syscall)
 	SAVE_MIN_WITH_COVER
 
 	// There is no particular reason for this code to be here, other than that
@@ -884,49 +921,45 @@ non_syscall:
 	// fault ever gets "unreserved", simply moved the following code to a more
 	// suitable spot...
 
-	mov r8=cr.iim			// get break immediate (must be done while psr.ic is off)
+	alloc r14=ar.pfs,0,0,2,0
+	mov out0=cr.iim
+	add out1=16,sp
 	adds r3=8,r2			// set up second base pointer for SAVE_REST
 
-	// turn interrupt collection back on:
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i				// guarantee that interrupt collection is enabled
 	;;
 (p15)	ssm psr.i			// restore psr.i
 	movl r15=ia64_leave_kernel
 	;;
-	alloc r14=ar.pfs,0,0,2,0
-	mov out0=r8			// break number
-	add out1=16,sp			// pointer to pt_regs
-	;;
 	SAVE_REST
 	mov rp=r15
 	;;
 	br.call.sptk.many b6=ia64_bad_break	// avoid WAW on CFM and ignore return addr
-	;;
+END(non_syscall)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4800 Entry 18 (size 64 bundles) Reserved
+	DBG_FAULT(18)
 	FAULT(18)
 
-	// There is no particular reason for this code to be here, other than that
-	// there happens to be space here that would go unused otherwise.  If this
-	// fault ever gets "unreserved", simply moved the following code to a more
-	// suitable spot...
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 */
 
-dispatch_unaligned_handler:
+ENTRY(dispatch_unaligned_handler)
 	SAVE_MIN_WITH_COVER
 	;;
-	//
-	// we can't have the alloc while psr.ic is cleared because 
-	// we might get a mandatory RSE (when you reach the end of the 
-	// rotating partition when doing the alloc) spill which could cause 
-	// a page fault on the kernel virtual address and the handler 
-	// wouldn't get the state to recover.
-	//
-	mov r15=cr.ifa
-	ssm psr.ic
+	alloc r14=ar.pfs,0,0,2,0		// now it's safe (must be first in insn group!)
+	mov out0=cr.ifa
+	adds out1=16,sp
+
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interrupt collection is enabled
 	;;
@@ -934,66 +967,53 @@ dispatch_unaligned_handler:
 	adds r3=8,r2				// set up second base pointer
 	;;
 	SAVE_REST
-	;;
-	alloc r14=ar.pfs,0,0,2,0		// now it's safe (must be first in insn group!)
-	;;					// avoid WAW on r14
 	movl r14=ia64_leave_kernel
-	mov out0=r15				// out0 = faulting address
-	adds out1=16,sp				// out1 = pointer to pt_regs
 	;;
 	mov rp=r14
 	br.sptk.many ia64_prepare_handle_unaligned
-	;;
+END(dispatch_unaligned_handler)
 
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4c00 Entry 19 (size 64 bundles) Reserved
+	DBG_FAULT(19)
 	FAULT(19)
 
-	// There is no particular reason for this code to be here, other than that
-	// there happens to be space here that would go unused otherwise.  If this
-	// fault ever gets "unreserved", simply moved the following code to a more
-	// suitable spot...
+	/*
+	 * There is no particular reason for this code to be here, other than that
+	 * there happens to be space here that would go unused otherwise.  If this
+	 * fault ever gets "unreserved", simply moved the following code to a more
+	 * suitable spot...
+	 */
 
-dispatch_to_fault_handler:
-	//
-	// Input:
-	//	psr.ic:	off
-	//	r19:	fault vector number (e.g., 24 for General Exception)
-	//	r31:	contains saved predicates (pr)
-	//
+ENTRY(dispatch_to_fault_handler)
+	/*
+	 * Input:
+	 *	psr.ic:	off
+	 *	r19:	fault vector number (e.g., 24 for General Exception)
+	 *	r31:	contains saved predicates (pr)
+	 */
 	SAVE_MIN_WITH_COVER_R19
-	//
-	// Copy control registers to temporary registers, then turn on psr bits,
-	// then copy the temporary regs to the output regs.  We have to do this
-	// because the "alloc" can cause a mandatory store which could lead to
-	// an "Alt DTLB" fault which we can handle only if psr.ic is on.
-	//
-	mov r8=cr.isr
-	mov r9=cr.ifa
-	mov r10=cr.iim
-	mov r11=cr.itir
+	alloc r14=ar.pfs,0,0,5,0
+	mov out0=r15
+	mov out1=cr.isr
+	mov out2=cr.ifa
+	mov out3=cr.iim
+	mov out4=cr.itir
 	;;
-	ssm psr.ic
+	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
 	srlz.i					// guarantee that interrupt collection is enabled
 	;;
 (p15)	ssm psr.i				// restore psr.i
 	adds r3=8,r2				// set up second base pointer for SAVE_REST
 	;;
-	alloc r14=ar.pfs,0,0,5,0		// must be first in insn group
-	mov out0=r15
-	mov out1=r8
-	mov out2=r9
-	mov out3=r10
-	mov out4=r11
-	;;
 	SAVE_REST
 	movl r14=ia64_leave_kernel
 	;;
 	mov rp=r14
 	br.call.sptk.many b6=ia64_fault
-	;;
+END(dispatch_to_fault_handler)
 
 //
 // --- End of long entries, Beginning of short entries
@@ -1002,55 +1022,67 @@ dispatch_to_fault_handler:
 	.align 1024
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5000 Entry 20 (size 16 bundles) Page Not Present (10,22,49)
+ENTRY(page_not_present)
+	DBG_FAULT(20)
 	mov r16=cr.ifa
 	rsm psr.dt
-	// The Linux page fault handler doesn't expect non-present pages to be in
-	// the TLB.  Flush the existing entry now, so we meet that expectation.
-	mov r17=_PAGE_SIZE_4K<<2
+	/*
+	 * The Linux page fault handler doesn't expect non-present pages to be in
+	 * the TLB.  Flush the existing entry now, so we meet that expectation.
+	 */
+	mov r17=PAGE_SHIFT<<2
 	;;
 	ptc.l r16,r17
 	;;
 	mov r31=pr
 	srlz.d
 	br.sptk.many page_fault
-	;;
+END(page_not_present)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5100 Entry 21 (size 16 bundles) Key Permission (13,25,52)
+ENTRY(key_permission)
+	DBG_FAULT(21)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
-	;;
+END(key_permission)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5200 Entry 22 (size 16 bundles) Instruction Access Rights (26)
+ENTRY(iaccess_rights)
+	DBG_FAULT(22)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
-	;;
+END(iaccess_rights)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
+ENTRY(daccess_rights)
+	DBG_FAULT(23)
 	mov r16=cr.ifa
 	rsm psr.dt
 	mov r31=pr
 	;;
 	srlz.d
 	br.sptk.many page_fault
-	;;
+END(daccess_rights)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5400 Entry 24 (size 16 bundles) General Exception (5,32,34,36,38,39)
+ENTRY(general_exception)
+	DBG_FAULT(24)
 	mov r16=cr.isr
 	mov r31=pr
 	;;
@@ -1059,39 +1091,44 @@ dispatch_to_fault_handler:
 	;;
 	mov r19=24		// fault number
 	br.sptk.many dispatch_to_fault_handler
-	;;
+END(general_exception)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
+ENTRY(disabled_fp_reg)
+	DBG_FAULT(25)
 	rsm psr.dfh		// ensure we can access fph
 	;;
 	srlz.d
 	mov r31=pr
 	mov r19=25
 	br.sptk.many dispatch_to_fault_handler
-	;;
+END(disabled_fp_reg)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5600 Entry 26 (size 16 bundles) Nat Consumption (11,23,37,50)
+ENTRY(nat_consumption)
+	DBG_FAULT(26)
 	FAULT(26)
+END(nat_consumption)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5700 Entry 27 (size 16 bundles) Speculation (40)
-	//
-	// A [f]chk.[as] instruction needs to take the branch to
-	// the recovery code but this part of the architecture is
-	// not implemented in hardware on some CPUs, such as Itanium.
-	// Thus, in general we need to emulate the behavior.
-	// IIM contains the relative target (not yet sign extended).
-	// So after sign extending it we simply add it to IIP.
-	// We also need to reset the EI field of the IPSR to zero,
-	// i.e., the slot to restart into.
-	//
-	// cr.imm contains zero_ext(imm21)
-	//
+ENTRY(speculation_vector)
+	DBG_FAULT(27)
+	/*
+	 * A [f]chk.[as] instruction needs to take the branch to the recovery code but
+	 * this part of the architecture is not implemented in hardware on some CPUs, such
+	 * as Itanium.  Thus, in general we need to emulate the behavior.  IIM contains
+	 * the relative target (not yet sign extended).  So after sign extending it we
+	 * simply add it to IIP.  We also need to reset the EI field of the IPSR to zero,
+	 * i.e., the slot to restart into.
+	 *
+	 * cr.imm contains zero_ext(imm21)
+	 */
 	mov r18=cr.iim
 	;;
 	mov r17=cr.iip
@@ -1112,105 +1149,130 @@ dispatch_to_fault_handler:
 	;;
 
 	rfi				// and go back
-	;;
+END(speculation_vector)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5800 Entry 28 (size 16 bundles) Reserved
+	DBG_FAULT(28)
 	FAULT(28)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
+ENTRY(debug_vector)
+	DBG_FAULT(29)
 	FAULT(29)
+END(debug_vector)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5a00 Entry 30 (size 16 bundles) Unaligned Reference (57)
+ENTRY(unaligned_access)
+	DBG_FAULT(30)
 	mov r16=cr.ipsr
 	mov r31=pr		// prepare to save predicates
-	;;									
-	br.sptk.many dispatch_unaligned_handler
 	;;
+	br.sptk.many dispatch_unaligned_handler
+END(unaligned_access)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5b00 Entry 31 (size 16 bundles) Unsupported Data Reference (57)
+	DBG_FAULT(31)
 	FAULT(31)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5c00 Entry 32 (size 16 bundles) Floating-Point Fault (64)
+	DBG_FAULT(32)
 	FAULT(32)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5d00 Entry 33 (size 16 bundles) Floating Point Trap (66)
+	DBG_FAULT(33)
 	FAULT(33)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5e00 Entry 34 (size 16 bundles) Lower Privilege Tranfer Trap (66)
+	DBG_FAULT(34)
 	FAULT(34)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5f00 Entry 35 (size 16 bundles) Taken Branch Trap (68)
+	DBG_FAULT(35)
 	FAULT(35)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6000 Entry 36 (size 16 bundles) Single Step Trap (69)
+	DBG_FAULT(36)
 	FAULT(36)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Reserved
+	DBG_FAULT(37)
 	FAULT(37)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6200 Entry 38 (size 16 bundles) Reserved
+	DBG_FAULT(38)
 	FAULT(38)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6300 Entry 39 (size 16 bundles) Reserved
+	DBG_FAULT(39)
 	FAULT(39)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6400 Entry 40 (size 16 bundles) Reserved
+	DBG_FAULT(40)
 	FAULT(40)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6500 Entry 41 (size 16 bundles) Reserved
+	DBG_FAULT(41)
 	FAULT(41)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6600 Entry 42 (size 16 bundles) Reserved
+	DBG_FAULT(42)
 	FAULT(42)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6700 Entry 43 (size 16 bundles) Reserved
+	DBG_FAULT(43)
 	FAULT(43)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6800 Entry 44 (size 16 bundles) Reserved
+	DBG_FAULT(44)
 	FAULT(44)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6900 Entry 45 (size 16 bundles) IA-32 Exeception (17,18,29,41,42,43,44,58,60,61,62,72,73,75,76,77)
+ENTRY(ia32_exception)
+	DBG_FAULT(45)
 	FAULT(45)
+END(ia32_exception)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6a00 Entry 46 (size 16 bundles) IA-32 Intercept  (30,31,59,70,71)
+ENTRY(ia32_intercept)
+	DBG_FAULT(46)
 #ifdef	CONFIG_IA32_SUPPORT
 	mov r31=pr
 	mov r16=cr.isr
@@ -1219,129 +1281,152 @@ dispatch_to_fault_handler:
 	mov r18=ar.eflag
 	mov r19=cr.iim		// old eflag value
 	;;
-	cmp.ne p2,p0=2,r17
-(p2)	br.cond.spnt 1f		// not a system flag fault
+	cmp.ne p6,p0=2,r17
+(p6)	br.cond.spnt 1f		// not a system flag fault
 	xor r16=r18,r19
 	;;
 	extr.u r17=r16,18,1	// get the eflags.ac bit
 	;;
-	cmp.eq p2,p0=0,r17
-(p2)	br.cond.spnt 1f		// eflags.ac bit didn't change
+	cmp.eq p6,p0=0,r17
+(p6)	br.cond.spnt 1f		// eflags.ac bit didn't change
 	;;
 	mov pr=r31,-1		// restore predicate registers
 	rfi
-	;;
+
 1:
 #endif	// CONFIG_IA32_SUPPORT
 	FAULT(46)
+END(ia32_intercept)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6b00 Entry 47 (size 16 bundles) IA-32 Interrupt  (74)
+ENTRY(ia32_interrupt)
+	DBG_FAULT(47)
 #ifdef CONFIG_IA32_SUPPORT
 	mov r31=pr
 	br.sptk.many dispatch_to_ia32_handler
-	;;
 #else
 	FAULT(47)
 #endif
+END(ia32_interrupt)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6c00 Entry 48 (size 16 bundles) Reserved
+	DBG_FAULT(48)
 	FAULT(48)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6d00 Entry 49 (size 16 bundles) Reserved
+	DBG_FAULT(49)
 	FAULT(49)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6e00 Entry 50 (size 16 bundles) Reserved
+	DBG_FAULT(50)
 	FAULT(50)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6f00 Entry 51 (size 16 bundles) Reserved
+	DBG_FAULT(51)
 	FAULT(51)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7000 Entry 52 (size 16 bundles) Reserved
+	DBG_FAULT(52)
 	FAULT(52)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7100 Entry 53 (size 16 bundles) Reserved
+	DBG_FAULT(53)
 	FAULT(53)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7200 Entry 54 (size 16 bundles) Reserved
+	DBG_FAULT(54)
 	FAULT(54)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7300 Entry 55 (size 16 bundles) Reserved
+	DBG_FAULT(55)
 	FAULT(55)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7400 Entry 56 (size 16 bundles) Reserved
+	DBG_FAULT(56)
 	FAULT(56)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7500 Entry 57 (size 16 bundles) Reserved
+	DBG_FAULT(57)
 	FAULT(57)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7600 Entry 58 (size 16 bundles) Reserved
+	DBG_FAULT(58)
 	FAULT(58)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7700 Entry 59 (size 16 bundles) Reserved
+	DBG_FAULT(59)
 	FAULT(59)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7800 Entry 60 (size 16 bundles) Reserved
+	DBG_FAULT(60)
 	FAULT(60)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7900 Entry 61 (size 16 bundles) Reserved
+	DBG_FAULT(61)
 	FAULT(61)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7a00 Entry 62 (size 16 bundles) Reserved
+	DBG_FAULT(62)
 	FAULT(62)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7b00 Entry 63 (size 16 bundles) Reserved
+	DBG_FAULT(63)
 	FAULT(63)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7c00 Entry 64 (size 16 bundles) Reserved
+	DBG_FAULT(64)
 	FAULT(64)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7d00 Entry 65 (size 16 bundles) Reserved
+	DBG_FAULT(65)
 	FAULT(65)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7e00 Entry 66 (size 16 bundles) Reserved
+	DBG_FAULT(66)
 	FAULT(66)
 
 	.align 256
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7f00 Entry 67 (size 16 bundles) Reserved
+	DBG_FAULT(67)
 	FAULT(67)

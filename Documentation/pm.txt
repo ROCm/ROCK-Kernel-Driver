@@ -33,7 +33,7 @@ and be sure that they are started sometime in the system boot process.
 Go ahead and start both.  If ACPI or APM is not available on your
 system the associated daemon will exit gracefully.
 
-  apmd:   http://linuxcare.com.au/apm/
+  apmd:   http://worldvisions.ca/~apenwarr/apmd/
   acpid:  http://phobos.fs.tum.de/acpi/
 
 Driver Interface

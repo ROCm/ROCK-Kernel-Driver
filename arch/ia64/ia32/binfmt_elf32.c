@@ -57,28 +57,30 @@ put_shared_page(struct task_struct * tsk, struct page *page, unsigned long addre
 
 	if (page_count(page) != 1)
 		printk("mem_map disagrees with %p at %08lx\n", (void *) page, address);
+
 	pgd = pgd_offset(tsk->mm, address);
-	pmd = pmd_alloc(pgd, address);
-	if (!pmd) {
-		__free_page(page);
-		force_sig(SIGKILL, tsk);
-		return 0;
+
+	spin_lock(&tsk->mm->page_table_lock);
+	{
+		pmd = pmd_alloc(tsk->mm, pgd, address);
+		if (!pmd)
+			goto out;
+		pte = pte_alloc(tsk->mm, pmd, address);
+		if (!pte)
+			goto out;
+		if (!pte_none(*pte))
+			goto out;
+		flush_page_to_ram(page);
+		set_pte(pte, pte_mkwrite(mk_pte(page, PAGE_SHARED)));
 	}
-	pte = pte_alloc(pmd, address);
-	if (!pte) {
-		__free_page(page);
-		force_sig(SIGKILL, tsk);
-		return 0;
-	}
-	if (!pte_none(*pte)) {
-		pte_ERROR(*pte);
-		__free_page(page);
-		return 0;
-	}
-	flush_page_to_ram(page);
-	set_pte(pte, pte_mkwrite(mk_pte(page, PAGE_SHARED)));
+	spin_unlock(&tsk->mm->page_table_lock);
 	/* no need for flush_tlb */
 	return page;
+
+  out:
+	spin_unlock(&tsk->mm->page_table_lock);
+	__free_page(page);
+	return 0;
 }
 
 void ia64_elf32_init(struct pt_regs *regs)
@@ -90,12 +92,13 @@ void ia64_elf32_init(struct pt_regs *regs)
 		put_shared_page(current, virt_to_page(ia32_tss), IA32_PAGE_OFFSET + PAGE_SIZE);
 
 	nr = smp_processor_id();
-	
+
 	/* Do all the IA-32 setup here */
 
-	current->thread.map_base  =  0x40000000;
-	current->thread.task_size =  0xc0000000;	/* use what Linux/x86 uses... */
- 
+	current->thread.map_base  = 0x40000000;
+	current->thread.task_size = 0xc0000000;		/* use what Linux/x86 uses... */
+	set_fs(USER_DS);				/* set addr limit for new TASK_SIZE */
+
 	/* setup ia32 state for ia32_load_state */
 
 	current->thread.eflag = IA32_EFLAG;
@@ -124,14 +127,8 @@ void ia64_elf32_init(struct pt_regs *regs)
 		: "r" ((ulong)IA32_FCR_DEFAULT));
 	__asm__("mov ar.fir = r0");
 	__asm__("mov ar.fdr = r0");
-	__asm__("mov %0=ar.k0 ;;" : "=r" (current->thread.old_iob));
-	__asm__("mov ar.k0=%0 ;;" :: "r"(IA32_IOBASE));
-	/* TSS */
-	__asm__("mov ar.k1 = %0"
-		: /* no outputs */
-		: "r" IA64_SEG_DESCRIPTOR(IA32_PAGE_OFFSET + PAGE_SIZE,
-					  0x1FFFL, 0xBL, 1L,
-					  3L, 1L, 1L, 1L));
+	current->thread.old_iob = ia64_get_kr(IA64_KR_IO_BASE);
+	ia64_set_kr(IA64_KR_IO_BASE, IA32_IOBASE);
 
 	/* Get the segment selectors right */
 	regs->r16 = (__USER_DS << 16) |  (__USER_DS); /* ES == DS, GS, FS are zero */
@@ -149,23 +146,10 @@ void ia64_elf32_init(struct pt_regs *regs)
 	regs->r31 = IA64_SEG_DESCRIPTOR(0xc0000000L, 0x400L, 0x3L, 1L, 3L,
 					1L, 1L, 1L);
 
-       	/* Clear psr.ac */
+	/* Clear psr.ac */
 	regs->cr_ipsr &= ~IA64_PSR_AC;
 
 	regs->loadrs = 0;
-	/*
-	 *  According to the ABI %edx points to an `atexit' handler.
-	 *  Since we don't have one we'll set it to 0 and initialize
-	 *  all the other registers just to make things more deterministic,
-	 *  ala the i386 implementation.
-	 */
-	regs->r8 = 0;	/* %eax */
-	regs->r11 = 0;	/* %ebx */
-	regs->r9 = 0;	/* %ecx */
-	regs->r10 = 0;	/* %edx */
-	regs->r13 = 0;	/* %ebp */
-	regs->r14 = 0;	/* %esi */
-	regs->r15 = 0;	/* %edi */
 }
 
 #undef STACK_TOP
@@ -185,9 +169,9 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 	bprm->exec += stack_base;
 
 	mpnt = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!mpnt) 
-		return -ENOMEM; 
-	
+	if (!mpnt)
+		return -ENOMEM;
+
 	{
 		mpnt->vm_mm = current->mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
@@ -200,7 +184,7 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_private_data = 0;
 		insert_vm_struct(current->mm, mpnt);
 		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
-	} 
+	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		if (bprm->page[i]) {
@@ -208,7 +192,7 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 		}
 		stack_base += PAGE_SIZE;
 	}
-	
+
 	return 0;
 }
 

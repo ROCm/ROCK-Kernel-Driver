@@ -1,8 +1,8 @@
 /*
  * Initialize MMU support.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -23,116 +23,33 @@
 #include <asm/pgalloc.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/uaccess.h>
 
 /* References to section boundaries: */
 extern char _stext, _etext, _edata, __init_begin, __init_end;
 
-/*
- * These are allocated in head.S so that we get proper page alignment.
- * If you change the size of these then change head.S as well.
- */
-extern char empty_bad_page[PAGE_SIZE];
-extern pmd_t empty_bad_pmd_table[PTRS_PER_PMD];
-extern pte_t empty_bad_pte_table[PTRS_PER_PTE];
-
 extern void ia64_tlb_init (void);
 
+unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
+
 static unsigned long totalram_pages;
-
-/*
- * Fill in empty_bad_pmd_table with entries pointing to
- * empty_bad_pte_table and return the address of this PMD table.
- */
-static pmd_t *
-get_bad_pmd_table (void)
-{
-	pmd_t v;
-	int i;
-
-	pmd_set(&v, empty_bad_pte_table);
-
-	for (i = 0; i < PTRS_PER_PMD; ++i)
-		empty_bad_pmd_table[i] = v;
-
-	return empty_bad_pmd_table;
-}
-
-/*
- * Fill in empty_bad_pte_table with PTEs pointing to empty_bad_page
- * and return the address of this PTE table.
- */
-static pte_t *
-get_bad_pte_table (void)
-{
-	pte_t v;
-	int i;
-
-	set_pte(&v, pte_mkdirty(mk_pte_phys(__pa(empty_bad_page), PAGE_SHARED)));
-
-	for (i = 0; i < PTRS_PER_PTE; ++i)
-		empty_bad_pte_table[i] = v;
-
-	return empty_bad_pte_table;
-}
-
-void
-__handle_bad_pgd (pgd_t *pgd)
-{
-	pgd_ERROR(*pgd);
-	pgd_set(pgd, get_bad_pmd_table());
-}
-
-void
-__handle_bad_pmd (pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-	pmd_set(pmd, get_bad_pte_table());
-}
-
-/*
- * Allocate and initialize an L3 directory page and set
- * the L2 directory entry PMD to the newly allocated page.
- */
-pte_t*
-get_pte_slow (pmd_t *pmd, unsigned long offset)
-{
-	pte_t *pte;
-
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
-	if (pmd_none(*pmd)) {
-		if (pte) {
-			/* everything A-OK */
-			clear_page(pte);
-			pmd_set(pmd, pte);
-			return pte + offset;
-		}
-		pmd_set(pmd, get_bad_pte_table());
-		return NULL;
-	}
-	free_page((unsigned long) pte);
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
 
 int
 do_check_pgt_cache (int low, int high)
 {
 	int freed = 0;
 
-        if (pgtable_cache_size > high) {
-                do {
-                        if (pgd_quicklist)
-                                free_page((unsigned long)get_pgd_fast()), ++freed;
-                        if (pmd_quicklist)
-                                free_page((unsigned long)get_pmd_fast()), ++freed;
-                        if (pte_quicklist)
-                                free_page((unsigned long)get_pte_fast()), ++freed;
-                } while (pgtable_cache_size > low);
-        }
-        return freed;
+	if (pgtable_cache_size > high) {
+		do {
+			if (pgd_quicklist)
+				free_page((unsigned long)pgd_alloc_one_fast()), ++freed;
+			if (pmd_quicklist)
+				free_page((unsigned long)pmd_alloc_one_fast(0, 0)), ++freed;
+			if (pte_quicklist)
+				free_page((unsigned long)pte_alloc_one_fast(0, 0)), ++freed;
+		} while (pgtable_cache_size > low);
+	}
+	return freed;
 }
 
 /*
@@ -188,12 +105,12 @@ free_initrd_mem(unsigned long start, unsigned long end)
 {
 	/*
 	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
-	 * Thus EFI and the kernel may have different page sizes. It is 
-	 * therefore possible to have the initrd share the same page as 
-	 * the end of the kernel (given current setup). 
+	 * Thus EFI and the kernel may have different page sizes. It is
+	 * therefore possible to have the initrd share the same page as
+	 * the end of the kernel (given current setup).
 	 *
 	 * To avoid freeing/using the wrong page (kernel sized) we:
-	 * 	- align up the beginning of initrd
+	 *	- align up the beginning of initrd
 	 *	- keep the end untouched
 	 *
 	 *  |             |
@@ -201,8 +118,8 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	 *  |             |
 	 *  |             |
 	 *  |             | 9000
-	 *  |/////////////| 
-	 *  |/////////////| 
+	 *  |/////////////|
+	 *  |/////////////|
 	 *  |=============| 8000
 	 *  |///INITRD////|
 	 *  |/////////////|
@@ -211,9 +128,9 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	 *  |KKKKKKKKKKKKK|
 	 *  |=============| 6000
 	 *  |KKKKKKKKKKKKK|
-	 *  |KKKKKKKKKKKKK| 
+	 *  |KKKKKKKKKKKKK|
 	 *  K=kernel using 8KB pages
-	 * 
+	 *
 	 * In this example, we must free page 8000 ONLY. So we must align up
 	 * initrd_start and keep initrd_end as is.
 	 */
@@ -286,52 +203,59 @@ put_gate_page (struct page *page, unsigned long address)
 		       page_address(page));
 
 	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
-	pmd = pmd_alloc(pgd, address);
-	if (!pmd) {
-		__free_page(page);
-		panic("Out of memory.");
-		return 0;
+
+	spin_lock(&init_mm.page_table_lock);
+	{
+		pmd = pmd_alloc(&init_mm, pgd, address);
+		if (!pmd)
+			goto out;
+		pte = pte_alloc(&init_mm, pmd, address);
+		if (!pte)
+			goto out;
+		if (!pte_none(*pte)) {
+			pte_ERROR(*pte);
+			goto out;
+		}
+		flush_page_to_ram(page);
+		set_pte(pte, mk_pte(page, PAGE_GATE));
 	}
-	pte = pte_alloc(pmd, address);
-	if (!pte) {
-		__free_page(page);
-		panic("Out of memory.");
-		return 0;
-	}
-	if (!pte_none(*pte)) {
-		pte_ERROR(*pte);
-		__free_page(page);
-		return 0;
-	}
-	flush_page_to_ram(page);
-	set_pte(pte, mk_pte(page, PAGE_GATE));
+  out:	spin_unlock(&init_mm.page_table_lock);
 	/* no need for flush_tlb */
 	return page;
 }
 
 void __init
-ia64_rid_init (void)
+ia64_mmu_init (void)
 {
 	unsigned long flags, rid, pta, impl_va_bits;
+	extern void __init tlb_init (void);
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
 #else
 #	define VHPT_ENABLE_BIT	1
 #endif
 
-	/* Set up the kernel identity mappings (regions 6 & 7) and the vmalloc area (region 5): */
+	/*
+	 * Set up the kernel identity mapping for regions 6 and 5.  The mapping for region
+	 * 7 is setup up in _start().
+	 */
 	ia64_clear_ic(flags);
 
 	rid = ia64_rid(IA64_REGION_ID_KERNEL, __IA64_UNCACHED_OFFSET);
-	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (_PAGE_SIZE_256M << 2));
-
-	rid = ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET);
-	ia64_set_rr(PAGE_OFFSET, (rid << 8) | (_PAGE_SIZE_256M << 2));
+	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (_PAGE_SIZE_64M << 2));
 
 	rid = ia64_rid(IA64_REGION_ID_KERNEL, VMALLOC_START);
 	ia64_set_rr(VMALLOC_START, (rid << 8) | (PAGE_SHIFT << 2) | 1);
 
+	/* ensure rr6 is up-to-date before inserting the PERCPU_ADDR translation: */
+	ia64_srlz_d();
+
+	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
+		 pte_val(mk_pte_phys(__pa(&cpu_data[smp_processor_id()]), PAGE_KERNEL)),
+		 PAGE_SHIFT);
+
 	__restore_flags(flags);
+	ia64_srlz_i();
 
 	/*
 	 * Check if the virtually mapped linear page table (VMLPT) overlaps with a mapped
@@ -356,7 +280,7 @@ ia64_rid_init (void)
 #	define vmlpt_bits		(impl_va_bits - PAGE_SHIFT + pte_bits)
 #	define POW2(n)			(1ULL << (n))
 
-	impl_va_bits = ffz(~my_cpu_data.unimpl_va_mask);
+	impl_va_bits = ffz(~(local_cpu_data->unimpl_va_mask | (7UL << 61)));
 
 	if (impl_va_bits < 51 || impl_va_bits > 61)
 		panic("CPU has bogus IMPL_VA_MSB value of %lu!\n", impl_va_bits - 1);
@@ -374,6 +298,8 @@ ia64_rid_init (void)
 	 * enabled.
 	 */
 	ia64_set_pta(pta | (0 << 8) | (vmlpt_bits << 2) | VHPT_ENABLE_BIT);
+
+	ia64_tlb_init();
 }
 
 /*
@@ -390,7 +316,7 @@ paging_init (void)
 
 	memset(zones_size, 0, sizeof(zones_size));
 
-	max_dma = (PAGE_ALIGN(MAX_DMA_ADDRESS) >> PAGE_SHIFT);
+	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 	if (max_low_pfn < max_dma)
 		zones_size[ZONE_DMA] = max_low_pfn;
 	else {

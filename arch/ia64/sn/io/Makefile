@@ -18,15 +18,15 @@
 EXTRA_CFLAGS	:= -DSN -DLANGUAGE_C=1 -D_LANGUAGE_C=1 -I. -DBRINGUP \
 		   -DDIRECT_L1_CONSOLE -DNUMA_BASE -DSIMULATED_KLGRAPH \
 		   -DNUMA_MIGR_CONTROL -DLITTLE_ENDIAN -DREAL_HARDWARE \
-		   -DNEW_INTERRUPTS -DCONFIG_IA64_SGI_IO
+		   -DNEW_INTERRUPTS
 O_TARGET := sgiio.o
-O_OBJS   := stubs.o sgi_if.o pciio.o pcibr.o xtalk.o xbow.o xswitch.o hubspc.o \
-		klgraph_hack.o io.o hubdev.o \
+obj-y   := stubs.o sgi_if.o pciio.o pcibr.o xtalk.o xbow.o xswitch.o hubspc.o \
+		klgraph_hack.o io.o hubdev.o huberror.o \
 		hcl.o labelcl.o invent.o klgraph.o klconflib.o sgi_io_sim.o \
 		module.o sgi_io_init.o klgraph_hack.o ml_SN_init.o \
-		ml_SN_intr.o ip37.o \
+		ml_SN_intr.o ip37.o pciba.o \
 		ml_iograph.o hcl_util.o cdl.o \
 		mem_refcnt.o devsupport.o alenlist.o pci_bus_cvlink.o \
-		eeprom.o pci.o pci_dma.o l1.o l1_command.o
+		eeprom.o pci.o pci_dma.o l1.o l1_command.o ate_utils.o
 
 include $(TOPDIR)/Rules.make

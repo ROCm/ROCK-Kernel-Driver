@@ -1,12 +1,30 @@
-/* $Id: entry.S,v 1.11 2001/01/10 21:13:29 bjornw Exp $
+/* $Id: entry.S,v 1.15 2001/03/05 13:14:30 bjornw Exp $
  *
  *  linux/arch/cris/entry.S
  *
- *  Copyright (C) 2000 Axis Communications AB
+ *  Copyright (C) 2000, 2001 Axis Communications AB
  *
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.15  2001/03/05 13:14:30  bjornw
+ *  Spelling fix
+ *
+ *  Revision 1.14  2001/02/23 08:36:36  perf
+ *  New ABI; syscallnr=r9, arg5=mof, arg6=srp.
+ *  Corrected tracesys call check.
+ *
+ *  Revision 1.13  2001/02/15 08:40:55  perf
+ *  H-P by way of perf;
+ *  - (_system_call): Don't read system call function address into r1.
+ *  - (RBFExit): There is no such thing as a null pop.  Adjust sp by addq.
+ *  - (_system_call): Don't use r10 and don't save and restore it.
+ *  - (THREAD_ESP0): New constant.
+ *  - (_system_call): Inline set_esp0.
+ *
+ *  Revision 1.12  2001/01/31 17:56:25  orjanf
+ *  Added definition of LTASK_PID and made it global.
+ *
  *  Revision 1.11  2001/01/10 21:13:29  bjornw
  *  SYMBOL_NAME is defined incorrectly for the compiler options we currently use
  *
@@ -79,7 +97,8 @@
 	.globl _mmu_bus_fault
 				
 	.globl _sys_call_table
-		
+	
+	.globl LTASK_PID	
 	;; syscall error codes
 	
 LENOSYS = 38
@@ -90,7 +109,17 @@ LENOSYS = 38
 LTASK_SIGPENDING  =  8
 LTASK_NEEDRESCHED = 20
 LTASK_PTRACE      = 24
+LTASK_PID         = 105
 
+	;; process bits for ptrace
+
+PT_TRACESYS_BIT	  = 1
+
+	;; Offset for esp0 into task_struct: current->thread.esp0.
+	;; FIXME: In need of padding somewhere, to get dword-alignment.
+
+THREAD_ESP0	  = 597
+	
 	;; some pt_regs offsets (from ptrace.h)
 	
 LORIG_R10	= 4
@@ -98,8 +127,8 @@ LR13		= 8
 LR12		= 12
 LR11		= 16
 LR10		= 20
-LR1		= 56
-LR0		= 60	
+LR9		= 24
+LMOF		= 64
 LDCCR		= 68
 LSRP		= 72
 LIRP		= 76
@@ -124,7 +153,7 @@ _ret_from_intr:
 	nop
 	ba	ret_with_reschedule  ; go back but check schedule and signals first 
 	nop
-		
+
 reschedule:
 	;; keep r9 intact
 	push	r9
@@ -170,41 +199,38 @@ _system_call:
 	push	r10		; push orig_r10
 	clear.d [sp=sp-4]	; frametype == 0, normal stackframe
 	
-	move.d	r10,r2		; save for later
-	
-	movs.w	-LENOSYS,r10
-	move.d	r10,[sp+LR10]	; put the default return value in r10 in the frame
-	
-	move.d	sp,r10
-	jsr	_set_esp0	; save top of frame (clobbers r9...)
+	movs.w	-LENOSYS,r0
+	move.d	r0,[sp+LR10]	; put the default return value in r10 in the frame
+
+	;; Perform "current->thread.esp0 = sp".
+	;; This used to be a separate function; set_esp0(ssp).
+	movs.w -8192,r0		; THREAD_SIZE == 8192
+	and.d sp,r0
+
+	move.d sp,[r0+THREAD_ESP0]
 
 	;; check if this process is syscall-traced
 
-	move.d	sp, r10
-	and.d	-8192, r10		; THREAD_SIZE == 8192
-	move.d	[r10+LTASK_PTRACE],r10
-	btstq	2, r10	                ; PT_TRACESYS
+	move.d	[r0+LTASK_PTRACE],r0
+	btstq	PT_TRACESYS_BIT, r0
 	bmi	tracesys
 	nop	
 
 	;; check for sanity in the requested syscall number
 	
-	cmpu.w	NR_syscalls,r1	
+	cmpu.w	NR_syscalls,r9	
 	bcc	_ret_from_sys_call
-	lslq	2,r1		;  multiply by 4, in the delay slot
+	lslq	2,r9		;  multiply by 4, in the delay slot
 
-	;; read the system call vector into r1
+	;; the parameter carrying registers r10, r11, r12 and 13 are intact.
+	;; the fifth and sixth parameters (if any) was in mof and srp 
+	;; respectively, and we need to put them on the stack.
+
+	push	srp
+	push	mof
 	
-	move.d	[r1+_sys_call_table],r1	
-
-	;; the parameter carrying registers r11, r12 and 13 are intact - restore r10.
-	;; the fifth parameter (if any) was in r0, and we need to put it on the stack
-
-	push	r0
-	move.d	r2,r10
-	
-	jsr	r1		; actually call the corresponding system call
-	addq	4,sp		; pop the r0 parameter
+	jsr	[r9+_sys_call_table]	; actually do the system call
+	addq	2*4,sp		; pop the mof and srp parameters
 	move.d	r10,[sp+LR10]	; save the return value
 
 	moveq	1,r9		; "parameter" to ret_from_sys_call to show it was a sys call
@@ -269,10 +295,8 @@ RBFexit:
 	;; just get the PC value to restart it with, and skip the rest of
 	;; the frame.
 	pop	irp		; fixup location will be here
-	pop	p8		; null pop
-	pop	p8		; null pop
 	reti			; return to IRP, taking U-flag into account
-	pop	p8		; null pop in delayslot
+	addq	12,sp		; Skip rest of SBFS frame.
 
 
 tracesys:
@@ -289,30 +313,32 @@ tracesys:
 
 	;; check for sanity in the requested syscall number
 
-	move.d	[sp+LR1], r1
+	move.d	[sp+LR9], r9
 	movs.w	-LENOSYS, r10
-	cmpu.w	NR_syscalls,r1	
+	cmpu.w	NR_syscalls,r9	
 	bcc	1f
-	lslq	2,r1		;  multiply by 4, in the delay slot
+	lslq	2,r9		;  multiply by 4, in the delay slot
 
-	;; read the system call vector entry into r1
+	;; read the system call vector entry into r9
 	
-	move.d	[r1+_sys_call_table],r1
+	move.d	[r9+_sys_call_table],r9
 
-	;; restore r10, r11, r12, r13 and r0 into the needed registers
+	;; restore r10, r11, r12, r13, mof and srp into the needed registers
 
 	move.d	[sp+LORIG_R10], r10  ; LR10 is already filled with -LENOSYS
 	move.d	[sp+LR11],      r11
 	move.d	[sp+LR12],      r12
 	move.d	[sp+LR13],      r13
-	move.d	[sp+LR0],       r0
+	move	[sp+LMOF],      mof
+	move	[sp+LSRP],      srp
 
-	;; the fifth parameter needs to be put on the stack for the system
-	;; call to find it
+	;; the fifth and sixth parameters needs to be put on the stack for
+	;; the system call to find them
 
-	push	r0
-	jsr	r1		; actually call the system-call
-	addq	4,sp		; pop the r0 parameter
+	push	srp
+	push	mof
+	jsr	r9		; actually call the system-call
+	addq	2*4,sp		; pop the r0 parameter
 
 1:	move.d	r10,[sp+LR10]	; save the return value
 

@@ -183,7 +183,6 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 	if (file)
 		cred = nfs_file_cred(file);
 
-	lock_kernel();
 	dprintk("NFS:      nfs_writepage_sync(%x/%Ld %d@%Ld)\n",
 		inode->i_dev, (long long)NFS_FILEID(inode),
 		count, (long long)(page_offset(page) + offset));
@@ -228,7 +227,6 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 io_error:
 	kunmap(page);
 
-	unlock_kernel();
 	return written? written : result;
 }
 
@@ -282,16 +280,17 @@ nfs_writepage(struct page *page)
 	if (page->index >= end_index+1 || !offset)
 		goto out;
 do_it:
-	if (!PageError(page) && NFS_SERVER(inode)->rsize >= PAGE_CACHE_SIZE) {
+	lock_kernel();
+	if (NFS_SERVER(inode)->rsize >= PAGE_CACHE_SIZE) {
 		err = nfs_writepage_async(NULL, inode, page, 0, offset);
 		if (err >= 0)
-			goto out_ok;
+			err = 0;
+	} else {
+		err = nfs_writepage_sync(NULL, inode, page, 0, offset); 
+		if (err == offset)
+			err = 0;
 	}
-	err = nfs_writepage_sync(NULL, inode, page, 0, offset); 
-	if ( err == offset) {
-out_ok:
-		err = 0;
-	}
+	unlock_kernel();
 out:
 	UnlockPage(page);
 	return err; 
@@ -1172,7 +1171,9 @@ nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 
 	rpc_clnt_sigmask(clnt, &oldset);
 	rpc_call_setup(task, &msg, 0);
+	lock_kernel();
 	rpc_execute(task);
+	unlock_kernel();
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return 0;
  out_bad:
@@ -1394,7 +1395,9 @@ nfs_commit_list(struct list_head *head, int how)
 	dprintk("NFS: %4d initiated commit call\n", task->tk_pid);
 	rpc_clnt_sigmask(clnt, &oldset);
 	rpc_call_setup(task, &msg, 0);
+	lock_kernel();
 	rpc_execute(task);
+	unlock_kernel();
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return 0;
  out_bad:

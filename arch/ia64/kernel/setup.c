@@ -1,8 +1,8 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
  * Copyright (C) 1999 VA Linux Systems
@@ -42,16 +42,20 @@
 # include <linux/blk.h>
 #endif
 
+#if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
+# error "struct cpuinfo_ia64 too big!"
+#endif
+
 extern char _end;
 
 /* cpu_data[0] is data for the bootstrap processor: */
-struct cpuinfo_ia64 cpu_data[NR_CPUS];
+struct cpuinfo_ia64 cpu_data[NR_CPUS] __attribute__ ((section ("__special_page_section")));
 
 unsigned long ia64_cycles_per_usec;
-struct ia64_boot_param ia64_boot_param;
+struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
 /* This tells _start which CPU is booting.  */
-int cpu_now_booting = 0;
+int cpu_now_booting;
 
 #ifdef CONFIG_SMP
 volatile unsigned long cpu_online_map;
@@ -119,14 +123,7 @@ setup_arch (char **cmdline_p)
 
 	unw_init();
 
-	/*
-	 * The secondary bootstrap loader passes us the boot
-	 * parameters at the beginning of the ZERO_PAGE, so let's
-	 * stash away those values before ZERO_PAGE gets cleared out.
-	 */
-	memcpy(&ia64_boot_param, (void *) ZERO_PAGE_ADDR, sizeof(ia64_boot_param));
-
-	*cmdline_p = __va(ia64_boot_param.command_line);
+	*cmdline_p = __va(ia64_boot_param->command_line);
 	strncpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';		/* for safety */
 
@@ -140,9 +137,8 @@ setup_arch (char **cmdline_p)
 	 * change APIs, they'd do things for the better.  Grumble...
 	 */
 	bootmap_start = PAGE_ALIGN(__pa(&_end));
-	if (ia64_boot_param.initrd_size)
-		bootmap_start = PAGE_ALIGN(bootmap_start
-					   + ia64_boot_param.initrd_size);
+	if (ia64_boot_param->initrd_size)
+		bootmap_start = PAGE_ALIGN(bootmap_start + ia64_boot_param->initrd_size);
 	bootmap_size = init_bootmem(bootmap_start >> PAGE_SHIFT, max_pfn);
 
 	efi_memmap_walk(free_available_memory, 0);
@@ -150,7 +146,7 @@ setup_arch (char **cmdline_p)
 	reserve_bootmem(bootmap_start, bootmap_size);
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	initrd_start = ia64_boot_param.initrd_start;
+	initrd_start = ia64_boot_param->initrd_start;
 
 	if (initrd_start) {
 		u64 start, size;
@@ -163,16 +159,16 @@ setup_arch (char **cmdline_p)
 			       "for initrd, please upgrade the loader\n");
 		else
 #endif
-			/* 
+			/*
 			 * The loader ONLY passes physical addresses
 			 */
 			initrd_start = (unsigned long)__va(initrd_start);
-		initrd_end = initrd_start+ia64_boot_param.initrd_size;
+		initrd_end = initrd_start+ia64_boot_param->initrd_size;
 		start      = initrd_start;
-		size       = ia64_boot_param.initrd_size;
+		size       = ia64_boot_param->initrd_size;
 
 		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
-		       (void *) initrd_start, ia64_boot_param.initrd_size);
+		       (void *) initrd_start, ia64_boot_param->initrd_size);
 
 		/*
 		 * The kernel end and the beginning of initrd can be
@@ -218,18 +214,18 @@ setup_arch (char **cmdline_p)
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
 
-#ifdef CONFIG_SMP
-	current->processor = 0;
-	cpu_physical_id(0) = hard_smp_processor_id();
-#endif
 	/*
 	 *  Set `iobase' to the appropriate address in region 6
 	 *    (uncached access range)
 	 */
-	__asm__ ("mov %0=ar.k0;;" : "=r"(ia64_iobase));
+	ia64_iobase = ia64_get_kr(IA64_KR_IO_BASE);
 	ia64_iobase = __IA64_UNCACHED_OFFSET | (ia64_iobase & ~PAGE_OFFSET);
 
 	cpu_init();	/* initialize the bootstrap CPU */
+
+#ifdef CONFIG_SMP
+	cpu_physical_id(0) = hard_smp_processor_id();
+#endif
 
 #ifdef CONFIG_IA64_GENERIC
 	machvec_init(acpi_get_sysname());
@@ -239,7 +235,7 @@ setup_arch (char **cmdline_p)
 	if (efi.acpi20) {
 		/* Parse the ACPI 2.0 tables */
 		acpi20_parse(efi.acpi20);
-	} else 
+	} else
 #endif
 	if (efi.acpi) {
 		/* Parse the ACPI tables */
@@ -259,8 +255,8 @@ setup_arch (char **cmdline_p)
 	ia64_mca_init();
 #endif
 
-	paging_init();
 	platform_setup(cmdline_p);
+	paging_init();
 }
 
 /*
@@ -325,7 +321,7 @@ get_cpuinfo (char *buffer)
 			     c->ppn, c->number, c->proc_freq / 1000000, c->proc_freq % 1000000,
 			     c->itc_freq / 1000000, c->itc_freq % 1000000,
 			     lpj*HZ/500000, (lpj*HZ/5000) % 100);
-        }
+	}
 	return p - buffer;
 }
 
@@ -362,8 +358,6 @@ identify_cpu (struct cpuinfo_ia64 *c)
 	for (i = 0; i < 5; ++i)
 		cpuid.bits[i] = ia64_get_cpuid(i);
 
-	memset(c, 0, sizeof(struct cpuinfo_ia64));
-
 	memcpy(c->vendor, cpuid.field.vendor, 16);
 	c->ppn = cpuid.field.ppn;
 	c->number = cpuid.field.number;
@@ -382,12 +376,6 @@ identify_cpu (struct cpuinfo_ia64 *c)
 	       smp_processor_id(), impl_va_msb + 1, phys_addr_size);
 	c->unimpl_va_mask = ~((7L<<61) | ((1L << (impl_va_msb + 1)) - 1));
 	c->unimpl_pa_mask = ~((1L<<63) | ((1L << phys_addr_size) - 1));
-
-#ifdef CONFIG_IA64_SOFTSDV_HACKS
-	/* BUG: SoftSDV doesn't support the cpuid registers. */
-	if (c->vendor[0] == '\0') 
-		memcpy(c->vendor, "Intel", 6);
-#endif
 }
 
 /*
@@ -397,12 +385,18 @@ identify_cpu (struct cpuinfo_ia64 *c)
 void
 cpu_init (void)
 {
-	extern void __init ia64_rid_init (void);
-	extern void __init ia64_tlb_init (void);
+	extern void __init ia64_mmu_init (void);
+	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
 
-	identify_cpu(&my_cpu_data);
+	/*
+	 * We can't pass "local_cpu_data" do identify_cpu() because we haven't called
+	 * ia64_mmu_init() yet.  And we can't call ia64_mmu_init() first because it
+	 * depends on the data returned by identify_cpu().  We break the dependency by
+	 * accessing cpu_data[] the old way, through identity mapped space.
+	 */
+	identify_cpu(&cpu_data[smp_processor_id()]);
 
 	/* Clear the stack memory reserved for pt_regs: */
 	memset(ia64_task_regs(current), 0, sizeof(struct pt_regs));
@@ -415,22 +409,30 @@ cpu_init (void)
 	ia64_set_dcr(  IA64_DCR_DM | IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
 		     | IA64_DCR_DA | IA64_DCR_DD);
 #ifndef CONFIG_SMP
-	ia64_set_fpu_owner(0);		/* initialize ar.k5 */
+	ia64_set_fpu_owner(0);
 #endif
 
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
-	ia64_rid_init();
-	ia64_tlb_init();
+	ia64_mmu_init();
 
-#ifdef	CONFIG_IA32_SUPPORT
+#ifdef CONFIG_IA32_SUPPORT
 	/* initialize global ia32 state - CR0 and CR4 */
 	__asm__("mov ar.cflg = %0"
 		: /* no outputs */
 		: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
 #endif
 
+	/* disable all local interrupt sources: */
+	ia64_set_itv(1 << 16);
+	ia64_set_lrr0(1 << 16);
+	ia64_set_lrr1(1 << 16);
+	ia64_set_pmv(1 << 16);
+	ia64_set_cmcv(1 << 16);
+
+	/* clear TPR & XTP to enable all interrupt classes: */
+	ia64_set_tpr(0);
 #ifdef CONFIG_SMP
 	normal_xtp();
 #endif
@@ -439,7 +441,7 @@ cpu_init (void)
 	if (ia64_pal_vm_summary(NULL, &vmi) == 0)
 		max_ctx = (1U << (vmi.pal_vm_info_2_s.rid_size - 3)) - 1;
 	else {
-		printk("ia64_rid_init: PAL VM summary failed, assuming 18 RID bits\n");
+		printk("cpu_init: PAL VM summary failed, assuming 18 RID bits\n");
 		max_ctx = (1U << 15) - 1;	/* use architected minimum */
 	}
 	while (max_ctx < ia64_ctx.max_ctx) {
@@ -447,4 +449,10 @@ cpu_init (void)
 		if (cmpxchg(&ia64_ctx.max_ctx, old, max_ctx) == old)
 			break;
 	}
+
+	if (ia64_pal_rse_info(&num_phys_stacked, 0) != 0) {
+		printk ("cpu_init: PAL RSE info failed, assuming 96 physical stacked regs\n");
+		num_phys_stacked = 96;
+	}
+	local_cpu_data->phys_stacked_size_p8 = num_phys_stacked*8 + 8;
 }

@@ -172,13 +172,20 @@ static struct pccard_operations pci_socket_operations = {
 static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_socket_ops *ops)
 {
 	pci_socket_t *socket = nr + pci_socket_array;
-
+	int err;
+	
 	memset(socket, 0, sizeof(*socket));
 	socket->dev = dev;
 	socket->op = ops;
 	dev->driver_data = socket;
 	spin_lock_init(&socket->event_lock);
-	return socket->op->open(socket);
+	err = socket->op->open(socket);
+	if(err)
+	{
+		socket->dev = NULL;
+		dev->driver_data = NULL;
+	}
+	return err;
 }
 
 void cardbus_register(pci_socket_t *socket)
@@ -195,8 +202,7 @@ cardbus_probe (struct pci_dev *dev, const struct pci_device_id *id)
 
 	for (s = 0; s < MAX_SOCKETS; s++) {
 		if (pci_socket_array [s].dev == 0) {
-			add_pci_socket (s, dev, &yenta_operations);
-			return 0;
+			return add_pci_socket (s, dev, &yenta_operations);
 		}
 	}
 	return -ENODEV;

@@ -1,10 +1,9 @@
 /*
- * This file contains the code that gets mapped at the upper end of
- * each task's text region.  For now, it contains the signal
- * trampoline code only.
+ * This file contains the code that gets mapped at the upper end of each task's text
+ * region.  For now, it contains the signal trampoline code only.
  *
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <asm/asmmacro.h>
@@ -14,11 +13,7 @@
 #include <asm/unistd.h>
 #include <asm/page.h>
 
-	.psr abi64
-	.psr lsb
-	.lsb
-
-	.section __gate_section,"ax"
+	.section .text.gate,"ax"
 
 	.align PAGE_SIZE
 
@@ -51,28 +46,24 @@
 	 *   |            space              |
 	 *   +-------------------------------+ <-- sp
 	 *
-	 * The register stack looks _exactly_ the way it looked at the
-	 * time the signal occurred.  In other words, we're treading
-	 * on a potential mine-field: each incoming general register
-	 * may be a NaT value (includeing sp, in which case the process
-	 * ends up dying with a SIGSEGV).
+	 * The register stack looks _exactly_ the way it looked at the time the signal
+	 * occurred.  In other words, we're treading on a potential mine-field: each
+	 * incoming general register may be a NaT value (including sp, in which case the
+	 * process ends up dying with a SIGSEGV).
 	 *
-	 * The first need to do is a cover to get the registers onto
-	 * the backing store.  Once that is done, we invoke the signal
-	 * handler which may modify some of the machine state.  After
-	 * returning from the signal handler, we return control to the
-	 * previous context by executing a sigreturn system call.  A
-	 * signal handler may call the rt_sigreturn() function to
-	 * directly return to a given sigcontext.  However, the
-	 * user-level sigreturn() needs to do much more than calling
-	 * the rt_sigreturn() system call as it needs to unwind the
-	 * stack to restore preserved registers that may have been
-	 * saved on the signal handler's call stack.
+	 * The first need to do is a cover to get the registers onto the backing store.
+	 * Once that is done, we invoke the signal handler which may modify some of the
+	 * machine state.  After returning from the signal handler, we return control to
+	 * the previous context by executing a sigreturn system call.  A signal handler
+	 * may call the rt_sigreturn() function to directly return to a given sigcontext.
+	 * However, the user-level sigreturn() needs to do much more than calling the
+	 * rt_sigreturn() system call as it needs to unwind the stack to restore preserved
+	 * registers that may have been saved on the signal handler's call stack.
 	 *
 	 * On entry:
 	 *	r2	= signal number
 	 *	r3	= plabel of signal handler
-	 *	r15	= new register backing store (ignored)
+	 *	r15	= new register backing store
 	 *	[sp+16] = sigframe
 	 */
 
@@ -153,7 +144,7 @@ END(invoke_sighandler)
 
 ENTRY(setup_rbs)
 	flushrs					// must be first in insn
-	mov ar.rsc=r0				// put RSE into enforced lazy mode
+	mov ar.rsc=0				// put RSE into enforced lazy mode
 	adds r16=(RNAT_OFF+SIGCONTEXT_OFF),sp
 	;;
 	mov r14=ar.rnat				// get rnat as updated by flushrs
@@ -167,7 +158,7 @@ END(setup_rbs)
 
 ENTRY(restore_rbs)
 	flushrs
-	mov ar.rsc=r0				// put RSE into enforced lazy mode
+	mov ar.rsc=0				// put RSE into enforced lazy mode
 	adds r16=(RNAT_OFF+SIGCONTEXT_OFF),sp
 	;;
 	ld8 r14=[r16]				// get new rnat

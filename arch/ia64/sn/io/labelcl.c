@@ -286,7 +286,7 @@ labelcl_info_add_LBL(devfs_handle_t de,
 		if (!strcmp(info_name, old_label_list[i].name)) {
 			/* Not allowed to add duplicate labelled info names. */
 			kfree(new_label_list);
-			printk("labelcl_info_add_LBL: Duplicate label name %s for vertex 0x%p\n", info_name, de);
+			printk(KERN_WARNING "labelcl_info_add_LBL: Duplicate label name %s for vertex 0x%p\n", info_name, de);
 			return(-1);
 		}
 		new_label_list[i] = old_label_list[i]; /* structure copy */

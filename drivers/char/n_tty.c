@@ -15,7 +15,7 @@
  * This file also contains code originally written by Linus Torvalds,
  * Copyright 1991, 1992, 1993, and by Julian Cowley, Copyright 1994.
  * 
- * This file may be redistributed under the terms of the GNU Public
+ * This file may be redistributed under the terms of the GNU General Public
  * License.
  *
  * Reduced memory usage for older ARM systems  - Russell King.
@@ -100,7 +100,7 @@ static inline void put_tty_queue(unsigned char c, struct tty_struct *tty)
 	unsigned long flags;
 	/*
 	 *	The problem of stomping on the buffers ends here.
-	 *	Why didn't anyone see this one comming? --AJK
+	 *	Why didn't anyone see this one coming? --AJK
 	*/
 	spin_lock_irqsave(&tty->read_lock, flags);
 	put_tty_queue_nolock(c, tty);

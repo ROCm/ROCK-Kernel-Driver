@@ -1853,6 +1853,7 @@ static int ymf_open(struct inode *inode, struct file *file)
 		return -ENXIO;
 	}
 
+	unit = NULL;	/* gcc warns */
 	for (list = ymf_devs.next; list != &ymf_devs; list = list->next) {
 		unit = list_entry(list, ymfpci_t, ymf_devs);
 		if (((unit->dev_audio ^ minor) & ~0x0F) == 0)
@@ -2147,8 +2148,8 @@ static void ymfpci_download_image(ymfpci_t *codec)
 	ymfpci_writew(codec, YDSXGR_GLOBALCTRL, ctrl & ~0x0007);
 
 	/* setup DSP instruction code */
-	for (i = 0; i < YDSXG_DSPLENGTH; i++)
-		ymfpci_writel(codec, YDSXGR_DSPINSTRAM + i, DspInst[i >> 2]);
+	for (i = 0; i < YDSXG_DSPLENGTH / 4; i++)
+		ymfpci_writel(codec, YDSXGR_DSPINSTRAM + (i << 2), DspInst[i]);
 
 	switch (codec->pci->device) {
 	case PCI_DEVICE_ID_YAMAHA_724F:
@@ -2163,11 +2164,11 @@ static void ymfpci_download_image(ymfpci_t *codec)
 
 	if (ver_1e) {
 		/* setup control instruction code */
-		for (i = 0; i < YDSXG_CTRLLENGTH; i++)
-			ymfpci_writel(codec, YDSXGR_CTRLINSTRAM + i, CntrlInst1E[i >> 2]);
+		for (i = 0; i < YDSXG_CTRLLENGTH / 4; i++)
+			ymfpci_writel(codec, YDSXGR_CTRLINSTRAM + (i << 2), CntrlInst1E[i]);
 	} else {
-		for (i = 0; i < YDSXG_CTRLLENGTH; i++)
-			ymfpci_writel(codec, YDSXGR_CTRLINSTRAM + i, CntrlInst[i >> 2]);
+		for (i = 0; i < YDSXG_CTRLLENGTH / 4; i++)
+			ymfpci_writel(codec, YDSXGR_CTRLINSTRAM + (i << 2), CntrlInst[i]);
 	}
 
 	ymfpci_enable_dsp(codec);

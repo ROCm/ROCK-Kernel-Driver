@@ -23,7 +23,7 @@
    Functions as standalone, loadable, and PCMCIA driver, the latter from
    Dave Hinds' PCMCIA package.
 
-   Redistributable under terms of the GNU Public License
+   Redistributable under terms of the GNU General Public License
 
 */
 /*----------------------------------------------------------------*/

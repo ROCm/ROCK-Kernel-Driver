@@ -1,4 +1,4 @@
-/* $Id: delay.h,v 1.2 2000/08/08 16:36:41 bjornw Exp $ */
+/* $Id: delay.h,v 1.3 2001/02/23 13:47:33 bjornw Exp $ */
 
 #ifndef _CRIS_DELAY_H
 #define _CRIS_DELAY_H

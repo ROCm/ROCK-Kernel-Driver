@@ -487,8 +487,10 @@ if [ "$CONFIG_VME" = "y" ]; then
    fi
 fi
 if [ "$CONFIG_APOLLO" = "y" ]; then
-   bool 'Support for DN serial port (dummy)' CONFIG_SERIAL
+   bool 'Support for DN serial port (dummy)' CONFIG_DN_SERIAL
    bool 'Support for serial port console' CONFIG_SERIAL_CONSOLE
+
+   define_tristate CONFIG_SERIAL $CONFIG_DN_SERIAL
 fi 
 bool 'Support for user serial device modules' CONFIG_USERIAL
 bool 'Watchdog Timer Support'	CONFIG_WATCHDOG

@@ -238,7 +238,7 @@ void __init config_q40(void)
     mach_max_dma_address = 32*1024*1024;   /* no DMA at all, but ide-scsi requires it.. */
 
 
-/* userfull for early debugging stages writes kernel messages into SRAM */
+/* useful for early debugging stages - writes kernel messages into SRAM */
 
     if (!strncmp( m68k_debug_device,"mem",3 ))
       {

@@ -10,6 +10,8 @@
 #ifndef _ASM_SN_XTALK_XTALKADDRS_H
 #define _ASM_SN_XTALK_XTALKADDRS_H
 
+#include <linux/config.h>
+
 /*
  * CrossTalk to SN0 Hub addressing support
  *
@@ -58,8 +60,6 @@
  * This looks very much like a REMOTE_HUB access, except the nodeID
  * is in a different place, and the highest xtalk bit is set.
  */
-
-#include <linux/config.h>
 
 /* Hub-specific xtalk definitions */
 

@@ -30,6 +30,7 @@
 #define HCL_TEMP_NAME_LEN 44 
 #define HCL_VERSION "1.0"
 devfs_handle_t hwgraph_root = NULL;
+devfs_handle_t linux_busnum = NULL;
 
 /*
  * Debug flag definition.
@@ -41,13 +42,21 @@ devfs_handle_t hwgraph_root = NULL;
 static unsigned int hcl_debug_init __initdata = HCL_DEBUG_NONE;
 #endif
 static unsigned int hcl_debug = HCL_DEBUG_NONE;
+#if defined(CONFIG_HCL_DEBUG) && !defined(MODULE)
 static unsigned int boot_options = OPTION_NONE;
+#endif
 
 /*
  * Some Global definitions.
  */
 spinlock_t hcl_spinlock;
 devfs_handle_t hcl_handle = NULL;
+
+invplace_t invplace_none = {
+	GRAPH_VERTEX_NONE,
+	GRAPH_VERTEX_PLACE_NONE,
+	NULL
+};
 
 /*
  * HCL device driver.
@@ -98,6 +107,7 @@ static int hcl_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations hcl_fops = {
+	(struct module *)0,
 	NULL,		/* lseek - default */
 	NULL,		/* read - general block-dev read */
 	NULL,		/* write - general block-dev write */
@@ -110,9 +120,9 @@ struct file_operations hcl_fops = {
 	hcl_close,	/* release */
 	NULL,		/* fsync */
 	NULL,		/* fasync */
-	NULL,		/* check_media_change */
-	NULL,		/* revalidate */
-	NULL		/* lock */
+	NULL,		/* lock */
+	NULL,		/* readv */
+	NULL,		/* writev */
 };
 
 
@@ -134,13 +144,15 @@ int __init init_hcl(void)
 	extern struct string_table label_string_table;
 	int rv = 0;
 
+#if defined(CONFIG_HCL_DEBUG) && !defined(MODULE)
 	printk ("\n%s: v%s Colin Ngam (cngam@sgi.com)\n",
 		HCL_NAME, HCL_VERSION);
-#if defined(CONFIG_HCL_DEBUG) && !defined(MODULE)
+
 	hcl_debug = hcl_debug_init;
 	printk ("%s: hcl_debug: 0x%0x\n", HCL_NAME, hcl_debug);
-#endif
 	printk ("\n%s: boot_options: 0x%0x\n", HCL_NAME, boot_options);
+#endif
+
 	spin_lock_init(&hcl_spinlock);
 
 	/*
@@ -148,7 +160,7 @@ int __init init_hcl(void)
 	 */
 	rv = hwgraph_path_add(NULL, "hw", &hwgraph_root);
 	if (rv)
-		printk ("init_hcl: Failed to create hwgraph_root. Error = %d.\n", rv);
+		printk ("WARNING: init_hcl: Failed to create hwgraph_root. Error = %d.\n", rv);
 
 	/*
 	 * Create the hcl driver to support inventory entry manipulations.
@@ -171,6 +183,15 @@ int __init init_hcl(void)
 	 */
 	string_table_init(&label_string_table);
 
+	/*
+	 * Create the directory that links Linux bus numbers to our Xwidget.
+	 */
+	rv = hwgraph_path_add(hwgraph_root, "linux/busnum", &linux_busnum);
+	if (linux_busnum == NULL) {
+		panic("HCL: Unable to create hw/linux/busnum\n");
+		return(0);
+	}
+
 	return(0);
 
 }
@@ -190,7 +211,6 @@ static int __init hcl_setup(char *str)
 {
     while ( (*str != '\0') && !isspace (*str) )
     {
-	printk("HCL: Boot time parameter %s\n", str);
 #ifdef CONFIG_HCL_DEBUG
         if (strncmp (str, "all", 3) == 0) {
             hcl_debug_init |= HCL_DEBUG_ALL;
@@ -445,7 +465,7 @@ hwgraph_register(devfs_handle_t de, const char *name,
 		/*
 		 * We need to clean up!
 		 */
-		printk("HCL: Unable to set the connect point to it's parent 0x%p\n",
+		printk(KERN_WARNING "HCL: Unable to set the connect point to it's parent 0x%p\n",
 			new_devfs_handle);
 	}
 
@@ -561,19 +581,44 @@ hwgraph_edge_add(devfs_handle_t from, devfs_handle_t to, char *name)
 {
 
 	char *path;
+	char *s1;
+	char *index;
 	int name_start;
 	devfs_handle_t handle = NULL;
 	int rv;
+	int i, count;
 
 	path = kmalloc(1024, GFP_KERNEL);
+	memset(path, 0x0, 1024);
+	name_start = devfs_generate_path (from, path, 1024);
+	s1 = &path[name_start];
+	count = 0;
+	while (1) {
+		index = strstr (s1, "/");
+		if (index) {
+			count++;
+			s1 = ++index;
+		} else {
+			count++;
+			break;
+		}
+	}
+
+	memset(path, 0x0, 1024);
 	name_start = devfs_generate_path (to, path, 1024);
+
+	for (i = 0; i < count; i++) {
+		strcat(path,"../");
+	}
+
+	strcat(path, &path[name_start]);
 
 	/*
 	 * Otherwise, just create a symlink to the vertex.
 	 * In this case the vertex was previous created with a REAL pathname.
 	 */
 	rv = devfs_mk_symlink (from, (const char *)name, 
-			       DEVFS_FL_DEFAULT, (const char *)&path[name_start],
+			       DEVFS_FL_DEFAULT, path,
 			       &handle, NULL);
 
 	name_start = devfs_generate_path (handle, path, 1024);
@@ -744,7 +789,6 @@ again:
 		*placeptr = which_place + 1;
 		if (curr && name) {
 			tempname = devfs_get_name(*target, &namelen);
-			printk("hwgraph_edge_get_next: Component name = %s, length = %d\n", tempname, namelen);
 			if (tempname && namelen)
 				strcpy(name, tempname);
 		}
@@ -1335,7 +1379,7 @@ vertex_to_name(devfs_handle_t vhdl, char *buf, uint buflen)
 		return(DEVNAME_UNKNOWN);
 }
 
-#ifdef IRIX
+#ifdef LATER
 /*
 ** Return the compact node id of the node that ultimately "owns" the specified
 ** vertex.  In order to do this, we walk back through masters and connect points
@@ -1440,7 +1484,7 @@ graph_error_t loop_rv;
 
   return (mem_vhdl);
 }
-#endif /* IRIX */
+#endif /* LATER */
 
 
 /*
@@ -1454,7 +1498,7 @@ hwgraph_char_device_add(        devfs_handle_t from,
 {
 	devfs_handle_t xx = NULL;
 
-	printk("FIXME: hwgraph_char_device_add() called. Use hwgraph_register.\n");
+	printk("WARNING: hwgraph_char_device_add() not supported .. use hwgraph_register.\n");
 	*devhdl = xx;	// Must set devhdl
 	return(GRAPH_SUCCESS);
 }
@@ -1462,14 +1506,13 @@ hwgraph_char_device_add(        devfs_handle_t from,
 graph_error_t
 hwgraph_edge_remove(devfs_handle_t from, char *name, devfs_handle_t *toptr)
 {
-	printk("FIXME: hwgraph_edge_remove\n");
+	printk("WARNING: hwgraph_edge_remove NOT supported.\n");
 	return(GRAPH_ILLEGAL_REQUEST);
 }
 
 graph_error_t
 hwgraph_vertex_unref(devfs_handle_t vhdl)
 {
-	printk("FIXME: hwgraph_vertex_unref\n");
 	return(GRAPH_ILLEGAL_REQUEST);
 }
 

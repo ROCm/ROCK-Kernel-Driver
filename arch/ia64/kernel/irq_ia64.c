@@ -39,7 +39,7 @@
 #define IRQ_DEBUG	0
 
 /* default base addr of IPI table */
-unsigned long ipi_base_addr = (__IA64_UNCACHED_OFFSET | IPI_DEFAULT_BASE_ADDR);	
+unsigned long ipi_base_addr = (__IA64_UNCACHED_OFFSET | IA64_IPI_DEFAULT_BASE_ADDR);
 
 /*
  * Legacy IRQ to IA-64 vector translation table.
@@ -53,13 +53,15 @@ __u8 isa_irq_to_vector_map[16] = {
 int
 ia64_alloc_irq (void)
 {
-	static int next_irq = FIRST_DEVICE_IRQ;
+	static int next_irq = IA64_FIRST_DEVICE_VECTOR;
 
-	if (next_irq > LAST_DEVICE_IRQ)
+	if (next_irq > IA64_LAST_DEVICE_VECTOR)
 		/* XXX could look for sharable vectors instead of panic'ing... */
 		panic("ia64_alloc_irq: out of interrupt vectors!");
 	return next_irq++;
 }
+
+extern unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs);
 
 /*
  * That's where the IVT branches when we get an external
@@ -67,7 +69,7 @@ ia64_alloc_irq (void)
  * function ptr.
  */
 void
-ia64_handle_irq (unsigned long vector, struct pt_regs *regs)
+ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 {
 	unsigned long saved_tpr;
 
@@ -89,7 +91,7 @@ ia64_handle_irq (unsigned long vector, struct pt_regs *regs)
 			static unsigned char count;
 			static long last_time;
 
-			if (count > 5 && jiffies - last_time > 5*HZ)
+			if (jiffies - last_time > 5*HZ)
 				count = 0;
 			if (++count < 5) {
 				last_time = jiffies;
@@ -109,19 +111,10 @@ ia64_handle_irq (unsigned long vector, struct pt_regs *regs)
 	saved_tpr = ia64_get_tpr();
 	ia64_srlz_d();
 	do {
-		if (vector >= NR_IRQS) {
-			printk("handle_irq: invalid vector %lu\n", vector);
-			ia64_set_tpr(saved_tpr);
-			ia64_srlz_d();
-			return;
-		}
 		ia64_set_tpr(vector);
 		ia64_srlz_d();
 
-		if ((irq_desc[vector].status & IRQ_PER_CPU) != 0)
-			do_IRQ_per_cpu(vector, regs);
-		else
-			do_IRQ(vector, regs);
+		do_IRQ(local_vector_to_irq(vector), regs);
 
 		/*
 		 * Disable interrupts and send EOI:
@@ -130,7 +123,7 @@ ia64_handle_irq (unsigned long vector, struct pt_regs *regs)
 		ia64_set_tpr(saved_tpr);
 		ia64_eoi();
 		vector = ia64_get_ivr();
-	} while (vector != IA64_SPURIOUS_INT);
+	} while (vector != IA64_SPURIOUS_INT_VECTOR);
 }
 
 #ifdef CONFIG_SMP
@@ -144,33 +137,30 @@ static struct irqaction ipi_irqaction = {
 };
 #endif
 
+void
+register_percpu_irq (ia64_vector vec, struct irqaction *action)
+{
+	irq_desc_t *desc;
+	unsigned int irq;
+
+	for (irq = 0; irq < NR_IRQS; ++irq)
+		if (irq_to_vector(irq) == vec) {
+			desc = irq_desc(irq);
+			desc->status |= IRQ_PER_CPU;
+			desc->handler = &irq_type_ia64_sapic;
+			if (action)
+				setup_irq(irq, action);
+		}
+}
+
 void __init
 init_IRQ (void)
 {
-	/*
-	 * Disable all local interrupts
-	 */
-	ia64_set_itv(0, 1);
-	ia64_set_lrr0(0, 1);
-	ia64_set_lrr1(0, 1);
-
-	irq_desc[IA64_SPURIOUS_INT].handler = &irq_type_ia64_sapic;
+	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
 #ifdef CONFIG_SMP
-	/* 
-	 * Configure the IPI vector and handler
-	 */
-	irq_desc[IPI_IRQ].status |= IRQ_PER_CPU;
-	irq_desc[IPI_IRQ].handler = &irq_type_ia64_sapic;
-	setup_irq(IPI_IRQ, &ipi_irqaction);
+	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);
 #endif
-
-	ia64_set_pmv(1 << 16);
-	ia64_set_cmcv(CMC_IRQ);			/* XXX fix me */
-
 	platform_irq_init();
-
-	/* clear TPR to enable all interrupt classes: */
-	ia64_set_tpr(0);
 }
 
 void

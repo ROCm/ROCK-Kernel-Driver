@@ -37,28 +37,29 @@
 #define NAME		PASTE(PASTE(__,SGN),PASTE(OP,di3))
 
 GLOBAL_ENTRY(NAME)
-	UNW(.prologue)
+	.prologue
 	.regstk 2,0,0,0
 	// Transfer inputs to FP registers.
 	setf.sig f8 = in0
 	setf.sig f9 = in1
-	UNW(.fframe 16)
-	UNW(.save.f 0x20)
+	;;
+	.fframe 16
+	.save.f 0x20
 	stf.spill [sp] = f17,-16
 
 	// Convert the inputs to FP, to avoid FP software-assist faults.
 	INT_TO_FP(f8, f8)
 	;;
 
-	UNW(.save.f 0x10)
+	.save.f 0x10
 	stf.spill [sp] = f16
-	UNW(.body)
+	.body
 	INT_TO_FP(f9, f9)
 	;;
 	frcpa.s1 f17, p6 = f8, f9	// y0 = frcpa(b)
 	;;
 (p6)	fmpy.s1 f7 = f8, f17		// q0 = a*y0
-(p6)	fnma.s1 f6 = f9, f17, f1	// e0 = -b*y0 + 1 
+(p6)	fnma.s1 f6 = f9, f17, f1	// e0 = -b*y0 + 1
 	;;
 (p6)	fma.s1 f16 = f7, f6, f7		// q1 = q0*e0 + q0
 (p6)	fmpy.s1 f7 = f6, f6		// e1 = e0*e0
@@ -70,7 +71,7 @@ GLOBAL_ENTRY(NAME)
 (p6)	fma.s1 f6 = f17, f6, f17	// y1 = y0*e0 + y0
 	;;
 (p6)	fma.s1 f6 = f6, f7, f6		// y2 = y1*e1 + y1
-(p6)	fnma.s1 f7 = f9, f16, f8	// r = -b*q2 + a 
+(p6)	fnma.s1 f7 = f9, f16, f8	// r = -b*q2 + a
 	;;
 #ifdef MODULO
 	setf.sig f8 = in0		// f8 = a
@@ -78,7 +79,7 @@ GLOBAL_ENTRY(NAME)
 #endif
 (p6)	fma.s1 f17 = f7, f6, f16	// q3 = r*y2 + q2
 	;;
-	UNW(.restore sp)
+	.restore sp
 	ldf.fill f16 = [sp], 16
 	FP_TO_INT(f17, f17)		// q = trunc(q3)
 	;;

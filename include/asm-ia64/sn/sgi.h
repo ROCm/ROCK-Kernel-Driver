@@ -13,6 +13,7 @@
 #define _ASM_SN_SGI_H
 
 #include <linux/config.h>
+
 #include <asm/sn/types.h>
 #include <asm/uaccess.h>		/* for copy_??_user */
 #include <linux/mm.h>
@@ -121,28 +122,12 @@ typedef enum graph_error_e {
 	GRAPH_IN_USE		/* 7 */
 } graph_error_t;
 
-#define SV_FIFO         0x0             /* sv_t is FIFO type */
-#define SV_LIFO         0x2             /* sv_t is LIFO type */
-#define SV_PRIO         0x4             /* sv_t is PRIO type */
-#define SV_KEYED        0x6             /* sv_t is KEYED type */
-#define SV_DEFAULT      SV_FIFO
-
-
-#define MUTEX_DEFAULT	0x0		/* needed by mutex_init() calls */
-#define PZERO		25		/* needed by mutex_lock(), sv_wait()
-					 * psema() calls */
-
-#define sema_t  uint64_t		/* FIXME */
 #define KM_SLEEP   0x0000
 #define KM_NOSLEEP 0x0001		/* needed by kmem_alloc_node(), kmem_zalloc()
 					 * calls */
 #define VM_NOSLEEP 0x0001		/* needed kmem_alloc_node(), kmem_zalloc_node
 					 * calls */
 #define XG_WIDGET_PART_NUM      0xC102          /* KONA/xt_regs.h     XG_XT_PART_NUM_VALUE */
-
-#ifndef K1BASE
-#define K1BASE 0xA0000000
-#endif
 
 #ifndef TO_PHYS_MASK
 #define TO_PHYS_MASK 0x0000000fffffffff
@@ -171,8 +156,6 @@ typedef uint64_t vhandl_t;
 #define _PAGESZ 4096
 #endif
 
-typedef uint64_t k_machreg_t;	/* needed by cmn_err.h */
-
 typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 
 #define HUB_PIO_CONVEYOR 0x1
@@ -188,44 +171,64 @@ typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 #define POFFMASK		(NBPP - 1)
 #define poff(X)			((__psunsigned_t)(X) & POFFMASK)
 
-#define initnsema(a,b,c) 	sema_init(a,b)
-
 #define BZERO(a,b)		memset(a, 0, b)
 
-#define kern_malloc(x)	kmalloc(x, GFP_KERNEL)
-#define kern_free(x)	kfree(x)
+#define kern_malloc(x)		kmalloc(x, GFP_KERNEL)
+#define kern_free(x)		kfree(x)
 
 typedef cpuid_t cpu_cookie_t;
 #define CPU_NONE		-1
 
+/*
+ * mutext support mapping
+ */
+
+#define mutex_spinlock_init(s)	spin_lock_init(s)
+inline static unsigned long
+mutex_spinlock(spinlock_t *sem) {
+	unsigned long flags = 0;
+//	spin_lock_irqsave(sem, flags);
+	spin_lock(sem);
+	return(flags);
+}
+// #define mutex_spinunlock(s,t)	spin_unlock_irqrestore(s,t)
+#define mutex_spinunlock(s,t)	spin_unlock(s)
+
+
+#define mutex_t			struct semaphore
+#define mutex_init(s)		init_MUTEX(s)
+#define mutex_init_locked(s)	init_MUTEX_LOCKED(s)
+#define mutex_lock(s)		down(s)
+#define mutex_unlock(s)		up(s)
+
+#define io_splock(s)		mutex_spinlock(s)
+#define io_spunlock(s,t)	spin_unlock(s)
+
+#define spin_lock_destroy(s)
 
 #if defined(DISABLE_ASSERT)
 #define ASSERT(expr)
 #define ASSERT_ALWAYS(expr)
 #else
-#define ASSERT(expr)	\
+#define ASSERT(expr)  do {	\
         if(!(expr)) { \
 		printk( "Assertion [%s] failed! %s:%s(line=%d)\n",\
 			#expr,__FILE__,__FUNCTION__,__LINE__); \
 		panic("Assertion panic\n"); 	\
-        }
+        } } while(0)
 
-#define ASSERT_ALWAYS(expr)	\
+#define ASSERT_ALWAYS(expr)	do {\
         if(!(expr)) { \
 		printk( "Assertion [%s] failed! %s:%s(line=%d)\n",\
 			#expr,__FILE__,__FUNCTION__,__LINE__); \
 		panic("Assertion always panic\n"); 	\
-        }
+        } } while(0)
 #endif	/* DISABLE_ASSERT */
 
-/* These are defined as cmn_err() replacements */
-#define PRINT_WARNING(x...)	{ printk("WARNING : "); printk(x); }
-#define PRINT_NOTICE(x...)	{ printk("NOTICE : "); printk(x); }
-#define PRINT_ALERT(x...)	{ printk("ALERT : "); printk(x); }
+#define PRINT_WARNING(x...)	do { printk("WARNING : "); printk(x); } while(0)
+#define PRINT_NOTICE(x...)	do { printk("NOTICE : "); printk(x); } while(0)
+#define PRINT_ALERT(x...)	do { printk("ALERT : "); printk(x); } while(0)
 #define PRINT_PANIC		panic
-
-#define mutex_t int
-#define spinlock_init(x,name) mutex_init(x, MUTEX_DEFAULT, name);
 
 #ifdef CONFIG_SMP
 #define cpu_enabled(cpu)        (test_bit(cpu, &cpu_online_map))

@@ -155,7 +155,7 @@ static void start_proc( char * label, int menu_num, int toplevel )
     printf("\"catch {focus $oldFocus}; " );
     /* 
      * We are checking which windows should be destroyed and which are 
-     * common parrents with the next one. Remember that menu_num field
+     * common parents with the next one. Remember that menu_num field
      * in mainmenu_option record reports number of its *parent* menu.
      */
     if ( menu_num < tot_menu_num

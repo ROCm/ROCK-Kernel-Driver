@@ -9,9 +9,9 @@
    use will be evident. */
 #ifdef CONFIG_SVINTO_SIM
   /* Let's use the ucsim interface since it lets us do write(2, ...) */
-#define SIMCOUT(s,len) asm ("moveq 4,r1\n\tmoveq 2,r10\n\tmove.d %0,r11\n\tmove.d %1,r12\
+#define SIMCOUT(s,len) asm ("moveq 4,r9\n\tmoveq 2,r10\n\tmove.d %0,r11\n\tmove.d %1,r12\
 \n\tpush irp\n\t.word 0xae3f\n\t.dword 0f\n\tjump -6809\n0:\n\tpop irp" \
-       : : "rm" (s), "rm" (len) : "r1","r10","r11","r12","memory")
+       : : "rm" (s), "rm" (len) : "r9","r10","r11","r12","memory")
 #define TRACE_ON() __extension__ \
  ({ int _Foofoo; __asm__ volatile ("bmod [%0],%0" : "=r" (_Foofoo) : "0" \
 			       (255)); _Foofoo; })
@@ -127,6 +127,13 @@ static inline unsigned long virt_to_phys(volatile void * address)
 static inline void * phys_to_virt(unsigned long address)
 {
 	return __va(address);
+}
+
+extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
+
+extern inline void * ioremap (unsigned long offset, unsigned long size)
+{
+	return __ioremap(offset, size, 0);
 }
 
 /*

@@ -9,7 +9,7 @@
  */
 
 /* Bytes per L1 (data) cache line.  */
-#define L1_CACHE_SHIFT		6
+#define L1_CACHE_SHIFT		CONFIG_IA64_L1_CACHE_SHIFT
 #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
 
 #ifdef CONFIG_SMP

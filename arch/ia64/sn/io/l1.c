@@ -34,6 +34,7 @@
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
@@ -42,7 +43,6 @@
 #include <asm/sn/labelcl.h>
 #include <asm/sn/eeprom.h>
 #include <asm/sn/ksys/i2c.h>
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
 #include <asm/sn/ksys/l1.h>
@@ -51,6 +51,20 @@
 
 #include <asm/sn/sn1/uart16550.h>
 
+/*
+ * Delete this when atomic_clear is part of atomic.h.
+ */
+static __inline__ int
+atomic_clear (int i, atomic_t *v)
+{
+	__s32 old, new;
+
+	do {
+		old = atomic_read(v);
+		new = old & ~i;
+	} while (ia64_cmpxchg("acq", v, old, new, sizeof(atomic_t)) != old);
+	return new;
+}
 
 #if defined(EEPROM_DEBUG)
 #define db_printf(x) printk x
@@ -73,6 +87,7 @@
 /* location of uart receive/xmit data register */
 #define L1_UART_BASE(n)	((ulong)REMOTE_HSPEC_ADDR((n), HSPEC_UART_0))
 #define LOCAL_HUB	LOCAL_HUB_ADDR
+#define LOCK_HUB	REMOTE_HUB_ADDR
 
 #define ADDR_L1_REG(n, r)	\
     (L1_UART_BASE(n) | ( (r) << 3 ))
@@ -84,21 +99,10 @@
     ( SD(ADDR_L1_REG((n), (r)), (v)) )
 
 
-/* Avoid conflicts with symmon...*/
-#define CONS_HW_LOCK(x)
-#define CONS_HW_UNLOCK(x)
-
-#define L1_CONS_HW_LOCK(sc)	CONS_HW_LOCK(sc->uart == BRL1_LOCALUART)
-#define L1_CONS_HW_UNLOCK(sc)	CONS_HW_UNLOCK(sc->uart == BRL1_LOCALUART)
-
-#if DEBUG
-static int debuglock_ospl; /* For CONS_HW_LOCK macro */
-#endif
-
 /* UART-related #defines */
 
 #define UART_BAUD_RATE		57600
-#define UART_FIFO_DEPTH		16
+#define UART_FIFO_DEPTH		0xf0
 #define UART_DELAY_SPAN		10
 #define UART_PUTC_TIMEOUT	50000
 #define UART_INIT_TIMEOUT	100000
@@ -146,6 +150,9 @@ static int debuglock_ospl; /* For CONS_HW_LOCK macro */
 	    _xyz[0] = _b[_i++];			\
 	}
 #else	/* BIG_ENDIAN */
+
+extern char *bcopy(const char * src, char * dest, int count);
+
 #define COPY_INT_TO_BUFFER(_b, _i, _n)			\
 	{						\
 		bcopy((char *)&_n, _b, sizeof(_n));	\
@@ -165,13 +172,148 @@ static int debuglock_ospl; /* For CONS_HW_LOCK macro */
 	}
 #endif	/* LITTLE_ENDIAN */
 
-int atomicAddInt(int *int_ptr, int value);
-int atomicClearInt(int *int_ptr, int value);
 void kmem_free(void *where, int size);
 
 #define BCOPY(x,y,z)	memcpy(y,x,z)
 
-extern char *bcopy(const char * src, char * dest, int count);
+/*
+ * Console locking defines and functions.
+ *
+ */
+
+#ifdef BRINGUP
+#define FORCE_CONSOLE_NASID
+#endif
+
+#define HUB_LOCK		16
+
+#define PRIMARY_LOCK_TIMEOUT    10000000
+#define HUB_LOCK_REG(n)         LOCK_HUB(n, MD_PERF_CNT0)
+
+#define SET_BITS(reg, bits)     SD(reg, LD(reg) |  (bits))
+#define CLR_BITS(reg, bits)     SD(reg, LD(reg) & ~(bits))
+#define TST_BITS(reg, bits)     ((LD(reg) & (bits)) != 0)
+
+#define HUB_TEST_AND_SET(n)	LD(LOCK_HUB(n,LB_SCRATCH_REG3_RZ))
+#define HUB_CLEAR(n)		SD(LOCK_HUB(n,LB_SCRATCH_REG3),0)
+
+#define RTC_TIME_MAX		((rtc_time_t) ~0ULL)
+
+
+/*
+ * primary_lock
+ *
+ *   Allows CPU's 0-3  to mutually exclude the hub from one another by
+ *   obtaining a blocking lock.  Does nothing if only one CPU is active.
+ *
+ *   This lock should be held just long enough to set or clear a global
+ *   lock bit.  After a relatively short timeout period, this routine
+ *   figures something is wrong, and steals the lock. It does not set
+ *   any other CPU to "dead".
+ */
+inline void
+primary_lock(nasid_t nasid)
+{
+	rtc_time_t          expire;
+
+	expire = rtc_time() + PRIMARY_LOCK_TIMEOUT;
+
+	while (HUB_TEST_AND_SET(nasid)) {
+		if (rtc_time() > expire) {
+			HUB_CLEAR(nasid);
+		}
+	}
+}
+
+/*
+ * primary_unlock (internal)
+ *
+ *   Counterpart to primary_lock
+ */
+
+inline void
+primary_unlock(nasid_t nasid)
+{
+	HUB_CLEAR(nasid);
+}
+
+/*
+ * hub_unlock
+ *
+ *   Counterpart to hub_lock_timeout and hub_lock
+ */
+
+inline void
+hub_unlock(nasid_t nasid, int level)
+{
+	uint64_t mask = 1ULL << level;
+
+	primary_lock(nasid);
+	CLR_BITS(HUB_LOCK_REG(nasid), mask);
+	primary_unlock(nasid);
+}
+
+/*
+ * hub_lock_timeout
+ *
+ *   Uses primary_lock to implement multiple lock levels.
+ *
+ *   There are 20 lock levels from 0 to 19 (limited by the number of bits
+ *   in HUB_LOCK_REG).  To prevent deadlock, multiple locks should be
+ *   obtained in order of increasingly higher level, and released in the
+ *   reverse order.
+ *
+ *   A timeout value of 0 may be used for no timeout.
+ *
+ *   Returns 0 if successful, -1 if lock times out.
+ */
+
+inline int
+hub_lock_timeout(nasid_t nasid, int level, rtc_time_t timeout)
+{
+	uint64_t mask = 1ULL << level;
+	rtc_time_t expire = (timeout ?  rtc_time() + timeout : RTC_TIME_MAX);
+	int done    = 0;
+
+	while (! done) {
+		while (TST_BITS(HUB_LOCK_REG(nasid), mask)) {
+			if (rtc_time() > expire)
+				return -1;
+		}
+
+		primary_lock(nasid);
+
+		if (! TST_BITS(HUB_LOCK_REG(nasid), mask)) {
+			SET_BITS(HUB_LOCK_REG(nasid), mask);
+			done = 1;
+		}
+		primary_unlock(nasid);
+	}
+	return 0;
+}
+
+
+#define LOCK_TIMEOUT	(0x1500000 * 1) /* 0x1500000 is ~30 sec */
+
+inline void
+lock_console(nasid_t nasid)
+{
+	int ret;
+
+	ret = hub_lock_timeout(nasid, HUB_LOCK, (rtc_time_t)LOCK_TIMEOUT);
+	if ( ret != 0 ) {
+		/* timeout */
+		hub_unlock(nasid, HUB_LOCK);
+		/* If the 2nd lock fails, just pile ahead.... */
+		hub_lock_timeout(nasid, HUB_LOCK, (rtc_time_t)LOCK_TIMEOUT);
+	}
+}
+
+inline void
+unlock_console(nasid_t nasid)
+{
+	hub_unlock(nasid, HUB_LOCK);
+}
 
 
 int 
@@ -189,7 +331,7 @@ uart_delay( rtc_time_t delay_span )
     UART_DELAY( delay_span );
 }
 
-#define UART_PUTC_READY(n)	(READ_L1_UART_REG((n), REG_LSR) & LSR_XHRE)
+#define UART_PUTC_READY(n)      ( (READ_L1_UART_REG((n), REG_LSR) & LSR_XHRE) && (READ_L1_UART_REG((n), REG_MSR) & MSR_CTS) )
 
 static int
 uart_putc( l1sc_t *sc ) 
@@ -197,6 +339,10 @@ uart_putc( l1sc_t *sc )
 #ifdef BRINGUP
     /* need a delay to avoid dropping chars */
     UART_DELAY(57);
+#endif
+#ifdef FORCE_CONSOLE_NASID
+    /* We need this for the console write path _elscuart_flush() -> brl1_send() */
+    sc->nasid = 0;
 #endif
     WRITE_L1_UART_REG( sc->nasid, REG_DAT,
 		       sc->send[sc->sent] );
@@ -209,6 +355,10 @@ uart_getc( l1sc_t *sc )
 {
     u_char lsr_reg = 0;
     nasid_t nasid = sc->nasid;
+
+#ifdef FORCE_CONSOLE_NASID
+    nasid = sc->nasid = 0;
+#endif
 
     if( (lsr_reg = READ_L1_UART_REG( nasid, REG_LSR )) & 
 	(LSR_RCA | LSR_PARERR | LSR_FRMERR) ) 
@@ -246,7 +396,8 @@ uart_init( l1sc_t *sc, int baud )
 	}
     }
 
-    L1_CONS_HW_LOCK( sc );
+    if ( sc->uart == BRL1_LOCALUART )
+	lock_console(nasid);
 
     WRITE_L1_UART_REG( nasid, REG_LCR, LCR_DLAB );
 	uart_delay( UART_DELAY_SPAN );
@@ -271,16 +422,16 @@ uart_init( l1sc_t *sc, int baud )
     WRITE_L1_UART_REG( nasid, REG_FCR,
 	FCR_FIFOEN | FCR_RxFIFO | FCR_TxFIFO );
 
-    L1_CONS_HW_UNLOCK( sc );
+    if ( sc->uart == BRL1_LOCALUART )
+	unlock_console(nasid);
 }
 
+/* This requires the console lock */
 static void
 uart_intr_enable( l1sc_t *sc, u_char mask )
 {
     u_char lcr_reg, icr_reg;
     nasid_t nasid = sc->nasid;
-
-    L1_CONS_HW_LOCK(sc);
 
     /* make sure that the DLAB bit in the LCR register is 0
      */
@@ -293,17 +444,14 @@ uart_intr_enable( l1sc_t *sc, u_char mask )
     icr_reg = READ_L1_UART_REG( nasid, REG_ICR );
     icr_reg |= mask;
     WRITE_L1_UART_REG( nasid, REG_ICR, icr_reg /*(ICR_RIEN | ICR_TIEN)*/ );
-
-    L1_CONS_HW_UNLOCK(sc);
 }
 
+/* This requires the console lock */
 static void
 uart_intr_disable( l1sc_t *sc, u_char mask )
 {
     u_char lcr_reg, icr_reg;
     nasid_t nasid = sc->nasid;
-
-    L1_CONS_HW_LOCK(sc);
 
     /* make sure that the DLAB bit in the LCR register is 0
      */
@@ -316,8 +464,6 @@ uart_intr_disable( l1sc_t *sc, u_char mask )
     icr_reg = READ_L1_UART_REG( nasid, REG_ICR );
     icr_reg &= mask;
     WRITE_L1_UART_REG( nasid, REG_ICR, icr_reg /*(ICR_RIEN | ICR_TIEN)*/ );
-
-    L1_CONS_HW_UNLOCK(sc);
 }
 
 #define uart_enable_xmit_intr(sc) \
@@ -353,15 +499,9 @@ uart_intr_disable( l1sc_t *sc, u_char mask )
 	}						\
     }
 
-#ifdef SABLE
-#define RTR_UART_PUTC_TIMEOUT	0
-#define RTR_UART_DELAY_SPAN	0
-#define RTR_UART_INIT_TIMEOUT	0
-#else
 #define RTR_UART_PUTC_TIMEOUT	UART_PUTC_TIMEOUT*10
 #define RTR_UART_DELAY_SPAN	UART_DELAY_SPAN
 #define RTR_UART_INIT_TIMEOUT	UART_INIT_TIMEOUT*10
-#endif
 
 static int
 rtr_uart_putc( l1sc_t *sc )
@@ -370,7 +510,11 @@ rtr_uart_putc( l1sc_t *sc )
     nasid_t nasid = sc->nasid;
     net_vec_t path = sc->uart;
     rtc_time_t expire = rtc_time() + RTR_UART_PUTC_TIMEOUT;
-    
+
+#ifdef FORCE_CONSOLE_NASID
+    /* We need this for the console write path _elscuart_flush() -> brl1_send() */
+    nasid = sc->nasid = 0;
+#endif
     c = (sc->send[sc->sent] & 0xffULL);
     
     while( 1 ) 
@@ -398,6 +542,10 @@ rtr_uart_getc( l1sc_t *sc )
     uint64_t regval;
     nasid_t nasid = sc->nasid;
     net_vec_t path = sc->uart;
+
+#ifdef FORCE_CONSOLE_NASID
+    nasid = sc->nasid = 0;
+#endif
 
     READ_RTR_L1_UART_REG( path, nasid, REG_LSR, &regval );
     if( regval & (LSR_RCA | LSR_PARERR | LSR_FRMERR) )
@@ -468,28 +616,6 @@ rtr_uart_init( l1sc_t *sc, int baud )
 
     return 0;
 }
-    
-	
-
-/*********************************************************************
- * locking macros 
- */
-
-#define L1SC_SEND_LOCK(l,pl)						\
-     { if( (l)->uart == BRL1_LOCALUART )				\
-	 (pl) = mutex_spinlock_spl( &((l)->send_lock), spl7 ); }
-
-#define L1SC_SEND_UNLOCK(l,pl)				\
-     { if( (l)->uart == BRL1_LOCALUART )		\
-	 mutex_spinunlock( &((l)->send_lock), (pl)); }
-
-#define L1SC_RECV_LOCK(l,pl)						\
-     { if( (l)->uart == BRL1_LOCALUART )				\
-	 (pl) = mutex_spinlock_spl( &((l)->recv_lock), spl7 ); }
-
-#define L1SC_RECV_UNLOCK(l,pl)				\
-     { if( (l)->uart == BRL1_LOCALUART )		\
-	 mutex_spinunlock( &((l)->recv_lock), (pl)); }
 
 
 /*********************************************************************
@@ -501,60 +627,17 @@ rtr_uart_init( l1sc_t *sc, int baud )
  *
  */
 
-
 #ifdef SPINLOCKS_WORK
-#define SUBCH_LOCK(sc,pl) \
-     (pl) = mutex_spinlock_spl( &((sc)->subch_lock), spl7 )
-#define SUBCH_UNLOCK(sc,pl) \
-     mutex_spinunlock( &((sc)->subch_lock), (pl) )
-
-#define SUBCH_DATA_LOCK(sbch,pl) \
-     (pl) = mutex_spinlock_spl( &((sbch)->data_lock), spl7 )
-#define SUBCH_DATA_UNLOCK(sbch,pl) \
-     mutex_spinunlock( &((sbch)->data_lock), (pl) )
+#define SUBCH_LOCK(sc)			spin_lock_irq( &((sc)->subch_lock) )
+#define SUBCH_UNLOCK(sc)		spin_unlock_irq( &((sc)->subch_lock) )
+#define SUBCH_DATA_LOCK(sbch) 		spin_lock_irq( &((sbch)->data_lock) )
+#define SUBCH_DATA_UNLOCK(sbch)		spin_unlock_irq( &((sbch)->data_lock) )
 #else
-#define SUBCH_LOCK(sc,pl) 
-#define SUBCH_UNLOCK(sc,pl)
-#define SUBCH_DATA_LOCK(sbch,pl)
-#define SUBCH_DATA_UNLOCK(sbch,pl)
-#endif	/* SPINLOCKS_WORK */
-
-/*
- * set a function to be called for subchannel ch in the event of
- * a transmission low-water interrupt from the uart
- */
-void
-subch_set_tx_notify( l1sc_t *sc, int ch, brl1_notif_t func )
-{
-    int pl;
-    L1SC_SEND_LOCK( sc, pl );
-    sc->subch[ch].tx_notify = func;
-    
-    /* some upper layer is asking to be notified of low-water, but if the 
-     * send buffer isn't already in use, we're going to need to get the
-     * interrupts going on the uart...
-     */
-    if( func && !sc->send_in_use )
-	uart_enable_xmit_intr( sc );
-    L1SC_SEND_UNLOCK(sc, pl );
-}
-
-/*
- * set a function to be called for subchannel ch when data is received
- */
-void
-subch_set_rx_notify( l1sc_t *sc, int ch, brl1_notif_t func )
-{
-#ifdef SPINLOCKS_WORK
-    int pl;
+#define SUBCH_LOCK(sc)
+#define SUBCH_UNLOCK(sc)
+#define SUBCH_DATA_LOCK(sbch)
+#define SUBCH_DATA_UNLOCK(sbch)
 #endif
-    brl1_sch_t *subch = &(sc->subch[ch]);
-
-    SUBCH_DATA_LOCK( subch, pl );
-    sc->subch[ch].rx_notify = func;
-    SUBCH_DATA_UNLOCK( subch, pl );
-}
-
 
 
 /* get_myid is an internal function that reads the PI_CPU_NUM
@@ -680,21 +763,18 @@ static unsigned short crc16_calc( unsigned short crc, u_char c )
 /* timeouts */
 #define BRL1_INIT_TIMEOUT	500000
 
-extern l1sc_t * get_elsc( void );
-
 /*
  * brl1_discard_packet is a dummy "receive callback" used to get rid
  * of packets we don't want
  */
 void brl1_discard_packet( l1sc_t *sc, int ch )
 {
-    int pl;
     brl1_sch_t *subch = &sc->subch[ch];
     sc_cq_t *q = subch->iqp;
-    SUBCH_DATA_LOCK( subch, pl );
+    SUBCH_DATA_LOCK( subch );
     q->opos = q->ipos;
-    atomicClearInt( &(subch->packet_arrived), ~((unsigned)0) );
-    SUBCH_DATA_UNLOCK( subch, pl );
+    atomic_clear( &(subch->packet_arrived), ~((unsigned)0) );
+    SUBCH_DATA_UNLOCK( subch );
 }
 
 
@@ -720,18 +800,14 @@ brl1_send_chars( l1sc_t *sc )
      */
     if( sc->uart == BRL1_LOCALUART ) 
     {
-	CONS_HW_LOCK(1);
 	if( !(sc->fifo_space) && UART_PUTC_READY( sc->nasid ) )
-//	    sc->fifo_space = UART_FIFO_DEPTH;
-	    sc->fifo_space = 1000;
+	    sc->fifo_space = UART_FIFO_DEPTH;
 	
 	while( (sc->sent < sc->send_len) && (sc->fifo_space) ) {
 	    uart_putc( sc );
 	    sc->fifo_space--;
 	    sc->sent++;
 	}
-
-	CONS_HW_UNLOCK(1);
     }
 
     else
@@ -770,7 +846,6 @@ brl1_send_chars( l1sc_t *sc )
 	    }
 	}
     }
-    
     return sc->sent;
 }
 
@@ -786,20 +861,25 @@ brl1_send_chars( l1sc_t *sc )
  * until our message has been completely transmitted.
  */
 
-int
+static int
 brl1_send( l1sc_t *sc, char *msg, int len, u_char type_and_subch, int wait )
 {
-    int pl;
     int index;
     int pkt_len = 0;
     unsigned short crc = INIT_CRC;
     char *send_ptr = sc->send;
 
-    L1SC_SEND_LOCK(sc, pl);
+#ifdef BRINGUP
+    /* We want to be sure that we are sending the entire packet before returning */
+    wait = 1;
+#endif
+    if ( sc->uart == BRL1_LOCALUART )
+	lock_console(sc->nasid);
 
     if( sc->send_in_use ) {
 	if( !wait ) {
-	    L1SC_SEND_UNLOCK(sc, pl);
+    	    if ( sc->uart == BRL1_LOCALUART )
+	    	unlock_console(sc->nasid);
 	    return 0; /* couldn't send anything; wait for buffer to drain */
 	}
 	else {
@@ -880,58 +960,9 @@ brl1_send( l1sc_t *sc, char *msg, int len, u_char type_and_subch, int wait )
 	/* enable low-water interrupts so buffer will be drained */
 	uart_enable_xmit_intr(sc);
     }
-    L1SC_SEND_UNLOCK(sc, pl);
+    if ( sc->uart == BRL1_LOCALUART )
+	unlock_console(sc->nasid);
     return len;
-}
-
-
-/* brl1_send_cont is intended to be called as an interrupt service
- * routine.  It sends until the UART won't accept any more characters,
- * or until an error is encountered (in which case we surrender the
- * send buffer and give up trying to send the packet).  Once the
- * last character in the packet has been sent, this routine releases
- * the send buffer and calls any previously-registered "low-water"
- * output routines.
- */
-int
-brl1_send_cont( l1sc_t *sc )
-{
-    int pl;
-    int done = 0;
-    brl1_notif_t callups[BRL1_NUM_SUBCHANS];
-    brl1_notif_t *callup;
-    brl1_sch_t *subch;
-    int index;
-
-    L1SC_SEND_LOCK(sc, pl);
-    brl1_send_chars( sc );
-    done = (sc->sent == sc->send_len);
-    if( done ) {
-
-	sc->send_in_use = 0;
-	uart_disable_xmit_intr(sc);
-
-	/* collect pointers to callups *before* unlocking */
-	subch = sc->subch;
-	callup = callups;
-	for( index = 0; index < BRL1_NUM_SUBCHANS; index++ ) {
-	    *callup = subch->tx_notify;
-	    subch++;
-	    callup++;
-	}
-    }
-    L1SC_SEND_UNLOCK(sc, pl);
-
-    if( done ) {
-	/* call any upper layer that's asked for low-water notification */
-	callup = callups;
-	for( index = 0; index < BRL1_NUM_SUBCHANS; index++ ) {
-	    if( *callup )
-		(*(*callup))( sc, index );
-	    callup++;
-	}
-    }
-    return 0;
 }
 
 
@@ -1039,14 +1070,16 @@ brl1_receive( l1sc_t *sc )
 {
     int result;		/* value to be returned by brl1_receive */
     int c;		/* most-recently-read character	     	*/
-    int pl;		/* priority level for UART receive lock */
     int done;		/* set done to break out of recv loop	*/
     sc_cq_t *q;		/* pointer to queue we're working with	*/
 
     result = BRL1_NO_MESSAGE;
 
-    L1SC_RECV_LOCK( sc, pl );
-    L1_CONS_HW_LOCK( sc );
+#ifdef FORCE_CONSOLE_NASID
+    sc->nasid = 0;
+#endif
+    if ( sc->uart == BRL1_LOCALUART )
+	lock_console(sc->nasid);
 
     done = 0;
     while( !done )
@@ -1171,7 +1204,6 @@ brl1_receive( l1sc_t *sc )
 		unsigned short crc;	/* holds the crc as we calculate it */
 		int i;			/* index variable */
 		brl1_sch_t *subch;      /* subchannel for received packet */
-		int sch_pl;		/* cookie for subchannel lock */
 		brl1_notif_t callup;	/* "data ready" callup */
 
 		/* whatever else may happen, we've seen a flag and we're
@@ -1226,7 +1258,7 @@ brl1_receive( l1sc_t *sc )
 
 		/* get the subchannel and lock it */
 		subch = &(sc->subch[SUBCH( LAST_HDR_GET(sc) )]);
-		SUBCH_DATA_LOCK( subch, sch_pl );
+		SUBCH_DATA_LOCK( subch );
 		
 		/* if this isn't a console packet, we need to record
 		 * a length byte
@@ -1242,16 +1274,16 @@ brl1_receive( l1sc_t *sc )
 		/* notify subchannel owner that there's something
 		 * on the queue for them
 		 */
-		atomicAddInt( &(subch->packet_arrived), 1);
+		atomic_inc(&(subch->packet_arrived));
 		callup = subch->rx_notify;
-		SUBCH_DATA_UNLOCK( subch, sch_pl );
+		SUBCH_DATA_UNLOCK( subch );
 
 		if( callup ) {
-		    L1_CONS_HW_UNLOCK( sc );
-		    L1SC_RECV_UNLOCK( sc, pl );
+		    if ( sc->uart == BRL1_LOCALUART )
+			unlock_console(sc->nasid);
 		    (*callup)( sc, SUBCH(LAST_HDR_GET(sc)) );
-		    L1SC_RECV_LOCK( sc, pl );
-		    L1_CONS_HW_LOCK( sc );
+		    if ( sc->uart == BRL1_LOCALUART )
+			lock_console(sc->nasid);
 		}
 		continue;	/* go back for more! */
 	    }
@@ -1320,8 +1352,8 @@ brl1_receive( l1sc_t *sc )
 	} /* end of switch( STATE_GET(sc) ) */
     } /* end of while(!done) */
     
-    L1_CONS_HW_UNLOCK( sc );
-    L1SC_RECV_UNLOCK(sc, pl);
+    if ( sc->uart == BRL1_LOCALUART )
+	unlock_console(sc->nasid);
 
     return result;
 }	    
@@ -1338,6 +1370,9 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     brl1_sch_t *subch;
 
     bzero( sc, sizeof( *sc ) );
+#ifdef FORCE_CONSOLE_NASID
+    nasid = (nasid_t)0;
+#endif
     sc->nasid = nasid;
     sc->uart = uart;
     sc->getc_f = (uart == BRL1_LOCALUART ? uart_getc : rtr_uart_getc);
@@ -1351,9 +1386,9 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     /* assign processor TTY channels */
     for( i = 0; i < CPUS_PER_NODE; i++, subch++ ) {
 	subch->use = BRL1_SUBCH_RSVD;
-	subch->packet_arrived = 0;
-	spinlock_init( &(subch->data_lock), NULL );
-	sv_init( &(subch->arrive_sv), SV_FIFO, NULL );
+	subch->packet_arrived = ATOMIC_INIT(0);
+	spin_lock_init( &(subch->data_lock) );
+	sv_init( &(subch->arrive_sv), &(subch->data_lock), SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */ );
 	subch->tx_notify = NULL;
 	/* (for now, drop elscuart packets in the kernel) */
 	subch->rx_notify = brl1_discard_packet;
@@ -1364,9 +1399,9 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
      * processor's individual TTY channel has been assigned)
      */
     subch->use = BRL1_SUBCH_RSVD;
-    subch->packet_arrived = 0;
-    spinlock_init( &(subch->data_lock), NULL );
-    sv_init( &(subch->arrive_sv), SV_FIFO, NULL );
+    subch->packet_arrived = ATOMIC_INIT(0);
+    spin_lock_init( &(subch->data_lock) );
+    sv_init( &(subch->arrive_sv), &subch->data_lock, SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */ );
     subch->tx_notify = NULL;
     if( sc->uart == BRL1_LOCALUART ) {
 	subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
@@ -1387,7 +1422,7 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
      */
     for( ; i < 0x10; i++, subch++ ) {
 	subch->use = BRL1_SUBCH_FREE;
-	subch->packet_arrived = 0;
+	subch->packet_arrived = ATOMIC_INIT(0);
 	subch->tx_notify = NULL;
 	subch->rx_notify = brl1_discard_packet;
 	subch->iqp = &sc->garbage_q;
@@ -1396,7 +1431,7 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
     /* remaining subchannels are free */
     for( ; i < BRL1_NUM_SUBCHANS; i++, subch++ ) {
 	subch->use = BRL1_SUBCH_FREE;
-	subch->packet_arrived = 0;
+	subch->packet_arrived = ATOMIC_INIT(0);
 	subch->tx_notify = NULL;
 	subch->rx_notify = brl1_discard_packet;
 	subch->iqp = &sc->garbage_q;
@@ -1404,9 +1439,7 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
 
     /* initialize synchronization structures
      */
-    spinlock_init( &(sc->send_lock), NULL );
-    spinlock_init( &(sc->recv_lock), NULL );
-    spinlock_init( &(sc->subch_lock), NULL );
+    spin_lock_init( &(sc->subch_lock) );
 
     if( sc->uart == BRL1_LOCALUART ) {
 	uart_init( sc, UART_BAUD_RATE );
@@ -1423,146 +1456,46 @@ brl1_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
 	extern int elsc_module_get(l1sc_t *);
 
 	sc->modid = elsc_module_get( sc );
-	sc->modid = 
-	    (sc->modid < 0 ? INVALID_MODULE : sc->modid);
-
+	sc->modid = (sc->modid < 0 ? INVALID_MODULE : sc->modid);
 	sc->verbose = 1;
     }
 }
 
 
-/*********************************************************************
- * These are interrupt-related functions used in the kernel to service
- * the L1.
- */
-
-/*
- * brl1_intrd is the function which is called in a loop by the
- * xthread that services L1 interrupts.
- */
-#ifdef IRIX
-void
-brl1_intrd( struct eframe_s *ep )
-{
-    u_char isr_reg;
-    l1sc_t *sc = get_elsc();
-
-    isr_reg = READ_L1_UART_REG(sc->nasid, REG_ISR);
-
-    while( isr_reg & (ISR_RxRDY | ISR_TxRDY) ) {
-
-	if( isr_reg & ISR_RxRDY ) {
-	    brl1_receive(sc);
-	}
-	if( (isr_reg & ISR_TxRDY) || 
-	    (sc->send_in_use && UART_PUTC_READY(sc->nasid)) ) 
-	{
-	    brl1_send_cont(sc);
-	}
-	isr_reg = READ_L1_UART_REG(sc->nasid, REG_ISR);
-    }
-
-    /* uart interrupts were blocked at bedrock when the interrupt
-     * was initially answered; reenable them now
-     */
-    intr_unblock_bit( sc->intr_cpu, UART_INTR );
-    ep = ep; /* placate the compiler */
-}
-#endif
-
-
-
-/* brl1_intr is called directly from the uart interrupt; after it runs, the
- * interrupt "daemon" xthread is signalled to continue.
- */
-#ifdef IRIX
-void
-brl1_intr( struct eframe_s *ep )
-{
-    /* Disable the UART interrupt, giving the xthread time to respond.
-     * When the daemon (xthread) finishes doing its thing, it will
-     * unblock the interrupt.
-     */
-    intr_block_bit( get_elsc()->intr_cpu, UART_INTR );
-    ep = ep; /* placate the compiler */
-}
-
-
-/* set up uart interrupt handling for this node's uart
- */
-void
-brl1_connect_intr( l1sc_t *sc )
-{
-    cpuid_t last_cpu;
-
-    sc->intr_cpu = nodepda->node_first_cpu;
-
-    if( intr_connect_level(sc->intr_cpu, UART_INTR, INTPEND0_MAXMASK,
-			   (intr_func_t)brl1_intrd, 0, 
-			   (intr_func_t)brl1_intr) )
-	cmn_err(CE_PANIC, "brl1_connect_intr: Can't connect UART interrupt.");
-
-    uart_enable_recv_intr( sc );
-}
-#endif	/* IRIX */
-
-#ifdef SABLE
-/* this function is called periodically to generate fake interrupts
- * and allow brl1_intrd to send/receive characters
- */
-void
-hubuart_service( void )
-{
-    l1sc_t *sc = get_elsc();
-    /* note that we'll lose error state by reading the lsr_reg.
-     * This is probably ok in the frictionless domain of sable.
-     */
-    int lsr_reg;
-    nasid_t nasid = sc->nasid;
-    lsr_reg = READ_L1_UART_REG( nasid, REG_LSR );
-    if( lsr_reg & (LSR_RCA | LSR_XSRE) ) {
-        REMOTE_HUB_PI_SEND_INTR(0, 0, UART_INTR);
-    }
-}
-#endif /* SABLE */
-
-
-/*********************************************************************
- * The following function allows the kernel to "go around" the
- * uninitialized l1sc structure to allow console output during
- * early system startup.
- */
-
 /* These are functions to use from serial_in/out when in protocol
- * mode to send and receive uart control regs.
+ * mode to send and receive uart control regs. These are external
+ * interfaces into the protocol driver.
  */
 void
-brl1_send_control(int offset, int value)
+l1_control_out(int offset, int value)
 {
-	nasid_t nasid = get_nasid();
+	nasid_t nasid = 0; //(get_elsc())->nasid;
 	WRITE_L1_UART_REG(nasid, offset, value); 
 }
 
 int
-brl1_get_control(int offset)
+l1_control_in(int offset)
 {
-	nasid_t nasid = get_nasid();
+	nasid_t nasid = 0; //(get_elsc())->nasid;
 	return(READ_L1_UART_REG(nasid, offset)); 
 }
 
 #define PUTCHAR(ch) \
     { \
-        while( !(READ_L1_UART_REG( nasid, REG_LSR ) & LSR_XHRE) );  \
+        while( (!(READ_L1_UART_REG( nasid, REG_LSR ) & LSR_XHRE)) || \
+                (!(READ_L1_UART_REG( nasid, REG_MSR ) & MSR_CTS)) ); \
         WRITE_L1_UART_REG( nasid, REG_DAT, (ch) ); \
     }
 
 int
-brl1_send_console_packet( char *str, int len )
+l1_serial_out( char *str, int len )
 {
     int sent = len;
     char crc_char;
     unsigned short crc = INIT_CRC;
-    nasid_t nasid = get_nasid();
+    nasid_t nasid = 0; //(get_elsc())->nasid;
+
+    lock_console(nasid);
 
     PUTCHAR( BRL1_FLAG_CH );
     PUTCHAR( BRL1_EVENT | SC_CONS_SYSTEM );
@@ -1598,7 +1531,16 @@ brl1_send_console_packet( char *str, int len )
     PUTCHAR( crc_char );
     PUTCHAR( BRL1_FLAG_CH );
 
+    unlock_console(nasid);
     return sent - len;
+}
+
+int
+l1_serial_in(void)
+{
+	static int l1_cons_getc( l1sc_t *sc );
+
+	return(l1_cons_getc(get_elsc()));
 }
 
 
@@ -1612,7 +1554,7 @@ brl1_send_console_packet( char *str, int len )
  *
  */
 
-int
+static int
 l1_cons_poll( l1sc_t *sc )
 {
     /* in case this gets called before the l1sc_t structure for the module_t
@@ -1623,13 +1565,13 @@ l1_cons_poll( l1sc_t *sc )
 	return 0;
     }
 
-    if( sc->subch[SC_CONS_SYSTEM].packet_arrived ) {
+    if( atomic_read(&sc->subch[SC_CONS_SYSTEM].packet_arrived) ) {
 	return 1;
     }
 
     brl1_receive( sc );
 
-    if( sc->subch[SC_CONS_SYSTEM].packet_arrived ) {
+    if( atomic_read(&sc->subch[SC_CONS_SYSTEM].packet_arrived) ) {
 	return 1;
     }
     return 0;
@@ -1638,13 +1580,11 @@ l1_cons_poll( l1sc_t *sc )
 
 /* pull a character off of the system console queue (if one is available)
  */
-int
+static int
 l1_cons_getc( l1sc_t *sc )
 {
     int c;
-#ifdef SPINLOCKS_WORK
-    int pl;
-#endif
+
     brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
     sc_cq_t *q = subch->iqp;
 
@@ -1652,16 +1592,16 @@ l1_cons_getc( l1sc_t *sc )
 	return 0;
     }
 
-    SUBCH_DATA_LOCK( subch, pl );
+    SUBCH_DATA_LOCK( subch );
     if( cq_empty( q ) ) {
-	subch->packet_arrived = 0;
-	SUBCH_DATA_UNLOCK( subch, pl );
+	atomic_set(&subch->packet_arrived, 0);
+	SUBCH_DATA_UNLOCK( subch );
 	return 0;
     }
     cq_rem( q, c );
     if( cq_empty( q ) )
-	subch->packet_arrived = 0;
-    SUBCH_DATA_UNLOCK( subch, pl );
+	atomic_set(&subch->packet_arrived, 0);
+    SUBCH_DATA_UNLOCK( subch );
 
     return c;
 }
@@ -1672,104 +1612,13 @@ l1_cons_getc( l1sc_t *sc )
 void
 l1_cons_init( l1sc_t *sc )
 {
-#ifdef SPINLOCKS_WORK
-    int pl;
-#endif
     brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
 
-    SUBCH_DATA_LOCK( subch, pl );
-    subch->packet_arrived = 0;
+    SUBCH_DATA_LOCK( subch );
+    atomic_set(&subch->packet_arrived, 0);
     cq_init( subch->iqp );
-    SUBCH_DATA_UNLOCK( subch, pl );
+    SUBCH_DATA_UNLOCK( subch );
 }
-
-
-/*
- * Write a message to the L1 on the system console subchannel.
- *
- * Danger: don't use a non-zero value for the wait parameter unless you're
- * someone important (like a kernel error message).
- */
-int
-l1_cons_write( l1sc_t *sc, char *msg, int len, int wait )
-{
-    return( brl1_send( sc, msg, len, (SC_CONS_SYSTEM | BRL1_EVENT), wait ) );
-}
-
-
-/* 
- * Read as many characters from the system console receive queue as are
- * available there (up to avail bytes).
- */
-int
-l1_cons_read( l1sc_t *sc, char *buf, int avail )
-{
-    int pl;
-    int before_wrap, after_wrap;
-    brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
-    sc_cq_t *q = subch->iqp;
-
-    if( !(subch->packet_arrived) )
-	return 0;
-
-    SUBCH_DATA_LOCK( subch, pl );
-    if( q->opos > q->ipos ) {
-	before_wrap = BRL1_QSIZE - q->opos;
-	if( before_wrap >= avail ) {
-	    before_wrap = avail;
-	    after_wrap = 0;
-	}
-	else {
-	    avail -= before_wrap;
-	    after_wrap = q->ipos;
-	    if( after_wrap > avail )
-		after_wrap = avail;
-	}
-    }
-    else {
-	before_wrap = q->ipos - q->opos;
-	if( before_wrap > avail )
-	    before_wrap = avail;
-	after_wrap = 0;
-    }
-
-
-    BCOPY( q->buf + q->opos, buf, before_wrap  );
-    if( after_wrap )
-        BCOPY( q->buf, buf + before_wrap, after_wrap  );
-    q->opos = ((q->opos + before_wrap + after_wrap) % BRL1_QSIZE);
-
-    subch->packet_arrived = 0;
-    SUBCH_DATA_UNLOCK( subch, pl );
-
-    return( before_wrap + after_wrap );
-}
-	
-
-/*
- * Install a callback function for the system console subchannel 
- * to allow an upper layer to be notified when the send buffer 
- * has been emptied.
- */
-void
-l1_cons_tx_notif( l1sc_t *sc, brl1_notif_t func )
-{
-    subch_set_tx_notify( sc, SC_CONS_SYSTEM, func );
-}
-
-
-/*
- * Install a callback function for the system console subchannel
- * to allow an upper layer to be notified when a packet has been
- * received.
- */
-void
-l1_cons_rx_notif( l1sc_t *sc, brl1_notif_t func )
-{
-    subch_set_rx_notify( sc, SC_CONS_SYSTEM, func );
-}
-
-
 
 
 /*********************************************************************
@@ -1795,7 +1644,9 @@ void
 sc_data_ready( l1sc_t *sc, int ch )
 {
     brl1_sch_t *subch = &(sc->subch[ch]);
+    SUBCH_DATA_LOCK( subch );
     sv_signal( &(subch->arrive_sv) );
+    SUBCH_DATA_UNLOCK( subch );
 }
 
 /* sc_open reserves a subchannel to send a request to the L1 (the
@@ -1810,10 +1661,9 @@ sc_open( l1sc_t *sc, uint target )
      * subchannel assignment.
      */
     int ch;
-    int pl;
     brl1_sch_t *subch;
 
-    SUBCH_LOCK( sc, pl );
+    SUBCH_LOCK( sc );
 
     /* Look for a free subchannel. Subchannels 0-15 are reserved
      * for other purposes.
@@ -1826,17 +1676,17 @@ sc_open( l1sc_t *sc, uint target )
 
     if( ch == BRL1_NUM_SUBCHANS ) {
         /* there were no subchannels available! */
-        SUBCH_UNLOCK( sc, pl );
+        SUBCH_UNLOCK( sc );
         return SC_NSUBCH;
     }
 
     subch->use = BRL1_SUBCH_RSVD;
-    SUBCH_UNLOCK( sc, pl );
+    SUBCH_UNLOCK( sc );
 
-    subch->packet_arrived = 0;
+    atomic_set(&subch->packet_arrived, 0);
     subch->target = target;
-    sv_init( &(subch->arrive_sv), SV_FIFO, NULL );
-    spinlock_init( &(subch->data_lock), NULL );
+    spin_lock_init( &(subch->data_lock) );
+    sv_init( &(subch->arrive_sv), &(subch->data_lock), SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */);
     subch->tx_notify = NULL;
     subch->rx_notify = sc_data_ready;
     subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
@@ -1854,27 +1704,28 @@ int
 sc_close( l1sc_t *sc, int ch )
 {
     brl1_sch_t *subch;
-    int pl;
 
-    SUBCH_LOCK( sc, pl );
+    SUBCH_LOCK( sc );
     subch = &(sc->subch[ch]);
     if( subch->use != BRL1_SUBCH_RSVD ) {
         /* we're trying to close a subchannel that's not open */
         return SC_NOPEN;
     }
 
-    subch->packet_arrived = 0;
+    atomic_set(&subch->packet_arrived, 0);
     subch->use = BRL1_SUBCH_FREE;
 
+    SUBCH_DATA_LOCK( subch );
     sv_broadcast( &(subch->arrive_sv) );
     sv_destroy( &(subch->arrive_sv) );
-    spinlock_destroy( &(subch->data_lock) );
+    SUBCH_DATA_UNLOCK( subch );
+    spin_lock_destroy( &(subch->data_lock) );
 
     ASSERT( subch->iqp && (subch->iqp != &sc->garbage_q) );
     kmem_free( subch->iqp, sizeof(sc_cq_t) );
     subch->iqp = &sc->garbage_q;
 
-    SUBCH_UNLOCK( sc, pl );
+    SUBCH_UNLOCK( sc );
 
     return SC_SUCCESS;
 }
@@ -2248,7 +2099,7 @@ subch_pull_msg( brl1_sch_t *subch, char *msg, int *len )
     else {
 	q->opos = ((q->opos + before_wrap) & (BRL1_QSIZE - 1));
     }
-    atomicAddInt( &(subch->packet_arrived), -1 );
+    atomic_dec(&(subch->packet_arrived));
 }
 
 
@@ -2263,7 +2114,6 @@ subch_pull_msg( brl1_sch_t *subch, char *msg, int *len )
 int
 sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 {
-    int pl;             /* lock cookie */
     int is_msg = 0;
     brl1_sch_t *subch = &(sc->subch[ch]);
 
@@ -2278,7 +2128,7 @@ sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
         /* kick the next lower layer and see if it pulls anything in
          */
 	brl1_receive( sc );
-	is_msg = subch->packet_arrived;
+	is_msg = atomic_read(&subch->packet_arrived);
 
     } while( block && !is_msg && (rtc_time() < exp_time) );
 
@@ -2287,9 +2137,9 @@ sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 	return( SC_NMSG );
     }
 
-    SUBCH_DATA_LOCK( subch, pl );
+    SUBCH_DATA_LOCK( subch );
     subch_pull_msg( subch, msg, len );
-    SUBCH_DATA_UNLOCK( subch, pl );
+    SUBCH_DATA_UNLOCK( subch );
 
     return( SC_SUCCESS );
 }
@@ -2305,17 +2155,16 @@ sc_recv_poll( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 int
 sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 {
-    int pl;             /* lock cookie */
     int is_msg = 0;
     brl1_sch_t *subch = &(sc->subch[ch]);
 
     do {
-	SUBCH_DATA_LOCK(subch, pl);
-	is_msg = subch->packet_arrived;
+	SUBCH_DATA_LOCK(subch);
+	is_msg = atomic_read(&subch->packet_arrived);
 	if( !is_msg && block ) {
 	    /* wake me when you've got something */
 	    subch->rx_notify = sc_data_ready;
-	    sv_wait( &(subch->arrive_sv), 0, &(subch->data_lock), pl );
+	    sv_wait( &(subch->arrive_sv), 0, 0);
 	    if( subch->use == BRL1_SUBCH_FREE ) {
 		/* oops-- somebody closed our subchannel while we were
 		 * sleeping!
@@ -2329,12 +2178,12 @@ sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
 
     if( !is_msg ) {
 	/* no message and we didn't care to wait for one */
-	SUBCH_DATA_UNLOCK( subch, pl );
+	SUBCH_DATA_UNLOCK( subch );
 	return( SC_NMSG );
     }
 
     subch_pull_msg( subch, msg, len );
-    SUBCH_DATA_UNLOCK( subch, pl );
+    SUBCH_DATA_UNLOCK( subch );
 
     return( SC_SUCCESS );
 }
@@ -2388,12 +2237,12 @@ sc_command( l1sc_t *sc, int ch, char *cmd, char *resp, int *len )
     }
     
     /* block on sc_recv_* */
-#ifdef notyet
+#ifdef LATER
     if( sc->uart == BRL1_LOCALUART ) {
 	return( sc_recv_intr( sc, ch, resp, len, __WAIT_RECV ) );
     }
     else
-#endif
+#endif	/* LATER */
     {
 	return( sc_recv_poll( sc, ch, resp, len, __WAIT_RECV ) );
     }
@@ -2438,12 +2287,12 @@ sc_poll( l1sc_t *sc, int ch )
 {
     brl1_sch_t *subch = &(sc->subch[ch]);
 
-    if( subch->packet_arrived )
+    if( atomic_read(&subch->packet_arrived) )
 	return 1;
 
     brl1_receive( sc );
 
-    if( subch->packet_arrived )
+    if( atomic_read(&subch->packet_arrived) )
 	return 1;
 
     return 0;
@@ -2461,6 +2310,9 @@ sc_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart )
 /* sc_dispatch_env_event handles events sent from the system control
  * network's environmental monitor tasks.
  */
+
+#ifdef LINUX_KERNEL_THREADS
+
 static void
 sc_dispatch_env_event( uint code, int argc, char *args, int maxlen )
 {
@@ -2512,18 +2364,16 @@ sc_dispatch_env_event( uint code, int argc, char *args, int maxlen )
 	for( ;
 	     i < j && ((args[i] == 0xd) || (args[i] == 0xa));
 	     i++ );
-	
-	/* write the event to syslog */
-#ifdef IRIX
-	cmn_err_tag( ESPcode, CE_WARN, &(args[i]) );
-#endif
     }
 }
+#endif	/* LINUX_KERNEL_THREADS */
 
 
 /* sc_event waits for events to arrive from the system controller, and
  * prints appropriate messages to the syslog.
  */
+
+#ifdef LINUX_KERNEL_THREADS
 static void
 sc_event( l1sc_t *sc, int ch )
 {
@@ -2544,7 +2394,7 @@ sc_event( l1sc_t *sc, int ch )
 	 */
 	result = sc_recv_intr( sc, ch, event, &event_len, 1 );
 	if( result != SC_SUCCESS ) {
-	    cmn_err( CE_WARN, "Error receiving sysctl event on nasid %d\n",
+	    PRINT_WARNING("Error receiving sysctl event on nasid %d\n",
 		     sc->nasid );
 	}
 	else {
@@ -2588,13 +2438,13 @@ sc_event( l1sc_t *sc, int ch )
 	
     }			
 }
+#endif	/* LINUX_KERNEL_THREADS */
 
 /* sc_listen sets up a service thread to listen for incoming events.
  */
 void
 sc_listen( l1sc_t *sc )
 {
-    int pl;
     int result;
     brl1_sch_t *subch;
 
@@ -2602,24 +2452,26 @@ sc_listen( l1sc_t *sc )
     int         len;    /* length of message being sent */
     int         ch;     /* system controller subchannel used */
 
+#ifdef LINUX_KERNEL_THREADS
     extern int msc_shutdown_pri;
+#endif
 
     /* grab the designated "event subchannel" */
-    SUBCH_LOCK( sc, pl );
+    SUBCH_LOCK( sc );
     subch = &(sc->subch[BRL1_EVENT_SUBCH]);
     if( subch->use != BRL1_SUBCH_FREE ) {
-	SUBCH_UNLOCK( sc, pl );
-	cmn_err( CE_WARN, "sysctl event subchannel in use! "
+	SUBCH_UNLOCK( sc );
+	PRINT_WARNING("sysctl event subchannel in use! "
 		 "Not monitoring sysctl events.\n" );
 	return;
     }
     subch->use = BRL1_SUBCH_RSVD;
-    SUBCH_UNLOCK( sc, pl );
+    SUBCH_UNLOCK( sc );
 
-    subch->packet_arrived = 0;
+    atomic_set(&subch->packet_arrived, 0);
     subch->target = BRL1_LOCALUART;
-    sv_init( &(subch->arrive_sv), SV_FIFO, NULL );
-    spinlock_init( &(subch->data_lock), NULL );
+    spin_lock_init( &(subch->data_lock) );
+    sv_init( &(subch->arrive_sv), &(subch->data_lock), SV_MON_SPIN | SV_ORDER_FIFO /* | SV_INTS */);
     subch->tx_notify = NULL;
     subch->rx_notify = sc_data_ready;
     subch->iqp = kmem_zalloc_node( sizeof(sc_cq_t), KM_NOSLEEP,
@@ -2670,7 +2522,7 @@ sc_listen( l1sc_t *sc )
 	
 err_return:
     /* there was a problem; complain */
-    cmn_err( CE_WARN, "failed to set sysctl event-monitoring subchannel.  "
+    PRINT_WARNING("failed to set sysctl event-monitoring subchannel.  "
 	     "Sysctl events will not be monitored.\n" );
 }
 
@@ -2825,7 +2677,7 @@ _elscuart_poll( l1sc_t *sc )
 int
 _elscuart_readc( l1sc_t *sc )
 {
-    int c, pl;
+    int c;
     sc_cq_t *q;
     brl1_sch_t *subch;
 
@@ -2833,32 +2685,32 @@ _elscuart_readc( l1sc_t *sc )
 	subch = &(sc->subch[ SC_CONS_SYSTEM ]);
 	q = subch->iqp;
 	
-	SUBCH_DATA_LOCK( subch, pl );
+	SUBCH_DATA_LOCK( subch );
         if( !cq_empty( q ) ) {
             cq_rem( q, c );
 	    if( cq_empty( q ) ) {
-		subch->packet_arrived = 0;
+		atomic_set(&subch->packet_arrived, 0);
 	    }
-	    SUBCH_DATA_UNLOCK( subch, pl );
+	    SUBCH_DATA_UNLOCK( subch );
             return c;
         }
-	SUBCH_DATA_UNLOCK( subch, pl );
+	SUBCH_DATA_UNLOCK( subch );
     }
 
     subch = &(sc->subch[ L1_ELSCUART_SUBCH(get_myid()) ]);
     q = subch->iqp;
 
-    SUBCH_DATA_LOCK( subch, pl );
+    SUBCH_DATA_LOCK( subch );
     if( cq_empty( q ) ) {
-	SUBCH_DATA_UNLOCK( subch, pl );
+	SUBCH_DATA_UNLOCK( subch );
         return -1;
     }
 
     cq_rem( q, c );
     if( cq_empty ( q ) ) {
-	subch->packet_arrived = 0;
+	atomic_set(&subch->packet_arrived, 0);
     }
-    SUBCH_DATA_UNLOCK( subch, pl );
+    SUBCH_DATA_UNLOCK( subch );
 
     return c;
 }
@@ -2918,6 +2770,7 @@ _elscuart_probe( l1sc_t *sc )
 #else
     char ver[BRL1_QSIZE];
     extern int elsc_version( l1sc_t *, char * );
+
     if ( IS_RUNNING_ON_SIMULATOR() )
     	return 0;
     return( elsc_version(sc, ver) >= 0 );
@@ -2932,43 +2785,13 @@ _elscuart_probe( l1sc_t *sc )
 void
 _elscuart_init( l1sc_t *sc )
 {
-    int pl;
     brl1_sch_t *subch = &sc->subch[L1_ELSCUART_SUBCH(get_myid())];
 
-    SUBCH_DATA_LOCK(subch, pl);
+    SUBCH_DATA_LOCK(subch);
 
-    subch->packet_arrived = 0;
+    atomic_set(&subch->packet_arrived, 0);
     cq_init( subch->iqp );
     cq_init( &sc->oq[MAP_OQ(L1_ELSCUART_SUBCH(get_myid()))] );
 
-    SUBCH_DATA_UNLOCK(subch, pl);
+    SUBCH_DATA_UNLOCK(subch);
 }
-
-
-#ifdef IRIX
-
-/* elscuart_syscon_listen causes the processor on which it's
- * invoked to "listen" to the system console subchannel (that
- * is, subchannel 4) for console input.
- */
-void
-elscuart_syscon_listen( l1sc_t *sc )
-{
-    int pl;
-    brl1_sch_t *subch = &(sc->subch[SC_CONS_SYSTEM]);
-
-    /* if we're already listening, don't bother */
-    if( sc->cons_listen )
-        return;
-
-    SUBCH_DATA_LOCK( subch, pl );
-
-    subch->use = BRL1_SUBCH_RSVD;
-    subch->packet_arrived = 0;
-
-    SUBCH_DATA_UNLOCK( subch, pl );
-
-
-    sc->cons_listen = 1;
-}
-#endif	/* IRIX */

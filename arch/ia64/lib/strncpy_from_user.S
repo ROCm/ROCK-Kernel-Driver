@@ -8,27 +8,15 @@
  *	in2:	length of buffer in bytes
  * Outputs:
  *	r8:	-EFAULT in case of fault or number of bytes copied if no fault
- * 
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ *
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 00/03/06 D. Mosberger Fixed to return proper return value (bug found by
  *			 by Andreas Schwab <schwab@suse.de>).
  */
 
 #include <asm/asmmacro.h>
-
-#define EX(x...)				\
-99:	x;					\
-	.section __ex_table,"a";		\
-	data4 @gprel(99b);			\
-	data4 .Lexit-99b;			\
-	.previous
-
-	.text
-	.psr abi64
-	.psr lsb
-	.lsb
 
 GLOBAL_ENTRY(__strncpy_from_user)
 	alloc r2=ar.pfs,3,0,0,0
@@ -41,15 +29,16 @@ GLOBAL_ENTRY(__strncpy_from_user)
 
 	// XXX braindead copy loop---this needs to be optimized
 .Loop1:
-	EX(ld1 r8=[in1],1;; st1 [in0]=r8,1; cmp.ne p6,p7=r8,r0)
+	EX(.Lexit, ld1 r8=[in1],1)
+	;;
+	EX(.Lexit, st1 [in0]=r8,1)
+	cmp.ne p6,p7=r8,r0
 	;;
 (p6)	cmp.ne.unc p8,p0=in1,r10
 (p8)	br.cond.dpnt.few .Loop1
 	;;
 (p6)	mov r8=in2		// buffer filled up---return buffer length
 (p7)	sub r8=in1,r9,1		// return string length (excluding NUL character)
-	br.ret.sptk.few rp
-
-.Lexit:
+[.Lexit:]
 	br.ret.sptk.few rp
 END(__strncpy_from_user)

@@ -188,6 +188,10 @@ ip27c_config_type:	.word 	0	/* To recognize special configs */
 #define	IP27C_R10000_SCCD_MASK		(7 << IP27C_R10000_SCCD_SHFT)
 #define	IP27C_R10000_SCCD(_B)		((_B) << IP27C_R10000_SCCD_SHFT)
 
+#define	IP27C_R10000_DDR_SHFT		23
+#define	IP27C_R10000_DDR_MASK		(1 << IP27C_R10000_DDR_SHFT)
+#define	IP27C_R10000_DDR(_B)		((_B) << IP27C_R10000_DDR_SHFT)
+
 #define	IP27C_R10000_SCCT_SHFT		25
 #define	IP27C_R10000_SCCT_MASK		(0xf << IP27C_R10000_SCCT_SHFT)
 #define	IP27C_R10000_SCCT(_B)		((_B) << IP27C_R10000_SCCT_SHFT)
@@ -375,6 +379,7 @@ static config_modifiable_t ip_config_table[NUMB_IP_CONFIGS] = {
 	 IP27C_R10000_SCCE(0)	 + \
 	 IP27C_R10000_ME(1)	 + \
 	 IP27C_R10000_SCS(4)	 + \
+	 IP27C_R10000_DDR(1)     + \
 	 IP27C_R10000_SCCD(3)	 + \
 	 IP27C_R10000_SCCT(0xa)	 + \
 	 IP27C_R10000_ODSC(0)	 + \
@@ -503,12 +508,7 @@ extern	config_modifiable_t	ip_config_table[];
  * for building hex images (as required by start.s)
  */
 #ifdef IP27_CONFIG_SN00_4MB_100_200_133
-#ifdef IRIX
-/* Set PrcReqMax to 0 to reduce memory problems */
-#define	BRINGUP_PRM_VAL	0
-#else
 #define	BRINGUP_PRM_VAL	3
-#endif
 #define CONFIG_CPU_MODE \
 	(IP27C_R10000_KSEG0CA(5) + \
 	 IP27C_R10000_DEVNUM(0)	 + \
@@ -593,6 +593,7 @@ extern	config_modifiable_t	ip_config_table[];
 	 IP27C_R10000_ME(1)	 + \
 	 IP27C_R10000_SCS(4)	 + \
 	 IP27C_R10000_SCCD(3)	 + \
+         IP27C_R10000_DDR(1)     + \
 	 IP27C_R10000_SCCT(0xa)	 + \
 	 IP27C_R10000_ODSC(0)	 + \
 	 IP27C_R10000_ODSYS(1)	 + \

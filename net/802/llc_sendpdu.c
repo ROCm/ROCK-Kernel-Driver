@@ -98,7 +98,7 @@ static unsigned char cr_bit_encode[] = {
 
 /*
  *	Sendpdu() constructs an output frame in a new skb and
- *	gives it to the MAC layer for transmision.
+ *	gives it to the MAC layer for transmission.
  *	This function is not used to send I pdus.
  *	No queues are updated here, nothing is saved for retransmission.
  *
@@ -186,7 +186,7 @@ void llc_unit_data_request(llcptr lp, int ll, char * data)
 
 /*
  *	llc_sendipdu() Completes an I pdu in an existing skb and gives it
- *	to the MAC layer for transmision.
+ *	to the MAC layer for transmission.
  *	Parameter "type" must be either I_CMD or I_RSP.
  *	The skb is not freed after xmit, it is kept in case a retransmission
  *	is requested. If needed it can be picked up again from the rtq.

@@ -36,13 +36,17 @@
 <toc></toc>
 
   <chapter id="Basics">
-     <title>Driver Basic</title>
+     <title>Driver Basics</title>
      <sect1><title>Driver Entry and Exit points</title>
 !Iinclude/linux/init.h
      </sect1>
 
      <sect1><title>Atomics</title>
 !Iinclude/asm-i386/atomic.h
+     </sect1>
+
+     <sect1><title>Delaying, scheduling, and timer routines</title>
+!Ekernel/sched.c
      </sect1>
   </chapter>
 
@@ -53,11 +57,42 @@
      </sect1>
   </chapter>
 
+  <chapter id="libc">
+     <title>Basic C Library Functions</title>
+
+     <para>
+       When writing drivers, you cannot in general use routines which are
+       from the C Library.  Some of the functions have been found generally
+       useful and they are listed below.  The behaviour of these functions
+       may vary slightly from those defined by ANSI, and these deviations
+       are noted in the text.
+     </para>
+
+     <sect1><title>String Conversions</title>
+!Ilib/vsprintf.c
+!Elib/vsprintf.c
+     </sect1>
+     <sect1><title>String Manipulation</title>
+!Ilib/string.c
+     </sect1>
+     <sect1><title>Bit Operations</title>
+!Iinclude/asm-i386/bitops.h
+     </sect1>
+  </chapter>
+
   <chapter id="mm">
      <title>Memory Management in Linux</title>
      <sect1><title>The Slab Cache</title>
 !Emm/slab.c
       </sect1>
+  </chapter>
+
+  <chapter id="proc">
+     <title>The proc filesystem</title>
+ 
+     <sect1><title>sysctl interface</title>
+!Ekernel/sysctl.c
+     </sect1>
   </chapter>
 
   <chapter id="vfs">
@@ -177,5 +212,68 @@
 !Edrivers/net/wan/z85230.c
   </chapter>
 
+  <chapter id="fbdev">
+     <title>Frame Buffer Library</title>
+
+     <para>
+       The frame buffer drivers depend heavily on four data structures.  
+       These structures are declared in include/linux/fb.h.  They are 
+       fb_info, fb_var_screeninfo, fb_fix_screeninfo and fb_monospecs. 
+       The last three can be made available to and from userland. 
+     </para>
+
+     <para>
+       fb_info defines the current state of a particular video card. 
+       Inside fb_info, there exists a fb_ops structure which is a 
+       collection of needed functions to make fbdev and fbcon work.
+       fb_info is only visible to the kernel.
+     </para>
+
+     <para>
+       fb_var_screeninfo is used to describe the features of a video card 
+       that are user defined.  With fb_var_screeninfo, things such as
+       depth and the resolution may be defined.
+     </para>
+
+     <para>
+       The next structure is fb_fix_screeninfo. This defines the 
+       properties of a card that are created when a mode is set and can't 
+       be changed otherwise.  A good example of this is the start of the 
+       frame buffer memory.  This "locks" the address of the frame buffer
+       memory, so that it cannot be changed or moved.
+     </para>
+
+     <para>
+       The last structure is fb_monospecs. In the old API, there was 
+       little importance for fb_monospecs. This allowed for forbidden things 
+       such as setting a mode of 800x600 on a fix frequency monitor. With 
+       the new API, fb_monospecs prevents such things, and if used 
+       correctly, can prevent a monitor from being cooked.  fb_monospecs
+       will not be useful until kernels 2.5.x.
+     </para>
+
+     <sect1><title>Frame Buffer Memory</title>
+!Edrivers/video/fbmem.c
+     </sect1>
+     <sect1><title>Frame Buffer Console</title>
+!Edrivers/video/fbcon.c
+     </sect1>
+     <sect1><title>Frame Buffer Colormap</title>
+!Edrivers/video/fbcmap.c
+     </sect1>
+     <sect1><title>Frame Buffer Generic Functions</title>
+!Idrivers/video/fbgen.c
+     </sect1>
+     <sect1><title>Frame Buffer Video Mode Database</title>
+!Idrivers/video/modedb.c
+!Edrivers/video/modedb.c
+     </sect1>
+     <sect1><title>Frame Buffer Macintosh Video Mode Database</title>
+!Idrivers/video/macmodes.c
+     </sect1>
+     <sect1><title>Frame Buffer Fonts</title>
+!Idrivers/video/fonts.c
+     </sect1>
+  </chapter>
 
 </book>

@@ -8,6 +8,8 @@
  * Copyright (C) 2000 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Jack Steiner (steiner@sgi.com)
  */
+#include <linux/config.h>
+
 #include <asm/efi.h>
 #include <asm/pal.h>
 #include <asm/sal.h>
@@ -62,6 +64,7 @@ int		bsp_lid;
 func_ptr_t	ap_entry;
 
 
+static efi_runtime_services_t    *efi_runtime_p;
 static char fw_mem[(  sizeof(efi_system_table_t)
 		    + sizeof(efi_runtime_services_t)
 		    + NUM_EFI_DESCS*sizeof(efi_config_table_t)
@@ -88,8 +91,8 @@ asm ("
 	.text
 	.proc pal_emulator_static
 pal_emulator_static:
-	mov r8=-1
-	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */
+	mov r8=-1;;
+	cmp.eq p6,p7=6,r28;;		/* PAL_PTCE_INFO */
 (p7)	br.cond.sptk.few 1f
 	;;
 	mov r8=0			/* status = 0 */
@@ -98,20 +101,20 @@ pal_emulator_static:
 	movl r11=0x1000000000002000	/* stride[0], stride[1] */
 	br.cond.sptk.few rp
 
-1:	cmp.eq p6,p7=14,r28		/* PAL_FREQ_RATIOS */
-(p7)	br.cond.sptk.few 1f
+1:	cmp.eq p6,p7=14,r28;;		/* PAL_FREQ_RATIOS */
+(p7)	br.cond.sptk.few 1f;;
 	mov r8=0			/* status = 0 */
 	movl r9 =0x100000064		/* proc_ratio (1/100) */
 	movl r10=0x100000100		/* bus_ratio<<32 (1/256) */
 	movl r11=0x10000000a		/* itc_ratio<<32 (1/100) */
 
-1:	cmp.eq p6,p7=22,r28		/* PAL_MC_DRAIN */
-(p7)	br.cond.sptk.few 1f
+1:	cmp.eq p6,p7=22,r28;;		/* PAL_MC_DRAIN */
+(p7)	br.cond.sptk.few 1f;;
 	mov r8=0
 	br.cond.sptk.few rp
 
-1:	cmp.eq p6,p7=23,r28		/* PAL_MC_EXPECTED */
-(p7)	br.cond.sptk.few 1f
+1:	cmp.eq p6,p7=23,r28;;		/* PAL_MC_EXPECTED */
+(p7)	br.cond.sptk.few 1f;;
 	mov r8=0
 	br.cond.sptk.few rp
 
@@ -256,6 +259,36 @@ fix_function_pointer(void *fp)
 	_fp->gp = __fwtab_pa(base_nasid, _fp->gp);
 }
 
+void
+fix_virt_function_pointer(void *fptr)
+{
+        func_ptr_t      *fp;
+
+        fp = fptr;
+        fp->pc = fp->pc | PAGE_OFFSET;
+        fp->gp = fp->gp | PAGE_OFFSET;
+}
+
+
+int
+efi_set_virtual_address_map(void)
+{
+        efi_runtime_services_t            *runtime;
+
+        runtime = efi_runtime_p;
+        fix_virt_function_pointer((void*)runtime->get_time);
+        fix_virt_function_pointer((void*)runtime->set_time);
+        fix_virt_function_pointer((void*)runtime->get_wakeup_time);
+        fix_virt_function_pointer((void*)runtime->set_wakeup_time);
+        fix_virt_function_pointer((void*)runtime->set_virtual_address_map);
+        fix_virt_function_pointer((void*)runtime->get_variable);
+        fix_virt_function_pointer((void*)runtime->get_next_variable);
+        fix_virt_function_pointer((void*)runtime->set_variable);
+        fix_virt_function_pointer((void*)runtime->get_next_high_mono_count);
+        fix_virt_function_pointer((void*)runtime->reset_system);
+        return EFI_SUCCESS;;
+}
+
 
 void
 sys_fw_init (const char *args, int arglen, int bsp)
@@ -305,7 +338,7 @@ sys_fw_init (const char *args, int arglen, int bsp)
 
 	cp = fw_mem;
 	efi_systab  = (void *) cp; cp += sizeof(*efi_systab);
-	efi_runtime = (void *) cp; cp += sizeof(*efi_runtime);
+	efi_runtime_p = efi_runtime = (void *) cp; cp += sizeof(*efi_runtime);
 	efi_tables  = (void *) cp; cp += NUM_EFI_DESCS*sizeof(*efi_tables);
 	sal_systab  = (void *) cp; cp += sizeof(*sal_systab);
 	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
@@ -354,7 +387,7 @@ sys_fw_init (const char *args, int arglen, int bsp)
 	efi_runtime->set_time = __fwtab_pa(base_nasid, &efi_unimplemented);
 	efi_runtime->get_wakeup_time = __fwtab_pa(base_nasid, &efi_unimplemented);
 	efi_runtime->set_wakeup_time = __fwtab_pa(base_nasid, &efi_unimplemented);
-	efi_runtime->set_virtual_address_map = __fwtab_pa(base_nasid, &efi_success);
+	efi_runtime->set_virtual_address_map = __fwtab_pa(base_nasid, &efi_set_virtual_address_map);
 	efi_runtime->get_variable = __fwtab_pa(base_nasid, &efi_unimplemented);
 	efi_runtime->get_next_variable = __fwtab_pa(base_nasid, &efi_unimplemented);
 	efi_runtime->set_variable = __fwtab_pa(base_nasid, &efi_unimplemented);
@@ -370,10 +403,11 @@ sys_fw_init (const char *args, int arglen, int bsp)
 	fix_function_pointer(&efi_get_time);
 	fix_function_pointer(&efi_success);
 	fix_function_pointer(&efi_reset_system);
+	fix_function_pointer(&efi_set_virtual_address_map);
 
 	/* fill in the ACPI system table: */
 	memcpy(acpi_systab->signature, "RSD PTR ", 8);
-	acpi_systab->rsdt = (acpi_rsdt_t*)__fwtab_pa(base_nasid, acpi_rsdt);
+	acpi_systab->rsdt = (struct acpi_rsdt*)__fwtab_pa(base_nasid, acpi_rsdt);
 
 	memcpy(acpi_rsdt->header.signature, "RSDT",4);
 	acpi_rsdt->header.length = sizeof(acpi_rsdt_t);

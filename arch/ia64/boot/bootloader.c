@@ -3,8 +3,8 @@
  *
  * Loads an ELF kernel.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
  *
  * 01/07/99 S.Eranian modified to pass command line arguments to kernel
@@ -65,35 +65,22 @@ cons_write (const char *buf)
 	}
 }
 
-void
-enter_virtual_mode (unsigned long new_psr)
-{
-	long tmp;
-
-	asm volatile ("movl %0=1f" : "=r"(tmp));
-	asm volatile ("mov cr.ipsr=%0" :: "r"(new_psr));
-	asm volatile ("mov cr.iip=%0" :: "r"(tmp));
-	asm volatile ("mov cr.ifs=r0");
-	asm volatile ("rfi;;");
-	asm volatile ("1:");
-}
-
 #define MAX_ARGS 32
 
 void
 _start (void)
 {
-	register long sp asm ("sp");
 	static char stack[16384] __attribute__ ((aligned (16)));
 	static char mem[4096];
 	static char buffer[1024];
-	unsigned long flags, off;
+	unsigned long off;
 	int fd, i;
 	struct disk_req req;
 	struct disk_stat stat;
 	struct elfhdr *elf;
 	struct elf_phdr *elf_phdr;	/* program header */
 	unsigned long e_entry, e_phoff, e_phnum;
+	register struct ia64_boot_param *bp;
 	char *kpath, *args;
 	long arglen = 0;
 
@@ -107,15 +94,13 @@ _start (void)
 	ssc(0, 0, 0, 0, SSC_CONSOLE_INIT);
 
 	/*
-	 * S.Eranian: extract the commandline argument from the 
-	 * simulator
+	 * S.Eranian: extract the commandline argument from the simulator
 	 *
 	 * The expected format is as follows:
          *
 	 *	kernelname args...
 	 *
-	 * Both are optional but you can't have the second one without the 
-	 * first.
+	 * Both are optional but you can't have the second one without the first.
 	 */
 	arglen = ssc((long) buffer, 0, 0, 0, SSC_GET_ARGS);
 
@@ -183,6 +168,10 @@ _start (void)
 		e_phoff += sizeof(*elf_phdr);
 
 		elf_phdr = (struct elf_phdr *) mem;
+
+		if (elf_phdr->p_type != PT_LOAD)
+			continue;
+
 		req.len = elf_phdr->p_filesz;
 		req.addr = __pa(elf_phdr->p_vaddr);
 		ssc(fd, 1, (long) &req, elf_phdr->p_offset, SSC_READ);
@@ -197,38 +186,12 @@ _start (void)
 	/* fake an I/O base address: */
 	asm volatile ("mov ar.k0=%0" :: "r"(0xffffc000000UL));
 
-	/*
-	 * Install a translation register that identity maps the
-	 * kernel's 256MB page.
-	 */
-	ia64_clear_ic(flags);
-	ia64_set_rr(          0, (0x1000 << 8) | (_PAGE_SIZE_1M << 2));
-	ia64_set_rr(PAGE_OFFSET, (ia64_rid(0, PAGE_OFFSET) << 8) | (_PAGE_SIZE_256M << 2));
-	ia64_srlz_d();
-	ia64_itr(0x3, 0, 1024*1024,
-		 pte_val(mk_pte_phys(1024*1024, __pgprot(__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RWX))),
-		 _PAGE_SIZE_1M);
-	ia64_itr(0x3, 1, PAGE_OFFSET,
-		 pte_val(mk_pte_phys(0, __pgprot(__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RWX))),
-		 _PAGE_SIZE_256M);
-	ia64_srlz_i();
-
-	enter_virtual_mode(flags | IA64_PSR_IT | IA64_PSR_IC | IA64_PSR_DT | IA64_PSR_RT
-			   | IA64_PSR_DFH | IA64_PSR_BN);
-
-	sys_fw_init(args, arglen);
+	bp = sys_fw_init(args, arglen);
 
 	ssc(0, (long) kpath, 0, 0, SSC_LOAD_SYMBOLS);
 
-	/*
-	 * Install the kernel's command line argument on ZERO_PAGE
-	 * just after the botoparam structure.
-	 * In case we don't have any argument just put \0
-	 */
-	memcpy(((struct ia64_boot_param *)ZERO_PAGE_ADDR) + 1, args, arglen);
-	sp = __pa(&stack);
-
-	asm volatile ("br.sptk.few %0" :: "b"(e_entry));
+	asm volatile ("mov sp=%2; mov r28=%1; br.sptk.few %0"
+		      :: "b"(e_entry), "r"(bp), "r"(__pa(&stack)));
 
 	cons_write("kernel returned!\n");
 	ssc(-1, 0, 0, 0, SSC_EXIT);

@@ -8,11 +8,12 @@
  * This hopefully works with any (fixed) IA-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
+
 #include <asm/mman.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -103,12 +104,6 @@
  */
 #define PTRS_PER_PTE	(__IA64_UL(1) << (PAGE_SHIFT-3))
 
-# ifndef __ASSEMBLY__
-
-#include <asm/bitops.h>
-#include <asm/mmu_context.h>
-#include <asm/system.h>
-
 /*
  * All the normal masks have the "page accessed" bits on, as any time
  * they are used, the page is accessed. They are cleared only by the
@@ -125,6 +120,13 @@
 #define PAGE_COPY	__pgprot(__ACCESS_BITS | _PAGE_PL_3 | _PAGE_AR_R)
 #define PAGE_GATE	__pgprot(__ACCESS_BITS | _PAGE_PL_0 | _PAGE_AR_X_RX)
 #define PAGE_KERNEL	__pgprot(__DIRTY_BITS  | _PAGE_PL_0 | _PAGE_AR_RWX)
+
+# ifndef __ASSEMBLY__
+
+#include <asm/bitops.h>
+#include <asm/mmu_context.h>
+#include <asm/processor.h>
+#include <asm/system.h>
 
 /*
  * Next come the mappings that determine how mmap() protection bits
@@ -173,7 +175,7 @@
 static inline long
 ia64_phys_addr_valid (unsigned long addr)
 {
-	return (addr & (my_cpu_data.unimpl_pa_mask)) == 0;
+	return (addr & (local_cpu_data->unimpl_pa_mask)) == 0;
 }
 
 /*
@@ -203,25 +205,12 @@ ia64_phys_addr_valid (unsigned long addr)
 #define set_pte(ptep, pteval)	(*(ptep) = (pteval))
 
 #define RGN_SIZE	(1UL << 61)
-#define RGN_MAP_LIMIT	(1UL << (4*PAGE_SHIFT - 12))	/* limit of mappable area in region */
+#define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
 #define RGN_KERNEL	7
 
-#define VMALLOC_START		(0xa000000000000000 + 2*PAGE_SIZE)
+#define VMALLOC_START		(0xa000000000000000 + 3*PAGE_SIZE)
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
-#define VMALLOC_END		(0xa000000000000000 + RGN_MAP_LIMIT)
-
-/*
- * BAD_PAGETABLE is used when we need a bogus page-table, while
- * BAD_PAGE is used for a bogus page.
- *
- * ZERO_PAGE is a global shared page that is always zero:  used
- * for zero-mapped memory areas etc..
- */
-extern pte_t ia64_bad_page (void);
-extern pmd_t *ia64_bad_pagetable (void);
-
-#define BAD_PAGETABLE	ia64_bad_pagetable()
-#define BAD_PAGE	ia64_bad_page()
+#define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
 
 /*
  * Conversion functions: convert a page and protection to a page entry,
@@ -251,14 +240,12 @@ extern pmd_t *ia64_bad_pagetable (void);
 /* pte_page() returns the "struct page *" corresponding to the PTE: */
 #define pte_page(pte)			(mem_map + (unsigned long) ((pte_val(pte) & _PFN_MASK) >> PAGE_SHIFT))
 
-#define pmd_set(pmdp, ptep) 		(pmd_val(*(pmdp)) = __pa(ptep))
 #define pmd_none(pmd)			(!pmd_val(pmd))
 #define pmd_bad(pmd)			(!ia64_phys_addr_valid(pmd_val(pmd)))
 #define pmd_present(pmd)		(pmd_val(pmd) != 0UL)
 #define pmd_clear(pmdp)			(pmd_val(*(pmdp)) = 0UL)
 #define pmd_page(pmd)			((unsigned long) __va(pmd_val(pmd) & _PFN_MASK))
 
-#define pgd_set(pgdp, pmdp)		(pgd_val(*(pgdp)) = __pa(pmdp))
 #define pgd_none(pgd)			(!pgd_val(pgd))
 #define pgd_bad(pgd)			(!ia64_phys_addr_valid(pgd_val(pgd)))
 #define pgd_present(pgd)		(pgd_val(pgd) != 0UL)
@@ -301,7 +288,11 @@ extern pmd_t *ia64_bad_pagetable (void);
  * works bypasses the caches, but does allow for consecutive writes to
  * be combined into single (but larger) write transactions.
  */
-#define pgprot_writecombine(prot)	__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_WC)
+#ifdef CONFIG_MCKINLEY_A0_SPECIFIC
+# define pgprot_writecombine(prot)	prot
+#else
+# define pgprot_writecombine(prot)	__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_WC)
+#endif
 
 /*
  * Return the region index for virtual address ADDRESS.

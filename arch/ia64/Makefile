@@ -5,7 +5,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1998-2000 by David Mosberger-Tang <davidm@hpl.hp.com>
+# Copyright (C) 1998-2001 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
 NM := $(CROSS_COMPILE)nm -B
@@ -14,13 +14,13 @@ AWK := awk
 export AWK
 
 LINKFLAGS = -static -T arch/$(ARCH)/vmlinux.lds
-AFLAGS += -Wa,-x 
+AFLAGS += -Wa,-x
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
 
 CFLAGS := $(CFLAGS) -pipe $(EXTRA) -Wa,-x -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
 	  -funwind-tables -falign-functions=32
-# -frename-registers
+# -frename-registers (this crashes the Nov 17 compiler...)
 CFLAGS_KERNEL := -mconstant-gp
 
 ifeq ($(CONFIG_ITANIUM_ASTEP_SPECIFIC),y)
@@ -53,7 +53,7 @@ ifdef CONFIG_IA64_HP_SIM
 endif
 
 ifdef CONFIG_IA64_SGI_SN1
-CFLAGS += -DBRINGUP
+	CFLAGS		+= -DBRINGUP
         SUBDIRS         :=      arch/$(ARCH)/sn/sn1	\
 				arch/$(ARCH)/sn		\
 				arch/$(ARCH)/sn/io	\
@@ -103,6 +103,11 @@ arch/$(ARCH)/vmlinux.lds: arch/$(ARCH)/vmlinux.lds.S FORCE
 
 FORCE: ;
 
+compressed: vmlinux
+	$(OBJCOPY) --strip-all vmlinux vmlinux-tmp
+	gzip -9 vmlinux-tmp
+	mv vmlinux-tmp.gz vmlinux.gz
+
 rawboot:
 	@$(MAKEBOOT) rawboot
 
@@ -120,8 +125,6 @@ srmboot:
 	@$(MAKEBOOT) srmboot
 
 archclean:
-	@$(MAKE) -C arch/$(ARCH)/kernel clean
-	@$(MAKE) -C arch/$(ARCH)/tools clean
 	@$(MAKEBOOT) clean
 
 archmrproper:

@@ -11,12 +11,12 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/pci_ids.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
 #include <asm/sn/types.h>
 #include <asm/sn/hack.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/iobus.h>
 #include <asm/sn/iograph.h>
 #include <asm/param.h>
@@ -31,23 +31,34 @@
 #include <asm/sn/intr.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
 #include <asm/sn/klconfig.h>
+#include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/io.h>
-#include <asm/sn/pci/pci_bus_cvlink.h>
 
 #include <asm/sn/pci/pciio.h>
 // #include <sys/ql.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 extern int bridge_rev_b_data_check_disable;
+#include <asm/sn/pci/pciio.h>
+#include <asm/sn/pci/pci_bus_cvlink.h>
 
 #define MAX_PCI_XWIDGET 256
-devfs_handle_t busnum_to_xwidget[MAX_PCI_XWIDGET];
+devfs_handle_t busnum_to_pcibr_vhdl[MAX_PCI_XWIDGET];
 nasid_t busnum_to_nid[MAX_PCI_XWIDGET];
+void * busnum_to_atedmamaps[MAX_PCI_XWIDGET];
 unsigned char num_bridges;
 static int done_probing = 0;
 
 static int pci_bus_map_create(devfs_handle_t xtalk);
 devfs_handle_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
+
+#define SN1_IOPORTS_UNIT 256
+#define MAX_IOPORTS 0xffff
+#define MAX_IOPORTS_CHUNKS (MAX_IOPORTS / SN1_IOPORTS_UNIT)
+struct ioports_to_tlbs_s ioports_to_tlbs[MAX_IOPORTS_CHUNKS];
+unsigned long sn1_allocate_ioports(unsigned long pci_address);
+
+
 
 /*
  * pci_bus_cvlink_init() - To be called once during initialization before 
@@ -56,9 +67,13 @@ devfs_handle_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 void
 pci_bus_cvlink_init(void)
 {
-
-	memset(busnum_to_xwidget, 0x0, sizeof(devfs_handle_t) * MAX_PCI_XWIDGET);
+	memset(busnum_to_pcibr_vhdl, 0x0, sizeof(devfs_handle_t) * MAX_PCI_XWIDGET);
 	memset(busnum_to_nid, 0x0, sizeof(nasid_t) * MAX_PCI_XWIDGET);
+
+	memset(busnum_to_atedmamaps, 0x0, sizeof(void *) * MAX_PCI_XWIDGET);
+
+	memset(ioports_to_tlbs, 0x0, sizeof(ioports_to_tlbs));
+
 	num_bridges = 0;
 }
 
@@ -70,27 +85,13 @@ devfs_handle_t
 pci_bus_to_vertex(unsigned char busnum)
 {
 
-	devfs_handle_t	xwidget;
 	devfs_handle_t	pci_bus = NULL;
 
 
 	/*
 	 * First get the xwidget vertex.
 	 */
-	xwidget = busnum_to_xwidget[busnum];
-	if (!xwidget)
-		return (NULL);
-
-	/*
-	 * Use devfs to get the pci vertex from xwidget.
-	 */
-	if (hwgraph_traverse(xwidget, EDGE_LBL_PCI, &pci_bus) != GRAPH_SUCCESS) {
-		if (!pci_bus) {
-			printk("pci_bus_to_vertex: Cannot find pci bus for given bus number %d\n", busnum);
-			return (NULL);
-		}
-	}
-
+	pci_bus = busnum_to_pcibr_vhdl[busnum];
 	return(pci_bus);
 }
 
@@ -138,7 +139,6 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 
 	if (hwgraph_traverse(pci_bus, name, &device_vertex) != GRAPH_SUCCESS) {
 		if (!device_vertex) {
-			printk("devfn_to_vertex: Unable to get slot&func %s from pci vertex 0x%p\n", name, pci_bus);
 			return(NULL);
 		}
 	}
@@ -175,6 +175,61 @@ set_sn1_pci64(struct pci_dev *dev)
 }
 
 /*
+ * sn1_allocate_ioports() - This routine provides the allocation and 
+ *	mappings between Linux style IOPORTs management.
+ *
+ *	For simplicity sake, SN1 will allocate IOPORTs in chunks of 
+ *	256bytes .. irrespective of what the card desires.  This may 
+ *	have to change when we understand how to deal with legacy ioports 
+ *	which are hardcoded in some drivers e.g. SVGA.
+ *
+ *	Ofcourse, the SN1 IO Infrastructure has no concept of IOPORT numbers.
+ *	It will remain so.  The IO Infrastructure will continue to map 
+ *	IO Resource just like IRIX.  When this is done, we map IOPORT 
+ *	chunks to these resources.  The Linux drivers will see and use real 
+ *	IOPORT numbers.  The various IOPORT access macros e.g. inb/outb etc. 
+ *	does the munging of these IOPORT numbers to make a Uncache Virtual 
+ *	Address.  This address via the tlb entries generates the PCI Address 
+ *	allocated by the SN1 IO Infrastructure Layer.
+ */
+static unsigned long sn1_ioport_num = 0x100; /* Reserve room for Legacy stuff */
+unsigned long
+sn1_allocate_ioports(unsigned long pci_address)
+{
+	
+	unsigned long ioport_index;
+
+	/*
+	 * Just some idiot checking ..
+	 */
+	if ( sn1_ioport_num > 0xffff ) {
+		printk("sn1_allocate_ioports: No more IO PORTS available\n");
+		return(-1);
+	}
+
+	/*
+	 * See Section 4.1.1.5 of Intel IA-64 Acrchitecture Software Developer's
+	 * Manual for details.
+	 */
+	ioport_index = sn1_ioport_num / SN1_IOPORTS_UNIT;
+	ioports_to_tlbs[ioport_index].ppn = pci_address;
+	ioports_to_tlbs[ioport_index].p = 1; /* Present Bit */
+	ioports_to_tlbs[ioport_index].ma = 5; /* Memory Attributes */
+	ioports_to_tlbs[ioport_index].a = 0; /* Set Data Access Bit Fault */
+	ioports_to_tlbs[ioport_index].d = 0; /* Dirty Bit */
+	ioports_to_tlbs[ioport_index].pl = 3;/* Privilege Level - All levels can R/W*/
+	ioports_to_tlbs[ioport_index].ar = 2; /* Access Rights - R/W only*/
+	ioports_to_tlbs[ioport_index].ed = 0; /* Exception Deferral Bit */
+	ioports_to_tlbs[ioport_index].ig = 0; /* Ignored */
+
+	printk("sn1_allocate_ioports: ioport_index 0x%x ioports_to_tlbs 0x%p\n", ioport_index, ioports_to_tlbs[ioport_index].ppn);
+	
+	sn1_ioport_num += SN1_IOPORTS_UNIT;
+
+	return(sn1_ioport_num - SN1_IOPORTS_UNIT);
+}
+
+/*
  * sn1_pci_fixup() - This routine is called when platform_pci_fixup() is 
  *	invoked at the end of pcibios_init() to link the Linux pci 
  *	infrastructure to SGI IO Infrasturcture - ia64/kernel/pci.c
@@ -189,6 +244,11 @@ sn1_pci_fixup(int arg)
 	struct pci_dev *device_dev = NULL;
 	struct sn1_widget_sysdata *widget_sysdata;
 	struct sn1_device_sysdata *device_sysdata;
+	unsigned long ioport;
+	pciio_intr_t intr_handle;
+	int cpuid, bit;
+	devfs_handle_t *device_vertex;
+	pciio_intr_line_t lines;
 	extern void sn1_pci_find_bios(void);
 
 
@@ -204,7 +264,6 @@ unsigned long   res;
         devfs_handle_t  bridge_vhdl = pci_bus_to_vertex(0);
         pcibr_soft_t    pcibr_soft = (pcibr_soft_t) hwgraph_fastinfo_get(bridge_vhdl);
 	bridge_t        *bridge = pcibr_soft->bs_base;
-printk("Before Changing PIO Map Address:\n");
         printk("pci_fixup_ioc3: Before devreg fixup\n");
         printk("pci_fixup_ioc3: Devreg 0 0x%x\n", bridge->b_device[0].reg);
         printk("pci_fixup_ioc3: Devreg 1 0x%x\n", bridge->b_device[1].reg);
@@ -280,16 +339,11 @@ printk("Before Changing PIO Map Address:\n");
 			size = device_dev->resource[idx].end -
 				device_dev->resource[idx].start;
 			if (size) {
-res = 0;
-res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
-printk("Before pciio_pio_addr Base address %d = 0x%lx\n", idx, res);
+				res = 0;
+				res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
+				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(vhdl, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, PCIIO_BYTE_STREAM);
 
-				printk(" Changing device %d:%d resource start address from 0x%lx", 
-				PCI_SLOT(device_dev->devfn),PCI_FUNC(device_dev->devfn),
-				device_dev->resource[idx].start);
-				device_dev->resource[idx].start = 
-				(unsigned long)pciio_pio_addr(vhdl, 0, 
-					PCIIO_SPACE_WIN(idx), 0, size, 0, PCIIO_BYTE_STREAM);
+/* printk("sn1_pci_fixup: Mapped Address = 0x%p size = 0x%x\n", device_dev->resource[idx].start, size); */
 			}
 			else
 				continue;
@@ -304,13 +358,14 @@ printk("Before pciio_pio_addr Base address %d = 0x%lx\n", idx, res);
 				device_dev->resource[idx].start & 0xfffff7ffffffffff;
 			device_dev->resource[idx].end = 
 				device_dev->resource[idx].end & 0xfffff7ffffffffff;
-			printk(" to 0x%lx\n", device_dev->resource[idx].start);
-res = 0;
-res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
-printk("After pciio_pio_addr Base address %d = 0x%lx\n", idx, res);
-
-			if (device_dev->resource[idx].flags & IORESOURCE_IO)
+			res = 0;
+			res = pciio_config_get(vhdl, (unsigned) PCI_BASE_ADDRESS_0 + idx, 4);
+			if (device_dev->resource[idx].flags & IORESOURCE_IO) {
 				cmd |= PCI_COMMAND_IO;
+				ioport = sn1_allocate_ioports(device_dev->resource[idx].start);
+				/* device_dev->resource[idx].start = ioport; */
+				/* device_dev->resource[idx].end = ioport + SN1_IOPORTS_UNIT */
+			}
 			else if (device_dev->resource[idx].flags & IORESOURCE_MEM)
 				cmd |= PCI_COMMAND_MEMORY;
 		}
@@ -319,9 +374,6 @@ printk("After pciio_pio_addr Base address %d = 0x%lx\n", idx, res);
 		 */
 		size = device_dev->resource[PCI_ROM_RESOURCE].end -
 			device_dev->resource[PCI_ROM_RESOURCE].start;
-		printk(" Changing device %d:%d ROM resource start address from 0x%lx", 
-			PCI_SLOT(device_dev->devfn),PCI_FUNC(device_dev->devfn),
-			device_dev->resource[PCI_ROM_RESOURCE].start);
 		device_dev->resource[PCI_ROM_RESOURCE].start =
 			(unsigned long) pciio_pio_addr(vhdl, 0, PCIIO_SPACE_ROM, 0, 
 				size, 0, PCIIO_BYTE_STREAM);
@@ -341,24 +393,26 @@ printk("After pciio_pio_addr Base address %d = 0x%lx\n", idx, res);
 					   /* bit gets dropped .. no harm */
 		pci_write_config_word(device_dev, PCI_COMMAND, cmd);
 
-		printk("  to 0x%lx\n", device_dev->resource[PCI_ROM_RESOURCE].start);
+		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN, &lines);
+#ifdef BRINGUP
+		if (device_dev->vendor == PCI_VENDOR_ID_SGI &&
+			device_dev->device == PCI_DEVICE_ID_SGI_IOC3 ) {
+				lines = 1;
+		}
 
-		/*
-		 * Set the irq correctly.
-		 * Bits 7:3 = slot
-		 * Bits 2:0 = function
-		 *
-		 * In the IRQ we will have:
-		 *	Bits 24:16 = bus number
-		 *	Bits 15:8 = slot|func number
-		 */
-		irq = 0;
-		irq = (irq | (device_dev->devfn << 8));
-		irq = (irq | ( (device_dev->bus->number & 0xff) << 16) );
+#endif
+ 
+		device_sysdata = (struct sn1_device_sysdata *)device_dev->sysdata;
+		device_vertex = device_sysdata->vhdl;
+ 
+		intr_handle = pciio_intr_alloc(device_vertex, NULL, lines, device_vertex);
+
+		bit = intr_handle->pi_irq;
+		cpuid = intr_handle->pi_cpu;
+		irq = bit_pos_to_irq(bit);
+		irq = irq + (cpuid << 8);
+		pciio_intr_connect(intr_handle, NULL, NULL, NULL);
 		device_dev->irq = irq;
-printk("sn1_pci_fixup: slot= %d  fn= %d  vendor= 0x%x  device= 0x%x  irq= 0x%x\n",
-PCI_SLOT(device_dev->devfn),PCI_FUNC(device_dev->devfn),device_dev->vendor,
-device_dev->device, device_dev->irq);
 
 	}
 #endif	/* REAL_HARDWARE */
@@ -369,7 +423,6 @@ device_dev->device, device_dev->irq);
         pcibr_soft_t    pcibr_soft = (pcibr_soft_t) hwgraph_fastinfo_get(bridge_vhdl);
         bridge_t        *bridge = pcibr_soft->bs_base;
 
-printk("After Changing PIO Map Address:\n");
         printk("pci_fixup_ioc3: Before devreg fixup\n");
         printk("pci_fixup_ioc3: Devreg 0 0x%x\n", bridge->b_device[0].reg);
         printk("pci_fixup_ioc3: Devreg 1 0x%x\n", bridge->b_device[1].reg);
@@ -386,6 +439,25 @@ printk("After Changing PIO Map Address:\n");
 
 /*
  * pci_bus_map_create() - Called by pci_bus_to_hcl_cvlink() to finish the job.
+ *
+ *	Linux PCI Bus numbers are assigned from lowest module_id numbers
+ *	(rack/slot etc.) starting from HUB_WIDGET_ID_MAX down to 
+ *	HUB_WIDGET_ID_MIN:
+ *		widgetnum 15 gets lower Bus Number than widgetnum 14 etc.
+ *
+ *	Given 2 modules 001c01 and 001c02 we get the following mappings:
+ *		001c01, widgetnum 15 = Bus number 0
+ *		001c01, widgetnum 14 = Bus number 1
+ *		001c02, widgetnum 15 = Bus number 3
+ *		001c02, widgetnum 14 = Bus number 4
+ *		etc.
+ *
+ * The rational for starting Bus Number 0 with Widget number 15 is because 
+ * the system boot disks are always connected via Widget 15 Slot 0 of the 
+ * I-brick.  Linux creates /dev/sd* devices(naming) strating from Bus Number 0 
+ * Therefore, /dev/sda1 will be the first disk, on Widget 15 of the lowest 
+ * module id(Master Cnode) of the system.
+ *	
  */
 static int 
 pci_bus_map_create(devfs_handle_t xtalk)
@@ -402,10 +474,21 @@ pci_bus_map_create(devfs_handle_t xtalk)
 	/*
 	 * Loop throught this vertex and get the Xwidgets ..
 	 */
-	for (widgetnum = HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX; widgetnum++) {
+	for (widgetnum = HUB_WIDGET_ID_MAX; widgetnum >= HUB_WIDGET_ID_MIN; widgetnum--) {
+        {
+                int pos;
+                char dname[256];
+                pos = devfs_generate_path(xtalk, dname, 256);
+                printk("%s : path= %s\n", __FUNCTION__, &dname[pos]);
+        }
+
 		sprintf(pathname, "%d", widgetnum);
 		xwidget = NULL;
 		
+		/*
+		 * Example - /hw/module/001c16/Pbrick/xtalk/8 is the xwidget
+		 *	     /hw/module/001c16/Pbrick/xtalk/8/pci/1 is device
+		 */
 		rv = hwgraph_traverse(xtalk, pathname, &xwidget);
 		if ( (rv != GRAPH_SUCCESS) ) {
 			if (!xwidget)
@@ -425,25 +508,35 @@ pci_bus_map_create(devfs_handle_t xtalk)
 		 * Should not be any race here ...
 		 */
 		num_bridges++;
-		busnum_to_xwidget[num_bridges - 1] = xwidget;
+		busnum_to_pcibr_vhdl[num_bridges - 1] = pci_bus;
 
 		/*
 		 * Get the master node and from there get the NASID.
 		 */
 		master_node_vertex = device_master_get(xwidget);
 		if (!master_node_vertex) {
-			printk(" **** pci_bus_map_create: Unable to get .master for vertex 0x%p **** \n", xwidget);
+			printk("WARNING: pci_bus_map_create: Unable to get .master for vertex 0x%p\n", xwidget);
 		}
 	
 		hubinfo_get(master_node_vertex, &hubinfo);
 		if (!hubinfo) {
-			printk(" **** pci_bus_map_create: Unable to get hubinfo for master node vertex 0x%p ****\n", master_node_vertex);
+			printk("WARNING: pci_bus_map_create: Unable to get hubinfo for master node vertex 0x%p\n", master_node_vertex);
 			return(1);
 		} else {
 			busnum_to_nid[num_bridges - 1] = hubinfo->h_nasid;
 		}
 
-		printk("pci_bus_map_create: Found Hub nasid %d PCI Xwidget 0x%p  widgetnum= %d\n", hubinfo->h_nasid, xwidget, widgetnum);
+		/*
+		 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
+		 */
+		busnum_to_atedmamaps[num_bridges - 1] = (void *) kmalloc(
+			sizeof(struct sn1_dma_maps_s) * 512, GFP_KERNEL);
+		if (!busnum_to_atedmamaps[num_bridges - 1])
+			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, xwidget);
+
+		memset(busnum_to_atedmamaps[num_bridges - 1], 0x0, 
+			sizeof(struct sn1_dma_maps_s) * 512);
+
 	}
 
         return(0);
@@ -468,6 +561,9 @@ pci_bus_to_hcl_cvlink(void)
 	graph_vertex_place_t placeptr = EDGE_PLACE_WANT_REAL_EDGES;
 	int rv = 0;
 	char name[256];
+	int master_iobrick;
+	moduleid_t iobrick_id;
+	int i;
 
 	/*
 	 * Iterate throught each xtalk links in the system ..
@@ -480,42 +576,48 @@ pci_bus_to_hcl_cvlink(void)
 	devfs_hdl = hwgraph_path_to_vertex("/dev/hw/module");
 
 	/*
-	 * Loop throught this directory "/devfs/hw/module/" and get each 
-	 * of it's entry.
+	 * To provide consistent(not persistent) device naming, we need to start 
+	 * bus number allocation from the C-Brick with the lowest module id e.g. 001c01 
+	 * with an attached I-Brick.  Find the master_iobrick.
 	 */
-	while (1) {
-	
-		/* Get vertex of component /dev/hw/<module_number> */
-		memset((char *)name, '0', 256);
-		module_comp = NULL;
-		rv = hwgraph_edge_get_next(devfs_hdl, (char *)name, &module_comp, (uint *)&placeptr);
-		if ((rv == 0) && (module_comp)) {
-			/* Found a valid entry */
-			node = NULL;
-			rv = hwgraph_edge_get(module_comp, "node", &node);
-
-		} else {
-			printk("pci_bus_to_hcl_cvlink: No more Module Component.\n");
-			return(0);
-		}
-
-		if ( (rv != 0) || (!node) ){
-			printk("pci_bus_to_hcl_cvlink: Module Component does not have node vertex.\n");
-			continue;
-		} else {
-			xtalk = NULL;
-			rv = hwgraph_edge_get(node, "xtalk", &xtalk);
-			if ( (rv != 0) || (xtalk == NULL) ){
-				printk("pci_bus_to_hcl_cvlink: Node has no xtalk vertex.\n");
-				continue;
+	master_iobrick = -1;
+	for (i = 0; i < nummodules; i++) {
+		moduleid_t iobrick_id; 
+		iobrick_id = iobrick_module_get(&modules[i]->elsc);
+		if (iobrick_id > 0) { /* Valid module id */
+			if (MODULE_GET_BTYPE(iobrick_id) == MODULE_IBRICK) {
+				master_iobrick = i;
+				break;
 			}
 		}
+	}
 
-		printk("pci_bus_to_hcl_cvlink: Found Module %s node vertex = 0x%p xtalk vertex = 0x%p\n", name, node, xtalk);
-		/*
-		 * Call routine to get the existing PCI Xwidget and create
-		 * the convenience link from "/devfs/hw/pci_bus/.."
-		 */
+	/*
+	 * The master_iobrick gets bus 0 and 1.
+	 */
+	if (master_iobrick >= 0) {
+		memset(name, 0, 256);
+		format_module_id(name, modules[master_iobrick]->id, MODULE_FORMAT_BRIEF);
+		strcat(name, "/node/xtalk");
+		xtalk = NULL;
+		rv = hwgraph_edge_get(devfs_hdl, name, &xtalk);
+		pci_bus_map_create(xtalk);
+	}
+		
+	/*
+	 * Now go do the rest of the modules, starting from the C-Brick with the lowest 
+	 * module id, remembering to skip the master_iobrick, which was done above.
+	 */
+	for (i = 0; i < nummodules; i++) {
+		if (i == master_iobrick) {
+			continue; /* Did the master_iobrick already. */
+		}
+
+		memset(name, 0, 256);
+		format_module_id(name, modules[i]->id, MODULE_FORMAT_BRIEF);
+		strcat(name, "/node/xtalk");
+		xtalk = NULL;
+		rv = hwgraph_edge_get(devfs_hdl, name, &xtalk);
 		pci_bus_map_create(xtalk);
 	}
 
@@ -539,10 +641,8 @@ sgi_pci_intr_support (unsigned int requested_irq, device_desc_t *dev_desc,
 	struct sn1_widget_sysdata *widget_sysdata;
 	struct sn1_device_sysdata *device_sysdata;
 
-	printk("sgi_pci_intr_support: Called with requested_irq 0x%x\n", requested_irq);
-
 	if (!dev_desc || !bus_vertex || !device_vertex) {
-		printk("sgi_pci_intr_support: Invalid parameter dev_desc 0x%p, bus_vertex 0x%p, device_vertex 0x%p\n", dev_desc, bus_vertex, device_vertex);
+		printk("WARNING: sgi_pci_intr_support: Invalid parameter dev_desc 0x%p, bus_vertex 0x%p, device_vertex 0x%p\n", dev_desc, bus_vertex, device_vertex);
 		return(-1);
 	}
 
@@ -577,15 +677,11 @@ sgi_pci_intr_support (unsigned int requested_irq, device_desc_t *dev_desc,
 	if (pci_dev->vendor == PCI_VENDOR_ID_SGI &&
 	    pci_dev->device == PCI_DEVICE_ID_SGI_IOC3 ) {
 		*lines = 1;
-		printk("%s : IOC3 HACK: lines= %d\n", __FUNCTION__, *lines);
 	}
 #endif /* BRINGUP */
 
 	/* Not supported currently */
 	*dev_desc = NULL;
-
-	printk("sgi_pci_intr_support: Device Descriptor 0x%p, Bus Vertex 0x%p, Interrupt Pins 0x%x, Device Vertex 0x%p\n", *dev_desc, *bus_vertex, *lines, *device_vertex);
-
 	return(0);
 
 }

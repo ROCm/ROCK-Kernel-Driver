@@ -1,46 +1,75 @@
-	;; $Id: head.S,v 1.11 2001/01/16 16:31:38 bjornw Exp $
-	;; 
-	;; Head of the kernel - alter with care
-	;;
-	;; Copyright (C) 2000, 2001 Axis Communications AB
-	;;
-	;; Authors:	Bjorn Wesen (bjornw@axis.com)
-	;; 
-	;; $Log: head.S,v $
-	;; Revision 1.11  2001/01/16 16:31:38  bjornw
-	;; * Changed name and semantics of running_from_flash to romfs_in_flash,
-	;;   set by head.S to indicate to setup.c whether there is a cramfs image
-	;;   after the kernels BSS or not. Should work for all three boot-cases
-	;;   (DRAM with cramfs in DRAM, DRAM with cramfs in flash (compressed boot),
-	;;    and flash with cramfs in flash)
-	;;
-	;; Revision 1.10  2001/01/16 14:12:21  bjornw
-	;; * Check for cramfs start passed in r9 from the decompressor, if all other
-	;;   cramfs options fail (if we boot from DRAM but don't find a cramfs image
-	;;   after the kernel in DRAM, it is probably still in the flash)
-	;; * Check magic in cramfs detection when booting from flash directly
-	;;
-	;; Revision 1.9  2001/01/15 17:17:02  bjornw
-	;; * Corrected the code that detects the cramfs lengths
-	;; * Added a comment saying that the above does not work due to other
-	;;   reasons..
-	;;
-	;; Revision 1.8  2001/01/15 16:27:51  jonashg
-	;; Made boot after flashing work.
-	;; * end destination is __vmlinux_end in RAM.
-	;; * _romfs_start moved because of virtual memory.
-	;;
-	;; Revision 1.7  2000/11/21 13:55:29  bjornw
-	;; Use CONFIG_CRIS_LOW_MAP for the low VM map instead of explicit CPU type
-	;;
-	;; Revision 1.6  2000/10/06 12:36:55  bjornw
-	;; Forgot swapper_pg_dir when changing memory map..
-	;;
-	;; Revision 1.5  2000/10/04 16:49:30  bjornw
-	;; * Fixed memory mapping in LX
-	;; * Check for cramfs instead of romfs
-	;;
-	;;
+/* $Id: head.S,v 1.20 2001/02/23 12:47:56 bjornw Exp $
+ * 
+ * Head of the kernel - alter with care
+ *
+ * Copyright (C) 2000, 2001 Axis Communications AB
+ *
+ * Authors:	Bjorn Wesen (bjornw@axis.com)
+ * 
+ * $Log: head.S,v $
+ * Revision 1.20  2001/02/23 12:47:56  bjornw
+ * MMU regs during LOW_MAP updated to reflect a newer reality
+ *
+ * Revision 1.19  2001/02/19 11:12:07  bjornw
+ * Changed comment header format
+ *
+ * Revision 1.18  2001/02/15 07:25:38  starvik
+ * Added support for synchronous serial ports
+ *
+ * Revision 1.17  2001/02/08 15:53:13  starvik
+ * Last commit removed some important ifdefs
+ *
+ * Revision 1.16  2001/02/08 15:20:38  starvik
+ * Include dram_init.S as inline
+ *
+ * Revision 1.15  2001/01/29 18:12:01  bjornw
+ * Corrected some comments
+ *
+ * Revision 1.14  2001/01/29 13:11:29  starvik
+ * Include dram_init.S (with DRAM/SDRAM initialization)
+ *
+ * Revision 1.13  2001/01/23 14:54:57  markusl
+ * Updated for USB
+ * i.e. added r_gen_config settings
+ *
+ * Revision 1.12  2001/01/19 16:16:29  perf
+ * Added temporary mapping of 0x0c->0x0c to avoid flash loading confusion.
+ * Renamed serial options from ETRAX100 to ETRAX.
+ *
+ * Revision 1.11  2001/01/16 16:31:38  bjornw
+ * * Changed name and semantics of running_from_flash to romfs_in_flash,
+ *   set by head.S to indicate to setup.c whether there is a cramfs image
+ *   after the kernels BSS or not. Should work for all three boot-cases
+ *   (DRAM with cramfs in DRAM, DRAM with cramfs in flash (compressed boot),
+ *    and flash with cramfs in flash)
+ *
+ * Revision 1.10  2001/01/16 14:12:21  bjornw
+ * * Check for cramfs start passed in r9 from the decompressor, if all other
+ *   cramfs options fail (if we boot from DRAM but don't find a cramfs image
+ *   after the kernel in DRAM, it is probably still in the flash)
+ * * Check magic in cramfs detection when booting from flash directly
+ *
+ * Revision 1.9  2001/01/15 17:17:02  bjornw
+ * * Corrected the code that detects the cramfs lengths
+ * * Added a comment saying that the above does not work due to other
+ *   reasons..
+ *
+ * Revision 1.8  2001/01/15 16:27:51  jonashg
+ * Made boot after flashing work.
+ * * end destination is __vmlinux_end in RAM.
+ * * _romfs_start moved because of virtual memory.
+ *
+ * Revision 1.7  2000/11/21 13:55:29  bjornw
+ * Use CONFIG_CRIS_LOW_MAP for the low VM map instead of explicit CPU type
+ *
+ * Revision 1.6  2000/10/06 12:36:55  bjornw
+ * Forgot swapper_pg_dir when changing memory map..
+ *
+ * Revision 1.5  2000/10/04 16:49:30  bjornw
+ * * Fixed memory mapping in LX
+ * * Check for cramfs instead of romfs
+ *
+ */
 	
 #include <linux/config.h>
 #define ASSEMBLER_MACROS_ONLY
@@ -82,13 +111,13 @@
 	;; slightly different. We also let the simulator get this mapping for now.
 
 #ifdef CONFIG_CRIS_LOW_MAP
-	move.d	0x0800b000, r0	; kseg mappings
+	move.d	0x0004b098, r0	; kseg mappings, temporary map of 0xc0->0x40
 	move.d	r0, [R_MMU_KBASE_HI]
 
 	move.d	0x04040000, r0	; temporary map of 0x40->0x40 and 0x00->0x00 
 	move.d	r0, [R_MMU_KBASE_LO]
 
-	move.d	0x80074871, r0	; mmu enable, segs e,b,6,5,4,0 segment mapped
+	move.d	0x80075c71, r0	; mmu enable, segs c,b,9,8,6,5,4,0 segment mapped
 	move.d	r0, [R_MMU_CONFIG]
 #else
 	move.d	0x0804b000, r0	; kseg mappings
@@ -131,24 +160,9 @@
 	jump	inram		; enter cached ram
 	
 inflash:
+	;; We need to initialze DRAM registers before we start using the DRAM
+#include "../lib/dram_init.S"	
 
-#ifndef CONFIG_SVINTO_SIM	
-
-	;; We need to setup the bus registers before we start using the DRAM
-
-	move.d   DEF_R_WAITSTATES, r0
-	move.d   r0, [R_WAITSTATES]
-
-	move.d   DEF_R_BUS_CONFIG, r0
-	move.d   r0, [R_BUS_CONFIG]
-  
-	move.d   DEF_R_DRAM_CONFIG, r0
-	move.d   r0, [R_DRAM_CONFIG]
-
-	move.d   DEF_R_DRAM_TIMING, r0
-	move.d   r0, [R_DRAM_TIMING]
-
-#endif
 	;; Copy text+data to DRAM
 	;; This is fragile - the calculation of r4 as the image size depends
 	;; on that the labels below actually are the first and last positions
@@ -357,27 +371,38 @@ w5u:	move.b	[R_DMA_CH5_CMD],r0
 #if !defined(CONFIG_KGDB) && !defined(CONFIG_DMA_MEMCPY)
 	or.d	0x140000,r0	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
 #endif
-#if !defined(CONFIG_KGDB) || !defined(CONFIG_DEBUG_PORT1)
+#if !defined(CONFIG_KGDB) || !defined(CONFIG_DEBUG_PORT1)	
 	or.d	0xc00000,r0	; DMA channels 8 and 9 to ser1, kgdb doesnt want DMA
-#endif
+#endif	
 #ifdef CONFIG_DMA_MEMCPY
 	or.d	0x003c0000,r0	; 6/7 memory-memory DMA
 #endif
-#ifdef CONFIG_ETRAX100_SERIAL_PORT2
+#ifdef CONFIG_ETRAX_SERIAL_PORT2
 	or.d	0x2808,r0	; DMA channels 2 and 3 to serport 2, port 2 enabled
 #endif
-#ifdef CONFIG_ETRAX100_SERIAL_PORT3
+#if defined(CONFIG_ETRAX_SERIAL_PORT3) || defined(CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1)
 	or.d	0x28100,r0	; DMA channels 4 and 5 to serport 3, port 3 enabled
-#endif
-#if defined(CONFIG_ETRAX100_PARALLEL_PORT0) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
+#endif	
+#if defined(CONFIG_ETRAX_PARALLEL_PORT0) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	or.w	0x4,r0	; parport 0 enabled using DMA 2/3
 #endif
-#if defined(CONFIG_ETRAX100_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
+#if defined(CONFIG_ETRAX_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	or.w	0x80,r0	; parport 1 enabled using DMA 4/5
 #endif
 #ifdef CONFIG_BLK_DEV_ETRAXIDE
 	or.d	0x3c02,r0	; DMA channels 2 and 3 to ATA, ATA enabled
 #endif
+	
+#ifdef CONFIG_ETRAX_USB_HOST_PORT1
+	or.d	0x20000000,r0	; Set the USB port 1 enable bit
+#endif
+#ifdef CONFIG_ETRAX_USB_HOST_PORT2
+	or.d	0x40000000,r0	; Set the USB port 2 enable bit
+#endif
+#ifdef CONFIG_ETRAX_USB_HOST
+	and.d	0xff3fffff,r0	; Connect DMA channels 8 and 9 to USB
+#endif
+	
 #ifdef CONFIG_JULIETTE
 	or.d	0x3c000,r0	; DMA channels 4 and 5 to EXTDMA0, for Juliette
 #ifndef CONFIG_BLK_DEV_ETRAXIDE
@@ -438,6 +463,9 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	move.b	DEF_R_PORT_PB_DATA,r0
 	move.b	r0,[_port_pb_data_shadow]
 	move.b	r0,[R_PORT_PB_DATA]
+	move.d  0, r0
+	move.d  r0,[_port_pb_i2c_shadow]
+	move.d  r0, [R_PORT_PB_I2C]
 
 	moveq	0,r0
 	move.d	r0,[_port_g_data_shadow]
@@ -478,7 +506,7 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	move.d	r0,[0x90000000]
 #endif
 	
-#ifdef CONFIG_ETRAX100_SERIAL_PORT3	
+#ifdef CONFIG_ETRAX_SERIAL_PORT3	
 	;; setup the serial port 3 at 115200 baud for debug purposes
 	
 	moveq	0,r0
@@ -497,8 +525,7 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 #endif /* CONFIG_SVINTO_SIM */
 
 	jump	_start_kernel	; jump into the C-function _start_kernel in init/main.c
-
-	
+		
 	.data
 _etrax_irv:	
 	.dword	0
@@ -508,7 +535,7 @@ _romfs_length:
 	.dword	0
 _romfs_in_flash:
 	.dword	0
-
+	
 	;; put some special pages at the beginning of the kernel aligned
 	;; to page boundaries - the kernel cannot start until after this
 

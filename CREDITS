@@ -311,9 +311,6 @@ E: anton@samba.org
 W: http://samba.org/~anton/
 P: 1024/8462A731 4C 55 86 34 44 59 A7 99  2B 97 88 4A 88 9A 0D 97
 D: sun4 port, Sparc hacker
-S: 47 Robert Street
-S: Marrickville NSW 2204
-S: Australia
 
 N: Hugh Blemings
 E: hugh@misc.nu
@@ -765,6 +762,11 @@ D: D-Link pocket adapter drivers
 S: Grevgatan 11
 S: S-114 53 Stockholm
 S: Sweden
+
+N: Michael Engel
+E: engel@unix-ag.org
+D: DECstation framebuffer drivers
+S: Germany
 
 N: Paal-Kristian Engstad
 E: engstad@intermetrics.com
@@ -1220,13 +1222,12 @@ S: Wantage, New Jersey 07461
 S: USA
 
 N: Harald Hoyer
-E: HarryH@Royal.Net
-W: http://hot.spotline.de/
-W: http://home.pages.de/~saturn
+E: harald.hoyer@parzelle.de
+W: http://parzelle.de/
 D: ip_masq_quake
 D: md boot support
-S: Alleenstrasse 27
-S: D-71679 Asperg
+S: Hohe Strasse 30
+S: D-70176 Stuttgart
 S: Germany
 
 N: Jan Hubicka
@@ -1725,12 +1726,8 @@ S: 198 00 Praha 9
 S: Czech Republic
 
 N: Paul Mackerras
-E: paulus@linuxcare.com
+E: paulus@samba.org
 D: Linux port for PCI Power Macintosh
-S: Linuxcare, Inc.
-S: 24 Marcus Clarke Street
-S: Canberra ACT 2601
-S: Australia
 
 N: Pat Mackinlay
 E: pat@it.com.au
@@ -1878,6 +1875,11 @@ S: Conectiva S.A.
 S: R. Tocantins, 89 - Cristo Rei
 S: 80050-430 - Curitiba - Paraná
 S: Brazil
+
+N: Karsten Merker
+E: merker@linuxtag.org
+D: DECstation framebuffer drivers
+S: Germany
 
 N: Michael Meskes
 E: meskes@debian.org
@@ -2359,8 +2361,8 @@ S: 79080-740 - Campo Grande - Mato Grosso do Sul
 S: Brazil
 
 N: Stephen Rothwell
-E: sfr@linuxcare.com.au
-W: http://linuxcare.com.au/sfr
+E: sfr@canb.auug.org.au
+W: http://www.canb.auug.org.au/~sfr
 P: 1024/BD8C7805 CD A4 9D 01 10 6E 7E 3B  91 88 FA D9 C8 40 AA 02
 D: Boot/setup/build work for setup > 2K
 D: Author, APM driver
@@ -2403,12 +2405,12 @@ S: 91052 Erlangen
 S: Germany
 
 N: Paul `Rusty' Russell
-E: rusty@linuxcare.com
+E: rusty@rustcorp.com.au
 W: http://www.samba.org/netfilter
 D: Ruggedly handsome.
 D: netfilter, ipchains with Michael Neuling.
-S: 301/222 City Walk
-S: Canberra ACT 2601
+S: 52 Moore St
+S: Turner ACT 2612
 S: Australia
 
 N: Bill Ryder
@@ -2429,11 +2431,11 @@ S: FIN-33720 Tampere
 S: Finland
 
 N: Thomas Sailer
-E: sailer@ife.ee.ethz.ch
+E: t.sailer@alumni.ethz.ch
 E: HB9JNX@HB9W.CHE.EU (packet radio)
 D: hfmodem, Baycom and sound card radio modem driver
-S: Weinbergstrasse 76
-S: 8408 Winterthur
+S: Markusstrasse 18
+S: 8006 Zuerich
 S: Switzerland
 
 N: Robert Sanders
@@ -2515,6 +2517,14 @@ D: Always IN2000 SCSI driver
 D: wd33c93 SCSI driver (linux-m68k)
 S: San Jose, California
 S: USA
+
+N: Robert Siemer
+E: Robert.Siemer@gmx.de
+P: 2048/C99A4289 2F DC 17 2E 56 62 01 C8  3D F2 AC 09 F2 E5 DD EE
+D: miroSOUND PCM20 radio RDS driver, ACI rewrite
+S: Klosterweg 28 / i309
+S: 76131 Karlsruhe
+S: Germany
 
 N: Jaspreet Singh
 E: jaspreet@sangoma.com
@@ -2696,7 +2706,7 @@ S: Canada K2L 1S2
 
 N: Andrew Tridgell
 E: tridge@samba.org
-W: http://linuxcare.com.au/tridge/
+W: http://samba.org/tridge/
 D: dosemu, networking, samba
 S: 3 Ballow Crescent
 S: MacGregor A.C.T 2615

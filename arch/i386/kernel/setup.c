@@ -58,6 +58,12 @@
  *  Massive cleanup of CPU detection and bug handling;
  *  Transmeta CPU detection,
  *  H. Peter Anvin <hpa@zytor.com>, November 2000
+ *
+ *  Added E820 sanitization routine (removes overlapping memory regions);
+ *  Brian Moyle <bmoyle@mvista.com>, February 2001
+ *
+ *  VIA C3 Support.
+ *  Dave Jones <davej@suse.de>, March 2001
  */
 
 /*
@@ -440,6 +446,170 @@ static void __init print_memory_map(char *who)
 }
 
 /*
+ * Sanitize the BIOS e820 map.
+ *
+ * Some e820 responses include overlapping entries.  The following 
+ * replaces the original e820 map with a new one, removing overlaps.
+ *
+ */
+static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
+{
+	struct change_member {
+		struct e820entry *pbios; /* pointer to original bios entry */
+		unsigned long long addr; /* address for this change point */
+	};
+	struct change_member change_point_list[2*E820MAX];
+	struct change_member *change_point[2*E820MAX];
+	struct e820entry *overlap_list[E820MAX];
+	struct e820entry new_bios[E820MAX];
+	struct change_member *change_tmp;
+	unsigned long current_type, last_type;
+	unsigned long long last_addr;
+	int chgidx, still_changing;
+	int overlap_entries;
+	int new_bios_entry;
+	int old_nr, new_nr;
+	int i;
+
+	/*
+		Visually we're performing the following (1,2,3,4 = memory types)...
+
+		Sample memory map (w/overlaps):
+		   ____22__________________
+		   ______________________4_
+		   ____1111________________
+		   _44_____________________
+		   11111111________________
+		   ____________________33__
+		   ___________44___________
+		   __________33333_________
+		   ______________22________
+		   ___________________2222_
+		   _________111111111______
+		   _____________________11_
+		   _________________4______
+
+		Sanitized equivalent (no overlap):
+		   1_______________________
+		   _44_____________________
+		   ___1____________________
+		   ____22__________________
+		   ______11________________
+		   _________1______________
+		   __________3_____________
+		   ___________44___________
+		   _____________33_________
+		   _______________2________
+		   ________________1_______
+		   _________________4______
+		   ___________________2____
+		   ____________________33__
+		   ______________________4_
+	*/
+
+	/* if there's only one memory region, don't bother */
+	if (*pnr_map < 2)
+		return -1;
+
+	old_nr = *pnr_map;
+
+	/* bail out if we find any unreasonable addresses in bios map */
+	for (i=0; i<old_nr; i++)
+		if (biosmap[i].addr + biosmap[i].size < biosmap[i].addr)
+			return -1;
+
+	/* create pointers for initial change-point information (for sorting) */
+	for (i=0; i < 2*old_nr; i++)
+		change_point[i] = &change_point_list[i];
+
+	/* record all known change-points (starting and ending addresses) */
+	chgidx = 0;
+	for (i=0; i < old_nr; i++)	{
+		change_point[chgidx]->addr = biosmap[i].addr;
+		change_point[chgidx++]->pbios = &biosmap[i];
+		change_point[chgidx]->addr = biosmap[i].addr + biosmap[i].size;
+		change_point[chgidx++]->pbios = &biosmap[i];
+	}
+
+	/* sort change-point list by memory addresses (low -> high) */
+	still_changing = 1;
+	while (still_changing)	{
+		still_changing = 0;
+		for (i=1; i < 2*old_nr; i++)  {
+			/* if <current_addr> > <last_addr>, swap */
+			/* or, if current=<start_addr> & last=<end_addr>, swap */
+			if ((change_point[i]->addr < change_point[i-1]->addr) ||
+				((change_point[i]->addr == change_point[i-1]->addr) &&
+				 (change_point[i]->addr == change_point[i]->pbios->addr) &&
+				 (change_point[i-1]->addr != change_point[i-1]->pbios->addr))
+			   )
+			{
+				change_tmp = change_point[i];
+				change_point[i] = change_point[i-1];
+				change_point[i-1] = change_tmp;
+				still_changing=1;
+			}
+		}
+	}
+
+	/* create a new bios memory map, removing overlaps */
+	overlap_entries=0;	 /* number of entries in the overlap table */
+	new_bios_entry=0;	 /* index for creating new bios map entries */
+	last_type = 0;		 /* start with undefined memory type */
+	last_addr = 0;		 /* start with 0 as last starting address */
+	/* loop through change-points, determining affect on the new bios map */
+	for (chgidx=0; chgidx < 2*old_nr; chgidx++)
+	{
+		/* keep track of all overlapping bios entries */
+		if (change_point[chgidx]->addr == change_point[chgidx]->pbios->addr)
+		{
+			/* add map entry to overlap list (> 1 entry implies an overlap) */
+			overlap_list[overlap_entries++]=change_point[chgidx]->pbios;
+		}
+		else
+		{
+			/* remove entry from list (order independent, so swap with last) */
+			for (i=0; i<overlap_entries; i++)
+			{
+				if (overlap_list[i] == change_point[chgidx]->pbios)
+					overlap_list[i] = overlap_list[overlap_entries-1];
+			}
+			overlap_entries--;
+		}
+		/* if there are overlapping entries, decide which "type" to use */
+		/* (larger value takes precedence -- 1=usable, 2,3,4,4+=unusable) */
+		current_type = 0;
+		for (i=0; i<overlap_entries; i++)
+			if (overlap_list[i]->type > current_type)
+				current_type = overlap_list[i]->type;
+		/* continue building up new bios map based on this information */
+		if (current_type != last_type)	{
+			if (last_type != 0)	 {
+				new_bios[new_bios_entry].size =
+					change_point[chgidx]->addr - last_addr;
+				/* move forward only if the new size was non-zero */
+				if (new_bios[new_bios_entry].size != 0)
+					if (++new_bios_entry >= E820MAX)
+						break; 	/* no more space left for new bios entries */
+			}
+			if (current_type != 0)	{
+				new_bios[new_bios_entry].addr = change_point[chgidx]->addr;
+				new_bios[new_bios_entry].type = current_type;
+				last_addr=change_point[chgidx]->addr;
+			}
+			last_type = current_type;
+		}
+	}
+	new_nr = new_bios_entry;   /* retain count for new bios entries */
+
+	/* copy new bios mapping into original location */
+	memcpy(biosmap, new_bios, new_nr*sizeof(struct e820entry));
+	*pnr_map = new_nr;
+
+	return 0;
+}
+
+/*
  * Copy the BIOS e820 map into a safe place.
  *
  * Sanity-check it while we're at it..
@@ -506,6 +676,7 @@ void __init setup_memory_region(void)
 	 * Otherwise fake a memory map; one section from 0k->640k,
 	 * the next section from 1mb->appropriate_mem_k
 	 */
+	sanitize_e820_map(E820_MAP, &E820_MAP_NR);
 	if (copy_e820_map(E820_MAP, E820_MAP_NR) < 0) {
 		unsigned long mem_size;
 
@@ -560,7 +731,7 @@ static inline void parse_mem_cmdline (char ** cmdline_p)
 				 * blow away any automatically generated
 				 * size
 				 */
-				unsigned long start_at, mem_size;
+				unsigned long long start_at, mem_size;
  
 				if (usermem == 0) {
 					/* first time in: zap the whitelist
@@ -1401,7 +1572,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 
 		case 6:
 			switch (c->x86_model) {
-				case 6:	/* Cyrix III */
+				case 6 ... 7:		/* Cyrix III or C3 */
 					rdmsr (0x1107, lo, hi);
 					lo |= (1<<1 | 1<<7);	/* Report CX8 & enable PGE */
 					wrmsr (0x1107, lo, hi);
@@ -1480,6 +1651,32 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 	c->x86_capability[0] = cpuid_edx(0x00000001);
 	wrmsr(0x80860004, cap_mask, uk);
 }
+
+
+static void __init init_rise(struct cpuinfo_x86 *c)
+{
+	printk("CPU: Rise iDragon");
+	if (c->x86_model > 2)
+		printk(" II");
+	printk("\n");
+	printk("If you have one of these please email davej@suse.de\n");
+
+	/* Unhide possibly hidden capability flags
+	   The mp6 iDragon family don't have MSRs.
+	   We switch on extra features with this cpuid wierdness: */
+	__asm__ (
+		"movl $0x6363452a, %%eax\n\t"
+		"movl $0x3231206c, %%ecx\n\t"
+		"movl $0x2a32313a, %%edx\n\t"
+		"cpuid\n\t"
+		"movl $0x63634523, %%eax\n\t"
+		"movl $0x32315f6c, %%ecx\n\t"
+		"movl $0x2333313a, %%edx\n\t"
+		"cpuid\n\t" : : : "eax", "ebx", "ecx", "edx"
+	);
+	set_bit(X86_FEATURE_CX8, &c->x86_capability);
+}
+
 
 extern void trap_init_f00f_bug(void);
 
@@ -1732,8 +1929,8 @@ static struct cpu_model_info cpu_models[] __initdata = {
 	  { "Nx586", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	    NULL, NULL, NULL, NULL, NULL, NULL, NULL }},
 	{ X86_VENDOR_RISE,	5,
-	  { "mP6", "mP6", NULL, NULL, NULL, NULL, NULL,
-	    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }},
+	  { "iDragon", NULL, "iDragon", NULL, NULL, NULL, NULL,
+	    NULL, "iDragon II", "iDragon II", NULL, NULL, NULL, NULL, NULL, NULL }},
 };
 
 /* Look up CPU names by table lookup. */
@@ -1997,6 +2194,15 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	case X86_VENDOR_UNKNOWN:
 	default:
 		/* Not much we can do here... */
+		/* Check if at least it has cpuid */
+		if (c->cpuid_level == -1)
+		{
+			/* No cpuid. It must be an ancient CPU */
+			if (c->x86 == 4)
+				strcpy(c->x86_model_id, "486");
+			else if (c->x86 == 3)
+				strcpy(c->x86_model_id, "386");
+		}
 		break;
 
 	case X86_VENDOR_CYRIX:
@@ -2021,6 +2227,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	case X86_VENDOR_TRANSMETA:
 		init_transmeta(c);
+		break;
+
+	case X86_VENDOR_RISE:
+		init_rise(c);
 		break;
 	}
 	

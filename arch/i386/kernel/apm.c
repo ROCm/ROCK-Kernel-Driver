@@ -1,6 +1,6 @@
 /* -*- linux-c -*-
  * APM BIOS driver for Linux
- * Copyright 1994-2000 Stephen Rothwell (sfr@linuxcare.com)
+ * Copyright 1994-2001 Stephen Rothwell (sfr@canb.auug.org.au)
  *
  * Initial development of this driver was funded by NEC Australia P/L
  *	and NEC Corporation
@@ -23,7 +23,7 @@
  * March 1996, Rik Faith (faith@cs.unc.edu):
  *    Prohibit APM BIOS calls unless apm_enabled.
  *    (Thanks to Ulrich Windl <Ulrich.Windl@rz.uni-regensburg.de>)
- * April 1996, Stephen Rothwell (Stephen.Rothwell@canb.auug.org.au)
+ * April 1996, Stephen Rothwell (sfr@canb.auug.org.au)
  *    Version 1.0 and 1.1
  * May 1996, Version 1.2
  * Feb 1998, Version 1.3
@@ -119,7 +119,7 @@
  *         Make power off under SMP work again.
  *         Fix thinko with initial engaging of BIOS.
  *         Make sure power off only happens on CPU 0
- *         (Paul "Rusty" Russell <rusty@linuxcare.com>).
+ *         (Paul "Rusty" Russell <rusty@rustcorp.com.au>).
  *         Do error notification to user mode if BIOS calls fail.
  *         Move entrypoint offset fix to ...boot/setup.S
  *         where it belongs (Cosmos <gis88564@cis.nctu.edu.tw>).
@@ -227,6 +227,8 @@ extern int (*console_blank_hook)(int);
  * P: Toshiba 1950S: battery life information only gets updated after resume
  * P: Midwest Micro Soundbook Elite DX2/66 monochrome: screen blanking
  * 	broken in BIOS [Reported by Garst R. Reese <reese@isn.net>]
+ * ?: AcerNote-950: oops on reading /proc/apm - workaround is a WIP
+ * 	Neale Banks <neale@lowendale.com.au> December 2000
  *
  * Legend: U = unusable with APM patches
  *         P = partially usable with APM patches
@@ -1550,6 +1552,9 @@ static int __init apm_setup(char *str)
 			apm_disabled = 1;
 		if (strncmp(str, "on", 2) == 0)
 			apm_disabled = 0;
+		if ((strncmp(str, "broken-psr", 10) == 0) ||
+		    (strncmp(str, "broken_psr", 10) == 0))
+			apm_info.get_power_status_broken = 1;
 		invert = (strncmp(str, "no-", 3) == 0);
 		if (invert)
 			str += 3;

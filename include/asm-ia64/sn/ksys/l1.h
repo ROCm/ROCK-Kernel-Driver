@@ -80,11 +80,11 @@ typedef struct brl1_sch_s {
 				 * use == BRL1_SUBCH_FREE */
     uint	target;		/* type, rack and slot of component to
 				 * which this subchannel is directed */
-    int		packet_arrived; /* true if packet arrived on
+    atomic_t	packet_arrived; /* true if packet arrived on
 				 * this subchannel */
     sc_cq_t *	iqp;		/* input queue for this subchannel */
     sv_t	arrive_sv;	/* used to wait for a packet */
-    lock_t	data_lock;	/* synchronize access to input queues and
+    spinlock_t	data_lock;	/* synchronize access to input queues and
 				 * other fields of the brl1_sch_s struct */
     brl1_notif_t tx_notify;     /* notify higher layer that transmission may 
 				 * continue */
@@ -118,9 +118,7 @@ typedef struct l1sc_s {
     brl1_uartf_t putc_f;	/* pointer to UART putc function */
     brl1_uartf_t getc_f;	/* pointer to UART getc function */
 
-    lock_t	 send_lock;	/* arbitrates send synchronization */
-    lock_t	 recv_lock;	/* arbitrates uart receive access */
-    lock_t	 subch_lock;	/* arbitrates subchannel allocation */
+    spinlock_t	 subch_lock;	/* arbitrates subchannel allocation */
     cpuid_t	 intr_cpu;	/* cpu that receives L1 interrupts */
 
     u_char	 send_in_use;	/* non-zero if send buffer contains an
@@ -223,6 +221,7 @@ typedef struct l1sc_s {
 #define L1_RESP_REQC	(-101)	/* bad request code	        */
 #define L1_RESP_NAVAIL	(-104)	/* requested data not available */
 #define L1_RESP_ARGVAL	(-105)  /* arg value out of range       */
+#define L1_RESP_INVAL   (-107)  /* requested data invalid       */
 
 /* L1 general requests */
 
@@ -239,16 +238,19 @@ typedef struct l1sc_s {
 #define L1_REQ_PORTSPEED	0x000a	/* get ioport speed */
 
 #define L1_REQ_CONS_SUBCH	0x1002  /* select this node's console 
-					 * subchannel */
+					   subchannel */
 #define L1_REQ_CONS_NODE	0x1003  /* volunteer to be the master 
-					 * (console-hosting) node */
+					   (console-hosting) node */
 #define L1_REQ_DISP1		0x1004  /* write line 1 of L1 display */
 #define L1_REQ_DISP2		0x1005  /* write line 2 of L1 display */
 #define L1_REQ_PARTITION_SET	0x1006	/* set partition id */
 #define L1_REQ_EVENT_SUBCH	0x1007	/* set the subchannel for system
 					   controller event transmission */
 
-#define L1_REQ_RESET		0x2001	/* request a full system reset */
+#define L1_REQ_RESET		0x2000	/* request a full system reset */
+#define L1_REQ_PCI_UP		0x2001  /* power up pci slot or bus */
+#define L1_REQ_PCI_DOWN		0x2002  /* power down pci slot or bus */
+#define L1_REQ_PCI_RESET	0x2003  /* reset pci bus or slot */
 
 /* L1 command interpreter requests */
 
@@ -325,18 +327,6 @@ int	sc_poll( l1sc_t *sc, int ch );
 void	sc_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart );
 void	sc_intr_enable( l1sc_t *sc );
 
-#if 0
-int	sc_portspeed_get( l1sc_t *sc );
-#endif
-
-int	l1_cons_poll( l1sc_t *sc );
-int	l1_cons_getc( l1sc_t *sc );
-void	l1_cons_init( l1sc_t *sc );
-int	l1_cons_read( l1sc_t *sc, char *buf, int avail );
-int	l1_cons_write( l1sc_t *sc, char *msg, int len, int wait );
-void	l1_cons_tx_notif( l1sc_t *sc, brl1_notif_t func );
-void	l1_cons_rx_notif( l1sc_t *sc, brl1_notif_t func );
-
 int	_elscuart_putc( l1sc_t *sc, int c );
 int	_elscuart_getc( l1sc_t *sc );
 int	_elscuart_poll( l1sc_t *sc );
@@ -354,11 +344,7 @@ int	elsc_cons_node(l1sc_t *e);
 int	elsc_display_line(l1sc_t *e, char *line, int lnum);
 
 extern l1sc_t *get_elsc( void );
-extern void    set_elsc( l1sc_t *e );
-
 #define get_l1sc	get_elsc
-#define set_l1sc(e)	set_elsc(e)
-
 #define get_master_l1sc get_l1sc
 
 int	router_module_get( nasid_t nasid, net_vec_t path );

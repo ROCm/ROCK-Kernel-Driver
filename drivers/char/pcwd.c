@@ -462,8 +462,8 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 			outb_p(0xA5, current_readport + 3);
 			spin_unlock(&io_lock);
 		}
-		unlock_kernel();
 #endif
+		unlock_kernel();
 	}
 	return 0;
 }

@@ -25,13 +25,14 @@ unsigned long
 get_unmapped_area (unsigned long addr, unsigned long len)
 {
 	struct vm_area_struct * vmm;
+	long map_shared = (current->thread.flags & IA64_THREAD_MAP_SHARED) != 0;
 
 	if (len > RGN_MAP_LIMIT)
 		return 0;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (current->thread.flags & IA64_THREAD_MAP_SHARED)
+	if (map_shared)
 		addr = COLOR_ALIGN(addr);
 	else
 		addr = PAGE_ALIGN(addr);
@@ -45,11 +46,13 @@ get_unmapped_area (unsigned long addr, unsigned long len)
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
 		addr = vmm->vm_end;
+		if (map_shared)
+			addr = COLOR_ALIGN(addr);
 	}
 }
 
 asmlinkage long
-ia64_getpriority (int which, int who, long arg2, long arg3, long arg4, long arg5, long arg6, 
+ia64_getpriority (int which, int who, long arg2, long arg3, long arg4, long arg5, long arg6,
 		  long arg7, long stack)
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
@@ -246,15 +249,15 @@ sys_mmap (unsigned long addr, unsigned long len, int prot, int flags,
 asmlinkage long
 sys_vm86 (long arg0, long arg1, long arg2, long arg3)
 {
-        printk(KERN_ERR "sys_vm86(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
-        return -ENOSYS;
+	printk(KERN_ERR "sys_vm86(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
+	return -ENOSYS;
 }
 
 asmlinkage long
 sys_modify_ldt (long arg0, long arg1, long arg2, long arg3)
 {
-        printk(KERN_ERR "sys_modify_ldt(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
-        return -ENOSYS;
+	printk(KERN_ERR "sys_modify_ldt(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
+	return -ENOSYS;
 }
 
 asmlinkage unsigned long
@@ -392,7 +395,7 @@ ia64_oldfstat (unsigned int fd, struct ia64_oldstat *statbuf)
 	}
 	return err;
 }
- 
+
 #endif
 
 #ifndef CONFIG_PCI

@@ -3,14 +3,13 @@
  * Optimized version of the standard memset() function
  *
  * Return: none
- *         
  *
  * Inputs:
  *	in0:	address of buffer
  * 	in1:	byte value to use for storing
  *	in2:	length of the buffer
  *
- * Copyright (C) 1999 Hewlett-Packard Co
+ * Copyright (C) 1999, 2001 Hewlett-Packard Co
  * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
  */
 
@@ -31,20 +30,16 @@
 #define saved_lc	r20
 #define tmp		r21
 
- 	.text
- 	.psr	abi64
- 	.psr	lsb
-
 GLOBAL_ENTRY(memset)
-	UNW(.prologue)
-	UNW(.save ar.pfs, saved_pfs)
- 	alloc	saved_pfs=ar.pfs,3,0,0,0	// cnt is sink here
+	.prologue
+	.save ar.pfs, saved_pfs
+ 	alloc saved_pfs=ar.pfs,3,0,0,0	// cnt is sink here
 	cmp.eq p8,p0=r0,len	// check for zero length
-	UNW(.save ar.lc, saved_lc)
+	.save ar.lc, saved_lc
 	mov saved_lc=ar.lc	// preserve ar.lc (slow)
-	;; 
+	;;
 
-	UNW(.body)
+	.body
 
 	adds tmp=-1,len		// br.ctop is repeat/until
 	tbit.nz p6,p0=buf,0	// odd alignment
@@ -82,7 +77,7 @@ long_memset:
 (p6)	st8 [buf]=val,8		// 8-byte aligned
 (p6)	adds len=-8,len;;
 	shr.u cnt=len,4		// number of 128-bit (2x64bit) words
-	;;	
+	;;
 	cmp.eq p6,p0=r0,cnt
 	adds tmp=-1,cnt
 (p6)	br.cond.dpnt.few .dotail // we have less than 16 bytes left
@@ -96,10 +91,10 @@ long_memset:
 	br.cloop.dptk.few 2b
 	;;
 .dotail:			// tail correction based on len only
-	tbit.nz p6,p0=len,3	
+	tbit.nz p6,p0=len,3
 	;;
 (p6)	st8 [buf]=val,8		// at least 8 bytes
-	tbit.nz p6,p0=len,2	
+	tbit.nz p6,p0=len,2
 	;;
 (p6)	st4 [buf]=val,4		// at least 4 bytes
 	tbit.nz p6,p0=len,1

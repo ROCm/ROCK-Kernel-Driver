@@ -55,12 +55,13 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
+
+#ifdef CONFIG_USB_SERIAL_DEBUG
+	static int debug = 1;
+#else
+	static int debug;
+#endif
 
 #include "usb-serial.h"
 
@@ -705,3 +706,7 @@ module_exit(empeg_exit);
 
 MODULE_AUTHOR("Gary Brubaker <xavyer@ix.netcom.com>");
 MODULE_DESCRIPTION("USB Empeg Mark I/II Driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

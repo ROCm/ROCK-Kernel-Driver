@@ -139,35 +139,6 @@ discontig_mem_init(void)
 	dump_bootmem_info() ;
 }
 
-void __init
-discontig_paging_init(void)
-{
-	int i;
-	unsigned long max_dma, zones_size[MAX_NR_ZONES];
-	void dump_node_data(void);
-
-        max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	for (i = 0; i < numnodes; i++) {
-	       extern void free_unused_memmap_node(int);
-               unsigned long startpfn = __pa((void *)NODE_START(i)) >> PAGE_SHIFT;
-               unsigned long numpfn = NODE_SIZE(i) >> PAGE_SHIFT;
-               memset(zones_size, 0, sizeof(zones_size));
-
-               if ((startpfn + numpfn) < max_dma) {
-                       zones_size[ZONE_DMA] = numpfn;
-               } else if (startpfn > max_dma) {
-                       zones_size[ZONE_NORMAL] = numpfn;
-               } else {
-                       zones_size[ZONE_DMA] = (max_dma - startpfn);
-                       zones_size[ZONE_NORMAL] = numpfn - zones_size[ZONE_DMA];
-               }
-               free_area_init_node(i, NODE_DATA(i), NULL, zones_size, startpfn<<PAGE_SHIFT, 0);
-	       free_unused_memmap_node(i);
-	}
-	dump_node_data();
-}
-
-
 void
 dump_node_data(void)
 {

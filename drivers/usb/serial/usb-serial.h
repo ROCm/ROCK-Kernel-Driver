@@ -219,15 +219,24 @@ static inline struct usb_serial* get_usb_serial (struct usb_serial_port *port, c
 
 static inline void usb_serial_debug_data (const char *file, const char *function, int size, const unsigned char *data)
 {
-#ifdef CONFIG_USB_SERIAL_DEBUG
 	int i;
+
+	if (!debug)
+		return;
+	
 	printk (KERN_DEBUG "%s: %s - length = %d, data = ", file, function, size);
 	for (i = 0; i < size; ++i) {
 		printk ("%.2x ", data[i]);
 	}
 	printk ("\n");
-#endif
 }
+
+
+/* Use our own dbg macro */
+#undef dbg
+#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG __FILE__ ": " format "\n" , ## arg); } while (0)
+
+
 
 #endif	/* ifdef __LINUX_USB_SERIAL_H */
 

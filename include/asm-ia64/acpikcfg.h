@@ -1,4 +1,5 @@
 #include <linux/config.h>
+
 #ifdef	CONFIG_ACPI_KERNEL_CONFIG
 /*
  *  acpikcfg.h - ACPI based Kernel Configuration Manager External Interfaces

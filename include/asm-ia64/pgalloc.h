@@ -8,8 +8,8 @@
  * This hopefully works with any (fixed) ia-64 page-size, as defined
  * in <asm/page.h> (currently 8192).
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 2000, Goutham Rao <goutham.rao@intel.com>
  */
 
@@ -28,68 +28,60 @@
  * a lot of work and caused unnecessary memory traffic.  How broken...
  * We fix this by caching them.
  */
-#define pgd_quicklist		(my_cpu_data.pgd_quick)
-#define pmd_quicklist		(my_cpu_data.pmd_quick)
-#define pte_quicklist		(my_cpu_data.pte_quick)
-#define pgtable_cache_size	(my_cpu_data.pgtable_cache_sz)
+#define pgd_quicklist		(local_cpu_data->pgd_quick)
+#define pmd_quicklist		(local_cpu_data->pmd_quick)
+#define pte_quicklist		(local_cpu_data->pte_quick)
+#define pgtable_cache_size	(local_cpu_data->pgtable_cache_sz)
 
-static __inline__ pgd_t*
-get_pgd_slow (void)
-{
-	pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
-	if (ret)
-		clear_page(ret);
-	return ret;
-}
-
-static __inline__ pgd_t*
-get_pgd_fast (void)
+static inline pgd_t*
+pgd_alloc_one_fast (void)
 {
 	unsigned long *ret = pgd_quicklist;
 
-	if (ret != NULL) {
+	if (__builtin_expect(ret != NULL, 1)) {
 		pgd_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		--pgtable_cache_size;
-	}
-	return (pgd_t *)ret;
+	} else
+		ret = NULL;
+	return (pgd_t *) ret;
 }
 
-static __inline__ pgd_t*
+static inline pgd_t*
 pgd_alloc (void)
 {
-	pgd_t *pgd;
+	/* the VM system never calls pgd_alloc_one_fast(), so we do it here. */
+	pgd_t *pgd = pgd_alloc_one_fast();
 
-	pgd = get_pgd_fast();
-	if (!pgd)
-		pgd = get_pgd_slow();
+	if (__builtin_expect(pgd == NULL, 0)) {
+		pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
+		if (__builtin_expect(pgd != NULL, 1))
+			clear_page(pgd);
+	}
 	return pgd;
 }
 
-static __inline__ void
-free_pgd_fast (pgd_t *pgd)
+static inline void
+pgd_free (pgd_t *pgd)
 {
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	++pgtable_cache_size;
 }
 
-static __inline__ pmd_t *
-get_pmd_slow (void)
+static inline void
+pgd_populate (struct mm_struct *mm, pgd_t *pgd_entry, pmd_t *pmd)
 {
-	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
-
-	if (pmd)
-		clear_page(pmd);
-	return pmd;
+	pgd_val(*pgd_entry) = __pa(pmd);
 }
 
-static __inline__ pmd_t *
-get_pmd_fast (void)
+
+static inline pmd_t*
+pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long *ret = (unsigned long *)pmd_quicklist;
 
-	if (ret != NULL) {
+	if (__builtin_expect(ret != NULL, 1)) {
 		pmd_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		--pgtable_cache_size;
@@ -97,28 +89,36 @@ get_pmd_fast (void)
 	return (pmd_t *)ret;
 }
 
-static __inline__ void
-free_pmd_fast (pmd_t *pmd)
+static inline pmd_t*
+pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
+{
+	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
+
+	if (__builtin_expect(pmd != NULL, 1))
+		clear_page(pmd);
+	return pmd;
+}
+
+static inline void
+pmd_free (pmd_t *pmd)
 {
 	*(unsigned long *)pmd = (unsigned long) pmd_quicklist;
 	pmd_quicklist = (unsigned long *) pmd;
 	++pgtable_cache_size;
 }
 
-static __inline__ void
-free_pmd_slow (pmd_t *pmd)
+static inline void
+pmd_populate (struct mm_struct *mm, pmd_t *pmd_entry, pte_t *pte)
 {
-	free_page((unsigned long)pmd);
+	pmd_val(*pmd_entry) = __pa(pte);
 }
 
-extern pte_t *get_pte_slow (pmd_t *pmd, unsigned long address_preadjusted);
-
-static __inline__ pte_t *
-get_pte_fast (void)
+static inline pte_t*
+pte_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long *ret = (unsigned long *)pte_quicklist;
 
-	if (ret != NULL) {
+	if (__builtin_expect(ret != NULL, 1)) {
 		pte_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		--pgtable_cache_size;
@@ -126,70 +126,24 @@ get_pte_fast (void)
 	return (pte_t *)ret;
 }
 
-static __inline__ void
-free_pte_fast (pte_t *pte)
+
+static inline pte_t*
+pte_alloc_one (struct mm_struct *mm, unsigned long addr)
+{
+	pte_t *pte = (pte_t *) __get_free_page(GFP_KERNEL);
+
+	if (__builtin_expect(pte != NULL, 1))
+		clear_page(pte);
+	return pte;
+}
+
+static inline void
+pte_free (pte_t *pte)
 {
 	*(unsigned long *)pte = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	++pgtable_cache_size;
 }
-
-#define pte_free_kernel(pte)	free_pte_fast(pte)
-#define pte_free(pte)		free_pte_fast(pte)
-#define pmd_free_kernel(pmd)	free_pmd_fast(pmd)
-#define pmd_free(pmd)		free_pmd_fast(pmd)
-#define pgd_free(pgd)		free_pgd_fast(pgd)
-
-extern void __handle_bad_pgd (pgd_t *pgd);
-extern void __handle_bad_pmd (pmd_t *pmd);
-
-static __inline__ pte_t*
-pte_alloc (pmd_t *pmd, unsigned long vmaddr)
-{
-	unsigned long offset;
-
-	offset = (vmaddr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
-	if (pmd_none(*pmd)) {
-		pte_t *pte_page = get_pte_fast();
-
-		if (!pte_page)
-			return get_pte_slow(pmd, offset);
-		pmd_set(pmd, pte_page);
-		return pte_page + offset;
-	}
-	if (pmd_bad(*pmd)) {
-		__handle_bad_pmd(pmd);
-		return NULL;
-	}
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-static __inline__ pmd_t*
-pmd_alloc (pgd_t *pgd, unsigned long vmaddr)
-{
-	unsigned long offset;
-
-	offset = (vmaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1);
-	if (pgd_none(*pgd)) {
-		pmd_t *pmd_page = get_pmd_fast();
-
-		if (!pmd_page)
-			pmd_page = get_pmd_slow();
-		if (pmd_page) {
-			pgd_set(pgd, pmd_page);
-			return pmd_page + offset;
-		} else
-			return NULL;
-	}
-	if (pgd_bad(*pgd)) {
-		__handle_bad_pgd(pgd);
-		return NULL;
-	}
-	return (pmd_t *) pgd_page(*pgd) + offset;
-}
-
-#define pte_alloc_kernel(pmd, addr)	pte_alloc(pmd, addr)
-#define pmd_alloc_kernel(pgd, addr)	pmd_alloc(pgd, addr)
 
 extern int do_check_pgt_cache (int, int);
 
@@ -219,7 +173,7 @@ extern spinlock_t ptcg_lock;
 /*
  * Flush a specified user mapping
  */
-static __inline__ void
+static inline void
 flush_tlb_mm (struct mm_struct *mm)
 {
 	if (mm) {
@@ -237,7 +191,7 @@ extern void flush_tlb_range (struct mm_struct *mm, unsigned long start, unsigned
 /*
  * Page-granular tlb flush.
  */
-static __inline__ void
+static inline void
 flush_tlb_page (struct vm_area_struct *vma, unsigned long addr)
 {
 #ifdef CONFIG_SMP
@@ -300,20 +254,22 @@ copy_user_page (void *to, void *from, unsigned long vaddr, struct page *page)
  * that may be necessary.
  */
 static inline void
-update_mmu_cache (struct vm_area_struct *vma, unsigned long address, pte_t pte)
+update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 {
+	unsigned long addr;
 	struct page *page;
 
 	if (!pte_exec(pte))
 		return;				/* not an executable page... */
 
 	page = pte_page(pte);
-	address &= PAGE_MASK;
+	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
+	addr = (unsigned long) page_address(page);
 
 	if (test_bit(PG_arch_1, &page->flags))
 		return;				/* i-cache is already coherent with d-cache */
 
-	flush_icache_range(address, address + PAGE_SIZE);
+	flush_icache_range(addr, addr + PAGE_SIZE);
 	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
 }
 

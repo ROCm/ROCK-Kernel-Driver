@@ -431,7 +431,7 @@ int zft_extract_volume_headers(__u8 *buffer)
 /* this functions translates the failed_sector_log, misused as
  * EOF-marker list, into a virtual volume table. The table mustn't be
  * written to tape, because this would occupy the first data segment,
- * which should be the volume table, but is actualy the first segment
+ * which should be the volume table, but is actually the first segment
  * that is filled with data (when using standard ftape).  We assume,
  * that we get a non-empty failed_sector_log.
  */

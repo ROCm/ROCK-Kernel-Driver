@@ -49,7 +49,7 @@ This documentation is  part of a soon (or  so we hope) to be  released book on
 the SuSE  Linux distribution. As  there is  no complete documentation  for the
 /proc file system and we've used  many freely available sources to write these
 chapters, it  seems only fair  to give the work  back to the  Linux community.
-This work is  based on the 2.2.*  kernel version and the  upcomming 2.4.*. I'm
+This work is  based on the 2.2.*  kernel version and the  upcoming 2.4.*. I'm
 afraid it's still far from complete, but we  hope it will be useful. As far as
 we know, it is the first 'all-in-one' document about the /proc file system. It
 is focused  on the Intel  x86 hardware,  so if you  are looking for  PPC, ARM,
@@ -281,7 +281,7 @@ LOC is the local interrupt counter of the internal APIC of every CPU.
 
 ERR is incremented in the case of errors in the IO-APIC bus (the bus that
 connects the CPUs in a SMP system. This means that an error has been detected,
-the IO-APIC automatically retry the transmision, so it should not be a big
+the IO-APIC automatically retry the transmission, so it should not be a big
 problem, but you should read the SMP-FAQ.
 
 In this context it could be interesting to note the new irq directory in 2.4.

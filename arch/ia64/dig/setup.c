@@ -1,9 +1,9 @@
 /*
- * Platform dependent support for Intel SoftSDV simulator.
+ * Platform dependent support for DIG64 platforms.
  *
  * Copyright (C) 1999 Intel Corp.
- * Copyright (C) 1999 Hewlett-Packard Co
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Vijay Chander <vijay@engr.sgi.com>
@@ -48,18 +48,14 @@ dig_setup (char **cmdline_p)
 	 */
 	ROOT_DEV = to_kdev_t(0x0802);		/* default to second partition on first drive */
 
-#ifdef	CONFIG_IA64_SOFTSDV_HACKS
-	ROOT_DEV = to_kdev_t(0x0302);		/* 2nd partion on 1st IDE */
-#endif /* CONFIG_IA64_SOFTSDV_HACKS */
-
 #ifdef CONFIG_SMP
 	init_smp_config();
 #endif
 
 	memset(&screen_info, 0, sizeof(screen_info));
 
-	if (!ia64_boot_param.console_info.num_rows
-	    || !ia64_boot_param.console_info.num_cols)
+	if (!ia64_boot_param->console_info.num_rows
+	    || !ia64_boot_param->console_info.num_cols)
 	{
 		printk("dig_setup: warning: invalid screen-info, guessing 80x25\n");
 		orig_x = 0;
@@ -68,10 +64,10 @@ dig_setup (char **cmdline_p)
 		num_rows = 25;
 		font_height = 16;
 	} else {
-		orig_x = ia64_boot_param.console_info.orig_x;
-		orig_y = ia64_boot_param.console_info.orig_y;
-		num_cols = ia64_boot_param.console_info.num_cols;
-		num_rows = ia64_boot_param.console_info.num_rows;
+		orig_x = ia64_boot_param->console_info.orig_x;
+		orig_y = ia64_boot_param->console_info.orig_y;
+		num_cols = ia64_boot_param->console_info.num_cols;
+		num_rows = ia64_boot_param->console_info.num_rows;
 		font_height = 400 / num_rows;
 	}
 

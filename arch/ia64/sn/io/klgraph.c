@@ -23,18 +23,15 @@
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/agent.h>
-#ifdef CONFIG_IA64_SGI_IO
 #include <asm/sn/kldir.h>
-#endif
 #include <asm/sn/gda.h> 
 #include <asm/sn/klconfig.h>
 #include <asm/sn/router.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/hcl_util.h>
 
-#define KLGRAPH_DEBUG 1
+/* #define KLGRAPH_DEBUG 1 */
 #ifdef KLGRAPH_DEBUG
 #define GRPRINTF(x)	printk x
 #define CE_GRPANIC	CE_PANIC
@@ -47,25 +44,6 @@
 
 extern char arg_maxnodes[];
 extern int maxnodes;
-
-#ifndef BRINGUP
-/*
- * Gets reason for diagval using table lookup.
- */
-static char*
-get_diag_string(uint diagcode)
-{
-  int num_entries;
-  int i;
-  num_entries = sizeof(diagval_map) / sizeof(diagval_t);
-  for (i = 0; i < num_entries; i++){
-    if ((unchar)diagval_map[i].dv_code == (unchar)diagcode)
-      return diagval_map[i].dv_msg;
-  }
-  return "Unknown";
-}
-
-#endif /* ndef BRINGUP */
 
 
 /*
@@ -105,7 +83,7 @@ klhwg_baseio_inventory_add(devfs_handle_t baseio_vhdl,cnodeid_t cnode)
 		klhwg_invent_alloc(cnode, INV_PROM, sizeof(invent_miscinfo_t));
 	baseio_inventory->im_type = INV_IO6PROM;
 	/* Read the io6prom revision from the nvram */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef LATER
 	nvram_prom_version_get(&version,&revision);
 #endif
 	/* Store the revision info  in the inventory */
@@ -169,7 +147,7 @@ klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 	(void) hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
 	rc = device_master_set(myhubv, node_vertex);
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	/*
 	 * Activate when we support hub stats.
 	 */
@@ -178,8 +156,7 @@ klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 #endif
 
 	if (rc != GRAPH_SUCCESS) {
-		cmn_err(CE_WARN,
-			"klhwg_add_hub: Can't add hub info label 0x%p, code %d",
+		PRINT_WARNING("klhwg_add_hub: Can't add hub info label 0x%p, code %d",
 			myhubv, rc);
 	}
 
@@ -187,15 +164,12 @@ klhwg_add_hub(devfs_handle_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 
 #ifndef BRINGUP
 	init_hub_stats(cnode, NODEPDA(cnode));
-#endif /* ndef BRINGUP */
-
-#ifndef CONFIG_IA64_SGI_IO
 	sndrv_attach(myhubv);
 #else
 	/*
 	 * Need to call our driver to do the attach?
 	 */
-	printk("klhwg_add_hub: Need to add code to do the attach.\n");
+	FIXME("klhwg_add_hub: Need to add code to do the attach.\n");
 #endif
 }
 
@@ -350,7 +324,7 @@ klhwg_update_xbox_rps(cnodeid_t cnode, int rps_state)
 		rps_invent->ir_gen.ig_flag = INVENT_ENABLED;
 }
 
-#endif /* ndef BRINGUP */
+#endif /* BRINGUP */
 
 void
 klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
@@ -366,7 +340,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 
 #if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || defined(CONFIG_IA64_GENERIC)
 	if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid),
-				KLTYPE_PBRICK_XBOW)) == NULL)
+				KLTYPE_IOBRICK_XBOW)) == NULL)
 			return;
 #endif
 
@@ -380,7 +354,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	    == NULL)
 	    return;
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	/*
 	 * We cannot support this function in devfs .. see below where 
 	 * we use hwgraph_path_add() to create this vertex with a known 
@@ -390,21 +364,19 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	ASSERT(err == GRAPH_SUCCESS);
 
 	xswitch_vertex_init(xbow_v);
-#endif /* !CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 	for (widgetnum = HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX; widgetnum++) {
 		if (!XBOW_PORT_TYPE_HUB(xbow_p, widgetnum)) 
 		    continue;
 
 		hub_nasid = XBOW_PORT_NASID(xbow_p, widgetnum);
-		printk("klhwg_add_xbow: Found xbow port type hub hub_nasid %d widgetnum %d\n", hub_nasid, widgetnum);
 		if (hub_nasid == INVALID_NASID) {
-			cmn_err(CE_WARN, "hub widget %d, skipping xbow graph\n", widgetnum);
+			PRINT_WARNING("hub widget %d, skipping xbow graph\n", widgetnum);
 			continue;
 		}
 
 		hub_cnode = NASID_TO_COMPACT_NODEID(hub_nasid);
-		printk("klhwg_add_xbow: cnode %d cnode %d\n", nasid_to_compact_node[0], nasid_to_compact_node[1]);
 
 		if (is_specified(arg_maxnodes) && hub_cnode == INVALID_CNODEID) {
 			continue;
@@ -412,21 +384,18 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 			
 		hubv = cnodeid_to_vertex(hub_cnode);
 
-#ifdef CONFIG_IA64_SGI_IO
-		printk("klhwg_add_xbow: Hub Vertex found = %p hub_cnode %d\n", hubv, hub_cnode);
 		err = hwgraph_path_add(hubv, EDGE_LBL_XTALK, &xbow_v);
                 if (err != GRAPH_SUCCESS) {
                         if (err == GRAPH_DUP)
-                                cmn_err(CE_WARN, "klhwg_add_xbow: Check for "
+                                PRINT_WARNING("klhwg_add_xbow: Check for "
                                         "working routers and router links!");
 
-                        cmn_err(CE_GRPANIC, "klhwg_add_xbow: Failed to add "
+                        PRINT_PANIC("klhwg_add_xbow: Failed to add "
                                 "edge: vertex 0x%p (0x%p) to vertex 0x%p (0x%p),"
                                 "error %d\n",
                                 hubv, hubv, xbow_v, xbow_v, err);
                 }
 		xswitch_vertex_init(xbow_v); 
-#endif
 
 		NODEPDA(hub_cnode)->xbow_vhdl = xbow_v;
 
@@ -443,14 +412,14 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 		GRPRINTF(("klhwg_add_xbow: adding port nasid %d %s to vertex 0x%p\n",
 			hub_nasid, EDGE_LBL_XTALK, hubv));
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 		err = hwgraph_edge_add(hubv, xbow_v, EDGE_LBL_XTALK);
 		if (err != GRAPH_SUCCESS) {
 			if (err == GRAPH_DUP)
-				cmn_err(CE_WARN, "klhwg_add_xbow: Check for "
+				PRINT_WARNING("klhwg_add_xbow: Check for "
 					"working routers and router links!");
 
-			cmn_err(CE_GRPANIC, "klhwg_add_xbow: Failed to add "
+			PRINT_PANIC("klhwg_add_xbow: Failed to add "
 				"edge: vertex 0x%p (0x%p) to vertex 0x%p (0x%p), "
 				"error %d\n",
 				hubv, hubv, xbow_v, xbow_v, err);
@@ -488,9 +457,8 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 			path_buffer, hwgraph_root));
 		rv = hwgraph_path_add(hwgraph_root, path_buffer, &node_vertex);
 
-		printk("klhwg_add_node: rv = %d graph success %d node_vertex 0x%p\n", rv, GRAPH_SUCCESS, node_vertex);
 		if (rv != GRAPH_SUCCESS)
-			cmn_err(CE_PANIC, "Node vertex creation failed.  "
+			PRINT_PANIC("Node vertex creation failed.  "
 					  "Path == %s",
 				path_buffer);
 
@@ -504,11 +472,8 @@ klhwg_add_node(devfs_handle_t hwgraph_root, cnodeid_t cnode, gda_t *gdap)
 		if(!board_disabled) {
 			mark_nodevertex_as_node(node_vertex,
 					    cnode + board_disabled * numnodes);
-			printk("klhwg_add_node: node_vertex %p, cnode %d numnodes %d\n", node_vertex, cnode, numnodes);
 
 			s = dev_to_name(node_vertex, path_buffer, sizeof(path_buffer));
-			printk("klhwg_add_node: s %s\n", s);
-
 			NODEPDA(cnode)->hwg_node_name =
 						kmalloc(strlen(s) + 1,
 						GFP_KERNEL);
@@ -581,7 +546,7 @@ klhwg_add_all_routers(devfs_handle_t hwgraph_root)
 			rv = hwgraph_path_add(hwgraph_root, path_buffer, &node_vertex);
 
 			if (rv != GRAPH_SUCCESS)
-				cmn_err(CE_PANIC, "Router vertex creation "
+				PRINT_PANIC("Router vertex creation "
 						  "failed.  Path == %s",
 					path_buffer);
 
@@ -629,12 +594,11 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 			return;
 
 	if (rc != GRAPH_SUCCESS)
-		cmn_err(CE_WARN, "Can't find router: %s", path_buffer);
+		PRINT_WARNING("Can't find router: %s", path_buffer);
 
 	/* We don't know what to do with multiple router components */
 	if (brd->brd_numcompts != 1) {
-		cmn_err(CE_PANIC,
-			"klhwg_connect_one_router: %d cmpts on router\n",
+		PRINT_PANIC("klhwg_connect_one_router: %d cmpts on router\n",
 			brd->brd_numcompts);
 		return;
 	}
@@ -668,7 +632,7 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 		if (rc != GRAPH_SUCCESS) {
 			if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 				continue;
-			cmn_err(CE_PANIC, "Can't find router: %s", dest_path);
+			PRINT_PANIC("Can't find router: %s", dest_path);
 		}
 		GRPRINTF(("klhwg_connect_one_router: Link from %s/%d to %s\n",
 			  path_buffer, port, dest_path));
@@ -685,7 +649,7 @@ klhwg_connect_one_router(devfs_handle_t hwgraph_root, lboard_t *brd,
 		}
 
 		if (rc != GRAPH_SUCCESS && !is_specified(arg_maxnodes))
-			cmn_err(CE_GRPANIC, "Can't create edge: %s/%s to vertex 0x%p error 0x%x\n",
+			PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p error 0x%x\n",
 				path_buffer, dest_path, dest_hndl, rc);
 		
 	}
@@ -768,7 +732,7 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 		rc = hwgraph_traverse(hwgraph_root, path_buffer, &hub_hndl);
 
 		if (rc != GRAPH_SUCCESS)
-			cmn_err(CE_WARN, "Can't find hub: %s", path_buffer);
+			PRINT_WARNING("Can't find hub: %s", path_buffer);
 
 		dest_brd = (lboard_t *)NODE_OFFSET_TO_K0(
 				hub->hub_port.port_nasid,
@@ -782,7 +746,7 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 		if (rc != GRAPH_SUCCESS) {
 			if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 				continue;
-			cmn_err(CE_PANIC, "Can't find board: %s", dest_path);
+			PRINT_PANIC("Can't find board: %s", dest_path);
 		} else {
 		
 
@@ -792,7 +756,7 @@ klhwg_connect_hubs(devfs_handle_t hwgraph_root)
 			rc = hwgraph_edge_add(hub_hndl, dest_hndl, EDGE_LBL_INTERCONNECT);
 
 			if (rc != GRAPH_SUCCESS)
-				cmn_err(CE_GRPANIC, "Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
+				PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
 				path_buffer, dest_path, dest_hndl, rc);
 
 		}
@@ -815,7 +779,7 @@ klhwg_device_disable_hints_add(void)
 					 */
 	char		device_name[MAXDEVNAME];
 	
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	device_admin_table_init();
 #endif
 	for(cnode = 0; cnode < numnodes; cnode++) {
@@ -853,7 +817,7 @@ klhwg_device_disable_hints_add(void)
 				device_component_canonical_name_get(board,
 							    component,
 							    device_name);
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 				device_admin_table_update(device_name,
 							  ADMIN_LBL_DISABLED,
 							  "yes");
@@ -877,13 +841,20 @@ klhwg_add_all_modules(devfs_handle_t hwgraph_root)
 	char		name[128];
 	devfs_handle_t	vhdl;
 	int		rc;
+	char		buffer[16];
 
 	/* Add devices under each module */
 
 	for (cm = 0; cm < nummodules; cm++) {
 		/* Use module as module vertex fastinfo */
 
+#ifdef __ia64
+		memset(buffer, 0, 16);
+		format_module_id(buffer, modules[cm]->id, MODULE_FORMAT_BRIEF);
+		sprintf(name, EDGE_LBL_MODULE "/%s", buffer);
+#else
 		sprintf(name, EDGE_LBL_MODULE "/%x", modules[cm]->id);
+#endif
 
 		rc = hwgraph_path_add(hwgraph_root, name, &vhdl);
 		ASSERT(rc == GRAPH_SUCCESS);
@@ -893,9 +864,15 @@ klhwg_add_all_modules(devfs_handle_t hwgraph_root)
 
 		/* Add system controller */
 
+#ifdef __ia64
+		sprintf(name,
+			EDGE_LBL_MODULE "/%s/" EDGE_LBL_L1,
+			buffer);
+#else
 		sprintf(name,
 			EDGE_LBL_MODULE "/%x/" EDGE_LBL_L1,
 			modules[cm]->id);
+#endif
 
 		rc = hwgraph_path_add(hwgraph_root, name, &vhdl);
 		ASSERT_ALWAYS(rc == GRAPH_SUCCESS); 
@@ -905,7 +882,7 @@ klhwg_add_all_modules(devfs_handle_t hwgraph_root)
 				     INFO_LBL_ELSC,
 				     (arbitrary_info_t) (__psint_t) 1);
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 		sndrv_attach(vhdl);
 #else
 		/*
@@ -923,13 +900,10 @@ klhwg_add_all_nodes(devfs_handle_t hwgraph_root)
 	gda_t		*gdap;
 	cnodeid_t	cnode;
 
-#ifdef SIMULATED_KLGRAPH
-	//gdap = 0xa800000000011000;
-	gdap = (gda_t *)0xe000000000011000;
-	printk("klhwg_add_all_nodes: SIMULATED_KLGRAPH FIXME: gdap= 0x%p\n", gdap);
-#else
-	gdap = GDA;
-#endif /* SIMULATED_KLGRAPH */
+	gdap = (gda_t *)0xe000000000002400;
+
+	FIXME("klhwg_add_all_nodes: FIX GDA\n");
+
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		ASSERT(gdap->g_nasidtable[cnode] != INVALID_NASID);
 		klhwg_add_node(hwgraph_root, cnode, gdap);
@@ -938,12 +912,7 @@ klhwg_add_all_nodes(devfs_handle_t hwgraph_root)
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		ASSERT(gdap->g_nasidtable[cnode] != INVALID_NASID);
 
-#ifndef CONFIG_IA64_SGI_IO
 		klhwg_add_xbow(cnode, gdap->g_nasidtable[cnode]);
-#else
-		printk("klhwg_add_all_nodes: Fix me by getting real nasid\n");
-		klhwg_add_xbow(cnode, 0);
-#endif
 	}
 
 	/*
@@ -959,7 +928,7 @@ klhwg_add_all_nodes(devfs_handle_t hwgraph_root)
 	 * routers in the system.
 	 */
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	router_guardians_set(hwgraph_root);
 #endif
 

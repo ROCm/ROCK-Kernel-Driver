@@ -7,8 +7,8 @@
  * Inputs:
  *	in0: address of buffer to checksum (char *)
  *	in1: length of the buffer (int)
- * 
- * Copyright (C) 1999 Hewlett-Packard Co
+ *
+ * Copyright (C) 1999, 2001 Hewlett-Packard Co
  * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
  *
  */
@@ -39,7 +39,7 @@
 //	This version avoids synchronization in the core loop by also using a
 //	pipeline for the accumulation of the checksum in result[].
 //
-//	 p[]     
+//	 p[]
 //	|---|
 //     0|   | r32 : new value loaded in pipeline
 //	|---|
@@ -50,7 +50,7 @@
 //     3|   | r35 : previous value added to checksum (previous iteration)
 //      |---|
 //
-//	result[] 
+//	result[]
 //	|---|
 //     0|   | r36 : new checksum
 //	|---|
@@ -68,7 +68,7 @@
 //	- Maybe another algorithm which would take care of the folding at the
 //	  end in a different manner
 //	- Work with people more knowledgeable than me on the network stack
-//	  to figure out if we could not split the function depending on the 
+//	  to figure out if we could not split the function depending on the
 //	  type of packet or alignment we get. Like the ip_fast_csum() routine
 //	  where we know we have at least 20bytes worth of data to checksum.
 //	- Look at RFCs about checksums to see whether or not we can do better
@@ -94,17 +94,11 @@
 #define buf		in0
 #define len		in1
 
-
-	.text
-	.psr abi64
-	.psr lsb
-	.lsb
-
 // unsigned long do_csum(unsigned char *buf,int len)
 
 GLOBAL_ENTRY(do_csum)
-	UNW(.prologue)
-	UNW(.save ar.pfs, saved_pfs)
+	.prologue
+	.save ar.pfs, saved_pfs
 	alloc saved_pfs=ar.pfs,2,8,0,8
 
 	.rotr p[4], result[3]
@@ -126,7 +120,7 @@ GLOBAL_ENTRY(do_csum)
 	;;
 	and lastoff=7,tmp1	// how many bytes off for last element
 	andcm last=tmp2,tmp3	// address of word containing last byte
-	UNW(.save pr, saved_pr)
+	.save pr, saved_pr
 	mov saved_pr=pr		// preserve predicates (rotation)
 	;;
 	sub tmp3=last,first	// tmp3=distance from first to last
@@ -144,14 +138,14 @@ GLOBAL_ENTRY(do_csum)
 	;;
 
 	shl tmp1=tmp1,3		// number of bits
-	shl hmask=hmask,tmp2 	// build head mask, mask off [0,firstoff[
+	shl hmask=hmask,tmp2	// build head mask, mask off [0,firstoff[
 	;;
 	shr.u tmask=tmask,tmp1	// build tail mask, mask off ]8,lastoff]
-	UNW(.save ar.lc, saved_lc)
+	.save ar.lc, saved_lc
 	mov saved_lc=ar.lc	// save lc
 	;;
 
-	UNW(.body)
+	.body
 
 (p8)	and hmask=hmask,tmask	// apply tail mask to head mask if 1 word only
 (p9)	and p[1]=lastval,tmask	// mask last it as appropriate
@@ -163,7 +157,7 @@ GLOBAL_ENTRY(do_csum)
 	;;
 	// XXX Fixme: not very nice initialization here
 	//
-	// Setup loop control registers: 
+	// Setup loop control registers:
 	//
 	// tmp3=0 (1 word)   : lc=0, ec=2, p16=F
 	// tmp3=1 (2 words)  : lc=0, ec=3, p16=F
@@ -227,7 +221,7 @@ GLOBAL_ENTRY(do_csum)
 	add ret0=tmp1,tmp2
 	mov pr=saved_pr,0xffffffffffff0000
 	;;
-	// if buf was odd then swap bytes 
+	// if buf was odd then swap bytes
 	mov ar.pfs=saved_pfs		// restore ar.ec
 (p10)	mux1 ret0=ret0,@rev		// reverse word
 	;;

@@ -43,22 +43,19 @@
 #if defined(_RUN_UNCACHED)
 #define CAC_BASE		0x9600000000000000
 #else
+#ifndef __ia64
 #define CAC_BASE		0xa800000000000000
+#else
+#define CAC_BASE                0xe000000000000000
+#endif
 #endif
 
-#ifdef Colin
-#define HSPEC_BASE		0x9000000000000000
-#define IO_BASE			0x9200000000000000
-#define MSPEC_BASE		0x9400000000000000
-#define UNCAC_BASE		0x9600000000000000
-#else
 #define HSPEC_BASE              0xc0000b0000000000
 #define HSPEC_SWIZ_BASE         0xc000030000000000
 #define IO_BASE                 0xc0000a0000000000
 #define IO_SWIZ_BASE            0xc000020000000000
 #define MSPEC_BASE              0xc000000000000000
 #define UNCAC_BASE              0xc000000000000000
-#endif
 
 #define TO_PHYS(x)		(	      ((x) & TO_PHYS_MASK))
 #define TO_CAC(x)		(CAC_BASE   | ((x) & TO_PHYS_MASK))

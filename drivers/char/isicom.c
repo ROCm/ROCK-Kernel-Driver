@@ -16,6 +16,10 @@
  *
  *	10/6/99 sameer			Merged the ISA and PCI drivers to
  *					a new unified driver.
+ *	09/06/01 acme@conectiva.com.br	use capable, not suser, do
+ *					restore_flags on failure in
+ *					isicom_send_break, verify put_user
+ *					result
  *	***********************************************************
  *
  *	To use this driver you also need the support package. You 
@@ -1354,13 +1358,13 @@ extern inline void isicom_send_break(struct isi_port * port, unsigned long lengt
 	while (((inw(base + 0x0e) & 0x0001) == 0) && (wait-- > 0));	
 	if (!wait) {
 		printk(KERN_DEBUG "ISICOM: Card found busy in isicom_send_break.\n");
-		return;
+		goto out;
 	}	
 	outw(0x8000 | ((port->channel) << (card->shift_count)) | 0x3, base);
 	outw((length & 0xff) << 8 | 0x00, base);
 	outw((length & 0xff00), base);
 	InterruptTheCard(base);
-	restore_flags(flags);
+out:	restore_flags(flags);
 }
 
 static int isicom_get_modem_info(struct isi_port * port, unsigned int * value)
@@ -1375,8 +1379,7 @@ static int isicom_get_modem_info(struct isi_port * port, unsigned int * value)
 		((status & ISI_DSR) ? TIOCM_DSR : 0) |
 		((status & ISI_CTS) ? TIOCM_CTS : 0) |
 		((status & ISI_RI ) ? TIOCM_RI  : 0);
-	put_user(info, (unsigned int *) value);
-	return 0;	
+	return put_user(info, (unsigned int *) value);
 }
 
 static int isicom_set_modem_info(struct isi_port * port, unsigned int cmd,
@@ -1438,7 +1441,7 @@ static int isicom_set_serial_info(struct isi_port * port,
 	reconfig_port = ((port->flags & ASYNC_SPD_MASK) != 
 			 (newinfo.flags & ASYNC_SPD_MASK));
 	
-	if (!suser()) {
+	if (!capable(CAP_SYS_ADMIN)) {
 		if ((newinfo.close_delay != port->close_delay) ||
 		    (newinfo.closing_wait != port->closing_wait) ||
 		    ((newinfo.flags & ~ASYNC_USR_MASK) != 

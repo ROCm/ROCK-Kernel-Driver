@@ -89,7 +89,7 @@ typedef enum configtype {
 	PCIAdapter,
 	GIOAdapter,
 	TPUAdapter,
-
+	TernaryCache,
 	Anonymous
 } CONFIGTYPE;
 

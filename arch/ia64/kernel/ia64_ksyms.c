@@ -24,8 +24,11 @@ EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strtok);
 
-#include <asm/hw_irq.h>
+#include <linux/irq.h>
 EXPORT_SYMBOL(isa_irq_to_vector_map);
+EXPORT_SYMBOL(enable_irq);
+EXPORT_SYMBOL(disable_irq);
+EXPORT_SYMBOL(disable_irq_nosync);
 
 #include <linux/in6.h>
 #include <asm/checksum.h>
@@ -40,10 +43,14 @@ EXPORT_SYMBOL(__ia64_memcpy_fromio);
 EXPORT_SYMBOL(__ia64_memcpy_toio);
 EXPORT_SYMBOL(__ia64_memset_c_io);
 
-#include <asm/irq.h>
-EXPORT_SYMBOL(enable_irq);
-EXPORT_SYMBOL(disable_irq);
-EXPORT_SYMBOL(disable_irq_nosync);
+#include <asm/semaphore.h>
+EXPORT_SYMBOL_NOVERS(__down);
+EXPORT_SYMBOL_NOVERS(__down_interruptible);
+EXPORT_SYMBOL_NOVERS(__down_trylock);
+EXPORT_SYMBOL_NOVERS(__up);
+EXPORT_SYMBOL_NOVERS(__down_read_failed);
+EXPORT_SYMBOL_NOVERS(__down_write_failed);
+EXPORT_SYMBOL_NOVERS(__rwsem_wake);
 
 #include <asm/page.h>
 EXPORT_SYMBOL(clear_page);
@@ -57,7 +64,11 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(last_cli_ip);
 #endif
 
+#include <asm/pgalloc.h>
+
 #ifdef CONFIG_SMP
+
+EXPORT_SYMBOL(smp_flush_tlb_all);
 
 #include <asm/current.h>
 #include <asm/hardirq.h>
@@ -65,6 +76,8 @@ EXPORT_SYMBOL(synchronize_irq);
 
 #include <asm/smp.h>
 EXPORT_SYMBOL(smp_call_function);
+EXPORT_SYMBOL(smp_call_function_single);
+EXPORT_SYMBOL(cpu_online_map);
 
 #include <linux/smp.h>
 EXPORT_SYMBOL(smp_num_cpus);
@@ -78,7 +91,11 @@ EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 
-#endif
+#else /* !CONFIG_SMP */
+
+EXPORT_SYMBOL(__flush_tlb_all);
+
+#endif /* !CONFIG_SMP */
 
 #include <asm/uaccess.h>
 EXPORT_SYMBOL(__copy_user);
@@ -111,3 +128,12 @@ EXPORT_SYMBOL_NOVERS(__umoddi3);
 
 extern unsigned long ia64_iobase;
 EXPORT_SYMBOL(ia64_iobase);
+
+#include <asm/pal.h>
+EXPORT_SYMBOL(ia64_pal_call_phys_stacked);
+EXPORT_SYMBOL(ia64_pal_call_phys_static);
+EXPORT_SYMBOL(ia64_pal_call_stacked);
+EXPORT_SYMBOL(ia64_pal_call_static);
+
+extern struct efi efi;
+EXPORT_SYMBOL(efi);

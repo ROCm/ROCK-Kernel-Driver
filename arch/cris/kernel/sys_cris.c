@@ -1,4 +1,4 @@
-/* $Id: sys_cris.c,v 1.3 2000/08/02 13:59:02 bjornw Exp $
+/* $Id: sys_cris.c,v 1.4 2001/01/31 14:55:58 perf Exp $
  *
  * linux/arch/cris/kernel/sys_etrax.c
  *
@@ -97,10 +97,22 @@ out:
         return error;
 }
 
-asmlinkage unsigned long old_mmap(unsigned long addr, size_t len, int prot,
-                                  int flags, int fd, off_t offset)
-{
-        return do_mmap2(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
+asmlinkage unsigned long old_mmap(unsigned long *args)
+{        
+	unsigned long buffer[6];
+	int err = -EFAULT;
+
+	if (copy_from_user(&buffer, args, sizeof(buffer)))
+		goto out;
+
+	err = -EINVAL;
+	if (buffer[5] & ~PAGE_MASK) /* verify that offset is on page boundary */
+		goto out;
+
+	err = do_mmap2(buffer[0], buffer[1], buffer[2], buffer[3],
+                       buffer[4], buffer[5] >> PAGE_SHIFT);
+out:
+	return err;
 }
 
 asmlinkage long

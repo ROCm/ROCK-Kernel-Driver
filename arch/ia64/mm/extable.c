@@ -1,8 +1,8 @@
 /*
  * Kernel exception handling table support.  Derived from arch/alpha/mm/extable.c.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -43,14 +43,22 @@ search_one_table (const struct exception_table_entry *first,
         return 0;
 }
 
-register unsigned long gp __asm__("gp");
+#ifndef CONFIG_MODULE
+register unsigned long main_gp __asm__("gp");
+#endif
 
-const struct exception_table_entry *
+struct exception_fixup
 search_exception_table (unsigned long addr)
 {
+	const struct exception_table_entry *entry;
+	struct exception_fixup fix = { 0 };
+
 #ifndef CONFIG_MODULE
 	/* There is only the kernel to search.  */
-	return search_one_table(__start___ex_table, __stop___ex_table - 1, addr - gp);
+	entry = search_one_table(__start___ex_table, __stop___ex_table - 1, addr - main_gp);
+	if (entry)
+		fix.cont = entry->cont + main_gp;
+	return fix;
 #else
 	struct exception_table_entry *ret;
 	/* The kernel is the last "module" -- no need to treat it special. */
@@ -59,10 +67,22 @@ search_exception_table (unsigned long addr)
 	for (mp = module_list; mp ; mp = mp->next) {
 		if (!mp->ex_table_start)
 			continue;
-		ret = search_one_table(mp->ex_table_start, mp->ex_table_end - 1, addr - mp->gp);
-		if (ret)
-			return ret;
+		entry = search_one_table(mp->ex_table_start, mp->ex_table_end - 1, addr - mp->gp);
+		if (entry) {
+			fix.cont = entry->cont + mp->gp;
+			return fix;
+		}
 	}
-	return 0;
 #endif
+	return fix;
+}
+
+void
+handle_exception (struct pt_regs *regs, struct exception_fixup fix)
+{
+	regs->r8 = -EFAULT;
+	if (fix.cont & 4)
+		regs->r9 = 0;
+	regs->cr_iip = (long) fix.cont & ~0xf;
+	ia64_psr(regs)->ri = fix.cont & 0x3;		/* set continuation slot number */
 }

@@ -11,6 +11,7 @@
 #define _ASM_SN_ADDRS_H
 
 #include <linux/config.h>
+
 #if _LANGUAGE_C
 #include <linux/types.h>
 #endif /* _LANGUAGE_C */
@@ -21,22 +22,15 @@
 #include <asm/sn/kldir.h>
 #endif	/* CONFIG_IA64_SGI_SN1 */
 
-#if defined(CONFIG_IA64_SGI_IO)
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/addrs.h>
 #endif
-#endif	/* CONFIG_IA64_SGI_IO */
 
 
 #if _LANGUAGE_C
 
-#if defined(CONFIG_IA64_SGI_IO)	/* FIXME */
 #define PS_UINT_CAST		(__psunsigned_t)
 #define UINT64_CAST		(uint64_t)
-#else	/* CONFIG_IA64_SGI_IO */
-#define PS_UINT_CAST		(unsigned long)
-#define UINT64_CAST		(unsigned long)
-#endif	/* CONFIG_IA64_SGI_IO */
 
 #define HUBREG_CAST		(volatile hubreg_t *)
 
@@ -138,6 +132,8 @@
 
 #define UALIAS_BASE		HSPEC_BASE
 #define UALIAS_SIZE		0x10000000	/* 256 Megabytes */
+#define CPU_UALIAS		0x20000		/* 128 Kilobytes */
+#define UALIAS_CPU_SIZE		(CPU_UALIAS / CPUS_PER_NODE)
 #define UALIAS_LIMIT		(UALIAS_BASE + UALIAS_SIZE)
 
 /*
@@ -408,24 +404,19 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
 #define PHYS_RAMBASE		0x0
 #define K0_RAMBASE		PHYS_TO_K0(PHYS_RAMBASE)
 
-#define EX_HANDLER_OFFSET(slice) ((slice) << 16)
-#define EX_HANDLER_ADDR(nasid, slice)					\
-	PHYS_TO_K0(NODE_OFFSET(nasid) | EX_HANDLER_OFFSET(slice))
-#define EX_HANDLER_SIZE		0x0400
-
-#define EX_FRAME_OFFSET(slice)	((slice) << 16 | 0x400)
-#define EX_FRAME_ADDR(nasid, slice)					\
-	PHYS_TO_K0(NODE_OFFSET(nasid) | EX_FRAME_OFFSET(slice))
-#define EX_FRAME_SIZE		0x0c00
-
 #define ARCS_SPB_OFFSET		0x1000
 #define ARCS_SPB_ADDR(nasid)						\
 	PHYS_TO_K0(NODE_OFFSET(nasid) | ARCS_SPB_OFFSET)
 #define ARCS_SPB_SIZE		0x0400
 
 #define KLDIR_OFFSET		0x2000
+#ifndef __ia64
 #define KLDIR_ADDR(nasid)						\
 	TO_NODE_UNCAC((nasid), KLDIR_OFFSET)
+#else
+#define KLDIR_ADDR(nasid)                                               \
+        TO_NODE_CAC((nasid), KLDIR_OFFSET)
+#endif
 #define KLDIR_SIZE		0x0400
 
 

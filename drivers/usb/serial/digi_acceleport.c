@@ -241,14 +241,14 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/tqueue.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
+	static int debug = 1;
 #else
-	#undef DEBUG
+	static int debug;
 #endif
 
-#include <linux/usb.h>
 #include "usb-serial.h"
 
 
@@ -2085,4 +2085,7 @@ module_exit(digi_exit);
 
 MODULE_AUTHOR("Peter Berger <pberger@brimson.com>, Al Borchers <borchers@steinerpoint.com>");
 MODULE_DESCRIPTION("Digi AccelePort USB-2/USB-4 Serial Converter driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 

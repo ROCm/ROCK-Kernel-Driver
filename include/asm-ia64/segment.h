@@ -3,4 +3,4 @@
 
 /* Only here because we have some old header files that expect it.. */
 
-#endif /* __ALPHA_SEGMENT_H */
+#endif /* _ASM_IA64_SEGMENT_H */

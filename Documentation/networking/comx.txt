@@ -162,7 +162,7 @@ pppd (this pppd will work as async pppd to, the modifiactions merely relax
 some restricions in order to be able to use non-async lines too.
 If configured, this driver can use Van Jacobson TCP header compression (you'll
 need the slhc.o module for this).
-Additionaly to use this protocol, enable async ppp in your kernel config, and
+Additionally to use this protocol, enable async ppp in your kernel config, and
 create the comx device special files in /dev. They're character special files
 with major 88, and their names must be the same as their network interface
 counterparts (i.e /dev/comx0 with minor 0 corresponds interface comx0 and so

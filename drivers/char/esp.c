@@ -1907,7 +1907,7 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 			    return get_lsr_info(info, (unsigned int *) arg);
 
 		case TIOCSERSWILD:
-			if (!suser())
+			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
 			return 0;
 

@@ -7,7 +7,7 @@
  * http://www.pap-philips.de
  * -----------------------------------------------------------
  * This software may be used and distributed according to the terms of
- * the GNU Public License, incorporated herein by reference.
+ * the GNU General Public License, incorporated herein by reference.
  *
  * Author:
  * L. Haag
@@ -65,7 +65,7 @@
 
 //#define DEBUG_QUEUE
 
-/* Log successfull handshake and protocol operations  */
+/* Log successful handshake and protocol operations  */
 //#define DEBUG_PROTO_S
 
 /* Log handshake and protocol errors: */

@@ -538,7 +538,7 @@ static void cyrix_get_arr (unsigned int reg, unsigned long *base,
      * Note: shift==0xf means 4G, this is unsupported.
      */
     if (shift)
-      *size = (reg < 7 ? 0x1UL : 0x40UL) << shift;
+      *size = (reg < 7 ? 0x1UL : 0x40UL) << (shift - 1);
     else
       *size = 0;
 

@@ -68,19 +68,19 @@ GLOBAL_ENTRY(memcpy)
 	 * the more general copy routine handling arbitrary
 	 * sizes/alignment etc.
 	 */
-	UNW(.prologue)
-	UNW(.save ar.pfs, saved_pfs)
+	.prologue
+	.save ar.pfs, saved_pfs
 	alloc saved_pfs=ar.pfs,3,Nrot,0,Nrot
-	UNW(.save ar.lc, saved_lc)
+	.save ar.lc, saved_lc
 	mov saved_lc=ar.lc
 	or t0=in0,in1
 	;;
 
 	or t0=t0,in2
-	UNW(.save pr, saved_pr)
+	.save pr, saved_pr
 	mov saved_pr=pr
 
-	UNW(.body)
+	.body
 
 	cmp.eq p6,p0=in2,r0	// zero length?
 	mov retval=in0		// return dst

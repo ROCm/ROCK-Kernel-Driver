@@ -43,16 +43,13 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
-	#define isalpha(x) ( ( x > 96 && x < 123) || ( x > 64 && x < 91) || (x > 47 && x < 58) )
-	#define DEBUG
+	static int debug = 1;
 #else
-	#undef DEBUG
+	static int debug;
 #endif
-
-#include <linux/usb.h>
 
 #include "usb-serial.h"
 
@@ -252,8 +249,7 @@ static void omninet_read_bulk_callback (struct urb *urb)
 		return;
 	}
 
-#ifdef DEBUG
-	if(header->oh_xxx != 0x30) {
+	if ((debug) && (header->oh_xxx != 0x30)) {
 		if (urb->actual_length) {
 			printk (KERN_DEBUG __FILE__ ": omninet_read %d: ", header->oh_len);
 			for (i = 0; i < (header->oh_len + OMNINET_HEADERLEN); i++) {
@@ -262,7 +258,6 @@ static void omninet_read_bulk_callback (struct urb *urb)
 			printk ("\n");
 		}
 	}
-#endif
 
 	if (urb->actual_length && header->oh_len) {
 		for (i = 0; i < header->oh_len; i++) {
@@ -413,4 +408,7 @@ static void __exit omninet_exit (void)
 
 module_init(omninet_init);
 module_exit(omninet_exit);
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 

@@ -1,13 +1,10 @@
 /* ld script to make the Linux/CRIS kernel
  * Authors: Bjorn Wesen (bjornw@axis.com)
- *
- * For now, on Etrax-100 LX, the DRAM starts virtually at 0x6. Normally
- * it should be at 0xc.
  */	
 
 SECTIONS
 {
-	. = 0x60000000;               /* DRAM starts virtually at 0x60000000 */
+	. = @ETRAX_DRAM_VIRTUAL_BASE@;
 	_dram_start = .;
 	_ibr_start = .;
 	. = . + 0x4000; /* see head.S and pages reserved at the start */
@@ -21,6 +18,7 @@ SECTIONS
 		*(.fixup)
 		*(.text.__*)
 		*(.rodata)
+		*(.rodata.__*)
 	}
 
 	. = ALIGN(4);                /* Exception table */
@@ -77,5 +75,5 @@ SECTIONS
 		*(.exitcall.exit)
         }
 
-	_dram_end = 0x60000000 + @ETRAX_DRAM_SIZE_M@*1024*1024;
+	_dram_end = _dram_start + @ETRAX_DRAM_SIZE_M@*1024*1024;
 }

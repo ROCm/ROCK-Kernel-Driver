@@ -1,11 +1,15 @@
 /*
 	drivers/net/tulip/tulip.h
 
-	Copyright 2000  The Linux Kernel Team
-	Written/copyright 1994-1999 by Donald Becker.
+	Copyright 2000,2001  The Linux Kernel Team
+	Written/copyright 1994-2001 by Donald Becker.
 
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
+
+	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	for more information on this driver, or visit the project
+	Web page at http://sourceforge.net/projects/tulip/
 
 */
 
@@ -46,17 +50,18 @@ struct tulip_chip_table {
 
 
 enum tbl_flag {
-	HAS_MII = 1,
-	HAS_MEDIA_TABLE = 2,
-	CSR12_IN_SROM = 4,
-	ALWAYS_CHECK_MII = 8,
-	HAS_ACPI = 0x10,
-	MC_HASH_ONLY = 0x20,	/* Hash-only multicast filter. */
-	HAS_PNICNWAY = 0x80,
-	HAS_NWAY = 0x40,	/* Uses internal NWay xcvr. */
-	HAS_INTR_MITIGATION = 0x100,
-	IS_ASIX = 0x200,
-	HAS_8023X = 0x400,
+	HAS_MII			= 0x0001,
+	HAS_MEDIA_TABLE		= 0x0002,
+	CSR12_IN_SROM		= 0x0004,
+	ALWAYS_CHECK_MII	= 0x0008,
+	HAS_ACPI		= 0x0010,
+	MC_HASH_ONLY		= 0x0020, /* Hash-only multicast filter. */
+	HAS_PNICNWAY		= 0x0080,
+	HAS_NWAY		= 0x0040, /* Uses internal NWay xcvr. */
+	HAS_INTR_MITIGATION	= 0x0100,
+	IS_ASIX			= 0x0200,
+	HAS_8023X		= 0x0400,
+	COMET_MAC_ADDR		= 0x0800,
 };
 
 
@@ -136,6 +141,15 @@ enum status_bits {
 	TxNoBuf = 0x04,
 	TxDied = 0x02,
 	TxIntr = 0x01,
+};
+
+
+enum tulip_rx_modes {
+	FullDuplex		= 0x0200,
+	AcceptBroadcast		= 0x0100,
+	AcceptAllMulticast	= 0x0080,
+	AcceptAllPhys		= 0x0040,
+	AcceptRunt		= 0x0008,
 };
 
 
@@ -236,6 +250,7 @@ enum t21143_csr6_bits {
 #define TX_RING_SIZE	16
 #define RX_RING_SIZE	32
 
+#define MEDIA_MASK     31
 
 #define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer. */
 
@@ -251,44 +266,10 @@ enum t21143_csr6_bits {
 #define DESC_RING_WRAP 0x02000000
 
 
-/*  EEPROM_Ctrl bits. */
-#define EE_SHIFT_CLK	0x02	/* EEPROM shift clock. */
-#define EE_CS			0x01	/* EEPROM chip select. */
-#define EE_DATA_WRITE	0x04	/* Data from the Tulip to EEPROM. */
-#define EE_WRITE_0		0x01
-#define EE_WRITE_1		0x05
-#define EE_DATA_READ	0x08	/* Data from the EEPROM chip. */
-#define EE_ENB			(0x4800 | EE_CS)
-
-/* Delay between EEPROM clock transitions.
-   Even at 33Mhz current PCI implementations don't overrun the EEPROM clock.
-   We add a bus turn-around to insure that this remains true. */
-#define eeprom_delay()	inl(ee_addr)
-
-/* The EEPROM commands include the alway-set leading bit. */
-#define EE_READ_CMD		(6)
-
 #define EEPROM_SIZE 128 	/* 2 << EEPROM_ADDRLEN */
 
 
-/* The maximum data clock rate is 2.5 Mhz.  The minimum timing is usually
-   met by back-to-back PCI I/O cycles, but we insert a delay to avoid
-   "overclocking" issues or future 66Mhz PCI. */
-#define mdio_delay() inl(mdio_addr)
-
-/* Read and write the MII registers using software-generated serial
-   MDIO protocol.  It is just different enough from the EEPROM protocol
-   to not share code.  The maxium data clock rate is 2.5 Mhz. */
-#define MDIO_SHIFT_CLK	0x10000
-#define MDIO_DATA_WRITE0 0x00000
-#define MDIO_DATA_WRITE1 0x20000
-#define MDIO_ENB		0x00000		/* Ignore the 0x02000 databook setting. */
-#define MDIO_ENB_IN		0x40000
-#define MDIO_DATA_READ	0x80000
-
-
 #define RUN_AT(x) (jiffies + (x))
-
 
 #if defined(__i386__)			/* AKA get_unaligned() */
 #define get_u16(ptr) (*(u16 *)(ptr))
@@ -346,7 +327,9 @@ struct tulip_private {
 	int flags;
 	struct net_device_stats stats;
 	struct timer_list timer;	/* Media selection timer. */
+	u32 mc_filter[2];
 	spinlock_t lock;
+	spinlock_t mii_lock;
 	unsigned int cur_rx, cur_tx;	/* The next free ring entry */
 	unsigned int dirty_rx, dirty_tx;	/* The ring entries to be free()ed. */
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */

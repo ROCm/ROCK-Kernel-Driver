@@ -1,6 +1,7 @@
 BOOKS	:= wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	   kernel-api.sgml parportbook.sgml kernel-hacking.sgml \
-	   kernel-locking.sgml via-audio.sgml mousedrivers.sgml sis900.sgml
+	   kernel-locking.sgml via-audio.sgml mousedrivers.sgml sis900.sgml \
+	   deviceiobook.sgml
 
 PS	:=	$(patsubst %.sgml, %.ps, $(BOOKS))
 PDF	:=	$(patsubst %.sgml, %.pdf, $(BOOKS))
@@ -9,11 +10,11 @@ IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
 EPS-parportbook := $(patsubst %.fig, %.eps, $(IMG-parportbook))
 JPG-parportbook := $(patsubst %.fig, %.jpeg, $(IMG-parportbook))
 
+books:	$(BOOKS)
+
 $(BOOKS): $(TOPDIR)/scripts/docproc
 
 .PHONY:	books ps pdf html clean mrproper
-
-books:	$(BOOKS)
 
 ps:	$(PS)
 
@@ -55,6 +56,9 @@ sis900.sgml: sis900.tmpl $(TOPDIR)/drivers/net/sis900.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/net/sis900.c \
 		<sis900.tmpl >sis900.sgml
 
+deviceiobook.sgml: deviceiobook.tmpl
+	$(TOPDIR)/scripts/docgen <deviceiobook.tmpl >deviceiobook.sgml
+
 mcabook.sgml: mcabook.tmpl $(TOPDIR)/arch/i386/kernel/mca.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/arch/i386/kernel/mca.c \
 		<mcabook.tmpl >mcabook.sgml
@@ -64,6 +68,7 @@ videobook.sgml: videobook.tmpl $(TOPDIR)/drivers/media/video/videodev.c
 		<videobook.tmpl >videobook.sgml
 
 APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
+		$(TOPDIR)/arch/i386/kernel/irq.c \
 		$(TOPDIR)/arch/i386/kernel/mca.c \
 		$(TOPDIR)/arch/i386/kernel/mtrr.c \
 		$(TOPDIR)/drivers/char/misc.c \
@@ -77,11 +82,24 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/drivers/net/wan/syncppp.c \
 		$(TOPDIR)/drivers/net/wan/z85230.c \
 		$(TOPDIR)/drivers/usb/usb.c \
-		$(TOPDIR)/fs/locks.c \
+		$(TOPDIR)/drivers/video/fbmem.c \
+		$(TOPDIR)/drivers/video/fbcmap.c \
+		$(TOPDIR)/drivers/video/fbcon.c \
+		$(TOPDIR)/drivers/video/fbgen.c \
+		$(TOPDIR)/drivers/video/fonts.c \
+		$(TOPDIR)/drivers/video/macmodes.c \
+		$(TOPDIR)/drivers/video/modedb.c \
 		$(TOPDIR)/fs/devfs/base.c \
+		$(TOPDIR)/fs/locks.c \
+		$(TOPDIR)/include/asm-i386/bitops.h \
 		$(TOPDIR)/kernel/pm.c \
 		$(TOPDIR)/kernel/ksyms.c \
 		$(TOPDIR)/kernel/kmod.c \
+		$(TOPDIR)/kernel/printk.c \
+		$(TOPDIR)/kernel/sched.c \
+		$(TOPDIR)/kernel/sysctl.c \
+		$(TOPDIR)/lib/string.c \
+		$(TOPDIR)/lib/vsprintf.c \
 		$(TOPDIR)/net/netsyms.c
  
 kernel-api.sgml: kernel-api.tmpl $(APISOURCES)

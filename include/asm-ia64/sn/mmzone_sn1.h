@@ -1,12 +1,11 @@
 #ifndef _ASM_IA64_MMZONE_SN1_H
 #define _ASM_IA64_MMZONE_SN1_H
 
+#include <linux/config.h>
+
 /*
  * Copyright, 2000, Silicon Graphics, sprasad@engr.sgi.com
  */
-
-#include <linux/config.h>
-
 /* Maximum configuration supported by SNIA hardware. There are other
  * restrictions that may limit us to a smaller max configuration.
  */

@@ -1,5 +1,5 @@
 /* This file is derived from the GAS 2.1.4 assembler control file.
-   The GAS product is under the GNU Public License, version 2 or later.
+   The GAS product is under the GNU General Public License, version 2 or later.
    As such, this file is also under that license.
 
    If the file format changes in the COFF object, this file should be

@@ -13,17 +13,17 @@
  *
  * Description:
  *	 This driver is intended to support the PMC551 PCI Ram device from
- *	 Ramix Inc.  The PMC551 is a PMC Mezzanine module for cPCI embeded
+ *	 Ramix Inc.  The PMC551 is a PMC Mezzanine module for cPCI embedded
  *	 systems.  The device contains a single SROM that initally programs the
  *	 V370PDC chipset onboard the device, and various banks of DRAM/SDRAM
  *	 onboard.  This driver implements this PCI Ram device as an MTD (Memory
  *	 Technologies Device) so that it can be used to hold a filesystem, or
- *	 for added swap space in embeded systems.  Since the memory on this
+ *	 for added swap space in embedded systems.  Since the memory on this
  *	 board isn't as fast as main memory we do not try to hook it into main
  *	 memeory as that would simply reduce performance on the system.  Using
  *	 it as a block device allows us to use it as high speed swap or for a
- *	 high speed disk device of some sort.  Which becomes very usefull on
- *	 diskless systems in the embeded market I might add.
+ *	 high speed disk device of some sort.  Which becomes very useful on
+ *	 diskless systems in the embedded market I might add.
  *	 
  * Notes:
  *	 Due to what I assume is more buggy SROM, the 64M PMC551 I have

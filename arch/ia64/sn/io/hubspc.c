@@ -61,7 +61,7 @@ typedef struct cpuprom_info {
 }cpuprom_info_t;
 
 static cpuprom_info_t	*cpuprom_head;
-lock_t	cpuprom_spinlock;
+spinlock_t	cpuprom_spinlock;
 #define	PROM_LOCK()	mutex_spinlock(&cpuprom_spinlock)
 #define	PROM_UNLOCK(s)	mutex_spinunlock(&cpuprom_spinlock, (s))
 
@@ -72,7 +72,7 @@ void
 prominfo_add(devfs_handle_t hub, devfs_handle_t prom)
 {
 	cpuprom_info_t	*info;
-	int	s;
+	unsigned long	s;
 
 	info = kmalloc(sizeof(cpuprom_info_t), GFP_KERNEL);
 	ASSERT(info);
@@ -89,7 +89,7 @@ prominfo_add(devfs_handle_t hub, devfs_handle_t prom)
 void
 prominfo_del(devfs_handle_t prom)
 {
-	int	s;
+	unsigned long	s;
 	cpuprom_info_t	*info;
 	cpuprom_info_t	**prev;
 
@@ -111,7 +111,7 @@ prominfo_del(devfs_handle_t prom)
 devfs_handle_t
 prominfo_nodeget(devfs_handle_t prom)
 {
-	int	s;
+	unsigned long	s;
 	cpuprom_info_t	*info;
 
 	s = PROM_LOCK();
@@ -297,7 +297,7 @@ hubspc_init(void)
 	printf("hubspc_init: Completed\n");
 #endif	/* HUBSPC_DEBUG */
 	/* Initialize spinlocks */
-	spinlock_init(&cpuprom_spinlock, "promlist");
+	mutex_spinlock_init(&cpuprom_spinlock);
 }
 
 /* ARGSUSED */
@@ -312,12 +312,6 @@ hubspc_open(devfs_handle_t *devp, mode_t oflag, int otyp, cred_t *crp)
                 break;
 
         case HUBSPC_PROM:
-		/* Check if the user has proper access rights to 
-		 * read/write the prom space.
-		 */
-                if (!cap_able(CAP_DEVICE_MGT)) {
-                        errcode = EPERM;
-                }                
                 break;
 
         default:

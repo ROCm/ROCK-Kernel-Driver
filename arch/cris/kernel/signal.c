@@ -38,9 +38,6 @@
 
 #define RESTART_CRIS_SYS(regs) regs->r10 = regs->orig_r10; regs->irp -= 2;
 
-int sys_wait4(pid_t pid, unsigned long *stat_addr,
-			 int options, unsigned long *ru);
-
 int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs);
 
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
@@ -391,9 +388,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	} else {
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
-		/* This is movu.w __NR_sigreturn, r1; break 13; */
+		/* This is movu.w __NR_sigreturn, r9; break 13; */
 		/* TODO: check byteorder */
-		err |= __put_user(0x1c5f,         (short *)(frame->retcode+0));
+		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
 		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
 		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
 	}
@@ -453,9 +450,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	} else {
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
-		/* This is movu.w __NR_sigreturn, r1; break 13; */
+		/* This is movu.w __NR_sigreturn, r9; break 13; */
 		/* TODO: check byteorder */
-		err |= __put_user(0x1c5f,         (short *)(frame->retcode+0));
+		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
 		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
 		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
 	}

@@ -495,7 +495,7 @@ Changes for patch v52
 
 - Replaced dummy .epoch inode with .devfsd character device
 
-- Modified rc.devfs to take acount of above change
+- Modified rc.devfs to take account of above change
 
 - Removed spurious driver warning messages when CONFIG_DEVFS_FS=n
 

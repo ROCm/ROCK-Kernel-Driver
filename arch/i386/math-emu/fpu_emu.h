@@ -88,7 +88,7 @@ extern u_char emulating;
 #else
 #  define RE_ENTRANT_CHECK_OFF
 #  define RE_ENTRANT_CHECK_ON
-#endif RE_ENTRANT_CHECKING
+#endif /* RE_ENTRANT_CHECKING */
 
 #define FWAIT_OPCODE 0x9b
 #define OP_SIZE_PREFIX 0x66
@@ -212,6 +212,6 @@ asmlinkage int FPU_round(FPU_REG *arg, unsigned int extent, int dummy,
 #include "fpu_proto.h"
 #endif
 
-#endif __ASSEMBLY__
+#endif /* __ASSEMBLY__ */
 
-#endif _FPU_EMU_H_
+#endif /* _FPU_EMU_H_ */

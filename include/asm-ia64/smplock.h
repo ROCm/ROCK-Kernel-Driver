@@ -3,10 +3,12 @@
  *
  * Default SMP lock implementation
  */
-#include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/spinlock.h>
+#include <linux/sched.h>
 
-#include <asm/spinlock.h>
+#include <asm/current.h>
+#include <asm/hardirq.h>
 
 extern spinlock_t kernel_flag;
 

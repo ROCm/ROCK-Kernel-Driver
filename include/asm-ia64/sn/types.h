@@ -9,7 +9,6 @@
 #ifndef _ASM_SN_TYPES_H
 #define _ASM_SN_TYPES_H
 
-#include <linux/config.h>
 #include <linux/types.h>
 
 typedef unsigned long 	cpuid_t;
@@ -22,15 +21,12 @@ typedef signed short	moduleid_t;	/* user-visible module number type */
 typedef signed short	cmoduleid_t;	/* kernel compact module id type */
 typedef unsigned char	clusterid_t;	/* Clusterid of the cell */
 
-#if defined(CONFIG_IA64_SGI_IO)
 #define __psunsigned_t uint64_t
 #define lock_t uint64_t
-#define sv_t uint64_t
 
 typedef unsigned long iopaddr_t;
 typedef unsigned char uchar_t;
 typedef unsigned long paddr_t;
 typedef unsigned long pfn_t;
-#endif        /* CONFIG_IA64_SGI_IO */
 
 #endif /* _ASM_SN_TYPES_H */

@@ -35,15 +35,9 @@ typedef int pciio_device_id_t;
 
 #define PCIIO_DEVICE_ID_NONE	-1
 
-#ifdef colin
-typedef char pciio_bus_t;	/* PCI bus number (0..255) */
-typedef char pciio_slot_t;	/* PCI slot number (0..31, 255) */
-typedef char pciio_function_t;	/* PCI func number (0..7, 255) */
-#else
 typedef uint8_t pciio_bus_t;       /* PCI bus number (0..255) */
 typedef uint8_t pciio_slot_t;      /* PCI slot number (0..31, 255) */
 typedef uint8_t pciio_function_t;  /* PCI func number (0..7, 255) */
-#endif
 
 #define	PCIIO_SLOTS		((pciio_slot_t)32)
 #define	PCIIO_FUNCS		((pciio_function_t)8)
@@ -446,6 +440,24 @@ pciio_error_extract_f	(devfs_handle_t vhdl,
 			 pciio_space_t *spacep,
 			 iopaddr_t *addrp);
 
+typedef void
+pciio_driver_reg_callback_f	(devfs_handle_t conn,
+				int key1,
+				int key2,
+				int error);
+
+typedef void
+pciio_driver_unreg_callback_f	(devfs_handle_t conn, /* pci connection point */
+				 int key1,
+				 int key2,
+				 int error);
+
+typedef int
+pciio_device_unregister_f	(devfs_handle_t conn);
+
+typedef int
+pciio_dma_enabled_f		(devfs_handle_t conn);
+
 /*
  * Adapters that provide a PCI interface adhere to this software interface.
  */
@@ -491,6 +503,12 @@ typedef struct pciio_provider_s {
     /* Error handling interface */
     pciio_error_devenable_f *error_devenable;
     pciio_error_extract_f *error_extract;
+
+    /* Callback support */
+    pciio_driver_reg_callback_f *driver_reg_callback;
+    pciio_driver_unreg_callback_f *driver_unreg_callback;
+    pciio_device_unregister_f 	*device_unregister;
+    pciio_dma_enabled_f		*dma_enabled;
 } pciio_provider_t;
 
 /* PCI devices use these standard PCI provider interfaces */
@@ -540,13 +558,8 @@ extern pciio_error_extract_f pciio_error_extract;
 #define PCIIO_WIDGETDEV_SLOT_MASK		0x1f
 #define PCIIO_WIDGETDEV_FUNC_MASK		0x7
 
-#ifdef IRIX
-#define pciio_widgetdev_create(slot,func)	\
-	((slot) << PCIIO_WIDGETDEV_SLOT_SHFT + (func))
-#else
 #define pciio_widgetdev_create(slot,func)       \
         (((slot) << PCIIO_WIDGETDEV_SLOT_SHFT) + (func))
-#endif
 
 #define pciio_widgetdev_slot_get(wdev)		\
 	(((wdev) >> PCIIO_WIDGETDEV_SLOT_SHFT) & PCIIO_WIDGETDEV_SLOT_MASK)
@@ -612,8 +625,14 @@ pciio_device_info_unregister(
 			pciio_info_t pciio_info);	/* details about conn point */
 
 
-extern int              pciio_device_attach(devfs_handle_t pcicard);	/* vertex created by pciio_device_register */
-extern int             pciio_device_detach(devfs_handle_t pcicard);	/* vertex created by pciio_device_register */
+extern int              
+pciio_device_attach(
+			devfs_handle_t pcicard,   /* vertex created by pciio_device_register */
+			int drv_flags);
+extern int
+pciio_device_detach(
+			devfs_handle_t pcicard,   /* vertex created by pciio_device_register */
+                        int drv_flags);
 
 /*
  * Generic PCI interface, for use with all PCI providers
@@ -632,7 +651,7 @@ extern iopaddr_t        pciio_pio_pciaddr_get(pciio_piomap_t pciio_piomap);
 extern ulong            pciio_pio_mapsz_get(pciio_piomap_t pciio_piomap);
 extern caddr_t          pciio_pio_kvaddr_get(pciio_piomap_t pciio_piomap);
 
-#ifdef IRIX
+#ifdef LATER
 #ifdef USE_PCI_PIO
 extern uint8_t 		pciio_pio_read8(volatile uint8_t *addr);
 extern uint16_t 	pciio_pio_read16(volatile uint16_t *addr);
@@ -676,7 +695,7 @@ __inline void pciio_pio_write64(uint64_t val, volatile uint64_t *addr)
 	*addr = val;
 }
 #endif /* USE_PCI_PIO */
-#endif
+#endif	/* LATER */
 
 /* Generic PCI dma interfaces */
 extern devfs_handle_t     pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap);

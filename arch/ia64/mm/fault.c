@@ -47,7 +47,7 @@ void
 ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs)
 {
 	struct mm_struct *mm = current->mm;
-	const struct exception_table_entry *fix;
+	struct exception_fixup fix;
 	struct vm_area_struct *vma, *prev_vma;
 	struct siginfo si;
 	int signal = SIGSEGV;
@@ -163,14 +163,13 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		return;
 	}
 
+#ifdef GAS_HAS_LOCAL_TAGS
+	fix = search_exception_table(regs->cr_iip + ia64_psr(regs)->ri);
+#else
 	fix = search_exception_table(regs->cr_iip);
-	if (fix) {
-		regs->r8 = -EFAULT;
-		if (fix->skip & 1) {
-			regs->r9 = 0;
-		}
-		regs->cr_iip += ((long) fix->skip) & ~15;
-		regs->cr_ipsr &= ~IA64_PSR_RI;	/* clear exception slot number */
+#endif
+	if (fix.cont) {
+		handle_exception(regs, fix);
 		return;
 	}
 

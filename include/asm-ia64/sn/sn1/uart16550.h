@@ -1,3 +1,16 @@
+/* $Id$
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2000 by Colin Ngam
+ */
+
+#ifndef _ASM_SN_SN1_UART16550_H
+#define _ASM_SN_SN1_UART16550_H
+
 
 /*
  * Definitions for 16550  chip
@@ -212,3 +225,4 @@
 #define INC_RING_POINTER(x) \
 	( ((x & 0xffe0) < 4064) ? (x += 32) : 0 )
 
+#endif /* _ASM_SN_SN1_UART16550_H */

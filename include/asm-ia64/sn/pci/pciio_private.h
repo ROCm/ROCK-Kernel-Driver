@@ -10,10 +10,6 @@
 #ifndef _ASM_SN_PCI_PCIIO_PRIVATE_H
 #define _ASM_SN_PCI_PCIIO_PRIVATE_H
 
-#ifdef colin
-#include <ksys/xthread.h>
-#endif
-
 /*
  * pciio_private.h -- private definitions for pciio
  * PCI drivers should NOT include this file.
@@ -54,12 +50,12 @@ struct pciio_intr_s {
     pciio_intr_line_t       pi_lines;	/* which interrupt line(s) */
     intr_func_t             pi_func;	/* handler function (when connected) */
     intr_arg_t              pi_arg;	/* handler parameter (when connected) */
-#ifdef IRIX
+#ifdef LATER
     thd_int_t               pi_tinfo;	/* Thread info (when connected) */
 #endif
     cpuid_t                 pi_mustruncpu; /* Where we must run. */
-    int			    pi_irq;	/* IRQ assigned */
-    int			    pi_cpu;	/* cpu assigned */
+    int                     pi_irq;     /* IRQ assigned */
+    int                     pi_cpu;     /* cpu assigned */
 };
 
 /* PCIIO_INTR (pi_flags) flags */

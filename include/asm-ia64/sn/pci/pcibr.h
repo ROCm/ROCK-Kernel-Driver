@@ -143,6 +143,14 @@ extern alenlist_t	pcibr_dmamap_list(pcibr_dmamap_t dmamap,
 
 extern void		pcibr_dmamap_done(pcibr_dmamap_t dmamap);
 
+/*
+ * pcibr_get_dmatrans_node() will return the compact node id to which  
+ * all 32-bit Direct Mapping memory accesses will be directed.
+ * (This node id can be different for each PCI bus.) 
+ */
+
+extern cnodeid_t	pcibr_get_dmatrans_node(devfs_handle_t pconn_vhdl);
+
 extern iopaddr_t	pcibr_dmatrans_addr(devfs_handle_t dev,
 					    device_desc_t dev_desc,
 					    paddr_t paddr,
@@ -215,10 +223,6 @@ extern pciio_slot_t	pcibr_error_extract(devfs_handle_t pcibr_vhdl,
 					    pciio_space_t *spacep,
 					    iopaddr_t *addrp);
 
-extern int		pcibr_rrb_alloc(devfs_handle_t pconn_vhdl,
-					int *count_vchan0,
-					int *count_vchan1);
-
 extern int		pcibr_wrb_flush(devfs_handle_t pconn_vhdl);
 extern int		pcibr_rrb_check(devfs_handle_t pconn_vhdl,
 					int *count_vchan0,
@@ -241,7 +245,7 @@ typedef rrb_alloc_funct_f      *rrb_alloc_funct_t;
 void			pcibr_set_rrb_callback(devfs_handle_t xconn_vhdl,
 					       rrb_alloc_funct_f *func);
 
-extern void		pcibr_device_unregister(devfs_handle_t);
+extern int		pcibr_device_unregister(devfs_handle_t);
 extern int		pcibr_dma_enabled(devfs_handle_t);
 /*
  * Bridge-specific flags that can be set via pcibr_device_flags_set
@@ -337,7 +341,7 @@ extern xwidget_intr_preset_f pcibr_xintr_preset;
 
 extern void		pcibr_hints_fix_rrbs(devfs_handle_t);
 extern void		pcibr_hints_dualslot(devfs_handle_t, pciio_slot_t, pciio_slot_t);
-extern void		pcibr_hints_subdevs(devfs_handle_t, pciio_slot_t, uint64_t);
+extern void		pcibr_hints_subdevs(devfs_handle_t, pciio_slot_t, ulong);
 extern void		pcibr_hints_handsoff(devfs_handle_t);
 
 typedef unsigned	pcibr_intr_bits_f(pciio_info_t, pciio_intr_line_t);
@@ -353,8 +357,104 @@ extern int		pcibr_asic_rev(devfs_handle_t);
 #define PCIBR			'p'
 #define _PCIBR(x)		((PCIBR << 8) | (x))
 
-#define PCIBR_SLOT_POWERUP	_PCIBR(1)
-#define PCIBR_SLOT_SHUTDOWN	_PCIBR(2)
-#define PCIBR_SLOT_INQUIRY	_PCIBR(3)
+#define PCIBR_SLOT_STARTUP	_PCIBR(1)
+#define PCIBR_SLOT_SHUTDOWN     _PCIBR(2)
+#define PCIBR_SLOT_QUERY	_PCIBR(3)
+
+/*
+ * Bit defintions for variable slot_status in struct
+ * pcibr_soft_slot_s.  They are here so that both
+ * the pcibr driver and the pciconfig command can
+ * reference them.
+ */
+#define SLOT_STARTUP_CMPLT      0x01
+#define SLOT_STARTUP_INCMPLT    0x02
+#define SLOT_SHUTDOWN_CMPLT     0x04
+#define SLOT_SHUTDOWN_INCMPLT   0x08
+#define SLOT_POWER_UP           0x10
+#define SLOT_POWER_DOWN         0x20
+#define SLOT_IS_SYS_CRITICAL    0x40
+
+#define SLOT_STATUS_MASK        (SLOT_STARTUP_CMPLT | SLOT_STARTUP_INCMPLT | \
+                                 SLOT_SHUTDOWN_CMPLT | SLOT_SHUTDOWN_INCMPLT)
+#define SLOT_POWER_MASK         (SLOT_POWER_UP | SLOT_POWER_DOWN)
+
+/*
+ * Bit definitions for variable resp_f_staus.
+ * They are here so that both the pcibr driver
+ * and the pciconfig command can reference them.
+ */
+#define FUNC_IS_VALID           0x01
+#define FUNC_IS_SYS_CRITICAL    0x02
+
+/*
+ * Structures for requesting PCI bridge information and receiving a response
+ */
+typedef struct pcibr_slot_info_req_s *pcibr_slot_info_req_t;
+typedef struct pcibr_slot_info_resp_s *pcibr_slot_info_resp_t;
+typedef struct pcibr_slot_func_info_resp_s *pcibr_slot_func_info_resp_t;
+
+struct pcibr_slot_info_req_s {
+   int                      req_slot;
+   pcibr_slot_info_resp_t   req_respp;
+   int                      req_size;
+};
+
+struct pcibr_slot_info_resp_s {
+    int                     resp_has_host;
+    char                    resp_host_slot;
+    devfs_handle_t            resp_slot_conn;
+    char                    resp_slot_conn_name[MAXDEVNAME];
+    int                     resp_slot_status;
+    int                     resp_l1_bus_num;
+    int                     resp_bss_ninfo;
+    char                    resp_bss_devio_bssd_space[16];
+    iopaddr_t               resp_bss_devio_bssd_base; 
+    bridgereg_t             resp_bss_device;
+    int                     resp_bss_pmu_uctr;
+    int                     resp_bss_d32_uctr;
+    int                     resp_bss_d64_uctr;
+    iopaddr_t               resp_bss_d64_base;
+    unsigned                resp_bss_d64_flags;
+    iopaddr_t               resp_bss_d32_base;
+    unsigned                resp_bss_d32_flags;
+    int                     resp_bss_ext_ates_active;
+    volatile unsigned      *resp_bss_cmd_pointer;
+    unsigned                resp_bss_cmd_shadow;
+    int                     resp_bs_rrb_valid;
+    int                     resp_bs_rrb_valid_v;
+    int                     resp_bs_rrb_res;
+    bridgereg_t             resp_b_resp;
+    bridgereg_t             resp_b_int_device;
+    bridgereg_t             resp_b_int_enable;
+    bridgereg_t             resp_b_int_host;
+
+    struct pcibr_slot_func_info_resp_s {
+        int                     resp_f_status;
+        char                    resp_f_slot_name[MAXDEVNAME];
+        char                    resp_f_bus;
+        char                    resp_f_slot;
+        char                    resp_f_func;
+        char                    resp_f_master_name[MAXDEVNAME];
+        void                   *resp_f_pops;
+        error_handler_f        *resp_f_efunc;
+        error_handler_arg_t     resp_f_einfo;
+        int                     resp_f_vendor;
+        int                     resp_f_device;
+
+        struct {
+            char                    resp_w_space[16];
+            iopaddr_t               resp_w_base;
+            size_t                  resp_w_size;
+        } resp_f_window[6];
+
+        unsigned                resp_f_rbase;
+        unsigned                resp_f_rsize;
+        int                     resp_f_ibit[4];
+        int                     resp_f_att_det_error;
+
+    } resp_func[8];
+
+};
 
 #endif				/* _ASM_SN_PCI_PCIBR_H */

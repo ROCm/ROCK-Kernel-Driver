@@ -11,6 +11,7 @@
 #define _ASM_SN_ROUTER_H
 
 #include <linux/config.h>
+
 #if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
 #include <asm/sn/sn1/router.h>
 #endif

@@ -1,8 +1,8 @@
 /*
  * Platform dependent support for HP simulator.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/init.h>
@@ -35,10 +35,12 @@ static struct hw_interrupt_type irq_type_hp_sim = {
 void __init
 hpsim_irq_init (void)
 {
+	irq_desc_t *idesc;
 	int i;
 
-	for (i = IA64_MIN_VECTORED_IRQ; i <= IA64_MAX_VECTORED_IRQ; ++i) {
-		if (irq_desc[i].handler == &no_irq_type)
-			irq_desc[i].handler = &irq_type_hp_sim;
+	for (i = 0; i < NR_IRQS; ++i) {
+		idesc = irq_desc(i);
+		if (idesc->handler == &no_irq_type)
+			idesc->handler = &irq_type_hp_sim;
 	}
 }

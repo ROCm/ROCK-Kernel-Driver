@@ -272,19 +272,24 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/smp_lock.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
+	static int debug = 1;
 #else
-	#undef DEBUG
+	static int debug;
 #endif
-#include <linux/usb.h>
+
+#include "usb-serial.h"
+
 
 /* Module information */
 MODULE_AUTHOR("Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/");
 MODULE_DESCRIPTION("USB Serial Driver");
 
-#include "usb-serial.h"
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+
 
 #define MAX(a,b)	(((a)>(b))?(a):(b))
 
@@ -364,6 +369,7 @@ static struct tty_struct *	serial_tty[SERIAL_TTY_MINORS];
 static struct termios *		serial_termios[SERIAL_TTY_MINORS];
 static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
+
 
 LIST_HEAD(usb_serial_driver_list);
 

@@ -92,16 +92,15 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
 
-#include "usb-serial.h"
+#ifdef CONFIG_USB_SERIAL_DEBUG
+	static int debug = 1;
+#else
+	static int debug;
+#endif
 
+#include "usb-serial.h"
 #include "visor.h"
 
 #define MIN(a,b)                (((a)<(b))?(a):(b))
@@ -689,3 +688,7 @@ module_exit(visor_exit);
 
 MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com>");
 MODULE_DESCRIPTION("USB HandSpring Visor driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

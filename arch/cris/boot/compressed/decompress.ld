@@ -1,3 +1,5 @@
+OUTPUT_FORMAT(elf32-us-cris)
+
 MEMORY 
 	{
 	dram : ORIGIN = 0x40700000,

@@ -10,7 +10,7 @@
 
 #include <linux/config.h>
 
-#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_SOFTSDV_HACKS)
+#ifdef CONFIG_IA64_HP_SIM
 /*
  * Yeah, simulating stuff is slow, so let us catch some breath between
  * timer interrupts...

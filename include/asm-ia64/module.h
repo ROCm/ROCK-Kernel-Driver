@@ -35,7 +35,6 @@ struct archdata {
 static inline int
 ia64_module_init(struct module *mod)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	struct archdata *archdata;
 
 	if (!mod_member_present(mod, archdata_start) || !mod->archdata_start)
@@ -79,14 +78,12 @@ ia64_module_init(struct module *mod)
 						   (unsigned long) archdata->segment_base,
 						   (unsigned long) archdata->gp,
 						   archdata->unw_start, archdata->unw_end);
-#endif /* CONFIG_IA64_NEW_UNWIND */
 	return 0;
 }
 
 static inline void
 ia64_module_unmap(void * addr)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	struct module *mod = (struct module *) addr;
 	struct archdata *archdata;
 
@@ -100,7 +97,6 @@ ia64_module_unmap(void * addr)
 		if (archdata->unw_table != NULL)
 			unw_remove_unwind_table((void *) archdata->unw_table);
 	}
-#endif /* CONFIG_IA64_NEW_UNWIND */
 
 	vfree(addr);
 }

@@ -15,21 +15,26 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/pci/bridge.h>
+#include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn1/hubdev.h>
 #include <asm/sn/module.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/xtalk/xswitch.h>
 #include <asm/sn/nodepda.h>
+#include <asm/sn/sn_cpuid.h>
 
 
-#define LDEBUG	1	
+/* #define LDEBUG	1	*/
 
-#define DPRINTF		if (LDEBUG) printk
+#ifdef LDEBUG
+#define DPRINTF		printk
 #define printf		printk
+#else
+#define DPRINTF(x...)
+#endif
 
 module_t	       *modules[MODULE_MAX];
 int			nummodules;
@@ -100,8 +105,6 @@ module_t *module_lookup(moduleid_t id)
 {
     int			i;
 
-    DPRINTF("module_lookup: id=%d\n", id);
-
     for (i = 0; i < nummodules; i++)
 	if (modules[i]->id == id) {
 	    DPRINTF("module_lookup: found m=0x%p\n", modules[i]);
@@ -125,29 +128,29 @@ module_t *module_add_node(moduleid_t id, cnodeid_t n)
 {
     module_t	       *m;
     int			i;
+    char		buffer[16];
 
-    DPRINTF("module_add_node: id=%x node=%d\n", id, n);
+#ifdef __ia64
+    memset(buffer, 0, 16);
+    format_module_id(buffer, id, MODULE_FORMAT_BRIEF);
+    DPRINTF("module_add_node: id=%s node=%d\n", buffer, n);
+#endif
 
     if ((m = module_lookup(id)) == 0) {
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef LATER
 	m = kmem_zalloc_node(sizeof (module_t), KM_NOSLEEP, n);
 #else
 	m = kmalloc(sizeof (module_t), GFP_KERNEL);
 	memset(m, 0 , sizeof(module_t));
-	printk("Module nodecnt = %d\n", m->nodecnt); 
 #endif
 	ASSERT_ALWAYS(m);
-
-	DPRINTF("module_add_node: m=0x%p\n", m);
 
 	m->id = id;
 	spin_lock_init(&m->lock);
 
-	init_MUTEX_LOCKED(&m->thdcnt);
+	mutex_init_locked(&m->thdcnt);
 
-printk("Set elsc to 0x%p on node %d\n", &m->elsc, get_nasid());
-
-set_elsc(&m->elsc);
+// set_elsc(&m->elsc);
 	elsc_init(&m->elsc, COMPACT_TO_NASID_NODEID(n));
 	spin_lock_init(&m->elsclock);
 
@@ -162,8 +165,7 @@ set_elsc(&m->elsc);
 
     m->nodes[m->nodecnt++] = n;
 
-printk("module_add_node: module %x now has %d nodes\n", id, m->nodecnt);
-    DPRINTF("module_add_node: module %x now has %d nodes\n", id, m->nodecnt);
+    DPRINTF("module_add_node: module %s now has %d nodes\n", buffer, m->nodecnt);
 
     return m;
 }
@@ -172,6 +174,7 @@ int module_probe_snum(module_t *m, nasid_t nasid)
 {
     lboard_t	       *board;
     klmod_serial_num_t *comp;
+    char * bcopy(const char * src, char * dest, int count);
 
     board = find_lboard((lboard_t *) KL_CONFIG_INFO(nasid),
 			KLTYPE_MIDPLANE8);
@@ -204,14 +207,8 @@ int module_probe_snum(module_t *m, nasid_t nasid)
     if (m->snum_valid)
 	return 1;
     else {
-#ifndef CONFIG_IA64_SGI_IO
-	cmn_err(CE_WARN | CE_MAINTENANCE,
-		"Invalid serial number for module %d, "
+	DPRINTF("Invalid serial number for module %d, "
 		"possible missing or invalid NIC.", m->id);
-#else
-	printk("Invalid serial number for module %d, "
-		"possible missing or invalid NIC.", m->id);
-#endif
 	return 0;
     }
 }
@@ -246,32 +243,12 @@ io_module_init(void)
 	    nserial);
 
     if (nserial == 0)
-	cmn_err(CE_WARN, "No serial number found.");
+	PRINT_WARNING("io_module_init: No serial number found.\n");
 }
-
-#ifdef BRINGUP
-elsc_t *Elsc[100];
-
-void
-set_elsc(elsc_t *p)
-{
-      Elsc[get_nasid()] = p;
-}
-#endif
 
 elsc_t *get_elsc(void)
 {
-#ifdef BRINGUP
-return(Elsc[get_nasid()]);
-#else
-	if ( NODEPDA(get_nasid())->module == (module_t *)0 ) {
-		printf("get_elsc() for nasd %d fails\n", get_nasid());
-//		return((elsc_t *)0);
-	}
-	return &NODEPDA(get_nasid())->module->elsc;
-
-//	return &NODEPDA(NASID_TO_COMPACT_NODEID(0))->module->elsc;
-#endif
+	return &NODEPDA(cpuid_to_cnodeid(smp_processor_id()))->module->elsc;
 }
 
 int

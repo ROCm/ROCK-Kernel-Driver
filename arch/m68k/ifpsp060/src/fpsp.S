@@ -19594,7 +19594,7 @@ ceaf_pd7:
 # in the data register file. If it's actually out in memory, use one of	#
 # the mem_read() routines to fetch it. If the mem_read() access returns	#
 # a failing value, exit through the special facc_in() routine which	#
-# will create an acess error exception frame from the current exception #
+# will create an access error exception frame from the current exception #
 # frame.								#
 # 	Immediate data and regular data accesses are separated because 	#
 # if an immediate data access fails, the resulting fault status		#
@@ -24608,7 +24608,7 @@ end_bstr:
 # made out of the current exception stack frame. 			#
 #	So, we first call restore() which makes sure that any updated	#
 # -(an)+ register gets returned to its pre-exception value and then	#
-# we change the stack to an acess error stack frame.			#
+# we change the stack to an access error stack frame.			#
 #									#
 #########################################################################
 

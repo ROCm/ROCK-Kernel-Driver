@@ -349,7 +349,7 @@ int ibrick_mac_addr_get( nasid_t nasid, char *eaddr );
  * is ignored.
  */
 
-#ifdef IRIX
+#ifdef LATER
 char *eeprom_vertex_info_set( int component, int nasid, devfs_handle_t v,
 			      net_vec_t path );
 #endif
@@ -363,7 +363,7 @@ char *eeprom_vertex_info_set( int component, int nasid, devfs_handle_t v,
  * if the part and mfg numbers stored there indicate that this widget
  * is an XBridge (and so must be part of a brick).
  */
-#ifdef IRIX
+#ifdef LATER
 int is_iobrick( int nasid, int widget_num );
 #endif
 
@@ -371,11 +371,7 @@ int is_iobrick( int nasid, int widget_num );
  * address passed to it and uses is_iobrick to determine whether
  * the widget in question is part of an SN1 IO brick.
  */
-#ifdef IRIX
 #define IS_IOBRICK(rg)	is_iobrick( NASID_GET((rg)), SWIN_WIDGETNUM((rg)) )
-#else
-#define IS_IOBRICK(rg)	1
-#endif
 
 
 

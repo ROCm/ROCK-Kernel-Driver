@@ -13,6 +13,7 @@
 #define _ASM_IA64_SN_SN_CPUID_H
 
 #include <linux/config.h>
+#include <asm/processor.h>
 #include <asm/sn/mmzone_sn1.h>
 
 /*
@@ -26,18 +27,35 @@
 
 
 /*
- * The following assumes the following mappings for LID register values:
+ *  Definitions of terms (these definitions are for IA64 ONLY. Other architectures
+ *  use cpuid/cpunum quite defferently):
  *
- *         LID
+ *	   CPUID - a number in range of 0..NR_CPUS-1 that uniquely identifies
+ *		the cpu. The value cpuid has no significance on IA64 other than
+ *		the boot cpu is 0.
+ *			smp_processor_id() returns the cpuid of the current cpu.
+ *
+ *	   CPUNUM - On IA64, a cpunum and cpuid are the same. This is NOT true
+ *		on other architectures like IA32.
+ *
+ * 	   CPU_PHYSICAL_ID (also known as HARD_PROCESSOR_ID)
+ *		This is the same as 31:24 of the processor LID register
+ *			hard_smp_processor_id()- cpu_physical_id of current processor
+ *			cpu_physical_id(cpuid) - convert a <cpuid> to a <physical_cpuid>
+ *			cpu_logical_id(phy_id) - convert a <physical_cpuid> to a <cpuid> 
+ *				* not real efficient - dont use in perf critical code
+ *
+ *         LID - processor defined register (see PRM V2).
  *		31:24 - id   Contains the NASID
  *		23:16 - eid  Contains 0-3 to identify the cpu on the node
  *				bit 17 - synergy number
- *				bit 16 - FSB number 
+ *				bit 16 - FSB slot number 
  *
- * 	   SAPICID
- *		This is the same as 31:24 of LID
  *
- * The macros convert between cpuid & slice/fsb/synergy/nasid/cnodeid.
+ *
+ * The following assumes the following mappings for LID register values:
+ *
+ * The macros convert between cpu physical ids & slice/fsb/synergy/nasid/cnodeid.
  * These terms are described below:
  *
  *
@@ -46,7 +64,7 @@
  *          -----   -----           -----   -----
  *            |       |               |       |
  *            |       |               |       |
- *          0 |       | 1           0 |       | 1       FSB
+ *          0 |       | 1           0 |       | 1       FSB SLOT
  *             -------                 -------  
  *                |                       |
  *                |                       |
@@ -68,25 +86,27 @@
  *
  */
 
+#ifndef CONFIG_SMP
+#define cpu_logical_id(cpu)				0
+#define cpu_physical_id(cpuid)			((ia64_get_lid() >> 16) & 0xffff)
+#endif
 
-
-#define sapicid_to_nasid(sid)		((sid) >> 8)
-#define sapicid_to_synergy(sid)		(((sid) >> 1) & 1)
-#define sapicid_to_fsb(sid)		((sid) & 1)
-#define sapicid_to_slice(sid)		((sid) & 3)
+#define cpu_physical_id_to_nasid(cpi)		((cpi) >> 8)
+#define cpu_physical_id_to_synergy(cpi)		(((cpi) >> 1) & 1)
+#define cpu_physical_id_to_fsb_slot(cpi)	((cpi) & 1)
+#define cpu_physical_id_to_slice(cpi)		((cpi) & 3)
 
 /*
  * NOTE: id & eid refer to Intels definitions of the LID register
  *	(id = NASID, eid = slice)
  * NOTE: on non-MP systems, only cpuid 0 exists
  */
-#define id_eid_to_sapicid(id,eid)       (((id)<<8) | (eid))
-#define id_eid_to_cpuid(id,eid)         ((NASID_TO_CNODEID(id)<<2) | (eid))
+#define id_eid_to_cpu_physical_id(id,eid)       (((id)<<8) | (eid))
+#define id_eid_to_cpuid(id,eid)         	(cpu_logical_id(id_eid_to_cpu_physical_id((id),(eid))))
 
 
 /*
- * The following table/struct is for translating between sapicid and cpuids.
- * It is also used for managing PTC coherency domains.
+ * The following table/struct  is used for managing PTC coherency domains.
  */
 typedef struct {
 	u8	domain;
@@ -99,28 +119,13 @@ extern sn_sapicid_info_t	sn_sapicid_info[];	/* indexed by cpuid */
 
 
 /*
- * cpuid_to_spaicid  - Convert a cpuid to a SAPIC id of the cpu. 
- * The SAPIC id is the same as bits 31:16 of the LID register.
- */
-static __inline__ int
-cpuid_to_spaicid(int cpuid)
-{
-#ifdef CONFIG_SMP
-	return cpu_physical_id(cpuid);
-#else
-	return ((ia64_get_lid() >> 16) & 0xffff);
-#endif
-}
-
-
-/*
  * cpuid_to_fsb_slot  - convert a cpuid to the fsb slot number that it is in.
  *   (there are 2 cpus per FSB. This function returns 0 or 1)
  */
 static __inline__ int
 cpuid_to_fsb_slot(int cpuid)
 {
-	return sapicid_to_fsb(cpuid_to_spaicid(cpuid));
+	return cpu_physical_id_to_fsb_slot(cpu_physical_id(cpuid));
 }
 
 
@@ -132,7 +137,7 @@ cpuid_to_fsb_slot(int cpuid)
 static __inline__ int
 cpuid_to_synergy(int cpuid)
 {
-	return sapicid_to_synergy(cpuid_to_spaicid(cpuid));
+	return cpu_physical_id_to_synergy(cpu_physical_id(cpuid));
 }
 
 
@@ -143,7 +148,7 @@ cpuid_to_synergy(int cpuid)
 static __inline__ int
 cpuid_to_slice(int cpuid)
 {
-	return sapicid_to_slice(cpuid_to_spaicid(cpuid));
+	return cpu_physical_id_to_slice(cpu_physical_id(cpuid));
 }
 
 
@@ -153,7 +158,7 @@ cpuid_to_slice(int cpuid)
 static __inline__ int
 cpuid_to_nasid(int cpuid)
 {
-	return sapicid_to_nasid(cpuid_to_spaicid(cpuid));
+	return cpu_physical_id_to_nasid(cpu_physical_id(cpuid));
 }
 
 
@@ -166,23 +171,42 @@ cpuid_to_cnodeid(int cpuid)
 	return nasid_map[cpuid_to_nasid(cpuid)];
 }
 
+/*
+ * cnodeid_to_nasid - convert a cnodeid to a NASID
+ */
 static __inline__ int
 cnodeid_to_nasid(int cnodeid)
 {
-	int i;
-	for (i = 0; i < MAXNASIDS; i++) {
-		if (nasid_map[i] == cnodeid) {
-			return(i);
-		}
-	}
-	return(-1);
+	if (nasid_map[cnodeid_map[cnodeid]] != cnodeid)
+		panic("cnodeid_to_nasid, cnode = %d", cnodeid);
+	return cnodeid_map[cnodeid];
 }
 
+/*
+ * nasid_to_cnodeid - convert a NASID to a cnodeid
+ */
+static __inline__ int
+nasid_to_cnodeid(int nasid)
+{
+	if (cnodeid_map[nasid_map[nasid]] != nasid)
+		panic("nasid_to_cnodeid");
+	return nasid_map[nasid];
+}
+
+
+/*
+ * cnode_slice_to_cpuid - convert a codeid & slice to a cpuid
+ */
 static __inline__ int
 cnode_slice_to_cpuid(int cnodeid, int slice) {
 	return(id_eid_to_cpuid(cnodeid_to_nasid(cnodeid),slice));
 }
 
+/*
+ * cpuid_to_subnode - convert a cpuid to the subnode it resides on.
+ *   slice 0 & 1 are on subnode 0
+ *   slice 2 & 3 are on subnode 1.
+ */
 static __inline__ int
 cpuid_to_subnode(int cpuid) {
 	int ret = cpuid_to_slice(cpuid);
@@ -190,9 +214,27 @@ cpuid_to_subnode(int cpuid) {
 	else return 1;
 }
 
+/*
+ * cpuid_to_localslice - convert a cpuid to a local slice
+ *    slice 0 & 2 are local slice 0
+ *    slice 1 & 3 are local slice 1
+ */
 static __inline__ int
 cpuid_to_localslice(int cpuid) {
 	return(cpuid_to_slice(cpuid) & 1);
+}
+
+static __inline__ int
+cnodeid_to_cpuid(int cnode) {
+	int cpu;
+
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		if (cpuid_to_cnodeid(cpu) == cnode) {
+			break;
+		}
+	}
+	if (cpu == smp_num_cpus) cpu = -1;
+	return cpu;
 }
 
 

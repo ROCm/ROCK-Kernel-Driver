@@ -92,7 +92,7 @@ struct file_operations coda_dir_operations = {
 
 
 /* inode operations for directories */
-/* acces routines: lookup, readlink, permission */
+/* access routines: lookup, readlink, permission */
 static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
 {
 	struct inode *res_inode = NULL;

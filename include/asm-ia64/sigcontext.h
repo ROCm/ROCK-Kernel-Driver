@@ -36,6 +36,7 @@ struct sigcontext {
 	unsigned long		sc_ar_lc;	/* loop count register */
 	unsigned long		sc_pr;		/* predicate registers */
 	unsigned long		sc_br[8];	/* branch registers */
+	/* Note: sc_gr[0] is used as the "uc_link" member of ucontext_t */
 	unsigned long		sc_gr[32];	/* general registers (static partition) */
 	struct ia64_fpreg	sc_fr[128];	/* floating-point registers */
 

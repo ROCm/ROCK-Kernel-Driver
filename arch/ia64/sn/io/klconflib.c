@@ -82,7 +82,7 @@ find_component(lboard_t *brd, klinfo_t *kli, unsigned char struct_type)
 		}
 		index = j;
 		if (index == KLCF_NUM_COMPS(brd)) {
-			printf("find_component: Bad pointer: 0x%p\n", kli);
+			DBG("find_component: Bad pointer: 0x%p\n", kli);
 			return (klinfo_t *)NULL;
 		}
 		index++;	/* next component */
@@ -152,11 +152,6 @@ find_lboard_module_class(lboard_t *start, moduleid_t mod,
 	return (lboard_t *)NULL;
 }
 
-#ifndef CONFIG_IA64_SGI_IO
-#define tolower(c)	(isupper(c) ? (c) - 'A' + 'a' : (c))
-#define toupper(c)	(islower(c) ? (c) - 'a' + 'A' : (c))
-#endif
-
 
 /*
  * Convert a NIC name to a name for use in the hardware graph.
@@ -205,10 +200,6 @@ nic_name_convert(char *old_name, char *new_name)
             !strncmp(new_name, "mio", 3) || 
 	    !strncmp(new_name, "media_io", 8))
 		strcpy(new_name, "baseio");
-#if !defined(CONFIG_SGI_IP35) && !defined(CONFIG_IA64_SGI_SN1) && !defined(CONFIG_IA64_GENERIC)
-	else if (!strncmp(new_name, "ip29", 4))
-		strcpy(new_name,SN00_MOTHERBOARD);
-#endif
 	else if (!strncmp(new_name, "divo", 4))
 		strcpy(new_name, "divo") ;
 
@@ -284,11 +275,11 @@ get_board_name(nasid_t nasid, moduleid_t mod, slotid_t slot, char *name)
 
 	/*
  	 * PV # 540860
-	 * If the name is not 'baseio' or SN00 MOTHERBOARD
+	 * If the name is not 'baseio' 
 	 * get the lowest of all the names in the nic string.
 	 * This is needed for boards like divo, which can have
 	 * a bunch of daughter cards, but would like to be called
-	 * divo. We could do this for baseio and SN00 MOTHERBOARD
+	 * divo. We could do this for baseio 
  	 * but it has some special case names that we would not
  	 * like to disturb at this point.
 	 */
@@ -355,11 +346,7 @@ xbow_port_io_enabled(nasid_t nasid, int link)
 	/*
 	 * look for boards that might contain an xbow or xbridge
 	 */
-#if SN0
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_MIDPLANE8);
-#else
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_PBRICK_XBOW);
-#endif
+	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IOBRICK_XBOW);
 	if (brd == NULL) return 0;
 		
 	if ((xbow_p = (klxbow_t *)find_component(brd, NULL, KLSTRUCT_XBOW))
@@ -369,7 +356,7 @@ xbow_port_io_enabled(nasid_t nasid, int link)
 	if (!XBOW_PORT_TYPE_IO(xbow_p, link) || !XBOW_PORT_IS_ENABLED(xbow_p, link))
 	    return 0;
 
-	printf("xbow_port_io_enabled:  brd 0x%p xbow_p 0x%p \n", brd, xbow_p);
+	DBG("xbow_port_io_enabled:  brd 0x%p xbow_p 0x%p \n", brd, xbow_p);
 
 	return 1;
 }
@@ -394,6 +381,9 @@ board_to_path(lboard_t *brd, char *path)
 		case KLCLASS_ROUTER:
 			if (brd->brd_type == KLTYPE_META_ROUTER) {
 				board_name = EDGE_LBL_META_ROUTER;
+				hasmetarouter++;
+			} else if (brd->brd_type == KLTYPE_REPEATER_ROUTER) {
+				board_name = EDGE_LBL_REPEATER_ROUTER;
 				hasmetarouter++;
 			} else
 				board_name = EDGE_LBL_ROUTER;
@@ -420,21 +410,16 @@ board_to_path(lboard_t *brd, char *path)
 			
 	modnum = brd->brd_module;
 
-#if defined(SN0)
-	slot = brd->brd_slot;
-	get_slotname(slot, slot_name);
-
-	ASSERT(modnum >= 0);
-
-	sprintf(path, "%H/" EDGE_LBL_SLOT "/%s/%s", 
-		modnum, slot_name, board_name);
-#else
 	ASSERT(modnum != MODULE_UNKNOWN && modnum != INVALID_MODULE);
-#ifdef BRINGUP /* fix IP35 hwgraph */
-	sprintf(path, EDGE_LBL_MODULE "/%x/%s", modnum, board_name);
+#ifdef __ia64
+	{
+		char	buffer[16];
+		memset(buffer, 0, 16);
+		format_module_id(buffer, modnum, MODULE_FORMAT_BRIEF);
+		sprintf(path, EDGE_LBL_MODULE "/%s/%s", buffer, board_name);
+	}
 #else
 	sprintf(path, "%H/%s", modnum, board_name);
-#endif
 #endif
 }
 
@@ -455,172 +440,8 @@ get_module_id(nasid_t nasid)
 }
 
 
-#ifndef CONFIG_IA64_SGI_IO
-#if 1
-/*
- *  find_gfxpipe(#)
- *
- *  XXXmacko
- *  This is only used by graphics drivers, and should be moved
- *  over to gfx/kern/graphics/SN0 as soon as it's convenient.
- */
-static klgfx_t *graphics_pipe_list = NULL;
-static devfs_handle_t hwgraph_all_gfxids = GRAPH_VERTEX_NONE;
-
-void
-setup_gfxpipe_link(devfs_handle_t vhdl,int pipenum)
-{
-	char idbuf[8];
-	extern graph_hdl_t hwgraph;
-
-	graph_info_add_LBL(hwgraph, vhdl, INFO_LBL_GFXID, INFO_DESC_EXPORT, 
-		(arbitrary_info_t)pipenum);
-	if (hwgraph_all_gfxids == GRAPH_VERTEX_NONE)
-		hwgraph_path_add(hwgraph_root, EDGE_LBL_GFX, &hwgraph_all_gfxids);
-	sprintf(idbuf, "%d", pipenum);
-	hwgraph_edge_add(hwgraph_all_gfxids, vhdl, idbuf);
-
-}
-#endif
-
-/* 
- * find the pipenum'th logical graphics pipe (KLCLASS_GFX)
- */
-lboard_t *
-find_gfxpipe(int pipenum)
-{
-        gda_t           *gdap;
-        cnodeid_t       cnode;
-        nasid_t         nasid;
-        lboard_t        *lb;
-	klgfx_t		*kg,**pkg;
-	int		i;
-
-        gdap = (gda_t *)GDA_ADDR(get_nasid());
-        if (gdap->g_magic != GDA_MAGIC)
-        	return NULL;
-
-	if (!graphics_pipe_list) {
-		/* for all nodes */
-        	for (cnode = 0; cnode < MAX_COMPACT_NODES; cnode ++) {
-                	nasid = gdap->g_nasidtable[cnode];
-                	if (nasid == INVALID_NASID)
-                        	continue;
-			lb = KL_CONFIG_INFO(nasid) ;
-			while (lb = find_lboard_class(lb, KLCLASS_GFX)) {
-				moduleid_t kgm, pkgm;
-				int	kgs, pkgs;
-
-#if defined(DEBUG) && (defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)) && defined(BRINGUP)
-				printf("find_gfxpipe(): PIPE: %s mod %M slot %d\n",lb?lb->brd_name:"!LBRD",
-					lb->brd_module,lb->brd_slot);
-#endif
-				/* insert lb into list */
-				if (!(kg = (klgfx_t*)find_first_component(lb,KLSTRUCT_GFX))) {
-					lb = KLCF_NEXT(lb);
-					continue;
-				}
-				/* set moduleslot now that we have brd_module set */
-				kg->moduleslot = (lb->brd_module << 8) | SLOTNUM_GETSLOT(lb->brd_slot);
-				/* make sure board has device flag set */
-				kg->gfx_info.flags |= KLINFO_DEVICE;
-				if (kg->cookie < KLGFX_COOKIE) {
-				    kg->gfx_next_pipe = NULL;
-				    kg->cookie = KLGFX_COOKIE;
-				}
-
-				kgm = kg->moduleslot>>8;
-				kgs = kg->moduleslot&0xff;
-				pkg = &graphics_pipe_list;
-				while (*pkg) {
-					pkgm = (*pkg)->moduleslot>>8;
-					pkgs = (*pkg)->moduleslot&0xff;
-
-					if (!(MODULE_CMP(kgm, pkgm) > 0 ||
-					      (MODULE_CMP(kgm, pkgm) == 0 &&
-					       kgs > pkgs)))
-					    break;
-
-					pkg = &(*pkg)->gfx_next_pipe;
-				}
-				kg->gfx_next_pipe = *pkg;
-				*pkg = kg;
-				lb = KLCF_NEXT(lb);
-			}
-		}
-#ifdef FIND_GFXPIPE_DEBUG
-		i = 0;
-		kg = graphics_pipe_list;
-		while (kg) {
-			lboard_t *lb;
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-			lb = find_lboard_class(KL_CONFIG_INFO(kg->gfx_info.nasid), KLCLASS_GFX);
-#else
-#error Need to figure out how to find graphics boards ...
-#endif
-#if defined(SUPPORT_PRINTING_M_FORMAT)
-			printf("find_gfxpipe(): %s pipe %d mod %M slot %d\n",lb?lb->brd_name:"!LBRD",i,
-				(kg->moduleslot>>8),(kg->moduleslot&0xff));
-#else
-			printf("find_gfxpipe(): %s pipe %d mod 0x%x slot %d\n",lb?lb->brd_name:"!LBRD",i,
-				(kg->moduleslot>>8),(kg->moduleslot&0xff));
-#endif
-			kg = kg->gfx_next_pipe;
-			i++;
-		}
-#endif
-        }
-
-	i = 0;
-	kg = graphics_pipe_list;
-	while (kg && (i < pipenum)) {
-		kg = kg->gfx_next_pipe;
-		i++;
-		}
-
-	if (!kg) return NULL;
-
-#if defined(SN0)
-	return find_lboard_modslot(KL_CONFIG_INFO(kg->gfx_info.nasid),
-				(kg->moduleslot>>8),
-				SLOTNUM_XTALK_CLASS|(kg->moduleslot&0xff));
-#elif defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-	return find_lboard_class(KL_CONFIG_INFO(kg->gfx_info.nasid), KLCLASS_GFX);
-#else
-#error Need to figure out how to find graphics boards ...
-#endif
-}
-#endif
-
-
 #define MHZ	1000000
 
-#ifndef CONFIG_IA64_SGI_IO
-uint
-cpu_cycles_adjust(uint orig_cycles)
-{
-	klcpu_t *acpu;
-	uint speed;
-
-	acpu  = nasid_slice_to_cpuinfo(get_nasid(), get_slice());
-
-	if (acpu == NULL) return orig_cycles;
-
-	/*
-	 * cpu cycles seem to be half of the real value, hack and mult by 2
-	 * for now.
-	 */
-	speed = (orig_cycles * 2) / MHZ;
-
-	/*
-	 * if the cpu thinks its running at some random speed nowhere close 
-	 * the programmed speed, do nothing.
-	 */
-	if ((speed < (acpu->cpu_speed - 2)) || (speed > (acpu->cpu_speed + 2)))
-	    return orig_cycles;
-	return (acpu->cpu_speed * MHZ/2);
-}
-#endif /* CONFIG_IA64_SGI_IO */
 
 /* Get the canonical hardware graph name for the given pci component
  * on the given io board.
@@ -633,9 +454,6 @@ device_component_canonical_name_get(lboard_t 	*brd,
 	moduleid_t 	modnum;
 	slotid_t 	slot;
 	char 		board_name[20];
-#ifdef SN0
-	char 		slot_name[SLOTNUM_MAXLENGTH];
-#endif
 
 	ASSERT(brd);
 
@@ -646,13 +464,7 @@ device_component_canonical_name_get(lboard_t 	*brd,
 	 * into a string 
 	 */
 	slot = brd->brd_slot;
-#ifdef SN0
-	get_slotname(slot, slot_name);
-
-	ASSERT(modnum >= 0);
-#else
 	ASSERT(modnum != MODULE_UNKNOWN && modnum != INVALID_MODULE);
-#endif
 
 	/* Get the io board name  */
 	if (!brd || (brd->brd_sversion < 2)) {
@@ -662,18 +474,10 @@ device_component_canonical_name_get(lboard_t 	*brd,
 	}
 
 	/* Give out the canonical  name of the pci device*/
-#ifdef SN0
-	sprintf(name, 
-		"/hw/"EDGE_LBL_MODULE "/%M/"EDGE_LBL_SLOT"/%s/%s/"
-		EDGE_LBL_PCI"/%d", 
-		modnum, slot_name, board_name,KLCF_BRIDGE_W_ID(component));
-#elif defined (CONFIG_SGI_IP35)  || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 	sprintf(name, 
 		"/dev/hw/"EDGE_LBL_MODULE "/%x/"EDGE_LBL_SLOT"/%s/"
 		EDGE_LBL_PCI"/%d", 
 		modnum, board_name,KLCF_BRIDGE_W_ID(component));
-#endif
-	
 }
 
 /*
@@ -894,90 +698,6 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 }
 
 #include "asm/sn/sn_private.h"
-#ifndef CONFIG_IA64_SGI_IO
-/*
- * Given a physical address get the name of memory dimm bank
- * in a hwgraph name format.
- */
-void
-membank_pathname_get(paddr_t paddr,char *name)
-{
-	cnodeid_t	cnode;
-	char		slotname[SLOTNUM_MAXLENGTH];
-
-	cnode = paddr_cnode(paddr);
-	/* Make sure that we have a valid name buffer */
-	if (!name)
-		return;
-
-	name[0] = 0;
-	/* Make sure that the cnode is valid */
-	if ((cnode == CNODEID_NONE) || (cnode > numnodes))
-		return;
-	/* Given a slotid(class:type) get the slotname */
-#if defined (SN0)
-	get_slotname(NODE_SLOTID(cnode),slotname);
-	sprintf(name,
-		"/hw/"EDGE_LBL_MODULE"/%M/"EDGE_LBL_SLOT"/%s/"EDGE_LBL_NODE
-		"/"EDGE_LBL_MEMORY"/dimm_bank/%d",
-		NODE_MODULEID(cnode),slotname,paddr_dimm(paddr));
-#elif defined (CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-	sprintf(name,
-		"/dev/hw/"EDGE_LBL_MODULE"/%M/"EDGE_LBL_NODE
-		"/"EDGE_LBL_MEMORY"/dimm_bank/%d",
-		NODE_MODULEID(cnode),paddr_dimm(paddr));
-#endif
-}
-
-
-
-int
-membank_check_mixed_hidensity(nasid_t nasid)
-{
-	lboard_t *brd;
-	klmembnk_t *mem;
-	int min_size = 1024, max_size = 0;
-	int bank, mem_size;
-
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IP27);
-	ASSERT(brd);
-
-	mem = (klmembnk_t *)find_first_component(brd, KLSTRUCT_MEMBNK);
-	ASSERT(mem);
-
-
-	for (mem_size = 0, bank = 0; bank < MD_MEM_BANKS; bank++) {
-		mem_size = KLCONFIG_MEMBNK_SIZE(mem, bank);
-		if (mem_size < min_size)
-		    min_size = mem_size;
-		if (mem_size > max_size)
-		    max_size = mem_size;
-	}
-	
-	if ((max_size == 512) && (max_size != min_size))
-	    return 1;
-
-	return 0;
-}
-
-
-int
-mem_mixed_hidensity_banks(void)
-{
-	cnodeid_t cnode;
-	nasid_t nasid;
-
-	for (cnode = 0; cnode < maxnodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		if (nasid == INVALID_NASID)
-		    continue;
-		if (membank_check_mixed_hidensity(nasid))
-		    return 1;
-	}
-	return 0;
-
-}
-#endif /* CONFIG_IA64_SGI_IO */
 
 xwidgetnum_t
 nodevertex_widgetnum_get(devfs_handle_t node_vtx)

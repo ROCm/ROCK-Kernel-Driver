@@ -133,7 +133,15 @@
 	SOUND_MASK_LINE1| SOUND_MASK_LINE|\
 	SOUND_MASK_PHONEIN)
 
-#define supported_mixer(CODEC,FOO) ((CODEC)->supported_mixers & (1<<FOO) )
+/* original check is not good enough in case FOO is greater than
+ * SOUND_MIXER_NRDEVICES because the supported_mixers has exactly
+ * SOUND_MIXER_NRDEVICES elements.
+ * before matching the given mixer against the bitmask in supported_mixers we
+ * check if mixer number exceeds maximum allowed size which is as mentioned
+ * above SOUND_MIXER_NRDEVICES */
+#define supported_mixer(CODEC,FOO) ((FOO >= 0) && \
+                                    (FOO < SOUND_MIXER_NRDEVICES) && \
+                                    (CODEC)->supported_mixers & (1<<FOO) )
 
 struct ac97_codec {
 	/* AC97 controller connected with */

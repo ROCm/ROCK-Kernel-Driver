@@ -2,14 +2,15 @@
 	drivers/net/tulip/eeprom.c
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000  The Linux Kernel Team
-	Written/copyright 1994-1999 by Donald Becker.
+	Copyright 2000,2001  The Linux Kernel Team
+	Written/copyright 1994-2001 by Donald Becker.
 
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/networking/tulip.txt for more
-	information on this driver.
+	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	for more information on this driver, or visit the project
+	Web page at http://sourceforge.net/projects/tulip/
 
 */
 
@@ -77,9 +78,9 @@ static const char *block_name[] __devinitdata = {
 void __devinit tulip_parse_eeprom(struct net_device *dev)
 {
 	/* The last media info list parsed, for multiport boards.  */
-	static struct mediatable *last_mediatable = NULL;
-	static unsigned char *last_ee_data = NULL;
-	static int controller_index = 0;
+	static struct mediatable *last_mediatable;
+	static unsigned char *last_ee_data;
+	static int controller_index;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	unsigned char *ee_data = tp->eeprom;
 	int i;
@@ -143,9 +144,10 @@ subsequent_board:
 
 		printk(KERN_INFO "%s: 21041 Media table, default media %4.4x (%s).\n",
 			   dev->name, media,
-			   media & 0x0800 ? "Autosense" : medianame[media & 15]);
+			   media & 0x0800 ? "Autosense" : medianame[media & MEDIA_MASK]);
 		for (i = 0; i < count; i++) {
-			unsigned char media_code = *p++;
+			unsigned char media_block = *p++;
+			int media_code = media_block & MEDIA_MASK;
 			if (media_code & 0x40)
 				p += 6;
 			printk(KERN_INFO "%s:  21041 media #%d, %s.\n",
@@ -182,7 +184,7 @@ subsequent_board:
 		mtable->csr15dir = mtable->csr15val = 0;
 
 		printk(KERN_INFO "%s:  EEPROM default media type %s.\n", dev->name,
-			   media & 0x0800 ? "Autosense" : medianame[media & 15]);
+			   media & 0x0800 ? "Autosense" : medianame[media & MEDIA_MASK]);
 		for (i = 0; i < count; i++) {
 			struct medialeaf *leaf = &mtable->mleaf[i];
 
@@ -216,7 +218,7 @@ subsequent_board:
 					new_advertise |= get_u16(&p[7+gpr_len+reset_len]);
 				} else {
 					mtable->has_nonmii = 1;
-					leaf->media = p[2] & 0x0f;
+					leaf->media = p[2] & MEDIA_MASK;
 					/* Davicom's media number for 100BaseTX is strange */
 					if (tp->chip_id == DM910X && leaf->media == 1)
 						leaf->media = 3;
@@ -261,6 +263,23 @@ subsequent_board:
 	}
 }
 /* Reading a serial EEPROM is a "bit" grungy, but we work our way through:->.*/
+
+/*  EEPROM_Ctrl bits. */
+#define EE_SHIFT_CLK	0x02	/* EEPROM shift clock. */
+#define EE_CS			0x01	/* EEPROM chip select. */
+#define EE_DATA_WRITE	0x04	/* Data from the Tulip to EEPROM. */
+#define EE_WRITE_0		0x01
+#define EE_WRITE_1		0x05
+#define EE_DATA_READ	0x08	/* Data from the EEPROM chip. */
+#define EE_ENB			(0x4800 | EE_CS)
+
+/* Delay between EEPROM clock transitions.
+   Even at 33Mhz current PCI implementations don't overrun the EEPROM clock.
+   We add a bus turn-around to insure that this remains true. */
+#define eeprom_delay()	inl(ee_addr)
+
+/* The EEPROM commands include the alway-set leading bit. */
+#define EE_READ_CMD		(6)
 
 /* Note: this routine returns extra data bits for size detection. */
 int __devinit tulip_read_eeprom(long ioaddr, int location, int addr_len)

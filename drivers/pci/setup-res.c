@@ -163,6 +163,10 @@ pdev_sort_resources(struct pci_dev *dev,
 				size = ln->res->end - ln->res->start;
 			if (r_size > size) {
 				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+				if (!tmp) {
+					printk("pdev_sort_resources(): kmalloc() failed!\n");
+					continue;
+				}
 				tmp->next = ln;
 				tmp->res = r;
 				tmp->dev = dev;

@@ -2,11 +2,22 @@
  *  linux/arch/cris/mm/init.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Copyright (C) 2000  Axis Communications AB
+ *  Copyright (C) 2000,2001  Axis Communications AB
  *
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: init.c,v $
+ *  Revision 1.18  2001/02/23 12:46:44  bjornw
+ *  * 0xc was not CSE1; 0x8 is, same as uncached flash, so we move the uncached
+ *    flash during CRIS_LOW_MAP from 0xe to 0x8 so both the flash and the I/O
+ *    is mapped straight over (for !CRIS_LOW_MAP the uncached flash is still 0xe)
+ *
+ *  Revision 1.17  2001/02/22 15:05:21  bjornw
+ *  Map 0x9 straight over during LOW_MAP to allow for memory mapped LEDs
+ *
+ *  Revision 1.16  2001/02/22 15:02:35  bjornw
+ *  Map 0xc straight over during LOW_MAP to allow for memory mapped I/O
+ *
  *  Revision 1.15  2001/01/10 21:12:10  bjornw
  *  loops_per_sec -> loops_per_jiffy
  *
@@ -287,16 +298,19 @@ paging_init(void)
 	 * The Juliette chip is mapped at 0xa so we pass that segment straight
 	 * through. We cannot vremap it because the vmalloc area is below 0x8
 	 * and Juliette needs an uncached area above 0x8.
+	 *
+	 * Same thing with 0xc and 0x9, which is memory-mapped I/O on some boards.
+	 * We map them straight over in LOW_MAP, but use vremap in LX version 2.
 	 */
 
 	*R_MMU_KSEG = ( IO_STATE(R_MMU_KSEG, seg_f, page ) | 
-			IO_STATE(R_MMU_KSEG, seg_e, seg  ) |  /* uncached flash */
+			IO_STATE(R_MMU_KSEG, seg_e, page ) |
 			IO_STATE(R_MMU_KSEG, seg_d, page ) | 
-			IO_STATE(R_MMU_KSEG, seg_c, page ) | 
+			IO_STATE(R_MMU_KSEG, seg_c, page ) |   
 			IO_STATE(R_MMU_KSEG, seg_b, seg  ) |  /* kernel reg area */
 			IO_STATE(R_MMU_KSEG, seg_a, seg  ) |  /* Juliette etc. */
-			IO_STATE(R_MMU_KSEG, seg_9, page ) |
-			IO_STATE(R_MMU_KSEG, seg_8, page ) |
+			IO_STATE(R_MMU_KSEG, seg_9, seg  ) |  /* LED's on some boards */
+			IO_STATE(R_MMU_KSEG, seg_8, seg  ) |  /* CSE0/1, flash and I/O */
 			IO_STATE(R_MMU_KSEG, seg_7, page ) |  /* kernel vmalloc area */
 			IO_STATE(R_MMU_KSEG, seg_6, seg  ) |  /* kernel DRAM area */
 			IO_STATE(R_MMU_KSEG, seg_5, seg  ) |  /* cached flash */
@@ -307,13 +321,13 @@ paging_init(void)
 			IO_STATE(R_MMU_KSEG, seg_0, page ) ); /* user area */
 
 	*R_MMU_KBASE_HI = ( IO_FIELD(R_MMU_KBASE_HI, base_f, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_e, 0x8 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_e, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_d, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_c, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_b, 0xb ) |
 			    IO_FIELD(R_MMU_KBASE_HI, base_a, 0xa ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_9, 0x0 ) |
-			    IO_FIELD(R_MMU_KBASE_HI, base_8, 0x0 ) );
+			    IO_FIELD(R_MMU_KBASE_HI, base_9, 0x9 ) |
+			    IO_FIELD(R_MMU_KBASE_HI, base_8, 0x8 ) );
 	
 	*R_MMU_KBASE_LO = ( IO_FIELD(R_MMU_KBASE_LO, base_7, 0x0 ) |
 			    IO_FIELD(R_MMU_KBASE_LO, base_6, 0x4 ) |

@@ -2,14 +2,15 @@
 	drivers/net/tulip/21142.c
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000  The Linux Kernel Team
-	Written/copyright 1994-1999 by Donald Becker.
+	Copyright 2000,2001  The Linux Kernel Team
+	Written/copyright 1994-2001 by Donald Becker.
 
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/networking/tulip.txt for more
-	information on this driver.
+	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	for more information on this driver, or visit the project
+	Web page at http://sourceforge.net/projects/tulip/
 
 */
 
@@ -107,16 +108,17 @@ void t21142_start_nway(struct net_device *dev)
 	dev->if_port = 0;
 	tp->nway = tp->mediasense = 1;
 	tp->nwayset = tp->lpar = 0;
+	if (tp->chip_id == PNIC2) {
+		tp->csr6 = 0x01000000 | (tp->to_advertise & 0x0040 ? FullDuplex : 0);
+		return;
+	}
 	if (tulip_debug > 1)
 		printk(KERN_DEBUG "%s: Restarting 21143 autonegotiation, csr14=%8.8x.\n",
 			   dev->name, csr14);
 	outl(0x0001, ioaddr + CSR13);
 	udelay(100);
 	outl(csr14, ioaddr + CSR14);
-	if (tp->chip_id == PNIC2)
-	  tp->csr6 = 0x01a80000 | (tp->to_advertise & 0x0040 ? 0x0200 : 0);
-	else
-	  tp->csr6 = 0x82420000 | (tp->to_advertise & 0x0040 ? 0x0200 : 0);
+	tp->csr6 = 0x82420000 | (tp->to_advertise & 0x0040 ? FullDuplex : 0);
 	tulip_outl_csr(tp, tp->csr6, CSR6);
 	if (tp->mtable  &&  tp->mtable->csr15dir) {
 		outl(tp->mtable->csr15dir, ioaddr + CSR15);

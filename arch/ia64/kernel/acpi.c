@@ -1,9 +1,9 @@
 /*
- * Advanced Configuration and Power Interface 
+ * Advanced Configuration and Power Interface
  *
- * Based on 'ACPI Specification 1.0b' February 2, 1999 and 
+ * Based on 'ACPI Specification 1.0b' February 2, 1999 and
  * 'IA-64 Extensions to ACPI Specification' Revision 0.6
- * 
+ *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 2000 Hewlett-Packard Co.
@@ -111,15 +111,15 @@ readl_unaligned(void *p)
  * Identify usable CPU's and remember them for SMP bringup later.
  */
 static void __init
-acpi20_lsapic (char *p) 
+acpi20_lsapic (char *p)
 {
 	int add = 1;
 
 	acpi20_entry_lsapic_t *lsapic = (acpi20_entry_lsapic_t *) p;
-	printk("      CPU %d (%.04x:%.04x): ", total_cpus, lsapic->eid, lsapic->id);
+	printk("      CPU %.04x:%.04x: ", lsapic->eid, lsapic->id);
 
 	if ((lsapic->flags & LSAPIC_ENABLED) == 0) {
-		printk("Disabled.\n");
+		printk("disabled.\n");
 		add = 0;
 	}
 
@@ -127,11 +127,14 @@ acpi20_lsapic (char *p)
 	smp_boot_data.cpu_phys_id[total_cpus] = -1;
 #endif
 	if (add) {
-		printk("Available.\n");
 		available_cpus++;
+		printk("available");
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[total_cpus] = (lsapic->id << 8) | lsapic->eid;
-#endif /* CONFIG_SMP */
+		if (hard_smp_processor_id() == smp_boot_data.cpu_phys_id[total_cpus])
+			printk(" (BSP)");
+#endif
+		printk(".\n");
 	}
 	total_cpus++;
 }
@@ -199,7 +202,7 @@ acpi20_parse_madt (acpi_madt_t *madt)
 			printk("ACPI 2.0 MADT: LOCAL SAPIC\n");
 			acpi20_lsapic(p);
 			break;
-	
+
 		case ACPI20_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
@@ -233,7 +236,7 @@ acpi20_parse_madt (acpi_madt_t *madt)
 	end = p + (madt->header.length - sizeof(acpi_madt_t));
 
 	while (p < end) {
-		
+
 		switch (*p) {
 		case ACPI20_ENTRY_INT_SRC_OVERRIDE:
 			printk("ACPI 2.0 MADT: INT SOURCE Override\n");
@@ -251,7 +254,7 @@ acpi20_parse_madt (acpi_madt_t *madt)
 		available_cpus, total_cpus);
 }
 
-int __init 
+int __init
 acpi20_parse (acpi20_rsdp_t *rsdp20)
 {
 	acpi_xsdt_t *xsdt;
@@ -311,12 +314,12 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
 		printk("ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
-	smp_boot_data.cpu_count = available_cpus;
+	smp_boot_data.cpu_count = total_cpus;
 #endif
 	return 1;
 }
 /*
- * ACPI 1.0b with 0.71 IA64 extensions functions; should be removed once all 
+ * ACPI 1.0b with 0.71 IA64 extensions functions; should be removed once all
  * platforms start supporting ACPI 2.0
  */
 
@@ -324,13 +327,13 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
  * Identify usable CPU's and remember them for SMP bringup later.
  */
 static void __init
-acpi_lsapic (char *p) 
+acpi_lsapic (char *p)
 {
 	int add = 1;
 
 	acpi_entry_lsapic_t *lsapic = (acpi_entry_lsapic_t *) p;
 
-	if ((lsapic->flags & LSAPIC_PRESENT) == 0) 
+	if ((lsapic->flags & LSAPIC_PRESENT) == 0)
 		return;
 
 	printk("      CPU %d (%.04x:%.04x): ", total_cpus, lsapic->eid, lsapic->id);
@@ -388,7 +391,7 @@ acpi_parse_msapic (acpi_sapic_t *msapic)
 		      case ACPI_ENTRY_LOCAL_SAPIC:
 			acpi_lsapic(p);
 			break;
-	
+
 		      case ACPI_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
@@ -415,7 +418,7 @@ acpi_parse_msapic (acpi_sapic_t *msapic)
 	printk("      %d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 }
 
-int __init 
+int __init
 acpi_parse (acpi_rsdp_t *rsdp)
 {
 	acpi_rsdt_t *rsdt;
@@ -433,9 +436,9 @@ acpi_parse (acpi_rsdp_t *rsdp)
 		return 0;
 	}
 
-	printk("ACPI: %.6s %.8s %d.%d\n", rsdt->header.oem_id, rsdt->header.oem_table_id, 
+	printk("ACPI: %.6s %.8s %d.%d\n", rsdt->header.oem_id, rsdt->header.oem_table_id,
 	       rsdt->header.oem_revision >> 16, rsdt->header.oem_revision & 0xffff);
-	
+
 #ifdef CONFIG_ACPI_KERNEL_CONFIG
 	acpi_cf_init(rsdp);
 #endif
@@ -460,7 +463,7 @@ acpi_parse (acpi_rsdp_t *rsdp)
 		printk("ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
-	smp_boot_data.cpu_count = available_cpus;
+	smp_boot_data.cpu_count = total_cpus;
 #endif
 	return 1;
 }

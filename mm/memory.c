@@ -274,7 +274,7 @@ static inline int free_pte(pte_t pte)
 		 */
 		if (pte_dirty(pte) && page->mapping)
 			set_page_dirty(page);
-		free_page_and_swap_cache(page);
+		page_cache_release(page);
 		return 1;
 	}
 	swap_free(pte_to_swp_entry(pte));
@@ -815,6 +815,24 @@ static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page
 }
 
 /*
+ * Work out if there are any other processes sharing this
+ * swap cache page. Never mind the buffers.
+ */
+static inline int exclusive_swap_page(struct page *page)
+{
+	unsigned int count;
+
+	if (!PageLocked(page))
+		BUG();
+	if (!PageSwapCache(page))
+		return 0;
+	count = page_count(page) - !!page->buffers;	/*  2: us + swap cache */
+	count += swap_count(page);			/* +1: just swap cache */
+	return count == 3;				/* =3: total */
+}
+
+
+/*
  * This routine handles present pages, when users try to write
  * to a shared page. It is done by copying the page to a new address
  * and decrementing the shared-page counter for the old page.
@@ -853,19 +871,21 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	 *   marked dirty).
 	 */
 	switch (page_count(old_page)) {
+	int can_reuse;
+	case 3:
+		if (!old_page->buffers)
+			break;
+		/* FallThrough */
 	case 2:
-		/*
-		 * Lock the page so that no one can look it up from
-		 * the swap cache, grab a reference and start using it.
-		 * Can not do lock_page, holding page_table_lock.
-		 */
-		if (!PageSwapCache(old_page) || TryLockPage(old_page))
+		if (!PageSwapCache(old_page))
 			break;
-		if (is_page_shared(old_page)) {
-			UnlockPage(old_page);
+		if (TryLockPage(old_page))
 			break;
-		}
+		/* Recheck swapcachedness once the page is locked */
+		can_reuse = exclusive_swap_page(old_page);
 		UnlockPage(old_page);
+		if (!can_reuse)
+			break;
 		/* FallThrough */
 	case 1:
 		if (PageReserved(old_page))
@@ -903,8 +923,7 @@ bad_wp_page:
 	return -1;
 }
 
-static void vmtruncate_list(struct vm_area_struct *mpnt,
-			    unsigned long pgoff, unsigned long partial)
+static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 {
 	do {
 		struct mm_struct *mm = mpnt->vm_mm;
@@ -947,7 +966,7 @@ static void vmtruncate_list(struct vm_area_struct *mpnt,
  */
 void vmtruncate(struct inode * inode, loff_t offset)
 {
-	unsigned long partial, pgoff;
+	unsigned long pgoff;
 	struct address_space *mapping = inode->i_mapping;
 	unsigned long limit;
 
@@ -959,19 +978,15 @@ void vmtruncate(struct inode * inode, loff_t offset)
 		goto out_unlock;
 
 	pgoff = (offset + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	partial = (unsigned long)offset & (PAGE_CACHE_SIZE - 1);
-
 	if (mapping->i_mmap != NULL)
-		vmtruncate_list(mapping->i_mmap, pgoff, partial);
+		vmtruncate_list(mapping->i_mmap, pgoff);
 	if (mapping->i_mmap_shared != NULL)
-		vmtruncate_list(mapping->i_mmap_shared, pgoff, partial);
+		vmtruncate_list(mapping->i_mmap_shared, pgoff);
 
 out_unlock:
 	spin_unlock(&mapping->i_shared_lock);
 	truncate_inode_pages(mapping, offset);
-	if (inode->i_op && inode->i_op->truncate)
-		inode->i_op->truncate(inode);
-	return;
+	goto out_truncate;
 
 do_expand:
 	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
@@ -986,8 +1001,13 @@ do_expand:
 		}
 	}
 	inode->i_size = offset;
-	if (inode->i_op && inode->i_op->truncate)
+
+out_truncate:
+	if (inode->i_op && inode->i_op->truncate) {
+		lock_kernel();
 		inode->i_op->truncate(inode);
+		unlock_kernel();
+	}
 out:
 	return;
 }
@@ -1077,7 +1097,7 @@ static int do_swap_page(struct mm_struct * mm,
 	pte = mk_pte(page, vma->vm_page_prot);
 
 	swap_free(entry);
-	if (write_access && !is_page_shared(page))
+	if (write_access && exclusive_swap_page(page))
 		pte = pte_mkwrite(pte_mkdirty(pte));
 	UnlockPage(page);
 

@@ -10,6 +10,9 @@
 #ifndef _ASM_SN_INTR_H
 #define _ASM_SN_INTR_H
 
+/* Subnode wildcard */
+#define SUBNODE_ANY		-1
+
 /* Number of interrupt levels associated with each interrupt register. */
 #define N_INTPEND_BITS		64
 
@@ -24,8 +27,6 @@
 
 #if LANGUAGE_C
 
-#if defined(CONFIG_IA64_SGI_IO)
-
 #define II_NAMELEN	24
 
 /*
@@ -36,7 +37,7 @@ typedef struct intr_vector_s {
 	intr_func_t	iv_func;	/* Interrupt handler function */
 	intr_func_t	iv_prefunc;	/* Interrupt handler prologue func */
 	void		*iv_arg;	/* Argument to pass to handler */
-#ifdef IRIX
+#ifdef LATER
 	thd_int_t		iv_tinfo;	/* Thread info */
 #endif
 	cpuid_t			iv_mustruncpu;	/* Where we must run. */
@@ -93,7 +94,7 @@ typedef struct intr_vecblk_s {
 						     call an intr routine. */
 	intr_info_t	info[N_INTPEND_BITS];	  /* information needed only
 						     to maintain interrupts. */
-	lock_t		vector_lock;		  /* Lock for this and the
+	spinlock_t	vector_lock;		  /* Lock for this and the
 						     masks in the PDA. */
 	splfunc_t	vector_spl;		  /* vector_lock req'd spl */
 	int		vector_state;		  /* Initialized to zero.
@@ -122,15 +123,12 @@ typedef struct intr_vecblk_s {
 #define hub_intrinfo0	private.p_intmasks.dispatch0->info
 #define hub_intrinfo1	private.p_intmasks.dispatch1->info
 
-#endif	/* CONFIG_IA64_SGI_IO */
-
 /*
  * Macros to manipulate the interrupt register on the calling hub chip.
  */
 
 #define LOCAL_HUB_SEND_INTR(_level)	LOCAL_HUB_S(PI_INT_PEND_MOD, \
 						    (0x100|(_level)))
-#if defined(CONFIG_IA64_SGI_IO)
 #define REMOTE_HUB_PI_SEND_INTR(_hub, _sn, _level) \
 		REMOTE_HUB_PI_S((_hub), _sn, PI_INT_PEND_MOD, (0x100|(_level)))
 
@@ -138,7 +136,6 @@ typedef struct intr_vecblk_s {
 		REMOTE_HUB_PI_S(cputonasid(_cpuid),				\
 			SUBNODE(cputoslice(_cpuid)),				\
 			PI_INT_PEND_MOD, (0x100|(_level)))
-#endif	/* CONFIG_IA64_SGI_IO*/
 
 /*
  * When clearing the interrupt, make sure this clear does make it 
@@ -153,7 +150,6 @@ typedef struct intr_vecblk_s {
 		REMOTE_HUB_PI_S((_hub), (_sn), PI_INT_PEND_MOD, (_level)),	\
                 REMOTE_HUB_PI_L((_hub), (_sn), PI_INT_PEND0)
 
-#if defined(CONFIG_IA64_SGI_IO)
 /* Special support for use by gfx driver only.  Supports special gfx hub interrupt. */
 extern void install_gfxintr(cpuid_t cpu, ilvl_t swlevel, intr_func_t intr_func, void *intr_arg);
 
@@ -164,7 +160,6 @@ void setrtvector(intr_func_t func);
  */
 extern void intr_block_bit(cpuid_t cpu, int bit);
 extern void intr_unblock_bit(cpuid_t cpu, int bit);
-#endif	/* CONFIG_IA64_SGI_IO */
 
 #endif /* LANGUAGE_C */
 
@@ -246,6 +241,13 @@ extern void intr_unblock_bit(cpuid_t cpu, int bit);
 # define IO_ERROR_INTR	38	/* set up by prom */
 # define DEBUG_INTR_B	37	/* used by symmon to stop all cpus */
 # define DEBUG_INTR_A	36
+#endif
+
+#ifdef CONFIG_IA64_SGI_SN1
+// These aren't strictly accurate or complete.  See the
+// Synergy Spec. for details.
+#define SGI_UART_IRQ	(65)
+#define SGI_HUB_ERROR_IRQ	(182)
 #endif
 
 #endif /* _ASM_SN_INTR_H */

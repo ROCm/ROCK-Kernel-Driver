@@ -45,6 +45,8 @@
 #define SO_TIMESTAMP           29
 #define SCM_TIMESTAMP          SO_TIMESTAMP
 
+#define SO_ACCEPTCONN          30
+
 #if defined(__KERNEL__)
 /* Socket types. */
 #define SOCK_STREAM     1               /* stream (connection) socket   */

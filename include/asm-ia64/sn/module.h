@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 #include <linux/config.h>
+
 #include <asm/sn/systeminfo.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
@@ -178,22 +179,24 @@ struct module_s {
 
     int			disable_alert;
     int			count_down;
+
+    /* System serial number info (used by SN1) */
+    char		sys_snum[MAX_SERIAL_NUM_SIZE];
+    int			sys_snum_valid;
 };
 
 /* module.c */
 extern module_t	       *modules[MODULE_MAX];	/* Indexed by cmoduleid_t   */
 extern int		nummodules;
 
-#ifndef CONFIG_IA64_SGI_IO
-/* Clashes with LINUX stuff */
-extern void		module_init(void);
-#endif
 extern module_t	       *module_lookup(moduleid_t id);
 
 extern elsc_t	       *get_elsc(void);
 
 extern int		get_kmod_info(cmoduleid_t cmod,
 				      module_info_t *mod_info);
+extern int		get_kmod_sys_snum(cmoduleid_t cmod,
+					  char *snum);
 
 extern void		format_module_id(char *buffer, moduleid_t m, int fmt);
 extern int		parse_module_id(char *buffer);

@@ -8,7 +8,7 @@
 EXTRA_CFLAGS	:= -DSN -DLANGUAGE_C=1 -D_LANGUAGE_C=1 -I. -DBRINGUP \
 		   -DDIRECT_L1_CONSOLE -DNUMA_BASE -DSIMULATED_KLGRAPH \
 		   -DNUMA_MIGR_CONTROL -DLITTLE_ENDIAN -DREAL_HARDWARE \
-		   -DNEW_INTERRUPTS -DCONFIG_IA64_SGI_IO
+		   -DNEW_INTERRUPTS
 
 .S.s:
 	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
@@ -18,18 +18,13 @@ EXTRA_CFLAGS	:= -DSN -DLANGUAGE_C=1 -D_LANGUAGE_C=1 -I. -DBRINGUP \
 all: sn1.a
 
 O_TARGET        = sn1.a
-O_HEADERS       =
-O_OBJS          = irq.o setup.o iomv.o mm.o smp.o synergy.o sn1_asm.o \
-		discontig.o
 
-ifeq ($(CONFIG_IA64_SGI_AUTOTEST),y)
-O_OBJS          += llsc4.o
-endif
+obj-y          = irq.o setup.o iomv.o mm.o smp.o synergy.o sn1_asm.o \
+		discontig.o probe.o error.o sv.o
 
-
-ifeq ($(CONFIG_IA64_GENERIC),y)
-O_OBJS		+= machvec.o
-endif
+obj-$(CONFIG_IA64_SGI_AUTOTEST)	+= llsc4.o
+obj-$(CONFIG_IA64_GENERIC)	+= machvec.o
+obj-$(CONFIG_MODULES)		+= sn1_ksyms.o
 
 clean::
 

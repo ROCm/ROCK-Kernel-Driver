@@ -72,7 +72,7 @@
 	;;										\
 	dep	old_psr = 0, old_psr, 32, 32;						\
 	                                                                                \
-	mov	ar.rsc = r0 ;								\
+	mov	ar.rsc = 0 ;								\
 	;;										\
 	mov	temp2 = ar.bspstore;							\
 	;;										\
@@ -148,7 +148,7 @@
 	dep	temp2 = 0, temp2, PSR_IC, 2;						\
 	;;										\
 	mov	psr.l = temp2;								\
-	mov	ar.rsc = r0;								\
+	mov	ar.rsc = 0;								\
 	;;										\
 	srlz.d;										\
 	mov	temp2 = ar.bspstore;							\

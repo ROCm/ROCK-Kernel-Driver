@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*
  * This file implements call frame unwind support for the Linux
@@ -30,8 +30,6 @@
 #include <linux/slab.h>
 
 #include <asm/unwind.h>
-
-#ifdef CONFIG_IA64_NEW_UNWIND
 
 #include <asm/delay.h>
 #include <asm/page.h>
@@ -306,7 +304,7 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 		}
 	} else {
 		/* access a stacked register */
-		addr = ia64_rse_skip_regs((unsigned long *) info->bsp, regnum);
+		addr = ia64_rse_skip_regs((unsigned long *) info->bsp, regnum - 32);
 		nat_addr = ia64_rse_rnat_addr(addr);
 		if ((unsigned long) addr < info->regstk.limit
 		    || (unsigned long) addr >= info->regstk.top)
@@ -660,7 +658,7 @@ finish_prologue (struct unw_state_record *sr)
 	 */
 	if (sr->any_spills) {
 		off = sr->spill_offset;
-		alloc_spill_area(&off, 16, sr->curr.reg + UNW_REG_F2, sr->curr.reg + UNW_REG_F31); 
+		alloc_spill_area(&off, 16, sr->curr.reg + UNW_REG_F2, sr->curr.reg + UNW_REG_F31);
 		alloc_spill_area(&off,  8, sr->curr.reg + UNW_REG_B1, sr->curr.reg + UNW_REG_B5);
 		alloc_spill_area(&off,  8, sr->curr.reg + UNW_REG_R4, sr->curr.reg + UNW_REG_R7);
 	}
@@ -911,6 +909,10 @@ desc_label_state (unw_word label, struct unw_state_record *sr)
 	struct unw_reg_state *rs;
 
 	rs = alloc_reg_state();
+	if (!rs) {
+		printk("unwind: cannot stack!\n");
+		return;
+	}
 	memcpy(rs, &sr->curr, sizeof(*rs));
 	rs->label = label;
 	rs->next = sr->reg_state_list;
@@ -927,7 +929,7 @@ desc_is_active (unsigned char qp, unw_word t, struct unw_state_record *sr)
 	if (sr->when_target <= sr->region_start + MIN((int)t, sr->region_len - 1))
 		return 0;
 	if (qp > 0) {
-		if ((sr->pr_val & (1UL << qp)) == 0) 
+		if ((sr->pr_val & (1UL << qp)) == 0)
 			return 0;
 		sr->pr_mask |= (1UL << qp);
 	}
@@ -944,7 +946,7 @@ desc_restore_p (unsigned char qp, unw_word t, unsigned char abreg, struct unw_st
 
 	r = sr->curr.reg + decode_abreg(abreg, 0);
 	r->where = UNW_WHERE_NONE;
-	r->when = sr->region_start + MIN((int)t, sr->region_len - 1);
+	r->when = UNW_WHEN_NEVER;
 	r->val = 0;
 }
 
@@ -1443,12 +1445,17 @@ build_script (struct unw_frame_info *info)
 		 * sp has been restored and all values on the memory stack below
 		 * psp also have been restored.
 		 */
-		sr.curr.reg[UNW_REG_PSP].where = UNW_WHERE_NONE;
 		sr.curr.reg[UNW_REG_PSP].val = 0;
+		sr.curr.reg[UNW_REG_PSP].where = UNW_WHERE_NONE;
+		sr.curr.reg[UNW_REG_PSP].when = UNW_WHEN_NEVER;
 		for (r = sr.curr.reg; r < sr.curr.reg + UNW_NUM_REGS; ++r)
 			if ((r->where == UNW_WHERE_PSPREL && r->val <= 0x10)
 			    || r->where == UNW_WHERE_SPREL)
+			{
+				r->val = 0;
 				r->where = UNW_WHERE_NONE;
+				r->when = UNW_WHEN_NEVER;
+			}
 	}
 
 	script->flags = sr.flags;
@@ -1477,7 +1484,7 @@ build_script (struct unw_frame_info *info)
 			      case UNW_WHERE_PSPREL: printk("[psp+0x%lx]", r->val); break;
 			      case UNW_WHERE_NONE:
 				printk("%s+0x%lx", unw.preg_name[r - sr.curr.reg], r->val);
-				break; 
+				break;
 			      default:		     printk("BADWHERE(%d)", r->where); break;
 			}
 			printk("\t\t%d\n", r->when);
@@ -1604,7 +1611,9 @@ run_script (struct unw_script *script, struct unw_frame_info *state)
 
 		      case UNW_INSN_LOAD:
 #if UNW_DEBUG
-			if ((s[val] & (my_cpu_data.unimpl_va_mask | 0x7)) || s[val] < TASK_SIZE) {
+			if ((s[val] & (local_cpu_data->unimpl_va_mask | 0x7)) != 0
+			    || s[val] < TASK_SIZE)
+			{
 				debug(1, "unwind: rejecting bad psp=0x%lx\n", s[val]);
 				break;
 			}
@@ -1636,7 +1645,7 @@ find_save_locs (struct unw_frame_info *info)
 	int have_write_lock = 0;
 	struct unw_script *scr;
 
-	if ((info->ip & (my_cpu_data.unimpl_va_mask | 0xf)) || info->ip < TASK_SIZE) {
+	if ((info->ip & (local_cpu_data->unimpl_va_mask | 0xf)) || info->ip < TASK_SIZE) {
 		/* don't let obviously bad addresses pollute the cache */
 		debug(1, "unwind: rejecting bad ip=0x%lx\n", info->ip);
 		info->rp_loc = 0;
@@ -1672,7 +1681,7 @@ unw_unwind (struct unw_frame_info *info)
 	unsigned long ip, pr, num_regs;
 	STAT(unsigned long start, flags;)
 	int retval;
-	
+
 	STAT(local_irq_save(flags); ++unw.stat.api.unwinds; start = ia64_get_itc());
 
 	prev_ip = info->ip;
@@ -1818,139 +1827,13 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	STAT(unw.stat.api.init_time += ia64_get_itc() - start; local_irq_restore(flags));
 }
 
-#endif /* CONFIG_IA64_NEW_UNWIND */
-
 void
 unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 {
 	struct switch_stack *sw = (struct switch_stack *) (t->thread.ksp + 16);
 
-#ifdef CONFIG_IA64_NEW_UNWIND
 	unw_init_frame_info(info, t, sw);
-#else
-	unsigned long sol, limit, top;
-
-	memset(info, 0, sizeof(*info));
-
-	sol = (sw->ar_pfs >> 7) & 0x7f;	/* size of locals */
-
-	limit = (unsigned long) t + IA64_RBS_OFFSET;
-	top   = sw->ar_bspstore;
-	if (top - (unsigned long) t >= IA64_STK_OFFSET)
-		top = limit;
-
-	info->regstk.limit = limit;
-	info->regstk.top   = top;
-	info->sw  = sw;
-	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sol);
-	info->cfm_loc = &sw->ar_pfs;
-	info->ip  = sw->b0;
-#endif
 }
-
-void
-unw_init_from_current (struct unw_frame_info *info, struct pt_regs *regs)
-{
-#ifdef CONFIG_IA64_NEW_UNWIND
-	struct switch_stack *sw = (struct switch_stack *) regs - 1;
-
-	unw_init_frame_info(info, current, sw);
-	/* skip over interrupt frame: */
-	unw_unwind(info);
-#else
-	struct switch_stack *sw = (struct switch_stack *) regs - 1;
-	unsigned long sol, sof, *bsp, limit, top;
-
-	limit = (unsigned long) current + IA64_RBS_OFFSET;
-	top   = sw->ar_bspstore;
-	if (top - (unsigned long) current >= IA64_STK_OFFSET)
-		top = limit;
-
-	memset(info, 0, sizeof(*info));
-
-	sol = (sw->ar_pfs >> 7) & 0x7f;	/* size of frame */
-
-	/* this gives us the bsp top level frame (kdb interrupt frame): */
-	bsp = ia64_rse_skip_regs((unsigned long *) top, -sol);
-
-	/* now skip past the interrupt frame: */
-	sof = regs->cr_ifs & 0x7f;	/* size of frame */
-
-	info->regstk.limit = limit;
-	info->regstk.top   = top;
-	info->sw = sw;
-	info->bsp = (unsigned long) ia64_rse_skip_regs(bsp, -sof);
-	info->cfm_loc = &regs->cr_ifs;
-	info->ip  = regs->cr_iip;
-#endif
-}
-
-#ifndef CONFIG_IA64_NEW_UNWIND
-
-static unsigned long
-read_reg (struct unw_frame_info *info, int regnum, int *is_nat)
-{
-	unsigned long *addr, *rnat_addr, rnat;
-
-	addr = ia64_rse_skip_regs((unsigned long *) info->bsp, regnum);
-	if ((unsigned long) addr < info->regstk.limit
-	    || (unsigned long) addr >= info->regstk.top || ((long) addr & 0x7) != 0)
-	{
-		*is_nat = 1;
-		return 0xdeadbeefdeadbeef;
-	}
-	rnat_addr = ia64_rse_rnat_addr(addr);
-
-	if ((unsigned long) rnat_addr >= info->regstk.top)
-		rnat = info->sw->ar_rnat;
-	else
-		rnat = *rnat_addr;
-	*is_nat = (rnat & (1UL << ia64_rse_slot_num(addr))) != 0;
-	return *addr;
-}
-
-/*
- * On entry, info->regstk.top should point to the register backing
- * store for r32.
- */
-int
-unw_unwind (struct unw_frame_info *info)
-{
-	unsigned long sol, cfm = *info->cfm_loc;
-	int is_nat;
-
-	sol = (cfm >> 7) & 0x7f;	/* size of locals */
-
-	/*
-	 * In general, we would have to make use of unwind info to
-	 * unwind an IA-64 stack, but for now gcc uses a special
-	 * convention that makes this possible without full-fledged
-	 * unwindo info.  Specifically, we expect "rp" in the second
-	 * last, and "ar.pfs" in the last local register, so the
-	 * number of locals in a frame must be at least two.  If it's
-	 * less than that, we reached the end of the C call stack.
-	 */
-	if (sol < 2)
-		return -1;
-
-	info->ip = read_reg(info, sol - 2, &is_nat);
-	if (is_nat || (info->ip & (my_cpu_data.unimpl_va_mask | 0xf)))
-		/* reject let obviously bad addresses */
-		return -1;
-
-	info->cfm_loc = ia64_rse_skip_regs((unsigned long *) info->bsp, sol - 1);
-	cfm = read_reg(info, sol - 1, &is_nat);
-	if (is_nat)
-		return -1;
-
-	sol = (cfm >> 7) & 0x7f;
-
-	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->bsp, -sol);
-	return 0;
-}
-#endif /* !CONFIG_IA64_NEW_UNWIND */
-
-#ifdef CONFIG_IA64_NEW_UNWIND
 
 static void
 init_unwind_table (struct unw_table *table, const char *name, unsigned long segment_base,
@@ -1979,7 +1862,7 @@ unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned lon
 		dprintk("unwind: ignoring attempt to insert empty unwind table\n");
 		return 0;
 	}
-	
+
 	table = kmalloc(sizeof(*table), GFP_USER);
 	if (!table)
 		return 0;
@@ -2052,12 +1935,10 @@ unw_remove_unwind_table (void *handle)
 
 	kfree(table);
 }
-#endif /* CONFIG_IA64_NEW_UNWIND */
 
 void
 unw_init (void)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	extern int ia64_unw_start, ia64_unw_end, __gp;
 	extern void unw_hash_index_t_is_too_narrow (void);
 	long i, off;
@@ -2093,5 +1974,4 @@ unw_init (void)
 
 	init_unwind_table(&unw.kernel_table, "kernel", KERNEL_START, (unsigned long) &__gp,
 			  &ia64_unw_start, &ia64_unw_end);
-#endif /* CONFIG_IA64_NEW_UNWIND */
 }

@@ -1,19 +1,25 @@
-	;; $Id: checksumcopy.S,v 1.2 2000/08/08 16:57:31 bjornw Exp $
-	;; A fast checksum+copy routine using movem
-	;; Copyright (c) 1998, 2000 Axis Communications AB
-	;;
-	;; Authors:	Bjorn Wesen
-	;; 
-	;; csum_partial_copy_nocheck(const char *src, char *dst,
-	;;		             int len, unsigned int sum)
+/* $Id: checksumcopy.S,v 1.4 2001/02/19 11:11:34 bjornw Exp $
+ * A fast checksum+copy routine using movem
+ * Copyright (c) 1998, 2001 Axis Communications AB
+ *
+ * Authors:	Bjorn Wesen
+ * 
+ * csum_partial_copy_nocheck(const char *src, char *dst,
+ *		             int len, unsigned int sum)
+ */
 
 	.globl	_csum_partial_copy_nocheck
 _csum_partial_copy_nocheck:	
 	
+	;; r10 - src
+	;; r11 - dst
+	;; r12 - length
+	;; r13 - checksum
+
 	;; check for breakeven length between movem and normal word looping versions
 	
 	cmpu.w	80,r12
-	bcs	no_movem
+	blo	word_loop
 	nop
 
 	;; need to save the registers we use below in the movem loop
@@ -23,11 +29,6 @@ _csum_partial_copy_nocheck:
 	movem	r8,[sp]
 	
 	;; do a movem copy and checksum
-
-	;; r10 - src
-	;; r11 - dst
-	;; r12 - length
-	;; r13 - checksum
 
 	subq	10*4,r12	; update length for the first loop
 	
@@ -61,6 +62,8 @@ mloop:	movem	[r10+],r9	; read 10 longwords
 	
 	ax
 	addq	0,r13
+	ax			; do it again, since we might have generated a carry
+	addq	0,r13
 
 	subq	10*4,r12
 	bge	mloop
@@ -68,23 +71,27 @@ mloop:	movem	[r10+],r9	; read 10 longwords
 
 	addq	10*4,r12	; compensate for last loop underflowing length
 
-	;; fold 32-bit checksum into a 16-bit checksum, to avoid carries below
-	
-	moveq	-1,r1		; put 0xffff in r1, faster than move.d 0xffff,r1
-	lsrq	16,r1
-	
-	move.d	r13,r0
-	lsrq	16,r0		; r0 = checksum >> 16
-	and.d	r1,r13		; checksum = checksum & 0xffff
-	add.d	r0,r13		; checksum += r0
-	move.d	r13,r0		; do the same again, maybe we got a carry last add
-	lsrq	16,r0
-	and.d	r1,r13
-	add.d	r0,r13
-	
 	movem	[sp+],r8	; restore regs
-		
-no_movem:
+
+word_loop:
+	;; only fold if there is anything to fold.
+
+	cmpq	0,r13
+	beq	no_fold
+
+	;; fold 32-bit checksum into a 16-bit checksum, to avoid carries below
+	;; r9 can be used as temporary.
+	
+	move.d	r13,r9
+	lsrq	16,r9		; r0 = checksum >> 16
+	and.d	0xffff,r13	; checksum = checksum & 0xffff
+	add.d	r9,r13		; checksum += r0
+	move.d	r13,r9		; do the same again, maybe we got a carry last add
+	lsrq	16,r9
+	and.d	0xffff,r13
+	add.d	r9,r13
+	
+no_fold:
 	cmpq	2,r12
 	blt	no_words
 	nop

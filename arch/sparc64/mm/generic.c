@@ -21,11 +21,7 @@ static inline void forget_pte(pte_t page)
 		struct page *ptpage = pte_page(page);
 		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
 			return;
-		/* 
-		 * free_page() used to be able to clear swap cache
-		 * entries.  We may now have to do it manually.  
-		 */
-		free_page_and_swap_cache(ptpage);
+		page_cache_release(ptpage);
 		return;
 	}
 	swap_free(pte_to_swp_entry(page));

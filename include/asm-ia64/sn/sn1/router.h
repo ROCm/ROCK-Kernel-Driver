@@ -513,7 +513,7 @@ typedef struct router_info_s {
 #ifdef DEBUG
 	int64_t	ri_deltatime;	/* Time it took to sample	    */
 #endif
-	lock_t		ri_lock;	/* Lock for access to router info   */
+	spinlock_t	ri_lock;	/* Lock for access to router info   */
 	net_vec_t	*ri_vecarray;	/* Pointer to array of vectors	    */
 	struct lboard_s	*ri_brd;	/* Pointer to board structure	    */
 	char *		ri_name;	/* This board's hwg path 	    */
@@ -566,6 +566,7 @@ typedef struct nodepda_router_info_s {
 #define NORMAL_ROUTER_NAME	"normal_router"
 #define NULL_ROUTER_NAME	"null_router"
 #define META_ROUTER_NAME	"meta_router"
+#define REPEATER_ROUTER_NAME	"repeater_router"
 #define UNKNOWN_ROUTER_NAME	"unknown_router" 
 
 /* The following definitions are needed by the router traversing
@@ -630,7 +631,7 @@ typedef struct router_queue_s {
  */
 
 #define RRM_RESETOK(_L)		(UINT64_CAST 1 << ((_L) - 1))
-#define RRM_RESETOK_ALL		(UINT64_CAST 0x3f)
+#define RRM_RESETOK_ALL		ALL_PORTS
 
 /*
  * RR_META_TABLE(_x) and RR_LOCAL_TABLE(_x) mask and shift definitions

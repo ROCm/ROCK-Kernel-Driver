@@ -1,16 +1,21 @@
-	;; $Id: checksum.S,v 1.1 2000/07/10 16:25:21 bjornw Exp $
-	;; A fast checksum routine using movem
-	;; Copyright (c) 1998 Bjorn Wesen/Axis Communications AB
+/* $Id: checksum.S,v 1.4 2001/02/19 11:11:33 bjornw Exp $
+ * A fast checksum routine using movem
+ * Copyright (c) 1998-2001 Axis Communications AB
+ *
+ * csum_partial(const unsigned char * buff, int len, unsigned int sum)
+ */
 
-	;; csum_partial(const unsigned char * buff, int len, unsigned int sum)
-	
 	.globl	_csum_partial
 _csum_partial:
 	
+	;; r10 - src
+	;; r11 - length
+	;; r12 - checksum
+
 	;; check for breakeven length between movem and normal word looping versions
 	
 	cmpu.w	80,r11
-	bcs	no_movem
+	blo	word_loop
 	nop
 
 	;; need to save the registers we use below in the movem loop
@@ -20,10 +25,6 @@ _csum_partial:
 	movem	r8,[sp]
 	
 	;; do a movem checksum
-
-	;; r10 - src
-	;; r11 - length
-	;; r12 - checksum
 
 	subq	10*4,r11	; update length for the first loop
 	
@@ -65,23 +66,30 @@ mloop:	movem	[r10+],r9	; read 10 longwords
 
 	addq	10*4,r11	; compensate for last loop underflowing length
 
-	;; fold 32-bit checksum into a 16-bit checksum, to avoid carries below
-	
-	moveq	-1,r1		; put 0xffff in r1, faster than move.d 0xffff,r1
-	lsrq	16,r1
-	
-	move.d	r12,r0
-	lsrq	16,r0		; r0 = checksum >> 16
-	and.d	r1,r12		; checksum = checksum & 0xffff
-	add.d	r0,r12		; checksum += r0
-	move.d	r12,r0		; do the same again, maybe we got a carry last add
-	lsrq	16,r0
-	and.d	r1,r12
-	add.d	r0,r12
-	
 	movem	[sp+],r8	; restore regs
 
-no_movem:
+word_loop:
+	;; only fold if there is anything to fold.
+
+	cmpq	0,r12
+	beq	no_fold
+
+	;; fold 32-bit checksum into a 16-bit checksum, to avoid carries below.
+	;; r9 and r13 can be used as temporaries.
+	
+	moveq	-1,r9		; put 0xffff in r9, faster than move.d 0xffff,r9
+	lsrq	16,r9
+	
+	move.d	r12,r13
+	lsrq	16,r13		; r13 = checksum >> 16
+	and.d	r9,r12		; checksum = checksum & 0xffff
+	add.d	r13,r12		; checksum += r13
+	move.d	r12,r13		; do the same again, maybe we got a carry last add
+	lsrq	16,r13
+	and.d	r9,r12
+	add.d	r13,r12
+
+no_fold:
 	cmpq	2,r11
 	blt	no_words
 	nop
@@ -110,4 +118,3 @@ do_byte:
 	ret
 	move.d	r12, r10
 		
-	

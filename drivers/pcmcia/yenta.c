@@ -755,6 +755,9 @@ static void yenta_allocate_resources(pci_socket_t *socket)
  */
 static void yenta_close(pci_socket_t *sock)
 {
+	/* Disable all events so we don't die in an IRQ storm */
+	cb_writel(sock, CB_SOCKET_MASK, 0x0);
+
 	if (sock->cb_irq)
 		free_irq(sock->cb_irq, sock);
 	else

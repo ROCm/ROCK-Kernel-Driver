@@ -5,8 +5,9 @@
  * to set up the kernel's global pointer and jump to the kernel
  * entry point.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2001 Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Intel Corp.
@@ -18,15 +19,14 @@
 
 #include <asm/asmmacro.h>
 #include <asm/fpu.h>
-#include <asm/pal.h>
+#include <asm/kregs.h>
+#include <asm/mmu_context.h>
 #include <asm/offsets.h>
+#include <asm/pal.h>
+#include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
-
-	.psr abi64
-	.psr lsb
-	.lsb
 
 	.section __special_page_section,"ax"
 
@@ -38,29 +38,66 @@ empty_zero_page:
 swapper_pg_dir:
 	.skip PAGE_SIZE
 
-	.global empty_bad_page
-empty_bad_page:
-	.skip PAGE_SIZE
-
-	.global empty_bad_pte_table
-empty_bad_pte_table:
-	.skip PAGE_SIZE
-
-	.global empty_bad_pmd_table
-empty_bad_pmd_table:
-	.skip PAGE_SIZE
-
 	.rodata
 halt_msg:
 	stringz "Halting kernel\n"
 
 	.text
 
+	.global start_ap
+
+	/*
+	 * Start the kernel.  When the bootloader passes control to _start(), r28
+	 * points to the address of the boot parameter area.  Execution reaches
+	 * here in physical mode.
+	 */
 GLOBAL_ENTRY(_start)
-	UNW(.prologue)
-	UNW(.save rp, r4)		// terminate unwind chain with a NULL rp
-	UNW(mov r4=r0)
-	UNW(.body)
+start_ap:
+	.prologue
+	.save rp, r4		// terminate unwind chain with a NULL rp
+	mov r4=r0
+	.body
+
+	/*
+	 * Initialize the region register for region 7 and install a translation register
+	 * that maps the kernel's text and data:
+	 */
+	rsm psr.i | psr.ic
+	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (_PAGE_SIZE_64M << 2))
+	;;
+	srlz.i
+	mov r18=_PAGE_SIZE_64M<<2
+	movl r17=PAGE_OFFSET + 64*1024*1024
+	;;
+	mov rr[r17]=r16
+	mov cr.itir=r18
+	mov cr.ifa=r17
+	mov r16=IA64_TR_KERNEL
+	movl r18=(64*1024*1024 | PAGE_KERNEL)
+	;;
+	srlz.i
+	;;
+	itr.i itr[r16]=r18
+	;;
+	itr.d dtr[r16]=r18
+	;;
+	srlz.i
+
+	/*
+	 * Switch into virtual mode:
+	 */
+	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN)
+	;;
+	mov cr.ipsr=r16
+	movl r17=1f
+	;;
+	mov cr.iip=r17
+	mov cr.ifs=r0
+	;;
+	rfi
+	;;
+1:	// now we are in virtual mode
+
 	// set IVT entry point---can't access I/O ports without it
 	movl r3=ia64_ivt
 	;;
@@ -74,7 +111,7 @@ GLOBAL_ENTRY(_start)
 	;;
 
 #ifdef CONFIG_IA64_EARLY_PRINTK
-	mov r3=(6<<8) | (28<<2)
+	mov r3=(6<<8) | (_PAGE_SIZE_64M<<2)
 	movl r2=6<<61
 	;;
 	mov rr[r2]=r3
@@ -83,27 +120,32 @@ GLOBAL_ENTRY(_start)
 	;;
 #endif
 
-#define isAP	p2	// are we booting an Application Processor (not the BSP)?
+#define isAP	p2	// are we an Application Processor?
+#define isBP	p3	// are we the Bootstrap Processor?
 
-	// Find the init_task for the currently booting CPU.  At poweron, and in
-	// UP mode, cpu_now_booting is 0
+	/*
+	 * Find the init_task for the currently booting CPU.  At poweron, and in
+	 * UP mode, cpu_now_booting is 0.
+	 */
 	movl r3=cpu_now_booting
  	;;
-	ld4 r3=[r3]
+	ld4 r3=[r3]		// r3 <- smp_processor_id()
 	movl r2=init_tasks
-	;; 
+	;;
 	shladd r2=r3,3,r2
 	;;
 	ld8 r2=[r2]
-	cmp4.ne isAP,p0=r3,r0	// p9 == true if this is an application processor (ap)
+	cmp4.ne isAP,isBP=r3,r0
 	;;			// RAW on r2
 	extr r3=r2,0,61		// r3 == phys addr of task struct
 	;;
 
-	// load the "current" pointer (r13) and ar.k6 with the current task 
+	// load the "current" pointer (r13) and ar.k6 with the current task
 	mov r13=r2
-	mov ar.k6=r3		// Physical address
-	;;
+	mov IA64_KR(CURRENT)=r3		// Physical address
+
+	// initialize k4 to a safe value (64-128MB is mapped by TR_KERNEL)
+	mov IA64_KR(CURRENT_STACK)=1
 	/*
 	 * Reserve space at the top of the stack for "struct pt_regs".  Kernel threads
 	 * don't store interesting values in that structure, but the space still needs
@@ -113,14 +155,18 @@ GLOBAL_ENTRY(_start)
 	 */
 	addl r12=IA64_STK_OFFSET-IA64_PT_REGS_SIZE-16,r2
 	addl r2=IA64_RBS_OFFSET,r2	// initialize the RSE
-	mov ar.rsc=r0		// place RSE in enforced lazy mode
+	mov ar.rsc=0		// place RSE in enforced lazy mode
+	;;
+	loadrs			// clear the dirty partition
 	;;
 	mov ar.bspstore=r2	// establish the new RSE stack
 	;;
-	loadrs			// load zero bytes from the register stack
-	;;
 	mov ar.rsc=0x3		// place RSE in eager mode
+
+(isBP)	dep r28=-1,r28,61,3	// make address virtual
+(isBP)	movl r2=ia64_boot_param
 	;;
+(isBP)	st8 [r2]=r28		// save the address of the boot param area passed by the bootloader
 
 #ifdef CONFIG_IA64_EARLY_PRINTK
 	.rodata
@@ -135,15 +181,11 @@ alive_msg:
 1:	// force new bundle
 #endif /* CONFIG_IA64_EARLY_PRINTK */
 
-	alloc r2=ar.pfs,8,0,2,0
-	;;
 #ifdef CONFIG_SMP
 (isAP)	br.call.sptk.few rp=smp_callin
 .ret0:
 (isAP)	br.cond.sptk.few self
 #endif
-
-#undef isAP
 
 	// This is executed by the bootstrap processor (bsp) only:
 
@@ -153,9 +195,11 @@ alive_msg:
 .ret1:
 #endif
 	br.call.sptk.few rp=start_kernel
-.ret2:	addl r2=@ltoff(halt_msg),gp
+.ret2:	addl r3=@ltoff(halt_msg),gp
 	;;
-	ld8 out0=[r2]
+	alloc r2=ar.pfs,8,0,2,0
+	;;
+	ld8 out0=[r3]
 	br.call.sptk.few b0=console_print
 self:	br.sptk.few self		// endless loop
 END(_start)

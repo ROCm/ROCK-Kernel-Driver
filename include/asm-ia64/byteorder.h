@@ -20,18 +20,18 @@ __ia64_swab64 (__u64 x)
 static __inline__ __const__ __u32
 __ia64_swab32 (__u32 x)
 {
-	return __ia64_swab64 (x) >> 32;
+	return __ia64_swab64(x) >> 32;
 }
 
 static __inline__ __const__ __u16
 __ia64_swab16(__u16 x)
 {
-	return __ia64_swab64 (x) >> 48;
+	return __ia64_swab64(x) >> 48;
 }
 
-#define __arch__swab64(x) __ia64_swab64 (x)
-#define __arch__swab32(x) __ia64_swab32 (x)
-#define __arch__swab16(x) __ia64_swab16 (x)
+#define __arch__swab64(x) __ia64_swab64(x)
+#define __arch__swab32(x) __ia64_swab32(x)
+#define __arch__swab16(x) __ia64_swab16(x)
 
 #define __BYTEORDER_HAS_U64__
 

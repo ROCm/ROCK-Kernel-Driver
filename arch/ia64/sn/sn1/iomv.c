@@ -25,11 +25,8 @@ sn1_io_addr(unsigned long port)
  		 * for accessing registers in bedrock local block
  		 * (so we don't do port&0xfff)
  		 */
-		if (port == 0x1f6 || port == 0x1f7
-			|| port == 0x3f6 || port == 0x3f7
-			|| port == 0x1f0 || port == 0x1f1
-			|| port == 0x1f3 || port == 0x1f4
-			|| port == 0x1f2 || port == 0x1f5)  {
+		if (port >= 0x1f0 && port <= 0x1f7 ||
+			port == 0x3f6 || port == 0x3f7) {
 			io_base = __IA64_UNCACHED_OFFSET | 0x00000FFFFC000000;
 			addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
 		} else {

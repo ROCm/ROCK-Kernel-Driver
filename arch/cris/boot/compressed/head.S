@@ -8,7 +8,6 @@
  *
  */
 
-#include <linux/config.h>
 #define ASSEMBLER_MACROS_ONLY
 #include <asm/sv_addr_ag.h>
 
@@ -22,23 +21,24 @@
 	nop
 	di
 
-#ifndef CONFIG_SVINTO_SIM	
+	;; We need to initialze DRAM registers before we start using the DRAM
+#include "../../lib/dram_init.S"
+	
+dram_init_finished:
+	
+	;; Initiate the PA and PB ports
 
-	;; We need to setup the bus registers before we start using the DRAM
+	move.b   DEF_R_PORT_PA_DATA, r0
+	move.b   r0, [R_PORT_PA_DATA]
 
-	move.d   DEF_R_WAITSTATES, r0
-	move.d   r0, [R_WAITSTATES]
+	move.b   DEF_R_PORT_PA_DIR, r0
+	move.b   r0, [R_PORT_PA_DIR]
 
-	move.d   DEF_R_BUS_CONFIG, r0
-	move.d   r0, [R_BUS_CONFIG]
-  
-	move.d   DEF_R_DRAM_CONFIG, r0
-	move.d   r0, [R_DRAM_CONFIG]
+	move.b   DEF_R_PORT_PB_DATA, r0
+	move.b   r0, [R_PORT_PB_DATA]
 
-	move.d   DEF_R_DRAM_TIMING, r0
-	move.d   r0, [R_DRAM_TIMING]
-
-#endif
+	move.b   DEF_R_PORT_PB_DIR, r0
+	move.b   r0, [R_PORT_PB_DIR]
 
 	;; Setup the stack to a suitably high address.
 	;; We assume 8 MB is the minimum DRAM in an eLinux
@@ -83,7 +83,7 @@ basse:	move.d	pc, r5
 	;; Do the decompression and save compressed size in _inptr
 	
 	jsr	_decompress_kernel
-
+	
 	;; Put start address of cramfs in r9 so the kernel can use it
 	;; when mounting from flash
 
@@ -91,7 +91,6 @@ basse:	move.d	pc, r5
 	add.d	[_inptr], r9		; size of compressed kernel
 
 	;; Enter the decompressed kernel
-		
 	jump	0x40004000	; kernel is linked to this address
 	
 	.data

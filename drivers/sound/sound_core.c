@@ -168,7 +168,11 @@ static int sound_insert_unit(struct sound_unit **list, struct file_operations *f
 	spin_unlock(&sound_loader_lock);
 	
 	if(r<0)
+	{
 		kfree(s);
+		return r;
+	}
+	
 	if (r == low)
 		sprintf (name_buf, "%s", name);
 	else

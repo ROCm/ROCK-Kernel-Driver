@@ -30,10 +30,6 @@ hub_widget_id(nasid_t nasid)
 		
 	ii_wcr.wcr_reg_value = REMOTE_HUB_L(nasid,IIO_WCR);
 
-	printk("hub_widget_id: Found Hub Widget ID 0x%x from Register 0x%p\n", ii_wcr.wcr_fields_s.wcr_widget_id, REMOTE_HUB_ADDR(nasid, IIO_WCR));
-
-	printk("hub_widget_id: Found Hub Widget 0x%lx wcr_reg_value 0x%lx\n", REMOTE_HUB_L(nasid,IIO_WCR), ii_wcr.wcr_reg_value);
-
 	return ii_wcr.wcr_fields_s.wcr_widget_id;
 }
 
@@ -64,8 +60,6 @@ hubreg_t
 get_hub_chiprev(nasid_t nasid)
 {
 
-	printk("get_hub_chiprev: Hub Chip Rev 0x%lx\n",
-		(REMOTE_HUB_L(nasid, LB_REV_ID) & LRI_REV_MASK) >> LRI_REV_SHFT);
 	return ((REMOTE_HUB_L(nasid, LB_REV_ID) & LRI_REV_MASK)
 		                                         >> LRI_REV_SHFT);
 }

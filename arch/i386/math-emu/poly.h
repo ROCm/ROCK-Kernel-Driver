@@ -118,4 +118,4 @@ extern inline void negate_Xsig(Xsig *x)
                :"=g" (*x):"g" (x):"si","ax","cx");
 }
 
-#endif _POLY_H
+#endif /* _POLY_H */

@@ -24,10 +24,13 @@ CONFIG_USE_SERIAL_CONSOLE=y
 # Hardware setup
 #
 CONFIG_ETRAX100LX=y
+# CONFIG_ETRAX100LX_V2 is not set
 # CONFIG_SVINTO_SIM is not set
 CONFIG_CRIS_LOW_MAP=y
-ETRAX_DRAM_BASE=40000000
+ETRAX_DRAM_VIRTUAL_BASE=60000000
 ETRAX_DRAM_SIZE=8
+CONFIG_ETRAX_FLASH_LENGTH=2
+CONFIG_ETRAX_FLASH_BUSWIDTH=2
 CONFIG_ETRAX_PA_LEDS=y
 # CONFIG_ETRAX_PB_LEDS is not set
 # CONFIG_ETRAX_90000000_LEDS is not set
@@ -40,8 +43,13 @@ CONFIG_DEBUG_PORT0=y
 # CONFIG_DEBUG_PORT1 is not set
 # CONFIG_DEBUG_PORT2 is not set
 # CONFIG_DEBUG_PORT3 is not set
+CONFIG_RESCUE_SER0=y
+# CONFIG_RESCUE_SER1 is not set
+# CONFIG_RESCUE_SER2 is not set
+# CONFIG_RESCUE_SER3 is not set
 DEF_R_WAITSTATES=95a6
 DEF_R_BUS_CONFIG=104
+# CONFIG_SDRAM is not set
 DEF_R_DRAM_CONFIG=1a200040
 DEF_R_DRAM_TIMING=5611
 DEF_R_PORT_PA_DIR=1d
@@ -56,6 +64,87 @@ DEF_R_PORT_PB_DATA=f3
 CONFIG_ETRAX_ETHERNET=y
 CONFIG_NET_ETHERNET=y
 CONFIG_ETRAX_SERIAL=y
+# CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB is not set
+CONFIG_ETRAX_SERIAL_PORT1=y
+# CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB is not set
+# CONFIG_ETRAX_SERIAL_PORT2 is not set
+# CONFIG_ETRAX_SERIAL_PORT3 is not set
+# CONFIG_RS485 is not set
+# CONFIG_ETRAX_SYNCHRONOUS_SERIAL is not set
+# CONFIG_ETRAX_IDE is not set
+CONFIG_ETRAX_AXISFLASHMAP=y
+CONFIG_MTD=y
+CONFIG_MTD_CFI=y
+# CONFIG_MTD_CFI_INTELEXT is not set
+CONFIG_MTD_CFI_AMDSTD=y
+CONFIG_MTD_AMDSTD=y
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
+CONFIG_ETRAX_I2C=y
+CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C=y
+CONFIG_ETRAX_GPIO=y
+CONFIG_ETRAX_PA_BUTTON_BITMASK=02
+CONFIG_PA_CHANGEABLE_DIR=00
+CONFIG_PA_CHANGEABLE_BITS=FF
+CONFIG_PB_CHANGEABLE_DIR=00
+CONFIG_PB_CHANGEABLE_BITS=FF
+# CONFIG_JULIETTE is not set
+# CONFIG_JULIETTE_VIDEO is not set
+# CONFIG_JULIETTE_CCD is not set
+# CONFIG_JULIETTE_SS1M is not set
+# CONFIG_JULIETTE_MEGCCD is not set
+# CONFIG_ETRAX_USB_HOST is not set
+
+#
+# Memory Technology Devices (MTD)
+#
+CONFIG_MTD=y
+# CONFIG_MTD_DEBUG is not set
+# CONFIG_MTD_DOC1000 is not set
+# CONFIG_MTD_DOC2000 is not set
+# CONFIG_MTD_DOC2001 is not set
+# CONFIG_MTD_DOCPROBE is not set
+# CONFIG_MTD_PMC551 is not set
+# CONFIG_MTD_SLRAM is not set
+# CONFIG_MTD_RAM is not set
+# CONFIG_MTD_ROM is not set
+# CONFIG_MTD_MTDRAM is not set
+CONFIG_MTD_CFI=y
+# CONFIG_MTD_CFI_GEOMETRY is not set
+# CONFIG_MTD_CFI_INTELEXT is not set
+CONFIG_MTD_CFI_AMDSTD=y
+CONFIG_MTD_AMDSTD=y
+# CONFIG_MTD_SHARP is not set
+# CONFIG_MTD_PHYSMAP is not set
+# CONFIG_MTD_NORA is not set
+# CONFIG_MTD_PNC2000 is not set
+# CONFIG_MTD_RPXLITE is not set
+# CONFIG_MTD_SBC_MEDIAGX is not set
+# CONFIG_MTD_ELAN_104NC is not set
+# CONFIG_MTD_SA1100 is not set
+# CONFIG_MTD_DC21285 is not set
+# CONFIG_MTD_CSTM_CFI_JEDEC is not set
+# CONFIG_MTD_JEDEC is not set
+# CONFIG_MTD_MIXMEM is not set
+# CONFIG_MTD_OCTAGON is not set
+# CONFIG_MTD_VMAX is not set
+# CONFIG_MTD_NAND is not set
+# CONFIG_MTD_NAND_SPIA is not set
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
+# CONFIG_FTL is not set
+# CONFIG_NFTL is not set
+
+#
+# Parallel port support
+#
+# CONFIG_PARPORT is not set
+
+#
+# Plug and Play configuration
+#
+# CONFIG_PNP is not set
+# CONFIG_ISAPNP is not set
 
 #
 # Block devices
@@ -90,10 +179,6 @@ CONFIG_INET=y
 # CONFIG_IPV6 is not set
 # CONFIG_KHTTPD is not set
 # CONFIG_ATM is not set
-
-#
-#  
-#
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
 # CONFIG_DECNET is not set
@@ -101,6 +186,7 @@ CONFIG_INET=y
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_LLC is not set
+# CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
 # CONFIG_NET_FASTROUTE is not set
@@ -112,9 +198,59 @@ CONFIG_INET=y
 # CONFIG_NET_SCHED is not set
 
 #
+# Telephony Support
+#
+# CONFIG_PHONE is not set
+# CONFIG_PHONE_IXJ is not set
+
+#
+# ATA/IDE/MFM/RLL support
+#
+# CONFIG_IDE is not set
+
+#
+# IDE, ATA and ATAPI Block devices
+#
+# CONFIG_BLK_DEV_IDE is not set
+# CONFIG_BLK_DEV_HD_IDE is not set
+# CONFIG_BLK_DEV_HD is not set
+# CONFIG_BLK_DEV_IDEDISK is not set
+# CONFIG_IDEDISK_MULTI_MODE is not set
+# CONFIG_BLK_DEV_IDEDISK_VENDOR is not set
+# CONFIG_BLK_DEV_IDEDISK_FUJITSU is not set
+# CONFIG_BLK_DEV_IDEDISK_IBM is not set
+# CONFIG_BLK_DEV_IDEDISK_MAXTOR is not set
+# CONFIG_BLK_DEV_IDEDISK_QUANTUM is not set
+# CONFIG_BLK_DEV_IDEDISK_SEAGATE is not set
+# CONFIG_BLK_DEV_IDEDISK_WD is not set
+# CONFIG_BLK_DEV_COMMERIAL is not set
+# CONFIG_BLK_DEV_TIVO is not set
+# CONFIG_BLK_DEV_IDECS is not set
+# CONFIG_BLK_DEV_IDECD is not set
+# CONFIG_BLK_DEV_IDETAPE is not set
+# CONFIG_BLK_DEV_IDEFLOPPY is not set
+# CONFIG_BLK_DEV_IDESCSI is not set
+# CONFIG_BLK_DEV_CMD640 is not set
+# CONFIG_BLK_DEV_CMD640_ENHANCED is not set
+# CONFIG_BLK_DEV_ISAPNP is not set
+# CONFIG_IDE_CHIPSETS is not set
+# CONFIG_IDEDMA_AUTO is not set
+# CONFIG_DMA_NONPCI is not set
+# CONFIG_BLK_DEV_IDE_MODES is not set
+
+#
 # SCSI support
 #
 # CONFIG_SCSI is not set
+
+#
+# I2O device support
+#
+# CONFIG_I2O is not set
+# CONFIG_I2O_BLOCK is not set
+# CONFIG_I2O_LAN is not set
+# CONFIG_I2O_SCSI is not set
+# CONFIG_I2O_PROC is not set
 
 #
 # Network device support
@@ -177,6 +313,16 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_WAN is not set
 
 #
+# Amateur Radio support
+#
+# CONFIG_HAMRADIO is not set
+
+#
+# IrDA (infrared) support
+#
+# CONFIG_IRDA is not set
+
+#
 # ISDN subsystem
 #
 # CONFIG_ISDN is not set
@@ -185,6 +331,60 @@ CONFIG_NET_ETHERNET=y
 # CD-ROM drivers (not for SCSI or IDE/ATAPI drives)
 #
 # CONFIG_CD_NO_IDESCSI is not set
+
+#
+# Input core support
+#
+# CONFIG_INPUT is not set
+
+#
+# Character devices
+#
+# CONFIG_VT is not set
+# CONFIG_SERIAL is not set
+# CONFIG_SERIAL_EXTENDED is not set
+# CONFIG_SERIAL_NONSTANDARD is not set
+# CONFIG_UNIX98_PTYS is not set
+
+#
+# I2C support
+#
+# CONFIG_I2C is not set
+
+#
+# Mice
+#
+# CONFIG_BUSMOUSE is not set
+# CONFIG_MOUSE is not set
+
+#
+# Joysticks
+#
+# CONFIG_JOYSTICK is not set
+# CONFIG_QIC02_TAPE is not set
+
+#
+# Watchdog Cards
+#
+# CONFIG_WATCHDOG is not set
+# CONFIG_INTEL_RNG is not set
+# CONFIG_NVRAM is not set
+# CONFIG_RTC is not set
+# CONFIG_DTLK is not set
+# CONFIG_R3964 is not set
+# CONFIG_APPLICOM is not set
+
+#
+# Ftape, the floppy tape device driver
+#
+# CONFIG_FTAPE is not set
+# CONFIG_AGP is not set
+# CONFIG_DRM is not set
+
+#
+# Multimedia devices
+#
+# CONFIG_VIDEO_DEV is not set
 
 #
 # File systems
@@ -259,59 +459,14 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_NLS is not set
 
 #
-# Character devices
-#
-# CONFIG_VT is not set
-# CONFIG_SERIAL is not set
-# CONFIG_SERIAL_EXTENDED is not set
-# CONFIG_SERIAL_NONSTANDARD is not set
-# CONFIG_UNIX98_PTYS is not set
-# CONFIG_PRINTER is not set
-# CONFIG_PPDEV is not set
-
-#
-# I2C support
-#
-# CONFIG_I2C is not set
-
-#
-# Mice
-#
-# CONFIG_BUSMOUSE is not set
-# CONFIG_MOUSE is not set
-
-#
-# Joysticks
-#
-# CONFIG_JOYSTICK is not set
-
-#
-# Input core support is needed for joysticks
-#
-# CONFIG_QIC02_TAPE is not set
-
-#
-# Watchdog Cards
-#
-# CONFIG_WATCHDOG is not set
-# CONFIG_INTEL_RNG is not set
-# CONFIG_NVRAM is not set
-# CONFIG_RTC is not set
-# CONFIG_DTLK is not set
-# CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
-
-#
-# Ftape, the floppy tape device driver
-#
-# CONFIG_FTAPE is not set
-# CONFIG_AGP is not set
-# CONFIG_DRM is not set
-
-#
 # Sound
 #
 # CONFIG_SOUND is not set
+
+#
+# USB support
+#
+# CONFIG_USB is not set
 
 #
 # Kernel hacking

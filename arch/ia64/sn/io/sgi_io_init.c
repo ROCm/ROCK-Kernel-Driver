@@ -79,13 +79,8 @@ extern synergy_da_t	*Synergy_da_indr[];
 void
 sgi_master_io_infr_init(void)
 {
-#ifdef Colin
-	/*
-	 * Simulate Big Window 0.
-	 * Only when we build for lutsen etc. ..
-	 */
-	simulated_BW0_init();
-#endif
+	int cnode;
+	extern int maxnodes;
 
 	/*
 	 * Do any early init stuff .. einit_tbl[] etc.
@@ -122,7 +117,9 @@ sgi_master_io_infr_init(void)
 	sn_mp_setup();
 
 	DBG("--> sgi_master_io_infr_init: calling per_hub_init(0).\n");
-	per_hub_init(0); /* Need to get and send in actual cnode number */
+	for (cnode = 0; cnode < maxnodes; cnode++) {
+		per_hub_init(cnode);
+	}
 
 	/* We can do headless hub cnodes here .. */
 
@@ -188,7 +185,7 @@ sgi_slave_io_infr_init(void)
 	/* Emulate cboot() .. */
 	mlreset(1); /* This is a slave cpu */
 
-	per_hub_init(0); /* Need to get and send in actual cnode number */
+	// per_hub_init(0); /* Need to get and send in actual cnode number */
 
 	/* Done */
 }
@@ -212,12 +209,8 @@ sn_mp_setup(void)
 	 * do not currently support yet .. just a hack for now.
 	 */
 #ifdef NUMA_BASE
-	DBG("sn_mp_setup(): maxnodes= %d  numnodes= %d\n", maxnodes,numnodes);
         maxnodes = numnodes;
-#ifdef SIMULATED_KLGRAPH
-	maxnodes = 1;
-	numnodes = 1;
-#endif /* SIMULATED_KLGRAPH */
+	DBG("sn_mp_setup(): maxnodes= %d  numnodes= %d\n", maxnodes,numnodes);
         printk("sn_mp_setup(): Allocating backing store for *Nodepdaindr[%2d] \n",
                 maxnodes);
 
@@ -259,6 +252,14 @@ sn_mp_setup(void)
 	 *      ml/SN/promif.c
 	 */
 
+#ifdef CONFIG_IA64_SGI_SN1
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		/* Skip holes in CPU space */
+		if (cpu_enabled(cpu)) {
+			init_platform_pda(cpu);
+		}
+	}
+#endif
 	for (cnode = 0; cnode < maxnodes; cnode++) {
 		/*
 		 * Set up platform-dependent nodepda fields.
@@ -267,29 +268,7 @@ sn_mp_setup(void)
 		 */
 		DBG("sn_mp_io_setup: calling init_platform_nodepda(%2d)\n",cnode);
 		init_platform_nodepda(Nodepdaindr[cnode], cnode);
-
-		/*
-		 * This routine clears the Hub's Interrupt registers.
-		 */
-#ifndef CONFIG_IA64_SGI_IO
-		/*
-		 * We need to move this intr_clear_all() routine 
-		 * from SN/intr.c to a more appropriate file.
-		 * Talk to Al Mayer.
-		 */
-                intr_clear_all(COMPACT_TO_NASID_NODEID(cnode));
-#endif
 	}
-
-#ifdef CONFIG_IA64_SGI_IO
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-		/* Skip holes in CPU space */
-		if (cpu_enabled(cpu)) {
-			init_platform_pda(cpu);
-		}
-	}
-#endif
-
 	/*
 	 * Initialize platform-dependent vertices in the hwgraph:
 	 *	module
@@ -309,4 +288,26 @@ sn_mp_setup(void)
 	klhwg_add_all_modules(hwgraph_root);
 	DBG("sn_mp_setup: calling klhwg_add_all_nodes()\n");
 	klhwg_add_all_nodes(hwgraph_root);
+
+
+	for (cnode = 0; cnode < maxnodes; cnode++) {
+
+		/*
+		 * This routine clears the Hub's Interrupt registers.
+		 */
+#ifdef CONFIG_IA64_SGI_SN1
+		/*
+		 * We need to move this intr_clear_all() routine 
+		 * from SN/intr.c to a more appropriate file.
+		 * Talk to Al Mayer.
+		 */
+                intr_clear_all(COMPACT_TO_NASID_NODEID(cnode));
+		/* now init the hub */
+	//	per_hub_init(cnode);
+#endif
+	}
+
+#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+	synergy_perf_init();
+#endif /* CONFIG_IA64_SGI_SYNERGY_PERF */
 }

@@ -2,34 +2,31 @@
 #define _ASM_IA64_MMU_CONTEXT_H
 
 /*
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
+
+/*
+ * Routines to manage the allocation of task context numbers.  Task context numbers are
+ * used to reduce or eliminate the need to perform TLB flushes due to context switches.
+ * Context numbers are implemented using ia-64 region ids.  Since the IA-64 TLB does not
+ * consider the region number when performing a TLB lookup, we need to assign a unique
+ * region id to each region in a process.  We use the least significant three bits in a
+ * region id for this purpose.
+ *
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ */
+
+#define IA64_REGION_ID_KERNEL	0 /* the kernel's region id (tlb.c depends on this being 0) */
+
+#define ia64_rid(ctx,addr)	(((ctx) << 3) | (addr >> 61))
+
+# ifndef __ASSEMBLY__
 
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 
 #include <asm/processor.h>
-
-/*
- * Routines to manage the allocation of task context numbers.  Task
- * context numbers are used to reduce or eliminate the need to perform
- * TLB flushes due to context switches.  Context numbers are
- * implemented using ia-64 region ids.  Since ia-64 TLBs do not
- * guarantee that the region number is checked when performing a TLB
- * lookup, we need to assign a unique region id to each region in a
- * process.  We use the least significant three bits in a region id
- * for this purpose.  On processors where the region number is checked
- * in TLB lookups, we can get back those two bits by defining
- * CONFIG_IA64_TLB_CHECKS_REGION_NUMBER.  The macro
- * IA64_REGION_ID_BITS gives the number of bits in a region id.  The
- * architecture manual guarantees this number to be in the range
- * 18-24.
- *
- * Copyright (C) 1998 David Mosberger-Tang <davidm@hpl.hp.com>
- */
-
-#define IA64_REGION_ID_KERNEL	0 /* the kernel's region id (tlb.c depends on this being 0) */
 
 struct ia64_ctx {
 	spinlock_t lock;
@@ -45,12 +42,6 @@ extern void wrap_mmu_context (struct mm_struct *mm);
 static inline void
 enter_lazy_tlb (struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
-}
-
-static inline unsigned long
-ia64_rid (unsigned long context, unsigned long region_addr)
-{
-	return context << 3 | (region_addr >> 61);
 }
 
 static inline void
@@ -123,11 +114,12 @@ activate_mm (struct mm_struct *prev, struct mm_struct *next)
 	 * We may get interrupts here, but that's OK because interrupt
 	 * handlers cannot touch user-space.
 	 */
-	__asm__ __volatile__ ("mov ar.k7=%0" :: "r"(__pa(next->pgd)));
+	ia64_set_kr(IA64_KR_PT_BASE, __pa(next->pgd));
 	get_mmu_context(next);
 	reload_context(next);
 }
 
 #define switch_mm(prev_mm,next_mm,next_task,cpu)	activate_mm(prev_mm, next_mm)
 
+# endif /* ! __ASSEMBLY__ */
 #endif /* _ASM_IA64_MMU_CONTEXT_H */

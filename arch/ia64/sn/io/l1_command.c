@@ -18,7 +18,6 @@
 #include <asm/sn/labelcl.h>
 #include <asm/sn/eeprom.h>
 #include <asm/sn/ksys/i2c.h>
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
 #include <asm/sn/ksys/l1.h>
@@ -67,7 +66,6 @@ extern char *bcopy(const char * src, char * dest, int count);
 static char elsc_nvram_buffer[NVRAM_SIZE];
 
 #define SC_COMMAND sc_command
-
 
 /*
  * elsc_init
@@ -206,6 +204,7 @@ int elsc_nvram_read(elsc_t *e, int addr, char *buf, int len)
     return -1;
 }
 
+
 /*
  * Command Set
  */
@@ -311,6 +310,7 @@ int elsc_debug_get(elsc_t *e, u_char *byte1, u_char *byte2)
 
     return 0;
 }
+
 
 /*
  * elsc_rack_bay_get fills in the two int * arguments with the
@@ -447,8 +447,9 @@ int elsc_module_get(elsc_t *e)
 
     /* construct module ID from rack and slot info */
 
-    if ((ret = elsc_rack_bay_type_get(e, &rnum, &bay, &bricktype)) < 0)
+    if ((ret = elsc_rack_bay_type_get(e, &rnum, &bay, &bricktype)) < 0) {
 	return ret;
+    }
 
     /* report unset location info. with a special, otherwise invalid modid */
     if (rnum == 0 && bay == 0)
@@ -935,6 +936,7 @@ int elsc_nic_get(elsc_t *e, uint64_t *nic, int verbose)
     return cbrick_uid_get( e->nasid, nic );
 }
 
+
 int _elsc_hbt(elsc_t *e, int ival, int rdly)
 {
     e = e;
@@ -958,11 +960,12 @@ int sc_command_interp( l1sc_t *sc, l1addr_t compt, l1addr_t rack, l1addr_t bay,
 
     /* fill in msg with the opcode & params */
     bzero( msg, BRL1_QSIZE );
-    subch = sc_open( sc, L1_ADDR_LOCAL );
 
-    L1_BUILD_ADDR( &target, compt, rack, bay, L1_ADDR_TASK_CMD );
+    L1_BUILD_ADDR( &target, compt, rack, bay, 0 );
+    subch = sc_open( sc, target );
+
     if( (len = sc_construct_msg( sc, subch, msg, BRL1_QSIZE,
-				 target, L1_REQ_EXEC_CMD, 2,
+				 L1_ADDR_TASK_CMD, L1_REQ_EXEC_CMD, 2,
 				 L1_ARG_ASCII, cmd )) < 0 )
     {
 	sc_close( sc, subch );
@@ -970,7 +973,7 @@ int sc_command_interp( l1sc_t *sc, l1addr_t compt, l1addr_t rack, l1addr_t bay,
     }
 		   
     /* send the request to the L1 */
-    if( sc_command( sc, subch, msg, msg, &len ) < 0 )
+    if( SC_COMMAND( sc, subch, msg, msg, &len ) < 0 )
     {
 	sc_close( sc, subch );
 	return( ELSC_ERROR_CMD_SEND );
@@ -986,6 +989,38 @@ int sc_command_interp( l1sc_t *sc, l1addr_t compt, l1addr_t rack, l1addr_t bay,
     }
 
     return 0;
+}
+
+/*
+ * sc_power_down
+ *
+ * Shuts down the c-brick associated with sc, and any attached I/O bricks
+ * or other c-bricks (won't go through r-bricks).
+ */
+
+int sc_power_down(l1sc_t *sc)
+{
+    return sc_command_interp( sc, L1_ADDR_TYPE_L1, L1_ADDR_RACK_LOCAL, 
+			      L1_ADDR_BAY_LOCAL, "* pwr d" );
+}
+
+
+/*
+ * sc_power_down_all
+ *
+ * Works similarly to sc_power_down, except that the request is sent to the
+ * closest L2 and EVERYBODY gets turned off.
+ */
+
+int sc_power_down_all(l1sc_t *sc)
+{
+    if( nodepda->num_routers > 0 ) {
+	return sc_command_interp( sc, L1_ADDR_TYPE_L2, L1_ADDR_RACK_LOCAL, 
+				  L1_ADDR_BAY_LOCAL, "* pwr d" );
+    }
+    else {
+	return sc_power_down( sc );
+    }
 }
 
 
@@ -1115,10 +1150,6 @@ int iobrick_module_get(l1sc_t *sc)
     if ((ret = iobrick_rack_bay_type_get(sc, &rnum, &bay, &brick_type)) < 0)
         return ret;
 
-    /* report unset location info. with a special, otherwise invalid modid */
-    if (rnum == 0 && bay == 0)
-        return MODULE_NOT_SET;
-
     if (bay > MODULE_BPOS_MASK >> MODULE_BPOS_SHFT)
         return ELSC_ERROR_MODULE;
 
@@ -1203,28 +1234,101 @@ iobrick_get_sys_snum( l1sc_t *sc, char *snum_str )
  */
 
 int
+iobrick_pci_pwr( l1sc_t *sc, int bus, int slot, int req_code )
+{
+#if 0 /* The "bedrock request" method of performing this function
+       * seems to be broken in the L1, so for now use the command-
+       * interpreter method
+       */
+
+    char	msg[BRL1_QSIZE];
+    int		len;    /* length of message being sent */
+    int		subch;  /* system controller subchannel used */
+
+    /* fill in msg with the opcode & params */
+    bzero( msg, BRL1_QSIZE );
+    subch = sc_open( sc, L1_ADDR_LOCALIO );
+
+    if( (len = sc_construct_msg( sc, subch, msg, BRL1_QSIZE,
+				 L1_ADDR_TASK_GENERAL,
+				 req_code, 4,
+				 L1_ARG_INT, bus,
+				 L1_ARG_INT, slot )) < 0 )
+    {
+	sc_close( sc, subch );
+	return( ELSC_ERROR_CMD_ARGS );
+    }
+
+    /* send the request to the L1 */
+    if( SC_COMMAND(sc, subch, msg, msg, &len ) < 0 )
+    {
+	sc_close( sc, subch );
+	return( ELSC_ERROR_CMD_SEND );
+    }
+
+    /* free up subchannel */
+    sc_close( sc, subch );
+
+    /* check response */
+    if( sc_interpret_resp( msg, 0 ) < 0 )
+    {
+	return( ELSC_ERROR_RESP_FORMAT );
+    }
+
+    return 0;
+
+#else
+    char cmd[64];
+    char *fxn;
+
+    switch( req_code )
+    {
+    case L1_REQ_PCI_UP:
+	fxn = "u";
+	break;
+    case L1_REQ_PCI_DOWN:
+	fxn = "d";
+	break;
+    case L1_REQ_PCI_RESET:
+	fxn = "rst";
+	break;
+    default:
+	return( ELSC_ERROR_CMD_ARGS );
+    }
+
+    if( slot == -1 ) 
+	sprintf( cmd, "pci %d %s", bus, fxn );
+    else
+        sprintf( cmd, "pci %d %d %s", bus, slot, fxn );
+	
+    return sc_command_interp( sc, L1_ADDR_TYPE_IOBRICK,
+	L1_ADDR_RACK_LOCAL, L1_ADDR_BAY_LOCAL, cmd );
+#endif
+}
+				 
+int
 iobrick_pci_slot_pwr( l1sc_t *sc, int bus, int slot, int up )
 {
-    char cmd[BRL1_QSIZE];
-    unsigned rack, bay, brick_type;
-    if( iobrick_rack_bay_type_get( sc, &rack, &bay, &brick_type ) < 0 )
-	return( ELSC_ERROR_CMD_SEND );
-    sprintf( cmd, "pci %d %d %s", bus, slot,
-	     (up ? "u" : "d") );
-    return( sc_command_interp
-	    ( sc, L1_ADDR_TYPE_L1, rack, bay, cmd ) );
+    return iobrick_pci_pwr( sc, bus, slot, up );
 }
 
 int
 iobrick_pci_bus_pwr( l1sc_t *sc, int bus, int up )
 {
-    char cmd[BRL1_QSIZE];
-    unsigned rack, bay, brick_type;
-    if( iobrick_rack_bay_type_get( sc, &rack, &bay, &brick_type ) < 0 )
-	return( ELSC_ERROR_CMD_SEND );
-    sprintf( cmd, "pci %d %s", bus, (up ? "u" : "d") );
-    return( sc_command_interp
-	    ( sc, L1_ADDR_TYPE_L1, rack, bay, cmd ) );
+    return iobrick_pci_pwr( sc, bus, -1, up );
+}
+
+
+int
+iobrick_pci_slot_rst( l1sc_t *sc, int bus, int slot )
+{
+    return iobrick_pci_pwr( sc, bus, slot, L1_REQ_PCI_RESET );
+}
+
+int
+iobrick_pci_bus_rst( l1sc_t *sc, int bus )
+{
+    return iobrick_pci_pwr( sc, bus, -1, L1_REQ_PCI_RESET );
 }
 
 

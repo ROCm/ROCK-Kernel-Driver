@@ -11,6 +11,17 @@
  * partition split defined below.
  *
  * $Log: axisflashmap.c,v $
+ * Revision 1.4  2001/02/23 12:47:15  bjornw
+ * Uncached flash in LOW_MAP moved from 0xe to 0x8
+ *
+ * Revision 1.3  2001/02/16 12:11:45  jonashg
+ * MTD driver amd_flash is now included in MTD CVS repository.
+ * (It's now in drivers/mtd).
+ *
+ * Revision 1.2  2001/02/09 11:12:22  jonashg
+ * Support for AMD compatible non-CFI flash chips.
+ * Only tested with Toshiba TC58FVT160 so far.
+ *
  * Revision 1.1  2001/01/12 17:01:18  bjornw
  * * Added axisflashmap.c, a physical mapping for MTD that reads and understands
  *   Axis partition-table format.
@@ -31,7 +42,7 @@
 #include <asm/mmu.h>
 
 #ifdef CONFIG_CRIS_LOW_MAP
-#define FLASH_UNCACHED_ADDR  KSEG_E
+#define FLASH_UNCACHED_ADDR  KSEG_8
 #define FLASH_CACHED_ADDR    KSEG_5
 #else
 #define FLASH_UNCACHED_ADDR  KSEG_E
@@ -205,8 +216,14 @@ init_axis_flash(void)
 
 	mymtd = do_cfi_probe(&axis_map);
 
+#ifdef CONFIG_MTD_AMDSTD
+	if (!mymtd) {
+		mymtd = do_amd_flash_probe(&axis_map);
+	}
+#endif
+
 	if(!mymtd) {
-		printk("cfi_probe erred %d\n", mymtd);
+		printk("%s: No flash chip found!\n", axis_map.name);
 		return -ENXIO;
 	}
 
@@ -218,7 +235,8 @@ init_axis_flash(void)
 	 * now at least.
 	 */
 
-	ptable_head = FLASH_CACHED_ADDR + PTABLE_SECTOR + PARTITION_TABLE_OFFSET;
+	ptable_head = (struct partitiontable_head *)(FLASH_CACHED_ADDR +
+		PTABLE_SECTOR + PARTITION_TABLE_OFFSET);
 	pidx++;  /* first partition is always set to the default */
 
 	if ((ptable_head->magic == PARTITION_TABLE_MAGIC)

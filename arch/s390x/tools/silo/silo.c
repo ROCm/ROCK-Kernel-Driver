@@ -376,7 +376,7 @@ verify_options (struct silo_options *o)
     if ( errno == ENOENT ) {
       ITRY (creat ( o-> bootmap, O_RDWR ));
     } else {
-      PRINT_LEVEL(1,"Cannot acces bootmap file '%s': %s\n",o->bootmap,
+      PRINT_LEVEL(1,"Cannot access bootmap file '%s': %s\n",o->bootmap,
 		  strerror(errno));
     }
   }

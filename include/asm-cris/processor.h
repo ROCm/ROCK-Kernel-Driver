@@ -1,7 +1,7 @@
 /*
  * include/asm-cris/processor.h
  *
- * Copyright (C) 2000 Axis Communications AB
+ * Copyright (C) 2000, 2001 Axis Communications AB
  *
  * Authors:         Bjorn Wesen        Initial version
  *
@@ -57,9 +57,6 @@ struct thread_struct {
 /* saved stack-frame upon syscall entry, points to registers */
 
 #define current_regs() (current->thread.esp0)
-
-/* this lives in process.c */
-asmlinkage void set_esp0(unsigned long ssp);
 
 /* INIT_MMAP is the kernels map of memory, between KSEG_C and KSEG_D */
 

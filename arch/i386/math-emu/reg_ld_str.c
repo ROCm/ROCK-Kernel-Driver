@@ -439,7 +439,7 @@ int FPU_store_double(FPU_REG *st0_ptr, u_char st0_tag, double *dfloat)
 		 converts to decide underflow. */
 	      if ( !((tmp.sigh == 0x00100000) && (tmp.sigl == 0) &&
 		  (st0_ptr->sigl & 0x000007ff)) )
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 		{
 		  EXCEPTION(EX_Underflow);
 		  /* This is a special case: see sec 16.2.5.1 of
@@ -559,7 +559,7 @@ int FPU_store_double(FPU_REG *st0_ptr, u_char st0_tag, double *dfloat)
 	  /* Underflow has priority. */
 	  if ( control_word & CW_Underflow )
 	    denormal_operand();
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 	  reg_copy(st0_ptr, &tmp);
 	  goto denormal_arg;
 	}
@@ -659,7 +659,7 @@ int FPU_store_single(FPU_REG *st0_ptr, u_char st0_tag, float *single)
 		 converts to decide underflow. */
 	      if ( !((tmp.sigl == 0x00800000) &&
 		  ((st0_ptr->sigh & 0x000000ff) || st0_ptr->sigl)) )
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
 		{
 		  EXCEPTION(EX_Underflow);
 		  /* This is a special case: see sec 16.2.5.1 of
@@ -776,7 +776,7 @@ int FPU_store_single(FPU_REG *st0_ptr, u_char st0_tag, float *single)
 	  /* Underflow has priority. */
 	  if ( control_word & CW_Underflow )
 	    denormal_operand();
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */ 
 	  goto denormal_arg;
 	}
       else if (st0_tag == TW_Infinity)
@@ -1221,7 +1221,7 @@ u_char *fldenv(fpu_addr_modes addr_modes, u_char *s)
 
 #ifdef PECULIAR_486
   control_word &= ~0xe080;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */ 
 
   top = (partial_status >> SW_Top_Shift) & 7;
 
@@ -1303,7 +1303,7 @@ u_char *fstenv(fpu_addr_modes addr_modes, u_char *d)
       FPU_put_user(control_word & ~0xe080, (unsigned long *) d);
 #else
       FPU_put_user(control_word, (unsigned short *) d);
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
       FPU_put_user(status_word(), (unsigned short *) (d+2));
       FPU_put_user(fpu_tag_word, (unsigned short *) (d+4));
       FPU_put_user(instruction_address.offset, (unsigned short *) (d+6));
@@ -1335,7 +1335,7 @@ u_char *fstenv(fpu_addr_modes addr_modes, u_char *d)
       fpu_tag_word |= 0xffff0000;
       I387.soft.fcs &= ~0xf8000000;
       I387.soft.fos |= 0xffff0000;
-#endif PECULIAR_486
+#endif /* PECULIAR_486 */
       __copy_to_user(d, &control_word, 7*4);
       RE_ENTRANT_CHECK_ON;
       d += 0x1c;

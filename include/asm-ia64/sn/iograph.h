@@ -90,6 +90,7 @@
 #define EDGE_LBL_PROM			"prom"
 #define EDGE_LBL_RACK			"rack"
 #define EDGE_LBL_RDISK			"rdisk"
+#define EDGE_LBL_REPEATER_ROUTER	"repeaterrouter"
 #define EDGE_LBL_ROUTER			"router"
 #define EDGE_LBL_RPOS			"bay"		/* Position in rack */
 #define EDGE_LBL_SCSI			"scsi"
@@ -117,9 +118,9 @@
 #define EDGE_LBL_RPS                    "rps"           /* redundant power supply */ 
 #define EDGE_LBL_XBOX_RPS               "xbox_rps"      /* redundant power supply for xbox unit */ 
 #define EDGE_LBL_IOBRICK		"iobrick"
-#define EDGE_LBL_PBRICK			"pbrick"
-#define EDGE_LBL_IBRICK			"ibrick"
-#define EDGE_LBL_XBRICK			"xbrick"
+#define EDGE_LBL_PBRICK			"Pbrick"
+#define EDGE_LBL_IBRICK			"Ibrick"
+#define EDGE_LBL_XBRICK			"Xbrick"
 #define EDGE_LBL_CPUBUS			"cpubus"	/* CPU Interfaces (SysAd) */
 
 /* vertex info labels in hwgraph */
@@ -134,6 +135,8 @@
 #define INFO_LBL_DKIOTIME		"_dkiotime"
 #define INFO_LBL_DRIVER			"_driver"	/* points to attached device_driver_t */
 #define INFO_LBL_ELSC			"_elsc"
+#define	INFO_LBL_SUBCH			"_subch"	/* system controller subchannel */
+#define INFO_LBL_L1SCP			"_l1scp"	/* points to l1sc_t */
 #define INFO_LBL_FC_PORTNAME		"_fc_portname"
 #define INFO_LBL_GIOIO			"_gioio"
 #define INFO_LBL_GFUNCS			"_gioio_ops"	/* ops vector for gio providers */
@@ -196,5 +199,21 @@
 #if defined(__KERNEL__)
 void init_all_devices(void);
 #endif /* __KERNEL__ */
+
+#include <asm/sn/xtalk/xbow.h>	/* For get MAX_PORT_NUM */
+
+int io_brick_map_widget(char, int);
+int io_path_map_widget(devfs_handle_t);
+
+/*
+ * Map a brick's widget number to a meaningful int
+ */
+
+struct io_brick_map_s {
+    char                ibm_type;                  /* brick type, e.g. */
+                                                   /* 'I' for Ibrick   */
+    int                 ibm_map_wid[MAX_PORT_NUM]; /* wid to int map */
+};
+
 
 #endif /* _ASM_SN_IOGRAPH_H */

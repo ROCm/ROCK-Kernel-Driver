@@ -1,11 +1,11 @@
 /*
  * TLB support routines.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  *
- * 08/02/00 A. Mallick <asit.k.mallick@intel.com>	
- *		Modified RID allocation for SMP 
+ * 08/02/00 A. Mallick <asit.k.mallick@intel.com>
+ *		Modified RID allocation for SMP
  *          Goutham Rao <goutham.rao@intel.com>
  *              IPI based ptc implementation and A-step IPI implementation.
  */
@@ -41,7 +41,7 @@ struct ia64_ctx ia64_ctx = {
 };
 
 /*
- * Seralize usage of ptc.g 
+ * Seralize usage of ptc.g
  */
 spinlock_t ptcg_lock = SPIN_LOCK_UNLOCKED; /* see <asm/pgtable.h> */
 
@@ -49,7 +49,7 @@ spinlock_t ptcg_lock = SPIN_LOCK_UNLOCKED; /* see <asm/pgtable.h> */
 
 #include <linux/irq.h>
 
-unsigned long 	flush_end, flush_start, flush_nbits, flush_rid;
+unsigned long	flush_end, flush_start, flush_nbits, flush_rid;
 atomic_t flush_cpu_count;
 
 /*
@@ -71,7 +71,7 @@ flush_tlb_no_ptcg (unsigned long start, unsigned long end, unsigned long nbits)
 	if (!(flags & IA64_PSR_I)) {
 		saved_tpr = ia64_get_tpr();
 		ia64_srlz_d();
-		ia64_set_tpr(IPI_IRQ - 16);
+		ia64_set_tpr(IA64_IPI_VECTOR - 16);
 		ia64_srlz_d();
 		local_irq_enable();
 	}
@@ -97,13 +97,14 @@ flush_tlb_no_ptcg (unsigned long start, unsigned long end, unsigned long nbits)
 	/*
 	 * Wait for other CPUs to finish purging entries.
 	 */
-#if (defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_BSTEP_SPECIFIC))
+#if defined(CONFIG_ITANIUM_ASTEP_SPECIFIC) || defined(CONFIG_ITANIUM_BSTEP_SPECIFIC)
 	{
+		extern void smp_resend_flush_tlb (void);
 		unsigned long start = ia64_get_itc();
+
 		while (atomic_read(&flush_cpu_count) > 0) {
-			if ((ia64_get_itc() - start) > 40000UL) {
-				atomic_set(&flush_cpu_count, smp_num_cpus - 1);
-				smp_send_flush_tlb();
+			if ((ia64_get_itc() - start) > 400000UL) {
+				smp_resend_flush_tlb();
 				start = ia64_get_itc();
 			}
 		}
@@ -148,7 +149,7 @@ wrap_mmu_context (struct mm_struct *mm)
 		if (tsk_context == ia64_ctx.next) {
 			if (++ia64_ctx.next >= ia64_ctx.limit) {
 				/* empty range: reset the range limit and start over */
-				if (ia64_ctx.next > max_ctx) 
+				if (ia64_ctx.next > max_ctx)
 					ia64_ctx.next = 300;
 				ia64_ctx.limit = max_ctx + 1;
 				goto repeat;
@@ -166,11 +167,11 @@ __flush_tlb_all (void)
 {
 	unsigned long i, j, flags, count0, count1, stride0, stride1, addr;
 
-	addr    = my_cpu_data.ptce_base;
-	count0  = my_cpu_data.ptce_count[0];
-	count1  = my_cpu_data.ptce_count[1];
-	stride0 = my_cpu_data.ptce_stride[0];
-	stride1 = my_cpu_data.ptce_stride[1];
+	addr    = local_cpu_data->ptce_base;
+	count0  = local_cpu_data->ptce_count[0];
+	count1  = local_cpu_data->ptce_count[1];
+	stride0 = local_cpu_data->ptce_stride[0];
+	stride1 = local_cpu_data->ptce_stride[1];
 
 	local_irq_save(flags);
 	for (i = 0; i < count0; ++i) {
@@ -249,11 +250,11 @@ ia64_tlb_init (void)
 	ia64_ptce_info_t ptce_info;
 
 	ia64_get_ptce(&ptce_info);
-	my_cpu_data.ptce_base = ptce_info.base;
-	my_cpu_data.ptce_count[0] = ptce_info.count[0];
-	my_cpu_data.ptce_count[1] = ptce_info.count[1];
-	my_cpu_data.ptce_stride[0] = ptce_info.stride[0];
-	my_cpu_data.ptce_stride[1] = ptce_info.stride[1];
+	local_cpu_data->ptce_base = ptce_info.base;
+	local_cpu_data->ptce_count[0] = ptce_info.count[0];
+	local_cpu_data->ptce_count[1] = ptce_info.count[1];
+	local_cpu_data->ptce_stride[0] = ptce_info.stride[0];
+	local_cpu_data->ptce_stride[1] = ptce_info.stride[1];
 
 	__flush_tlb_all();		/* nuke left overs from bootstrapping... */
 }

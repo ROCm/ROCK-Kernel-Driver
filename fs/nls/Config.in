@@ -37,23 +37,26 @@ if [ "$CONFIG_NLS" = "y" ]; then
   tristate 'Codepage 865 (Norwegian, Danish)'      CONFIG_NLS_CODEPAGE_865
   tristate 'Codepage 866 (Cyrillic/Russian)'       CONFIG_NLS_CODEPAGE_866
   tristate 'Codepage 869 (Greek)'                  CONFIG_NLS_CODEPAGE_869
-  tristate 'Codepage 874 (Thai)'                   CONFIG_NLS_CODEPAGE_874
-  tristate 'Codepage 932 (Shift-JIS, EUC-JP)'      CONFIG_NLS_CODEPAGE_932
-  tristate 'Codepage 936 (GBK)'                    CONFIG_NLS_CODEPAGE_936
-  tristate 'Codepage 949 (UnifiedHangul)'          CONFIG_NLS_CODEPAGE_949
-  tristate 'Codepage 950 (Big5)'                   CONFIG_NLS_CODEPAGE_950
+  tristate 'Simplified Chinese charset (CP936, GB2312)' CONFIG_NLS_CODEPAGE_936
+  tristate 'Traditional Chinese charset (Big5)'    CONFIG_NLS_CODEPAGE_950
+  tristate 'Japanese charsets (Shift-JIS, EUC-JP)' CONFIG_NLS_CODEPAGE_932
+  tristate 'Korean charset (CP949, EUC-KR)'        CONFIG_NLS_CODEPAGE_949
+  tristate 'Thai charset (CP874, TIS-620)'         CONFIG_NLS_CODEPAGE_874
+  tristate 'Hebrew charsets (ISO-8859-8, CP1255)'  CONFIG_NLS_ISO8859_8
+  tristate 'Windows CP1251 (Bulgarian, Belarussian)' CONFIG_NLS_CODEPAGE_1251
   tristate 'NLS ISO 8859-1  (Latin 1; Western European Languages)' CONFIG_NLS_ISO8859_1
   tristate 'NLS ISO 8859-2  (Latin 2; Slavic/Central European Languages)' CONFIG_NLS_ISO8859_2
   tristate 'NLS ISO 8859-3  (Latin 3; Esperanto, Galician, Maltese, Turkish)' CONFIG_NLS_ISO8859_3
-  tristate 'NLS ISO 8859-4  (Latin 4; Estonian, Latvian, Lithuanian)' CONFIG_NLS_ISO8859_4
+  tristate 'NLS ISO 8859-4  (Latin 4; old Baltic charset)' CONFIG_NLS_ISO8859_4
   tristate 'NLS ISO 8859-5  (Cyrillic)'             CONFIG_NLS_ISO8859_5
   tristate 'NLS ISO 8859-6  (Arabic)'               CONFIG_NLS_ISO8859_6
   tristate 'NLS ISO 8859-7  (Modern Greek)'         CONFIG_NLS_ISO8859_7
-  tristate 'NLS ISO 8859-8  (Hebrew)'               CONFIG_NLS_ISO8859_8
   tristate 'NLS ISO 8859-9  (Latin 5; Turkish)'     CONFIG_NLS_ISO8859_9
+  tristate 'NLS ISO 8859-13 (Latin 7; Baltic)'      CONFIG_NLS_ISO8859_13
   tristate 'NLS ISO 8859-14 (Latin 8; Celtic)'      CONFIG_NLS_ISO8859_14
   tristate 'NLS ISO 8859-15 (Latin 9; Western European Languages with Euro)' CONFIG_NLS_ISO8859_15
   tristate 'NLS KOI8-R (Russian)'                   CONFIG_NLS_KOI8_R
+  tristate 'NLS KOI8-U (Ukrainian)'                 CONFIG_NLS_KOI8_U
   tristate 'NLS UTF8'                               CONFIG_NLS_UTF8
   endmenu
 fi

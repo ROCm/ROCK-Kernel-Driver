@@ -22,6 +22,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/pm.h>
+#include <linux/interrupt.h>
 
 int pm_active;
 
@@ -49,6 +50,9 @@ static LIST_HEAD(pm_devs);
  *	Add a device to the list of devices that wish to be notified about
  *	power management events. A &pm_dev structure is returned on success,
  *	on failure the return is %NULL.
+ *
+ *      The callback function will be called in process context and
+ *      it may sleep.
  */
  
 struct pm_dev *pm_register(pm_dev_t type,
@@ -150,6 +154,10 @@ int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	int status = 0;
 	int prev_state, next_state;
+
+	if (in_interrupt())
+		BUG();
+
 	switch (rqst) {
 	case PM_SUSPEND:
 	case PM_RESUME:

@@ -11,6 +11,7 @@
 #define _ASM_SN_KSYS_ELSC_H
 
 #include <linux/config.h>
+
 #if defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/ksys/l1.h>
 #endif
@@ -48,7 +49,7 @@ int	elsc_msg_check(elsc_t *e, char *msg, int msg_max);
 int	elsc_msg_callback(elsc_t *e,
 			  void (*callback)(void *callback_data, char *msg),
 			  void *callback_data);
-#if 0
+#ifdef LATER
 char   *elsc_errmsg(int code);
 
 int	elsc_nvram_write(elsc_t *e, int addr, char *buf, int len);
@@ -68,7 +69,7 @@ int 	elsc_ust_read(elsc_t *e, char *c);
  */
 
 int	elsc_version(elsc_t *e, char *result);
-#if 0
+#ifdef LATER
 int	elsc_debug_set(elsc_t *e, u_char byte1, u_char byte2);
 int	elsc_debug_get(elsc_t *e, u_char *byte1, u_char *byte2);
 #endif
@@ -90,7 +91,7 @@ int	elsc_lock(elsc_t *e,
 int	elsc_unlock(elsc_t *e);
 int	elsc_display_char(elsc_t *e, int led, int chr);
 int	elsc_display_digit(elsc_t *e, int led, int num, int l_case);
-#if 0
+#ifdef LATER
 int	elsc_display_mesg(elsc_t *e, char *chr);	/* 8-char input */
 int	elsc_password_set(elsc_t *e, char *password);	/* 4-char input */
 int	elsc_password_get(elsc_t *e, char *password);	/* 4-char output */

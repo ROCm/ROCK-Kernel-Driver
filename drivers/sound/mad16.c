@@ -423,72 +423,80 @@ static int __init chip_detect(void)
 
 	DDB(printk("Detect using password = 0xE5\n"));
 	
-	if (!detect_mad16())	/* No luck. Try different model */
-	{
-		board_type = C928;
-
-		DDB(printk("Detect using password = 0xE2\n"));
-
-		if (!detect_mad16())
-		{
-			board_type = C929;
-
-			DDB(printk("Detect using password = 0xE3\n"));
-
-			if (!detect_mad16())
-			{
-				if (inb(PASSWD_REG) != 0xff)
-					return 0;
-
-				/*
-				 * First relocate MC# registers to 0xe0e/0xe0f, disable password 
-				 */
-
-				outb((0xE4), PASSWD_REG);
-				outb((0x80), PASSWD_REG);
-
-				board_type = C930;
-
-				DDB(printk("Detect using password = 0xE4\n"));
-
-				for (i = 0xf8d; i <= 0xf93; i++)
-					DDB(printk("port %03x = %02x\n", i, mad_read(i)));
-                                if(!detect_mad16()) {
-
-				  /* The C931 has the password reg at F8D */
-				  outb((0xE4), 0xF8D);
-				  outb((0x80), 0xF8D);
-				  DDB(printk("Detect using password = 0xE4 for C931\n"));
-
-				  if (!detect_mad16()) {
-				    board_type = C924;
-				    c924pnp++;
-				    DDB(printk("Detect using password = 0xE5 (again), port offset -0x80\n"));
-				    if (!detect_mad16()) {
-				      c924pnp=0;
-				      return 0;
-				    }
-				  
-				    DDB(printk("mad16.c: 82C924 PnP detected\n"));
-				  }
-				}
-				else
-				  DDB(printk("mad16.c: 82C930 detected\n"));
-			} else
-				DDB(printk("mad16.c: 82C929 detected\n"));
-		} else {
-			unsigned char model;
-
-			if (((model = mad_read(MC3_PORT)) & 0x03) == 0x03) {
-				DDB(printk("mad16.c: Mozart detected\n"));
-				board_type = MOZART;
-			} else {
-				DDB(printk("mad16.c: 82C928 detected???\n"));
-				board_type = C928;
-			}
-		}
+	if (detect_mad16()) {
+		return 1;
 	}
-	return 1;
+	
+	board_type = C928;
+
+	DDB(printk("Detect using password = 0xE2\n"));
+
+	if (detect_mad16())
+	{
+		unsigned char model;
+
+		if (((model = mad_read(MC3_PORT)) & 0x03) == 0x03) {
+			DDB(printk("mad16.c: Mozart detected\n"));
+			board_type = MOZART;
+		} else {
+			DDB(printk("mad16.c: 82C928 detected???\n"));
+			board_type = C928;
+		}
+		return 1;
+	}
+
+	board_type = C929;
+
+	DDB(printk("Detect using password = 0xE3\n"));
+
+	if (detect_mad16())
+	{
+		DDB(printk("mad16.c: 82C929 detected\n"));
+		return 1;
+	}
+
+	if (inb(PASSWD_REG) != 0xff)
+		return 0;
+
+	/*
+	 * First relocate MC# registers to 0xe0e/0xe0f, disable password 
+	 */
+
+	outb((0xE4), PASSWD_REG);
+	outb((0x80), PASSWD_REG);
+
+	board_type = C930;
+
+	DDB(printk("Detect using password = 0xE4\n"));
+
+	for (i = 0xf8d; i <= 0xf93; i++)
+		DDB(printk("port %03x = %02x\n", i, mad_read(i)));
+
+        if(detect_mad16()) {
+		DDB(printk("mad16.c: 82C930 detected\n"));
+		return 1;
+	}
+
+	/* The C931 has the password reg at F8D */
+	outb((0xE4), 0xF8D);
+	outb((0x80), 0xF8D);
+	DDB(printk("Detect using password = 0xE4 for C931\n"));
+
+	if (detect_mad16()) {
+		return 1;
+	}
+
+	board_type = C924;
+	c924pnp++;
+	DDB(printk("Detect using password = 0xE5 (again), port offset -0x80\n"));
+	if (detect_mad16()) {
+		DDB(printk("mad16.c: 82C924 PnP detected\n"));
+		return 1;
+	}
+	
+	c924pnp=0;
+
+	return 0;
 }
 
 static int __init probe_mad16(struct address_info *hw_config)

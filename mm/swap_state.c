@@ -17,8 +17,23 @@
 
 #include <asm/pgtable.h>
 
+/*
+ * We may have stale swap cache pages in memory: notice
+ * them here and get rid of the unnecessary final write.
+ */
 static int swap_writepage(struct page *page)
 {
+	/* One for the page cache, one for this user, one for page->buffers */
+	if (page_count(page) > 2 + !!page->buffers)
+		goto in_use;
+	if (swap_count(page) > 1)
+		goto in_use;
+
+	/* We could remove it here, but page_launder will do it anyway */
+	UnlockPage(page);
+	return 0;
+
+in_use:
 	rw_swap_page(WRITE, page, 0);
 	return 0;
 }
@@ -129,26 +144,6 @@ void delete_from_swap_cache(struct page *page)
 	delete_from_swap_cache_nolock(page);
 	UnlockPage(page);
 }
-
-/* 
- * Perform a free_page(), also freeing any swap cache associated with
- * this page if it is the last user of the page. Can not do a lock_page,
- * as we are holding the page_table_lock spinlock.
- */
-void free_page_and_swap_cache(struct page *page)
-{
-	/* 
-	 * If we are the only user, then try to free up the swap cache. 
-	 */
-	if (PageSwapCache(page) && !TryLockPage(page)) {
-		if (!is_page_shared(page)) {
-			delete_from_swap_cache_nolock(page);
-		}
-		UnlockPage(page);
-	}
-	page_cache_release(page);
-}
-
 
 /*
  * Lookup a swap entry in the swap cache. A found page will be returned

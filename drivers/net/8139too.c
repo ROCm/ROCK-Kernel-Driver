@@ -149,7 +149,7 @@ an MMIO register read.
 #include <asm/io.h>
 
 
-#define RTL8139_VERSION "0.9.15c"
+#define RTL8139_VERSION "0.9.15d"
 #define MODNAME "8139too"
 #define RTL8139_DRIVER_NAME   MODNAME " Fast Ethernet driver " RTL8139_VERSION
 #define PFX MODNAME ": "
@@ -204,6 +204,7 @@ static int multicast_filter_limit = 32;
 #define RX_BUF_PAD 16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
 #define RX_BUF_TOT_LEN (RX_BUF_LEN + RX_BUF_PAD + RX_BUF_WRAP_PAD)
+#define RX_EARLY_THRESH 2
 
 /* Number of Tx descriptor registers. */
 #define NUM_TX_DESC	4
@@ -662,7 +663,7 @@ static const u16 rtl8139_intr_mask =
 	TxErr | TxOK | RxErr | RxOK;
 
 static const unsigned int rtl8139_rx_config =
-	  RxCfgEarlyRxNone | RxCfgRcv32K | RxNoWrap |
+	  (RX_EARLY_THRESH << RxCfgEarlyRxShift) | RxCfgRcv32K | RxNoWrap |
 	  (RX_FIFO_THRESH << RxCfgFIFOShift) |
 	  (RX_DMA_BURST << RxCfgDMAShift);
 
@@ -1843,10 +1844,9 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 }
 
 
-/* The data sheet doesn't describe the Rx ring at all, so I'm guessing at the
-   field alignments and semantics. */
 static void rtl8139_rx_interrupt (struct net_device *dev,
-				  struct rtl8139_private *tp, void *ioaddr)
+				  struct rtl8139_private *tp, void *ioaddr,
+				  u16 status)
 {
 	unsigned char *rx_ring;
 	u16 cur_rx;
@@ -1862,6 +1862,11 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 		 " free to %4.4x, Cmd %2.2x.\n", dev->name, cur_rx,
 		 RTL_R16 (RxBufAddr),
 		 RTL_R16 (RxBufPtr), RTL_R8 (ChipCmd));
+
+	if (status & RxFIFOOver)
+		status = RxOverflow | RxOK;
+	else
+		status = RxOK;
 
 	while ((RTL_R8 (ChipCmd) & RxBufEmpty) == 0) {
 		int ring_offset = cur_rx % RX_BUF_LEN;
@@ -1889,17 +1894,10 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 		}
 #endif
 
-		/* E. Gill */
-		/* Note from BSD driver:
-		 * Here's a totally undocumented fact for you. When the
-		 * RealTek chip is in the process of copying a packet into
-		 * RAM for you, the length will be 0xfff0. If you spot a
-		 * packet header with this value, you need to stop. The
-		 * datasheet makes absolutely no mention of this and
-		 * RealTek should be shot for this.
-		 */
-		if (rx_size == 0xfff0)
+		if (rx_size == 0xfff0) { /* Early Rx in progress */
+			RTL_W16_F (IntrStatus, status);
 			break;
+		}
 
 		/* If Rx err or invalid rx_size/rx_status received
 		 * (which happens if we get lost in the ring),
@@ -1942,7 +1940,9 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 		}
 
 		cur_rx = (cur_rx + rx_size + 4 + 3) & ~3;
-		RTL_W16_F (RxBufPtr, cur_rx - 16);
+		RTL_W16 (RxBufPtr, cur_rx - 16);
+		RTL_W16_F (IntrStatus, status);
+		barrier();
 	}
 
 	DPRINTK ("%s: Done rtl8139_rx(), current %4.4x BufAddr %4.4x,"
@@ -1996,11 +1996,6 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 		tp->stats.rx_length_errors++;
 	if (status & (RxUnderrun | RxFIFOOver))
 		tp->stats.rx_fifo_errors++;
-	if (status & RxOverflow) {
-		tp->stats.rx_over_errors++;
-		tp->cur_rx = RTL_R16 (RxBufAddr) % RX_BUF_LEN;
-		RTL_W16_F (RxBufPtr, tp->cur_rx - 16);
-	}
 	if (status & PCIErr) {
 		u16 pci_cmd_status;
 		pci_read_config_word (tp->pci_dev, PCI_STATUS, &pci_cmd_status);
@@ -2020,7 +2015,8 @@ static void rtl8139_interrupt (int irq, void *dev_instance,
 	struct rtl8139_private *tp = dev->priv;
 	int boguscnt = max_interrupt_work;
 	void *ioaddr = tp->mmio_addr;
-	int status = 0, link_changed = 0; /* avoid bogus "uninit" warning */
+	int ackstat, status;
+	int link_changed = 0; /* avoid bogus "uninit" warning */
 
 	do {
 		status = RTL_R16 (IntrStatus);
@@ -2053,26 +2049,26 @@ static void rtl8139_interrupt (int irq, void *dev_instance,
 		   CPU speed, lower CPU speed --> more errors).
 		   After clearing the RxOverflow bit the transfer of the
 		   packet was repeated and all data are error free transferred */
-		RTL_W16_F (IntrStatus, (status & RxFIFOOver) ? (status | RxOverflow) : status);
+		ackstat = status & ~(RxFIFOOver | RxOverflow | RxOK);
+		RTL_W16 (IntrStatus, ackstat);
 
-		DPRINTK ("%s: interrupt  status=%#4.4x new intstat=%#4.4x.\n",
-				dev->name, status,
-				RTL_R16 (IntrStatus));
+		DPRINTK ("%s: interrupt  status=%#4.4x ackstat=%#4.4x new intstat=%#4.4x.\n",
+			 dev->name, ackstat, status, RTL_R16 (IntrStatus));
 
 		if ((status &
 		     (PCIErr | PCSTimeout | RxUnderrun | RxOverflow |
 		      RxFIFOOver | TxErr | TxOK | RxErr | RxOK)) == 0)
 			break;
 
+		if (netif_running (dev) &&
+		    status & (RxOK | RxUnderrun | RxOverflow | RxFIFOOver))	/* Rx interrupt */
+			rtl8139_rx_interrupt (dev, tp, ioaddr, status);
+
 		/* Check uncommon events with one test. */
 		if (status & (PCIErr | PCSTimeout | RxUnderrun | RxOverflow |
 		  	      RxFIFOOver | TxErr | RxErr))
 			rtl8139_weird_interrupt (dev, tp, ioaddr,
 						 status, link_changed);
-
-		if (netif_running (dev) &&
-		    status & (RxOK | RxUnderrun | RxOverflow | RxFIFOOver))	/* Rx interrupt */
-			rtl8139_rx_interrupt (dev, tp, ioaddr);
 
 		if (netif_running (dev) &&
 		    status & (TxOK | TxErr)) {

@@ -378,9 +378,10 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 	ia64_psr(regs)->ri = 0;		/* clear return slot number */		\
 	ia64_psr(regs)->is = 1;		/* IA-32 instruction set */		\
 	regs->cr_iip = new_ip;							\
-	regs->r12 = new_sp;							\
+	regs->ar_rsc = 0xc;		/* enforced lazy mode, priv. level 3 */	\
 	regs->ar_rnat = 0;							\
 	regs->loadrs = 0;							\
+	regs->r12 = new_sp;							\
 } while (0)
 
 extern void ia32_gdt_init (void);

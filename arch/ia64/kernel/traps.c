@@ -7,8 +7,6 @@
  * 05/12/00 grao <goutham.rao@intel.com> : added isr in siginfo for SIGFPE
  */
 
-#define FPSWA_DEBUG	1
-
 /*
  * The fpu_fault() handler needs to be able to access and update all
  * floating point registers.  Those saved in pt_regs can be accessed
@@ -47,31 +45,10 @@ static fpswa_interface_t *fpswa_interface;
 void __init
 trap_init (void)
 {
-	printk("fpswa interface at %lx\n", ia64_boot_param.fpswa);
-	if (ia64_boot_param.fpswa) {
-#define OLD_FIRMWARE
-#ifdef OLD_FIRMWARE
-		/*
-		 * HACK to work around broken firmware.  This code
-		 * applies the label fixup to the FPSWA interface and
-		 * works both with old and new (fixed) firmware.
-		 */
-		unsigned long addr = (unsigned long) __va(ia64_boot_param.fpswa);
-		unsigned long gp_val = *(unsigned long *)(addr + 8);
-
-		/* go indirect and indexed to get table address */
-		addr = gp_val;
-		gp_val = *(unsigned long *)(addr + 8);
-
-		while (gp_val == *(unsigned long *)(addr + 8)) {
-			*(unsigned long *)addr |= PAGE_OFFSET;
-			*(unsigned long *)(addr + 8) |= PAGE_OFFSET;
-			addr += 16;
-		}
-#endif
+	printk("fpswa interface at %lx\n", ia64_boot_param->fpswa);
+	if (ia64_boot_param->fpswa)
 		/* FPSWA fixup: make the interface pointer a kernel virtual address: */
-		fpswa_interface = __va(ia64_boot_param.fpswa);
-	}
+		fpswa_interface = __va(ia64_boot_param->fpswa);
 }
 
 void
@@ -240,6 +217,7 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 {
 	fp_state_t fp_state;
 	fpswa_ret_t ret;
+#define FPSWA_BUG
 #ifdef FPSWA_BUG
 	struct ia64_fpreg f6_15[10];
 #endif
@@ -250,7 +228,7 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 	memset(&fp_state, 0, sizeof(fp_state_t));
 
 	/*
-	 * compute fp_state.  only FP registers f6 - f11 are used by the 
+	 * compute fp_state.  only FP registers f6 - f11 are used by the
 	 * kernel, so set those bits in the mask and set the low volatile
 	 * pointer to point to these registers.
 	 */
@@ -263,15 +241,15 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 	f6_15[1] = regs->f7;
 	f6_15[2] = regs->f8;
 	f6_15[3] = regs->f9;
- 	__asm__ ("stf.spill %0=f10%P0" : "=m"(f6_15[4]));
- 	__asm__ ("stf.spill %0=f11%P0" : "=m"(f6_15[5]));
- 	__asm__ ("stf.spill %0=f12%P0" : "=m"(f6_15[6]));
- 	__asm__ ("stf.spill %0=f13%P0" : "=m"(f6_15[7]));
- 	__asm__ ("stf.spill %0=f14%P0" : "=m"(f6_15[8]));
- 	__asm__ ("stf.spill %0=f15%P0" : "=m"(f6_15[9]));
+	__asm__ ("stf.spill %0=f10%P0" : "=m"(f6_15[4]));
+	__asm__ ("stf.spill %0=f11%P0" : "=m"(f6_15[5]));
+	__asm__ ("stf.spill %0=f12%P0" : "=m"(f6_15[6]));
+	__asm__ ("stf.spill %0=f13%P0" : "=m"(f6_15[7]));
+	__asm__ ("stf.spill %0=f14%P0" : "=m"(f6_15[8]));
+	__asm__ ("stf.spill %0=f15%P0" : "=m"(f6_15[9]));
 	fp_state.fp_state_low_volatile = (fp_state_low_volatile_t *) f6_15;
 #endif
-        /*
+	/*
 	 * unsigned long (*EFI_FPSWA) (
 	 *      unsigned long    trap_type,
 	 *	void             *Bundle,
@@ -287,12 +265,12 @@ fp_emulate (int fp_fault, void *bundle, long *ipsr, long *fpsr, long *isr, long 
 					(unsigned long *) isr, (unsigned long *) pr,
 					(unsigned long *) ifs, &fp_state);
 #ifdef FPSWA_BUG
- 	__asm__ ("ldf.fill f10=%0%P0" :: "m"(f6_15[4]));
- 	__asm__ ("ldf.fill f11=%0%P0" :: "m"(f6_15[5]));
- 	__asm__ ("ldf.fill f12=%0%P0" :: "m"(f6_15[6]));
- 	__asm__ ("ldf.fill f13=%0%P0" :: "m"(f6_15[7]));
- 	__asm__ ("ldf.fill f14=%0%P0" :: "m"(f6_15[8]));
- 	__asm__ ("ldf.fill f15=%0%P0" :: "m"(f6_15[9]));
+	__asm__ ("ldf.fill f10=%0%P0" :: "m"(f6_15[4]));
+	__asm__ ("ldf.fill f11=%0%P0" :: "m"(f6_15[5]));
+	__asm__ ("ldf.fill f12=%0%P0" :: "m"(f6_15[6]));
+	__asm__ ("ldf.fill f13=%0%P0" :: "m"(f6_15[7]));
+	__asm__ ("ldf.fill f14=%0%P0" :: "m"(f6_15[8]));
+	__asm__ ("ldf.fill f15=%0%P0" :: "m"(f6_15[9]));
 	regs->f6 = f6_15[0];
 	regs->f7 = f6_15[1];
 	regs->f8 = f6_15[2];
@@ -319,21 +297,20 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	if (copy_from_user(bundle, (void *) fault_ip, sizeof(bundle)))
 		return -1;
 
-#ifdef FPSWA_DEBUG
-	if (fpu_swa_count > 5 && jiffies - last_time > 5*HZ)
+	if (jiffies - last_time > 5*HZ)
 		fpu_swa_count = 0;
 	if (++fpu_swa_count < 5) {
 		last_time = jiffies;
-		printk("%s(%d): floating-point assist fault at ip %016lx\n",
+		printk(KERN_WARNING "%s(%d): floating-point assist fault at ip %016lx\n",
 		       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri);
 	}
-#endif
+
 	exception = fp_emulate(fp_fault, bundle, &regs->cr_ipsr, &regs->ar_fpsr, &isr, &regs->pr,
- 			       &regs->cr_ifs, regs);
+			       &regs->cr_ifs, regs);
 	if (fp_fault) {
 		if (exception == 0) {
 			/* emulation was successful */
- 			ia64_increment_ip(regs);
+			ia64_increment_ip(regs);
 		} else if (exception == -1) {
 			printk("handle_fpu_swa: fp_emulate() returned -1\n");
 			return -1;
@@ -392,7 +369,7 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 	struct siginfo si;
 	char buf[128];
 
-#ifdef CONFIG_IA64_BRL_EMU	
+#ifdef CONFIG_IA64_BRL_EMU
 	{
 		extern struct illegal_op_return ia64_emulate_brl (struct pt_regs *, unsigned long);
 
@@ -431,7 +408,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"IA-64 Reserved Register/Field fault",
 		"Disabled Instruction Set Transition fault",
 		"Unknown fault 5", "Unknown fault 6", "Unknown fault 7", "Illegal Hazard fault",
-		"Unknown fault 9", "Unknown fault 10", "Unknown fault 11", "Unknown fault 12", 
+		"Unknown fault 9", "Unknown fault 10", "Unknown fault 11", "Unknown fault 12",
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
@@ -444,7 +421,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		unsigned long n = vector;
 		char buf[32], *cp;
 
-		if (count > 5 && jiffies - last_time > 5*HZ)
+		if (jiffies - last_time > 5*HZ)
 			count = 0;
 
 		if (count++ < 5) {
@@ -502,7 +479,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
 		switch (vector) {
-		      case 29: 
+		      case 29:
 			siginfo.si_code = TRAP_HWBKPT;
 #ifdef CONFIG_ITANIUM
 			/*
@@ -513,7 +490,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			  ifa = regs->cr_iip;
 #endif
 			siginfo.si_addr = (void *) ifa;
-		        break;
+			break;
 		      case 35: siginfo.si_code = TRAP_BRANCH; break;
 		      case 36: siginfo.si_code = TRAP_TRACE; break;
 		}

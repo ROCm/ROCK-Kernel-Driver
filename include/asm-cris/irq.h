@@ -19,7 +19,7 @@
 
 #include <asm/sv_addr_ag.h>
 
-#define NR_IRQS 26     /* TODO: what is this for Etrax100/LX ? */
+#define NR_IRQS 32
 
 extern void disable_irq(unsigned int);
 extern void enable_irq(unsigned int);

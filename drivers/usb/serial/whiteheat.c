@@ -67,18 +67,16 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-
-#ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
 
+#ifdef CONFIG_USB_SERIAL_DEBUG
+	static int debug = 1;
+#else
+	static int debug;
+#endif
+
 #include "usb-serial.h"
-
 #include "whiteheat_fw.h"		/* firmware for the ConnectTech WhiteHEAT device */
-
 #include "whiteheat.h"			/* WhiteHEAT specific commands */
 
 #define CONNECT_TECH_VENDOR_ID		0x0710
@@ -634,3 +632,7 @@ module_exit(whiteheat_exit);
 
 MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com>");
 MODULE_DESCRIPTION("USB ConnectTech WhiteHEAT driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

@@ -10,6 +10,7 @@
 #ifndef _ASM_SN_IOERROR_H
 #define _ASM_SN_IOERROR_H
 
+#if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
 
 /*
  * Macros defining the various Errors to be handled as part of
@@ -177,6 +178,7 @@ typedef enum {
     MODE_DEVREENABLE		/* Reenable pass                */
 } ioerror_mode_t;
 
+#endif				/* C || C++ */
 
 typedef int             error_handler_f(void *, int, ioerror_mode_t, ioerror_t *);
 typedef void           *error_handler_arg_t;

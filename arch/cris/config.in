@@ -36,15 +36,19 @@ mainmenu_option next_comment
 comment 'Hardware setup'
 
 choice 'Processor type' \
-	"Etrax-100-LX	CONFIG_ETRAX100LX	\
-	 Etrax-100-LX-for-xsim-simulator   CONFIG_SVINTO_SIM" Etrax-100-LX
+	"Etrax-100-LX-v1	CONFIG_ETRAX100LX	\
+	 Etrax-100-LX-v2	CONFIG_ETRAX100LX_V2	\
+	 Etrax-100-LX-for-xsim-simulator   CONFIG_SVINTO_SIM" Etrax-100-LX-v1
 
 # For both LX version 1 and the current simulator we enable the low VM mapping
-# Later when LX version 2 and above exist, this should be done with an if
 
-define_bool CONFIG_CRIS_LOW_MAP y
+if [ "$CONFIG_ETRAX100LX" = "y" -o "$CONFIG_SVINTO_SIM" = "y" ]; then
+	define_bool CONFIG_CRIS_LOW_MAP y
+	define_hex  ETRAX_DRAM_VIRTUAL_BASE 60000000
+else
+	define_hex  ETRAX_DRAM_VIRTUAL_BASE c0000000
+fi
 
-hex 'DRAM base (hex)' ETRAX_DRAM_BASE 40000000
 int 'DRAM size (dec, in MB)' ETRAX_DRAM_SIZE 8
 
 int 'Max possible flash size (dec, in MB)' CONFIG_ETRAX_FLASH_LENGTH 2
@@ -69,12 +73,29 @@ choice 'Product debug-port' \
 	"Serial-0	CONFIG_DEBUG_PORT0	\
 	 Serial-1	CONFIG_DEBUG_PORT1	\
 	 Serial-2	CONFIG_DEBUG_PORT2	\
-	 Serial-3	CONFIG_DEBUG_PORT3" Serial-0
+	 Serial-3	CONFIG_DEBUG_PORT3	\
+	 disabled	CONFIG_DEBUG_PORT_NULL" Serial-0 
+
+choice 'Product rescue-port' \
+	"Serial-0	CONFIG_RESCUE_SER0	\
+	 Serial-1	CONFIG_RESCUE_SER1	\
+	 Serial-2	CONFIG_RESCUE_SER2	\
+	 Serial-3	CONFIG_RESCUE_SER3" Serial-0
 
 hex 'R_WAITSTATES' DEF_R_WAITSTATES 95a6
 hex 'R_BUS_CONFIG' DEF_R_BUS_CONFIG 104
-hex 'R_DRAM_CONFIG' DEF_R_DRAM_CONFIG 1a200040
-hex 'R_DRAM_TIMING' DEF_R_DRAM_TIMING 5611
+
+bool 'SDRAM support' CONFIG_SDRAM n
+if [ "$CONFIG_SDRAM" = "n" ]; then
+	hex 'R_DRAM_CONFIG' DEF_R_DRAM_CONFIG 1a200040
+	hex 'R_DRAM_TIMING' DEF_R_DRAM_TIMING 5611
+fi
+
+if [ "$CONFIG_SDRAM" = "y" ]; then
+	hex 'R_SDRAM_CONFIG' DEF_R_SDRAM_CONFIG d2fa7878
+	hex 'R_SDRAM_TIMING' DEF_R_SDRAM_TIMING 80004801
+fi
+
 hex 'R_PORT_PA_DIR' DEF_R_PORT_PA_DIR 1c
 hex 'R_PORT_PA_DATA' DEF_R_PORT_PA_DATA 00
 hex 'R_PORT_PB_CONFIG' DEF_R_PORT_PB_CONFIG 00
@@ -82,24 +103,6 @@ hex 'R_PORT_PB_DIR' DEF_R_PORT_PB_DIR 00
 hex 'R_PORT_PB_DATA' DEF_R_PORT_PB_DATA ff
 
 endmenu
-
-# only configure IP numbers if the kernel ifconfig/route setup is enabled
-
-if [ "$CONFIG_KERNEL_IFCONFIG" = "y" ]; then
-  mainmenu_option next_comment	
-  comment 'IP address selection'
-
-  comment 'All addresses are in hexadecimal form without 0x prefix'
-
-  hex 'IP address' ELTEST_IPADR ab1005af
-  hex 'Network' ELTEST_NETWORK ab100000
-  hex 'Netmask' ELTEST_NETMASK ffff0000
-  hex 'Broadcast' ELTEST_BROADCAST ab10ffff
-  hex 'Gateway' ELTEST_GATEWAY ab100101
-  hwaddr 'Ethernet address' ELTEST_ETHADR 00408ccd0000
-
-  endmenu
-fi
 
 # bring in Etrax built-in drivers
 

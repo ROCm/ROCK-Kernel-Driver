@@ -109,22 +109,6 @@ extern void unw_init_frame_info (struct unw_frame_info *info, struct task_struct
 				 struct switch_stack *sw);
 
 /*
- * Prepare to unwind the current task.  For this to work, the kernel
- * stack identified by REGS must look like this:
- *
- *	//		      //
- *	|		      |
- *	|   kernel stack      |
- *	|		      |
- *	+=====================+
- *	|   struct pt_regs    |
- *	+---------------------+ <--- REGS
- *	| struct switch_stack |
- *	+---------------------+
- */
-extern void unw_init_from_current (struct unw_frame_info *info, struct pt_regs *regs);
-
-/*
  * Prepare to unwind the currently running thread.
  */
 extern void unw_init_running (void (*callback)(struct unw_frame_info *info, void *arg), void *arg);
@@ -144,42 +128,42 @@ extern int unw_unwind_to_user (struct unw_frame_info *info);
 
 #define unw_is_intr_frame(info)	(((info)->flags & UNW_FLAG_INTERRUPT_FRAME) != 0)
 
-static inline unsigned long
+static inline int
 unw_get_ip (struct unw_frame_info *info, unsigned long *valp)
 {
 	*valp = (info)->ip;
 	return 0;
 }
 
-static inline unsigned long
+static inline int
 unw_get_sp (struct unw_frame_info *info, unsigned long *valp)
 {
 	*valp = (info)->sp;
 	return 0;
 }
 
-static inline unsigned long
+static inline int
 unw_get_psp (struct unw_frame_info *info, unsigned long *valp)
 {
 	*valp = (info)->psp;
 	return 0;
 }
 
-static inline unsigned long
+static inline int
 unw_get_bsp (struct unw_frame_info *info, unsigned long *valp)
 {
 	*valp = (info)->bsp;
 	return 0;
 }
 
-static inline unsigned long
+static inline int
 unw_get_cfm (struct unw_frame_info *info, unsigned long *valp)
 {
 	*valp = *(info)->cfm_loc;
 	return 0;
 }
 
-static inline unsigned long
+static inline int
 unw_set_cfm (struct unw_frame_info *info, unsigned long val)
 {
 	*(info)->cfm_loc = val;

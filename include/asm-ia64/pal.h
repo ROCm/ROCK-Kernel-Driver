@@ -1267,7 +1267,7 @@ static inline s64
 ia64_pal_version (pal_version_u_t *pal_min_version, pal_version_u_t *pal_cur_version) 
 {	
 	struct ia64_pal_retval iprv;
-	PAL_CALL(iprv, PAL_VERSION, 0, 0, 0);
+	PAL_CALL_PHYS(iprv, PAL_VERSION, 0, 0, 0);
 	if (pal_min_version)
 		pal_min_version->pal_version_val = iprv.v0;
 

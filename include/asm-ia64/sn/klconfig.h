@@ -12,6 +12,8 @@
 #ifndef	_ASM_SN_KLCONFIG_H
 #define	_ASM_SN_KLCONFIG_H
 
+#include <linux/config.h>
+
 /*
  * klconfig.h
  */
@@ -32,7 +34,6 @@
  *      that offsets of existing fields do not change.
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/sn/types.h>
 #include <asm/sn/slotnum.h>
@@ -60,11 +61,10 @@ typedef s32 klconf_off_t;
 #define SIZE_PAD		4096 /* 4k padding for structures */
 #if (defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)) && defined(BRINGUP) /* MAX_SLOTS_PER_NODE??? */
 /* 
- * 1 NODE brick, 2 Router bricks (1 local, 1 meta), 6 XIO Widgets, 
- * 1 Midplane (midplane will likely become IO brick when Bruce cleans
- * up IP35 klconfig)
+ * 1 NODE brick, 3 Router bricks (1 local, 1 meta, 1 repeater),
+ * 6 XIO Widgets, 1 Xbow, 1 gfx
  */
-#define MAX_SLOTS_PER_NODE	(1 + 2 + 6 + 1) 
+#define MAX_SLOTS_PER_NODE	(1 + 3 + 6 + 1 + 1) 
 #else
 /* 
  * 1 NODE brd, 2 Router brd (1 8p, 1 meta), 6 Widgets, 
@@ -88,7 +88,7 @@ typedef s32 klconf_off_t;
 #define VISITED_BOARD		0x08	/* Used for compact hub numbering. */
 #define LOCAL_MASTER_IO6	0x10 	/* master io6 for that node */
 #define GLOBAL_MASTER_IO6	0x20
-#define THIRD_NIC_PRESENT 	0x40  	/* for future use */
+#define GLOBAL_MASTER_EXT 	0x40  	/* extend master io6 to other bus on ibrick */
 #define SECOND_NIC_PRESENT 	0x80 	/* addons like MIO are present */
 
 /* klinfo->flags fields */
@@ -119,15 +119,9 @@ typedef s32 klconf_off_t;
 
 
 typedef struct console_s {
-#if defined(CONFIG_IA64_SGI_IO)	/* FIXME */
 	__psunsigned_t 	uart_base;
 	__psunsigned_t 	config_base;
 	__psunsigned_t 	memory_base;
-#else
-	unsigned long 	uart_base;
-	unsigned long 	config_base;
-	unsigned long 	memory_base;
-#endif
 	short		baud;
 	short		flag;
 	int		type;
@@ -164,18 +158,20 @@ typedef struct kl_config_hdr {
 #define KL_CONFIG_INFO_SET_OFFSET(_nasid, _off)				\
         (KL_CONFIG_HDR(_nasid)->ch_board_info = (_off))
 
-#if !defined(SIMULATED_KLGRAPH)
+#ifndef __ia64
 #define KL_CONFIG_INFO(_nasid) 						\
         (lboard_t *)((KL_CONFIG_HDR(_nasid)->ch_board_info) ?		\
 	 NODE_OFFSET_TO_K0((_nasid), KL_CONFIG_HDR(_nasid)->ch_board_info) : \
 	 0)
 #else
-/*
- * For Fake klgraph info.
- */
-extern kl_config_hdr_t *linux_klcfg;
-#define KL_CONFIG_INFO(_nasid) (lboard_t *)((ulong)linux_klcfg->ch_board_info | 0xe000000000000000)
-#endif	/* CONFIG_IA64_SGI_IO */
+#define NODE_OFFSET_TO_LBOARD(nasid,off)        (lboard_t*)(NODE_CAC_BASE(nasid) + (off))
+
+#define KL_CONFIG_INFO(_nasid)                                          \
+	(lboard_t *)((KL_CONFIG_HDR(_nasid)->ch_board_info) ?           \
+	 NODE_OFFSET_TO_LBOARD((_nasid), KL_CONFIG_HDR(_nasid)->ch_board_info) : \
+	 NULL)
+
+#endif	/* __ia64 */
 
 #define KL_CONFIG_MAGIC(_nasid)		(KL_CONFIG_HDR(_nasid)->ch_magic)
 
@@ -187,23 +183,13 @@ extern kl_config_hdr_t *linux_klcfg;
 
 /* --- New Macros for the changed kl_config_hdr_t structure --- */
 
-#if defined(CONFIG_IA64_SGI_IO)
 #define PTR_CH_MALLOC_HDR(_k)   ((klc_malloc_hdr_t *)\
 			((__psunsigned_t)_k + (_k->ch_malloc_hdr_off)))
-#else
-#define PTR_CH_MALLOC_HDR(_k)   ((klc_malloc_hdr_t *)\
-			(unsigned long)_k + (_k->ch_malloc_hdr_off)))
-#endif
 
 #define KL_CONFIG_CH_MALLOC_HDR(_n)   PTR_CH_MALLOC_HDR(KL_CONFIG_HDR(_n))
 
-#if defined(CONFIG_IA64_SGI_IO)
 #define PTR_CH_CONS_INFO(_k)	((console_t *)\
 			((__psunsigned_t)_k + (_k->ch_cons_off)))
-#else
-#define PTR_CH_CONS_INFO(_k)	((console_t *)\
-			((unsigned long)_k + (_k->ch_cons_off)))
-#endif
 
 #define KL_CONFIG_CH_CONS_INFO(_n)   PTR_CH_CONS_INFO(KL_CONFIG_HDR(_n))
 
@@ -374,6 +360,7 @@ extern kl_config_hdr_t *linux_klcfg;
 #define KLTYPE_IP27	(KLCLASS_CPU | 0x1) /* 2 CPUs(R10K) per board */
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #define KLTYPE_IP35	KLTYPE_IP27
+#define KLTYPE_IP37	KLTYPE_IP35
 #endif
 
 #define KLTYPE_WEIRDIO	(KLCLASS_IO  | 0x0)
@@ -394,6 +381,8 @@ extern kl_config_hdr_t *linux_klcfg;
 #define KLTYPE_TPU    	(KLCLASS_IO  | 0xB) /* Tensor Processing Unit */
 #define KLTYPE_GSN_A   	(KLCLASS_IO  | 0xC) /* Main GSN board */
 #define KLTYPE_GSN_B   	(KLCLASS_IO  | 0xD) /* Auxiliary GSN board */
+#define KLTYPE_SHOEHORN (KLCLASS_IO  | 0xE)
+#define KLTYPE_SERIAL_HIPPI (KLCLASS_IO  | 0xF)
 
 #define KLTYPE_GFX	(KLCLASS_GFX | 0x0) /* unknown graphics type */
 #define KLTYPE_GFX_KONA (KLCLASS_GFX | 0x1) /* KONA graphics on IP27 */
@@ -404,11 +393,12 @@ extern kl_config_hdr_t *linux_klcfg;
 #define KLTYPE_ROUTER2    KLTYPE_ROUTER		/* Obsolete! */
 #define KLTYPE_NULL_ROUTER (KLCLASS_ROUTER | 0x2)
 #define KLTYPE_META_ROUTER (KLCLASS_ROUTER | 0x3)
+#define KLTYPE_REPEATER_ROUTER (KLCLASS_ROUTER | 0x4)
 
 #define KLTYPE_WEIRDMIDPLANE (KLCLASS_MIDPLANE | 0x0)
 #define KLTYPE_MIDPLANE8  (KLCLASS_MIDPLANE | 0x1) /* 8 slot backplane */
 #define KLTYPE_MIDPLANE    KLTYPE_MIDPLANE8
-#define KLTYPE_PBRICK_XBOW	(KLCLASS_MIDPLANE | 0x2)
+#define KLTYPE_IOBRICK_XBOW	(KLCLASS_MIDPLANE | 0x2)
 
 #define KLTYPE_IOBRICK		(KLCLASS_IOBRICK | 0x0)
 #define KLTYPE_IBRICK		(KLCLASS_IOBRICK | 0x1)
@@ -485,7 +475,7 @@ typedef struct lboard_s {
 #define KLCF_NUM_COMPS(_brd)	((_brd)->brd_numcompts)
 #define KLCF_MODULE_ID(_brd)	((_brd)->brd_module)
 
-#ifndef SIMULATED_KLGRAPH
+#ifndef __ia64
 #define KLCF_NEXT(_brd) 		((_brd)->brd_next ? (lboard_t *)((_brd)->brd_next):  NULL)
 #define KLCF_COMP(_brd, _ndx)   \
 		(klinfo_t *)(NODE_OFFSET_TO_K0(NASID_GET(_brd), \
@@ -494,14 +484,18 @@ typedef struct lboard_s {
 		(NODE_OFFSET_TO_K0(NASID_GET(_brd), (_comp)->errinfo))
 
 #else
-/*
- * For fake klgraph info.
- */
-#define KLCF_COMP(_brd, _ndx)           (klinfo_t *)((ulong) 0xe000000000000000 |((_brd)->brd_compts[(_ndx)]))
-#define KLCF_NEXT(_brd)	((_brd)->brd_next ? (lboard_t *)((ulong) 0xe000000000000000 | (_brd->brd_next)) : NULL)
-#define KLCF_COMP_ERROR(_brd, _comp)    (_brd = _brd , (_comp)->errinfo)
 
-#endif	/* SIMULATED_KLGRAPH */
+#define NODE_OFFSET_TO_KLINFO(n,off)    ((klinfo_t*) TO_NODE_CAC(n,off))
+#define KLCF_NEXT(_brd)         \
+        ((_brd)->brd_next ?     \
+         (NODE_OFFSET_TO_LBOARD(NASID_GET(_brd), (_brd)->brd_next)): NULL)
+#define KLCF_COMP(_brd, _ndx)   \
+                (NODE_OFFSET_TO_KLINFO(NASID_GET(_brd), (_brd)->brd_compts[(_ndx)]))
+
+#define KLCF_COMP_ERROR(_brd, _comp)    \
+                (NODE_OFFSET_TO_K0(NASID_GET(_brd), (_comp)->errinfo))
+
+#endif /* __ia64 */
 
 #define KLCF_COMP_TYPE(_comp)	((_comp)->struct_type)
 #define KLCF_BRIDGE_W_ID(_comp)	((_comp)->physid)	/* Widget ID */
@@ -581,6 +575,11 @@ typedef struct klinfo_s {                  /* Generic info */
 #define KLSTRUCT_GSN_A          29
 #define KLSTRUCT_GSN_B          30
 #define KLSTRUCT_XTHD           31
+#define KLSTRUCT_QLFIBRE        32
+#define KLSTRUCT_1394           33
+#define KLSTRUCT_USB		34
+#define KLSTRUCT_USBKBD		35
+#define KLSTRUCT_USBMS		36
 
 /*
  * These are the indices of various components within a lboard structure.
@@ -845,6 +844,15 @@ typedef struct klmio_s {                          /* MIO */
     	mio_t       	mio_specific   ; 
 } klmio_t ;
 
+/*
+ * USB info
+ */
+
+typedef struct klusb_s {
+	klinfo_t	usb_info;	/* controller info */
+	void		*usb_bus;	/* handle to usb_bus_t */
+	uint64_t	usb_controller;	/* ptr to controller info */
+} klusb_t ; 
 
 typedef union klcomp_s {
 	klcpu_t		kc_cpu;
@@ -862,6 +870,7 @@ typedef union klcomp_s {
 	klfddi_t	kc_fddi;
 	klmio_t		kc_mio;
 	klmod_serial_num_t kc_snum ;
+	klusb_t		kc_usb;
 } klcomp_t;
 
 typedef union kldev_s {      /* for device structure allocation */
@@ -925,7 +934,6 @@ extern klinfo_t *find_first_component(lboard_t *brd, unsigned char type);
 extern klcpu_t *nasid_slice_to_cpuinfo(nasid_t, int);
 
 
-#if defined(CONFIG_IA64_SGI_IO)
 extern xwidgetnum_t nodevertex_widgetnum_get(devfs_handle_t node_vtx);
 extern devfs_handle_t nodevertex_xbow_peer_get(devfs_handle_t node_vtx);
 extern lboard_t *find_gfxpipe(int pipenum);
@@ -954,8 +962,5 @@ extern int	board_serial_number_get(lboard_t *,char *);
 extern int	is_master_baseio(nasid_t,moduleid_t,slotid_t);
 extern nasid_t	get_actual_nasid(lboard_t *brd) ;
 extern net_vec_t klcfg_discover_route(lboard_t *, lboard_t *, int);
-#else	/* CONFIG_IA64_SGI_IO */
-extern klcpu_t *sn_get_cpuinfo(cpuid_t cpu);
-#endif	/* CONFIG_IA64_SGI_IO */
 
 #endif /* _ASM_SN_KLCONFIG_H */

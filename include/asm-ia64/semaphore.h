@@ -116,7 +116,7 @@ up (struct semaphore * sem)
 #endif
 	if (atomic_inc_return(&sem->count) <= 0)
 		__up(sem);
-}	
+}
 
 /*
  * rw mutexes (should that be mutices? =) -- throw rw spinlocks and

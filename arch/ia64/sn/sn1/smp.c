@@ -124,10 +124,10 @@ sn1_send_IPI(int cpuid, int vector, int delivery_mode, int redirect)
 
 #ifdef CONFIG_SMP
 
+#ifdef PTC_NOTYET
 static void __init
 process_sal_ptc_domain_info(ia64_sal_ptc_domain_info_t *di, int domain)
 {
-#ifdef PTC_NOTYET
 	ia64_sal_ptc_domain_proc_entry_t	*pe;
 	int 					i, sapicid, cpuid;
 
@@ -138,7 +138,6 @@ process_sal_ptc_domain_info(ia64_sal_ptc_domain_info_t *di, int domain)
 		sn_sapicid_info[cpuid].domain = domain;
 		sn_sapicid_info[cpuid].sapicid = sapicid;
 	}
-#endif
 }
 
 
@@ -153,6 +152,7 @@ process_sal_desc_ptc(ia64_sal_desc_ptc_t *ptc)
 		process_sal_ptc_domain_info(di, i);	
 	}
 }
+#endif
 
 
 void __init
@@ -179,7 +179,7 @@ init_sn1_smp_config(void)
 {
 
 #ifdef PTC_NOTYET
-	sn_sapicid_info[0].sapicid = hard_processor_sapicid();
+	sn_sapicid_info[0].sapicid = hard_smp_processor_id();
 #endif
 }
 

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.11 2000/11/27 17:58:30 bjornw Exp $
+# $Id: Makefile,v 1.15 2001/02/16 17:50:04 larsv Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -25,7 +25,7 @@ LD_SCRIPT=$(TOPDIR)/arch/cris/cris.ld
 # regenerating stuff (even for incremental linking of subsystems!) is
 # even more nauseating.
 LD = if [ ! -e $(LD_SCRIPT).tmp -o $(LD_SCRIPT) -nt $(LD_SCRIPT).tmp ]; then \
-          sed -e s/@ETRAX_DRAM_BASE@/0x$(ETRAX_DRAM_BASE)/ \
+          sed -e s/@ETRAX_DRAM_VIRTUAL_BASE@/0x$(ETRAX_DRAM_VIRTUAL_BASE)/ \
               -e s/@ETRAX_DRAM_SIZE_M@/$(ETRAX_DRAM_SIZE)/ \
               < $(LD_SCRIPT) > $(LD_SCRIPT).tmp; \
      else true; \
@@ -49,7 +49,7 @@ endif
 
 HEAD := arch/cris/kernel/head.o
 
-SUBDIRS += arch/cris/kernel arch/cris/mm arch/cris/lib arch/cris/drivers
+SUBDIRS += arch/cris/kernel arch/cris/mm arch/cris/lib arch/cris/drivers arch/cris/boot/rescue
 CORE_FILES += arch/cris/kernel/kernel.o arch/cris/mm/mm.o arch/cris/drivers/drivers.o
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)
@@ -76,10 +76,18 @@ simimage: timage
 
 cramfs:
 ## cramfs      - Creates a cramfs image
-	mkcramfs -p 8192 root cramfs.img
+	mkcramfs -b 8192 root cramfs.img
 	cat vmlinux.bin cramfs.img >timage
 
-zImage: vmlinux
+clinux: vmlinux.bin decompress.bin rescue.bin
+
+decompress.bin: dummy
+	@make -C arch/cris/boot/compressed decompress.bin
+
+rescue.bin: dummy
+	@make -C arch/cris/boot/rescue rescue.bin
+
+zImage: vmlinux.bin
 ## zImage     - Compressed kernel (gzip)
 	@$(MAKEBOOT) zImage
 

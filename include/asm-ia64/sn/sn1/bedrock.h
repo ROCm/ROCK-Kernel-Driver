@@ -11,6 +11,8 @@
 #ifndef _ASM_SN_SN1_BEDROCK_H
 #define _ASM_SN_SN1_BEDROCK_H
 
+#include <linux/config.h>
+
 /* The secret password; used to release protection */
 #define HUB_PASSWORD		0x53474972756c6573ull
 
@@ -22,7 +24,6 @@
 
 #define MAX_HUB_PATH		80
 
-#include <linux/config.h>
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/arch.h>
 #include <asm/sn/sn1/addrs.h>

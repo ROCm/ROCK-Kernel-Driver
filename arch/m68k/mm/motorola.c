@@ -286,6 +286,7 @@ void __init paging_init(void)
 }
 
 extern char __init_begin, __init_end;
+extern unsigned long totalram_pages;
 
 void free_initmem(void)
 {
@@ -296,6 +297,7 @@ void free_initmem(void)
 		virt_to_page(addr)->flags &= ~(1 << PG_reserved);
 		set_page_count(virt_to_page(addr), 1);
 		free_page(addr);
+		totalram_pages++;
 	}
 }
 

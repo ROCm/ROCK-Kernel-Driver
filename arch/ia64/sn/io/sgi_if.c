@@ -21,8 +21,6 @@
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/slotnum.h>
 
-#define spinlock_init(x,name) mutex_init(x, MUTEX_DEFAULT, name);
-
 void *
 kmem_zalloc(size_t size, int flag)
 {

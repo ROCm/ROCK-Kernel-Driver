@@ -13,6 +13,7 @@
 extern spinlock_t hcl_spinlock;
 extern devfs_handle_t hcl_handle; /* HCL driver */
 extern devfs_handle_t hwgraph_root;
+extern devfs_handle_t linux_busnum;
 
 
 typedef long            labelcl_info_place_t;
@@ -22,7 +23,6 @@ typedef long            arb_info_desc_t;
 /* Support for INVENTORY */
 struct inventory_s;
 struct invplace_s;
-extern struct invplace_s invplace_none;
 
 
 /* 

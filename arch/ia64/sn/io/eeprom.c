@@ -53,7 +53,6 @@
 #include <asm/sn/labelcl.h>
 #include <asm/sn/eeprom.h>
 #include <asm/sn/ksys/i2c.h>
-#include <asm/sn/cmn_err.h>
 /* #include <sys/SN/SN1/ip27log.h> */
 #include <asm/sn/router.h>
 #include <asm/sn/module.h>
@@ -949,6 +948,7 @@ int read_spd( l1sc_t *sc, int subch, int l1_compt,
 #else
     char msg[BRL1_QSIZE]; 	    /* message buffer */
     int len;              	    /* number of bytes used in message buffer */
+    int resp;                       /* l1 response code */
     int spd_len = EEPROM_CHUNKSIZE; /* remaining bytes in spd record */
     int offset = 0;		    /* current offset into spd record */
     char *spd_p = spd->bytes;	    /* "thumb" for writing to spd */
@@ -981,11 +981,26 @@ int read_spd( l1sc_t *sc, int subch, int l1_compt,
 	}
 
 	/* check response */
-	if( sc_interpret_resp( msg, 5, 
+	if( (resp = sc_interpret_resp( msg, 5, 
 			       L1_ARG_INT, &spd_len,
-			       L1_ARG_UNKNOWN, &len, spd_p ) < 0 )
+			       L1_ARG_UNKNOWN, &len, spd_p )) < 0 )
 	{
-	    return( EEP_L1 );
+            /*
+             * translate l1 response code to eeprom.c error codes:
+             * The L1 response will be L1_RESP_NAVAIL if the spd
+             * can't be read (i.e. the spd isn't physically there). It will
+             * return L1_RESP_INVAL if the spd exists, but fails the checksum
+             * test because the eeprom wasn't programmed, programmed incorrectly,
+             * or corrupted. L1_RESP_NAVAIL indicates the eeprom is likely not present,
+             * whereas L1_RESP_INVAL indicates the eeprom is present, but the data is
+             * invalid.
+             */
+            if(resp == L1_RESP_INVAL) {
+                resp = EEP_BAD_CHECKSUM;
+            } else {
+                resp = EEP_L1;
+            }
+            return( resp );
 	}
 
 	if( spd_len > EEPROM_CHUNKSIZE )
@@ -1201,7 +1216,9 @@ int _cbrick_eeprom_read( eeprom_brd_record_t *buf, l1sc_t *scp,
 #else
     int r;
     uint64_t uid = 0;
+#ifdef LOG_GETENV
     char uid_str[32];
+#endif
     int l1_compt, subch;
 
     if ( IS_RUNNING_ON_SIMULATOR() )
@@ -1228,6 +1245,13 @@ int _cbrick_eeprom_read( eeprom_brd_record_t *buf, l1sc_t *scp,
     if( (subch = sc_open( scp, L1_ADDR_LOCAL )) < 0 )
 	return EEP_L1;
 
+    if((component & C_DIMM) == C_DIMM) {
+        l1_compt = L1_EEP_DIMM(component & COMPT_MASK);
+        r = read_spd(scp,subch,l1_compt, buf->spd);
+        sc_close(scp,subch);
+        return(r);
+    }
+
     switch( component )
     {
       case C_BRICK:
@@ -1251,13 +1275,6 @@ int _cbrick_eeprom_read( eeprom_brd_record_t *buf, l1sc_t *scp,
 	/* one of the PIMM boards */
 	l1_compt = L1_EEP_PIMM( component & COMPT_MASK );
 	break;
-
-      case C_DIMM:
-	/* one of the DIMMs */
-	l1_compt = L1_EEP_DIMM( component & COMPT_MASK );
-	r = read_spd( scp, subch, l1_compt, buf->spd );
-	sc_close( scp, subch );
-	return r;
 
       default:
 	/* unsupported board type */
@@ -1297,8 +1314,7 @@ int cbrick_eeprom_read( eeprom_brd_record_t *buf, nasid_t nasid,
 	scp = get_l1sc();
     }
     else {
-	elsc_t *get_elsc(void);
-	scp = get_elsc();
+	scp = &NODEPDA( NASID_TO_COMPACT_NODEID(nasid) )->module->elsc;
     }
 
     return _cbrick_eeprom_read( buf, scp, component );
@@ -1333,8 +1349,7 @@ int iobrick_eeprom_read( eeprom_brd_record_t *buf, nasid_t nasid,
 	scp = get_l1sc();
     }
     else {
-	elsc_t *get_elsc(void);
-	scp = get_elsc();
+	scp = &NODEPDA( NASID_TO_COMPACT_NODEID(nasid) )->module->elsc;
     }
 
     if( (subch = sc_open( scp, L1_ADDR_LOCALIO )) < 0 )
@@ -1350,9 +1365,11 @@ int iobrick_eeprom_read( eeprom_brd_record_t *buf, nasid_t nasid,
 
 	if( r != EEP_OK ) {
 	    sc_close( scp, subch );
-#ifdef BRINGUP /* Once EEPROMs are universally available, remove this */
+	/*
+	 * Whenever we no longer need to test on hardware
+	 * that does not have EEPROMS, then this can be removed.
+	 */
 	    r = fake_an_eeprom_record( buf, component, rtc_time() );
-#endif /* BRINGUP */
 	    return r;
 	}
 	break;

@@ -2,14 +2,15 @@
 	drivers/net/tulip/media.c
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000  The Linux Kernel Team
-	Written/copyright 1994-1999 by Donald Becker.
+	Copyright 2000,2001  The Linux Kernel Team
+	Written/copyright 1994-2001 by Donald Becker.
 
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/networking/tulip.txt for more
-	information on this driver.
+	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	for more information on this driver, or visit the project
+	Web page at http://sourceforge.net/projects/tulip/
 
 */
 
@@ -22,6 +23,25 @@
    10base2(!) packets trigger a full-duplex-request interrupt. */
 #define FULL_DUPLEX_MAGIC	0x6969
 
+/* The maximum data clock rate is 2.5 Mhz.  The minimum timing is usually
+   met by back-to-back PCI I/O cycles, but we insert a delay to avoid
+   "overclocking" issues or future 66Mhz PCI. */
+#define mdio_delay() inl(mdio_addr)
+
+/* Read and write the MII registers using software-generated serial
+   MDIO protocol.  It is just different enough from the EEPROM protocol
+   to not share code.  The maxium data clock rate is 2.5 Mhz. */
+#define MDIO_SHIFT_CLK		0x10000
+#define MDIO_DATA_WRITE0	0x00000
+#define MDIO_DATA_WRITE1	0x20000
+#define MDIO_ENB		0x00000 /* Ignore the 0x02000 databook setting. */
+#define MDIO_ENB_IN		0x40000
+#define MDIO_DATA_READ		0x80000
+
+static const unsigned char comet_miireg2offset[32] = {
+	0xB4, 0xB8, 0xBC, 0xC0,  0xC4, 0xC8, 0xCC, 0,  0,0,0,0,  0,0,0,0,
+	0,0xD0,0,0,  0,0,0,0,  0,0,0,0, 0, 0xD4, 0xD8, 0xDC, };
+
 
 /* MII transceiver control section.
    Read and write the MII registers using software-generated serial
@@ -32,32 +52,34 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	int i;
-	int read_cmd = (0xf6 << 10) | (phy_id << 5) | location;
+	int read_cmd = (0xf6 << 10) | ((phy_id & 0x1f) << 5) | location;
 	int retval = 0;
 	long ioaddr = dev->base_addr;
 	long mdio_addr = ioaddr + CSR9;
+	unsigned long flags;
 
+	if (location & ~0x1f)
+		return 0xffff;
+
+	if (tp->chip_id == COMET  &&  phy_id == 30) {
+		if (comet_miireg2offset[location])
+			return inl(ioaddr + comet_miireg2offset[location]);
+		return 0xffff;
+	}
+
+	spin_lock_irqsave(&tp->mii_lock, flags);
 	if (tp->chip_id == LC82C168) {
 		int i = 1000;
 		outl(0x60020000 + (phy_id<<23) + (location<<18), ioaddr + 0xA0);
 		inl(ioaddr + 0xA0);
 		inl(ioaddr + 0xA0);
-		while (--i > 0)
+		while (--i > 0) {
+			barrier();
 			if ( ! ((retval = inl(ioaddr + 0xA0)) & 0x80000000))
-				return retval & 0xffff;
-		return 0xffff;
-	}
-
-	if (tp->chip_id == COMET) {
-		if (phy_id == 1) {
-			if (location < 7)
-				return inl(ioaddr + 0xB4 + (location<<2));
-			else if (location == 17)
-				return inl(ioaddr + 0xD0);
-			else if (location >= 29 && location <= 31)
-				return inl(ioaddr + 0xD4 + ((location-29)<<2));
+				break;
 		}
-		return 0xffff;
+		spin_unlock_irqrestore(&tp->mii_lock, flags);
+		return retval & 0xffff;
 	}
 
 	/* Establish sync by sending at least 32 logic ones. */
@@ -84,36 +106,39 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 		outl(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
+
+	spin_unlock_irqrestore(&tp->mii_lock, flags);
 	return (retval>>1) & 0xffff;
 }
 
-void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int value)
+void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	int i;
-	int cmd = (0x5002 << 16) | (phy_id << 23) | (location<<18) | value;
+	int cmd = (0x5002 << 16) | ((phy_id & 0x1f) << 23) | (location<<18) | (val & 0xffff);
 	long ioaddr = dev->base_addr;
 	long mdio_addr = ioaddr + CSR9;
+	unsigned long flags;
 
-	if (tp->chip_id == LC82C168) {
-		int i = 1000;
-		outl(cmd, ioaddr + 0xA0);
-		do
-			if ( ! (inl(ioaddr + 0xA0) & 0x80000000))
-				break;
-		while (--i > 0);
+	if (location & ~0x1f)
+		return;
+
+	if (tp->chip_id == COMET && phy_id == 30) {
+		if (comet_miireg2offset[location])
+			outl(val, ioaddr + comet_miireg2offset[location]);
 		return;
 	}
 
-	if (tp->chip_id == COMET) {
-		if (phy_id != 1)
-			return;
-		if (location < 7)
-			outl(value, ioaddr + 0xB4 + (location<<2));
-		else if (location == 17)
-			outl(value, ioaddr + 0xD0);
-		else if (location >= 29 && location <= 31)
-			outl(value, ioaddr + 0xD4 + ((location-29)<<2));
+	spin_lock_irqsave(&tp->mii_lock, flags);
+	if (tp->chip_id == LC82C168) {
+		int i = 1000;
+		outl(cmd, ioaddr + 0xA0);
+		do {
+			barrier();
+			if ( ! (inl(ioaddr + 0xA0) & 0x80000000))
+				break;
+		} while (--i > 0);
+		spin_unlock_irqrestore(&tp->mii_lock, flags);
 		return;
 	}
 
@@ -139,6 +164,8 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int valu
 		outl(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
+
+	spin_unlock_irqrestore(&tp->mii_lock, flags);
 }
 
 
@@ -172,7 +199,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 			for (i = 0; i < 5; i++)
 				setup[i] = get_u16(&p[i*2 + 1]);
 
-			dev->if_port = p[0] & 15;
+			dev->if_port = p[0] & MEDIA_MASK;
 			if (tulip_media_cap[dev->if_port] & MediaAlwaysFD)
 				tp->full_duplex = 1;
 

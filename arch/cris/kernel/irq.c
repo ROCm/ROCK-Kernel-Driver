@@ -1,8 +1,8 @@
-/* $Id: irq.c,v 1.5 2000/08/17 15:35:15 bjornw Exp $
+/* $Id: irq.c,v 1.11 2001/02/27 13:52:52 bjornw Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
- *      Copyright (c) 2000 Axis Communications AB
+ *      Copyright (c) 2000,2001 Axis Communications AB
  *
  *      Authors: Bjorn Wesen (bjornw@axis.com)
  *
@@ -30,7 +30,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/random.h>
 
 #include <asm/system.h>
@@ -160,6 +160,8 @@ BUILD_IRQ(22, 0x400000)
 BUILD_IRQ(23, 0x800000)
 BUILD_IRQ(24, 0x1000000)
 BUILD_IRQ(25, 0x2000000)
+/* IRQ 26-30 are resereved */	
+BUILD_IRQ(31, 0x80000000)
  
 /*
  * Pointers to the low-level handlers 
@@ -172,7 +174,8 @@ static void (*interrupt[NR_IRQS])(void) = {
 	IRQ12_interrupt, IRQ13_interrupt, NULL, NULL,	
 	IRQ16_interrupt, IRQ17_interrupt, IRQ18_interrupt, IRQ19_interrupt,	
 	IRQ20_interrupt, IRQ21_interrupt, IRQ22_interrupt, IRQ23_interrupt,	
-	IRQ24_interrupt, IRQ25_interrupt
+	IRQ24_interrupt, IRQ25_interrupt, NULL, NULL, NULL, NULL, NULL,
+	IRQ31_interrupt
 };
 
 static void (*sinterrupt[NR_IRQS])(void) = {
@@ -182,7 +185,8 @@ static void (*sinterrupt[NR_IRQS])(void) = {
 	sIRQ12_interrupt, sIRQ13_interrupt, NULL, NULL,	
 	sIRQ16_interrupt, sIRQ17_interrupt, sIRQ18_interrupt, sIRQ19_interrupt,	
 	sIRQ20_interrupt, sIRQ21_interrupt, sIRQ22_interrupt, sIRQ23_interrupt,	
-	sIRQ24_interrupt, sIRQ25_interrupt
+	sIRQ24_interrupt, sIRQ25_interrupt, NULL, NULL, NULL, NULL, NULL,
+	sIRQ31_interrupt
 };
 
 static void (*bad_interrupt[NR_IRQS])(void) = {
@@ -198,7 +202,9 @@ static void (*bad_interrupt[NR_IRQS])(void) = {
 	bad_IRQ18_interrupt, bad_IRQ19_interrupt,
 	bad_IRQ20_interrupt, bad_IRQ21_interrupt,
 	bad_IRQ22_interrupt, bad_IRQ23_interrupt,
-	bad_IRQ24_interrupt, bad_IRQ25_interrupt
+	bad_IRQ24_interrupt, bad_IRQ25_interrupt,
+	NULL, NULL, NULL, NULL, NULL,
+	bad_IRQ31_interrupt
 };
 
 /*
@@ -212,7 +218,8 @@ static struct irqaction *irq_action[NR_IRQS] = {
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL,
-	NULL, NULL
+	NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL
 };
 
 int get_irq_list(char *buf)
@@ -412,6 +419,8 @@ void weird_irq(void)
 */
 
 void system_call(void);  /* from entry.S */
+void gdb_handle_breakpoint(void); /* from traps.c */
+void do_sigtrap(void); /* also from traps.c */
 
 void init_IRQ(void)
 {
@@ -431,14 +440,22 @@ void init_IRQ(void)
 
 	for(i = 0; i < NR_IRQS; i++)
 		irq_shortcuts[i] = NULL;
-	
-	for (i = 0; i < 256; i++)
-		etrax_irv->v[i] = weird_irq;
-      
+        
+        for (i = 0; i < 256; i++)
+               etrax_irv->v[i] = weird_irq;
+
+        /* the entries in the break vector contain actual code to be
+           executed by the associated break handler, rather than just a jump
+           address. therefore we need to setup a default breakpoint handler
+           for all breakpoints */
+
+	for (i = 0; i < 16; i++)
+                set_break_vector(i, do_sigtrap);
+        
 	/* set all etrax irq's to the bad handlers */
 	for (i = 2; i < NR_IRQS; i++)
 		set_int_vector(i, bad_interrupt[i], 0);
-
+        
 	/* except IRQ 15 which is the multiple-IRQ handler on Etrax100 */
 
 	set_int_vector(15, multiple_interrupt, 0);
@@ -456,12 +473,15 @@ void init_IRQ(void)
 
 	set_break_vector(13, system_call);
 
+        /* setup a breakpoint handler for debugging used for both user and
+           kernel mode debugging  (which is why it is not inside an ifdef
+           CONFIG_KGDB) */
+        set_break_vector(8, gdb_handle_breakpoint);
+
 #ifdef CONFIG_KGDB
 	/* setup kgdb if its enabled, and break into the debugger */
-
 	kgdb_init();
-
 	breakpoint();
 #endif
 
-} 
+}

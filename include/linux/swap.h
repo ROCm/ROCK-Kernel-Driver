@@ -134,7 +134,6 @@ extern void oom_kill(void);
 extern void __delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache_nolock(struct page *page);
-extern void free_page_and_swap_cache(struct page *page);
 
 /* linux/mm/swapfile.c */
 extern unsigned int nr_swapfiles;
@@ -166,23 +165,6 @@ extern unsigned long swap_cache_del_total;
 extern unsigned long swap_cache_find_total;
 extern unsigned long swap_cache_find_success;
 #endif
-
-/*
- * Work out if there are any other processes sharing this page, ignoring
- * any page reference coming from the swap cache, or from outstanding
- * swap IO on this page.  (The page cache _does_ count as another valid
- * reference to the page, however.)
- */
-static inline int is_page_shared(struct page *page)
-{
-	unsigned int count;
-	if (PageReserved(page))
-		return 1;
-	count = page_count(page);
-	if (PageSwapCache(page))
-		count += swap_count(page) - 2 - !!page->buffers;
-	return  count > 1;
-}
 
 extern spinlock_t pagemap_lru_lock;
 

@@ -1,8 +1,11 @@
-/* $Id: bitops.h,v 1.3 2000/10/17 14:56:27 bjornw Exp $ */
+/* $Id: bitops.h,v 1.4 2001/02/28 04:26:11 hp Exp $ */
 /* all of these should probably be rewritten in assembler for speed. */
 
 #ifndef _CRIS_BITOPS_H
 #define _CRIS_BITOPS_H
+
+/* Currently this is unsuitable for consumption outside the kernel.  */
+#ifdef __KERNEL__ 
 
 #include <asm/system.h>
 
@@ -163,8 +166,6 @@ extern __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
-
-#ifdef __KERNEL__ 
 
 #define ext2_set_bit                 test_and_set_bit
 #define ext2_clear_bit               test_and_clear_bit

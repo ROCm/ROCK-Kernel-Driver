@@ -1,16 +1,14 @@
-/**************************************************************************
- *									  *
- *		 Copyright (C) 1992-1997, Silicon Graphics, Inc.	  *
- *									  *
- *  These coded instructions, statements, and computer programs	 contain  *
- *  unpublished	 proprietary  information of Silicon Graphics, Inc., and  *
- *  are protected by Federal copyright law.  They  may	not be disclosed  *
- *  to	third  parties	or copied or duplicated in any form, in whole or  *
- *  in part, without the prior written consent of Silicon Graphics, Inc.  *
- *									  *
- **************************************************************************/
-#ifndef __SYS_SN_SN0_FRU_H__
-#define __SYS_SN_SN0_FRU_H__
+/* $Id$
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Copyright (C) 1992 - 1997, 1999-2000 Silicon Graphics, Inc.
+ * Copyright (C) 2000 by Patrick Gefre
+ */
+#ifndef _ASM_SN_SN_FRU_H
+#define _ASM_SN_SN_FRU_H
 
 #define MAX_DIMMS			8	 /* max # of dimm banks */
 #define MAX_PCIDEV			8	 /* max # of pci devices on a pci bus */
@@ -44,6 +42,5 @@ typedef struct kf_pci_bus_s {
 } kf_pci_bus_t;
 
 
-
-#endif /* #ifdef __SYS_SN_SN0_FRU_H__ */
+#endif	/* _ASM_SN_SN_FRU_H */
 

@@ -1016,6 +1016,8 @@ static int __init psaux_init(void)
 
 	misc_register(&psaux_mouse);
 	queue = (struct aux_queue *) kmalloc(sizeof(*queue), GFP_KERNEL);
+	if (queue == NULL)
+		panic("psaux_init(): out of memory");
 	memset(queue, 0, sizeof(*queue));
 	queue->head = queue->tail = 0;
 	init_waitqueue_head(&queue->proc_list);

@@ -9,7 +9,7 @@ serialization, but it wories me...
 2. The code is currently able to handle one connection only,
 there is more work in register_cl2llc_client() to make a chain
 of llc structures and in mac_data_indicate() to find back
-the llc structure addressed by an incomming frame.
+the llc structure addressed by an incoming frame.
 According to IEEE, connections are identified by (remote mac + local mac
 + dsap + ssap). dsap and ssap do not seem important: existing applications
 always use the same dsap/ssap. Its probably sufficient to index on 

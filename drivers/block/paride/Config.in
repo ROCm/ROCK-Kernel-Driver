@@ -20,7 +20,8 @@ dep_tristate '  Parallel port ATAPI tapes' CONFIG_PARIDE_PT $CONFIG_PARIDE
 dep_tristate '  Parallel port generic ATAPI devices' CONFIG_PARIDE_PG $CONFIG_PARIDE
 comment 'Parallel IDE protocol modules'
 dep_tristate '    ATEN EH-100 protocol' CONFIG_PARIDE_ATEN $CONFIG_PARIDE
-dep_tristate '    MicroSolutions backpack protocol' CONFIG_PARIDE_BPCK $CONFIG_PARIDE
+dep_tristate '    MicroSolutions backpack (Series 5) protocol' CONFIG_PARIDE_BPCK $CONFIG_PARIDE
+dep_tristate '    MicroSolutions backpack (Series 6) protocol' CONFIG_PARIDE_BPCK6 $CONFIG_PARIDE
 dep_tristate '    DataStor Commuter protocol' CONFIG_PARIDE_COMM $CONFIG_PARIDE
 dep_tristate '    DataStor EP-2000 protocol' CONFIG_PARIDE_DSTR $CONFIG_PARIDE
 dep_tristate '    FIT TD-2000 protocol' CONFIG_PARIDE_FIT2 $CONFIG_PARIDE

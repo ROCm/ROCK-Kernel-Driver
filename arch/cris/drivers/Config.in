@@ -1,16 +1,74 @@
 mainmenu_option next_comment
 comment 'Drivers for Etrax built-in interfaces'
 
-bool 'Ethernet support' CONFIG_ETRAX_ETHERNET y
+bool 'Ethernet support' CONFIG_ETRAX_ETHERNET
 if [ "$CONFIG_ETRAX_ETHERNET" = "y" ]; then
 # this is just so that the user does not have to go into the
 # normal ethernet driver section just to enable ethernetworking
   define_bool CONFIG_NET_ETHERNET y
+else
+  define_bool CONFIG_NET_ETHERNET n
 fi
 
-bool 'Serial-port support' CONFIG_ETRAX_SERIAL y
+bool 'Serial-port support' CONFIG_ETRAX_SERIAL
+if [ "$CONFIG_ETRAX_SERIAL" = "y" ]; then
+  comment '  Port 0 is always enabled'
+  bool '  Ser0 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB
+  if [ "$CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB" = "y" ]; then
+    int '    Ser0 DTR on PB bit' CONFIG_ETRAX_SER0_DTR_ON_PB_BIT 4
+    int '    Ser0 RI  on PB bit' CONFIG_ETRAX_SER0_RI_ON_PB_BIT 5
+    int '    Ser0 DSR on PB bit' CONFIG_ETRAX_SER0_DSR_ON_PB_BIT 6
+    int '    Ser0 CD  on PB bit' CONFIG_ETRAX_SER0_CD_ON_PB_BIT 7
+  fi
+ 
+  bool '  Serial port 1 enabled' CONFIG_ETRAX_SERIAL_PORT1
+  if [ "$CONFIG_ETRAX_SERIAL_PORT1" = "y" ]; then
+    bool '  Ser1 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB
+    if [ "$CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB" = "y" ]; then
+      int '    Ser1 DTR on PB bit' CONFIG_ETRAX_SER1_DTR_ON_PB_BIT 4
+      int '    Ser1 RI  on PB bit' CONFIG_ETRAX_SER1_RI_ON_PB_BIT 5
+      int '    Ser1 DSR on PB bit' CONFIG_ETRAX_SER1_DSR_ON_PB_BIT 6
+      int '    Ser1 CD  on PB bit' CONFIG_ETRAX_SER1_CD_ON_PB_BIT 7
+    fi
+  fi
+  if [ "$CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB" = "y" -a \
+       "$CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB" = "y" ]; then
+    comment 'Make sure you dont have the same PB bits more than once!'
+  fi
+  bool '  Serial port 2 enabled' CONFIG_ETRAX_SERIAL_PORT2
+  if [ "$CONFIG_ETRAX_SERIAL_PORT2" = "y" ]; then
+    bool '    Ser2 DTR, RI, DSR, CD on PA' CONFIG_ETRAX_SER2_DTR_RI_DSR_CD_ON_PA
+    if [ "$CONFIG_ETRAX_SER2_DTR_RI_DSR_CD_ON_PA" = "y" ]; then
+      int '      Ser2 DTR on PA bit' CONFIG_ETRAX_SER2_DTR_ON_PA_BIT 4
+      int '      Ser2 RI  on PA bit' CONFIG_ETRAX_SER2_RI_ON_PA_BIT 5
+      int '      Ser2 DSR on PA bit' CONFIG_ETRAX_SER2_DSR_ON_PA_BIT 6
+      int '      Ser2 CD  on PA bit' CONFIG_ETRAX_SER2_CD_ON_PA_BIT 7
+    fi 
+  fi
+  bool '  Serial port 3 enabled' CONFIG_ETRAX_SERIAL_PORT3
+  bool '  RS-485 support' CONFIG_RS485
+  if [ "$CONFIG_RS485" = "y" ]; then
+    bool '    RS-485 mode on PA' CONFIG_RS485_ON_PA
+    if [ "$CONFIG_RS485_ON_PA" = "y" ]; then
+      int '      RS-485 mode on PA bit' CONFIG_RS485_ON_PA_BIT 3
+    fi
+    bool '    Disable serial receiver' CONFIG_RS485_DISABLE_RECEIVER
+  fi
+fi
 
-bool 'ATA/IDE support' CONFIG_ETRAX_IDE n
+bool 'Synchronous serial port support' CONFIG_ETRAX_SYNCHRONOUS_SERIAL
+if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL" = "y" ]; then 
+  bool '  Synchronous serial port 0 enabled' CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT0
+  if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT0" = "y" ]; then
+    bool '    Synchronous serial port 0 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL0_DMA y
+  fi
+  bool '  Synchronous serial port 1 enabled' CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1
+  if [ "$CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1" = "y" ]; then
+    bool '    Synchronous serial port 1 uses DMA' CONFIG_ETRAX_SYNCHRONOUS_SERIAL1_DMA y
+  fi 
+fi
+
+bool 'ATA/IDE support' CONFIG_ETRAX_IDE
 
 if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
 # here we should add the CONFIG_'s necessary to enable the basic
@@ -25,14 +83,18 @@ if [ "$CONFIG_ETRAX_IDE" = "y" ]; then
 
 	define_bool CONFIG_BLK_DEV_IDEDMA y
 	define_bool CONFIG_DMA_NONPCI y
- 
+	
+	int 'Delay for drives to regain consciousness' CONFIG_IDE_DELAY 15
+	
 	choice 'IDE reset pin' \
   	"Port_PB_Bit_7  CONFIG_ETRAX_IDE_PB7_RESET\
    	 Port_G_Bit_27  CONFIG_ETRAX_IDE_G27_RESET\
    	 Port_CSE1_Bit_16  CONFIG_ETRAX_IDE_CSE1_16_RESET" Port_PB_Bit_7 
+else
+	define_bool CONFIG_IDE n
 fi
 
-bool 'Axis flash-map support' CONFIG_ETRAX_AXISFLASHMAP n
+bool 'Axis flash-map support' CONFIG_ETRAX_AXISFLASHMAP
 
 if [ "$CONFIG_ETRAX_AXISFLASHMAP" = "y" ]; then
 # here we define the CONFIG_'s necessary to enable MTD support
@@ -43,7 +105,39 @@ if [ "$CONFIG_ETRAX_AXISFLASHMAP" = "y" ]; then
 	define_bool CONFIG_MTD_CFI_INTELEXT n
 	define_bool CONFIG_MTD_CFI_AMDSTD y
 
+	define_bool CONFIG_MTD_AMDSTD y
+
 	define_bool CONFIG_MTD_CHAR y
+	define_bool CONFIG_MTD_BLOCK y
+fi
+
+bool 'I2C support' CONFIG_ETRAX_I2C
+if [ "$CONFIG_ETRAX_I2C" = "y" ]; then
+# this is true for most products since PB-I2C seems to be somewhat
+# flawed.. 
+	bool 'I2C uses PB not PB-I2C' CONFIG_ETRAX_I2C_USES_PB_NOT_PB_I2C
+fi
+
+bool 'GPIO support' CONFIG_ETRAX_GPIO
+if [ "$CONFIG_ETRAX_GPIO" = "y" ]; then
+  hex  '  PA-buttons bitmask' CONFIG_ETRAX_PA_BUTTON_BITMASK 02
+  hex  '  PA user changeable dir mask' CONFIG_PA_CHANGEABLE_DIR 00
+  hex  '  PA user changeable bits mask' CONFIG_PA_CHANGEABLE_BITS FF
+  hex  '  PB user changeable dir mask' CONFIG_PB_CHANGEABLE_DIR 00
+  hex  '  PB user changeable bits mask' CONFIG_PB_CHANGEABLE_BITS FF
+fi
+
+bool 'Juliette support' CONFIG_JULIETTE n
+
+if [ "$CONFIG_JULIETTE" = "y" ]; then
+   source arch/cris/drivers/juliette/Config.in
+fi
+
+bool 'USB host' CONFIG_ETRAX_USB_HOST
+if [ "$CONFIG_ETRAX_USB_HOST" = "y" ]; then
+	define_bool CONFIG_USB y
+	bool '  USB port 1 enabled' CONFIG_ETRAX_USB_HOST_PORT1 n
+	bool '  USB port 2 enabled' CONFIG_ETRAX_USB_HOST_PORT2 n
 fi
 
 endmenu

@@ -4,7 +4,7 @@
 /*
  * Extensible Firmware Interface
  * Based on 'Extensible Firmware Interface Specification' version 0.9, April 30, 1999
- * 
+ *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Hewlett-Packard Co.
@@ -20,9 +20,12 @@
 #include <asm/system.h>
 
 #define EFI_SUCCESS		0
-#define EFI_INVALID_PARAMETER	2
-#define EFI_UNSUPPORTED		3
-#define EFI_BUFFER_TOO_SMALL	4
+#define EFI_LOAD_ERROR          (1L | (1L << 63))
+#define EFI_INVALID_PARAMETER	(2L | (1L << 63))
+#define EFI_UNSUPPORTED		(3L | (1L << 63))
+#define EFI_BAD_BUFFER_SIZE     (4L | (1L << 63))
+#define EFI_BUFFER_TOO_SMALL	(5L | (1L << 63))
+#define EFI_NOT_FOUND          (14L | (1L << 63))
 
 typedef unsigned long efi_status_t;
 typedef u8 efi_bool_t;
@@ -173,7 +176,7 @@ typedef void efi_reset_system_t (int reset_type, efi_status_t status,
 
 #define SMBIOS_TABLE_GUID    \
     ((efi_guid_t) { 0xeb9d2d31, 0x2d88, 0x11d3, { 0x9a, 0x16, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d }})
-	
+
 #define SAL_SYSTEM_TABLE_GUID    \
     ((efi_guid_t) { 0xeb9d2d32, 0x2d88, 0x11d3, { 0x9a, 0x16, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d }})
 
@@ -183,7 +186,7 @@ typedef struct {
 } efi_config_table_t;
 
 #define EFI_SYSTEM_TABLE_SIGNATURE 0x5453595320494249
-#define EFI_SYSTEM_TABLE_REVISION  ((0 << 16) | (92))
+#define EFI_SYSTEM_TABLE_REVISION  ((1 << 16) | 00)
 
 typedef struct {
 	efi_table_hdr_t hdr;
@@ -234,5 +237,13 @@ extern void efi_map_pal_code (void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timeval *tv);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
+
+
+/*
+ * Variable Attributes
+ */
+#define EFI_VARIABLE_NON_VOLATILE       0x0000000000000001
+#define EFI_VARIABLE_BOOTSERVICE_ACCESS 0x0000000000000002
+#define EFI_VARIABLE_RUNTIME_ACCESS     0x0000000000000004
 
 #endif /* _ASM_IA64_EFI_H */

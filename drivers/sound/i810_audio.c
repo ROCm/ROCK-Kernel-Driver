@@ -101,8 +101,11 @@
 #endif
 
 static int ftsodell=0;
+static int strict_clocking=0;
 static unsigned int clocking=48000;
 
+//#define DEBUG
+//#define DEBUG2
 
 #define ADC_RUNNING	1
 #define DAC_RUNNING	2
@@ -169,6 +172,7 @@ enum {
 #define DMA_INT_COMPLETE	(1<<3)  /* buffer read/write complete and ioc set */
 #define DMA_INT_LVI		(1<<2)  /* last valid done */
 #define DMA_INT_CELV		(1<<1)  /* last valid is current */
+#define DMA_INT_DCH		(1)	/* DMA Controller Halted (happens on LVI interrupts) */
 #define DMA_INT_MASK (DMA_INT_FIFO|DMA_INT_COMPLETE|DMA_INT_LVI)
 
 /* interrupts for the whole chip */
@@ -183,7 +187,7 @@ enum {
 #define INT_MASK (INT_SEC|INT_PRI|INT_MC|INT_PO|INT_PI|INT_MO|INT_NI|INT_GPI)
 
 
-#define DRIVER_VERSION "0.01"
+#define DRIVER_VERSION "0.02"
 
 /* magic numbers to protect our data structures */
 #define I810_CARD_MAGIC		0x5072696E /* "Prin" */
@@ -247,7 +251,7 @@ struct i810_state {
 	struct dmabuf {
 		/* wave sample stuff */
 		unsigned int rate;
-		unsigned char fmt, enable;
+		unsigned char fmt, enable, trigger;
 
 		/* hardware channel */
 		struct i810_channel *read_channel;
@@ -277,10 +281,9 @@ struct i810_state {
 		/* OSS stuff */
 		unsigned mapped:1;
 		unsigned ready:1;
-		unsigned endcleared:1;
 		unsigned update_flag;
-		unsigned ossfragshift;
-		int ossmaxfrags;
+		unsigned ossfragsize;
+		unsigned ossmaxfrags;
 		unsigned subdivision;
 	} dmabuf;
 };
@@ -408,8 +411,11 @@ static unsigned int i810_set_dac_rate(struct i810_state * state, unsigned int ra
 	/*
 	 *	Adjust for misclocked crap
 	 */
-	 
 	rate = ( rate * clocking)/48000;
+	if(strict_clocking && rate < 8000) {
+		rate = 8000;
+		dmabuf->rate = (rate * 48000)/clocking;
+	}
 	
 	if(rate != i810_ac97_get(codec, AC97_PCM_FRONT_DAC_RATE))
 	{
@@ -456,6 +462,10 @@ static unsigned int i810_set_adc_rate(struct i810_state * state, unsigned int ra
 	 */
 	 
 	rate = ( rate * clocking)/48000;
+	if(strict_clocking && rate < 8000) {
+		rate = 8000;
+		dmabuf->rate = (rate * 48000)/clocking;
+	}
 	
 	if(rate != i810_ac97_get(codec, AC97_PCM_LR_DAC_RATE))
 	{
@@ -478,34 +488,10 @@ static unsigned int i810_set_adc_rate(struct i810_state * state, unsigned int ra
 	return dmabuf->rate;
 }
 
-/* prepare channel attributes for playback */ 
-static void i810_play_setup(struct i810_state *state)
-{
-//	struct dmabuf *dmabuf = &state->dmabuf;
-//	struct i810_channel *channel = dmabuf->channel;
-	/* Fixed format. .. */
-	//if (dmabuf->fmt & I810_FMT_16BIT)
-	//if (dmabuf->fmt & I810_FMT_STEREO)
-}
-
-/* prepare channel attributes for recording */
-static void i810_rec_setup(struct i810_state *state)
-{
-//	u16 w;
-//	struct i810_card *card = state->card;
-//	struct dmabuf *dmabuf = &state->dmabuf;
-//	struct i810_channel *channel = dmabuf->channel;
-
-	/* Enable AC-97 ADC (capture) */
-//	if (dmabuf->fmt & I810_FMT_16BIT) {
-//	if (dmabuf->fmt & I810_FMT_STEREO)
-}
-
-
 /* get current playback/recording dma buffer pointer (byte offset from LBA),
    called with spinlock held! */
    
-extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state)
+extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state, int rec)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned int civ, offset;
@@ -513,17 +499,13 @@ extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state)
 	
 	if (!dmabuf->enable)
 		return 0;
-	if (dmabuf->enable & DAC_RUNNING)
-		c = dmabuf->write_channel;
-	else if (dmabuf->enable & ADC_RUNNING)
+	if (rec)
 		c = dmabuf->read_channel;
-	else {
-		printk("i810_audio: invalid dmabuf->enable state in get_dma_addr\n");
-		return 0;
-	}
+	else
+		c = dmabuf->write_channel;
 	do {
 		civ = inb(state->card->iobase+c->port+OFF_CIV);
-		offset = (civ + 1) * (dmabuf->dmasize/SG_LEN) -
+		offset = (civ + 1) * dmabuf->fragsize -
 			      2 * inw(state->card->iobase+c->port+OFF_PICB);
 		/* CIV changed before we read PICB (very seldom) ?
 		 * then PICB was rubbish, so try again */
@@ -532,22 +514,26 @@ extern __inline__ unsigned i810_get_dma_addr(struct i810_state *state)
 	return offset;
 }
 
-static void resync_dma_ptrs(struct i810_state *state, int rec)
-{
-	struct dmabuf *dmabuf = &state->dmabuf;
-	struct i810_channel *c;
-	int offset;
-
-	if(rec) {
-		c = dmabuf->read_channel;
-	} else {
-		c = dmabuf->write_channel;
-	}
-	offset = inb(state->card->iobase+c->port+OFF_CIV);
-	offset *= (dmabuf->dmasize/SG_LEN);
-	
-	dmabuf->hwptr=dmabuf->swptr = offset;
-}
+//static void resync_dma_ptrs(struct i810_state *state, int rec)
+//{
+//	struct dmabuf *dmabuf = &state->dmabuf;
+//	struct i810_channel *c;
+//	int offset;
+//
+//	if(rec) {
+//		c = dmabuf->read_channel;
+//	} else {
+//		c = dmabuf->write_channel;
+//	}
+//	if(c==NULL)
+//		return;
+//	offset = inb(state->card->iobase+c->port+OFF_CIV);
+//	if(offset == inb(state->card->iobase+c->port+OFF_LVI))
+//		offset++;
+//	offset *= dmabuf->fragsize;
+//	
+//	dmabuf->hwptr=dmabuf->swptr = offset;
+//}
 	
 /* Stop recording (lock held) */
 extern __inline__ void __stop_adc(struct i810_state *state)
@@ -575,12 +561,13 @@ static void start_adc(struct i810_state *state)
 	struct i810_card *card = state->card;
 	unsigned long flags;
 
-	spin_lock_irqsave(&card->lock, flags);
-	if ((dmabuf->mapped || dmabuf->count < (signed)dmabuf->dmasize) && dmabuf->ready) {
+	if (dmabuf->count < dmabuf->dmasize && dmabuf->ready && !dmabuf->enable &&
+	    (dmabuf->trigger & PCM_ENABLE_INPUT)) {
+		spin_lock_irqsave(&card->lock, flags);
 		dmabuf->enable |= ADC_RUNNING;
-		outb((1<<4) | 1<<2 | 1, card->iobase + PI_CR);
+		outb((1<<4) | (1<<2) | 1, card->iobase + PI_CR);
+		spin_unlock_irqrestore(&card->lock, flags);
 	}
-	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 /* stop playback (lock held) */
@@ -609,12 +596,13 @@ static void start_dac(struct i810_state *state)
 	struct i810_card *card = state->card;
 	unsigned long flags;
 
-	spin_lock_irqsave(&card->lock, flags);
-	if ((dmabuf->mapped || dmabuf->count > 0) && dmabuf->ready) {
+	if (dmabuf->count > 0 && dmabuf->ready && !dmabuf->enable &&
+	    (dmabuf->trigger & PCM_ENABLE_OUTPUT)) {
+		spin_lock_irqsave(&card->lock, flags);
 		dmabuf->enable |= DAC_RUNNING;
-		outb((1<<4) | 1<<2 | 1, card->iobase + PO_CR);
+		outb((1<<4) | (1<<2) | 1, card->iobase + PO_CR);
+		spin_unlock_irqrestore(&card->lock, flags);
 	}
-	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 #define DMABUF_DEFAULTORDER (16-PAGE_SHIFT)
@@ -625,17 +613,28 @@ static int alloc_dmabuf(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
 	void *rawbuf= NULL;
-	int order;
+	int order, size;
 	struct page *page, *pend;
 
-	/* alloc as big a chunk as we can, FIXME: is this necessary ?? */
-	for (order = DMABUF_DEFAULTORDER; order >= DMABUF_MINORDER; order--)
+	/* If we don't have any oss frag params, then use our default ones */
+	if(dmabuf->ossmaxfrags == 0)
+		dmabuf->ossmaxfrags = 4;
+	if(dmabuf->ossfragsize == 0)
+		dmabuf->ossfragsize = (PAGE_SIZE<<DMABUF_DEFAULTORDER)/dmabuf->ossmaxfrags;
+	size = dmabuf->ossfragsize * dmabuf->ossmaxfrags;
+
+	/* alloc enough to satisfy the oss params */
+	for (order = DMABUF_DEFAULTORDER; order >= DMABUF_MINORDER; order--) {
+		if ( (PAGE_SIZE<<order) > size )
+			continue;
 		if ((rawbuf = pci_alloc_consistent(state->card->pci_dev,
 						   PAGE_SIZE << order,
 						   &dmabuf->dma_handle)))
 			break;
+	}
 	if (!rawbuf)
 		return -ENOMEM;
+
 
 #ifdef DEBUG
 	printk("i810_audio: allocated %ld (order = %d) bytes at %p\n",
@@ -677,52 +676,53 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 	struct dmabuf *dmabuf = &state->dmabuf;
 	struct i810_channel *c;
 	struct sg_item *sg;
-	unsigned bytepersec;
-	unsigned bufsize;
 	unsigned long flags;
 	int ret;
-	unsigned fragsize;
+	unsigned fragint;
 	int i;
 
 	spin_lock_irqsave(&state->card->lock, flags);
-	resync_dma_ptrs(state, rec);
+	if(dmabuf->enable & DAC_RUNNING)
+		__stop_dac(state);
+	if(dmabuf->enable & ADC_RUNNING)
+		__stop_adc(state);
 	dmabuf->total_bytes = 0;
 	dmabuf->count = dmabuf->error = 0;
+	dmabuf->swptr = dmabuf->hwptr = 0;
 	spin_unlock_irqrestore(&state->card->lock, flags);
 
 	/* allocate DMA buffer if not allocated yet */
-	if (!dmabuf->rawbuf)
-		if ((ret = alloc_dmabuf(state)))
-			return ret;
+	if (dmabuf->rawbuf)
+		dealloc_dmabuf(state);
+	if ((ret = alloc_dmabuf(state)))
+		return ret;
 
 	/* FIXME: figure out all this OSS fragment stuff */
-	/* sample_shift is for 16 byte samples, add an extra shift for bytes */
-	bytepersec = dmabuf->rate << (sample_shift[dmabuf->fmt] + 1);
-	bufsize = PAGE_SIZE << dmabuf->buforder;
-	if (dmabuf->ossfragshift) {
-		if ((1000 << dmabuf->ossfragshift) < bytepersec)
-			dmabuf->fragshift = ld2(bytepersec/1000);
-		else
-			dmabuf->fragshift = dmabuf->ossfragshift;
+	/* I did, it now does what it should according to the OSS API.  DL */
+	dmabuf->dmasize = PAGE_SIZE << dmabuf->buforder;
+	dmabuf->numfrag = SG_LEN;
+	dmabuf->fragsize = dmabuf->dmasize/dmabuf->numfrag;
+	dmabuf->fragsamples = dmabuf->fragsize >> 1;
+
+	memset(dmabuf->rawbuf, 0, dmabuf->dmasize);
+
+	if(dmabuf->ossmaxfrags == 4) {
+		fragint = 8;
+		dmabuf->ossfragsize = dmabuf->dmasize>>2;
+		dmabuf->fragshift = 2;
+	} else if (dmabuf->ossmaxfrags == 8) {
+		fragint = 4;
+		dmabuf->ossfragsize = dmabuf->dmasize>>3;
+		dmabuf->fragshift = 3;
+	} else if (dmabuf->ossmaxfrags == 16) {
+		fragint = 2;
+		dmabuf->ossfragsize = dmabuf->dmasize>>4;
+		dmabuf->fragshift = 4;
 	} else {
-		/* lets hand out reasonable big ass buffers by default */
-		dmabuf->fragshift = (dmabuf->buforder + PAGE_SHIFT -2);
+		fragint = 1;
+		dmabuf->ossfragsize = dmabuf->dmasize>>5;
+		dmabuf->fragshift = 5;
 	}
-	dmabuf->numfrag = bufsize >> dmabuf->fragshift;
-	while (dmabuf->numfrag < 4 && dmabuf->fragshift > 3) {
-		dmabuf->fragshift--;
-		dmabuf->numfrag = bufsize >> dmabuf->fragshift;
-	}
-	dmabuf->fragsize = 1 << dmabuf->fragshift;
-	if (dmabuf->ossmaxfrags >= 4 && dmabuf->ossmaxfrags < dmabuf->numfrag)
-		dmabuf->numfrag = dmabuf->ossmaxfrags;
-	dmabuf->fragsamples = dmabuf->fragsize >> sample_shift[dmabuf->fmt];
-	dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
-
-	memset(dmabuf->rawbuf, (dmabuf->fmt & I810_FMT_16BIT) ? 0 : 0x80,
-	       dmabuf->dmasize);
-
-	fragsize = bufsize / SG_LEN;
 	/*
 	 *	Now set up the ring 
 	 */
@@ -737,24 +737,26 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 		 *	way (we might want more interrupts later..) 
 		 */
 	  
-		for(i=0;i<32;i++)
+		for(i=0;i<dmabuf->numfrag;i++)
 		{
-			sg->busaddr=virt_to_bus(dmabuf->rawbuf+fragsize*i);
-			sg->control=(fragsize>>sample_shift[dmabuf->fmt]);
-			sg->control|=CON_IOC;
+			sg->busaddr=virt_to_bus(dmabuf->rawbuf+dmabuf->fragsize*i);
+			// the card will always be doing 16bit stereo
+			sg->control=dmabuf->fragsamples;
+			sg->control|=CON_BUFPAD;
+			// set us up to get IOC interrupts as often as needed to
+			// satisfy numfrag requirements, no more
+			if( ((i+1) % fragint) == 0) {
+				sg->control|=CON_IOC;
+			}
 			sg++;
 		}
 		spin_lock_irqsave(&state->card->lock, flags);
 		outb(2, state->card->iobase+c->port+OFF_CR);   /* reset DMA machine */
 		outl(virt_to_bus(&c->sg[0]), state->card->iobase+c->port+OFF_BDBAR);
-		outb(31, state->card->iobase+c->port+OFF_LVI);
 		outb(0, state->card->iobase+c->port+OFF_CIV);
+		outb(0, state->card->iobase+c->port+OFF_LVI);
+		dmabuf->count = 0;
 
-		if (c == dmabuf->read_channel) {
-			i810_rec_setup(state);
-		} else {
-			i810_play_setup(state);
-		}
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
 		if(c != dmabuf->write_channel)
@@ -775,36 +777,115 @@ static int prog_dmabuf(struct i810_state *state, unsigned rec)
 
 	return 0;
 }
-/*
- * Clear the rest of the last i810 dma buffer, normally there is no rest
- * because the OSS fragment size is the same as the size of this buffer.
- */
-static void i810_clear_tail(struct i810_state *state)
+
+static void __i810_update_lvi(struct i810_state *state, int rec)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;
-	unsigned swptr;
-	unsigned char silence = (dmabuf->fmt & I810_FMT_16BIT) ? 0 : 0x80;
-	unsigned int len;
+	int x, port;
+	
+	port = state->card->iobase;
+	if(rec)
+		port += dmabuf->read_channel->port;
+	else
+		port += dmabuf->write_channel->port;
+
+	if(dmabuf->mapped) {
+		if(rec)
+			dmabuf->swptr = (dmabuf->hwptr + dmabuf->dmasize
+				       	- dmabuf->count) % dmabuf->dmasize;
+		else
+			dmabuf->swptr = (dmabuf->hwptr + dmabuf->count)
+			       		% dmabuf->dmasize;
+	}
+	/*
+	 * two special cases, count == 0 on write
+	 * means no data, and count == dmasize
+	 * means no data on read, handle appropriately
+	 */
+	if(!rec && dmabuf->count == 0) {
+		outb(inb(port+OFF_CIV),port+OFF_LVI);
+		return;
+	}
+	if(rec && dmabuf->count == dmabuf->dmasize) {
+		outb(inb(port+OFF_CIV),port+OFF_LVI);
+		return;
+	}
+	/* swptr - 1 is the tail of our transfer */
+	x = (dmabuf->dmasize + dmabuf->swptr - 1) % dmabuf->dmasize;
+	x /= dmabuf->fragsize;
+	outb(x&31, port+OFF_LVI);
+}
+
+static void i810_update_lvi(struct i810_state *state, int rec)
+{
+	struct dmabuf *dmabuf = &state->dmabuf;
 	unsigned long flags;
 
+	if(!dmabuf->ready)
+		return;
 	spin_lock_irqsave(&state->card->lock, flags);
-	swptr = dmabuf->swptr;
+	__i810_update_lvi(state, rec);
 	spin_unlock_irqrestore(&state->card->lock, flags);
+}
 
-	if(dmabuf->dmasize)
-		len = swptr % (dmabuf->dmasize/SG_LEN);
-	else
-		len = 0;
-	
-	memset(dmabuf->rawbuf + swptr, silence, len);
+/* update buffer manangement pointers, especially, dmabuf->count and dmabuf->hwptr */
+static void i810_update_ptr(struct i810_state *state)
+{
+	struct dmabuf *dmabuf = &state->dmabuf;
+	unsigned hwptr;
+	int diff;
 
-	spin_lock_irqsave(&state->card->lock, flags);
-	dmabuf->swptr += len;
-	dmabuf->count += len;
-	spin_unlock_irqrestore(&state->card->lock, flags);
-
-	/* restart the dma machine in case it is halted */
-	start_dac(state);
+	/* error handling and process wake up for DAC */
+	if (dmabuf->enable == ADC_RUNNING) {
+		/* update hardware pointer */
+		hwptr = i810_get_dma_addr(state, 1);
+		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+//		printk("HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
+		dmabuf->hwptr = hwptr;
+		dmabuf->total_bytes += diff;
+		dmabuf->count += diff;
+		if (dmabuf->count > dmabuf->dmasize) {
+			/* buffer underrun or buffer overrun */
+			/* this is normal for the end of a read */
+			/* only give an error if we went past the */
+			/* last valid sg entry */
+			if(inb(state->card->iobase + PI_CIV) !=
+			   inb(state->card->iobase + PI_LVI)) {
+				printk(KERN_WARNING "i810_audio: DMA overrun on read\n");
+				dmabuf->error++;
+			}
+		}
+		if (dmabuf->count > dmabuf->ossfragsize)
+			wake_up(&dmabuf->wait);
+	}
+	/* error handling and process wake up for DAC */
+	if (dmabuf->enable == DAC_RUNNING) {
+		/* update hardware pointer */
+		hwptr = i810_get_dma_addr(state, 0);
+		diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
+//		printk("HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
+		dmabuf->hwptr = hwptr;
+		dmabuf->total_bytes += diff;
+		dmabuf->count -= diff;
+		if (dmabuf->count < 0) {
+			/* buffer underrun or buffer overrun */
+			/* this is normal for the end of a write */
+			/* only give an error if we went past the */
+			/* last valid sg entry */
+			if(inb(state->card->iobase + PO_CIV) !=
+			   inb(state->card->iobase + PO_LVI)) {
+				printk(KERN_WARNING "i810_audio: DMA overrun on write\n");
+				printk("i810_audio: CIV %d, LVI %d, hwptr %x, "
+					"count %d\n",
+					inb(state->card->iobase + PO_CIV),
+					inb(state->card->iobase + PO_LVI),
+					dmabuf->hwptr, dmabuf->count);
+				dmabuf->error++;
+			}
+		}
+		if (dmabuf->count < (dmabuf->dmasize-dmabuf->ossfragsize))
+			wake_up(&dmabuf->wait);
+	}
 }
 
 static int drain_dac(struct i810_state *state, int nonblock)
@@ -815,7 +896,7 @@ static int drain_dac(struct i810_state *state, int nonblock)
 	unsigned long tmo;
 	int count;
 
-	if (dmabuf->mapped || !dmabuf->ready)
+	if (!dmabuf->ready)
 		return 0;
 
 	add_wait_queue(&dmabuf->wait, &wait);
@@ -825,6 +906,7 @@ static int drain_dac(struct i810_state *state, int nonblock)
 		current->state = TASK_INTERRUPTIBLE;
 
 		spin_lock_irqsave(&state->card->lock, flags);
+		i810_update_ptr(state);
 		count = dmabuf->count;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
@@ -834,6 +916,10 @@ static int drain_dac(struct i810_state *state, int nonblock)
 		if (signal_pending(current))
 			break;
 
+		i810_update_lvi(state,0);
+		if (dmabuf->enable != DAC_RUNNING)
+			start_dac(state);
+
 		if (nonblock) {
 			remove_wait_queue(&dmabuf->wait, &wait);
 			current->state = TASK_RUNNING;
@@ -841,7 +927,7 @@ static int drain_dac(struct i810_state *state, int nonblock)
 		}
 
 		tmo = (dmabuf->dmasize * HZ) / dmabuf->rate;
-		tmo >>= sample_shift[dmabuf->fmt];
+		tmo >>= 1;
 		if (!schedule_timeout(tmo ? tmo : 1) && tmo){
 			printk(KERN_ERR "i810_audio: drain_dac, dma timeout?\n");
 			break;
@@ -855,88 +941,18 @@ static int drain_dac(struct i810_state *state, int nonblock)
 	return 0;
 }
 
-/* update buffer manangement pointers, especially, dmabuf->count and dmabuf->hwptr */
-static void i810_update_ptr(struct i810_state *state)
-{
-	struct dmabuf *dmabuf = &state->dmabuf;
-	unsigned hwptr, swptr;
-	int clear_cnt = 0;
-	int diff;
-	unsigned char silence;
-//	unsigned half_dmasize;
-
-	/* update hardware pointer */
-	hwptr = i810_get_dma_addr(state);
-	diff = (dmabuf->dmasize + hwptr - dmabuf->hwptr) % dmabuf->dmasize;
-//	printk("HWP %d,%d,%d\n", hwptr, dmabuf->hwptr, diff);
-	dmabuf->hwptr = hwptr;
-	dmabuf->total_bytes += diff;
-
-	/* error handling and process wake up for DAC */
-	if (dmabuf->enable == ADC_RUNNING) {
-		if (dmabuf->mapped) {
-			dmabuf->count -= diff;
-			if (dmabuf->count >= (signed)dmabuf->fragsize)
-				wake_up(&dmabuf->wait);
-		} else {
-			dmabuf->count += diff;
-
-			if (dmabuf->count < 0 || dmabuf->count > dmabuf->dmasize) {
-				/* buffer underrun or buffer overrun, we have no way to recover
-				   it here, just stop the machine and let the process force hwptr
-				   and swptr to sync */
-				__stop_adc(state);
-				dmabuf->error++;
-			}
-			else if (!dmabuf->endcleared) {
-				swptr = dmabuf->swptr;
-				silence = (dmabuf->fmt & I810_FMT_16BIT ? 0 : 0x80);
-				if (dmabuf->count < (signed) dmabuf->fragsize) 
-				{
-					clear_cnt = dmabuf->fragsize;
-					if ((swptr + clear_cnt) > dmabuf->dmasize)
-						clear_cnt = dmabuf->dmasize - swptr;
-					memset (dmabuf->rawbuf + swptr, silence, clear_cnt);
-					dmabuf->endcleared = 1;
-				}
-			}			
-			if (dmabuf->count < (signed)dmabuf->dmasize/2) {
-				wake_up(&dmabuf->wait);
-			}
-		}
-	}
-	/* error handling and process wake up for DAC */
-	if (dmabuf->enable == DAC_RUNNING) {
-		if (dmabuf->mapped) {
-			dmabuf->count += diff;
-			if (dmabuf->count >= (signed)dmabuf->fragsize)
-				wake_up(&dmabuf->wait);
-		} else {
-			dmabuf->count -= diff;
-
-			if (dmabuf->count < 0 || dmabuf->count > dmabuf->dmasize) {
-				/* buffer underrun or buffer overrun, we have no way to recover
-				   it here, just stop the machine and let the process force hwptr
-				   and swptr to sync */
-				__stop_dac(state);
-				printk(KERN_WARNING "i810_audio: DMA overrun on send\n");
-				dmabuf->error++;
-			}
-			if (dmabuf->count < (signed)dmabuf->dmasize/2) {
-				wake_up(&dmabuf->wait);
-			}
-		}
-	}
-}
-
 static void i810_channel_interrupt(struct i810_card *card)
 {
-	int i;
-
+	int i, count;
+	
+#ifdef DEBUG_INTERRUPTS
+	printk("CHANNEL ");
+#endif
 	for(i=0;i<NR_HW_CH;i++)
 	{
 		struct i810_state *state = card->states[i];
 		struct i810_channel *c;
+		struct dmabuf *dmabuf;
 		unsigned long port = card->iobase;
 		u16 status;
 		
@@ -944,34 +960,55 @@ static void i810_channel_interrupt(struct i810_card *card)
 			continue;
 		if(!state->dmabuf.ready)
 			continue;
-		if(state->dmabuf.enable & DAC_RUNNING)
-			c=state->dmabuf.write_channel;
+		dmabuf = &state->dmabuf;
+		if(dmabuf->enable & DAC_RUNNING)
+			c=dmabuf->write_channel;
 		else
-			c=state->dmabuf.read_channel;
+			c=dmabuf->read_channel;
 		
 		port+=c->port;
 		
 		status = inw(port + OFF_SR);
-		
+#ifdef DEBUG_INTERRUPTS
+		printk("NUM %d PORT %lX IRQ ( ST%d ", c->num, c->port, status);
+#endif
 		if(status & DMA_INT_COMPLETE)
 		{
-			int x;
-			/* Keep the card chasing its tail */
-			outb(x=((inb(port+OFF_CIV)-1)&31), port+OFF_LVI);
 			i810_update_ptr(state);
+#ifdef DEBUG_INTERRUPTS
+			printk("COMP%d ",x);
+#endif
 		}
 		if(status & DMA_INT_LVI)
 		{
-			/* Back to the start */
 			i810_update_ptr(state);
-			outb(0, port + OFF_CR);
+			wake_up(&dmabuf->wait);
+#ifdef DEBUG_INTERRUPTS
+			printk("LVI ");
+#endif
+		}
+		if(status & DMA_INT_DCH)
+		{
+			i810_update_ptr(state);
+			if(dmabuf->enable & DAC_RUNNING)
+				count = dmabuf->count;
+			else
+				count = dmabuf->dmasize - dmabuf->count;
+			if(count > 0) {
+				outb(inb(port+OFF_CR) | 1, port+OFF_CR);
+			} else {
+				wake_up(&dmabuf->wait);
+#ifdef DEBUG_INTERRUPTS
+				printk("DCH - STOP ");
+#endif
+			}
 		}
 		outw(status & DMA_INT_MASK, port + OFF_SR);
 	}
+#ifdef DEBUG_INTERRUPTS
+	printk(")\n");
+#endif
 }
-
-static u32 jiff = 0;
-static u32 jiff_count = 0;
 
 static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -1009,10 +1046,10 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
-	unsigned swptr;
+	unsigned int swptr;
 	int cnt;
 
-#ifdef DEBUG
+#ifdef DEBUG2
 	printk("i810_audio: i810_read called, count = %d\n", count);
 #endif
 
@@ -1026,43 +1063,45 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		dmabuf->ready = 0;
 		dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
 		if (!dmabuf->read_channel) {
-			return -ENODEV;
+			return -EBUSY;
 		}
 	}
 	if (!dmabuf->ready && (ret = prog_dmabuf(state, 1)))
 		return ret;
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
+	dmabuf->trigger &= ~PCM_ENABLE_OUTPUT;
 	ret = 0;
 
 	while (count > 0) {
 		spin_lock_irqsave(&state->card->lock, flags);
-		if (dmabuf->count > (signed) dmabuf->dmasize) {
-			/* buffer overrun, we are recovering from sleep_on_timeout,
-			   resync hwptr and swptr, make process flush the buffer */
-			dmabuf->count = dmabuf->dmasize;
-			dmabuf->swptr = dmabuf->hwptr;
-		}
 		swptr = dmabuf->swptr;
-		cnt = dmabuf->dmasize - swptr;
-		if (dmabuf->count < cnt)
-			cnt = dmabuf->count;
+		if (dmabuf->count > dmabuf->dmasize) {
+			dmabuf->count = 0;
+		}
+		cnt = dmabuf->count;
+		if(cnt > (dmabuf->dmasize - swptr))
+			cnt = dmabuf->dmasize - swptr;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
 		if (cnt > count)
 			cnt = count;
 		if (cnt <= 0) {
 			unsigned long tmo;
-			/* buffer is empty, start the dma machine and wait for data to be
-			   recorded */
-			start_adc(state);
+			// are we already running?  only start us if we aren't running
+			// currently
+			i810_update_lvi(state,1);
+			if(!dmabuf->enable) {
+				dmabuf->trigger |= PCM_ENABLE_INPUT;
+				start_adc(state);
+			}
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
 				return ret;
 			}
 			/* This isnt strictly right for the 810  but it'll do */
 			tmo = (dmabuf->dmasize * HZ) / (dmabuf->rate * 2);
-			tmo >>= sample_shift[dmabuf->fmt];
+			tmo >>= 1;
 			/* There are two situations when sleep_on_timeout returns, one is when
 			   the interrupt is serviced correctly and the process is waked up by
 			   ISR ON TIME. Another is when timeout is expired, which means that
@@ -1102,8 +1141,9 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_adc(state);
 	}
+	i810_update_lvi(state,1);
+	start_adc(state);
 	return ret;
 }
 
@@ -1115,10 +1155,10 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 	struct dmabuf *dmabuf = &state->dmabuf;
 	ssize_t ret;
 	unsigned long flags;
-	unsigned swptr;
-	int cnt;
+	unsigned int swptr = 0;
+	int cnt, x;
 
-#ifdef DEBUG
+#ifdef DEBUG2
 	printk("i810_audio: i810_write called, count = %d\n", count);
 #endif
 
@@ -1132,25 +1172,23 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		dmabuf->ready = 0;
 		dmabuf->write_channel = state->card->alloc_pcm_channel(state->card);
 		if(!dmabuf->write_channel)
-			return -ENODEV;
+			return -EBUSY;
 	}
 	if (!dmabuf->ready && (ret = prog_dmabuf(state, 0)))
 		return ret;
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
+	dmabuf->trigger &= ~PCM_ENABLE_INPUT;
 	ret = 0;
 
 	while (count > 0) {
 		spin_lock_irqsave(&state->card->lock, flags);
-		if (dmabuf->count < 0) {
-			/* buffer underrun, we are recovering from sleep_on_timeout,
-			   resync hwptr and swptr */
-			dmabuf->count = 0;
-			dmabuf->swptr = dmabuf->hwptr;
-		}
 		swptr = dmabuf->swptr;
+		if (dmabuf->count < 0) {
+			dmabuf->count = 0;
+		}
 		cnt = dmabuf->dmasize - swptr;
-		if (dmabuf->count + cnt > dmabuf->dmasize)
+		if(cnt > (dmabuf->dmasize - dmabuf->count))
 			cnt = dmabuf->dmasize - dmabuf->count;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
@@ -1158,16 +1196,20 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 			cnt = count;
 		if (cnt <= 0) {
 			unsigned long tmo;
-			/* buffer is full, start the dma machine and wait for data to be
-			   played */
-			start_dac(state);
+			// There is data waiting to be played
+			i810_update_lvi(state,0);
+			if(!dmabuf->enable && dmabuf->count) {
+				/* force the starting incase SETTRIGGER has been used */
+				/* to stop it, otherwise this is a deadlock situation */
+				dmabuf->trigger |= PCM_ENABLE_OUTPUT;
+				start_dac(state);
+			}
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
 				return ret;
 			}
 			/* Not strictly correct but works */
-			tmo = dmabuf->rate << (sample_shift[dmabuf->fmt] + 1);
-			tmo = dmabuf->dmasize * HZ / tmo;
+			tmo = (dmabuf->dmasize * HZ) / (dmabuf->rate * 4);
 			/* There are two situations when sleep_on_timeout returns, one is when
 			   the interrupt is serviced correctly and the process is waked up by
 			   ISR ON TIME. Another is when timeout is expired, which means that
@@ -1184,6 +1226,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 #endif
 				/* a buffer underrun, we delay the recovery until next time the
 				   while loop begin and we REALLY have data to play */
+				//return ret;
 			}
 			if (signal_pending(current)) {
 				if (!ret) ret = -ERESTARTSYS;
@@ -1191,7 +1234,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 			}
 			continue;
 		}
-		if (copy_from_user(dmabuf->rawbuf + swptr, buffer, cnt)) {
+		if (copy_from_user(dmabuf->rawbuf+swptr,buffer,cnt)) {
 			if (!ret) ret = -EFAULT;
 			return ret;
 		}
@@ -1201,14 +1244,21 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 		spin_lock_irqsave(&state->card->lock, flags);
 		dmabuf->swptr = swptr;
 		dmabuf->count += cnt;
-		dmabuf->endcleared = 0;
 		spin_unlock_irqrestore(&state->card->lock, flags);
 
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_dac(state);
 	}
+	if (swptr % dmabuf->fragsize) {
+		x = dmabuf->fragsize - (swptr % dmabuf->fragsize);
+		if((x + dmabuf->count) < dmabuf->dmasize)
+			memset(dmabuf->rawbuf + swptr, '\0', x);
+	}
+	i810_update_lvi(state,0);
+	if (!dmabuf->enable && dmabuf->count >= dmabuf->ossfragsize)
+		start_dac(state);
+
 	return ret;
 }
 
@@ -1220,21 +1270,9 @@ static unsigned int i810_poll(struct file *file, struct poll_table_struct *wait)
 	unsigned long flags;
 	unsigned int mask = 0;
 
-	if (file->f_mode & FMODE_WRITE) {
-		if (!dmabuf->write_channel)
-			return 0;
-		if (!dmabuf->ready && prog_dmabuf(state, 0))
-			return 0;
-		poll_wait(file, &dmabuf->wait, wait);
-	} else { 
-	// don't do both read and write paths or we won't get woke up properly
-	// when we have a file with both permissions
-		if (!dmabuf->read_channel)
-			return 0;
-		if (!dmabuf->ready && prog_dmabuf(state, 1))
-			return 0;
-		poll_wait(file, &dmabuf->wait, wait);
-	}
+	if(!dmabuf->ready)
+		return 0;
+	poll_wait(file, &dmabuf->wait, wait);
 	spin_lock_irqsave(&state->card->lock, flags);
 	i810_update_ptr(state);
 	if (file->f_mode & FMODE_READ && dmabuf->enable & ADC_RUNNING) {
@@ -1262,22 +1300,24 @@ static int i810_mmap(struct file *file, struct vm_area_struct *vma)
 	int ret = -EINVAL;
 	unsigned long size;
 
-	/* 
-	 *	Until we figure out a few problems
-	 */
-	 
 	lock_kernel();
 	if (vma->vm_flags & VM_WRITE) {
-		if (!dmabuf->write_channel && (dmabuf->write_channel = state->card->alloc_pcm_channel(state->card)) == NULL)
+		if (!dmabuf->write_channel &&
+		    (dmabuf->write_channel =
+		     state->card->alloc_pcm_channel(state->card)) == NULL) {
+			ret = -EBUSY;
 			goto out;
-		if ((ret = prog_dmabuf(state, 0)) != 0)
+		}
+	}
+	if (vma->vm_flags & VM_READ) {
+		if (!dmabuf->read_channel &&
+		    (dmabuf->read_channel = 
+		     state->card->alloc_rec_pcm_channel(state->card)) == NULL) {
+			ret = -EBUSY;
 			goto out;
-	} else if (vma->vm_flags & VM_READ) {
-		if (!dmabuf->read_channel && (dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card)) == NULL)
-			goto out;
-		if ((ret = prog_dmabuf(state, 1)) != 0)
-			goto out;
-	} else 
+		}
+	}
+	if ((ret = prog_dmabuf(state, 0)) != 0)
 		goto out;
 
 	ret = -EINVAL;
@@ -1291,9 +1331,13 @@ static int i810_mmap(struct file *file, struct vm_area_struct *vma)
 			     size, vma->vm_page_prot))
 		goto out;
 	dmabuf->mapped = 1;
+	if(vma->vm_flags & VM_WRITE)
+		dmabuf->count = dmabuf->dmasize;
+	else
+		dmabuf->count = 0;
 	ret = 0;
 #ifdef DEBUG
-	printk("i810_audio: mmap'ed %d bytes of data space\n", size);
+	printk("i810_audio: mmap'ed %ld bytes of data space\n", size);
 #endif
 out:
 	unlock_kernel();
@@ -1312,41 +1356,52 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 	mapped = ((file->f_mode & FMODE_WRITE) && dmabuf->mapped) ||
 		((file->f_mode & FMODE_READ) && dmabuf->mapped);
 #ifdef DEBUG
-	printk("i810_audio: i810_ioctl, command = %2d, arg = 0x%08x\n",
-	       _IOC_NR(cmd), arg ? *(int *)arg : 0);
+	printk("i810_audio: i810_ioctl, arg=0x%x, cmd=", arg ? *(int *)arg : 0);
 #endif
 
 	switch (cmd) 
 	{
 	case OSS_GETVERSION:
+#ifdef DEBUG
+		printk("OSS_GETVERSION\n");
+#endif
 		return put_user(SOUND_VERSION, (int *)arg);
 
 	case SNDCTL_DSP_RESET:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_RESET\n");
+#endif
 		/* FIXME: spin_lock ? */
-		if (file->f_mode & FMODE_WRITE) {
+		if (dmabuf->enable == DAC_RUNNING) {
 			stop_dac(state);
-			synchronize_irq();
-			dmabuf->ready = 0;
-			resync_dma_ptrs(state, 0);
-			dmabuf->swptr = dmabuf->hwptr = 0;
-			dmabuf->count = dmabuf->total_bytes = 0;
 		}
-		if (file->f_mode & FMODE_READ) {
+		if (dmabuf->enable == ADC_RUNNING) {
 			stop_adc(state);
-			synchronize_irq();
-			resync_dma_ptrs(state, 1);
-			dmabuf->ready = 0;
-			dmabuf->swptr = dmabuf->hwptr = 0;
-			dmabuf->count = dmabuf->total_bytes = 0;
 		}
+		synchronize_irq();
+		dmabuf->ready = 0;
+		dmabuf->swptr = dmabuf->hwptr = 0;
+		dmabuf->count = dmabuf->total_bytes = 0;
 		return 0;
 
 	case SNDCTL_DSP_SYNC:
-		if (file->f_mode & FMODE_WRITE)
-			return drain_dac(state, file->f_flags & O_NONBLOCK);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SYNC\n");
+#endif
+		if (dmabuf->enable != DAC_RUNNING || file->f_flags & O_NONBLOCK)
+			return 0;
+		drain_dac(state, 0);
+		stop_dac(state);
+		synchronize_irq();
+		dmabuf->ready = 0;
+		dmabuf->swptr = dmabuf->hwptr = 0;
+		dmabuf->count = dmabuf->total_bytes = 0;
 		return 0;
 
 	case SNDCTL_DSP_SPEED: /* set smaple rate */
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SPEED\n");
+#endif
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
 		if (val >= 0) {
@@ -1368,71 +1423,68 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		return put_user(dmabuf->rate, (int *)arg);
 
 	case SNDCTL_DSP_STEREO: /* set stereo or mono channel */
+#ifdef DEBUG
+		printk("SNDCTL_DSP_STEREO\n");
+#endif
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
-		if(val==0)
-			return -EINVAL;
-		if (file->f_mode & FMODE_WRITE) {
+		if(val==0) {
+			ret = -EINVAL;
+		} else {
+			ret = 1;
+		}
+		if (dmabuf->enable & DAC_RUNNING) {
 			stop_dac(state);
-			dmabuf->ready = 0;
-			dmabuf->fmt |= I810_FMT_STEREO;
 		}
-		if (file->f_mode & FMODE_READ) {
+		if (dmabuf->enable & ADC_RUNNING) {
 			stop_adc(state);
-			dmabuf->ready = 0;
-			dmabuf->fmt |= I810_FMT_STEREO;
 		}
-		return 0;
+		return ret;
 
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
 			if (!dmabuf->ready && (val = prog_dmabuf(state, 0)))
 				return val;
-			return put_user(dmabuf->fragsize, (int *)arg);
 		}
 		if (file->f_mode & FMODE_READ) {
 			if (!dmabuf->ready && (val = prog_dmabuf(state, 1)))
 				return val;
-			return put_user(dmabuf->fragsize, (int *)arg);
 		}
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETBLKSIZE %d\n", dmabuf->ossfragsize);
+#endif
+		return put_user(dmabuf->ossfragsize, (int *)arg);
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask of supported sample format*/
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETFMTS\n");
+#endif
 		return put_user(AFMT_S16_LE, (int *)arg);
 
 	case SNDCTL_DSP_SETFMT: /* Select sample format */
-		if (get_user(val, (int *)arg))
-			return -EFAULT;
-		if (val != AFMT_QUERY) {
-			if (file->f_mode & FMODE_WRITE) {
-				stop_dac(state);
-				dmabuf->ready = 0;
-				dmabuf->fmt |= I810_FMT_16BIT;
-			}
-			if (file->f_mode & FMODE_READ) {
-				stop_adc(state);
-				dmabuf->ready = 0;
-				dmabuf->fmt |= I810_FMT_16BIT;
-			}
-		}
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SETFMT\n");
+#endif
 		return put_user(AFMT_S16_LE, (int *)arg);
 
 	case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, (int *)arg))
-			return -EFAULT;
-		if (val != 0) {
-			if (file->f_mode & FMODE_WRITE) {
-				stop_dac(state);
-				dmabuf->ready = 0;
-			}
-			if (file->f_mode & FMODE_READ) {
-				stop_adc(state);
-				dmabuf->ready = 0;
-			}
-		}
+#ifdef DEBUG
+		printk("SNDCTL_DSP_CHANNELS\n");
+#endif
 		return put_user(2, (int *)arg);
 
-	case SNDCTL_DSP_POST:
-		/* FIXME: the same as RESET ?? */
+	case SNDCTL_DSP_POST: /* the user has sent all data and is notifying us */
+		/* we update the swptr to the end of the last sg segment then return */
+#ifdef DEBUG
+		printk("SNDCTL_DSP_POST\n");
+#endif
+		if(!dmabuf->ready || (dmabuf->enable != DAC_RUNNING))
+			return 0;
+		if((dmabuf->swptr % dmabuf->fragsize) != 0) {
+			val = dmabuf->fragsize - (dmabuf->swptr % dmabuf->fragsize);
+			dmabuf->swptr += val;
+			dmabuf->count += val;
+		}
 		return 0;
 
 	case SNDCTL_DSP_SUBDIVIDE:
@@ -1442,6 +1494,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SUBDIVIDE %d\n", val);
+#endif
 		dmabuf->subdivision = val;
 		dmabuf->ready = 0;
 		return 0;
@@ -1450,15 +1505,27 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
 
-		dmabuf->ossfragshift = val & 0xffff;
+		dmabuf->ossfragsize = 1<<(val & 0xffff);
 		dmabuf->ossmaxfrags = (val >> 16) & 0xffff;
-		if (dmabuf->ossfragshift < 4)
-			dmabuf->ossfragshift = 4;
-		if (dmabuf->ossfragshift > 15)
-			dmabuf->ossfragshift = 15;
-		if (dmabuf->ossmaxfrags < 4)
+		if (dmabuf->ossmaxfrags <= 4)
 			dmabuf->ossmaxfrags = 4;
+		else if (dmabuf->ossmaxfrags <= 8)
+			dmabuf->ossmaxfrags = 8;
+		else if (dmabuf->ossmaxfrags <= 16)
+			dmabuf->ossmaxfrags = 16;
+		else
+			dmabuf->ossmaxfrags = 32;
+		val = dmabuf->ossfragsize * dmabuf->ossmaxfrags;
+		if (val < 16384)
+			val = 16384;
+		if (val > 65536)
+			val = 65536;
+		dmabuf->ossfragsize = val/dmabuf->ossmaxfrags;
 		dmabuf->ready = 0;
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SETFRAGMENT 0x%x, %d, %d\n", val,
+			dmabuf->ossfragsize, dmabuf->ossmaxfrags);
+#endif
 
 		return 0;
 
@@ -1469,12 +1536,41 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return val;
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
-		abinfo.fragsize = dmabuf->fragsize;
-		abinfo.bytes = dmabuf->dmasize - dmabuf->count;
-		abinfo.fragstotal = dmabuf->numfrag;
-		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
+		abinfo.fragsize = dmabuf->ossfragsize;
+		abinfo.fragstotal = dmabuf->ossmaxfrags;
+		if(dmabuf->mapped)
+			abinfo.bytes = dmabuf->count;
+		else
+			abinfo.bytes = dmabuf->dmasize - dmabuf->count;
+		abinfo.fragments = abinfo.bytes / dmabuf->ossfragsize;
 		spin_unlock_irqrestore(&state->card->lock, flags);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETOSPACE %d, %d, %d, %d\n", abinfo.bytes,
+			abinfo.fragsize, abinfo.fragments, abinfo.fragstotal);
+#endif
 		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+
+	case SNDCTL_DSP_GETOPTR:
+		if (!(file->f_mode & FMODE_WRITE))
+			return -EINVAL;
+		if (!dmabuf->ready && (val = prog_dmabuf(state, 0)) != 0)
+			return val;
+		spin_lock_irqsave(&state->card->lock, flags);
+		i810_update_ptr(state);
+		cinfo.bytes = dmabuf->total_bytes;
+		cinfo.ptr = dmabuf->hwptr;
+		cinfo.blocks = (dmabuf->dmasize - dmabuf->count)/dmabuf->ossfragsize;
+		if (dmabuf->mapped) {
+			dmabuf->count = (dmabuf->dmasize - 
+					 (dmabuf->count & (dmabuf->ossfragsize-1)));
+			__i810_update_lvi(state, 0);
+		}
+		spin_unlock_irqrestore(&state->card->lock, flags);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETOPTR %d, %d, %d, %d\n", cinfo.bytes,
+			cinfo.blocks, cinfo.ptr, dmabuf->count);
+#endif
+		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -1483,87 +1579,111 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			return val;
 		spin_lock_irqsave(&state->card->lock, flags);
 		i810_update_ptr(state);
-		abinfo.fragsize = dmabuf->fragsize;
-		abinfo.bytes = dmabuf->count;
-		abinfo.fragstotal = dmabuf->numfrag;
-		abinfo.fragments = abinfo.bytes >> dmabuf->fragshift;
+		abinfo.fragsize = dmabuf->ossfragsize;
+		abinfo.fragstotal = dmabuf->ossmaxfrags;
+		abinfo.bytes = dmabuf->dmasize - dmabuf->count;
+		abinfo.fragments = abinfo.bytes / dmabuf->ossfragsize;
 		spin_unlock_irqrestore(&state->card->lock, flags);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETISPACE %d, %d, %d, %d\n", abinfo.bytes,
+			abinfo.fragsize, abinfo.fragments, abinfo.fragstotal);
+#endif
 		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
+	case SNDCTL_DSP_GETIPTR:
+		if (!(file->f_mode & FMODE_READ))
+			return -EINVAL;
+		if (!dmabuf->ready && (val = prog_dmabuf(state, 0)) != 0)
+			return val;
+		spin_lock_irqsave(&state->card->lock, flags);
+		i810_update_ptr(state);
+		cinfo.bytes = dmabuf->total_bytes;
+		cinfo.blocks = dmabuf->count/dmabuf->ossfragsize;
+		cinfo.ptr = dmabuf->hwptr;
+		if (dmabuf->mapped) {
+			dmabuf->count &= dmabuf->ossfragsize-1;
+			__i810_update_lvi(state, 1);
+		}
+		spin_unlock_irqrestore(&state->card->lock, flags);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETIPTR %d, %d, %d, %d\n", cinfo.bytes,
+			cinfo.blocks, cinfo.ptr, dmabuf->count);
+#endif
+		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+
 	case SNDCTL_DSP_NONBLOCK:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_NONBLOCK\n");
+#endif
 		file->f_flags |= O_NONBLOCK;
 		return 0;
 
 	case SNDCTL_DSP_GETCAPS:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETCAPS\n");
+#endif
 	    return put_user(DSP_CAP_REALTIME|DSP_CAP_TRIGGER|DSP_CAP_MMAP|DSP_CAP_BIND,
 			    (int *)arg);
 
 	case SNDCTL_DSP_GETTRIGGER:
 		val = 0;
-		if (file->f_mode & FMODE_READ && dmabuf->enable & ADC_RUNNING)
-			val |= PCM_ENABLE_INPUT;
-		if (file->f_mode & FMODE_WRITE && dmabuf->enable & DAC_RUNNING)
-			val |= PCM_ENABLE_OUTPUT;
-		return put_user(val, (int *)arg);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETTRIGGER 0x%x\n", dmabuf->trigger);
+#endif
+		return put_user(dmabuf->trigger, (int *)arg);
 
 	case SNDCTL_DSP_SETTRIGGER:
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
-		if (file->f_mode & FMODE_READ && val & PCM_ENABLE_INPUT) {
-			if (dmabuf->enable & DAC_RUNNING)
-				return -ENODEV;
-			if (!dmabuf->read_channel) {
-				dmabuf->ready = 0;
-				dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
-				if (!dmabuf->read_channel)
-					return -ENODEV;
-			}
-			if (!dmabuf->ready && (ret = prog_dmabuf(state, 1)))
-				return ret;
-			start_adc(state);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SETTRIGGER 0x%x\n", val);
+#endif
+		if( !(val & PCM_ENABLE_INPUT) && dmabuf->enable == ADC_RUNNING) {
+			stop_adc(state);
 		}
-		if (file->f_mode & FMODE_WRITE && val & PCM_ENABLE_OUTPUT) {
-			if (dmabuf->enable & ADC_RUNNING)
-				return -ENODEV;
+		if( !(val & PCM_ENABLE_OUTPUT) && dmabuf->enable == DAC_RUNNING) {
+			stop_dac(state);
+		}
+		dmabuf->trigger = val;
+		if(val & PCM_ENABLE_OUTPUT) {
 			if (!dmabuf->write_channel) {
 				dmabuf->ready = 0;
 				dmabuf->write_channel = state->card->alloc_pcm_channel(state->card);
 				if (!dmabuf->write_channel)
-					return -ENODEV;
+					return -EBUSY;
 			}
 			if (!dmabuf->ready && (ret = prog_dmabuf(state, 0)))
 				return ret;
-			start_dac(state);
+			if (dmabuf->mapped) {
+				dmabuf->count = dmabuf->dmasize;
+				i810_update_lvi(state,0);
+			}
+			if (!dmabuf->enable && dmabuf->count > dmabuf->fragsize)
+				start_dac(state);
+		}
+		if(val & PCM_ENABLE_INPUT) {
+			if (!dmabuf->read_channel) {
+				dmabuf->ready = 0;
+				dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
+				if (!dmabuf->read_channel)
+					return -EBUSY;
+			}
+			if (!dmabuf->ready && (ret = prog_dmabuf(state, 1)))
+				return ret;
+			if (dmabuf->mapped) {
+				dmabuf->count = 0;
+				i810_update_lvi(state,1);
+			}
+			if (!dmabuf->enable && dmabuf->count <
+			    (dmabuf->dmasize - dmabuf->fragsize))
+				start_adc(state);
 		}
 		return 0;
 
-	case SNDCTL_DSP_GETIPTR:
-		if (!(file->f_mode & FMODE_READ))
-			return -EINVAL;
-		spin_lock_irqsave(&state->card->lock, flags);
-		i810_update_ptr(state);
-		cinfo.bytes = dmabuf->total_bytes;
-		cinfo.blocks = dmabuf->count >> dmabuf->fragshift;
-		cinfo.ptr = dmabuf->hwptr;
-		if (dmabuf->mapped)
-			dmabuf->count &= dmabuf->fragsize-1;
-		spin_unlock_irqrestore(&state->card->lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
-
-	case SNDCTL_DSP_GETOPTR:
-		if (!(file->f_mode & FMODE_WRITE))
-			return -EINVAL;
-		spin_lock_irqsave(&state->card->lock, flags);
-		i810_update_ptr(state);
-		cinfo.bytes = dmabuf->total_bytes;
-		cinfo.blocks = dmabuf->count >> dmabuf->fragshift;
-		cinfo.ptr = dmabuf->hwptr;
-		if (dmabuf->mapped)
-			dmabuf->count &= dmabuf->fragsize-1;
-		spin_unlock_irqrestore(&state->card->lock, flags);
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
-
 	case SNDCTL_DSP_SETDUPLEX:
+#ifdef DEBUG
+		printk("SNDCTL_DSP_SETDUPLEX\n");
+#endif
 		return -EINVAL;
 
 	case SNDCTL_DSP_GETODELAY:
@@ -1573,16 +1693,27 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		i810_update_ptr(state);
 		val = dmabuf->count;
 		spin_unlock_irqrestore(&state->card->lock, flags);
+#ifdef DEBUG
+		printk("SNDCTL_DSP_GETODELAY %d\n", dmabuf->count);
+#endif
 		return put_user(val, (int *)arg);
 
 	case SOUND_PCM_READ_RATE:
+#ifdef DEBUG
+		printk("SOUND_PCM_READ_RATE %d\n", dmabuf->rate);
+#endif
 		return put_user(dmabuf->rate, (int *)arg);
 
 	case SOUND_PCM_READ_CHANNELS:
-		return put_user((dmabuf->fmt & I810_FMT_STEREO) ? 2 : 1,
-				(int *)arg);
+#ifdef DEBUG
+		printk("SOUND_PCM_READ_CHANNELS\n");
+#endif
+		return put_user(2, (int *)arg);
 
 	case SOUND_PCM_READ_BITS:
+#ifdef DEBUG
+		printk("SOUND_PCM_READ_BITS\n");
+#endif
 		return put_user(AFMT_S16_LE, (int *)arg);
 
 	case SNDCTL_DSP_MAPINBUF:
@@ -1590,6 +1721,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 	case SNDCTL_DSP_SETSYNCRO:
 	case SOUND_PCM_WRITE_FILTER:
 	case SOUND_PCM_READ_FILTER:
+#ifdef DEBUG
+		printk("SNDCTL_* -EINVAL\n");
+#endif
 		return -EINVAL;
 	}
 	return -EINVAL;
@@ -1621,7 +1755,7 @@ static int i810_open(struct inode *inode, struct file *file)
 	if (!state)
 		return -ENODEV;
 
- found_virt:
+found_virt:
 	/* initialize the virtual channel */
 	state->virt = i;
 	state->card = card;
@@ -1629,33 +1763,36 @@ static int i810_open(struct inode *inode, struct file *file)
 	init_waitqueue_head(&dmabuf->wait);
 	init_MUTEX(&state->open_sem);
 	file->private_data = state;
+	dmabuf->trigger = 0;
 
 	/* allocate hardware channels */
 	if(file->f_mode & FMODE_READ) {
 		if((dmabuf->read_channel = card->alloc_rec_pcm_channel(card)) == NULL) {
 			kfree (card->states[i]);
 			card->states[i] = NULL;;
-			return -ENODEV;
+			return -EBUSY;
 		}
-		i810_set_adc_rate(state, 48000);
+		i810_set_adc_rate(state, 8000);
+		dmabuf->trigger |= PCM_ENABLE_INPUT;
 	}
 	if(file->f_mode & FMODE_WRITE) {
 		if((dmabuf->write_channel = card->alloc_pcm_channel(card)) == NULL) {
 			kfree (card->states[i]);
 			card->states[i] = NULL;;
-			return -ENODEV;
+			return -EBUSY;
 		}
-		i810_set_dac_rate(state, 48000);
+		i810_set_dac_rate(state, 8000);
+		dmabuf->trigger |= PCM_ENABLE_OUTPUT;
 	}
 		
 	down(&state->open_sem);
 
 	/* set default sample format. According to OSS Programmer's Guide  /dev/dsp
 	   should be default to unsigned 8-bits, mono, with sample rate 8kHz and
-	   /dev/dspW will accept 16-bits sample */
-	dmabuf->fmt &= ~I810_FMT_MASK;
-	dmabuf->fmt |= I810_FMT_16BIT;
-	dmabuf->ossfragshift = 0;
+	   /dev/dspW will accept 16-bits sample, but we don't support those so we
+	   set it immediately to stereo and 16bit, which is all we do support */
+	dmabuf->fmt |= I810_FMT_16BIT | I810_FMT_STEREO;
+	dmabuf->ossfragsize = 0;
 	dmabuf->ossmaxfrags  = 0;
 	dmabuf->subdivision  = 0;
 
@@ -1671,22 +1808,23 @@ static int i810_release(struct inode *inode, struct file *file)
 	struct dmabuf *dmabuf = &state->dmabuf;
 
 	lock_kernel();
-	if (file->f_mode & FMODE_WRITE) {
-	}
 
-	/* stop DMA state machine and free DMA buffers/channels */
 	down(&state->open_sem);
 
-	if (dmabuf->enable & DAC_RUNNING) {
-		i810_clear_tail(state);
-		drain_dac(state, file->f_flags & O_NONBLOCK);
+	/* stop DMA state machine and free DMA buffers/channels */
+	if(dmabuf->enable == DAC_RUNNING ||
+	   (dmabuf->count && (dmabuf->trigger & PCM_ENABLE_OUTPUT))) {
+		if(drain_dac(state,file->f_mode & O_NDELAY)) {
+			up(&state->open_sem);
+			unlock_kernel();
+			return -EBUSY;
+		}
 		stop_dac(state);
-		dealloc_dmabuf(state);
 	}
 	if(dmabuf->enable & ADC_RUNNING) {
 		stop_adc(state);
-		dealloc_dmabuf(state);
 	}
+	dealloc_dmabuf(state);
 	if (file->f_mode & FMODE_WRITE) {
 		state->card->free_pcm_channel(state->card, dmabuf->write_channel->num);
 	}
@@ -1827,6 +1965,19 @@ static int __init i810_ac97_init(struct i810_card *card)
 		if (ac97_probe_codec(codec) == 0)
 			break;
 
+		/* power up everything, modify this when implementing power saving */
+		i810_ac97_set(codec, AC97_POWER_CONTROL,
+			i810_ac97_get(codec, AC97_POWER_CONTROL) & ~0x7f00);
+		/* wait for analog ready */
+	        for (i=10;
+		     i && ((i810_ac97_get(codec, AC97_POWER_CONTROL) & 0xf) != 0xf);
+		     i--)
+		{
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ/20);
+		}
+
+		/* Don't attempt to get eid until powerup is complete */
 		eid = i810_ac97_get(codec, AC97_EXTENDED_ID);
 		
 		if(eid==0xFFFFFF)
@@ -1845,18 +1996,6 @@ static int __init i810_ac97_init(struct i810_card *card)
 			printk(KERN_WARNING "i810_audio: only 48Khz playback available.\n");
 		else
 		{
-			/* power up everything, modify this when implementing power saving */
-			i810_ac97_set(codec, AC97_POWER_CONTROL,
-				i810_ac97_get(codec, AC97_POWER_CONTROL) & ~0x7f00);
-			/* wait for analog ready */
-		        for (i=10;
-			     i && ((i810_ac97_get(codec, AC97_POWER_CONTROL) & 0xf) != 0xf);
-			     i--)
-			{
-				current->state = TASK_UNINTERRUPTIBLE;
-				schedule_timeout(HZ/20);
-			}
-
 			/* Enable variable rate mode */
 			i810_ac97_set(codec, AC97_EXTENDED_STATUS, 9);
 			i810_ac97_set(codec,AC97_EXTENDED_STATUS,
@@ -1996,6 +2135,7 @@ MODULE_AUTHOR("");
 MODULE_DESCRIPTION("Intel 810 audio support");
 MODULE_PARM(ftsodell, "i");
 MODULE_PARM(clocking, "i");
+MODULE_PARM(strict_clocking, "i");
 
 #define I810_MODULE_NAME "intel810_audio"
 
@@ -2036,6 +2176,7 @@ static void __init i810_configure_clocking (void)
 		init_waitqueue_head(&dmabuf->wait);
 		init_MUTEX(&state->open_sem);
 		dmabuf->fmt = I810_FMT_STEREO | I810_FMT_16BIT;
+		dmabuf->trigger = PCM_ENABLE_OUTPUT;
 		i810_set_dac_rate(state, 48000);
 		if(prog_dmabuf(state, 0) != 0) {
 			goto config_out_nodmabuf;
@@ -2044,25 +2185,30 @@ static void __init i810_configure_clocking (void)
 			goto config_out;
 		}
 		dmabuf->count = dmabuf->dmasize;
+		outb(31,card->iobase+dmabuf->write_channel->port+OFF_LVI);
 		save_flags(flags);
 		cli();
 		start_dac(state);
-		offset = i810_get_dma_addr(state);
+		offset = i810_get_dma_addr(state, 0);
 		mdelay(50);
-		new_offset = i810_get_dma_addr(state);
+		new_offset = i810_get_dma_addr(state, 0);
 		stop_dac(state);
 		outb(2,card->iobase+dmabuf->write_channel->port+OFF_CR);
 		restore_flags(flags);
 		i = new_offset - offset;
+#ifdef DEBUG
 		printk("i810_audio: %d bytes in 50 milliseconds\n", i);
+#endif
+		if(i == 0)
+			goto config_out;
 		i = i / 4 * 20;
 		if (i > 48500 || i < 47500) {
 			clocking = clocking * clocking / i;
-			printk("i810_audio: setting clocking to %d to compensate\n", clocking);
+			printk("i810_audio: setting clocking to %d\n", clocking);
 		}
-config_out_nodmabuf:
-		dealloc_dmabuf(state);
 config_out:
+		dealloc_dmabuf(state);
+config_out_nodmabuf:
 		state->card->free_pcm_channel(state->card,state->dmabuf.write_channel->num);
 		kfree(state);
 		card->states[0] = NULL;

@@ -158,6 +158,7 @@ ia64_fls (unsigned long x)
 	__asm__ ("getf.exp %0=%1" : "=r"(exp) : "f"(d));
 	return exp - 0xffff;
 }
+
 /*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore

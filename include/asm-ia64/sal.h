@@ -28,15 +28,12 @@ extern spinlock_t sal_lock;
 #define __SAL_CALL(result,a0,a1,a2,a3,a4,a5,a6,a7)	\
 	result = (*ia64_sal)(a0,a1,a2,a3,a4,a5,a6,a7)
 
-#ifdef CONFIG_SMP
-# define SAL_CALL(result,args...) do {		\
-	  spin_lock(&sal_lock);			\
-	  __SAL_CALL(result,args);		\
-	  spin_unlock(&sal_lock);		\
+# define SAL_CALL(result,args...) do {			\
+	unsigned long flags;				\
+	spin_lock_irqsave(&sal_lock, flags);		\
+	__SAL_CALL(result,args);			\
+	spin_unlock_irqrestore(&sal_lock, flags);	\
 } while (0)
-#else
-# define SAL_CALL(result,args...)	__SAL_CALL(result,args)
-#endif
 
 #define SAL_SET_VECTORS			0x01000000
 #define SAL_GET_STATE_INFO		0x01000001
@@ -440,11 +437,10 @@ ia64_sal_cache_init (void)
  * machine state at the time of MCA's, INITs or CMCs 
  */
 static inline s64
-ia64_sal_clear_state_info (u64 sal_info_type, u64 sal_info_sub_type)
+ia64_sal_clear_state_info (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, sal_info_sub_type,
-	         0, 0, 0, 0, 0);
+	SAL_CALL(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, 0, 0, 0, 0, 0, 0);
 	return isrv.status;
 }
 
@@ -453,10 +449,10 @@ ia64_sal_clear_state_info (u64 sal_info_type, u64 sal_info_sub_type)
  * state at the time of the MCAs, INITs or CMCs.
  */
 static inline u64
-ia64_sal_get_state_info (u64 sal_info_type, u64 sal_info_sub_type, u64 *sal_info)
+ia64_sal_get_state_info (u64 sal_info_type, u64 *sal_info)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_GET_STATE_INFO, sal_info_type, sal_info_sub_type,
+	SAL_CALL(isrv, SAL_GET_STATE_INFO, sal_info_type, 0,
 	         sal_info, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
@@ -466,11 +462,10 @@ ia64_sal_get_state_info (u64 sal_info_type, u64 sal_info_sub_type, u64 *sal_info
  * state at the time of MCAs, INITs or CMCs
  */
 static inline u64
-ia64_sal_get_state_info_size (u64 sal_info_type, u64 sal_info_sub_type)
+ia64_sal_get_state_info_size (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, sal_info_sub_type,
-	         0, 0, 0, 0, 0);
+	SAL_CALL(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, 0, 0, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
 	return isrv.v0;
@@ -492,11 +487,10 @@ ia64_sal_mc_rendez (void)
  * non-monarch processor at the end of machine check processing.
  */
 static inline s64
-ia64_sal_mc_set_params (u64 param_type, u64 i_or_m, u64 i_or_m_val, u64 timeout)
+ia64_sal_mc_set_params (u64 param_type, u64 i_or_m, u64 i_or_m_val, u64 timeout, u64 rz_always)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_MC_SET_PARAMS, param_type, i_or_m, i_or_m_val, timeout,
-	         0, 0, 0);
+	SAL_CALL(isrv, SAL_MC_SET_PARAMS, param_type, i_or_m, i_or_m_val, timeout, rz_always, 0, 0);
 	return isrv.status;
 }
 

@@ -239,14 +239,13 @@
 #include <linux/serial.h>
 #include <linux/ioctl.h>
 #include <linux/proc_fs.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
+	static int debug = 1;
 #else
-	#undef DEBUG
+	static int debug;
 #endif
-
-#include <linux/usb.h>
 
 #include "usb-serial.h"
 
@@ -278,6 +277,9 @@
 /* Module information */
 MODULE_AUTHOR("Greg Kroah-Hartman <greg@kroah.com> and David Iacovelli");
 MODULE_DESCRIPTION("Edgeport USB Serial Driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 #define MAX_NAME_LEN		64
 
@@ -471,47 +473,6 @@ static void unicode_to_ascii		(char *string, short *unicode, int unicode_size);
 
 static int  get_string_desc		(struct usb_device *dev, int Id, struct usb_string_descriptor **pRetDesc);
 
-
-
-
-
-#ifdef DEBUG
-
-/* Dump a buffer in HEX and Ascii */
-void DbgDisplayBuffer( void *pBuffer, __u32 Len )
-{
-	char    DisplayBuf[80];
-	char *  pStr = DisplayBuf;
-	__u8 *pBuf = pBuffer; 
-	__u32   i;
-	__u8   d;
-
-	while (Len) {
-		// Init for new line
-		memset( DisplayBuf, ' ', sizeof( DisplayBuf ));
-		DisplayBuf[79]=0;
-		pStr = DisplayBuf;
-		pStr[54] = '[';
-		pStr[71] = ']';
-
-		for ( i = 0; i < MIN(16, Len) ; i++ ) {
-			d = (__u8)(*pBuf >> 4);
-			pStr[(i*3)+0] = (char)((d < 10) ? d+'0' : d -10 + 'A');
-			d = (__u8)(*pBuf & 0xf);
-			pStr[(i*3)+1] = (char)((d < 10) ? d+'0' : d -10 + 'A');
-
-			if (*pBuf > 31 && *pBuf < 127)
-				pStr[i+55]=*pBuf;
-			else
-				pStr[i+55]='.';
-
-			pBuf++;
-		}
-		Len -= i;
-		dbg("%s", DisplayBuf );
-	}
-}
-#endif
 
 
 
@@ -745,7 +706,6 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 			break;
 	}
 
-#ifdef DEBUG
 	// Dump Product Info structure
 	dbg("**Product Information:");
 	dbg("  ProductId             %x", product_info->ProductId );
@@ -770,7 +730,6 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 	    product_info->ManufactureDescDate[2]+1900);
 	dbg("  iDownloadFile         0x%x",     product_info->iDownloadFile);
 
-#endif
 }
 
 
@@ -812,14 +771,7 @@ static void edge_interrupt_callback (struct urb *urb)
 
 	// process this interrupt-read even if there are no ports open
 	if (length) {
-#ifdef DEBUG
-		int i;
-		printk (KERN_DEBUG __FILE__ ": "__FUNCTION__" - length = %d, data = ", length);
-		for (i = 0; i < length; ++i) {
-			printk ("%.2x ", data[i]);
-		}
-		printk ("\n");
-#endif
+		usb_serial_debug_data (__FILE__, __FUNCTION__, length, data);
 
 		if (length > 1) {
 			bytes_avail = data[0] | (data[1] << 8);
@@ -894,13 +846,7 @@ static void edge_bulk_in_callback (struct urb *urb)
 	if (urb->actual_length) {
 		raw_data_length = urb->actual_length;
 
-#ifdef DEBUG
-		{
-//			int i;
-			dbg (__FUNCTION__" - length = %d, data = ", raw_data_length);
-//			DbgDisplayBuffer((void *)data, raw_data_length);
-		}
-#endif
+		usb_serial_debug_data (__FILE__, __FUNCTION__, raw_data_length, data);
 
 		/* decrement our rxBytes available by the number that we just got */
 		edge_serial->rxBytesAvail -= raw_data_length;
@@ -976,10 +922,8 @@ static void edge_bulk_out_cmd_callback (struct urb *urb)
 
 	dbg(__FUNCTION__);
 
-#ifdef DEBUG	
 	CmdUrbs--;
 	dbg(__FUNCTION__" - FREE URB %p (outstanding %d)", urb, CmdUrbs);
-#endif
 
 
 	/* if this urb had a transfer buffer already (old transfer) free it */
@@ -1412,12 +1356,9 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 		// No need to check for wrap since we can not get to end of fifo in this part
 	}
 
-#ifdef DEBUG
 	if (copySize) {
-		dbg (__FUNCTION__" - length = %d, data = ", copySize);
-		DbgDisplayBuffer((void *)data, copySize);
+		usb_serial_debug_data (__FILE__, __FUNCTION__, copySize, data);
 	}
-#endif
 
 	send_more_port_data((struct edgeport_serial *)port->serial->private, edge_port);
 
@@ -1519,12 +1460,9 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		fifo->count -= secondhalf;
 	}
 
-#ifdef DEBUG
 	if (count) {
-		dbg (__FUNCTION__" - length = %d, data = ", count);
-		DbgDisplayBuffer((void *)&buffer[2], count);
+		usb_serial_debug_data (__FILE__, __FUNCTION__, count, &buffer[2]);
 	}
-#endif
 
 	/* fill up the urb with all of our data and submit it */
 	FILL_BULK_URB (urb, edge_serial->serial->dev, 
@@ -2498,16 +2436,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	urb_t *urb;
 	int timeout;
 
-#ifdef DEBUG
-	if (length) {
-		int i;
-		printk (KERN_DEBUG __FILE__ ": "__FUNCTION__" - length = %d, buffer = ", length);
-		for (i = 0; i < length; ++i) {
-			printk ("%.2x ", buffer[i]);
-		}
-		printk ("\n");
-	}
-#endif
+	usb_serial_debug_data (__FILE__, __FUNCTION__, length, buffer);
 
 	/* Allocate our next urb */
 	urb = usb_alloc_urb (0);
@@ -2857,7 +2786,6 @@ static void get_manufacturing_desc (struct edgeport_serial *edge_serial)
 	if (response < 1) {
 		err("error in getting manufacturer descriptor");
 	} else {
-#ifdef DEBUG
 		char string[30];
 		dbg("**Manufacturer Descriptor");
 		dbg("  RomSize:        %dK", edge_serial->manuf_descriptor.RomSize);
@@ -2875,7 +2803,6 @@ static void get_manufacturing_desc (struct edgeport_serial *edge_serial)
 		dbg("  UartType:       %d", edge_serial->manuf_descriptor.UartType);
 		dbg("  IonPid:         %d", edge_serial->manuf_descriptor.IonPid);
 		dbg("  IonConfig:      %d", edge_serial->manuf_descriptor.IonConfig);
-#endif
 	}
 }
 
@@ -3138,6 +3065,4 @@ void __exit edgeport_exit (void)
 
 module_init(edgeport_init);
 module_exit(edgeport_exit);
-
-
 

@@ -33,13 +33,6 @@
 #include <asm/processor.h>
 #include <asm/asmmacro.h>
 
-	.text
-	.psr abi64
-	.psr lsb
-	.lsb
-
-	.text
-
 /*
  * Inputs:
  *	in0 = address of function descriptor of EFI routine to call
@@ -50,15 +43,15 @@
  */
 
 GLOBAL_ENTRY(efi_call_phys)
-	UNW(.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8))
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
 	alloc loc1=ar.pfs,8,5,7,0
 	ld8 r2=[in0],8			// load EFI function's entry point
 	mov loc0=rp
-	UNW(.body)
+	.body
 	;;
 	mov loc2=gp			// save global pointer
 	mov loc4=ar.rsc			// save RSE configuration
-	mov ar.rsc=r0			// put RSE in enforced lazy, LE mode
+	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	;;
 
 	ld8 gp=[in0]			// load EFI function's global pointer
@@ -80,7 +73,7 @@ GLOBAL_ENTRY(efi_call_phys)
 	mov out5=in6
 	mov out6=in7
 	br.call.sptk.few rp=b6		// call the EFI function
-.ret1:	mov ar.rsc=r0			// put RSE in enforced lazy, LE mode
+.ret1:	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3
 	br.call.sptk.few rp=ia64_switch_mode // return to virtual mode
 .ret2:	mov ar.rsc=loc4			// restore RSE configuration

@@ -6,6 +6,7 @@
 #define _LINUX_ASM_SN_MMZONE_H
 
 #include <linux/config.h>
+
 #include <asm/sn/mmzone_sn1.h>
 #include <asm/sn/sn_cpuid.h>
 

@@ -1,8 +1,8 @@
 /*
  * PAL & SAL emulation.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * For the HP simulator, this file gets include in boot/bootloader.c.
  * For SoftSDV, this file gets included in sys_softsdv.c.
@@ -22,7 +22,8 @@
 
 #define NUM_MEM_DESCS	2
 
-static char fw_mem[(  sizeof(efi_system_table_t)
+static char fw_mem[(  sizeof(struct ia64_boot_param)
+		    + sizeof(efi_system_table_t)
 		    + sizeof(efi_runtime_services_t)
 		    + 1*sizeof(efi_config_table_t)
 		    + sizeof(struct ia64_sal_systab)
@@ -151,6 +152,14 @@ static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */
 	movl r10=0x100000100		/* bus_ratio<<32 (1/256) */
 	movl r11=0x100000064		/* itc_ratio<<32 (1/100) */
 	;;
+1:	cmp.eq p6,p7=19,r28		/* PAL_RSE_INFO */
+(p7)	br.cond.sptk.few 1f
+	mov r8=0			/* status = 0 */
+	mov r9=96			/* num phys stacked */
+	mov r10=0			/* hints */
+	mov r11=0
+	br.cond.sptk.few rp
+
 1:	cmp.eq p6,p7=1,r28		/* PAL_CACHE_FLUSH */
 (p7)	br.cond.sptk.few 1f
 	mov r9=ar.lc
@@ -168,8 +177,7 @@ static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */
 	;;
 	mov ar.lc=r9
 	mov r8=r0
-1:
-	br.cond.sptk.few rp
+1:	br.cond.sptk.few rp
 
 stacked:
 	br.ret.sptk.few rp
@@ -249,13 +257,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			 * or something platform specific?  The SAL
 			 * doc ain't exactly clear on this...
 			 */
-#if defined(CONFIG_IA64_SOFTSDV_HACKS)
-			r9 =   4000000;
-#elif defined(CONFIG_IA64_SDV)
-			r9 = 300000000;
-#else
 			r9 = 700000000;
-#endif
 			break;
 
 		      case SAL_FREQ_BASE_REALTIME_CLOCK:
@@ -332,7 +334,7 @@ id (long addr)
 	return (void *) addr;
 }
 
-void
+struct ia64_boot_param *
 sys_fw_init (const char *args, int arglen)
 {
 	efi_system_table_t *efi_systab;
@@ -358,6 +360,7 @@ sys_fw_init (const char *args, int arglen)
 	sal_systab  = (void *) cp; cp += sizeof(*sal_systab);
 	sal_ed      = (void *) cp; cp += sizeof(*sal_ed);
 	efi_memmap  = (void *) cp; cp += NUM_MEM_DESCS*sizeof(*efi_memmap);
+	bp	    = (void *) cp; cp += sizeof(*bp);
 	cmd_line    = (void *) cp;
 
 	if (args) {
@@ -423,7 +426,7 @@ sys_fw_init (const char *args, int arglen)
 	strcpy(sal_systab->product_id, "SN1");
 #endif
 
-	/* fill in an entry point: */	
+	/* fill in an entry point: */
 	sal_ed->type = SAL_DESC_ENTRY_POINT;
 	sal_ed->pal_proc = __pa(pal_desc[0]);
 	sal_ed->sal_proc = __pa(sal_desc[0]);
@@ -440,15 +443,15 @@ sys_fw_init (const char *args, int arglen)
 	md->pad = 0;
 	md->phys_addr = 2*MB;
 	md->virt_addr = 0;
-	md->num_pages = (64*MB) >> 12;	/* 64MB (in 4KB pages) */
+	md->num_pages = (128*MB) >> 12;	/* 128MB (in 4KB pages) */
 	md->attribute = EFI_MEMORY_WB;
 
 	/* descriptor for firmware emulator: */
 	md = &efi_memmap[1];
-	md->type = EFI_RUNTIME_SERVICES_DATA;
+	md->type = EFI_PAL_CODE;
 	md->pad = 0;
 	md->phys_addr = 1*MB;
-	md->virt_addr = 0;
+	md->virt_addr = 1*MB;
 	md->num_pages = (1*MB) >> 12;	/* 1MB (in 4KB pages) */
 	md->attribute = EFI_MEMORY_WB;
 
@@ -468,7 +471,6 @@ sys_fw_init (const char *args, int arglen)
 	md->attribute = EFI_MEMORY_WB;
 #endif
 
-	bp = id(ZERO_PAGE_ADDR);
 	bp->efi_systab = __pa(&fw_mem);
 	bp->efi_memmap = __pa(efi_memmap);
 	bp->efi_memmap_size = NUM_MEM_DESCS*sizeof(efi_memory_desc_t);
@@ -479,6 +481,7 @@ sys_fw_init (const char *args, int arglen)
 	bp->console_info.num_rows = 25;
 	bp->console_info.orig_x = 0;
 	bp->console_info.orig_y = 24;
-	bp->num_pci_vectors = 0;
 	bp->fpswa = 0;
+
+	return bp;
 }

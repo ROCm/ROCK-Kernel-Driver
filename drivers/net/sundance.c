@@ -1239,7 +1239,7 @@ static void __devexit sundance_remove1 (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	
 	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
-	while (dev) {
+	if (dev) {
 		unregister_netdev(dev);
 		pci_release_regions(pdev);
 #ifndef USE_IO_OPS

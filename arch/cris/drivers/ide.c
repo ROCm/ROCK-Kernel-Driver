@@ -1,4 +1,4 @@
-/* $Id: ide.c,v 1.4 2001/01/10 21:14:32 bjornw Exp $
+/* $Id: ide.c,v 1.9 2001/03/01 13:11:18 bjornw Exp $
  *
  * Etrax specific IDE functions, like init and PIO-mode setting etc.
  * Almost the entire ide.c is used for the rest of the Etrax ATA driver.
@@ -8,6 +8,23 @@
  *             Mikael Starvik     (pio setup stuff)
  *
  * $Log: ide.c,v $
+ * Revision 1.9  2001/03/01 13:11:18  bjornw
+ * 100 -> HZ
+ *
+ * Revision 1.8  2001/03/01 09:32:56  matsfg
+ * Moved IDE delay to a CONFIG-parameter instead
+ *
+ * Revision 1.7  2001/02/23 13:46:38  bjornw
+ * Spellling check
+ *
+ * Revision 1.6  2001/02/22 15:44:30  bjornw
+ * * Use ioremap when mapping the CSE1 memory-mapped reset-line for LX v2
+ * * sw_len for a 65536 descriptor is 0, not 65536
+ * * Express concern for G27 reset code
+ *
+ * Revision 1.5  2001/02/16 07:35:38  matsfg
+ * Now handles DMA request blocks between 64k and 128k by split into two descriptors.
+ *
  * Revision 1.4  2001/01/10 21:14:32  bjornw
  * Initialize hwif->ideproc, for the new way of handling ide_xxx_data
  *
@@ -63,8 +80,13 @@
 /* number of Etrax DMA descriptors */
 #define MAX_DMA_DESCRS 64
 
+#ifdef CONFIG_ETRAX_IDE_CSE1_16_RESET
+/* address where the memory-mapped IDE reset bit lives, if used */
+static volatile unsigned long *reset_addr;
+#endif
+
 #define LOWDB(x)
-#define D(x)
+#define D(x) 
 
 void OUT_BYTE(unsigned char data, ide_ioreg_t reg) {
 	LOWDB(printk("ob: data 0x%x, reg 0x%x\n", data, reg));
@@ -208,7 +230,8 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive); /* defined 
 static void e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
 			  void *buffer, unsigned int length);        /* defined below */
 
-void __init init_e100_ide (void)
+void __init 
+init_e100_ide (void)
 {
 	volatile unsigned int dummy;
 	int h;
@@ -225,6 +248,8 @@ void __init init_e100_ide (void)
 		hwif->ideproc = &e100_ideproc;
 	}
 	/* actually reset and configure the etrax100 ide/ata interface */
+
+	/* This is mystifying; why is not G27 SET anywhere ? It's just reset here twice. */
 
 	/* de-assert bus-reset */
 #ifdef CONFIG_ETRAX_IDE_PB7_RESET  
@@ -252,7 +277,16 @@ void __init init_e100_ide (void)
 	*R_GEN_CONFIG = genconfig_shadow;
 
 #ifdef CONFIG_ETRAX_IDE_CSE1_16_RESET
-	*(volatile long *)(MEM_CSE1_START | MEM_NON_CACHEABLE) = 0;
+#ifndef CONFIG_CRIS_LOW_MAP
+	/* remap the I/O-mapped reset-bit from CSE1 to something inside our kernel space */
+	reset_addr = (unsigned long *)ioremap((unsigned long)(MEM_CSE1_START |
+							      MEM_NON_CACHEABLE), 16);
+	*reset_addr = 0;
+#else
+	/* LOW_MAP, can't do the ioremap, but it's already mapped straight over */
+	reset_addr = (unsigned long *)(MEM_CSE1_START | MEM_NON_CACHEABLE);
+	*reset_addr = 0;
+#endif
 #endif
 
 	/* wait some */
@@ -262,9 +296,11 @@ void __init init_e100_ide (void)
 	dummy = 3;
 
 #ifdef CONFIG_ETRAX_IDE_CSE1_16_RESET
-	*(volatile long *)(MEM_CSE1_START | MEM_NON_CACHEABLE) = 1 << 16;
-	*R_PORT_G_DATA = 0;  /* de-assert bus-reset */
+	*reset_addr = 1 << 16;
 #endif
+#ifdef CONFIG_ETRAX_IDE_G27_RESET
+	*R_PORT_G_DATA = 0; /* de-assert bus-reset */
+#endif 
 
 	/* make a dummy read to set the ata controller in a proper state */
 	dummy = *R_ATA_STATUS_DATA;
@@ -286,9 +322,9 @@ void __init init_e100_ide (void)
 			     IO_STATE( R_IRQ_MASK0_SET, ata_irq2, set ) |
 			     IO_STATE( R_IRQ_MASK0_SET, ata_irq3, set ) );
 
-	printk("ide: waiting 10 seconds for drives to regain consciousness\n");
+	printk("ide: waiting %d seconds for drives to regain consciousness\n", CONFIG_IDE_DELAY);
 
-	h = jiffies + 1000;
+	h = jiffies + (CONFIG_IDE_DELAY * HZ);
 	while(jiffies < h) ;
 
   /* reset the dma channels we will use */
@@ -560,14 +596,6 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 			return 1;
 		}
 
-		/* uh.. I'm lazy.. if size >= 65536, it should loop below and split it in
-		   more than one descriptor */
-
-		if(size >= 65536) {
-			printk("too large ATA DMA request block, size = %d!\n", size);
-			return 1;
-		}
-
 		/* however, this case is more difficult - R_ATA_TRANSFER_CNT cannot be more
 		   than 65536 words per transfer, so in that case we need to either 
 		   1) use a DMA interrupt to re-trigger R_ATA_TRANSFER_CNT and continue with
@@ -581,8 +609,22 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 			return 1;
 		}
 
-		/* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
+		/* If size > 65536 it has to be splitted into new descriptors. Since we don't handle 
+                   size > 131072 only one split is necessary */
 
+		if(size > 65536) {
+ 		        /* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
+                        ata_descrs[count].sw_len = 0;  /* 0 means 65536, this is a 16-bit field */
+                        ata_descrs[count].ctrl = 0;
+                        ata_descrs[count].buf = addr;
+                        ata_descrs[count].next = virt_to_phys(&ata_descrs[count + 1]);
+                        count++;
+                        ata_tot_size += 65536;
+                        /* size and addr should refere to not handled data */
+                        size -= 65536;
+                        addr += 65536;
+                }
+		/* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
 		ata_descrs[count].sw_len = size;
 		ata_descrs[count].ctrl = 0;
 		ata_descrs[count].buf = addr;

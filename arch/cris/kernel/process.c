@@ -1,9 +1,9 @@
-/* $Id: process.c,v 1.8 2000/09/13 14:34:13 bjornw Exp $
+/* $Id: process.c,v 1.12 2001/02/27 13:52:52 bjornw Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Copyright (C) 2000  Axis Communications AB
+ *  Copyright (C) 2000, 2001  Axis Communications AB
  *
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
@@ -23,7 +23,7 @@
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
@@ -70,11 +70,6 @@ static int hlt_counter=0;
 */
 
 #define currentregs ((struct pt_regs *)current->thread.esp0)
-
-asmlinkage void set_esp0(unsigned long ssp)
-{
-	current->thread.esp0 = ssp;
-}
 
 void disable_hlt(void)
 {
@@ -134,7 +129,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	register long __a __asm__ ("r10");
 	
 	__asm__ __volatile__
-		("movu.w %1,r1\n\t"     /* r1 contains syscall number, to sys_clone */
+		("movu.w %1,r9\n\t"     /* r9 contains syscall number, to sys_clone */
 		 "clear.d r10\n\t"      /* r10 is argument 1 to clone */
 		 "move.d %2,r11\n\t"    /* r11 is argument 2 to clone, the flags */
 		 "break 13\n\t"         /* call sys_clone, this will fork */
@@ -143,14 +138,14 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 		 "nop\n\t"              /* delay slot */
 		 "move.d %4,r10\n\t"    /* set argument to function to call */
 		 "jsr %5\n\t"           /* call specified function */
-		 "movu.w %3,r1\n\t"     /* r1 is sys_exit syscall number */
+		 "movu.w %3,r9\n\t"     /* r9 is sys_exit syscall number */
 		 "moveq -1,r10\n\t"     /* Give a really bad exit-value */
 		 "break 13\n\t"         /* call sys_exit, killing the child */
 		 "1:\n\t"
 		 : "=r" (__a) 
 		 : "g" (__NR_clone), "r" (flags | CLONE_VM), "g" (__NR_exit),
 		   "r" (arg), "r" (fn) 
-		 : "r10", "r11", "r1");
+		 : "r10", "r11", "r9");
 	
 	return __a;
 }

@@ -15,11 +15,13 @@ extern "C" {
 #endif
 
 #include <linux/config.h>
+
 #include <asm/sn/agent.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/router.h>
+#include <asm/sn/synergy.h>
 /* #include <SN/klkernvars.h> */
-#ifdef IRIX
+#ifdef LATER
 typedef struct module_s module_t;       /* Avoids sys/SN/module.h */
 #else
 #include <asm/sn/module.h>
@@ -54,6 +56,10 @@ typedef struct subnodepda_s subnode_pda_t;
 
 struct ptpool_s;
 
+#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+struct synergy_perf_s;
+#endif
+
 
 /*
  * Node-specific data structure.
@@ -67,7 +73,8 @@ struct ptpool_s;
  */
 
 
-#ifndef CONFIG_IA64_SGI_IO
+
+#ifdef LATER
 /*
  * The following structure is contained in the nodepda & contains
  * a lock & queue-head for sanon pages that belong to the node.
@@ -78,9 +85,6 @@ typedef struct {
 	plist_t sal_listhead;
 } sanon_list_head_t;
 #endif
-
-
-
 struct nodepda_s {
 
 #ifdef	NUMA_BASE
@@ -133,7 +137,7 @@ struct nodepda_s {
 	 * Each node gets its own syswait counter to remove contention
 	 * on the global one.
 	 */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	struct syswait syswait;
 #endif
 
@@ -141,7 +145,7 @@ struct nodepda_s {
 	/*
 	 * Node-specific Zone structures.
 	 */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef LATER
 	zoneset_element_t	node_zones;
 	pg_data_t	node_pg_data;	/* VM page data structures */ 
 	plist_t	error_discard_plist;
@@ -154,7 +158,7 @@ struct nodepda_s {
 	/* Information needed for SN Hub chip interrupt handling. */
 	subnode_pda_t	snpda[NUM_SUBNODES];
 	/* Distributed kernel support */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	kern_vars_t	kern_vars;
 #endif
 	/* Vector operation support */
@@ -173,6 +177,17 @@ struct nodepda_s {
 	nodepda_router_info_t	*npda_rip_first;
 	nodepda_router_info_t	**npda_rip_last;
 	int		dependent_routers;
+
+#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+	int			synergy_perf_enabled;
+        int       		synergy_perf_freq;
+	spinlock_t		synergy_perf_lock;
+        uint64_t       		synergy_inactive_intervals;
+        uint64_t       		synergy_active_intervals;
+        struct synergy_perf_s	*synergy_perf_data;
+        struct synergy_perf_s	*synergy_perf_first; /* reporting consistency .. */
+#endif /* CONFIG_IA64_SGI_SYNERGY_PERF */
+
 	devfs_handle_t 	xbow_vhdl;
 	nasid_t		xbow_peer;	/* NASID of our peer hub on xbow */
 	struct semaphore xbow_sema;	/* Sema for xbow synchronization */
@@ -189,13 +204,13 @@ struct nodepda_s {
 	char		ni_error_print; /* For printing ni error state
 					 * only once during system panic
 					 */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	md_perf_monitor_t node_md_perfmon;
 	hubstat_t	hubstats;
 	int		hubticks;
-	int		huberror_ticks;
 	sbe_info_t	*sbe_info;	/* ECC single-bit error statistics */
-#endif	/* !CONFIG_IA64_SGI_IO */
+#endif	/* LATER */
+	int		huberror_ticks;
 
 	router_queue_t  *visited_router_q;
 	router_queue_t	*bfs_router_q; 
@@ -218,10 +233,8 @@ struct nodepda_s {
 	void 		*pdinfo;	/* Platform-dependent per-node info */
 	uint64_t	*dump_stack;	/* Dump stack during nmi handling */
 	int		dump_count;	/* To allow only one cpu-per-node */
-#if defined BRINGUP
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	io_perf_monitor_t node_io_perfmon;
-#endif
 #endif
 
 	/*
@@ -235,7 +248,7 @@ struct nodepda_s {
 	void		*cached_global_pool;	/* pointer to cached vmpool */
 #endif /* NUMA_BASE */
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	sanon_list_head_t sanon_list_head;	/* head for sanon pages */	
 #endif
 #ifdef	NUMA_BASE
@@ -246,7 +259,7 @@ struct nodepda_s {
 	 * The BTEs on this node are shared by the local cpus
 	 */
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	bteinfo_t	*node_bte_info[BTES_PER_NODE];
 #endif
 #endif
@@ -273,7 +286,7 @@ typedef struct nodepda_s nodepda_t;
  *	SUBNODEPDA(x,s)	-> to access subnode PDA for cnodeid/slice 'x'
  */
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 #define	nodepda		private.p_nodepda	/* Ptr to this node's PDA */
 #if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
 #define subnodepda	private.p_subnodepda	/* Ptr to this node's subnode PDA */

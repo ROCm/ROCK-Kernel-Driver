@@ -1,8 +1,8 @@
 /*
  * Utility to generate asm-ia64/offsets.h.
  *
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Note that this file has dual use: when building the kernel
  * natively, the file is translated into a binary and executed.  When
@@ -45,9 +45,8 @@ tab[] =
     { "IA64_PT_REGS_SIZE",		sizeof (struct pt_regs) },
     { "IA64_SWITCH_STACK_SIZE",		sizeof (struct switch_stack) },
     { "IA64_SIGINFO_SIZE",		sizeof (struct siginfo) },
-#ifdef CONFIG_IA64_NEW_UNWIND
+    { "IA64_CPU_SIZE",			sizeof (struct cpuinfo_ia64) },
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
-#endif
     { "", 0 },			/* spacer */
     { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
     { "IA64_TASK_SIGPENDING_OFFSET",	offsetof (struct task_struct, sigpending) },
@@ -57,6 +56,9 @@ tab[] =
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },
 #ifdef CONFIG_IA32_SUPPORT
     { "IA64_TASK_THREAD_SIGMASK_OFFSET",offsetof (struct task_struct, thread.un.sigmask) },
+#endif
+#ifdef CONFIG_PERFMON
+    { "IA64_TASK_PFM_NOTIFY_OFFSET",	offsetof(struct task_struct, thread.pfm_pend_notify) },
 #endif
     { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
     { "IA64_TASK_MM_OFFSET",		offsetof (struct task_struct, mm) },
@@ -157,6 +159,11 @@ tab[] =
     { "IA64_SIGCONTEXT_FR6_OFFSET",	offsetof (struct sigcontext, sc_fr[6]) },
     { "IA64_CLONE_VFORK",		CLONE_VFORK },
     { "IA64_CLONE_VM",			CLONE_VM },
+    { "IA64_CPU_IRQ_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.irq_count) },
+    { "IA64_CPU_BH_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.bh_count) },
+    { "IA64_CPU_SOFTIRQ_ACTIVE_OFFSET",		offsetof (struct cpuinfo_ia64, softirq.active) },
+    { "IA64_CPU_SOFTIRQ_MASK_OFFSET",		offsetof (struct cpuinfo_ia64, softirq.mask) },
+    { "IA64_CPU_PHYS_STACKED_SIZE_P8_OFFSET",	offsetof (struct cpuinfo_ia64, phys_stacked_size_p8) },
 };
 
 static const char *tabs = "\t\t\t\t\t\t\t\t\t\t";

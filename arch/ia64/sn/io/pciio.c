@@ -14,6 +14,7 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/xtalk/xbow.h>	/* Must be before iograph.h to get MAX_PORT_NUM */
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
@@ -23,6 +24,7 @@
 #include <asm/sn/ioerror_handling.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pciio_private.h>
+#include <asm/sn/sn_sal.h>
 
 #define DEBUG_PCIIO
 #undef DEBUG_PCIIO	/* turn this on for yet more console output */
@@ -38,28 +40,30 @@ cdl_p                   pciio_registry = NULL;
 int
 badaddr_val(volatile void *addr, int len, volatile void *ptr)
 {
+	int ret = 0;
+	volatile void *new_addr;
+
 	switch (len) {
-		case 4: *(volatile u32*)ptr = *(((volatile u32*)(((u64) addr)^4)));
-		default: printk("FIXME: argh fix badaddr_val\n");
+		case 4:
+			new_addr = (void *)(((u64) addr)^4);
+			ret = ia64_sn_probe_io_slot((long)new_addr, len, (void *)ptr);
+			break;
+		default:
+			printk(KERN_WARNING "badaddr_val given len %x but supports len of 4 only\n", len);
 	}
-	/* no such thing as a bad addr .... */
-	return(0);
+
+	if (ret < 0)
+		panic("badaddr_val: unexpected status (%d) in probing", ret);
+	return(ret);
+
 }
 
-
-void
-cmn_err_tag(int seqnumber, register int level, char *fmt, ...)
-{
-}
 
 nasid_t
 get_console_nasid(void)
 {
-#ifdef IRIX
+	extern nasid_t console_nasid;
 	return console_nasid;
-#else
-	return 0;
-#endif
 }
 
 int
@@ -208,8 +212,8 @@ pciio_info_t		pciio_device_info_new(pciio_info_t, devfs_handle_t, pciio_slot_t, 
 void			pciio_device_info_free(pciio_info_t);
 devfs_handle_t		pciio_device_info_register(devfs_handle_t, pciio_info_t);
 void			pciio_device_info_unregister(devfs_handle_t, pciio_info_t);
-int                     pciio_device_attach(devfs_handle_t);
-int			pciio_device_detach(devfs_handle_t);
+int                     pciio_device_attach(devfs_handle_t, int);
+int			pciio_device_detach(devfs_handle_t, int);
 void                    pciio_error_register(devfs_handle_t, error_handler_f *, error_handler_arg_t);
 
 int                     pciio_reset(devfs_handle_t);
@@ -234,13 +238,30 @@ pciio_to_provider_fns(devfs_handle_t dev)
     pciio_info_t            card_info;
     pciio_provider_t       *provider_fns;
 
-    card_info = pciio_info_get(dev);
-    ASSERT(card_info != NULL);
+    /*
+     * We're called with two types of vertices, one is
+     * the bridge vertex (ends with "pci") and the other is the
+     * pci slot vertex (ends with "pci/[0-8]").  For the first type
+     * we need to get the provider from the PFUNCS label.  For
+     * the second we get it from fastinfo/c_pops.
+     */
+    provider_fns = pciio_provider_fns_get(dev);
+    if (provider_fns == NULL) {
+	card_info = pciio_info_get(dev);
+	if (card_info != NULL) {
+		provider_fns = pciio_info_pops_get(card_info);
+	}
+    }
 
-    provider_fns = pciio_info_pops_get(card_info);
-    ASSERT(provider_fns != NULL);
+    if (provider_fns == NULL)
+#if defined(SUPPORT_PRINTING_V_FORMAT)
+	PRINT_PANIC("%v: provider_fns == NULL", dev);
+#else
+	PRINT_PANIC("0x%x: provider_fns == NULL", dev);
+#endif
 
-    return (provider_fns);
+    return provider_fns;
+
 }
 
 #define DEV_FUNC(dev,func)	pciio_to_provider_fns(dev)->func
@@ -672,15 +693,21 @@ pciio_error_handler(
     error_state_t	    e_state;
 #endif
 
-#ifdef IRIX
 #if DEBUG && ERROR_DEBUG
-    cmn_err(CE_CONT, "%v: pciio_error_handler\n", pciio_vhdl);
+#if defined(SUPPORT_PRINTING_V_FORMAT)
+    printk("%v: pciio_error_handler\n", pciio_vhdl);
+#else
+    printk("0x%x: pciio_error_handler\n", pciio_vhdl);
 #endif
 #endif
 
-    IOERR_PRINTF(cmn_err(CE_NOTE,
-			 "%v: PCI Bus Error: Error code: %d Error mode: %d\n",
+#if defined(SUPPORT_PRINTING_V_FORMAT)
+    IOERR_PRINTF(printk("%v: PCI Bus Error: Error code: %d Error mode: %d\n",
 			 pciio_vhdl, error_code, mode));
+#else
+    IOERR_PRINTF(printk("0x%x: PCI Bus Error: Error code: %d Error mode: %d\n",
+			 pciio_vhdl, error_code, mode));
+#endif
 
     /* If there is an error handler sitting on
      * the "no-slot" connection point, give it
@@ -715,7 +742,7 @@ pciio_error_handler(
 	 * widgetdev is a 4byte value encoded as slot in the higher order
 	 * 2 bytes and function in the lower order 2 bytes.
 	 */
-#ifdef IRIX
+#ifdef LATER
 	slot = pciio_widgetdev_slot_get(IOERROR_GETVALUE(ioerror, widgetdev));
 #else
 	slot = 0;
@@ -732,8 +759,11 @@ pciio_error_handler(
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
 		e_state = error_state_get(pciio_vhdl);
 
+
 		if (e_state == ERROR_STATE_ACTION)
 		    (void)error_state_set(pciio_vhdl, ERROR_STATE_NONE);
+
+
 
 		if (error_state_set(pconn_vhdl,e_state) ==
 		    ERROR_RETURN_CODE_CANNOT_SET_STATE)
@@ -825,11 +855,17 @@ pciio_endian_set(devfs_handle_t dev,
     ASSERT((desired_end == PCIDMA_ENDIAN_BIG) || (desired_end == PCIDMA_ENDIAN_LITTLE));
 
 #if DEBUG
-    cmn_err(CE_ALERT,
-	    "%v: pciio_endian_set is going away.\n"
+#if defined(SUPPORT_PRINTING_V_FORMAT)
+    PRINT_ALERT("%v: pciio_endian_set is going away.\n"
 	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
 	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
 	    dev);
+#else
+    PRINT_ALERT("0x%x: pciio_endian_set is going away.\n"
+	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
+	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
+	    dev);
+#endif
 #endif
 
     return DEV_FUNC(dev, endian_set)
@@ -1027,8 +1063,6 @@ pciio_info_get(devfs_handle_t pciio)
 	(pciio_info->c_fingerprint != pciio_info_fingerprint)) {
 #endif /* BRINGUP */
 
-	printk("pciio_info_get: Found fastinfo 0x%p but wrong fingerprint %s\n", pciio_info,
-	pciio_info->c_fingerprint);
 	return((pciio_info_t)-1); /* Should panic .. */
     }
 	
@@ -1198,7 +1232,11 @@ int
 pciio_attach(devfs_handle_t pciio)
 {
 #if DEBUG && ATTACH_DEBUG
-    cmn_err(CE_CONT, "%v: pciio_attach\n", pciio);
+#if defined(SUPPORT_PRINTING_V_FORMAT)
+    printk("%v: pciio_attach\n", pciio);
+#else
+    printk("0x%x: pciio_attach\n", pciio);
+#endif
 #endif
     return 0;
 }
@@ -1220,11 +1258,7 @@ pciio_provider_unregister(devfs_handle_t provider)
 {
     arbitrary_info_t        ainfo;
 
-#ifdef IRIX
-    hwgraph_info_remove_LBL(provider, INFO_LBL_PFUNCS, &ainfo);
-#else
     hwgraph_info_remove_LBL(provider, INFO_LBL_PFUNCS, (long *) &ainfo);
-#endif
 }
 
 /*
@@ -1258,7 +1292,7 @@ pciio_driver_register(
 
     return cdl_add_driver(pciio_registry,
 			  vendor_id, device_id,
-			  driver_prefix, flags);
+			  driver_prefix, flags, NULL);
 }
 
 /*
@@ -1274,7 +1308,33 @@ pciio_driver_unregister(
      */
     ASSERT(pciio_registry != NULL);
 
-    cdl_del_driver(pciio_registry, driver_prefix);
+    cdl_del_driver(pciio_registry, driver_prefix, NULL);
+}
+
+/* 
+ * Set the slot status for a device supported by the 
+ * driver being registered.
+ */
+void
+pciio_driver_reg_callback(
+                           devfs_handle_t pconn_vhdl,
+			   int key1,
+			   int key2,
+                           int error)
+{
+}
+
+/* 
+ * Set the slot status for a device supported by the 
+ * driver being unregistered.
+ */
+void
+pciio_driver_unreg_callback(
+                           devfs_handle_t pconn_vhdl,
+			   int key1,
+			   int key2,
+                           int error)
+{
 }
 
 /*
@@ -1307,7 +1367,6 @@ pciio_device_register(
 		pciio_vendor_id_t vendor_id,
 		pciio_device_id_t device_id)
 {
-
     return pciio_device_info_register
 	(connectpt, pciio_device_info_new (NULL, master, slot, func,
 					   vendor_id, device_id));
@@ -1366,8 +1425,6 @@ pciio_device_info_register(
 			    pciio_info->c_slot,
 			    pciio_info->c_func);
 
-    printk("pciio_device_info_register: connectpt 0x%p, pciio_info 0x%p\n", connectpt, pciio_info);
-
     if (GRAPH_SUCCESS !=
 	hwgraph_path_add(connectpt, name, &pconn))
 	return pconn;
@@ -1379,7 +1436,9 @@ pciio_device_info_register(
 	int pos;
 	char dname[256];
 	pos = devfs_generate_path(pconn, dname, 256);
+#ifdef DEBUG_PCIIO
 	printk("%s : pconn path= %s \n", __FUNCTION__, &dname[pos]);
+#endif
     }
 #endif /* BRINGUP */
 
@@ -1421,6 +1480,7 @@ pciio_device_info_unregister(devfs_handle_t connectpt,
     /* Remove the link to our pci provider */
     hwgraph_edge_remove(pconn, EDGE_LBL_MASTER, NULL);
 
+
     hwgraph_vertex_unref(pconn);
     hwgraph_vertex_destroy(pconn);
     
@@ -1447,26 +1507,27 @@ pciio_device_inventory_add(devfs_handle_t pconn_vhdl)
 static void
 pciio_device_inventory_remove(devfs_handle_t pconn_vhdl)
 {
-#ifdef IRIX
+#ifdef LATER
     hwgraph_inventory_remove(pconn_vhdl,-1,-1,-1,-1,-1);
 #endif
 }
 
 /*ARGSUSED */
 int
-pciio_device_attach(devfs_handle_t pconn)
+pciio_device_attach(devfs_handle_t pconn,
+		    int          drv_flags)
 {
     pciio_info_t            pciio_info;
     pciio_vendor_id_t       vendor_id;
     pciio_device_id_t       device_id;
+    int pciba_attach(devfs_handle_t);
+
 
     pciio_device_inventory_add(pconn);
     pciio_info = pciio_info_get(pconn);
 
     vendor_id = pciio_info->c_vendor;
     device_id = pciio_info->c_device;
-
-    printk("pciio_device_attach: Function 0x%p, vendor 0x%x, device_id %x\n", pconn, vendor_id, device_id);
 
     /* we don't start attaching things until
      * all the driver init routines (including
@@ -1475,12 +1536,17 @@ pciio_device_attach(devfs_handle_t pconn)
      */
     ASSERT(pciio_registry != NULL);
 
-    return(cdl_add_connpt(pciio_registry, vendor_id, device_id, pconn));
+    /*
+     * Since pciba is not called from cdl routines .. call it here.
+     */
+    pciba_attach(pconn);
 
+    return(cdl_add_connpt(pciio_registry, vendor_id, device_id, pconn, drv_flags));
 }
 
 int
-pciio_device_detach(devfs_handle_t pconn)
+pciio_device_detach(devfs_handle_t pconn,
+		    int          drv_flags)
 {
     pciio_info_t            pciio_info;
     pciio_vendor_id_t       vendor_id;
@@ -1499,10 +1565,9 @@ pciio_device_detach(devfs_handle_t pconn)
      */
     ASSERT(pciio_registry != NULL);
 
-    cdl_del_connpt(pciio_registry, vendor_id, device_id, pconn);
+    return(cdl_del_connpt(pciio_registry, vendor_id, device_id,
+		          pconn, drv_flags));
 
-    return(0);
-    
 }
 
 /*

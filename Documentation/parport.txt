@@ -174,7 +174,7 @@ spintime	The number of microseconds to busy-loop while waiting
 		peripherals.  This is a port-wide setting, i.e. it
 		applies to all devices on a particular port.
 
-timeslice	The number of miliseconds that a device driver is
+timeslice	The number of milliseconds that a device driver is
 		allowed to keep a port claimed for.  This is advisory,
 		and driver can ignore it if it must.
 

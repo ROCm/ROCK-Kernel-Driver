@@ -15,12 +15,10 @@
 #include <linux/types.h>
 #include <linux/config.h>
 
-#if defined(CONFIG_IA64_SGI_IO)
 #include <asm/sn/types.h>
 #if defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_SGI_IP37) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/arch.h>
 #endif
-#endif	/* CONFIG_IA64_SGI_IO */
 
 
 #if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
@@ -68,7 +66,7 @@ typedef u64     bdrkreg_t;
  *	cputolocalslice - returns a number 0..1 that identifies the local slice of
  *			the cpu within it's PI interface.
  */
-#ifdef notyet
+#ifdef LATER
 	/* These are dummied up for now ..... */
 #define cputocnode(cpu)				\
                (pdaindr[(cpu)].p_nodeid)
@@ -86,7 +84,7 @@ typedef u64     bdrkreg_t;
 #define cputoslice(cpu) 0
 #define cputolocalslice(cpu) 0
 #define cputosubnode(cpu) 0
-#endif	/* notyet */
+#endif	/* LATER */
 #endif	/* CONFIG_SGI_IP35 */
 
 #if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
@@ -131,6 +129,7 @@ extern nasid_t compact_to_nasid_node[MAX_COMPACT_NODES];
     ((nnode) >> \
      (is_fine_dirmode() ? NASID_TO_FINEREG_SHFT : NASID_TO_COARSEREG_SHFT))
 
+#ifndef __ia64
 extern cnodeid_t nasid_to_compact_node[MAX_NASIDS];
 extern nasid_t compact_to_nasid_node[MAX_COMPACT_NODES];
 extern cnodeid_t cpuid_to_compact_node[MAXCPUS];
@@ -153,6 +152,17 @@ nasid_t compact_to_nasid_nodeid(cnodeid_t cnode);
 #define COMPACT_TO_NASID_NODEID(cnode)	compact_to_nasid_nodeid(cnode)
 #define CPUID_TO_COMPACT_NODEID(cpu)	(cpuid_to_compact_node[(cpu)])
 #endif
+
+#else
+
+/*
+ * IA64 specific nasid and cnode ids.
+ */
+#define NASID_TO_COMPACT_NODEID(nasid)  (nasid_to_cnodeid(nasid))
+#define COMPACT_TO_NASID_NODEID(cnode)  (cnodeid_to_nasid(cnode))
+#define CPUID_TO_COMPACT_NODEID(cpu)    (cpuid_to_cnodeid(cpu))
+
+#endif /* #ifndef __ia64 */
 
 extern int node_getlastslot(cnodeid_t);
 

@@ -28,6 +28,10 @@ BEGIN {
 	inside_table = 0
 }
 
+/.*[.]rodata/ {
+	inside_table = 0
+}
+
 {
 	if (inside_table) {
 		if ($1 == "//") getline;
@@ -61,7 +65,7 @@ BEGIN {
 	inside_table = 1
 }
 
-/tab#:/ {
+/tab\#:/ {
 	inside_table = 1
 }
 

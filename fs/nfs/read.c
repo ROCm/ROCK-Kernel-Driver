@@ -335,7 +335,9 @@ nfs_pagein_one(struct list_head *head, struct inode *inode)
 
 	rpc_clnt_sigmask(clnt, &oldset);
 	rpc_call_setup(task, &msg, 0);
+	lock_kernel();
 	rpc_execute(task);
+	unlock_kernel();
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return 0;
 out_bad:

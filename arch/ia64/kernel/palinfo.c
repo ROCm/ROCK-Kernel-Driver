@@ -5,16 +5,13 @@
  * This code is based on specification of PAL as of the
  * Intel IA-64 Architecture Software Developer's Manual v1.0.
  *
- * 
+ *
  * Copyright (C) 2000 Hewlett-Packard Co
  * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
- * 
+ *
  * 05/26/2000	S.Eranian	initial release
  * 08/21/2000	S.Eranian	updated to July 2000 PAL specs
- *
- * ISSUES:
- *	- as of 2.2.9/2.2.12, the following values are still wrong
- *		PAL_VM_SUMMARY: key & rid sizes
+ * 02/05/2001   S.Eranian	fixed module support
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -36,12 +33,7 @@
 MODULE_AUTHOR("Stephane Eranian <eranian@hpl.hp.com>");
 MODULE_DESCRIPTION("/proc interface to IA-64 PAL");
 
-/*
- * Hope to get rid of this one in a near future
-*/
-#define IA64_PAL_VERSION_BUG		1
-
-#define PALINFO_VERSION "0.3"
+#define PALINFO_VERSION "0.4"
 
 #ifdef CONFIG_SMP
 #define cpu_is_online(i) (cpu_online_map & (1UL << i))
@@ -83,7 +75,7 @@ static const char *cache_st_hints[]={
 	"Non-temporal, all levels",
 	"Reserved",
 	"Reserved",
-	"Reserved",	
+	"Reserved",
 	"Reserved"
 };
 
@@ -94,7 +86,7 @@ static const char *cache_ld_hints[]={
 	"Non-temporal, all levels",
 	"Reserved",
 	"Reserved",
-	"Reserved",	
+	"Reserved",
 	"Reserved"
 };
 
@@ -108,7 +100,7 @@ static const char *rse_hints[]={
 #define RSE_HINTS_COUNT (sizeof(rse_hints)/sizeof(const char *))
 
 /*
- * The current revision of the Volume 2 (July 2000) of 
+ * The current revision of the Volume 2 (July 2000) of
  * IA-64 Architecture Software Developer's Manual is wrong.
  * Table 4-10 has invalid information concerning the ma field:
  * Correct table is:
@@ -116,7 +108,7 @@ static const char *rse_hints[]={
  *      bit 4 - 100 - UC
  *      bit 5 - 101 - UCE
  *      bit 6 - 110 - WC
- *      bit 7 - 111 - NatPage 
+ *      bit 7 - 111 - NatPage
  */
 static const char *mem_attrib[]={
 	"Write Back (WB)",		/* 000 */
@@ -136,7 +128,7 @@ static const char *mem_attrib[]={
  *
  * Input:
  *	- a pointer to a buffer to hold the string
- * 	- a 64-bit vector
+ *	- a 64-bit vector
  * Ouput:
  *	- a pointer to the end of the buffer
  *
@@ -163,7 +155,7 @@ bitvector_process(char *p, u64 vector)
  *
  * Input:
  *	- a pointer to a buffer to hold the string
- * 	- a 64-bit vector
+ *	- a 64-bit vector
  * Ouput:
  *	- a pointer to the end of the buffer
  *
@@ -181,7 +173,7 @@ bitregister_process(char *p, u64 *reg_info, int max)
 		if (i != 0 && (i%64) == 0) value = *++reg_info;
 
 		if ((value & 0x1) == 0 && skip == 0) {
-			if (begin  <= i - 2) 
+			if (begin  <= i - 2)
 				p += sprintf(p, "%d-%d ", begin, i-1);
 			else
 				p += sprintf(p, "%d ", i-1);
@@ -194,7 +186,7 @@ bitregister_process(char *p, u64 *reg_info, int max)
 		value >>=1;
 	}
 	if (begin > -1) {
-		if (begin < 127) 
+		if (begin < 127)
 			p += sprintf(p, "%d-127", begin);
 		else
 			p += sprintf(p, "127");
@@ -219,7 +211,7 @@ power_info(char *page)
 		if (halt_info[i].pal_power_mgmt_info_s.im == 1) {
 			p += sprintf(p,	"Power level %d:\n" \
 					"\tentry_latency       : %d cycles\n" \
-				 	"\texit_latency        : %d cycles\n" \
+					"\texit_latency        : %d cycles\n" \
 					"\tpower consumption   : %d mW\n" \
 					"\tCache+TLB coherency : %s\n", i,
 				halt_info[i].pal_power_mgmt_info_s.entry_latency,
@@ -233,7 +225,7 @@ power_info(char *page)
 	return p - page;
 }
 
-static int 
+static int
 cache_info(char *page)
 {
 	char *p = page;
@@ -288,13 +280,13 @@ cache_info(char *page)
 
 			for(k=0; k < 8; k++ ) {
 				if ( cci.pcci_st_hints & 0x1) p += sprintf(p, "[%s]", cache_st_hints[k]);
-				cci.pcci_st_hints >>=1; 
+				cci.pcci_st_hints >>=1;
 			}
 			p += sprintf(p, "\n\tLoad hints     : ");
 
 			for(k=0; k < 8; k++ ) {
 				if ( cci.pcci_ld_hints & 0x1) p += sprintf(p, "[%s]", cache_ld_hints[k]);
-				cci.pcci_ld_hints >>=1; 
+				cci.pcci_ld_hints >>=1;
 			}
 			p += sprintf(p, "\n\tAlias boundary : %d byte(s)\n" \
 					"\tTag LSB        : %d\n" \
@@ -384,7 +376,7 @@ vm_info(char *page)
 			ptce.stride[1]);
 
 	p += sprintf(p, "TC Levels                      : %d\n" \
-			"Unique TC(s)                   : %d\n", 
+			"Unique TC(s)                   : %d\n",
 			vm_info_1.pal_vm_info_1_s.num_tc_levels,
 			vm_info_1.pal_vm_info_1_s.max_unique_tcs);
 
@@ -392,7 +384,7 @@ vm_info(char *page)
 		for (j=2; j>0 ; j--) {
 			tc_pages = 0; /* just in case */
 
-		
+
 			/* even without unification, some levels may not be present */
 			if ((status=ia64_pal_vm_info(i,j, &tc_info, &tc_pages)) != 0) {
 				continue;
@@ -422,7 +414,7 @@ vm_info(char *page)
 	}
 	p += sprintf(p, "\n");
 
-	return p - page;	
+	return p - page;
 }
 
 
@@ -446,7 +438,7 @@ register_info(char *page)
 
 		if (ia64_pal_register_info(info, &reg_info[0], &reg_info[1]) != 0) return 0;
 
-	 	p += sprintf(p, "%-32s : ", info_type[info]);
+		p += sprintf(p, "%-32s : ", info_type[info]);
 
 		p = bitregister_process(p, reg_info, 128);
 
@@ -458,8 +450,8 @@ register_info(char *page)
 	p += sprintf(p, "RSE stacked physical registers   : %ld\n" \
 			"RSE load/store hints             : %ld (%s)\n",
 			phys_stacked,
-			hints.ph_data, 
-		     	hints.ph_data < RSE_HINTS_COUNT ? rse_hints[hints.ph_data]: "(\?\?)");
+			hints.ph_data,
+			hints.ph_data < RSE_HINTS_COUNT ? rse_hints[hints.ph_data]: "(\?\?)");
 
 	if (ia64_pal_debug_info(&iregs, &dregs)) return 0;
 
@@ -486,15 +478,15 @@ static const char *proc_features[]={
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	"Disable BINIT on processor time-out",
 	"Disable dynamic power management (DPM)",
-	"Disable coherency", 
-	"Disable cache", 
+	"Disable coherency",
+	"Disable cache",
 	"Enable CMCI promotion",
 	"Enable MCA to BINIT promotion",
 	"Enable MCA promotion",
 	"Enable BEER promotion"
 };
 
-	
+
 static int
 processor_info(char *page)
 {
@@ -508,7 +500,7 @@ processor_info(char *page)
 
 	for(i=0; i < 64; i++, v++,avail >>=1, status >>=1, control >>=1) {
 		if ( ! *v ) continue;
-		p += sprintf(p, "%-40s : %s%s %s\n", *v, 
+		p += sprintf(p, "%-40s : %s%s %s\n", *v,
 				avail & 0x1 ? "" : "NotImpl",
 				avail & 0x1 ? (status & 0x1 ? "On" : "Off"): "",
 				avail & 0x1 ? (control & 0x1 ? "Ctrl" : "NoCtrl"): "");
@@ -526,9 +518,9 @@ static const char *bus_features[]={
 	"Enable Half Transfer",
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, 
-	"Enable Cache Line Repl. Exclusive", 
-	"Enable Cache Line Repl. Shared", 
+	NULL, NULL, NULL, NULL,
+	"Enable Cache Line Repl. Exclusive",
+	"Enable Cache Line Repl. Shared",
 	"Disable Transaction Queuing",
 	"Disable Reponse Error Checking",
 	"Disable Bus Error Checking",
@@ -541,7 +533,7 @@ static const char *bus_features[]={
 	"Disable Bus Data Error Checking"
 };
 
-	
+
 static int
 bus_info(char *page)
 {
@@ -560,7 +552,7 @@ bus_info(char *page)
 
 	for(i=0; i < 64; i++, v++, avail >>=1, status >>=1, control >>=1) {
 		if ( ! *v ) continue;
-		p += sprintf(p, "%-48s : %s%s %s\n", *v, 
+		p += sprintf(p, "%-48s : %s%s %s\n", *v,
 				avail & 0x1 ? "" : "NotImpl",
 				avail & 0x1 ? (status  & 0x1 ? "On" : "Off"): "",
 				avail & 0x1 ? (control & 0x1 ? "Ctrl" : "NoCtrl"): "");
@@ -568,62 +560,39 @@ bus_info(char *page)
 	return p - page;
 }
 
-
-/*
- * physical mode call for PAL_VERSION is working fine.
- * This function is meant to go away once PAL get fixed.
- */
-static inline s64 
-ia64_pal_version_phys(pal_version_u_t *pal_min_version, pal_version_u_t *pal_cur_version) 
-{	
-	struct ia64_pal_retval iprv;
-	PAL_CALL_PHYS(iprv, PAL_VERSION, 0, 0, 0);
-	if (pal_min_version)
-		pal_min_version->pal_version_val = iprv.v0;
-	if (pal_cur_version)
-		pal_cur_version->pal_version_val = iprv.v1;
-	return iprv.status; 
-}
-
 static int
 version_info(char *page)
 {
-	s64 status;
 	pal_version_u_t min_ver, cur_ver;
 	char *p = page;
 
-#ifdef IA64_PAL_VERSION_BUG
-	/* The virtual mode call is buggy. But the physical mode call seems
-	 * to be ok. Until they fix virtual mode, we do physical.
+	/* The PAL_VERSION call is advertised as being able to support
+	 * both physical and virtual mode calls. This seems to be a documentation
+	 * bug rather than firmware bug. In fact, it does only support physical mode.
+	 * So now the code reflects this fact and the pal_version() has been updated
+	 * accordingly.
 	 */
-	status = ia64_pal_version_phys(&min_ver, &cur_ver);
-#else
-	/* The system crashes if you enable this code with the wrong PAL 
-	 * code
-	 */
-	status = ia64_pal_version(&min_ver, &cur_ver);
-#endif
-	if (status != 0) return 0;
+	if (ia64_pal_version(&min_ver, &cur_ver) != 0) return 0;
 
 	p += sprintf(p, "PAL_vendor : 0x%02x (min=0x%02x)\n" \
 			"PAL_A      : %x.%x.%x (min=%x.%x.%x)\n" \
 			"PAL_B      : %x.%x.%x (min=%x.%x.%x)\n",
-	     		cur_ver.pal_version_s.pv_pal_vendor,
-	     		min_ver.pal_version_s.pv_pal_vendor,
+			cur_ver.pal_version_s.pv_pal_vendor,
+			min_ver.pal_version_s.pv_pal_vendor,
 
-	     		cur_ver.pal_version_s.pv_pal_a_model>>4,
-	     		cur_ver.pal_version_s.pv_pal_a_model&0xf,
-	     		cur_ver.pal_version_s.pv_pal_a_rev,
-	     		min_ver.pal_version_s.pv_pal_a_model>>4,
-	     		min_ver.pal_version_s.pv_pal_a_model&0xf,
-	     		min_ver.pal_version_s.pv_pal_a_rev,
+			cur_ver.pal_version_s.pv_pal_a_model>>4,
+			cur_ver.pal_version_s.pv_pal_a_model&0xf,
+			cur_ver.pal_version_s.pv_pal_a_rev,
+			min_ver.pal_version_s.pv_pal_a_model>>4,
+			min_ver.pal_version_s.pv_pal_a_model&0xf,
+			min_ver.pal_version_s.pv_pal_a_rev,
 
-	     		cur_ver.pal_version_s.pv_pal_b_model>>4,
-	     		cur_ver.pal_version_s.pv_pal_b_model&0xf,
-	     		cur_ver.pal_version_s.pv_pal_b_rev,
-	     		min_ver.pal_version_s.pv_pal_b_model>>4,
-	     		min_ver.pal_version_s.pv_pal_b_model&0xf,
-	     		min_ver.pal_version_s.pv_pal_b_rev);
+			cur_ver.pal_version_s.pv_pal_b_model>>4,
+			cur_ver.pal_version_s.pv_pal_b_model&0xf,
+			cur_ver.pal_version_s.pv_pal_b_rev,
+			min_ver.pal_version_s.pv_pal_b_model>>4,
+			min_ver.pal_version_s.pv_pal_b_model&0xf,
+			min_ver.pal_version_s.pv_pal_b_rev);
 
 	return p - page;
 }
@@ -650,7 +619,7 @@ perfmon_info(char *page)
 			"Counter width                 : %d bits\n" \
 			"Cycle event number            : %d\n" \
 			"Retired event number          : %d\n" \
-			"Implemented PMC               : ", 
+			"Implemented PMC               : ",
 			pm_info.pal_perf_mon_info_s.generic,
 			pm_info.pal_perf_mon_info_s.width,
 			pm_info.pal_perf_mon_info_s.cycles,
@@ -659,15 +628,15 @@ perfmon_info(char *page)
 	p = bitregister_process(p, pm_buffer, 256);
 
 	p += sprintf(p, "\nImplemented PMD               : ");
-	
+
 	p = bitregister_process(p, pm_buffer+4, 256);
 
 	p += sprintf(p, "\nCycles count capable          : ");
-	
+
 	p = bitregister_process(p, pm_buffer+8, 256);
 
 	p += sprintf(p, "\nRetired bundles count capable : ");
-	
+
 	p = bitregister_process(p, pm_buffer+12, 256);
 
 	p += sprintf(p, "\n");
@@ -683,7 +652,7 @@ frequency_info(char *page)
 	u64 base;
 
 	if (ia64_pal_freq_base(&base) == -1)
-		p += sprintf(p, "Output clock            : not implemented\n"); 
+		p += sprintf(p, "Output clock            : not implemented\n");
 	else
 		p += sprintf(p, "Output clock            : %ld ticks/s\n", base);
 
@@ -762,7 +731,7 @@ tr_info(char *page)
 
 		if (ifa_reg->valid == 0) continue;
 
-		gr_reg   = (struct gr_reg *)tr_buffer;	
+		gr_reg   = (struct gr_reg *)tr_buffer;
 		itir_reg = (struct itir_reg *)&tr_buffer[1];
 		rid_reg  = (struct rid_reg *)&tr_buffer[3];
 
@@ -788,7 +757,7 @@ tr_info(char *page)
 				"\trid  : %x\n" \
 				"\tp    : %d\n" \
 				"\tma   : %d\n" \
-				"\td    : %d\n", 
+				"\td    : %d\n",
 				gr_reg->pl,
 				gr_reg->ar,
 				rid_reg->rid,
@@ -807,7 +776,7 @@ tr_info(char *page)
  */
 static palinfo_entry_t palinfo_entries[]={
 	{ "version_info",	version_info, },
-	{ "vm_info", 		vm_info, },
+	{ "vm_info",		vm_info, },
 	{ "cache_info",		cache_info, },
 	{ "power_info",		power_info, },
 	{ "register_info",	register_info, },
@@ -821,14 +790,14 @@ static palinfo_entry_t palinfo_entries[]={
 #define NR_PALINFO_ENTRIES	(sizeof(palinfo_entries)/sizeof(palinfo_entry_t))
 
 /*
- * this array is used to keep track of the proc entries we create. This is 
+ * this array is used to keep track of the proc entries we create. This is
  * required in the module mode when we need to remove all entries. The procfs code
  * does not do recursion of deletion
  *
  * Notes:
  *	- first +1 accounts for the cpuN entry
  *	- second +1 account for toplevel palinfo
- * 
+ *
  */
 #define NR_PALINFO_PROC_ENTRIES	(NR_CPUS*(NR_PALINFO_ENTRIES+1)+1)
 
@@ -855,7 +824,7 @@ typedef union {
 #ifdef CONFIG_SMP
 
 /*
- * used to hold information about final function to call 
+ * used to hold information about final function to call
  */
 typedef struct {
 	palinfo_func_t	func;	/* pointer to function to call */
@@ -888,7 +857,7 @@ palinfo_smp_call(void *info)
  *	0 : error or nothing to output
  *	otherwise how many bytes in the "page" buffer were written
  */
-static 
+static
 int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 {
 	palinfo_smp_data_t ptr;
@@ -908,7 +877,7 @@ int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 	return ptr.ret;
 }
 #else /* ! CONFIG_SMP */
-static 
+static
 int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 {
 	printk(__FUNCTION__" should not be called with non SMP kernel\n");
@@ -930,25 +899,25 @@ palinfo_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 	 * in SMP mode, we may need to call another CPU to get correct
 	 * information. PAL, by definition, is processor specific
 	 */
-	if (f->req_cpu == smp_processor_id()) 
+	if (f->req_cpu == smp_processor_id())
 		len = (*palinfo_entries[f->func_id].proc_read)(page);
 	else
 		len = palinfo_handle_smp(f, page);
 
-        if (len <= off+count) *eof = 1;
+	if (len <= off+count) *eof = 1;
 
-        *start = page + off;
-        len   -= off;
+	*start = page + off;
+	len   -= off;
 
-        if (len>count) len = count;
-        if (len<0) len = 0;
+	if (len>count) len = count;
+	if (len<0) len = 0;
 
 	MOD_DEC_USE_COUNT;
 
-        return len;
+	return len;
 }
 
-static int __init 
+static int __init
 palinfo_init(void)
 {
 #	define CPUSTR	"cpu%d"
@@ -979,7 +948,7 @@ palinfo_init(void)
 
 		for (j=0; j < NR_PALINFO_ENTRIES; j++) {
 			f.func_id = j;
-			*pdir++ = create_proc_read_entry (palinfo_entries[j].name, 0, cpu_dir, 
+			*pdir++ = create_proc_read_entry (palinfo_entries[j].name, 0, cpu_dir,
 						palinfo_read_entry, (void *)f.value);
 		}
 		*pdir++ = cpu_dir;
@@ -994,9 +963,10 @@ palinfo_exit(void)
 {
 	int i = 0;
 
-	/* remove all nodes: depth first pass */
+	/* remove all nodes: depth first pass. Could optimize this  */
 	for (i=0; i< NR_PALINFO_PROC_ENTRIES ; i++) {
-		remove_proc_entry (palinfo_proc_entries[i]->name, NULL);
+		if (palinfo_proc_entries[i])
+			remove_proc_entry (palinfo_proc_entries[i]->name, NULL);
 	}
 }
 

@@ -10,6 +10,8 @@
 #ifndef _ASM_SN_DMAMAP_H
 #define _ASM_SN_DMAMAP_H
 
+#include <asm/sn/sv.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,7 +55,7 @@ extern void	dma_mapfree(dmamap_t *);
 extern int	dma_map(dmamap_t *, caddr_t, int);
 extern int	dma_map2(dmamap_t *, caddr_t, caddr_t, int);
 extern paddr_t	dma_mapaddr(dmamap_t *, caddr_t);
-#ifdef IRIX
+#ifdef LATER
 extern int	dma_mapbp(dmamap_t *, buf_t *, int);
 #endif
 extern int	dma_map_alenlist(dmamap_t *, struct alenlist_s *, size_t);

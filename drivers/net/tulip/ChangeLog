@@ -1,3 +1,80 @@
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Remove code that existed when one or more of
+	  the following defines existed.  These defines were never used
+	  by normal users in practice: TULIP_FULL_DUPLEX,
+	  TULIP_DEFAULT_MEDIA, and TULIP_NO_MEDIA_SWITCH.
+	  
+	* tulip.h, eeprom.c: Move EE_* constants from tulip.h to eeprom.c.
+	* tulip.h, media.c: Move MDIO_* constants from tulip.h to media.c.
+
+	* media.c: Add barrier() to mdio_read/write's PNIC status check
+	  loops.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merged from Becker's tulip.c 0.92t:
+
+	* tulip.h: Add MEDIA_MASK constant for bounding medianame[]
+	  array lookups.
+	* eeprom.c, media.c, timer.c, tulip_core.c: Use it.
+
+	* media.c, tulip_core.c: mdio_{read,write} cleanup.  Since this
+	  is called [pretty much] directly from ioctl, we mask
+	  read/write arguments to limit the values passed.
+	  Added mii_lock.  Added comet_miireg2offset and better
+	  Comet-specific mdio_read/write code.	Pay closer attention
+	  to the bits we set in ioctl.	Remove spinlocks from ioctl,
+	  they are in mdio_read/write now.  Use mask to limit
+	  phy number in tulip_init_one's MII scan.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merged from Becker's tulip.c 0.92t:
+
+	* 21142.c, tulip_core.c: PNIC2 MAC address and NWay fixes.
+	* tulip.h: Add FullDuplex constant, used in above change.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* timer.c: Do not call netif_carrier_{on,off}, it is not used in
+	  the main tree.  Leave code in, disabled, as markers for future
+	  carrier notification.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merged from Becker's tulip.c 0.92t, except for the tulip.h
+	whitespace cleanup:
+
+	* interrupt.c: If Rx stops, make sure to update the
+	  multicast filter before restarting.
+	* tulip.h: Add COMET_MAC_ADDR feature flag, clean up flags.
+	  Add Accept* Rx mode bit constants.
+	  Add mc_filter[] to driver private struct.
+	* tulip_core.c: Add new Comet PCI id 0x1113:0x9511.
+	  Add COMET_MAC_ADDR feature flag to comet entry in board info array.
+	  Prefer to test COMET_MAC_ADDR flag to testing chip_id for COMET,
+	  when dealing with the Comet's MAC address.
+	  Enable Tx underrun recovery for Comet chips.
+	  Use new Accept* constants in set_rx_mode.
+	  Prefer COMET_MAC_ADDR flag test to chip_id test in set_rx_mode.
+	  Store built mc_filter for later use in intr handler by Comets.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Use tp->cur_tx when building the
+	  setup frame, instead of assuming that the setup
+	  frame is always built in slot zero.  This case is
+	  hit during PM resume.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* *.c: Update file headers (copyright, urls, etc.)
+	* Makefile: re-order to that chip-specific modules on own line
+	* eeprom.c: BSS/zero-init cleanup (Andrey Panin)
+	* tulip_core.c: merge medianame[] update from tulip.c.
+	  Additional arch-specific rx_copybreak, csr0 values. (various)
+
 2001-02-20  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* media.c (tulip_select_media): No need to initialize

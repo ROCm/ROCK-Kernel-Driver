@@ -10,11 +10,7 @@
 #ifndef _ASM_SN_XTALK_XTALK_PRIVATE_H
 #define _ASM_SN_XTALK_XTALK_PRIVATE_H
 
-#ifdef IRIX
-#include <sys/ioerror.h>	/* for error function and arg types */
-#else
 #include <asm/sn/ioerror.h>        /* for error function and arg types */
-#endif
 
 /*
  * xtalk_private.h -- private definitions for xtalk
@@ -44,7 +40,6 @@ struct xtalk_dmamap_s {
  * All Crosstalk providers set up interrupts using this information.
  */
 struct xtalk_intr_s {
-    int                     xi_flags;	/* XTALK_INTR flags */
     devfs_handle_t            xi_dev;	/* requestor of this intr */
     xwidgetnum_t            xi_target;	/* master's widget number */
     xtalk_intr_vector_t     xi_vector;	/* 8-bit interrupt vector */

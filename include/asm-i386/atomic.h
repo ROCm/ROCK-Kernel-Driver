@@ -75,7 +75,7 @@ static __inline__ void atomic_sub(int i, atomic_t *v)
 }
 
 /**
- * atomic_sub_and_test - test variable then subtract 
+ * atomic_sub_and_test - subtract value from variable and test result
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
  * 
@@ -111,7 +111,7 @@ static __inline__ void atomic_inc(atomic_t *v)
 }
 
 /**
- * atomic_dec - decrement the atomic variable
+ * atomic_dec - decrement atomic variable
  * @v: pointer of type atomic_t
  * 
  * Atomically decrements @v by 1.  Note that the guaranteed
@@ -126,7 +126,7 @@ static __inline__ void atomic_dec(atomic_t *v)
 }
 
 /**
- * atomic_dec_and_test - decrement by 1 and test
+ * atomic_dec_and_test - decrement and test
  * @v: pointer of type atomic_t
  * 
  * Atomically decrements @v by 1 and
@@ -146,7 +146,7 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
 }
 
 /**
- * atomic_inc_and_test - increment by 1 and test 
+ * atomic_inc_and_test - increment and test 
  * @v: pointer of type atomic_t
  * 
  * Atomically increments @v by 1

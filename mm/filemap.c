@@ -108,7 +108,6 @@ void __remove_inode_page(struct page *page)
 	if (PageDirty(page)) BUG();
 	remove_page_from_inode_queue(page);
 	remove_page_from_hash_queue(page);
-	page->mapping = NULL;
 }
 
 void remove_inode_page(struct page *page)

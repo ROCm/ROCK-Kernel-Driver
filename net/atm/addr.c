@@ -52,25 +52,26 @@ static void notify_sigd(struct atm_dev *dev)
 	sigd_enq(NULL,as_itf_notify,NULL,&pvc,NULL);
 }
 
+/*
+ *	This is called from atm_ioctl only. You must hold the lock as a caller
+ */
 
-void reset_addr(struct atm_dev *dev)
+void atm_reset_addr(struct atm_dev *dev)
 {
 	struct atm_dev_addr *this;
 
 	down(&local_lock);
-	spin_lock (&atm_dev_lock);		
 	while (dev->local) {
 		this = dev->local;
 		dev->local = this->next;
 		kfree(this);
 	}
 	up(&local_lock);
-	spin_unlock (&atm_dev_lock);
 	notify_sigd(dev);
 }
 
 
-int add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
+int atm_add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
 {
 	struct atm_dev_addr **walk;
 	int error;
@@ -96,7 +97,7 @@ int add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
 }
 
 
-int del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
+int atm_del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
 {
 	struct atm_dev_addr **walk,*this;
 	int error;
@@ -119,7 +120,7 @@ int del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr)
 }
 
 
-int get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size)
+int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size)
 {
 	struct atm_dev_addr *walk;
 	int total;

@@ -12,7 +12,7 @@
 
 #include <linux/config.h>
 
-#ifdef __KERNEL__
+#if __KERNEL__
 
 /*
  * Basic types required for io error handling interfaces.
@@ -255,7 +255,7 @@ error_skip_point_mark(devfs_handle_t  v)
 	int		code = 0;		
 
 	/* Check if we have a valid hwgraph vertex */
-#ifdef IRIX
+#ifdef	LATER
 	if (!dev_is_vertex(v))
 		return(code);
 #endif
@@ -276,18 +276,6 @@ error_skip_point_mark(devfs_handle_t  v)
 	}								   
 	ASSERT(v_error_skip_env_get(v, error_env) == GRAPH_SUCCESS);
 	code = setjmp(*error_env);					   
-#ifdef IRIX
-	/* NOTE: It might be OK to leave the allocated jump buffer on the
-	 * vertex. This can be used for later purposes.
-	 */
-	if (code) {							   
-		/* This is the case where a long jump has been taken from one
-		 * one of the error handling interfaces.		     
-		 */							     
-		if (v_error_skip_env_clear(v, error_env) == GRAPH_SUCCESS)   
-			kfree(error_env);
-	}								     
-#endif
 	return(code);							     
 }
 #endif	/* CONFIG_SGI_IO_ERROR_HANDLING */
@@ -309,8 +297,6 @@ extern counter_t		error_retry_count_decrement(devfs_handle_t);
  * thru the calls the io error handling layer.
  */
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-#define IS_DEVICE_SHUTDOWN(_d) 	(error_state_get(_d) == ERROR_STATE_SHUTDOWN)
-#else
 extern boolean_t		is_device_shutdown(devfs_handle_t);
 #define IS_DEVICE_SHUTDOWN(_d) 	(is_device_shutdown(_d))
 #endif

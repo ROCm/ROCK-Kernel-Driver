@@ -43,6 +43,8 @@
 #define IIO_IOPRB_0		IIO_IPRB0
 #define IIO_PRTE_0      	IIO_IPRTE0        /* PIO Read address table entry 0 */
 #define IIO_PRTE(_x)    	(IIO_PRTE_0 + (8 * (_x)))
+#define IIO_NUM_IPRBS 		(9) 
+#define IIO_WIDPRTE(x)  IIO_PRTE(((x) - 8)) /* widget ID to its PRTE num */
 
 #define IIO_LLP_CSR_IS_UP               0x00002000
 #define IIO_LLP_CSR_LLP_STAT_MASK       0x00003000
@@ -192,6 +194,21 @@
 #define       HUBII_XBOW_CREDIT       3
 #define       HUBII_XBOW_REV2_CREDIT  4
 
+/*
+ * Number of credits that xtalk devices should use when communicating
+ * with a Bedrock (depth of Bedrock's queue).
+ */
+#define HUB_CREDIT 4
+
+/*
+ * Some IIO_PRB fields
+ */
+#define IIO_PRB_MULTI_ERR	(1LL << 63)
+#define IIO_PRB_SPUR_RD		(1LL << 51)
+#define IIO_PRB_SPUR_WR		(1LL << 50)
+#define IIO_PRB_RD_TO		(1LL << 49)
+#define IIO_PRB_ERROR		(1LL << 48)
+
 /*************************************************************************
 
  Some of the IIO field masks and shifts are defined here.
@@ -243,6 +260,29 @@
 #define IBCT_POISON		(0x1 << 8)
 #define IBCT_NOTIFY		(0x1 << 4)
 #define IBCT_ZFIL_MODE		(0x1 << 0)
+
+/*
+ * IIO Incoming Error Packet Header (IIO_IIEPH1/IIO_IIEPH2)
+ */
+#define IIEPH1_VALID		(1 << 44)
+#define IIEPH1_OVERRUN		(1 << 40)
+#define IIEPH1_ERR_TYPE_SHFT	32
+#define IIEPH1_ERR_TYPE_MASK	0xf
+#define IIEPH1_SOURCE_SHFT	20
+#define IIEPH1_SOURCE_MASK	11
+#define IIEPH1_SUPPL_SHFT	8
+#define IIEPH1_SUPPL_MASK	11
+#define IIEPH1_CMD_SHFT		0
+#define IIEPH1_CMD_MASK		7
+
+#define IIEPH2_TAIL		(1 << 40)
+#define IIEPH2_ADDRESS_SHFT	0
+#define IIEPH2_ADDRESS_MASK	38
+
+#define IIEPH1_ERR_SHORT_REQ	2
+#define IIEPH1_ERR_SHORT_REPLY	3
+#define IIEPH1_ERR_LONG_REQ	4
+#define IIEPH1_ERR_LONG_REPLY	5
 
 /*
  * IO Error Clear register bit field definitions
@@ -363,6 +403,10 @@ typedef ii_icrb0_d_u_t icrbd_t;
 /* A few more #defines for backwards compatibility */
 #define iprb_t          ii_iprb0_u_t
 #define iprb_regval     ii_iprb0_regval
+#define iprb_mult_err	ii_iprb0_fld_s.i_mult_err
+#define iprb_spur_rd	ii_iprb0_fld_s.i_spur_rd
+#define iprb_spur_wr	ii_iprb0_fld_s.i_spur_wr
+#define iprb_rd_to	ii_iprb0_fld_s.i_rd_to
 #define iprb_ovflow     ii_iprb0_fld_s.i_of_cnt
 #define iprb_error      ii_iprb0_fld_s.i_error
 #define iprb_ff         ii_iprb0_fld_s.i_f
@@ -385,7 +429,6 @@ typedef ii_icrb0_d_u_t icrbd_t;
 
 #define IO_PERF_SETS	32
 
-#ifdef BRINGUP
 #if __KERNEL__
 #if _LANGUAGE_C
 /* XXX moved over from SN/SN0/hubio.h -- each should be checked for SN1 */
@@ -646,6 +689,11 @@ hub_intr_alloc( devfs_handle_t dev,               /* which device */
                 device_desc_t dev_desc,         /* device descriptor */
                 devfs_handle_t owner_dev);        /* owner of this interrupt */
 
+extern hub_intr_t
+hub_intr_alloc_nothd(devfs_handle_t dev,          /* which device */
+                device_desc_t dev_desc,         /* device descriptor */
+                devfs_handle_t owner_dev);        /* owner of this interrupt */
+
 extern void
 hub_intr_free(hub_intr_t intr_hdl);
 
@@ -710,5 +758,4 @@ extern int  hub_dma_enabled(devfs_handle_t);
 
 #endif /* _LANGUAGE_C */
 #endif /* _KERNEL */
-#endif /* BRINGUP */
 #endif  /* _ASM_SN_SN1_HUBIO_NEXT_H */

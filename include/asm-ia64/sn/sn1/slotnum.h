@@ -14,8 +14,7 @@
 #define SLOTNUM_MAXLENGTH	16
 
 /*
- * This file attempts to define a slot number space across all slots
- * a IP27 module.  Here, we deal with the top level slots.
+ * This file attempts to define a slot number space across all slots.
  *
  *	Node slots
  *	Router slots
@@ -24,16 +23,20 @@
  *	Other slots are children of their parent crosstalk slot:
  *		PCI slots
  *		VME slots
+ *
+ *	The PCI class has been added since the XBridge ASIC on SN-MIPS
+ *	has built-in PCI bridges (2). On IBricks, widget E & F serve
+ *	PCI busses, and on PBricks all widgets serve as PCI busses
+ *	with the use of the super-bridge mode of the XBridge ASIC.
  */
-// #include <slotnum.h>
 
-// #ifdef NOTDEF	/* moved to sys/slotnum.h */
 #define SLOTNUM_NODE_CLASS	0x00	/* Node   */
 #define SLOTNUM_ROUTER_CLASS	0x10	/* Router */
 #define SLOTNUM_XTALK_CLASS	0x20	/* Xtalk  */
 #define SLOTNUM_MIDPLANE_CLASS	0x30	/* Midplane */
 #define SLOTNUM_XBOW_CLASS	0x40	/* Xbow  */
 #define SLOTNUM_KNODE_CLASS	0x50	/* Kego node */
+#define SLOTNUM_PCI_CLASS	0x60	/* PCI widgets on XBridge */
 #define SLOTNUM_INVALID_CLASS	0xf0	/* Invalid */
 
 #define SLOTNUM_CLASS_MASK	0xf0
@@ -41,7 +44,6 @@
 
 #define SLOTNUM_GETCLASS(_sn)	((_sn) & SLOTNUM_CLASS_MASK)
 #define SLOTNUM_GETSLOT(_sn)	((_sn) & SLOTNUM_SLOT_MASK)
-// #endif	/* NOTDEF */
 
 /* This determines module to pnode mapping. */
 /* NODESLOTS_PER_MODULE has changed from 4 to 6

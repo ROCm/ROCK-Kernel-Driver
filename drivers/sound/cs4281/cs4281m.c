@@ -4289,6 +4289,11 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 	CS_DBGOUT(CS_FUNCTION | CS_INIT, 2,
 		  printk(KERN_INFO "cs4281: probe()+\n"));
 
+	if (pci_enable_device(pcidev)) {
+		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
+			 "cs4281: pci_enable_device() failed\n"));
+		return -1;
+	}
 	if (!RSRCISMEMORYREGION(pcidev, 0) ||
 	    !RSRCISMEMORYREGION(pcidev, 1)) {
 		CS_DBGOUT(CS_ERROR, 1, printk(KERN_ERR
@@ -4366,11 +4371,6 @@ static int __devinit cs4281_probe(struct pci_dev *pcidev,
 	s->magic = CS4281_MAGIC;
 	s->pcidev = pcidev;
 	s->irq = pcidev->irq;
-	if (pci_enable_device(pcidev)) {
-		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
-			 "cs4281: pci_enable_device() failed\n"));
-		goto err_irq;
-	}
 	if (request_irq
 	    (s->irq, cs4281_interrupt, SA_SHIRQ, "Crystal CS4281", s)) {
 		CS_DBGOUT(CS_INIT | CS_ERROR, 1,

@@ -1,8 +1,8 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #define __KERNEL_SYSCALLS__	/* see <asm/unistd.h> */
 #include <linux/config.h>
@@ -20,14 +20,13 @@
 
 #include <asm/delay.h>
 #include <asm/efi.h>
+#include <asm/perfmon.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
 #include <asm/user.h>
-
-#ifdef CONFIG_IA64_NEW_UNWIND
 
 static void
 do_show_stack (struct unw_frame_info *info, void *arg)
@@ -46,12 +45,9 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 	} while (unw_unwind(info) >= 0);
 }
 
-#endif
-
 void
 show_stack (struct task_struct *task)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	if (!task)
 		unw_init_running(do_show_stack, 0);
 	else {
@@ -60,7 +56,6 @@ show_stack (struct task_struct *task)
 		unw_init_from_blocked_task(&info, task);
 		do_show_stack(&info, 0);
 	}
-#endif
 }
 
 void
@@ -108,10 +103,8 @@ show_regs (struct pt_regs *regs)
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
 	}
-#ifdef CONFIG_IA64_NEW_UNWIND
 	if (!user_mode(regs))
 		show_stack(0);
-#endif
 }
 
 void __attribute__((noreturn))
@@ -147,7 +140,7 @@ ia64_save_extra (struct task_struct *task)
 		ia64_save_debug_regs(&task->thread.dbr[0]);
 #ifdef CONFIG_PERFMON
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
-		ia64_save_pm_regs(task);
+		pfm_save_regs(task);
 #endif
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_save_state(&task->thread);
@@ -160,7 +153,7 @@ ia64_load_extra (struct task_struct *task)
 		ia64_load_debug_regs(&task->thread.dbr[0]);
 #ifdef CONFIG_PERFMON
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
-		ia64_load_pm_regs(task);
+		pfm_load_regs(task);
 #endif
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_load_state(&task->thread);
@@ -210,6 +203,7 @@ copy_thread (int nr, unsigned long clone_flags,
 	struct switch_stack *child_stack, *stack;
 	extern char ia64_ret_from_clone;
 	struct pt_regs *child_ptregs;
+	int retval = 0;
 
 #ifdef CONFIG_SMP
 	/*
@@ -290,15 +284,17 @@ copy_thread (int nr, unsigned long clone_flags,
 	if (IS_IA32_PROCESS(ia64_task_regs(current)))
 		ia32_save_state(&p->thread);
 #endif
-	return 0;
+#ifdef CONFIG_PERFMON
+	if (current->thread.pfm_context)
+		retval = pfm_inherit(p);
+#endif
+	return retval;
 }
-
-#ifdef CONFIG_IA64_NEW_UNWIND
 
 void
 do_copy_regs (struct unw_frame_info *info, void *arg)
 {
-	unsigned long ar_bsp, ndirty, *krbs, addr, mask, sp, nat_bits = 0, ip;
+	unsigned long ar_bsp, addr, mask, sp, nat_bits = 0, ip, ar_rnat;
 	elf_greg_t *dst = arg;
 	struct pt_regs *pt;
 	char nat;
@@ -313,17 +309,17 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 	unw_get_sp(info, &sp);
 	pt = (struct pt_regs *) (sp + 16);
 
-	krbs = (unsigned long *) current + IA64_RBS_OFFSET/8;
-	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
-	ar_bsp = (unsigned long) ia64_rse_skip_regs((long *) pt->ar_bspstore, ndirty);
+	ar_bsp = ia64_get_user_bsp(current, pt);
 
 	/*
-	 * Write portion of RSE backing store living on the kernel
-	 * stack to the VM of the process.
+	 * Write portion of RSE backing store living on the kernel stack to the VM of the
+	 * process.
 	 */
 	for (addr = pt->ar_bspstore; addr < ar_bsp; addr += 8)
-		if (ia64_peek(pt, current, addr, &val) == 0)
+		if (ia64_peek(current, ar_bsp, addr, &val) == 0)
 			access_process_vm(current, addr, &val, sizeof(val), 1);
+
+	ia64_peek(current, ar_bsp, (long) ia64_rse_rnat_addr((long *) addr - 1), &ar_rnat);
 
 	/*
 	 * coredump format:
@@ -361,7 +357,7 @@ do_copy_regs (struct unw_frame_info *info, void *arg)
 	 */
 	dst[46] = ar_bsp;
 	dst[47] = pt->ar_bspstore;
-	unw_get_ar(info, UNW_AR_RNAT, &dst[48]);
+	dst[48] = ar_rnat;
 	unw_get_ar(info, UNW_AR_CCV, &dst[49]);
 	unw_get_ar(info, UNW_AR_UNAT, &dst[50]);
 	unw_get_ar(info, UNW_AR_FPSR, &dst[51]);
@@ -391,91 +387,16 @@ do_dump_fpu (struct unw_frame_info *info, void *arg)
 		memcpy(dst + 32, current->thread.fph, 96*16);
 }
 
-#endif /* CONFIG_IA64_NEW_UNWIND */
-
 void
 ia64_elf_core_copy_regs (struct pt_regs *pt, elf_gregset_t dst)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	unw_init_running(do_copy_regs, dst);
-#else
-	struct switch_stack *sw = ((struct switch_stack *) pt) - 1;
-	unsigned long ar_ec, cfm, ar_bsp, ndirty, *krbs, addr;
-
-	ar_ec = (sw->ar_pfs >> 52) & 0x3f;
-
-	cfm = pt->cr_ifs & ((1UL << 63) - 1);
-	if ((pt->cr_ifs & (1UL << 63)) == 0) {
-		/* if cr_ifs isn't valid, we got here through a syscall or a break */
-		cfm = sw->ar_pfs & ((1UL << 38) - 1);
-	}
-
-	krbs = (unsigned long *) current + IA64_RBS_OFFSET/8;
-	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
-	ar_bsp = (unsigned long) ia64_rse_skip_regs((long *) pt->ar_bspstore, ndirty);
-
-	/*
-	 * Write portion of RSE backing store living on the kernel
-	 * stack to the VM of the process.
-	 */
-	for (addr = pt->ar_bspstore; addr < ar_bsp; addr += 8) {
-		long val;
-		if (ia64_peek(pt, current, addr, &val) == 0)
-			access_process_vm(current, addr, &val, sizeof(val), 1);
-	}
-
-	/*	r0-r31
-	 *	NaT bits (for r0-r31; bit N == 1 iff rN is a NaT)
-	 *	predicate registers (p0-p63)
-	 *	b0-b7
-	 *	ip cfm user-mask
-	 *	ar.rsc ar.bsp ar.bspstore ar.rnat
-	 *	ar.ccv ar.unat ar.fpsr ar.pfs ar.lc ar.ec
-	 */
-	memset(dst, 0, sizeof(dst));	/* don't leak any "random" bits */
-
-	/* r0 is zero */   dst[ 1] =  pt->r1; dst[ 2] =  pt->r2; dst[ 3] = pt->r3;
-	dst[ 4] =  sw->r4; dst[ 5] =  sw->r5; dst[ 6] =  sw->r6; dst[ 7] = sw->r7;
-	dst[ 8] =  pt->r8; dst[ 9] =  pt->r9; dst[10] = pt->r10; dst[11] = pt->r11;
-	dst[12] = pt->r12; dst[13] = pt->r13; dst[14] = pt->r14; dst[15] = pt->r15;
-	memcpy(dst + 16, &pt->r16, 16*8);	/* r16-r31 are contiguous */
-
-	dst[32] = ia64_get_nat_bits(pt, sw);
-	dst[33] = pt->pr;
-
-	/* branch regs: */
-	dst[34] = pt->b0; dst[35] = sw->b1; dst[36] = sw->b2; dst[37] = sw->b3;
-	dst[38] = sw->b4; dst[39] = sw->b5; dst[40] = pt->b6; dst[41] = pt->b7;
-
-	dst[42] = pt->cr_iip + ia64_psr(pt)->ri;
-	dst[43] = pt->cr_ifs;
-	dst[44] = pt->cr_ipsr & IA64_PSR_UM;
-
-	dst[45] = pt->ar_rsc; dst[46] = ar_bsp; dst[47] = pt->ar_bspstore;  dst[48] = pt->ar_rnat;
-	dst[49] = pt->ar_ccv; dst[50] = pt->ar_unat; dst[51] = sw->ar_fpsr; dst[52] = pt->ar_pfs;
-	dst[53] = sw->ar_lc; dst[54] = (sw->ar_pfs >> 52) & 0x3f;
-#endif /* !CONFIG_IA64_NEW_UNWIND */
 }
 
 int
 dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
 {
-#ifdef CONFIG_IA64_NEW_UNWIND
 	unw_init_running(do_dump_fpu, dst);
-#else
-	struct switch_stack *sw = ((struct switch_stack *) pt) - 1;
-
-	memset(dst, 0, sizeof (dst));	/* don't leak any "random" bits */
-
-	/* f0 is 0.0 */  /* f1 is 1.0 */  dst[2] = sw->f2; dst[3] = sw->f3;
-	dst[4] = sw->f4; dst[5] = sw->f5; dst[6] = pt->f6; dst[7] = pt->f7;
-	dst[8] = pt->f8; dst[9] = pt->f9;
-	memcpy(dst + 10, &sw->f10, 22*16);	/* f10-f31 are contiguous */
-
-	ia64_flush_fph(current);
-	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0)
-		memcpy(dst + 32, current->thread.fph, 96*16);
-#endif
 	return 1;	/* f0-f31 are always valid so we always return 1 */
 }
 
@@ -523,6 +444,15 @@ flush_thread (void)
 #endif
 }
 
+#ifdef CONFIG_PERFMON
+void
+release_thread (struct task_struct *task)
+{
+	if (task->thread.pfm_context)
+		pfm_context_exit(task);
+}
+#endif
+
 /*
  * Clean up state associated with current thread.  This is called when
  * the thread calls exit().
@@ -545,7 +475,7 @@ exit_thread (void)
 		 * we garantee no race.  this call we also stop
 		 * monitoring
 		 */
-		ia64_save_pm_regs(current);
+		pfm_flush_regs(current);
 		/*
 		 * make sure that switch_to() will not save context again
 		 */

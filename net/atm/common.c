@@ -867,7 +867,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				ret_val = -EPERM;
 				goto done;
 			}
-			reset_addr(dev);
+			atm_reset_addr(dev);
 			break;
 		case ATM_ADDADDR:
 		case ATM_DELADDR:
@@ -883,13 +883,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 					goto done;
 				}
 				if (cmd == ATM_ADDADDR)
-					ret_val = add_addr(dev,&addr);
+					ret_val = atm_add_addr(dev,&addr);
 				else
-					ret_val = del_addr(dev,&addr);
+					ret_val = atm_del_addr(dev,&addr);
 				goto done;
 			}
 		case ATM_GETADDR:
-			size = get_addr(dev,buf,len);
+			size = atm_get_addr(dev,buf,len);
 			if (size < 0)
 				ret_val = size;
 			else

@@ -15,9 +15,10 @@
 	1.04    GRG 1998.11.28  added support for FRIQ 
 	1.05    TMW 2000.06.06  use parport_find_number instead of
 				parport_enumerate
+	1.06    TMW 2001.03.26  more sane parport-or-not resource management
 */
 
-#define PI_VERSION      "1.05"
+#define PI_VERSION      "1.06"
 
 #include <linux/module.h>
 #include <linux/config.h>
@@ -160,8 +161,10 @@ static void pi_unregister_parport( PIA *pi)
 void pi_release( PIA *pi)
 
 {	pi_unregister_parport(pi);
-	if ((!pi->pardev)&&(pi->reserved)) 
+#ifndef CONFIG_PARPORT
+	if (pi->reserved)
 		release_region(pi->port,pi->reserved);
+#endif /* !CONFIG_PARPORT */
 	pi->proto->release_proto(pi);
 }
 
@@ -234,7 +237,7 @@ void pi_unregister( PIP *pr)
 	MOD_DEC_USE_COUNT;
 }
 
-static void pi_register_parport( PIA *pi, int verbose)
+static int pi_register_parport( PIA *pi, int verbose)
 
 {
 #ifdef CONFIG_PARPORT
@@ -242,15 +245,16 @@ static void pi_register_parport( PIA *pi, int verbose)
 	struct parport *port;
 
 	port = parport_find_base (pi->port);
-	if (!port) return;
+	if (!port)
+	  return 0;
 
 	pi->pardev = parport_register_device(port,
 					     pi->device,NULL,
 					     pi_wake_up,NULL,
 					     0,(void *)pi);
 	parport_put_port (port);
-	if (!pi->pardev) return;
-
+	if (!pi->pardev)
+	  return 0;
 
 	init_waitqueue_head(&pi->parq);
 
@@ -258,8 +262,9 @@ static void pi_register_parport( PIA *pi, int verbose)
 			    port->name);
 	
 	pi->parname = (char *)port->name;
-
 #endif
+
+	return 1;
 }
 
 static int pi_probe_mode( PIA *pi, int max, char * scratch, int verbose)
@@ -271,7 +276,9 @@ static int pi_probe_mode( PIA *pi, int max, char * scratch, int verbose)
 		range = 3;
 		if (pi->mode >= pi->proto->epp_first) range = 8;
 		if ((range == 8) && (pi->port % 8)) return 0;
-		if ((!pi->pardev) && check_region(pi->port,range)) return 0;
+#ifndef CONFIG_PARPORT
+		if (check_region(pi->port,range)) return 0;
+#endif /* !CONFIG_PARPORT */
 		pi->reserved = range;
 		return (!pi_test_proto(pi,scratch,verbose));
 	}
@@ -280,7 +287,9 @@ static int pi_probe_mode( PIA *pi, int max, char * scratch, int verbose)
 		range = 3;
 		if (pi->mode >= pi->proto->epp_first) range = 8;
 		if ((range == 8) && (pi->port % 8)) break;
-		if ((!pi->pardev) && check_region(pi->port,range)) break;
+#ifndef CONFIG_PARPORT
+		if (check_region(pi->port,range)) break;
+#endif /* !CONFIG_PARPORT */
 		pi->reserved = range;
 		if (!pi_test_proto(pi,scratch,verbose)) best = pi->mode;
 	}
@@ -299,9 +308,12 @@ static int pi_probe_unit( PIA *pi, int unit, char * scratch, int verbose)
 		e = pi->proto->max_units; 
 	}
 
-	pi_register_parport(pi,verbose);
+	if (!pi_register_parport(pi,verbose))
+	  return 0;
 
-	if ((!pi->pardev) && check_region(pi->port,3)) return 0;
+#ifndef CONFIG_PARPORT
+	if (check_region(pi->port,3)) return 0;
+#endif /* !CONFIG_PARPORT */
 
 	if (pi->proto->test_port) {
 		pi_claim(pi);
@@ -391,8 +403,9 @@ int pi_init(PIA *pi, int autoprobe, int port, int mode,
 		return 0;
 	}
 
-	if (!pi->pardev)
-	   request_region(pi->port,pi->reserved,pi->device);
+#ifndef CONFIG_PARPORT
+	request_region(pi->port,pi->reserved,pi->device);
+#endif /* !CONFIG_PARPORT */
 
 	if (pi->parname)
 	   printk("%s: Sharing %s at 0x%x\n",pi->device,
@@ -407,11 +420,16 @@ int pi_init(PIA *pi, int autoprobe, int port, int mode,
 
 int	init_module(void)
 
-{	int k;
+{
+	int k;
+	const char *indicate_pp = "";
+#ifdef CONFIG_PARPORT
+	indicate_pp = " (parport)";
+#endif
 
 	for (k=0;k<MAX_PROTOS;k++) protocols[k] = 0;
 
-	printk("paride: version %s installed\n",PI_VERSION);
+	printk("paride: version %s installed%s\n",PI_VERSION,indicate_pp);
 	return 0;
 }
 

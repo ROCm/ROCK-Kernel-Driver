@@ -29,20 +29,20 @@
  */
 #define MINSTATE_START_SAVE_MIN_VIRT								\
 	dep r1=-1,r1,61,3;				/* r1 = current (virtual) */		\
-(p7)	mov ar.rsc=r0;		/* set enforced lazy mode, pl 0, little-endian, loadrs=0 */	\
+(pUser)	mov ar.rsc=0;		/* set enforced lazy mode, pl 0, little-endian, loadrs=0 */	\
 	;;											\
-(p7)	addl rKRBS=IA64_RBS_OFFSET,r1;			/* compute base of RBS */		\
-(p7)	mov rARRNAT=ar.rnat;									\
+(pUser)	addl rKRBS=IA64_RBS_OFFSET,r1;			/* compute base of RBS */		\
+(pUser)	mov rARRNAT=ar.rnat;									\
 (pKern) mov r1=sp;					/* get sp  */				\
 	;;											\
-(p7)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
-(p7)	mov rARBSPSTORE=ar.bspstore;			/* save ar.bspstore */			\
+(pUser)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
+(pUser)	mov rARBSPSTORE=ar.bspstore;			/* save ar.bspstore */			\
 	;;											\
 (pKern) addl r1=-IA64_PT_REGS_SIZE,r1;			/* if in kernel mode, use sp (r12) */	\
-(p7)	mov ar.bspstore=rKRBS;				/* switch to kernel RBS */		\
+(pUser)	mov ar.bspstore=rKRBS;				/* switch to kernel RBS */		\
 	;;											\
-(p7)	mov r18=ar.bsp;										\
-(p7)	mov ar.rsc=0x3;		/* set eager mode, pl 0, little-endian, loadrs=0 */		\
+(pUser)	mov r18=ar.bsp;										\
+(pUser)	mov ar.rsc=0x3;		/* set eager mode, pl 0, little-endian, loadrs=0 */		\
 
 #define MINSTATE_END_SAVE_MIN_VIRT								\
 	or r13=r13,r14;		/* make `current' a kernel virtual address */			\
@@ -55,20 +55,20 @@
  */
 #define MINSTATE_START_SAVE_MIN_PHYS								\
 (pKern) movl sp=ia64_init_stack+IA64_STK_OFFSET-IA64_PT_REGS_SIZE;				\
-(p7)	mov ar.rsc=r0;		/* set enforced lazy mode, pl 0, little-endian, loadrs=0 */	\
-(p7)	addl rKRBS=IA64_RBS_OFFSET,r1;		/* compute base of register backing store */	\
+(pUser)	mov ar.rsc=0;		/* set enforced lazy mode, pl 0, little-endian, loadrs=0 */	\
+(pUser)	addl rKRBS=IA64_RBS_OFFSET,r1;		/* compute base of register backing store */	\
 	;;											\
-(p7)	mov rARRNAT=ar.rnat;									\
+(pUser)	mov rARRNAT=ar.rnat;									\
 (pKern) dep r1=0,sp,61,3;				/* compute physical addr of sp	*/	\
-(p7)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
-(p7)	mov rARBSPSTORE=ar.bspstore;			/* save ar.bspstore */			\
-(p7)	dep rKRBS=-1,rKRBS,61,3;			/* compute kernel virtual addr of RBS */\
+(pUser)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
+(pUser)	mov rARBSPSTORE=ar.bspstore;			/* save ar.bspstore */			\
+(pUser)	dep rKRBS=-1,rKRBS,61,3;			/* compute kernel virtual addr of RBS */\
 	;;											\
 (pKern) addl r1=-IA64_PT_REGS_SIZE,r1;		/* if in kernel mode, use sp (r12) */		\
-(p7)	mov ar.bspstore=rKRBS;			/* switch to kernel RBS */			\
+(pUser)	mov ar.bspstore=rKRBS;			/* switch to kernel RBS */			\
 	;;											\
-(p7)	mov r18=ar.bsp;										\
-(p7)	mov ar.rsc=0x3;		/* set eager mode, pl 0, little-endian, loadrs=0 */		\
+(pUser)	mov r18=ar.bsp;										\
+(pUser)	mov ar.rsc=0x3;		/* set eager mode, pl 0, little-endian, loadrs=0 */		\
 
 #define MINSTATE_END_SAVE_MIN_PHYS								\
 	or r12=r12,r14;		/* make sp a kernel virtual address */				\
@@ -101,29 +101,30 @@
  *	r12 = kernel sp (kernel virtual address)
  *	r13 = points to current task_struct (kernel virtual address)
  *	p15 = TRUE if psr.i is set in cr.ipsr
- *	predicate registers (other than p6, p7, and p15), b6, r3, r8, r9, r10, r11, r14, r15:
+ *	predicate registers (other than p2, p3, and p15), b6, r3, r8, r9, r10, r11, r14, r15:
  *		preserved
  *
  * Note that psr.ic is NOT turned on by this macro.  This is so that
  * we can pass interruption state as arguments to a handler.
  */
-#define DO_SAVE_MIN(COVER,EXTRA)								  \
+#define DO_SAVE_MIN(COVER,SAVE_IFS,EXTRA)							  \
 	mov rARRSC=ar.rsc;									  \
 	mov rARPFS=ar.pfs;									  \
 	mov rR1=r1;										  \
 	mov rARUNAT=ar.unat;									  \
 	mov rCRIPSR=cr.ipsr;									  \
-	mov rB6=b6;		/* rB6 = branch reg 6 */					  \
+	mov rB6=b6;				/* rB6 = branch reg 6 */			  \
 	mov rCRIIP=cr.iip;									  \
-	mov r1=ar.k6;		/* r1 = current (physical) */					  \
+	mov r1=IA64_KR(CURRENT);		/* r1 = current (physical) */			  \
+	COVER;											  \
 	;;											  \
 	invala;											  \
 	extr.u r16=rCRIPSR,32,2;		/* extract psr.cpl */				  \
 	;;											  \
-	cmp.eq pKern,p7=r0,r16;			/* are we in kernel mode already? (psr.cpl==0) */ \
+	cmp.eq pKern,pUser=r0,r16;		/* are we in kernel mode already? (psr.cpl==0) */ \
 	/* switch from user to kernel RBS: */							  \
-	COVER;											  \
 	;;											  \
+	SAVE_IFS;										  \
 	MINSTATE_START_SAVE_MIN									  \
 	;;											  \
 	mov r16=r1;					/* initialize first base pointer */	  \
@@ -135,7 +136,7 @@
 	;;											  \
 	st8 [r16]=rCRIFS,16;	/* save cr.ifs */						  \
 	st8 [r17]=rARUNAT,16;	/* save ar.unat */						  \
-(p7)	sub r18=r18,rKRBS;	/* r18=RSE.ndirty*8 */						  \
+(pUser)	sub r18=r18,rKRBS;	/* r18=RSE.ndirty*8 */						  \
 	;;											  \
 	st8 [r16]=rARPFS,16;	/* save ar.pfs */						  \
 	st8 [r17]=rARRSC,16;	/* save ar.rsc */						  \
@@ -143,8 +144,8 @@
 	;;			/* avoid RAW on r16 & r17 */					  \
 (pKern)	adds r16=16,r16;	/* skip over ar_rnat field */					  \
 (pKern)	adds r17=16,r17;	/* skip over ar_bspstore field */				  \
-(p7)	st8 [r16]=rARRNAT,16;	/* save ar.rnat */						  \
-(p7)	st8 [r17]=rARBSPSTORE,16;	/* save ar.bspstore */					  \
+(pUser)	st8 [r16]=rARRNAT,16;	/* save ar.rnat */						  \
+(pUser)	st8 [r17]=rARBSPSTORE,16;	/* save ar.bspstore */					  \
 	;;											  \
 	st8 [r16]=rARPR,16;	/* save predicates */						  \
 	st8 [r17]=rB6,16;	/* save b6 */							  \
@@ -171,7 +172,7 @@
 	;;											  \
 .mem.offset 0,0;		st8.spill [r16]=r10,16;						  \
 .mem.offset 8,0;		st8.spill [r17]=r11,16;						  \
-	mov r13=ar.k6;		/* establish `current' */					  \
+	mov r13=IA64_KR(CURRENT);	/* establish `current' */				  \
 	;;											  \
 	EXTRA;											  \
 	movl r1=__gp;		/* establish kernel global pointer */				  \
@@ -240,6 +241,6 @@
 # define STOPS
 #endif
 
-#define SAVE_MIN_WITH_COVER	DO_SAVE_MIN(cover;; mov rCRIFS=cr.ifs,) STOPS
-#define SAVE_MIN_WITH_COVER_R19	DO_SAVE_MIN(cover;; mov rCRIFS=cr.ifs, mov r15=r19) STOPS
-#define SAVE_MIN		DO_SAVE_MIN(mov rCRIFS=r0,) STOPS
+#define SAVE_MIN_WITH_COVER	DO_SAVE_MIN(cover, mov rCRIFS=cr.ifs,) STOPS
+#define SAVE_MIN_WITH_COVER_R19	DO_SAVE_MIN(cover, mov rCRIFS=cr.ifs, mov r15=r19) STOPS
+#define SAVE_MIN		DO_SAVE_MIN(     , mov rCRIFS=r0, ) STOPS

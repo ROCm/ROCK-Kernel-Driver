@@ -2,8 +2,8 @@
 #define _ASM_IA64_PTRACE_H
 
 /*
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
  *
  * 12/07/98	S. Eranian	added pt_regs & switch_stack
@@ -67,7 +67,7 @@
 # define IA64_TASK_STRUCT_LOG_NUM_PAGES		0
 #endif
 
-#define IA64_RBS_OFFSET			((IA64_TASK_SIZE + 15) & ~15) 
+#define IA64_RBS_OFFSET			((IA64_TASK_SIZE + 15) & ~15)
 #define IA64_STK_OFFSET			((1 << IA64_TASK_STRUCT_LOG_NUM_PAGES)*PAGE_SIZE)
 
 #define INIT_TASK_SIZE			IA64_STK_OFFSET
@@ -96,11 +96,11 @@ struct pt_regs {
 	unsigned long cr_iip;		/* interrupted task's instruction pointer */
 	unsigned long cr_ifs;		/* interrupted task's function state */
 
-	unsigned long ar_unat;		/* interrupted task's NaT register (preserved) */ 
+	unsigned long ar_unat;		/* interrupted task's NaT register (preserved) */
 	unsigned long ar_pfs;		/* prev function state  */
 	unsigned long ar_rsc;		/* RSE configuration */
 	/* The following two are valid only if cr_ipsr.cpl > 0: */
-	unsigned long ar_rnat;		/* RSE NaT */ 
+	unsigned long ar_rnat;		/* RSE NaT */
 	unsigned long ar_bspstore;	/* RSE bspstore */
 
 	unsigned long pr;		/* 64 predicate registers (1 bit each) */
@@ -160,7 +160,7 @@ struct pt_regs {
  * "preserved" registers.
  */
 struct switch_stack {
-	unsigned long caller_unat;	/* user NaT collection register (preserved) */ 
+	unsigned long caller_unat;	/* user NaT collection register (preserved) */
 	unsigned long ar_fpsr;		/* floating-point status register */
 
 	struct ia64_fpreg f2;		/* preserved */
@@ -206,7 +206,7 @@ struct switch_stack {
 	unsigned long ar_pfs;		/* previous function state */
 	unsigned long ar_lc;		/* loop counter (preserved) */
 	unsigned long ar_unat;		/* NaT bits for r4-r7 */
-	unsigned long ar_rnat;		/* RSE NaT collection register */ 
+	unsigned long ar_rnat;		/* RSE NaT collection register */
 	unsigned long ar_bspstore;	/* RSE dirty base (preserved) */
 	unsigned long pr;		/* 64 predicate registers (1 bit each) */
 };
@@ -220,22 +220,16 @@ struct switch_stack {
   struct task_struct;			/* forward decl */
 
   extern void show_regs (struct pt_regs *);
-  extern long ia64_peek (struct pt_regs *, struct task_struct *, unsigned long addr, long *val);
-  extern long ia64_poke (struct pt_regs *, struct task_struct *, unsigned long addr, long val);
-  extern void ia64_flush_fph (struct task_struct *t);
-  extern void ia64_sync_fph (struct task_struct *t);
+  extern unsigned long ia64_get_user_bsp (struct task_struct *, struct pt_regs *);
+  extern long ia64_peek (struct task_struct *, unsigned long, unsigned long, long *);
+  extern long ia64_poke (struct task_struct *, unsigned long, unsigned long, long);
+  extern void ia64_flush_fph (struct task_struct *);
+  extern void ia64_sync_fph (struct task_struct *);
 
-#ifdef CONFIG_IA64_NEW_UNWIND
   /* get nat bits for scratch registers such that bit N==1 iff scratch register rN is a NaT */
   extern unsigned long ia64_get_scratch_nat_bits (struct pt_regs *pt, unsigned long scratch_unat);
   /* put nat bits for scratch registers such that scratch register rN is a NaT iff bit N==1 */
   extern unsigned long ia64_put_scratch_nat_bits (struct pt_regs *pt, unsigned long nat);
-#else
-  /* get nat bits for r1-r31 such that bit N==1 iff rN is a NaT */
-  extern long ia64_get_nat_bits (struct pt_regs *pt, struct switch_stack *sw);
-  /* put nat bits for r1-r31 such that rN is a NaT iff bit N==1 */
-  extern void ia64_put_nat_bits (struct pt_regs *pt, struct switch_stack *sw, unsigned long nat);
-#endif
 
   extern void ia64_increment_ip (struct pt_regs *pt);
   extern void ia64_decrement_ip (struct pt_regs *pt);

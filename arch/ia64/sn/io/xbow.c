@@ -17,18 +17,17 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
+#include <asm/sn/hack.h>
 #include <asm/sn/pci/bridge.h>
 #include <asm/sn/xtalk/xtalk_private.h>
 
-#define DEBUG		1
-#define XBOW_DEBUG	1
+/* #define DEBUG		1 */
+/* #define XBOW_DEBUG	1 */
 
 
 /*
  * Files needed to get the device driver entry points
  */
-
-/* #include <asm/cred.h> */
 
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/xtalk/xtalk.h>
@@ -66,7 +65,7 @@ struct xbow_soft_s {
     xbow_perf_t             xbow_perfcnt[XBOW_PERF_COUNTERS];
     xbow_perf_link_t        xbow_perflink[MAX_XBOW_PORTS];
     xbow_link_status_t      xbow_link_status[MAX_XBOW_PORTS];
-    lock_t                  xbow_perf_lock;
+    spinlock_t              xbow_perf_lock;
     int                     link_monitor;
     widget_cfg_t	   *wpio[MAX_XBOW_PORTS];	/* cached PIO pointer */
 
@@ -74,7 +73,7 @@ struct xbow_soft_s {
      * destination port since contention happens there.
      * Implicit mapping from xbow ports (8..f) -> (0..7) array indices.
      */
-    lock_t		    xbow_bw_alloc_lock;		/* bw allocation lock */
+    spinlock_t		    xbow_bw_alloc_lock;		/* bw allocation lock */
     unsigned long long	    bw_hiwm[MAX_XBOW_PORTS];	/* hiwater mark values */
     unsigned long long      bw_cur_used[MAX_XBOW_PORTS]; /* bw used currently */
 };
@@ -118,15 +117,8 @@ void                    xbow_update_llp_status(devfs_handle_t);
 
 int                     xbow_disable_llp_monitor(devfs_handle_t);
 int                     xbow_enable_llp_monitor(devfs_handle_t);
-
-#ifdef IRIX
-int			xbow_prio_bw_alloc(devfs_handle_t, xwidgetnum_t, xwidgetnum_t,
-				unsigned long long, unsigned long long);
-#else
 int                     xbow_prio_bw_alloc(devfs_handle_t, xwidgetnum_t, xwidgetnum_t,
                                 unsigned long long, unsigned long long);
-#endif
-
 
 xswitch_reset_link_f    xbow_reset_link;
 
@@ -237,7 +229,11 @@ xbow_attach(devfs_handle_t conn)
     int			    xbow_num;
 	
 #if DEBUG && ATTACH_DEBUG
-    cmn_err(CE_CONT, "%v: xbow_attach\n", conn);
+#if defined(SUPPORT_PRINTING_V_FORMAT
+    printk("%v: xbow_attach\n", conn);
+#else
+    printk("0x%x: xbow_attach\n", conn);
+#endif
 #endif
 
     /*
@@ -261,7 +257,9 @@ xbow_attach(devfs_handle_t conn)
      * of our connection point.
      */
     busv = hwgraph_connectpt_get(conn);
+#if DEBUG && ATTACH_DEBUG
     printk("xbow_attach: Bus Vertex 0x%p, conn 0x%p, xbow register 0x%p wid= 0x%x\n", busv, conn, xbow, *(volatile u32 *)xbow);
+#endif
 
     ASSERT(busv != GRAPH_VERTEX_NONE);
 
@@ -283,8 +281,7 @@ xbow_attach(devfs_handle_t conn)
                         S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
                         /* &hcl_fops */ (void *)&vhdl, NULL);
     if (!vhdl) {
-        printk("xbow_attach: Unable to create char device for xbow conn
-0x%p\n",
+        printk(KERN_WARNING "xbow_attach: Unable to create char device for xbow conn %p\n",
                 conn);
     }
 
@@ -306,11 +303,7 @@ xbow_attach(devfs_handle_t conn)
     /* Add xbow number as a suffix to the hwgraph name of the xbow.
      * This is helpful while looking at the error/warning messages.
      */
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
     xbow_num = 0;
-#else
-    xbow_num = xswitch_id_get(busv);
-#endif
 
     /*
      * get the name of this xbow vertex and keep the info.
@@ -341,7 +334,7 @@ xbow_attach(devfs_handle_t conn)
      * Crossbow is DOWNREV: these chips are not good
      * to have around, and the operator should be told.
      */
-#ifdef IRIX
+#ifdef	LATER
 #if !DEBUG
     if (
 #if SHOW_REVS
@@ -349,8 +342,7 @@ xbow_attach(devfs_handle_t conn)
 #endif	/* SHOW_REVS */
 	   (rev < XBOW_REV_1_1))
 #endif	/* !DEBUG  */
-	cmn_err((rev < XBOW_REV_1_1) ? CE_WARN : CE_CONT,
-		"%sCrossbow ASIC: rev %s (code=%d) at %s%s",
+	printk("%sCrossbow ASIC: rev %s (code=%d) at %s%s",
 		(rev < XBOW_REV_1_1) ? "DOWNREV " : "",
 		(rev == XBOW_REV_1_0) ? "1.0" :
 		(rev == XBOW_REV_1_1) ? "1.1" :
@@ -362,14 +354,13 @@ xbow_attach(devfs_handle_t conn)
 		"unknown",
 		rev, soft->name,
 		(rev < XBOW_REV_1_1) ? "" : "\n");
-#endif	/* IRIX */
-
-    spinlock_init(&soft->xbow_perf_lock, "xbow_perf_lock");
+#endif	/* LATER */
+    mutex_spinlock_init(&soft->xbow_perf_lock);
     soft->xbow_perfcnt[0].xp_perf_reg = &xbow->xb_perf_ctr_a;
     soft->xbow_perfcnt[1].xp_perf_reg = &xbow->xb_perf_ctr_b;
 
     /* Initialization for GBR bw allocation */
-    spinlock_init(&soft->xbow_bw_alloc_lock, "xbow_bw_alloc_lock");
+    mutex_spinlock_init(&soft->xbow_bw_alloc_lock);
 
 #define	XBOW_8_BIT_PORT_BW_MAX		(400 * 1000 * 1000)	/* 400 MB/s */
 #define XBOW_16_BIT_PORT_BW_MAX		(800 * 1000 * 1000)	/* 800 MB/s */
@@ -403,7 +394,7 @@ xbow_attach(devfs_handle_t conn)
     xwidget_error_register(conn, xbow_error_handler, soft);
 
 #else
-    printk("xbow_attach: Fixme: we bypassed attaching xbow error interrupt.\n");
+    FIXME("xbow_attach: Fixme: we bypassed attaching xbow error interrupt.\n");
 #endif /* LATER */
 
     /*
@@ -479,8 +470,6 @@ xbow_attach(devfs_handle_t conn)
 int
 xbow_open(devfs_handle_t *devp, int oflag, int otyp, cred_t *credp)
 {
-    if (!_CAP_CRABLE((uint64_t)credp, CAP_DEVICE_MGT))
-	return EPERM;
     return 0;
 
 }
@@ -525,27 +514,8 @@ xbow_widget_num_get(devfs_handle_t dev)
 	char		devname[MAXDEVNAME];
 	xwidget_info_t	xwidget_info;
 	int		i;
-#if IP27
-	cnodeid_t	cnodeid = CNODEID_NONE;
-#endif
 
 	vertex_to_name(dev, devname, MAXDEVNAME);
-
-#if IP30
-	/* If there is a ".connection" edge from this vertex,
-	 * then it must be "/hw/node" vertex. Return the widget
-	 * number for heart: 8.
-	 */
-	if (hwgraph_edge_get(dev, EDGE_LBL_CONN, &tdev) ==
-			GRAPH_SUCCESS) {
-		return ((xwidgetnum_t) 8);
-	}
-#elif IP27
-	if ((cnodeid = nodevertex_to_cnodeid(dev)) != CNODEID_NONE) {
-		ASSERT(cnodeid < maxnodes);
-		return(hub_widget_id(COMPACT_TO_NASID_NODEID(cnodeid)));
-	}
-#endif
 
 	/* If this is a pci controller vertex, traverse up using
 	 * the ".." links to get to the widget.
@@ -601,7 +571,7 @@ xbow_ioctl(devfs_handle_t dev,
     ASSERT_ALWAYS(rc != 0);
 #endif
     switch (cmd) {
-#ifdef IRIX
+#ifdef LATER
     case XBOWIOC_PERF_ENABLE:
     case XBOWIOC_PERF_DISABLE:
 	{
@@ -630,7 +600,7 @@ xbow_ioctl(devfs_handle_t dev,
 	}
 #endif
 
-#ifdef IRIX
+#ifdef LATER
     case XBOWIOC_PERF_GET:
 	{
 	    xbow_perf_link_t       *xbow_perf_cnt;
@@ -652,10 +622,6 @@ xbow_ioctl(devfs_handle_t dev,
 #endif
 
     case XBOWIOC_LLP_ERROR_ENABLE:
-	if (!_CAP_CRABLE((uint64_t)cr, CAP_DEVICE_MGT)) {
-	    error = EPERM;
-	    break;
-	}
 	if ((error = xbow_enable_llp_monitor(vhdl)) != 0)
 	    error = EINVAL;
 
@@ -663,16 +629,12 @@ xbow_ioctl(devfs_handle_t dev,
 
     case XBOWIOC_LLP_ERROR_DISABLE:
 
-	if (!_CAP_CRABLE((uint64_t)cr, CAP_DEVICE_MGT)) {
-	    error = EPERM;
-	    break;
-	}
 	if ((error = xbow_disable_llp_monitor(vhdl)) != 0)
 	    error = EINVAL;
 
 	break;
 
-#ifdef IRIX
+#ifdef LATER
     case XBOWIOC_LLP_ERROR_GET:
 	{
 	    xbow_link_status_t     *xbow_llp_status;
@@ -693,16 +655,11 @@ xbow_ioctl(devfs_handle_t dev,
 	}
 #endif
 
-#ifdef IRIX
+#ifdef LATER
     case GIOCSETBW:
 	{
 	    grio_ioctl_info_t info;
 	    xwidgetnum_t src_widgetnum, dest_widgetnum;
-
-	    if (!cap_able(CAP_DEVICE_MGT)) {
-		error = EPERM;
-		break;
-	    }
 
 	    if (COPYIN(arg, &info, sizeof(grio_ioctl_info_t))) {
 		error = EFAULT;
@@ -863,14 +820,14 @@ xbow_intr_preset(void *which_widget,
     xbow->xb_wid_int_lower = XTALK_ADDR_TO_LOWER(addr);
 }
 
-#define	XEM_ADD_STR(s)		cmn_err(CE_CONT, "%s", (s))
-#define	XEM_ADD_NVAR(n,v)	cmn_err(CE_CONT, "\t%20s: 0x%x\n", (n), (v))
+#define	XEM_ADD_STR(s)		printk("%s", (s))
+#define	XEM_ADD_NVAR(n,v)	printk("\t%20s: 0x%x\n", (n), (v))
 #define	XEM_ADD_VAR(v)		XEM_ADD_NVAR(#v,(v))
 #define XEM_ADD_IOEF(n) 	if (IOERROR_FIELDVALID(ioe,n))		    \
 				    XEM_ADD_NVAR("ioe." #n,		    \
 						 IOERROR_GETVALUE(ioe,n))
 
-#ifdef IRIX
+#ifdef LATER
 static void
 xem_add_ioe(ioerror_t *ioe)
 {
@@ -891,7 +848,7 @@ xem_add_ioe(ioerror_t *ioe)
 }
 
 #define XEM_ADD_IOE()	(xem_add_ioe(ioe))
-#endif	/* IRIX */
+#endif	/* LATER */
 
 int                     xbow_xmit_retry_errors = 0;
 
@@ -971,7 +928,6 @@ xbow_xmit_retry_error(xbow_soft_t soft,
 static void
 xbow_errintr_handler(intr_arg_t arg)
 {
-#ifdef IRIX
     ioerror_t               ioe[1];
     xbow_soft_t             soft = (xbow_soft_t) arg;
     xbow_t                 *xbow = soft->base;
@@ -1065,9 +1021,8 @@ xbow_errintr_handler(intr_arg_t arg)
 		    xwidget_vhdl = xbow_widget_lookup(soft->busv,port);
 		    xwidget_name = xwidget_name_get(xwidget_vhdl);
 
-#ifdef IRIX
-		    cmn_err(CE_CONT,
-			    "%s port %X[%s] XIO Bus Error",
+#ifdef	LATER
+		    printk("%s port %X[%s] XIO Bus Error",
 			    soft->name, port, xwidget_name);
 		    if (link_status & XB_STAT_MULTI_ERR)
 			XEM_ADD_STR("\tMultiple Errors\n");
@@ -1089,8 +1044,7 @@ xbow_errintr_handler(intr_arg_t arg)
 			XEM_ADD_STR("\tMaximum Request Timeout\n");
 		    if (link_status & XB_STAT_SRC_TOUT_ERR)
 			XEM_ADD_STR("\tSource Timeout Error\n");
-#endif
-
+#endif	/* LATER */
 		    {
 			int                     other_port;
 
@@ -1130,8 +1084,7 @@ xbow_errintr_handler(intr_arg_t arg)
 			| XB_WID_STAT_XTALK_ERR
 			| XB_WID_STAT_REG_ACC_ERR)) {
 
-	    cmn_err(CE_CONT,
-		    "%s Port 0 XIO Bus Error",
+	    printk("%s Port 0 XIO Bus Error",
 		    soft->name);
 	    if (wid_stat & XB_WID_STAT_MULTI_ERR)
 		XEM_ADD_STR("\tMultiple Error\n");
@@ -1150,9 +1103,8 @@ xbow_errintr_handler(intr_arg_t arg)
 	XEM_ADD_VAR(wid_err_upper);
 	XEM_ADD_VAR(wid_err_lower);
 	XEM_ADD_VAR(wid_err_addr);
-	cmn_err_tag(8, CE_PANIC, "XIO Bus Error");
+	PRINT_PANIC("XIO Bus Error");
     }
-#endif
 }
 #endif	/* LATER */
 
@@ -1180,7 +1132,6 @@ xbow_error_handler(
 		      ioerror_mode_t mode,
 		      ioerror_t *ioerror)
 {
-#ifdef IRIX
     int                     retval = IOERROR_WIDGETLEVEL;
 
     xbow_soft_t             soft = (xbow_soft_t) einfo;
@@ -1204,7 +1155,7 @@ xbow_error_handler(
     busv = soft->busv;
 
 #if DEBUG && ERROR_DEBUG
-    cmn_err(CE_CONT, "%s: xbow_error_handler\n", soft->name, busv);
+    printk("%s: xbow_error_handler\n", soft->name, busv);
 #endif
 
     port = IOERROR_GETVALUE(ioerror, widgetnum);
@@ -1217,14 +1168,12 @@ xbow_error_handler(
 	    return IOERROR_HANDLED;
 
 	if (error_code & IOECODE_DMA) {
-	    cmn_err(CE_ALERT,
-		    "DMA error blamed on Crossbow at %s\n"
+	    PRINT_ALERT("DMA error blamed on Crossbow at %s\n"
 		    "\tbut Crosbow never initiates DMA!",
 		    soft->name);
 	}
 	if (error_code & IOECODE_PIO) {
-	    cmn_err(CE_ALERT,
-		    "PIO Error on XIO Bus %s\n"
+	    PRINT_ALERt("PIO Error on XIO Bus %s\n"
 		    "\tattempting to access XIO controller\n"
 		    "\twith offset 0x%X",
 		    soft->name,
@@ -1258,14 +1207,12 @@ xbow_error_handler(
 	    return IOERROR_HANDLED;
 
 	if (error_code & IOECODE_DMA) {
-	    cmn_err(CE_ALERT,
-		    "DMA error blamed on XIO port at %s/%d\n"
+	    PRINT_ALERT("DMA error blamed on XIO port at %s/%d\n"
 		    "\tbut Crossbow does not support that port",
 		    soft->name, port);
 	}
 	if (error_code & IOECODE_PIO) {
-	    cmn_err(CE_ALERT,
-		    "PIO Error on XIO Bus %s\n"
+	    PRINT_ALERT("PIO Error on XIO Bus %s\n"
 		    "\tattempting to access XIO port %d\n"
 		    "\t(which Crossbow does not support)"
 		    "\twith offset 0x%X",
@@ -1309,14 +1256,12 @@ xbow_error_handler(
 	    return IOERROR_HANDLED;
 
 	if (error_code & IOECODE_DMA) {
-	    cmn_err(CE_ALERT,
-		    "DMA error blamed on XIO port at %s/%d\n"
+	    PRINT_ALERT("DMA error blamed on XIO port at %s/%d\n"
 		    "\tbut there is no device connected there.",
 		    soft->name, port);
 	}
 	if (error_code & IOECODE_PIO) {
-	    cmn_err(CE_ALERT,
-		    "PIO Error on XIO Bus %s\n"
+	    PRINT_ALERT("PIO Error on XIO Bus %s\n"
 		    "\tattempting to access XIO port %d\n"
 		    "\t(which has no device connected)"
 		    "\twith offset 0x%X",
@@ -1349,16 +1294,14 @@ xbow_error_handler(
 	if (mode == MODE_DEVPROBE)
 	    return IOERROR_HANDLED;
 
-	cmn_err(CE_ALERT,
-		"%s%sError on XIO Bus %s port %d",
+	PRINT_ALERT("%s%sError on XIO Bus %s port %d",
 		(error_code & IOECODE_DMA) ? "DMA " : "",
 		(error_code & IOECODE_PIO) ? "PIO " : "",
 		soft->name, port);
 
 	if ((error_code & IOECODE_PIO) &&
 	    (IOERROR_FIELDVALID(ioerror, xtalkaddr))) {
-	    cmn_err(CE_CONT,
-		    "\tAccess attempted to offset 0x%X\n",
+	    printk("\tAccess attempted to offset 0x%X\n",
 		    IOERROR_GETVALUE(ioerror, xtalkaddr));
 	}
 	if (link_aux_status & XB_AUX_LINKFAIL_RST_BAD)
@@ -1393,16 +1336,14 @@ xbow_error_handler(
     if (retval == IOERROR_UNHANDLED) {
 	retval = IOERROR_PANIC;
 
-	cmn_err(CE_ALERT,
-		"%s%sError on XIO Bus %s port %d",
+	PRINT_ALERT("%s%sError on XIO Bus %s port %d",
 		(error_code & IOECODE_DMA) ? "DMA " : "",
 		(error_code & IOECODE_PIO) ? "PIO " : "",
 		soft->name, port);
 
 	if ((error_code & IOECODE_PIO) &&
 	    (IOERROR_FIELDVALID(ioerror, xtalkaddr))) {
-	    cmn_err(CE_CONT,
-		    "\tAccess attempted to offset 0x%X\n",
+	    printk("\tAccess attempted to offset 0x%X\n",
 		    IOERROR_GETVALUE(ioerror, xtalkaddr));
 	}
     }
@@ -1428,7 +1369,6 @@ xbow_error_handler(
      */
 
     return retval;
-#endif /* IRIX */
 }
 
 #endif	/* LATER */
@@ -1440,7 +1380,8 @@ xbow_update_perf_counters(devfs_handle_t vhdl)
     xbow_perf_t            *xbow_perf = xbow_soft->xbow_perfcnt;
     xbow_perf_link_t       *xbow_plink = xbow_soft->xbow_perflink;
     xbow_perfcount_t        perf_reg;
-    int                     link, s, i;
+    unsigned long           s;
+    int                     link, i;
 
     for (i = 0; i < XBOW_PERF_COUNTERS; i++, xbow_perf++) {
 	if (xbow_perf->xp_mode == XBOW_MONITOR_NONE)
@@ -1460,7 +1401,7 @@ xbow_update_perf_counters(devfs_handle_t vhdl)
     }
     /* Do port /mode multiplexing here */
 
-#ifdef IRIX
+#ifdef LATER
     (void) timeout(xbow_update_perf_counters,
 		   (void *) (__psunsigned_t) vhdl, XBOW_PERF_TIMEOUT);
 #endif
@@ -1484,7 +1425,8 @@ xbow_enable_perf_counter(devfs_handle_t vhdl, int link, int mode, int counter)
     xbow_linkctrl_t         xbow_link_ctrl;
     xbow_t                 *xbow = xbow_soft->base;
     xbow_perfcount_t        perf_reg;
-    int                     s, i;
+    unsigned long           s;
+    int                     i;
 
     link -= BASE_XBOW_PORT;
     if ((link < 0) || (link >= MAX_XBOW_PORTS))
@@ -1525,7 +1467,7 @@ xbow_enable_perf_counter(devfs_handle_t vhdl, int link, int mode, int counter)
     *(xbowreg_t *) xbow_perf->xp_perf_reg = perf_reg.xb_counter_val;
     xbow_perf->xp_current = perf_reg.xb_perf.count;
 
-#ifdef IRIX
+#ifdef LATER
     (void) timeout(xbow_update_perf_counters,
 		   (void *) (__psunsigned_t) vhdl, XBOW_PERF_TIMEOUT);
 #endif
@@ -1578,13 +1520,13 @@ xbow_update_llp_status(devfs_handle_t vhdl)
 	    aux_sts.xb_aux_linkstatus.tx_retry_cnt;
 
 	if (lnk_sts.linkstatus & ~(XB_STAT_RCV_ERR | XB_STAT_XMT_RTRY_ERR | XB_STAT_LINKALIVE)) {
-#ifdef IRIX
-	    cmn_err(CE_WARN, "link %d[%s]: bad status 0x%x\n",
+#ifdef	LATER
+	    PRINT_WARNING("link %d[%s]: bad status 0x%x\n",
 		    link, xwidget_name, lnk_sts.linkstatus);
 #endif
 	}
     }
-#ifdef IRIX
+#ifdef LATER
     if (xbow_soft->link_monitor)
 	(void) timeout(xbow_update_llp_status,
 		       (void *) (__psunsigned_t) vhdl, XBOW_STATS_TIMEOUT);
@@ -1611,7 +1553,7 @@ xbow_enable_llp_monitor(devfs_handle_t vhdl)
 {
     xbow_soft_t             xbow_soft = xbow_soft_get(vhdl);
 
-#ifdef IRIX
+#ifdef LATER
     (void) timeout(xbow_update_llp_status,
 		   (void *) (__psunsigned_t) vhdl, XBOW_STATS_TIMEOUT);
 #endif
@@ -1690,7 +1632,7 @@ idbg_xbowregs(int64_t regs)
     int                     i;
     xb_linkregs_t          *link;
 
-#ifdef IRIX
+#ifdef LATER
     if (dev_is_vertex((devfs_handle_t) regs)) {
 	devfs_handle_t            vhdl = (devfs_handle_t) regs;
 	xbow_soft_t             soft = xbow_soft_get(vhdl);
@@ -1702,7 +1644,7 @@ idbg_xbowregs(int64_t regs)
 	xbow = (xbow_t *) regs;
     }
 
-#ifdef IRIX
+#ifdef LATER
     qprintf("Printing xbow registers starting at 0x%x\n", xbow);
     qprintf("wid %x status %x erruppr %x errlower %x control %x timeout %x\n",
 	    xbow->xb_wid_id, xbow->xb_wid_stat, xbow->xb_wid_err_upper,
@@ -1716,7 +1658,7 @@ idbg_xbowregs(int64_t regs)
 
     for (i = 8; i <= 0xf; i++) {
 	link = &xbow->xb_link(i);
-#ifdef IRIX
+#ifdef LATER
 	qprintf("Link %d registers\n", i);
 	qprintf("\tctrl %x stat %x arbuppr %x arblowr %x auxstat %x\n",
 		link->link_control, link->link_status,
@@ -1795,7 +1737,7 @@ xbow_prio_bw_alloc(devfs_handle_t vhdl,
     xbow_soft_t             soft = xbow_soft_get(vhdl);
     volatile xbowreg_t     *xreg;
     xbowreg_t               mask;
-    int                     s;
+    unsigned long           s;
     int                     error = 0;
     bandwidth_t             old_bw_BYTES, req_bw_BYTES;
     xbowreg_t               old_xreg;

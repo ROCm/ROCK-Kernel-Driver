@@ -40,43 +40,6 @@
 extern void clear_page (void *page);
 extern void copy_page (void *to, void *from);
 
-#  ifdef STRICT_MM_TYPECHECKS
-/*
- * These are used to make use of C type-checking..
- */
-typedef struct { unsigned long pte; } pte_t;
-typedef struct { unsigned long pmd; } pmd_t;
-typedef struct { unsigned long pgd; } pgd_t;
-typedef struct { unsigned long pgprot; } pgprot_t;
-
-#define pte_val(x)	((x).pte)
-#define pmd_val(x)	((x).pmd)
-#define pgd_val(x)	((x).pgd)
-#define pgprot_val(x)	((x).pgprot)
-
-#define __pte(x)	((pte_t) { (x) } )
-#define __pgprot(x)	((pgprot_t) { (x) } )
-
-#  else /* !STRICT_MM_TYPECHECKS */
-/*
- * .. while these make it easier on the compiler
- */
-typedef unsigned long pte_t;
-typedef unsigned long pmd_t;
-typedef unsigned long pgd_t;
-typedef unsigned long pgprot_t;
-
-#define pte_val(x)	(x)
-#define pmd_val(x)	(x)
-#define pgd_val(x)	(x)
-#define pgprot_val(x)	(x)
-
-#define __pte(x)	(x)
-#define __pgd(x)	(x)
-#define __pgprot(x)	(x)
-
-#  endif /* !STRICT_MM_TYPECHECKS */
-
 /*
  * Note: the MAP_NR_*() macro can't use __pa() because MAP_NR_*(X) MUST
  * map to something >= max_mapnr if X is outside the identity mapped
@@ -133,7 +96,7 @@ get_order (unsigned long size)
 {
 	double d = size - 1;
 	long order;
-                
+
 	__asm__ ("getf.exp %0=%1" : "=r"(order) : "f"(d));
 	order = order - PAGE_SHIFT - 0xffff + 1;
 	if (order < 0)
@@ -142,7 +105,45 @@ get_order (unsigned long size)
 }
 
 # endif /* __KERNEL__ */
-#endif /* !ASSEMBLY */
+#endif /* !__ASSEMBLY__ */
+
+#ifdef STRICT_MM_TYPECHECKS
+  /*
+   * These are used to make use of C type-checking..
+   */
+  typedef struct { unsigned long pte; } pte_t;
+  typedef struct { unsigned long pmd; } pmd_t;
+  typedef struct { unsigned long pgd; } pgd_t;
+  typedef struct { unsigned long pgprot; } pgprot_t;
+
+# define pte_val(x)	((x).pte)
+# define pmd_val(x)	((x).pmd)
+# define pgd_val(x)	((x).pgd)
+# define pgprot_val(x)	((x).pgprot)
+
+# define __pte(x)	((pte_t) { (x) } )
+# define __pgprot(x)	((pgprot_t) { (x) } )
+
+#else /* !STRICT_MM_TYPECHECKS */
+  /*
+   * .. while these make it easier on the compiler
+   */
+# ifndef __ASSEMBLY__
+    typedef unsigned long pte_t;
+    typedef unsigned long pmd_t;
+    typedef unsigned long pgd_t;
+    typedef unsigned long pgprot_t;
+# endif
+
+# define pte_val(x)	(x)
+# define pmd_val(x)	(x)
+# define pgd_val(x)	(x)
+# define pgprot_val(x)	(x)
+
+# define __pte(x)	(x)
+# define __pgd(x)	(x)
+# define __pgprot(x)	(x)
+#endif /* !STRICT_MM_TYPECHECKS */
 
 #define PAGE_OFFSET		0xe000000000000000
 

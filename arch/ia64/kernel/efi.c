@@ -5,9 +5,9 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999-2000 Hewlett-Packard Co.
+ * Copyright (C) 1999-2001 Hewlett-Packard Co.
  * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1999-2000 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999-2001 Stephane Eranian <eranian@hpl.hp.com>
  *
  * All EFI Runtime Services are not implemented yet as EFI only
  * supports physical mode addressing on SoftSDV. This is to be fixed
@@ -16,7 +16,7 @@
  * Implemented EFI runtime services and virtual mode calls.  --davidm
  *
  * Goutham Rao: <goutham.rao@intel.com>
- * 	Skip non-WB memory and ignore empty memory ranges.
+ *	Skip non-WB memory and ignore empty memory ranges.
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -26,6 +26,7 @@
 
 #include <asm/efi.h>
 #include <asm/io.h>
+#include <asm/kregs.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 
@@ -128,9 +129,9 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 	efi_memory_desc_t *md;
 	u64 efi_desc_size, start, end;
 
-	efi_map_start = __va(ia64_boot_param.efi_memmap);
-	efi_map_end   = efi_map_start + ia64_boot_param.efi_memmap_size;
-	efi_desc_size = ia64_boot_param.efi_memdesc_size;
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
@@ -203,9 +204,9 @@ efi_map_pal_code (void)
 	u64 mask, flags;
 	u64 vaddr;
 
-	efi_map_start = __va(ia64_boot_param.efi_memmap);
-	efi_map_end   = efi_map_start + ia64_boot_param.efi_memmap_size;
-	efi_desc_size = ia64_boot_param.efi_memdesc_size;
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
@@ -218,61 +219,48 @@ efi_map_pal_code (void)
 			continue;
 		}
 		/*
-		 * We must use the same page size as the one used
-		 * for the kernel region when we map the PAL code.
-		 * This way, we avoid overlapping TRs if code is 
-		 * executed nearby. The Alt I-TLB installs 256MB
-		 * page sizes as defined for region 7.
+		 * The only ITLB entry in region 7 that is used is the one installed by
+		 * __start().  That entry covers a 64MB range.
 		 *
 		 * XXX Fixme: should be dynamic here (for page size)
 		 */
-		mask  = ~((1 << _PAGE_SIZE_256M)-1);
+		mask  = ~((1 << _PAGE_SIZE_64M) - 1);
 		vaddr = PAGE_OFFSET + md->phys_addr;
 
 		/*
-		 * We must check that the PAL mapping won't overlap
-		 * with the kernel mapping on ITR1. 
+		 * We must check that the PAL mapping won't overlap with the kernel
+		 * mapping.
 		 *
-		 * PAL code is guaranteed to be aligned on a power of 2
-		 * between 4k and 256KB.
-		 * Also from the documentation, it seems like there is an
-		 * implicit guarantee that you will need only ONE ITR to
-		 * map it. This implies that the PAL code is always aligned
-		 * on its size, i.e., the closest matching page size supported
-		 * by the TLB. Therefore PAL code is guaranteed never to cross
-		 * a 256MB unless it is bigger than 256MB (very unlikely!).
-		 * So for now the following test is enough to determine whether
-		 * or not we need a dedicated ITR for the PAL code.
+		 * PAL code is guaranteed to be aligned on a power of 2 between 4k and
+		 * 256KB.  Also from the documentation, it seems like there is an implicit
+		 * guarantee that you will need only ONE ITR to map it. This implies that
+		 * the PAL code is always aligned on its size, i.e., the closest matching
+		 * page size supported by the TLB. Therefore PAL code is guaranteed never
+		 * to cross a 64MB unless it is bigger than 64MB (very unlikely!).  So for
+		 * now the following test is enough to determine whether or not we need a
+		 * dedicated ITR for the PAL code.
 		 */
-		if ((vaddr & mask) == (PAGE_OFFSET & mask)) {
-			printk(__FUNCTION__ " : no need to install ITR for PAL Code\n");
+		if ((vaddr & mask) == (KERNEL_START & mask)) {
+			printk(__FUNCTION__ " : no need to install ITR for PAL code\n");
 			continue;
 		}
 
-	  	printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
+		printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
 		       smp_processor_id(), md->phys_addr, md->phys_addr + (md->num_pages << 12),
-		       vaddr & mask, (vaddr & mask) + 256*1024*1024);
+		       vaddr & mask, (vaddr & mask) + 64*1024*1024);
 
 		/*
 		 * Cannot write to CRx with PSR.ic=1
 		 */
 		ia64_clear_ic(flags);
-
-		/*
-		 * ITR0/DTR0: used for kernel code/data
-		 * ITR1/DTR1: used by HP simulator
-		 * ITR2/DTR2: map PAL code
-		 */
-		ia64_itr(0x1, 2, vaddr & mask,
-			 pte_val(mk_pte_phys(md->phys_addr,
-					     __pgprot(__DIRTY_BITS|_PAGE_PL_0|_PAGE_AR_RX))),
-			 _PAGE_SIZE_256M);
+		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
+			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), _PAGE_SIZE_64M);
 		local_irq_restore(flags);
-		ia64_srlz_i ();
+		ia64_srlz_i();
 	}
 }
 
-void __init 
+void __init
 efi_init (void)
 {
 	void *efi_map_start, *efi_map_end;
@@ -301,14 +289,14 @@ efi_init (void)
 	if (mem_limit != ~0UL)
 		printk("Ignoring memory above %luMB\n", mem_limit >> 20);
 
-	efi.systab = __va(ia64_boot_param.efi_systab);
+	efi.systab = __va(ia64_boot_param->efi_systab);
 
 	/*
 	 * Verify the EFI Table
- 	 */
-	if (efi.systab == NULL) 
+	 */
+	if (efi.systab == NULL)
 		panic("Woah! Can't find EFI system table.\n");
-	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE) 
+	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
 		panic("Woah! EFI system table signature incorrect\n");
 	if ((efi.systab->hdr.revision ^ EFI_SYSTEM_TABLE_REVISION) >> 16 != 0)
 		printk("Warning: EFI system table major version mismatch: "
@@ -360,9 +348,9 @@ efi_init (void)
 	efi.get_next_high_mono_count = phys_get_next_high_mono_count;
 	efi.reset_system = phys_reset_system;
 
-	efi_map_start = __va(ia64_boot_param.efi_memmap);
-	efi_map_end   = efi_map_start + ia64_boot_param.efi_memmap_size;
-	efi_desc_size = ia64_boot_param.efi_memdesc_size;
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
 
 #if EFI_DEBUG
 	/* print EFI memory map: */
@@ -380,16 +368,7 @@ efi_init (void)
 #endif
 
 	efi_map_pal_code();
-
-#ifndef CONFIG_IA64_SOFTSDV_HACKS
-	/*
-	 * (Some) SoftSDVs seem to have a problem with this call.
-	 * Since it's mostly a performance optimization, just don't do
-	 * it for now...  --davidm 99/12/6
-	 */
 	efi_enter_virtual_mode();
-#endif
-
 }
 
 void
@@ -400,9 +379,9 @@ efi_enter_virtual_mode (void)
 	efi_status_t status;
 	u64 efi_desc_size;
 
-	efi_map_start = __va(ia64_boot_param.efi_memmap);
-	efi_map_end   = efi_map_start + ia64_boot_param.efi_memmap_size;
-	efi_desc_size = ia64_boot_param.efi_memdesc_size;
+	efi_map_start = __va(ia64_boot_param->efi_memmap);
+	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
+	efi_desc_size = ia64_boot_param->efi_memdesc_size;
 
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
@@ -441,9 +420,9 @@ efi_enter_virtual_mode (void)
 	}
 
 	status = efi_call_phys(__va(runtime->set_virtual_address_map),
-			       ia64_boot_param.efi_memmap_size,
-			       efi_desc_size, ia64_boot_param.efi_memdesc_version,
-			       ia64_boot_param.efi_memmap);
+			       ia64_boot_param->efi_memmap_size,
+			       efi_desc_size, ia64_boot_param->efi_memdesc_version,
+			       ia64_boot_param->efi_memmap);
 	if (status != EFI_SUCCESS) {
 		printk("Warning: unable to switch EFI into virtual mode (status=%lu)\n", status);
 		return;

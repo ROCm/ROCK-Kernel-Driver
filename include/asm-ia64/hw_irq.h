@@ -2,8 +2,8 @@
 #define _ASM_IA64_HW_IRQ_H
 
 /*
- * Copyright (C) 2000 Hewlett-Packard Co
- * Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2001 Hewlett-Packard Co
+ * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/sched.h>
@@ -12,6 +12,8 @@
 #include <asm/machvec.h>
 #include <asm/ptrace.h>
 #include <asm/smp.h>
+
+typedef u8 ia64_vector;
 
 /*
  * 0 special
@@ -26,31 +28,32 @@
  *
  * 15 classes of 16 interrupts each.
  */
-#define IA64_MIN_VECTORED_IRQ	 16
-#define IA64_MAX_VECTORED_IRQ	255
+#define IA64_MIN_VECTORED_IRQ		 16
+#define IA64_MAX_VECTORED_IRQ		255
+#define IA64_NUM_VECTORS		256
 
-#define IA64_SPURIOUS_INT	0x0f
+#define IA64_SPURIOUS_INT_VECTOR	0x0f
 
 /*
  * Vectors 0x10-0x1f are used for low priority interrupts, e.g. CMCI.
  */
-#define PCE_IRQ			0x1e	/* platform corrected error interrupt vector */
-#define CMC_IRQ			0x1f	/* correctable machine-check interrupt vector */
+#define IA64_PCE_VECTOR			0x1e	/* platform corrected error interrupt vector */
+#define IA64_CMC_VECTOR			0x1f	/* correctable machine-check interrupt vector */
 /*
  * Vectors 0x20-0x2f are reserved for legacy ISA IRQs.
  */
-#define FIRST_DEVICE_IRQ	0x30
-#define LAST_DEVICE_IRQ		0xe7
+#define IA64_FIRST_DEVICE_VECTOR	0x30
+#define IA64_LAST_DEVICE_VECTOR		0xe7
 
-#define MCA_RENDEZ_IRQ		0xe8	/* MCA rendez interrupt */
-#define PERFMON_IRQ		0xee	/* performanc monitor interrupt vector */
-#define TIMER_IRQ		0xef	/* use highest-prio group 15 interrupt for timer */
-#define	MCA_WAKEUP_IRQ		0xf0	/* MCA wakeup interrupt (must be higher than MCA_RENDEZ_IRQ) */
-#define IPI_IRQ			0xfe	/* inter-processor interrupt vector */
+#define IA64_MCA_RENDEZ_VECTOR		0xe8	/* MCA rendez interrupt */
+#define IA64_PERFMON_VECTOR		0xee	/* performanc monitor interrupt vector */
+#define IA64_TIMER_VECTOR		0xef	/* use highest-prio group 15 interrupt for timer */
+#define	IA64_MCA_WAKEUP_VECTOR		0xf0	/* MCA wakeup (must be >MCA_RENDEZ_VECTOR) */
+#define IA64_IPI_VECTOR			0xfe	/* inter-processor interrupt vector */
 
 /* IA64 inter-cpu interrupt related definitions */
 
-#define IPI_DEFAULT_BASE_ADDR	0xfee00000
+#define IA64_IPI_DEFAULT_BASE_ADDR	0xfee00000
 
 /* Delivery modes for inter-cpu interrupts */
 enum {
@@ -61,9 +64,6 @@ enum {
         IA64_IPI_DM_EXTINT =    0x7,    /* pend an 8259-compatible interrupt. */
 };
 
-#define IA64_BUS_ID(cpu)        (cpu >> 8)
-#define IA64_LOCAL_ID(cpu)      (cpu & 0xff)
-
 extern __u8 isa_irq_to_vector_map[16];
 #define isa_irq_to_vector(x)	isa_irq_to_vector_map[(x)]
 
@@ -73,11 +73,71 @@ extern struct hw_interrupt_type irq_type_ia64_sapic;	/* CPU-internal interrupt c
 
 extern int ia64_alloc_irq (void);	/* allocate a free irq */
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
+extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 
 static inline void
 hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
 {
 	platform_send_ipi(smp_processor_id(), vector, IA64_IPI_DM_INT, 0);
+}
+
+/*
+ * Default implementations for the irq-descriptor API:
+ */
+
+extern struct irq_desc _irq_desc[NR_IRQS];
+
+static inline struct irq_desc *
+__ia64_irq_desc (unsigned int irq)
+{
+	return _irq_desc + irq;
+}
+
+static inline ia64_vector
+__ia64_irq_to_vector (unsigned int irq)
+{
+	return (ia64_vector) irq;
+}
+
+static inline unsigned int
+__ia64_local_vector_to_irq (ia64_vector vec)
+{
+	return (unsigned int) vec;
+}
+
+/*
+ * Next follows the irq descriptor interface.  On IA-64, each CPU supports 256 interrupt
+ * vectors.  On smaller systems, there is a one-to-one correspondence between interrupt
+ * vectors and the Linux irq numbers.  However, larger systems may have multiple interrupt
+ * domains meaning that the translation from vector number to irq number depends on the
+ * interrupt domain that a CPU belongs to.  This API abstracts such platform-dependent
+ * differences and provides a uniform means to translate between vector and irq numbers
+ * and to obtain the irq descriptor for a given irq number.
+ */
+
+/* Return a pointer to the irq descriptor for IRQ.  */
+static inline struct irq_desc *
+irq_desc (int irq)
+{
+	return platform_irq_desc(irq);
+}
+
+/* Extract the IA-64 vector that corresponds to IRQ.  */
+static inline ia64_vector
+irq_to_vector (int irq)
+{
+	return platform_irq_to_vector(irq);
+}
+
+/*
+ * Convert the local IA-64 vector to the corresponding irq number.  This translation is
+ * done in the context of the interrupt domain that the currently executing CPU belongs
+ * to.
+ */
+static inline unsigned int
+local_vector_to_irq (ia64_vector vec)
+{
+	return platform_local_vector_to_irq(vec);
 }
 
 #endif /* _ASM_IA64_HW_IRQ_H */

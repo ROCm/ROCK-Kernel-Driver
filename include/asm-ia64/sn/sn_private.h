@@ -10,7 +10,6 @@
 #ifndef _ASM_SN_PRIVATE_H
 #define _ASM_SN_PRIVATE_H
 
-#include <linux/config.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xtalk_private.h>
@@ -20,12 +19,12 @@ extern nasid_t master_nasid;
 extern hubreg_t get_region(cnodeid_t);
 extern hubreg_t	nasid_to_region(nasid_t);
 /* promif.c */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 extern cpuid_t cpu_node_probe(cpumask_t *cpumask, int *numnodes);
 #endif
 extern void he_arcs_set_vectors(void);
 extern void mem_init(void);
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 extern int cpu_enabled(cpuid_t);
 #endif
 extern void cpu_unenable(cpuid_t);
@@ -35,7 +34,7 @@ extern void set_master_bridge_base(void);
 extern int check_nasid_equiv(nasid_t, nasid_t);
 extern nasid_t get_console_nasid(void);
 extern char get_console_pcislot(void);
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 extern void intr_init_vecblk(nodepda_t *npda, cnodeid_t, int);
 #endif
 
@@ -112,19 +111,19 @@ extern void setup_replication_mask(int maxnodes);
 
 /* init.c */
 extern cnodeid_t get_compact_nodeid(void);	/* get compact node id */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 extern void init_platform_nodepda(nodepda_t *npda, cnodeid_t node);
 extern void init_platform_pda(pda_t *ppda, cpuid_t cpu);
 #endif
 extern void per_cpu_init(void);
 extern void per_hub_init(cnodeid_t);
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 extern cpumask_t boot_cpumask;
 #endif
 extern int is_fine_dirmode(void);
 extern void update_node_information(cnodeid_t);
  
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 /* clksupport.c */
 extern void early_counter_intr(eframe_t *);
 #endif
@@ -251,7 +250,7 @@ typedef struct hubinfo_s {
 /* IP27 cpu-specific information stored under INFO_LBL_CPU_INFO */
 /* TBD: IP27-dependent stuff currently in pda.h should be here */
 typedef struct cpuinfo_s {
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	pda_t		*ci_cpupda;	/* pointer to CPU's private data area */
 #endif
 	cpuid_t		ci_cpuid;	/* CPU ID */

@@ -17,6 +17,7 @@
  */
 
 #include <asm/sn/pci/pciio_private.h>
+#include <asm/sn/ksys/l1.h>
 
 /*
  * convenience typedefs
@@ -31,6 +32,7 @@ typedef struct pcibr_soft_slot_s *pcibr_soft_slot_t;
 typedef struct pcibr_hints_s *pcibr_hints_t;
 typedef struct pcibr_intr_list_s *pcibr_intr_list_t;
 typedef struct pcibr_intr_wrap_s *pcibr_intr_wrap_t;
+typedef struct pcibr_intr_cbuf_s *pcibr_intr_cbuf_t;
 
 /*
  * Bridge sets up PIO using this information.
@@ -50,7 +52,7 @@ struct pcibr_piomap_s {
     xtalk_piomap_t          bp_xtalk_pio;	/* corresponding xtalk resource */
     pcibr_piomap_t	    bp_next;	/* Next piomap on the list */
     pcibr_soft_t	    bp_soft;	/* backpointer to bridge soft data */
-    int			    bp_toc[1];	/* PCI timeout counter */
+    atomic_t		    bp_toc[1];	/* PCI timeout counter */
 
 };
 
@@ -77,6 +79,18 @@ struct pcibr_dmamap_s {
     bridge_ate_t            bd_ate_prime;	/* value of 1st ATE written */
 };
 
+#define	IBUFSIZE	5		/* size of circular buffer (holds 4) */
+
+/*
+ * Circular buffer used for interrupt processing
+ */
+struct pcibr_intr_cbuf_s {
+    spinlock_t		ib_lock;		/* cbuf 'put' lock */
+    int			ib_in;			/* index of next free entry */
+    int			ib_out;			/* index of next full entry */
+    pcibr_intr_wrap_t   ib_cbuf[IBUFSIZE];	/* circular buffer of wrap  */
+};
+
 /*
  * Bridge sets up interrupts using this information.
  */
@@ -94,6 +108,7 @@ struct pcibr_intr_s {
 #define bi_cpu		bi_pi.pi_cpu	/* cpu assigned. */
     unsigned                bi_ibits;	/* which Bridge interrupt bit(s) */
     pcibr_soft_t            bi_soft;	/* shortcut to soft info */
+    struct pcibr_intr_cbuf_s bi_ibuf;	/* circular buffer of wrap ptrs */
 };
 
 /*
@@ -121,6 +136,7 @@ struct pcibr_info_s {
     /* pcibr-specific connection state */
     int			    f_ibit[4];	/* Bridge bit for each INTx */
     pcibr_piomap_t	    f_piomap;
+    int                     f_att_det_error;
 };
 
 /* =====================================================================
@@ -139,8 +155,11 @@ struct pcibr_intr_list_s {
 struct pcibr_intr_wrap_s {
     pcibr_soft_t            iw_soft;	/* which bridge */
     volatile bridgereg_t   *iw_stat;	/* ptr to b_int_status */
-    bridgereg_t             iw_intr;	/* bits in b_int_status */
+    bridgereg_t             iw_intr;	/* bit in b_int_status */
     pcibr_intr_list_t       iw_list;	/* ghostbusters! */
+    int			    iw_hdlrcnt;	/* running handler count */
+    int			    iw_shared;  /* if Bridge bit is shared */
+    int			    iw_connected; /* if already connected */
 };
 
 #define	PCIBR_ISR_ERR_START	8
@@ -175,11 +194,14 @@ struct pcibr_soft_s {
 
     unsigned                bs_dma_flags;	/* revision-implied DMA flags */
 
+    l1sc_t                 *bs_l1sc;            /* io brick l1 system cntr */
+    moduleid_t		    bs_moduleid;	/* io brick moduleid */
+
     /*
      * Lock used primarily to get mutual exclusion while managing any
      * bridge resources..
      */
-    lock_t                  bs_lock;
+    spinlock_t              bs_lock;
     
     devfs_handle_t	    bs_noslot_conn;	/* NO-SLOT connection point */
     pcibr_info_t	    bs_noslot_info;
@@ -199,6 +221,9 @@ struct pcibr_soft_s {
 	int                     has_host;
 	pciio_slot_t            host_slot;
 	devfs_handle_t		slot_conn;
+
+	int			slot_status;
+
 	/* Potentially several connection points
 	 * for this slot. bss_ninfo is how many,
 	 * and bss_infos is a pointer to
@@ -265,7 +290,7 @@ struct pcibr_soft_s {
 	/* Shadow information used for implementing
 	 * Bridge Hardware WAR #484930
 	 */
-	int			bss_ext_ates_active;
+	atomic_t		bss_ext_ates_active;
         volatile unsigned      *bss_cmd_pointer;
 	unsigned		bss_cmd_shadow;
 
@@ -295,13 +320,10 @@ struct pcibr_soft_s {
 	 */
 	xtalk_intr_t            bsi_xtalk_intr;
 	/*
-	 * We do not like sharing PCI interrrupt lines
-	 * between devices, but the Origin 200 PCI
-	 * layout forces us to do so.
+	 * A wrapper structure is associated with each
+	 * Bridge interrupt bit.
 	 */
-	pcibr_intr_list_t       bsi_pcibr_intr_list;
-	pcibr_intr_wrap_t       bsi_pcibr_intr_wrap;
-	int                     bsi_pcibr_wrap_set;
+	struct pcibr_intr_wrap_s  bsi_pcibr_intr_wrap;
 
     } bs_intr[8];
 
@@ -325,7 +347,7 @@ struct pcibr_soft_s {
      */
     struct br_errintr_info {
 	int                     bserr_toutcnt;
-#ifdef IRIX
+#ifdef LATER
 	toid_t                  bserr_toutid;	/* Timeout started by errintr */
 #endif
 	iopaddr_t               bserr_addr;	/* Address where error occurred */

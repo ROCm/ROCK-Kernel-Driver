@@ -13,6 +13,7 @@
 #if defined(__KERNEL__) || defined(_KMEMUSER)
 
 #include <linux/config.h>
+
 #if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
 #include <asm/sn/sn1/arch.h>    /* needed for MAX_COMPACT_NODES */
 #endif

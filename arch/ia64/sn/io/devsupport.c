@@ -1,5 +1,3 @@
-#define ilvt_t int
-
 /* $Id$
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -28,7 +26,7 @@
 /* =====Generic iobus support===== */
 
 /* String table to hold names of interrupts. */
-#ifdef notyet
+#ifdef LATER
 static struct string_table device_desc_string_table;
 #endif
 
@@ -36,7 +34,7 @@ static struct string_table device_desc_string_table;
 static void
 device_desc_init(void)
 {
-#ifdef notyet
+#ifdef LATER
 	string_table_init(&device_desc_string_table);
 #endif
 	FIXME("device_desc_init");
@@ -47,7 +45,7 @@ device_desc_init(void)
 static device_desc_t
 device_desc_alloc(void)
 {
-#ifdef notyet
+#ifdef LATER
 	device_desc_t device_desc;
 
 	device_desc = (device_desc_t)kmem_zalloc(sizeof(struct device_desc_s), 0);
@@ -69,7 +67,7 @@ device_desc_alloc(void)
 void
 device_desc_free(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	if (!(device_desc->flags & D_IS_ASSOC)) /* sanity */
 		kfree(device_desc);
 #endif
@@ -79,7 +77,7 @@ device_desc_free(device_desc_t device_desc)
 device_desc_t
 device_desc_dup(devfs_handle_t dev)
 {
-#ifdef notyet
+#ifdef LATER
 	device_desc_t orig_device_desc, new_device_desc;
 
 
@@ -111,7 +109,7 @@ device_desc_dup(devfs_handle_t dev)
 device_desc_t	
 device_desc_default_get(devfs_handle_t dev)
 {
-#ifdef notyet
+#ifdef LATER
 	graph_error_t rc;
 	device_desc_t device_desc;
 
@@ -130,7 +128,7 @@ device_desc_default_get(devfs_handle_t dev)
 void		
 device_desc_default_set(devfs_handle_t dev, device_desc_t new_device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	graph_error_t rc;
 	device_desc_t old_device_desc = NULL;
 
@@ -164,7 +162,7 @@ device_desc_default_set(devfs_handle_t dev, device_desc_t new_device_desc)
 devfs_handle_t
 device_desc_intr_target_get(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	return(device_desc->intr_target);
 #else
 	FIXME("device_desc_intr_target_get");
@@ -175,7 +173,7 @@ device_desc_intr_target_get(device_desc_t device_desc)
 int
 device_desc_intr_policy_get(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	return(device_desc->intr_policy);
 #else
 	FIXME("device_desc_intr_policy_get");
@@ -186,7 +184,7 @@ device_desc_intr_policy_get(device_desc_t device_desc)
 ilvl_t
 device_desc_intr_swlevel_get(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	return(device_desc->intr_swlevel);
 #else
 	FIXME("device_desc_intr_swlevel_get");
@@ -197,7 +195,7 @@ device_desc_intr_swlevel_get(device_desc_t device_desc)
 char *
 device_desc_intr_name_get(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	return(device_desc->intr_name);
 #else
 	FIXME("device_desc_intr_name_get");
@@ -208,7 +206,7 @@ device_desc_intr_name_get(device_desc_t device_desc)
 int
 device_desc_flags_get(device_desc_t device_desc)
 {
-#ifdef notyet
+#ifdef LATER
 	return(device_desc->flags);
 #else
 	FIXME("device_desc_flags_get");
@@ -240,7 +238,7 @@ device_desc_intr_swlevel_set(device_desc_t device_desc, ilvl_t swlevel)
 void
 device_desc_intr_name_set(device_desc_t device_desc, char *name)
 {
-#ifdef notyet
+#ifdef LATER
 	if ( device_desc != (device_desc_t)0 )
 		device_desc->intr_name = string_table_insert(&device_desc_string_table, name);
 #else
@@ -325,7 +323,7 @@ struct device_driver_s {
 static void
 dev_admin_registry_init(dev_admin_registry_t *registry)
 {
-#ifdef notyet
+#ifdef LATER
 	if ( registry != (dev_admin_registry_t *)0 )
 		DEV_ADMIN_REGISTRY_INITLOCK(&registry->reg_lock,
 				    "dev_admin_registry_lock");
@@ -349,7 +347,7 @@ dev_admin_registry_add(dev_admin_registry_t	*registry,
 		       char			*name,
 		       char			*val)
 {
-#ifdef notyet
+#ifdef LATER
 	dev_admin_list_t	*reg_entry;
 	dev_admin_list_t	*scan = 0;
 
@@ -404,7 +402,7 @@ out:	DEV_ADMIN_REGISTRY_UNLOCK(&registry->reg_lock);
 static char *
 dev_admin_registry_find(dev_admin_registry_t *registry,char *name)
 {
-#ifdef notyet
+#ifdef LATER
 	dev_admin_list_t	*scan = 0;
 	
 	DEV_ADMIN_REGISTRY_RDLOCK(&registry->reg_lock);
@@ -433,7 +431,7 @@ char *
 device_admin_info_get(devfs_handle_t	dev_vhdl,
 		      char		*info_lbl)
 {
-#ifdef notyet
+#ifdef LATER
 	char		*info = 0;
 
 	/* return value need not be GRAPH_SUCCESS as the labelled
@@ -460,7 +458,7 @@ device_admin_info_set(devfs_handle_t	dev_vhdl,
 		      char		*dev_info_lbl,
 		      char		*dev_info_val)
 {
-#ifdef notyet
+#ifdef LATER
 	graph_error_t		rv;
 	arbitrary_info_t	old_info;
 
@@ -570,7 +568,7 @@ char *
 device_driver_admin_info_get(char		*driver_prefix,
 			     char		*driver_info_lbl)
 {
-#ifdef notyet
+#ifdef LATER
 	device_driver_t driver;
 
 	driver = device_driver_get(driver_prefix);
@@ -592,7 +590,7 @@ device_driver_admin_info_set(char		*driver_prefix,
 			     char		*driver_info_lbl,
 			     char		*driver_info_val)
 {
-#ifdef notyet
+#ifdef LATER
 	device_driver_t driver;
 
 	driver = device_driver_get(driver_prefix);
@@ -623,7 +621,7 @@ static mrlock_t		extended_dev_admin_table_lock;
 void
 device_admin_table_init(void)
 {
-#ifdef notyet
+#ifdef LATER
 	extended_dev_admin_table_size = 0;
 	mrinit(&extended_dev_admin_table_lock,
 	       "extended_dev_admin_table_lock");
@@ -638,7 +636,7 @@ device_admin_table_init(void)
 void
 device_admin_table_update(char *name,char *label,char *value)
 {
-#ifdef notyet
+#ifdef LATER
 	dev_admin_info_t	*p;
 
 	mrupdate(&extended_dev_admin_table_lock);
@@ -678,7 +676,7 @@ mrlock_t		extended_drv_admin_table_lock;
 void
 device_driver_admin_table_init(void)
 {
-#ifdef notyet
+#ifdef LATER
 	extended_drv_admin_table_size = 0;
 	mrinit(&extended_drv_admin_table_lock,
 	       "extended_drv_admin_table_lock");
@@ -693,7 +691,7 @@ device_driver_admin_table_init(void)
 void
 device_driver_admin_table_update(char *name,char *label,char *value)
 {
-#ifdef notyet
+#ifdef LATER
 	dev_admin_info_t	*p;
 
 	mrupdate(&extended_dev_admin_table_lock);
@@ -730,7 +728,7 @@ out:	mrunlock(&extended_drv_admin_table_lock);
 void
 device_admin_info_update(devfs_handle_t	dev_vhdl)
 {
-#ifdef notyet
+#ifdef LATER
 	int			i = 0;
 	dev_admin_info_t	*scan;
 	devfs_handle_t		scan_vhdl;
@@ -779,7 +777,7 @@ device_admin_info_update(devfs_handle_t	dev_vhdl)
 void
 device_driver_admin_info_update(device_driver_t	driver)
 {
-#ifdef notyet
+#ifdef LATER
 	int			i = 0;
 	dev_admin_info_t	*scan;
 
@@ -823,7 +821,7 @@ device_driver_admin_info_update(device_driver_t	driver)
 */
 
 #define DEVICE_DRIVER_HASH_SIZE 32
-#ifdef notyet
+#ifdef LATER
 lock_t device_driver_lock[DEVICE_DRIVER_HASH_SIZE];
 device_driver_t device_driver_hash[DEVICE_DRIVER_HASH_SIZE];
 static struct string_table driver_prefix_string_table;
@@ -835,7 +833,7 @@ static struct string_table driver_prefix_string_table;
 void
 device_driver_init(void)
 {
-#ifdef notyet
+#ifdef LATER
 	int i;
 	extern void alenlist_init(void);
 	extern void hwgraph_init(void);
@@ -849,7 +847,7 @@ device_driver_init(void)
 	string_table_init(&driver_prefix_string_table);
 
 	for (i=0; i<DEVICE_DRIVER_HASH_SIZE; i++) {
-		spinlock_init(&device_driver_lock[i], "devdrv");
+		spin_lock_init(&device_driver_lock[i]);
 		device_driver_hash[i] = NULL;
 	}
 
@@ -877,7 +875,7 @@ device_driver_init(void)
 static int
 driver_prefix_hash(char *prefix)
 {
-#ifdef notyet
+#ifdef LATER
 	int accum = 0;
 	char nextchar;
 
@@ -903,10 +901,10 @@ driver_prefix_hash(char *prefix)
 device_driver_t
 device_driver_alloc(char *prefix)
 {
-#ifdef notyet
+#ifdef LATER
 	int which_hash;
 	device_driver_t new_driver;
-	int s;
+	unsigned long s;
 		
 	which_hash = driver_prefix_hash(prefix);
 
@@ -964,9 +962,9 @@ device_driver_alloc(char *prefix)
 void
 device_driver_free(device_driver_t driver)
 {
-#ifdef notyet
+#ifdef LATER
 	int which_hash;
-	int s;
+	unsigned long s;
 
 	if (!driver)
 		return;
@@ -1027,10 +1025,10 @@ device_driver_free(device_driver_t driver)
 device_driver_t
 device_driver_get(char *prefix)
 {
-#ifdef notyet
+#ifdef LATER
 	int which_hash;
 	device_driver_t drvscan;
-	int s;
+	unsigned long s;
 
 	if (prefix == NULL)
 		return(NULL);
@@ -1060,7 +1058,7 @@ device_driver_get(char *prefix)
 device_driver_t
 device_driver_getbydev(devfs_handle_t device)
 {
-#ifdef notyet
+#ifdef LATER
 	struct bdevsw *my_bdevsw;
 	struct cdevsw *my_cdevsw;
 
@@ -1093,7 +1091,7 @@ device_driver_devsw_put(device_driver_t driver,
 			struct bdevsw *my_bdevsw,
 			struct cdevsw *my_cdevsw)
 {
-#ifdef notyet
+#ifdef LATER
 	int i;
 
 	if (!driver)
@@ -1194,7 +1192,7 @@ device_driver_name_get(device_driver_t driver, char *buffer, int length)
 void 
 device_info_set(devfs_handle_t device, void *info)
 {
-#ifdef notyet
+#ifdef LATER
 	hwgraph_fastinfo_set(device, (arbitrary_info_t)info);
 #endif
 	FIXME("device_info_set");
@@ -1207,7 +1205,7 @@ device_info_set(devfs_handle_t device, void *info)
 void *
 device_info_get(devfs_handle_t device)
 {
-#ifdef notyet
+#ifdef LATER
 	return((void *)hwgraph_fastinfo_get(device));
 #else
 	FIXME("device_info_get");
@@ -1222,7 +1220,7 @@ device_info_get(devfs_handle_t device)
 int
 device_driver_sysgen_thread_pri_get(char *dev_prefix)
 {
-#ifdef notyet
+#ifdef LATER
 	int pri;
 	char *pri_s;
 	char *class;

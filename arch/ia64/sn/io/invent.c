@@ -61,6 +61,9 @@ add_to_inventory(int class, int type, int controller, int unit, int state)
  * These two routines are intended to prevent the caller from having to know
  * the internal structure of the inventory table.
  *
+ * The caller of get_next_inventory is supposed to call start_scan_invent
+ * before the irst call to get_next_inventory, and the caller is required
+ * to call end_scan_invent after the last call to get_next_inventory.
  */
 inventory_t *
 get_next_inventory(invplace_t *place)
@@ -74,11 +77,15 @@ get_next_inventory(invplace_t *place)
 		 * We've exhausted inventory items on the last device.
 		 * Advance to next device.
 		 */
-		rv = hwgraph_vertex_get_next(&device, &place->invplace_vplace);
-		if (rv != LABELCL_SUCCESS)
-			return(NULL);
-		place->invplace_vhdl = device;
 		place->invplace_inv = NULL; /* Start from beginning invent on this device */
+		rv = hwgraph_vertex_get_next(&device, &place->invplace_vplace);
+		if (rv == LABELCL_SUCCESS) {
+			place->invplace_vhdl = device;
+		}
+		else {
+			place->invplace_vhdl = GRAPH_VERTEX_NONE;
+			return(NULL);
+		}
 	}
 
 	return(pinv);
@@ -89,6 +96,23 @@ int
 get_sizeof_inventory(int abi)
 {
 	return sizeof(inventory_t);
+}
+
+/* Must be called prior to first call to get_next_inventory */
+void
+start_scan_inventory(invplace_t *iplace)
+{
+	*iplace = INVPLACE_NONE;
+}
+
+/* Must be called after last call to get_next_inventory */
+void
+end_scan_inventory(invplace_t *iplace)
+{
+	devfs_handle_t vhdl = iplace->invplace_vhdl;
+	if (vhdl != GRAPH_VERTEX_NONE)
+		hwgraph_vertex_unref(vhdl);
+	*iplace = INVPLACE_NONE; /* paranoia */
 }
 
 /*
@@ -106,11 +130,13 @@ scaninvent(int (*fun)(inventory_t *, void *), void *arg)
 
 	ie = 0;
 	rc = 0;
-	while ( (ie = (inventory_t *)get_next_inventory(&iplace)) ) {
+	start_scan_inventory(&iplace);
+	while ((ie = (inventory_t *)get_next_inventory(&iplace))) {
 		rc = (*fun)(ie, arg);
 		if (rc)
 			break;
 	}
+	end_scan_inventory(&iplace);
 	return rc;
 }
 
@@ -127,6 +153,7 @@ find_inventory(inventory_t *pinv, int class, int type, int controller,
 {
 	invplace_t iplace =  { NULL,NULL, NULL };
 
+	start_scan_inventory(&iplace);
 	while ((pinv = (inventory_t *)get_next_inventory(&iplace)) != NULL) {
 		if (class != -1 && pinv->inv_class != class)
 			continue;
@@ -146,6 +173,7 @@ find_inventory(inventory_t *pinv, int class, int type, int controller,
 			continue;
 		break;
 	}
+	end_scan_inventory(&iplace);
 
 	return(pinv);
 }

@@ -6,8 +6,8 @@
  *	in1:	length of buffer in bytes
  * Outputs:
  *	r8:	number of bytes that didn't get cleared due to a fault
- * 
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
+ *
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
  * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
  */
 
@@ -51,27 +51,12 @@
 //	have side effects (same thing for writing).
 //
 
-// The label comes first because our store instruction contains a comma
-// and confuse the preprocessor otherwise
-//
-#define EX(y,x...)				\
-	.section __ex_table,"a";		\
-	data4 @gprel(99f);			\
-	data4 y-99f;				\
-	.previous;				\
-99:	x
-
-	.text
-	.psr abi64
-	.psr lsb
-	.lsb
-
 GLOBAL_ENTRY(__do_clear_user)
-	UNW(.prologue)
-	UNW(.save ar.pfs, saved_pfs)
- 	alloc	saved_pfs=ar.pfs,2,0,0,0
+	.prologue
+	.save ar.pfs, saved_pfs
+	alloc	saved_pfs=ar.pfs,2,0,0,0
 	cmp.eq p6,p0=r0,len		// check for zero length
-	UNW(.save ar.lc, saved_lc)
+	.save ar.lc, saved_lc
 	mov saved_lc=ar.lc		// preserve ar.lc (slow)
 	.body
 	;;				// avoid WAW on CFM
@@ -80,7 +65,7 @@ GLOBAL_ENTRY(__do_clear_user)
 (p6)	br.ret.spnt.few rp
 	;;
 	cmp.lt p6,p0=16,len		// if len > 16 then long memset
-	mov ar.lc=tmp			// initialize lc for small count 
+	mov ar.lc=tmp			// initialize lc for small count
 (p6)	br.cond.dptk.few long_do_clear
 	;;				// WAR on ar.lc
 	//
@@ -91,7 +76,7 @@ GLOBAL_ENTRY(__do_clear_user)
 	// the various counters compared to how long the loop is supposed
 	// to last on average does not make this solution viable.
 	//
-1:	
+1:
 	EX( .Lexit1, st1 [buf]=r0,1 )
 	adds len=-1,len			// countdown length using len
 	br.cloop.dptk.few 1b
@@ -99,7 +84,7 @@ GLOBAL_ENTRY(__do_clear_user)
 	//
 	// .Lexit4: comes from byte by byte loop
 	//	    len contains bytes left
-.Lexit1:			
+.Lexit1:
 	mov ret0=len			// faster than using ar.lc
 	mov ar.lc=saved_lc
 	br.ret.sptk.few rp		// end of short clear_user
@@ -110,7 +95,7 @@ GLOBAL_ENTRY(__do_clear_user)
 	// so we focus on alignment (no branches required)
 	//
 	// The use of len/len2 for countdown of the number of bytes left
-	// instead of ret0 is due to the fact that the exception code 
+	// instead of ret0 is due to the fact that the exception code
 	// changes the values of r8.
 	//
 long_do_clear:
@@ -131,10 +116,10 @@ long_do_clear:
 	EX( .Lexit3, (p6) st8 [buf]=r0,8 )	// 8-byte aligned
 (p6)	adds len=-8,len;;
 	shr.u cnt=len,4		// number of 128-bit (2x64bit) words
-	;;	
+	;;
 	cmp.eq p6,p0=r0,cnt
 	adds tmp=-1,cnt
-(p6)	br.cond.dpnt.few .dotail 	// we have less than 16 bytes left
+(p6)	br.cond.dpnt.few .dotail	// we have less than 16 bytes left
 	;;
 	adds buf2=8,buf			// setup second base pointer
 	mov ar.lc=tmp
@@ -143,32 +128,30 @@ long_do_clear:
 	//
 	// 16bytes/iteration core loop
 	//
-	// The second store can never generate a fault because 
+	// The second store can never generate a fault because
 	// we come into the loop only when we are 16-byte aligned.
 	// This means that if we cross a page then it will always be
 	// in the first store and never in the second.
 	//
-	// 
+	//
 	// We need to keep track of the remaining length. A possible (optimistic)
-	// way would be to ue ar.lc and derive how many byte were left by
+	// way would be to use ar.lc and derive how many byte were left by
 	// doing : left= 16*ar.lc + 16.  this would avoid the addition at
-	// every iteration. 
+	// every iteration.
 	// However we need to keep the synchronization point. A template
 	// M;;MB does not exist and thus we can keep the addition at no
 	// extra cycle cost (use a nop slot anyway). It also simplifies the
 	// (unlikely)  error recovery code
 	//
 
-2:					
-
-	EX(.Lexit3, st8 [buf]=r0,16 )
+2:	EX(.Lexit3, st8 [buf]=r0,16 )
 	;;				// needed to get len correct when error
 	st8 [buf2]=r0,16
-	adds len=-16,len		
+	adds len=-16,len
 	br.cloop.dptk.few 2b
 	;;
 	mov ar.lc=saved_lc
-	// 
+	//
 	// tail correction based on len only
 	//
 	// We alternate the use of len3,len2 to allow parallelism and correct
@@ -176,14 +159,14 @@ long_do_clear:
 	// The addition of len2/len3 does not cost anything more compared to
 	// the regular memset as we had empty slots.
 	//
-.dotail:				
+.dotail:
 	mov len2=len			// for parallelization of error handling
 	mov len3=len
-	tbit.nz p6,p0=len,3	
+	tbit.nz p6,p0=len,3
 	;;
 	EX( .Lexit2, (p6) st8 [buf]=r0,8 )	// at least 8 bytes
 (p6)	adds len3=-8,len2
-	tbit.nz p7,p6=len,2	
+	tbit.nz p7,p6=len,2
 	;;
 	EX( .Lexit2, (p7) st4 [buf]=r0,4 )	// at least 4 bytes
 (p7)	adds len2=-4,len3
@@ -207,8 +190,8 @@ long_do_clear:
 	//
 	//
 	// .Lexit2:
-	// 	if p6 -> coming from st8 or st2 : len2 contains what's left
-	// 	if p7 -> coming from st4 or st1 : len3 contains what's left
+	//	if p6 -> coming from st8 or st2 : len2 contains what's left
+	//	if p7 -> coming from st4 or st1 : len3 contains what's left
 	// We must restore lc/pr even though might not have been used.
 .Lexit2:
 	.pred.rel "mutex", p6, p7

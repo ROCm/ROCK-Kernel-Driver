@@ -34,13 +34,9 @@ ia64_get_itm (void)
 }
 
 static __inline__ void
-ia64_set_itv (unsigned char vector, unsigned char masked)
+ia64_set_itv (unsigned long val)
 {
-	if (masked > 1)
-		masked = 1;
-
-	__asm__ __volatile__("mov cr.itv=%0;; srlz.d;;"
-			     :: "r"((masked << 16) | vector) : "memory");
+	__asm__ __volatile__("mov cr.itv=%0;; srlz.d;;" :: "r"(val) : "memory");
 }
 
 static __inline__ void
@@ -79,16 +75,11 @@ __delay (unsigned long loops)
 static __inline__ void
 udelay (unsigned long usecs)
 {
-#ifdef CONFIG_IA64_SOFTSDV_HACKS
-	while (usecs--)
-		;
-#else
 	unsigned long start = ia64_get_itc();
-	unsigned long cycles = usecs*my_cpu_data.cyc_per_usec;
+	unsigned long cycles = usecs*local_cpu_data->cyc_per_usec;
 
 	while (ia64_get_itc() - start < cycles)
 		/* skip */;
-#endif	/* CONFIG_IA64_SOFTSDV_HACKS */
 }
 
 #endif /* _ASM_IA64_DELAY_H */

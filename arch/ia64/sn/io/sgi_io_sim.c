@@ -17,9 +17,6 @@
 #include <asm/sn/sn_private.h>
 #include <asm/sn/synergy.h>
 
-cnodeid_t nasid_to_compact_node[MAX_NASIDS];
-nasid_t compact_to_nasid_node[MAX_COMPACT_NODES];
-cnodeid_t cpuid_to_compact_node[MAXCPUS];
 cpuid_t         master_procid = 0;
 int maxnodes;
 char arg_maxnodes[4];
@@ -40,12 +37,6 @@ int
 is_specified(char *s)
 {
         return (strlen(s) != 0);
-}
-
-
-void pciba_init(void)
-{
-	FIXME("pciba_init : no-op\n");
 }
 
 void xbmon_init(void)
@@ -82,7 +73,7 @@ void initialize_io(void)
  * Routines provided by ml/SN/promif.c.
  */
 static __psunsigned_t master_bridge_base = (__psunsigned_t)NULL;
-static nasid_t console_nasid;
+nasid_t console_nasid;
 static char console_wid;
 static char console_pcislot;
 
@@ -90,19 +81,12 @@ void
 set_master_bridge_base(void)
 {
 
-#ifdef SIMULATED_KLGRAPH
-	printk("set_master_bridge_base: SIMULATED_KLGRAPH FIXME hardwired master.\n");
-	console_nasid = 0;
-	console_wid = 0x8;
-	console_pcislot = 0x2;
-#else
         console_nasid = KL_CONFIG_CH_CONS_INFO(master_nasid)->nasid;
         console_wid = WIDGETID_GET(KL_CONFIG_CH_CONS_INFO(master_nasid)->memory_base);
         console_pcislot = KL_CONFIG_CH_CONS_INFO(master_nasid)->npci;
-#endif /* SIMULATED_KLGRAPH */
-
         master_bridge_base = (__psunsigned_t)NODE_SWIN_BASE(console_nasid,
                                                             console_wid);
+	FIXME("WARNING: set_master_bridge_base: NON NASID 0 DOES NOT WORK\n");
 }
 
 int
@@ -133,21 +117,6 @@ is_master_nasid_widget(nasid_t test_nasid, xwidgetnum_t test_wid)
         } else {
                 return 0;
         }
-}
-
-cnodeid_t
-nasid_to_compact_nodeid(nasid_t nasid)
-{
-        ASSERT(nasid >= 0 && nasid < MAX_NASIDS);
-        return nasid_to_compact_node[nasid];
-}
-
-nasid_t
-compact_to_nasid_nodeid(cnodeid_t cnode)
-{
-        ASSERT(cnode >= 0 && cnode <= MAX_COMPACT_NODES);
-        ASSERT(compact_to_nasid_node[cnode] >= 0);
-        return compact_to_nasid_node[cnode];
 }
 
 /*

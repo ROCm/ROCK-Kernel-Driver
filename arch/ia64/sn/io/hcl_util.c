@@ -137,6 +137,20 @@ mark_nodevertex_as_node(devfs_handle_t vhdl, cnodeid_t cnodeid)
 	}
 }
 
+/*
+** If the specified device represents a CPU, return its cpuid;
+** otherwise, return CPU_NONE.
+*/
+cpuid_t
+cpuvertex_to_cpuid(devfs_handle_t vhdl)
+{
+	arbitrary_info_t cpuid = CPU_NONE;
+
+	(void)labelcl_info_get_LBL(vhdl, INFO_LBL_CPUID, NULL, &cpuid);
+
+	return((cpuid_t)cpuid);
+}
+
 
 /*
 ** dev_to_name converts a devfs_handle_t into a canonical name.  If the devfs_handle_t

@@ -11,7 +11,7 @@
  * 00/04/19	D. Mosberger	Rewritten to mirror more closely the x86 I/O APIC code.
  *				In particular, we now have separate handlers for edge
  *				and level triggered interrupts.
- * 00/10/27	Asit Mallick, Goutham Rao <goutham.rao@intel.com> IRQ vector allocation 
+ * 00/10/27	Asit Mallick, Goutham Rao <goutham.rao@intel.com> IRQ vector allocation
  *				PCI to vector mapping, shared PCI interrupts.
  * 00/10/27	D. Mosberger	Document things a bit more to make them more understandable.
  *				Clean up much of the old IOSAPIC cruft.
@@ -79,27 +79,27 @@ static struct {
 static struct iosapic_irq {
 	char *addr;			/* base address of IOSAPIC */
 	unsigned char base_irq;		/* first irq assigned to this IOSAPIC */
-        char pin;			/* IOSAPIC pin (-1 => not an IOSAPIC irq) */
-	unsigned char dmode 	: 3;	/* delivery mode (see iosapic.h) */
+	char pin;			/* IOSAPIC pin (-1 => not an IOSAPIC irq) */
+	unsigned char dmode	: 3;	/* delivery mode (see iosapic.h) */
 	unsigned char polarity	: 1;	/* interrupt polarity (see iosapic.h) */
 	unsigned char trigger	: 1;	/* trigger mode (see iosapic.h) */
-} iosapic_irq[NR_IRQS];
+} iosapic_irq[IA64_NUM_VECTORS];
 
 /*
  * Translate IOSAPIC irq number to the corresponding IA-64 interrupt vector.  If no
  * entry exists, return -1.
  */
-static int 
+static int
 iosapic_irq_to_vector (int irq)
 {
 	int vector;
 
-	for (vector = 0; vector < NR_IRQS; ++vector)
+	for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
 		if (iosapic_irq[vector].base_irq + iosapic_irq[vector].pin == irq)
 			return vector;
 	return -1;
 }
-		
+
 /*
  * Map PCI pin to the corresponding IA-64 interrupt vector.  If no such mapping exists,
  * return -1.
@@ -137,14 +137,8 @@ set_rte (unsigned int vector, unsigned long dest)
 		 (dmode << IOSAPIC_DELIVERY_SHIFT) |
 		 vector);
 
-#ifdef CONFIG_IA64_AZUSA_HACKS
-	/* set Flush Disable bit */
-	if (addr != (char *) 0xc0000000fec00000)
-		low32 |= (1 << 17);
-#endif
-
 	/* dest contains both id and eid */
-	high32 = (dest << IOSAPIC_DEST_SHIFT);	
+	high32 = (dest << IOSAPIC_DEST_SHIFT);
 
 	writel(IOSAPIC_RTE_HIGH(pin), addr + IOSAPIC_REG_SELECT);
 	writel(high32, addr + IOSAPIC_WINDOW);
@@ -158,16 +152,17 @@ nop (unsigned int vector)
 	/* do nothing... */
 }
 
-static void 
-mask_irq (unsigned int vector)
+static void
+mask_irq (unsigned int irq)
 {
 	unsigned long flags;
 	char *addr;
 	u32 low32;
 	int pin;
+	ia64_vector vec = irq_to_vector(irq);
 
-	addr = iosapic_irq[vector].addr;
-	pin = iosapic_irq[vector].pin;
+	addr = iosapic_irq[vec].addr;
+	pin = iosapic_irq[vec].pin;
 
 	if (pin < 0)
 		return;			/* not an IOSAPIC interrupt! */
@@ -183,16 +178,17 @@ mask_irq (unsigned int vector)
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 }
 
-static void 
-unmask_irq (unsigned int vector)
+static void
+unmask_irq (unsigned int irq)
 {
 	unsigned long flags;
 	char *addr;
 	u32 low32;
 	int pin;
+	ia64_vector vec = irq_to_vector(irq);
 
-	addr = iosapic_irq[vector].addr;
-	pin = iosapic_irq[vector].pin;
+	addr = iosapic_irq[vec].addr;
+	pin = iosapic_irq[vec].pin;
 	if (pin < 0)
 		return;			/* not an IOSAPIC interrupt! */
 
@@ -209,7 +205,7 @@ unmask_irq (unsigned int vector)
 
 
 static void
-iosapic_set_affinity (unsigned int vector, unsigned long mask)
+iosapic_set_affinity (unsigned int irq, unsigned long mask)
 {
 	printk("iosapic_set_affinity: not implemented yet\n");
 }
@@ -219,16 +215,18 @@ iosapic_set_affinity (unsigned int vector, unsigned long mask)
  */
 
 static unsigned int
-iosapic_startup_level_irq (unsigned int vector)
+iosapic_startup_level_irq (unsigned int irq)
 {
-	unmask_irq(vector);
+	unmask_irq(irq);
 	return 0;
 }
 
 static void
-iosapic_end_level_irq (unsigned int vector)
+iosapic_end_level_irq (unsigned int irq)
 {
-	writel(vector, iosapic_irq[vector].addr + IOSAPIC_EOI);
+	ia64_vector vec = irq_to_vector(irq);
+
+	writel(vec, iosapic_irq[vec].addr + IOSAPIC_EOI);
 }
 
 #define iosapic_shutdown_level_irq	mask_irq
@@ -252,9 +250,9 @@ struct hw_interrupt_type irq_type_iosapic_level = {
  */
 
 static unsigned int
-iosapic_startup_edge_irq (unsigned int vector)
+iosapic_startup_edge_irq (unsigned int irq)
 {
-	unmask_irq(vector);
+	unmask_irq(irq);
 	/*
 	 * IOSAPIC simply drops interrupts pended while the
 	 * corresponding pin was masked, so we can't know if an
@@ -264,15 +262,16 @@ iosapic_startup_edge_irq (unsigned int vector)
 }
 
 static void
-iosapic_ack_edge_irq (unsigned int vector)
+iosapic_ack_edge_irq (unsigned int irq)
 {
+	irq_desc_t *idesc = irq_desc(irq);
 	/*
 	 * Once we have recorded IRQ_PENDING already, we can mask the
 	 * interrupt for real. This prevents IRQ storms from unhandled
 	 * devices.
 	 */
-	if ((irq_desc[vector].status & (IRQ_PENDING|IRQ_DISABLED)) == (IRQ_PENDING|IRQ_DISABLED))
-		mask_irq(vector);
+	if ((idesc->status & (IRQ_PENDING|IRQ_DISABLED)) == (IRQ_PENDING|IRQ_DISABLED))
+		mask_irq(irq);
 }
 
 #define iosapic_enable_edge_irq		unmask_irq
@@ -291,7 +290,7 @@ struct hw_interrupt_type irq_type_iosapic_edge = {
 };
 
 static unsigned int
-iosapic_version (char *addr) 
+iosapic_version (char *addr)
 {
 	/*
 	 * IOSAPIC Version Register return 32 bit structure like:
@@ -335,6 +334,7 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 {
 	struct hw_interrupt_type *irq_type;
 	int i, irq, max_pin, vector;
+	irq_desc_t *idesc;
 	unsigned int ver;
 	char *addr;
 	static int first_time = 1;
@@ -342,18 +342,18 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 	if (first_time) {
 		first_time = 0;
 
-		for (vector = 0; vector < NR_IRQS; ++vector)
+		for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
 			iosapic_irq[vector].pin = -1;	/* mark as unused */
 
-		/* 
+		/*
 		 * Fetch the PCI interrupt routing table:
 		 */
 #ifdef CONFIG_ACPI_KERNEL_CONFIG
 		acpi_cf_get_pci_vectors(&pci_irq.route, &pci_irq.num_routes);
 #else
 		pci_irq.route =
-			(struct pci_vector_struct *) __va(ia64_boot_param.pci_vectors);
-		pci_irq.num_routes = ia64_boot_param.num_pci_vectors;
+			(struct pci_vector_struct *) __va(ia64_boot_param->pci_vectors);
+		pci_irq.num_routes = ia64_boot_param->num_pci_vectors;
 #endif
 	}
 
@@ -361,8 +361,8 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 
 	ver = iosapic_version(addr);
 	max_pin = (ver >> 16) & 0xff;
-	
-	printk("IOSAPIC: version %x.%x, address 0x%lx, IRQs 0x%02x-0x%02x\n", 
+
+	printk("IOSAPIC: version %x.%x, address 0x%lx, IRQs 0x%02x-0x%02x\n",
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, base_irq, base_irq + max_pin);
 
 	if (base_irq == 0)
@@ -385,20 +385,20 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 			       irq, iosapic_irq[vector].base_irq + iosapic_irq[vector].pin,
 			       vector);
 #endif
-		  	irq_type = &irq_type_iosapic_edge;
-			if (irq_desc[vector].handler != irq_type) {
-				if (irq_desc[vector].handler != &no_irq_type)
+			irq_type = &irq_type_iosapic_edge;
+			idesc = irq_desc(vector);
+			if (idesc->handler != irq_type) {
+				if (idesc->handler != &no_irq_type)
 					printk("iosapic_init: changing vector 0x%02x from %s to "
-					       "%s\n", irq, irq_desc[vector].handler->typename,
+					       "%s\n", irq, idesc->handler->typename,
 					       irq_type->typename);
-				irq_desc[vector].handler = irq_type;
+				idesc->handler = irq_type;
 			}
 
 			/* program the IOSAPIC routing table: */
 			set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 		}
 
-#ifndef CONFIG_IA64_SOFTSDV_HACKS
 	for (i = 0; i < pci_irq.num_routes; i++) {
 		irq = pci_irq.route[i].irq;
 
@@ -428,18 +428,17 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq)
 		       iosapic_irq[vector].base_irq + iosapic_irq[vector].pin, vector);
 # endif
 		irq_type = &irq_type_iosapic_level;
-		if (irq_desc[vector].handler != irq_type){
-			if (irq_desc[vector].handler != &no_irq_type)
+		idesc = irq_desc(vector);
+		if (idesc->handler != irq_type){
+			if (idesc->handler != &no_irq_type)
 				printk("iosapic_init: changing vector 0x%02x from %s to %s\n",
-				       vector, irq_desc[vector].handler->typename,
-				       irq_type->typename);
-			irq_desc[vector].handler = irq_type;
+				       vector, idesc->handler->typename, irq_type->typename);
+			idesc->handler = irq_type;
 		}
 
 		/* program the IOSAPIC routing table: */
 		set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 	}
-#endif /* !CONFIG_IA64_SOFTSDV_HACKS */
 }
 
 void
@@ -492,7 +491,7 @@ iosapic_pci_fixup (int phase)
 		 * Nothing to fixup
 		 * Fix out-of-range IRQ numbers
 		 */
-		if (dev->irq >= NR_IRQS)
+		if (dev->irq >= IA64_NUM_VECTORS)
 			dev->irq = 15;	/* Spurious interrupts */
 	}
 }

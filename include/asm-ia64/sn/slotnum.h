@@ -10,9 +10,10 @@
 #ifndef _ASM_SN_SLOTNUM_H
 #define _ASM_SN_SLOTNUM_H
 
+#include <linux/config.h>
+
 typedef	unsigned char slotid_t;
 
-#include <linux/config.h>
 #if defined (CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/slotnum.h>
 #else

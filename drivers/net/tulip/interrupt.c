@@ -2,14 +2,15 @@
 	drivers/net/tulip/interrupt.c
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2000  The Linux Kernel Team
-	Written/copyright 1994-1999 by Donald Becker.
+	Copyright 2000,2001  The Linux Kernel Team
+	Written/copyright 1994-2001 by Donald Becker.
 
 	This software may be used and distributed according to the terms
 	of the GNU General Public License, incorporated herein by reference.
 
-	Please refer to Documentation/networking/tulip.txt for more
-	information on this driver.
+	Please refer to Documentation/DocBook/tulip.{pdf,ps,html}
+	for more information on this driver, or visit the project
+	Web page at http://sourceforge.net/projects/tulip/
 
 */
 
@@ -299,6 +300,12 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				/* Restart the transmit process. */
 				tulip_restart_rxtx(tp, tp->csr6);
 				outl(0, ioaddr + CSR1);
+			}
+			if (csr5 & (RxDied | RxNoBuf)) {
+				if (tp->flags & COMET_MAC_ADDR) {
+					outl(tp->mc_filter[0], ioaddr + 0xAC);
+					outl(tp->mc_filter[1], ioaddr + 0xB0);
+				}
 			}
 			if (csr5 & RxDied) {		/* Missed a Rx frame. */
 				tp->stats.rx_errors++;

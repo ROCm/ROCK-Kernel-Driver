@@ -18,6 +18,12 @@
 *! Jul 21 1999  Bjorn Wesen     eLinux port
 *!
 *! $Log: kgdb.c,v $
+*! Revision 1.4  2001/02/23 13:45:19  bjornw
+*! config.h check
+*!
+*! Revision 1.3  2001/01/31 18:08:23  orjanf
+*! Removed kgdb_handle_breakpoint from being the break 8 handler.
+*!
 *! Revision 1.2  2001/01/12 14:22:25  orjanf
 *! Updated kernel debugging support to work with ETRAX 100LX.
 *!
@@ -43,7 +49,7 @@
 *!
 *!---------------------------------------------------------------------------
 *!
-*! $Id: kgdb.c,v 1.2 2001/01/12 14:22:25 orjanf Exp $
+*! $Id: kgdb.c,v 1.4 2001/02/23 13:45:19 bjornw Exp $
 *!
 *! (C) Copyright 1999, Axis Communications AB, LUND, SWEDEN
 *!
@@ -1531,7 +1537,7 @@ kgdb_init(void)
 {
 	/* could initialize debug port as well but it's done in head.S already... */
 
-	set_break_vector(8, kgdb_handle_breakpoint);
+        /* breakpoint handler is now set in irq.c */
 	set_int_vector(8, kgdb_handle_serial, 0);
 	
 	enableDebugIRQ();

@@ -14,7 +14,6 @@
 #include <linux/pci.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/cmn_err.h>
 #include <asm/sn/iobus.h>
 #include <asm/sn/iograph.h>
 #include <asm/param.h>
@@ -250,18 +249,9 @@ void
 pci_fixup_ioc3(struct pci_dev *d)
 {
         int 		i;
-	int 		slot;
-	unsigned long 	res = 0;
-	unsigned int 	val, size;
-	int 		ret;
-	u_short 	command;
+	unsigned int 	size;
 
-	devfs_handle_t 	device_vertex;
 	devfs_handle_t	bridge_vhdl = pci_bus_to_vertex(d->bus->number);
-	pcibr_soft_t 	pcibr_soft = (pcibr_soft_t) hwgraph_fastinfo_get(bridge_vhdl);
-	devfs_handle_t  xconn_vhdl = pcibr_soft->bs_conn;
-	bridge_t 	*bridge = pcibr_soft->bs_base;
-	bridgereg_t 	devreg;
 
         /* IOC3 only decodes 0x20 bytes of the config space, reading
 	 * beyond that is relatively benign but writing beyond that
@@ -271,7 +261,7 @@ pci_fixup_ioc3(struct pci_dev *d)
 	 *       currently we hack this with special code in 
 	 *	 sgi_pci_intr_support()
 	 */
-        printk("pci_fixup_ioc3: Fixing base addresses for ioc3 device %s\n", d->slot_name);
+        DBG("pci_fixup_ioc3: Fixing base addresses for ioc3 device %s\n", d->slot_name);
 
 	/* I happen to know from the spec that the ioc3 needs only 0xfffff 
 	 * The standard pci trick of writing ~0 to the baddr and seeing
@@ -296,7 +286,9 @@ pci_fixup_ioc3(struct pci_dev *d)
 	 * DEV_DIRECT bit.  This will not work if IOC3 is not on Slot 
 	 * 4.
 	 */
-	*(volatile u32 *)0xc0000a000f000220 |= 0x90000;
+	DBG("pci_fixup_ioc3: FIXME .. need to take NASID into account when setting IOC3 devreg 0x%x\n", *(volatile u32 *)0xc0000a000f000220);
+
+ 	*(volatile u32 *)0xc0000a000f000220 |= 0x90000; 
 
         d->subsystem_vendor = 0;
         d->subsystem_device = 0;

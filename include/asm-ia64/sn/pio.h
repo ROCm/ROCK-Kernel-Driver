@@ -33,7 +33,7 @@ typedef volatile ulong*	pioaddr_t;
 typedef struct piomap {
 	uint		pio_bus;
 	uint		pio_adap;
-#ifdef IRIX
+#ifdef LATER
 	iospace_t	pio_iospace;
 #endif
 	int		pio_flag;
@@ -41,7 +41,7 @@ typedef struct piomap {
 	char		pio_name[7];	/* to identify the mapped device */
 	struct piomap	*pio_next;	/* dlist to link active piomap's */
 	struct piomap	*pio_prev;	/* for debug and error reporting */
-#ifdef IRIX
+#ifdef LATER
 	void		(*pio_errfunc)(); /* Pointer to an error function */
 					  /* Used only for piomaps allocated
 					   * in user level vme driver     */
@@ -50,6 +50,10 @@ typedef struct piomap {
 	iobush_t	pio_bushandle;	/* bus-level handle */
 } piomap_t;
 
+#define pio_type	pio_iospace.ios_type
+#define pio_iopaddr	pio_iospace.ios_iopaddr
+#define pio_size	pio_iospace.ios_size
+#define pio_vaddr	pio_iospace.ios_vaddr
 
 /* Macro to get/set PIO error function */
 #define	pio_seterrf(p,f)	(p)->pio_errfunc = (f)
@@ -64,7 +68,7 @@ typedef struct piomap {
  * pio_mapfree()  - frees the mapping as specified in the piomap handle.
  * pio_mapaddr()  - returns the kv address that maps to piomap'ed io address.
  */
-#ifdef IRIX
+#ifdef LATER
 extern piomap_t	*pio_mapalloc(uint,uint,iospace_t*,int,char*);
 extern void	 pio_mapfree(piomap_t*);
 extern caddr_t	 pio_mapaddr(piomap_t*,iopaddr_t);
@@ -101,7 +105,7 @@ extern void orw_rmw(volatile void*, unsigned int);
 extern void andb_rmw(volatile void*, unsigned int);
 extern void andh_rmw(volatile void*, unsigned int);
 extern void andw_rmw(volatile void*, unsigned int);
-#endif	/* IRIX */
+#endif	/* LATER */
 
 
 /*

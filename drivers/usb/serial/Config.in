@@ -6,7 +6,9 @@ comment 'USB Serial Converter support'
 
 tristate 'USB Serial Converter support' CONFIG_USB_SERIAL $CONFIG_USB
 if [ "$CONFIG_USB_SERIAL" != "n" ]; then
-  bool '  USB Serial Converter verbose debug' CONFIG_USB_SERIAL_DEBUG
+  if [ "$CONFIG_USB_SERIAL" = "y" ]; then
+     bool '  USB Serial Converter verbose debug' CONFIG_USB_SERIAL_DEBUG
+  fi
   bool '  USB Generic Serial Driver' CONFIG_USB_SERIAL_GENERIC
   dep_tristate '  USB Belkin and Peracom Single Port Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_BELKIN $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
   dep_tristate '  USB ConnectTech WhiteHEAT Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_WHITEHEAT $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL

@@ -41,6 +41,7 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
 #define platform_outb		sn1_outb
 #define platform_outw		sn1_outw
 #define platform_outl		sn1_outl
+#define platform_pci_dma_init	machvec_noop
 #define platform_pci_alloc_consistent	sn1_pci_alloc_consistent
 #define platform_pci_free_consistent	sn1_pci_free_consistent
 #define platform_pci_map_single		sn1_pci_map_single

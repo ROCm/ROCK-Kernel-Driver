@@ -2,8 +2,8 @@
 #define _ASM_IA64_SIGINFO_H
 
 /*
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/types.h>
@@ -66,6 +66,12 @@ typedef struct siginfo {
 			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG (XPG requires a "long") */
 			int _fd;
 		} _sigpoll;
+		/* SIGPROF */
+		struct {
+			pid_t _pid;		/* which child */
+			uid_t _uid;		/* sender's uid */
+			unsigned long _pfm_ovfl_counters; /* which PMU counter overflowed */
+		} _sigprof;
 	} _sifields;
 } siginfo_t;
 
@@ -85,6 +91,7 @@ typedef struct siginfo {
 #define si_isr		_sifields._sigfault._isr	/* valid if si_code==FPE_FLTxxx */
 #define si_band		_sifields._sigpoll._band
 #define si_fd		_sifields._sigpoll._fd
+#define si_pfm_ovfl	_sifields._sigprof._pfm_ovfl_counters
 
 /*
  * si_code values
@@ -98,6 +105,7 @@ typedef struct siginfo {
 #define __SI_FAULT	(3 << 16)
 #define __SI_CHLD	(4 << 16)
 #define __SI_RT		(5 << 16)
+#define __SI_PROF	(6 << 16)
 #define __SI_CODE(T,N)	((T) << 16 | ((N) & 0xffff))
 #else
 #define __SI_KILL	0
@@ -201,12 +209,16 @@ typedef struct siginfo {
 #define NSIGPOLL	6
 
 /*
+ * SIGPROF si_codes
+ */
+#define PROF_OVFL	(__SI_PROF|1)  /* some counters overflowed */
+
+/*
  * sigevent definitions
- * 
- * It seems likely that SIGEV_THREAD will have to be handled from 
- * userspace, libpthread transmuting it to SIGEV_SIGNAL, which the
- * thread manager then catches and does the appropriate nonsense.
- * However, everything is written out here so as to not get lost.
+ *
+ * It seems likely that SIGEV_THREAD will have to be handled from userspace, libpthread
+ * transmuting it to SIGEV_SIGNAL, which the thread manager then catches and does the
+ * appropriate nonsense.  However, everything is written out here so as to not get lost.
  */
 #define SIGEV_SIGNAL	0	/* notify via signal */
 #define SIGEV_NONE	1	/* other notification: meaningless */
@@ -246,6 +258,7 @@ copy_siginfo (siginfo_t *to, siginfo_t *from)
 }
 
 extern int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from);
+extern int copy_siginfo_from_user(siginfo_t *to, siginfo_t *from);
 
 #endif /* __KERNEL__ */
 

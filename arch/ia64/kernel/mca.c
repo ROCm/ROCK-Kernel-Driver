@@ -1,16 +1,16 @@
 /*
- * File: 	mca.c
- * Purpose: 	Generic MCA handling layer
+ * File:	mca.c
+ * Purpose:	Generic MCA handling layer
  *
  * Updated for latest kernel
  * Copyright (C) 2000 Intel
  * Copyright (C) Chuck Fleckenstein (cfleck@co.intel.com)
- *  
+ *
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander(vijay@engr.sgi.com)
  *
- * 00/03/29 C. Fleckenstein  Fixed PAL/SAL update issues, began MCA bug fixes, logging issues, 
- *                           added min save state dump, added INIT handler. 
+ * 00/03/29 C. Fleckenstein  Fixed PAL/SAL update issues, began MCA bug fixes, logging issues,
+ *                           added min save state dump, added INIT handler.
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -27,8 +27,9 @@
 #include <asm/mca.h>
 
 #include <asm/irq.h>
+#include <asm/machvec.h>
 
- 
+
 typedef struct ia64_fptr {
 	unsigned long fp;
 	unsigned long gp;
@@ -43,8 +44,8 @@ u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[INIT_TASK_SIZE] __attribute__((aligned(16)));
 
-static void			ia64_mca_cmc_vector_setup(int 		enable, 
-							  int_vector_t 	cmc_vector);
+static void			ia64_mca_cmc_vector_setup(int		enable,
+							  int_vector_t	cmc_vector);
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
@@ -77,7 +78,7 @@ cmci_handler_platform (int cmc_irq, void *arg, struct pt_regs *ptregs)
  * console, then we would call the appropriate debug hooks here.
  */
 void
-init_handler_platform (struct pt_regs *regs) 
+init_handler_platform (struct pt_regs *regs)
 {
 	/* if a kernel debugger is available call it here else just dump the registers */
 	show_regs(regs);		/* dump the state info */
@@ -87,7 +88,7 @@ void
 log_print_platform ( void *cur_buff_ptr, prfunc_t prfunc)
 {
 }
-	
+
 void
 ia64_mca_init_platform (void)
 {
@@ -131,7 +132,7 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss, struct pt_regs *ptregs)
 				tpmss_ptr++;  /* skip to next entry */
 				continue;
 			}
-		} 
+		}
 
 		printk("%5s=0x%16.16lx ",min_state_labels[i],*tpmss_ptr++);
 
@@ -142,7 +143,7 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss, struct pt_regs *ptregs)
 	/* hang city for now, until we include debugger or copy to ptregs to show: */
 	while (1);
 }
- 
+
 /*
  * ia64_mca_cmc_vector_setup
  *	Setup the correctable machine check vector register in the processor
@@ -154,14 +155,14 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss, struct pt_regs *ptregs)
  *	None
  */
 static void
-ia64_mca_cmc_vector_setup(int 		enable, 
-			  int_vector_t 	cmc_vector)
+ia64_mca_cmc_vector_setup(int		enable,
+			  int_vector_t	cmc_vector)
 {
 	cmcv_reg_t	cmcv;
 
-	cmcv.cmcv_regval 	= 0;
-	cmcv.cmcv_mask  	= enable;
-	cmcv.cmcv_vector 	= cmc_vector;
+	cmcv.cmcv_regval	= 0;
+	cmcv.cmcv_mask	= enable;
+	cmcv.cmcv_vector	= cmc_vector;
 	ia64_set_cmcv(cmcv.cmcv_regval);
 }
 
@@ -223,25 +224,27 @@ ia64_mca_init(void)
 	for(i = 0 ; i < IA64_MAXCPUS; i++)
 		ia64_mc_info.imi_rendez_checkin[i] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
 
-	/* NOTE : The actual irqs for the rendez, wakeup and 
+	/* NOTE : The actual irqs for the rendez, wakeup and
 	 * cmc interrupts are requested in the platform-specific
 	 * mca initialization code.
 	 */
-	/* 
+	/*
 	 * Register the rendezvous spinloop and wakeup mechanism with SAL
 	 */
 
 	/* Register the rendezvous interrupt vector with SAL */
 	if (ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_INT,
 				   SAL_MC_PARAM_MECHANISM_INT,
-				   IA64_MCA_RENDEZ_INT_VECTOR,
-				   IA64_MCA_RENDEZ_TIMEOUT))
+				   IA64_MCA_RENDEZ_VECTOR,
+				   IA64_MCA_RENDEZ_TIMEOUT,
+				   0))
 		return;
 
 	/* Register the wakeup interrupt vector with SAL */
 	if (ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_WAKEUP,
 				   SAL_MC_PARAM_MECHANISM_INT,
-				   IA64_MCA_WAKEUP_INT_VECTOR,
+				   IA64_MCA_WAKEUP_VECTOR,
+				   0,
 				   0))
 		return;
 
@@ -249,17 +252,16 @@ ia64_mca_init(void)
 	/*
 	 * Setup the correctable machine check vector
 	 */
-	ia64_mca_cmc_vector_setup(IA64_CMC_INT_ENABLE, 
-				  IA64_MCA_CMC_INT_VECTOR);
+	ia64_mca_cmc_vector_setup(IA64_CMC_INT_ENABLE, IA64_CMC_VECTOR);
 
 	IA64_MCA_DEBUG("ia64_mca_init : correctable mca vector setup done\n");
 
-	ia64_mc_info.imi_mca_handler 		= __pa(ia64_os_mca_dispatch);
+	ia64_mc_info.imi_mca_handler		= __pa(ia64_os_mca_dispatch);
 	/*
 	 * XXX - disable SAL checksum by setting size to 0; should be
 	 *	__pa(ia64_os_mca_dispatch_end) - __pa(ia64_os_mca_dispatch);
 	 */
-	ia64_mc_info.imi_mca_handler_size	= 0; 
+	ia64_mc_info.imi_mca_handler_size	= 0;
 	/* Register the os mca handler with SAL */
 	if (ia64_sal_set_vectors(SAL_VECTOR_OS_MCA,
 				 ia64_mc_info.imi_mca_handler,
@@ -271,13 +273,13 @@ ia64_mca_init(void)
 
 	IA64_MCA_DEBUG("ia64_mca_init : registered os mca handler with SAL\n");
 
-	/* 
+	/*
 	 * XXX - disable SAL checksum by setting size to 0, should be
-	 * IA64_INIT_HANDLER_SIZE 
+	 * IA64_INIT_HANDLER_SIZE
 	 */
-	ia64_mc_info.imi_monarch_init_handler 		= __pa(mon_init_ptr->fp);
+	ia64_mc_info.imi_monarch_init_handler		= __pa(mon_init_ptr->fp);
 	ia64_mc_info.imi_monarch_init_handler_size	= 0;
-	ia64_mc_info.imi_slave_init_handler 		= __pa(slave_init_ptr->fp);
+	ia64_mc_info.imi_slave_init_handler		= __pa(slave_init_ptr->fp);
 	ia64_mc_info.imi_slave_init_handler_size	= 0;
 
 	IA64_MCA_DEBUG("ia64_mca_init : os init handler at %lx\n",ia64_mc_info.imi_monarch_init_handler);
@@ -296,7 +298,7 @@ ia64_mca_init(void)
 
 	IA64_MCA_DEBUG("ia64_mca_init : registered os init handler with SAL\n");
 
-	/* Initialize the areas set aside by the OS to buffer the 
+	/* Initialize the areas set aside by the OS to buffer the
 	 * platform/processor error states for MCA/INIT/CMC
 	 * handling.
 	 */
@@ -308,7 +310,7 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PLATFORM);
 
 	ia64_mca_init_platform();
-	
+
 	IA64_MCA_DEBUG("ia64_mca_init : platform-specific mca handling setup done\n");
 
 #if defined(MCA_TEST)
@@ -321,9 +323,9 @@ ia64_mca_init(void)
 /*
  * ia64_mca_wakeup_ipi_wait
  *	Wait for the inter-cpu interrupt to be sent by the
- * 	monarch processor once it is done with handling the
+ *	monarch processor once it is done with handling the
  *	MCA.
- * Inputs 
+ * Inputs
  *	None
  * Outputs
  *	None
@@ -331,8 +333,8 @@ ia64_mca_init(void)
 void
 ia64_mca_wakeup_ipi_wait(void)
 {
-	int	irr_num = (IA64_MCA_WAKEUP_INT_VECTOR >> 6);
-	int	irr_bit = (IA64_MCA_WAKEUP_INT_VECTOR & 0x3f);
+	int	irr_num = (IA64_MCA_WAKEUP_VECTOR >> 6);
+	int	irr_bit = (IA64_MCA_WAKEUP_VECTOR & 0x3f);
 	u64	irr = 0;
 
 	do {
@@ -356,7 +358,7 @@ ia64_mca_wakeup_ipi_wait(void)
 /*
  * ia64_mca_wakeup
  *	Send an inter-cpu interrupt to wake-up a particular cpu
- * 	and mark that cpu to be out of rendez.
+ *	and mark that cpu to be out of rendez.
  * Inputs
  *	cpuid
  * Outputs
@@ -365,9 +367,8 @@ ia64_mca_wakeup_ipi_wait(void)
 void
 ia64_mca_wakeup(int cpu)
 {
-	platform_send_ipi(cpu, IA64_MCA_WAKEUP_INT_VECTOR, IA64_IPI_DM_INT, 0);
+	platform_send_ipi(cpu, IA64_MCA_WAKEUP_VECTOR, IA64_IPI_DM_INT, 0);
 	ia64_mc_info.imi_rendez_checkin[cpu] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
-	
 }
 /*
  * ia64_mca_wakeup_all
@@ -390,10 +391,10 @@ ia64_mca_wakeup_all(void)
 }
 /*
  * ia64_mca_rendez_interrupt_handler
- *	This is handler used to put slave processors into spinloop 
+ *	This is handler used to put slave processors into spinloop
  *	while the monarch processor does the mca handling and later
  *	wake each slave up once the monarch is done.
- * Inputs 
+ * Inputs
  *	None
  * Outputs
  *	None
@@ -403,7 +404,7 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 {
 	int flags, cpu = 0;
 	/* Mask all interrupts */
-        save_and_cli(flags);
+	save_and_cli(flags);
 
 #ifdef CONFIG_SMP
 	cpu = cpu_logical_id(hard_smp_processor_id());
@@ -414,7 +415,7 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 	 */
 	ia64_sal_mc_rendez();
 
-	/* Wait for the wakeup IPI from the monarch 
+	/* Wait for the wakeup IPI from the monarch
 	 * This waiting is done by polling on the wakeup-interrupt
 	 * vector bit in the processor's IRRs
 	 */
@@ -430,30 +431,30 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 /*
  * ia64_mca_wakeup_int_handler
  *	The interrupt handler for processing the inter-cpu interrupt to the
- * 	slave cpu which was spinning in the rendez loop.
+ *	slave cpu which was spinning in the rendez loop.
  *	Since this spinning is done by turning off the interrupts and
- *	polling on the wakeup-interrupt bit in the IRR, there is 
+ *	polling on the wakeup-interrupt bit in the IRR, there is
  *	nothing useful to be done in the handler.
  *  Inputs
  *	wakeup_irq	(Wakeup-interrupt bit)
  *	arg		(Interrupt handler specific argument)
  *	ptregs		(Exception frame at the time of the interrupt)
  *  Outputs
- *	
+ *
  */
 void
 ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 {
-	
+
 }
 
 /*
  * ia64_return_to_sal_check
  *	This is function called before going back from the OS_MCA handler
- * 	to the OS_MCA dispatch code which finally takes the control back
- * 	to the SAL.
+ *	to the OS_MCA dispatch code which finally takes the control back
+ *	to the SAL.
  *	The main purpose of this routine is to setup the OS_MCA to SAL
- *	return state which can be used by the OS_MCA dispatch code 
+ *	return state which can be used by the OS_MCA dispatch code
  *	just before going back to SAL.
  * Inputs
  *	None
@@ -467,16 +468,16 @@ ia64_return_to_sal_check(void)
 	/* Copy over some relevant stuff from the sal_to_os_mca_handoff
 	 * so that it can be used at the time of os_mca_to_sal_handoff
 	 */
-	ia64_os_to_sal_handoff_state.imots_sal_gp = 
+	ia64_os_to_sal_handoff_state.imots_sal_gp =
 		ia64_sal_to_os_handoff_state.imsto_sal_gp;
 
-	ia64_os_to_sal_handoff_state.imots_sal_check_ra = 
+	ia64_os_to_sal_handoff_state.imots_sal_check_ra =
 		ia64_sal_to_os_handoff_state.imsto_sal_check_ra;
 
 	/* For now ignore the MCA */
 	ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_CORRECTED;
 }
-/* 
+/*
  * ia64_mca_ucmc_handler
  *	This is uncorrectable machine check handler called from OS_MCA
  *	dispatch code which is in turn called from SAL_CHECK().
@@ -503,7 +504,7 @@ ia64_mca_ucmc_handler(void)
 
 	ia64_log_print(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
 
-	/* 
+	/*
 	 * Do some error handling - Platform-specific mca handler is called at this point
 	 */
 
@@ -520,11 +521,11 @@ ia64_mca_ucmc_handler(void)
 	ia64_return_to_sal_check();
 }
 
-/* 
+/*
  * ia64_mca_cmc_int_handler
  *	This is correctable machine check interrupt handler.
  *	Right now the logs are extracted and displayed in a well-defined
- *	format. 
+ *	format.
  * Inputs
  *	None
  * Outputs
@@ -532,7 +533,7 @@ ia64_mca_ucmc_handler(void)
  */
 void
 ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
-{	
+{
 	/* Get the CMC processor log */
 	ia64_log_get(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
 	/* Get the CMC platform log */
@@ -543,8 +544,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 	cmci_handler_platform(cmc_irq, arg, ptregs);
 
 	/* Clear the CMC SAL logs now that they have been saved in the OS buffer */
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PROCESSOR);
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PLATFORM);
+	ia64_sal_clear_state_info(SAL_INFO_TYPE_CMC);
 }
 
 /*
@@ -563,17 +563,17 @@ typedef struct ia64_state_log_s {
 static ia64_state_log_t	ia64_state_log[IA64_MAX_LOG_TYPES][IA64_MAX_LOG_SUBTYPES];
 
 #define IA64_LOG_LOCK_INIT(it, sit)	spin_lock_init(&ia64_state_log[it][sit].isl_lock)
-#define IA64_LOG_LOCK(it, sit)	 	spin_lock_irqsave(&ia64_state_log[it][sit].isl_lock, s)
-#define IA64_LOG_UNLOCK(it, sit) 	spin_unlock_irqrestore(&ia64_state_log[it][sit].isl_lock,\
+#define IA64_LOG_LOCK(it, sit)		spin_lock_irqsave(&ia64_state_log[it][sit].isl_lock, s)
+#define IA64_LOG_UNLOCK(it, sit)	spin_unlock_irqrestore(&ia64_state_log[it][sit].isl_lock,\
 							       s)
 #define IA64_LOG_NEXT_INDEX(it, sit)	ia64_state_log[it][sit].isl_index
-#define IA64_LOG_CURR_INDEX(it, sit) 	1 - ia64_state_log[it][sit].isl_index
+#define IA64_LOG_CURR_INDEX(it, sit)	1 - ia64_state_log[it][sit].isl_index
 #define IA64_LOG_INDEX_INC(it, sit)	\
 	ia64_state_log[it][sit].isl_index = 1 - ia64_state_log[it][sit].isl_index
 #define IA64_LOG_INDEX_DEC(it, sit)	\
 	ia64_state_log[it][sit].isl_index = 1 - ia64_state_log[it][sit].isl_index
-#define IA64_LOG_NEXT_BUFFER(it, sit) 	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_NEXT_INDEX(it,sit)]))
-#define IA64_LOG_CURR_BUFFER(it, sit) 	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_CURR_INDEX(it,sit)]))
+#define IA64_LOG_NEXT_BUFFER(it, sit)	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_NEXT_INDEX(it,sit)]))
+#define IA64_LOG_CURR_BUFFER(it, sit)	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_CURR_INDEX(it,sit)]))
 
 /*
  * C portion of the OS INIT handler
@@ -582,7 +582,7 @@ static ia64_state_log_t	ia64_state_log[IA64_MAX_LOG_TYPES][IA64_MAX_LOG_SUBTYPES
  *
  * Inputs: pointer to pt_regs where processor info was saved.
  *
- * Returns: 
+ * Returns:
  *   0 if SAL must warm boot the System
  *   1 if SAL must retrun to interrupted context using PAL_MC_RESUME
  *
@@ -601,49 +601,48 @@ ia64_init_handler (struct pt_regs *regs)
 	/* Get the INIT platform log */
 	ia64_log_get(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PLATFORM, (prfunc_t)printk);
 
-#ifdef IA64_DUMP_ALL_PROC_INFO 
+#ifdef IA64_DUMP_ALL_PROC_INFO
 	ia64_log_print(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
-#endif 
+#endif
 
-	/* 
+	/*
 	 * get pointer to min state save area
 	 *
 	 */
 	plog_ptr=(ia64_psilog_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT,
 						       SAL_SUB_INFO_TYPE_PROCESSOR);
 	proc_ptr = &plog_ptr->devlog.proclog;
-	
+
 	ia64_process_min_state_save(&proc_ptr->slpi_min_state_area,regs);
 
 	init_handler_platform(regs);              /* call platform specific routines */
 
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PROCESSOR);
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PLATFORM);
+	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
 }
 
 /*
  * ia64_log_init
- * 	Reset the OS ia64 log buffer
- * Inputs 	:	info_type 	(SAL_INFO_TYPE_{MCA,INIT,CMC})
+ *	Reset the OS ia64 log buffer
+ * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
  *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- * Outputs	: 	None
+ * Outputs	:	None
  */
 void
 ia64_log_init(int sal_info_type, int sal_sub_info_type)
 {
 	IA64_LOG_LOCK_INIT(sal_info_type, sal_sub_info_type);
 	IA64_LOG_NEXT_INDEX(sal_info_type, sal_sub_info_type) = 0;
-	memset(IA64_LOG_NEXT_BUFFER(sal_info_type, sal_sub_info_type), 0, 
+	memset(IA64_LOG_NEXT_BUFFER(sal_info_type, sal_sub_info_type), 0,
 	       sizeof(ia64_psilog_t) * IA64_MAX_LOGS);
 }
 
-/* 
+/*
  * ia64_log_get
- * 	Get the current MCA log from SAL and copy it into the OS log buffer.
- * Inputs 	:	info_type 	(SAL_INFO_TYPE_{MCA,INIT,CMC})
+ *	Get the current MCA log from SAL and copy it into the OS log buffer.
+ * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
  *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- * Outputs	: 	None
+ * Outputs	:	None
  *
  */
 void
@@ -658,7 +657,7 @@ ia64_log_get(int sal_info_type, int sal_sub_info_type, prfunc_t prfunc)
 	/* Get the process state information */
 	log_buffer = IA64_LOG_NEXT_BUFFER(sal_info_type, sal_sub_info_type);
 
-	if (!(total_len=ia64_sal_get_state_info(sal_info_type, sal_sub_info_type ,(u64 *)log_buffer)))
+	if (!(total_len=ia64_sal_get_state_info(sal_info_type,(u64 *)log_buffer)))
 		prfunc("ia64_mca_log_get : Getting processor log failed\n");
 
 	IA64_MCA_DEBUG("ia64_log_get: retrieved %d bytes of error information\n",total_len);
@@ -669,21 +668,21 @@ ia64_log_get(int sal_info_type, int sal_sub_info_type, prfunc_t prfunc)
 
 }
 
-/* 
+/*
  * ia64_log_clear
- * 	Clear the current MCA log from SAL and dpending on the clear_os_buffer flags
+ *	Clear the current MCA log from SAL and dpending on the clear_os_buffer flags
  *	clear the OS log buffer also
- * Inputs 	:	info_type 	(SAL_INFO_TYPE_{MCA,INIT,CMC})
+ * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
  *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- *			clear_os_buffer 
+ *			clear_os_buffer
  *			prfunc		(print function)
- * Outputs	: 	None
+ * Outputs	:	None
  *
  */
 void
 ia64_log_clear(int sal_info_type, int sal_sub_info_type, int clear_os_buffer, prfunc_t prfunc)
 {
-	if (ia64_sal_clear_state_info(sal_info_type, sal_sub_info_type))
+	if (ia64_sal_clear_state_info(sal_info_type))
 		prfunc("ia64_mca_log_get : Clearing processor log failed\n");
 
 	if (clear_os_buffer) {
@@ -698,7 +697,7 @@ ia64_log_clear(int sal_info_type, int sal_sub_info_type, int clear_os_buffer, pr
 		memset(log_buffer, 0, sizeof(ia64_psilog_t));
 
 		IA64_LOG_INDEX_DEC(sal_info_type, sal_sub_info_type);
-	
+
 		IA64_LOG_UNLOCK(sal_info_type, sal_sub_info_type);
 	}
 
@@ -708,19 +707,19 @@ ia64_log_clear(int sal_info_type, int sal_sub_info_type, int clear_os_buffer, pr
  * ia64_log_processor_regs_print
  *	Print the contents of the saved processor register(s) in the format
  *		<reg_prefix>[<index>] <value>
- *		
- * Inputs	:	regs 		(Register save buffer)
- *			reg_num 	(# of registers)
+ *
+ * Inputs	:	regs		(Register save buffer)
+ *			reg_num	(# of registers)
  *			reg_class	(application/banked/control/bank1_general)
  *			reg_prefix	(ar/br/cr/b1_gr)
- * Outputs	: 	None
+ * Outputs	:	None
  *
  */
 void
-ia64_log_processor_regs_print(u64 	*regs, 
-			      int 	reg_num,
-			      char 	*reg_class,
-			      char 	*reg_prefix,
+ia64_log_processor_regs_print(u64	*regs,
+			      int	reg_num,
+			      char	*reg_class,
+			      char	*reg_prefix,
 			      prfunc_t	prfunc)
 {
 	int i;
@@ -756,14 +755,14 @@ static char *pal_cache_op[] = {
  * ia64_log_cache_check_info_print
  *	Display the machine check information related to cache error(s).
  * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later 
+ *			info		(Machine check info logged by the PAL and later
  *					 captured by the SAL)
  *			target_addr	(Address which caused the cache error)
- * Outputs	: 	None
+ * Outputs	:	None
  */
-void 
-ia64_log_cache_check_info_print(int 			i, 
-				pal_cache_check_info_t 	info,
+void
+ia64_log_cache_check_info_print(int			i,
+				pal_cache_check_info_t	info,
 				u64			target_addr,
 				prfunc_t		prfunc)
 {
@@ -794,13 +793,13 @@ ia64_log_cache_check_info_print(int 			i,
  * ia64_log_tlb_check_info_print
  *	Display the machine check information related to tlb error(s).
  * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later 
+ *			info		(Machine check info logged by the PAL and later
  *					 captured by the SAL)
- * Outputs	: 	None
+ * Outputs	:	None
  */
 
 void
-ia64_log_tlb_check_info_print(int 			i,
+ia64_log_tlb_check_info_print(int			i,
 			      pal_tlb_check_info_t	info,
 			      prfunc_t			prfunc)
 {
@@ -826,16 +825,16 @@ ia64_log_tlb_check_info_print(int 			i,
  * ia64_log_bus_check_info_print
  *	Display the machine check information related to bus error(s).
  * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later 
+ *			info		(Machine check info logged by the PAL and later
  *					 captured by the SAL)
  *			req_addr	(Address of the requestor of the transaction)
  *			resp_addr	(Address of the responder of the transaction)
  *			target_addr	(Address where the data was to be delivered to  or
  *					 obtained from)
- * Outputs	: 	None
+ * Outputs	:	None
  */
 void
-ia64_log_bus_check_info_print(int 			i,
+ia64_log_bus_check_info_print(int			i,
 			      pal_bus_check_info_t	info,
 			      u64			req_addr,
 			      u64			resp_addr,
@@ -868,9 +867,9 @@ ia64_log_bus_check_info_print(int 			i,
  * ia64_log_processor_info_print
  *	Display the processor-specific information logged by PAL as a part
  *	of MCA or INIT or CMC.
- * Inputs 	:	lh	(Pointer of the sal log header which specifies the format
+ * Inputs	:	lh	(Pointer of the sal log header which specifies the format
  *				 of SAL state info as specified by the SAL spec).
- * Outputs	: 	None
+ * Outputs	:	None
  */
 void
 ia64_log_processor_info_print(sal_log_header_t *lh, prfunc_t prfunc)
@@ -892,29 +891,29 @@ ia64_log_processor_info_print(sal_log_header_t *lh, prfunc_t prfunc)
 	}
 
 	/* Print branch register contents if valid */
-	if (slpi->slpi_valid.slpi_br) 
+	if (slpi->slpi_valid.slpi_br)
 		ia64_log_processor_regs_print(slpi->slpi_br, 8, "Branch", "br", prfunc);
 
 	/* Print control register contents if valid */
-	if (slpi->slpi_valid.slpi_cr) 
+	if (slpi->slpi_valid.slpi_cr)
 		ia64_log_processor_regs_print(slpi->slpi_cr, 128, "Control", "cr", prfunc);
 
 	/* Print application register contents if valid */
-	if (slpi->slpi_valid.slpi_ar) 
+	if (slpi->slpi_valid.slpi_ar)
 		ia64_log_processor_regs_print(slpi->slpi_br, 128, "Application", "ar", prfunc);
 
 	/* Print region register contents if valid */
-	if (slpi->slpi_valid.slpi_rr) 
+	if (slpi->slpi_valid.slpi_rr)
 		ia64_log_processor_regs_print(slpi->slpi_rr, 8, "Region", "rr", prfunc);
 
 	/* Print floating-point register contents if valid */
-	if (slpi->slpi_valid.slpi_fr) 
-		ia64_log_processor_regs_print(slpi->slpi_fr, 128, "Floating-point", "fr", 
+	if (slpi->slpi_valid.slpi_fr)
+		ia64_log_processor_regs_print(slpi->slpi_fr, 128, "Floating-point", "fr",
 					      prfunc);
 
 	/* Print the cache check information if any*/
 	for (i = 0 ; i < MAX_CACHE_ERRORS; i++)
-		ia64_log_cache_check_info_print(i, 
+		ia64_log_cache_check_info_print(i,
 					slpi->slpi_cache_check_info[i].slpi_cache_check,
 					slpi->slpi_cache_check_info[i].slpi_target_address,
 						prfunc);
@@ -924,7 +923,7 @@ ia64_log_processor_info_print(sal_log_header_t *lh, prfunc_t prfunc)
 
 	/* Print the bus check information if any*/
 	for (i = 0 ; i < MAX_BUS_ERRORS; i++)
-		ia64_log_bus_check_info_print(i, 
+		ia64_log_bus_check_info_print(i,
 					slpi->slpi_bus_check_info[i].slpi_bus_check,
 					slpi->slpi_bus_check_info[i].slpi_requestor_addr,
 					slpi->slpi_bus_check_info[i].slpi_responder_addr,
@@ -935,15 +934,15 @@ ia64_log_processor_info_print(sal_log_header_t *lh, prfunc_t prfunc)
 
 /*
  * ia64_log_print
- * 	Display the contents of the OS error log information
- * Inputs 	:	info_type 	(SAL_INFO_TYPE_{MCA,INIT,CMC})
+ *	Display the contents of the OS error log information
+ * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
  *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- * Outputs	: 	None
+ * Outputs	:	None
  */
 void
 ia64_log_print(int sal_info_type, int sal_sub_info_type, prfunc_t prfunc)
 {
-	char 	*info_type, *sub_info_type;
+	char	*info_type, *sub_info_type;
 
 	switch(sal_info_type) {
 	case SAL_INFO_TYPE_MCA:

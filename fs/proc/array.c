@@ -273,9 +273,6 @@ int proc_pid_status(struct task_struct *task, char * buffer)
 {
 	char * orig = buffer;
 	struct mm_struct *mm;
-#if defined(CONFIG_ARCH_S390)
-	int line,len;
-#endif
 
 	buffer = task_name(task, buffer);
 	buffer = task_state(task, buffer);
@@ -291,8 +288,7 @@ int proc_pid_status(struct task_struct *task, char * buffer)
 	buffer = task_sig(task, buffer);
 	buffer = task_cap(task, buffer);
 #if defined(CONFIG_ARCH_S390)
-	for(line=0;(len=sprintf_regs(line,buffer,task,NULL,NULL))!=0;line++)
-		buffer+=len;
+	buffer = task_show_regs(task, buffer);
 #endif
 	return buffer - orig;
 }

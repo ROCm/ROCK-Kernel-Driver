@@ -162,7 +162,7 @@ void connect_request(llcptr lp)
  *	Interpret_pseudo_code() executes the actions in the connection component
  *	state transition table. Table 4 in document on p88.
  *
- *	If this function is called to handle an incomming pdu, skb will point
+ *	If this function is called to handle an incoming pdu, skb will point
  *	to the buffer with the pdu and type will contain the decoded pdu type.
  *
  *	If called by data_request skb points to an skb that was skb_alloc-ed by 

@@ -1,6 +1,6 @@
 COMPILE pdutr INDEX
 ;
-; Transition tables for incomming pdu events.
+; Transition tables for incoming pdu events.
 ; translate this thing into C with
 ;  	awk -f ./compile.awk pdu.trans > pdutr.h
 ;

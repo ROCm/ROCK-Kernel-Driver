@@ -246,7 +246,7 @@ NORMAL7		SEND_REJ_RSP(F=1)
 		START_REJ_TIMER
 ;
 ; the order of opcodes in NORMAL8 is changed.
-; the transition table will execute NORMAL8A for incomming pdus
+; the transition table will execute NORMAL8A for incoming pdus
 ; with p/f 1, pdus with pf 0 are treated in NORMAL8B.
 ;   
 NORMAL8A	V(R):=V(R)+1

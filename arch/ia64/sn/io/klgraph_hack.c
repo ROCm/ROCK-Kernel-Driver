@@ -35,55 +35,6 @@ extern void dump_ii(void), dump_lb(void), dump_crossbow(void);
 extern void clear_ii_error(void);
 #endif /* BRINGUP */
 
-void
-simulated_BW0_init(void)
-{
-
-	unsigned long *cnode0_hub;
-	unsigned long hub_widget = 0x1000000;
-	unsigned long hub_offset = 0x800000;
-	unsigned long hub_reg_base = 0;
-	extern void * vmalloc(unsigned long);
-
-	memset(&nasid_to_compact_node[0], 0, sizeof(cnodeid_t) * MAX_NASIDS);
-
-	BW0 = vmalloc(0x10000000);
-	if (BW0 == NULL) {
-		printk("Darn it .. cannot create space for Big Window 0\n");
-	}
-	printk("BW0: Start Address %p\n", BW0);
-	
-	memset(BW0+(0x10000000 - 8), 0xf, 0x8);
-
-	printk("BW0: Last WORD address %p has value 0x%lx\n", (char *)(BW0 +(0x10000000 - 8)), *(long *)(BW0 +(0x10000000 - 8)));
-
-	printk("XWIDGET 8 Address = 0x%p\n", (unsigned long *)(NODE_SWIN_BASE(0, 8)) ); 
-
-	/*
-	 * Do some HUB Register Hack ..
-	 */
-	hub_reg_base = (unsigned long)BW0 + hub_widget + hub_offset;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_WID); *cnode0_hub = 0x1c110049;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_WSTAT); *cnode0_hub = 0x0;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_WCR); *cnode0_hub = 0x401b;
-	printk("IIO_WCR address = 0x%p\n", cnode0_hub);
-
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ILAPR); *cnode0_hub = 0xffffffffffffffff;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ILAPO); *cnode0_hub = 0x0;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IOWA); *cnode0_hub = 0xff01;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IIWA); *cnode0_hub = 0xff01;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IIDEM); *cnode0_hub = 0xffffffffffffffff;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ILCSR); *cnode0_hub = 0x3fc03ff640a;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ILLR); *cnode0_hub = 0x0;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IIDSR); *cnode0_hub = 0x1000040;
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IGFX0); *cnode0_hub = 0x0;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_IGFX1); *cnode0_hub = 0x0;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ISCR0); *cnode0_hub = 0x23d;
-        cnode0_hub = (unsigned long *)(hub_reg_base + IIO_ISCR1); *cnode0_hub = 0x0;
-#endif	/* CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 */
-}
-
 #define SYNERGY_WIDGET          ((char *)0xc0000e0000000000)
 #define SYNERGY_SWIZZLE         ((char *)0xc0000e0000000400)
 #define HUBREG                  ((char *)0xc0000a0001e00000)
@@ -136,10 +87,10 @@ klgraph_hack_init(void)
 	klxbow_t	*klxbow_ptr;
 	klinfo_t	*klinfo_ptr;
 	klcomp_t	*klcomp_ptr;
+#if 0
 	uint64_t	*tmp;
 	volatile u32	*tmp32;
 
-#if 0
 	/* Preset some values */
 	/* Write IOERR clear to clear the CRAZY bit in the status */
 	tmp = (uint64_t *)0xc0000a0001c001f8; *tmp = (uint64_t)0xffffffff;
@@ -164,7 +115,6 @@ klgraph_hack_init(void)
 	*tmp32 = 0xba98;
 	tmp32 = (volatile u32 *)0xc0000a000f000288L;
 	*tmp32 = 0xba98;
-#endif
 
 printk("Widget ID Address 0x%p Value 0x%lx\n", (uint64_t *)0xc0000a0001e00000, *( (volatile uint64_t *)0xc0000a0001e00000) );
 
@@ -181,6 +131,7 @@ printk("Xbow ID Address 0x%p Value 0x%x\n", (uint64_t *)0xc0000a0000000000, *( (
 
 printk("Xbow ID Address 0x%p Value 0x%x\n", (uint64_t *)0xc000020000000004, *( (volatile uint32_t *)0xc000020000000004) );
 
+#endif
 
 	if ( test )
 		test_io_regs();
@@ -210,9 +161,8 @@ printk("Xbow ID Address 0x%p Value 0x%x\n", (uint64_t *)0xc000020000000004, *( (
 	 */
 	linux_klcfg = (kl_config_hdr_t *)0xe000000000030000;
 	if (linux_klcfg->ch_magic == 0xbeedbabe) {
-		printk("Linux Kernel Booted from Disk\n");
+		return;
 	} else {
-		printk("Linux Kernel Booted from PROM\n");
 		linux_klcfg = kl_hdr_ptr;
 	}
 

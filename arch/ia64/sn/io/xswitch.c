@@ -88,13 +88,15 @@ xswitch_info_get(devfs_handle_t xwidget)
 
     xswitch_info = (xswitch_info_t)
 	hwgraph_fastinfo_get(xwidget);
-#ifdef IRIX
+#ifdef	LATER
     if ((xswitch_info != NULL) &&
 	(xswitch_info->fingerprint != xswitch_info_fingerprint))
-	cmn_err(CE_PANIC, "%v xswitch_info_get bad fingerprint", xwidget);
+#ifdef SUPPORT_PRINTING_V_FORMAT
+	PRINT_PANIC("%v xswitch_info_get bad fingerprint", xwidget);
+#else
+	PRINT_PANIC("%x xswitch_info_get bad fingerprint", xwidget);
 #endif
-
-    printk("xswitch_info_get: xwidget 0x%p xswitch_info 0x%p\n", xwidget, xswitch_info);
+#endif	/* LATER */
 
     return (xswitch_info);
 }
@@ -118,9 +120,9 @@ devfs_handle_t
 xswitch_info_vhdl_get(xswitch_info_t xswitch_info,
 		      xwidgetnum_t port)
 {
-#ifdef IRIX
+#ifdef	LATER
     if (xswitch_info == NULL)
-	cmn_err(CE_PANIC, "xswitch_info_vhdl_get: null xswitch_info");
+	PRINT_PANIC("xswitch_info_vhdl_get: null xswitch_info");
 #endif
 
 #if XSWITCH_CENSUS_PORT_MIN
@@ -196,8 +198,6 @@ xswitch_info_new(devfs_handle_t xwidget)
 					       GRAPH_VERTEX_NONE);
 	}
 	xswitch_info_set(xwidget, xswitch_info);
-	printk("xswitch_info_new: xswitch_info_set xwidget 0x%p, xswitch_info 0x%p\n",
-		xwidget, xswitch_info);
     }
     return xswitch_info;
 }

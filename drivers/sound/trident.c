@@ -2890,7 +2890,7 @@ static void ali_restore_regs(struct trident_card *card)
 	{	
 		if ((i*4 == T4D_MISCINT) || (i*4 == T4D_STOP_A) || (i*4 == T4D_START_A))
 			continue;
-		ali_registers.global_regs[i] = inl(TRID_REG(card, i*4));
+		outl(ali_registers.global_regs[i], TRID_REG(card, i*4));
 	}
 	
 	//start HW channel

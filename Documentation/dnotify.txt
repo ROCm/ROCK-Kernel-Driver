@@ -1,7 +1,7 @@
 		Linux Directory Notification
 		============================
 
-	   Stephen Rothwell <sfr@linuxcare.com.au>
+	   Stephen Rothwell <sfr@canb.auug.org.au>
 
 The intention of directory notification is to allow user applications
 to be notified when a directory, or any of the files in it, are changed.

@@ -25,7 +25,7 @@ HUB_SET_LED(int val)
 	long	*ledp;
 	int	eid;
 
-	eid = hard_processor_sapicid() & 3;
+	eid = hard_smp_processor_id() & 3;
 	ledp = (long*) (LED0 + (eid<<3));
 	*ledp = val;
 }

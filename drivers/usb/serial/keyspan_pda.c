@@ -67,13 +67,14 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/tqueue.h>
+#include <linux/usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
-	#define DEBUG
+	static int debug = 1;
 #else
-	#undef DEBUG
+	static int debug;
 #endif
-#include <linux/usb.h>
+
 
 struct ezusb_hex_record {
 	__u16 address;
@@ -82,7 +83,6 @@ struct ezusb_hex_record {
 };
 
 #include "keyspan_pda_fw.h"
-
 #include "usb-serial.h"
 
 struct keyspan_pda_private {
@@ -823,3 +823,7 @@ module_exit(keyspan_pda_exit);
 
 MODULE_AUTHOR("Brian Warner <warner@lothar.com>");
 MODULE_DESCRIPTION("USB Keyspan PDA Converter driver");
+
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug, "Debug enabled or not");
+

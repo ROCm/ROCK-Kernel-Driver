@@ -12,20 +12,12 @@
 #define _ASM_SN_IO_H
 
 #include <linux/config.h>
+
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/addrs.h>
 #endif
 
-#define IO_SPACE_BASE IO_BASE
-
 /* Because we only have PCI I/O ports.  */
-#if !defined(CONFIG_IA64_SGI_IO)
-#define IO_SPACE_LIMIT 0xffffffff
-
-/* No isa_* versions, the Origin doesn't have ISA / EISA bridges.  */
-
-#else	/* CONFIG_IA64_SGI_IO */
-
 #define IIO_ITTE_BASE	0x400160	/* base of translation table entries */
 #define IIO_ITTE(bigwin)	(IIO_ITTE_BASE + 8*(bigwin))
 
@@ -71,7 +63,5 @@
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #include <asm/sn/sn1/hubio.h>
 #endif
-
-#endif	/* CONFIG_IA64_SGI_IO */
 
 #endif /* _ASM_SN_IO_H */

@@ -1,6 +1,6 @@
 /*
  * Network Checksum & Copy routine
- * 
+ *
  * Copyright (C) 1999 Hewlett-Packard Co
  * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -107,22 +107,18 @@ static unsigned int
 do_csum_partial_copy_from_user (const char *src, char *dst, int len,
 				unsigned int psum, int *errp)
 {
-	const unsigned char *psrc = src;
 	unsigned long result;
-	int cplen = len;
-	int r = 0;
 
 	/* XXX Fixme
-	 * for now we separate the copy from checksum for obvious 
+	 * for now we separate the copy from checksum for obvious
 	 * alignment difficulties. Look at the Alpha code and you'll be
 	 * scared.
 	 */
 
-	while ( cplen-- ) r |=__get_user(*dst++,psrc++);
+	if (__copy_from_user(dst, src, len) != 0 && errp)
+		*errp = -EFAULT;
 
-	if ( r && errp ) *errp = r;
-
-	result = do_csum(src, len);
+	result = do_csum(dst, len);
 
 	/* add in old sum, and carry.. */
 	result += psum;

@@ -30,6 +30,15 @@ typedef void
 cdl_iter_f		(devfs_handle_t vhdl);
 
 /*
+ *	cdl_drv_f is the type for the functions
+ *	that are called by cdl_add_driver and 
+ *      cdl_del_driver.
+ */
+
+typedef void	
+cdl_drv_f		(devfs_handle_t vhdl, int key1, int key2, int error);
+
+/*
  *	If CDL_PRI_HI is specified in the flags
  *	parameter for cdl_add_driver, then that driver's
  *	attach routine will be called for future connect
@@ -73,8 +82,10 @@ extern void		cdl_del(cdl_p reg);
  *
  *	Calls the driver's attach routine with all
  *	connection points on the list that have the same
- *	key information as the driver; then places the
- *	driver on the list so that any connection points
+ *	key information as the driver; call-back the 
+ *      specified function to notify the driver of the 
+ *      attach status for each device.  Place the driver
+ *      on the list so that any connection points
  *	discovered in the future that match the driver
  *	can be handed off to the driver's attach
  *	routine.
@@ -86,14 +97,17 @@ extern int		cdl_add_driver(cdl_p reg,
 				       int key1,
 				       int key2,
 				       char *prefix,
-				       int flags);
+				       int flags,
+				       cdl_drv_f *func);
 
 /*
  *	cdl_del_driver: remove a device driver
  *
  *	Calls the driver's detach routine with all
  *	connection points on the list that match the
- *	driver; then forgets about the driver. Future
+ *	driver;  call-back the specified function to
+ *      notify the driver of the detach status for each
+ *      device.  Then forget about the driver.  Future
  *	calls to cdl_add_connpt with connections that
  *	would match this driver no longer trigger calls
  *	to the driver's attach routine.
@@ -107,7 +121,8 @@ extern int		cdl_add_driver(cdl_p reg,
  *	was successful.
  */
 extern void		cdl_del_driver(cdl_p reg, 
-				       char *prefix);
+				       char *prefix,
+				       cdl_drv_f *func);
 
 /*
  *	cdl_add_connpt: add a connection point
@@ -124,7 +139,8 @@ extern void		cdl_del_driver(cdl_p reg,
 extern int		cdl_add_connpt(cdl_p reg,
 				       int key1,
 				       int key2,
-				       devfs_handle_t conn);
+				       devfs_handle_t conn,
+				       int drv_flags);
 
 /*
  *	cdl_del_connpt: delete a connection point
@@ -138,10 +154,11 @@ extern int		cdl_add_connpt(cdl_p reg,
  *	NOTE: Same caveat here about the detach calls as
  *	in the cdl_del_driver() comment above.
  */
-extern void		cdl_del_connpt(cdl_p reg,
+extern int		cdl_del_connpt(cdl_p reg,
 				       int key1,
 				       int key2,
-				       devfs_handle_t conn);
+				       devfs_handle_t conn,
+				       int drv_flags);
 
 /*
  *	cdl_iterate: find all verticies in the registry
@@ -162,7 +179,7 @@ extern void		cdl_iterate(cdl_p reg,
  */
 
 struct async_attach_s {
-	sema_t async_sema;
+	struct semaphore async_sema;
 	int    async_count;
 };
 typedef struct async_attach_s *async_attach_t;

@@ -1,12 +1,23 @@
-/* $Id: ethernet.c,v 1.5 2000/11/29 17:22:22 bjornw Exp $
+/* $Id: ethernet.c,v 1.8 2001/02/27 13:52:48 bjornw Exp $
  *
  * e100net.c: A network driver for the ETRAX 100LX network controller.
  *
- * Copyright (c) 1998-2000 Axis Communications AB.
+ * Copyright (c) 1998-2001 Axis Communications AB.
  *
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: ethernet.c,v $
+ * Revision 1.8  2001/02/27 13:52:48  bjornw
+ * malloc.h -> slab.h
+ *
+ * Revision 1.7  2001/02/23 13:46:38  bjornw
+ * Spellling check
+ *
+ * Revision 1.6  2001/01/26 15:21:04  starvik
+ * Don't disable interrupts while reading MDIO registers (MDIO is slow)
+ * Corrected promiscuous mode
+ * Improved deallocation of IRQs ("ifconfig eth0 down" now works)
+ *
  * Revision 1.5  2000/11/29 17:22:22  bjornw
  * Get rid of the udword types legacy stuff
  *
@@ -39,7 +50,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -53,7 +64,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
-#include <asm/svinto.h>
+#include <asm/svinto.h>     /* DMA and register descriptions */
 
 //#define ETHDEBUG
 
@@ -483,9 +494,6 @@ e100_get_mdio_reg(unsigned char reg_num)
 	unsigned short data;   /* Data read from MDIO */
 	int bitCounter;
 	
-	save_flags(flags);
-	cli();
-	
 	/* Start of frame, OP Code, Physical Address, Register Address */
 	cmd = (MDIO_START << 14) | (MDIO_READ << 12) | (MDIO_PHYS_ADDR << 7) |
 		(reg_num << 2);
@@ -498,8 +506,7 @@ e100_get_mdio_reg(unsigned char reg_num)
 	for(bitCounter=15; bitCounter>=0 ; bitCounter--) {
 		data |= (e100_receive_mdio_bit() << bitCounter);
 	}
-	
-	restore_flags(flags);
+
 	return data;
 }
 
@@ -555,9 +562,6 @@ e100_reset_tranceiver(void)
 	unsigned short data;
 	int bitCounter;
 
-	save_flags(flags);
-	cli();
-
 	data = e100_get_mdio_reg(MDIO_BASE_CONTROL_REG);
 
 	cmd = (MDIO_START << 14) | (MDIO_WRITE << 12) | (MDIO_PHYS_ADDR << 7) | (MDIO_BASE_CONTROL_REG << 2);
@@ -569,8 +573,6 @@ e100_reset_tranceiver(void)
 	for(bitCounter = 15; bitCounter >= 0 ; bitCounter--) {
 		e100_send_mdio_bit(GET_BIT(bitCounter, data));
 	}
-	
-	restore_flags(flags);
 }
 
 /* Called by upper layers if they decide it took too long to complete
@@ -858,9 +860,9 @@ e100_close(struct net_device *dev)
 
 	/* Flush the Tx and disable Rx here. */
 
-	free_irq(NETWORK_DMARX_IRQ, NULL);
-	free_irq(NETWORK_DMATX_IRQ, NULL);
-	free_irq(NETWORK_STATUS_IRQ, NULL);
+	free_irq(NETWORK_DMARX_IRQ, (void *)dev);
+	free_irq(NETWORK_DMATX_IRQ, (void *)dev);
+	free_irq(NETWORK_STATUS_IRQ, (void *)dev);
 
 	free_dma(0);
 	free_dma(1);
@@ -926,10 +928,21 @@ set_multicast_list(struct net_device *dev)
 		/* promiscuous mode */
 		lo_bits = 0xfffffffful;
 		hi_bits = 0xfffffffful;
+
+                /* Enable individual receive */
+		*R_NETWORK_REC_CONFIG =
+		  IO_STATE(R_NETWORK_REC_CONFIG, broadcast,  receive) |
+		  IO_STATE(R_NETWORK_REC_CONFIG, ma0,        enable) |
+		  IO_STATE(R_NETWORK_REC_CONFIG, individual, receive);
 	} else if (num_addr == 0) {
 		/* Normal, clear the mc list */
 		lo_bits = 0x00000000ul;
 		hi_bits = 0x00000000ul;
+
+                /* Disable individual receive */
+		*R_NETWORK_REC_CONFIG =
+		  IO_STATE(R_NETWORK_REC_CONFIG, broadcast,  receive) |
+		  IO_STATE(R_NETWORK_REC_CONFIG, ma0,        enable);
 	} else {
 		/* MC mode, receive normal and MC packets */
 		char hash_ix;
@@ -971,6 +984,10 @@ set_multicast_list(struct net_device *dev)
 			}
 			dmi = dmi->next;
 		}
+                /* Disable individual receive */
+		*R_NETWORK_REC_CONFIG =
+		  IO_STATE(R_NETWORK_REC_CONFIG, broadcast,  receive) |
+		  IO_STATE(R_NETWORK_REC_CONFIG, ma0,        enable);
 	}
 	*R_NETWORK_GA_0 = lo_bits;
 	*R_NETWORK_GA_1 = hi_bits;

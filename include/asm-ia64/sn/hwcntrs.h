@@ -73,7 +73,6 @@ typedef struct rcb_slot {
 } rcb_slot_t;
 
 #if defined(__KERNEL__)
-// #include <sys/immu.h>
 typedef struct sn0_refcnt_args_32 {
 	uint64_t    vaddr;
 	uint64_t    len;

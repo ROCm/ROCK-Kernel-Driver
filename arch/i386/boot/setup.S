@@ -18,7 +18,7 @@
  * March 1993/June 1994 (Christoph.Niemann@linux.org)
  *
  * add APM BIOS checking by Stephen Rothwell, May 1994
- * (Stephen.Rothwell@canb.auug.org.au)
+ * (sfr@canb.auug.org.au)
  *
  * High load stuff, initrd support and position independency
  * by Hans Lermen & Werner Almesberger, February 1996

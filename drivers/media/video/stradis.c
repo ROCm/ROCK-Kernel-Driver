@@ -54,8 +54,8 @@
 #include "cs8420.h"
 
 #define DEBUG(x) 		/* debug driver */
-#undef  IDEBUG(x) 		/* debug irq handler */
-#undef  MDEBUG(x) 		/* debug memory management */
+#undef  IDEBUG	 		/* debug irq handler */
+#undef  MDEBUG	 		/* debug memory management */
 
 #define SAA7146_MAX 6
 

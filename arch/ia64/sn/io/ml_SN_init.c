@@ -45,24 +45,7 @@ hubreg_t	region_mask = 0;
 
 extern xwidgetnum_t hub_widget_id(nasid_t);
 
-#ifndef CONFIG_IA64_SGI_IO
-#if defined (IP27)
-short		cputype = CPU_IP27;
-#elif defined (IP33)
-short		cputype = CPU_IP33;
-#elif defined (IP35)
-short		cputype = CPU_IP35;
-#else
-#error <BOMB! define new cputype here >
-#endif
-#endif /* CONFIG_IA64_SGI_IO */
-
 static int	fine_mode = 0;
-
-#ifndef CONFIG_IA64_SGI_IO
-/* Global variables */
-pdaindr_t	pdaindr[MAXCPUS];
-#endif
 
 static cnodemask_t	hub_init_mask;	/* Mask of cpu in a node doing init */
 static volatile cnodemask_t hub_init_done_mask;
@@ -101,7 +84,7 @@ mlreset(int slave)
 		master_nasid = get_nasid();
 		set_master_bridge_base();
 		FIXME("mlreset: Enable when we support ioc3 ..");
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 		if (get_console_nasid() == master_nasid) 
 			/* Set up the IOC3 */
 			ioc3_mlreset((ioc3_cfg_t *)KL_CONFIG_CH_CONS_INFO(master_nasid)->config_base,
@@ -113,7 +96,7 @@ mlreset(int slave)
 		nvram_baseinit();
 
 		fine_mode = is_fine_dirmode();
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 		/* We're the master processor */
 		master_procid = smp_processor_id();
@@ -125,7 +108,7 @@ mlreset(int slave)
 		 */
 		ASSERT_ALWAYS(master_nasid == get_nasid());
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 
 	/*
 	 * Activate when calias is implemented.
@@ -155,7 +138,7 @@ mlreset(int slave)
 				((HUB_PIO_MAP_TO_MEM << IIO_ITTE_IOSP_SHIFT) |
 				(0 << IIO_ITTE_WIDGET_SHIFT)));
 		}
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 		/* Set up the hub initialization mask and init the lock */
 		CNODEMASK_CLRALL(hub_init_mask);
@@ -169,7 +152,7 @@ mlreset(int slave)
 		/* Initialize Hub Pseudodriver Management */
 		hubdev_init();
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 		/*
 		 * Our IO system doesn't require cache writebacks.  Set some
 		 * variables appropriately.
@@ -192,7 +175,7 @@ mlreset(int slave)
                  * keep redundant PROM code in memory.
                  */
 		he_arcs_set_vectors();
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 	} else { /* slave != 0 */
 		/*
@@ -216,8 +199,10 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 
 	extern void router_map_init(nodepda_t *);
 	extern void router_queue_init(nodepda_t *,cnodeid_t);
+	extern void intr_init_vecblk(nodepda_t *, cnodeid_t, int);
+
 #if defined(DEBUG)
-	extern lock_t		intr_dev_targ_map_lock;
+	extern spinlock_t	intr_dev_targ_map_lock;
 	extern uint64_t 	intr_dev_targ_map_size;
 
 	/* Initialize the lock to access the device - target cpu mapping
@@ -229,7 +214,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 		 * There is always a cnode 0 present.
 		 */
 		intr_dev_targ_map_size = 0;
-		init_spinlock(&intr_dev_targ_map_lock,"dtmap_lock",0);
+		spin_lock_init(&intr_dev_targ_map_lock);
 	}
 #endif	/* DEBUG */
 	/* Allocate per-node platform-dependent data */
@@ -240,8 +225,6 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	hubinfo->h_nodepda = npda;
 	hubinfo->h_cnodeid = node;
 	hubinfo->h_nasid = COMPACT_TO_NASID_NODEID(node);
-
-	printk("init_platform_nodepda: hubinfo 0x%p, &hubinfo->h_crblock 0x%p\n", hubinfo, &hubinfo->h_crblock);
 
 	spin_lock_init(&hubinfo->h_crblock);
 
@@ -265,21 +248,18 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	for (sn=0; sn<NUM_SUBNODES; sn++) {
 		SNPDA(npda,sn)->prof_count = 0;
 		SNPDA(npda,sn)->next_prof_timeout = 0;
-// ajm
-#ifndef CONFIG_IA64_SGI_IO
 		intr_init_vecblk(npda, node, sn);
-#endif
 	}
 
 	npda->vector_unit_busy = 0;
 
 	spin_lock_init(&npda->vector_lock);
-	init_MUTEX_LOCKED(&npda->xbow_sema); /* init it locked? */
+	mutex_init_locked(&npda->xbow_sema); /* init it locked? */
 	spin_lock_init(&npda->fprom_lock);
 
 	spin_lock_init(&npda->node_utlbswitchlock);
 	npda->ni_error_print = 0;
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	if (need_utlbmiss_patch) {
 		npda->node_need_utlbmiss_patch = 1;
 		npda->node_utlbmiss_patched = 1;
@@ -299,7 +279,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 		npda->nasid_mask[nasid / 8] |= (1 << nasid % 8);
 	}
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	npda->node_first_cpu = get_cnode_cpu(node);
 #endif
 
@@ -324,7 +304,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	 * may not be guaranteed shared memory at that time
 	 * which precludes depending on a global dump stack
 	 */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	npda->dump_stack = (uint64_t *)kmem_zalloc_node(DUMP_STACK_SIZE,VM_NOSLEEP,
 							  node);
 	ASSERT_ALWAYS(npda->dump_stack);
@@ -334,7 +314,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	 * both the cpus on a node to proceed with nmi
 	 * handling.
 	 */
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	npda->dump_count = 0;
 
 	/* Setup the (module,slot) --> nic mapping for all the routers
@@ -356,7 +336,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 		npda->node_bte_info[i] = (bteinfo_t *)NULL;
 	}
 #endif
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 }
 
 /* XXX - Move the interrupt stuff to intr.c ? */
@@ -369,13 +349,15 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 void init_platform_pda(cpuid_t cpu)
 {
 	hub_intmasks_t *intmasks;
+#ifdef	LATER
 	cpuinfo_t cpuinfo;
+#endif
 	int i;
 	cnodeid_t	cnode;
 	synergy_da_t	*sda;
 	int	which_synergy;
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	/* Allocate per-cpu platform-dependent data */
 	cpuinfo = (cpuinfo_t)kmem_alloc_node(sizeof(struct cpuinfo_s), GFP_ATOMIC, cputocnode(cpu));
 	ASSERT_ALWAYS(cpuinfo);
@@ -390,7 +372,7 @@ void init_platform_pda(cpuid_t cpu)
 	// intmasks = &ppda->p_intmasks;
 	intmasks = &sda->s_intmasks;
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	ASSERT_ALWAYS(&ppda->p_nodepda);
 #endif
 
@@ -400,15 +382,15 @@ void init_platform_pda(cpuid_t cpu)
 
 	/* Set up pointer to the vector block in the nodepda. */
 	/* (Cant use SUBNODEPDA - not working yet) */
-	intmasks->dispatch0 = &Nodepdaindr[cnode]->snpda[cputosubnode(cpu)].intr_dispatch0;
-	intmasks->dispatch1 = &Nodepdaindr[cnode]->snpda[cputosubnode(cpu)].intr_dispatch1;
+	intmasks->dispatch0 = &Nodepdaindr[cnode]->snpda[cpuid_to_subnode(cpu)].intr_dispatch0;
+	intmasks->dispatch1 = &Nodepdaindr[cnode]->snpda[cpuid_to_subnode(cpu)].intr_dispatch1;
 
 	/* Clear INT_PEND1 masks. */
 	for (i = 0; i < N_INTPEND1_MASKS; i++)
 		intmasks->intpend1_masks[i] = 0;
 
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	/* Don't read the routers unless we're the master. */
 	ppda->p_routertick = 0;
 #endif
@@ -419,7 +401,7 @@ void init_platform_pda(cpuid_t cpu)
 #error "need protect_hub_calias, protect_nmi_handler_data"
 #endif
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 /*
  * For now, just protect the first page (exception handlers). We
  * may want to protect more stuff later.
@@ -433,13 +415,6 @@ protect_hub_calias(nasid_t nasid)
 	for (i = 0; i < MAX_REGIONS; i++) {
 		if (i == nasid_to_region(nasid))
 			continue;
-#ifndef BRINGUP
-		/* Protect the exception handlers. */
-		*(__psunsigned_t *)BDPRT_ENTRY(pa, i) = MD_PROT_NO;
-
-		/* Protect the ARCS SPB. */
-		*(__psunsigned_t *)BDPRT_ENTRY(pa + 4096, i) = MD_PROT_NO;
-#endif
 	}
 }
 
@@ -455,15 +430,12 @@ protect_nmi_handler_data(nasid_t nasid, int slice)
 	for (i = 0; i < MAX_REGIONS; i++) {
 		if (i == nasid_to_region(nasid))
 			continue;
-#ifndef BRINGUP
-		*(__psunsigned_t *)BDPRT_ENTRY(pa, i) = MD_PROT_NO;
-#endif
 	}
 }
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 
-#ifdef IRIX
+#ifdef LATER
 /*
  * Protect areas of memory that we access uncached by marking them as
  * poisoned so the T5 can't read them speculatively and erroneously
@@ -492,7 +464,7 @@ protect_low_memory(nasid_t nasid)
 				CACHE_ERR_AREA_SIZE, 1);
 #error "SN1 not handled correctly"
 }
-#endif	/* IRIX */
+#endif	/* LATER */
 
 /*
  * per_hub_init
@@ -509,15 +481,10 @@ per_hub_init(cnodeid_t cnode)
 	ii_icmr_u_t	ii_icmr;
 	ii_ibcr_u_t	ii_ibcr;
 #endif
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 	int i;
 #endif
 
-#ifdef SIMULATED_KLGRAPH
-	compact_to_nasid_node[0] = 0;
-	nasid_to_compact_node[0] = 0;
-	FIXME("per_hub_init: SIMULATED_KLCONFIG: compact_to_nasid_node[0] = 0\n");
-#endif /* SIMULATED_KLGRAPH */
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 	ASSERT(nasid != INVALID_NASID);
@@ -546,15 +513,26 @@ per_hub_init(cnodeid_t cnode)
 	if (!done) {
 		npdap = NODEPDA(cnode);
 
+#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+		/* initialize per-node synergy perf instrumentation */
+		npdap->synergy_perf_enabled = 0; /* off by default */
+		npdap->synergy_perf_lock = SPIN_LOCK_UNLOCKED;
+		npdap->synergy_perf_freq = SYNERGY_PERF_FREQ_DEFAULT;
+		npdap->synergy_inactive_intervals = 0;
+		npdap->synergy_active_intervals = 0;
+		npdap->synergy_perf_data = NULL;
+		npdap->synergy_perf_first = NULL;
+#endif /* CONFIG_IA64_SGI_SYNERGY_PERF */
+
 		npdap->hub_chip_rev = get_hub_chiprev(nasid);
 
-#ifndef CONFIG_IA64_SGI_IO
+#ifdef	LATER
 		for (i = 0; i < CPUS_PER_NODE; i++) {
 			cpu = cnode_slice_to_cpuid(cnode, i);
 			if (!cpu_enabled(cpu))
 			    SET_CPU_LEDS(nasid, i, 0xf);
 		}
-#endif /* CONFIG_IA64_SGI_IO */
+#endif /* LATER */
 
 #if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC) /* SN1 specific */
 
@@ -582,7 +560,6 @@ per_hub_init(cnodeid_t cnode)
 #endif /* SN0_HWDEBUG */
 
 
-#ifndef CONFIG_IA64_SGI_IO
 
 		/* Reserve all of the hardwired interrupt levels. */
 		intr_reserve_hardwired(cnode);
@@ -590,6 +567,7 @@ per_hub_init(cnodeid_t cnode)
 		/* Initialize error interrupts for this hub. */
 		hub_error_init(cnode);
 
+#ifdef LATER
 		/* Set up correctable memory/directory ECC error interrupt. */
 		install_eccintr(cnode);
 
@@ -599,7 +577,7 @@ per_hub_init(cnodeid_t cnode)
 		/* Enable RT clock interrupts */
 		hub_rtc_init(cnode);
 		hub_migrintr_init(cnode); /* Enable migration interrupt */
-#endif
+#endif	/* LATER */
 
 		spin_lock(&hub_mask_lock);
 		CNODEMASK_SETB(hub_init_done_mask, cnode);
@@ -609,9 +587,14 @@ per_hub_init(cnodeid_t cnode)
 		/*
 		 * Wait for the other CPU to complete the initialization.
 		 */
-		while (CNODEMASK_TSTB(hub_init_done_mask, cnode) == 0)
+		while (CNODEMASK_TSTB(hub_init_done_mask, cnode) == 0) {
+			/*
+			 * On SNIA64 we should never get here ..
+			 */
+			printk("WARNING: per_hub_init: Should NEVER get here!\n");
 			/* LOOP */
 			;
+		}
 	}
 }
 

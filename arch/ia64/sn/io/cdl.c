@@ -67,7 +67,7 @@ cdl_new(char *name, char *k1str, char *k2str)
 void
 cdl_del(cdl_p reg)
 {
-	printk("SGI IO INFRASTRUCTURE - cdl_del not supported.\n");
+	return;
 }
 
 /*
@@ -77,7 +77,7 @@ cdl_del(cdl_p reg)
   Do nothing.
  */
 int
-cdl_add_driver(cdl_p reg, int key1, int key2, char *prefix, int flags)
+cdl_add_driver(cdl_p reg, int key1, int key2, char *prefix, int flags, cdl_drv_f *func)
 {
     return 0;
 }
@@ -86,11 +86,9 @@ cdl_add_driver(cdl_p reg, int key1, int key2, char *prefix, int flags)
  * cdl_del_driver: Not supported.
  */
 void
-cdl_del_driver(cdl_p reg,
-	       char *prefix)
+cdl_del_driver(cdl_p reg, char *prefix, cdl_drv_f *func)
 {
-
-	printk("SGI IO INFRASTRUCTURE - cdl_del_driver not supported.\n");
+	return;
 }
 
 /*
@@ -106,7 +104,7 @@ cdl_del_driver(cdl_p reg,
  */
 int
 cdl_add_connpt(cdl_p reg, int part_num, int mfg_num, 
-	       devfs_handle_t connpt)
+	       devfs_handle_t connpt, int drv_flags)
 {
 	int i;
 	
@@ -123,27 +121,12 @@ cdl_add_connpt(cdl_p reg, int part_num, int mfg_num,
 			if (sgi_infrastructure_drivers[i].attach) {
 			    return(sgi_infrastructure_drivers[i].attach(connpt));
 			}
-#ifdef BRINGUP
-			/*
-			 * XXX HACK ALERT bypassing fops for now..
-			 */
-			else {
-			    printk("cdl_add_connpt: NEED FOPS FOR OUR DRIVERS!!\n");
-			    printk("cdl_add_connpt: part_num= 0x%x  mfg_num= 0x%x\n",
-				part_num, mfg_num);
-			    return(-1);
-			}
-#endif /* BRINGUP */
 		} else {
 			continue;
 		}
-
-		printk("**** cdl_add_connpt: driver not found for part_num %d mfg_num %d ****\n", part_num, mfg_num);
-
-		return(-1);
 	}	
-	if ( (i == MAX_SGI_IO_INFRA_DRVR) ) 
-		printk("**** cdl_add_connpt: Driver not found for part_num 0x%x mfg_num 0x%x ****\n", part_num, mfg_num);
+
+	/* printk("WARNING: cdl_add_connpt: Driver not found for part_num 0x%x mfg_num 0x%x\n", part_num, mfg_num); */
 
 	return (0);
 }
@@ -151,11 +134,11 @@ cdl_add_connpt(cdl_p reg, int part_num, int mfg_num,
 /*
  * cdl_del_connpt: Not implemented.
  */
-void
-cdl_del_connpt(cdl_p reg, int key1, int key2, devfs_handle_t connpt)
+int
+cdl_del_connpt(cdl_p reg, int key1, int key2, devfs_handle_t connpt, int drv_flags)
 {
 
-	printk("SGI IO INFRASTRUCTURE - cdl_del_cdl_del_connpt not supported.\n");
+	return(0);
 }
 
 /*
@@ -166,65 +149,54 @@ cdl_iterate(cdl_p reg,
 	    char *prefix,
 	    cdl_iter_f * func)
 {
-
-	printk("SGI IO INFRASTRUCTURE - cdl_iterate not supported.\n");
+	return;
 }
 
 async_attach_t 
 async_attach_new(void)
 {
 
-	printk("SGI IO INFRASTRUCTURE - async_attach_new not supported.\n");
 	return(0);
 }
 
 void 
 async_attach_free(async_attach_t aa)
 {
-	printk("SGI IO INFRASTRUCTURE - async_attach_free not supported.\n");
+	return;
 }
 
 async_attach_t 
 async_attach_get_info(devfs_handle_t vhdl)
 {
 
-	printk("SGI IO INFRASTRUCTURE - async_attach_get_info not supported.\n");
 	return(0);
 }
 
 void            
 async_attach_add_info(devfs_handle_t vhdl, async_attach_t aa)
 {
-	printk("SGI IO INFRASTRUCTURE - async_attach_add_info not supported.\n");
+	return;
 
 }
 
 void            
 async_attach_del_info(devfs_handle_t vhdl)
 {
-
-	printk("SGI IO INFRASTRUCTURE - async_attach_del_info not supported.\n");
-
+	return;
 }
 
 void async_attach_signal_start(async_attach_t aa)
 {
-
-	printk("SGI IO INFRASTRUCTURE - async_attach_signal_start not supported.\n");
-
+	return;
 }
 
 void async_attach_signal_done(async_attach_t aa)
 {
-
-	printk("SGI IO INFRASTRUCTURE - async_attach_signal_done not supported.\n");
-
+	return;
 }
 
 void async_attach_waitall(async_attach_t aa)
 {
-
-	printk("SGI IO INFRASTRUCTURE - async_attach_waitall not supported.\n");
-
+	return;
 }
 

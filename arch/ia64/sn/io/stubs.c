@@ -31,8 +31,6 @@ int default_intr_pri;
 int force_fire_and_forget;
 int ignore_conveyor_override;
 
-#define spinlock_init(x,name) mutex_init(x, MUTEX_DEFAULT, name);
-
 devfs_handle_t dummy_vrtx;	/* Needed for cpuid_to_vertex() in hack.h */
 
 
@@ -105,32 +103,6 @@ kmem_zone_init(register int size, char *zone_name)
 	return((zone_t *)0);
 }
 
-uint64_t
-rmalloc(struct map *mp, size_t size)
-{
-	FIXME("rmalloc : returns NULL");
-	return((uint64_t)0);
-}
-
-void
-rmfree(struct map *mp, size_t size, uint64_t a)
-{
-	FIXME("rmfree : no-op");
-}
-
-struct map *
-rmallocmap(uint64_t mapsiz)
-{
-	FIXME("rmallocmap : returns NULL");
-	return((struct map *)0);
-}
-
-void
-rmfreemap(struct map *mp)
-{
-	FIXME("rmfreemap : no-op");
-}
-
 int
 compare_and_swap_ptr(void **location, void *old_ptr, void *new_ptr)
 {
@@ -170,40 +142,6 @@ devfs_handle_t
 ioc3_console_vhdl_get(void)
 	{FIXME("ioc3_console_vhdl_get"); return( (devfs_handle_t)-1);}
 
-
-#if 0
-#define io_splock(l) 1
-#define io_spunlock(l,s)
-
-#define spinlock_destroy(a)     /* needed by pcibr_detach() */
-#define mutex_spinlock(a) 0
-#define mutex_spinunlock(a,b)
-#define mutex_init(a,b,c)               ;
-#define mutex_lock(a,b)                 ;
-#define mutex_unlock(a)                 ;
-#define dev_to_vhdl(dev) 0
-#define get_timestamp() 0
-#define us_delay(a)
-#define v_mapphys(a,b,c) 0
-#define splhi()  0
-#define splx(s)
-#define spinlock_init(x,name) mutex_init(x, MUTEX_DEFAULT, name);
-#endif /* 0 */
-
-int
-cap_able(uint64_t x)
-{
-	FIXME("cap_able : returns 1");
-	return(1);
-}
-
-int
-cap_able_cred(uint64_t a, uint64_t b)
-{
-	FIXME("cap_able_cred : returns 1");
-	return(1);
-}
-
 void
 nic_vmc_check(devfs_handle_t vhdl, char *nicinfo)
 {
@@ -236,21 +174,5 @@ vector_write_node(net_vec_t dest, nasid_t nasid,
               uint64_t value)
 {
 	FIXME("vector_write_node\n");
-	return(0);
-}
-
-int
-atomicAddInt(int *int_ptr, int value)
-{
-//	FIXME("atomicAddInt : simple add\n");
-	*int_ptr += value;
-	return(0);
-}
-
-int
-atomicClearInt(int *int_ptr, int value)
-{
-	FIXME("atomicClearInt : simple clear\n");
-	*int_ptr &= ~value;
 	return(0);
 }

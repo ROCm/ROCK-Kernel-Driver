@@ -9,7 +9,9 @@
 
 O_TARGET := tulip.o
 
-obj-y   := 21142.o eeprom.o interrupt.o media.o pnic.o timer.o tulip_core.o
+obj-y   := eeprom.o interrupt.o media.o \
+	   timer.o tulip_core.o		\
+	   21142.o pnic.o
 obj-m   := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make

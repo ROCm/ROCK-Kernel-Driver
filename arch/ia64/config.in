@@ -24,6 +24,10 @@ define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n
 define_bool CONFIG_SBUS n
 
+choice 'IA-64 processor type' \
+	"Itanium			CONFIG_ITANIUM \
+	 McKinley			CONFIG_MCKINLEY" Itanium
+
 choice 'IA-64 system type'					\
 	"generic		CONFIG_IA64_GENERIC		\
 	 DIG-compliant		CONFIG_IA64_DIG			\
@@ -36,24 +40,47 @@ choice 'Kernel page size'						\
 	 16KB			CONFIG_IA64_PAGE_SIZE_16KB		\
 	 64KB			CONFIG_IA64_PAGE_SIZE_64KB" 16KB
 
-if [ "$CONFIG_IA64_DIG" = "y" ]; then
-	define_bool CONFIG_ITANIUM y
+if [ "$CONFIG_ITANIUM" = "y" ]; then
 	define_bool CONFIG_IA64_BRL_EMU y
 	bool '  Enable Itanium A-step specific code' CONFIG_ITANIUM_ASTEP_SPECIFIC
 	bool '  Enable Itanium B-step specific code' CONFIG_ITANIUM_BSTEP_SPECIFIC
 	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
 	  bool '   Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
+        fi
+	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
 	  bool '   Enable Itanium B1-step specific code' CONFIG_ITANIUM_B1_SPECIFIC
+	fi
+	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
 	  bool '   Enable Itanium B2-step specific code' CONFIG_ITANIUM_B2_SPECIFIC
 	fi
 	bool '  Enable Itanium C-step specific code' CONFIG_ITANIUM_CSTEP_SPECIFIC
 	if [ "$CONFIG_ITANIUM_CSTEP_SPECIFIC" = "y" ]; then
 	  bool '   Enable Itanium C0-step specific code' CONFIG_ITANIUM_C0_SPECIFIC
 	fi
+	if [ "$CONFIG_ITANIUM_ASTEP_SPECIFIC" = "y" -o "$CONFIG_ITANIUM_B0_SPECIFIC" = "y" \
+	     -o "$CONFIG_ITANIUM_B1_SPECIFIC" = "y" -o "$CONFIG_ITANIUM_B2_SPECIFIC" = "y" ]; then
+	  define_bool CONFIG_ITANIUM_PTCG n
+	else
+	  define_bool CONFIG_ITANIUM_PTCG y
+	fi
+	if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
+	  define_int CONFIG_IA64_L1_CACHE_SHIFT 7 # align cache-sensitive data to 128 bytes
+	else
+	  define_int CONFIG_IA64_L1_CACHE_SHIFT 6 # align cache-sensitive data to 64 bytes
+	fi
+fi
+
+if [ "$CONFIG_MCKINLEY" = "y" ]; then
+	define_bool CONFIG_ITANIUM_PTCG y
+	define_int CONFIG_IA64_L1_CACHE_SHIFT 7
+	bool '  Enable McKinley A-step specific code' CONFIG_MCKINLEY_ASTEP_SPECIFIC
+	if [ "$CONFIG_MCKINLEY_ASTEP_SPECIFIC" = "y" ]; then
+	  bool '   Enable McKinley A0/A1-step specific code' CONFIG_MCKINLEY_A0_SPECIFIC
+	fi
+fi
+
+if [ "$CONFIG_IA64_DIG" = "y" ]; then
 	bool '  Force interrupt redirection' CONFIG_IA64_HAVE_IRQREDIR
-	bool '  Enable use of global TLB purge instruction (ptc.g)' CONFIG_ITANIUM_PTCG
-	bool '  Enable SoftSDV hacks' CONFIG_IA64_SOFTSDV_HACKS
-	bool '  Enable AzusA hacks' CONFIG_IA64_AZUSA_HACKS
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	bool '  Enable ACPI 2.0 with errata 1.3' CONFIG_ACPI20
 	bool '  ACPI kernel configuration manager (EXPERIMENTAL)' CONFIG_ACPI_KERNEL_CONFIG
@@ -65,11 +92,6 @@ if [ "$CONFIG_IA64_DIG" = "y" ]; then
 fi
 
 if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
-	bool '  Enable use of global TLB purge instruction (ptc.g)' CONFIG_ITANIUM_PTCG
-	bool '  Enable Itanium B-step specific code' CONFIG_ITANIUM_BSTEP_SPECIFIC
-	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
-	  bool '    Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
-	fi
 	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN1_SIM
 	define_bool CONFIG_DEVFS_DEBUG y
 	define_bool CONFIG_DEVFS_FS y
@@ -87,7 +109,8 @@ define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.
 
 bool 'SMP support' CONFIG_SMP
 bool 'Performance monitor support' CONFIG_PERFMON
-bool '/proc/pal support' CONFIG_IA64_PALINFO
+tristate '/proc/pal support' CONFIG_IA64_PALINFO
+tristate '/proc/efi support' CONFIG_IA64_EFIVARS
 
 bool 'Networking support' CONFIG_NET
 bool 'System V IPC' CONFIG_SYSVIPC
@@ -253,7 +276,6 @@ bool 'Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
 bool 'Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG
 bool 'Turn on irq debug checks (slow!)' CONFIG_IA64_DEBUG_IRQ
 bool 'Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
-bool 'Enable new unwind support' CONFIG_IA64_NEW_UNWIND
 bool 'Disable VHPT' CONFIG_DISABLE_VHPT
 
 endmenu

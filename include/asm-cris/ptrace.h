@@ -23,9 +23,8 @@
 #define PT_DCCR      17
 #define PT_SRP       18
 #define PT_IRP       19
-#define PT_MAX       19
-
-#define PT_USP       42    /* special case - USP is not in the pt_regs */
+#define PT_USP       20    /* special case - USP is not in the pt_regs */
+#define PT_MAX       20
 
 /* Frame types */
 

@@ -1,9 +1,9 @@
-/* $Id: setup.c,v 1.8 2001/01/16 16:31:38 bjornw Exp $
+/* $Id: setup.c,v 1.11 2001/03/02 15:52:03 bjornw Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Copyright (c) 2000  Axis Communications AB
+ *  Copyright (c) 2001  Axis Communications AB
  */
 
 /*
@@ -17,7 +17,7 @@
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/tty.h>
@@ -75,7 +75,8 @@ extern unsigned long romfs_start, romfs_length, romfs_in_flash; /* from head.S *
  *
  */
 
-void __init setup_arch(char **cmdline_p)
+void __init 
+setup_arch(char **cmdline_p)
 {
         unsigned long bootmap_size;
 	unsigned long start_pfn, max_pfn;
@@ -179,7 +180,7 @@ void __init setup_arch(char **cmdline_p)
 
 	/* give credit for the CRIS port */
 
-	printk("Linux/CRIS port on ETRAX 100LX (c) 2000 Axis Communications AB\n");
+	printk("Linux/CRIS port on ETRAX 100LX (c) 2001 Axis Communications AB\n");
 
 }
 
@@ -192,6 +193,7 @@ void __init setup_arch(char **cmdline_p)
 #define HAS_ATA		0x0020
 #define HAS_USB		0x0040
 #define HAS_IRQ_BUG	0x0080
+#define HAS_MMU_BUG     0x0100
 
 static struct cpu_info {
 	char *model;
@@ -214,7 +216,8 @@ static struct cpu_info {
 	{ "Simulator",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
 	{ "ETRAX 100",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_IRQ_BUG },
 	{ "ETRAX 100",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
-	{ "ETRAX 100LX",  8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU },
+	{ "ETRAX 100LX",  8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU | HAS_MMU_BUG },
+	{ "ETRAX 100LX v2",  8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU },
 	{ "Unknown",   0, 0 },
 };
 
@@ -241,6 +244,7 @@ int get_cpuinfo(char *buffer)
 		       "cache size\t: %d kB\n"
 		       "fpu\t\t: %s\n"
 		       "mmu\t\t: %s\n"
+		       "mmu DMA bug\t: %s\n"
 		       "ethernet\t: %s Mbps\n"
 		       "token ring\t: %s\n"
 		       "scsi\t\t: %s\n"
@@ -253,6 +257,7 @@ int get_cpuinfo(char *buffer)
 		       cpu_info[revision].cache,
 		       cpu_info[revision].flags & HAS_FPU ? "yes" : "no",
 		       cpu_info[revision].flags & HAS_MMU ? "yes" : "no",
+		       cpu_info[revision].flags & HAS_MMU_BUG ? "yes" : "no",
 		       cpu_info[revision].flags & HAS_ETHERNET100 ? "10/100" : "10",
 		       cpu_info[revision].flags & HAS_TOKENRING ? "4/16 Mbps" : "no",
 		       cpu_info[revision].flags & HAS_SCSI ? "yes" : "no",

@@ -114,7 +114,7 @@ snippet, this ends up being shorter.
 ~~~~~~~~~~~~~~~~~
 
 The time an event was generated is stored in ``js_event.time''. It's a time
-in miliseconds since ... well, since sometime in the past.  This eases the
+in milliseconds since ... well, since sometime in the past.  This eases the
 task of detecting double clicks, figuring out if movement of axis and button
 presses happened at the same time, and similar.
 

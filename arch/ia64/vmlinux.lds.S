@@ -5,10 +5,18 @@
 
 OUTPUT_FORMAT("elf64-ia64-little")
 OUTPUT_ARCH(ia64)
-ENTRY(_start)
+ENTRY(phys_start)
 SECTIONS
 {
+  /* Sections to be discarded */
+  /DISCARD/ : {
+	*(.text.exit)
+	*(.data.exit)
+	*(.exitcall.exit)
+	}
+
   v = PAGE_OFFSET;	/* this symbol is here to make debugging easier... */
+  phys_start = _start - PAGE_OFFSET;
 
   . = KERNEL_START;
 
@@ -16,11 +24,11 @@ SECTIONS
   _stext = .;
   .text : AT(ADDR(.text) - PAGE_OFFSET)
     {
-	*(__ivt_section)
+	*(.text.ivt)
 	/* these are not really text pages, but the zero page needs to be in a fixed location: */
 	*(__special_page_section)
 	__start_gate_section = .;
-	*(__gate_section)
+	*(.text.gate)
 	__stop_gate_section = .;
 	*(.text)
     }
@@ -34,7 +42,7 @@ SECTIONS
 
   /* Read-only data */
 
-  __gp = ALIGN(8) + 0x200000;
+  __gp = ALIGN(16) + 0x200000;	/* gp must be 16-byte aligned for exc. table */
 
   /* Global data */
   _data = .;
@@ -60,13 +68,19 @@ SECTIONS
 	{ *(__ksymtab) }
   __stop___ksymtab = .;
 
-  /* Unwind table */
+  __start___kallsyms = .;	/* All kernel symbols for debugging */
+  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
+	{ *(__kallsyms) }
+  __stop___kallsyms = .;
+
+  /* Unwind info & table: */
+  .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
+	{ *(.IA_64.unwind_info*) }
+  . = ALIGN(8);
   ia64_unw_start = .;
   .IA_64.unwind : AT(ADDR(.IA_64.unwind) - PAGE_OFFSET)
-	{ *(.IA_64.unwind) }
+	{ *(.IA_64.unwind*) }
   ia64_unw_end = .;
-  .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
-	{ *(.IA_64.unwind_info) }
 
   .rodata : AT(ADDR(.rodata) - PAGE_OFFSET)
 	{ *(.rodata) }
@@ -129,13 +143,6 @@ SECTIONS
 	{ *(.bss) *(COMMON) }
   . = ALIGN(64 / 8);
   _end = .;
-
-  /* Sections to be discarded */
-  /DISCARD/ : {
-	*(.text.exit)
-	*(.data.exit)
-	*(.exitcall.exit)
-	}
 
   /* Stabs debugging sections.  */
   .stab 0 : { *(.stab) }

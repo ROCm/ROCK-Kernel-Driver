@@ -1072,6 +1072,8 @@ rpciod(void *ptr)
 	current->pgrp = 1;
 	strcpy(current->comm, "rpciod");
 
+	current->flags |= PF_MEMALLOC;
+
 	dprintk("RPC: rpciod starting (pid %d)\n", rpciod_pid);
 	while (rpciod_users) {
 		if (signalled()) {

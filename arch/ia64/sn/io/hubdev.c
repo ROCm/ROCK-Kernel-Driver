@@ -31,7 +31,7 @@ hubdev_callout_t *hubdev_callout_list = NULL;
 void
 hubdev_init(void)
 {
-	mutex_init(&hubdev_callout_mutex, MUTEX_DEFAULT, "hubdev");
+	mutex_init(&hubdev_callout_mutex);
         hubdev_callout_list = NULL;
 }
         
@@ -45,9 +45,9 @@ hubdev_register(int (*attach_method)(devfs_handle_t))
         callout =  (hubdev_callout_t *)kmem_zalloc(sizeof(hubdev_callout_t), KM_SLEEP);
         ASSERT(callout);
         
-	mutex_lock(&hubdev_callout_mutex, PZERO);
+	mutex_lock(&hubdev_callout_mutex);
         /*
-         * Insert at the front of the list
+         * Insert at the end of the list
          */
         callout->fp = hubdev_callout_list;
         hubdev_callout_list = callout;
@@ -62,7 +62,7 @@ hubdev_unregister(int (*attach_method)(devfs_handle_t))
         
         ASSERT(attach_method);
    
-	mutex_lock(&hubdev_callout_mutex, PZERO);
+	mutex_lock(&hubdev_callout_mutex);
         /*
          * Remove registry element containing attach_method
          */
@@ -86,7 +86,7 @@ hubdev_docallouts(devfs_handle_t hub)
         hubdev_callout_t *p;
         int errcode;
 
-	mutex_lock(&hubdev_callout_mutex, PZERO);
+	mutex_lock(&hubdev_callout_mutex);
         
         for (p = hubdev_callout_list; p != NULL; p = p->fp) {
                 ASSERT(p->attach_method);

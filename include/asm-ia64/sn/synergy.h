@@ -2,6 +2,7 @@
 #define ASM_IA64_SN_SYNERGY_H
 
 #include "asm/io.h"
+#include "asm/sn/nodepda.h"
 #include "asm/sn/intr_public.h"
 
 
@@ -41,47 +42,52 @@
 #define WRITE_LOCAL_SYNERGY_REG(addr, value)	__synergy_out(addr, value)
 
 #define HUBREG_CAST             (volatile hubreg_t *)
-#define NODE_OFFSET(_n)         (UINT64_CAST (_n) << NODE_SIZE_BITS)
-#define SYN_UNCACHED_SPACE      0xc000000000000000
-#define NODE_HSPEC_BASE(_n)     (HSPEC_BASE + NODE_OFFSET(_n))
-#define NODE_LREG_BASE(_n)      (NODE_HSPEC_BASE(_n) + 0x30000000)
-#define RREG_BASE(_n)           (NODE_LREG_BASE(_n))
+#define HUB_L(_a)               *(_a)
+#define HUB_S(_a, _d)           *(_a) = (_d)
+
+#define HSPEC_SYNERGY0_0        0x04000000    /* Synergy0 Registers     */
+#define HSPEC_SYNERGY1_0        0x05000000    /* Synergy1 Registers     */
+#define HS_SYNERGY_STRIDE       (HSPEC_SYNERGY1_0 - HSPEC_SYNERGY0_0)
 #define REMOTE_HSPEC(_n, _x)    (HUBREG_CAST (RREG_BASE(_n) + (_x)))
-#define    HSPEC_SYNERGY0_0          0x04000000    /* Synergy0 Registers     */
-#define    HSPEC_SYNERGY1_0          0x05000000    /* Synergy1 Registers     */
-#define HS_SYNERGY_STRIDE               (HSPEC_SYNERGY1_0 - HSPEC_SYNERGY0_0)
+
+#define RREG_BASE(_n)           (NODE_LREG_BASE(_n))
+#define NODE_LREG_BASE(_n)      (NODE_HSPEC_BASE(_n) + 0x30000000)
+#define NODE_HSPEC_BASE(_n)     (HSPEC_BASE + NODE_OFFSET(_n))
+#ifndef HSPEC_BASE
+#define HSPEC_BASE              (SYN_UNCACHED_SPACE | HSPEC_BASE_SYN)
+#endif
+#define SYN_UNCACHED_SPACE      0xc000000000000000
+#define HSPEC_BASE_SYN          0x00000b0000000000
+#define NODE_OFFSET(_n)         (UINT64_CAST (_n) << NODE_SIZE_BITS)
+#define NODE_SIZE_BITS		33
 
 
-#define HUB_L(_a)                       *(_a)
-#define HUB_S(_a, _d)                   *(_a) = (_d)
-
+#define RSYN_REG_OFFSET(fsb, reg) (((fsb) ? HSPEC_SYNERGY1_0 : HSPEC_SYNERGY0_0) | (reg))
 
 #define REMOTE_SYNERGY_LOAD(nasid, fsb, reg)  __remote_synergy_in(nasid, fsb, reg)
 #define REMOTE_SYNERGY_STORE(nasid, fsb, reg, val) __remote_synergy_out(nasid, fsb, reg, val)
 
+extern inline uint64_t
+__remote_synergy_in(int nasid, int fsb, uint64_t reg) {
+	volatile uint64_t *addr;
+
+	addr = (uint64_t *)(RREG_BASE(nasid) + RSYN_REG_OFFSET(fsb, reg));
+	return (*addr);
+}
+
 extern inline void
-__remote_synergy_out(int nasid, int fsb, unsigned long reg, unsigned long val) {
-	unsigned long addr = ((RREG_BASE(nasid)) + 
-		((HSPEC_SYNERGY0_0 | (fsb)*HS_SYNERGY_STRIDE) | ((reg) << 2)));
+__remote_synergy_out(int nasid, int fsb, uint64_t reg, uint64_t value) {
+	volatile uint64_t *addr;
 
-	HUB_S((unsigned long *)(addr),      (val) >> 48);
-	HUB_S((unsigned long *)(addr+0x08), (val) >> 32);
-	HUB_S((unsigned long *)(addr+0x10), (val) >> 16);
-	HUB_S((unsigned long *)(addr+0x18), (val)      );
-	__ia64_mf_a();
+        addr = (uint64_t *)(RREG_BASE(nasid) + RSYN_REG_OFFSET(fsb, (reg<<2)));
+        *(addr+0) = value >> 48;
+        *(addr+1) = value >> 32;
+        *(addr+2) = value >> 16;
+        *(addr+3) = value;
+        __ia64_mf_a();
 }
 
-extern inline unsigned long
-__remote_synergy_in(int nasid, int fsb, unsigned long reg) {
-	volatile unsigned long *addr = (unsigned long *) ((RREG_BASE(nasid)) + 
-		((HSPEC_SYNERGY0_0 | (fsb)*HS_SYNERGY_STRIDE) | (reg)));
-	unsigned long ret;
-
-	ret = *addr;
-	__ia64_mf_a();
-	return ret;
-}
-
+/* XX this doesn't make a lot of sense. Which fsb?  */
 extern inline void
 __synergy_out(unsigned long addr, unsigned long value)
 {
@@ -94,6 +100,7 @@ __synergy_out(unsigned long addr, unsigned long value)
 
 #define READ_LOCAL_SYNERGY_REG(addr)	__synergy_in(addr)
 
+/* XX this doesn't make a lot of sense. Which fsb? */
 extern inline unsigned long
 __synergy_in(unsigned long addr)
 {
@@ -120,7 +127,39 @@ struct sn1_cnode_action_list {
 	spinlock_t action_list_lock;
 	struct sn1_intr_action *action_list;
 };
-	
+
+#if defined(CONFIG_IA64_SGI_SYNERGY_PERF)
+
+/* multiplex the counters every 10 timer interrupts */ 
+#define SYNERGY_PERF_FREQ_DEFAULT 10
+
+/* synergy perf control registers */
+#define PERF_CNTL0_A            0xab0UL /* control A on FSB0 */
+#define PERF_CNTL0_B            0xab8UL /* control B on FSB0 */
+#define PERF_CNTL1_A            0xac0UL /* control A on FSB1 */
+#define PERF_CNTL1_B            0xac8UL /* control B on FSB1 */
+
+/* synergy perf counters */
+#define PERF_CNTR0_A            0xad0UL /* counter A on FSB0 */
+#define PERF_CNTR0_B            0xad8UL /* counter B on FSB0 */
+#define PERF_CNTR1_A            0xaf0UL /* counter A on FSB1 */
+#define PERF_CNTR1_B            0xaf8UL /* counter B on FSB1 */
+
+/* Synergy perf data. Each nodepda keeps a list of these */
+struct synergy_perf_s {
+        uint64_t        intervals;      /* count of active intervals for this event */
+        uint64_t        modesel;        /* mode and sel bits, both A and B registers */
+        struct synergy_perf_s *next;	/* next in circular linked list */
+        uint64_t        counts[2];      /* [0] is synergy-A counter, [1] synergy-B counter */
+};
+
+typedef struct synergy_perf_s synergy_perf_t;
+
+extern void synergy_perf_init(void);
+extern void synergy_perf_update(int);
+
+#endif /* CONFIG_IA64_SGI_SYNERGY_PERF */
+
 
 /* Temporary defintions for testing: */
 

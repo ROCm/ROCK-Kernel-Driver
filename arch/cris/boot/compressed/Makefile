@@ -16,11 +16,14 @@ SYSTEM = $(TOPDIR)/vmlinux.bin
 
 all: vmlinuz
 
-vmlinuz: piggy.img $(OBJECTS)
-	$(LD) -mcriself -T decompress.ld -o decompress.o $(OBJECTS)
+decompress.bin: $(OBJECTS)
+	$(LD) -T decompress.ld -o decompress.o $(OBJECTS)
 	$(OBJCOPY) -O binary --remove-section=.bss decompress.o decompress.bin
 # save it for mkprod in the topdir.
 	cp decompress.bin $(TOPDIR)
+
+
+vmlinuz: piggy.img decompress.bin
 	cat decompress.bin piggy.img $(TOPDIR)/cramfs.img > vmlinuz
 	rm -f piggy.img
 

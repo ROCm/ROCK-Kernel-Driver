@@ -71,6 +71,7 @@ void			xtalk_dmamap_drain(xtalk_dmamap_t);
 void			xtalk_dmaaddr_drain(devfs_handle_t, iopaddr_t, size_t);
 void			xtalk_dmalist_drain(devfs_handle_t, alenlist_t);
 xtalk_intr_t            xtalk_intr_alloc(devfs_handle_t, device_desc_t, devfs_handle_t);
+xtalk_intr_t            xtalk_intr_alloc_nothd(devfs_handle_t, device_desc_t, devfs_handle_t);
 void                    xtalk_intr_free(xtalk_intr_t);
 int                     xtalk_intr_connect(xtalk_intr_t, intr_func_t, intr_arg_t, xtalk_intr_setfunc_t, void *, void *);
 void                    xtalk_intr_disconnect(xtalk_intr_t);
@@ -318,7 +319,7 @@ null_xtalk_early_piotrans_addr(xwidget_part_num_t part_num,
 			       unsigned flags)
 {
 #if DEBUG
-    cmn_err(CE_PANIC, "null_xtalk_early_piotrans_addr");
+    PRINT_PANIC("null_xtalk_early_piotrans_addr");
 #endif
     return NULL;
 }
@@ -439,6 +440,19 @@ xtalk_intr_alloc(devfs_handle_t dev,	/* which Crosstalk device */
 	(dev, dev_desc, owner_dev);
 }
 
+/*
+ * Allocate resources required for an interrupt as specified in dev_desc.
+ * Unconditionally setup resources to be non-threaded.
+ * Return resource handle in intr_hdl.
+ */
+xtalk_intr_t
+xtalk_intr_alloc_nothd(devfs_handle_t dev,	/* which Crosstalk device */
+		 	device_desc_t dev_desc,	/* device descriptor */
+		 	devfs_handle_t owner_dev)	/* owner of this interrupt */
+{
+    return (xtalk_intr_t) DEV_FUNC(dev, intr_alloc_nothd)
+	(dev, dev_desc, owner_dev);
+}
 
 /*
  * Free resources consumed by intr_alloc.
@@ -527,7 +541,11 @@ xtalk_error_handler(
     xwidget_info_t          xwidget_info;
 
 #if DEBUG && ERROR_DEBUG
-    cmn_err(CE_CONT, "%v: xtalk_error_handler\n", xconn);
+#ifdef SUPPORT_PRINTING_V_FORMAT
+    printk("%v: xtalk_error_handler\n", xconn);
+#else
+    printk("%x: xtalk_error_handler\n", xconn);
+#endif
 #endif
 
     xwidget_info = xwidget_info_get(xconn);
@@ -549,9 +567,13 @@ xtalk_error_handler(
 	(mode == MODE_DEVREENABLE))
 	return IOERROR_HANDLED;
 
-#ifdef IRIX
-    cmn_err(CE_WARN, "Xbow at %v encountered Fatal error", xconn);
+#ifdef	LATER
+#ifdef SUPPORT_PRINTING_V_FORMAT
+    PRINT_WARNING("Xbow at %v encountered Fatal error", xconn);
+#else
+    PRINT_WARNING("Xbow at %x encountered Fatal error", xconn);
 #endif
+#endif	/* LATER */
     ioerror_dump("xtalk", error_code, mode, ioerror);
 
     return IOERROR_UNHANDLED;
@@ -648,13 +670,6 @@ xtalk_intr_sfarg_get(xtalk_intr_t xtalk_intr)
     return (xtalk_intr->xi_sfarg);
 }
 
-
-int
-xtalk_intr_flags_get(xtalk_intr_t xtalk_intr)
-{
-	return(xtalk_intr->xi_flags);
-}
-
 /****** Generic crosstalk pio interfaces ******/
 devfs_handle_t
 xtalk_pio_dev_get(xtalk_piomap_t xtalk_piomap)
@@ -726,11 +741,15 @@ xwidget_info_get(devfs_handle_t xwidget)
     widget_info = (xwidget_info_t)
 	hwgraph_fastinfo_get(xwidget);
 
-#ifdef IRIX
+#ifdef	LATER
     if ((widget_info != NULL) &&
 	(widget_info->w_fingerprint != widget_info_fingerprint))
-	cmn_err(CE_PANIC, "%v bad xwidget_info", xwidget);
+#ifdef SUPPORT_PRINTING_V_FORMAT
+	PRINT_PANIC("%v bad xwidget_info", xwidget);
+#else
+	PRINT_PANIC("%x bad xwidget_info", xwidget);
 #endif
+#endif	/* LATER */
 
     return (widget_info);
 }
@@ -894,7 +913,7 @@ xwidget_driver_register(xwidget_part_num_t part_num,
 
     return cdl_add_driver(xtalk_registry,
 			  part_num, mfg_num,
-			  driver_prefix, flags);
+			  driver_prefix, flags, NULL);
 }
 
 /*
@@ -910,7 +929,7 @@ xwidget_driver_unregister(char *driver_prefix)
      */
     ASSERT(xtalk_registry != NULL);
 
-    cdl_del_driver(xtalk_registry, driver_prefix);
+    cdl_del_driver(xtalk_registry, driver_prefix, NULL);
 }
 
 /*
@@ -963,7 +982,6 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
      * long as we have it, we can use it elsewhere.
      */
     s = dev_to_name(widget,devnm,MAXDEVNAME);
-    printk("xwidget_register: dev_to_name widget id 0x%p, s = %s\n", widget, s);
     widget_info->w_name = kmalloc(strlen(s) + 1, GFP_KERNEL);
     strcpy(widget_info->w_name,s);
     
@@ -985,7 +1003,8 @@ xwidget_register(xwidget_hwid_t hwid,		/* widget's hardware ID */
     if (aa)
 	    async_attach_add_info(widget, aa);
 
-    return cdl_add_connpt(xtalk_registry, hwid->part_num, hwid->mfg_num, widget);
+    return cdl_add_connpt(xtalk_registry, hwid->part_num, hwid->mfg_num,
+                          widget, 0);
 }
 
 /*
@@ -1009,8 +1028,8 @@ xwidget_unregister(devfs_handle_t widget)
     
     hwid = &(widget_info->w_hwid);
 
-    cdl_del_connpt(xtalk_registry, hwid->part_num, 
-		   hwid->mfg_num, widget);
+    cdl_del_connpt(xtalk_registry, hwid->part_num, hwid->mfg_num,
+                   widget, 0);
 
     /* Clean out the xwidget information */
     (void)kfree(widget_info->w_name);
@@ -1051,7 +1070,7 @@ xwidget_gfx_reset(devfs_handle_t xwidget)
 
     xswitch_reset_link(xwidget);
     info = xwidget_info_get(xwidget);
-#ifdef IRIX
+#ifdef LATER
     ASSERT_ALWAYS(info != NULL);
 #endif
 
@@ -1083,26 +1102,7 @@ xwidget_name_get(devfs_handle_t xwidget_vhdl)
 	ASSERT(info != NULL);
 	return(xwidget_info_name_get(info));
 }
-/*
- * xtalk_device_powerup
- *	Reset and initialize the specified xtalk widget
- */
-int 
-xtalk_device_powerup(devfs_handle_t xbus_vhdl, xwidgetnum_t widget)
-{
-#ifndef CONFIG_IA64_SGI_IO
-	extern void	io_xswitch_widget_init(devfs_handle_t,
-					       devfs_handle_t,
-					       xwidgetnum_t,
-					       async_attach_t);
-	io_xswitch_widget_init(xbus_vhdl, 
-			       hwgraph_connectpt_get(xbus_vhdl),
-			       widget,
-			       NULL);
-#endif	/* CONFIG_IA64_SGI_IO */
-	
-	return(0);
-}
+
 /*
  * xtalk_device_shutdown
  *	Disable  the specified xtalk widget and clean out all the software

@@ -11,6 +11,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
@@ -50,14 +51,14 @@ static unsigned int *io_tlb_list;
 static unsigned int io_tlb_index;
 
 /*
- * We need to save away the original address corresponding to a mapped entry for the sync 
+ * We need to save away the original address corresponding to a mapped entry for the sync
  * operations.
  */
 static unsigned char **io_tlb_orig_addr;
 
 /*
  * Protect the above data structures in the map and unmap calls
- */ 
+ */
 static spinlock_t io_tlb_lock = SPIN_LOCK_UNLOCKED;
 
 static int __init
@@ -132,7 +133,7 @@ map_single (struct pci_dev *hwdev, char *buffer, size_t size, int direction)
 	{
 		wrap = index = ALIGN(io_tlb_index, stride);
 
-		if (index >= io_tlb_nslabs) 
+		if (index >= io_tlb_nslabs)
 			wrap = index = 0;
 
 		do {
@@ -164,12 +165,12 @@ map_single (struct pci_dev *hwdev, char *buffer, size_t size, int direction)
 		} while (index != wrap);
 
 		/*
-		 * XXX What is a suitable recovery mechanism here?  We cannot 
+		 * XXX What is a suitable recovery mechanism here?  We cannot
 		 * sleep because we are called from with in interrupts!
 		 */
 		panic("map_single: could not allocate software IO TLB (%ld bytes)", size);
-found:
 	}
+  found:
 	spin_unlock_irqrestore(&io_tlb_lock, flags);
 
 	/*
@@ -199,9 +200,9 @@ unmap_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 	 */
 	if ((direction == PCI_DMA_FROMDEVICE) || (direction == PCI_DMA_BIDIRECTIONAL))
 		/*
- 	 	 * bounce... copy the data back into the original buffer * and delete the
- 	 	 * bounce buffer.
- 	 	 */
+		 * bounce... copy the data back into the original buffer * and delete the
+		 * bounce buffer.
+		 */
 		memcpy(buffer, dma_addr, size);
 
 	/*
@@ -236,9 +237,9 @@ sync_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 	char *buffer = io_tlb_orig_addr[index];
 
 	/*
-  	 * bounce... copy the data back into/from the original buffer
+	 * bounce... copy the data back into/from the original buffer
 	 * XXX How do you handle PCI_DMA_BIDIRECTIONAL here ?
- 	 */
+	 */
 	if (direction == PCI_DMA_FROMDEVICE)
 		memcpy(buffer, dma_addr, size);
 	else if (direction == PCI_DMA_TODEVICE)
@@ -298,8 +299,8 @@ swiotlb_map_single (struct pci_dev *hwdev, void *ptr, size_t size, int direction
 		 */
 		return pci_addr;
 
-	/* 
-	 * get a bounce buffer: 
+	/*
+	 * get a bounce buffer:
 	 */
 	pci_addr = virt_to_phys(map_single(hwdev, ptr, size, direction));
 
@@ -325,12 +326,8 @@ mark_clean (void *addr, size_t size)
 	pg_addr = PAGE_ALIGN((unsigned long) addr);
 	end = (unsigned long) addr + size;
 	while (pg_addr + PAGE_SIZE <= end) {
-#if 0
-		set_bit(PG_arch_1, virt_to_page(pg_addr));
-#else
-		if (!VALID_PAGE(virt_to_page(pg_addr)))
-			printk("Invalid addr %lx!!!\n", pg_addr);
-#endif
+		struct page *page = virt_to_page(pg_addr);
+		set_bit(PG_arch_1, &page->flags);
 		pg_addr += PAGE_SIZE;
 	}
 }
@@ -454,3 +451,14 @@ swiotlb_dma_address (struct scatterlist *sg)
 {
 	return virt_to_phys(sg->address);
 }
+
+EXPORT_SYMBOL(swiotlb_init);
+EXPORT_SYMBOL(swiotlb_map_single);
+EXPORT_SYMBOL(swiotlb_unmap_single);
+EXPORT_SYMBOL(swiotlb_map_sg);
+EXPORT_SYMBOL(swiotlb_unmap_sg);
+EXPORT_SYMBOL(swiotlb_sync_single);
+EXPORT_SYMBOL(swiotlb_sync_sg);
+EXPORT_SYMBOL(swiotlb_dma_address);
+EXPORT_SYMBOL(swiotlb_alloc_consistent);
+EXPORT_SYMBOL(swiotlb_free_consistent);

@@ -13,6 +13,7 @@ HPATH           = $(TOPDIR)/include
 LIB     = ../../lib/lib.a
 
 OBJ=fpromasm.o main.o  fw-emu.o fpmem.o
+obj-y=fprom
 
 fprom: $(OBJ)
 	$(LD) -static -Tfprom.lds -o fprom $(OBJ) $(LIB)
