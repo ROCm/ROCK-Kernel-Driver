@@ -95,18 +95,36 @@
 #define VOODOO5_MAX_PIXCLOCK 350000.0
 
 static struct fb_fix_screeninfo tdfx_fix __initdata = {
-	"3Dfx", (unsigned long) NULL, 0, FB_TYPE_PACKED_PIXELS, 0,
-	FB_VISUAL_PSEUDOCOLOR, 0, 1, 1, 0, (unsigned long) NULL, 0,
-	FB_ACCEL_3DFX_BANSHEE
+	id:		"3Dfx",
+	type:		FB_TYPE_PACKED_PIXELS,
+	visual:		FB_VISUAL_PSEUDOCOLOR, 
+	ypanstep:	1,
+	ywrapstep:	1, 
+	accel:		FB_ACCEL_3DFX_BANSHEE
 };
 
 static struct fb_var_screeninfo tdfx_var __initdata = {
 	/* "640x480, 8 bpp @ 60 Hz */
-	640, 480, 640, 1024, 0, 0, 8, 0,
-	{0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-	0, FB_ACTIVATE_NOW, -1, -1, FB_ACCELF_TEXT,
-	39722, 40, 24, 32, 11, 96, 2,
-	0, FB_VMODE_NONINTERLACED
+	xres:		640,
+	yres:		480,
+	xres_virtual:	640,
+	yres_virtual:	1024,
+	bits_per_pixel:	8,
+	red:		{0, 8, 0},
+	blue:		{0, 8, 0},
+	green:		{0, 8, 0},
+	activate:	FB_ACTIVATE_NOW,
+	height:		-1,
+	width:		-1,
+	accel_flags:	FB_ACCELF_TEXT,
+	pixclock:	39722,
+	left_margin:	40,
+	right_margin:	24,
+	upper_margin:	32,
+	lower_margin:	11,
+	hsync_len:	96,
+	vsync_len:	2,
+	vmode:		FB_VMODE_NONINTERLACED
 };
 
 /*
@@ -927,7 +945,7 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 		srcfmt = 0x400000;
 	} else {
 		banshee_make_room(6 + ((size + 3) >> 2));
-		srcfmt = 0xBEEFDEAD;
+		srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
 	}	
 
 	tdfx_outl(SRCXY,     0);
@@ -1062,13 +1080,13 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->fbops		= &tdfxfb_ops;
 	info->fix		= tdfx_fix; 	
 	info->par		= &default_par;
+	info->disp		= (struct display *)(info + 1);	
 	info->pseudo_palette	= (void *)(info->disp + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
 	/* The below feilds will go away !!!! */
-	info->currcon		= -1;
 	strcpy(info->modename, info->fix.id);
-	info->disp		= (struct display *)(info + 1);	
+	info->currcon		= -1;
 	info->switch_con	= gen_switch;			 
 	info->updatevar		= gen_update_var;
 

@@ -68,12 +68,12 @@
 #endif
 
 #include <video/fbcon.h>
-#include <video/neo_reg.h>
+#include <video/neomagic.h>
 
 #define NEOFB_VERSION "0.3.3"
 
 struct neofb_par default_par;
- 
+
 /* --------------------------------------------------------------------- */
 
 static int disabled = 0;
@@ -516,112 +516,10 @@ static inline void neo2200_accel_init(struct fb_info *fb,
 	neo2200->pitch = (pitch << 16) | pitch;
 }
 
-static void
-neo2200_accel_bmove(struct display *p, int sy, int sx, int dy, int dx,
-		    int height, int width)
-{
-	struct fb_info *fb = (struct fb_info *) p->fb_info;
-	struct fb_var_screeninfo *var = &p->fb_info->var;
-	struct neofb_par *par = (struct neofb_par *) fb->par;
-	Neo2200 *neo2200 = par->neo2200;
-	u_long src, dst;
-	int bpp, pitch, inc_y;
-	u_int fh, fw;
-
-	/* setting blitting direction does not work, so this case is unaccelerated */
-	if (sx != dx) {
-		neo2200_wait_idle(par);
-		p->dispsw->bmove(p, sy, sx, dy, dx, height, width);
-		return;
-	}
-
-	bpp = (var->bits_per_pixel + 7) / 8;
-	pitch = var->xres_virtual * bpp;
-
-	fw = fontwidth(p);
-	sx *= fw * bpp;
-	dx *= fw * bpp;
-	width *= fw;
-
-	fh = fontheight(p);
-	sy *= fh;
-	dy *= fh;
-
-	if (sy > dy)
-		inc_y = fh;
-	else {
-		inc_y = -fh;
-		sy += (height - 1) * fh;
-		dy += (height - 1) * fh;
-	}
-
-	neo2200_wait_fifo(par, 1);
-
-	/* set blt control */
-	neo2200->bltCntl = NEO_BC3_FIFO_EN |
-	    NEO_BC3_SKIP_MAPPING | 0x0c0000;
-
-	/* looks silly, but setting the blitting direction did not work */
-	while (height--) {
-		src = sx + sy * pitch;
-		dst = dx + dy * pitch;
-
-		neo2200_wait_fifo(par, 3);
-
-		neo2200->srcStart = src;
-		neo2200->dstStart = dst;
-		neo2200->xyExt = (fh << 16) | (width & 0xffff);
-
-		sy += inc_y;
-		dy += inc_y;
-	}
-}
-
-static void
-neo2200_accel_clear(struct vc_data *conp, struct display *p, int sy,
-		    int sx, int height, int width)
-{
-	struct fb_info *fb = (struct fb_info *) p->fb_info;
-	struct fb_var_screeninfo *var = &p->fb_info->var;
-	struct neofb_par *par = (struct neofb_par *) fb->par;
-	Neo2200 *neo2200 = par->neo2200;
-	u_long dst;
-	u_int fw, fh;
-	u32 bgx = attr_bgcol_ec(p, conp);
-
-	fw = fontwidth(p);
-	fh = fontheight(p);
-
-	dst = sx * fw + sy * var->xres_virtual * fh;
-	width = width * fw;
-	height = height * fh;
-
-	neo2200_wait_fifo(par, 4);
-
-	/* set blt control */
-	neo2200->bltCntl = NEO_BC3_FIFO_EN |
-	    NEO_BC0_SRC_IS_FG | NEO_BC3_SKIP_MAPPING | 0x0c0000;
-
-	switch (var->bits_per_pixel) {
-	case 8:
-		neo2200->fgColor = bgx;
-		break;
-	case 16:
-		neo2200->fgColor =
-		    ((u16 *) (p->fb_info)->pseudo_palette)[bgx];
-		break;
-	}
-
-	neo2200->dstStart = dst * ((var->bits_per_pixel + 7) / 8);
-
-	neo2200->xyExt = (height << 16) | (width & 0xffff);
-}
-
-
 /* --------------------------------------------------------------------- */
 
-static int 
-neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info) 
+static int
+neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	unsigned int pixclock = var->pixclock;
@@ -715,7 +613,7 @@ neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->blue.offset = 0;
 		var->blue.length = 5;
 		break;
-	
+
 	case 24:		/* TRUECOLOUR, 16m */
 		var->transp.offset = 0;
 		var->transp.length = 0;
@@ -777,12 +675,11 @@ neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->yoffset = var->yres_virtual - var->yres;
 
 	if (var->bits_per_pixel >= 24 || !par->neo2200)
-		var->accel_flags &= ~FB_ACCELF_TEXT;	
+		var->accel_flags &= ~FB_ACCELF_TEXT;
 	return 0;
 }
 
-static int 
-neofb_set_par(struct fb_info *info)
+static int neofb_set_par(struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	struct xtimings timings;
@@ -790,7 +687,7 @@ neofb_set_par(struct fb_info *info)
 	int i, clock_hi = 0;
 	int lcd_stretch;
 	int hoffset, voffset;
-	
+
 	DBG("neofb_set_par");
 
 	neoUnlock();
@@ -811,7 +708,7 @@ neofb_set_par(struct fb_info *info)
 	timings.pixclock = PICOS2KHZ(info->var.pixclock);
 
 	if (timings.pixclock < 1)
-		timings.pixclock = 1;	
+		timings.pixclock = 1;
 
 	/*
 	 * This will allocate the datastructure and initialize all of the
@@ -1011,7 +908,8 @@ neofb_set_par(struct fb_info *info)
 	}
 
 	par->biosMode =
-	    neoFindMode(info->var.xres, info->var.yres, info->var.bits_per_pixel);
+	    neoFindMode(info->var.xres, info->var.yres,
+			info->var.bits_per_pixel);
 
 	/*
 	 * Calculate the VCLK that most closely matches the requested dot
@@ -1021,7 +919,7 @@ neofb_set_par(struct fb_info *info)
 
 	/* Since we program the clocks ourselves, always use VCLK3. */
 	par->MiscOutReg |= 0x0C;
-	
+
 	/* linear colormap for non palettized modes */
 	switch (info->var.bits_per_pixel) {
 	case 8:
@@ -1031,7 +929,7 @@ neofb_set_par(struct fb_info *info)
 	case 16:
 		/* DirectColor, 64k */
 		info->fix.visual = FB_VISUAL_DIRECTCOLOR;
-		
+
 		for (i = 0; i < 64; i++) {
 			outb(i, 0x3c8);
 
@@ -1046,7 +944,7 @@ neofb_set_par(struct fb_info *info)
 #endif
 		/* TrueColor, 16m */
 		info->fix.visual = FB_VISUAL_TRUECOLOR;
-		
+
 		for (i = 0; i < 256; i++) {
 			outb(i, 0x3c8);
 
@@ -1227,7 +1125,7 @@ neofb_set_par(struct fb_info *info)
 	neoLock();
 
 	info->fix.line_length =
-		info->var.xres_virtual * (info->var.bits_per_pixel >> 3);
+	    info->var.xres_virtual * (info->var.bits_per_pixel >> 3);
 
 	if (info->var.accel_flags & FB_ACCELF_TEXT)
 		neo2200_accel_init(info, &info->var);
@@ -1334,10 +1232,121 @@ static int neofb_blank(int blank, struct fb_info *fb)
 	return 0;
 }
 
+static void
+neo2200fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	struct neofb_par *par = (struct neofb_par *) info->par;
+	u_long dst, rop;
+
+	dst = rect->dx + rect->dy * info->var.xres_virtual;
+	rop = rect->rop ? 0x060000 : 0x0c0000;
+
+	neo2200_wait_fifo(par, 4);
+
+	/* set blt control */
+	par->neo2200->bltCntl = NEO_BC3_FIFO_EN |
+	    NEO_BC0_SRC_IS_FG | NEO_BC3_SKIP_MAPPING |
+	    //               NEO_BC3_DST_XY_ADDR  |
+	    //               NEO_BC3_SRC_XY_ADDR  |
+	    rop;
+
+	switch (info->var.bits_per_pixel) {
+	case 8:
+		par->neo2200->fgColor = rect->color;
+		break;
+	case 16:
+		par->neo2200->fgColor =
+		    ((u16 *) (info->pseudo_palette))[rect->color];
+		break;
+	}
+
+	par->neo2200->dstStart =
+	    dst * ((info->var.bits_per_pixel + 7) / 8);
+	par->neo2200->xyExt =
+	    (rect->height << 16) | (rect->width & 0xffff);
+}
+
+static void
+neo2200fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+	struct neofb_par *par = (struct neofb_par *) info->par;
+	u_long src, dst, bltCntl;
+
+	bltCntl = NEO_BC3_FIFO_EN | NEO_BC3_SKIP_MAPPING | 0x0C0000;
+
+	if (area->sy < area->dy) {
+		area->sy += (area->height - 1);
+		area->dy += (area->height - 1);
+
+		bltCntl |= NEO_BC0_DST_Y_DEC | NEO_BC0_SRC_Y_DEC;
+	}
+
+	if (area->sx < area->dx) {
+		area->sx += (area->width - 1);
+		area->dx += (area->width - 1);
+
+		bltCntl |= NEO_BC0_X_DEC;
+	}
+
+	src =
+	    area->sx * (info->var.bits_per_pixel >> 3) +
+	    area->sy * info->fix.line_length;
+	dst =
+	    area->dx * (info->var.bits_per_pixel >> 3) +
+	    area->dy * info->fix.line_length;
+
+	neo2200_wait_fifo(par, 4);
+
+	/* set blt control */
+	par->neo2200->bltCntl = bltCntl;
+
+	par->neo2200->srcStart = src;
+	par->neo2200->dstStart = dst;
+	par->neo2200->xyExt =
+	    (area->height << 16) | (area->width & 0xffff);
+}
+
+static void
+neo2200fb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	struct neofb_par *par = (struct neofb_par *) info->par;
+
+	neo2200_wait_idle(par);
+
+	switch (info->var.bits_per_pixel) {
+	case 8:
+		par->neo2200->fgColor = image->fg_color;
+		par->neo2200->bgColor = image->bg_color;
+		break;
+	case 16:
+		par->neo2200->fgColor =
+		    ((u16 *) (info->pseudo_palette))[image->fg_color];
+		par->neo2200->bgColor =
+		    ((u16 *) (info->pseudo_palette))[image->bg_color];
+		break;
+	}
+
+	par->neo2200->bltCntl = NEO_BC0_SYS_TO_VID |
+	    NEO_BC0_SRC_MONO | NEO_BC3_SKIP_MAPPING |
+	    //                      NEO_BC3_DST_XY_ADDR |
+	    0x0c0000;
+
+	par->neo2200->srcStart = 0;
+//      par->neo2200->dstStart = (image->dy << 16) | (image->dx & 0xffff);
+	par->neo2200->dstStart =
+	    ((image->dx & 0xffff) * (info->var.bits_per_pixel >> 3) +
+	     image->dy * info->fix.line_length);
+	par->neo2200->xyExt =
+	    (image->height << 16) | (image->width & 0xffff);
+
+	memcpy(par->mmio_vbase + 0x100000, image->data,
+	       (image->width * image->height) >> 3);
+}
+
 static struct fb_ops neofb_ops = {
 	owner:		THIS_MODULE,
 	fb_check_var:	neofb_check_var,
-	fb_set_par:	neofb_set_par,		
+	fb_set_par:	neofb_set_par,
 	fb_set_var:	gen_set_var,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
@@ -1348,7 +1357,7 @@ static struct fb_ops neofb_ops = {
 	fb_blank:	neofb_blank,
 	fb_fillrect:	cfb_fillrect,
 	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,		
+	fb_imageblit:	cfb_imageblit,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1429,10 +1438,11 @@ static struct fb_var_screeninfo __devinitdata neofb_var1280x1024x8 = {
 
 static struct fb_var_screeninfo *neofb_var = NULL;
 
-static int __devinit neo_map_mmio(struct fb_info *info, struct pci_dev *dev)
+static int __devinit neo_map_mmio(struct fb_info *info,
+				  struct pci_dev *dev)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
-	
+
 	DBG("neo_map_mmio");
 
 	info->fix.mmio_start = pci_resource_start(dev, 1);
@@ -1447,7 +1457,8 @@ static int __devinit neo_map_mmio(struct fb_info *info, struct pci_dev *dev)
 	par->mmio_vbase = ioremap(info->fix.mmio_start, MMIO_SIZE);
 	if (!par->mmio_vbase) {
 		printk("neofb: unable to map memory mapped IO\n");
-		release_mem_region(info->fix.mmio_start, info->fix.mmio_len);
+		release_mem_region(info->fix.mmio_start,
+				   info->fix.mmio_len);
 		return -ENOMEM;
 	} else
 		printk(KERN_INFO "neofb: mapped io at %p\n",
@@ -1458,22 +1469,23 @@ static int __devinit neo_map_mmio(struct fb_info *info, struct pci_dev *dev)
 static void __devinit neo_unmap_mmio(struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
-	
+
 	DBG("neo_unmap_mmio");
 
 	if (par->mmio_vbase) {
 		iounmap(par->mmio_vbase);
 		par->mmio_vbase = NULL;
 
-		release_mem_region(info->fix.mmio_start, info->fix.mmio_len);
+		release_mem_region(info->fix.mmio_start,
+				   info->fix.mmio_len);
 	}
 }
 
-static int __devinit neo_map_video(struct fb_info *info, struct pci_dev *dev, 
-				   int video_len)
+static int __devinit neo_map_video(struct fb_info *info,
+				   struct pci_dev *dev, int video_len)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
-	
+
 	DBG("neo_map_video");
 
 	info->fix.smem_start = pci_resource_start(dev, 0);
@@ -1485,10 +1497,12 @@ static int __devinit neo_map_video(struct fb_info *info, struct pci_dev *dev,
 		return -EBUSY;
 	}
 
-	info->screen_base = ioremap(info->fix.smem_start, info->fix.smem_len);
+	info->screen_base =
+	    ioremap(info->fix.smem_start, info->fix.smem_len);
 	if (!info->screen_base) {
 		printk("neofb: unable to map screen memory\n");
-		release_mem_region(info->fix.smem_start, info->fix.smem_len);
+		release_mem_region(info->fix.smem_start,
+				   info->fix.smem_len);
 		return -ENOMEM;
 	} else
 		printk(KERN_INFO "neofb: mapped framebuffer at %p\n",
@@ -1508,7 +1522,7 @@ static int __devinit neo_map_video(struct fb_info *info, struct pci_dev *dev,
 static void __devinit neo_unmap_video(struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
-	
+
 	DBG("neo_unmap_video");
 
 	if (info->screen_base) {
@@ -1520,7 +1534,8 @@ static void __devinit neo_unmap_video(struct fb_info *info)
 		iounmap(info->screen_base);
 		info->screen_base = NULL;
 
-		release_mem_region(info->fix.smem_start, info->fix.smem_len);
+		release_mem_region(info->fix.smem_start,
+				   info->fix.smem_len);
 	}
 }
 
@@ -1690,25 +1705,23 @@ static int __devinit neo_init_hw(struct fb_info *info)
 }
 
 
-static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev,
-						      const struct
-						      pci_device_id *id)
+static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const struct
+						   pci_device_id *id)
 {
 	struct fb_info *info;
 	struct neofb_par *par;
-	
+
 	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
 		       sizeof(u32) * 16, GFP_KERNEL);
 
 	if (!info)
 		return NULL;
 
-	memset(info, 0,
-	       sizeof(struct fb_info) + sizeof(struct display));
+	memset(info, 0, sizeof(struct fb_info) + sizeof(struct display));
 
 	par = &default_par;
 	memset(par, 0, sizeof(struct neofb_par));
-	
+
 	info->currcon = -1;
 	info->fix.accel = id->driver_data;
 
@@ -1840,8 +1853,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 	h_sync = 1953125000 / info->var.pixclock;
 	h_sync =
 	    h_sync * 512 / (info->var.xres + info->var.left_margin +
-			    info->var.right_margin +
-			    info->var.hsync_len);
+			    info->var.right_margin + info->var.hsync_len);
 	v_sync =
 	    h_sync / (info->var.yres + info->var.upper_margin +
 		      info->var.lower_margin + info->var.vsync_len);
@@ -1936,10 +1948,10 @@ static struct pci_device_id neofb_devices[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, neofb_devices);
 
 static struct pci_driver neofb_driver = {
-	name:		"neofb",
-	id_table:	neofb_devices,
-	probe:		neofb_probe,
-	remove:		__devexit_p(neofb_remove)
+	name:"neofb",
+	id_table:neofb_devices,
+	probe:neofb_probe,
+	remove:__devexit_p(neofb_remove)
 };
 
 /* **************************** init-time only **************************** */
