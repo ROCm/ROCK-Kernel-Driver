@@ -1,11 +1,9 @@
 /*
- * $Id: usbmouse.c,v 1.6 2000/08/14 21:05:26 vojtech Exp $
+ * $Id: usbmouse.c,v 1.15 2001/12/27 10:37:41 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  USB HIDBP Mouse support
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -24,8 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -35,23 +33,22 @@
 #include <linux/init.h>
 #include <linux/usb.h>
 
-#define	_HID_BOOT_PROTOCOL
-#include "hid.h"
-
 /*
  * Version Information
  */
 #define DRIVER_VERSION "v1.6"
-#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@suse.cz>"
+#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
 #define DRIVER_DESC "USB HID Boot Protocol mouse driver"
+#define DRIVER_LICENSE "GPL"
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE(DRIVER_LICENSE);
 
 struct usb_mouse {
 	signed char data[8];
 	char name[128];
+	char phys[64];
 	struct usb_device *usbdev;
 	struct input_dev dev;
 	struct urb *irq;
@@ -107,6 +104,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_mouse *mouse;
 	int pipe, maxp;
+	char path[64];
 	char *buf;
 
 	iface = &dev->actconfig->interface[ifnum];
@@ -120,8 +118,6 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
-
-	hid_set_idle(dev, interface->bInterfaceNumber, 0, 0);
 
 	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) return NULL;
 	memset(mouse, 0, sizeof(struct usb_mouse));
@@ -144,7 +140,11 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	mouse->dev.open = usb_mouse_open;
 	mouse->dev.close = usb_mouse_close;
 
+	usb_make_path(dev, path, 64);
+	sprintf(mouse->phys, "%s/input0", path);
+
 	mouse->dev.name = mouse->name;
+	mouse->dev.phys = mouse->phys;
 	mouse->dev.idbus = BUS_USB;
 	mouse->dev.idvendor = dev->descriptor.idVendor;
 	mouse->dev.idproduct = dev->descriptor.idProduct;
@@ -173,8 +173,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 
 	input_register_device(&mouse->dev);
 
-	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\n",
-		 mouse->dev.number, mouse->name, dev->bus->busnum, dev->devnum, ifnum);
+	printk(KERN_INFO "input: %s on %s\n", mouse->name, path);
 
 	return mouse;
 }

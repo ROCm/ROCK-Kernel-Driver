@@ -1,11 +1,9 @@
 /*
- * $Id: usbkbd.c,v 1.20 2001/04/26 08:34:49 vojtech Exp $
+ * $Id: usbkbd.c,v 1.27 2001/12/27 10:37:41 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  USB HIDBP Keyboard support
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -24,8 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  * 
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -35,19 +33,17 @@
 #include <linux/init.h>
 #include <linux/usb.h>
 
-#define	_HID_BOOT_PROTOCOL
-#include "hid.h"
-
 /*
  * Version Information
  */
 #define DRIVER_VERSION ""
-#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@suse.cz>"
+#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
 #define DRIVER_DESC "USB HID Boot Protocol keyboard driver"
+#define DRIVER_LICENSE "GPL"
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE(DRIVER_LICENSE);
 
 static unsigned char usb_kbd_keycode[256] = {
 	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -74,9 +70,10 @@ struct usb_kbd {
 	unsigned char new[8];
 	unsigned char old[8];
 	struct urb *irq, *led;
-	struct usb_ctrlrequest dr;
+	struct usb_ctrlrequest cr;
 	unsigned char leds, newleds;
 	char name[128];
+	char phys[64];
 	int open;
 };
 
@@ -129,7 +126,7 @@ int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, i
 
 	kbd->leds = kbd->newleds;
 	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led, GFP_KERNEL))
+	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
 		err("usb_submit_urb(leds) failed");
 
 	return 0;
@@ -147,7 +144,7 @@ static void usb_kbd_led(struct urb *urb)
 
 	kbd->leds = kbd->newleds;
 	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led, GFP_KERNEL))
+	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
 		err("usb_submit_urb(leds) failed");
 }
 
@@ -181,6 +178,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_kbd *kbd;
 	int i, pipe, maxp;
+	char path[64];
 	char *buf;
 
 	iface = &dev->actconfig->interface[ifnum];
@@ -194,9 +192,6 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
-
-	hid_set_protocol(dev, interface->bInterfaceNumber, 0);
-	hid_set_idle(dev, interface->bInterfaceNumber, 0, 0);
 
 	if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
 	memset(kbd, 0, sizeof(struct usb_kbd));
@@ -230,13 +225,17 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	FILL_INT_URB(kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
 		usb_kbd_irq, kbd, endpoint->bInterval);
 
-	kbd->dr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
-	kbd->dr.bRequest = HID_REQ_SET_REPORT;
-	kbd->dr.wValue = 0x200;
-	kbd->dr.wIndex = interface->bInterfaceNumber;
-	kbd->dr.wLength = 1;
+	kbd->cr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
+	kbd->cr.bRequest = 0x09;
+	kbd->cr.wValue = 0x200;
+	kbd->cr.wIndex = interface->bInterfaceNumber;
+	kbd->cr.wLength = 1;
+
+	usb_make_path(dev, path, 64);
+	sprintf(kbd->phys, "%s/input0", path);
 
 	kbd->dev.name = kbd->name;
+	kbd->dev.phys = kbd->phys;	
 	kbd->dev.idbus = BUS_USB;
 	kbd->dev.idvendor = dev->descriptor.idVendor;
 	kbd->dev.idproduct = dev->descriptor.idProduct;
@@ -261,12 +260,11 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	kfree(buf);
 
 	FILL_CONTROL_URB(kbd->led, dev, usb_sndctrlpipe(dev, 0),
-		(void*) &kbd->dr, &kbd->leds, 1, usb_kbd_led, kbd);
+		(void*) &kbd->cr, &kbd->leds, 1, usb_kbd_led, kbd);
 			
 	input_register_device(&kbd->dev);
 
-	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\n",
-		 kbd->dev.number, kbd->name, dev->bus->busnum, dev->devnum, ifnum);
+	printk(KERN_INFO "input: %s on %s\n", kbd->name, path);
 
 	return kbd;
 }

@@ -1,7 +1,7 @@
 /*
- * $Id: wacom.c,v 1.22 2001/04/26 11:26:09 vojtech Exp $
+ * $Id: wacom.c,v 1.28 2001/09/25 10:12:07 vojtech Exp $
  *
- *  Copyright (c) 2000-2001 Vojtech Pavlik	<vojtech@suse.cz>
+ *  Copyright (c) 2000-2001 Vojtech Pavlik	<vojtech@ucw.cz>
  *  Copyright (c) 2000 Andreas Bach Aaen	<abach@stofanet.dk>
  *  Copyright (c) 2000 Clifford Wolf		<clifford@clifford.at>
  *  Copyright (c) 2000 Sam Mosel		<sam.mosel@computer.org>
@@ -10,8 +10,6 @@
  *  Copyright (c) 2001 Frederic Lepied		<flepied@mandrakesoft.com>
  *
  *  USB Wacom Graphire and Wacom Intuos tablet support
- *
- *  Sponsored by SuSE
  *
  *  ChangeLog:
  *      v0.1 (vp)  - Initial release
@@ -57,8 +55,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/kernel.h>
@@ -72,12 +70,13 @@
  * Version Information
  */
 #define DRIVER_VERSION "v1.21"
-#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@suse.cz>"
+#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
 #define DRIVER_DESC "USB Wacom Graphire and Wacom Intuos tablet driver"
+#define DRIVER_LICENSE "GPL"
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_LICENSE(DRIVER_LICENSE);
 
 #define USB_VENDOR_ID_WACOM	0x056a
 
@@ -106,6 +105,7 @@ struct wacom {
 	int open;
 	int x, y;
 	__u32 serial[2];
+	char phys[32];
 };
 
 static void wacom_pl_irq(struct urb *urb)
@@ -354,6 +354,7 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 {
 	struct usb_endpoint_descriptor *endpoint;
 	struct wacom *wacom;
+	char path[64];
 
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL))) return NULL;
 	memset(wacom, 0, sizeof(struct wacom));
@@ -394,7 +395,11 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 	wacom->dev.open = wacom_open;
 	wacom->dev.close = wacom_close;
 
+	usb_make_path(dev, path, 64);
+	sprintf(wacom->phys, "%s/input0", path);
+
 	wacom->dev.name = wacom->features->name;
+	wacom->dev.phys = wacom->phys;
 	wacom->dev.idbus = BUS_USB;
 	wacom->dev.idvendor = dev->descriptor.idVendor;
 	wacom->dev.idproduct = dev->descriptor.idProduct;
@@ -408,8 +413,7 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	input_register_device(&wacom->dev);
 
-	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\n",
-		 wacom->dev.number, wacom->features->name, dev->bus->busnum, dev->devnum, ifnum);
+	printk(KERN_INFO "input: %s on %s\n", wacom->features->name, path);
 
 	return wacom;
 }
