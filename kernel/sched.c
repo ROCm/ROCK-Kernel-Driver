@@ -2809,6 +2809,8 @@ void __might_sleep(char *file, int line)
 		prev_jiffy = jiffies;
 		printk(KERN_ERR "Debug: sleeping function called from invalid"
 				" context at %s:%d\n", file, line);
+		printk("in_atomic():%d, irqs_disabled():%d\n",
+				in_atomic(), irqs_disabled());
 		dump_stack();
 	}
 #endif
