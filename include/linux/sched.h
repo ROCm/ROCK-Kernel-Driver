@@ -147,6 +147,7 @@ extern spinlock_t mmlist_lock;
 typedef struct task_struct task_t;
 
 extern void sched_init(void);
+extern void sched_init_smp(void);
 extern void init_idle(task_t *idle, int cpu);
 
 extern cpumask_t idle_cpu_mask;
@@ -542,6 +543,73 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
 #ifdef CONFIG_SMP
+#define SD_FLAG_NEWIDLE		1	/* Balance when about to become idle */
+#define SD_FLAG_EXEC		2	/* Balance on exec */
+#define SD_FLAG_WAKE		4	/* Balance on task wakeup */
+#define SD_FLAG_FASTMIGRATE	8	/* Sync wakes put task on waking CPU */
+#define SD_FLAG_IDLE		16	/* Should not have all CPUs idle */
+
+struct sched_group {
+	struct sched_group *next;	/* Must be a circular list */
+	cpumask_t cpumask;
+};
+
+struct sched_domain {
+	/* These fields must be setup */
+	struct sched_domain *parent;	/* top domain must be null terminated */
+	struct sched_group *groups;	/* the balancing groups of the domain */
+	cpumask_t span;			/* span of all CPUs in this domain */
+	unsigned long min_interval;	/* Minimum balance interval ms */
+	unsigned long max_interval;	/* Maximum balance interval ms */
+	unsigned int busy_factor;	/* less balancing by factor if busy */
+	unsigned int imbalance_pct;	/* No balance until over watermark */
+	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
+	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
+	int flags;			/* See SD_FLAG_* */
+
+	/* Runtime fields. */
+	unsigned int balance_interval;	/* initialise to 1. units in ms. */
+	unsigned int nr_balance_failed; /* initialise to 0 */
+};
+
+/* Common values for CPUs */
+#define SD_CPU_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 1,			\
+	.max_interval		= 4,			\
+	.busy_factor		= 64,			\
+	.imbalance_pct		= 125,			\
+	.cache_hot_time		= (5*1000000/2),	\
+	.cache_nice_tries	= 1,			\
+	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE,\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+
+#ifdef CONFIG_NUMA
+/* Common values for NUMA nodes */
+#define SD_NODE_INIT (struct sched_domain) {		\
+	.span			= CPU_MASK_NONE,	\
+	.parent			= NULL,			\
+	.groups			= NULL,			\
+	.min_interval		= 8,			\
+	.max_interval		= 256*fls(num_online_cpus()),\
+	.busy_factor		= 8,			\
+	.imbalance_pct		= 125,			\
+	.cache_hot_time		= (10*1000000),		\
+	.cache_nice_tries	= 1,			\
+	.flags			= SD_FLAG_EXEC,		\
+	.balance_interval	= 1,			\
+	.nr_balance_failed	= 0,			\
+}
+#endif
+
+DECLARE_PER_CPU(struct sched_domain, base_domains);
+#define cpu_sched_domain(cpu)	(&per_cpu(base_domains, (cpu)))
+#define this_sched_domain()	(&__get_cpu_var(base_domains))
+
 extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
 static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
@@ -554,10 +622,8 @@ extern unsigned long long sched_clock(void);
 
 #ifdef CONFIG_NUMA
 extern void sched_balance_exec(void);
-extern void node_nr_running_init(void);
 #else
 #define sched_balance_exec()   {}
-#define node_nr_running_init() {}
 #endif
 
 /* Move tasks off this (offline) CPU onto another. */

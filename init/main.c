@@ -567,7 +567,6 @@ static void do_pre_smp_initcalls(void)
 
 	migration_init();
 #endif
-	node_nr_running_init();
 	spawn_ksoftirqd();
 }
 
@@ -596,6 +595,7 @@ static int init(void * unused)
 	do_pre_smp_initcalls();
 
 	smp_init();
+	sched_init_smp();
 
 	/*
 	 * Do this before initcalls, because some drivers want to access

@@ -15,6 +15,7 @@
  *		and per-CPU runqueues.  Cleanups and useful suggestions
  *		by Davide Libenzi, preemptible kernel bits by Robert Love.
  *  2003-09-03	Interactivity tuning by Con Kolivas.
+ *  2004-04-02	Scheduler domains code by Nick Piggin
  */
 
 #include <linux/mm.h>
@@ -91,7 +92,6 @@
 #define MAX_SLEEP_AVG		(AVG_TIMESLICE * MAX_BONUS)
 #define STARVATION_LIMIT	(MAX_SLEEP_AVG)
 #define NS_MAX_SLEEP_AVG	(JIFFIES_TO_NS(MAX_SLEEP_AVG))
-#define NODE_THRESHOLD		125
 #define CREDIT_LIMIT		100
 
 /*
@@ -187,10 +187,13 @@ static inline unsigned int task_timeslice(task_t *p)
 typedef struct runqueue runqueue_t;
 
 struct prio_array {
-	int nr_active;
+	unsigned int nr_active;
 	unsigned long bitmap[BITMAP_SIZE];
 	struct list_head queue[MAX_PRIO];
 };
+
+#define SCHED_LOAD_SHIFT 7	/* increase resolution of load calculations */
+#define SCHED_LOAD_SCALE (1 << SCHED_LOAD_SHIFT)
 
 /*
  * This is the main, per-CPU runqueue data structure.
@@ -202,23 +205,32 @@ struct prio_array {
 struct runqueue {
 	spinlock_t lock;
 	unsigned long long nr_switches;
-	unsigned long nr_running, expired_timestamp, nr_uninterruptible,
-		timestamp_last_tick;
+	unsigned long nr_running, expired_timestamp, nr_uninterruptible;
+	unsigned long long timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
-	int best_expired_prio, prev_cpu_load[NR_CPUS];
-#ifdef CONFIG_NUMA
-	atomic_t *node_nr_running;
-	int prev_node_load[MAX_NUMNODES];
-#endif
-	task_t *migration_thread;
-	struct list_head migration_queue;
+	int best_expired_prio;
 
 	atomic_t nr_iowait;
+
+#ifdef CONFIG_SMP
+	unsigned long cpu_load[NR_CPUS];
+#endif
+	/* For active balancing */
+	int active_balance;
+	int push_cpu;
+
+	task_t *migration_thread;
+	struct list_head migration_queue;
 };
 
 static DEFINE_PER_CPU(struct runqueue, runqueues);
+
+#ifdef CONFIG_SMP
+/* Mandatory scheduling domains */
+DEFINE_PER_CPU(struct sched_domain, base_domains);
+#endif
 
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
 #define this_rq()		(&__get_cpu_var(runqueues))
@@ -241,50 +253,15 @@ const unsigned long scheduling_functions_end_here =
 # define task_running(rq, p)		((rq)->curr == (p))
 #endif
 
-#ifdef CONFIG_NUMA
-
-/*
- * Keep track of running tasks.
- */
-
-static atomic_t node_nr_running[MAX_NUMNODES] ____cacheline_maxaligned_in_smp =
-	{[0 ...MAX_NUMNODES-1] = ATOMIC_INIT(0)};
-
-static inline void nr_running_init(struct runqueue *rq)
-{
-	rq->node_nr_running = &node_nr_running[0];
-}
-
 static inline void nr_running_inc(runqueue_t *rq)
 {
-	atomic_inc(rq->node_nr_running);
 	rq->nr_running++;
 }
 
 static inline void nr_running_dec(runqueue_t *rq)
 {
-	atomic_dec(rq->node_nr_running);
 	rq->nr_running--;
 }
-
-__init void node_nr_running_init(void)
-{
-	int i;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			cpu_rq(i)->node_nr_running =
-				&node_nr_running[cpu_to_node(i)];
-	}
-}
-
-#else /* !CONFIG_NUMA */
-
-# define nr_running_init(rq)	do { } while (0)
-# define nr_running_inc(rq)	do { (rq)->nr_running++; } while (0)
-# define nr_running_dec(rq)	do { (rq)->nr_running--; } while (0)
-
-#endif /* CONFIG_NUMA */
 
 /*
  * task_rq_lock - lock the runqueue a given task resides on and disable
@@ -637,7 +614,77 @@ void kick_process(task_t *p)
 }
 
 EXPORT_SYMBOL_GPL(kick_process);
+/*
+ * Return a low guess at the load of cpu. Update previous history if update
+ * is true
+ */
+static inline unsigned long get_low_cpu_load(int cpu, int update)
+{
+	runqueue_t *rq = cpu_rq(cpu);
+	runqueue_t *this_rq = this_rq();
+	unsigned long nr = rq->nr_running << SCHED_LOAD_SHIFT;
+	unsigned long load = this_rq->cpu_load[cpu];
+	unsigned long ret = min(nr, load);
 
+	if (update)
+		this_rq->cpu_load[cpu] = (nr + load) / 2;
+
+	return ret;
+}
+
+static inline unsigned long get_high_cpu_load(int cpu, int update)
+{
+	runqueue_t *rq = cpu_rq(cpu);
+	runqueue_t *this_rq = this_rq();
+	unsigned long nr = rq->nr_running << SCHED_LOAD_SHIFT;
+	unsigned long load = this_rq->cpu_load[cpu];
+	unsigned long ret = max(nr, load);
+
+	if (update)
+		this_rq->cpu_load[cpu] = (nr + load) / 2;
+
+	return ret;
+}
+
+#endif
+
+/*
+ * sched_balance_wake can be used with SMT architectures to wake a
+ * task onto an idle sibling if cpu is not idle. Returns cpu if
+ * cpu is idle or no siblings are idle, otherwise returns an idle
+ * sibling.
+ */
+#if defined(CONFIG_SMP) && defined(ARCH_HAS_SCHED_WAKE_BALANCE)
+static int sched_balance_wake(int cpu, task_t *p)
+{
+	struct sched_domain *domain;
+	int i;
+
+	if (idle_cpu(cpu))
+		return cpu;
+
+	domain = cpu_sched_domain(cpu);
+	if (!(domain->flags & SD_FLAG_WAKE))
+		return cpu;
+
+	for_each_cpu_mask(i, domain->span) {
+		if (!cpu_online(i))
+			continue;
+
+		if (!cpu_isset(i, p->cpus_allowed))
+			continue;
+
+		if (idle_cpu(i))
+			return i;
+	}
+
+	return cpu;
+}
+#else
+static inline int sched_balance_wake(int cpu, task_t *p)
+{
+	return cpu;
+}
 #endif
 
 /***
@@ -660,44 +707,106 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	int success = 0;
 	long old_state;
 	runqueue_t *rq;
+	int cpu, this_cpu;
+#ifdef CONFIG_SMP
+	unsigned long long now;
+	unsigned long load, this_load;
+	int new_cpu;
+	struct sched_domain *sd;
+#endif
 
-repeat_lock_task:
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
-	if (old_state & state) {
-		if (!p->array) {
-			/*
-			 * Fast-migrate the task if it's not running or runnable
-			 * currently. Do not violate hard affinity.
-			 */
-			if (unlikely(sync && !task_running(rq, p) &&
-				(task_cpu(p) != smp_processor_id()) &&
-					cpu_isset(smp_processor_id(),
-							p->cpus_allowed) &&
-					!cpu_is_offline(smp_processor_id()))) {
-				set_task_cpu(p, smp_processor_id());
-				task_rq_unlock(rq, &flags);
-				goto repeat_lock_task;
-			}
-			if (old_state == TASK_UNINTERRUPTIBLE) {
-				rq->nr_uninterruptible--;
-				/*
-				 * Tasks on involuntary sleep don't earn
-				 * sleep_avg beyond just interactive state.
-				 */
-				p->activated = -1;
-			}
-			if (sync && (task_cpu(p) == smp_processor_id()))
-				__activate_task(p, rq);
-			else {
-				activate_task(p, rq);
-				if (TASK_PREEMPTS_CURR(p, rq))
-					resched_task(rq->curr);
-			}
-			success = 1;
-		}
-		p->state = TASK_RUNNING;
+	if (!(old_state & state))
+		goto out;
+
+	if (p->array)
+		goto out_running;
+
+	this_cpu = smp_processor_id();
+	cpu = task_cpu(p);
+
+#ifdef CONFIG_SMP
+	if (cpu == this_cpu || unlikely(cpu_is_offline(this_cpu)))
+		goto out_activate;
+
+	if (unlikely(!cpu_isset(this_cpu, p->cpus_allowed)
+				|| task_running(rq, p)))
+		goto out_activate;
+
+	/* Passive load balancing */
+	load = get_low_cpu_load(cpu, 1);
+	this_load = get_high_cpu_load(this_cpu, 1);
+	if (load > this_load) {
+		new_cpu = sched_balance_wake(this_cpu, p);
+		set_task_cpu(p, new_cpu);
+		goto repeat_lock_task;
 	}
+
+	now = sched_clock();
+	sd = cpu_sched_domain(this_cpu);
+
+	/*
+	 * Fast-migrate the task if it's not running or
+	 * runnable currently. Do not violate hard affinity.
+	 */
+	do {
+		if (!(sd->flags & SD_FLAG_FASTMIGRATE))
+			break;
+		if (now - p->timestamp < sd->cache_hot_time)
+			break;
+
+		if (cpu_isset(cpu, sd->span)) {
+			new_cpu = sched_balance_wake(this_cpu, p);
+			set_task_cpu(p, new_cpu);
+			goto repeat_lock_task;
+		}
+		sd = sd->parent;
+	} while (sd);
+
+	new_cpu = sched_balance_wake(cpu, p);
+	if (new_cpu != cpu) {
+		set_task_cpu(p, new_cpu);
+		goto repeat_lock_task;
+	}
+	goto out_activate;
+
+repeat_lock_task:
+	task_rq_unlock(rq, &flags);
+	rq = task_rq_lock(p, &flags);
+	old_state = p->state;
+	if (!(old_state & state))
+		goto out;
+
+	if (p->array)
+		goto out_running;
+
+	this_cpu = smp_processor_id();
+	cpu = task_cpu(p);
+
+out_activate:
+#endif /* CONFIG_SMP */
+	if (old_state == TASK_UNINTERRUPTIBLE) {
+		rq->nr_uninterruptible--;
+		/*
+		 * Tasks on involuntary sleep don't earn
+		 * sleep_avg beyond just interactive state.
+		 */
+		p->activated = -1;
+	}
+
+	if (sync && cpu == this_cpu) {
+		__activate_task(p, rq);
+	} else {
+		activate_task(p, rq);
+		if (TASK_PREEMPTS_CURR(p, rq))
+			resched_task(rq->curr);
+	}
+	success = 1;
+
+out_running:
+	p->state = TASK_RUNNING;
+out:
 	task_rq_unlock(rq, &flags);
 
 	return success;
@@ -756,8 +865,8 @@ void fastcall sched_fork(task_t *p)
 	p->timestamp = sched_clock();
 	if (!current->time_slice) {
 		/*
-	 	 * This case is rare, it happens when the parent has only
-	 	 * a single jiffy left from its timeslice. Taking the
+		 * This case is rare, it happens when the parent has only
+		 * a single jiffy left from its timeslice. Taking the
 		 * runqueue lock is not a problem.
 		 */
 		current->time_slice = 1;
@@ -873,7 +982,7 @@ static inline void finish_task_switch(task_t *prev)
 	 * still held, otherwise prev could be scheduled on another cpu, die
 	 * there before we look at prev->state, and then the reference would
 	 * be dropped twice.
-	 * 		Manfred Spraul <manfred@colorfullife.com>
+	 *		Manfred Spraul <manfred@colorfullife.com>
 	 */
 	prev_task_flags = prev->flags;
 	finish_arch_switch(rq, prev);
@@ -1005,6 +1114,14 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 		spin_unlock(&rq2->lock);
 }
 
+enum idle_type
+{
+	IDLE,
+	NOT_IDLE,
+	NEWLY_IDLE,
+};
+
+#ifdef CONFIG_SMP
 #ifdef CONFIG_NUMA
 /*
  * If dest_cpu is allowed for this process, migrate the task to it.
@@ -1050,215 +1167,79 @@ out:
  * Find the least loaded CPU.  Slightly favor the current CPU by
  * setting its runqueue length as the minimum to start.
  */
-static int sched_best_cpu(struct task_struct *p)
+static int sched_best_cpu(struct task_struct *p, struct sched_domain *domain)
 {
-	int i, minload, load, best_cpu, node = 0;
-	cpumask_t cpumask;
+	int i, min_load, this_cpu, best_cpu;
 
-	best_cpu = task_cpu(p);
-	if (cpu_rq(best_cpu)->nr_running <= 2)
-		return best_cpu;
+	best_cpu = this_cpu = task_cpu(p);
+	min_load = INT_MAX;
 
-	minload = 10000000;
-	for_each_node_with_cpus(i) {
-		/*
-		 * Node load is always divided by nr_cpus_node to normalise
-		 * load values in case cpu count differs from node to node.
-		 * We first multiply node_nr_running by 10 to get a little
-		 * better resolution.
-		 */
-		load = 10 * atomic_read(&node_nr_running[i]) / nr_cpus_node(i);
-		if (load < minload) {
-			minload = load;
-			node = i;
-		}
-	}
-
-	minload = 10000000;
-	cpumask = node_to_cpumask(node);
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_isset(i, cpumask))
+	for (i = 0; i < NR_CPUS; i++) {
+		unsigned long load;
+		if (!cpu_isset(i, domain->span))
 			continue;
-		if (cpu_rq(i)->nr_running < minload) {
+
+		if (i == this_cpu)
+			load = get_low_cpu_load(i, 0);
+		else
+			load = get_high_cpu_load(i, 0) + SCHED_LOAD_SCALE;
+
+		if (min_load > load) {
 			best_cpu = i;
-			minload = cpu_rq(i)->nr_running;
+			min_load = load;
 		}
+
 	}
 	return best_cpu;
 }
 
 void sched_balance_exec(void)
 {
+	struct sched_domain *domain = this_sched_domain();
 	int new_cpu;
+	int this_cpu = smp_processor_id();
+	if (numnodes == 1)
+		return;
 
-	if (numnodes > 1) {
-		new_cpu = sched_best_cpu(current);
-		if (new_cpu != smp_processor_id())
+	while (domain->parent && !(domain->flags & SD_FLAG_EXEC))
+		domain = domain->parent;
+
+	if (domain->flags & SD_FLAG_EXEC) {
+		new_cpu = sched_best_cpu(current, domain);
+		if (new_cpu != this_cpu)
 			sched_migrate_task(current, new_cpu);
 	}
 }
-
-/*
- * Find the busiest node. All previous node loads contribute with a
- * geometrically deccaying weight to the load measure:
- *      load_{t} = load_{t-1}/2 + nr_node_running_{t}
- * This way sudden load peaks are flattened out a bit.
- * Node load is divided by nr_cpus_node() in order to compare nodes
- * of different cpu count but also [first] multiplied by NR_CPUS to
- * provide better resolution.
- */
-static int find_busiest_node(int this_node)
-{
-	int i, node = -1, load, this_load, maxload;
-
-	if (!nr_cpus_node(this_node))
-		return node;
-	this_load = maxload = (this_rq()->prev_node_load[this_node] >> 1)
-  + (NR_CPUS * atomic_read(&node_nr_running[this_node])
-		/ nr_cpus_node(this_node));
-	this_rq()->prev_node_load[this_node] = this_load;
-	for_each_node_with_cpus(i) {
-		if (i == this_node)
-			continue;
-		load = (this_rq()->prev_node_load[i] >> 1)
-   + (NR_CPUS * atomic_read(&node_nr_running[i])
-			/ nr_cpus_node(i));
-		this_rq()->prev_node_load[i] = load;
-		if (load > maxload && (100*load > NODE_THRESHOLD*this_load)) {
-			maxload = load;
-			node = i;
-		}
-	}
-	return node;
-}
-
 #endif /* CONFIG_NUMA */
 
-#ifdef CONFIG_SMP
-
 /*
- * double_lock_balance - lock the busiest runqueue
- *
- * this_rq is locked already. Recalculate nr_running if we have to
- * drop the runqueue lock.
+ * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
  */
-static inline
-unsigned int double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest,
-				 int this_cpu, int idle,
-				 unsigned int nr_running)
+static inline void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
 {
 	if (unlikely(!spin_trylock(&busiest->lock))) {
 		if (busiest < this_rq) {
 			spin_unlock(&this_rq->lock);
 			spin_lock(&busiest->lock);
 			spin_lock(&this_rq->lock);
-			/* Need to recalculate nr_running */
-			if (idle || (this_rq->nr_running >
-					this_rq->prev_cpu_load[this_cpu]))
-				nr_running = this_rq->nr_running;
-			else
-				nr_running = this_rq->prev_cpu_load[this_cpu];
 		} else
 			spin_lock(&busiest->lock);
 	}
-	return nr_running;
-}
-
-/*
- * find_busiest_queue - find the busiest runqueue among the cpus in cpumask.
- */
-static inline
-runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, int idle,
-			       int *imbalance, cpumask_t cpumask)
-{
-	int nr_running, load, max_load, i;
-	runqueue_t *busiest, *rq_src;
-
-	/*
-	 * We search all runqueues to find the most busy one.
-	 * We do this lockless to reduce cache-bouncing overhead,
-	 * we re-check the 'best' source CPU later on again, with
-	 * the lock held.
-	 *
-	 * We fend off statistical fluctuations in runqueue lengths by
-	 * saving the runqueue length (as seen by the balancing CPU) during
-	 * the previous load-balancing operation and using the smaller one
-	 * of the current and saved lengths. If a runqueue is long enough
-	 * for a longer amount of time then we recognize it and pull tasks
-	 * from it.
-	 *
-	 * The 'current runqueue length' is a statistical maximum variable,
-	 * for that one we take the longer one - to avoid fluctuations in
-	 * the other direction. So for a load-balance to happen it needs
-	 * stable long runqueue on the target CPU and stable short runqueue
-	 * on the local runqueue.
-	 *
-	 * We make an exception if this CPU is about to become idle - in
-	 * that case we are less picky about moving a task across CPUs and
-	 * take what can be taken.
-	 */
-	if (idle || (this_rq->nr_running > this_rq->prev_cpu_load[this_cpu]))
-		nr_running = this_rq->nr_running;
-	else
-		nr_running = this_rq->prev_cpu_load[this_cpu];
-
-	busiest = NULL;
-	max_load = 1;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_isset(i, cpumask))
-			continue;
-
-		rq_src = cpu_rq(i);
-		if (idle || (rq_src->nr_running < this_rq->prev_cpu_load[i]))
-			load = rq_src->nr_running;
-		else
-			load = this_rq->prev_cpu_load[i];
-		this_rq->prev_cpu_load[i] = rq_src->nr_running;
-
-		if ((load > max_load) && (rq_src != this_rq)) {
-			busiest = rq_src;
-			max_load = load;
-		}
-	}
-
-	if (likely(!busiest))
-		goto out;
-
-	*imbalance = max_load - nr_running;
-
-	/* It needs an at least ~25% imbalance to trigger balancing. */
-	if (!idle && ((*imbalance)*4 < max_load)) {
-		busiest = NULL;
-		goto out;
-	}
-
-	nr_running = double_lock_balance(this_rq, busiest, this_cpu,
-					 idle, nr_running);
-	/*
-	 * Make sure nothing changed since we checked the
-	 * runqueue length.
-	 */
-	if (busiest->nr_running <= nr_running) {
-		spin_unlock(&busiest->lock);
-		busiest = NULL;
-	}
-out:
-	return busiest;
 }
 
 /*
  * pull_task - move a task from a remote runqueue to the local runqueue.
  * Both runqueues must be locked.
  */
-static inline
-void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t *p,
-	       runqueue_t *this_rq, int this_cpu)
+static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array,
+		task_t *p, runqueue_t *this_rq, prio_array_t *this_array,
+		int this_cpu)
 {
 	dequeue_task(p, src_array);
 	nr_running_dec(src_rq);
 	set_task_cpu(p, this_cpu);
 	nr_running_inc(this_rq);
-	enqueue_task(p, this_rq->active);
+	enqueue_task(p, this_array);
 	p->timestamp = sched_clock() -
 				(src_rq->timestamp_last_tick - p->timestamp);
 	/*
@@ -1266,61 +1247,57 @@ void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t *p,
 	 * to be always true for them.
 	 */
 	if (TASK_PREEMPTS_CURR(p, this_rq))
-		set_need_resched();
+		resched_task(this_rq->curr);
 }
 
 /*
  * can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
  */
 static inline
-int can_migrate_task(task_t *tsk, runqueue_t *rq, int this_cpu, int idle)
+int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
+		struct sched_domain *domain, enum idle_type idle)
 {
-	unsigned long delta = rq->timestamp_last_tick - tsk->timestamp;
-
 	/*
 	 * We do not migrate tasks that are:
 	 * 1) running (obviously), or
 	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
 	 * 3) are cache-hot on their current CPU.
 	 */
-	if (task_running(rq, tsk))
+	if (task_running(rq, p))
 		return 0;
-	if (!cpu_isset(this_cpu, tsk->cpus_allowed))
+	if (!cpu_isset(this_cpu, p->cpus_allowed))
 		return 0;
-	if (!idle && (delta <= JIFFIES_TO_NS(cache_decay_ticks)))
-		return 0;
+
+	/* Aggressive migration if we've failed balancing */
+	if (idle == NEWLY_IDLE ||
+			domain->nr_balance_failed < domain->cache_nice_tries) {
+		if ((rq->timestamp_last_tick - p->timestamp)
+						< domain->cache_hot_time)
+			return 0;
+	}
+
 	return 1;
 }
 
 /*
- * Current runqueue is empty, or rebalance tick: if there is an
- * inbalance (current runqueue is too short) then pull from
- * busiest runqueue(s).
+ * move_tasks tries to move up to max_nr_move tasks from busiest to this_rq,
+ * as part of a balancing operation within "domain". Returns the number of
+ * tasks moved.
  *
- * We call this with the current runqueue locked,
- * irqs disabled.
+ * Called with both runqueues locked.
  */
-static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
+static int move_tasks(runqueue_t *this_rq, int this_cpu, runqueue_t *busiest,
+			unsigned long max_nr_move, struct sched_domain *domain,
+			enum idle_type idle)
 {
-	int imbalance, idx, this_cpu = smp_processor_id();
-	runqueue_t *busiest;
-	prio_array_t *array;
+	int idx;
+	int pulled = 0;
+	prio_array_t *array, *dst_array;
 	struct list_head *head, *curr;
 	task_t *tmp;
 
-	if (cpu_is_offline(this_cpu))
+	if (max_nr_move <= 0 || busiest->nr_running <= 1)
 		goto out;
-
-	busiest = find_busiest_queue(this_rq, this_cpu, idle,
-				     &imbalance, cpumask);
-	if (!busiest)
-		goto out;
-
-	/*
-	 * We only want to steal a number of tasks equal to 1/2 the imbalance,
-	 * otherwise we'll just shift the imbalance to the new queue:
-	 */
-	imbalance /= 2;
 
 	/*
 	 * We first consider expired tasks. Those will likely not be
@@ -1328,10 +1305,13 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 	 * be cache-cold, thus switching CPUs has the least effect
 	 * on them.
 	 */
-	if (busiest->expired->nr_active)
+	if (busiest->expired->nr_active) {
 		array = busiest->expired;
-	else
+		dst_array = this_rq->expired;
+	} else {
 		array = busiest->active;
+		dst_array = this_rq->active;
+	}
 
 new_array:
 	/* Start searching at priority 0: */
@@ -1344,9 +1324,10 @@ skip_bitmap:
 	if (idx >= MAX_PRIO) {
 		if (array == busiest->expired) {
 			array = busiest->active;
+			dst_array = this_rq->active;
 			goto new_array;
 		}
-		goto out_unlock;
+		goto out;
 	}
 
 	head = array->queue + idx;
@@ -1356,100 +1337,441 @@ skip_queue:
 
 	curr = curr->prev;
 
-	if (!can_migrate_task(tmp, busiest, this_cpu, idle)) {
+	if (!can_migrate_task(tmp, busiest, this_cpu, domain, idle)) {
 		if (curr != head)
 			goto skip_queue;
 		idx++;
 		goto skip_bitmap;
 	}
-	pull_task(busiest, array, tmp, this_rq, this_cpu);
+	pull_task(busiest, array, tmp, this_rq, dst_array, this_cpu);
+	pulled++;
 
-	/* Only migrate one task if we are idle */
-	if (!idle && --imbalance) {
+	/* We only want to steal up to the prescribed number of tasks. */
+	if (pulled < max_nr_move) {
 		if (curr != head)
 			goto skip_queue;
 		idx++;
 		goto skip_bitmap;
 	}
-out_unlock:
-	spin_unlock(&busiest->lock);
 out:
-	;
+	return pulled;
 }
 
 /*
- * One of the idle_cpu_tick() and busy_cpu_tick() functions will
- * get called every timer tick, on every CPU. Our balancing action
- * frequency and balancing agressivity depends on whether the CPU is
- * idle or not.
- *
- * busy-rebalance every 200 msecs. idle-rebalance every 1 msec. (or on
- * systems with HZ=100, every 10 msecs.)
- *
- * On NUMA, do a node-rebalance every 400 msecs.
+ * find_busiest_group finds and returns the busiest CPU group within the
+ * domain. It calculates and returns the number of tasks which should be
+ * moved to restore balance via the imbalance parameter.
  */
-#define IDLE_REBALANCE_TICK (HZ/1000 ?: 1)
-#define BUSY_REBALANCE_TICK (HZ/5 ?: 1)
-#define IDLE_NODE_REBALANCE_TICK (IDLE_REBALANCE_TICK * 5)
-#define BUSY_NODE_REBALANCE_TICK (BUSY_REBALANCE_TICK * 2)
-
-#ifdef CONFIG_NUMA
-static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
+static struct sched_group *
+find_busiest_group(struct sched_domain *domain, int this_cpu,
+				unsigned long *imbalance, enum idle_type idle)
 {
-	int node = find_busiest_node(cpu_to_node(this_cpu));
+	unsigned long max_load, avg_load, total_load, this_load;
+	int modify, total_nr_cpus, busiest_nr_cpus = 0;
+	enum idle_type package_idle = IDLE;
+	struct sched_group *busiest = NULL, *group = domain->groups;
 
-	if (node >= 0) {
-		cpumask_t cpumask = node_to_cpumask(node);
-		cpu_set(this_cpu, cpumask);
-		spin_lock(&this_rq->lock);
-		load_balance(this_rq, idle, cpumask);
-		spin_unlock(&this_rq->lock);
-	}
-}
-#endif
+	max_load = 0;
+	this_load = 0;
+	total_load = 0;
+	total_nr_cpus = 0;
 
-static void rebalance_tick(runqueue_t *this_rq, int idle)
-{
-#ifdef CONFIG_NUMA
-	int this_cpu = smp_processor_id();
-#endif
-	unsigned long j = jiffies;
+	if (group == NULL)
+		goto out_balanced;
 
 	/*
-	 * First do inter-node rebalancing, then intra-node rebalancing,
-	 * if both events happen in the same tick. The inter-node
-	 * rebalancing does not necessarily have to create a perfect
-	 * balance within the node, since we load-balance the most loaded
-	 * node with the current CPU. (ie. other CPUs in the local node
-	 * are not balanced.)
+	 * Don't modify when we newly become idle because that ruins our
+	 * statistics: its triggered by some value of nr_running (ie. 0).
+	 * Timer based balancing is a good statistic though.
 	 */
-	if (idle) {
-#ifdef CONFIG_NUMA
-		if (!(j % IDLE_NODE_REBALANCE_TICK))
-			balance_node(this_rq, idle, this_cpu);
-#endif
-		if (!(j % IDLE_REBALANCE_TICK)) {
-			spin_lock(&this_rq->lock);
-			load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
-			spin_unlock(&this_rq->lock);
+	if (idle == NEWLY_IDLE)
+		modify = 0;
+	else
+		modify = 1;
+
+	do {
+		unsigned long load;
+		int local_group;
+		int i, nr_cpus = 0;
+
+		local_group = cpu_isset(this_cpu, group->cpumask);
+
+		/* Tally up the load of all CPUs in the group */
+		avg_load = 0;
+		for_each_cpu_mask(i, group->cpumask) {
+			if (!cpu_online(i))
+				continue;
+
+			/* Bias balancing toward cpus of our domain */
+			if (local_group) {
+				load = get_high_cpu_load(i, modify);
+				if (!idle_cpu(i))
+					package_idle = NOT_IDLE;
+			} else
+				load = get_low_cpu_load(i, modify);
+
+			nr_cpus++;
+			avg_load += load;
 		}
+
+		if (!nr_cpus)
+			goto nextgroup;
+
+		total_load += avg_load;
+		total_nr_cpus += nr_cpus;
+		avg_load /= nr_cpus;
+
+		if (avg_load > max_load)
+			max_load = avg_load;
+
+		if (local_group) {
+			this_load = avg_load;
+		} else if (avg_load >= max_load) {
+			busiest = group;
+			busiest_nr_cpus = nr_cpus;
+		}
+nextgroup:
+		group = group->next;
+	} while (group != domain->groups);
+
+	if (!busiest)
+		goto out_balanced;
+
+	avg_load = total_load / total_nr_cpus;
+	if (idle == NOT_IDLE && this_load >= avg_load)
+		goto out_balanced;
+
+	if (idle == NOT_IDLE && 100*max_load <= domain->imbalance_pct*this_load)
+		goto out_balanced;
+
+	/*
+	 * We're trying to get all the cpus to the average_load, so we don't
+	 * want to push ourselves above the average load, nor do we wish to
+	 * reduce the max loaded cpu below the average load, as either of these
+	 * actions would just result in more rebalancing later, and ping-pong
+	 * tasks around. Thus we look for the minimum possible imbalance.
+	 * Negative imbalances (*we* are more loaded than anyone else) will
+	 * be counted as no imbalance for these purposes -- we can't fix that
+	 * by pulling tasks to us.  Be careful of negative numbers as they'll
+	 * appear as very large values with unsigned longs.
+	 */
+	if (avg_load >= this_load) {
+		*imbalance = min(max_load - avg_load, avg_load - this_load);
+		/* Get rid of the scaling factor, rounding *up* as we divide */
+		*imbalance = (*imbalance + SCHED_LOAD_SCALE - 1)
+						>> SCHED_LOAD_SHIFT;
+	} else
+		*imbalance = 0;
+
+	if (*imbalance == 0) {
+		if (package_idle != NOT_IDLE && domain->flags & SD_FLAG_IDLE
+			&& max_load * busiest_nr_cpus > (3*SCHED_LOAD_SCALE/2))
+			*imbalance = 1;
+		else
+			busiest = NULL;
+	}
+
+	return busiest;
+
+out_balanced:
+	if (busiest && idle == NEWLY_IDLE) {
+		*imbalance = 1;
+		return busiest;
+	}
+
+	*imbalance = 0;
+	return NULL;
+}
+
+/*
+ * find_busiest_queue - find the busiest runqueue among the cpus in group.
+ */
+static runqueue_t *find_busiest_queue(struct sched_group *group)
+{
+	int i;
+	unsigned long max_load = 0;
+	runqueue_t *busiest = NULL;
+
+	for_each_cpu_mask(i, group->cpumask) {
+		unsigned long load;
+
+		if (!cpu_online(i))
+			continue;
+
+		load = get_low_cpu_load(i, 0);
+
+		if (load > max_load) {
+			max_load = load;
+			busiest = cpu_rq(i);
+		}
+	}
+
+	return busiest;
+}
+
+/*
+ * Check this_cpu to ensure it is balanced within domain. Attempt to move
+ * tasks if there is an imbalance.
+ *
+ * Called with this_rq unlocked.
+ */
+static int load_balance(int this_cpu, runqueue_t *this_rq,
+			struct sched_domain *domain, enum idle_type idle)
+{
+	struct sched_group *group;
+	runqueue_t *busiest = NULL;
+	unsigned long imbalance;
+	int balanced = 0, failed = 0;
+	int nr_moved = 0;
+
+	spin_lock(&this_rq->lock);
+
+	group = find_busiest_group(domain, this_cpu, &imbalance, idle);
+	if (!group) {
+		balanced = 1;
+		goto out;
+	}
+
+	busiest = find_busiest_queue(group);
+	if (!busiest || busiest == this_rq) {
+		balanced = 1;
+		goto out;
+	}
+
+	/* Attempt to move tasks */
+	double_lock_balance(this_rq, busiest);
+
+	nr_moved = move_tasks(this_rq, this_cpu, busiest,
+					imbalance, domain, idle);
+	spin_unlock(&busiest->lock);
+out:
+	spin_unlock(&this_rq->lock);
+
+	if (!balanced && nr_moved == 0)
+		failed = 1;
+
+	if (domain->flags & SD_FLAG_IDLE && failed && busiest &&
+	   		domain->nr_balance_failed > domain->cache_nice_tries) {
+		int i;
+		for_each_cpu_mask(i, group->cpumask) {
+			int wake = 0;
+
+			if (!cpu_online(i))
+				continue;
+
+			busiest = cpu_rq(i);
+			spin_lock(&busiest->lock);
+			if (!busiest->active_balance) {
+				busiest->active_balance = 1;
+				busiest->push_cpu = this_cpu;
+				wake = 1;
+			}
+			spin_unlock(&busiest->lock);
+			if (wake)
+				wake_up_process(busiest->migration_thread);
+		}
+	}
+
+	if (failed)
+		domain->nr_balance_failed++;
+	else
+		domain->nr_balance_failed = 0;
+
+	if (balanced) {
+		if (domain->balance_interval < domain->max_interval)
+			domain->balance_interval *= 2;
+	} else {
+		domain->balance_interval = domain->min_interval;
+	}
+
+	return nr_moved;
+}
+
+/*
+ * Check this_cpu to ensure it is balanced within domain. Attempt to move
+ * tasks if there is an imbalance.
+ *
+ * Called from schedule when this_rq is about to become idle (NEWLY_IDLE).
+ * this_rq is locked.
+ */
+static int load_balance_newidle(int this_cpu, runqueue_t *this_rq,
+			struct sched_domain *domain)
+{
+	struct sched_group *group;
+	runqueue_t *busiest = NULL;
+	unsigned long imbalance;
+	int nr_moved = 0;
+
+	group = find_busiest_group(domain, this_cpu, &imbalance, NEWLY_IDLE);
+	if (!group)
+		goto out;
+
+	busiest = find_busiest_queue(group);
+	if (!busiest || busiest == this_rq)
+		goto out;
+
+	/* Attempt to move tasks */
+	double_lock_balance(this_rq, busiest);
+
+	nr_moved = move_tasks(this_rq, this_cpu, busiest,
+					imbalance, domain, NEWLY_IDLE);
+
+	spin_unlock(&busiest->lock);
+
+out:
+	return nr_moved;
+}
+
+/*
+ * idle_balance is called by schedule() if this_cpu is about to become
+ * idle. Attempts to pull tasks from other CPUs.
+ */
+static inline void idle_balance(int this_cpu, runqueue_t *this_rq)
+{
+	struct sched_domain *domain = this_sched_domain();
+
+	if (unlikely(cpu_is_offline(this_cpu)))
+		return;
+
+	do {
+		if (unlikely(!domain->groups))
+			/* hasn't been setup yet */
+			break;
+
+		if (domain->flags & SD_FLAG_NEWIDLE) {
+			if (load_balance_newidle(this_cpu, this_rq, domain)) {
+				/* We've pulled tasks over so stop searching */
+				break;
+			}
+		}
+
+		domain = domain->parent;
+	} while (domain);
+}
+
+/*
+ * active_load_balance is run by migration threads. It pushes a running
+ * task off the cpu. It can be required to correctly have at least 1 task
+ * running on each physical CPU where possible, and not have a physical /
+ * logical imbalance.
+ *
+ * Called with busiest locked.
+ */
+static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
+{
+	int i;
+	struct sched_domain *sd = cpu_sched_domain(busiest_cpu);
+	struct sched_group *group, *busy_group;
+
+	if (busiest->nr_running <= 1)
+		return;
+
+	/* sd->parent should never cause a NULL dereference, if it did so,
+ 	 * then push_cpu was set to a buggy value */
+	while (!cpu_isset(busiest->push_cpu, sd->span)) {
+ 		sd = sd->parent;
+		if (!sd->parent && !cpu_isset(busiest->push_cpu, sd->span)) {
+			WARN_ON(1);
+			return;
+		}
+	}
+
+	if (!sd->groups) {
+		WARN_ON(1);
 		return;
 	}
-#ifdef CONFIG_NUMA
-	if (!(j % BUSY_NODE_REBALANCE_TICK))
-		balance_node(this_rq, idle, this_cpu);
-#endif
-	if (!(j % BUSY_REBALANCE_TICK)) {
-		spin_lock(&this_rq->lock);
-		load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
-		spin_unlock(&this_rq->lock);
+
+ 	group = sd->groups;
+	while (!cpu_isset(busiest_cpu, group->cpumask)) {
+ 		group = group->next;
+		if (group == sd->groups) {
+			WARN_ON(1);
+			return;
+		}
 	}
+ 	busy_group = group;
+
+ 	group = sd->groups;
+ 	do {
+		runqueue_t *rq;
+ 		int push_cpu = 0, nr = 0;
+
+ 		if (group == busy_group)
+ 			goto next_group;
+
+ 		for_each_cpu_mask(i, group->cpumask) {
+			if (!cpu_online(i))
+				continue;
+
+			if (!idle_cpu(i))
+				goto next_group;
+ 			push_cpu = i;
+ 			nr++;
+ 		}
+ 		if (nr == 0)
+ 			goto next_group;
+
+		rq = cpu_rq(push_cpu);
+		double_lock_balance(busiest, rq);
+		move_tasks(rq, push_cpu, busiest, 1, sd, IDLE);
+		spin_unlock(&rq->lock);
+next_group:
+		group = group->next;
+	} while (group != sd->groups);
+}
+
+/*
+ * rebalance_tick will get called every timer tick, on every CPU.
+ *
+ * It checks each scheduling domain to see if it is due to be balanced,
+ * and initiates a balancing operation if so.
+ *
+ * Balancing parameters are set up in arch_init_sched_domains.
+ */
+
+/* Don't have all balancing operations going off at once */
+#define CPU_OFFSET(cpu) (HZ * cpu / NR_CPUS)
+
+static void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_type idle)
+{
+	unsigned long j = jiffies + CPU_OFFSET(this_cpu);
+	struct sched_domain *domain = this_sched_domain();
+
+	if (unlikely(cpu_is_offline(this_cpu)))
+		return;
+
+	/* Run through all this CPU's domains */
+	do {
+		int modulo;
+
+		if (unlikely(!domain->groups))
+			break;
+
+		modulo = domain->balance_interval;
+
+		if (idle != IDLE)
+			modulo *= domain->busy_factor;
+
+		/* scale ms to jiffies */
+		modulo = modulo * HZ / 1000;
+		if (modulo == 0)
+			modulo = 1;
+
+		if (!(j % modulo)) {
+			if (load_balance(this_cpu, this_rq, domain, idle)) {
+				/* We've pulled tasks over so no longer idle */
+				idle = NOT_IDLE;
+			}
+		}
+
+		domain = domain->parent;
+	} while (domain);
 }
 #else
 /*
  * on UP we do not need to balance between CPUs:
  */
-static inline void rebalance_tick(runqueue_t *this_rq, int idle)
+static inline void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_type idle)
 {
 }
 #endif
@@ -1507,7 +1829,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			cpustat->iowait += sys_ticks;
 		else
 			cpustat->idle += sys_ticks;
-		rebalance_tick(rq, 1);
+		rebalance_tick(cpu, rq, IDLE);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
@@ -1591,7 +1913,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 out_unlock:
 	spin_unlock(&rq->lock);
 out:
-	rebalance_tick(rq, 0);
+	rebalance_tick(cpu, rq, NOT_IDLE);
 }
 
 /*
@@ -1658,7 +1980,7 @@ need_resched:
 
 	if (unlikely(!rq->nr_running)) {
 #ifdef CONFIG_SMP
-		load_balance(rq, 1, cpu_to_node_mask(smp_processor_id()));
+		idle_balance(smp_processor_id(), rq);
 #endif
 		if (!rq->nr_running) {
 			next = rq->idle;
@@ -2761,7 +3083,7 @@ static void move_task_away(struct task_struct *p, int dest_cpu)
 	if (p->array) {
 		deactivate_task(p, this_rq());
 		activate_task(p, rq_dest);
-		if (p->prio < rq_dest->curr->prio)
+		if (TASK_PREEMPTS_CURR(p, rq_dest))
 			resched_task(rq_dest->curr);
 	}
 	p->timestamp = rq_dest->timestamp_last_tick;
@@ -2791,7 +3113,13 @@ static int migration_thread(void * data)
 			refrigerator(PF_FREEZE);
 
 		spin_lock_irq(&rq->lock);
+		if (rq->active_balance) {
+			active_load_balance(rq, cpu);
+			rq->active_balance = 0;
+		}
+
 		head = &rq->migration_queue;
+
 		current->state = TASK_INTERRUPTIBLE;
 		if (list_empty(head)) {
 			spin_unlock_irq(&rq->lock);
@@ -2939,6 +3267,144 @@ int __init migration_init(void)
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(kernel_flag);
 
+#ifdef CONFIG_SMP
+#ifdef ARCH_HAS_SCHED_DOMAIN
+extern void __init arch_init_sched_domains(void);
+#else
+static struct sched_group sched_group_cpus[NR_CPUS];
+#ifdef CONFIG_NUMA
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+DEFINE_PER_CPU(struct sched_domain, node_domains);
+static void __init arch_init_sched_domains(void)
+{
+	int i;
+	cpumask_t all_cpus = CPU_MASK_NONE;
+	struct sched_group *first_node = NULL, *last_node = NULL;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+
+		cpu_set(i, all_cpus);
+	}
+
+	/* Set up domains */
+	for_each_cpu_mask(i, all_cpus) {
+		int node = cpu_to_node(i);
+		cpumask_t nodemask = node_to_cpumask(node);
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+
+		*node_domain = SD_NODE_INIT;
+		node_domain->span = all_cpus;
+
+		*cpu_domain = SD_CPU_INIT;
+		cpus_and(cpu_domain->span, nodemask, all_cpus);
+		cpu_domain->parent = node_domain;
+	}
+
+	/* Set up groups */
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+		int j;
+		cpumask_t nodemask;
+		struct sched_group *node = &sched_group_nodes[i];
+
+		cpus_and(nodemask, node_to_cpumask(i), all_cpus);
+
+		if (cpus_empty(nodemask))
+			continue;
+
+		node->cpumask = nodemask;
+
+		for_each_cpu_mask(j, node->cpumask) {
+			struct sched_group *cpu = &sched_group_cpus[j];
+
+			cpus_clear(cpu->cpumask);
+			cpu_set(j, cpu->cpumask);
+
+			if (!first_cpu)
+				first_cpu = cpu;
+			if (last_cpu)
+				last_cpu->next = cpu;
+			last_cpu = cpu;
+		}
+		last_cpu->next = first_cpu;
+
+		if (!first_node)
+			first_node = node;
+		if (last_node)
+			last_node->next = node;
+		last_node = node;
+	}
+	last_node->next = first_node;
+
+	mb();
+	for_each_cpu_mask(i, all_cpus) {
+		struct sched_domain *node_domain = &per_cpu(node_domains, i);
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		node_domain->groups = &sched_group_nodes[cpu_to_node(i)];
+		cpu_domain->groups = &sched_group_cpus[i];
+	}
+}
+
+#else /* CONFIG_NUMA */
+static void __init arch_init_sched_domains(void)
+{
+	int i;
+	cpumask_t all_cpus = CPU_MASK_NONE;
+	struct sched_group *first_cpu = NULL, *last_cpu = NULL;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+
+		cpu_set(i, all_cpus);
+	}
+
+	/* Set up domains */
+	for_each_cpu_mask(i, all_cpus) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+
+		*cpu_domain = SD_CPU_INIT;
+		cpu_domain->span = all_cpus;
+	}
+
+	/* Set up CPU groups */
+	for_each_cpu_mask(i, all_cpus) {
+		struct sched_group *cpu = &sched_group_cpus[i];
+
+		cpus_clear(cpu->cpumask);
+		cpu_set(i, cpu->cpumask);
+
+		if (!first_cpu)
+			first_cpu = cpu;
+		if (last_cpu)
+			last_cpu->next = cpu;
+		last_cpu = cpu;
+	}
+	last_cpu->next = first_cpu;
+
+	mb();
+	for_each_cpu_mask(i, all_cpus) {
+		struct sched_domain *cpu_domain = cpu_sched_domain(i);
+		cpu_domain->groups = &sched_group_cpus[i];
+	}
+}
+
+#endif /* CONFIG_NUMA */
+#endif /* ARCH_HAS_SCHED_DOMAIN */
+
+void __init sched_init_smp(void)
+{
+	arch_init_sched_domains();
+}
+#else
+void __init sched_init_smp(void)
+{
+}
+#endif /* CONFIG_SMP */
+
 void __init sched_init(void)
 {
 	runqueue_t *rq;
@@ -2946,6 +3412,11 @@ void __init sched_init(void)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
+#ifdef CONFIG_SMP
+		struct sched_domain *domain;
+		domain = cpu_sched_domain(i);
+		memset(domain, 0, sizeof(struct sched_domain));
+#endif
 
 		rq = cpu_rq(i);
 		rq->active = rq->arrays;
@@ -2955,7 +3426,6 @@ void __init sched_init(void)
 		spin_lock_init(&rq->lock);
 		INIT_LIST_HEAD(&rq->migration_queue);
 		atomic_set(&rq->nr_iowait, 0);
-		nr_running_init(rq);
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;
