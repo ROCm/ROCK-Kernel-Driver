@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -86,7 +87,7 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 	skb_set_owner_r(skbn, sk);
 	skb_queue_tail(&sk->receive_queue, skbn);
 	if (!sk->dead)
-		sk->data_ready(sk,skbn->len);
+		sk->data_ready(sk, skbn->len);
 
 	return 0;
 }
@@ -364,10 +365,10 @@ int x25_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 
 int x25_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	int queued;
+	int queued = x25_process_rx_frame(sk, skb);
 
-	queued = x25_process_rx_frame(sk,skb);
-	if(!queued) kfree_skb(skb);
+	if (!queued)
+		kfree_skb(skb);
 
 	return 0;
 }
