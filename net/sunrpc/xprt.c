@@ -143,15 +143,17 @@ __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 	if (!xprt->snd_task) {
 		if (xprt->nocong || __xprt_get_cong(xprt, task)) {
 			xprt->snd_task = task;
-			if (req)
+			if (req) {
 				req->rq_bytes_sent = 0;
+				req->rq_ntrans++;
+			}
 		}
 	}
 	if (xprt->snd_task != task) {
 		dprintk("RPC: %4d TCP write queue full\n", task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
-		if (req && req->rq_nresend)
+		if (req && req->rq_ntrans)
 			rpc_sleep_on(&xprt->resend, task, NULL, NULL);
 		else
 			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
@@ -189,8 +191,10 @@ __xprt_lock_write_next(struct rpc_xprt *xprt)
 	if (xprt->nocong || __xprt_get_cong(xprt, task)) {
 		struct rpc_rqst *req = task->tk_rqstp;
 		xprt->snd_task = task;
-		if (req)
+		if (req) {
 			req->rq_bytes_sent = 0;
+			req->rq_ntrans++;
+		}
 	}
 }
 
@@ -578,7 +582,7 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 	if (!xprt->nocong) {
 		xprt_adjust_cwnd(xprt, copied);
 		__xprt_put_cong(xprt, req);
-	       	if (!req->rq_nresend) {
+	       	if (req->rq_ntrans == 1) {
 			unsigned timer =
 				task->tk_msg.rpc_proc->p_timer;
 			if (timer)
@@ -1064,7 +1068,7 @@ xprt_timer(struct rpc_task *task)
 		goto out;
 
 	xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
-	req->rq_nresend++;
+	__xprt_put_cong(xprt, req);
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
 		task->tk_pid, req ? "pending" : "backlogged");

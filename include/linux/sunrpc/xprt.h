@@ -115,7 +115,7 @@ struct rpc_rqst {
 
 	unsigned long		rq_xtime;	/* when transmitted */
 	int			rq_ntimeo;
-	int			rq_nresend;
+	int			rq_ntrans;
 };
 #define rq_svec			rq_snd_buf.head
 #define rq_slen			rq_snd_buf.len
