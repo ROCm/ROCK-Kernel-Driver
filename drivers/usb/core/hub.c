@@ -279,12 +279,13 @@ static int usb_hub_configure(struct usb_hub *hub,
 	struct usb_hub_status hubstatus;
 	unsigned int pipe;
 	int maxp, ret;
+	char *message;
 
 	hub->descriptor = kmalloc(sizeof(*hub->descriptor), GFP_KERNEL);
 	if (!hub->descriptor) {
-		err("Unable to kmalloc %Zd bytes for hub descriptor",
-			sizeof(*hub->descriptor));
-		return -1;
+		message = "can't kmalloc hub descriptor";
+		ret = -ENOMEM;
+		goto fail;
 	}
 
 	/* Request the entire hub descriptor.
@@ -294,13 +295,12 @@ static int usb_hub_configure(struct usb_hub *hub,
 	ret = usb_get_hub_descriptor(dev, hub->descriptor,
 			sizeof(*hub->descriptor));
 	if (ret < 0) {
-		err("Unable to get hub descriptor (err = %d)", ret);
-		kfree(hub->descriptor);
-		return -1;
+		message = "can't read hub descriptor";
+		goto fail;
 	} else if (hub->descriptor->bNbrPorts > USB_MAXCHILDREN) {
-		err("Hub is too big! %d children", hub->descriptor->bNbrPorts);
-		kfree(hub->descriptor);
-		return -1;
+		message = "hub has too many ports!";
+		ret = -ENODEV;
+		goto fail;
 	}
 
 	dev->maxchild = hub->descriptor->bNbrPorts;
@@ -396,9 +396,8 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	ret = usb_get_hub_status(dev, &hubstatus);
 	if (ret < 0) {
-		err("Unable to get hub status (err = %d)", ret);
-		kfree(hub->descriptor);
-		return -1;
+		message = "can't get hub status";
+		goto fail;
 	}
 
 	le16_to_cpus(&hubstatus.wHubStatus);
@@ -419,18 +418,17 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	hub->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!hub->urb) {
-		err("couldn't allocate interrupt urb");
-		kfree(hub->descriptor);
-		return -1;
+		message = "couldn't allocate interrupt urb";
+		ret = -ENOMEM;
+		goto fail;
 	}
 
 	usb_fill_int_urb(hub->urb, dev, pipe, hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
 	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {
-		err("usb_submit_urb failed (%d)", ret);
-		kfree(hub->descriptor);
-		return -1;
+		message = "couldn't submit status urb";
+		goto fail;
 	}
 		
 	/* Wake up khubd */
@@ -439,6 +437,12 @@ static int usb_hub_configure(struct usb_hub *hub,
 	usb_hub_power_on(hub);
 
 	return 0;
+
+fail:
+	dev_err (hub->intf->dev, "config failed, %s (err %d)\n",
+			message, ret);
+	/* hub_disconnect() frees urb and descriptor */
+	return ret;
 }
 
 static void hub_disconnect(struct usb_interface *intf)
@@ -497,32 +501,27 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	/*  specs is not defined, but it works */
 	if ((desc->desc.bInterfaceSubClass != 0) &&
 	    (desc->desc.bInterfaceSubClass != 1)) {
-		err("invalid subclass (%d) for USB hub device #%d",
-			desc->desc.bInterfaceSubClass, dev->devnum);
+descriptor_error:
+		dev_err (intf->dev, "bad descriptor, ignoring hub\n");
 		return -EIO;
 	}
 
 	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
 	if (desc->desc.bNumEndpoints != 1) {
-		err("invalid bNumEndpoints (%d) for USB hub device #%d",
-			desc->desc.bNumEndpoints, dev->devnum);
-		return -EIO;
+		goto descriptor_error;
 	}
 
 	endpoint = &desc->endpoint[0].desc;
 
 	/* Output endpoint? Curiousier and curiousier.. */
 	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
-		err("Device #%d is hub class, but has output endpoint?",
-			dev->devnum);
-		return -EIO;
+		goto descriptor_error;
 	}
 
 	/* If it's not an interrupt endpoint, we'd better punt! */
 	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
 			!= USB_ENDPOINT_XFER_INT) {
-		err("Device #%d is hub class, but endpoint is not interrupt?",
-			dev->devnum);
+		goto descriptor_error;
 		return -EIO;
 	}
 
@@ -553,8 +552,6 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		strcpy (intf->dev.name, "Hub");
 		return 0;
 	}
-
-	err("hub configuration failed for device at %s", dev->devpath);
 
 	hub_disconnect (intf);
 	return -ENODEV;
