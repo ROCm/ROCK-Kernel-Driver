@@ -194,7 +194,7 @@ struct ezusb_hex_record {
 #define	keyspan_usa49w_product_id		0x010a
 
 
-typedef struct {
+struct keyspan_device_details {
 	/* product ID value */
 	int	product_id;
 	
@@ -232,13 +232,13 @@ typedef struct {
 			u8 *rate_hi, u8 *rate_low, u8 *prescaler);
 	u32	baudclk;
 
-} keyspan_device_details; 
+}; 
 
 	/* Now for each device type we setup the device detail
 	   structure with the appropriate information (provided
 	   in Keyspan's documentation) */
 
-static const keyspan_device_details usa18x_device_details = {
+static const struct keyspan_device_details usa18x_device_details = {
 	keyspan_usa18x_product_id,	/* product ID */
        	msg_usa26, 			/* msg type*/
 	1,				/* num ports */
@@ -254,7 +254,7 @@ static const keyspan_device_details usa18x_device_details = {
 	KEYSPAN_USA18X_BAUDCLK		/* base baud clock */
 };
 
-static const keyspan_device_details usa19_device_details = {
+static const struct keyspan_device_details usa19_device_details = {
 	keyspan_usa19_product_id,	/* product ID */
        	msg_usa28, 			/* msg type*/
 	1,				/* num ports */
@@ -270,7 +270,7 @@ static const keyspan_device_details usa19_device_details = {
 	KEYSPAN_USA19_BAUDCLK		/* base baud clock */
 };
 
-static const keyspan_device_details usa19w_device_details = {
+static const struct keyspan_device_details usa19w_device_details = {
 	keyspan_usa19w_product_id,	/* product ID */
        	msg_usa26, 			/* msg type*/
 	1,				/* num ports */
@@ -286,7 +286,7 @@ static const keyspan_device_details usa19w_device_details = {
 	KEYSPAN_USA19W_BAUDCLK		/* base baud clock */
 };
 
-static const keyspan_device_details usa28x_device_details = {
+static const struct keyspan_device_details usa28x_device_details = {
 	keyspan_usa28x_product_id,	/* product ID */
        	msg_usa26, 			/* msg type*/
 	2,				/* num ports */
@@ -302,7 +302,7 @@ static const keyspan_device_details usa28x_device_details = {
 	KEYSPAN_USA28X_BAUDCLK
 };
 
-static const keyspan_device_details usa28xa_device_details = {
+static const struct keyspan_device_details usa28xa_device_details = {
 	keyspan_usa28xa_product_id,	/* product ID */
        	msg_usa26, 			/* msg type*/
 	2,				/* num ports */
@@ -320,7 +320,7 @@ static const keyspan_device_details usa28xa_device_details = {
 
 	/* We don't need a separate entry for the usa28xb as it appears as a 28x anyway */
 
-static const keyspan_device_details usa49w_device_details = {
+static const struct keyspan_device_details usa49w_device_details = {
 	keyspan_usa49w_product_id,	/* product ID */
        	msg_usa49, 			/* msg type*/
 	4,				/* num ports */
@@ -336,7 +336,7 @@ static const keyspan_device_details usa49w_device_details = {
 	KEYSPAN_USA49W_BAUDCLK
 };
 
-static const keyspan_device_details *keyspan_devices[] = {
+static const struct keyspan_device_details *keyspan_devices[] = {
 	&usa18x_device_details,
 	&usa19_device_details,
 	&usa19w_device_details,

@@ -186,25 +186,27 @@ void usb_stor_print_Scsi_Cmnd( Scsi_Cmnd* cmd )
 	US_DEBUGP("Buffer has %d scatterlists.\n", cmd->use_sg );
 	for ( i=0; i<cmd->use_sg; i++ )
 	{
+		char *adr = page_address(sg[i].page) + sg[i].offset;
+		
 		US_DEBUGP("Length of scatterlist %d is %d.\n",i,sg[i].length);
 		US_DEBUGP("%02x %02x %02x %02x %02x %02x %02x %02x\n"
 			  "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-			  sg[i].address[0],
-			  sg[i].address[1],
-			  sg[i].address[2],
-			  sg[i].address[3],
-			  sg[i].address[4],
-			  sg[i].address[5],
-			  sg[i].address[6],
-			  sg[i].address[7],
-			  sg[i].address[8],
-			  sg[i].address[9],
-			  sg[i].address[10],
-			  sg[i].address[11],
-			  sg[i].address[12],
-			  sg[i].address[13],
-			  sg[i].address[14],
-			  sg[i].address[15]);
+			  adr[0],
+			  adr[1],
+			  adr[2],
+			  adr[3],
+			  adr[4],
+			  adr[5],
+			  adr[6],
+			  adr[7],
+			  adr[8],
+			  adr[9],
+			  adr[10],
+			  adr[11],
+			  adr[12],
+			  adr[13],
+			  adr[14],
+			  adr[15]);
 	}
 }
 

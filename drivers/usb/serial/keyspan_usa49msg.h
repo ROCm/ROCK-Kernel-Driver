@@ -107,7 +107,7 @@
 	0x80		globalControlMessage
 */
 
-typedef struct keyspan_usa49_portControlMessage
+struct keyspan_usa49_portControlMessage
 {
 	/*
 		0.	0/1/2/3 	port control message follows
@@ -173,7 +173,7 @@ typedef struct keyspan_usa49_portControlMessage
 		enablePort,		// start servicing port (move data, check status)
 		disablePort;	// stop servicing port (does implicit tx/rx flush/off)
 	
-} keyspan_usa49_portControlMessage;
+};
 
 // defines for bits in lcr
 #define	USA_DATABITS_5		0x00
@@ -201,7 +201,7 @@ typedef struct keyspan_usa49_portControlMessage
 	sends any control message (either global or port-specific).
 */
 
-typedef struct keyspan_usa49_globalControlMessage
+struct keyspan_usa49_globalControlMessage
 {
 	u8	portNumber,			// 0x80
 		sendGlobalStatus,	// 1/2=number of status responses requested
@@ -209,7 +209,7 @@ typedef struct keyspan_usa49_globalControlMessage
 		resetStatusCount,	// a cycling value
 		remoteWakeupEnable,		// 0x10=P1, 0x20=P2, 0x40=P3, 0x80=P4
 		disableStatusMessages;	// 1=send no status until host talks
-} keyspan_usa49_globalControlMessage;
+};
 
 /*
 	Device->host messages send on the global status endpoint
@@ -221,7 +221,7 @@ typedef struct keyspan_usa49_globalControlMessage
 	0x81				globalDebugMessage
 */
 
-typedef struct keyspan_usa49_portStatusMessage	// one for each port
+struct keyspan_usa49_portStatusMessage	// one for each port
 {
 	u8	portNumber,		// 0,1,2,3
 		cts,			// reports CTS pin
@@ -234,7 +234,7 @@ typedef struct keyspan_usa49_portStatusMessage	// one for each port
 		controlResponse,// 1=a control message has been processed
 		txAck,			// ACK (data TX complete)
 		rs232valid;		// RS-232 signal valid
-} keyspan_usa49_portStatusMessage;
+};
 
 // bits in RX data message when STAT byte is included
 #define	RXERROR_OVERRUN	0x02
@@ -242,19 +242,19 @@ typedef struct keyspan_usa49_portStatusMessage	// one for each port
 #define	RXERROR_FRAMING	0x08
 #define	RXERROR_BREAK	0x10
 
-typedef struct keyspan_usa49_globalStatusMessage
+struct keyspan_usa49_globalStatusMessage
 {
 	u8	portNumber,			// 0x80=globalStatusMessage
 		sendGlobalStatus,	// from request, decremented
 		resetStatusCount;	// as in request
-} keyspan_usa49_globalStatusMessage;
+};
 
-typedef struct keyspan_usa49_globalDebugMessage
+struct keyspan_usa49_globalDebugMessage
 {
 	u8	portNumber,			// 0x81=globalDebugMessage
 		n,					// typically a count/status byte
 		b;					// typically a data byte
-} keyspan_usa49_globalDebugMessage;
+};
 
 // ie: the maximum length of an EZUSB endpoint buffer
 #define	MAX_DATA_LEN			64

@@ -415,14 +415,14 @@
 
 /* Structures */
 
-typedef struct digi_serial {
+struct digi_serial {
 	spinlock_t ds_serial_lock;
 	struct usb_serial_port *ds_oob_port;	/* out-of-band port */
 	int ds_oob_port_num;			/* index of out-of-band port */
 	int ds_device_started;
-} digi_serial_t;
+};
 
-typedef struct digi_port {
+struct digi_port {
 	spinlock_t dp_port_lock;
 	int dp_port_num;
 	int dp_out_buf_len;
@@ -441,7 +441,7 @@ typedef struct digi_port {
 	int dp_in_close;			/* close in progress */
 	wait_queue_head_t dp_close_wait;	/* wait queue for close */
 	struct tq_struct dp_wakeup_task;
-} digi_port_t;
+};
 
 
 /* Local Function Declarations */
@@ -599,7 +599,7 @@ static void digi_wakeup_write_lock( struct usb_serial_port *port )
 {
 
 	unsigned long flags;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 
 
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
@@ -645,8 +645,8 @@ static int digi_write_oob_command( struct usb_serial_port *port,
 
 	int ret = 0;
 	int len;
-	struct usb_serial_port *oob_port = (struct usb_serial_port *)((digi_serial_t *)port->serial->private)->ds_oob_port;
-	digi_port_t *oob_priv = (digi_port_t *)oob_port->private;
+	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)port->serial->private)->ds_oob_port;
+	struct digi_port *oob_priv = (struct digi_port *)oob_port->private;
 	unsigned long flags = 0;
 
 
@@ -714,7 +714,7 @@ static int digi_write_inb_command( struct usb_serial_port *port,
 
 	int ret = 0;
 	int len;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned char *data = port->write_urb->transfer_buffer;
 	unsigned long flags = 0;
 
@@ -800,9 +800,9 @@ static int digi_set_modem_signals( struct usb_serial_port *port,
 {
 
 	int ret;
-	digi_port_t *port_priv = (digi_port_t *)port->private;
-	struct usb_serial_port *oob_port = (struct usb_serial_port *)((digi_serial_t *)port->serial->private)->ds_oob_port;
-	digi_port_t *oob_priv = (digi_port_t *)oob_port->private;
+	struct digi_port *port_priv = (struct digi_port *)port->private;
+	struct usb_serial_port *oob_port = (struct usb_serial_port *)((struct digi_serial *)port->serial->private)->ds_oob_port;
+	struct digi_port *oob_priv = (struct digi_port *)oob_port->private;
 	unsigned char *data = oob_port->write_urb->transfer_buffer;
 	unsigned long flags = 0;
 
@@ -879,7 +879,7 @@ static int digi_transmit_idle( struct usb_serial_port *port,
 
 	int ret;
 	unsigned char buf[2];
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned long flags = 0;
 
 
@@ -919,7 +919,7 @@ static void digi_rx_throttle( struct usb_serial_port *port )
 {
 
 	unsigned long flags;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 
 
 dbg( "digi_rx_throttle: TOP: port=%d", priv->dp_port_num );
@@ -940,7 +940,7 @@ static void digi_rx_unthrottle( struct usb_serial_port *port )
 	int ret = 0;
 	int len;
 	unsigned long flags;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	struct tty_struct *tty = port->tty;
 
 
@@ -984,7 +984,7 @@ static void digi_set_termios( struct usb_serial_port *port,
 	struct termios *old_termios )
 {
 
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned int iflag = port->tty->termios->c_iflag;
 	unsigned int cflag = port->tty->termios->c_cflag;
 	unsigned int old_iflag = old_termios->c_iflag;
@@ -1208,7 +1208,7 @@ static int digi_ioctl( struct usb_serial_port *port, struct file *file,
 	unsigned int cmd, unsigned long arg )
 {
 
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned int val;
 	unsigned long flags = 0;
 
@@ -1260,7 +1260,7 @@ static int digi_write( struct usb_serial_port *port, int from_user,
 {
 
 	int ret,data_len,new_len;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned char *data = port->write_urb->transfer_buffer;
 	unsigned char user_buf[64];	/* 64 bytes is max USB bulk packet */
 	unsigned long flags = 0;
@@ -1347,14 +1347,14 @@ static void digi_write_bulk_callback( struct urb *urb )
 
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;
-	digi_port_t *priv;
+	struct digi_port *priv;
 	int ret = 0;
 
 
 dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 
 	/* port and serial sanity check */
-	if( port == NULL || (priv=(digi_port_t *)(port->private)) == NULL ) {
+	if( port == NULL || (priv=(struct digi_port *)(port->private)) == NULL ) {
 		err( __FUNCTION__ ": port or port->private is NULL, status=%d",
 			urb->status );
 		return;
@@ -1367,7 +1367,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 
 	/* handle oob callback */
 	if( priv->dp_port_num
-	== ((digi_serial_t *)(serial->private))->ds_oob_port_num ) {
+	== ((struct digi_serial *)(serial->private))->ds_oob_port_num ) {
 		dbg( "digi_write_bulk_callback: oob callback" );
 		spin_lock( &priv->dp_port_lock );
 		priv->dp_write_urb_in_use = 0;
@@ -1427,7 +1427,7 @@ static int digi_write_room( struct usb_serial_port *port )
 {
 
 	int room;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	unsigned long flags = 0;
 
 
@@ -1450,7 +1450,7 @@ dbg( "digi_write_room: port=%d, room=%d", priv->dp_port_num, room );
 static int digi_chars_in_buffer( struct usb_serial_port *port )
 {
 
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 
 
 	if( port->write_urb->status == -EINPROGRESS
@@ -1471,7 +1471,7 @@ static int digi_open( struct usb_serial_port *port, struct file *filp )
 
 	int ret;
 	unsigned char buf[32];
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	struct termios not_termios;
 	unsigned long flags = 0;
 
@@ -1548,7 +1548,7 @@ static void digi_close( struct usb_serial_port *port, struct file *filp )
 	int ret;
 	unsigned char buf[32];
 	struct tty_struct *tty = port->tty;
-	digi_port_t *priv = (digi_port_t *)port->private;
+	struct digi_port *priv = (struct digi_port *)port->private;
 	unsigned long flags = 0;
 
 
@@ -1656,7 +1656,7 @@ static int digi_startup_device( struct usb_serial *serial )
 {
 
 	int i,ret = 0;
-	digi_serial_t *serial_priv = (digi_serial_t *)serial->private;
+	struct digi_serial *serial_priv = (struct digi_serial *)serial->private;
 	struct usb_serial_port *port;
 
 
@@ -1695,8 +1695,8 @@ static int digi_startup( struct usb_serial *serial )
 {
 
 	int i;
-	digi_port_t *priv;
-	digi_serial_t *serial_priv;
+	struct digi_port *priv;
+	struct digi_serial *serial_priv;
 
 
 dbg( "digi_startup: TOP" );
@@ -1707,9 +1707,9 @@ dbg( "digi_startup: TOP" );
 
 		/* allocate port private structure */
 		priv = serial->port[i].private =
-			(digi_port_t *)kmalloc( sizeof(digi_port_t),
+			(struct digi_port *)kmalloc( sizeof(struct digi_port),
 			GFP_KERNEL );
-		if( priv == (digi_port_t *)0 ) {
+		if( priv == (struct digi_port *)0 ) {
 			while( --i >= 0 )
 				kfree( serial->port[i].private );
 			return( 1 );			/* error */
@@ -1742,9 +1742,9 @@ dbg( "digi_startup: TOP" );
 
 	/* allocate serial private structure */
 	serial_priv = serial->private =
-		(digi_serial_t *)kmalloc( sizeof(digi_serial_t),
+		(struct digi_serial *)kmalloc( sizeof(struct digi_serial),
 		GFP_KERNEL );
-	if( serial_priv == (digi_serial_t *)0 ) {
+	if( serial_priv == (struct digi_serial *)0 ) {
 		for( i=0; i<serial->type->num_ports+1; i++ )
 			kfree( serial->port[i].private );
 		return( 1 );			/* error */
@@ -1765,7 +1765,7 @@ static void digi_shutdown( struct usb_serial *serial )
 {
 
 	int i;
-	digi_port_t *priv;
+	struct digi_port *priv;
 	unsigned long flags;
 
 
@@ -1800,14 +1800,14 @@ static void digi_read_bulk_callback( struct urb *urb )
 {
 
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	digi_port_t *priv;
+	struct digi_port *priv;
 	int ret;
 
 
 dbg( "digi_read_bulk_callback: TOP" );
 
 	/* port sanity check, do not resubmit if port is not valid */
-	if( port == NULL || (priv=(digi_port_t *)(port->private)) == NULL ) {
+	if( port == NULL || (priv=(struct digi_port *)(port->private)) == NULL ) {
 		err( __FUNCTION__ ": port or port->private is NULL, status=%d",
 			urb->status );
 		return;
@@ -1827,7 +1827,7 @@ dbg( "digi_read_bulk_callback: TOP" );
 
 	/* handle oob or inb callback, do not resubmit if error */
 	if( priv->dp_port_num
-	== ((digi_serial_t *)(port->serial->private))->ds_oob_port_num ) {
+	== ((struct digi_serial *)(port->serial->private))->ds_oob_port_num ) {
 		if( digi_read_oob_callback( urb ) != 0 )
 			return;
 	} else {
@@ -1860,7 +1860,7 @@ static int digi_read_inb_callback( struct urb *urb )
 
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct tty_struct *tty = port->tty;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	int opcode = ((unsigned char *)urb->transfer_buffer)[0];
 	int len = ((unsigned char *)urb->transfer_buffer)[1];
 	int status = ((unsigned char *)urb->transfer_buffer)[2];
@@ -1972,7 +1972,7 @@ static int digi_read_oob_callback( struct urb *urb )
 
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = port->serial;
-	digi_port_t *priv = (digi_port_t *)(port->private);
+	struct digi_port *priv = (struct digi_port *)(port->private);
 	int opcode, line, status, val;
 	int i;
 

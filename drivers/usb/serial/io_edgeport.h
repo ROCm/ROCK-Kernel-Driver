@@ -136,7 +136,6 @@ struct string_block {
 	__u16	Strings[1];			/* Start of string block */
 };
 
-typedef struct string_block STRING_BLOCK, *PSTRING_BLOCK;
 
 
 #endif

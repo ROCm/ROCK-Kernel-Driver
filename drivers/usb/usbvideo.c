@@ -791,6 +791,10 @@ int usbvideo_register(
 		cams->cb.getFrame = usbvideo_GetFrame;
 	if (cams->cb.disconnect == NULL)
 		cams->cb.disconnect = usbvideo_Disconnect;
+	if (cams->cb.startDataPump == NULL)
+		cams->cb.startDataPump = usbvideo_StartDataPump;
+	if (cams->cb.stopDataPump == NULL)
+		cams->cb.stopDataPump = usbvideo_StopDataPump;
 #if USES_PROC_FS
 	/*
 	 * If both /proc fs callbacks are NULL then we assume that the driver
@@ -963,7 +967,7 @@ void usbvideo_Disconnect(struct usb_device *dev, void *ptr)
 	uvd->remove_pending = 1; /* Now all ISO data will be ignored */
 
 	/* At this time we ask to cancel outstanding URBs */
-	usbvideo_StopDataPump(uvd);
+	GET_CALLBACK(uvd, stopDataPump)(uvd);
 
 	for (i=0; i < USBVIDEO_NUMSBUF; i++)
 		usb_free_urb(uvd->sbuf[i].urb);
@@ -1299,7 +1303,7 @@ int usbvideo_v4l_open(struct video_device *dev, int flags)
 	if (errCode == 0) {
 		/* Start data pump if we have valid endpoint */
 		if (uvd->video_endp != 0)
-			errCode = usbvideo_StartDataPump(uvd);
+			errCode = GET_CALLBACK(uvd, startDataPump)(uvd);
 		if (errCode == 0) {
 			if (VALID_CALLBACK(uvd, setupOnOpen)) {
 				if (uvd->debug > 1)
@@ -1349,8 +1353,8 @@ void usbvideo_v4l_close(struct video_device *dev)
 	if (uvd->debug > 1)
 		info("%s($%p)", proc, dev);
 
-	down(&uvd->lock);	
-	usbvideo_StopDataPump(uvd);
+	down(&uvd->lock);
+	GET_CALLBACK(uvd, stopDataPump)(uvd);
 	usbvideo_rvfree(uvd->fbuf, uvd->fbuf_size);
 	uvd->fbuf = NULL;
 	RingQueue_Free(&uvd->dp);

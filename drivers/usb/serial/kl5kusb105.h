@@ -16,7 +16,7 @@
 
 /* baud rates */
 
-typedef enum {
+enum {
   kl5kusb105a_sio_b115200 = 0,
   kl5kusb105a_sio_b57600  = 1,
   kl5kusb105a_sio_b38400  = 2,
@@ -27,7 +27,7 @@ typedef enum {
   kl5kusb105a_sio_b2400   = 9,   /* unchecked */
   kl5kusb105a_sio_b1200   = 0xa,  /* unchecked */
   kl5kusb105a_sio_b600    = 0xb   /* unchecked */
-} KL5KUSB105A_SIO_baudrate_t;
+};
 
 /* data bits */
 #define kl5kusb105a_dtb_7   7

@@ -369,8 +369,8 @@ struct edgeport_port {
 struct edgeport_serial {
 	char			name[MAX_NAME_LEN+1];		/* string name of this device */
 
-	EDGE_MANUF_DESCRIPTOR		manuf_descriptor;	/* the manufacturer descriptor */
-	EDGE_BOOT_DESCRIPTOR		boot_descriptor;	/* the boot firmware descriptor */
+	struct edge_manuf_descriptor	manuf_descriptor;	/* the manufacturer descriptor */
+	struct edge_boot_descriptor	boot_descriptor;	/* the boot firmware descriptor */
 	struct edgeport_product_info	product_info;		/* Product Info */
 
 	__u8			interrupt_in_endpoint;		/* the interrupt endpoint handle */
@@ -397,17 +397,17 @@ struct edgeport_serial {
 };
 
 /* baud rate information */
-typedef struct _DIVISOR_TABLE_ENTRY {
+struct divisor_table_entry {
 	__u32   BaudRate;
 	__u16  Divisor;
-} DIVISOR_TABLE_ENTRY, *PDIVISOR_TABLE_ENTRY;
+};
 
 //
 // Define table of divisors for Rev A EdgePort/4 hardware
 // These assume a 3.6864MHz crystal, the standard /16, and
 // MCR.7 = 0.
 //
-static DIVISOR_TABLE_ENTRY  DivisorTable[] = {
+static struct divisor_table_entry divisor_table[] = {
 	{   75,		3072},  
 	{   110,	2095},		/* 2094.545455 => 230450   => .0217 % over */
 	{   134,	1713},		/* 1713.011152 => 230398.5 => .00065% under */
@@ -507,7 +507,7 @@ static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 	__u16 BootBuildNumber;
 	__u8 *BootImage;      
 	__u32 BootSize;
-	PEDGE_FIRMWARE_IMAGE_RECORD record;
+	struct edge_firmware_image_record *record;
 	unsigned char *firmware;
 	int response;
 
@@ -563,13 +563,13 @@ static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 		firmware = BootImage;
 
 		for (;;) {
-			record = (PEDGE_FIRMWARE_IMAGE_RECORD)firmware;
+			record = (struct edge_firmware_image_record *)firmware;
 			response = rom_write (edge_serial->serial, record->ExtAddr, record->Addr, record->Len, &record->Data[0]);
 			if (response < 0) {
 				err("sram_write failed (%x, %x, %d)", record->ExtAddr, record->Addr, record->Len);
 				break;
 			}
-			firmware += sizeof (EDGE_FIRMWARE_IMAGE_RECORD) + record->Len;
+			firmware += sizeof (struct edge_firmware_image_record) + record->Len;
 			if (firmware >= &BootImage[BootSize]) {
 				break;
 			}
@@ -2569,9 +2569,9 @@ static int calc_baud_rate_divisor (int baudrate, int *divisor)
 
 	dbg(__FUNCTION__" - %d", baudrate);
 
-	for (i = 0; i < NUM_ENTRIES(DivisorTable); i++) {
-		if ( DivisorTable[i].BaudRate == baudrate ) {
-			*divisor = DivisorTable[i].Divisor;
+	for (i = 0; i < NUM_ENTRIES(divisor_table); i++) {
+		if ( divisor_table[i].BaudRate == baudrate ) {
+			*divisor = divisor_table[i].Divisor;
 			return 0;
 		}
 	}
@@ -2863,7 +2863,7 @@ static void get_boot_desc (struct edgeport_serial *edge_serial)
  ****************************************************************************/
 static void load_application_firmware (struct edgeport_serial *edge_serial)
 {
-	PEDGE_FIRMWARE_IMAGE_RECORD record;
+	struct edge_firmware_image_record *record;
 	unsigned char *firmware;
 	unsigned char *FirmwareImage;
 	int ImageSize;
@@ -2901,13 +2901,13 @@ static void load_application_firmware (struct edgeport_serial *edge_serial)
 
 
 	for (;;) {
-		record = (PEDGE_FIRMWARE_IMAGE_RECORD)firmware;
+		record = (struct edge_firmware_image_record *)firmware;
 		response = sram_write (edge_serial->serial, record->ExtAddr, record->Addr, record->Len, &record->Data[0]);
 		if (response < 0) {
 			err("sram_write failed (%x, %x, %d)", record->ExtAddr, record->Addr, record->Len);
 			break;
 		}
-		firmware += sizeof (EDGE_FIRMWARE_IMAGE_RECORD) + record->Len;
+		firmware += sizeof (struct edge_firmware_image_record) + record->Len;
 		if (firmware >= &FirmwareImage[ImageSize]) {
 			break;
 		}
