@@ -16,6 +16,7 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/signal.h>
+#include <linux/init.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -490,23 +491,38 @@ nextnode:
 
 	ops->cppr_info(boot_cpuid, 0xff);
 	iosync();
-	if (xics_irq_8259_cascade != -1) {
+
+	ppc64_boot_msg(0x21, "XICS Done");
+}
+
+/*
+ * We cant do this in init_IRQ because we need the memory subsystem up for
+ * request_irq()
+ */
+static int __init xics_setup_i8259(void)
+{
+	if (naca->interrupt_controller == IC_PPC_XIC &&
+	    xics_irq_8259_cascade != -1) {
 		if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET,
 				no_action, 0, "8259 cascade", 0))
 			printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 		i8259_init();
 	}
+	return 0;
+}
+arch_initcall(xics_setup_i8259);
 
 #ifdef CONFIG_SMP
+void xics_request_IPIs(void)
+{
 	real_irq_to_virt_map[XICS_IPI] = virt_irq_to_real_map[XICS_IPI] =
 		XICS_IPI;
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, SA_INTERRUPT,
 		    "IPI", 0);
 	irq_desc[XICS_IPI+XICS_IRQ_OFFSET].status |= IRQ_PER_CPU;
-#endif
-	ppc64_boot_msg(0x21, "XICS Done");
 }
+#endif
 
 void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 {

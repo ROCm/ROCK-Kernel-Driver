@@ -208,7 +208,7 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int __init smp_chrp_probe(void)
+static int __init smp_openpic_probe(void)
 {
 	int i;
 	int nr_cpus = 0;
@@ -301,6 +301,10 @@ static int __init smp_xics_probe(void)
 		if (cpu_possible(i))
 			nr_cpus++;
 	}
+#ifdef CONFIG_SMP
+	extern void xics_request_IPIs(void);
+	xics_request_IPIs();
+#endif
 
 	return nr_cpus;
 }
@@ -337,7 +341,7 @@ void __init smp_init_pSeries(void)
 
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		smp_ops->message_pass	= smp_openpic_message_pass;
-		smp_ops->probe		= smp_chrp_probe;
+		smp_ops->probe		= smp_openpic_probe;
 	} else {
 		smp_ops->message_pass	= smp_xics_message_pass;
 		smp_ops->probe		= smp_xics_probe;

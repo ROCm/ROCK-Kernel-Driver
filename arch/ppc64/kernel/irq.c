@@ -72,40 +72,6 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
 
-/* nasty hack for shared irq's since we need to do kmalloc calls but
- * can't very early in the boot when we need to do a request irq.
- * this needs to be removed.
- * -- Cort
- */
-#define IRQ_KMALLOC_ENTRIES 16
-static int cache_bitmask = 0;
-static struct irqaction malloc_cache[IRQ_KMALLOC_ENTRIES];
-extern int mem_init_done;
-
-void *irq_kmalloc(size_t size, int pri)
-{
-	unsigned int i;
-	if ( mem_init_done )
-		return kmalloc(size,pri);
-	for ( i = 0; i < IRQ_KMALLOC_ENTRIES ; i++ )
-		if ( ! ( cache_bitmask & (1<<i) ) ) {
-			cache_bitmask |= (1<<i);
-			return (void *)(&malloc_cache[i]);
-		}
-	return 0;
-}
-
-void irq_kfree(void *ptr)
-{
-	unsigned int i;
-	for ( i = 0 ; i < IRQ_KMALLOC_ENTRIES ; i++ )
-		if ( ptr == &malloc_cache[i] ) {
-			cache_bitmask &= ~(1<<i);
-			return;
-		}
-	kfree(ptr);
-}
-
 int
 setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -205,7 +171,7 @@ do_free_irq(int irq, void* dev_id)
 
 			/* Wait to make sure it's not being used on another CPU */
 			synchronize_irq(irq);
-			irq_kfree(action);
+			kfree(action);
 			return 0;
 		}
 		printk("Trying to free free IRQ%d\n",irq);
@@ -229,9 +195,9 @@ int request_irq(unsigned int irq,
 		return do_free_irq(irq, dev_id);
 	
 	action = (struct irqaction *)
-		irq_kmalloc(sizeof(struct irqaction), GFP_KERNEL);
+		kmalloc(sizeof(struct irqaction), GFP_KERNEL);
 	if (!action) {
-		printk(KERN_ERR "irq_kmalloc() failed for irq %d !\n", irq);
+		printk(KERN_ERR "kmalloc() failed for irq %d !\n", irq);
 		return -ENOMEM;
 	}
 	
