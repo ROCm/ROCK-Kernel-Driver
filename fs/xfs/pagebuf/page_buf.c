@@ -46,7 +46,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/compiler.h>
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -57,6 +56,7 @@
 #include <linux/bio.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/workqueue.h>
 
 #include <support/debug.h>
 #include <support/kmem.h>
