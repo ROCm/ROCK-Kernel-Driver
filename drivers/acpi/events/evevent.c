@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
- *              $Revision: 94 $
+ *              $Revision: 95 $
  *
  *****************************************************************************/
 
@@ -343,30 +343,44 @@ acpi_ev_gpe_initialize (void)
 	acpi_gbl_gpe_block_info[0].block_base_number = 0;
 	acpi_gbl_gpe_block_info[1].block_base_number = acpi_gbl_FADT->gpe1_base;
 
+	/* Warn and exit if there are no GPE registers */
+
 	acpi_gbl_gpe_register_count = acpi_gbl_gpe_block_info[0].register_count +
 			 acpi_gbl_gpe_block_info[1].register_count;
 	if (!acpi_gbl_gpe_register_count) {
-		ACPI_REPORT_WARNING (("Zero GPEs are defined in the FADT\n"));
+		ACPI_REPORT_WARNING (("There are no GPE blocks defined in the FADT\n"));
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	/* Determine the maximum GPE number for this machine */
+	/*
+	 * Determine the maximum GPE number for this machine.
+	 * Note: both GPE0 and GPE1 are optional, and either can exist without
+	 * the other
+	 */
+	if (acpi_gbl_gpe_block_info[0].register_count) {
+		/* GPE block 0 exists */
 
-	acpi_gbl_gpe_number_max = ACPI_MUL_8 (acpi_gbl_gpe_block_info[0].register_count) - 1;
+		acpi_gbl_gpe_number_max = ACPI_MUL_8 (acpi_gbl_gpe_block_info[0].register_count) - 1;
+	}
 
 	if (acpi_gbl_gpe_block_info[1].register_count) {
-		/* Check for GPE0/GPE1 overlap */
+		/* GPE block 1 exists */
 
-		if (acpi_gbl_gpe_number_max >= acpi_gbl_FADT->gpe1_base) {
+		/* Check for GPE0/GPE1 overlap (if both banks exist) */
+
+		if ((acpi_gbl_gpe_block_info[0].register_count) &&
+			(acpi_gbl_gpe_number_max >= acpi_gbl_FADT->gpe1_base)) {
 			ACPI_REPORT_ERROR ((
-				"GPE0 block (GPE  0 to %d) overlaps the GPE1 block (GPE %d to %d)\n",
+				"GPE0 block (GPE 0 to %d) overlaps the GPE1 block (GPE %d to %d)\n",
 				acpi_gbl_gpe_number_max, acpi_gbl_FADT->gpe1_base,
 				acpi_gbl_FADT->gpe1_base + (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1)));
 			return_ACPI_STATUS (AE_BAD_VALUE);
 		}
 
-		/* GPE0 and GPE1 do not have to be contiguous in the GPE number space */
-
+		/*
+		 * GPE0 and GPE1 do not have to be contiguous in the GPE number space,
+		 * But, GPE0 always starts at zero.
+		 */
 		acpi_gbl_gpe_number_max = acpi_gbl_FADT->gpe1_base +
 				 (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1);
 	}
@@ -379,9 +393,8 @@ acpi_ev_gpe_initialize (void)
 		return_ACPI_STATUS (AE_BAD_VALUE);
 	}
 
-	/*
-	 * Allocate the GPE number-to-index translation table
-	 */
+	/* Allocate the GPE number-to-index translation table */
+
 	acpi_gbl_gpe_number_to_index = ACPI_MEM_CALLOCATE (
 			   sizeof (ACPI_GPE_INDEX_INFO) *
 			   ((ACPI_SIZE) acpi_gbl_gpe_number_max + 1));
@@ -396,9 +409,8 @@ acpi_ev_gpe_initialize (void)
 	ACPI_MEMSET (acpi_gbl_gpe_number_to_index, (int) ACPI_GPE_INVALID,
 			sizeof (ACPI_GPE_INDEX_INFO) * ((ACPI_SIZE) acpi_gbl_gpe_number_max + 1));
 
-	/*
-	 * Allocate the GPE register information block
-	 */
+	/* Allocate the GPE register information block */
+
 	acpi_gbl_gpe_register_info = ACPI_MEM_CALLOCATE (
 			  (ACPI_SIZE) acpi_gbl_gpe_register_count *
 			  sizeof (ACPI_GPE_REGISTER_INFO));
@@ -470,7 +482,6 @@ acpi_ev_gpe_initialize (void)
 			 * are cleared by writing a '1', while enable registers are cleared
 			 * by writing a '0'.
 			 */
-
 			status = acpi_hw_low_level_write (8, 0x00, &gpe_register_info->enable_address, 0);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -484,16 +495,18 @@ acpi_ev_gpe_initialize (void)
 			gpe_register++;
 		}
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d: %X registers at %8.8X%8.8X\n",
-			(s32) gpe_block, acpi_gbl_gpe_block_info[0].register_count,
-			ACPI_HIDWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address)),
-			ACPI_LODWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address))));
+		if (i) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d: %X registers at %8.8X%8.8X\n",
+				(s32) gpe_block, acpi_gbl_gpe_block_info[0].register_count,
+				ACPI_HIDWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address)),
+				ACPI_LODWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address))));
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d Range GPE #%2.2X to GPE #%2.2X\n",
-			(s32) gpe_block,
-			acpi_gbl_gpe_block_info[gpe_block].block_base_number,
-			acpi_gbl_gpe_block_info[gpe_block].block_base_number +
-				((acpi_gbl_gpe_block_info[gpe_block].register_count * 8) -1)));
+			ACPI_REPORT_INFO (("GPE Block%d defined as GPE%d to GPE%d\n",
+				(s32) gpe_block,
+				acpi_gbl_gpe_block_info[gpe_block].block_base_number,
+				acpi_gbl_gpe_block_info[gpe_block].block_base_number +
+					((acpi_gbl_gpe_block_info[gpe_block].register_count * 8) -1)));
+		}
 	}
 
 	return_ACPI_STATUS (AE_OK);
