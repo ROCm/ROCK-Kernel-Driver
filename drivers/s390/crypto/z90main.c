@@ -50,7 +50,7 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.31.2.3 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.31.2.4 $"
 
 static char z90cmain_version[] __initdata =
 	"z90main.o (" VERSION_Z90MAIN_C "/"
@@ -2581,8 +2581,7 @@ z90crypt_config_task(unsigned long ptr)
 
 	PDEBUG("jiffies %ld\n", jiffies);
 
-	if ((rc = refresh_z90crypt(&z90crypt.cdx)))
-		PRINTK("Error %d detected in refresh_z90crypt.\n", rc);
+	rc = refresh_z90crypt(&z90crypt.cdx);
 	/* If return was fatal, don't bother reconfiguring */
 	if ((rc != TSQ_FATAL_ERROR) && (rc != RSQ_FATAL_ERROR))
 		z90crypt_schedule_config_task(CONFIGTIME);
@@ -2758,69 +2757,83 @@ helper_scan_devices(int cdx_array[16], int *cdx_p, int *correct_cdx_found)
 {
 	enum hdstat hd_stat;
 	int q_depth, dev_type;
-	int i, j, k;
+	int indx, chkdom, numdomains;
 
-	q_depth = dev_type = k = 0;
-	for (i = 0; i < z90crypt.max_count; i++) {
+	q_depth = dev_type = numdomains = 0;
+	for (chkdom = 0; chkdom <= 15; cdx_array[chkdom++] = -1);
+	for (indx = 0; indx < z90crypt.max_count; indx++) {
 		hd_stat = HD_NOT_THERE;
-		for (j = 0; j <= 15; cdx_array[j++] = -1);
-		k = 0;
-		for (j = 0; j <= 15; j++) {
-			hd_stat = query_online(i, j, MAX_RESET,
+		numdomains = 0;
+		for (chkdom = 0; chkdom <= 15; chkdom++) {
+			hd_stat = query_online(indx, chkdom, MAX_RESET,
 					       &q_depth, &dev_type);
 			if (hd_stat == HD_TSQ_EXCEPTION) {
 				z90crypt.terminating = 1;
-				PRINTKC("exception taken!\n");
 				break;
 			}
 			if (hd_stat == HD_ONLINE) {
-				cdx_array[k++] = j;
-				if (*cdx_p == j) {
+				cdx_array[numdomains++] = chkdom;
+				if (*cdx_p == chkdom) {
 					*correct_cdx_found  = 1;
 					break;
 				}
 			}
 		}
-		if ((*correct_cdx_found == 1) || (k != 0))
+		if ((*correct_cdx_found == 1) || (numdomains != 0))
 			break;
 		if (z90crypt.terminating)
 			break;
 	}
-	return k;
+	return numdomains;
 }
 
 static inline int
 probe_crypto_domain(int *cdx_p)
 {
 	int cdx_array[16];
-	int correct_cdx_found, k;
+	char cdx_array_text[53], temp[5];
+	int correct_cdx_found, numdomains;
 
 	correct_cdx_found = 0;
-	k = helper_scan_devices(cdx_array, cdx_p, &correct_cdx_found);
+	numdomains = helper_scan_devices(cdx_array, cdx_p, &correct_cdx_found);
 
-	if (z90crypt.terminating)
+	if (z90crypt.terminating) {
+		PRINTKC("Exception taken probing domain. z90crypt will no "
+			"longer function.\n");
+		PRINTKC("Please 1) unload z90crypt, 2) ensure that you have "
+			"devices defined to this LPAR/guest, and then 3) "
+			"load z90crypt.\n");
 		return TSQ_FATAL_ERROR;
+	}
 
 	if (correct_cdx_found)
 		return 0;
 
-	if (k == 0) {
-		*cdx_p = 0;
-		return 0;
+	if (numdomains == 0) {
+		PRINTKW("Unable to find crypto domain: No devices found\n");
+		return Z90C_NO_DEVICES;
 	}
 
-	if (k == 1) {
+	if (numdomains == 1) {
 		if (*cdx_p == -1) {
 			*cdx_p = cdx_array[0];
 			return 0;
 		}
-		if (*cdx_p != cdx_array[0]) {
-			PRINTK("incorrect domain: specified = %d, found = %d\n",
-			       *cdx_p, cdx_array[0]);
-			return Z90C_INCORRECT_DOMAIN;
-		}
+		PRINTKW("incorrect domain: specified = %d, found = %d\n",
+		       *cdx_p, cdx_array[0]);
+		return Z90C_INCORRECT_DOMAIN;
 	}
 
+	numdomains--;
+	sprintf(cdx_array_text, "%d", cdx_array[numdomains]);
+	while (numdomains) {
+		numdomains--;
+		sprintf(temp, ", %d", cdx_array[numdomains]);
+		strcat(cdx_array_text, temp);
+	}
+
+	PRINTKW("ambiguous domain detected: specified = %d, found array = %s\n",
+		*cdx_p, cdx_array_text);
 	return Z90C_AMBIGUOUS_DOMAIN;
 }
 
@@ -2839,25 +2852,14 @@ refresh_z90crypt(int *cdx_p)
 		return TSQ_FATAL_ERROR;
 	rv = 0;
 	if (!z90crypt.hdware_info->hdware_mask.st_count &&
-	    !z90crypt.domain_established)
+	    !z90crypt.domain_established) {
 		rv = probe_crypto_domain(cdx_p);
-	if (z90crypt.terminating)
-		return TSQ_FATAL_ERROR;
-	if (rv) {
-		switch (rv) {
-		case Z90C_AMBIGUOUS_DOMAIN:
-			PRINTK("ambiguous domain detected\n");
-			break;
-		case Z90C_INCORRECT_DOMAIN:
-			PRINTK("incorrect domain specified\n");
-			break;
-		default:
-			PRINTK("probe domain returned %d\n", rv);
-			break;
-		}
-		return rv;
-	}
-	if (*cdx_p) {
+		if (z90crypt.terminating)
+			return TSQ_FATAL_ERROR;
+		if (rv == Z90C_NO_DEVICES)
+			return 0; // try later
+		if (rv)
+			return rv;
 		z90crypt.cdx = *cdx_p;
 		z90crypt.domain_established = 1;
 	}

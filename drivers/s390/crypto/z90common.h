@@ -27,7 +27,7 @@
 #ifndef _Z90COMMON_
 #define _Z90COMMON_
 
-#define VERSION_Z90COMMON_H "$Revision: 1.8.2.1 $"
+#define VERSION_Z90COMMON_H "$Revision: 1.8.2.2 $"
 
 
 #define RESPBUFFSIZE 256
@@ -56,6 +56,7 @@ enum hdstat {
 	HD_TSQ_EXCEPTION	
 };
 
+#define Z90C_NO_DEVICES                1
 #define Z90C_AMBIGUOUS_DOMAIN	2
 #define Z90C_INCORRECT_DOMAIN	3
 #define ENOTINIT		4
