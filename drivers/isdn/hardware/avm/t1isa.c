@@ -263,26 +263,11 @@ static void t1_handle_interrupt(avmcard * card)
 
 static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "t1isa: interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "%s: reentering interrupt hander.\n",
-				 card->name);
-		return;
-	}
-
-	card->interrupt = 1;
+	avmcard *card = devptr;
 
 	t1_handle_interrupt(card);
-
-	card->interrupt = 0;
 }
+
 /* ------------------------------------------------------------- */
 
 static int t1isa_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)

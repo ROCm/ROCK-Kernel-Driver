@@ -719,25 +719,9 @@ static void c4_handle_interrupt(avmcard *card)
 
 static void c4_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "%s: interrupt: wrong device\n", card->name);
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "%s: reentering interrupt hander\n",
-				card->name);
-		return;
-	}
-
-	card->interrupt = 1;
+	avmcard *card = devptr;
 
 	c4_handle_interrupt(card);
-
-	card->interrupt = 0;
 }
 
 /* ------------------------------------------------------------- */

@@ -36,25 +36,11 @@ MODULE_LICENSE("GPL");
 
 static void b1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "b1_interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "b1_interrupt: reentering interrupt hander (%s)\n", card->name);
-		return;
-	}
-
-	card->interrupt = 1;
+	avmcard *card = (avmcard *) devptr;
 
 	b1_handle_interrupt(card);
-
-	card->interrupt = 0;
 }
+
 /* ------------------------------------------------------------- */
 
 static struct capi_driver_interface *di;

@@ -372,11 +372,8 @@ static void b1dma_dispatch_tx(avmcard *card)
 	u8 cmd, subcmd;
 	u16 len;
 	u32 txlen;
-	int inint;
 	void *p;
 	
-	inint = card->interrupt;
-
 	skb = skb_dequeue(&dma->send_queue);
 
 	len = CAPIMSG_LEN(skb->data);
@@ -398,8 +395,7 @@ static void b1dma_dispatch_tx(avmcard *card)
 		}
 		txlen = (u8 *)p - (u8 *)dma->sendbuf.dmabuf;
 #ifdef CONFIG_B1DMA_DEBUG
-		printk(KERN_DEBUG "tx(%d): put msg len=%d\n",
-				inint, txlen);
+		printk(KERN_DEBUG "tx: put msg len=%d\n", txlen);
 #endif
 	} else {
 		txlen = skb->len-2;
@@ -408,8 +404,8 @@ static void b1dma_dispatch_tx(avmcard *card)
 			printk(KERN_INFO "%s: send ack\n", card->name);
 #endif
 #ifdef CONFIG_B1DMA_DEBUG
-		printk(KERN_DEBUG "tx(%d): put 0x%x len=%d\n",
-				inint, skb->data[2], txlen);
+		printk(KERN_DEBUG "tx: put 0x%x len=%d\n", 
+		       skb->data[2], txlen);
 #endif
 		memcpy(dma->sendbuf.dmabuf, skb->data+2, skb->len-2);
 	}
@@ -619,24 +615,9 @@ static void b1dma_handle_interrupt(avmcard *card)
 
 void b1dma_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "b1dma: interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "%s: reentering interrupt hander\n", card->name);
-		return;
-	}
-
-	card->interrupt = 1;
+	avmcard *card = devptr;
 
 	b1dma_handle_interrupt(card);
-
-	card->interrupt = 0;
 }
 
 /* ------------------------------------------------------------- */

@@ -72,8 +72,6 @@ typedef struct avmcard {
 	char msgbuf[128];	/* capimsg msg part */
 	char databuf[2048];	/* capimsg data part */
 
-	int interrupt;
-
 	void *mbase;
 	volatile u32 csr;
 	avmcard_dmainfo *dma;

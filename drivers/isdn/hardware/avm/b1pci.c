@@ -48,24 +48,9 @@ static struct capi_driver_interface *di;
 
 static void b1pci_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
-	avmcard *card;
-
-	card = (avmcard *) devptr;
-
-	if (!card) {
-		printk(KERN_WARNING "b1pci: interrupt: wrong device\n");
-		return;
-	}
-	if (card->interrupt) {
-		printk(KERN_ERR "%s: reentering interrupt hander.\n", card->name);
-		return;
-	}
-
-	card->interrupt = 1;
+	avmcard *card = devptr;
 
 	b1_handle_interrupt(card);
-
-	card->interrupt = 0;
 }
 
 /* ------------------------------------------------------------- */
