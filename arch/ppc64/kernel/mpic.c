@@ -580,11 +580,13 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 void __init mpic_assign_isu(struct mpic *mpic, unsigned int isu_num,
 			    unsigned long phys_addr)
 {
+	unsigned int isu_first = isu_num * mpic->isu_size;
+
 	BUG_ON(isu_num >= MPIC_MAX_ISU);
 
 	mpic->isus[isu_num] = ioremap(phys_addr, MPIC_IRQ_STRIDE * mpic->isu_size);
-	if ((isu_num + mpic->isu_size) > mpic->num_sources)
-		mpic->num_sources = isu_num + mpic->isu_size;
+	if ((isu_first + mpic->isu_size) > mpic->num_sources)
+		mpic->num_sources = isu_first + mpic->isu_size;
 }
 
 void __init mpic_setup_cascade(unsigned int irq, mpic_cascade_t handler,
