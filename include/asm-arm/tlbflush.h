@@ -262,7 +262,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 	if (tlb_flag(TLB_WB))
 		asm("mcr%? p15, 0, %0, c7, c10, 4" : : "r" (zero));
 
-	if (mm == current->active_mm) {
+	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask)) {
 		if (tlb_flag(TLB_V3_FULL))
 			asm("mcr%? p15, 0, %0, c6, c0, 0" : : "r" (zero));
 		if (tlb_flag(TLB_V4_U_FULL))
@@ -292,7 +292,7 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
 	if (tlb_flag(TLB_WB))
 		asm("mcr%? p15, 0, %0, c7, c10, 4" : : "r" (zero));
 
-	if (vma->vm_mm == current->active_mm) {
+	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask)) {
 		if (tlb_flag(TLB_V3_PAGE))
 			asm("mcr%? p15, 0, %0, c6, c0, 0" : : "r" (uaddr));
 		if (tlb_flag(TLB_V4_U_PAGE))
