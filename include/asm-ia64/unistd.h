@@ -232,6 +232,9 @@
 #define __NR_io_getevents		1240
 #define __NR_io_submit			1241
 #define __NR_io_cancel			1242
+#define __NR_epoll_create		1243
+#define __NR_epoll_ctl			1244
+#define __NR_epoll_wait			1245
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

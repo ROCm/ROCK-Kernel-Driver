@@ -20,21 +20,19 @@ extern int simscsi_reset (Scsi_Cmnd *, unsigned int);
 extern int simscsi_biosparam (struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 
-#define SIMSCSI {					\
-	detect:			simscsi_detect,		\
-	release:		simscsi_release,	\
-	info:			simscsi_info,		\
-	queuecommand:		simscsi_queuecommand,	\
-	abort:			simscsi_abort,		\
-	reset:			simscsi_reset,		\
-	bios_param:		simscsi_biosparam,	\
-	can_queue:		SIMSCSI_REQ_QUEUE_LEN,	\
-	this_id:		-1,			\
-	sg_tablesize:		SG_ALL,			\
-	cmd_per_lun:		SIMSCSI_REQ_QUEUE_LEN,	\
-	present:		0,			\
-	unchecked_isa_dma:	0,			\
-	use_clustering:		DISABLE_CLUSTERING	\
+#define SIMSCSI {						\
+	.detect			= simscsi_detect,		\
+	.release		= simscsi_release,		\
+	.info			= simscsi_info,			\
+	.queuecommand		= simscsi_queuecommand,		\
+	.bios_param		= simscsi_biosparam,		\
+	.can_queue		= SIMSCSI_REQ_QUEUE_LEN,	\
+	.this_id		= -1,				\
+	.sg_tablesize		= SG_ALL,			\
+	.cmd_per_lun		= SIMSCSI_REQ_QUEUE_LEN,	\
+	.present		= 0,				\
+	.unchecked_isa_dma	= 0,				\
+	.use_clustering		= DISABLE_CLUSTERING		\
 }
 
 #endif /* SIMSCSI_H */
