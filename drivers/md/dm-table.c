@@ -205,7 +205,7 @@ static int alloc_targets(struct dm_table *t, unsigned int num)
 
 int dm_table_create(struct dm_table **result, int mode, unsigned num_targets)
 {
-	struct dm_table *t = kmalloc(sizeof(*t), GFP_NOIO);
+	struct dm_table *t = kmalloc(sizeof(*t), GFP_KERNEL);
 
 	if (!t)
 		return -ENOMEM;
