@@ -1113,10 +1113,11 @@ static int usb_stor_reset_common(struct us_data *us,
 		goto Done;
 	}
 
-	/* long wait for reset, so unlock to allow disconnects */
-	up(&us->dev_semaphore);
-	msleep(6000);
-	down(&us->dev_semaphore);
+ 	/* Give the device some time to recover from the reset,
+ 	 * but don't delay disconnect processing. */
+ 	wait_event_interruptible_timeout(us->dev_reset_wait,
+ 			test_bit(US_FLIDX_DISCONNECTING, &us->flags),
+ 			HZ*6);
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
 		US_DEBUGP("Reset interrupted by disconnect\n");
 		goto Done;
