@@ -371,16 +371,16 @@ extern int fb_unregister_client(struct notifier_block *nb);
 #define FB_PIXMAP_SYNC    256   /* set if GPU can DMA       */
 
 struct fb_pixmap {
-	u8 *addr;		/* pointer to memory                    */
-	u32 size;		/* size of buffer in bytes              */
-	u32 offset;		/* current offset to buffer             */
-	u32 buf_align;		/* byte alignment of each bitmap        */
-	u32 scan_align;		/* alignment per scanline               */
-	u32 access_align;	/* alignment per read/write             */
-	u32 flags;		/* see FB_PIXMAP_*                      */
-					  /* access methods                */
-	void (*outbuf)(u8 *dst, u8 *addr, unsigned int size); 
-	u8   (*inbuf) (u8 *addr);
+	u8  *addr;		/* pointer to memory			*/
+	u32 size;		/* size of buffer in bytes		*/
+	u32 offset;		/* current offset to buffer		*/
+	u32 buf_align;		/* byte alignment of each bitmap	*/
+	u32 scan_align;		/* alignment per scanline		*/
+	u32 access_align;	/* alignment per read/write		*/
+	u32 flags;		/* see FB_PIXMAP_*			*/
+				/* access methods			*/
+	void (*outbuf)(struct fb_info *info, u8 *addr, u8 *src, unsigned int size);
+	u8   (*inbuf) (struct fb_info *info, u8 *addr);
 };
 
     /*
@@ -388,64 +388,53 @@ struct fb_pixmap {
      */
 
 struct fb_ops {
-    /* open/release and usage marking */
-    struct module *owner;
-    int (*fb_open)(struct fb_info *info, int user);
-    int (*fb_release)(struct fb_info *info, int user);
+	/* open/release and usage marking */
+	struct module *owner;
+	int (*fb_open)(struct fb_info *info, int user);
+	int (*fb_release)(struct fb_info *info, int user);
 
-    /* For framebuffers with strange non linear layouts */	
-	ssize_t(*fb_read) (struct file * file, char *buf, size_t count,
-			   loff_t * ppos);
-	ssize_t(*fb_write) (struct file * file, const char *buf,
-			    size_t count, loff_t * ppos);
+	/* For framebuffers with strange non linear layouts */
+	ssize_t (*fb_read)(struct file *file, char *buf, size_t count, loff_t *ppos);
+	ssize_t (*fb_write)(struct file *file, const char *buf, size_t count, loff_t *ppos);
 
 	/* checks var and eventually tweaks it to something supported,
 	 * DO NOT MODIFY PAR */
-	int (*fb_check_var) (struct fb_var_screeninfo * var,
-			     struct fb_info * info);
+	int (*fb_check_var)(struct fb_var_screeninfo *var, struct fb_info *info);
 	/* set the video mode according to info->var */
-    int (*fb_set_par)(struct fb_info *info);
+	int (*fb_set_par)(struct fb_info *info);
 
-    /* set color register */
-    int (*fb_setcolreg)(unsigned regno, unsigned red, unsigned green,
-			     unsigned blue, unsigned transp,
-			     struct fb_info * info);
+	/* set color register */
+	int (*fb_setcolreg)(unsigned regno, unsigned red, unsigned green,
+			    unsigned blue, unsigned transp, struct fb_info *info);
 
-    /* blank display */
-    int (*fb_blank)(int blank, struct fb_info *info);
+	/* blank display */
+	int (*fb_blank)(int blank, struct fb_info *info);
 
-    /* pan display */
-	int (*fb_pan_display) (struct fb_var_screeninfo * var,
-			       struct fb_info * info);
+	/* pan display */
+	int (*fb_pan_display)(struct fb_var_screeninfo *var, struct fb_info *info);
 
-    /* draws a rectangle */
-	void (*fb_fillrect) (struct fb_info * info,
-			     const struct fb_fillrect * rect);
-    /* Copy data from area to another */
-	void (*fb_copyarea) (struct fb_info * info,
-			     const struct fb_copyarea * region);
-    /* Draws a image to the display */
-	void (*fb_imageblit) (struct fb_info * info,
-			      const struct fb_image * image);
+	/* Draws a rectangle */
+	void (*fb_fillrect) (struct fb_info *info, const struct fb_fillrect *rect);
+	/* Copy data from area to another */
+	void (*fb_copyarea) (struct fb_info *info, const struct fb_copyarea *region);
+	/* Draws a image to the display */
+	void (*fb_imageblit) (struct fb_info *info, const struct fb_image *image);
 
-    /* Draws cursor */
-	int (*fb_cursor) (struct fb_info * info,
-			  struct fb_cursor * cursor);
+	/* Draws cursor */
+	int (*fb_cursor) (struct fb_info *info, struct fb_cursor *cursor);
 
-    /* Rotates the display */
-    void (*fb_rotate)(struct fb_info *info, int angle);
+	/* Rotates the display */
+	void (*fb_rotate)(struct fb_info *info, int angle);
 
-    /* wait for blit idle, optional */
-    int (*fb_sync)(struct fb_info *info);		
+	/* wait for blit idle, optional */
+	int (*fb_sync)(struct fb_info *info);
 
-    /* perform fb specific ioctl (optional) */
-	int (*fb_ioctl) (struct inode * inode, struct file * file,
-			 unsigned int cmd, unsigned long arg,
-			 struct fb_info * info);
+	/* perform fb specific ioctl (optional) */
+	int (*fb_ioctl)(struct inode *inode, struct file *file, unsigned int cmd,
+			unsigned long arg, struct fb_info *info);
 
-    /* perform fb specific mmap */
-	int (*fb_mmap) (struct fb_info * info, struct file * file,
-			struct vm_area_struct * vma);
+	/* perform fb specific mmap */
+	int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
 };
 
 struct fb_info {
@@ -459,6 +448,7 @@ struct fb_info {
 	struct fb_cursor cursor;	/* Current cursor */	
 	struct work_struct queue;	/* Framebuffer event queue */
 	struct fb_pixmap pixmap;	/* Image Hardware Mapper */
+	struct fb_pixmap sprite;	/* Cursor hardware Mapper */
 	struct fb_cmap cmap;		/* Current cmap */
 	struct fb_ops *fbops;
 	char *screen_base;		/* Virtual address */
@@ -537,14 +527,16 @@ extern int register_framebuffer(struct fb_info *fb_info);
 extern int unregister_framebuffer(struct fb_info *fb_info);
 extern int fb_prepare_logo(struct fb_info *fb_info);
 extern int fb_show_logo(struct fb_info *fb_info);
-extern u32 fb_get_buffer_offset(struct fb_info *info, u32 size);
-extern void move_buf_unaligned(struct fb_info *info, u8 * dst, u8 * src,
-				u32 d_pitch, u32 height, u32 mask,
-				u32 shift_high, u32 shift_low, u32 mod,
-				u32 idx);
-extern void move_buf_aligned(struct fb_info *info, u8 * dst, u8 * src,
-				u32 d_pitch, u32 s_pitch, u32 height);
+extern char* fb_get_buffer_offset(struct fb_info *info, struct fb_pixmap *buf, u32 size);
+extern void fb_move_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+				u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+				u32 height, u32 shift_high, u32 shift_low, u32 mod);
+extern void fb_move_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+				u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+				u32 height);
+extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
+
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
 
