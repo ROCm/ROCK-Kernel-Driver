@@ -29,6 +29,11 @@ obj-$(CONFIG_ACPI_INTERPRETER)	+= osl.o utils.o \
 #
 # ACPI Bus and Device Drivers
 #
+processor_tmp-objs	+= processor.o
+ifdef CONFIG_CPU_FREQ
+processor_tmp-objs	+= processor_perflib.o
+endif
+
 obj-$(CONFIG_ACPI_BUS)		+= sleep/
 obj-$(CONFIG_ACPI_BUS)		+= bus.o
 obj-$(CONFIG_ACPI_AC) 		+= ac.o
@@ -39,7 +44,7 @@ obj-$(CONFIG_ACPI_FAN)		+= fan.o
 obj-$(CONFIG_ACPI_VIDEO)	+= video.o
 obj-$(CONFIG_ACPI_PCI)		+= pci_root.o pci_link.o pci_irq.o pci_bind.o
 obj-$(CONFIG_ACPI_POWER)	+= power.o
-obj-$(CONFIG_ACPI_PROCESSOR)	+= processor.o
+obj-$(CONFIG_ACPI_PROCESSOR)	+= processor_tmp.o
 obj-$(CONFIG_ACPI_CONTAINER)	+= container.o
 obj-$(CONFIG_ACPI_THERMAL)	+= thermal.o
 obj-$(CONFIG_ACPI_SYSTEM)	+= system.o event.o

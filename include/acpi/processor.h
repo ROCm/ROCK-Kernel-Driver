@@ -2,6 +2,7 @@
 #define __ACPI_PROCESSOR_H
 
 #include <linux/kernel.h>
+#include <linux/config.h>
 
 #define ACPI_PROCESSOR_BUSY_METRIC	10
 
@@ -143,5 +144,29 @@ extern void acpi_processor_unregister_performance (
 /* note: this locks both the calling module and the processor module
          if a _PPC object exists, rmmod is disallowed then */
 int acpi_processor_notify_smm(struct module *calling_module);
+
+
+
+/* for communication between multiple parts of the processor kernel module */
+extern struct acpi_processor	*processors[NR_CPUS];
+
+/* in processor_perflib.c */
+#ifdef CONFIG_CPU_FREQ
+void acpi_processor_ppc_init(void);
+void acpi_processor_ppc_exit(void);
+int acpi_processor_ppc_has_changed(struct acpi_processor *pr);
+#else
+static inline void acpi_processor_ppc_init(void) { return; }
+static inline void acpi_processor_ppc_exit(void) { return; }
+static inline int acpi_processor_ppc_has_changed(struct acpi_processor *pr) {
+	static unsigned int printout = 1;
+	if (printout) {
+		printk(KERN_WARNING "Warning: Processor Platform Limit event detected, but not handled.\n");
+		printk(KERN_WARNING "Consider compiling CPUfreq support into your kernel.\n");
+		printout = 0;
+	}
+	return 0;
+}
+#endif /* CONFIG_CPU_FREQ */
 
 #endif
