@@ -436,7 +436,7 @@ void highlevel_host_reset(struct hpsb_host *host)
 }
 
 void highlevel_iso_receive(struct hpsb_host *host, void *data,
-                           unsigned int length)
+			   size_t length)
 {
         struct list_head *entry;
         struct hpsb_highlevel *hl;
@@ -456,7 +456,7 @@ void highlevel_iso_receive(struct hpsb_host *host, void *data,
 }
 
 void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
-                           void *data, unsigned int length)
+			   void *data, size_t length)
 {
         struct list_head *entry;
         struct hpsb_highlevel *hl;

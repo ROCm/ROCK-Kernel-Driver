@@ -113,35 +113,33 @@ static void fill_async_stream_packet(struct hpsb_packet *packet, int length,
 /**
  * hpsb_get_tlabel - allocate a transaction label
  * @packet: the packet who's tlabel/tpool we set
- * @wait: whether to sleep if no tlabel is available
  *
- * Every asynchronous transaction on the 1394 bus needs a transaction label to
- * match the response to the request.  This label has to be different from any
- * other transaction label in an outstanding request to the same node to make
- * matching possible without ambiguity.
+ * Every asynchronous transaction on the 1394 bus needs a transaction
+ * label to match the response to the request.  This label has to be
+ * different from any other transaction label in an outstanding request to
+ * the same node to make matching possible without ambiguity.
  *
- * There are 64 different tlabels, so an allocated tlabel has to be freed with
- * hpsb_free_tlabel() after the transaction is complete (unless it's reused again for
- * the same target node).
- *
- * @wait cannot be set if in_interrupt()
+ * There are 64 different tlabels, so an allocated tlabel has to be freed
+ * with hpsb_free_tlabel() after the transaction is complete (unless it's
+ * reused again for the same target node).
  *
  * Return value: Zero on success, otherwise non-zero. A non-zero return
- * generally means there are no available tlabels.
+ * generally means there are no available tlabels. If this is called out
+ * of interrupt or atomic context, then it will sleep until can return a
+ * tlabel.
  */
-int hpsb_get_tlabel(struct hpsb_packet *packet, int wait)
+int hpsb_get_tlabel(struct hpsb_packet *packet)
 {
 	unsigned long flags;
 	struct hpsb_tlabel_pool *tp;
 
 	tp = &packet->host->tpool[packet->node_id & NODE_MASK];
 
-	if (wait) {
-		BUG_ON(in_interrupt());
-		down(&tp->count);
-	} else {
+	if (in_interrupt() || in_atomic()) {
 		if (down_trylock(&tp->count))
 			return 1;
+	} else {
+		down(&tp->count);
 	}
 
 	spin_lock_irqsave(&tp->lock, flags);
@@ -270,7 +268,7 @@ struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
 	packet->host = host;
 	packet->node_id = node;
 
-	if (hpsb_get_tlabel(packet, in_interrupt() ? 0 : 1)) {
+	if (hpsb_get_tlabel(packet)) {
 		free_hpsb_packet(packet);
 		return NULL;
 	}
@@ -301,7 +299,7 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 	packet->host = host;
 	packet->node_id = node;
 
-	if (hpsb_get_tlabel(packet, in_interrupt() ? 0 : 1)) {
+	if (hpsb_get_tlabel(packet)) {
 		free_hpsb_packet(packet);
 		return NULL;
 	}
@@ -329,7 +327,7 @@ struct hpsb_packet *hpsb_make_lockpacket(struct hpsb_host *host, nodeid_t node,
 
 	p->host = host;
 	p->node_id = node;
-	if (hpsb_get_tlabel(p, in_interrupt() ? 0 : 1)) {
+	if (hpsb_get_tlabel(p)) {
 		free_hpsb_packet(p);
 		return NULL;
 	}
@@ -366,7 +364,7 @@ struct hpsb_packet *hpsb_make_lock64packet(struct hpsb_host *host, nodeid_t node
 
 	p->host = host;
 	p->node_id = node;
-	if (hpsb_get_tlabel(p, in_interrupt() ? 0 : 1)) {
+	if (hpsb_get_tlabel(p)) {
 		free_hpsb_packet(p);
 		return NULL;
 	}

@@ -1,6 +1,18 @@
 #ifndef __I386_DIV64
 #define __I386_DIV64
 
+/*
+ * do_div() is NOT a C function. It wants to return
+ * two values (the quotient and the remainder), but
+ * since that doesn't work very well in C, what it
+ * does is:
+ *
+ * - modifies the 64-bit dividend _in_place_
+ * - returns the 32-bit remainder
+ *
+ * This ends up being the most efficient "calling
+ * convention" on x86.
+ */
 #define do_div(n,base) ({ \
 	unsigned long __upper, __low, __high, __mod; \
 	asm("":"=a" (__low), "=d" (__high):"A" (n)); \
