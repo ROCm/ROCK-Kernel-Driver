@@ -72,6 +72,11 @@ CONFIG_ACPI_PROCESSOR
   ACPI C2 and C3 processor states to save power, on systems that
   support it.
 
+CONFIG_ACPI_PROCESSOR_PERF
+  This driver adds support for CPU frequency scaling, if this is supported
+  by the hardware and the BIOS. If you are compiling for a mobile system,
+  say Y.
+
 CONFIG_ACPI_THERMAL
   This driver adds support for ACPI thermal zones.  Most mobile and
   some desktop systems support ACPI thermal zones.  It is HIGHLY

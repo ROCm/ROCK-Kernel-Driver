@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 139 $
+ *       $Revision: 140 $
  *
  *****************************************************************************/
 
@@ -611,10 +611,6 @@ acpi_ex_exit_interpreter (
 void
 acpi_ex_truncate_for32bit_table (
 	acpi_operand_object     *obj_desc);
-
-u8
-acpi_ex_validate_object_type (
-	acpi_object_type        type);
 
 u8
 acpi_ex_acquire_global_lock (

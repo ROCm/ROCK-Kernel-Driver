@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 103 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -49,32 +49,6 @@
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exutils")
 
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ex_validate_object_type
- *
- * PARAMETERS:  Type            Object type to validate
- *
- * DESCRIPTION: Determine if a type is a valid ACPI object type
- *
- ******************************************************************************/
-
-u8
-acpi_ex_validate_object_type (
-	acpi_object_type        type)
-{
-
-	ACPI_FUNCTION_ENTRY ();
-
-
-	if ((type > ACPI_TYPE_MAX && type < INTERNAL_TYPE_BEGIN) ||
-		(type > INTERNAL_TYPE_MAX)) {
-		return (FALSE);
-	}
-
-	return (TRUE);
-}
 
 #ifndef ACPI_NO_METHOD_EXECUTION
 
@@ -336,7 +310,7 @@ acpi_ex_eisa_id_to_string (
 
 	eisa_id = acpi_ut_dword_byte_swap (numeric_id);
 
-	out_string[0] = (char) ('@' + ((eisa_id >> 26) & 0x1f));
+	out_string[0] = (char) ('@' + (((unsigned long) eisa_id >> 26) & 0x1f));
 	out_string[1] = (char) ('@' + ((eisa_id >> 21) & 0x1f));
 	out_string[2] = (char) ('@' + ((eisa_id >> 16) & 0x1f));
 	out_string[3] = acpi_ut_hex_to_ascii_char ((acpi_integer) eisa_id, 12);

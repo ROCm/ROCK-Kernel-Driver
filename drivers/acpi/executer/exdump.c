@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 160 $
+ *              $Revision: 162 $
  *
  *****************************************************************************/
 
@@ -58,7 +58,6 @@ acpi_ex_dump_operand (
 {
 	u8                      *buf = NULL;
 	u32                     length;
-	u32                     i;
 	acpi_operand_object     **element;
 	u16                     element_index;
 
@@ -97,7 +96,7 @@ acpi_ex_dump_operand (
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		switch (obj_desc->reference.opcode) {
 		case AML_DEBUG_OP:
@@ -217,22 +216,6 @@ acpi_ex_dump_operand (
 		break;
 
 
-	case INTERNAL_TYPE_IF:
-
-		acpi_os_printf ("If [Integer] %8.8X%8.8X\n",
-				 ACPI_HIDWORD (obj_desc->integer.value),
-				 ACPI_LODWORD (obj_desc->integer.value));
-		break;
-
-
-	case INTERNAL_TYPE_WHILE:
-
-		acpi_os_printf ("While [Integer] %8.8X%8.8X\n",
-				 ACPI_HIDWORD (obj_desc->integer.value),
-				 ACPI_LODWORD (obj_desc->integer.value));
-		break;
-
-
 	case ACPI_TYPE_PACKAGE:
 
 		acpi_os_printf ("Package count %X @ %p\n",
@@ -279,24 +262,20 @@ acpi_ex_dump_operand (
 
 	case ACPI_TYPE_STRING:
 
-		acpi_os_printf ("String length %X @ %p \"",
+		acpi_os_printf ("String length %X @ %p ",
 				 obj_desc->string.length, obj_desc->string.pointer);
-
-		for (i = 0; i < obj_desc->string.length; i++) {
-			acpi_os_printf ("%c",
-					 obj_desc->string.pointer[i]);
-		}
-		acpi_os_printf ("\"\n");
+		acpi_ut_print_string (obj_desc->string.pointer, ACPI_UINT8_MAX);
+		acpi_os_printf ("\n");
 		break;
 
 
-	case INTERNAL_TYPE_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
 
 		acpi_os_printf ("Bank_field\n");
 		break;
 
 
-	case INTERNAL_TYPE_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
 
 		acpi_os_printf (
 			"Region_field: Bits=%X Acc_width=%X Lock=%X Update=%X at byte=%X bit=%X of below:\n",
@@ -308,7 +287,7 @@ acpi_ex_dump_operand (
 		break;
 
 
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		acpi_os_printf ("Index_field\n");
 		break;
@@ -321,16 +300,13 @@ acpi_ex_dump_operand (
 			obj_desc->buffer_field.bit_length, obj_desc->buffer_field.base_byte_offset,
 			obj_desc->buffer_field.start_field_bit_offset);
 
-		if (!obj_desc->buffer_field.buffer_obj)
-		{
+		if (!obj_desc->buffer_field.buffer_obj) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL* \n"));
 		}
-		else if (ACPI_GET_OBJECT_TYPE (obj_desc->buffer_field.buffer_obj) != ACPI_TYPE_BUFFER)
-		{
+		else if (ACPI_GET_OBJECT_TYPE (obj_desc->buffer_field.buffer_obj) != ACPI_TYPE_BUFFER) {
 			acpi_os_printf ("*not a Buffer* \n");
 		}
-		else
-		{
+		else {
 			ACPI_DUMP_STACK_ENTRY (obj_desc->buffer_field.buffer_obj);
 		}
 
@@ -423,13 +399,11 @@ acpi_ex_dump_operands (
 	ACPI_FUNCTION_NAME ("Ex_dump_operands");
 
 
-	if (!ident)
-	{
+	if (!ident) {
 		ident = "?";
 	}
 
-	if (!note)
-	{
+	if (!note) {
 		note = "?";
 	}
 
@@ -437,15 +411,13 @@ acpi_ex_dump_operands (
 		"************* Operand Stack Contents (Opcode [%s], %d Operands)\n",
 		ident, num_levels));
 
-	if (num_levels == 0)
-	{
+	if (num_levels == 0) {
 		num_levels = 1;
 	}
 
 	/* Dump the operand stack starting at the top */
 
-	for (i = 0; num_levels > 0; i--, num_levels--)
-	{
+	for (i = 0; num_levels > 0; i--, num_levels--) {
 		obj_desc = &operands[i];
 		acpi_ex_dump_operand (*obj_desc);
 	}
@@ -529,10 +501,8 @@ acpi_ex_dump_node (
 	ACPI_FUNCTION_ENTRY ();
 
 
-	if (!flags)
-	{
-		if (!((ACPI_LV_OBJECTS & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer)))
-		{
+	if (!flags) {
+		if (!((ACPI_LV_OBJECTS & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
 			return;
 		}
 	}
@@ -571,24 +541,20 @@ acpi_ex_dump_object_descriptor (
 	ACPI_FUNCTION_TRACE ("Ex_dump_object_descriptor");
 
 
-	if (!flags)
-	{
-		if (!((ACPI_LV_OBJECTS & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer)))
-		{
+	if (!flags) {
+		if (!((ACPI_LV_OBJECTS & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
 			return_VOID;
 		}
 	}
 
-	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED)
-	{
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
 		acpi_ex_dump_node ((acpi_namespace_node *) obj_desc, flags);
 		acpi_os_printf ("\nAttached Object (%p):\n", ((acpi_namespace_node *) obj_desc)->object);
 		acpi_ex_dump_object_descriptor (((acpi_namespace_node *) obj_desc)->object, flags);
 		return;
 	}
 
-	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND)
-	{
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
 		acpi_os_printf ("Ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
 		return_VOID;
 	}
@@ -601,8 +567,7 @@ acpi_ex_dump_object_descriptor (
 
 	/* Object-specific Fields */
 
-	switch (ACPI_GET_OBJECT_TYPE (obj_desc))
-	{
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		acpi_os_printf ("%20s : %8.8X%8.8X\n", "Value",
@@ -614,7 +579,10 @@ acpi_ex_dump_object_descriptor (
 	case ACPI_TYPE_STRING:
 
 		acpi_ex_out_integer ("Length",       obj_desc->string.length);
-		acpi_ex_out_pointer ("Pointer",      obj_desc->string.pointer);
+
+		acpi_os_printf ("%20s : %p ", "Pointer", obj_desc->string.pointer);
+		acpi_ut_print_string (obj_desc->string.pointer, ACPI_UINT8_MAX);
+		acpi_os_printf ("\n");
 		break;
 
 
@@ -633,14 +601,11 @@ acpi_ex_dump_object_descriptor (
 
 		/* Dump the package contents */
 
-		if (obj_desc->package.count > 0)
-		{
+		if (obj_desc->package.count > 0) {
 			acpi_os_printf ("\nPackage Contents:\n");
-			for (i = 0; i < obj_desc->package.count; i++)
-			{
+			for (i = 0; i < obj_desc->package.count; i++) {
 				acpi_os_printf ("[%.3d] %p", i, obj_desc->package.elements[i]);
-				if (obj_desc->package.elements[i])
-				{
+				if (obj_desc->package.elements[i]) {
 					acpi_os_printf (" %s", acpi_ut_get_object_type_name (obj_desc->package.elements[i]));
 				}
 				acpi_os_printf ("\n");
@@ -723,9 +688,9 @@ acpi_ex_dump_object_descriptor (
 
 
 	case ACPI_TYPE_BUFFER_FIELD:
-	case INTERNAL_TYPE_REGION_FIELD:
-	case INTERNAL_TYPE_BANK_FIELD:
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		acpi_ex_out_integer ("Field_flags",  obj_desc->common_field.field_flags);
 		acpi_ex_out_integer ("Access_byte_width", obj_desc->common_field.access_byte_width);
@@ -737,23 +702,22 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("End_buf_valid_bits", obj_desc->common_field.end_buffer_valid_bits);
 		acpi_ex_out_pointer ("Parent_node",  obj_desc->common_field.node);
 
-		switch (ACPI_GET_OBJECT_TYPE (obj_desc))
-		{
+		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case ACPI_TYPE_BUFFER_FIELD:
 			acpi_ex_out_pointer ("Buffer_obj",   obj_desc->buffer_field.buffer_obj);
 			break;
 
-		case INTERNAL_TYPE_REGION_FIELD:
+		case ACPI_TYPE_LOCAL_REGION_FIELD:
 			acpi_ex_out_pointer ("Region_obj",   obj_desc->field.region_obj);
 			break;
 
-		case INTERNAL_TYPE_BANK_FIELD:
+		case ACPI_TYPE_LOCAL_BANK_FIELD:
 			acpi_ex_out_integer ("Value",        obj_desc->bank_field.value);
 			acpi_ex_out_pointer ("Region_obj",   obj_desc->bank_field.region_obj);
 			acpi_ex_out_pointer ("Bank_obj",     obj_desc->bank_field.bank_obj);
 			break;
 
-		case INTERNAL_TYPE_INDEX_FIELD:
+		case ACPI_TYPE_LOCAL_INDEX_FIELD:
 			acpi_ex_out_integer ("Value",        obj_desc->index_field.value);
 			acpi_ex_out_pointer ("Index",        obj_desc->index_field.index_obj);
 			acpi_ex_out_pointer ("Data",         obj_desc->index_field.data_obj);
@@ -766,7 +730,7 @@ acpi_ex_dump_object_descriptor (
 		break;
 
 
-	case INTERNAL_TYPE_REFERENCE:
+	case ACPI_TYPE_LOCAL_REFERENCE:
 
 		acpi_ex_out_integer ("Target_type",  obj_desc->reference.target_type);
 		acpi_ex_out_string ("Opcode",        (acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name);
@@ -777,7 +741,7 @@ acpi_ex_dump_object_descriptor (
 		break;
 
 
-	case INTERNAL_TYPE_ADDRESS_HANDLER:
+	case ACPI_TYPE_LOCAL_ADDRESS_HANDLER:
 
 		acpi_ex_out_integer ("Space_id",     obj_desc->addr_handler.space_id);
 		acpi_ex_out_pointer ("Next",         obj_desc->addr_handler.next);
@@ -787,24 +751,16 @@ acpi_ex_dump_object_descriptor (
 		break;
 
 
-	case INTERNAL_TYPE_NOTIFY:
+	case ACPI_TYPE_LOCAL_NOTIFY:
 
 		acpi_ex_out_pointer ("Node",         obj_desc->notify_handler.node);
 		acpi_ex_out_pointer ("Context",      obj_desc->notify_handler.context);
 		break;
 
 
-	case INTERNAL_TYPE_ALIAS:
-	case INTERNAL_TYPE_FIELD_DEFN:
-	case INTERNAL_TYPE_BANK_FIELD_DEFN:
-	case INTERNAL_TYPE_INDEX_FIELD_DEFN:
-	case INTERNAL_TYPE_IF:
-	case INTERNAL_TYPE_ELSE:
-	case INTERNAL_TYPE_WHILE:
-	case INTERNAL_TYPE_SCOPE:
-	case INTERNAL_TYPE_DEF_ANY:
-	case INTERNAL_TYPE_EXTRA:
-	case INTERNAL_TYPE_DATA:
+	case ACPI_TYPE_LOCAL_ALIAS:
+	case ACPI_TYPE_LOCAL_EXTRA:
+	case ACPI_TYPE_LOCAL_DATA:
 	default:
 
 		acpi_os_printf ("Ex_dump_object_descriptor: Display not implemented for object type %s\n",

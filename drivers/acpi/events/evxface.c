@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 130 $
+ *              $Revision: 131 $
  *
  *****************************************************************************/
 
@@ -294,7 +294,7 @@ acpi_install_notify_handler (
 
 		/* Install the handler */
 
-		notify_obj = acpi_ut_create_internal_object (INTERNAL_TYPE_NOTIFY);
+		notify_obj = acpi_ut_create_internal_object (ACPI_TYPE_LOCAL_NOTIFY);
 		if (!notify_obj) {
 			status = AE_NO_MEMORY;
 			goto unlock_and_exit;

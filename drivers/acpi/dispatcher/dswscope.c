@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 53 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acdispat.h"
 
 
@@ -88,6 +87,7 @@ acpi_ds_scope_stack_push (
 	acpi_walk_state         *walk_state)
 {
 	acpi_generic_state      *scope_info;
+	acpi_generic_state      *old_scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_scope_stack_push");
@@ -102,7 +102,7 @@ acpi_ds_scope_stack_push (
 
 	/* Make sure object type is valid */
 
-	if (!acpi_ex_validate_object_type (type)) {
+	if (!acpi_ut_valid_object_type (type)) {
 		ACPI_REPORT_WARNING (("Ds_scope_stack_push: type code out of range\n"));
 	}
 
@@ -119,6 +119,28 @@ acpi_ds_scope_stack_push (
 	scope_info->common.data_type = ACPI_DESC_TYPE_STATE_WSCOPE;
 	scope_info->scope.node      = node;
 	scope_info->common.value    = (u16) type;
+
+	walk_state->scope_depth++;
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+		"[%.2d] Pushed scope ", (u32) walk_state->scope_depth));
+
+	old_scope_info = walk_state->scope_info;
+	if (old_scope_info) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
+			"[%4.4s] (%10s)",
+			old_scope_info->scope.node->name.ascii,
+			acpi_ut_get_type_name (old_scope_info->common.value)));
+	}
+	else {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
+			"[\\___] (%10s)", "ROOT"));
+	}
+
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
+		", New scope -> [%4.4s] (%s)\n",
+		scope_info->scope.node->name.ascii,
+		acpi_ut_get_type_name (scope_info->common.value)));
 
 	/* Push new scope object onto stack */
 
@@ -150,6 +172,7 @@ acpi_ds_scope_stack_pop (
 	acpi_walk_state         *walk_state)
 {
 	acpi_generic_state      *scope_info;
+	acpi_generic_state      *new_scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_scope_stack_pop");
@@ -163,8 +186,25 @@ acpi_ds_scope_stack_pop (
 		return_ACPI_STATUS (AE_STACK_UNDERFLOW);
 	}
 
+	walk_state->scope_depth--;
+
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-		"Popped object type (%s)\n", acpi_ut_get_type_name (scope_info->common.value)));
+		"[%.2d] Popped scope [%4.4s] (%10s), New scope -> ",
+		(u32) walk_state->scope_depth,
+		scope_info->scope.node->name.ascii,
+		acpi_ut_get_type_name (scope_info->common.value)));
+
+	new_scope_info = walk_state->scope_info;
+	if (new_scope_info) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
+			"[%4.4s] (%s)\n",
+			new_scope_info->scope.node->name.ascii,
+			acpi_ut_get_type_name (new_scope_info->common.value)));
+	}
+	else {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC,
+			"[\\___] (ROOT)\n"));
+	}
 
 	acpi_ut_delete_generic_state (scope_info);
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 146 $
+ *       $Revision: 147 $
  *
  *****************************************************************************/
 
@@ -636,6 +636,11 @@ acpi_ut_delete_object_cache (
 /*
  * utmisc
  */
+
+void
+acpi_ut_print_string (
+	char                    *string,
+	u8                      max_length);
 
 acpi_status
 acpi_ut_divide (
