@@ -2163,11 +2163,13 @@ int shpchp_disable_slot (struct slot *p_slot)
 	u32 rc = 0;
 	int ret = 0;
 	unsigned int devfn;
-	struct pci_bus *pci_bus = p_slot->ctrl->pci_dev->subordinate;
+	struct pci_bus *pci_bus;
 	struct pci_func *func;
 
 	if (!p_slot->ctrl)
 		return 1;
+
+	pci_bus = p_slot->ctrl->pci_dev->subordinate;
 
 	/* Check to see if (latch closed, card present, power on) */
 	down(&p_slot->ctrl->crit_sect);

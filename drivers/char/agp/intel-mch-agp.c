@@ -84,7 +84,7 @@ static struct aper_size_info_fixed intel_i830_sizes[] =
 
 static struct _intel_i830_private {
 	struct pci_dev *i830_dev;		/* device one */
-	volatile u8 *registers;
+	volatile u8 __iomem *registers;
 	int gtt_entries;
 } intel_i830_private;
 
@@ -172,7 +172,7 @@ static int intel_i830_create_gatt_table(void)
 	pci_read_config_dword(intel_i830_private.i830_dev,I810_MMADDR,&temp);
 	temp &= 0xfff80000;
 
-	intel_i830_private.registers = (volatile u8 *) ioremap(temp,128 * 4096);
+	intel_i830_private.registers = (volatile u8 __iomem*) ioremap(temp,128 * 4096);
 	if (!intel_i830_private.registers)
 		return (-ENOMEM);
 
@@ -255,7 +255,7 @@ static int intel_i830_configure(void)
 
 static void intel_i830_cleanup(void)
 {
-	iounmap((void *) intel_i830_private.registers);
+	iounmap((void __iomem *) intel_i830_private.registers);
 }
 
 static int intel_i830_insert_entries(struct agp_memory *mem,off_t pg_start,

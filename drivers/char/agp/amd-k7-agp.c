@@ -24,11 +24,11 @@ static struct pci_device_id agp_amdk7_pci_table[];
 
 struct amd_page_map {
 	unsigned long *real;
-	unsigned long *remapped;
+	unsigned long __iomem *remapped;
 };
 
 static struct _amd_irongate_private {
-	volatile u8 *registers;
+	volatile u8 __iomem *registers;
 	struct amd_page_map **gatt_pages;
 	int num_tables;
 } amd_irongate_private;
@@ -54,7 +54,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	global_cache_flush();
 
 	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
-		page_map->remapped[i] = agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, page_map->remapped+i);
 
 	return 0;
 }
@@ -151,7 +151,7 @@ static int amd_create_gatt_table(void)
 	}
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
-	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
@@ -165,9 +165,8 @@ static int amd_create_gatt_table(void)
 
 	/* Calculate the agp offset */
 	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
-		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
-			virt_to_phys(amd_irongate_private.gatt_pages[i]->real);
-		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
+		writel(virt_to_phys(amd_irongate_private.gatt_pages[i]->real) | 1,
+			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
 	}
 
 	return 0;
@@ -178,7 +177,7 @@ static int amd_free_gatt_table(void)
 	struct amd_page_map page_dir;
 
 	page_dir.real = (unsigned long *)agp_bridge->gatt_table_real;
-	page_dir.remapped = (unsigned long *)agp_bridge->gatt_table;
+	page_dir.remapped = (unsigned long __iomem *)agp_bridge->gatt_table;
 
 	amd_free_gatt_pages();
 	amd_free_page_map(&page_dir);
@@ -218,7 +217,7 @@ static int amd_irongate_configure(void)
 	/* Get the memory mapped registers */
 	pci_read_config_dword(agp_bridge->dev, AMD_MMBASE, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
-	amd_irongate_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	amd_irongate_private.registers = (volatile u8 __iomem *) ioremap(temp, 4096);
 
 	/* Write out the address of the gatt table */
 	OUTREG32(amd_irongate_private.registers, AMD_ATTBASE,
@@ -263,7 +262,7 @@ static void amd_irongate_cleanup(void)
 	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
 	temp = ((temp & ~(0x0000000f)) | previous_size->size_value);
 	pci_write_config_dword(agp_bridge->dev, AMD_APSIZE, temp);
-	iounmap((void *) amd_irongate_private.registers);
+	iounmap((void __iomem *) amd_irongate_private.registers);
 }
 
 /*
@@ -282,7 +281,7 @@ static void amd_irongate_tlbflush(struct agp_memory *temp)
 static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
@@ -297,7 +296,7 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 	while (j < (pg_start + mem->page_count)) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		if (!PGE_EMPTY(agp_bridge, cur_gatt[GET_GATT_OFF(addr)]))
+		if (!PGE_EMPTY(agp_bridge, readl(cur_gatt+GET_GATT_OFF(addr))))
 			return -EBUSY;
 		j++;
 	}
@@ -310,8 +309,7 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_generic_mask_memory(mem->memory[i], mem->type);
+		writel(agp_generic_mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 	}
 	amd_irongate_tlbflush(mem);
 	return 0;
@@ -320,7 +318,7 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 static int amd_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	if (type != 0 || mem->type != 0)
@@ -329,8 +327,7 @@ static int amd_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] = 
-			(unsigned long) agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, cur_gatt+GET_GATT_OFF(addr));
 	}
 
 	amd_irongate_tlbflush(mem);

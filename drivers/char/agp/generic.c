@@ -35,6 +35,7 @@
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
 #include <linux/vmalloc.h>
+#include <asm/io.h>
 #include "agp.h"
 
 __u32 *agp_gatt_table;
@@ -737,7 +738,7 @@ int agp_generic_create_gatt_table(void)
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++)
-		agp_bridge->gatt_table[i] = (unsigned long) agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, agp_bridge->gatt_table+i);
 
 	return 0;
 }
@@ -843,9 +844,8 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 	j = pg_start;
 
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j])) {
+		if (!PGE_EMPTY(agp_bridge, readl(agp_bridge->gatt_table+j)))
 			return -EBUSY;
-		}
 		j++;
 	}
 
@@ -855,9 +855,7 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
-		agp_bridge->gatt_table[j] =
-				agp_bridge->driver->mask_memory(
-						mem->memory[i], mem->type);
+		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), agp_bridge->gatt_table+j);
 
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
@@ -875,10 +873,8 @@ int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 	}
 
 	/* AK: bogus, should encode addresses > 4GB */
-	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
-		agp_bridge->gatt_table[i] =
-		    (unsigned long) agp_bridge->scratch_page;
-	}
+	for (i = pg_start; i < (mem->page_count + pg_start); i++)
+		writel(agp_bridge->scratch_page, agp_bridge->gatt_table+i);
 
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;

@@ -27,12 +27,12 @@
 
 struct serverworks_page_map {
 	unsigned long *real;
-	unsigned long *remapped;
+	unsigned long __iomem *remapped;
 };
 
 static struct _serverworks_private {
 	struct pci_dev *svrwrks_dev;	/* device one */
-	volatile u8 *registers;
+	volatile u8 __iomem *registers;
 	struct serverworks_page_map **gatt_pages;
 	int num_tables;
 	struct serverworks_page_map scratch_dir;
@@ -61,9 +61,8 @@ static int serverworks_create_page_map(struct serverworks_page_map *page_map)
 	}
 	global_cache_flush();
 
-	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
-		page_map->remapped[i] = agp_bridge->scratch_page;
-	}
+	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
+		writel(agp_bridge->scratch_page, page_map->remapped+i);
 
 	return 0;
 }
@@ -162,10 +161,8 @@ static int serverworks_create_gatt_table(void)
 	}
 	/* Create a fake scratch directory */
 	for(i = 0; i < 1024; i++) {
-		serverworks_private.scratch_dir.remapped[i] = (unsigned long) agp_bridge->scratch_page;
-		page_dir.remapped[i] =
-			virt_to_phys(serverworks_private.scratch_dir.real);
-		page_dir.remapped[i] |= 0x00000001;
+		writel(agp_bridge->scratch_page, serverworks_private.scratch_dir.remapped+i);
+		writel(virt_to_phys(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
 	}
 
 	retval = serverworks_create_gatt_pages(value->num_entries / 1024);
@@ -176,7 +173,7 @@ static int serverworks_create_gatt_table(void)
 	}
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
-	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
@@ -189,11 +186,8 @@ static int serverworks_create_gatt_table(void)
 
 	/* Calculate the agp offset */	
 
-	for(i = 0; i < value->num_entries / 1024; i++) {
-		page_dir.remapped[i] =
-			virt_to_phys(serverworks_private.gatt_pages[i]->real);
-		page_dir.remapped[i] |= 0x00000001;
-	}
+	for(i = 0; i < value->num_entries / 1024; i++)
+		writel(virt_to_phys(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
 
 	return 0;
 }
@@ -203,7 +197,7 @@ static int serverworks_free_gatt_table(void)
 	struct serverworks_page_map page_dir;
    
 	page_dir.real = (unsigned long *)agp_bridge->gatt_table_real;
-	page_dir.remapped = (unsigned long *)agp_bridge->gatt_table;
+	page_dir.remapped = (unsigned long __iomem *)agp_bridge->gatt_table;
 
 	serverworks_free_gatt_pages();
 	serverworks_free_page_map(&page_dir);
@@ -269,7 +263,7 @@ static int serverworks_configure(void)
 	/* Get the memory mapped registers */
 	pci_read_config_dword(agp_bridge->dev, serverworks_private.mm_addr_ofs, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
-	serverworks_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	serverworks_private.registers = (volatile u8 __iomem *) ioremap(temp, 4096);
 	if (!serverworks_private.registers) {
 		printk (KERN_ERR PFX "Unable to ioremap() memory.\n");
 		return -ENOMEM;
@@ -311,14 +305,14 @@ static int serverworks_configure(void)
 
 static void serverworks_cleanup(void)
 {
-	iounmap((void *) serverworks_private.registers);
+	iounmap((void __iomem *) serverworks_private.registers);
 }
 
 static int serverworks_insert_memory(struct agp_memory *mem,
 			     off_t pg_start, int type)
 {
 	int i, j, num_entries;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
@@ -334,9 +328,8 @@ static int serverworks_insert_memory(struct agp_memory *mem,
 	while (j < (pg_start + mem->page_count)) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = SVRWRKS_GET_GATT(addr);
-		if (!PGE_EMPTY(agp_bridge, cur_gatt[GET_GATT_OFF(addr)])) {
+		if (!PGE_EMPTY(agp_bridge, readl(cur_gatt+GET_GATT_OFF(addr))))
 			return -EBUSY;
-		}
 		j++;
 	}
 
@@ -348,8 +341,7 @@ static int serverworks_insert_memory(struct agp_memory *mem,
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = SVRWRKS_GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
+		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 	}
 	serverworks_tlbflush(mem);
 	return 0;
@@ -359,7 +351,7 @@ static int serverworks_remove_memory(struct agp_memory *mem, off_t pg_start,
 			     int type)
 {
 	int i;
-	unsigned long *cur_gatt;
+	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
 	if (type != 0 || mem->type != 0) {
@@ -372,8 +364,7 @@ static int serverworks_remove_memory(struct agp_memory *mem, off_t pg_start,
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = SVRWRKS_GET_GATT(addr);
-		cur_gatt[GET_GATT_OFF(addr)] = 
-			(unsigned long) agp_bridge->scratch_page;
+		writel(agp_bridge->scratch_page, cur_gatt+GET_GATT_OFF(addr));
 	}
 
 	serverworks_tlbflush(mem);
