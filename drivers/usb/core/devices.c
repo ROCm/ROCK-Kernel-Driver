@@ -452,6 +452,7 @@ static char *usb_dump_string(char *start, char *end, const struct usb_device *de
  * nbytes - the maximum number of bytes to write
  * skip_bytes - the number of bytes to skip before writing anything
  * file_offset - the offset into the devices file on completion
+ * The caller must own the usbdev->serialize semaphore.
  */
 static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *skip_bytes, loff_t *file_offset,
 				struct usb_device *usbdev, struct usb_bus *bus, int level, int index, int count)
@@ -552,9 +553,13 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *ski
 	
 	/* Now look at all of this device's children. */
 	for (chix = 0; chix < usbdev->maxchild; chix++) {
-		if (usbdev->children[chix]) {
-			ret = usb_device_dump(buffer, nbytes, skip_bytes, file_offset, usbdev->children[chix],
+		struct usb_device *childdev = usbdev->children[chix];
+
+		if (childdev) {
+			down(&childdev->serialize);
+			ret = usb_device_dump(buffer, nbytes, skip_bytes, file_offset, childdev,
 					bus, level + 1, chix, ++cnt);
+			up(&childdev->serialize);
 			if (ret == -EFAULT)
 				return total_written;
 			total_written += ret;
@@ -582,8 +587,11 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
+
 		/* recurse through all children of the root hub */
+		down(&bus->root_hub->serialize);
 		ret = usb_device_dump(&buf, &nbytes, &skip_bytes, ppos, bus->root_hub, bus, 0, 0, 0);
+		up(&bus->root_hub->serialize);
 		if (ret < 0) {
 			up(&usb_bus_list_lock);
 			return ret;
