@@ -306,6 +306,8 @@ static inline int verify_chain(Indirect *from, Indirect *to)
  *	@inode: inode in question (we are only interested in its superblock)
  *	@i_block: block number to be parsed
  *	@offsets: array to store the offsets in
+ *      @boundary: set this non-zero if the referred-to block is likely to be
+ *             followed (on disk) by an indirect block.
  *
  *	To store the locations of file's data ext3 uses a data structure common
  *	for UNIX filesystems - tree of pointers anchored in the inode, with
@@ -330,7 +332,8 @@ static inline int verify_chain(Indirect *from, Indirect *to)
  * get there at all.
  */
 
-static int ext3_block_to_path(struct inode *inode, long i_block, int offsets[4])
+static int ext3_block_to_path(struct inode *inode,
+			long i_block, int offsets[4], int *boundary)
 {
 	int ptrs = EXT3_ADDR_PER_BLOCK(inode->i_sb);
 	int ptrs_bits = EXT3_ADDR_PER_BLOCK_BITS(inode->i_sb);
@@ -338,26 +341,33 @@ static int ext3_block_to_path(struct inode *inode, long i_block, int offsets[4])
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
+	int final = 0;
 
 	if (i_block < 0) {
 		ext3_warning (inode->i_sb, "ext3_block_to_path", "block < 0");
 	} else if (i_block < direct_blocks) {
 		offsets[n++] = i_block;
+		final = direct_blocks;
 	} else if ( (i_block -= direct_blocks) < indirect_blocks) {
 		offsets[n++] = EXT3_IND_BLOCK;
 		offsets[n++] = i_block;
+		final = ptrs;
 	} else if ((i_block -= indirect_blocks) < double_blocks) {
 		offsets[n++] = EXT3_DIND_BLOCK;
 		offsets[n++] = i_block >> ptrs_bits;
 		offsets[n++] = i_block & (ptrs - 1);
+		final = ptrs;
 	} else if (((i_block -= double_blocks) >> (ptrs_bits * 2)) < ptrs) {
 		offsets[n++] = EXT3_TIND_BLOCK;
 		offsets[n++] = i_block >> (ptrs_bits * 2);
 		offsets[n++] = (i_block >> ptrs_bits) & (ptrs - 1);
 		offsets[n++] = i_block & (ptrs - 1);
+		final = ptrs;
 	} else {
 		ext3_warning (inode->i_sb, "ext3_block_to_path", "block > big");
 	}
+	if (boundary)
+		*boundary = (i_block & (ptrs - 1)) == (final - 1);
 	return n;
 }
 
@@ -734,7 +744,8 @@ static int ext3_get_block_handle(handle_t *handle, struct inode *inode,
 	Indirect *partial;
 	unsigned long goal;
 	int left;
-	int depth = ext3_block_to_path(inode, iblock, offsets);
+	int boundary = 0;
+	int depth = ext3_block_to_path(inode, iblock, offsets, &boundary);
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	loff_t new_size;
 
@@ -752,6 +763,8 @@ reread:
 		clear_buffer_new(bh_result);
 got_it:
 		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
+		if (boundary)
+			set_buffer_boundary(bh_result);
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
@@ -1875,7 +1888,7 @@ void ext3_truncate(struct inode * inode)
 	ext3_block_truncate_page(handle, inode->i_mapping, inode->i_size);
 		
 
-	n = ext3_block_to_path(inode, last_block, offsets);
+	n = ext3_block_to_path(inode, last_block, offsets, NULL);
 	if (n == 0)
 		goto out_stop;	/* error */
 
