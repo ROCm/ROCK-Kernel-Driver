@@ -1343,6 +1343,16 @@ static ssize_t aio_fsync(struct kiocb *iocb)
 }
 
 /*
+ * Retry method for aio_poll (also used for first time submit)
+ * Responsible for updating iocb state as retries progress
+ */
+static ssize_t aio_poll(struct kiocb *iocb)
+{
+	unsigned events = (unsigned)(iocb->ki_buf);
+	return generic_aio_poll(iocb, events);
+}
+
+/*
  * aio_setup_iocb:
  *	Performs the initial checks and aio retry method
  *	setup for the kiocb at the time of io submission.
@@ -1386,6 +1396,13 @@ ssize_t aio_setup_iocb(struct kiocb *kiocb)
 		ret = -EINVAL;
 		if (file->f_op->aio_fsync)
 			kiocb->ki_retry = aio_fsync;
+		break;
+	case IOCB_CMD_POLL:
+		ret = -EINVAL;
+		if (file->f_op->poll) {
+			memset(kiocb->private, 0, sizeof(kiocb->private));
+			kiocb->ki_retry = aio_poll;
+		}
 		break;
 	default:
 		dprintk("EINVAL: io_submit: no operation provided\n");

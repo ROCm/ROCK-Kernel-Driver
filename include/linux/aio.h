@@ -193,4 +193,5 @@ static inline struct kiocb *list_kiocb(struct list_head *h)
 extern atomic_t aio_nr;
 extern unsigned aio_max_nr;
 
+extern ssize_t generic_aio_poll(struct kiocb *, unsigned);
 #endif /* __LINUX__AIO_H */
