@@ -1484,6 +1484,7 @@ EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);
 EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);
+EXPORT_SYMBOL(usb_ifnum_to_if);
 
 EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);

@@ -88,9 +88,12 @@ static int detect(struct SHT *sht)
 	/* register the host */
 	us->host = scsi_register(sht, sizeof(us));
 	if (us->host) {
+		struct usb_interface *iface;
 		us->host->hostdata[0] = (unsigned long)us;
 		us->host_no = us->host->host_no;
-		scsi_set_device(us->host, &us->pusb_dev->dev);
+		iface = usb_ifnum_to_if(us->pusb_dev, us->ifnum);
+		if (iface)
+			scsi_set_device(us->host, &iface->dev);
 		return 1;
 	}
 
