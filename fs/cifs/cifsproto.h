@@ -155,7 +155,7 @@ extern int CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon,
 			 __u64 size, __u16 fileHandle,__u32 opener_pid, int AllocSizeFlag);
 extern int CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *pTcon,
 			char *full_path, __u64 mode, __u64 uid,
-			__u64 gid, const struct nls_table *nls_codepage);
+			__u64 gid, dev_t dev, const struct nls_table *nls_codepage);
 
 extern int CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 			const char *newName,

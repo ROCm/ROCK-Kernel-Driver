@@ -2299,7 +2299,7 @@ CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
 int
 CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 		    char *fileName, __u64 mode, __u64 uid, __u64 gid,
-		    const struct nls_table *nls_codepage)
+		    dev_t device, const struct nls_table *nls_codepage)
 {
 	TRANSACTION2_SPI_REQ *pSMB = NULL;
 	TRANSACTION2_SPI_RSP *pSMBr = NULL;
@@ -2358,6 +2358,9 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	data_offset->Uid = cpu_to_le64(uid);
 	data_offset->Gid = cpu_to_le64(gid);
+	/* better to leave device as zero when it is  */
+	data_offset->DevMajor = cpu_to_le64(MAJOR(device));
+	data_offset->DevMinor = cpu_to_le64(MINOR(device));
 	data_offset->Permissions = cpu_to_le64(mode);
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,

@@ -125,6 +125,7 @@ cifs_open(struct inode *inode, struct file *file)
 					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
 						(__u64)-1, 
 						(__u64)-1,
+						0 /* dev */,
 						cifs_sb->local_nls);
 				else {/* BB implement via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/

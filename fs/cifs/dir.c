@@ -193,6 +193,43 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	return rc;
 }
 
+int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t device_number) 
+{
+	int rc = -EPERM;
+	int xid;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	char *full_path = NULL;
+	struct inode * newinode = NULL;
+
+	xid = GetXid();
+
+	cifs_sb = CIFS_SB(inode->i_sb);
+	pTcon = cifs_sb->tcon;
+
+	full_path = build_path_from_dentry(direntry);
+
+	if (pTcon->ses->capabilities & CAP_UNIX) {
+		rc = CIFSSMBUnixSetPerms(xid, pTcon,
+			full_path, mode, current->euid, current->egid,
+			device_number, cifs_sb->local_nls);
+		if(!rc) {
+                        rc = cifs_get_inode_info_unix(&newinode, full_path,
+                                                      inode->i_sb);
+			direntry->d_op = &cifs_dentry_ops;
+			if(rc == 0)
+				d_instantiate(direntry, newinode);
+		}
+	}
+
+        if (full_path)
+                kfree(full_path);
+        FreeXid(xid);
+
+        return rc;
+}
+
+
 struct dentry *
 cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct nameidata *nd)
 {
