@@ -1480,13 +1480,6 @@ static int __init ata_module_init(void)
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
 	idefloppy_init();
 #endif
-#ifdef CONFIG_BLK_DEV_IDESCSI
-# ifdef CONFIG_SCSI
-	idescsi_init();
-# else
-   #error ATA SCSI emulation selected but no SCSI-subsystem in kernel
-# endif
-#endif
 
 	initializing = 0;
 
