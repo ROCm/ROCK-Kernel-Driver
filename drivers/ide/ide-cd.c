@@ -3047,7 +3047,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
-int ide_cdrom_init(void);
+static int ide_cdrom_init(void);
 int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
@@ -3161,7 +3161,7 @@ static void __exit ide_cdrom_exit(void)
 	ide_unregister_module (&ide_cdrom_module);
 }
  
-int ide_cdrom_init(void)
+static int ide_cdrom_init(void)
 {
 	ide_drive_t *drive;
 	int failed = 0;

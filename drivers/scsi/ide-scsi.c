@@ -569,7 +569,7 @@ static ide_driver_t idescsi_driver = {
 	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
-int idescsi_init (void);
+static int idescsi_init (void);
 static ide_module_t idescsi_module = {
 	IDE_DRIVER_MODULE,
 	idescsi_init,
@@ -612,7 +612,7 @@ failed:
 /*
  *	idescsi_init will register the driver for each scsi.
  */
-int idescsi_init (void)
+static int idescsi_init (void)
 {
 	ide_drive_t *drive;
 	int i, failed;

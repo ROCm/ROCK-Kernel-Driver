@@ -177,7 +177,6 @@ spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_BLK_DEV_IDESCSI_24
 #define CONFIG_BLK_DEV_IDESCSI
-extern int idescsi_init(void);
 #endif
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
@@ -3389,29 +3388,6 @@ void __init ide_init_builtin_drivers (void)
 #ifdef CONFIG_PROC_FS
 	proc_ide_create();
 #endif
-
-	/*
-	 * Attempt to match drivers for the available drives
-	 */
-#ifdef CONFIG_BLK_DEV_IDEDISK
-	(void) idedisk_init();
-#endif /* CONFIG_BLK_DEV_IDEDISK */
-#ifdef CONFIG_BLK_DEV_IDECD
-	(void) ide_cdrom_init();
-#endif /* CONFIG_BLK_DEV_IDECD */
-#ifdef CONFIG_BLK_DEV_IDETAPE
-	(void) idetape_init();
-#endif /* CONFIG_BLK_DEV_IDETAPE */
-#ifdef CONFIG_BLK_DEV_IDEFLOPPY
-	(void) idefloppy_init();
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
-#ifdef CONFIG_BLK_DEV_IDESCSI
- #ifdef CONFIG_SCSI
-	(void) idescsi_init();
- #else
-    #warning ide scsi-emulation selected but no SCSI-subsystem in kernel
- #endif
-#endif /* CONFIG_BLK_DEV_IDESCSI */
 }
 
 static int default_cleanup (ide_drive_t *drive)

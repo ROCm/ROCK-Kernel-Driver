@@ -2143,7 +2143,7 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-int idefloppy_init (void);
+static int idefloppy_init (void);
 int idefloppy_reinit(ide_drive_t *drive);
 
 /*
@@ -2254,7 +2254,7 @@ static void __exit idefloppy_exit (void)
 /*
  *	idefloppy_init will register the driver for each floppy.
  */
-int idefloppy_init (void)
+static int idefloppy_init (void)
 {
 	ide_drive_t *drive;
 	int failed = 0;

@@ -6305,7 +6305,7 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
-int idetape_init (void);
+static int idetape_init (void);
 int idetape_reinit(ide_drive_t *drive);
 
 /*
@@ -6441,7 +6441,7 @@ static void __exit idetape_exit (void)
 /*
  *	idetape_init will register the driver for each tape.
  */
-int idetape_init (void)
+static int idetape_init (void)
 {
 	ide_drive_t *drive;
 	int minor, failed = 0, supported = 0;

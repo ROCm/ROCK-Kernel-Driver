@@ -1636,7 +1636,7 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
-int idedisk_init (void);
+static int idedisk_init (void);
 int idedisk_reinit(ide_drive_t *drive);
 
 /*
@@ -1735,7 +1735,7 @@ static void __exit idedisk_exit (void)
 	ide_unregister_module(&idedisk_module);
 }
 
-int idedisk_init (void)
+static int idedisk_init (void)
 {
 	ide_drive_t *drive;
 	int failed = 0;
