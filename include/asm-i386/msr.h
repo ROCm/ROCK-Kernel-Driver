@@ -8,14 +8,29 @@
  */
 
 #define rdmsr(msr,val1,val2) \
-     __asm__ __volatile__("rdmsr" \
+	__asm__ __volatile__("rdmsr" \
 			  : "=a" (val1), "=d" (val2) \
 			  : "c" (msr))
 
 #define wrmsr(msr,val1,val2) \
-     __asm__ __volatile__("wrmsr" \
+	__asm__ __volatile__("wrmsr" \
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
+
+#define rdmsrl(msr,val) do {unsigned long l__,h__; \
+	rdmsr (msr, l__, h__);  \
+	val = l__;  \
+	val |= ((u64)h__<<32);  \
+} while(0)
+
+static void wrmsrl (u32 msr, u64 val)
+{
+	u32 lo, hi;
+
+	lo = (u32) val;
+	hi = val >> 32;
+	wrmsr (msr, lo, hi);
+}
 
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))

@@ -84,27 +84,6 @@ static unsigned int latency;
 static char have_a0;
 
 
-#ifndef rdmsrl
-#define rdmsrl(msr,val) do {unsigned long l__,h__; \
-	rdmsr (msr, l__, h__);	\
-	val = l__;	\
-	val |= ((u64)h__<<32);	\
-} while(0)
-#endif
-
-#ifndef wrmsrl
-static void wrmsrl (u32 msr, u64 val)
-{
-	u32 lo, hi;
-
-	lo = (u32) val;
-	hi = val >> 32;
-	wrmsr (msr, lo, hi);
-}
-#endif
-
-
-
 static int check_powernow(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
