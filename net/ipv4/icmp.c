@@ -876,7 +876,7 @@ static void icmp_discard(struct sk_buff *skb)
  
 int icmp_rcv(struct sk_buff *skb)
 {
-	struct icmphdr *icmph = skb->h.icmph;
+	struct icmphdr *icmph;
 	struct rtable *rt = (struct rtable*)skb->dst;
 
 	ICMP_INC_STATS_BH(IcmpInMsgs);
@@ -894,6 +894,8 @@ int icmp_rcv(struct sk_buff *skb)
 
 	if (!pskb_pull(skb, sizeof(struct icmphdr)))
 		goto error;
+
+	icmph = skb->h.icmph;
 
 	/*
 	 *	18 is the highest 'known' ICMP type. Anything else is a mystery
