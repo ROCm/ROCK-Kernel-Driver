@@ -351,7 +351,7 @@ static inline unsigned long page_zonenum(struct page *page)
 {
 	return (page->flags >> NODEZONE_SHIFT) & (~(~0UL << ZONES_SHIFT));
 }
-static inline unsigned long page_nodenum(struct page *page)
+static inline unsigned long page_to_nid(struct page *page)
 {
 	return (page->flags >> (NODEZONE_SHIFT + ZONES_SHIFT));
 }
