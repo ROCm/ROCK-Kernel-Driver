@@ -2149,59 +2149,65 @@ struct if6_iter_state {
 	int bucket;
 };
 
-static inline struct inet6_ifaddr *if6_get_bucket(struct seq_file *seq, loff_t *pos)
+static struct inet6_ifaddr *if6_get_first(struct seq_file *seq)
 {
-	int i;
 	struct inet6_ifaddr *ifa = NULL;
-	loff_t l = *pos;
 	struct if6_iter_state *state = seq->private;
 
-	for (; state->bucket < IN6_ADDR_HSIZE; ++state->bucket)
-		for (i = 0, ifa = inet6_addr_lst[state->bucket]; ifa; ++i, ifa=ifa->lst_next) {
-			if (l--)
-				continue;
-			*pos = i;
-			goto out;
-		}
-out:
+	for (state->bucket = 0; state->bucket < IN6_ADDR_HSIZE; ++state->bucket) {
+		ifa = inet6_addr_lst[state->bucket];
+		if (ifa)
+			break;
+	}
 	return ifa;
+}
+
+static struct inet6_ifaddr *if6_get_next(struct seq_file *seq, struct inet6_ifaddr *ifa)
+{
+	struct if6_iter_state *state = seq->private;
+
+	ifa = ifa->lst_next;
+try_again:
+	if (!ifa && ++state->bucket < IN6_ADDR_HSIZE) {
+		ifa = inet6_addr_lst[state->bucket];
+		goto try_again;
+	}
+	return ifa;
+}
+
+static struct inet6_ifaddr *if6_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct inet6_ifaddr *ifa = if6_get_first(seq);
+
+	if (ifa)
+		while(pos && (ifa = if6_get_next(seq, ifa)) != NULL)
+			--pos;
+	return pos ? NULL : ifa;
 }
 
 static void *if6_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock_bh(&addrconf_hash_lock);
-	return *pos ? if6_get_bucket(seq, pos) : SEQ_START_TOKEN;
+	return if6_get_idx(seq, *pos);
 }
 
 static void *if6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct inet6_ifaddr *ifa;
-	struct if6_iter_state *state;
 
-	if (v == SEQ_START_TOKEN) {
-		ifa = if6_get_bucket(seq, pos);
-		goto out;
-	}
-
-	state = seq->private;
-
-	ifa = v;
-	ifa = ifa->lst_next;
-	if (ifa)
-		goto out;
-
-	if (++state->bucket >= IN6_ADDR_HSIZE)
-		goto out;
-
-	*pos = 0;
-	ifa = if6_get_bucket(seq, pos);
-out:
+	ifa = if6_get_next(seq, v);
 	++*pos;
 	return ifa;
 }
 
-static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr *ifp)
+static void if6_seq_stop(struct seq_file *seq, void *v)
 {
+	read_unlock_bh(&addrconf_hash_lock);
+}
+
+static int if6_seq_show(struct seq_file *seq, void *v)
+{
+	struct inet6_ifaddr *ifp = (struct inet6_ifaddr *)v;
 	seq_printf(seq,
 		   "%04x%04x%04x%04x%04x%04x%04x%04x %02x %02x %02x %02x %8s\n",
 		   NIP6(ifp->addr),
@@ -2210,20 +2216,7 @@ static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr 
 		   ifp->scope,
 		   ifp->flags,
 		   ifp->idev->dev->name);
-}
-
-static int if6_seq_show(struct seq_file *seq, void *v)
-{
-	if (v == SEQ_START_TOKEN)
-		return 0;
-	else
-		if6_iface_seq_show(seq, v);
 	return 0;
-}
-
-static void if6_seq_stop(struct seq_file *seq, void *v)
-{
-	read_unlock_bh(&addrconf_hash_lock);
 }
 
 static struct seq_operations if6_seq_ops = {
