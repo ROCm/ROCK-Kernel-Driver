@@ -63,17 +63,6 @@ quirk_isa_bridge(struct pci_dev *dev)
 }
 
 static void __init
-quirk_ali_ide_ports(struct pci_dev *dev)
-{
-	if (dev->resource[0].end == 0xffff)
-		dev->resource[0].end = dev->resource[0].start + 7;
-	if (dev->resource[2].end == 0xffff)
-		dev->resource[2].end = dev->resource[2].start + 7;
-	if (dev->resource[3].end == 0xffff)
-		dev->resource[3].end = dev->resource[3].start + 7;
-}
-
-static void __init
 quirk_cypress(struct pci_dev *dev)
 {
 	/* The Notorious Cy82C693 chip.  */
@@ -121,8 +110,6 @@ pcibios_fixup_final(struct pci_dev *dev)
 struct pci_fixup pcibios_fixups[] __initdata = {
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82378,
 	  quirk_isa_bridge },
-	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229,
-	  quirk_ali_ide_ports },
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693,
 	  quirk_cypress },
 	{ PCI_FIXUP_FINAL,  PCI_ANY_ID,	PCI_ANY_ID,
