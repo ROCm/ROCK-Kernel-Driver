@@ -381,7 +381,7 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
-	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print | sort`; do \
+	   for f in `cd .tmp_export-objs; find modules -name SCCS -prune -o -name BitKeeper -prune -o -name \*.ver -print | sort`; do \
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
@@ -492,7 +492,9 @@ spec:
 #	   will become invalid
 
 rpm:	clean spec
-	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
+	find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -size 0 -o -name .depend -o -name .hdepend \) \
+		-type f -print | xargs rm -f
 	set -e; \
 	cd $(TOPDIR)/.. ; \
 	ln -sf $(TOPDIR) $(KERNELPATH) ; \
@@ -629,23 +631,26 @@ include arch/$(ARCH)/Makefile
 
 clean:	archclean
 	@echo 'Cleaning up'
-	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
-		   -name .\*.tmp -o -name .\*.d \) -type f -print \
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
+		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
-	@find . \( -name .depend -o -name .\*.cmd \) \
-		   -type f -print | xargs rm -f
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -name .depend -o -name .\*.cmd \) \
+		-type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
 	@$(MAKE) -C Documentation/DocBook mrproper
 
 distclean: mrproper
 	@echo 'Making distclean'
-	@find . \( -not -type d \) -and \
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -not -type d \) -and \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
@@ -655,16 +660,24 @@ distclean: mrproper
 # ---------------------------------------------------------------------------
 
 TAGS: FORCE
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init arch/${ARCH} -name '*.[chS]' ; } | grep -v SCCS | etags -
+	{ find include/asm-${ARCH} -name SCCS -prune -o -name BitKeeper -prune \
+		-o -name '*.h' -print ; \
+	find include -name SCCS -prune -o -name BitKeeper -prune -o \
+		-type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print ; \
+	find $(SUBDIRS) init arch/${ARCH} \
+		-name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[chS]' -print ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
 tags: FORCE
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name SCCS -prune -o -name BitKeeper -prune -o -name '*.h' -print` && \
+	find include -name SCCS -prune -o -name BitKeeper -prune -o \
+		-type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[ch]' -print | xargs ctags $$CTAGSF -a
 
 # Documentation targets
 # ---------------------------------------------------------------------------
@@ -677,13 +690,19 @@ sgmldocs psdocs pdfdocs htmldocs:
 # ---------------------------------------------------------------------------
 
 checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[hcS]' -type f -print | sort \
+		| xargs $(PERL) -w scripts/checkconfig.pl
 
 checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name [cC]onfig.in -print | sort \
+		| xargs $(PERL) -w scripts/checkhelp.pl
 
 checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[hcS]' -type f -print | sort \
+		| xargs $(PERL) -w scripts/checkincludes.pl
 
 else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 
