@@ -788,8 +788,18 @@
     </para>
 
     <para>
-      Note that the atomic operations are defined to act as both
-      read and write barriers on all platforms.
+      Note that the atomic operations do in general not act as memory
+      barriers. Instead you can insert a memory barrier before or
+      after <function>atomic_inc()</function> or
+      <function>atomic_dec()</function> by inserting
+      <function>smp_mb__before_atomic_inc()</function>,
+      <function>smp_mb__after_atomic_inc()</function>,
+      <function>smp_mb__before_atomic_dec()</function> or
+      <function>smp_mb__after_atomic_dec()</function>
+      respectively. The advantage of using those macros instead of
+      <function>smp_mb()</function> is, that they are cheaper on some
+      platforms.    
+      <!-- Sebastian Wilhelmi <seppi@seppi.de> 2002-03-04 -->
     </para>
    </sect1>
 
