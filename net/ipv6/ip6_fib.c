@@ -449,9 +449,10 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt,
 			 *	Same priority level
 			 */
 
-			if ((iter->rt6i_dev == rt->rt6i_dev) &&
-			    (ipv6_addr_cmp(&iter->rt6i_gateway,
-					   &rt->rt6i_gateway) == 0)) {
+			if (iter->rt6i_dev == rt->rt6i_dev &&
+			    iter->rt6i_idev == rt->rt6i_idev &&
+			    ipv6_addr_cmp(&iter->rt6i_gateway,
+					   &rt->rt6i_gateway) == 0) {
 				if (!(iter->rt6i_flags&RTF_EXPIRES))
 					return -EEXIST;
 				iter->rt6i_expires = rt->rt6i_expires;

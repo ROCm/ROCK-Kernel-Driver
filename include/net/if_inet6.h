@@ -51,6 +51,7 @@ struct inet6_ifaddr
 	struct timer_list	timer;
 
 	struct inet6_dev	*idev;
+	struct rt6_info		*rt;
 
 	struct inet6_ifaddr	*lst_next;      /* next addr in addr_lst */
 	struct inet6_ifaddr	*if_next;       /* next addr in inet6_dev */
@@ -133,6 +134,7 @@ struct ifacaddr6
 {
 	struct in6_addr		aca_addr;
 	struct inet6_dev	*aca_idev;
+	struct rt6_info		*aca_rt;
 	struct ifacaddr6	*aca_next;
 	int			aca_users;
 	atomic_t		aca_refcnt;
