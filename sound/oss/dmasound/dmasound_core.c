@@ -1,4 +1,3 @@
-
 /*
  *  linux/drivers/sound/dmasound/dmasound_core.c
  *
@@ -103,38 +102,113 @@
  *	2000/3/25	Geert Uytterhoeven:
  *			  - Integration of dmasound_q40
  *			  - Small clean ups
+ *
+ *	2001/01/26 [1.0] Iain Sandoe
+ *			  - make /dev/sndstat show revision & edition info.
+ *			  - since dmasound.mach.sq_setup() can fail on pmac
+ *			    its type has been changed to int and the returns
+ *			    are checked.
+ *		   [1.1]  - stop missing translations from being called.
+ *	2001/02/08 [1.2]  - remove unused translation tables & move machine-
+ *			    specific tables to low-level.
+ *			  - return correct info. for SNDCTL_DSP_GETFMTS.
+ *		   [1.3]  - implement SNDCTL_DSP_GETCAPS fully.
+ *		   [1.4]  - make /dev/sndstat text length usage deterministic.
+ *			  - make /dev/sndstat call to low-level
+ *			    dmasound.mach.state_info() pass max space to ll driver.
+ *			  - tidy startup banners and output info.
+ *		   [1.5]  - tidy up a little (removed some unused #defines in
+ *			    dmasound.h)
+ *			  - fix up HAS_RECORD conditionalisation.
+ *			  - add record code in places it is missing...
+ *			  - change buf-sizes to bytes to allow < 1kb for pmac
+ *			    if user param entry is < 256 the value is taken to
+ *			    be in kb > 256 is taken to be in bytes.
+ *			  - make default buff/frag params conditional on
+ *			    machine to allow smaller values for pmac.
+ *			  - made the ioctls, read & write comply with the OSS
+ *			    rules on setting params.
+ *			  - added parsing of _setup() params for record.
+ *	2001/04/04 [1.6]  - fix bug where sample rates higher than maximum were
+ *			    being reported as OK.
+ *			  - fix open() to return -EBUSY as per OSS doc. when
+ *			    audio is in use - this is independent of O_NOBLOCK.
+ *			  - fix bug where SNDCTL_DSP_POST was blocking.
  */
 
+ /* Record capability notes 30/01/2001:
+  * At present these observations apply only to pmac LL driver (the only one
+  * that can do record, at present).  However, if other LL drivers for machines
+  * with record are added they may apply.
+  *
+  * The fragment parameters for the record and play channels are separate.
+  * However, if the driver is opened O_RDWR there is no way (in the current OSS
+  * API) to specify their values independently for the record and playback
+  * channels.  Since the only common factor between the input & output is the
+  * sample rate (on pmac) it should be possible to open /dev/dspX O_WRONLY and
+  * /dev/dspY O_RDONLY.  The input & output channels could then have different
+  * characteristics (other than the first that sets sample rate claiming the
+  * right to set it for ever).  As it stands, the format, channels, number of
+  * bits & sample rate are assumed to be common.  In the future perhaps these
+  * should be the responsibility of the LL driver - and then if a card really
+  * does not share items between record & playback they can be specified
+  * separately.
+*/
+
+/* Thread-safeness of shared_resources notes: 31/01/2001
+ * If the user opens O_RDWR and then splits record & play between two threads
+ * both of which inherit the fd - and then starts changing things from both
+ * - we will have difficulty telling.
+ *
+ * It's bad application coding - but ...
+ * TODO: think about how to sort this out... without bogging everything down in
+ * semaphores.
+ *
+ * Similarly, the OSS spec says "all changes to parameters must be between
+ * open() and the first read() or write(). - and a bit later on (by
+ * implication) "between SNDCTL_DSP_RESET and the first read() or write() after
+ * it".  If the app is multi-threaded and this rule is broken between threads
+ * we will have trouble spotting it - and the fault will be rather obscure :-(
+ *
+ * We will try and put out at least a kmsg if we see it happen... but I think
+ * it will be quite hard to trap it with an -EXXX return... because we can't
+ * see the fault until after the damage is done.
+*/
 
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/sound.h>
 #include <linux/init.h>
 #include <linux/soundcard.h>
+#include <linux/poll.h>
 #include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
 #include "dmasound.h"
 
+#define DMASOUND_CORE_REVISION 1
+#define DMASOUND_CORE_EDITION 6
 
     /*
      *  Declarations
      */
 
 int dmasound_catchRadius = 0;
-static unsigned int numWriteBufs = 4;
-static unsigned int writeBufSize = 32;	/* in KB! */
+MODULE_PARM(dmasound_catchRadius, "i");
+
+static unsigned int numWriteBufs = DEFAULT_N_BUFFERS;
+MODULE_PARM(numWriteBufs, "i");
+static unsigned int writeBufSize = DEFAULT_BUFF_SIZE ;	/* in bytes */
+MODULE_PARM(writeBufSize, "i");
+
 #ifdef HAS_RECORD
-static unsigned int numReadBufs = 4;
-static unsigned int readBufSize = 32;	/* in KB! */
+static unsigned int numReadBufs = DEFAULT_N_BUFFERS;
+MODULE_PARM(numReadBufs, "i");
+static unsigned int readBufSize = DEFAULT_BUFF_SIZE;	/* in bytes */
+MODULE_PARM(readBufSize, "i");
 #endif
 
-MODULE_PARM(dmasound_catchRadius, "i");
-MODULE_PARM(numWriteBufs, "i");
-MODULE_PARM(writeBufSize, "i");
-MODULE_PARM(numReadBufs, "i");
-MODULE_PARM(readBufSize, "i");
 MODULE_LICENSE("GPL");
 
 #ifdef MODULE
@@ -144,246 +218,9 @@ static int state_unit = -1;
 static int irq_installed = 0;
 #endif /* MODULE */
 
-
-    /*
-     *  Conversion tables
-     */
-
-#ifdef HAS_8BIT_TABLES
-/* 8 bit mu-law */
-
-char dmasound_ulaw2dma8[] = {
-	-126,	-122,	-118,	-114,	-110,	-106,	-102,	-98,
-	-94,	-90,	-86,	-82,	-78,	-74,	-70,	-66,
-	-63,	-61,	-59,	-57,	-55,	-53,	-51,	-49,
-	-47,	-45,	-43,	-41,	-39,	-37,	-35,	-33,
-	-31,	-30,	-29,	-28,	-27,	-26,	-25,	-24,
-	-23,	-22,	-21,	-20,	-19,	-18,	-17,	-16,
-	-16,	-15,	-15,	-14,	-14,	-13,	-13,	-12,
-	-12,	-11,	-11,	-10,	-10,	-9,	-9,	-8,
-	-8,	-8,	-7,	-7,	-7,	-7,	-6,	-6,
-	-6,	-6,	-5,	-5,	-5,	-5,	-4,	-4,
-	-4,	-4,	-4,	-4,	-3,	-3,	-3,	-3,
-	-3,	-3,	-3,	-3,	-2,	-2,	-2,	-2,
-	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
-	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
-	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
-	-1,	-1,	-1,	-1,	-1,	-1,	-1,	0,
-	125,	121,	117,	113,	109,	105,	101,	97,
-	93,	89,	85,	81,	77,	73,	69,	65,
-	62,	60,	58,	56,	54,	52,	50,	48,
-	46,	44,	42,	40,	38,	36,	34,	32,
-	30,	29,	28,	27,	26,	25,	24,	23,
-	22,	21,	20,	19,	18,	17,	16,	15,
-	15,	14,	14,	13,	13,	12,	12,	11,
-	11,	10,	10,	9,	9,	8,	8,	7,
-	7,	7,	6,	6,	6,	6,	5,	5,
-	5,	5,	4,	4,	4,	4,	3,	3,
-	3,	3,	3,	3,	2,	2,	2,	2,
-	2,	2,	2,	2,	1,	1,	1,	1,
-	1,	1,	1,	1,	1,	1,	1,	1,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0
-};
-
-/* 8 bit A-law */
-
-char dmasound_alaw2dma8[] = {
-	-22,	-21,	-24,	-23,	-18,	-17,	-20,	-19,
-	-30,	-29,	-32,	-31,	-26,	-25,	-28,	-27,
-	-11,	-11,	-12,	-12,	-9,	-9,	-10,	-10,
-	-15,	-15,	-16,	-16,	-13,	-13,	-14,	-14,
-	-86,	-82,	-94,	-90,	-70,	-66,	-78,	-74,
-	-118,	-114,	-126,	-122,	-102,	-98,	-110,	-106,
-	-43,	-41,	-47,	-45,	-35,	-33,	-39,	-37,
-	-59,	-57,	-63,	-61,	-51,	-49,	-55,	-53,
-	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
-	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
-	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
-	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
-	-6,	-6,	-6,	-6,	-5,	-5,	-5,	-5,
-	-8,	-8,	-8,	-8,	-7,	-7,	-7,	-7,
-	-3,	-3,	-3,	-3,	-3,	-3,	-3,	-3,
-	-4,	-4,	-4,	-4,	-4,	-4,	-4,	-4,
-	21,	20,	23,	22,	17,	16,	19,	18,
-	29,	28,	31,	30,	25,	24,	27,	26,
-	10,	10,	11,	11,	8,	8,	9,	9,
-	14,	14,	15,	15,	12,	12,	13,	13,
-	86,	82,	94,	90,	70,	66,	78,	74,
-	118,	114,	126,	122,	102,	98,	110,	106,
-	43,	41,	47,	45,	35,	33,	39,	37,
-	59,	57,	63,	61,	51,	49,	55,	53,
-	1,	1,	1,	1,	1,	1,	1,	1,
-	1,	1,	1,	1,	1,	1,	1,	1,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	5,	5,	5,	5,	4,	4,	4,	4,
-	7,	7,	7,	7,	6,	6,	6,	6,
-	2,	2,	2,	2,	2,	2,	2,	2,
-	3,	3,	3,	3,	3,	3,	3,	3
-};
-#endif /* HAS_8BIT_TABLES */
-
-#ifdef HAS_16BIT_TABLES
-
-/* 16 bit mu-law */
-
-short dmasound_ulaw2dma16[] = {
-	-32124,	-31100,	-30076,	-29052,	-28028,	-27004,	-25980,	-24956,
-	-23932,	-22908,	-21884,	-20860,	-19836,	-18812,	-17788,	-16764,
-	-15996,	-15484,	-14972,	-14460,	-13948,	-13436,	-12924,	-12412,
-	-11900,	-11388,	-10876,	-10364,	-9852,	-9340,	-8828,	-8316,
-	-7932,	-7676,	-7420,	-7164,	-6908,	-6652,	-6396,	-6140,
-	-5884,	-5628,	-5372,	-5116,	-4860,	-4604,	-4348,	-4092,
-	-3900,	-3772,	-3644,	-3516,	-3388,	-3260,	-3132,	-3004,
-	-2876,	-2748,	-2620,	-2492,	-2364,	-2236,	-2108,	-1980,
-	-1884,	-1820,	-1756,	-1692,	-1628,	-1564,	-1500,	-1436,
-	-1372,	-1308,	-1244,	-1180,	-1116,	-1052,	-988,	-924,
-	-876,	-844,	-812,	-780,	-748,	-716,	-684,	-652,
-	-620,	-588,	-556,	-524,	-492,	-460,	-428,	-396,
-	-372,	-356,	-340,	-324,	-308,	-292,	-276,	-260,
-	-244,	-228,	-212,	-196,	-180,	-164,	-148,	-132,
-	-120,	-112,	-104,	-96,	-88,	-80,	-72,	-64,
-	-56,	-48,	-40,	-32,	-24,	-16,	-8,	0,
-	32124,	31100,	30076,	29052,	28028,	27004,	25980,	24956,
-	23932,	22908,	21884,	20860,	19836,	18812,	17788,	16764,
-	15996,	15484,	14972,	14460,	13948,	13436,	12924,	12412,
-	11900,	11388,	10876,	10364,	9852,	9340,	8828,	8316,
-	7932,	7676,	7420,	7164,	6908,	6652,	6396,	6140,
-	5884,	5628,	5372,	5116,	4860,	4604,	4348,	4092,
-	3900,	3772,	3644,	3516,	3388,	3260,	3132,	3004,
-	2876,	2748,	2620,	2492,	2364,	2236,	2108,	1980,
-	1884,	1820,	1756,	1692,	1628,	1564,	1500,	1436,
-	1372,	1308,	1244,	1180,	1116,	1052,	988,	924,
-	876,	844,	812,	780,	748,	716,	684,	652,
-	620,	588,	556,	524,	492,	460,	428,	396,
-	372,	356,	340,	324,	308,	292,	276,	260,
-	244,	228,	212,	196,	180,	164,	148,	132,
-	120,	112,	104,	96,	88,	80,	72,	64,
-	56,	48,	40,	32,	24,	16,	8,	0,
-};
-
-/* 16 bit A-law */
-
-short dmasound_alaw2dma16[] = {
-	-5504,	-5248,	-6016,	-5760,	-4480,	-4224,	-4992,	-4736,
-	-7552,	-7296,	-8064,	-7808,	-6528,	-6272,	-7040,	-6784,
-	-2752,	-2624,	-3008,	-2880,	-2240,	-2112,	-2496,	-2368,
-	-3776,	-3648,	-4032,	-3904,	-3264,	-3136,	-3520,	-3392,
-	-22016,	-20992,	-24064,	-23040,	-17920,	-16896,	-19968,	-18944,
-	-30208,	-29184,	-32256,	-31232,	-26112,	-25088,	-28160,	-27136,
-	-11008,	-10496,	-12032,	-11520,	-8960,	-8448,	-9984,	-9472,
-	-15104,	-14592,	-16128,	-15616,	-13056,	-12544,	-14080,	-13568,
-	-344,	-328,	-376,	-360,	-280,	-264,	-312,	-296,
-	-472,	-456,	-504,	-488,	-408,	-392,	-440,	-424,
-	-88,	-72,	-120,	-104,	-24,	-8,	-56,	-40,
-	-216,	-200,	-248,	-232,	-152,	-136,	-184,	-168,
-	-1376,	-1312,	-1504,	-1440,	-1120,	-1056,	-1248,	-1184,
-	-1888,	-1824,	-2016,	-1952,	-1632,	-1568,	-1760,	-1696,
-	-688,	-656,	-752,	-720,	-560,	-528,	-624,	-592,
-	-944,	-912,	-1008,	-976,	-816,	-784,	-880,	-848,
-	5504,	5248,	6016,	5760,	4480,	4224,	4992,	4736,
-	7552,	7296,	8064,	7808,	6528,	6272,	7040,	6784,
-	2752,	2624,	3008,	2880,	2240,	2112,	2496,	2368,
-	3776,	3648,	4032,	3904,	3264,	3136,	3520,	3392,
-	22016,	20992,	24064,	23040,	17920,	16896,	19968,	18944,
-	30208,	29184,	32256,	31232,	26112,	25088,	28160,	27136,
-	11008,	10496,	12032,	11520,	8960,	8448,	9984,	9472,
-	15104,	14592,	16128,	15616,	13056,	12544,	14080,	13568,
-	344,	328,	376,	360,	280,	264,	312,	296,
-	472,	456,	504,	488,	408,	392,	440,	424,
-	88,	72,	120,	104,	24,	8,	56,	40,
-	216,	200,	248,	232,	152,	136,	184,	168,
-	1376,	1312,	1504,	1440,	1120,	1056,	1248,	1184,
-	1888,	1824,	2016,	1952,	1632,	1568,	1760,	1696,
-	688,	656,	752,	720,	560,	528,	624,	592,
-	944,	912,	1008,	976,	816,	784,	880,	848,
-};
-#endif /* HAS_16BIT_TABLES */
-
-
-#ifdef HAS_14BIT_TABLES
-
-    /*
-     *  Unused for now. Where are the MSB parts anyway??
-     */
-
-/* 14 bit mu-law (LSB) */
-
-char dmasound_ulaw2dma14l[] = {
-	33,	33,	33,	33,	33,	33,	33,	33,
-	33,	33,	33,	33,	33,	33,	33,	33,
-	33,	33,	33,	33,	33,	33,	33,	33,
-	33,	33,	33,	33,	33,	33,	33,	33,
-	1,	1,	1,	1,	1,	1,	1,	1,
-	1,	1,	1,	1,	1,	1,	1,	1,
-	49,	17,	49,	17,	49,	17,	49,	17,
-	49,	17,	49,	17,	49,	17,	49,	17,
-	41,	57,	9,	25,	41,	57,	9,	25,
-	41,	57,	9,	25,	41,	57,	9,	25,
-	37,	45,	53,	61,	5,	13,	21,	29,
-	37,	45,	53,	61,	5,	13,	21,	29,
-	35,	39,	43,	47,	51,	55,	59,	63,
-	3,	7,	11,	15,	19,	23,	27,	31,
-	34,	36,	38,	40,	42,	44,	46,	48,
-	50,	52,	54,	56,	58,	60,	62,	0,
-	31,	31,	31,	31,	31,	31,	31,	31,
-	31,	31,	31,	31,	31,	31,	31,	31,
-	31,	31,	31,	31,	31,	31,	31,	31,
-	31,	31,	31,	31,	31,	31,	31,	31,
-	63,	63,	63,	63,	63,	63,	63,	63,
-	63,	63,	63,	63,	63,	63,	63,	63,
-	15,	47,	15,	47,	15,	47,	15,	47,
-	15,	47,	15,	47,	15,	47,	15,	47,
-	23,	7,	55,	39,	23,	7,	55,	39,
-	23,	7,	55,	39,	23,	7,	55,	39,
-	27,	19,	11,	3,	59,	51,	43,	35,
-	27,	19,	11,	3,	59,	51,	43,	35,
-	29,	25,	21,	17,	13,	9,	5,	1,
-	61,	57,	53,	49,	45,	41,	37,	33,
-	30,	28,	26,	24,	22,	20,	18,	16,
-	14,	12,	10,	8,	6,	4,	2,	0
-};
-
-/* 14 bit A-law (LSB) */
-
-char dmasound_alaw2dma14l[] = {
-	32,	32,	32,	32,	32,	32,	32,	32,
-	32,	32,	32,	32,	32,	32,	32,	32,
-	16,	48,	16,	48,	16,	48,	16,	48,
-	16,	48,	16,	48,	16,	48,	16,	48,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	42,	46,	34,	38,	58,	62,	50,	54,
-	10,	14,	2,	6,	26,	30,	18,	22,
-	42,	46,	34,	38,	58,	62,	50,	54,
-	10,	14,	2,	6,	26,	30,	18,	22,
-	40,	56,	8,	24,	40,	56,	8,	24,
-	40,	56,	8,	24,	40,	56,	8,	24,
-	20,	28,	4,	12,	52,	60,	36,	44,
-	20,	28,	4,	12,	52,	60,	36,	44,
-	32,	32,	32,	32,	32,	32,	32,	32,
-	32,	32,	32,	32,	32,	32,	32,	32,
-	48,	16,	48,	16,	48,	16,	48,	16,
-	48,	16,	48,	16,	48,	16,	48,	16,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	0,	0,	0,	0,	0,	0,	0,	0,
-	22,	18,	30,	26,	6,	2,	14,	10,
-	54,	50,	62,	58,	38,	34,	46,	42,
-	22,	18,	30,	26,	6,	2,	14,	10,
-	54,	50,	62,	58,	38,	34,	46,	42,
-	24,	8,	56,	40,	24,	8,	56,	40,
-	24,	8,	56,	40,	24,	8,	56,	40,
-	44,	36,	60,	52,	12,	4,	28,	20,
-	44,	36,	60,	52,	12,	4,	28,	20
-};
-#endif /* HAS_14BIT_TABLES */
-
+/* control over who can modify resources shared between play/record */
+static mode_t shared_resource_owner = 0 ;
+static int shared_resources_initialised = 0 ;
 
     /*
      *  Mid level stuff
@@ -393,15 +230,7 @@ struct sound_settings dmasound;
 
 static inline void sound_silence(void)
 {
-	/* update hardware settings one more */
-	dmasound.mach.init();
-
-	dmasound.mach.silence();
-}
-
-static inline void sound_init(void)
-{
-	dmasound.mach.init();
+	dmasound.mach.silence(); /* _MUST_ stop DMA */
 }
 
 static inline int sound_set_format(int format)
@@ -414,8 +243,17 @@ static int sound_set_speed(int speed)
 	if (speed < 0)
 		return dmasound.soft.speed;
 
+	/* trap out-of-range speed settings.
+	   at present we allow (arbitrarily) low rates - using soft
+	   up-conversion - but we can't allow > max because there is
+	   no soft down-conversion.
+	*/
+	if (dmasound.mach.max_dsp_speed &&
+	   (speed > dmasound.mach.max_dsp_speed))
+		speed = dmasound.mach.max_dsp_speed ;
+
 	dmasound.soft.speed = speed;
-	dmasound.mach.init();
+
 	if (dmasound.minDev == SND_DEV_DSP)
 		dmasound.dsp.speed = dmasound.soft.speed;
 
@@ -432,7 +270,6 @@ static int sound_set_stereo(int stereo)
 	dmasound.soft.stereo = stereo;
 	if (dmasound.minDev == SND_DEV_DSP)
 		dmasound.dsp.stereo = stereo;
-	dmasound.mach.init();
 
 	return stereo;
 }
@@ -471,9 +308,13 @@ static ssize_t sound_copy_translate(TRANS *trans, const u_char *userPtr,
 	    default:
 		return 0;
 	}
-	return ct_func(userPtr, userCount, frame, frameUsed, frameLeft);
+	/* if the user has requested a non-existent translation don't try
+	   to call it but just return 0 bytes moved
+	*/
+	if (ct_func)
+		return ct_func(userPtr, userCount, frame, frameUsed, frameLeft);
+	return 0;
 }
-
 
     /*
      *  /dev/mixer abstraction
@@ -555,8 +396,10 @@ static void __init mixer_init(void)
      */
 
 struct sound_queue dmasound_write_sq;
+static void sq_reset_output(void) ;
 #ifdef HAS_RECORD
 struct sound_queue dmasound_read_sq;
+static void sq_reset_input(void) ;
 #endif
 
 static int sq_allocate_buffers(struct sound_queue *sq, int num, int size)
@@ -588,8 +431,6 @@ static void sq_release_buffers(struct sound_queue *sq)
 	int i;
 
 	if (sq->buffers) {
-		if (sq != &write_sq && dmasound.mach.abort_read)
-			dmasound.mach.abort_read();
 		for (i = 0; i < sq->numBufs; i++)
 			dmasound.mach.dma_free(sq->buffers[i], sq->bufSize);
 		kfree(sq->buffers);
@@ -597,15 +438,84 @@ static void sq_release_buffers(struct sound_queue *sq)
 	}
 }
 
-static void sq_setup(struct sound_queue *sq, int max_count, int max_active,
-		     int block_size)
+
+static int sq_setup(struct sound_queue *sq)
 {
-	void (*setup_func)(void);
+	int (*setup_func)(void) = 0;
+	int hard_frame ;
 
-	sq->max_count = max_count;
-	sq->max_active = max_active;
-	sq->block_size = block_size;
+	if (sq->locked) { /* are we already set? - and not changeable */
+#ifdef DEBUG_DMASOUND
+printk("dmasound_core: tried to sq_setup a locked queue\n") ;
+#endif
+		return -EINVAL ;
+	}
+	sq->locked = 1 ; /* don't think we have a race prob. here _check_ */
 
+	/* make sure that the parameters are set up
+	   This should have been done already...
+	*/
+
+	dmasound.mach.init();
+
+	/* OK.  If the user has set fragment parameters explicitly, then we
+	   should leave them alone... as long as they are valid.
+	   Invalid user fragment params can occur if we allow the whole buffer
+	   to be used when the user requests the fragments sizes (with no soft
+	   x-lation) and then the user subsequently sets a soft x-lation that
+	   requires increased internal buffering.
+
+	   Othwerwise (if the user did not set them) OSS says that we should
+	   select frag params on the basis of 0.5 s output & 0.1 s input
+	   latency. (TODO.  For now we will copy in the defaults.)
+	*/
+
+	if (sq->user_frags <= 0) {
+		sq->max_count = sq->numBufs ;
+		sq->max_active = sq->numBufs ;
+		sq->block_size = sq->bufSize;
+		/* set up the user info */
+		sq->user_frags = sq->numBufs ;
+		sq->user_frag_size = sq->bufSize ;
+		sq->user_frag_size *=
+			(dmasound.soft.size * (dmasound.soft.stereo+1) ) ;
+		sq->user_frag_size /=
+			(dmasound.hard.size * (dmasound.hard.stereo+1) ) ;
+	} else {
+		/* work out requested block size */
+		sq->block_size = sq->user_frag_size ;
+		sq->block_size *=
+			(dmasound.hard.size * (dmasound.hard.stereo+1) ) ;
+		sq->block_size /=
+			(dmasound.soft.size * (dmasound.soft.stereo+1) ) ;
+		/* the user wants to write frag-size chunks */
+		sq->block_size *= dmasound.hard.speed ;
+		sq->block_size /= dmasound.soft.speed ;
+		/* this only works for size values which are powers of 2 */
+		hard_frame =
+			(dmasound.hard.size * (dmasound.hard.stereo+1))/8 ;
+		sq->block_size +=  (hard_frame - 1) ;
+		sq->block_size &= ~(hard_frame - 1) ; /* make sure we are aligned */
+		/* let's just check for obvious mistakes */
+		if ( sq->block_size <= 0 || sq->block_size > sq->bufSize) {
+#ifdef DEBUG_DMASOUND
+printk("dmasound_core: invalid frag size (user set %d)\n", sq->user_frag_size) ;
+#endif
+			sq->block_size = sq->bufSize ;
+		}
+		if ( sq->user_frags <= sq->numBufs ) {
+			sq->max_count = sq->user_frags ;
+			/* if user has set max_active - then use it */
+			sq->max_active = (sq->max_active <= sq->max_count) ?
+				sq->max_active : sq->max_count ;
+		} else {
+#ifdef DEBUG_DMASOUND
+printk("dmasound_core: invalid frag count (user set %d)\n", sq->user_frags) ;
+#endif
+			sq->max_count =
+			sq->max_active = sq->numBufs ;
+		}
+	}
 	sq->front = sq->count = sq->rear_size = 0;
 	sq->syncing = 0;
 	sq->active = 0;
@@ -613,12 +523,16 @@ static void sq_setup(struct sound_queue *sq, int max_count, int max_active,
 	if (sq == &write_sq) {
 	    sq->rear = -1;
 	    setup_func = dmasound.mach.write_sq_setup;
-	} else {
+	}
+#ifdef HAS_RECORD
+	else {
 	    sq->rear = 0;
 	    setup_func = dmasound.mach.read_sq_setup;
 	}
+#endif
 	if (setup_func)
-	    setup_func();
+	    return setup_func();
+	return 0 ;
 }
 
 static inline void sq_play(void)
@@ -631,7 +545,8 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
 {
 	ssize_t uWritten = 0;
 	u_char *dest;
-	ssize_t uUsed, bUsed, bLeft;
+	ssize_t uUsed = 0, bUsed, bLeft;
+	unsigned long flags ;
 
 	/* ++TeSche: Is something like this necessary?
 	 * Hey, that's an honest question! Or does any other part of the
@@ -640,10 +555,51 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
 	if (uLeft == 0)
 		return 0;
 
+	/* implement any changes we have made to the soft/hard params.
+	   this is not satisfactory really, all we have done up to now is to
+	   say what we would like - there hasn't been any real checking of capability
+	*/
+
+	if (shared_resources_initialised == 0) {
+		dmasound.mach.init() ;
+		shared_resources_initialised = 1 ;
+	}
+
+	/* set up the sq if it is not already done. This may seem a dumb place
+	   to do it - but it is what OSS requires.  It means that write() can
+	   return memory allocation errors.  To avoid this possibility use the
+	   GETBLKSIZE or GETOSPACE ioctls (after you've fiddled with all the
+	   params you want to change) - these ioctls also force the setup.
+	*/
+
+	if (write_sq.locked == 0) {
+		if ((uWritten = sq_setup(&write_sq)) < 0) return uWritten ;
+		uWritten = 0 ;
+	}
+
+/* FIXME: I think that this may be the wrong behaviour when we get strapped
+	for time and the cpu is close to being (or actually) behind in sending data.
+	- because we've lost the time that the N samples, already in the buffer,
+	would have given us to get here with the next lot from the user.
+*/
 	/* The interrupt doesn't start to play the last, incomplete frame.
 	 * Thus we can append to it without disabling the interrupts! (Note
 	 * also that write_sq.rear isn't affected by the interrupt.)
 	 */
+
+	/* as of 1.6 this behaviour changes if SNDCTL_DSP_POST has been issued:
+	   this will mimic the behaviour of syncing and allow the sq_play() to
+	   queue a partial fragment.  Since sq_play() may/will be called from
+	   the IRQ handler - at least on Pmac we have to deal with it.
+	   The strategy - possibly not optimum - is to kill _POST status if we
+	   get here.  This seems, at least, reasonable - in the sense that POST
+	   is supposed to indicate that we might not write before the queue
+	   is drained - and if we get here in time then it does not apply.
+	*/
+
+	save_flags(flags) ; cli() ;
+	write_sq.syncing &= ~2 ; /* take out POST status */
+	restore_flags(flags) ;
 
 	if (write_sq.count > 0 &&
 	    (bLeft = write_sq.block_size-write_sq.rear_size) > 0) {
@@ -655,12 +611,12 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
 			return uUsed;
 		src += uUsed;
 		uWritten += uUsed;
-		uLeft -= uUsed;
+		uLeft = (uUsed <= uLeft) ? (uLeft - uUsed) : 0 ; /* paranoia */
 		write_sq.rear_size = bUsed;
 	}
 
-	do {
-		while (write_sq.count == write_sq.max_active) {
+	while (uLeft) {
+		while (write_sq.count >= write_sq.max_active) {
 			sq_play();
 			if (write_sq.open_mode & O_NONBLOCK)
 				return uWritten > 0 ? uWritten : -EAGAIN;
@@ -685,17 +641,43 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
 			break;
 		src += uUsed;
 		uWritten += uUsed;
-		uLeft -= uUsed;
+		uLeft = (uUsed <= uLeft) ? (uLeft - uUsed) : 0 ; /* paranoia */
 		if (bUsed) {
 			write_sq.rear = (write_sq.rear+1) % write_sq.max_count;
 			write_sq.rear_size = bUsed;
 			write_sq.count++;
 		}
-	} while (bUsed);   /* uUsed may have been 0 */
+	} /* uUsed may have been 0 */
 
 	sq_play();
 
 	return uUsed < 0? uUsed: uWritten;
+}
+
+static unsigned int sq_poll(struct file *file, struct poll_table_struct *wait)
+{
+	unsigned int mask = 0;
+	int retVal;
+	
+	if (write_sq.locked == 0) {
+		if ((retVal = sq_setup(&write_sq)) < 0)
+			return retVal;
+		return 0;
+	}
+	if (file->f_mode & FMODE_WRITE )
+		poll_wait(file, &write_sq.action_queue, wait);
+#ifdef HAS_RECORD
+	if (file->f_mode & FMODE_READ)
+		poll_wait(file, &read_sq.action_queue, wait);
+	if (file->f_mode & FMODE_READ)
+		if (read_sq.block_size - read_sq.rear_size > 0)
+			mask |= POLLIN | POLLRDNORM;
+#endif
+	if (file->f_mode & FMODE_WRITE)
+		if (write_sq.count < write_sq.max_active || write_sq.block_size - write_sq.rear_size > 0)
+			mask |= POLLOUT | POLLWRNORM;
+	return mask;
+
 }
 
 #ifdef HAS_RECORD
@@ -707,9 +689,12 @@ static ssize_t sq_write(struct file *file, const char *src, size_t uLeft,
      *  The value 'rear' indicates the buffer the DMA is currently filling.
      *  When 'front' == 'rear' the buffer "ring" is empty (we always have an
      *  empty available).  The 'rear_size' is used to track partial offsets
-     *  into the current buffer.  Right now, I just keep the DMA running.  If
-     *  the reader can't keep up, the interrupt tosses the oldest buffer.  We
-     *  could also shut down the DMA in this case.
+     *  into the buffer we are currently returning to the user.
+
+     *  This level (> [1.5]) doesn't care what strategy the LL driver uses with
+     *  DMA on over-run.  It can leave it running (and keep active == 1) or it
+     *  can kill it and set active == 0 in which case this routine will spot
+     *  it and restart the DMA.
      */
 
 static ssize_t sq_read(struct file *file, char *dst, size_t uLeft,
@@ -721,14 +706,38 @@ static ssize_t sq_read(struct file *file, char *dst, size_t uLeft,
 	if (uLeft == 0)
 		return 0;
 
-	if (!read_sq.active && dmasound.mach.record)
-		dmasound.mach.record();	/* Kick off the record process. */
+	/* cater for the compatibility mode - record compiled in but no LL */
+	if (dmasound.mach.record == NULL)
+		return -EINVAL ;
+
+	/* see comment in sq_write()
+	*/
+
+	if( shared_resources_initialised == 0) {
+		dmasound.mach.init() ;
+		shared_resources_initialised = 1 ;
+	}
+
+	/* set up the sq if it is not already done. see comments in sq_write().
+	*/
+
+	if (read_sq.locked == 0) {
+		if ((uRead = sq_setup(&read_sq)) < 0)
+			return uRead ;
+	}
 
 	uRead = 0;
 
 	/* Move what the user requests, depending upon other options.
 	*/
 	while (uLeft > 0) {
+
+		/* we happened to get behind and the LL driver killed DMA
+		   then we should set it going again.  This also sets it
+		   going the first time through.
+		*/
+		if ( !read_sq.active )
+			dmasound.mach.record();
 
 		/* When front == rear, the DMA is not done yet.
 		*/
@@ -774,14 +783,16 @@ static inline void sq_init_waitqueue(struct sound_queue *sq)
 	sq->busy = 0;
 }
 
+#if 0 /* blocking open() */
 static inline void sq_wake_up(struct sound_queue *sq, struct file *file,
 			      mode_t mode)
 {
 	if (file->f_mode & mode) {
-		sq->busy = 0;
+		sq->busy = 0; /* CHECK: IS THIS OK??? */
 		WAKE_UP(sq->open_queue);
 	}
 }
+#endif
 
 static int sq_open2(struct sound_queue *sq, struct file *file, mode_t mode,
 		    int numbufs, int bufsize)
@@ -790,6 +801,7 @@ static int sq_open2(struct sound_queue *sq, struct file *file, mode_t mode,
 
 	if (file->f_mode & mode) {
 		if (sq->busy) {
+#if 0 /* blocking open() */
 			rc = -EBUSY;
 			if (file->f_flags & O_NONBLOCK)
 				return rc;
@@ -800,84 +812,193 @@ static int sq_open2(struct sound_queue *sq, struct file *file, mode_t mode,
 					return rc;
 			}
 			rc = 0;
+#else
+			/* OSS manual says we will return EBUSY regardless
+			   of O_NOBLOCK.
+			*/
+			return -EBUSY ;
+#endif
 		}
 		sq->busy = 1; /* Let's play spot-the-race-condition */
 
-		if (sq_allocate_buffers(sq, numbufs, bufsize)) {
+		/* allocate the default number & size of buffers.
+		   (i.e. specified in _setup() or as module params)
+		   can't be changed at the moment - but _could_ be perhaps
+		   in the setfragments ioctl.
+		*/
+		if (( rc = sq_allocate_buffers(sq, numbufs, bufsize))) {
+#if 0 /* blocking open() */
 			sq_wake_up(sq, file, mode);
+#else
+			sq->busy = 0 ;
+#endif
 			return rc;
 		}
 
-		sq_setup(sq, numbufs, numbufs, bufsize);
 		sq->open_mode = file->f_mode;
 	}
 	return rc;
 }
 
 #define write_sq_init_waitqueue()	sq_init_waitqueue(&write_sq)
+#if 0 /* blocking open() */
 #define write_sq_wake_up(file)		sq_wake_up(&write_sq, file, FMODE_WRITE)
+#endif
 #define write_sq_release_buffers()	sq_release_buffers(&write_sq)
 #define write_sq_open(file)	\
-	sq_open2(&write_sq, file, FMODE_WRITE, numWriteBufs, writeBufSize << 10)
+	sq_open2(&write_sq, file, FMODE_WRITE, numWriteBufs, writeBufSize )
 
 #ifdef HAS_RECORD
 #define read_sq_init_waitqueue()	sq_init_waitqueue(&read_sq)
+#if 0 /* blocking open() */
 #define read_sq_wake_up(file)		sq_wake_up(&read_sq, file, FMODE_READ)
+#endif
 #define read_sq_release_buffers()	sq_release_buffers(&read_sq)
 #define read_sq_open(file)	\
-	sq_open2(&read_sq, file, FMODE_READ, numReadBufs, readBufSize << 10)
-#else /* !HAS_RECORD */
+	sq_open2(&read_sq, file, FMODE_READ, numReadBufs, readBufSize )
+#else
 #define read_sq_init_waitqueue()	do {} while (0)
+#if 0 /* blocking open() */
 #define read_sq_wake_up(file)		do {} while (0)
+#endif
 #define read_sq_release_buffers()	do {} while (0)
-#define read_sq_open(file)		(0)
-#endif /* !HAS_RECORD */
+#define sq_reset_input()		do {} while (0)
+#endif
 
 static int sq_open(struct inode *inode, struct file *file)
 {
 	int rc;
 
 	dmasound.mach.open();
-	if ((rc = write_sq_open(file)) || (rc = read_sq_open(file))) {
+
+	if ((rc = write_sq_open(file))) { /* checks the f_mode */
 		dmasound.mach.release();
 		return rc;
 	}
+#ifdef HAS_RECORD
+	if (dmasound.mach.record) {
+		if ((rc = read_sq_open(file))) { /* checks the f_mode */
+			dmasound.mach.release();
+			return rc;
+		}
+	} else { /* no record function installed; in compat mode */
+		if (file->f_mode & FMODE_READ) {
+			/* TODO: if O_RDWR, release any resources grabbed by write part */
+			dmasound.mach.release() ;
+			/* I think this is what is required by open(2) */
+			return -ENXIO ;
+		}
+	}
+#else /* !HAS_RECORD */
+	if (file->f_mode & FMODE_READ) {
+		/* TODO: if O_RDWR, release any resources grabbed by write part */
+		dmasound.mach.release() ;
+		return -ENXIO ; /* I think this is what is required by open(2) */
+	}
+#endif /* HAS_RECORD */
 
 	if (dmasound.mach.sq_open)
-	    dmasound.mach.sq_open();
+	    dmasound.mach.sq_open(file->f_mode);
+
+	/* CHECK whether this is sensible - in the case that dsp0 could be opened
+	  O_RDONLY and dsp1 could be opened O_WRONLY
+	*/
+
 	dmasound.minDev = MINOR(inode->i_rdev) & 0x0f;
-	dmasound.soft = dmasound.dsp;
-	dmasound.hard = dmasound.dsp;
-	sound_init();
-	if ((MINOR(inode->i_rdev) & 0x0f) == SND_DEV_AUDIO) {
+
+	/* OK. - we should make some attempt at consistency. At least the H'ware
+	   options should be set with a valid mode.  We will make it that the LL
+	   driver must supply defaults for hard & soft params.
+	*/
+
+	if (shared_resource_owner == 0) {
+		/* you can make this AFMT_U8/mono/8K if you want to mimic old
+		   OSS behaviour - while we still have soft translations ;-) */
+		dmasound.soft = dmasound.mach.default_soft ;
+		dmasound.dsp = dmasound.mach.default_soft ;
+		dmasound.hard = dmasound.mach.default_hard ;
+	}
+
+#ifndef DMASOUND_STRICT_OSS_COMPLIANCE
+	/* none of the current LL drivers can actually do this "native" at the moment
+	   OSS does not really require us to supply /dev/audio if we can't do it.
+	*/
+	if (dmasound.minDev == SND_DEV_AUDIO) {
 		sound_set_speed(8000);
 		sound_set_stereo(0);
 		sound_set_format(AFMT_MU_LAW);
-	}
-
-#if 0
-	if (file->f_mode == FMODE_READ && dmasound.mach.record) {
-		/* Start dma'ing straight away */
-		dmasound.mach.record();
 	}
 #endif
 
 	return 0;
 }
 
-static void sq_reset(void)
+static void sq_reset_output(void)
 {
-	sound_silence();
+	sound_silence(); /* this _must_ stop DMA, we might be about to lose the buffers */
 	write_sq.active = 0;
 	write_sq.count = 0;
-	write_sq.front = (write_sq.rear+1) % write_sq.max_count;
+	write_sq.rear_size = 0;
+	/* write_sq.front = (write_sq.rear+1) % write_sq.max_count;*/
+	write_sq.front = 0 ;
+	write_sq.rear = -1 ; /* same as for set-up */
+
+	/* OK - we can unlock the parameters and fragment settings */
+	write_sq.locked = 0 ;
+	write_sq.user_frags = 0 ;
+	write_sq.user_frag_size = 0 ;
+}
+
+#ifdef HAS_RECORD
+
+static void sq_reset_input(void)
+{
+	if (dmasound.mach.record && read_sq.active) {
+		if (dmasound.mach.abort_read) { /* this routine must really be present */
+			read_sq.syncing = 1 ;
+			/* this can use the read_sq.sync_queue to sleep if
+			   necessary - it should not return until DMA
+			   is really stopped - because we might deallocate
+			   the buffers as the next action...
+			*/
+			dmasound.mach.abort_read() ;
+		} else {
+			printk(KERN_ERR
+			"dmasound_core: %s has no abort_read()!! all bets are off\n",
+				dmasound.mach.name) ;
+		}
+	}
+	read_sq.syncing =
+	read_sq.active =
+	read_sq.front =
+	read_sq.count =
+	read_sq.rear = 0 ;
+
+	/* OK - we can unlock the parameters and fragment settings */
+	read_sq.locked = 0 ;
+	read_sq.user_frags = 0 ;
+	read_sq.user_frag_size = 0 ;
+}
+
+#endif
+
+static void sq_reset(void)
+{
+	sq_reset_output() ;
+	sq_reset_input() ;
+	/* we could consider resetting the shared_resources_owner here... but I
+	   think it is probably still rather non-obvious to application writer
+	*/
+
+	/* we release everything else though */
+	shared_resources_initialised = 0 ;
 }
 
 static int sq_fsync(struct file *filp, struct dentry *dentry)
 {
 	int rc = 0;
 
-	write_sq.syncing = 1;
+	write_sq.syncing |= 1;
 	sq_play();	/* there may be an incomplete frame waiting */
 
 	while (write_sq.active) {
@@ -886,13 +1007,14 @@ static int sq_fsync(struct file *filp, struct dentry *dentry)
 			/* While waiting for audio output to drain, an
 			 * interrupt occurred.  Stop audio output immediately
 			 * and clear the queue. */
-			sq_reset();
+			sq_reset_output();
 			rc = -EINTR;
 			break;
 		}
 	}
 
-	write_sq.syncing = 0;
+	/* flag no sync regardless of whether we had a DSP_POST or not */
+	write_sq.syncing = 0 ;
 	return rc;
 }
 
@@ -901,33 +1023,130 @@ static int sq_release(struct inode *inode, struct file *file)
 	int rc = 0;
 
 	lock_kernel();
-	if (write_sq.busy)
-		rc = sq_fsync(file, file->f_dentry);
-	dmasound.soft = dmasound.dsp;
-	dmasound.hard = dmasound.dsp;
-	sound_silence();
 
-	write_sq_release_buffers();
-	read_sq_release_buffers();
+#ifdef HAS_RECORD
+	/* probably best to do the read side first - so that time taken to do it
+	   overlaps with playing any remaining output samples.
+	*/
+	if (file->f_mode & FMODE_READ) {
+		sq_reset_input() ; /* make sure dma is stopped and all is quiet */
+		read_sq_release_buffers();
+		read_sq.busy = 0;
+	}
+#endif
+
+	if (file->f_mode & FMODE_WRITE) {
+		if (write_sq.busy)
+			rc = sq_fsync(file, file->f_dentry);
+
+		sq_reset_output() ; /* make sure dma is stopped and all is quiet */
+		write_sq_release_buffers();
+		write_sq.busy = 0;
+	}
+
+	if (file->f_mode & shared_resource_owner) { /* it's us that has them */
+		shared_resource_owner = 0 ;
+		shared_resources_initialised = 0 ;
+		dmasound.hard = dmasound.mach.default_hard ;
+	}
+
 	dmasound.mach.release();
 
-	/* There is probably a DOS atack here. They change the mode flag. */
-	/* XXX add check here */
-	read_sq_wake_up(file);
-	write_sq_wake_up(file);
-
+#if 0 /* blocking open() */
 	/* Wake up a process waiting for the queue being released.
 	 * Note: There may be several processes waiting for a call
 	 * to open() returning. */
+
+	/* Iain: hmm I don't understand this next comment ... */
+	/* There is probably a DOS atack here. They change the mode flag. */
+	/* XXX add check here,*/
+	read_sq_wake_up(file); /* checks f_mode */
+	write_sq_wake_up(file); /* checks f_mode */
+#endif /* blocking open() */
+
 	unlock_kernel();
 
 	return rc;
 }
 
+/* here we see if we have a right to modify format, channels, size and so on
+   if no-one else has claimed it already then we do...
+
+   TODO: We might change this to mask O_RDWR such that only one or the other channel
+   is the owner - if we have problems.
+*/
+
+static int shared_resources_are_mine(mode_t md)
+{
+	if (shared_resource_owner)
+		return (shared_resource_owner & md ) ;
+	else {
+		shared_resource_owner = md ;
+		return 1 ;
+	}
+}
+
+/* if either queue is locked we must deny the right to change shared params
+*/
+
+static int queues_are_quiescent(void)
+{
+#ifdef HAS_RECORD
+	if (dmasound.mach.record)
+		if (read_sq.locked)
+			return 0 ;
+#endif
+	if (write_sq.locked)
+		return 0 ;
+	return 1 ;
+}
+
+/* check and set a queue's fragments per user's wishes...
+   we will check against the pre-defined literals and the actual sizes.
+   This is a bit fraught - because soft translations can mess with our
+   buffer requirements *after* this call - OSS says "call setfrags first"
+*/
+
+/* It is possible to replace all the -EINVAL returns with an override that
+   just puts the allowable value in.  This may be what many OSS apps require
+*/
+
+static int set_queue_frags(struct sound_queue *sq, int bufs, int size)
+{
+	if (sq->locked) {
+#ifdef DEBUG_DMASOUND
+printk("dmasound_core: tried to set_queue_frags on a locked queue\n") ;
+#endif
+		return -EINVAL ;
+	}
+
+	if ((size < MIN_FRAG_SIZE) || (size > MAX_FRAG_SIZE))
+		return -EINVAL ;
+	size = (1<<size) ; /* now in bytes */
+	if (size > sq->bufSize)
+		return -EINVAL ; /* this might still not work */
+
+	if (bufs <= 0)
+		return -EINVAL ;
+	if (bufs > sq->numBufs) /* the user is allowed say "don't care" with 0x7fff */
+		bufs = sq->numBufs ;
+
+	/* there is, currently, no way to specify max_active separately
+	   from max_count.  This could be a LL driver issue - I guess
+	   if there is a requirement for these values to be different then
+	  we will have to pass that info. up to this level.
+	*/
+	sq->user_frags =
+	sq->max_active = bufs ;
+	sq->user_frag_size = size ;
+
+	return 0 ;
+}
+
 static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		    u_long arg)
 {
-	int val;
+	int val, result;
 	u_long fmt;
 	int data;
 	int size, nbufs;
@@ -937,85 +1156,165 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	case SNDCTL_DSP_RESET:
 		sq_reset();
 		return 0;
-	case SNDCTL_DSP_POST:
-	case SNDCTL_DSP_SYNC:
-		return sq_fsync(file, file->f_dentry);
-
-		/* ++TeSche: before changing any of these it's
-		 * probably wise to wait until sound playing has
-		 * settled down. */
-	case SNDCTL_DSP_SPEED:
-		sq_fsync(file, file->f_dentry);
-		IOCTL_IN(arg, data);
-		return IOCTL_OUT(arg, sound_set_speed(data));
-	case SNDCTL_DSP_STEREO:
-		sq_fsync(file, file->f_dentry);
-		IOCTL_IN(arg, data);
-		return IOCTL_OUT(arg, sound_set_stereo(data));
-	case SOUND_PCM_WRITE_CHANNELS:
-		sq_fsync(file, file->f_dentry);
-		IOCTL_IN(arg, data);
-		return IOCTL_OUT(arg, sound_set_stereo(data-1)+1);
-	case SNDCTL_DSP_SETFMT:
-		sq_fsync(file, file->f_dentry);
-		IOCTL_IN(arg, data);
-		return IOCTL_OUT(arg, sound_set_format(data));
+		break ;
 	case SNDCTL_DSP_GETFMTS:
-		fmt = 0;
-		if (dmasound.trans_write) {
-			if (dmasound.trans_write->ct_ulaw)
-				fmt |= AFMT_MU_LAW;
-			if (dmasound.trans_write->ct_alaw)
-				fmt |= AFMT_A_LAW;
-			if (dmasound.trans_write->ct_s8)
-				fmt |= AFMT_S8;
-			if (dmasound.trans_write->ct_u8)
-				fmt |= AFMT_U8;
-			if (dmasound.trans_write->ct_s16be)
-				fmt |= AFMT_S16_BE;
-			if (dmasound.trans_write->ct_u16be)
-				fmt |= AFMT_U16_BE;
-			if (dmasound.trans_write->ct_s16le)
-				fmt |= AFMT_S16_LE;
-			if (dmasound.trans_write->ct_u16le)
-				fmt |= AFMT_U16_LE;
-		}
+		fmt = dmasound.mach.hardware_afmts ; /* this is what OSS says.. */
 		return IOCTL_OUT(arg, fmt);
+		break ;
 	case SNDCTL_DSP_GETBLKSIZE:
-		size = write_sq.block_size
-			* dmasound.soft.size * (dmasound.soft.stereo + 1)
-			/ (dmasound.hard.size * (dmasound.hard.stereo + 1));
+		/* this should tell the caller about bytes that the app can
+		   read/write - the app doesn't care about our internal buffers.
+		   We force sq_setup() here as per OSS 1.1 (which should
+		   compute the values necessary).
+		   Since there is no mechanism to specify read/write separately, for
+		   fds opened O_RDWR, the write_sq values will, arbitrarily, overwrite
+		   the read_sq ones.
+		*/
+		size = 0 ;
+#ifdef HAS_RECORD
+		if (dmasound.mach.record && (file->f_mode & FMODE_READ)) {
+			if ( !read_sq.locked )
+				sq_setup(&read_sq) ; /* set params */
+			size = read_sq.user_frag_size ;
+		}
+#endif
+		if (file->f_mode & FMODE_WRITE) {
+			if ( !write_sq.locked )
+				sq_setup(&write_sq) ;
+			size = write_sq.user_frag_size ;
+		}
 		return IOCTL_OUT(arg, size);
+		break ;
+	case SNDCTL_DSP_POST:
+		/* all we are going to do is to tell the LL that any
+		   partial frags can be queued for output.
+		   The LL will have to clear this flag when last output
+		   is queued.
+		*/
+		write_sq.syncing |= 0x2 ;
+		sq_play() ;
+		return 0 ;
+	case SNDCTL_DSP_SYNC:
+		/* This call, effectively, has the same behaviour as SNDCTL_DSP_RESET
+		   except that it waits for output to finish before resetting
+		   everything - read, however, is killed imediately.
+		*/
+		result = 0 ;
+		if ((file->f_mode & FMODE_READ) && dmasound.mach.record)
+			sq_reset_input() ;
+		if (file->f_mode & FMODE_WRITE) {
+			result = sq_fsync(file, file->f_dentry);
+			sq_reset_output() ;
+		}
+		/* if we are the shared resource owner then release them */
+		if (file->f_mode & shared_resource_owner)
+			shared_resources_initialised = 0 ;
+		return result ;
+		break ;
+	case SNDCTL_DSP_SPEED:
+		/* changing this on the fly will have wierd effects on the sound.
+		   Where there are rate conversions implemented in soft form - it
+		   will cause the _ctx_xxx() functions to be substituted.
+		   However, there doesn't appear to be any reason to dis-allow it from
+		   a driver pov.
+		*/
+		if (shared_resources_are_mine(file->f_mode)) {
+			IOCTL_IN(arg, data);
+			data = sound_set_speed(data) ;
+			shared_resources_initialised = 0 ;
+			return IOCTL_OUT(arg, data);
+		} else
+			return -EINVAL ;
+		break ;
+	/* OSS says these next 4 actions are undefined when the device is
+	   busy/active - we will just return -EINVAL.
+	   To be allowed to change one - (a) you have to own the right
+	    (b) the queue(s) must be quiescent
+	*/
+	case SNDCTL_DSP_STEREO:
+		if (shared_resources_are_mine(file->f_mode) &&
+		    queues_are_quiescent()) {
+			IOCTL_IN(arg, data);
+			shared_resources_initialised = 0 ;
+			return IOCTL_OUT(arg, sound_set_stereo(data));
+		} else
+			return -EINVAL ;
+		break ;
+	case SOUND_PCM_WRITE_CHANNELS:
+		if (shared_resources_are_mine(file->f_mode) &&
+		    queues_are_quiescent()) {
+			IOCTL_IN(arg, data);
+			/* the user might ask for 20 channels, we will return 1 or 2 */
+			shared_resources_initialised = 0 ;
+			return IOCTL_OUT(arg, sound_set_stereo(data-1)+1);
+		} else
+			return -EINVAL ;
+		break ;
+	case SNDCTL_DSP_SETFMT:
+		if (shared_resources_are_mine(file->f_mode) &&
+		    queues_are_quiescent()) {
+		    	int format;
+			IOCTL_IN(arg, data);
+			shared_resources_initialised = 0 ;
+			format = sound_set_format(data);
+			result = IOCTL_OUT(arg, format);
+			if (result < 0)
+				return result;
+			if (format != data)
+				return -EINVAL;
+			return 0;
+		} else
+			return -EINVAL ;
+		break ;
 	case SNDCTL_DSP_SUBDIVIDE:
+		return -EINVAL ;
 		break;
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (write_sq.count || write_sq.active || write_sq.syncing)
-			return -EINVAL;
-		IOCTL_IN(arg, size);
-		nbufs = size >> 16;
-		if (nbufs < 2 || nbufs > write_sq.numBufs)
-			nbufs = write_sq.numBufs;
-		size &= 0xffff;
-		if (size >= 8 && size <= 29) {
-			size = 1 << size;
-			size *= dmasound.hard.size * (dmasound.hard.stereo + 1);
-			size /= dmasound.soft.size * (dmasound.soft.stereo + 1);
-			if (size > write_sq.bufSize)
-				size = write_sq.bufSize;
-		} else
-			size = write_sq.bufSize;
-		sq_setup(&write_sq, write_sq.numBufs, nbufs, size);
-		return IOCTL_OUT(arg,write_sq.bufSize | write_sq.numBufs << 16);
+		/* we can do this independently for the two queues - with the
+		   proviso that for fds opened O_RDWR we cannot separate the
+		   actions and both queues will be set per the last call.
+		   NOTE: this does *NOT* actually set the queue up - merely
+		   registers our intentions.
+		*/
+		IOCTL_IN(arg, data);
+		result = 0 ;
+		nbufs = (data >> 16) & 0x7fff ; /* 0x7fff is 'use maximum' */
+		size = data & 0xffff;
+#ifdef HAS_RECORD
+		if ((file->f_mode & FMODE_READ) && dmasound.mach.record) {
+			result = set_queue_frags(&read_sq, nbufs, size) ;
+			if (result)
+				return result ;
+		}
+#endif
+		if (file->f_mode & FMODE_WRITE) {
+			result = set_queue_frags(&write_sq, nbufs, size) ;
+			if (result)
+				return result ;
+		}
+		/* NOTE: this return value is irrelevant - OSS specifically says that
+		   the value is 'random' and that the user _must_ check the actual
+		   frags values using SNDCTL_DSP_GETBLKSIZE or similar */
+		return IOCTL_OUT(arg, data);
+		break ;
 	case SNDCTL_DSP_GETOSPACE:
-		info.fragments = write_sq.max_active - write_sq.count;
-		info.fragstotal = write_sq.max_active;
-		info.fragsize = write_sq.block_size;
-		info.bytes = info.fragments * info.fragsize;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
+		/*
+		*/
+		if (file->f_mode & FMODE_WRITE) {
+			if ( !write_sq.locked )
+				sq_setup(&write_sq) ;
+			info.fragments = write_sq.max_active - write_sq.count;
+			info.fragstotal = write_sq.max_active;
+			info.fragsize = write_sq.user_frag_size;
+			info.bytes = info.fragments * info.fragsize;
+			if (copy_to_user((void *)arg, &info, sizeof(info)))
+				return -EFAULT;
+			return 0;
+		} else
+			return -EINVAL ;
+		break ;
 	case SNDCTL_DSP_GETCAPS:
-		val = 1;        /* Revision level of this ioctl() */
+		val = dmasound.mach.capabilities & 0xffffff00;
 		return IOCTL_OUT(arg,val);
 
 	default:
@@ -1029,42 +1328,46 @@ static struct file_operations sq_fops =
 	owner:		THIS_MODULE,
 	llseek:		no_llseek,
 	write:		sq_write,
+	poll:		sq_poll,
 	ioctl:		sq_ioctl,
 	open:		sq_open,
 	release:	sq_release,
 #ifdef HAS_RECORD
-	read:		sq_read,
+	read:		NULL	/* default to no read for compat mode */
 #endif
 };
 
-static void __init sq_init(void)
+static int __init sq_init(void)
 {
 #ifndef MODULE
 	int sq_unit;
 #endif
+
+#ifdef HAS_RECORD
+	if (dmasound.mach.record)
+		sq_fops.read = sq_read ;
+#endif
 	sq_unit = register_sound_dsp(&sq_fops, -1);
-	if (sq_unit < 0)
-		return;
+	if (sq_unit < 0) {
+		printk(KERN_ERR "dmasound_core: couldn't register fops\n") ;
+		return sq_unit ;
+	}
 
 	write_sq_init_waitqueue();
 	read_sq_init_waitqueue();
 
-	/* whatever you like as startup mode for /dev/dsp,
-	 * (/dev/audio hasn't got a startup mode). note that
-	 * once changed a new open() will *not* restore these!
+	/* These parameters will be restored for every clean open()
+	 * in the case of multiple open()s (e.g. dsp0 & dsp1) they
+	 * will be set so long as the shared resources have no owner.
 	 */
-	dmasound.dsp.format = AFMT_U8;
-	dmasound.dsp.stereo = 0;
-	dmasound.dsp.size = 8;
 
-	/* set minimum rate possible without expanding */
-	dmasound.dsp.speed = dmasound.mach.min_dsp_speed;
-
-	/* before the first open to /dev/dsp this wouldn't be set */
-	dmasound.soft = dmasound.dsp;
-	dmasound.hard = dmasound.dsp;
-
-	sound_silence();
+	if (shared_resource_owner == 0) {
+		dmasound.soft = dmasound.mach.default_soft ;
+		dmasound.hard = dmasound.mach.default_hard ;
+		dmasound.dsp = dmasound.mach.default_soft ;
+		shared_resources_initialised = 0 ;
+	}
+	return 0 ;
 }
 
 
@@ -1072,11 +1375,67 @@ static void __init sq_init(void)
      *  /dev/sndstat
      */
 
+/* we allow more space for record-enabled because there are extra output lines.
+   the number here must include the amount we are prepared to give to the low-level
+   driver.
+*/
+
+#ifdef HAS_RECORD
+#define STAT_BUFF_LEN 1024
+#else
+#define STAT_BUFF_LEN 768
+#endif
+
+/* this is how much space we will allow the low-level driver to use
+   in the stat buffer.  Currently, 2 * (80 character line + <NL>).
+   We do not police this (it is up to the ll driver to be honest).
+*/
+
+#define LOW_LEVEL_STAT_ALLOC 162
+
 static struct {
     int busy;
-    char buf[512];	/* state.buf should not overflow! */
+    char buf[STAT_BUFF_LEN];	/* state.buf should not overflow! */
     int len, ptr;
 } state;
+
+/* publish this function for use by low-level code, if required */
+
+char *get_afmt_string(int afmt)
+{
+        switch(afmt) {
+            case AFMT_MU_LAW:
+                return "mu-law";
+                break;
+            case AFMT_A_LAW:
+                return "A-law";
+                break;
+            case AFMT_U8:
+                return "unsigned 8 bit";
+                break;
+            case AFMT_S8:
+                return "signed 8 bit";
+                break;
+            case AFMT_S16_BE:
+                return "signed 16 bit BE";
+                break;
+            case AFMT_U16_BE:
+                return "unsigned 16 bit BE";
+                break;
+            case AFMT_S16_LE:
+                return "signed 16 bit LE";
+                break;
+            case AFMT_U16_LE:
+                return "unsigned 16 bit LE";
+                break;
+	    case 0:
+		return "format not set" ;
+		break ;
+            default:
+                break ;
+        }
+        return "ERROR: Unsupported AFMT_XXXX code" ;
+}
 
 static int state_open(struct inode *inode, struct file *file)
 {
@@ -1090,52 +1449,76 @@ static int state_open(struct inode *inode, struct file *file)
 	state.ptr = 0;
 	state.busy = 1;
 
-	len += sprintf(buffer+len, "%sDMA sound driver:\n", dmasound.mach.name);
+	len += sprintf(buffer+len, "%sDMA sound driver rev %03d :\n",
+		dmasound.mach.name, (DMASOUND_CORE_REVISION<<4) +
+		((dmasound.mach.version>>8) & 0x0f));
+	len += sprintf(buffer+len,
+		"Core driver edition %02d.%02d : %s driver edition %02d.%02d\n",
+		DMASOUND_CORE_REVISION, DMASOUND_CORE_EDITION, dmasound.mach.name2,
+		(dmasound.mach.version >> 8), (dmasound.mach.version & 0xff)) ;
 
-	len += sprintf(buffer+len, "\tsound.format = 0x%x",
-		       dmasound.soft.format);
-	switch (dmasound.soft.format) {
-	    case AFMT_MU_LAW:
-		len += sprintf(buffer+len, " (mu-law)");
-		break;
-	    case AFMT_A_LAW:
-		len += sprintf(buffer+len, " (A-law)");
-		break;
-	    case AFMT_U8:
-		len += sprintf(buffer+len, " (unsigned 8 bit)");
-		break;
-	    case AFMT_S8:
-		len += sprintf(buffer+len, " (signed 8 bit)");
-		break;
-	    case AFMT_S16_BE:
-		len += sprintf(buffer+len, " (signed 16 bit big)");
-		break;
-	    case AFMT_U16_BE:
-		len += sprintf(buffer+len, " (unsigned 16 bit big)");
-		break;
-	    case AFMT_S16_LE:
-		len += sprintf(buffer+len, " (signed 16 bit little)");
-		break;
-	    case AFMT_U16_LE:
-		len += sprintf(buffer+len, " (unsigned 16 bit little)");
-		break;
-	}
-	len += sprintf(buffer+len, "\n");
-	len += sprintf(buffer+len, "\tsound.speed = %dHz (phys. %dHz)\n",
-		       dmasound.soft.speed, dmasound.hard.speed);
-	len += sprintf(buffer+len, "\tsound.stereo = 0x%x (%s)\n",
-		       dmasound.soft.stereo,
-		       dmasound.soft.stereo ? "stereo" : "mono");
+	/* call the low-level module to fill in any stat info. that it has
+	   if present.  Maximum buffer usage is specified.
+	*/
+
 	if (dmasound.mach.state_info)
-	    len += dmasound.mach.state_info(buffer);
-	len += sprintf(buffer+len, "\tsq.block_size = %d sq.max_count = %d"
-		       " sq.max_active = %d\n",
-		       write_sq.block_size, write_sq.max_count,
-		       write_sq.max_active);
-	len += sprintf(buffer+len, "\tsq.count = %d sq.rear_size = %d\n",
-		       write_sq.count, write_sq.rear_size);
-	len += sprintf(buffer+len, "\tsq.active = %d sq.syncing = %d\n",
-		       write_sq.active, write_sq.syncing);
+		len += dmasound.mach.state_info(buffer+len,
+			(size_t) LOW_LEVEL_STAT_ALLOC) ;
+
+	/* make usage of the state buffer as deterministic as poss.
+	   exceptional conditions could cause overrun - and this is flagged as
+	   a kernel error.
+	*/
+
+	/* formats and settings */
+
+	len += sprintf(buffer+len,"\t\t === Formats & settings ===\n") ;
+	len += sprintf(buffer+len,"Parameter %20s%20s\n","soft","hard") ;
+	len += sprintf(buffer+len,"Format   :%20s%20s\n",
+		get_afmt_string(dmasound.soft.format),
+		get_afmt_string(dmasound.hard.format));
+
+	len += sprintf(buffer+len,"Samp Rate:%14d s/sec%14d s/sec\n",
+		       dmasound.soft.speed, dmasound.hard.speed);
+
+	len += sprintf(buffer+len,"Channels :%20s%20s\n",
+		       dmasound.soft.stereo ? "stereo" : "mono",
+		       dmasound.hard.stereo ? "stereo" : "mono" );
+
+	/* sound queue status */
+
+	len += sprintf(buffer+len,"\t\t === Sound Queue status ===\n");
+	len += sprintf(buffer+len,"Allocated:%8s%6s\n","Buffers","Size") ;
+	len += sprintf(buffer+len,"%9s:%8d%6d\n",
+		"write", write_sq.numBufs, write_sq.bufSize) ;
+#ifdef HAS_RECORD
+	if (dmasound.mach.record)
+		len += sprintf(buffer+len,"%9s:%8d%6d\n",
+			"read", read_sq.numBufs, read_sq.bufSize) ;
+#endif
+	len += sprintf(buffer+len,
+		"Current  : MaxFrg FragSiz MaxAct Frnt Rear "
+		"Cnt RrSize A B S L  xruns\n") ;
+	len += sprintf(buffer+len,"%9s:%7d%8d%7d%5d%5d%4d%7d%2d%2d%2d%2d%7d\n",
+		"write", write_sq.max_count, write_sq.block_size,
+		write_sq.max_active, write_sq.front, write_sq.rear,
+		write_sq.count, write_sq.rear_size, write_sq.active,
+		write_sq.busy, write_sq.syncing, write_sq.locked, write_sq.xruns) ;
+#ifdef HAS_RECORD
+	if (dmasound.mach.record)
+		len += sprintf(buffer+len,"%9s:%7d%8d%7d%5d%5d%4d%7d%2d%2d%2d%2d%7d\n",
+			"read", read_sq.max_count, read_sq.block_size,
+			read_sq.max_active, read_sq.front, read_sq.rear,
+			read_sq.count, read_sq.rear_size, read_sq.active,
+			read_sq.busy, read_sq.syncing, read_sq.locked, read_sq.xruns) ;
+#endif
+#ifdef DEBUG_DMASOUND
+printk("dmasound: stat buffer used %d bytes\n", len) ;
+#endif
+
+	if (len >= STAT_BUFF_LEN)
+		printk(KERN_ERR "dmasound_core: stat buffer overflowed!\n");
+
 	state.len = len;
 	return 0;
 }
@@ -1171,15 +1554,16 @@ static struct file_operations state_fops = {
 	release:	state_release,
 };
 
-static void __init state_init(void)
+static int __init state_init(void)
 {
 #ifndef MODULE
 	int state_unit;
 #endif
 	state_unit = register_sound_special(&state_fops, SND_DEV_STATUS);
 	if (state_unit < 0)
-		return;
+		return state_unit ;
 	state.busy = 0;
+	return 0 ;
 }
 
 
@@ -1191,6 +1575,7 @@ static void __init state_init(void)
 
 int __init dmasound_init(void)
 {
+	int res ;
 #ifdef MODULE
 	if (irq_installed)
 		return -EBUSY;
@@ -1199,10 +1584,12 @@ int __init dmasound_init(void)
 	/* Set up sound queue, /dev/audio and /dev/dsp. */
 
 	/* Set default settings. */
-	sq_init();
+	if ((res = sq_init()) < 0)
+		return res ;
 
 	/* Set up /dev/sndstat. */
-	state_init();
+	if ((res = state_init()) < 0)
+		return res ;
 
 	/* Set up /dev/mixer. */
 	mixer_init();
@@ -1215,8 +1602,21 @@ int __init dmasound_init(void)
 	irq_installed = 1;
 #endif
 
-	printk(KERN_INFO "DMA sound driver installed, using %d buffers of %dk.\n",
-	       numWriteBufs, writeBufSize);
+	printk(KERN_INFO "%s DMA sound driver rev %03d installed\n",
+		dmasound.mach.name, (DMASOUND_CORE_REVISION<<4) +
+		((dmasound.mach.version>>8) & 0x0f));
+	printk(KERN_INFO
+		"Core driver edition %02d.%02d : %s driver edition %02d.%02d\n",
+		DMASOUND_CORE_REVISION, DMASOUND_CORE_EDITION, dmasound.mach.name2,
+		(dmasound.mach.version >> 8), (dmasound.mach.version & 0xff)) ;
+	printk(KERN_INFO "Write will use %4d fragments of %7d bytes as default\n",
+		numWriteBufs, writeBufSize) ;
+#ifdef HAS_RECORD
+	if (dmasound.mach.record)
+		printk(KERN_INFO
+			"Read  will use %4d fragments of %7d bytes as default\n",
+			numReadBufs, readBufSize) ;
+#endif
 
 	return 0;
 }
@@ -1228,6 +1628,7 @@ void dmasound_deinit(void)
 	if (irq_installed) {
 		sound_silence();
 		dmasound.mach.irqcleanup();
+		irq_installed = 0;
 	}
 
 	write_sq_release_buffers();
@@ -1245,29 +1646,60 @@ void dmasound_deinit(void)
 
 static int __init dmasound_setup(char *str)
 {
-	int ints[6];
+	int ints[6], size;
 
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 
 	/* check the bootstrap parameter for "dmasound=" */
 
+	/* FIXME: other than in the most naive of cases there is no sense in these
+	 *	  buffers being other than powers of two.  This is not checked yet.
+	 */
+
 	switch (ints[0]) {
+#ifdef HAS_RECORD
+        case 5:
+                if ((ints[5] < 0) || (ints[5] > MAX_CATCH_RADIUS))
+                        printk("dmasound_setup: illegal catch radius, using default = %d\n", catchRadius);
+                else
+                        catchRadius = ints[5];
+                /* fall through */
+        case 4:
+                if (ints[4] < MIN_BUFFERS)
+                        printk("dmasound_setup: illegal number of read buffers, using default = %d\n",
+                                 numReadBufs);
+                else
+                        numReadBufs = ints[4];
+                /* fall through */
+        case 3:
+		if ((size = ints[3]) < 256)  /* check for small buffer specs */
+			size <<= 10 ;
+                if (size < MIN_BUFSIZE || size > MAX_BUFSIZE)
+                        printk("dmasound_setup: illegal read buffer size, using default = %d\n", readBufSize);
+                else
+                        readBufSize = size;
+                /* fall through */
+#else
 	case 3:
 		if ((ints[3] < 0) || (ints[3] > MAX_CATCH_RADIUS))
 			printk("dmasound_setup: illegal catch radius, using default = %d\n", catchRadius);
 		else
 			catchRadius = ints[3];
 		/* fall through */
+#endif
 	case 2:
 		if (ints[1] < MIN_BUFFERS)
 			printk("dmasound_setup: illegal number of buffers, using default = %d\n", numWriteBufs);
 		else
 			numWriteBufs = ints[1];
-		if (ints[2] < MIN_BUFSIZE || ints[2] > MAX_BUFSIZE)
-			printk("dmasound_setup: illegal buffer size, using default = %dK\n", writeBufSize);
-		else
-			writeBufSize = ints[2];
-		break;
+		/* fall through */
+	case 1:
+		if ((size = ints[2]) < 256) /* check for small buffer specs */
+			size <<= 10 ;
+                if (size < MIN_BUFSIZE || size > MAX_BUFSIZE)
+                        printk("dmasound_setup: illegal write buffer size, using default = %d\n", writeBufSize);
+                else
+                        writeBufSize = size;
 	case 0:
 		break;
 	default:
@@ -1281,6 +1713,85 @@ __setup("dmasound=", dmasound_setup);
 
 #endif /* !MODULE */
 
+    /*
+     *  Conversion tables
+     */
+
+#ifdef HAS_8BIT_TABLES
+/* 8 bit mu-law */
+
+char dmasound_ulaw2dma8[] = {
+	-126,	-122,	-118,	-114,	-110,	-106,	-102,	-98,
+	-94,	-90,	-86,	-82,	-78,	-74,	-70,	-66,
+	-63,	-61,	-59,	-57,	-55,	-53,	-51,	-49,
+	-47,	-45,	-43,	-41,	-39,	-37,	-35,	-33,
+	-31,	-30,	-29,	-28,	-27,	-26,	-25,	-24,
+	-23,	-22,	-21,	-20,	-19,	-18,	-17,	-16,
+	-16,	-15,	-15,	-14,	-14,	-13,	-13,	-12,
+	-12,	-11,	-11,	-10,	-10,	-9,	-9,	-8,
+	-8,	-8,	-7,	-7,	-7,	-7,	-6,	-6,
+	-6,	-6,	-5,	-5,	-5,	-5,	-4,	-4,
+	-4,	-4,	-4,	-4,	-3,	-3,	-3,	-3,
+	-3,	-3,	-3,	-3,	-2,	-2,	-2,	-2,
+	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
+	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
+	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
+	-1,	-1,	-1,	-1,	-1,	-1,	-1,	0,
+	125,	121,	117,	113,	109,	105,	101,	97,
+	93,	89,	85,	81,	77,	73,	69,	65,
+	62,	60,	58,	56,	54,	52,	50,	48,
+	46,	44,	42,	40,	38,	36,	34,	32,
+	30,	29,	28,	27,	26,	25,	24,	23,
+	22,	21,	20,	19,	18,	17,	16,	15,
+	15,	14,	14,	13,	13,	12,	12,	11,
+	11,	10,	10,	9,	9,	8,	8,	7,
+	7,	7,	6,	6,	6,	6,	5,	5,
+	5,	5,	4,	4,	4,	4,	3,	3,
+	3,	3,	3,	3,	2,	2,	2,	2,
+	2,	2,	2,	2,	1,	1,	1,	1,
+	1,	1,	1,	1,	1,	1,	1,	1,
+	0,	0,	0,	0,	0,	0,	0,	0,
+	0,	0,	0,	0,	0,	0,	0,	0,
+	0,	0,	0,	0,	0,	0,	0,	0
+};
+
+/* 8 bit A-law */
+
+char dmasound_alaw2dma8[] = {
+	-22,	-21,	-24,	-23,	-18,	-17,	-20,	-19,
+	-30,	-29,	-32,	-31,	-26,	-25,	-28,	-27,
+	-11,	-11,	-12,	-12,	-9,	-9,	-10,	-10,
+	-15,	-15,	-16,	-16,	-13,	-13,	-14,	-14,
+	-86,	-82,	-94,	-90,	-70,	-66,	-78,	-74,
+	-118,	-114,	-126,	-122,	-102,	-98,	-110,	-106,
+	-43,	-41,	-47,	-45,	-35,	-33,	-39,	-37,
+	-59,	-57,	-63,	-61,	-51,	-49,	-55,	-53,
+	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
+	-2,	-2,	-2,	-2,	-2,	-2,	-2,	-2,
+	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
+	-1,	-1,	-1,	-1,	-1,	-1,	-1,	-1,
+	-6,	-6,	-6,	-6,	-5,	-5,	-5,	-5,
+	-8,	-8,	-8,	-8,	-7,	-7,	-7,	-7,
+	-3,	-3,	-3,	-3,	-3,	-3,	-3,	-3,
+	-4,	-4,	-4,	-4,	-4,	-4,	-4,	-4,
+	21,	20,	23,	22,	17,	16,	19,	18,
+	29,	28,	31,	30,	25,	24,	27,	26,
+	10,	10,	11,	11,	8,	8,	9,	9,
+	14,	14,	15,	15,	12,	12,	13,	13,
+	86,	82,	94,	90,	70,	66,	78,	74,
+	118,	114,	126,	122,	102,	98,	110,	106,
+	43,	41,	47,	45,	35,	33,	39,	37,
+	59,	57,	63,	61,	51,	49,	55,	53,
+	1,	1,	1,	1,	1,	1,	1,	1,
+	1,	1,	1,	1,	1,	1,	1,	1,
+	0,	0,	0,	0,	0,	0,	0,	0,
+	0,	0,	0,	0,	0,	0,	0,	0,
+	5,	5,	5,	5,	4,	4,	4,	4,
+	7,	7,	7,	7,	6,	6,	6,	6,
+	2,	2,	2,	2,	2,	2,	2,	2,
+	3,	3,	3,	3,	3,	3,	3,	3
+};
+#endif /* HAS_8BIT_TABLES */
 
     /*
      *  Visible symbols for modules
@@ -1300,14 +1811,4 @@ EXPORT_SYMBOL(dmasound_catchRadius);
 EXPORT_SYMBOL(dmasound_ulaw2dma8);
 EXPORT_SYMBOL(dmasound_alaw2dma8);
 #endif
-#ifdef HAS_16BIT_TABLES
-EXPORT_SYMBOL(dmasound_ulaw2dma16);
-EXPORT_SYMBOL(dmasound_alaw2dma16);
-#endif
-#ifdef HAS_14BIT_TABLES
-EXPORT_SYMBOL(dmasound_ulaw2dma14l);
-EXPORT_SYMBOL(dmasound_ulaw2dma14h);
-EXPORT_SYMBOL(dmasound_alaw2dma14l);
-EXPORT_SYMBOL(dmasound_alaw2dma14h);
-#endif
-
+EXPORT_SYMBOL(get_afmt_string) ;
