@@ -352,6 +352,12 @@ static ssize_t disk_range_read(struct gendisk * disk, char *page)
 {
 	return sprintf(page, "%d\n", disk->minors);
 }
+static ssize_t disk_removable_read(struct gendisk * disk, char *page)
+{
+	return sprintf(page, "%d\n",
+		       (disk->flags & GENHD_FL_REMOVABLE ? 1 : 0));
+
+}
 static ssize_t disk_size_read(struct gendisk * disk, char *page)
 {
 	return sprintf(page, "%llu\n", (unsigned long long)get_capacity(disk));
@@ -384,6 +390,10 @@ static struct disk_attribute disk_attr_range = {
 	.attr = {.name = "range", .mode = S_IRUGO },
 	.show	= disk_range_read
 };
+static struct disk_attribute disk_attr_removable = {
+	.attr = {.name = "removable", .mode = S_IRUGO },
+	.show	= disk_removable_read
+};
 static struct disk_attribute disk_attr_size = {
 	.attr = {.name = "size", .mode = S_IRUGO },
 	.show	= disk_size_read
@@ -396,6 +406,7 @@ static struct disk_attribute disk_attr_stat = {
 static struct attribute * default_attrs[] = {
 	&disk_attr_dev.attr,
 	&disk_attr_range.attr,
+	&disk_attr_removable.attr,
 	&disk_attr_size.attr,
 	&disk_attr_stat.attr,
 	NULL,
