@@ -217,7 +217,7 @@ unsigned int speedstep_detect_processor (void)
 		ebx = cpuid_ebx(0x00000001);
 		ebx &= 0x000000FF;
 
-		dprintk(KERN_INFO "ebx value is %x, x86_mask is %x\n", ebx, c->86_mask);
+		dprintk(KERN_INFO "ebx value is %x, x86_mask is %x\n", ebx, c->x86_mask);
 
 		switch (c->x86_mask) {
 		case 4: 
