@@ -43,18 +43,6 @@ config CPU_FREQ_STAT_DETAILS
          This will show detail CPU frequency translation table in sysfs file
          system
 
-config CPU_FREQ_PROC_INTF
-	tristate "/proc/cpufreq interface (deprecated)"
-	depends on CPU_FREQ && PROC_FS
-	help
-	  This enables the /proc/cpufreq interface for controlling
-	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically). 
-	  
-	  For details, take a look at <file:Documentation/cpu-freq/>.
-	  
-	  If in doubt, say N.
-
 choice
 	prompt "Default CPUFreq governor"
 	depends on CPU_FREQ

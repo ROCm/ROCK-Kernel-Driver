@@ -287,7 +287,7 @@ EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
 /**
  * cpufreq_parse_governor - parse a governor string
  */
-int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
+static int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
 				struct cpufreq_governor **governor)
 {
 	if (!cpufreq_driver)

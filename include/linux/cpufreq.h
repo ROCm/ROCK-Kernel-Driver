@@ -252,9 +252,6 @@ int cpufreq_update_policy(unsigned int cpu);
 /* query the current CPU frequency (in kHz). If zero, cpufreq couldn't detect it */
 unsigned int cpufreq_get(unsigned int cpu);
 
-/* the proc_intf.c needs this */
-int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
-
 
 /*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *
