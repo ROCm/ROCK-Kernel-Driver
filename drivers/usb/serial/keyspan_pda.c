@@ -781,7 +781,7 @@ static int keyspan_pda_startup (struct usb_serial *serial)
 	usb_set_serial_port_data(serial->port[0], priv);
 	init_waitqueue_head(&serial->port[0]->write_wait);
 	INIT_WORK(&priv->wakeup_work, (void *)keyspan_pda_wakeup_write,
-			(void *)(&serial->port[0]));
+			(void *)(serial->port[0]));
 	INIT_WORK(&priv->unthrottle_work,
 			(void *)keyspan_pda_request_unthrottle,
 			(void *)(serial));
