@@ -2743,11 +2743,11 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 
 		/* ---------------------------------------------------------------
 			Command sets channels iflag structure on the board. Such things 
-			as input soft flow control, handeling of parity errors, and
-			break handeling are all set here.
+			as input soft flow control, handling of parity errors, and
+			break handling are all set here.
 		------------------------------------------------------------------- */
 
-		/* break handeling, parity handeling, input stripping, flow control chars */
+		/* break handling, parity handling, input stripping, flow control chars */
 		fepcmd(ch, SETIFLAGS, (unsigned int) ch->fepiflag, 0, 0, 0);
 	}
 

@@ -100,7 +100,7 @@ ieee754sp ieee754sp_bestnan(ieee754sp x, ieee754sp y)
 }
 
 
-/* generate a normal/denormal number with over,under handeling
+/* generate a normal/denormal number with over,under handling
  * sn is sign
  * xe is an unbiased exponent
  * xm is 3bit extended precision value.

@@ -674,7 +674,7 @@ out_unlock:
 /*============================================================
  * wanpipe_delayed_tarnsmit
  *
- *	Transmit bottom half handeler. It dequeues packets
+ *	Transmit bottom half handler. It dequeues packets
  *      from sk->write_queue and passes them to the 
  *      driver.  If the driver is busy, the packet is 
  *      re-enqueued.  

@@ -3064,7 +3064,7 @@ dflt_1:
 
 		/* Bug Fix: Mar 14 2000
                  * The Protocol violation error conditions were  
-                 * not handeled previously */
+                 * not handled previously */
 
 		switch (mb->cmd.pktType & 0x7F){
 
