@@ -98,13 +98,13 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include <sound/mpu401.h>
 #include <sound/opl3.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include "azt3328.h"
 
@@ -166,18 +166,19 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 #ifdef SUPPORT_JOYSTICK
 static int joystick[SNDRV_CARDS];
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
@@ -1596,31 +1597,3 @@ static void __exit alsa_card_azf3328_exit(void)
 
 module_init(alsa_card_azf3328_init)
 module_exit(alsa_card_azf3328_exit)
-
-#ifndef MODULE
-
-/* format is: snd-azf3328=enable,index,id,joystick */
-
-static int __init alsa_card_azf3328_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	snd_azf3328_dbgcallenter();
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	snd_azf3328_dbgcallleave();
-	return 1;
-}
-
-__setup("snd-azt3328=", alsa_card_azf3328_setup);
-
-#endif /* ifndef MODULE */

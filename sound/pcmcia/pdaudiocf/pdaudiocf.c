@@ -21,6 +21,7 @@
 #include <sound/driver.h>
 #include <sound/core.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <pcmcia/version.h>
 #include <pcmcia/ciscode.h>
 #include <pcmcia/cisreg.h>
@@ -43,19 +44,20 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static unsigned int irq_mask = 0xffff;
 static int irq_list[4] = { -1 };
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(irq_mask, "i");
+module_param(irq_mask, int, 0444);
 MODULE_PARM_DESC(irq_mask, "IRQ bitmask for " CARD_NAME " soundcard.");
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq_list, "List of Available interrupts for " CARD_NAME " soundcard.");
  
 

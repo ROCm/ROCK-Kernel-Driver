@@ -24,8 +24,8 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pnp.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/opl3.h>
 #include <sound/snd_wavefront.h>
@@ -52,49 +52,50 @@ static long fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	    /* PnP setup */
 static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	    /* 0,1,3,5,6,7 */
 static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	    /* 0,1,3,5,6,7 */
 static int use_cs4232_midi[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; 
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for WaveFront soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for WaveFront soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable WaveFront soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
-MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "ISA PnP detection for WaveFront soundcards.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
-MODULE_PARM(cs4232_pcm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(cs4232_pcm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(cs4232_pcm_port, "Port # for CS4232 PCM interface.");
 MODULE_PARM_SYNTAX(cs4232_pcm_port, SNDRV_PORT12_DESC);
-MODULE_PARM(cs4232_pcm_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(cs4232_pcm_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(cs4232_pcm_irq, "IRQ # for CS4232 PCM interface.");
 MODULE_PARM_SYNTAX(cs4232_pcm_irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for CS4232 PCM interface.");
 MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
-MODULE_PARM(dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma2, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma2, "DMA2 # for CS4232 PCM interface.");
 MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
-MODULE_PARM(cs4232_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(cs4232_mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(cs4232_mpu_port, "port # for CS4232 MPU-401 interface.");
 MODULE_PARM_SYNTAX(cs4232_mpu_port, SNDRV_PORT12_DESC);
-MODULE_PARM(cs4232_mpu_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(cs4232_mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(cs4232_mpu_irq, "IRQ # for CS4232 MPU-401 interface.");
 MODULE_PARM_SYNTAX(cs4232_mpu_irq, SNDRV_ENABLED ",allows:{{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(ics2115_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(ics2115_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(ics2115_irq, "IRQ # for ICS2115.");
 MODULE_PARM_SYNTAX(ics2115_irq, SNDRV_ENABLED ",allows:{{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(ics2115_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(ics2115_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(ics2115_port, "Port # for ICS2115.");
 MODULE_PARM_SYNTAX(ics2115_port, SNDRV_PORT12_DESC);
-MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port #.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT12_DESC);
-MODULE_PARM(use_cs4232_midi, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(use_cs4232_midi, bool, boot_devs, 0444);
 MODULE_PARM_DESC(use_cs4232_midi, "Use CS4232 MPU-401 interface (inaccessibly located inside your computer)");
 MODULE_PARM_SYNTAX(use_cs4232_midi, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -731,41 +732,3 @@ static void __exit alsa_card_wavefront_exit(void)
 
 module_init(alsa_card_wavefront_init)
 module_exit(alsa_card_wavefront_exit)
-
-#ifndef MODULE
-
-/* format is: snd-wavefront=enable,index,id,isapnp,
-			    cs4232_pcm_port,cs4232_pcm_irq,
-			    cs4232_mpu_port,cs4232_mpu_irq,
-			    ics2115_port,ics2115_irq,
-			    fm_port,
-			    dma1,dma2,
-			    use_cs4232_midi */
-
-static int __init alsa_card_wavefront_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&isapnp[nr_dev]) == 2 &&
-	       get_option_long(&str,&cs4232_pcm_port[nr_dev]) == 2 &&
-	       get_option(&str,&cs4232_pcm_irq[nr_dev]) == 2 &&
-	       get_option_long(&str,&cs4232_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&cs4232_mpu_irq[nr_dev]) == 2 &&
-	       get_option_long(&str,&ics2115_port[nr_dev]) == 2 &&
-	       get_option(&str,&ics2115_irq[nr_dev]) == 2 &&
-	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
-	       get_option(&str,&dma1[nr_dev]) == 2 &&
-	       get_option(&str,&dma2[nr_dev]) == 2 &&
-	       get_option(&str,&use_cs4232_midi[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-wavefront=", alsa_card_wavefront_setup);
-
-#endif /* ifndef MODULE */

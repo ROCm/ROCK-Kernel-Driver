@@ -39,13 +39,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/mpu401.h>
 #include <sound/ac97_codec.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Takashi Iwai <tiwai@suse.de>");
@@ -63,20 +63,21 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP; /* all enabled */
 static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int amp_gpio[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Enable external amp for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
-MODULE_PARM(amp_gpio, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(amp_gpio, int, boot_devs, 0444);
 MODULE_PARM_DESC(amp_gpio, "GPIO pin number for external amp. (default = -1)");
 MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
@@ -2782,26 +2783,3 @@ static void __exit alsa_card_m3_exit(void)
 
 module_init(alsa_card_m3_init)
 module_exit(alsa_card_m3_exit)
-
-#ifndef MODULE
-
-/* format is: snd-maestro3=enable,index,id,external_amp,amp_gpio */
-
-static int __init alsa_card_maestro3_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&external_amp[nr_dev]) == 2 &&
-	       get_option(&str,&amp_gpio[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-maestro3=", alsa_card_maestro3_setup);
-
-#endif /* ifndef MODULE */

@@ -34,12 +34,12 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
 #include <sound/mpu401.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 /* for 440MX workaround */
 #include <asm/pgtable.h>
@@ -81,29 +81,30 @@ static int joystick[SNDRV_CARDS];
 #ifdef SUPPORT_MIDI
 static int mpu_port[SNDRV_CARDS]; /* disabled */
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Intel i8x0 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Intel i8x0 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Intel i8x0 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
-MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,4}},dialog:list,default:-1");
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
 MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 #ifdef SUPPORT_MIDI
-MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(mpu_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU401 port # for Intel i8x0 driver.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog:list");
 #endif
@@ -2862,33 +2863,3 @@ static void __exit alsa_card_intel8x0_exit(void)
 
 module_init(alsa_card_intel8x0_init)
 module_exit(alsa_card_intel8x0_exit)
-
-#ifndef MODULE
-
-/* format is: snd-intel8x0=enable,index,id,ac97_clock,ac97_quirk,mpu_port,joystick */
-
-static int __init alsa_card_intel8x0_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_quirk[nr_dev]) == 2
-#ifdef SUPPORT_MIDI
-	       && get_option(&str,&mpu_port[nr_dev]) == 2
-#endif
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-intel8x0=", alsa_card_intel8x0_setup);
-
-#endif /* ifndef MODULE */

@@ -26,12 +26,12 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/ac97_codec.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
@@ -45,20 +45,21 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
 static int spdif_aclink[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ATI IXP controller.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ATI IXP controller.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable audio part of ATI IXP controller.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
-MODULE_PARM(spdif_aclink, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(spdif_aclink, bool, boot_devs, 0444);
 MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 MODULE_PARM_SYNTAX(spdif_aclink, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
@@ -1582,27 +1583,3 @@ static void __exit alsa_card_atiixp_exit(void)
 
 module_init(alsa_card_atiixp_init)
 module_exit(alsa_card_atiixp_exit)
-
-#ifndef MODULE
-
-/* format is: snd-atiixp=enable,index,id,ac97_clock,spdif_aclink */
-
-static int __init alsa_card_atiixp_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
-	       get_option(&str,&spdif_aclink[nr_dev]) == 2
-	       );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-atiixp=", alsa_card_atiixp_setup);
-
-#endif /* ifndef MODULE */

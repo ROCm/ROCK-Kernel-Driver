@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/initval.h>
 
@@ -48,19 +49,20 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_SUPPORTED_DEVICE("sound");
 
-MODULE_PARM(seq_client_load, "1-64i");
+static int boot_devs;
+module_param_array(seq_client_load, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_client_load, "The numbers of global (system) clients to load through kmod.");
-MODULE_PARM(seq_default_timer_class, "i");
+module_param(seq_default_timer_class, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_class, "The default timer class.");
-MODULE_PARM(seq_default_timer_sclass, "i");
+module_param(seq_default_timer_sclass, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_sclass, "The default timer slave class.");
-MODULE_PARM(seq_default_timer_card, "i");
+module_param(seq_default_timer_card, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_card, "The default timer card number.");
-MODULE_PARM(seq_default_timer_device, "i");
+module_param(seq_default_timer_device, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_device, "The default timer device number.");
-MODULE_PARM(seq_default_timer_subdevice, "i");
+module_param(seq_default_timer_subdevice, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_subdevice, "The default timer subdevice number.");
-MODULE_PARM(seq_default_timer_resolution, "i");
+module_param(seq_default_timer_resolution, int, 0444);
 MODULE_PARM_DESC(seq_default_timer_resolution, "The default timer resolution in Hz.");
 
 /*

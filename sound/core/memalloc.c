@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
+#include <linux/moduleparam.h>
 #include <asm/semaphore.h>
 #include <sound/memalloc.h>
 #ifdef CONFIG_SBUS
@@ -45,7 +46,8 @@ MODULE_LICENSE("GPL");
 #define SNDRV_CARDS	8
 #endif
 static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+static int boot_devs;
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
 
 /*
@@ -841,25 +843,6 @@ static void __exit snd_mem_exit(void)
 module_init(snd_mem_init)
 module_exit(snd_mem_exit)
 
-
-#ifndef MODULE
-
-/* format is: snd-page-alloc=enable */
-
-static int __init snd_mem_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-page-alloc=", snd_mem_setup);
-
-#endif
 
 /*
  * exports

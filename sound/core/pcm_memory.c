@@ -23,18 +23,19 @@
 #include <asm/io.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/initval.h>
 
 static int preallocate_dma = 1;
-MODULE_PARM(preallocate_dma, "i");
+module_param(preallocate_dma, int, 0444);
 MODULE_PARM_DESC(preallocate_dma, "Preallocate DMA memory when the PCM devices are initialized.");
 MODULE_PARM_SYNTAX(preallocate_dma, SNDRV_BOOLEAN_TRUE_DESC);
 
 static int maximum_substreams = 4;
-MODULE_PARM(maximum_substreams, "i");
+module_param(maximum_substreams, int, 0444);
 MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
 MODULE_PARM_SYNTAX(maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
 

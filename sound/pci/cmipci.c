@@ -32,6 +32,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -41,7 +42,6 @@
 #include <sound/opl3.h>
 #include <sound/sb.h>
 #include <sound/asoundef.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
@@ -68,29 +68,30 @@ static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
 #ifdef SUPPORT_JOYSTICK
 static int joystick_port[SNDRV_CARDS];
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for C-Media PCI soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for C-Media PCI soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable C-Media PCI soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x320},{0x310},{0x300}},dialog:list");
-MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 #ifdef DO_SOFT_AC3
-MODULE_PARM(soft_ac3, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(soft_ac3, bool, boot_devs, 0444);
 MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
 MODULE_PARM_SYNTAX(soft_ac3, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201}},dialog:list");
 #endif
@@ -3282,34 +3283,3 @@ static void __exit alsa_card_cmipci_exit(void)
 
 module_init(alsa_card_cmipci_init)
 module_exit(alsa_card_cmipci_exit)
-
-#ifndef MODULE
-
-/* format is: snd-cmipci=enable,index,id,
-			 mpu_port,fm_port,soft_ac3,joystick_port */
-
-static int __init alsa_card_cmipci_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
-	       get_option_long(&str,&fm_port[nr_dev]) == 2
-#ifdef DO_SOFT_AC3
-	       && get_option(&str,&soft_ac3[nr_dev]) == 2
-#endif
-#ifdef SUPPORT_JOYSTICK
-	       && get_option(&str,&joystick_port[nr_dev]) == 2
-#endif
-	       );
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-cmipci=", alsa_card_cmipci_setup);
-
-#endif /* ifndef MODULE */

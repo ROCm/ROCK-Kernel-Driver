@@ -25,8 +25,6 @@
  *
  */
 
-#define __SNDRV_OSS_COMPAT__
-
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -34,12 +32,12 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/ac97_codec.h>
 #include <sound/mpu401.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Matt Wu <Matt_Wu@acersoftech.com.cn>");
@@ -53,20 +51,21 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
 static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
 static int spdif[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALI M5451 PCI Audio.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALI M5451 PCI Audio.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALI 5451 PCI Audio.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(pcm_channels, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_channels, "PCM Channels");
 MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
-MODULE_PARM(spdif, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(spdif, bool, boot_devs, 0444);
 MODULE_PARM_DESC(spdif, "Support SPDIF I/O");
 MODULE_PARM_SYNTAX(spdif, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -2307,25 +2306,3 @@ static void __exit alsa_card_ali_exit(void)
 
 module_init(alsa_card_ali_init)
 module_exit(alsa_card_ali_exit)
-
-#ifndef MODULE
-
-/* format is: snd-ali5451=enable,index,id,pcm_channels */
-
-static int __init alsa_card_ali_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&pcm_channels[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-ali5451=", alsa_card_ali_setup);
-
-#endif /* ifndef */

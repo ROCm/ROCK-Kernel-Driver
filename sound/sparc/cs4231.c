@@ -15,6 +15,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 
 #include <sound/driver.h>
 #include <sound/core.h>
@@ -22,7 +23,6 @@
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/timer.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/pcm_params.h>
 
@@ -49,14 +49,15 @@
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sun CS4231 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sun CS4231 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Sun CS4231 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Jaroslav Kysela, Derrick J. Brashear and David S. Miller");
@@ -2251,24 +2252,3 @@ static void __exit cs4231_exit(void)
 
 module_init(cs4231_init);
 module_exit(cs4231_exit);
-
-#ifndef MODULE
-
-/* format is: snd-sun-cs4231=index,id,enable */
-
-static int __init alsa_card_sun_cs4231_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&index[nr_dev]) == 2 &&
-	       get_option(&str,&id[nr_dev]) == 2 &&
-	       get_id(&str,&enable[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-sun-cs4231=", alsa_card_sun_cs4231_setup);
-
-#endif /* ifndef MODULE */

@@ -5521,7 +5521,8 @@ struct _snd_pcm_runtime {
 
     <para>
       The module parameters must be declared with the standard
-    <function>MODULE_PARM()</function> and
+    <function>module_param()()</function>,
+    <function>module_param_array()()</function> and
     <function>MODULE_PARM_DESC()</function> macros. The ALSA provides
     an additional macro, <function>MODULE_PARM_SYNTAX()</function>,
     for describing its syntax. The strings will be written to
@@ -5545,18 +5546,22 @@ struct _snd_pcm_runtime {
 <![CDATA[
   #define CARD_NAME "My Chip"
 
-  MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+  static int boot_devs;
+  module_param_array(index, int, boot_devs, 0444);
   MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
   MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-  MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+  module_param_array(id, charp, boot_devs, 0444);
   MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
   MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-  MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+  module_param_array(enable, bool, boot_devs, 0444);
   MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
   MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 ]]>
         </programlisting>
       </informalexample>
+
+    Here boot_devs is passed but simply ignored since we don't care
+    the number of parsed parameters.
     </para>
 
     <para>
@@ -5577,39 +5582,6 @@ struct _snd_pcm_runtime {
       </informalexample>
     </para>
 
-    <para>
-      For building the driver into kernel, you should define the
-      <function>setup()</function> function in addition, too. 
-      ALSA provides <function>get_id()</function> function to retrieve
-      a string argument from the kernel boot parameters.
-
-      <informalexample>
-        <programlisting>
-<![CDATA[
-  #ifndef MODULE
-
-  /* format is: snd-mychip=enable,index,id */
-
-  static int __init alsa_card_mychip_setup(char *str)
-  {
-          static unsigned __initdata nr_dev = 0;
-
-          if (nr_dev >= SNDRV_CARDS)
-                  return 0;
-          (void)(get_option(&str,&enable[nr_dev]) == 2 &&
-                 get_option(&str,&index[nr_dev]) == 2 &&
-                 get_id(&str,&id[nr_dev]) == 2);
-          nr_dev++;
-          return 1;
-  }
-
-  __setup("snd-mychip=", alsa_card_mychip_setup);
-
-  #endif /* ifndef MODULE */
-]]>
-        </programlisting>
-      </informalexample>
-    </para>
   </chapter>
 
 

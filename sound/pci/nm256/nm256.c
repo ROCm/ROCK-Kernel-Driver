@@ -31,12 +31,12 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #define CARD_NAME "NeoMagic 256AV/ZX"
@@ -62,32 +62,33 @@ static int force_ac97[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disable
 static int buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not specified */
 static int use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 static int vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(playback_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(playback_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(playback_bufsize, "DAC frame size in kB for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(playback_bufsize, SNDRV_ENABLED);
-MODULE_PARM(capture_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(capture_bufsize, int, boot_devs, 0444);
 MODULE_PARM_DESC(capture_bufsize, "ADC frame size in kB for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(capture_bufsize, SNDRV_ENABLED);
-MODULE_PARM(force_ac97, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(force_ac97, bool, boot_devs, 0444);
 MODULE_PARM_DESC(force_ac97, "Force to use AC97 codec for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(force_ac97, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(buffer_top, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(buffer_top, int, boot_devs, 0444);
 MODULE_PARM_DESC(buffer_top, "Set the top address of audio buffer for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(buffer_top, SNDRV_ENABLED);
-MODULE_PARM(use_cache, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(use_cache, bool, boot_devs, 0444);
 MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
 MODULE_PARM_SYNTAX(use_cache, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(vaio_hack, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(vaio_hack, bool, boot_devs, 0444);
 MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
 MODULE_PARM_SYNTAX(vaio_hack, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
@@ -1686,31 +1687,3 @@ static void __exit alsa_card_nm256_exit(void)
 
 module_init(alsa_card_nm256_init)
 module_exit(alsa_card_nm256_exit)
-
-#ifndef MODULE
-
-/* format is: snd-nm256=enable,index,id,
-			playback_bufsize,capture_bufsize,
-			force_ac97,buffer_top,use_cache */
-
-static int __init alsa_card_nm256_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&playback_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&capture_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&force_ac97[nr_dev]) == 2 &&
-	       get_option(&str,&buffer_top[nr_dev]) == 2 &&
-	       get_option(&str,&use_cache[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-nm256=", alsa_card_nm256_setup);
-
-#endif /* ifndef MODULE */

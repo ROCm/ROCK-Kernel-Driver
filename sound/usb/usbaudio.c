@@ -45,11 +45,11 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/usb.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include "usbaudio.h"
@@ -69,26 +69,27 @@ static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for
 static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
 static int nrpacks = 4;		/* max. number of packets per urb */
 static int async_unlink = 1;
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the USB audio adapter.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable USB audio adapter.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(vid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(vid, int, boot_devs, 0444);
 MODULE_PARM_DESC(vid, "Vendor ID for the USB audio device.");
 MODULE_PARM_SYNTAX(vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
-MODULE_PARM(pid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(pid, int, boot_devs, 0444);
 MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
 MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
-MODULE_PARM(nrpacks, "i");
+module_param(nrpacks, int, 0444);
 MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
 MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{1,10}}");
-MODULE_PARM(async_unlink, "i");
+module_param(async_unlink, bool, 0444);
 MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
 MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
 
@@ -3139,26 +3140,3 @@ static void __exit snd_usb_audio_cleanup(void)
 
 module_init(snd_usb_audio_init);
 module_exit(snd_usb_audio_cleanup);
-
-#ifndef MODULE
-/*
- * format is snd-usb-audio=enable,index,id,vid,pid
- */
-static int __init snd_usb_audio_module_setup(char* str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
-	       get_option(&str, &index[nr_dev]) == 2 &&
-	       get_id(&str, &id[nr_dev]) == 2 &&
-	       get_option(&str, &vid[nr_dev]) == 2 &&
-	       get_option(&str, &pid[nr_dev]) == 2);
-	++nr_dev;
-	return 1;
-}
-
-__setup("snd-usb-audio=", snd_usb_audio_module_setup);
-
-#endif /* !MODULE */

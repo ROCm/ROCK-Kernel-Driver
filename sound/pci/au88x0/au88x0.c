@@ -19,7 +19,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
-#define SNDRV_GET_ID
+#include <linux/moduleparam.h>
 #include <sound/initval.h>
 
 // module parameters (see "Module Parameters")
@@ -27,17 +27,18 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
 static int pcifix[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 255 };
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(pcifix, "1-255i");
+module_param_array(pcifix, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcifix, "Enable VIA-workaround for " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(pcifix,
 		   SNDRV_ENABLED
@@ -47,24 +48,6 @@ MODULE_DESCRIPTION("Aureal vortex");
 MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 MODULE_DEVICES("{{Aureal Semiconductor Inc., Aureal Vortex Sound Processor}}");
-
-#ifndef MODULE
-/* format is: snd-mychip=enable,index,id */
-static int __init alsa_card_vortex_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
-	       get_option(&str, &index[nr_dev]) == 2 &&
-	       get_id(&str, &id[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-au88x0=", alsa_card_vortex_setup);
-#endif				/* ifndef MODULE */
 
 MODULE_DEVICE_TABLE(pci, snd_vortex_ids);
 

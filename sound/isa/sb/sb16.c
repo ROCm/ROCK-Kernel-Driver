@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/pnp.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/sb16_csp.h>
@@ -34,7 +35,6 @@
 #define SNDRV_LEGACY_AUTO_PROBE
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #define chip_t sb_t
@@ -92,54 +92,55 @@ static int csp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 #ifdef SNDRV_SBAWE_EMU8000
 static int seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
 #endif
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for SoundBlaster 16 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for SoundBlaster 16 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable SoundBlaster 16 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef CONFIG_PNP
-MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
-MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for SB16 driver.");
 MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x220},{0x240},{0x260},{0x280}},dialog:list");
-MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for SB16 driver.");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0x330},{0x300}},dialog:list");
-MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for SB16 PnP driver.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0x388},{0x38c},{0x390},{0x394}},dialog:list");
 #ifdef SNDRV_SBAWE_EMU8000
-MODULE_PARM(awe_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+module_param_array(awe_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(awe_port, "AWE port # for SB16 PnP driver.");
 MODULE_PARM_SYNTAX(awe_port, SNDRV_ENABLED ",allows:{{0x620},{0x640},{0x660},{0x680}},dialog:list");
 #endif
-MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SB16 driver.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-MODULE_PARM(dma8, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for SB16 driver.");
 MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
-MODULE_PARM(dma16, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(dma16, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma16, "16-bit DMA # for SB16 driver.");
 MODULE_PARM_SYNTAX(dma16, SNDRV_DMA16_DESC);
-MODULE_PARM(mic_agc, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(mic_agc, int, boot_devs, 0444);
 MODULE_PARM_DESC(mic_agc, "Mic Auto-Gain-Control switch.");
 MODULE_PARM_SYNTAX(mic_agc, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #ifdef CONFIG_SND_SB16_CSP
-MODULE_PARM(csp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(csp, int, boot_devs, 0444);
 MODULE_PARM_DESC(csp, "ASP/CSP chip support.");
 MODULE_PARM_SYNTAX(csp, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #endif
 #ifdef SNDRV_SBAWE_EMU8000
-MODULE_PARM(seq_ports, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(seq_ports, int, boot_devs, 0444);
 MODULE_PARM_DESC(seq_ports, "Number of sequencer ports for WaveTable synth.");
 MODULE_PARM_SYNTAX(seq_ports, SNDRV_ENABLED ",allows:{{0,8}},skill:advanced");
 #endif
@@ -691,60 +692,3 @@ static void __exit alsa_card_sb16_exit(void)
 
 module_init(alsa_card_sb16_init)
 module_exit(alsa_card_sb16_exit)
-
-#ifndef MODULE
-
-/* format is: snd-sb16=enable,index,id,isapnp,
-		       port,mpu_port,fm_port,
-		       irq,dma8,dma16,
-		       mic_agc,csp,
-		       [awe_port,seq_ports] */
-
-static int __init alsa_card_sb16_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-	int __attribute__ ((__unused__)) pnp = INT_MAX;
-	int __attribute__ ((__unused__)) xcsp = INT_MAX;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&pnp) == 2 &&
-	       get_option_long(&str,&port[nr_dev]) == 2 &&
-	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
-	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
-	       get_option(&str,&irq[nr_dev]) == 2 &&
-	       get_option(&str,&dma8[nr_dev]) == 2 &&
-	       get_option(&str,&dma16[nr_dev]) == 2 &&
-	       get_option(&str,&mic_agc[nr_dev]) == 2
-#ifdef CONFIG_SND_SB16_CSP
-	       &&
-	       get_option(&str,&xcsp) == 2
-#endif
-#ifdef SNDRV_SBAWE_EMU8000
-	       &&
-	       get_option_long(&str,&awe_port[nr_dev]) == 2 &&
-	       get_option(&str,&seq_ports[nr_dev]) == 2
-#endif
-	       );
-#ifdef CONFIG_PNP
-	if (pnp != INT_MAX)
-		isapnp[nr_dev] = pnp;
-#endif
-#ifdef CONFIG_SND_SB16_CSP
-	if (xcsp != INT_MAX)
-		csp[nr_dev] = xcsp;
-#endif
-	nr_dev++;
-	return 1;
-}
-
-#ifndef SNDRV_SBAWE_EMU8000
-__setup("snd-sb16=", alsa_card_sb16_setup);
-#else
-__setup("snd-sbawe=", alsa_card_sb16_setup);
-#endif
-
-#endif /* ifndef MODULE */

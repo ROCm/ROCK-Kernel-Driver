@@ -29,9 +29,9 @@
 #include <linux/pci.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/cs46xx.h>
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -52,23 +52,24 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int thinkpad[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int boot_devs;
 
-MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the CS46xx soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the CS46xx soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable CS46xx soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Force to enable external amplifer.");
 MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(thinkpad, bool, boot_devs, 0444);
 MODULE_PARM_DESC(thinkpad, "Force to enable Thinkpad's CLKRUN control.");
 MODULE_PARM_SYNTAX(thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+module_param_array(mmap_valid, bool, boot_devs, 0444);
 MODULE_PARM_DESC(mmap_valid, "Support OSS mmap.");
 MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
@@ -216,27 +217,3 @@ static void __exit alsa_card_cs46xx_exit(void)
 
 module_init(alsa_card_cs46xx_init)
 module_exit(alsa_card_cs46xx_exit)
-
-#ifndef MODULE
-
-/* format is: snd-cs46xx=enable,index,id,mmap_valid,external_amp,thinkpad */
-
-static int __init alsa_card_cs46xx_setup(char *str)
-{
-	static unsigned __initdata nr_dev = 0;
-
-	if (nr_dev >= SNDRV_CARDS)
-		return 0;
-	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
-	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&mmap_valid[nr_dev]) == 2 &&
-	       get_option(&str,&external_amp[nr_dev]) == 2 &&
-	       get_option(&str,&thinkpad[nr_dev]) == 2);
-	nr_dev++;
-	return 1;
-}
-
-__setup("snd-cs46xx=", alsa_card_cs46xx_setup);
-
-#endif /* ifndef MODULE */
