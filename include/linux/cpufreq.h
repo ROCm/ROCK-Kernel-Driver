@@ -68,7 +68,6 @@ struct cpufreq_policy {
         unsigned int            policy; /* see above */
 	struct cpufreq_governor *governor; /* see below */
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
-	struct device		* dev;
 	struct kobject		kobj;
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
