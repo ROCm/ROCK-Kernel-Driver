@@ -43,6 +43,7 @@
 
 struct divert_blk;
 struct vlan_group;
+struct ethtool_ops;
 
 #define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
 					   functions are available. */
@@ -300,6 +301,8 @@ struct net_device
 	 * See <net/iw_handler.h> for details. Jean II */
 	struct iw_handler_def *	wireless_handlers;
 
+	struct ethtool_ops *ethtool_ops;
+
 	/*
 	 * This marks the end of the "visible" part of the structure. All
 	 * fields hereafter are internal to the system, and may change at
@@ -485,7 +488,6 @@ struct packet_type
 	struct list_head	list;
 };
 
-
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
 
@@ -633,6 +635,7 @@ extern int		netif_rx(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void *);
+extern int		dev_ethtool(struct ifreq *);
 extern unsigned		dev_get_flags(const struct net_device *);
 extern int		dev_change_flags(struct net_device *, unsigned);
 extern int		dev_set_mtu(struct net_device *, int);
