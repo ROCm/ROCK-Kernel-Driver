@@ -16,7 +16,7 @@
 /* This macro obfuscates arithmetic on a variable address so that gcc
    shouldn't recognize the original var, and make assumptions about it */
 #define RELOC_HIDE(ptr, off)					\
-  ({ __typeof__(ptr) __ptr;					\
-    __asm__ ("" : "=g"(__ptr) : "0"((void *)(ptr) + (off)));	\
-    __ptr; })
+  ({ unsigned long __ptr;					\
+    __asm__ ("" : "=g"(__ptr) : "0"(ptr));		\
+    (typeof(ptr)) (__ptr + (off)); })
 #endif /* __LINUX_COMPILER_H */

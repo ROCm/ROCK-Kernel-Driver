@@ -2074,7 +2074,7 @@ void __init sun4c_paging_init(void)
 		zholes_size[ZONE_HIGHMEM] = npages - calc_highpages();
 
 		free_area_init_node(0, NULL, NULL, zones_size,
-				    phys_base, zholes_size);
+				    phys_base >> PAGE_SHIFT, zholes_size);
 	}
 
 	cnt = 0;

@@ -857,16 +857,12 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSPGRP:
 			if (get_user(pid, (int *)arg))
 				err = -EFAULT;
-			else if (current->pid != pid &&
-				 current->pgrp != -pid &&
-				!capable(CAP_NET_ADMIN))
-				err = -EPERM;
 			else
-				sk->proc = pid;
+				err = f_setown(sock->file, pid, 1);
 			break;
 		case FIOGETOWN:
 		case SIOCGPGRP:
-			err = put_user(sk->proc, (int *)arg);
+			err = put_user(sock->file->f_owner.pid, (int *)arg);
 			break;
 		case SIOCGSTAMP:
 			if (!sk->stamp.tv_sec)

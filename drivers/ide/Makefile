@@ -7,7 +7,7 @@
 # Note : at this point, these files are compiled on all systems.
 # In the future, some of these should be built conditionally.
 #
-export-objs		:= ide-taskfile.o ide.o ide-probe.o ataraid.o
+export-objs		:= ide-taskfile.o ide.o ide-probe.o
 
 obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o ide-probe-mod.o
 obj-$(CONFIG_BLK_DEV_IDECS)     += ide-cs.o

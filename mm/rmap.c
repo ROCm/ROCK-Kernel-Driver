@@ -25,6 +25,7 @@
 #include <linux/swapops.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>

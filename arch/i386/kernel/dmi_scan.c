@@ -12,6 +12,7 @@
 
 unsigned long dmi_broken;
 int is_sony_vaio_laptop;
+int is_unsafe_smbus;
 
 struct dmi_header
 {
@@ -459,6 +460,19 @@ static int __init apm_kills_local_apic_timer(struct dmi_blacklist *d)
 	return 0;
 }
 
+/* 
+ * Don't access SMBus on IBM systems which get corrupted eeproms 
+ */
+
+static __init int disable_smbus(struct dmi_blacklist *d)
+{
+	if (is_unsafe_smbus == 0) {
+		is_unsafe_smbus = 1;
+		printk(KERN_INFO "%s machine detected. Disabling SMBus accesses.\n", d->ident);
+	}
+	return 0;
+}
+
 /*
  *	Simple "print if true" callback
  */
@@ -728,6 +742,15 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	 */
 	 
 	{ set_apm_ints, "IBM", {	/* Allow interrupts during suspend on IBM laptops */
+			MATCH(DMI_SYS_VENDOR, "IBM"),
+			NO_MATCH, NO_MATCH, NO_MATCH
+			} },
+
+	/*
+	 *	SMBus / sensors settings
+	 */
+	 
+	{ disable_smbus, "IBM", {
 			MATCH(DMI_SYS_VENDOR, "IBM"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },

@@ -25,6 +25,7 @@
 #include <linux/buffer_head.h>		/* for try_to_release_page() */
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
+#include <linux/rmap-locking.h>
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>

@@ -46,9 +46,9 @@ static int zone_balance_max[MAX_NR_ZONES] __initdata = { 255 , 255, 255, };
  */
 static inline int bad_range(struct zone *zone, struct page *page)
 {
-	if (page - mem_map >= zone->zone_start_mapnr + zone->size)
+	if (page_to_pfn(page) >= zone->zone_start_pfn + zone->size)
 		return 1;
-	if (page - mem_map < zone->zone_start_mapnr)
+	if (page_to_pfn(page) < zone->zone_start_pfn)
 		return 1;
 	if (zone != page_zone(page))
 		return 1;
@@ -773,15 +773,13 @@ static inline unsigned long wait_table_bits(unsigned long size)
  *   - clear the memory bitmaps
  */
 void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
-	unsigned long *zones_size, unsigned long zone_start_paddr, 
+	unsigned long *zones_size, unsigned long zone_start_pfn, 
 	unsigned long *zholes_size, struct page *lmem_map)
 {
 	unsigned long i, j;
 	unsigned long map_size;
 	unsigned long totalpages, offset, realtotalpages;
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
-
-	BUG_ON(zone_start_paddr & ~PAGE_MASK);
 
 	totalpages = 0;
 	for (i = 0; i < MAX_NR_ZONES; i++) {
@@ -810,7 +808,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 	}
 	*gmap = pgdat->node_mem_map = lmem_map;
 	pgdat->node_size = totalpages;
-	pgdat->node_start_paddr = zone_start_paddr;
+	pgdat->node_start_pfn = zone_start_pfn;
 	pgdat->node_start_mapnr = (lmem_map - mem_map);
 	pgdat->nr_zones = 0;
 
@@ -868,9 +866,9 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 
 		zone->zone_mem_map = mem_map + offset;
 		zone->zone_start_mapnr = offset;
-		zone->zone_start_paddr = zone_start_paddr;
+		zone->zone_start_pfn = zone_start_pfn;
 
-		if ((zone_start_paddr >> PAGE_SHIFT) & (zone_required_alignment-1))
+		if ((zone_start_pfn) & (zone_required_alignment-1))
 			printk("BUG: wrong zone alignment, it will crash\n");
 
 		/*
@@ -885,8 +883,12 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			SetPageReserved(page);
 			INIT_LIST_HEAD(&page->list);
 			if (j != ZONE_HIGHMEM)
-				set_page_address(page, __va(zone_start_paddr));
-			zone_start_paddr += PAGE_SIZE;
+				/*
+				 * The shift left won't overflow because the
+				 * ZONE_NORMAL is below 4G.
+				 */
+				set_page_address(page, __va(zone_start_pfn << PAGE_SHIFT));
+			zone_start_pfn++;
 		}
 
 		offset += size;

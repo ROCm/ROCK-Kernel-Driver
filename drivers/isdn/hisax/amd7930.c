@@ -90,7 +90,6 @@
  * 
  */
 
-#define __NO_VERSION__
 #include "hisax.h"
 #include "../../sbus/audio/amd7930.h"
 #include "isac.h"
