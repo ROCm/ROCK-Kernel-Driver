@@ -152,7 +152,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	 *   pcibr_dmatrans_addr ignores a missing PCIIO_DMA_A64 flag on
 	 *   PCI-X buses.
 	 */
-	if (hwdev->consistent_dma_mask == ~0UL)
+	if (hwdev->dev.coherent_dma_mask == ~0UL)
 		*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
 					  PCIIO_DMA_CMD | PCIIO_DMA_A64);
 	else {
@@ -169,7 +169,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 		}
 	}
 
-	if (!*dma_handle || *dma_handle > hwdev->consistent_dma_mask) {
+	if (!*dma_handle || *dma_handle > hwdev->dev.coherent_dma_mask) {
 		if (dma_map) {
 			pcibr_dmamap_done(dma_map);
 			pcibr_dmamap_free(dma_map);

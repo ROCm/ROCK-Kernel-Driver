@@ -372,7 +372,7 @@ static void * pa11_dma_alloc_consistent (struct device *dev, size_t size, dma_ad
 ** ISA cards will certainly only support 24-bit DMA addressing.
 ** Not clear if we can, want, or need to support ISA.
 */
-	if (!dev || *dev->dma_mask != 0xffffffff)
+	if (!dev || *dev->coherent_dma_mask < 0xffffffff)
 		gfp |= GFP_DMA;
 #endif
 	return (void *)vaddr;
