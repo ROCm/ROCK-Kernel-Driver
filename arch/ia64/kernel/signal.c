@@ -559,10 +559,12 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 
 		ka = &current->sighand->action[signr - 1];
 
+		/* Always make any pending restarted system calls return -EINTR */
+		current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 		if (restart) {
 			switch (errno) {
 			      case ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			      case ERESTARTNOHAND:
 				scr->pt.r8 = ERR_CODE(EINTR);
 				/* note: scr->pt.r10 is already -1 */
