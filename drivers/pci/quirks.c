@@ -852,7 +852,9 @@ static void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
 #endif
 		noirqdebug_setup("");
 #endif
+#ifdef CONFIG_SMP
 		no_irq_affinity = 1;
+#endif
 	}
 
 	config &= ~0x2;
