@@ -88,26 +88,19 @@ static void remove_swap_bdev(struct block_device *bdev)
 	BUG();
 }
 
-/*
- * Unlike a standard unplug_io_fn, swap_unplug_io_fn is never called
- * through swap's backing_dev_info (which is only used by shrink_list),
- * but directly from sync_page when PageSwapCache: and takes the page
- * as argument, so that it can find the right device from swp_entry_t.
- */
-void swap_unplug_io_fn(struct page *page)
+void swap_unplug_io_fn(struct backing_dev_info *unused_bdi)
 {
-	swp_entry_t entry;
+	int i;
 
 	down(&swap_bdevs_sem);
-	entry.val = page->private;
-	if (PageSwapCache(page)) {
-		struct block_device *bdev = swap_bdevs[swp_type(entry)];
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		struct block_device *bdev = swap_bdevs[i];
 		struct backing_dev_info *bdi;
 
-		if (bdev) {
-			bdi = bdev->bd_inode->i_mapping->backing_dev_info;
-			(*bdi->unplug_io_fn)(bdi);
-		}
+		if (bdev == NULL)
+			break;
+		bdi = bdev->bd_inode->i_mapping->backing_dev_info;
+		(*bdi->unplug_io_fn)(bdi);
 	}
 	up(&swap_bdevs_sem);
 }
