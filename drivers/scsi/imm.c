@@ -20,6 +20,9 @@
 #define IMM_PROBE_EPP17 0x0100
 #define IMM_PROBE_EPP19 0x0200
 
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <asm/io.h>
 #include <linux/parport.h>
@@ -77,17 +80,6 @@ static void imm_wakeup(void *ref)
 	return;
 }
 
-static int imm_release(struct Scsi_Host *host)
-{
-	imm_struct *dev = imm_dev(host);
-	int host_no = host->unique_id;
-
-	printk("Releasing imm%i\n", host_no);
-	scsi_unregister(host);
-	parport_unregister_device(dev->dev);
-	return 0;
-}
-
 static int imm_pb_claim(imm_struct *dev)
 {
 	if (parport_claim(dev->dev)) {
@@ -107,25 +99,6 @@ static inline void imm_pb_release(imm_struct *dev)
 /***************************************************************************
  *                   Parallel port probing routines                        *
  ***************************************************************************/
-
-static Scsi_Host_Template driver_template = {
-	.proc_name = "imm",
-	.proc_info = imm_proc_info,
-	.name = "Iomega VPI2 (imm) interface",
-	.detect = imm_detect,
-	.release = imm_release,
-	.queuecommand = imm_queuecommand,
-	.eh_abort_handler = imm_abort,
-	.eh_bus_reset_handler = imm_reset,
-	.eh_host_reset_handler = imm_reset,
-	.bios_param = imm_biosparam,
-	.this_id = 7,
-	.sg_tablesize = SG_ALL,
-	.cmd_per_lun = 1,
-	.use_clustering = ENABLE_CLUSTERING,
-};
-
-#include  "scsi_module.c"
 
 static int imm_detect(Scsi_Host_Template * host)
 {
@@ -214,11 +187,10 @@ static int imm_detect(Scsi_Host_Template * host)
 
 		INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
 
-		host->can_queue = IMM_CAN_QUEUE;
-		host->sg_tablesize = imm_sg;
-		hreg = scsi_register(host, 0);
+		hreg = scsi_host_alloc(host, 0);
 		if (hreg == NULL)
 			continue;
+		list_add_tail(&hreg->sht_legacy_list, &host->legacy_hosts);
 		hreg->io_port = pb->base;
 		hreg->n_io_port = ports;
 		hreg->dma_channel = -1;
@@ -1237,5 +1209,67 @@ static int device_check(imm_struct *dev)
 	printk("imm: No devices found, aborting driver load.\n");
 	return 1;
 }
+
+static Scsi_Host_Template driver_template = {
+	.module			= THIS_MODULE,
+	.proc_name		= "imm",
+	.proc_info		= imm_proc_info,
+	.name			= "Iomega VPI2 (imm) interface",
+	.queuecommand		= imm_queuecommand,
+	.eh_abort_handler	= imm_abort,
+	.eh_bus_reset_handler	= imm_reset,
+	.eh_host_reset_handler	= imm_reset,
+	.bios_param		= imm_biosparam,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.can_queue		= 1,
+};
+
+static int __init imm_driver_init(void)
+{
+	struct scsi_host_template *sht = &driver_template;
+	struct Scsi_Host *shost;
+	struct list_head *l;
+	int error;
+
+	INIT_LIST_HEAD(&sht->legacy_hosts);
+
+	imm_detect(sht);
+	if (list_empty(&sht->legacy_hosts))
+		return -ENODEV;
+
+	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list) {
+		error = scsi_add_host(shost, NULL);
+		if (error)
+			goto fail;
+		scsi_scan_host(shost);
+	}
+	return 0;
+ fail:
+	l = &shost->sht_legacy_list;
+	while ((l = l->prev) != &sht->legacy_hosts)
+		scsi_remove_host(list_entry(l, struct Scsi_Host, sht_legacy_list));
+	return error;
+}
+
+static void __exit imm_driver_exit(void)
+{
+	struct scsi_host_template *sht = &driver_template;
+	struct Scsi_Host *host, *s;
+
+	list_for_each_entry(host, &sht->legacy_hosts, sht_legacy_list)
+		scsi_remove_host(host);
+	list_for_each_entry_safe(host, s, &sht->legacy_hosts, sht_legacy_list) {
+		imm_struct *dev = imm_dev(host);
+		list_del(&host->sht_legacy_list);
+		scsi_host_put(host);
+		parport_unregister_device(dev->dev);
+	}
+}
+
+module_init(imm_driver_init);
+module_exit(imm_driver_exit);
 
 MODULE_LICENSE("GPL");

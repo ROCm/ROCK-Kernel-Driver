@@ -108,11 +108,7 @@ static char *IMM_MODE_STRING[] =
 	[IMM_UNKNOWN]	 = "Unknown",
 };
 
-/* This is a global option */
-int imm_sg = SG_ALL;		/* enable/disable scatter-gather. */
-
 /* other options */
-#define IMM_CAN_QUEUE   1	/* use "queueing" interface */
 #define IMM_BURST_SIZE	512	/* data burst size */
 #define IMM_SELECT_TMO  500	/* 500 how long to wait for target ? */
 #define IMM_SPIN_TMO    5000	/* 50000 imm_wait loop limiter */
@@ -144,17 +140,7 @@ int imm_sg = SG_ALL;		/* enable/disable scatter-gather. */
 #endif
 
 static int imm_engine(imm_struct *, Scsi_Cmnd *);
-static int imm_in(imm_struct *, char *, int);
 static int imm_init(imm_struct *);
 static void imm_interrupt(void *);
-static int imm_out(imm_struct *, char *, int);
-
-static int imm_detect(Scsi_Host_Template *);
-static int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int imm_abort(Scsi_Cmnd *);
-static int imm_reset(Scsi_Cmnd *);
-static int imm_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
-static int imm_biosparam(struct scsi_device *, struct block_device *,
-		sector_t, int *);
 
 #endif				/* _IMM_H */
