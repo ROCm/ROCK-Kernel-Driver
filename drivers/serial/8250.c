@@ -517,7 +517,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	unsigned char save_lcr, save_mcr;
 	unsigned long flags;
 
-	if (!up->port.iobase && !up->port.membase)
+	if (!up->port.iobase && !up->port.mapbase && !up->port.membase)
 		return;
 
 	DEBUG_AUTOCONF("ttyS%d: autoconf (0x%04x, 0x%08lx): ",
@@ -1950,6 +1950,7 @@ static int __register_serial(struct serial_struct *req, int line)
 	port.regshift = req->iomem_reg_shift;
 	port.iotype   = req->io_type;
 	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
+	port.mapbase  = req->iomap_base;
 	port.line     = line;
 
 	if (share_irqs)

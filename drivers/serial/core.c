@@ -2009,7 +2009,7 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	/*
 	 * If there isn't a port here, don't do anything further.
 	 */
-	if (!port->iobase && !port->mapbase)
+	if (!port->iobase && !port->mapbase && !port->membase)
 		return;
 
 	/*
@@ -2418,6 +2418,7 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 			state->port->iotype   = port->iotype;
 			state->port->flags    = port->flags;
 			state->port->line     = state - drv->state;
+			state->port->mapbase  = port->mapbase;
 
 			__uart_register_port(drv, state, state->port);
 		}

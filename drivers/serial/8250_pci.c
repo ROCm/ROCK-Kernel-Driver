@@ -176,6 +176,7 @@ get_pci_port(struct pci_dev *dev, struct pci_board *board,
 		return 0;
 	}
 	req->io_type = SERIAL_IO_MEM;
+	req->iomap_base = port;
 	req->iomem_base = ioremap(port, board->uart_offset);
 	if (req->iomem_base == NULL)
 		return -ENOMEM;
