@@ -51,6 +51,7 @@ extern int max_queued_signals;
 extern int sysrq_enabled;
 extern int core_uses_pid;
 extern int cad_pid;
+extern int pid_max;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -255,6 +256,8 @@ static ctl_table kern_table[] = {
 	{KERN_S390_USER_DEBUG_LOGGING,"userprocess_debug",
 	 &sysctl_userprocess_debug,sizeof(int),0644,NULL,&proc_dointvec},
 #endif
+	{KERN_PIDMAX, "pid_max", &pid_max, sizeof (int),
+	 0600, NULL, &proc_dointvec},
 	{0}
 };
 

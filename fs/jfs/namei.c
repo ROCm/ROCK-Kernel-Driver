@@ -29,7 +29,6 @@
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
-extern struct inode_operations jfs_special_inode_operations;
 extern struct file_operations jfs_file_operations;
 extern struct address_space_operations jfs_aops;
 
@@ -1338,7 +1337,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
 		goto out3;
 
-	ip->i_op = &jfs_special_inode_operations;
+	ip->i_op = &jfs_file_inode_operations;
 	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);

@@ -14,6 +14,7 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include "sysv.h"
 
@@ -273,6 +274,7 @@ int sysv_make_empty(struct inode *inode, struct inode *dir)
 
 	if (!page)
 		return -ENOMEM;
+	kmap(page);
 	err = mapping->a_ops->prepare_write(NULL, page, 0, 2 * SYSV_DIRSIZE);
 	if (err) {
 		unlock_page(page);
@@ -291,6 +293,7 @@ int sysv_make_empty(struct inode *inode, struct inode *dir)
 
 	err = dir_commit_chunk(page, 0, 2 * SYSV_DIRSIZE);
 fail:
+	kunmap(page);
 	page_cache_release(page);
 	return err;
 }

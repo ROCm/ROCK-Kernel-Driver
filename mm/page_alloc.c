@@ -782,10 +782,9 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 	const unsigned long zone_required_alignment = 1UL << (MAX_ORDER-1);
 
 	totalpages = 0;
-	for (i = 0; i < MAX_NR_ZONES; i++) {
-		unsigned long size = zones_size[i];
-		totalpages += size;
-	}
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		totalpages += zones_size[i];
+
 	realtotalpages = totalpages;
 	if (zholes_size)
 		for (i = 0; i < MAX_NR_ZONES; i++)
@@ -823,7 +822,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		if (zholes_size)
 			realsize -= zholes_size[j];
 
-		printk("zone(%lu): %lu pages.\n", j, size);
+		printk("  %s zone: %lu pages\n", zone_names[j], realsize);
 		zone->size = size;
 		zone->name = zone_names[j];
 		spin_lock_init(&zone->lock);

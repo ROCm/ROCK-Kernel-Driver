@@ -211,6 +211,11 @@ struct signal_struct {
 	atomic_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
+
+        /* current thread group signal load-balancing target: */
+        task_t                  *curr_target;
+
+	struct sigpending	shared_pending;
 };
 
 /*
@@ -356,7 +361,7 @@ struct task_struct {
 	spinlock_t sigmask_lock;	/* Protects signal and blocked */
 	struct signal_struct *sig;
 
-	sigset_t blocked;
+	sigset_t blocked, real_blocked, shared_unblocked;
 	struct sigpending pending;
 
 	unsigned long sas_ss_sp;
@@ -431,6 +436,7 @@ extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
+extern int task_curr(task_t *p);
 extern int idle_cpu(int cpu);
 
 void yield(void);
@@ -455,7 +461,7 @@ extern struct task_struct init_task;
 extern struct   mm_struct init_mm;
 
 /* PID hashing. (shouldnt this be dynamic?) */
-#define PIDHASH_SZ (4096 >> 2)
+#define PIDHASH_SZ 8192
 extern struct task_struct *pidhash[PIDHASH_SZ];
 
 #define pid_hashfn(x)	((((x) >> 8) ^ (x)) & (PIDHASH_SZ - 1))
@@ -535,7 +541,7 @@ extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
 extern void sig_exit(int, int, struct siginfo *);
-extern int dequeue_signal(sigset_t *, siginfo_t *);
+extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t *info);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
@@ -654,6 +660,7 @@ extern void exit_thread(void);
 extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
+extern void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
@@ -786,8 +793,29 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 #define for_each_thread(task) \
 	for (task = next_thread(current) ; task != current ; task = next_thread(task))
 
-#define next_thread(p) \
-	list_entry((p)->thread_group.next, struct task_struct, thread_group)
+static inline task_t *next_thread(task_t *p)
+{
+	if (!p->sig)
+		BUG();
+#if CONFIG_SMP
+	if (!spin_is_locked(&p->sig->siglock) &&
+				!rwlock_is_locked(&tasklist_lock))
+		BUG();
+#endif
+	return list_entry((p)->thread_group.next, task_t, thread_group);
+}
+
+static inline task_t *prev_thread(task_t *p)
+{
+	if (!p->sig)
+		BUG();
+#if CONFIG_SMP
+	if (!spin_is_locked(&p->sig->siglock) &&
+				!rwlock_is_locked(&tasklist_lock))
+		BUG();
+#endif
+	return list_entry((p)->thread_group.prev, task_t, thread_group);
+}
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
@@ -903,21 +931,8 @@ static inline void cond_resched(void)
    This is required every time the blocked sigset_t changes.
    Athread cathreaders should have t->sigmask_lock.  */
 
-static inline void recalc_sigpending_tsk(struct task_struct *t)
-{
-	if (has_pending_signals(&t->pending.signal, &t->blocked))
-		set_tsk_thread_flag(t, TIF_SIGPENDING);
-	else
-		clear_tsk_thread_flag(t, TIF_SIGPENDING);
-}
-
-static inline void recalc_sigpending(void)
-{
-	if (has_pending_signals(&current->pending.signal, &current->blocked))
-		set_thread_flag(TIF_SIGPENDING);
-	else
-		clear_thread_flag(TIF_SIGPENDING);
-}
+extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
+extern void recalc_sigpending(void);
 
 /*
  * Wrappers for p->thread_info->cpu access. No-op on UP.

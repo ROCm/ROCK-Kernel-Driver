@@ -36,7 +36,6 @@ static inline void __unhash_process(struct task_struct *p)
 	nr_threads--;
 	unhash_pid(p);
 	REMOVE_LINKS(p);
-	list_del(&p->thread_group);
 	p->pid = 0;
 	proc_dentry = p->proc_dentry;
 	if (unlikely(proc_dentry != NULL)) {
@@ -66,8 +65,14 @@ static void release_task(struct task_struct * p)
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
+	if (unlikely(p->ptrace)) {
+		write_lock_irq(&tasklist_lock);
+		__ptrace_unlink(p);
+		write_unlock_irq(&tasklist_lock);
+	}
 	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
 	unhash_process(p);
+	exit_sighand(p);
 
 	release_thread(p);
 	if (p != current) {
@@ -239,7 +244,8 @@ void daemonize(void)
 static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
 {
 	/* We dont want people slaying init */
-	p->exit_signal = SIGCHLD;
+	if (p->exit_signal != -1)
+		p->exit_signal = SIGCHLD;
 	p->self_exec_id++;
 
 	/* Make sure we're not reparenting to ourselves */
@@ -407,18 +413,15 @@ void exit_mm(struct task_struct *tsk)
  */
 static inline void forget_original_parent(struct task_struct * father)
 {
-	struct task_struct *p, *reaper;
+	struct task_struct *p, *reaper = father;
 	struct list_head *_p;
 
-	read_lock(&tasklist_lock);
+	write_lock_irq(&tasklist_lock);
 
-	/* Next in our thread group, if they're not already exiting */
-	reaper = father;
-	do {
-		reaper = next_thread(reaper);
-		if (!(reaper->flags & PF_EXITING))
-			break;
-	} while (reaper != father);
+	if (father->exit_signal != -1)
+		reaper = prev_thread(reaper);
+	else
+		reaper = child_reaper;
 
 	if (reaper == father)
 		reaper = child_reaper;
@@ -427,7 +430,7 @@ static inline void forget_original_parent(struct task_struct * father)
 	 * There are only two places where our children can be:
 	 *
 	 * - in our child list
-	 * - in the global ptrace list
+	 * - in our ptraced child list
 	 *
 	 * Search them and reparent children.
 	 */
@@ -439,17 +442,29 @@ static inline void forget_original_parent(struct task_struct * father)
 		p = list_entry(_p,struct task_struct,ptrace_list);
 		reparent_thread(p, reaper, child_reaper);
 	}
-	read_unlock(&tasklist_lock);
+	write_unlock_irq(&tasklist_lock);
 }
 
-static inline void zap_thread(task_t *p, task_t *father)
+static inline void zap_thread(task_t *p, task_t *father, int traced)
 {
-	ptrace_unlink(p);
-	list_del_init(&p->sibling);
-	p->ptrace = 0;
+	/* If someone else is tracing this thread, preserve the ptrace links.  */
+	if (unlikely(traced)) {
+		task_t *trace_task = p->parent;
+		int ptrace_flag = p->ptrace;
+		BUG_ON (ptrace_flag == 0);
 
-	p->parent = p->real_parent;
-	list_add_tail(&p->sibling, &p->parent->children);
+		__ptrace_unlink(p);
+		p->ptrace = ptrace_flag;
+		__ptrace_link(p, trace_task);
+	} else {
+		/* Otherwise, if we were tracing this thread, untrace it.  */
+		ptrace_unlink (p);
+
+		list_del_init(&p->sibling);
+		p->parent = p->real_parent;
+		list_add_tail(&p->sibling, &p->parent->children);
+	}
+
 	if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
 		do_notify_parent(p, p->exit_signal);
 	/*
@@ -517,7 +532,7 @@ static void exit_notify(void)
 	 *	
 	 */
 	
-	if(current->exit_signal != SIGCHLD &&
+	if (current->exit_signal != SIGCHLD && current->exit_signal != -1 &&
 	    ( current->parent_exec_id != t->self_exec_id  ||
 	      current->self_exec_id != current->parent_exec_id) 
 	    && !capable(CAP_KILL))
@@ -540,11 +555,11 @@ static void exit_notify(void)
 
 zap_again:
 	list_for_each_safe(_p, _n, &current->children)
-		zap_thread(list_entry(_p,struct task_struct,sibling), current);
+		zap_thread(list_entry(_p,struct task_struct,sibling), current, 0);
 	list_for_each_safe(_p, _n, &current->ptrace_children)
-		zap_thread(list_entry(_p,struct task_struct,ptrace_list), current);
+		zap_thread(list_entry(_p,struct task_struct,ptrace_list), current, 1);
 	/*
-	 * reparent_thread might drop the tasklist lock, thus we could
+	 * zap_thread might drop the tasklist lock, thus we could
 	 * have new children queued back from the ptrace list into the
 	 * child list:
 	 */
@@ -587,7 +602,6 @@ fake_volatile:
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);
-	exit_sighand(tsk);
 	exit_thread();
 
 	if (current->leader)
@@ -633,6 +647,41 @@ asmlinkage long sys_exit(int error_code)
 	do_exit((error_code&0xff)<<8);
 }
 
+static inline int eligible_child(pid_t pid, int options, task_t *p)
+{
+	if (pid>0) {
+		if (p->pid != pid)
+			return 0;
+	} else if (!pid) {
+		if (p->pgrp != current->pgrp)
+			return 0;
+	} else if (pid != -1) {
+		if (p->pgrp != -pid)
+			return 0;
+	}
+
+	/*
+	 * Do not consider detached threads that are
+	 * not ptraced:
+	 */
+	if (p->exit_signal == -1 && !p->ptrace)
+		return 0;
+
+	/* Wait for all children (clone and not) if __WALL is set;
+	 * otherwise, wait for clone children *only* if __WCLONE is
+	 * set; otherwise, wait for non-clone children *only*.  (Note:
+	 * A "clone" child here is one that reports to its parent
+	 * using a signal other than SIGCHLD.) */
+	if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
+	    && !(options & __WALL))
+		return 0;
+
+	if (security_ops->task_wait(p))
+		return 0;
+
+	return 1;
+}
+
 asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru)
 {
 	int flag, retval;
@@ -653,34 +702,8 @@ repeat:
 		struct list_head *_p;
 		list_for_each(_p,&tsk->children) {
 			p = list_entry(_p,struct task_struct,sibling);
-			if (pid>0) {
-				if (p->pid != pid)
-					continue;
-			} else if (!pid) {
-				if (p->pgrp != current->pgrp)
-					continue;
-			} else if (pid != -1) {
-				if (p->pgrp != -pid)
-					continue;
-			}
-			/*
-			 * Do not consider detached threads that are
-			 * not ptraced:
-			 */
-			if (p->exit_signal == -1 && !p->ptrace)
+			if (!eligible_child(pid, options, p))
 				continue;
-			/* Wait for all children (clone and not) if __WALL is set;
-			 * otherwise, wait for clone children *only* if __WCLONE is
-			 * set; otherwise, wait for non-clone children *only*.  (Note:
-			 * A "clone" child here is one that reports to its parent
-			 * using a signal other than SIGCHLD.) */
-			if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
-			    && !(options & __WALL))
-				continue;
-
-			if (security_ops->task_wait(p))
-				continue;
-
 			flag = 1;
 			switch (p->state) {
 			case TASK_STOPPED:
@@ -715,7 +738,7 @@ repeat:
 				retval = p->pid;
 				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					ptrace_unlink(p);
+					__ptrace_unlink(p);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
 				} else
@@ -725,12 +748,23 @@ repeat:
 				continue;
 			}
 		}
+		if (!flag) {
+			list_for_each (_p,&tsk->ptrace_children) {
+				p = list_entry(_p,struct task_struct,ptrace_list);
+				if (!eligible_child(pid, options, p))
+					continue;
+				flag = 1;
+				break;
+			}
+		}
 		if (options & __WNOTHREAD)
 			break;
 		tsk = next_thread(tsk);
+		if (tsk->sig != current->sig)
+			BUG();
 	} while (tsk != current);
 	read_unlock(&tasklist_lock);
-	if (flag || !list_empty(&current->ptrace_children)) {
+	if (flag) {
 		retval = 0;
 		if (options & WNOHANG)
 			goto end_wait4;

@@ -504,6 +504,8 @@ static inline int make_private_signals(void)
 {
 	struct signal_struct * newsig;
 
+	remove_thread_group(current, current->sig);
+
 	if (atomic_read(&current->sig->count) <= 1)
 		return 0;
 	newsig = kmem_cache_alloc(sigact_cachep, GFP_KERNEL);
@@ -512,6 +514,8 @@ static inline int make_private_signals(void)
 	spin_lock_init(&newsig->siglock);
 	atomic_set(&newsig->count, 1);
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
+	init_sigpending(&newsig->shared_pending);
+
 	spin_lock_irq(&current->sigmask_lock);
 	current->sig = newsig;
 	spin_unlock_irq(&current->sigmask_lock);
@@ -575,42 +579,10 @@ static inline void flush_old_files(struct files_struct * files)
  */
 static void de_thread(struct task_struct *tsk)
 {
-	struct task_struct *sub;
-	struct list_head *head, *ptr;
-	struct siginfo info;
-	int pause;
-
-	write_lock_irq(&tasklist_lock);
-
-	if (tsk->tgid != tsk->pid) {
-		/* subsidiary thread - just escapes the group */
-		list_del_init(&tsk->thread_group);
-		tsk->tgid = tsk->pid;
-		pause = 0;
-	}
-	else {
-		/* master thread - kill all subsidiary threads */
-		info.si_signo = SIGKILL;
-		info.si_errno = 0;
-		info.si_code = SI_DETHREAD;
-		info.si_pid = current->pid;
-		info.si_uid = current->uid;
-
-		head = tsk->thread_group.next;
-		list_del_init(&tsk->thread_group);
-
-		list_for_each(ptr,head) {
-			sub = list_entry(ptr,struct task_struct,thread_group);
-			send_sig_info(SIGKILL,&info,sub);
-		}
-
-		pause = 1;
-	}
-
-	write_unlock_irq(&tasklist_lock);
-
-	/* give the subsidiary threads a chance to clean themselves up */
-	if (pause) yield();
+	if (!list_empty(&tsk->thread_group))
+		BUG();
+	/* An exec() starts a new thread group: */
+	tsk->tgid = tsk->pid;
 }
 
 int flush_old_exec(struct linux_binprm * bprm)
@@ -633,6 +605,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 	if (retval) goto mmap_failed;
 
 	/* This is the point of no return */
+	de_thread(current);
+
 	release_old_signals(oldsig);
 
 	current->sas_ss_sp = current->sas_ss_size = 0;
@@ -650,9 +624,6 @@ int flush_old_exec(struct linux_binprm * bprm)
 	current->comm[i] = '\0';
 
 	flush_thread();
-
-	if (!list_empty(&current->thread_group))
-		de_thread(current);
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
 	    permission(bprm->file->f_dentry->d_inode,MAY_READ))

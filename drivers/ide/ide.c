@@ -275,7 +275,6 @@ static void init_hwif_data (unsigned int index)
 		drive->name[1]			= 'd';
 		drive->name[2]			= 'a' + (index * MAX_DRIVES) + unit;
 		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
-		init_waitqueue_head(&drive->wqueue);
 		INIT_LIST_HEAD(&drive->list);
 	}
 }
@@ -1661,7 +1660,7 @@ ide_drive_t *get_info_ptr (kdev_t i_rdev)
 			if (unit < MAX_DRIVES) {
 				ide_drive_t *drive = &hwif->drives[unit];
 #if 0
-				if ((drive->present) && (drive->part[minor].nr_sects))
+				if (drive->present && get_capacity(drive->disk))
 #else
 				if (drive->present)
 #endif
@@ -1748,10 +1747,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 void ide_revalidate_drive (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
-	g->part[0].nr_sects = current_capacity(drive);
+	set_capacity(drive->disk, current_capacity(drive));
 }
 
 /*
@@ -1805,8 +1801,6 @@ static int ide_open (struct inode * inode, struct file * filp)
 #endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 	}
 #endif /* CONFIG_KMOD */
-	while (drive->busy)
-		sleep_on(&drive->wqueue);
 	drive->usage++;
 	if (drive->driver != NULL)
 		return DRIVER(drive)->open(inode, filp, drive);
@@ -1877,7 +1871,7 @@ struct seq_operations ide_drivers_op = {
  */
 int ide_replace_subdriver (ide_drive_t *drive, const char *driver)
 {
-	if (!drive->present || drive->busy || drive->usage)
+	if (!drive->present || drive->usage)
 		goto abort;
 	if (drive->driver != NULL && DRIVER(drive)->cleanup(drive))
 		goto abort;
@@ -1961,7 +1955,7 @@ void ide_unregister (unsigned int index)
 		drive = &hwif->drives[unit];
 		if (!drive->present)
 			continue;
-		if (drive->busy || drive->usage)
+		if (drive->usage)
 			goto abort;
 		if (drive->driver != NULL && DRIVER(drive)->cleanup(drive))
 			goto abort;
@@ -1978,7 +1972,7 @@ void ide_unregister (unsigned int index)
 			continue;
 		minor = drive->select.b.unit << PARTN_BITS;
 		for (p = 0; p < (1<<PARTN_BITS); ++p) {
-			if (drive->part[p].nr_sects > 0) {
+			if (get_capacity(drive->disk)) {
 				kdev_t devp = mk_kdev(hwif->major, minor+p);
 				invalidate_device(devp, 0);
 			}
@@ -2058,17 +2052,12 @@ void ide_unregister (unsigned int index)
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
 	blk_clear(hwif->major);
-	gd = hwif->gd[0];
+	gd = hwif->drives[0].disk;
 	if (gd) {
 		int i;
-		kfree(gd->part);
-		if (gd->de_arr)
-			kfree (gd->de_arr);
-		if (gd->flags)
-			kfree (gd->flags);
-		kfree(gd);
 		for (i = 0; i < MAX_DRIVES; i++)
-			hwif->gd[i] = NULL;
+			hwif->drives[i].disk = NULL;
+		kfree(gd);
 	}
 	old_hwif		= *hwif;
 	init_hwif_data (index);	/* restore hwif data to pristine status */
@@ -2530,7 +2519,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->bios_head, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->bios_sect, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (unsigned short *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
+			if (put_user((unsigned)get_start_sect(inode->i_bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -2542,7 +2531,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->head, (byte *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->sect, (byte *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
+			if (put_user((unsigned)get_start_sect(inode->i_bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -2653,18 +2642,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			}
 			return 0;
 		}
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKSSZGET:
-		case BLKPG:
-		case BLKELVGET:
-		case BLKELVSET:
-		case BLKBSZGET:
-		case BLKBSZSET:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
@@ -3362,7 +3339,7 @@ static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, byte 
 static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
-	return -EIO;
+	return -EINVAL;
 }
 
 static int default_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
@@ -3434,7 +3411,7 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	
 	spin_lock_irqsave(&ide_lock, flags);
 	if (version != IDE_SUBDRIVER_VERSION || !drive->present ||
-	    drive->driver != NULL || drive->busy || drive->usage) {
+	    drive->driver != NULL || drive->usage) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
@@ -3463,8 +3440,7 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	unsigned long flags;
 	
 	spin_lock_irqsave(&ide_lock, flags);
-	if (drive->usage || drive->busy ||
-	    drive->driver == NULL || DRIVER(drive)->busy) {
+	if (drive->usage || drive->driver == NULL || DRIVER(drive)->busy) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}

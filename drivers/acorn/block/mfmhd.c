@@ -193,8 +193,6 @@ struct mfm_info {
 
 #define MFM_DRV_INFO mfm_info[raw_cmd.dev]
 
-static struct hd_struct mfm[MFM_MAXDRIVES << 6];
-
 /* Stuff from the assembly routines */
 extern unsigned int hdc63463_baseaddress;	/* Controller base address */
 extern unsigned int hdc63463_irqpolladdress;	/* Address to read to test for int */
@@ -882,6 +880,20 @@ static void mfm_rerequest(void)
 	mfm_request();
 }
 
+static struct gendisk mfm_gendisk[2] = {
+{
+	.major		= MAJOR_NR,
+	.first_minor	= 0,
+	.major_name	= "mfma",
+	.minor_shift	= 6,
+},
+{
+	.major		= MAJOR_NR,
+	.first_minor	= 64,
+	.major_name	= "mfmb",
+	.minor_shift	= 6,
+};
+
 static void mfm_request(void)
 {
 	DBG("mfm_request CURRENT=%p Busy=%d\n", CURRENT, Busy);
@@ -895,7 +907,7 @@ static void mfm_request(void)
 	Busy = 1;
 
 	while (1) {
-		unsigned int dev, block, nsect;
+		unsigned int dev, block, nsect, unit;
 
 		DBG("mfm_request: loop start\n");
 		sti();
@@ -912,25 +924,25 @@ static void mfm_request(void)
 		DBG("mfm_request:                 before arg extraction\n");
 
 		dev = minor(CURRENT->rq_dev);
+		unit = dev>>6;
 		block = CURRENT->sector;
 		nsect = CURRENT->nr_sectors;
 #ifdef DEBUG
-		/*if ((dev>>6)==1) */ console_printf("mfm_request:                                raw vals: dev=%d (block=512 bytes) block=%d nblocks=%d\n", dev, block, nsect);
+		/*if (unit==1) */ console_printf("mfm_request:                                raw vals: dev=%d (block=512 bytes) block=%d nblocks=%d\n", dev, block, nsect);
 #endif
-		if (dev >= (mfm_drives << 6) ||
-		    block >= mfm[dev].nr_sects || ((block+nsect) > mfm[dev].nr_sects)) {
-			if (dev >= (mfm_drives << 6))
+		if (unit >= mfm_drives ||
+		    block >= get_capacity(mfm_gendisk + unit) ||
+		    ((block+nsect) > get_capacity(mfm_gendisk + unit))) {
+			if (unit >= mfm_drives)
 				printk("mfm: bad minor number: device=%s\n", kdevname(CURRENT->rq_dev));
 			else
-				printk("mfm%c: bad access: block=%d, count=%d, nr_sects=%ld\n", (dev >> 6)+'a',
-				       block, nsect, mfm[dev].nr_sects);
+				printk("mfm%c: bad access: block=%d, count=%d, nr_sects=%ld\n", unit+'a',
+				       block, nsect, get_capacity(mfm_gendisk+unit));
 			printk("mfm: continue 1\n");
 			end_request(CURRENT, 0);
 			Busy = 0;
 			continue;
 		}
-
-		block += mfm[dev].start_sect;
 
 		/* DAG: Linux doesn't cope with this - even though it has an array telling
 		   it the hardware block size - silly */
@@ -1163,18 +1175,9 @@ static int mfm_initdrives(void)
 static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long arg)
 {
 	struct hd_geometry *geo = (struct hd_geometry *) arg;
-	kdev_t dev;
-	int device, minor, err;
-
-	if (!inode || !(dev = inode->i_rdev))
-		return -EINVAL;
-
-	minor = minor(dev);
-
-	device = DEVICE_NR(minor(inode->i_rdev)), err;
+	int device = DEVICE_NR(minor(inode->i_rdev));
 	if (device >= mfm_drives)
 		return -EINVAL;
-
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
 	if (!arg)
@@ -1185,7 +1188,8 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 		return -EFAULT;
 	if (put_user (mfm_info[device].cylinders, &geo->cylinders))
 		return -EFAULT;
-	if (put_user (mfm[minor].start_sect, &geo->start))
+	start = get_start_sect(inode->i_bdev);
+	if (put_user (get_start_sect(inode->i_bdev), &geo->start))
 		return -EFAULT;
 	return 0;
 }
@@ -1237,26 +1241,9 @@ void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 		if (raw_cmd.dev == drive)
 			mfm_specify ();
 		mfm_geometry (drive);
-		mfm[drive << 6].start_sect = 0;
-		mfm[drive << 6].nr_sects = mfm_info[drive].cylinders * mfm_info[drive].heads * mfm_info[drive].sectors / 2;
+		set_capacity(&mfm_gendisk[drive], mfm_info[drive].cylinders * mfm_info[drive].heads * mfm_info[drive].sectors / 2);
 	}
 }
-
-static struct gendisk mfm_gendisk[2] = {
-{
-	.major		= MAJOR_NR,
-	.first_minor	= 0,
-	.major_name	= "mfma",
-	.minor_shift	= 6,
-	.part		= mfm,
-},
-{
-	.major		= MAJOR_NR,
-	.first_minor	= 64,
-	.major_name	= "mfmb",
-	.minor_shift	= 6,
-	.part		= mfm + 64,
-};
 
 static struct block_device_operations mfm_fops =
 {
@@ -1280,7 +1267,6 @@ static void mfm_geninit (void)
 		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 
 	for (i = 0; i < mfm_drives; i++) {
-		mfm_gendisk[i].nr_real = 1;
 		add_gendisk(mfm_gendisk + i);
 		mfm_geometry (i);
 		register_disk(mfm_gendisk + i, mk_kdev(MAJOR_NR,i<<6), 1<<6,

@@ -571,8 +571,8 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 	struct page *page = grab_cache_page(mapping, 0);
 	unsigned chunk_size = ext2_chunk_size(inode);
 	struct ext2_dir_entry_2 * de;
-	char *base;
 	int err;
+	void *kaddr;
 
 	if (!page)
 		return -ENOMEM;
@@ -581,22 +581,21 @@ int ext2_make_empty(struct inode *inode, struct inode *parent)
 		unlock_page(page);
 		goto fail;
 	}
-	base = page_address(page);
-
-	de = (struct ext2_dir_entry_2 *) base;
+	kaddr = kmap_atomic(page, KM_USER0);
+	de = (struct ext2_dir_entry_2 *)kaddr;
 	de->name_len = 1;
 	de->rec_len = cpu_to_le16(EXT2_DIR_REC_LEN(1));
 	memcpy (de->name, ".\0\0", 4);
 	de->inode = cpu_to_le32(inode->i_ino);
 	ext2_set_de_type (de, inode);
 
-	de = (struct ext2_dir_entry_2 *) (base + EXT2_DIR_REC_LEN(1));
+	de = (struct ext2_dir_entry_2 *)(kaddr + EXT2_DIR_REC_LEN(1));
 	de->name_len = 2;
 	de->rec_len = cpu_to_le16(chunk_size - EXT2_DIR_REC_LEN(1));
 	de->inode = cpu_to_le32(parent->i_ino);
 	memcpy (de->name, "..\0", 4);
 	ext2_set_de_type (de, inode);
-
+	kunmap_atomic(kaddr, KM_USER0);
 	err = ext2_commit_chunk(page, 0, chunk_size);
 fail:
 	page_cache_release(page);

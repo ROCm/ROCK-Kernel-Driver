@@ -159,9 +159,6 @@ static struct cardinfo cards[MM_MAXCARDS];
 static struct block_device_operations mm_fops;
 static struct timer_list battery_timer;
 
-
-static struct hd_struct mm_partitions[MM_MAXCARDS << MM_SHIFT];
-
 static int num_cards = 0;
 
 static struct gendisk mm_gendisk[MM_MAXCARDS];
@@ -812,7 +809,7 @@ static void del_battery_timer(void)
 static int mm_revalidate(kdev_t i_rdev)
 {
 	int card_number = DEVICE_NR(i_rdev);
-	mm_partitions[minor(i_rdev)].nr_sects = cards[card_number].mm_size << 1;
+	set_capacity(mm_gendisk + card_number, cards[card_number].mm_size << 1);
 	return 0;
 }
 /*
@@ -1192,8 +1189,6 @@ int __init mm_init(void)
 		struct gendisk *disk = mm_gendisk + i;
 		sprintf(mm_names + i*6, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
-		disk->part  = mm_partitions + (i << MM_SHIFT);
-		disk->nr_real = 1;
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
 		disk->major_name = mm_names + i*6;
@@ -1222,10 +1217,8 @@ void __exit mm_cleanup(void)
 
 	del_battery_timer();
 
-	for (i=0; i < num_cards ; i++) {
-		devfs_register_partitions(mm_gendisk + i, i<<MM_SHIFT, 1);
+	for (i=0; i < num_cards ; i++)
 		del_gendisk(mm_gendisk + i);
-	}
 	if (devfs_handle)
 		devfs_unregister(devfs_handle);
 	devfs_handle = NULL;

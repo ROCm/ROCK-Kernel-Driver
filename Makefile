@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 33
+SUBLEVEL = 34
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -318,7 +318,7 @@ prepare: include/linux/version.h include/asm include/config/MARKER
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
 
-arch/$ARCH/vmlinux.lds.s: arch/$ARCH/vmlinux.lds.S
+arch/$(ARCH)/vmlinux.lds.s: arch/$(ARCH)/vmlinux.lds.S
 	$(CPP) $(CPPFLAGS) $(CPPFLAGS_$@) -P -C -U$(ARCH) $< -o $@
 
 # Single targets

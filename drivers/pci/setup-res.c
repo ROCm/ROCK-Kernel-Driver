@@ -73,7 +73,7 @@ static int pci_assign_bus_resource(const struct pci_bus *bus,
 	int i;
 
 	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
-	for (i = 0 ; i < 4; i++) {
+	for (i = 0 ; i < PCI_BUS_NUM_RESOURCES; i++) {
 		struct resource *r = bus->resource[i];
 		if (!r)
 			continue;

@@ -35,16 +35,15 @@
 /* Note mask bit is true for ENABLED irqs.  */
 static unsigned long cached_irq_mask;
 
-/* Bus 0, Device 0.  Nothing else matters, since we invoke the
-   POLARIS routines directly.  */
-static struct pci_dev rx164_system;
-
 static inline void
 rx164_update_irq_hw(unsigned long mask)
 {
-	unsigned int temp;
-	polaris_write_config_dword(&rx164_system, 0x74, mask);
-	polaris_read_config_dword(&rx164_system, 0x74, &temp);
+	volatile unsigned int *irq_mask;
+
+	irq_mask = (void *)(POLARIS_DENSE_CONFIG_BASE + 0x74);
+	*irq_mask = mask;
+	mb();
+	*irq_mask;
 }
 
 static inline void
@@ -86,14 +85,14 @@ static struct hw_interrupt_type rx164_irq_type = {
 static void 
 rx164_device_interrupt(unsigned long vector, struct pt_regs *regs)
 {
-	unsigned int temp;
 	unsigned long pld;
+	volatile unsigned int *dirr;
 	long i;
 
 	/* Read the interrupt summary register.  On Polaris, this is
 	   the DIRR register in PCI config space (offset 0x84).  */
-	polaris_read_config_dword(&rx164_system, 0x84, &temp);
-	pld = temp;
+	dirr = (void *)(POLARIS_DENSE_CONFIG_BASE + 0x84);
+	pld = *dirr;
 
 	/*
 	 * Now for every possible bit set, work through them and call

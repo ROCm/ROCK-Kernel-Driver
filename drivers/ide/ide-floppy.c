@@ -1500,7 +1500,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 	drive->bios_cyl = 0;
 	drive->bios_head = drive->bios_sect = 0;
 	floppy->blocks = floppy->bs_factor = 0;
-	drive->part[0].nr_sects = 0;
+	set_capacity(drive->disk, 0);
 
 	idefloppy_create_read_capacity_cmd (&pc);
 	if (idefloppy_queue_pc_tail (drive, &pc)) {
@@ -1555,7 +1555,7 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 		(void) idefloppy_get_flexible_disk_page (drive);
 	}
 
-	drive->part[0].nr_sects = floppy->blocks * floppy->bs_factor;
+	set_capacity(drive->disk, floppy->blocks * floppy->bs_factor);
 	return rc;
 }
 
@@ -1817,7 +1817,7 @@ static int idefloppy_ioctl (ide_drive_t *drive, struct inode *inode, struct file
 		return (idefloppy_get_format_progress(drive, inode, file,
 						      (int *)arg));
 	}
- 	return -EIO;
+ 	return -EINVAL;
 }
 
 /*
@@ -2065,7 +2065,6 @@ static void idefloppy_add_settings(ide_drive_t *drive)
 static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 {
 	struct idefloppy_id_gcw gcw;
-	int i;
 
 	*((unsigned short *) &gcw) = drive->id->config;
 	drive->driver_data = floppy;
@@ -2108,23 +2107,12 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 
 	(void) idefloppy_get_capacity (drive);
 	idefloppy_add_settings(drive);
-	for (i = 0; i < MAX_DRIVES; ++i) {
-		ide_hwif_t *hwif = HWIF(drive);
-
-		if (drive != &hwif->drives[i]) continue;
-		hwif->gd[i]->de_arr[i] = drive->de;
-		if (drive->removable)
-			hwif->gd[i]->flags[i] |= GENHD_FL_REMOVABLE;
-		break;
-	}
 }
 
 static int idefloppy_cleanup (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
@@ -2191,9 +2179,7 @@ static ide_driver_t idefloppy_driver = {
 static int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 	if (!strstr("ide-floppy", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -2221,10 +2207,13 @@ static int idefloppy_reinit (ide_drive_t *drive)
 	idefloppy_setup (drive, floppy);
 	DRIVER(drive)->busy--;
 	g->minor_shift = PARTN_BITS;
+	g->de = drive->de;
+	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
+	g->flags |= GENHD_FL_DEVFS;
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,
-		      g->part[0].nr_sects);
+		      get_capacity(g));
 	return 0;
 failed:
 	return 1;

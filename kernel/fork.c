@@ -46,6 +46,14 @@ int nr_threads;
 
 int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
+
+/*
+ * Protects next_safe, last_pid and pid_max:
+ */
+spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
+
+static int next_safe = DEFAULT_PID_MAX;
+int pid_max = DEFAULT_PID_MAX;
 int last_pid;
 
 struct task_struct *pidhash[PIDHASH_SZ];
@@ -151,11 +159,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	return tsk;
 }
 
-spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
-
 static int get_pid(unsigned long flags)
 {
-	static int next_safe = PID_MAX;
 	struct task_struct *p;
 	int pid;
 
@@ -163,34 +168,35 @@ static int get_pid(unsigned long flags)
 		return 0;
 
 	spin_lock(&lastpid_lock);
-	if((++last_pid) & ~PID_MASK) {
+	if (++last_pid > pid_max) {
 		last_pid = 300;		/* Skip daemons etc. */
 		goto inside;
 	}
-	if(last_pid >= next_safe) {
+
+	if (last_pid >= next_safe) {
 inside:
-		next_safe = PID_MAX;
+		next_safe = pid_max;
 		read_lock(&tasklist_lock);
 	repeat:
 		for_each_task(p) {
-			if(p->pid == last_pid	||
+			if (p->pid == last_pid	||
 			   p->pgrp == last_pid	||
 			   p->tgid == last_pid	||
 			   p->session == last_pid) {
-				if(++last_pid >= next_safe) {
-					if(last_pid & ~PID_MASK)
+				if (++last_pid >= next_safe) {
+					if (last_pid >= pid_max)
 						last_pid = 300;
-					next_safe = PID_MAX;
+					next_safe = pid_max;
 				}
 				goto repeat;
 			}
-			if(p->pid > last_pid && next_safe > p->pid)
+			if (p->pid > last_pid && next_safe > p->pid)
 				next_safe = p->pid;
-			if(p->pgrp > last_pid && next_safe > p->pgrp)
+			if (p->pgrp > last_pid && next_safe > p->pgrp)
 				next_safe = p->pgrp;
-			if(p->tgid > last_pid && next_safe > p->tgid)
+			if (p->tgid > last_pid && next_safe > p->tgid)
 				next_safe = p->tgid;
-			if(p->session > last_pid && next_safe > p->session)
+			if (p->session > last_pid && next_safe > p->session)
 				next_safe = p->session;
 		}
 		read_unlock(&tasklist_lock);
@@ -624,6 +630,9 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	spin_lock_init(&sig->siglock);
 	atomic_set(&sig->count, 1);
 	memcpy(tsk->sig->action, current->sig->action, sizeof(tsk->sig->action));
+	sig->curr_target = NULL;
+	init_sigpending(&sig->shared_pending);
+
 	return 0;
 }
 
@@ -657,6 +666,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
+
+	/*
+	 * Thread groups must share signals as well:
+	 */
+	if (clone_flags & CLONE_THREAD)
+		clone_flags |= CLONE_SIGHAND;
 
 	retval = security_ops->task_create(clone_flags);
 	if (retval)
@@ -830,21 +845,22 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	write_lock_irq(&tasklist_lock);
 
 	/* CLONE_PARENT re-uses the old parent */
-	p->real_parent = current->real_parent;
-	p->parent = current->parent;
-	if (!(clone_flags & CLONE_PARENT)) {
+	if (clone_flags & CLONE_PARENT)
+		p->real_parent = current->real_parent;
+	else
 		p->real_parent = current;
-		if (!(p->ptrace & PT_PTRACED))
-			p->parent = current;
-	}
+	p->parent = p->real_parent;
 
 	if (clone_flags & CLONE_THREAD) {
+		spin_lock(&current->sig->siglock);
 		p->tgid = current->tgid;
 		list_add(&p->thread_group, &current->thread_group);
+		spin_unlock(&current->sig->siglock);
 	}
 
 	SET_LINKS(p);
-	ptrace_link(p, p->parent);
+	if (p->ptrace & PT_PTRACED)
+		__ptrace_link(p, current->parent);
 	hash_pid(p);
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

@@ -122,11 +122,12 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
     }
     /* if we've copied bytes from disk into the page, we need to zero
     ** out the unused part of the block (it was not up to date before)
-    ** the page is still kmapped (by whoever called reiserfs_get_block)
     */
     if (up_to_date_bh) {
         unsigned pgoff = (tail_offset + total_tail - 1) & (PAGE_CACHE_SIZE - 1);
-	memset(page_address(unbh->b_page) + pgoff, 0, n_blk_size - total_tail) ;
+	char *kaddr=kmap_atomic(up_to_date_bh->b_page, KM_USER0);
+	memset(kaddr + pgoff, 0, n_blk_size - total_tail) ;
+	kunmap_atomic(kaddr, KM_USER0);
     }
 
     REISERFS_I(inode)->i_first_direct_byte = U32_MAX;

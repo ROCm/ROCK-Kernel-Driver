@@ -106,7 +106,7 @@ struct jfs_superblock {
 
 };
 
-extern int readSuper(struct super_block *, struct metapage **);
+extern int readSuper(struct super_block *, struct buffer_head **);
 extern int updateSuper(struct super_block *, uint);
 
 #endif /*_H_JFS_SUPERBLOCK */
