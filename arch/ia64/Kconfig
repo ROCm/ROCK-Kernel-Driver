@@ -401,6 +401,15 @@ config HUGETLB_PAGE_SIZE_256KB
 
 endchoice
 
+config IA64_PAL_IDLE
+	bool "Use PAL_HALT_LIGHT in idle loop"
+	---help---
+	  Say Y here to enable use of PAL_HALT_LIGHT in the cpu_idle loop.
+	  This allows the CPU to enter a low power state when idle.  You
+	  can enable CONFIG_IA64_PALINFO and check /proc/pal/cpu0/power_info
+	  to see the power consumption and latency for this state.  If you're
+	  unsure your firmware supports it, answer N.
+
 config SMP
 	bool "SMP support"
 	---help---

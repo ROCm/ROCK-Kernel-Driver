@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2002 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
 
@@ -168,13 +168,13 @@ GetBankSize(int index, node_memmap_t nmemmap)
 #endif
 
 void
-build_mem_desc(efi_memory_desc_t *md, int type, long paddr, long numbytes)
+build_mem_desc(efi_memory_desc_t *md, int type, long paddr, long numbytes, long attr)
 {
         md->type = type;
         md->phys_addr = paddr;
         md->virt_addr = 0;
         md->num_pages = numbytes >> 12;
-        md->attribute = EFI_MEMORY_WB;
+        md->attribute = attr;
 }
 
 int
@@ -236,28 +236,40 @@ build_efi_memmap(void *md, int mdsize)
                                  */
                                 if (bank == 0) {
 					if (cnode == 0) {
-						hole = 1*1024*1024;
-						build_mem_desc(md, EFI_PAL_CODE, paddr, hole);
+						hole = 2*1024*1024;
+						build_mem_desc(md, EFI_PAL_CODE, paddr, hole, EFI_MEMORY_WB|EFI_MEMORY_WB);
 						numbytes -= hole;
                                         	paddr += hole;
 			        		count++ ;
                                         	md += mdsize;
-						hole = 3*1024*1024;
-						build_mem_desc(md, EFI_RUNTIME_SERVICES_DATA, paddr, hole);
+						hole = 1*1024*1024;
+						build_mem_desc(md, EFI_CONVENTIONAL_MEMORY, paddr, hole, EFI_MEMORY_UC);
+						numbytes -= hole;
+                                        	paddr += hole;
+			        		count++ ;
+                                        	md += mdsize;
+						hole = 1*1024*1024;
+						build_mem_desc(md, EFI_RUNTIME_SERVICES_DATA, paddr, hole, EFI_MEMORY_WB|EFI_MEMORY_WB);
 						numbytes -= hole;
                                         	paddr += hole;
 			        		count++ ;
                                         	md += mdsize;
 					} else {
-						hole = PROMRESERVED_SIZE;
-                                        	build_mem_desc(md, EFI_RUNTIME_SERVICES_DATA, paddr, hole);
+						hole = 2*1024*1024;
+                                        	build_mem_desc(md, EFI_RUNTIME_SERVICES_DATA, paddr, hole, EFI_MEMORY_WB|EFI_MEMORY_WB);
+						numbytes -= hole;
+                                        	paddr += hole;
+			        		count++ ;
+                                        	md += mdsize;
+						hole = 2*1024*1024;
+                                        	build_mem_desc(md, EFI_RUNTIME_SERVICES_DATA, paddr, hole, EFI_MEMORY_UC);
 						numbytes -= hole;
                                         	paddr += hole;
 			        		count++ ;
                                         	md += mdsize;
 					}
                                 }
-                                build_mem_desc(md, EFI_CONVENTIONAL_MEMORY, paddr, numbytes);
+                                build_mem_desc(md, EFI_CONVENTIONAL_MEMORY, paddr, numbytes, EFI_MEMORY_WB|EFI_MEMORY_WB);
 
 			        md += mdsize ;
 			        count++ ;

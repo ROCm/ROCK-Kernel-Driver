@@ -237,7 +237,7 @@ sn_setup(char **cmdline_p)
 		       "%x.%02x\n", SN_SAL_MIN_MAJOR, SN_SAL_MIN_MINOR);
 		panic("PROM version too old\n");
 	}
-
+#ifdef CONFIG_PCI
 #ifdef CONFIG_IA64_SGI_SN2
 	{
 		extern void io_sh_swapper(int, int);
@@ -253,7 +253,7 @@ sn_setup(char **cmdline_p)
 		(void)get_master_baseio_nasid();
 	}
 #endif
-
+#endif /* CONFIG_PCI */
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec, &drift);
 	if (status != 0 || ticks_per_sec < 100000) {
 		printk(KERN_WARNING "unable to determine platform RTC clock frequency, guessing.\n");
@@ -349,7 +349,7 @@ sn_init_pdas(char **cmdline_p)
         for (cnode=0; cnode < numnodes; cnode++)
 		memcpy(nodepdaindr[cnode]->pernode_pdaindr, nodepdaindr, sizeof(nodepdaindr));
 
-
+#ifdef CONFIG_PCI
 	/*
 	 * Set up IO related platform-dependent nodepda fields.
 	 * The following routine actually sets up the hubinfo struct
@@ -359,6 +359,7 @@ sn_init_pdas(char **cmdline_p)
 		init_platform_nodepda(nodepdaindr[cnode], cnode);
 		bte_init_node (nodepdaindr[cnode], cnode);
 	}
+#endif
 }
 
 /**

@@ -2,7 +2,7 @@
 #define _ASM_IA64_FPU_H
 
 /*
- * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2002, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -57,8 +57,9 @@
 struct ia64_fpreg {
 	union {
 		unsigned long bits[2];
+		long double __dummy;	/* force 16-byte alignment */
 	} u;
-} __attribute__ ((aligned (16)));
+};
 
 # endif /* __ASSEMBLY__ */
 

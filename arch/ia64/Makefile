@@ -14,6 +14,7 @@ export AWK
 
 OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
+LDFLAGS_MODULE	+= -T arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
 EXTRA		:=
 
@@ -23,7 +24,7 @@ CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
-GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC))
+GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\
@@ -50,11 +51,8 @@ core-$(CONFIG_IA64_DIG) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/ arch/ia64/hp/common/ arch/ia64/hp/zx1/ \
 				   arch/ia64/hp/sim/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
-core-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/kernel/ \
-				   arch/ia64/sn/io/ \
-				   arch/ia64/sn/io/sn2/ \
-				   arch/ia64/sn/io/sn2/pcibr/ \
-				   arch/ia64/sn/kernel/sn2/
+core-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/
+
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/

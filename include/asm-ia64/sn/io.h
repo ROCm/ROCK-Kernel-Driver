@@ -3,8 +3,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
+ * Copyright (C) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (C) 2000 Ralf Baechle
- * Copyright (C) 2000-2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_IA64_SN_IO_H
 #define _ASM_IA64_SN_IO_H
@@ -77,5 +77,10 @@
 #include <asm/sn/sn2/shub.h>
 #include <asm/sn/sn2/shubio.h>
 #endif
+
+/*
+ * Used to ensure write ordering (like mb(), but for I/O space)
+ */
+extern void sn_mmiob(void);
 
 #endif /* _ASM_IA64_SN_IO_H */

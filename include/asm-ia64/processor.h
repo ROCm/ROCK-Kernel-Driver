@@ -379,7 +379,7 @@ extern unsigned long get_wchan (struct task_struct *p);
 static inline unsigned long
 ia64_get_kr (unsigned long regnum)
 {
-	unsigned long r;
+	unsigned long r = 0;
 
 	switch (regnum) {
 	      case 0: asm volatile ("mov %0=ar.k0" : "=r"(r)); break;
@@ -915,13 +915,13 @@ ia64_tpa (__u64 addr)
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define PREFETCH_STRIDE 256
 
-extern inline void
+static inline void
 prefetch (const void *x)
 {
          __asm__ __volatile__ ("lfetch [%0]" : : "r"(x));
 }
 
-extern inline void
+static inline void
 prefetchw (const void *x)
 {
 	__asm__ __volatile__ ("lfetch.excl [%0]" : : "r"(x));
