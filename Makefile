@@ -1123,8 +1123,11 @@ versioncheck:
 		| xargs $(PERL) -w scripts/checkversion.pl
 
 buildcheck:
-	$(PERL) scripts/reference_discarded.pl
-	$(PERL) scripts/reference_init.pl
+	$(PERL) $(src)/scripts/reference_discarded.pl
+	$(PERL) $(src)/scripts/reference_init.pl
+
+namespacecheck:
+	$(PERL) $(src)/scripts/namespace.pl
 
 endif #ifeq ($(config-targets),1)
 endif #ifeq ($(mixed-targets),1)
