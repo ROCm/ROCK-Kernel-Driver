@@ -24,21 +24,41 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 	return x;
 }
 
+/* gcc should generate this for open coded C now too. May be worth switching to 
+   it because inline assembly cannot be scheduled. -AK */
 static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
 {
-	__asm__("xchgb %b0,%h0"		/* swap bytes		*/ \
-		: "=q" (x) \
-		:  "0" (x)); \
+	__asm__("xchgb %b0,%h0"		/* swap bytes		*/
+		: "=q" (x)
+		:  "0" (x));
 		return x;
 }
 
+
+static inline __u64 ___arch__swab64(__u64 val) 
+{ 
+	union { 
+		struct { __u32 a,b; } s;
+		__u64 u;
+	} v;
+	v.u = val;
+#ifdef CONFIG_X86_BSWAP
+	asm("bswapl %0 ; bswapl %1 ; xchgl %0,%1" 
+	    : "=r" (v.s.a), "=r" (v.s.b) 
+	    : "0" (v.s.a), "1" (v.s.b)); 
+#else
+   v.s.a = ___arch__swab32(v.s.a); 
+	v.s.b = ___arch__swab32(v.s.b); 
+	asm("xchgl %0,%1" : "=r" (v.s.a), "=r" (v.s.b) : "0" (v.s.a), "1" (v.s.b));
+#endif
+	return v.u;	
+} 
+
+#define __arch__swab64(x) ___arch__swab64(x)
 #define __arch__swab32(x) ___arch__swab32(x)
 #define __arch__swab16(x) ___arch__swab16(x)
 
-#if !defined(__STRICT_ANSI__) || defined(__KERNEL__)
-#  define __BYTEORDER_HAS_U64__
-#  define __SWAB_64_THRU_32__
-#endif
+#define __BYTEORDER_HAS_U64__
 
 #endif /* __GNUC__ */
 
