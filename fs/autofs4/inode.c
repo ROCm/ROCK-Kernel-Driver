@@ -91,8 +91,8 @@ static void autofs4_put_super(struct super_block *sb)
 }
 
 static struct super_operations autofs4_sops = {
-	put_super:	autofs4_put_super,
-	statfs:		simple_statfs,
+	.put_super	= autofs4_put_super,
+	.statfs		= simple_statfs,
 };
 
 static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
