@@ -589,6 +589,7 @@ static int ffb_driver_kernel_context_switch_unlock(struct drm_device *dev)
 
 static void ffb_driver_register_fns(drm_device_t *dev)
 {
+	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
 	dev->fn_tbl.release = ffb_driver_release;
 	dev->fn_tbl.presetup = ffb_driver_presetup;
 	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;

@@ -131,19 +131,15 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 	return 0;
 }
 
-#if !__HAVE_DRIVER_FOPS_POLL
 /** No-op. */
 unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 {
 	return 0;
 }
-#endif
 
 
-#if !__HAVE_DRIVER_FOPS_READ
 /** No-op. */
 ssize_t DRM(read)(struct file *filp, char __user *buf, size_t count, loff_t *off)
 {
 	return 0;
 }
-#endif

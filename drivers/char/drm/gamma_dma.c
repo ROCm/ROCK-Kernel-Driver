@@ -935,6 +935,8 @@ static int gamma_driver_dma_quiescent(drm_device_t *dev)
 
 void gamma_driver_register_fns(drm_device_t *dev)
 {
+	DRM(fops).read = gamma_fops_read;
+	DRM(fops).poll = gamma_fops_poll;
 	dev->fn_tbl.preinit = gamma_driver_preinit;
 	dev->fn_tbl.pretakedown = gamma_driver_pretakedown;
 	dev->fn_tbl.dma_ready = gamma_driver_dma_ready;

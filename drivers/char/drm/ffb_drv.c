@@ -26,20 +26,6 @@
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	1
 
-#define DRIVER_FOPS						\
-static struct file_operations	DRM(fops) = {			\
-	.owner   		= THIS_MODULE,			\
-	.open	 		= DRM(open),			\
-	.flush	 		= DRM(flush),			\
-	.release 		= DRM(release),			\
-	.ioctl	 		= DRM(ioctl),			\
-	.mmap	 		= DRM(mmap),			\
-	.read	 		= DRM(read),			\
-	.fasync	 		= DRM(fasync),			\
-	.poll	 		= DRM(poll),			\
-	.get_unmapped_area	= ffb_get_unmapped_area,		\
-}
-
 #define DRIVER_COUNT_CARDS()	ffb_count_card_instances()
 
 /* For mmap customization */
@@ -243,11 +229,11 @@ static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
 	return NULL;
 }
 
-static unsigned long ffb_get_unmapped_area(struct file *filp,
-					   unsigned long hint,
-					   unsigned long len,
-					   unsigned long pgoff,
-					   unsigned long flags)
+unsigned long ffb_get_unmapped_area(struct file *filp,
+				    unsigned long hint,
+				    unsigned long len,
+				    unsigned long pgoff,
+				    unsigned long flags)
 {
 	drm_map_t *map = ffb_find_map(filp, pgoff << PAGE_SHIFT);
 	unsigned long addr = -ENOMEM;
