@@ -36,8 +36,10 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
+#define DRIVER_DESC	"Gunze AHL-51S touchscreen driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Gunze AHL-51S touchscreen driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -111,7 +113,7 @@ static void gunze_disconnect(struct serio *serio)
  * and if yes, registers it as an input device.
  */
 
-static void gunze_connect(struct serio *serio, struct serio_dev *dev)
+static void gunze_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct gunze *gunze;
 
@@ -142,7 +144,7 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 	gunze->dev.id.product = 0x0051;
 	gunze->dev.id.version = 0x0100;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(gunze);
 		return;
 	}
@@ -156,10 +158,14 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
  * The serio device structure.
  */
 
-static struct serio_dev gunze_dev = {
-	.interrupt =	gunze_interrupt,
-	.connect =	gunze_connect,
-	.disconnect =	gunze_disconnect,
+static struct serio_driver gunze_drv = {
+	.driver		= {
+		.name	= "gunze",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= gunze_interrupt,
+	.connect	= gunze_connect,
+	.disconnect	= gunze_disconnect,
 };
 
 /*
@@ -168,13 +174,13 @@ static struct serio_dev gunze_dev = {
 
 int __init gunze_init(void)
 {
-	serio_register_device(&gunze_dev);
+	serio_register_driver(&gunze_drv);
 	return 0;
 }
 
 void __exit gunze_exit(void)
 {
-	serio_unregister_device(&gunze_dev);
+	serio_unregister_driver(&gunze_drv);
 }
 
 module_init(gunze_init);

@@ -107,7 +107,7 @@ struct uart_sunzilog_port {
 	unsigned char			prev_status;
 
 #ifdef CONFIG_SERIO
-	struct serio			serio;
+	struct serio			*serio;
 	int				serio_open;
 #endif
 };
@@ -291,7 +291,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 		/* Stop-A is handled by drivers/char/keyboard.c now. */
 #ifdef CONFIG_SERIO
 		if (up->serio_open)
-			serio_interrupt(&up->serio, ch, 0, regs);
+			serio_interrupt(up->serio, ch, 0, regs);
 #endif
 	} else if (ZS_IS_MOUSE(up)) {
 		int ret = suncore_mouse_baud_detection(ch, is_break);
@@ -306,7 +306,7 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 		case 0:
 #ifdef CONFIG_SERIO
 			if (up->serio_open)
-				serio_interrupt(&up->serio, ch, 0, regs);
+				serio_interrupt(up->serio, ch, 0, regs);
 #endif
 			break;
 		};
@@ -1295,7 +1295,7 @@ static spinlock_t sunzilog_serio_lock = SPIN_LOCK_UNLOCKED;
 
 static int sunzilog_serio_write(struct serio *serio, unsigned char ch)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunzilog_serio_lock, flags);
@@ -1309,7 +1309,7 @@ static int sunzilog_serio_write(struct serio *serio, unsigned char ch)
 
 static int sunzilog_serio_open(struct serio *serio)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 	int ret;
 
@@ -1326,7 +1326,7 @@ static int sunzilog_serio_open(struct serio *serio)
 
 static void sunzilog_serio_close(struct serio *serio)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunzilog_serio_lock, flags);
@@ -1545,33 +1545,45 @@ static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channe
 	up->curregs[R15] = BRKIE;
 	brg = BPS_TO_BRG(baud, ZS_CLOCK / ZS_CLOCK_DIVISOR);
 	sunzilog_convert_to_zs(up, up->cflag, 0, brg);
-
-#ifdef CONFIG_SERIO
-	memset(&up->serio, 0, sizeof(up->serio));
-
-	up->serio.driver = up;
-
-	up->serio.type = SERIO_RS232;
-	if (channel == KEYBOARD_LINE) {
-		up->serio.type |= SERIO_SUNKBD;
-		up->serio.name = "zskbd";
-	} else {
-		up->serio.type |= (SERIO_SUN | (1 << 16));
-		up->serio.name = "zsms";
-	}
-	up->serio.phys = (channel == KEYBOARD_LINE ?
-			  "zs/serio0" : "zs/serio1");
-
-	up->serio.write = sunzilog_serio_write;
-	up->serio.open = sunzilog_serio_open;
-	up->serio.close = sunzilog_serio_close;
-
-	serio_register_port(&up->serio);
-#endif
-
 	sunzilog_set_mctrl(&up->port, TIOCM_DTR | TIOCM_RTS);
 	__sunzilog_startup(up);
 }
+
+#ifdef CONFIG_SERIO
+static void __init sunzilog_register_serio(struct uart_sunzilog_port *up, int channel)
+{
+	struct serio *serio;
+
+	up->serio = serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+
+		memset(serio, 0, sizeof(serio));
+
+		serio->port_data = up;
+
+		serio->type = SERIO_RS232;
+		if (channel == KEYBOARD_LINE) {
+			serio->type |= SERIO_SUNKBD;
+			strlcpy(serio->name, "zskbd", sizeof(serio->name));
+		} else {
+			serio->type |= (SERIO_SUN | (1 << 16));
+			strlcpy(serio->name, "zsms", sizeof(serio->name));
+		}
+		strlcpy(serio->phys,
+			(channel == KEYBOARD_LINE ? "zs/serio0" : "zs/serio1"),
+			sizeof(serio->phys));
+
+		serio->write = sunzilog_serio_write;
+		serio->open = sunzilog_serio_open;
+		serio->close = sunzilog_serio_close;
+
+		serio_register_port(serio);
+	} else {
+		printk(KERN_WARNING "zs%d: not enough memory for serio port\n",
+			channel);
+	}
+}
+#endif
 
 static void __init sunzilog_init_hw(void)
 {
@@ -1615,6 +1627,11 @@ static void __init sunzilog_init_hw(void)
 		}
 
 		spin_unlock_irqrestore(&up->port.lock, flags);
+
+#ifdef CONFIG_SERIO
+		if (i == KEYBOARD_LINE || i == MOUSE_LINE)
+			sunzilog_register_serio(up, i);
+#endif
 	}
 }
 
@@ -1732,10 +1749,15 @@ static void __exit sunzilog_exit(void)
 	for (i = 0; i < NUM_CHANNELS; i++) {
 		struct uart_sunzilog_port *up = &sunzilog_port_table[i];
 
-		if (ZS_IS_KEYB(up) || ZS_IS_MOUSE(up))
-			continue;
-
-		uart_remove_one_port(&sunzilog_reg, &up->port);
+		if (ZS_IS_KEYB(up) || ZS_IS_MOUSE(up)) {
+#ifdef CONFIG_SERIO
+			if (up->serio) {
+				serio_unregister_port(up->serio);
+				up->serio = NULL;
+			}
+#endif
+		} else
+			uart_remove_one_port(&sunzilog_reg, &up->port);
 	}
 
 	uart_unregister_driver(&sunzilog_reg);

@@ -33,6 +33,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/serio.h>
+#include <linux/err.h>
 
 #include <asm/irq.h>
 #include <asm/hardware.h>
@@ -43,6 +44,9 @@
 MODULE_AUTHOR("Vojtech Pavlik, Russell King");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
+
+static struct serio *rpckbd_port;
+static struct platform_device *rpckbd_device;
 
 static int rpckbd_write(struct serio *port, unsigned char val)
 {
@@ -101,25 +105,49 @@ static void rpckbd_close(struct serio *port)
 	free_irq(IRQ_KEYBOARDTX, port);
 }
 
-static struct serio rpckbd_port =
+/*
+ * Allocate and initialize serio structure for subsequent registration
+ * with serio core.
+ */
+
+static struct serio * __init rpckbd_allocate_port(void)
 {
-	.type	= SERIO_8042,
-	.open	= rpckbd_open,
-	.close	= rpckbd_close,
-	.write	= rpckbd_write,
-	.name	= "RiscPC PS/2 kbd port",
-	.phys	= "rpckbd/serio0",
-};
+	struct serio *serio;
+
+	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (serio) {
+		memset(serio, 0, sizeof(struct serio));
+		serio->type		= SERIO_8042;
+		serio->write		= rpckbd_write;
+		serio->open		= rpckbd_open;
+		serio->close		= rpckbd_close;
+		serio->dev.parent	= &rpckbd_device->dev;
+		strlcpy(serio->name, "RiscPC PS/2 kbd port", sizeof(serio->name));
+		strlcpy(serio->phys, "rpckbd/serio0", sizeof(serio->phys));
+	}
+
+	return serio;
+}
 
 static int __init rpckbd_init(void)
 {
-	serio_register_port(&rpckbd_port);
+	rpckbd_device = platform_device_register_simple("rpckbd", -1, NULL, 0);
+	if (IS_ERR(rpckbd_device))
+		return PTR_ERR(rpckbd_device);
+
+	if (!(rpckbd_port = rpckbd_allocate_port())) {
+		platform_device_unregister(rpckbd_device);
+		return -ENOMEM;
+	}
+
+	serio_register_port(rpckbd_port);
 	return 0;
 }
 
 static void __exit rpckbd_exit(void)
 {
-	serio_unregister_port(&rpckbd_port);
+	serio_unregister_port(rpckbd_port);
+	platform_device_unregister(rpckbd_device);
 }
 
 module_init(rpckbd_init);

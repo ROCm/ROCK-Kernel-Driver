@@ -56,7 +56,6 @@ typedef struct siginfo {
 			int _status;		/* exit code */
 			clock_t _utime;
 			clock_t _stime;
-			struct rusage _rusage;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */

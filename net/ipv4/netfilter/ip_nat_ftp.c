@@ -297,7 +297,7 @@ static int __init init(void)
 	char *tmpname;
 
 	if (ports_c == 0)
-		ports[ports_c] = FTP_PORT;
+		ports[ports_c++] = FTP_PORT;
 
 	for (i = 0; i < ports_c; i++) {
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;

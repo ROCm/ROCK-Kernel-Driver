@@ -22,8 +22,10 @@
 #include "synaptics.h"
 #include "logips2pp.h"
 
+#define DRIVER_DESC	"PS/2 mouse driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("PS/2 mouse driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 static char *psmouse_proto;
@@ -142,36 +144,66 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 			printk(KERN_WARNING "psmouse.c: bad data from KBC -%s%s\n",
 				flags & SERIO_TIMEOUT ? " timeout" : "",
 				flags & SERIO_PARITY ? " bad parity" : "");
-		if (psmouse->acking) {
-			psmouse->ack = -1;
-			psmouse->acking = 0;
-		}
-		psmouse->pktcnt = 0;
+		psmouse->nak = 1;
+		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+		clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
+		wake_up_interruptible(&psmouse->wait);
 		goto out;
 	}
 
-	if (psmouse->acking) {
+	if (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags)) {
 		switch (data) {
 			case PSMOUSE_RET_ACK:
-				psmouse->ack = 1;
+				psmouse->nak = 0;
 				break;
+
 			case PSMOUSE_RET_NAK:
-				psmouse->ack = -1;
+				psmouse->nak = 1;
 				break;
+
+			/*
+			 * Workaround for mice which don't ACK the Get ID command.
+			 * These are valid mouse IDs that we recognize.
+			 */
+			case 0x00:
+			case 0x03:
+			case 0x04:
+				if (test_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags)) {
+					psmouse->nak = 0;
+					break;
+				}
+				/* Fall through */
 			default:
-				psmouse->ack = 1;	/* Workaround for mice which don't ACK the Get ID command */
-				if (psmouse->cmdcnt)
-					psmouse->cmdbuf[--psmouse->cmdcnt] = data;
-				break;
+				goto out;
 		}
-		psmouse->acking = 0;
+
+		if (!psmouse->nak && psmouse->cmdcnt) {
+			set_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			set_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+		}
+		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+		wake_up_interruptible(&psmouse->wait);
+
+		if (data == PSMOUSE_RET_ACK || data == PSMOUSE_RET_NAK)
+			goto out;
+	}
+
+	if (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags)) {
+		if (psmouse->cmdcnt)
+			psmouse->cmdbuf[--psmouse->cmdcnt] = data;
+
+		if (test_and_clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags) && psmouse->cmdcnt)
+			wake_up_interruptible(&psmouse->wait);
+
+		if (!psmouse->cmdcnt) {
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			wake_up_interruptible(&psmouse->wait);
+		}
 		goto out;
 	}
 
-	if (psmouse->cmdcnt) {
-		psmouse->cmdbuf[--psmouse->cmdcnt] = data;
+	if (psmouse->state == PSMOUSE_INITIALIZING)
 		goto out;
-	}
 
 	if (psmouse->state == PSMOUSE_ACTIVATED &&
 	    psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
@@ -238,78 +270,96 @@ out:
  * psmouse_sendbyte() sends a byte to the mouse, and waits for acknowledge.
  * It doesn't handle retransmission, though it could - because when there would
  * be need for retransmissions, the mouse has to be replaced anyway.
+ *
+ * psmouse_sendbyte() can only be called from a process context
  */
 
 static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 {
-	int timeout = 10000; /* 100 msec */
-	psmouse->ack = 0;
-	psmouse->acking = 1;
+	psmouse->nak = 1;
+	set_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 
-	if (serio_write(psmouse->serio, byte)) {
-		psmouse->acking = 0;
-		return -1;
-	}
+	if (serio_write(psmouse->serio, byte) == 0)
+		wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags),
+				msecs_to_jiffies(200));
 
-	while (!psmouse->ack && timeout--) udelay(10);
-
-	return -(psmouse->ack <= 0);
+	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+	return -psmouse->nak;
 }
 
 /*
  * psmouse_command() sends a command and its parameters to the mouse,
  * then waits for the response and puts it in the param array.
+ *
+ * psmouse_command() can only be called from a process context
  */
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 {
-	int timeout = 500000; /* 500 msec */
+	int timeout;
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
+	int rc = -1;
 	int i;
+
+	timeout = msecs_to_jiffies(command == PSMOUSE_CMD_RESET_BAT ? 4000 : 500);
+
+	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+	if (command == PSMOUSE_CMD_GETID)
+		set_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags);
+
+	if (receive && param)
+		for (i = 0; i < receive; i++)
+			psmouse->cmdbuf[(receive - 1) - i] = param[i];
 
 	psmouse->cmdcnt = receive;
 
-	if (command == PSMOUSE_CMD_RESET_BAT)
-                timeout = 4000000; /* 4 sec */
-
-	/* initialize cmdbuf with preset values from param */
-	if (receive)
-	   for (i = 0; i < receive; i++)
-		psmouse->cmdbuf[(receive - 1) - i] = param[i];
-
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
-			return (psmouse->cmdcnt = 0) - 1;
+			goto out;
 
 	for (i = 0; i < send; i++)
 		if (psmouse_sendbyte(psmouse, param[i]))
-			return (psmouse->cmdcnt = 0) - 1;
+			goto out;
 
-	while (psmouse->cmdcnt && timeout--) {
+	timeout = wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags), timeout);
 
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
-				timeout > 100000) /* do not run in a endless loop */
-			timeout = 100000; /* 1 sec */
+	if (psmouse->cmdcnt && timeout > 0) {
+		if (command == PSMOUSE_CMD_RESET_BAT && jiffies_to_msecs(timeout) > 100)
+			timeout = msecs_to_jiffies(100);
 
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_GETID &&
-		    psmouse->cmdbuf[1] != 0xab && psmouse->cmdbuf[1] != 0xac) {
+		if (command == PSMOUSE_CMD_GETID &&
+		    psmouse->cmdbuf[receive - 1] != 0xab && psmouse->cmdbuf[receive - 1] != 0xac) {
+			/*
+			 * Device behind the port is not a keyboard
+			 * so we don't need to wait for the 2nd byte
+			 * of ID response.
+			 */
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
 			psmouse->cmdcnt = 0;
-			break;
 		}
 
-		udelay(1);
+		wait_event_interruptible_timeout(psmouse->wait,
+				!test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags), timeout);
 	}
 
-	for (i = 0; i < receive; i++)
-		param[i] = psmouse->cmdbuf[(receive - 1) - i];
+	if (param)
+		for (i = 0; i < receive; i++)
+			param[i] = psmouse->cmdbuf[(receive - 1) - i];
 
-	if (psmouse->cmdcnt)
-		return (psmouse->cmdcnt = 0) - 1;
+	if (psmouse->cmdcnt && (command != PSMOUSE_CMD_RESET_BAT || psmouse->cmdcnt != 1))
+		goto out;
 
-	return 0;
+	rc = 0;
+
+out:
+	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+	clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+	clear_bit(PSMOUSE_FLAG_WAITID, &psmouse->flags);
+	return rc;
 }
-
 
 /*
  * psmouse_sliced_command() sends an extended PS/2 command to the mouse
@@ -393,6 +443,8 @@ static int intellimouse_detect(struct psmouse *psmouse)
 static int im_explorer_detect(struct psmouse *psmouse)
 {
 	unsigned char param[2];
+
+	intellimouse_detect(psmouse);
 
 	param[0] = 200;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
@@ -598,6 +650,21 @@ static void psmouse_initialize(struct psmouse *psmouse)
 }
 
 /*
+ * psmouse_set_state() sets new psmouse state and resets all flags and
+ * counters while holding serio lock so fighting with interrupt handler
+ * is not a concern.
+ */
+
+static void psmouse_set_state(struct psmouse *psmouse, enum psmouse_state new_state)
+{
+	serio_pause_rx(psmouse->serio);
+	psmouse->state = new_state;
+	psmouse->pktcnt = psmouse->cmdcnt = psmouse->out_of_sync = 0;
+	psmouse->flags = 0;
+	serio_continue_rx(psmouse->serio);
+}
+
+/*
  * psmouse_activate() enables the mouse so that we get motion reports from it.
  */
 
@@ -606,8 +673,23 @@ static void psmouse_activate(struct psmouse *psmouse)
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
 		printk(KERN_WARNING "psmouse.c: Failed to enable mouse on %s\n", psmouse->serio->phys);
 
-	psmouse->state = PSMOUSE_ACTIVATED;
+	psmouse_set_state(psmouse, PSMOUSE_ACTIVATED);
 }
+
+
+/*
+ * psmouse_deactivate() puts the mouse into poll mode so that we don't get motion
+ * reports from it unless we explicitely request it.
+ */
+
+static void psmouse_deactivate(struct psmouse *psmouse)
+{
+	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_DISABLE))
+		printk(KERN_WARNING "psmouse.c: Failed to deactivate mouse on %s\n", psmouse->serio->phys);
+
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+}
+
 
 /*
  * psmouse_cleanup() resets the mouse into power-on state.
@@ -626,22 +708,21 @@ static void psmouse_cleanup(struct serio *serio)
 
 static void psmouse_disconnect(struct serio *serio)
 {
-	struct psmouse *psmouse = serio->private;
+	struct psmouse *psmouse, *parent;
 
-	psmouse->state = PSMOUSE_CMD_MODE;
+	psmouse = serio->private;
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
-	if (psmouse->ptport) {
-		if (psmouse->ptport->deactivate)
-			psmouse->ptport->deactivate(psmouse);
-		__serio_unregister_port(&psmouse->ptport->serio); /* we have serio_sem */
-		kfree(psmouse->ptport);
-		psmouse->ptport = NULL;
+	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU) {
+		parent = serio->parent->private;
+		if (parent->pt_deactivate)
+			parent->pt_deactivate(parent);
 	}
 
 	if (psmouse->disconnect)
 		psmouse->disconnect(psmouse);
 
-	psmouse->state = PSMOUSE_IGNORE;
+	psmouse_set_state(psmouse, PSMOUSE_IGNORE);
 
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
@@ -652,39 +733,49 @@ static void psmouse_disconnect(struct serio *serio)
  * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
-static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
+static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 {
-	struct psmouse *psmouse;
+	struct psmouse *psmouse, *parent = NULL;
 
 	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
 	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
 		return;
 
+	/*
+	 * If this is a pass-through port deactivate parent so the device
+	 * connected to this port can be successfully identified
+	 */
+	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU) {
+		parent = serio->parent->private;
+		psmouse_deactivate(parent);
+	}
+
 	if (!(psmouse = kmalloc(sizeof(struct psmouse), GFP_KERNEL)))
-		return;
+		goto out;
 
 	memset(psmouse, 0, sizeof(struct psmouse));
 
+	init_waitqueue_head(&psmouse->wait);
 	init_input_dev(&psmouse->dev);
 	psmouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
-	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
+	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
 
 	serio->private = psmouse;
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, drv)) {
 		kfree(psmouse);
 		serio->private = NULL;
-		return;
+		goto out;
 	}
 
 	if (psmouse_probe(psmouse) < 0) {
 		serio_close(serio);
 		kfree(psmouse);
 		serio->private = NULL;
-		return;
+		goto out;
 	}
 
 	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
@@ -711,63 +802,88 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	printk(KERN_INFO "input: %s on %s\n", psmouse->devname, serio->phys);
 
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+
 	psmouse_initialize(psmouse);
 
-	if (psmouse->ptport) {
-		printk(KERN_INFO "serio: %s port at %s\n", psmouse->ptport->serio.name, psmouse->phys);
-		__serio_register_port(&psmouse->ptport->serio); /* we have serio_sem */
-		if (psmouse->ptport->activate)
-			psmouse->ptport->activate(psmouse);
+	if (parent && parent->pt_activate)
+		parent->pt_activate(parent);
+
+	if (serio->child) {
+		/*
+		 * Nothing to be done here, serio core will detect that
+		 * the driver set serio->child and will register it for us.
+		 */
+		printk(KERN_INFO "serio: %s port at %s\n", serio->child->name, psmouse->phys);
 	}
 
 	psmouse_activate(psmouse);
+
+out:
+	/* If this is a pass-through port the parent awaits to be activated */
+	if (parent)
+		psmouse_activate(parent);
 }
 
 
 static int psmouse_reconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
-	struct serio_dev *dev = serio->dev;
+	struct psmouse *parent = NULL;
+	struct serio_driver *drv = serio->drv;
+	int rc = -1;
 
-	if (!dev || !psmouse) {
+	if (!drv || !psmouse) {
 		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
 
-	psmouse->state = PSMOUSE_CMD_MODE;
-	psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = psmouse->out_of_sync = 0;
+	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU) {
+		parent = serio->parent->private;
+		psmouse_deactivate(parent);
+	}
+
+	psmouse_set_state(psmouse, PSMOUSE_INITIALIZING);
+
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
-			return -1;
+			goto out;
 	} else if (psmouse_probe(psmouse) < 0 ||
 		   psmouse->type != psmouse_extensions(psmouse, psmouse_max_proto, 0))
-		return -1;
+		goto out;
 
 	/* ok, the device type (and capabilities) match the old one,
 	 * we can continue using it, complete intialization
 	 */
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
+
 	psmouse_initialize(psmouse);
 
-	if (psmouse->ptport) {
-       		if (psmouse_reconnect(&psmouse->ptport->serio)) {
-			__serio_unregister_port(&psmouse->ptport->serio);
-			__serio_register_port(&psmouse->ptport->serio);
-			if (psmouse->ptport->activate)
-				psmouse->ptport->activate(psmouse);
-		}
-	}
+	if (parent && parent->pt_activate)
+		parent->pt_activate(parent);
 
 	psmouse_activate(psmouse);
-	return 0;
+	rc = 0;
+
+out:
+	/* If this is a pass-through port the parent waits to be activated */
+	if (parent)
+		psmouse_activate(parent);
+
+	return rc;
 }
 
 
-static struct serio_dev psmouse_dev = {
-	.interrupt =	psmouse_interrupt,
-	.connect =	psmouse_connect,
-	.reconnect =	psmouse_reconnect,
-	.disconnect =	psmouse_disconnect,
-	.cleanup =	psmouse_cleanup,
+static struct serio_driver psmouse_drv = {
+	.driver		= {
+		.name	= "psmouse",
+	},
+	.description	= DRIVER_DESC,
+	.interrupt	= psmouse_interrupt,
+	.connect	= psmouse_connect,
+	.reconnect	= psmouse_reconnect,
+	.disconnect	= psmouse_disconnect,
+	.cleanup	= psmouse_cleanup,
 };
 
 static inline void psmouse_parse_proto(void)
@@ -787,13 +903,13 @@ static inline void psmouse_parse_proto(void)
 int __init psmouse_init(void)
 {
 	psmouse_parse_proto();
-	serio_register_device(&psmouse_dev);
+	serio_register_driver(&psmouse_drv);
 	return 0;
 }
 
 void __exit psmouse_exit(void)
 {
-	serio_unregister_device(&psmouse_dev);
+	serio_unregister_driver(&psmouse_drv);
 }
 
 module_init(psmouse_init);

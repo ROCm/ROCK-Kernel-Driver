@@ -480,6 +480,9 @@ static int DRM(probe)(struct pci_dev *pdev)
 	if (DRM(numdevs) >= MAX_DEVICES)
 		return -ENODEV;
 
+	if ((retcode=pci_enable_device(pdev)))
+		return retcode;
+
 	dev = &(DRM(device)[DRM(numdevs)]);
 
 	memset( (void *)dev, 0, sizeof(*dev) );
@@ -785,7 +788,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 
 		add_wait_queue( &dev->lock.lock_queue, &entry );
 		for (;;) {
-			current->state = TASK_INTERRUPTIBLE;
+			__set_current_state(TASK_INTERRUPTIBLE);
 			if ( !dev->lock.hw_lock ) {
 				/* Device has been unregistered */
 				retcode = -EINTR;
@@ -805,7 +808,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 				break;
 			}
 		}
-		current->state = TASK_RUNNING;
+		__set_current_state(TASK_RUNNING);
 		remove_wait_queue( &dev->lock.lock_queue, &entry );
 		if( !retcode ) {
 			if (dev->fn_tbl.release)
@@ -985,7 +988,7 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 
 	add_wait_queue( &dev->lock.lock_queue, &entry );
 	for (;;) {
-		current->state = TASK_INTERRUPTIBLE;
+		__set_current_state(TASK_INTERRUPTIBLE);
 		if ( !dev->lock.hw_lock ) {
 			/* Device has been unregistered */
 			ret = -EINTR;
@@ -1006,7 +1009,7 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 			break;
 		}
 	}
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue( &dev->lock.lock_queue, &entry );
 
 	sigemptyset( &dev->sigmask );

@@ -94,13 +94,14 @@ static Scsi_Host_Template sis_sht = {
 
 static struct ata_port_operations sis_ops = {
 	.port_disable		= ata_port_disable,
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.check_status		= ata_check_status_pio,
-	.exec_command		= ata_exec_command_pio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
+	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
-	.bmdma_setup            = ata_bmdma_setup_pio,
-	.bmdma_start            = ata_bmdma_start_pio,
+	.bmdma_setup            = ata_bmdma_setup,
+	.bmdma_start            = ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -110,6 +111,16 @@ static struct ata_port_operations sis_ops = {
 	.scr_write		= sis_scr_write,
 	.port_start		= ata_port_start,
 	.port_stop		= ata_port_stop,
+};
+
+static struct ata_port_info sis_port_info = {
+	.sht		= &sis_sht,
+	.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
+			  ATA_FLAG_NO_LEGACY,
+	.pio_mask	= 0x1f,
+	.mwdma_mask	= 0x7,
+	.udma_mask	= 0x7f,
+	.port_ops	= &sis_ops,
 };
 
 
@@ -185,6 +196,7 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct ata_probe_ent *probe_ent = NULL;
 	int rc;
 	u32 genctl;
+	struct ata_port_info *ppi;
 
 	rc = pci_enable_device(pdev);
 	if (rc)
@@ -201,19 +213,12 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
+	ppi = &sis_port_info;
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
 	if (!probe_ent) {
 		rc = -ENOMEM;
 		goto err_out_regions;
 	}
-
-	memset(probe_ent, 0, sizeof(*probe_ent));
-	probe_ent->pdev = pdev;
-	INIT_LIST_HEAD(&probe_ent->node);
-
-	probe_ent->sht = &sis_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
-				ATA_FLAG_NO_LEGACY;
 
 	/* check and see if the SCRs are in IO space or PCI cfg space */
 	pci_read_config_dword(pdev, SIS_GENCTL, &genctl);
@@ -231,32 +236,12 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		probe_ent->host_flags |= SIS_FLAG_CFGSCR;
 	}
 
-	probe_ent->pio_mask = 0x1f;
-	probe_ent->mwdma_mask = 0x7;
-	probe_ent->udma_mask = 0x7f;
-	probe_ent->port_ops = &sis_ops;
-
-	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
-	ata_std_ports(&probe_ent->port[0]);
-	probe_ent->port[0].ctl_addr =
-		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
-	probe_ent->port[0].bmdma_addr = pci_resource_start(pdev, 4);
-	if (!(probe_ent->host_flags & SIS_FLAG_CFGSCR))
+	if (!(probe_ent->host_flags & SIS_FLAG_CFGSCR)) {
 		probe_ent->port[0].scr_addr =
 			pci_resource_start(pdev, SIS_SCR_PCI_BAR);
-
-	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
-	ata_std_ports(&probe_ent->port[1]);
-	probe_ent->port[1].ctl_addr =
-		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
-	probe_ent->port[1].bmdma_addr = pci_resource_start(pdev, 4) + 8;
-	if (!(probe_ent->host_flags & SIS_FLAG_CFGSCR))
 		probe_ent->port[1].scr_addr =
 			pci_resource_start(pdev, SIS_SCR_PCI_BAR) + 64;
-
-	probe_ent->n_ports = 2;
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = SA_SHIRQ;
+	}
 
 	pci_set_master(pdev);
 	pci_enable_intx(pdev);
