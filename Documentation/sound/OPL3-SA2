@@ -21,7 +21,7 @@ Up until recently (December 2000), I'd thought the 719 to be a
 different chipset, the OPL3-SAx.  After an email exhange with
 Yamaha, however, it turns out that the 719 is just a re-badged
 715, and the chipsets are identical.  The chipset detection code
-has been updated to refkect this.
+has been updated to reflect this.
 
 Anyways, all of these chipsets implement the following devices:
 

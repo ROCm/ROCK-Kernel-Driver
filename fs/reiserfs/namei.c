@@ -72,7 +72,7 @@ static int bin_search_in_dir_item (struct reiserfs_dir_entry * de, loff_t off)
 // comment?  maybe something like set de to point to what the path points to?
 static inline void set_de_item_location (struct reiserfs_dir_entry * de, struct path * path)
 {
-    de->de_bh = get_bh (path);
+    de->de_bh = get_last_bh (path);
     de->de_ih = get_ih (path);
     de->de_deh = B_I_DEH (de->de_bh, de->de_ih);
     de->de_item_num = PATH_LAST_POSITION (path);

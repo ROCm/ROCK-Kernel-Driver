@@ -3,11 +3,6 @@
 
 #include <linux/list.h>
 
-/* these are used to keep track of the pages that need
-** flushing before the current transaction can commit
-*/
-struct reiserfs_page_list ;
-
 struct reiserfs_inode_info {
   __u32 i_key [4];/* key is still 4 32 bit integers */
   
@@ -21,21 +16,6 @@ struct reiserfs_inode_info {
   int i_pack_on_close ; // file might need tail packing on close 
 
   __u32 i_first_direct_byte; // offset of first byte stored in direct item.
-
-  /* pointer to the page that must be flushed before 
-  ** the current transaction can commit.
-  **
-  ** this pointer is only used when the tail is converted back into
-  ** a direct item, or the file is deleted
-  */
-  struct reiserfs_page_list *i_converted_page ;
-
-  /* we save the id of the transaction when we did the direct->indirect
-  ** conversion.  That allows us to flush the buffers to disk
-  ** without having to update this inode to zero out the converted
-  ** page variable
-  */
-  int i_conversion_trans_id ;
 
 				/* My guess is this contains the first
                                    unused block of a sequence of

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.13 05/21/01 00:48:24 cort
+# BK Id: SCCS/s.Makefile 1.18 07/07/01 13:37:26 paulus
 #
 # This file is included by the global makefile so that you can add your own
 # architecture-specific flags and dependencies. Remember to do have actions
@@ -52,12 +52,10 @@ endif
 
 ARCH_SUBDIRS = arch/ppc/kernel arch/ppc/mm arch/ppc/lib
 SUBDIRS := $(SUBDIRS) $(ARCH_SUBDIRS)
-ARCHIVES := arch/ppc/kernel/kernel.o arch/ppc/mm/mm.o arch/ppc/lib/lib.o $(ARCHIVES)
 CORE_FILES := arch/ppc/kernel/kernel.o arch/ppc/mm/mm.o arch/ppc/lib/lib.o $(CORE_FILES)
 
 ifdef CONFIG_MATH_EMULATION
 SUBDIRS += arch/ppc/math-emu
-ARCHIVES += arch/ppc/math-emu/math-emu.o
 CORE_FILES += arch/ppc/math-emu/math-emu.o
 endif
 
@@ -80,7 +78,6 @@ endif
 
 ifdef CONFIG_APUS
 SUBDIRS += arch/ppc/amiga
-ARCHIVES += arch/ppc/amiga/amiga.o
 CORE_FILES += arch/ppc/amiga/amiga.o
 endif
 
@@ -103,4 +100,4 @@ archclean:
 archmrproper:
 
 archdep:
-	$(MAKEBOOT) dep
+	$(MAKEBOOT) fastdep

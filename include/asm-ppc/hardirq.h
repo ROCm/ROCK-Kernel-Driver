@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.hardirq.h 1.10 06/09/01 22:16:38 paulus
+ * BK Id: SCCS/s.hardirq.h 1.12 07/10/01 11:26:58 trini
  */
 #ifdef __KERNEL__
 #ifndef __ASM_HARDIRQ_H
@@ -19,6 +19,7 @@ typedef struct {
 	unsigned int __local_irq_count;
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
+	struct task_struct * __ksoftirqd_task;
 	unsigned int __last_jiffy_stamp;
 } ____cacheline_aligned irq_cpustat_t;
 

@@ -227,7 +227,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 	if (found_page)
 		goto out_free_swap;
 
-	new_page = alloc_page(GFP_USER);
+	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		goto out_free_swap;	/* Out of memory */
 

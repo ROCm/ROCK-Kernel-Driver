@@ -74,11 +74,11 @@ static int _cvt(unsigned long val, char *buf, long radix, char *digits);
 void _vprintk(void(*)(const char), const char *, va_list);
 
 #if defined(CONFIG_SERIAL_CONSOLE)
-struct NS16550 *com_port;
+extern unsigned long com_port;
 
-int serial_tstc(volatile struct NS16550 *);
-unsigned char serial_getc(volatile struct NS16550 *);
-void serial_putc(volatile struct NS16550 *, unsigned char);
+extern int serial_tstc(volatile unsigned long com_port);
+extern unsigned char serial_getc(volatile unsigned long com_port);
+extern void serial_putc(volatile unsigned long com_port, unsigned char c);
 #endif
 
 void pause(void)

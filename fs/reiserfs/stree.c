@@ -436,7 +436,7 @@ inline void decrement_bcount(
             ) { 
   if ( p_s_bh ) {
     if ( atomic_read (&(p_s_bh->b_count)) ) {
-      atomic_dec (&(p_s_bh->b_count));
+      put_bh(p_s_bh) ;
       return;
     }
     reiserfs_panic(NULL, "PAP-5070: decrement_bcount: trying to free free buffer %b", p_s_bh);
@@ -1032,7 +1032,7 @@ static inline int prepare_for_direntry_item (struct path * path,
     }
     
     /* Cut one record from the directory item. */
-    *cut_size = -(DEH_SIZE + entry_length (get_bh (path), le_ih, pos_in_item (path)));
+    *cut_size = -(DEH_SIZE + entry_length (get_last_bh (path), le_ih, pos_in_item (path)));
     return M_CUT; 
 }
 
@@ -1192,13 +1192,21 @@ static char  prepare_for_delete_or_cut(
 		/* Search for the buffer in cache. */
 		p_s_un_bh = get_hash_table(p_s_sb->s_dev, *p_n_unfm_pointer, n_blk_size);
 
-		if (p_s_un_bh && buffer_locked(p_s_un_bh)) {
-		  __wait_on_buffer(p_s_un_bh) ;
-		  if ( item_moved (&s_ih, p_s_path) )  {
-		      need_research = 1;
-		      brelse(p_s_un_bh) ;
-		      break ;
-		  }
+		if (p_s_un_bh) {
+		    mark_buffer_clean(p_s_un_bh) ;
+		    if (buffer_locked(p_s_un_bh)) {
+		        __wait_on_buffer(p_s_un_bh) ;
+		    }
+		    /* even if the item moves, the block number of the
+		    ** unformatted node we want to cut won't.  So, it was
+		    ** safe to clean the buffer here, this block _will_
+		    ** get freed during this call to prepare_for_delete_or_cut
+		    */
+		    if ( item_moved (&s_ih, p_s_path) )  {
+		        need_research = 1;
+		        brelse(p_s_un_bh) ;
+		        break ;
+		    }
 		}
 		if ( p_s_un_bh && block_in_use (p_s_un_bh)) {
 		    /* Block is locked or held more than by one holder and by
@@ -1243,30 +1251,7 @@ static char  prepare_for_delete_or_cut(
 		if ( item_moved (&s_ih, p_s_path) )  {
 		    need_research = 1;
 		    break ;
-#if 0
-		    reiserfs_prepare_for_journal(p_s_sb, 
-		                                 PATH_PLAST_BUFFER(p_s_path),
-						 1) ;
-		    if ( comp_items(&s_ih, p_s_path) )  {
-		      reiserfs_restore_prepared_buffer(p_s_sb, 
-		                               PATH_PLAST_BUFFER(p_s_path)) ;
-		      brelse(p_s_un_bh);
-		      break;
-		    }
-		    *p_n_unfm_pointer = 0;
-		    journal_mark_dirty (th,p_s_sb,PATH_PLAST_BUFFER(p_s_path));
-
-		    reiserfs_free_block(th, p_s_sb, block_addr);
-		    if (p_s_un_bh) {
-			mark_buffer_clean (p_s_un_bh);
-			brelse (p_s_un_bh);
-		    }
-		    if ( comp_items(&s_ih, p_s_path) )  {
-		      break ;
-		    }
-#endif
 		}
-
 	    }
 
 	    /* a trick.  If the buffer has been logged, this
@@ -1560,6 +1545,17 @@ void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inod
         reiserfs_warning("clm-4001: deleting inode with link count==%d\n", inode->i_nlink) ;
     }
 #endif
+#if defined( USE_INODE_GENERATION_COUNTER )
+    if( !old_format_only ( th -> t_super ) )
+      {
+       __u32 *inode_generation;
+       
+       inode_generation = 
+         &th -> t_super -> u.reiserfs_sb.s_rs -> s_inode_generation;
+       *inode_generation = cpu_to_le32( le32_to_cpu( *inode_generation ) + 1 );
+      }
+/* USE_INODE_GENERATION_COUNTER */
+#endif
     reiserfs_delete_solid_item (th, INODE_PKEY (inode));
 }
 
@@ -1793,11 +1789,11 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     
     do_balance(&s_cut_balance, NULL, NULL, c_mode);
     if ( n_is_inode_locked ) {
-        /* we've converted from indirect to direct, we must remove
-	** ourselves from the list of pages that need flushing before
-	** this transaction can commit
+	/* we've done an indirect->direct conversion.  when the data block 
+	** was freed, it was removed from the list of blocks that must 
+	** be flushed before the transaction commits, so we don't need to 
+	** deal with it here.
 	*/
-	reiserfs_remove_page_from_flush_list(th, p_s_inode) ;
 	p_s_inode->u.reiserfs_i.i_pack_on_close = 0 ;
     }
     return n_ret_value;
@@ -1960,15 +1956,15 @@ static void check_research_for_paste (struct path * path, struct cpu_key * p_s_k
     struct item_head * found_ih = get_ih (path);
     
     if (is_direct_le_ih (found_ih)) {
-	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_bh (path)->b_size) !=
+	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) !=
 	    cpu_key_k_offset (p_s_key) ||
-	    op_bytes_number (found_ih, get_bh (path)->b_size) != pos_in_item (path))
+	    op_bytes_number (found_ih, get_last_bh (path)->b_size) != pos_in_item (path))
 	    reiserfs_panic (0, "PAP-5720: check_research_for_paste: "
 			    "found direct item %h or position (%d) does not match to key %K",
 			    found_ih, pos_in_item (path), p_s_key);
     }
     if (is_indirect_le_ih (found_ih)) {
-	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_bh (path)->b_size) != cpu_key_k_offset (p_s_key) || 
+	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) != cpu_key_k_offset (p_s_key) || 
 	    I_UNFM_NUM (found_ih) != pos_in_item (path) ||
 	    get_ih_free_space (found_ih) != 0)
 	    reiserfs_panic (0, "PAP-5730: check_research_for_paste: "

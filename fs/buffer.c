@@ -72,17 +72,6 @@ static char buffersize_index[65] =
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
 
-static inline void get_bh(struct buffer_head * bh)
-{
-	atomic_inc(&(bh)->b_count);
-}
-
-static inline void put_bh(struct buffer_head *bh)
-{
-	smp_mb__before_atomic_dec();
-	atomic_dec(&bh->b_count);
-}
-
 /*
  * Hash table gook..
  */
@@ -2790,7 +2779,7 @@ int kupdate(void *startup)
 
 static int __init bdflush_init(void)
 {
-	static DECLARE_COMPLETION(startup);
+	static struct completion startup __initdata = COMPLETION_INITIALIZER(startup);
 
 	kernel_thread(bdflush, &startup, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
 	wait_for_completion(&startup);

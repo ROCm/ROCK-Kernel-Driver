@@ -172,7 +172,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		// user space buffer is swapped out. At that time
 		// entry can move to somewhere else
 		memcpy (local_buf, d_name, d_reclen);
-		if (filldir (dirent, d_name, d_reclen, d_off, d_ino, 
+		if (filldir (dirent, local_buf, d_reclen, d_off, d_ino, 
 		             DT_UNKNOWN) < 0) {
 		    if (local_buf != small_buf) {
 			kfree(local_buf) ;
@@ -187,8 +187,6 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		next_pos = deh_offset (deh) + 1;
 
 		if (item_moved (&tmp_ih, &path_to_entry)) {
-		    reiserfs_warning ("vs-9020: reiserfs_readdir "
-				      "things are moving under hands. Researching..\n");
 		    goto research;
 		}
 	    } /* for */
@@ -202,10 +200,6 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 	   delimiting key check is it directory end */
 	rkey = get_rkey (&path_to_entry, inode->i_sb);
 	if (! comp_le_keys (rkey, &MIN_KEY)) {
-#ifdef CONFIG_REISERFS_CHECK
-	    reiserfs_warning ("vs-9025: reiserfs_readdir:"
-			      "get_rkey failed. Researching..\n");
-#endif
 	    /* set pos_key to key, that is the smallest and greater
 	       that key of the last entry in the item */
 	    set_cpu_key_k_offset (&pos_key, next_pos);

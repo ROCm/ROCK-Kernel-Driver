@@ -28,8 +28,8 @@ CONFIG_6xx=y
 # CONFIG_8xx is not set
 # CONFIG_8260 is not set
 # CONFIG_ALL_PPC is not set
-# CONFIG_GEMINI is not set
 CONFIG_APUS=y
+# CONFIG_GEMINI is not set
 # CONFIG_PPC601_SYNC_FIX is not set
 # CONFIG_SMP is not set
 # CONFIG_ALTIVEC is not set
@@ -42,6 +42,7 @@ CONFIG_APUS=y
 # CONFIG_EISA is not set
 # CONFIG_SBUS is not set
 # CONFIG_MCA is not set
+CONFIG_PCI_PERMEDIA=y
 CONFIG_PCI=y
 CONFIG_NET=y
 CONFIG_SYSCTL=y
@@ -343,7 +344,6 @@ CONFIG_A4091_SCSI=y
 CONFIG_WARPENGINE_SCSI=y
 CONFIG_BLZ603EPLUS_SCSI=y
 CONFIG_OKTAGON_SCSI=y
-CONFIG_CYBERSTORMIII_SCSI=y
 
 #
 # IEEE 1394 (FireWire) support
@@ -364,12 +364,12 @@ CONFIG_DUMMY=m
 # CONFIG_EQUALIZER is not set
 CONFIG_TUN=m
 # CONFIG_ETHERTAP is not set
-# CONFIG_NET_SB1000 is not set
 
 #
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
+# CONFIG_ARM_AM79C961A is not set
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
@@ -379,12 +379,16 @@ CONFIG_ARIADNE=y
 CONFIG_NE2K_ZORRO=y
 CONFIG_A2065=y
 CONFIG_HYDRA=y
+# CONFIG_SUNLANCE is not set
+# CONFIG_HAPPYMEAL is not set
+# CONFIG_SUNBMAC is not set
+# CONFIG_SUNQE is not set
+# CONFIG_SUNLANCE is not set
+# CONFIG_SUNGEM is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
-# CONFIG_AT1700 is not set
-# CONFIG_DEPCA is not set
 # CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 # CONFIG_NET_PCI is not set
@@ -394,6 +398,8 @@ CONFIG_HYDRA=y
 # Ethernet (1000 Mbit)
 #
 # CONFIG_ACENIC is not set
+# CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_MYRI_SBUS is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
@@ -541,6 +547,7 @@ CONFIG_VT_CONSOLE=y
 # CONFIG_SERIAL is not set
 # CONFIG_SERIAL_EXTENDED is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
+CONFIG_A2232=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=256
 CONFIG_PRINTER=m
@@ -584,6 +591,7 @@ CONFIG_MOUSE=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
+# CONFIG_SONYPI is not set
 
 #
 # Ftape, the floppy tape device driver
@@ -622,6 +630,7 @@ CONFIG_RAMFS=m
 CONFIG_ISO9660_FS=y
 CONFIG_JOLIET=y
 CONFIG_MINIX_FS=y
+# CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
@@ -635,7 +644,6 @@ CONFIG_DEVPTS_FS=y
 CONFIG_ROMFS_FS=y
 CONFIG_EXT2_FS=y
 # CONFIG_SYSV_FS is not set
-# CONFIG_SYSV_FS_WRITE is not set
 # CONFIG_UDF_FS is not set
 # CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
@@ -747,6 +755,7 @@ CONFIG_DMASOUND=m
 # CONFIG_SOUND_MSNDCLAS is not set
 # CONFIG_SOUND_MSNDPIN is not set
 # CONFIG_SOUND_VIA82CXXX is not set
+# CONFIG_MIDI_VIA82CXXX is not set
 CONFIG_SOUND_OSS=m
 CONFIG_SOUND_TRACEINIT=y
 CONFIG_SOUND_DMAP=y
@@ -783,6 +792,11 @@ CONFIG_SOUND_VMIDI=m
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# Bluetooth support
+#
+# CONFIG_BLUEZ is not set
 
 #
 # Kernel hacking

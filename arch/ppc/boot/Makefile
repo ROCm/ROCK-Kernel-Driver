@@ -10,17 +10,6 @@
 # modified by Cort (cort@cs.nmt.edu)
 #
 
-.c.s:
-	$(CC) $(CFLAGS) -S -o $*.s $<
-.s.o:
-	$(AS) -o $*.o $<
-.c.o:
-	$(CC) $(CFLAGS) -c -o $*.o $<
-.S.s:
-	$(CPP) $(AFLAGS) -traditional -o $*.o $<
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c -o $*.o $<
-
 GZIP_FLAGS = -v9f
 
 CFLAGS	:= $(CPPFLAGS) -O2 -DSTDC_HEADERS -fno-builtin -D__BOOTER__ \
@@ -34,33 +23,41 @@ else
 TFTPSIMAGE=/tftpboot/sImage
 endif
 
-
 lib/zlib.a:
 	$(MAKE) -C lib
 
 images/vmlinux.gz: $(TOPDIR)/vmlinux
 	$(MAKE) -C images vmlinux.gz
 
-# Since gemini doesn't need/have it's own directory, we do znetboot* here
-ifdef CONFIG_GEMINI
-BOOT_TARGETS = zImage zImage.initrd
-else
-BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
+# Subdirs and tools needed for each.
+subdir-y			:= lib images common
+subdir-$(CONFIG_ALL_PPC)	+= chrp pmac prep
+tools-$(CONFIG_ALL_PPC)		:= addnote piggyback mknote hack-coff mkprep
+subdir-$(CONFIG_4xx)		+= tree
+subdir-$(CONFIG_8xx)		+= mbx
+subdir-$(CONFIG_8260)		+= mbx
+tools-$(CONFIG_GEMINI)		:= mksimage
+
+# These are dirs we don't want to go into on BOOT_TARGETS
+NONBOOT				:= lib images common
+
+# These are the subdirs we want to use
+BOOTDIRS			= $(filter-out $(NONBOOT), $(subdir-y))
+
+# This will make the tools we need.  We do it like this to ensure that we use
+# HOSTCC. -- Tom
+maketools:
+	$(MAKE) -C utils $(tools-y)
+
+# The targets all boards support for boot images.
+BOOT_TARGETS = zImage
+ifndef CONFIG_GEMINI
+BOOT_TARGETS += zImage.initrd znetboot znetboot.initrd
 endif
 
-# We go into the utils dir by hand to ensure HOSTCC builds
-$(BOOT_TARGETS): sImage vmapus lib/zlib.a images/vmlinux.gz
-ifneq ("xx$(CONFIG_8260)$(CONFIG_8xx)","xx")
-	$(MAKE) -C mbx $@
-endif
-ifdef CONFIG_ALL_PPC
-	$(MAKE) -C utils addnote piggyback mknote hack-coff mkprep
-	$(MAKE) -C chrp $@
-	$(MAKE) -C pmac $@
-	$(MAKE) -C prep $@
-endif
-ifdef CONFIG_4xx
-	$(MAKE) -C tree $@
+$(BOOT_TARGETS): sImage vmapus lib/zlib.a images/vmlinux.gz maketools
+ifneq ($(BOOTDIRS),)
+	for d in $(BOOTDIRS); do $(MAKE) -C $$d $@; done
 endif
 
 sImage: $(TOPDIR)/vmlinux
@@ -79,18 +76,11 @@ znetboot : zImage
 	cp images/sImage $(TFTPSIMAGE)
 endif
 
-# Do the dirs
+# Clean up after ourselves.  We have to do it like this since only some dirs
+# need to be gone into. -- Tom
 clean:
 	$(MAKE) -C images clean
 	$(MAKE) -C tree clean
 	$(MAKE) -C utils clean
-
-dep:
-	$(MAKE) -C mbx fastdep
-	$(MAKE) -C chrp fastdep
-	$(MAKE) -C common fastdep
-	$(MAKE) -C pmac fastdep
-	$(MAKE) -C prep fastdep
-	$(MAKE) -C common fastdep
 
 include $(TOPDIR)/Rules.make

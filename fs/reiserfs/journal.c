@@ -114,11 +114,7 @@ static void init_journal_hash(struct super_block *p_s_sb) {
 static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
   if (bh) {
     clear_bit(BH_Dirty, &bh->b_state) ;
-#if 0
-    if (bh->b_list != BUF_CLEAN) {
-      reiserfs_file_buffer(bh, BUF_CLEAN) ;
-    }
-#endif
+    refile_buffer(bh) ;
   }
   return 0 ;
 }
@@ -711,7 +707,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
       }
       ll_rw_block(WRITE, 1, &tbh) ;
       count++ ;
-      atomic_dec(&(tbh->b_count)) ; /* once for our get_hash */
+      put_bh(tbh) ; /* once for our get_hash */
     } 
   }
 
@@ -726,7 +722,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
       if (!buffer_uptodate(tbh)) {
 	reiserfs_panic(s, "journal-601, buffer write failed\n") ;
       }
-      atomic_dec(&(tbh->b_count)) ; /* once for our get_hash */
+      put_bh(tbh) ; /* once for our get_hash */
       bforget(tbh) ;    /* once due to original getblk in do_journal_end */
       atomic_dec(&(jl->j_commit_left)) ;
     }
@@ -873,9 +869,11 @@ static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
     }
     mark_buffer_uptodate(bh, uptodate) ;
     unlock_buffer(bh) ;
+    put_bh(bh) ;
 }
 static void submit_logged_buffer(struct buffer_head *bh) {
     lock_buffer(bh) ;
+    get_bh(bh) ;
     bh->b_end_io = reiserfs_end_buffer_io_sync ;
     mark_buffer_notjournal_new(bh) ;
     clear_bit(BH_Dirty, &bh->b_state) ;
@@ -971,13 +969,13 @@ static int flush_journal_list(struct super_block *s,
       /* we do this to make sure nobody releases the buffer while 
       ** we are working with it 
       */
-      atomic_inc(&(saved_bh->b_count)) ;  
+      get_bh(saved_bh) ;
 
       if (buffer_journal_dirty(saved_bh)) {
         was_jwait = 1 ;
 	mark_buffer_notjournal_dirty(saved_bh) ;
-        /* brelse the inc from journal_mark_dirty */
-	atomic_dec(&(saved_bh->b_count)) ; 
+        /* undo the inc from journal_mark_dirty */
+	put_bh(saved_bh) ;
       }
       if (can_dirty(cn)) {
         was_dirty = 1 ;
@@ -1020,7 +1018,7 @@ printk("journal-813: BAD! buffer %lu %cdirty %cjwait, not in a newer tranasction
     } 
     if (was_dirty) { 
       /* we inc again because saved_bh gets decremented at free_cnode */
-      atomic_inc(&(saved_bh->b_count)) ;  
+      get_bh(saved_bh) ;
       set_bit(BLOCK_NEEDS_FLUSH, &cn->state) ;
       submit_logged_buffer(saved_bh) ;
       count++ ;
@@ -1033,7 +1031,7 @@ free_cnode:
     cn = cn->next ;
     if (saved_bh) {
       /* we incremented this to keep others from taking the buffer head away */
-      atomic_dec(&(saved_bh->b_count)); 
+      put_bh(saved_bh) ;
       if (atomic_read(&(saved_bh->b_count)) < 0) {
         printk("journal-945: saved_bh->b_count < 0") ;
       }
@@ -1889,6 +1887,7 @@ int journal_init(struct super_block *p_s_sb) {
   memset(journal_writers, 0, sizeof(char *) * 512) ; /* debug code */
 
   INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_bitmap_nodes) ;
+  INIT_LIST_HEAD(&(SB_JOURNAL(p_s_sb)->j_dummy_inode.i_dirty_buffers)) ;
   reiserfs_allocate_list_bitmaps(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_bitmap, 
                                  SB_BMAP_NR(p_s_sb)) ;
   allocate_bitmap_nodes(p_s_sb) ;
@@ -2179,7 +2178,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
     cn->jlist = NULL ;
     insert_journal_hash(SB_JOURNAL(p_s_sb)->j_hash_table, cn) ;
     if (!count_already_incd) {
-      atomic_inc(&(bh->b_count)) ;
+      get_bh(bh) ;
     }
   }
   cn->next = NULL ;
@@ -2251,7 +2250,7 @@ int remove_from_transaction(struct super_block *p_s_sb, unsigned long blocknr, i
 
   if (!already_cleaned) {
     mark_buffer_notjournal_dirty(bh) ; 
-    atomic_dec(&(bh->b_count)) ;
+    put_bh(bh) ;
     if (atomic_read(&(bh->b_count)) < 0) {
       printk("journal-1752: remove from trans, b_count < 0\n") ;
     }
@@ -2582,11 +2581,8 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
 	    ** in the current trans
 	    */
 	    mark_buffer_notjournal_dirty(cn->bh) ;
-	    if (!buffer_locked(cn->bh)) {
-	      reiserfs_clean_and_file_buffer(cn->bh) ;
-	    }
 	    cleaned = 1 ;
-	    atomic_dec(&(cn->bh->b_count)) ;
+	    put_bh(cn->bh) ;
 	    if (atomic_read(&(cn->bh->b_count)) < 0) {
 	      printk("journal-2138: cn->bh->b_count < 0\n") ;
 	    }
@@ -2602,7 +2598,8 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   }
 
   if (bh) {
-    atomic_dec(&(bh->b_count)) ; /* get_hash incs this */
+    reiserfs_clean_and_file_buffer(bh) ;
+    put_bh(bh) ; /* get_hash grabs the buffer */
     if (atomic_read(&(bh->b_count)) < 0) {
       printk("journal-2165: bh->b_count < 0\n") ;
     }
@@ -2654,275 +2651,6 @@ void reiserfs_prepare_for_journal(struct super_block *p_s_sb,
     }
     retry_count++ ;
   }
-}
-
-/* 
- * Wait for a page to get unlocked.
- *
- * This must be called with the caller "holding" the page,
- * ie with increased "page->count" so that the page won't
- * go away during the wait..
- */
-static void ___reiserfs_wait_on_page(struct reiserfs_page_list *pl)
-{
-    struct task_struct *tsk = current;
-    struct page *page = pl->page ;
-    DECLARE_WAITQUEUE(wait, tsk);
-
-    add_wait_queue(&page->wait, &wait);
-    do {
-	block_sync_page(page);
-	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-	if (!PageLocked(page) || pl->do_not_lock)
-	    break;
-	schedule();
-    } while (PageLocked(page));
-    tsk->state = TASK_RUNNING;
-    remove_wait_queue(&page->wait, &wait);
-}
-
-/*
- * Get an exclusive lock on the page..
- * but, every time you get woken up, check the page to make sure
- * someone hasn't called a journal_begin with it locked.
- *
- * the page should always be locked when this returns
- *
- * returns 0 if you've got the page locked
- * returns 1 if it returns because someone else has called journal_begin
- *           with the page locked
- * this is only useful to the code that flushes pages before a 
- * commit.  Do not export this hack.  Ever.
- */
-static int reiserfs_try_lock_page(struct reiserfs_page_list *pl)
-{
-    struct page *page = pl->page ;
-    while (TryLockPage(page)) {
-	if (pl->do_not_lock) {
-	    /* the page is locked, but we cannot have it */
-	    return 1 ;
-	}
-	___reiserfs_wait_on_page(pl);
-    }
-    /* we have the page locked */
-    return 0 ;
-}
-
-
-/*
-** This can only be called from do_journal_end.
-** it runs through the list things that need flushing before the
-** transaction can commit, and writes each of them to disk
-**
-*/
-
-static void flush_pages_before_commit(struct reiserfs_transaction_handle *th,
-                                      struct super_block *p_s_sb) {
-  struct reiserfs_page_list *pl = SB_JOURNAL(p_s_sb)->j_flush_pages ;
-  struct reiserfs_page_list *pl_tmp ;
-  struct buffer_head *bh, *head ;
-  int count = 0 ;
-
-  /* first write each dirty unlocked buffer in the list */
-
-  while(pl) {
-    /* ugly.  journal_end can be called from get_block, which has a 
-    ** page locked.  So, we have to check to see if pl->page is the page
-    ** currently locked by the calling function, and if so, skip the
-    ** lock
-    */
-    if (reiserfs_try_lock_page(pl)) {
-      goto setup_next ;
-    }
-    if (!PageLocked(pl->page)) {
-      BUG() ;
-    }
-    if (pl->page->buffers) {
-      head = pl->page->buffers ;
-      bh = head ;
-      do {
-	if (bh->b_blocknr == pl->blocknr && buffer_dirty(bh) &&
-	    !buffer_locked(bh) && buffer_uptodate(bh) ) {
-	  ll_rw_block(WRITE, 1, &bh) ;
-	}
-	bh = bh->b_this_page ;
-      } while (bh != head) ;
-    }
-    if (!pl->do_not_lock) {
-      UnlockPage(pl->page) ;
-    }
-setup_next:
-    pl = pl->next ;
-  }
-
-  /* now wait on them */
-
-  pl = SB_JOURNAL(p_s_sb)->j_flush_pages ;
-  while(pl) {
-    if (reiserfs_try_lock_page(pl)) {
-      goto remove_page ;
-    }
-    if (!PageLocked(pl->page)) {
-      BUG() ;
-    }
-    if (pl->page->buffers) {
-      head = pl->page->buffers ;
-      bh = head ;
-      do {
-	if (bh->b_blocknr == pl->blocknr) {
-	  count++ ;
-	  wait_on_buffer(bh) ;
-	  if (!buffer_uptodate(bh)) {
-	    reiserfs_panic(p_s_sb, "journal-2443: flush_pages_before_commit, error writing block %lu\n", bh->b_blocknr) ;
-	  }
-	}
-	bh = bh->b_this_page ;
-      } while (bh != head) ;
-    }
-    if (!pl->do_not_lock) {
-      UnlockPage(pl->page) ;
-    }
-remove_page:
-    /* we've waited on the I/O, we can remove the page from the
-    ** list, and free our pointer struct to it.
-    */
-    if (pl->prev) {
-      pl->prev->next = pl->next ;
-    }
-    if (pl->next) {
-      pl->next->prev = pl->prev ;
-    }
-    put_page(pl->page) ;
-    pl_tmp = pl ;
-    pl = pl->next ;
-    reiserfs_kfree(pl_tmp, sizeof(struct reiserfs_page_list), p_s_sb) ;
-  }
-  SB_JOURNAL(p_s_sb)->j_flush_pages = NULL ;
-}
-
-/*
-** called when a indirect item is converted back into a tail.
-**
-** The reiserfs part of the inode stores enough information to find
-** our page_list struct in the flush list.  We remove it from the list
-** and free the struct.
-**
-** Note, it is possible for this to happen:
-**
-** reiserfs_add_page_to_flush_list(inode)
-** transaction ends, list is flushed
-** reiserfs_remove_page_from_flush_list(inode)
-**
-** This would be bad because the page_list pointer in the inode is not
-** updated when the list is flushed, so we can't know if the pointer is
-** valid.  So, in the inode, we also store the transaction id when the
-** page was added.  If we are trying to remove something from an old 
-** transaction, we just clear out the pointer in the inode and return.
-**
-** Normal case is to use the reiserfs_page_list pointer in the inode to 
-** find and remove the page from the flush list.
-*/
-int reiserfs_remove_page_from_flush_list(struct reiserfs_transaction_handle *th,
-                                         struct inode *inode) {
-  struct reiserfs_page_list *pl ;
-
-  /* was this conversion done in a previous transaction? If so, return */
-  if (inode->u.reiserfs_i.i_conversion_trans_id < th->t_trans_id) {
-    inode->u.reiserfs_i.i_converted_page = NULL ;
-    inode->u.reiserfs_i.i_conversion_trans_id = 0  ;
-    return 0 ;
-  }
-
-  /* remove the page_list struct from the list, release our hold on the
-  ** page, and free the page_list struct
-  */
-  pl = inode->u.reiserfs_i.i_converted_page ;
-  if (pl) {
-    if (pl->next) {
-      pl->next->prev = pl->prev ;
-    }
-    if (pl->prev) {
-      pl->prev->next = pl->next ;
-    }
-    if (SB_JOURNAL(inode->i_sb)->j_flush_pages == pl) {
-      SB_JOURNAL(inode->i_sb)->j_flush_pages = pl->next ;
-    }
-    put_page(pl->page) ;
-    reiserfs_kfree(pl, sizeof(struct reiserfs_page_list), inode->i_sb) ;
-    inode->u.reiserfs_i.i_converted_page = NULL ;
-    inode->u.reiserfs_i.i_conversion_trans_id = 0 ;
-  }
-  return 0 ;
-}
-
-/*
-** Called after a direct to indirect transaction.  The unformatted node
-** must be flushed to disk before the transaction commits, otherwise, we
-** risk losing the data from the direct item.  This adds the page
-** containing the unformatted node to a list of pages that need flushing.
-**
-** it calls get_page(page), so the page won't disappear until we've
-** flushed or removed it from our list.
-**
-** pointers to the reiserfs_page_list struct are stored in the inode, 
-** so this page can be quickly removed from the list after the tail is
-** converted back into a direct item.
-**
-** If we fail to find the memory for the reiserfs_page_list struct, we
-** just sync the page now.  Not good, but safe.
-**
-** since this must be called with the page locked, we always set
-** the do_not_lock field in the page_list struct we allocate
-**
-*/
-int reiserfs_add_page_to_flush_list(struct reiserfs_transaction_handle *th, 
-                                    struct inode *inode,
-				    struct buffer_head *bh) {
-  struct reiserfs_page_list *new_pl ;
-
-/* debugging use ONLY.  Do not define this on data you care about. */
-#ifdef REISERFS_NO_FLUSH_AFTER_CONVERT
-  return 0 ;
-#endif
-
-  get_page(bh->b_page) ;
-  new_pl = reiserfs_kmalloc(sizeof(struct reiserfs_page_list), GFP_NOFS,
-                            inode->i_sb) ;
-  if (!new_pl) {
-    put_page(bh->b_page) ;
-    reiserfs_warning("journal-2480: forced to flush page, out of memory\n") ;
-    ll_rw_block(WRITE, 1, &bh) ;
-    wait_on_buffer(bh) ;
-    if (!buffer_uptodate(bh)) {
-      reiserfs_panic(inode->i_sb, "journal-2484: error writing buffer %lu to disk\n", bh->b_blocknr) ;
-    }
-    inode->u.reiserfs_i.i_converted_page = NULL ;
-    return 0 ;
-  }
-
-  new_pl->page = bh->b_page ;
-  new_pl->do_not_lock = 1 ;
-  new_pl->blocknr = bh->b_blocknr ;
-  new_pl->next = SB_JOURNAL(inode->i_sb)->j_flush_pages; 
-  if (new_pl->next) {
-    new_pl->next->prev = new_pl ;
-  }
-  new_pl->prev = NULL ;
-  SB_JOURNAL(inode->i_sb)->j_flush_pages = new_pl ;
-  
-  /* if we have numbers from an old transaction, zero the converted
-  ** page, it has already been flushed and freed
-  */
-  if (inode->u.reiserfs_i.i_conversion_trans_id &&
-      inode->u.reiserfs_i.i_conversion_trans_id < th->t_trans_id) {
-    inode->u.reiserfs_i.i_converted_page = NULL ;
-  }
-  if (inode->u.reiserfs_i.i_converted_page) {
-    reiserfs_panic(inode->i_sb, "journal-2501: inode already had a converted page\n") ;
-  }
-  inode->u.reiserfs_i.i_converted_page = new_pl ;
-  inode->u.reiserfs_i.i_conversion_trans_id = th->t_trans_id ;
-  return 0 ;
 }
 
 /*
@@ -3137,11 +2865,8 @@ printk("journal-2020: do_journal_end: BAD desc->j_len is ZERO\n") ;
   jindex = (SB_JOURNAL_LIST_INDEX(p_s_sb) + 1) % JOURNAL_LIST_COUNT ; 
   SB_JOURNAL_LIST_INDEX(p_s_sb) = jindex ;
 
-  /* make sure to flush any data converted from direct items to
-  ** indirect items before allowing the commit blocks to reach the
-  ** disk
-  */
-  flush_pages_before_commit(th, p_s_sb) ;
+  /* write any buffers that must hit disk before this commit is done */
+  fsync_inode_buffers(&(SB_JOURNAL(p_s_sb)->j_dummy_inode)) ;
 
   /* honor the flush and async wishes from the caller */
   if (flush) {

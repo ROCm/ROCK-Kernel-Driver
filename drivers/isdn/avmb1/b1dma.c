@@ -1,5 +1,5 @@
 /*
- * $Id: b1dma.c,v 1.11.6.6 2001/05/17 21:15:33 kai Exp $
+ * $Id: b1dma.c,v 1.11.6.7 2001/07/18 16:02:15 kai Exp $
  * 
  * Common module for AVM B1 cards that support dma with AMCC
  * 
@@ -30,7 +30,7 @@
 #error FIXME: driver requires 32-bit platform
 #endif
 
-static char *revision = "$Revision: 1.11.6.6 $";
+static char *revision = "$Revision: 1.11.6.7 $";
 
 /* ------------------------------------------------------------- */
 

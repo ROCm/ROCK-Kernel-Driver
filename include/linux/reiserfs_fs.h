@@ -65,6 +65,9 @@
 /* enable journalling */
 #define ENABLE_JOURNAL
 
+#define USE_INODE_GENERATION_COUNTER
+
+
 #ifdef __KERNEL__
 
 /* #define REISERFS_CHECK */
@@ -708,6 +711,7 @@ struct stat_data {
     __u32 sd_blocks;
     union {
 	__u32 sd_rdev;
+	__u32 sd_generation;
       //__u32 sd_first_direct_byte; 
       /* first byte of file which is stored in a
 				       direct item: except that if it equals 1
@@ -1102,7 +1106,7 @@ struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
 
 #define PATH_H_PATH_OFFSET(p_s_path, n_h) ((p_s_path)->path_length - (n_h))
 
-#define get_bh(path) PATH_PLAST_BUFFER(path)
+#define get_last_bh(path) PATH_PLAST_BUFFER(path)
 #define get_ih(path) PATH_PITEM_HEAD(path)
 #define get_item_pos(path) PATH_LAST_POSITION(path)
 #define get_item(path) ((void *)B_N_PITEM(PATH_PLAST_BUFFER(path), PATH_LAST_POSITION (path)))
@@ -1539,29 +1543,6 @@ struct reiserfs_journal_header {
   __u32 j_last_flush_trans_id ;		/* id of last fully flushed transaction */
   __u32 j_first_unflushed_offset ;      /* offset in the log of where to start replay after a crash */
   __u32 j_mount_id ;
-} ;
-
-/* these are used to keep flush pages that contain converted direct items.
-** if the page is not flushed before the transaction that converted it
-** is committed, we risk losing data
-**
-** note, while a page is in this list, its counter is incremented.
-*/
-struct reiserfs_page_list {
-  struct reiserfs_page_list *next ;
-  struct reiserfs_page_list *prev ;
-  struct page *page ;
-  unsigned long blocknr ; /* block number holding converted data */
-
-  /* if a transaction writer has the page locked the flush_page_list
-  ** function doesn't need to (and can't) get the lock while flushing
-  ** the page.  do_not_lock needs to be set by anyone who calls journal_end
-  ** with a page lock held.  They have to look in the inode and see
-  ** if the inode has the page they have locked in the flush list.
-  **
-  ** this sucks.
-  */
-  int do_not_lock ; 
 } ;
 
 extern task_queue reiserfs_commit_thread_tq ;

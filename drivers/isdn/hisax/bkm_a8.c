@@ -1,4 +1,4 @@
-/* $Id: bkm_a8.c,v 1.14.6.5 2001/04/15 14:51:09 keil Exp $
+/* $Id: bkm_a8.c,v 1.14.6.6 2001/07/18 16:02:15 kai Exp $
  * bkm_a8.c     low level stuff for Scitel Quadro (4*S0, passive)
  *              derived from the original file sedlbauer.c
  *              derived from the original file niccy.c
@@ -27,7 +27,7 @@
 
 extern const char *CardType[];
 
-const char sct_quadro_revision[] = "$Revision: 1.14.6.5 $";
+const char sct_quadro_revision[] = "$Revision: 1.14.6.6 $";
 
 static const char *sct_quadro_subtypes[] =
 {

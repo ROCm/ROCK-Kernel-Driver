@@ -1,4 +1,4 @@
-/* $Id: asuscom.c,v 1.11.6.1 2001/02/16 16:43:25 kai Exp $
+/* $Id: asuscom.c,v 1.11.6.2 2001/07/13 09:20:12 kai Exp $
  *
  * asuscom.c     low level stuff for ASUSCOM NETWORK INC. ISDNLink cards
  *
@@ -20,7 +20,7 @@
 
 extern const char *CardType[];
 
-const char *Asuscom_revision = "$Revision: 1.11.6.1 $";
+const char *Asuscom_revision = "$Revision: 1.11.6.2 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -341,7 +341,7 @@ setup_asuscom(struct IsdnCard *card)
 	cs->cardmsg = &Asus_card_msg;
 	val = readreg(cs->hw.asus.cfg_reg + ASUS_IPAC_ALE, 
 		cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);
-	if (val == 1) {
+	if ((val == 1) || (val == 2)) {
 		cs->subtyp = ASUS_IPAC;
 		cs->hw.asus.adr  = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;

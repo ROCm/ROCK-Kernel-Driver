@@ -1069,6 +1069,17 @@ extern void set_buffer_async_io(struct buffer_head *bh) ;
 #define BUF_PROTECTED	3	/* Ramdisk persistent storage */
 #define NR_LIST		4
 
+static inline void get_bh(struct buffer_head * bh)
+{
+        atomic_inc(&(bh)->b_count);
+}
+
+static inline void put_bh(struct buffer_head *bh)
+{
+        smp_mb__before_atomic_dec();
+        atomic_dec(&bh->b_count);
+}
+
 /*
  * This is called by bh->b_end_io() handlers when I/O has completed.
  */

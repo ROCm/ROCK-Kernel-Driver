@@ -1030,7 +1030,7 @@ static int  is_left_neighbor_in_cache(
 		     left, left);
     }
 #endif
-    atomic_dec (&(left->b_count));
+    put_bh(left) ;
     return 1;
   }
 
@@ -1123,7 +1123,7 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
 	    n_first_last_position = B_NR_ITEMS (p_s_parent);
 	if ( n_position != n_first_last_position ) {
 	    *pp_s_com_father = p_s_parent;
-	    atomic_inc (&((*pp_s_com_father)->b_count));
+	    get_bh(*pp_s_com_father) ;
 	    /*(*pp_s_com_father = p_s_parent)->b_count++;*/
 	    break;
 	}
@@ -1228,8 +1228,8 @@ static int  get_parents (struct tree_balance * p_s_tb, int n_h)
 	/* Current node is not the first child of its parent. */
 	/*(p_s_curf = p_s_curcf = PATH_OFFSET_PBUFFER(p_s_path, n_path_offset - 1))->b_count += 2;*/
 	p_s_curf = p_s_curcf = PATH_OFFSET_PBUFFER(p_s_path, n_path_offset - 1);
-	atomic_inc (&(p_s_curf->b_count));
-	atomic_inc (&(p_s_curf->b_count));
+	get_bh(p_s_curf) ;
+	get_bh(p_s_curf) ;
 	p_s_tb->lkey[n_h] = n_position - 1;
     }
     else  {
@@ -1267,8 +1267,8 @@ static int  get_parents (struct tree_balance * p_s_tb, int n_h)
 /* Current node is not the last child of its parent F[n_h]. */
 	/*(p_s_curf = p_s_curcf = PATH_OFFSET_PBUFFER(p_s_path, n_path_offset - 1))->b_count += 2;*/
 	p_s_curf = p_s_curcf = PATH_OFFSET_PBUFFER(p_s_path, n_path_offset - 1);
-	atomic_inc (&(p_s_curf->b_count));
-	atomic_inc (&(p_s_curf->b_count));
+	get_bh(p_s_curf) ;
+	get_bh(p_s_curf) ;
 	p_s_tb->rkey[n_h] = n_position;
     }	
 

@@ -126,7 +126,7 @@ extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 		  "=b" (*ebx),
 		  "=c" (*ecx),
 		  "=d" (*edx)
-		: "a" (op));
+		: "0" (op));
 }
 
 /*
@@ -134,38 +134,42 @@ extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
  */
 extern inline unsigned int cpuid_eax(unsigned int op)
 {
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax;
 
 	__asm__("cpuid"
-		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (op));
+		: "=a" (eax)
+		: "0" (op)
+		: "bx", "cx", "dx");
 	return eax;
 }
 extern inline unsigned int cpuid_ebx(unsigned int op)
 {
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax, ebx;
 
 	__asm__("cpuid"
-		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (op));
+		: "=a" (eax), "=b" (ebx)
+		: "0" (op)
+		: "cx", "dx" );
 	return ebx;
 }
 extern inline unsigned int cpuid_ecx(unsigned int op)
 {
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax, ecx;
 
 	__asm__("cpuid"
-		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (op));
+		: "=a" (eax), "=c" (ecx)
+		: "0" (op)
+		: "bx", "dx" );
 	return ecx;
 }
 extern inline unsigned int cpuid_edx(unsigned int op)
 {
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax, edx;
 
 	__asm__("cpuid"
-		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (op));
+		: "=a" (eax), "=d" (edx)
+		: "0" (op)
+		: "bx", "cx");
 	return edx;
 }
 

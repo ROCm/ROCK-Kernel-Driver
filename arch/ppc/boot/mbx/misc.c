@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.9 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.misc.c 1.11 07/18/01 15:46:50 trini
  */
 /*
  * Adapted for PowerPC by Gary Thomas
@@ -56,6 +56,9 @@ unsigned int initrd_offset, initrd_size;
  */
 char	cmd_buf[256];
 char	*cmd_line = cmd_buf;
+
+/* We need to pass along a 'dummy' com_port. */
+unsigned long com_port = 0;
 
 /* This is the default cmdline that will be given to the user at boot time..
  * If none was specified at compile time, we'll give it one that should work.

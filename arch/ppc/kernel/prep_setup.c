@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_setup.c 1.20 05/21/01 09:19:50 trini
+ * BK Id: SCCS/s.prep_setup.c 1.23 07/18/01 22:56:39 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -99,7 +99,6 @@ int _prep_type;
 kdev_t boot_dev;
 /* used in nasty hack for sound - see prep_setup_arch() -- Cort */
 long ppc_cs4232_dma, ppc_cs4232_dma2;
-unsigned long empty_zero_page[1024];
 
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;

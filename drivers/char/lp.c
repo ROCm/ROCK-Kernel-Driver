@@ -616,6 +616,7 @@ static int reset = 0;
 MODULE_PARM(parport, "1-" __MODULE_STRING(LP_NO) "s");
 MODULE_PARM(reset, "i");
 
+#ifndef MODULE
 static int __init lp_setup (char *str)
 {
 	static int parport_ptr; // initially zero
@@ -645,6 +646,7 @@ static int __init lp_setup (char *str)
 	}
 	return 1;
 }
+#endif
 
 static int lp_register(int nr, struct parport *port)
 {

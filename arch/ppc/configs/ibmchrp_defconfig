@@ -28,8 +28,8 @@ CONFIG_6xx=y
 # CONFIG_8xx is not set
 # CONFIG_8260 is not set
 CONFIG_ALL_PPC=y
-# CONFIG_GEMINI is not set
 # CONFIG_APUS is not set
+# CONFIG_GEMINI is not set
 # CONFIG_PPC601_SYNC_FIX is not set
 # CONFIG_SMP is not set
 # CONFIG_ALTIVEC is not set
@@ -286,23 +286,27 @@ CONFIG_NETDEVICES=y
 # CONFIG_EQUALIZER is not set
 # CONFIG_TUN is not set
 # CONFIG_ETHERTAP is not set
-# CONFIG_NET_SB1000 is not set
 
 #
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
+# CONFIG_ARM_AM79C961A is not set
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
 # CONFIG_NCR885E is not set
 # CONFIG_OAKNET is not set
+# CONFIG_SUNLANCE is not set
+# CONFIG_HAPPYMEAL is not set
+# CONFIG_SUNBMAC is not set
+# CONFIG_SUNQE is not set
+# CONFIG_SUNLANCE is not set
+# CONFIG_SUNGEM is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
-# CONFIG_AT1700 is not set
-# CONFIG_DEPCA is not set
 # CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 CONFIG_NET_PCI=y
@@ -311,12 +315,14 @@ CONFIG_PCNET32=y
 # CONFIG_APRICOT is not set
 # CONFIG_CS89x0 is not set
 # CONFIG_TULIP is not set
+# CONFIG_TULIP_MWI is not set
+# CONFIG_TULIP_MMIO is not set
 CONFIG_DE4X5=y
 # CONFIG_DGRS is not set
 # CONFIG_DM9102 is not set
 # CONFIG_EEPRO100 is not set
-# CONFIG_EEPRO100_PM is not set
 # CONFIG_LNE390 is not set
+# CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
 # CONFIG_NE2K_PCI is not set
 # CONFIG_NE3210 is not set
@@ -331,18 +337,20 @@ CONFIG_DE4X5=y
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
 # CONFIG_WINBOND_840 is not set
-# CONFIG_HAPPYMEAL is not set
 # CONFIG_NET_POCKET is not set
 
 #
 # Ethernet (1000 Mbit)
 #
 # CONFIG_ACENIC is not set
+# CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_MYRI_SBUS is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
+# CONFIG_PLIP is not set
 # CONFIG_PPP is not set
 # CONFIG_SLIP is not set
 
@@ -507,6 +515,7 @@ CONFIG_RTC=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
+# CONFIG_SONYPI is not set
 
 #
 # Ftape, the floppy tape device driver
@@ -545,6 +554,7 @@ CONFIG_TMPFS=y
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_MINIX_FS is not set
+# CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
@@ -558,7 +568,6 @@ CONFIG_DEVPTS_FS=y
 # CONFIG_ROMFS_FS is not set
 CONFIG_EXT2_FS=y
 # CONFIG_SYSV_FS is not set
-# CONFIG_SYSV_FS_WRITE is not set
 # CONFIG_UDF_FS is not set
 # CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
@@ -656,6 +665,11 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# Bluetooth support
+#
+# CONFIG_BLUEZ is not set
 
 #
 # Kernel hacking

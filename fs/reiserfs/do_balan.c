@@ -1626,7 +1626,7 @@ static void store_thrown (struct tree_balance * tb, struct buffer_head * bh)
     for (i = 0; i < sizeof (tb->thrown)/sizeof (tb->thrown[0]); i ++)
 	if (!tb->thrown[i]) {
 	    tb->thrown[i] = bh;
-	    atomic_inc(&bh->b_count) ; /* decremented in free_thrown */
+	    get_bh(bh) ; /* free_thrown puts this */
 	    return;
 	}
     reiserfs_warning ("store_thrown: too many thrown buffers\n");

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_setup.c 1.20 06/05/01 21:22:02 paulus
+ * BK Id: SCCS/s.chrp_setup.c 1.22 07/18/01 22:56:39 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -96,8 +96,6 @@ extern int probingmem;
 extern unsigned long loops_per_jiffy;
 extern int bootx_text_mapped;
 static int max_width;
-
-unsigned long empty_zero_page[1024];
 
 static const char *gg2_memtypes[4] = {
 	"FPM", "SDRAM", "EDO", "BEDO"

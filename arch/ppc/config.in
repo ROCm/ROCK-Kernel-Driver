@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.config.in 1.30 06/27/01 14:49:58 trini
+# BK Id: SCCS/s.config.in 1.34 07/08/01 11:39:11 trini
 #
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
@@ -85,7 +85,7 @@ fi
 if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
   choice 'Machine Type'		\
 	"CHRP/PowerMac/PReP	CONFIG_ALL_PPC		\
-  	 Amgia-APUS		CONFIG_APUS		\
+  	 Amiga-APUS		CONFIG_APUS		\
 	 Synergy-Gemini        	CONFIG_GEMINI"		CHRP/PowerMac/PReP
 fi
 
@@ -165,7 +165,7 @@ fi
 
 source drivers/parport/Config.in
 
-if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
+if [ "$CONFIG_4xx" != "y" ]; then
   if [ "$CONFIG_APUS" != "y" ]; then
     tristate 'Support for /dev/rtc' CONFIG_PPC_RTC
   else
@@ -178,10 +178,11 @@ if [ "$CONFIG_ALL_PPC" = "y" ]; then
   bool 'Support for RTAS (RunTime Abstraction Services) in /proc' CONFIG_PPC_RTAS
   bool 'Support for early boot text console (BootX or OpenFirmware only)' CONFIG_BOOTX_TEXT
   bool 'Support for PReP Residual Data' CONFIG_PREP_RESIDUAL
-  bool 'Default bootloader kernel arguments' CONFIG_CMDLINE_BOOL
-  if [ "$CONFIG_CMDLINE_BOOL" = "y" ] ; then
-    string 'Initial kernel command string' CONFIG_CMDLINE "console=ttyS0,9600 console=tty0 root=/dev/sda2"
-  fi
+fi
+
+bool 'Default bootloader kernel arguments' CONFIG_CMDLINE_BOOL
+if [ "$CONFIG_CMDLINE_BOOL" = "y" ] ; then
+  string 'Initial kernel command string' CONFIG_CMDLINE "console=ttyS0,9600 console=tty0 root=/dev/sda2"
 fi
 
 if [ "$CONFIG_APUS" = "y" ]; then

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.20 06/27/01 14:49:58 trini
+ * BK Id: SCCS/s.m8xx_setup.c 1.23 07/18/01 22:56:39 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -54,7 +54,6 @@ unsigned long m8xx_get_rtc_time(void);
 void m8xx_calibrate_decr(void);
 
 unsigned char __res[sizeof(bd_t)];
-unsigned long empty_zero_page[1024];
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
 #ifdef	CONFIG_BLK_DEV_MPC8xx_IDE
@@ -261,7 +260,7 @@ m8xx_set_rtc_time(unsigned long time)
 	return(0);
 }
 
-unsigned long __init
+unsigned long
 m8xx_get_rtc_time(void)
 {
 	/* Get time from the RTC.

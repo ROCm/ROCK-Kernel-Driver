@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.15 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.m8260_setup.c 1.20 07/18/01 22:56:39 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -66,7 +66,6 @@ extern void mackbd_init_hw(void);
 extern unsigned long loops_per_jiffy;
 
 unsigned char __res[sizeof(bd_t)];
-unsigned long empty_zero_page[1024];
 
 extern char saved_command_line[256];
 

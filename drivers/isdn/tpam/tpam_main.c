@@ -1,4 +1,4 @@
-/* $Id: tpam_main.c,v 1.1.2.1 2001/06/05 19:45:37 kai Exp $
+/* $Id: tpam_main.c,v 1.1.2.2 2001/07/11 12:22:59 kai Exp $
  *
  * Turbo PAM ISDN driver for Linux. (Kernel Driver - main routines)
  *
@@ -148,7 +148,8 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	card->interface.features = 
 		ISDN_FEATURE_P_EURO |
 		ISDN_FEATURE_L2_HDLC |
-		ISDN_FEATURE_L2_MODEM;
+		ISDN_FEATURE_L2_MODEM |
+		ISDN_FEATURE_L3_TRANS;
 	card->interface.hl_hdrlen = 0;
 	card->interface.command = tpam_command;
 	card->interface.writebuf_skb = tpam_writebuf_skb;

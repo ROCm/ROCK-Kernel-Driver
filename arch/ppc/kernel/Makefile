@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.22 06/28/01 08:01:06 trini
+# BK Id: SCCS/s.Makefile 1.24 07/10/01 12:12:22 trini
 #
 #
 # Makefile for the linux kernel.
@@ -76,9 +76,11 @@ obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
 include $(TOPDIR)/Rules.make
 
 entry.o: entry.S ppc_defs.h
+misc.o: misc.S ppc_defs.h
 head.o: head.S ppc_defs.h
 head_4xx.o: head_4xx.S ppc_defs.h
 head_8xx.o: head_8xx.S ppc_defs.h
+gemini_prom.o: gemini_prom.S ppc_defs.h
 
 ppc_defs.h: mk_defs.c ppc_defs.head \
 		$(TOPDIR)/include/asm/mmu.h \

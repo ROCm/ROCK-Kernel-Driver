@@ -60,7 +60,8 @@ struct reiserfs_super_block
                                    don't need to save bytes in the
                                    superblock. -Hans */
   __u16 s_reserved;
-  char s_unused[128] ;			/* zero filled by mkreiserfs */
+  __u32 s_inode_generation;
+  char s_unused[124] ;			/* zero filled by mkreiserfs */
 } __attribute__ ((__packed__));
 
 #define SB_SIZE (sizeof(struct reiserfs_super_block))
@@ -249,6 +250,7 @@ struct reiserfs_journal {
   int j_free_bitmap_nodes ;
   int j_used_bitmap_nodes ;
   struct list_head j_bitmap_nodes ;
+  struct inode j_dummy_inode ;
   struct reiserfs_list_bitmap j_list_bitmap[JOURNAL_NUM_BITMAPS] ;	/* array of bitmaps to record the deleted blocks */
   struct reiserfs_journal_list j_journal_list[JOURNAL_LIST_COUNT] ;	    /* array of all the journal lists */
   struct reiserfs_journal_cnode *j_hash_table[JOURNAL_HASH_SIZE] ; 	    /* hash table for real buffer heads in current trans */ 
