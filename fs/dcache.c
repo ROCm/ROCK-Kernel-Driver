@@ -41,12 +41,7 @@ EXPORT_SYMBOL(dcache_lock);
 
 static kmem_cache_t *dentry_cache; 
 
-/*
- * The allocation size for each dentry.  It is a multiple of 16 bytes.  We
- * leave the final 32-47 bytes for the inline name.
- */
-#define DENTRY_STORAGE	(((sizeof(struct dentry)+32) + 15) & ~15)
-#define DNAME_INLINE_LEN (DENTRY_STORAGE - sizeof(struct dentry))
+#define DNAME_INLINE_LEN (sizeof(struct dentry)-offsetof(struct dentry,d_iname))
 
 /*
  * This is the single most critical data structure when it comes
@@ -1573,7 +1568,7 @@ static void __init dcache_init(unsigned long mempages)
 	 * of the dcache. 
 	 */
 	dentry_cache = kmem_cache_create("dentry_cache",
-					 DENTRY_STORAGE,
+					 sizeof(struct dentry),
 					 0,
 					 SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);
