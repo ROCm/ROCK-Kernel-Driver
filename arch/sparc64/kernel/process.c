@@ -42,6 +42,13 @@
 
 /* #define VERBOSE_SHOWREGS */
 
+/*
+ * Nothing special yet...
+ */
+void default_idle(void)
+{
+}
+
 #ifndef CONFIG_SMP
 
 /*
