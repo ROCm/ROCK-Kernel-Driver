@@ -32,10 +32,9 @@
 typedef struct svc_client	svc_client;
 typedef struct svc_export	svc_export;
 
-static svc_export *	exp_find(svc_client *clp, kdev_t dev);
-static svc_export *	exp_parent(svc_client *clp, kdev_t dev,
+static svc_export *	exp_parent(svc_client *clp, struct super_block *sb,
 					struct dentry *dentry);
-static svc_export *	exp_child(svc_client *clp, kdev_t dev,
+static svc_export *	exp_child(svc_client *clp, struct super_block *sb,
 					struct dentry *dentry);
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
@@ -66,21 +65,6 @@ static int			want_lock;
 static int			hash_count;
 static DECLARE_WAIT_QUEUE_HEAD(	hash_wait );
 
-
-/*
- * Find a client's export for a device.
- */
-static inline svc_export *
-exp_find(svc_client *clp, kdev_t dev)
-{
-	svc_export *	exp;
-
-	exp = clp->cl_export[EXPORT_HASH(dev)];
-	while (exp && !kdev_same(exp->ex_dev, dev))
-		exp = exp->ex_next;
-	return exp;
-}
-
 /*
  * Find the client's export entry matching xdev/xino.
  */
@@ -92,14 +76,26 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 	if (!clp)
 		return NULL;
 
-	exp = clp->cl_export[EXPORT_HASH(dev)];
-	if (exp)
-		do {
-			if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
-				goto out;
-		} while (NULL != (exp = exp->ex_next));
-	exp = NULL;
-out:
+	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next) {
+		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
+			break;
+	}
+	return exp;
+}
+
+svc_export *
+exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
+{
+	int hash = EXPORT_HASH(mnt->mnt_sb->s_dev);
+	svc_export *exp;
+
+	if (!clp)
+		return NULL;
+
+	for (exp = clp->cl_export[hash]; exp; exp = exp->ex_next) {
+		if (exp->ex_dentry == dentry && exp->ex_mnt == mnt)
+			break;
+	}
 	return exp;
 }
 
@@ -107,14 +103,14 @@ out:
  * Find the export entry for a given dentry.  <gam3@acm.org>
  */
 static svc_export *
-exp_parent(svc_client *clp, kdev_t dev, struct dentry *dentry)
+exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	svc_export      *exp;
 
 	if (clp == NULL)
 		return NULL;
 
-	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next)
+	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next)
 		if (is_subdir(dentry, exp->ex_dentry))
 			break;
 	return exp;
@@ -126,14 +122,14 @@ exp_parent(svc_client *clp, kdev_t dev, struct dentry *dentry)
  * <gam3@acm.org>
  */
 static svc_export *
-exp_child(svc_client *clp, kdev_t dev, struct dentry *dentry)
+exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 {
 	svc_export      *exp;
 
 	if (clp == NULL)
 		return NULL;
 
-	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next) {
+	for (exp = clp->cl_export[EXPORT_HASH(sb->s_dev)]; exp; exp = exp->ex_next) {
 		struct dentry	*ndentry = exp->ex_dentry;
 		if (ndentry && is_subdir(ndentry->d_parent, dentry))
 			break;
@@ -221,12 +217,12 @@ exp_export(struct nfsctl_export *nxp)
 		goto finish;
 	}
 
-	if ((parent = exp_child(clp, dev, nd.dentry)) != NULL) {
+	if ((parent = exp_child(clp, inode->i_sb, nd.dentry)) != NULL) {
 		dprintk("exp_export: export not valid (Rule 3).\n");
 		goto finish;
 	}
 	/* Is this is a sub-export, must be a proper subset of FS */
-	if ((parent = exp_parent(clp, dev, nd.dentry)) != NULL) {
+	if ((parent = exp_parent(clp, inode->i_sb, nd.dentry)) != NULL) {
 		dprintk("exp_export: sub-export not valid (Rule 2).\n");
 		goto finish;
 	}
@@ -380,53 +376,32 @@ out:
  * since its harder to fool a kernel module than a user space program.
  */
 int
-exp_rootfh(struct svc_client *clp, kdev_t dev, ino_t ino,
-	   char *path, struct knfsd_fh *f, int maxsize)
+exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 {
 	struct svc_export	*exp;
 	struct nameidata	nd;
 	struct inode		*inode;
 	struct svc_fh		fh;
+	kdev_t			dev;
 	int			err;
 
 	err = -EPERM;
-	if (path) {
-		if (path_init(path, LOOKUP_POSITIVE, &nd) &&
-		    path_walk(path, &nd)) {
-			printk("nfsd: exp_rootfh path not found %s", path);
-			return err;
-		}
-		dev = nd.dentry->d_inode->i_dev;
-		ino = nd.dentry->d_inode->i_ino;
-	
-		dprintk("nfsd: exp_rootfh(%s [%p] %s:%02x:%02x/%ld)\n",
-		         path, nd.dentry, clp->cl_ident,
-		         major(dev), minor(dev), (long) ino);
-		exp = exp_parent(clp, dev, nd.dentry);
-	} else {
-		dprintk("nfsd: exp_rootfh(%s:%02x:%02x/%ld)\n",
-		         clp->cl_ident, major(dev), minor(dev), (long) ino);
-		if ((exp = exp_get(clp, dev, ino))) {
-			nd.mnt = mntget(exp->ex_mnt);
-			nd.dentry = dget(exp->ex_dentry);
-		}
+	/* NB: we probably ought to check that it's NUL-terminated */
+	if (path_init(path, LOOKUP_POSITIVE, &nd) &&
+	    path_walk(path, &nd)) {
+		printk("nfsd: exp_rootfh path not found %s", path);
+		return err;
 	}
+	inode = nd.dentry->d_inode;
+	dev = inode->i_dev;
+
+	dprintk("nfsd: exp_rootfh(%s [%p] %s:%02x:%02x/%ld)\n",
+		 path, nd.dentry, clp->cl_ident,
+		 major(dev), minor(dev), (long) inode->i_ino);
+	exp = exp_parent(clp, inode->i_sb, nd.dentry);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");
 		goto out;
-	}
-
-	inode = nd.dentry->d_inode;
-	if (!inode) {
-		printk("exp_rootfh: Aieee, NULL d_inode\n");
-		goto out;
-	}
-	if (!kdev_same(inode->i_dev, dev) || inode->i_ino != ino) {
-		printk("exp_rootfh: Aieee, ino/dev mismatch\n");
-		printk("exp_rootfh: arg[dev(%02x:%02x):ino(%ld)]"
-		       " inode[dev(%02x:%02x):ino(%ld)]\n",
-		       major(dev), minor(dev), (long) ino,
-		       major(inode->i_dev), minor(inode->i_dev), (long) inode->i_ino);
 	}
 
 	/*
