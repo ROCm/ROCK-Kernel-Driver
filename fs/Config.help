@@ -6,6 +6,11 @@ CONFIG_QUOTA
   <http://www.linuxdoc.org/docs.html#howto>. Probably the quota
   support is only useful for multi user systems. If unsure, say N.
 
+CONFIG_QFMT_V1
+  This quota format was (is) used by kernels earlier than 2.4.??. If
+  you have quota working and you don't want to convert to new quota
+  format say Y here.
+
 CONFIG_MINIX_FS
   Minix is a simple operating system used in many classes about OS's.
   The minix file system (method to organize files on a hard disk

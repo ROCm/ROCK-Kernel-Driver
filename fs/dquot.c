@@ -792,7 +792,10 @@ static inline void flush_warnings(struct dquot **dquots, char *warntype)
 
 static inline char ignore_hardlimit(struct dquot *dquot)
 {
-	return capable(CAP_SYS_RESOURCE);
+	struct mem_dqinfo *info = &sb_dqopt(dquot->dq_sb)->info[dquot->dq_type];
+
+	return capable(CAP_SYS_RESOURCE) &&
+	    (info->dqi_format->qf_fmt_id != QFMT_VFS_OLD || !(info->dqi_flags & V1_DQF_RSQUASH));
 }
 
 static int check_idq(struct dquot *dquot, ulong inodes, char *warntype)

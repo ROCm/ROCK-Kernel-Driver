@@ -135,6 +135,7 @@ struct if_dqinfo {
 #ifdef __KERNEL__
 
 #include <linux/xqm.h>
+#include <linux/dqblk_v1.h>
 
 /*
  * Data for one user/group kept in memory
@@ -161,6 +162,7 @@ struct mem_dqinfo {
 	unsigned int dqi_bgrace;
 	unsigned int dqi_igrace;
 	union {
+		struct v1_mem_dqinfo v1_i;
 	} u;
 };
 

@@ -82,6 +82,7 @@ obj-y				+= binfmt_script.o
 obj-$(CONFIG_BINFMT_ELF)	+= binfmt_elf.o
 
 obj-$(CONFIG_QUOTA) += dquot.o
+obj-$(CONFIG_QFMT_V1) += quota_v1.o
 
 # persistent filesystems
 obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))
