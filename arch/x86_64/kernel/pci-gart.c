@@ -72,6 +72,7 @@ static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 #define EMERGENCY_PAGES 32 /* = 128KB */ 
 
 #ifdef CONFIG_AGP
+extern int agp_amdk8_init(void);
 extern int agp_init(void);
 #define AGPEXTERN extern
 #else
@@ -453,10 +454,14 @@ void __init pci_iommu_init(void)
 	unsigned long aper_size;
 	unsigned long iommu_start;
 		
-#ifndef CONFIG_AGP
+#ifndef CONFIG_AGP_AMD_8151
 	no_agp = 1; 
 #else
-	no_agp = no_agp || (agp_init() < 0) || (agp_copy_info(&info) < 0); 
+	/* Add other K8 AGP bridge drivers here */
+	no_agp = no_agp ||
+			(agp_init() < 0) ||
+			(agp_amdk8_init() < 0) ||
+			(agp_copy_info(&info) < 0);
 #endif	
 
 	if (no_iommu || (!force_mmu && end_pfn < 0xffffffff>>PAGE_SHIFT)) { 
