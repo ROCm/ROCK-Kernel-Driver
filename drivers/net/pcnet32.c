@@ -845,8 +845,9 @@ pcnet32_open(struct net_device *dev)
 	    if (lp->options == (PCNET32_PORT_FD | PCNET32_PORT_AUI))
 		val |= 2;
 	} else if (lp->options & PCNET32_PORT_ASEL) {
-	/* workaround for xSeries250 */
-	    val |= 3;
+	/* workaround of xSeries250, turn on for 79C975 only */
+	    i = ((lp->a.read_csr(ioaddr, 88) | (lp->a.read_csr(ioaddr,89) << 16)) >> 12) & 0xffff;
+	    if (i == 0x2627) val |= 3;
 	}
 	lp->a.write_bcr (ioaddr, 9, val);
     }
