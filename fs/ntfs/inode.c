@@ -23,6 +23,7 @@
 #include <linux/buffer_head.h>
 
 #include "ntfs.h"
+#include "dir.h"
 
 struct inode *ntfs_alloc_big_inode(struct super_block *sb)
 {
@@ -1337,13 +1338,6 @@ void ntfs_clear_big_inode(struct inode *vi)
 	return;
 }
 
-static const option_t si_readdir_opts_arr[] = {
-	{ SHOW_SYSTEM,	"system" },
-	{ SHOW_WIN32,	"win32" },
-	{ SHOW_DOS,	"dos" },
-	{ 0,		NULL }
-};
-
 /**
  * ntfs_show_options - show mount options in /proc/mounts
  * @sf:		seq_file in which to write our mount options
@@ -1368,20 +1362,10 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 		seq_printf(sf, ",dmask=0%o", vol->dmask);
 	}
 	seq_printf(sf, ",nls=%s", vol->nls_map->charset);
-	switch (vol->readdir_opts) {
-	case SHOW_ALL:
-		seq_printf(sf, ",show_inodes=all");
-		break;
-	case SHOW_POSIX:
-		seq_printf(sf, ",show_inodes=posix");
-		break;
-	default:
-		for (i = 0; si_readdir_opts_arr[i].val; i++) {
-			if (si_readdir_opts_arr[i].val & vol->readdir_opts)
-				seq_printf(sf, ",show_inodes=%s",
-						si_readdir_opts_arr[i].str);
-		}
-	}
+	if (NVolCaseSensitive(vol))
+		seq_printf(sf, ",case_sensitive");
+	if (NVolShowSystemFiles(vol))
+		seq_printf(sf, ",show_sys_files");
 	for (i = 0; on_errors_arr[i].val; i++) {
 		if (on_errors_arr[i].val & vol->on_errors)
 			seq_printf(sf, ",errors=%s", on_errors_arr[i].str);
