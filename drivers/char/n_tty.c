@@ -1031,6 +1031,7 @@ do_it_again:
 			tty->link->ctrl_status = 0;
 			if (put_user(cs, b++)) {
 				retval = -EFAULT;
+				b--;
 				break;
 			}
 			nr--;
@@ -1073,6 +1074,7 @@ do_it_again:
 		if (tty->packet && b == buf) {
 			if (put_user(TIOCPKT_DATA, b++)) {
 				retval = -EFAULT;
+				b--;
 				break;
 			}
 			nr--;
@@ -1103,6 +1105,7 @@ do_it_again:
 				if (!eol || (c != __DISABLED_CHAR)) {
 					if (put_user(c, b++)) {
 						retval = -EFAULT;
+						b--;
 						break;
 					}
 					nr--;
@@ -1146,7 +1149,7 @@ do_it_again:
 
 	current->state = TASK_RUNNING;
 	size = b - buf;
-	if (!retval && size) {
+	if (size) {
 		retval = size;
 		if (nr)
 	       		clear_bit(TTY_PUSH, &tty->flags);
