@@ -392,7 +392,6 @@ static void setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 	return;
 
 badframe:
-	udbg_printf("setup_frame32 - badframe in setup_frame, regs=%p frame=%p newsp=%lx\n", regs, frame, newsp);  PPCDBG_ENTER_DEBUGGER();
 #if DEBUG_SIG
 	printk("badframe in setup_frame32, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
@@ -933,7 +932,6 @@ static void setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 	return;
 
 badframe:
-	udbg_printf("setup_frame32 - badframe in setup_frame, regs=%p frame=%p newsp=%lx\n", regs, frame, newsp);  PPCDBG_ENTER_DEBUGGER();
 #if DEBUG_SIG
 	printk("badframe in setup_frame32, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
