@@ -1262,7 +1262,7 @@ static block_state deflate_slow(
     return flush == Z_FINISH ? finish_done : block_done;
 }
 
-int zlib_deflate_workspacesize(void)
+extern int zlib_deflate_workspacesize(void)
 {
     return sizeof(deflate_workspace);
 }

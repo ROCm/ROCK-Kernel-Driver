@@ -7,7 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/nmi.h>
+
 #include <linux/string.h>
 EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(memchr);
@@ -121,9 +121,4 @@ extern char ia64_spinlock_contention;
 EXPORT_SYMBOL(ia64_spinlock_contention);
 #  endif
 # endif
-#endif
-
-#ifdef CONFIG_CRASH_DUMP_MODULE
-extern char *_end;
-EXPORT_SYMBOL(_end);
 #endif

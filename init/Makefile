@@ -10,7 +10,7 @@ mounts-$(CONFIG_BLK_DEV_INITRD)	+= do_mounts_initrd.o
 mounts-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
 
 extra-$(CONFIG_KERNTYPES)	+= kerntypes.o
-CFLAGS_kerntypes.o		:= -gdwarf-2
+CFLAGS_kerntypes.o		:= -gstabs
 
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h

@@ -34,7 +34,6 @@
 
 static __s32 	     saved_irq_count;	/* saved preempt_count() flags */
 
-
 static int
 alloc_dha_stack(void)
 {
@@ -290,10 +289,6 @@ __dump_configure_header(const struct pt_regs *regs)
 void
 __dump_init(uint64_t local_memory_start)
 {
-	dump_mbanks = 1;
-	dump_mbank[ 0 ].start = 0;
-	dump_mbank[ 0 ].end  = (((u64) max_mapnr) << PAGE_SHIFT) - 1;
-	dump_mbank[ 0 ].type = DUMP_MBANK_TYPE_CONVENTIONAL_MEMORY;
 	return;
 }
 

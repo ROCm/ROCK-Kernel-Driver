@@ -361,7 +361,7 @@ int dump_overlay_sequencer(void)
 	struct dump_data_filter *filter = dump_config.dumper->filter;
 	struct dump_data_filter *filter2 = dumper_stage2.filter;
 	int pass = 0, err = 0, save = 0;
-	int (*action)(unsigned long, unsigned long,unsigned long, unsigned long);
+	int (*action)(unsigned long, unsigned long);
 
 	/* Make sure gzip compression is being used */
 	if (dump_config.dumper->compress->compress_type != DUMP_COMPRESS_GZIP) {
@@ -415,7 +415,7 @@ int dump_overlay_sequencer(void)
 			break;
 		}	
 		printk("\n %d overlay pages %s of %d each in pass %d\n", 
-		err, save ? "saved" : "skipped", (int)DUMP_PAGE_SIZE, pass);
+		err, save ? "saved" : "skipped", DUMP_PAGE_SIZE, pass);
 	}
 
 	return err;
@@ -447,7 +447,7 @@ static inline struct page *dump_next_saved_page(void)
  * faster.
  */
 int dump_saved_data_iterator(int pass, int (*action)(unsigned long, 
-	unsigned long,unsigned long, unsigned long), struct dump_data_filter *filter)
+	unsigned long), struct dump_data_filter *filter)
 {
 	loff_t loc, end;
 	struct page *page;
@@ -455,16 +455,16 @@ int dump_saved_data_iterator(int pass, int (*action)(unsigned long,
 	int i, err = 0;
 	unsigned long sz;
 
-	for (i = 0; i < dump_mbanks; i++) {
-		loc  = dump_mbank[i].start;
-		end = dump_mbank[i].end;
+	for (i = 0; i < filter->num_mbanks; i++) {
+		loc  = filter->start[i];
+		end = filter->end[i];
 		printk("pass %d, start off 0x%llx end offset 0x%llx\n", pass,
 			loc, end);
 
 		/* loc will get treated as logical offset into stage 1 */
 		page = dump_get_saved_page(loc);
 			
-		for (; loc < end; loc += /*PAGE_SIZE*/DUMP_PAGE_SIZE) {
+		for (; loc < end; loc += PAGE_SIZE) {
 			dump_config.dumper->curr_loc = loc;
 			if (!page) {
 				printk("no more saved data for pass %d\n", 
@@ -474,8 +474,9 @@ int dump_saved_data_iterator(int pass, int (*action)(unsigned long,
 			sz = (loc + PAGE_SIZE > end) ? end - loc : PAGE_SIZE;
 
 			if (page && filter->selector(pass, (unsigned long)page, 
-				loc, PAGE_SIZE))  {
-				if ((err = action((unsigned long)page, sz,DUMP_PAGE_SIZE,loc%PAGE_SIZE)))
+				PAGE_SIZE))  {
+				pr_debug("mem offset 0x%llx\n", loc);
+				if ((err = action((unsigned long)page, sz))) 
 					break;
 				else
 					count++;
@@ -491,30 +492,27 @@ int dump_saved_data_iterator(int pass, int (*action)(unsigned long,
 	return err ? err : count;
 }
 
-static inline int dump_overlay_pages_done(unsigned long loc, unsigned long phys_addr,unsigned long len,unsigned long offset)
+static inline int dump_overlay_pages_done(struct page *page, int nr)
 {
 	int ret=0;
-	struct page *page= (struct page *)loc;
 
-	if((offset+len) == PAGE_SIZE)/*This ensures that a complete page is dumped*/
-	{
+	for (; nr ; page++, nr--) {
 		if (dump_check_and_free_page(dump_memdev, page))
 			ret++;
 	}
-
 	return ret;
 }
 
-int dump_overlay_save_data(unsigned long loc, unsigned long phys_addr,unsigned long len,unsigned long offset)
+int dump_overlay_save_data(unsigned long loc, unsigned long len)
 {
 	int err = 0;
 	struct page *page = (struct page *)loc;
 	static unsigned long cnt = 0;
 
-	if ((err = dump_generic_save_data(loc,phys_addr,len,offset)))
+	if ((err = dump_generic_save_data(loc, len)))
 		return err;
 
-	if (dump_overlay_pages_done((unsigned long)page, phys_addr,len /*>> PAGE_SHIFT*/,offset)) {
+	if (dump_overlay_pages_done(page, len >> PAGE_SHIFT)) {
 		cnt++;
 		if (!(cnt & 0x7f))
 			pr_debug("released page 0x%lx\n", page_to_pfn(page));
@@ -524,11 +522,11 @@ int dump_overlay_save_data(unsigned long loc, unsigned long phys_addr,unsigned l
 }
 
 
-int dump_overlay_skip_data(unsigned long loc, unsigned long phys_addr,unsigned long len,unsigned long offset_in_page)
+int dump_overlay_skip_data(unsigned long loc, unsigned long len)
 {
 	struct page *page = (struct page *)loc;
 
-	dump_overlay_pages_done((unsigned long)page, phys_addr,len /*>> PAGE_SHIFT*/,offset_in_page);
+	dump_overlay_pages_done(page, len >> PAGE_SHIFT);
 	return 0;
 }
 
@@ -553,7 +551,7 @@ int dump_overlay_resume(void)
         err = dump_activate_softboot();
 #endif
 		
-//	return err;
+	return err;
 	err = dump_switchover_stage();  /* plugs into soft boot mechanism */
 	dump_config.dumper = &dumper_stage1; /* set things back */
 	return err;
@@ -602,7 +600,7 @@ int dump_overlay_configure(unsigned long devid)
 	}
 	dump_config.dump_addr = (unsigned long)dump_saved_config;
 	printk("Dump config block of size %d set up at 0x%lx\n", 
-		(int)sizeof(*dump_saved_config), (unsigned long)dump_saved_config);
+		sizeof(*dump_saved_config), (unsigned long)dump_saved_config);
 	return 0;
 }
 
@@ -660,7 +658,7 @@ int dump_staged_unconfigure(void)
 /* ----- PASSTHRU FILTER ROUTINE --------- */
 
 /* transparent - passes everything through */
-int dump_passthru_filter(int pass, unsigned long loc, unsigned long phy_addr,unsigned long sz)
+int dump_passthru_filter(int pass, unsigned long loc, unsigned long sz)
 {
 	return 1;
 }
@@ -739,7 +737,7 @@ static int dph_valid(struct __dump_page *dph)
 	if ((dph->dp_address & (PAGE_SIZE - 1)) || (dph->dp_flags 
 	      > DUMP_DH_COMPRESSED) || (!dph->dp_flags) ||
 		(dph->dp_size > PAGE_SIZE)) {
-	printk("dp->address = 0x%lx, dp->size = 0x%x, dp->flag = 0x%x\n",
+	printk("dp->address = 0x%llx, dp->size = 0x%x, dp->flag = 0x%x\n",
 		dph->dp_address, dph->dp_size, dph->dp_flags);
 		return 0;
 	}
@@ -769,14 +767,12 @@ int dump_verify_lcrash_data(void *buf, unsigned long sz)
  * TBD/Later: Consider avoiding the copy by using a scatter/gather 
  * vector representation for the dump buffer
  */
-int dump_passthru_add_data(unsigned long loc, unsigned long phys_addr,unsigned long sz,unsigned long offset_in_page)
+int dump_passthru_add_data(unsigned long loc, unsigned long sz)
 {
 	struct page *page = (struct page *)loc;
 	void *buf = dump_config.dumper->curr_buf;
 	int err = 0;
 
-//	printk(KERN_EMERG "In dump passsthrough add data \n");
-//	mdelay(1000);
 	if ((err = dump_copy_pages(buf, page, sz))) {
 		printk("dump_copy_pages failed");
 		return err;
@@ -846,7 +842,7 @@ struct dump_fmt dump_fmt_passthru = {
 /* Filter that simply passes along any data within the range (transparent)*/
 /* Note: The start and end ranges in the table are filled in at run-time */
 
-extern int dump_filter_none(int pass, unsigned long loc, unsigned long phy_addr,unsigned long sz);
+extern int dump_filter_none(int pass, unsigned long loc, unsigned long sz);
 
 struct dump_data_filter dump_passthru_filtertable[MAX_PASSES] = {
 {.name = "passkern", .selector = dump_passthru_filter, 

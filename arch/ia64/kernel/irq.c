@@ -74,9 +74,6 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
-#ifdef CONFIG_CRASH_DUMP_MODULE
-EXPORT_SYMBOL(_irq_desc);
-#endif
 
 #ifdef CONFIG_IA64_GENERIC
 irq_desc_t * __ia64_irq_desc (unsigned int irq)
@@ -931,14 +928,7 @@ static struct proc_dir_entry * irq_dir [NR_IRQS];
 
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
-#if !(defined(CONFIG_CRASH_DUMP) || defined (CONFIG_CRASH_DUMP_MODULE))
-static
-#endif
-unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
-
-#ifdef CONFIG_CRASH_DUMP_MODULE
-EXPORT_SYMBOL(irq_affinity);
-#endif
+static cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
 

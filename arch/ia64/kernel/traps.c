@@ -23,8 +23,6 @@
 #include <asm/intrinsics.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
-#include <asm/nmi.h>
-#include <linux/dump.h>
 
 /*
  * fp_emulate() needs to be able to access and update all floating point registers.  Those
@@ -115,7 +113,6 @@ die (const char *str, struct pt_regs *regs, long err)
 		printk("%s[%d]: %s %ld [%d]\n",
 			current->comm, current->pid, str, err, ++die_counter);
 		show_regs(regs);
-		dump((char *)str, regs);
   	} else
 		printk(KERN_ERR "Recursive die() failure, output suppressed\n");
 

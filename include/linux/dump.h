@@ -56,7 +56,6 @@
  * macro to __dump_memcpy() and use it's arch specific version.
  */
 #define DUMP_memcpy		memcpy
-#define bzero(a,b)              memset(a, 0, b)
 
 /* necessary header files */
 #include <asm/dump.h>			/* for architecture-specific header */
