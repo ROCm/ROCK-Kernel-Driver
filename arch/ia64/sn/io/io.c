@@ -529,7 +529,11 @@ hub_dmaaddr_drain(	vertex_hdl_t vhdl,
 void
 hub_provider_startup(vertex_hdl_t hubv)
 {
+	hubinfo_t       hubinfo;
+
+	hubinfo_get(hubv, &hubinfo);
 	hub_pio_init(hubv);
+	intr_init_vecblk(nasid_to_cnodeid(hubinfo->h_nasid));
 }
 
 /*
