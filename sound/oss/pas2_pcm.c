@@ -16,6 +16,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "pas2.h"
@@ -43,6 +44,8 @@ static unsigned short pcm_bitsok = 8;	/* mask of OK bits */
 static int      pcm_busy = 0;
 int             pas_audiodev = -1;
 static int      open_mode = 0;
+
+extern spinlock_t lock;
 
 static int pcm_set_speed(int arg)
 {
@@ -101,8 +104,7 @@ static int pcm_set_speed(int arg)
 	pcm_filter = tmp;
 #endif
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	pas_write(tmp & ~(0x40 | 0x80), 0x0B8A);
 	pas_write(0x00 | 0x30 | 0x04, 0x138B);
@@ -110,7 +112,7 @@ static int pcm_set_speed(int arg)
 	pas_write((foo >> 8) & 0xff, 0x1388);
 	pas_write(tmp, 0x0B8A);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 
 	return pcm_speed;
 }
@@ -212,15 +214,14 @@ static int pas_audio_open(int dev, int mode)
 
 	DEB(printk("pas2_pcm.c: static int pas_audio_open(int mode = %X)\n", mode));
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 	if (pcm_busy)
 	{
-		restore_flags(flags);
+		spin_unlock_irqrestore(&lock, flags);
 		return -EBUSY;
 	}
 	pcm_busy = 1;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 
 	if ((err = pas_set_intr(PAS_PCM_INTRBITS)) < 0)
 		return err;
@@ -238,15 +239,14 @@ static void pas_audio_close(int dev)
 
 	DEB(printk("pas2_pcm.c: static void pas_audio_close(void)\n"));
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	pas_audio_reset(dev);
 	pas_remove_intr(PAS_PCM_INTRBITS);
 	pcm_mode = PCM_NON;
 
 	pcm_busy = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 }
 
 static void pas_audio_output_block(int dev, unsigned long buf, int count,
@@ -265,8 +265,7 @@ static void pas_audio_output_block(int dev, unsigned long buf, int count,
 	    cnt == pcm_count)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	pas_write(pas_read(0xF8A) & ~0x40,
 		  0xF8A);
@@ -293,7 +292,7 @@ static void pas_audio_output_block(int dev, unsigned long buf, int count,
 
 	pcm_mode = PCM_DAC;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 }
 
 static void pas_audio_start_input(int dev, unsigned long buf, int count,
@@ -313,8 +312,7 @@ static void pas_audio_start_input(int dev, unsigned long buf, int count,
 	    cnt == pcm_count)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	/* DMAbuf_start_dma (dev, buf, count, DMA_MODE_READ); */
 
@@ -338,7 +336,7 @@ static void pas_audio_start_input(int dev, unsigned long buf, int count,
 
 	pcm_mode = PCM_ADC;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 }
 
 #ifndef NO_TRIGGER
@@ -346,8 +344,7 @@ static void pas_audio_trigger(int dev, int state)
 {
 	unsigned long   flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 	state &= open_mode;
 
 	if (state & PCM_ENABLE_OUTPUT)
@@ -357,7 +354,7 @@ static void pas_audio_trigger(int dev, int state)
 	else
 		pas_write(pas_read(0xF8A) & ~0x40, 0xF8A);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock, flags);
 }
 #endif
 
