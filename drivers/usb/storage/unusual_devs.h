@@ -297,6 +297,13 @@ UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310,
 		US_SC_SCSI, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
 
+/* Submitted by Rajesh Kumble Nayak <nayak@obs-nice.fr> */
+UNUSUAL_DEV(  0x054c, 0x002e, 0x0500, 0x0500, 
+		"Sony",
+		"Handycam HC-85",
+		US_SC_UFI, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
+
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Sony",
 		"Memorystick MSC-U01N",
