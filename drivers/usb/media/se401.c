@@ -1521,10 +1521,10 @@ static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
 }
 
 static struct usb_driver se401_driver = {
-        name:		"se401",
-        id_table:	device_table,
+        .name		= "se401",
+        .id_table	= device_table,
 	.probe =	se401_probe,
-        disconnect:	se401_disconnect
+        .disconnect	= se401_disconnect
 };
 
 
