@@ -10,7 +10,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
-#include <linux/device.h>
+#include <linux/sysdev.h>
 
 #include <asm/atomic.h>
 #include <asm/system.h>
