@@ -168,7 +168,6 @@ int __init rtc_MK48T08_init(void)
 		return -ENODEV;
 
 	printk(KERN_INFO "MK48T08 Real Time Clock Driver v%s\n", RTC_VERSION);
-	misc_register(&rtc_dev);
-	return 0;
+	return misc_register(&rtc_dev);
 }
 

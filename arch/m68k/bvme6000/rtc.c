@@ -177,7 +177,6 @@ int __init rtc_DP8570A_init(void)
 		return -ENODEV;
 
 	printk(KERN_INFO "DP8570A Real Time Clock Driver v%s\n", RTC_VERSION);
-	misc_register(&rtc_dev);
-	return 0;
+	return misc_register(&rtc_dev);
 }
 
