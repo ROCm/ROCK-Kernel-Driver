@@ -37,31 +37,14 @@
 #define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
 
 #ifdef CONFIG_HUGETLB_PAGE
+# define REGION_HPAGE		(4UL)	/* note: this is hardcoded in reload_context()!*/
+# define REGION_SHIFT		61
+# define HPAGE_REGION_BASE	(REGION_HPAGE << REGION_SHIFT)
+# define HPAGE_SHIFT		hpage_shift
+# define HPAGE_SHIFT_DEFAULT	28	/* check ia64 SDM for architecture supported size */
+# define HPAGE_SIZE		(__IA64_UL_CONST(1) << HPAGE_SHIFT)
+# define HPAGE_MASK		(~(HPAGE_SIZE - 1))
 
-# if defined(CONFIG_HUGETLB_PAGE_SIZE_4GB)
-#  define HPAGE_SHIFT	32
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_1GB)
-#  define HPAGE_SHIFT	30
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_256MB)
-#  define HPAGE_SHIFT	28
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_64MB)
-#  define HPAGE_SHIFT	26
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_16MB)
-#  define HPAGE_SHIFT	24
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_4MB)
-#  define HPAGE_SHIFT	22
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_1MB)
-#  define HPAGE_SHIFT	20
-# elif defined(CONFIG_HUGETLB_PAGE_SIZE_256KB)
-#  define HPAGE_SHIFT	18
-# else
-#  error Unsupported IA-64 HugeTLB Page Size!
-# endif
-
-# define REGION_HPAGE	(4UL)	/* note: this is hardcoded in mmu_context.h:reload_context()!*/
-# define REGION_SHIFT	61
-# define HPAGE_SIZE	(__IA64_UL_CONST(1) << HPAGE_SHIFT)
-# define HPAGE_MASK	(~(HPAGE_SIZE - 1))
 # define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 # define ARCH_HAS_HUGEPAGE_ONLY_RANGE
 #endif /* CONFIG_HUGETLB_PAGE */
@@ -140,6 +123,7 @@ typedef union ia64_va {
 # define is_hugepage_only_range(addr, len)		\
 	 (REGION_NUMBER(addr) == REGION_HPAGE &&	\
 	  REGION_NUMBER((addr)+(len)) == REGION_HPAGE)
+extern unsigned int hpage_shift;
 #endif
 
 static __inline__ int
