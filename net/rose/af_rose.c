@@ -1083,7 +1083,11 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	asmptr = skb->h.raw = skb_put(skb, len);
 
-	memcpy_fromiovec(asmptr, msg->msg_iov, len);
+	err = memcpy_fromiovec(asmptr, msg->msg_iov, len);
+	if (err) {
+		kfree_skb(skb);
+		return err;
+	}
 
 	/*
 	 *	If the Q BIT Include socket option is in force, the first
@@ -1133,8 +1137,10 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 		frontlen = skb_headroom(skb);
 
 		while (skb->len > 0) {
-			if ((skbn = sock_alloc_send_skb(sk, frontlen + ROSE_PACLEN, 0, &err)) == NULL)
+			if ((skbn = sock_alloc_send_skb(sk, frontlen + ROSE_PACLEN, 0, &err)) == NULL) {
+				kfree_skb(skb);
 				return err;
+			}
 
 			skbn->sk   = sk;
 			skbn->free = 1;
@@ -1159,7 +1165,7 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 		}
 
 		skb->free = 1;
-		kfree_skb(skb, FREE_WRITE);
+		kfree_skb(skb);
 	} else {
 		skb_queue_tail(&sk->sk_write_queue, skb);		/* Throw it on the queue */
 	}

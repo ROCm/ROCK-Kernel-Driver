@@ -90,7 +90,7 @@ config IP_ROUTE_NAT
 	  destination addresses of packets that pass through it, in a manner
 	  you specify.  General information about Network Address Translation
 	  can be gotten from the document
-	  <http://www.csn.tu-chemnitz.de/~mha/linux-ip-nat/diplom/nat.html>.
+	  <http://www.hasenstein.com/linux-ip-nat/diplom/nat.html>.
 
 config IP_ROUTE_MULTIPATH
 	bool "IP: equal cost multipath"

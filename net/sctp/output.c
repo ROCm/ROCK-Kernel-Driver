@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -350,7 +350,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	 */
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet***\n");
 	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
-
 		if (sctp_chunk_is_data(chunk)) {
 
 			if (!chunk->has_tsn) {
