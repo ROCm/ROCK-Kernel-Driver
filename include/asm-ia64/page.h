@@ -79,7 +79,8 @@ do {						\
 #define alloc_zeroed_user_highpage(vma, vaddr) \
 ({						\
 	struct page *page = alloc_page_vma(GFP_HIGHUSER | __GFP_ZERO, vma, vaddr); \
-	flush_dcache_page(page);		\
+	if (page)				\
+ 		flush_dcache_page(page);	\
 	page;					\
 })
 
