@@ -325,6 +325,12 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
+#define NFS4_enc_statfs_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_getattr_maxsz)
+#define NFS4_dec_statfs_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 12)
 
 
 
@@ -1686,6 +1692,28 @@ static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, uint32_t *p, const struct
 }
 
 /*
+ * a STATFS request
+ */
+static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, uint32_t *p, const struct nfs4_statfs_arg *args)
+{
+	extern u32 nfs4_statfs_bitmap[];
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status == 0)
+		status = encode_getattr_two(&xdr,
+				args->bitmask[0] & nfs4_statfs_bitmap[0],
+				args->bitmask[1] & nfs4_statfs_bitmap[1]);
+	return status;
+}
+
+/*
  * a RENEW request
  */
 static int
@@ -1938,6 +1966,57 @@ static int decode_attr_fileid(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t
 	return 0;
 }
 
+static int decode_attr_files_avail(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_FILES_AVAIL - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_FILES_AVAIL)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[0] &= ~FATTR4_WORD0_FILES_AVAIL;
+	}
+	dprintk("%s: files avail=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
+}
+
+static int decode_attr_files_free(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_FILES_FREE - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_FILES_FREE)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[0] &= ~FATTR4_WORD0_FILES_FREE;
+	}
+	dprintk("%s: files free=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
+}
+
+static int decode_attr_files_total(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_FILES_TOTAL - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_FILES_TOTAL)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[0] &= ~FATTR4_WORD0_FILES_TOTAL;
+	}
+	dprintk("%s: files total=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
+}
+
 static int decode_attr_maxlink(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *maxlink)
 {
 	uint32_t *p;
@@ -2073,6 +2152,57 @@ static int decode_attr_rdev(struct xdr_stream *xdr, uint32_t *bitmap, dev_t *rde
 	}
 	dprintk("%s: rdev=(0x%x:0x%x)\n", __FUNCTION__, major, minor);
 	return 0;
+}
+
+static int decode_attr_space_avail(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_SPACE_AVAIL - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_SPACE_AVAIL)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[1] &= ~FATTR4_WORD1_SPACE_AVAIL;
+	}
+	dprintk("%s: space avail=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
+}
+
+static int decode_attr_space_free(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_SPACE_FREE - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_SPACE_FREE)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[1] &= ~FATTR4_WORD1_SPACE_FREE;
+	}
+	dprintk("%s: space free=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
+}
+
+static int decode_attr_space_total(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *res)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*res = 0;
+	if (unlikely(bitmap[1] & (FATTR4_WORD1_SPACE_TOTAL - 1U)))
+		return -EIO;
+	if (likely(bitmap[1] & FATTR4_WORD1_SPACE_TOTAL)) {
+		READ_BUF(8);
+		READ64(*res);
+		bitmap[1] &= ~FATTR4_WORD1_SPACE_TOTAL;
+	}
+	dprintk("%s: space total=%Lu\n", __FUNCTION__, (unsigned long long)*res);
+	return status;
 }
 
 static int decode_attr_space_used(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *used)
@@ -2244,14 +2374,11 @@ static int decode_create(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 	return 0;
 }
 
-extern uint32_t nfs4_fsstat_bitmap[2];
-
 static int
 decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
     struct nfs_server *server)
 {
 	struct nfs_fattr *nfp = getattr->gt_attrs;
-	struct nfs_fsstat *fsstat = getattr->gt_fsstat;
 	uint32_t attrlen, dummy32, bmlen,
 		 bmval0 = 0,
 		 bmval1 = 0,
@@ -2335,24 +2462,6 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
                 READ64(nfp->fileid);
                 dprintk("read_attrs: fileid=%Ld\n", (long long) nfp->fileid);
         }
-	if (bmval0 & FATTR4_WORD0_FILES_AVAIL) {
-		READ_BUF(8);
-		len += 8;
-		READ64(fsstat->afiles);
-		dprintk("read_attrs: files_avail=0x%Lx\n", (long long) fsstat->afiles);
-	}
-        if (bmval0 & FATTR4_WORD0_FILES_FREE) {
-                READ_BUF(8);
-                len += 8;
-                READ64(fsstat->ffiles);
-                dprintk("read_attrs: files_free=0x%Lx\n", (long long) fsstat->ffiles);
-        }
-        if (bmval0 & FATTR4_WORD0_FILES_TOTAL) {
-                READ_BUF(8);
-                len += 8;
-                READ64(fsstat->tfiles);
-                dprintk("read_attrs: files_tot=0x%Lx\n", (long long) fsstat->tfiles);
-        }
 	
         if (bmval1 & FATTR4_WORD1_MODE) {
                 READ_BUF(4);
@@ -2413,24 +2522,6 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 			nfp->rdev = 0;
 		dprintk("read_attrs: rdev=%u:%u\n", major, minor);
         }
-        if (bmval1 & FATTR4_WORD1_SPACE_AVAIL) {
-                READ_BUF(8);
-                len += 8;
-                READ64(fsstat->abytes);
-                dprintk("read_attrs: savail=0x%Lx\n", (long long) fsstat->abytes);
-        }
-	if (bmval1 & FATTR4_WORD1_SPACE_FREE) {
-                READ_BUF(8);
-                len += 8;
-                READ64(fsstat->fbytes);
-                dprintk("read_attrs: sfree=0x%Lx\n", (long long) fsstat->fbytes);
-        }
-        if (bmval1 & FATTR4_WORD1_SPACE_TOTAL) {
-                READ_BUF(8);
-                len += 8;
-                READ64(fsstat->tbytes);
-                dprintk("read_attrs: stotal=0x%Lx\n", (long long) fsstat->tbytes);
-        }
         if (bmval1 & FATTR4_WORD1_SPACE_USED) {
                 READ_BUF(8);
                 len += 8;
@@ -2459,6 +2550,40 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
                 goto xdr_error;
 	
         DECODE_TAIL;
+}
+
+static int decode_statfs(struct xdr_stream *xdr, struct nfs_fsstat *fsstat)
+{
+	uint32_t *savep;
+	uint32_t attrlen, 
+		 bitmap[2] = {0};
+	int status;
+	
+	if ((status = decode_op_hdr(xdr, OP_GETATTR)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_bitmap(xdr, bitmap)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_length(xdr, &attrlen, &savep)) != 0)
+		goto xdr_error;
+
+	if ((status = decode_attr_files_avail(xdr, bitmap, &fsstat->afiles)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_files_free(xdr, bitmap, &fsstat->ffiles)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_files_total(xdr, bitmap, &fsstat->tfiles)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_space_avail(xdr, bitmap, &fsstat->abytes)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_space_free(xdr, bitmap, &fsstat->fbytes)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_space_total(xdr, bitmap, &fsstat->tbytes)) != 0)
+		goto xdr_error;
+
+	status = verify_attr_len(xdr, savep, attrlen);
+xdr_error:
+	if (status != 0)
+		printk(KERN_NOTICE "%s: xdr error %d!\n", __FUNCTION__, -status);
+	return status;
 }
 
 static int decode_pathconf(struct xdr_stream *xdr, struct nfs_pathconf *pathconf)
@@ -3648,6 +3773,24 @@ static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs_p
 }
 
 /*
+ * STATFS request
+ */
+static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs_fsstat *fsstat)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_putfh(&xdr);
+	if (!status)
+		status = decode_statfs(&xdr, fsstat);
+	return status;
+}
+
+/*
  * Decode RENEW response
  */
 static int
@@ -3850,6 +3993,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LINK,		enc_link,	dec_link),
   PROC(CREATE,		enc_create,	dec_create),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
+  PROC(STATFS,		enc_statfs,	dec_statfs),
 };
 
 struct rpc_version		nfs_version4 = {

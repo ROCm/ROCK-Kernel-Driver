@@ -650,6 +650,11 @@ struct nfs4_setclientid {
 	struct nfs4_client *		sc_state;	  /* response */
 };
 
+struct nfs4_statfs_arg {
+	const struct nfs_fh *		fh;
+	const u32 *			bitmask;
+};
+
 struct nfs4_op {
 	u32				opnum;
 	union {
