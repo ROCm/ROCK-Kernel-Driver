@@ -23,7 +23,6 @@
 
 struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 int do_remount_sb(struct super_block *sb, int flags, void * data);
-void kill_super(struct super_block *sb);
 int __init init_rootfs(void);
 
 static struct list_head *mount_hashtable;
@@ -152,7 +151,7 @@ void __mntput(struct vfsmount *mnt)
 	struct super_block *sb = mnt->mnt_sb;
 	dput(mnt->mnt_root);
 	free_vfsmnt(mnt);
-	kill_super(sb);
+	deactivate_super(sb);
 }
 
 /* iterator */

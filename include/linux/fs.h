@@ -959,6 +959,7 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 void kill_block_super(struct super_block *sb);
 void kill_anon_super(struct super_block *sb);
 void kill_litter_super(struct super_block *sb);
+void deactivate_super(struct super_block *sb);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \

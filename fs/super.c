@@ -297,22 +297,6 @@ static inline void destroy_super(struct super_block *s)
 /* Superblock refcounting  */
 
 /**
- *	deactivate_super	-	turn an active reference into temporary
- *	@s: superblock to deactivate
- *
- *	Turns an active reference into temporary one.  Returns 0 if there are
- *	other active references, 1 if we had deactivated the last one.
- */
-static inline int deactivate_super(struct super_block *s)
-{
-	if (!atomic_dec_and_lock(&s->s_active, &sb_lock))
-		return 0;
-	s->s_count -= S_BIAS-1;
-	spin_unlock(&sb_lock);
-	return 1;
-}
-
-/**
  *	put_super	-	drop a temporary reference to superblock
  *	@s: superblock in question
  *
@@ -325,6 +309,28 @@ static inline void put_super(struct super_block *s)
 	if (!--s->s_count)
 		destroy_super(s);
 	spin_unlock(&sb_lock);
+}
+
+/**
+ *	deactivate_super	-	drop an active reference to superblock
+ *	@s: superblock to deactivate
+ *
+ *	Drops an active reference to superblock, acquiring a temprory one if
+ *	there is no active references left.  In that case we lock superblock,
+ *	tell fs driver to shut it down and drop the temporary reference we
+ *	had just acquired.
+ */
+void deactivate_super(struct super_block *s)
+{
+	struct file_system_type *fs = s->s_type;
+	if (atomic_dec_and_lock(&s->s_active, &sb_lock)) {
+		s->s_count -= S_BIAS-1;
+		spin_unlock(&sb_lock);
+		down_write(&s->s_umount);
+		fs->kill_sb(s);
+		put_filesystem(fs);
+		put_super(s);
+	}
 }
 
 /**
@@ -380,13 +386,12 @@ static void insert_super(struct super_block *s, struct file_system_type *type)
  *	remove_super	-	makes superblock unreachable
  *	@s:	superblock in question
  *
- *	Removes superblock from the lists, unlocks it and drop the reference
- *	@s should have no active references by that time and after
- *	remove_super() it's essentially	in rundown mode - all remaining
- *	references are temporary, no new reference of any sort are going
- *	to appear and all holders of temporary ones will eventually drop them.
- *	At that point superblock itself will be destroyed; all its contents
- *	is already gone.
+ *	Removes superblock from the lists, and unlocks it.  @s should have
+ *	no active references by that time and after remove_super() it's
+ *	essentially in rundown mode - all remaining references are temporary,
+ *	no new references of any sort are going to appear and all holders
+ *	of temporary ones will eventually drop them.  At that point superblock
+ *	itself will be destroyed; all its contents is already gone.
  */
 static void remove_super(struct super_block *s)
 {
@@ -395,7 +400,6 @@ static void remove_super(struct super_block *s)
 	list_del(&s->s_instances);
 	spin_unlock(&sb_lock);
 	up_write(&s->s_umount);
-	put_super(s);
 }
 
 static void generic_shutdown_super(struct super_block *sb)
@@ -430,18 +434,6 @@ static void generic_shutdown_super(struct super_block *sb)
 		unlock_super(sb);
 	}
 	remove_super(sb);
-}
-
-void kill_super(struct super_block *sb)
-{
-	struct file_system_type *fs = sb->s_type;
-
-	if (!deactivate_super(sb))
-		return;
-
-	down_write(&sb->s_umount);
-	fs->kill_sb(sb);
-	put_filesystem(fs);
 }
 
 struct super_block *sget(struct file_system_type *type,
@@ -732,7 +724,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	if (s->s_root) {
 		if ((flags ^ s->s_flags) & MS_RDONLY) {
 			up_write(&s->s_umount);
-			kill_super(s);
+			deactivate_super(s);
 			s = ERR_PTR(-EBUSY);
 		}
 		bd_release(bdev);
@@ -743,7 +735,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
 			up_write(&s->s_umount);
-			kill_super(s);
+			deactivate_super(s);
 			s = ERR_PTR(error);
 		} else
 			s->s_flags |= MS_ACTIVE;
@@ -781,7 +773,7 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error) {
 		up_write(&s->s_umount);
-		kill_super(s);
+		deactivate_super(s);
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
@@ -807,7 +799,7 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
 			up_write(&s->s_umount);
-			kill_super(s);
+			deactivate_super(s);
 			return ERR_PTR(error);
 		}
 		s->s_flags |= MS_ACTIVE;

@@ -291,6 +291,7 @@ EXPORT_SYMBOL(get_sb_nodev);
 EXPORT_SYMBOL(get_sb_single);
 EXPORT_SYMBOL(kill_anon_super);
 EXPORT_SYMBOL(kill_litter_super);
+EXPORT_SYMBOL(deactivate_super);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);
