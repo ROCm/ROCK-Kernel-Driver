@@ -252,7 +252,6 @@ isdn_dc2minor(int di, int ch)
 	return -1;
 }
 
-static int isdn_timer_cnt1 = 0;
 static int isdn_timer_cnt2 = 0;
 static int isdn_timer_cnt3 = 0;
 
@@ -269,11 +268,6 @@ isdn_timer_funct(ulong dummy)
 			isdn_tty_modem_xmit();
 	}
 	if (tf & ISDN_TIMER_SLOW) {
-		if (++isdn_timer_cnt1 >= ISDN_TIMER_02SEC) {
-			isdn_timer_cnt1 = 0;
-			if (tf & ISDN_TIMER_NETDIAL)
-				isdn_net_dial();
-		}
 		if (++isdn_timer_cnt2 >= ISDN_TIMER_1SEC) {
 			isdn_timer_cnt2 = 0;
 			if (tf & ISDN_TIMER_NETHANGUP)
@@ -308,7 +302,6 @@ isdn_timer_ctrl(int tf, int onoff)
 	cli();
 	if ((tf & ISDN_TIMER_SLOW) && (!(dev->tflags & ISDN_TIMER_SLOW))) {
 		/* If the slow-timer wasn't activated until now */
-		isdn_timer_cnt1 = 0;
 		isdn_timer_cnt2 = 0;
 	}
 	old_tflags = dev->tflags;

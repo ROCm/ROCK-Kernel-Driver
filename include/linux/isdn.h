@@ -245,18 +245,12 @@ typedef struct {
 #define ISDN_TIMER_MODEMPLUS   2
 #define ISDN_TIMER_MODEMRING   4
 #define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_NETDIAL    16 
 #define ISDN_TIMER_NETHANGUP  32
 #define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
 #define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
                               ISDN_TIMER_MODEMXMIT)
 #define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_NETHANGUP | \
-                              ISDN_TIMER_NETDIAL | ISDN_TIMER_CARRIER)
-
-/* Timeout-Values for isdn_net_dial() */
-#define ISDN_TIMER_DTIMEOUT10 (10*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
-#define ISDN_TIMER_DTIMEOUT15 (15*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
-#define ISDN_TIMER_DTIMEOUT60 (60*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
+                              ISDN_TIMER_CARRIER)
 
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
@@ -291,6 +285,8 @@ typedef struct {
 typedef struct isdn_net_local_s {
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
+  struct timer_list      dial_timer;   /* dial timeout                     */
+  int                    dial_event;   /* event in case of timer expiry    */
   struct net_device_stats stats;       /* Ethernet Statistics              */
   int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
@@ -301,7 +297,6 @@ typedef struct isdn_net_local_s {
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int                    cbdelay;      /* Delay before Callback starts     */
-  int                    dtimer;       /* Timeout-counter for dialing      */
   char                   msn[ISDN_MSNLEN]; /* MSNs/EAZs for this interface */
   u_char                 cbhup;        /* Flag: Reject Call before Callback*/
   u_char                 dialstate;    /* State for dialing                */
