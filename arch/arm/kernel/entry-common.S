@@ -213,7 +213,7 @@ sys_execve_wrapper:
 		add	r3, sp, #S_OFF
 		b	sys_execve
 
-sys_clone_wapper:
+sys_clone_wrapper:
 		add	ip, sp, #S_OFF
 		str	ip, [sp, #4]
 		b	sys_clone
@@ -237,6 +237,10 @@ sys_rt_sigreturn_wrapper:
 sys_sigaltstack_wrapper:
 		ldr	r2, [sp, #S_OFF + S_SP]
 		b	do_sigaltstack
+
+sys_futex_wrapper:
+		str	r5, [sp, #4]		@ push sixth arg
+		b	sys_futex
 
 /*
  * Note: off_4k (r5) is always units of 4K.  If we can't do the requested

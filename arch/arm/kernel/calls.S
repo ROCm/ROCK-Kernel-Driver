@@ -134,7 +134,7 @@ __syscall_start:
 		.long	sys_ipc
 		.long	sys_fsync
 		.long	sys_sigreturn_wrapper
-/* 120 */	.long	sys_clone_wapper
+/* 120 */	.long	sys_clone_wrapper
 		.long	sys_setdomainname
 		.long	sys_newuname
 		.long	sys_ni_syscall
@@ -254,7 +254,7 @@ __syscall_start:
 		.long	sys_fremovexattr
 		.long	sys_tkill
 		.long	sys_sendfile64
-/* 240 */	.long	sys_futex
+/* 240 */	.long	sys_futex_wrapper
 		.long	sys_sched_setaffinity
 		.long	sys_sched_getaffinity
 		.long	sys_io_setup
