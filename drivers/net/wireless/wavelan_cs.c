@@ -1548,7 +1548,6 @@ wavelan_set_mac_address(struct net_device *	dev,
 /*
  * Frequency setting (for hardware able of it)
  * It's a bit complicated and you don't really want to look into it...
- * (called in wavelan_ioctl)
  */
 static inline int
 wv_set_frequency(u_long		base,	/* i/o port of the card */
@@ -1838,27 +1837,14 @@ wl_his_gather(struct net_device *	dev,
 }
 #endif	/* HISTOGRAM */
 
-static inline int
-wl_netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void wl_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-
-		strncpy(info.driver, "wavelan_cs", sizeof(info.driver)-1);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-
-	return -EOPNOTSUPP;
+	strncpy(info->driver, "wavelan_cs", sizeof(info->driver)-1);
 }
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = wl_get_drvinfo
+};
 
 /*------------------------------------------------------------------*/
 /*
@@ -2741,41 +2727,6 @@ static const struct iw_handler_def	wavelan_handler_def =
 	.spy_offset	= ((void *) (&((net_local *) NULL)->spy_data) -
 			   (void *) NULL),
 };
-
-/*------------------------------------------------------------------*/
-/*
- * Perform ioctl : config & info stuff
- * This is here that are treated the wireless extensions (iwconfig)
- */
-static int
-wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
-	      struct ifreq *	rq,	/* Data passed */
-	      int		cmd)	/* Ioctl number */
-{
-  int			ret = 0;
-
-#ifdef DEBUG_IOCTL_TRACE
-  printk(KERN_DEBUG "%s: ->wavelan_ioctl(cmd=0x%X)\n", dev->name, cmd);
-#endif
-
-  /* Look what is the request */
-  switch(cmd)
-    {
-    case SIOCETHTOOL:
-      ret = wl_netdev_ethtool_ioctl(dev, rq->ifr_data);
-      break;
-
-      /* ------------------- OTHER IOCTL ------------------- */
-
-    default:
-      ret = -EOPNOTSUPP;
-    }
-
-#ifdef DEBUG_IOCTL_TRACE
-  printk(KERN_DEBUG "%s: <-wavelan_ioctl()\n", dev->name);
-#endif
-  return ret;
-}
 
 /*------------------------------------------------------------------*/
 /*
@@ -4716,10 +4667,10 @@ wavelan_attach(void)
   /* Set the watchdog timer */
   dev->tx_timeout	= &wavelan_watchdog;
   dev->watchdog_timeo	= WATCHDOG_JIFFIES;
+  SET_ETHTOOL_OPS(dev, &ops);
 
 #ifdef WIRELESS_EXT	/* If wireless extension exist in the kernel */
   dev->wireless_handlers = (struct iw_handler_def *)&wavelan_handler_def;
-  dev->do_ioctl = wavelan_ioctl;	/* old wireless extensions */
   dev->get_wireless_stats = wavelan_get_wireless_stats;
 #endif
 
