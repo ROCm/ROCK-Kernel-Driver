@@ -35,7 +35,7 @@
 #include <asm/irq.h>
 #include <asm/mpspec.h>
 
-#if defined (CONFIG_X86_LOCAL_APIC)
+#ifdef CONFIG_X86_LOCAL_APIC
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 #include <asm/io_apic.h>
@@ -50,11 +50,19 @@ int acpi_lapic;
 int acpi_ioapic;
 int acpi_strict;
 
+#ifdef CONFIG_X86_LOCAL_APIC
+static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
+#endif
+
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
 
-enum acpi_irq_model_id		acpi_irq_model;
+/*
+ * The default interrupt routing model is PIC (8259).  This gets
+ * overriden if IOAPICs are enumerated (below).
+ */
+enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
 /*
  * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
@@ -98,10 +106,6 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 
 
 #ifdef CONFIG_X86_LOCAL_APIC
-
-static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
-
-
 static int __init
 acpi_parse_madt (
 	unsigned long		phys_addr,
@@ -118,11 +122,12 @@ acpi_parse_madt (
 		return -ENODEV;
 	}
 
-	if (madt->lapic_address)
+	if (madt->lapic_address) {
 		acpi_lapic_addr = (u64) madt->lapic_address;
 
-	printk(KERN_INFO PREFIX "Local APIC address 0x%08x\n",
-		madt->lapic_address);
+		printk(KERN_DEBUG PREFIX "Local APIC address 0x%08x\n",
+			madt->lapic_address);
+	}
 
 	acpi_madt_oem_check(madt->header.oem_id, madt->header.oem_table_id);
 	
@@ -252,7 +257,7 @@ acpi_parse_nmi_src (
 	return 0;
 }
 
-#endif /*CONFIG_X86_IO_APIC*/
+#endif /* CONFIG_X86_IO_APIC */
 
 #ifdef	CONFIG_ACPI_BUS
 /*
@@ -399,10 +404,156 @@ acpi_find_rsdp (void)
 	return rsdp_phys;
 }
 
+#ifdef	CONFIG_X86_LOCAL_APIC
+/*
+ * Parse LAPIC entries in MADT
+ * returns 0 on success, < 0 on error
+ */
+static int __init
+acpi_parse_madt_lapic_entries(void)
+{
+	int count;
+
+	/* 
+	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
+	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
+	 */
+
+	count = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0);
+	if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
+		return count;
+	}
+
+	mp_register_lapic_address(acpi_lapic_addr);
+
+	count = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
+				       MAX_APICS);
+	if (!count) { 
+		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return -ENODEV;
+	}
+	else if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing LAPIC entry\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return count;
+	}
+
+	count = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0);
+	if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return count;
+	}
+	return 0;
+}
+#endif /* CONFIG_X86_LOCAL_APIC */
+
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
+/*
+ * Parse IOAPIC related entries in MADT
+ * returns 0 on success, < 0 on error
+ */
+static int __init
+acpi_parse_madt_ioapic_entries(void)
+{
+	int count;
+
+	/*
+	 * ACPI interpreter is required to complete interrupt setup,
+	 * so if it is off, don't enumerate the io-apics with ACPI.
+	 * If MPS is present, it will handle them,
+	 * otherwise the system will stay in PIC mode
+	 */
+	if (acpi_disabled || acpi_noirq) {
+		return -ENODEV;
+        }
+
+	/*
+ 	 * if "noapic" boot option, don't look for IO-APICs
+	 */
+	if (ioapic_setup_disabled()) {
+		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
+			"due to 'noapic' option.\n");
+		return -ENODEV;
+	}
+
+	count = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic, MAX_IO_APICS);
+	if (!count) {
+		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
+		return -ENODEV;
+	}
+	else if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing IOAPIC entry\n");
+		return count;
+	}
+
+	/* Build a default routing table for legacy (ISA) interrupts. */
+	mp_config_acpi_legacy_irqs();
+
+	count = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
+	if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return count;
+	}
+
+	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
+	if (count < 0) {
+		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return count;
+	}
+
+	return 0;
+}
+#else
+static inline int acpi_parse_madt_ioapic_entries(void)
+{
+	return -1;
+}
+#endif /* !(CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER) */
+
+
+static void __init
+acpi_process_madt(void)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	int count, error;
+
+	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
+	if (count == 1) {
+
+		/*
+		 * Parse MADT LAPIC entries
+		 */
+		error = acpi_parse_madt_lapic_entries();
+		if (!error) {
+			acpi_lapic = 1;
+
+			/*
+			 * Parse MADT IO-APIC entries
+			 */
+			error = acpi_parse_madt_ioapic_entries();
+			if (!error) {
+				acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
+				acpi_irq_balance_set(NULL);
+				acpi_ioapic = 1;
+
+				smp_found_config = 1;
+				clustered_apic_check();
+			}
+		}
+	}
+#endif
+	return;
+}
+
 /*
  * acpi_boot_init()
  *  called from setup_arch(), always.
- *	1. maps ACPI tables for later use
+ *	1. checksums all tables
  *	2. enumerates lapics
  *	3. enumerates io-apics
  *
@@ -422,164 +573,43 @@ acpi_find_rsdp (void)
 int __init
 acpi_boot_init (void)
 {
-	int			result = 0;
-
-	if (acpi_disabled && !acpi_ht)
-		 return 1;
+	int error;
 
 	/*
-	 * The default interrupt routing model is PIC (8259).  This gets
-	 * overriden if IOAPICs are enumerated (below).
+	 * If acpi_disabled, bail out
+	 * One exception: acpi=ht continues far enough to enumerate LAPICs
 	 */
-	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
+	if (acpi_disabled && !acpi_ht)
+		 return 1;
 
 	/* 
 	 * Initialize the ACPI boot-time table parser.
 	 */
-	result = acpi_table_init();
-	if (result) {
+	error = acpi_table_init();
+	if (error) {
 		acpi_disabled = 1;
-		return result;
+		return error;
 	}
 
-	result = acpi_blacklisted();
-	if (result) {
+	/*
+	 * blacklist may disable ACPI entirely
+	 */
+	error = acpi_blacklisted();
+	if (error) {
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
 		acpi_disabled = 1;
-		return result;
+		return error;
 	}
-
-#ifdef CONFIG_X86_LOCAL_APIC
-
-	/* 
-	 * MADT
-	 * ----
-	 * Parse the Multiple APIC Description Table (MADT), if exists.
-	 * Note that this table provides platform SMP configuration 
-	 * information -- the successor to MPS tables.
-	 */
-
-	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
-	if (!result) {
-		return 0;
-	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing MADT\n");
-		return result;
-	}
-	else if (result > 1) 
-		printk(KERN_WARNING PREFIX "Multiple MADT tables exist\n");
-
-	/* 
-	 * Local APIC
-	 * ----------
-	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
-	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
-	 */
-
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0);
-	if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
-		return result;
-	}
-
-	mp_register_lapic_address(acpi_lapic_addr);
-
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
-				       MAX_APICS);
-	if (!result) { 
-		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return -ENODEV;
-	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
-
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0);
-	if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
-
-	acpi_lapic = 1;
-
-#endif /*CONFIG_X86_LOCAL_APIC*/
-
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
-
-	/* 
-	 * I/O APIC 
-	 * --------
-	 */
 
 	/*
-	 * ACPI interpreter is required to complete interrupt setup,
-	 * so if it is off, don't enumerate the io-apics with ACPI.
-	 * If MPS is present, it will handle them,
-	 * otherwise the system will stay in PIC mode
+	 * Process the Multiple APIC Description Table (MADT), if present
 	 */
-	if (acpi_disabled || acpi_noirq) {
-		return 1;
-        }
-
-	/*
- 	 * if "noapic" boot option, don't look for IO-APICs
-	 */
-	if (ioapic_setup_disabled()) {
-		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
-			"due to 'noapic' option.\n");
-		return 1;
-	}
-
-	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic, MAX_IO_APICS);
-	if (!result) {
-		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
-		return -ENODEV;
-	}
-	else if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing IOAPIC entry\n");
-		return result;
-	}
-
-	/* Build a default routing table for legacy (ISA) interrupts. */
-	mp_config_acpi_legacy_irqs();
-
-	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
-	if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
-
-	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
-	if (result < 0) {
-		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
-		/* TBD: Cleanup to allow fallback to MPS */
-		return result;
-	}
-
-	acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
-
-	acpi_irq_balance_set(NULL);
-
-	acpi_ioapic = 1;
-
-#endif /* CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER */
-
-#ifdef CONFIG_X86_LOCAL_APIC
-	if (acpi_lapic && acpi_ioapic) {
-		smp_found_config = 1;
-		clustered_apic_check();
-	}
-#endif
+	acpi_process_madt();
 
 #ifdef CONFIG_HPET_TIMER
-	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
+	(void) acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 #endif
 
 	return 0;
 }
+
