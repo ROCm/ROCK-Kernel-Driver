@@ -119,14 +119,23 @@ void oprofile_shutdown(void)
 }
 
  
+extern void timer_init(struct oprofile_operations ** ops);
+
+ 
 static int __init oprofile_init(void)
 {
 	int err;
 
 	/* Architecture must fill in the interrupt ops and the
-	 * logical CPU type.
+	 * logical CPU type, or we can fall back to the timer
+	 * interrupt profiler.
 	 */
 	err = oprofile_arch_init(&oprofile_ops);
+	if (err == -ENODEV) {
+		timer_init(&oprofile_ops);
+		err = 0;
+	}
+
 	if (err)
 		goto out;
 
