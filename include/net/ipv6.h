@@ -222,21 +222,21 @@ typedef int		(*inet_getfrag_t) (const void *data,
 					   unsigned int, unsigned int);
 
 
-extern int		ipv6_addr_type(struct in6_addr *addr);
+extern int		ipv6_addr_type(const struct in6_addr *addr);
 
-static inline int ipv6_addr_scope(struct in6_addr *addr)
+static inline int ipv6_addr_scope(const struct in6_addr *addr)
 {
 	return ipv6_addr_type(addr) & IPV6_ADDR_SCOPE_MASK;
 }
 
-static inline int ipv6_addr_cmp(struct in6_addr *a1, struct in6_addr *a2)
+static inline int ipv6_addr_cmp(const struct in6_addr *a1, const struct in6_addr *a2)
 {
-	return memcmp((void *) a1, (void *) a2, sizeof(struct in6_addr));
+	return memcmp((const void *) a1, (const void *) a2, sizeof(struct in6_addr));
 }
 
-static inline void ipv6_addr_copy(struct in6_addr *a1, struct in6_addr *a2)
+static inline void ipv6_addr_copy(struct in6_addr *a1, const struct in6_addr *a2)
 {
-	memcpy((void *) a1, (void *) a2, sizeof(struct in6_addr));
+	memcpy((void *) a1, (const void *) a2, sizeof(struct in6_addr));
 }
 
 #ifndef __HAVE_ARCH_ADDR_SET
@@ -251,7 +251,7 @@ static inline void ipv6_addr_set(struct in6_addr *addr,
 }
 #endif
 
-static inline int ipv6_addr_any(struct in6_addr *a)
+static inline int ipv6_addr_any(const struct in6_addr *a)
 {
 	return ((a->s6_addr32[0] | a->s6_addr32[1] | 
 		 a->s6_addr32[2] | a->s6_addr32[3] ) == 0); 

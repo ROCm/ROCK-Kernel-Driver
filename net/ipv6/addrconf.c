@@ -172,7 +172,7 @@ static struct ipv6_devconf ipv6_devconf_dflt =
 const struct in6_addr in6addr_any = IN6ADDR_ANY_INIT;
 const struct in6_addr in6addr_loopback = IN6ADDR_LOOPBACK_INIT;
 
-int ipv6_addr_type(struct in6_addr *addr)
+int ipv6_addr_type(const struct in6_addr *addr)
 {
 	int type;
 	u32 st;
@@ -486,7 +486,7 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 /* On success it returns ifp with increased reference count */
 
 static struct inet6_ifaddr *
-ipv6_add_addr(struct inet6_dev *idev, struct in6_addr *addr, int pfxlen,
+ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	      int scope, unsigned flags)
 {
 	struct inet6_ifaddr *ifa;
