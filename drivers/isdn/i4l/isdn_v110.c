@@ -515,14 +515,12 @@ buffer_full:
 }
 
 int
-isdn_v110_stat_callback(int idx, isdn_ctrl * c)
+isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 {
 	isdn_v110_stream *v = NULL;
 	int i;
 	int ret;
 
-	if (idx < 0)
-		return 0;
 	switch (c->command) {
 		case ISDN_STAT_BSENT:
                         /* Keep the send-queue of the driver filled
@@ -531,9 +529,9 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 			 * send down an Idle-Frame (or an Sync-Frame, if
 			 * v->SyncInit != 0). 
 			 */
-			if (!(v = dev->v110[idx]))
+			if (!(v = iv110->v110))
 				return 0;
-			atomic_inc(&dev->v110use[idx]);
+			atomic_inc(&iv110->v110use);
 			if (v->skbidle > 0) {
 				v->skbidle--;
 				ret = 1;
@@ -560,38 +558,38 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 				} else
 					break;
 			}
-			atomic_dec(&dev->v110use[idx]);
+			atomic_dec(&iv110->v110use);
 			return ret;
 		case ISDN_STAT_DHUP:
 		case ISDN_STAT_BHUP:
 			while (1) {
-				atomic_inc(&dev->v110use[idx]);
-				if (atomic_dec_and_test(&dev->v110use[idx])) {
-					isdn_v110_close(dev->v110[idx]);
-					dev->v110[idx] = NULL;
+				atomic_inc(&iv110->v110use);
+				if (atomic_dec_and_test(&iv110->v110use)) {
+					isdn_v110_close(iv110->v110);
+					iv110->v110 = NULL;
 					break;
 				}
 				sti();
 			}
 			break;
 		case ISDN_STAT_BCONN:
-			if (dev->v110emu[idx] && (dev->v110[idx] == NULL)) {
+			if (iv110->v110emu && (iv110->v110 == NULL)) {
 				int hdrlen = dev->drv[c->driver]->interface->hl_hdrlen;
 				int maxsize = dev->drv[c->driver]->interface->maxbufsize;
-				atomic_inc(&dev->v110use[idx]);
-				switch (dev->v110emu[idx]) {
+				atomic_inc(&iv110->v110use);
+				switch (iv110->v110emu) {
 					case ISDN_PROTO_L2_V11096:
-						dev->v110[idx] = isdn_v110_open(V110_9600, hdrlen, maxsize);
+						iv110->v110 = isdn_v110_open(V110_9600, hdrlen, maxsize);
 						break;
 					case ISDN_PROTO_L2_V11019:
-						dev->v110[idx] = isdn_v110_open(V110_19200, hdrlen, maxsize);
+						iv110->v110 = isdn_v110_open(V110_19200, hdrlen, maxsize);
 						break;
 					case ISDN_PROTO_L2_V11038:
-						dev->v110[idx] = isdn_v110_open(V110_38400, hdrlen, maxsize);
+						iv110->v110 = isdn_v110_open(V110_38400, hdrlen, maxsize);
 						break;
 					default:;
 				}
-				if ((v = dev->v110[idx])) {
+				if ((v = iv110->v110)) {
 					while (v->SyncInit) {
 						struct sk_buff *skb = isdn_v110_sync(v);
 						if (dev->drv[c->driver]->interface->writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
@@ -603,8 +601,8 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 						v->skbidle++;
 					}
 				} else
-					printk(KERN_WARNING "isdn_v110: Couldn't open stream for chan %d\n", idx);
-				atomic_dec(&dev->v110use[idx]);
+					printk(KERN_WARNING "isdn_v110: Couldn't open stream\n");
+				atomic_dec(&iv110->v110use);
 			}
 			break;
 		default:
