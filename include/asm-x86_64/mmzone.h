@@ -57,9 +57,8 @@ static inline __attribute__((pure)) int phys_to_nid(unsigned long addr)
 #define page_to_pfn(page) \
 	(long)(((page) - page_zone(page)->zone_mem_map) + page_zone(page)->zone_start_pfn)
 
-/* AK: !DISCONTIGMEM just forces it to 1. Can't we too? */
-#define pfn_valid(pfn)          ((pfn) < num_physpages)
-
-
+#define pfn_valid(pfn) ((pfn) >= num_physpages ? 0 : \
+			({ u8 nid__ = pfn_to_nid(pfn); \
+			   nid__ != 0xff && (pfn) >= node_start_pfn(nid__) && (pfn) <= node_end_pfn(nid__); }))
 #endif
 #endif
