@@ -109,9 +109,9 @@ static void amiga_heartbeat(int on);
 #endif
 
 static struct console amiga_console_driver = {
-	name:		"debug",
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 
@@ -123,10 +123,10 @@ static struct {
     struct resource _ciab, _ciaa, _custom, _kickstart;
 } mb_resources = {
 //    { "Ranger Memory", 0x00c00000, 0x00c7ffff },
-    _ciab:	{ "CIA B", 0x00bfd000, 0x00bfdfff },
-    _ciaa:	{ "CIA A", 0x00bfe000, 0x00bfefff },
-    _custom:	{ "Custom I/O", 0x00dff000, 0x00dfffff },
-    _kickstart:	{ "Kickstart ROM", 0x00f80000, 0x00ffffff }
+    ._ciab =	  { "CIA B", 0x00bfd000, 0x00bfdfff },
+    ._ciaa =	  { "CIA A", 0x00bfe000, 0x00bfefff },
+    ._custom =	  { "Custom I/O", 0x00dff000, 0x00dfffff },
+    ._kickstart = { "Kickstart ROM", 0x00f80000, 0x00ffffff }
 };
 
 static struct resource rtc_resource = {
