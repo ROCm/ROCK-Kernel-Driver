@@ -495,8 +495,10 @@ static int __init root_nfs_get_handle(void)
 	if (status < 0)
 		printk(KERN_ERR "Root-NFS: Server returned error %d "
 				"while mounting %s\n", status, nfs_path);
-	else
-		nfs_copy_fh(nfs_data.root, fh);
+	else {
+		nfs_data.root.size = fh.size;
+		memcpy(nfs_data.root.data, fh.data, fh.size);
+	}
 
 	return status;
 }
