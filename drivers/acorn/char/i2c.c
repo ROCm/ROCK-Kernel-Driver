@@ -311,9 +311,6 @@ static struct i2c_adapter ioc_ops = {
 	.algo_data		= &ioc_data,
 	.client_register	= ioc_client_reg,
 	.client_unregister	= ioc_client_unreg,
-	.dev			= {
-		.name		= "IOC/IOMD",
-	},
 };
 
 static int __init i2c_ioc_init(void)
