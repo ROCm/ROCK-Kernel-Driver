@@ -66,10 +66,6 @@ AFLAGS_vmlinux.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
 LD_vmlinux = $(CC) 
 LDFLAGS_vmlinux = $(LINK_PROFILE) $(LINK_WRAPS) -static $(ARCH_DIR)/main.o 
 
-cmd_link_vmlinux := $(CC) $(LINK_PROFILE) $(LINK_WRAPS) -static \
-	$(subst $(cmd_link_vmlinux),$(LD),) $(ARCH_DIR)/main.o vmlinux.o \
-	-L/usr/lib -lutil
-
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
 	include/asm-um/ptrace.h include/asm-um/arch-signal.h
@@ -79,7 +75,8 @@ ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
 
-linux: $(ARCH_SYMLINKS) $(GEN_HEADERS) $(SYS_HEADERS) $(ARCH_DIR)/main.o \
+linux: scripts $(ARCH_SYMLINKS) $(GEN_HEADERS) $(SYS_HEADERS) \
+	$(ARCH_DIR)/main.o \
 	vmlinux
 	mv vmlinux linux
 
