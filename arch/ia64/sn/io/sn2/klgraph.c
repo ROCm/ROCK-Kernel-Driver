@@ -527,7 +527,7 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		/* Use module as module vertex fastinfo */
 
 		memset(buffer, 0, 16);
-		format_module_id(buffer, modules[cm]->id, MODULE_FORMAT_BRIEF);
+		format_module_id(buffer, sn_modules[cm]->id, MODULE_FORMAT_BRIEF);
 		sprintf(name, EDGE_LBL_MODULE "/%s", buffer);
 
 		rc = hwgraph_path_add(hwgraph_root, name, &module_vhdl);
@@ -535,7 +535,7 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		rc = rc;
 		HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, module_vhdl, NULL, "Created module path.\n");
 
-		hwgraph_fastinfo_set(module_vhdl, (arbitrary_info_t) modules[cm]);
+		hwgraph_fastinfo_set(module_vhdl, (arbitrary_info_t) sn_modules[cm]);
 
 		/* Add system controller */
 		sprintf(name,
