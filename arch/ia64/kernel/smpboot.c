@@ -311,6 +311,15 @@ smp_callin (void)
 		 */
 		Dprintk("Going to syncup ITC with BP.\n");
 		ia64_sync_itc(0);
+
+		/*
+		 * Make sure we didn't sync the itc ahead of the next
+		 * timer interrupt, if so, just reset it.
+		 */
+		if (time_after(ia64_get_itc(),local_cpu_data->itm_next)) {
+			Dprintk("oops, jumped a timer.\n");
+			ia64_cpu_local_tick();
+		}
 	}
 
 	/*
