@@ -1640,7 +1640,8 @@ flush
 
 Writing to this file results in a flush of the routing cache.
 
-gc_elastic, gc_interval, gc_min_interval, gc_tresh, gc_timeout
+gc_elasticity, gc_interval, gc_min_interval, gc_tresh, gc_timeout,
+gc_thresh, gc_thresh1, gc_thresh2, gc_thresh3
 --------------------------------------------------------------
 
 Values to  control  the  frequency  and  behavior  of  the  garbage collection
