@@ -289,7 +289,7 @@ struct i2o_device *i2o_iop_find_device(struct i2o_controller *c, u16 tid)
 	    if (dev->lct_data.tid == tid)
 		return dev;
 
-	return 0;
+	return NULL;
 };
 
 /**
@@ -978,7 +978,7 @@ int i2o_status_get(struct i2o_controller *c)
 		rmb();
 	}
 
-#if DEBUG
+#ifdef DEBUG
 	i2o_debug_state(c);
 #endif
 

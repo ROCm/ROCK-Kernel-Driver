@@ -473,7 +473,7 @@ mraid_mm_attach_buf(mraid_mmadp_t *adp, uioc_t *kioc, int xferlen)
 	int		i;
 
 	kioc->pool_index	= -1;
-	kioc->buf_vaddr		= 0;
+	kioc->buf_vaddr		= NULL;
 	kioc->buf_paddr		= 0;
 	kioc->free_buf		= 0;
 
@@ -573,13 +573,13 @@ mraid_mm_alloc_kioc(mraid_mmadp_t *adp)
 	memset((caddr_t)(unsigned long)kioc->cmdbuf, 0, sizeof(mbox64_t));
 	memset((caddr_t) kioc->pthru32, 0, sizeof(mraid_passthru_t));
 
-	kioc->buf_vaddr		= 0;
+	kioc->buf_vaddr		= NULL;
 	kioc->buf_paddr		= 0;
 	kioc->pool_index	=-1;
 	kioc->free_buf		= 0;
-	kioc->user_data		= 0;
+	kioc->user_data		= NULL;
 	kioc->user_data_len	= 0;
-	kioc->user_pthru	= 0;
+	kioc->user_pthru	= NULL;
 
 	return kioc;
 }
@@ -1091,7 +1091,7 @@ mraid_mm_teardown_dma_pools(mraid_mmadp_t *adp)
 							pool->paddr);
 
 			pci_pool_destroy(pool->handle);
-			pool->handle = 0;
+			pool->handle = NULL;
 		}
 	}
 
