@@ -667,13 +667,11 @@ static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 		for (c = 0; c < MAX_CHANNELS; c++) {
 			if (cval->cmask & (1 << c)) {
 				err = get_cur_mix_value(cval, c + 1, &val);
-#ifdef IGNORE_CTL_ERROR
 				if (err < 0) {
-					ucontrol->value.integer.value[0] = cval->min;
-					return 0;
-				}
-#endif
-				if (err < 0) {
+					if (cval->chip->ignore_ctl_error) {
+						ucontrol->value.integer.value[0] = cval->min;
+						return 0;
+					}
 					snd_printd(KERN_ERR "cannot get current value for control %d ch %d: err = %d\n", cval->control, c + 1, err);
 					return err;
 				}
@@ -685,13 +683,11 @@ static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	} else {
 		/* master channel */
 		err = get_cur_mix_value(cval, 0, &val);
-#ifdef IGNORE_CTL_ERROR
 		if (err < 0) {
-			ucontrol->value.integer.value[0] = cval->min;
-			return 0;
-		}
-#endif
-		if (err < 0) {
+			if (cval->chip->ignore_ctl_error) {
+				ucontrol->value.integer.value[0] = cval->min;
+				return 0;
+			}
 			snd_printd(KERN_ERR "cannot get current value for control %d master ch: err = %d\n", cval->control, err);
 			return err;
 		}
@@ -713,12 +709,11 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 		for (c = 0; c < MAX_CHANNELS; c++) {
 			if (cval->cmask & (1 << c)) {
 				err = get_cur_mix_value(cval, c + 1, &oval);
-#ifdef IGNORE_CTL_ERROR
-				if (err < 0)
-					return 0;
-#endif
-				if (err < 0)
+				if (err < 0) {
+					if (cval->chip->ignore_ctl_error)
+						return 0;
 					return err;
+				}
 				val = ucontrol->value.integer.value[cnt];
 				val = get_abs_value(cval, val);
 				if (oval != val) {
@@ -732,10 +727,8 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	} else {
 		/* master channel */
 		err = get_cur_mix_value(cval, 0, &oval);
-#ifdef IGNORE_CTL_ERROR
-		if (err < 0)
+		if (err < 0 && cval->chip->ignore_ctl_error)
 			return 0;
-#endif
 		if (err < 0)
 			return err;
 		val = ucontrol->value.integer.value[0];
@@ -1025,12 +1018,10 @@ static int mixer_ctl_procunit_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int err, val;
 
 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
-#ifdef IGNORE_CTL_ERROR
-	if (err < 0) {
+	if (err < 0 && cval->chip->ignore_ctl_error) {
 		ucontrol->value.integer.value[0] = cval->min;
 		return 0;
 	}
-#endif
 	if (err < 0)
 		return err;
 	val = get_relative_value(cval, val);
@@ -1045,12 +1036,11 @@ static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
-#ifdef IGNORE_CTL_ERROR
-	if (err < 0)
-		return 0;
-#endif
-	if (err < 0)
+	if (err < 0) {
+		if (cval->chip->ignore_ctl_error)
+			return 0;
 		return err;
+	}
 	val = ucontrol->value.integer.value[0];
 	val = get_abs_value(cval, val);
 	if (val != oval) {
@@ -1274,14 +1264,13 @@ static int mixer_ctl_selector_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, err;
 
 	err = get_cur_ctl_value(cval, 0, &val);
-#ifdef IGNORE_CTL_ERROR
 	if (err < 0) {
-		ucontrol->value.enumerated.item[0] = 0;
-		return 0;
-	}
-#endif
-	if (err < 0)
+		if (cval->chip->ignore_ctl_error) {
+			ucontrol->value.enumerated.item[0] = 0;
+			return 0;
+		}
 		return err;
+	}
 	val = get_relative_value(cval, val);
 	ucontrol->value.enumerated.item[0] = val;
 	return 0;
@@ -1294,12 +1283,11 @@ static int mixer_ctl_selector_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, 0, &oval);
-#ifdef IGNORE_CTL_ERROR
-	if (err < 0)
-		return 0;
-#endif
-	if (err < 0)
+	if (err < 0) {
+		if (cval->chip->ignore_ctl_error)
+			return 0;
 		return err;
+	}
 	val = ucontrol->value.enumerated.item[0];
 	val = get_abs_value(cval, val);
 	if (val != oval) {
@@ -1509,9 +1497,13 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 	for (map = usbmix_ctl_maps; map->vendor; map++) {
 		if (map->vendor == dev->idVendor && map->product == dev->idProduct) {
 			state.map = map->map;
+			chip->ignore_ctl_error = map->ignore_ctl_error;
 			break;
 		}
 	}
+#ifdef IGNORE_CTL_ERROR
+	chip->ignore_ctl_error = 1;
+#endif
 
 	desc = NULL;
 	while ((desc = snd_usb_find_csint_desc(hostif->extra, hostif->extralen, desc, OUTPUT_TERMINAL)) != NULL) {
