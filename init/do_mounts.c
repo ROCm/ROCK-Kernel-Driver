@@ -717,8 +717,6 @@ void __init prepare_namespace(void)
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (!initrd_start)
-		mount_initrd = 0;
 	real_root_dev = ROOT_DEV;
 #endif
 
