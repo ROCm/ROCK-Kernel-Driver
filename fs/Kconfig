@@ -1043,7 +1043,7 @@ config JFFS_FS_VERBOSE
 
 config JFFS_PROC_FS
 	bool "JFFS stats available in /proc filesystem"
-	depends on JFFS_FS
+	depends on JFFS_FS && PROC
 	help
 	  Enabling this option will cause statistics from mounted JFFS file systems
 	  to be made available to the user in the /proc/fs/jffs/ directory.
