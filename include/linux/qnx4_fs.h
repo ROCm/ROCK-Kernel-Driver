@@ -106,7 +106,7 @@ struct qnx4_sb_info {
 
 struct qnx4_inode_info {
 	struct qnx4_inode_entry raw;
-	unsigned long mmu_private;
+	loff_t mmu_private;
 	struct inode vfs_inode;
 };
 

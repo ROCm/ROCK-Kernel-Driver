@@ -72,7 +72,7 @@ enum
 /* CTL_BUS names: */
 enum
 {
-	BUS_ISA=1		/* ISA */
+	CTL_BUS_ISA=1		/* ISA */
 };
 
 /* CTL_KERN names: */
