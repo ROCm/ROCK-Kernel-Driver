@@ -66,7 +66,7 @@ static long fm_port[SNDRV_CARDS];
 static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
 #endif
 #ifdef SUPPORT_JOYSTICK
-static int joystick[SNDRV_CARDS];
+static int joystick_port[SNDRV_CARDS];
 #endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -90,9 +90,9 @@ MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 o
 MODULE_PARM_SYNTAX(soft_ac3, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #endif
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(joystick, "Enable joystick.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick_port, "Joystick port address.");
+MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201}},dialog:list");
 #endif
 
 #ifndef PCI_DEVICE_ID_CMEDIA_CM8738
@@ -352,9 +352,6 @@ MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #define CM_EXTENT_MIDI	  0x2
 #define CM_EXTENT_SYNTH	  0x4
 
-/* fixed legacy joystick address */
-#define CM_JOYSTICK_ADDR	0x200
-  
 
 /*
  * pci ids
@@ -3151,13 +3148,29 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 #endif /* USE_VAR48KRATE */
 
 #ifdef SUPPORT_JOYSTICK
-	if (joystick[dev] &&
-	    (cm->res_joystick = request_region(CM_JOYSTICK_ADDR, 8, "CMIPCI gameport")) != NULL) {
-		cm->gameport.io = CM_JOYSTICK_ADDR;
+	if (joystick_port[dev] > 0) {
+		if (joystick_port[dev] == 1) { /* auto-detect */
+			static int ports[] = { 0x200, 0x201, 0 };
+			int i;
+			for (i = 0; ports[i]; i++) {
+				joystick_port[dev] = ports[i];
+				cm->res_joystick = request_region(ports[i], 8, "CMIPCI gameport");
+				if (cm->res_joystick)
+					break;
+			}
+		} else {
+			cm->res_joystick = request_region(joystick_port[dev], 8, "CMIPCI gameport");
+		}
+	}
+	if (cm->res_joystick) {
+		cm->gameport.io = joystick_port[dev];
 		snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
 		gameport_register_port(&cm->gameport);
-	} else
+	} else {
+		if (joystick_port[dev] > 0)
+			printk(KERN_WARNING "cmipci: cannot reserve joystick ports\n");
 		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
+	}
 #endif
 	*rcmipci = cm;
 	return 0;

@@ -227,7 +227,7 @@ Module parameters
     fm_port     - 0x388 (default), 0 = disable (default)
     soft_ac3    - Sofware-conversion of raw SPDIF packets (model 033 only)
                   (default = 1)
-    joystick	- Enable joystick (default off)
+    joystick_port - Joystick port address (0 = disable, 1 = auto-detect)
 
     Module supports autoprobe and multiple chips (max 8).
     
@@ -536,7 +536,7 @@ Module parameters
     Module supports up to 8 cards.
 
     Note: you need to load the firmware via hdsploader utility included
-          in alsa-tools package.
+          in alsa-tools and alsa-firmware packages.
 
     Note: snd-page-alloc module does the job which snd-hammerfall-mem
           module did formerly.  It will allocate the buffers in advance
@@ -1058,11 +1058,13 @@ Module parameters
     Module supports up to 8 cards.
 
     For loading the firmware, use vxloader utility in alsa-tools
-    package.  You can load the firmware automatically by adding
-    the following to /etc/modules.conf
+    and alsa-firmware packages.  You can load the firmware automatically
+    by adding the following to /etc/modprobe.conf
 
-	post-install snd-vx222 "/usr/bin/vxload"
+	install snd-vx222 /usr/bin/vxload
 
+    (for 2.2/2.4 kernels, add "post-install /usr/bin/vxload" to
+     /etc/modules.conf, instead.)
     IBL size defines the interrupts period for PCM.  The smaller size
     gives smaller latency but leads to more CPU consumption, too.
     The size is usually aligned to 126.  As default (=0), the smallest
@@ -1087,7 +1089,7 @@ Module parameters
     up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
 
     For loading the firmware, use vxloader utility in alsa-tools
-    package.
+    and alsa-firmware packages.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
@@ -1113,7 +1115,7 @@ Module parameters
     up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
 
     For loading the firmware, use vxloader utility in alsa-tools
-    package.
+    and alsa-firmware packages.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
