@@ -96,9 +96,10 @@ static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t
 
 	if (!dentry->d_inode) {
 		inode = sysfs_get_inode(dir->i_sb, mode, dev);
-		if (inode)
+		if (inode) {
 			d_instantiate(dentry, inode);
-		else
+			dget(dentry);
+		} else
 			error = -ENOSPC;
 	} else
 		error = -EEXIST;
@@ -135,9 +136,10 @@ static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char *
 	if (inode) {
 		int l = strlen(symname)+1;
 		error = page_symlink(inode, symname, l);
-		if (!error)
+		if (!error) {
 			d_instantiate(dentry, inode);
-		else
+			dget(dentry);
+		} else
 			iput(inode);
 	}
 	return error;
@@ -571,8 +573,8 @@ static void hash_and_remove(struct dentry * dir, const char * name)
 		/* make sure dentry is really there */
 		if (victim->d_inode && 
 		    (victim->d_parent->d_inode == dir->d_inode)) {
-			d_invalidate(victim);
 			simple_unlink(dir->d_inode,victim);
+			d_delete(victim);
 		}
 	}
 	up(&dir->d_inode->i_sem);
@@ -631,15 +633,15 @@ void sysfs_remove_dir(struct kobject * kobj)
 		struct dentry * d = list_entry(node,struct dentry,d_child);
 		/* make sure dentry is still there */
 		if (d->d_inode) {
-			d_invalidate(d);
 			simple_unlink(dentry->d_inode,d);
+			d_delete(dentry);
 		}
 	}
 
 	up(&dentry->d_inode->i_sem);
 	d_invalidate(dentry);
 	simple_rmdir(parent->d_inode,dentry);
-
+	d_delete(dentry);
 	up(&parent->d_inode->i_sem);
 	dput(parent);
 }
