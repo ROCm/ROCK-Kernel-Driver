@@ -737,7 +737,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	}
 
 	for (i = 0; (z = zones[i]) != NULL; i++)
-		wakeup_kswapd(z);
+		wakeup_kswapd(z, classzone_idx);
 
 	/*
 	 * Go through the zonelist again. Let __GFP_HIGH and allocations

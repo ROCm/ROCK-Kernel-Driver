@@ -1145,9 +1145,11 @@ int kswapd(void *p)
 /*
  * A zone is low on free memory, so wake its kswapd task to service it.
  */
-void wakeup_kswapd(struct zone *zone)
+void wakeup_kswapd(struct zone *zone, int classzone_idx)
 {
-	if (zone->free_pages > zone->pages_low)
+	if (zone->present_pages == 0)
+		return;
+	if (zone->free_pages > zone->pages_low + zone->lowmem_reserve[classzone_idx])
 		return;
 	if (!waitqueue_active(&zone->zone_pgdat->kswapd_wait))
 		return;
