@@ -442,9 +442,12 @@ static ssize_t harmony_audio_read(struct file *file,
 		buf_to_read = harmony.first_filled_record;
 
 		/* Copy the page to an aligned buffer */
-		copy_to_user(buffer+count, 
-			     recorded_buf.addr+(HARMONY_BUF_SIZE*buf_to_read), 
-			     HARMONY_BUF_SIZE);
+		if (copy_to_user(buffer+count, recorded_buf.addr +
+				 (HARMONY_BUF_SIZE*buf_to_read),
+				 HARMONY_BUF_SIZE)) {
+			count = -EFAULT;
+			break;
+		}
 		
 		harmony.nb_filled_record--;
 		harmony.first_filled_record++;
@@ -474,13 +477,16 @@ static ssize_t harmony_audio_read(struct file *file,
 #define test_rate(tested,real_value,harmony_value) if ((tested)<=(real_value))\
                                                     
 
-static void harmony_format_auto_detect(const char *buffer, int block_size)
+static int harmony_format_auto_detect(const char *buffer, int block_size)
 {
 	u8 file_header[24];
 	u32 start_string;
+	int ret = 0;
 	
 	if (block_size>24) {
-		copy_from_user(file_header, buffer, sizeof(file_header));
+		if (copy_from_user(file_header, buffer, sizeof(file_header)))
+			ret = -EFAULT;
+			
 		start_string = four_bytes_to_u32(0);
 		
 		if ((file_header[4]==0) && (start_string==0x2E736E64)) {
@@ -505,7 +511,7 @@ static void harmony_format_auto_detect(const char *buffer, int block_size)
 			default:
 				harmony_set_control(HARMONY_DF_16BIT_LINEAR,
 						HARMONY_SR_44KHZ, HARMONY_SS_STEREO);
-				return;
+				goto out;
 			}
 			switch (nb_voices) {
 			case HARMONY_MAGIC_MONO:
@@ -520,10 +526,12 @@ static void harmony_format_auto_detect(const char *buffer, int block_size)
 			}
 			harmony_set_rate(harmony_detect_rate(&speed));
 			harmony.dac_rate = speed;
-			return;			
+			goto out;
 		}
 	}
 	harmony_set_control(HARMONY_DF_8BIT_ULAW, HARMONY_SR_8KHZ, HARMONY_SS_MONO);
+out:
+	return ret;
 }
 #undef four_bytes_to_u32
 
@@ -538,8 +546,10 @@ static ssize_t harmony_audio_write(struct file *file,
 	int frame_size;
 	int buf_to_fill;
 
-	if (!harmony.format_initialized) 
-	   harmony_format_auto_detect(buffer, total_count);
+	if (!harmony.format_initialized) {
+		if (harmony_format_auto_detect(buffer, total_count))
+			return -EFAULT;
+	}
 	
 	while (count<total_count) {
 		/* Wait until we're out of control mode */
@@ -573,8 +583,9 @@ static ssize_t harmony_audio_write(struct file *file,
 		}
 
 		/* Copy the page to an aligned buffer */
-		copy_from_user(played_buf.addr + (HARMONY_BUF_SIZE*buf_to_fill) + harmony.play_offset, 
-				buffer+count, frame_size);
+		if (copy_from_user(played_buf.addr +(HARMONY_BUF_SIZE*buf_to_fill) + harmony.play_offset, 
+				   buffer+count, frame_size))
+			return -EFAULT;
 		CHECK_WBACK_INV_OFFSET(played_buf, (HARMONY_BUF_SIZE*buf_to_fill + harmony.play_offset), 
 				frame_size);
 	
