@@ -130,3 +130,13 @@ config SERIO_PCIPS2
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called pcips2.
+
+config SERIO_MACEPS2
+	tristate "SGI O2 MACE PS/2 controller"
+	depends on SGI_IP32 && SERIO
+	help
+	  Say Y here if you have SGI O2 workstation and want to use its
+	  PS/2 ports.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called maceps2.
