@@ -818,7 +818,7 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
  *	@dev: Device whose IDENTIFY DEVICE results we will examine
  *	@s: string into which data is output
  *	@ofs: offset into identify device page
- *	@len: length of string to return
+ *	@len: length of string to return. must be an even number.
  *
  *	The strings in the IDENTIFY DEVICE page are broken up into
  *	16-bit chunks.  Run through the string, and output each
@@ -845,29 +845,6 @@ void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 		ofs++;
 		len -= 2;
 	}
-}
-
-/**
- *	ata_dev_parse_strings - Store useful IDENTIFY DEVICE page strings
- *	@dev: Device whose IDENTIFY DEVICE page info we use
- *
- *	We store 'vendor' and 'product' strings read from the device,
- *	for later use in the SCSI simulator's INQUIRY data.
- *
- *	Set these strings here, in the case of 'product', using
- *	data read from the ATA IDENTIFY DEVICE page.
- *
- *	LOCKING:
- *	caller.
- */
-
-static void ata_dev_parse_strings(struct ata_device *dev)
-{
-	assert (dev->class == ATA_DEV_ATA);
-	memcpy(dev->vendor, "ATA     ", 8);
-
-	ata_dev_id_string(dev, dev->product, ATA_ID_PROD_OFS,
-			  sizeof(dev->product));
 }
 
 /**
@@ -1126,8 +1103,6 @@ retry:
 	}
 
 	ata_dump_id(dev);
-
-	ata_dev_parse_strings(dev);
 
 	/* ATA-specific feature tests */
 	if (dev->class == ATA_DEV_ATA) {
@@ -2346,7 +2321,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 
 	if (cmd) {
 		if (unlikely(drv_stat & (ATA_ERR | ATA_BUSY | ATA_DRQ))) {
-			if (qc->flags & ATA_QCFLAG_ATAPI)
+			if (is_atapi_taskfile(&qc->tf))
 				cmd->result = SAM_STAT_CHECK_CONDITION;
 			else
 				ata_to_sense_error(qc);
@@ -2659,6 +2634,8 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
+
+	/* BMDMA completion */
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
@@ -2677,8 +2654,16 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 		handled = 1;
 		break;
 
+	/* command completion, but no data xfer */
+	/* FIXME: a shared interrupt _will_ cause a non-data command
+	 * to be completed prematurely, with an error.
+	 *
+	 * This doesn't matter right now, since we aren't sending
+	 * non-data commands down this pipe except in development
+	 * situations.
+	 */
 	case ATA_PROT_ATAPI:
-	case ATA_PROT_NODATA:	/* command completion, but no data xfer */
+	case ATA_PROT_NODATA:
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
 		ata_qc_complete(qc, status);
@@ -3525,3 +3510,4 @@ EXPORT_SYMBOL_GPL(ata_scsi_error);
 EXPORT_SYMBOL_GPL(ata_scsi_slave_config);
 EXPORT_SYMBOL_GPL(ata_scsi_release);
 EXPORT_SYMBOL_GPL(ata_host_intr);
+EXPORT_SYMBOL_GPL(ata_dev_id_string);
