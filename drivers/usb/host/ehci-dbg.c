@@ -102,8 +102,8 @@ static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 
 #ifdef	DEBUG
 
-#if 0
-static void dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
+static void __attribute__((__unused__))
+dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	dbg ("%s %p info1 %x info2 %x hw_curr %x qtd_next %x", label,
 		qh, qh->hw_info1, qh->hw_info2,
@@ -117,15 +117,13 @@ static void dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 			qh->hw_buf [4]);
 	}
 }
-#endif
 
 static const char *const fls_strings [] =
     { "1024", "512", "256", "??" };
 
 #else
-#if 0
-static inline void dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh) {}
-#endif
+static inline void __attribute__((__unused__))
+dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh) {}
 #endif	/* DEBUG */
 
 /* functions have the "wrong" filename when they're output... */
