@@ -143,7 +143,14 @@ extern void __flushw_user(void);
 
 #define flush_user_windows flushw_user
 #define flush_register_windows flushw_all
-#define prepare_to_switch flushw_all
+
+#define prepare_arch_schedule(prev)	task_lock(prev)
+#define finish_arch_schedule(prev)	task_unlock(prev)
+#define prepare_arch_switch(rq)		\
+do {	spin_unlock(&(rq)->lock);	\
+	flushw_all();			\
+} while (0)
+#define finish_arch_switch(rq)		__sti()
 
 #ifndef CONFIG_DEBUG_SPINLOCK
 #define CHECK_LOCKS(PREV)	do { } while(0)
@@ -172,61 +179,61 @@ if ((PREV)->thread.smp_lock_count) {					\
 	 * not preserve it's value.  Hairy, but it lets us remove 2 loads
 	 * and 2 stores in this critical code path.  -DaveM
 	 */
-#define switch_to(prev, next)							\
-do {	CHECK_LOCKS(prev);							\
-	if (test_thread_flag(TIF_PERFCTR)) {					\
-		unsigned long __tmp;						\
-		read_pcr(__tmp);						\
-		current_thread_info()->pcr_reg = __tmp;				\
-		read_pic(__tmp);						\
-		current_thread_info()->kernel_cntd0 += (unsigned int)(__tmp);	\
-		current_thread_info()->kernel_cntd1 += ((__tmp) >> 32);		\
-	}									\
-	save_and_clear_fpu();							\
-	/* If you are tempted to conditionalize the following */		\
-	/* so that ASI is only written if it changes, think again. */		\
-	__asm__ __volatile__("wr %%g0, %0, %%asi"				\
-	: : "r" (__thread_flag_byte_ptr(next->thread_info)[TI_FLAG_BYTE_CURRENT_DS]));	\
-	__asm__ __volatile__(							\
-	"mov	%%g6, %%g5\n\t"							\
-	"wrpr	%%g0, 0x95, %%pstate\n\t"					\
-	"stx	%%i6, [%%sp + 2047 + 0x70]\n\t"					\
-	"stx	%%i7, [%%sp + 2047 + 0x78]\n\t"					\
-	"rdpr	%%wstate, %%o5\n\t"						\
-	"stx	%%o6, [%%g6 + %2]\n\t"						\
-	"stb	%%o5, [%%g6 + %1]\n\t"						\
-	"rdpr	%%cwp, %%o5\n\t"						\
-	"stb	%%o5, [%%g6 + %4]\n\t"						\
-	"mov	%0, %%g6\n\t"							\
-	"ldub	[%0 + %4], %%g1\n\t"						\
-	"wrpr	%%g1, %%cwp\n\t"						\
-	"ldx	[%%g6 + %2], %%o6\n\t"						\
-	"ldub	[%%g6 + %1], %%o5\n\t"						\
-	"ldx	[%%g6 + %3], %%o7\n\t"						\
-	"mov	%%g6, %%l2\n\t"							\
-	"wrpr	%%o5, 0x0, %%wstate\n\t"					\
-	"ldx	[%%sp + 2047 + 0x70], %%i6\n\t"					\
-	"ldx	[%%sp + 2047 + 0x78], %%i7\n\t"					\
-	"wrpr	%%g0, 0x94, %%pstate\n\t"					\
-	"mov	%%l2, %%g6\n\t"							\
-	"ldx	[%%g6 + %6], %%g4\n\t"						\
-	"wrpr	%%g0, 0x96, %%pstate\n\t"					\
-	"andcc	%%o7, %5, %%g0\n\t"						\
-	"bne,pn	%%icc, ret_from_syscall\n\t"					\
-	" nop\n\t"								\
-	: /* no outputs */							\
-	: "r" (next->thread_info),						\
-	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),		\
-	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)					\
-	: "cc", "g1", "g2", "g3", "g5", "g7",					\
-	  "l2", "l3", "l4", "l5", "l6", "l7",					\
-	  "i0", "i1", "i2", "i3", "i4", "i5",					\
-	  "o0", "o1", "o2", "o3", "o4", "o5", "o7");				\
-	/* If you fuck with this, update ret_from_syscall code too. */		\
-	if (test_thread_flag(TIF_PERFCTR)) {					\
-		write_pcr(current_thread_info()->pcr_reg);			\
-		reset_pic();							\
-	}									\
+#define switch_to(prev, next, last)					\
+do {	CHECK_LOCKS(prev);						\
+	if (test_thread_flag(TIF_PERFCTR)) {				\
+		unsigned long __tmp;					\
+		read_pcr(__tmp);					\
+		current_thread_info()->pcr_reg = __tmp;			\
+		read_pic(__tmp);					\
+		current_thread_info()->kernel_cntd0 += (unsigned int)(__tmp);\
+		current_thread_info()->kernel_cntd1 += ((__tmp) >> 32);	\
+	}								\
+	save_and_clear_fpu();						\
+	/* If you are tempted to conditionalize the following */	\
+	/* so that ASI is only written if it changes, think again. */	\
+	__asm__ __volatile__("wr %%g0, %0, %%asi"			\
+	: : "r" (__thread_flag_byte_ptr(next->thread_info)[TI_FLAG_BYTE_CURRENT_DS]));\
+	__asm__ __volatile__(						\
+	"mov	%%g4, %%g5\n\t"						\
+	"wrpr	%%g0, 0x95, %%pstate\n\t"				\
+	"stx	%%i6, [%%sp + 2047 + 0x70]\n\t"				\
+	"stx	%%i7, [%%sp + 2047 + 0x78]\n\t"				\
+	"rdpr	%%wstate, %%o5\n\t"					\
+	"stx	%%o6, [%%g6 + %3]\n\t"					\
+	"stb	%%o5, [%%g6 + %2]\n\t"					\
+	"rdpr	%%cwp, %%o5\n\t"					\
+	"stb	%%o5, [%%g6 + %5]\n\t"					\
+	"mov	%1, %%g6\n\t"						\
+	"ldub	[%1 + %5], %%g1\n\t"					\
+	"wrpr	%%g1, %%cwp\n\t"					\
+	"ldx	[%%g6 + %3], %%o6\n\t"					\
+	"ldub	[%%g6 + %2], %%o5\n\t"					\
+	"ldx	[%%g6 + %4], %%o7\n\t"					\
+	"mov	%%g6, %%l2\n\t"						\
+	"wrpr	%%o5, 0x0, %%wstate\n\t"				\
+	"ldx	[%%sp + 2047 + 0x70], %%i6\n\t"				\
+	"ldx	[%%sp + 2047 + 0x78], %%i7\n\t"				\
+	"wrpr	%%g0, 0x94, %%pstate\n\t"				\
+	"mov	%%l2, %%g6\n\t"						\
+	"ldx	[%%g6 + %7], %%g4\n\t"					\
+	"wrpr	%%g0, 0x96, %%pstate\n\t"				\
+	"andcc	%%o7, %6, %%g0\n\t"					\
+	"bne,pn	%%icc, ret_from_syscall\n\t"				\
+	" mov	%%g5, %0\n\t"						\
+	: "=&r" (last)							\
+	: "0" (next->thread_info),					\
+	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),	\
+	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)				\
+	: "cc", "g1", "g2", "g3", "g5", "g7",				\
+	  "l2", "l3", "l4", "l5", "l6", "l7",				\
+	  "i0", "i1", "i2", "i3", "i4", "i5",				\
+	  "o0", "o1", "o2", "o3", "o4", "o5", "o7");			\
+	/* If you fuck with this, update ret_from_syscall code too. */	\
+	if (test_thread_flag(TIF_PERFCTR)) {				\
+		write_pcr(current_thread_info()->pcr_reg);		\
+		reset_pic();						\
+	}								\
 } while(0)
 
 extern __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)

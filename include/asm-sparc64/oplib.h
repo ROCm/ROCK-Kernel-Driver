@@ -113,6 +113,9 @@ extern void prom_cmdline(void);
  */
 extern void prom_halt(void) __attribute__ ((noreturn));
 
+/* Halt and power-off the machine. */
+extern void prom_halt_power_off(void) __attribute__ ((noreturn));
+
 /* Set the PROM 'sync' callback function to the passed function pointer.
  * When the user gives the 'sync' command at the prom prompt while the
  * kernel is still active, the prom will call this routine.
