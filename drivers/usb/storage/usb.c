@@ -437,41 +437,6 @@ static int usb_stor_control_thread(void * __us)
 			us->srb->result = GOOD << 1;
 		}
 
-		/* Most USB devices can't handle START_STOP.  But we
-		 * need something for media-change, so we'll use TUR
-		 * instead.
-		 *
-		 * We specifically allow this command through if either:
-		 * (a) it's a load/eject command (cmnd[4] & 2)
-		 * (b) it's a multi-target unit (i.e. legacy SCSI adaptor)
-		 */
-		else if (us->srb->cmnd[0] == START_STOP &&
-				!(us->srb->cmnd[4] & 2) &&
-				!(us->flags & US_FL_SCM_MULT_TARG)) {
-			unsigned char saved_cdb[16]; /* largest SCSI-III cmd */
-			__u8 old_cmd_len;
-
-			US_DEBUGP("Converting START_STOP to TUR\n");
-
-			/* save old command */
-			memcpy(saved_cdb, us->srb->cmnd, us->srb->cmd_len);
-			old_cmd_len = us->srb->cmd_len;
-
-			/* set up new command -- preserve LUN */
-			us->srb->cmd_len = 6;
-			memset(us->srb->cmnd, 0, us->srb->cmd_len);
-			us->srb->cmnd[0] = TEST_UNIT_READY;
-			us->srb->cmnd[1] = saved_cdb[1] & 0xE0;
-
-			/* do command */
-			US_DEBUG(usb_stor_show_command(us->srb));
-			us->proto_handler(us->srb, us);
-
-			/* restore original command */
-			us->srb->cmd_len = old_cmd_len;
-			memcpy(us->srb->cmnd, saved_cdb, us->srb->cmd_len);
-		}
-
 		/* we've got a command, let's do it! */
 		else {
 			US_DEBUG(usb_stor_show_command(us->srb));
