@@ -654,6 +654,7 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
  */
 #define EISA_bus 0
 #define MCA_bus 0
+#define MCA_bus__is_a_macro
 
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;

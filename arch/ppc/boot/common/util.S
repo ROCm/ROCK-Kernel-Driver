@@ -160,9 +160,22 @@ _setup_L3CR:
 	blr
 
 
+/* udelay (on non-601 processors) needs to know the period of the
+ * timebase in nanoseconds.  This used to be hardcoded to be 60ns
+ * (period of 66MHz/4).  Now a variable is used that is initialized to
+ * 60 for backward compatibility, but it can be overridden as necessary
+ * with code something like this:
+ *    extern unsigned long timebase_period_ns;
+ *    timebase_period_ns = 1000000000 / bd->bi_tbfreq;
+ */
+	.data
+	.globl timebase_period_ns
+timebase_period_ns:
+	.long	60
+
+	.text
 /*
  * Delay for a number of microseconds
- * -- Use the BUS timer (assumes 66MHz)
  */
 	.globl	udelay
 udelay:
@@ -180,8 +193,13 @@ udelay:
 
 .udelay_not_601:
 	mulli	r4,r3,1000	/* nanoseconds */
-	addi	r4,r4,59
-	li	r5,60
+	/*  Change r4 to be the number of ticks using:	
+	 *	(nanoseconds + (timebase_period_ns - 1 )) / timebase_period_ns
+	 *  timebase_period_ns defaults to 60 (16.6MHz) */
+	lis	r5,timebase_period_ns@h
+	lwz	r5,timebase_period_ns@l(r5)
+	addi	r4,r4,r5
+	addi	r4,r4,-1
 	divw	r4,r4,r5	/* BUS ticks */
 1:	mftbu	r5
 	mftb	r6

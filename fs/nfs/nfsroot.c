@@ -437,6 +437,7 @@ static int __init root_nfs_ports(void)
  */
 static int __init root_nfs_get_handle(void)
 {
+	struct nfs_fh fh;
 	struct sockaddr_in sin;
 	int status;
 	int protocol = (nfs_data.flags & NFS_MOUNT_TCP) ?
@@ -445,11 +446,14 @@ static int __init root_nfs_get_handle(void)
 					NFS_MNT3_VERSION : NFS_MNT_VERSION;
 
 	set_sockaddr(&sin, servaddr, mount_port);
-	status = nfsroot_mount(&sin, nfs_path, &nfs_data.root,
-							version, protocol);
+	status = nfsroot_mount(&sin, nfs_path, &fh, version, protocol);
 	if (status < 0)
 		printk(KERN_ERR "Root-NFS: Server returned error %d "
 				"while mounting %s\n", status, nfs_path);
+	else {
+		nfs_data.root.size = fh.size;
+		memcpy(nfs_data.root.data, fh.data, fh.size);
+	}
 
 	return status;
 }

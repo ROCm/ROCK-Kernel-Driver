@@ -357,6 +357,21 @@ sandpoint_setup_arch(void)
 }
 
 /*
+ * Fix IDE interrupts.
+ */
+static int __init
+sandpoint_fix_winbond_83553(void)
+{
+	/* Make all 8259 interrupt level sensitive */
+	outb(0xf8, 0x4d0);
+	outb(0xde, 0x4d1);
+
+	return 0;
+}
+
+arch_initcall(sandpoint_fix_winbond_83553);
+
+/*
  * Initialize the ISA devices on the Nat'l PC87308VUL SuperIO chip.
  */
 static int __init
@@ -390,21 +405,6 @@ sandpoint_setup_natl_87308(void)
 }
 
 arch_initcall(sandpoint_setup_natl_87308);
-
-/*
- * Fix IDE interrupts.
- */
-static int __init
-sandpoint_fix_winbond_83553(void)
-{
-	/* Make all 8259 interrupt level sensitive */
-	outb(0xf8, 0x4d0);
-	outb(0xde, 0x4d1);
-
-	return 0;
-}
-
-arch_initcall(sandpoint_fix_winbond_83553);
 
 static int __init
 sandpoint_request_io(void)
