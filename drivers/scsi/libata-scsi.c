@@ -138,7 +138,7 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 			printk(KERN_INFO "ata%u: dev %u max request 512KB (lba48)\n",
 			       ap->id, sdev->id);
 		} else
-			printk(KERN_INFO "ata%u: dev %u max request 120KB\n",
+			printk(KERN_INFO "ata%u: dev %u max request 128KB\n",
 			       ap->id, sdev->id);
 	}
 
