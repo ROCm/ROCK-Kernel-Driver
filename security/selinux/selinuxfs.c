@@ -68,40 +68,15 @@ enum sel_inos {
 	SEL_DISABLE	/* disable SELinux until next reboot */
 };
 
+#define TMPBUFLEN	12
 static ssize_t sel_read_enforce(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	char *page;
+	char tmpbuf[TMPBUFLEN];
 	ssize_t length;
-	ssize_t end;
 
-	if (count < 0 || count > PAGE_SIZE)
-		return -EINVAL;
-	if (!(page = (char*)__get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
-
-	length = scnprintf(page, PAGE_SIZE, "%d", selinux_enforcing);
-	if (length < 0) {
-		free_page((unsigned long)page);
-		return length;
-	}
-
-	if (*ppos >= length) {
-		free_page((unsigned long)page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count)) {
-		count = -EFAULT;
-		goto out;
-	}
-	*ppos = end;
-out:
-	free_page((unsigned long)page);
-	return count;
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", selinux_enforcing);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
 }
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
@@ -119,10 +94,9 @@ static ssize_t sel_write_enforce(struct file * file, const char __user * buf,
 		/* No partial writes. */
 		return -EINVAL;
 	}
-	page = (char*)__get_free_page(GFP_KERNEL);
+	page = (char*)get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
 	length = -EFAULT;
 	if (copy_from_user(page, buf, count))
 		goto out;
@@ -170,10 +144,9 @@ static ssize_t sel_write_disable(struct file * file, const char __user * buf,
 		/* No partial writes. */
 		return -EINVAL;
 	}
-	page = (char*)__get_free_page(GFP_KERNEL);
+	page = (char*)get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
 	length = -EFAULT;
 	if (copy_from_user(page, buf, count))
 		goto out;
@@ -204,37 +177,11 @@ static struct file_operations sel_disable_ops = {
 static ssize_t sel_read_policyvers(struct file *filp, char __user *buf,
                                    size_t count, loff_t *ppos)
 {
-	char *page;
+	char tmpbuf[TMPBUFLEN];
 	ssize_t length;
-	ssize_t end;
 
-	if (count < 0 || count > PAGE_SIZE)
-		return -EINVAL;
-	if (!(page = (char*)__get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
-
-	length = scnprintf(page, PAGE_SIZE, "%u", POLICYDB_VERSION_MAX);
-	if (length < 0) {
-		free_page((unsigned long)page);
-		return length;
-	}
-
-	if (*ppos >= length) {
-		free_page((unsigned long)page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count)) {
-		count = -EFAULT;
-		goto out;
-	}
-	*ppos = end;
-out:
-	free_page((unsigned long)page);
-	return count;
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%u", POLICYDB_VERSION_MAX);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
 }
 
 static struct file_operations sel_policyvers_ops = {
@@ -247,37 +194,11 @@ static int sel_make_bools(void);
 static ssize_t sel_read_mls(struct file *filp, char __user *buf,
 				size_t count, loff_t *ppos)
 {
-	char *page;
+	char tmpbuf[TMPBUFLEN];
 	ssize_t length;
-	ssize_t end;
 
-	if (count < 0 || count > PAGE_SIZE)
-		return -EINVAL;
-	if (!(page = (char*)__get_free_page(GFP_KERNEL)))
-		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
-
-	length = scnprintf(page, PAGE_SIZE, "%d", selinux_mls_enabled);
-	if (length < 0) {
-		free_page((unsigned long)page);
-		return length;
-	}
-
-	if (*ppos >= length) {
-		free_page((unsigned long)page);
-		return 0;
-	}
-	if (count + *ppos > length)
-		count = length - *ppos;
-	end = count + *ppos;
-	if (copy_to_user(buf, (char *) page + *ppos, count)) {
-		count = -EFAULT;
-		goto out;
-	}
-	*ppos = end;
-out:
-	free_page((unsigned long)page);
-	return count;
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%d", selinux_mls_enabled);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
 }
 
 static struct file_operations sel_mls_ops = {
@@ -352,10 +273,9 @@ static ssize_t sel_write_context(struct file * file, const char __user * buf,
 		/* No partial writes. */
 		return -EINVAL;
 	}
-	page = (char*)__get_free_page(GFP_KERNEL);
+	page = (char*)get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
 	length = -EFAULT;
 	if (copy_from_user(page, buf, count))
 		goto out;
@@ -695,11 +615,10 @@ static ssize_t sel_read_bool(struct file *filep, char __user *buf,
 		ret = -EINVAL;
 		goto out;
 	}
-	if (!(page = (char*)__get_free_page(GFP_KERNEL))) {
+	if (!(page = (char*)get_zeroed_page(GFP_KERNEL))) {
 		ret = -ENOMEM;
 		goto out;
 	}
-	memset(page, 0, PAGE_SIZE);
 
 	inode = filep->f_dentry->d_inode;
 	cur_enforcing = security_get_bool_value(inode->i_ino - BOOL_INO_OFFSET);
@@ -761,12 +680,11 @@ static ssize_t sel_write_bool(struct file *filep, const char __user *buf,
 		/* No partial writes. */
 		goto out;
 	}
-	page = (char*)__get_free_page(GFP_KERNEL);
+	page = (char*)get_zeroed_page(GFP_KERNEL);
 	if (!page) {
 		length = -ENOMEM;
 		goto out;
 	}
-	memset(page, 0, PAGE_SIZE);
 
 	if (copy_from_user(page, buf, count))
 		goto out;
@@ -820,13 +738,11 @@ static ssize_t sel_commit_bools_write(struct file *filep,
 		/* No partial writes. */
 		goto out;
 	}
-	page = (char*)__get_free_page(GFP_KERNEL);
+	page = (char*)get_zeroed_page(GFP_KERNEL);
 	if (!page) {
 		length = -ENOMEM;
 		goto out;
 	}
-
-	memset(page, 0, PAGE_SIZE);
 
 	if (copy_from_user(page, buf, count))
 		goto out;
@@ -913,9 +829,8 @@ static int sel_make_bools(void)
 
 	sel_remove_bools(dir);
 
-	if (!(page = (char*)__get_free_page(GFP_KERNEL)))
+	if (!(page = (char*)get_zeroed_page(GFP_KERNEL)))
 		return -ENOMEM;
-	memset(page, 0, PAGE_SIZE);
 
 	ret = security_get_bools(&num, &names, &values);
 	if (ret != 0)
