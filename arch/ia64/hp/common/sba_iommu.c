@@ -1519,8 +1519,8 @@ ioc_iova_init(struct ioc *ioc)
 		agp_found |= pci_find_capability(device, PCI_CAP_ID_AGP);
 
 	if (agp_found && reserve_sba_gart) {
-		DBG_INIT("%s: AGP device found, reserving half of IOVA for GART support\n",
-			 __FUNCTION__);
+		printk(KERN_INFO PFX "reserving %dMb of IOVA space at 0x%lx for agpgart\n",
+		      ioc->iov_size/2 >> 20, ioc->ibase + ioc->iov_size/2);
 		ioc->pdir_size /= 2;
 		((u64 *)ioc->pdir_base)[PDIR_INDEX(ioc->iov_size/2)] = ZX1_SBA_IOMMU_COOKIE;
 	}
