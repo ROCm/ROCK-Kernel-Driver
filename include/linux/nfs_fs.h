@@ -319,6 +319,7 @@ extern void nfs_complete_unlink(struct dentry *);
  * linux/fs/nfs/write.c
  */
 extern int  nfs_writepage(struct page *);
+extern int  nfs_writepages(struct address_space *, struct writeback_control *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
 extern void nfs_writeback_done(struct rpc_task *task, int stable,
@@ -343,6 +344,13 @@ extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsign
 extern int  nfs_commit_list(struct list_head *, int);
 extern int  nfs_scan_lru_commit(struct nfs_server *, struct list_head *);
 extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *);
+#else
+static inline int
+nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,
+		unsigned int len, int flags)
+{
+	return 0;
+}
 #endif
 
 static inline int

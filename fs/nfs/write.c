@@ -52,6 +52,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
+#include <linux/mpage.h>
+#include <linux/writeback.h>
 
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs_fs.h>
@@ -275,6 +277,25 @@ region_locked(struct inode *inode, struct nfs_page *req)
 	}
 
 	return 0;
+}
+
+int
+nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
+{
+	struct inode *inode = mapping->host;
+	int is_sync = !wbc->nonblocking;
+	int err;
+
+	err = generic_writepages(mapping, wbc);
+	if (err)
+		goto out;
+	err = nfs_flush_file(inode, NULL, 0, 0, 0);
+	if (err < 0)
+		goto out;
+	if (is_sync)
+		err = nfs_wb_all(inode);
+out:
+	return err;
 }
 
 /*
@@ -850,6 +871,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 		req = nfs_list_entry(head->next);
 		nfs_list_remove_request(req);
 		nfs_list_add_request(req, &data->pages);
+		SetPageWriteback(req->wb_page);
 		*pages++ = req->wb_page;
 		count += req->wb_bytes;
 	}
@@ -1005,10 +1027,12 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 			SetPageError(page);
 			if (req->wb_file)
 				req->wb_file->f_error = task->tk_status;
+			end_page_writeback(page);
 			nfs_inode_remove_request(req);
 			dprintk(", error = %d\n", task->tk_status);
 			goto next;
 		}
+		end_page_writeback(page);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 		if (stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
