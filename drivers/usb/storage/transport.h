@@ -117,6 +117,7 @@ struct bulk_cs_wrap {
 /*
  * usb_stor_bulk_transfer_xxx() return codes, in order of severity
  */
+
 #define USB_STOR_XFER_GOOD		0  /* good transfer                 */
 #define USB_STOR_XFER_SHORT		1  /* transfered less than expected */
 #define USB_STOR_XFER_STALLED		2  /* endpoint stalled		    */
@@ -129,7 +130,14 @@ struct bulk_cs_wrap {
 #define USB_STOR_TRANSPORT_GOOD	   0   /* Transport good, command good	   */
 #define USB_STOR_TRANSPORT_FAILED  1   /* Transport good, command failed   */
 #define USB_STOR_TRANSPORT_ERROR   2   /* Transport bad (i.e. device dead) */
-#define USB_STOR_TRANSPORT_ABORTED 3   /* Transport aborted                */
+
+/*
+ * We used to have USB_STOR_XFER_ABORTED and USB_STOR_TRANSPORT_ABORTED
+ * return codes.  But now the transport and low-level transfer routines
+ * treat an abort as just another error (-ENOENT for a cancelled URB).
+ * It is up to the invoke_transport() function to test for aborts and
+ * distinguish them from genuine communication errors.
+ */
 
 /*
  * CBI accept device specific command
@@ -162,12 +170,12 @@ extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
 extern int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
-		char *buf, unsigned int length, unsigned int *act_len);
+		void *buf, unsigned int length, unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		struct scatterlist *sg, int num_sg, unsigned int length,
 		unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sg(struct us_data *us, unsigned int pipe,
-		char *buf, unsigned int length, int use_sg, int *residual);
+		void *buf, unsigned int length, int use_sg, int *residual);
 
 static __inline__ int usb_stor_bulk_transfer_srb(struct us_data *us,
 		unsigned int pipe, Scsi_Cmnd *srb, unsigned int length) {

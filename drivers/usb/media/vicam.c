@@ -1,6 +1,7 @@
 /*
  * USB ViCam WebCam driver
- * Copyright (c) 2002 Joe Burks (jburks@wavicle.org)
+ * Copyright (c) 2002 Joe Burks (jburks@wavicle.org),
+ *                    John Tyner (fill in email address)
  *
  * Supports 3COM HomeConnect PC Digital WebCam
  *
@@ -42,14 +43,6 @@
 #include "usbvideo.h"
 
 // #define VICAM_DEBUG
-
-#ifndef MODULE_LICENSE
-#define MODULE_LICENSE(a)
-#endif
-
-#ifndef bool
-#define bool int
-#endif
 
 #ifdef VICAM_DEBUG
 #define ADBG(lineno,fmt,args...) printk(fmt, jiffies, __FUNCTION__, lineno, ##args)
@@ -403,26 +396,27 @@ static void rvfree(void *mem, unsigned long size)
 	}
 	vfree(mem);
 }
-	
+
 struct vicam_camera {
 	u16 shutter_speed;	// capture shutter speed
 	u16 gain;		// capture gain
 
 	u8 *raw_image;		// raw data captured from the camera
 	u8 *framebuf;		// processed data in RGB24 format
+	u8 *cntrlbuf;		// area used to send control msgs
 
 	struct video_device vdev;	// v4l video device
 	struct usb_device *udev;	// usb device
 
 	struct semaphore busy_lock;	// guard against SMP multithreading
 
-	bool is_initialized;
+	int is_initialized;
 	u8 open_count;
 	u8 bulkEndpoint;
-	bool needsDummyRead;
+	int needsDummyRead;
 
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *proc_entry;
+#if defined(CONFIG_VIDEO_PROC_FS)
+	struct proc_dir_entry *proc_dir;
 #endif
 
 };
@@ -437,22 +431,16 @@ send_control_msg(struct usb_device *udev, u8 request, u16 value, u16 index,
 {
 	int status;
 
-	// for reasons not yet known to me, you can't send USB control messages
-	// with data in the module (if you are compiled as a module).  Whatever
-	// the reason, copying it to memory allocated as kernel memory then
-	// doing the usb control message fixes the problem.
-
-	unsigned char *transfer_buffer = kmalloc(size, GFP_KERNEL);
-	memcpy(transfer_buffer, cp, size);
+	/* cp must be memory that has been allocated by kmalloc */
 
 	status = usb_control_msg(udev,
 				 usb_sndctrlpipe(udev, 0),
 				 request,
 				 USB_DIR_OUT | USB_TYPE_VENDOR |
 				 USB_RECIP_DEVICE, value, index,
-				 transfer_buffer, size, HZ);
+				 cp, size, HZ);
 
-	kfree(transfer_buffer);
+	status = min(status, 0);
 
 	if (status < 0) {
 		printk(KERN_INFO "Failed sending control message, error %d.\n",
@@ -465,29 +453,30 @@ send_control_msg(struct usb_device *udev, u8 request, u16 value, u16 index,
 static int
 initialize_camera(struct vicam_camera *cam)
 {
+	const struct {
+		u8 *data;
+		u32 size;
+	} firmware[] = {
+		{ .data = setup1, .size = sizeof(setup1) },
+		{ .data = setup2, .size = sizeof(setup2) },
+		{ .data = setup3, .size = sizeof(setup3) },
+		{ .data = setup4, .size = sizeof(setup4) },
+		{ .data = setup5, .size = sizeof(setup5) },
+		{ .data = setup3, .size = sizeof(setup3) },
+		{ .data = NULL, .size = 0 }
+	};
+	
 	struct usb_device *udev = cam->udev;
-	int status;
+	int err, i;
 
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup1, sizeof (setup1))) < 0)
-		return status;
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup2, sizeof (setup2))) < 0)
-		return status;
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup3, sizeof (setup3))) < 0)
-		return status;
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup4, sizeof (setup4))) < 0)
-		return status;
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup5, sizeof (setup5))) < 0)
-		return status;
-	if ((status =
-	     send_control_msg(udev, 0xff, 0, 0, setup3, sizeof (setup3))) < 0)
-		return status;
+	for (i = 0, err = 0; firmware[i].data && !err; i++) {
+		memcpy(cam->cntrlbuf, firmware[i].data, firmware[i].size);
 
-	return 0;
+		err = send_control_msg(udev, 0xff, 0, 0,
+				       cam->cntrlbuf, firmware[i].size);
+	}
+
+	return err;
 }
 
 static int
@@ -752,7 +741,8 @@ vicam_open(struct inode *inode, struct file *file)
 		       "vicam video_device improperly initialized");
 	}
 
-	down_interruptible(&cam->busy_lock);
+	if ( down_interruptible(&cam->busy_lock) )
+		return -EINTR;
 
 	if (cam->open_count > 0) {
 		printk(KERN_INFO
@@ -770,6 +760,14 @@ vicam_open(struct inode *inode, struct file *file)
 	cam->framebuf = rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 	if (!cam->framebuf) {
 		kfree(cam->raw_image);
+		up(&cam->busy_lock);
+		return -ENOMEM;
+	}
+
+	cam->cntrlbuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!cam->cntrlbuf) {
+		kfree(cam->raw_image);
+		rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 		up(&cam->busy_lock);
 		return -ENOMEM;
 	}
@@ -803,6 +801,7 @@ vicam_close(struct inode *inode, struct file *file)
 
 	kfree(cam->raw_image);
 	rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
+	kfree(cam->cntrlbuf);
 
 	cam->open_count--;
 
@@ -831,7 +830,7 @@ inline void writepixel(char *rgb, int Y, int Cr, int Cb)
 //   Copyright (C) 2002 Monroe Williams (monroe@pobox.com)
 // --------------------------------------------------------------------------------
 
-void vicam_decode_color( char *data, char *rgb)
+static void vicam_decode_color( char *data, char *rgb)
 {
 	int x,y;
 	int Cr, Cb;
@@ -915,7 +914,7 @@ void vicam_decode_color( char *data, char *rgb)
 static void
 read_frame(struct vicam_camera *cam, int framenum)
 {
-	unsigned char request[16];
+	unsigned char *request = cam->cntrlbuf;
 	int realShutter;
 	int n;
 	int actual_length;
@@ -984,7 +983,8 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 
 	DBG("read %d bytes.\n", (int) count);
 
-	down_interruptible(&cam->busy_lock);
+	if ( down_interruptible(&cam->busy_lock) )
+		return -EINTR;
 
 	if (*ppos >= VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
@@ -1057,24 +1057,17 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
+#if defined(CONFIG_VIDEO_PROC_FS)
 
 static struct proc_dir_entry *vicam_proc_root = NULL;
 
-static int
-vicam_read_proc(char *page, char **start, off_t off,
-		      int count, int *eof, void *data)
+static int vicam_read_helper(char *page, char **start, off_t off,
+				int count, int *eof, int value)
 {
 	char *out = page;
 	int len;
-	struct vicam_camera *cam = (struct vicam_camera *) data;
 
-	out +=
-	    sprintf(out, "Vicam-based WebCam Linux Driver.\n");
-	out += sprintf(out, "(c) 2002 Joe Burks (jburks@wavicle.org)\n");
-	out += sprintf(out, "vicam stats:\n");
-	out += sprintf(out, "    Shutter Speed: 1/%d\n", cam->shutter_speed);
-	out += sprintf(out, "             Gain: %d\n", cam->gain);
+	out += sprintf(out, "%d",value);
 
 	len = out - page;
 	len -= off;
@@ -1089,38 +1082,43 @@ vicam_read_proc(char *page, char **start, off_t off,
 	return len;
 }
 
-static int
-vicam_write_proc(struct file *file, const char *buffer,
-		       unsigned long count, void *data)
+static int vicam_read_proc_shutter(char *page, char **start, off_t off,
+				int count, int *eof, void *data)
 {
-	char *in;
-	char *start;
-	struct vicam_camera *cam = (struct vicam_camera *) data;
+	return vicam_read_helper(page,start,off,count,eof,
+				((struct vicam_camera *)data)->shutter_speed);
+}
 
-	in = kmalloc(count + 1, GFP_KERNEL);
-	if (!in)
-		return -ENOMEM;
+static int vicam_read_proc_gain(char *page, char **start, off_t off,
+				int count, int *eof, void *data)
+{
+	return vicam_read_helper(page,start,off,count,eof,
+				((struct vicam_camera *)data)->gain);
+}
 
-	in[count] = 0;		// I'm not sure buffer is gauranteed to be null terminated
-	// so I do this to make sure I have a null in there.
+static int vicam_write_proc_shutter(struct file *file, const char *buffer,
+				unsigned long count, void *data)
+{
+	struct vicam_camera *cam = (struct vicam_camera *)data;
+	
+	cam->shutter_speed = simple_strtoul(buffer, NULL, 10);
 
-	strncpy(in, buffer, count);
-
-	start = strstr(in, "gain=");
-	if (start
-	    && (start == in || *(start - 1) == ' ' || *(start - 1) == ','))
-		cam->gain = simple_strtoul(start + 5, NULL, 10);
-
-	start = strstr(in, "shutter=");
-	if (start
-	    && (start == in || *(start - 1) == ' ' || *(start - 1) == ','))
-		cam->shutter_speed = simple_strtoul(start + 8, NULL, 10);
-
-	kfree(in);
 	return count;
 }
 
-void
+static int vicam_write_proc_gain(struct file *file, const char *buffer,
+				unsigned long count, void *data)
+{
+	struct vicam_camera *cam = (struct vicam_camera *)data;
+	
+	cam->gain = simple_strtoul(buffer, NULL, 10);
+
+	return count;
+}
+
+
+
+static void
 vicam_create_proc_root(void)
 {
 	vicam_proc_root = create_proc_entry("video/vicam", S_IFDIR, 0);
@@ -1132,19 +1130,17 @@ vicam_create_proc_root(void)
 		       "could not create /proc entry for vicam!");
 }
 
-void
+static void
 vicam_destroy_proc_root(void)
 {
 	if (vicam_proc_root)
 		remove_proc_entry("video/vicam", 0);
 }
 
-void
-vicam_create_proc_entry(void *ptr)
+static void
+vicam_create_proc_entry(struct vicam_camera *cam)
 {
-	struct vicam_camera *cam = (struct vicam_camera *) ptr;
-
-	char name[7];
+	char name[64];
 	struct proc_dir_entry *ent;
 
 	DBG(KERN_INFO "vicam: creating proc entry\n");
@@ -1158,45 +1154,53 @@ vicam_create_proc_entry(void *ptr)
 
 	sprintf(name, "video%d", cam->vdev.minor);
 
-	ent =
-	    create_proc_entry(name, S_IFREG | S_IRUGO | S_IWUSR,
-			      vicam_proc_root);
-	if (!ent)
-		return;
+	cam->proc_dir = create_proc_entry(name, S_IFDIR, vicam_proc_root);
 
-	ent->data = cam;
-	ent->read_proc = vicam_read_proc;
-	ent->write_proc = vicam_write_proc;
-	ent->size = 512;
-	cam->proc_entry = ent;
+	if ( !cam->proc_dir ) return; // We should probably return an error here
+	
+	ent =
+	    create_proc_entry("shutter", S_IFREG | S_IRUGO | S_IWUSR,
+			      cam->proc_dir);
+	if (ent) {
+		ent->data = cam;
+		ent->read_proc = vicam_read_proc_shutter;
+		ent->write_proc = vicam_write_proc_shutter;
+		ent->size = 64;
+	}
+
+	ent = create_proc_entry("gain", S_IFREG | S_IRUGO | S_IWUSR,
+					cam->proc_dir);
+	if ( ent ) {
+		ent->data = cam;
+		ent->read_proc = vicam_read_proc_gain;
+		ent->write_proc = vicam_write_proc_gain;
+		ent->size = 64;
+	}
 }
 
-void
+static void
 vicam_destroy_proc_entry(void *ptr)
 {
 	struct vicam_camera *cam = (struct vicam_camera *) ptr;
-	char name[7];
+	char name[16];
 
-	if (!cam || !cam->proc_entry)
+	if ( !cam->proc_dir )
 		return;
 
 	sprintf(name, "video%d", cam->vdev.minor);
-	remove_proc_entry(name, vicam_proc_root);
-	cam->proc_entry = NULL;
+	remove_proc_entry("shutter", cam->proc_dir);
+	remove_proc_entry("gain", cam->proc_dir);
+	remove_proc_entry(name,vicam_proc_root);
+	cam->proc_dir = NULL;
 
 }
 
+#else
+static inline void vicam_create_proc_root(void) { }
+static inline void vicam_destroy_proc_root(void) { }
+static inline void vicam_create_proc_entry(struct vicam_camera *cam) { }
+static inline void vicam_destroy_proc_entry(void *ptr) { }
 #endif
-
-int
-vicam_video_init(struct video_device *vdev)
-{
-	// This would normally create the proc entry for this camera
-#ifdef CONFIG_PROC_FS
-	vicam_create_proc_entry(vdev->priv);
-#endif
-	return 0;
-}
 
 static struct file_operations vicam_fops = {
 	.owner		= THIS_MODULE,
@@ -1296,6 +1300,8 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 		return -EIO;
 	}
 
+	vicam_create_proc_entry(cam);
+
 	printk(KERN_INFO "ViCam webcam driver now controlling video device %d\n",cam->vdev.minor);
 
 	dev_set_drvdata(&intf->dev, cam);
@@ -1314,9 +1320,7 @@ vicam_disconnect(struct usb_interface *intf)
 	
 	video_unregister_device(&cam->vdev);
 
-#ifdef CONFIG_PROC_FS
 	vicam_destroy_proc_entry(cam);
-#endif
 
 	kfree(cam);
 
@@ -1329,9 +1333,7 @@ static int __init
 usb_vicam_init(void)
 {
 	DBG(KERN_INFO "ViCam-based WebCam driver startup\n");
-#ifdef CONFIG_PROC_FS
 	vicam_create_proc_root();
-#endif
 	if (usb_register(&vicam_driver) != 0)
 		printk(KERN_WARNING "usb_register failed!\n");
 	return 0;
@@ -1344,9 +1346,7 @@ usb_vicam_exit(void)
 	       "ViCam-based WebCam driver shutdown\n");
 
 	usb_deregister(&vicam_driver);
-#ifdef CONFIG_PROC_FS
 	vicam_destroy_proc_root();
-#endif
 }
 
 module_init(usb_vicam_init);
