@@ -1976,6 +1976,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 			tx_ring->buffer_info[i].skb = NULL;
 		}
 
+		tx_desc->buffer_addr = 0;
+		tx_desc->lower.data = 0;
 		tx_desc->upper.data = 0;
 
 		if(++i == tx_ring->count) i = 0;
