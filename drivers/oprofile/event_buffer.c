@@ -151,10 +151,14 @@ ssize_t event_buffer_read(struct file * file, char * buf, size_t count, loff_t *
 	if (count != max || *offset)
 		return -EINVAL;
 
-	/* wait for the event buffer to fill up with some data */
 	wait_event_interruptible(buffer_wait, atomic_read(&buffer_ready));
+
 	if (signal_pending(current))
 		return -EINTR;
+
+	/* can't currently happen */
+	if (!atomic_read(&buffer_ready))
+		return -EAGAIN;
 
 	down(&buffer_sem);
 
