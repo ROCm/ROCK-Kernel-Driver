@@ -17,6 +17,7 @@
 #include <asm/mpc52xx.h>
 #include <asm/mpc52xx_psc.h>
 #include <asm/serial.h>
+#include <asm/io.h>
 #include <asm/time.h>
 
 #if MPC52xx_PF_CONSOLE_PORT == 0
