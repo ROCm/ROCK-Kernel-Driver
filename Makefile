@@ -2,7 +2,7 @@ VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 5
 EXTRAVERSION =-rc3
-NAME=Feisty Dunnart
+NAME=Zonked Quokka
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
