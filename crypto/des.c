@@ -1036,7 +1036,7 @@ static int setkey(u32 *expkey, const u8 *key, size_t keylen, int *flags)
 	u8 bits0[56], bits1[56];
 
 	if (keylen != DES_KEY_SIZE) {
-		*flags |= CRYPTO_BAD_KEY_LEN;
+		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
 		return -EINVAL;
 	}
 
@@ -1050,7 +1050,7 @@ static int setkey(u32 *expkey, const u8 *key, size_t keylen, int *flags)
 	n |= parity[key[7]];
 	w = 0x88888888L;
 	
-	if ((*flags & CRYPTO_WEAK_KEY_CHECK)
+	if ((*flags & CRYPTO_TFM_REQ_WEAK_KEY)
 	    && !((n - (w >> 3)) & w)) {  /* 1 in 10^10 keys passes this test */
 		if (n < 0x41415151) {
 			if (n < 0x31312121) {
@@ -1108,7 +1108,7 @@ static int setkey(u32 *expkey, const u8 *key, size_t keylen, int *flags)
 	
 		goto not_weak;
 weak:
-		*flags |= CRYPTO_WEAK_KEY;
+		*flags |= CRYPTO_TFM_RES_WEAK_KEY;
 		return -EINVAL;
 	}
 
@@ -1211,7 +1211,7 @@ static int des3_ede_setkey(void *ctx, const u8 *key, size_t keylen, int *flags)
 	struct des3_ede_ctx *dctx = ctx;
 
 	if (keylen != DES3_EDE_KEY_SIZE) {
-		*flags |= CRYPTO_BAD_KEY_LEN;
+		*flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
 		return -EINVAL;
 	}
 
@@ -1219,7 +1219,7 @@ static int des3_ede_setkey(void *ctx, const u8 *key, size_t keylen, int *flags)
 	    memcmp(&key[DES_KEY_SIZE], &key[DES_KEY_SIZE * 2],
 	    					DES_KEY_SIZE))) {
 
-		*flags |= CRYPTO_BAD_KEY_SCHED;
+		*flags |= CRYPTO_TFM_RES_BAD_KEY_SCHED;
 		return -EINVAL;
 	}
 	
@@ -1255,8 +1255,8 @@ static void des3_ede_decrypt(void *ctx, u8 *dst, u8 *src)
 }
 
 static struct crypto_alg des_alg = {
-	.cra_id		=	CRYPTO_ALG_DES,
 	.cra_name	=	"des",
+	.cra_flags	=	CRYPTO_ALG_TYPE_CIPHER,
 	.cra_blocksize	=	DES_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des_ctx),
 	.cra_module	=	THIS_MODULE,
@@ -1269,8 +1269,8 @@ static struct crypto_alg des_alg = {
 };
 
 static struct crypto_alg des3_ede_alg = {
-	.cra_id		=	CRYPTO_ALG_DES3_EDE,
 	.cra_name	=	"des3_ede",
+	.cra_flags	=	CRYPTO_ALG_TYPE_CIPHER,
 	.cra_blocksize	=	DES3_EDE_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des3_ede_ctx),
 	.cra_module	=	THIS_MODULE,

@@ -16,6 +16,7 @@
  */
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <asm/scatterlist.h>
@@ -71,15 +72,15 @@ static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
 {
 	int i;
 	struct scatterlist tmp;
-	char ipad[crypto_tfm_blocksize(tfm) + 1];
-	char opad[crypto_tfm_blocksize(tfm) + 1];
+	char ipad[crypto_tfm_alg_blocksize(tfm) + 1];
+	char opad[crypto_tfm_alg_blocksize(tfm) + 1];
 
-	if (keylen > crypto_tfm_blocksize(tfm)) {
+	if (keylen > crypto_tfm_alg_blocksize(tfm)) {
 		tmp.page = virt_to_page(key);
 		tmp.offset = ((long)key & ~PAGE_MASK);
 		tmp.length = keylen;
 		crypto_digest_digest(tfm, &tmp, 1, key);
-		keylen = crypto_tfm_digestsize(tfm);
+		keylen = crypto_tfm_alg_digestsize(tfm);
 	}
 
 	memset(ipad, 0, sizeof(ipad));
@@ -87,14 +88,14 @@ static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
 	memcpy(ipad, key, keylen);
 	memcpy(opad, key, keylen);
 
-	for (i = 0; i < crypto_tfm_blocksize(tfm); i++) {
+	for (i = 0; i < crypto_tfm_alg_blocksize(tfm); i++) {
 		ipad[i] ^= 0x36;
 		opad[i] ^= 0x5c;
 	}
 
 	tmp.page = virt_to_page(ipad);
 	tmp.offset = ((long)ipad & ~PAGE_MASK);
-	tmp.length = crypto_tfm_blocksize(tfm);
+	tmp.length = crypto_tfm_alg_blocksize(tfm);
 
 	crypto_digest_init(tfm);
 	crypto_digest_update(tfm, &tmp, 1);
@@ -103,18 +104,23 @@ static void hmac(struct crypto_tfm *tfm, u8 *key, size_t keylen,
 
 	tmp.page = virt_to_page(opad);
 	tmp.offset = ((long)opad & ~PAGE_MASK);
-	tmp.length = crypto_tfm_blocksize(tfm);
+	tmp.length = crypto_tfm_alg_blocksize(tfm);
 
 	crypto_digest_init(tfm);
 	crypto_digest_update(tfm, &tmp, 1);
 	
 	tmp.page = virt_to_page(out);
 	tmp.offset = ((long)out & ~PAGE_MASK);
-	tmp.length = crypto_tfm_digestsize(tfm);
+	tmp.length = crypto_tfm_alg_digestsize(tfm);
 	
 	crypto_digest_update(tfm, &tmp, 1);
 	crypto_digest_final(tfm, out);
 	return;
+}
+
+int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags)
+{
+	return crypto_cipher_flags(flags) ? -EINVAL : 0;
 }
 
 void crypto_init_digest_ops(struct crypto_tfm *tfm)

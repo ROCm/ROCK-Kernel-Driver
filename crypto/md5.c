@@ -214,8 +214,8 @@ static void md5_final(void *ctx, u8 *out)
 }
 
 static struct crypto_alg alg = {
-	.cra_id		=	CRYPTO_ALG_MD5,
 	.cra_name	=	"md5",
+	.cra_flags	=	CRYPTO_ALG_TYPE_DIGEST,
 	.cra_blocksize	=	MD5_HMAC_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct md5_ctx),
 	.cra_module	=	THIS_MODULE,

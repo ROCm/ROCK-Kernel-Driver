@@ -76,9 +76,9 @@ static void test_md5(void)
 	memcpy(tvmem, md5_tv_template, tsize);
 	md5_tv = (void *)tvmem;
 	
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_MD5);
+	tfm = crypto_alloc_tfm("md5", 0);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_MD5\n");
+		printk("failed to load transform for md5\n");
 		return;
 	}
 	
@@ -95,8 +95,8 @@ static void test_md5(void)
 		crypto_digest_update(tfm, sg, 1);
 		crypto_digest_final(tfm, result);
 
-		hexdump(result, crypto_tfm_digestsize(tfm));
-		printk("%s\n", memcmp(result, md5_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n", memcmp(result, md5_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	}
 
 	printk("\ntesting md5 across pages\n");
@@ -118,9 +118,9 @@ static void test_md5(void)
 	
 	memset(result, 0, sizeof(result));
 	crypto_digest_digest(tfm, sg, 2, result);
-	hexdump(result, crypto_tfm_digestsize(tfm));
+	hexdump(result, crypto_tfm_alg_digestsize(tfm));
 	
-	printk("%s\n", memcmp(result, md5_tv[4].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+	printk("%s\n", memcmp(result, md5_tv[4].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	
 	printk("\ntesting hmac_md5\n");
 	
@@ -144,8 +144,8 @@ static void test_md5(void)
 		
 		crypto_digest_hmac(tfm, hmac_md5_tv[i].key, strlen(hmac_md5_tv[i].key),sg , 1, result);
 		
-		hexdump(result, crypto_tfm_digestsize(tfm));
-		printk("%s\n", memcmp(result, hmac_md5_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n", memcmp(result, hmac_md5_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	}
 	
 	printk("\ntesting hmac_md5 across pages\n");
@@ -167,9 +167,9 @@ static void test_md5(void)
 	
 	memset(result, 0, sizeof(result));
 	crypto_digest_hmac(tfm, hmac_md5_tv[1].key, strlen(hmac_md5_tv[1].key), sg, 2, result);
-	hexdump(result, crypto_tfm_digestsize(tfm));
+	hexdump(result, crypto_tfm_alg_digestsize(tfm));
 	
-	printk("%s\n", memcmp(result, hmac_md5_tv[1].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+	printk("%s\n", memcmp(result, hmac_md5_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	
 	crypto_free_tfm(tfm);
 }
@@ -195,9 +195,9 @@ static void test_md4(void)
 	memcpy(tvmem, md4_tv_template, tsize);
 	md4_tv = (void *)tvmem;
 	
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_MD4);
+	tfm = crypto_alloc_tfm("md4", 0);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_MD4\n");
+		printk("failed to load transform for md4\n");
 		return;
 	}
 	
@@ -212,8 +212,8 @@ static void test_md4(void)
 
 		crypto_digest_digest(tfm, sg, 1, result);
 		
-		hexdump(result, crypto_tfm_digestsize(tfm));
-		printk("%s\n", memcmp(result, md4_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n", memcmp(result, md4_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	}
 	
 	crypto_free_tfm(tfm);
@@ -241,9 +241,9 @@ static void test_sha1(void)
 	memcpy(tvmem, sha1_tv_template, tsize);
 	sha1_tv = (void *)tvmem;
 	
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_SHA1);
+	tfm = crypto_alloc_tfm("sha1", 0);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_SHA1\n");
+		printk("failed to load transform for sha1\n");
 		return;
 	}
 
@@ -260,8 +260,8 @@ static void test_sha1(void)
 		crypto_digest_update(tfm, sg, 1);
 		crypto_digest_final(tfm, result);
 
-		hexdump(result, crypto_tfm_digestsize(tfm));
-		printk("%s\n", memcmp(result, sha1_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+		hexdump(result, crypto_tfm_alg_digestsize(tfm));
+		printk("%s\n", memcmp(result, sha1_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	}
 
 	printk("\ntesting sha1 across pages\n");
@@ -283,8 +283,8 @@ static void test_sha1(void)
 	
 	memset(result, 0, sizeof(result));
 	crypto_digest_digest(tfm, sg, 2, result);
-	hexdump(result, crypto_tfm_digestsize(tfm));
-	printk("%s\n", memcmp(result, sha1_tv[1].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+	hexdump(result, crypto_tfm_alg_digestsize(tfm));
+	printk("%s\n", memcmp(result, sha1_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 
 	printk("\ntesting hmac_sha1\n");
 
@@ -309,7 +309,7 @@ static void test_sha1(void)
 		crypto_digest_hmac(tfm, hmac_sha1_tv[i].key, strlen(hmac_sha1_tv[i].key),sg , 1, result);
 		
 		hexdump(result, sizeof(result));
-		printk("%s\n", memcmp(result, hmac_sha1_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+		printk("%s\n", memcmp(result, hmac_sha1_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	}
 
 	printk("\ntesting hmac_sha1 across pages\n");
@@ -332,9 +332,9 @@ static void test_sha1(void)
 	
 	memset(result, 0, sizeof(result));
 	crypto_digest_hmac(tfm, hmac_sha1_tv[1].key, strlen(hmac_sha1_tv[1].key), sg, 2, result);
-	hexdump(result, crypto_tfm_digestsize(tfm));
+	hexdump(result, crypto_tfm_alg_digestsize(tfm));
 	
-	printk("%s\n", memcmp(result, hmac_sha1_tv[1].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+	printk("%s\n", memcmp(result, hmac_sha1_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 	crypto_free_tfm(tfm);	
 }
 
@@ -360,9 +360,9 @@ void test_des(void)
 	memcpy(tvmem, des_enc_tv_template, tsize);
 	des_tv = (void *)tvmem;
 
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_DES_ECB);
+	tfm = crypto_alloc_tfm("des", 0);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_DES_ECB\n");
+		printk("failed to load transform for des (default ecb)\n");
 		return;
 	}
 
@@ -370,8 +370,8 @@ void test_des(void)
 		printk("test %d:\n", i + 1);
 
 		key = des_tv[i].key;
-	
-		tfm->crt_flags = CRYPTO_WEAK_KEY_CHECK;
+		tfm->crt_flags |= CRYPTO_TFM_REQ_WEAK_KEY;
+		
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
@@ -700,7 +700,7 @@ void test_des(void)
 	 */
 	i = 7;
 	key = des_tv[i].key;
-	tfm->crt_flags = CRYPTO_ATOMIC;
+	tfm->crt_flags = CRYPTO_TFM_REQ_ATOMIC;
 	
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
@@ -761,7 +761,6 @@ void test_des(void)
 	sg[7].length = 1;
 	
 	ret = crypto_cipher_encrypt(tfm, sg, 8);
-
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
@@ -926,9 +925,9 @@ void test_des(void)
 
 	crypto_free_tfm(tfm);
 
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_DES_CBC);
+	tfm = crypto_alloc_tfm("des", CRYPTO_TFM_MODE_CBC);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_DES_CBC\n");
+		printk("failed to load transform for des cbc\n");
 		return;
 	}
 
@@ -945,7 +944,7 @@ void test_des(void)
 	for (i = 0; i < DES_CBC_ENC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
 
-		tfm->crt_flags = CRYPTO_ATOMIC;
+		tfm->crt_flags |= CRYPTO_TFM_REQ_ATOMIC;
 		key = des_tv[i].key;
 		
 		ret = crypto_cipher_setkey(tfm, key, 8);
@@ -961,7 +960,7 @@ void test_des(void)
 		sg[0].offset = ((long)p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_ivsize(tfm));
+		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 		
 		ret = crypto_cipher_encrypt(tfm, sg, 1);
 		if (ret) {
@@ -987,7 +986,7 @@ void test_des(void)
 	printk("\ntesting des cbc encryption chunking scenario F\n"); 
 	i = 4;
 	
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_DES_CBC);
+	tfm = crypto_alloc_tfm("des", CRYPTO_TFM_MODE_CBC);
 	if (tfm == NULL) {
 		printk("failed to load transform for CRYPTO_ALG_DES_CCB\n");
 		return;
@@ -1018,7 +1017,7 @@ void test_des(void)
 	sg[1].offset = ((long)p & ~PAGE_MASK);
 	sg[1].length = 11;
 	
-	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_ivsize(tfm));
+	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 	
 	ret = crypto_cipher_encrypt(tfm, sg, 2);
 	if (ret) {
@@ -1066,7 +1065,7 @@ void test_des(void)
 		sg[0].offset = ((long)p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_blocksize(tfm));
+		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_blocksize(tfm));
 		
 		ret = crypto_cipher_decrypt(tfm, sg, 1);
 		if (ret) {
@@ -1116,7 +1115,7 @@ void test_des(void)
 	sg[1].offset = ((long)p & ~PAGE_MASK);
 	sg[1].length = 4;
 	
-	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_ivsize(tfm));
+	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 	
 	ret = crypto_cipher_decrypt(tfm, sg, 2);
 	if (ret) {
@@ -1161,9 +1160,9 @@ void test_des3_ede(void)
 	memcpy(tvmem, des3_ede_enc_tv_template, tsize);
 	des_tv = (void *)tvmem;
 
-	tfm = crypto_alloc_tfm(CRYPTO_ALG_DES3_EDE_ECB);
+	tfm = crypto_alloc_tfm("des3_ede", CRYPTO_TFM_MODE_ECB);
 	if (tfm == NULL) {
-		printk("failed to load transform for CRYPTO_ALG_DES3_EDE_ECB\n");
+		printk("failed to load transform for 3des ecb\n");
 		return;
 	}
 
@@ -1171,8 +1170,6 @@ void test_des3_ede(void)
 		printk("test %d:\n", i + 1);
 
 		key = des_tv[i].key;
-		
-		tfm->crt_flags = CRYPTO_WEAK_KEY_CHECK;
 		ret = crypto_cipher_setkey(tfm, key, 24);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
@@ -1214,8 +1211,6 @@ void test_des3_ede(void)
 		printk("test %d:\n", i + 1);
 
 		key = des_tv[i].key;
-		
-		tfm->crt_flags = CRYPTO_WEAK_KEY_CHECK;
 		ret = crypto_cipher_setkey(tfm, key, 24);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);

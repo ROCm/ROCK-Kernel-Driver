@@ -221,8 +221,8 @@ static void md4_final(void *ctx, u8 *out)
 }
 
 static struct crypto_alg alg = {
-	.cra_id		=	CRYPTO_ALG_MD4,
 	.cra_name	=	"md4",
+	.cra_flags	=	CRYPTO_ALG_TYPE_DIGEST,
 	.cra_blocksize	=	MD4_HMAC_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct md4_ctx),
 	.cra_module	=	THIS_MODULE,

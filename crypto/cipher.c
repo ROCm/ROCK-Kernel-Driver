@@ -15,7 +15,9 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/list.h>
+#include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <linux/highmem.h>
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
@@ -50,7 +52,7 @@ static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
                        int rlen, int *last, int in)
 {
 	int i, copied, coff, j, aligned;
-	size_t bsize = crypto_tfm_blocksize(tfm);
+	size_t bsize = crypto_tfm_alg_blocksize(tfm);
 
 	for (i = sgidx, j = copied = 0, aligned = 0 ; copied < bsize; i++) {
 		int len = sg[i].length;
@@ -115,11 +117,11 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
                  size_t nsg, cryptfn_t crfn, procfn_t prfn, int enc)
 {
 	int i, coff;
-	size_t bsize = crypto_tfm_blocksize(tfm);
+	size_t bsize = crypto_tfm_alg_blocksize(tfm);
 	u8 tmp[CRYPTO_MAX_BLOCK_SIZE];
 
 	if (sglen(sg, nsg) % bsize) {
-		tfm->crt_flags |= CRYPTO_BAD_BLOCK_LEN;
+		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_BLOCK_LEN;
 		return -EINVAL;
 	}
 
@@ -168,15 +170,15 @@ static void cbc_process(struct crypto_tfm *tfm,
 		xor_64(tfm->crt_cipher.cit_iv, block);
 		fn(tfm->crt_ctx, block, tfm->crt_cipher.cit_iv);
 		memcpy(tfm->crt_cipher.cit_iv, block,
-		       crypto_tfm_blocksize(tfm));
+		       crypto_tfm_alg_blocksize(tfm));
 	} else {
 		u8 buf[CRYPTO_MAX_BLOCK_SIZE];
 		
 		fn(tfm->crt_ctx, buf, block);
 		xor_64(buf, tfm->crt_cipher.cit_iv);
 		memcpy(tfm->crt_cipher.cit_iv, block,
-		       crypto_tfm_blocksize(tfm));
-		memcpy(block, buf, crypto_tfm_blocksize(tfm));
+		       crypto_tfm_alg_blocksize(tfm));
+		memcpy(block, buf, crypto_tfm_alg_blocksize(tfm));
 	}
 }
 
@@ -225,6 +227,27 @@ static int nocrypt(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
 	return -ENOSYS;
 }
 
+int crypto_init_cipher_flags(struct crypto_tfm *tfm, u32 flags)
+{
+	struct crypto_alg *alg = tfm->__crt_alg;
+	u32 mode = flags & CRYPTO_TFM_MODE_MASK;
+	
+	tfm->crt_cipher.cit_mode = mode ? mode : CRYPTO_TFM_MODE_ECB;
+	
+	if (alg->cra_cipher.cia_ivsize && mode != CRYPTO_TFM_MODE_ECB) {
+		tfm->crt_cipher.cit_iv =
+			kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
+		if (tfm->crt_cipher.cit_iv == NULL)
+			return -ENOMEM;
+	} else
+		tfm->crt_cipher.cit_iv = NULL;
+
+	if (flags & CRYPTO_TFM_REQ_WEAK_KEY)
+		tfm->crt_flags = CRYPTO_TFM_REQ_WEAK_KEY;
+	
+	return 0;
+}
+
 void crypto_init_cipher_ops(struct crypto_tfm *tfm)
 {
 	struct cipher_tfm *ops = &tfm->crt_cipher;
@@ -232,22 +255,22 @@ void crypto_init_cipher_ops(struct crypto_tfm *tfm)
 	ops->cit_setkey = setkey;
 
 	switch (tfm->crt_cipher.cit_mode) {
-	case CRYPTO_MODE_ECB:
+	case CRYPTO_TFM_MODE_ECB:
 		ops->cit_encrypt = ecb_encrypt;
 		ops->cit_decrypt = ecb_decrypt;
 		break;
 		
-	case CRYPTO_MODE_CBC:
+	case CRYPTO_TFM_MODE_CBC:
 		ops->cit_encrypt = cbc_encrypt;
 		ops->cit_decrypt = cbc_decrypt;
 		break;
 		
-	case CRYPTO_MODE_CFB:
+	case CRYPTO_TFM_MODE_CFB:
 		ops->cit_encrypt = nocrypt;
 		ops->cit_decrypt = nocrypt;
 		break;
 	
-	case CRYPTO_MODE_CTR:
+	case CRYPTO_TFM_MODE_CTR:
 		ops->cit_encrypt = nocrypt;
 		ops->cit_decrypt = nocrypt;
 		break;

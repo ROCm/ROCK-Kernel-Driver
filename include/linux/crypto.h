@@ -16,56 +16,50 @@
 #ifndef _LINUX_CRYPTO_H
 #define _LINUX_CRYPTO_H
 
-/* 
- * Crypto context flags.
+/*
+ * Algorithm masks and types.
  */
-#define CRYPTO_WEAK_KEY_CHECK	0x0001
-#define CRYPTO_WEAK_KEY		0x0008
-#define CRYPTO_BAD_KEY_LEN	0x0010
-#define CRYPTO_BAD_KEY_SCHED	0x0020
-#define CRYPTO_BAD_BLOCK_LEN	0x0040
-#define CRYPTO_ATOMIC		0x1000
+#define CRYPTO_ALG_TYPE_MASK		0x000000ff
+#define CRYPTO_ALG_TYPE_CIPHER		0x00000001
+#define CRYPTO_ALG_TYPE_DIGEST		0x00000002
+#define CRYPTO_ALG_TYPE_COMP		0x00000004
+
 
 /*
- * Algorithm identifiers.  These may be expanded later to 64 bits
- * and include vendor id info, so we can have multiple versions
- * (e.g. asm, various hardware versions etc).
- *
- * Todo: sadb translation.
+ * Transform masks and values (for crt_flags).
  */
-#define CRYPTO_TYPE_MASK        0xf0000000
-#define CRYPTO_MODE_MASK        0x0ff00000
-#define CRYPTO_ALG_MASK		0x000fffff
+#define CRYPTO_TFM_MODE_MASK		0x000000ff
+#define CRYPTO_TFM_REQ_MASK		0x000fff00
+#define CRYPTO_TFM_RES_MASK		0xfff00000
 
-#define CRYPTO_TYPE_CIPHER	0x10000000
-#define CRYPTO_TYPE_DIGEST	0x20000000
-#define CRYPTO_TYPE_COMP	0x40000000
+#define CRYPTO_TFM_MODE_ECB		0x00000001
+#define CRYPTO_TFM_MODE_CBC		0x00000002
+#define CRYPTO_TFM_MODE_CFB		0x00000004
+#define CRYPTO_TFM_MODE_CTR		0x00000008
 
-#define CRYPTO_MODE_ECB		0x00100000
-#define CRYPTO_MODE_CBC		0x00200000
-#define CRYPTO_MODE_CFB		0x00400000
-#define CRYPTO_MODE_CTR		0x00800000
+#define CRYPTO_TFM_REQ_ATOMIC		0x00000100
+#define CRYPTO_TFM_REQ_WEAK_KEY		0x00000200
 
-#define CRYPTO_ALG_NULL		0x00000001
+#define CRYPTO_TFM_RES_WEAK_KEY		0x00100000
+#define CRYPTO_TFM_RES_BAD_KEY_LEN   	0x00200000
+#define CRYPTO_TFM_RES_BAD_KEY_SCHED 	0x00400000
+#define CRYPTO_TFM_RES_BAD_BLOCK_LEN 	0x00800000
+#define CRYPTO_TFM_RES_BAD_FLAGS 	0x01000000
 
-#define CRYPTO_ALG_DES		(0x00000002|CRYPTO_TYPE_CIPHER)
-#define CRYPTO_ALG_DES_ECB	(CRYPTO_ALG_DES|CRYPTO_MODE_ECB)
-#define CRYPTO_ALG_DES_CBC	(CRYPTO_ALG_DES|CRYPTO_MODE_CBC)
 
-#define CRYPTO_ALG_DES3_EDE	(0x00000003|CRYPTO_TYPE_CIPHER)
-#define CRYPTO_ALG_DES3_EDE_ECB	(CRYPTO_ALG_DES3_EDE|CRYPTO_MODE_ECB)
-#define CRYPTO_ALG_DES3_EDE_CBC	(CRYPTO_ALG_DES3_EDE|CRYPTO_MODE_CBC)
-
-#define CRYPTO_ALG_MD4		(0x00000f00|CRYPTO_TYPE_DIGEST)
-#define CRYPTO_ALG_MD5		(0x00000f01|CRYPTO_TYPE_DIGEST)
-#define CRYPTO_ALG_SHA1		(0x00000f02|CRYPTO_TYPE_DIGEST)
-
-#define CRYPTO_UNSPEC		0
-#define CRYPTO_MAX_ALG_NAME	64
-#define CRYPTO_MAX_BLOCK_SIZE	16
+/*
+ * Miscellaneous stuff.
+ */
+#define CRYPTO_UNSPEC			0
+#define CRYPTO_MAX_ALG_NAME		64
+#define CRYPTO_MAX_BLOCK_SIZE		16
 
 struct scatterlist;
 
+/*
+ * Algorithms: modular crypto algorithm implementations, managed
+ * via crypto_register_alg() and crypto_unregister_alg().
+ */
 struct cipher_alg {
 	size_t cia_keysize;
 	size_t cia_ivsize;
@@ -92,7 +86,7 @@ struct compress_alg {
 
 struct crypto_alg {
 	struct list_head cra_list;
-	u32 cra_id;
+	int cra_flags;
 	size_t cra_blocksize;
 	size_t cra_ctxsize;
 	char cra_name[CRYPTO_MAX_ALG_NAME];
@@ -112,11 +106,13 @@ struct crypto_alg {
 int crypto_register_alg(struct crypto_alg *alg);
 int crypto_unregister_alg(struct crypto_alg *alg);
 
+/*
+ * Transforms: user-instantiated objects which encapsulate algorithms
+ * and core processing logic.  Managed via crypto_alloc_tfm() and
+ * crypto_free_tfm(), as well as the various helpers below.
+ */
 struct crypto_tfm;
 
-/*
- * Transformations: user-instantiated algorithms.
- */
 struct cipher_tfm {
 	void *cit_iv;
 	u32 cit_mode;
@@ -161,17 +157,61 @@ struct crypto_tfm {
 	struct crypto_alg *__crt_alg;
 };
 
-/*
- * Finds specified algorithm, allocates and returns a transform for it.
- * Will try an load a module based on the name if not present
- * in the kernel.  Increments its algorithm refcount.
+/* 
+ * Transform user interface.
  */
-struct crypto_tfm *crypto_alloc_tfm(u32 id);
+ 
+/*
+ * crypto_alloc_tfm() will first attempt to locate an already loaded algorithm.
+ * If that fails and the kernel supports dynamically loadable modules, it
+ * will then attempt to load a module of the same name or alias.  A refcount
+ * is grabbed on the algorithm which is then associated with the new transform.
+ */
+struct crypto_tfm *crypto_alloc_tfm(char *alg_name, u32 tfm_flags);
+void crypto_free_tfm(struct crypto_tfm *tfm);
 
 /*
- * Frees the transform and decrements its algorithm's recount.
+ * Transform helpers which query the underlying algorithm.
  */
-void crypto_free_tfm(struct crypto_tfm *tfm);
+static inline char *crypto_tfm_alg_name(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_name;
+}
+
+static inline const char *crypto_tfm_alg_modname(struct crypto_tfm *tfm)
+{
+	struct crypto_alg *alg = tfm->__crt_alg;
+	
+	if (alg->cra_module)
+		return alg->cra_module->name;
+	else
+		return NULL;
+}
+
+static inline u32 crypto_tfm_alg_type(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_flags & CRYPTO_ALG_TYPE_MASK;
+}
+
+static inline size_t crypto_tfm_alg_keysize(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_cipher.cia_keysize;
+}
+
+static inline size_t crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_cipher.cia_ivsize;
+}
+
+static inline size_t crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_blocksize;
+}
+
+static inline size_t crypto_tfm_alg_digestsize(struct crypto_tfm *tfm)
+{
+	return tfm->__crt_alg->cra_digest.dia_digestsize;
+}
 
 /*
  * API wrappers.
@@ -239,49 +279,6 @@ static inline void crypto_comp_compress(struct crypto_tfm *tfm)
 static inline void crypto_comp_decompress(struct crypto_tfm *tfm) 
 {
 	tfm->crt_compress.cot_decompress(tfm);
-}
-
-/*
- * Transform helpers which allow the underlying algorithm to be queried.
- */
-static inline int crypto_tfm_id(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_id;
-}
-
-static inline int crypto_tfm_alg(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_id & CRYPTO_ALG_MASK;
-}
-
-static inline char *crypto_tfm_name(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_name;
-}
-
-static inline u32 crypto_tfm_type(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_id & CRYPTO_TYPE_MASK;
-}
-
-static inline size_t crypto_tfm_keysize(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_cipher.cia_keysize;
-}
-
-static inline size_t crypto_tfm_ivsize(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_cipher.cia_ivsize;
-}
-
-static inline size_t crypto_tfm_blocksize(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_blocksize;
-}
-
-static inline size_t crypto_tfm_digestsize(struct crypto_tfm *tfm)
-{
-	return tfm->__crt_alg->cra_digest.dia_digestsize;
 }
 
 #endif	/* _LINUX_CRYPTO_H */

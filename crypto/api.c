@@ -36,7 +36,7 @@ static inline void crypto_alg_put(struct crypto_alg *alg)
 		__MOD_DEC_USE_COUNT(alg->cra_module);
 }
 
-struct crypto_alg *crypto_alg_lookup(u32 algid)
+struct crypto_alg *crypto_alg_lookup(char *name)
 {
 	struct list_head *p;
 	struct crypto_alg *alg = NULL;
@@ -44,10 +44,13 @@ struct crypto_alg *crypto_alg_lookup(u32 algid)
 	down_read(&crypto_alg_sem);
 	
 	list_for_each(p, &crypto_alg_list) {
-		if ((((struct crypto_alg *)p)->cra_id
-				& CRYPTO_ALG_MASK) == algid) {
-			if (crypto_alg_get((struct crypto_alg *)p))
-				alg = (struct crypto_alg *)p;
+		struct crypto_alg *q =
+			list_entry(p, struct crypto_alg, cra_list);
+
+		if (!(strcmp(q->cra_name, name))) {
+
+			if (crypto_alg_get(q))
+				alg = q;
 			break;
 		}
 	}
@@ -56,18 +59,43 @@ struct crypto_alg *crypto_alg_lookup(u32 algid)
 	return alg;
 }
 
+static int crypto_init_flags(struct crypto_tfm *tfm, u32 flags)
+{
+	tfm->crt_flags = 0;
+	
+	if (flags & CRYPTO_TFM_REQ_ATOMIC)
+		tfm->crt_flags |= CRYPTO_TFM_REQ_ATOMIC;
+	
+	switch (crypto_tfm_alg_type(tfm)) {
+	case CRYPTO_ALG_TYPE_CIPHER:
+		return crypto_init_cipher_flags(tfm, flags);
+		
+	case CRYPTO_ALG_TYPE_DIGEST:
+		return crypto_init_digest_flags(tfm, flags);
+		
+	case CRYPTO_ALG_TYPE_COMP:
+		return crypto_init_compress_flags(tfm, flags);
+	
+	default:
+		BUG();
+		
+	}
+	
+	return -EINVAL;
+}
+
 static void crypto_init_ops(struct crypto_tfm *tfm)
 {
-	switch (crypto_tfm_type(tfm) & CRYPTO_TYPE_MASK) {
-	case CRYPTO_TYPE_CIPHER:
+	switch (crypto_tfm_alg_type(tfm)) {
+	case CRYPTO_ALG_TYPE_CIPHER:
 		crypto_init_cipher_ops(tfm);
 		break;
 		
-	case CRYPTO_TYPE_DIGEST:
+	case CRYPTO_ALG_TYPE_DIGEST:
 		crypto_init_digest_ops(tfm);
 		break;
 		
-	case CRYPTO_TYPE_COMP:
+	case CRYPTO_ALG_TYPE_COMP:
 		crypto_init_compress_ops(tfm);
 		break;
 	
@@ -77,16 +105,16 @@ static void crypto_init_ops(struct crypto_tfm *tfm)
 	}
 }
 
-struct crypto_tfm *crypto_alloc_tfm(u32 id)
+struct crypto_tfm *crypto_alloc_tfm(char *name, u32 flags)
 {
 	struct crypto_tfm *tfm = NULL;
 	struct crypto_alg *alg;
 
-	alg = crypto_alg_lookup(id & CRYPTO_ALG_MASK);
+	alg = crypto_alg_lookup(name);
 #ifdef CONFIG_KMOD
 	if (alg == NULL) {
-		crypto_alg_autoload(id & CRYPTO_ALG_MASK);
-		alg = crypto_alg_lookup(id & CRYPTO_ALG_MASK);
+		crypto_alg_autoload(name);
+		alg = crypto_alg_lookup(name);
 	}
 #endif
 	if (alg == NULL)
@@ -102,17 +130,11 @@ struct crypto_tfm *crypto_alloc_tfm(u32 id)
 			goto out_free_tfm;
 	}
 
-	if ((alg->cra_id & CRYPTO_TYPE_MASK) == CRYPTO_TYPE_CIPHER) {
-		if (alg->cra_cipher.cia_ivsize) {
-			tfm->crt_cipher.cit_iv =
-				kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
-			if (tfm->crt_cipher.cit_iv == NULL)
-				goto out_free_ctx;
-		}
-		tfm->crt_cipher.cit_mode = id & CRYPTO_MODE_MASK;
-	}
-	
 	tfm->__crt_alg = alg;
+	
+	if (crypto_init_flags(tfm, flags))
+		goto out_free_ctx;
+		
 	crypto_init_ops(tfm);
 	
 	goto out;
@@ -134,8 +156,8 @@ void crypto_free_tfm(struct crypto_tfm *tfm)
 	if (tfm->__crt_alg->cra_ctxsize)
 		kfree(tfm->crt_ctx);
 		
-	if (crypto_tfm_type(tfm) == CRYPTO_TYPE_CIPHER)
-		if (tfm->__crt_alg->cra_cipher.cia_ivsize)
+	if (crypto_tfm_alg_type(tfm) == CRYPTO_ALG_TYPE_CIPHER)
+		if (tfm->crt_cipher.cit_iv)
 			kfree(tfm->crt_cipher.cit_iv);
 	
 	crypto_alg_put(tfm->__crt_alg);
@@ -150,9 +172,10 @@ int crypto_register_alg(struct crypto_alg *alg)
 	down_write(&crypto_alg_sem);
 	
 	list_for_each(p, &crypto_alg_list) {
-		struct crypto_alg *q = (struct crypto_alg *)p;
+		struct crypto_alg *q =
+			list_entry(p, struct crypto_alg, cra_list);
 		
-		if (q->cra_id == alg->cra_id) {
+		if (!(strcmp(q->cra_name, alg->cra_name))) {
 			ret = -EEXIST;
 			goto out;
 		}
@@ -172,7 +195,7 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	
 	down_write(&crypto_alg_sem);
 	list_for_each(p, &crypto_alg_list) {
-		if (alg == (struct crypto_alg *)p) {
+		if (alg == (void *)p) {
 			list_del(p);
 			ret = 0;
 			goto out;
@@ -215,16 +238,17 @@ static int c_show(struct seq_file *m, void *p)
 	struct crypto_alg *alg = (struct crypto_alg *)p;
 	
 	seq_printf(m, "name       : %s\n", alg->cra_name);
-	seq_printf(m, "id         : 0x%08x\n", alg->cra_id);
+	seq_printf(m, "module     : %s\n", alg->cra_module ?
+					alg->cra_module->name : "[static]");
 	seq_printf(m, "blocksize  : %Zd\n", alg->cra_blocksize);
 	
-	switch (alg->cra_id & CRYPTO_TYPE_MASK) {
-	case CRYPTO_TYPE_CIPHER:
+	switch (alg->cra_flags & CRYPTO_ALG_TYPE_MASK) {
+	case CRYPTO_ALG_TYPE_CIPHER:
 		seq_printf(m, "keysize    : %Zd\n", alg->cra_cipher.cia_keysize);
 		seq_printf(m, "ivsize     : %Zd\n", alg->cra_cipher.cia_ivsize);
 		break;
 		
-	case CRYPTO_TYPE_DIGEST:
+	case CRYPTO_ALG_TYPE_DIGEST:
 		seq_printf(m, "digestsize : %Zd\n",
 		           alg->cra_digest.dia_digestsize);
 		break;

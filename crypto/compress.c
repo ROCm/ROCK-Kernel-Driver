@@ -13,6 +13,8 @@
  */
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/errno.h>
+#include <linux/module.h>
 #include <asm/scatterlist.h>
 #include <linux/string.h>
 #include <linux/crypto.h>
@@ -30,6 +32,11 @@ static void crypto_compress(struct crypto_tfm *tfm)
 static void crypto_decompress(struct crypto_tfm *tfm)
 {
 	return;
+}
+
+int crypto_init_compress_flags(struct crypto_tfm *tfm, u32 flags)
+{
+	return crypto_cipher_flags(flags) ? -EINVAL : 0;
 }
 
 void crypto_init_compress_ops(struct crypto_tfm *tfm)

@@ -15,31 +15,17 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/string.h>
+#include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/crypto.h>
 #include "internal.h"
 
-static struct {
-	u32 algid;
-	char *name;
-} alg_modmap[] = {
-	{ CRYPTO_ALG_DES,	"des"	},
-	{ CRYPTO_ALG_DES3_EDE,	"des"	},
-	{ CRYPTO_ALG_MD4,	"md4"	},
-	{ CRYPTO_ALG_MD5,	"md5"	},
-	{ CRYPTO_ALG_SHA1,	"sha1"	},
-};
-#define ALG_MAX_MODMAP 5
-
-void crypto_alg_autoload(u32 algid)
+/*
+ * A far more intelligent version of this is planned.  For now, just
+ * try an exact match on the name of the algorithm.
+ */
+void crypto_alg_autoload(char *name)
 {
-	int i;
-
-	for (i = 0; i < ALG_MAX_MODMAP ; i++) {
-		if ((alg_modmap[i].algid & CRYPTO_ALG_MASK) == algid) {
-			request_module(alg_modmap[i].name);
-			break;
-		}
-	}
+	request_module(name);
 	return;
 }
