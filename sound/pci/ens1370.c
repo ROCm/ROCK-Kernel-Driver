@@ -2354,7 +2354,11 @@ static void __devexit snd_audiopci_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name = "Ensoniq AudioPCI",
+#ifdef CHIP1371
+	.name = "Ensoniq 1371+",
+#else
+	.name = "Ensoniq 1370",
+#endif
 	.id_table = snd_audiopci_ids,
 	.probe = snd_audiopci_probe,
 	.remove = __devexit_p(snd_audiopci_remove),
