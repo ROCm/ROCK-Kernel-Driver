@@ -40,7 +40,6 @@
 
 #define XQUAD_PORTIO_BASE 0xfe400000
 #define XQUAD_PORTIO_QUAD 0x40000  /* 256k per quad. */
-#define XQUAD_PORTIO_LEN  0x80000  /* Only remapping first 2 quads */
 
 #ifdef __KERNEL__
 
