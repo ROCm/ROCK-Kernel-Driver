@@ -554,7 +554,7 @@ static int stop_refcounts(void)
 	stopref_state = STOPREF_WAIT;
 
 	/* No CPUs can come up or down during this. */
-	down(&cpucontrol);
+	lock_cpu_hotplug();
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (i == cpu || !cpu_online(i))
@@ -572,7 +572,7 @@ static int stop_refcounts(void)
 	/* If some failed, kill them all. */
 	if (ret < 0) {
 		stopref_set_state(STOPREF_EXIT, 1);
-		up(&cpucontrol);
+		unlock_cpu_hotplug();
 		return ret;
 	}
 
@@ -595,7 +595,7 @@ static void restart_refcounts(void)
 	stopref_set_state(STOPREF_EXIT, 0);
 	local_irq_enable();
 	preempt_enable();
-	up(&cpucontrol);
+	unlock_cpu_hotplug();
 }
 #else /* ...!SMP */
 static inline int stop_refcounts(void)

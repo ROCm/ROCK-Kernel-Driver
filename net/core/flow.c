@@ -283,10 +283,11 @@ static void flow_cache_flush_per_cpu(void *data)
 void flow_cache_flush(void)
 {
 	struct flow_flush_info info;
+	static DECLARE_MUTEX(flow_flush_sem);
 
-	/* Don't want cpus going down or up during this, also protects
-	 * against multiple callers. */
+	/* Don't want cpus going down or up during this. */
 	lock_cpu_hotplug();
+	down(&flow_flush_sem);
 	atomic_set(&info.cpuleft, num_online_cpus());
 	init_completion(&info.completion);
 
@@ -296,6 +297,7 @@ void flow_cache_flush(void)
 	local_bh_enable();
 
 	wait_for_completion(&info.completion);
+	up(&flow_flush_sem);
 	unlock_cpu_hotplug();
 }
 
