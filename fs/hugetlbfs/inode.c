@@ -265,13 +265,11 @@ static void hugetlbfs_drop_inode(struct inode *inode)
  * vma->vm_pgoff is in PAGE_SIZE units.
  */
 static void
-hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
+hugetlb_vmtruncate_list(struct list_head *list, unsigned long h_pgoff)
 {
 	struct vm_area_struct *vma;
-	struct prio_tree_iter iter;
 
-	vma = __vma_prio_tree_first(root, &iter, h_pgoff, ULONG_MAX);
-	while (vma) {
+	list_for_each_entry(vma, list, shared) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
 		unsigned long h_length;
@@ -303,8 +301,6 @@ hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 		zap_hugepage_range(vma,
 				vma->vm_start + v_offset,
 				v_length - v_offset);
-
-		vma = __vma_prio_tree_next(vma, root, &iter, h_pgoff, ULONG_MAX);
 	}
 }
 
@@ -324,11 +320,9 @@ static int hugetlb_vmtruncate(struct inode *inode, loff_t offset)
 
 	inode->i_size = offset;
 	down(&mapping->i_shared_sem);
-	/* Protect against page fault */
-	atomic_inc(&mapping->truncate_count);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
+	if (!list_empty(&mapping->i_mmap))
 		hugetlb_vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
+	if (!list_empty(&mapping->i_mmap_shared))
 		hugetlb_vmtruncate_list(&mapping->i_mmap_shared, pgoff);
 	up(&mapping->i_shared_sem);
 	truncate_hugepages(mapping, offset);

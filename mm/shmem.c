@@ -1413,8 +1413,7 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 			 * virtual addresses, take care about potential aliasing
 			 * before reading the page on the kernel side.
 			 */
-			if (!prio_tree_empty(&mapping->i_mmap_shared) ||
-				!list_empty(&mapping->i_mmap_nonlinear))
+			if (!list_empty(&mapping->i_mmap_shared))
 				flush_dcache_page(page);
 			/*
 			 * Mark the page accessed if we read the beginning.

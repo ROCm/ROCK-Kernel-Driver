@@ -1455,8 +1455,8 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 	if (IS_MANDLOCK(inode) &&
 	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
 		struct address_space *mapping = filp->f_mapping;
-		if (!prio_tree_empty(&mapping->i_mmap_shared) ||
-			!list_empty(&mapping->i_mmap_nonlinear)) {
+
+		if (!list_empty(&mapping->i_mmap_shared)) {
 			error = -EAGAIN;
 			goto out;
 		}
@@ -1593,8 +1593,8 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 	if (IS_MANDLOCK(inode) &&
 	    (inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID) {
 		struct address_space *mapping = filp->f_mapping;
-		if (!prio_tree_empty(&mapping->i_mmap_shared) ||
-			!list_empty(&mapping->i_mmap_nonlinear)) {
+
+		if (!list_empty(&mapping->i_mmap_shared)) {
 			error = -EAGAIN;
 			goto out;
 		}
