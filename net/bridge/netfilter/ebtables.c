@@ -365,7 +365,7 @@ ebt_check_match(struct ebt_entry_match *m, struct ebt_entry *e,
 	m->u.match = match;
 	if (!try_module_get(match->me)) {
 		up(&ebt_mutex);
-		return -EINVAL;
+		return -ENOENT;
 	}
 	up(&ebt_mutex);
 	if (match->check &&
@@ -394,7 +394,7 @@ ebt_check_watcher(struct ebt_entry_watcher *w, struct ebt_entry *e,
 	w->u.watcher = watcher;
 	if (!try_module_get(watcher->me)) {
 		up(&ebt_mutex);
-		return -EINVAL;
+		return -ENOENT;
 	}
 	up(&ebt_mutex);
 	if (watcher->check &&
@@ -634,6 +634,7 @@ ebt_check_entry(struct ebt_entry *e, struct ebt_table_info *newinfo,
 		goto cleanup_watchers;
 	if (!try_module_get(target->me)) {
 		up(&ebt_mutex);
+		ret = -ENOENT;
 		goto cleanup_watchers;
 	}
 	up(&ebt_mutex);

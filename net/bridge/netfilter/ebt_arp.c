@@ -2,7 +2,7 @@
  *  ebt_arp
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *	Tim Gardner <timg@tpi.com>
  *
  *  April, 2002
@@ -37,10 +37,10 @@ static int ebt_filter_arp(const struct sk_buff *skb, const struct net_device *in
 		uint32_t dst;
 		uint32_t src;
 
-		// Make sure the packet is long enough.
+		/* Make sure the packet is long enough */
 		if ((((*skb).nh.raw) + arp_len) > (*skb).tail)
 			return EBT_NOMATCH;
-		// IPv4 addresses are always 4 bytes.
+		/* IPv4 addresses are always 4 bytes */
 		if (((*skb).nh.arph)->ar_pln != sizeof(uint32_t))
 			return EBT_NOMATCH;
 
@@ -82,8 +82,10 @@ static int ebt_arp_check(const char *tablename, unsigned int hookmask,
 
 static struct ebt_match filter_arp =
 {
-	{NULL, NULL}, EBT_ARP_MATCH, ebt_filter_arp, ebt_arp_check, NULL,
-	THIS_MODULE
+	.name		= EBT_ARP_MATCH,
+	.match		= ebt_filter_arp,
+	.check		= ebt_arp_check,
+	.me		= THIS_MODULE,
 };
 
 static int __init init(void)
