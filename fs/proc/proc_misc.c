@@ -386,7 +386,7 @@ static int devices_read_proc(char *page, char **start, off_t off,
 extern int show_interrupts(struct seq_file *p, void *v);
 static int interrupts_open(struct inode *inode, struct file *file)
 {
-	unsigned size = PAGE_SIZE * (1 + NR_CPUS / 8);
+	unsigned size = 4096 * (1 + num_online_cpus() / 8);
 	char *buf = kmalloc(size, GFP_KERNEL);
 	struct seq_file *m;
 	int res;
