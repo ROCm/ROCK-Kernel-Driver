@@ -2712,14 +2712,7 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 	hide_cursor(currcons);
 	if (!from_timer_handler)
 		del_timer_sync(&console_timer);
-	if (vesa_off_interval) {
-		console_timer.function = vesa_powerdown_screen;
-		mod_timer(&console_timer, jiffies + vesa_off_interval);
-	} else {
-		if (!from_timer_handler)
-			del_timer_sync(&console_timer);
-		console_timer.function = unblank_screen_t;
-	}
+	console_timer.function = unblank_screen_t;
 
 	save_screen(currcons);
 	/* In case we need to reset origin, blanking hook returns 1 */
@@ -2730,6 +2723,12 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 
 	if (console_blank_hook && console_blank_hook(1))
 		return;
+
+	if (vesa_off_interval) {
+		console_timer.function = vesa_powerdown_screen;
+		mod_timer(&console_timer, jiffies + vesa_off_interval);
+	}
+
     	if (vesa_blank_mode)
 		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1);
 }
@@ -2771,12 +2770,12 @@ void unblank_screen(void)
 	}
 
 	console_blanked = 0;
-	if (console_blank_hook)
-		console_blank_hook(0);
-	set_palette(currcons);
 	if (sw->con_blank(vc_cons[currcons].d, 0))
 		/* Low-level driver cannot restore -> do it ourselves */
 		update_screen(fg_console);
+	if (console_blank_hook)
+		console_blank_hook(0);
+	set_palette(currcons);
 	set_cursor(fg_console);
 }
 
