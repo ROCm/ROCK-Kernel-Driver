@@ -346,6 +346,12 @@ UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
 		0 ),
 #endif
 
+UNUSUAL_DEV(  0x054c, 0x002c, 0x0100, 0x0100, 
+		"Sony",
+		"USB Floppy Drive",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN ),
+
 UNUSUAL_DEV(  0x054c, 0x002d, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick MSAC-US1",
