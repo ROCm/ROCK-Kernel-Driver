@@ -1,7 +1,7 @@
 /*
  * This file define the new driver API for Wireless Extensions
  *
- * Version :	4	21.6.02
+ * Version :	5	4.12.02
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
  * Copyright (c) 2001-2002 Jean Tourrilhes, All Rights Reserved.
@@ -206,7 +206,7 @@
  * will be needed...
  * I just plan to increment with each new version.
  */
-#define IW_HANDLER_VERSION	4
+#define IW_HANDLER_VERSION	5
 
 /*
  * Changes :
@@ -220,9 +220,17 @@
  * V3 to V4
  * --------
  *	- Reshuffle IW_HEADER_TYPE_XXX to map IW_PRIV_TYPE_XXX changes
+ *
+ * V4 to V5
+ * --------
+ *	- Add new spy support : struct iw_spy_data & prototypes
  */
 
 /**************************** CONSTANTS ****************************/
+
+/* Enable enhanced spy support. Disable to reduce footprint */
+#define IW_WIRELESS_SPY
+#define IW_WIRELESS_THRSPY
 
 /* Special error message for the driver to indicate that we
  * should do a commit after return from the iw_handler */
@@ -315,6 +323,9 @@ struct iw_handler_def
 	 * We will automatically export that to user space... */
 	struct iw_priv_args *	private_args;
 
+	/* Driver enhanced spy support */
+	long			spy_offset;	/* Spy data offset */
+
 	/* In the long term, get_wireless_stats will move from
 	 * 'struct net_device' to here, to minimise bloat. */
 };
@@ -350,6 +361,33 @@ struct iw_ioctl_description
 
 /* Need to think of short header translation table. Later. */
 
+/* --------------------- ENHANCED SPY SUPPORT --------------------- */
+/*
+ * In the old days, the driver was handling spy support all by itself.
+ * Now, the driver can delegate this task to Wireless Extensions.
+ * It needs to include this struct in its private part and use the
+ * standard spy iw_handler.
+ */
+
+/*
+ * Instance specific spy data, i.e. addresses spied and quality for them.
+ */
+struct iw_spy_data
+{
+#ifdef IW_WIRELESS_SPY
+	/* --- Standard spy support --- */
+	int			spy_number;
+	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
+	struct iw_quality	spy_stat[IW_MAX_SPY];
+#ifdef IW_WIRELESS_THRSPY
+	/* --- Enhanced spy support (event) */
+	struct iw_quality	spy_thr_low;	/* Low threshold */
+	struct iw_quality	spy_thr_high;	/* High threshold */
+	u_char			spy_thr_under[IW_MAX_SPY];
+#endif /* IW_WIRELESS_THRSPY */
+#endif /* IW_WIRELESS_SPY */
+};
+
 /**************************** PROTOTYPES ****************************/
 /*
  * Functions part of the Wireless Extensions (defined in net/core/wireless.c).
@@ -375,6 +413,31 @@ extern void wireless_send_event(struct net_device *	dev,
 
 /* We may need a function to send a stream of events to user space.
  * More on that later... */
+
+/* Standard handler for SIOCSIWSPY */
+extern int iw_handler_set_spy(struct net_device *	dev,
+			      struct iw_request_info *	info,
+			      union iwreq_data *	wrqu,
+			      char *			extra);
+/* Standard handler for SIOCGIWSPY */
+extern int iw_handler_get_spy(struct net_device *	dev,
+			      struct iw_request_info *	info,
+			      union iwreq_data *	wrqu,
+			      char *			extra);
+/* Standard handler for SIOCSIWTHRSPY */
+extern int iw_handler_set_thrspy(struct net_device *	dev,
+				 struct iw_request_info *info,
+				 union iwreq_data *	wrqu,
+				 char *			extra);
+/* Standard handler for SIOCGIWTHRSPY */
+extern int iw_handler_get_thrspy(struct net_device *	dev,
+				 struct iw_request_info *info,
+				 union iwreq_data *	wrqu,
+				 char *			extra);
+/* Driver call to update spy records */
+extern void wireless_spy_update(struct net_device *	dev,
+				unsigned char *		address,
+				struct iw_quality *	wstats);
 
 /************************* INLINE FUNTIONS *************************/
 /*
