@@ -3111,11 +3111,19 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		skb->nh.iph->check = 0;
 		skb->nh.iph->tot_len = ntohs(mss + ip_tcp_len + tcp_opt_len);
-		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
-						      skb->nh.iph->daddr,
-						      0, IPPROTO_TCP, 0);
+		if (tp->tg3_flags2 & TG3_FLG2_HW_TSO) {
+			skb->h.th->check = 0;
+			base_flags &= ~TXD_FLAG_TCPUDP_CSUM;
+		}
+		else {
+			skb->h.th->check =
+				~csum_tcpudp_magic(skb->nh.iph->saddr,
+						   skb->nh.iph->daddr,
+						   0, IPPROTO_TCP, 0);
+		}
 
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		if ((tp->tg3_flags2 & TG3_FLG2_HW_TSO) ||
+		    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)) {
 			if (tcp_opt_len || skb->nh.iph->ihl > 5) {
 				int tsflags;
 
@@ -3182,7 +3190,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				would_hit_hwbug = entry + 1;
 			}
 
-			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+			if (tp->tg3_flags2 & TG3_FLG2_HW_TSO)
 				tg3_set_txd(tp, entry, mapping, len,
 					    base_flags, (i == last)|(mss << 1));
 			else
@@ -4774,7 +4782,7 @@ static int tg3_load_tso_firmware(struct tg3 *tp)
 	unsigned long cpu_base, cpu_scratch_base, cpu_scratch_size;
 	int err, i;
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+	if (tp->tg3_flags2 & TG3_FLG2_HW_TSO)
 		return 0;
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
@@ -5208,7 +5216,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 #if TG3_TSO_SUPPORT != 0
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+	if (tp->tg3_flags2 & TG3_FLG2_HW_TSO)
 		rdmac_mode |= (1 << 27);
 #endif
 
@@ -5358,7 +5366,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(RCVDBDI_MODE, RCVDBDI_MODE_ENABLE | RCVDBDI_MODE_INV_RING_SZ);
 	tw32(SNDDATAI_MODE, SNDDATAI_MODE_ENABLE);
 #if TG3_TSO_SUPPORT != 0
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+	if (tp->tg3_flags2 & TG3_FLG2_HW_TSO)
 		tw32(SNDDATAI_MODE, SNDDATAI_MODE_ENABLE | 0x8);
 #endif
 	tw32(SNDBDI_MODE, SNDBDI_MODE_ENABLE | SNDBDI_MODE_ATTN_ENABLE);
@@ -7867,6 +7875,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	tp->pci_hdr_type     = (cacheline_sz_reg >> 16) & 0xff;
 	tp->pci_bist         = (cacheline_sz_reg >> 24) & 0xff;
 
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+		tp->tg3_flags2 |= TG3_FLG2_HW_TSO;
+
 	if (pci_find_capability(tp->pdev, PCI_CAP_ID_EXP) != 0)
 		tp->tg3_flags2 |= TG3_FLG2_PCI_EXPRESS;
 
@@ -8762,11 +8773,13 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	}
 
 #if TG3_TSO_SUPPORT != 0
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	if (tp->tg3_flags2 & TG3_FLG2_HW_TSO) {
+		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
+	}
+	else if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
 	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
-	    ((tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0 &&
-	     GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5750)) {
+	    (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0) {
 		tp->tg3_flags2 &= ~TG3_FLG2_TSO_CAPABLE;
 	} else {
 		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
