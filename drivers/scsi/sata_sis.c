@@ -200,14 +200,17 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	int rc;
 	u32 genctl;
 	struct ata_port_info *ppi;
+	int pci_dev_busy = 0;
 
 	rc = pci_enable_device(pdev);
 	if (rc)
 		return rc;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		pci_dev_busy = 1;
 		goto err_out;
+	}
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -259,7 +262,8 @@ err_out_regions:
 	pci_release_regions(pdev);
 
 err_out:
-	pci_disable_device(pdev);
+	if (!pci_dev_busy)
+		pci_disable_device(pdev);
 	return rc;
 
 }

@@ -336,6 +336,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	void *mmio_base;
 	int rc;
 	unsigned int i;
+	int pci_dev_busy = 0;
 	u32 tmp, irq_mask;
 
 	if (!printed_version++)
@@ -350,8 +351,10 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		return rc;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		pci_dev_busy = 1;
 		goto err_out;
+	}
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -438,7 +441,8 @@ err_out_free_ent:
 err_out_regions:
 	pci_release_regions(pdev);
 err_out:
-	pci_disable_device(pdev);
+	if (!pci_dev_busy)
+		pci_disable_device(pdev);
 	return rc;
 }
 

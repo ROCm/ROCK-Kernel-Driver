@@ -290,6 +290,7 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct ata_probe_ent *probe_ent;
 	int board_id = (int) ent->driver_data;
 	const int *bar_sizes;
+	int pci_dev_busy = 0;
 	u8 tmp8;
 
 	if (!printed_version++)
@@ -300,8 +301,10 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		return rc;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		pci_dev_busy = 1;
 		goto err_out;
+	}
 
 	if (board_id == vt6420) {
 		pci_read_config_byte(pdev, SATA_PATA_SHARING, &tmp8);
@@ -360,7 +363,8 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 err_out_regions:
 	pci_release_regions(pdev);
 err_out:
-	pci_disable_device(pdev);
+	if (!pci_dev_busy)
+		pci_disable_device(pdev);
 	return rc;
 }
 

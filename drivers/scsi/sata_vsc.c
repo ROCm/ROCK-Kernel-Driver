@@ -255,6 +255,7 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	static int printed_version;
 	struct ata_probe_ent *probe_ent = NULL;
 	unsigned long base;
+	int pci_dev_busy = 0;
 	void *mmio_base;
 	int rc;
 
@@ -274,8 +275,10 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	}
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		pci_dev_busy = 1;
 		goto err_out;
+	}
 
 	/*
 	 * Use 32 bit DMA mask, because 64 bit address support is poor.
@@ -352,7 +355,8 @@ err_out_free_ent:
 err_out_regions:
 	pci_release_regions(pdev);
 err_out:
-	pci_disable_device(pdev);
+	if (!pci_dev_busy)
+		pci_disable_device(pdev);
 	return rc;
 }
 

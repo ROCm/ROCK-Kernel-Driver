@@ -3656,6 +3656,7 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 	struct ata_port_info *port[2];
 	u8 tmp8, mask;
 	unsigned int legacy_mode = 0;
+	int disable_dev_on_err = 1;
 	int rc;
 
 	DPRINTK("ENTER\n");
@@ -3686,8 +3687,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 		return rc;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		disable_dev_on_err = 0;
 		goto err_out;
+	}
 
 	if (legacy_mode) {
 		if (!request_region(0x1f0, 8, "libata")) {
@@ -3697,8 +3700,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 			conflict = ____request_resource(&ioport_resource, &res);
 			if (!strcmp(conflict->name, "libata"))
 				legacy_mode |= (1 << 0);
-			else
+			else {
+				disable_dev_on_err = 0;
 				printk(KERN_WARNING "ata: 0x1f0 IDE port busy\n");
+			}
 		} else
 			legacy_mode |= (1 << 0);
 
@@ -3709,8 +3714,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 			conflict = ____request_resource(&ioport_resource, &res);
 			if (!strcmp(conflict->name, "libata"))
 				legacy_mode |= (1 << 1);
-			else
+			else {
+				disable_dev_on_err = 0;
 				printk(KERN_WARNING "ata: 0x170 IDE port busy\n");
+			}
 		} else
 			legacy_mode |= (1 << 1);
 	}
@@ -3763,7 +3770,8 @@ err_out_regions:
 		release_region(0x170, 8);
 	pci_release_regions(pdev);
 err_out:
-	pci_disable_device(pdev);
+	if (disable_dev_on_err)
+		pci_disable_device(pdev);
 	return rc;
 }
 
