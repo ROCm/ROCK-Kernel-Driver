@@ -392,7 +392,8 @@ int i2c_attach_client(struct i2c_client *client)
 	client->dev.driver = &client->driver->driver;
 	client->dev.bus = &i2c_bus_type;
 	
-	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id), "i2c_dev_%d", i);
+	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id),
+		"%d-%04x", i2c_adapter_id(adapter), client->addr);
 	printk("registering %s\n", client->dev.bus_id);
 	device_register(&client->dev);
 	
