@@ -1481,7 +1481,7 @@ static int __init rose_proto_init(void)
 
 	rose_callsign = null_ax25_address;
 
-	if (rose_ndevs > 0x7FFFFFFF/sizeof(struct net_device)) {
+	if (rose_ndevs > 0x7FFFFFFF/sizeof(struct net_device *)) {
 		printk(KERN_ERR "ROSE: rose_proto_init - rose_ndevs parameter to large\n");
 		return -1;
 	}
@@ -1502,23 +1502,14 @@ static int __init rose_proto_init(void)
 				   name, rose_setup);
 		if (!dev) {
 			printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate memory\n");
-			while (--i >= 0)
-				kfree(dev_rose[i]);
-			return -ENOMEM;
+			goto fail;
+		}
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "ROSE: netdevice regeistration failed\n");
+			free_netdev(dev);
+			goto fail;
 		}
 		dev_rose[i] = dev;
-	}
-
-	for (i = 0; i < rose_ndevs; i++) {
-		if (register_netdev(dev_rose[i])) {
-			printk(KERN_ERR "ROSE: netdevice regeistration failed\n");
-			while (--i >= 0) {
-				unregister_netdev(dev_rose[i]);
-				kfree(dev_rose[i]);
-				return -EIO;
-			}
-		}
-			
 	}
 
 	sock_register(&rose_family_ops);
@@ -1541,6 +1532,13 @@ static int __init rose_proto_init(void)
 	proc_net_fops_create("rose_routes", S_IRUGO, &rose_routes_fops);
 
 	return 0;
+fail:
+	while (--i >= 0) {
+		unregister_netdev(dev_rose[i]);
+		free_netdev(dev_rose[i]);
+	}
+	kfree(dev_rose);
+	return -ENOMEM;
 }
 module_init(rose_proto_init);
 
