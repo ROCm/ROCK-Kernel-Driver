@@ -532,7 +532,17 @@ static int acm_probe (struct usb_interface *intf,
 	u8 call_management_function = 0;
 	int call_interface_num = -1;
 	int data_interface_num;
+	unsigned long quirks;
 
+	/* handle quirks deadly to normal probing*/
+	quirks = (unsigned long)id->driver_info;
+	if (quirks == NO_UNION_NORMAL) {
+		data_interface = usb_ifnum_to_if(usb_dev, 1);
+		control_interface = usb_ifnum_to_if(usb_dev, 0);
+		goto skip_normal_probe;
+	}
+	
+	/* normal probing*/
 	if (!buffer) {
 		err("Wierd descriptor references");
 		return -EINVAL;
@@ -607,6 +617,7 @@ next_desc:
 		if (data_interface_num != call_interface_num)
 			dev_dbg(&intf->dev,"Seperate call control interface. That is not fully supported.");
 
+skip_normal_probe:
 	if (usb_interface_claimed(data_interface)) { /* valid in this context */
 		dev_dbg(&intf->dev,"The data interface isn't available\n");
 		return -EBUSY;
@@ -805,6 +816,10 @@ static void acm_disconnect(struct usb_interface *intf)
  */
 
 static struct usb_device_id acm_ids[] = {
+	/* quirky and broken devices */
+	{ USB_DEVICE(0x0870, 0x0001), /* Metricom GS Modem */
+	.driver_info = NO_UNION_NORMAL, /* has no union descriptor */
+	},
 	/* control interfaces with various AT-command sets */
 	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 1) },
 	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 2) },
