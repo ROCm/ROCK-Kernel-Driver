@@ -245,8 +245,8 @@ static unsigned int futex_poll(struct file *filp,
 }
 
 static struct file_operations futex_fops = {
-	release:	futex_close,
-	poll:		futex_poll,
+	.release	= futex_close,
+	.poll		= futex_poll,
 };
 
 /* Signal allows caller to avoid the race which would occur if they
@@ -357,8 +357,8 @@ futexfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type futex_fs_type = {
-	name:		"futexfs",
-	get_sb:		futexfs_get_sb,
+	.name		= "futexfs",
+	.get_sb		= futexfs_get_sb,
 };
 
 static int __init init(void)

@@ -286,8 +286,8 @@
 #define __NR_pciconfig_write		346
 #define __NR_query_module		347
 #define __NR_prctl			348
-#define __NR_pread			349
-#define __NR_pwrite			350
+#define __NR_pread64			349
+#define __NR_pwrite64			350
 #define __NR_rt_sigreturn		351
 #define __NR_rt_sigaction		352
 #define __NR_rt_sigprocmask		353

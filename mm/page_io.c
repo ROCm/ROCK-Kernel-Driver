@@ -132,11 +132,11 @@ static int swap_vm_writeback(struct page *page, int *nr_to_write)
 }
 
 struct address_space_operations swap_aops = {
-	vm_writeback:	swap_vm_writeback,
-	writepage:	swap_writepage,
-	readpage:	swap_readpage,
-	sync_page:	block_sync_page,
-	set_page_dirty:	__set_page_dirty_nobuffers,
+	.vm_writeback	= swap_vm_writeback,
+	.writepage	= swap_writepage,
+	.readpage	= swap_readpage,
+	.sync_page	= block_sync_page,
+	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
 /*

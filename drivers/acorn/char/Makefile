@@ -3,8 +3,6 @@
 #
 
 # All the objects that export symbols.
-export-objs	:= mouse_rpc.o
-
 obj-arc		:= keyb_arc.o
 obj-rpc		:= keyb_ps2.o
 obj-clps7500	:= keyb_ps2.o defkeymap-acorn.o

@@ -22,38 +22,22 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: core.c,v 1.91 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: core.c,v 1.100 2002/07/28 10:03:28 rmk Exp $
  *
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
-#include <linux/ioport.h>
-#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/console.h>
-#include <linux/sysrq.h>
 #include <linux/pm.h>
 #include <linux/serial_core.h>
 #include <linux/smp_lock.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
 
-#include <asm/system.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #undef	DEBUG
 #ifdef DEBUG
@@ -931,12 +915,12 @@ uart_wait_modem_status(struct uart_info *info, unsigned long arg)
 	 */
 	spin_lock_irq(&port->lock);
 	memcpy(&cprev, &port->icount, sizeof(struct uart_icount));
-	spin_unlock_irq(&port->lock);
 
 	/*
 	 * Force modem status interrupts on
 	 */
 	port->ops->enable_ms(port);
+	spin_unlock_irq(&port->lock);
 
 	add_wait_queue(&info->delta_msr_wait, &wait);
 	for (;;) {
@@ -1200,7 +1184,9 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	 * disable the receive line status interrupts.
 	 */
 	if (info->flags & UIF_INITIALIZED) {
+		spin_lock_irqsave(&port->lock, flags);
 		port->ops->stop_rx(port);
+		spin_unlock_irqrestore(&port->lock, flags);
 		/*
 		 * Before we drop DTR, make sure the UART transmitter
 		 * has completely drained; this is especially
@@ -1948,8 +1934,8 @@ static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstat
 			spin_lock_irq(&port->lock);
 			ops->stop_tx(port, 0);
 			ops->set_mctrl(port, 0);
-			spin_unlock_irq(&port->lock);
 			ops->stop_rx(port);
+			spin_unlock_irq(&port->lock);
 			ops->shutdown(port);
 		}
 		if (ops->pm)

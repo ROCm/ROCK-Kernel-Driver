@@ -489,11 +489,7 @@ int __init i2c_dev_init(void)
 	printk(KERN_INFO "i2c-dev.o: i2c /dev entries driver module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 
 	i2cdev_initialized = 0;
-#ifdef CONFIG_DEVFS_FS
-	if (devfs_register_chrdev(I2C_MAJOR, "i2c", &i2cdev_fops)) {
-#else
 	if (register_chrdev(I2C_MAJOR,"i2c",&i2cdev_fops)) {
-#endif
 		printk(KERN_ERR "i2c-dev.o: unable to get major %d for i2c bus\n",
 		       I2C_MAJOR);
 		return -EIO;
@@ -528,10 +524,8 @@ int i2cdev_cleanup(void)
 	if (i2cdev_initialized >= 1) {
 #ifdef CONFIG_DEVFS_FS
 		devfs_unregister(devfs_handle);
-		if ((res = devfs_unregister_chrdev(I2C_MAJOR, "i2c"))) {
-#else
-		if ((res = unregister_chrdev(I2C_MAJOR,"i2c"))) {
 #endif
+		if ((res = unregister_chrdev(I2C_MAJOR,"i2c"))) {
 			printk(KERN_ERR "i2c-dev.o: unable to release major %d for i2c bus\n",
 			       I2C_MAJOR);
 			return res;

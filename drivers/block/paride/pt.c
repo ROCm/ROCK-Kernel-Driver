@@ -907,7 +907,7 @@ static int __init pt_init(void)
 	if (pt_detect())
 		return -1;
 
-	if (devfs_register_chrdev(major,name,&pt_fops)) {
+	if (register_chrdev(major,name,&pt_fops)) {
 		printk("pt_init: unable to get major number %d\n",
 			major);
 		for (unit=0;unit<PT_UNITS;unit++)
@@ -929,7 +929,7 @@ static void __exit pt_exit(void)
 {
 	int unit;
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(major,name);
+	unregister_chrdev(major,name);
 	for (unit=0;unit<PT_UNITS;unit++)
 		if (PT.present)
 			pi_release(PI);

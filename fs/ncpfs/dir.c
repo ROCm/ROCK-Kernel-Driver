@@ -51,22 +51,22 @@ extern int ncp_symlink(struct inode *, struct dentry *, const char *);
 		      
 struct file_operations ncp_dir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	ncp_readdir,
-	ioctl:		ncp_ioctl,
+	.read		= generic_read_dir,
+	.readdir	= ncp_readdir,
+	.ioctl		= ncp_ioctl,
 };
 
 struct inode_operations ncp_dir_inode_operations =
 {
-	create:		ncp_create,
-	lookup:		ncp_lookup,
-	unlink:		ncp_unlink,
-	symlink:	ncp_symlink,
-	mkdir:		ncp_mkdir,
-	rmdir:		ncp_rmdir,
-	mknod:		ncp_mknod,
-	rename:		ncp_rename,
-	setattr:	ncp_notify_change,
+	.create		= ncp_create,
+	.lookup		= ncp_lookup,
+	.unlink		= ncp_unlink,
+	.symlink	= ncp_symlink,
+	.mkdir		= ncp_mkdir,
+	.rmdir		= ncp_rmdir,
+	.mknod		= ncp_mknod,
+	.rename		= ncp_rename,
+	.setattr	= ncp_notify_change,
 };
 
 /*
@@ -79,17 +79,17 @@ static int ncp_delete_dentry(struct dentry *);
 
 static struct dentry_operations ncp_dentry_operations =
 {
-	d_revalidate:	ncp_lookup_validate,
-	d_hash:		ncp_hash_dentry,
-	d_compare:	ncp_compare_dentry,
-	d_delete:	ncp_delete_dentry,
+	.d_revalidate	= ncp_lookup_validate,
+	.d_hash		= ncp_hash_dentry,
+	.d_compare	= ncp_compare_dentry,
+	.d_delete	= ncp_delete_dentry,
 };
 
 struct dentry_operations ncp_root_dentry_operations =
 {
-	d_hash:		ncp_hash_dentry,
-	d_compare:	ncp_compare_dentry,
-	d_delete:	ncp_delete_dentry,
+	.d_hash		= ncp_hash_dentry,
+	.d_compare	= ncp_compare_dentry,
+	.d_delete	= ncp_delete_dentry,
 };
 
 

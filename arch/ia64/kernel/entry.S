@@ -1134,8 +1134,8 @@ sys_call_table:
 	data8 sys_flock				// 1145
 	data8 sys_readv
 	data8 sys_writev
-	data8 sys_pread
-	data8 sys_pwrite
+	data8 sys_pread64
+	data8 sys_pwrite64
 	data8 sys_sysctl			// 1150
 	data8 sys_mmap
 	data8 sys_munmap

@@ -9,7 +9,7 @@ KHEAD := head.o
 O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= $(KHEAD)
 
-export-objs         := ppc_ksyms.o setup.o
+export-objs         := ppc_ksyms.o
 
 obj-y               :=	ppc_ksyms.o setup.o entry.o traps.o irq.o idle.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \

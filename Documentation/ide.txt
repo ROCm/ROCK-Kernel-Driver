@@ -1,8 +1,5 @@
 
-
-
 	Information regarding the Enhanced IDE drive in Linux 2.5
-
 
 ==============================================================================
 
@@ -49,7 +46,7 @@ Common pitfalls:
 - If you mix devices on the same cable, please consider using similar devices
   in respect of the data transfer mode they support.
 
-- Even better tru to stick to the same vendor and device type on the same
+- Even better try to stick to the same vendor and device type on the same
   cable.
 
 ================================================================================
@@ -69,7 +66,8 @@ sixth..     ide5, usually PCI, probed
 To access devices on interfaces > ide0, device entries please make sure that
 device files for them are present in /dev.  If not, please create such
 entries, by simply running the included shell script:
-/usr/src/linux/scripts/MAKEDEV.ide
+
+	/usr/src/linux/scripts/MAKEDEV.ide
 
 This driver automatically probes for most IDE interfaces (including all PCI
 ones), for the drives/geometries attached to those interfaces, and for the IRQ
@@ -195,11 +193,10 @@ and still allows newer hardware to run on the 2nd/3rd/4th IDE ports
 under control of ide.c.   To have ide.c also "take over" the primary
 IDE port in this situation, use the "command line" parameter:  ide0=0x1f0
 
-The IDE driver is partly modularized.  The high level disk/cdrom/tape/floppy
+The IDE driver is modularized.  The high level disk/CD-ROM/tape/floppy
 drivers can always be compiled as loadable modules, the chipset drivers
 can only be compiled into the kernel, and the core code (ide.c) can be
-compiled as a loadable module provided no chipset support and no special
-partition table translations are needed.
+compiled as a loadable module provided no chipset support is needed.
 
 When using ide.c/ide-tape.c as modules in combination with kerneld, add:
 
@@ -217,8 +214,9 @@ driver using the "options=" keyword to insmod, while replacing any ',' with
 
 ================================================================================
 
-Summary of ide driver parameters for kernel "command line":
-----------------------------------------------------------
+Summary of ide driver parameters for kernel command line
+--------------------------------------------------------
+
  "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
  
  "idex=" is recognized for all "x" from "0" to "3", such as "ide1".
@@ -300,6 +298,53 @@ ports must not be altered.
 There may be more options than shown -- use the source, Luke!
 
 Everything else is rejected with a "BAD OPTION" message.
+
+================================================================================
+
+IDE ATAPI streaming tape driver
+-------------------------------
+
+This driver is a part of the Linux ide driver and works in co-operation
+with linux/drivers/block/ide.c.
+
+The driver, in co-operation with ide.c, basically traverses the
+request-list for the block device interface. The character device
+interface, on the other hand, creates new requests, adds them
+to the request-list of the block device, and waits for their completion.
+
+Pipelined operation mode is now supported on both reads and writes.
+
+The block device major and minor numbers are determined from the
+tape's relative position in the ide interfaces, as explained in ide.c.
+
+The character device interface consists of the following devices:
+
+ ht0		major 37, minor 0	first  IDE tape, rewind on close.
+ ht1		major 37, minor 1	second IDE tape, rewind on close.
+ ...
+ nht0		major 37, minor 128	first  IDE tape, no rewind on close.
+ nht1		major 37, minor 129	second IDE tape, no rewind on close.
+ ...
+
+Run linux/scripts/MAKEDEV.ide to create the above entries.
+
+The general magnetic tape commands compatible interface, as defined by
+include/linux/mtio.h, is accessible through the character device.
+
+General ide driver configuration options, such as the interrupt-unmask
+flag, can be configured by issuing an ioctl to the block device interface,
+as any other ide device.
+
+Our own ide-tape ioctl's can be issued to either the block device or
+the character device interface.
+
+Maximal throughput with minimal bus load will usually be achieved in the
+following scenario:
+
+	1.	ide-tape is operating in the pipelined operation mode.
+	2.	No buffering is performed by the user backup program.
+
+
 
 ================================================================================
 

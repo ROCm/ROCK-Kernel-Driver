@@ -1,8 +1,6 @@
 /*
  *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
- */
-
-/*
+ *
  *  Version 0.03	Cleaned auto-tune, added probe
  *  Version 0.04	Added second channel tuning
  *  Version 0.05	Enhanced tuning ; added qd6500 support
@@ -81,36 +79,12 @@
  * bit 5 : status, but of what ?
  * bit 6 : always set 1 by dos driver
  * bit 7 : set 1 for non-ATAPI devices on primary port
- * 	(maybe read-ahead and post-write buffer ?)
+ *	(maybe read-ahead and post-write buffer ?)
  */
 
 static int timings[4]={-1,-1,-1,-1}; /* stores current timing for each timer */
 
-static void qd_write_reg(u8 content, unsigned int reg)
-{
-	unsigned long flags;
-
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
-	outb(content,reg);
-	restore_flags(flags);	/* all CPUs */
-}
-
-static u8 __init qd_read_reg(unsigned int reg)
-{
-	unsigned long flags;
-	u8 read;
-
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
-	read = inb(reg);
-	restore_flags(flags);	/* all CPUs */
-	return read;
-}
-
 /*
- * qd_select:
- *
  * This routine is invoked from ide.c to prepare for access to a given drive.
  */
 
@@ -120,12 +94,10 @@ static void qd_select(struct ata_device *drive)
 		(QD_TIMREG(drive) & 0x02);
 
 	if (timings[index] != QD_TIMING(drive))
-		qd_write_reg(timings[index] = QD_TIMING(drive), QD_TIMREG(drive));
+		outb(timings[index] = QD_TIMING(drive), QD_TIMREG(drive));
 }
 
 /*
- * qd6500_compute_timing
- *
  * computes the timing value where
  *	lower nibble represents active time,   in count of VLB clocks
  *	upper nibble represents recovery time, in count of VLB clocks
@@ -147,8 +119,6 @@ static u8 qd6500_compute_timing(struct ata_channel *hwif, int active_time, int r
 }
 
 /*
- * qd6580_compute_timing
- *
  * idem for qd6580
  */
 
@@ -161,8 +131,6 @@ static u8 qd6580_compute_timing(int active_time, int recovery_time)
 }
 
 /*
- * qd_find_disk_type
- *
  * tries to find timing from dos driver's table
  */
 
@@ -187,8 +155,6 @@ static int qd_find_disk_type(struct ata_device *drive,
 }
 
 /*
- * qd_timing_ok:
- *
  * check whether timings don't conflict
  */
 
@@ -201,8 +167,6 @@ static int qd_timing_ok(struct ata_device drives[])
 }
 
 /*
- * qd_set_timing:
- *
  * records the timing, and enables selectproc as needed
  */
 
@@ -221,10 +185,6 @@ static void qd_set_timing(struct ata_device *drive, u8 timing)
 	printk(KERN_DEBUG "%s: %#x\n", drive->name, timing);
 }
 
-/*
- * qd6500_tune_drive
- */
-
 static void qd6500_tune_drive(struct ata_device *drive, u8 pio)
 {
 	int active_time   = 175;
@@ -241,10 +201,6 @@ static void qd6500_tune_drive(struct ata_device *drive, u8 pio)
 
 	qd_set_timing(drive, qd6500_compute_timing(drive->channel, active_time, recovery_time));
 }
-
-/*
- * qd6580_tune_drive
- */
 
 static void qd6580_tune_drive(struct ata_device *drive, u8 pio)
 {
@@ -291,7 +247,7 @@ static void qd6580_tune_drive(struct ata_device *drive, u8 pio)
 	}
 
 	if (!drive->channel->unit && drive->type != ATA_DISK) {
-		qd_write_reg(0x5f, QD_CONTROL_PORT);
+		outb(0x5f, QD_CONTROL_PORT);
 		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n", drive->name, drive->channel->name);
 	}
 
@@ -299,8 +255,6 @@ static void qd6580_tune_drive(struct ata_device *drive, u8 pio)
 }
 
 /*
- * qd_testreg
- *
  * tests if the given port is a register
  */
 
@@ -308,15 +262,11 @@ static int __init qd_testreg(int port)
 {
 	u8 savereg;
 	u8 readreg;
-	unsigned long flags;
 
-	save_flags(flags);	/* all CPUs */
-	cli();			/* all CPUs */
 	savereg = inb_p(port);
 	outb_p(QD_TESTVAL, port);	/* safe value */
 	readreg = inb_p(port);
 	outb(savereg, port);
-	restore_flags(flags);	/* all CPUs */
 
 	if (savereg == QD_TESTVAL) {
 		printk(KERN_ERR "Outch ! the probe for qd65xx isn't reliable !\n");
@@ -329,8 +279,6 @@ static int __init qd_testreg(int port)
 }
 
 /*
- * qd_setup:
- *
  * called to setup an ata channel : adjusts attributes & links for tuning
  */
 
@@ -349,8 +297,6 @@ void __init qd_setup(int unit, int base, int config, unsigned int data0, unsigne
 }
 
 /*
- * qd_unsetup:
- *
  * called to unsetup an ata channel : back to default values, unlinks tuning
  */
 void __init qd_unsetup(int unit) {
@@ -368,13 +314,13 @@ void __init qd_unsetup(int unit) {
 
 	if (tuneproc == (void *) qd6500_tune_drive) {
 		// will do it for both
-		qd_write_reg(QD6500_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
+		outb(QD6500_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
 	} else if (tuneproc == (void *) qd6580_tune_drive) {
 		if (QD_CONTROL(hwif) & QD_CONTR_SEC_DISABLED) {
-			qd_write_reg(QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
-			qd_write_reg(QD6580_DEF_DATA2, QD_TIMREG(&hwif->drives[1]));
+			outb(QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
+			outb(QD6580_DEF_DATA2, QD_TIMREG(&hwif->drives[1]));
 		} else {
-			qd_write_reg(unit?QD6580_DEF_DATA2:QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
+			outb(unit ? QD6580_DEF_DATA2 : QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
 		}
 	} else {
 		printk(KERN_WARNING "Unknown qd65xx tuning fonction !\n");
@@ -383,8 +329,6 @@ void __init qd_unsetup(int unit) {
 }
 
 /*
- * qd_probe:
- *
  * looks at the specified baseport, and if qd found, registers & initialises it
  * return 1 if another qd may be probed
  */
@@ -394,7 +338,7 @@ int __init qd_probe(int base)
 	u8 config;
 	int unit;
 
-	config = qd_read_reg(QD_CONFIG_PORT);
+	config = inb(QD_CONFIG_PORT);
 
 	if (! ((config & QD_CONFIG_BASEPORT) >> 1 == (base == 0xb0)) ) return 1;
 
@@ -425,7 +369,7 @@ int __init qd_probe(int base)
 
 		/* qd6580 found */
 
-		control = qd_read_reg(QD_CONTROL_PORT);
+		control = inb(QD_CONTROL_PORT);
 
 		printk(KERN_NOTICE "qd6580 at %#x\n", base);
 		printk(KERN_DEBUG "qd6580: config=%#x, control=%#x, ID3=%u\n", config, control, QD_ID3);
@@ -434,7 +378,7 @@ int __init qd_probe(int base)
 			/* secondary disabled */
 			printk(KERN_INFO "%s: qd6580: single IDE board\n", ide_hwifs[unit].name);
 			qd_setup(unit, base, config | (control << 8), QD6580_DEF_DATA, QD6580_DEF_DATA2, &qd6580_tune_drive);
-			qd_write_reg(QD_DEF_CONTR, QD_CONTROL_PORT);
+			outb(QD_DEF_CONTR, QD_CONTROL_PORT);
 
 			return 1;
 		} else {
@@ -443,7 +387,7 @@ int __init qd_probe(int base)
 
 			qd_setup(ATA_PRIMARY, base, config | (control << 8), QD6580_DEF_DATA, QD6580_DEF_DATA, &qd6580_tune_drive);
 			qd_setup(ATA_SECONDARY, base, config | (control << 8), QD6580_DEF_DATA2, QD6580_DEF_DATA2, &qd6580_tune_drive);
-			qd_write_reg(QD_DEF_CONTR, QD_CONTROL_PORT);
+			outb(QD_DEF_CONTR, QD_CONTROL_PORT);
 
 			return 0; /* no other qd65xx possible */
 		}
@@ -454,8 +398,6 @@ int __init qd_probe(int base)
 
 #ifndef MODULE
 /*
- * init_qd65xx:
- *
  * called by ide.c when parsing command line
  */
 

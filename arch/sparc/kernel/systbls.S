@@ -31,7 +31,7 @@ sys_call_table:
 /*50*/	.long sys_getegid16, sys_acct, sys_nis_syscall, sys_getgid, sys_ioctl
 /*55*/	.long sys_reboot, sys_mmap2, sys_symlink, sys_readlink, sys_execve
 /*60*/	.long sys_umask, sys_chroot, sys_newfstat, sys_fstat64, sys_getpagesize
-/*65*/	.long sys_msync, sys_vfork, sys_pread, sys_pwrite, sys_geteuid
+/*65*/	.long sys_msync, sys_vfork, sys_pread64, sys_pwrite64, sys_geteuid
 /*70*/	.long sys_getegid, sys_mmap, sys_setreuid, sys_munmap, sys_mprotect
 /*75*/	.long sys_madvise, sys_vhangup, sys_truncate64, sys_mincore, sys_getgroups16
 /*80*/	.long sys_setgroups16, sys_getpgrp, sys_setgroups, sys_setitimer, sys_ftruncate64

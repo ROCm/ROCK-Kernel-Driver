@@ -1699,7 +1699,7 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 {
 	atomic_inc(&adapter->irq_sem);
 	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
-	synchronize_irq();
+	synchronize_irq(adapter->netdev->irq);
 }
 
 /**

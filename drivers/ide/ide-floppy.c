@@ -94,9 +94,10 @@
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/cdrom.h>
+#include <linux/buffer_head.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
-#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -1711,9 +1712,9 @@ static void idefloppy_setup(struct ata_device *drive, idefloppy_floppy_t *floppy
 		struct ata_channel *hwif = drive->channel;
 
 		if (drive != &hwif->drives[i]) continue;
-		hwif->gd->de_arr[i] = drive->de;
+		hwif->gd[i]->de_arr[0] = drive->de;
 		if (drive->removable)
-			hwif->gd->flags[i] |= GENHD_FL_REMOVABLE;
+			hwif->gd[i]->flags[0] |= GENHD_FL_REMOVABLE;
 		break;
 	}
 }
@@ -1722,10 +1723,10 @@ static int idefloppy_cleanup(struct ata_device *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 
-	if (ide_unregister_subdriver (drive))
+	if (ata_unregister_device(drive))
 		return 1;
 	drive->driver_data = NULL;
-	kfree (floppy);
+	kfree(floppy);
 	return 0;
 }
 
@@ -1779,7 +1780,7 @@ static void idefloppy_attach(struct ata_device *drive)
 				drive->name);
 		return;
 	}
-	if (ide_register_subdriver(drive, &idefloppy_driver)) {
+	if (ata_register_device(drive, &idefloppy_driver)) {
 		printk(KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (floppy);
 		return;

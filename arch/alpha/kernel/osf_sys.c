@@ -221,8 +221,8 @@ asmlinkage unsigned long sys_getxpid(int a0, int a1, int a2, int a3, int a4,
 	 * isn't actually going to matter, as if the parent happens
 	 * to change we can happily return either of the pids.
 	 */
-	(&regs)->r20 = tsk->real_parent->pid;
-	return tsk->pid;
+	(&regs)->r20 = tsk->real_parent->tgid;
+	return tsk->tgid;
 }
 
 asmlinkage unsigned long osf_mmap(unsigned long addr, unsigned long len,

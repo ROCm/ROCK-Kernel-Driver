@@ -23,13 +23,13 @@ int default_suspend(int state, int flags)
 }
 
 static struct platform_t default_platform = {
-	name:		"Default Platform",
-	suspend_states:	0,
-	reboot:		default_reboot,
-	halt:		default_halt,
-	power_off:	default_halt,
-	suspend:	default_suspend,
-	idle:		default_idle,
+	.name		= "Default Platform",
+	.suspend_states	= 0,
+	.reboot		= default_reboot,
+	.halt		= default_halt,
+	.power_off	= default_halt,
+	.suspend	= default_suspend,
+	.idle		= default_idle,
 };
 
 struct platform_t * platform = &default_platform;

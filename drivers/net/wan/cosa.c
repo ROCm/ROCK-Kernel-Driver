@@ -373,13 +373,13 @@ static int __init cosa_init(void)
 	printk(KERN_INFO "cosa: SMP found. Please mail any success/failure reports to the author.\n");
 #endif
 	if (cosa_major > 0) {
-		if (devfs_register_chrdev(cosa_major, "cosa", &cosa_fops)) {
+		if (register_chrdev(cosa_major, "cosa", &cosa_fops)) {
 			printk(KERN_WARNING "cosa: unable to get major %d\n",
 				cosa_major);
 			return -EIO;
 		}
 	} else {
-		if (!(cosa_major=devfs_register_chrdev(0, "cosa", &cosa_fops))) {
+		if (!(cosa_major=register_chrdev(0, "cosa", &cosa_fops))) {
 			printk(KERN_WARNING "cosa: unable to register chardev\n");
 			return -EIO;
 		}
@@ -395,7 +395,7 @@ static int __init cosa_init(void)
 			       &cosa_fops, NULL);
 	if (!nr_cards) {
 		printk(KERN_WARNING "cosa: no devices found.\n");
-		devfs_unregister_chrdev(cosa_major, "cosa");
+		unregister_chrdev(cosa_major, "cosa");
 		return -ENODEV;
 	}
 	return 0;
@@ -422,7 +422,7 @@ void cleanup_module (void)
 		free_dma(cosa->dma);
 		release_region(cosa->datareg,is_8bit(cosa)?2:4);
 	}
-	devfs_unregister_chrdev(cosa_major, "cosa");
+	unregister_chrdev(cosa_major, "cosa");
 }
 #endif
 

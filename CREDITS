@@ -1342,6 +1342,12 @@ S: 998 East 900 South, Suite 26
 S: Provo, Utah 84606-5607
 S: USA
 
+N: Marcel Holtmann
+E: marcel@holtmann.org
+W: http://www.holtmann.org
+D: Author of the Linux Bluetooth Subsystem PC Card drivers
+S: Germany
+
 N: Rob W. W. Hooft
 E: hooft@EMBL-Heidelberg.DE
 D: Shared libs for graphics-tools and for the f2c compiler

@@ -62,6 +62,20 @@ CONFIG_BLUEZ_HCIDTL1
   Say Y here to compile support for HCI DTL1 devices into the
   kernel or say M to compile it as module (dtl1_cs.o).
 
+HCI BT3C (PC Card) device driver
+CONFIG_BLUEZ_HCIBT3C
+  Bluetooth HCI BT3C (PC Card) driver.
+  This driver provides support for Bluetooth PCMCIA devices with
+  3Com BT3C interface:
+     3Com Bluetooth Card (3CRWB6096)
+     HP Bluetooth Card
+
+  The HCI BT3C driver uses external firmware loader program provided in
+  the BlueFW package. For more information, see <http://bluez.sf.net>.
+
+  Say Y here to compile support for HCI BT3C devices into the
+  kernel or say M to compile it as module (bt3c_cs.o).
+
 HCI BlueCard (PC Card) device driver
 CONFIG_BLUEZ_HCIBLUECARD
   Bluetooth HCI BlueCard (PC Card) driver.

@@ -175,14 +175,12 @@ static struct mtd_notifier ftl_notifier = {
 #define XFER_FAILED	0x04
 
 static struct hd_struct ftl_hd[MINOR_NR(MAX_DEV, 0, 0)];
-static int ftl_sizes[MINOR_NR(MAX_DEV, 0, 0)];
 
 static struct gendisk ftl_gendisk = {
     major:		FTL_MAJOR,
     major_name:		"ftl",
     minor_shift:	PART_BITS,
     part:		ftl_hd,
-    sizes:		ftl_sizes,
 };
 
 /*====================================================================*/

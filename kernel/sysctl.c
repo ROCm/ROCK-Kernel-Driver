@@ -22,7 +22,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/sysctl.h>
-#include <linux/swapctl.h>
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
 #include <linux/utsname.h>
@@ -127,12 +126,12 @@ static ssize_t proc_writesys(struct file *, const char *, size_t, loff_t *);
 static int proc_sys_permission(struct inode *, int);
 
 struct file_operations proc_sys_file_operations = {
-	read:		proc_readsys,
-	write:		proc_writesys,
+	.read		= proc_readsys,
+	.write		= proc_writesys,
 };
 
 static struct inode_operations proc_sys_inode_operations = {
-	permission:	proc_sys_permission,
+	.permission	= proc_sys_permission,
 };
 
 extern struct proc_dir_entry *proc_sys_root;
@@ -272,8 +271,6 @@ static ctl_table vm_table[] = {
 	{VM_OVERCOMMIT_RATIO, "overcommit_ratio",
 	 &sysctl_overcommit_ratio, sizeof(sysctl_overcommit_ratio), 0644,
 	 NULL, &proc_dointvec},
-	{VM_PAGERDAEMON, "kswapd",
-	 &pager_daemon, sizeof(pager_daemon_t), 0644, NULL, &proc_dointvec},
 	{VM_PAGE_CLUSTER, "page-cluster", 
 	 &page_cluster, sizeof(int), 0644, NULL, &proc_dointvec},
 	{VM_DIRTY_BACKGROUND, "dirty_background_ratio",

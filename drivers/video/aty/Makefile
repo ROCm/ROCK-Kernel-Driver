@@ -1,6 +1,3 @@
-
-export-objs    :=  atyfb_base.o mach64_accel.o
-
 obj-$(CONFIG_FB_ATY) += atyfb.o
 
 atyfb-y				:= atyfb_base.o mach64_accel.o ../cfbimgblt.o

@@ -1,32 +1,11 @@
 /*
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
- */
-/*
+ *
  * Emulation of a SCSI host adapter for IDE ATAPI devices.
  *
  * With this driver, one can use the Linux SCSI drivers instead of the
  * native IDE ATAPI drivers.
- *
- * Ver 0.1   Dec  3 96   Initial version.
- * Ver 0.2   Jan 26 97   Fixed bug in cleanup_module() and added emulation
- *                        of MODE_SENSE_6/MODE_SELECT_6 for cdroms. Thanks
- *                        to Janos Farkas for pointing this out.
- *                       Avoid using bitfields in structures for m68k.
- *                       Added Scatter/Gather and DMA support.
- * Ver 0.4   Dec  7 97   Add support for ATAPI PD/CD drives.
- *                       Use variable timeout for each command.
- * Ver 0.5   Jan  2 98   Fix previous PD/CD support.
- *                       Allow disabling of SCSI-6 to SCSI-10 transformation.
- * Ver 0.6   Jan 27 98   Allow disabling of SCSI command translation layer
- *                        for access through /dev/sg.
- *                       Fix MODE_SENSE_6/MODE_SELECT_6/INQUIRY translation.
- * Ver 0.7   Dec 04 98   Ignore commands where lun != 0 to avoid multiple
- *                        detection of devices with CONFIG_SCSI_MULTI_LUN
- * Ver 0.8   Feb 05 99   Optical media need translation too. Reverse 0.7.
- * Ver 0.9   Jul 04 99   Fix a bug in SG_SET_TRANSFORM.
  */
-
-#define IDESCSI_VERSION "0.9"
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -495,9 +474,8 @@ static void idescsi_release(struct inode *inode, struct file *filp, struct ata_d
 static Scsi_Host_Template template;
 static int idescsi_cleanup (struct ata_device *drive)
 {
-	if (ide_unregister_subdriver (drive)) {
+	if (ata_unregister_device(drive))
 		return 1;
-	}
 	scsi_unregister_host(&template);
 
 	return 0;
@@ -762,7 +740,7 @@ static void idescsi_attach(struct ata_device *drive)
 
 	host = scsi_register(&template, sizeof(idescsi_scsi_t));
 	if (!host) {
-		printk (KERN_ERR
+		printk(KERN_ERR
 			"ide-scsi: %s: Can't allocate a scsi host structure\n",
 			drive->name);
 		return;
@@ -771,8 +749,8 @@ static void idescsi_attach(struct ata_device *drive)
 	host->max_lun = drive->last_lun + 1;
 	host->max_id = 1;
 
-	if (ide_register_subdriver(drive, &ata_ops)) {
-		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
+	if (ata_register_device(drive, &ata_ops)) {
+		printk(KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
 		scsi_unregister(host);
 		return;
 	}

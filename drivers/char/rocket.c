@@ -1881,15 +1881,23 @@ static int __init init_ISA(int i, int *reserved_controller)
 {
 	int	num_aiops, num_chan;
 	int	aiop, chan;
+	int     extent = 0;
 	unsigned int	aiopio[MAX_AIOPS_PER_BOARD];	
 	CONTROLLER_t	*ctlp;
 
 	if (rcktpt_io_addr[i] == 0)
 		return(0);
 
-	if (check_region(rcktpt_io_addr[i],64)) {
+	if (rcktpt_io_addr[i] + 0x40 == controller) {
+		*reserved_controller = 1;
+		extent = 68;
+	} else {
+		extent = 64;
+	}
+	if (!request_region(rcktpt_io_addr[i], extent,
+			    "Comtrol Rocketport")) {
 		printk("RocketPort board address 0x%lx in use...\n",
-			rcktpt_io_addr[i]);
+		       rcktpt_io_addr[i]);
 		rcktpt_io_addr[i] = 0;
 		return(0);
 	}
@@ -1901,6 +1909,7 @@ static int __init init_ISA(int i, int *reserved_controller)
 				    aiopio, MAX_AIOPS_PER_BOARD, 0,
 				    FREQ_DIS, 0);
 	if (num_aiops <= 0) {
+		release_region(rcktpt_io_addr[i], extent);
 		rcktpt_io_addr[i] = 0;
 		return(0);
 	}
@@ -1914,14 +1923,6 @@ static int __init init_ISA(int i, int *reserved_controller)
 	printk("Rocketport controller #%d found at 0x%lx, "
 	       "%d AIOPs\n", i, rcktpt_io_addr[i],
 	       num_aiops);
-	if (rcktpt_io_addr[i] + 0x40 == controller) {
-		*reserved_controller = 1;
-		request_region(rcktpt_io_addr[i], 68,
-				       "Comtrol Rocketport");
-	} else {
-		request_region(rcktpt_io_addr[i], 64,
-			       "Comtrol Rocketport");
-	}
 	return(1);
 }
 

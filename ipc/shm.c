@@ -186,7 +186,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_flags = (shmflg & S_IRWXUGO);
 
 	sprintf (name, "SYSV%08x", key);
-	file = shmem_file_setup(name, size);
+	file = shmem_file_setup(name, size, VM_ACCOUNT);
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
@@ -671,7 +671,7 @@ asmlinkage long sys_shmdt (char *shmaddr)
 		shmdnext = shmd->vm_next;
 		if (shmd->vm_ops == &shm_vm_ops
 		    && shmd->vm_start - (shmd->vm_pgoff << PAGE_SHIFT) == (ulong) shmaddr) {
-			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start, 1);
+			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start);
 			retval = 0;
 		}
 	}

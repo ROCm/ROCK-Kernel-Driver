@@ -124,7 +124,6 @@
  *	Some of these can be made smaller later
  */
 
-static int i2ob_sizes[MAX_I2OB<<4];
 static int i2ob_media_change_flag[MAX_I2OB];
 
 static int i2ob_context;
@@ -731,7 +730,6 @@ static int i2ob_evt(void *dummy)
 			{
 				for(i = unit; i <= unit+15; i++)
 				{
-					i2ob_sizes[i] = 0;
 					blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
 					i2ob[i].nr_sects = 0;
 					i2ob_gendisk.part[i].nr_sects = 0;
@@ -767,7 +765,6 @@ static int i2ob_evt(void *dummy)
 					i2ob_query_device(&i2ob_dev[unit], 0x0000, 4, &size, 8);
 
 				spin_lock_irqsave(&I2O_LOCK(unit), flags);	
-				i2ob_sizes[unit] = (int)(size>>10);
 				i2ob_gendisk.part[unit].nr_sects = size>>9;
 				i2ob[unit].nr_sects = (int)(size>>9);
 				spin_unlock_irqrestore(&I2O_LOCK(unit), flags);	
@@ -1081,7 +1078,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 		{
 			struct hd_geometry g;
 			int u = minor(inode->i_rdev) & 0xF0;
-			i2o_block_biosparam(i2ob_sizes[u]<<1, 
+			i2o_block_biosparam(i2ob[u].nr_sects, 
 				&g.cylinders, &g.heads, &g.sectors);
 			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user((void *)arg, &g, sizeof(g))
@@ -1268,7 +1265,6 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
-	i2ob_sizes[unit] = (int)(size>>10);
 	i2ob_gendisk.part[unit].nr_sects = size>>9;
 	i2ob[unit].nr_sects = (int)(size>>9);
 
@@ -1655,7 +1651,6 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	for(i = unit; i <= unit+15; i++)
 	{
 		i2ob_dev[i].i2odev = NULL;
-		i2ob_sizes[i] = 0;
 		blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
 		i2ob[i].nr_sects = 0;
 		i2ob_gendisk.part[i].nr_sects = 0;
@@ -1762,7 +1757,6 @@ static struct gendisk i2ob_gendisk =
 	major_name:	"i2o/hd",
 	minor_shift:	4,
 	part:		i2ob,
-	sizes:		i2ob_sizes,
 	nr_real:	MAX_I2OB,
 	fops:		&i2ob_fops,
 };

@@ -28,9 +28,9 @@ static struct list_head uidhash_table[UIDHASH_SZ];
 static spinlock_t uidhash_lock = SPIN_LOCK_UNLOCKED;
 
 struct user_struct root_user = {
-	__count:	ATOMIC_INIT(1),
-	processes:	ATOMIC_INIT(1),
-	files:		ATOMIC_INIT(0)
+	.__count	= ATOMIC_INIT(1),
+	.processes	= ATOMIC_INIT(1),
+	.files		= ATOMIC_INIT(0)
 };
 
 /*

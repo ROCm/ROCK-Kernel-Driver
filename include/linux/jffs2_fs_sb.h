@@ -1,15 +1,14 @@
-/* $Id: jffs2_fs_sb.h,v 1.26 2002/03/17 10:18:42 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.32 2002/07/23 14:35:34 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/tqueue.h>
 #include <linux/completion.h>
 #include <asm/semaphore.h>
 #include <linux/list.h>
-
-#define INOCACHE_HASHSIZE 14
 
 #define JFFS2_SB_FLAG_RO 1
 #define JFFS2_SB_FLAG_MOUNTING 2
@@ -33,6 +32,9 @@ struct jffs2_sb_info {
 					   out-of-order writing of nodes.
 					   And GC.
 					*/
+	uint32_t cleanmarker_size;	/* Size of an _inline_ CLEANMARKER
+					 (i.e. zero for OOB CLEANMARKER */
+
 	uint32_t flash_size;
 	uint32_t used_size;
 	uint32_t dirty_size;
@@ -52,6 +54,7 @@ struct jffs2_sb_info {
 	struct jffs2_eraseblock *gcblock;	/* The block we're currently garbage-collecting */
 
 	struct list_head clean_list;		/* Blocks 100% full of clean data */
+	struct list_head very_dirty_list;	/* Blocks with lots of dirty space */
 	struct list_head dirty_list;		/* Blocks with some dirty space */
 	struct list_head erasable_list;		/* Blocks which are completely dirty, and need erasing */
 	struct list_head erasable_pending_wbuf_list;	/* Blocks which need erasing but only after the current wbuf is flushed */
@@ -66,10 +69,8 @@ struct jffs2_sb_info {
 						   against erase completion handler */
 	wait_queue_head_t erase_wait;		/* For waiting for erases to complete */
 
-	struct jffs2_inode_cache *inocache_list[INOCACHE_HASHSIZE];
+	struct jffs2_inode_cache **inocache_list;
 	spinlock_t inocache_lock;
-	/* This _really_ speeds up mounts. */
-	struct jffs2_inode_cache *inocache_last;
 	
 	/* Sem to allow jffs2_garbage_collect_deletion_dirent to
 	   drop the erase_completion_lock while it's holding a pointer 
@@ -81,6 +82,8 @@ struct jffs2_sb_info {
 	uint32_t wbuf_ofs;
 	uint32_t wbuf_len;
 	uint32_t wbuf_pagesize;
+	struct tq_struct wbuf_task;		/* task for timed wbuf flush */
+	struct timer_list wbuf_timer;		/* timer for flushing wbuf */
 
 	/* OS-private pointer for getting back to master superblock info */
 	void *os_priv;

@@ -185,8 +185,6 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 		return -EBADF;
 	if (!file->f_op || !file->f_op->read)
 		return -EINVAL;
-	if (pos < 0)
-		return -EINVAL;
 
 	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
 	if (!ret) {
@@ -209,8 +207,6 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 	if (!file->f_op || !file->f_op->write)
-		return -EINVAL;
-	if (pos < 0)
 		return -EINVAL;
 
 	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
@@ -254,11 +250,14 @@ asmlinkage ssize_t sys_write(unsigned int fd, const char * buf, size_t count)
 	return ret;
 }
 
-asmlinkage ssize_t sys_pread(unsigned int fd, char *buf,
+asmlinkage ssize_t sys_pread64(unsigned int fd, char *buf,
 			     size_t count, loff_t pos)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+
+	if (pos < 0)
+		return -EINVAL;
 
 	file = fget(fd);
 	if (file) {
@@ -269,11 +268,14 @@ asmlinkage ssize_t sys_pread(unsigned int fd, char *buf,
 	return ret;
 }
 
-asmlinkage ssize_t sys_pwrite(unsigned int fd, const char *buf,
+asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char *buf,
 			      size_t count, loff_t pos)
 {
 	struct file *file;
 	ssize_t ret = -EBADF;
+
+	if (pos < 0)
+		return -EINVAL;
 
 	file = fget(fd);
 	if (file) {

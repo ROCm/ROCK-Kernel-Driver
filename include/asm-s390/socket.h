@@ -11,7 +11,7 @@
 
 #include <asm/sockios.h>
 
-/* For setsockoptions(2) */
+/* For setsockopt(2) */
 #define SOL_SOCKET	1
 
 #define SO_DEBUG	1

@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: amba.c,v 1.37 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: amba.c,v 1.41 2002/07/28 10:03:27 rmk Exp $
  *
  * This is a generic driver for ARM AMBA-type serial ports.  They
  * have a lot of 16550-like features, but are not register compatable.
@@ -33,30 +33,15 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #if defined(CONFIG_SERIAL_AMBA_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -138,26 +123,20 @@ static void ambauart_start_tx(struct uart_port *port, unsigned int tty_start)
 
 static void ambauart_stop_rx(struct uart_port *port)
 {
-	unsigned long flags;
 	unsigned int cr;
 
-	spin_lock_irqsave(&port->lock, flags);
 	cr = UART_GET_CR(port);
 	cr &= ~(AMBA_UARTCR_RIE | AMBA_UARTCR_RTIE);
 	UART_PUT_CR(port, cr);
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void ambauart_enable_ms(struct uart_port *port)
 {
-	unsigned long flags;
 	unsigned int cr;
 
-	spin_lock_irqsave(&port->lock, flags);
 	cr = UART_GET_CR(port);
 	cr |= AMBA_UARTCR_MSIE;
 	UART_PUT_CR(port, cr);
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void
@@ -742,7 +721,7 @@ static int __init ambauart_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: AMBA driver $Revision: 1.37 $\n");
+	printk(KERN_INFO "Serial: AMBA driver $Revision: 1.41 $\n");
 
 	ret = uart_register_driver(&amba_reg);
 	if (ret == 0) {
@@ -770,5 +749,5 @@ module_exit(ambauart_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("ARM Ltd/Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.37 $");
+MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.41 $");
 MODULE_LICENSE("GPL");

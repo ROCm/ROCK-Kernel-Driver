@@ -399,8 +399,6 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	IWRITE_UNLOCK(dip);
 
-	d_delete(dentry);
-
       out2:
 	free_UCSname(&dname);
 
@@ -542,8 +540,6 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	}
 
 	IWRITE_UNLOCK(dip);
-
-	d_delete(dentry);
 
       out1:
 	free_UCSname(&dname);
