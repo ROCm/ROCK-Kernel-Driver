@@ -155,6 +155,7 @@ static void e100_vlan_rx_kill_vid(struct net_device *netdev, u16 vid);
 static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e100_suspend(struct pci_dev *pcid, u32 state);
 static int e100_resume(struct pci_dev *pcid);
+static unsigned char e100_asf_enabled(struct e100_private *bdp);
 struct notifier_block e100_notifier_reboot = {
         .notifier_call  = e100_notify_reboot,
         .next           = NULL,
@@ -228,7 +229,6 @@ static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
 unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
-static unsigned char e100_asf_enabled(struct e100_private *bdp);
 
 /**
  * e100_get_rx_struct - retrieve cell to hold skb buff from the pool
@@ -4164,7 +4164,6 @@ e100_resume(struct pci_dev *pcid)
 
 	return 0;
 }
-#endif /* CONFIG_PM */
 
 /**
  * e100_asf_enabled - checks if ASF is configured on the current adaper
@@ -4190,6 +4189,7 @@ e100_asf_enabled(struct e100_private *bdp)
 	}
 	return false;
 }
+#endif /* CONFIG_PM */
 
 #ifdef E100_CU_DEBUG
 unsigned char
