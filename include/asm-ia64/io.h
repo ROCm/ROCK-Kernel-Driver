@@ -414,6 +414,16 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
 # endif /* __KERNEL__ */
 
 /*
+ * Enabling BIO_VMERGE_BOUNDARY forces us to turn off I/O MMU bypassing.  It is said that
+ * BIO-level virtual merging can give up to 4% performance boost (not verified for ia64).
+ * On the other hand, we know that I/O MMU bypassing gives ~8% performance improvement on
+ * SPECweb-like workloads on zx1-based machines.  Thus, for now we favor I/O MMU bypassing
+ * over BIO-level virtual merging.
+ */
+#if 1
+#define BIO_VMERGE_BOUNDARY	0
+#else
+/*
  * It makes no sense at all to have this BIO_VMERGE_BOUNDARY macro here.  Should be
  * replaced by dma_merge_mask() or something of that sort.  Note: the only way
  * BIO_VMERGE_BOUNDARY is used is to mask off bits.  Effectively, our definition gets
@@ -425,5 +435,6 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
  */
 extern unsigned long ia64_max_iommu_merge_mask;
 #define BIO_VMERGE_BOUNDARY	(ia64_max_iommu_merge_mask + 1)
+#endif
 
 #endif /* _ASM_IA64_IO_H */
