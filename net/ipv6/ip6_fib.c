@@ -496,6 +496,12 @@ static __inline__ void fib6_start_gc(struct rt6_info *rt)
 		mod_timer(&ip6_fib_timer, jiffies + ip6_rt_gc_interval);
 }
 
+void fib6_force_start_gc(void)
+{
+	if (ip6_fib_timer.expires == 0)
+		mod_timer(&ip6_fib_timer, jiffies + ip6_rt_gc_interval);
+}
+
 /*
  *	Add routing information to the routing tree.
  *	<destination addr>/<source addr>
@@ -1214,6 +1220,7 @@ void fib6_run_gc(unsigned long dummy)
 
 
 	write_lock_bh(&rt6_lock);
+	ndisc_dst_gc(&gc_args.more);
 	fib6_clean_tree(&ip6_routing_table, fib6_age, 0, NULL);
 	write_unlock_bh(&rt6_lock);
 
