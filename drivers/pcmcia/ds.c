@@ -992,11 +992,10 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_get_next_region(s->handle, &buf.region);
 	break;
     case DS_GET_FIRST_WINDOW:
-	buf.win_info.handle = (window_handle_t)s->handle;
-	ret = pcmcia_get_first_window(&buf.win_info.handle, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, 0, &buf.win_info.window);
 	break;
     case DS_GET_NEXT_WINDOW:
-	ret = pcmcia_get_next_window(&buf.win_info.handle, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, buf.win_info.handle->index + 1, &buf.win_info.window);
 	break;
     case DS_GET_MEM_PAGE:
 	ret = pcmcia_get_mem_page(buf.win_info.handle,

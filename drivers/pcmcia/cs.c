@@ -1073,17 +1073,12 @@ EXPORT_SYMBOL(pcmcia_get_next_client);
 
 /*====================================================================*/
 
-static int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
+int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req)
 {
-    struct pcmcia_socket *s;
     window_t *win;
     int w;
 
-    if (idx == 0)
-	s = ((client_handle_t)*handle)->Socket;
-    else
-	s = (*handle)->sock;
-    if (!(s->state & SOCKET_PRESENT))
+    if (!s || !(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     for (w = idx; w < MAX_WIN; w++)
 	if (s->state & SOCKET_WIN_REQ(w)) break;
@@ -1105,20 +1100,7 @@ static int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
     *handle = win;
     return CS_SUCCESS;
 } /* get_window */
-
-int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-    return pcmcia_get_window(win, 0, req);
-}
-
-int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
-{
-    if ((win == NULL) || ((*win)->magic != WINDOW_MAGIC))
-	return CS_BAD_HANDLE;
-    return pcmcia_get_window(win, (*win)->index+1, req);
-}
+EXPORT_SYMBOL(pcmcia_get_window);
 
 /*=====================================================================
 
@@ -2103,8 +2085,6 @@ EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
 EXPORT_SYMBOL(pcmcia_get_configuration_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
-EXPORT_SYMBOL(pcmcia_get_first_window);
-EXPORT_SYMBOL(pcmcia_get_next_window);
 EXPORT_SYMBOL(pcmcia_get_status);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);

@@ -171,6 +171,7 @@ extern struct class_interface pccard_sysfs_interface;
 /* In cs.c */
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
+int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req);
 
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 
