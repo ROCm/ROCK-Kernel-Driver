@@ -36,6 +36,7 @@
 #include <linux/ioctl.h>
 #include <linux/file.h>
 #include <linux/init.h>
+#include <linux/wait.h>
 #include <net/sock.h>
 
 #include <linux/input.h>
@@ -459,7 +460,6 @@ static int hidp_session(void *arg)
 	struct sk_buff *skb;
 	int vendor = 0x0000, product = 0x0000;
 	wait_queue_t ctrl_wait, intr_wait;
-	unsigned long timeo = HZ;
 
 	BT_DBG("session %p", session);
 
@@ -504,28 +504,12 @@ static int hidp_session(void *arg)
 
 	hidp_del_timer(session);
 
-	if (intr_sk->sk_state != BT_CONNECTED) {
-		init_waitqueue_entry(&ctrl_wait, current);
-		add_wait_queue(ctrl_sk->sk_sleep, &ctrl_wait);
-		while (timeo && ctrl_sk->sk_state != BT_CLOSED) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			timeo = schedule_timeout(timeo);
-		}
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(ctrl_sk->sk_sleep, &ctrl_wait);
-		timeo = HZ;
-	}
+	if (intr_sk->sk_state != BT_CONNECTED)
+		wait_event_timeout(*(ctrl_sk->sk_sleep), (ctrl_sk->sk_state == BT_CLOSED), HZ);
 
 	fput(session->ctrl_sock->file);
 
-	init_waitqueue_entry(&intr_wait, current);
-	add_wait_queue(intr_sk->sk_sleep, &intr_wait);
-	while (timeo && intr_sk->sk_state != BT_CLOSED) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		timeo = schedule_timeout(timeo);
-	}
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(intr_sk->sk_sleep, &intr_wait);
+	wait_event_timeout(*(intr_sk->sk_sleep), (intr_sk->sk_state == BT_CLOSED), HZ);
 
 	fput(session->intr_sock->file);
 
