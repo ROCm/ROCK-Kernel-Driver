@@ -561,7 +561,11 @@ static int dio_bio_add_page(struct dio *dio)
 	ret = bio_add_page(dio->bio, dio->cur_page,
 			dio->cur_page_len, dio->cur_page_offset);
 	if (ret == dio->cur_page_len) {
-		dio->pages_in_io--;
+		/*
+		 * Decrement count only, if we are done with this page
+		 */
+		if ((dio->cur_page_len + dio->cur_page_offset) == PAGE_SIZE)
+			dio->pages_in_io--;
 		page_cache_get(dio->cur_page);
 		dio->final_block_in_bio = dio->cur_page_block +
 			(dio->cur_page_len >> dio->blkbits);
