@@ -275,7 +275,7 @@ add_window (struct acpi_resource *res, void *data)
 			return AE_OK;
 
 		window = &info->controller->window[info->controller->windows++];
-		window->resource.flags |= flags;
+		window->resource.flags	= flags;
 		window->resource.start  = addr.min_address_range;
 		window->resource.end    = addr.max_address_range;
 		window->offset		= offset;
