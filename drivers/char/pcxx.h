@@ -85,10 +85,10 @@ struct channel {
 	int							count;
 	int							blocked_open;
 	int							close_delay;
-	int							event;
+	unsigned long						event;
 	wait_queue_head_t			open_wait;
 	wait_queue_head_t			close_wait;
-	struct tq_struct			tqueue;
+	struct work_struct			tqueue;
 							/* ------------ Async control data ------------- */
 	unchar						modemfake;      /* Modem values to be forced */
 	unchar						modem;          /* Force values */
