@@ -96,13 +96,14 @@ static void EnableSRAM(THINKPAD_BD_DATA * pBDData)
 }
 
 
-static void UartInterrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t UartInterrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	PRINTK_3(TRACE_TP3780I,
 		"tp3780i::UartInterrupt entry irq %x dev_id %x\n", irq, (int) dev_id);
+	return IRQ_HANDLED;
 }
 
-static void DspInterrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t DspInterrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	pMWAVE_DEVICE_DATA pDrvData = &mwave_s_mdd;
 	DSP_3780I_CONFIG_SETTINGS *pSettings = &pDrvData->rBDData.rDspSettings;
@@ -150,6 +151,7 @@ static void DspInterrupt(int irq, void *dev_id, struct pt_regs *regs)
 			"tp3780i::DspInterrupt, return false from dsp3780i_GetIPCSource\n");
 	}
 	PRINTK_1(TRACE_TP3780I, "tp3780i::DspInterrupt exit\n");
+	return IRQ_HANDLED;
 }
 
 
