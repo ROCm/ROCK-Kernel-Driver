@@ -62,7 +62,7 @@
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
-#define DEBUG
+#undef DEBUG
 
 #ifdef DEBUG
 #define kaweth_dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format "\n" ,##arg)
