@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2004 Richard Purdie
  *
- *  $Id: sharpsl.c,v 1.2 2004/11/24 20:38:07 rpurdie Exp $
+ *  $Id: sharpsl.c,v 1.3 2005/01/03 14:53:50 rpurdie Exp $
  *
  *  Based on Sharp's NAND driver sharp_sl.c
  *
@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 
 static void __iomem *sharpsl_io_base;
 static int sharpsl_phys_base = 0x0C000000;
@@ -56,43 +57,22 @@ static struct mtd_info *sharpsl_mtd = NULL;
  */
 #define DEFAULT_NUM_PARTITIONS 3
 
-#if defined CONFIG_MACH_POODLE
-#define SHARPSL_ROOTFS_SIZE 22
-#define SHARPSL_FLASH_SIZE 64
-#elif defined CONFIG_MACH_CORGI 
-#define SHARPSL_ROOTFS_SIZE 25
-#define SHARPSL_FLASH_SIZE 32
-#elif defined CONFIG_MACH_SHEPHERD
-#define SHARPSL_ROOTFS_SIZE 25
-#define SHARPSL_FLASH_SIZE 64
-#elif defined CONFIG_MACH_HUSKY
-#define SHARPSL_ROOTFS_SIZE 53
-#define SHARPSL_FLASH_SIZE 128
-#elif defined CONFIG_MACH_TOSA
-#define SHARPSL_ROOTFS_SIZE 28
-#define SHARPSL_FLASH_SIZE 64
-#else
-#define SHARPSL_ROOTFS_SIZE 30
-#define SHARPSL_FLASH_SIZE 64
-#endif
-
 static int nr_partitions;
 static struct mtd_partition sharpsl_nand_default_partition_info[] = {
 	{
-	.name = "NAND flash partition 0",
+	.name = "System Area",
 	.offset = 0,
 	.size = 7 * 1024 * 1024,
 	},
-	
 	{
-	.name = "NAND flash partition 1",
+	.name = "Root Filesystem",
 	.offset = 7 * 1024 * 1024,
-	.size = SHARPSL_ROOTFS_SIZE * 1024 * 1024,
+	.size = 30 * 1024 * 1024,
 	},
 	{
-	.name = "NAND flash partition 2",
-	.offset = (SHARPSL_ROOTFS_SIZE+7) * 1024 * 1024,
-	.size = (SHARPSL_FLASH_SIZE - SHARPSL_ROOTFS_SIZE - 7) * 1024 * 1024,
+	.name = "Home Filesystem",
+	.offset = MTDPART_OFS_APPEND ,
+	.size = MTDPART_SIZ_FULL ,
 	},
 };
 
@@ -235,12 +215,19 @@ sharpsl_nand_init(void)
 	if (nr_partitions <= 0) {
 		nr_partitions = DEFAULT_NUM_PARTITIONS;
 		sharpsl_partition_info = sharpsl_nand_default_partition_info;
+		if (machine_is_poodle()) {
+			sharpsl_partition_info[1].size=22 * 1024 * 1024;
+		} else if (machine_is_corgi() || machine_is_shepherd()) {
+			sharpsl_partition_info[1].size=25 * 1024 * 1024;
+		} else if (machine_is_husky()) {
+			sharpsl_partition_info[1].size=53 * 1024 * 1024;
+		} 		
 	}
 
-#ifdef CONFIG_MACH_HUSKY
-	/* Need to use small eraseblock size for backward compatibility */
-	sharpsl_mtd->flags |= MTD_NO_VIRTBLOCKS;
-#endif
+	if (machine_is_husky()) {
+		/* Need to use small eraseblock size for backward compatibility */
+		sharpsl_mtd->flags |= MTD_NO_VIRTBLOCKS;
+	}
 
 	add_mtd_partitions(sharpsl_mtd, sharpsl_partition_info, nr_partitions);
 
