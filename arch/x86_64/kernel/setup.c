@@ -909,7 +909,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
+#ifdef CONFIG_X86_MCE
 	mcheck_init(c);
+#endif
 }
  
 

@@ -877,7 +877,9 @@ void __init trap_init(void)
 	set_intr_gate(15,&spurious_interrupt_bug);
 	set_intr_gate(16,&coprocessor_error);
 	set_intr_gate(17,&alignment_check);
+#ifdef CONFIG_X86_MCE
 	set_intr_gate_ist(18,&machine_check, MCE_STACK); 
+#endif
 	set_intr_gate(19,&simd_coprocessor_error);
 
 #ifdef CONFIG_IA32_EMULATION
