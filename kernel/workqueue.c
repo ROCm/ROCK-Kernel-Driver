@@ -325,7 +325,7 @@ struct workqueue_struct *__create_workqueue(const char *name,
 	} else {
 		spin_lock(&workqueue_lock);
 		list_add(&wq->list, &workqueues);
-		spin_unlock_irq(&workqueue_lock);
+		spin_unlock(&workqueue_lock);
 		for_each_online_cpu(cpu) {
 			p = create_workqueue_thread(wq, cpu);
 			if (p) {
@@ -377,7 +377,7 @@ void destroy_workqueue(struct workqueue_struct *wq)
 			cleanup_workqueue_thread(wq, cpu);
 		spin_lock(&workqueue_lock);
 		list_del(&wq->list);
-		spin_unlock_irq(&workqueue_lock);
+		spin_unlock(&workqueue_lock);
 	}
 	unlock_cpu_hotplug();
 	kfree(wq);
