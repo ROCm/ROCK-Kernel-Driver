@@ -965,12 +965,12 @@ xlog_iodone(xfs_buf_t *bp)
 		aborted = XFS_LI_ABORTED;
 	}
 	xlog_state_done_syncing(iclog, aborted);
-	if ( !(XFS_BUF_ISASYNC(bp)) ) {
+	if (!(XFS_BUF_ISASYNC(bp))) {
 		/*
 		 * Corresponding psema() will be done in bwrite().  If we don't
 		 * vsema() here, panic.
 		 */
-	  XFS_BUF_V_IODONESEMA(bp);
+		XFS_BUF_V_IODONESEMA(bp);
 	}
 }	/* xlog_iodone */
 
@@ -1241,6 +1241,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		ASSERT(XFS_BUF_ISBUSY(iclog->ic_bp));
 		ASSERT(XFS_BUF_VALUSEMA(iclog->ic_bp) <= 0);
 		sv_init(&iclog->ic_forcesema, SV_DEFAULT, "iclog-force");
+		sv_init(&iclog->ic_writesema, SV_DEFAULT, "iclog-write");
 
 		iclogp = &iclog->ic_next;
 	}
@@ -1521,6 +1522,7 @@ xlog_unalloc_log(xlog_t *log)
 	iclog = log->l_iclog;
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		sv_destroy(&iclog->ic_forcesema);
+		sv_destroy(&iclog->ic_writesema);
 		XFS_freerbuf(iclog->ic_bp);
 #ifdef DEBUG
 		if (iclog->ic_trace != NULL) {
@@ -2156,6 +2158,12 @@ xlog_state_done_syncing(
 		iclog->ic_state = XLOG_STATE_DONE_SYNC;
 	}
 
+	/*
+	 * Someone could be sleeping prior to writing out the next
+	 * iclog buffer, we wake them all, one will get to do the
+	 * I/O, the others get to wait for the result.
+	 */
+	sv_broadcast(&iclog->ic_writesema);
 	LOG_UNLOCK(log, s);
 	xlog_state_do_callback(log, aborted, iclog);	/* also cleans log */
 }	/* xlog_state_done_syncing */
@@ -2706,17 +2714,6 @@ xlog_state_put_ticket(xlog_t	    *log,
 	LOG_UNLOCK(log, s);
 }	/* xlog_state_put_ticket */
 
-void xlog_sync_work(
-	void	*v)
-{
-	xlog_in_core_t	*iclog = (xlog_in_core_t *)v;
-	xlog_t		*log  = iclog->ic_log;
-
-	xlog_sync(log, iclog);
-}
-
-int xlog_mode = 1;
-
 /*
  * Flush iclog to disk if this is the last reference to the given iclog and
  * the WANT_SYNC bit is set.
@@ -2765,13 +2762,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	 * flags after this point.
 	 */
 	if (sync) {
-		INIT_WORK(&iclog->ic_write_work, xlog_sync_work, iclog);
-		switch (xlog_mode) {
-		case 0:
-			return xlog_sync(log, iclog);
-		case 1:
-		        queue_work(pagebuf_workqueue, &iclog->ic_write_work);
-		}
+		return xlog_sync(log, iclog);
 	}
 	return (0);
 
@@ -2976,9 +2967,11 @@ xlog_state_sync(xlog_t	  *log,
 		uint	  flags)
 {
     xlog_in_core_t	*iclog;
+    int			already_slept = 0;
     SPLDECL(s);
 
 
+try_again:
     s = LOG_LOCK(log);
     iclog = log->l_iclog;
 
@@ -2999,12 +2992,40 @@ xlog_state_sync(xlog_t	  *log,
 	}
 
 	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-		iclog->ic_refcnt++;
-		xlog_state_switch_iclogs(log, iclog, 0);
-		LOG_UNLOCK(log, s);
-		if (xlog_state_release_iclog(log, iclog))
-			return XFS_ERROR(EIO);
-		s = LOG_LOCK(log);
+		/*
+		 * We sleep here if we haven't already slept (e.g.
+		 * this is the first time we've looked at the correct
+		 * iclog buf) and the buffer before us is going to
+		 * be sync'ed. The reason for this is that if we
+		 * are doing sync transactions here, by waiting for
+		 * the previous I/O to complete, we can allow a few
+		 * more transactions into this iclog before we close
+		 * it down.
+		 *
+		 * Otherwise, we mark the buffer WANT_SYNC, and bump
+		 * up the refcnt so we can release the log (which drops
+		 * the ref count).  The state switch keeps new transaction
+		 * commits from using this buffer.  When the current commits
+		 * finish writing into the buffer, the refcount will drop to
+		 * zero and the buffer will go out then.
+		 */
+		if (!already_slept &&
+		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
+						 XLOG_STATE_SYNCING))) {
+			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
+			XFS_STATS_INC(xfsstats.xs_log_force_sleep);
+			sv_wait(&iclog->ic_prev->ic_writesema, PSWP,
+				&log->l_icloglock, s);
+			already_slept = 1;
+			goto try_again;
+		} else {
+			iclog->ic_refcnt++;
+			xlog_state_switch_iclogs(log, iclog, 0);
+			LOG_UNLOCK(log, s);
+			if (xlog_state_release_iclog(log, iclog))
+				return XFS_ERROR(EIO);
+			s = LOG_LOCK(log);
+		}
 	}
 
 	if ((flags & XFS_LOG_SYNC) && /* sleep */
