@@ -1365,16 +1365,8 @@ static struct platform_device i82365_device = {
 
 static int __init init_i82365(void)
 {
-    servinfo_t serv;
     int i, ret;
 
-    pcmcia_get_card_services_info(&serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "i82365: Card Services release "
-	       "does not match!\n");
-	return -1;
-    }
-    DEBUG(0, "%s\n", version);
     if (driver_register(&i82365_driver))
 	return -1;
 

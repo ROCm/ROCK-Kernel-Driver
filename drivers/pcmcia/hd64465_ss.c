@@ -884,18 +884,8 @@ static struct platform_device hd64465_device = {
 
 static int __init init_hs(void)
 {
-	servinfo_t serv;
 	int i;
 	unsigned short v;
-
-    	/*
-	 * Check API version
-	 */
-	pcmcia_get_card_services_info(&serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-	    printk(KERN_NOTICE MODNAME ": Card Services release does not match!\n");
-	    return -ENODEV;
-	}
 
 /*	hd64465_io_debug = 1; */
 	if (driver_register(&hd64465_driver))
