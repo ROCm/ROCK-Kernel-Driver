@@ -637,6 +637,7 @@ io_sigpending:
 ext_int_handler:
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	brasl   %r14,do_extint
 	llgh	%r6,__LC_EXT_INT_CODE  # get interruption code
 	lgr	%r1,%r6		       # calculate index = code & 0xff
 	nill	%r1,0xff

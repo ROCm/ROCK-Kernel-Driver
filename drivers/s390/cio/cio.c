@@ -16,10 +16,12 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/kernel_stat.h>
 
 #include <asm/hardirq.h>
 #include <asm/cio.h>
 #include <asm/delay.h>
+#include <asm/irq.h>
 
 #include "airq.h"
 #include "cio.h"
@@ -608,6 +610,7 @@ do_IRQ (struct pt_regs regs)
 	tpi_info = (struct tpi_info *) __LC_SUBCHANNEL_ID;
 	irb = (struct irb *) __LC_IRB;
 	do {
+		kstat_cpu(smp_processor_id()).irqs[IO_INTERRUPT]++;
 		/*
 		 * Non I/O-subchannel thin interrupts are processed differently
 		 */
