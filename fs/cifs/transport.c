@@ -187,22 +187,26 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -EIO;
 	}
 
-	if (ses->server->tcpStatus == CifsExiting) {
-		return -ENOENT;
-	} else if (ses->server->tcpStatus == CifsNeedReconnect) {
-		cFYI(1,("tcp session dead - return to caller to retry"));
-		return -EAGAIN;
-	} else if (ses->status != CifsGood) {
-		/* check if SMB session is bad because we are setting it up */
-		if((in_buf->Command != SMB_COM_SESSION_SETUP_ANDX) && 
-			(in_buf->Command != SMB_COM_NEGOTIATE)) {
-			return -EAGAIN;
-		} /* else ok - we are setting up session */
-	}
 	/* make sure that we sign in the same order that we send on this socket 
 		and avoid races inside tcp sendmsg code that could cause corruption
 		of smb data */
 	down(&ses->server->tcpSem); 
+
+	if (ses->server->tcpStatus == CifsExiting) {
+		rc = -ENOENT;
+		goto out_unlock;
+	} else if (ses->server->tcpStatus == CifsNeedReconnect) {
+		cFYI(1,("tcp session dead - return to caller to retry"));
+		rc = -EAGAIN;
+		goto out_unlock;
+	} else if (ses->status != CifsGood) {
+		/* check if SMB session is bad because we are setting it up */
+		if((in_buf->Command != SMB_COM_SESSION_SETUP_ANDX) && 
+			(in_buf->Command != SMB_COM_NEGOTIATE)) {
+			rc = -EAGAIN;
+			goto out_unlock;
+		} /* else ok - we are setting up session */
+	}
 	midQ = AllocMidQEntry(in_buf, ses);
 	if (midQ == NULL) {
 		up(&ses->server->tcpSem);
@@ -288,7 +292,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return rc;
 	}
   
-
 	if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
 		       ("Frame too large received.  Length: %d  Xid: %d",
@@ -341,5 +344,9 @@ cifs_no_response_exit:
 	DeleteMidQEntry(midQ);	/* BB what if process is killed?
 			 - BB add background daemon to clean up Mid entries from
 			 killed processes & test killing process with active mid */
+	return rc;
+
+out_unlock:
+	up(&ses->server->tcpSem);
 	return rc;
 }

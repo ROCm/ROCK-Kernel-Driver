@@ -81,6 +81,10 @@ cifs_open(struct inode *inode, struct file *file)
 	}
 
 	full_path = build_path_from_dentry(file->f_dentry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
 	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
@@ -150,8 +154,6 @@ cifs_open(struct inode *inode, struct file *file)
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
 		cFYI(1, ("oplock: %d ", oplock));	
 	} else {
-		if(file->private_data)
-			kfree(file->private_data);
 		file->private_data =
 			kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
 		if (file->private_data) {
@@ -286,6 +288,11 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(file->f_dentry);
+	if(full_path == NULL) {
+		up(&pCifsFile->fh_sem);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
 	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
@@ -634,25 +641,21 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	int bytes_written = 0;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
-	struct inode *inode = page->mapping->host;
+	struct inode *inode;
 	struct cifsInodeInfo *cifsInode;
 	struct cifsFileInfo *open_file = NULL;
 	struct list_head *tmp;
 	struct list_head *tmp1;
 
-	cifs_sb = CIFS_SB(inode->i_sb);
-	pTcon = cifs_sb->tcon;
-
-	/* figure out which file struct to use 
-	if (file->private_data == NULL) {
-		return -EBADF;
-	}     
-	 */
 	if (!mapping) {
 		return -EFAULT;
 	} else if(!mapping->host) {
 		return -EFAULT;
 	}
+
+	inode = page->mapping->host;
+	cifs_sb = CIFS_SB(inode->i_sb);
+	pTcon = cifs_sb->tcon;
 
 	offset += (loff_t)from;
 	write_data = kmap(page);

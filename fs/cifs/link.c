@@ -48,6 +48,11 @@ cifs_hardlink(struct dentry *old_file, struct inode *inode,
 
 	fromName = build_path_from_dentry(old_file);
 	toName = build_path_from_dentry(direntry);
+	if((fromName == NULL) || (toName == NULL)) {
+		rc = -ENOMEM;
+		goto cifs_hl_exit;
+	}
+
 	if (cifs_sb_target->tcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSUnixCreateHardLink(xid, pTcon, fromName, toName,
 					    cifs_sb_target->local_nls);
@@ -70,6 +75,7 @@ cifs_hardlink(struct dentry *old_file, struct inode *inode,
 	cifsInode = CIFS_I(old_file->d_inode);
 	cifsInode->time = 0;	/* will force revalidate to go get info when needed */
 
+cifs_hl_exit:
 	if (fromName)
 		kfree(fromName);
 	if (toName)
@@ -91,6 +97,10 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 
 	xid = GetXid();
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	cFYI(1, ("Full path: %s inode = 0x%p", full_path, inode));
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
@@ -150,6 +160,11 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
+
 	cFYI(1, ("Full path: %s ", full_path));
 	cFYI(1, ("symname is %s", symname));
 
@@ -205,6 +220,11 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
+
 	cFYI(1,
 	     ("Full path: %s inode = 0x%p pBuffer = 0x%p buflen = %d",
 	      full_path, inode, pBuffer, buflen));
