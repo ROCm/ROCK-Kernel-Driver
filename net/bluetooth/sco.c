@@ -698,7 +698,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 		
 		opts.mtu = sco_pi(sk)->conn->mtu;
 
-		BT_INFO("mtu %d", opts.mtu);
+		BT_DBG("mtu %d", opts.mtu);
 
 		len = min_t(unsigned int, len, sizeof(opts));
 		if (copy_to_user(optval, (char *)&opts, len))
