@@ -81,6 +81,9 @@ typedef __s64	Elf64_Sxword;
 
 #define EM_CRIS         76      /* Axis Communications 32-bit embedded processor */
 
+#define EM_V850		87	/* NEC v850 */
+
+
 /*
  * This is an interim value that we will use until the committee comes
  * up with a final number.
