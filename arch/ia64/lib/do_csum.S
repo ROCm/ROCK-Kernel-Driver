@@ -207,10 +207,10 @@ GLOBAL_ENTRY(do_csum)
 	//
 .do_csum16:
 	shr.u count=count,1	// we do 16 bytes per loop
-	adds count=-1,count
 	brp.loop.imp 1f,2f
 	;;
 	cmp.eq p9,p10=r0,count	// if (count == 0)
+	adds count=-1,count
 	mov ar.ec=PIPE_DEPTH
 
 	mov carry1=r0
@@ -254,6 +254,7 @@ GLOBAL_ENTRY(do_csum)
 	cmp.ltu p6,p0=result1[0],result2[LOAD_LATENCY+1]
 	;;
 (p6)	adds result1[0]=1,result1[0]
+	;;
 .do_csum_exit:
 	//
 	// now fold 64 into 16 bits taking care of carry
