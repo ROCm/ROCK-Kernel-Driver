@@ -3,7 +3,7 @@
 
    Copyright 1995-2000 Kai Makisara.
 
-   Last modified: Tue Jan 22 21:52:34 2002 by makisara
+   Last modified: Sun May  5 15:09:56 2002 by makisara
 */
 
 #ifndef _ST_OPTIONS_H
@@ -30,22 +30,17 @@
    SENSE. */
 #define ST_DEFAULT_BLOCK 0
 
-/* The tape driver buffer size in kilobytes. Must be non-zero. */
-#define ST_BUFFER_BLOCKS 32
+/* The minimum tape driver buffer size in kilobytes in fixed block mode.
+   Must be non-zero. */
+#define ST_FIXED_BUFFER_BLOCKS 32
 
 /* The number of kilobytes of data in the buffer that triggers an
    asynchronous write in fixed block mode. See also ST_ASYNC_WRITES
    below. */
 #define ST_WRITE_THRESHOLD_BLOCKS 30
 
-/* The maximum number of tape buffers the driver tries to allocate at 
-   driver initialisation. The number is also constrained by the number
-   of drives detected. If more buffers are needed, they are allocated
-   at run time and freed after use. */
-#define ST_MAX_BUFFERS 4
-
 /* Maximum number of scatter/gather segments */
-#define ST_MAX_SG      16
+#define ST_MAX_SG      64
 
 /* The number of scatter/gather segments to allocate at first try (must be
    smaller or equal to the maximum). */
