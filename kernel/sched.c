@@ -2398,6 +2398,7 @@ asmlinkage long sys_sched_yield(void)
 {
 	runqueue_t *rq = this_rq_lock();
 	prio_array_t *array = current->array;
+	prio_array_t *target = rq->expired;
 
 	/*
 	 * We implement yielding by moving the task into the expired
@@ -2406,13 +2407,12 @@ asmlinkage long sys_sched_yield(void)
 	 * (special rule: RT tasks will just roundrobin in the active
 	 *  array.)
 	 */
-	if (likely(!rt_task(current))) {
-		dequeue_task(current, array);
-		enqueue_task(current, rq->expired);
-	} else {
-		list_del(&current->run_list);
-		list_add_tail(&current->run_list, array->queue + current->prio);
-	}
+	if (unlikely(rt_task(current)))
+		target = rq->active;
+
+	dequeue_task(current, array);
+	enqueue_task(current, target);
+
 	/*
 	 * Since we are going to call schedule() anyway, there's
 	 * no need to preempt:
