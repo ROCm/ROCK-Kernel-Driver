@@ -211,7 +211,7 @@ static void mfc3_change_mode( struct parport *p, int m)
 
 static int use_cnt = 0;
 
-static void mfc3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mfc3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int i;
 
@@ -221,6 +221,7 @@ static void mfc3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				dummy = pia(this_port[i])->pprb; /* clear irq bit */
 				parport_generic_irq(irq, this_port[i], regs);
 			}
+	return IRQ_HANDLED;
 }
 
 static void mfc3_enable_irq(struct parport *p)
