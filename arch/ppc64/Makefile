@@ -16,6 +16,7 @@
 KERNELLOAD	=0xc000000000000000
 
 LDFLAGS		:= -m elf64ppc
+ARCHBLOBLFLAGS	:= -I binary -O elf64-powerpc -B powerpc
 LDFLAGS_vmlinux	= -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		:= $(CFLAGS) -msoft-float -pipe \
