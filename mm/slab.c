@@ -1041,8 +1041,11 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
 		(dtor && !ctor) ||
-		(offset < 0 || offset > size))
+		(offset < 0 || offset > size)) {
+			printk(KERN_ERR "%s: Early error in slab %s\n",
+					__FUNCTION__, name);
 			BUG();
+		}
 
 #if DEBUG
 	WARN_ON(strchr(name, ' '));	/* It confuses parsers */
