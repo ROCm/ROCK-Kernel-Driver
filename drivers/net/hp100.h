@@ -518,11 +518,8 @@
  */
 #define HP100_LAN_100		100	/* lan_type value for VG */
 #define HP100_LAN_10		10	/* lan_type value for 10BaseT */
+#define HP100_LAN_COAX		9	/* lan_type value for Coax */
 #define HP100_LAN_ERR		(-1)	/* lan_type value for link down */
-
-#define TRUE 1
-#define FALSE 0
-
 
 /* 
  * Bus Master Data Structures  ----------------------------------------------

@@ -117,7 +117,6 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 
-#define LINUX_2_1
 typedef struct net_device_stats hp100_stats_t;
 
 #include "hp100.h"
@@ -285,7 +284,6 @@ static struct hp100_pci_id hp100_pci_ids[] = {
 
 #define HP100_PCI_IDS_SIZE	(sizeof(hp100_pci_ids)/sizeof(struct hp100_pci_id))
 
-#if LINUX_VERSION_CODE >= 0x20400
 static struct pci_device_id hp100_pci_tbl[] __initdata = {
 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585A, PCI_ANY_ID, PCI_ANY_ID,},
 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585B, PCI_ANY_ID, PCI_ANY_ID,},
@@ -294,7 +292,6 @@ static struct pci_device_id hp100_pci_tbl[] __initdata = {
 	{}			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, hp100_pci_tbl);
-#endif				/* LINUX_VERSION_CODE >= 0x20400 */
 
 static int hp100_rx_ratio = HP100_DEFAULT_RX_RATIO;
 static int hp100_priority_tx = HP100_DEFAULT_PRIORITY_TX;
@@ -356,8 +353,8 @@ static void hp100_RegisterDump(struct net_device *dev);
  * address - Jean II */
 static inline dma_addr_t virt_to_whatever(struct net_device *dev, u32 * ptr)
 {
-  return ((u_long) ptr) +
-    ((struct hp100_private *) (dev->priv))->whatever_offset;
+	return ((u_long) ptr) +
+		((struct hp100_private *) (dev->priv))->whatever_offset;
 }
 
 /* TODO: This function should not really be needed in a good design... */
@@ -376,9 +373,7 @@ int __init hp100_probe(struct net_device *dev)
 {
 	int base_addr = dev ? dev->base_addr : 0;
 	int ioaddr = 0;
-#ifdef CONFIG_PCI
 	int pci_start_index = 0;
-#endif
 
 #ifdef HP100_DEBUG_B
 	hp100_outw(0x4200, TRACE);
@@ -854,7 +849,10 @@ static int __init hp100_probe1(struct net_device *dev, int ioaddr,
 		printk("100Mb/s Voice Grade AnyLAN network.\n");
 		break;
 	case HP100_LAN_10:
-		printk("10Mb/s network.\n");
+		printk("10Mb/s network (10baseT).\n");
+		break;
+	case HP100_LAN_COAX:
+		printk("10Mb/s network (coax).\n");
 		break;
 	default:
 		printk("Warning! Link down.\n");
@@ -889,7 +887,7 @@ static void hp100_hwinit(struct net_device *dev)
 		wait();
 	} else {
 		hp100_outw(HP100_INT_EN | HP100_RESET_LB, OPTION_LSW);
-		hp100_cascade_reset(dev, TRUE);
+		hp100_cascade_reset(dev, 1);
 		hp100_page(MAC_CTRL);
 		hp100_andb(~(HP100_RX_EN | HP100_TX_EN), MAC_CFG_1);
 	}
@@ -900,7 +898,7 @@ static void hp100_hwinit(struct net_device *dev)
 	wait();
 
 	/* Go into reset again. */
-	hp100_cascade_reset(dev, TRUE);
+	hp100_cascade_reset(dev, 1);
 
 	/* Set Option Registers to a safe state  */
 	hp100_outw(HP100_DEBUG_EN |
@@ -943,13 +941,13 @@ static void hp100_hwinit(struct net_device *dev)
 	wait();			/* TODO: Do we really need this? */
 
 	/* Enable Hardware (e.g. unreset) */
-	hp100_cascade_reset(dev, FALSE);
+	hp100_cascade_reset(dev, 0);
 
 	/* ------- initialisation complete ----------- */
 
 	/* Finally try to log in the Hub if there may be a VG connection. */
-	if (lp->lan_type != HP100_LAN_10)
-		hp100_login_to_vg_hub(dev, FALSE);	/* relogin */
+	if ((lp->lan_type == HP100_LAN_100) || (lp->lan_type == HP100_LAN_ERR))
+		hp100_login_to_vg_hub(dev, 0);	/* relogin */
 }
 
 
@@ -1191,7 +1189,7 @@ static int hp100_close(struct net_device *dev)
 	hp100_stop_interface(dev);
 
 	if (lp->lan_type == HP100_LAN_100)
-		lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+		lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 
 	netif_stop_queue(dev);
 
@@ -1508,11 +1506,29 @@ static void hp100_BM_shutdown(struct net_device *dev)
 			hp100_andb(~HP100_BM_MASTER, BM);
 		}	/* end of shutdown procedure for non-etr parts */
 
-		hp100_cascade_reset(dev, TRUE);
+		hp100_cascade_reset(dev, 1);
 	}
 	hp100_page(PERFORMANCE);
 	/* hp100_outw( HP100_BM_READ | HP100_BM_WRITE | HP100_RESET_HB, OPTION_LSW ); */
 	/* Busmaster mode should be shut down now. */
+}
+
+static int hp100_check_lan(struct net_device *dev)
+{
+	struct hp100_private *lp = (struct hp100_private *) dev->priv;
+
+	if (lp->lan_type < 0) {	/* no LAN type detected yet? */
+		hp100_stop_interface(dev);
+		if ((lp->lan_type = hp100_sense_lan(dev)) < 0) {
+			printk("hp100: %s: no connection found - check wire\n", dev->name);
+			hp100_start_interface(dev);	/* 10Mb/s RX packets maybe handled */
+			return -EIO;
+		}
+		if (lp->lan_type == HP100_LAN_100)
+			lp->hub_status = hp100_login_to_vg_hub(dev, 0);	/* relogin */
+		hp100_start_interface(dev);
+	}
+	return 0;
 }
 
 /* 
@@ -1550,23 +1566,14 @@ static int hp100_start_xmit_bm(struct sk_buff *skb, struct net_device *dev)
 		if (jiffies - dev->trans_start < HZ)
 			return -EAGAIN;
 
-		if (lp->lan_type < 0) {	/* no LAN type detected yet? */
-			hp100_stop_interface(dev);
-			if ((lp->lan_type = hp100_sense_lan(dev)) < 0) {
-				printk("hp100: %s: no connection found - check wire\n", dev->name);
-				hp100_start_interface(dev);	/* 10Mb/s RX pkts maybe handled */
-				return -EIO;
-			}
-			if (lp->lan_type == HP100_LAN_100)
-				lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);	/* relogin */
-			hp100_start_interface(dev);
-		}
+		if (hp100_check_lan(dev))
+			return -EIO;
 
 		if (lp->lan_type == HP100_LAN_100 && lp->hub_status < 0) {
 			/* we have a 100Mb/s adapter but it isn't connected to hub */
 			printk("hp100: %s: login to 100Mb/s hub retry\n", dev->name);
 			hp100_stop_interface(dev);
-			lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+			lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 			hp100_start_interface(dev);
 		} else {
 			spin_lock_irqsave(&lp->lock, flags);
@@ -1577,18 +1584,18 @@ static int hp100_start_xmit_bm(struct sk_buff *skb, struct net_device *dev)
 			if (i == HP100_LAN_ERR)
 				printk("hp100: %s: link down detected\n", dev->name);
 			else if (lp->lan_type != i) {	/* cable change! */
-				/* it's very hard - all network setting must be changed!!! */
+				/* it's very hard - all network settings must be changed!!! */
 				printk("hp100: %s: cable change 10Mb/s <-> 100Mb/s detected\n", dev->name);
 				lp->lan_type = i;
 				hp100_stop_interface(dev);
 				if (lp->lan_type == HP100_LAN_100)
-					lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+					lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 				hp100_start_interface(dev);
 			} else {
 				printk("hp100: %s: interface reset\n", dev->name);
 				hp100_stop_interface(dev);
 				if (lp->lan_type == HP100_LAN_100)
-					lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+					lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 				hp100_start_interface(dev);
 			}
 		}
@@ -1699,17 +1706,8 @@ static int hp100_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (skb->len <= 0)
 		return 0;
 
-	if (lp->lan_type < 0) {	/* no LAN type detected yet? */
-		hp100_stop_interface(dev);
-		if ((lp->lan_type = hp100_sense_lan(dev)) < 0) {
-			printk("hp100: %s: no connection found - check wire\n", dev->name);
-			hp100_start_interface(dev);	/* 10Mb/s RX packets maybe handled */
-			return -EIO;
-		}
-		if (lp->lan_type == HP100_LAN_100)
-			lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);	/* relogin */
-		hp100_start_interface(dev);
-	}
+	if (hp100_check_lan(dev))
+		return -EIO;
 
 	/* If there is not enough free memory on the card... */
 	i = hp100_inl(TX_MEM_FREE) & 0x7fffffff;
@@ -1729,7 +1727,7 @@ static int hp100_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			/* we have a 100Mb/s adapter but it isn't connected to hub */
 			printk("hp100: %s: login to 100Mb/s hub retry\n", dev->name);
 			hp100_stop_interface(dev);
-			lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+			lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 			hp100_start_interface(dev);
 		} else {
 			spin_lock_irqsave(&lp->lock, flags);
@@ -1745,13 +1743,13 @@ static int hp100_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				lp->lan_type = i;
 				hp100_stop_interface(dev);
 				if (lp->lan_type == HP100_LAN_100)
-					lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+					lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 				hp100_start_interface(dev);
 			} else {
 				printk("hp100: %s: interface reset\n", dev->name);
 				hp100_stop_interface(dev);
 				if (lp->lan_type == HP100_LAN_100)
-					lp->hub_status = hp100_login_to_vg_hub(dev, FALSE);
+					lp->hub_status = hp100_login_to_vg_hub(dev, 0);
 				hp100_start_interface(dev);
 				mdelay(1);
 			}
@@ -2220,7 +2218,7 @@ static void hp100_set_multicast_list(struct net_device *dev)
 #ifdef HP100_DEBUG
 			printk("hp100: %s: 100VG MAC settings have changed - relogin.\n", dev->name);
 #endif
-			lp->hub_status = hp100_login_to_vg_hub(dev, TRUE);	/* force a relogin to the hub */
+			lp->hub_status = hp100_login_to_vg_hub(dev, 1);	/* force a relogin to the hub */
 		}
 	} else {
 		int i;
@@ -2245,7 +2243,7 @@ static void hp100_set_multicast_list(struct net_device *dev)
 #ifdef HP100_DEBUG
 				printk("hp100: %s: 100VG MAC settings have changed - relogin.\n", dev->name);
 #endif
-				lp->hub_status = hp100_login_to_vg_hub(dev, TRUE);	/* force a relogin to the hub */
+				lp->hub_status = hp100_login_to_vg_hub(dev, 1);	/* force a relogin to the hub */
 			}
 		}
 	}
@@ -2539,7 +2537,7 @@ static int hp100_sense_lan(struct net_device *dev)
 		hp100_page(MAC_CTRL);
 		hp100_outb(val_10, 10_LAN_CFG_1);
 		hp100_page(PERFORMANCE);
-		return HP100_LAN_10;
+		return HP100_LAN_COAX;
 	}
 
 	if ((lp->id->id == 0x02019F022) ||
@@ -2685,7 +2683,7 @@ static int hp100_login_to_vg_hub(struct net_device *dev, u_short force_relogin)
 	 */
 	hp100_page(MAC_CTRL);
 	startst = hp100_inb(VG_LAN_CFG_1);
-	if ((force_relogin == TRUE) || (hp100_inb(MAC_CFG_4) & HP100_MAC_SEL_ST)) {
+	if ((force_relogin == 1) || (hp100_inb(MAC_CFG_4) & HP100_MAC_SEL_ST)) {
 #ifdef HP100_DEBUG_TRAINING
 		printk("hp100: %s: Start training\n", dev->name);
 #endif
@@ -2847,7 +2845,7 @@ static void hp100_cascade_reset(struct net_device *dev, u_short enable)
 	printk("hp100: %s: cascade_reset\n", dev->name);
 #endif
 
-	if (enable == TRUE) {
+	if (enable) {
 		hp100_outw(HP100_HW_RST | HP100_RESET_LB, OPTION_LSW);
 		if (lp->chip == HP100_CHIPID_LASSEN) {
 			/* Lassen requires a PCI transmit fifo reset */
