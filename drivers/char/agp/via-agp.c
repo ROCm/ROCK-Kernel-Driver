@@ -221,6 +221,13 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "Apollo Pro KT133/KM133/TwisterK",
 	},
 
+	/* VT8753A */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_8753_0,	// 0x3128
+		.chipset	= VIA_P4X266,
+		.chipset_name	= "P4X266",
+	},	*/	
+
 	/* VT8366 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8367_0,
@@ -264,11 +271,11 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "Apollo ProSavage PM133/PL133/PN133/Twister"
 	},
 
-	/* P4M266 */
+	/* VT8752*/
 /*	{
-		.device_id	= PCI_DEVICE_ID_VIA_P4M266,	// 0x3148
+		.device_id	= PCI_DEVICE_ID_VIA_8752,	// 0x3148
 		.chipset	= VIA_P4M266,
-		.chipset_name	= "P4M266",
+		.chipset_name	= "ProSavage DDR P4M266",
 	},	*/
 
 	/* KN266/PN266 */
@@ -278,6 +285,7 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset_name	= "KN266/PN266",
 	},	*/
 
+	/* VT8754 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8754,
 		.chipset	= VIA_P4X,
