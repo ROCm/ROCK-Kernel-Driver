@@ -15,7 +15,7 @@
  * intf_dev_link - symlink from interface's directory to device's directory
  *
  */
-int intf_dev_link(struct intf_data * data)
+static int intf_dev_link(struct intf_data * data)
 {
 	char	linkname[16];
 
@@ -23,7 +23,7 @@ int intf_dev_link(struct intf_data * data)
 	return sysfs_create_link(&data->intf->kobj,&data->dev->kobj,linkname);
 }
 
-void intf_dev_unlink(struct intf_data * data)
+static void intf_dev_unlink(struct intf_data * data)
 {
 	char	linkname[16];
 	snprintf(linkname,16,"%u",data->intf_num);
@@ -38,8 +38,6 @@ int interface_register(struct device_interface * intf)
 	if (cls) {
 		pr_debug("register interface '%s' with class '%s\n",
 			 intf->name,cls->name);
-		intf_make_dir(intf);
-
 		kobject_init(&intf->kobj);
 		strncpy(intf->kobj.name,intf->name,KOBJ_NAME_LEN);
 		intf->kobj.subsys = &cls->subsys;
@@ -61,8 +59,6 @@ void interface_unregister(struct device_interface * intf)
 	spin_lock(&device_lock);
 	list_del_init(&intf->node);
 	spin_unlock(&device_lock);
-
-	intf_remove_dir(intf);
 }
 
 int interface_add(struct device_class * cls, struct device * dev)

@@ -380,7 +380,6 @@ void put_bus(struct bus_type * bus)
 	list_del_init(&bus->node);
 	spin_unlock(&device_lock);
 	WARN_ON(bus->present);
-	bus_remove_dir(bus);
 }
 
 int bus_register(struct bus_type * bus)
@@ -409,11 +408,7 @@ int bus_register(struct bus_type * bus)
 	spin_unlock(&device_lock);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
-
-	/* give it some driverfs entities */
-	bus_make_dir(bus);
 	put_bus(bus);
-
 	return 0;
 }
 
@@ -424,6 +419,9 @@ void bus_unregister(struct bus_type * bus)
 	spin_unlock(&device_lock);
 
 	pr_debug("bus %s: unregistering\n",bus->name);
+	subsystem_unregister(&bus->drvsubsys);
+	subsystem_unregister(&bus->devsubsys);
+	subsystem_unregister(&bus->subsys);
 	put_bus(bus);
 }
 

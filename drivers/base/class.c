@@ -49,28 +49,28 @@ static struct subsystem class_subsys = {
 };
 
 
-int devclass_dev_link(struct device_class * cls, struct device * dev)
+static int devclass_dev_link(struct device_class * cls, struct device * dev)
 {
 	char	linkname[16];
 	snprintf(linkname,16,"%u",dev->class_num);
 	return sysfs_create_link(&cls->devsubsys.kobj,&dev->kobj,linkname);
 }
 
-void devclass_dev_unlink(struct device_class * cls, struct device * dev)
+static void devclass_dev_unlink(struct device_class * cls, struct device * dev)
 {
 	char	linkname[16];
 	snprintf(linkname,16,"%u",dev->class_num);
 	sysfs_remove_link(&cls->devsubsys.kobj,linkname);
 }
 
-int devclass_drv_link(struct device_driver * drv)
+static int devclass_drv_link(struct device_driver * drv)
 {
 	char	name[KOBJ_NAME_LEN * 3];
 	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
 	return sysfs_create_link(&drv->devclass->drvsubsys.kobj,&drv->kobj,name);
 }
 
-void devclass_drv_unlink(struct device_driver * drv)
+static void devclass_drv_unlink(struct device_driver * drv)
 {
 	char	name[KOBJ_NAME_LEN * 3];
 	snprintf(name,KOBJ_NAME_LEN * 3,"%s:%s",drv->bus->name,drv->name);
@@ -224,7 +224,6 @@ void put_devclass(struct device_class * cls)
 	if (atomic_dec_and_lock(&cls->refcount,&device_lock)) {
 		list_del_init(&cls->node);
 		spin_unlock(&device_lock);
-		devclass_remove_dir(cls);
 	}
 }
 
@@ -242,18 +241,17 @@ int devclass_register(struct device_class * cls)
 	cls->subsys.parent = &class_subsys;
 	subsystem_register(&cls->subsys);
 
-	snprintf(cls->devsubsys.kobj.name,"devices",KOBJ_NAME_LEN);
+	snprintf(cls->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");
 	cls->devsubsys.parent = &cls->subsys;
 	subsystem_register(&cls->devsubsys);
 
-	snprintf(cls->drvsubsys.kobj.name,"drivers",KOBJ_NAME_LEN);
+	snprintf(cls->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
 	cls->drvsubsys.parent = &cls->subsys;
 	subsystem_register(&cls->drvsubsys);
 
 	spin_lock(&device_lock);
 	list_add_tail(&cls->node,&class_list);
 	spin_unlock(&device_lock);
-	devclass_make_dir(cls);
 	put_devclass(cls);
 	return 0;
 }
@@ -264,6 +262,9 @@ void devclass_unregister(struct device_class * cls)
 	cls->present = 0;
 	spin_unlock(&device_lock);
 	pr_debug("device class '%s': unregistering\n",cls->name);
+	subsystem_unregister(&cls->drvsubsys);
+	subsystem_unregister(&cls->devsubsys);
+	subsystem_unregister(&cls->subsys);
 	put_devclass(cls);
 }
 

@@ -73,10 +73,6 @@ struct bus_type {
 	struct list_head	devices;
 	struct list_head	drivers;
 
-	struct driver_dir_entry	dir;
-	struct driver_dir_entry	device_dir;
-	struct driver_dir_entry	driver_dir;
-
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
@@ -127,8 +123,6 @@ struct device_driver {
 	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
-
-	struct driver_dir_entry	dir;
 
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev);
@@ -189,10 +183,6 @@ struct device_class {
 	struct list_head	drivers;
 	struct list_head	intf_list;
 
-	struct driver_dir_entry	dir;
-	struct driver_dir_entry	driver_dir;
-	struct driver_dir_entry	device_dir;
-
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
 	int	(*hotplug)(struct device *dev, char **envp, 
@@ -243,7 +233,6 @@ struct device_interface {
 	struct kobject		kobj;
 	struct list_head	node;
 	struct list_head	devices;
-	struct driver_dir_entry	dir;
 
 	u32			devnum;
 

@@ -23,8 +23,6 @@ DECLARE_MUTEX(device_sem);
 
 spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
-struct subsystem device_subsys;
-
 #define to_dev(obj) container_of(obj,struct device,kobj)
 
 
@@ -117,9 +115,7 @@ int device_add(struct device *dev)
 	if (dev->parent)
 		dev->kobj.parent = &dev->parent->kobj;
 	dev->kobj.subsys = &device_subsys;
-	kobject_register(&dev->kobj);
-
-	if ((error = device_make_dir(dev)))
+	if ((error = kobject_register(&dev->kobj)))
 		goto register_done;
 
 	bus_add_device(dev);
@@ -233,9 +229,6 @@ void device_del(struct device * dev)
 
 	bus_remove_device(dev);
 
-	/* remove the driverfs directory */
-	device_remove_dir(dev);
-
 	if (dev->release)
 		dev->release(dev);
 
@@ -275,3 +268,6 @@ EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(device_unregister);
 EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);
+
+EXPORT_SYMBOL(device_create_file);
+EXPORT_SYMBOL(device_remove_file);
