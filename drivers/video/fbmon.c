@@ -511,6 +511,9 @@ static void fb_timings_dclk(struct __fb_timings *timings)
  * refresh rate.  Otherwise, it will calculate timings based on
  * the flag and accompanying value.  
  *
+ * If FB_IGNOREMON bit is set in @flags, monitor specs will be 
+ * ignored and @var will be filled with the calculated timings.
+ *
  * All calculations are based on the VESA GTF Spreadsheet
  * available at VESA's public ftp (http://www.vesa.org).
  * 
@@ -527,22 +530,27 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 {
 	struct __fb_timings timings;
 	u32 interlace = 1, dscan = 1;
-	u32 hfmin, hfmax, vfmin, vfmax;
+	u32 hfmin, hfmax, vfmin, vfmax, dclkmin, dclkmax;
 
 	/* 
 	 * If monspecs are invalid, use values that are enough
 	 * for 640x480@60
 	 */
-	if ((!info->monspecs.hfmax && !info->monspecs.vfmax) ||
+	if (!info->monspecs.hfmax || !info->monspecs.vfmax ||
+	    !info->monspecs.dclkmax ||
 	    info->monspecs.hfmax < info->monspecs.hfmin ||
-	    info->monspecs.vfmax < info->monspecs.vfmin) {
+	    info->monspecs.vfmax < info->monspecs.vfmin ||
+	    info->monspecs.dclkmax < info->monspecs.dclkmin) {
 		hfmin = 29000; hfmax = 30000;
 		vfmin = 60; vfmax = 60;
+		dclkmin = 0; dclkmax = 25000000;
 	} else {
 		hfmin = info->monspecs.hfmin;
 		hfmax = info->monspecs.hfmax;
 		vfmin = info->monspecs.vfmin;
 		vfmax = info->monspecs.vfmax;
+		dclkmin = info->monspecs.dclkmin;
+		dclkmax = info->monspecs.dclkmax;
 	}
 
 	memset(&timings, 0, sizeof(struct __fb_timings));
@@ -557,8 +565,8 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 		dscan = 2;
 	}
 
-	switch (flags) {
-	case 0: /* maximize refresh rate */
+	switch (flags & ~FB_IGNOREMON) {
+	case FB_MAXTIMINGS: /* maximize refresh rate */
 		timings.hfreq = hfmax;
 		fb_timings_hfreq(&timings);
 		if (timings.vfreq > vfmax) {
@@ -566,15 +574,15 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 			fb_timings_vfreq(&timings);
 		}
 		break;
-	case 1: /* vrefresh driven */
+	case FB_VSYNCTIMINGS: /* vrefresh driven */
 		timings.vfreq = val;
 		fb_timings_vfreq(&timings);
 		break;
-	case 2: /* hsync driven */
+	case FB_HSYNCTIMINGS: /* hsync driven */
 		timings.hfreq = val;
 		fb_timings_hfreq(&timings);
 		break;
-	case 3: /* pixelclock driven */
+	case FB_DCLKTIMINGS: /* pixelclock driven */
 		timings.dclk = PICOS2KHZ(val) * 1000;
 		fb_timings_dclk(&timings);
 		break;
@@ -583,10 +591,11 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 		
 	} 
 	
-	if (timings.vfreq < vfmin || timings.vfreq > vfmax || 
-	    timings.hfreq < hfmin || timings.hfreq > hfmax)
+	if (!(flags & FB_IGNOREMON) && 
+	    (timings.vfreq < vfmin || timings.vfreq > vfmax || 
+	     timings.hfreq < hfmin || timings.hfreq > hfmax ||
+	     timings.dclk < dclkmin || timings.dclk > dclkmax))
 		return -EINVAL;
-
 
 	var->pixclock = KHZ2PICOS(timings.dclk/1000);
 	var->hsync_len = (timings.htotal * 8)/100;
@@ -616,22 +625,27 @@ int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var, struct fb_inf
 int fb_validate_mode(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	u32 hfreq, vfreq, htotal, vtotal, pixclock;
-	u32 hfmin, hfmax, vfmin, vfmax;
+	u32 hfmin, hfmax, vfmin, vfmax, dclkmin, dclkmax;
 
 	/* 
 	 * If monspecs are invalid, use values that are enough
 	 * for 640x480@60
 	 */
-	if ((!info->monspecs.hfmax && !info->monspecs.vfmax) ||
+	if (!info->monspecs.hfmax || !info->monspecs.vfmax ||
+	    !info->monspecs.dclkmax ||
 	    info->monspecs.hfmax < info->monspecs.hfmin ||
-	    info->monspecs.vfmax < info->monspecs.vfmin) {
+	    info->monspecs.vfmax < info->monspecs.vfmin ||
+	    info->monspecs.dclkmax < info->monspecs.dclkmin) {
 		hfmin = 29000; hfmax = 30000;
 		vfmin = 60; vfmax = 60;
+		dclkmin = 0; dclkmax = 25000000;
 	} else {
 		hfmin = info->monspecs.hfmin;
 		hfmax = info->monspecs.hfmax;
 		vfmin = info->monspecs.vfmin;
 		vfmax = info->monspecs.vfmax;
+		dclkmin = info->monspecs.dclkmin;
+		dclkmax = info->monspecs.dclkmax;
 	}
 
 	if (!var->pixclock)

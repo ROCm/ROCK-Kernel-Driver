@@ -4,7 +4,7 @@
 #endif
 
 #if TRIDENTFB_DEBUG
-#define debug(f,a...)	printk("%s:" f,  __FUNCTION__ , ## a)
+#define debug(f,a...)	printk("%s:" f,  __FUNCTION__ , ## a);mdelay(1000);
 #else
 #define debug(f,a...)
 #endif
@@ -18,10 +18,13 @@
 
 #define CYBER9320	0x9320
 #define CYBER9388	0x9388
+#define CYBER9382	0x9382		/* the real PCI id for this is 9660 */
+#define CYBER9385	0x9385		/* ditto */		
 #define CYBER9397	0x9397
 #define CYBER9397DVD	0x939A
 #define CYBER9520	0x9520
 #define CYBER9525DVD	0x9525
+#define TGUI9660	0x9660
 #define IMAGE975	0x9750
 #define IMAGE985	0x9850
 #define BLADE3D		0x9880
@@ -41,9 +44,19 @@
 #define BLADE	1
 #define XP	2
 
-#define is_image()	(family == IMAGE)
-#define is_blade()	(family == BLADE)
-#define is_xp()		(family == XP)
+#define is_image(id)	
+#define is_xp(id)	((id == CYBERBLADEXPAi1) ||\
+			 (id == CYBERBLADEXPm8) ||\
+			 (id == CYBERBLADEXPm16)) 
+
+#define is_blade(id)	((id == BLADE3D) ||\
+			 (id == CYBERBLADEE4) ||\
+			 (id == CYBERBLADEi7) ||\
+			 (id == CYBERBLADEi7D) ||\
+			 (id == CYBERBLADEi1) ||\
+			 (id == CYBERBLADEi1D) ||\
+			 (id ==	CYBERBLADEAi1) ||\
+			 (id ==	CYBERBLADEAi1D))
 
 /* these defines are for 'lcd' variable */
 #define LCD_STRETCH	0
@@ -55,20 +68,13 @@
 #define DISPLAY_FP	1
 
 #define flatpanel (displaytype == DISPLAY_FP)
-/* these are for defaultaccel variable */
-#define ACCEL	1
-#define NOACCEL	0
-
-#define TRIDENT_IOSIZE	0x20000
-#define NTSC 14.31818
-#define PAL  17.73448
 
 /* General Registers */
 #define SPR	0x1F		/* Software Programming Register (videoram) */
 
 /* 3C4 */
 #define RevisionID 0x09
-#define OldOrNew 0x0B
+#define OldOrNew 0x0B	
 #define ConfPort1 0x0C
 #define ConfPort2 0x0C
 #define NewMode2 0x0D
