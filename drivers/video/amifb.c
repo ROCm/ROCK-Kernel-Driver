@@ -2268,19 +2268,6 @@ int __init amifb_init(void)
 		return -ENXIO;
 
 	/*
-	 * TODO: where should we put this? The DMI Resolver doesn't have a
-	 *	 frame buffer accessible by the CPU
-	 */
-
-#ifdef CONFIG_GSP_RESOLVER
-	if (amifb_resolver){
-		custom.dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER |
-				DMAF_BLITTER | DMAF_SPRITE;
-		return 0;
-	}
-#endif
-
-	/*
 	 * We request all registers starting from bplpt[0]
 	 */
 	if (!request_mem_region(CUSTOM_PHYSADDR+0xe0, 0x120,
