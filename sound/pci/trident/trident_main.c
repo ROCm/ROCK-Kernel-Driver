@@ -48,7 +48,7 @@
 
 static int snd_trident_pcm_mixer_build(trident_t *trident, snd_trident_voice_t * voice, snd_pcm_substream_t *substream);
 static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t * voice, snd_pcm_substream_t *substream);
-static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_PM
 static int snd_trident_set_power_state(snd_card_t *card, unsigned int power_state);
 #endif
@@ -3683,11 +3683,11 @@ int snd_trident_free(trident_t *trident)
                 the method try & fail so it is possible that it won't
                 work on all computers. [jaroslav]
 
-   Returns:     None.
+   Returns:     Whether IRQ was handled or not.
   
   ---------------------------------------------------------------------------*/
 
-static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	trident_t *trident = snd_magic_cast(trident_t, dev_id, return);
 	unsigned int audio_int, chn_int, stimer, channel, mask, tmp;
@@ -3696,7 +3696,7 @@ static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	audio_int = inl(TRID_REG(trident, T4D_MISCINT));
 	if ((audio_int & (ADDRESS_IRQ|MPU401_IRQ)) == 0)
-		return;
+		return IRQ_NONE;
 	if (audio_int & ADDRESS_IRQ) {
 		// get interrupt status for all channels
 		spin_lock(&trident->reg_lock);
@@ -3781,6 +3781,8 @@ static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		}
 	}
 	// outl((ST_TARGET_REACHED | MIXER_OVERFLOW | MIXER_UNDERFLOW), TRID_REG(trident, T4D_MISCINT));
+
+	return IRQ_HANDLED;
 }
 
 /*---------------------------------------------------------------------------
