@@ -224,29 +224,23 @@ fail:
 int cb_alloc(socket_info_t * s)
 {
 	struct pci_bus *bus;
-	struct pci_dev tmp;
 	u_short vend, v, dev;
 	u_char i, hdr, fn;
 	cb_config_t *c;
 	int irq;
 
 	bus = s->cap.cb_dev->subordinate;
-	memset(&tmp, 0, sizeof(tmp));
-	tmp.bus = bus;
-	tmp.sysdata = bus->sysdata;
-	tmp.devfn = 0;
 
-	pci_read_config_word(&tmp, PCI_VENDOR_ID, &vend);
-	pci_read_config_word(&tmp, PCI_DEVICE_ID, &dev);
+	pci_bus_read_config_word(bus, 0, PCI_VENDOR_ID, &vend);
+	pci_bus_read_config_word(bus, 0, PCI_DEVICE_ID, &dev);
 	printk(KERN_INFO "cs: cb_alloc(bus %d): vendor 0x%04x, "
 	       "device 0x%04x\n", bus->number, vend, dev);
 
-	pci_read_config_byte(&tmp, PCI_HEADER_TYPE, &hdr);
+	pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr);
 	fn = 1;
 	if (hdr & 0x80) {
 		do {
-			tmp.devfn = fn;
-			if (pci_read_config_word(&tmp, PCI_VENDOR_ID, &v) ||
+			if (pci_bus_read_config_word(bus, fn, PCI_VENDOR_ID, &v) ||
 			    !v || v == 0xffff)
 				break;
 			fn++;
