@@ -629,6 +629,21 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const struct sctp_endpoint *ep,
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP, SCTP_ULPEVENT(ev));
 
+	/* Sockets API Draft Section 5.3.1.6 	
+	 * When a peer sends a Adaption Layer Indication parameter , SCTP
+	 * delivers this notification to inform the application that of the
+	 * peers requested adaption layer.
+	 */
+	if (new_asoc->peer.adaption_ind) {
+		ev = sctp_ulpevent_make_adaption_indication(new_asoc,
+							    GFP_ATOMIC);
+		if (!ev)
+			goto nomem_ev;
+
+		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
+				SCTP_ULPEVENT(ev));
+	}
+
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem_ev:
@@ -712,6 +727,20 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const struct sctp_endpoint *ep,
 		goto nomem;
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP, SCTP_ULPEVENT(ev));
+
+	/* Sockets API Draft Section 5.3.1.6
+	 * When a peer sends a Adaption Layer Indication parameter , SCTP
+	 * delivers this notification to inform the application that of the
+	 * peers requested adaption layer.
+	 */
+	if (asoc->peer.adaption_ind) {
+		ev = sctp_ulpevent_make_adaption_indication(asoc, GFP_ATOMIC);
+		if (!ev)
+			goto nomem;
+
+		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
+				SCTP_ULPEVENT(ev));
+	}
 
 	return SCTP_DISPOSITION_CONSUME;
 nomem:
@@ -1532,6 +1561,21 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const struct sctp_endpoint *ep,
 		goto nomem_ev;
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP, SCTP_ULPEVENT(ev));
+
+	/* Sockets API Draft Section 5.3.1.6
+	 * When a peer sends a Adaption Layer Indication parameter , SCTP
+	 * delivers this notification to inform the application that of the
+	 * peers requested adaption layer.
+	 */
+	if (asoc->peer.adaption_ind) {
+		ev = sctp_ulpevent_make_adaption_indication(asoc, GFP_ATOMIC);
+		if (!ev)
+			goto nomem_ev;
+
+		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
+				SCTP_ULPEVENT(ev));
+	}
+
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem_ev:
@@ -1612,6 +1656,21 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const struct sctp_endpoint *ep,
 			goto nomem;
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(ev));
+
+		/* Sockets API Draft Section 5.3.1.6
+		 * When a peer sends a Adaption Layer Indication parameter,
+		 * SCTP delivers this notification to inform the application
+		 * that of the peers requested adaption layer.
+		 */
+		if (new_asoc->peer.adaption_ind) {
+			ev = sctp_ulpevent_make_adaption_indication(new_asoc,
+								 GFP_ATOMIC);
+			if (!ev)
+				goto nomem;
+
+			sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
+					SCTP_ULPEVENT(ev));
+		}
 	}
 	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSMIT, SCTP_NULL());
 
