@@ -86,9 +86,62 @@ struct new_signal_frame32 {
 	__siginfo_fpu_t		fpu_state;
 };
 
+struct siginfo32 {
+	int si_signo;
+	int si_errno;
+	int si_code;
+
+	union {
+		int _pad[SI_PAD_SIZE32];
+
+		/* kill() */
+		struct {
+			compat_pid_t _pid;		/* sender's pid */
+			unsigned int _uid;		/* sender's uid */
+		} _kill;
+
+		/* POSIX.1b timers */
+		struct {
+			timer_t _tid;			/* timer id */
+			int _overrun;			/* overrun count */
+			sigval_t32 _sigval;		/* same as below */
+			int _sys_private;		/* not to be passed to user */
+		} _timer;
+
+		/* POSIX.1b signals */
+		struct {
+			compat_pid_t _pid;		/* sender's pid */
+			unsigned int _uid;		/* sender's uid */
+			sigval_t32 _sigval;
+		} _rt;
+
+		/* SIGCHLD */
+		struct {
+			compat_pid_t _pid;		/* which child */
+			unsigned int _uid;		/* sender's uid */
+			int _status;			/* exit code */
+			compat_clock_t _utime;
+			compat_clock_t _stime;
+			struct compat_rusage _rusage;
+		} _sigchld;
+
+		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
+		struct {
+			u32 _addr; /* faulting insn/memory ref. */
+			int _trapno;
+		} _sigfault;
+
+		/* SIGPOLL */
+		struct {
+			int _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+			int _fd;
+		} _sigpoll;
+	} _sifields;
+};
+
 struct rt_signal_frame32 {
 	struct sparc_stackf32	ss;
-	siginfo_t32		info;
+	struct siginfo32	info;
 	struct pt_regs32	regs;
 	compat_sigset_t		mask;
 	/* __siginfo_fpu32_t * */ u32 fpu_save;
@@ -105,11 +158,11 @@ struct rt_signal_frame32 {
 #define NF_ALIGNEDSZ  (((sizeof(struct new_signal_frame32) + 7) & (~7)))
 #define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame32) + 7) & (~7)))
 
-int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
+int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
 {
 	int err;
 
-	if (!access_ok(VERIFY_WRITE, to, sizeof(siginfo_t32)))
+	if (!access_ok(VERIFY_WRITE, to, sizeof(struct siginfo32)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please be sure
@@ -135,6 +188,8 @@ int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
+			err |= put_compat_rusage(&from->si_rusage,
+						 &to->si_rusage);
 		default:
 			err |= __put_user(from->si_pid, &to->si_pid);
 			err |= __put_user(from->si_uid, &to->si_uid);
@@ -153,6 +208,22 @@ int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 		}
 	}
 	return err;
+}
+
+/* CAUTION: This is just a very minimalist implementation for the
+ *          sake of compat_sys_rt_sigqueueinfo()
+ */
+int copy_siginfo_to_kernel32(siginfo_t *to, struct siginfo32 __user *from)
+{
+	if (!access_ok(VERIFY_WRITE, from, sizeof(struct siginfo32)))
+		return -EFAULT;
+
+	if (copy_from_user(to, from, 3*sizeof(int)) ||
+	    copy_from_user(to->_sifields._pad, from->_sifields._pad,
+			   SI_PAD_SIZE))
+		return -EFAULT;
+
+	return 0;
 }
 
 /*

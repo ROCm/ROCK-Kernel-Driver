@@ -55,7 +55,7 @@ typedef struct xtalk_piomap_s *xtalk_piomap_t;
 /*
  * Kernel/driver only definitions
  */
-#if __KERNEL__
+#ifdef __KERNEL__
 
 #include <asm/types.h>
 #include <asm/sn/types.h>

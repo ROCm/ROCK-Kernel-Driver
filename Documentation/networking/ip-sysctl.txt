@@ -837,6 +837,11 @@ bridge-nf-call-iptables - BOOLEAN
 	0 : disable this.
 	Default: 1
 
+bridge-nf-call-ip6tables - BOOLEAN
+	1 : pass bridged IPv6 traffic to ip6tables' chains.
+	0 : disable this.
+	Default: 1
+
 bridge-nf-filter-vlan-tagged - BOOLEAN
 	1 : pass bridged vlan-tagged ARP/IP traffic to arptables/iptables.
 	0 : disable this.

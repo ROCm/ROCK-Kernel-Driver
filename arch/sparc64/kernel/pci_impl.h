@@ -11,7 +11,6 @@
 #include <linux/spinlock.h>
 #include <asm/io.h>
 
-extern spinlock_t pci_controller_lock;
 extern struct pci_controller_info *pci_controller_root;
 
 extern int pci_num_controllers;

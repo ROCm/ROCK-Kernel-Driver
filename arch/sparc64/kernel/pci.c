@@ -41,7 +41,6 @@ asmlinkage int sys_pciconfig_write(unsigned long bus, unsigned long dfn,
 #else
 
 /* List of all PCI controllers found in the system. */
-spinlock_t pci_controller_lock = SPIN_LOCK_UNLOCKED;
 struct pci_controller_info *pci_controller_root = NULL;
 
 /* Each PCI controller found gets a unique index. */
@@ -298,12 +297,9 @@ static void __init pci_controller_probe(void)
 static void __init pci_scan_each_controller_bus(void)
 {
 	struct pci_controller_info *p;
-	unsigned long flags;
 
-	spin_lock_irqsave(&pci_controller_lock, flags);
 	for (p = pci_controller_root; p; p = p->next)
 		p->scan_bus(p);
-	spin_unlock_irqrestore(&pci_controller_lock, flags);
 }
 
 /* Reorder the pci_dev chain, so that onboard devices come first

@@ -512,7 +512,7 @@ struct inode_operations cifs_file_inode_ops = {
 };
 
 struct inode_operations cifs_symlink_inode_ops = {
-	.readlink = cifs_readlink,
+	.readlink = generic_readlink, 
 	.follow_link = cifs_follow_link,
 	.put_link = cifs_put_link,
 	.permission = cifs_permission,

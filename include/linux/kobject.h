@@ -15,7 +15,7 @@
 #ifndef _KOBJECT_H_
 #define _KOBJECT_H_
 
-#if __KERNEL__
+#ifdef __KERNEL__
 
 #include <linux/types.h>
 #include <linux/list.h>
