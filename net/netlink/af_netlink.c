@@ -540,6 +540,12 @@ static inline void netlink_trim(struct sk_buff *skb, int allocation)
 {
 	int delta = skb->end - skb->tail;
 
+	/* If the packet is charged to a socket, the modification
+	 * of truesize below is illegal and will corrupt socket
+	 * buffer accounting state.
+	 */
+	BUG_ON(skb->list != NULL);
+
 	if (delta * 2 < skb->truesize)
 		return;
 	if (pskb_expand_head(skb, 0, -delta, allocation))
