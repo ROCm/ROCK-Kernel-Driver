@@ -420,7 +420,7 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 #if	defined(CONFIG_X86)
 #define USE_KMALLOC
 
-#elif	define(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
+#elif	defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
 #define USE_KMALLOC
 
 /* FIXME there are other cases, including an x86-64 one ...  */
@@ -502,6 +502,7 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 {
 	struct net2280_ep_regs	*regs = ep->regs;
 	u8			*buf;
+	u32			tmp;
 	unsigned		count, total;
 
 	/* INVARIANT:  fifo is currently empty. (testable) */
@@ -525,14 +526,17 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 		 * should normally be full (4 bytes) and successive partial
 		 * lines are ok only in certain cases.
 		 */
-		writel (get_unaligned ((u32 *)buf), &regs->ep_data);
+		tmp = get_unaligned ((u32 *)buf);
+		cpu_to_le32s (&tmp);
+		writel (tmp, &regs->ep_data);
 		buf += 4;
 		count -= 4;
 	}
 
 	/* last fifo entry is "short" unless we wrote a full packet */
 	if (total < ep->ep.maxpacket) {
-		u32	tmp = count ? get_unaligned ((u32 *)buf) : count;
+		tmp = count ? get_unaligned ((u32 *)buf) : count;
+		cpu_to_le32s (&tmp);
 		set_fifo_bytecount (ep, count & 0x03);
 		writel (tmp, &regs->ep_data);
 	}
@@ -632,12 +636,15 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 			req, req->req.actual, req->req.length);
 
 	while (count >= 4) {
-		put_unaligned (readl (&regs->ep_data), (u32 *)buf);
+		tmp = readl (&regs->ep_data);
+		cpu_to_le32s (&tmp);
+		put_unaligned (tmp, (u32 *)buf);
 		buf += 4;
 		count -= 4;
 	}
 	if (count) {
 		tmp = readl (&regs->ep_data);
+		cpu_to_le32s (&tmp);
 		do {
 			*buf++ = (u8) tmp;
 			tmp >>= 8;
@@ -2130,6 +2137,10 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			, &ep->regs->ep_stat);
 		u.raw [0] = readl (&dev->usb->setup0123);
 		u.raw [1] = readl (&dev->usb->setup4567);
+		
+		cpu_to_le32s (&u.raw [0]);
+		cpu_to_le32s (&u.raw [1]);
+
 		le16_to_cpus (&u.r.wValue);
 		le16_to_cpus (&u.r.wIndex);
 		le16_to_cpus (&u.r.wLength);
