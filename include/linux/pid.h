@@ -46,10 +46,10 @@ extern void switch_exec_pids(struct task_struct *leader, struct task_struct *thr
 		do {
 
 #define while_each_task_pid(who, type, task)				\
-			task = pid_task((task)->pids[type].pid_list.next,\
-						type);			\
-			prefetch((task)->pids[type].pid_list.next);	\
-		} while (hlist_unhashed(&(task)->pids[type].pid_chain));\
+		} while (task = pid_task((task)->pids[type].pid_list.next,\
+						type),			\
+			prefetch((task)->pids[type].pid_list.next),	\
+			hlist_unhashed(&(task)->pids[type].pid_chain));	\
 	}								\
 
 #endif /* _LINUX_PID_H */
