@@ -953,6 +953,7 @@ static void strip_unlock(struct strip *strip_info)
  * ascii representation of the number plus 9 charactes for the " seconds"
  * and the null character.
  */
+#ifdef CONFIG_PROC_FS
 static char *time_delta(char buffer[], long time)
 {
 	time -= jiffies;
@@ -1173,6 +1174,7 @@ static struct file_operations strip_seq_fops = {
 	.llseek  = seq_lseek,
 	.release = seq_release,
 };
+#endif
 
 
 
