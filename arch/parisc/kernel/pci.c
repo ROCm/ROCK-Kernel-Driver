@@ -345,7 +345,7 @@ pcibios_link_hba_resources( struct resource *hba_res, struct resource *r)
 /*
 ** called by drivers/pci/setup-res.c:pci_setup_bridge().
 */
-void pcibios_fixup_pbus_ranges(
+void __devinit pcibios_fixup_pbus_ranges(
 	struct pci_bus *bus,
 	struct pbus_set_ranges_data *ranges
 	)

@@ -254,7 +254,7 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
  * them, we proceed to assigning numbers to the remaining buses in
  * order to avoid overlaps between old and new bus numbers.
  */
-static int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
+int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
 {
 	unsigned int buses;
 	unsigned short cr;
@@ -480,8 +480,7 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 
 		/*
 		 * Link the device to both the global PCI device chain and
-		 * the per-bus list of devices and call /sbin/hotplug if we
-		 * should.
+		 * the per-bus list of devices and add the /proc entry.
 		 */
 		pci_insert_device (dev, bus);
 
@@ -596,4 +595,5 @@ EXPORT_SYMBOL(pci_add_new_bus);
 EXPORT_SYMBOL(pci_do_scan_bus);
 EXPORT_SYMBOL(pci_scan_slot);
 EXPORT_SYMBOL(pci_scan_bus);
+EXPORT_SYMBOL(pci_scan_bridge);
 #endif
