@@ -1066,8 +1066,8 @@ int fastcall __user_walk_it(const char __user *name, unsigned flags,
 	return err;
 }
 
-int __user_walk(const char __user *name, unsigned flags,
-		struct nameidata *nd, const char **pname)
+int fastcall __user_walk(const char __user *name, unsigned flags,
+			 struct nameidata *nd, const char **pname)
 {
 	intent_init(&nd->intent, IT_LOOKUP);
 	return __user_walk_it(name, flags, nd, pname);

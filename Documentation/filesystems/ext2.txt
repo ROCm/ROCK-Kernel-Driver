@@ -35,22 +35,6 @@ resgid=n			The group ID which may use the reserved blocks.
 
 sb=n				Use alternate superblock at this location.
 
-iopen				Makes an invisible pseudo-directory called 
-				__iopen__ available in the root directory
-				of the filesystem.  Allows open-by-inode-
-				number.  i.e., inode 3145 can be accessed
-				via /mntpt/__iopen__/3145
-
-iopen_nopriv			This option makes the iopen directory be
-				world-readable.  This may be safer since it
-				allows daemons to run as an unprivileged user,
-				however it significantly changes the security
-				model of a Unix filesystem, since previously
-				all files under a mode 700 directory were not
-				generally avilable even if the
-				permissions on the file itself is
-				world-readable.
-
 grpquota,noquota,quota,usrquota	Quota options are silently ignored by ext2.
 
 
