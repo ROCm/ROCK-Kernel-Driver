@@ -1106,6 +1106,7 @@ asmlinkage long sys32_umask(u32 mask)
 	return sys_umask((int)mask);
 }
 
+#ifdef CONFIG_SYSCTL
 struct __sysctl_args32 {
 	u32 name;
 	int nlen;
@@ -1155,6 +1156,7 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 	}
 	return error;
 }
+#endif
 
 asmlinkage int sys32_olduname(struct oldold_utsname __user * name)
 {

@@ -1973,10 +1973,10 @@ struct sysctl32 {
 	unsigned int	__unused[4];
 };
 
+#ifdef CONFIG_SYSCTL
 asmlinkage long
 sys32_sysctl (struct sysctl32 __user *args)
 {
-#ifdef CONFIG_SYSCTL
 	struct sysctl32 a32;
 	mm_segment_t old_fs = get_fs ();
 	void __user *oldvalp, *newvalp;
@@ -2015,10 +2015,8 @@ sys32_sysctl (struct sysctl32 __user *args)
 		return -EFAULT;
 
 	return ret;
-#else
-	return -ENOSYS;
-#endif
 }
+#endif
 
 asmlinkage long
 sys32_newuname (struct new_utsname __user *name)
