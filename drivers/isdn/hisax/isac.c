@@ -45,7 +45,7 @@ isac_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
 	return cs->dc_hw_ops->write_fifo(cs, p, len);
 }
 
-void
+static void
 ISACVersion(struct IsdnCardState *cs, char *s)
 {
 	int val;
@@ -558,4 +558,12 @@ initisac(struct IsdnCardState *cs)
 
 	/* RESET Receiver and Transmitter */
 	isac_write(cs, ISAC_CMDR, 0x41);
+}
+
+int
+isac_setup(struct IsdnCardState *cs, struct dc_hw_ops *isac_ops)
+{
+	cs->dc_hw_ops = isac_ops;
+	ISACVersion(cs, "HiSax:");
+	return 0;
 }

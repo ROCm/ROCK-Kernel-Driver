@@ -700,11 +700,10 @@ ready:
 		(cs->subtyp == AVM_FRITZ_PCI) ? "AVM Fritz!PCI" : "AVM Fritz!PnP",
 		cs->irq, cs->hw.avm.cfg_reg);
 
-	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hdlc_hw_ops;
 	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->card_ops = &avm_pci_ops;
-	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
+	isac_setup(cs, &isac_ops);
 	return 1;
  err:
 	hisax_release_resources(cs);

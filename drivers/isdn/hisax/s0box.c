@@ -197,15 +197,9 @@ setup_s0box(struct IsdnCard *card)
 	printk(KERN_INFO
 	       "HiSax: hscx A:0x%x  hscx B:0x%x\n",
 	       cs->hw.teles3.hscx[0], cs->hw.teles3.hscx[1]);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &s0box_ops;
-	ISACVersion(cs, "S0Box:");
-	if (HscxVersion(cs, "S0Box:")) {
-		printk(KERN_WARNING
-		       "S0Box: wrong HSCX versions check IO address\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

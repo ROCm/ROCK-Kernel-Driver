@@ -308,12 +308,9 @@ setup_bkm_a4t(struct IsdnCard *card)
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
 	reset_bkm(cs);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &jade_ops;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &bkm_a4t_ops;
-	ISACVersion(cs, "Telekom A4T:");
-	/* Jade version */
-	JadeVersion(cs, "Telekom A4T:");
-	return (1);
+	isac_setup(cs, &isac_ops);
+	jade_setup(cs, &jade_ops);
+	return 1;
 }

@@ -227,21 +227,15 @@ setup_sportster(struct IsdnCard *card)
 			return(0);
 	}
 	sportster_reset(cs);
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d cfg:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.spt.cfg_reg);
+	printk(KERN_INFO "HiSax: %s config irq:%d cfg:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.spt.cfg_reg);
 
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sportster_card_msg;
 	cs->card_ops = &sportster_ops;
-	ISACVersion(cs, "Sportster:");
-	if (HscxVersion(cs, "Sportster:")) {
-		printk(KERN_WARNING
-		       "Sportster: wrong HSCX versions check IO address\n");
-		sportster_release(cs);
-		return (0);
-	}
-	return (1);
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
+	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

@@ -314,10 +314,8 @@ setup_asuscom(struct IsdnCard *card)
 		cs->subtyp = ASUS_IPAC;
 		cs->card_ops = &asuscom_ipac_ops;
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
-		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
-		printk(KERN_INFO "Asus: IPAC version %x\n", val);
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
 	} else {
 		cs->subtyp = ASUS_ISACHSCX;
 		cs->card_ops = &asuscom_ops;
@@ -326,14 +324,8 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_HSCX;
 		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
 		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
-		cs->dc_hw_ops = &isac_ops;
-		cs->bc_hw_ops = &hscx_ops;
-		ISACVersion(cs, "ISDNLink:");
-		if (HscxVersion(cs, "ISDNLink:")) {
-			printk(KERN_WARNING
-		     	"ISDNLink: wrong HSCX versions check IO address\n");
+		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 			goto err;
-		}
 	}
 	printk(KERN_INFO "ISDNLink: resetting card\n");
 	cs->card_ops->reset(cs);

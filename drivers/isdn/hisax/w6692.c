@@ -668,6 +668,23 @@ static int id_idx ;
 
 static struct pci_dev *dev_w6692 __initdata = NULL;
 
+static int
+w6692_setup(struct IsdnCardState *cs, struct dc_hw_ops *dc_ops,
+	    struct bc_hw_ops *bc_ops)
+{
+	cs->dc_hw_ops = dc_ops;
+	cs->bc_hw_ops = bc_ops;
+	dc_l1_init(cs, &w6692_dc_l1_ops);
+	cs->bc_l1_ops = &w6692_bc_l1_ops;
+	W6692Version(cs, "W6692:");
+	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
+	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));
+	printk(KERN_INFO "W6692 D_EXIR=0x%X\n", w6692_read_reg(cs, W_D_EXIR));
+	printk(KERN_INFO "W6692 D_EXIM=0x%X\n", w6692_read_reg(cs, W_D_EXIM));
+	printk(KERN_INFO "W6692 D_RSTA=0x%X\n", w6692_read_reg(cs, W_D_RSTA));
+	return 0;
+}
+
 int __init 
 setup_w6692(struct IsdnCard *card)
 {
@@ -733,17 +750,8 @@ setup_w6692(struct IsdnCard *card)
 	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
-	cs->dc_hw_ops = &w6692_dc_hw_ops;
-	cs->bc_hw_ops = &w6692_bc_hw_ops;
-	dc_l1_init(cs, &w6692_dc_l1_ops);
-	cs->bc_l1_ops = &w6692_bc_l1_ops;
-	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &w6692_ops;
-	W6692Version(cs, "W6692:");
-	printk(KERN_INFO "W6692 ISTA=0x%X\n", w6692_read_reg(cs, W_ISTA));
-	printk(KERN_INFO "W6692 IMASK=0x%X\n", w6692_read_reg(cs, W_IMASK));
-	printk(KERN_INFO "W6692 D_EXIR=0x%X\n", w6692_read_reg(cs, W_D_EXIR));
-	printk(KERN_INFO "W6692 D_EXIM=0x%X\n", w6692_read_reg(cs, W_D_EXIM));
-	printk(KERN_INFO "W6692 D_RSTA=0x%X\n", w6692_read_reg(cs, W_D_RSTA));
+	w6692_setup(cs, &w6692_dc_hw_ops, &w6692_bc_hw_ops);
+	cs->irq_flags |= SA_SHIRQ;
 	return (1);
 }

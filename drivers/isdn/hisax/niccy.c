@@ -298,18 +298,12 @@ setup_niccy(struct IsdnCard *card)
 			goto err;
 #endif /* CONFIG_PCI */
 	}
-	printk(KERN_INFO
-		"HiSax: %s %s config irq:%d data:0x%X ale:0x%X\n",
+	printk(KERN_INFO "HiSax: %s %s config irq:%d data:0x%X ale:0x%X\n",
 		CardType[cs->typ], (cs->subtyp==1) ? "PnP":"PCI",
 		cs->irq, cs->hw.niccy.isac, cs->hw.niccy.isac_ale);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &niccy_ops;
-	ISACVersion(cs, "Niccy:");
-	if (HscxVersion(cs, "Niccy:")) {
-		printk(KERN_WARNING
-		    "Niccy: wrong HSCX versions check IO address\n");
-	}
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		goto err;
 	return 1;
  err:
 	niccy_release(cs);

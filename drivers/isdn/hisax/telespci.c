@@ -275,16 +275,10 @@ setup_telespci(struct IsdnCard *card)
 	       CardType[cs->typ], cs->irq,
 	       cs->hw.teles0.membase);
 
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &telespci_ops;
-	ISACVersion(cs, "TelesPCI:");
-	if (HscxVersion(cs, "TelesPCI:")) {
-		printk(KERN_WARNING
-		 "TelesPCI: wrong HSCX versions check IO/MEM addresses\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

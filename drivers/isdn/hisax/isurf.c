@@ -259,19 +259,13 @@ setup_isurf(struct IsdnCard *card)
 
 	cs->auxcmd = &isurf_auxcmd;
 	cs->card_ops = &isurf_ops;
-	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
 	reset_isurf(cs, ISURF_RESET);
 	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
-	ISACVersion(cs, "ISurf:");
-	cs->bc_hw_ops = &isar_ops;
-	ver = ISARVersion(cs, "ISurf:");
-	if (ver < 0) {
-		printk(KERN_WARNING
-			"ISurf: wrong ISAR version (ret = %d)\n", ver);
+	isac_setup(cs, &isac_ops);
+	if (isar_setup(cs, &isar_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

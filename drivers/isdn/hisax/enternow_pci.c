@@ -110,13 +110,14 @@ WriteByteAmd7930(struct IsdnCardState *cs, BYTE offset, BYTE value)
 }
 
 
-static struct dc_hw_ops enternow_ops = {
+static struct dc_hw_ops amd7930_ops = {
 	.read_reg   = ReadByteAmd7930,
 	.write_reg  = WriteByteAmd7930,
 };
 
-void
-enpci_setIrqMask(struct IsdnCardState *cs, BYTE val) {
+static void
+enpci_setIrqMask(struct IsdnCardState *cs, BYTE val)
+{
         if (!val)
 	        OutByte(cs->hw.njet.base+NETJET_IRQMASK1, 0x00);
         else
@@ -339,8 +340,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	cs->hw.njet.last_is0 = 0;
 	cs->hw.njet.bc_activate = enpci_bc_activate;
 	cs->hw.njet.bc_deactivate = enpci_bc_deactivate;
-	cs->dc_hw_ops = &enternow_ops;
-        cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
+	amd7930_setup(cs, &amd7930_ops, &enpci_setIrqMask);
 
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &enpci_ops;

@@ -225,7 +225,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 
 	strcpy(tmp, avm_revision);
 	printk(KERN_INFO "HiSax: AVM A1 PCMCIA driver Rev. %s\n",
-						 HiSax_getrev(tmp));
+	       HiSax_getrev(tmp));
 	cs->hw.avm.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
 
@@ -246,15 +246,9 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	printk(KERN_INFO "AVM A1 PCMCIA: io 0x%x irq %d model %d version %d\n",
 				cs->hw.avm.cfg_reg, cs->irq, model, vers);
 
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &avm_a1p_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		return 0;
 
-	ISACVersion(cs, "AVM A1 PCMCIA:");
-	if (HscxVersion(cs, "AVM A1 PCMCIA:")) {
-		printk(KERN_WARNING
-		       "AVM A1 PCMCIA: wrong HSCX versions check IO address\n");
-		return (0);
-	}
-	return (1);
+	return 1;
 }

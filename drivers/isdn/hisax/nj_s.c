@@ -194,9 +194,8 @@ setup_netjet_s(struct IsdnCard *card)
 		return 0;
 	
 	nj_s_reset(cs);
-	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_s_ops;
-	ISACVersion(cs, "NETjet-S:");
+	isac_setup(cs, &netjet_dc_ops);
 	return 1;
 }

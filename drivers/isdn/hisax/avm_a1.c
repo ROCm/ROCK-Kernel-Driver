@@ -228,15 +228,9 @@ setup_avm_a1(struct IsdnCard *card)
 	       cs->hw.avm.hscx[0] + 32, cs->hw.avm.hscxfifo[0],
 	       cs->hw.avm.hscx[1] + 32, cs->hw.avm.hscxfifo[1]);
 
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &avm_a1_ops;
-	ISACVersion(cs, "AVM A1:");
-	if (HscxVersion(cs, "AVM A1:")) {
-		printk(KERN_WARNING
-		       "AVM A1: wrong HSCX versions check IO address\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

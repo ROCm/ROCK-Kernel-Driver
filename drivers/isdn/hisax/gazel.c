@@ -525,7 +525,6 @@ setup_gazel(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u8 val;
 
 	strcpy(tmp, gazel_revision);
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));
@@ -542,22 +541,15 @@ setup_gazel(struct IsdnCard *card)
 	case R647:
 	case R685:
 		if (cs->subtyp == R647) {
-			cs->dc_hw_ops = &r647_isac_ops;
-			cs->bc_hw_ops = &r647_hscx_ops;
 			cs->card_ops  = &r647_ops;
+			if (hscxisac_setup(cs, &r647_isac_ops, &r647_hscx_ops))
+				goto err;
 		} else {
-			cs->dc_hw_ops = &r685_isac_ops;
-			cs->bc_hw_ops = &r685_hscx_ops;
 			cs->card_ops  = &r685_ops;
+			if (hscxisac_setup(cs, &r685_isac_ops, &r685_hscx_ops))
+				goto err;
 		}
 		cs->card_ops->reset(cs);
-		ISACVersion(cs, "Gazel:");
-		if (HscxVersion(cs, "Gazel:")) {
-			printk(KERN_WARNING
-			       "Gazel: wrong HSCX versions check IO address\n");
-			cs->card_ops->release(cs);
-				return (0);
-		}
 		break;
 	case R742:
 	case R753:
@@ -566,13 +558,13 @@ setup_gazel(struct IsdnCard *card)
 		} else {
 			cs->card_ops = &r753_ops;
 		}
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
 		cs->card_ops->reset(cs);
-		val = ipac_read(cs, IPAC_ID);
-		printk(KERN_INFO "Gazel: IPAC version %x\n", val);
 		break;
 	}
-
 	return 1;
+ err:
+	hisax_release_resources(cs);
+	return 0;
 }

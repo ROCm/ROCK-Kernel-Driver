@@ -225,16 +225,10 @@ setup_teles0(struct IsdnCard *card)
 		printk(KERN_WARNING "Teles0: wrong IRQ\n");
 		goto err;
 	}
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &teles0_ops;
-	ISACVersion(cs, "Teles0:");
-	if (HscxVersion(cs, "Teles0:")) {
-		printk(KERN_WARNING
-		 "Teles0: wrong HSCX versions check IO/MEM addresses\n");
-		goto err;
-	}
-	return (1);
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+  		goto err;
+	return 1;
 
  err:
 	hisax_release_resources(cs);

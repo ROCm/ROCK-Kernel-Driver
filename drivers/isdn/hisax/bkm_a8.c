@@ -287,14 +287,10 @@ setup_sct_quadro(struct IsdnCard *card)
 	       cs->hw.ax.data_adr,
 	       cs->irq);
 
-	cs->dc_hw_ops = &ipac_dc_ops;
-	cs->bc_hw_ops = &ipac_bc_ops;
 	cs->card_ops = &bkm_a8_ops;
+	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+		goto err;
 
-	printk(KERN_INFO "HiSax: %s (%s): IPAC Version %d\n",
-		CardType[card->typ],
-		sct_quadro_subtypes[cs->subtyp],
-		ipac_read(cs, IPAC_ID));
 	return 1;
  err:
 	hisax_release_resources(cs);

@@ -190,9 +190,8 @@ setup_netjet_u(struct IsdnCard *card)
 		return 0;
 	
 	nj_u_reset(cs);
-	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &nj_u_ops;
-	ICCVersion(cs, "NETspider-U:");
+	icc_setup(cs, &netjet_dc_ops);
 	return 1;
 }

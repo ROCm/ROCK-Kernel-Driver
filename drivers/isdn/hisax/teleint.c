@@ -314,11 +314,10 @@ setup_TeleInt(struct IsdnCard *card)
 	       cs->hw.hfc.addr,
 	       cs->irq);
 
-	teleint_reset(cs);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hfc_ops;
 	cs->card_ops = &teleint_ops;
-	ISACVersion(cs, "TeleInt:");
+	teleint_reset(cs);
+	isac_setup(cs, &isac_ops);
+	hfc_setup(cs, &hfc_ops);
 	return 1;
  err:
 	teleint_release(cs);

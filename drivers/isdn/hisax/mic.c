@@ -156,19 +156,11 @@ setup_mic(struct IsdnCard *card)
 	if (!request_io(&cs->rs, cs->hw.mic.cfg_reg, 8, "mic isdn"))
 		goto err;
   
-	printk(KERN_INFO
-	       "mic: defined at 0x%x IRQ %d\n",
-	       cs->hw.mic.cfg_reg,
-	       cs->irq);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
+	printk(KERN_INFO "mic: defined at 0x%x IRQ %d\n",
+	       cs->hw.mic.cfg_reg, cs->irq);
 	cs->card_ops = &mic_ops;
-	ISACVersion(cs, "mic:");
-	if (HscxVersion(cs, "mic:")) {
-		printk(KERN_WARNING
-		    "mic: wrong HSCX versions check IO address\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

@@ -1048,21 +1048,13 @@ setup_elsa(struct IsdnCard *card)
 	}
 	elsa_reset(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &elsa_ipac_ops;
-		val = readreg(cs, cs->hw.elsa.isac, IPAC_ID);
-		printk(KERN_INFO "Elsa: IPAC version %x\n", val);
-	} else {
-		cs->dc_hw_ops = &isac_ops;
-		cs->bc_hw_ops = &hscx_ops;
-		cs->card_ops = &elsa_ops;
-		ISACVersion(cs, "Elsa:");
-		if (HscxVersion(cs, "Elsa:")) {
-			printk(KERN_WARNING
-			       "Elsa: wrong HSCX versions check IO address\n");
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
 			goto err;
-		}
+	} else {
+		cs->card_ops = &elsa_ops;
+		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+			goto err;
 	}
 	if (cs->subtyp == ELSA_PC) {
 		val = readitac(cs, ITAC_SYS);

@@ -472,7 +472,7 @@ static struct pci_bus *pnp_c __devinitdata = NULL;
 int __devinit
 setup_sedlbauer(struct IsdnCard *card)
 {
-	int bytecnt, ver, val;
+	int bytecnt, val;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u16 sub_vendor_id, sub_id;
@@ -667,16 +667,12 @@ ready:
 			cs->hw.sedl.isac = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 		}
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &sedlbauer_ipac_ops;
-
-		val = readreg(cs, cs->hw.sedl.isac, IPAC_ID);
-		printk(KERN_INFO "Sedlbauer: IPAC version %x\n", val);
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
 		sedlbauer_reset(cs);
 	} else {
 		/* ISAC_HSCX oder ISAC_ISAR */
-		cs->dc_hw_ops = &isac_ops;
 		if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
 			if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
 				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg +
@@ -702,14 +698,9 @@ ready:
 			test_and_set_bit(HW_ISAR, &cs->HW_Flags);
 			cs->card_ops = &sedlbauer_isar_ops;
 			cs->auxcmd = &isar_auxcmd;
-			ISACVersion(cs, "Sedlbauer:");
-			cs->bc_hw_ops = &isar_ops;
-			ver = ISARVersion(cs, "Sedlbauer:");
-			if (ver < 0) {
-				printk(KERN_WARNING
-					"Sedlbauer: wrong ISAR version (ret = %d)\n", ver);
+			isac_setup(cs, &isac_ops);
+			if (isar_setup(cs, &isar_ops))
 				goto err;
-			}
 		} else {
 			if (cs->hw.sedl.bus == SEDL_BUS_PCMCIA) {
 				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_HSCX_PCMCIA_ADR;
@@ -725,14 +716,9 @@ ready:
 				cs->hw.sedl.reset_off = cs->hw.sedl.cfg_reg + SEDL_HSCX_ISA_RESET_OFF;
 			}
 			cs->card_ops = &sedlbauer_ops;
-			cs->bc_hw_ops = &hscx_ops;
-			ISACVersion(cs, "Sedlbauer:");
-		
-			if (HscxVersion(cs, "Sedlbauer:")) {
-				printk(KERN_WARNING
-					"Sedlbauer: wrong HSCX versions check IO address\n");
+			if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 				goto err;
-			}
+
 			sedlbauer_reset(cs);
 		}
 	}

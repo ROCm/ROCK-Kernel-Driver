@@ -725,39 +725,27 @@ ready:
 	}
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		diva_ipac_isa_reset(cs);
-		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->bc_hw_ops = &ipac_bc_ops;
 		cs->card_ops = &diva_ipac_isa_ops;
-		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
-		printk(KERN_INFO "Diva: IPAC version %x\n", val);
+		if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
+			goto err;
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
 		diva_ipac_pci_reset(cs);
-		cs->dc_hw_ops = &mem_ipac_dc_ops;
-		cs->bc_hw_ops = &mem_ipac_bc_ops;
 		cs->card_ops = &diva_ipac_pci_ops;
-		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
-		printk(KERN_INFO "Diva: IPAC version %x\n", val);
+		if (ipac_setup(cs, &mem_ipac_dc_ops, &mem_ipac_bc_ops))
+			goto err;
 	} else if (cs->subtyp == DIVA_IPACX_PCI) {
 		diva_ipacx_pci_reset(cs);
-		cs->dc_hw_ops = &ipacx_dc_ops;
-		cs->bc_hw_ops = &ipacx_bc_ops;
 		cs->card_ops = &diva_ipacx_pci_ops;
-		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
-		       ipacx_dc_read(cs, IPACX_ID) &0x3F);
+		if (ipacx_setup(cs, &ipacx_dc_ops, &ipacx_bc_ops))
+			goto err;
 	} else { /* DIVA 2.0 */
 		diva_reset(cs);
 		cs->hw.diva.tl.function = (void *) diva_led_handler;
 		cs->hw.diva.tl.data = (long) cs;
 		init_timer(&cs->hw.diva.tl);
-		cs->dc_hw_ops = &isac_ops;
-		cs->bc_hw_ops = &hscx_ops;
 		cs->card_ops = &diva_ops;
-		ISACVersion(cs, "Diva:");
-		if (HscxVersion(cs, "Diva:")) {
-			printk(KERN_WARNING
-		       "Diva: wrong HSCX versions check IO address\n");
+		if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 			goto err;
-		}
 	}
 	return 1;
  err:

@@ -235,20 +235,12 @@ setup_ix1micro(struct IsdnCard *card)
 	if (!request_io(&cs->rs, cs->hw.ix1.cfg_reg, 4, "ix1micro cfg"))
 		goto err;
 	
-	printk(KERN_INFO
-	       "HiSax: %s config irq:%d io:0x%X\n",
-	       CardType[cs->typ], cs->irq,
-	       cs->hw.ix1.cfg_reg);
+	printk(KERN_INFO "HiSax: %s config irq:%d io:0x%X\n",
+	       CardType[cs->typ], cs->irq, cs->hw.ix1.cfg_reg);
 	ix1_reset(cs);
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
 	cs->card_ops = &ix1_ops;
-	ISACVersion(cs, "ix1-Micro:");
-	if (HscxVersion(cs, "ix1-Micro:")) {
-		printk(KERN_WARNING
-		    "ix1-Micro: wrong HSCX versions check IO address\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
 	return 1;
  err:
 	hisax_release_resources(cs);

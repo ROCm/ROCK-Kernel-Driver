@@ -231,18 +231,13 @@ setup_saphir(struct IsdnCard *card)
 	cs->hw.saphir.timer.data = (long) cs;
 	cs->hw.saphir.timer.expires = jiffies + 4*HZ;
 	add_timer(&cs->hw.saphir.timer);
-	if (saphir_reset(cs)) {
+	if (saphir_reset(cs))
 		goto err;
-	}
-	cs->dc_hw_ops = &isac_ops;
-	cs->bc_hw_ops = &hscx_ops;
+
 	cs->card_ops = &saphir_ops;
-	ISACVersion(cs, "saphir:");
-	if (HscxVersion(cs, "saphir:")) {
-		printk(KERN_WARNING
-		    "saphir: wrong HSCX versions check IO address\n");
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
 		goto err;
-	}
+
 	return 1;
  err:
 	saphir_release(cs);
