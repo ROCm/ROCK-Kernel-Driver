@@ -47,7 +47,7 @@ int fc_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
 	 */
 	if (type == ETH_P_IP || type == ETH_P_ARP)
 	{
-		struct fcllc *fcllc=(struct fcllc *)(fch+1);
+		struct fcllc *fcllc;
 
 		hdr_len = sizeof(struct fch_hdr) + sizeof(struct fcllc);
 		fch = (struct fch_hdr *)skb_push(skb, hdr_len);
