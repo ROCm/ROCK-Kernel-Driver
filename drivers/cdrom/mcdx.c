@@ -1182,7 +1182,7 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcdx_request,
 		       &mcdx_lock);
 	blksize_size[MAJOR_NR] = mcdx_blocksizes;
 

@@ -13,6 +13,28 @@
 #include <linux/module.h>
 #include <linux/mempool.h>
 
+static void add_element(mempool_t *pool, void *element)
+{
+	BUG_ON(pool->curr_nr >= pool->min_nr);
+	pool->elements[pool->curr_nr++] = element;
+}
+
+static void *remove_element(mempool_t *pool)
+{
+	BUG_ON(pool->curr_nr <= 0);
+	return pool->elements[--pool->curr_nr];
+}
+
+static void free_pool(mempool_t *pool)
+{
+	while (pool->curr_nr) {
+		void *element = remove_element(pool);
+		pool->free(element, pool->pool_data);
+	}
+	kfree(pool->elements);
+	kfree(pool);
+}
+
 /**
  * mempool_create - create a memory pool
  * @min_nr:    the minimum number of elements guaranteed to be
@@ -25,27 +47,25 @@
  * memory pool. The pool can be used from the mempool_alloc and mempool_free
  * functions. This function might sleep. Both the alloc_fn() and the free_fn()
  * functions might sleep - as long as the mempool_alloc function is not called
- * from IRQ contexts. The element allocated by alloc_fn() must be able to
- * hold a struct list_head. (8 bytes on x86.)
+ * from IRQ contexts.
  */
 mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 				mempool_free_t *free_fn, void *pool_data)
 {
 	mempool_t *pool;
-	int i;
-
-	BUG_ON(!alloc_fn);
-	BUG_ON(!free_fn);
 
 	pool = kmalloc(sizeof(*pool), GFP_KERNEL);
 	if (!pool)
 		return NULL;
 	memset(pool, 0, sizeof(*pool));
-
+	pool->elements = kmalloc(min_nr * sizeof(void *), GFP_KERNEL);
+	if (!pool->elements) {
+		kfree(pool);
+		return NULL;
+	}
 	spin_lock_init(&pool->lock);
 	pool->min_nr = min_nr;
 	pool->pool_data = pool_data;
-	INIT_LIST_HEAD(&pool->elements);
 	init_waitqueue_head(&pool->wait);
 	pool->alloc = alloc_fn;
 	pool->free = free_fn;
@@ -53,27 +73,15 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 	/*
 	 * First pre-allocate the guaranteed number of buffers.
 	 */
-	for (i = 0; i < min_nr; i++) {
+	while (pool->curr_nr < pool->min_nr) {
 		void *element;
-		struct list_head *tmp;
+
 		element = pool->alloc(GFP_KERNEL, pool->pool_data);
-
 		if (unlikely(!element)) {
-			/*
-			 * Not enough memory - free the allocated ones
-			 * and return:
-			 */
-			list_for_each(tmp, &pool->elements) {
-				element = tmp;
-				pool->free(element, pool->pool_data);
-			}
-			kfree(pool);
-
+			free_pool(pool);
 			return NULL;
 		}
-		tmp = element;
-		list_add(tmp, &pool->elements);
-		pool->curr_nr++;
+		add_element(pool, element);
 	}
 	return pool;
 }
@@ -94,53 +102,54 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
  * while this function is running. mempool_alloc() & mempool_free()
  * might be called (eg. from IRQ contexts) while this function executes.
  */
-void mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
+int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
 {
-	int delta;
 	void *element;
+	void **new_elements;
 	unsigned long flags;
-	struct list_head *tmp;
 
-	if (new_min_nr <= 0)
-		BUG();
+	BUG_ON(new_min_nr <= 0);
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (new_min_nr < pool->min_nr) {
-		pool->min_nr = new_min_nr;
-		/*
-		 * Free possible excess elements.
-		 */
-		while (pool->curr_nr > pool->min_nr) {
-			tmp = pool->elements.next;
-			if (tmp == &pool->elements)
-				BUG();
-			list_del(tmp);
-			element = tmp;
-			pool->curr_nr--;
+		while (pool->curr_nr > new_min_nr) {
+			element = remove_element(pool);
 			spin_unlock_irqrestore(&pool->lock, flags);
-
 			pool->free(element, pool->pool_data);
-
 			spin_lock_irqsave(&pool->lock, flags);
 		}
-		spin_unlock_irqrestore(&pool->lock, flags);
-		return;
+		pool->min_nr = new_min_nr;
+		goto out_unlock;
 	}
-	delta = new_min_nr - pool->min_nr;
-	pool->min_nr = new_min_nr;
 	spin_unlock_irqrestore(&pool->lock, flags);
 
-	/*
-	 * We refill the pool up to the new treshold - but we dont
-	 * (cannot) guarantee that the refill succeeds.
-	 */
-	while (delta) {
+	/* Grow the pool */
+	new_elements = kmalloc(new_min_nr * sizeof(*new_elements), gfp_mask);
+	if (!new_elements)
+		return -ENOMEM;
+
+	spin_lock_irqsave(&pool->lock, flags);
+	memcpy(new_elements, pool->elements,
+			pool->curr_nr * sizeof(*new_elements));
+	kfree(pool->elements);
+	pool->elements = new_elements;
+	pool->min_nr = new_min_nr;
+
+	while (pool->curr_nr < pool->min_nr) {
+		spin_unlock_irqrestore(&pool->lock, flags);
 		element = pool->alloc(gfp_mask, pool->pool_data);
 		if (!element)
-			break;
-		mempool_free(element, pool);
-		delta--;
+			goto out;
+		spin_lock_irqsave(&pool->lock, flags);
+		if (pool->curr_nr < pool->min_nr)
+			add_element(pool, element);
+		else
+			kfree(element);		/* Raced */
 	}
+out_unlock:
+	spin_unlock_irqrestore(&pool->lock, flags);
+out:
+	return 0;
 }
 
 /**
@@ -149,27 +158,14 @@ void mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
  *             mempool_create().
  *
  * this function only sleeps if the free_fn() function sleeps. The caller
- * has to guarantee that no mempool_alloc() nor mempool_free() happens in
- * this pool when calling this function.
+ * has to guarantee that all elements have been returned to the pool (ie:
+ * freed) prior to calling mempool_destroy().
  */
 void mempool_destroy(mempool_t *pool)
 {
-	void *element;
-	struct list_head *head, *tmp;
-
-	if (!pool)
-		return;
-
-	head = &pool->elements;
-	for (tmp = head->next; tmp != head; ) {
-		element = tmp;
-		tmp = tmp->next;
-		pool->free(element, pool->pool_data);
-		pool->curr_nr--;
-	}
-	if (pool->curr_nr)
-		BUG();
-	kfree(pool);
+	if (pool->curr_nr != pool->min_nr)
+		BUG();		/* There were outstanding elements */
+	free_pool(pool);
 }
 
 /**
@@ -187,7 +183,6 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 {
 	void *element;
 	unsigned long flags;
-	struct list_head *tmp;
 	int curr_nr;
 	DECLARE_WAITQUEUE(wait, current);
 	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
@@ -214,10 +209,7 @@ repeat_alloc:
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (likely(pool->curr_nr)) {
-		tmp = pool->elements.next;
-		list_del(tmp);
-		element = tmp;
-		pool->curr_nr--;
+		element = remove_element(pool);
 		spin_unlock_irqrestore(&pool->lock, flags);
 		return element;
 	}
@@ -260,8 +252,7 @@ void mempool_free(void *element, mempool_t *pool)
 	if (pool->curr_nr < pool->min_nr) {
 		spin_lock_irqsave(&pool->lock, flags);
 		if (pool->curr_nr < pool->min_nr) {
-			list_add(element, &pool->elements);
-			pool->curr_nr++;
+			add_element(pool, element);
 			spin_unlock_irqrestore(&pool->lock, flags);
 			wake_up(&pool->wait);
 			return;
@@ -276,4 +267,3 @@ EXPORT_SYMBOL(mempool_resize);
 EXPORT_SYMBOL(mempool_destroy);
 EXPORT_SYMBOL(mempool_alloc);
 EXPORT_SYMBOL(mempool_free);
-

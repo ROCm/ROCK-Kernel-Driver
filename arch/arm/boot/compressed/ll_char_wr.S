@@ -27,10 +27,10 @@
 #define FLASH           0x08
 #define INVERSE         0x10
 
-LC0:		.word	SYMBOL_NAME(bytes_per_char_h)
-		.word	SYMBOL_NAME(video_size_row)
-		.word	SYMBOL_NAME(acorndata_8x8)
-		.word	SYMBOL_NAME(con_charconvtable)
+LC0:		.word	bytes_per_char_h
+		.word	video_size_row
+		.word	acorndata_8x8
+		.word	con_charconvtable
 
 ENTRY(ll_write_char)
 		stmfd	sp!, {r4 - r7, lr}

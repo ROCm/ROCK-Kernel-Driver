@@ -73,9 +73,9 @@ real_dz:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 
 |
 |	Inexact exception
@@ -164,9 +164,9 @@ inex_done:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 	
 |
 |	Overflow exception
@@ -190,9 +190,9 @@ ovfl_done:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 	
 |
 |	Underflow exception
@@ -216,9 +216,9 @@ unfl_done:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 	
 |
 |	Signalling NAN exception
@@ -238,9 +238,9 @@ real_snan:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 	
 |
 |	Operand Error exception
@@ -260,9 +260,9 @@ real_operr:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 
 	
 |
@@ -288,9 +288,9 @@ real_bsun:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 
 |
 |	F-line exception
@@ -309,9 +309,9 @@ real_fline:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 
 |
 |	Unsupported data type exception
@@ -331,9 +331,9 @@ real_unsupp:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	bral	SYMBOL_NAME(ret_from_exception)
+	bral	ret_from_exception
 
 |
 |	Trace exception
@@ -341,7 +341,7 @@ real_unsupp:
 	.global	real_trace
 real_trace:
 	|
-	bral	SYMBOL_NAME(trap)
+	bral	trap
 
 |
 |	fpsp_fmt_error --- exit point for frame format error
@@ -382,7 +382,7 @@ fpsp_done:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	tstl	%curptr@(TASK_NEEDRESCHED)
-	jne	SYMBOL_NAME(ret_from_exception)	| deliver signals,
+	jne	ret_from_exception	| deliver signals,
 						| reschedule etc..
 	RESTORE_ALL
 
@@ -505,7 +505,7 @@ in_ea:
 	.section .fixup,#alloc,#execinstr
 	.even
 1:
-	jbra	SYMBOL_NAME(fpsp040_die)
+	jbra	fpsp040_die
 
 	.section __ex_table,#alloc
 	.align	4

@@ -44,36 +44,36 @@
 
 #include "m68k_defs.h"
 
-.globl SYMBOL_NAME(system_call), SYMBOL_NAME(buserr), SYMBOL_NAME(trap)
-.globl SYMBOL_NAME(resume), SYMBOL_NAME(ret_from_exception)
-.globl SYMBOL_NAME(ret_from_signal)
-.globl SYMBOL_NAME(inthandler), SYMBOL_NAME(sys_call_table)
-.globl SYMBOL_NAME(sys_fork), SYMBOL_NAME(sys_clone), SYMBOL_NAME(sys_vfork)
-.globl SYMBOL_NAME(ret_from_interrupt), SYMBOL_NAME(bad_interrupt)
+.globl system_call, buserr, trap
+.globl resume, ret_from_exception
+.globl ret_from_signal
+.globl inthandler, sys_call_table
+.globl sys_fork, sys_clone, sys_vfork
+.globl ret_from_interrupt, bad_interrupt
 
 .text
 ENTRY(buserr)
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(buserr_c)
+	bsrl	buserr_c
 	addql	#4,%sp
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 ENTRY(trap)
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	movel	%sp,%sp@- 		| stack frame pointer argument
-	bsrl	SYMBOL_NAME(trap_c)
+	bsrl	trap_c
 	addql	#4,%sp
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 ENTRY(reschedule)
 	| save top of frame
 	movel	%sp,%curptr@(TASK_THREAD+THREAD_ESP0)
 
-	pea	SYMBOL_NAME(ret_from_exception)
-	jmp	SYMBOL_NAME(schedule)
+	pea	ret_from_exception
+	jmp	schedule
 
 	| After a fork we jump here directly from resume,
 	| so that %d1 contains the previous task
@@ -81,32 +81,32 @@ ENTRY(reschedule)
 	| what happens in schedule_tail() in future...
 ENTRY(ret_from_fork)
 	movel	%d1,%sp@-
-	jsr	SYMBOL_NAME(schedule_tail)
+	jsr	schedule_tail
 	addql	#4,%sp
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 badsys:
 	movel	#-ENOSYS,%sp@(PT_D0)
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 do_trace:
 	movel	#-ENOSYS,%sp@(PT_D0)	| needed for strace
 	subql	#4,%sp
 	SAVE_SWITCH_STACK
-	jbsr	SYMBOL_NAME(syscall_trace)
+	jbsr	syscall_trace
 	RESTORE_SWITCH_STACK
 	addql	#4,%sp
 	movel	%sp@(PT_ORIG_D0),%d1
 	movel	#-ENOSYS,%d0
 	cmpl	#NR_syscalls,%d1
 	jcc	1f
-	jbsr	@(SYMBOL_NAME(sys_call_table),%d1:l:4)@(0)
+	jbsr	@(sys_call_table,%d1:l:4)@(0)
 1:	movel	%d0,%sp@(PT_D0)		| save the return value
 	subql	#4,%sp			| dummy return address
 	SAVE_SWITCH_STACK
-	jbsr	SYMBOL_NAME(syscall_trace)
+	jbsr	syscall_trace
 
-SYMBOL_NAME_LABEL(ret_from_signal)
+ret_from_signal:
 	RESTORE_SWITCH_STACK 
 	addql	#4,%sp
 /* on 68040 complete pending writebacks if any */	
@@ -115,11 +115,11 @@ SYMBOL_NAME_LABEL(ret_from_signal)
 	subql	#7,%d0				| bus error frame ?
 	jbne	1f
 	movel	%sp,%sp@-
-	jbsr	SYMBOL_NAME(berr_040cleanup)
+	jbsr	berr_040cleanup
 	addql	#4,%sp
 1:	
 #endif	
-	jra	SYMBOL_NAME(ret_from_exception)
+	jra	ret_from_exception
 
 ENTRY(system_call)
 	SAVE_ALL_SYS
@@ -132,10 +132,10 @@ ENTRY(system_call)
 	jne	do_trace
 	cmpl	#NR_syscalls,%d0
 	jcc	badsys
-	jbsr	@(SYMBOL_NAME(sys_call_table),%d0:l:4)@(0)
+	jbsr	@(sys_call_table,%d0:l:4)@(0)
 	movel	%d0,%sp@(PT_D0)		| save the return value
 
-SYMBOL_NAME_LABEL(ret_from_exception)
+ret_from_exception:
 	btst	#5,%sp@(PT_SR)		| check if returning to kernel
 	bnes	2f			| if so, skip resched, signals
 	| only allow interrupts when we are really the last one on the
@@ -143,9 +143,9 @@ SYMBOL_NAME_LABEL(ret_from_exception)
 	| heavy interrupt load
 	andw	#ALLOWINT,%sr
 	tstl	%curptr@(TASK_NEEDRESCHED)
-	jne	SYMBOL_NAME(reschedule)
+	jne	reschedule
 #if 0
-	cmpl	#SYMBOL_NAME(task),%curptr	| task[0] cannot have signals
+	cmpl	#task,%curptr		| task[0] cannot have signals
 	jeq	2f
 #endif
 					| check for delayed trace
@@ -153,7 +153,7 @@ SYMBOL_NAME_LABEL(ret_from_exception)
 	jne	do_delayed_trace
 5:
 	tstl	%curptr@(TASK_STATE)	| state
-	jne	SYMBOL_NAME(reschedule)
+	jne	reschedule
 
 	tstl	%curptr@(TASK_SIGPENDING)
 	jne	Lsignal_return
@@ -164,7 +164,7 @@ Lsignal_return:
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
 	clrl	%sp@-
-	bsrl	SYMBOL_NAME(do_signal)
+	bsrl	do_signal
 	addql	#8,%sp
 	RESTORE_SWITCH_STACK
 	addql	#4,%sp
@@ -175,7 +175,7 @@ do_delayed_trace:
 	pea	1			| send SIGTRAP
 	movel	%curptr,%sp@-
 	pea	LSIGTRAP
-	jbsr	SYMBOL_NAME(send_sig)
+	jbsr	send_sig
 	addql	#8,%sp
 	addql	#4,%sp
 	jra	5b
@@ -183,15 +183,15 @@ do_delayed_trace:
 
 #if 0
 #if CONFIG_AMIGA
-SYMBOL_NAME_LABEL(ami_inthandler)
-	addql	#1,SYMBOL_NAME(irq_stat)+8	| local_irq_count
+ami_inthandler:
+	addql	#1,irq_stat+8		| local_irq_count
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 
 	bfextu	%sp@(PT_VECTOR){#4,#12},%d0
 	movel	%d0,%a0
-	addql	#1,%a0@(SYMBOL_NAME(kstat)+STAT_IRQ-VECOFF(VEC_SPUR))
-	movel	%a0@(SYMBOL_NAME(autoirq_list)-VECOFF(VEC_SPUR)),%a0
+	addql	#1,%a0@(kstat+STAT_IRQ-VECOFF(VEC_SPUR))
+	movel	%a0@(autoirq_list-VECOFF(VEC_SPUR)),%a0
 
 | amiga vector int handler get the req mask instead of irq vector
 	lea	CUSTOMBASE,%a1
@@ -202,7 +202,7 @@ SYMBOL_NAME_LABEL(ami_inthandler)
 	pea	%sp@
 	movel	%a0@(IRQ_DEVID),%sp@-
 	movel	%d0,%sp@-
-	pea	%pc@(SYMBOL_NAME(ret_from_interrupt):w)
+	pea	%pc@(ret_from_interrupt:w)
 	jbra	@(IRQ_HANDLER,%a0)@(0)
 
 ENTRY(nmi_handler)
@@ -213,10 +213,10 @@ ENTRY(nmi_handler)
 /*
 ** This is the main interrupt handler, responsible for calling process_int()
 */
-SYMBOL_NAME_LABEL(inthandler)
+inthandler:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
-	addql	#1,SYMBOL_NAME(irq_stat)+8	| local_irq_count
+	addql	#1,irq_stat+8		| local_irq_count
 					|  put exception # in d0
 	bfextu %sp@(PT_VECTOR){#4,#10},%d0
 
@@ -227,15 +227,15 @@ SYMBOL_NAME_LABEL(inthandler)
 	jbeq	1f
 	btstb	#3,0xff000004		
 	jbeq	1f
-	jbsr	SYMBOL_NAME(floppy_hardint)
+	jbsr	floppy_hardint
 	jbra	3f
 1:
 #endif		
-	jbsr	SYMBOL_NAME(process_int)|  process the IRQ
+	jbsr	process_int|  process the IRQ
 3:     	addql	#8,%sp			|  pop parameters off stack
 
-SYMBOL_NAME_LABEL(ret_from_interrupt)
-	subql	#1,SYMBOL_NAME(irq_stat)+8	| local_irq_count
+ret_from_interrupt:
+	subql	#1,irq_stat+8		| local_irq_count
 	jeq	1f
 2:
 	RESTORE_ALL
@@ -249,24 +249,24 @@ SYMBOL_NAME_LABEL(ret_from_interrupt)
 #endif
 	/* check if we need to do software interrupts */
 
-	movel	SYMBOL_NAME(irq_stat),%d0	| softirq_active
-	andl	SYMBOL_NAME(irq_stat)+4,%d0	| softirq_mask
-	jeq	SYMBOL_NAME(ret_from_exception)
+	movel	irq_stat,%d0		| softirq_active
+	andl	irq_stat+4,%d0		| softirq_mask
+	jeq	ret_from_exception
 
-	pea	SYMBOL_NAME(ret_from_exception)
-	jra	SYMBOL_NAME(do_softirq)
+	pea	ret_from_exception
+	jra	do_softirq
 
 
 /* Handler for uninitialized and spurious interrupts */
 
-SYMBOL_NAME_LABEL(bad_interrupt)
-	addql	#1,SYMBOL_NAME(num_spurious)
+bad_interrupt:
+	addql	#1,num_spurious
 	rte
 
 ENTRY(sys_fork)
 	SAVE_SWITCH_STACK	
 	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	SYMBOL_NAME(m68k_fork)
+	jbsr	m68k_fork
 	addql	#4,%sp
 	RESTORE_SWITCH_STACK
 	rts
@@ -274,7 +274,7 @@ ENTRY(sys_fork)
 ENTRY(sys_clone)
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	SYMBOL_NAME(m68k_clone)
+	jbsr	m68k_clone
 	addql	#4,%sp
 	RESTORE_SWITCH_STACK
 	rts
@@ -282,7 +282,7 @@ ENTRY(sys_clone)
 ENTRY(sys_vfork)
 	SAVE_SWITCH_STACK	
 	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	SYMBOL_NAME(m68k_vfork)
+	jbsr	m68k_vfork
 	addql	#4,%sp
 	RESTORE_SWITCH_STACK
 	rts
@@ -290,7 +290,7 @@ ENTRY(sys_vfork)
 ENTRY(sys_sigsuspend)
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	SYMBOL_NAME(do_sigsuspend)
+	jbsr	do_sigsuspend
 	addql	#4,%sp
 	RESTORE_SWITCH_STACK
 	rts
@@ -298,24 +298,24 @@ ENTRY(sys_sigsuspend)
 ENTRY(sys_rt_sigsuspend)
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	SYMBOL_NAME(do_rt_sigsuspend)
+	jbsr	do_rt_sigsuspend
 	addql	#4,%sp
 	RESTORE_SWITCH_STACK
 	rts
 
 ENTRY(sys_sigreturn)
 	SAVE_SWITCH_STACK
-	jbsr	SYMBOL_NAME(do_sigreturn)
+	jbsr	do_sigreturn
 	RESTORE_SWITCH_STACK
 	rts
 
 ENTRY(sys_rt_sigreturn)
 	SAVE_SWITCH_STACK
-	jbsr	SYMBOL_NAME(do_rt_sigreturn)
+	jbsr	do_rt_sigreturn
 	RESTORE_SWITCH_STACK
 	rts
 
-SYMBOL_NAME_LABEL(resume)
+resume:
 	/*
 	 * Beware - when entering resume, prev (the current task) is
 	 * in a0, next (the new task) is in a1,so don't change these
@@ -343,14 +343,14 @@ SYMBOL_NAME_LABEL(resume)
 	/* save floating point context */
 #ifndef CONFIG_M68KFPU_EMU_ONLY
 #ifdef CONFIG_M68KFPU_EMU
-	tstl	SYMBOL_NAME(m68k_fputype)
+	tstl	m68k_fputype
 	jeq	3f
 #endif
 	fsave	%a0@(TASK_THREAD+THREAD_FPSTATE)
 
 #if defined(CONFIG_M68060)
 #if !defined(CPU_M68060_ONLY)
-	btst	#3,SYMBOL_NAME(m68k_cputype)+3
+	btst	#3,m68k_cputype+3
 	beqs	1f
 #endif
 	/* The 060 FPU keeps status in bits 15-8 of the first longword */
@@ -377,12 +377,12 @@ SYMBOL_NAME_LABEL(resume)
 	/* restore floating point context */
 #ifndef CONFIG_M68KFPU_EMU_ONLY
 #ifdef CONFIG_M68KFPU_EMU
-	tstl	SYMBOL_NAME(m68k_fputype)
+	tstl	m68k_fputype
 	jeq	4f
 #endif
 #if defined(CONFIG_M68060)
 #if !defined(CPU_M68060_ONLY)
-	btst	#3,SYMBOL_NAME(m68k_cputype)+3
+	btst	#3,m68k_cputype+3
 	beqs	1f
 #endif
 	/* The 060 FPU keeps status in bits 15-8 of the first longword */
@@ -424,231 +424,231 @@ SYMBOL_NAME_LABEL(resume)
 
 .data
 ALIGN
-SYMBOL_NAME_LABEL(sys_call_table)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* 0  -  old "setup()" system call*/
-	.long SYMBOL_NAME(sys_exit)
-	.long SYMBOL_NAME(sys_fork)
-	.long SYMBOL_NAME(sys_read)
-	.long SYMBOL_NAME(sys_write)
-	.long SYMBOL_NAME(sys_open)		/* 5 */
-	.long SYMBOL_NAME(sys_close)
-	.long SYMBOL_NAME(sys_waitpid)
-	.long SYMBOL_NAME(sys_creat)
-	.long SYMBOL_NAME(sys_link)
-	.long SYMBOL_NAME(sys_unlink)		/* 10 */
-	.long SYMBOL_NAME(sys_execve)
-	.long SYMBOL_NAME(sys_chdir)
-	.long SYMBOL_NAME(sys_time)
-	.long SYMBOL_NAME(sys_mknod)
-	.long SYMBOL_NAME(sys_chmod)		/* 15 */
-	.long SYMBOL_NAME(sys_chown16)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old break syscall holder */
-	.long SYMBOL_NAME(sys_stat)
-	.long SYMBOL_NAME(sys_lseek)
-	.long SYMBOL_NAME(sys_getpid)		/* 20 */
-	.long SYMBOL_NAME(sys_mount)
-	.long SYMBOL_NAME(sys_oldumount)
-	.long SYMBOL_NAME(sys_setuid16)
-	.long SYMBOL_NAME(sys_getuid16)
-	.long SYMBOL_NAME(sys_stime)		/* 25 */
-	.long SYMBOL_NAME(sys_ptrace)
-	.long SYMBOL_NAME(sys_alarm)
-	.long SYMBOL_NAME(sys_fstat)
-	.long SYMBOL_NAME(sys_pause)
-	.long SYMBOL_NAME(sys_utime)		/* 30 */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old stty syscall holder */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old gtty syscall holder */
-	.long SYMBOL_NAME(sys_access)
-	.long SYMBOL_NAME(sys_nice)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* 35 */		/* old ftime syscall holder */
-	.long SYMBOL_NAME(sys_sync)
-	.long SYMBOL_NAME(sys_kill)
-	.long SYMBOL_NAME(sys_rename)
-	.long SYMBOL_NAME(sys_mkdir)
-	.long SYMBOL_NAME(sys_rmdir)		/* 40 */
-	.long SYMBOL_NAME(sys_dup)
-	.long SYMBOL_NAME(sys_pipe)
-	.long SYMBOL_NAME(sys_times)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old prof syscall holder */
-	.long SYMBOL_NAME(sys_brk)		/* 45 */
-	.long SYMBOL_NAME(sys_setgid16)
-	.long SYMBOL_NAME(sys_getgid16)
-	.long SYMBOL_NAME(sys_signal)
-	.long SYMBOL_NAME(sys_geteuid16)
-	.long SYMBOL_NAME(sys_getegid16)	/* 50 */
-	.long SYMBOL_NAME(sys_acct)
-	.long SYMBOL_NAME(sys_umount)					/* recycled never used phys() */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old lock syscall holder */
-	.long SYMBOL_NAME(sys_ioctl)
-	.long SYMBOL_NAME(sys_fcntl)		/* 55 */
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old mpx syscall holder */
-	.long SYMBOL_NAME(sys_setpgid)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old ulimit syscall holder */
-	.long SYMBOL_NAME(sys_ni_syscall)
-	.long SYMBOL_NAME(sys_umask)		/* 60 */
-	.long SYMBOL_NAME(sys_chroot)
-	.long SYMBOL_NAME(sys_ustat)
-	.long SYMBOL_NAME(sys_dup2)
-	.long SYMBOL_NAME(sys_getppid)
-	.long SYMBOL_NAME(sys_getpgrp)		/* 65 */
-	.long SYMBOL_NAME(sys_setsid)
-	.long SYMBOL_NAME(sys_sigaction)
-	.long SYMBOL_NAME(sys_sgetmask)
-	.long SYMBOL_NAME(sys_ssetmask)
-	.long SYMBOL_NAME(sys_setreuid16)	/* 70 */
-	.long SYMBOL_NAME(sys_setregid16)
-	.long SYMBOL_NAME(sys_sigsuspend)
-	.long SYMBOL_NAME(sys_sigpending)
-	.long SYMBOL_NAME(sys_sethostname)
-	.long SYMBOL_NAME(sys_setrlimit)	/* 75 */
-	.long SYMBOL_NAME(sys_old_getrlimit)
-	.long SYMBOL_NAME(sys_getrusage)
-	.long SYMBOL_NAME(sys_gettimeofday)
-	.long SYMBOL_NAME(sys_settimeofday)
-	.long SYMBOL_NAME(sys_getgroups16)	/* 80 */
-	.long SYMBOL_NAME(sys_setgroups16)
-	.long SYMBOL_NAME(old_select)
-	.long SYMBOL_NAME(sys_symlink)
-	.long SYMBOL_NAME(sys_lstat)
-	.long SYMBOL_NAME(sys_readlink)		/* 85 */
-	.long SYMBOL_NAME(sys_uselib)
-	.long SYMBOL_NAME(sys_swapon)
-	.long SYMBOL_NAME(sys_reboot)
-	.long SYMBOL_NAME(old_readdir)
-	.long SYMBOL_NAME(old_mmap)		/* 90 */
-	.long SYMBOL_NAME(sys_munmap)
-	.long SYMBOL_NAME(sys_truncate)
-	.long SYMBOL_NAME(sys_ftruncate)
-	.long SYMBOL_NAME(sys_fchmod)
-	.long SYMBOL_NAME(sys_fchown16)		/* 95 */
-	.long SYMBOL_NAME(sys_getpriority)
-	.long SYMBOL_NAME(sys_setpriority)
-	.long SYMBOL_NAME(sys_ni_syscall)				/* old profil syscall holder */
-	.long SYMBOL_NAME(sys_statfs)
-	.long SYMBOL_NAME(sys_fstatfs)		/* 100 */
-	.long SYMBOL_NAME(sys_ioperm)
-	.long SYMBOL_NAME(sys_socketcall)
-	.long SYMBOL_NAME(sys_syslog)
-	.long SYMBOL_NAME(sys_setitimer)
-	.long SYMBOL_NAME(sys_getitimer)	/* 105 */
-	.long SYMBOL_NAME(sys_newstat)
-	.long SYMBOL_NAME(sys_newlstat)
-	.long SYMBOL_NAME(sys_newfstat)
-	.long SYMBOL_NAME(sys_ni_syscall)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* iopl for i386 */ /* 110 */
-	.long SYMBOL_NAME(sys_vhangup)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* obsolete idle() syscall */
-	.long SYMBOL_NAME(sys_ni_syscall)	/* vm86old for i386 */
-	.long SYMBOL_NAME(sys_wait4)
-	.long SYMBOL_NAME(sys_swapoff)		/* 115 */
-	.long SYMBOL_NAME(sys_sysinfo)
-	.long SYMBOL_NAME(sys_ipc)
-	.long SYMBOL_NAME(sys_fsync)
-	.long SYMBOL_NAME(sys_sigreturn)
-	.long SYMBOL_NAME(sys_clone)		/* 120 */
-	.long SYMBOL_NAME(sys_setdomainname)
-	.long SYMBOL_NAME(sys_newuname)
-	.long SYMBOL_NAME(sys_cacheflush)	/* modify_ldt for i386 */
-	.long SYMBOL_NAME(sys_adjtimex)
-	.long SYMBOL_NAME(sys_mprotect)		/* 125 */
-	.long SYMBOL_NAME(sys_sigprocmask)
-	.long SYMBOL_NAME(sys_create_module)
-	.long SYMBOL_NAME(sys_init_module)
-	.long SYMBOL_NAME(sys_delete_module)
-	.long SYMBOL_NAME(sys_get_kernel_syms)	/* 130 */
-	.long SYMBOL_NAME(sys_quotactl)
-	.long SYMBOL_NAME(sys_getpgid)
-	.long SYMBOL_NAME(sys_fchdir)
-	.long SYMBOL_NAME(sys_bdflush)
-	.long SYMBOL_NAME(sys_sysfs)		/* 135 */
-	.long SYMBOL_NAME(sys_personality)
-	.long SYMBOL_NAME(sys_ni_syscall)	/* for afs_syscall */
-	.long SYMBOL_NAME(sys_setfsuid16)
-	.long SYMBOL_NAME(sys_setfsgid16)
-	.long SYMBOL_NAME(sys_llseek)		/* 140 */
-	.long SYMBOL_NAME(sys_getdents)
-	.long SYMBOL_NAME(sys_select)
-	.long SYMBOL_NAME(sys_flock)
-	.long SYMBOL_NAME(sys_msync)
-	.long SYMBOL_NAME(sys_readv)		/* 145 */
-	.long SYMBOL_NAME(sys_writev)
-	.long SYMBOL_NAME(sys_getsid)
-	.long SYMBOL_NAME(sys_fdatasync)
-	.long SYMBOL_NAME(sys_sysctl)
-	.long SYMBOL_NAME(sys_mlock)		/* 150 */
-	.long SYMBOL_NAME(sys_munlock)
-	.long SYMBOL_NAME(sys_mlockall)
-	.long SYMBOL_NAME(sys_munlockall)
-	.long SYMBOL_NAME(sys_sched_setparam)
-	.long SYMBOL_NAME(sys_sched_getparam)   /* 155 */
-	.long SYMBOL_NAME(sys_sched_setscheduler)
-	.long SYMBOL_NAME(sys_sched_getscheduler)
-	.long SYMBOL_NAME(sys_sched_yield)
-	.long SYMBOL_NAME(sys_sched_get_priority_max)
-	.long SYMBOL_NAME(sys_sched_get_priority_min)  /* 160 */
-	.long SYMBOL_NAME(sys_sched_rr_get_interval)
-	.long SYMBOL_NAME(sys_nanosleep)
-	.long SYMBOL_NAME(sys_mremap)
-	.long SYMBOL_NAME(sys_setresuid16)
-	.long SYMBOL_NAME(sys_getresuid16)	/* 165 */
-	.long SYMBOL_NAME(sys_getpagesize)
-	.long SYMBOL_NAME(sys_query_module)
-	.long SYMBOL_NAME(sys_poll)
-	.long SYMBOL_NAME(sys_nfsservctl)
-	.long SYMBOL_NAME(sys_setresgid16)	/* 170 */
-	.long SYMBOL_NAME(sys_getresgid16)
-	.long SYMBOL_NAME(sys_prctl)
-	.long SYMBOL_NAME(sys_rt_sigreturn)
-	.long SYMBOL_NAME(sys_rt_sigaction)
-	.long SYMBOL_NAME(sys_rt_sigprocmask)	/* 175 */
-	.long SYMBOL_NAME(sys_rt_sigpending)
-	.long SYMBOL_NAME(sys_rt_sigtimedwait)
-	.long SYMBOL_NAME(sys_rt_sigqueueinfo)
-	.long SYMBOL_NAME(sys_rt_sigsuspend)
-	.long SYMBOL_NAME(sys_pread)		/* 180 */
-	.long SYMBOL_NAME(sys_pwrite)
-	.long SYMBOL_NAME(sys_lchown16);
-	.long SYMBOL_NAME(sys_getcwd)
-	.long SYMBOL_NAME(sys_capget)
-	.long SYMBOL_NAME(sys_capset)           /* 185 */
-	.long SYMBOL_NAME(sys_sigaltstack)
-	.long SYMBOL_NAME(sys_sendfile)
-	.long SYMBOL_NAME(sys_ni_syscall)		/* streams1 */
-	.long SYMBOL_NAME(sys_ni_syscall)		/* streams2 */
-	.long SYMBOL_NAME(sys_vfork)            /* 190 */
-	.long SYMBOL_NAME(sys_getrlimit)
-	.long SYMBOL_NAME(sys_mmap2)
-	.long SYMBOL_NAME(sys_truncate64)
-	.long SYMBOL_NAME(sys_ftruncate64)
-	.long SYMBOL_NAME(sys_stat64)		/* 195 */
-	.long SYMBOL_NAME(sys_lstat64)
-	.long SYMBOL_NAME(sys_fstat64)
-	.long SYMBOL_NAME(sys_chown)
-	.long SYMBOL_NAME(sys_getuid)
-	.long SYMBOL_NAME(sys_getgid)		/* 200 */
-	.long SYMBOL_NAME(sys_geteuid)
-	.long SYMBOL_NAME(sys_getegid)
-	.long SYMBOL_NAME(sys_setreuid)
-	.long SYMBOL_NAME(sys_setregid)
-	.long SYMBOL_NAME(sys_getgroups)	/* 205 */
-	.long SYMBOL_NAME(sys_setgroups)
-	.long SYMBOL_NAME(sys_fchown)
-	.long SYMBOL_NAME(sys_setresuid)
-	.long SYMBOL_NAME(sys_getresuid)
-	.long SYMBOL_NAME(sys_setresgid)	/* 210 */
-	.long SYMBOL_NAME(sys_getresgid)
-	.long SYMBOL_NAME(sys_lchown)
-	.long SYMBOL_NAME(sys_setuid)
-	.long SYMBOL_NAME(sys_setgid)
-	.long SYMBOL_NAME(sys_setfsuid)		/* 215 */
-	.long SYMBOL_NAME(sys_setfsgid)
-	.long SYMBOL_NAME(sys_ni_syscall)
-	.long SYMBOL_NAME(sys_ni_syscall)
-	.long SYMBOL_NAME(sys_ni_syscall)
-	.long SYMBOL_NAME(sys_getdents64)	/* 220 */
-	.long SYMBOL_NAME(sys_gettid)
-	.long SYMBOL_NAME(sys_tkill)
+sys_call_table:
+	.long sys_ni_syscall	/* 0  -  old "setup()" system call*/
+	.long sys_exit
+	.long sys_fork
+	.long sys_read
+	.long sys_write
+	.long sys_open		/* 5 */
+	.long sys_close
+	.long sys_waitpid
+	.long sys_creat
+	.long sys_link
+	.long sys_unlink	/* 10 */
+	.long sys_execve
+	.long sys_chdir
+	.long sys_time
+	.long sys_mknod
+	.long sys_chmod		/* 15 */
+	.long sys_chown16
+	.long sys_ni_syscall				/* old break syscall holder */
+	.long sys_stat
+	.long sys_lseek
+	.long sys_getpid	/* 20 */
+	.long sys_mount
+	.long sys_oldumount
+	.long sys_setuid16
+	.long sys_getuid16
+	.long sys_stime		/* 25 */
+	.long sys_ptrace
+	.long sys_alarm
+	.long sys_fstat
+	.long sys_pause
+	.long sys_utime		/* 30 */
+	.long sys_ni_syscall				/* old stty syscall holder */
+	.long sys_ni_syscall				/* old gtty syscall holder */
+	.long sys_access
+	.long sys_nice
+	.long sys_ni_syscall	/* 35 */		/* old ftime syscall holder */
+	.long sys_sync
+	.long sys_kill
+	.long sys_rename
+	.long sys_mkdir
+	.long sys_rmdir		/* 40 */
+	.long sys_dup
+	.long sys_pipe
+	.long sys_times
+	.long sys_ni_syscall				/* old prof syscall holder */
+	.long sys_brk		/* 45 */
+	.long sys_setgid16
+	.long sys_getgid16
+	.long sys_signal
+	.long sys_geteuid16
+	.long sys_getegid16	/* 50 */
+	.long sys_acct
+	.long sys_umount					/* recycled never used phys() */
+	.long sys_ni_syscall				/* old lock syscall holder */
+	.long sys_ioctl
+	.long sys_fcntl		/* 55 */
+	.long sys_ni_syscall				/* old mpx syscall holder */
+	.long sys_setpgid
+	.long sys_ni_syscall				/* old ulimit syscall holder */
+	.long sys_ni_syscall
+	.long sys_umask		/* 60 */
+	.long sys_chroot
+	.long sys_ustat
+	.long sys_dup2
+	.long sys_getppid
+	.long sys_getpgrp	/* 65 */
+	.long sys_setsid
+	.long sys_sigaction
+	.long sys_sgetmask
+	.long sys_ssetmask
+	.long sys_setreuid16	/* 70 */
+	.long sys_setregid16
+	.long sys_sigsuspend
+	.long sys_sigpending
+	.long sys_sethostname
+	.long sys_setrlimit	/* 75 */
+	.long sys_old_getrlimit
+	.long sys_getrusage
+	.long sys_gettimeofday
+	.long sys_settimeofday
+	.long sys_getgroups16	/* 80 */
+	.long sys_setgroups16
+	.long old_select
+	.long sys_symlink
+	.long sys_lstat
+	.long sys_readlink	/* 85 */
+	.long sys_uselib
+	.long sys_swapon
+	.long sys_reboot
+	.long old_readdir
+	.long old_mmap		/* 90 */
+	.long sys_munmap
+	.long sys_truncate
+	.long sys_ftruncate
+	.long sys_fchmod
+	.long sys_fchown16	/* 95 */
+	.long sys_getpriority
+	.long sys_setpriority
+	.long sys_ni_syscall				/* old profil syscall holder */
+	.long sys_statfs
+	.long sys_fstatfs	/* 100 */
+	.long sys_ioperm
+	.long sys_socketcall
+	.long sys_syslog
+	.long sys_setitimer
+	.long sys_getitimer	/* 105 */
+	.long sys_newstat
+	.long sys_newlstat
+	.long sys_newfstat
+	.long sys_ni_syscall
+	.long sys_ni_syscall	/* iopl for i386 */ /* 110 */
+	.long sys_vhangup
+	.long sys_ni_syscall	/* obsolete idle() syscall */
+	.long sys_ni_syscall	/* vm86old for i386 */
+	.long sys_wait4
+	.long sys_swapoff	/* 115 */
+	.long sys_sysinfo
+	.long sys_ipc
+	.long sys_fsync
+	.long sys_sigreturn
+	.long sys_clone		/* 120 */
+	.long sys_setdomainname
+	.long sys_newuname
+	.long sys_cacheflush	/* modify_ldt for i386 */
+	.long sys_adjtimex
+	.long sys_mprotect	/* 125 */
+	.long sys_sigprocmask
+	.long sys_create_module
+	.long sys_init_module
+	.long sys_delete_module
+	.long sys_get_kernel_syms	/* 130 */
+	.long sys_quotactl
+	.long sys_getpgid
+	.long sys_fchdir
+	.long sys_bdflush
+	.long sys_sysfs		/* 135 */
+	.long sys_personality
+	.long sys_ni_syscall	/* for afs_syscall */
+	.long sys_setfsuid16
+	.long sys_setfsgid16
+	.long sys_llseek	/* 140 */
+	.long sys_getdents
+	.long sys_select
+	.long sys_flock
+	.long sys_msync
+	.long sys_readv		/* 145 */
+	.long sys_writev
+	.long sys_getsid
+	.long sys_fdatasync
+	.long sys_sysctl
+	.long sys_mlock		/* 150 */
+	.long sys_munlock
+	.long sys_mlockall
+	.long sys_munlockall
+	.long sys_sched_setparam
+	.long sys_sched_getparam   /* 155 */
+	.long sys_sched_setscheduler
+	.long sys_sched_getscheduler
+	.long sys_sched_yield
+	.long sys_sched_get_priority_max
+	.long sys_sched_get_priority_min  /* 160 */
+	.long sys_sched_rr_get_interval
+	.long sys_nanosleep
+	.long sys_mremap
+	.long sys_setresuid16
+	.long sys_getresuid16	/* 165 */
+	.long sys_getpagesize
+	.long sys_query_module
+	.long sys_poll
+	.long sys_nfsservctl
+	.long sys_setresgid16	/* 170 */
+	.long sys_getresgid16
+	.long sys_prctl
+	.long sys_rt_sigreturn
+	.long sys_rt_sigaction
+	.long sys_rt_sigprocmask	/* 175 */
+	.long sys_rt_sigpending
+	.long sys_rt_sigtimedwait
+	.long sys_rt_sigqueueinfo
+	.long sys_rt_sigsuspend
+	.long sys_pread		/* 180 */
+	.long sys_pwrite
+	.long sys_lchown16;
+	.long sys_getcwd
+	.long sys_capget
+	.long sys_capset	/* 185 */
+	.long sys_sigaltstack
+	.long sys_sendfile
+	.long sys_ni_syscall	/* streams1 */
+	.long sys_ni_syscall	/* streams2 */
+	.long sys_vfork		/* 190 */
+	.long sys_getrlimit
+	.long sys_mmap2
+	.long sys_truncate64
+	.long sys_ftruncate64
+	.long sys_stat64	/* 195 */
+	.long sys_lstat64
+	.long sys_fstat64
+	.long sys_chown
+	.long sys_getuid
+	.long sys_getgid	/* 200 */
+	.long sys_geteuid
+	.long sys_getegid
+	.long sys_setreuid
+	.long sys_setregid
+	.long sys_getgroups	/* 205 */
+	.long sys_setgroups
+	.long sys_fchown
+	.long sys_setresuid
+	.long sys_getresuid
+	.long sys_setresgid	/* 210 */
+	.long sys_getresgid
+	.long sys_lchown
+	.long sys_setuid
+	.long sys_setgid
+	.long sys_setfsuid	/* 215 */
+	.long sys_setfsgid
+	.long sys_ni_syscall
+	.long sys_ni_syscall
+	.long sys_ni_syscall
+	.long sys_getdents64	/* 220 */
+	.long sys_gettid
+	.long sys_tkill
 
-	.rept NR_syscalls-(.-SYMBOL_NAME(sys_call_table))/4
-		.long SYMBOL_NAME(sys_ni_syscall)
+	.rept NR_syscalls-(.-sys_call_table)/4
+		.long sys_ni_syscall
 	.endr

@@ -55,24 +55,6 @@ static unsigned int cpu_6xx[16] = {
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 /* IDE functions */
-static int
-k2_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-        return check_region(from, extent);
-}
-
-static void
-k2_ide_request_region(ide_ioreg_t from, unsigned int extent,
-		const char *name)
-{
-        request_region(from, extent, name);
-}
-
-static void
-k2_ide_release_region(ide_ioreg_t from, unsigned int extent)
-{
-        release_region(from, extent);
-}
 
 static void __init
 k2_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port,
@@ -373,9 +355,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	ppc_md.nvram_write_val = todc_direct_write_val;
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-	ppc_ide_md.ide_check_region = k2_ide_check_region;
-	ppc_ide_md.ide_request_region = k2_ide_request_region;
-	ppc_ide_md.ide_release_region = k2_ide_release_region;
 	ppc_ide_md.ide_init_hwif = k2_ide_init_hwif_ports;
 #endif
 }

@@ -1784,7 +1784,7 @@ int acsi_init( void )
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &acsi_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
 	add_gendisk(&acsi_gendisk);
 
 #ifdef CONFIG_ATARI_SLM

@@ -1500,7 +1500,7 @@ int __init cm206_init(void)
 		return -EIO;
 	}
 	devfs_plain_cdrom(&cm206_info, &cm206_bdops);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
 		       &cm206_lock);
 	blksize_size[MAJOR_NR] = cm206_blocksizes;
 	init_bh(CM206_BH, cm206_bh);

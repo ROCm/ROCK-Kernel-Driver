@@ -35,12 +35,6 @@ extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 struct ide_machdep_calls {
         int         (*default_irq)(ide_ioreg_t base);
         ide_ioreg_t (*default_io_base)(int index);
-        int         (*ide_check_region)(ide_ioreg_t from, unsigned int extent);
-        void        (*ide_request_region)(ide_ioreg_t from,
-                                      unsigned int extent,
-                                      const char *name);
-        void        (*ide_release_region)(ide_ioreg_t from,
-                                      unsigned int extent);
         void        (*ide_init_hwif)(hw_regs_t *hw,
                                      ide_ioreg_t data_port,
                                      ide_ioreg_t ctrl_port,
@@ -118,25 +112,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 }
 
-static __inline__ int ide_check_region (ide_ioreg_t from, unsigned int extent)
-{
-	if (ppc_ide_md.ide_check_region)
-		return ppc_ide_md.ide_check_region(from, extent);
-	return 0;
-}
-
-static __inline__ void ide_request_region (ide_ioreg_t from, unsigned int extent, const char *name)
-{
-	if (ppc_ide_md.ide_request_region)
-		ppc_ide_md.ide_request_region(from, extent, name);
-}
-
-static __inline__ void ide_release_region (ide_ioreg_t from, unsigned int extent)
-{
-	if (ppc_ide_md.ide_release_region)
-		ppc_ide_md.ide_release_region(from, extent);
-}
-
 typedef union {
 	unsigned all			: 8;	/* all of the bits together */
 	struct {
@@ -159,14 +134,6 @@ typedef union {
 		unsigned bit0		: 1;
 	} b;
 } control_t;
-
-#if !defined(ide_request_irq)
-#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
-#endif
-
-#if !defined(ide_free_irq)
-#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
-#endif
 
 /*
  * The following are not needed for the non-m68k ports

@@ -7,7 +7,7 @@
  * Original driver (sg.c):
  *        Copyright (C) 1992 Lawrence Foard
  * Version 2 and 3 extensions to driver:
- *        Copyright (C) 1998 - 2001 Douglas Gilbert
+ *        Copyright (C) 1998 - 2002 Douglas Gilbert
  *
  *  Modified  19-JAN-1998  Richard Gooch <rgooch@atnf.csiro.au>  Devfs support
  *
@@ -19,9 +19,9 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
- static char sg_version_str[] = "Version: 3.5.23 (20020103)";
+ static char * sg_version_str = "Version: 3.5.25 (20020425)";
 #endif
- static int sg_version_num = 30523; /* 2 digits for each component */
+ static int sg_version_num = 30525; /* 2 digits for each component */
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
  *      - scsi logging is available via SCSI_LOG_TIMEOUT macros. First
@@ -285,7 +285,7 @@ static int sg_open(struct inode * inode, struct file * filp)
 
     if (flags & O_EXCL) {
         if (O_RDONLY == (flags & O_ACCMODE))  {
-            retval = -EACCES;   /* Can't lock it with read only access */
+            retval = -EPERM;   /* Can't lock it with read only access */
 	    goto error_out;
 	}
 	if (sdp->headfp && (flags & O_NONBLOCK))
@@ -574,7 +574,7 @@ static ssize_t sg_write(struct file * filp, const char * buf,
     hp->iovec_count = 0;
     hp->mx_sb_len = 0;
     if (input_size > 0)
-	hp->dxfer_direction = ((old_hdr.reply_len - SZ_SG_HEADER) > 0) ?
+	hp->dxfer_direction = (old_hdr.reply_len > SZ_SG_HEADER) ?
 			      SG_DXFER_TO_FROM_DEV : SG_DXFER_TO_DEV;
     else
 	hp->dxfer_direction = (mxsize > 0) ? SG_DXFER_FROM_DEV :
@@ -643,7 +643,7 @@ static ssize_t sg_new_write(Sg_fd * sfp, const char * buf, size_t count,
     if (read_only &&
 	(! sg_allow_access(cmnd[0], sfp->parentdp->device->type))) {
 	sg_remove_request(sfp, srp);
-	return -EACCES;
+	return -EPERM;
     }
     k = sg_common_write(sfp, srp, cmnd, timeout, blocking);
     if (k < 0) return k;
@@ -718,6 +718,7 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
     default:
 	SRpnt->sr_data_direction = SCSI_DATA_NONE; break;
     }
+    SRpnt->upper_private_data = srp;
     srp->data.k_use_sg = 0;
     srp->data.sglist_len = 0;
     srp->data.bufflen = 0;
@@ -972,7 +973,7 @@ static int sg_ioctl(struct inode * inode, struct file * filp,
 
 	    copy_from_user(&opcode, siocp->data, 1);
 	    if (! sg_allow_access(opcode, sdp->device->type))
-		return -EACCES;
+		return -EPERM;
 	}
         return scsi_ioctl_send_command(sdp->device, (void *)arg);
     case SG_SET_DEBUG:
@@ -989,7 +990,7 @@ static int sg_ioctl(struct inode * inode, struct file * filp,
         return scsi_ioctl(sdp->device, cmd_in, (void *)arg);
     default:
 	if (read_only)
-            return -EACCES; /* don't know so take safe approach */
+            return -EPERM; /* don't know so take safe approach */
         return scsi_ioctl(sdp->device, cmd_in, (void *)arg);
     }
 }
@@ -1188,43 +1189,28 @@ static int sg_mmap(struct file * filp, struct vm_area_struct *vma)
  * mid level when a command is completed (or has failed). */
 static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
 {
-    Scsi_Request * SRpnt = SCpnt->sc_request;
-    int dev = minor(SRpnt->sr_request.rq_dev);
+    Scsi_Request * SRpnt = NULL;
     Sg_device * sdp = NULL;
     Sg_fd * sfp;
     Sg_request * srp = NULL;
 
-    read_lock(&sg_dev_arr_lock);
-    if (sg_dev_arr && (dev >= 0)) {
-	if (dev < sg_template.dev_max)
-	    sdp = sg_dev_arr[dev];
+    if (SCpnt && (SRpnt = SCpnt->sc_request))
+	srp = (Sg_request *)SRpnt->upper_private_data;
+    if (NULL == srp) {
+    	printk(KERN_ERR "sg_cmd_done_bh: NULL request\n");
+	if (SRpnt)
+	    scsi_release_request(SRpnt);
+	return;
     }
+    sfp = srp->parentfp;
+    if (sfp)
+    	sdp = sfp->parentdp;
     if ((NULL == sdp) || sdp->detached) {
-	read_unlock(&sg_dev_arr_lock);
-	SCSI_LOG_TIMEOUT(1, printk("sg...bh: dev=%d gone\n", dev));
+    	printk(KERN_INFO "sg_cmd_done_bh: device detached\n");
         scsi_release_request(SRpnt);
-        SRpnt = NULL;
         return;
     }
-    sfp = sdp->headfp;
-    while (sfp) {
-	read_lock(&sfp->rq_list_lock);
-	for (srp = sfp->headrp; srp; srp = srp->nextrp) {
-            if (SRpnt == srp->my_cmdp)
-                break;
-        }
-	read_unlock(&sfp->rq_list_lock);
-        if (srp)
-            break;
-        sfp = sfp->nextfp;
-    }
-    if (! srp) {
-	read_unlock(&sg_dev_arr_lock);
-	SCSI_LOG_TIMEOUT(1, printk("sg...bh: req missing, dev=%d\n", dev));
-        scsi_release_request(SRpnt);
-        SRpnt = NULL;
-        return;
-    }
+
     /* First transfer ownership of data buffers to sg_device object. */
     srp->data.k_use_sg = SRpnt->sr_use_sg;
     srp->data.sglist_len = SRpnt->sr_sglist_len;
@@ -1240,10 +1226,10 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
 
     srp->my_cmdp = NULL;
     srp->done = 1;
-    read_unlock(&sg_dev_arr_lock);
 
     SCSI_LOG_TIMEOUT(4, printk("sg...bh: dev=%d, pack_id=%d, res=0x%x\n",
-		     dev, srp->header.pack_id, (int)SRpnt->sr_result));
+		     minor(sdp->i_rdev), srp->header.pack_id, 
+		     (int)SRpnt->sr_result));
     srp->header.resid = SCpnt->resid;
     /* sg_unmap_and(&srp->data, 0); */     /* unmap locked pages a.s.a.p. */
     /* N.B. unit of duration changes here from jiffies to millisecs */
@@ -2443,7 +2429,11 @@ static char * sg_low_malloc(int rqSz, int lowDma, int mem_src, int * retSzp)
         return resp;
     if (SG_HEAP_KMAL == mem_src) {
         resp = kmalloc(rqSz, page_mask);
-        if (resp && retSzp) *retSzp = rqSz;
+        if (resp) {
+	    if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+	    	memset(resp, 0, rqSz);
+	    if (retSzp) *retSzp = rqSz;
+	}
         return resp;
     }
     else if (SG_HEAP_PAGE == mem_src) {
@@ -2460,7 +2450,11 @@ static char * sg_low_malloc(int rqSz, int lowDma, int mem_src, int * retSzp)
             resp = (char *)__get_free_pages(page_mask, order); /* try half */
             resSz = a_size;
         }
-        if (retSzp) *retSzp = resSz;
+	if (resp) {
+	    if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+	    	memset(resp, 0, resSz);
+	    if (retSzp) *retSzp = resSz;
+	}
     }
     else
         printk(KERN_ERR "sg_low_malloc: bad mem_src=%d, rqSz=%df\n", 
@@ -2581,9 +2575,9 @@ static inline unsigned sg_jif_to_ms(int jifs)
     }
 }
 
-static unsigned char allow_ops[] = {TEST_UNIT_READY, INQUIRY,
-READ_CAPACITY, READ_BUFFER, READ_6, READ_10, READ_12,
-MODE_SENSE, MODE_SENSE_10};
+static unsigned char allow_ops[] = {TEST_UNIT_READY, REQUEST_SENSE,
+INQUIRY, READ_CAPACITY, READ_BUFFER, READ_6, READ_10, READ_12,
+MODE_SENSE, MODE_SENSE_10, LOG_SENSE};
 
 static int sg_allow_access(unsigned char opcode, char dev_type)
 {
@@ -2983,17 +2977,28 @@ static int sg_proc_hoststrs_read(char * buffer, char ** start, off_t offset,
 				 int size, int * eof, void * data)
 { SG_PROC_READ_FN(sg_proc_hoststrs_info); }
 
+#define SG_MAX_HOST_STR_LEN 256
+
 static int sg_proc_hoststrs_info(char * buffer, int * len, off_t * begin,
 				 off_t offset, int size)
 {
     struct Scsi_Host * shp;
     int k;
+    char buff[SG_MAX_HOST_STR_LEN];
+    char * cp;
 
     for (k = 0, shp = scsi_hostlist; shp; shp = shp->next, ++k) {
-    	for ( ; k < shp->host_no; ++k)
-	    PRINT_PROC("<no active host>\n");
-	PRINT_PROC("%s\n", shp->hostt->info ? shp->hostt->info(shp) :
-		    (shp->hostt->name ? shp->hostt->name : "<no name>"));
+        for ( ; k < shp->host_no; ++k)
+            PRINT_PROC("<no active host>\n");
+        strncpy(buff, shp->hostt->info ? shp->hostt->info(shp) :
+                    (shp->hostt->name ? shp->hostt->name : "<no name>"),
+                SG_MAX_HOST_STR_LEN);
+        buff[SG_MAX_HOST_STR_LEN - 1] = '\0';
+        for (cp = buff; *cp; ++cp) {
+            if ('\n' == *cp)
+                *cp = ' '; /* suppress imbedded newlines */
+        }
+        PRINT_PROC("%s\n", buff);
     }
     return 1;
 }

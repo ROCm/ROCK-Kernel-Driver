@@ -87,13 +87,13 @@ static inline void clear_LDT(void)
 /*
  * load one particular LDT into the current CPU
  */
-static inline void load_LDT (struct mm_struct *mm)
+static inline void load_LDT (mm_context_t *pc)
 {
 	int cpu = smp_processor_id();
-	void *segments = mm->context.segments;
-	int count = LDT_ENTRIES;
+	void *segments = pc->ldt;
+	int count = pc->size;
 
-	if (!segments) {
+	if (!count) {
 		segments = &default_ldt[0];
 		count = 5;
 	}

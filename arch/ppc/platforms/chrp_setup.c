@@ -463,33 +463,6 @@ chrp_init2(void)
 #endif /* CONFIG_VT && (CONFIG_ADB_KEYBOARD || CONFIG_INPUT) */
 }
 
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-/*
- * IDE stuff.
- */
-
-static int __chrp
-chrp_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-        return check_region(from, extent);
-}
-
-static void __chrp
-chrp_ide_request_region(ide_ioreg_t from,
-			unsigned int extent,
-			const char *name)
-{
-        request_region(from, extent, name);
-}
-
-static void __chrp
-chrp_ide_release_region(ide_ioreg_t from,
-			unsigned int extent)
-{
-        release_region(from, extent);
-}
-#endif
-
 /*
  * One of the main thing these mappings are needed for is so that
  * xmon can get to the serial port early on.  We probably should
@@ -596,12 +569,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_SMP
 	ppc_md.smp_ops = &chrp_smp_ops;
 #endif /* CONFIG_SMP */
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.ide_check_region = chrp_ide_check_region;
-        ppc_ide_md.ide_request_region = chrp_ide_request_region;
-        ppc_ide_md.ide_release_region = chrp_ide_release_region;
-#endif
 
 	/*
 	 * Print the banner, then scroll down so boot progress

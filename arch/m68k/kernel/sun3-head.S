@@ -12,27 +12,27 @@ CACHES_OFF	= 0x00000008	| actually a clear and disable --m
 ROOT_TABLE_SIZE = 128
 PAGESIZE	= 8192
 SUN3_INVALID_PMEG = 255
-.globl SYMBOL_NAME(bootup_user_stack)
-.globl SYMBOL_NAME(bootup_kernel_stack)
-.globl SYMBOL_NAME(pg0)
-.globl SYMBOL_NAME(empty_bad_page)
-.globl SYMBOL_NAME(empty_bad_page_table)
-.globl SYMBOL_NAME(empty_zero_page)
-.globl SYMBOL_NAME(swapper_pg_dir)
-.globl SYMBOL_NAME(kernel_pmd_table)
-.globl SYMBOL_NAME(availmem)
-.global SYMBOL_NAME(m68k_pgtable_cachemode)
-.global SYMBOL_NAME(kpt)
+.globl bootup_user_stack
+.globl bootup_kernel_stack
+.globl pg0
+.globl empty_bad_page
+.globl empty_bad_page_table
+.globl empty_zero_page
+.globl swapper_pg_dir
+.globl kernel_pmd_table
+.globl availmem
+.global m68k_pgtable_cachemode
+.global kpt
 | todo: all these should be in bss!
-SYMBOL_NAME(swapper_pg_dir):                .skip 0x2000
-SYMBOL_NAME(pg0):                           .skip 0x2000
-SYMBOL_NAME(empty_bad_page):                .skip 0x2000
-SYMBOL_NAME(empty_bad_page_table):          .skip 0x2000
-SYMBOL_NAME(kernel_pmd_table):              .skip 0x2000
-SYMBOL_NAME(empty_zero_page):               .skip 0x2000
+swapper_pg_dir:                .skip 0x2000
+pg0:                           .skip 0x2000
+empty_bad_page:                .skip 0x2000
+empty_bad_page_table:          .skip 0x2000
+kernel_pmd_table:              .skip 0x2000
+empty_zero_page:               .skip 0x2000
 
-.globl SYMBOL_NAME(kernel_pg_dir)
-.equ    SYMBOL_NAME(kernel_pg_dir),SYMBOL_NAME(kernel_pmd_table)
+.globl kernel_pg_dir
+.equ    kernel_pg_dir,kernel_pmd_table
 
 	.section .head
 ENTRY(_stext)
@@ -69,11 +69,11 @@ ENTRY(_start)
 	jmp	1f:l		
 
 /* Following code executes at high addresses (0xE000xxx). */
-1:	lea	SYMBOL_NAME(init_task_union),%a2	| get initial thread...
+1:	lea	init_task_union,%a2			| get initial thread...
 	lea	%a2@(KTHREAD_SIZE),%sp			| ...and its stack.
 
 /* copy bootinfo records from the loader to _end */
-	lea	SYMBOL_NAME(_end), %a1
+	lea	_end, %a1
 	lea	BI_START, %a0
 	/* number of longs to copy */
 	movel	%a0@, %d0
@@ -88,22 +88,22 @@ ENTRY(_start)
 	moveq	#-1,%d0
 	movsb	%d0,(AC_SEGMAP+0x0)
 
-	jbsr	SYMBOL_NAME(sun3_init)
+	jbsr	sun3_init
 
-	jbsr	SYMBOL_NAME(base_trap_init)
+	jbsr	base_trap_init
 			
-        jbsr    SYMBOL_NAME(start_kernel)
+        jbsr    start_kernel
 	trap	#15			
 
         .data
         .even
-SYMBOL_NAME_LABEL(kpt)
+kpt:
         .long 0
-SYMBOL_NAME_LABEL(availmem)
+availmem:
         .long 0
 | todo: remove next two. --m
-SYMBOL_NAME_LABEL(is_medusa)
+is_medusa:
         .long 0
-SYMBOL_NAME_LABEL(m68k_pgtable_cachemode)
+m68k_pgtable_cachemode:
         .long 0
 

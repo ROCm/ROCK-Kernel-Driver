@@ -82,8 +82,18 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 int snd_i2c_device_create(snd_i2c_bus_t *bus, const char *name, unsigned char addr, snd_i2c_device_t **rdevice);
 int snd_i2c_device_free(snd_i2c_device_t *device);
 
-static inline void snd_i2c_lock(snd_i2c_bus_t *bus) { spin_lock(&(bus->master ? bus->master->lock : bus->lock)); }
-static inline void snd_i2c_unlock(snd_i2c_bus_t *bus) { spin_unlock(&(bus->master ? bus->master->lock : bus->lock)); }
+static inline void snd_i2c_lock(snd_i2c_bus_t *bus) {
+	if (bus->master)
+		spin_lock(&bus->master->lock);
+	else
+		spin_lock(&bus->lock);
+}
+static inline void snd_i2c_unlock(snd_i2c_bus_t *bus) {
+	if (bus->master)
+		spin_unlock(&bus->master->lock);
+	else
+		spin_unlock(&bus->lock);
+}
 
 int snd_i2c_sendbytes(snd_i2c_device_t *device, unsigned char *bytes, int count);
 int snd_i2c_readbytes(snd_i2c_device_t *device, unsigned char *bytes, int count);

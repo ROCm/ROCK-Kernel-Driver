@@ -2013,7 +2013,7 @@ int __init atari_floppy_init (void)
 
 	blk_size[MAJOR_NR] = floppy_sizes;
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ataflop_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &ataflop_lock);
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
 	       DriveType == 0 ? 'D' : DriveType == 1 ? 'H' : 'E',

@@ -60,7 +60,7 @@ ENTRY(c_backtrace)
 		adr	r0, .Lfe
 		mov	r1, save
 		bic	r2, r2, mask
-		bl	SYMBOL_NAME(printk)	@ print pc and link register
+		bl	printk			@ print pc and link register
 
 		sub	r0, frame, #16
 1002:		ldr	r1, [save, #4]		@ get instruction at function+4
@@ -89,7 +89,7 @@ ENTRY(c_backtrace)
 		.align	0
 1004:		ldr	r0, =.Lbad
 		mov	r1, frame
-		bl	SYMBOL_NAME(printk)
+		bl	printk
 		LOADREGS(fd, sp!, {r4 - r8, pc})
 		.ltorg
 		.previous
@@ -121,12 +121,12 @@ ENTRY(c_backtrace)
 		ldr	r2, [stack], #-4
 		mov	r1, reg
 		adr	r0, .Lfp
-		bl	SYMBOL_NAME(printk)
+		bl	printk
 2:		subs	reg, reg, #1
 		bpl	1b
 		teq	r7, #0
 		adrne	r0, .Lcr
-		blne	SYMBOL_NAME(printk)
+		blne	printk
 		mov	r0, stack
 		LOADREGS(fd, sp!, {instr, reg, stack, r7, pc})
 

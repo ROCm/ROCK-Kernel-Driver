@@ -305,14 +305,14 @@ ENTRY(level3_physmem_pgt)
 .org 0xb000
 .data
 
-.globl SYMBOL_NAME(gdt)
+.globl gdt
 
 	.word 0
 	.align 16
 	.word 0
 pGDT64:
 	.word	gdt_end-gdt_table
-SYMBOL_NAME_LABEL(gdt)
+gdt:
 	.quad	gdt_table
 	
 

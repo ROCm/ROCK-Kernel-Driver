@@ -394,11 +394,6 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (retval)
 		goto free_pt;
 
-	/*
-	 * child gets a private LDT (if there was an LDT in the parent)
-	 */
-	copy_segments(tsk, mm);
-
 	if (init_new_context(tsk,mm))
 		goto free_pt;
 

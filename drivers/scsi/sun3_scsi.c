@@ -357,7 +357,7 @@ static void sun3_scsi_reset_boot(struct Scsi_Host *instance)
 	NCR5380_write( INITIATOR_COMMAND_REG, ICR_BASE );
 	NCR5380_read( RESET_PARITY_INTERRUPT_REG );
 
-	for( end = jiffies + AFTER_RESET_DELAY; jiffies < end; )
+	for( end = jiffies + AFTER_RESET_DELAY; time_before(jiffies, end); )
 		barrier();
 
 	/* switch on SCSI IRQ again */

@@ -2,7 +2,7 @@ BOOKS	:= wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	   kernel-api.sgml parportbook.sgml kernel-hacking.sgml \
 	   kernel-locking.sgml via-audio.sgml mousedrivers.sgml sis900.sgml \
 	   deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
-	   writing_usb_driver.sgml
+	   writing_usb_driver.sgml scsidrivers.sgml
 
 PS	:=	$(patsubst %.sgml, %.ps, $(BOOKS))
 PDF	:=	$(patsubst %.sgml, %.pdf, $(BOOKS))
@@ -67,6 +67,9 @@ tulip-user.sgml: tulip-user.tmpl
 	$(TOPDIR)/scripts/docgen <$< >$@
 
 writing_usb_driver.sgml: writing_usb_driver.tmpl
+	$(TOPDIR)/scripts/docgen <$< >$@
+
+scsidrivers.sgml : scsidrivers.tmpl
 	$(TOPDIR)/scripts/docgen <$< >$@
 
 sis900.sgml: sis900.tmpl $(TOPDIR)/drivers/net/sis900.c

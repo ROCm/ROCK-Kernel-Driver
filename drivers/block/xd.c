@@ -170,7 +170,7 @@ int __init xd_init (void)
 		return -1;
 	}
 	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &xd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
 	add_gendisk(&xd_gendisk);
 	xd_geninit();
 

@@ -69,6 +69,7 @@ enum chipset_type {
 	ALI_M1631,
 	ALI_M1632,
 	ALI_M1641,
+	ALI_M1644,
 	ALI_M1647,
 	ALI_M1651,
 	ALI_GENERIC,

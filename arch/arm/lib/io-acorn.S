@@ -52,7 +52,7 @@ ENTRY(insl)
 ENTRY(outsl)
 		adr	r0, .iosl_warning
 		mov	r1, lr
-		b	SYMBOL_NAME(printk)
+		b	printk
 
 @ Purpose: write a memc register
 @ Proto  : void memc_write(int register, int value);

@@ -92,34 +92,6 @@ typedef union {
 	} b;
 } control_t;
 
-static __inline__ int ide_request_irq(unsigned int irq,
-				      void (*handler)(int, void *, struct pt_regs *),
-				      unsigned long flags, const char *name, void *devid)
-{
-	return request_irq(irq, handler, SA_SHIRQ, name, devid);
-}
-
-static __inline__ void ide_free_irq(unsigned int irq, void *dev_id)
-{
-	free_irq(irq, dev_id);
-}
-
-static __inline__ int ide_check_region(ide_ioreg_t base, unsigned int size)
-{
-	return check_region(base, size);
-}
-
-static __inline__ void ide_request_region(ide_ioreg_t base, unsigned int size,
-					  const char *name)
-{
-	request_region(base, size, name);
-}
-
-static __inline__ void ide_release_region(ide_ioreg_t base, unsigned int size)
-{
-	release_region(base, size);
-}
-
 #undef  SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS 0
 

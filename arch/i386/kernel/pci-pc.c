@@ -421,8 +421,9 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		    pci_sanity_check(&pci_direct_conf1)) {
 			outl (tmp, 0xCF8);
 			__restore_flags(flags);
-			printk("PCI: Using configuration type 1\n");
-			request_region(0xCF8, 8, "PCI conf1");
+			printk(KERN_INFO "PCI: Using configuration type 1\n");
+			if (!request_region(0xCF8, 8, "PCI conf1"))
+				return NULL;
 			return &pci_direct_conf1;
 		}
 		outl (tmp, 0xCF8);
@@ -438,8 +439,9 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		if (inb (0xCF8) == 0x00 && inb (0xCFA) == 0x00 &&
 		    pci_sanity_check(&pci_direct_conf2)) {
 			__restore_flags(flags);
-			printk("PCI: Using configuration type 2\n");
-			request_region(0xCF8, 4, "PCI conf2");
+			printk(KERN_INFO "PCI: Using configuration type 2\n");
+			if (!request_region(0xCF8, 4, "PCI conf2"))
+				return NULL;
 			return &pci_direct_conf2;
 		}
 	}
@@ -546,10 +548,10 @@ static unsigned long bios32_service(unsigned long service)
 		case 0:
 			return address + entry;
 		case 0x80:	/* Not present */
-			printk("bios32_service(0x%lx): not present\n", service);
+			printk(KERN_WARNING "bios32_service(0x%lx): not present\n", service);
 			return 0;
 		default: /* Shouldn't happen */
-			printk("bios32_service(0x%lx): returned 0x%x -- BIOS bug!\n",
+			printk(KERN_WARNING "bios32_service(0x%lx): returned 0x%x -- BIOS bug!\n",
 				service, return_code);
 			return 0;
 	}
@@ -599,7 +601,7 @@ static int __devinit check_pcibios(void)
 				status, signature);
 			return 0;
 		}
-		printk("PCI: PCI BIOS revision %x.%02x entry at 0x%lx, last bus=%d\n",
+		printk(KERN_INFO "PCI: PCI BIOS revision %x.%02x entry at 0x%lx, last bus=%d\n",
 			major_ver, minor_ver, pcibios_entry, pcibios_last_bus);
 #ifdef CONFIG_PCI_DIRECT
 		if (!(hw_mech & PCIBIOS_HW_TYPE1))
@@ -901,7 +903,7 @@ static void __devinit pcibios_sort(void)
 				}
 			}
 			if (ln == &pci_devices) {
-				printk("PCI: BIOS reporting unknown device %02x:%02x\n", bus, devfn);
+				printk(KERN_WARNING "PCI: BIOS reporting unknown device %02x:%02x\n", bus, devfn);
 				/*
 				 * We must not continue scanning as several buggy BIOSes
 				 * return garbage after the last device. Grr.
@@ -910,7 +912,7 @@ static void __devinit pcibios_sort(void)
 			}
 		}
 		if (!found) {
-			printk("PCI: Device %02x:%02x not found by BIOS\n",
+			printk(KERN_WARNING "PCI: Device %02x:%02x not found by BIOS\n",
 				dev->bus->number, dev->devfn);
 			list_del(&dev->global_list);
 			list_add_tail(&dev->global_list, &sorted_devices);
@@ -970,7 +972,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 			rt->size = opt.size + sizeof(struct irq_routing_table);
 			rt->exclusive_irqs = map;
 			memcpy(rt->slots, (void *) page, opt.size);
-			printk("PCI: Using BIOS Interrupt Routing Table\n");
+			printk(KERN_INFO "PCI: Using BIOS Interrupt Routing Table\n");
 		}
 	}
 	free_page(page);
@@ -1035,7 +1037,7 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 	}
 	if (!seen_host_bridge)
 		return;
-	printk("PCI: Ignoring ghost devices on bus %02x\n", b->number);
+	printk(KERN_WARNING "PCI: Ignoring ghost devices on bus %02x\n", b->number);
 
 	ln = &b->devices;
 	while (ln->next != &b->devices) {
@@ -1073,7 +1075,7 @@ static void __devinit pcibios_fixup_peer_bridges(void)
 			if (!pci_read_config_word(&dev, PCI_VENDOR_ID, &l) &&
 			    l != 0x0000 && l != 0xffff) {
 				DBG("Found device at %02x:%02x [%04x]\n", n, dev.devfn, l);
-				printk("PCI: Discovered peer bus %02x\n", n);
+				printk(KERN_INFO "PCI: Discovered peer bus %02x\n", n);
 				pci_scan_bus(n, pci_root_ops, NULL);
 				break;
 			}
@@ -1117,7 +1119,7 @@ static void __devinit pci_fixup_i450gx(struct pci_dev *d)
 	 */
 	u8 busno;
 	pci_read_config_byte(d, 0x4a, &busno);
-	printk("PCI: i440KX/GX host bridge %s: secondary bus %02x\n", d->slot_name, busno);
+	printk(KERN_INFO "PCI: i440KX/GX host bridge %s: secondary bus %02x\n", d->slot_name, busno);
 	pci_scan_bus(busno, pci_root_ops, NULL);
 	pcibios_last_bus = -1;
 }
@@ -1130,9 +1132,21 @@ static void __devinit  pci_fixup_umc_ide(struct pci_dev *d)
 	 */
 	int i;
 
-	printk("PCI: Fixing base address flags for device %s\n", d->slot_name);
+	printk(KERN_WARNING "PCI: Fixing base address flags for device %s\n", d->slot_name);
 	for(i=0; i<4; i++)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
+}
+
+static void __devinit  pci_fixup_ncr53c810(struct pci_dev *d)
+{
+    /*
+     * NCR 53C810 returns class code 0 (at least on some systems).
+     * Fix class to be PCI_CLASS_STORAGE_SCSI
+     */
+    if (!d->class) {
+        printk("PCI: fixing NCR 53C810 class code for %s\n", d->slot_name);
+        d->class = PCI_CLASS_STORAGE_SCSI << 8;
+    }
 }
 
 static void __devinit pci_fixup_ide_bases(struct pci_dev *d)
@@ -1226,6 +1240,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8622,	        pci_fixup_via_northbridge_bug },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8361,	        pci_fixup_via_northbridge_bug },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8367_0,	pci_fixup_via_northbridge_bug },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	pci_fixup_ncr53c810 },
 	{ 0 }
 };
 
@@ -1261,6 +1276,8 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 
 void __devinit pcibios_config_init(void)
 {
+	struct pci_ops *tmp=NULL;
+
 	/*
 	 * Try all known PCI access methods. Note that we support using 
 	 * both PCI BIOS and direct access, with a preference for direct.
@@ -1275,6 +1292,7 @@ void __devinit pcibios_config_init(void)
 		pci_config_write = pci_bios_write;
 	}
 #endif
+	tmp = pci_root_ops;
 
 #ifdef CONFIG_PCI_DIRECT
 	if ((pci_probe & (PCI_PROBE_CONF1 | PCI_PROBE_CONF2)) 
@@ -1289,6 +1307,10 @@ void __devinit pcibios_config_init(void)
 		}
 	}
 #endif
+
+	/* if direct access failed, fall back to BIOS access. */
+	if (pci_root_ops == NULL)
+		pci_root_ops = tmp;
 
 	return;
 }

@@ -283,15 +283,6 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 		old = inw(hwif->config_data) & ~1;
 		if (old != compat && inb(old+2) == 0xff) {
 			compat += (next_offset += 0x400);	/* leave lower 10 bits untouched */
-#if 1
-			if (ide_check_region(compat + 2, 1))
-				printk("Aieee %s: ide_check_region failure at 0x%04x\n", hwif->name, (compat + 2));
-			/*
-			 * The region check is not needed; however.........
-			 * Since this is the checked in ide-probe.c,
-			 * this is only an assignment.
-			 */
-#endif
 			hwif->io_ports[IDE_CONTROL_OFFSET] = compat + 2;
 			outw(compat|1, hwif->config_data);
 			printk("%s: control basereg workaround: old=0x%04x, new=0x%04x\n", hwif->name, old, inw(hwif->config_data) & ~1);

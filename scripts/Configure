@@ -541,7 +541,10 @@ DEFAULTS=.config
 if [ ! -f .config ]; then
   DEFAULTS=/etc/kernel-config
   if [ ! -f $DEFAULTS ]; then
-    DEFAULTS=arch/$ARCH/defconfig
+    DEFAULTS=/boot/config-`uname -r`
+    if [ ! -f $DEFAULTS ]; then
+      DEFAULTS=arch/$ARCH/defconfig
+    fi
   fi
 fi
 

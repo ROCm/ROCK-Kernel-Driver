@@ -263,27 +263,6 @@ pplus_ide_default_io_base(int index)
 	}
 }
 
-static int 
-pplus_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-	return check_region(from, extent);
-}
-
-static void 
-pplus_ide_request_region(ide_ioreg_t from,
-			unsigned int extent,
-			const char *name)
-{
-	request_region(from, extent, name);
-}
-
-static void 
-pplus_ide_release_region(ide_ioreg_t from,
-			unsigned int extent)
-{
-	release_region(from, extent);
-}
-
 static void __init
 pplus_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
 {
@@ -528,9 +507,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	ppc_ide_md.default_irq = pplus_ide_default_irq;
 	ppc_ide_md.default_io_base = pplus_ide_default_io_base;
-	ppc_ide_md.ide_check_region = pplus_ide_check_region;
-	ppc_ide_md.ide_request_region = pplus_ide_request_region;
-	ppc_ide_md.ide_release_region = pplus_ide_release_region;
 	ppc_ide_md.ide_init_hwif = pplus_ide_init_hwif_ports;
 #endif
 

@@ -21,6 +21,7 @@
 #include <asm/io.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/info.h>
@@ -105,12 +106,13 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 
 #define CM_REG_CHFORMAT		0x08
 
-#define CM_CHB3D5C		0x80000000	/* 5 channels */
-#define CM_CHB3D		0x20000000	/* 4,5,6 channels */
+#define CM_CHB3D5C		0x80000000	/* 5,6 channels */
+#define CM_CHB3D		0x20000000	/* 4 channels */
 
 #define CM_CHIP_MASK1		0x1f000000
 #define CM_CHIP_037		0x01000000
 
+#define CM_SPDIF_SELECT1	0x00080000	/* for model <= 037 ? */
 #define CM_AC3EN1		0x00100000	/* enable AC3: model 037 */
 #define CM_SPD24SEL		0x00020000	/* 24bit spdif: model 037 */
 #define CM_SPDIF_INVERSE	0x00010000
@@ -189,7 +191,7 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_SFIL_MASK		0x30000000
 #define CM_TXVX			0x08000000
 #define CM_N4SPK3D		0x04000000	/* 4ch output */
-#define CM_SPDO5V		0x02000000	/* 5V spdif output */
+#define CM_SPDO5V		0x02000000	/* 5V spdif output (1 = 0.5v (coax)) */
 #define CM_SPDIF48K		0x01000000	/* write */
 #define CM_SPATUS48K		0x01000000	/* read */
 #define CM_ENDBDAC		0x00800000	/* enable dual dac */
@@ -204,7 +206,7 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_VIDWPPRT		0x00002000
 #define CM_SFILENB		0x00001000
 #define CM_MMODE_MASK		0x00000E00
-#define CM_SPDIF_SELECT		0x00000100	/* for model > 039 ? */
+#define CM_SPDIF_SELECT2	0x00000100	/* for model > 039 ? */
 #define CM_ENCENTER		0x00000080	/* shared with FLINKON? */
 #define CM_FLINKON		0x00000080
 #define CM_FLINKOFF		0x00000040
@@ -556,8 +558,8 @@ static int set_dac_channels(cmipci_t *cm, cmipci_pcm_t *rec, int channels)
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_CHB3D);
 			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_CHB3D5C);
 		} else {
-			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_CHB3D);
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_CHB3D5C);
+			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_CHB3D);
 		}
 		if (channels == 6) {
 			snd_cmipci_set_bit(cm, CM_REG_LEGACY_CTRL, CM_CHB3D6C);
@@ -2142,7 +2144,8 @@ DEFINE_BIT_SWITCH_ARG(spdif_in, CM_REG_FUNCTRL1, CM_SPDF_1, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_0, CM_REG_FUNCTRL1, CM_SPDF_0, 0);
 DEFINE_BIT_SWITCH_ARG(spdo_48k, CM_REG_MISC_CTRL, CM_SPDF_AC97|CM_SPDIF48K, 0);
 #endif
-DEFINE_BIT_SWITCH_ARG(spdif_in_1_2, CM_REG_MISC_CTRL, CM_SPDIF_SELECT, 0, 0);
+DEFINE_BIT_SWITCH_ARG(spdif_in_sel1, CM_REG_CHFORMAT, CM_SPDIF_SELECT1, 0, 0);
+DEFINE_BIT_SWITCH_ARG(spdif_in_sel2, CM_REG_MISC_CTRL, CM_SPDIF_SELECT2, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_enable, CM_REG_LEGACY_CTRL, CM_ENSPDOUT, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdo2dac, CM_REG_FUNCTRL1, CM_SPDO2DAC, 0, 1);
 DEFINE_BIT_SWITCH_ARG(spdi_valid, CM_REG_MISC, CM_SPDVALID, 1, 0);
@@ -2242,12 +2245,13 @@ static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
 static snd_kcontrol_new_t snd_cmipci_old_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("IEC958 Mix Analog", spdif_dac_out),
 	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase),
+	DEFINE_MIXER_SWITCH("IEC958 In Select", spdif_in_sel1),
 };
 
 /* only for model 039 or later */
 static snd_kcontrol_new_t snd_cmipci_extra_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("Line-In As Bass", line_bass),
-	DEFINE_MIXER_SWITCH("IEC958 In Select", spdif_in_1_2),
+	DEFINE_MIXER_SWITCH("IEC958 In Select", spdif_in_sel2),
 	DEFINE_MIXER_SWITCH("IEC958 In Phase Inverse", spdi_phase2),
 };
 

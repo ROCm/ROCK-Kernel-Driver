@@ -271,6 +271,7 @@ static int isapnp_fmi_probe(void)
 	while (id_table[i].card_vendor != 0 && dev == NULL) {
 		dev = isapnp_find_dev(NULL, id_table[i].vendor,
 				      id_table[i].function, NULL);
+		i++;
 	}
 
 	if (!dev)

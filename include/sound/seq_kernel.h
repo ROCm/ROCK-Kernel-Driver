@@ -65,7 +65,6 @@ typedef union sndrv_seq_timestamp snd_seq_timestamp_t;
 #define snd_seq_ev_is_fixed_type	sndrv_seq_ev_is_fixed_type      
 #define snd_seq_ev_is_instr_type	sndrv_seq_ev_is_instr_type      
 #define snd_seq_ev_is_variable_type	sndrv_seq_ev_is_variable_type   
-#define snd_seq_ev_is_varipc_type	sndrv_seq_ev_is_varipc_type     
 #define snd_seq_ev_is_reserved		sndrv_seq_ev_is_reserved        
 #define snd_seq_ev_is_direct		sndrv_seq_ev_is_direct          
 #define snd_seq_ev_is_prior		sndrv_seq_ev_is_prior           
@@ -73,7 +72,6 @@ typedef union sndrv_seq_timestamp snd_seq_timestamp_t;
 #define snd_seq_ev_is_fixed		sndrv_seq_ev_is_fixed           
 #define snd_seq_ev_is_variable		sndrv_seq_ev_is_variable        
 #define snd_seq_ev_is_varusr		sndrv_seq_ev_is_varusr          
-#define snd_seq_ev_is_varipc		sndrv_seq_ev_is_varipc          
 #define snd_seq_ev_timestamp_type	sndrv_seq_ev_timestamp_type     
 #define snd_seq_ev_is_tick		sndrv_seq_ev_is_tick            
 #define snd_seq_ev_is_real		sndrv_seq_ev_is_real            

@@ -2060,7 +2060,7 @@ int __init optcd_init(void)
 	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 			S_IFBLK | S_IRUGO | S_IWUGO, &opt_fops, NULL);
 	blksize_size[MAJOR_NR] = &blksize;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_optcd_request,
 		       &optcd_lock);
 	request_region(optcd_port, 4, "optcd");
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);

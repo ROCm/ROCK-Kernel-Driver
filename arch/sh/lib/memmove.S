@@ -20,7 +20,7 @@ ENTRY(memmove)
 	jmp	@r0
 	 nop
 	.balign 4
-2:	.long	SYMBOL_NAME(memcpy)
+2:	.long	memcpy
 1:
 	sub	r5,r4		! From here, r4 has the distance to r0
 	tst	r6,r6
