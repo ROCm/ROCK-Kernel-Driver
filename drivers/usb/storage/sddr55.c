@@ -838,8 +838,8 @@ int sddr55_transport(struct scsi_cmnd *srb, struct us_data *us)
 		capacity /= PAGESIZE;
 		capacity--;
 
-		((u32 *) ptr)[0] = cpu_to_be32(capacity);
-		((u32 *) ptr)[1] = cpu_to_be32(PAGESIZE);
+		((__be32 *) ptr)[0] = cpu_to_be32(capacity);
+		((__be32 *) ptr)[1] = cpu_to_be32(PAGESIZE);
 		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		sddr55_read_map(us);

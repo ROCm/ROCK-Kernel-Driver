@@ -285,8 +285,8 @@ static void wacom_penpartner_irq(struct urb *urb, struct pt_regs *regs)
 
 	input_regs(dev, regs);
 	input_report_key(dev, BTN_TOOL_PEN, 1);
-	input_report_abs(dev, ABS_X, le16_to_cpu(get_unaligned((u16 *) &data[1])));
-	input_report_abs(dev, ABS_Y, le16_to_cpu(get_unaligned((u16 *) &data[3])));
+	input_report_abs(dev, ABS_X, le16_to_cpu(get_unaligned((__le16 *) &data[1])));
+	input_report_abs(dev, ABS_Y, le16_to_cpu(get_unaligned((__le16 *) &data[3])));
 	input_report_abs(dev, ABS_PRESSURE, (signed char)data[6] + 127);
 	input_report_key(dev, BTN_TOUCH, ((signed char)data[6] > -80) && !(data[5] & 0x20));
 	input_report_key(dev, BTN_STYLUS, (data[5] & 0x40));
@@ -329,8 +329,8 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 	if (data[0] != 2)
 		dbg("wacom_graphire_irq: received unknown report #%d", data[0]);
 
-	x = le16_to_cpu(*(u16 *) &data[2]);
-	y = le16_to_cpu(*(u16 *) &data[4]);
+	x = le16_to_cpu(*(__le16 *) &data[2]);
+	y = le16_to_cpu(*(__le16 *) &data[4]);
 
 	input_regs(dev, regs);
 
@@ -367,7 +367,7 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 		input_report_abs(dev, ABS_Y, y);
 	}
 
-	input_report_abs(dev, ABS_PRESSURE, le16_to_cpu(*(u16 *) &data[6]));
+	input_report_abs(dev, ABS_PRESSURE, le16_to_cpu(*(__le16 *) &data[6]));
 	input_report_key(dev, BTN_TOUCH, data[1] & 0x01);
 	input_report_key(dev, BTN_STYLUS, data[1] & 0x02);
 	input_report_key(dev, BTN_STYLUS2, data[1] & 0x04);
@@ -456,8 +456,8 @@ static void wacom_intuos_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	input_report_abs(dev, ABS_X, be16_to_cpu(*(u16 *) &data[2]));
-	input_report_abs(dev, ABS_Y, be16_to_cpu(*(u16 *) &data[4]));
+	input_report_abs(dev, ABS_X, be16_to_cpu(*(__be16 *) &data[2]));
+	input_report_abs(dev, ABS_Y, be16_to_cpu(*(__be16 *) &data[4]));
 	input_report_abs(dev, ABS_DISTANCE, data[9]);
 
 	if ((data[1] & 0xb8) == 0xa0) {						/* general pen packet */

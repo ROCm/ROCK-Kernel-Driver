@@ -57,7 +57,7 @@ struct ehci_hcd {			/* one per controller */
 	/* periodic schedule support */
 #define	DEFAULT_I_TDPS		1024		/* some HCs can do less */
 	unsigned		periodic_size;
-	u32			*periodic;	/* hw periodic table */
+	__le32			*periodic;	/* hw periodic table */
 	dma_addr_t		periodic_dma;
 	unsigned		i_thresh;	/* uframes HC might cache */
 
@@ -72,7 +72,7 @@ struct ehci_hcd {			/* one per controller */
 	struct usb_hcd		hcd;
 	struct ehci_caps __iomem *caps;
 	struct ehci_regs __iomem *regs;
-	u32			hcs_params;	/* cached register copy */
+	__u32			hcs_params;	/* cached register copy */
 
 	/* per-HC memory pools (could be per-bus, but ...) */
 	struct dma_pool		*qh_pool;	/* qh per active urb */
@@ -272,9 +272,9 @@ struct ehci_regs {
  */
 struct ehci_qtd {
 	/* first part defined by EHCI spec */
-	u32			hw_next;	  /* see EHCI 3.5.1 */
-	u32			hw_alt_next;      /* see EHCI 3.5.2 */
-	u32			hw_token;         /* see EHCI 3.5.3 */       
+	__le32			hw_next;	  /* see EHCI 3.5.1 */
+	__le32			hw_alt_next;      /* see EHCI 3.5.2 */
+	__le32			hw_token;         /* see EHCI 3.5.3 */       
 #define	QTD_TOGGLE	(1 << 31)	/* data toggle */
 #define	QTD_LENGTH(tok)	(((tok)>>16) & 0x7fff)
 #define	QTD_IOC		(1 << 15)	/* interrupt on complete */
@@ -288,8 +288,8 @@ struct ehci_qtd {
 #define	QTD_STS_MMF	(1 << 2)	/* incomplete split transaction */
 #define	QTD_STS_STS	(1 << 1)	/* split transaction state */
 #define	QTD_STS_PING	(1 << 0)	/* issue PING? */
-	u32			hw_buf [5];        /* see EHCI 3.5.4 */
-	u32			hw_buf_hi [5];        /* Appendix B */
+	__le32			hw_buf [5];        /* see EHCI 3.5.4 */
+	__le32			hw_buf_hi [5];        /* Appendix B */
 
 	/* the rest is HCD-private */
 	dma_addr_t		qtd_dma;		/* qtd address */
@@ -349,18 +349,18 @@ union ehci_shadow {
 
 struct ehci_qh {
 	/* first part defined by EHCI spec */
-	u32			hw_next;	 /* see EHCI 3.6.1 */
-	u32			hw_info1;        /* see EHCI 3.6.2 */
+	__le32			hw_next;	 /* see EHCI 3.6.1 */
+	__le32			hw_info1;        /* see EHCI 3.6.2 */
 #define	QH_HEAD		0x00008000
-	u32			hw_info2;        /* see EHCI 3.6.2 */
-	u32			hw_current;	 /* qtd list - see EHCI 3.6.4 */
+	__le32			hw_info2;        /* see EHCI 3.6.2 */
+	__le32			hw_current;	 /* qtd list - see EHCI 3.6.4 */
 	
 	/* qtd overlay (hardware parts of a struct ehci_qtd) */
-	u32			hw_qtd_next;
-	u32			hw_alt_next;
-	u32			hw_token;
-	u32			hw_buf [5];
-	u32			hw_buf_hi [5];
+	__le32			hw_qtd_next;
+	__le32			hw_alt_next;
+	__le32			hw_token;
+	__le32			hw_buf [5];
+	__le32			hw_buf_hi [5];
 
 	/* the rest is HCD-private */
 	dma_addr_t		qh_dma;		/* address of qh */
@@ -396,7 +396,7 @@ struct ehci_qh {
 struct ehci_iso_packet {
 	/* These will be copied to iTD when scheduling */
 	u64			bufp;		/* itd->hw_bufp{,_hi}[pg] |= */
-	u32			transaction;	/* itd->hw_transaction[i] |= */
+	__le32			transaction;	/* itd->hw_transaction[i] |= */
 	u8			cross;		/* buf crosses pages */
 	/* for full speed OUT splits */
 	u16			buf1;
@@ -418,8 +418,8 @@ struct ehci_iso_sched {
  */
 struct ehci_iso_stream {
 	/* first two fields match QH, but info1 == 0 */
-	u32			hw_next;
-	u32			hw_info1;
+	__le32			hw_next;
+	__le32			hw_info1;
 
 	u32			refcount;
 	u8			bEndpointAddress;
@@ -433,7 +433,7 @@ struct ehci_iso_stream {
 	unsigned long		start;		/* jiffies */
 	unsigned long		rescheduled;
 	int			next_uframe;
-	u32			splits;
+	__le32			splits;
 
 	/* the rest is derived from the endpoint descriptor,
 	 * trusting urb->interval == f(epdesc->bInterval) and
@@ -446,12 +446,12 @@ struct ehci_iso_stream {
 	unsigned		bandwidth;
 
 	/* This is used to initialize iTD's hw_bufp fields */
-	u32			buf0;		
-	u32			buf1;		
-	u32			buf2;
+	__le32			buf0;		
+	__le32			buf1;		
+	__le32			buf2;
 
 	/* this is used to initialize sITD's tt info */
-	u32			address;
+	__le32			address;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -464,8 +464,8 @@ struct ehci_iso_stream {
  */
 struct ehci_itd {
 	/* first part defined by EHCI spec */
-	u32			hw_next;           /* see EHCI 3.3.1 */
-	u32			hw_transaction [8]; /* see EHCI 3.3.2 */
+	__le32			hw_next;           /* see EHCI 3.3.1 */
+	__le32			hw_transaction [8]; /* see EHCI 3.3.2 */
 #define EHCI_ISOC_ACTIVE        (1<<31)        /* activate transfer this slot */
 #define EHCI_ISOC_BUF_ERR       (1<<30)        /* Data buffer error */
 #define EHCI_ISOC_BABBLE        (1<<29)        /* babble detected */
@@ -475,8 +475,8 @@ struct ehci_itd {
 
 #define ITD_ACTIVE	__constant_cpu_to_le32(EHCI_ISOC_ACTIVE)
 
-	u32			hw_bufp [7];	/* see EHCI 3.3.3 */ 
-	u32			hw_bufp_hi [7];	/* Appendix B */
+	__le32			hw_bufp [7];	/* see EHCI 3.3.3 */ 
+	__le32			hw_bufp_hi [7];	/* Appendix B */
 
 	/* the rest is HCD-private */
 	dma_addr_t		itd_dma;	/* for this itd */
@@ -503,11 +503,11 @@ struct ehci_itd {
  */
 struct ehci_sitd {
 	/* first part defined by EHCI spec */
-	u32			hw_next;
+	__le32			hw_next;
 /* uses bit field macros above - see EHCI 0.95 Table 3-8 */
-	u32			hw_fullspeed_ep;	/* EHCI table 3-9 */
-	u32			hw_uframe;		/* EHCI table 3-10 */
-	u32			hw_results;		/* EHCI table 3-11 */
+	__le32			hw_fullspeed_ep;	/* EHCI table 3-9 */
+	__le32			hw_uframe;		/* EHCI table 3-10 */
+	__le32			hw_results;		/* EHCI table 3-11 */
 #define	SITD_IOC	(1 << 31)	/* interrupt on completion */
 #define	SITD_PAGE	(1 << 30)	/* buffer 0/1 */
 #define	SITD_LENGTH(x)	(0x3ff & ((x)>>16))
@@ -521,9 +521,9 @@ struct ehci_sitd {
 
 #define SITD_ACTIVE	__constant_cpu_to_le32(SITD_STS_ACTIVE)
 
-	u32			hw_buf [2];		/* EHCI table 3-12 */
-	u32			hw_backpointer;		/* EHCI table 3-13 */
-	u32			hw_buf_hi [2];		/* Appendix B */
+	__le32			hw_buf [2];		/* EHCI table 3-12 */
+	__le32			hw_backpointer;		/* EHCI table 3-13 */
+	__le32			hw_buf_hi [2];		/* Appendix B */
 
 	/* the rest is HCD-private */
 	dma_addr_t		sitd_dma;
@@ -548,8 +548,8 @@ struct ehci_sitd {
  * it hits a "restore" FSTN; then it returns to finish other uframe 0/1 work.
  */
 struct ehci_fstn {
-	u32			hw_next;	/* any periodic q entry */
-	u32			hw_prev;	/* qh or EHCI_LIST_END */
+	__le32			hw_next;	/* any periodic q entry */
+	__le32			hw_prev;	/* qh or EHCI_LIST_END */
 
 	/* the rest is HCD-private */
 	dma_addr_t		fstn_dma;

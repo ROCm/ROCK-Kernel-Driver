@@ -1931,7 +1931,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	pauerswald_t cp = NULL;
 	unsigned int u = 0;
-	u16 *pbuf;
+	__le16 *pbuf;
 	int ret;
 
 	dbg ("probe: vendor id 0x%x, device id 0x%x",
@@ -2003,7 +2003,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	info("device is a %s", cp->dev_desc);
 
         /* get the maximum allowed control transfer length */
-        pbuf = (u16 *) kmalloc (2, GFP_KERNEL);    /* use an allocated buffer because of urb target */
+        pbuf = (__le16 *) kmalloc (2, GFP_KERNEL);    /* use an allocated buffer because of urb target */
         if (!pbuf) {
 		err( "out of memory");
 		goto pfail;

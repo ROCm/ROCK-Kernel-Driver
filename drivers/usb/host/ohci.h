@@ -16,7 +16,7 @@
  */
 struct ed {
 	/* first fields are hardware-specified, le32 */
-	__u32			hwINFO;       	/* endpoint config bitmap */
+	__le32			hwINFO;       	/* endpoint config bitmap */
 	/* info bits defined by hcd */
 #define ED_DEQUEUE	__constant_cpu_to_le32(1 << 27)
 	/* info bits defined by the hardware */
@@ -25,11 +25,11 @@ struct ed {
 #define ED_LOWSPEED	__constant_cpu_to_le32(1 << 13)
 #define ED_OUT		__constant_cpu_to_le32(0x01 << 11)
 #define ED_IN		__constant_cpu_to_le32(0x02 << 11)
-	__u32			hwTailP;	/* tail of TD list */
-	__u32			hwHeadP;	/* head of TD list (hc r/w) */
+	__le32			hwTailP;	/* tail of TD list */
+	__le32			hwHeadP;	/* head of TD list (hc r/w) */
 #define ED_C		__constant_cpu_to_le32(0x02)	/* toggle carry */
 #define ED_H		__constant_cpu_to_le32(0x01)	/* halted */
-	__u32			hwNextED;	/* next ED in list */
+	__le32			hwNextED;	/* next ED in list */
 
 	/* rest are purely for the driver's use */
 	dma_addr_t		dma;		/* addr of ED */
@@ -71,7 +71,7 @@ struct ed {
  */
 struct td {
 	/* first fields are hardware-specified, le32 */
-	__u32		hwINFO;		/* transfer info bitmask */
+	__le32		hwINFO;		/* transfer info bitmask */
 
 	/* hwINFO bits for both general and iso tds: */
 #define TD_CC       0xf0000000			/* condition code */
@@ -100,13 +100,13 @@ struct td {
 
 	/* (no hwINFO #defines yet for iso tds) */
 
-  	__u32		hwCBP;		/* Current Buffer Pointer (or 0) */
-  	__u32		hwNextTD;	/* Next TD Pointer */
-  	__u32		hwBE;		/* Memory Buffer End Pointer */
+  	__le32		hwCBP;		/* Current Buffer Pointer (or 0) */
+  	__le32		hwNextTD;	/* Next TD Pointer */
+  	__le32		hwBE;		/* Memory Buffer End Pointer */
 
 	/* PSW is only for ISO */
 #define MAXPSW 1		/* hardware allows 8 */
-  	__u16		hwPSW [MAXPSW];
+  	__le16		hwPSW [MAXPSW];
 
 	/* rest are purely for the driver's use */
   	__u8		index;
@@ -171,16 +171,16 @@ static const int cc_to_error [16] = {
  */
 struct ohci_hcca {
 #define NUM_INTS 32
-	__u32	int_table [NUM_INTS];	/* periodic schedule */
+	__le32	int_table [NUM_INTS];	/* periodic schedule */
 
 	/* 
 	 * OHCI defines u16 frame_no, followed by u16 zero pad.
 	 * Since some processors can't do 16 bit bus accesses,
 	 * portable access must be a 32 bit byteswapped access.
 	 */
-	u32	frame_no;		/* current frame number */
+	__le32	frame_no;		/* current frame number */
 #define OHCI_FRAME_NO(hccap) ((u16)le32_to_cpup(&(hccap)->frame_no))
-	__u32	done_head;		/* info returned for an interrupt */
+	__le32	done_head;		/* info returned for an interrupt */
 	u8	reserved_for_hc [116];
 	u8	what [4];		/* spec only identifies 252 bytes :) */
 } __attribute__ ((aligned(256)));

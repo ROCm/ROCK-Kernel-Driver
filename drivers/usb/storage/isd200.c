@@ -295,8 +295,8 @@ struct isd200_info {
  */
 
 struct read_capacity_data {
-	__u32 LogicalBlockAddress;
-	__u32 BytesPerBlock;
+	__be32 LogicalBlockAddress;
+	__be32 BytesPerBlock;
 };
 
 /*
@@ -1016,7 +1016,8 @@ static int isd200_get_inquiry_data( struct us_data *us )
 			} else {
 				/* ATA Command Identify successful */
 				int i;
-				__u16 *src, *dest;
+				__be16 *src;
+				__u16 *dest;
 				ide_fix_driveid(id);
 
 				US_DEBUGP("   Identify Data Structure:\n");
@@ -1068,17 +1069,17 @@ static int isd200_get_inquiry_data( struct us_data *us )
 				}
 
 				/* Fill in vendor identification fields */
-				src = (__u16*)id->model;
+				src = (__be16*)id->model;
 				dest = (__u16*)info->InquiryData.VendorId;
 				for (i=0;i<4;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)(id->model+8);
+				src = (__be16*)(id->model+8);
 				dest = (__u16*)info->InquiryData.ProductId;
 				for (i=0;i<8;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)id->fw_rev;
+				src = (__be16*)id->fw_rev;
 				dest = (__u16*)info->InquiryData.ProductRevisionLevel;
 				for (i=0;i<2;i++)
 					dest[i] = be16_to_cpu(src[i]);

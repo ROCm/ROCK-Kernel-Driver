@@ -103,9 +103,9 @@
 struct usb_ctrlrequest {
 	__u8 bRequestType;
 	__u8 bRequest;
-	__u16 wValue;
-	__u16 wIndex;
-	__u16 wLength;
+	__le16 wValue;
+	__le16 wIndex;
+	__le16 wLength;
 } __attribute__ ((packed));
 
 /*-------------------------------------------------------------------------*/
@@ -230,7 +230,7 @@ struct usb_string_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 wData[1];		/* UTF-16LE encoded */
+	__le16 wData[1];		/* UTF-16LE encoded */
 } __attribute__ ((packed));
 
 /* note that "string" zero is special, it holds language codes that
