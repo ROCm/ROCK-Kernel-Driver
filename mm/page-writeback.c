@@ -99,6 +99,22 @@ EXPORT_SYMBOL(laptop_mode);
 
 static void background_writeout(unsigned long _min_pages);
 
+struct writeback_state
+{
+	unsigned long nr_dirty;
+	unsigned long nr_unstable;
+	unsigned long nr_mapped;
+	unsigned long nr_writeback;
+};
+
+static void get_writeback_state(struct writeback_state *wbs)
+{
+	wbs->nr_dirty = read_page_state(nr_dirty);
+	wbs->nr_unstable = read_page_state(nr_unstable);
+	wbs->nr_mapped = read_page_state(nr_mapped);
+	wbs->nr_writeback = read_page_state(nr_writeback);
+}
+
 /*
  * Work out the current dirty-memory clamping and background writeout
  * thresholds.
@@ -117,7 +133,7 @@ static void background_writeout(unsigned long _min_pages);
  * clamping level.
  */
 static void
-get_dirty_limits(struct page_state *ps, long *pbackground, long *pdirty)
+get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
@@ -126,9 +142,9 @@ get_dirty_limits(struct page_state *ps, long *pbackground, long *pdirty)
 	long dirty;
 	struct task_struct *tsk;
 
-	get_page_state(ps);
+	get_writeback_state(wbs);
 
-	unmapped_ratio = 100 - (ps->nr_mapped * 100) / total_pages;
+	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / total_pages;
 
 	dirty_ratio = vm_dirty_ratio;
 	if (dirty_ratio > unmapped_ratio / 2)
@@ -161,7 +177,7 @@ get_dirty_limits(struct page_state *ps, long *pbackground, long *pdirty)
  */
 static void balance_dirty_pages(struct address_space *mapping)
 {
-	struct page_state ps;
+	struct writeback_state wbs;
 	long nr_reclaimable;
 	long background_thresh;
 	long dirty_thresh;
@@ -178,9 +194,9 @@ static void balance_dirty_pages(struct address_space *mapping)
 			.nr_to_write	= write_chunk,
 		};
 
-		get_dirty_limits(&ps, &background_thresh, &dirty_thresh);
-		nr_reclaimable = ps.nr_dirty + ps.nr_unstable;
-		if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
+		if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 			break;
 
 		dirty_exceeded = 1;
@@ -193,10 +209,10 @@ static void balance_dirty_pages(struct address_space *mapping)
 		 */
 		if (nr_reclaimable) {
 			writeback_inodes(&wbc);
-			get_dirty_limits(&ps, &background_thresh,
+			get_dirty_limits(&wbs, &background_thresh,
 					&dirty_thresh);
-			nr_reclaimable = ps.nr_dirty + ps.nr_unstable;
-			if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
+			nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
+			if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 				break;
 			pages_written += write_chunk - wbc.nr_to_write;
 			if (pages_written >= write_chunk)
@@ -205,7 +221,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 		blk_congestion_wait(WRITE, HZ/10);
 	}
 
-	if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
+	if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 		dirty_exceeded = 0;
 
 	if (writeback_in_progress(bdi))
@@ -232,10 +248,10 @@ static void balance_dirty_pages(struct address_space *mapping)
  * which was newly dirtied.  The function will periodically check the system's
  * dirty state and will initiate writeback if needed.
  *
- * On really big machines, get_page_state is expensive, so try to avoid calling
- * it too often (ratelimiting).  But once we're over the dirty memory limit we
- * decrease the ratelimiting by a lot, to prevent individual processes from
- * overshooting the limit by (ratelimit_pages) each.
+ * On really big machines, get_writeback_state is expensive, so try to avoid
+ * calling it too often (ratelimiting).  But once we're over the dirty memory
+ * limit we decrease the ratelimiting by a lot, to prevent individual processes
+ * from overshooting the limit by (ratelimit_pages) each.
  */
 void balance_dirty_pages_ratelimited(struct address_space *mapping)
 {
@@ -276,12 +292,12 @@ static void background_writeout(unsigned long _min_pages)
 	};
 
 	for ( ; ; ) {
-		struct page_state ps;
+		struct writeback_state wbs;
 		long background_thresh;
 		long dirty_thresh;
 
-		get_dirty_limits(&ps, &background_thresh, &dirty_thresh);
-		if (ps.nr_dirty + ps.nr_unstable < background_thresh
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		if (wbs.nr_dirty + wbs.nr_unstable < background_thresh
 				&& min_pages <= 0)
 			break;
 		wbc.encountered_congestion = 0;
@@ -306,10 +322,10 @@ static void background_writeout(unsigned long _min_pages)
 int wakeup_bdflush(long nr_pages)
 {
 	if (nr_pages == 0) {
-		struct page_state ps;
+		struct writeback_state wbs;
 
-		get_page_state(&ps);
-		nr_pages = ps.nr_dirty + ps.nr_unstable;
+		get_writeback_state(&wbs);
+		nr_pages = wbs.nr_dirty + wbs.nr_unstable;
 	}
 	return pdflush_operation(background_writeout, nr_pages);
 }
@@ -343,7 +359,7 @@ static void wb_kupdate(unsigned long arg)
 	unsigned long start_jif;
 	unsigned long next_jif;
 	long nr_to_write;
-	struct page_state ps;
+	struct writeback_state wbs;
 	struct writeback_control wbc = {
 		.bdi		= NULL,
 		.sync_mode	= WB_SYNC_NONE,
@@ -355,11 +371,11 @@ static void wb_kupdate(unsigned long arg)
 
 	sync_supers();
 
-	get_page_state(&ps);
+	get_writeback_state(&wbs);
 	oldest_jif = jiffies - (dirty_expire_centisecs * HZ) / 100;
 	start_jif = jiffies;
 	next_jif = start_jif + (dirty_writeback_centisecs * HZ) / 100;
-	nr_to_write = ps.nr_dirty + ps.nr_unstable +
+	nr_to_write = wbs.nr_dirty + wbs.nr_unstable +
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused);
 	while (nr_to_write > 0) {
 		wbc.encountered_congestion = 0;
@@ -434,8 +450,8 @@ void laptop_sync_completion(void)
 /*
  * If ratelimit_pages is too high then we can get into dirty-data overload
  * if a large number of processes all perform writes at the same time.
- * If it is too low then SMP machines will call the (expensive) get_page_state
- * too often.
+ * If it is too low then SMP machines will call the (expensive)
+ * get_writeback_state too often.
  *
  * Here we set ratelimit_pages to a level which ensures that when all CPUs are
  * dirtying in parallel, we cannot go more than 3% (1/32) over the dirty memory
