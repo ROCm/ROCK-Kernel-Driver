@@ -1240,7 +1240,7 @@ static int w83627hf_write_value(struct i2c_client *client, u16 reg, u16 value)
 static void w83627hf_init_client(struct i2c_client *client)
 {
 	struct w83627hf_data *data = i2c_get_clientdata(client);
-	int vid = 0, i;
+	int i;
 	int type = data->type;
 	u8 tmp;
 
@@ -1283,9 +1283,6 @@ static void w83627hf_init_client(struct i2c_client *client)
 		/* Convert VID to voltage based on default VRM */
 		data->vrm = DEFAULT_VRM;
 	}
-
-	if (type != w83697hf)
-		vid = vid_from_reg(vid, data->vrm);
 
 	tmp = w83627hf_read_value(client, W83781D_REG_SCFG1);
 	for (i = 1; i <= 3; i++) {

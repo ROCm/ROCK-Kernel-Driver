@@ -1491,7 +1491,7 @@ static void
 w83781d_init_client(struct i2c_client *client)
 {
 	struct w83781d_data *data = i2c_get_clientdata(client);
-	int vid = 0, i, p;
+	int i, p;
 	int type = data->type;
 	u8 tmp;
 
@@ -1513,14 +1513,7 @@ w83781d_init_client(struct i2c_client *client)
 		w83781d_write_value(client, W83781D_REG_BEEP_INTS2, 0);
 	}
 
-	if (type != w83697hf) {
-		vid = w83781d_read_value(client, W83781D_REG_VID_FANDIV) & 0x0f;
-		vid |=
-		    (w83781d_read_value(client, W83781D_REG_CHIPID) & 0x01) <<
-		    4;
-		data->vrm = DEFAULT_VRM;
-		vid = vid_from_reg(vid, data->vrm);
-	}
+	data->vrm = 82;
 
 	if ((type != w83781d) && (type != as99127f)) {
 		tmp = w83781d_read_value(client, W83781D_REG_SCFG1);
