@@ -3650,6 +3650,17 @@ static int tg3_chip_reset(struct tg3 *tp)
 
 	/* do the reset */
 	val = GRC_MISC_CFG_CORECLK_RESET;
+
+	if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
+		if (tr32(0x7e2c) == 0x60) {
+			tw32(0x7e2c, 0x20);
+		}
+		if (tp->pci_chip_rev_id != CHIPREV_ID_5750_A0) {
+			tw32(GRC_MISC_CFG, (1 << 29));
+			val |= (1 << 29);
+		}
+	}
+
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
 		val |= GRC_MISC_CFG_KEEP_GPHY_POWER;
