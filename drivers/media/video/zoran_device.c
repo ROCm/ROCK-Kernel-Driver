@@ -1033,7 +1033,10 @@ zr36057_enable_jpg (struct zoran          *zr,
 
 	switch (mode) {
 
-	case BUZ_MODE_MOTION_COMPRESS:
+	case BUZ_MODE_MOTION_COMPRESS: {
+		struct jpeg_app_marker app;
+		struct jpeg_com_marker com;
+
 		/* In motion compress mode, the decoder output must be enabled, and
 		 * the video bus direction set to input.
 		 */
@@ -1043,6 +1046,19 @@ zr36057_enable_jpg (struct zoran          *zr,
 
 		/* Take the JPEG codec and the VFE out of sleep */
 		jpeg_codec_sleep(zr, 0);
+
+		/* set JPEG app/com marker */
+		app.appn = zr->jpg_settings.jpg_comp.APPn;
+		app.len = zr->jpg_settings.jpg_comp.APP_len;
+		memcpy(app.data, zr->jpg_settings.jpg_comp.APP_data, 60);
+		zr->codec->control(zr->codec, CODEC_S_JPEG_APP_DATA,
+				   sizeof(struct jpeg_app_marker), &app);
+
+		com.len = zr->jpg_settings.jpg_comp.COM_len;
+		memcpy(com.data, zr->jpg_settings.jpg_comp.COM_data, 60);
+		zr->codec->control(zr->codec, CODEC_S_JPEG_COM_DATA,
+				   sizeof(struct jpeg_com_marker), &com);
+
 		/* Setup the JPEG codec */
 		zr->codec->control(zr->codec, CODEC_S_JPEG_TDS_BYTE,
 				   sizeof(int), &field_size);
@@ -1066,6 +1082,7 @@ zr36057_enable_jpg (struct zoran          *zr,
 		dprintk(2, KERN_INFO "%s: enable_jpg(MOTION_COMPRESS)\n",
 			ZR_DEVNAME(zr));
 		break;
+	}
 
 	case BUZ_MODE_MOTION_DECOMPRESS:
 		/* In motion decompression mode, the decoder output must be disabled, and
