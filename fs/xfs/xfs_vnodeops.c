@@ -1625,6 +1625,10 @@ xfs_release(
 		return 0;
 	}
 
+	/* If this is a read-only mount, don't do this (would generate I/O) */
+	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+		return 0;
+
 	mp = ip->i_mount;
 
 	if (ip->i_d.di_nlink != 0) {
@@ -1700,6 +1704,11 @@ xfs_inactive(
 	}
 
 	error = 0;
+
+	/* If this is a read-only mount, don't do this (would generate I/O) */
+	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+		goto out;
+
 	if (ip->i_d.di_nlink != 0) {
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
