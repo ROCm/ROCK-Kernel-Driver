@@ -136,17 +136,19 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/unistd.h>
 #include <linux/spinlock.h>
+#include <linux/stat.h>
+
 #include <asm/io.h>
 #include <asm/irq.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "qlogicfas.h"
-#include <linux/stat.h>
 
 /*----------------------------------------------------------------*/
 /* driver state info, local to driver */
