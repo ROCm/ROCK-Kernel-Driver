@@ -15,6 +15,7 @@
 #ifndef _DEV_TABLE_H_
 #define _DEV_TABLE_H_
 
+#include <linux/spinlock.h>
 /*
  * Sound card numbers 27 to 999. (1 to 26 are defined in soundcard.h)
  * Numbers 1000 to N are reserved for driver's internal use.
@@ -107,9 +108,11 @@ struct dma_buffparms
 	/*
 	 * Queue parameters.
 	 */
-       	int      qlen;
-       	int      qhead;
-       	int      qtail;
+	int      qlen;
+	int      qhead;
+	int      qtail;
+	spinlock_t lock;
+		
 	int	 cfrag;	/* Current incomplete fragment (write) */
 
 	int      nbufs;
@@ -205,7 +208,7 @@ struct audio_operations
 	int  format_mask;	/* Bitmask for supported audio formats */
 	void *devc;		/* Driver specific info */
 	struct audio_driver *d;
-	void *portc;		/* Driver spesific info */
+	void *portc;		/* Driver specific info */
 	struct dma_buffparms *dmap_in, *dmap_out;
 	struct coproc_operations *coproc;
 	int mixer_dev;
@@ -292,7 +295,7 @@ struct midi_input_info
 {
 	/* MIDI input scanner variables */
 #define MI_MAX	10
-	int             m_busy;
+	volatile int             m_busy;
     	unsigned char   m_buf[MI_MAX];
 	unsigned char	m_prev_status;	/* For running status */
     	int             m_ptr;
