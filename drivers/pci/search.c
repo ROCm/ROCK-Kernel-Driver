@@ -332,6 +332,7 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	struct list_head *n;
 	struct pci_dev *dev;
 
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
