@@ -133,40 +133,32 @@ struct page_state {
 	unsigned long pgrotated;	/* pages rotated to tail of the LRU */
 };
 
-DECLARE_PER_CPU(struct page_state, page_states);
-
 extern void get_page_state(struct page_state *ret);
 extern void get_full_page_state(struct page_state *ret);
 extern unsigned long __read_page_state(unsigned offset);
+extern void __mod_page_state(unsigned offset, unsigned long delta);
 
 #define read_page_state(member) \
 	__read_page_state(offsetof(struct page_state, member))
 
-#define mod_page_state(member, delta)					\
-	do {								\
-		unsigned long flags;					\
-		local_irq_save(flags);					\
-		__get_cpu_var(page_states).member += (delta);		\
-		local_irq_restore(flags);				\
-	} while (0)
-
+#define mod_page_state(member, delta)	\
+	__mod_page_state(offsetof(struct page_state, member), (delta))
 
 #define inc_page_state(member)	mod_page_state(member, 1UL)
 #define dec_page_state(member)	mod_page_state(member, 0UL - 1)
 #define add_page_state(member,delta) mod_page_state(member, (delta))
 #define sub_page_state(member,delta) mod_page_state(member, 0UL - (delta))
 
-#define mod_page_state_zone(zone, member, delta)			\
-	do {								\
-		unsigned long flags;					\
-		local_irq_save(flags);					\
-		if (is_highmem(zone))					\
-			__get_cpu_var(page_states).member##_high += (delta);\
-		else if (is_normal(zone))				\
-			__get_cpu_var(page_states).member##_normal += (delta);\
-		else							\
-			__get_cpu_var(page_states).member##_dma += (delta);\
-		local_irq_restore(flags);				\
+#define mod_page_state_zone(zone, member, delta)				\
+	do {									\
+		unsigned offset;						\
+		if (is_highmem(zone))						\
+			offset = offsetof(struct page_state, member##_high);	\
+		else if (is_normal(zone))					\
+			offset = offsetof(struct page_state, member##_normal);	\
+		else								\
+			offset = offsetof(struct page_state, member##_dma);	\
+		__mod_page_state(offset, (delta));				\
 	} while (0)
 
 /*
