@@ -28,7 +28,6 @@
 #include <asm/io.h>
 #include <linux/ata.h>
 
-
 /*
  * compile-time options
  */
@@ -82,7 +81,7 @@ enum {
 	ATA_SHT_EMULATED	= 1,
 	ATA_SHT_CMD_PER_LUN	= 1,
 	ATA_SHT_THIS_ID		= -1,
-	ATA_SHT_USE_CLUSTERING	= 1,
+	ATA_SHT_USE_CLUSTERING	= 0,
 
 	/* struct ata_device stuff */
 	ATA_DFLAG_LBA48		= (1 << 0), /* device supports LBA48 */
@@ -251,7 +250,7 @@ struct ata_queued_cmd {
 	struct ata_port		*ap;
 	struct ata_device	*dev;
 
-	struct scsi_cmnd		*scsicmd;
+	struct scsi_cmnd	*scsicmd;
 	void			(*scsidone)(struct scsi_cmnd *);
 
 	struct list_head	node;

@@ -377,7 +377,6 @@ struct tcp_opt {
 
 /* TCP Westwood structure */
         struct {
-                __u32    bw_sample;        /* bandwidth sample */
                 __u32    bw_ns_est;        /* first bandwidth estimation..not too smoothed 8) */
                 __u32    bw_est;           /* bandwidth estimate */
                 __u32    rtt_win_sx;       /* here starts a new evaluation... */

@@ -45,6 +45,7 @@
 #include <linux/smp_lock.h>
 #include <linux/rwsem.h>
 #include <linux/stddef.h>
+#include <linux/device.h>
 #include <net/slhc_vj.h>
 #include <asm/atomic.h>
 
@@ -270,6 +271,8 @@ static struct channel *ppp_find_channel(int unit);
 static int ppp_connect_channel(struct channel *pch, int unit);
 static int ppp_disconnect_channel(struct channel *pch);
 static void ppp_destroy_channel(struct channel *pch);
+
+static struct class_simple *ppp_class;
 
 /* Translates a PPP protocol number to a NP index (NP == network protocol) */
 static inline int proto_to_npindex(int proto)
@@ -804,15 +807,29 @@ static int __init ppp_init(void)
 	printk(KERN_INFO "PPP generic driver version " PPP_VERSION "\n");
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
 	if (!err) {
+		ppp_class = class_simple_create(THIS_MODULE, "ppp");
+		if (IS_ERR(ppp_class)) {
+			err = PTR_ERR(ppp_class);
+			goto out_chrdev;
+		}
+		class_simple_device_add(ppp_class, MKDEV(PPP_MAJOR, 0), NULL, "ppp");
 		err = devfs_mk_cdev(MKDEV(PPP_MAJOR, 0),
 				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
 		if (err)
-			unregister_chrdev(PPP_MAJOR, "ppp");
+			goto out_class;
 	}
 
+out:
 	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
 	return err;
+
+out_class:
+	class_simple_device_remove(MKDEV(PPP_MAJOR,0));
+	class_simple_destroy(ppp_class);
+out_chrdev:
+	unregister_chrdev(PPP_MAJOR, "ppp");
+	goto out;
 }
 
 /*
@@ -2545,6 +2562,8 @@ static void __exit ppp_cleanup(void)
 	if (unregister_chrdev(PPP_MAJOR, "ppp") != 0)
 		printk(KERN_ERR "PPP: failed to unregister PPP device\n");
 	devfs_remove("ppp");
+	class_simple_device_remove(MKDEV(PPP_MAJOR, 0));
+	class_simple_destroy(ppp_class);
 }
 
 /*

@@ -40,6 +40,7 @@
 #include <asm/processor.h>
 #include <asm/psr.h>
 #include <asm/elf.h>
+#include <asm/unistd.h>
 
 /* 
  * Power management idle function 

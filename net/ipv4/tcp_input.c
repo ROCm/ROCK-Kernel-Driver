@@ -2051,21 +2051,25 @@ static void tcp_process_frto(struct sock *sk, u32 prior_snd_una)
 	 */
 	tp->frto_counter = (tp->frto_counter + 1) % 3;
 }
+
 /*
- * TCP Westwood
- * Functions needed for estimating bandwidth.
+ * TCP Westwood+
  */
 
 /*
- * This function initializes fields used in TCP Westwood.
- * We can't get no information about RTT at this time so
- * we are forced to set it to 0.
+ * @init_westwood
+ * This function initializes fields used in TCP Westwood+. We can't
+ * get no information about RTTmin at this time so we simply set it to
+ * TCP_WESTWOOD_INIT_RTT. This value was chosen to be too conservative
+ * since in this way we're sure it will be updated in a consistent
+ * way as soon as possible. It will reasonably happen within the first
+ * RTT period of the connection lifetime.
  */
+
 static void init_westwood(struct sock *sk)
 {
         struct tcp_opt *tp = tcp_sk(sk);
 
-        tp->westwood.bw_sample = 0;
         tp->westwood.bw_ns_est = 0;
         tp->westwood.bw_est = 0;
         tp->westwood.accounted = 0;
@@ -2080,6 +2084,7 @@ static void init_westwood(struct sock *sk)
  * @westwood_do_filter
  * Low-pass filter. Implemented using constant coeffients.
  */
+
 static inline __u32 westwood_do_filter(__u32 a, __u32 b)
 {
 	return (((7 * a) + b) >> 3);
@@ -2088,20 +2093,21 @@ static inline __u32 westwood_do_filter(__u32 a, __u32 b)
 static void westwood_filter(struct sock *sk, __u32 delta)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	__u32 sample = tp->westwood.bk / delta;
 
 	tp->westwood.bw_ns_est =
-		westwood_do_filter(tp->westwood.bw_ns_est, sample);
+		westwood_do_filter(tp->westwood.bw_ns_est, 
+				   tp->westwood.bk / delta);
 	tp->westwood.bw_est =
 		westwood_do_filter(tp->westwood.bw_est,
 				   tp->westwood.bw_ns_est);
-	tp->westwood.bw_sample = sample;
 }
 
-/* @westwood_update_rttmin
+/* 
+ * @westwood_update_rttmin
  * It is used to update RTTmin. In this case we MUST NOT use
  * WESTWOOD_RTT_MIN minimum bound since we could be on a LAN!
  */
+
 static inline __u32 westwood_update_rttmin(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2118,9 +2124,9 @@ static inline __u32 westwood_update_rttmin(struct sock *sk)
 
 /*
  * @westwood_acked
- * Evaluate increases for dk. It requires no lock since when it is
- * called lock should already be held. Be careful about it!
+ * Evaluate increases for dk. 
  */
+
 static inline __u32 westwood_acked(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2136,6 +2142,7 @@ static inline __u32 westwood_acked(struct sock *sk)
  * It returns 0 if we are still evaluating samples in the same RTT
  * window, 1 if the sample has to be considered in the next window.
  */
+
 static int westwood_new_window(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2164,11 +2171,9 @@ static int westwood_new_window(struct sock *sk)
 /*
  * @westwood_update_window
  * It updates RTT evaluation window if it is the right moment to do
- * it. If so it calls filter for evaluating bandwidth. Be careful
- * about __westwood_update_window() since it is called without
- * any form of lock. It should be used only for internal purposes.
- * Call westwood_update_window() instead.
+ * it. If so it calls filter for evaluating bandwidth. 
  */
+
 static void __westwood_update_window(struct sock *sk, __u32 now)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2192,11 +2197,12 @@ static void westwood_update_window(struct sock *sk, __u32 now)
 }
 
 /*
- * @__westwood_fast_bw
+ * @__tcp_westwood_fast_bw
  * It is called when we are in fast path. In particular it is called when
  * header prediction is successfull. In such case infact update is
  * straight forward and doesn't need any particular care.
  */
+
 void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2210,7 +2216,7 @@ void __tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 
 
 /*
- * @tcp_westwood_dupack_update
+ * @westwood_dupack_update
  * It updates accounted and cumul_ack when receiving a dupack.
  */
 
@@ -2244,6 +2250,7 @@ static inline void westwood_complete_update(struct tcp_opt *tp)
  * This function evaluates cumul_ack for evaluating dk in case of
  * delayed or partial acks.
  */
+
 static __u32 westwood_acked_count(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -2271,11 +2278,12 @@ static __u32 westwood_acked_count(struct sock *sk)
 
 
 /*
- * @__westwood_slow_bw
+ * @__tcp_westwood_slow_bw
  * It is called when something is going wrong..even if there could
  * be no problems! Infact a simple delayed packet may trigger a
  * dupack. But we need to be careful in such case.
  */
+
 void __tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);

@@ -31,7 +31,7 @@ extern int request_irq_boot(unsigned int,
 #include <asm/regs306x.h>
 #define CMFA 6
 
-int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
+int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	ctrl_outb(H8300_TIMER_COUNT_DATA,TCORA2);
 	ctrl_outb(0x00,_8TCSR2);
@@ -62,7 +62,7 @@ void platform_timer_eoi(void)
 #define GRA  0x00ffff6a
 #define GRB  0x00ffff6c
 
-int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
+int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	*(unsigned short *)GRA= H8300_TIMER_COUNT_DATA;
 	*(unsigned short *)TCNT=0;

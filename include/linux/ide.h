@@ -143,16 +143,7 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
 #define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
 
-#define IDE_DATA_OFFSET_HOB	(0)
-#define IDE_ERROR_OFFSET_HOB	(1)
-#define IDE_NSECTOR_OFFSET_HOB	(2)
-#define IDE_SECTOR_OFFSET_HOB	(3)
-#define IDE_LCYL_OFFSET_HOB	(4)
-#define IDE_HCYL_OFFSET_HOB	(5)
-#define IDE_SELECT_OFFSET_HOB	(6)
 #define IDE_CONTROL_OFFSET_HOB	(7)
-
-#define IDE_FEATURE_OFFSET_HOB	IDE_ERROR_OFFSET_HOB
 
 #define IDE_DATA_REG		(HWIF(drive)->io_ports[IDE_DATA_OFFSET])
 #define IDE_ERROR_REG		(HWIF(drive)->io_ports[IDE_ERROR_OFFSET])
@@ -164,16 +155,6 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_STATUS_REG		(HWIF(drive)->io_ports[IDE_STATUS_OFFSET])
 #define IDE_CONTROL_REG		(HWIF(drive)->io_ports[IDE_CONTROL_OFFSET])
 #define IDE_IRQ_REG		(HWIF(drive)->io_ports[IDE_IRQ_OFFSET])
-
-#define IDE_DATA_REG_HOB	(HWIF(drive)->io_ports[IDE_DATA_OFFSET])
-#define IDE_ERROR_REG_HOB	(HWIF(drive)->io_ports[IDE_ERROR_OFFSET])
-#define IDE_NSECTOR_REG_HOB	(HWIF(drive)->io_ports[IDE_NSECTOR_OFFSET])
-#define IDE_SECTOR_REG_HOB	(HWIF(drive)->io_ports[IDE_SECTOR_OFFSET])
-#define IDE_LCYL_REG_HOB	(HWIF(drive)->io_ports[IDE_LCYL_OFFSET])
-#define IDE_HCYL_REG_HOB	(HWIF(drive)->io_ports[IDE_HCYL_OFFSET])
-#define IDE_SELECT_REG_HOB	(HWIF(drive)->io_ports[IDE_SELECT_OFFSET])
-#define IDE_STATUS_REG_HOB	(HWIF(drive)->io_ports[IDE_STATUS_OFFSET])
-#define IDE_CONTROL_REG_HOB	(HWIF(drive)->io_ports[IDE_CONTROL_OFFSET])
 
 #define IDE_FEATURE_REG		IDE_ERROR_REG
 #define IDE_COMMAND_REG		IDE_STATUS_REG
@@ -998,7 +979,6 @@ typedef struct hwif_s {
  */
 typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
 typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
-typedef ide_startstop_t (ide_post_handler_t)(ide_drive_t *);
 typedef int (ide_expiry_t)(ide_drive_t *);
 
 typedef struct hwgroup_s {
@@ -1360,7 +1340,6 @@ typedef struct ide_task_s {
 	int			command_type;
 	ide_pre_handler_t	*prehandler;
 	ide_handler_t		*handler;
-	ide_post_handler_t	*posthandler;
 	struct request		*rq;		/* copy of request */
 	void			*special;	/* valid_t generally */
 } ide_task_t;
@@ -1455,18 +1434,8 @@ extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_out_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_mulout_intr(ide_drive_t *, struct request *);
 extern ide_startstop_t task_mulout_intr(ide_drive_t *);
-extern void ide_init_drive_taskfile(struct request *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
-
-extern ide_pre_handler_t * ide_pre_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-extern ide_handler_t * ide_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-extern ide_post_handler_t * ide_post_handler_parser(struct hd_drive_task_hdr *, struct hd_drive_hob_hdr *);
-
-/* Expects args is a full set of TF registers and parses the command type */
-extern int ide_cmd_type_parser(ide_task_t *);
 
 int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);

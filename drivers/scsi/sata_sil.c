@@ -244,12 +244,8 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 {
 	unsigned int n, quirks = 0;
-	u32 class_rev = 0;
 	const char *s = &dev->product[0];
 	unsigned int len = strnlen(s, sizeof(dev->product));
-
-	pci_read_config_dword(ap->host_set->pdev, PCI_CLASS_REVISION, &class_rev);
-	class_rev &= 0xff;
 
 	/* ATAPI specifies that empty space is blank-filled; remove blanks */
 	while ((len > 0) && (s[len - 1] == ' '))
@@ -263,7 +259,7 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 		}
 	
 	/* limit requests to 15 sectors */
-	if ((class_rev <= 0x01) && (quirks & SIL_QUIRK_MOD15WRITE)) {
+	if (quirks & SIL_QUIRK_MOD15WRITE) {
 		printk(KERN_INFO "ata%u(%u): applying Seagate errata fix\n",
 		       ap->id, dev->devno);
 		ap->host->max_sectors = 15;
@@ -272,7 +268,6 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 	}
 
 	/* limit to udma5 */
-	/* is this for (class_rev <= 0x01) only, too? */
 	if (quirks & SIL_QUIRK_UDMA5MAX) {
 		printk(KERN_INFO "ata%u(%u): applying Maxtor errata fix %s\n",
 		       ap->id, dev->devno, s);
@@ -405,13 +400,7 @@ err_out:
 
 static int __init sil_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&sil_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&sil_pci_driver);
 }
 
 static void __exit sil_exit(void)

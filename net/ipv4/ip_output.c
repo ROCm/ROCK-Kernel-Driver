@@ -1187,6 +1187,10 @@ int ip_push_pending_frames(struct sock *sk)
 
 out:
 	inet->cork.flags &= ~IPCORK_OPT;
+	if (inet->cork.opt) {
+		kfree(inet->cork.opt);
+		inet->cork.opt = NULL;
+	}
 	if (inet->cork.rt) {
 		ip_rt_put(inet->cork.rt);
 		inet->cork.rt = NULL;

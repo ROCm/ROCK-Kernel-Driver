@@ -421,7 +421,7 @@ extern void consistent_sync_page(struct page *page, unsigned long offset,
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
 
 #define consistent_alloc(gfp, size, handle)	NULL
-#define consistent_free(addr, size)		do { } while (0)
+#define consistent_free(addr)			do { } while (0)
 #define consistent_sync(addr, size, rw)		do { } while (0)
 #define consistent_sync_page(pg, off, sz, rw)	do { } while (0)
 

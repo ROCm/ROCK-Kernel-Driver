@@ -89,21 +89,21 @@ static __inline__ int test_bit(int nr, const unsigned long* addr)
 	case BIT:						     \
 	__asm__("stc ccr,%w1\n\t"				     \
 		"orc #0x80,ccr\n\t"				     \
-		"bld #" #BIT ",@%3\n\t"				     \
-		OP " #" #BIT ",@%3\n\t"				     \
+		"bld #" #BIT ",@%4\n\t"				     \
+		OP " #" #BIT ",@%4\n\t"				     \
 		"rotxl.l %0\n\t"				     \
 		"ldc %w1,ccr"					     \
-		: "=r"(retval),"=&r"(ccrsave)			     \
+		: "=r"(retval),"=&r"(ccrsave),"=m"(*b_addr)	     \
 		: "0" (retval),"r" (b_addr)			     \
 		: "memory");                                         \
         break;
 
 #define H8300_GEN_TEST_BITOP_CONST(OP,BIT)			     \
 	case BIT:						     \
-	__asm__("bld #" #BIT ",@%2\n\t"				     \
-		OP " #" #BIT ",@%2\n\t"				     \
+	__asm__("bld #" #BIT ",@%3\n\t"				     \
+		OP " #" #BIT ",@%3\n\t"				     \
 		"rotxl.l %0\n\t"				     \
-		: "=r"(retval)					     \
+		: "=r"(retval),"=m"(*b_addr)			     \
 		: "0" (retval),"r" (b_addr)			     \
 		: "memory");                                         \
         break;
@@ -129,13 +129,13 @@ static __inline__ int FNNAME(int nr, volatile void * addr)	     \
 	} else {						     \
 		__asm__("stc ccr,%w1\n\t"			     \
 			"orc #0x80,ccr\n\t"			     \
-			"btst %w4,@%3\n\t"			     \
-			OP " %w4,@%3\n\t"			     \
+			"btst %w5,@%4\n\t"			     \
+			OP " %w5,@%4\n\t"			     \
 			"beq 1f\n\t"				     \
 			"inc.l #1,%0\n"				     \
 			"1:\n\t"				     \
 			"ldc %w1,ccr"				     \
-			: "=r"(retval),"=&r"(ccrsave)		     \
+			: "=r"(retval),"=&r"(ccrsave),"=m"(*b_addr)  \
 			: "0" (retval),"r" (b_addr),"r"(nr)	     \
 			: "memory");				     \
 	}							     \
@@ -159,12 +159,12 @@ static __inline__ int __ ## FNNAME(int nr, volatile void * addr)     \
 			H8300_GEN_TEST_BITOP_CONST(OP,7) 	     \
 		}						     \
 	} else {						     \
-		__asm__("btst %w3,@%2\n\t"			     \
-			OP " %w3,@%2\n\t"			     \
+		__asm__("btst %w4,@%3\n\t"			     \
+			OP " %w4,@%3\n\t"			     \
 			"beq 1f\n\t"				     \
 			"inc.l #1,%0\n"				     \
 			"1:"					     \
-			: "=r"(retval)				     \
+			: "=r"(retval),"=m"(*b_addr)		     \
 			: "0" (retval),"r" (b_addr),"r"(nr)	     \
 			: "memory");				     \
 	}							     \
@@ -183,7 +183,7 @@ H8300_GEN_TEST_BITOP(test_and_change_bit,"bnot")
 
 static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+	unsigned long *p = (unsigned long *)(((unsigned long)addr + (offset >> 3)) & ~3);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 

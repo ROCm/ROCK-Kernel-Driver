@@ -1230,8 +1230,6 @@ static inline void map_kernel(void)
 /* Paging initialization on the Sparc Reference MMU. */
 extern void sparc_context_init(int);
 
-extern int linux_num_cpus;
-
 void (*poke_srmmu)(void) __initdata = NULL;
 
 extern unsigned long bootmem_init(unsigned long *pages_avail);

@@ -119,7 +119,7 @@ config	IP_VS_WRR
 	  module, choose M here. If unsure, say N.
 
 config	IP_VS_LC
-        tristate "least-connection scheduling scheduling"
+        tristate "least-connection scheduling"
         depends on IP_VS
 	---help---
 	  The least-connection scheduling algorithm directs network

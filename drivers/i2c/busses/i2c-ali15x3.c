@@ -61,10 +61,6 @@
 /* Note: we assume there can only be one ALI15X3, with one SMBus interface */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_BUS
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>

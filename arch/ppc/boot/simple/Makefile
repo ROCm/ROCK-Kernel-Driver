@@ -90,6 +90,7 @@ zimageinitrd-$(motorola)		:= zImage.initrd-PPLUS
 
 # Overrides previous assingment
      extra.o-$(CONFIG_PPLUS)		:= legacy.o
+     extra.o-$(CONFIG_LOPEC)		:= mpc10x_memory.o
 
       zimage-$(pcore)			:= zImage-STRIPELF
 zimageinitrd-$(pcore)			:= zImage.initrd-STRIPELF
@@ -209,10 +210,10 @@ $(images)/zImage.initrd-TREE: $(obj)/zvmlinux.initrd $(MKTREE)
 	$(MKTREE) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(end-y) \
 		$(ENTRYPOINT)
 
-$(images)/zImage-PPLUS: $(obj)/zvmlinux $(MKPREP) $(MKBUGBOOT)
-	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.pplus
+$(images)/zImage-PPLUS: $(obj)/zvmlinux $(utils)/mkprep $(MKBUGBOOT)
+	$(MKPREP) -pbp $(obj)/zvmlinux $(images)/zImage.$(end-y)
 	$(MKBUGBOOT) $(obj)/zvmlinux $(images)/zImage.bugboot
 
-$(images)/zImage.initrd-PPLUS: $(obj)/zvmlinux.initrd $(MKPREP) $(MKBUGBOOT)
-	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.pplus
+$(images)/zImage.initrd-PPLUS: $(obj)/zvmlinux.initrd $(utils)/mkprep $(MKBUGBOOT)
+	$(MKPREP) -pbp $(obj)/zvmlinux.initrd $(images)/zImage.initrd.$(end-y)
 	$(MKBUGBOOT) $(obj)/zvmlinux.initrd $(images)/zImage.initrd.bugboot

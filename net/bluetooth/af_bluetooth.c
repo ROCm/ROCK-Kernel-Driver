@@ -323,7 +323,7 @@ int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 	return err;
 }
 
-struct net_proto_family bt_sock_family_ops = {
+static struct net_proto_family bt_sock_family_ops = {
 	.owner  = THIS_MODULE,
 	.family	= PF_BLUETOOTH,
 	.create	= bt_sock_create,
@@ -364,7 +364,7 @@ static int __init bt_init(void)
 	return 0;
 }
 
-static void __exit bt_cleanup(void)
+static void __exit bt_exit(void)
 {
 	hci_sock_cleanup();
 
@@ -377,9 +377,10 @@ static void __exit bt_cleanup(void)
 }
 
 subsys_initcall(bt_init);
-module_exit(bt_cleanup);
+module_exit(bt_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth Core ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_NETPROTO(PF_BLUETOOTH);

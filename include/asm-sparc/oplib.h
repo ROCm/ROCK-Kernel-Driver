@@ -306,6 +306,11 @@ extern void prom_apply_obio_ranges(struct linux_prom_registers *obioregs, int nr
 extern void prom_apply_generic_ranges(int node, int parent, 
 				      struct linux_prom_registers *sbusregs, int nregs);
 
+/* CPU probing helpers.  */
+int cpu_find_by_instance(int instance, int *prom_node, int *mid);
+int cpu_find_by_mid(int mid, int *prom_node);
+int cpu_get_hwmid(int prom_node);
+
 extern spinlock_t prom_lock;
 
 #endif /* !(__SPARC_OPLIB_H) */

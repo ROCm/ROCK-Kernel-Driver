@@ -3896,11 +3896,6 @@ static int st_probe(struct device *dev)
 				       dev_num);
 				goto out_free_tape;
 			}
-			/* Make sure that the minor numbers corresponding to the four
-			   first modes always get the same names */
-			i = mode << (4 - ST_NBR_MODE_BITS);
-			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%s%s%s", j ? "n" : "",
-				 disk->disk_name, st_formats[i]);
 			cdev->owner = THIS_MODULE;
 			cdev->ops = &st_fops;
 
@@ -3959,7 +3954,7 @@ out_free_tape:
 		}
 	}
 	if (cdev)
-		kobject_put(&cdev->kobj);
+		cdev_del(cdev);
 	write_lock(&st_dev_arr_lock);
 	scsi_tapes[dev_num] = NULL;
 	st_nr_dev--;

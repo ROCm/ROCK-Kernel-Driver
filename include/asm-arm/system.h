@@ -93,6 +93,14 @@ extern int cpu_architecture(void);
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 
+#define UDBG_UNDEFINED	(1 << 0)
+#define UDBG_SYSCALL	(1 << 1)
+#define UDBG_BADABORT	(1 << 2)
+#define UDBG_SEGV	(1 << 3)
+#define UDBG_BUS	(1 << 4)
+
+extern unsigned int user_debug;
+
 #if __LINUX_ARM_ARCH__ >= 4
 #define vectors_base()	((cr_alignment & CR_V) ? 0xffff0000 : 0)
 #else

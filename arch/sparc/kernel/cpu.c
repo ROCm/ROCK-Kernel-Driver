@@ -4,6 +4,7 @@
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/smp.h>
@@ -13,6 +14,9 @@
 #include <asm/head.h>
 #include <asm/psr.h>
 #include <asm/mbus.h>
+#include <asm/cpudata.h>
+
+DEFINE_PER_CPU(cpuinfo_sparc, __cpu_data) = { 0 };
 
 struct cpu_iu_info {
   int psr_impl;
@@ -118,17 +122,15 @@ struct cpu_iu_info linux_sparc_chips[] = {
 
 #define NSPARCCHIPS  (sizeof(linux_sparc_chips)/sizeof(struct cpu_iu_info))
 
-char *sparc_cpu_type[NR_CPUS] = { 0 };
-char *sparc_fpu_type[NR_CPUS] = { 0 };
+char *sparc_cpu_type;
+char *sparc_fpu_type;
 
 unsigned int fsr_storage;
 
 void __init cpu_probe(void)
 {
 	int psr_impl, psr_vers, fpu_vers;
-	int i, cpuid, psr;
-
-	cpuid = hard_smp_processor_id();
+	int i, psr;
 
 	psr_impl = ((get_psr()>>28)&0xf);
 	psr_vers = ((get_psr()>>24)&0xf);
@@ -141,7 +143,7 @@ void __init cpu_probe(void)
 	for(i = 0; i<NSPARCCHIPS; i++) {
 		if(linux_sparc_chips[i].psr_impl == psr_impl)
 			if(linux_sparc_chips[i].psr_vers == psr_vers) {
-				sparc_cpu_type[cpuid] = linux_sparc_chips[i].cpu_name;
+				sparc_cpu_type = linux_sparc_chips[i].cpu_name;
 				break;
 			}
 	}
@@ -153,7 +155,7 @@ void __init cpu_probe(void)
 	for(i = 0; i<NSPARCFPU; i++) {
 		if(linux_sparc_fpu[i].psr_impl == psr_impl)
 			if(linux_sparc_fpu[i].fp_vers == fpu_vers) {
-				sparc_fpu_type[cpuid] = linux_sparc_fpu[i].fp_name;
+				sparc_fpu_type = linux_sparc_fpu[i].fp_name;
 				break;
 			}
 	}
@@ -161,6 +163,6 @@ void __init cpu_probe(void)
 	if(i == NSPARCFPU) {
 		printk("DEBUG: psr.impl = 0x%x  fsr.vers = 0x%x\n", psr_impl,
 			    fpu_vers);
-		sparc_fpu_type[cpuid] = linux_sparc_fpu[31].fp_name;
+		sparc_fpu_type = linux_sparc_fpu[31].fp_name;
 	}
 }

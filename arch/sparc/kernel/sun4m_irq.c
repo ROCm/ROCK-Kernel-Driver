@@ -292,8 +292,8 @@ static void __init sun4m_init_timers(irqreturn_t (*counter_fn)(int, void *, stru
 		prom_printf("time_init: unable to attach IRQ%d\n",TIMER_IRQ);
 		prom_halt();
 	}
-    
-	if(linux_num_cpus > 1) {
+   
+	if (!cpu_find_by_instance(1, NULL, NULL)) {
 		for(cpu = 0; cpu < 4; cpu++)
 			sun4m_timers->cpu_timers[cpu].l14_timer_limit = 0;
 		sun4m_interrupts->set = SUN4M_INT_E14;
@@ -327,6 +327,7 @@ void __init sun4m_init_IRQ(void)
 	struct linux_prom_registers int_regs[PROMREG_MAX];
 	int num_regs;
 	struct resource r;
+	int mid;
     
 	local_irq_disable();
 	if((ie_node = prom_searchsiblings(prom_getchild(prom_root_node), "obio")) == 0 ||
@@ -364,10 +365,10 @@ void __init sun4m_init_IRQ(void)
 	sbus_ioremap(&r, 0, int_regs[4].reg_size, "interrupts_system");
 
 	sun4m_interrupts->set = ~SUN4M_INT_MASKALL;
-	for (i=0; i<linux_num_cpus; i++)
-		sun4m_interrupts->cpu_intregs[i].clear = ~0x17fff;
-    
-	if (linux_num_cpus > 1) {
+	for (i = 0; !cpu_find_by_instance(i, NULL, &mid); i++)
+		sun4m_interrupts->cpu_intregs[mid].clear = ~0x17fff;
+
+	if (!cpu_find_by_instance(1, NULL, NULL)) {
 		/* system wide interrupts go to cpu 0, this should always
 		 * be safe because it is guaranteed to be fitted or OBP doesn't
 		 * come up

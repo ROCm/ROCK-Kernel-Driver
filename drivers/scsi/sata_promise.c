@@ -1791,13 +1791,7 @@ err_out:
 
 static int __init pdc_sata_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&pdc_sata_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&pdc_sata_pci_driver);
 }
 
 

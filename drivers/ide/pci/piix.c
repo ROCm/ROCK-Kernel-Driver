@@ -814,7 +814,7 @@ static struct pci_driver driver = {
 	.probe		= piix_init_one,
 };
 
-static int piix_ide_init(void)
+static int __init piix_ide_init(void)
 {
 	piix_check_450nx();
 	return ide_pci_register_driver(&driver);

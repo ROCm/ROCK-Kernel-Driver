@@ -35,6 +35,8 @@
 
 #define DRM_STUB_MAXCARDS 16	/* Enough for one machine */
 
+static struct class_simple *drm_class;
+
 /** Stub list. One for each minor. */
 static struct drm_stub_list {
 	const char             *name;
@@ -117,6 +119,7 @@ static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
 			DRM(stub_root) = DRM(proc_init)(dev, i, DRM(stub_root),
 							&DRM(stub_list)[i]
 							.dev_root);
+			class_simple_device_add(drm_class, MKDEV(DRM_MAJOR, i), NULL, name);
 			return i;
 		}
 	}
@@ -141,6 +144,7 @@ static int DRM(stub_putminor)(int minor)
 	DRM(proc_cleanup)(minor, DRM(stub_root),
 			  DRM(stub_list)[minor].dev_root);
 	if (minor) {
+		class_simple_device_remove(MKDEV(DRM_MAJOR, minor));
 		inter_module_put("drm");
 	} else {
 		inter_module_unregister("drm");
@@ -148,6 +152,8 @@ static int DRM(stub_putminor)(int minor)
 			  sizeof(*DRM(stub_list)) * DRM_STUB_MAXCARDS,
 			  DRM_MEM_STUB);
 		unregister_chrdev(DRM_MAJOR, "drm");
+		class_simple_device_remove(MKDEV(DRM_MAJOR, minor));
+		class_simple_destroy(drm_class);
 	}
 	return 0;
 }
@@ -170,10 +176,23 @@ int DRM(stub_register)(const char *name, struct file_operations *fops,
 		       drm_device_t *dev)
 {
 	struct drm_stub_info *i = NULL;
+	int ret1;
+	int ret2;
 
 	DRM_DEBUG("\n");
-	if (register_chrdev(DRM_MAJOR, "drm", &DRM(stub_fops)))
+	ret1 = register_chrdev(DRM_MAJOR, "drm", &DRM(stub_fops));
+	if (!ret1) {
+		drm_class = class_simple_create(THIS_MODULE, "drm");
+		if (IS_ERR(drm_class)) {
+			printk (KERN_ERR "Error creating drm class.\n");
+			unregister_chrdev(DRM_MAJOR, "drm");
+			return PTR_ERR(drm_class);
+		}
+	}
+	else if (ret1 == -EBUSY)
 		i = (struct drm_stub_info *)inter_module_get("drm");
+	else
+		return -1;
 
 	if (i) {
 				/* Already registered */
@@ -186,8 +205,18 @@ int DRM(stub_register)(const char *name, struct file_operations *fops,
 		DRM_DEBUG("calling inter_module_register\n");
 		inter_module_register("drm", THIS_MODULE, &DRM(stub_info));
 	}
-	if (DRM(stub_info).info_register)
-		return DRM(stub_info).info_register(name, fops, dev);
+	if (DRM(stub_info).info_register) {
+		ret2 = DRM(stub_info).info_register(name, fops, dev);
+		if (ret2) {
+			if (!ret1) {
+			unregister_chrdev(DRM_MAJOR, "drm");
+			class_simple_destroy(drm_class);
+			}
+			if (!i)
+				inter_module_unregister("drm");
+		}
+		return ret2;
+	}
 	return -1;
 }
 

@@ -24,13 +24,10 @@
 	sethi	%hi(boot_cpu_id), %reg; \
 	ldub	[%reg + %lo(boot_cpu_id)], %reg;
 
-#define GET_PROCESSOR_MID(reg, tmp) \
+#define GET_PROCESSOR_MID(reg) \
 	rd	%tbr, %reg; \
-	sethi	%hi(mid_xlate), %tmp; \
 	srl	%reg, 12, %reg; \
-	or	%tmp, %lo(mid_xlate), %tmp; \
-	and	%reg, 3, %reg; \
-	ldub	[%tmp + %reg], %reg;
+	and	%reg, 3, %reg;
 
 #define GET_PROCESSOR_OFFSET(reg, tmp) \
 	GET_PROCESSOR_ID(reg) \
