@@ -1603,7 +1603,6 @@ tty3270_write(struct tty_struct * tty,
 	      const unsigned char *buf, int count)
 {
 	struct tty3270 *tp;
-	int length, ret;
 
 	tp = tty->driver_data;
 	if (!tp)
