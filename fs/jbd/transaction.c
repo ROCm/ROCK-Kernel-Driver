@@ -1111,6 +1111,16 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	if (jh->b_transaction == handle->h_transaction &&
 					jh->b_jlist == BJ_Metadata) {
 		JBUFFER_TRACE(jh, "fastpath");
+		console_verbose();
+		if (jh->b_transaction != journal->j_running_transaction) {
+			printk("jh->b_transaction=%p\n", jh->b_transaction);
+			printk("journal->j_running_transaction=%p\n",
+				journal->j_running_transaction);
+			printk("handle->h_transaction=%p\n",
+				handle->h_transaction);
+			printk("journal->j_committing_transaction=%p\n",
+				journal->j_committing_transaction);
+		}
 		J_ASSERT_JH(jh, jh->b_transaction ==
 					journal->j_running_transaction);
 		goto out_unlock_bh;
