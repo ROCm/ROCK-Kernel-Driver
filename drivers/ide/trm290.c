@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  linux/drivers/ide/trm290.c		Version 1.02	Mar. 18, 2000
  *
  *  Copyright (c) 1997-1998  Mark Lord
@@ -139,6 +140,8 @@
 
 #include <asm/io.h>
 
+#include "pcihost.h"
+
 static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
 	struct ata_channel *hwif = drive->channel;
@@ -249,7 +252,7 @@ static int trm290_dmaproc(struct ata_device *drive)
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __init ide_init_trm290(struct ata_channel *hwif)
+static void __init trm290_init_channel(struct ata_channel *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;
@@ -293,7 +296,7 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 			hwif->irq = primary_irq;
 	}
 
-	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->unit ? 0x0080 : 0x0000), 3);
+	ata_init_dma(hwif, (hwif->config_data + 4) ^ (hwif->unit ? 0x0080 : 0x0000));
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->udma_start = trm290_udma_start;
@@ -326,4 +329,19 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 		}
 	}
 #endif
+}
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_TEKRAM,
+	device: PCI_DEVICE_ID_TEKRAM_DC290,
+	init_channel: trm290_init_channel,
+	bootable: ON_BOARD
+};
+
+int __init init_trm290(void)
+{
+        ata_register_chipset(&chipset);
+
+        return 0;
 }

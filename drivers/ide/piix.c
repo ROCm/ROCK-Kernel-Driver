@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: piix.c,v 1.3 2002/03/29 16:06:06 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
@@ -45,9 +46,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define PIIX_IDETIM0		0x40
 #define PIIX_IDETIM1		0x42
@@ -401,8 +404,7 @@ int piix_dmaproc(struct ata_device *drive)
  * The initialization callback. Here we determine the IDE chip type
  * and initialize its drive independent registers.
  */
-
-unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
+static unsigned int __init piix_init_chipset(struct pci_dev *dev)
 {
 	unsigned int u;
 	unsigned short w;
@@ -532,12 +534,12 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_piix(struct ata_channel *hwif)
+static unsigned int __init piix_ata66_check(struct ata_channel *hwif)
 {
 	return ((piix_enabled & piix_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_piix(struct ata_channel *hwif)
+static void __init piix_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -567,10 +569,166 @@ void __init ide_init_piix(struct ata_channel *hwif)
  * We allow the BM-DMA driver only work on enabled interfaces,
  * and only if DMA is safe with the chip and bridge.
  */
-
-void __init ide_dmacapable_piix(struct ata_channel *hwif, unsigned long dmabase)
+static void __init piix_init_dma(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if (((piix_enabled >> hwif->unit) & 1)
 		&& !(piix_config->flags & PIIX_NODMA))
-			ide_setup_dma(hwif, dmabase, 8);
+			ata_init_dma(hwif, dmabase);
+}
+
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371FB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371SB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82371AB,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82443MX_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82372FB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801AA_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801AB_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801BA_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801BA_8,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801E_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801CA_10,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801CA_11,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_INTEL,
+		device: PCI_DEVICE_ID_INTEL_82801DB_9,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_EFAR,
+		device: PCI_DEVICE_ID_EFAR_SLC90E66_1,
+		init_chipset: piix_init_chipset,
+		ata66_check: piix_ata66_check,
+		init_channel: piix_init_channel,
+		init_dma: piix_init_dma,
+		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_piix(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+	return 0;
 }

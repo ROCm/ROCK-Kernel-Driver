@@ -20,13 +20,14 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #undef DISPLAY_ALI_TIMINGS
 
@@ -239,7 +240,7 @@ static byte chip_is_1543c_e;
 byte ali_proc = 0;
 static struct pci_dev *isa_dev;
 
-static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
+static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 {
 	struct ata_timing *t;
 	struct ata_channel *hwif = drive->channel;
@@ -303,7 +304,7 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	__restore_flags(flags);
 }
 
-static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
+static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -352,13 +353,13 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 	return (err);
 }
 
-static void config_chipset_for_pio (ide_drive_t *drive)
+static void config_chipset_for_pio(struct ata_device *drive)
 {
 	ali15x3_tune_drive(drive, 5);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra33)
+static int config_chipset_for_dma(struct ata_device *drive, byte ultra33)
 {
 	struct hd_driveid *id	= drive->id;
 	byte speed		= 0x00;
@@ -408,7 +409,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra33)
 	return rval;
 }
 
-static byte ali15x3_can_ultra (ide_drive_t *drive)
+static byte ali15x3_can_ultra(struct ata_device *drive)
 {
 #ifndef CONFIG_WDC_ALI15X3
 	struct hd_driveid *id	= drive->id;
@@ -429,7 +430,7 @@ static byte ali15x3_can_ultra (ide_drive_t *drive)
 	}
 }
 
-static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
+static int ali15x3_config_drive_for_dma(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -505,7 +506,7 @@ static int ali15x3_dmaproc(struct ata_device *drive)
 }
 #endif
 
-unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
+static unsigned int __init ali15x3_init_chipset(struct pci_dev *dev)
 {
 	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
@@ -543,7 +544,7 @@ unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
  * of UDMA66 transfers. It doesn't check the drives.
  * But see note 2 below!
  */
-unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
+static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int ata66	= 0;
@@ -638,7 +639,7 @@ unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
 	return(ata66);
 }
 
-void __init ide_init_ali15x3(struct ata_channel *hwif)
+static void __init ali15x3_init_channel(struct ata_channel *hwif)
 {
 #ifndef CONFIG_SPARC64
 	byte ideic, inmir;
@@ -694,13 +695,33 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 		hwif->autodma = 0;
 #else
 	hwif->autodma = 0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 }
 
-void __init ide_dmacapable_ali15x3(struct ata_channel *hwif, unsigned long dmabase)
+static void __init ali15x3_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if ((dmabase) && (m5229_revision < 0x20)) {
+	if ((dmabase) && (m5229_revision < 0x20))
 		return;
-	}
-	ide_setup_dma(hwif, dmabase, 8);
+
+	ata_init_dma(ch, dmabase);
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_AL,
+        device: PCI_DEVICE_ID_AL_M5229,
+	init_chipset: ali15x3_init_chipset,
+	ata66_check: ali15x3_ata66_check,
+	init_channel: ali15x3_init_channel,
+	init_dma: ali15x3_init_dma,
+	enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+	bootable: ON_BOARD
+};
+
+int __init init_ali15x3(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }

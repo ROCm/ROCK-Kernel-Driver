@@ -23,6 +23,7 @@
 #include <asm/dma.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 extern char *ide_xfer_verbose (byte xfer_rate);
 
@@ -212,7 +213,7 @@ static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 /*
  * Enable the PCI device
  */
-unsigned int __init pci_init_sl82c105(struct pci_dev *dev)
+static unsigned int __init sl82c105_init_chipset(struct pci_dev *dev)
 {
 	unsigned char ctrl_stat;
 
@@ -225,7 +226,7 @@ unsigned int __init pci_init_sl82c105(struct pci_dev *dev)
 	return dev->irq;
 }
 
-void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
+static void __init sl82c105_init_dma(struct ata_channel *hwif, unsigned long dma_base)
 {
 	unsigned int rev;
 	byte dma_state;
@@ -246,7 +247,7 @@ void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
 	outb(dma_state, dma_base + 2);
 
 	hwif->XXX_udma = NULL;
-	ide_setup_dma(hwif, dma_base, 8);
+	ata_init_dma(hwif, dma_base);
 	if (hwif->XXX_udma)
 		hwif->XXX_udma = sl82c105_dmaproc;
 }
@@ -254,8 +255,26 @@ void __init dma_init_sl82c105(struct ata_channel *hwif, unsigned long dma_base)
 /*
  * Initialise the chip
  */
-void __init ide_init_sl82c105(struct ata_channel *hwif)
+static void __init sl82c105_init_channel(struct ata_channel *hwif)
 {
 	hwif->tuneproc = tune_sl82c105;
 }
 
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_WINBOND,
+	device: PCI_DEVICE_ID_WINBOND_82C105,
+	init_chipset: sl82c105_init_chipset,
+	init_channel: sl82c105_init_channel,
+	init_dma: sl82c105_init_dma,
+	enablebits: { {0x40,0x01,0x01}, {0x40,0x10,0x10} },
+	bootable: ON_BOARD
+};
+
+int __init init_sl82c105(void)
+{
+	ata_register_chipset(&chipset);
+
+	return 0;
+}

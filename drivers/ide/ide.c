@@ -67,13 +67,11 @@
 #include <asm/bitops.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 /*
  * Those will be moved into separate header files eventually.
  */
-#ifdef CONFIG_BLK_DEV_RZ1000
-extern void ide_probe_for_rz100x(void);
-#endif
 #ifdef CONFIG_ETRAX_IDE
 extern void init_e100_ide(void);
 #endif
@@ -438,7 +436,7 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
 			return ide_started;	/* continue polling */
 		}
 		ch->poll_timeout = 0;	/* end of polling */
-		printk("%s: ATAPI reset timed-out, status=0x%02x\n", drive->name, stat);
+		printk("%s: ATAPI reset timed out, status=0x%02x\n", drive->name, stat);
 		return do_reset1 (drive, 1);	/* do it the old fashioned way */
 	}
 	ch->poll_timeout = 0;	/* done polling */
@@ -461,7 +459,7 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
 			ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
 			return ide_started;	/* continue polling */
 		}
-		printk("%s: reset timed-out, status=0x%02x\n", ch->name, stat);
+		printk("%s: reset timed out, status=0x%02x\n", ch->name, stat);
 		drive->failures++;
 	} else  {
 		printk("%s: reset: ", ch->name);
@@ -2486,28 +2484,13 @@ static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 			return 0;
 		}
 
-		case HDIO_GETGEO_BIG:
-		{
-			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
-
-			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
-				return -EINVAL;
-
-			if (put_user(drive->bios_head, (byte *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->bios_sect, (byte *) &loc->sectors)) return -EFAULT;
-			if (put_user(drive->bios_cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
-				(unsigned long *) &loc->start)) return -EFAULT;
-			return 0;
-		}
-
 		case HDIO_GETGEO_BIG_RAW:
 		{
 			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
 			if (!loc || (drive->type != ATA_DISK && drive->type != ATA_FLOPPY))
 				return -EINVAL;
-			if (put_user(drive->head, (byte *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->sect, (byte *) &loc->sectors)) return -EFAULT;
+			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
+			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
 			if (put_user((unsigned)drive->part[minor(inode->i_rdev)&PARTN_MASK].start_sect,
 				(unsigned long *) &loc->start)) return -EFAULT;
@@ -2971,7 +2954,7 @@ int __init ide_setup (char *s)
 				init_pdc4030();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
+#endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 			case -17: /* "ali14xx" */
 			{
@@ -3389,10 +3372,76 @@ static int __init ata_module_init(void)
 
 	initializing = 1;
 
+#ifdef CONFIG_PCI
+	/*
+	 * Register the host chip drivers.
+	 */
+# ifdef CONFIG_BLK_DEV_PIIX
+	init_piix();
+# endif
+# ifdef CONFIG_BLK_DEV_VIA82CXXX
+	init_via82cxxx();
+# endif
+# ifdef CONFIG_BLK_DEV_PDC202XX
+	init_pdc202xx();
+# endif
+# ifdef CONFIG_BLK_DEV_RZ1000
+	init_rz1000();
+# endif
+# ifdef CONFIG_BLK_DEV_SIS5513
+	init_sis5513();
+# endif
+# ifdef CONFIG_BLK_DEV_CMD64X
+	init_cmd64x();
+# endif
+# ifdef CONFIG_BLK_DEV_OPTI621
+	init_opti621();
+# endif
+# ifdef CONFIG_BLK_DEV_TRM290
+	init_trm290();
+# endif
+# ifdef CONFIG_BLK_DEV_NS87415
+	init_ns87415();
+# endif
+# ifdef CONFIG_BLK_DEV_AEC62XX
+	init_aec62xx();
+# endif
+# ifdef CONFIG_BLK_DEV_SL82C105
+	init_sl82c105();
+# endif
+# ifdef CONFIG_BLK_DEV_HPT34X
+	init_hpt34x();
+# endif
+# ifdef CONFIG_BLK_DEV_HPT366
+	init_hpt366();
+# endif
+# ifdef CONFIG_BLK_DEV_ALI15X3
+	init_ali15x3();
+# endif
+# ifdef CONFIG_BLK_DEV_CY82C693
+	init_cy82c693();
+# endif
+# ifdef CONFIG_BLK_DEV_CS5530
+	init_cs5530();
+# endif
+# ifdef CONFIG_BLK_DEV_AMD74XX
+	init_amd74xx();
+# endif
+# ifdef CONFIG_BLK_DEV_PDC_ADMA
+	init_pdcadma();
+# endif
+# ifdef CONFIG_BLK_DEV_SVWKS
+	init_svwks();
+# endif
+# ifdef CONFIG_BLK_DEV_IT8172
+	init_it8172();
+# endif
+
+	init_ata_pci_misc();
+
 	/*
 	 * Detect and initialize "known" IDE host chip types.
 	 */
-#ifdef CONFIG_PCI
 	if (pci_present()) {
 # ifdef CONFIG_PCI
 		ide_scan_pcibus(ide_scan_direction);

@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * linux/drivers/ide/hpt34x.c		Version 0.31	June. 9, 2000
  *
  * Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
@@ -40,10 +41,12 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
+
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #ifndef SPLIT_BYTE
-#define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
+# define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
 #endif
 
 #define HPT343_DEBUG_DRIVE_INFO		0
@@ -373,7 +376,7 @@ static int hpt34x_dmaproc(struct ata_device *drive)
  */
 #define	HPT34X_PCI_INIT_REG		0x80
 
-unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
+static unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 {
 	int i = 0;
 	unsigned long hpt34xIoBase = pci_resource_start(dev, 4);
@@ -420,15 +423,15 @@ unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 		bmide_dev = dev;
 		hpt34x_display_info = &hpt34x_get_info;
 	}
-#endif /* DISPLAY_HPT34X_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return dev->irq;
 }
 
-void __init ide_init_hpt34x(struct ata_channel *hwif)
+static void __init ide_init_hpt34x(struct ata_channel *hwif)
 {
-	hwif->tuneproc = &hpt34x_tune_drive;
-	hwif->speedproc = &hpt34x_tune_chipset;
+	hwif->tuneproc = hpt34x_tune_drive;
+	hwif->speedproc = hpt34x_tune_chipset;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
@@ -449,9 +452,28 @@ void __init ide_init_hpt34x(struct ata_channel *hwif)
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 	}
-#else /* !CONFIG_BLK_DEV_IDEDMA */
+#else
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_TTI,
+	device: PCI_DEVICE_ID_TTI_HPT343,
+	init_chipset: pci_init_hpt34x,
+	init_channel:	ide_init_hpt34x,
+	bootable: NEVER_BOARD,
+	extra: 16,
+	flags: ATA_F_NOADMA | ATA_F_DMA
+};
+
+int __init init_hpt34x(void)
+{
+	ata_register_chipset(&chipset);
+
+	return 0;
 }

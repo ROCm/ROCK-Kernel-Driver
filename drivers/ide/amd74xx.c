@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: amd74xx.c,v 2.8 2002/03/14 11:52:20 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
@@ -42,9 +43,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define AMD_IDE_ENABLE		(0x00 + amd_config->base)
 #define AMD_IDE_CONFIG		(0x01 + amd_config->base)
@@ -298,7 +301,7 @@ int amd74xx_dmaproc(struct ata_device *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
+static unsigned int __init amd74xx_init_chipset(struct pci_dev *dev)
 {
 	unsigned char t;
 	unsigned int u;
@@ -396,12 +399,12 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init ata66_amd74xx(struct ata_channel *hwif)
+static unsigned int __init amd74xx_ata66_check(struct ata_channel *hwif)
 {
 	return ((amd_enabled & amd_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_amd74xx(struct ata_channel *hwif)
+static void __init amd74xx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -432,9 +435,84 @@ void __init ide_init_amd74xx(struct ata_channel *hwif)
 /*
  * We allow the BM-DMA driver only work on enabled interfaces.
  */
-
-void __init ide_dmacapable_amd74xx(struct ata_channel *hwif, unsigned long dmabase)
+static void __init amd74xx_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if ((amd_enabled >> hwif->unit) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
+	if ((amd_enabled >> ch->unit) & 1)
+		ata_init_dma(ch, dmabase);
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_AMD,
+		device: PCI_DEVICE_ID_AMD_COBRA_7401,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_VIPER_7409,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_VIPER_7411,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_OPUS_7441,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_AMD,
+		device:	PCI_DEVICE_ID_AMD_8111_IDE,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor:	PCI_VENDOR_ID_NVIDIA,
+		device:	PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
+		init_chipset: amd74xx_init_chipset,
+		ata66_check: amd74xx_ata66_check,
+		init_channel: amd74xx_init_channel,
+		init_dma: amd74xx_init_dma,
+		enablebits: {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_amd74xx(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  linux/drivers/ide/pdc202xx.c	Version 0.30	Mar. 18, 2000
  *
  *  Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
@@ -47,6 +48,7 @@
 #include <asm/irq.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define PDC202XX_DEBUG_DRIVE_INFO		0
 #define PDC202XX_DECODE_REGISTER_INFO		0
@@ -377,7 +379,7 @@ static void decode_registers (byte registers, byte value)
 
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 
-static int check_in_drive_lists (ide_drive_t *drive, const char **list)
+static int check_in_drive_lists(struct ata_device *drive, const char **list)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -397,7 +399,7 @@ static int check_in_drive_lists (ide_drive_t *drive, const char **list)
 	return 0;
 }
 
-static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
+static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -521,7 +523,7 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, byte speed)
 	return err;
 }
 
-static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
+static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -682,7 +684,7 @@ static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
  * 180, 120,  90,  90,  90,  60,  30
  *  11,   5,   4,   3,   2,   1,   0
  */
-static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
+static int config_chipset_for_pio(struct ata_device *drive, byte pio)
 {
 	byte speed = 0x00;
 
@@ -694,13 +696,13 @@ static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
 	return ((int) pdc202xx_tune_chipset(drive, speed));
 }
 
-static void pdc202xx_tune_drive (ide_drive_t *drive, byte pio)
+static void pdc202xx_tune_drive(struct ata_device *drive, byte pio)
 {
 	(void) config_chipset_for_pio(drive, pio);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
+static int config_chipset_for_dma(struct ata_device *drive, byte ultra)
 {
 	struct hd_driveid *id	= drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -921,7 +923,7 @@ jumpbit_is_set:
 						     0);
 }
 
-static int config_drive_xfer_rate (ide_drive_t *drive)
+static int config_drive_xfer_rate(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
@@ -977,7 +979,7 @@ no_dma_set:
 	return 0;
 }
 
-int pdc202xx_quirkproc (ide_drive_t *drive)
+int pdc202xx_quirkproc(struct ata_device *drive)
 {
 	return ((int) check_in_drive_lists(drive, pdc_quirk_drives));
 }
@@ -1139,7 +1141,7 @@ static int pdc202xx_dmaproc(struct ata_device *drive)
 }
 #endif
 
-void pdc202xx_new_reset (ide_drive_t *drive)
+void pdc202xx_new_reset(struct ata_device *drive)
 {
 	OUT_BYTE(0x04,IDE_CONTROL_REG);
 	mdelay(1000);
@@ -1149,7 +1151,7 @@ void pdc202xx_new_reset (ide_drive_t *drive)
 		drive->channel->unit ? "Secondary" : "Primary");
 }
 
-void pdc202xx_reset (ide_drive_t *drive)
+void pdc202xx_reset(struct ata_device *drive)
 {
 	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
@@ -1167,7 +1169,7 @@ void pdc202xx_reset (ide_drive_t *drive)
  * this has been a long time ago Thu Jul 27 16:40:57 2000 was the patch date
  * HOTSWAP ATA Infrastructure.
  */
-static int pdc202xx_tristate (ide_drive_t * drive, int state)
+static int pdc202xx_tristate(struct ata_device * drive, int state)
 {
 #if 0
 	struct ata_channel *hwif = drive->channel;
@@ -1188,7 +1190,7 @@ static int pdc202xx_tristate (ide_drive_t * drive, int state)
 	return 0;
 }
 
-unsigned int __init pci_init_pdc202xx(struct pci_dev *dev)
+static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 {
 	unsigned long high_16	= pci_resource_start(dev, 4);
 	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
@@ -1277,7 +1279,7 @@ unsigned int __init pci_init_pdc202xx(struct pci_dev *dev)
 		OUT_BYTE(secondary_mode|1, high_16 + 0x001b);
 		printk("%s\n", (IN_BYTE(high_16 + 0x001b) & 1) ? "MASTER" : "PCI");
 	}
-#endif /* CONFIG_PDC202XX_MASTER */
+#endif
 
 fttk_tx_series:
 
@@ -1287,11 +1289,11 @@ fttk_tx_series:
 		bmide_dev = dev;
 		pdc202xx_display_info = &pdc202xx_get_info;
 	}
-#endif /* DISPLAY_PDC202XX_TIMINGS && CONFIG_PROC_FS */
+#endif
 	return dev->irq;
 }
 
-unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
+static unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 {
 	unsigned short mask = (hwif->unit) ? (1<<11) : (1<<10);
 	unsigned short CIS;
@@ -1310,7 +1312,7 @@ unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 	}
 }
 
-void __init ide_init_pdc202xx(struct ata_channel *hwif)
+static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
 	hwif->tuneproc  = &pdc202xx_tune_drive;
 	hwif->quirkproc = &pdc202xx_quirkproc;
@@ -1362,4 +1364,156 @@ void __init ide_init_pdc202xx(struct ata_channel *hwif)
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
 #endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+#ifdef CONFIG_PDC202XX_FORCE
+        {
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20246,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: NULL,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		extra: 16,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+        {
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20262,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
+	},
+        {
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20265,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: ON_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
+	},
+        {
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20267,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+#else
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20246,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: NULL,
+		init_channel: ide_init_pdc202xx,
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+		bootable: OFF_BOARD,
+		extra: 16,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20262,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+		bootable: OFF_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20265,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+		bootable: OFF_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ | ATA_F_PHACK  | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20267,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		exnablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+		bootable: OFF_BOARD,
+		extra: 48,
+		flags: ATA_F_IRQ  | ATA_F_DMA
+	},
+#endif
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20268,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+	/* Promise used a different PCI identification for the raid card
+	 * apparently to try and prevent Linux detecting it and using our own
+	 * raid code. We want to detect it for the ataraid drivers, so we have
+	 * to list both here.. */
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20268R,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		flags: ATA_F_IRQ  | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20269,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20275,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_PROMISE,
+		device: PCI_DEVICE_ID_PROMISE_20276,
+		init_chipset: pdc202xx_init_chipset,
+		ata66_check: ata66_pdc202xx,
+		init_channel: ide_init_pdc202xx,
+		bootable: OFF_BOARD,
+		flags: ATA_F_IRQ | ATA_F_DMA
+	},
+};
+
+int __init init_pdc202xx(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -853,8 +853,8 @@ extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
 
 #ifdef CONFIG_PCI
-# define ON_BOARD		1
-# define NEVER_BOARD		0
+# define ON_BOARD		0
+# define NEVER_BOARD		1
 # ifdef CONFIG_BLK_DEV_OFFBOARD
 #  define OFF_BOARD		ON_BOARD
 # else
@@ -889,8 +889,9 @@ extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 extern int check_drive_lists(struct ata_device *, int good_bad);
 extern int XXX_ide_dmaproc(struct ata_device *);
 extern void ide_release_dma(struct ata_channel *);
-extern void ide_setup_dma(struct ata_channel *,	unsigned long, unsigned int) __init;
 extern int ata_start_dma(struct ata_device *, struct request *rq);
+
+extern void ata_init_dma(struct ata_channel *,	unsigned long) __init;
 #endif
 
 extern spinlock_t ide_lock;

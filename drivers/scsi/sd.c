@@ -242,38 +242,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 				return -EFAULT;
 			return 0;
 		}
-		case HDIO_GETGEO_BIG:
-		{
-			struct hd_big_geometry *loc = 
-					(struct hd_big_geometry *) arg;
 
-			if(!loc)
-				return -EINVAL;
-			host = sdp->host;
-
-			/* default to most commonly used values */
-			diskinfo[0] = 0x40;
-			diskinfo[1] = 0x20;
-			diskinfo[2] = sdkp->capacity >> 11;
-
-			/* override with calculated, extended default, 
-			   or driver values */
-			if(host->hostt->bios_param != NULL) 
-				host->hostt->bios_param(sdkp, dev,
-							&diskinfo[0]);
-			else
-				scsicam_bios_param(sdkp, dev, &diskinfo[0]);
-
-			if (put_user(diskinfo[0], &loc->heads) ||
-				put_user(diskinfo[1], &loc->sectors) ||
-				put_user(diskinfo[2], 
-					 (unsigned int *) &loc->cylinders) ||
-				put_user((unsigned)
-					   get_start_sect(inode->i_rdev),
-					 (unsigned long *)&loc->start))
-				return -EFAULT;
-			return 0;
-		}
 		case BLKGETSIZE:
 		case BLKGETSIZE64:
 		case BLKROSET:

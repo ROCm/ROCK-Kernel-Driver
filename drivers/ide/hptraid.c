@@ -107,22 +107,6 @@ static int hptraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			return 0;
 		}
 
-		case HDIO_GETGEO_BIG:
-		{
-			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
-			unsigned int bios_cyl;
-			if (!loc) return -EINVAL;
-			val = 255;
-			if (put_user(val, (byte *) &loc->heads)) return -EFAULT;
-			val = 63;
-			if (put_user(val, (byte *) &loc->sectors)) return -EFAULT;
-			bios_cyl = raid[minor].sectors/63/255;
-			if (put_user(bios_cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)ataraid_gendisk.part[minor(inode->i_rdev)].start_sect,
-				(unsigned long *) &loc->start)) return -EFAULT;
-			return 0;
-		}
-			
 		case BLKROSET:
 		case BLKROGET:
 		case BLKSSZGET:

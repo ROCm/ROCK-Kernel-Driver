@@ -2,7 +2,7 @@
  * linux/drivers/ide/ide-geometry.c
  *
  * Sun Feb 24 23:13:03 CET 2002: Patch by Andries Brouwer to remove the
- * confused CMOS probe applied. This is solving more problems then it my
+ * confused CMOS probe applied. This is solving more problems than it may
  * (unexpectedly) introduce.
  */
 

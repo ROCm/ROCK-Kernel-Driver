@@ -466,14 +466,14 @@ void ide_release_dma(struct ata_channel *ch)
 /*
  * This can be called for a dynamically installed interface. Don't __init it
  */
-void ide_setup_dma(struct ata_channel *ch, unsigned long dma_base, unsigned int num_ports)
+void ata_init_dma(struct ata_channel *ch, unsigned long dma_base)
 {
-	printk("    %s: BM-DMA at 0x%04lx-0x%04lx", ch->name, dma_base, dma_base + num_ports - 1);
-	if (check_region(dma_base, num_ports)) {
-		printk(" -- ERROR, PORT ADDRESSES ALREADY IN USE\n");
+	if (!request_region(dma_base, 8, ch->name)) {
+		printk(KERN_ERR "ATA: ERROR: BM DMA portst already in use!\n");
+
 		return;
 	}
-	request_region(dma_base, num_ports, ch->name);
+	printk(KERN_INFO"    %s: BM-DMA at 0x%04lx-0x%04lx", ch->name, dma_base, dma_base + 7);
 	ch->dma_base = dma_base;
 	ch->dmatable_cpu = pci_alloc_consistent(ch->pci_dev,
 						  PRD_ENTRIES * PRD_BYTES,

@@ -799,17 +799,27 @@ abort:
 	if (rq) kfree (rq);
 	cmd->result = DID_ERROR << 16;
 	done(cmd);
+
 	return 0;
 }
 
-int idescsi_abort (Scsi_Cmnd *cmd)
+/* FIXME: This needs further investigation.
+ */
+int idescsi_device_reset (Scsi_Cmnd *cmd)
 {
-	return SCSI_ABORT_SNOOZE;
-}
+#if 0
+	ide_drive_t *drive = idescsi_drives[cmd->target];
+        struct request req;
 
-int idescsi_reset (Scsi_Cmnd *cmd, unsigned int resetflags)
-{
-	return SCSI_RESET_SUCCESS;
+        ide_init_drive_cmd(&req);
+        req.flags = REQ_SPECIAL;
+
+	/* FIX ME, the next executable line causes on oops in lk 2.5.10-dj1
+	 * [code copied from ide-cd's ide_cdrom_reset(), does it work?]
+	 */
+        ide_do_drive_cmd(drive, &req, ide_wait);
+#endif
+	return SUCCESS;
 }
 
 int idescsi_bios (Disk *disk, kdev_t dev, int *parm)
@@ -832,8 +842,8 @@ static Scsi_Host_Template idescsi_template = {
 	info:		idescsi_info,
 	ioctl:		idescsi_ioctl,
 	queuecommand:	idescsi_queue,
-	abort:		idescsi_abort,
-	reset:		idescsi_reset,
+	eh_device_reset_handler: 
+			idescsi_device_reset,
 	bios_param:	idescsi_bios,
 	can_queue:	10,
 	this_id:	-1,

@@ -1,4 +1,6 @@
-/* $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
+ * $Id: cmd64x.c,v 1.21 2000/01/30 23:23:16
  *
  * linux/drivers/ide/cmd64x.c		Version 1.22	June 9, 2000
  *
@@ -18,12 +20,13 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
-#include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
@@ -1070,19 +1073,19 @@ static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 		bmide_dev = dev;
 		cmd64x_display_info = &cmd64x_get_info;
 	}
-#endif /* DISPLAY_CMD64X_TIMINGS && CONFIG_PROC_FS */
+#endif
 
 	return 0;
 }
 
-unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
+static unsigned int __init cmd64x_init_chipset(struct pci_dev *dev)
 {
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
 		return cmd680_pci_init (dev);
 	return cmd64x_pci_init (dev);
 }
 
-unsigned int cmd680_ata66(struct ata_channel *hwif)
+static unsigned int cmd680_ata66(struct ata_channel *hwif)
 {
 	byte ata66	= 0;
 	byte addr_mask	= (hwif->unit) ? 0xB0 : 0xA0;
@@ -1091,7 +1094,7 @@ unsigned int cmd680_ata66(struct ata_channel *hwif)
 	return (ata66 & 0x01) ? 1 : 0;
 }
 
-unsigned int cmd64x_ata66(struct ata_channel *hwif)
+static unsigned int cmd64x_ata66(struct ata_channel *hwif)
 {
 	byte ata66 = 0;
 	byte mask = (hwif->unit) ? 0x02 : 0x01;
@@ -1100,7 +1103,7 @@ unsigned int cmd64x_ata66(struct ata_channel *hwif)
 	return (ata66 & mask) ? 1 : 0;
 }
 
-unsigned int __init ata66_cmd64x(struct ata_channel *hwif)
+static unsigned int __init cmd64x_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
@@ -1108,7 +1111,7 @@ unsigned int __init ata66_cmd64x(struct ata_channel *hwif)
 	return cmd64x_ata66(hwif);
 }
 
-void __init ide_init_cmd64x(struct ata_channel *hwif)
+static void __init cmd64x_init_channel(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int class_rev;
@@ -1158,5 +1161,64 @@ void __init ide_init_cmd64x(struct ata_channel *hwif)
 	}
 
 	hwif->highmem = 1;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_643,
+		init_chipset: cmd64x_init_chipset,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_646,
+		init_chipset: cmd64x_init_chipset,
+		init_channel: cmd64x_init_channel,
+		enablebits: {{0x00,0x00,0x00}, {0x51,0x80,0x80}},
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_648,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_649,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_CMD,
+		device: PCI_DEVICE_ID_CMD_680,
+		init_chipset: cmd64x_init_chipset,
+		ata66_check: cmd64x_ata66_check,
+		init_channel: cmd64x_init_channel,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+};
+
+int __init init_cmd64x(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -25,6 +25,7 @@
 #include <asm/irq.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #undef DISPLAY_PDCADMA_TIMINGS
 
@@ -66,7 +67,7 @@ static int pdcadma_dmaproc(struct ata_device *drive)
 }
 #endif
 
-unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
+static unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 {
 #if defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!pdcadma_proc) {
@@ -78,12 +79,12 @@ unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_pdcadma(struct ata_channel *channel)
+static unsigned int __init ata66_pdcadma(struct ata_channel *channel)
 {
 	return 1;
 }
 
-void __init ide_init_pdcadma(struct ata_channel *hwif)
+static void __init ide_init_pdcadma(struct ata_channel *hwif)
 {
 	hwif->autodma = 0;
 	hwif->dma_base = 0;
@@ -97,8 +98,31 @@ void __init ide_init_pdcadma(struct ata_channel *hwif)
 //	}
 }
 
-void __init ide_dmacapable_pdcadma(struct ata_channel *hwif, unsigned long dmabase)
+static void __init ide_dmacapable_pdcadma(struct ata_channel *hwif, unsigned long dmabase)
 {
 //	ide_setup_dma(hwif, dmabase, 8);
 }
 
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	PCI_VENDOR_ID_PDC, PCI_DEVICE_ID_PDC_1841,
+	pci_init_pdcadma,
+	ata66_pdcadma,
+	ide_init_pdcadma,
+	ide_dmacapable_pdcadma,
+	{
+		{0x00,0x00,0x00},
+		{0x00,0x00,0x00}
+	},
+	OFF_BOARD,
+	0,
+	ATA_F_NODMA
+};
+
+int __init init_pdcadma(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
+}

@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  Copyright (C) 1996-1998  Linus Torvalds & authors (see below)
  *
  * Authors:
@@ -92,12 +93,14 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/pci.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define OPTI621_MAX_PIO 3
 /* In fact, I do not have any PIO 4 drive
@@ -310,9 +313,38 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 /*
  * ide_init_opti621() is called once for each hwif found at boot.
  */
-void __init ide_init_opti621(struct ata_channel *hwif)
+static void __init ide_init_opti621(struct ata_channel *hwif)
 {
 	hwif->drives[0].drive_data = PIO_DONT_KNOW;
 	hwif->drives[1].drive_data = PIO_DONT_KNOW;
 	hwif->tuneproc = &opti621_tune_drive;
+}
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_OPTI,
+		device: PCI_DEVICE_ID_OPTI_82C621,
+		init_channel: ide_init_opti621,
+		enablebits: {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		bootable: ON_BOARD
+	},
+	{
+		vendor: PCI_VENDOR_ID_OPTI,
+		device: PCI_DEVICE_ID_OPTI_82C825,
+		init_channel: ide_init_opti621,
+		enablebits: {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_opti621(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -280,7 +280,7 @@ struct hd_geometry {
       unsigned long start;
 };
 
-/* BIG GEOMETRY */
+/* BIG GEOMETRY - dying, used only by HDIO_GETGEO_BIG_RAW */
 struct hd_big_geometry {
 	unsigned char heads;
 	unsigned char sectors;
@@ -327,7 +327,7 @@ enum {
 };
 
 /* hd/ide ctl's that pass (arg) ptrs to user space are numbered 0x033n/0x033n */
-#define HDIO_GETGEO_BIG		0x0330	/* */
+/* 0x330 is reserved - used to be HDIO_GETGEO_BIG */
 #define HDIO_GETGEO_BIG_RAW	0x0331	/* */
 
 #define __NEW_HD_DRIVE_ID

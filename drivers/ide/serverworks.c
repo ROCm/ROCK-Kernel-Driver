@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * linux/drivers/ide/serverworks.c		Version 0.3	26 Oct 2001
  *
  * May be copied or modified under the terms of the GNU General Public License
@@ -85,13 +86,14 @@
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/hdreg.h>
-#include <linux/ide.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #undef DISPLAY_SVWKS_TIMINGS
 #undef SVWKS_DEBUG_DRIVE_INFO
@@ -238,7 +240,7 @@ extern char *ide_xfer_verbose (byte xfer_rate);
 
 static struct pci_dev *isa_dev;
 
-static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
+static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 {
 	byte udma_modes[]	= { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
 	byte dma_modes[]	= { 0x77, 0x21, 0x20 };
@@ -347,7 +349,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
 	pci_write_config_byte(dev, drive_pci2, dma_timing);
 	pci_write_config_byte(dev, drive_pci3, ultra_timing);
 	pci_write_config_byte(dev, 0x54, ultra_enable);
-	
+
 	if (speed > XFER_PIO_4)
 		outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
 	else
@@ -359,7 +361,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
 	return err;
 }
 
-static void config_chipset_for_pio (ide_drive_t *drive)
+static void config_chipset_for_pio(struct ata_device *drive)
 {
 	unsigned short eide_pio_timing[6] = {960, 480, 240, 180, 120, 90};
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
@@ -397,7 +399,7 @@ static void config_chipset_for_pio (ide_drive_t *drive)
 	drive->current_speed = speed;
 }
 
-static void svwks_tune_drive (ide_drive_t *drive, byte pio)
+static void svwks_tune_drive(struct ata_device *drive, byte pio)
 {
 	byte speed;
 	switch(pio) {
@@ -411,7 +413,7 @@ static void svwks_tune_drive (ide_drive_t *drive, byte pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma (ide_drive_t *drive)
+static int config_chipset_for_dma(struct ata_device *drive)
 {
 	struct hd_driveid *id	= drive->id;
 	struct pci_dev *dev	= drive->channel->pci_dev;
@@ -536,7 +538,7 @@ static int svwks_dmaproc(struct ata_device *drive)
 }
 #endif
 
-unsigned int __init pci_init_svwks(struct pci_dev *dev)
+static unsigned int __init svwks_init_chipset(struct pci_dev *dev)
 {
 	unsigned int reg;
 	byte btr;
@@ -621,7 +623,7 @@ static unsigned int __init ata66_svwks_cobalt(struct ata_channel *hwif)
 	return 0;
 }
 
-unsigned int __init ata66_svwks(struct ata_channel *hwif)
+static unsigned int __init svwks_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 
@@ -636,7 +638,7 @@ unsigned int __init ata66_svwks(struct ata_channel *hwif)
 	return 0;
 }
 
-void __init ide_init_svwks(struct ata_channel *hwif)
+static void __init ide_init_svwks(struct ata_channel *hwif)
 {
 	if (!hwif->irq)
 		hwif->irq = hwif->unit ? 15 : 14;
@@ -648,7 +650,7 @@ void __init ide_init_svwks(struct ata_channel *hwif)
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
-#else /* CONFIG_BLK_DEV_IDEDMA */
+#else
 	if (hwif->dma_base) {
 #ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
@@ -662,5 +664,38 @@ void __init ide_init_svwks(struct ata_channel *hwif)
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 	}
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
+#endif
+}
+
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+        {
+		vendor: PCI_VENDOR_ID_SERVERWORKS,
+		device: PCI_DEVICE_ID_SERVERWORKS_OSB4IDE,
+		init_chipset: svwks_init_chipset,
+		ata66_check: svwks_ata66_check,
+		init_channel: ide_init_svwks,
+		bootable: ON_BOARD,
+		flags: ATA_F_DMA
+	},
+	{
+		vendor: PCI_VENDOR_ID_SERVERWORKS,
+		device: PCI_DEVICE_ID_SERVERWORKS_CSB5IDE,
+		init_chipset: svwks_init_chipset,
+		ata66_check: svwks_ata66_check,
+		init_channel: ide_init_svwks,
+		bootable: ON_BOARD
+	},
+};
+
+int __init init_svwks(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+        return 0;
 }

@@ -37,11 +37,13 @@
 #include <linux/ide.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/it8172/it8172_int.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 /*
  * Prototypes
@@ -224,25 +226,25 @@ static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_IT8172_TUNING) */
 
 
-unsigned int __init pci_init_it8172 (struct pci_dev *dev)
+static unsigned int __init pci_init_it8172 (struct pci_dev *dev)
 {
     unsigned char progif;
-    
+
     /*
      * Place both IDE interfaces into PCI "native" mode
      */
     (void)pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
-    (void)pci_write_config_byte(dev, PCI_CLASS_PROG, progif | 0x05);    
+    (void)pci_write_config_byte(dev, PCI_CLASS_PROG, progif | 0x05);
 
     return IT8172_IDE_IRQ;
 }
 
 
-void __init ide_init_it8172(struct ata_channel *hwif)
+static void __init ide_init_it8172(struct ata_channel *hwif)
 {
     struct pci_dev* dev = hwif->pci_dev;
     unsigned long cmdBase, ctrlBase;
-    
+
     hwif->tuneproc = &it8172_tune_drive;
     hwif->drives[0].autotune = 1;
     hwif->drives[1].autotune = 1;
@@ -253,17 +255,35 @@ void __init ide_init_it8172(struct ata_channel *hwif)
 #ifndef CONFIG_BLK_DEV_IDEDMA
     hwif->autodma = 0;
 #else /* CONFIG_BLK_DEV_IDEDMA */
-#ifdef CONFIG_IT8172_TUNING
+# ifdef CONFIG_IT8172_TUNING
     hwif->autodma = 1;
     hwif->dmaproc = &it8172_dmaproc;
     hwif->speedproc = &it8172_tune_chipset;
-#endif /* CONFIG_IT8172_TUNING */
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
+# endif
+#endif
 
     cmdBase = dev->resource[0].start;
     ctrlBase = dev->resource[1].start;
-    
+
     ide_init_hwif_ports(&hwif->hw, cmdBase, ctrlBase | 2, NULL);
     memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
     hwif->noprobe = 0;
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+        vendor:	PCI_VENDOR_ID_ITE,
+	device: PCI_DEVICE_ID_ITE_IT8172G,
+	init_chipset: pci_init_it8172,
+	init_channel: ide_init_it8172,
+	exnablebits: {{0x00,0x00,0x00}, {0x40,0x00,0x01} },
+	bootable: ON_BOARD
+};
+
+int __init init_it8172(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }

@@ -477,7 +477,7 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
 			return ide_started; /* continue polling... */
 		}
 		ch->poll_timeout = 0;
-		printk(KERN_ERR "%s: write timed-out!\n",drive->name);
+		printk(KERN_ERR "%s: write timed out!\n",drive->name);
 		return ide_error(drive, "write timeout", GET_STAT());
 	}
 

@@ -342,6 +342,7 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 		if (!noautodma)
 			ide_hwifs[ix].autodma = 1;
 #endif
+		ide_hwifs[ix].unmask = 1;
 	}
 }
 

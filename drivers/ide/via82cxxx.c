@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  * $Id: via82cxxx.c,v 3.34 2002/02/12 11:26:11 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
@@ -65,9 +66,11 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+
 #include <asm/io.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 #define VIA_IDE_ENABLE		0x40
 #define VIA_IDE_CONFIG		0x41
@@ -380,7 +383,7 @@ static int via82cxxx_dmaproc(struct ata_device *drive)
  * and initialize its drive independent registers.
  */
 
-unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
+static unsigned int __init via82cxxx_init_chipset(struct pci_dev *dev)
 {
 	struct pci_dev *isa = NULL;
 	unsigned char t, v;
@@ -510,12 +513,12 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_via82cxxx(struct ata_channel *hwif)
+static unsigned int __init via82cxxx_ata66_check(struct ata_channel *hwif)
 {
 	return ((via_enabled & via_80w) >> hwif->unit) & 1;
 }
 
-void __init ide_init_via82cxxx(struct ata_channel *hwif)
+static void __init via82cxxx_init_channel(struct ata_channel *hwif)
 {
 	int i;
 
@@ -546,8 +549,45 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
  * We allow the BM-DMA driver to only work on enabled interfaces.
  */
 
-void __init ide_dmacapable_via82cxxx(struct ata_channel *hwif, unsigned long dmabase)
+static void __init via82cxxx_init_dma(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((via_enabled >> hwif->unit) & 1)
-		ide_setup_dma(hwif, dmabase, 8);
+		ata_init_dma(hwif, dmabase);
+}
+
+/* module data table */
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_VIA,
+		device:	PCI_DEVICE_ID_VIA_82C576_1,
+		init_chipset: via82cxxx_init_chipset,
+		ata66_check: via82cxxx_ata66_check,
+		init_channel: via82cxxx_init_channel,
+		init_dma: via82cxxx_init_dma,
+		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+	{
+		vendor:	PCI_VENDOR_ID_VIA,
+		device:	PCI_DEVICE_ID_VIA_82C586_1,
+		init_chipset: via82cxxx_init_chipset,
+		ata66_check: via82cxxx_ata66_check,
+		init_channel: via82cxxx_init_channel,
+		init_dma: via82cxxx_init_dma,
+		enablebits: {{0x40,0x02,0x02}, {0x40,0x01,0x01}},
+		bootable: ON_BOARD,
+		flags: ATA_F_NOADMA
+	},
+};
+
+int __init init_via82cxxx(void)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
+
+	return 0;
 }

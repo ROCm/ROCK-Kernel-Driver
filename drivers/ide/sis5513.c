@@ -40,17 +40,18 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/hdreg.h>
 
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+#include <linux/hdreg.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 
 #include "ata-timing.h"
+#include "pcihost.h"
 
 /* When DEBUG is defined it outputs initial PCI config register
    values and changes made to them by the driver */
@@ -741,7 +742,7 @@ static int sis5513_dmaproc(struct ata_device *drive)
 #endif
 
 /* Chip detection and general config */
-unsigned int __init pci_init_sis5513(struct pci_dev *dev)
+static unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 {
 	struct pci_dev *host;
 	int i = 0;
@@ -823,7 +824,7 @@ unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_sis5513(struct ata_channel *hwif)
+static unsigned int __init ata66_sis5513(struct ata_channel *hwif)
 {
 	byte reg48h = 0, ata66 = 0;
 	byte mask = hwif->unit ? 0x20 : 0x10;
@@ -835,7 +836,7 @@ unsigned int __init ata66_sis5513(struct ata_channel *hwif)
         return ata66;
 }
 
-void __init ide_init_sis5513(struct ata_channel *hwif)
+static void __init ide_init_sis5513(struct ata_channel *hwif)
 {
 
 	hwif->irq = hwif->unit ? 15 : 14;
@@ -860,4 +861,24 @@ void __init ide_init_sis5513(struct ata_channel *hwif)
 #endif
 	}
 	return;
+}
+
+
+/* module data table */
+static struct ata_pci_device chipset __initdata = {
+	vendor: PCI_VENDOR_ID_SI,
+	device: PCI_DEVICE_ID_SI_5513,
+	init_chipset: pci_init_sis5513,
+	ata66_check: ata66_sis5513,
+	init_channel: ide_init_sis5513,
+	enablebits: {{0x4a,0x02,0x02}, {0x4a,0x04,0x04} },
+	bootable: ON_BOARD,
+	flags: ATA_F_NOADMA
+};
+
+int __init init_sis5513(void)
+{
+	ata_register_chipset(&chipset);
+
+        return 0;
 }
