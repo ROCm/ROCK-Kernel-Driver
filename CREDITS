@@ -2220,14 +2220,13 @@ S: 7546 JA  Enschede
 S: Netherlands
 
 N: David S. Miller
-E: davem@redhat.com
+E: davem@davemloft.net
 D: Sparc and blue box hacker
 D: Vger Linux mailing list co-maintainer
 D: Linux Emacs elf/qmagic support + other libc/gcc things
 D: Yee bore de yee bore! ;-)
-S: 750 N. Shoreline Blvd.
-S: Apt. #111
-S: Mountain View, California 94043
+S: 575 Harrison St. #103
+S: San Francisco, CA 94105
 S: USA
 
 N: Rick Miller
