@@ -57,11 +57,8 @@ tab[] =
     { "IA64_TASK_PROCESSOR_OFFSET",	offsetof (struct task_struct, processor) },
     { "IA64_TASK_THREAD_OFFSET",	offsetof (struct task_struct, thread) },
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },
-#ifdef CONFIG_IA32_SUPPORT
-    { "IA64_TASK_THREAD_SIGMASK_OFFSET",offsetof (struct task_struct, thread.un.sigmask) },
-#endif
 #ifdef CONFIG_PERFMON
-    { "IA64_TASK_PFM_NOTIFY_OFFSET",	offsetof(struct task_struct, thread.pfm_pend_notify) },
+    { "IA64_TASK_PFM_MUST_BLOCK_OFFSET",offsetof(struct task_struct, thread.pfm_must_block) },
 #endif
     { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
     { "IA64_TASK_MM_OFFSET",		offsetof (struct task_struct, mm) },
@@ -165,17 +162,18 @@ tab[] =
     { "IA64_SIGCONTEXT_FR6_OFFSET",	offsetof (struct sigcontext, sc_fr[6]) },
     { "IA64_SIGCONTEXT_PR_OFFSET",	offsetof (struct sigcontext, sc_pr) },
     { "IA64_SIGCONTEXT_R12_OFFSET",	offsetof (struct sigcontext, sc_gr[12]) },
+    { "IA64_SIGCONTEXT_RBS_BASE_OFFSET",offsetof (struct sigcontext, sc_rbs_base) },
+    { "IA64_SIGCONTEXT_LOADRS_OFFSET",	offsetof (struct sigcontext, sc_loadrs) },
     { "IA64_SIGFRAME_ARG0_OFFSET",		offsetof (struct sigframe, arg0) },
     { "IA64_SIGFRAME_ARG1_OFFSET",		offsetof (struct sigframe, arg1) },
     { "IA64_SIGFRAME_ARG2_OFFSET",		offsetof (struct sigframe, arg2) },
-    { "IA64_SIGFRAME_RBS_BASE_OFFSET",		offsetof (struct sigframe, rbs_base) },
     { "IA64_SIGFRAME_HANDLER_OFFSET",		offsetof (struct sigframe, handler) },
     { "IA64_SIGFRAME_SIGCONTEXT_OFFSET",	offsetof (struct sigframe, sc) },
     { "IA64_CLONE_VFORK",		CLONE_VFORK },
     { "IA64_CLONE_VM",			CLONE_VM },
     { "IA64_CPU_IRQ_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.irq_count) },
     { "IA64_CPU_BH_COUNT_OFFSET",	offsetof (struct cpuinfo_ia64, irq_stat.f.bh_count) },
-    { "IA64_CPU_PHYS_STACKED_SIZE_P8_OFFSET",	offsetof (struct cpuinfo_ia64, phys_stacked_size_p8) },
+    { "IA64_CPU_PHYS_STACKED_SIZE_P8_OFFSET",offsetof (struct cpuinfo_ia64, phys_stacked_size_p8)},
 };
 
 static const char *tabs = "\t\t\t\t\t\t\t\t\t\t";

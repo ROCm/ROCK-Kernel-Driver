@@ -1,7 +1,7 @@
 #ifndef _ASM_IA64_SEMBUF_H
 #define _ASM_IA64_SEMBUF_H
 
-/* 
+/*
  * The semid64_ds structure for IA-64 architecture.
  * Note extra padding because this structure is passed back and forth
  * between kernel and user space.

@@ -33,6 +33,7 @@ int decnet_dn_count = 1;
 int decnet_di_count = 3;
 int decnet_dr_count = 3;
 int decnet_log_martians = 1;
+int decnet_no_fc_max_cwnd = NSP_MIN_WINDOW;
 
 #ifdef CONFIG_SYSCTL
 extern int decnet_dst_gc_interval;
@@ -42,6 +43,8 @@ static int min_state_count[] = { 1 };
 static int max_state_count[] = { NSP_MAXRXTSHIFT };
 static int min_decnet_dst_gc_interval[] = { 1 };
 static int max_decnet_dst_gc_interval[] = { 60 };
+static int min_decnet_no_fc_max_cwnd[] = { NSP_MIN_WINDOW };
+static int max_decnet_no_fc_max_cwnd[] = { NSP_MAX_WINDOW };
 static char node_name[7] = "???";
 
 static struct ctl_table_header *dn_table_header = NULL;
@@ -344,6 +347,10 @@ static ctl_table dn_table[] = {
 	sizeof(int), 0644,
 	NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL,
 	&min_decnet_dst_gc_interval, &max_decnet_dst_gc_interval},
+	{NET_DECNET_NO_FC_MAX_CWND, "no_fc_max_cwnd", &decnet_no_fc_max_cwnd,
+	sizeof(int), 0644,
+	NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL,
+	&min_decnet_no_fc_max_cwnd, &max_decnet_no_fc_max_cwnd},
 	{NET_DECNET_DEBUG_LEVEL, "debug", &decnet_debug_level, 
 	sizeof(int), 0644, 
 	NULL, &proc_dointvec, &sysctl_intvec, NULL,

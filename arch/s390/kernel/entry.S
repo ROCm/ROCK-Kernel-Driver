@@ -256,9 +256,17 @@ sysc_signal_return:
 #
 sysc_tracesys:
         l       %r1,BASED(.Ltrace)
-	l       %r2,BASED(.Lc_ENOSYS)
-	st      %r2,SP_R2(%r15)   # give sysc_trace an -ENOSYS retval
+	l       %r7,BASED(.Lc_ENOSYS)
+	st      %r7,SP_R2(%r15)   # give sysc_trace an -ENOSYS retval
         basr    %r14,%r1
+	l       %r2,SP_R2(%r15)
+	cr      %r2,%r7 # compare with saved -ENOSYS
+	be      BASED(sysc_tracesys_dn1)
+	# strace wants to change the syscall
+	sll     %r2,24
+	srl     %r2,22
+        l       %r8,sys_call_table-entry_base(2,%r13) # get address of system call    
+sysc_tracesys_dn1:		
 	lm      %r3,%r6,SP_R3(%r15)
 	l       %r2,SP_ORIG_R2(%r15)
         basr    %r14,%r8          # call sys_xxx
@@ -689,10 +697,7 @@ pgm_no_sv:
         l       %r5,SP_PSW+4(15)  # load psw addr
         sr      %r5,%r7           # substract ilc from psw
         st      %r5,SP_PSW+4(15)  # store corrected psw addr
-pgm_per:cl      %r3,BASED(.Lc20)  # pseudo page fault ?
-        be      BASED(pgm_go)     # if yes then don't reenable interrupts
-        stosm   24(%r15),0x03     # reenable interrupts
-pgm_go: basr    %r14,%r1          # branch to interrupt-handler
+pgm_per:basr    %r14,%r1          # branch to interrupt-handler
 pgm_dn: n	%r8,BASED(.Lc128) # check for per excepton
         be      BASED(pgm_return)
         la      %r2,SP_PTREGS(15) # address of register-save area

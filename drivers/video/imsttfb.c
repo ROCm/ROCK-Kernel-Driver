@@ -1950,7 +1950,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	init_imstt(p);
 
-	pdev->driver_data = p;
+	pci_set_drvdata(pdev, p);
 
 	return 0;
 }
@@ -1958,7 +1958,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 static void __devexit
 imsttfb_remove(struct pci_dev *pdev)
 {
-	struct fb_info_imstt *p = (struct fb_info_imstt *)pdev->driver_data;
+	struct fb_info_imstt *p = pci_get_drvdata(pdev);
 
 	unregister_framebuffer(&p->info);
 	iounmap(p->cmap_regs);

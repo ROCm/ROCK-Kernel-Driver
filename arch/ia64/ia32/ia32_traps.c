@@ -1,7 +1,12 @@
 /*
- * IA32 exceptions handler
+ * IA-32 exception handlers
+ *
+ * Copyright (C) 2000 Asit K. Mallick <asit.k.mallick@intel.com>
+ * Copyright (C) 2001 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 06/16/00	A. Mallick	added siginfo for most cases (close to IA32)
+ * 09/29/00	D. Mosberger	added ia32_intercept()
  */
 
 #include <linux/kernel.h>
@@ -9,6 +14,26 @@
 
 #include <asm/ia32.h>
 #include <asm/ptrace.h>
+
+int
+ia32_intercept (struct pt_regs *regs, unsigned long isr)
+{
+	switch ((isr >> 16) & 0xff) {
+	      case 0:	/* Instruction intercept fault */
+	      case 3:	/* Locked Data reference fault */
+	      case 1:	/* Gate intercept trap */
+		return -1;
+
+	      case 2:	/* System flag trap */
+		if (((isr >> 14) & 0x3) >= 2) {
+			/* MOV SS, POP SS instructions */
+			ia64_psr(regs)->id = 1;
+			return 0;
+		} else
+			return -1;
+	}
+	return -1;
+}
 
 int
 ia32_exception (struct pt_regs *regs, unsigned long isr)

@@ -338,12 +338,12 @@ iplstart:
 # reset files in VM reader
 #
         stidp __LC_CPUID                       # store cpuid
-        lh    %r0,__LC_CPUID+4                 # get cpu version
-        chi   %r0,0x7490                       # running on P/390 ?
-        be    start                            #   no -> skip reset
+	tm    __LC_CPUID,0xff                  # running VM ?
+	bno   .Lnoreset
         la    %r2,.Lreset              
         lhi   %r3,26
         .long 0x83230008
+.Lnoreset:
 #endif
 	
 #

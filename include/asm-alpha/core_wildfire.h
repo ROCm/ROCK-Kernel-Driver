@@ -278,7 +278,7 @@ typedef struct {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int wildfire_inb(unsigned long addr)
+__EXTERN_INLINE u8 wildfire_inb(unsigned long addr)
 {
 	/* ??? I wish I could get rid of this.  But there's no ioremap
 	   equivalent for I/O space.  PCI I/O can be forced into the
@@ -289,33 +289,33 @@ __EXTERN_INLINE unsigned int wildfire_inb(unsigned long addr)
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE void wildfire_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void wildfire_outb(u8 b, unsigned long addr)
 {
 	addr += WILDFIRE_IO_BIAS;
 	__kernel_stb(b, *(vucp)addr);
 	mb();
 }
 
-__EXTERN_INLINE unsigned int wildfire_inw(unsigned long addr)
+__EXTERN_INLINE u16 wildfire_inw(unsigned long addr)
 {
 	addr += WILDFIRE_IO_BIAS;
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE void wildfire_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void wildfire_outw(u16 b, unsigned long addr)
 {
 	addr += WILDFIRE_IO_BIAS;
 	__kernel_stw(b, *(vusp)addr);
 	mb();
 }
 
-__EXTERN_INLINE unsigned int wildfire_inl(unsigned long addr)
+__EXTERN_INLINE u32 wildfire_inl(unsigned long addr)
 {
 	addr += WILDFIRE_IO_BIAS;
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE void wildfire_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void wildfire_outl(u32 b, unsigned long addr)
 {
 	addr += WILDFIRE_IO_BIAS;
 	*(vuip)addr = b;
@@ -343,42 +343,42 @@ __EXTERN_INLINE int wildfire_is_ioaddr(unsigned long addr)
 	return addr >= WILDFIRE_BASE;
 }
 
-__EXTERN_INLINE unsigned long wildfire_readb(unsigned long addr)
+__EXTERN_INLINE u8 wildfire_readb(unsigned long addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE unsigned long wildfire_readw(unsigned long addr)
+__EXTERN_INLINE u16 wildfire_readw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE unsigned long wildfire_readl(unsigned long addr)
+__EXTERN_INLINE u32 wildfire_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long wildfire_readq(unsigned long addr)
+__EXTERN_INLINE u64 wildfire_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void wildfire_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void wildfire_writeb(u8 b, unsigned long addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void wildfire_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void wildfire_writew(u16 b, unsigned long addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void wildfire_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void wildfire_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void wildfire_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void wildfire_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

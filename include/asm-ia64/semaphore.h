@@ -63,8 +63,6 @@ extern int  __down_interruptible (struct semaphore * sem);
 extern int  __down_trylock (struct semaphore * sem);
 extern void __up (struct semaphore * sem);
 
-extern spinlock_t semaphore_wake_lock;
-
 /*
  * Atomically decrement the semaphore's count.  If it goes negative,
  * block the calling thread in the TASK_UNINTERRUPTIBLE state.

@@ -1230,6 +1230,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		ti->open_action = RESTART;
 		outb(0, dev->base_addr + ADAPTRESET);
 		ibmtr_reset_timer(&(ti->tr_timer), dev);/*BMS try to reopen*/
+		spin_unlock(&(ti->lock));
 		return;
 	}
 	if (readb(ti->mmio + ACA_OFFSET + ACA_RW + ISRP_EVEN)

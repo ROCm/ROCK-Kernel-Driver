@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"0.9.15-pre8"
-#define DRV_RELDATE	"Oct 11, 2001"
+#define DRV_VERSION	"0.9.15-pre9"
+#define DRV_RELDATE	"Nov 6, 2001"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -29,6 +29,10 @@
 #include <linux/ethtool.h>
 #include <asm/unaligned.h>
 #include <asm/uaccess.h>
+
+#ifdef __sparc__
+#include <asm/pbm.h>
+#endif
 
 static char version[] __devinitdata =
 	"Linux Tulip driver version " DRV_VERSION " (" DRV_RELDATE ")\n";
@@ -165,7 +169,7 @@ struct tulip_chip_table tulip_tbl[] = {
 
   /* PNIC2 */
   { "Lite-On PNIC-II", 256, 0x0801fbff,
-	HAS_MII | HAS_NWAY | HAS_8023X | HAS_PCI_MWI, t21142_timer },
+	HAS_MII | HAS_NWAY | HAS_8023X | HAS_PCI_MWI, pnic2_timer },
 
   /* COMET */
   { "ADMtek Comet", 256, 0x0001abef,
@@ -261,7 +265,7 @@ static void tulip_set_power_state (struct tulip_private *tp,
 		if (tmp != newtmp)
 			pci_write_config_dword (tp->pdev, CFDD, newtmp);
 	}
-	
+
 }
 
 
@@ -297,14 +301,6 @@ static void tulip_up(struct net_device *dev)
 	tp->cur_rx = tp->cur_tx = 0;
 	tp->dirty_rx = tp->dirty_tx = 0;
 
-	if (tp->chip_id == PNIC2) {
-		u32 addr_high = (dev->dev_addr[1]<<8) + (dev->dev_addr[0]<<0);
-		/* This address setting does not appear to impact chip operation?? */
-		outl((dev->dev_addr[5]<<8) + dev->dev_addr[4] +
-			(dev->dev_addr[3]<<24) + (dev->dev_addr[2]<<16),
-			ioaddr + 0xB0);
-		outl(addr_high + (addr_high<<16), ioaddr + 0xB8);
-	}
 	if (tp->flags & MC_HASH_ONLY) {
 		u32 addr_low = cpu_to_le32(get_unaligned((u32 *)dev->dev_addr));
 		u32 addr_high = cpu_to_le32(get_unaligned((u16 *)(dev->dev_addr+4)));
@@ -420,7 +416,12 @@ media_picked:
 		} else
 			t21142_start_nway(dev);
 	} else if (tp->chip_id == PNIC2) {
-		t21142_start_nway(dev);
+	        /* for initial startup advertise 10/100 Full and Half */
+	        tp->sym_advertise = 0x01E0;
+                /* enable autonegotiate end interrupt */
+	        outl(inl(ioaddr+CSR5)| 0x00008010, ioaddr + CSR5);
+	        outl(inl(ioaddr+CSR7)| 0x00008010, ioaddr + CSR7);
+		pnic2_start_nway(dev);
 	} else if (tp->chip_id == LC82C168  &&  ! tp->medialock) {
 		if (tp->mii_cnt) {
 			dev->if_port = 11;
@@ -901,7 +902,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 {
 	struct tulip_private *np = dev->priv;
 	u32 ethcmd;
-		
+
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
 		return -EFAULT;
 
@@ -917,7 +918,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	}
 
         }
-	
+
 	return -EOPNOTSUPP;
 }
 
@@ -971,7 +972,7 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 			case 4:
                                 /* Advertised value, bogus 10baseTx-FD value from CSR6. */
                                 data->val_out =
-					((inl(ioaddr + CSR6) >> 3) & 0x0040) + 
+					((inl(ioaddr + CSR6) >> 3) & 0x0040) +
 					((csr14 >> 1) & 0x20) + 1;
                                 if (tp->chip_id != DC21041)
                                          data->val_out |= ((csr14 >> 9) & 0x03C0);
@@ -1007,8 +1008,13 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 		if (data->phy_id == 32 && (tp->flags & HAS_NWAY)) {
 			u16 value = data->val_in;
 			if (regnum == 0) {
-				if ((value & 0x1200) == 0x1200)
-					t21142_start_nway (dev);
+			  if ((value & 0x1200) == 0x1200) {
+			    if (tp->chip_id == PNIC2) {
+                                   pnic2_start_nway (dev);
+                            } else {
+				   t21142_start_nway (dev);
+                            }
+			  }
 			} else if (regnum == 4)
 				tp->sym_advertise = value;
 		} else {
@@ -1257,7 +1263,7 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 	u8 cache;
 	u16 pci_command, new_command;
 	u32 csr0;
-	
+
 	if (tulip_debug > 3)
 		printk(KERN_DEBUG "%s: tulip_mwi_config()\n", pdev->slot_name);
 
@@ -1283,7 +1289,7 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 
 	/* if we have any cache line size at all, we can do MRM */
 	csr0 |= MRM;
-	
+
 	/* ...and barring hardware bugs, MWI */
 	if (!(tp->chip_id == DC21143 && tp->revision == 65))
 		csr0 |= MWI;
@@ -1321,7 +1327,7 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 
 	tp->csr0 = csr0;
 	goto out;
-	
+
 early_out:
 	if (csr0 & MWI) {
 		pci_command &= ~PCI_COMMAND_INVALIDATE;
@@ -1369,16 +1375,16 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	 *	Lan media wire a tulip chip to a wan interface. Needs a very
 	 *	different driver (lmc driver)
 	 */
-	 
+
         if (pdev->subsystem_vendor == PCI_VENDOR_ID_LMC) {
 		printk (KERN_ERR PFX "skipping LMC card.\n");
 		return -ENODEV;
 	}
-	
+
 	/*
 	 *	Early DM9100's need software CRC and the DMFE driver
 	 */
-	 
+
 	if (pdev->vendor == 0x1282 && pdev->device == 0x9100)
 	{
 		u32 dev_rev;
@@ -1390,17 +1396,17 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 			return -ENODEV;
 		}
 	}
-		
+
 	/*
-	 *	Looks for early PCI chipsets where people report hangs 
+	 *	Looks for early PCI chipsets where people report hangs
 	 *	without the workarounds being on.
 	 */
-	 
-	/* Intel Saturn. Switch to 8 long words burst, 8 long word cache aligned 
+
+	/* Intel Saturn. Switch to 8 long words burst, 8 long word cache aligned
 	   Aries might need this too. The Saturn errata are not pretty reading but
 	   thankfully its an old 486 chipset.
 	*/
-	
+
 	if (pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82424, NULL)) {
 		csr0 = MRL | MRM | (8 << BurstLenShift) | (1 << CALShift);
 		force_csr0 = 1;
@@ -1410,25 +1416,31 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		csr0 = MRL | MRM | (8 << BurstLenShift) | (1 << CALShift);
 		force_csr0 = 1;
 	}
-		
+
 	/* bugfix: the ASIX must have a burst limit or horrible things happen. */
 	if (chip_idx == AX88140) {
 		if ((csr0 & 0x3f00) == 0)
 			csr0 |= 0x2000;
 	}
-	
+
 	/* PNIC doesn't have MWI/MRL/MRM... */
 	if (chip_idx == LC82C168)
 		csr0 &= ~0xfff10000; /* zero reserved bits 31:20, 16 */
 
-	/* DM9102A has troubles with MRM, clear bit 24 too. */
+	/* DM9102A has troubles with MRM & clear reserved bits 24:22, 20, 16, 7:1 */
 	if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
-		csr0 &= ~0x01200000;
+		csr0 &= ~0x01f100ff;
+
+#if defined(__sparc__)
+        /* DM9102A needs 32-dword alignment/burst length on sparc - chip bug? */
+        if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
+                csr0 = (csr0 & ~0xff00) | 0xe000;
+#endif
 
 	/*
 	 *	And back to business
 	 */
- 
+
 	i = pci_enable_device(pdev);
 	if (i) {
 		printk (KERN_ERR PFX
@@ -1575,6 +1587,22 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 			sa_offset = 2;		/* Grrr, damn Matrox boards. */
 			multiport_cnt = 4;
 		}
+#ifdef CONFIG_DDB5476
+		if ((pdev->bus->number == 0) && (PCI_SLOT(pdev->devfn) == 6)) {
+			/* DDB5476 MAC address in first EEPROM locations. */
+                       sa_offset = 0;
+                       /* No media table either */
+                       tp->flags &= ~HAS_MEDIA_TABLE;
+               }
+#endif
+#ifdef CONFIG_DDB5477
+               if ((pdev->bus->number == 0) && (PCI_SLOT(pdev->devfn) == 4)) {
+                       /* DDB5477 MAC address in first EEPROM locations. */
+                       sa_offset = 0;
+                       /* No media table either */
+                       tp->flags &= ~HAS_MEDIA_TABLE;
+               }
+#endif
 		for (i = 0; i < 6; i ++) {
 			dev->dev_addr[i] = ee_data[i + sa_offset];
 			sum += ee_data[i + sa_offset];
@@ -1590,14 +1618,26 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		}
 	/* On the Zynx 315 Etherarray and other multiport boards only the
 	   first Tulip has an EEPROM.
+	   On Sparc systems the mac address is held in the OBP property
+	   "local-mac-address".
 	   The addresses of the subsequent ports are derived from the first.
 	   Many PCI BIOSes also incorrectly report the IRQ line, so we correct
 	   that here as well. */
 	if (sum == 0  || sum == 6*0xff) {
+#if defined(__sparc__)
+		struct pcidev_cookie *pcp = pdev->sysdata;
+#endif
 		eeprom_missing = 1;
 		for (i = 0; i < 5; i++)
 			dev->dev_addr[i] = last_phys_addr[i];
 		dev->dev_addr[i] = last_phys_addr[i] + 1;
+#if defined(__sparc__)
+		if ((pcp != NULL) && prom_getproplen(pcp->prom_node,
+			"local-mac-address") == 6) {
+			prom_getproperty(pcp->prom_node, "local-mac-address",
+			    dev->dev_addr, 6);
+		}
+#endif
 #if defined(__i386__)		/* Patch up x86 BIOS bug. */
 		if (last_irq)
 			irq = last_irq;
@@ -1690,10 +1730,10 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		printk("%c%2.2X", i ? ':' : ' ', dev->dev_addr[i]);
 	printk(", IRQ %d.\n", irq);
 
-	if ((tp->flags & HAS_NWAY)  || tp->chip_id == DC21041)
-		tp->link_change = t21142_lnk_change;
-	else if (tp->chip_id == PNIC2)
+        if (tp->chip_id == PNIC2)
 		tp->link_change = pnic2_lnk_change;
+	else if ((tp->flags & HAS_NWAY)  || tp->chip_id == DC21041)
+		tp->link_change = t21142_lnk_change;
 	else if (tp->flags & HAS_PNICNWAY)
 		tp->link_change = pnic_lnk_change;
 
@@ -1719,7 +1759,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 			outl(tp->mtable->csr12dir | 0x100, ioaddr + CSR12);
 		break;
 	case DC21142:
-	case PNIC2:
 		if (tp->mii_cnt  ||  tulip_media_cap[dev->if_port] & MediaIsMII) {
 			outl(csr6_mask_defstate, ioaddr + CSR6);
 			outl(0x0000, ioaddr + CSR13);
@@ -1727,6 +1766,11 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 			outl(csr6_mask_hdcap, ioaddr + CSR6);
 		} else
 			t21142_start_nway(dev);
+		break;
+	case PNIC2:
+	        /* just do a reset for sanity sake */
+		outl(0x0000, ioaddr + CSR13);
+		outl(0x0000, ioaddr + CSR14);
 		break;
 	case LC82C168:
 		if ( ! tp->mii_cnt) {

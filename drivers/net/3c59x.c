@@ -868,7 +868,7 @@ static int vortex_cards_found;
 
 static int vortex_suspend (struct pci_dev *pdev, u32 state)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev && dev->priv) {
 		if (netif_running(dev)) {
@@ -881,7 +881,7 @@ static int vortex_suspend (struct pci_dev *pdev, u32 state)
 
 static int vortex_resume (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev && dev->priv) {
 		if (netif_running(dev)) {

@@ -988,8 +988,6 @@ static int matroxfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 #undef minfo
 }
 
-static int matroxfb_switch(int con, struct fb_info *info);
-
 static int matroxfb_get_vblank(CPMINFO struct fb_vblank *vblank)
 {
 	unsigned int sts1;
@@ -1183,7 +1181,7 @@ static struct fb_ops matroxfb_ops = {
 	fb_ioctl:	matroxfb_ioctl,
 };
 
-static int matroxfb_switch(int con, struct fb_info *info)
+int matroxfb_switch(int con, struct fb_info *info)
 {
 #define minfo ((struct matrox_fb_info*)info)
 	struct fb_cmap* cmap;
@@ -1414,11 +1412,11 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_VIDEO64BIT		0x0001
 #define	DEVF_SWAPS		0x0002
 #define DEVF_SRCORG		0x0004
-/* #define DEVF_recycled	0x0008 */
+#define DEVF_BOTHDACS		0x0008	/* put CRTC1 on both outputs by default */
 #define DEVF_CROSS4MB		0x0010
 #define DEVF_TEXT4B		0x0020
 #define DEVF_DDC_8_2		0x0040
-/* #define DEVF_recycled	0x0080 */
+#define DEVF_G550DAC		0x0080
 #define DEVF_SUPPORT32MB	0x0100
 #define DEVF_ANY_VXRES		0x0200
 #define DEVF_TEXT16B		0x0400
@@ -1434,6 +1432,7 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_G400	(DEVF_G2CORE | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2)
 /* if you'll find how to drive DFP... */
 #define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC | DEVF_SRCORG)
+#define DEVF_G550	(DEVF_G450 | DEVF_G550DAC | DEVF_BOTHDACS)
 
 static struct board {
 	unsigned short vendor, device, rev, svid, sid;
@@ -1477,13 +1476,13 @@ static struct board {
 		"Mystique 220 (PCI)"},
 #endif
 #ifdef CONFIG_FB_MATROX_G100
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100,	0xFF,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_MM,	0xFF,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MGA_G100_PCI,
 		DEVF_G100,
 		230000,
 		&vbG100,
 		"MGA-G100 (PCI)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100,	0xFF,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_MM,	0xFF,
 		0,			0,
 		DEVF_G100,
 		230000,
@@ -1561,24 +1560,30 @@ static struct board {
 		230000,
 		&vbG200,
 		"G200 (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,	0x80,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0x80,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MILLENNIUM_G400_MAX_AGP,
 		DEVF_G400,
 		360000,
 		&vbG400,
 		"Millennium G400 MAX (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,	0x80,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0x80,
 		0,			0,
 		DEVF_G400,
 		300000,
 		&vbG400,
 		"G400 (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,	0xFF,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0xFF,
 		0,			0,
 		DEVF_G450,
 		500000,		/* ??? vco goes up to 900MHz... */
 		&vbG400,
-		"G450 (AGP)"},
+		"G450"},
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G550,	0xFF,
+		0,			0,
+		DEVF_G550,
+		500000,
+		&vbG400,
+		"G550"},
 #endif
 	{0,			0,				0xFF,
 		0,			0,
@@ -1641,8 +1646,18 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		if (dfp)
 			ACCESS_FBINFO(output.ph) |= MATROXFB_OUTPUT_CONN_DFP;
 	}
+	if (b->flags & DEVF_BOTHDACS) {
+#ifdef CONFIG_FB_MATROX_G450	
+		ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
+		ACCESS_FBINFO(output.ph) |= MATROXFB_OUTPUT_CONN_SECONDARY;
+#else
+		printk(KERN_INFO "Only digital output of G550 is now working (in analog mode). Enable G450 support in\n");
+		printk(KERN_INFO "kernel configuration if you have analog monitor connected to G550 analog output.\n");
+#endif
+	}
 	ACCESS_FBINFO(devflags.dfp_type) = dfp_type;
 	ACCESS_FBINFO(devflags.g450dac) = b->flags & DEVF_G450DAC;
+	ACCESS_FBINFO(devflags.g550dac) = b->flags & DEVF_G550DAC;
 	ACCESS_FBINFO(devflags.textstep) = ACCESS_FBINFO(devflags.vgastep) * ACCESS_FBINFO(devflags.textmode);
 	ACCESS_FBINFO(devflags.textvram) = 65536 / ACCESS_FBINFO(devflags.textmode);
 
@@ -2060,7 +2075,7 @@ static int matroxfb_probe(struct pci_dev* pdev, const struct pci_device_id* dumm
 	ACCESS_FBINFO(pcidev) = pdev;
 	ACCESS_FBINFO(dead) = 0;
 	ACCESS_FBINFO(usecount) = 0;
-	pdev->driver_data = MINFO;
+	pci_set_drvdata(pdev, MINFO);
 	/* CMDLINE */
 	memcpy(ACCESS_FBINFO(fbcon.fontname), fontname, sizeof(ACCESS_FBINFO(fbcon.fontname)));
 	/* DEVFLAGS */
@@ -2122,7 +2137,7 @@ static int matroxfb_probe(struct pci_dev* pdev, const struct pci_device_id* dumm
 static void pci_remove_matrox(struct pci_dev* pdev) {
 	struct matrox_fb_info* minfo;
 
-	minfo = pdev->driver_data;
+	minfo = pci_get_drvdata(pdev);
 	matroxfb_remove(PMINFO 1);
 }
 
@@ -2140,7 +2155,7 @@ static struct pci_device_id matroxfb_devices[] __devinitdata = {
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
 #endif
 #ifdef CONFIG_FB_MATROX_G100
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_MM,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
@@ -2148,7 +2163,9 @@ static struct pci_device_id matroxfb_devices[] __devinitdata = {
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,
+		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
+	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G550,
 		PCI_ANY_ID,	PCI_ANY_ID,	0, 0, 0},
 #endif
 	{0,			0,
@@ -2638,6 +2655,7 @@ int __init init_module(void){
 module_exit(matrox_done);
 EXPORT_SYMBOL(matroxfb_register_driver);
 EXPORT_SYMBOL(matroxfb_unregister_driver);
+EXPORT_SYMBOL(matroxfb_switch);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -19,24 +19,29 @@
 #include <asm/shmparam.h>
 #include <asm/uaccess.h>
 
-#define COLOR_ALIGN(addr)	(((addr) + SHMLBA - 1) & ~(SHMLBA - 1))
-
 unsigned long
 arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len,
 			unsigned long pgoff, unsigned long flags)
 {
-	struct vm_area_struct * vmm;
 	long map_shared = (flags & MAP_SHARED);
+	unsigned long align_mask = PAGE_SIZE - 1;
+	struct vm_area_struct * vmm;
 
 	if (len > RGN_MAP_LIMIT)
 		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (map_shared)
-		addr = COLOR_ALIGN(addr);
-	else
-		addr = PAGE_ALIGN(addr);
+	if (map_shared && (TASK_SIZE > 0xfffffffful))
+		/*
+		 * For 64-bit tasks, align shared segments to 1MB to avoid potential
+		 * performance penalty due to virtual aliasing (see ASDM).  For 32-bit
+		 * tasks, we prefer to avoid exhausting the address space too quickly by
+		 * limiting alignment to a single page.
+		 */
+		align_mask = SHMLBA - 1;
+
+	addr = (addr + align_mask) & ~align_mask;
 
 	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
 		/* At this point:  (!vmm || addr < vmm->vm_end). */
@@ -46,9 +51,7 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 			return -ENOMEM;
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
-		addr = vmm->vm_end;
-		if (map_shared)
-			addr = COLOR_ALIGN(addr);
+		addr = (vmm->vm_end + align_mask) & ~align_mask;
 	}
 }
 
@@ -184,8 +187,10 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 		if (!file)
 			return -EBADF;
 
-		if (!file->f_op || !file->f_op->mmap)
-			return -ENODEV;
+		if (!file->f_op || !file->f_op->mmap) {
+			addr = -ENODEV;
+			goto out;
+		}
 	}
 
 	/*
@@ -194,22 +199,26 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	 */
 	len = PAGE_ALIGN(len);
 	if (len == 0)
-		return addr;
+		goto out;
 
 	/* don't permit mappings into unmapped space or the virtual page table of a region: */
 	roff = rgn_offset(addr);
-	if ((len | roff | (roff + len)) >= RGN_MAP_LIMIT)
-		return -EINVAL;
+	if ((len | roff | (roff + len)) >= RGN_MAP_LIMIT) {
+		addr = -EINVAL;
+		goto out;
+	}
 
 	/* don't permit mappings that would cross a region boundary: */
-	if (rgn_index(addr) != rgn_index(addr + len))
-		return -EINVAL;
+	if (rgn_index(addr) != rgn_index(addr + len)) {
+		addr = -EINVAL;
+		goto out;
+	}
 
 	down_write(&current->mm->mmap_sem);
 	addr = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
 
-	if (file)
+out:	if (file)
 		fput(file);
 	return addr;
 }

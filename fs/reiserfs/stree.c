@@ -648,7 +648,6 @@ int search_by_key (struct super_block * p_s_sb,
                                        stop at leaf level - set to
                                        DISK_LEAF_NODE_LEVEL */
     ) {
-    kdev_t n_dev = p_s_sb->s_dev;
     int  n_block_number = SB_ROOT_BLOCK (p_s_sb),
       expected_level = SB_TREE_HEIGHT (p_s_sb),
       n_block_size    = p_s_sb->s_blocksize;
@@ -661,7 +660,9 @@ int search_by_key (struct super_block * p_s_sb,
 #ifdef CONFIG_REISERFS_CHECK
     int n_repeat_counter = 0;
 #endif
-
+    
+    PROC_INFO_INC( p_s_sb, search_by_key );
+    
     /* As we add each node to a path we increase its count.  This means that
        we must be careful to release all nodes in a path before we either
        discard the path struct or re-use the path struct, as we do here. */
@@ -696,17 +697,24 @@ int search_by_key (struct super_block * p_s_sb,
 	/* Read the next tree node, and set the last element in the path to
            have a pointer to it. */
 	if ( ! (p_s_bh = p_s_last_element->pe_buffer =
-		reiserfs_bread(n_dev, n_block_number, n_block_size)) ) {
+		reiserfs_bread(p_s_sb, n_block_number, n_block_size)) ) {
 	    p_s_search_path->path_length --;
 	    pathrelse(p_s_search_path);
 	    return IO_ERROR;
 	}
+
+ 	if( fs_changed (fs_gen, p_s_sb) ) {
+ 		PROC_INFO_INC( p_s_sb, search_by_key_fs_changed );
+ 		PROC_INFO_INC( p_s_sb, sbk_fs_changed[ expected_level - 1 ] );
+ 	}
 
 	/* It is possible that schedule occurred. We must check whether the key
 	   to search is still in the tree rooted from the current buffer. If
 	   not then repeat search from the root. */
 	if ( fs_changed (fs_gen, p_s_sb) && 
 	     (!B_IS_IN_TREE (p_s_bh) || !key_in_buffer(p_s_search_path, p_s_key, p_s_sb)) ) {
+ 	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );
+	    PROC_INFO_INC( p_s_sb, sbk_restarted[ expected_level - 1 ] );
 	    decrement_counters_in_path(p_s_search_path);
 	    
 	    /* Get the root block number so that we can repeat the search
@@ -740,6 +748,8 @@ int search_by_key (struct super_block * p_s_sb,
 	
 	/* ok, we have acquired next formatted node in the tree */
 	n_node_level = B_LEVEL (p_s_bh);
+
+	PROC_INFO_BH_STAT( p_s_sb, p_s_bh, n_node_level - 1 );
 
 	RFALSE( n_node_level < n_stop_level,
 		"vs-5152: tree level (%d) is less than stop level (%d)",

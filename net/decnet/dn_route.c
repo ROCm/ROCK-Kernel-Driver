@@ -638,8 +638,8 @@ static int dn_forward(struct sk_buff *skb)
 {
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct dst_entry *dst = skb->dst;
-	struct net_device *dev = skb->dev;
 	struct neighbour *neigh;
+	struct net_device *dev = skb->dev;
 	int err = -EINVAL;
 
 	if ((neigh = dst->neighbour) == NULL)

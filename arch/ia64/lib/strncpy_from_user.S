@@ -40,5 +40,5 @@ GLOBAL_ENTRY(__strncpy_from_user)
 (p6)	mov r8=in2		// buffer filled up---return buffer length
 (p7)	sub r8=in1,r9,1		// return string length (excluding NUL character)
 [.Lexit:]
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__strncpy_from_user)

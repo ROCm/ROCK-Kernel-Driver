@@ -87,6 +87,15 @@ struct e100_serial {
         struct wait_queue       *close_wait;
 #endif  
 
+	unsigned long char_time_usec;       /* The time for 1 char, in usecs */
+	unsigned long last_tx_active_usec;  /* Last tx usec in the jiffies */
+	unsigned long last_tx_active;       /* Last tx time in jiffies */
+	unsigned long last_rx_active_usec;  /* Last rx usec in the jiffies */
+	unsigned long last_rx_active;       /* Last rx time in jiffies */
+
+	int break_detected_cnt;
+	int errorcode;
+
 #ifdef CONFIG_RS485
 	struct rs485_control    rs485;  /* RS-485 support */
 #endif

@@ -540,6 +540,11 @@
 	7411  AMD-765 [Viper] IDE
 	7413  AMD-765 [Viper] ACPI
 	7414  AMD-765 [Viper] USB
+	7440  AMD-768 [??] ISA
+	7441  AMD-768 [??] IDE
+	7443  AMD-768 [??] ACPI
+	7448  AMD-768 [??] PCI
+	7449  AMD-768 [??] USB
 1023  Trident Microsystems
 	0194  82C194
 	2000  4DWave DX
@@ -1094,6 +1099,8 @@
 	4d33  20246
 	4d38  20262
 	4d68  20268
+	6268  20268R
+	4d69  20269
 	5300  DC5300
 105b  Foxconn International, Inc.
 105c  Wipro Infotech Limited
@@ -1370,6 +1377,7 @@
 	0650  PBC0650A
 	0670  USB0670
 	0673  USB0673
+	0680  PCI0680
 1096  Alacron
 1097  Appian Technology
 1098  Quantum Designs (H.K.) Ltd

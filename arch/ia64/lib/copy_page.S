@@ -90,5 +90,5 @@ GLOBAL_ENTRY(copy_page)
 	mov pr=saved_pr,0xffffffffffff0000	// restore predicates
 	mov ar.pfs=saved_pfs
 	mov ar.lc=saved_lc
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(copy_page)

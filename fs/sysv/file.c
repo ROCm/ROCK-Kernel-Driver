@@ -30,7 +30,6 @@ struct file_operations sysv_file_operations = {
 
 struct inode_operations sysv_file_inode_operations = {
 	truncate:	sysv_truncate,
-	setattr:	sysv_notify_change,
 };
 
 int sysv_sync_file(struct file * file, struct dentry *dentry, int datasync)

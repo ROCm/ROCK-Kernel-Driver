@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 2001/10/01 14:44:07 bjornw Exp $
+# $Id: Makefile,v 1.9 2001/10/22 13:10:21 pkj Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -16,6 +16,9 @@
 all: kernel.o head.o
 
 O_TARGET := kernel.o
+
+export-objs := ksyms.o
+
 obj-y   := process.o signal.o entry.o traps.o irq.o \
            ptrace.o setup.o time.o sys_cris.o shadows.o \
 	   debugport.o semaphore.o

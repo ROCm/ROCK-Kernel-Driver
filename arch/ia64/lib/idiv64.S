@@ -89,5 +89,5 @@ GLOBAL_ENTRY(NAME)
 #endif
 	getf.sig r8 = f17		// transfer result to result register
 	ldf.fill f17 = [sp]
-	br.ret.sptk rp
+	br.ret.sptk.many rp
 END(NAME)

@@ -120,6 +120,11 @@ struct irda_class_desc {
 	__u8  bMaxUnicastList;
 } __attribute__ ((packed));
 
+/* class specific interface request to get the IrDA-USB class descriptor
+ * (6.2.5, USB-IrDA class spec 1.0) */
+
+#define IU_REQ_GET_CLASS_DESC	0x06
+
 struct irda_usb_cb {
 	struct irda_class_desc *irda_desc;
 	struct usb_device *usbdev;	/* init: probe_irda */

@@ -53,8 +53,17 @@
 
 extern void __init iosapic_init (unsigned long address, unsigned int base_irq,
                                  int pcat_compat);
+extern int iosapic_register_irq (u32 global_vector, unsigned long polarity,
+                                 unsigned long edge_triggered, u32 base_irq,
+                                 char *iosapic_address);
 extern void iosapic_register_legacy_irq (unsigned long irq, unsigned long pin,
 					 unsigned long polarity, unsigned long trigger);
+extern int iosapic_register_platform_irq (u32 int_type, u32 global_vector, u32 iosapic_vector,
+					  u16 eid, u16 id, unsigned long polarity,
+					  unsigned long edge_triggered, u32 base_irq,
+					  char *iosapic_address);
+extern unsigned int iosapic_version (char *addr);
+
 extern void iosapic_pci_fixup (int);
 
 # endif /* !__ASSEMBLY__ */

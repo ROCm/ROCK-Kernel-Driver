@@ -33,6 +33,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/machvec.h>
+#include <asm/mca.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -41,6 +42,8 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+
+#define SMP_DEBUG 0
 
 #if SMP_DEBUG
 #define Dprintk(x...)  printk(x)
@@ -310,7 +313,7 @@ smp_commence (void)
 }
 
 
-void __init
+static void __init
 smp_callin (void)
 {
 	int cpuid, phys_id;
@@ -324,8 +327,7 @@ smp_callin (void)
 	phys_id = hard_smp_processor_id();
 
 	if (test_and_set_bit(cpuid, &cpu_online_map)) {
-		printk("huh, phys CPU#0x%x, CPU#0x%x already present??\n", 
-					phys_id, cpuid);
+		printk("huh, phys CPU#0x%x, CPU#0x%x already present??\n", phys_id, cpuid);
 		BUG();
 	}
 
@@ -341,6 +343,12 @@ smp_callin (void)
 	 * Get our bogomips.
 	 */
 	ia64_init_itm();
+
+#ifdef CONFIG_IA64_MCA
+	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
+	ia64_mca_check_errors();	/* For post-failure MCA error logging */
+#endif
+
 #ifdef CONFIG_PERFMON
 	perfmon_init_percpu();
 #endif
@@ -364,14 +372,15 @@ start_secondary (void *unused)
 {
 	extern int cpu_idle (void);
 
+	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 	efi_map_pal_code();
 	cpu_init();
 	smp_callin();
-	Dprintk("CPU %d is set to go. \n", smp_processor_id());
+	Dprintk("CPU %d is set to go.\n", smp_processor_id());
 	while (!atomic_read(&smp_commenced))
 		;
 
-	Dprintk("CPU %d is starting idle. \n", smp_processor_id());
+	Dprintk("CPU %d is starting idle.\n", smp_processor_id());
 	return cpu_idle();
 }
 
@@ -415,7 +424,7 @@ do_boot_cpu (int sapicid)
 	unhash_process(idle);
 	init_tasks[cpu] = idle;
 
-	Dprintk("Sending Wakeup Vector to AP 0x%x/0x%x.\n", cpu, sapicid);
+	Dprintk("Sending wakeup vector %u to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
 
 	platform_send_ipi(cpu, ap_wakeup_vector, IA64_IPI_DM_INT, 0);
 
@@ -424,7 +433,6 @@ do_boot_cpu (int sapicid)
 	 */
 	Dprintk("Waiting on callin_map ...");
 	for (timeout = 0; timeout < 100000; timeout++) {
-		Dprintk(".");
 		if (test_bit(cpu, &cpu_callin_map))
 			break;  /* It has booted */
 		udelay(100);

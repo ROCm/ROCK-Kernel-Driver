@@ -1107,24 +1107,13 @@ static int ps2esdi_ioctl(struct inode *inode,
 			}
 			break;
 
-		case BLKGETSIZE:
-			if (arg) {
-				if ((err = verify_area(VERIFY_WRITE, (unsigned long *) arg, sizeof(unsigned long))))
-					 return (err);
-				put_user(ps2esdi[MINOR(inode->i_rdev)].nr_sects, (unsigned long *) arg);
-
-				return (0);
-			}
-			break;
-
-		case BLKGETSIZE64:
-			return put_user((u64)ps2esdi[MINOR(inode->i_rdev)].nr_sects << 9, (u64 *) arg);
-
 		case BLKRRPART:
                         if (!capable(CAP_SYS_ADMIN)) 
 				return -EACCES;
 			return (ps2esdi_reread_partitions(inode->i_rdev));
 
+		case BLKGETSIZE:
+		case BLKGETSIZE64:
 		case BLKROSET:
 		case BLKROGET:
 		case BLKRASET:

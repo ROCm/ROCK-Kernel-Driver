@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai M{kisara (email
 Kai.Makisara@metla.fi)
 
-Last modified: Sat Aug  5 10:29:07 2000 by makisara@kai.makisara.local
+Last modified: Thu Nov  1 22:41:59 2001 by makisara@kai.makisara.local
 
 
 BASICS
@@ -312,6 +312,8 @@ MTSETDRVBUFFER
 		this flag unless there are tapes using the device
 		dependent (from the old times) (global)
 	     MT_ST_SYSV sets the SYSV sematics (mode)
+	     MT_ST_NOWAIT enables immediate mode (i.e., don't wait for
+	        the command to finish) for some commands (e.g., rewind)
 	     MT_ST_DEBUGGING debugging (global; debugging must be
 		compiled into the driver)
 	MT_ST_SETBOOLEANS
@@ -341,6 +343,25 @@ MTSETDRVBUFFER
 	   known to take a long time. The default is 14000 seconds
 	   (3.9 hours). For erase this value is further multiplied by
 	   eight.
+	MT_ST_SET_CLN
+	   Set the cleaning request interpretation parameters using
+	   the lowest 24 bits of the argument. The driver can set the
+	   generic status bit GMT_CLN if a cleaning request bit pattern
+	   is found from the extended sense data. Many drives set one or
+	   more bits in the extended sense data when the drive needs
+	   cleaning. The bits are device-dependent. The driver is
+	   given the number of the sense data byte (the lowest eight
+	   bits of the argument; must be >= 18 (values 1 - 17
+	   reserved) and <= the maximum requested sense data sixe), 
+	   a mask to select the relevant bits (the bits 9-16), and the
+	   bit pattern (bits 17-23). If the bit pattern is zero, one
+	   or more bits under the mask indicate cleaning request. If
+	   the pattern is non-zero, the pattern must match the masked
+	   sense data byte.
+
+	   (The cleaning bit is set if the additional sense code and
+	   qualifier 00h 17h are seen regardless of the setting of
+	   MT_ST_SET_CLN.)
 
 The following ioctl uses the structure mtpos:
 MTIOCPOS Reads the current position from the drive. Uses

@@ -60,7 +60,6 @@ get_new_mmu_context (struct mm_struct *mm)
 static inline void
 get_mmu_context (struct mm_struct *mm)
 {
-	/* check if our ASN is of an older generation and thus invalid: */
 	if (mm->context == 0)
 		get_new_mmu_context(mm);
 }

@@ -1,0 +1,13 @@
+Fri Oct 26 2001  Christoph Hellwig  <hch@caldera.de>
+
+	* dir.c, ialloc.c, namei.c, include/linux/sysv_fs_i.h:
+	Implement per-Inode lookup offset cache.
+	Modelled after Ted's ext2 patch.
+
+Fri Oct 26 2001  Christoph Hellwig  <hch@caldera.de>
+
+	* inode.c, super.c, include/linux/sysv_fs.h,
+	  include/linux/sysv_fs_sb.h:
+	Remove symlink faking.	Noone really wants to use these as
+	linux filesystems and native OSes don't support it anyway.
+

@@ -46,11 +46,13 @@ extern int ez_init(void);
 extern int bpcd_init(void);
 extern int ps2esdi_init(void);
 extern int jsfd_init(void);
+extern int viodasd_init(void);
+extern int viocd_init(void);
 
 #if defined(CONFIG_ARCH_S390)
-extern int mdisk_init(void);
 extern int dasd_init(void);
 extern int xpram_init(void);
+extern int tapeblock_init(void);
 #endif /* CONFIG_ARCH_S390 */
 
 extern void set_device_ro(kdev_t dev,int flag);

@@ -575,6 +575,11 @@ static void set_parameters (struct tree_balance * tb, int h, int lnum,
       tb->lbytes = lb;
       tb->rbytes = rb;
     }
+  PROC_INFO_ADD( tb -> tb_sb, lnum[ h ], lnum );
+  PROC_INFO_ADD( tb -> tb_sb, rnum[ h ], rnum );
+
+  PROC_INFO_ADD( tb -> tb_sb, lbytes[ h ], lb );
+  PROC_INFO_ADD( tb -> tb_sb, rbytes[ h ], rb );
 }
 
 
@@ -666,6 +671,7 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
 
   if (MAX_CHILD_SIZE (S0) + vn->vn_size <= rfree + lfree + ih_size) {
     set_parameters (tb, 0, -1, -1, -1, NULL, -1, -1);
+    PROC_INFO_INC( tb -> tb_sb, leaves_removable );
     return 1;  
   }
   return 0;
@@ -1169,6 +1175,7 @@ static inline int can_node_be_removed (int mode, int lfree, int sfree, int rfree
 	    return NO_BALANCING_NEEDED;
 	}
     }
+    PROC_INFO_INC( tb -> tb_sb, can_node_be_removed[ h ] );
     return !NO_BALANCING_NEEDED;
 }
 
@@ -1906,8 +1913,11 @@ static int  get_neighbors(
     struct buffer_head  * p_s_bh;
 
 
+    PROC_INFO_INC( p_s_sb, get_neighbors[ n_h ] );
+
     if ( p_s_tb->lnum[n_h] ) {
 	/* We need left neighbor to balance S[n_h]. */
+	PROC_INFO_INC( p_s_sb, need_l_neighbor[ n_h ] );
 	p_s_bh = PATH_OFFSET_PBUFFER(p_s_tb->tb_path, n_path_offset);
 	
 	RFALSE( p_s_bh == p_s_tb->FL[n_h] && 
@@ -1916,11 +1926,12 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FL[n_h] ) ? p_s_tb->lkey[n_h] : B_NR_ITEMS (p_s_tb->FL[n_h]);
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb->s_dev, n_son_number, p_s_sb->s_blocksize);
+	p_s_bh = reiserfs_bread(p_s_sb, n_son_number, p_s_sb->s_blocksize);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {
 	    decrement_bcount(p_s_bh);
+	    PROC_INFO_INC( p_s_sb, get_neighbors_restart[ n_h ] );
 	    return REPEAT_SEARCH;
 	}
 	
@@ -1939,6 +1950,7 @@ static int  get_neighbors(
 
 
     if ( p_s_tb->rnum[n_h] ) { /* We need right neighbor to balance S[n_path_offset]. */
+	PROC_INFO_INC( p_s_sb, need_r_neighbor[ n_h ] );
 	p_s_bh = PATH_OFFSET_PBUFFER(p_s_tb->tb_path, n_path_offset);
 	
 	RFALSE( p_s_bh == p_s_tb->FR[n_h] && 
@@ -1947,11 +1959,12 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FR[n_h] ) ? p_s_tb->rkey[n_h] + 1 : 0;
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FR[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb->s_dev, n_son_number, p_s_sb->s_blocksize);
+	p_s_bh = reiserfs_bread(p_s_sb, n_son_number, p_s_sb->s_blocksize);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {
 	    decrement_bcount(p_s_bh);
+	    PROC_INFO_INC( p_s_sb, get_neighbors_restart[ n_h ] );
 	    return REPEAT_SEARCH;
 	}
 	decrement_bcount(p_s_tb->R[n_h]);
@@ -2292,6 +2305,8 @@ int fix_nodes (int n_op_mode,
     int wait_tb_buffers_run = 0 ; 
     int windex ;
     struct buffer_head  * p_s_tbS0 = PATH_PLAST_BUFFER(p_s_tb->tb_path);
+
+    ++ p_s_tb -> tb_sb -> u.reiserfs_sb.s_fix_nodes;
 
     n_pos_in_item = p_s_tb->tb_path->pos_in_item;
 

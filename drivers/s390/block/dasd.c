@@ -117,6 +117,8 @@ EXPORT_SYMBOL (dasd_set_normalized_cda);
 /* SECTION: Constant definitions to be used within this file */
 
 #define PRINTK_HEADER DASD_NAME":"
+#undef  DASD_PROFILE            /* fill profile information - used for */
+                                /* statistics and perfomance           */
 
 #define DASD_MIN_SIZE_FOR_QUEUE 32
 #undef CONFIG_DYNAMIC_QUEUE_MIN_SIZE
@@ -525,6 +527,8 @@ dasd_strtoul (char *str, char **stra, int* features)
         val = simple_strtoul (buffer, &buffer, 16);
 
         /* check for features - e.g. (ro) ; the '\0', ')' and '-' stops check */
+        *features = DASD_DEFAULT_FEATURES;
+
         if (temp[i]=='(') {
 
                 while (temp[i]!='\0' && temp[i]!=')'&&temp[i]!='-') { 
@@ -561,7 +565,7 @@ dasd_parse (char **str)
 {
 	char *temp;
 	int from, to;
-        int features = 0;
+        int features;
         int rc = 0;
 
 	if (*str) {
@@ -1008,6 +1012,7 @@ dasd_find_disc (dasd_device_t * device, dasd_discipline_t *d)
 
 static dasd_profile_info_t dasd_global_profile;
 
+#ifdef DASD_PROFILE
 /*
  * macro: dasd_profile_add_counter
  * increments counter in global and local profiling structures
@@ -1032,13 +1037,20 @@ static dasd_profile_info_t dasd_global_profile;
 void
 dasd_profile_add (ccw_req_t * cqr)
 {
-	long strtime, irqtime, endtime, tottime;
+	long strtime, irqtime, endtime, tottime; /* in microsecnds*/
 	long tottimeps, sectors;
 	dasd_device_t *device = cqr->device;
 
 	if (!cqr->req)		/* safeguard against abnormal cqrs */
 		return;
-	sectors = ((struct request *) (cqr->req))->nr_sectors;
+
+        if ((!cqr->buildclk) ||
+            (!cqr->startclk) ||
+            (!cqr->stopclk ) ||
+            (!cqr->endclk  ) ||
+            (!(sectors = ((struct request *) (cqr->req))->nr_sectors)))
+                return;
+
 	strtime = ((cqr->startclk - cqr->buildclk) >> 12);
 	irqtime = ((cqr->stopclk - cqr->startclk) >> 12);
 	endtime = ((cqr->endclk - cqr->stopclk) >> 12);
@@ -1064,7 +1076,7 @@ dasd_profile_add (ccw_req_t * cqr)
 	dasd_profile_add_counter (irqtime / sectors, dasd_io_time2ps, device);
 	dasd_profile_add_counter (endtime, dasd_io_time3, device);
 }
-
+#endif
 
 /* SECTION: All the gendisk stuff */
 
@@ -1506,6 +1518,11 @@ static request_queue_t *
 dasd_get_queue (kdev_t kdev)
 {
 	dasd_device_t *device = dasd_device_from_kdev (kdev);
+
+	if (!device) {
+		return NULL;
+	}
+
 	return device->request_queue;
 }
 
@@ -1544,7 +1561,9 @@ dasd_finalize_request (ccw_req_t * cqr)
 
 	asm volatile ("STCK %0":"=m" (cqr->endclk));
 	if (cqr->req) {
+#ifdef DASD_PROFILE
 		dasd_profile_add (cqr);
+#endif
 		dasd_end_request (cqr->req, (cqr->status == CQR_STATUS_DONE));
 		/* free request if nobody is waiting on it */
 		dasd_free_request (cqr, cqr->device);
@@ -2294,18 +2313,6 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			rc = put_user(ver, (int *) data);
 			break;
         }
-	case BLKGETSIZE:{	/* Return device size */
-			unsigned long blocks = major_info->gendisk.sizes
-						[MINOR (inp->i_rdev)] << 1;
-			rc = put_user(blocks, (unsigned long *) data);
-			break;
-		}
-	case BLKGETSIZE64:{
-			u64 blocks = major_info->gendisk.sizes 
-                                      [MINOR (inp->i_rdev)];
-			rc = put_user(blocks << 10, (u64 *) data);
-			break;
-		}
 	case BLKRRPART:{
 			if (!capable (CAP_SYS_ADMIN)) {
 				rc = -EACCES;
@@ -2501,6 +2508,8 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 		break;
 		}
 #endif /* 0 */
+	case BLKGETSIZE:
+	case BLKGETSIZE64:
 	case BLKSSZGET:
 	case BLKROSET:
 	case BLKROGET:
@@ -2577,7 +2586,7 @@ dasd_open (struct inode *inp, struct file *filp)
 	}
         spin_lock_irqsave(&discipline_lock,flags);
 	device = dasd_device_from_kdev (inp->i_rdev);
-	if (device == NULL ) {
+	if (!device) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No device registered as (%d:%d)\n",
 			MAJOR (inp->i_rdev), 
@@ -2618,7 +2627,7 @@ dasd_release (struct inode *inp, struct file *filp)
                 goto out;
 	}
 	device = dasd_device_from_kdev (inp->i_rdev);
-	if (device == NULL) {
+	if (!device) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No device registered as %d:%d\n",
 			MAJOR (inp->i_rdev), 
@@ -2638,6 +2647,7 @@ dasd_release (struct inode *inp, struct file *filp)
                 invalidate_buffers (inp->i_rdev);
                 if ( device->discipline->owner )
                         __MOD_DEC_USE_COUNT(device->discipline->owner);
+                MOD_DEC_USE_COUNT;
 	} else if ( count == -1 ) { /* paranoia only */
                 atomic_set (&device->open_count,0);
                 printk (KERN_WARNING PRINTK_HEADER
@@ -2661,7 +2671,11 @@ int
 dasd_fillgeo(int kdev,struct hd_geometry *geo)
 {
 	dasd_device_t *device = dasd_device_from_kdev (kdev);
-	if (!device->discipline->fill_geometry)
+
+	if (!device)
+                return -EINVAL;
+
+        if (!device->discipline->fill_geometry)
 		return -EINVAL;
 
 	device->discipline->fill_geometry (device, geo);
@@ -3094,8 +3108,10 @@ dasd_state_del_to_new (dasd_device_t **addr )
 #endif
 }
         goto out;
+#ifdef CONFIG_ARCH_S390X
  noidal:
         free_page ((long) device->lowmem_ccws);
+#endif
  noccw:
         kfree(device);
  out:
@@ -3308,16 +3324,16 @@ dasd_state_ready_to_accept (dasd_device_t *device )
         int rc = 0;
         unsigned long flags;
 
-        if ( device->init_cqr != NULL ) {
+        s390irq_spin_lock_irqsave (device->devinfo.irq, flags);
+        if ( device->init_cqr != NULL &&  atomic_read(&dasd_init_pending) != 0 ) {
                 if ( device->discipline->term_IO == NULL )
                         BUG();
-                s390irq_spin_lock_irqsave (device->devinfo.irq, flags);
                 device->discipline->term_IO (device->init_cqr);
-                s390irq_spin_unlock_irqrestore(device->devinfo.irq, flags);
                 atomic_dec (&dasd_init_pending);
                 dasd_free_request (device->init_cqr, device);
                 device->init_cqr = NULL;
         }
+        s390irq_spin_unlock_irqrestore(device->devinfo.irq, flags);
         memset(&device->sizes,0,sizeof(dasd_sizes_t));
         device->level = DASD_STATE_ACCEPT;
         return rc;
@@ -3632,19 +3648,30 @@ dasd_devices_open (struct inode *inode, struct file *file)
 		for (i = 0; i < 1 << (MINORBITS - DASD_PARTN_BITS); i++) {
 			dasd_device_t *device;
                         int devno = dasd_devno_from_devindex(index+i);
+                        int features;
+
                         if ( devno == -ENODEV )
                                 continue;
+
+                        features = dasd_features_from_devno(devno);
+                        if (features < DASD_DEFAULT_FEATURES)
+                                features = DASD_DEFAULT_FEATURES;
+
                         device = temp->dasd_device[i];
 			if (device) {
+
 				len += sprintf (info->data + len,
-						"%04x(%s) at (%3d:%3d) is %7s:",
+						"%04x(%s) at (%3d:%3d) is %-7s%4s: ",
 						device->devinfo.devno,
 						device->discipline ?
 						device->
 						discipline->name : "none",
 						temp->gendisk.major,
 						i << DASD_PARTN_BITS,
-						device->name);
+						device->name,
+                                                (features & DASD_FEATURE_READONLY) ? 
+                                                "(ro)" : " ");
+                                
 				switch (device->level) {
 				case DASD_STATE_NEW:
                                         len +=
@@ -3709,10 +3736,12 @@ dasd_devices_open (struct inode *inode, struct file *file)
                                                         "%04x",devno);
                                 }
                                 len += sprintf (info->data + len,
-                                                "(none) at (%3d:%3d) is %7s: unknown",
+                                                "(none) at (%3d:%3d) is %-7s%4s: unknown",
 						temp->gendisk.major,
 						i << DASD_PARTN_BITS,
-						buffer);
+						buffer,
+                                                (features & DASD_FEATURE_READONLY) ? 
+                                                "(ro)" : " ");
                         }
                         if ( dasd_probeonly )
                             len += sprintf(info->data + len,"(probeonly)");
@@ -3753,7 +3782,7 @@ dasd_devices_write (struct file *file, const char *user_buf,
 	int off = 0;
 	char *temp;
 	dasd_range_t range;
-        int features = 0;
+        int features;
 
 	if (buffer == NULL)
 		return -ENOMEM;
@@ -3906,7 +3935,7 @@ dasd_statistics_open (struct inode *inode, struct file *file)
 	}
 	len += sprintf (info->data + len, "\n");
 
-	len += sprintf (info->data + len, "Histogram of I/O times\n");
+	len += sprintf (info->data + len, "Histogram of I/O times (microseconds)\n");
 	for (i = 0; i < 16; i++) {
 		len += sprintf (info->data + len, "%7d ",
                                 dasd_global_profile.dasd_io_times[i] >> shift);

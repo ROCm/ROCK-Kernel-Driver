@@ -243,7 +243,8 @@ asm(
 .globl	__write_lock_failed
 __write_lock_failed:
 	" LOCK "addl	$" RW_LOCK_BIAS_STR ",(%eax)
-1:	cmpl	$" RW_LOCK_BIAS_STR ",(%eax)
+1:	rep; nop
+	cmpl	$" RW_LOCK_BIAS_STR ",(%eax)
 	jne	1b
 
 	" LOCK "subl	$" RW_LOCK_BIAS_STR ",(%eax)
@@ -255,7 +256,8 @@ __write_lock_failed:
 .globl	__read_lock_failed
 __read_lock_failed:
 	lock ; incl	(%eax)
-1:	cmpl	$1,(%eax)
+1:	rep; nop
+	cmpl	$1,(%eax)
 	js	1b
 
 	lock ; decl	(%eax)

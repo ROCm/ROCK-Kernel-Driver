@@ -2428,8 +2428,7 @@ static int chandev_setup(int in_read_conf,char *instr,char *errstr,int lineno)
 					else if(ints[0]==2)
 						ints[3]=ints[2];
 					chandev_add_parms(ints[1],ints[2],ints[3],currstr);
-//					currstr=currstr+strlen(currstr)+1;
-					continue;
+					goto NextOption;
 				}
 				else
 					goto BadArgs;
@@ -2696,6 +2695,7 @@ static int chandev_setup(int in_read_conf,char *instr,char *errstr,int lineno)
 		}
 		else
 			goto BadArgs;
+	NextOption:
 		if(cnt<strcnt)
 		{
 			/* eat up stuff till next string */

@@ -769,6 +769,8 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
     RFALSE( h < 1, "h (%d) can not be < 1 on internal level", h);
 
+    PROC_INFO_INC( tb -> tb_sb, balance_at[ h ] );
+
     order = ( tbSh ) ? PATH_H_POSITION (tb->tb_path, h + 1)/*tb->S[h]->b_item_order*/ : 0;
 
   /* Using insert_size[h] calculate the number insert_num of items

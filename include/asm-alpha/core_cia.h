@@ -307,46 +307,46 @@ struct el_CIA_sysdata_mcheck {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int cia_inb(unsigned long addr)
+__EXTERN_INLINE u8 cia_inb(unsigned long addr)
 {
 	long result;
 	result = *(vip) ((addr << 5) + CIA_IO + 0x00);
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void cia_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void cia_outb(u8 b, unsigned long addr)
 {
 	unsigned long w = __kernel_insbl(b, addr & 3);
 	*(vuip) ((addr << 5) + CIA_IO + 0x00) = w;
 	mb();
 }
 
-__EXTERN_INLINE unsigned int cia_inw(unsigned long addr)
+__EXTERN_INLINE u16 cia_inw(unsigned long addr)
 {
 	long result;
 	result = *(vip) ((addr << 5) + CIA_IO + 0x08);
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void cia_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void cia_outw(u16 b, unsigned long addr)
 {
 	unsigned long w = __kernel_inswl(b, addr & 3);
 	*(vuip) ((addr << 5) + CIA_IO + 0x08) = w;
 	mb();
 }
 
-__EXTERN_INLINE unsigned int cia_inl(unsigned long addr)
+__EXTERN_INLINE u32 cia_inl(unsigned long addr)
 {
 	return *(vuip) ((addr << 5) + CIA_IO + 0x18);
 }
 
-__EXTERN_INLINE void cia_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void cia_outl(u32 b, unsigned long addr)
 {
 	*(vuip) ((addr << 5) + CIA_IO + 0x18) = b;
 	mb();
 }
 
-__EXTERN_INLINE unsigned int cia_bwx_inb(unsigned long addr)
+__EXTERN_INLINE u8 cia_bwx_inb(unsigned long addr)
 {
 	/* ??? I wish I could get rid of this.  But there's no ioremap
 	   equivalent for I/O space.  PCI I/O can be forced into the
@@ -356,29 +356,29 @@ __EXTERN_INLINE unsigned int cia_bwx_inb(unsigned long addr)
 	return __kernel_ldbu(*(vucp)(addr+CIA_BW_IO));
 }
 
-__EXTERN_INLINE void cia_bwx_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_outb(u8 b, unsigned long addr)
 {
 	__kernel_stb(b, *(vucp)(addr+CIA_BW_IO));
 	mb();
 }
 
-__EXTERN_INLINE unsigned int cia_bwx_inw(unsigned long addr)
+__EXTERN_INLINE u16 cia_bwx_inw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)(addr+CIA_BW_IO));
 }
 
-__EXTERN_INLINE void cia_bwx_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_outw(u16 b, unsigned long addr)
 {
 	__kernel_stw(b, *(vusp)(addr+CIA_BW_IO));
 	mb();
 }
 
-__EXTERN_INLINE unsigned int cia_bwx_inl(unsigned long addr)
+__EXTERN_INLINE u32 cia_bwx_inl(unsigned long addr)
 {
 	return *(vuip)(addr+CIA_BW_IO);
 }
 
-__EXTERN_INLINE void cia_bwx_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_outl(u32 b, unsigned long addr)
 {
 	*(vuip)(addr+CIA_BW_IO) = b;
 	mb();
@@ -417,7 +417,7 @@ __EXTERN_INLINE void cia_bwx_outl(unsigned int b, unsigned long addr)
  *
  */
 
-__EXTERN_INLINE unsigned long cia_readb(unsigned long addr)
+__EXTERN_INLINE u8 cia_readb(unsigned long addr)
 {
 	unsigned long result;
 
@@ -426,7 +426,7 @@ __EXTERN_INLINE unsigned long cia_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long cia_readw(unsigned long addr)
+__EXTERN_INLINE u16 cia_readw(unsigned long addr)
 {
 	unsigned long result;
 
@@ -435,7 +435,7 @@ __EXTERN_INLINE unsigned long cia_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void cia_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void cia_writeb(u8 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -444,7 +444,7 @@ __EXTERN_INLINE void cia_writeb(unsigned char b, unsigned long addr)
 	*(vuip) ((addr << 5) + CIA_SPARSE_MEM + 0x00) = w;
 }
 
-__EXTERN_INLINE void cia_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void cia_writew(u16 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -453,22 +453,22 @@ __EXTERN_INLINE void cia_writew(unsigned short b, unsigned long addr)
 	*(vuip) ((addr << 5) + CIA_SPARSE_MEM + 0x08) = w;
 }
 
-__EXTERN_INLINE unsigned long cia_readl(unsigned long addr)
+__EXTERN_INLINE u32 cia_readl(unsigned long addr)
 {
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE unsigned long cia_readq(unsigned long addr)
+__EXTERN_INLINE u64 cia_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void cia_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void cia_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void cia_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void cia_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }
@@ -485,42 +485,42 @@ __EXTERN_INLINE void cia_iounmap(unsigned long addr)
 	return;
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_readb(unsigned long addr)
+__EXTERN_INLINE u8 cia_bwx_readb(unsigned long addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_readw(unsigned long addr)
+__EXTERN_INLINE u16 cia_bwx_readw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_readl(unsigned long addr)
+__EXTERN_INLINE u32 cia_bwx_readl(unsigned long addr)
 {
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE unsigned long cia_bwx_readq(unsigned long addr)
+__EXTERN_INLINE u64 cia_bwx_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void cia_bwx_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writeb(u8 b, unsigned long addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void cia_bwx_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writew(u16 b, unsigned long addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void cia_bwx_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void cia_bwx_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void cia_bwx_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

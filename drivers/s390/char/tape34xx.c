@@ -1631,7 +1631,7 @@ tape34xx_bsb_init_done (tape_info_t * ti)
 	tapestate_set (ti, TS_DONE);
 	ti->rc = 0;
 	ti->wanna_wakeup=1;
-	wake_up_interruptible (&ti->wq);
+	wake_up (&ti->wq);
 }
 
 void
@@ -2050,8 +2050,13 @@ tape34xx_error_recovery (tape_info_t* ti)
 	return;
     case 0x38:
 	// Physical end of tape. A read/write operation reached the physical end of tape.
-	if (tapestate_get(ti)==TS_WRI_INIT) {
+	if (tapestate_get(ti)==TS_WRI_INIT ||
+	    tapestate_get(ti)==TS_DSE_INIT ||
+	    tapestate_get(ti)==TS_EGA_INIT ||
+	    tapestate_get(ti)==TS_WTM_INIT){
  	    tape34xx_error_recovery_has_failed(ti,ENOSPC);
+	} else {
+	    tape34xx_error_recovery_has_failed(ti,EIO);
 	}
 	return;
     case 0x39:

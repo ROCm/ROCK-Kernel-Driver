@@ -314,6 +314,74 @@ struct reiserfs_journal {
 
 typedef __u32 (*hashf_t) (const signed char *, int);
 
+struct proc_dir_entry;
+
+#if defined( CONFIG_PROC_FS ) && defined( CONFIG_REISERFS_PROC_INFO )
+typedef unsigned long int stat_cnt_t;
+typedef struct reiserfs_proc_info_data
+{
+  spinlock_t lock;
+  int exiting;
+  int max_hash_collisions;
+
+  stat_cnt_t breads;
+  stat_cnt_t bread_miss;
+  stat_cnt_t search_by_key;
+  stat_cnt_t search_by_key_fs_changed;
+  stat_cnt_t search_by_key_restarted;
+
+  stat_cnt_t leaked_oid;
+  stat_cnt_t leaves_removable;
+
+  /* balances per level. Use explicit 5 as MAX_HEIGHT is not visible yet. */
+  stat_cnt_t balance_at[ 5 ]; /* XXX */
+  /* sbk == search_by_key */
+  stat_cnt_t sbk_read_at[ 5 ]; /* XXX */
+  stat_cnt_t sbk_fs_changed[ 5 ];
+  stat_cnt_t sbk_restarted[ 5 ];
+  stat_cnt_t items_at[ 5 ]; /* XXX */
+  stat_cnt_t free_at[ 5 ]; /* XXX */
+  stat_cnt_t can_node_be_removed[ 5 ]; /* XXX */
+  long int lnum[ 5 ]; /* XXX */
+  long int rnum[ 5 ]; /* XXX */
+  long int lbytes[ 5 ]; /* XXX */
+  long int rbytes[ 5 ]; /* XXX */
+  stat_cnt_t get_neighbors[ 5 ];
+  stat_cnt_t get_neighbors_restart[ 5 ];
+  stat_cnt_t need_l_neighbor[ 5 ];
+  stat_cnt_t need_r_neighbor[ 5 ];
+
+  stat_cnt_t free_block;
+  struct __find_forward_stats {
+	stat_cnt_t call;
+	stat_cnt_t wait;
+	stat_cnt_t bmap;
+	stat_cnt_t retry;
+	stat_cnt_t in_journal_hint;
+	stat_cnt_t in_journal_out;
+  } find_forward;
+  struct __journal_stats {
+	stat_cnt_t in_journal;
+	stat_cnt_t in_journal_bitmap;
+	stat_cnt_t in_journal_reusable;
+	stat_cnt_t lock_journal;
+	stat_cnt_t lock_journal_wait;
+	stat_cnt_t journal_being;
+	stat_cnt_t journal_relock_writers;
+	stat_cnt_t journal_relock_wcount;
+	stat_cnt_t mark_dirty;
+	stat_cnt_t mark_dirty_already;
+	stat_cnt_t mark_dirty_notjournal;
+	stat_cnt_t restore_prepared;
+	stat_cnt_t prepare;
+	stat_cnt_t prepare_retry;
+  } journal;
+} reiserfs_proc_info_data_t;
+#else
+typedef struct reiserfs_proc_info_data
+{} reiserfs_proc_info_data_t;
+#endif
+
 /* reiserfs union of in-core super block data */
 struct reiserfs_sb_info
 {
@@ -352,6 +420,8 @@ struct reiserfs_sb_info
     int s_bmaps_without_search;
     int s_direct2indirect;
     int s_indirect2direct;
+    reiserfs_proc_info_data_t s_proc_info_data;
+    struct proc_dir_entry *procdir;
 };
 
 

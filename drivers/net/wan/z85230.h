@@ -368,6 +368,8 @@ struct z8530_channel
 
 	unsigned char		tx_active; /* character is being xmitted */
 	unsigned char		tx_stopped; /* output is suspended */
+
+	spinlock_t		*lock;	  /* Devicr lock */
 };	
 
 /*
@@ -386,6 +388,7 @@ struct z8530_dev
 	int irq;	/* Interrupt for the device */
 	int active;	/* Soft interrupt enable - the Mac doesn't 
 			   always have a hard disable on its 8530s... */
+	spinlock_t lock;
 };
 
 

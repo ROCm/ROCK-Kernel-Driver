@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  *
  *     Copyright (c) 1998-2000 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *      
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -25,108 +26,19 @@
 #ifndef IRMOD_H
 #define IRMOD_H
 
-#include <linux/skbuff.h>
-#include <linux/miscdevice.h>
+#include <net/irda/irda.h>		/* Notify stuff */
 
-#include <net/irda/irqueue.h>
+/* Nothing much here anymore - Maybe this header should be merged in
+ * another header like net/irda/irda.h... - Jean II */
 
-#define IRMGR_IOC_MAGIC 'm'
-#define IRMGR_IOCTNPC     _IO(IRMGR_IOC_MAGIC, 1)
-#define IRMGR_IOC_MAXNR   1 
+/* Locking wrapper - Note the inverted logic on irda_lock().
+ * Those function basically return false if the lock is already in the
+ * position you want to set it. - Jean II */
+#define irda_lock(lock)		(! test_and_set_bit(0, (void *) (lock)))
+#define irda_unlock(lock)	(test_and_clear_bit(0, (void *) (lock)))
 
-/*
- *  Events that we pass to the user space manager
- */
-typedef enum {
-	EVENT_DEVICE_DISCOVERED = 0,
-	EVENT_REQUEST_MODULE,
-	EVENT_IRLAN_START,
-	EVENT_IRLAN_STOP,
-	EVENT_IRLPT_START,  /* Obsolete */
-	EVENT_IRLPT_STOP,   /* Obsolete */
-	EVENT_IROBEX_START, /* Obsolete */
-	EVENT_IROBEX_STOP,  /* Obsolete */
-	EVENT_IRDA_STOP,
-	EVENT_NEED_PROCESS_CONTEXT,
-} IRMGR_EVENT;
-
-/*
- *  Event information passed to the IrManager daemon process
- */
-struct irmanager_event {
-	IRMGR_EVENT event;
-	char devname[10];
-	char info[32];
-	int service;
-	__u32 saddr;
-	__u32 daddr;
-};
-
-typedef void (*TODO_CALLBACK)( void *self, __u32 param);
-
-/*
- *  Same as irmanager_event but this one can be queued and inclueds some
- *  addtional information
- */
-struct irda_event {
-	irda_queue_t q; /* Must be first */
-	
-	struct irmanager_event event;
-};
-
-/*
- *  Funtions with needs to be called with a process context
- */
-struct irda_todo {
-	irda_queue_t q; /* Must be first */
-
-	void *self;
-	TODO_CALLBACK callback;
-	__u32 param;
-};
-
-/*
- *  Main structure for the IrDA device (not much here :-)
- */
-struct irda_cb {
-	struct miscdevice dev;	
-	wait_queue_head_t wait_queue;
-
-	int in_use;
-
-	irda_queue_t *event_queue; /* Events queued for the irmanager */
-	irda_queue_t *todo_queue;  /* Todo list */
-};
-
-int irmod_init_module(void);
-void irmod_cleanup_module(void);
-
-/*
- * Function irda_lock (lock)
- *
- *    Lock variable. Returns false if the lock is already set.
- *    
- */
-static inline int irda_lock(int *lock) 
-{
-	if (test_and_set_bit( 0, (void *) lock))  {
-		IRDA_DEBUG(3, __FUNCTION__ 
-		      "(), Trying to lock, already locked variable!\n");
-		return FALSE;
-        }  
-	return TRUE;
-}
-
-inline int irda_unlock(int *lock);
-
+/* Zero the notify structure */
 void irda_notify_init(notify_t *notify);
-
-void irda_execute_as_process(void *self, TODO_CALLBACK callback, __u32 param);
-void irmanager_notify(struct irmanager_event *event);
-
-extern void irda_proc_modcount(struct inode *, int);
-void irda_mod_inc_use_count(void);
-void irda_mod_dec_use_count(void);
 
 #endif /* IRMOD_H */
 

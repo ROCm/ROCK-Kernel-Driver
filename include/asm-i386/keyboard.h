@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/kd.h>
+#include <linux/pm.h>
 #include <asm/io.h>
 
 #define KEYBOARD_IRQ			1
@@ -28,7 +29,8 @@ extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
 extern char pckbd_unexpected_up(unsigned char keycode);
 extern void pckbd_leds(unsigned char leds);
 extern void pckbd_init_hw(void);
-extern void pckbd_pm_resume(void);
+extern int pckbd_pm_resume(struct pm_dev *, pm_request_t, void *);
+extern pm_callback pm_kbd_request_override;
 extern unsigned char pckbd_sysrq_xlate[128];
 
 #define kbd_setkeycode		pckbd_setkeycode

@@ -47,5 +47,5 @@ GLOBAL_ENTRY(clear_page)
 	br.cloop.dptk.few 1b
 	;;
 	mov ar.lc = r2		// restore lc
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(clear_page)

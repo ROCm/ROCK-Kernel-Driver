@@ -189,11 +189,6 @@ acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
 		return AE_ERROR;
 	}
 
-	if ((unsigned long) phys < virt_to_phys(high_memory)) {
-		*virt = phys_to_virt((unsigned long) phys);
-		return AE_OK;
-	}
-
 	*virt = ioremap((unsigned long) phys, size);
 	if (!*virt)
 		return AE_ERROR;
@@ -204,8 +199,7 @@ acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, u32 size, void **virt)
 void
 acpi_os_unmap_memory(void *virt, u32 size)
 {
-	if (virt >= high_memory)
-		iounmap(virt);
+	iounmap(virt);
 }
 
 acpi_status

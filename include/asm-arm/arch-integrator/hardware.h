@@ -22,7 +22,7 @@
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
-#include <asm/arch/sizes.h>
+#include <asm/sizes.h>
 #include <asm/arch/platform.h>
 
 /*

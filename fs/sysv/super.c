@@ -298,7 +298,6 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 	int bsize = 1 << n_bits;
 	int bsize_4 = bsize >> 2;
 
-	sb->sv_kludge_symlinks = 1;
 	sb->sv_firstinodezone = 2;
 
 	flavour_setup[sb->sv_type](sb);

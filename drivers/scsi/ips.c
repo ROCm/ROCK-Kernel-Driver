@@ -7566,8 +7566,10 @@ ips_verify_bios_memio(ips_ha_t *ha, char *buffer, u_int32_t buffersize, u_int32_
       return (0);
 }
 
+#if defined (MODULE) || (LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0))
 static Scsi_Host_Template driver_template = IPS;
 #include "scsi_module.c"
+#endif
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.

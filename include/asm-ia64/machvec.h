@@ -1,11 +1,11 @@
 /*
  * Machine vector for IA-64.
- * 
+ *
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Srinivasa Thirumalachar <sprasad@engr.sgi.com>
  * Copyright (C) Vijay Chander <vijay@engr.sgi.com>
  * Copyright (C) 1999-2001 Hewlett-Packard Co.
- * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_MACHVEC_H
 #define _ASM_IA64_MACHVEC_H
@@ -28,6 +28,7 @@ typedef void ia64_mv_mca_handler_t (void);
 typedef void ia64_mv_cmci_handler_t (int, void *, struct pt_regs *);
 typedef void ia64_mv_log_print_t (void);
 typedef void ia64_mv_send_ipi_t (int, int, int, int);
+typedef void ia64_mv_global_tlb_purge_t (unsigned long, unsigned long, unsigned long);
 typedef struct irq_desc *ia64_mv_irq_desc (unsigned int);
 typedef u8 ia64_mv_irq_to_vector (u8);
 typedef unsigned int ia64_mv_local_vector_to_irq (u8 vector);
@@ -67,6 +68,8 @@ extern void machvec_noop (void);
 #  include <asm/machvec_dig.h>
 # elif defined (CONFIG_IA64_SGI_SN1)
 #  include <asm/machvec_sn1.h>
+# elif defined (CONFIG_IA64_SGI_SN2)
+#  include <asm/machvec_sn2.h>
 # elif defined (CONFIG_IA64_GENERIC)
 
 # ifdef MACHVEC_PLATFORM_HEADER
@@ -82,6 +85,7 @@ extern void machvec_noop (void);
 #  define platform_log_print	ia64_mv.log_print
 #  define platform_pci_fixup	ia64_mv.pci_fixup
 #  define platform_send_ipi	ia64_mv.send_ipi
+#  define platform_global_tlb_purge	ia64_mv.global_tlb_purge
 #  define platform_pci_dma_init		ia64_mv.dma_init
 #  define platform_pci_alloc_consistent	ia64_mv.alloc_consistent
 #  define platform_pci_free_consistent	ia64_mv.free_consistent
@@ -147,6 +151,7 @@ struct ia64_machine_vector {
 	platform_cmci_handler,			\
 	platform_log_print,			\
 	platform_send_ipi,			\
+	platform_global_tlb_purge,		\
 	platform_pci_dma_init,			\
 	platform_pci_alloc_consistent,		\
 	platform_pci_free_consistent,		\
@@ -216,6 +221,9 @@ extern ia64_mv_pci_dma_address swiotlb_dma_address;
 #endif
 #ifndef platform_send_ipi
 # define platform_send_ipi	ia64_send_ipi	/* default to architected version */
+#endif
+#ifndef platform_global_tlb_purge
+# define platform_global_tlb_purge	ia64_global_tlb_purge /* default to architected version */
 #endif
 #ifndef platform_pci_dma_init
 # define platform_pci_dma_init		swiotlb_init

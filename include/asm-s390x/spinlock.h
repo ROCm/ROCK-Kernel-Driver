@@ -20,7 +20,7 @@
 
 typedef struct {
 	volatile unsigned int lock;
-} spinlock_t __attribute__ ((aligned (8)));
+} __attribute__ ((aligned (4))) spinlock_t;
 
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
 #define spin_lock_init(lp) do { (lp)->lock = 0; } while(0)

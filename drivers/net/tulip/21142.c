@@ -106,10 +106,6 @@ void t21142_start_nway(struct net_device *dev)
 	dev->if_port = 0;
 	tp->nway = tp->mediasense = 1;
 	tp->nwayset = tp->lpar = 0;
-	if (tp->chip_id == PNIC2) {
-		tp->csr6 = 0x01000000 | (tp->sym_advertise & 0x0040 ? FullDuplex : 0);
-		return;
-	}
 	if (tulip_debug > 1)
 		printk(KERN_DEBUG "%s: Restarting 21143 autonegotiation, csr14=%8.8x.\n",
 			   dev->name, csr14);
@@ -127,23 +123,6 @@ void t21142_start_nway(struct net_device *dev)
 }
 
 
-void pnic2_lnk_change(struct net_device *dev, int csr5)
-{
-	struct tulip_private *tp = (struct tulip_private *)dev->priv;
-	long ioaddr = dev->base_addr;
-	int csr12 = inl(ioaddr + CSR12);
-
-	if (tulip_debug > 1)
-		printk(KERN_INFO"%s: PNIC-2 link status changed, CSR5/12/14 %8.8x"
-			" %8.8x, %8.8x.\n",
-			dev->name, csr12, csr5, (int)inl(ioaddr + CSR14));
-	dev->if_port = 5;
-	tp->lpar = csr12 >> 16;
-	tp->nwayset = 1;
-	tp->csr6 = 0x01000000 | (tp->csr6 & 0xffff);
-	outl(tp->csr6, ioaddr + CSR6);
-
-}
 
 void t21142_lnk_change(struct net_device *dev, int csr5)
 {

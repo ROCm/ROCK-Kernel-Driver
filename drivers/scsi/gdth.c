@@ -799,6 +799,17 @@ GDTH_INITFUNC(static int, gdth_search_pci(gdth_pci_str *pcistr))
     return cnt;
 }
 
+#if LINUX_VERSION_CODE >= 0x20363
+/* Vortex only makes RAID controllers.
+ * We do not really want to specify all 550 ids here, so wildcard match.
+ */
+static struct pci_device_id gdthtable[] = {
+	{PCI_VENDOR_ID_VORTEX,PCI_ANY_ID,PCI_ANY_ID, PCI_ANY_ID },
+	{PCI_VENDOR_ID_INTEL,PCI_DEVICE_ID_INTEL_SRC,PCI_ANY_ID,PCI_ANY_ID }, 
+	{0}
+};
+MODULE_DEVICE_TABLE(pci,gdthtable);
+#endif
 
 GDTH_INITFUNC(static void, gdth_search_dev(gdth_pci_str *pcistr, ushort *cnt,
                                            ushort vendor, ushort device))

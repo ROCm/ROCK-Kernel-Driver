@@ -192,20 +192,20 @@ extern void _sethae (unsigned long addr);	/* cached version */
  * to convince yourself that it won't break anything (in particular
  * module support).
  */
-extern unsigned int	_inb (unsigned long port);
-extern unsigned int	_inw (unsigned long port);
-extern unsigned int	_inl (unsigned long port);
-extern void		_outb (unsigned char b,unsigned long port);
-extern void		_outw (unsigned short w,unsigned long port);
-extern void		_outl (unsigned int l,unsigned long port);
-extern unsigned long	_readb(unsigned long addr);
-extern unsigned long	_readw(unsigned long addr);
-extern unsigned long	_readl(unsigned long addr);
-extern unsigned long	_readq(unsigned long addr);
-extern void		_writeb(unsigned char b, unsigned long addr);
-extern void		_writew(unsigned short b, unsigned long addr);
-extern void		_writel(unsigned int b, unsigned long addr);
-extern void		_writeq(unsigned long b, unsigned long addr);
+extern u8		_inb (unsigned long port);
+extern u16		_inw (unsigned long port);
+extern u32		_inl (unsigned long port);
+extern void		_outb (u8 b,unsigned long port);
+extern void		_outw (u16 w,unsigned long port);
+extern void		_outl (u32 l,unsigned long port);
+extern u8		_readb(unsigned long addr);
+extern u16		_readw(unsigned long addr);
+extern u32		_readl(unsigned long addr);
+extern u64		_readq(unsigned long addr);
+extern void		_writeb(u8 b, unsigned long addr);
+extern void		_writew(u16 b, unsigned long addr);
+extern void		_writel(u32 b, unsigned long addr);
+extern void		_writeq(u64 b, unsigned long addr);
 
 #ifdef __KERNEL__
 /*
@@ -256,7 +256,7 @@ extern void		_writeq(unsigned long b, unsigned long addr);
 
 #else 
 
-/* Userspace declarations.  */
+/* Userspace declarations.  Kill in 2.5. */
 
 extern unsigned int	inb(unsigned long port);
 extern unsigned int	inw(unsigned long port);
@@ -308,26 +308,26 @@ static inline void * ioremap_nocache(unsigned long offset, unsigned long size)
 
 /* Indirect back to the macros provided.  */
 
-extern unsigned long	___raw_readb(unsigned long addr);
-extern unsigned long	___raw_readw(unsigned long addr);
-extern unsigned long	___raw_readl(unsigned long addr);
-extern unsigned long	___raw_readq(unsigned long addr);
-extern void		___raw_writeb(unsigned char b, unsigned long addr);
-extern void		___raw_writew(unsigned short b, unsigned long addr);
-extern void		___raw_writel(unsigned int b, unsigned long addr);
-extern void		___raw_writeq(unsigned long b, unsigned long addr);
+extern u8		___raw_readb(unsigned long addr);
+extern u16		___raw_readw(unsigned long addr);
+extern u32		___raw_readl(unsigned long addr);
+extern u64		___raw_readq(unsigned long addr);
+extern void		___raw_writeb(u8 b, unsigned long addr);
+extern void		___raw_writew(u16 b, unsigned long addr);
+extern void		___raw_writel(u32 b, unsigned long addr);
+extern void		___raw_writeq(u64 b, unsigned long addr);
 
 #ifdef __raw_readb
-# define readb(a)	({ unsigned long r_ = __raw_readb(a); mb(); r_; })
+# define readb(a)	({ u8 r_ = __raw_readb(a); mb(); r_; })
 #endif
 #ifdef __raw_readw
-# define readw(a)	({ unsigned long r_ = __raw_readw(a); mb(); r_; })
+# define readw(a)	({ u16 r_ = __raw_readw(a); mb(); r_; })
 #endif
 #ifdef __raw_readl
-# define readl(a)	({ unsigned long r_ = __raw_readl(a); mb(); r_; })
+# define readl(a)	({ u32 r_ = __raw_readl(a); mb(); r_; })
 #endif
 #ifdef __raw_readq
-# define readq(a)	({ unsigned long r_ = __raw_readq(a); mb(); r_; })
+# define readq(a)	({ u64 r_ = __raw_readq(a); mb(); r_; })
 #endif
 
 #ifdef __raw_writeb

@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -33,9 +34,6 @@
 #include <net/irda/irlmp.h>
 #include <net/irda/irlmp_frame.h>
 #include <net/irda/discovery.h>
-
-#define	DISCO_SMALL_DELAY	250	/* Delay for some discoveries in ms */
-struct timer_list disco_delay;		/* The timer associated */
 
 static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap, 
 				       __u8 slsap, int status, hashbin_t *);
@@ -343,28 +341,6 @@ void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 }
 
 /*
- * Function irlmp_discovery_timeout (priv)
- *
- *    Create a discovery event to the state machine (called after a delay)
- *
- * Note : irlmp_do_lap_event will handle the very rare case where the LAP
- * is destroyed while we were sleeping.
- */
-static void irlmp_discovery_timeout(u_long	priv)
-{
-	struct lap_cb *self;
-
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
-
-	self = (struct lap_cb *) priv;
-	ASSERT(self != NULL, return;);
-
-	/* Just handle it the same way as a discovery confirm,
-	 * bypass the LM_LAP state machine (see below) */
-	irlmp_discovery_confirm(irlmp->cachelog);
-}
-
-/*
  * Function irlmp_link_discovery_indication (self, log)
  *
  *    Device is discovering us
@@ -379,25 +355,16 @@ static void irlmp_discovery_timeout(u_long	priv)
  *	o Make faster discovery, statistically divide time of discovery
  *	  events by 2 (important for the latency aspect and user feel)
  *	o Even is we do active discovery, the other node might not
- *	  answer our discoveries (ex: Palm).
+ *	  answer our discoveries (ex: Palm). The Palm will just perform
+ *	  one active discovery and connect directly to us.
  *
  * However, when both devices discover each other, they might attempt to
  * connect to each other following the discovery event, and it would create
  * collisions on the medium (SNRM battle).
- * The trick here is to defer the event by a little delay to avoid both
- * devices to jump in exactly at the same time...
- *
- * The delay is currently set to 0.25s, which leave enough time to perform
- * a connection and don't interfer with next discovery (the lowest discovery
- * period/timeout that may be set is 1s). The message triggering this
- * event was the last of the discovery, so the medium is now free...
- * Maybe more testing is needed to get the value right...
-
- * One more problem : the other node might do only a single discovery
- * and connect immediately to us, and we would receive only a single
- * discovery indication event, and because of the delay, it will arrive
- * while the LAP is connected. That's another good reason to
- * bypass the LM_LAP state machine ;-)
+ * The "fix" for that is to disable all connection requests in IrLAP
+ * for 100ms after a discovery indication by setting the media_busy flag.
+ * Previously, we used to postpone the event which was quite ugly. Now
+ * that IrLAP takes care of this problem, just pass the event up...
  *
  * Jean II
  */
@@ -409,14 +376,9 @@ void irlmp_link_discovery_indication(struct lap_cb *self,
 
 	irlmp_add_discovery(irlmp->cachelog, discovery);
 	
-	/* If delay was activated, kill it! */
-	if(timer_pending(&disco_delay))
-		del_timer(&disco_delay);
-	/* Set delay timer to expire in 0.25s. */
-	disco_delay.expires = jiffies + (DISCO_SMALL_DELAY * HZ/1000);
-	disco_delay.function = irlmp_discovery_timeout;
-	disco_delay.data = (unsigned long) self;
-	add_timer(&disco_delay);
+	/* Just handle it the same way as a discovery confirm,
+	 * bypass the LM_LAP state machine (see below) */
+	irlmp_discovery_confirm(irlmp->cachelog);
 }
 
 /*
@@ -435,10 +397,6 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	
 	irlmp_add_discovery_log(irlmp->cachelog, log);
-
-	/* If discovery delay was activated, kill it! */
-	if(timer_pending(&disco_delay))
-		del_timer(&disco_delay);
 
 	/* Propagate event to various LSAPs registered for it.
 	 * We bypass the LM_LAP state machine because

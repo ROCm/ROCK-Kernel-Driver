@@ -170,7 +170,7 @@ void s390_do_machine_check( void )
 static int s390_machine_check_handler( void *parm)
 {
 	struct semaphore *sem = parm;
-	int               flags;
+	unsigned long     flags;
 	mache_t          *pmache;
 
 	int               found = 0;

@@ -5,6 +5,8 @@
  * Copyright (C) 1999-2000 Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  *
+ * 2001/10/11	Fix unaligned access to rotating registers in s/w pipelined loops.
+ * 2001/08/13	Correct size of extended floats (float_fsz) from 16 to 10 bytes.
  * 2001/01/17	Add support emulation of unaligned kernel accesses.
  */
 #include <linux/kernel.h>
@@ -282,9 +284,19 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 	unsigned long rnats, nat_mask;
 	unsigned long on_kbs;
 	long sof = (regs->cr_ifs) & 0x7f;
+	long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
+	long rrb_gr = (regs->cr_ifs >> 18) & 0x7f;
+	long ridx;
 
-	DPRINT("r%lu, sw.bspstore=%lx pt.bspstore=%lx sof=%ld sol=%ld\n",
-	       r1, sw->ar_bspstore, regs->ar_bspstore, sof, (regs->cr_ifs >> 7) & 0x7f);
+	if ((r1 - 32) > sor)
+		ridx = -sof + (r1 - 32);
+	else if ((r1 - 32) < (sor - rrb_gr))
+		ridx = -sof + (r1 - 32) + rrb_gr;
+	else
+		ridx = -sof + (r1 - 32) - (sor - rrb_gr);
+
+	DPRINT("r%lu, sw.bspstore=%lx pt.bspstore=%lx sof=%ld sol=%ld ridx=%ld\n",
+	       r1, sw->ar_bspstore, regs->ar_bspstore, sof, (regs->cr_ifs >> 7) & 0x7f, ridx);
 
 	if ((r1 - 32) >= sof) {
 		/* this should never happen, as the "rsvd register fault" has higher priority */
@@ -293,7 +305,7 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 	}
 
 	on_kbs = ia64_rse_num_regs(kbs, (unsigned long *) sw->ar_bspstore);
-	addr = ia64_rse_skip_regs((unsigned long *) sw->ar_bspstore, -sof + (r1 - 32));
+	addr = ia64_rse_skip_regs((unsigned long *) sw->ar_bspstore, ridx);
 	if (addr >= kbs) {
 		/* the register is on the kernel backing store: easy... */
 		rnat_addr = ia64_rse_rnat_addr(addr);
@@ -318,12 +330,12 @@ set_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long val, int nat)
 		return;
 	}
 
-	bspstore = (unsigned long *) regs->ar_bspstore;
+	bspstore = (unsigned long *)regs->ar_bspstore;
 	ubs_end = ia64_rse_skip_regs(bspstore, on_kbs);
 	bsp     = ia64_rse_skip_regs(ubs_end, -sof);
-	addr    = ia64_rse_skip_regs(bsp, r1 - 32);
+	addr    = ia64_rse_skip_regs(bsp, ridx + sof);
 
-	DPRINT("ubs_end=%p bsp=%p addr=%px\n", (void *) ubs_end, (void *) bsp, (void *) addr);
+	DPRINT("ubs_end=%p bsp=%p addr=%p\n", (void *) ubs_end, (void *) bsp, (void *) addr);
 
 	ia64_poke(current, sw, (unsigned long) ubs_end, (unsigned long) addr, val);
 
@@ -353,9 +365,19 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 	unsigned long rnats, nat_mask;
 	unsigned long on_kbs;
 	long sof = (regs->cr_ifs) & 0x7f;
+	long sor = 8 * ((regs->cr_ifs >> 14) & 0xf);
+	long rrb_gr = (regs->cr_ifs >> 18) & 0x7f;
+	long ridx;
 
-	DPRINT("r%lu, sw.bspstore=%lx pt.bspstore=%lx sof=%ld sol=%ld\n",
-	       r1, sw->ar_bspstore, regs->ar_bspstore, sof, (regs->cr_ifs >> 7) & 0x7f);
+	if ((r1 - 32) > sor)
+		ridx = -sof + (r1 - 32);
+	else if ((r1 - 32) < (sor - rrb_gr))
+		ridx = -sof + (r1 - 32) + rrb_gr;
+	else
+		ridx = -sof + (r1 - 32) - (sor - rrb_gr);
+
+	DPRINT("r%lu, sw.bspstore=%lx pt.bspstore=%lx sof=%ld sol=%ld ridx=%ld\n",
+	       r1, sw->ar_bspstore, regs->ar_bspstore, sof, (regs->cr_ifs >> 7) & 0x7f, ridx);
 
 	if ((r1 - 32) >= sof) {
 		/* this should never happen, as the "rsvd register fault" has higher priority */
@@ -364,7 +386,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 	}
 
 	on_kbs = ia64_rse_num_regs(kbs, (unsigned long *) sw->ar_bspstore);
-	addr = ia64_rse_skip_regs((unsigned long *) sw->ar_bspstore, -sof + (r1 - 32));
+	addr = ia64_rse_skip_regs((unsigned long *) sw->ar_bspstore, ridx);
 	if (addr >= kbs) {
 		/* the register is on the kernel backing store: easy... */
 		*val = *addr;
@@ -390,7 +412,7 @@ get_rse_reg (struct pt_regs *regs, unsigned long r1, unsigned long *val, int *na
 	bspstore = (unsigned long *)regs->ar_bspstore;
 	ubs_end = ia64_rse_skip_regs(bspstore, on_kbs);
 	bsp     = ia64_rse_skip_regs(ubs_end, -sof);
-	addr    = ia64_rse_skip_regs(bsp, r1 - 32);
+	addr    = ia64_rse_skip_regs(bsp, ridx + sof);
 
 	DPRINT("ubs_end=%p bsp=%p addr=%p\n", (void *) ubs_end, (void *) bsp, (void *) addr);
 
@@ -908,7 +930,7 @@ emulate_store_int (unsigned long ifa, load_store_t ld, struct pt_regs *regs)
  * floating point operations sizes in bytes
  */
 static const unsigned char float_fsz[4]={
-	16, /* extended precision (e) */
+	10, /* extended precision (e) */
 	8,  /* integer (8)            */
 	4,  /* single precision (s)   */
 	8   /* double precision (d)   */
@@ -978,11 +1000,11 @@ emulate_load_floatpair (unsigned long ifa, load_store_t ld, struct pt_regs *regs
 	unsigned long len = float_fsz[ld.x6_sz];
 
 	/*
-	 * fr0 & fr1 don't need to be checked because Illegal Instruction
-	 * faults have higher priority than unaligned faults.
+	 * fr0 & fr1 don't need to be checked because Illegal Instruction faults have
+	 * higher priority than unaligned faults.
 	 *
-	 * r0 cannot be found as the base as it would never generate an
-	 * unaligned reference.
+	 * r0 cannot be found as the base as it would never generate an unaligned
+	 * reference.
 	 */
 
 	/*
@@ -996,8 +1018,10 @@ emulate_load_floatpair (unsigned long ifa, load_store_t ld, struct pt_regs *regs
 	 * invalidate the ALAT entry and execute updates, if any.
 	 */
 	if (ld.x6_op != 0x2) {
-		/* this assumes little-endian byte-order: */
-
+		/*
+		 * This assumes little-endian byte-order.  Note that there is no "ldfpe"
+		 * instruction:
+		 */
 		if (copy_from_user(&fpr_init[0], (void *) ifa, len)
 		    || copy_from_user(&fpr_init[1], (void *) (ifa + len), len))
 			return -1;
@@ -1337,7 +1361,7 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 
 	/*
 	 * IMPORTANT:
-	 * Notice that the swictch statement DOES not cover all possible instructions
+	 * Notice that the switch statement DOES not cover all possible instructions
 	 * that DO generate unaligned references. This is made on purpose because for some
 	 * instructions it DOES NOT make sense to try and emulate the access. Sometimes it
 	 * is WRONG to try and emulate. Here is a list of instruction we don't emulate i.e.,

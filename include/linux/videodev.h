@@ -91,7 +91,7 @@ struct video_tuner
 {
 	int tuner;
 	char name[32];
-	ulong rangelow, rangehigh;	/* Tuner range */
+	unsigned long rangelow, rangehigh;	/* Tuner range */
 	__u32 flags;
 #define VIDEO_TUNER_PAL		1
 #define VIDEO_TUNER_NTSC	2

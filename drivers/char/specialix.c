@@ -969,7 +969,10 @@ extern inline int sx_setup_board(struct specialix_board * bp)
 	if (bp->flags & SX_BOARD_ACTIVE) 
 		return 0;
 
-	error = request_irq(bp->irq, sx_interrupt, SA_INTERRUPT, "specialix IO8+", bp);
+	if (bp->flags & SX_BOARD_IS_PCI)
+		error = request_irq(bp->irq, sx_interrupt, SA_INTERRUPT | SA_SHIRQ, "specialix IO8+", bp);
+	else
+		error = request_irq(bp->irq, sx_interrupt, SA_INTERRUPT, "specialix IO8+", bp);
 
 	if (error) 
 		return error;

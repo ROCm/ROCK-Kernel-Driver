@@ -190,34 +190,34 @@ struct el_IRONGATE_sysdata_mcheck {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int irongate_inb(unsigned long addr)
+__EXTERN_INLINE u8 irongate_inb(unsigned long addr)
 {
 	return __kernel_ldbu(*(vucp)(addr + IRONGATE_IO));
 }
 
-__EXTERN_INLINE void irongate_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void irongate_outb(u8 b, unsigned long addr)
 {
         __kernel_stb(b, *(vucp)(addr + IRONGATE_IO));
 	mb();
 }
 
-__EXTERN_INLINE unsigned int irongate_inw(unsigned long addr)
+__EXTERN_INLINE u16 irongate_inw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)(addr + IRONGATE_IO));
 }
 
-__EXTERN_INLINE void irongate_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void irongate_outw(u16 b, unsigned long addr)
 {
         __kernel_stw(b, *(vusp)(addr + IRONGATE_IO));
 	mb();
 }
 
-__EXTERN_INLINE unsigned int irongate_inl(unsigned long addr)
+__EXTERN_INLINE u32 irongate_inl(unsigned long addr)
 {
 	return *(vuip)(addr + IRONGATE_IO);
 }
 
-__EXTERN_INLINE void irongate_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void irongate_outl(u32 b, unsigned long addr)
 {
         *(vuip)(addr + IRONGATE_IO) = b;
 	mb();
@@ -227,42 +227,42 @@ __EXTERN_INLINE void irongate_outl(unsigned int b, unsigned long addr)
  * Memory functions.  All accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long irongate_readb(unsigned long addr)
+__EXTERN_INLINE u8 irongate_readb(unsigned long addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE unsigned long irongate_readw(unsigned long addr)
+__EXTERN_INLINE u16 irongate_readw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE unsigned long irongate_readl(unsigned long addr)
+__EXTERN_INLINE u32 irongate_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long irongate_readq(unsigned long addr)
+__EXTERN_INLINE u64 irongate_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void irongate_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void irongate_writeb(u8 b, unsigned long addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void irongate_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void irongate_writew(u16 b, unsigned long addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void irongate_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void irongate_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void irongate_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void irongate_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

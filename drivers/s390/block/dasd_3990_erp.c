@@ -55,7 +55,7 @@ log_erp_chain (ccw_req_t *cqr,
         while (loop_cqr != NULL) {
                 
                 DASD_MESSAGE (KERN_ERR, device, 
-                              "(%s) ERP chain report for req: %p\n",
+                              "(%s) ERP chain report for req: %p",
                               caller == 0 ? "EXAMINE" : "ACTION",
                               loop_cqr);
                 
@@ -66,7 +66,7 @@ log_erp_chain (ccw_req_t *cqr,
                         
                         DASD_MESSAGE (KERN_ERR, device, 
                                       "%p: %02x%02x%02x%02x %02x%02x%02x%02x "
-                                      "%02x%02x%02x%02x %02x%02x%02x%02x\n",
+                                      "%02x%02x%02x%02x %02x%02x%02x%02x",
                                       nl,
                                       nl[0], nl[1], nl[2], nl[3],
                                       nl[4], nl[5], nl[6], nl[7],
@@ -80,13 +80,13 @@ log_erp_chain (ccw_req_t *cqr,
                 if (loop_cqr->cplength > 40) { /* log only parts of the CP */
 
                         DASD_MESSAGE (KERN_ERR, device, "%s",
-                                      "Start of channel program:\n");
+                                      "Start of channel program:");
                         
                         for (i = 0; i < 20; i += 2) { 
                                 
                                 DASD_MESSAGE (KERN_ERR, device, 
                                               "%p: %02x%02x%02x%02x %02x%02x%02x%02x "
-                                              "%02x%02x%02x%02x %02x%02x%02x%02x\n",
+                                              "%02x%02x%02x%02x %02x%02x%02x%02x",
                                               nl,
                                               nl[0], nl[1], nl[2], nl[3],
                                               nl[4], nl[5], nl[6], nl[7],
@@ -97,7 +97,7 @@ log_erp_chain (ccw_req_t *cqr,
                         }
                         
                         DASD_MESSAGE (KERN_ERR, device, "%s",
-                                      "End of channel program:\n");
+                                      "End of channel program:");
                         
                         nl  = (char *) loop_cqr->cpaddr;
                         nl  += ((loop_cqr->cplength - 10) * 8);
@@ -106,7 +106,7 @@ log_erp_chain (ccw_req_t *cqr,
                                 
                                 DASD_MESSAGE (KERN_ERR, device, 
                                               "%p: %02x%02x%02x%02x %02x%02x%02x%02x "
-                                              "%02x%02x%02x%02x %02x%02x%02x%02x\n",
+                                              "%02x%02x%02x%02x %02x%02x%02x%02x",
                                               nl,
                                               nl[0], nl[1], nl[2], nl[3],
                                               nl[4], nl[5], nl[6], nl[7],
@@ -119,13 +119,13 @@ log_erp_chain (ccw_req_t *cqr,
                 } else { /* log the whole CP */
                         
                         DASD_MESSAGE (KERN_ERR, device, "%s",
-                                      "Channel program (complete):\n");
+                                      "Channel program (complete):");
                         
                         for (i = 0; i < (loop_cqr->cplength + 4); i += 2) { 
                                 
                                 DASD_MESSAGE (KERN_ERR, device, 
                                               "%p: %02x%02x%02x%02x %02x%02x%02x%02x "
-                                              "%02x%02x%02x%02x %02x%02x%02x%02x\n",
+                                              "%02x%02x%02x%02x %02x%02x%02x%02x",
                                               nl,
                                               nl[0], nl[1], nl[2], nl[3],
                                               nl[4], nl[5], nl[6], nl[7],
@@ -151,14 +151,14 @@ log_erp_chain (ccw_req_t *cqr,
                                 nl -= 10*8;     /* start some bytes before */
                                 
                                 DASD_MESSAGE (KERN_ERR, device, 
-                                                "Failed CCW (%p) (area):\n",
+                                                "Failed CCW (%p) (area):",
                                                 (void *)(long)cpa);
                                 
                                 for (i = 0; i < 20; i += 2) { 
                                         
                                         DASD_MESSAGE (KERN_ERR, device, 
                                                       "%p: %02x%02x%02x%02x %02x%02x%02x%02x "
-                                                      "%02x%02x%02x%02x %02x%02x%02x%02x\n",
+                                                      "%02x%02x%02x%02x %02x%02x%02x%02x",
                                                       nl,
                                                       nl[0], nl[1], nl[2], nl[3],
                                                       nl[4], nl[5], nl[6], nl[7],
@@ -171,7 +171,7 @@ log_erp_chain (ccw_req_t *cqr,
                         } else {
                                 
                                 DASD_MESSAGE (KERN_ERR, device, 
-                                              "Failed CCW (%p) already logged\n",
+                                              "Failed CCW (%p) already logged",
                                               (void *)(long)cpa);
                         }
                 }

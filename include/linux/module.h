@@ -257,8 +257,6 @@ static const unsigned long __module_##gtype##_size \
   __attribute__ ((unused)) = sizeof(struct gtype##_id); \
 static const struct gtype##_id * __module_##gtype##_table \
   __attribute__ ((unused)) = name
-#define MODULE_DEVICE_TABLE(type,name)		\
-  MODULE_GENERIC_TABLE(type##_device,name)
 
 /*
  * The following license idents are currently accepted as indicating free
@@ -312,8 +310,15 @@ static const char __module_using_checksums[] __attribute__((section(".modinfo"))
 #define MODULE_SUPPORTED_DEVICE(name)
 #define MODULE_PARM(var,type)
 #define MODULE_PARM_DESC(var,desc)
-#define MODULE_GENERIC_TABLE(gtype,name)
-#define MODULE_DEVICE_TABLE(type,name)
+
+/* Create a dummy reference to the table to suppress gcc unused warnings.  Put
+ * the reference in the .data.exit section which is discarded when code is built
+ * in, so the reference does not bloat the running kernel.  Note: cannot be
+ * const, other exit data may be writable.
+ */
+#define MODULE_GENERIC_TABLE(gtype,name) \
+static struct gtype##_id * __module_##gtype##_table \
+  __attribute__ ((unused, __section__(".data.exit"))) = name
 
 #ifndef __GENKSYMS__
 
@@ -327,6 +332,9 @@ extern struct module *module_list;
 #endif /* !__GENKSYMS__ */
 
 #endif /* MODULE */
+
+#define MODULE_DEVICE_TABLE(type,name)		\
+  MODULE_GENERIC_TABLE(type##_device,name)
 
 /* Export a symbol either from the kernel or a module.
 

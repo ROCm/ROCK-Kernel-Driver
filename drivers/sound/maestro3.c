@@ -2693,7 +2693,7 @@ static int __init m3_probe(struct pci_dev *pci_dev, const struct pci_device_id *
         goto out;
     }
 
-    pci_dev->driver_data = card;
+    pci_set_drvdata(pci_dev, card);
     
     m3_enable_ints(card);
     m3_assp_continue(card);
@@ -2773,7 +2773,7 @@ static int m3_suspend(struct pci_dev *pci_dev, u32 state)
 {
     unsigned long flags;
     int i;
-    struct m3_card *card = pci_dev->driver_data;
+    struct m3_card *card = pci_get_drvdata(pci_dev);
 
     /* must be a better way.. */
     save_flags(flags);
@@ -2825,7 +2825,7 @@ static int m3_resume(struct pci_dev *pci_dev)
     unsigned long flags;
     int index;
     int i;
-    struct m3_card *card = pci_dev->driver_data;
+    struct m3_card *card = pci_get_drvdata(pci_dev);
 
     save_flags(flags); /* paranoia */
     cli();

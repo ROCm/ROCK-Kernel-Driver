@@ -1465,7 +1465,7 @@ static struct pci_driver driver = {
 
 static int __init ns83820_init(void)
 {
-	printk(KERN_INFO "ns83820.c: National Semiconductor DP83820 10/100/100 driver.\n");
+	printk(KERN_INFO "ns83820.c: National Semiconductor DP83820 10/100/1000 driver.\n");
 	return pci_module_init(&driver);
 }
 

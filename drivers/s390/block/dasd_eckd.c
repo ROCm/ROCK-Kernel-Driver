@@ -631,7 +631,7 @@ dasd_eckd_do_analysis (struct dasd_device_t *device)
 		}
 	}
 	if (device->sizes.bp_block == 0) {
-		DASD_MESSAGE (KERN_WARNING, device, "%s\n",
+		DASD_MESSAGE (KERN_WARNING, device, "%s",
 			      "Volume has incompatible disk layout");
 		return -EMEDIUMTYPE;
 	}
@@ -746,7 +746,7 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 	     (fdata->start_unit / private->rdc_data.no_cyl) %
 	     (private->rdc_data.no_cyl / 20))) {
 		DASD_MESSAGE (KERN_INFO, device,
-			      "Format Cylinder: %d Flags: %d\n",
+			      "Format Cylinder: %d Flags: %d",
 			      fdata->start_unit / private->rdc_data.trk_per_cyl, fdata->intensity);
 	}
 	if ((fdata->intensity & ~0x8) & 0x04) {

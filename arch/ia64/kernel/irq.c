@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 
+#include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/system.h>
@@ -121,7 +122,10 @@ struct hw_interrupt_type no_irq_type = {
 	end_none
 };
 
-volatile unsigned long irq_err_count;
+atomic_t irq_err_count;
+#if defined(CONFIG_X86) && defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
+atomic_t irq_mis_count;
+#endif
 
 /*
  * Generic, controller-independent functions:
@@ -164,14 +168,17 @@ int get_irq_list(char *buf)
 		p += sprintf(p, "%10u ",
 			nmi_count(cpu_logical_map(j)));
 	p += sprintf(p, "\n");
-#if defined(CONFIG_SMP) && defined(__i386__)
+#if defined(CONFIG_SMP) && defined(CONFIG_X86)
 	p += sprintf(p, "LOC: ");
 	for (j = 0; j < smp_num_cpus; j++)
 		p += sprintf(p, "%10u ",
 			apic_timer_irqs[cpu_logical_map(j)]);
 	p += sprintf(p, "\n");
 #endif
-	p += sprintf(p, "ERR: %10lu\n", irq_err_count);
+	p += sprintf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
+#if defined(CONFIG_X86) && defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
+	p += sprintf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
+#endif
 	return p - buf;
 }
 
@@ -183,7 +190,7 @@ int get_irq_list(char *buf)
 
 #ifdef CONFIG_SMP
 unsigned int global_irq_holder = NO_PROC_ID;
-volatile unsigned long global_irq_lock; /* long for set_bit --RR */
+unsigned volatile long global_irq_lock; /* pedantic: long for set_bit --RR */
 
 extern void show_stack(unsigned long* esp);
 
@@ -201,14 +208,14 @@ static void show(char * str)
 		printk(" %d",bh_count(i));
 
 	printk(" ]\nStack dumps:");
-#if defined(__ia64__)
+#if defined(CONFIG_IA64)
 	/*
 	 * We can't unwind the stack of another CPU without access to
 	 * the registers of that CPU.  And sending an IPI when we're
 	 * in a potentially wedged state doesn't sound like a smart
 	 * idea.
 	 */
-#elif defined(__i386__)
+#elif defined(CONFIG_X86)
 	for(i=0;i< smp_num_cpus;i++) {
 		unsigned long esp;
 		if(i==cpu)
@@ -261,7 +268,7 @@ static void show(char * str)
 /*
  * We have to allow irqs to arrive between __sti and __cli
  */
-# ifdef __ia64__
+# ifdef CONFIG_IA64
 #  define SYNC_OTHER_CORES(x) __asm__ __volatile__ ("nop 0")
 # else
 #  define SYNC_OTHER_CORES(x) __asm__ __volatile__ ("nop")
@@ -331,6 +338,9 @@ static inline void get_irqlock(void)
 		/* Uhhuh.. Somebody else got it. Wait.. */
 		do {
 			do {
+#ifdef CONFIG_X86
+				rep_nop();
+#endif
 			} while (test_bit(0,&global_irq_lock));
 		} while (test_and_set_bit(0,&global_irq_lock));
 	}
@@ -364,7 +374,7 @@ void __global_cli(void)
 {
 	unsigned int flags;
 
-#ifdef __ia64__
+#ifdef CONFIG_IA64
 	__save_flags(flags);
 	if (flags & IA64_PSR_I) {
 		__cli();
@@ -403,7 +413,7 @@ unsigned long __global_save_flags(void)
 	int cpu = smp_processor_id();
 
 	__save_flags(flags);
-#ifdef __ia64__
+#ifdef CONFIG_IA64
 	local_enabled = (flags & IA64_PSR_I) != 0;
 #else
 	local_enabled = (flags >> EFLAGS_IF_SHIFT) & 1;
@@ -476,13 +486,19 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	return status;
 }
 
-/*
- * Generic enable/disable code: this just calls
- * down into the PIC-specific version for the actual
- * hardware disable after having gotten the irq
- * controller lock.
+/**
+ *	disable_irq_nosync - disable an irq without waiting
+ *	@irq: Interrupt to disable
+ *
+ *	Disable the selected interrupt line.  Disables and Enables are
+ *	nested.
+ *	Unlike disable_irq(), this function does not ensure existing
+ *	instances of the IRQ handler have completed before returning.
+ *
+ *	This function may be called from IRQ context.
  */
-void inline disable_irq_nosync(unsigned int irq)
+
+inline void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc(irq);
 	unsigned long flags;
@@ -495,10 +511,19 @@ void inline disable_irq_nosync(unsigned int irq)
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-/*
- * Synchronous version of the above, making sure the IRQ is
- * no longer running on any other IRQ..
+/**
+ *	disable_irq - disable an irq and wait for completion
+ *	@irq: Interrupt to disable
+ *
+ *	Disable the selected interrupt line.  Enables and Disables are
+ *	nested.
+ *	This function waits for any pending IRQ handlers for this interrupt
+ *	to complete before returning. If you use this function while
+ *	holding a resource the IRQ handler may need you will deadlock.
+ *
+ *	This function may be called - with care - from IRQ context.
  */
+
 void disable_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
@@ -511,6 +536,17 @@ void disable_irq(unsigned int irq)
 	}
 #endif
 }
+
+/**
+ *	enable_irq - enable handling of an irq
+ *	@irq: Interrupt to enable
+ *
+ *	Undoes the effect of one call to disable_irq().  If this
+ *	matches the last disable, processing of interrupts on this
+ *	IRQ line is re-enabled.
+ *
+ *	This function may be called from IRQ context.
+ */
 
 void enable_irq(unsigned int irq)
 {
@@ -533,7 +569,8 @@ void enable_irq(unsigned int irq)
 		desc->depth--;
 		break;
 	case 0:
-		printk("enable_irq() unbalanced from %p\n", (void *) __builtin_return_address(0));
+		printk("enable_irq(%u) unbalanced from %p\n",
+		       irq, (void *) __builtin_return_address(0));
 	}
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
@@ -626,10 +663,40 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		desc->handler->end(irq);
 		spin_unlock(&desc->lock);
 	}
-	if (local_softirq_pending())
-		do_softirq();
 	return 1;
 }
+
+/**
+ *	request_irq - allocate an interrupt line
+ *	@irq: Interrupt line to allocate
+ *	@handler: Function to be called when the IRQ occurs
+ *	@irqflags: Interrupt type flags
+ *	@devname: An ascii name for the claiming device
+ *	@dev_id: A cookie passed back to the handler function
+ *
+ *	This call allocates interrupt resources and enables the
+ *	interrupt line and IRQ handling. From the point this
+ *	call is made your handler function may be invoked. Since
+ *	your handler function must clear any interrupt the board 
+ *	raises, you must take care both to initialise your hardware
+ *	and to set up the interrupt handler in the right order.
+ *
+ *	Dev_id must be globally unique. Normally the address of the
+ *	device data structure is used as the cookie. Since the handler
+ *	receives this value it makes sense to use it.
+ *
+ *	If your interrupt is shared you must pass a non NULL dev_id
+ *	as this is required when freeing the interrupt.
+ *
+ *	Flags:
+ *
+ *	SA_SHIRQ		Interrupt is shared
+ *
+ *	SA_INTERRUPT		Disable local interrupts while processing
+ *
+ *	SA_SAMPLE_RANDOM	The interrupt can be used for entropy
+ *
+ */
 
 int request_irq(unsigned int irq,
 		void (*handler)(int, void *, struct pt_regs *),
@@ -675,6 +742,24 @@ int request_irq(unsigned int irq,
 		kfree(action);
 	return retval;
 }
+
+/**
+ *	free_irq - free an interrupt
+ *	@irq: Interrupt line to free
+ *	@dev_id: Device identity to free
+ *
+ *	Remove an interrupt handler. The handler is removed and if the
+ *	interrupt line is no longer in use by any driver it is disabled.
+ *	On a shared IRQ the caller must ensure the interrupt is disabled
+ *	on the card it drives before calling this function. The function
+ *	does not return until any executing interrupts for this IRQ
+ *	have completed.
+ *
+ *	This function may be called from interrupt context. 
+ *
+ *	Bugs: Attempting to free an irq in a handler for the same irq hangs
+ *	      the machine.
+ */
 
 void free_irq(unsigned int irq, void *dev_id)
 {
@@ -726,6 +811,17 @@ void free_irq(unsigned int irq, void *dev_id)
  * with "IRQ_WAITING" cleared and the interrupt
  * disabled.
  */
+
+static DECLARE_MUTEX(probe_sem);
+
+/**
+ *	probe_irq_on	- begin an interrupt autodetect
+ *
+ *	Commence probing for an interrupt. The interrupts are scanned
+ *	and a mask of potential interrupt lines is returned.
+ *
+ */
+
 unsigned long probe_irq_on(void)
 {
 	unsigned int i;
@@ -733,6 +829,7 @@ unsigned long probe_irq_on(void)
 	unsigned long val;
 	unsigned long delay;
 
+	down(&probe_sem);
 	/*
 	 * something may have generated an irq long ago and we want to
 	 * flush such a longstanding irq before considering it as spurious.
@@ -799,10 +896,19 @@ unsigned long probe_irq_on(void)
 	return val;
 }
 
-/*
- * Return a mask of triggered interrupts (this
- * can handle only legacy ISA interrupts).
+/**
+ *	probe_irq_mask - scan a bitmap of interrupt lines
+ *	@val:	mask of interrupts to consider
+ *
+ *	Scan the ISA bus interrupt lines and return a bitmap of
+ *	active interrupts. The interrupt probe logic state is then
+ *	returned to its previous value.
+ *
+ *	Note: we need to scan all the irq's even though we will
+ *	only return ISA irq numbers - just so that we reset them
+ *	all to a known state.
  */
+
 unsigned int probe_irq_mask(unsigned long val)
 {
 	int i;
@@ -825,14 +931,29 @@ unsigned int probe_irq_mask(unsigned long val)
 		}
 		spin_unlock_irq(&desc->lock);
 	}
+	up(&probe_sem);
 
 	return mask & val;
 }
 
-/*
- * Return the one interrupt that triggered (this can
- * handle any interrupt source)
+/**
+ *	probe_irq_off	- end an interrupt autodetect
+ *	@val: mask of potential interrupts (unused)
+ *
+ *	Scans the unused interrupt lines and returns the line which
+ *	appears to have triggered the interrupt. If no interrupt was
+ *	found then zero is returned. If more than one interrupt is
+ *	found then minus the first candidate is returned to indicate
+ *	their is doubt.
+ *
+ *	The interrupt probe logic state is returned to its previous
+ *	value.
+ *
+ *	BUGS: When used in a module (which arguably shouldnt happen)
+ *	nothing prevents two IRQ probe callers from overlapping. The
+ *	results of this are non-optimal.
  */
+
 int probe_irq_off(unsigned long val)
 {
 	int i, irq_found, nr_irqs;
@@ -857,6 +978,7 @@ int probe_irq_off(unsigned long val)
 		}
 		spin_unlock_irq(&desc->lock);
 	}
+	up(&probe_sem);
 
 	if (nr_irqs > 1)
 		irq_found = -irq_found;
@@ -911,7 +1033,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 	if (!shared) {
 		desc->depth = 0;
-		desc->status &= ~IRQ_DISABLED;
+		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
 		desc->handler->startup(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);
@@ -922,19 +1044,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
-static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
-
-static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 
 #define HEX_DIGITS 8
-
-static int irq_affinity_read_proc (char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	if (count < HEX_DIGITS+1)
-		return -EINVAL;
-	return sprintf (page, "%08lx\n", irq_affinity[(long)data]);
-}
 
 static unsigned int parse_hex_value (const char *buffer,
 		unsigned long count, unsigned long *ret)
@@ -973,6 +1084,20 @@ out:
 	return 0;
 }
 
+#if CONFIG_SMP
+
+static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
+
+static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+
+static int irq_affinity_read_proc (char *page, char **start, off_t off,
+			int count, int *eof, void *data)
+{
+	if (count < HEX_DIGITS+1)
+		return -EINVAL;
+	return sprintf (page, "%08lx\n", irq_affinity[(long)data]);
+}
+
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
@@ -984,7 +1109,6 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	err = parse_hex_value(buffer, count, &new_value);
 
-#if CONFIG_SMP
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
@@ -992,13 +1116,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 */
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
-#endif
 
 	irq_affinity[irq] = new_value;
 	irq_desc(irq)->handler->set_affinity(irq, new_value);
 
 	return full_count;
 }
+
+#endif /* CONFIG_SMP */
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
@@ -1027,7 +1152,6 @@ static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 
 static void register_irq_proc (unsigned int irq)
 {
-	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
 
 	if (!root_irq_dir || (irq_desc(irq)->handler == &no_irq_type))
@@ -1039,15 +1163,22 @@ static void register_irq_proc (unsigned int irq)
 	/* create /proc/irq/1234 */
 	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
 
-	/* create /proc/irq/1234/smp_affinity */
-	entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
+#if CONFIG_SMP
+	{
+		struct proc_dir_entry *entry;
+		/* create /proc/irq/1234/smp_affinity */
+		entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
-	entry->nlink = 1;
-	entry->data = (void *)(long)irq;
-	entry->read_proc = irq_affinity_read_proc;
-	entry->write_proc = irq_affinity_write_proc;
+		if (entry) {
+			entry->nlink = 1;
+			entry->data = (void *)(long)irq;
+			entry->read_proc = irq_affinity_read_proc;
+			entry->write_proc = irq_affinity_write_proc;
+		}
 
-	smp_affinity_entry[irq] = entry;
+		smp_affinity_entry[irq] = entry;
+	}
+#endif
 }
 
 unsigned long prof_cpu_mask = -1;
@@ -1062,6 +1193,9 @@ void init_irq_proc (void)
 
 	/* create /proc/irq/prof_cpu_mask */
 	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
+
+	if (!entry)
+		return;
 
 	entry->nlink = 1;
 	entry->data = (void *)&prof_cpu_mask;

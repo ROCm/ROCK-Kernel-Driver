@@ -130,14 +130,31 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY)
 			tmp |= 0x00100000;	/* connect CRTC2 to DAC */
 	}
+	if (mt->interlaced) {
+		tmp |= 0x02000000;	/* interlaced, second field is bigger, as G450 apparently ignores it */
+		mt->VDisplay >>= 1;
+		mt->VSyncStart >>= 1;
+		mt->VSyncEnd >>= 1;
+		mt->VTotal >>= 1;
+	}
 	mga_outl(0x3C10, tmp | 0x10000000);	/* depth and so on... 0x10000000 is VIDRST polarity */
 	mga_outl(0x3C14, ((mt->HDisplay - 8) << 16) | (mt->HTotal - 8));
 	mga_outl(0x3C18, ((mt->HSyncEnd - 8) << 16) | (mt->HSyncStart - 8));
 	mga_outl(0x3C1C, ((mt->VDisplay - 1) << 16) | (mt->VTotal - 1));
 	mga_outl(0x3C20, ((mt->VSyncEnd - 1) << 16) | (mt->VSyncStart - 1));
 	mga_outl(0x3C24, ((mt->VSyncStart) << 16) | (mt->HSyncStart));	/* preload */
-	mga_outl(0x3C28, pos);		/* vmemory start */
-	mga_outl(0x3C40, p->var.xres_virtual * (p->var.bits_per_pixel >> 3));
+	{
+		u_int32_t linelen = p->var.xres_virtual * (p->var.bits_per_pixel >> 3);
+		if (mt->interlaced) {
+			/* field #0 is smaller, so... */
+			mga_outl(0x3C2C, pos);			/* field #1 vmemory start */
+			mga_outl(0x3C28, pos + linelen);	/* field #0 vmemory start */
+			linelen <<= 1;
+		} else {
+			mga_outl(0x3C28, pos);		/* vmemory start */
+		}
+		mga_outl(0x3C40, linelen);
+	}
 	tmp = 0x0FFF0000;		/* line compare */
 	if (mt->sync & FB_SYNC_HOR_HIGH_ACT)
 		tmp |= 0x00000100;
@@ -155,11 +172,20 @@ static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info,
 static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 		struct fb_var_screeninfo* var) {
 	unsigned int pos;
+	unsigned int linelen;
+	unsigned int pixelsize;
 
 #define minfo (m2info->primary_dev)
-	pos = (var->yoffset * var->xres_virtual + var->xoffset) * var->bits_per_pixel >> 3;
+	pixelsize = var->bits_per_pixel >> 3;
+	linelen = var->xres_virtual * pixelsize;
+	pos = var->yoffset * linelen + var->xoffset * pixelsize;
 	pos += m2info->video.offbase;
-	mga_outl(0x3C28, pos);
+	if (var->vmode & FB_VMODE_INTERLACED) {
+		mga_outl(0x3C2C, pos);
+		mga_outl(0x3C28, pos + linelen);
+	} else {
+		mga_outl(0x3C28, pos);
+	}
 #undef minfo
 }
 
@@ -700,15 +726,13 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->mmio.len = ACCESS_FBINFO(mmio.len);
 
 	/*
-	 *  If we have two outputs, connect CRTC2 to it...
+	 *  If we have unused output, connect CRTC2 to it...
 	 */
-	if (ACCESS_FBINFO(output.all) & MATROXFB_OUTPUT_CONN_SECONDARY) {
+	if ((ACCESS_FBINFO(output.all) & MATROXFB_OUTPUT_CONN_SECONDARY) && 
+	   !(ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) &&
+	   !(ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_DFP)) {
 		ACCESS_FBINFO(output.sh) |= MATROXFB_OUTPUT_CONN_SECONDARY;
-		ACCESS_FBINFO(output.ph) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		if (ACCESS_FBINFO(output.all) & MATROXFB_OUTPUT_CONN_DFP) {
-			ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_DFP;
-			ACCESS_FBINFO(output.ph) &= ~MATROXFB_OUTPUT_CONN_DFP;
-		}
+		ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_DFP;
 	}
 
 	matroxfb_dh_set_var(&matroxfb_dh_defined, -2, &m2info->fbcon);
@@ -815,6 +839,7 @@ static void matroxfb_crtc2_exit(void) {
 
 MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G400 CRTC2 driver");
+MODULE_LICENSE("GPL");
 module_init(matroxfb_crtc2_init);
 module_exit(matroxfb_crtc2_exit);
 /* we do not have __setup() yet */

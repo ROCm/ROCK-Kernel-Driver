@@ -1,3 +1,15 @@
+/*
+ *
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
+ *
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ *
+ * Version: 1.51 2001/01/19
+ *
+ * See matroxfb_base.c for contributors.
+ *
+ */
+
 #include "matroxfb_base.h"
 #include "matroxfb_maven.h"
 #include <linux/i2c.h>
@@ -282,8 +294,8 @@ static void* i2c_matroxfb_probe(struct matrox_fb_info* minfo) {
 		return NULL;
 
 	matroxfb_DAC_lock_irqsave(flags);
-	matroxfb_DAC_out(PMINFO DAC_XGENIODATA, 0x00);
-	matroxfb_DAC_out(PMINFO DAC_XGENIOCTRL, 0xFF);
+	matroxfb_DAC_out(PMINFO DAC_XGENIODATA, 0xFF);
+	matroxfb_DAC_out(PMINFO DAC_XGENIOCTRL, 0x00);
 	matroxfb_DAC_unlock_irqrestore(flags);
 
 	memset(m2info, 0, sizeof(*m2info));
@@ -343,7 +355,7 @@ static void __exit i2c_matroxfb_exit(void) {
 	matroxfb_unregister_driver(&i2c_matroxfb);
 }
 
-MODULE_AUTHOR("(c) 1999 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Support module providing I2C buses present on Matrox videocards");
 
 module_init(i2c_matroxfb_init);

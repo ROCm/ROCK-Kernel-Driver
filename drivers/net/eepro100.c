@@ -108,10 +108,12 @@ static int debug = -1;			/* The debug level */
 
 #include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 #include <linux/delay.h>
 
 MODULE_AUTHOR("Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>");
@@ -1913,6 +1915,35 @@ speedo_get_stats(struct net_device *dev)
 	return &sp->stats;
 }
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+	struct speedo_private *sp = dev->priv;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+        switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "eepro100", sizeof(info.driver)-1);
+		strncpy(info.version, version, sizeof(info.version)-1);
+		if (sp && sp->pdev)
+			strcpy(info.bus_info, sp->pdev->slot_name);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	
+        }
+	
+	return -EOPNOTSUPP;
+}
+
+
+
+
+
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
@@ -1952,6 +1983,8 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			add_timer(&sp->timer); /* may be set to the past  --SAW */
 		pci_set_power_state(sp->pdev, saved_acpi);
 		return 0;
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2001 Hewlett-Packard Co
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Adapted from arch/i386/kernel/ldt.c
  */
@@ -15,6 +15,8 @@
 
 #include <asm/uaccess.h>
 #include <asm/ia32.h>
+
+#define P(p)	((void *) (unsigned long) (p))
 
 /*
  * read_ldt() is not really atomic - this is not a problem since synchronization of reads
@@ -58,10 +60,30 @@ read_ldt (void *ptr, unsigned long bytecount)
 }
 
 static int
+read_default_ldt (void * ptr, unsigned long bytecount)
+{
+	unsigned long size;
+	int err;
+
+	/* XXX fix me: should return equivalent of default_ldt[0] */
+	err = 0;
+	size = 8;
+	if (size > bytecount)
+		size = bytecount;
+
+	err = size;
+	if (clear_user(ptr, size))
+		err = -EFAULT;
+
+	return err;
+}
+
+static int
 write_ldt (void * ptr, unsigned long bytecount, int oldmode)
 {
 	struct ia32_modify_ldt_ldt_s ldt_info;
 	__u64 entry;
+	int ret;
 
 	if (bytecount != sizeof(ldt_info))
 		return -EINVAL;
@@ -97,23 +119,28 @@ write_ldt (void * ptr, unsigned long bytecount, int oldmode)
 	 * memory, but we still need to guard against out-of-memory, hence we must use
 	 * put_user().
 	 */
-	return __put_user(entry, (__u64 *) IA32_LDT_OFFSET + ldt_info.entry_number);
+	ret = __put_user(entry, (__u64 *) IA32_LDT_OFFSET + ldt_info.entry_number);
+	ia32_load_segment_descriptors(current);
+	return ret;
 }
 
 asmlinkage int
-sys32_modify_ldt (int func, void *ptr, unsigned int bytecount)
+sys32_modify_ldt (int func, unsigned int ptr, unsigned int bytecount)
 {
 	int ret = -ENOSYS;
 
 	switch (func) {
 	      case 0:
-		ret = read_ldt(ptr, bytecount);
+		ret = read_ldt(P(ptr), bytecount);
 		break;
 	      case 1:
-		ret = write_ldt(ptr, bytecount, 1);
+		ret = write_ldt(P(ptr), bytecount, 1);
+		break;
+	      case 2:
+		ret = read_default_ldt(P(ptr), bytecount);
 		break;
 	      case 0x11:
-		ret = write_ldt(ptr, bytecount, 0);
+		ret = write_ldt(P(ptr), bytecount, 0);
 		break;
 	}
 	return ret;

@@ -59,4 +59,3 @@ EXPORT_SYMBOL(console_device);
 EXPORT_SYMBOL_NOVERS(do_call_softirq);
 
 
-

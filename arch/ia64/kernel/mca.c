@@ -3,12 +3,20 @@
  * Purpose:	Generic MCA handling layer
  *
  * Updated for latest kernel
+ * Copyright (C) 2001 Intel
+ * Copyright (C) Fred Lewis (frederick.v.lewis@intel.com)
+ *
  * Copyright (C) 2000 Intel
  * Copyright (C) Chuck Fleckenstein (cfleck@co.intel.com)
  *
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander(vijay@engr.sgi.com)
  *
+ * 01/01/03 F. Lewis    Added setup of CMCI and CPEI IRQs, logging of corrected
+ *                      platform errors, completed code for logging of
+ *                      corrected & uncorrected machine check errors, and
+ *                      updated for conformance with Nov. 2000 revision of the
+ *                      SAL 3.0 spec.
  * 00/03/29 C. Fleckenstein  Fixed PAL/SAL update issues, began MCA bug fixes, logging issues,
  *                           added min save state dump, added INIT handler.
  */
@@ -16,6 +24,7 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/smp_lock.h>
 
@@ -27,8 +36,10 @@
 #include <asm/mca.h>
 
 #include <asm/irq.h>
-#include <asm/machvec.h>
+#include <asm/hw_irq.h>
+#include <asm/acpi-ext.h>
 
+#undef MCA_PRT_XTRA_DATA
 
 typedef struct ia64_fptr {
 	unsigned long fp;
@@ -38,22 +49,67 @@ typedef struct ia64_fptr {
 ia64_mc_info_t			ia64_mc_info;
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
-u64				ia64_mca_proc_state_dump[256];
+u64				ia64_mca_proc_state_dump[512];
 u64				ia64_mca_stack[1024];
 u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[INIT_TASK_SIZE] __attribute__((aligned(16)));
 
-static void			ia64_mca_cmc_vector_setup(int		enable,
-							  int_vector_t	cmc_vector);
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
-static void			ia64_log_init(int,int);
-static void			ia64_log_get(int,int, prfunc_t);
-static void			ia64_log_clear(int,int,int, prfunc_t);
+static void			ia64_log_init(int);
 extern void		        ia64_monarch_init_handler (void);
 extern void		        ia64_slave_init_handler (void);
+extern struct hw_interrupt_type irq_type_iosapic_level;
+
+static struct irqaction cmci_irqaction = {
+	handler:    ia64_mca_cmc_int_handler,
+	flags:      SA_INTERRUPT,
+	name:       "cmc_hndlr"
+};
+
+static struct irqaction mca_rdzv_irqaction = {
+	handler:    ia64_mca_rendez_int_handler,
+	flags:      SA_INTERRUPT,
+	name:       "mca_rdzv"
+};
+
+static struct irqaction mca_wkup_irqaction = {
+	handler:    ia64_mca_wakeup_int_handler,
+	flags:      SA_INTERRUPT,
+	name:       "mca_wkup"
+};
+
+static struct irqaction mca_cpe_irqaction = {
+	handler:    ia64_mca_cpe_int_handler,
+	flags:      SA_INTERRUPT,
+	name:       "cpe_hndlr"
+};
+
+/*
+ *  ia64_mca_log_sal_error_record
+ *
+ *  This function retrieves a specified error record type from SAL, sends it to
+ *  the system log, and notifies SALs to clear the record from its non-volatile
+ *  memory.
+ *
+ *  Inputs  :   sal_info_type   (Type of error record MCA/CMC/CPE/INIT)
+ *  Outputs :   None
+ */
+void
+ia64_mca_log_sal_error_record(int sal_info_type)
+{
+	/* Get the MCA error record */
+	if (!ia64_log_get(sal_info_type, (prfunc_t)printk))
+		return;                 // no record retrieved
+
+	/* Log the error record */
+	ia64_log_print(sal_info_type, (prfunc_t)printk);
+
+	/* Clear the CMC SAL logs now that they have been logged */
+	ia64_sal_clear_state_info(sal_info_type);
+}
 
 /*
  * hack for now, add platform dependent handlers
@@ -67,10 +123,14 @@ mca_handler_platform (void)
 }
 
 void
-cmci_handler_platform (int cmc_irq, void *arg, struct pt_regs *ptregs)
+ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 {
+	IA64_MCA_DEBUG("ia64_mca_cpe_int_handler: received interrupt. vector = %#x\n", cpe_irq);
 
+	/* Get the CMC error record and log it */
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
 }
+
 /*
  * This routine will be used to deal with platform specific handling
  * of the init, i.e. drop into the kernel debugger on server machine,
@@ -81,17 +141,72 @@ void
 init_handler_platform (struct pt_regs *regs)
 {
 	/* if a kernel debugger is available call it here else just dump the registers */
+
 	show_regs(regs);		/* dump the state info */
+	while (1);			/* hang city if no debugger */
 }
 
-void
-log_print_platform ( void *cur_buff_ptr, prfunc_t prfunc)
-{
-}
-
+/*
+ * ia64_mca_init_platform
+ *
+ *  External entry for platform specific MCA initialization.
+ *
+ *  Inputs
+ *      None
+ *
+ *  Outputs
+ *      None
+ */
 void
 ia64_mca_init_platform (void)
 {
+
+}
+
+/*
+ *  ia64_mca_check_errors
+ *
+ *  External entry to check for error records which may have been posted by SAL
+ *  for a prior failure which resulted in a machine shutdown before an the
+ *  error could be logged.  This function must be called after the filesystem
+ *  is initialized.
+ *
+ *  Inputs  :   None
+ *
+ *  Outputs :   None
+ */
+void
+ia64_mca_check_errors (void)
+{
+	/*
+	 *  If there is an MCA error record pending, get it and log it.
+	 */
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
+}
+
+/*
+ * ia64_mca_register_cpev
+ *
+ *  Register the corrected platform error vector with SAL.
+ *
+ *  Inputs
+ *      cpev        Corrected Platform Error Vector number
+ *
+ *  Outputs
+ *      None
+ */
+static void
+ia64_mca_register_cpev (int cpev)
+{
+	/* Register the CPE interrupt vector with SAL */
+	if (ia64_sal_mc_set_params(SAL_MC_PARAM_CPE_INT, SAL_MC_PARAM_MECHANISM_INT, cpev, 0, 0)) {
+		printk("ia64_mca_platform_init: failed to register Corrected "
+		       "Platform Error interrupt vector with SAL.\n");
+		return;
+	}
+
+	IA64_MCA_DEBUG("ia64_mca_platform_init: corrected platform error "
+		       "vector %#x setup and enabled\n", cpev);
 }
 
 #endif /* PLATFORM_MCA_HANDLERS */
@@ -140,30 +255,36 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss, struct pt_regs *ptregs)
 				     && !ia64_pmss_dump_bank0))
 			printk("\n");
 	}
-	/* hang city for now, until we include debugger or copy to ptregs to show: */
-	while (1);
 }
 
 /*
  * ia64_mca_cmc_vector_setup
- *	Setup the correctable machine check vector register in the processor
+ *
+ *  Setup the corrected machine check vector register in the processor and
+ *  unmask interrupt.  This function is invoked on a per-processor basis.
+ *
  * Inputs
- *	Enable (1 - enable cmc interrupt , 0 - disable)
- *	CMC handler entry point (if enabled)
+ *      None
  *
  * Outputs
  *	None
  */
-static void
-ia64_mca_cmc_vector_setup(int		enable,
-			  int_vector_t	cmc_vector)
+void
+ia64_mca_cmc_vector_setup (void)
 {
 	cmcv_reg_t	cmcv;
 
 	cmcv.cmcv_regval	= 0;
-	cmcv.cmcv_mask	= enable;
-	cmcv.cmcv_vector	= cmc_vector;
+	cmcv.cmcv_mask      = 0;        /* Unmask/enable interrupt */
+	cmcv.cmcv_vector    = IA64_CMC_VECTOR;
 	ia64_set_cmcv(cmcv.cmcv_regval);
+
+	IA64_MCA_DEBUG("ia64_mca_platform_init: CPU %d corrected "
+		       "machine check vector %#x setup and enabled.\n",
+		       smp_processor_id(), IA64_CMC_VECTOR);
+
+	IA64_MCA_DEBUG("ia64_mca_platform_init: CPU %d CMCV = %#016lx\n",
+		       smp_processor_id(), ia64_get_cmcv());
 }
 
 
@@ -174,26 +295,58 @@ sal_log_processor_info_t	slpi_buf;
 void
 mca_test(void)
 {
-	slpi_buf.slpi_valid.slpi_psi = 1;
-	slpi_buf.slpi_valid.slpi_cache_check = 1;
-	slpi_buf.slpi_valid.slpi_tlb_check = 1;
-	slpi_buf.slpi_valid.slpi_bus_check = 1;
-	slpi_buf.slpi_valid.slpi_minstate = 1;
-	slpi_buf.slpi_valid.slpi_bank1_gr = 1;
-	slpi_buf.slpi_valid.slpi_br = 1;
-	slpi_buf.slpi_valid.slpi_cr = 1;
-	slpi_buf.slpi_valid.slpi_ar = 1;
-	slpi_buf.slpi_valid.slpi_rr = 1;
-	slpi_buf.slpi_valid.slpi_fr = 1;
+	slpi_buf.valid.psi_static_struct = 1;
+	slpi_buf.valid.num_cache_check = 1;
+	slpi_buf.valid.num_tlb_check = 1;
+	slpi_buf.valid.num_bus_check = 1;
+	slpi_buf.valid.processor_static_info.minstate = 1;
+	slpi_buf.valid.processor_static_info.br = 1;
+	slpi_buf.valid.processor_static_info.cr = 1;
+	slpi_buf.valid.processor_static_info.ar = 1;
+	slpi_buf.valid.processor_static_info.rr = 1;
+	slpi_buf.valid.processor_static_info.fr = 1;
 
 	ia64_os_mca_dispatch();
 }
 
 #endif /* #if defined(MCA_TEST) */
 
+
+/*
+ *  verify_guid
+ *
+ *  Compares a test guid to a target guid and returns result.
+ *
+ *  Inputs
+ *      test_guid *     (ptr to guid to be verified)
+ *      target_guid *   (ptr to standard guid to be verified against)
+ *
+ *  Outputs
+ *      0               (test verifies against target)
+ *      non-zero        (test guid does not verify)
+ */
+static int
+verify_guid (efi_guid_t *test, efi_guid_t *target)
+{
+	int     rc;
+
+	if ((rc = memcmp((void *)test, (void *)target, sizeof(efi_guid_t)))) {
+		IA64_MCA_DEBUG("ia64_mca_print: invalid guid = "
+			       "{ %08x, %04x, %04x, { %#02x, %#02x, %#02x, %#02x, "
+			       "%#02x, %#02x, %#02x, %#02x, } } \n ",
+			       test->data1, test->data2, test->data3, test->data4[0],
+			       test->data4[1], test->data4[2], test->data4[3],
+			       test->data4[4], test->data4[5], test->data4[6],
+			       test->data4[7]);
+	}
+
+	return rc;
+}
+
 /*
  * ia64_mca_init
- *	Do all the mca specific initialization on a per-processor basis.
+ *
+ *  Do all the system level mca specific initialization.
  *
  *	1. Register spinloop and wakeup request interrupt vectors
  *
@@ -201,77 +354,80 @@ mca_test(void)
  *
  *	3. Register OS_INIT handler entry point
  *
- *	4. Initialize CMCV register to enable/disable CMC interrupt on the
- *	   processor and hook a handler in the platform-specific ia64_mca_init.
+ *  4. Initialize MCA/CMC/INIT related log buffers maintained by the OS.
  *
- *	5. Initialize MCA/CMC/INIT related log buffers maintained by the OS.
+ *  Note that this initialization is done very early before some kernel
+ *  services are available.
  *
- * Inputs
- *	None
- * Outputs
- *	None
+ *  Inputs  :   None
+ *
+ *  Outputs :   None
  */
 void __init
 ia64_mca_init(void)
 {
 	ia64_fptr_t *mon_init_ptr = (ia64_fptr_t *)ia64_monarch_init_handler;
 	ia64_fptr_t *slave_init_ptr = (ia64_fptr_t *)ia64_slave_init_handler;
+	ia64_fptr_t *mca_hldlr_ptr = (ia64_fptr_t *)ia64_os_mca_dispatch;
 	int i;
+	s64 rc;
 
-	IA64_MCA_DEBUG("ia64_mca_init : begin\n");
+	IA64_MCA_DEBUG("ia64_mca_init: begin\n");
 
 	/* Clear the Rendez checkin flag for all cpus */
-	for(i = 0 ; i < IA64_MAXCPUS; i++)
+	for(i = 0 ; i < NR_CPUS; i++)
 		ia64_mc_info.imi_rendez_checkin[i] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
 
-	/* NOTE : The actual irqs for the rendez, wakeup and
-	 * cmc interrupts are requested in the platform-specific
-	 * mca initialization code.
-	 */
 	/*
 	 * Register the rendezvous spinloop and wakeup mechanism with SAL
 	 */
 
 	/* Register the rendezvous interrupt vector with SAL */
-	if (ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_INT,
-				   SAL_MC_PARAM_MECHANISM_INT,
-				   IA64_MCA_RENDEZ_VECTOR,
-				   IA64_MCA_RENDEZ_TIMEOUT,
-				   0))
+	if ((rc = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_INT,
+					 SAL_MC_PARAM_MECHANISM_INT,
+					 IA64_MCA_RENDEZ_VECTOR,
+					 IA64_MCA_RENDEZ_TIMEOUT,
+					 0)))
+	{
+		printk("ia64_mca_init: Failed to register rendezvous interrupt "
+		       "with SAL.  rc = %ld\n", rc);
 		return;
+	}
 
 	/* Register the wakeup interrupt vector with SAL */
-	if (ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_WAKEUP,
-				   SAL_MC_PARAM_MECHANISM_INT,
-				   IA64_MCA_WAKEUP_VECTOR,
-				   0,
-				   0))
+	if ((rc = ia64_sal_mc_set_params(SAL_MC_PARAM_RENDEZ_WAKEUP,
+					 SAL_MC_PARAM_MECHANISM_INT,
+					 IA64_MCA_WAKEUP_VECTOR,
+					 0, 0)))
+	{
+		printk("ia64_mca_init: Failed to register wakeup interrupt with SAL.  rc = %ld\n",
+		       rc);
 		return;
+	}
 
-	IA64_MCA_DEBUG("ia64_mca_init : registered mca rendezvous spinloop and wakeup mech.\n");
-	/*
-	 * Setup the correctable machine check vector
-	 */
-	ia64_mca_cmc_vector_setup(IA64_CMC_INT_ENABLE, IA64_CMC_VECTOR);
+	IA64_MCA_DEBUG("ia64_mca_init: registered mca rendezvous spinloop and wakeup mech.\n");
 
-	IA64_MCA_DEBUG("ia64_mca_init : correctable mca vector setup done\n");
-
-	ia64_mc_info.imi_mca_handler		= __pa(ia64_os_mca_dispatch);
+	ia64_mc_info.imi_mca_handler        = __pa(mca_hldlr_ptr->fp);
 	/*
 	 * XXX - disable SAL checksum by setting size to 0; should be
 	 *	__pa(ia64_os_mca_dispatch_end) - __pa(ia64_os_mca_dispatch);
 	 */
 	ia64_mc_info.imi_mca_handler_size	= 0;
+
 	/* Register the os mca handler with SAL */
-	if (ia64_sal_set_vectors(SAL_VECTOR_OS_MCA,
-				 ia64_mc_info.imi_mca_handler,
-				 __pa(ia64_get_gp()),
-				 ia64_mc_info.imi_mca_handler_size,
-				 0,0,0))
-
+	if ((rc = ia64_sal_set_vectors(SAL_VECTOR_OS_MCA,
+				       ia64_mc_info.imi_mca_handler,
+				       mca_hldlr_ptr->gp,
+				       ia64_mc_info.imi_mca_handler_size,
+				       0, 0, 0)))
+	{
+		printk("ia64_mca_init: Failed to register os mca handler with SAL.  rc = %ld\n",
+		       rc);
 		return;
+	}
 
-	IA64_MCA_DEBUG("ia64_mca_init : registered os mca handler with SAL\n");
+	IA64_MCA_DEBUG("ia64_mca_init: registered os mca handler with SAL at 0x%lx, gp = 0x%lx\n",
+		       ia64_mc_info.imi_mca_handler, mca_hldlr_ptr->gp);
 
 	/*
 	 * XXX - disable SAL checksum by setting size to 0, should be
@@ -282,53 +438,87 @@ ia64_mca_init(void)
 	ia64_mc_info.imi_slave_init_handler		= __pa(slave_init_ptr->fp);
 	ia64_mc_info.imi_slave_init_handler_size	= 0;
 
-	IA64_MCA_DEBUG("ia64_mca_init : os init handler at %lx\n",ia64_mc_info.imi_monarch_init_handler);
+	IA64_MCA_DEBUG("ia64_mca_init: os init handler at %lx\n",
+		       ia64_mc_info.imi_monarch_init_handler);
 
 	/* Register the os init handler with SAL */
-	if (ia64_sal_set_vectors(SAL_VECTOR_OS_INIT,
-				 ia64_mc_info.imi_monarch_init_handler,
-				 __pa(ia64_get_gp()),
-				 ia64_mc_info.imi_monarch_init_handler_size,
-				 ia64_mc_info.imi_slave_init_handler,
-				 __pa(ia64_get_gp()),
-				 ia64_mc_info.imi_slave_init_handler_size))
-
-
+	if ((rc = ia64_sal_set_vectors(SAL_VECTOR_OS_INIT,
+				       ia64_mc_info.imi_monarch_init_handler,
+				       __pa(ia64_get_gp()),
+				       ia64_mc_info.imi_monarch_init_handler_size,
+				       ia64_mc_info.imi_slave_init_handler,
+				       __pa(ia64_get_gp()),
+				       ia64_mc_info.imi_slave_init_handler_size)))
+	{
+		printk("ia64_mca_init: Failed to register m/s init handlers with SAL. rc = %ld\n",
+		       rc);
 		return;
+	}
 
-	IA64_MCA_DEBUG("ia64_mca_init : registered os init handler with SAL\n");
+	IA64_MCA_DEBUG("ia64_mca_init: registered os init handler with SAL\n");
+
+	/*
+	 *  Configure the CMCI vector and handler. Interrupts for CMC are
+	 *  per-processor, so AP CMC interrupts are setup in smp_callin() (smp.c).
+	 */
+	register_percpu_irq(IA64_CMC_VECTOR, &cmci_irqaction);
+	ia64_mca_cmc_vector_setup();       /* Setup vector on BSP & enable */
+
+	/* Setup the MCA rendezvous interrupt vector */
+	register_percpu_irq(IA64_MCA_RENDEZ_VECTOR, &mca_rdzv_irqaction);
+
+	/* Setup the MCA wakeup interrupt vector */
+	register_percpu_irq(IA64_MCA_WAKEUP_VECTOR, &mca_wkup_irqaction);
+
+	/* Setup the CPE interrupt vector */
+	{
+		irq_desc_t *desc;
+		unsigned int irq;
+		int cpev = acpi_request_vector(ACPI20_ENTRY_PIS_CPEI);
+
+		if (cpev >= 0) {
+			for (irq = 0; irq < NR_IRQS; ++irq)
+				if (irq_to_vector(irq) == cpev) {
+					desc = irq_desc(irq);
+					desc->status |= IRQ_PER_CPU;
+					desc->handler = &irq_type_iosapic_level;
+					setup_irq(irq, &mca_cpe_irqaction);
+				}
+			ia64_mca_register_cpev(cpev);
+		} else
+			printk("ia64_mca_init: Failed to get routed CPEI vector from ACPI.\n");
+	}
 
 	/* Initialize the areas set aside by the OS to buffer the
 	 * platform/processor error states for MCA/INIT/CMC
 	 * handling.
 	 */
-	ia64_log_init(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PROCESSOR);
-	ia64_log_init(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PLATFORM);
-	ia64_log_init(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PROCESSOR);
-	ia64_log_init(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PLATFORM);
-	ia64_log_init(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PROCESSOR);
-	ia64_log_init(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PLATFORM);
-
-	ia64_mca_init_platform();
-
-	IA64_MCA_DEBUG("ia64_mca_init : platform-specific mca handling setup done\n");
+	ia64_log_init(SAL_INFO_TYPE_MCA);
+	ia64_log_init(SAL_INFO_TYPE_INIT);
+	ia64_log_init(SAL_INFO_TYPE_CMC);
+	ia64_log_init(SAL_INFO_TYPE_CPE);
 
 #if defined(MCA_TEST)
 	mca_test();
 #endif /* #if defined(MCA_TEST) */
 
 	printk("Mca related initialization done\n");
+
+#if 0   // Too early in initialization -- error log is lost
+	/* Do post-failure MCA error logging */
+	ia64_mca_check_errors();
+#endif  // Too early in initialization -- error log is lost
 }
 
 /*
  * ia64_mca_wakeup_ipi_wait
+ *
  *	Wait for the inter-cpu interrupt to be sent by the
  *	monarch processor once it is done with handling the
  *	MCA.
- * Inputs
- *	None
- * Outputs
- *	None
+ *
+ *  Inputs  :   None
+ *  Outputs :   None
  */
 void
 ia64_mca_wakeup_ipi_wait(void)
@@ -339,16 +529,16 @@ ia64_mca_wakeup_ipi_wait(void)
 
 	do {
 		switch(irr_num) {
-		case 0:
+		      case 0:
 			irr = ia64_get_irr0();
 			break;
-		case 1:
+		      case 1:
 			irr = ia64_get_irr1();
 			break;
-		case 2:
+		      case 2:
 			irr = ia64_get_irr2();
 			break;
-		case 3:
+		      case 3:
 			irr = ia64_get_irr3();
 			break;
 		}
@@ -357,26 +547,28 @@ ia64_mca_wakeup_ipi_wait(void)
 
 /*
  * ia64_mca_wakeup
+ *
  *	Send an inter-cpu interrupt to wake-up a particular cpu
  *	and mark that cpu to be out of rendez.
- * Inputs
- *	cpuid
- * Outputs
- *	None
+ *
+ *  Inputs  :   cpuid
+ *  Outputs :   None
  */
 void
 ia64_mca_wakeup(int cpu)
 {
 	platform_send_ipi(cpu, IA64_MCA_WAKEUP_VECTOR, IA64_IPI_DM_INT, 0);
 	ia64_mc_info.imi_rendez_checkin[cpu] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
+
 }
+
 /*
  * ia64_mca_wakeup_all
+ *
  *	Wakeup all the cpus which have rendez'ed previously.
- * Inputs
- *	None
- * Outputs
- *	None
+ *
+ *  Inputs  :   None
+ *  Outputs :   None
  */
 void
 ia64_mca_wakeup_all(void)
@@ -389,15 +581,16 @@ ia64_mca_wakeup_all(void)
 			ia64_mca_wakeup(cpu);
 
 }
+
 /*
  * ia64_mca_rendez_interrupt_handler
+ *
  *	This is handler used to put slave processors into spinloop
  *	while the monarch processor does the mca handling and later
  *	wake each slave up once the monarch is done.
- * Inputs
- *	None
- * Outputs
- *	None
+ *
+ *  Inputs  :   None
+ *  Outputs :   None
  */
 void
 ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
@@ -423,23 +616,22 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 
 	/* Enable all interrupts */
 	restore_flags(flags);
-
-
 }
 
 
 /*
  * ia64_mca_wakeup_int_handler
+ *
  *	The interrupt handler for processing the inter-cpu interrupt to the
  *	slave cpu which was spinning in the rendez loop.
  *	Since this spinning is done by turning off the interrupts and
  *	polling on the wakeup-interrupt bit in the IRR, there is
  *	nothing useful to be done in the handler.
- *  Inputs
- *	wakeup_irq	(Wakeup-interrupt bit)
+ *
+ *  Inputs  :   wakeup_irq  (Wakeup-interrupt bit)
  *	arg		(Interrupt handler specific argument)
  *	ptregs		(Exception frame at the time of the interrupt)
- *  Outputs
+ *  Outputs :   None
  *
  */
 void
@@ -450,16 +642,16 @@ ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 
 /*
  * ia64_return_to_sal_check
+ *
  *	This is function called before going back from the OS_MCA handler
  *	to the OS_MCA dispatch code which finally takes the control back
  *	to the SAL.
  *	The main purpose of this routine is to setup the OS_MCA to SAL
  *	return state which can be used by the OS_MCA dispatch code
  *	just before going back to SAL.
- * Inputs
- *	None
- * Outputs
- *	None
+ *
+ *  Inputs  :   None
+ *  Outputs :   None
  */
 
 void
@@ -474,11 +666,13 @@ ia64_return_to_sal_check(void)
 	ia64_os_to_sal_handoff_state.imots_sal_check_ra =
 		ia64_sal_to_os_handoff_state.imsto_sal_check_ra;
 
-	/* For now ignore the MCA */
-	ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_CORRECTED;
+	/* Cold Boot for uncorrectable MCA */
+	ia64_os_to_sal_handoff_state.imots_os_status = IA64_MCA_COLD_BOOT;
 }
+
 /*
  * ia64_mca_ucmc_handler
+ *
  *	This is uncorrectable machine check handler called from OS_MCA
  *	dispatch code which is in turn called from SAL_CHECK().
  *	This is the place where the core of OS MCA handling is done.
@@ -487,93 +681,92 @@ ia64_return_to_sal_check(void)
  *	monarch processor. Once the  monarch is done with MCA handling
  *	further MCA logging is enabled by clearing logs.
  *	Monarch also has the duty of sending wakeup-IPIs to pull the
- *	slave processors out of rendez. spinloop.
- * Inputs
- *	None
- * Outputs
- *	None
+ *  slave processors out of rendezvous spinloop.
+ *
+ *  Inputs  :   None
+ *  Outputs :   None
  */
 void
 ia64_mca_ucmc_handler(void)
 {
+#if 0   /* stubbed out @FVL */
+	/*
+	 *  Attempting to log a DBE error Causes "reserved register/field panic"
+	 *  in printk.
+	 */
 
-	/* Get the MCA processor log */
-	ia64_log_get(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
-	/* Get the MCA platform log */
-	ia64_log_get(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PLATFORM, (prfunc_t)printk);
-
-	ia64_log_print(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
+	/* Get the MCA error record and log it */
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
+#endif  /* stubbed out @FVL */
 
 	/*
-	 * Do some error handling - Platform-specific mca handler is called at this point
+	 *  Do Platform-specific mca error handling if required.
 	 */
-
 	mca_handler_platform() ;
 
-	/* Clear the SAL MCA logs */
-	ia64_log_clear(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PROCESSOR, 1, printk);
-	ia64_log_clear(SAL_INFO_TYPE_MCA, SAL_SUB_INFO_TYPE_PLATFORM, 1, printk);
-
-	/* Wakeup all the processors which are spinning in the rendezvous
-	 * loop.
+	/*
+	 *  Wakeup all the processors which are spinning in the rendezvous
+	 *  loop.
 	 */
 	ia64_mca_wakeup_all();
+
+	/* Return to SAL */
 	ia64_return_to_sal_check();
 }
 
 /*
  * ia64_mca_cmc_int_handler
- *	This is correctable machine check interrupt handler.
+ *
+ *  This is corrected machine check interrupt handler.
  *	Right now the logs are extracted and displayed in a well-defined
  *	format.
+ *
  * Inputs
- *	None
+ *      interrupt number
+ *      client data arg ptr
+ *      saved registers ptr
+ *
  * Outputs
  *	None
  */
 void
 ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 {
-	/* Get the CMC processor log */
-	ia64_log_get(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
-	/* Get the CMC platform log */
-	ia64_log_get(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PLATFORM, (prfunc_t)printk);
+	IA64_MCA_DEBUG("ia64_mca_cmc_int_handler: received interrupt vector = %#x on CPU %d\n",
+		       cmc_irq, smp_processor_id());
 
-
-	ia64_log_print(SAL_INFO_TYPE_CMC, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
-	cmci_handler_platform(cmc_irq, arg, ptregs);
-
-	/* Clear the CMC SAL logs now that they have been saved in the OS buffer */
-	ia64_sal_clear_state_info(SAL_INFO_TYPE_CMC);
+	/* Get the CMC error record and log it */
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CMC);
 }
 
 /*
  * IA64_MCA log support
  */
 #define IA64_MAX_LOGS		2	/* Double-buffering for nested MCAs */
-#define IA64_MAX_LOG_TYPES	3	/* MCA, CMC, INIT */
-#define IA64_MAX_LOG_SUBTYPES	2	/* Processor, Platform */
+#define IA64_MAX_LOG_TYPES      4   /* MCA, INIT, CMC, CPE */
 
-typedef struct ia64_state_log_s {
+typedef struct ia64_state_log_s
+{
 	spinlock_t	isl_lock;
 	int		isl_index;
-	ia64_psilog_t	isl_log[IA64_MAX_LOGS];	/* need space to store header + error log */
+	ia64_err_rec_t  isl_log[IA64_MAX_LOGS]; /* need space to store header + error log */
 } ia64_state_log_t;
 
-static ia64_state_log_t	ia64_state_log[IA64_MAX_LOG_TYPES][IA64_MAX_LOG_SUBTYPES];
+static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
 
-#define IA64_LOG_LOCK_INIT(it, sit)	spin_lock_init(&ia64_state_log[it][sit].isl_lock)
-#define IA64_LOG_LOCK(it, sit)		spin_lock_irqsave(&ia64_state_log[it][sit].isl_lock, s)
-#define IA64_LOG_UNLOCK(it, sit)	spin_unlock_irqrestore(&ia64_state_log[it][sit].isl_lock,\
-							       s)
-#define IA64_LOG_NEXT_INDEX(it, sit)	ia64_state_log[it][sit].isl_index
-#define IA64_LOG_CURR_INDEX(it, sit)	1 - ia64_state_log[it][sit].isl_index
-#define IA64_LOG_INDEX_INC(it, sit)	\
-	ia64_state_log[it][sit].isl_index = 1 - ia64_state_log[it][sit].isl_index
-#define IA64_LOG_INDEX_DEC(it, sit)	\
-	ia64_state_log[it][sit].isl_index = 1 - ia64_state_log[it][sit].isl_index
-#define IA64_LOG_NEXT_BUFFER(it, sit)	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_NEXT_INDEX(it,sit)]))
-#define IA64_LOG_CURR_BUFFER(it, sit)	(void *)(&(ia64_state_log[it][sit].isl_log[IA64_LOG_CURR_INDEX(it,sit)]))
+/* Note:  Some of these macros assume IA64_MAX_LOGS is always 2.  Should be */
+/* fixed. @FVL                                                              */
+#define IA64_LOG_LOCK_INIT(it) spin_lock_init(&ia64_state_log[it].isl_lock)
+#define IA64_LOG_LOCK(it)      spin_lock_irqsave(&ia64_state_log[it].isl_lock, s)
+#define IA64_LOG_UNLOCK(it)    spin_unlock_irqrestore(&ia64_state_log[it].isl_lock,s)
+#define IA64_LOG_NEXT_INDEX(it)    ia64_state_log[it].isl_index
+#define IA64_LOG_CURR_INDEX(it)    1 - ia64_state_log[it].isl_index
+#define IA64_LOG_INDEX_INC(it) \
+    ia64_state_log[it].isl_index = 1 - ia64_state_log[it].isl_index
+#define IA64_LOG_INDEX_DEC(it) \
+    ia64_state_log[it].isl_index = 1 - ia64_state_log[it].isl_index
+#define IA64_LOG_NEXT_BUFFER(it)   (void *)(&(ia64_state_log[it].isl_log[IA64_LOG_NEXT_INDEX(it)]))
+#define IA64_LOG_CURR_BUFFER(it)   (void *)(&(ia64_state_log[it].isl_log[IA64_LOG_CURR_INDEX(it)]))
 
 /*
  * C portion of the OS INIT handler
@@ -584,123 +777,217 @@ static ia64_state_log_t	ia64_state_log[IA64_MAX_LOG_TYPES][IA64_MAX_LOG_SUBTYPES
  *
  * Returns:
  *   0 if SAL must warm boot the System
- *   1 if SAL must retrun to interrupted context using PAL_MC_RESUME
+ *   1 if SAL must return to interrupted context using PAL_MC_RESUME
  *
  */
-
 void
 ia64_init_handler (struct pt_regs *regs)
 {
 	sal_log_processor_info_t *proc_ptr;
-	ia64_psilog_t *plog_ptr;
+	ia64_err_rec_t *plog_ptr;
 
 	printk("Entered OS INIT handler\n");
 
 	/* Get the INIT processor log */
-	ia64_log_get(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
-	/* Get the INIT platform log */
-	ia64_log_get(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PLATFORM, (prfunc_t)printk);
+	if (!ia64_log_get(SAL_INFO_TYPE_INIT, (prfunc_t)printk))
+		return;                 // no record retrieved
 
 #ifdef IA64_DUMP_ALL_PROC_INFO
-	ia64_log_print(SAL_INFO_TYPE_INIT, SAL_SUB_INFO_TYPE_PROCESSOR, (prfunc_t)printk);
+	ia64_log_print(SAL_INFO_TYPE_INIT, (prfunc_t)printk);
 #endif
 
 	/*
 	 * get pointer to min state save area
 	 *
 	 */
-	plog_ptr=(ia64_psilog_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT,
-						       SAL_SUB_INFO_TYPE_PROCESSOR);
-	proc_ptr = &plog_ptr->devlog.proclog;
+	plog_ptr=(ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT);
+	proc_ptr = &plog_ptr->proc_err;
 
-	ia64_process_min_state_save(&proc_ptr->slpi_min_state_area,regs);
-
-	init_handler_platform(regs);              /* call platform specific routines */
+	ia64_process_min_state_save(&proc_ptr->processor_static_info.min_state_area,
+				    regs);
 
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
+
+	init_handler_platform(regs);              /* call platform specific routines */
 }
+
+/*
+ *  ia64_log_prt_guid
+ *
+ *  Print a formatted GUID.
+ *
+ * Inputs   :   p_guid      (ptr to the GUID)
+ *              prfunc      (print function)
+ * Outputs  :   None
+ *
+ */
+void
+ia64_log_prt_guid (efi_guid_t *p_guid, prfunc_t prfunc)
+{
+	printk("GUID = { %08x, %04x, %04x, { %#02x, %#02x, %#02x, %#02x, "
+	       "%#02x, %#02x, %#02x, %#02x, } } \n ", p_guid->data1,
+	       p_guid->data2, p_guid->data3, p_guid->data4[0], p_guid->data4[1],
+	       p_guid->data4[2], p_guid->data4[3], p_guid->data4[4],
+	       p_guid->data4[5], p_guid->data4[6], p_guid->data4[7]);
+}
+
+static void
+ia64_log_hexdump(unsigned char *p, unsigned long n_ch, prfunc_t prfunc)
+{
+	int i, j;
+
+	if (!p)
+		return;
+
+	for (i = 0; i < n_ch;) {
+		prfunc("%p ", (void *)p);
+		for (j = 0; (j < 16) && (i < n_ch); i++, j++, p++) {
+			prfunc("%02x ", *p);
+		}
+		prfunc("\n");
+	}
+}
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+
+static void
+ia64_log_prt_record_header (sal_log_record_header_t *rh, prfunc_t prfunc)
+{
+	prfunc("SAL RECORD HEADER:  Record buffer = %p,  header size = %ld\n",
+	       (void *)rh, sizeof(sal_log_record_header_t));
+	ia64_log_hexdump((unsigned char *)rh, sizeof(sal_log_record_header_t),
+			 (prfunc_t)prfunc);
+	prfunc("Total record length = %d\n", rh->len);
+	ia64_log_prt_guid(&rh->platform_guid, prfunc);
+	prfunc("End of SAL RECORD HEADER\n");
+}
+
+static void
+ia64_log_prt_section_header (sal_log_section_hdr_t *sh, prfunc_t prfunc)
+{
+	prfunc("SAL SECTION HEADER:  Record buffer = %p,  header size = %ld\n",
+	       (void *)sh, sizeof(sal_log_section_hdr_t));
+	ia64_log_hexdump((unsigned char *)sh, sizeof(sal_log_section_hdr_t),
+			 (prfunc_t)prfunc);
+	prfunc("Length of section & header = %d\n", sh->len);
+	ia64_log_prt_guid(&sh->guid, prfunc);
+	prfunc("End of SAL SECTION HEADER\n");
+}
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
 
 /*
  * ia64_log_init
  *	Reset the OS ia64 log buffer
- * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
- *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
+ * Inputs   :   info_type   (SAL_INFO_TYPE_{MCA,INIT,CMC,CPE})
  * Outputs	:	None
  */
 void
-ia64_log_init(int sal_info_type, int sal_sub_info_type)
+ia64_log_init(int sal_info_type)
 {
-	IA64_LOG_LOCK_INIT(sal_info_type, sal_sub_info_type);
-	IA64_LOG_NEXT_INDEX(sal_info_type, sal_sub_info_type) = 0;
-	memset(IA64_LOG_NEXT_BUFFER(sal_info_type, sal_sub_info_type), 0,
-	       sizeof(ia64_psilog_t) * IA64_MAX_LOGS);
+	IA64_LOG_LOCK_INIT(sal_info_type);
+	IA64_LOG_NEXT_INDEX(sal_info_type) = 0;
+	memset(IA64_LOG_NEXT_BUFFER(sal_info_type), 0,
+	       sizeof(ia64_err_rec_t) * IA64_MAX_LOGS);
 }
 
 /*
  * ia64_log_get
+ *
  *	Get the current MCA log from SAL and copy it into the OS log buffer.
- * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
- *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- * Outputs	:	None
+ *
+ *  Inputs  :   info_type   (SAL_INFO_TYPE_{MCA,INIT,CMC,CPE})
+ *              prfunc      (fn ptr of log output function)
+ *  Outputs :   size        (total record length)
  *
  */
-void
-ia64_log_get(int sal_info_type, int sal_sub_info_type, prfunc_t prfunc)
+u64
+ia64_log_get(int sal_info_type, prfunc_t prfunc)
 {
-	sal_log_header_t	*log_buffer;
-	int			s,total_len=0;
+	sal_log_record_header_t     *log_buffer;
+	u64                         total_len = 0;
+	int                         s;
 
-	IA64_LOG_LOCK(sal_info_type, sal_sub_info_type);
-
+	IA64_LOG_LOCK(sal_info_type);
 
 	/* Get the process state information */
-	log_buffer = IA64_LOG_NEXT_BUFFER(sal_info_type, sal_sub_info_type);
+	log_buffer = IA64_LOG_NEXT_BUFFER(sal_info_type);
 
-	if (!(total_len=ia64_sal_get_state_info(sal_info_type,(u64 *)log_buffer)))
-		prfunc("ia64_mca_log_get : Getting processor log failed\n");
+	total_len = ia64_sal_get_state_info(sal_info_type, (u64 *)log_buffer);
 
-	IA64_MCA_DEBUG("ia64_log_get: retrieved %d bytes of error information\n",total_len);
-
-	IA64_LOG_INDEX_INC(sal_info_type, sal_sub_info_type);
-
-	IA64_LOG_UNLOCK(sal_info_type, sal_sub_info_type);
-
+	if (total_len) {
+		IA64_LOG_INDEX_INC(sal_info_type);
+		IA64_LOG_UNLOCK(sal_info_type);
+		IA64_MCA_DEBUG("ia64_log_get: SAL error record type %d retrieved. "
+			       "Record length = %ld\n", sal_info_type, total_len);
+		return total_len;
+	} else {
+		IA64_LOG_UNLOCK(sal_info_type);
+		prfunc("ia64_log_get: Failed to retrieve SAL error record type %d\n",
+		       sal_info_type);
+		return 0;
+	}
 }
 
 /*
- * ia64_log_clear
- *	Clear the current MCA log from SAL and dpending on the clear_os_buffer flags
- *	clear the OS log buffer also
- * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
- *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
- *			clear_os_buffer
+ *  ia64_log_prt_oem_data
+ *
+ *  Print OEM specific data if included.
+ *
+ * Inputs   :   header_len  (length passed in section header)
+ *              sect_len    (default length of section type)
+ *              p_data      (ptr to data)
  *			prfunc		(print function)
  * Outputs	:	None
  *
  */
 void
-ia64_log_clear(int sal_info_type, int sal_sub_info_type, int clear_os_buffer, prfunc_t prfunc)
+ia64_log_prt_oem_data (int header_len, int sect_len, u8 *p_data, prfunc_t prfunc)
 {
-	if (ia64_sal_clear_state_info(sal_info_type))
-		prfunc("ia64_mca_log_get : Clearing processor log failed\n");
+	int oem_data_len, i;
 
-	if (clear_os_buffer) {
-		sal_log_header_t	*log_buffer;
-		int			s;
-
-		IA64_LOG_LOCK(sal_info_type, sal_sub_info_type);
-
-		/* Get the process state information */
-		log_buffer = IA64_LOG_CURR_BUFFER(sal_info_type, sal_sub_info_type);
-
-		memset(log_buffer, 0, sizeof(ia64_psilog_t));
-
-		IA64_LOG_INDEX_DEC(sal_info_type, sal_sub_info_type);
-
-		IA64_LOG_UNLOCK(sal_info_type, sal_sub_info_type);
+	if ((oem_data_len = header_len - sect_len) > 0) {
+		prfunc(" OEM Specific Data:");
+		for (i = 0; i < oem_data_len; i++, p_data++)
+			prfunc(" %02x", *p_data);
 	}
+	prfunc("\n");
+}
 
+/*
+ *  ia64_log_rec_header_print
+ *
+ *  Log info from the SAL error record header.
+ *
+ *  Inputs  :   lh *    (ptr to SAL log error record header)
+ *              prfunc  (fn ptr of log output function to use)
+ *  Outputs :   None
+ */
+void
+ia64_log_rec_header_print (sal_log_record_header_t *lh, prfunc_t prfunc)
+{
+	char str_buf[32];
+
+	sprintf(str_buf, "%2d.%02d",
+		(lh->revision.major >> 4) * 10 + (lh->revision.major & 0xf),
+		(lh->revision.minor >> 4) * 10 + (lh->revision.minor & 0xf));
+	prfunc("+Err Record ID: %d    SAL Rev: %s\n", lh->id, str_buf);
+	sprintf(str_buf, "%02d/%02d/%04d/ %02d:%02d:%02d",
+		(lh->timestamp.slh_month >> 4) * 10 +
+		(lh->timestamp.slh_month & 0xf),
+		(lh->timestamp.slh_day >> 4) * 10 +
+		(lh->timestamp.slh_day & 0xf),
+		(lh->timestamp.slh_century >> 4) * 1000 +
+		(lh->timestamp.slh_century & 0xf) * 100 +
+		(lh->timestamp.slh_year >> 4) * 10 +
+		(lh->timestamp.slh_year & 0xf),
+		(lh->timestamp.slh_hour >> 4) * 10 +
+		(lh->timestamp.slh_hour & 0xf),
+		(lh->timestamp.slh_minute >> 4) * 10 +
+		(lh->timestamp.slh_minute & 0xf),
+		(lh->timestamp.slh_second >> 4) * 10 +
+		(lh->timestamp.slh_second & 0xf));
+	prfunc("+Time: %s    Severity %d\n", str_buf, lh->severity);
 }
 
 /*
@@ -729,6 +1016,33 @@ ia64_log_processor_regs_print(u64	*regs,
 		prfunc("+ %s[%d] 0x%lx\n", reg_prefix, i, regs[i]);
 }
 
+/*
+ * ia64_log_processor_fp_regs_print
+ *  Print the contents of the saved floating page register(s) in the format
+ *      <reg_prefix>[<index>] <value>
+ *
+ * Inputs:  ia64_fpreg  (Register save buffer)
+ *          reg_num     (# of registers)
+ *          reg_class   (application/banked/control/bank1_general)
+ *          reg_prefix  (ar/br/cr/b1_gr)
+ * Outputs: None
+ *
+ */
+void
+ia64_log_processor_fp_regs_print (struct ia64_fpreg *regs,
+                                  int               reg_num,
+                                  char              *reg_class,
+                                  char              *reg_prefix,
+                                  prfunc_t          prfunc)
+{
+	int i;
+
+	prfunc("+%s Registers\n", reg_class);
+	for (i = 0; i < reg_num; i++)
+		prfunc("+ %s[%d] 0x%lx%016lx\n", reg_prefix, i, regs[i].u.bits[1],
+		       regs[i].u.bits[0]);
+}
+
 static char *pal_mesi_state[] = {
 	"Invalid",
 	"Shared",
@@ -754,69 +1068,91 @@ static char *pal_cache_op[] = {
 /*
  * ia64_log_cache_check_info_print
  *	Display the machine check information related to cache error(s).
- * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later
+ * Inputs:  i           (Multiple errors are logged, i - index of logged error)
+ *          cc_info *   (Ptr to cache check info logged by the PAL and later
  *					 captured by the SAL)
- *			target_addr	(Address which caused the cache error)
- * Outputs	:	None
+ *          prfunc      (fn ptr of print function to be used for output)
+ * Outputs: None
  */
 void
-ia64_log_cache_check_info_print(int			i,
-				pal_cache_check_info_t	info,
-				u64			target_addr,
-				prfunc_t		prfunc)
+ia64_log_cache_check_info_print (int                      i,
+                                 sal_log_mod_error_info_t *cache_check_info,
+				 prfunc_t		prfunc)
 {
+	pal_cache_check_info_t  *info;
+	u64                     target_addr;
+
+	if (!cache_check_info->valid.check_info) {
+		IA64_MCA_DEBUG("ia64_mca_log_print: invalid cache_check_info[%d]\n",i);
+		return;                 /* If check info data not valid, skip it */
+	}
+
+	info        = (pal_cache_check_info_t *)&cache_check_info->check_info;
+	target_addr = cache_check_info->target_identifier;
+
 	prfunc("+ Cache check info[%d]\n+", i);
-	prfunc("  Level: L%d",info.level);
-	if (info.mv)
-		prfunc(" ,Mesi: %s",pal_mesi_state[info.mesi]);
-	prfunc(" ,Index: %d,", info.index);
-	if (info.ic)
-		prfunc(" ,Cache: Instruction");
-	if (info.dc)
-		prfunc(" ,Cache: Data");
-	if (info.tl)
-		prfunc(" ,Line: Tag");
-	if (info.dl)
-		prfunc(" ,Line: Data");
-	prfunc(" ,Operation: %s,", pal_cache_op[info.op]);
-	if (info.wv)
-		prfunc(" ,Way: %d,", info.way);
-	if (info.tv)
-		prfunc(" ,Target Addr: 0x%lx", target_addr);
-	if (info.mc)
-		prfunc(" ,MC: Corrected");
+	prfunc("  Level: L%d,",info->level);
+	if (info->mv)
+		prfunc(" Mesi: %s,",pal_mesi_state[info->mesi]);
+	prfunc(" Index: %d,", info->index);
+	if (info->ic)
+		prfunc(" Cache: Instruction,");
+	if (info->dc)
+		prfunc(" Cache: Data,");
+	if (info->tl)
+		prfunc(" Line: Tag,");
+	if (info->dl)
+		prfunc(" Line: Data,");
+	prfunc(" Operation: %s,", pal_cache_op[info->op]);
+	if (info->wv)
+		prfunc(" Way: %d,", info->way);
+	if (cache_check_info->valid.target_identifier)
+		/* Hope target address is saved in target_identifier */
+		if (info->tv)
+			prfunc(" Target Addr: 0x%lx,", target_addr);
+	if (info->mc)
+		prfunc(" MC: Corrected");
 	prfunc("\n");
 }
 
 /*
  * ia64_log_tlb_check_info_print
  *	Display the machine check information related to tlb error(s).
- * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later
+ * Inputs:  i           (Multiple errors are logged, i - index of logged error)
+ *          tlb_info *  (Ptr to machine check info logged by the PAL and later
  *					 captured by the SAL)
- * Outputs	:	None
+ *          prfunc      (fn ptr of print function to be used for output)
+ * Outputs: None
  */
-
 void
-ia64_log_tlb_check_info_print(int			i,
-			      pal_tlb_check_info_t	info,
-			      prfunc_t			prfunc)
+ia64_log_tlb_check_info_print (int                      i,
+                               sal_log_mod_error_info_t *tlb_check_info,
+                               prfunc_t                 prfunc)
+
 {
+	pal_tlb_check_info_t    *info;
+
+	if (!tlb_check_info->valid.check_info) {
+		IA64_MCA_DEBUG("ia64_mca_log_print: invalid tlb_check_info[%d]\n", i);
+		return;                 /* If check info data not valid, skip it */
+	}
+
+	info = (pal_tlb_check_info_t *)&tlb_check_info->check_info;
+
 	prfunc("+ TLB Check Info [%d]\n+", i);
-	if (info.itc)
+	if (info->itc)
 		prfunc("  Failure: Instruction Translation Cache");
-	if (info.dtc)
+	if (info->dtc)
 		prfunc("  Failure: Data Translation Cache");
-	if (info.itr) {
+	if (info->itr) {
 		prfunc("  Failure: Instruction Translation Register");
-		prfunc(" ,Slot: %d", info.tr_slot);
+		prfunc(" ,Slot: %d", info->tr_slot);
 	}
-	if (info.dtr) {
+	if (info->dtr) {
 		prfunc("  Failure: Data Translation Register");
-		prfunc(" ,Slot: %d", info.tr_slot);
+		prfunc(" ,Slot: %d", info->tr_slot);
 	}
-	if (info.mc)
+	if (info->mc)
 		prfunc(" ,MC: Corrected");
 	prfunc("\n");
 }
@@ -824,159 +1160,721 @@ ia64_log_tlb_check_info_print(int			i,
 /*
  * ia64_log_bus_check_info_print
  *	Display the machine check information related to bus error(s).
- * Inputs	:	i		(Multiple errors are logged, i - index of logged error)
- *			info		(Machine check info logged by the PAL and later
+ * Inputs:  i           (Multiple errors are logged, i - index of logged error)
+ *          bus_info *  (Ptr to machine check info logged by the PAL and later
  *					 captured by the SAL)
- *			req_addr	(Address of the requestor of the transaction)
- *			resp_addr	(Address of the responder of the transaction)
- *			target_addr	(Address where the data was to be delivered to  or
- *					 obtained from)
- * Outputs	:	None
+ *          prfunc      (fn ptr of print function to be used for output)
+ * Outputs: None
  */
 void
-ia64_log_bus_check_info_print(int			i,
-			      pal_bus_check_info_t	info,
-			      u64			req_addr,
-			      u64			resp_addr,
-			      u64			targ_addr,
-			      prfunc_t			prfunc)
+ia64_log_bus_check_info_print (int                      i,
+                               sal_log_mod_error_info_t *bus_check_info,
+                               prfunc_t                 prfunc)
 {
+	pal_bus_check_info_t *info;
+	u64         req_addr;   /* Address of the requestor of the transaction */
+	u64         resp_addr;  /* Address of the responder of the transaction */
+	u64         targ_addr;  /* Address where the data was to be delivered to */
+	/* or obtained from */
+
+	if (!bus_check_info->valid.check_info) {
+		IA64_MCA_DEBUG("ia64_mca_log_print: invalid bus_check_info[%d]\n", i);
+		return;                 /* If check info data not valid, skip it */
+	}
+
+	info      = (pal_bus_check_info_t *)&bus_check_info->check_info;
+	req_addr  = bus_check_info->requestor_identifier;
+	resp_addr = bus_check_info->responder_identifier;
+	targ_addr = bus_check_info->target_identifier;
+
 	prfunc("+ BUS Check Info [%d]\n+", i);
-	prfunc(" Status Info: %d", info.bsi);
-	prfunc(" ,Severity: %d", info.sev);
-	prfunc(" ,Transaction Type: %d", info.type);
-	prfunc(" ,Transaction Size: %d", info.size);
-	if (info.cc)
+	prfunc(" Status Info: %d", info->bsi);
+	prfunc(" ,Severity: %d", info->sev);
+	prfunc(" ,Transaction Type: %d", info->type);
+	prfunc(" ,Transaction Size: %d", info->size);
+	if (info->cc)
 		prfunc(" ,Cache-cache-transfer");
-	if (info.ib)
+	if (info->ib)
 		prfunc(" ,Error: Internal");
-	if (info.eb)
+	if (info->eb)
 		prfunc(" ,Error: External");
-	if (info.mc)
+	if (info->mc)
 		prfunc(" ,MC: Corrected");
-	if (info.tv)
+	if (info->tv)
 		prfunc(" ,Target Address: 0x%lx", targ_addr);
-	if (info.rq)
+	if (info->rq)
 		prfunc(" ,Requestor Address: 0x%lx", req_addr);
-	if (info.tv)
+	if (info->tv)
 		prfunc(" ,Responder Address: 0x%lx", resp_addr);
 	prfunc("\n");
 }
 
 /*
- * ia64_log_processor_info_print
- *	Display the processor-specific information logged by PAL as a part
- *	of MCA or INIT or CMC.
- * Inputs	:	lh	(Pointer of the sal log header which specifies the format
- *				 of SAL state info as specified by the SAL spec).
- * Outputs	:	None
+ *  ia64_log_mem_dev_err_info_print
+ *
+ *  Format and log the platform memory device error record section data.
+ *
+ *  Inputs:  mem_dev_err_info * (Ptr to memory device error record section
+ *                               returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
  */
 void
-ia64_log_processor_info_print(sal_log_header_t *lh, prfunc_t prfunc)
+ia64_log_mem_dev_err_info_print (sal_log_mem_dev_err_info_t *mdei,
+                                 prfunc_t                   prfunc)
 {
-	sal_log_processor_info_t	*slpi;
-	int				i;
+	prfunc("+ Mem Error Detail: ");
 
-	if (!lh)
-		return;
+	if (mdei->valid.error_status)
+		prfunc(" Error Status: %#lx,", mdei->error_status);
+	if (mdei->valid.physical_addr)
+		prfunc(" Physical Address: %#lx,", mdei->physical_addr);
+	if (mdei->valid.addr_mask)
+		prfunc(" Address Mask: %#lx,", mdei->addr_mask);
+	if (mdei->valid.node)
+		prfunc(" Node: %d,", mdei->node);
+	if (mdei->valid.card)
+		prfunc(" Card: %d,", mdei->card);
+	if (mdei->valid.module)
+		prfunc(" Module: %d,", mdei->module);
+	if (mdei->valid.bank)
+		prfunc(" Bank: %d,", mdei->bank);
+	if (mdei->valid.device)
+		prfunc(" Device: %d,", mdei->device);
+	if (mdei->valid.row)
+		prfunc(" Row: %d,", mdei->row);
+	if (mdei->valid.column)
+		prfunc(" Column: %d,", mdei->column);
+	if (mdei->valid.bit_position)
+		prfunc(" Bit Position: %d,", mdei->bit_position);
+	if (mdei->valid.target_id)
+		prfunc(" ,Target Address: %#lx,", mdei->target_id);
+	if (mdei->valid.requestor_id)
+		prfunc(" ,Requestor Address: %#lx,", mdei->requestor_id);
+	if (mdei->valid.responder_id)
+		prfunc(" ,Responder Address: %#lx,", mdei->responder_id);
+	if (mdei->valid.bus_spec_data)
+		prfunc(" Bus Specific Data: %#lx,", mdei->bus_spec_data);
+	prfunc("\n");
 
-	if (lh->slh_log_type != SAL_SUB_INFO_TYPE_PROCESSOR)
-		return;
+	if (mdei->valid.oem_id) {
+		u8  *p_data = &(mdei->oem_id[0]);
+		int i;
 
-	slpi = (sal_log_processor_info_t *)((char *)lh+sizeof(sal_log_header_t));  /* point to proc info */
-
-	if (!slpi) {
-		prfunc("No Processor Error Log found\n");
-		return;
+		prfunc(" OEM Memory Controller ID:");
+		for (i = 0; i < 16; i++, p_data++)
+			prfunc(" %02x", *p_data);
+		prfunc("\n");
 	}
 
-	/* Print branch register contents if valid */
-	if (slpi->slpi_valid.slpi_br)
-		ia64_log_processor_regs_print(slpi->slpi_br, 8, "Branch", "br", prfunc);
+	if (mdei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)mdei->header.len,
+				      (int)sizeof(sal_log_mem_dev_err_info_t) - 1,
+				      &(mdei->oem_data[0]), prfunc);
+	}
+}
 
-	/* Print control register contents if valid */
-	if (slpi->slpi_valid.slpi_cr)
-		ia64_log_processor_regs_print(slpi->slpi_cr, 128, "Control", "cr", prfunc);
+/*
+ *  ia64_log_sel_dev_err_info_print
+ *
+ *  Format and log the platform SEL device error record section data.
+ *
+ *  Inputs:  sel_dev_err_info * (Ptr to the SEL device error record section
+ *                               returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_sel_dev_err_info_print (sal_log_sel_dev_err_info_t *sdei,
+                                 prfunc_t                   prfunc)
+{
+	int     i;
 
-	/* Print application register contents if valid */
-	if (slpi->slpi_valid.slpi_ar)
-		ia64_log_processor_regs_print(slpi->slpi_br, 128, "Application", "ar", prfunc);
+	prfunc("+ SEL Device Error Detail: ");
 
-	/* Print region register contents if valid */
-	if (slpi->slpi_valid.slpi_rr)
-		ia64_log_processor_regs_print(slpi->slpi_rr, 8, "Region", "rr", prfunc);
-
-	/* Print floating-point register contents if valid */
-	if (slpi->slpi_valid.slpi_fr)
-		ia64_log_processor_regs_print(slpi->slpi_fr, 128, "Floating-point", "fr",
-					      prfunc);
-
-	/* Print the cache check information if any*/
-	for (i = 0 ; i < MAX_CACHE_ERRORS; i++)
-		ia64_log_cache_check_info_print(i,
-					slpi->slpi_cache_check_info[i].slpi_cache_check,
-					slpi->slpi_cache_check_info[i].slpi_target_address,
-						prfunc);
-	/* Print the tlb check information if any*/
-	for (i = 0 ; i < MAX_TLB_ERRORS; i++)
-		ia64_log_tlb_check_info_print(i,slpi->slpi_tlb_check_info[i], prfunc);
-
-	/* Print the bus check information if any*/
-	for (i = 0 ; i < MAX_BUS_ERRORS; i++)
-		ia64_log_bus_check_info_print(i,
-					slpi->slpi_bus_check_info[i].slpi_bus_check,
-					slpi->slpi_bus_check_info[i].slpi_requestor_addr,
-					slpi->slpi_bus_check_info[i].slpi_responder_addr,
-					slpi->slpi_bus_check_info[i].slpi_target_addr,
-					      prfunc);
+	if (sdei->valid.record_id)
+		prfunc(" Record ID: %#x", sdei->record_id);
+	if (sdei->valid.record_type)
+		prfunc(" Record Type: %#x", sdei->record_type);
+	prfunc(" Time Stamp: ");
+	for (i = 0; i < 4; i++)
+		prfunc("%1d", sdei->timestamp[i]);
+	if (sdei->valid.generator_id)
+		prfunc(" Generator ID: %#x", sdei->generator_id);
+	if (sdei->valid.evm_rev)
+		prfunc(" Message Format Version: %#x", sdei->evm_rev);
+	if (sdei->valid.sensor_type)
+		prfunc(" Sensor Type: %#x", sdei->sensor_type);
+	if (sdei->valid.sensor_num)
+		prfunc(" Sensor Number: %#x", sdei->sensor_num);
+	if (sdei->valid.event_dir)
+		prfunc(" Event Direction Type: %#x", sdei->event_dir);
+	if (sdei->valid.event_data1)
+		prfunc(" Data1: %#x", sdei->event_data1);
+	if (sdei->valid.event_data2)
+		prfunc(" Data2: %#x", sdei->event_data2);
+	if (sdei->valid.event_data3)
+		prfunc(" Data3: %#x", sdei->event_data3);
+	prfunc("\n");
 
 }
 
 /*
- * ia64_log_print
- *	Display the contents of the OS error log information
- * Inputs	:	info_type	(SAL_INFO_TYPE_{MCA,INIT,CMC})
- *			sub_info_type	(SAL_SUB_INFO_TYPE_{PROCESSOR,PLATFORM})
+ *  ia64_log_pci_bus_err_info_print
+ *
+ *  Format and log the platform PCI bus error record section data.
+ *
+ *  Inputs:  pci_bus_err_info * (Ptr to the PCI bus error record section
+ *                               returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_pci_bus_err_info_print (sal_log_pci_bus_err_info_t *pbei,
+                                 prfunc_t                   prfunc)
+{
+	prfunc("+ PCI Bus Error Detail: ");
+
+	if (pbei->valid.err_status)
+		prfunc(" Error Status: %#lx", pbei->err_status);
+	if (pbei->valid.err_type)
+		prfunc(" Error Type: %#x", pbei->err_type);
+	if (pbei->valid.bus_id)
+		prfunc(" Bus ID: %#x", pbei->bus_id);
+	if (pbei->valid.bus_address)
+		prfunc(" Bus Address: %#lx", pbei->bus_address);
+	if (pbei->valid.bus_data)
+		prfunc(" Bus Data: %#lx", pbei->bus_data);
+	if (pbei->valid.bus_cmd)
+		prfunc(" Bus Command: %#lx", pbei->bus_cmd);
+	if (pbei->valid.requestor_id)
+		prfunc(" Requestor ID: %#lx", pbei->requestor_id);
+	if (pbei->valid.responder_id)
+		prfunc(" Responder ID: %#lx", pbei->responder_id);
+	if (pbei->valid.target_id)
+		prfunc(" Target ID: %#lx", pbei->target_id);
+	if (pbei->valid.oem_data)
+		prfunc("\n");
+
+	if (pbei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)pbei->header.len,
+				      (int)sizeof(sal_log_pci_bus_err_info_t) - 1,
+				      &(pbei->oem_data[0]), prfunc);
+	}
+}
+
+/*
+ *  ia64_log_smbios_dev_err_info_print
+ *
+ *  Format and log the platform SMBIOS device error record section data.
+ *
+ *  Inputs:  smbios_dev_err_info * (Ptr to the SMBIOS device error record
+ *                                  section returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_smbios_dev_err_info_print (sal_log_smbios_dev_err_info_t *sdei,
+                                    prfunc_t                      prfunc)
+{
+	u8      i;
+
+	prfunc("+ SMBIOS Device Error Detail: ");
+
+	if (sdei->valid.event_type)
+		prfunc(" Event Type: %#x", sdei->event_type);
+	if (sdei->valid.time_stamp) {
+		prfunc(" Time Stamp: ");
+		for (i = 0; i < 6; i++)
+			prfunc("%d", sdei->time_stamp[i]);
+	}
+	if ((sdei->valid.data) && (sdei->valid.length)) {
+		prfunc(" Data: ");
+		for (i = 0; i < sdei->length; i++)
+			prfunc(" %02x", sdei->data[i]);
+	}
+	prfunc("\n");
+}
+
+/*
+ *  ia64_log_pci_comp_err_info_print
+ *
+ *  Format and log the platform PCI component error record section data.
+ *
+ *  Inputs:  pci_comp_err_info * (Ptr to the PCI component error record section
+ *                                returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_pci_comp_err_info_print(sal_log_pci_comp_err_info_t *pcei,
+				 prfunc_t                     prfunc)
+{
+	u32     n_mem_regs, n_io_regs;
+	u64     i, n_pci_data;
+	u64     *p_reg_data;
+	u8      *p_oem_data;
+
+	prfunc("+ PCI Component Error Detail: ");
+
+	if (pcei->valid.err_status)
+		prfunc(" Error Status: %#lx\n", pcei->err_status);
+	if (pcei->valid.comp_info)
+		prfunc(" Component Info: Vendor Id = %#x, Device Id = %#x,"
+		       " Class Code = %#x, Seg/Bus/Dev/Func = %d/%d/%d/%d\n",
+		       pcei->comp_info.vendor_id, pcei->comp_info.device_id,
+		       pcei->comp_info.class_code, pcei->comp_info.seg_num,
+		       pcei->comp_info.bus_num, pcei->comp_info.dev_num,
+		       pcei->comp_info.func_num);
+
+	n_mem_regs = (pcei->valid.num_mem_regs) ? pcei->num_mem_regs : 0;
+	n_io_regs =  (pcei->valid.num_io_regs)  ? pcei->num_io_regs  : 0;
+	p_reg_data = &(pcei->reg_data_pairs[0]);
+	p_oem_data = (u8 *)p_reg_data +
+		(n_mem_regs + n_io_regs) * 2 * sizeof(u64);
+	n_pci_data = p_oem_data - (u8 *)pcei;
+
+	if (n_pci_data > pcei->header.len) {
+		prfunc(" Invalid PCI Component Error Record format: length = %ld, "
+		       " Size PCI Data = %d, Num Mem-Map/IO-Map Regs = %ld/%ld\n",
+		       pcei->header.len, n_pci_data, n_mem_regs, n_io_regs);
+		return;
+	}
+
+	if (n_mem_regs) {
+		prfunc(" Memory Mapped Registers\n Address \tValue\n");
+		for (i = 0; i < pcei->num_mem_regs; i++) {
+			prfunc(" %#lx %#lx\n", p_reg_data[0], p_reg_data[1]);
+			p_reg_data += 2;
+		}
+	}
+	if (n_io_regs) {
+		prfunc(" I/O Mapped Registers\n Address \tValue\n");
+		for (i = 0; i < pcei->num_io_regs; i++) {
+			prfunc(" %#lx %#lx\n", p_reg_data[0], p_reg_data[1]);
+			p_reg_data += 2;
+		}
+	}
+	if (pcei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)pcei->header.len, n_pci_data,
+				      p_oem_data, prfunc);
+		prfunc("\n");
+	}
+}
+
+/*
+ *  ia64_log_plat_specific_err_info_print
+ *
+ *  Format and log the platform specifie error record section data.
+ *
+ *  Inputs:  sel_dev_err_info * (Ptr to the platform specific error record
+ *                               section returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_plat_specific_err_info_print (sal_log_plat_specific_err_info_t *psei,
+                                       prfunc_t                         prfunc)
+{
+	prfunc("+ Platform Specific Error Detail: ");
+
+	if (psei->valid.err_status)
+		prfunc(" Error Status: %#lx", psei->err_status);
+	if (psei->valid.guid) {
+		prfunc(" GUID: ");
+		ia64_log_prt_guid(&psei->guid, prfunc);
+	}
+	if (psei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)psei->header.len,
+				      (int)sizeof(sal_log_plat_specific_err_info_t) - 1,
+				      &(psei->oem_data[0]), prfunc);
+	}
+	prfunc("\n");
+}
+
+/*
+ *  ia64_log_host_ctlr_err_info_print
+ *
+ *  Format and log the platform host controller error record section data.
+ *
+ *  Inputs:  host_ctlr_err_info * (Ptr to the host controller error record
+ *                                 section returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_host_ctlr_err_info_print (sal_log_host_ctlr_err_info_t *hcei,
+                                   prfunc_t                     prfunc)
+{
+	prfunc("+ Host Controller Error Detail: ");
+
+	if (hcei->valid.err_status)
+		prfunc(" Error Status: %#lx", hcei->err_status);
+	if (hcei->valid.requestor_id)
+		prfunc(" Requestor ID: %#lx", hcei->requestor_id);
+	if (hcei->valid.responder_id)
+		prfunc(" Responder ID: %#lx", hcei->responder_id);
+	if (hcei->valid.target_id)
+		prfunc(" Target ID: %#lx", hcei->target_id);
+	if (hcei->valid.bus_spec_data)
+		prfunc(" Bus Specific Data: %#lx", hcei->bus_spec_data);
+	if (hcei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)hcei->header.len,
+				      (int)sizeof(sal_log_host_ctlr_err_info_t) - 1,
+				      &(hcei->oem_data[0]), prfunc);
+	}
+	prfunc("\n");
+}
+
+/*
+ *  ia64_log_plat_bus_err_info_print
+ *
+ *  Format and log the platform bus error record section data.
+ *
+ *  Inputs:  plat_bus_err_info * (Ptr to the platform bus error record section
+ *                                returned by SAL)
+ *           prfunc             (fn ptr of print function to be used for output)
+ *  Outputs: None
+ */
+void
+ia64_log_plat_bus_err_info_print (sal_log_plat_bus_err_info_t *pbei,
+                                  prfunc_t                    prfunc)
+{
+	prfunc("+ Platform Bus Error Detail: ");
+
+	if (pbei->valid.err_status)
+		prfunc(" Error Status: %#lx", pbei->err_status);
+	if (pbei->valid.requestor_id)
+		prfunc(" Requestor ID: %#lx", pbei->requestor_id);
+	if (pbei->valid.responder_id)
+		prfunc(" Responder ID: %#lx", pbei->responder_id);
+	if (pbei->valid.target_id)
+		prfunc(" Target ID: %#lx", pbei->target_id);
+	if (pbei->valid.bus_spec_data)
+		prfunc(" Bus Specific Data: %#lx", pbei->bus_spec_data);
+	if (pbei->valid.oem_data) {
+		ia64_log_prt_oem_data((int)pbei->header.len,
+				      (int)sizeof(sal_log_plat_bus_err_info_t) - 1,
+				      &(pbei->oem_data[0]), prfunc);
+	}
+	prfunc("\n");
+}
+
+/*
+ *  ia64_log_proc_dev_err_info_print
+ *
+ *  Display the processor device error record.
+ *
+ *  Inputs:  sal_log_processor_info_t * (Ptr to processor device error record
+ *                                       section body).
+ *           prfunc                     (fn ptr of print function to be used
+ *                                       for output).
+ *  Outputs: None
+ */
+void
+ia64_log_proc_dev_err_info_print (sal_log_processor_info_t  *slpi,
+                                  prfunc_t                  prfunc)
+{
+#ifdef MCA_PRT_XTRA_DATA
+	size_t  d_len = slpi->header.len - sizeof(sal_log_section_hdr_t);
+#endif
+	sal_processor_static_info_t *spsi;
+	int                         i;
+	sal_log_mod_error_info_t    *p_data;
+
+	prfunc("+Processor Device Error Info Section\n");
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+	{
+		char    *p_data = (char *)&slpi->valid;
+
+		prfunc("SAL_PROC_DEV_ERR SECTION DATA:  Data buffer = %p, "
+		       "Data size = %ld\n", (void *)p_data, d_len);
+		ia64_log_hexdump(p_data, d_len, prfunc);
+		prfunc("End of SAL_PROC_DEV_ERR SECTION DATA\n");
+	}
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
+
+	if (slpi->valid.proc_error_map)
+		prfunc(" Processor Error Map: %#lx\n", slpi->proc_error_map);
+
+	if (slpi->valid.proc_state_param)
+		prfunc(" Processor State Param: %#lx\n", slpi->proc_state_parameter);
+
+	if (slpi->valid.proc_cr_lid)
+		prfunc(" Processor LID: %#lx\n", slpi->proc_cr_lid);
+
+	/*
+	 *  Note: March 2001 SAL spec states that if the number of elements in any
+	 *  of  the MOD_ERROR_INFO_STRUCT arrays is zero, the entire array is
+	 *  absent. Also, current implementations only allocate space for number of
+	 *  elements used.  So we walk the data pointer from here on.
+	 */
+	p_data = &slpi->cache_check_info[0];
+
+	/* Print the cache check information if any*/
+	for (i = 0 ; i < slpi->valid.num_cache_check; i++, p_data++)
+		ia64_log_cache_check_info_print(i, p_data, prfunc);
+
+	/* Print the tlb check information if any*/
+	for (i = 0 ; i < slpi->valid.num_tlb_check; i++, p_data++)
+		ia64_log_tlb_check_info_print(i, p_data, prfunc);
+
+	/* Print the bus check information if any*/
+	for (i = 0 ; i < slpi->valid.num_bus_check; i++, p_data++)
+		ia64_log_bus_check_info_print(i, p_data, prfunc);
+
+	/* Print the reg file check information if any*/
+	for (i = 0 ; i < slpi->valid.num_reg_file_check; i++, p_data++)
+		ia64_log_hexdump((u8 *)p_data, sizeof(sal_log_mod_error_info_t),
+				 prfunc);    /* Just hex dump for now */
+
+	/* Print the ms check information if any*/
+	for (i = 0 ; i < slpi->valid.num_ms_check; i++, p_data++)
+		ia64_log_hexdump((u8 *)p_data, sizeof(sal_log_mod_error_info_t),
+				 prfunc);    /* Just hex dump for now */
+
+	/* Print CPUID registers if any*/
+	if (slpi->valid.cpuid_info) {
+		u64     *p = (u64 *)p_data;
+
+		prfunc(" CPUID Regs: %#lx %#lx %#lx %#lx\n", p[0], p[1], p[2], p[3]);
+		p_data++;
+	}
+
+	/* Print processor static info if any */
+	if (slpi->valid.psi_static_struct) {
+		spsi = (sal_processor_static_info_t *)p_data;
+
+		/* Print branch register contents if valid */
+		if (spsi->valid.br)
+			ia64_log_processor_regs_print(spsi->br, 8, "Branch", "br",
+						      prfunc);
+
+		/* Print control register contents if valid */
+		if (spsi->valid.cr)
+			ia64_log_processor_regs_print(spsi->cr, 128, "Control", "cr",
+						      prfunc);
+
+		/* Print application register contents if valid */
+		if (spsi->valid.ar)
+			ia64_log_processor_regs_print(spsi->ar, 128, "Application",
+						      "ar", prfunc);
+
+		/* Print region register contents if valid */
+		if (spsi->valid.rr)
+			ia64_log_processor_regs_print(spsi->rr, 8, "Region", "rr",
+						      prfunc);
+
+		/* Print floating-point register contents if valid */
+		if (spsi->valid.fr)
+			ia64_log_processor_fp_regs_print(spsi->fr, 128, "Floating-point", "fr",
+							 prfunc);
+	}
+}
+
+/*
+ * ia64_log_processor_info_print
+ *
+ *	Display the processor-specific information logged by PAL as a part
+ *	of MCA or INIT or CMC.
+ *
+ *  Inputs   :  lh      (Pointer of the sal log header which specifies the
+ *                       format of SAL state info as specified by the SAL spec).
+ *              prfunc  (fn ptr of print function to be used for output).
  * Outputs	:	None
  */
 void
-ia64_log_print(int sal_info_type, int sal_sub_info_type, prfunc_t prfunc)
+ia64_log_processor_info_print(sal_log_record_header_t *lh, prfunc_t prfunc)
 {
-	char	*info_type, *sub_info_type;
+	sal_log_section_hdr_t       *slsh;
+	int                         n_sects;
+	int                         ercd_pos;
 
+	if (!lh)
+		return;
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+	ia64_log_prt_record_header(lh, prfunc);
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
+
+	if ((ercd_pos = sizeof(sal_log_record_header_t)) >= lh->len) {
+		IA64_MCA_DEBUG("ia64_mca_log_print: "
+			       "truncated SAL CMC error record. len = %d\n",
+			       lh->len);
+		return;
+	}
+
+	/* Print record header info */
+	ia64_log_rec_header_print(lh, prfunc);
+
+	for (n_sects = 0; (ercd_pos < lh->len); n_sects++, ercd_pos += slsh->len) {
+		/* point to next section header */
+		slsh = (sal_log_section_hdr_t *)((char *)lh + ercd_pos);
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+		ia64_log_prt_section_header(slsh, prfunc);
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
+
+		if (verify_guid((void *)&slsh->guid, (void *)&(SAL_PROC_DEV_ERR_SECT_GUID))) {
+			IA64_MCA_DEBUG("ia64_mca_log_print: unsupported record section\n");
+			continue;
+		}
+
+		/*
+		 *  Now process processor device error record section
+		 */
+		ia64_log_proc_dev_err_info_print((sal_log_processor_info_t *)slsh,
+						 printk);
+	}
+
+	IA64_MCA_DEBUG("ia64_mca_log_print: "
+		       "found %d sections in SAL CMC error record. len = %d\n",
+		       n_sects, lh->len);
+	if (!n_sects) {
+		prfunc("No Processor Device Error Info Section found\n");
+		return;
+	}
+}
+
+/*
+ *  ia64_log_platform_info_print
+ *
+ *  Format and Log the SAL Platform Error Record.
+ *
+ *  Inputs  :   lh      (Pointer to the sal error record header with format
+ *                       specified by the SAL spec).
+ *              prfunc  (fn ptr of log output function to use)
+ *  Outputs :   None
+ */
+void
+ia64_log_platform_info_print (sal_log_record_header_t *lh, prfunc_t prfunc)
+{
+	sal_log_section_hdr_t       *slsh;
+	int                         n_sects;
+	int                         ercd_pos;
+
+	if (!lh)
+		return;
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+	ia64_log_prt_record_header(lh, prfunc);
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
+
+	if ((ercd_pos = sizeof(sal_log_record_header_t)) >= lh->len) {
+		IA64_MCA_DEBUG("ia64_mca_log_print: "
+			       "truncated SAL error record. len = %d\n",
+			       lh->len);
+		return;
+	}
+
+	/* Print record header info */
+	ia64_log_rec_header_print(lh, prfunc);
+
+	for (n_sects = 0; (ercd_pos < lh->len); n_sects++, ercd_pos += slsh->len) {
+		/* point to next section header */
+		slsh = (sal_log_section_hdr_t *)((char *)lh + ercd_pos);
+
+#ifdef MCA_PRT_XTRA_DATA    // for test only @FVL
+		ia64_log_prt_section_header(slsh, prfunc);
+
+		if (efi_guidcmp(slsh->guid, SAL_PROC_DEV_ERR_SECT_GUID) != 0) {
+			size_t  d_len = slsh->len - sizeof(sal_log_section_hdr_t);
+			char    *p_data = (char *)&((sal_log_mem_dev_err_info_t *)slsh)->valid;
+
+			prfunc("Start of Platform Err Data Section:  Data buffer = %p, "
+			       "Data size = %ld\n", (void *)p_data, d_len);
+			ia64_log_hexdump(p_data, d_len, prfunc);
+			prfunc("End of Platform Err Data Section\n");
+		}
+#endif  // MCA_PRT_XTRA_DATA for test only @FVL
+
+		/*
+		 *  Now process CPE error record section
+		 */
+		if (efi_guidcmp(slsh->guid, SAL_PROC_DEV_ERR_SECT_GUID) == 0) {
+			ia64_log_proc_dev_err_info_print((sal_log_processor_info_t *)slsh,
+							 prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_MEM_DEV_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform Memory Device Error Info Section\n");
+			ia64_log_mem_dev_err_info_print((sal_log_mem_dev_err_info_t *)slsh,
+							prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_SEL_DEV_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform SEL Device Error Info Section\n");
+			ia64_log_sel_dev_err_info_print((sal_log_sel_dev_err_info_t *)slsh,
+							prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_PCI_BUS_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform PCI Bus Error Info Section\n");
+			ia64_log_pci_bus_err_info_print((sal_log_pci_bus_err_info_t *)slsh,
+							prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_SMBIOS_DEV_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform SMBIOS Device Error Info Section\n");
+			ia64_log_smbios_dev_err_info_print((sal_log_smbios_dev_err_info_t *)slsh,
+							   prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_PCI_COMP_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform PCI Component Error Info Section\n");
+			ia64_log_pci_comp_err_info_print((sal_log_pci_comp_err_info_t *)slsh,
+							 prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform Specific Error Info Section\n");
+			ia64_log_plat_specific_err_info_print((sal_log_plat_specific_err_info_t *)
+							      slsh,
+							      prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_HOST_CTLR_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform Host Controller Error Info Section\n");
+			ia64_log_host_ctlr_err_info_print((sal_log_host_ctlr_err_info_t *)slsh,
+							  prfunc);
+		} else if (efi_guidcmp(slsh->guid, SAL_PLAT_BUS_ERR_SECT_GUID) == 0) {
+			prfunc("+Platform Bus Error Info Section\n");
+			ia64_log_plat_bus_err_info_print((sal_log_plat_bus_err_info_t *)slsh,
+							 prfunc);
+		} else {
+			IA64_MCA_DEBUG("ia64_mca_log_print: unsupported record section\n");
+			continue;
+		}
+	}
+
+	IA64_MCA_DEBUG("ia64_mca_log_print: found %d sections in SAL error record. len = %d\n",
+		       n_sects, lh->len);
+	if (!n_sects) {
+		prfunc("No Platform Error Info Sections found\n");
+		return;
+	}
+}
+
+/*
+ * ia64_log_print
+ *
+ *  Displays the contents of the OS error log information
+ *
+ *  Inputs   :  info_type   (SAL_INFO_TYPE_{MCA,INIT,CMC,CPE})
+ *              prfunc      (fn ptr of log output function to use)
+ * Outputs	:	None
+ */
+void
+ia64_log_print(int sal_info_type, prfunc_t prfunc)
+{
 	switch(sal_info_type) {
-	case SAL_INFO_TYPE_MCA:
-		info_type = "MCA";
+	      case SAL_INFO_TYPE_MCA:
+		prfunc("+BEGIN HARDWARE ERROR STATE AT MCA\n");
+		ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
+		prfunc("+END HARDWARE ERROR STATE AT MCA\n");
 		break;
-	case SAL_INFO_TYPE_INIT:
-		info_type = "INIT";
+	      case SAL_INFO_TYPE_INIT:
+		prfunc("+MCA INIT ERROR LOG (UNIMPLEMENTED)\n");
 		break;
-	case SAL_INFO_TYPE_CMC:
-		info_type = "CMC";
+	      case SAL_INFO_TYPE_CMC:
+		prfunc("+BEGIN HARDWARE ERROR STATE AT CMC\n");
+		ia64_log_processor_info_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
+		prfunc("+END HARDWARE ERROR STATE AT CMC\n");
 		break;
-	default:
-		info_type = "UNKNOWN";
+	      case SAL_INFO_TYPE_CPE:
+		prfunc("+BEGIN HARDWARE ERROR STATE AT CPE\n");
+		ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
+		prfunc("+END HARDWARE ERROR STATE AT CPE\n");
 		break;
-	}
-
-	switch(sal_sub_info_type) {
-	case SAL_SUB_INFO_TYPE_PROCESSOR:
-		sub_info_type = "PROCESSOR";
-		break;
-	case SAL_SUB_INFO_TYPE_PLATFORM:
-		sub_info_type = "PLATFORM";
-		break;
-	default:
-		sub_info_type = "UNKNOWN";
+	      default:
+		prfunc("+MCA UNKNOWN ERROR LOG (UNIMPLEMENTED)\n");
 		break;
 	}
-
-	prfunc("+BEGIN HARDWARE ERROR STATE [%s %s]\n", info_type, sub_info_type);
-	if (sal_sub_info_type == SAL_SUB_INFO_TYPE_PROCESSOR)
-		ia64_log_processor_info_print(
-				      IA64_LOG_CURR_BUFFER(sal_info_type, sal_sub_info_type),
-				      prfunc);
-	else
-		log_print_platform(IA64_LOG_CURR_BUFFER(sal_info_type, sal_sub_info_type),prfunc);
-	prfunc("+END HARDWARE ERROR STATE [%s %s]\n", info_type, sub_info_type);
 }

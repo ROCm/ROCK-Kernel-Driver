@@ -3,10 +3,11 @@
  *
  * Copyright (C) 1999 Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 2001 Hewlett-Packard Co
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 06/16/00	A. Mallick	initialize csd/ssd/tssd/cflg for ia32_load_state
  * 04/13/01	D. Mosberger	dropped saving tssd in ar.k1---it's not needed
+ * 09/14/01	D. Mosberger	fixed memory management for gdt/tss page
  */
 #include <linux/config.h>
 
@@ -41,65 +42,59 @@
 extern void ia64_elf32_init (struct pt_regs *regs);
 extern void put_dirty_page (struct task_struct * tsk, struct page *page, unsigned long address);
 
+static void elf32_set_personality (void);
+
 #define ELF_PLAT_INIT(_r)		ia64_elf32_init(_r)
 #define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
-#define elf_map				elf_map32
+#define elf_map				elf32_map
+#define SET_PERSONALITY(ex, ibcs2)	elf32_set_personality()
 
 /* Ugly but avoids duplication */
 #include "../../../fs/binfmt_elf.c"
 
-/* Global descriptor table */
-unsigned long *ia32_gdt_table, *ia32_tss;
+extern struct page *ia32_shared_page[];
+extern unsigned long *ia32_gdt;
 
 struct page *
-put_shared_page (struct task_struct * tsk, struct page *page, unsigned long address)
+ia32_install_shared_page (struct vm_area_struct *vma, unsigned long address, int no_share)
 {
-	pgd_t * pgd;
-	pmd_t * pmd;
-	pte_t * pte;
+	struct page *pg = ia32_shared_page[(address - vma->vm_start)/PAGE_SIZE];
 
-	if (page_count(page) != 1)
-		printk("mem_map disagrees with %p at %08lx\n", (void *) page, address);
-
-	pgd = pgd_offset(tsk->mm, address);
-
-	spin_lock(&tsk->mm->page_table_lock);
-	{
-		pmd = pmd_alloc(tsk->mm, pgd, address);
-		if (!pmd)
-			goto out;
-		pte = pte_alloc(tsk->mm, pmd, address);
-		if (!pte)
-			goto out;
-		if (!pte_none(*pte))
-			goto out;
-		flush_page_to_ram(page);
-		set_pte(pte, pte_mkwrite(mk_pte(page, PAGE_SHARED)));
-	}
-	spin_unlock(&tsk->mm->page_table_lock);
-	/* no need for flush_tlb */
-	return page;
-
-  out:
-	spin_unlock(&tsk->mm->page_table_lock);
-	__free_page(page);
-	return 0;
+	get_page(pg);
+	return pg;
 }
+
+static struct vm_operations_struct ia32_shared_page_vm_ops = {
+	nopage:	ia32_install_shared_page
+};
 
 void
 ia64_elf32_init (struct pt_regs *regs)
 {
 	struct vm_area_struct *vma;
-	int nr;
 
 	/*
 	 * Map GDT and TSS below 4GB, where the processor can find them.  We need to map
 	 * it with privilege level 3 because the IVE uses non-privileged accesses to these
 	 * tables.  IA-32 segmentation is used to protect against IA-32 accesses to them.
 	 */
-	put_shared_page(current, virt_to_page(ia32_gdt_table), IA32_GDT_OFFSET);
-	if (PAGE_SHIFT <= IA32_PAGE_SHIFT)
-		put_shared_page(current, virt_to_page(ia32_tss), IA32_TSS_OFFSET);
+	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+	if (vma) {
+		vma->vm_mm = current->mm;
+		vma->vm_start = IA32_GDT_OFFSET;
+		vma->vm_end = vma->vm_start + max(PAGE_SIZE, 2*IA32_PAGE_SIZE);
+		vma->vm_page_prot = PAGE_SHARED;
+		vma->vm_flags = VM_READ|VM_MAYREAD;
+		vma->vm_ops = &ia32_shared_page_vm_ops;
+		vma->vm_pgoff = 0;
+		vma->vm_file = NULL;
+		vma->vm_private_data = NULL;
+		down_write(&current->mm->mmap_sem);
+		{
+			insert_vm_struct(current->mm, vma);
+		}
+		up_write(&current->mm->mmap_sem);
+	}
 
 	/*
 	 * Install LDT as anonymous memory.  This gives us all-zero segment descriptors
@@ -116,33 +111,12 @@ ia64_elf32_init (struct pt_regs *regs)
 		vma->vm_pgoff = 0;
 		vma->vm_file = NULL;
 		vma->vm_private_data = NULL;
-		insert_vm_struct(current->mm, vma);
+		down_write(&current->mm->mmap_sem);
+		{
+			insert_vm_struct(current->mm, vma);
+		}
+		up_write(&current->mm->mmap_sem);
 	}
-
-	nr = smp_processor_id();
-
-	current->thread.map_base  = IA32_PAGE_OFFSET/3;
-	current->thread.task_size = IA32_PAGE_OFFSET;	/* use what Linux/x86 uses... */
-	set_fs(USER_DS);				/* set addr limit for new TASK_SIZE */
-
-	/* Setup the segment selectors */
-	regs->r16 = (__USER_DS << 16) | __USER_DS; /* ES == DS, GS, FS are zero */
-	regs->r17 = (__USER_DS << 16) | __USER_CS; /* SS, CS; ia32_load_state() sets TSS and LDT */
-
-	/* Setup the segment descriptors */
-	regs->r24 = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[__USER_DS >> 3]);	/* ESD */
-	regs->r27 = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[__USER_DS >> 3]);	/* DSD */
-	regs->r28 = 0;								/* FSD (null) */
-	regs->r29 = 0;								/* GSD (null) */
-	regs->r30 = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[_LDT(nr)]);		/* LDTD */
-
-	/*
-	 * Setup GDTD.  Note: GDTD is the descrambled version of the pseudo-descriptor
-	 * format defined by Figure 3-11 "Pseudo-Descriptor Format" in the IA-32
-	 * architecture manual.
-	 */
-	regs->r31 = IA32_SEG_UNSCRAMBLE(IA32_SEG_DESCRIPTOR(IA32_GDT_OFFSET, IA32_PAGE_SIZE - 1, 0,
-							    0, 0, 0, 0, 0, 0));
 
 	ia64_psr(regs)->ac = 0;		/* turn off alignment checking */
 	regs->loadrs = 0;
@@ -164,10 +138,19 @@ ia64_elf32_init (struct pt_regs *regs)
 	current->thread.fcr = IA32_FCR_DEFAULT;
 	current->thread.fir = 0;
 	current->thread.fdr = 0;
-	current->thread.csd = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[__USER_CS >> 3]);
-	current->thread.ssd = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[__USER_DS >> 3]);
-	current->thread.tssd = IA32_SEG_UNSCRAMBLE(ia32_gdt_table[_TSS(nr)]);
 
+	/*
+	 * Setup GDTD.  Note: GDTD is the descrambled version of the pseudo-descriptor
+	 * format defined by Figure 3-11 "Pseudo-Descriptor Format" in the IA-32
+	 * architecture manual.
+	 */
+	regs->r31 = IA32_SEG_UNSCRAMBLE(IA32_SEG_DESCRIPTOR(IA32_GDT_OFFSET, IA32_PAGE_SIZE - 1, 0,
+							    0, 0, 0, 0, 0, 0));
+	/* Setup the segment selectors */
+	regs->r16 = (__USER_DS << 16) | __USER_DS; /* ES == DS, GS, FS are zero */
+	regs->r17 = (__USER_DS << 16) | __USER_CS; /* SS, CS; ia32_load_state() sets TSS and LDT */
+
+	ia32_load_segment_descriptors(current);
 	ia32_load_state(current);
 }
 
@@ -189,6 +172,7 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 	if (!mpnt)
 		return -ENOMEM;
 
+	down_write(&current->mm->mmap_sem);
 	{
 		mpnt->vm_mm = current->mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
@@ -204,54 +188,32 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		if (bprm->page[i]) {
-			put_dirty_page(current,bprm->page[i],stack_base);
+		struct page *page = bprm->page[i];
+		if (page) {
+			bprm->page[i] = NULL;
+			put_dirty_page(current, page, stack_base);
 		}
 		stack_base += PAGE_SIZE;
 	}
+	up_write(&current->mm->mmap_sem);
 
 	return 0;
 }
 
-static unsigned long
-ia32_mm_addr (unsigned long addr)
+static void
+elf32_set_personality (void)
 {
-	struct vm_area_struct *vma;
-
-	if ((vma = find_vma(current->mm, addr)) == NULL)
-		return ELF_PAGESTART(addr);
-	if (vma->vm_start > addr)
-		return ELF_PAGESTART(addr);
-	return ELF_PAGEALIGN(addr);
+	set_personality(PER_LINUX32);
+	current->thread.map_base  = IA32_PAGE_OFFSET/3;
+	current->thread.task_size = IA32_PAGE_OFFSET;	/* use what Linux/x86 uses... */
+	set_fs(USER_DS);				/* set addr limit for new TASK_SIZE */
 }
 
-/*
- *  Normally we would do an `mmap' to map in the process's text section.
- *  This doesn't work with IA32 processes as the ELF file might specify
- *  a non page size aligned address.  Instead we will just allocate
- *  memory and read the data in from the file.  Slightly less efficient
- *  but it works.
- */
-extern long ia32_do_mmap (struct file *filep, unsigned int len, unsigned int prot,
-			  unsigned int flags, unsigned int fd, unsigned int offset);
-
 static unsigned long
-elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
+elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
 {
-	unsigned long retval;
+	unsigned long pgoff = (eppnt->p_vaddr) & ~IA32_PAGE_MASK;
 
-	if (eppnt->p_memsz >= (1UL<<32) || addr > (1UL<<32) - eppnt->p_memsz)
-		return -EINVAL;
-
-	/*
-	 *  Make sure the elf interpreter doesn't get loaded at location 0
-	 *    so that NULL pointers correctly cause segfaults.
-	 */
-	if (addr == 0)
-		addr += PAGE_SIZE;
-	set_brk(ia32_mm_addr(addr), addr + eppnt->p_memsz);
-	memset((char *) addr + eppnt->p_filesz, 0, eppnt->p_memsz - eppnt->p_filesz);
-	kernel_read(filep, eppnt->p_offset, (char *) addr, eppnt->p_filesz);
-	retval = (unsigned long) addr;
-	return retval;
+	return ia32_do_mmap(filep, (addr & IA32_PAGE_MASK), eppnt->p_filesz + pgoff, prot, type,
+			    eppnt->p_offset - pgoff);
 }

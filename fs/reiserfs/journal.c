@@ -520,12 +520,14 @@ int reiserfs_in_journal(struct super_block *p_s_sb, kdev_t dev,
     return 0 ;
   }
 
+  PROC_INFO_INC( p_s_sb, journal.in_journal );
   /* If we aren't doing a search_all, this is a metablock, and it will be logged before use.
   ** if we crash before the transaction that freed it commits,  this transaction won't
   ** have committed either, and the block will never be written
   */
   if (search_all) {
     for (i = 0 ; i < JOURNAL_NUM_BITMAPS ; i++) {
+      PROC_INFO_INC( p_s_sb, journal.in_journal_bitmap );
       jb = SB_JOURNAL(p_s_sb)->j_list_bitmap + i ;
       if (jb->journal_list && jb->bitmaps[bmap_nr] &&
           test_bit(bit_nr, jb->bitmaps[bmap_nr]->data)) {
@@ -548,6 +550,7 @@ int reiserfs_in_journal(struct super_block *p_s_sb, kdev_t dev,
     return 1; 
   }
 
+  PROC_INFO_INC( p_s_sb, journal.in_journal_reusable );
   /* safe for reuse */
   return 0 ;
 }
@@ -568,7 +571,9 @@ inline void insert_journal_hash(struct reiserfs_journal_cnode **table, struct re
 
 /* lock the current transaction */
 inline static void lock_journal(struct super_block *p_s_sb) {
+  PROC_INFO_INC( p_s_sb, journal.lock_journal );
   while(atomic_read(&(SB_JOURNAL(p_s_sb)->j_wlock)) > 0) {
+    PROC_INFO_INC( p_s_sb, journal.lock_journal_wait );
     sleep_on(&(SB_JOURNAL(p_s_sb)->j_wait)) ;
   }
   atomic_set(&(SB_JOURNAL(p_s_sb)->j_wlock), 1) ;
@@ -2011,6 +2016,7 @@ static int do_journal_begin_r(struct reiserfs_transaction_handle *th, struct sup
     th->t_super = p_s_sb ; /* others will check this for the don't log flag */
     return 0 ;
   }
+  PROC_INFO_INC( p_s_sb, journal.journal_being );
 
 relock:
   lock_journal(p_s_sb) ;
@@ -2018,6 +2024,7 @@ relock:
   if (test_bit(WRITERS_BLOCKED, &SB_JOURNAL(p_s_sb)->j_state)) {
     unlock_journal(p_s_sb) ;
     reiserfs_wait_on_write_block(p_s_sb) ;
+    PROC_INFO_INC( p_s_sb, journal.journal_relock_writers );
     goto relock ;
   }
 
@@ -2056,6 +2063,7 @@ relock:
 	sleep_on(&(SB_JOURNAL(p_s_sb)->j_join_wait)) ;
       }
     }
+    PROC_INFO_INC( p_s_sb, journal.journal_relock_wcount );
     goto relock ;
   }
 
@@ -2102,6 +2110,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   int count_already_incd = 0 ;
   int prepared = 0 ;
 
+  PROC_INFO_INC( p_s_sb, journal.mark_dirty );
   if (reiserfs_dont_log(th->t_super)) {
     mark_buffer_dirty(bh) ;
     return 0 ;
@@ -2116,6 +2125,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   prepared = test_and_clear_bit(BH_JPrepared, &bh->b_state) ;
   /* already in this transaction, we are done */
   if (buffer_journaled(bh)) {
+    PROC_INFO_INC( p_s_sb, journal.mark_dirty_already );
     return 0 ;
   }
 
@@ -2145,6 +2155,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
 
   if (buffer_journal_dirty(bh)) {
     count_already_incd = 1 ;
+    PROC_INFO_INC( p_s_sb, journal.mark_dirty_notjournal );
     mark_buffer_notjournal_dirty(bh) ;
   }
 
@@ -2645,6 +2656,7 @@ void reiserfs_commit_for_inode(struct inode *inode) {
 
 void reiserfs_restore_prepared_buffer(struct super_block *p_s_sb, 
                                       struct buffer_head *bh) {
+  PROC_INFO_INC( p_s_sb, journal.restore_prepared );
   if (reiserfs_dont_log (p_s_sb))
     return;
 
@@ -2666,6 +2678,7 @@ void reiserfs_prepare_for_journal(struct super_block *p_s_sb,
                                   struct buffer_head *bh, int wait) {
   int retry_count = 0 ;
 
+  PROC_INFO_INC( p_s_sb, journal.prepare );
   if (reiserfs_dont_log (p_s_sb))
     return;
 
@@ -2681,6 +2694,7 @@ void reiserfs_prepare_for_journal(struct super_block *p_s_sb,
 	      "waiting while do_balance was running\n") ;
       wait_on_buffer(bh) ;
     }
+    PROC_INFO_INC( p_s_sb, journal.prepare_retry );
     retry_count++ ;
   }
 }

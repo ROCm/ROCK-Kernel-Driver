@@ -280,6 +280,9 @@ static int balance_leaf (struct tree_balance * tb,
 			tb->insert_size [0]);
     }
 #endif
+
+    PROC_INFO_INC( tb -> tb_sb, balance_at[ 0 ] );
+
     /* Make balance in case insert_size[0] < 0 */
     if ( tb->insert_size[0] < 0 )
 	return balance_leaf_when_delete (tb, flag);

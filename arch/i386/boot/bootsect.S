@@ -395,9 +395,15 @@ print_digit:
 # NOTE: Doesn't save %ax or %dx; do it yourself if you need to.
 
 kill_motor:
+#if 1
+	xorw	%ax, %ax		# reset FDC
+	xorb	%dl, %dl
+	int	$0x13
+#else
 	movw	$0x3f2, %dx
 	xorb	%al, %al
 	outb	%al, %dx
+#endif
 	ret
 
 sectors:	.word 0

@@ -299,7 +299,7 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
   streamer_priv->streamer_ring_speed = ringspeed[card_no];
   streamer_priv->streamer_message_level = message_level[card_no];
 
-  pdev->driver_data=dev;
+  pci_set_drvdata(pdev, dev);
 
   spin_lock_init(&streamer_priv->streamer_lock);
   
@@ -329,7 +329,7 @@ err_out:
 }
 
 static void __devexit streamer_remove_one(struct pci_dev *pdev) {
-  struct net_device *dev=pdev->driver_data;
+  struct net_device *dev=pci_get_drv_data(pdev);
   struct streamer_private *streamer_priv;
 
 #if STREAMER_DEBUG
@@ -373,7 +373,7 @@ static void __devexit streamer_remove_one(struct pci_dev *pdev) {
   release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev,0));
   release_mem_region(pci_resource_start(pdev, 1), pci_resource_len(pdev,1));
   kfree(dev);
-  pdev->driver_data=NULL;
+  pci_set_drvdata(pdev, NULL);
 }
 
 
@@ -1704,7 +1704,7 @@ static int streamer_proc_info(char *buffer, char **start, off_t offset,
 
   for(sdev=dev_streamer; sdev; sdev=sdev->next) {
     pci_device=sdev->pci_dev;
-    dev=pci_device->driver_data;
+    dev=pci_get_drvdata(pci_device);
 
 				size = sprintf_info(buffer + len, dev);
 				len += size;

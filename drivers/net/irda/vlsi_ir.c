@@ -1238,7 +1238,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	printk(KERN_INFO "%s: registered device %s\n", drivername, ndev->name);
 
-	pdev->driver_data = ndev;
+	pci_set_drvdata(pdev, ndev);
 
 	return 0;
 
@@ -1247,13 +1247,13 @@ out_freedev:
 out_disable:
 	pci_disable_device(pdev);
 out:
-	pdev->driver_data = NULL;
+	pci_set_drvdata(pdev, NULL);
 	return -ENODEV;
 }
 
 static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 {
-	struct net_device *ndev = pdev->driver_data;
+	struct net_device *ndev = pci_get_drvdata(pdev);
 
 	if (ndev) {
 		printk(KERN_INFO "%s: unregister device %s\n",
@@ -1267,7 +1267,7 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 	}
 	else
 		printk(KERN_CRIT "%s: lost netdevice?\n", drivername);
-	pdev->driver_data = NULL;
+	pci_set_drvdata(pdev, NULL);
 
 	pci_disable_device(pdev);
 	printk(KERN_INFO "%s: %s disabled\n", drivername, pdev->name);

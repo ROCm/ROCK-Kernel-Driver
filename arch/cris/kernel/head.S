@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.40 2001/10/03 14:59:57 pkj Exp $
+/* $Id: head.S,v 1.41 2001/10/29 14:55:58 pkj Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,9 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.41  2001/10/29 14:55:58  pkj
+ * Corrected pa$r0 to par0.
+ *
  * Revision 1.40  2001/10/03 14:59:57  pkj
  * Added support for resetting the Bluetooth hardware.
  *
@@ -520,7 +523,7 @@ _start_it:
 	moveq	0,$r0
 #if (!defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT0)) \
 	&& !defined(CONFIG_DMA_MEMCPY)
-	; DMA channels 6 and 7 to se$r0, kgdb doesnt want DMA
+	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma7, serial0)	\
 		| IO_STATE (R_GEN_CONFIG, dma6, serial0),$r0
 #endif
@@ -554,7 +557,7 @@ _start_it:
 #endif
 #if defined(CONFIG_ETRAX_PARALLEL_PORT0) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	; parport 0 enabled using DMA 2/3
-	or.w	IO_STATE (R_GEN_CONFIG, pa$r0, select),$r0
+	or.w	IO_STATE (R_GEN_CONFIG, par0, select),$r0
 #endif
 #if defined(CONFIG_ETRAX_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	; parport 1 enabled using DMA 4/5

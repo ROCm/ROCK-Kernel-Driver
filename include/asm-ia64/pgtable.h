@@ -9,7 +9,7 @@
  * in <asm/page.h> (currently 8192).
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -466,11 +466,21 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 # endif /* !__ASSEMBLY__ */
 
 /*
- * Identity-mapped regions use a large page size.  KERNEL_PG_NUM is the
- * number of the (large) page frame that mapps the kernel.
+ * Identity-mapped regions use a large page size.  We'll call such large pages
+ * "granules".  If you can think of a better name that's unambiguous, let me
+ * know...
  */
-#define KERNEL_PG_SHIFT		_PAGE_SIZE_64M
-#define KERNEL_PG_SIZE		(1 << KERNEL_PG_SHIFT)
-#define KERNEL_PG_NUM		((KERNEL_START - PAGE_OFFSET) / KERNEL_PG_SIZE)
+#if defined(CONFIG_IA64_GRANULE_64MB)
+# define IA64_GRANULE_SHIFT	_PAGE_SIZE_64M
+#elif defined(CONFIG_IA64_GRANULE_16MB)
+# define IA64_GRANULE_SHIFT	_PAGE_SIZE_16M
+#endif
+#define IA64_GRANULE_SIZE	(1 << IA64_GRANULE_SHIFT)
+/*
+ * log2() of the page size we use to map the kernel image (IA64_TR_KERNEL):
+ */
+#define KERNEL_TR_PAGE_SHIFT	_PAGE_SIZE_64M
+#define KERNEL_TR_PAGE_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
+#define KERNEL_TR_PAGE_NUM	((KERNEL_START - PAGE_OFFSET) / KERNEL_TR_PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */

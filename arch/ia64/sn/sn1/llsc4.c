@@ -35,16 +35,6 @@ extern void bringup_set_led_bits(u8 bits, u8 mask);
 static int	inttest=0;
 #endif
 
-#ifdef IA64_SEMFIX_INSN
-#undef IA64_SEMFIX_INSN
-#endif
-#ifdef IA64_SEMFIX
-#undef IA64_SEMFIX
-#endif
-# define IA64_SEMFIX_INSN
-# define IA64_SEMFIX    ""
-
-
 /*
  * Test parameter table for AUTOTEST
  */
@@ -192,7 +182,6 @@ static void print_params(void)
 	printk ("     llscfail    \t%s\tForce a failure to test the trigger & error messages\n", fail_enabled ? "on" : "off");
 	printk ("     llscselt    \t%s\tSelective triger on failures\n", selective_trigger ? "on" : "off");
 	printk ("     llscblkadr  \t%s\tDump data block addresses\n", dump_block_addrs_opt ? "on" : "off");
-	printk ("  SEMFIX: %s\n", IA64_SEMFIX);
 	printk ("\n");
 }
 __setup("autotest", autotest_enable);

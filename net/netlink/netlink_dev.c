@@ -28,10 +28,11 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 
+#include <asm/bitops.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-static unsigned open_map;
+static long open_map;
 static struct socket *netlink_user[MAX_LINKS];
 
 /*
@@ -111,10 +112,8 @@ static int netlink_open(struct inode * inode, struct file * file)
 
 	if (minor>=MAX_LINKS)
 		return -ENODEV;
-	if (open_map&(1<<minor))
+	if (test_and_set_bit(minor, &open_map))
 		return -EBUSY;
-
-	open_map |= (1<<minor);
 
 	err = sock_create(PF_NETLINK, SOCK_RAW, minor, &sock);
 	if (err < 0)
@@ -132,7 +131,7 @@ static int netlink_open(struct inode * inode, struct file * file)
 	return 0;
 
 out:
-	open_map &= ~(1<<minor);
+	clear_bit(minor, &open_map);
 	return err;
 }
 
@@ -141,11 +140,9 @@ static int netlink_release(struct inode * inode, struct file * file)
 	unsigned int minor = MINOR(inode->i_rdev);
 	struct socket *sock;
 
-	lock_kernel();
 	sock = netlink_user[minor];
 	netlink_user[minor] = NULL;
-	open_map &= ~(1<<minor);
-	unlock_kernel();
+	clear_bit(minor, &open_map);
 	sock_release(sock);
 	return 0;
 }

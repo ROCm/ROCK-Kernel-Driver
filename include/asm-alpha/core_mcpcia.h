@@ -217,7 +217,7 @@ struct el_MCPCIA_uncorrected_frame_mcheck {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int mcpcia_inb(unsigned long in_addr)
+__EXTERN_INLINE u8 mcpcia_inb(unsigned long in_addr)
 {
 	unsigned long addr, hose, result;
 
@@ -234,7 +234,7 @@ __EXTERN_INLINE unsigned int mcpcia_inb(unsigned long in_addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void mcpcia_outb(unsigned char b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_outb(u8 b, unsigned long in_addr)
 {
 	unsigned long addr, hose, w;
 
@@ -247,7 +247,7 @@ __EXTERN_INLINE void mcpcia_outb(unsigned char b, unsigned long in_addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int mcpcia_inw(unsigned long in_addr)
+__EXTERN_INLINE u16 mcpcia_inw(unsigned long in_addr)
 {
 	unsigned long addr, hose, result;
 
@@ -259,7 +259,7 @@ __EXTERN_INLINE unsigned int mcpcia_inw(unsigned long in_addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void mcpcia_outw(unsigned short b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_outw(u16 b, unsigned long in_addr)
 {
 	unsigned long addr, hose, w;
 
@@ -272,7 +272,7 @@ __EXTERN_INLINE void mcpcia_outw(unsigned short b, unsigned long in_addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int mcpcia_inl(unsigned long in_addr)
+__EXTERN_INLINE u32 mcpcia_inl(unsigned long in_addr)
 {
 	unsigned long addr, hose;
 
@@ -283,7 +283,7 @@ __EXTERN_INLINE unsigned int mcpcia_inl(unsigned long in_addr)
 	return *(vuip) ((addr << 5) + hose + 0x18);
 }
 
-__EXTERN_INLINE void mcpcia_outl(unsigned int b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_outl(u32 b, unsigned long in_addr)
 {
 	unsigned long addr, hose;
 
@@ -345,7 +345,7 @@ __EXTERN_INLINE int mcpcia_is_ioaddr(unsigned long addr)
 	return addr >= MCPCIA_SPARSE(0);
 }
 
-__EXTERN_INLINE unsigned long mcpcia_readb(unsigned long in_addr)
+__EXTERN_INLINE u8 mcpcia_readb(unsigned long in_addr)
 {
 	unsigned long addr = in_addr & 0xffffffffUL;
 	unsigned long hose = in_addr & ~0xffffffffUL;
@@ -364,7 +364,7 @@ __EXTERN_INLINE unsigned long mcpcia_readb(unsigned long in_addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long mcpcia_readw(unsigned long in_addr)
+__EXTERN_INLINE u16 mcpcia_readw(unsigned long in_addr)
 {
 	unsigned long addr = in_addr & 0xffffffffUL;
 	unsigned long hose = in_addr & ~0xffffffffUL;
@@ -383,7 +383,7 @@ __EXTERN_INLINE unsigned long mcpcia_readw(unsigned long in_addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void mcpcia_writeb(unsigned char b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_writeb(u8 b, unsigned long in_addr)
 {
 	unsigned long addr = in_addr & 0xffffffffUL;
 	unsigned long hose = in_addr & ~0xffffffffUL;
@@ -401,7 +401,7 @@ __EXTERN_INLINE void mcpcia_writeb(unsigned char b, unsigned long in_addr)
 	*(vuip) ((addr << 5) + hose + 0x00) = w;
 }
 
-__EXTERN_INLINE void mcpcia_writew(unsigned short b, unsigned long in_addr)
+__EXTERN_INLINE void mcpcia_writew(u16 b, unsigned long in_addr)
 {
 	unsigned long addr = in_addr & 0xffffffffUL;
 	unsigned long hose = in_addr & ~0xffffffffUL;
@@ -419,22 +419,22 @@ __EXTERN_INLINE void mcpcia_writew(unsigned short b, unsigned long in_addr)
 	*(vuip) ((addr << 5) + hose + 0x08) = w;
 }
 
-__EXTERN_INLINE unsigned long mcpcia_readl(unsigned long addr)
+__EXTERN_INLINE u32 mcpcia_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long mcpcia_readq(unsigned long addr)
+__EXTERN_INLINE u64 mcpcia_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void mcpcia_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void mcpcia_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void mcpcia_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void mcpcia_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

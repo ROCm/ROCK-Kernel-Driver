@@ -37,7 +37,7 @@ Try:
 	* Not overclocking your CPU.
 
 	* Having the memory tested in a memory tester or exchanged
-	  with the vendor.
+	  with the vendor. Consider testing it with memtest86 yourself.
 	
 	* Exchanging your CPU, cache, or motherboard for one that works.
 

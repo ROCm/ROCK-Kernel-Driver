@@ -20,7 +20,7 @@
  * S390 uses 'Compare And Swap' for atomicity in SMP enviroment
  */
 
-typedef struct { volatile int counter; } atomic_t __attribute__ ((aligned (4)));
+typedef struct { volatile int counter; } __attribute__ ((aligned (4))) atomic_t;
 #define ATOMIC_INIT(i)  { (i) }
 
 #define atomic_eieio()          __asm__ __volatile__ ("BCR 15,0")

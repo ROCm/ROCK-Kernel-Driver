@@ -93,6 +93,17 @@ struct atm_dev_stats {
 					/* query supported loopback modes */
 #define ATM_SETSC	_IOW('a',ATMIOC_SPECIAL+1,int)
 					/* enable or disable single-copy */
+#define ATM_SETBACKEND	_IOW('a',ATMIOC_SPECIAL+2,atm_backend_t)
+					/* set backend handler */
+
+/*
+ * These are backend handkers that can be set via the ATM_SETBACKEND call
+ * above.  In the future we may support dynamic loading of these - for now,
+ * they're just being used to share the ATMIOC_BACKEND ioctls
+ */
+#define ATM_BACKEND_RAW		0	
+#define ATM_BACKEND_PPP		1	/* PPPoATM - RFC2364 */
+#define ATM_BACKEND_BR_2684	2	/* Bridged RFC1483/2684 */
 
 /* for ATM_GETTYPE */
 #define ATM_ITFTYP_LEN	8	/* maximum length of interface type name */

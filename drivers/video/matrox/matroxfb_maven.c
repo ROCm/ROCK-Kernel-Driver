@@ -1,3 +1,15 @@
+/*
+ *
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
+ *
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ *
+ * Version: 1.51 2001/01/19
+ *
+ * See matroxfb_base.c for contributors.
+ *
+ */
+
 #include "matroxfb_maven.h"
 #include "matroxfb_misc.h"
 #include "matroxfb_DAC1064.h"
@@ -1030,8 +1042,9 @@ static void matroxfb_maven_exit(void) {
 		i2c_del_driver(&maven_driver);
 }
 
-MODULE_AUTHOR("(c) 1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G200/G400 Matrox MGA-TVO driver");
+MODULE_LICENSE("GPL");
 module_init(matroxfb_maven_init);
 module_exit(matroxfb_maven_exit);
 /* we do not have __setup() yet */

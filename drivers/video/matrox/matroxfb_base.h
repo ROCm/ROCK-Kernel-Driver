@@ -146,21 +146,6 @@
 #ifndef PCI_SS_VENDOR_ID_MATROX
 #define PCI_SS_VENDOR_ID_MATROX		PCI_VENDOR_ID_MATROX
 #endif
-#ifndef PCI_DEVICE_ID_MATROX_G200_PCI
-#define PCI_DEVICE_ID_MATROX_G200_PCI	0x0520
-#endif
-#ifndef PCI_DEVICE_ID_MATROX_G200_AGP
-#define PCI_DEVICE_ID_MATROX_G200_AGP	0x0521
-#endif
-#ifndef PCI_DEVICE_ID_MATROX_G100
-#define PCI_DEVICE_ID_MATROX_G100	0x1000
-#endif
-#ifndef PCI_DEVICE_ID_MATROX_G100_AGP
-#define PCI_DEVICE_ID_MATROX_G100_AGP	0x1001
-#endif
-#ifndef PCI_DEVICE_ID_MATROX_G400_AGP
-#define PCI_DEVICE_ID_MATROX_G400_AGP	0x0525
-#endif
 
 #ifndef PCI_SS_ID_MATROX_PRODUCTIVA_G100_AGP
 #define PCI_SS_ID_MATROX_GENERIC		0xFF00
@@ -533,6 +518,7 @@ struct matrox_fb_info {
 						/* 0 except for 6MB Millenium */
 		int		memtype;
 		int		g450dac;
+		int		g550dac;
 		int		dfp_type;
 			      } devflags;
 	struct display_switch	dispsw;

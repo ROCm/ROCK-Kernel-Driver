@@ -1,4 +1,4 @@
-/* $Id: eicon_isa.c,v 1.16.6.1 2001/09/23 22:24:37 kai Exp $
+/* $Id: eicon_isa.c,v 1.16.6.2 2001/11/06 20:58:29 kai Exp $
  *
  * ISDN low-level module for Eicon active ISDN-Cards.
  * Hardware-specific code for old ISA cards.
@@ -20,7 +20,7 @@
 #define release_shmem release_region
 #define request_shmem request_region
 
-char *eicon_isa_revision = "$Revision: 1.16.6.1 $";
+char *eicon_isa_revision = "$Revision: 1.16.6.2 $";
 
 #undef EICON_MCA_DEBUG
 
@@ -231,7 +231,7 @@ eicon_isa_bootload(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 	boot = &card->shmem->boot;
 
 	/* Delay 0.2 sec. */
-	SLEEP(20);
+	SLEEP(HZ / 5);
 
 	/* Start CPU */
 	writeb(cbuf.boot_opt, &boot->ctrl);
@@ -244,10 +244,10 @@ eicon_isa_bootload(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 #endif /* CONFIG_MCA */
 
 	/* Delay 0.2 sec. */
-	SLEEP(20);
+	SLEEP(HZ / 5);
 
 	timeout = jiffies + (HZ * 22);
-	while (timeout > jiffies) {
+	while (time_before(jiffies, timeout)) {
 		if (readb(&boot->ctrl) == 0)
 			break;
 		SLEEP(10);
@@ -362,8 +362,8 @@ eicon_isa_load(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 	while (tmp--) {
 		memcpy_toio(&boot->b, p, 256);
 		writeb(1, &boot->ctrl);
-		timeout = jiffies + 10;
-		while (timeout > jiffies) {
+		timeout = jiffies + HZ / 10;
+		while (time_before(jiffies, timeout)) {
 			if (readb(&boot->ctrl) == 0)
 				break;
 			SLEEP(2);
@@ -386,7 +386,7 @@ eicon_isa_load(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 	/* Start firmware, wait for signature */
 	writeb(2, &boot->ctrl);
 	timeout = jiffies + (5*HZ);
-	while (timeout > jiffies) {
+	while (time_before(jiffies, timeout)) {
 		if (readw(&boot->signature) == 0x4447)
 			break;
 		SLEEP(2);
@@ -410,8 +410,8 @@ eicon_isa_load(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 		tmp = readb(&card->shmem->com.ReadyInt);
 		tmp ++;
 		writeb(tmp, &card->shmem->com.ReadyInt);
-		timeout = jiffies + 20;
-		while (timeout > jiffies) {
+		timeout = jiffies + HZ / 5;
+		while (time_before(jiffies, timeout)) {
 			if (card->irqprobe > 1)
 				break;
 			SLEEP(2);

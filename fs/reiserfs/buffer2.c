@@ -16,6 +16,7 @@
 #include <linux/locks.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/kernel_stat.h>
 
 /*
  *  wait_buffer_until_released
@@ -63,9 +64,16 @@ void wait_buffer_until_released (const struct buffer_head * bh)
    block. */
 /* The function is NOT SCHEDULE-SAFE! */
 
-struct buffer_head  * reiserfs_bread (kdev_t n_dev, int n_block, int n_size) 
+struct buffer_head  * reiserfs_bread (struct super_block *super, int n_block, int n_size) 
 {
-    return bread (n_dev, n_block, n_size);
+    struct buffer_head  *result;
+    PROC_EXP( unsigned int ctx_switches = kstat.context_swtch );
+
+    result = bread (super -> s_dev, n_block, n_size);
+    PROC_INFO_INC( super, breads );
+    PROC_EXP( if( kstat.context_swtch != ctx_switches ) 
+	      PROC_INFO_INC( super, bread_miss ) );
+    return result;
 }
 
 /* This function looks for a buffer which contains a given block.  If

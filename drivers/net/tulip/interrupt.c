@@ -28,8 +28,8 @@ unsigned int tulip_max_interrupt_work;
 #define MIT_SIZE 15
 unsigned int mit_table[MIT_SIZE+1] =
 {
-        /*  CRS11 21143 hardware Mitigation Control Interrupt 
-            We use only RX mitigation we other techniques for 
+        /*  CRS11 21143 hardware Mitigation Control Interrupt
+            We use only RX mitigation we other techniques for
             TX intr. mitigation.
 
            31    Cycle Size (timer control)
@@ -39,7 +39,7 @@ unsigned int mit_table[MIT_SIZE+1] =
            19:17 RX No pkts before Int.
            16       Continues Mode (CM)
         */
-                         
+
         0x0,             /* IM disabled */
         0x80150000,      /* RX time = 1, RX pkts = 2, CM = 1 */
         0x80150000,
@@ -110,7 +110,7 @@ static int tulip_rx(struct net_device *dev)
 #ifdef CONFIG_NET_HW_FLOWCONTROL
         int drop = 0, mit_sel = 0;
 
-/* that one buffer is needed for mit activation; or might be a 
+/* that one buffer is needed for mit activation; or might be a
    bug in the ring buffer code; check later -- JHS*/
 
         if (rx_work_limit >=RX_RING_SIZE) rx_work_limit--;
@@ -210,7 +210,7 @@ static int tulip_rx(struct net_device *dev)
 			}
 			skb->protocol = eth_type_trans(skb, dev);
 #ifdef CONFIG_NET_HW_FLOWCONTROL
-                        mit_sel = 
+                        mit_sel =
 #endif
 			netif_rx(skb);
 
@@ -258,34 +258,34 @@ throttle:
 
         /* We use this simplistic scheme for IM. It's proven by
            real life installations. We can have IM enabled
-           continuesly but this would cause unnecessary latency. 
-           Unfortunely we can't use all the NET_RX_* feedback here. 
-           This would turn on IM for devices that is not contributing 
-           to backlog congestion with unnecessary latency. 
+           continuesly but this would cause unnecessary latency.
+           Unfortunely we can't use all the NET_RX_* feedback here.
+           This would turn on IM for devices that is not contributing
+           to backlog congestion with unnecessary latency.
 
            We monitor the the device RX-ring and have:
 
            HW Interrupt Mitigation either ON or OFF.
 
-           ON:  More then 1 pkt received (per intr.) OR we are dropping 
+           ON:  More then 1 pkt received (per intr.) OR we are dropping
            OFF: Only 1 pkt received
-           
+
            Note. We only use min and max (0, 15) settings from mit_table */
 
 
         if( tp->flags &  HAS_INTR_MITIGATION) {
-                if((received > 1 || mit_sel == NET_RX_DROP) 
-                   && tp->mit_sel != 15 ) { 
-                        tp->mit_sel = 15; 
+                if((received > 1 || mit_sel == NET_RX_DROP)
+                   && tp->mit_sel != 15 ) {
+                        tp->mit_sel = 15;
                         tp->mit_change = 1; /* Force IM change */
                 }
                 if((received <= 1 && mit_sel != NET_RX_DROP) && tp->mit_sel != 0 ) {
-                        tp->mit_sel = 0; 
+                        tp->mit_sel = 0;
                         tp->mit_change = 1; /* Force IM change */
                 }
         }
 
-        return RX_RING_SIZE+1; /* maxrx+1 */      
+        return RX_RING_SIZE+1; /* maxrx+1 */
 #else
 	return received;
 #endif

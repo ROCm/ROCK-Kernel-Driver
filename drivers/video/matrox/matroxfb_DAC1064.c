@@ -321,7 +321,8 @@ void DAC1064_global_restore(CPMINFO const struct matrox_hw_state* hw) {
 		outDAC1064(PMINFO 0x20, 0x04);
 		outDAC1064(PMINFO 0x1F, ACCESS_FBINFO(devflags.dfp_type));
 		if (ACCESS_FBINFO(devflags.g450dac)) {
-			outDAC1064(PMINFO M1064_X8B, 0xCC);	/* only matrox know... */
+			outDAC1064(PMINFO M1064_XSYNCCTRL, 0xCC);	/* only matrox know... */
+			outDAC1064(PMINFO M1064_XPWRCTRL, 0x1F);	/* powerup everything */
 			outDAC1064(PMINFO M1064_XOUTPUTCONN, hw->DACreg[POS1064_XOUTPUTCONN]);
 		}
 	}

@@ -58,6 +58,11 @@ EXPORT_SYMBOL(atm_tcp_ops);
 #endif
 #endif
 
+#if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
+int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
+EXPORT_SYMBOL(pppoatm_ioctl_hook);
+#endif
+
 #include "resources.h"		/* atm_find_dev */
 #include "common.h"		/* prototypes */
 #include "protocols.h"		/* atm_init_<transport> */
@@ -773,6 +778,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 		default:
 			break;
 	}
+#if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
+	if (pppoatm_ioctl_hook) {
+		ret_val = pppoatm_ioctl_hook(vcc, cmd, arg);
+		if (ret_val != -ENOIOCTLCMD)
+			goto done;
+	}
+#endif
 	if (get_user(buf,&((struct atmif_sioc *) arg)->arg)) {
 		ret_val = -EFAULT;
 		goto done;

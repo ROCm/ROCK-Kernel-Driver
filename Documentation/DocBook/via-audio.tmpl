@@ -68,7 +68,7 @@
 	support are not yet available.
   </para>
   <para>
-  	This driver supports any Linux kernel version after 2.3.50.
+  	This driver supports any Linux kernel version after 2.4.10.
   </para>
   <para>
 	Please send bug reports to the mailing list <email>linux-via@gtf.org</email>.
@@ -157,14 +157,6 @@
     </para>
     </listitem></varlistentry>
 
-    <varlistentry><term>RealPlayer trouble</term>
-    <listitem>
-    <para>
-	RealPlayer output very scratchy.  Workaround:  use esd, and
-	configure RealPlayer to output to esd.
-    </para>
-    </listitem></varlistentry>
-
   </variablelist>
 	
   </para>
@@ -190,6 +182,9 @@
 	Adrian Cox <email>adrian@humboldt.co.uk</email>, for bugfixing
 	MMAP support, and several other notable fixes that resulted from
 	his hard work and testing.
+  </para>
+  <para>
+  	Thomas Sailer for further bugfixes.
   </para>
   </chapter>
   
@@ -233,6 +228,31 @@
 
   <chapter id="changelog">
       <title>Driver ChangeLog</title>
+
+<sect1 id="version191"><title>
+Version 1.9.1
+</title>
+  <itemizedlist spacing=compact>
+   <listitem>
+    <para>
+    DSP read/write bugfixes from Thomas Sailer.
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Add new PCI id for single-channel use of Via 8233.
+    </para>
+   </listitem>
+
+   <listitem>
+    <para>
+    Other bug fixes, tweaks, new ioctls.
+    </para>
+   </listitem>
+
+  </itemizedlist>
+</sect1>
 
 <sect1 id="version1115"><title>
 Version 1.1.15

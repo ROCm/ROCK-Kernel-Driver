@@ -4,7 +4,7 @@
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 2001 Hewlett-Packard Co
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_SMP_H
 #define _ASM_IA64_SMP_H
@@ -18,6 +18,7 @@
 #include <linux/kernel.h>
 
 #include <asm/io.h>
+#include <asm/param.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 
@@ -107,7 +108,12 @@ hard_smp_processor_id (void)
 	return lid.f.id << 8 | lid.f.eid;
 }
 
-#define NO_PROC_ID		(-1)
+#define NO_PROC_ID		0xffffffff	/* no processor magic marker */
+
+/*
+ * Extra overhead to move a task from one cpu to another (due to TLB and cache misses).
+ * Expressed in "negative nice value" units (larger number means higher priority/penalty).
+ */
 #define PROC_CHANGE_PENALTY	20
 
 extern void __init init_smp_config (void);

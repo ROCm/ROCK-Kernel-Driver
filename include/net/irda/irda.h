@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1998-2000 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *      
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -42,6 +43,11 @@ typedef __u32 magic_t;
 
 #ifndef FALSE 
 #define FALSE 0
+#endif
+
+/* Hack to do small backoff when setting media busy in IrLAP */
+#ifndef SMALL
+#define SMALL 5
 #endif
 
 #ifndef IRDA_MIN /* Lets not mix this MIN with other header files */

@@ -60,6 +60,13 @@ static unsigned int cardtype[ZORAN_MAX]={ [ 0 ... ZORAN_MAX-1 ] = CARDTYPE };
 static int video_nr = -1;
 static int vbi_nr = -1;
 
+static struct pci_device_id zr36120_pci_tbl[] = {
+	{ PCI_VENDOR_ID_ZORAN,PCI_DEVICE_ID_ZORAN_36120,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, zr36120_pci_tbl);
+
 MODULE_AUTHOR("Pauline Middelink <middelin@polyware.nl>");
 MODULE_DESCRIPTION("Zoran ZR36120 based framegrabber");
 MODULE_LICENSE("GPL");

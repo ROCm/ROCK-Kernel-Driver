@@ -92,6 +92,13 @@ asmlinkage void name(struct pt_regs * regs, long interruption_code) \
 static void inline do_trap(long interruption_code, int signr, char *str,
                            struct pt_regs *regs, siginfo_t *info)
 {
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
                 struct task_struct *tsk = current;
                 tsk->thread.trap_no = interruption_code;
@@ -161,6 +168,14 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	int do_sig = 0;
 
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
+
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
 	/* WARNING don't change this check back to */
 	/* int problem_state=(regs->psw.mask & PSW_PROBLEM_STATE); */
 	/* & then doing if(problem_state) an int is too small for this */
@@ -186,6 +201,14 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	int do_sig = 0;
 
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
+
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
 	__asm__ volatile ("stfpc %0\n\t" 
 			  : "=m" (current->thread.fp_regs.fpc));
 	/* Same code should work when we implement fpu emulation */

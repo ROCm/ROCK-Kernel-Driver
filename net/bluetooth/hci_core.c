@@ -891,7 +891,7 @@ int hci_inquiry(unsigned long arg)
 
 	/* Limit inquiry time, also avoid overflows */
 
-	if(ir.length > 2048)
+	if(ir.length > 2048 || ir.num_rsp > 2048)
 	{
 		err = -EINVAL;
 		goto done;

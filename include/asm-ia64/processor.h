@@ -168,10 +168,13 @@
 #define IA64_THREAD_UAC_NOPRINT	(__IA64_UL(1) << 3)	/* don't log unaligned accesses */
 #define IA64_THREAD_UAC_SIGBUS	(__IA64_UL(1) << 4)	/* generate SIGBUS on unaligned acc. */
 #define IA64_THREAD_KRBS_SYNCED	(__IA64_UL(1) << 5)	/* krbs synced with process vm? */
-#define IA64_KERNEL_DEATH	(__IA64_UL(1) << 63)	/* see die_if_kernel()... */
+#define IA64_THREAD_FPEMU_NOPRINT (__IA64_UL(1) << 6)	/* don't log any fpswa faults */
+#define IA64_THREAD_FPEMU_SIGFPE  (__IA64_UL(1) << 7)	/* send a SIGFPE for fpswa faults */
 
 #define IA64_THREAD_UAC_SHIFT	3
 #define IA64_THREAD_UAC_MASK	(IA64_THREAD_UAC_NOPRINT | IA64_THREAD_UAC_SIGBUS)
+#define IA64_THREAD_FPEMU_SHIFT	6
+#define IA64_THREAD_FPEMU_MASK	(IA64_THREAD_FPEMU_NOPRINT | IA64_THREAD_FPEMU_SIGFPE)
 
 
 /*
@@ -190,6 +193,7 @@
 #include <asm/page.h>
 #include <asm/rse.h>
 #include <asm/unwind.h>
+#include <asm/atomic.h>
 
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {
@@ -324,6 +328,18 @@ typedef struct {
 		 (int *) (addr));								\
 })
 
+#define SET_FPEMU_CTL(task,value)								\
+({												\
+	(task)->thread.flags = (((task)->thread.flags & ~IA64_THREAD_FPEMU_MASK)		\
+			  | (((value) << IA64_THREAD_FPEMU_SHIFT) & IA64_THREAD_FPEMU_MASK));	\
+	0;											\
+})
+#define GET_FPEMU_CTL(task,addr)								\
+({												\
+	put_user(((task)->thread.flags & IA64_THREAD_FPEMU_MASK) >> IA64_THREAD_FPEMU_SHIFT,	\
+		 (int *) (addr));								\
+})
+
 struct siginfo;
 
 struct thread_struct {
@@ -341,21 +357,19 @@ struct thread_struct {
 	__u64 fdr;			/* IA32 fp except. data reg */
 	__u64 csd;			/* IA32 code selector descriptor */
 	__u64 ssd;			/* IA32 stack selector descriptor */
-	__u64 tssd;			/* IA32 TSS descriptor */
+	__u64 old_k1;			/* old value of ar.k1 */
 	__u64 old_iob;			/* old IOBase value */
-	union {
-		__u64 sigmask;		/* aligned mask for sigsuspend scall */
-	} un;
-# define INIT_THREAD_IA32	0, 0, 0x17800000037fULL, 0, 0, 0, 0, 0, 0, {0},
+# define INIT_THREAD_IA32	0, 0, 0x17800000037fULL, 0, 0, 0, 0, 0, 0,
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
 #ifdef CONFIG_PERFMON
 	__u64 pmc[IA64_NUM_PMC_REGS];
 	__u64 pmd[IA64_NUM_PMD_REGS];
-	unsigned long pfm_pend_notify;	/* non-zero if we need to notify and block */
+	unsigned long pfm_must_block;	/* non-zero if we need to block on overflow */
 	void *pfm_context;		/* pointer to detailed PMU context */
-# define INIT_THREAD_PM		{0, }, {0, }, 0, 0,
+	atomic_t pfm_notifiers_check;	/* indicate if release_thread much check tasklist */
+# define INIT_THREAD_PM		{0, }, {0, }, 0, 0, {0},
 #else
 # define INIT_THREAD_PM
 #endif
@@ -628,10 +642,11 @@ ia64_invala (void)
 }
 
 /*
- * Save the processor status flags in FLAGS and then clear the
- * interrupt collection and interrupt enable bits.
+ * Save the processor status flags in FLAGS and then clear the interrupt collection and
+ * interrupt enable bits.  Don't trigger any mandatory RSE references while this bit is
+ * off!
  */
-#define ia64_clear_ic(flags)							\
+#define ia64_clear_ic(flags)						\
 	asm volatile ("mov %0=psr;; rsm psr.i | psr.ic;; srlz.i;;"	\
 			      : "=r"(flags) :: "memory");
 
@@ -719,6 +734,8 @@ ia64_set_lrr0 (unsigned long val)
 {
 	asm volatile ("mov cr.lrr0=%0;; srlz.d" :: "r"(val) : "memory");
 }
+
+#define cpu_relax()	do { } while (0)
 
 
 static inline void
@@ -816,7 +833,7 @@ thread_saved_pc (struct thread_struct *t)
 /* NOTE: The task struct and the stacks are allocated together.  */
 #define alloc_task_struct() \
         ((struct task_struct *) __get_free_pages(GFP_KERNEL, IA64_TASK_STRUCT_LOG_NUM_PAGES))
-#define free_task_struct(p)     free_pages((unsigned long)(p), IA64_TASK_STRUCT_LOG_NUM_PAGES)
+#define free_task_struct(p)	free_pages((unsigned long)(p), IA64_TASK_STRUCT_LOG_NUM_PAGES)
 #define get_task_struct(tsk)	atomic_inc(&virt_to_page(tsk)->count)
 
 #define init_task	(init_task_union.task)
@@ -942,6 +959,42 @@ ia64_get_gp(void)
 	return val;
 }
 
+static inline void
+ia64_set_ibr (__u64 regnum, __u64 value)
+{
+	asm volatile ("mov ibr[%0]=%1" :: "r"(regnum), "r"(value));
+}
+
+static inline void
+ia64_set_dbr (__u64 regnum, __u64 value)
+{
+	asm volatile ("mov dbr[%0]=%1" :: "r"(regnum), "r"(value));
+#ifdef CONFIG_ITANIUM
+	asm volatile (";; srlz.d");
+#endif
+}
+
+static inline __u64
+ia64_get_ibr (__u64 regnum)
+{
+	__u64 retval;
+
+	asm volatile ("mov %0=ibr[%1]" : "=r"(retval) : "r"(regnum));
+	return retval;
+}
+
+static inline __u64
+ia64_get_dbr (__u64 regnum)
+{
+	__u64 retval;
+
+	asm volatile ("mov %0=dbr[%1]" : "=r"(retval) : "r"(regnum));
+#ifdef CONFIG_ITANIUM
+	asm volatile (";; srlz.d");
+#endif
+	return retval;
+}
+
 /* XXX remove the handcoded version once we have a sufficiently clever compiler... */
 #ifdef SMART_COMPILER
 # define ia64_rotr(w,n)				\
@@ -969,27 +1022,33 @@ ia64_thash (__u64 addr)
 	return result;
 }
 
-#define cpu_relax()	do { } while (0)
-
+static inline __u64
+ia64_tpa (__u64 addr)
+{
+	__u64 result;
+	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
+	return result;
+}
 
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define PREFETCH_STRIDE 256
 
-extern inline void prefetch(const void *x)
+extern inline void
+prefetch (const void *x)
 {
          __asm__ __volatile__ ("lfetch [%0]" : : "r"(x));
 }
-         
-extern inline void prefetchw(const void *x)
+
+extern inline void
+prefetchw (const void *x)
 {
 	__asm__ __volatile__ ("lfetch.excl [%0]" : : "r"(x));
 }
 
-#define spin_lock_prefetch(x)   prefetchw(x)
+#define spin_lock_prefetch(x)	prefetchw(x)
 
-                  
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_IA64_PROCESSOR_H */

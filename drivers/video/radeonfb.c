@@ -889,7 +889,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		rinfo->palette[i].blue = default_blu[j];
 	}
 
-	pdev->driver_data = rinfo;
+	pci_set_drvdata(pdev, rinfo);
 
 	if (register_framebuffer ((struct fb_info *) rinfo) < 0) {
 		printk ("radeonfb: could not register framebuffer\n");
@@ -930,7 +930,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 
 static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 {
-        struct radeonfb_info *rinfo = pdev->driver_data;
+        struct radeonfb_info *rinfo = pci_get_drvdata(pdev);
  
         if (!rinfo)
                 return;

@@ -71,8 +71,8 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 				drive->sect  = drive->bios_sect = sect;
 				drive->ctl   = *(BIOS+8);
 			} else {
-				printk("hd%d: C/H/S=%d/%d/%d from BIOS ignored\n",
-				       unit, cyl, head, sect);
+				printk("hd%c: C/H/S=%d/%d/%d from BIOS ignored\n",
+				       unit+'a', cyl, head, sect);
 			}
 		}
 

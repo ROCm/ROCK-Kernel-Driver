@@ -23,6 +23,14 @@ fi
 
 bool 'Serial-port support' CONFIG_ETRAX_SERIAL
 if [ "$CONFIG_ETRAX_SERIAL" = "y" ]; then
+#  bool '  Use fast timers for DMA flush and RS-485 timing' CONFIG_ETRAX_SERIAL_FAST_TIMER n
+  define_bool CONFIG_ETRAX_SERIAL_FAST_TIMER n
+  if [ "$CONFIG_ETRAX_SERIAL_FAST_TIMER" = "n" ]; then
+    bool '  Fast serial port DMA flush' CONFIG_ETRAX_SERIAL_FLUSH_DMA_FAST
+    if [ "$CONFIG_ETRAX100_SERIAL_FLUSH_DMA_FAST" = "n" ]; then
+      int '  Receive flush timeout (ticks) ' CONFIG_ETRAX_SERIAL_RX_TIMEOUT_TICKS 5
+    fi
+  fi
   bool '  Serial port 0 enabled' CONFIG_ETRAX_SERIAL_PORT0
   if [ "$CONFIG_ETRAX_SERIAL_PORT0" = "y" ]; then
     bool '  Ser0 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB

@@ -850,7 +850,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
   DASSERT(self != NULL, 0, PPP_ERROR, "Self is NULL !!!\n");
 
   /* Check if we are connected */
-  if(self->ttp_open == 0)
+  if(!(test_bit(0, &self->ttp_open)))
     {
 #ifdef CONNECT_IN_SEND
       /* Let's try to connect one more time... */
@@ -884,7 +884,7 @@ ppp_irnet_send(struct ppp_channel *	chan,
        */
 #ifdef BLOCK_WHEN_CONNECT
       /* If we are attempting to connect */
-      if(self->ttp_connect)
+      if(test_bit(0, &self->ttp_connect))
 	{
 	  /* Blocking packet, ppp_generic will retry later */
 	  return 0;

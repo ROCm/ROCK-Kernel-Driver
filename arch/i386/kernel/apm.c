@@ -1471,7 +1471,7 @@ static int do_ioctl(struct inode * inode, struct file *filp,
 	as = filp->private_data;
 	if (check_apm_user(as, "ioctl"))
 		return -EIO;
-	if (!as->suser)
+	if ((!as->suser) || (!as->writer))
 		return -EPERM;
 	switch (cmd) {
 	case APM_IOC_STANDBY:

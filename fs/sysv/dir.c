@@ -140,33 +140,43 @@ struct sysv_dir_entry *sysv_find_entry(struct dentry *dentry, struct page **res_
 	const char * name = dentry->d_name.name;
 	int namelen = dentry->d_name.len;
 	struct inode * dir = dentry->d_parent->d_inode;
-	unsigned long n;
+	unsigned long start, n;
 	unsigned long npages = dir_pages(dir);
 	struct page *page = NULL;
 	struct sysv_dir_entry *de;
 
 	*res_page = NULL;
 
-	for (n = 0; n < npages; n++) {
+	start = dir->u.sysv_i.i_dir_start_lookup;
+	if (start >= npages)
+		start = 0;
+	n = start;
+
+	do {
 		char *kaddr;
 		page = dir_get_page(dir, n);
-		if (IS_ERR(page))
-			continue;
-
-		kaddr = (char*)page_address(page);
-		de = (struct sysv_dir_entry *) kaddr;
-		kaddr += PAGE_CACHE_SIZE - SYSV_DIRSIZE;
-		for ( ; (char *) de <= kaddr ; de++) {
-			if (!de->inode)
-				continue;
-			if (namecompare(namelen, SYSV_NAMELEN, name, de->name)) 
-				goto found;
+		if (!IS_ERR(page)) {
+			kaddr = (char*)page_address(page);
+			de = (struct sysv_dir_entry *) kaddr;
+			kaddr += PAGE_CACHE_SIZE - SYSV_DIRSIZE;
+			for ( ; (char *) de <= kaddr ; de++) {
+				if (!de->inode)
+					continue;
+				if (namecompare(namelen, SYSV_NAMELEN,
+							name, de->name))
+					goto found;
+			}
 		}
 		dir_put_page(page);
-	}
+
+		if (++n >= npages)
+			n = 0;
+	} while (n != start);
+
 	return NULL;
 
 found:
+	dir->u.sysv_i.i_dir_start_lookup = n;
 	*res_page = page;
 	return de;
 }

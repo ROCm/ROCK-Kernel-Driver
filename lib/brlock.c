@@ -54,6 +54,7 @@ again:
 		if (__brlock_array[cpu_logical_map(i)][idx] != 0) {
 			spin_unlock(&__br_write_locks[idx].lock);
 			barrier();
+			cpu_relax();
 			goto again;
 		}
 }

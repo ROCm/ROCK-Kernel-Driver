@@ -312,10 +312,10 @@ static void hga_blank(int blank_mode)
 static int __init hga_card_detect(void)
 {
 	int count=0;
-	u16 *p, p_save;
-	u16 *q, q_save;
+	unsigned char p, p_save;
+	unsigned char q, q_save;
 
-	hga_vram_base = VGA_MAP_MEM(0xb0000);
+	hga_vram_base = 0xb0000;
 	hga_vram_len  = 0x08000;
 
 	if (request_region(0x3b0, 12, "hgafb"))
@@ -325,14 +325,14 @@ static int __init hga_card_detect(void)
 
 	/* do a memory check */
 
-	p = (u16 *) hga_vram_base;
-	q = (u16 *) (hga_vram_base + 0x01000);
+	p = hga_vram_base;
+	q = hga_vram_base + 0x01000;
 
-	p_save = scr_readw(p); q_save = scr_readw(q);
+	p_save = isa_readw(p); q_save = isa_readw(q);
 
-	scr_writew(0xaa55, p); if (scr_readw(p) == 0xaa55) count++;
-	scr_writew(0x55aa, p); if (scr_readw(p) == 0x55aa) count++;
-	scr_writew(p_save, p);
+	isa_writew(0xaa55, p); if (isa_readw(p) == 0xaa55) count++;
+	isa_writew(0x55aa, p); if (isa_readw(p) == 0x55aa) count++;
+	isa_writew(p_save, p);
 
 	if (count != 2) {
 		return 0;
@@ -717,7 +717,7 @@ int __init hgafb_init(void)
 	if (!nologo) hga_show_logo();
 #endif /* MODULE */
 
-	hga_fix.smem_start = hga_vram_base;
+	hga_fix.smem_start = VGA_MAP_MEM(hga_vram_base);
 	hga_fix.smem_len = hga_vram_len;
 
 	disp.var = hga_default_var;
@@ -795,7 +795,7 @@ int __init hgafb_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	while (this_opt = strsep(&options, ",")) {
+	while ((this_opt = strsep(&options, ","))) {
 		if (!strncmp(this_opt, "font:", 5))
 			strcpy(fb_info.fontname, this_opt+5);
 	}

@@ -11,7 +11,7 @@
  *	does not count the \0
  *
  * Copyright (C) 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 09/24/99 S.Eranian add speculation recovery code
  */
@@ -116,7 +116,7 @@ GLOBAL_ENTRY(strlen)
 	ld8.s w[0]=[src],8	// speculatively load next to next
 	cmp.eq.and p6,p0=8,val1	// p6 = p6 and val1==8
 	cmp.eq.and p6,p0=8,val2	// p6 = p6 and mask==8
-(p6)	br.wtop.dptk.few 1b	// loop until p6 == 0
+(p6)	br.wtop.dptk 1b		// loop until p6 == 0
 	;;
 	//
 	// We must return try the recovery code iff
@@ -127,14 +127,14 @@ GLOBAL_ENTRY(strlen)
 	//
 	cmp.eq  p8,p9=8,val1	// p6 = val1 had zero (disambiguate)
 	tnat.nz p6,p7=val1	// test NaT on val1
-(p6)	br.cond.spnt.few recover// jump to recovery if val1 is NaT
+(p6)	br.cond.spnt .recover	// jump to recovery if val1 is NaT
 	;;
 	//
 	// if we come here p7 is true, i.e., initialized for // cmp
 	//
 	cmp.eq.and  p7,p0=8,val1// val1==8?
 	tnat.nz.and p7,p0=val2	// test NaT if val2
-(p7)	br.cond.spnt.few recover// jump to recovery if val2 is NaT
+(p7)	br.cond.spnt .recover	// jump to recovery if val2 is NaT
 	;;
 (p8)	mov val1=val2		// the other test got us out of the loop
 (p8)	adds src=-16,src	// correct position when 3 ahead
@@ -146,7 +146,7 @@ GLOBAL_ENTRY(strlen)
 	;;
 	sub ret0=ret0,tmp	// adjust
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp	// end of normal execution
+	br.ret.sptk.many rp	// end of normal execution
 
 	//
 	// Outlined recovery code when speculation failed
@@ -165,7 +165,7 @@ GLOBAL_ENTRY(strlen)
 	//	- today we restart from the beginning of the string instead
 	//	  of trying to continue where we left off.
 	//
-recover:
+.recover:
 	ld8 val=[base],8	// will fail if unrecoverable fault
 	;;
 	or val=val,mask		// remask first bytes
@@ -180,7 +180,7 @@ recover:
 	czx1.r val1=val		// search 0 byte from right
 	;;
 	cmp.eq p6,p0=8,val1	// val1==8 ?
-(p6)	br.wtop.dptk.few 2b	// loop until p6 == 0
+(p6)	br.wtop.dptk 2b		// loop until p6 == 0
 	;;			// (avoid WAW on p63)
 	sub ret0=base,orig	// distance from base
 	sub tmp=8,val1
@@ -188,5 +188,5 @@ recover:
 	;;
 	sub ret0=ret0,tmp	// length=now - back -1
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp	// end of successful recovery code
+	br.ret.sptk.many rp	// end of successful recovery code
 END(strlen)

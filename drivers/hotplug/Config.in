@@ -1,0 +1,12 @@
+#
+# PCI Hotplug support
+#
+mainmenu_option next_comment
+comment 'PCI Hotplug Support'
+
+dep_tristate 'Support for PCI Hotplug (EXPERIMENTAL)' CONFIG_HOTPLUG_PCI $CONFIG_DDFS $CONFIG_EXPERIMENTAL
+
+dep_tristate '  Compaq PCI Hotplug driver' CONFIG_HOTPLUG_PCI_COMPAQ $CONFIG_HOTPLUG_PCI
+dep_mbool '    Save configuration into NVRAM on Compaq servers' CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM $CONFIG_HOTPLUG_PCI_COMPAQ
+
+endmenu

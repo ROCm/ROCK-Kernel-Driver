@@ -18680,4 +18680,4 @@ AdvInquiryHandling(
         }
     }
 }
-MODULE_LICENSE("BSD without advertising clause");
+MODULE_LICENSE("Dual BSD/GPL");

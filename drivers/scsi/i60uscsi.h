@@ -342,14 +342,10 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	UBYTE ActiveTags[16][16];	/* 50 */
 	ORC_TCS HCS_Tcs[16];	/* 28 */
 	U32 BitAllocFlag[MAX_CHANNELS][8];	/* Max STB is 256, So 256/32 */
-#if LINUX_VERSION_CODE >= CVT_LINUX_VERSION(2,1,95)
 	spinlock_t BitAllocFlagLock;
-#endif
 	ULONG pSRB_head;
 	ULONG pSRB_tail;
-#if LINUX_VERSION_CODE >= CVT_LINUX_VERSION(2,1,95)
 	spinlock_t pSRB_lock;
-#endif
 } ORC_HCS;
 
 /* Bit Definition for HCS_Flags */

@@ -23,7 +23,7 @@
 #define O_NDELAY	O_NONBLOCK
 #define O_SYNC		 010000
 #define FASYNC		 020000	/* fcntl, for BSD compatibility */
-#define O_DIRECT	 040000	/* direct disk access hint - currently ignored */
+#define O_DIRECT	 040000	/* direct disk access hint */
 #define O_LARGEFILE	0100000
 #define O_DIRECTORY	0200000	/* must be a directory */
 #define O_NOFOLLOW	0400000 /* don't follow links */

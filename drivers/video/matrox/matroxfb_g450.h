@@ -6,6 +6,7 @@
 
 struct matroxfb_g450_info {
 	struct matrox_fb_info*	primary_dev;
+	unsigned int		timmings;
 };
 
 #endif /* __MATROXFB_MAVEN_H__ */

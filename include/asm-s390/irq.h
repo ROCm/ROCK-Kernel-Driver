@@ -313,7 +313,7 @@ typedef struct {
       scsw_t scsw;             /* subchannel status word */
       esw_t  esw;              /* extended status word */
       __u8   ecw[32];          /* extended control word */
-   } irb_t __attribute__ ((packed,aligned(4)));
+   } __attribute__ ((packed,aligned(4))) irb_t;
 #ifdef __KERNEL__
 
 /*

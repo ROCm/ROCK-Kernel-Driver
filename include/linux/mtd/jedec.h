@@ -7,7 +7,7 @@
  *
  * See the AMD flash databook for information on how to operate the interface.
  *
- * $Id: jedec.h,v 1.1 2000/07/04 07:21:51 jgg Exp $
+ * $Id: jedec.h,v 1.2 2001/11/06 14:37:36 dwmw2 Exp $
  */
 
 #ifndef __LINUX_MTD_JEDEC_H__
@@ -63,7 +63,5 @@ struct jedec_private
    
    struct jedec_flash_chip chips[MAX_JEDEC_CHIPS];  
 };
-
-extern const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id);
 
 #endif

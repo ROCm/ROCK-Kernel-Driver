@@ -230,11 +230,8 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 				return -EFAULT;
 			return 0;
 		}
-		case BLKGETSIZE:   /* Return device size */
-			return put_user(sd[SD_PARTITION(inode->i_rdev)].nr_sects, (unsigned long *) arg);
+		case BLKGETSIZE:
 		case BLKGETSIZE64:
-			return put_user((u64)sd[SD_PARTITION(inode->i_rdev)].nr_sects << 9, (u64 *)arg);
-
 		case BLKROSET:
 		case BLKROGET:
 		case BLKRASET:
@@ -459,8 +456,10 @@ static int sd_open(struct inode *inode, struct file *filp)
 	 * is being re-read.
 	 */
 
-	while (rscsi_disks[target].device->busy)
+	while (rscsi_disks[target].device->busy) {
 		barrier();
+		cpu_relax();
+	}
 	/*
 	 * The following code can sleep.
 	 * Module unloading must be prevented

@@ -45,7 +45,8 @@ static int		vxfs_bmap(struct address_space *, long);
 
 struct address_space_operations vxfs_aops = {
 	.readpage =		vxfs_readpage,
-	.bmap =			vxfs_bmap
+	.bmap =			vxfs_bmap,
+	.sync_page =		block_sync_page,
 };
 
 

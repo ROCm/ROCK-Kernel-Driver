@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1998-1999 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -502,10 +503,17 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 		IRDA_DEBUG(4, __FUNCTION__ 
 			   "(), discovery only possible in NDM mode\n");
 		irlap_discovery_confirm(self, NULL);
+		/* Note : in theory, if we are not in NDM, we could postpone
+		 * the discovery like we do for connection request.
+		 * In practice, it's not worth it. If the media was busy,
+		 * it's likely next time around it won't be busy. If we are
+		 * in REPLY state, we will get passive discovery info & event.
+		 * Jean II */
 		return;
 	}
 
-	/* Check if last discovery request finished in time */
+	/* Check if last discovery request finished in time, or if
+	 * it was aborted due to the media busy flag. */
 	if (self->discovery_log != NULL) {
 		hashbin_delete(self->discovery_log, (FREE_FUNC) kfree);
 		self->discovery_log = NULL;
@@ -555,10 +563,16 @@ void irlap_discovery_confirm(struct irlap_cb *self, hashbin_t *discovery_log)
 	
 	/* 
 	 * Check for successful discovery, since we are then allowed to clear 
-	 * the media busy condition (irlap p.94). This should allow us to make 
-	 * connection attempts much easier.
+	 * the media busy condition (IrLAP 6.13.4 - p.94). This should allow
+	 * us to make connection attempts much faster and easier (i.e. no
+	 * collisions).
+	 * Setting media busy to false will also generate an event allowing
+	 * to process pending events in NDM state machine.
+	 * Note : the spec doesn't define what's a successful discovery is.
+	 * If we want Ultra to work, it's successful even if there is
+	 * nobody discovered - Jean II
 	 */
-	if (discovery_log && HASHBIN_GET_SIZE(discovery_log) > 0)
+	if (discovery_log)
 		irda_device_set_media_busy(self->netdev, FALSE);
 	
 	/* Inform IrLMP */
@@ -580,7 +594,18 @@ void irlap_discovery_indication(struct irlap_cb *self, discovery_t *discovery)
 	ASSERT(discovery != NULL, return;);
 
 	ASSERT(self->notify.instance != NULL, return;);
-	
+
+	/* A device is very likely to connect immediately after it performs
+	 * a successful discovery. This means that in our case, we are much
+	 * more likely to receive a connection request over the medium.
+	 * So, we backoff to avoid collisions.
+	 * IrLAP spec 6.13.4 suggest 100ms...
+	 * Note : this little trick actually make a *BIG* difference. If I set
+	 * my Linux box with discovery enabled and one Ultra frame sent every
+	 * second, my Palm has no trouble connecting to it every time !
+	 * Jean II */
+	irda_device_set_media_busy(self->netdev, SMALL);
+
 	irlmp_link_discovery_indication(self->notify.instance, discovery);
 }
 

@@ -1,4 +1,4 @@
-/* $Id: tpam.h,v 1.1.2.2 2001/09/23 22:25:03 kai Exp $
+/* $Id: tpam.h,v 1.1.2.3 2001/11/06 20:58:30 kai Exp $
  *
  * Turbo PAM ISDN driver for Linux. (Kernel Driver)
  *
@@ -213,8 +213,8 @@ extern void tpam_recv_U3DataInd(tpam_card *, struct sk_buff *);
 extern void tpam_recv_U3ReadyToReceiveInd(tpam_card *, struct sk_buff *);
 
 /* Function prototypes from tpam_hdlc.c */
-extern u32 hdlc_encode(u8 *, u8 *, u32 *, u32);
-extern u32 hdlc_decode(u8 *, u8 *, u32);
+extern u32 tpam_hdlc_encode(u8 *, u8 *, u32 *, u32);
+extern u32 tpam_hdlc_decode(u8 *, u8 *, u32);
 
 /* Function prototypes from tpam_crcpc.c */
 extern void init_CRC(void);

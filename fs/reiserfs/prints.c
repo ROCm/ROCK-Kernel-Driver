@@ -520,15 +520,8 @@ static int print_super_block (struct buffer_head * bh)
 	    (sb_state(rs) == REISERFS_VALID_FS) ? "VALID" : "ERROR");
     printk ("Hash function \"%s\"\n",
             sb_hash_function_code(rs) == TEA_HASH ? "tea" :
-	    ((sb_hash_function_code(rs) == YURA_HASH) ? "rupasov" : "unknown"));
+	    ( sb_hash_function_code(rs) == YURA_HASH ? "rupasov" : (sb_hash_function_code(rs) == R5_HASH ? "r5" : "unknown")));
 
-#if 0
-    __u32 s_journal_trans_max ;           /* max number of blocks in a transaction.  */
-    __u32 s_journal_block_count ;         /* total size of the journal. can change over time  */
-    __u32 s_journal_max_batch ;           /* max number of blocks to batch into a trans */
-    __u32 s_journal_max_commit_age ;      /* in seconds, how old can an async commit be */
-    __u32 s_journal_max_trans_age ;       /* in seconds, how old can a transaction be */
-#endif
     printk ("Tree height %d\n", sb_tree_height(rs));
     return 0;
 }

@@ -217,5 +217,6 @@ extern int decnet_time_wait;
 extern int decnet_dn_count;
 extern int decnet_di_count;
 extern int decnet_dr_count;
+extern int decnet_no_fc_max_cwnd;
 
 #endif /* _NET_DN_H */

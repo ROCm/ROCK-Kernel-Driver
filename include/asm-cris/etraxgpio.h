@@ -35,4 +35,15 @@
 /* SHUTDOWN ioctl */
 #define IO_SHUTDOWN   0xD
 #define IO_GET_PWR_BT 0xE
+
+/* Bit toggling in driver settings */
+/* bit set in low byte0 is CLK mask (0x00FF), 
+   bit set in byte1 is DATA mask    (0xFF00) 
+   msb, data_mask[7:0] , clk_mask[7:0]
+ */
+#define IO_CFG_WRITE_MODE 0xF 
+#define IO_CFG_WRITE_MODE_VALUE(msb, data_mask, clk_mask) \
+  ( (((msb)&1) << 16) | (((data_mask) &0xFF) << 8) | ((clk_mask) & 0xFF) )
+
+
 #endif

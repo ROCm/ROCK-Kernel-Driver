@@ -4,8 +4,9 @@
  *
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999-2000 David Mosberger <davidm@hpl.hp.com>
- * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999-2001 Hewlett-Packard Co
+ *	David Mosberger <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 05/22/2000 eranian Added support for stacked register calls
  * 05/24/2000 eranian Added support for physical mode static calls
@@ -31,7 +32,7 @@ GLOBAL_ENTRY(ia64_pal_handler_init)
 	movl r2=pal_entry_point
 	;;
 	st8 [r2]=in0
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(ia64_pal_handler_init)
 
 /*
@@ -41,7 +42,7 @@ END(ia64_pal_handler_init)
  */
 GLOBAL_ENTRY(ia64_pal_default_handler)
 	mov r8=-1
-	br.cond.sptk.few rp
+	br.cond.sptk.many rp
 END(ia64_pal_default_handler)
 
 /*
@@ -79,13 +80,13 @@ GLOBAL_ENTRY(ia64_pal_call_static)
 	;;
 (p6)	srlz.i
 	mov rp = r8
-	br.cond.sptk.few b7
+	br.cond.sptk.many b7
 1:	mov psr.l = loc3
 	mov ar.pfs = loc1
 	mov rp = loc0
 	;;
 	srlz.d				// seralize restoration of psr.l
-	br.ret.sptk.few	b0
+	br.ret.sptk.many b0
 END(ia64_pal_call_static)
 
 /*
@@ -120,7 +121,7 @@ GLOBAL_ENTRY(ia64_pal_call_stacked)
 	mov rp = loc0
 	;;
 	srlz.d				// serialize restoration of psr.l
-	br.ret.sptk.few	b0
+	br.ret.sptk.many b0
 END(ia64_pal_call_stacked)
 
 /*
@@ -173,13 +174,13 @@ GLOBAL_ENTRY(ia64_pal_call_phys_static)
 	or loc3=loc3,r17		// add in psr the bits to set
 	;;
 	andcm r16=loc3,r16		// removes bits to clear from psr
-	br.call.sptk.few rp=ia64_switch_mode
+	br.call.sptk.many rp=ia64_switch_mode
 .ret1:	mov rp = r8			// install return address (physical)
-	br.cond.sptk.few b7
+	br.cond.sptk.many b7
 1:
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3			// r16= original psr
-	br.call.sptk.few rp=ia64_switch_mode // return to virtual mode
+	br.call.sptk.many rp=ia64_switch_mode // return to virtual mode
 .ret2:
 	mov psr.l = loc3		// restore init PSR
 
@@ -188,7 +189,7 @@ GLOBAL_ENTRY(ia64_pal_call_phys_static)
 	;;
 	mov ar.rsc=loc4			// restore RSE configuration
 	srlz.d				// seralize restoration of psr.l
-	br.ret.sptk.few	b0
+	br.ret.sptk.many b0
 END(ia64_pal_call_phys_static)
 
 /*
@@ -227,13 +228,13 @@ GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	mov b7 = loc2			// install target to branch reg
 	;;
 	andcm r16=loc3,r16		// removes bits to clear from psr
-	br.call.sptk.few rp=ia64_switch_mode
+	br.call.sptk.many rp=ia64_switch_mode
 .ret6:
 	br.call.sptk.many rp=b7		// now make the call
 .ret7:
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3			// r16= original psr
-	br.call.sptk.few rp=ia64_switch_mode	// return to virtual mode
+	br.call.sptk.many rp=ia64_switch_mode	// return to virtual mode
 
 .ret8:	mov psr.l  = loc3		// restore init PSR
 	mov ar.pfs = loc1
@@ -241,6 +242,6 @@ GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	;;
 	mov ar.rsc=loc4			// restore RSE configuration
 	srlz.d				// seralize restoration of psr.l
-	br.ret.sptk.few	b0
+	br.ret.sptk.many b0
 END(ia64_pal_call_phys_stacked)
 

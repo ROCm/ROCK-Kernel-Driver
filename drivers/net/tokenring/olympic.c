@@ -737,7 +737,7 @@ static void olympic_rx(struct net_device *dev)
 			} else {	
 			
 				if (buffer_cnt == 1) {
-					skb = dev_alloc_skb(olympic_priv->pkt_buf_sz) ; 
+					skb = dev_alloc_skb(max_t(int, olympic_priv->pkt_buf_sz,length)) ; 
 				} else {
 					skb = dev_alloc_skb(length) ; 
 				}
@@ -1684,7 +1684,7 @@ static int olympic_proc_info(char *buffer, char **start, off_t offset, int lengt
 
 static void __devexit olympic_remove_one(struct pci_dev *pdev) 
 {
-	struct net_device *dev = pdev->driver_data ; 
+	struct net_device *dev = pci_get_drvdata(pdev) ; 
 	struct olympic_private *olympic_priv=(struct olympic_private *)dev->priv;
 
 	if (olympic_priv->olympic_network_monitor) { 

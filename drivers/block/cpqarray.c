@@ -942,6 +942,8 @@ queue_next:
 	if ((c = cmd_alloc(h,1)) == NULL)
 		goto startio;
 
+	blkdev_dequeue_request(creq);
+
 	spin_unlock_irq(&io_request_lock);
 
 	bh = creq->bh;
@@ -987,13 +989,10 @@ DBGPX(
 DBGPX(	printk("Submitting %d sectors in %d segments\n", sect, seg); );
 	c->req.hdr.sg_cnt = seg;
 	c->req.hdr.blk_cnt = creq->nr_sectors;
-
-	spin_lock_irq(&io_request_lock);
-
-	blkdev_dequeue_request(creq);
-
 	c->req.hdr.cmd = (creq->cmd == READ) ? IDA_READ : IDA_WRITE;
 	c->type = CMD_RWREQ;
+
+	spin_lock_irq(&io_request_lock);
 
 	/* Put the request on the tail of the request queue */
 	addQ(&h->reqQ, c);

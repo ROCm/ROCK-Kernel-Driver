@@ -12,6 +12,7 @@
 
 unsigned long dmi_broken;
 int is_sony_vaio_laptop;
+int enable_acpi_smp_table;
 
 struct dmi_header
 {
@@ -401,7 +402,6 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
  */
 
 typedef void (pm_kbd_func) (void);
-extern pm_kbd_func *pm_kbd_request_override;
 
 static __init int broken_ps2_resume(struct dmi_blacklist *d)
 {

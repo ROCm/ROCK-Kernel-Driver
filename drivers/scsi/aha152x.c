@@ -2956,7 +2956,11 @@ static void is_complete(struct Scsi_Host *shpnt)
 
 	DO_LOCK(flags);
 	if(HOSTDATA(shpnt)->in_intr!=0)
+	{
+		DO_UNLOCK(flags);
+		/* _error never returns.. */
 		aha152x_error(shpnt, "bottom-half already running!?");
+	}
 	HOSTDATA(shpnt)->in_intr++;
 	DO_UNLOCK(flags);
 

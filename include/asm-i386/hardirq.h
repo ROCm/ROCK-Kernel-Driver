@@ -68,7 +68,7 @@ static inline void irq_enter(int cpu, int irq)
 	++local_irq_count(cpu);
 
 	while (test_bit(0,&global_irq_lock)) {
-		/* nothing */;
+		cpu_relax();
 	}
 }
 

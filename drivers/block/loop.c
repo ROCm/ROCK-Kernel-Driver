@@ -186,6 +186,8 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 	data = bh->b_data;
 	while (len > 0) {
 		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
+		int transfer_result;
+
 		size = PAGE_CACHE_SIZE - offset;
 		if (size > len)
 			size = len;
@@ -197,9 +199,18 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 			goto unlock;
 		kaddr = page_address(page);
 		flush_dcache_page(page);
-		if (lo_do_transfer(lo, WRITE, kaddr + offset, data, size, IV))
-			goto write_fail;
+		transfer_result = lo_do_transfer(lo, WRITE, kaddr + offset, data, size, IV);
+		if (transfer_result) {
+			/*
+			 * The transfer failed, but we still write the data to
+			 * keep prepare/commit calls balanced.
+			 */
+			printk(KERN_ERR "loop: transfer error block %ld\n", index);
+			memset(kaddr + offset, 0, size);
+		}
 		if (aops->commit_write(file, page, offset, offset+size))
+			goto unlock;
+		if (transfer_result)
 			goto unlock;
 		data += size;
 		len -= size;
@@ -211,10 +222,6 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 	}
 	return 0;
 
-write_fail:
-	printk(KERN_ERR "loop: transfer error block %ld\n", index);
-	ClearPageUptodate(page);
-	kunmap(page);
 unlock:
 	UnlockPage(page);
 	page_cache_release(page);

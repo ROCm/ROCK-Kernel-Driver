@@ -309,7 +309,7 @@ static struct pci_ops pci_direct_conf2 = {
  * This should be close to trivial, but it isn't, because there are buggy
  * chipsets (yes, you guessed it, by Intel and Compaq) that have no class ID.
  */
-static int __init pci_sanity_check(struct pci_ops *o)
+static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u16 x;
 	struct pci_bus bus;		/* Fake bus and device */
@@ -329,7 +329,7 @@ static int __init pci_sanity_check(struct pci_ops *o)
 	return 0;
 }
 
-static struct pci_ops * __init pci_check_direct(void)
+static struct pci_ops * __devinit pci_check_direct(void)
 {
 	unsigned int tmp;
 	unsigned long flags;
@@ -488,7 +488,7 @@ static struct {
 
 static int pci_bios_present;
 
-static int __init check_pcibios(void)
+static int __devinit check_pcibios(void)
 {
 	u32 signature, eax, ebx, ecx;
 	u8 status, major_ver, minor_ver, hw_mech;
@@ -538,7 +538,7 @@ static int __init check_pcibios(void)
 	return 0;
 }
 
-static int __init pci_bios_find_device (unsigned short vendor, unsigned short device_id,
+static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short device_id,
 					unsigned short index, unsigned char *bus, unsigned char *device_fn)
 {
 	unsigned short bx;
@@ -747,7 +747,7 @@ static struct pci_ops pci_bios_access = {
  * Try to find PCI BIOS.
  */
 
-static struct pci_ops * __init pci_find_bios(void)
+static struct pci_ops * __devinit pci_find_bios(void)
 {
 	union bios32 *check;
 	unsigned char sum;
@@ -801,7 +801,7 @@ static struct pci_ops * __init pci_find_bios(void)
  * which used BIOS ordering, we are bound to do this...
  */
 
-static void __init pcibios_sort(void)
+static void __devinit pcibios_sort(void)
 {
 	LIST_HEAD(sorted_devices);
 	struct list_head *ln;
@@ -855,7 +855,7 @@ struct irq_routing_options {
 	u16 segment;
 } __attribute__((packed));
 
-struct irq_routing_table * __init pcibios_get_irq_routing_table(void)
+struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 {
 	struct irq_routing_options opt;
 	struct irq_routing_table *rt = NULL;
@@ -929,7 +929,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
  * expected to be unique) and remove the ghost devices.
  */
 
-static void __init pcibios_fixup_ghosts(struct pci_bus *b)
+static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 {
 	struct list_head *ln, *mn;
 	struct pci_dev *d, *e;
@@ -979,7 +979,7 @@ static void __init pcibios_fixup_ghosts(struct pci_bus *b)
  * Discover remaining PCI buses in case there are peer host bridges.
  * We use the number of last PCI bus provided by the PCI BIOS.
  */
-static void __init pcibios_fixup_peer_bridges(void)
+static void __devinit pcibios_fixup_peer_bridges(void)
 {
 	int n;
 	struct pci_bus bus;
@@ -1010,7 +1010,7 @@ static void __init pcibios_fixup_peer_bridges(void)
  * Exceptions for specific devices. Usually work-arounds for fatal design flaws.
  */
 
-static void __init pci_fixup_i450nx(struct pci_dev *d)
+static void __devinit pci_fixup_i450nx(struct pci_dev *d)
 {
 	/*
 	 * i450NX -- Find and scan all secondary buses on all PXB's.
@@ -1032,7 +1032,7 @@ static void __init pci_fixup_i450nx(struct pci_dev *d)
 	pcibios_last_bus = -1;
 }
 
-static void __init pci_fixup_i450gx(struct pci_dev *d)
+static void __devinit pci_fixup_i450gx(struct pci_dev *d)
 {
 	/*
 	 * i450GX and i450KX -- Find and scan all secondary buses.
@@ -1045,49 +1045,7 @@ static void __init pci_fixup_i450gx(struct pci_dev *d)
 	pcibios_last_bus = -1;
 }
 
-#if 0
-/* Until we get proper handling pray the BIOS gets it right */
-/*
- * ServerWorks host bridges -- Find and scan all secondary buses.
- * Register 0x44 contains first, 0x45 last bus number routed there.
- */
-static void __init pci_fixup_serverworks(struct pci_dev *d)
-{
-	u8 busno1, busno2;
-
-	pci_read_config_byte(d, 0x44, &busno1);
-	pci_read_config_byte(d, 0x45, &busno2);
-	if (busno2 < busno1)
-		busno2 = busno1;
-	if (busno2 > pcibios_last_bus) {
-		pcibios_last_bus = busno2;
-		printk("PCI: ServerWorks host bridge: last bus %02x\n", pcibios_last_bus);
-	}
-}
-#endif
-
-#if 0
-/* Our bus code shouldnt need this fixup any more. Delete once verified */
-/*	
- * Compaq host bridges -- Find and scan all secondary buses.
- * This time registers 0xc8 and 0xc9.
- */
-static void __init pci_fixup_compaq(struct pci_dev *d)
-{
-	u8 busno1, busno2;
-
-	pci_read_config_byte(d, 0xc8, &busno1);
-	pci_read_config_byte(d, 0xc9, &busno2);
-	if (busno2 < busno1)
-		busno2 = busno1;
-	if (busno2 > pcibios_last_bus) {
-		pcibios_last_bus = busno2;
-		printk("PCI: Compaq host bridge: last bus %02x\n", busno2);
-	}
-}
-#endif	
-
-static void __init pci_fixup_umc_ide(struct pci_dev *d)
+static void __devinit  pci_fixup_umc_ide(struct pci_dev *d)
 {
 	/*
 	 * UM8886BF IDE controller sets region type bits incorrectly,
@@ -1100,7 +1058,7 @@ static void __init pci_fixup_umc_ide(struct pci_dev *d)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
 }
 
-static void __init pci_fixup_ide_bases(struct pci_dev *d)
+static void __devinit pci_fixup_ide_bases(struct pci_dev *d)
 {
 	int i;
 
@@ -1119,7 +1077,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	}
 }
 
-static void __init pci_fixup_ide_trash(struct pci_dev *d)
+static void __devinit  pci_fixup_ide_trash(struct pci_dev *d)
 {
 	int i;
 
@@ -1132,7 +1090,7 @@ static void __init pci_fixup_ide_trash(struct pci_dev *d)
 		d->resource[i].start = d->resource[i].end = d->resource[i].flags = 0;
 }
 
-static void __init pci_fixup_latency(struct pci_dev *d)
+static void __devinit  pci_fixup_latency(struct pci_dev *d)
 {
 	/*
 	 *  SiS 5597 and 5598 chipsets require latency timer set to
@@ -1142,7 +1100,7 @@ static void __init pci_fixup_latency(struct pci_dev *d)
 	pcibios_max_latency = 32;
 }
 
-static void __init pci_fixup_piix4_acpi(struct pci_dev *d)
+static void __devinit pci_fixup_piix4_acpi(struct pci_dev *d)
 {
 	/*
 	 * PIIX4 ACPI device: hardwired IRQ9
@@ -1173,16 +1131,6 @@ static void __init pci_fixup_via_athlon_bug(struct pci_dev *d)
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454GX,	pci_fixup_i450gx },
-#if 0
-/* Until we get proper handling pray the BIOS gets it right */
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_HE,		pci_fixup_serverworks },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_LE,		pci_fixup_serverworks },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	PCI_DEVICE_ID_SERVERWORKS_CMIC_HE,	pci_fixup_serverworks },
-#endif	
-#if 0
-/* Our bus code shouldnt need this fixup any more. Delete once verified */
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_COMPAQ,	PCI_DEVICE_ID_COMPAQ_6010,	pci_fixup_compaq },
-#endif	
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_UMC,	PCI_DEVICE_ID_UMC_UM8886BF,	pci_fixup_umc_ide },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5513,		pci_fixup_ide_trash },
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
@@ -1198,14 +1146,14 @@ struct pci_fixup pcibios_fixups[] = {
  *  are examined.
  */
 
-void __init pcibios_fixup_bus(struct pci_bus *b)
+void __devinit  pcibios_fixup_bus(struct pci_bus *b)
 {
 	pcibios_fixup_ghosts(b);
 	pci_read_bridge_bases(b);
 }
 
 
-void __init pcibios_config_init(void)
+void __devinit pcibios_config_init(void)
 {
 	/*
 	 * Try all known PCI access methods. Note that we support using 
@@ -1262,7 +1210,7 @@ void __init pcibios_init(void)
 #endif
 }
 
-char * __init pcibios_setup(char *str)
+char * __devinit  pcibios_setup(char *str)
 {
 	if (!strcmp(str, "off")) {
 		pci_probe = 0;

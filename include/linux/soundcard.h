@@ -179,7 +179,7 @@ typedef struct seq_event_rec {
  * Some big endian/little endian handling macros
  */
 
-#if defined(_AIX) || defined(AIX) || defined(sparc) || defined(__sparc__) || defined(HPPA) || defined(PPC)
+#if defined(_AIX) || defined(AIX) || defined(sparc) || defined(__sparc__) || defined(HPPA) || defined(PPC) || defined(__mc68000__)
 /* Big endian machines */
 #  define _PATCHKEY(id) (0xfd00|id)
 #  define AFMT_S16_NE AFMT_S16_BE

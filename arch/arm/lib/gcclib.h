@@ -11,7 +11,7 @@ typedef          int DItype     __attribute__ ((mode (DI)));
 typedef          int word_type 	__attribute__ ((mode (__word__)));
 typedef unsigned int UDItype    __attribute__ ((mode (DI)));
 
-#if 0 /* FIXME: endian test here!!! */
+#ifdef __ARMEB__
   struct DIstruct {SItype high, low;};
 #else
   struct DIstruct {SItype low, high;};

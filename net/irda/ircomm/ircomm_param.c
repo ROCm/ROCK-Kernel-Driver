@@ -182,13 +182,13 @@ static int ircomm_param_service_type(void *instance, irda_param_t *param,
 				     int get)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) instance;
-	__u8 service_type = param->pv.b; /* We know it's a one byte integer */
+	__u8 service_type = (__u8) param->pv.i;
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
 	if (get) {
-		param->pv.b = self->settings.service_type;
+		param->pv.i = self->settings.service_type;
 		return 0;
 	}
 
@@ -246,9 +246,9 @@ static int ircomm_param_port_type(void *instance, irda_param_t *param, int get)
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = IRCOMM_SERIAL;
+		param->pv.i = IRCOMM_SERIAL;
 	else {
-		self->settings.port_type = param->pv.b;
+		self->settings.port_type = (__u8) param->pv.i;
 
 		IRDA_DEBUG(0, __FUNCTION__ "(), port type=%d\n", 
 			   self->settings.port_type);
@@ -317,9 +317,9 @@ static int ircomm_param_data_format(void *instance, irda_param_t *param,
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
 	if (get)
-		param->pv.b = self->settings.data_format;
+		param->pv.i = self->settings.data_format;
 	else
-		self->settings.data_format = param->pv.b;
+		self->settings.data_format = (__u8) param->pv.i;
 	
 	return 0;
 }
@@ -339,11 +339,11 @@ static int ircomm_param_flow_control(void *instance, irda_param_t *param,
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->settings.flow_control;
+		param->pv.i = self->settings.flow_control;
 	else
-		self->settings.flow_control = param->pv.b;
+		self->settings.flow_control = (__u8) param->pv.i;
 
-	IRDA_DEBUG(1, __FUNCTION__ "(), flow control = 0x%02x\n", param->pv.b);
+	IRDA_DEBUG(1, __FUNCTION__ "(), flow control = 0x%02x\n", (__u8) param->pv.i);
 
 	return 0;
 }
@@ -362,15 +362,15 @@ static int ircomm_param_xon_xoff(void *instance, irda_param_t *param, int get)
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 	
 	if (get) {
-		param->pv.s = self->settings.xonxoff[0];
-		param->pv.s |= self->settings.xonxoff[1] << 8;
+		param->pv.i = self->settings.xonxoff[0];
+		param->pv.i |= self->settings.xonxoff[1] << 8;
 	} else {
-		self->settings.xonxoff[0] = param->pv.s & 0xff;
-		self->settings.xonxoff[1] = param->pv.s >> 8;
+		self->settings.xonxoff[0] = (__u16) param->pv.i & 0xff;
+		self->settings.xonxoff[1] = (__u16) param->pv.i >> 8;
 	}
 
 	IRDA_DEBUG(0, __FUNCTION__ "(), XON/XOFF = 0x%02x,0x%02x\n", 
-		   param->pv.s & 0xff, param->pv.s >> 8);
+		   param->pv.i & 0xff, param->pv.i >> 8);
 
 	return 0;
 }
@@ -389,15 +389,15 @@ static int ircomm_param_enq_ack(void *instance, irda_param_t *param, int get)
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 	
 	if (get) {
-		param->pv.s = self->settings.enqack[0];
-		param->pv.s |= self->settings.enqack[1] << 8;
+		param->pv.i = self->settings.enqack[0];
+		param->pv.i |= self->settings.enqack[1] << 8;
 	} else {
-		self->settings.enqack[0] = param->pv.s & 0xff;
-		self->settings.enqack[1] = param->pv.s >> 8;
+		self->settings.enqack[0] = (__u16) param->pv.i & 0xff;
+		self->settings.enqack[1] = (__u16) param->pv.i >> 8;
 	}
 
 	IRDA_DEBUG(0, __FUNCTION__ "(), ENQ/ACK = 0x%02x,0x%02x\n",
-		   param->pv.s & 0xff, param->pv.s >> 8);
+		   param->pv.i & 0xff, param->pv.i >> 8);
 
 	return 0;
 }
@@ -431,9 +431,9 @@ static int ircomm_param_dte(void *instance, irda_param_t *param, int get)
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
 	if (get)
-		param->pv.b = self->settings.dte;
+		param->pv.i = self->settings.dte;
 	else {
-		dte = param->pv.b;
+		dte = (__u8) param->pv.i;
 		
 		if (dte & IRCOMM_DELTA_DTR)
 			self->settings.dce |= (IRCOMM_DELTA_DSR|
@@ -470,9 +470,9 @@ static int ircomm_param_dce(void *instance, irda_param_t *param, int get)
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) instance;
 	__u8 dce;
 
-	IRDA_DEBUG(1, __FUNCTION__ "(), dce = 0x%02x\n", param->pv.b);
+	IRDA_DEBUG(1, __FUNCTION__ "(), dce = 0x%02x\n", (__u8) param->pv.i);
 
-	dce = param->pv.b;
+	dce = (__u8) param->pv.i;
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);

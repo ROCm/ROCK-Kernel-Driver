@@ -33,6 +33,7 @@ endif
 
 obj-$(CONFIG_ATM_LANE) += lec.o
 obj-$(CONFIG_ATM_MPOA) += mpoa.o
+obj-$(CONFIG_PPPOATM) += pppoatm.o
 
 include $(TOPDIR)/Rules.make
 

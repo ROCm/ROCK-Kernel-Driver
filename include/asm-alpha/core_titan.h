@@ -379,7 +379,7 @@ struct el_PRIVATEER_envdata_mcheck {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int titan_inb(unsigned long addr)
+__EXTERN_INLINE u8 titan_inb(unsigned long addr)
 {
 	/* ??? I wish I could get rid of this.  But there's no ioremap
 	   equivalent for I/O space.  PCI I/O can be forced into the
@@ -390,33 +390,33 @@ __EXTERN_INLINE unsigned int titan_inb(unsigned long addr)
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE void titan_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void titan_outb(u8 b, unsigned long addr)
 {
 	addr += TITAN_IO_BIAS;
 	__kernel_stb(b, *(vucp)addr);
 	mb();
 }
 
-__EXTERN_INLINE unsigned int titan_inw(unsigned long addr)
+__EXTERN_INLINE u16 titan_inw(unsigned long addr)
 {
 	addr += TITAN_IO_BIAS;
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE void titan_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void titan_outw(u16 b, unsigned long addr)
 {
 	addr += TITAN_IO_BIAS;
 	__kernel_stw(b, *(vusp)addr);
 	mb();
 }
 
-__EXTERN_INLINE unsigned int titan_inl(unsigned long addr)
+__EXTERN_INLINE u32 titan_inl(unsigned long addr)
 {
 	addr += TITAN_IO_BIAS;
 	return *(vuip)addr;
 }
 
-__EXTERN_INLINE void titan_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void titan_outl(u32 b, unsigned long addr)
 {
 	addr += TITAN_IO_BIAS;
 	*(vuip)addr = b;
@@ -444,42 +444,42 @@ __EXTERN_INLINE int titan_is_ioaddr(unsigned long addr)
 	return addr >= TITAN_BASE;
 }
 
-__EXTERN_INLINE unsigned long titan_readb(unsigned long addr)
+__EXTERN_INLINE u8 titan_readb(unsigned long addr)
 {
 	return __kernel_ldbu(*(vucp)addr);
 }
 
-__EXTERN_INLINE unsigned long titan_readw(unsigned long addr)
+__EXTERN_INLINE u16 titan_readw(unsigned long addr)
 {
 	return __kernel_ldwu(*(vusp)addr);
 }
 
-__EXTERN_INLINE unsigned long titan_readl(unsigned long addr)
+__EXTERN_INLINE u32 titan_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long titan_readq(unsigned long addr)
+__EXTERN_INLINE u64 titan_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void titan_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void titan_writeb(u8 b, unsigned long addr)
 {
 	__kernel_stb(b, *(vucp)addr);
 }
 
-__EXTERN_INLINE void titan_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void titan_writew(u16 b, unsigned long addr)
 {
 	__kernel_stw(b, *(vusp)addr);
 }
 
-__EXTERN_INLINE void titan_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void titan_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void titan_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void titan_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

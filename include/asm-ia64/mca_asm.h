@@ -41,7 +41,7 @@
  */
 #define DATA_PA_TO_VA(addr,temp)							\
 	mov	temp	= 0x7	;;							\
-	dep	addr	= temp, addr, 61, 3;
+	dep	addr	= temp, addr, 61, 3;;
 
 /*
  * This macro jumps to the instruction at the given virtual address
@@ -74,6 +74,7 @@
 											\
 	mov	ar.rsc = 0 ;								\
 	;;										\
+	srlz.d;										\
 	mov	temp2 = ar.bspstore;							\
 	;;										\
 	DATA_VA_TO_PA(temp2);								\
@@ -101,6 +102,8 @@
 	dep	temp1 = 0, temp1, PSR_RT, 1;						\
 	;;										\
 	dep	temp1 = 0, temp1, PSR_I, 1;						\
+	;;										\
+	dep	temp1 = 0, temp1, PSR_IC, 1;						\
 	;;										\
 	movl	temp2 = start_addr;							\
 	mov	cr.ipsr = temp1;							\
@@ -145,6 +148,8 @@
 #define VIRTUAL_MODE_ENTER(temp1, temp2, start_addr, old_psr)	\
 	mov	temp2 = psr;					\
 	;;							\
+	mov	old_psr = temp2;				\
+	;;							\
 	dep	temp2 = 0, temp2, PSR_IC, 2;			\
 	;;							\
 	mov	psr.l = temp2;					\
@@ -163,7 +168,7 @@
 	;;							\
 	mov	temp1 = old_psr;				\
 	;;							\
-	mov	temp2 = 1					\
+	mov	temp2 = 1;					\
 	;;							\
 	dep	temp1 = temp2, temp1, PSR_I,  1;		\
 	;;							\
@@ -182,8 +187,10 @@
 	movl	temp2 = start_addr;				\
 	;;							\
 	mov	cr.iip = temp2;					\
+	;;							\
 	DATA_PA_TO_VA(sp, temp1);				\
 	DATA_PA_TO_VA(gp, temp2);				\
+	srlz.i;							\
 	;;							\
 	nop	1;						\
 	nop	2;						\
@@ -246,7 +253,7 @@
 	mov     ar.bspstore=p_bspstore;;					\
 	mov     temp=ar.bsp;;							\
 	sub     temp=temp,p_bspstore;;						\
-	st8     [p_stackframe]=temp,8
+	st8     [p_stackframe]=temp,8;;
 
 /*
  * rse_return_context
@@ -278,28 +285,20 @@
 	mov     ar.rnat=temp;;							\
 	add     p_stackframe=-rse_rnat_offset+rse_pfs_offset,p_stackframe;;	\
 	ld8     temp=[p_stackframe];;						\
-	mov     ar.pfs=temp;							\
+	mov     ar.pfs=temp;;							\
 	add     p_stackframe=-rse_pfs_offset+rse_ifs_offset,p_stackframe;;	\
 	ld8     temp=[p_stackframe];;						\
-	mov     cr.ifs=temp;							\
+	mov     cr.ifs=temp;;							\
 	add     p_stackframe=-rse_ifs_offset+rse_rsc_offset,p_stackframe;;	\
 	ld8     temp=[p_stackframe];;						\
 	mov     ar.rsc=temp ;							\
-	add     p_stackframe=-rse_rsc_offset,p_stackframe;			\
-	mov     temp=cr.ipsr;;							\
-	st8     [p_stackframe]=temp,8;						\
-	mov     temp=cr.iip;;							\
-	st8     [p_stackframe]=temp,-8;						\
 	mov     temp=psr;;							\
 	or      temp=temp,psr_mask_reg;;					\
 	mov     cr.ipsr=temp;;							\
 	mov     temp=ip;;							\
 	add     temp=0x30,temp;;						\
 	mov     cr.iip=temp;;							\
-	rfi;;									\
-	ld8     temp=[p_stackframe],8;;						\
-	mov     cr.ipsr=temp;;							\
-	ld8     temp=[p_stackframe];;						\
-	mov     cr.iip=temp
+	srlz.i;;								\
+	rfi;;
 
 #endif /* _ASM_IA64_MCA_ASM_H */

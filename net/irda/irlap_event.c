@@ -12,6 +12,7 @@
  *     Copyright (c) 1998-2000 Dag Brattli <dag@brattli.net>,
  *     Copyright (c) 1998      Thomas Davis <ratbert@radiks.net>
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -114,6 +115,7 @@ static const char *irlap_event[] = {
 	"DISCOVERY_TIMER_EXPIRED",
 	"WD_TIMER_EXPIRED",
 	"BACKOFF_TIMER_EXPIRED",
+	"MEDIA_BUSY_TIMER_EXPIRED",
 };
 
 const char *irlap_state[] = {
@@ -263,15 +265,7 @@ void irlap_do_event(struct irlap_cb *self, IRLAP_EVENT event,
 						    NULL, NULL);
 		}
 		break;
-	case LAP_NDM:
-		/* Check if we should try to connect */
-		if ((self->connect_pending) && !self->media_busy) {
-			self->connect_pending = FALSE;
-			
-			ret = (*state[self->state])(self, CONNECT_REQUEST, 
-						    NULL, NULL);
-		}
-		break;
+/*	case LAP_NDM: */
 /* 	case LAP_CONN: */
 /* 	case LAP_RESET_WAIT: */
 /* 	case LAP_RESET_CHECK: */
@@ -305,17 +299,6 @@ void irlap_next_state(struct irlap_cb *self, IRLAP_STATE state)
 	if ((state != LAP_XMIT_P) && (state != LAP_XMIT_S))
 		self->bytes_left = self->line_capacity;
 #endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
-#ifdef CONFIG_IRDA_ULTRA
-	/* Send any pending Ultra frames if any */
-	/* The higher layers may have sent a few Ultra frames while we
-	 * were doing discovery (either query or reply). Those frames
-	 * have been queued, but were never sent. It is now time to
-	 * send them...
-	 * Jean II */
-	if ((state == LAP_NDM) && (!skb_queue_empty(&self->txq_ultra)))
-		/* Force us to listen 500 ms before sending Ultra */
-		irda_device_set_media_busy(self->netdev, TRUE);
-#endif /* CONFIG_IRDA_ULTRA */
 }
 
 /*
@@ -339,6 +322,9 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 		ASSERT(self->netdev != NULL, return -1;);
 
 		if (self->media_busy) {
+			/* Note : this will never happen, because we test
+			 * media busy in irlap_connect_request() and
+			 * postpone the event... - Jean II */
 			IRDA_DEBUG(0, __FUNCTION__
 				   "(), CONNECT_REQUEST: media busy!\n");
 			
@@ -379,6 +365,9 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 						
 			/* This will make IrLMP try again */
  			irlap_discovery_confirm(self, NULL);
+			/* Note : the discovery log is not cleaned up here,
+			 * it will be done in irlap_discovery_request()
+			 * Jean II */
 			return 0;
 	 	} 
 		
@@ -417,8 +406,7 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 			 */
 			irlap_start_query_timer(self, QUERY_TIMEOUT*info->S);
 			irlap_next_state(self, LAP_REPLY);
-		}
-		else {
+		} else {
 		/* This is the final slot. How is it possible ?
 		 * This would happen is both discoveries are just slightly
 		 * offset (if they are in sync, all packets are lost).
@@ -439,6 +427,54 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 			/* Last discovery request -> in the log */
 			irlap_discovery_indication(self, info->discovery); 
 		}
+		break;
+	case MEDIA_BUSY_TIMER_EXPIRED:
+		/* A bunch of events may be postponed because the media is
+		 * busy (usually immediately after we close a connection),
+		 * or while we are doing discovery (state query/reply).
+		 * In all those cases, the media busy flag will be cleared
+		 * when it's OK for us to process those postponed events.
+		 * This event is not mentioned in the state machines in the
+		 * IrLAP spec. It's because they didn't consider Ultra and
+		 * postponing connection request is optional.
+		 * Jean II */
+#ifdef CONFIG_IRDA_ULTRA
+		/* Send any pending Ultra frames if any */
+		if (!skb_queue_empty(&self->txq_ultra)) {
+			/* We don't send the frame, just post an event.
+			 * Also, previously this code was in timer.c...
+			 * Jean II */
+			ret = (*state[self->state])(self, SEND_UI_FRAME, 
+						    NULL, NULL);
+		}
+#endif /* CONFIG_IRDA_ULTRA */
+		/* Check if we should try to connect.
+		 * This code was previously in irlap_do_event() */
+		if (self->connect_pending) {
+			self->connect_pending = FALSE;
+
+			/* This one *should* not pend in this state, except
+			 * if a socket try to connect and immediately
+			 * disconnect. - clear - Jean II */
+			if (self->disconnect_pending)
+				irlap_disconnect_indication(self, LAP_DISC_INDICATION);
+			else
+				ret = (*state[self->state])(self,
+							    CONNECT_REQUEST, 
+							    NULL, NULL);
+			self->disconnect_pending = FALSE;
+		}
+		/* Note : one way to test if this code works well (including
+		 * media busy and small busy) is to create a user space
+		 * application generating an Ultra packet every 3.05 sec (or
+		 * 2.95 sec) and to see how it interact with discovery.
+		 * It's fairly easy to check that no packet is lost, that the
+		 * packets are postponed during discovery and that after
+		 * discovery indication you have a 100ms "gap".
+		 * As connection request and Ultra are now processed the same
+		 * way, this avoid the tedious job of trying IrLAP connection
+		 * in all those cases...
+		 * Jean II */
 		break;
 #ifdef CONFIG_IRDA_ULTRA
 	case SEND_UI_FRAME:
@@ -735,8 +771,10 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 
 		break;		
 	case DISCONNECT_REQUEST:
+		IRDA_DEBUG(0, __FUNCTION__ "(), Disconnect request!\n");
 		irlap_send_dm_frame(self);
-		irlap_next_state( self, LAP_CONN);
+		irlap_next_state( self, LAP_NDM);
+		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	default:
 		IRDA_DEBUG(1, __FUNCTION__ "(), Unknown event %d, %s\n", event,
@@ -1417,13 +1455,12 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_start_final_timer(self, self->final_timeout);
 		break;
 	case RECV_RD_RSP:
-		IRDA_DEBUG(0, __FUNCTION__ "(), RECV_RD_RSP\n");
+		IRDA_DEBUG(1, __FUNCTION__ "(), RECV_RD_RSP\n");
 
-		irlap_next_state(self, LAP_PCLOSE);
-		irlap_send_disc_frame(self);
 		irlap_flush_all_queues(self);
-		irlap_start_final_timer(self, self->final_timeout);
-		self->retry_count = 0;
+		irlap_next_state(self, LAP_XMIT_P);
+		/* Call back the LAP state machine to do a proper disconnect */
+		irlap_disconnect_request(self);
 		break;
 	default:
 		IRDA_DEBUG(1, __FUNCTION__ "(), Unknown event %s\n", 

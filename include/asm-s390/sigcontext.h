@@ -26,14 +26,14 @@ typedef struct
 {
         unsigned long mask;
         unsigned long addr;
-} _psw_t __attribute__ ((aligned(8)));
+} __attribute__ ((aligned(8))) _psw_t;
 
 typedef struct
 {
 	_psw_t psw;
 	unsigned long gprs[__NUM_GPRS];
 	unsigned int  acrs[__NUM_ACRS];
-} _s390_regs_common __attribute__ ((packed));
+} _s390_regs_common;
 
 typedef struct
 {

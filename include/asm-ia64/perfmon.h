@@ -9,7 +9,7 @@
 #include <linux/types.h>
 
 /*
- * Structure used to define a context
+ * Request structure used to define a context
  */
 typedef struct {
 	unsigned long smpl_entries;	/* how many entries in sampling buffer */
@@ -23,7 +23,7 @@ typedef struct {
 } pfreq_context_t;
 
 /*
- * Structure used to configure a PMC or PMD
+ * Request structure used to write/read a PMC or PMD
  */
 typedef struct {
 	unsigned long	reg_num;	/* which register */
@@ -41,11 +41,16 @@ typedef union {
 	pfreq_reg_t	pfr_reg;	/* request to configure a PMD/PMC */
 } perfmon_req_t;
 
+#ifdef __KERNEL__
+
 extern void pfm_save_regs (struct task_struct *);
 extern void pfm_load_regs (struct task_struct *);
 
-extern int pfm_inherit (struct task_struct *);
+extern int pfm_inherit (struct task_struct *, struct pt_regs *);
 extern void pfm_context_exit (struct task_struct *);
 extern void pfm_flush_regs (struct task_struct *);
+extern void pfm_cleanup_notifiers (struct task_struct *);
+
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_IA64_PERFMON_H */

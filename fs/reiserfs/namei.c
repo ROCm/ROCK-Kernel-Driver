@@ -475,6 +475,9 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     put_deh_offset(deh, SET_GENERATION_NUMBER(deh_offset(deh), gen_number));
     set_cpu_key_k_offset (&entry_key, deh_offset(deh));
  
+    /* update max-hash-collisions counter in reiserfs_sb_info */
+    PROC_INFO_MAX( th -> t_super, max_hash_collisions, gen_number );
+ 		  
     if (gen_number != 0) {	/* we need to re-search for the insertion point */
       if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
             reiserfs_warning ("vs-7032: reiserfs_add_entry: "

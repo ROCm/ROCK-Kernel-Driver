@@ -62,7 +62,7 @@ void pnic_lnk_change(struct net_device *dev, int csr5)
 			   dev->name, phy_reg, csr5);
 	if (inl(ioaddr + CSR5) & TPLnkFail) {
 		outl((inl(ioaddr + CSR7) & ~TPLnkFail) | TPLnkPass, ioaddr + CSR7);
-		/* If we use an external MII, then we mustn't use the 
+		/* If we use an external MII, then we mustn't use the
 		 * internal negotiation.
 		 */
 		if (tulip_media_cap[dev->if_port] & MediaIsMII)
@@ -92,7 +92,7 @@ void pnic_timer(unsigned long data)
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	long ioaddr = dev->base_addr;
 	int next_tick = 60*HZ;
-	
+
 	if(!inl(ioaddr + CSR7)) {
 		/* the timer was called due to a work overflow
 		 * in the interrupt handler. Skip the connection

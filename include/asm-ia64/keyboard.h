@@ -2,16 +2,16 @@
 #define _ASM_IA64_KEYBOARD_H
 
 /*
- * This file contains the ia-64 architecture specific keyboard
- * definitions.
+ * This file contains the ia64 architecture specific keyboard definitions.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 # ifdef __KERNEL__
 
 #include <linux/irq.h>
+#include <linux/kd.h>
 
 #define KEYBOARD_IRQ			isa_irq_to_vector(1)
 #define DISABLE_KBD_DURING_INTERRUPTS	0
@@ -38,6 +38,7 @@ extern unsigned char pckbd_sysrq_xlate[128];
 #define INIT_KBD
 
 #define SYSRQ_KEY		0x54
+#define E1_PAUSE   119		/* PAUSE key */
 
 /* resource allocation */
 #define kbd_request_region()

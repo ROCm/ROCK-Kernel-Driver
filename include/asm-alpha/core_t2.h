@@ -329,13 +329,13 @@ struct el_t2_frame_corrected {
 #define vip	volatile int *
 #define vuip	volatile unsigned int *
 
-__EXTERN_INLINE unsigned int t2_inb(unsigned long addr)
+__EXTERN_INLINE u8 t2_inb(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + T2_IO + 0x00);
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void t2_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void t2_outb(u8 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -344,13 +344,13 @@ __EXTERN_INLINE void t2_outb(unsigned char b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int t2_inw(unsigned long addr)
+__EXTERN_INLINE u16 t2_inw(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + T2_IO + 0x08);
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void t2_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void t2_outw(u16 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -359,12 +359,12 @@ __EXTERN_INLINE void t2_outw(unsigned short b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int t2_inl(unsigned long addr)
+__EXTERN_INLINE u32 t2_inl(unsigned long addr)
 {
 	return *(vuip) ((addr << 5) + T2_IO + 0x18);
 }
 
-__EXTERN_INLINE void t2_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void t2_outl(u32 b, unsigned long addr)
 {
 	*(vuip) ((addr << 5) + T2_IO + 0x18) = b;
 	mb();
@@ -402,7 +402,7 @@ __EXTERN_INLINE void t2_outl(unsigned int b, unsigned long addr)
  *
  */
 
-__EXTERN_INLINE unsigned long t2_readb(unsigned long addr)
+__EXTERN_INLINE u8 t2_readb(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -414,7 +414,7 @@ __EXTERN_INLINE unsigned long t2_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long t2_readw(unsigned long addr)
+__EXTERN_INLINE u16 t2_readw(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -427,7 +427,7 @@ __EXTERN_INLINE unsigned long t2_readw(unsigned long addr)
 }
 
 /* On SABLE with T2, we must use SPARSE memory even for 32-bit access. */
-__EXTERN_INLINE unsigned long t2_readl(unsigned long addr)
+__EXTERN_INLINE u32 t2_readl(unsigned long addr)
 {
 	unsigned long msb;
 
@@ -438,7 +438,7 @@ __EXTERN_INLINE unsigned long t2_readl(unsigned long addr)
 	return *(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x18);
 }
 
-__EXTERN_INLINE unsigned long t2_readq(unsigned long addr)
+__EXTERN_INLINE u64 t2_readq(unsigned long addr)
 {
 	unsigned long r0, r1, work, msb;
 
@@ -452,7 +452,7 @@ __EXTERN_INLINE unsigned long t2_readq(unsigned long addr)
 	return r1 << 32 | r0;
 }
 
-__EXTERN_INLINE void t2_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void t2_writeb(u8 b, unsigned long addr)
 {
 	unsigned long msb, w;
 
@@ -464,7 +464,7 @@ __EXTERN_INLINE void t2_writeb(unsigned char b, unsigned long addr)
 	*(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x00) = w;
 }
 
-__EXTERN_INLINE void t2_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void t2_writew(u16 b, unsigned long addr)
 {
 	unsigned long msb, w;
 
@@ -477,7 +477,7 @@ __EXTERN_INLINE void t2_writew(unsigned short b, unsigned long addr)
 }
 
 /* On SABLE with T2, we must use SPARSE memory even for 32-bit access. */
-__EXTERN_INLINE void t2_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void t2_writel(u32 b, unsigned long addr)
 {
 	unsigned long msb;
 
@@ -488,7 +488,7 @@ __EXTERN_INLINE void t2_writel(unsigned int b, unsigned long addr)
 	*(vuip) ((addr << 5) + T2_SPARSE_MEM + 0x18) = b;
 }
 
-__EXTERN_INLINE void t2_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void t2_writeq(u64 b, unsigned long addr)
 {
 	unsigned long msb, work;
 

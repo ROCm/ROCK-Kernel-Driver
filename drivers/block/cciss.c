@@ -1307,6 +1307,8 @@ queue_next:
 	if (( c = cmd_alloc(h, 1)) == NULL)
 		goto startio;
 
+	blkdev_dequeue_request(creq);
+
 	spin_unlock_irq(&io_request_lock);
 
 	c->cmd_type = CMD_RWREQ;      
@@ -1386,12 +1388,6 @@ queue_next:
 
 	spin_lock_irq(&io_request_lock);
 
-	blkdev_dequeue_request(creq);
-
-        /*
-         * ehh, we can't really end the request here since it's not
-         * even started yet. for now it shouldn't hurt though
-         */
 	addQ(&(h->reqQ),c);
 	h->Qdepth++;
 	if(h->Qdepth > h->maxQsinceinit)
@@ -1928,7 +1924,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	/* Initialize the pdev driver private data. 
 		have it point to hba[i].  */
-	pdev->driver_data = hba[i];
+	pci_set_drvdata(pdev, hba[i]);
 	/* command and error info recs zeroed out before 
 			they are used */
         memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+31)/32)*sizeof(__u32));
@@ -1987,12 +1983,12 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	ctlr_info_t *tmp_ptr;
 	int i;
 
-	if (pdev->driver_data == NULL)
+	if (pci_get_drvdata(pdev) == NULL)
 	{
 		printk( KERN_ERR "cciss: Unable to remove device \n");
 		return;
 	}
-	tmp_ptr = (ctlr_info_t *) pdev->driver_data;
+	tmp_ptr = pci_get_drvdata(pdev);
 	i = tmp_ptr->ctlr;
 	if (hba[i] == NULL) 
 	{
@@ -2003,7 +1999,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	/* Turn board interrupts off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	free_irq(hba[i]->intr, hba[i]);
-	pdev->driver_data = NULL;
+	pci_set_drvdata(pdev, NULL);
 	iounmap((void*)hba[i]->vaddr);
 	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	

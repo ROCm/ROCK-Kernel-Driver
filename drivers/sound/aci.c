@@ -47,6 +47,8 @@
  *        changed param aci_reset to reset, new params: ide, wss.
  *   2001-04-20  Robert Siemer
  *        even more cleanups...
+ *   2001-10-08  Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *   	  Get rid of check_region, .bss optimizations, use set_current_state
  */
 
 #include <linux/kernel.h>
@@ -70,9 +72,9 @@ EXPORT_SYMBOL(aci_version);
 #include "aci.h"
 
 
-static int aci_solo=0;	/* status bit of the card that can't be		*
+static int aci_solo;	/* status bit of the card that can't be		*
 			 * checked with ACI versions prior to 0xb0	*/
-static int aci_amp=0;   /* status bit for power-amp/line-out level
+static int aci_amp;   /* status bit for power-amp/line-out level
 			   but I have no docs about what is what... */
 static int aci_micpreamp=3; /* microphone preamp-level that can't be    *
 			 * checked with ACI versions prior to 0xb0	*/
@@ -81,7 +83,7 @@ static int mixer_device;
 static struct semaphore aci_sem;
 
 #ifdef MODULE
-static int reset = 0;
+static int reset;
 MODULE_PARM(reset,"i");
 MODULE_PARM_DESC(reset,"When set to 1, reset aci mixer.");
 #else
@@ -146,7 +148,7 @@ static int busy_wait(void)
 			case 20 ... 30:
 				out /= 10;
 			default:
-				current->state=TASK_UNINTERRUPTIBLE;
+				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout(out);
 				break;
 			}
@@ -209,28 +211,25 @@ static inline int aci_rawread(void)
 int aci_rw_cmd(int write1, int write2, int write3)
 {
 	int write[] = {write1, write2, write3};
-	int read, i;
+	int read = -EINTR, i;
 
 	if (down_interruptible(&aci_sem))
-		return -EINTR;
+		goto out;
 
 	for (i=0; i<3; i++) {
 		if (write[i]< 0 || write[i] > 255)
 			break;
-		else
-			if (aci_rawwrite(write[i])<0) {
-				up(&aci_sem);
-				return -EBUSY;
-			}
+		else {
+			read = aci_rawwrite(write[i]);
+			if (read < 0)
+				goto out_up;
+		}
+		
 	}
 	
-	if ((read=aci_rawread())<0) {
-		up(&aci_sem);
-		return -EBUSY;
-	}
-
-	up(&aci_sem);
-	return read;
+	read = aci_rawread();
+out_up:	up(&aci_sem);
+out:	return read;
 }
 
 EXPORT_SYMBOL(aci_rw_cmd);
@@ -602,7 +601,7 @@ static struct mixer_operations aci_mixer_operations =
 static int __init attach_aci(void)
 {
 	char *boardname;
-	int i;
+	int i, rc = -EBUSY;
 
 	init_MUTEX(&aci_sem);
 
@@ -610,27 +609,32 @@ static int __init attach_aci(void)
 	aci_port = (inb(0xf90) & 0x10) ?
 		0x344: 0x354; /* Get aci_port from MC4_PORT */
 
-	if (check_region(aci_port, 3)) {
-		printk(KERN_NOTICE "aci: I/O area 0x%03x-0x%03x already used.\n",
+	if (!request_region(aci_port, 3, "sound mixer (ACI)")) {
+		printk(KERN_NOTICE
+		       "aci: I/O area 0x%03x-0x%03x already used.\n",
 		       aci_port, aci_port+2);
-		return -EBUSY;
+		goto out;
 	}
 
 	/* force ACI into a known state */
+	rc = -EFAULT;
 	for (i=0; i<3; i++)
 		if (aci_rw_cmd(ACI_ERROR_OP, -1, -1)<0)
-			return -EFAULT;
+			goto out_release_region;
 
 	/* official this is one aci read call: */
+	rc = -EFAULT;
 	if ((aci_idcode[0]=aci_rw_cmd(ACI_READ_IDCODE, -1, -1))<0 ||
 	    (aci_idcode[1]=aci_rw_cmd(ACI_READ_IDCODE, -1, -1))<0) {
-		printk(KERN_ERR "aci: Failed to read idcode on 0x%03x.\n", aci_port);
-		return -EFAULT;
+		printk(KERN_ERR "aci: Failed to read idcode on 0x%03x.\n",
+		       aci_port);
+		goto out_release_region;
 	}
 
 	if ((aci_version=aci_rw_cmd(ACI_READ_VERSION, -1, -1))<0) {
-		printk(KERN_ERR "aci: Failed to read version on 0x%03x.\n", aci_port);
-		return -EFAULT;
+		printk(KERN_ERR "aci: Failed to read version on 0x%03x.\n",
+		       aci_port);
+		goto out_release_region;
 	}
 
 	if (aci_idcode[0] == 'm') {
@@ -660,42 +664,40 @@ static int __init attach_aci(void)
 	       aci_idcode[0], aci_idcode[1],
 	       boardname, aci_port);
 
+	rc = -EBUSY;
 	if (reset) {
 		/* first write()s after reset fail with my PCM20 */
 		if (aci_rw_cmd(ACI_INIT, -1, -1)<0 ||
 		    aci_rw_cmd(ACI_ERROR_OP, ACI_ERROR_OP, ACI_ERROR_OP)<0 ||
 		    aci_rw_cmd(ACI_ERROR_OP, ACI_ERROR_OP, ACI_ERROR_OP)<0)
-			return -EBUSY;
+			goto out_release_region;
 	}
 
 	/* the PCM20 is muted after reset (and reboot) */
 	if (aci_rw_cmd(ACI_SET_MUTE, 0x00, -1)<0)
-		return -EBUSY;
+		goto out_release_region;
 
 	if (ide>=0)
 		if (aci_rw_cmd(ACI_SET_IDE, !ide, -1)<0)
-			return -EBUSY;
+			goto out_release_region;
 	
 	if (wss>=0 && aci_idcode[1]=='A')
 		if (aci_rw_cmd(ACI_SET_WSS, !!wss, -1)<0)
-			return -EBUSY;
+			goto out_release_region;
 
-	if (!request_region(aci_port, 3, "sound mixer (ACI)"))
-		return -ENOMEM;
-
-	if ((mixer_device = sound_install_mixer(MIXER_DRIVER_VERSION,
-						boardname,
-						&aci_mixer_operations,
-						sizeof(aci_mixer_operations),
-						NULL)) >= 0) {
-		/* Maybe initialize the CS4231A mixer here... */
-	} else {
+	mixer_device = sound_install_mixer(MIXER_DRIVER_VERSION, boardname,
+					   &aci_mixer_operations,
+					   sizeof(aci_mixer_operations), NULL);
+	rc = 0;
+	if (mixer_device < 0) {
 		printk(KERN_ERR "aci: Failed to install mixer.\n");
-		release_region(aci_port, 3);
-		return mixer_device;
-	}
-
-	return 0;
+		rc = mixer_device;
+		goto out_release_region;
+	} /* else Maybe initialize the CS4231A mixer here... */
+out:	return rc;
+out_release_region:
+	release_region(aci_port, 3);
+	goto out;
 }
 
 static void __exit unload_aci(void)

@@ -241,53 +241,6 @@ struct sysv_inode {
 	u32 i_ctime;	/* time of creation */
 };
 
-/* The admissible values for i_mode are listed in <linux/stat.h> :
- * #define S_IFMT  00170000  mask for type
- * #define S_IFREG  0100000  type = regular file
- * #define S_IFBLK  0060000  type = block device
- * #define S_IFDIR  0040000  type = directory
- * #define S_IFCHR  0020000  type = character device
- * #define S_IFIFO  0010000  type = named pipe
- * #define S_ISUID  0004000  set user id
- * #define S_ISGID  0002000  set group id
- * #define S_ISVTX  0001000  save swapped text even after use
- * Additionally for SystemV:
- * #define S_IFLNK  0120000  type = symbolic link
- * #define S_IFNAM  0050000  type = XENIX special named file ??
- * Additionally for Coherent:
- * #define S_IFMPB  0070000  type = multiplexed block device ??
- * #define S_IFMPC  0030000  type = multiplexed character device ??
- *
- * Since Coherent doesn't know about symbolic links, we use a kludgey
- * implementation of symbolic links: i_mode = COH_KLUDGE_SYMLINK_MODE
- * denotes a symbolic link. When a regular file should get this mode by
- * accident, it is automatically converted to COH_KLUDGE_NOT_SYMLINK.
- * We use S_IFREG because only regular files (and Coherent pipes...) can have
- * data blocks with arbitrary contents associated with them, and S_ISVTX
- * ("save swapped text after use") because it is unused on both Linux and
- * Coherent: Linux does much more intelligent paging, and Coherent hasn't
- * virtual memory at all.
- * Same trick for Xenix.
- */
-#define COH_KLUDGE_SYMLINK_MODE	(S_IFREG | S_ISVTX)
-#define COH_KLUDGE_NOT_SYMLINK	(S_IFREG | S_ISVTX | S_IRUSR) /* force read access */
-static inline mode_t from_coh_imode(unsigned short mode)
-{
-	if (mode == COH_KLUDGE_SYMLINK_MODE)
-		return (S_IFLNK | 0777);
-	else
-		return mode;
-}
-static inline unsigned short to_coh_imode(mode_t mode)
-{
-	if (S_ISLNK(mode))
-		return COH_KLUDGE_SYMLINK_MODE;
-	else if (mode == COH_KLUDGE_SYMLINK_MODE)
-		return COH_KLUDGE_NOT_SYMLINK;
-	else
-		return mode;
-}
-
 /* Admissible values for i_nlink: 0.._LINK_MAX */
 enum {
 	XENIX_LINK_MAX	=	126,	/* ?? */
@@ -360,7 +313,6 @@ extern void sysv_truncate(struct inode *);
 extern void sysv_write_inode(struct inode *, int);
 extern int sysv_sync_inode(struct inode *);
 extern int sysv_sync_file(struct file *, struct dentry *, int);
-extern int sysv_notify_change(struct dentry *, struct iattr *);
 extern void sysv_set_inode(struct inode *, dev_t);
 
 extern struct sysv_dir_entry *sysv_find_entry(struct dentry*, struct page**);

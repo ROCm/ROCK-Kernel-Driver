@@ -422,7 +422,7 @@ static struct mtd_chip_driver jedec_chipdrv = {
 	module: THIS_MODULE
 };
 
-static int __init jedec_probe_init(void)
+int __init jedec_probe_init(void)
 {
 	register_mtd_chip_driver(&jedec_chipdrv);
 	return 0;

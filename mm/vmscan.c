@@ -7,7 +7,6 @@
  *  kswapd added: 7.1.96  sct
  *  Removed kswapd_ctl limits, and swap out as many pages as needed
  *  to bring the system back to freepages.high: 2.4.97, Rik van Riel.
- *  Version: $Id: vmscan.c,v 1.5 1998/02/23 22:14:28 sct Exp $
  *  Zone aware kswapd started 02/00, Kanoj Sarcar (kanoj@sgi.com).
  *  Multiqueue VM started 5.8.00, Rik van Riel.
  */
@@ -117,6 +116,13 @@ drop_pte:
 		goto drop_pte;
 
 	/*
+	 * Anonymous buffercache pages can be left behind by
+	 * concurrent truncate and pagefault.
+	 */
+	if (page->buffers)
+		goto preserve;
+
+	/*
 	 * This is a dirty, swappable page.  First of all,
 	 * get a suitable swap entry for it, and make sure
 	 * we have the swap cache set up to associate the
@@ -140,6 +146,7 @@ drop_pte:
 	}
 
 	/* No swap space left */
+preserve:
 	set_pte(page_table, pte);
 	UnlockPage(page);
 	return 0;
@@ -421,7 +428,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			/* avoid to free a locked page */
 			page_cache_get(page);
 
-			if (try_to_free_buffers(page, gfp_mask)) {
+			if (try_to_release_page(page, gfp_mask)) {
 				if (!page->mapping) {
 					/*
 					 * We must not allow an anon page
@@ -442,7 +449,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 				} else {
 					/*
 					 * The page is still in pagecache so undo the stuff
-					 * before the try_to_free_buffers since we've not
+					 * before the try_to_release_page since we've not
 					 * finished and we can now try the next step.
 					 */
 					page_cache_release(page);

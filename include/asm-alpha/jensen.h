@@ -118,7 +118,7 @@ static inline unsigned int jensen_local_inb(unsigned long addr)
 	return 0xff & *(vuip)((addr << 9) + EISA_VL82C106);
 }
 
-static inline void jensen_local_outb(unsigned char b, unsigned long addr)
+static inline void jensen_local_outb(u8 b, unsigned long addr)
 {
 	*(vuip)((addr << 9) + EISA_VL82C106) = b;
 	mb();
@@ -133,7 +133,7 @@ static inline unsigned int jensen_bus_inb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-static inline void jensen_bus_outb(unsigned char b, unsigned long addr)
+static inline void jensen_bus_outb(u8 b, unsigned long addr)
 {
 	jensen_set_hae(0);
 	*(vuip)((addr << 7) + EISA_IO + 0x00) = b * 0x01010101;
@@ -153,7 +153,7 @@ static inline void jensen_bus_outb(unsigned char b, unsigned long addr)
 /* mb LPT1 */	(addr >= 0x3bc && addr <= 0x3be) || \
 /* mb COM2 */	(addr >= 0x3f8 && addr <= 0x3ff))
 
-__EXTERN_INLINE unsigned int jensen_inb(unsigned long addr)
+__EXTERN_INLINE u8 jensen_inb(unsigned long addr)
 {
 	if (jensen_is_local(addr))
 		return jensen_local_inb(addr);
@@ -161,7 +161,7 @@ __EXTERN_INLINE unsigned int jensen_inb(unsigned long addr)
 		return jensen_bus_inb(addr);
 }
 
-__EXTERN_INLINE void jensen_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void jensen_outb(u8 b, unsigned long addr)
 {
 	if (jensen_is_local(addr))
 		jensen_local_outb(b, addr);
@@ -169,7 +169,7 @@ __EXTERN_INLINE void jensen_outb(unsigned char b, unsigned long addr)
 		jensen_bus_outb(b, addr);
 }
 
-__EXTERN_INLINE unsigned int jensen_inw(unsigned long addr)
+__EXTERN_INLINE u16 jensen_inw(unsigned long addr)
 {
 	long result;
 
@@ -179,20 +179,20 @@ __EXTERN_INLINE unsigned int jensen_inw(unsigned long addr)
 	return 0xffffUL & result;
 }
 
-__EXTERN_INLINE unsigned int jensen_inl(unsigned long addr)
+__EXTERN_INLINE u32 jensen_inl(unsigned long addr)
 {
 	jensen_set_hae(0);
 	return *(vuip) ((addr << 7) + EISA_IO + 0x60);
 }
 
-__EXTERN_INLINE void jensen_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void jensen_outw(u16 b, unsigned long addr)
 {
 	jensen_set_hae(0);
 	*(vuip) ((addr << 7) + EISA_IO + 0x20) = b * 0x00010001;
 	mb();
 }
 
-__EXTERN_INLINE void jensen_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void jensen_outl(u32 b, unsigned long addr)
 {
 	jensen_set_hae(0);
 	*(vuip) ((addr << 7) + EISA_IO + 0x60) = b;
@@ -203,7 +203,7 @@ __EXTERN_INLINE void jensen_outl(unsigned int b, unsigned long addr)
  * Memory functions.
  */
 
-__EXTERN_INLINE unsigned long jensen_readb(unsigned long addr)
+__EXTERN_INLINE u8 jensen_readb(unsigned long addr)
 {
 	long result;
 
@@ -214,7 +214,7 @@ __EXTERN_INLINE unsigned long jensen_readb(unsigned long addr)
 	return 0xffUL & result;
 }
 
-__EXTERN_INLINE unsigned long jensen_readw(unsigned long addr)
+__EXTERN_INLINE u16 jensen_readw(unsigned long addr)
 {
 	long result;
 
@@ -225,14 +225,14 @@ __EXTERN_INLINE unsigned long jensen_readw(unsigned long addr)
 	return 0xffffUL & result;
 }
 
-__EXTERN_INLINE unsigned long jensen_readl(unsigned long addr)
+__EXTERN_INLINE u32 jensen_readl(unsigned long addr)
 {
 	jensen_set_hae(addr);
 	addr &= JENSEN_HAE_MASK;
 	return *(vuip) ((addr << 7) + EISA_MEM + 0x60);
 }
 
-__EXTERN_INLINE unsigned long jensen_readq(unsigned long addr)
+__EXTERN_INLINE u64 jensen_readq(unsigned long addr)
 {
 	unsigned long r0, r1;
 
@@ -244,28 +244,28 @@ __EXTERN_INLINE unsigned long jensen_readq(unsigned long addr)
 	return r1 << 32 | r0;
 }
 
-__EXTERN_INLINE void jensen_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void jensen_writeb(u8 b, unsigned long addr)
 {
 	jensen_set_hae(addr);
 	addr &= JENSEN_HAE_MASK;
 	*(vuip) ((addr << 7) + EISA_MEM + 0x00) = b * 0x01010101;
 }
 
-__EXTERN_INLINE void jensen_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void jensen_writew(u16 b, unsigned long addr)
 {
 	jensen_set_hae(addr);
 	addr &= JENSEN_HAE_MASK;
 	*(vuip) ((addr << 7) + EISA_MEM + 0x20) = b * 0x00010001;
 }
 
-__EXTERN_INLINE void jensen_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void jensen_writel(u32 b, unsigned long addr)
 {
 	jensen_set_hae(addr);
 	addr &= JENSEN_HAE_MASK;
 	*(vuip) ((addr << 7) + EISA_MEM + 0x60) = b;
 }
 
-__EXTERN_INLINE void jensen_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void jensen_writeq(u64 b, unsigned long addr)
 {
 	jensen_set_hae(addr);
 	addr &= JENSEN_HAE_MASK;

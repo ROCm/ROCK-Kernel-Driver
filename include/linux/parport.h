@@ -11,8 +11,8 @@
 
 /* Start off with user-visible constants */
 
-/* Maximum of 8 ports per machine */
-#define PARPORT_MAX  8 
+/* Maximum of 16 ports per machine */
+#define PARPORT_MAX  16
 
 /* Magic numbers */
 #define PARPORT_IRQ_NONE  -1

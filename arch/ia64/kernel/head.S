@@ -6,8 +6,8 @@
  * entry point.
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 2001 Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999 Intel Corp.
@@ -63,17 +63,17 @@ start_ap:
 	 * that maps the kernel's text and data:
 	 */
 	rsm psr.i | psr.ic
-	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (KERNEL_PG_SHIFT << 2))
+	mov r16=((ia64_rid(IA64_REGION_ID_KERNEL, PAGE_OFFSET) << 8) | (IA64_GRANULE_SHIFT << 2))
 	;;
 	srlz.i
-	mov r18=KERNEL_PG_SHIFT<<2
-	movl r17=PAGE_OFFSET + KERNEL_PG_NUM*KERNEL_PG_SIZE
+	mov r18=KERNEL_TR_PAGE_SHIFT<<2
+	movl r17=KERNEL_START
 	;;
 	mov rr[r17]=r16
 	mov cr.itir=r18
 	mov cr.ifa=r17
 	mov r16=IA64_TR_KERNEL
-	movl r18=(KERNEL_PG_NUM*KERNEL_PG_SIZE | PAGE_KERNEL)
+	movl r18=((1 << KERNEL_TR_PAGE_SHIFT) | PAGE_KERNEL)
 	;;
 	srlz.i
 	;;
@@ -86,7 +86,8 @@ start_ap:
 	/*
 	 * Switch into virtual mode:
 	 */
-	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN)
+	movl r16=(IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN \
+		  |IA64_PSR_DI)
 	;;
 	mov cr.ipsr=r16
 	movl r17=1f
@@ -111,7 +112,7 @@ start_ap:
 	;;
 
 #ifdef CONFIG_IA64_EARLY_PRINTK
-	mov r3=(6<<8) | (KERNEL_PG_SHIFT<<2)
+	mov r3=(6<<8) | (IA64_GRANULE_SHIFT<<2)
 	movl r2=6<<61
 	;;
 	mov rr[r2]=r3
@@ -144,6 +145,7 @@ start_ap:
 	cmp4.ne isAP,isBP=r3,r0
 	;;			// RAW on r2
 	extr r3=r2,0,61		// r3 == phys addr of task struct
+	mov r16=KERNEL_TR_PAGE_NUM
 	;;
 
 	// load the "current" pointer (r13) and ar.k6 with the current task
@@ -151,7 +153,7 @@ start_ap:
 	mov IA64_KR(CURRENT)=r3		// Physical address
 
 	// initialize k4 to a safe value (64-128MB is mapped by TR_KERNEL)
-	mov IA64_KR(CURRENT_STACK)=1
+	mov IA64_KR(CURRENT_STACK)=r16
 	/*
 	 * Reserve space at the top of the stack for "struct pt_regs".  Kernel threads
 	 * don't store interesting values in that structure, but the space still needs
@@ -183,31 +185,31 @@ alive_msg:
 	alloc r2=ar.pfs,0,0,2,0
 	movl out0=alive_msg
 	;;
-	br.call.sptk.few rp=early_printk
+	br.call.sptk.many rp=early_printk
 1:	// force new bundle
 #endif /* CONFIG_IA64_EARLY_PRINTK */
 
 #ifdef CONFIG_SMP
-(isAP)	br.call.sptk.few rp=start_secondary
+(isAP)	br.call.sptk.many rp=start_secondary
 .ret0:
-(isAP)	br.cond.sptk.few self
+(isAP)	br.cond.sptk self
 #endif
 
 	// This is executed by the bootstrap processor (bsp) only:
 
 #ifdef CONFIG_IA64_FW_EMU
 	// initialize PAL & SAL emulator:
-	br.call.sptk.few rp=sys_fw_init
+	br.call.sptk.many rp=sys_fw_init
 .ret1:
 #endif
-	br.call.sptk.few rp=start_kernel
+	br.call.sptk.many rp=start_kernel
 .ret2:	addl r3=@ltoff(halt_msg),gp
 	;;
 	alloc r2=ar.pfs,8,0,2,0
 	;;
 	ld8 out0=[r3]
-	br.call.sptk.few b0=console_print
-self:	br.sptk.few self		// endless loop
+	br.call.sptk.many b0=console_print
+self:	br.sptk.many self		// endless loop
 END(_start)
 
 GLOBAL_ENTRY(ia64_save_debug_regs)
@@ -218,7 +220,7 @@ GLOBAL_ENTRY(ia64_save_debug_regs)
 	add r19=IA64_NUM_DBG_REGS*8,in0
 	;;
 1:	mov r16=dbr[r18]
-#if defined(CONFIG_ITANIUM_C0_SPECIFIC)
+#ifdef CONFIG_ITANIUM
 	;;
 	srlz.d
 #endif
@@ -227,17 +229,15 @@ GLOBAL_ENTRY(ia64_save_debug_regs)
 	;;
 	st8.nta [in0]=r16,8
 	st8.nta [r19]=r17,8
-	br.cloop.sptk.few 1b
+	br.cloop.sptk.many 1b
 	;;
 	mov ar.lc=r20			// restore ar.lc
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(ia64_save_debug_regs)
 
 GLOBAL_ENTRY(ia64_load_debug_regs)
 	alloc r16=ar.pfs,1,0,0,0
-#if !(defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC))
 	lfetch.nta [in0]
-#endif
 	mov r20=ar.lc			// preserve ar.lc
 	add r19=IA64_NUM_DBG_REGS*8,in0
 	mov ar.lc=IA64_NUM_DBG_REGS-1
@@ -248,15 +248,15 @@ GLOBAL_ENTRY(ia64_load_debug_regs)
 	add r18=1,r18
 	;;
 	mov dbr[r18]=r16
-#if defined(CONFIG_ITANIUM_BSTEP_SPECIFIC) || defined(CONFIG_ITANIUM_C0_SPECIFIC)
+#ifdef CONFIG_ITANIUM
 	;;
-	srlz.d
+	srlz.d				// Errata 132 (NoFix status)
 #endif
 	mov ibr[r18]=r17
-	br.cloop.sptk.few 1b
+	br.cloop.sptk.many 1b
 	;;
 	mov ar.lc=r20			// restore ar.lc
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(ia64_load_debug_regs)
 
 GLOBAL_ENTRY(__ia64_save_fpu)
@@ -406,7 +406,7 @@ GLOBAL_ENTRY(__ia64_save_fpu)
 	;;
 	stf.spill.nta [in0]=f126,32
 	stf.spill.nta [ r3]=f127,32
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__ia64_save_fpu)
 
 GLOBAL_ENTRY(__ia64_load_fpu)
@@ -556,7 +556,7 @@ GLOBAL_ENTRY(__ia64_load_fpu)
 	;;
 	ldf.fill.nta f126=[in0],32
 	ldf.fill.nta f127=[ r3],32
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__ia64_load_fpu)
 
 GLOBAL_ENTRY(__ia64_init_fpu)
@@ -690,7 +690,7 @@ GLOBAL_ENTRY(__ia64_init_fpu)
 	;;
 	ldf.fill f126=[sp]
 	mov      f127=f0
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__ia64_init_fpu)
 
 /*
@@ -738,7 +738,7 @@ GLOBAL_ENTRY(ia64_switch_mode)
 	rfi				// must be last insn in group
 	;;
 1:	mov rp=r14
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(ia64_switch_mode)
 
 #ifdef CONFIG_IA64_BRL_EMU
@@ -752,7 +752,7 @@ END(ia64_switch_mode)
 	alloc r16=ar.pfs,1,0,0,0;		\
 	mov reg=r32;				\
 	;;					\
-	br.ret.sptk rp;				\
+	br.ret.sptk.many rp;			\
  END(ia64_set_##reg)
 
 SET_REG(b1);
@@ -816,12 +816,11 @@ GLOBAL_ENTRY(ia64_spinlock_contention)
 	;;
 	cmp.ne p15,p0=tmp,r0
 	mov tmp=ar.itc
-(p15)	br.cond.sptk.few .retry	// lock is still busy
+(p15)	br.cond.sptk .retry	// lock is still busy
 	;;
 	// try acquiring lock (we know ar.ccv is still zero!):
 	mov tmp=1
 	;;
-	IA64_SEMFIX_INSN
 	cmpxchg4.acq tmp=[r31],tmp,ar.ccv
 	;;
 	cmp.eq p15,p0=tmp,r0

@@ -34,6 +34,7 @@
 #include <linux/vt_kern.h>
 #include <linux/smp_lock.h>
 #include <linux/kd.h>
+#include <linux/pm.h>
 
 #include <asm/keyboard.h>
 #include <asm/bitops.h>
@@ -397,29 +398,32 @@ char pckbd_unexpected_up(unsigned char keycode)
 	    return 0200;
 }
 
-void pckbd_pm_resume(void)
+int pckbd_pm_resume(struct pm_dev *dev, pm_request_t rqst, void *data) 
 {
 #if defined CONFIG_PSMOUSE
        unsigned long flags;
 
-       if (queue) {                    /* Aux port detected */
-               if (aux_count == 0) {   /* Mouse not in use */ 
-                       spin_lock_irqsave(&kbd_controller_lock, flags);
-                       /*
-                        * Dell Lat. C600 A06 enables mouse after resume.
-                        * When user touches the pad, it posts IRQ 12
-                        * (which we do not process), thus holding keyboard.
-                        */
-                       kbd_write_command(KBD_CCMD_MOUSE_DISABLE);
-                       /* kbd_write_cmd(AUX_INTS_OFF); */ /* Config & lock */
-                       kb_wait();
-                       kbd_write_command(KBD_CCMD_WRITE_MODE);
-                       kb_wait();
-                       kbd_write_output(AUX_INTS_OFF);
-                       spin_unlock_irqrestore(&kbd_controller_lock, flags);
-               }
+       if (rqst == PM_RESUME) {
+               if (queue) {                    /* Aux port detected */
+                       if (aux_count == 0) {   /* Mouse not in use */ 
+                               spin_lock_irqsave(&kbd_controller_lock, flags);
+			       /*
+				* Dell Lat. C600 A06 enables mouse after resume.
+				* When user touches the pad, it posts IRQ 12
+				* (which we do not process), thus holding keyboard.
+				*/
+			       kbd_write_command(KBD_CCMD_MOUSE_DISABLE);
+			       /* kbd_write_cmd(AUX_INTS_OFF); */ /* Config & lock */
+			       kb_wait();
+			       kbd_write_command(KBD_CCMD_WRITE_MODE);
+			       kb_wait();
+			       kbd_write_output(AUX_INTS_OFF);
+			       spin_unlock_irqrestore(&kbd_controller_lock, flags);
+		       }
+	       }
        }
-#endif       
+#endif
+       return 0;
 }
 
 

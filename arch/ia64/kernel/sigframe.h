@@ -1,3 +1,9 @@
+struct sigscratch {
+	unsigned long scratch_unat;	/* ar.unat for the general registers saved in pt */
+	unsigned long pad;
+	struct pt_regs pt;
+};
+
 struct sigframe {
 	/*
 	 * Place signal handler args where user-level unwinder can find them easily.
@@ -7,10 +13,11 @@ struct sigframe {
 	unsigned long arg0;		/* signum */
 	unsigned long arg1;		/* siginfo pointer */
 	unsigned long arg2;		/* sigcontext pointer */
+	/*
+	 * End of architected state.
+	 */
 
-	unsigned long rbs_base;		/* base of new register backing store (or NULL) */
 	void *handler;			/* pointer to the plabel of the signal handler */
-
 	struct siginfo info;
 	struct sigcontext sc;
 };

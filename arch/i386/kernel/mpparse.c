@@ -36,6 +36,7 @@ int smp_found_config;
  */
 int apic_version [MAX_APICS];
 int mp_bus_id_to_type [MAX_MP_BUSSES];
+int mp_bus_id_to_node [MAX_MP_BUSSES];
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
 int mp_current_pci_id;
 
@@ -55,6 +56,7 @@ unsigned long mp_lapic_addr;
 
 /* Processor that is doing the boot up */
 unsigned int boot_cpu_physical_apicid = -1U;
+unsigned int boot_cpu_logical_apicid = -1U;
 /* Internal processor count */
 static unsigned int num_processors;
 
@@ -118,18 +120,45 @@ static char __init *mpc_family(int family,int model)
 	return n;
 }
 
-static void __init MP_processor_info (struct mpc_config_processor *m)
-{
-	int ver;
+#ifdef CONFIG_X86_IO_APIC
+extern int have_acpi_tables;	/* set by acpitable.c */
+#else
+#define have_acpi_tables (0)
+#endif
 
+/* 
+ * Have to match translation table entries to main table entries by counter
+ * hence the mpc_record variable .... can't see a less disgusting way of
+ * doing this ....
+ */
+
+static int mpc_record; 
+static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
+
+void __init MP_processor_info (struct mpc_config_processor *m)
+{
+ 	int ver, quad, logical_apicid;
+ 	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
 
-	printk("Processor #%d %s APIC version %d\n",
-		m->mpc_apicid,
-		mpc_family(	(m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
-				(m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
-		m->mpc_apicver);
+	logical_apicid = m->mpc_apicid;
+	if (clustered_apic_mode) {
+		quad = translation_table[mpc_record]->trans_quad;
+		logical_apicid = (quad << 4) + 
+			(m->mpc_apicid ? m->mpc_apicid << 1 : 1);
+		printk("Processor #%d %s APIC version %d (quad %d, apic %d)\n",
+			m->mpc_apicid,
+			mpc_family((m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
+				   (m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
+			m->mpc_apicver, quad, logical_apicid);
+	} else {
+		printk("Processor #%d %s APIC version %d\n",
+			m->mpc_apicid,
+			mpc_family((m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
+				   (m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
+			m->mpc_apicver);
+	}
 
 	if (m->mpc_featureflag&(1<<0))
 		Dprintk("    Floating point unit present.\n");
@@ -172,7 +201,8 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 		Dprintk("    Willamette New Instructions  present.\n");
 	if (m->mpc_featureflag&(1<<27))
 		Dprintk("    Self Snoop  present.\n");
-	/* 28 Reserved */
+	if (m->mpc_featureflag&(1<<28))
+		Dprintk("    HT  present.\n");
 	if (m->mpc_featureflag&(1<<29))
 		Dprintk("    Thermal Monitor present.\n");
 	/* 30, 31 Reserved */
@@ -181,6 +211,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
 		boot_cpu_physical_apicid = m->mpc_apicid;
+		boot_cpu_logical_apicid = logical_apicid;
 	}
 
 	num_processors++;
@@ -192,12 +223,11 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	if (clustered_apic_mode)
-		/* Crude temporary hack. Assumes processors are sequential */
-		phys_cpu_present_map |= 1 << (num_processors-1);
-	else
+	if (clustered_apic_mode) {
+		phys_cpu_present_map |= (logical_apicid&0xf) << (4*quad);
+	} else {
 		phys_cpu_present_map |= 1 << m->mpc_apicid;
-
+	}
 	/*
 	 * Validate version
 	 */
@@ -214,7 +244,13 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 
 	memcpy(str, m->mpc_bustype, 6);
 	str[6] = 0;
-	Dprintk("Bus #%d is %s\n", m->mpc_busid, str);
+	
+	if (clustered_apic_mode) {
+		mp_bus_id_to_node[m->mpc_busid] = translation_table[mpc_record]->trans_quad;
+		printk("Bus #%d is %s (node %d)\n", m->mpc_busid, str, mp_bus_id_to_node[m->mpc_busid]);
+	} else {
+		Dprintk("Bus #%d is %s\n", m->mpc_busid, str);
+	}
 
 	if (strncmp(str, BUSTYPE_ISA, sizeof(BUSTYPE_ISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_ISA;
@@ -286,6 +322,63 @@ static void __init MP_lintsrc_info (struct mpc_config_lintsrc *m)
 			BUG();
 }
 
+static void __init MP_translation_info (struct mpc_config_translation *m)
+{
+	printk("Translation: record %d, type %d, quad %d, global %d, local %d\n", mpc_record, m->trans_type, 
+		m->trans_quad, m->trans_global, m->trans_local);
+
+	if (mpc_record >= MAX_MPC_ENTRY) 
+		printk("MAX_MPC_ENTRY exceeded!\n");
+	else
+		translation_table[mpc_record] = m; /* stash this for later */
+}
+
+/*
+ * Read/parse the MPC oem tables
+ */
+
+static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
+	unsigned short oemsize)
+{
+	int count = sizeof (*oemtable); /* the header size */
+	unsigned char *oemptr = ((unsigned char *)oemtable)+count;
+	
+	printk("Found an OEM MPC table at %8p - parsing it ... \n", oemtable);
+	if (memcmp(oemtable->oem_signature,MPC_OEM_SIGNATURE,4))
+	{
+		printk("SMP mpc oemtable: bad signature [%c%c%c%c]!\n",
+			oemtable->oem_signature[0],
+			oemtable->oem_signature[1],
+			oemtable->oem_signature[2],
+			oemtable->oem_signature[3]);
+		return;
+	}
+	if (mpf_checksum((unsigned char *)oemtable,oemtable->oem_length))
+	{
+		printk("SMP oem mptable: checksum error!\n");
+		return;
+	}
+	while (count < oemtable->oem_length) {
+		switch (*oemptr) {
+			case MP_TRANSLATION:
+			{
+				struct mpc_config_translation *m=
+					(struct mpc_config_translation *)oemptr;
+				MP_translation_info(m);
+				oemptr += sizeof(*m);
+				count += sizeof(*m);
+				++mpc_record;
+				break;
+			}
+			default:
+			{
+				printk("Unrecognised OEM table entry type! - %d\n", (int) *oemptr);
+				return;
+			}
+		}
+       }
+}
+
 /*
  * Read/parse the MPC
  */
@@ -327,8 +420,18 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
-	/* save the local APIC address, it might be non-default */
-	mp_lapic_addr = mpc->mpc_lapic;
+	/* save the local APIC address, it might be non-default,
+	 * but only if we're not using the ACPI tables
+	 */
+	if (!have_acpi_tables)
+		mp_lapic_addr = mpc->mpc_lapic;
+
+	if (clustered_apic_mode && mpc->mpc_oemptr) {
+		/* We need to process the oem mpc tables to tell us which quad things are in ... */
+		mpc_record = 0;
+		smp_read_mpc_oem((struct mp_config_oemtable *) mpc->mpc_oemptr, mpc->mpc_oemsize);
+		mpc_record = 0;
+	}
 
 	/*
 	 *	Now process the configuration blocks.
@@ -339,7 +442,10 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 			{
 				struct mpc_config_processor *m=
 					(struct mpc_config_processor *)mpt;
-				MP_processor_info(m);
+
+				/* ACPI may already have provided this one for us */
+				if (!have_acpi_tables)
+					MP_processor_info(m);
 				mpt += sizeof(*m);
 				count += sizeof(*m);
 				break;
@@ -381,7 +487,13 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 				count+=sizeof(*m);
 				break;
 			}
+			default:
+			{
+				count = mpc->mpc_length;
+				break;
+			}
 		}
+		++mpc_record;
 	}
 	if (clustered_apic_mode && nr_ioapics > 2) {
 		/* don't initialise IO apics on secondary quads */
@@ -550,6 +662,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 }
 
 static struct intel_mp_floating *mpf_found;
+extern void 	config_acpi_tables(void);
 
 /*
  * Scan the memory blocks for an SMP configuration block.
@@ -557,6 +670,18 @@ static struct intel_mp_floating *mpf_found;
 void __init get_smp_config (void)
 {
 	struct intel_mp_floating *mpf = mpf_found;
+
+#ifdef CONFIG_X86_IO_APIC
+	/*
+	 * Check if the ACPI tables are provided. Use them only to get
+	 * the processor information, mainly because it provides
+	 * the info on the logical processor(s), rather than the physical
+	 * processor(s) that are provided by the MPS. We attempt to 
+	 * check only if the user provided a commandline override
+	 */
+	config_acpi_tables();
+#endif
+	
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {
 		printk("    IMCR and PIC compatibility mode.\n");

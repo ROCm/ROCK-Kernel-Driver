@@ -1701,7 +1701,7 @@ MODULE_DEVICE_TABLE(pci, xircom_pci_table);
 #ifdef CONFIG_PM
 static int xircom_suspend(struct pci_dev *pdev, u32 state)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xircom_private *tp = dev->priv;
 	printk(KERN_INFO "xircom_suspend(%s)\n", dev->name);
 	if (tp->open)
@@ -1712,7 +1712,7 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 
 static int xircom_resume(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct xircom_private *tp = dev->priv;
 	printk(KERN_INFO "xircom_resume(%s)\n", dev->name);
 
@@ -1734,7 +1734,7 @@ static int xircom_resume(struct pci_dev *pdev)
 
 static void __devexit xircom_remove_one(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 
 	printk(KERN_INFO "xircom_remove_one(%s)\n", dev->name);
 	unregister_netdev(dev);

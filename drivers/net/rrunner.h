@@ -478,6 +478,7 @@ struct cmd {
  * Mode bits
  */
 
+#define  PACKET_BAD		0x01 /* Packet had link-layer error */
 #define  INTERRUPT		0x02
 #define  TX_IP_CKSUM		0x04
 #define  PACKET_END		0x08

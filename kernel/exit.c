@@ -39,6 +39,7 @@ static void release_task(struct task_struct * p)
 				break;
 			task_unlock(p);
 			do {
+				cpu_relax();
 				barrier();
 			} while (p->has_cpu);
 		}
@@ -534,6 +535,9 @@ repeat:
 				}
 				goto end_wait4;
 			case TASK_ZOMBIE:
+				/* Make sure no other waiter picks this task up */
+				p->state = TASK_DEAD;
+
 				current->times.tms_cutime += p->times.tms_utime + p->times.tms_cutime;
 				current->times.tms_cstime += p->times.tms_stime + p->times.tms_cstime;
 				read_unlock(&tasklist_lock);

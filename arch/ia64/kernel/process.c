@@ -63,7 +63,8 @@ show_regs (struct pt_regs *regs)
 {
 	unsigned long ip = regs->cr_iip + ia64_psr(regs)->ri;
 
-	printk("\npsr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
+	printk("\nPid: %d, comm: %20s\n", current->pid, current->comm);
+	printk("psr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
 	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
 	printk("unat: %016lx pfs : %016lx rsc : %016lx\n",
 	       regs->ar_unat, regs->ar_pfs, regs->ar_rsc);
@@ -201,7 +202,7 @@ copy_thread (int nr, unsigned long clone_flags,
 {
 	unsigned long rbs, child_rbs, rbs_size, stack_offset, stack_top, stack_used;
 	struct switch_stack *child_stack, *stack;
-	extern char ia64_ret_from_clone;
+	extern char ia64_ret_from_clone, ia32_ret_from_clone;
 	struct pt_regs *child_ptregs;
 	int retval = 0;
 
@@ -250,7 +251,10 @@ copy_thread (int nr, unsigned long clone_flags,
 		child_ptregs->r12 = (unsigned long) (child_ptregs + 1); /* kernel sp */
 		child_ptregs->r13 = (unsigned long) p;		/* set `current' pointer */
 	}
-	child_stack->b0 = (unsigned long) &ia64_ret_from_clone;
+	if (IS_IA32_PROCESS(regs))
+		child_stack->b0 = (unsigned long) &ia32_ret_from_clone;
+	else
+		child_stack->b0 = (unsigned long) &ia64_ret_from_clone;
 	child_stack->ar_bspstore = child_rbs + rbs_size;
 
 	/* copy parts of thread_struct: */
@@ -285,9 +289,8 @@ copy_thread (int nr, unsigned long clone_flags,
 		ia32_save_state(p);
 #endif
 #ifdef CONFIG_PERFMON
-	p->thread.pfm_pend_notify = 0;
 	if (p->thread.pfm_context)
-		retval = pfm_inherit(p);
+		retval = pfm_inherit(p, child_ptregs);
 #endif
 	return retval;
 }
@@ -441,11 +444,24 @@ flush_thread (void)
 }
 
 #ifdef CONFIG_PERFMON
+/*
+ * By the time we get here, the task is detached from the tasklist. This is important
+ * because it means that no other tasks can ever find it as a notifiied task, therfore
+ * there is no race condition between this code and let's say a pfm_context_create().
+ * Conversely, the pfm_cleanup_notifiers() cannot try to access a task's pfm context if
+ * this other task is in the middle of its own pfm_context_exit() because it would alreayd
+ * be out of the task list. Note that this case is very unlikely between a direct child
+ * and its parents (if it is the notified process) because of the way the exit is notified
+ * via SIGCHLD.
+ */
 void
 release_thread (struct task_struct *task)
 {
 	if (task->thread.pfm_context)
 		pfm_context_exit(task);
+
+	if (atomic_read(&task->thread.pfm_notifiers_check) > 0)
+		pfm_cleanup_notifiers(task);
 }
 #endif
 
@@ -516,6 +532,29 @@ get_wchan (struct task_struct *p)
 }
 
 void
+cpu_halt (void)
+{
+	pal_power_mgmt_info_u_t power_info[8];
+	unsigned long min_power;
+	int i, min_power_state;
+
+	if (ia64_pal_halt_info(power_info) != 0)
+		return;
+
+	min_power_state = 0;
+	min_power = power_info[0].pal_power_mgmt_info_s.power_consumption;
+	for (i = 1; i < 8; ++i)
+		if (power_info[i].pal_power_mgmt_info_s.im
+		    && power_info[i].pal_power_mgmt_info_s.power_consumption < min_power) {
+			min_power = power_info[i].pal_power_mgmt_info_s.power_consumption;
+			min_power_state = i;
+		}
+
+	while (1)
+		ia64_pal_halt(min_power_state);
+}
+
+void
 machine_restart (char *restart_cmd)
 {
 	(*efi.reset_system)(EFI_RESET_WARM, 0, 0, 0);
@@ -524,6 +563,7 @@ machine_restart (char *restart_cmd)
 void
 machine_halt (void)
 {
+	cpu_halt();
 }
 
 void
@@ -531,4 +571,5 @@ machine_power_off (void)
 {
 	if (pm_power_off)
 		pm_power_off();
+	machine_halt();
 }

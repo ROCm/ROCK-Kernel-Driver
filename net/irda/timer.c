@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1997, 1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -94,29 +95,24 @@ void irlap_start_backoff_timer(struct irlap_cb *self, int timeout)
 			 irlap_backoff_timer_expired);
 }
 
-void irlap_start_mbusy_timer(struct irlap_cb *self)
+void irlap_start_mbusy_timer(struct irlap_cb *self, int timeout)
 {
-	irda_start_timer(&self->media_busy_timer, MEDIABUSY_TIMEOUT, 
+	irda_start_timer(&self->media_busy_timer, timeout, 
 			 (void *) self, irlap_media_busy_expired);
 }
 
 void irlap_stop_mbusy_timer(struct irlap_cb *self)
 {
 	/* If timer is activated, kill it! */
-	if(timer_pending(&self->media_busy_timer))
-		del_timer(&self->media_busy_timer);
+	del_timer(&self->media_busy_timer);
 
-#ifdef CONFIG_IRDA_ULTRA
-	/* Send any pending Ultra frames if any */
-	if (!skb_queue_empty(&self->txq_ultra))
-		/* Note : we don't send the frame, just post an event.
-		 * Frames will be sent only if we are in NDM mode (see
-		 * irlap_event.c).
-		 * Also, moved this code from irlap_media_busy_expired()
-		 * to here to catch properly all cases...
-		 * Jean II */
-		irlap_do_event(self, SEND_UI_FRAME, NULL, NULL);
-#endif /* CONFIG_IRDA_ULTRA */
+	/* If we are in NDM, there is a bunch of events in LAP that
+	 * that be pending due to the media_busy condition, such as
+	 * CONNECT_REQUEST and SEND_UI_FRAME. If we don't generate
+	 * an event, they will wait forever...
+	 * Jean II */
+	if (self->state == LAP_NDM)
+		irlap_do_event(self, MEDIA_BUSY_TIMER_EXPIRED, NULL, NULL);
 }
 
 void irlmp_start_watchdog_timer(struct lsap_cb *self, int timeout) 
@@ -237,5 +233,7 @@ void irlap_media_busy_expired(void* data)
 	ASSERT(self != NULL, return;);
 
 	irda_device_set_media_busy(self->netdev, FALSE);
-	/* Note : will deal with Ultra frames */
+	/* Note : the LAP event will be send in irlap_stop_mbusy_timer(),
+	* to catch other cases where the flag is cleared (for example
+	* after a discovery) - Jean II */
 }

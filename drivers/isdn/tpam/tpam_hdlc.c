@@ -1,4 +1,4 @@
-/* $Id: tpam_hdlc.c,v 1.1.2.2 2001/09/23 22:25:03 kai Exp $
+/* $Id: tpam_hdlc.c,v 1.1.2.3 2001/11/06 20:58:30 kai Exp $
  *
  * Turbo PAM ISDN driver for Linux. (Kernel Driver - HDLC encoding)
  *
@@ -35,11 +35,11 @@ Abstract:
     destuff5 : array necessary for the bit destuffing algorithm
     destuffs[] : array conaining the previous 6 arrays
 
-    hdlc_encode : bit stuffing of a byte array, with the addition of a start and
-    		  end flag, using the bit shift given in parameter (which is 
-		  updated at the end of encoding).
-    hdlc_decode : bit de-stuffing of a byte array with detection of possible
-    		  ABORTs.
+    tpam_hdlc_encode : bit stuffing of a byte array, with the addition 
+                  of a start and end flag, using the bit shift given in 
+		  parameter (which is updated at the end of encoding).
+    tpam_hdlc_decode : bit de-stuffing of a byte array with detection of 
+                  possible ABORTs.
 
 Revision History:
 
@@ -553,7 +553,7 @@ WORD * destuffs[] = { destuff0, destuff1, destuff2, destuff3, destuff4, destuff5
 
 /*- AuverTech Telecom -------------------------------------------------------+
  |                                                                           |
- | @Function  : hdlc_encode                                                  |
+ | @Function  : tpam_hdlc_encode                                             |
  | @Author    : Cyrille Boudon                                               |
  |                                                                           |
  +---------------------------------------------------------------------------+
@@ -576,8 +576,8 @@ WORD * destuffs[] = { destuff0, destuff1, destuff2, destuff3, destuff4, destuff5
  | beginning (for the first frame), the shift must be initialized to 0.      |
  |                                                                           |
  +---------------------------------------------------------------------------*/
-DWORD hdlc_encode(BYTE *pbyBuffIn, BYTE *pbyBuffOut,
-		  DWORD *pdwInitialShift, DWORD dwLength)
+DWORD tpam_hdlc_encode(BYTE *pbyBuffIn, BYTE *pbyBuffOut,
+		       DWORD *pdwInitialShift, DWORD dwLength)
 {
 	DWORD	dwShifter;     // temporary variable
 	DWORD	dwShiftNb;     // shift due to the insertion of '0'
@@ -754,7 +754,7 @@ carry:
 
 /*- AuverTech Telecom -------------------------------------------------------+
  |                                                                           |
- | @Function  : hdlc_decode                                                  |
+ | @Function  : tpam_hdlc_decode                                             |
  | @Author    : Cyrille Boudon                                               |
  |                                                                           |
  +---------------------------------------------------------------------------+
@@ -773,7 +773,7 @@ carry:
  | If an abort is encountered, the returned count is '0'.                    |
  |                                                                           |
  +---------------------------------------------------------------------------*/
-DWORD hdlc_decode(BYTE * pbyBuffIn, BYTE * pbyBuffOut, DWORD dwLength)
+DWORD tpam_hdlc_decode(BYTE * pbyBuffIn, BYTE * pbyBuffOut, DWORD dwLength)
 {
 	BYTE	byCharIn;    // byte being decoded
 	BYTE	byCarry;     // current carry

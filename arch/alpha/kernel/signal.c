@@ -17,6 +17,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/tty.h>
 
 #include <asm/bitops.h>
 #include <asm/uaccess.h>

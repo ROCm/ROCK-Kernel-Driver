@@ -475,18 +475,12 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 		}
                 put_user(pd_hd[dev].start_sect,(long *)&geo->start);
                 return 0;
-            case BLKGETSIZE:
-                if (!arg) return -EINVAL;
-                err = verify_area(VERIFY_WRITE,(unsigned long *) arg,sizeof(unsigned long));
-                if (err) return (err);
-                put_user(pd_hd[dev].nr_sects,(unsigned long *) arg);
-                return (0);
-            case BLKGETSIZE64:
-                return put_user((u64)pd_hd[dev].nr_sects << 9, (u64 *)arg);
             case BLKRRPART:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
                 return pd_revalidate(inode->i_rdev);
+	    case BLKGETSIZE:
+	    case BLKGETSIZE64:
 	    case BLKROSET:
 	    case BLKROGET:
 	    case BLKRASET:

@@ -59,7 +59,7 @@ int do_check_pgt_cache(int low, int high)
 			}
                         if(pte_quicklist) {
 				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed += 4;
+				freed += 1;
 			}
                 } while(pgtable_cache_size > low);
         }

@@ -1145,8 +1145,10 @@ int __init psched_calibrate_clock(void)
 	stop = jiffies + HZ/10;
 	PSCHED_GET_TIME(stamp);
 	do_gettimeofday(&tv);
-	while (time_before(jiffies, stop))
+	while (time_before(jiffies, stop)) {
 		barrier();
+		cpu_relax();
+	}
 	PSCHED_GET_TIME(stamp1);
 	do_gettimeofday(&tv1);
 

@@ -2,7 +2,7 @@
 #	Eric S. Raymond <mailto:esr@thyrsus.com>
 #	Steven Cole <mailto:elenstev@mesatop.com>
 #
-# Merged version 2.48: Current with 2.4.14 and 2.4.13-ac8.
+# Merged version 2.49: Current with 2.4.15-pre1 and 2.4.13-ac8.
 #
 # This version of the Linux kernel configuration help texts
 # corresponds to the kernel versions 2.4.x.
@@ -1795,6 +1795,16 @@ CONFIG_MD_RAID5
 
   If unsure, say Y.
 
+Multipath I/O support
+CONFIG_MD_MULTIPATH
+  Multipath-IO is the ability of certain devices to address the same
+  physical disk over multiple 'IO paths'. The code ensures that such
+  paths can be defined and handled at runtime, and ensures that a
+  transparent failover to the backup path(s) happens if a IO errors
+  arrives on the primary path.
+
+  If unsure, say N.
+
 # AC tree only
 Support for IDE Raid controllers
 CONFIG_BLK_DEV_ATARAID
@@ -2826,8 +2836,9 @@ CONFIG_ALPHA_CABRIOLET
 
 DP264
 CONFIG_ALPHA_DP264
-  Hard Data HD-DP264-based Alpha systems.  There is a Hard Data
-  website at <http://www.harddata.com/alpha/>.
+  Various 21264 systems with the tsunami core logic chipset.
+  API Networks: 264DP, UP2000(+), CS20;
+  Compaq: DS10(E,L), XP900, XP1000, DS20(E), ES40.
 
 EB164
 CONFIG_ALPHA_EB164
@@ -13603,6 +13614,15 @@ CONFIG_REISERFS_PROC_INFO
   everyone but ReiserFS developers and people fine-tuning reiserfs or
   tracing problems should say N.
 
+Publish some reiserfs-specific info under /proc/fs/reiserfs
+CONFIG_REISERFS_PROC_INFO
+  Create under /proc/fs/reiserfs hierarchy of files, displaying
+  various ReiserFS statistics and internal data on the expense of
+  making your kernel or module slightly larger (+8K). This also increases 
+  amount of kernel memory required for each mount. Almost everyone
+  but ReiserFS developers and people fine-tuning reiserfs or tracing
+  problems should say NO.
+
 Second extended fs support
 CONFIG_EXT2_FS
   This is the de facto standard Linux file system (method to organize
@@ -22202,14 +22222,21 @@ CONFIG_IRDA
   read the IR-HOWTO, available at
   <http://www.linuxdoc.org/docs.html#howto>.
 
+  If you want to exchange bits of data (vCal, vCard) with a PDA, you
+  will need to install some OBEX application, such as OpenObex :
+  <http://sourceforge.net/projects/openobex/>
+
   This support is also available as a module called irda.o.  If you
   want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.
 
 Ultra (connectionless) protocol
 CONFIG_IRDA_ULTRA
-  Say Y here to support the connectionless Ultra IRDA protocol, also
-  called IrOBEX.
+  Say Y here to support the connectionless Ultra IRDA protocol.
+  Ultra allows to exchange data over IrDA with really simple devices
+  (watch, beacon) without the overhead of the IrDA protocol (no handshaking,
+  no management frames, simple fixed header).
+  Ultra is available as a special socket : socket(AF_IRDA, SOCK_DGRAM, 1);
 
 IrDA protocol options
 CONFIG_IRDA_OPTIONS

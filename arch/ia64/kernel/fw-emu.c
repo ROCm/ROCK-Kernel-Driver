@@ -174,6 +174,43 @@ asm (
 "	;;\n"
 "	mov ar.lc=r9\n"
 "	mov r8=r0\n"
+"	;;\n"
+"1:	cmp.eq p6,p7=15,r28		/* PAL_PERF_MON_INFO */\n"
+"(p7)	br.cond.sptk.few 1f\n"
+"	mov r8=0			/* status = 0 */\n"
+"	movl r9 =0x12082004		/* generic=4 width=32 retired=8 cycles=18 */\n"
+"	mov r10=0			/* reserved */\n"
+"	mov r11=0			/* reserved */\n"
+"	mov r16=0xffff			/* implemented PMC */\n"
+"	mov r17=0xffff			/* implemented PMD */\n"
+"	add r18=8,r29			/* second index */\n"
+"	;;\n"
+"	st8 [r29]=r16,16		/* store implemented PMC */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
+"	st8 [r29]=r0,16			/* store implemented PMC */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
+"	st8 [r29]=r17,16		/* store implemented PMD */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	mov r16=0xf0			/* cycles count capable PMC */\n"
+"	;;\n"
+"	st8 [r29]=r0,16			/* store implemented PMC */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	mov r17=0x10			/* retired bundles capable PMC */\n"
+"	;;\n"
+"	st8 [r29]=r16,16		/* store cycles capable */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
+"	st8 [r29]=r0,16			/* store implemented PMC */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
+"	st8 [r29]=r17,16		/* store retired bundle capable */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
+"	st8 [r29]=r0,16			/* store implemented PMC */\n"
+"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
+"	;;\n"
 "1:	br.cond.sptk.few rp\n"
 "stacked:\n"
 "	br.ret.sptk.few rp\n"
@@ -414,11 +451,6 @@ sys_fw_init (const char *args, int arglen)
 #ifdef CONFIG_IA64_SDV
 	strcpy(sal_systab->oem_id, "Intel");
 	strcpy(sal_systab->product_id, "SDV");
-#endif
-
-#ifdef CONFIG_IA64_SGI_SN1_SIM
-	strcpy(sal_systab->oem_id, "SGI");
-	strcpy(sal_systab->product_id, "SN1");
 #endif
 
 	/* fill in an entry point: */

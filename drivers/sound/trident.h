@@ -29,7 +29,7 @@
 #endif
 
 #ifndef PCI_VENDOR_ID_SI
-#define PCI_VENDOR_ID_SI			0x0139
+#define PCI_VENDOR_ID_SI			0x1039
 #endif
 
 #ifndef PCI_VENDOR_ID_ALI

@@ -38,6 +38,10 @@
 #define DBG(x...)
 #endif
 
+#ifdef CONFIG_IA64_MCA
+extern void ia64_mca_check_errors( void );
+#endif
+
 /*
  * This interrupt-safe spinlock protects all accesses to PCI
  * configuration space.
@@ -122,6 +126,10 @@ pcibios_init (void)
 #	define PCI_BUSES_TO_SCAN 255
 	int i;
 
+#ifdef CONFIG_IA64_MCA
+	ia64_mca_check_errors();    /* For post-failure MCA error logging */
+#endif
+
 	platform_pci_fixup(0);	/* phase 0 initialization (before PCI bus has been scanned) */
 
 	printk("PCI: Probing PCI hardware\n");
@@ -194,4 +202,40 @@ char * __init
 pcibios_setup (char *str)
 {
 	return NULL;
+}
+
+int
+pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
+		     enum pci_mmap_state mmap_state, int write_combine)
+{
+	/*
+	 * I/O space cannot be accessed via normal processor loads and stores on this
+	 * platform.
+	 */
+	if (mmap_state == pci_mmap_io)
+		/*
+		 * XXX we could relax this for I/O spaces for which ACPI indicates that
+		 * the space is 1-to-1 mapped.  But at the moment, we don't support
+		 * multiple PCI address spaces and the legacy I/O space is not 1-to-1
+		 * mapped, so this is moot.
+		 */
+		return -EINVAL;
+
+	/*
+	 * Leave vm_pgoff as-is, the PCI space address is the physical address on this
+	 * platform.
+	 */
+	vma->vm_flags |= (VM_SHM | VM_LOCKED | VM_IO);
+
+	if (write_combine)
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	else
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	if (remap_page_range(vma->vm_start, vma->vm_pgoff << PAGE_SHIFT,
+			     vma->vm_end - vma->vm_start,
+			     vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
 }

@@ -9,6 +9,7 @@
 //
 #include <linux/config.h>
 
+#include <asm/asmmacro.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/mca_asm.h>
@@ -23,7 +24,7 @@
 #include "minstate.h"
 
 /*
- *	SAL_TO_OS_MCA_HANDOFF_STATE
+ *  SAL_TO_OS_MCA_HANDOFF_STATE (SAL 3.0 spec)
  *		1. GR1 = OS GP
  *		2. GR8 = PAL_PROC physical address
  *		3. GR9 = SAL_PROC physical address
@@ -33,6 +34,7 @@
  */
 #define SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(_tmp)		\
 	movl	_tmp=ia64_sal_to_os_handoff_state;;	\
+	DATA_VA_TO_PA(_tmp);;				\
 	st8	[_tmp]=r1,0x08;;			\
 	st8	[_tmp]=r8,0x08;;			\
 	st8	[_tmp]=r9,0x08;;			\
@@ -41,47 +43,29 @@
 	st8	[_tmp]=r12,0x08;;
 
 /*
- *	OS_MCA_TO_SAL_HANDOFF_STATE
- *		1. GR8 = OS_MCA status
- *		2. GR9 = SAL GP (physical)
- *		3. GR22 = New min state save area pointer
+ *  OS_MCA_TO_SAL_HANDOFF_STATE (SAL 3.0 spec)
+ *      1. GR8 = OS_MCA return status
+ *	2. GR9 = SAL GP (physical)
+ *      3. GR10 = 0/1 returning same/new context
+ *      4. GR22 = New min state save area pointer
+ *      returns ptr to SAL rtn save loc in _tmp
  */
-#define OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(_tmp)	\
-	movl	_tmp=ia64_os_to_sal_handoff_state;;	\
-	DATA_VA_TO_PA(_tmp);;				\
-	ld8	r8=[_tmp],0x08;;			\
-	ld8	r9=[_tmp],0x08;;			\
-	ld8	r22=[_tmp],0x08;;
-
-/*
- *	BRANCH
- *		Jump to the instruction referenced by
- *	"to_label".
- *		Branch is taken only if the predicate
- *	register "p" is true.
- *		"ip" is the address of the instruction
- *	located at "from_label".
- *		"temp" is a scratch register like r2
- *		"adjust" needed for HP compiler.
- *	A screwup somewhere with constant arithmetic.
- */
-#define BRANCH(to_label, temp, p, adjust)		\
-100:	(p)	mov		temp=ip;		\
-		;;					\
-	(p)	adds		temp=to_label-100b,temp;\
-		;;					\
-	(p)	adds		temp=adjust,temp;	\
-		;;					\
-	(p)	mov		b1=temp	;		\
-	(p)	br		b1
+#define OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(_tmp)				\
+	movl	_tmp=ia64_os_to_sal_handoff_state;;				\
+	DATA_VA_TO_PA(_tmp);;							\
+	ld8	r8=[_tmp],0x08;;						\
+	ld8	r9=[_tmp],0x08;;						\
+	ld8     r10=[_tmp],0x08;;						\
+	ld8     r22=[_tmp],0x08;;						\
+	movl    _tmp=ia64_sal_to_os_handoff_state;;				\
+	DATA_VA_TO_PA(_tmp);;							\
+	add     _tmp=0x28,_tmp;;            // point to SAL rtn save location
 
 	.global ia64_os_mca_dispatch
 	.global ia64_os_mca_dispatch_end
 	.global ia64_sal_to_os_handoff_state
 	.global	ia64_os_to_sal_handoff_state
-	.global	ia64_os_mca_ucmc_handler
 	.global	ia64_mca_proc_state_dump
-	.global ia64_mca_proc_state_restore
 	.global	ia64_mca_stack
 	.global	ia64_mca_stackframe
 	.global	ia64_mca_bspstore
@@ -100,7 +84,7 @@ ia64_os_mca_dispatch:
 #endif	/* #if defined(MCA_TEST) */
 
 	// Save the SAL to OS MCA handoff state as defined
-	// by SAL SPEC 2.5
+	// by SAL SPEC 3.0
 	// NOTE : The order in which the state gets saved
 	//	  is dependent on the way the C-structure
 	//	  for ia64_mca_sal_to_os_state_t has been
@@ -110,15 +94,20 @@ ia64_os_mca_dispatch:
 	// LOG PROCESSOR STATE INFO FROM HERE ON..
 	;;
 begin_os_mca_dump:
-	BRANCH(ia64_os_mca_proc_state_dump, r2, p0, 0x0)
-	;;
+	br	ia64_os_mca_proc_state_dump;;
+
 ia64_os_mca_done_dump:
 
 	// Setup new stack frame for OS_MCA handling
-	movl        r2=ia64_mca_bspstore		// local bspstore area location in r2
-	movl        r3=ia64_mca_stackframe		// save stack frame to memory in r3
+	movl    r2=ia64_mca_bspstore;;      // local bspstore area location in r2
+	DATA_VA_TO_PA(r2);;
+	movl    r3=ia64_mca_stackframe;;    // save stack frame to memory in r3
+	DATA_VA_TO_PA(r3);;
 	rse_switch_context(r6,r3,r2);;                  // RSC management in this new context
 	movl        r12=ia64_mca_stack;;
+	mov     r2=8*1024;;                 // stack size must be same as c array
+	add     r12=r2,r12;;                // stack base @ bottom of array
+	DATA_VA_TO_PA(r12);;
 
 	// Enter virtual mode from physical mode
 	VIRTUAL_MODE_ENTER(r2, r3, ia64_os_mca_virtual_begin, r4)
@@ -127,7 +116,7 @@ ia64_os_mca_virtual_begin:
 	// call our handler
 	movl		r2=ia64_mca_ucmc_handler;;
 	mov		b6=r2;;
-	br.call.sptk.few	b0=b6
+	br.call.sptk.many    b0=b6;;
 .ret0:
 	// Revert back to physical mode before going back to SAL
 	PHYSICAL_MODE_ENTER(r2, r3, ia64_os_mca_virtual_end, r4)
@@ -135,9 +124,9 @@ ia64_os_mca_virtual_end:
 
 #if defined(MCA_TEST)
 	// Pretend that we are in interrupt context
-	mov		r2=psr
-	dep		r2=0, r2, PSR_IC, 2;
-	mov		psr.l = r2
+	mov	r2=psr;;
+	dep	r2=0, r2, PSR_IC, 2;;
+	mov	psr.l = r2;;
 #endif	/* #if defined(MCA_TEST) */
 
 	// restore the original stack frame here
@@ -152,15 +141,14 @@ ia64_os_mca_virtual_end:
 	mov		r8=gp
 	;;
 begin_os_mca_restore:
-	BRANCH(ia64_os_mca_proc_state_restore, r2, p0, 0x0)
-	;;
+	br	ia64_os_mca_proc_state_restore;;
 
 ia64_os_mca_done_restore:
 	;;
 	// branch back to SALE_CHECK
 	OS_MCA_TO_SAL_HANDOFF_STATE_RESTORE(r2)
 	ld8		r3=[r2];;
-	mov		b0=r3                       // SAL_CHECK return address
+	mov		b0=r3;;			      // SAL_CHECK return address
 	br		b0
 	;;
 ia64_os_mca_dispatch_end:
@@ -178,8 +166,10 @@ ia64_os_mca_dispatch_end:
 //--
 
 ia64_os_mca_proc_state_dump:
-// Get and save GR0-31 from Proc. Min. State Save Area to SAL PSI
+// Save bank 1 GRs 16-31 which will be used by c-language code when we switch
+//  to virtual addressing mode.
 	movl		r2=ia64_mca_proc_state_dump;;           // Os state dump area
+        DATA_VA_TO_PA(r2)                   // convert to to physical address
 
 // save ar.NaT
 	mov		r5=ar.unat                  // ar.unat
@@ -250,16 +240,16 @@ cSaveCRs:
 // if PSR.ic=0, reading interruption registers causes an illegal operation fault
 	mov		r3=psr;;
 	tbit.nz.unc	p6,p0=r3,PSR_IC;;           // PSI Valid Log bit pos. test
-(p6)    st8		[r2]=r0,9*8+160             // increment by 168 byte inc.
+(p6)    st8     [r2]=r0,9*8+160             // increment by 232 byte inc.
 begin_skip_intr_regs:
-	BRANCH(SkipIntrRegs,  r9, p6, 0x0)
-	;;
+(p6)	br		SkipIntrRegs;;
+
 	add		r4=8,r2                  // duplicate r2 in r4
 	add		r6=2*8,r2                // duplicate r2 in r6
 
 	mov		r3=cr16                     // cr.ipsr
 	mov		r5=cr17                     // cr.isr
-	mov		r7=r0;;                     // cr.ida => cr18
+        mov     r7=r0;;                     // cr.ida => cr18 (reserved)
 	st8		[r2]=r3,3*8
 	st8		[r4]=r5,3*8
 	st8		[r6]=r7,3*8;;
@@ -394,8 +384,7 @@ cStRR:
 	br.cloop.sptk.few	cStRR
 	;;
 end_os_mca_dump:
-	BRANCH(ia64_os_mca_done_dump, r2, p0, -0x10)
-	;;
+	br	ia64_os_mca_done_dump;;
 
 //EndStub//////////////////////////////////////////////////////////////////////
 
@@ -484,11 +473,10 @@ restore_CRs:
 // if PSR.ic=1, reading interruption registers causes an illegal operation fault
 	mov		r3=psr;;
 	tbit.nz.unc	p6,p0=r3,PSR_IC;;           // PSI Valid Log bit pos. test
-(p6)    st8		[r2]=r0,9*8+160             // increment by 160 byte inc.
+(p6)    st8     [r2]=r0,9*8+160             // increment by 232 byte inc.
 
 begin_rskip_intr_regs:
-	BRANCH(rSkipIntrRegs, r9, p6, 0x0)
-	;;
+(p6)	br		rSkipIntrRegs;;
 
 	add		r4=8,r2                  // duplicate r2 in r4
 	add		r6=2*8,r2;;              // duplicate r2 in r4
@@ -498,7 +486,7 @@ begin_rskip_intr_regs:
 	ld8		r7=[r6],3*8;;
 	mov		cr16=r3                     // cr.ipsr
 	mov		cr17=r5                     // cr.isr is read only
-//      mov		cr18=r7;;                   // cr.ida
+//      mov     cr18=r7;;                   // cr.ida (reserved - don't restore)
 
 	ld8		r3=[r2],3*8
 	ld8		r5=[r4],3*8
@@ -629,8 +617,8 @@ cStRRr:
 	mov		ar.lc=r5
 	;;
 end_os_mca_restore:
-	BRANCH(ia64_os_mca_done_restore, r2, p0, -0x20)
-	;;
+	br	ia64_os_mca_done_restore;;
+
 //EndStub//////////////////////////////////////////////////////////////////////
 
 // ok, the issue here is that we need to save state information so
@@ -660,12 +648,7 @@ end_os_mca_restore:
 //		6. GR12 = Return address to location within SAL_INIT procedure
 
 
-	.text
-	.align 16
-.global ia64_monarch_init_handler
-.proc ia64_monarch_init_handler
-ia64_monarch_init_handler:
-
+GLOBAL_ENTRY(ia64_monarch_init_handler)
 #if defined(CONFIG_SMP) && defined(SAL_MPINIT_WORKAROUND)
 	//
 	// work around SAL bug that sends all processors to monarch entry
@@ -741,13 +724,12 @@ IVirtual_Switch:
 	adds out0=16,sp				// out0 = pointer to pt_regs
 	;;
 
-	br.call.sptk.few rp=ia64_init_handler
+	br.call.sptk.many rp=ia64_init_handler
 .ret1:
 
 return_from_init:
 	br.sptk return_from_init
-
-	.endp
+END(ia64_monarch_init_handler)
 
 //
 // SAL to OS entry point for INIT on the slave processor
@@ -755,14 +737,6 @@ return_from_init:
 // as a part of ia64_mca_init.
 //
 
-	.text
-	.align 16
-.global ia64_slave_init_handler
-.proc ia64_slave_init_handler
-ia64_slave_init_handler:
-
-
-slave_init_spin_me:
-	br.sptk slave_init_spin_me
-	;;
-	.endp
+GLOBAL_ENTRY(ia64_slave_init_handler)
+1:	br.sptk 1b
+END(ia64_slave_init_handler)

@@ -5,7 +5,7 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.8
+ * Version:    0.6.9
  *
  * 030700 :     Fixed connect logic to allow for disconnect.
  * 270700 :	Fixed potential SMP problems; we must protect against
@@ -29,6 +29,8 @@
  *		the original skb that was passed in on success, never on
  *		failure.  Delete the copy of the skb on failure to avoid
  *		a memory leak.
+ * 081001 :     Misc. cleanup (licence string, non-blocking, prevent
+ *              reference of device on close).
  *
  * Author:	Michal Ostrowski <mostrows@speakeasy.net>
  * Contributors:
@@ -349,7 +351,7 @@ int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
 
 		if (relay_po == NULL)
 			goto abort_kfree;
-			
+
 		if ((relay_po->sk->state & PPPOX_CONNECTED) == 0)
 			goto abort_put;
 
@@ -543,13 +545,12 @@ int pppoe_release(struct socket *sock)
 	po = sk->protinfo.pppox;
 	if (po->pppoe_pa.sid) {
 		delete_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
-		po->pppoe_pa.sid = 0 ;
 	}
 
 	if (po->pppoe_dev)
-	    dev_put(po->pppoe_dev);
+		dev_put(po->pppoe_dev);
 
-	po->pppoe_dev = NULL ;
+	po->pppoe_dev = NULL;
 
 	sock_orphan(sk);
 	sock->sk = NULL;
@@ -944,7 +945,8 @@ int pppoe_rcvmsg(struct socket *sock, struct msghdr *m, int total_len, int flags
 		goto end;
 	}
 
-	skb = skb_recv_datagram(sk, flags, 0, &error);
+	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
+				flags & MSG_DONTWAIT, &error);
 
 	if (error < 0) {
 		goto end;
@@ -1077,3 +1079,7 @@ void __exit pppoe_exit(void)
 
 module_init(pppoe_init);
 module_exit(pppoe_exit);
+
+MODULE_AUTHOR("Michal Ostrowski <mostrows@speakeasy.net>");
+MODULE_DESCRIPTION("PPP over Ethernet driver");
+MODULE_LICENSE("GPL");

@@ -14,7 +14,7 @@
  * mistake somewhere.
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
  */
@@ -25,7 +25,12 @@
 
 #define __IA64_UNCACHED_OFFSET	0xc000000000000000	/* region 6 */
 
-#define IO_SPACE_LIMIT 0xffff
+/*
+ * The legacy I/O space defined by the ia64 architecture supports only 65536 ports, but
+ * large machines may have multiple other I/O spaces so we can't place any a priori limit
+ * on IO_SPACE_LIMIT.  These additional spaces are described in ACPI.
+ */
+#define IO_SPACE_LIMIT		0xffffffffffffffffUL
 
 # ifdef __KERNEL__
 
@@ -43,7 +48,7 @@ virt_to_phys (volatile void *address)
 }
 
 static inline void*
-phys_to_virt(unsigned long address)
+phys_to_virt (unsigned long address)
 {
 	return (void *) (address + PAGE_OFFSET);
 }
@@ -54,6 +59,7 @@ phys_to_virt(unsigned long address)
  */
 #define bus_to_virt	phys_to_virt
 #define virt_to_bus	virt_to_phys
+#define page_to_bus	page_to_phys
 
 # endif /* KERNEL */
 

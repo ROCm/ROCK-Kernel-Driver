@@ -504,7 +504,7 @@ unw_access_ar (struct unw_frame_info *info, int regnum, unsigned long *val, int 
 	return 0;
 }
 
-inline int
+int
 unw_access_pr (struct unw_frame_info *info, unsigned long *val, int write)
 {
 	unsigned long *addr;

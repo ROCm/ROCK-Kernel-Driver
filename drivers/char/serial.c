@@ -85,6 +85,11 @@ static char *serial_revdate = "2001-07-08";
  * SERIAL_PARANOIA_CHECK
  * 		Check the magic number for the async_structure where
  * 		ever possible.
+ *
+ * CONFIG_SERIAL_ACPI
+ *		Enable support for serial console port and serial 
+ *		debug port as defined by the SPCR and DBGP tables in 
+ *		ACPI 2.0.
  */
 
 #include <linux/config.h>
@@ -111,6 +116,10 @@ static char *serial_revdate = "2001-07-08";
 #ifndef CONFIG_SERIAL_MANY_PORTS
 #define CONFIG_SERIAL_MANY_PORTS
 #endif
+#endif
+
+#ifdef CONFIG_SERIAL_ACPI
+#define ENABLE_SERIAL_ACPI
 #endif
 
 #if defined(CONFIG_ISAPNP)|| (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
@@ -1766,13 +1775,11 @@ static void change_speed(struct async_struct *info,
 		if (I_IGNPAR(info->tty))
 			info->ignore_status_mask |= UART_LSR_OE;
 	}
-#if 0 /* breaks serial console during boot stage */
 	/*
 	 * !!! ignore all characters if CREAD is not set
 	 */
 	if ((cflag & CREAD) == 0)
 		info->ignore_status_mask |= UART_LSR_DR;
-#endif
 	save_flags(flags); cli();
 	if (uart_config[info->state->type].flags & UART_STARTECH) {
 		serial_outp(info, UART_LCR, 0xBF);
@@ -2243,7 +2250,7 @@ static int get_lsr_info(struct async_struct * info, unsigned int *value)
 	    ((CIRC_CNT(info->xmit.head, info->xmit.tail,
 		       SERIAL_XMIT_SIZE) > 0) &&
 	     !info->tty->stopped && !info->tty->hw_stopped))
-		result &= TIOCSER_TEMT;
+		result &= ~TIOCSER_TEMT;
 
 	if (copy_to_user(value, &result, sizeof(int)))
 		return -EFAULT;
@@ -2355,7 +2362,7 @@ static int do_autoconfig(struct async_struct * info)
 
 	autoconfig(info->state);
 	if ((info->state->flags & ASYNC_AUTO_IRQ) &&
-	    (info->state->port != 0) &&
+	    (info->state->port != 0  || info->state->iomem_base != 0) &&
 	    (info->state->type != PORT_UNKNOWN)) {
 		irq = detect_uart_irq(info->state);
 		if (irq > 0)
@@ -3382,6 +3389,10 @@ static char serial_options[] __initdata =
 #endif
 #ifdef ENABLE_SERIAL_PNP
        " ISAPNP"
+#define SERIAL_OPT
+#endif
+#ifdef ENABLE_SERIAL_ACPI
+       " SERIAL_ACPI"
 #define SERIAL_OPT
 #endif
 #ifdef SERIAL_OPT
@@ -5475,13 +5486,22 @@ static int __init rs_init(void)
 			continue;
 		if (   (state->flags & ASYNC_BOOT_AUTOCONF)
 		    && (state->flags & ASYNC_AUTO_IRQ)
-		    && (state->port != 0))
+		    && (state->port != 0 || state->iomem_base != 0))
 			state->irq = detect_uart_irq(state);
-		printk(KERN_INFO "ttyS%02d%s at 0x%04lx (irq = %d) is a %s\n",
-		       state->line + SERIAL_DEV_OFFSET,
-		       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
-		       state->port, state->irq,
-		       uart_config[state->type].name);
+		if (state->io_type == SERIAL_IO_MEM) {
+			printk(KERN_INFO"ttyS%02d%s at 0x%px (irq = %d) is a %s\n",
+	 		       state->line + SERIAL_DEV_OFFSET,
+			       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
+			       state->iomem_base, state->irq,
+			       uart_config[state->type].name);
+		}
+		else {
+			printk(KERN_INFO "ttyS%02d%s at 0x%04lx (irq = %d) is a %s\n",
+	 		       state->line + SERIAL_DEV_OFFSET,
+			       (state->flags & ASYNC_FOURPORT) ? " FourPort" : "",
+			       state->port, state->irq,
+			       uart_config[state->type].name);
+		}
 		tty_register_devfs(&serial_driver, 0,
 				   serial_driver.minor_start + state->line);
 		tty_register_devfs(&callout_driver, 0,

@@ -82,7 +82,7 @@ OPTION 1: Build inside kernel tree (into kernel image, or as module)
 
 	(overwrite 8139too driver in kernel tree with different version)
 	1) cp 8139too.c $my_source_tree/drivers/net/8139too.c
-	
+
 OPTION 2: Build outside kernel tree
 
 	Use the included Makefile.
@@ -139,7 +139,7 @@ And thanks to every supporter free software.
 
 Submitting Bug Reports
 ----------------------
-Obtain and compile the modified rtl8139-diag source code from the 
+Obtain and compile the modified rtl8139-diag source code from the
 8139too driver Web site, http://sourceforge.net/projects/gkernel/
 This diagnostics programs, originally from Donald Becker, has been
 modified to display all registers on your RTL8139 chip, not just the
@@ -181,6 +181,27 @@ suggestions welcome)  (WIP)
 Change History
 --------------
 
+Version 0.9.22 - November 8, 2001
+
+* Additional retries before aborting Tx
+* Do not write other TxConfig bits when writing clear-abort bit.
+* Ack TxErr intr status after each Tx abort, too.
+
+
+Version 0.9.21 - November 1, 2001
+
+* Disable early Rx, it hurts performance and creates races.
+* Remove DPRINTK macro function tracing.
+* Better interrupt sharing behavior.
+* Acknowledge PCI errors.
+* Remove early-Rx acknowledgement, unnecessary
+* Remove code for uncommon case where Tx packets are
+  properly aligned, and do not need to be copied.
+  Tx packets are now always copied into a static DMA buffer,
+  which is allocated at interface open.
+* Fix problems with kernel thread exit.
+
+
 Version 0.9.20 - October 18, 2001
 
 * Print out notice when 8139C+ chip is detected
@@ -212,7 +233,7 @@ Version 0.9.18 - July 6, 2001
 Version 0.9.17 - May 7, 2001
 
 * Fix chipset wakeup bug which prevent media connection for 8139B
-* Print out "media is unconnected..." instead of 
+* Print out "media is unconnected..." instead of
   "partner ability 0000"
 
 

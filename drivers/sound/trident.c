@@ -640,13 +640,21 @@ static struct trident_channel * trident_alloc_pcm_channel(struct trident_card *c
 static void trident_free_pcm_channel(struct trident_card *card, unsigned int channel)
 {
 	int bank;
+        unsigned char b;
 
 	if (channel < 31 || channel > 63)
 		return;
 
+	if (card->pci_id == PCI_DEVICE_ID_TRIDENT_4DWAVE_DX ||
+            card->pci_id == PCI_DEVICE_ID_TRIDENT_4DWAVE_NX) {
+          b = inb (TRID_REG(card, T4D_REC_CH));
+          if ((b & ~0x80) == channel)
+            outb(0x0, TRID_REG(card, T4D_REC_CH));
+        }
+            
 	bank = channel >> 5;
 	channel = channel & 0x1f;
-
+        
 	card->banks[bank].bitmap &= ~(1 << (channel));
 }
 

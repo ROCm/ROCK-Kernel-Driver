@@ -704,7 +704,7 @@ tape_release (struct inode *inode, struct file *filp)
 	long lockflags;
 	tape_info_t *ti,*lastti;
 	ccw_req_t *cqr = NULL;
-	int rc;
+	int rc = 0;
 
 	ti = first_tape_info;
 	while ((ti != NULL) && (ti->rew_minor != MINOR (inode->i_rdev)) && (ti->nor_minor != MINOR (inode->i_rdev)))
@@ -718,13 +718,14 @@ tape_release (struct inode *inode, struct file *filp)
 		lastti->next=ti->next;
 	    }
 	    kfree(ti);    
-	    return 0;
+	    goto out;
 	}
 	if ((ti == NULL) || (tapestate_get (ti) != TS_IDLE)) {
 #ifdef TAPE_DEBUG
 	debug_text_event (tape_debug_area,6,"c:notidle!");
 #endif
-		return -ENXIO;	/* error in tape_release */
+		rc = -ENXIO;	/* error in tape_release */
+		goto out;
 	}
 #ifdef TAPE_DEBUG
 	debug_text_event (tape_debug_area,6,"c:release:");
@@ -750,8 +751,9 @@ tape_release (struct inode *inode, struct file *filp)
 	s390irq_spin_lock_irqsave (ti->devinfo.irq, lockflags);
 	tapestate_set (ti, TS_UNUSED);
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
+out:
 #ifdef MODULE
 	MOD_DEC_USE_COUNT;
 #endif				/* MODULE */
-	return 0;
+	return rc;
 }

@@ -9,11 +9,9 @@
 
 /*
  * Counters of total number and pending number of requests.
- * When the total number of requests exceeds the soft limit, we start
- * flushing out requests. If it exceeds the hard limit, we stall until
- * it drops again.
+ * When the total number of requests exceeds the hard limit, we stall
+ * until it drops again.
  */
-#define MAX_REQUEST_SOFT        192
 #define MAX_REQUEST_HARD        256
 
 /*
@@ -36,8 +34,6 @@ extern int		nfs_reqlist_alloc(struct nfs_server *);
 extern void		nfs_reqlist_free(struct nfs_server *);
 extern int		nfs_reqlist_init(struct nfs_server *);
 extern void		nfs_reqlist_exit(struct nfs_server *);
-extern void		inode_schedule_scan(struct inode *, unsigned long);
-extern void		inode_remove_flushd(struct inode *);
 extern void		nfs_wake_flushd(void);
 
 /*

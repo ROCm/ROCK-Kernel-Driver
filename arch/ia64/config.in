@@ -28,6 +28,7 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   define_bool CONFIG_ACPI y
+  define_bool CONFIG_ACPI_EFI y
   define_bool CONFIG_ACPI_INTERPRETER y
   define_bool CONFIG_ACPI_KERNEL_CONFIG y
 fi
@@ -40,7 +41,8 @@ choice 'IA-64 system type'					\
 	"generic		CONFIG_IA64_GENERIC		\
 	 DIG-compliant		CONFIG_IA64_DIG			\
 	 HP-simulator		CONFIG_IA64_HP_SIM		\
-	 SGI-SN1		CONFIG_IA64_SGI_SN1" generic
+	 SGI-SN1		CONFIG_IA64_SGI_SN1		\
+	 SGI-SN2		CONFIG_IA64_SGI_SN2" generic
 
 choice 'Kernel page size'						\
 	"4KB			CONFIG_IA64_PAGE_SIZE_4KB		\
@@ -51,25 +53,6 @@ choice 'Kernel page size'						\
 if [ "$CONFIG_ITANIUM" = "y" ]; then
 	define_bool CONFIG_IA64_BRL_EMU y
 	bool '  Enable Itanium B-step specific code' CONFIG_ITANIUM_BSTEP_SPECIFIC
-	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
-	  bool '   Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
-        fi
-	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
-	  bool '   Enable Itanium B1-step specific code' CONFIG_ITANIUM_B1_SPECIFIC
-	fi
-	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
-	  bool '   Enable Itanium B2-step specific code' CONFIG_ITANIUM_B2_SPECIFIC
-	fi
-	bool '  Enable Itanium C-step specific code' CONFIG_ITANIUM_CSTEP_SPECIFIC
-	if [ "$CONFIG_ITANIUM_CSTEP_SPECIFIC" = "y" ]; then
-	  bool '   Enable Itanium C0-step specific code' CONFIG_ITANIUM_C0_SPECIFIC
-	fi
-	if [ "$CONFIG_ITANIUM_B0_SPECIFIC" = "y" \
-	     -o "$CONFIG_ITANIUM_B1_SPECIFIC" = "y" -o "$CONFIG_ITANIUM_B2_SPECIFIC" = "y" ]; then
-	  define_bool CONFIG_ITANIUM_PTCG n
-	else
-	  define_bool CONFIG_ITANIUM_PTCG y
-	fi
 	if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
 	  define_int CONFIG_IA64_L1_CACHE_SHIFT 7 # align cache-sensitive data to 128 bytes
 	else
@@ -78,7 +61,6 @@ if [ "$CONFIG_ITANIUM" = "y" ]; then
 fi
 
 if [ "$CONFIG_MCKINLEY" = "y" ]; then
-	define_bool CONFIG_ITANIUM_PTCG y
 	define_int CONFIG_IA64_L1_CACHE_SHIFT 7
 	bool '  Enable McKinley A-step specific code' CONFIG_MCKINLEY_ASTEP_SPECIFIC
 	if [ "$CONFIG_MCKINLEY_ASTEP_SPECIFIC" = "y" ]; then
@@ -87,28 +69,32 @@ if [ "$CONFIG_MCKINLEY" = "y" ]; then
 fi
 
 if [ "$CONFIG_IA64_DIG" = "y" ]; then
-	bool '  Force interrupt redirection' CONFIG_IA64_HAVE_IRQREDIR
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 fi
 
-if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
-	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN1_SIM
-	define_bool CONFIG_DEVFS_DEBUG y
+if [ "$CONFIG_IA64_SGI_SN1" = "y" ] || [ "$CONFIG_IA64_SGI_SN2" = "y" ]; then
+	define_bool CONFIG_IA64_SGI_SN y
+	bool '  Enable extra debugging code' CONFIG_IA64_SGI_SN_DEBUG n
+	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN_SIM
+	bool '  Enable autotest (llsc). Option to run cache test instead of booting' \
+			CONFIG_IA64_SGI_AUTOTEST n
 	define_bool CONFIG_DEVFS_FS y
-	define_bool CONFIG_IA64_BRL_EMU y
+	if [ "$CONFIG_DEVFS_FS" = "y" ]; then
+	  bool '    Enable DEVFS Debug Code' CONFIG_DEVFS_DEBUG n
+	fi
+	bool '  Enable protocol mode for the L1 console' CONFIG_SERIAL_SGI_L1_PROTOCOL y
+	define_bool CONFIG_DISCONTIGMEM y
 	define_bool CONFIG_IA64_MCA y
-	define_bool CONFIG_ITANIUM y
-	define_bool CONFIG_SGI_IOC3_ETH y
+	define_bool CONFIG_NUMA y
 	define_bool CONFIG_PERCPU_IRQ y
-	define_int  CONFIG_CACHE_LINE_SHIFT 7
-	bool '  Enable DISCONTIGMEM support' CONFIG_DISCONTIGMEM
-	bool '	Enable NUMA support' CONFIG_NUMA
+	tristate '  PCIBA support' CONFIG_PCIBA
 fi
 
 define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.
 
 bool 'SMP support' CONFIG_SMP
+tristate 'Support running of Linux/x86 binaries' CONFIG_IA32_SUPPORT
 bool 'Performance monitor support' CONFIG_PERFMON
 tristate '/proc/pal support' CONFIG_IA64_PALINFO
 tristate '/proc/efi/vars support' CONFIG_EFI_VARS
@@ -270,19 +256,23 @@ fi
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-  tristate 'Kernel support for IA-32 emulation' CONFIG_IA32_SUPPORT
-  tristate 'Kernel FP software completion' CONFIG_MATHEMU
-else
-  define_bool CONFIG_MATHEMU y
-fi
+choice 'Physical memory granularity'				\
+	"16MB			CONFIG_IA64_GRANULE_16MB	\
+	 64MB			CONFIG_IA64_GRANULE_64MB" 64MB
 
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
-bool 'Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
-bool 'Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG
-bool 'Turn on irq debug checks (slow!)' CONFIG_IA64_DEBUG_IRQ
-bool 'Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
-bool 'Disable VHPT' CONFIG_DISABLE_VHPT
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
+   bool '  Disable VHPT' CONFIG_DISABLE_VHPT
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+
+# early printk is currently broken for SMP: the secondary processors get stuck...
+#   bool '  Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
+
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG
+   bool '  Turn on irq debug checks (slow!)' CONFIG_IA64_DEBUG_IRQ
+fi
 
 endmenu

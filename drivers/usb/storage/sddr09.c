@@ -1,6 +1,6 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
- * $Id: sddr09.c,v 1.19 2001/09/02 06:07:20 mdharm Exp $
+ * $Id: sddr09.c,v 1.21 2001/11/06 03:18:36 mdharm Exp $
  *
  * SDDR09 driver v0.1:
  *

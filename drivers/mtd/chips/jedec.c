@@ -11,7 +11,7 @@
  * not going to guess how to send commands to them, plus I expect they will
  * all speak CFI..
  *
- * $Id: jedec.c,v 1.11 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: jedec.c,v 1.12 2001/11/06 14:37:35 dwmw2 Exp $
  */
 
 #include <linux/mtd/jedec.h>
@@ -42,6 +42,7 @@ static const struct JEDECTable JEDEC_table[] =
    {0xC2AD,"Macronix MX29F016",2*1024*1024,64*1024,MTD_CAP_NORFLASH},
    {}};
 
+static const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id);
 static void jedec_sync(struct mtd_info *mtd) {};
 static int jedec_read(struct mtd_info *mtd, loff_t from, size_t len, 
 		      size_t *retlen, u_char *buf);
@@ -249,7 +250,7 @@ static int checkparity(u_char C)
 /* Take an array of JEDEC numbers that represent interleved flash chips
    and process them. Check to make sure they are good JEDEC numbers, look
    them up and then add them to the chip list */   
-int handle_jedecs(struct map_info *map,__u8 *Mfg,__u8 *Id,unsigned Count,
+static int handle_jedecs(struct map_info *map,__u8 *Mfg,__u8 *Id,unsigned Count,
 		  unsigned long base,struct jedec_private *priv)
 {
    unsigned I,J;
@@ -336,7 +337,7 @@ int handle_jedecs(struct map_info *map,__u8 *Mfg,__u8 *Id,unsigned Count,
 }
 
 /* Lookup the chip information from the JEDEC ID table. */
-const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id)
+static const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id)
 {
    __u16 Id = (mfr << 8) | id;
    unsigned long I = 0;
@@ -873,19 +874,19 @@ static void jedec_flash_chip_scan(struct jedec_private *priv,unsigned long start
    }
 }
 
-static int __init jedec_probe_init(void)
+int __init jedec_init(void)
 {
 	register_mtd_chip_driver(&jedec_chipdrv);
 	return 0;
 }
 
-static void __exit jedec_probe_exit(void)
+static void __exit jedec_exit(void)
 {
 	unregister_mtd_chip_driver(&jedec_chipdrv);
 }
 
-module_init(jedec_probe_init);
-module_exit(jedec_probe_exit);
+module_init(jedec_init);
+module_exit(jedec_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jason Gunthorpe <jgg@deltatee.com> et al.");

@@ -1,5 +1,5 @@
 /*
- * $Id: redboot.c,v 1.5 2001/10/02 15:05:11 dwmw2 Exp $
+ * $Id: redboot.c,v 1.6 2001/10/25 09:16:06 dwmw2 Exp $
  *
  * Parse RedBoot-style Flash Image System (FIS) tables and
  * produce a Linux partition array to match.
@@ -62,7 +62,15 @@ int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **ppa
 		goto out;
 	}
 
-	if (memcmp(buf, "RedBoot", 8)) {
+	/* RedBoot image could appear in any of the first three slots */
+	for (i = 0; i < 3; i++) {
+		if (!memcmp(buf[i].name, "RedBoot", 8))
+			break;
+	}
+	if (i == 3) {
+		/* Didn't find it */
+		printk(KERN_NOTICE "No RedBoot partition table detected in %s\n",
+		       master->name);
 		ret = 0;
 		goto out;
 	}

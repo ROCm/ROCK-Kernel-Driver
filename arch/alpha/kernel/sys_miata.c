@@ -176,6 +176,19 @@ miata_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		{   -1,    -1,    -1,    -1,    -1},  /* IdSel 31,  PCI-PCI */
         };
 	const long min_idsel = 3, max_idsel = 20, irqs_per_slot = 5;
+	
+	/* the USB function of the 82c693 has it's interrupt connected to 
+           the 2nd 8259 controller. So we have to check for it first. */
+
+	if((slot == 7) && (PCI_FUNC(dev->devfn) == 3)) {
+		u8 irq=0;
+
+		if(pci_read_config_byte(pci_find_slot(dev->bus->number, dev->devfn & ~(7)), 0x40,&irq)!=PCIBIOS_SUCCESSFUL)
+			return -1;
+		else	
+			return irq;
+	}
+
 	return COMMON_TABLE_LOOKUP;
 }
 

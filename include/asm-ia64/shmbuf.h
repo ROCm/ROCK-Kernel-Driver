@@ -1,7 +1,7 @@
 #ifndef _ASM_IA64_SHMBUF_H
 #define _ASM_IA64_SHMBUF_H
 
-/* 
+/*
  * The shmid64_ds structure for IA-64 architecture.
  * Note extra padding because this structure is passed back and forth
  * between kernel and user space.

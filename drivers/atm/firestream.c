@@ -912,6 +912,9 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 		if (IS_FS50(dev)) {
 			/* Increment the channel numer: take a free one next time.  */
 			for (to=33;to;to--, dev->channo++) {
+				/* We only have 32 channels */
+				if (dev->channo >= 32)
+					dev->channo = 0;
 				/* If we need to do RX, AND the RX is inuse, try the next */
 				if (DO_DIRECTION(rxtp) && dev->atm_vccs[dev->channo])
 					continue;
@@ -1226,7 +1229,7 @@ static int fs_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 {
 	func_enter ();
 	func_exit ();
-	return 0;
+	return -ENOIOCTLCMD;
 }
 
 

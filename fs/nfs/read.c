@@ -148,34 +148,6 @@ io_error:
 	return result;
 }
 
-static inline struct nfs_page *
-_nfs_find_read(struct inode *inode, struct page *page)
-{
-	struct list_head	*head, *next;
-
-	head = &inode->u.nfs_i.read;
-	next = head->next;
-	while (next != head) {
-		struct nfs_page *req = nfs_list_entry(next);
-		next = next->next;
-		if (page_index(req->wb_page) != page_index(page))
-			continue;
-		req->wb_count++;
-		return req;
-	}
-	return NULL;
-}
-
-static struct nfs_page *
-nfs_find_read(struct inode *inode, struct page *page)
-{
-	struct nfs_page *req;
-	spin_lock(&nfs_wreq_lock);
-	req = _nfs_find_read(inode, page);
-	spin_unlock(&nfs_wreq_lock);
-	return req;
-}
-
 /*
  * Add a request to the inode's asynchronous read list.
  */
@@ -185,61 +157,26 @@ nfs_mark_request_read(struct nfs_page *req)
 	struct inode *inode = req->wb_inode;
 
 	spin_lock(&nfs_wreq_lock);
-	if (list_empty(&req->wb_list)) {
-		nfs_list_add_request(req, &inode->u.nfs_i.read);
-		inode->u.nfs_i.nread++;
-	}
+	nfs_list_add_request(req, &inode->u.nfs_i.read);
+	inode->u.nfs_i.nread++;
+	__nfs_add_lru(&NFS_SERVER(inode)->lru_read, req);
 	spin_unlock(&nfs_wreq_lock);
-	/*
-	 * NB: the call to inode_schedule_scan() must lie outside the
-	 *     spinlock since it can run flushd().
-	 */
-	inode_schedule_scan(inode, req->wb_timeout);
 }
 
 static int
 nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 {
-	struct nfs_page	*req, *new = NULL;
-	int		result;
+	struct nfs_page	*new;
 
-	for (;;) {
-		result = 0;
-		if (Page_Uptodate(page))
-			break;
-
-		req = nfs_find_read(inode, page);
-		if (req) {
-			if (page != req->wb_page) {
-				nfs_release_request(req);
-				nfs_pagein_inode(inode, page_index(page), 0);
-				continue;
-			}
-			nfs_release_request(req);
-			break;
-		}
-
-		if (new) {
-			nfs_lock_request(new);
-			new->wb_timeout = jiffies + NFS_READ_DELAY;
-			nfs_mark_request_read(new);
-			nfs_unlock_request(new);
-			new = NULL;
-			break;
-		}
-
-		result = -ENOMEM;
-		new = nfs_create_request(file, inode, page, 0, PAGE_CACHE_SIZE);
-		if (!new)
-			break;
-	}
+	new = nfs_create_request(file, inode, page, 0, PAGE_CACHE_SIZE);
+	if (IS_ERR(new))
+		return PTR_ERR(new);
+	nfs_mark_request_read(new);
 
 	if (inode->u.nfs_i.nread >= NFS_SERVER(inode)->rpages ||
 	    page_index(page) == (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
 		nfs_pagein_inode(inode, 0, 0);
-	if (new)
-		nfs_release_request(new);
-	return result;
+	return 0;
 }
 
 /*
@@ -345,14 +282,13 @@ out_bad:
 	return -ENOMEM;
 }
 
-static int
-nfs_pagein_list(struct inode *inode, struct list_head *head)
+int
+nfs_pagein_list(struct list_head *head, int rpages)
 {
 	LIST_HEAD(one_request);
 	struct nfs_page		*req;
 	int			error = 0;
-	unsigned int		pages = 0,
-				rpages = NFS_SERVER(inode)->rpages;
+	unsigned int		pages = 0;
 
 	while (!list_empty(head)) {
 		pages += nfs_coalesce_requests(head, &one_request, rpages);
@@ -368,29 +304,70 @@ nfs_pagein_list(struct inode *inode, struct list_head *head)
 	return error;
 }
 
-static int
-nfs_scan_read_timeout(struct inode *inode, struct list_head *dst)
+/**
+ * nfs_scan_lru_read_timeout - Scan LRU list for timed out read requests
+ * @server: NFS superblock data
+ * @dst: destination list
+ *
+ * Moves a maximum of 'rpages' timed out requests from the NFS read LRU list.
+ * The elements are checked to ensure that they form a contiguous set
+ * of pages, and that they originated from the same file.
+ */
+int
+nfs_scan_lru_read_timeout(struct nfs_server *server, struct list_head *dst)
 {
-	int	pages;
-	spin_lock(&nfs_wreq_lock);
-	pages = nfs_scan_list_timeout(&inode->u.nfs_i.read, dst, inode);
-	inode->u.nfs_i.nread -= pages;
-	if ((inode->u.nfs_i.nread == 0) != list_empty(&inode->u.nfs_i.read))
-		printk(KERN_ERR "NFS: desynchronized value of nfs_i.nread.\n");
-	spin_unlock(&nfs_wreq_lock);
-	return pages;
+	struct inode *inode;
+	int npages;
+
+	npages = nfs_scan_lru_timeout(&server->lru_read, dst, server->rpages);
+	if (npages) {
+		inode = nfs_list_entry(dst->next)->wb_inode;
+		inode->u.nfs_i.nread -= npages;
+	}
+	return npages;
 }
 
+/**
+ * nfs_scan_lru_read - Scan LRU list for read requests
+ * @server: NFS superblock data
+ * @dst: destination list
+ *
+ * Moves a maximum of 'rpages' requests from the NFS read LRU list.
+ * The elements are checked to ensure that they form a contiguous set
+ * of pages, and that they originated from the same file.
+ */
+int
+nfs_scan_lru_read(struct nfs_server *server, struct list_head *dst)
+{
+	struct inode *inode;
+	int npages;
+
+	npages = nfs_scan_lru(&server->lru_read, dst, server->rpages);
+	if (npages) {
+		inode = nfs_list_entry(dst->next)->wb_inode;
+		inode->u.nfs_i.nread -= npages;
+	}
+	return npages;
+}
+
+/*
+ * nfs_scan_read - Scan an inode for read requests
+ * @inode: NFS inode to scan
+ * @dst: destination list
+ * @idx_start: lower bound of page->index to scan
+ * @npages: idx_start + npages sets the upper bound to scan
+ *
+ * Moves requests from the inode's read list.
+ * The requests are *not* checked to ensure that they form a contiguous set.
+ */
 static int
 nfs_scan_read(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
 	int	res;
-	spin_lock(&nfs_wreq_lock);
 	res = nfs_scan_list(&inode->u.nfs_i.read, dst, NULL, idx_start, npages);
 	inode->u.nfs_i.nread -= res;
 	if ((inode->u.nfs_i.nread == 0) != list_empty(&inode->u.nfs_i.read))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.nread.\n");
-	spin_unlock(&nfs_wreq_lock);
 	return res;
 }
 
@@ -401,26 +378,14 @@ int nfs_pagein_inode(struct inode *inode, unsigned long idx_start,
 	int	res,
 		error = 0;
 
+	spin_lock(&nfs_wreq_lock);
 	res = nfs_scan_read(inode, &head, idx_start, npages);
+	spin_unlock(&nfs_wreq_lock);
 	if (res)
-		error = nfs_pagein_list(inode, &head);
+		error = nfs_pagein_list(&head, NFS_SERVER(inode)->rpages);
 	if (error < 0)
 		return error;
 	return res;
-}
-
-int nfs_pagein_timeout(struct inode *inode)
-{
-	LIST_HEAD(head);
-	int	pages,
-		error = 0;
-
-	pages = nfs_scan_read_timeout(inode, &head);
-	if (pages)
-		error = nfs_pagein_list(inode, &head);
-	if (error < 0)
-		return error;
-	return pages;
 }
 
 /*
@@ -457,8 +422,8 @@ nfs_readpage_result(struct rpc_task *task)
                         (long long)NFS_FILEID(req->wb_inode),
                         req->wb_bytes,
                         (long long)(page_offset(page) + req->wb_offset));
-		nfs_unlock_request(req);
 		nfs_release_request(req);
+		nfs_unlock_request(req);
 	}
 }
 
@@ -500,11 +465,10 @@ nfs_readpage(struct file *file, struct page *page)
 	if (error)
 		goto out_error;
 
-	error = -1;
-	if (!PageError(page) && NFS_SERVER(inode)->rsize >= PAGE_CACHE_SIZE)
+	if (!PageError(page) && NFS_SERVER(inode)->rsize >= PAGE_CACHE_SIZE) {
 		error = nfs_readpage_async(file, inode, page);
-	if (error >= 0)
 		goto out;
+	}
 
 	error = nfs_readpage_sync(file, inode, page);
 	if (error < 0 && IS_SWAPFILE(inode))

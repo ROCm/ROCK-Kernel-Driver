@@ -826,7 +826,7 @@ static u32 rr_handle_event(struct net_device *dev, u32 prodidx, u32 eidx)
 		case E_RX_IDLE:
 			printk(KERN_WARNING "%s: RX data not moving\n",
 			       dev->name);
-			break;
+			goto drop;
 		case E_WATCHDOG:
 			printk(KERN_INFO "%s: The watchdog is here to see "
 			       "us\n", dev->name);
@@ -912,15 +912,43 @@ static u32 rr_handle_event(struct net_device *dev, u32 prodidx, u32 eidx)
 		case E_RX_PAR_ERR:
 			printk(KERN_WARNING "%s: Receive parity error\n",
 			       dev->name);
-			break;
+			goto drop;
 		case E_RX_LLRC_ERR:
 			printk(KERN_WARNING "%s: Receive LLRC error\n",
 			       dev->name);
-			break;
+			goto drop;
 		case E_PKT_LN_ERR:
 			printk(KERN_WARNING "%s: Receive packet length "
 			       "error\n", dev->name);
-			break;
+			goto drop;
+		case E_DTA_CKSM_ERR:
+			printk(KERN_WARNING "%s: Data checksum error\n",
+			       dev->name);
+			goto drop;
+		case E_SHT_BST:
+			printk(KERN_WARNING "%s: Unexpected short burst "
+			       "error\n", dev->name);
+			goto drop;
+		case E_STATE_ERR:
+			printk(KERN_WARNING "%s: Recv. state transition"
+			       " error\n", dev->name);
+			goto drop;
+		case E_UNEXP_DATA:
+			printk(KERN_WARNING "%s: Unexpected data error\n",
+			       dev->name);
+			goto drop;
+		case E_LST_LNK_ERR:
+			printk(KERN_WARNING "%s: Link lost error\n",
+			       dev->name);
+			goto drop;
+		case E_FRM_ERR:
+			printk(KERN_WARNING "%s: Framming Error\n",
+			       dev->name);
+			goto drop;
+		case E_FLG_SYN_ERR:
+			printk(KERN_WARNING "%s: Flag sync. lost during"
+			       "packet\n", dev->name);
+			goto drop;
 		case E_RX_INV_BUF:
 			printk(KERN_ERR "%s: Invalid receive buffer "
 			       "address\n", dev->name);
@@ -941,6 +969,23 @@ static u32 rr_handle_event(struct net_device *dev, u32 prodidx, u32 eidx)
 			writel(readl(&regs->HostCtrl)|HALT_NIC|RR_CLEAR_INT, 
 			       &regs->HostCtrl);
 			wmb();
+			break;
+		drop:
+			/* Label packet to be dropped.
+			 * Actual dropping occurs in rx
+			 * handling.
+			 *
+			 * The index of packet we get to drop is
+			 * the index of the packet following
+			 * the bad packet. -kbf
+			 */
+			{
+				u16 index = rrpriv->evt_ring[eidx].index;
+				index = (index + (RX_RING_ENTRIES - 1)) %
+					RX_RING_ENTRIES;
+				rrpriv->rx_ring[index].mode |=
+					(PACKET_BAD | PACKET_END);
+			}
 			break;
 		default:
 			printk(KERN_WARNING "%s: Unhandled event 0x%02x\n",
@@ -968,6 +1013,11 @@ static void rx_int(struct net_device *dev, u32 rxlimit, u32 index)
 		printk("len %x, mode %x\n", pkt_len,
 		       rrpriv->rx_ring[index].mode);
 #endif
+		if ( (rrpriv->rx_ring[index].mode & PACKET_BAD) == PACKET_BAD){
+			rrpriv->stats.rx_dropped++;
+			goto defer;
+		}
+
 		if (pkt_len > 0){
 			struct sk_buff *skb;
 
@@ -1046,6 +1096,15 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	printk("%s: interrupt, prodidx = %i, eidx = %i\n", dev->name,
 	       prodidx, rrpriv->info->evt_ctrl.pi);
 #endif
+	/*
+	 * Order here is important.  We must handle events
+	 * before doing anything else in order to catch
+	 * such things as LLRC errors, etc -kbf
+	 */
+
+	eidx = rrpriv->info->evt_ctrl.pi;
+	if (prodidx != eidx)
+		eidx = rr_handle_event(dev, prodidx, eidx);
 
 	rxindex = rrpriv->cur_rx;
 	if (rxindex != rxlimit)
@@ -1054,15 +1113,19 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	txcon = rrpriv->dirty_tx;
 	if (txcsmr != txcon) {
 		do {
-			rrpriv->stats.tx_packets++;
-			rrpriv->stats.tx_bytes +=rrpriv->tx_skbuff[txcon]->len;
-			dev_kfree_skb_irq(rrpriv->tx_skbuff[txcon]);
+			/* Due to occational firmware TX producer/consumer out
+			 * of sync. error need to check entry in ring -kbf
+			 */
+			if(rrpriv->tx_skbuff[txcon]){
+				rrpriv->stats.tx_packets++;
+				rrpriv->stats.tx_bytes +=rrpriv->tx_skbuff[txcon]->len;
+				dev_kfree_skb_irq(rrpriv->tx_skbuff[txcon]);
 
-			rrpriv->tx_skbuff[txcon] = NULL;
-			rrpriv->tx_ring[txcon].size = 0;
-			set_rraddr(&rrpriv->tx_ring[txcon].addr, 0);
-			rrpriv->tx_ring[txcon].mode = 0;
-
+				rrpriv->tx_skbuff[txcon] = NULL;
+				rrpriv->tx_ring[txcon].size = 0;
+				set_rraddr(&rrpriv->tx_ring[txcon].addr, 0);
+				rrpriv->tx_ring[txcon].mode = 0;
+			}
 			txcon = (txcon + 1) % TX_RING_ENTRIES;
 		} while (txcsmr != txcon);
 		wmb();
@@ -1076,10 +1139,6 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 			rr_mark_net_bh(NET_BH);
 		}
 	}
-
-	eidx = rrpriv->info->evt_ctrl.pi;
-	if (prodidx != eidx)
-		eidx = rr_handle_event(dev, prodidx, eidx);
 
 	eidx |= ((txcsmr << 8) | (rxlimit << 16));
 	writel(eidx, &regs->EvtCon);
@@ -1238,7 +1297,7 @@ static void rr_dump(struct net_device *dev)
 	       index, cons);
 
 	if (rrpriv->tx_skbuff[index]){
-		len = min(0x80, rrpriv->tx_skbuff[index]->len);
+		len = min_t(int, 0x80, rrpriv->tx_skbuff[index]->len);
 		printk("skbuff for index %i is valid - dumping data (0x%x bytes - DMA len 0x%x)\n", index, len, rrpriv->tx_ring[index].size);
 		for (i = 0; i < len; i++){
 			if (!(i & 7))
@@ -1249,7 +1308,7 @@ static void rr_dump(struct net_device *dev)
 	}
 
 	if (rrpriv->tx_skbuff[cons]){
-		len = min(0x80, rrpriv->tx_skbuff[cons]->len);
+		len = min_t(int, 0x80, rrpriv->tx_skbuff[cons]->len);
 		printk("skbuff for cons %i is valid - dumping data (0x%x bytes - skbuff len 0x%x)\n", cons, len, rrpriv->tx_skbuff[cons]->len);
 		printk("mode 0x%x, size 0x%x,\n phys %08x (virt %08lx), skbuff-addr %08lx, truesize 0x%x\n",
 		       rrpriv->tx_ring[cons].mode,

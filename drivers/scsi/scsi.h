@@ -61,7 +61,7 @@ extern __inline__ int scsi_to_pci_dma_dir(unsigned char scsi_dir)
 #endif
 #endif
 
-#if defined(CONFIG_SBUS) && !defined(CONFIG_SUN3)
+#if defined(CONFIG_SBUS) && !defined(CONFIG_SUN3) && !defined(CONFIG_SUN3X)
 #include <asm/sbus.h>
 #if ((SCSI_DATA_UNKNOWN == SBUS_DMA_BIDIRECTIONAL) && (SCSI_DATA_WRITE == SBUS_DMA_TODEVICE) && (SCSI_DATA_READ == SBUS_DMA_FROMDEVICE) && (SCSI_DATA_NONE == SBUS_DMA_NONE))
 #define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
@@ -351,7 +351,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define DRIVER_MASK         0x0f
 #define SUGGEST_MASK        0xf0
 
-#define MAX_COMMAND_SIZE    12
+#define MAX_COMMAND_SIZE    16
 #define SCSI_SENSE_BUFFERSIZE   64
 
 /*

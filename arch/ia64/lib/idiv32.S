@@ -79,5 +79,5 @@ GLOBAL_ENTRY(NAME)
 	;;
 #endif
 	getf.sig r8 = f6		// transfer result to result register
-	br.ret.sptk rp
+	br.ret.sptk.many rp
 END(NAME)

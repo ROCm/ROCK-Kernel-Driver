@@ -227,6 +227,9 @@
 #define __NR_madvise		219
 #define __NR_getdents64		220
 #define __NR_fcntl64		221
+#define __NR_security           223     /* syscall for security modules */
+#define __NR_gettid             224
+#define __NR_readahead          225
 
 /* XXX - _foo needs to be __foo, while __NR_bar could be _NR_bar. */
 #define _syscall0(type,name) \

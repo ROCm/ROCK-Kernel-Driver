@@ -130,7 +130,7 @@ static const struct {
 	{0x54524103, "TriTech TR28023",		&null_ops},
 	{0x54524106, "TriTech TR28026",		&null_ops},
 	{0x54524108, "TriTech TR28028",		&tritech_ops},
-	{0x54524123, "TriTech TR?????",		&null_ops},
+	{0x54524123, "TriTech TR A5",		&null_ops},
 	{0x574D4C00, "Wolfson WM9704",		&wolfson_ops},
 	{0x574D4C03, "Wolfson WM9703/9704",	&wolfson_ops},
 	{0x574D4C04, "Wolfson WM9704 (quad)",	&wolfson_ops},
@@ -143,7 +143,6 @@ static const struct {
 	{0x83847656, "SigmaTel STAC9756/57",	&sigmatel_9744_ops},
 	{0x83847684, "SigmaTel STAC9783/84?",	&null_ops},
 	{0x57454301, "Winbond 83971D",		&null_ops},
-	{0,}
 };
 
 static const char *ac97_stereo_enhancements[] =

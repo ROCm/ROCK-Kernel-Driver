@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1997, 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -47,7 +48,9 @@
  *  duration of the P-timer.
  */
 #define WD_TIMEOUT          (POLL_TIMEOUT*2)
+
 #define MEDIABUSY_TIMEOUT   (500*HZ/1000)    /* 500 msec */
+#define SMALLBUSY_TIMEOUT   (100*HZ/1000)    /* 100 msec - IrLAP 6.13.4 */
 
 /*
  *  Slot timer must never exceed 85 ms, and must always be at least 25 ms, 
@@ -75,7 +78,7 @@ inline void irlap_start_final_timer(struct irlap_cb *self, int timeout);
 inline void irlap_start_wd_timer(struct irlap_cb *self, int timeout);
 inline void irlap_start_backoff_timer(struct irlap_cb *self, int timeout);
 
-void irlap_start_mbusy_timer(struct irlap_cb *);
+void irlap_start_mbusy_timer(struct irlap_cb *self, int timeout);
 void irlap_stop_mbusy_timer(struct irlap_cb *);
 
 struct lsap_cb;

@@ -325,7 +325,8 @@ struct mtftcmd {
 #define GMT_DR_OPEN(x)          ((x) & 0x00040000)  /* door open (no tape) */
 /* #define GMT_ ? 		((x) & 0x00020000) */
 #define GMT_IM_REP_EN(x)        ((x) & 0x00010000)  /* immediate report mode */
-/* 16 generic status bits unused */
+#define GMT_CLN(x)              ((x) & 0x00008000)  /* cleaning requested */
+/* 15 generic status bits unused */
 
 
 /* SCSI-tape specific definitions */
@@ -349,6 +350,7 @@ struct mtftcmd {
 #define MT_ST_TIMEOUTS		0x70000000
 #define MT_ST_SET_TIMEOUT	(MT_ST_TIMEOUTS | 0x000000)
 #define MT_ST_SET_LONG_TIMEOUT	(MT_ST_TIMEOUTS | 0x100000)
+#define MT_ST_SET_CLN		0x80000000
 
 #define MT_ST_BUFFER_WRITES	0x1
 #define MT_ST_ASYNC_WRITES	0x2
@@ -363,6 +365,7 @@ struct mtftcmd {
 #define MT_ST_CAN_PARTITIONS    0x400
 #define MT_ST_SCSI2LOGICAL      0x800
 #define MT_ST_SYSV              0x1000
+#define MT_ST_NOWAIT            0x2000
 
 /* The mode parameters to be controlled. Parameter chosen with bits 20-28 */
 #define MT_ST_CLEAR_DEFAULT	0xfffff

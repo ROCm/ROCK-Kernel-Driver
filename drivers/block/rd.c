@@ -809,9 +809,6 @@ int swim3_fd_eject(int devnum);
 
 static void __init rd_load_disk(int n)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
-	extern kdev_t real_root_dev;
-#endif
 
 	if (rd_doload == 0)
 		return;

@@ -96,17 +96,25 @@ static void scsi_dump_status(int level);
 /* Do not call reset on error if we just did a reset within 15 sec. */
 #define MIN_RESET_PERIOD (15*HZ)
 
+/*
+ * Macro to determine the size of SCSI command. This macro takes vendor
+ * unique commands into account. SCSI commands in groups 6 and 7 are
+ * vendor unique and we will depend upon the command length being
+ * supplied correctly in cmd_len.
+ */
+#define CDB_SIZE(SCpnt)	((((SCpnt->cmnd[0] >> 5) & 7) < 6) ? \
+				COMMAND_SIZE(SCpnt->cmnd[0]) : SCpnt->cmd_len)
 
 /*
  * Data declarations.
  */
 unsigned long scsi_pid;
 Scsi_Cmnd *last_cmnd;
-/* Command groups 3 and 4 are reserved and should never be used.  */
+/* Command group 3 is reserved and should never be used.  */
 const unsigned char scsi_command_size[8] =
 {
 	6, 10, 10, 12,
-	12, 12, 10, 10
+	16, 12, 10, 10
 };
 static unsigned long serial_number;
 static Scsi_Cmnd *scsi_bh_queue_head;
@@ -679,18 +687,44 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		 * passes a meaningful return value.
 		 */
 		if (host->hostt->use_new_eh_code) {
-                        spin_lock_irqsave(&io_request_lock, flags);
-			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
-                        spin_unlock_irqrestore(&io_request_lock, flags);
-			if (rtn != 0) {
-				scsi_delete_timer(SCpnt);
-				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
-                                SCSI_LOG_MLQUEUE(3, printk("queuecommand : request rejected\n"));                                
+			/*
+			 * Before we queue this command, check if the command
+			 * length exceeds what the host adapter can handle.
+			 */
+			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
+				spin_lock_irqsave(&io_request_lock, flags);
+				rtn = host->hostt->queuecommand(SCpnt, scsi_done);
+				spin_unlock_irqrestore(&io_request_lock, flags);
+				if (rtn != 0) {
+					scsi_delete_timer(SCpnt);
+					scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
+					SCSI_LOG_MLQUEUE(3, printk("queuecommand : request rejected\n"));                                
+				}
+			} else {
+				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
+				SCpnt->result = (DID_ABORT << 16);
+				spin_lock_irqsave(&io_request_lock, flags);
+				scsi_done(SCpnt);
+				spin_unlock_irqrestore(&io_request_lock, flags);
+				rtn = 1;
 			}
 		} else {
-                        spin_lock_irqsave(&io_request_lock, flags);
-			host->hostt->queuecommand(SCpnt, scsi_old_done);
-                        spin_unlock_irqrestore(&io_request_lock, flags);
+			/*
+			 * Before we queue this command, check if the command
+			 * length exceeds what the host adapter can handle.
+			 */
+			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
+				spin_lock_irqsave(&io_request_lock, flags);
+				host->hostt->queuecommand(SCpnt, scsi_old_done);
+				spin_unlock_irqrestore(&io_request_lock, flags);
+			} else {
+				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
+				SCpnt->result = (DID_ABORT << 16);
+				spin_lock_irqsave(&io_request_lock, flags);
+				scsi_old_done(SCpnt);
+				spin_unlock_irqrestore(&io_request_lock, flags);
+				rtn = 1;
+			}
 		}
 	} else {
 		int temp;
@@ -702,8 +736,10 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 #ifdef DEBUG_DELAY
                 spin_unlock_irqrestore(&io_request_lock, flags);
 		clock = jiffies + 4 * HZ;
-		while (time_before(jiffies, clock))
+		while (time_before(jiffies, clock)) {
 			barrier();
+			cpu_relax();
+		}
 		printk("done(host = %d, result = %04x) : routine at %p\n",
 		       host->host_no, temp, host->hostt->command);
                 spin_lock_irqsave(&io_request_lock, flags);
@@ -787,14 +823,15 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 			 {
 			 int i;
 			 int target = SDpnt->id;
+			 int size = COMMAND_SIZE(((const unsigned char *)cmnd)[0]);
 			 printk("scsi_do_req (host = %d, channel = %d target = %d, "
 		    "buffer =%p, bufflen = %d, done = %p, timeout = %d, "
 				"retries = %d)\n"
 				"command : ", host->host_no, SDpnt->channel, target, buffer,
 				bufflen, done, timeout, retries);
-			 for (i = 0; i < 10; ++i)
-			 printk("%02x  ", ((unsigned char *) cmnd)[i]);
-			 printk("\n");
+			 for (i	 = 0; i < size; ++i)
+			 	printk("%02x  ", ((unsigned char *) cmnd)[i]);
+			 	printk("\n");
 			 });
 
 	if (!host) {
@@ -976,14 +1013,15 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 			 {
 			 int i;
 			 int target = SCpnt->target;
+			 int size = COMMAND_SIZE(((const unsigned char *)cmnd)[0]);
 			 printk("scsi_do_cmd (host = %d, channel = %d target = %d, "
 		    "buffer =%p, bufflen = %d, done = %p, timeout = %d, "
 				"retries = %d)\n"
 				"command : ", host->host_no, SCpnt->channel, target, buffer,
 				bufflen, done, timeout, retries);
-			 for (i = 0; i < 10; ++i)
-			 printk("%02x  ", ((unsigned char *) cmnd)[i]);
-			 printk("\n");
+			 for (i = 0; i < size; ++i)
+			 	printk("%02x  ", ((unsigned char *) cmnd)[i]);
+			 	printk("\n");
 			 });
 
 	if (!host) {
@@ -1476,9 +1514,6 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 	}
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
-
-static int proc_scsi_gen_write(struct file * file, const char * buf,
-                              unsigned long length, void *data);
 
 void __init scsi_host_no_insert(char *str, int n)
 {

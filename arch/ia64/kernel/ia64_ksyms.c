@@ -69,6 +69,8 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #include <asm/pgalloc.h>
 
+EXPORT_SYMBOL(flush_tlb_range);
+
 #ifdef CONFIG_SMP
 
 EXPORT_SYMBOL(smp_flush_tlb_all);
@@ -145,4 +147,3 @@ EXPORT_SYMBOL(efi);
 #include <linux/proc_fs.h>
 extern struct proc_dir_entry *efi_dir;
 EXPORT_SYMBOL(efi_dir);
-

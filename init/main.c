@@ -119,7 +119,7 @@ extern void softirq_init(void);
 int rows, cols;
 
 #ifdef CONFIG_BLK_DEV_INITRD
-kdev_t real_root_dev;
+unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
 #endif
 
 int root_mountflags = MS_RDONLY;

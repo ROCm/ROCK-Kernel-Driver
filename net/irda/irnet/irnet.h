@@ -126,17 +126,17 @@
  * History :
  * -------
  *
- * v1 - 15/5/00 - Jean II
+ * v1 - 15.5.00 - Jean II
  *	o Basic IrNET (hook to ppp_generic & IrTTP - incl. multipoint)
  *	o control channel on /dev/irnet (set name/address)
  *	o event channel on /dev/irnet (for user space daemon)
  *
- * v2 - 5/6/00 - Jean II
+ * v2 - 5.6.00 - Jean II
  *	o Enable DROP_NOT_READY to avoid PPP timeouts & other weirdness...
  *	o Add DISCONNECT_TO event and rename DISCONNECT_FROM.
  *	o Set official device number alloaction on /dev/irnet
  *
- * v3 - 30/8/00 - Jean II
+ * v3 - 30.8.00 - Jean II
  *	o Update to latest Linux-IrDA changes :
  *		- queue_t => irda_queue_t
  *	o Update to ppp-2.4.0 :
@@ -148,17 +148,17 @@
  *	  another multilink bug (darn !)
  *	o Remove LINKNAME_IOCTL cruft
  *
- * v3b - 31/8/00 - Jean II
+ * v3b - 31.8.00 - Jean II
  *	o Dump discovery log at event channel startup
  *
- * v4 - 28/9/00 - Jean II
+ * v4 - 28.9.00 - Jean II
  *	o Fix interaction between poll/select and dump discovery log
  *	o Add IRNET_BLOCKED_LINK event (depend on new IrDA-Linux patch)
  *	o Add IRNET_NOANSWER_FROM event (mostly to help support)
  *	o Release flow control in disconnect_indication
  *	o Block packets while connecting (speed up connections)
  *
- * v5 - 11/01/01 - Jean II
+ * v5 - 11.01.01 - Jean II
  *	o Init self->max_header_size, just in case...
  *	o Set up ap->chan.hdrlen, to get zero copy on tx side working.
  *	o avoid tx->ttp->flow->ppp->tx->... loop, by checking flow state
@@ -169,7 +169,7 @@
  *	o Declare hashbin HB_NOLOCK instead of HB_LOCAL to avoid
  *		disabling and enabling irq twice
  *
- * v6 - 31/05/01 - Jean II
+ * v6 - 31.05.01 - Jean II
  *	o Print source address in Found, Discovery, Expiry & Request events
  *	o Print requested source address in /proc/net/irnet
  *	o Change control channel input. Allow multiple commands in one line.
@@ -186,12 +186,19 @@
  *	o Add ttp_connect flag to prevent rentry on the connect procedure
  *	o Test and fixups to eliminate side effects of retries
  *
- * v7 - 22/08/01 - Jean II
+ * v7 - 22.08.01 - Jean II
  *	o Cleanup : Change "saddr = 0x0" to "saddr = DEV_ADDR_ANY"
  *	o Fix bug in BLOCK_WHEN_CONNECT introduced in v6 : due to the
  *	  asynchronous IAS query, self->tsap is NULL when PPP send the
  *	  first packet.  This was preventing "connect-delay 0" to work.
  *	  Change the test in ppp_irnet_send() to self->ttp_connect.
+ *
+ * v8 - 1.11.01 - Jean II
+ *	o Tighten the use of self->ttp_connect and self->ttp_open to
+ *	  prevent various race conditions.
+ *	o Avoid leaking discovery log and skb
+ *	o Replace "self" with "server" in irnet_connect_indication() to
+ *	  better detect cut'n'paste error ;-)
  */
 
 /***************************** INCLUDES *****************************/
@@ -204,6 +211,7 @@
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/netdevice.h>
+#include <linux/miscdevice.h>
 #include <linux/poll.h>
 #include <linux/config.h>
 #include <linux/ctype.h>	/* isspace() */

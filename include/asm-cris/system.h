@@ -17,7 +17,7 @@ extern struct task_struct *resume(struct task_struct *prev, struct task_struct *
 /* read the CPU version register */
 
 static inline unsigned long rdvr(void) { 
-	unsigned long vr;
+	unsigned char vr;
 	__asm__ volatile ("move $vr,%0" : "=rm" (vr));
 	return vr;
 }

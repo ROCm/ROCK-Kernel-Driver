@@ -1412,8 +1412,8 @@ L:	linux-video@atrey.karlin.mff.cuni.cz
 S:	Maintained
 
 SYSV FILESYSTEM
-P:	Krzysztof G. Baranowski
-M:	kgb@manjak.knm.org.pl
+P:	Christoph Hellwig
+M:	hch@caldera.de
 S:	Maintained
 
 TLAN NETWORK DRIVER

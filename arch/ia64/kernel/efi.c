@@ -6,8 +6,8 @@
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  * Copyright (C) 1999-2001 Hewlett-Packard Co.
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1999-2001 Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * All EFI Runtime Services are not implemented yet as EFI only
  * supports physical mode addressing on SoftSDV. This is to be fixed
@@ -234,7 +234,7 @@ efi_map_pal_code (void)
 		 * The only ITLB entry in region 7 that is used is the one installed by
 		 * __start().  That entry covers a 64MB range.
 		 */
-		mask  = ~((1 << KERNEL_PG_SHIFT) - 1);
+		mask  = ~((1 << KERNEL_TR_PAGE_SHIFT) - 1);
 		vaddr = PAGE_OFFSET + md->phys_addr;
 
 		/*
@@ -242,29 +242,32 @@ efi_map_pal_code (void)
 		 * mapping.
 		 *
 		 * PAL code is guaranteed to be aligned on a power of 2 between 4k and
-		 * 256KB.  Also from the documentation, it seems like there is an implicit
-		 * guarantee that you will need only ONE ITR to map it. This implies that
-		 * the PAL code is always aligned on its size, i.e., the closest matching
-		 * page size supported by the TLB. Therefore PAL code is guaranteed never
-		 * to cross a 64MB unless it is bigger than 64MB (very unlikely!).  So for
+		 * 256KB and that only one ITR is needed to map it. This implies that the
+		 * PAL code is always aligned on its size, i.e., the closest matching page
+		 * size supported by the TLB. Therefore PAL code is guaranteed never to
+		 * cross a 64MB unless it is bigger than 64MB (very unlikely!).  So for
 		 * now the following test is enough to determine whether or not we need a
 		 * dedicated ITR for the PAL code.
 		 */
 		if ((vaddr & mask) == (KERNEL_START & mask)) {
-			printk(__FUNCTION__ " : no need to install ITR for PAL code\n");
+			printk(__FUNCTION__ ": no need to install ITR for PAL code\n");
 			continue;
 		}
 
+		if (md->num_pages << 12 > IA64_GRANULE_SIZE)
+			panic("Woah!  PAL code size bigger than a granule!");
+
+		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
 		printk("CPU %d: mapping PAL code [0x%lx-0x%lx) into [0x%lx-0x%lx)\n",
 		       smp_processor_id(), md->phys_addr, md->phys_addr + (md->num_pages << 12),
-		       vaddr & mask, (vaddr & mask) + KERNEL_PG_SIZE);
+		       vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
 
 		/*
 		 * Cannot write to CRx with PSR.ic=1
 		 */
 		ia64_clear_ic(flags);
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), KERNEL_PG_SHIFT);
+			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), IA64_GRANULE_SHIFT);
 		local_irq_restore(flags);
 		ia64_srlz_i();
 	}
@@ -482,5 +485,7 @@ efi_get_iobase (void)
 static void __exit
 efivars_exit(void)
 {
+#ifdef CONFIG_PROC_FS
  	remove_proc_entry(efi_dir->name, NULL);
+#endif
 }

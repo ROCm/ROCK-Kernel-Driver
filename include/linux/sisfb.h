@@ -1,12 +1,6 @@
 #ifndef _LINUX_SISFB
 #define _LINUX_SISFB
 
-/* CRT2 connection */
-#define MASK_DISPTYPE_CRT2     0x04         /* Connect CRT2 */
-#define MASK_DISPTYPE_LCD      0x02         /* Connect LCD */
-#define MASK_DISPTYPE_TV       0x01         /* Connect TV */
-#define MASK_DISPTYPE_DISP2    (MASK_DISPTYPE_LCD | MASK_DISPTYPE_TV | MASK_DISPTYPE_CRT2)
-
 #define DISPTYPE_CRT1       0x00000008L
 #define DISPTYPE_CRT2       0x00000004L
 #define DISPTYPE_LCD        0x00000002L
@@ -17,96 +11,102 @@
 #define DISPMODE_MIRROR	    0x00000010L
 #define DISPMODE_DUALVIEW   0x00000040L
 
-#define HASVB_NONE      	0
-#define HASVB_301       	1
-#define HASVB_LVDS      	2
-#define HASVB_TRUMPION  	3
-#define HASVB_LVDS_CHRONTEL	4
-#define HASVB_LVDS_ALL      (HASVB_LVDS | HASVB_TRUMPION | HASVB_LVDS_CHRONTEL)
+#define HASVB_NONE      	0x00
+#define HASVB_301       	0x01
+#define HASVB_LVDS      	0x02
+#define HASVB_TRUMPION  	0x04
+#define HASVB_LVDS_CHRONTEL	0x10
+#define HASVB_302       	0x20
+#define HASVB_303       	0x40
+#define HASVB_CHRONTEL  	0x80
 
-enum _TVMODE
-{
+typedef enum _SIS_CHIP_TYPE {
+	SIS_VGALegacy = 0,
+	SIS_300,
+	SIS_630,
+	SIS_540,
+	SIS_730, 
+	SIS_315H,
+	SIS_315,
+	SIS_550,
+	SIS_315PRO,
+	SIS_640,
+	SIS_740,
+	SIS_330, 
+	MAX_SIS_CHIP
+} SIS_CHIP_TYPE;
+
+typedef enum _TVTYPE {
 	TVMODE_NTSC = 0,
 	TVMODE_PAL,
 	TVMODE_HIVISION,
 	TVMODE_TOTAL
-};
+} SIS_TV_TYPE;
 
-enum _TVPLUGTYPE
-{
-	TVPLUG_UNKNOWN = 0,
+typedef enum _TVPLUGTYPE {
+	TVPLUG_Legacy = 0,
 	TVPLUG_COMPOSITE,
 	TVPLUG_SVIDEO,
 	TVPLUG_SCART,
 	TVPLUG_TOTAL
+} SIS_TV_PLUG;
+
+struct sis_memreq {
+	unsigned long offset;
+	unsigned long size;
 };
 
-enum CHIPTYPE
-{
-	SiS_UNKNOWN = 0,
-	SiS_300,
-	SiS_540,
-	SiS_630,
-	SiS_630S,
-	SiS_730
+struct mode_info {
+	int    bpp;
+	int    xres;
+	int    yres;
+	int    v_xres;
+	int    v_yres;
+	int    org_x;
+	int    org_y;
+	unsigned int  vrate;
 };
 
-struct sis_memreq
-{
-    unsigned long offset;
-    unsigned long size;
+struct ap_data {
+	struct mode_info minfo;
+	unsigned long iobase;
+	unsigned int  mem_size;
+	unsigned long disp_state;    	
+	SIS_CHIP_TYPE chip;
+	unsigned char hasVB;
+	SIS_TV_TYPE TV_type;
+	SIS_TV_PLUG TV_plug;
+	unsigned long version;
+	char reserved[256];
 };
 
-/* Data for AP */
-struct mode_info
-{
-    int    bpp;
-    int    xres;
-    int    yres;
-    int    v_xres;
-    int    v_yres;
-    int    org_x;
-    int    org_y;
-    unsigned int  vrate;
-};
+struct video_info {
+	int    chip_id;
+	unsigned int  video_size;
+	unsigned long video_base;
+	char  *video_vbase;
+	unsigned long mmio_base;
+	char  *mmio_vbase; 
+	unsigned long vga_base;
 
-struct ap_data
-{
-    struct mode_info minfo;
-    unsigned long iobase;
-    unsigned int  mem_size;
-    unsigned long disp_state;    	
-	enum CHIPTYPE chip;
-};
+	int    video_bpp;
+	int    video_width;
+	int    video_height;
+	int    video_vwidth;
+	int    video_vheight;
+	int    org_x;
+	int    org_y;
+	unsigned int refresh_rate;
 
+	unsigned long disp_state;
+	unsigned char hasVB;
+	unsigned char TV_type;
+	unsigned char TV_plug;
 
-/* Data for kernel */
-struct video_info
-{
-    /* card parameters */
-    int    chip_id;
-    unsigned int  video_size;
-    unsigned long video_base;
-    char  *video_vbase;
-    unsigned long mmio_base;
-    char  *mmio_vbase; 
-    unsigned long vga_base;
+	SIS_CHIP_TYPE chip;
+	unsigned char revision_id;
 
-    /* mode */
-    int    video_bpp;
-    int    video_width;
-    int    video_height;
-    int    video_vwidth;
-    int    video_vheight;
-    int    org_x;
-    int    org_y;
-    unsigned int refresh_rate;
-
-    /* VB functions */
-    unsigned long disp_state;
-    unsigned char hasVB;
-    unsigned char TV_type;
-    unsigned char TV_plug;
+	char reserved[256];
 };
 
 #ifdef __KERNEL__
@@ -114,5 +114,6 @@ extern struct video_info ivideo;
 
 extern void sis_malloc(struct sis_memreq *req);
 extern void sis_free(unsigned long base);
+extern void sis_dispinfo(struct ap_data *rec);
 #endif
 #endif

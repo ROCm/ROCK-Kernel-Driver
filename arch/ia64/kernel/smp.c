@@ -48,6 +48,7 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
+#include <asm/mca.h>
 
 /* The 'big kernel lock' */
 spinlock_t kernel_flag = SPIN_LOCK_UNLOCKED;
@@ -70,20 +71,18 @@ static volatile struct call_data_struct *call_data;
 
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
-#ifndef CONFIG_ITANIUM_PTCG
-# define IPI_FLUSH_TLB		2
-#endif  /*!CONFIG_ITANIUM_PTCG */
 
 static void
 stop_this_cpu (void)
 {
+	extern void cpu_halt (void);
 	/*
 	 * Remove this CPU:
 	 */
 	clear_bit(smp_processor_id(), &cpu_online_map);
 	max_xtp();
 	__cli();
-	for (;;);
+	cpu_halt();
 }
 
 void
@@ -136,49 +135,6 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 			stop_this_cpu();
 			break;
 
-#ifndef CONFIG_ITANIUM_PTCG
-		case IPI_FLUSH_TLB:
-		{
-			extern unsigned long flush_start, flush_end, flush_nbits, flush_rid;
-			extern atomic_t flush_cpu_count;
-			unsigned long saved_rid = ia64_get_rr(flush_start);
-			unsigned long end = flush_end;
-			unsigned long start = flush_start;
-			unsigned long nbits = flush_nbits;
-
-			/*
-			 * Current CPU may be running with different RID so we need to
-			 * reload the RID of flushed address.  Purging the translation
-			 * also needs ALAT invalidation; we do not need "invala" here
-			 * since it is done in ia64_leave_kernel.
-			 */
-			ia64_srlz_d();
-			if (saved_rid != flush_rid) {
-				ia64_set_rr(flush_start, flush_rid);
-				ia64_srlz_d();
-			}
-
-			do {
-				/*
-				 * Purge local TLB entries.
-				 */
-				__asm__ __volatile__ ("ptc.l %0,%1" ::
-						      "r"(start), "r"(nbits<<2) : "memory");
-				start += (1UL << nbits);
-			} while (start < end);
-
-			ia64_insn_group_barrier();
-			ia64_srlz_i();			/* srlz.i implies srlz.d */
-
-			if (saved_rid != flush_rid) {
-				ia64_set_rr(flush_start, saved_rid);
-				ia64_srlz_d();
-			}
-			atomic_dec(&flush_cpu_count);
-			break;
-		}
-#endif	/* !CONFIG_ITANIUM_PTCG */
-
 		default:
 			printk(KERN_CRIT "Unknown IPI on CPU %d: %lu\n", this_cpu, which);
 			break;
@@ -228,30 +184,6 @@ smp_send_reschedule (int cpu)
 	platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 
-#ifndef CONFIG_ITANIUM_PTCG
-
-void
-smp_send_flush_tlb (void)
-{
-	send_IPI_allbutself(IPI_FLUSH_TLB);
-}
-
-void
-smp_resend_flush_tlb (void)
-{
-	int i;
-
-	/*
-	 * Really need a null IPI but since this rarely should happen & since this code
-	 * will go away, lets not add one.
-	 */
-	for (i = 0; i < smp_num_cpus; ++i)
-		if (i != smp_processor_id())
-			smp_send_reschedule(i);
-}
-
-#endif  /* !CONFIG_ITANIUM_PTCG */
-
 void
 smp_flush_tlb_all (void)
 {
@@ -277,10 +209,6 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 {
 	struct call_data_struct data;
 	int cpus = 1;
-#if (defined(CONFIG_ITANIUM_B0_SPECIFIC) \
-     || defined(CONFIG_ITANIUM_B1_SPECIFIC) || defined(CONFIG_ITANIUM_B2_SPECIFIC))
-	unsigned long timeout;
-#endif
 
 	if (cpuid == smp_processor_id()) {
 		printk(__FUNCTION__" trying to call self\n");
@@ -295,26 +223,15 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 		atomic_set(&data.finished, 0);
 
 	spin_lock_bh(&call_lock);
+
 	call_data = &data;
-
-#if (defined(CONFIG_ITANIUM_B0_SPECIFIC) \
-     || defined(CONFIG_ITANIUM_B1_SPECIFIC) || defined(CONFIG_ITANIUM_B2_SPECIFIC))
-  resend:
-  	send_IPI_single(cpuid, IPI_CALL_FUNC);
-
-	/*  Wait for response */
-	timeout = jiffies + HZ;
-	while ((atomic_read(&data.started) != cpus) && time_before(jiffies, timeout))
-		barrier();
-	if (atomic_read(&data.started) != cpus)
-		goto resend;
-#else
+	mb();	/* ensure store to call_data precedes setting of IPI_CALL_FUNC */
   	send_IPI_single(cpuid, IPI_CALL_FUNC);
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
-#endif
+
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
@@ -348,10 +265,6 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 {
 	struct call_data_struct data;
 	int cpus = smp_num_cpus-1;
-#if (defined(CONFIG_ITANIUM_B0_SPECIFIC) \
-     || defined(CONFIG_ITANIUM_B1_SPECIFIC) || defined(CONFIG_ITANIUM_B2_SPECIFIC))
-	unsigned long timeout;
-#endif
 
 	if (!cpus)
 		return 0;
@@ -364,27 +277,14 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 		atomic_set(&data.finished, 0);
 
 	spin_lock_bh(&call_lock);
+
 	call_data = &data;
-
-#if (defined(CONFIG_ITANIUM_B0_SPECIFIC) \
-     || defined(CONFIG_ITANIUM_B1_SPECIFIC) || defined(CONFIG_ITANIUM_B2_SPECIFIC))
-  resend:
-	/*  Send a message to all other CPUs and wait for them to respond */
-	send_IPI_allbutself(IPI_CALL_FUNC);
-
-	/* Wait for response */
-	timeout = jiffies + HZ;
-	while ((atomic_read(&data.started) != cpus) && time_before(jiffies, timeout))
-		barrier();
-	if (atomic_read(&data.started) != cpus)
-		goto resend;
-#else
+	mb();	/* ensure store to call_data precedes setting of IPI_CALL_FUNC */
 	send_IPI_allbutself(IPI_CALL_FUNC);
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
 		barrier();
-#endif
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)

@@ -34,6 +34,7 @@ p-$(CONFIG_CPU_ARM610)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM710)	+= proc-arm6,7.o
 p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o
 p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o
+p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o
 p-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o
 p-$(CONFIG_CPU_SA110)	+= proc-sa110.o
 p-$(CONFIG_CPU_SA1100)	+= proc-sa110.o

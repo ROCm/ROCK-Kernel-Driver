@@ -672,7 +672,6 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	ppriv->root = dev;
 	ppriv->pdev = pdev;
 	spin_lock_init(&ppriv->lock);
-	pdev->driver_data = ppriv;
 	pci_set_drvdata(pdev, ppriv);
 	return 0;
 

@@ -14,13 +14,6 @@
 #define module_map(x)		vmalloc(x)
 #define module_unmap(x)		ia64_module_unmap(x)
 #define module_arch_init(x)	ia64_module_init(x)
-#define arch_init_modules(x)	{ 	static struct archdata archdata; \
-					register char *kernel_gp asm ("gp");\
-					archdata.gp = kernel_gp; \
-					kernel_module.archdata_start = (const char *) &archdata; \
-					kernel_module.archdata_end   = (const char *) (&archdata + 1); \
-				}
-		
 
 /*
  * This must match in size and layout the data created by
@@ -34,12 +27,23 @@ struct archdata {
 	const char *gp;
 };
 
+static inline void
+arch_init_modules (struct module *kmod)
+{
+	static struct archdata archdata;
+	register char *kernel_gp asm ("gp");
+
+	archdata.gp = kernel_gp;
+	kmod->archdata_start = (const char *) &archdata;
+	kmod->archdata_end   = (const char *) (&archdata + 1);
+}
+
 /*
  * functions to add/remove a modules unwind info when
  * it is loaded or unloaded.
  */
 static inline int
-ia64_module_init(struct module *mod)
+ia64_module_init (struct module *mod)
 {
 	struct archdata *archdata;
 
@@ -51,28 +55,23 @@ ia64_module_init(struct module *mod)
 	 * Make sure the unwind pointers are sane.
 	 */
 
-	if (archdata->unw_table)
-	{
+	if (archdata->unw_table) {
 		printk(KERN_ERR "module_arch_init: archdata->unw_table must be zero.\n");
 		return 1;
 	}
-	if (!mod_bound(archdata->gp, 0, mod))
-	{
+	if (!mod_bound(archdata->gp, 0, mod)) {
 		printk(KERN_ERR "module_arch_init: archdata->gp out of bounds.\n");
 		return 1;
 	}
-	if (!mod_bound(archdata->unw_start, 0, mod))
-	{
+	if (!mod_bound(archdata->unw_start, 0, mod)) {
 		printk(KERN_ERR "module_arch_init: archdata->unw_start out of bounds.\n");
 		return 1;
 	}
-	if (!mod_bound(archdata->unw_end, 0, mod))
-	{
+	if (!mod_bound(archdata->unw_end, 0, mod)) {
 		printk(KERN_ERR "module_arch_init: archdata->unw_end out of bounds.\n");
 		return 1;
 	}
-	if (!mod_bound(archdata->segment_base, 0, mod))
-	{
+	if (!mod_bound(archdata->segment_base, 0, mod)) {
 		printk(KERN_ERR "module_arch_init: archdata->unw_table out of bounds.\n");
 		return 1;
 	}
@@ -88,7 +87,7 @@ ia64_module_init(struct module *mod)
 }
 
 static inline void
-ia64_module_unmap(void * addr)
+ia64_module_unmap (void * addr)
 {
 	struct module *mod = (struct module *) addr;
 	struct archdata *archdata;
@@ -96,8 +95,7 @@ ia64_module_unmap(void * addr)
 	/*
 	 * Before freeing the module memory remove the unwind table entry
 	 */
-	if (mod_member_present(mod, archdata_start) && mod->archdata_start)
-	{
+	if (mod_member_present(mod, archdata_start) && mod->archdata_start) {
 		archdata = (struct archdata *)(mod->archdata_start);
 
 		if (archdata->unw_table != NULL)

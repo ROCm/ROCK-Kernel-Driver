@@ -247,6 +247,17 @@ sysc_tracesys:
 	lghi    %r2,-ENOSYS
 	stg     %r2,SP_R2(%r15)     # give sysc_trace an -ENOSYS retval
         brasl   %r14,syscall_trace
+	lg      %r2,SP_R2(%r15)
+	cghi    %r2,-ENOSYS
+	je      sysc_tracesys_dn1   
+	sllg    %r2,%r2,56          # strace wants to change the syscall
+	srlg    %r2,%r2,53          # zap unused bits & multiply by 8
+	tm      SP_PSW+3(%r15),0x01 # are we running in 31 bit mode ?
+        jo      sysc_tracesys_noemu
+	la      %r2,4(%r2)          # use 31 bit emulation system calls
+sysc_tracesys_noemu:
+	lgf	%r8,0(%r2,%r7)      # load address of system call routine
+sysc_tracesys_dn1:	
 	lmg     %r3,%r6,SP_R3(%r15)
 	lg      %r2,SP_ORIG_R2(%r15)
         basr    %r14,%r8            # call sys_xxx
@@ -672,7 +683,6 @@ pgm_sv:
 	GET_CURRENT
 pgm_no_sv:
         llgh    %r8,__LC_PGM_INT_CODE  # N.B. saved int code used later KEEP it
-        stosm   48(%r15),0x03     # reenable interrupts
 	lghi    %r3,0x7f
         nr      %r3,%r8           # clear per-event-bit & move to r3
         je      pgm_dn            # none of Martins exceptions occurred bypass

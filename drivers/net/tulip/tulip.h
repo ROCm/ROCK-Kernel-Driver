@@ -118,7 +118,7 @@ enum tulip_offsets {
 };
 
 /* register offset and bits for CFDD PCI config reg */
-enum pci_cfg_driver_reg {	
+enum pci_cfg_driver_reg {
 	CFDD = 0x40,
 	CFDD_Sleep = (1 << 31),
 	CFDD_Snooze = (1 << 30),
@@ -405,6 +405,12 @@ extern u16 t21142_csr14[];
 void t21142_timer(unsigned long data);
 void t21142_start_nway(struct net_device *dev);
 void t21142_lnk_change(struct net_device *dev, int csr5);
+
+
+/* PNIC2.c */
+void pnic2_lnk_change(struct net_device *dev, int csr5);
+void pnic2_timer(unsigned long data);
+void pnic2_start_nway(struct net_device *dev);
 void pnic2_lnk_change(struct net_device *dev, int csr5);
 
 /* eeprom.c */

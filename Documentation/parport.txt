@@ -162,6 +162,10 @@ modes		Parallel port's hardware modes, comma-separated,
 				is available and will be used.
 		DMA		DMA is available and will be used.
 
+		Note that the current implementation will only take
+		advantage of COMPAT and ECP modes if it has an IRQ
+		line to use.
+
 autoprobe	Any IEEE-1284 device ID information that has been
 		acquired from the (non-IEEE 1284.3) device.
 

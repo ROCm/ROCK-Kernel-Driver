@@ -66,6 +66,7 @@ typedef enum {
 	IRDA_LITELINK_DONGLE     = 5,
 	IRDA_AIRPORT_DONGLE      = 6,
 	IRDA_OLD_BELKIN_DONGLE   = 7,
+	IRDA_EP7211_IR           = 8,
 } IRDA_DONGLE;
 
 /* Protocol types to be used for SOCK_DGRAM */

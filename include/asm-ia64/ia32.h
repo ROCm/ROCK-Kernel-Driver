@@ -12,30 +12,39 @@
  */
 
 /* 32bit compatibility types */
-typedef unsigned int	       __kernel_size_t32;
-typedef int		       __kernel_ssize_t32;
-typedef int		       __kernel_ptrdiff_t32;
-typedef int		       __kernel_time_t32;
-typedef int		       __kernel_clock_t32;
-typedef int		       __kernel_pid_t32;
-typedef unsigned short	       __kernel_ipc_pid_t32;
-typedef unsigned short	       __kernel_uid_t32;
-typedef unsigned short	       __kernel_gid_t32;
-typedef unsigned short	       __kernel_dev_t32;
-typedef unsigned int	       __kernel_ino_t32;
-typedef unsigned short	       __kernel_mode_t32;
-typedef unsigned short	       __kernel_umode_t32;
-typedef short		       __kernel_nlink_t32;
-typedef int		       __kernel_daddr_t32;
-typedef int		       __kernel_off_t32;
-typedef unsigned int	       __kernel_caddr_t32;
-typedef long		       __kernel_loff_t32;
-typedef __kernel_fsid_t	       __kernel_fsid_t32;
+typedef unsigned int	__kernel_size_t32;
+typedef int		__kernel_ssize_t32;
+typedef int		__kernel_ptrdiff_t32;
+typedef int		__kernel_time_t32;
+typedef int		__kernel_clock_t32;
+typedef int		__kernel_pid_t32;
+typedef unsigned short	__kernel_ipc_pid_t32;
+typedef unsigned short	__kernel_uid_t32;
+typedef unsigned int	__kernel_uid32_t32;
+typedef unsigned short	__kernel_gid_t32;
+typedef unsigned int	__kernel_gid32_t32;
+typedef unsigned short	__kernel_dev_t32;
+typedef unsigned int	__kernel_ino_t32;
+typedef unsigned short	__kernel_mode_t32;
+typedef unsigned short	__kernel_umode_t32;
+typedef short		__kernel_nlink_t32;
+typedef int		__kernel_daddr_t32;
+typedef int		__kernel_off_t32;
+typedef unsigned int	__kernel_caddr_t32;
+typedef long		__kernel_loff_t32;
+typedef __kernel_fsid_t	__kernel_fsid_t32;
 
 #define IA32_PAGE_SHIFT		12	/* 4KB pages */
-#define IA32_PAGE_SIZE		(1ULL << IA32_PAGE_SHIFT)
+#define IA32_PAGE_SIZE		(1UL << IA32_PAGE_SHIFT)
+#define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
+#define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
 #define IA32_TICK(tick)		((unsigned long long)(tick) * IA32_CLOCKS_PER_SEC / CLOCKS_PER_SEC)
+
+struct timespec32 {
+	int	tv_sec;
+	int	tv_nsec;
+};
 
 /* fcntl.h */
 struct flock32 {
@@ -46,6 +55,9 @@ struct flock32 {
        __kernel_pid_t32 l_pid;
 };
 
+#define F_GETLK64	12
+#define F_SETLK64	13
+#define F_SETLKW64	14
 
 /* sigcontext.h */
 /*
@@ -103,13 +115,19 @@ struct sigcontext_ia32 {
 #define _IA32_NSIG_BPW	       32
 #define _IA32_NSIG_WORDS	       (_IA32_NSIG / _IA32_NSIG_BPW)
 
+#define IA32_SET_SA_HANDLER(ka,handler,restorer)				\
+				((ka)->sa.sa_handler = (__sighandler_t)		\
+					(((unsigned long)(restorer) << 32)	\
+					 | ((handler) & 0xffffffff)))
+#define IA32_SA_HANDLER(ka)	((unsigned long) (ka)->sa.sa_handler & 0xffffffff)
+#define IA32_SA_RESTORER(ka)	((unsigned long) (ka)->sa.sa_handler >> 32)
+
 typedef struct {
        unsigned int sig[_IA32_NSIG_WORDS];
 } sigset32_t;
 
 struct sigaction32 {
-       unsigned int  sa_handler;	/* Really a pointer, but need to deal
-					     with 32 bits */
+       unsigned int sa_handler;		/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
        sigset32_t sa_mask;		/* A 32 bit mask */
@@ -160,6 +178,31 @@ struct stat32 {
        unsigned int  __unused3;
        unsigned int  __unused4;
        unsigned int  __unused5;
+};
+
+struct stat64 {
+	unsigned short	st_dev;
+	unsigned char	__pad0[10];
+	unsigned int	__st_ino;
+	unsigned int	st_mode;
+	unsigned int	st_nlink;
+	unsigned int	st_uid;
+	unsigned int	st_gid;
+	unsigned short	st_rdev;
+	unsigned char	__pad3[10];
+	unsigned int	st_size_lo;
+	unsigned int	st_size_hi;
+	unsigned int	st_blksize;
+	unsigned int	st_blocks;	/* Number 512-byte blocks allocated. */
+	unsigned int	__pad4;		/* future possible st_blocks high bits */
+	unsigned int	st_atime;
+	unsigned int	__pad5;
+	unsigned int	st_mtime;
+	unsigned int	__pad6;
+	unsigned int	st_ctime;
+	unsigned int	__pad7;		/* will be high 32 bits of ctime someday */
+	unsigned int	st_ino_lo;
+	unsigned int	st_ino_hi;
 };
 
 struct statfs32 {
@@ -229,6 +272,19 @@ typedef struct siginfo32 {
 	} _sifields;
 } siginfo_t32;
 
+struct linux32_dirent {
+	u32	d_ino;
+	u32	d_off;
+	u16	d_reclen;
+	char	d_name[256];
+};
+
+struct old_linux32_dirent {
+	u32	d_ino;
+	u32	d_offset;
+	u16	d_namlen;
+	char	d_name[1];
+};
 
 /*
  * IA-32 ELF specific definitions for IA-64.
@@ -252,7 +308,7 @@ typedef struct siginfo32 {
 #define ELF_ARCH	EM_386
 
 #define IA32_PAGE_OFFSET	0xc0000000
-#define IA32_STACK_TOP		((IA32_PAGE_OFFSET/3) * 2)
+#define IA32_STACK_TOP		IA32_PAGE_OFFSET
 
 /*
  * The system segments (GDT, TSS, LDT) have to be mapped below 4GB so the IA-32 engine can
@@ -322,6 +378,10 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define _TSS(n) ((((unsigned long) n)<<4)+(FIRST_TSS_ENTRY<<3))
 #define _LDT(n) ((((unsigned long) n)<<4)+(FIRST_LDT_ENTRY<<3))
 
+#define IA32_SEGSEL_RPL		(0x3 << 0)
+#define IA32_SEGSEL_TI		(0x1 << 2)
+#define IA32_SEGSEL_INDEX_SHIFT	3
+
 #define IA32_SEG_BASE		16
 #define IA32_SEG_TYPE		40
 #define IA32_SEG_SYS		44
@@ -377,7 +437,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
  */
 
 #define IA32_FSR_DEFAULT	0x55550000		/* set all tag bits */
-#define IA32_FCR_DEFAULT	0x17800000037fULL	/* extended precision, all masks */
+#define IA32_FCR_DEFAULT	0x17800000037fUL	/* extended precision, all masks */
 
 #define IA32_PTRACE_GETREGS	12
 #define IA32_PTRACE_SETREGS	13
@@ -421,6 +481,9 @@ extern int ia32_setup_frame1 (int sig, struct k_sigaction *ka, siginfo_t *info,
 extern void ia32_init_addr_space (struct pt_regs *regs);
 extern int ia32_setup_arg_pages (struct linux_binprm *bprm);
 extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
+extern int ia32_intercept (struct pt_regs *regs, unsigned long isr);
+extern unsigned long ia32_do_mmap (struct file *, unsigned long, unsigned long, int, int, loff_t);
+extern void ia32_load_segment_descriptors (struct task_struct *task);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

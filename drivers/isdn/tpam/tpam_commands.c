@@ -1,4 +1,4 @@
-/* $Id: tpam_commands.c,v 1.1.2.3 2001/09/23 22:25:03 kai Exp $
+/* $Id: tpam_commands.c,v 1.1.2.4 2001/11/06 20:58:30 kai Exp $
  *
  * Turbo PAM ISDN driver for Linux. (Kernel Driver - ISDN commands)
  *
@@ -206,7 +206,7 @@ static int tpam_command_ioctl_dsprun(tpam_card *card) {
 	
 	/* wait for the board signature */
 	timeout = jiffies + SIGNATURE_TIMEOUT;
-	while (timeout > jiffies) {
+	while (time_before(jiffies, timeout)) {
 		spin_lock_irq(&card->lock);
 		signature = copy_from_pam_dword(card, 
 						(void *)TPAM_MAGICNUMBER_REGISTER);
@@ -241,7 +241,7 @@ static int tpam_command_ioctl_dsprun(tpam_card *card) {
 
 	/* wait for NCO creation confirmation */
 	timeout = jiffies + NCOCREATE_TIMEOUT;
-	while (timeout > jiffies) {
+	while (time_before(jiffies, timeout)) {
 		if (card->channels_tested == TPAM_NBCHANNEL)
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -572,7 +572,7 @@ int tpam_writebuf_skb(int driverId, int channel, int ack, struct sk_buff *skb) {
 			return -ENOMEM;
 		}
 		hdlc_no_accm_encode(skb->data, skb->len, tempdata, &templen);
-		finallen = hdlc_encode(tempdata, finaldata, 
+		finallen = tpam_hdlc_encode(tempdata, finaldata, 
 				       &card->channels[channel].hdlcshift, 
 				       templen);
 		free_page((u32)tempdata);
@@ -897,7 +897,7 @@ void tpam_recv_U3DataInd(tpam_card *card, struct sk_buff *skb) {
 			       "get_free_page failed\n");
 			return;
 		}
-		templen = hdlc_decode(data, tempdata, len);
+		templen = tpam_hdlc_decode(data, tempdata, len);
 		templen = hdlc_no_accm_decode(tempdata, templen);
 		if (!(result = alloc_skb(templen, GFP_ATOMIC))) {
 			printk(KERN_ERR "TurboPAM(tpam_recv_U3DataInd): "
@@ -1019,6 +1019,6 @@ static void tpam_statcallb(tpam_card *card, isdn_ctrl ctrl) {
 	init_timer(timer);
 	timer->function = tpam_statcallb_run;
 	timer->data = (unsigned long)ds;
-	timer->expires = jiffies + 0.1 * HZ;   /* 0.1 second */
+	timer->expires = jiffies + HZ / 10;   /* 0.1 second */
 	add_timer(timer);
 }

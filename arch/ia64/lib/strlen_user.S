@@ -8,8 +8,8 @@
  *	ret0	0 in case of fault, strlen(buffer)+1 otherwise
  *
  * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 01/19/99 S.Eranian heavily enhanced version (see details below)
  * 09/24/99 S.Eranian added speculation recovery code
@@ -108,7 +108,7 @@ GLOBAL_ENTRY(__strlen_user)
 	mov ar.ec=r0		// clear epilogue counter (saved in ar.pfs)
 	;;
 	add base=-16,src	// keep track of aligned base
-	chk.s v[1], recover	// if already NaT, then directly skip to recover
+	chk.s v[1], .recover	// if already NaT, then directly skip to recover
 	or v[1]=v[1],mask	// now we have a safe initial byte pattern
 	;;
 1:
@@ -130,14 +130,14 @@ GLOBAL_ENTRY(__strlen_user)
 	//
 	cmp.eq  p8,p9=8,val1	// p6 = val1 had zero (disambiguate)
 	tnat.nz p6,p7=val1	// test NaT on val1
-(p6)	br.cond.spnt.few recover// jump to recovery if val1 is NaT
+(p6)	br.cond.spnt .recover	// jump to recovery if val1 is NaT
 	;;
 	//
 	// if we come here p7 is true, i.e., initialized for // cmp
 	//
 	cmp.eq.and  p7,p0=8,val1// val1==8?
 	tnat.nz.and p7,p0=val2	// test NaT if val2
-(p7)	br.cond.spnt.few recover// jump to recovery if val2 is NaT
+(p7)	br.cond.spnt .recover	// jump to recovery if val2 is NaT
 	;;
 (p8)	mov val1=val2		// val2 contains the value
 (p8)	adds src=-16,src	// correct position when 3 ahead
@@ -149,7 +149,7 @@ GLOBAL_ENTRY(__strlen_user)
 	;;
 	sub ret0=ret0,tmp	// length=now - back -1
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp	// end of normal execution
+	br.ret.sptk.many rp	// end of normal execution
 
 	//
 	// Outlined recovery code when speculation failed
@@ -162,7 +162,7 @@ GLOBAL_ENTRY(__strlen_user)
 	//	- today we restart from the beginning of the string instead
 	//	  of trying to continue where we left off.
 	//
-recover:
+.recover:
 	EX(.Lexit1, ld8 val=[base],8)	// load the initial bytes
 	;;
 	or val=val,mask			// remask first bytes
@@ -185,7 +185,7 @@ recover:
 	;;
 	sub ret0=ret0,tmp	// length=now - back -1
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp	// end of successful recovery code
+	br.ret.sptk.many rp	// end of successful recovery code
 
 	//
 	// We failed even on the normal load (called from exception handler)
@@ -194,5 +194,5 @@ recover:
 	mov ret0=0
 	mov pr=saved_pr,0xffffffffffff0000
 	mov ar.pfs=saved_pfs	// because of ar.ec, restore no matter what
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__strlen_user)

@@ -219,13 +219,13 @@ union el_lca {
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int lca_inb(unsigned long addr)
+__EXTERN_INLINE u8 lca_inb(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + LCA_IO + 0x00);
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void lca_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void lca_outb(u8 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -234,13 +234,13 @@ __EXTERN_INLINE void lca_outb(unsigned char b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int lca_inw(unsigned long addr)
+__EXTERN_INLINE u16 lca_inw(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + LCA_IO + 0x08);
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void lca_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void lca_outw(u16 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -249,12 +249,12 @@ __EXTERN_INLINE void lca_outw(unsigned short b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int lca_inl(unsigned long addr)
+__EXTERN_INLINE u32 lca_inl(unsigned long addr)
 {
 	return *(vuip) ((addr << 5) + LCA_IO + 0x18);
 }
 
-__EXTERN_INLINE void lca_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void lca_outl(u32 b, unsigned long addr)
 {
 	*(vuip) ((addr << 5) + LCA_IO + 0x18) = b;
 	mb();
@@ -266,7 +266,7 @@ __EXTERN_INLINE void lca_outl(unsigned int b, unsigned long addr)
  * dense memory space, everything else through sparse space.
  */
 
-__EXTERN_INLINE unsigned long lca_readb(unsigned long addr)
+__EXTERN_INLINE u8 lca_readb(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -280,7 +280,7 @@ __EXTERN_INLINE unsigned long lca_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long lca_readw(unsigned long addr)
+__EXTERN_INLINE u16 lca_readw(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -294,17 +294,17 @@ __EXTERN_INLINE unsigned long lca_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long lca_readl(unsigned long addr)
+__EXTERN_INLINE u32 lca_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long lca_readq(unsigned long addr)
+__EXTERN_INLINE u64 lca_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void lca_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void lca_writeb(u8 b, unsigned long addr)
 {
 	unsigned long msb;
 	unsigned long w;
@@ -319,7 +319,7 @@ __EXTERN_INLINE void lca_writeb(unsigned char b, unsigned long addr)
 	*(vuip) ((addr << 5) + LCA_SPARSE_MEM + 0x00) = w;
 }
 
-__EXTERN_INLINE void lca_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void lca_writew(u16 b, unsigned long addr)
 {
 	unsigned long msb;
 	unsigned long w;
@@ -334,12 +334,12 @@ __EXTERN_INLINE void lca_writew(unsigned short b, unsigned long addr)
 	*(vuip) ((addr << 5) + LCA_SPARSE_MEM + 0x08) = w;
 }
 
-__EXTERN_INLINE void lca_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void lca_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void lca_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void lca_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.8 2001/07/18 14:01:03 bjornw Exp $
+/* $Id: time.c,v 1.9 2001/10/25 10:26:37 johana Exp $
  *
  *  linux/arch/cris/kernel/time.c
  *
@@ -50,6 +50,11 @@ static int have_rtc;  /* used to remember if we have an RTC or not */
 #undef USE_CASCADE_TIMERS
 
 extern int setup_etrax_irq(int, struct irqaction *);
+
+/* Lookup table to convert *R_TIMER0 to microseconds (us) 
+ * Timer goes from TIMER0_DIV down to 1 meaning 0-10000us in step of approx 52us
+ */
+unsigned short cris_timer0_value_us[TIMER0_DIV+1];
 
 #define TICK_SIZE tick
 
@@ -380,6 +385,7 @@ static struct irqaction irq2  = { timer_interrupt, SA_SHIRQ | SA_INTERRUPT,
 void __init
 time_init(void)
 {	
+	int i;
 	/* probe for the RTC and read it if it exists */
 
 	if(RTC_INIT() < 0) {
@@ -442,6 +448,13 @@ time_init(void)
 		IO_STATE(R_TIMER_CTRL, tm0,       run)      |
 		IO_STATE(R_TIMER_CTRL, clksel0,   c19k2Hz);
 #endif
+
+	for (i=0; i <= TIMER0_DIV; i++) {
+		/* We must be careful not to get overflow... */
+		cris_timer0_value_us[TIMER0_DIV-i] = 
+		  (unsigned short)((unsigned long)
+		  ((i*(1000000/HZ))/TIMER0_DIV)&0x0000FFFFL);
+	}
 	
 	*R_IRQ_MASK0_SET =
 		IO_STATE(R_IRQ_MASK0_SET, timer0, set); /* unmask the timer irq */

@@ -2,7 +2,7 @@
  * Architecture-specific signal handling support.
  *
  * Copyright (C) 1999-2001 Hewlett-Packard Co
- * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from i386 and Alpha versions.
  */
@@ -39,12 +39,6 @@
 # define GET_SIGSET(k,u)	__get_user((k)->sig[0], &(u)->sig[0])
 #endif
 
-struct sigscratch {
-	unsigned long scratch_unat;	/* ar.unat for the general registers saved in pt */
-	unsigned long pad;
-	struct pt_regs pt;
-};
-
 extern long ia64_do_signal (sigset_t *, struct sigscratch *, long);	/* forward decl */
 
 long
@@ -55,6 +49,10 @@ ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (sigsetsize != sizeof(sigset_t))
 		return -EINVAL;
+
+	if (!access_ok(VERIFY_READ, uset, sigsetsize))
+		return -EFAULT;
+
 	if (GET_SIGSET(&set, uset))
 		return -EFAULT;
 
@@ -73,15 +71,9 @@ ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 	 * pre-set the correct error code here to ensure that the right values
 	 * get saved in sigcontext by ia64_do_signal.
 	 */
-#ifdef CONFIG_IA32_SUPPORT
-        if (IS_IA32_PROCESS(&scr->pt)) {
-                scr->pt.r8 = -EINTR;
-        } else
-#endif
-	{
-		scr->pt.r8 = EINTR;
-		scr->pt.r10 = -1;
-	}
+	scr->pt.r8 = EINTR;
+	scr->pt.r10 = -1;
+
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
@@ -139,10 +131,9 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 		struct ia64_psr *psr = ia64_psr(&scr->pt);
 
 		__copy_from_user(current->thread.fph, &sc->sc_fr[32], 96*16);
-		if (!psr->dfh) {
-			psr->mfh = 0;
+		psr->mfh = 0;	/* drop signal handler's fph contents... */
+		if (!psr->dfh)
 			__ia64_load_fpu(current->thread.fph);
-		}
 	}
 	return err;
 }
@@ -380,7 +371,8 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	err  = __put_user(sig, &frame->arg0);
 	err |= __put_user(&frame->info, &frame->arg1);
 	err |= __put_user(&frame->sc, &frame->arg2);
-	err |= __put_user(new_rbs, &frame->rbs_base);
+	err |= __put_user(new_rbs, &frame->sc.sc_rbs_base);
+	err |= __put_user(0, &frame->sc.sc_loadrs);	/* initialize to zero */
 	err |= __put_user(ka->sa.sa_handler, &frame->handler);
 
 	err |= copy_siginfo_to_user(&frame->info, info);
@@ -460,6 +452,7 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 long
 ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 {
+	struct signal_struct *sig;
 	struct k_sigaction *ka;
 	siginfo_t info;
 	long restart = in_syscall;
@@ -571,8 +564,8 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			      case SIGSTOP:
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags
-				      & SA_NOCLDSTOP))
+				sig = current->p_pptr->sig;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;

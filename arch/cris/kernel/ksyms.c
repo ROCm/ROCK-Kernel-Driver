@@ -24,6 +24,7 @@
 extern void dump_thread(struct pt_regs *, struct user *);
 extern unsigned long get_cmos_time(void);
 extern void __ashrdi3(void);
+extern void iounmap(void *addr);
 
 /* platform dependent support */
 
@@ -44,6 +45,19 @@ EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strncmp);
 EXPORT_SYMBOL(__ashrdi3);
+
+EXPORT_SYMBOL(__ioremap);
+EXPORT_SYMBOL(iounmap);
+
+/* export shadow registers for the CPU I/O pins */
+
+EXPORT_SYMBOL(genconfig_shadow);
+EXPORT_SYMBOL(port_pa_data_shadow);
+EXPORT_SYMBOL(port_pa_dir_shadow);
+EXPORT_SYMBOL(port_pb_data_shadow);
+EXPORT_SYMBOL(port_pb_dir_shadow);
+EXPORT_SYMBOL(port_pb_config_shadow);
+EXPORT_SYMBOL(port_g_data_shadow);
 
 /* other stuff */
 

@@ -143,7 +143,7 @@ pr_osl_add_device(
 	PR_CONTEXT		*processor)
 {
 	u32			i = 0;
-	struct proc_dir_entry	*proc_entry = NULL;
+	struct proc_dir_entry	*proc_entry = NULL, *proc;
 	char			processor_uid[16];
 
 	if (!processor) {
@@ -165,15 +165,18 @@ pr_osl_add_device(
 	sprintf(processor_uid, "%d", processor->uid);
 
 	proc_entry = proc_mkdir(processor_uid, pr_proc_root);
-	if (!proc_entry) {
+	if (!proc_entry)
 		return(AE_ERROR);
-	}
 
-	create_proc_read_entry(PR_PROC_STATUS, S_IFREG | S_IRUGO,
-		proc_entry, pr_osl_proc_read_status, (void*)processor);
+	proc = create_proc_read_entry(PR_PROC_STATUS, S_IFREG | S_IRUGO, 
+				      proc_entry, pr_osl_proc_read_status, (void*)processor);
+	if (!proc_entry)
+		return(AE_ERROR);
 
-	create_proc_read_entry(PR_PROC_INFO, S_IFREG | S_IRUGO,
-		proc_entry, pr_osl_proc_read_info, (void*)processor);
+	proc = create_proc_read_entry(PR_PROC_INFO, S_IFREG | S_IRUGO, 
+				      proc_entry, pr_osl_proc_read_info, (void*)processor);
+	if (!proc_entry)
+		return(AE_ERROR);
 
 	return(AE_OK);
 }

@@ -657,3 +657,7 @@ EXPORT_SYMBOL(matroxfb_fastfont_tryset);	/* accel */
 EXPORT_SYMBOL(matroxfb_fastfont_init);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWinit);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWrestore);		/* DAC1064, Ti3026 */
+
+MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_DESCRIPTION("Miscellaneous support for Matrox video cards");
+MODULE_LICENSE("GPL");

@@ -29,15 +29,6 @@
 #define GATE_ADDR		(0xa000000000000000 + PAGE_SIZE)
 #define PERCPU_ADDR		(0xa000000000000000 + 2*PAGE_SIZE)
 
-#if defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC)
-  /* Workaround for Errata 97.  */
-# define IA64_SEMFIX_INSN	mf;
-# define IA64_SEMFIX	"mf;"
-#else
-# define IA64_SEMFIX_INSN
-# define IA64_SEMFIX	""
-#endif
-
 #ifndef __ASSEMBLY__
 
 #include <linux/kernel.h>
@@ -210,12 +201,12 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 ({										\
 	switch (sz) {								\
 	      case 4:								\
-		__asm__ __volatile__ (IA64_SEMFIX"fetchadd4.rel %0=[%1],%2"	\
+		__asm__ __volatile__ ("fetchadd4.rel %0=[%1],%2"		\
 				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
 		break;								\
 										\
 	      case 8:								\
-		__asm__ __volatile__ (IA64_SEMFIX"fetchadd8.rel %0=[%1],%2"	\
+		__asm__ __volatile__ ("fetchadd8.rel %0=[%1],%2"		\
 				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
 		break;								\
 										\
@@ -257,22 +248,22 @@ __xchg (unsigned long x, volatile void *ptr, int size)
 
 	switch (size) {
 	      case 1:
-		__asm__ __volatile (IA64_SEMFIX"xchg1 %0=[%1],%2" : "=r" (result)
+		__asm__ __volatile ("xchg1 %0=[%1],%2" : "=r" (result)
 				    : "r" (ptr), "r" (x) : "memory");
 		return result;
 
 	      case 2:
-		__asm__ __volatile (IA64_SEMFIX"xchg2 %0=[%1],%2" : "=r" (result)
+		__asm__ __volatile ("xchg2 %0=[%1],%2" : "=r" (result)
 				    : "r" (ptr), "r" (x) : "memory");
 		return result;
 
 	      case 4:
-		__asm__ __volatile (IA64_SEMFIX"xchg4 %0=[%1],%2" : "=r" (result)
+		__asm__ __volatile ("xchg4 %0=[%1],%2" : "=r" (result)
 				    : "r" (ptr), "r" (x) : "memory");
 		return result;
 
 	      case 8:
-		__asm__ __volatile (IA64_SEMFIX"xchg8 %0=[%1],%2" : "=r" (result)
+		__asm__ __volatile ("xchg8 %0=[%1],%2" : "=r" (result)
 				    : "r" (ptr), "r" (x) : "memory");
 		return result;
 	}
@@ -313,22 +304,22 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 	 __asm__ __volatile__ ("mov ar.ccv=%0;;" :: "rO"(_o_));				\
 	switch (size) {									\
 	      case 1:									\
-		__asm__ __volatile__ (IA64_SEMFIX"cmpxchg1."sem" %0=[%1],%2,ar.ccv"	\
+		__asm__ __volatile__ ("cmpxchg1."sem" %0=[%1],%2,ar.ccv"		\
 				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
 		break;									\
 											\
 	      case 2:									\
-		__asm__ __volatile__ (IA64_SEMFIX"cmpxchg2."sem" %0=[%1],%2,ar.ccv"	\
+		__asm__ __volatile__ ("cmpxchg2."sem" %0=[%1],%2,ar.ccv"		\
 				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
 		break;									\
 											\
 	      case 4:									\
-		__asm__ __volatile__ (IA64_SEMFIX"cmpxchg4."sem" %0=[%1],%2,ar.ccv"	\
+		__asm__ __volatile__ ("cmpxchg4."sem" %0=[%1],%2,ar.ccv"		\
 				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
 		break;									\
 											\
 	      case 8:									\
-		__asm__ __volatile__ (IA64_SEMFIX"cmpxchg8."sem" %0=[%1],%2,ar.ccv"	\
+		__asm__ __volatile__ ("cmpxchg8."sem" %0=[%1],%2,ar.ccv"		\
 				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
 		break;									\
 											\

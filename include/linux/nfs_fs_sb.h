@@ -1,6 +1,8 @@
 #ifndef _NFS_FS_SB
 #define _NFS_FS_SB
 
+#include <linux/list.h>
+
 /*
  * NFS client parameters stored in the superblock.
  */
@@ -21,6 +23,10 @@ struct nfs_server {
 	unsigned int		namelen;
 	char *			hostname;	/* remote hostname */
 	struct nfs_reqlist *	rw_requests;	/* async read/write requests */
+	struct list_head	lru_read,
+				lru_dirty,
+				lru_commit,
+				lru_busy;
 };
 
 /*

@@ -83,6 +83,7 @@ int saa7110_write_block(struct saa7110* decoder, unsigned const char *data, unsi
 	while (len-- > 0) {
                 if (i2c_sendbyte(decoder->bus,*data,0)) {
                         i2c_stop(decoder->bus);
+                        UNLOCK_I2C_BUS(decoder->bus);
                         return -EAGAIN;
                 }
 		decoder->reg[subaddr++] = *data++;

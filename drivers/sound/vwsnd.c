@@ -3449,6 +3449,7 @@ static struct address_info the_hw_config = {
 
 MODULE_DESCRIPTION("SGI Visual Workstation sound module");
 MODULE_AUTHOR("Bob Miller <kbob@sgi.com>");
+MODULE_LICENSE("GPL");
 
 static int __init init_vwsnd(void)
 {

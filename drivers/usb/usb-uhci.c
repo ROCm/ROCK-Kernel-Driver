@@ -2848,7 +2848,7 @@ _static void start_hc (uhci_t *s)
 _static void __devexit
 uhci_pci_remove (struct pci_dev *dev)
 {
-	uhci_t *s = (uhci_t*) dev->driver_data;
+	uhci_t *s = pci_get_drvdata(dev);
 	struct usb_device *root_hub = s->bus->root_hub;
 
 	s->running = 0;		    // Don't allow submit_urb
@@ -2895,14 +2895,14 @@ _static int __init uhci_start_usb (uhci_t *s)
 _static int
 uhci_pci_suspend (struct pci_dev *dev, u32 state)
 {
-	reset_hc((uhci_t *) dev->driver_data);
+	reset_hc((uhci_t *) pci_get_drvdata(dev));
 	return 0;
 }
 
 _static int
 uhci_pci_resume (struct pci_dev *dev)
 {
-	start_hc((uhci_t *) dev->driver_data);
+	start_hc((uhci_t *) pci_get_drvdata(dev));
 	return 0;
 }
 #endif
@@ -3006,7 +3006,7 @@ _static int __devinit alloc_uhci (struct pci_dev *dev, int irq, unsigned int io_
 	}
 
 	//chain new uhci device into global list
-	dev->driver_data = s;
+	pci_set_drvdata(dev, s);
 	devs=s;
 
 	return 0;

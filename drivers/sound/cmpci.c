@@ -884,9 +884,9 @@ static int set_dac_channels(struct cm_state *s, int channels)
 
 		spin_unlock_irqrestore(&s->lock, flags);
 		ret = prog_dmabuf(s, 1);
+		if (ret) return ret;
 		spin_lock_irqsave(&s->lock, flags);
 
-		if (ret) return ret;
 		// copy the hw state
 		fmtm &= ~((CM_CFMT_STEREO | CM_CFMT_16BIT) << CM_CFMT_DACSHIFT);
 		fmtm &= ~((CM_CFMT_STEREO | CM_CFMT_16BIT) << CM_CFMT_ADCSHIFT);
@@ -2846,6 +2846,17 @@ MODULE_PARM_DESC(speakers, "(2-6) Number of speakers you connect");
 MODULE_PARM_DESC(use_line_as_rear, "(1/0) Use line-in jack as rear-out");
 MODULE_PARM_DESC(use_line_as_bass, "(1/0) Use line-in jack as bass/center");
 MODULE_PARM_DESC(joystick, "(1/0) Enable joystick interface, still need joystick driver");
+
+static struct pci_device_id cmpci_pci_tbl[] = {
+	{ PCI_VENDOR_ID_CMEDIA, PCI_DEVICE_ID_CMEDIA_CM8738, 
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+ 	{ PCI_VENDOR_ID_CMEDIA, PCI_DEVICE_ID_CMEDIA_CM8338A, 
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_CMEDIA, PCI_DEVICE_ID_CMEDIA_CM8338B, 
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, cmpci_pci_tbl);
 
 void initialize_chip(struct pci_dev *pcidev)
 {

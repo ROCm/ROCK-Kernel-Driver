@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1998-2000 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -455,8 +456,8 @@ static int irlap_param_baud_rate(void *instance, irda_param_t *param, int get)
 		 *  Stations must agree on baud rate, so calculate
 		 *  intersection 
 		 */
-		IRDA_DEBUG(2, "Requested BAUD_RATE: 0x%04x\n", param->pv.s);
-		final = param->pv.s & self->qos_rx.baud_rate.bits;
+		IRDA_DEBUG(2, "Requested BAUD_RATE: 0x%04x\n", (__u16) param->pv.i);
+		final = (__u16) param->pv.i & self->qos_rx.baud_rate.bits;
 
 		IRDA_DEBUG(2, "Final BAUD_RATE: 0x%04x\n", final);
 		self->qos_tx.baud_rate.bits = final;
@@ -483,14 +484,14 @@ static int irlap_param_link_disconnect(void *instance, irda_param_t *param,
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.link_disc_time.bits;
+		param->pv.i = self->qos_rx.link_disc_time.bits;
 	else {
 		/*  
 		 *  Stations must agree on link disconnect/threshold 
 		 *  time.
 		 */
-		IRDA_DEBUG(2, "LINK_DISC: %02x\n", param->pv.b);
-		final = param->pv.b & self->qos_rx.link_disc_time.bits;
+		IRDA_DEBUG(2, "LINK_DISC: %02x\n", (__u8) param->pv.i);
+		final = (__u8) param->pv.i & self->qos_rx.link_disc_time.bits;
 
 		IRDA_DEBUG(2, "Final LINK_DISC: %02x\n", final);
 		self->qos_tx.link_disc_time.bits = final;
@@ -515,9 +516,9 @@ static int irlap_param_max_turn_time(void *instance, irda_param_t *param,
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.max_turn_time.bits;
+		param->pv.i = self->qos_rx.max_turn_time.bits;
 	else
-		self->qos_tx.max_turn_time.bits = param->pv.b;
+		self->qos_tx.max_turn_time.bits = (__u8) param->pv.i;
 
 	return 0;
 }
@@ -537,9 +538,9 @@ static int irlap_param_data_size(void *instance, irda_param_t *param, int get)
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.data_size.bits;
+		param->pv.i = self->qos_rx.data_size.bits;
 	else
-		self->qos_tx.data_size.bits = param->pv.b;
+		self->qos_tx.data_size.bits = (__u8) param->pv.i;
 
 	return 0;
 }
@@ -560,9 +561,9 @@ static int irlap_param_window_size(void *instance, irda_param_t *param,
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.window_size.bits;
+		param->pv.i = self->qos_rx.window_size.bits;
 	else
-		self->qos_tx.window_size.bits = param->pv.b;
+		self->qos_tx.window_size.bits = (__u8) param->pv.i;
 
 	return 0;
 }
@@ -581,9 +582,9 @@ static int irlap_param_additional_bofs(void *instance, irda_param_t *param, int 
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.additional_bofs.bits;
+		param->pv.i = self->qos_rx.additional_bofs.bits;
 	else
-		self->qos_tx.additional_bofs.bits = param->pv.b;
+		self->qos_tx.additional_bofs.bits = (__u8) param->pv.i;
 
 	return 0;
 }
@@ -603,9 +604,9 @@ static int irlap_param_min_turn_time(void *instance, irda_param_t *param,
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
-		param->pv.b = self->qos_rx.min_turn_time.bits;
+		param->pv.i = self->qos_rx.min_turn_time.bits;
 	else
-		self->qos_tx.min_turn_time.bits = param->pv.b;
+		self->qos_tx.min_turn_time.bits = (__u8) param->pv.i;
 
 	return 0;
 }

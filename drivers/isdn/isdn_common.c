@@ -1,4 +1,4 @@
-/* $Id: isdn_common.c,v 1.114.6.15 2001/09/23 22:24:31 kai Exp $
+/* $Id: isdn_common.c,v 1.114.6.16 2001/11/06 20:58:28 kai Exp $
  *
  * Linux ISDN subsystem, common used functions (linklevel).
  *
@@ -44,7 +44,7 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114.6.15 $";
+static char *isdn_revision = "$Revision: 1.114.6.16 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;
@@ -1644,7 +1644,7 @@ isdn_open(struct inode *ino, struct file *filep)
 	if (minor == ISDN_MINOR_STATUS) {
 		infostruct *p;
 
-		if ((p = (infostruct *) kmalloc(sizeof(infostruct), GFP_KERNEL))) {
+		if ((p = kmalloc(sizeof(infostruct), GFP_KERNEL))) {
 			p->next = (char *) dev->infochain;
 			p->private = (char *) &(filep->private_data);
 			dev->infochain = p;
@@ -1996,7 +1996,7 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 
 	if ((adding) && (d->rcverr))
 		kfree(d->rcverr);
-	if (!(d->rcverr = (int *) kmalloc(sizeof(int) * m, GFP_KERNEL))) {
+	if (!(d->rcverr = kmalloc(sizeof(int) * m, GFP_KERNEL))) {
 		printk(KERN_WARNING "register_isdn: Could not alloc rcverr\n");
 		return -1;
 	}
@@ -2004,7 +2004,7 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 
 	if ((adding) && (d->rcvcount))
 		kfree(d->rcvcount);
-	if (!(d->rcvcount = (int *) kmalloc(sizeof(int) * m, GFP_KERNEL))) {
+	if (!(d->rcvcount = kmalloc(sizeof(int) * m, GFP_KERNEL))) {
 		printk(KERN_WARNING "register_isdn: Could not alloc rcvcount\n");
 		if (!adding) kfree(d->rcverr);
 		return -1;
@@ -2016,8 +2016,7 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 			skb_queue_purge(&d->rpqueue[j]);
 		kfree(d->rpqueue);
 	}
-	if (!(d->rpqueue =
-	      (struct sk_buff_head *) kmalloc(sizeof(struct sk_buff_head) * m, GFP_KERNEL))) {
+	if (!(d->rpqueue = kmalloc(sizeof(struct sk_buff_head) * m, GFP_KERNEL))) {
 		printk(KERN_WARNING "register_isdn: Could not alloc rpqueue\n");
 		if (!adding) {
 			kfree(d->rcvcount);
@@ -2031,8 +2030,7 @@ isdn_add_channels(driver *d, int drvidx, int n, int adding)
 
 	if ((adding) && (d->rcv_waitq))
 		kfree(d->rcv_waitq);
-	d->rcv_waitq = (wait_queue_head_t *)
-		kmalloc(sizeof(wait_queue_head_t) * 2 * m, GFP_KERNEL);
+	d->rcv_waitq = kmalloc(sizeof(wait_queue_head_t) * 2 * m, GFP_KERNEL);
 	if (!d->rcv_waitq) {
 		printk(KERN_WARNING "register_isdn: Could not alloc rcv_waitq\n");
 		if (!adding) {
@@ -2157,7 +2155,7 @@ register_isdn(isdn_if * i)
 		printk(KERN_WARNING "register_isdn: No write routine given.\n");
 		return 0;
 	}
-	if (!(d = (driver *) kmalloc(sizeof(driver), GFP_KERNEL))) {
+	if (!(d = kmalloc(sizeof(driver), GFP_KERNEL))) {
 		printk(KERN_WARNING "register_isdn: Could not alloc driver-struct\n");
 		return 0;
 	}

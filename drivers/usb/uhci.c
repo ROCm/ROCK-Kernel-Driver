@@ -2623,7 +2623,7 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	uhci->dev = dev;
 	uhci->io_addr = io_addr;
 	uhci->io_size = io_size;
-	dev->driver_data = uhci;
+	pci_set_drvdata(dev, uhci);
 
 #ifdef CONFIG_PROC_FS
 	uhci->num = uhci_num++;
@@ -2931,7 +2931,7 @@ static int __devinit uhci_pci_probe(struct pci_dev *dev, const struct pci_device
 
 static void __devexit uhci_pci_remove(struct pci_dev *dev)
 {
-	struct uhci *uhci = dev->driver_data;
+	struct uhci *uhci = pci_get_drvdata(dev);
 
 	if (uhci->bus->root_hub)
 		usb_disconnect(&uhci->bus->root_hub);
@@ -2956,14 +2956,14 @@ static void __devexit uhci_pci_remove(struct pci_dev *dev)
 #ifdef CONFIG_PM
 static int uhci_pci_suspend(struct pci_dev *dev, u32 state)
 {
-	suspend_hc((struct uhci *) dev->driver_data);
+	suspend_hc((struct uhci *) pci_get_drvdata(dev));
 	return 0;
 }
 
 static int uhci_pci_resume(struct pci_dev *dev)
 {
-	reset_hc((struct uhci *) dev->driver_data);
-	start_hc((struct uhci *) dev->driver_data);
+	reset_hc((struct uhci *) pci_get_drvdata(dev));
+	start_hc((struct uhci *) pci_get_drvdata(dev));
 	return 0;
 }
 #endif

@@ -25,6 +25,9 @@
  *     along with this program; if not, write to the Free Software 
  *     Foundation, Inc., 59 Temple Place, Suite 330, Boston, 
  *     MA 02111-1307 USA
+ *
+ *     Michel Dänzer <daenzer@debian.org>, 10/2001
+ *     - simplify irda_pv_t to avoid endianness issues
  *     
  ********************************************************************/
 
@@ -55,11 +58,7 @@ typedef enum {
 
 typedef union {
 	char   *c;
-	__u8    b;
-	__u16   s;
 	__u32   i;
-	__u8  *bp;
-	__u16 *sp;
 	__u32 *ip;
 } irda_pv_t;
 

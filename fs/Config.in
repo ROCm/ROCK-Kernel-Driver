@@ -10,6 +10,7 @@ tristate 'Kernel automounter version 4 support (also supports v3)' CONFIG_AUTOFS
 
 dep_tristate 'Reiserfs support' CONFIG_REISERFS_FS $CONFIG_EXPERIMENTAL
 dep_mbool '  Have reiserfs do extra internal checking' CONFIG_REISERFS_CHECK $CONFIG_REISERFS_FS $CONFIG_EXPERIMENTAL
+dep_mbool '  Stats in /proc/fs/reiserfs' CONFIG_REISERFS_PROC_INFO $CONFIG_REISERFS_FS $CONFIG_EXPERIMENTAL
 
 dep_tristate 'ADFS file system support' CONFIG_ADFS_FS $CONFIG_EXPERIMENTAL
 dep_mbool '  ADFS write support (DANGEROUS)' CONFIG_ADFS_FS_RW $CONFIG_ADFS_FS $CONFIG_EXPERIMENTAL
@@ -19,6 +20,13 @@ dep_tristate 'Amiga FFS file system support (EXPERIMENTAL)' CONFIG_AFFS_FS $CONF
 dep_tristate 'Apple Macintosh file system support (EXPERIMENTAL)' CONFIG_HFS_FS $CONFIG_EXPERIMENTAL
 
 dep_tristate 'BFS file system support (EXPERIMENTAL)' CONFIG_BFS_FS $CONFIG_EXPERIMENTAL
+
+tristate 'Ext3 journalling file system support (EXPERIMENTAL)' CONFIG_EXT3_FS
+# CONFIG_JBD could be its own option (even modular), but until there are
+# other users than ext3, we will simply make it be the same as CONFIG_EXT3_FS
+# dep_tristate '  Journal Block Device support (JBD for ext3)' CONFIG_JBD $CONFIG_EXT3_FS
+define_bool CONFIG_JBD $CONFIG_EXT3_FS
+dep_mbool '  JBD (ext3) debugging support' CONFIG_JBD_DEBUG $CONFIG_JBD
 
 # msdos file systems
 tristate 'DOS FAT fs support' CONFIG_FAT_FS

@@ -18,15 +18,16 @@ atomic_dec_and_lock:				\n\
 	subl	$1, 1, $1			\n\
 	beq	$1, 2f				\n\
 	stl_c	$1, 0($16)			\n\
-	beq	$1, 3f				\n\
+	beq	$1, 4f				\n\
 	mb					\n\
 	clr	$0				\n\
 	ret					\n\
-3:	br	1b				\n\
-2:	lda	$27, atomic_dec_and_lock_1	\n\
+2:	br	$29, 3f				\n\
+3:	ldgp	$29, 0($29)			\n\
+	br	$atomic_dec_and_lock_1..ng	\n\
+	.subsection 2				\n\
+4:	br	1b				\n\
 	.end atomic_dec_and_lock");
-
-	/* FALLTHRU */
 
 static int __attribute__((unused))
 atomic_dec_and_lock_1(atomic_t *atomic, spinlock_t *lock)

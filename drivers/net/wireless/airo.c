@@ -3214,17 +3214,19 @@ static void del_airo_dev( struct net_device *dev ) {
 static int __devinit airo_pci_probe(struct pci_dev *pdev,
 				    const struct pci_device_id *pent)
 {
-	pdev->driver_data = init_airo_card(pdev->irq,
-					   pdev->resource[2].start, 0);
-	if (!pdev->driver_data) {
+	struct net_device *dev;
+
+	dev = init_airo_card(pdev->irq,	pdev->resource[2].start, 0);
+	if (!dev)
 		return -ENODEV;
-	}
+
+	pci_set_drvdata(pdev, dev);
 	return 0;
 }
 
 static void __devexit airo_pci_remove(struct pci_dev *pdev)
 {
-	stop_airo_card(pdev->driver_data, 1);
+	stop_airo_card(pci_get_drvdata(pdev), 1);
 }
 #endif
 

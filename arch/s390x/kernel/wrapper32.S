@@ -629,8 +629,10 @@ sys32_setfsgid16_wrapper:
 	.globl  sys32_llseek_wrapper 
 sys32_llseek_wrapper:
 	llgfr	%r2,%r2			# unsigned int
-	lgfr	%r3,%r3			# off_t
-	llgfr	%r4,%r4			# unsigned int
+	llgfr	%r3,%r3			# unsigned long
+	llgfr	%r4,%r4			# unsigned long
+	llgtr	%r5,%r5			# loff_t *
+	llgfr	%r6,%r6			# unsigned int
 	jg	sys_llseek		# branch to system call
 
 	.globl  sys32_getdents_wrapper 

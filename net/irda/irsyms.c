@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1997, 1999-2000 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *      
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -79,7 +80,6 @@ EXPORT_SYMBOL(irttp_dup);
 EXPORT_SYMBOL(irda_debug);
 #endif
 EXPORT_SYMBOL(irda_notify_init);
-EXPORT_SYMBOL(irda_lock);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(proc_irda);
 #endif
@@ -217,21 +217,6 @@ static void __exit irda_cleanup(void)
 
 	/* Remove middle layer */
 	irlmp_cleanup();
-}
-
-/*
- * Function irda_unlock (lock)
- *
- *    Unlock variable. Returns false if lock is already unlocked
- *
- */
-inline int irda_unlock(int *lock) 
-{
-	if (!test_and_clear_bit(0, (void *) lock))  {
-		printk("Trying to unlock already unlocked variable!\n");
-		return FALSE;
-        }
-	return TRUE;
 }
 
 /*

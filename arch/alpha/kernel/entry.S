@@ -1145,3 +1145,6 @@ sys_call_table:
 	.quad sys_mincore			/* 375 */
 	.quad sys_pciconfig_iobase
 	.quad sys_getdents64
+	.quad sys_gettid
+	.quad sys_readahead
+	.quad sys_ni_syscall			/* 380, sys_security */

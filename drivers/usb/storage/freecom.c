@@ -1,6 +1,6 @@
 /* Driver for Freecom USB/IDE adaptor
  *
- * $Id: freecom.c,v 1.15 2001/06/27 23:50:28 mdharm Exp $
+ * $Id: freecom.c,v 1.18 2001/11/04 13:01:17 mdharm Exp $
  *
  * Freecom v0.1:
  *
@@ -132,6 +132,12 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 		sg = (struct scatterlist *) srb->request_buffer;
 		for (i = 0; i < srb->use_sg; i++) {
 
+			US_DEBUGP("transfer_amount: %d and total_transferred: %d\n", transfer_amount, total_transferred);
+
+			/* End this if we're done */
+			if (transfer_amount == total_transferred)
+				break;
+
 			/* transfer the lesser of the next buffer or the
 			 * remaining data */
 			if (transfer_amount - total_transferred >= 
@@ -139,10 +145,12 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 				result = usb_stor_transfer_partial(us,
 						sg[i].address, sg[i].length);
 				total_transferred += sg[i].length;
-			} else
+			} else {
 				result = usb_stor_transfer_partial(us,
 						sg[i].address,
 						transfer_amount - total_transferred);
+				total_transferred += transfer_amount - total_transferred;
+			}
 
 			/* if we get an error, end the loop here */
 			if (result)
@@ -158,7 +166,7 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 	srb->result = result;
 }
 
-
+#if 0
 /* Write a value to an ide register. */
 static int
 freecom_ide_write (struct us_data *us, int reg, int value)
@@ -255,6 +263,7 @@ freecom_ide_read (struct us_data *us, int reg, int *value)
 
         return USB_STOR_TRANSPORT_GOOD;
 }
+#endif
 
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
@@ -470,13 +479,15 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         US_DEBUGP("Device indicates that it has %d bytes available\n",
                         le16_to_cpu (fst->Count));
 
-        /* Find the length we desire to read.  It is the lesser of the SCSI
-         * layer's requested length, and the length the device claims to
-         * have available. */
+        /* Find the length we desire to read. */
         length = usb_stor_transfer_length (srb);
         US_DEBUGP("SCSI requested %d\n", length);
-        if (length > le16_to_cpu (fst->Count))
-                length = le16_to_cpu (fst->Count);
+
+	/* verify that this amount is legal */
+	if (length > srb->request_bufflen) {
+		length = srb->request_bufflen;
+		US_DEBUGP("Truncating request to match buffer length: %d\n", length);
+	}
 
         /* What we do now depends on what direction the data is supposed to
          * move in. */
@@ -522,7 +533,6 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                 if (result != USB_STOR_TRANSPORT_GOOD)
                         return result;
 
-#if 1
                 US_DEBUGP("FCM: Waiting for status\n");
                 result = usb_stor_bulk_msg (us, fst, ipipe,
                                 FCM_PACKET_LENGTH, &partial);
@@ -540,7 +550,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
                         US_DEBUGP("Drive seems still hungry\n");
                         return USB_STOR_TRANSPORT_FAILED;
                 }
-#endif
+
                 US_DEBUGP("Transfer happy\n");
                 break;
 
@@ -570,8 +580,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 int
 freecom_init (struct us_data *us)
 {
-        int result, value;
-        int counter;
+        int result;
 	char buffer[33];
 
         /* Allocate a buffer for us.  The upper usb transport code will
@@ -591,42 +600,29 @@ freecom_init (struct us_data *us)
 	buffer[32] = '\0';
 	US_DEBUGP("String returned from FC init is: %s\n", buffer);
 
-        result = freecom_ide_write (us, 0x06, 0xA0);
-        if (result != USB_STOR_TRANSPORT_GOOD)
-                return result;
-        result = freecom_ide_write (us, 0x01, 0x00);
-        if (result != USB_STOR_TRANSPORT_GOOD)
-                return result;
+	/* Special thanks to the people at Freecom for providing me with
+	 * this "magic sequence", which they use in their Windows and MacOS
+	 * drivers to make sure that all the attached perhiperals are
+	 * properly reset.
+	 */
 
-        counter = 50;
-        do {
-                result = freecom_ide_read (us, 0x07, &value);
-                if (result != USB_STOR_TRANSPORT_GOOD)
-                        return result;
-                if (counter-- < 0) {
-                        US_DEBUGP("Timeout in freecom");
-                        return USB_STOR_TRANSPORT_ERROR;
-                }
-        } while ((value & 0x80) != 0);
+	/* send reset */
+	result = usb_control_msg(us->pusb_dev,
+			usb_sndctrlpipe(us->pusb_dev, 0),
+			0x4d, 0x40, 0x24d8, 0x0, NULL, 0x0, 3*HZ);
+	US_DEBUGP("result from activate reset is %d\n", result);
 
-        result = freecom_ide_write (us, 0x07, 0x08);
-        if (result != USB_STOR_TRANSPORT_GOOD)
-                return result;
+	/* wait 250ms */
+	mdelay(250);
 
-        counter = 50;
-        do {
-                result = freecom_ide_read (us, 0x07, &value);
-                if (result != USB_STOR_TRANSPORT_GOOD)
-                        return result;
-                if (counter-- < 0) {
-                        US_DEBUGP("Timeout in freecom");
-                        return USB_STOR_TRANSPORT_ERROR;
-                }
-        } while ((value & 0x80) != 0);
+	/* clear reset */
+	result = usb_control_msg(us->pusb_dev,
+			usb_sndctrlpipe(us->pusb_dev, 0),
+			0x4d, 0x40, 0x24f8, 0x0, NULL, 0x0, 3*HZ);
+	US_DEBUGP("result from clear reset is %d\n", result);
 
-        result = freecom_ide_write (us, 0x08, 0x08);
-        if (result != USB_STOR_TRANSPORT_GOOD)
-                return result;
+	/* wait 3 seconds */
+	mdelay(3 * 1000);
 
         return USB_STOR_TRANSPORT_GOOD;
 }

@@ -8,7 +8,7 @@
  */
 
 /* XXX use this temporary define for MP systems trying to INIT */
-#define SAL_MPINIT_WORKAROUND
+#undef SAL_MPINIT_WORKAROUND
 
 #ifndef _ASM_IA64_MCA_H
 #define _ASM_IA64_MCA_H
@@ -61,8 +61,6 @@ enum {
 	IA64_MCA_RENDEZ_CHECKIN_DONE	=	0x1
 };
 
-#define IA64_MAXCPUS	64	/* Need to do something about this */
-
 /* Information maintained by the MC infrastructure */
 typedef struct ia64_mc_info_s {
 	u64		imi_mca_handler;
@@ -71,7 +69,7 @@ typedef struct ia64_mc_info_s {
 	size_t		imi_monarch_init_handler_size;
 	u64		imi_slave_init_handler;
 	size_t		imi_slave_init_handler_size;
-	u8		imi_rendez_checkin[IA64_MAXCPUS];
+	u8		imi_rendez_checkin[NR_CPUS];
 
 } ia64_mc_info_t;
 
@@ -128,18 +126,22 @@ extern void ia64_slave_init_handler(void);
 extern void ia64_mca_rendez_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_wakeup_int_handler(int,void *,struct pt_regs *);
 extern void ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
-extern void ia64_log_print(int,int,prfunc_t);
+extern void ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
+extern void ia64_log_print(int,prfunc_t);
+extern void ia64_mca_cmc_vector_setup(void);
+extern void ia64_mca_check_errors( void );
+extern u64  ia64_log_get(int, prfunc_t);
 
 #define PLATFORM_CALL(fn, args)	printk("Platform call TBD\n")
 
 #undef	MCA_TEST
 
-#define IA64_MCA_DEBUG_INFO 1
+#undef IA64_MCA_DEBUG_INFO
 
 #if defined(IA64_MCA_DEBUG_INFO)
-# define IA64_MCA_DEBUG	printk
+# define IA64_MCA_DEBUG(fmt...)	printk(fmt)
 #else
-# define IA64_MCA_DEBUG
+# define IA64_MCA_DEBUG(fmt...)
 #endif
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_IA64_MCA_H */

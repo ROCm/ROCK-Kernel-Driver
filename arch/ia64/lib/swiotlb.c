@@ -398,7 +398,7 @@ swiotlb_map_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int d
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++) {
-		sg->orig_address = sg->address;
+		sg->page = sg->address;
 		if ((virt_to_phys(sg->address) & ~hwdev->dma_mask) != 0) {
 			sg->address = map_single(hwdev, sg->address, sg->length, direction);
 		}
@@ -419,9 +419,9 @@ swiotlb_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->orig_address != sg->address) {
+		if (sg->page != sg->address) {
 			unmap_single(hwdev, sg->address, sg->length, direction);
-			sg->address = sg->orig_address;
+			sg->address = sg->page;
 		} else if (direction == PCI_DMA_FROMDEVICE)
 			mark_clean(sg->address, sg->length);
 }
@@ -442,7 +442,7 @@ swiotlb_sync_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int 
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->orig_address != sg->address)
+		if (sg->page != sg->address)
 			sync_single(hwdev, sg->address, sg->length, direction);
 }
 

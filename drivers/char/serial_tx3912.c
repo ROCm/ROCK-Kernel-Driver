@@ -20,7 +20,7 @@
 #include <linux/console.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/pm.h>

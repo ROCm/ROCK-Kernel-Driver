@@ -138,8 +138,8 @@ show_registers(struct pt_regs * regs)
 	   register.  */
 	unsigned long usp = rdusp();
 
-	printk("IRP: %08lx SRP: %08lx DCCR: %08lx USP: %08lx MOF: %08lx    %s\n",
-	       regs->irp, regs->srp, regs->dccr, usp, regs->mof, print_tainted());
+	printk("IRP: %08lx SRP: %08lx DCCR: %08lx USP: %08lx MOF: %08lx\n",
+	       regs->irp, regs->srp, regs->dccr, usp, regs->mof );
 	printk(" r0: %08lx  r1: %08lx   r2: %08lx  r3: %08lx\n",
 	       regs->r0, regs->r1, regs->r2, regs->r3);
 	printk(" r4: %08lx  r5: %08lx   r6: %08lx  r7: %08lx\n",

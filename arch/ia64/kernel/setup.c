@@ -534,10 +534,13 @@ cpu_init (void)
 	/*
 	 * Initialize default control register to defer all speculative faults.  The
 	 * kernel MUST NOT depend on a particular setting of these bits (in other words,
-	 * the kernel must have recovery code for all speculative accesses).
+	 * the kernel must have recovery code for all speculative accesses).  Turn on
+	 * dcr.lc as per recommendation by the architecture team.  Most IA-32 apps
+	 * shouldn't be affected by this (moral: keep your ia32 locks aligned and you'll
+	 * be fine).
 	 */
 	ia64_set_dcr(  IA64_DCR_DM | IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
-		     | IA64_DCR_DA | IA64_DCR_DD);
+		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
 #ifndef CONFIG_SMP
 	ia64_set_fpu_owner(0);
 #endif

@@ -245,6 +245,13 @@ MODULE_PARM(pass_through, "i");
 MODULE_PARM(lml33dpath, "i");
 MODULE_PARM(video_nr, "i");
 
+static struct pci_device_id zr36067_pci_tbl[] = {
+	{ PCI_VENDOR_ID_ZORAN, PCI_DEVICE_ID_ZORAN_36057, 
+	  PCI_ANY_ID, PCI_ANY_ID,  0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, zr36067_pci_tbl);
+
 /* Anybody who uses more than four? */
 #define BUZ_MAX 4
 

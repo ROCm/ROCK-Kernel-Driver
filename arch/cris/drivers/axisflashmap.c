@@ -11,6 +11,9 @@
  * partition split defined below.
  *
  * $Log: axisflashmap.c,v $
+ * Revision 1.15  2001/10/19 12:41:04  jonashg
+ * Name of probe has changed in MTD.
+ *
  * Revision 1.14  2001/09/21 07:14:10  jonashg
  * Made root filesystem (cramfs) use mtdblock driver when booting from flash.
  *
@@ -237,7 +240,9 @@ init_axis_flash(void)
 	printk(KERN_NOTICE "Axis flash mapping: %x at %x\n",
 	       WINDOW_SIZE, FLASH_CACHED_ADDR);
 
-	mymtd = (struct mtd_info *)do_map_probe("cfi", &axis_map);
+#ifdef CONFIG_MTD_CFI
+	mymtd = (struct mtd_info *)do_map_probe("cfi_probe", &axis_map);
+#endif
 
 #ifdef CONFIG_MTD_AMDSTD
 	if (!mymtd) {

@@ -1,8 +1,8 @@
 /*
  * MMU fault handling support.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -16,7 +16,7 @@
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
-extern void die_if_kernel (char *, struct pt_regs *, long);
+extern void die (char *, struct pt_regs *, long);
 
 /*
  * This routine is analogous to expand_stack() but instead grows the
@@ -46,16 +46,15 @@ expand_backing_store (struct vm_area_struct *vma, unsigned long address)
 void
 ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs)
 {
+	int signal = SIGSEGV, code = SEGV_MAPERR;
+	struct vm_area_struct *vma, *prev_vma;
 	struct mm_struct *mm = current->mm;
 	struct exception_fixup fix;
-	struct vm_area_struct *vma, *prev_vma;
 	struct siginfo si;
-	int signal = SIGSEGV;
 	unsigned long mask;
 
 	/*
-	 * If we're in an interrupt or have no user
-	 * context, we must not take the fault..
+	 * If we're in an interrupt or have no user context, we must not take the fault..
 	 */
 	if (in_interrupt() || !mm)
 		goto no_context;
@@ -71,6 +70,8 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		goto check_expansion;
 
   good_area:
+	code = SEGV_ACCERR;
+
 	/* OK, we've got a good vm_area for this memory area.  Check the access permissions: */
 
 #	define VM_READ_BIT	0
@@ -89,12 +90,13 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	if ((vma->vm_flags & mask) != mask)
 		goto bad_area;
 
+  survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault, make
 	 * sure we exit gracefully rather than endlessly redo the
 	 * fault.
 	 */
-	switch (handle_mm_fault(mm, vma, address, mask) != 0) {
+	switch (handle_mm_fault(mm, vma, address, mask)) {
 	      case 1:
 		++current->min_flt;
 		break;
@@ -147,7 +149,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	if (user_mode(regs)) {
 		si.si_signo = signal;
 		si.si_errno = 0;
-		si.si_code = SI_KERNEL;
+		si.si_code = code;
 		si.si_addr = (void *) address;
 		force_sig_info(signal, &si, current);
 		return;
@@ -174,17 +176,29 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	}
 
 	/*
-	 * Oops. The kernel tried to access some bad page. We'll have
-	 * to terminate things with extreme prejudice.
+	 * Oops. The kernel tried to access some bad page. We'll have to terminate things
+	 * with extreme prejudice.
 	 */
-	printk(KERN_ALERT "Unable to handle kernel paging request at "
-	       "virtual address %016lx\n", address);
-	die_if_kernel("Oops", regs, isr);
+	bust_spinlocks(1);
+
+	if (address < PAGE_SIZE)
+		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
+	else
+		printk(KERN_ALERT "Unable to handle kernel paging request at "
+		       "virtual address %016lx\n", address);
+	die("Oops", regs, isr);
+	bust_spinlocks(0);
 	do_exit(SIGKILL);
 	return;
 
   out_of_memory:
 	up_read(&mm->mmap_sem);
+	if (current->pid == 1) {
+		current->policy |= SCHED_YIELD;
+		schedule();
+		down_read(&mm->mmap_sem);
+		goto survive;
+	}
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);

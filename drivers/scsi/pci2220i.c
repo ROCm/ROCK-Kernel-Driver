@@ -2924,7 +2924,7 @@ int Pci2220i_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
 	return 0;
 	}
 
-MODULE_LICENSE("BSD without advertising clause");
+MODULE_LICENSE("Dual BSD/GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = PCI2220I;

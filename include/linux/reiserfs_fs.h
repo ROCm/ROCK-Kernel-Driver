@@ -19,6 +19,7 @@
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
 #include <asm/hardirq.h>
+#include <linux/proc_fs.h>
 #endif
 
 /*
@@ -1908,6 +1909,67 @@ int read_old_super_block (struct super_block * s, int size);*/
 struct super_block * reiserfs_read_super (struct super_block * s, void * data, int silent);
 int reiserfs_statfs (struct super_block * s, struct statfs * buf);
 
+/* procfs.c */
+
+#if defined( CONFIG_PROC_FS ) && defined( CONFIG_REISERFS_PROC_INFO )
+#define REISERFS_PROC_INFO
+#else
+#undef REISERFS_PROC_INFO
+#endif
+
+int reiserfs_proc_info_init( struct super_block *sb );
+int reiserfs_proc_info_done( struct super_block *sb );
+struct proc_dir_entry *reiserfs_proc_register( struct super_block *sb, 
+											   char *name, read_proc_t *func );
+void reiserfs_proc_unregister( struct super_block *sb, const char *name );
+struct proc_dir_entry *reiserfs_proc_register_global( char *name, 
+													  read_proc_t *func );
+void reiserfs_proc_unregister_global( const char *name );
+int reiserfs_proc_info_global_init( void );
+int reiserfs_proc_info_global_done( void );
+int reiserfs_proc_tail( int len, char *buffer, char **start, 
+						off_t offset, int count, int *eof );
+int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
+									 int count, int *eof, void *data );
+int reiserfs_version_in_proc( char *buffer, char **start, off_t offset,
+							  int count, int *eof, void *data );
+int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
+							int count, int *eof, void *data );
+int reiserfs_per_level_in_proc( char *buffer, char **start, off_t offset,
+								int count, int *eof, void *data );
+int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
+								int count, int *eof, void *data );
+int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
+									int count, int *eof, void *data );
+int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
+							 int count, int *eof, void *data );
+int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
+							  int count, int *eof, void *data );
+
+#if defined( REISERFS_PROC_INFO )
+
+#define PROC_EXP( e )   e
+
+#define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
+#define __PINFO( sb ) ( sb ) -> u.reiserfs_sb.s_proc_info_data
+#define PROC_INFO_MAX( sb, field, value )								\
+    __PINFO( sb ).field =												\
+        MAX( ( sb ) -> u.reiserfs_sb.s_proc_info_data.field, value )
+#define PROC_INFO_INC( sb, field ) ( ++ ( __PINFO( sb ).field ) )
+#define PROC_INFO_ADD( sb, field, val ) ( __PINFO( sb ).field += ( val ) )
+#define PROC_INFO_BH_STAT( sb, bh, level )							\
+    PROC_INFO_INC( sb, sbk_read_at[ ( level ) ] );						\
+    PROC_INFO_ADD( sb, free_at[ ( level ) ], B_FREE_SPACE( bh ) );	\
+    PROC_INFO_ADD( sb, items_at[ ( level ) ], B_NR_ITEMS( bh ) )
+#else
+#define PROC_EXP( e )
+#define VOID_V ( ( void ) 0 )
+#define PROC_INFO_MAX( sb, field, value ) VOID_V
+#define PROC_INFO_INC( sb, field ) VOID_V
+#define PROC_INFO_ADD( sb, field, val ) VOID_V
+#define PROC_INFO_BH_STAT( p_s_sb, p_s_bh, n_node_level ) VOID_V
+#endif
+
 /* dir.c */
 extern struct inode_operations reiserfs_dir_inode_operations;
 extern struct file_operations reiserfs_dir_operations;
@@ -1929,8 +1991,8 @@ int get_new_buffer (struct reiserfs_transaction_handle *th, struct buffer_head *
 /* buffer2.c */
 struct buffer_head * reiserfs_getblk (kdev_t n_dev, int n_block, int n_size);
 void wait_buffer_until_released (const struct buffer_head * bh);
-struct buffer_head * reiserfs_bread (kdev_t n_dev, int n_block, int n_size);
-
+struct buffer_head * reiserfs_bread (struct super_block *super, int n_block, 
+				     int n_size);
 
 /* fix_nodes.c */
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s);

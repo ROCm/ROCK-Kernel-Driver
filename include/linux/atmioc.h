@@ -27,7 +27,9 @@
 #define ATMIOC_SARPRV_END 0x7f
 #define ATMIOC_ITF	  0x80 /* Interface ioctls, globally unique */
 #define ATMIOC_ITF_END	  0x8f
-/* 0x90-0xbf: Reserved for future use */
+#define ATMIOC_BACKEND	  0x90 /* ATM generic backend ioctls, u. per backend */
+#define ATMIOC_BACKEND_END 0xaf
+/* 0xb0-0xbf: Reserved for future use */
 #define ATMIOC_AREQUIPA	  0xc0 /* Application requested IP over ATM, glob. u. */
 #define ATMIOC_LANE	  0xd0 /* LAN Emulation, globally unique */
 #define ATMIOC_MPOA       0xd8 /* MPOA, globally unique */

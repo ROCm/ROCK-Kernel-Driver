@@ -158,3 +158,7 @@ static void __exit pppox_exit(void)
 
 module_init(pppox_init);
 module_exit(pppox_exit);
+
+MODULE_AUTHOR("Michal Ostrowski <mostrows@speakeasy.net>");
+MODULE_DESCRIPTION("PPP over Ethernet driver (generic socket layer)");
+MODULE_LICENSE("GPL");

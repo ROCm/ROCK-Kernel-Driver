@@ -1746,7 +1746,7 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
         }
 
         /* Record driver data for later use */
-        pdev->driver_data = card;
+        pci_set_drvdata(pdev, card);
 
         /* Remainder of card setup */
         fst_init_card ( card );
@@ -1785,7 +1785,7 @@ fst_remove_one ( struct pci_dev *pdev )
         struct fst_card_info *card;
         int i;
 
-        card = pdev->driver_data;
+        card = pci_get_drvdata(pdev);
 
         for ( i = 0 ; i < card->nports ; i++ )
         {

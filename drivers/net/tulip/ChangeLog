@@ -1,3 +1,24 @@
+2001-11-06  Richard Mortimer  <richm@oldelvet.netscapeonline.co.uk>
+
+	* tulip_core.c:  Correct set of values to mask out of csr0,
+	for DM9102A chips.  Limit burst/alignment of DM9102A chips
+	on Sparcs.
+
+2001-11-06  Jun Sun  <jsun@mvista.com>
+
+	* tulip_core.c:  Support finding MAC address on
+	two MIPS boards, DDB5476 and DDB5477.
+
+2001-11-06  Kevin B. Hendricks  <khendricks@ivey.uwo.ca>
+
+	* Makefile, tulip.h, tulip_core.c, pnic2.c, 21142.c:
+	Fixes for PNIC II support.
+
+2001-11-06  David S. Miller  <davem@redhat.com>
+
+	* tulip_core.c: Support reading MAC address from
+	Sparc OBP property local-mac-address.
+
 2001-07-17  Erik A. Hendriks  <hendriks@lanl.gov>
 
 	* 21142.c: Merge fix from tulip.c 0.92w which prevents the

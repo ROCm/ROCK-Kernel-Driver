@@ -190,7 +190,7 @@ typedef struct format5_label
 	ds5ext_t DS5EXTAV[7];     /* seven available extents                 */
 	__u8 DS5FMTID;            /* format identifier                       */
 	ds5ext_t DS5MAVET[18];    /* eighteen available extents              */
-	cchhb_t DS5PTRDS[5];      /* pointer to next format5 DSCB            */
+	cchhb_t DS5PTRDS;         /* pointer to next format5 DSCB            */
 } __attribute__ ((packed)) format5_label_t;
 
 

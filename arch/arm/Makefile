@@ -39,11 +39,12 @@ tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
 tune-$(CONFIG_CPU_ARM710)	:=-mtune=arm710
 tune-$(CONFIG_CPU_ARM720T)	:=-mtune=arm7tdmi
 tune-$(CONFIG_CPU_ARM920T)	:=-mtune=arm9tdmi
+tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float
-AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu
+AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float
 
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	 = armo
@@ -120,6 +121,10 @@ ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
 MACHINE		 = integrator
 endif
 
+ifeq ($(CONFIG_ARCH_CAMELOT),y)
+MACHINE          = epxa10db
+endif
+
 ifeq ($(CONFIG_ARCH_CLPS711X),y)
 TEXTADDR	 = 0xc0028000
 MACHINE		 = clps711x
@@ -150,16 +155,21 @@ endif
 
 HEAD		:= arch/arm/kernel/head-$(PROCESSOR).o \
 		   arch/arm/kernel/init_task.o
-SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe \
-		   arch/arm/fastfpe
+SUBDIRS		+= arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe
 CORE_FILES	:= arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
 LIBS		:= arch/arm/lib/lib.a $(LIBS)
 
 ifeq ($(CONFIG_FPE_NWFPE),y)
 LIBS		:= arch/arm/nwfpe/math-emu.o $(LIBS)
 endif
+
+# Only include fastfpe if it is part of the kernel tree.
+FASTFPE		:= arch/arm/fastfpe
+ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
+SUBDIRS		+= $(FASTFPE)
 ifeq ($(CONFIG_FPE_FASTFPE),y)
 LIBS		:= arch/arm/fastfpe/fast-math-emu.o $(LIBS)
+endif
 endif
 
 ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
@@ -213,7 +223,8 @@ archdep: scripts/mkdep archsymlinks
 	@$(MAKETOOLS) dep
 	@$(MAKEBOOT) dep
 
-maketools: checkbin
+# we need version.h
+maketools: checkbin include/linux/version.h
 	@$(MAKETOOLS) all
 
 # Ensure this is ld "2.9.4" or later

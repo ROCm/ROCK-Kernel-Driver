@@ -21,6 +21,8 @@ extern unsigned long pci_mem_start;
 
 void pcibios_set_master(struct pci_dev *dev);
 void pcibios_penalize_isa_irq(int irq);
+struct irq_routing_table *pcibios_get_irq_routing_table(void);
+int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 /* Dynamic DMA mapping stuff.
  * i386 has everything mapped statically.
@@ -72,6 +74,7 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
+	flush_write_buffers();
 	return virt_to_bus(ptr);
 }
 
@@ -133,22 +136,23 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
-
-	/*
-	 * temporary 2.4 hack
-	 */
-	for (i = 0; i < nents; i++ ) {
-		if (sg[i].address && sg[i].page)
-			BUG();
-		else if (!sg[i].address && !sg[i].page)
-			BUG();
-
-		if (sg[i].address)
-			sg[i].dma_address = virt_to_bus(sg[i].address);
-		else
-			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
-	}
-
+ 
+ 	/*
+ 	 * temporary 2.4 hack
+ 	 */
+ 	for (i = 0; i < nents; i++ ) {
+ 		if (sg[i].address && sg[i].page)
+ 			BUG();
+ 		else if (!sg[i].address && !sg[i].page)
+ 			BUG();
+ 
+ 		if (sg[i].address)
+ 			sg[i].dma_address = virt_to_bus(sg[i].address);
+ 		else
+ 			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
+ 	}
+ 
+	flush_write_buffers();
 	return nents;
 }
 
@@ -179,7 +183,7 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
-	/* Nothing to do */
+	flush_write_buffers();
 }
 
 /* Make physical memory consistent for a set of streaming
@@ -194,7 +198,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
-	/* Nothing to do */
+	flush_write_buffers();
 }
 
 /* Return whether the given PCI device DMA address mask can
@@ -242,7 +246,7 @@ pci_dac_dma_to_offset(struct pci_dev *pdev, dma64_addr_t dma_addr)
 static __inline__ void
 pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len, int direction)
 {
-	/* Nothing to do. */
+	flush_write_buffers();
 }
 
 /* These macros should be used after a pci_map_sg call has been done

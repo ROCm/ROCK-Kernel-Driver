@@ -95,6 +95,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th, unsigned long 
   RFALSE(!s, "vs-4060: trying to free block on nonexistent device");
   RFALSE(is_reusable (s, block, 1) == 0, "vs-4070: can not free such block");
 
+  PROC_INFO_INC( s, free_block );
+
   rs = SB_DISK_SUPER_BLOCK (s);
   sbh = SB_BUFFER_WITH_SB (s);
   apbh = SB_AP_BITMAP (s);
@@ -136,10 +138,14 @@ static int find_forward (struct super_block * s, int * bmap_nr, int * offset, in
   unsigned long block_to_try = 0;
   unsigned long next_block_to_try = 0 ;
 
-  for (i = *bmap_nr; i < SB_BMAP_NR (s); i ++, *offset = 0) {
+  PROC_INFO_INC( s, find_forward.call );
+
+  for (i = *bmap_nr; i < SB_BMAP_NR (s); i ++, *offset = 0, 
+	       PROC_INFO_INC( s, find_forward.bmap )) {
     /* get corresponding bitmap block */
     bh = SB_AP_BITMAP (s)[i];
     if (buffer_locked (bh)) {
+	PROC_INFO_INC( s, find_forward.wait );
         __wait_on_buffer (bh);
     }
 retry:
@@ -174,17 +180,21 @@ retry:
 	  int new_i ;
 	  get_bit_address (s, next_block_to_try, &new_i, offset);
 
+	  PROC_INFO_INC( s, find_forward.in_journal_hint );
+
 	  /* block is not in this bitmap. reset i and continue
 	  ** we only reset i if new_i is in a later bitmap.
 	  */
 	  if (new_i > i) {
 	    i = (new_i - 1 ); /* i gets incremented by the for loop */
+	    PROC_INFO_INC( s, find_forward.in_journal_out );
 	    continue ;
 	  }
 	} else {
 	  /* no suggestion was made, just try the next block */
 	  *offset = j+1 ;
 	}
+	PROC_INFO_INC( s, find_forward.retry );
 	goto retry ;
       }
     }

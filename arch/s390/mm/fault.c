@@ -159,13 +159,16 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/*
 	 * Check whether we have a user MM in the first place.
 	 */
-        if (in_interrupt() || !mm)
+        if (in_interrupt() || !mm || !(regs->psw.mask & _PSW_IO_MASK_BIT))
                 goto no_context;
 
 	/*
 	 * When we get here, the fault happened in the current
-	 * task's user address space, so we search the VMAs
+	 * task's user address space, so we can switch on the
+	 * interrupts again and then search the VMAs
 	 */
+
+	__sti();
 
         down_read(&mm->mmap_sem);
 
@@ -415,7 +418,11 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
                                          "  la   2,0(%0)\n"
                                          "  sacf 512\n"
                                          "  ic   2,0(2)\n"
-                                         "  sacf 0"
+					 "0:sacf 0\n"
+					 ".section __ex_table,\"a\"\n"
+					 "  .align 4\n"
+					 "  .long  0b,0b\n"
+					 ".previous"
                                          : : "a" (address) : "2" );
 
                         return;
@@ -513,7 +520,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
          * external interrupt. 
 	 */
 	subcode = S390_lowcore.cpu_addr;
-	if ((subcode & 0xff00) != 0x0600)
+	if ((subcode & 0xff00) != 0x0200)
 		return;
 
 	/*
@@ -522,6 +529,13 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 	tsk = (struct task_struct *)
 		(*((unsigned long *) __LC_PFAULT_INTPARM) - THREAD_SIZE);
 	
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
 	if (subcode & 0x0080) {
 		/* signal bit is set -> a page has been swapped in by VM */
 		qp = (wait_queue_head_t *)

@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.21 2001/10/01 14:45:35 bjornw Exp $
+/* $Id: setup.c,v 1.22 2001/10/23 17:42:58 pkj Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -202,31 +202,57 @@ static struct cpu_info {
 } cpu_info[] = {
 	/* The first four models will never ever run this code and are
 	   only here for display.  */
-	{ "ETRAX 1",   0, 0 },
-	{ "ETRAX 2",   0, 0 },
-	{ "ETRAX 3",   0, HAS_TOKENRING },
-	{ "ETRAX 4",   0, HAS_TOKENRING | HAS_SCSI },
-	{ "Unknown",   0, 0 },
-	{ "Unknown",   0, 0 },
-	{ "Unknown",   0, 0 },
-	{ "Simulator",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
-	{ "ETRAX 100",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_IRQ_BUG },
-	{ "ETRAX 100",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
-	{ "ETRAX 100LX",  8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU | HAS_MMU_BUG },
+	{ "ETRAX 1",         0, 0 },
+	{ "ETRAX 2",         0, 0 },
+	{ "ETRAX 3",         0, HAS_TOKENRING },
+	{ "ETRAX 4",         0, HAS_TOKENRING | HAS_SCSI },
+	{ "Unknown",         0, 0 },
+	{ "Unknown",         0, 0 },
+	{ "Unknown",         0, 0 },
+	{ "Simulator",       8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
+	{ "ETRAX 100",       8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_IRQ_BUG },
+	{ "ETRAX 100",       8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA },
+	{ "ETRAX 100LX",     8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU | HAS_MMU_BUG },
 	{ "ETRAX 100LX v2",  8, HAS_ETHERNET100 | HAS_SCSI | HAS_ATA | HAS_USB | HAS_MMU },
-	{ "Unknown",   0, 0 },
+	{ "Unknown",         0, 0 }  /* This entry MUST be the last */
 };
 
 /*
- * BUFFER is PAGE_SIZE bytes long.
+ * get_cpuinfo - Get information on one CPU for use by the procfs.
+ *
+ *	Prints info on the next CPU into buffer.  Beware, doesn't check for
+ *	buffer overflow.  Current implementation of procfs assumes that the
+ *	resulting data is <= 1K.
+ *
+ *	BUFFER is PAGE_SIZE - 1K bytes long.
+ *
+ * Args:
+ *	buffer	-- you guessed it, the data buffer
+ *	cpu_np	-- Input: next cpu to get (start at 0).  Output: Updated.
+ *
+ *	Returns number of bytes written to buffer.
  */
-int get_cpuinfo(char *buffer)
+int get_cpuinfo(char *buffer, unsigned *cpu_np)
 {
 	int revision;
+ 	struct cpu_info *info;
+	unsigned n;
 
 	/* read the version register in the CPU and print some stuff */
 
 	revision = rdvr();
+
+	if (revision < 0 || revision >= sizeof cpu_info/sizeof *cpu_info) {
+		info = &cpu_info[sizeof cpu_info/sizeof *cpu_info - 1];
+	} else
+		info = &cpu_info[revision];
+
+  	/* No SMP at the moment, so just toggle 0/1 */
+	n = *cpu_np;
+	*cpu_np = 1;
+	if (n != 0) {
+		return (0);
+	}
 
 	return sprintf(buffer,
 		       "cpu\t\t: CRIS\n"
@@ -244,16 +270,16 @@ int get_cpuinfo(char *buffer)
 		       "bogomips\t: %lu.%02lu\n",
 
 		       revision,
-		       cpu_info[revision].model,
-		       cpu_info[revision].cache,
-		       cpu_info[revision].flags & HAS_FPU ? "yes" : "no",
-		       cpu_info[revision].flags & HAS_MMU ? "yes" : "no",
-		       cpu_info[revision].flags & HAS_MMU_BUG ? "yes" : "no",
-		       cpu_info[revision].flags & HAS_ETHERNET100 ? "10/100" : "10",
-		       cpu_info[revision].flags & HAS_TOKENRING ? "4/16 Mbps" : "no",
-		       cpu_info[revision].flags & HAS_SCSI ? "yes" : "no",
-		       cpu_info[revision].flags & HAS_ATA ? "yes" : "no",
-		       cpu_info[revision].flags & HAS_USB ? "yes" : "no",
+		       info->model,
+		       info->cache,
+		       info->flags & HAS_FPU ? "yes" : "no",
+		       info->flags & HAS_MMU ? "yes" : "no",
+		       info->flags & HAS_MMU_BUG ? "yes" : "no",
+		       info->flags & HAS_ETHERNET100 ? "10/100" : "10",
+		       info->flags & HAS_TOKENRING ? "4/16 Mbps" : "no",
+		       info->flags & HAS_SCSI ? "yes" : "no",
+		       info->flags & HAS_ATA ? "yes" : "no",
+		       info->flags & HAS_USB ? "yes" : "no",
 		       (loops_per_jiffy * HZ + 500) / 500000,
 		       ((loops_per_jiffy * HZ + 500) / 5000) % 100);
 }

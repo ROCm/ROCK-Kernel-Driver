@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1997, 1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -102,10 +103,6 @@ extern const char *irlsap_state[];
 void irlmp_watchdog_timer_expired(void *data);
 void irlmp_discovery_timer_expired(void *data);
 void irlmp_idle_timer_expired(void *data);
-
-void irlmp_next_station_state(IRLMP_STATE state);
-void irlmp_next_lsap_state(struct lsap_cb *self, LSAP_STATE state);
-void irlmp_next_lap_state(struct lap_cb *self, IRLMP_STATE state);
 
 void irlmp_do_lap_event(struct lap_cb *self, IRLMP_EVENT event, 
 			struct sk_buff *skb);

@@ -217,6 +217,7 @@ static int __devinit serial_register (struct pci_dev *dev,
 		if (get_pci_port (dev, board, &serial_req, k))
 			break;
 		serial_req.flags = ASYNC_SKIP_TEST | ASYNC_AUTOPROBE;
+		serial_req.baud_base = base_baud;
 		line = register_serial (&serial_req);
 		if (line < 0) {
 			printk (KERN_DEBUG

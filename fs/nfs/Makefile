@@ -9,8 +9,8 @@
 
 O_TARGET := nfs.o
 
-obj-y    := inode.o file.o read.o write.o dir.o symlink.o proc.o \
-	    nfs2xdr.o flushd.o unlink.o
+obj-y    := dir.o file.o flushd.o inode.o nfs2xdr.o pagelist.o proc.o \
+	    read.o symlink.o unlink.o write.o
 
 obj-$(CONFIG_ROOT_NFS) += nfsroot.o mount_clnt.o      
 obj-$(CONFIG_NFS_V3) += nfs3proc.o nfs3xdr.o

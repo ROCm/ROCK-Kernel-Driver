@@ -36,13 +36,18 @@ static struct atm_dev *alloc_atm_dev(const char *type)
 	if (!dev) return NULL;
 	memset(dev,0,sizeof(*dev));
 	dev->type = type;
-	dev->prev = last_dev;
 	dev->signal = ATM_PHY_SIG_UNKNOWN;
 	dev->link_rate = ATM_OC3_PCR;
 	dev->next = NULL;
+
+	spin_lock(&atm_dev_lock);
+
+	dev->prev = last_dev;
+
 	if (atm_devs) last_dev->next = dev;
 	else atm_devs = dev;
 	last_dev = dev;
+	spin_unlock(&atm_dev_lock);
 	return dev;
 }
 

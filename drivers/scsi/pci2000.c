@@ -858,7 +858,7 @@ int Pci2000_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
 	}
 
 
-MODULE_LICENSE("BSD without advertisement clause");
+MODULE_LICENSE("Dual BSD/GPL");
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = PCI2000;
 

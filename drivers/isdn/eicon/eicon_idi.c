@@ -1,4 +1,4 @@
-/* $Id: eicon_idi.c,v 1.41.6.3 2001/09/23 22:24:37 kai Exp $
+/* $Id: eicon_idi.c,v 1.41.6.4 2001/11/06 20:58:29 kai Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
  * IDI interface 
@@ -25,7 +25,7 @@
 
 #undef EICON_FULL_SERVICE_OKTETT
 
-char *eicon_idi_revision = "$Revision: 1.41.6.3 $";
+char *eicon_idi_revision = "$Revision: 1.41.6.4 $";
 
 eicon_manifbuf *manbuf;
 
@@ -3119,8 +3119,8 @@ eicon_idi_manage(eicon_card *card, eicon_manifbuf *mb)
 			return(ret); 
 		}
 
-	        timeout = jiffies + 50;
-        	while (timeout > jiffies) {
+	        timeout = jiffies + HZ / 2;
+        	while (time_before(jiffies, timeout)) {
 	                if (chan->e.B2Id) break;
         	        SLEEP(10);
 	        }
@@ -3181,8 +3181,8 @@ eicon_idi_manage(eicon_card *card, eicon_manifbuf *mb)
 
         eicon_schedule_tx(card);
 
-        timeout = jiffies + 50;
-        while (timeout > jiffies) {
+        timeout = jiffies + HZ / 2;
+        while (time_before(jiffies, timeout)) {
                 if (chan->fsm_state) break;
                 SLEEP(10);
         }

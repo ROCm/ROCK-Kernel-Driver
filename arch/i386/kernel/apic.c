@@ -575,7 +575,6 @@ static inline void apic_pm_init2(void) { }
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
-	int needs_pm = 0;
 	extern void get_cpu_vendor(struct cpuinfo_x86*);
 
 	/* Workaround for us being called before identify_cpu(). */
@@ -608,7 +607,6 @@ static int __init detect_init_APIC (void)
 			l &= ~MSR_IA32_APICBASE_BASE;
 			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 			wrmsr(MSR_IA32_APICBASE, l, h);
-			needs_pm = 1;
 		}
 	}
 	/*
@@ -628,8 +626,7 @@ static int __init detect_init_APIC (void)
 
 	printk("Found and enabled local APIC!\n");
 
-	if (needs_pm)
-		apic_pm_init1();
+	apic_pm_init1();
 
 	return 0;
 

@@ -108,10 +108,18 @@ void reiserfs_put_super (struct super_block * s)
   print_statistics (s);
 
   if (s->u.reiserfs_sb.s_kmallocs != 0) {
-    reiserfs_warning ("vs-2004: reiserfs_put_super: aloocated memory left %d\n",
+    reiserfs_warning ("vs-2004: reiserfs_put_super: allocated memory left %d\n",
 		      s->u.reiserfs_sb.s_kmallocs);
   }
 
+  reiserfs_proc_unregister( s, "journal" );
+  reiserfs_proc_unregister( s, "oidmap" );
+  reiserfs_proc_unregister( s, "on-disk-super" );
+  reiserfs_proc_unregister( s, "bitmap" );
+  reiserfs_proc_unregister( s, "per-level" );
+  reiserfs_proc_unregister( s, "super" );
+  reiserfs_proc_unregister( s, "version" );
+  reiserfs_proc_info_done( s );
   return;
 }
 
@@ -294,11 +302,11 @@ static int read_bitmaps (struct super_block * s)
        labeling scheme currently used will have enough space. Then we
        need one block for the super.  -Hans */
     bmp = (REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize) + 1;	/* first of bitmap blocks */
-    SB_AP_BITMAP (s)[0] = reiserfs_bread (s->s_dev, bmp, s->s_blocksize);
+    SB_AP_BITMAP (s)[0] = reiserfs_bread (s, bmp, s->s_blocksize);
     if(!SB_AP_BITMAP(s)[0])
 	return 1;
     for (i = 1, bmp = dl = s->s_blocksize * 8; i < sb_bmap_nr(rs); i ++) {
-	SB_AP_BITMAP (s)[i] = reiserfs_bread (s->s_dev, bmp, s->s_blocksize);
+	SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp, s->s_blocksize);
 	if (!SB_AP_BITMAP (s)[i])
 	    return 1;
 	bmp += dl;
@@ -321,7 +329,7 @@ static int read_old_bitmaps (struct super_block * s)
   memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
 
   for (i = 0; i < sb_bmap_nr(rs); i ++) {
-    SB_AP_BITMAP (s)[i] = reiserfs_bread (s->s_dev, bmp1 + i, s->s_blocksize);
+    SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp1 + i, s->s_blocksize);
     if (!SB_AP_BITMAP (s)[i])
       return 1;
   }
@@ -383,7 +391,7 @@ static int read_super_block (struct super_block * s, int size, int offset)
     if (s->s_blocksize != size)
 	set_blocksize (s->s_dev, s->s_blocksize);
 
-    bh = reiserfs_bread (s->s_dev, offset / s->s_blocksize, s->s_blocksize);
+    bh = reiserfs_bread (s, offset / s->s_blocksize, s->s_blocksize);
     if (!bh) {
 	printk("read_super_block: "
                 "bread failed (dev %s, block %d, size %d)\n",
@@ -593,7 +601,6 @@ int function2code (hashf_t func)
     return 0;
 }
 
-
 //
 // a portion of this function, particularly the VFS interface portion,
 // was derived from minix or ext2's analog and evolved as the
@@ -746,6 +753,14 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	}
     }
 
+    reiserfs_proc_info_init( s );
+    reiserfs_proc_register( s, "version", reiserfs_version_in_proc );
+    reiserfs_proc_register( s, "super", reiserfs_super_in_proc );
+    reiserfs_proc_register( s, "per-level", reiserfs_per_level_in_proc );
+    reiserfs_proc_register( s, "bitmap", reiserfs_bitmap_in_proc );
+    reiserfs_proc_register( s, "on-disk-super", reiserfs_on_disk_super_in_proc );
+    reiserfs_proc_register( s, "oidmap", reiserfs_oidmap_in_proc );
+    reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
     init_waitqueue_head (&(s->u.reiserfs_sb.s_wait));
 
     printk("%s\n", reiserfs_get_version_string()) ;
@@ -800,6 +815,9 @@ static DECLARE_FSTYPE_DEV(reiserfs_fs_type,"reiserfs",reiserfs_read_super);
 //
 static int __init init_reiserfs_fs (void)
 {
+	reiserfs_proc_info_global_init();
+	reiserfs_proc_register_global( "version", 
+				       reiserfs_global_version_in_proc );
         return register_filesystem(&reiserfs_fs_type);
 }
 
@@ -813,6 +831,8 @@ EXPORT_NO_SYMBOLS;
 //
 static void __exit exit_reiserfs_fs(void)
 {
+	reiserfs_proc_unregister_global( "version" );
+	reiserfs_proc_info_global_done();
         unregister_filesystem(&reiserfs_fs_type);
 }
 

@@ -2372,7 +2372,7 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 	ohci->regs = mem_base;   
 
 	ohci->ohci_dev = dev;
-	dev->driver_data = ohci;
+	pci_set_drvdata(dev, ohci);
  
 	INIT_LIST_HEAD (&ohci->ohci_hcd_list);
 	list_add (&ohci->ohci_hcd_list, &ohci_hcd_list);
@@ -2411,7 +2411,7 @@ static void hc_release_ohci (ohci_t * ohci)
 		free_irq (ohci->irq, ohci);
 		ohci->irq = -1;
 	}
-	ohci->ohci_dev->driver_data = 0;
+	pci_set_drvdata(ohci->ohci_dev, NULL);
 
 	usb_deregister_bus (ohci->bus);
 	usb_free_bus (ohci->bus);
@@ -2600,7 +2600,7 @@ ohci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 static void __devexit
 ohci_pci_remove (struct pci_dev *dev)
 {
-	ohci_t		*ohci = (ohci_t *) dev->driver_data;
+	ohci_t		*ohci = pci_get_drvdata(dev);
 
 	dbg ("remove %s controller usb-%s%s%s",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
@@ -2636,7 +2636,7 @@ ohci_pci_remove (struct pci_dev *dev)
 static int
 ohci_pci_suspend (struct pci_dev *dev, u32 state)
 {
-	ohci_t			*ohci = (ohci_t *) dev->driver_data;
+	ohci_t			*ohci = pci_get_drvdata(dev);
 	unsigned long		flags;
 	u16 cmd;
 
@@ -2715,7 +2715,7 @@ ohci_pci_suspend (struct pci_dev *dev, u32 state)
 static int
 ohci_pci_resume (struct pci_dev *dev)
 {
-	ohci_t		*ohci = (ohci_t *) dev->driver_data;
+	ohci_t		*ohci = pci_get_drvdata(dev);
 	int		temp;
 	unsigned long	flags;
 

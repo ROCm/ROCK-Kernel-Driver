@@ -9,7 +9,7 @@
  * in <asm/page.h> (currently 8192).
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 2000, Goutham Rao <goutham.rao@intel.com>
  */
 
@@ -164,11 +164,6 @@ extern void __flush_tlb_all (void);
 #else
 # define flush_tlb_all()	__flush_tlb_all()
 #endif
-
-/*
- * Serialize usage of ptc.g:
- */
-extern spinlock_t ptcg_lock;
 
 /*
  * Flush a specified user mapping

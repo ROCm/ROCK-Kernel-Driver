@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.34 2001/10/01 14:45:03 bjornw Exp $
+/* $Id: entry.S,v 1.35 2001/10/30 17:10:15 bjornw Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,9 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.35  2001/10/30 17:10:15  bjornw
+ *  Add some syscalls
+ *
  *  Revision 1.34  2001/10/01 14:45:03  bjornw
  *  Removed underscores and added register prefixes
  *
@@ -981,6 +984,9 @@ sys_call_table:
 	.long SYMBOL_NAME(sys_getdents64)       /* 220 */
 	.long SYMBOL_NAME(sys_fcntl64)
 	.long SYMBOL_NAME(sys_ni_syscall)	/* reserved for TUX */
+        .long SYMBOL_NAME(sys_ni_syscall)       /* Reserved for Security */
+        .long SYMBOL_NAME(sys_gettid)
+        .long SYMBOL_NAME(sys_readahead)        /* 225 */
 
         /*
          * NOTE!! This doesn't have to be exact - we just have
@@ -989,7 +995,7 @@ sys_call_table:
          * been shrunk every time we add a new system call.
          */
 
-	.rept NR_syscalls-222
+	.rept NR_syscalls-(.-sys_call_table)/4
 		.long SYMBOL_NAME(sys_ni_syscall)
 	.endr
 	

@@ -9,19 +9,13 @@
  * Output:
  * 	no return value
  *
- * Copyright (C) 2000 Hewlett-Packard Co
- * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 2000-2001 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
 
 #include <asm/asmmacro.h>
-
-#if defined(CONFIG_ITANIUM_B0_SPECIFIC) || defined(CONFIG_ITANIUM_B1_SPECIFIC)
-# define BRP(args...)	nop.b 0
-#else
-# define BRP(args...)	brp.loop.imp args
-#endif
 
 GLOBAL_ENTRY(bcopy)
 	.regstk 3,0,0,0
@@ -103,8 +97,8 @@ GLOBAL_ENTRY(memcpy)
 	cmp.ne p6,p0=t0,r0
 
 	mov src=in1		// copy because of rotation
-(p7)	br.cond.spnt.few memcpy_short
-(p6)	br.cond.spnt.few memcpy_long
+(p7)	br.cond.spnt.few .memcpy_short
+(p6)	br.cond.spnt.few .memcpy_long
 	;;
 	nop.m	0
 	;;
@@ -119,7 +113,7 @@ GLOBAL_ENTRY(memcpy)
 1: { .mib
 (p[0])	ld8 val[0]=[src],8
 	nop.i 0
-	BRP(1b, 2f)
+	brp.loop.imp 1b, 2f
 }
 2: { .mfb
 (p[N-1])st8 [dst]=val[N-1],8
@@ -139,14 +133,14 @@ GLOBAL_ENTRY(memcpy)
 	 * issues, we want to avoid read-modify-write of entire words.
 	 */
 	.align 32
-memcpy_short:
+.memcpy_short:
 	adds cnt=-1,in2		// br.ctop is repeat/until
 	mov ar.ec=MEM_LAT
-	BRP(1f, 2f)
+	brp.loop.imp 1f, 2f
 	;;
 	mov ar.lc=cnt
 	;;
-	nop.m	0			
+	nop.m	0
 	;;
 	nop.m	0
 	nop.i	0
@@ -163,7 +157,7 @@ memcpy_short:
 1: { .mib
 (p[0])	ld1 val[0]=[src],1
 	nop.i 0
-	BRP(1b, 2f)
+	brp.loop.imp 1b, 2f
 } ;;
 2: { .mfb
 (p[MEM_LAT-1])st1 [dst]=val[MEM_LAT-1],1
@@ -202,7 +196,7 @@ memcpy_short:
 
 #define LOG_LOOP_SIZE	6
 
-memcpy_long:
+.memcpy_long:
 	alloc t3=ar.pfs,3,Nrot,0,Nrot	// resize register frame
 	and t0=-8,src		// t0 = src & ~7
 	and t2=7,src		// t2 = src & 7
@@ -247,7 +241,7 @@ memcpy_long:
 	mov t4=ip
   }	;;
 	and src2=-8,src			// align source pointer
-	adds t4=memcpy_loops-1b,t4
+	adds t4=.memcpy_loops-1b,t4
 	mov ar.ec=N
 
 	and t0=7,src			// t0 = src & 7
@@ -266,7 +260,7 @@ memcpy_long:
 	mov pr=cnt,0x38			// set (p5,p4,p3) to # of bytes last-word bytes to copy
 	mov ar.lc=t2
 	;;
-	nop.m	0			
+	nop.m	0
 	;;
 	nop.m	0
 	nop.i	0
@@ -278,7 +272,7 @@ memcpy_long:
 	br.sptk.few b6
 	;;
 
-memcpy_tail:
+.memcpy_tail:
 	// At this point, (p5,p4,p3) are set to the number of bytes left to copy (which is
 	// less than 8) and t0 contains the last few bytes of the src buffer:
 (p5)	st4 [dst]=t0,4
@@ -300,7 +294,7 @@ memcpy_tail:
  1: { .mib											\
 	(p[0])		ld8 val[0]=[src2],8;							\
 	(p[MEM_LAT+3])	shrp w[0]=val[MEM_LAT+3],val[MEM_LAT+4-index],shift;			\
-			BRP(1b, 2f)								\
+			brp.loop.imp 1b, 2f							\
     };												\
  2: { .mfb											\
 	(p[MEM_LAT+4])	st8 [dst]=w[1],8;							\
@@ -311,8 +305,8 @@ memcpy_tail:
 			ld8 val[N-1]=[src_end];	/* load last word (may be same as val[N]) */	\
 			;;									\
 			shrp t0=val[N-1],val[N-index],shift;					\
-			br memcpy_tail
-memcpy_loops:
+			br .memcpy_tail
+.memcpy_loops:
 	COPY(0, 1) /* no point special casing this---it doesn't go any faster without shrp */
 	COPY(8, 0)
 	COPY(16, 0)

@@ -60,24 +60,27 @@
 
 #include <linux/isicom.h>
 
-static int device_id[] = {      0x2028,
-				0x2051,
-				0x2052,
-				0x2053,
-				0x2054,
-				0x2055,
-				0x2056,
-				0x2057,
-				0x2058
-			};
+static struct pci_device_id isicom_pci_tbl[] = {
+	{ VENDOR_ID, 0x2028, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2051, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2052, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2053, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2054, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2055, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2056, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2057, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ VENDOR_ID, 0x2058, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 
-static int isicom_refcount = 0;
+static int isicom_refcount;
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
-static struct isi_board * irq_to_board[16] = { NULL, };
+static struct isi_board * irq_to_board[16];
 static struct tty_driver isicom_normal, isicom_callout;
-static struct tty_struct * isicom_table[PORT_COUNT] = { NULL, };
-static struct termios * isicom_termios[PORT_COUNT] = { NULL, };
-static struct termios * isicom_termios_locked[PORT_COUNT] = { NULL, };
+static struct tty_struct * isicom_table[PORT_COUNT];
+static struct termios * isicom_termios[PORT_COUNT];
+static struct termios * isicom_termios_locked[PORT_COUNT];
 
 static struct isi_board isi_card[BOARD_COUNT];
 static struct isi_port  isi_ports[PORT_COUNT];
@@ -997,7 +1000,7 @@ static int block_til_ready(struct tty_struct * tty, struct file * filp, struct i
 		}
 		schedule();		
 	}
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&port->open_wait, &wait);
 	if (!tty_hung_up_p(filp))
 		port->count++;
@@ -1202,7 +1205,7 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 	port->tty = 0;
 	if (port->blocked_open) {
 		if (port->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 #ifdef ISICOM_DEBUG			
 			printk(KERN_DEBUG "ISICOM: scheduling until time out.\n");
 #endif			
@@ -1974,7 +1977,7 @@ int init_module(void)
 		for (idx=0; idx < DEVID_COUNT; idx++) {
 			dev = NULL;
 			for (;;){
-				if (!(dev = pci_find_device(VENDOR_ID, device_id[idx], dev)))
+				if (!(dev = pci_find_device(VENDOR_ID, isicom_pci_tbl[idx].device, dev)))
 					break;
 				if (card >= BOARD_COUNT)
 					break;
@@ -1988,7 +1991,7 @@ int init_module(void)
 								       * space.
 								       */
 				pciirq = dev->irq;
-				printk(KERN_INFO "ISI PCI Card(Device ID 0x%x)\n", device_id[idx]);
+				printk(KERN_INFO "ISI PCI Card(Device ID 0x%x)\n", isicom_pci_tbl[idx].device);
 				/*
 				 * allot the first empty slot in the array
 				 */				
@@ -2035,7 +2038,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	re_schedule = 0;
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout(HZ);
 
 	remove_bh(ISICOM_BH);

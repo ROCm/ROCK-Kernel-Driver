@@ -2478,6 +2478,10 @@ static int __init i810_ac97_init(struct i810_card *card)
 
 	for (num_ac97 = 0; num_ac97 < NR_AC97; num_ac97++) {
 
+		/* Assume codec isn't available until we go through the
+		 * gauntlet below */
+		card->ac97_codec[num_ac97] = NULL;
+
 		/* The ICH programmer's reference says you should   */
 		/* check the ready status before probing. So we chk */
 		/*   What do we do if it's not ready?  Wait and try */
@@ -2485,7 +2489,6 @@ static int __init i810_ac97_init(struct i810_card *card)
 		if (!i810_ac97_exists(card,num_ac97)) {
 			if(num_ac97 == 0)
 				printk(KERN_ERR "i810_audio: Primary codec not ready.\n");
-			card->ac97_codec[num_ac97] = 0;
 			break; /* I think this works, if not ready stop */
 		}
 
@@ -2503,6 +2506,7 @@ static int __init i810_ac97_init(struct i810_card *card)
 	
 		if(!i810_ac97_probe_and_powerup(card,codec)) {
 			printk("i810_audio: timed out waiting for codec %d analog ready", num_ac97);
+			kfree(codec);
 			break;	/* it didn't work */
 		}
 		/* Store state information about S/PDIF transmitter */
@@ -2750,7 +2754,7 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 		kfree(card);
 		return -ENODEV;
 	}
-	pci_dev->driver_data = card;
+	pci_set_drvdata(pci_dev, card);
 
 	if(clocking == 48000) {
 		i810_configure_clocking();
@@ -2778,7 +2782,7 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 static void __exit i810_remove(struct pci_dev *pci_dev)
 {
 	int i;
-	struct i810_card *card = pci_dev->driver_data;
+	struct i810_card *card = pci_get_drvdata(pci_dev);
 	/* free hardware resources */
 	free_irq(card->irq, devs);
 	release_region(card->iobase, 64);
@@ -2797,7 +2801,7 @@ static void __exit i810_remove(struct pci_dev *pci_dev)
 #ifdef CONFIG_PM
 static int i810_pm_suspend(struct pci_dev *dev, u32 pm_state)
 {
-        struct i810_card *card = dev->driver_data;
+        struct i810_card *card = pci_get_drvdata(dev);
         struct i810_state *state;
 	unsigned long flags;
 	struct dmabuf *dmabuf;
@@ -2856,7 +2860,7 @@ static int i810_pm_suspend(struct pci_dev *dev, u32 pm_state)
 static int i810_pm_resume(struct pci_dev *dev)
 {
 	int num_ac97,i=0;
-	struct i810_card *card=(struct i810_card *)dev->driver_data;
+	struct i810_card *card=pci_get_drvdata(dev);
 	pci_enable_device(dev);
 	pci_restore_state (dev,card->pm_save_state);
 
@@ -2870,7 +2874,7 @@ static int i810_pm_resume(struct pci_dev *dev)
 		struct ac97_codec *codec = card->ac97_codec[num_ac97];
 		/* check they haven't stolen the hardware while we were
 		   away */
-		if(!i810_ac97_exists(card,num_ac97)) {
+		if(!codec || !i810_ac97_exists(card,num_ac97)) {
 			if(num_ac97) continue;
 			else BUG();
 		}

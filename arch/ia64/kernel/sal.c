@@ -1,8 +1,8 @@
 /*
  * System Abstraction Layer (SAL) interface routines.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  */
@@ -17,8 +17,6 @@
 #include <asm/page.h>
 #include <asm/sal.h>
 #include <asm/pal.h>
-
-#define SAL_DEBUG
 
 spinlock_t sal_lock = SPIN_LOCK_UNLOCKED;
 
@@ -122,10 +120,8 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		switch (*p) {
 		      case SAL_DESC_ENTRY_POINT:
 			ep = (struct ia64_sal_desc_entry_point *) p;
-#ifdef SAL_DEBUG
-			printk("sal[%d] - entry: pal_proc=0x%lx, sal_proc=0x%lx\n",
-			       i, ep->pal_proc, ep->sal_proc);
-#endif
+			printk("SAL: entry: pal_proc=0x%lx, sal_proc=0x%lx\n",
+			       ep->pal_proc, ep->sal_proc);
 			ia64_pal_handler_init(__va(ep->pal_proc));
 			ia64_sal_handler_init(__va(ep->sal_proc), __va(ep->gp));
 			break;
@@ -138,17 +134,12 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 #ifdef CONFIG_SMP
 		      {
 			      struct ia64_sal_desc_ap_wakeup *ap = (void *) p;
-# ifdef SAL_DEBUG
-			      printk("sal[%d] - wakeup type %x, 0x%lx\n",
-				     i, ap->mechanism, ap->vector);
-# endif
+
 			      switch (ap->mechanism) {
 				    case IA64_SAL_AP_EXTERNAL_INT:
 				      ap_wakeup_vector = ap->vector;
-# ifdef SAL_DEBUG
 				      printk("SAL: AP wakeup using external interrupt "
 					     "vector 0x%lx\n", ap_wakeup_vector);
-# endif
 				      break;
 
 				    default:
@@ -163,21 +154,13 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 			      struct ia64_sal_desc_platform_feature *pf = (void *) p;
 			      printk("SAL: Platform features ");
 
-#ifdef CONFIG_IA64_HAVE_IRQREDIR
-			      /*
-			       * Early versions of SAL say we don't have
-			       * IRQ redirection, even though we do...
-			       */
-			      pf->feature_mask |= (1 << 1);
-#endif
-
 			      if (pf->feature_mask & (1 << 0))
 				      printk("BusLock ");
 
 			      if (pf->feature_mask & (1 << 1)) {
 				      printk("IRQ_Redirection ");
 #ifdef CONFIG_SMP
-				      if (no_int_routing) 
+				      if (no_int_routing)
 					      smp_int_redirect &= ~SMP_IRQ_REDIRECTION;
 				      else
 					      smp_int_redirect |= SMP_IRQ_REDIRECTION;

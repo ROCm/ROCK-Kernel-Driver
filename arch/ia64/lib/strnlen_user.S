@@ -33,7 +33,7 @@ GLOBAL_ENTRY(__strnlen_user)
 	add r9=1,r9
 	;;
 	cmp.eq p6,p0=r8,r0
-(p6)	br.dpnt.few .Lexit
+(p6)	br.cond.dpnt .Lexit
 	br.cloop.dptk.few .Loop1
 
 	add r9=1,in1			// NUL not found---return N+1
@@ -41,5 +41,5 @@ GLOBAL_ENTRY(__strnlen_user)
 .Lexit:
 	mov r8=r9
 	mov ar.lc=r16			// restore ar.lc
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 END(__strnlen_user)

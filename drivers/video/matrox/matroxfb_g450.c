@@ -1,3 +1,15 @@
+/*
+ *
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
+ *
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ *
+ * Version: 1.51 2001/01/19
+ *
+ * See matroxfb_base.c for contributors.
+ *
+ */
+
 #include "matroxfb_g450.h"
 #include "matroxfb_misc.h"
 #include "matroxfb_DAC1064.h"
@@ -31,36 +43,53 @@ static const struct matrox_pll_features maven_pll = {
 	3
 };
 
+static const struct matrox_pll_features g550_pll = {
+	135000,
+	27000,
+	4, 127,
+	0, 9,
+	3
+};
+
 static void DAC1064_calcclock(unsigned int freq, unsigned int fmax,
-		unsigned int* in, unsigned int* feed, unsigned int* post) {
+		unsigned int* in, unsigned int* feed, unsigned int* post,
+		unsigned int timmings) {
 	unsigned int fvco;
 	unsigned int p;
 
-	fvco = matroxfb_PLL_calcclock(&maven_pll, freq, fmax, in, feed, &p);
-	/* 0 => 100 ... 275 MHz
-           1 => 243 ... 367 MHz
-           2 => 320 ... 475 MHz
-           3 => 453 ... 556 MHz
-           4 => 540 ... 594 MHz
-           5 => 588 ... 621 MHz
-           6 => 626 ... 637 MHz
-           7 => 631 ... 642 MHz
+	switch (timmings) {
+		default:
+			fvco = matroxfb_PLL_calcclock(&maven_pll, freq, fmax, in, feed, &p);
+			/* 0 => 100 ... 275 MHz
+		           1 => 243 ... 367 MHz
+		           2 => 320 ... 475 MHz
+		           3 => 453 ... 556 MHz
+		           4 => 540 ... 594 MHz
+		           5 => 588 ... 621 MHz
+		           6 => 626 ... 637 MHz
+		           7 => 631 ... 642 MHz
 
-           As you can see, never choose frequency > 621 MHz, there is unavailable gap...
-           Just to be sure, currently driver uses 110 ... 500 MHz range.
-         */
-	if (fvco <= 260000)
-		;
-	else if (fvco <= 350000)
-		p |= 0x08;
-	else if (fvco <= 460000)
-		p |= 0x10;
-	else if (fvco <= 550000)
-		p |= 0x18;
-	else if (fvco <= 590000)
-		p |= 0x20;
-	else
-		p |= 0x28;
+		           As you can see, never choose frequency > 621 MHz, there is unavailable gap...
+		           Just to be sure, currently driver uses 110 ... 500 MHz range.
+		         */
+			if (fvco <= 260000)
+				;
+			else if (fvco <= 350000)
+				p |= 0x08;
+			else if (fvco <= 460000)
+				p |= 0x10;
+			else if (fvco <= 550000)
+				p |= 0x18;
+			else if (fvco <= 590000)
+				p |= 0x20;
+			else
+				p |= 0x28;
+			break;
+		case 1:
+			fvco = matroxfb_PLL_calcclock(&g550_pll, freq, fmax, in, feed, &p);
+			/* p |= 0x00; */
+			break;
+	}
 	*post = p;
 	return;
 }
@@ -70,7 +99,7 @@ static inline int matroxfb_g450_compute_timming(struct matroxfb_g450_info* m2inf
 		struct mavenregs* m) {
 	unsigned int a, b, c;
 
-	DAC1064_calcclock(mt->pixclock, 500000, &a, &b, &c);
+	DAC1064_calcclock(mt->pixclock, 300000, &a, &b, &c, m2info->timmings);
 	m->regs[0x80] = a;
 	m->regs[0x81] = b;
 	m->regs[0x82] = c;
@@ -139,6 +168,7 @@ static int matroxfb_g450_connect(struct matroxfb_g450_info* m2info) {
 	ACCESS_FBINFO(altout.output) = &matroxfb_g450_altout;
 	up_write(&ACCESS_FBINFO(altout.lock));
 	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
+	matroxfb_switch(ACCESS_FBINFO(currcon), (struct fb_info*)MINFO);	
 	return 0;
 }
 
@@ -171,6 +201,11 @@ static void* matroxfb_g450_probe(struct matrox_fb_info* minfo) {
 	}
 	memset(m2info, 0, sizeof(*m2info));
 	m2info->primary_dev = MINFO;
+	if (ACCESS_FBINFO(devflags.g550dac)) {
+		m2info->timmings = 1;
+	} else {
+		m2info->timmings = 0;
+	}
 	if (matroxfb_g450_connect(m2info)) {
 		kfree(m2info);
 		printk(KERN_ERR "matroxfb_g450: G450 DAC failed to initialize\n");
@@ -198,7 +233,8 @@ static void matroxfb_g450_exit(void) {
 	matroxfb_unregister_driver(&g450);
 }
 
-MODULE_AUTHOR("(c) 2000 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 2000-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G450 secondary output driver");
+MODULE_LICENSE("GPL");
 module_init(matroxfb_g450_init);
 module_exit(matroxfb_g450_exit);

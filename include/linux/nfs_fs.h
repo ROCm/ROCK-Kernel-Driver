@@ -207,10 +207,14 @@ extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned 
  */
 extern int  nfs_sync_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_flush_file(struct inode *, struct file *, unsigned long, unsigned int, int);
-extern int  nfs_flush_timeout(struct inode *, int);
+extern int  nfs_flush_list(struct list_head *, int, int);
+extern int  nfs_scan_lru_dirty(struct nfs_server *, struct list_head *);
+extern int  nfs_scan_lru_dirty_timeout(struct nfs_server *, struct list_head *);
 #ifdef CONFIG_NFS_V3
 extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsigned int, int);
-extern int  nfs_commit_timeout(struct inode *, int);
+extern int  nfs_commit_list(struct list_head *, int);
+extern int  nfs_scan_lru_commit(struct nfs_server *, struct list_head *);
+extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *);
 #endif
 
 static inline int
@@ -257,7 +261,9 @@ nfs_wb_file(struct inode *inode, struct file *file)
  */
 extern int  nfs_readpage(struct file *, struct page *);
 extern int  nfs_pagein_inode(struct inode *, unsigned long, unsigned int);
-extern int  nfs_pagein_timeout(struct inode *);
+extern int  nfs_pagein_list(struct list_head *, int);
+extern int  nfs_scan_lru_read(struct nfs_server *, struct list_head *);
+extern int  nfs_scan_lru_read_timeout(struct nfs_server *, struct list_head *);
 
 /*
  * linux/fs/mount_clnt.c

@@ -1,9 +1,9 @@
 /*
  * linux/arch/ia64/kernel/irq.c
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  *  6/10/99: Updated to bring in sync with x86 version to facilitate
  *	     support for SMP and different interrupt controllers.
@@ -131,6 +131,13 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 		ia64_eoi();
 		vector = ia64_get_ivr();
 	}
+	/*
+	 * This must be done *after* the ia64_eoi().  For example, the keyboard softirq
+	 * handler needs to be able to wait for further keyboard interrupts, which can't
+	 * come through until ia64_eoi() has been done.
+	 */
+	if (local_softirq_pending())
+		do_softirq();
 }
 
 #ifdef CONFIG_SMP

@@ -795,7 +795,7 @@ static int i82092aa_get_mem_map(unsigned sock, struct pccard_mem_map *mem)
 	mem->card_start = ( (unsigned long)(i & 0x3fff)<12) + mem->sys_start;
 	mem->card_start &=  0x3ffffff;
 	
-	printk("Card %i is from %x to %x \n",sock,mem->sys_start,mem->sys_stop);
+	printk("Card %i is from %lx to %lx \n",sock,mem->sys_start,mem->sys_stop);
 	
 	leave("i82092aa_get_mem_map");
 	return 0;
@@ -819,7 +819,7 @@ static int i82092aa_set_mem_map(unsigned sock, struct pccard_mem_map *mem)
 	if ( (mem->card_start > 0x3ffffff) || (mem->sys_start > mem->sys_stop) ||
 	     (mem->speed > 1000) ) {
 		leave("i82092aa_set_mem_map: invalid address / speed");
-		printk("invalid mem map for socket %i : %x to %x with a start of %x \n",sock,mem->sys_start, mem->sys_stop, mem->card_start);
+		printk("invalid mem map for socket %i : %lx to %lx with a start of %x \n",sock,mem->sys_start, mem->sys_stop, mem->card_start);
 		return -EINVAL;
 	}
 	
@@ -895,7 +895,6 @@ static int i82092aa_module_init(void)
 
 static void i82092aa_module_exit(void)
 {
-	int i;
 	enter("i82092aa_module_exit");
 	pci_unregister_driver(&i82092aa_pci_drv);
 	unregister_ss_entry(&i82092aa_operations);

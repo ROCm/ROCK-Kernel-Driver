@@ -145,9 +145,11 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
 	    }
 
             /* JDM comparing two little-endian values for equality -- safe */
-	    if (rs->s_oid_cursize == rs->s_oid_maxsize)
+	if (rs->s_oid_cursize == rs->s_oid_maxsize) {
 		/* objectid map must be expanded, but there is no space */
+		PROC_INFO_INC( s, leaked_oid );
 		return;
+	}
 
 	    /* expand the objectid map*/
 	    memmove (map + i + 3, map + i + 1, 

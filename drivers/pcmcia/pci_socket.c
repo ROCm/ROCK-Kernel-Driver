@@ -177,13 +177,13 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	memset(socket, 0, sizeof(*socket));
 	socket->dev = dev;
 	socket->op = ops;
-	dev->driver_data = socket;
+	pci_set_drvdata(dev, socket);
 	spin_lock_init(&socket->event_lock);
 	err = socket->op->open(socket);
 	if(err)
 	{
 		socket->dev = NULL;
-		dev->driver_data = NULL;
+		pci_set_drvdata(dev, NULL);
 	}
 	return err;
 }
@@ -210,24 +210,24 @@ cardbus_probe (struct pci_dev *dev, const struct pci_device_id *id)
 
 static void __devexit cardbus_remove (struct pci_dev *dev)
 {
-	pci_socket_t *socket = (pci_socket_t *) dev->driver_data;
+	pci_socket_t *socket = pci_get_drvdata(dev);
 
 	pcmcia_unregister_socket (socket->pcmcia_socket);
 	if (socket->op && socket->op->close)
 		socket->op->close(socket);
-	dev->driver_data = 0;
+	pci_set_drvdata(dev, NULL);
 }
 
 static int cardbus_suspend (struct pci_dev *dev, u32 state)
 {
-	pci_socket_t *socket = (pci_socket_t *) dev->driver_data;
+	pci_socket_t *socket = pci_get_drvdata(dev);
 	pcmcia_suspend_socket (socket->pcmcia_socket);
 	return 0;
 }
 
 static int cardbus_resume (struct pci_dev *dev)
 {
-	pci_socket_t *socket = (pci_socket_t *) dev->driver_data;
+	pci_socket_t *socket = pci_get_drvdata(dev);
 	pcmcia_resume_socket (socket->pcmcia_socket);
 	return 0;
 }

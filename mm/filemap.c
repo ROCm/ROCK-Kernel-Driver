@@ -209,19 +209,26 @@ unlock:
 	spin_unlock(&pagemap_lru_lock);
 }
 
+static int do_flushpage(struct page *page, unsigned long offset)
+{
+	int (*flushpage) (struct page *, unsigned long);
+	flushpage = page->mapping->a_ops->flushpage;
+	if (flushpage)
+		return (*flushpage)(page, offset);
+	return block_flushpage(page, offset);
+}
+
 static inline void truncate_partial_page(struct page *page, unsigned partial)
 {
 	memclear_highpage_flush(page, partial, PAGE_CACHE_SIZE-partial);
-				
 	if (page->buffers)
-		block_flushpage(page, partial);
-
+		do_flushpage(page, partial);
 }
 
 static void truncate_complete_page(struct page *page)
 {
 	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!page->buffers || block_flushpage(page, 0))
+	if (!page->buffers || do_flushpage(page, 0))
 		lru_cache_del(page);
 
 	/*

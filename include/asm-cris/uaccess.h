@@ -3,6 +3,9 @@
  *	       Hans-Peter Nilsson (hp@axis.com)
  *
  * $Log: uaccess.h,v $
+ * Revision 1.8  2001/10/29 13:01:48  bjornw
+ * Removed unused variable tmp2 in strnlen_user
+ *
  * Revision 1.7  2001/10/02 12:44:52  hp
  * Add support for 64-bit put_user/get_user
  *
@@ -1057,7 +1060,7 @@ __generic_clear_user_nocheck(void *to, unsigned long n)
 static inline long
 strnlen_user(const char *s, long n)
 {
-	long res, tmp1, tmp2;
+	long res, tmp1;
 
 	if (!access_ok(VERIFY_READ, s, 0))
 		return 0;

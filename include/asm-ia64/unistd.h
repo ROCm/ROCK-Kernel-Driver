@@ -4,8 +4,8 @@
 /*
  * IA-64 Linux syscall numbers and inline-functions.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <asm/break.h>
@@ -93,7 +93,7 @@
 #define __NR_setpriority		1102
 #define __NR_statfs			1103
 #define __NR_fstatfs			1104
-/* unused; used to be __NR_ioperm */
+#define __NR_gettid			1105
 #define __NR_semget			1106
 #define __NR_semop			1107
 #define __NR_semctl			1108
@@ -205,6 +205,7 @@
 #define __NR_clone2			1213
 #define __NR_getdents64			1214
 #define __NR_getunwind			1215
+#define __NR_readahead			1216
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

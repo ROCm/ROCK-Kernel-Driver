@@ -324,6 +324,10 @@ nfs_read_super(struct super_block *sb, void *raw_data, int silent)
 	if (!server->hostname)
 		goto out_unlock;
 	strcpy(server->hostname, data->hostname);
+	INIT_LIST_HEAD(&server->lru_read);
+	INIT_LIST_HEAD(&server->lru_dirty);
+	INIT_LIST_HEAD(&server->lru_commit);
+	INIT_LIST_HEAD(&server->lru_busy);
 
  nfsv3_try_again:
 	/* Check NFS protocol revision and initialize RPC op vector
@@ -1072,6 +1076,8 @@ extern int nfs_init_nfspagecache(void);
 extern void nfs_destroy_nfspagecache(void);
 extern int nfs_init_readpagecache(void);
 extern int nfs_destroy_readpagecache(void);
+extern int nfs_init_writepagecache(void);
+extern int nfs_destroy_writepagecache(void);
 
 /*
  * Initialize NFS
@@ -1088,6 +1094,10 @@ static int __init init_nfs_fs(void)
 	if (err)
 		return err;
 
+	err = nfs_init_writepagecache();
+	if (err)
+		return err;
+
 #ifdef CONFIG_PROC_FS
 	rpc_proc_register(&nfs_rpcstat);
 #endif
@@ -1096,6 +1106,7 @@ static int __init init_nfs_fs(void)
 
 static void __exit exit_nfs_fs(void)
 {
+	nfs_destroy_writepagecache();
 	nfs_destroy_readpagecache();
 	nfs_destroy_nfspagecache();
 #ifdef CONFIG_PROC_FS
@@ -1107,6 +1118,7 @@ static void __exit exit_nfs_fs(void)
 EXPORT_NO_SYMBOLS;
 /* Not quite true; I just maintain it */
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
+MODULE_LICENSE("GPL");
 
 module_init(init_nfs_fs)
 module_exit(exit_nfs_fs)

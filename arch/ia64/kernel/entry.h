@@ -1,12 +1,5 @@
 #include <linux/config.h>
 
-/* XXX fixme */
-#if defined(CONFIG_ITANIUM_B1_SPECIFIC)
-# define MOVBR(type,br,gr,lbl)	mov br=gr
-#else
-# define MOVBR(type,br,gr,lbl)	mov##type br=gr,lbl
-#endif
-
 /*
  * Preserved registers that are shared between code in ivt.S and entry.S.  Be
  * careful not to step on these!
@@ -62,7 +55,7 @@
 	;;					\
 	.fframe IA64_SWITCH_STACK_SIZE;		\
 	adds sp=-IA64_SWITCH_STACK_SIZE,sp;	\
-	MOVBR(.ret.sptk,b7,r28,1f);		\
+	mov.ret.sptk b7=r28,1f;			\
 	SWITCH_STACK_SAVES(0);			\
 	br.cond.sptk.many save_switch_stack;	\
 1:
@@ -71,7 +64,7 @@
 	movl r28=1f;				\
 	;;					\
 	invala;					\
-	MOVBR(.ret.sptk,b7,r28,1f);		\
+	mov.ret.sptk b7=r28,1f;			\
 	br.cond.sptk.many load_switch_stack;	\
 1:	.restore sp;				\
 	adds sp=IA64_SWITCH_STACK_SIZE,sp

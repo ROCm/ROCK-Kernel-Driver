@@ -16,7 +16,6 @@
  *		back-to-back 8-byte words per loop. Clean up the initialization
  *		for the loop. Support the cases where load latency = 1 or 2.
  *		Set CONFIG_IA64_LOAD_LATENCY to 1 or 2 (default).
- *
  */
 
 #include <asm/asmmacro.h>
@@ -130,7 +129,7 @@ GLOBAL_ENTRY(do_csum)
 	;;			// avoid WAW on CFM
 	mov tmp3=0x7		// a temporary mask/value
 	add tmp1=buf,len	// last byte's address
-(p6)	br.ret.spnt.few rp	// return if true (hope we can avoid that)
+(p6)	br.ret.spnt.many rp	// return if true (hope we can avoid that)
 
 	and firstoff=7,buf	// how many bytes off for first1 element
 	tbit.nz p15,p0=buf,0	// is buf an odd address ?
@@ -181,9 +180,9 @@ GLOBAL_ENTRY(do_csum)
 	cmp.ltu p6,p0=result1[0],word1[0]	// check the carry
 	;;
 (p6)	adds result1[0]=1,result1[0]
-(p8)	br.cond.dptk.few do_csum_exit	// if (within an 8-byte word)
+(p8)	br.cond.dptk .do_csum_exit	// if (within an 8-byte word)
 	;;
-(p11)	br.cond.dptk.few do_csum16	// if (count is even)
+(p11)	br.cond.dptk .do_csum16		// if (count is even)
 	;;
 	// Here count is odd.
 	ld8 word1[1]=[first1],8		// load an 8-byte word
@@ -196,14 +195,14 @@ GLOBAL_ENTRY(do_csum)
 	;;
 (p6)	adds result1[0]=1,result1[0]
 	;;
-(p9)	br.cond.sptk.few do_csum_exit	// if (count == 1) exit
+(p9)	br.cond.sptk .do_csum_exit	// if (count == 1) exit
 	// Fall through to caluculate the checksum, feeding result1[0] as
 	// the initial value in result1[0].
 	;;
 	//
 	// Calculate the checksum loading two 8-byte words per loop.
 	//
-do_csum16:
+.do_csum16:
 	mov saved_lc=ar.lc
 	shr.u count=count,1	// we do 16 bytes per loop
 	;;
@@ -225,7 +224,7 @@ do_csum16:
 	;;
 	add first2=8,first1
 	;;
-(p9)	br.cond.sptk.few do_csum_exit
+(p9)	br.cond.sptk .do_csum_exit
 	;;
 	nop.m	0
 	nop.i	0
@@ -241,7 +240,7 @@ do_csum16:
 2:
 (p16)	ld8 word1[0]=[first1],16
 (p16)	ld8 word2[0]=[first2],16
-	br.ctop.sptk.few 1b
+	br.ctop.sptk 1b
 	;;
 	// Since len is a 32-bit value, carry cannot be larger than
 	// a 64-bit value.
@@ -263,7 +262,7 @@ do_csum16:
 	;;
 (p6)	adds result1[0]=1,result1[0]
 	;;
-do_csum_exit:
+.do_csum_exit:
 	movl tmp3=0xffffffff
 	;;
 	// XXX Fixme
@@ -299,7 +298,7 @@ do_csum_exit:
 	;;
 	mov ar.lc=saved_lc
 (p15)	shr.u ret0=ret0,64-16	// + shift back to position = swap bytes
-	br.ret.sptk.few rp
+	br.ret.sptk.many rp
 
 //	I (Jun Nakajima) wrote an equivalent code (see below), but it was
 //	not much better than the original. So keep the original there so that
@@ -331,6 +330,6 @@ do_csum_exit:
 //(p15)	mux1 ret0=ret0,@rev		// reverse word
 //	;;
 //(p15)	shr.u ret0=ret0,64-16	// + shift back to position = swap bytes
-//	br.ret.sptk.few rp
+//	br.ret.sptk.many rp
 
 END(do_csum)

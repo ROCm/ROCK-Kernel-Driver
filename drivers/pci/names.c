@@ -52,7 +52,7 @@ static struct pci_vendor_info __initdata pci_vendor_list[] = {
 
 #define VENDORS (sizeof(pci_vendor_list)/sizeof(struct pci_vendor_info))
 
-void __init pci_name_device(struct pci_dev *dev)
+void __devinit pci_name_device(struct pci_dev *dev)
 {
 	const struct pci_vendor_info *vendor_p = pci_vendor_list;
 	int i = VENDORS;

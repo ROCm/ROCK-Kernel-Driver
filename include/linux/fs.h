@@ -216,6 +216,7 @@ enum bh_state_bits {
 	BH_Async,	/* 1 if the buffer is under end_buffer_io_async I/O */
 	BH_Wait_IO,	/* 1 if we should write out this buffer */
 	BH_launder,	/* 1 if we should throttle on this buffer */
+	BH_JBD,		/* 1 if it has an attached journal_head */
 
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
@@ -287,6 +288,7 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #include <linux/pipe_fs_i.h>
 #include <linux/minix_fs_i.h>
 #include <linux/ext2_fs_i.h>
+#include <linux/ext3_fs_i.h>
 #include <linux/hpfs_fs_i.h>
 #include <linux/ntfs_fs_i.h>
 #include <linux/msdos_fs_i.h>
@@ -376,10 +378,16 @@ struct address_space_operations {
 	int (*writepage)(struct page *);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
+	/*
+	 * ext3 requires that a successful prepare_write() call be followed
+	 * by a commit_write() call - they must be balanced
+	 */
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	/* Unfortunately this kludge is needed for FIBMAP. Don't use it */
 	int (*bmap)(struct address_space *, long);
+	int (*flushpage) (struct page *, unsigned long);
+	int (*releasepage) (struct page *, int);
 #define KERNEL_HAS_O_DIRECT /* this is for modules out of the kernel */
 	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
 };
@@ -470,6 +478,7 @@ struct inode {
 	union {
 		struct minix_inode_info		minix_i;
 		struct ext2_inode_info		ext2_i;
+		struct ext3_inode_info		ext3_i;
 		struct hpfs_inode_info		hpfs_i;
 		struct ntfs_inode_info		ntfs_i;
 		struct msdos_inode_info		msdos_i;
@@ -658,6 +667,7 @@ struct quota_mount_options
 
 #include <linux/minix_fs_sb.h>
 #include <linux/ext2_fs_sb.h>
+#include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
 #include <linux/ntfs_fs_sb.h>
 #include <linux/msdos_fs_sb.h>
@@ -714,6 +724,7 @@ struct super_block {
 	union {
 		struct minix_sb_info	minix_sb;
 		struct ext2_sb_info	ext2_sb;
+		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
 		struct ntfs_sb_info	ntfs_sb;
 		struct msdos_sb_info	msdos_sb;
@@ -1088,6 +1099,7 @@ extern int fs_may_remount_ro(struct super_block *);
 
 extern int try_to_free_buffers(struct page *, unsigned int);
 extern void refile_buffer(struct buffer_head * buf);
+extern void create_empty_buffers(struct page *, kdev_t, unsigned long);
 extern void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 
 /* reiserfs_writepage needs this */
@@ -1170,6 +1182,7 @@ static inline void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode 
 	buffer_insert_inode_queue(bh, inode);
 }
 
+extern void set_buffer_flushtime(struct buffer_head *);
 extern void balance_dirty(void);
 extern int check_disk_change(kdev_t);
 extern int invalidate_inodes(struct super_block *);
@@ -1349,12 +1362,15 @@ static inline void bforget(struct buffer_head *buf)
 extern int set_blocksize(kdev_t, int);
 extern struct buffer_head * bread(kdev_t, int, int);
 extern void wakeup_bdflush(void);
+extern void put_unused_buffer_head(struct buffer_head * bh);
+extern struct buffer_head * get_unused_buffer_head(int async);
 
 extern int brw_page(int, struct page *, kdev_t, int [], int);
 
 typedef int (get_block_t)(struct inode*,long,struct buffer_head*,int);
 
 /* Generic buffer handling for block filesystems.. */
+extern int try_to_release_page(struct page * page, int gfp_mask);
 extern int discard_bh_page(struct page *, unsigned long, int);
 #define block_flushpage(page, offset) discard_bh_page(page, offset, 1)
 #define block_invalidate_page(page) discard_bh_page(page, 0, 0)
@@ -1416,7 +1432,7 @@ extern void show_buffers(void);
 extern void mount_root(void);
 
 #ifdef CONFIG_BLK_DEV_INITRD
-extern kdev_t real_root_dev;
+extern unsigned int real_root_dev;
 extern int change_root(kdev_t, const char *);
 #endif
 

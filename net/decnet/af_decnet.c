@@ -1003,6 +1003,9 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (DN_SK(newsk)->segsize_rem < 230)
 		DN_SK(newsk)->segsize_rem = 230;
 
+	if ((DN_SK(newsk)->services_rem & NSP_FC_MASK) == NSP_FC_NONE)
+		DN_SK(newsk)->max_window = decnet_no_fc_max_cwnd;
+
 	newsk->state  = TCP_LISTEN;
 	newsk->zapped = 0;
 
@@ -1072,7 +1075,9 @@ static int dn_getname(struct socket *sock, struct sockaddr *uaddr,int *uaddr_len
 	lock_sock(sk);
 
 	if (peer) {
-		if (sock->state != SS_CONNECTED && scp->accept_mode == ACC_IMMED)
+		if ((sock->state != SS_CONNECTED && 
+		     sock->state != SS_CONNECTING) && 
+		    scp->accept_mode == ACC_IMMED)
 			return -ENOTCONN;
 
 		memcpy(sa, &scp->peer, sizeof(struct sockaddr_dn));
@@ -2145,6 +2150,7 @@ void dn_unregister_sysctl(void);
 EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("The Linux DECnet Network Protocol");
 MODULE_AUTHOR("Linux DECnet Project Team");
+MODULE_LICENSE("GPL");
 
 static int addr[2] = {0, 0};
 
@@ -2152,7 +2158,7 @@ MODULE_PARM(addr, "2i");
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
 #endif
 
-static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.0-test12s (C) 1995-2000 Linux DECnet Project Team\n";
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.9s (C) 1995-2001 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {

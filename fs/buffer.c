@@ -45,6 +45,7 @@
 #include <linux/quotaops.h>
 #include <linux/iobuf.h>
 #include <linux/highmem.h>
+#include <linux/module.h>
 #include <linux/completion.h>
 
 #include <asm/uaccess.h>
@@ -613,8 +614,12 @@ int inode_has_buffers(struct inode *inode)
    information that was supposed to be just stored on the physical layer
    by the user.
 
-   Thus invalidate_buffers in general usage is not allwowed to trash dirty
-   buffers. For example ioctl(FLSBLKBUF) expects dirty data to be preserved.
+   Thus invalidate_buffers in general usage is not allwowed to trash
+   dirty buffers. For example ioctl(FLSBLKBUF) expects dirty data to
+   be preserved.  These buffers are simply skipped.
+  
+   We also skip buffers which are still in use.  For example this can
+   happen if a userspace program is reading the block device.
 
    NOTE: In the case where the user removed a removable-media-disk even if
    there's still dirty data not synced on disk (due a bug in the device driver
@@ -1090,6 +1095,12 @@ void mark_buffer_dirty(struct buffer_head *bh)
 	}
 }
 
+void set_buffer_flushtime(struct buffer_head *bh)
+{
+	bh->b_flushtime = jiffies + bdf_prm.b_un.age_buffer;
+}
+EXPORT_SYMBOL(set_buffer_flushtime);
+
 /*
  * A buffer may need to be moved from one buffer list to another
  * (e.g. in case it is not shared any more). Handle this.
@@ -1165,7 +1176,7 @@ struct buffer_head * bread(kdev_t dev, int block, int size)
 /*
  * Note: the caller should wake up the buffer_wait list if needed.
  */
-static __inline__ void __put_unused_buffer_head(struct buffer_head * bh)
+static void __put_unused_buffer_head(struct buffer_head * bh)
 {
 	if (bh->b_inode)
 		BUG();
@@ -1182,12 +1193,20 @@ static __inline__ void __put_unused_buffer_head(struct buffer_head * bh)
 	}
 }
 
+void put_unused_buffer_head(struct buffer_head *bh)
+{
+	spin_lock(&unused_list_lock);
+	__put_unused_buffer_head(bh);
+	spin_unlock(&unused_list_lock);
+}
+EXPORT_SYMBOL(put_unused_buffer_head);
+
 /*
  * Reserve NR_RESERVED buffer heads for async IO requests to avoid
  * no-buffer-head deadlock.  Return NULL on failure; waiting for
  * buffer heads is now handled in create_buffers().
  */ 
-static struct buffer_head * get_unused_buffer_head(int async)
+struct buffer_head * get_unused_buffer_head(int async)
 {
 	struct buffer_head * bh;
 
@@ -1228,6 +1247,7 @@ static struct buffer_head * get_unused_buffer_head(int async)
 
 	return NULL;
 }
+EXPORT_SYMBOL(get_unused_buffer_head);
 
 void set_bh_page (struct buffer_head *bh, struct page *page, unsigned long offset)
 {
@@ -1242,6 +1262,7 @@ void set_bh_page (struct buffer_head *bh, struct page *page, unsigned long offse
 	else
 		bh->b_data = page_address(page) + offset;
 }
+EXPORT_SYMBOL(set_bh_page);
 
 /*
  * Create the appropriate buffers when given a page for data area and
@@ -1335,6 +1356,31 @@ static void discard_buffer(struct buffer_head * bh)
 	}
 }
 
+/**
+ * try_to_release_page - release old fs-specific metadata on a page
+ *
+ */
+
+int try_to_release_page(struct page * page, int gfp_mask)
+{
+	if (!PageLocked(page))
+		BUG();
+	
+	if (!page->mapping)
+		goto try_to_free;
+	if (!page->mapping->a_ops->releasepage)
+		goto try_to_free;
+	if (page->mapping->a_ops->releasepage(page, gfp_mask))
+		goto try_to_free;
+	/*
+	 * We couldn't release buffer metadata; don't even bother trying
+	 * to release buffers.
+	 */
+	return 0;
+try_to_free:	
+	return try_to_free_buffers(page, gfp_mask);
+}
+
 /*
  * We don't have to release all buffers here, but
  * we have to be sure that no dirty buffer is left
@@ -1378,7 +1424,7 @@ int discard_bh_page(struct page *page, unsigned long offset, int drop_pagecache)
 	 * instead.
 	 */
 	if (!offset) {
-		if (!try_to_free_buffers(page, 0))
+		if (!try_to_release_page(page, 0))
 			return 0;
 	}
 
@@ -1406,6 +1452,7 @@ void create_empty_buffers(struct page *page, kdev_t dev, unsigned long blocksize
 	page->buffers = head;
 	page_cache_get(page);
 }
+EXPORT_SYMBOL(create_empty_buffers);
 
 /*
  * We are taking a block for data and we don't want any output from any
@@ -1446,8 +1493,7 @@ static void unmap_underlying_metadata(struct buffer_head * bh)
  */
 
 /*
- * block_write_full_page() is SMP-safe - currently it's still
- * being called with the kernel lock held, but the code is ready.
+ * block_write_full_page() is SMP threaded - the kernel lock is not held.
  */
 static int __block_write_full_page(struct inode *inode, struct page *page, get_block_t *get_block)
 {
@@ -2444,6 +2490,7 @@ busy_buffer_page:
 		wakeup_bdflush();
 	return 0;
 }
+EXPORT_SYMBOL(try_to_free_buffers);
 
 /* ================== Debugging =================== */
 

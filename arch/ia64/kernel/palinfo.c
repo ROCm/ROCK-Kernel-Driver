@@ -6,12 +6,13 @@
  * Intel IA-64 Architecture Software Developer's Manual v1.0.
  *
  *
- * Copyright (C) 2000 Hewlett-Packard Co
- * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 2000-2001 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 05/26/2000	S.Eranian	initial release
  * 08/21/2000	S.Eranian	updated to July 2000 PAL specs
  * 02/05/2001   S.Eranian	fixed module support
+ * 10/23/2001	S.Eranian	updated pal_perf_mon_info bug fixes
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -32,8 +33,9 @@
 
 MODULE_AUTHOR("Stephane Eranian <eranian@hpl.hp.com>");
 MODULE_DESCRIPTION("/proc interface to IA-64 PAL");
+MODULE_LICENSE("GPL");
 
-#define PALINFO_VERSION "0.4"
+#define PALINFO_VERSION "0.5"
 
 #ifdef CONFIG_SMP
 #define cpu_is_online(i) (cpu_online_map & (1UL << i))
@@ -606,15 +608,6 @@ perfmon_info(char *page)
 
 	if (ia64_pal_perf_mon_info(pm_buffer, &pm_info) != 0) return 0;
 
-#ifdef IA64_PAL_PERF_MON_INFO_BUG
-	/*
-	 * This bug has been fixed in PAL 2.2.9 and higher
-	 */
-	pm_buffer[5]=0x3;
-	pm_info.pal_perf_mon_info_s.cycles  = 0x12;
-	pm_info.pal_perf_mon_info_s.retired = 0x08;
-#endif
-
 	p += sprintf(p, "PMC/PMD pairs                 : %d\n" \
 			"Counter width                 : %d bits\n" \
 			"Cycle event number            : %d\n" \
@@ -636,6 +629,14 @@ perfmon_info(char *page)
 	p = bitregister_process(p, pm_buffer+8, 256);
 
 	p += sprintf(p, "\nRetired bundles count capable : ");
+
+#ifdef CONFIG_ITANIUM
+	/*
+	 * PAL_PERF_MON_INFO reports that only PMC4 can be used to count CPU_CYCLES
+	 * which is wrong, both PMC4 and PMD5 support it.
+	 */
+	if (pm_buffer[12] == 0x10) pm_buffer[12]=0x30;
+#endif
 
 	p = bitregister_process(p, pm_buffer+12, 256);
 

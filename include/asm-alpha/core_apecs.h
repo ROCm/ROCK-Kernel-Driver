@@ -374,13 +374,13 @@ struct el_apecs_procdata
 #define vuip	volatile unsigned int *
 #define vulp	volatile unsigned long *
 
-__EXTERN_INLINE unsigned int apecs_inb(unsigned long addr)
+__EXTERN_INLINE u8 apecs_inb(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + APECS_IO + 0x00);
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE void apecs_outb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void apecs_outb(u8 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -389,13 +389,13 @@ __EXTERN_INLINE void apecs_outb(unsigned char b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int apecs_inw(unsigned long addr)
+__EXTERN_INLINE u16 apecs_inw(unsigned long addr)
 {
 	long result = *(vip) ((addr << 5) + APECS_IO + 0x08);
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE void apecs_outw(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void apecs_outw(u16 b, unsigned long addr)
 {
 	unsigned long w;
 
@@ -404,12 +404,12 @@ __EXTERN_INLINE void apecs_outw(unsigned short b, unsigned long addr)
 	mb();
 }
 
-__EXTERN_INLINE unsigned int apecs_inl(unsigned long addr)
+__EXTERN_INLINE u32 apecs_inl(unsigned long addr)
 {
 	return *(vuip) ((addr << 5) + APECS_IO + 0x18);
 }
 
-__EXTERN_INLINE void apecs_outl(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void apecs_outl(u32 b, unsigned long addr)
 {
 	*(vuip) ((addr << 5) + APECS_IO + 0x18) = b;
 	mb();
@@ -421,7 +421,7 @@ __EXTERN_INLINE void apecs_outl(unsigned int b, unsigned long addr)
  * dense memory space, everything else through sparse space.
  */
 
-__EXTERN_INLINE unsigned long apecs_readb(unsigned long addr)
+__EXTERN_INLINE u8 apecs_readb(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -435,7 +435,7 @@ __EXTERN_INLINE unsigned long apecs_readb(unsigned long addr)
 	return __kernel_extbl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long apecs_readw(unsigned long addr)
+__EXTERN_INLINE u16 apecs_readw(unsigned long addr)
 {
 	unsigned long result, msb;
 
@@ -449,17 +449,17 @@ __EXTERN_INLINE unsigned long apecs_readw(unsigned long addr)
 	return __kernel_extwl(result, addr & 3);
 }
 
-__EXTERN_INLINE unsigned long apecs_readl(unsigned long addr)
+__EXTERN_INLINE u32 apecs_readl(unsigned long addr)
 {
-	return *(vuip)addr;
+	return (*(vuip)addr) & 0xffffffff;
 }
 
-__EXTERN_INLINE unsigned long apecs_readq(unsigned long addr)
+__EXTERN_INLINE u64 apecs_readq(unsigned long addr)
 {
 	return *(vulp)addr;
 }
 
-__EXTERN_INLINE void apecs_writeb(unsigned char b, unsigned long addr)
+__EXTERN_INLINE void apecs_writeb(u8 b, unsigned long addr)
 {
 	unsigned long msb;
 
@@ -472,7 +472,7 @@ __EXTERN_INLINE void apecs_writeb(unsigned char b, unsigned long addr)
 	*(vuip) ((addr << 5) + APECS_SPARSE_MEM + 0x00) = b * 0x01010101;
 }
 
-__EXTERN_INLINE void apecs_writew(unsigned short b, unsigned long addr)
+__EXTERN_INLINE void apecs_writew(u16 b, unsigned long addr)
 {
 	unsigned long msb;
 
@@ -485,12 +485,12 @@ __EXTERN_INLINE void apecs_writew(unsigned short b, unsigned long addr)
 	*(vuip) ((addr << 5) + APECS_SPARSE_MEM + 0x08) = b * 0x00010001;
 }
 
-__EXTERN_INLINE void apecs_writel(unsigned int b, unsigned long addr)
+__EXTERN_INLINE void apecs_writel(u32 b, unsigned long addr)
 {
 	*(vuip)addr = b;
 }
 
-__EXTERN_INLINE void apecs_writeq(unsigned long b, unsigned long addr)
+__EXTERN_INLINE void apecs_writeq(u64 b, unsigned long addr)
 {
 	*(vulp)addr = b;
 }

@@ -235,6 +235,7 @@ struct atmif_sioc {
     void *arg;
 };
 
+typedef unsigned short atm_backend_t;
 
 #ifdef __KERNEL__
 

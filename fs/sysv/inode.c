@@ -117,7 +117,6 @@ static inline void write3byte(struct super_block *sb,
 static struct inode_operations sysv_symlink_inode_operations = {
 	readlink:	page_readlink,
 	follow_link:	page_follow_link,
-	setattr:	sysv_notify_change,
 };
 
 void sysv_set_inode(struct inode *inode, dev_t rdev)
@@ -146,7 +145,6 @@ static void sysv_read_inode(struct inode *inode)
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
 	unsigned int block, ino;
-	umode_t mode;
 	dev_t rdev = 0;
 
 	ino = inode->i_ino;
@@ -162,11 +160,8 @@ static void sysv_read_inode(struct inode *inode)
 		       bdevname(inode->i_dev));
 		return;
 	}
-	mode = fs16_to_cpu(sb, raw_inode->i_mode);
-	if (sb->sv_kludge_symlinks)
-		mode = from_coh_imode(mode);
 	/* SystemV FS: kludge permissions if ino==SYSV_ROOT_INO ?? */
-	inode->i_mode = mode;
+	inode->i_mode = fs16_to_cpu(sb, raw_inode->i_mode);
 	inode->i_uid = (uid_t)fs16_to_cpu(sb, raw_inode->i_uid);
 	inode->i_gid = (gid_t)fs16_to_cpu(sb, raw_inode->i_gid);
 	inode->i_nlink = fs16_to_cpu(sb, raw_inode->i_nlink);
@@ -181,24 +176,8 @@ static void sysv_read_inode(struct inode *inode)
 	brelse(bh);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		rdev = (u16)fs32_to_cpu(sb, inode->u.sysv_i.i_data[0]);
+	inode->u.sysv_i.i_dir_start_lookup = 0;
 	sysv_set_inode(inode, rdev);
-}
-
-/* To avoid inconsistencies between inodes in memory and inodes on disk. */
-int sysv_notify_change(struct dentry *dentry, struct iattr *attr)
-{
-	struct inode *inode = dentry->d_inode;
-	int error;
-
-	if ((error = inode_change_ok(inode, attr)) != 0)
-		return error;
-
-	if (attr->ia_valid & ATTR_MODE)
-		if (inode->i_sb->sv_kludge_symlinks)
-			if (attr->ia_mode == COH_KLUDGE_SYMLINK_MODE)
-				attr->ia_mode = COH_KLUDGE_NOT_SYMLINK;
-
-	return inode_setattr(inode, attr);
 }
 
 static struct buffer_head * sysv_update_inode(struct inode * inode)
@@ -207,7 +186,6 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
 	unsigned int ino, block;
-	umode_t mode;
 
 	ino = inode->i_ino;
 	if (!ino || ino > sb->sv_ninodes) {
@@ -220,10 +198,8 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 		printk("unable to read i-node block\n");
 		return 0;
 	}
-	mode = inode->i_mode;
-	if (sb->sv_kludge_symlinks)
-		mode = to_coh_imode(mode);
-	raw_inode->i_mode = cpu_to_fs16(sb, mode);
+
+	raw_inode->i_mode = cpu_to_fs16(sb, inode->i_mode);
 	raw_inode->i_uid = cpu_to_fs16(sb, fs_high2lowuid(inode->i_uid));
 	raw_inode->i_gid = cpu_to_fs16(sb, fs_high2lowgid(inode->i_gid));
 	raw_inode->i_nlink = cpu_to_fs16(sb, inode->i_nlink);

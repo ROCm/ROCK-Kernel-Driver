@@ -158,7 +158,7 @@ static unsigned int cs461x_peekBA0(unsigned long reg)
 
 static int cs461x_free(struct pci_dev *pdev)
 {
-	struct gameport *port = (struct gameport *)pdev->driver_data;
+	struct gameport *port = pci_get_drvdata(pdev);
 	if(port){
 	    gameport_unregister_port(port);
 	    kfree(port);
@@ -284,7 +284,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	}
 	memset(port, 0, sizeof(struct gameport));
 
-	pdev->driver_data = port;
+	pci_set_drvdata(pdev, port);
 	
 	port->open = cs461x_gameport_open;
 	port->read = cs461x_gameport_read;

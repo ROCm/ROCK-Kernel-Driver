@@ -6,7 +6,7 @@
 #ifndef _LINUX_ATMAPI_H
 #define _LINUX_ATMAPI_H
 
-#ifdef __sparc__
+#if defined(__sparc__) || defined(__ia64__)
 /* such alignment is not required on 32 bit sparcs, but we can't
    figure that we are on a sparc64 while compiling user-space programs. */
 #define __ATM_API_ALIGN	__attribute__((aligned(8)))
@@ -24,6 +24,6 @@
  * Convention: NULL pointers are passed as a field of all zeroes.
  */
  
-typedef struct { unsigned char _[8]; } atm_kptr_t;
+typedef struct { unsigned char _[8]; } __ATM_API_ALIGN atm_kptr_t;
 
 #endif

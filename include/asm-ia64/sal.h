@@ -7,10 +7,14 @@
  * This is based on version 2.5 of the manual "IA-64 System
  * Abstraction Layer".
  *
+ * Copyright (C) 2001 Intel
+ * Copyright (C) 2001 Fred Lewis <frederick.v.lewis@intel.com>
  * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
  * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Srinivasa Prasad Thirumalachar <sprasad@sprasad.engr.sgi.com>
  *
+ * 01/01/03 fvlewis Updated Error Record Structures to conform with Nov. 2000
+ *                  revision of the SAL spec.
  * 99/09/29 davidm	Updated for SAL 2.6.
  * 00/03/29 cfleck      Updated SAL Error Logging info for processor (SAL 2.6) 
  *                      (plus examples of platform error info structures from smariset @ Intel)
@@ -19,7 +23,9 @@
 #include <linux/spinlock.h>
 
 #include <asm/pal.h>
+#include <asm/efi.h>
 #include <asm/system.h>
+#include <asm/fpu.h>
 
 extern spinlock_t sal_lock;
 
@@ -173,10 +179,8 @@ typedef struct ia64_sal_ptc_domain_info {
 } ia64_sal_ptc_domain_info_t;
 
 typedef struct ia64_sal_ptc_domain_proc_entry {
-	u64 reserved : 16;
-	u64 eid : 8;		/* eid of processor */
 	u64 id  : 8;		/* id of processor */
-	u64 ignored : 32;
+	u64 eid : 8;		/* eid of processor */
 } ia64_sal_ptc_domain_proc_entry_t;
 
 
@@ -199,19 +203,15 @@ extern void ia64_sal_init (struct ia64_sal_systab *sal_systab);
 enum {
 	SAL_INFO_TYPE_MCA	=		0,	/* Machine check abort information */
         SAL_INFO_TYPE_INIT	=		1,	/* Init information */
-        SAL_INFO_TYPE_CMC	=		2 	/* Corrected machine check information */
-};
-
-/* Sub information type encodings */
-enum {
-        SAL_SUB_INFO_TYPE_PROCESSOR	=	0,	/* Processor information */
-        SAL_SUB_INFO_TYPE_PLATFORM	=	1	/* Platform information */
+        SAL_INFO_TYPE_CMC   =       2,  /* Corrected machine check information */
+        SAL_INFO_TYPE_CPE   =       3   /* Corrected platform error information */
 };
 
 /* Encodings for machine check parameter types */
 enum {
         SAL_MC_PARAM_RENDEZ_INT		=	1,	/* Rendezevous interrupt */
-        SAL_MC_PARAM_RENDEZ_WAKEUP	=	2	/* Wakeup */
+        SAL_MC_PARAM_RENDEZ_WAKEUP  =   2,  /* Wakeup */
+        SAL_MC_PARAM_CPE_INT        =   3   /* Corrected Platform Error Int */
 };
 
 /* Encodings for rendezvous mechanisms */
@@ -227,174 +227,389 @@ enum {
 	SAL_VECTOR_OS_BOOT_RENDEZ	= 2
 };
 
-/* Definition of the SAL Error Log from the SAL spec */
+/*
+** Definition of the SAL Error Log from the SAL spec
+*/
 
-/* Definition of timestamp according to SAL spec for logging purposes */
-
-typedef struct sal_log_timestamp {
-	u8 slh_century;		/* Century (19, 20, 21, ...) */
-	u8 slh_year;		/* Year (00..99) */
-	u8 slh_month;		/* Month (1..12) */
-	u8 slh_day;		/* Day (1..31) */
-	u8 slh_reserved;					
-	u8 slh_hour;		/* Hour (0..23)	*/
-	u8 slh_minute;		/* Minute (0..59) */
-	u8 slh_second;		/* Second (0..59) */
-} sal_log_timestamp_t;
-
+/* SAL Error Record Section GUID Definitions */
+#define SAL_PROC_DEV_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf1, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_MEM_DEV_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf2, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_SEL_DEV_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf3, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_PCI_BUS_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf4, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_SMBIOS_DEV_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf5, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_PCI_COMP_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf6, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_SPECIFIC_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf7, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_HOST_CTLR_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf8, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
+#define SAL_PLAT_BUS_ERR_SECT_GUID  \
+    ((efi_guid_t) { 0xe429faf9, 0x3cb7, 0x11d4, { 0xbc, 0xa7, 0x0, 0x80, \
+                    0xc7, 0x3c, 0x88, 0x81 }} )
 
 #define MAX_CACHE_ERRORS			6
 #define MAX_TLB_ERRORS				6
 #define MAX_BUS_ERRORS				1
 
-typedef struct sal_log_processor_info {
-	struct	{
-		u64 slpi_psi		: 1,
-		    slpi_cache_check: MAX_CACHE_ERRORS,
-		    slpi_tlb_check	: MAX_TLB_ERRORS,
-		    slpi_bus_check	: MAX_BUS_ERRORS,
-		    slpi_reserved2	: (31 - (MAX_TLB_ERRORS + MAX_CACHE_ERRORS
-		    			 + MAX_BUS_ERRORS)),
-		    slpi_minstate	: 1,
-		    slpi_bank1_gr	: 1,
-		    slpi_br		: 1,
-		    slpi_cr		: 1,
-		    slpi_ar		: 1,
-		    slpi_rr		: 1,
-		    slpi_fr		: 1,
-		    slpi_reserved1	: 25;
-	} slpi_valid;
+/* Definition of version  according to SAL spec for logging purposes */
+typedef struct sal_log_revision
+{
+    u8  minor;              /* BCD (0..99) */
+    u8  major;              /* BCD (0..99) */
+} sal_log_revision_t;
 
-	pal_processor_state_info_t slpi_processor_state_info;
+/* Definition of timestamp according to SAL spec for logging purposes */
+typedef struct sal_log_timestamp
+{
+	u8 slh_second;		/* Second (0..59) */
+    u8 slh_minute;      /* Minute (0..59) */
+    u8 slh_hour;        /* Hour (0..23) */
+    u8 slh_reserved;
+    u8 slh_day;         /* Day (1..31) */
+    u8 slh_month;       /* Month (1..12) */
+    u8 slh_year;        /* Year (00..99) */
+    u8 slh_century;     /* Century (19, 20, 21, ...) */
+} sal_log_timestamp_t;
 
-	struct {
-		pal_cache_check_info_t slpi_cache_check;
-		u64 slpi_target_address;
-	} slpi_cache_check_info[MAX_CACHE_ERRORS];
-		
-	pal_tlb_check_info_t slpi_tlb_check_info[MAX_TLB_ERRORS];
+/* Definition of log record  header structures */
+typedef struct sal_log_record_header
+{
+    u64                 id;             /* Unique monotonically increasing ID */
+    sal_log_revision_t  revision;       /* Major and Minor revision of header */
+    u16                 severity;       /* Error Severity */
+    u32                 len;            /* Length of this error log in bytes */
+    sal_log_timestamp_t timestamp;      /* Timestamp */
+    efi_guid_t          platform_guid;  /* Unique OEM Platform ID */
+} sal_log_record_header_t;
 
-	struct {
-		pal_bus_check_info_t slpi_bus_check;
-		u64 slpi_requestor_addr;	
-		u64 slpi_responder_addr;	
-		u64 slpi_target_addr;
-	} slpi_bus_check_info[MAX_BUS_ERRORS];
+/* Definition of log section header structures */
+typedef struct sal_log_sec_header
+{
+    efi_guid_t          guid;       /* Unique Section ID */
+    sal_log_revision_t  revision;   /* Major and Minor revision of Section */
+    u16                 reserved;
+    u32                 len;        /* Section length */
+} sal_log_section_hdr_t;
 
-	pal_min_state_area_t slpi_min_state_area;
-	u64 slpi_br[8];
-	u64 slpi_cr[128];
-	u64 slpi_ar[128];
-	u64 slpi_rr[8];
-	u64 slpi_fr[128];
+typedef struct sal_log_mod_error_info
+{
+    struct
+    {
+        u64 check_info              : 1,
+            requestor_identifier    : 1,
+            responder_identifier    : 1,
+            target_identifier       : 1,
+            precise_ip              : 1,
+            reserved                : 59;
+    } valid;
+    u64 check_info;
+    u64 requestor_identifier;
+    u64 responder_identifier;
+    u64 target_identifier;
+    u64 precise_ip;
+} sal_log_mod_error_info_t;
+
+typedef struct sal_processor_static_info
+{
+    struct
+    {
+        u64 minstate        : 1,
+            br              : 1,
+            cr              : 1,
+            ar              : 1,
+            rr              : 1,
+            fr              : 1,
+            reserved        : 58;
+    } valid;
+    pal_min_state_area_t    min_state_area;
+    u64                     br[8];
+    u64                     cr[128];
+    u64                     ar[128];
+    u64                     rr[8];
+    struct ia64_fpreg       fr[128];
+} sal_processor_static_info_t;
+
+typedef struct sal_log_processor_info
+{
+    sal_log_section_hdr_t       header;
+    struct
+    {
+        u64 proc_error_map      : 1,
+            proc_state_param    : 1,
+            proc_cr_lid         : 1,
+            psi_static_struct   : 1,
+            num_cache_check     : 4,
+            num_tlb_check       : 4,
+            num_bus_check       : 4,
+            num_reg_file_check  : 4,
+            num_ms_check        : 4,
+            cpuid_info          : 1,
+            reserved1           : 39;
+    } valid;
+    u64                         proc_error_map;
+    u64                         proc_state_parameter;
+    u64                         proc_cr_lid;
+    sal_log_mod_error_info_t    cache_check_info[16];
+    sal_log_mod_error_info_t    tlb_check_info[16];
+    sal_log_mod_error_info_t    bus_check_info[16];
+    sal_log_mod_error_info_t    reg_file_check_info[16];
+    sal_log_mod_error_info_t    ms_check_info[16];
+    struct
+    {
+        u64 regs[5];
+        u64 reserved;
+    } cpuid_info;
+    sal_processor_static_info_t processor_static_info;
 } sal_log_processor_info_t;
 
 /* platform error log structures */
-typedef struct platerr_logheader {
-	u64 nextlog;		/* next log offset if present */
-	u64 loglength;		/* log length */
-	u64 logsubtype;		/* log subtype memory/bus/component */
-	u64 eseverity;		/* error severity */
-} ehdr_t;
 
-typedef struct sysmem_errlog {
-	ehdr_t lhdr;		/* header */
-	u64 vflag;		/* valid bits for each field in the log */
-	u64 addr;		/* memory address */
-	u64 data;		/* memory data */
-	u64 cmd;		/* command bus value if any */
-	u64 ctrl;		/* control bus value if any */
-	u64 addrsyndrome;	/* memory address ecc/parity syndrome bits */
-	u64 datasyndrome;	/* data ecc/parity syndrome */
-	u64 cacheinfo;		/* platform cache info as defined in pal spec. table 7-34 */
-} merrlog_t;
+typedef struct sal_log_mem_dev_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 error_status    : 1,
+            physical_addr   : 1,
+            addr_mask       : 1,
+            node            : 1,
+            card            : 1,
+            module          : 1,
+            bank            : 1,
+            device          : 1,
+            row             : 1,
+            column          : 1,
+            bit_position    : 1,
+            requestor_id    : 1,
+            responder_id    : 1,
+            target_id       : 1,
+            bus_spec_data   : 1,
+            oem_id          : 1,
+            oem_data        : 1,
+            reserved        : 47;
+    } valid;
+    u64             error_status;
+    u64             physical_addr;
+    u64             addr_mask;
+    u16             node;
+    u16             card;
+    u16             module;
+    u16             bank;
+    u16             device;
+    u16             row;
+    u16             column;
+    u16             bit_position;
+    u64             requestor_id;
+    u64             responder_id;
+    u64             target_id;
+    u64             bus_spec_data;
+    u8              oem_id[16];
+    u8              oem_data[1];        /* Variable length data */
+} sal_log_mem_dev_err_info_t;
 
-typedef struct sysbus_errlog {
-	ehdr_t lhdr;		/* linkded list header */
-	u64 vflag;		/* valid bits for each field in the log */
-	u64 busnum;		/* bus number in error */
-	u64 reqaddr;		/* requestor address */
-	u64 resaddr;		/* responder address */
-	u64 taraddr;		/* target address */
-	u64 data;		/* requester r/w data */
-	u64 cmd;		/* bus commands */
-	u64 ctrl;		/* bus controls (be# &-0) */
-	u64 addrsyndrome;	/* addr bus ecc/parity bits */
-	u64 datasyndrome;	/* data bus ecc/parity bits */
-	u64 cmdsyndrome;	/* command bus ecc/parity bits */
-	u64 ctrlsyndrome;	/* control bus ecc/parity bits */
-} berrlog_t;
+typedef struct sal_log_sel_dev_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 record_id       : 1,
+            record_type     : 1,
+            generator_id    : 1,
+            evm_rev         : 1,
+            sensor_type     : 1,
+            sensor_num      : 1,
+            event_dir       : 1,
+            event_data1     : 1,
+            event_data2     : 1,
+            event_data3     : 1,
+            reserved        : 54;
+    } valid;
+    u16             record_id;
+    u8              record_type;
+    u8              timestamp[4];
+    u16             generator_id;
+    u8              evm_rev;
+    u8              sensor_type;
+    u8              sensor_num;
+    u8              event_dir;
+    u8              event_data1;
+    u8              event_data2;
+    u8              event_data3;
+} sal_log_sel_dev_err_info_t;
 
-/* platform error log structures */
-typedef struct syserr_chdr {	/* one header per component */
-	u64 busnum;		/* bus number on which the component resides */
-	u64 devnum;		/* same as device select */
-	u64 funcid;		/* function id of the device */
-	u64 devid;		/* pci device id */
-	u64 classcode;		/* pci class code for the device */
-	u64 cmdreg;		/* pci command reg value */
-	u64 statreg;		/* pci status reg value */
-} chdr_t;
+typedef struct sal_log_pci_bus_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 err_status      : 1,
+            err_type        : 1,
+            bus_id          : 1,
+            bus_address     : 1,
+            bus_data        : 1,
+            bus_cmd         : 1,
+            requestor_id    : 1,
+            responder_id    : 1,
+            target_id       : 1,
+            oem_data        : 1,
+            reserved        : 54;
+    } valid;
+    u64             err_status;
+    u16             err_type;
+    u16             bus_id;
+    u32             reserved;
+    u64             bus_address;
+    u64             bus_data;
+    u64             bus_cmd;
+    u64             requestor_id;
+    u64             responder_id;
+    u64             target_id;
+    u8              oem_data[1];        /* Variable length data */
+} sal_log_pci_bus_err_info_t;
 
-typedef struct cfginfo {
-	u64 cfgaddr;
-	u64 cfgval;
-} cfginfo_t;
+typedef struct sal_log_smbios_dev_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 event_type      : 1,
+            length          : 1,
+            time_stamp      : 1,
+            data            : 1,
+            reserved1       : 60;
+    } valid;
+    u8              event_type;
+    u8              length;
+    u8              time_stamp[6];
+    u8              data[1];  // data of variable length, length == slsmb_length
+} sal_log_smbios_dev_err_info_t;
 
-typedef struct sys_comperr {	/* per component */
-	ehdr_t lhdr;		/* linked list header */
-	u64 vflag;		/* valid bits for each field in the log */
-	chdr_t scomphdr;	
-	u64 numregpair;		/* number of reg addr/value pairs */
-	cfginfo_t cfginfo;
-} cerrlog_t;
+typedef struct sal_log_pci_comp_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 err_status      : 1,
+            comp_info       : 1,
+            num_mem_regs    : 1,
+            num_io_regs     : 1,
+            reg_data_pairs  : 1,
+            oem_data        : 1,
+            reserved        : 58;
+    } valid;
+    u64             err_status;
+    struct
+    {
+        u16 vendor_id;
+        u16 device_id;
+        u16 class_code;
+        u8  func_num;
+        u8  dev_num;
+        u8  bus_num;
+        u8  seg_num;
+        u8  reserved[6];
+    }               comp_info;
+    u32             num_mem_regs;
+    u32             num_io_regs;
+    u64             reg_data_pairs[1];
+    /* array of address/data register pairs is num_mem_regs + num_io_regs
+       elements long.  Each array element consists of a u64 address followed
+       by a u64 data value.  The oem_data array immediately follows the the
+       reg_data_pairs array */
+    u8              oem_data[1];        /* Variable length data */
+} sal_log_pci_comp_err_info_t;
 
-typedef struct sel_records {
-	ehdr_t lhdr;
-	u64 seldata;
-} isel_t;
+typedef struct sal_log_plat_specific_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 err_status      : 1,
+            guid            : 1,
+            oem_data        : 1,
+            reserved        : 61;
+    } valid;
+    u64             err_status;
+    efi_guid_t      guid;
+    u8              oem_data[1];      /* platform specific variable length data */
+} sal_log_plat_specific_err_info_t;
 
-typedef struct plat_errlog {
-	u64 mbcsvalid;		/* valid bits for each type of log */
-	merrlog_t smemerrlog;	/* platform memory error logs */
-	berrlog_t sbuserrlog;	/* platform bus error logs */
-	cerrlog_t scomperrlog;	/* platform chipset error logs */
-	isel_t selrecord;	/* ipmi sel record */
-} platforminfo_t;
+typedef struct sal_log_host_ctlr_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 err_status      : 1,
+            requestor_id    : 1,
+            responder_id    : 1,
+            target_id       : 1,
+            bus_spec_data   : 1,
+            oem_data        : 1,
+            reserved        : 58;
+    } valid;
+    u64             err_status;
+    u64             requestor_id;
+    u64             responder_id;
+    u64             target_id;
+    u64             bus_spec_data;
+    u8              oem_data[1];        /* Variable length OEM data */
+} sal_log_host_ctlr_err_info_t;
 
-/* over all log structure (processor+platform) */
+typedef struct sal_log_plat_bus_err_info
+{
+    sal_log_section_hdr_t   header;
+    struct
+    {
+        u64 err_status      : 1,
+            requestor_id    : 1,
+            responder_id    : 1,
+            target_id       : 1,
+            bus_spec_data   : 1,
+            oem_data        : 1,
+            reserved        : 58;
+    } valid;
+    u64             err_status;
+    u64             requestor_id;
+    u64             responder_id;
+    u64             target_id;
+    u64             bus_spec_data;
+    u8              oem_data[1];        /* Variable length OEM data */
+} sal_log_plat_bus_err_info_t;
 
-typedef union udev_specific_log {
-	sal_log_processor_info_t proclog;
-	platforminfo_t platlog;
-} devicelog_t;
+/* Overall platform error section structure */
+typedef union sal_log_platform_err_info
+{
+    sal_log_mem_dev_err_info_t          mem_dev_err;
+    sal_log_sel_dev_err_info_t          sel_dev_err;
+    sal_log_pci_bus_err_info_t          pci_bus_err;
+    sal_log_smbios_dev_err_info_t       smbios_dev_err;
+    sal_log_pci_comp_err_info_t         pci_comp_err;
+    sal_log_plat_specific_err_info_t    plat_specific_err;
+    sal_log_host_ctlr_err_info_t        host_ctlr_err;
+    sal_log_plat_bus_err_info_t         plat_bus_err;
+} sal_log_platform_err_info_t;
 
-
-#define sal_log_processor_info_psi_valid		slpi_valid.spli_psi
-#define sal_log_processor_info_cache_check_valid	slpi_valid.spli_cache_check
-#define sal_log_processor_info_tlb_check_valid		slpi_valid.spli_tlb_check
-#define sal_log_processor_info_bus_check_valid		slpi_valid.spli_bus_check
-#define sal_log_processor_info_minstate_valid		slpi_valid.spli_minstate
-#define sal_log_processor_info_bank1_gr_valid		slpi_valid.slpi_bank1_gr
-#define sal_log_processor_info_br_valid			slpi_valid.slpi_br
-#define sal_log_processor_info_cr_valid			slpi_valid.slpi_cr
-#define sal_log_processor_info_ar_valid			slpi_valid.slpi_ar
-#define sal_log_processor_info_rr_valid			slpi_valid.slpi_rr
-#define sal_log_processor_info_fr_valid			slpi_valid.slpi_fr
-
-typedef struct sal_log_header {
-	u64 slh_next_log;	/* Offset of the next log from the beginning of this structure */
-	u32 slh_log_len;	/* Length of this error log in bytes */
-	u16 slh_log_type;	/* Type of log (0 - cpu ,1 - platform) */
-	u16 slh_log_sub_type;	/* SGI specific sub type */
-	sal_log_timestamp_t slh_log_timestamp;	/* Timestamp */
-} sal_log_header_t;
-
-/* SAL PSI log structure */
-typedef struct psilog {
-	sal_log_header_t sal_elog_header;
-	devicelog_t devlog;
-} ia64_psilog_t;
+/* SAL log over-all, multi-section error record structure (processor+platform) */
+typedef struct err_rec
+{
+    sal_log_record_header_t     sal_elog_header;
+    sal_log_processor_info_t    proc_err;
+    sal_log_platform_err_info_t plat_err;
+    u8                          oem_data_pad[1024];
+} ia64_err_rec_t;
 
 /*
  * Now define a couple of inline functions for improved type checking
@@ -433,19 +648,20 @@ ia64_sal_cache_init (void)
 }
 
 /* Clear the processor and platform information logged by SAL with respect to the 
- * machine state at the time of MCA's, INITs or CMCs 
+ * machine state at the time of MCA's, INITs, CMCs, or CPEs.
  */
 static inline s64
 ia64_sal_clear_state_info (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, 0, 0, 0, 0, 0, 0);
+    SAL_CALL(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, 0,
+             0, 0, 0, 0, 0);
 	return isrv.status;
 }
 
 
 /* Get the processor and platform information logged by SAL with respect to the machine
- * state at the time of the MCAs, INITs or CMCs.
+ * state at the time of the MCAs, INITs, CMCs, or CPEs.
  */
 static inline u64
 ia64_sal_get_state_info (u64 sal_info_type, u64 *sal_info)
@@ -455,16 +671,18 @@ ia64_sal_get_state_info (u64 sal_info_type, u64 *sal_info)
 	         sal_info, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
+
 	return isrv.v0;
 }	
 /* Get the maximum size of the information logged by SAL with respect to the machine 
- * state at the time of MCAs, INITs or CMCs
+ * state at the time of MCAs, INITs, CMCs, or CPEs.
  */
 static inline u64
 ia64_sal_get_state_info_size (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, 0, 0, 0, 0, 0, 0);
+    SAL_CALL(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, 0,
+             0, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
 	return isrv.v0;

@@ -44,23 +44,23 @@ struct alpha_machine_vector
 	void (*mv_pci_tbi)(struct pci_controller *hose,
 			   dma_addr_t start, dma_addr_t end);
 
-	unsigned int (*mv_inb)(unsigned long);
-	unsigned int (*mv_inw)(unsigned long);
-	unsigned int (*mv_inl)(unsigned long);
+	u8 (*mv_inb)(unsigned long);
+	u16 (*mv_inw)(unsigned long);
+	u32 (*mv_inl)(unsigned long);
 
-	void (*mv_outb)(unsigned char, unsigned long);
-	void (*mv_outw)(unsigned short, unsigned long);
-	void (*mv_outl)(unsigned int, unsigned long);
+	void (*mv_outb)(u8, unsigned long);
+	void (*mv_outw)(u16, unsigned long);
+	void (*mv_outl)(u32, unsigned long);
 	
-	unsigned long (*mv_readb)(unsigned long);
-	unsigned long (*mv_readw)(unsigned long);
-	unsigned long (*mv_readl)(unsigned long);
-	unsigned long (*mv_readq)(unsigned long);
+	u8 (*mv_readb)(unsigned long);
+	u16 (*mv_readw)(unsigned long);
+	u32 (*mv_readl)(unsigned long);
+	u64 (*mv_readq)(unsigned long);
 
-	void (*mv_writeb)(unsigned char, unsigned long);
-	void (*mv_writew)(unsigned short, unsigned long);
-	void (*mv_writel)(unsigned int, unsigned long);
-	void (*mv_writeq)(unsigned long, unsigned long);
+	void (*mv_writeb)(u8, unsigned long);
+	void (*mv_writew)(u16, unsigned long);
+	void (*mv_writel)(u32, unsigned long);
+	void (*mv_writeq)(u64, unsigned long);
 
 	unsigned long (*mv_ioremap)(unsigned long, unsigned long);
 	void (*mv_iounmap)(unsigned long);

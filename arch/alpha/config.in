@@ -296,6 +296,10 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 fi
 endmenu
 
+if [ "$CONFIG_PCI" = "y" ]; then
+  source drivers/message/fusion/Config.in
+fi
+
 if [ "$CONFIG_NET" = "y" ]; then
   mainmenu_option next_comment
   comment 'Network device support'

@@ -86,7 +86,7 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 	port->gameport.io = ioport;
 	port->size = iolen;
 	port->dev = pdev;
-	pdev->driver_data = port;
+	pci_set_drvdata(pdev, port);
 
 	gameport_register_port(&port->gameport);
 
@@ -98,7 +98,7 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 
 static void __devexit emu_remove(struct pci_dev *pdev)
 {
-	struct emu *port = (struct emu *)pdev->driver_data;
+	struct emu *port = pci_get_drvdata(pdev);
 	gameport_unregister_port(&port->gameport);
 	release_region(port->gameport.io, port->size);
 	kfree(port);

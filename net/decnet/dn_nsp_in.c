@@ -355,6 +355,9 @@ static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 		scp->info_rem = cb->info;
 		scp->segsize_rem = cb->segsize;
 
+		if ((scp->services_rem & NSP_FC_MASK) == NSP_FC_NONE)
+			scp->max_window = decnet_no_fc_max_cwnd;
+
 		if (skb->len > 0) {
 			unsigned char dlen = *skb->data;
 			if ((dlen <= 16) && (dlen <= skb->len)) {

@@ -167,14 +167,14 @@ static int irda_insert_integer(void *self, __u8 *buf, int len, __u8 pi,
 	IRDA_DEBUG(2, __FUNCTION__ "(), pi=%#x, pl=%d, pi=%d\n", p.pi, p.pl, p.pv.i);
 	switch (p.pl) {
 	case 1:
-		n += irda_param_pack(buf, "bbb", p.pi, p.pl, p.pv.b);
+		n += irda_param_pack(buf, "bbb", p.pi, p.pl, (__u8) p.pv.i);
 		break;
 	case 2:
 		if (type & PV_BIG_ENDIAN)
-			cpu_to_be16s(&p.pv.s);
+			p.pv.i = cpu_to_be16((__u16) p.pv.i);
 		else
-			cpu_to_le16s(&p.pv.s);
-		n += irda_param_pack(buf, "bbs", p.pi, p.pl, p.pv.s);
+			p.pv.i = cpu_to_le16((__u16) p.pv.i);
+		n += irda_param_pack(buf, "bbs", p.pi, p.pl, (__u16) p.pv.i);
 		break;
 	case 4:
 		if (type & PV_BIG_ENDIAN)
@@ -230,16 +230,17 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 		return p.pl+2;
 	}
 
+
 	switch (p.pl) {
 	case 1:
-		n += irda_param_unpack(buf+2, "b", &p.pv.b);
+		n += irda_param_unpack(buf+2, "b", &p.pv.i);
 		break;
 	case 2:
-		n += irda_param_unpack(buf+2, "s", &p.pv.s);
+		n += irda_param_unpack(buf+2, "s", &p.pv.i);
 		if (type & PV_BIG_ENDIAN)
-			be16_to_cpus(&p.pv.s);
+			p.pv.i = be16_to_cpu((__u16) p.pv.i);
 		else
-			le16_to_cpus(&p.pv.s);
+			p.pv.i = le16_to_cpu((__u16) p.pv.i);
 		break;
 	case 4:
 		n += irda_param_unpack(buf+2, "i", &p.pv.i);
@@ -255,6 +256,7 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 		return p.pl+2;
 	}
 
+	IRDA_DEBUG(2, __FUNCTION__ "(), pi=%#x, pl=%d, pi=%d\n", p.pi, p.pl, p.pv.i);
 	/* Call handler for this parameter */
 	err = (*func)(self, &p, PV_PUT);
 	if (err < 0)
@@ -359,8 +361,8 @@ int irda_param_pack(__u8 *buf, char *fmt, ...)
 			buf[n++] = (__u8)va_arg(args, int);
 			break;
 		case 's':  /* 16 bits unsigned short */
-			arg.s = (__u16)va_arg(args, int);
-			put_unaligned(arg.s, (__u16 *)(buf+n)); n+=2;
+			arg.i = (__u16)va_arg(args, int);
+			put_unaligned((__u16)arg.i, (__u16 *)(buf+n)); n+=2;
 			break;
 		case 'i':  /* 32 bits unsigned integer */
 			arg.i = va_arg(args, __u32);
@@ -402,12 +404,12 @@ int irda_param_unpack(__u8 *buf, char *fmt, ...)
 	for (p = fmt; *p != '\0'; p++) {
 		switch (*p) {
 		case 'b':  /* 8 bits byte */
-			arg.bp = va_arg(args, __u8 *);
-			*arg.bp = buf[n++];
+			arg.ip = va_arg(args, __u32 *);
+			*arg.ip = buf[n++];
 			break;
 		case 's':  /* 16 bits short */
-			arg.sp = va_arg(args, __u16 *);
-			*arg.sp = get_unaligned((__u16 *)(buf+n)); n+=2;
+			arg.ip = va_arg(args, __u32 *);
+			*arg.ip = get_unaligned((__u16 *)(buf+n)); n+=2;
 			break;
 		case 'i':  /* 32 bits unsigned integer */
 			arg.ip = va_arg(args, __u32 *);

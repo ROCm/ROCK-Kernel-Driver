@@ -165,6 +165,8 @@ long strnlen_user(const char *s, long n)
 	unsigned long res, tmp;
 
 	__asm__ __volatile__(
+		"	testl %0, %0\n"
+		"	jz 3f\n"
 		"	andl %0,%%ecx\n"
 		"0:	repne; scasb\n"
 		"	setne %%al\n"
@@ -173,6 +175,8 @@ long strnlen_user(const char *s, long n)
 		"1:\n"
 		".section .fixup,\"ax\"\n"
 		"2:	xorl %%eax,%%eax\n"
+		"	jmp 1b\n"
+		"3:	movb $1,%%al\n"
 		"	jmp 1b\n"
 		".previous\n"
 		".section __ex_table,\"a\"\n"

@@ -31,7 +31,6 @@
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */
 #include <linux/config.h>
 #include <linux/notifier.h>
-#include <linux/ioport.h>	/* Needed for struct resource */
 #include <asm/atomic.h>
 
 /*
@@ -82,7 +81,7 @@ struct i2o_device
 struct i2o_pci
 {
 	int		irq;
-	int		queue_buggy:1;	/* Don't send a lot of messages */
+	int		queue_buggy:3;	/* Don't send a lot of messages */
 	int		short_req:1;	/* Use small block sizes        */
 	int		dpt:1;		/* Don't quiesce                */
 #ifdef CONFIG_MTRR

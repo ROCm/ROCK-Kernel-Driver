@@ -8,7 +8,7 @@
  *	r8:	number of bytes that didn't get cleared due to a fault
  *
  * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  */
 
 #include <asm/asmmacro.h>
@@ -62,11 +62,11 @@ GLOBAL_ENTRY(__do_clear_user)
 	;;				// avoid WAW on CFM
 	adds tmp=-1,len			// br.ctop is repeat/until
 	mov ret0=len			// return value is length at this point
-(p6)	br.ret.spnt.few rp
+(p6)	br.ret.spnt.many rp
 	;;
 	cmp.lt p6,p0=16,len		// if len > 16 then long memset
 	mov ar.lc=tmp			// initialize lc for small count
-(p6)	br.cond.dptk.few long_do_clear
+(p6)	br.cond.dptk .long_do_clear
 	;;				// WAR on ar.lc
 	//
 	// worst case 16 iterations, avg 8 iterations
@@ -79,7 +79,7 @@ GLOBAL_ENTRY(__do_clear_user)
 1:
 	EX( .Lexit1, st1 [buf]=r0,1 )
 	adds len=-1,len			// countdown length using len
-	br.cloop.dptk.few 1b
+	br.cloop.dptk 1b
 	;;				// avoid RAW on ar.lc
 	//
 	// .Lexit4: comes from byte by byte loop
@@ -87,7 +87,7 @@ GLOBAL_ENTRY(__do_clear_user)
 .Lexit1:
 	mov ret0=len			// faster than using ar.lc
 	mov ar.lc=saved_lc
-	br.ret.sptk.few rp		// end of short clear_user
+	br.ret.sptk.many rp		// end of short clear_user
 
 
 	//
@@ -98,7 +98,7 @@ GLOBAL_ENTRY(__do_clear_user)
 	// instead of ret0 is due to the fact that the exception code
 	// changes the values of r8.
 	//
-long_do_clear:
+.long_do_clear:
 	tbit.nz p6,p0=buf,0		// odd alignment (for long_do_clear)
 	;;
 	EX( .Lexit3, (p6) st1 [buf]=r0,1 )	// 1-byte aligned
@@ -119,7 +119,7 @@ long_do_clear:
 	;;
 	cmp.eq p6,p0=r0,cnt
 	adds tmp=-1,cnt
-(p6)	br.cond.dpnt.few .dotail	// we have less than 16 bytes left
+(p6)	br.cond.dpnt .dotail		// we have less than 16 bytes left
 	;;
 	adds buf2=8,buf			// setup second base pointer
 	mov ar.lc=tmp
@@ -148,7 +148,7 @@ long_do_clear:
 	;;				// needed to get len correct when error
 	st8 [buf2]=r0,16
 	adds len=-16,len
-	br.cloop.dptk.few 2b
+	br.cloop.dptk 2b
 	;;
 	mov ar.lc=saved_lc
 	//
@@ -178,7 +178,7 @@ long_do_clear:
 	;;
 	EX( .Lexit2, (p7) st1 [buf]=r0 )	// only 1 byte left
 	mov ret0=r0				// success
-	br.ret.dptk.few rp			// end of most likely path
+	br.ret.sptk.many rp			// end of most likely path
 
 	//
 	// Outlined error handling code
@@ -205,5 +205,5 @@ long_do_clear:
 .Lexit3:
 	mov ret0=len
 	mov ar.lc=saved_lc
-	br.ret.dptk.few rp
+	br.ret.sptk.many rp
 END(__do_clear_user)

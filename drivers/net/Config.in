@@ -274,6 +274,9 @@ if [ ! "$CONFIG_PPP" = "n" ]; then
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       dep_tristate '  PPP over Ethernet (EXPERIMENTAL)' CONFIG_PPPOE $CONFIG_PPP
    fi
+   if [ ! "$CONFIG_ATM" = "n" ]; then
+      dep_tristate '  PPP over ATM (EXPERIMENTAL)' CONFIG_PPPOATM $CONFIG_PPP
+   fi
 fi
 
 tristate 'SLIP (serial line) support' CONFIG_SLIP

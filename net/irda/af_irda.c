@@ -11,7 +11,7 @@
  * Sources:       af_netroom.c, af_ax25.c, af_rose.c, af_x25.c etc.
  * 
  *     Copyright (c) 1999 Dag Brattli <dagb@cs.uit.no>
- *     Copyright (c) 1999 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 1999-2001 Jean Tourrilhes <jt@hpl.hp.com>
  *     All Rights Reserved.
  *
  *     This program is free software; you can redistribute it and/or 
@@ -134,33 +134,41 @@ static void irda_disconnect_indication(void *instance, void *sap,
 
 	IRDA_DEBUG(2, __FUNCTION__ "(%p)\n", self);
 
+	/* Don't care about it, but let's not leak it */
+	if(skb)
+		dev_kfree_skb(skb);
+
 	sk = self->sk;
 	if (sk == NULL)
 		return;
 
-	sk->state     = TCP_CLOSE;
-        sk->err       = ECONNRESET;
-        sk->shutdown |= SEND_SHUTDOWN;
-	if (!sk->dead) {
-		sk->state_change(sk);
-                sk->dead = 1;
-        }
+	/* Prevent race conditions with irda_release() and irda_shutdown() */
+	if ((!sk->dead) && (sk->state != TCP_CLOSE)) {
+		sk->state     = TCP_CLOSE;
+		sk->err       = ECONNRESET;
+		sk->shutdown |= SEND_SHUTDOWN;
 
-	/* Close our TSAP.
-	 * If we leave it open, IrLMP put it back into the list of
-	 * unconnected LSAPs. The problem is that any incoming request
-	 * can then be matched to this socket (and it will be, because
-	 * it is at the head of the list). This would prevent any
-	 * listening socket waiting on the same TSAP to get those requests.
-	 * Some apps forget to close sockets, or hang to it a bit too long,
-	 * so we may stay in this dead state long enough to be noticed...
-	 * Note : all socket function do check sk->state, so we are safe...
-	 * Jean II
-	 */
-	if (self->tsap) {
-		irttp_close_tsap(self->tsap);
-		self->tsap = NULL;
-	}
+		sk->state_change(sk);
+                sk->dead = 1;	/* Uh-oh... Should use sock_orphan ? */
+
+		/* Close our TSAP.
+		 * If we leave it open, IrLMP put it back into the list of
+		 * unconnected LSAPs. The problem is that any incoming request
+		 * can then be matched to this socket (and it will be, because
+		 * it is at the head of the list). This would prevent any
+		 * listening socket waiting on the same TSAP to get those
+		 * requests. Some apps forget to close sockets, or hang to it
+		 * a bit too long, so we may stay in this dead state long
+		 * enough to be noticed...
+		 * Note : all socket function do check sk->state, so we are
+		 * safe...
+		 * Jean II
+		 */
+		if (self->tsap) {
+			irttp_close_tsap(self->tsap);
+			self->tsap = NULL;
+		}
+        }
 
 	/* Note : once we are there, there is not much you want to do
 	 * with the socket anymore, apart from closing it.
@@ -222,7 +230,8 @@ static void irda_connect_confirm(void *instance, void *sap,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
-	kfree_skb(skb);
+	dev_kfree_skb(skb);
+	// Should be ??? skb_queue_tail(&sk->receive_queue, skb);
 
 	/* We are now connected! */
 	sk->state = TCP_ESTABLISHED;
@@ -1205,7 +1214,7 @@ static int irda_release(struct socket *sock)
 	sk->protinfo.irda = NULL;
 
 	sock_orphan(sk);
-        sock->sk   = NULL;      
+	sock->sk   = NULL;      
 
 	/* Purge queues (see sock_init_data()) */
 	skb_queue_purge(&sk->receive_queue);

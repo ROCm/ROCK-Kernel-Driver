@@ -249,6 +249,8 @@ typedef __u32 kernel_cap_t;
 /* Override resource limits. Set resource limits. */
 /* Override quota limits. */
 /* Override reserved space on ext2 filesystem */
+/* Modify data journaling mode on ext3 filesystem (uses journaling
+   resources) */
 /* NOTE: ext2 honors fsuid when checking for resource overrides, so 
    you can override using fsuid too */
 /* Override size restrictions on IPC message queues */

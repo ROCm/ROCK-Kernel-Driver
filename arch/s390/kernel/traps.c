@@ -94,8 +94,16 @@ asmlinkage void name(struct pt_regs * regs, long interruption_code) \
 static void inline do_trap(long interruption_code, int signr, char *str,
                            struct pt_regs *regs, siginfo_t *info)
 {
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+        if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
                 struct task_struct *tsk = current;
+
                 tsk->thread.trap_no = interruption_code;
 		if (info)
 			force_sig_info(signr, info, tsk);
@@ -160,20 +168,27 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
         __u8 opcode[6];
 	__u16 *location;
 	int signal = 0;
-	int problem_state=(regs->psw.mask & PSW_PROBLEM_STATE);
 
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
-	if(problem_state)
+
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
 		get_user(*((__u16 *) opcode), location);
 	else
 		*((__u16 *)opcode)=*((__u16 *)location);
-	if(*((__u16 *)opcode)==S390_BREAKPOINT_U16)
+	if (*((__u16 *)opcode)==S390_BREAKPOINT_U16)
         {
 		if(do_debugger_trap(regs,SIGTRAP))
 			signal = SIGILL;
 	}
 #ifdef CONFIG_MATHEMU
-        else if (problem_state)
+        else if (regs->psw.mask & PSW_PROBLEM_STATE)
 	{
 		if (opcode[0] == 0xb3) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
@@ -216,8 +231,16 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	__u16 *location = NULL;
 	int signal = 0;
 
+	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
+
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+		
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
-		location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
 		case 0x28: /* LDR Rx,Ry   */
@@ -267,6 +290,14 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	int signal = 0;
 
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
+
+	/*
+	 * We got all needed information from the lowcore and can
+	 * now safely switch on interrupts.
+	 */
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
+		__sti();
+
 	if (MACHINE_HAS_IEEE)
 		__asm__ volatile ("stfpc %0\n\t" 
 				  : "=m" (current->thread.fp_regs.fpc));

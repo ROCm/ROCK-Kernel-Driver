@@ -65,6 +65,7 @@
 
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("/proc interface to EFI Variables");
+MODULE_LICENSE("GPL");
 
 #define EFIVARS_VERSION "0.03 2001-Apr-20"
 
@@ -276,21 +277,20 @@ efivar_write(struct file *file, const char *buffer,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
-	spin_lock(&efivars_lock);
 	MOD_INC_USE_COUNT;
 
 	var_data = kmalloc(size, GFP_KERNEL);
 	if (!var_data) {
 		MOD_DEC_USE_COUNT;
-		spin_unlock(&efivars_lock);
 		return -ENOMEM;
 	}
 	if (copy_from_user(var_data, buffer, size)) {
 		MOD_DEC_USE_COUNT;
-		spin_unlock(&efivars_lock);
+                kfree(var_data);
 		return -EFAULT;
 	}
 
+	spin_lock(&efivars_lock);
 
 	/* Since the data ptr we've currently got is probably for
 	   a different variable find the right variable.

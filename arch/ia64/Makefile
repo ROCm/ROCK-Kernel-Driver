@@ -17,13 +17,15 @@ LINKFLAGS = -static -T arch/$(ARCH)/vmlinux.lds
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
 
-CFLAGS := $(CFLAGS) -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 -falign-functions=32
+CFLAGS := $(CFLAGS) -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
+	  -falign-functions=32
+# -ffunction-sections
 CFLAGS_KERNEL := -mconstant-gp
 
 GCC_VERSION=$(shell $(CROSS_COMPILE)$(HOSTCC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
-	CFLAGS += -frename-registers
+	CFLAGS += -frename-registers --param max-inline-insns=400
 endif
 
 ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
@@ -32,7 +34,7 @@ endif
 
 ifdef CONFIG_IA64_GENERIC
 	CORE_FILES      :=      arch/$(ARCH)/hp/hp.a	\
-				arch/$(ARCH)/sn/sn.a	\
+				arch/$(ARCH)/sn/sn.o	\
 				arch/$(ARCH)/dig/dig.a	\
 				arch/$(ARCH)/sn/io/sgiio.o \
 				$(CORE_FILES)
@@ -52,15 +54,14 @@ ifdef CONFIG_IA64_HP_SIM
                                 $(CORE_FILES)
 endif
 
-ifdef CONFIG_IA64_SGI_SN1
+ifdef CONFIG_IA64_SGI_SN
 	CFLAGS		+= -DBRINGUP
-        SUBDIRS         :=      arch/$(ARCH)/sn/sn1	\
-				arch/$(ARCH)/sn		\
+        SUBDIRS         :=      arch/$(ARCH)/sn/kernel	\
 				arch/$(ARCH)/sn/io	\
 				arch/$(ARCH)/sn/fprom	\
 				$(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/sn/sn.a	\
-				arch/$(ARCH)/sn/io/sgiio.o\
+        CORE_FILES      :=      arch/$(ARCH)/sn/kernel/sn.o	\
+				arch/$(ARCH)/sn/io/sgiio.o	\
 				$(CORE_FILES)
 endif
 
@@ -105,7 +106,7 @@ FORCE: ;
 
 compressed: vmlinux
 	$(OBJCOPY) --strip-all vmlinux vmlinux-tmp
-	gzip -9 vmlinux-tmp
+	gzip vmlinux-tmp
 	mv vmlinux-tmp.gz vmlinux.gz
 
 rawboot:

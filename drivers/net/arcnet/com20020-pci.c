@@ -83,7 +83,7 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 		goto out_dev;
 	}
 	memset(lp, 0, sizeof(struct arcnet_local));
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	ioaddr = pci_resource_start(pdev, 2);
 	dev->base_addr = ioaddr;
@@ -128,7 +128,7 @@ out_dev:
 
 static void __devexit com20020pci_remove(struct pci_dev *pdev)
 {
-	com20020_remove(pdev->driver_data);
+	com20020_remove(pci_get_drvdata(pdev));
 }
 
 static struct pci_device_id com20020pci_id_table[] __devinitdata = {

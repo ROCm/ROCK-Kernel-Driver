@@ -13,7 +13,6 @@
 struct sysv_sb_info {
 	int	       s_type;		/* file system type: FSTYPE_{XENIX|SYSV|COH} */
 	char	       s_bytesex;	/* bytesex (le/be/pdp) */
-	char	       s_kludge_symlinks; /* flag whether symlinks have a kludgey mode */
 	char	       s_truncate;	/* if 1: names > SYSV_NAMELEN chars are truncated */
 					/* if 0: they are disallowed (ENAMETOOLONG) */
 	nlink_t        s_link_max;	/* max number of hard links to a file */
@@ -56,7 +55,6 @@ struct sysv_sb_info {
 /* sv_ == u.sysv_sb.s_ */
 #define sv_type					u.sysv_sb.s_type
 #define sv_bytesex				u.sysv_sb.s_bytesex
-#define sv_kludge_symlinks			u.sysv_sb.s_kludge_symlinks
 #define sv_truncate				u.sysv_sb.s_truncate
 #define sv_link_max				u.sysv_sb.s_link_max
 #define sv_inodes_per_block			u.sysv_sb.s_inodes_per_block
