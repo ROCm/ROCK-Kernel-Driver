@@ -357,7 +357,7 @@ void accel_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	area.dx = dx * vc->vc_font.width;
 	area.dy = dy * vc->vc_font.height;
 	area.height = height * vc->vc_font.height;
-	area.width = width * vc->vc_font.height;
+	area.width = width * vc->vc_font.width;
 
 	info->fbops->fb_copyarea(info, &area);
 }
@@ -909,6 +909,12 @@ static void fbcon_set_display(int con, int init, int logo)
 		logo = 0;
 
 	info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
+
+	/*
+	 * FIXME: need to set this in order for KDFONTOP ioctl
+	 *        to work
+	 */
+	p->fontwidthmask = FONTWIDTHRANGE(1,16);
 
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		if (i != con && fb_display[i].fb_info == info &&
@@ -1986,12 +1992,8 @@ static int fbcon_blank(struct vc_data *vc, int blank)
 		} else
 			update_screen(vc->vc_num);
 		return 0;
-	} else {
-		/* Tell console.c that it has to restore the screen itself */
-		return 1;
-	}
-	fb_blank(blank, info);
-	return 0;
+	} else
+		return fb_blank(blank, info);
 }
 
 static void fbcon_free_font(struct display *p)
