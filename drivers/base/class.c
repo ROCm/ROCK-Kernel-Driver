@@ -155,8 +155,7 @@ static int class_device_dev_link(struct class_device * class_dev)
 
 static void class_device_dev_unlink(struct class_device * class_dev)
 {
-	if (class_dev->dev)
-		sysfs_remove_link(&class_dev->kobj, "device");
+	sysfs_remove_link(&class_dev->kobj, "device");
 }
 
 static int class_device_driver_link(struct class_device * class_dev)
@@ -169,8 +168,7 @@ static int class_device_driver_link(struct class_device * class_dev)
 
 static void class_device_driver_unlink(struct class_device * class_dev)
 {
-	if ((class_dev->dev) && (class_dev->dev->driver))
-		sysfs_remove_link(&class_dev->kobj, "driver");
+	sysfs_remove_link(&class_dev->kobj, "driver");
 }
 
 

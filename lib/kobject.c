@@ -349,16 +349,16 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 		/* 
 		 * Need more space? Allocate it and try again 
 		 */
-		name = kmalloc(need,GFP_KERNEL);
+		limit = need + 1;
+		name = kmalloc(limit,GFP_KERNEL);
 		if (!name) {
 			error = -ENOMEM;
 			goto Done;
 		}
-		limit = need;
 		need = vsnprintf(name,limit,fmt,args);
 
 		/* Still? Give up. */
-		if (need > limit) {
+		if (need >= limit) {
 			kfree(name);
 			error = -EFAULT;
 			goto Done;

@@ -32,6 +32,9 @@
 #include <linux/kmod.h>
 #endif
 #include <linux/devfs_fs_kernel.h>
+#include <linux/err.h>
+#include <linux/kernel.h>
+#include <linux/device.h>
 
 #if defined(__mc68000__) || defined(CONFIG_APUS)
 #include <asm/setup.h>
@@ -1245,6 +1248,8 @@ static struct file_operations fb_fops = {
 #endif
 };
 
+static struct class_simple *fb_class;
+
 /**
  *	register_framebuffer - registers a frame buffer device
  *	@fb_info: frame buffer info structure
@@ -1259,6 +1264,7 @@ int
 register_framebuffer(struct fb_info *fb_info)
 {
 	int i;
+	struct class_device *c;
 
 	if (num_registered_fb == FB_MAX)
 		return -ENXIO;
@@ -1267,6 +1273,12 @@ register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = i;
+
+	c = class_simple_device_add(fb_class, MKDEV(FB_MAJOR, i), NULL, "fb%d", i);
+	if (IS_ERR(c)) {
+		/* Not fatal */
+		printk(KERN_WARNING "Unable to create class_device for framebuffer %d; errno = %ld\n", i, PTR_ERR(c));
+	}
 	
 	if (fb_info->pixmap.addr == NULL) {
 		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
@@ -1332,6 +1344,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 		kfree(fb_info->sprite.addr);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
+	class_simple_device_remove(MKDEV(FB_MAJOR, i));
 	return 0;
 }
 
@@ -1392,6 +1405,12 @@ fbmem_init(void)
 	devfs_mk_dir("fb");
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
+
+	fb_class = class_simple_create(THIS_MODULE, "graphics");
+	if (IS_ERR(fb_class)) {
+		printk(KERN_WARNING "Unable to create fb class; errno = %ld\n", PTR_ERR(fb_class));
+		fb_class = NULL;
+	}
 
 #ifdef CONFIG_FB_OF
 	if (ofonly) {
