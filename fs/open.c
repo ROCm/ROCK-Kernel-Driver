@@ -945,20 +945,12 @@ asmlinkage long sys_creat(const char __user * pathname, int mode)
  */
 int filp_close(struct file *filp, fl_owner_t id)
 {
-	struct address_space *mapping = filp->f_dentry->d_inode->i_mapping;
-	int retval = 0, err;
+	int retval;
 
 	/* Report and clear outstanding errors */
-	err = filp->f_error;
-	if (err) {
+	retval = filp->f_error;
+	if (retval)
 		filp->f_error = 0;
-		retval = err;
-	}
-
-	if (test_and_clear_bit(AS_ENOSPC, &mapping->flags))
-		retval = -ENOSPC;
-	if (test_and_clear_bit(AS_EIO, &mapping->flags))
-		retval = -EIO;
 
 	if (!file_count(filp)) {
 		printk(KERN_ERR "VFS: Close: file count is 0\n");
@@ -966,7 +958,7 @@ int filp_close(struct file *filp, fl_owner_t id)
 	}
 
 	if (filp->f_op && filp->f_op->flush) {
-		err = filp->f_op->flush(filp);
+		int err = filp->f_op->flush(filp);
 		if (!retval)
 			retval = err;
 	}
