@@ -21,10 +21,10 @@
 #include <linux/proc_fs.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/efi.h>
 
 #include <asm/pal.h>
 #include <asm/sal.h>
-#include <asm/efi.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #ifdef CONFIG_SMP

@@ -24,8 +24,8 @@
 #include <linux/types.h>
 #include <linux/time.h>
 #include <linux/proc_fs.h>
+#include <linux/efi.h>
 
-#include <asm/efi.h>
 #include <asm/io.h>
 #include <asm/kregs.h>
 #include <asm/pgtable.h>

@@ -30,6 +30,7 @@
 #include <linux/string.h>
 #include <linux/threads.h>
 #include <linux/tty.h>
+#include <linux/efi.h>
 
 #include <asm/ia32.h>
 #include <asm/page.h>
@@ -37,7 +38,6 @@
 #include <asm/processor.h>
 #include <asm/sal.h>
 #include <asm/system.h>
-#include <asm/efi.h>
 #include <asm/mca.h>
 #include <asm/smp.h>
 

@@ -37,7 +37,7 @@
 #include <linux/types.h>
 #include <linux/irq.h>
 #include <linux/acpi.h>
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>

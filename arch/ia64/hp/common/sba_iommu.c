@@ -30,11 +30,11 @@
 #include <linux/string.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/efi.h>
 
 #include <asm/delay.h>		/* ia64_get_itc() */
 #include <asm/io.h>
 #include <asm/page.h>		/* PAGE_OFFSET */
-#include <asm/efi.h>
 
 
 #define DRIVER_NAME "SBA"

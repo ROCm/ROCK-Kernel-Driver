@@ -32,12 +32,12 @@
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/cache.h>
+#include <linux/efi.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/delay.h>
-#include <asm/efi.h>
 #include <asm/machvec.h>
 #include <asm/io.h>
 #include <asm/irq.h>

@@ -19,9 +19,9 @@
 #include <linux/stddef.h>
 #include <linux/thread_info.h>
 #include <linux/unistd.h>
+#include <linux/efi.h>
 
 #include <asm/delay.h>
-#include <asm/efi.h>
 #include <asm/elf.h>
 #include <asm/perfmon.h>
 #include <asm/pgalloc.h>
