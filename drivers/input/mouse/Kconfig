@@ -121,3 +121,15 @@ config MOUSE_RISCPC
 	  The module will be called rpcmouse. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
+config MOUSE_PC9800
+	tristate "NEC PC-9800 busmouse"
+	depends on X86_PC9800 && INPUT && INPUT_MOUSE && ISA
+	help
+	  Say Y here if you have NEC PC-9801/PC-9821 computer and want its
+	  native mouse supported.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called logibm.o. If you want to compile it as a
+	  module, say M here and read <file.:Documentation/modules.txt>.
+
