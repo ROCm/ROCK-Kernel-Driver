@@ -1327,7 +1327,7 @@ static __u32 sun4c_get_scsi_one(char *bufptr, unsigned long len, struct sbus_bus
 	unsigned long page;
 
 	page = ((unsigned long)bufptr) & PAGE_MASK;
-	if (!VALID_PAGE(virt_to_page(page))) {
+	if (!virt_addr_valid(page)) {
 		sun4c_flush_page(page);
 		return (__u32)bufptr; /* already locked */
 	}
@@ -2106,7 +2106,7 @@ static void sun4c_pte_clear(pte_t *ptep)	{ *ptep = __pte(0); }
 static int sun4c_pmd_bad(pmd_t pmd)
 {
 	return (((pmd_val(pmd) & ~PAGE_MASK) != PGD_TABLE) ||
-		(!VALID_PAGE(virt_to_page(pmd_val(pmd)))));
+		(!virt_addr_valid(pmd_val(pmd))));
 }
 
 static int sun4c_pmd_present(pmd_t pmd)
@@ -2526,7 +2526,7 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(pgd_clear, sun4c_pgd_clear, BTFIXUPCALL_NOP);
 
 	BTFIXUPSET_CALL(mk_pte, sun4c_mk_pte, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(mk_pte_phys, sun4c_mk_pte_phys, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pfn_pte, sun4c_pfn_pte, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mk_pte_io, sun4c_mk_pte_io, BTFIXUPCALL_NORM);
 	
 	BTFIXUPSET_INT(pte_modify_mask, _SUN4C_PAGE_CHG_MASK);

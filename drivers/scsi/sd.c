@@ -41,7 +41,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-
+#include <linux/vmalloc.h>
 #include <linux/smp.h>
 
 #include <asm/uaccess.h>

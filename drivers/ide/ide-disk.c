@@ -1,11 +1,12 @@
-/*
- *  Copyright (C) 1994-1998  Linus Torvalds and authors:
+/***** vi:set ts=8 sts=8 sw=8:************************************************
  *
- *	Mark Lord <mlord@pobox.com>
- *	Gadi Oxman <gadio@netvision.net.il>
- *	Andre Hedrick <andre@linux-ide.org>
- *	Jens Axboe <axboe@suse.de>
- *	Marcin Dalecki <dalecki@evision.ag>
+ *  Copyright (C) 1994-1998,2002  Linus Torvalds and authors:
+ *
+ *	Mark Lord	<mlord@pobox.com>
+ *	Gadi Oxman	<gadio@netvision.net.il>
+ *	Andre Hedrick	<andre@linux-ide.org>
+ *	Jens Axboe	<axboe@suse.de>
+ *	Marcin Dalecki	<martin@dalecki.de>
  *
  * This is the ATA disk device driver, as evolved from hd.c and ide.c.
  */
@@ -98,6 +99,8 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 
 	if (lba48bit) {
 		if (cmd == READ) {
+			if (drive->using_tcq)
+				return WIN_READDMA_QUEUED_EXT;
 			if (drive->using_dma)
 				return WIN_READDMA_EXT;
 			else if (drive->mult_count)
@@ -105,6 +108,8 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 			else
 				return WIN_READ_EXT;
 		} else if (cmd == WRITE) {
+			if (drive->using_tcq)
+				return WIN_WRITEDMA_QUEUED_EXT;
 			if (drive->using_dma)
 				return WIN_WRITEDMA_EXT;
 			else if (drive->mult_count)
@@ -114,6 +119,8 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 		}
 	} else {
 		if (cmd == READ) {
+			if (drive->using_tcq)
+				return WIN_READDMA_QUEUED;
 			if (drive->using_dma)
 				return WIN_READDMA;
 			else if (drive->mult_count)
@@ -121,6 +128,8 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 			else
 				return WIN_READ;
 		} else if (cmd == WRITE) {
+			if (drive->using_tcq)
+				return WIN_WRITEDMA_QUEUED;
 			if (drive->using_dma)
 				return WIN_WRITEDMA;
 			else if (drive->mult_count)
@@ -148,7 +157,11 @@ static ide_startstop_t chs_do_request(struct ata_device *drive, struct request *
 
 	memset(&args, 0, sizeof(args));
 
-	args.taskfile.sector_count = sectors;
+	if (blk_rq_tagged(rq)) {
+		args.taskfile.feature = sectors;
+		args.taskfile.sector_count = rq->tag << 3;
+	} else
+		args.taskfile.sector_count = sectors;
 
 	args.taskfile.sector_number = sect;
 	args.taskfile.low_cylinder = cyl;
@@ -184,7 +197,12 @@ static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request
 
 	memset(&args, 0, sizeof(args));
 
-	args.taskfile.sector_count = sectors;
+	if (blk_rq_tagged(rq)) {
+		args.taskfile.feature = sectors;
+		args.taskfile.sector_count = rq->tag << 3;
+	} else
+		args.taskfile.sector_count = sectors;
+
 	args.taskfile.sector_number = block;
 	args.taskfile.low_cylinder = (block >>= 8);
 
@@ -226,8 +244,14 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
 
 	memset(&args, 0, sizeof(args));
 
-	args.taskfile.sector_count = sectors;
-	args.hobfile.sector_count = sectors >> 8;
+	if (blk_rq_tagged(rq)) {
+		args.taskfile.feature = sectors;
+		args.hobfile.feature = sectors >> 8;
+		args.taskfile.sector_count = rq->tag << 3;
+	} else {
+		args.taskfile.sector_count = sectors;
+		args.hobfile.sector_count = sectors >> 8;
+	}
 
 	args.taskfile.sector_number = block;		/* low lba */
 	args.taskfile.low_cylinder = (block >>= 8);	/* mid lba */
@@ -283,6 +307,30 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		extern ide_startstop_t promise_rw_disk(struct ata_device *, struct request *, unsigned long);
 
 		return promise_rw_disk(drive, rq, block);
+	}
+
+	/*
+	 * start a tagged operation
+	 */
+	if (drive->using_tcq) {
+		unsigned long flags;
+		int ret;
+
+		spin_lock_irqsave(&ide_lock, flags);
+
+		ret = blk_queue_start_tag(&drive->queue, rq);
+
+		if (ata_pending_commands(drive) > drive->max_depth)
+			drive->max_depth = ata_pending_commands(drive);
+		if (ata_pending_commands(drive) > drive->max_last_depth)
+			drive->max_last_depth = ata_pending_commands(drive);
+
+		spin_unlock_irqrestore(&ide_lock, flags);
+
+		if (ret) {
+			BUG_ON(!ata_pending_commands(drive));
+			return ide_started;
+		}
 	}
 
 	/* 48-bit LBA */
@@ -542,11 +590,61 @@ static int proc_idedisk_read_smart_values
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+static int proc_idedisk_read_tcq
+	(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	ide_drive_t	*drive = (ide_drive_t *) data;
+	char		*out = page;
+	int		len, cmds, i;
+	unsigned long	flags;
+
+	if (!blk_queue_tagged(&drive->queue)) {
+		len = sprintf(out, "not configured\n");
+		PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
+	}
+
+	spin_lock_irqsave(&ide_lock, flags);
+
+	len = sprintf(out, "TCQ currently on:\t%s\n", drive->using_tcq ? "yes" : "no");
+	len += sprintf(out+len, "Max queue depth:\t%d\n",drive->queue_depth);
+	len += sprintf(out+len, "Max achieved depth:\t%d\n",drive->max_depth);
+	len += sprintf(out+len, "Max depth since last:\t%d\n",drive->max_last_depth);
+	len += sprintf(out+len, "Current depth:\t\t%d\n", ata_pending_commands(drive));
+	len += sprintf(out+len, "Active tags:\t\t[ ");
+	for (i = 0, cmds = 0; i < drive->queue_depth; i++) {
+		struct request *rq = blk_queue_tag_request(&drive->queue, i);
+
+		if (!rq)
+			continue;
+
+		len += sprintf(out+len, "%d, ", i);
+		cmds++;
+	}
+	len += sprintf(out+len, "]\n");
+
+	len += sprintf(out+len, "Queue:\t\t\treleased [ %lu ] - started [ %lu ]\n", drive->immed_rel, drive->immed_comp);
+
+	if (ata_pending_commands(drive) != cmds)
+		len += sprintf(out+len, "pending request and queue count mismatch (counted: %d)\n", cmds);
+
+	len += sprintf(out+len, "DMA status:\t\t%srunning\n", test_bit(IDE_DMA, &HWGROUP(drive)->flags) ? "" : "not ");
+
+	drive->max_last_depth = 0;
+
+	spin_unlock_irqrestore(&ide_lock, flags);
+	PROC_IDE_READ_RETURN(page, start, off, count, eof, len);
+}
+#endif
+
 static ide_proc_entry_t idedisk_proc[] = {
 	{ "cache",		S_IFREG|S_IRUGO,	proc_idedisk_read_cache,		NULL },
 	{ "geometry",		S_IFREG|S_IRUGO,	proc_ide_read_geometry,			NULL },
 	{ "smart_values",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_values,		NULL },
 	{ "smart_thresholds",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_thresholds,	NULL },
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	{ "tcq",		S_IFREG|S_IRUSR,	proc_idedisk_read_tcq,			NULL },
+#endif
 	{ NULL, 0, NULL, NULL }
 };
 
@@ -633,6 +731,32 @@ static int set_acoustic(ide_drive_t *drive, int arg)
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+static int set_using_tcq(ide_drive_t *drive, int arg)
+{
+	if (!drive->driver)
+		return -EPERM;
+	if (!drive->channel->udma)
+		return -EPERM;
+	if (arg == drive->queue_depth && drive->using_tcq)
+		return 0;
+
+	/*
+	 * set depth, but check also id for max supported depth
+	 */
+	drive->queue_depth = arg ? arg : 1;
+	if (drive->id) {
+		if (drive->queue_depth > drive->id->queue_depth + 1)
+			drive->queue_depth = drive->id->queue_depth + 1;
+	}
+
+	if (drive->channel->udma(arg ? ide_dma_queued_on : ide_dma_queued_off, drive, NULL))
+		return -EIO;
+
+	return 0;
+}
+#endif
+
 static int probe_lba_addressing (ide_drive_t *drive, int arg)
 {
 	drive->addressing =  0;
@@ -664,6 +788,9 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"acoustic",		SETTING_RW,					HDIO_GET_ACOUSTIC,	HDIO_SET_ACOUSTIC,	TYPE_BYTE,	0,	254,				1,	1,	&drive->acoustic,		set_acoustic);
 	ide_add_setting(drive,	"failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->failures,		NULL);
 	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	ide_add_setting(drive,	"using_tcq",		SETTING_RW,					HDIO_GET_QDMA,		HDIO_SET_QDMA,		TYPE_BYTE,	0,	IDE_MAX_TAG,			1,		1,		&drive->using_tcq,		set_using_tcq);
+#endif
 }
 
 static int idedisk_suspend(struct device *dev, u32 state, u32 level)

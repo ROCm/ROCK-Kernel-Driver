@@ -187,11 +187,13 @@ extern void __update_mmu_cache(unsigned long mmu_context_hw, unsigned long addre
 
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
-	struct page *page = pte_page(pte);
+	struct page *page;
+	unsigned long pfn;
 	unsigned long pg_flags;
 
-	if (VALID_PAGE(page) &&
-	    page->mapping &&
+	pfn = pte_pfn(pte);
+	if (pfn_valid(pfn) &&
+	    (page = pfn_to_page(pfn), page->mapping) &&
 	    ((pg_flags = page->flags) & (1UL << PG_dcache_dirty))) {
 		int cpu = ((pg_flags >> 24) & (NR_CPUS - 1UL));
 
@@ -260,10 +262,14 @@ static inline void flush_cache_pte_range(struct mm_struct *mm, pmd_t *pmd, unsig
 			continue;
 
 		if (pte_present(pte) && pte_dirty(pte)) {
-			struct page *page = pte_page(pte);
+			struct page *page;
 			unsigned long pgaddr, uaddr;
+			unsigned long pfn = pte_pfn(pte);
 
-			if (!VALID_PAGE(page) || PageReserved(page) || !page->mapping)
+			if (!pfn_valid(pfn))
+				continue;
+			page = pfn_to_page(pfn);
+			if (PageReserved(page) || !page->mapping)
 				continue;
 			pgaddr = (unsigned long) page_address(page);
 			uaddr = address + offset;

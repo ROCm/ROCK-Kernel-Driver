@@ -522,6 +522,32 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 	blk_queue_bounce_limit(&drive->queue, addr);
 }
 
+int ide_start_dma(ide_dma_action_t func, struct ata_device *drive)
+{
+	struct ata_channel *hwif = drive->channel;
+	unsigned long dma_base = hwif->dma_base;
+	unsigned int reading = 0;
+
+	if (rq_data_dir(HWGROUP(drive)->rq) == READ)
+		reading = 1 << 3;
+
+	/* active tuning based on IO direction */
+	if (hwif->rwproc)
+		hwif->rwproc(drive, func);
+
+	/*
+	 * try PIO instead of DMA
+	 */
+	if (!ide_build_dmatable(drive, func))
+		return 1;
+
+	outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
+	outb(reading, dma_base);		/* specify r/w */
+	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
+	drive->waiting_for_dma = 1;
+	return 0;
+}
+
 /*
  * This initiates/aborts DMA read/write operations on a drive.
  *
@@ -543,7 +569,7 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
 	byte unit = (drive->select.b.unit & 0x01);
-	unsigned int count, reading = 0, set_high = 1;
+	unsigned int reading = 0, set_high = 1;
 	byte dma_stat;
 
 	switch (func) {
@@ -552,27 +578,27 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 		case ide_dma_off_quietly:
 			set_high = 0;
 			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+			hwif->udma(ide_dma_queued_off, drive, rq);
+#endif
 		case ide_dma_on:
 			ide_toggle_bounce(drive, set_high);
 			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma)
+			if (drive->using_dma) {
 				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+				hwif->udma(ide_dma_queued_on, drive, rq);
+#endif
+			}
 			return 0;
 		case ide_dma_check:
 			return config_drive_for_dma (drive);
 		case ide_dma_read:
 			reading = 1 << 3;
 		case ide_dma_write:
-			/* active tuning based on IO direction */
-			if (hwif->rwproc)
-				hwif->rwproc(drive, func);
+			if (ide_start_dma(func, drive))
+				return 1;
 
-			if (!(count = ide_build_dmatable(drive, func)))
-				return 1;	/* try PIO instead of DMA */
-			outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
-			outb(reading, dma_base);			/* specify r/w */
-			outb(inb(dma_base+2)|6, dma_base+2);		/* clear INTR & ERROR flags */
-			drive->waiting_for_dma = 1;
 			if (drive->type != ATA_DISK)
 				return 0;
 
@@ -587,6 +613,14 @@ int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request 
 				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 			}
 			return drive->channel->udma(ide_dma_begin, drive, NULL);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		case ide_dma_queued_on:
+		case ide_dma_queued_off:
+		case ide_dma_read_queued:
+		case ide_dma_write_queued:
+		case ide_dma_queued_start:
+			return ide_tcq_dmaproc(func, drive, rq);
+#endif
 		case ide_dma_begin:
 			/* Note that this is done *after* the cmd has
 			 * been issued to the drive, as per the BM-IDE spec.

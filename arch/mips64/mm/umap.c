@@ -115,8 +115,12 @@ void *vmalloc_uncached (unsigned long size)
 static inline void free_pte(pte_t page)
 {
 	if (pte_present(page)) {
-		struct page *ptpage = pte_page(page);
-		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
+		unsigned long pfn = pte_pfn(page);
+		struct page *ptpage;
+		if (!pfn_valid(pfn))
+			return;
+		ptpage = pfn_to_page(pfn);
+		if (PageReserved(ptpage))
 			return;
 		__free_page(ptpage);
 		if (current->mm->rss <= 0)

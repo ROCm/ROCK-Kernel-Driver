@@ -268,7 +268,7 @@ efi_map_pal_code (void)
 		 */
 		ia64_clear_ic(flags);
 		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			 pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL)), IA64_GRANULE_SHIFT);
+			 pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)), IA64_GRANULE_SHIFT);
 		local_irq_restore(flags);
 		ia64_srlz_i();
 	}

@@ -216,9 +216,10 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 
 	do {
 		if (pte_present(*pte)) {
-			struct page *page = pte_page(*pte);
+			unsigned long pfn = pte_pfn(*pte);
+			struct page *page = pfn_to_page(pfn);
 
-			if (VALID_PAGE(page) && !PageReserved(page)) {
+			if (pfn_valid(pfn) && !PageReserved(page)) {
 				count -= try_to_swap_out(mm, vma, address, pte, page, classzone);
 				if (!count) {
 					address += PAGE_SIZE;

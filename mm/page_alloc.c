@@ -101,8 +101,6 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (page->mapping)
 		BUG();
-	if (!VALID_PAGE(page))
-		BUG();
 	if (PageLocked(page))
 		BUG();
 	if (PageLRU(page))
@@ -295,8 +293,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 						BUG();
 					if (page->mapping)
 						BUG();
-					if (!VALID_PAGE(page))
-						BUG();
 					if (PageLocked(page))
 						BUG();
 					if (PageLRU(page))
@@ -477,8 +473,10 @@ void __free_pages(struct page *page, unsigned int order)
 
 void free_pages(unsigned long addr, unsigned int order)
 {
-	if (addr != 0)
+	if (addr != 0) {
+		BUG_ON(!virt_addr_valid(addr));
 		__free_pages(virt_to_page(addr), order);
+	}
 }
 
 /*

@@ -78,7 +78,7 @@ extern void momenco_ocelot_irq_setup(void);
 
 static char reset_reason;
 
-#define ENTRYLO(x) ((pte_val(mk_pte_phys((x), PAGE_KERNEL_UNCACHED)) >> 6)|1)
+#define ENTRYLO(x) ((pte_val(pfn_pte((x) >> PAGE_SHIFT, PAGE_KERNEL_UNCACHED)) >> 6)|1)
 
 static void __init setup_l3cache(unsigned long size);
 

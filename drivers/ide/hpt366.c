@@ -346,8 +346,6 @@ static int n_hpt_devs;
 static unsigned int pci_rev_check_hpt3xx(struct pci_dev *dev);
 static unsigned int pci_rev2_check_hpt3xx(struct pci_dev *dev);
 byte hpt366_proc = 0;
-byte hpt363_shared_irq;
-byte hpt363_shared_pin;
 extern char *ide_xfer_verbose (byte xfer_rate);
 
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)

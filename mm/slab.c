@@ -1415,15 +1415,16 @@ alloc_new_slab_nolock:
 #if DEBUG
 # define CHECK_NR(pg)						\
 	do {							\
-		if (!VALID_PAGE(pg)) {				\
+		if (!virt_addr_valid(pg)) {			\
 			printk(KERN_ERR "kfree: out of range ptr %lxh.\n", \
 				(unsigned long)objp);		\
 			BUG();					\
 		} \
 	} while (0)
-# define CHECK_PAGE(page)					\
+# define CHECK_PAGE(addr)					\
 	do {							\
-		CHECK_NR(page);					\
+		struct page *page = virt_to_page(addr);		\
+		CHECK_NR(addr);					\
 		if (!PageSlab(page)) {				\
 			printk(KERN_ERR "kfree: bad ptr %lxh.\n", \
 				(unsigned long)objp);		\
@@ -1439,7 +1440,7 @@ static inline void kmem_cache_free_one(kmem_cache_t *cachep, void *objp)
 {
 	slab_t* slabp;
 
-	CHECK_PAGE(virt_to_page(objp));
+	CHECK_PAGE(objp);
 	/* reduces memory footprint
 	 *
 	if (OPTIMIZE(cachep))
@@ -1519,7 +1520,7 @@ static inline void __kmem_cache_free (kmem_cache_t *cachep, void* objp)
 #ifdef CONFIG_SMP
 	cpucache_t *cc = cc_data(cachep);
 
-	CHECK_PAGE(virt_to_page(objp));
+	CHECK_PAGE(objp);
 	if (cc) {
 		int batchcount;
 		if (cc->avail < cc->limit) {
@@ -1601,7 +1602,7 @@ void kmem_cache_free (kmem_cache_t *cachep, void *objp)
 {
 	unsigned long flags;
 #if DEBUG
-	CHECK_PAGE(virt_to_page(objp));
+	CHECK_PAGE(objp);
 	if (cachep != GET_PAGE_CACHE(virt_to_page(objp)))
 		BUG();
 #endif
@@ -1626,7 +1627,7 @@ void kfree (const void *objp)
 	if (!objp)
 		return;
 	local_irq_save(flags);
-	CHECK_PAGE(virt_to_page(objp));
+	CHECK_PAGE(objp);
 	c = GET_PAGE_CACHE(virt_to_page(objp));
 	__kmem_cache_free(c, (void*)objp);
 	local_irq_restore(flags);

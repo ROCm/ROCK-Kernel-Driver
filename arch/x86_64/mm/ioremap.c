@@ -20,6 +20,7 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 	unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
+	unsigned long pfn;
 
 	address &= ~PMD_MASK;
 	end = address + size;
@@ -27,15 +28,16 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 		end = PMD_SIZE;
 	if (address >= end)
 		BUG();
+	pfn = phys_addr >> PAGE_SHIFT;
 	do {
 		if (!pte_none(*pte)) {
 			printk("remap_area_pte: page already exists\n");
 			BUG();
 		}
-		set_pte(pte, mk_pte_phys(phys_addr, __pgprot(_PAGE_PRESENT | _PAGE_RW | 
+		set_pte(pte, pfn_pte(pfn, __pgprot(_PAGE_PRESENT | _PAGE_RW | 
 					_PAGE_GLOBAL | _PAGE_DIRTY | _PAGE_ACCESSED | flags)));
 		address += PAGE_SIZE;
-		phys_addr += PAGE_SIZE;
+		pfn++;
 		pte++;
 	} while (address && (address < end));
 }
