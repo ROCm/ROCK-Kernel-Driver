@@ -601,11 +601,6 @@ static void requeue_task(struct task_struct *p, prio_array_t *array)
 	list_move_tail(&p->run_list, array->queue + p->prio);
 }
 
-/*
- * Used by the migration code - we pull tasks from the head of the
- * remote queue so we want these tasks to show up at the head of the
- * local queue:
- */
 static inline void enqueue_task_head(struct task_struct *p, prio_array_t *array)
 {
 	list_add(&p->run_list, array->queue + p->prio);
@@ -2573,10 +2568,7 @@ need_resched_nonpreemptible:
 
 	if (unlikely(prev->flags & PF_DEAD))
 		prev->state = EXIT_DEAD;
-	/*
-	 * if entering off of a kernel preemption go straight
-	 * to picking the next task.
-	 */
+
 	switch_count = &prev->nivcsw;
 	if (prev->state && !(preempt_count() & PREEMPT_ACTIVE)) {
 		switch_count = &prev->nvcsw;
