@@ -223,7 +223,7 @@ probe_unmapped_page(
 	page = find_get_page(mapping, index);
 	if (!page)
 		return 0;
-	if (TestSetPageLocked(page)) {
+	if (PageWriteback(page) || TestSetPageLocked(page)) {
 		page_cache_release(page);
 		return 0;
 	}
@@ -302,7 +302,7 @@ probe_page(
 	page = find_get_page(inode->i_mapping, index);
 	if (!page)
 		return NULL;
-	if (TestSetPageLocked(page)) {
+	if (PageWriteback(page) || TestSetPageLocked(page)) {
 		page_cache_release(page);
 		return NULL;
 	}
@@ -331,6 +331,7 @@ submit_page(
 
 	BUG_ON(PageWriteback(page));
 	SetPageWriteback(page);
+	clear_page_dirty(page);
 	unlock_page(page);
 
 	if (cnt) {
