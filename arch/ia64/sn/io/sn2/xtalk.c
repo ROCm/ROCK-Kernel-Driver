@@ -912,11 +912,6 @@ xwidget_unregister(vertex_hdl_t widget)
     if (!(widget_info = xwidget_info_get(widget)))
 	return(1);
 
-    /* Remove the inventory information associated
-     * with the widget.
-     */
-    hwgraph_inventory_remove(widget, -1, -1, -1, -1, -1);
-    
     hwid = &(widget_info->w_hwid);
 
     /* Clean out the xwidget information */

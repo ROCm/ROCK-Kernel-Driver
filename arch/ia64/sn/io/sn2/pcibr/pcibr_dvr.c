@@ -1914,9 +1914,9 @@ pcibr_detach(vertex_hdl_t xconn)
     /* Remove the Bridge revision labelled info */
     (void)hwgraph_info_remove_LBL(pcibr_vhdl, INFO_LBL_PCIBR_ASIC_REV, NULL);
     /* Remove the character device associated with this bridge */
-    (void)hwgraph_edge_remove(pcibr_vhdl, EDGE_LBL_CONTROLLER, NULL);
+    hwgraph_edge_remove(pcibr_vhdl, EDGE_LBL_CONTROLLER, NULL);
     /* Remove the PCI bridge vertex */
-    (void)hwgraph_edge_remove(xconn, EDGE_LBL_PCI, NULL);
+    hwgraph_edge_remove(xconn, EDGE_LBL_PCI, NULL);
 
     return(0);
 }
