@@ -7,6 +7,8 @@
 #ifndef _ORINOCO_H
 #define _ORINOCO_H
 
+#define DRIVER_VERSION "0.13e"
+
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>

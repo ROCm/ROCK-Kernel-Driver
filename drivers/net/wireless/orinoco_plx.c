@@ -108,6 +108,9 @@
  * going, might not have time for a while..
  */
 
+#define DRIVER_NAME "orinoco_plx"
+#define PFX DRIVER_NAME ": "
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -134,8 +137,6 @@
 
 #include "hermes.h"
 #include "orinoco.h"
-
-static char dev_info[] = "orinoco_plx";
 
 #define COR_OFFSET	(0x3e0/2) /* COR attribute offset of Prism2 PC card */
 #define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
@@ -218,7 +219,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	/* and 3 to the PCMCIA slot I/O address space */
 	pccard_ioaddr = pci_resource_start(pdev, 3);
 	pccard_iolen = pci_resource_len(pdev, 3);
-	if (! request_region(pccard_ioaddr, pccard_iolen, dev_info)) {
+	if (! request_region(pccard_ioaddr, pccard_iolen, DRIVER_NAME)) {
 		printk(KERN_ERR "orinoco_plx: I/O resource 0x%lx @ 0x%lx busy\n",
 		       pccard_iolen, pccard_ioaddr);
 		pccard_ioaddr = 0;
@@ -238,7 +239,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	printk(KERN_DEBUG "Detected Orinoco/Prism2 PLX device "
+	printk(KERN_DEBUG PFX "Detected Orinoco/Prism2 PLX device "
 	       "at %s irq:%d, io addr:0x%lx\n", pci_name(pdev), pdev->irq,
 	       pccard_ioaddr);
 
@@ -249,7 +250,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ,
 			  dev->name, dev);
 	if (err) {
-		printk(KERN_ERR "orinoco_plx: Error allocating IRQ %d.\n", pdev->irq);
+		printk(KERN_ERR PFX "Error allocating IRQ %d.\n", pdev->irq);
 		err = -EBUSY;
 		goto fail;
 	}
@@ -262,7 +263,7 @@ static int orinoco_plx_init_one(struct pci_dev *pdev,
 	return 0;
 
  fail:
-	printk(KERN_DEBUG "orinoco_plx: init_one(), FAIL!\n");
+	printk(KERN_DEBUG PFX "init_one(), FAIL!\n");
 
 	if (dev) {
 		if (dev->irq)
@@ -324,13 +325,14 @@ static struct pci_device_id orinoco_plx_pci_id_table[] = {
 MODULE_DEVICE_TABLE(pci, orinoco_plx_pci_id_table);
 
 static struct pci_driver orinoco_plx_driver = {
-	.name		= "orinoco_plx",
+	.name		= DRIVER_NAME,
 	.id_table	= orinoco_plx_pci_id_table,
 	.probe		= orinoco_plx_init_one,
 	.remove		= __devexit_p(orinoco_plx_remove_one),
 };
 
-static char version[] __initdata = "orinoco_plx.c 0.13e (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
 MODULE_AUTHOR("Daniel Barlow <dan@telent.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the PLX9052 PCI bridge");
 MODULE_LICENSE("Dual MPL/GPL");

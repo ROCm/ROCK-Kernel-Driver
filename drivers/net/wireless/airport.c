@@ -11,6 +11,9 @@
  *  0.06 : fix possible hang on powerup, add sleep support
  */
 
+#define DRIVER_NAME "airport"
+#define PFX DRIVER_NAME ": "
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -194,14 +197,14 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	hermes_t *hw;
 
 	if (macio_resource_count(mdev) < 1 || macio_irq_count(mdev) < 1) {
-		printk(KERN_ERR "airport: wrong interrupt/addresses in OF tree\n");
+		printk(KERN_ERR PFX "wrong interrupt/addresses in OF tree\n");
 		return -ENODEV;
 	}
 
 	/* Allocate space for private device-specific data */
 	dev = alloc_orinocodev(sizeof(*card), airport_hard_reset);
 	if (! dev) {
-		printk(KERN_ERR "airport: can't allocate device datas\n");
+		printk(KERN_ERR PFX "can't allocate device datas\n");
 		return -ENODEV;
 	}
 	priv = netdev_priv(dev);
@@ -211,7 +214,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	card->mdev = mdev;
 
 	if (macio_request_resource(mdev, 0, "airport")) {
-		printk(KERN_ERR "airport: can't request IO resource !\n");
+		printk(KERN_ERR PFX "can't request IO resource !\n");
 		free_netdev(dev);
 		return -EBUSY;
 	}
@@ -224,11 +227,11 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	/* Setup interrupts & base address */
 	dev->irq = macio_irq(mdev, 0);
 	phys_addr = macio_resource_start(mdev, 0);  /* Physical address */
-	printk(KERN_DEBUG "Airport at physical address %lx\n", phys_addr);
+	printk(KERN_DEBUG PFX "Airport at physical address %lx\n", phys_addr);
 	dev->base_addr = phys_addr;
 	card->vaddr = ioremap(phys_addr, AIRPORT_IO_LEN);
 	if (!card->vaddr) {
-		printk("airport: ioremap() failed\n");
+		printk(PFX "ioremap() failed\n");
 		goto failed;
 	}
 
@@ -244,17 +247,17 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	hermes_init(hw);
 
 	if (request_irq(dev->irq, orinoco_interrupt, 0, "Airport", dev)) {
-		printk(KERN_ERR "airport: Couldn't get IRQ %d\n", dev->irq);
+		printk(KERN_ERR PFX "Couldn't get IRQ %d\n", dev->irq);
 		goto failed;
 	}
 	card->irq_requested = 1;
 
 	/* Tell the stack we exist */
 	if (register_netdev(dev) != 0) {
-		printk(KERN_ERR "airport: register_netdev() failed\n");
+		printk(KERN_ERR PFX "register_netdev() failed\n");
 		goto failed;
 	}
-	printk(KERN_DEBUG "airport: card registered for interface %s\n", dev->name);
+	printk(KERN_DEBUG PFX "card registered for interface %s\n", dev->name);
 	card->ndev_registered = 1;
 	return 0;
  failed:
@@ -263,7 +266,8 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 }				/* airport_attach */
 
 
-static char version[] __initdata = "airport.c 0.13e (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
 MODULE_LICENSE("Dual MPL/GPL");
@@ -280,7 +284,7 @@ static struct of_match airport_match[] =
 
 static struct macio_driver airport_driver = 
 {
-	.name 		= "airport",
+	.name 		= DRIVER_NAME,
 	.match_table	= airport_match,
 	.probe		= airport_attach,
 	.remove		= airport_detach,

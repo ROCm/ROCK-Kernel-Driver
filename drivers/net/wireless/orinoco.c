@@ -419,6 +419,8 @@
  * hw_unavailable is non-zero).
  */
 
+#define DRIVER_NAME "orinoco"
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -4179,7 +4181,8 @@ EXPORT_SYMBOL(orinoco_interrupt);
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco.c 0.13e (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 static int __init init_orinoco(void)
 {

@@ -10,6 +10,9 @@
  * Copyright notice & release notes in file orinoco.c
  */
 
+#define DRIVER_NAME "orinoco_cs"
+#define PFX DRIVER_NAME ": "
+
 #include <linux/config.h>
 #ifdef  __IN_PCMCIA_PACKAGE__
 #include <pcmcia/k_compat.h>
@@ -74,7 +77,7 @@ MODULE_PARM(ignore_cis_vcc, "i");
  * device driver with appropriate cards, through the card
  * configuration database.
  */
-static dev_info_t dev_info = "orinoco_cs";
+static dev_info_t dev_info = DRIVER_NAME;
 
 /********************************************************************/
 /* Data structures						    */
@@ -240,9 +243,9 @@ static void orinoco_cs_detach(dev_link_t *link)
 
 	/* Unlink device structure, and free it */
 	*linkp = link->next;
-	DEBUG(0, "orinoco_cs: detach: link=%p link->dev=%p\n", link, link->dev);
+	DEBUG(0, PFX "detach: link=%p link->dev=%p\n", link, link->dev);
 	if (link->dev) {
-		DEBUG(0, "orinoco_cs: About to unregister net device %p\n",
+		DEBUG(0, PFX "About to unregister net device %p\n",
 		      dev);
 		unregister_netdev(dev);
 	}
@@ -400,7 +403,7 @@ orinoco_cs_config(dev_link_t *link)
 			pcmcia_release_io(link->handle, &link->io);
 		last_ret = pcmcia_get_next_tuple(handle, &tuple);
 		if (last_ret  == CS_NO_MORE_ITEMS) {
-			printk(KERN_ERR "GetNextTuple().  No matching "
+			printk(KERN_ERR PFX "GetNextTuple(): No matching "
 			       "CIS configuration, maybe you need the "
 			       "ignore_cis_vcc=1 parameter.\n");
 			goto cs_failed;
@@ -453,7 +456,7 @@ orinoco_cs_config(dev_link_t *link)
 	dev->name[0] = '\0';
 	/* Tell the stack we exist */
 	if (register_netdev(dev) != 0) {
-		printk(KERN_ERR "orinoco_cs: register_netdev() failed\n");
+		printk(KERN_ERR PFX "register_netdev() failed\n");
 		goto failed;
 	}
 
@@ -625,12 +628,13 @@ orinoco_cs_event(event_t event, int priority,
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco_cs.c 0.13e (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	"(David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 static struct pcmcia_driver orinoco_driver = {
 	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "orinoco_cs",
+		.name	= DRIVER_NAME,
 	},
 	.attach		= orinoco_cs_attach,
 	.detach		= orinoco_cs_detach,
@@ -650,7 +654,7 @@ exit_orinoco_cs(void)
 	pcmcia_unregister_driver(&orinoco_driver);
 
 	if (dev_list)
-		DEBUG(0, "orinoco_cs: Removing leftover devices.\n");
+		DEBUG(0, PFX "Removing leftover devices.\n");
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
 			orinoco_cs_release(dev_list);

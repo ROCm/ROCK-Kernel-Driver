@@ -85,6 +85,9 @@
  * Jean II
  */
 
+#define DRIVER_NAME "orinoco_pci"
+#define PFX DRIVER_NAME ": "
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -174,7 +177,7 @@ orinoco_pci_cor_reset(struct orinoco_private *priv)
 	}
 	/* Did we timeout ? */
 	if(time_after_eq(jiffies, timeout)) {
-		printk(KERN_ERR "orinoco_pci: Busy timeout\n");
+		printk(KERN_ERR PFX "Busy timeout\n");
 		return -ETIMEDOUT;
 	}
 	printk(KERN_NOTICE "pci_cor : reg = 0x%X - %lX - %lX\n", reg, timeout, jiffies);
@@ -220,7 +223,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	printk(KERN_DEBUG
+	printk(KERN_DEBUG PFX
 	       "Detected Orinoco/Prism2 PCI device at %s, mem:0x%lX to 0x%lX -> 0x%p, irq:%d\n",
 	       pci_name(pdev), dev->mem_start, dev->mem_end, pci_ioaddr, pdev->irq);
 
@@ -231,7 +234,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ,
 			  dev->name, dev);
 	if (err) {
-		printk(KERN_ERR "orinoco_pci: Error allocating IRQ %d.\n",
+		printk(KERN_ERR PFX "Error allocating IRQ %d.\n",
 		       pdev->irq);
 		err = -EBUSY;
 		goto fail;
@@ -368,7 +371,7 @@ static struct pci_device_id orinoco_pci_pci_id_table[] = {
 MODULE_DEVICE_TABLE(pci, orinoco_pci_pci_id_table);
 
 static struct pci_driver orinoco_pci_driver = {
-	.name		= "orinoco_pci",
+	.name		= DRIVER_NAME,
 	.id_table	= orinoco_pci_pci_id_table,
 	.probe		= orinoco_pci_init_one,
 	.remove		= __devexit_p(orinoco_pci_remove_one),
@@ -376,7 +379,8 @@ static struct pci_driver orinoco_pci_driver = {
 	.resume		= orinoco_pci_resume,
 };
 
-static char version[] __initdata = "orinoco_pci.c 0.13e (David Gibson <hermes@gibson.dropbear.id.au> & Jean Tourrilhes <jt@hpl.hp.com>)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (David Gibson <hermes@gibson.dropbear.id.au> & Jean Tourrilhes <jt@hpl.hp.com>)";
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using direct PCI interface");
 MODULE_LICENSE("Dual MPL/GPL");

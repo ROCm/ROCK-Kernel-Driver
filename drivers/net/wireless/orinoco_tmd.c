@@ -49,6 +49,9 @@
  * Pheecom sells cards with the TMD chip as "ASIC version"
  */
 
+#define DRIVER_NAME "orinoco_tmd"
+#define PFX DRIVER_NAME ": "
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -76,8 +79,6 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static char dev_info[] = "orinoco_tmd";
-
 #define COR_VALUE	(COR_LEVEL_REQ | COR_FUNC_ENA) /* Enable PC card with interrupt in level trigger */
 
 static int orinoco_tmd_init_one(struct pci_dev *pdev,
@@ -94,11 +95,11 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	if (err)
 		return -EIO;
 
-	printk(KERN_DEBUG "TMD setup\n");
+	printk(KERN_DEBUG PFX "TMD setup\n");
 	pccard_ioaddr = pci_resource_start(pdev, 2);
 	pccard_iolen = pci_resource_len(pdev, 2);
-	if (! request_region(pccard_ioaddr, pccard_iolen, dev_info)) {
-		printk(KERN_ERR "orinoco_tmd: I/O resource at 0x%lx len 0x%lx busy\n",
+	if (! request_region(pccard_ioaddr, pccard_iolen, DRIVER_NAME)) {
+		printk(KERN_ERR PFX "I/O resource at 0x%lx len 0x%lx busy\n",
 			pccard_ioaddr, pccard_iolen);
 		pccard_ioaddr = 0;
 		err = -EBUSY;
@@ -109,7 +110,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	mdelay(1);
 	reg = inb(addr);
 	if (reg != COR_VALUE) {
-		printk(KERN_ERR "orinoco_tmd: Error setting TMD COR values %x should be %x\n", reg, COR_VALUE);
+		printk(KERN_ERR PFX "Error setting TMD COR values %x should be %x\n", reg, COR_VALUE);
 		err = -EIO;
 		goto fail;
 	}
@@ -126,7 +127,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	printk(KERN_DEBUG "Detected Orinoco/Prism2 TMD device "
+	printk(KERN_DEBUG PFX "Detected Orinoco/Prism2 TMD device "
 	       "at %s irq:%d, io addr:0x%lx\n", pci_name(pdev), pdev->irq,
 	       pccard_ioaddr);
 
@@ -137,7 +138,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ,
 			  dev->name, dev);
 	if (err) {
-		printk(KERN_ERR "orinoco_tmd: Error allocating IRQ %d.\n",
+		printk(KERN_ERR PFX "Error allocating IRQ %d.\n",
 		       pdev->irq);
 		err = -EBUSY;
 		goto fail;
@@ -151,7 +152,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 	return 0;
 
  fail:
-	printk(KERN_DEBUG "orinoco_tmd: init_one(), FAIL!\n");
+	printk(KERN_DEBUG PFX "init_one(), FAIL!\n");
 
 	if (dev) {
 		if (dev->irq)
@@ -197,13 +198,14 @@ static struct pci_device_id orinoco_tmd_pci_id_table[] = {
 MODULE_DEVICE_TABLE(pci, orinoco_tmd_pci_id_table);
 
 static struct pci_driver orinoco_tmd_driver = {
-	.name		= "orinoco_tmd",
+	.name		= DRIVER_NAME,
 	.id_table	= orinoco_tmd_pci_id_table,
 	.probe		= orinoco_tmd_init_one,
 	.remove		= __devexit_p(orinoco_tmd_remove_one),
 };
 
-static char version[] __initdata = "orinoco_tmd.c 0.01 (Joerg Dorchain <joerg@dorchain.net>)";
+static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
+	" (Joerg Dorchain <joerg@dorchain.net>)";
 MODULE_AUTHOR("Joerg Dorchain <joerg@dorchain.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the TMD7160 PCI bridge");
 MODULE_LICENSE("Dual MPL/GPL");
