@@ -267,7 +267,6 @@ pciio_provider_t        pci_pic_provider =
     (pciio_priority_set_f *) pcibr_priority_set,
     (pciio_config_get_f *) pcibr_config_get,
     (pciio_config_set_f *) pcibr_config_set,
-    (pciio_error_devenable_f *) 0,
     (pciio_error_extract_f *) 0,
     (pciio_driver_reg_callback_f *) pcibr_driver_reg_callback,
     (pciio_driver_unreg_callback_f *) pcibr_driver_unreg_callback,

@@ -211,9 +211,6 @@ extern void		pcibr_config_set(vertex_hdl_t conn,
 					 unsigned size,
 					 uint64_t value);
 
-extern int		pcibr_error_devenable(vertex_hdl_t pconn_vhdl,
-					      int error_code);
-
 extern int		pcibr_wrb_flush(vertex_hdl_t pconn_vhdl);
 extern int		pcibr_rrb_check(vertex_hdl_t pconn_vhdl,
 					int *count_vchan0,

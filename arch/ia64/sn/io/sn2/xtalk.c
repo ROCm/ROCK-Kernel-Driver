@@ -64,7 +64,6 @@ int                     xtalk_intr_connect(xtalk_intr_t, intr_func_t, intr_arg_t
 void                    xtalk_intr_disconnect(xtalk_intr_t);
 vertex_hdl_t            xtalk_intr_cpu_get(xtalk_intr_t);
 int                     xtalk_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
-int                     xtalk_error_devenable(vertex_hdl_t, int, int);
 void                    xtalk_provider_startup(vertex_hdl_t);
 void                    xtalk_provider_shutdown(vertex_hdl_t);
 vertex_hdl_t            xtalk_intr_dev_get(xtalk_intr_t);
@@ -558,12 +557,6 @@ xtalk_error_handler(
     printk(KERN_WARNING "Xbow at %s encountered Fatal error", vertex_to_name(xconn, name, MAXDEVNAME));
 
     return IOERROR_UNHANDLED;
-}
-
-int
-xtalk_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
-{
-    return DEV_FUNC(xconn_vhdl, error_devenable) (xconn_vhdl, devnum, error_code);
 }
 
 

@@ -456,9 +456,6 @@ pciio_config_set_f	(vertex_hdl_t conn,	/* pci connection point */
 			 unsigned size,		/* width in bytes (1..4) */
 			 uint64_t value);	/* value to store */
 
-typedef int
-pciio_error_devenable_f (vertex_hdl_t pconn_vhdl, int error_code);
-
 typedef pciio_slot_t
 pciio_error_extract_f	(vertex_hdl_t vhdl,
 			 pciio_space_t *spacep,
@@ -523,7 +520,6 @@ typedef struct pciio_provider_s {
     pciio_config_set_f	   *config_set;
 
     /* Error handling interface */
-    pciio_error_devenable_f *error_devenable;
     pciio_error_extract_f *error_extract;
 
     /* Callback support */
@@ -565,7 +561,6 @@ extern pciio_endian_set_f pciio_endian_set;
 extern pciio_priority_set_f pciio_priority_set;
 extern pciio_config_get_f pciio_config_get;
 extern pciio_config_set_f pciio_config_set;
-extern pciio_error_devenable_f pciio_error_devenable;
 extern pciio_error_extract_f pciio_error_extract;
 
 /* Widgetdev in the IOERROR structure is encoded as follows.
