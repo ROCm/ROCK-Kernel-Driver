@@ -120,7 +120,7 @@ int multipath_end_request(struct bio *bio, unsigned int bytes_done, int error)
 
 	if (uptodate)
 		multipath_end_bh_io(mp_bh, uptodate);
-	else if ((bio->bi_rw & (1 << BIO_RW_AHEAD)) == 0) {
+	else if (!bio_rw_ahead(bio)) {
 		/*
 		 * oops, IO error:
 		 */
@@ -217,6 +217,31 @@ static void multipath_status (struct seq_file *seq, mddev_t *mddev)
 	seq_printf (seq, "]");
 }
 
+static int multipath_issue_flush(request_queue_t *q, struct gendisk *disk,
+				 sector_t *error_sector)
+{
+	mddev_t *mddev = q->queuedata;
+	multipath_conf_t *conf = mddev_to_conf(mddev);
+	int i, ret = 0;
+
+	for (i=0; i<mddev->raid_disks; i++) {
+		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
+		if (rdev && !rdev->faulty) {
+			struct block_device *bdev = rdev->bdev;
+			request_queue_t *r_queue = bdev_get_queue(bdev);
+
+			if (!r_queue->issue_flush_fn) {
+				ret = -EOPNOTSUPP;
+				break;
+			}
+
+			ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
+			if (ret)
+				break;
+		}
+	}
+	return ret;
+}
 
 /*
  * Careful, this can execute in IRQ contexts as well!
@@ -434,6 +459,8 @@ static int multipath_run (mddev_t *mddev)
 	memset(conf->multipaths, 0, sizeof(struct multipath_info)*mddev->raid_disks);
 
 	mddev->queue->unplug_fn = multipath_unplug;
+
+	mddev->queue->issue_flush_fn = multipath_issue_flush;
 
 	conf->working_disks = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {

@@ -40,6 +40,31 @@ static void raid0_unplug(request_queue_t *q)
 	}
 }
 
+static int raid0_issue_flush(request_queue_t *q, struct gendisk *disk,
+			     sector_t *error_sector)
+{
+	mddev_t *mddev = q->queuedata;
+	raid0_conf_t *conf = mddev_to_conf(mddev);
+	mdk_rdev_t **devlist = conf->strip_zone[0].dev;
+	int i, ret = 0;
+
+	for (i=0; i<mddev->raid_disks; i++) {
+		struct block_device *bdev = devlist[i]->bdev;
+		request_queue_t *r_queue = bdev_get_queue(bdev);
+
+		if (!r_queue->issue_flush_fn) {
+			ret = -EOPNOTSUPP;
+			break;
+		}
+
+		ret =r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
+		if (ret)
+			break;
+	}
+	return ret;
+}
+
+
 static int create_strip_zones (mddev_t *mddev)
 {
 	int i, c, j;
@@ -218,6 +243,8 @@ static int create_strip_zones (mddev_t *mddev)
 	}
 
 	mddev->queue->unplug_fn = raid0_unplug;
+
+	mddev->queue->issue_flush_fn = raid0_issue_flush;
 
 	printk("raid0: done.\n");
 	return 0;
