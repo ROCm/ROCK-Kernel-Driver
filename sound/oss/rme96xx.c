@@ -1083,7 +1083,9 @@ static int rme96xx_ioctl(struct inode *in, struct file *file,
 			dma->readptr &= s->fragsize<<1;
 		spin_unlock_irqrestore(&s->lock,flags);
 
-                return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
 
         case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -1100,7 +1102,9 @@ static int rme96xx_ioctl(struct inode *in, struct file *file,
 		if (dma->mmapped)
 			dma->writeptr &= s->fragsize<<1;
 		spin_unlock_irqrestore(&s->lock,flags);
-                return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
         case SNDCTL_DSP_GETBLKSIZE:
 	     return put_user(s->fragsize, (int *)arg);
 
@@ -1520,7 +1524,8 @@ static int rme96xx_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 	VALIDATE_STATE(s);
 	if (cmd == SOUND_MIXER_PRIVATE1) {
 		rme_mixer mixer;
-		copy_from_user(&mixer,(void*)arg,sizeof(mixer));
+		if (copy_from_user(&mixer,(void*)arg,sizeof(mixer)))
+			return -EFAULT;
 		
 		if (file->f_mode & FMODE_WRITE) {
 		     s->dma[mixer.devnr].outoffset = mixer.o_offset;
@@ -1537,7 +1542,8 @@ static int rme96xx_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 	}
 	if (cmd == SOUND_MIXER_PRIVATE3) {
 	     u32 control;
-	     copy_from_user(&control,(void*)arg,sizeof(control)); 
+	     if (copy_from_user(&control,(void*)arg,sizeof(control)))
+		     return -EFAULT;
 	     if (file->f_mode & FMODE_WRITE) {
 		  s->control_register = control;
 		  writel(control,s->iobase + RME96xx_control_register);

@@ -849,7 +849,9 @@ sb16_copy_from_user(int dev,
 	/* if not duplex no conversion */
 	if (!devc->fullduplex)
 	{
-		copy_from_user (localbuf + localoffs, userbuf + useroffs, len);
+		if (copy_from_user(localbuf + localoffs,
+				   userbuf + useroffs, len))
+			return -EFAULT;
 		*used = len;
 		*returned = len;
 	}
@@ -869,9 +871,10 @@ sb16_copy_from_user(int dev,
 		{
 			locallen = (c >= LBUFCOPYSIZE ? LBUFCOPYSIZE : c);
 			/* << 1 in order to get 16 bit samples */
-			copy_from_user (lbuf16,
-					userbuf+useroffs + (p << 1),
-					locallen << 1);
+			if (copy_from_user(lbuf16,
+					   userbuf + useroffs + (p << 1),
+					   locallen << 1))
+				return -EFAULT;
 			for (i = 0; i < locallen; i++)
 			{
 				buf8[p+i] = ~((lbuf16[i] >> 8) & 0xff) ^ 0x80;
@@ -898,9 +901,10 @@ sb16_copy_from_user(int dev,
 		while (c)
 		{
 			locallen = (c >= LBUFCOPYSIZE ? LBUFCOPYSIZE : c);
-			copy_from_user (lbuf8,
-					userbuf+useroffs + p,
-					locallen);
+			if (copy_from_user(lbuf8,
+					   userbuf+useroffs + p,
+					   locallen))
+				return -EFAULT;
 			for (i = 0; i < locallen; i++)
 			{
 				buf16[p+i] = (~lbuf8[i] ^ 0x80) << 8;
