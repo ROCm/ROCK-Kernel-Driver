@@ -866,7 +866,7 @@ static int __init usb_handoff_early(char *str)
 }
 __setup("usb-handoff", usb_handoff_early);
 
-static void __init quirk_usb_handoff_uhci(struct pci_dev *pdev)
+static void __devinit quirk_usb_handoff_uhci(struct pci_dev *pdev)
 {
 	unsigned long base = 0;
 	int wait_time, delta;
@@ -919,7 +919,7 @@ static void __init quirk_usb_handoff_uhci(struct pci_dev *pdev)
 		
 }
 
-static void __init quirk_usb_handoff_ohci(struct pci_dev *pdev)
+static void __devinit quirk_usb_handoff_ohci(struct pci_dev *pdev)
 {
 	void __iomem *base;
 	int wait_time;
@@ -949,7 +949,7 @@ static void __init quirk_usb_handoff_ohci(struct pci_dev *pdev)
 	iounmap(base);
 }
 
-static void __init quirk_usb_disable_ehci(struct pci_dev *pdev)
+static void __devinit quirk_usb_disable_ehci(struct pci_dev *pdev)
 {
 	int wait_time, delta;
 	void __iomem *base, *op_reg_base;
@@ -1039,7 +1039,7 @@ static void __init quirk_usb_disable_ehci(struct pci_dev *pdev)
 
 
 
-static void __init quirk_usb_early_handoff(struct pci_dev *pdev)
+static void __devinit quirk_usb_early_handoff(struct pci_dev *pdev)
 {
 	if (!usb_early_handoff)
 		return;
