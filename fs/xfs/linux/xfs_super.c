@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -153,8 +153,7 @@ xfs_set_inodeops(
 			inode->i_mapping->a_ops = &linvfs_aops;
 	} else {
 		inode->i_op = &linvfs_file_inode_operations;
-		init_special_inode(inode, inode->i_mode,
-					inode->i_rdev);
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 	}
 }
 
@@ -287,7 +286,7 @@ void
 xfs_flush_buftarg(
 	xfs_buftarg_t		*btp)
 {
-	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+	pagebuf_delwri_flush(btp, 1, NULL);
 }
 
 void
@@ -448,7 +447,8 @@ linvfs_clear_inode(
 #define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
 
 STATIC int
-syncd(void *arg)
+xfssyncd(
+	void			*arg)
 {
 	vfs_t			*vfsp = (vfs_t *) arg;
 	int			error;
@@ -480,11 +480,12 @@ syncd(void *arg)
 }
 
 STATIC int
-linvfs_start_syncd(vfs_t *vfsp)
+linvfs_start_syncd(
+	vfs_t			*vfsp)
 {
-	int pid;
+	int			pid;
 
-	pid = kernel_thread(syncd, (void *) vfsp,
+	pid = kernel_thread(xfssyncd, (void *) vfsp,
 			CLONE_VM | CLONE_FS | CLONE_FILES);
 	if (pid < 0)
 		return pid;
@@ -493,7 +494,8 @@ linvfs_start_syncd(vfs_t *vfsp)
 }
 
 STATIC void
-linvfs_stop_syncd(vfs_t *vfsp)
+linvfs_stop_syncd(
+	vfs_t			*vfsp)
 {
 	vfsp->vfs_flag |= VFS_UMOUNT;
 	wmb();

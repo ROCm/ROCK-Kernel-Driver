@@ -300,14 +300,10 @@ extern int pagebuf_ispin(		/* check if buffer is pinned	*/
 
 /* Delayed Write Buffer Routines */
 
-#define PBDF_WAIT    0x01
-extern void pagebuf_delwri_flush(
+extern void xfs_buf_delwri_flush(xfs_buftarg_t *, int, int *);
+extern void xfs_buf_delwri_dequeue(xfs_buf_t *);
 		xfs_buftarg_t *,
 		unsigned long,
-		int *);
-
-extern void pagebuf_delwri_dequeue(
-		xfs_buf_t *);
 
 /* Buffer Daemon Setup Routines */
 

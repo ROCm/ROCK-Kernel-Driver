@@ -31,14 +31,10 @@
  */
 
 /*
- *	page_buf.c
- *
- *	The page_buf module provides an abstract buffer cache model on top of
- *	the Linux page cache.  Cached metadata blocks for a file system are
- *	hashed to the inode for the block device.  The page_buf module
- *	assembles buffer (xfs_buf_t) objects on demand to aggregate such
- *	cached pages for I/O.
- *
+ *	The xfs_buf.c code provides an abstract buffer cache model on top
+ *	of the Linux page cache.  Cached metadata blocks for a file system
+ *	are hashed to the inode for the block device.  xfs_buf.c assembles
+ *	buffers (xfs_buf_t) on demand to aggregate such cached pages for I/O.
  *
  *      Written by Steve Lord, Jim Mostek, Russell Cattelan
  *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
@@ -251,7 +247,7 @@ _pagebuf_initialize(
 	pb->pb_file_offset = range_base;
 	/*
 	 * Set buffer_length and count_desired to the same value initially.
-	 * IO routines should use count_desired, which will be the same in
+	 * I/O routines should use count_desired, which will be the same in
 	 * most cases but may be reset (e.g. XFS recovery).
 	 */
 	pb->pb_buffer_length = pb->pb_count_desired = range_length;
@@ -514,8 +510,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	size_t			range_length;
 	int			hval;
 	pb_hash_t		*h;
-	struct list_head	*p;
-	xfs_buf_t		*pb;
+	xfs_buf_t		*pb, *n;
 	int			not_locked;
 
 	range_base = (ioff << BBSHIFT);
@@ -531,9 +526,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	h = &pbhash[hval];
 
 	spin_lock(&h->pb_hash_lock);
-	list_for_each(p, &h->pb_hash) {
-		pb = list_entry(p, xfs_buf_t, pb_hash_list);
-
+	list_for_each_entry_safe(pb, n, &h->pb_hash, pb_hash_list) {
 		if (pb->pb_target == target &&
 		    pb->pb_file_offset == range_base &&
 		    pb->pb_buffer_length == range_length) {
@@ -1116,18 +1109,12 @@ void
 pagebuf_iodone_work(
 	void			*v)
 {
-	xfs_buf_t		*pb = (xfs_buf_t *)v;
+	xfs_buf_t		*bp = (xfs_buf_t *)v;
 
-	if (pb->pb_iodone) {
-		(*(pb->pb_iodone)) (pb);
-		return;
-	}
-
-	if (pb->pb_flags & PBF_ASYNC) {
-		if (!pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
-	}
+	if (bp->pb_iodone)
+		(*(bp->pb_iodone))(bp);
+	else if (bp->pb_flags & PBF_ASYNC)
+		xfs_buf_relse(bp);
 }
 
 void
@@ -1397,22 +1384,7 @@ submit_io:
 }
 
 /*
- *	pagebuf_iorequest
- *
- *	pagebuf_iorequest is the core I/O request routine.
- *	It assumes that the buffer is well-formed and
- *	mapped and ready for physical I/O, unlike
- *	pagebuf_iostart() and pagebuf_iophysio().  Those
- *	routines call the pagebuf_ioinitiate routine to start I/O,
- *	if it is present, or else call pagebuf_iorequest()
- *	directly if the pagebuf_ioinitiate routine is not present.
- *
- *	This function will be responsible for ensuring access to the
- *	pages is restricted whilst I/O is in progress - for locking
- *	pagebufs the pagebuf lock is the mediator, for non-locking
- *	pagebufs the pages will be locked. In the locking case we
- *	need to use the pagebuf lock as multiple meta-data buffers
- *	will reference the same page.
+ *	pagebuf_iorequest -- the core I/O request routine.
  */
 int
 pagebuf_iorequest(			/* start real I/O		*/
@@ -1549,6 +1521,8 @@ pagebuf_delwri_queue(
 	int			unlock)
 {
 	PB_TRACE(pb, "delwri_q", (long)unlock);
+	ASSERT(pb->pb_flags & PBF_DELWRI);
+
 	spin_lock(&pbd_delwrite_lock);
 	/* If already in the queue, dequeue and place at tail */
 	if (!list_empty(&pb->pb_list)) {
@@ -1602,8 +1576,8 @@ STATIC int
 pagebuf_daemon(
 	void			*data)
 {
-	xfs_buf_t		*pb;
-	struct list_head	*curr, *next, tmp;
+	struct list_head	tmp;
+	xfs_buf_t		*pb, *n;
 
 	/*  Set up the thread  */
 	daemonize("xfsbufd");
@@ -1623,14 +1597,11 @@ pagebuf_daemon(
 		schedule_timeout(xfs_flush_interval);
 
 		spin_lock(&pbd_delwrite_lock);
-
-		list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-			pb = list_entry(curr, xfs_buf_t, pb_list);
-
+		list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 			PB_TRACE(pb, "walkq1", (long)pagebuf_ispin(pb));
+			ASSERT(pb->pb_flags & PBF_DELWRI);
 
-			if ((pb->pb_flags & PBF_DELWRI) &&
-			     !pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
+			if (!pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
 				if (!force_flush &&
 				    time_before(jiffies, pb->pb_flushtime)) {
 					pagebuf_unlock(pb);
@@ -1642,12 +1613,11 @@ pagebuf_daemon(
 				list_move(&pb->pb_list, &tmp);
 			}
 		}
-
 		spin_unlock(&pbd_delwrite_lock);
+
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, xfs_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
-
 			pagebuf_iostrategy(pb);
 			blk_run_address_space(pb->pb_target->pbr_mapping);
 		}
@@ -1664,31 +1634,24 @@ pagebuf_daemon(
 void
 pagebuf_delwri_flush(
 	xfs_buftarg_t		*target,
-	u_long			flags,
+	int			wait,
 	int			*pinptr)
 {
-	xfs_buf_t		*pb;
-	struct list_head	*curr, *next, tmp;
+	struct list_head	tmp;
+	xfs_buf_t		*pb, *n;
 	int			pincount = 0;
 
 	pagebuf_runall_queues(pagebuf_dataio_workqueue);
 	pagebuf_runall_queues(pagebuf_logio_workqueue);
 
-	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
+	spin_lock(&pbd_delwrite_lock);
+	list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 
-	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-		pb = list_entry(curr, xfs_buf_t, pb_list);
-
-		/*
-		 * Skip other targets, markers and in progress buffers
-		 */
-
-		if ((pb->pb_flags == 0) || (pb->pb_target != target) ||
-		    !(pb->pb_flags & PBF_DELWRI)) {
+		if (pb->pb_target != target)
 			continue;
-		}
 
+		ASSERT(pb->pb_flags & PBF_DELWRI);
 		PB_TRACE(pb, "walkq2", (long)pagebuf_ispin(pb));
 		if (pagebuf_ispin(pb)) {
 			pincount++;
@@ -1699,33 +1662,33 @@ pagebuf_delwri_flush(
 		pb->pb_flags |= PBF_WRITE;
 		list_move(&pb->pb_list, &tmp);
 	}
-	/* ok found all the items that can be worked on 
-	 * drop the lock and process the private list */
 	spin_unlock(&pbd_delwrite_lock);
 
-	list_for_each_safe(curr, next, &tmp) {
-		pb = list_entry(curr, xfs_buf_t, pb_list);
-
-		if (flags & PBDF_WAIT)
+	/*
+	 * Dropped the delayed write list lock, now walk the temporary list
+	 */
+	list_for_each_entry_safe(pb, n, &tmp, pb_list) {
+		if (wait)
 			pb->pb_flags &= ~PBF_ASYNC;
 		else
-			list_del_init(curr);
+			list_del_init(&pb->pb_list);
 
 		pagebuf_lock(pb);
 		pagebuf_iostrategy(pb);
 	}
 
+	/*
+	 * Remaining list items must be flushed before returning
+	 */
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, xfs_buf_t, pb_list);
 
 		list_del_init(&pb->pb_list);
-		pagebuf_iowait(pb);
-		if (!pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
+		xfs_iowait(pb);
+		xfs_buf_relse(pb);
 	}
 
-	if (flags & PBDF_WAIT)
+	if (wait)
 		blk_run_address_space(target->pbr_mapping);
 
 	if (pinptr)
