@@ -43,10 +43,12 @@
 #include <linux/personality.h>
 #include <linux/stat.h>
 #include <linux/filter.h>
+#include <linux/tty.h>
+#include <linux/binfmts.h>
+#include <linux/elf.h>
 #include <asm/types.h>
 #include <asm/ipc.h>
 #include <asm/uaccess.h>
-#include <linux/elf.h>
 #include <asm/ppc32.h>
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>

@@ -107,19 +107,6 @@ static long test_tce_range( struct TceTable *,
 			    long tcenum, 
 			    unsigned order );
 
-static unsigned fill_scatterlist_sg(struct scatterlist *sg, int nents, 
-				    dma_addr_t dma_addr, 
-				    unsigned long numTces );
-
-static unsigned long num_tces_sg( struct scatterlist *sg, 
-				  int nents );
-	
-static dma_addr_t create_tces_sg( struct TceTable *tbl, 
-				  struct scatterlist *sg, 
-			 	  int nents, 
-				  unsigned numTces,
-				  int direction );
-
 static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
 				      struct TceTable *tce_table_parms );
 
@@ -1426,8 +1413,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems,
 	int i;
 
 	for (i = 0; i < nelems; i++) {
-		unsigned long vaddr = (page_address(sglist->page) +
-				       sglist->offset);
+		void *vaddr = page_address(sglist->page) + sglist->offset;
 
 		sglist->dma_address = pci_map_single(pdev, vaddr,
 						     sglist->length,

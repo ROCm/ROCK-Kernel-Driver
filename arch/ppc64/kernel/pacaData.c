@@ -7,7 +7,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define __KERNEL__
 #include <asm/types.h>
 #include <asm/page.h>
 #include <stddef.h>

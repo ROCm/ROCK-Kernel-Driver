@@ -157,7 +157,7 @@ ioremap(unsigned long addr, unsigned long size)
 #else
 	if(mem_init_done && (addr >> 60UL)) {
 		if (IS_EEH_TOKEN_DISABLED(addr))
-			return IO_TOKEN_TO_ADDR(addr);
+			return (void *)IO_TOKEN_TO_ADDR(addr);
 		return (void*)addr; /* already mapped address or EEH token. */
 	}
 	return __ioremap(addr, size, _PAGE_NO_CACHE);
