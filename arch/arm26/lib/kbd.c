@@ -146,7 +146,7 @@ static int gen_getkeycode(unsigned int scancode)
 static int
 gen_translate(unsigned char scancode, unsigned char *keycode, char raw_mode)
 {
-	static int prev_scancode = 0;
+	static int prev_scancode;
 
 	/* special prefix scancodes.. */
 	if (scancode == 0xe0 || scancode == 0xe1) {
