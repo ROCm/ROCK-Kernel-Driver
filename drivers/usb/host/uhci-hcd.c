@@ -1340,7 +1340,7 @@ static struct urb *uhci_find_urb_ep(struct uhci_hcd *uhci, struct urb *urb)
 
 static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 {
-	int ret = -EINVAL;
+	int ret;
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned long flags;
 	struct urb *eurb;
@@ -1348,7 +1348,8 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 
 	spin_lock_irqsave(&uhci->schedule_lock, flags);
 
-	if (urb->status != -EINPROGRESS)	/* URB already unlinked! */
+	ret = urb->status;
+	if (ret != -EINPROGRESS)		/* URB already unlinked! */
 		goto out;
 
 	eurb = uhci_find_urb_ep(uhci, urb);
