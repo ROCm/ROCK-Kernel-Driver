@@ -221,6 +221,7 @@ int __init vesafb_init(void)
 {
 	int video_cmap_len;
 	int i;
+	unsigned int real_smem_len;
 
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
 		return -ENXIO;
@@ -232,15 +233,15 @@ int __init vesafb_init(void)
 	vesafb_defined.xres = screen_info.lfb_width;
 	vesafb_defined.yres = screen_info.lfb_height;
 	vesafb_fix.line_length = screen_info.lfb_linelength;
-	vesafb_fix.smem_len = screen_info.lfb_size * 65536;
+	real_smem_len = vesafb_fix.smem_len = screen_info.lfb_size * 65536;
 	vesafb_fix.visual   = (vesafb_defined.bits_per_pixel == 8) ?
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
 
-	/* limit framebuffer size to 16 MB.  Otherwise we'll eat tons of
+	/* limit framebuffer size to 32 MB.  Otherwise we'll eat tons of
 	 * kernel address space for nothing if the gfx card has alot of
 	 * memory (>= 128 MB isn't uncommon these days ...) */
-	if (vesafb_fix.smem_len > 16 * 1024 * 1024)
-		vesafb_fix.smem_len = 16 * 1024 * 1024;
+	if (vesafb_fix.smem_len > 32 * 1024 * 1024)
+		vesafb_fix.smem_len = 32 * 1024 * 1024;
 
 #ifndef __i386__
 	screen_info.vesapm_seg = 0;
@@ -350,7 +351,7 @@ int __init vesafb_init(void)
 	request_region(0x3c0, 32, "vesafb");
 
 	if (mtrr) {
-		int temp_size = vesafb_fix.smem_len;
+		int temp_size = real_smem_len;
 		/* Find the largest power-of-two */
 		while (temp_size & (temp_size - 1))
                 	temp_size &= (temp_size - 1);
