@@ -20,13 +20,15 @@ static unsigned short normal_i2c[] = {I2C_CLIENT_END};
 static unsigned short normal_i2c_range[] = {0x60,0x6f,I2C_CLIENT_END};
 I2C_CLIENT_INSMOD;
 
+#define UNSET (-1U)
+
 /* insmod options */
-static int debug =  0;
-static int type  = -1;
-static int addr  =  0;
+static unsigned int debug =  0;
+static unsigned int type  =  UNSET;
+static unsigned int addr  =  0;
 static char *pal =  "b";
-static int tv_range[2]    = { 44, 958 };
-static int radio_range[2] = { 65, 108 };
+static unsigned int tv_range[2]    = { 44, 958 };
+static unsigned int radio_range[2] = { 65, 108 };
 MODULE_PARM(debug,"i");
 MODULE_PARM(type,"i");
 MODULE_PARM(addr,"i");
@@ -45,13 +47,16 @@ static int this_adap;
 
 struct tuner
 {
-	int type;            /* chip type */
-	int freq;            /* keep track of the current settings */
-	int std;
-
-	int radio;
-	int mode;            /* current norm for multi-norm tuners */
-	int xogc;	     // only for MT2032
+	unsigned int type;            /* chip type */
+	unsigned int freq;            /* keep track of the current settings */
+	unsigned int std;
+	
+	unsigned int radio;
+	unsigned int mode;            /* current norm for multi-norm tuners */
+	
+	// only for MT2032
+	unsigned int xogc;
+	unsigned int radio_if2;
 };
 
 static struct i2c_driver driver;
@@ -217,8 +222,11 @@ static struct tunertype tuners[] = {
 	  16*160.00,16*442.00,0x01,0x02,0x04,0x8e,623 },
 	{ "LG NTSC (newer TAPC series)", LGINNOTEK, NTSC,
           16*170.00, 16*450.00, 0x01,0x02,0x08,0x8e,732},
+
+	{ "HITACHI V7-J180AT", HITACHI, NTSC,
+	  16*170.00, 16*450.00, 0x01,0x02,0x00,0x8e,940 },
 };
-#define TUNERS (sizeof(tuners)/sizeof(struct tunertype))
+#define TUNERS ARRAY_SIZE(tuners)
 
 /* ---------------------------------------------------------------------- */
 
@@ -381,10 +389,15 @@ static int mt2032_spurcheck(int f1, int f2, int spectrum_from,int spectrum_to)
 	return 1;
 }
 
-static int mt2032_compute_freq(int rfin, int if1, int if2, int spectrum_from,
-	int spectrum_to, unsigned char *buf, int *ret_sel, int xogc) //all in Hz
+static int mt2032_compute_freq(unsigned int rfin,
+			       unsigned int if1, unsigned int if2,
+			       unsigned int spectrum_from,
+			       unsigned int spectrum_to,
+			       unsigned char *buf,
+			       int *ret_sel,
+			       unsigned int xogc) //all in Hz
 {
-        int fref,lo1,lo1n,lo1a,s,sel,lo1freq, desired_lo1,
+        unsigned int fref,lo1,lo1n,lo1a,s,sel,lo1freq, desired_lo1,
 		desired_lo2,lo2,lo2n,lo2a,lo2num,lo2freq;
 
         fref= 5250 *1000; //5.25MHz
@@ -513,7 +526,9 @@ static int mt2032_optimize_vco(struct i2c_client *c,int sel,int lock)
 }
 
 
-static void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, int from, int to)
+static void mt2032_set_if_freq(struct i2c_client *c, unsigned int rfin,
+			       unsigned int if1, unsigned int if2,
+			       unsigned int from, unsigned int to)
 {
 	unsigned char buf[21];
 	int lint_try,ret,sel,lock=0;
@@ -568,28 +583,30 @@ static void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, 
 }
 
 
-static void mt2032_set_tv_freq(struct i2c_client *c, int freq, int norm)
+static void mt2032_set_tv_freq(struct i2c_client *c,
+			       unsigned int freq, unsigned int norm)
 {
 	int if2,from,to;
 
 	// signal bandwidth and picture carrier
-	if(norm==VIDEO_MODE_NTSC) {
+	if (norm==VIDEO_MODE_NTSC) {
 		from=40750*1000;
 		to=46750*1000;
 		if2=45750*1000; 
-	}
-	else {  // Pal 
+	} else {
+		// Pal 
 		from=32900*1000;
 		to=39900*1000;
 		if2=38900*1000;
 	}
 
-        mt2032_set_if_freq(c,freq* 1000*1000/16, 1090*1000*1000, if2, from, to);
+        mt2032_set_if_freq(c, freq*62500 /* freq*1000*1000/16 */,
+			   1090*1000*1000, if2, from, to);
 }
 
 
 // Set tuner frequency,  freq in Units of 62.5kHz = 1/16MHz
-static void set_tv_freq(struct i2c_client *c, int freq)
+static void set_tv_freq(struct i2c_client *c, unsigned int freq)
 {
 	u8 config;
 	u16 div;
@@ -598,7 +615,7 @@ static void set_tv_freq(struct i2c_client *c, int freq)
         unsigned char buffer[4];
 	int rc;
 
-	if (t->type == -1) {
+	if (t->type == UNSET) {
 		printk("tuner: tuner type not set\n");
 		return;
 	}
@@ -720,22 +737,23 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 
 }
 
-static void mt2032_set_radio_freq(struct i2c_client *c,int freq)
-{               
-        int if2;
-
-        if2=10700*1000; //  10.7MHz FM intermediate frequency
+static void mt2032_set_radio_freq(struct i2c_client *c, unsigned int freq)
+{
+	struct tuner *t = i2c_get_clientdata(c);
+	int if2 = t->radio_if2;
 
 	// per Manual for FM tuning: first if center freq. 1085 MHz
-        mt2032_set_if_freq(c,freq* 1000*1000/16, 1085*1000*1000,if2,if2,if2);
+        mt2032_set_if_freq(c, freq*62500 /* freq*1000*1000/16 */,
+			   1085*1000*1000,if2,if2,if2);
 }
 
-static void set_radio_freq(struct i2c_client *c, int freq)
+static void set_radio_freq(struct i2c_client *c, unsigned int freq)
 {
 	struct tunertype *tun;
 	struct tuner *t = i2c_get_clientdata(c);
         unsigned char buffer[4];
-	int rc,div;
+	unsigned div;
+	int rc;
 
 	if (freq < radio_range[0]*16 || freq > radio_range[1]*16) {
 		printk("tuner: radio freq (%d.%02d) out of range (%d-%d)\n",
@@ -743,7 +761,7 @@ static void set_radio_freq(struct i2c_client *c, int freq)
 		       radio_range[0],radio_range[1]);
 		return;
 	}
-	if (t->type == -1) {
+	if (t->type == UNSET) {
 		printk("tuner: tuner type not set\n");
 		return;
 	}
@@ -798,20 +816,20 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
                 kfree(client);
                 return -ENOMEM;
         }
-	i2c_set_clientdata(client, t);
         memset(t,0,sizeof(struct tuner));
-	if (type >= 0 && type < TUNERS) {
+	i2c_set_clientdata(client, t);
+	t->type       = UNSET;
+	t->radio_if2  = 10700*1000; // 10.7MHz - FM radio
+
+	if (type < TUNERS) {
 		t->type = type;
 		printk("tuner(bttv): type forced to %d (%s) [insmod]\n",t->type,tuners[t->type].name);
 		strncpy(client->dev.name, tuners[t->type].name, DEVICE_NAME_SIZE);
-	} else {
-		t->type = -1;
 	}
         i2c_attach_client(client);
         if (t->type == TUNER_MT2032)
                  mt2032_init(client);
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -835,7 +853,6 @@ static int tuner_detach(struct i2c_client *client)
 	i2c_detach_client(client);
 	kfree(t);
 	kfree(client);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -843,20 +860,17 @@ static int
 tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
 	struct tuner *t = i2c_get_clientdata(client);
-        int   *iarg = (int*)arg;
-#if 0
-        __u16 *sarg = (__u16*)arg;
-#endif
+        unsigned int *iarg = (int*)arg;
 
         switch (cmd) {
 
 	/* --- configuration --- */
 	case TUNER_SET_TYPE:
-		if (t->type != -1) {
+		if (t->type != UNSET) {
 			printk("tuner: type already set (%d)\n",t->type);
 			return 0;
 		}
-		if (*iarg < 0 || *iarg >= TUNERS)
+		if (*iarg >= TUNERS)
 			return 0;
 		t->type = *iarg;
 		printk("tuner: type set to %d (%s)\n",
@@ -868,6 +882,18 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	case AUDC_SET_RADIO:
 		t->radio = 1;
 		break;
+	case AUDC_CONFIG_PINNACLE:
+		switch (*iarg) {
+		case 2:
+			dprintk("tuner: pinnacle pal\n");
+			t->radio_if2 = 33300 * 1000;
+			break;
+		case 3:
+			dprintk("tuner: pinnacle ntsc\n");
+			t->radio_if2 = 41300 * 1000;
+			break;
+		}
+                break;
 		
 	/* --- v4l ioctls --- */
 	/* take care: bttv does userspace copying, we'll get a
@@ -913,35 +939,6 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			va->mode = (tuner_stereo(client) ? VIDEO_SOUND_STEREO : VIDEO_SOUND_MONO);
 		return 0;
 	}
-	
-#if 0
-	/* --- old, obsolete interface --- */
-	case TUNER_SET_TVFREQ:
-		dprintk("tuner: tv freq set to %d.%02d\n",
-			(*iarg)/16,(*iarg)%16*100/16);
-		set_tv_freq(client,*iarg);
-		t->radio = 0;
-		t->freq = *iarg;
-		break;
-
-	case TUNER_SET_RADIOFREQ:
-		dprintk("tuner: radio freq set to %d.%02d\n",
-			(*iarg)/16,(*iarg)%16*100/16);
-		set_radio_freq(client,*iarg);
-		t->radio = 1;
-		t->freq = *iarg;
-		break;
-	case TUNER_SET_MODE:
-		if (t->type != TUNER_PHILIPS_SECAM) {
-			dprintk("tuner: trying to change mode for other than TUNER_PHILIPS_SECAM\n");
-		} else {
-			int mode=(*sarg==VIDEO_MODE_SECAM)?1:0;
-			dprintk("tuner: mode set to %d\n", *sarg);
-			t->mode = mode;
-			set_tv_freq(client,t->freq);
-		}
-		break;
-#endif
 	default:
 		/* nothing */
 		break;
@@ -963,11 +960,9 @@ static struct i2c_driver driver = {
 };
 static struct i2c_client client_template =
 {
-	.flags  = I2C_CLIENT_ALLOW_USE,
-        .driver = &driver,
-        .dev	= {
-		.name	= "(tuner unset)",
-	},
+        .dev.name   = "(tuner unset)",
+	.flags      = I2C_CLIENT_ALLOW_USE,
+        .driver     = &driver,
 };
 
 static int tuner_init_module(void)
