@@ -39,8 +39,8 @@ htmldocs: $(HTML)
 
 ###
 #External programs used
-KERNELDOC=$(objtree)/scripts/kernel-doc
-DOCPROC=$(objtree)/scripts/docproc
+KERNELDOC = scripts/kernel-doc
+DOCPROC   = scripts/docproc
 
 ###
 # DOCPROC is used for two purposes:
@@ -50,14 +50,14 @@ DOCPROC=$(objtree)/scripts/docproc
 # The following rules are used to generate the .sgml documentation
 # required to generate the final targets. (ps, pdf, html).
 quiet_cmd_docproc = DOCPROC $@
-cmd_docproc = $(DOCPROC) doc $< >$@
+      cmd_docproc = $(DOCPROC) doc $< >$@
 define rule_docproc
-	set -e
-        $(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) 
-        $(cmd_$(1)); \
-        ( \
-          echo 'cmd_$@ := $(cmd_$(1))'; \
-          echo $@: `$(DOCPROC) depend $<`; \
+	set -e;								\
+        $(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) 	\
+        $(cmd_$(1)); 							\
+        ( 								\
+          echo 'cmd_$@ := $(cmd_$(1))'; 				\
+          echo $@: `$(DOCPROC) depend $<`; 				\
         ) > $(dir $@).$(notdir $@).cmd
 endef
 
@@ -96,41 +96,55 @@ $(obj)/parportbook.ps $(obj)/parportbook.pdf: $(EPS-parportbook) $(PNG-parportbo
 ###
 # Rules to generate postscript, PDF and HTML
 # db2html creates a directory. Generate a html file used for timestamp
+
+quiet_cmd_db2ps = DB2PS   $@
+      cmd_db2ps = db2ps -o $(dir $@) $<
 %.ps : %.sgml
 	@(which db2ps > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
-	$(call do_cmd,DB2PS   $@,db2ps -o $(dir $@) $<)
+	$(call cmd,db2ps)
 
+quiet_cmd_db2pdf = DB2PDF  $@
+      cmd_db2pdf = db2pdf -o $(dir $@) $<
 %.pdf : %.sgml
 	@(which db2pdf > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
-	$(call do_cmd,DB2PDF  $@,db2pdf -o $(dir $@) $<)
+	$(call cmd,db2pdf)
+
+quiet_cmd_db2html = DB2HTML $@
+      cmd_db2html = db2html -o $(patsubst %.html,%,$@) $< &&		      \
+		echo '<a HREF="$(patsubst %.html,%,$(notdir $@))/book1.html"> \
+         Goto $(patsubst %.html,%,$(notdir $@))</a><p>' > $@
 
 %.html:	%.sgml
 	@(which db2html > /dev/null 2>&1) || \
 	 (echo "*** You need to install DocBook stylesheets ***"; \
 	  exit 1)
 	@rm -rf $@ $(patsubst %.html,%,$@)
-	$(call do_cmd,DB2HTML $@,db2html -o $(patsubst %.html,%,$@) $< && \
-         echo '<a HREF="$(patsubst %.html,%,$(notdir $@))/book1.html">\
-         Goto $(patsubst %.html,%,$(notdir $@))</a><p>' > $@)
+	$(call cmd,db2html)
 	@if [ ! -z "$(PNG-$(basename $(notdir $@)))" ]; then \
             cp $(PNG-$(basename $(notdir $@))) $(patsubst %.html,%,$@); fi
 
 ###
 # Rules to generate postscripts and PNG imgages from .fig format files
+quiet_cmd_fig2eps = FIG2EPS $@
+      cmd_fig2eps = fig2dev -Leps $< $@
+
 %.eps: %.fig
-	$(call do_cmd,FIG2DEV -Leps $@,fig2dev -Leps $< $@)
+	$(call cmd,fig2eps)
+
+quiet_cmd_fig2png = FIG2PNG $@
+      cmd_fig2png = fig2dev -Lpng $< $@
 
 %.png: %.fig
-	$(call do_cmd,FIG2DEV -Lpng $@,fig2dev -Lpng $< $@)
+	$(call cmd,fig2png)
 
 ###
 # Rule to convert a .c file to inline SGML documentation
 %.sgml: %.c
-	@echo '  Generating $@'
+	@echo '  GEN     $@'
 	@(                            \
 	   echo "<programlisting>";   \
 	   expand --tabs=8 < $< |     \
