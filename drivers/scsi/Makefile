@@ -129,14 +129,12 @@ a100u2w-objs	:= inia100.o i60uscsi.o
 cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 
-EXTRA_TARGETS := 53c8xx_d.h 53c7xx_d.h sim710_d.h 53c700_d.h
-
 include $(TOPDIR)/Rules.make
 
 53c7,8xx.o: 53c8xx_d.h 53c8xx_u.h
 53c7xx.o:   53c7xx_d.h 53c7xx_u.h
 sim710.o:   sim710_d.h
-53c700.o:   53c700_d.h
+53c700.o $(MODVERDIR)/53c700.ver: 53c700_d.h
 
 # If you want to play with the firmware, uncomment
 # GENERATE_FIRMWARE := 1
