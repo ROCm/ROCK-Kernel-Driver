@@ -11,6 +11,30 @@
 #ifndef IDE_PROMISE_H
 #define IDE_PROMISE_H
 
+#include <linux/config.h>
+
+#ifndef CONFIG_BLK_DEV_PDC4030
+# ifdef _IDE_DISK
+
+# define IS_PDC4030_DRIVE (0)	/* auto-NULLs out pdc4030 code */
+
+ide_startstop_t promise_rw_disk(ide_drive_t *, struct request *, unsigned long);
+
+ide_startstop_t promise_rw_disk(ide_drive_t *drive, struct request *rq, unsigned long block)
+{
+        return ide_stopped;
+}
+# endif /* _IDE_DISK */
+#else /* CONFIG_BLK_DEV_PDC4030 */
+# ifdef _IDE_DISK
+#  define IS_PDC4030_DRIVE (HWIF(drive)->chipset == ide_pdc4030)
+
+ide_startstop_t promise_rw_disk(ide_drive_t *, struct request *, unsigned long);
+
+# endif /* _IDE_DISK */
+#endif /* CONFIG_BLK_DEV_PDC4030 */
+
+#ifdef __PROMISE_4030
 #define	PROMISE_EXTENDED_COMMAND	0xF0
 #define	PROMISE_READ			0xF2
 #define	PROMISE_WRITE			0xF3
@@ -40,5 +64,7 @@ struct dc_ident {
 	struct translation_mode current_tm[4];
 	u8	pad[SECTOR_WORDS*4 - 32];
 };
+
+#endif /* __PROMISE_4030 */
 
 #endif /* IDE_PROMISE_H */
