@@ -691,9 +691,10 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 	 *    Just Do It.
 	 */
 	struct irqaction *ap = bp->irq_info;
-	cpumask_t cpu_mask = get_smpaff_in_irqaction(ap);
+	cpumask_t cpu_mask;
 	unsigned int buddy, ticks;
 
+	cpus_addr(cpu_mask)[0] = get_smpaff_in_irqaction(ap);
 	cpus_and(cpu_mask, cpu_mask, cpu_online_map);
 	if (cpus_empty(cpu_mask))
 		cpu_mask = cpu_online_map;
@@ -1210,9 +1211,10 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 {
 	struct ino_bucket *bp = ivector_table + (long)data;
 	struct irqaction *ap = bp->irq_info;
-	cpumask_t mask = get_smpaff_in_irqaction(ap);
+	cpumask_t mask;
 	int len;
 
+	cpus_addr(mask)[0] = get_smpaff_in_irqaction(ap);
 	if (cpus_empty(mask))
 		mask = cpu_online_map;
 

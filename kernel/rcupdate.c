@@ -129,17 +129,14 @@ static void rcu_do_batch(struct rcu_head *list)
  */
 static void rcu_start_batch(int next_pending)
 {
-	cpumask_t active;
-
 	if (next_pending)
 		rcu_ctrlblk.next_pending = 1;
 
 	if (rcu_ctrlblk.next_pending &&
 			rcu_ctrlblk.completed == rcu_ctrlblk.cur) {
 		/* Can't change, since spin lock held. */
-		active = nohz_cpu_mask;
-		cpus_complement(active);
-		cpus_and(rcu_state.rcu_cpu_mask, cpu_online_map, active);
+		cpus_andnot(rcu_state.rcu_cpu_mask, cpu_online_map,
+							nohz_cpu_mask);
 		write_seqcount_begin(&rcu_ctrlblk.lock);
 		rcu_ctrlblk.next_pending = 0;
 		rcu_ctrlblk.cur++;

@@ -2951,6 +2951,11 @@ out_unlock:
 cpumask_t cpu_present_map;
 EXPORT_SYMBOL(cpu_present_map);
 
+#ifndef CONFIG_SMP
+cpumask_t cpu_online_map = CPU_MASK_ALL;
+cpumask_t cpu_possible_map = CPU_MASK_ALL;
+#endif
+
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process
  * @pid: pid of the process
