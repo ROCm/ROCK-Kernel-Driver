@@ -134,8 +134,12 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block * sb = inode->i_sb;
-
 	if (sb) {
+		/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
+		if (flags & (I_DIRTY | I_DIRTY_SYNC)) {
+			if (sb->s_op && sb->s_op->dirty_inode)
+				sb->s_op->dirty_inode(inode);
+		}
 		spin_lock(&inode_lock);
 		if ((inode->i_state & flags) != flags) {
 			inode->i_state |= flags;
@@ -676,7 +680,17 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 			spin_unlock(&inode_lock);
 
 			clean_inode(inode);
-			sb->s_op->read_inode(inode);
+
+			/* reiserfs specific hack right here.  We don't
+			** want this to last, and are looking for VFS changes
+			** that will allow us to get rid of it.
+			** -- mason@suse.com 
+			*/
+			if (sb->s_op->read_inode2) {
+				sb->s_op->read_inode2(inode, opaque) ;
+			} else {
+				sb->s_op->read_inode(inode);
+			}
 
 			/*
 			 * This is special!  We do not need the spinlock

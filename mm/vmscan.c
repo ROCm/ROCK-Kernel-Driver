@@ -72,9 +72,10 @@ set_swap_pte:
 		swap_duplicate(entry);
 		set_pte(page_table, swp_entry_to_pte(entry));
 drop_pte:
-		UnlockPage(page);
 		mm->rss--;
-		deactivate_page(page);
+		if (!page->age)
+			deactivate_page(page);
+		UnlockPage(page);
 		page_cache_release(page);
 		return;
 	}
@@ -153,7 +154,7 @@ static int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vma, pmd_
 
 			if (VALID_PAGE(page) && !PageReserved(page)) {
 				try_to_swap_out(mm, vma, address, pte, page);
-				if (--count)
+				if (!--count)
 					break;
 			}
 		}
@@ -471,7 +472,6 @@ dirty_page_rescan:
 		 */
 		if (PageDirty(page)) {
 			int (*writepage)(struct page *) = page->mapping->a_ops->writepage;
-			int result;
 
 			if (!writepage)
 				goto page_active;
@@ -489,16 +489,12 @@ dirty_page_rescan:
 			page_cache_get(page);
 			spin_unlock(&pagemap_lru_lock);
 
-			result = writepage(page);
+			writepage(page);
 			page_cache_release(page);
 
 			/* And re-start the thing.. */
 			spin_lock(&pagemap_lru_lock);
-			if (result != 1)
-				continue;
-			/* writepage refused to do anything */
-			set_page_dirty(page);
-			goto page_active;
+			continue;
 		}
 
 		/*
@@ -851,6 +847,15 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	if (free_shortage()) {
 		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
 		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
+	} else {
+		/*
+		 * Illogical, but true. At least for now.
+		 *
+		 * If we're _not_ under shortage any more, we
+		 * reap the caches. Why? Because a noticeable
+		 * part of the caches are the buffer-heads, 
+		 * which we'll want to keep if under shortage.
+		 */
 		kmem_cache_reap(gfp_mask);
 	} 
 

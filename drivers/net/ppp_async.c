@@ -33,13 +33,6 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 
-#ifndef spin_trylock_bh
-#define spin_trylock_bh(lock)	({ int __r; local_bh_disable();	\
-				   __r = spin_trylock(lock);	\
-				   if (!__r) local_bh_enable();	\
-				   __r; })
-#endif
-
 #define PPP_VERSION	"2.4.1"
 
 #define OBUFSIZE	256
@@ -76,6 +69,7 @@ struct asyncppp {
 /* Bit numbers in xmit_flags */
 #define XMIT_WAKEUP	0
 #define XMIT_FULL	1
+#define XMIT_BUSY	2
 
 /* State bits */
 #define SC_TOSS		0x20000000
@@ -181,18 +175,14 @@ ppp_asynctty_close(struct tty_struct *tty)
 }
 
 /*
- * Read does nothing.
+ * Read does nothing - no data is ever available this way.
+ * Pppd reads and writes packets via /dev/ppp instead.
  */
 static ssize_t
 ppp_asynctty_read(struct tty_struct *tty, struct file *file,
 		  unsigned char *buf, size_t count)
 {
-	/* For now, do the same as the old 2.3.x code useta */
-	struct asyncppp *ap = tty->disc_data;
-
-	if (ap == 0)
-		return -ENXIO;
-	return ppp_channel_read(&ap->chan, file, buf, count);
+	return -EAGAIN;
 }
 
 /*
@@ -203,12 +193,7 @@ static ssize_t
 ppp_asynctty_write(struct tty_struct *tty, struct file *file,
 		   const unsigned char *buf, size_t count)
 {
-	/* For now, do the same as the old 2.3.x code useta */
-	struct asyncppp *ap = tty->disc_data;
-
-	if (ap == 0)
-		return -ENXIO;
-	return ppp_channel_write(&ap->chan, buf, count);
+	return -EAGAIN;
 }
 
 static int
@@ -259,25 +244,6 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		err = 0;
 		break;
 
-/*
- * For now, do the same as the old 2.3 driver useta
- */
-	case PPPIOCGFLAGS:
-	case PPPIOCSFLAGS:
-	case PPPIOCGASYNCMAP:
-	case PPPIOCSASYNCMAP:
-	case PPPIOCGRASYNCMAP:
-	case PPPIOCSRASYNCMAP:
-	case PPPIOCGXASYNCMAP:
-	case PPPIOCSXASYNCMAP:
-	case PPPIOCGMRU:
-	case PPPIOCSMRU:
-		err = -EPERM;
-		if (!capable(CAP_NET_ADMIN))
-			break;
-		err = ppp_async_ioctl(&ap->chan, cmd, arg);
-		break;
-
 	case PPPIOCATTACH:
 	case PPPIOCDETACH:
 		err = ppp_channel_ioctl(&ap->chan, cmd, arg);
@@ -294,18 +260,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 static unsigned int
 ppp_asynctty_poll(struct tty_struct *tty, struct file *file, poll_table *wait)
 {
-	unsigned int mask;
-	struct asyncppp *ap = tty->disc_data;
-
-	mask = POLLOUT | POLLWRNORM;
-/*
- * For now, do the same as the old 2.3 driver useta
- */
-	if (ap != 0)
-		mask |= ppp_channel_poll(&ap->chan, file, wait);
-	if (test_bit(TTY_OTHER_CLOSED, &tty->flags) || tty_hung_up_p(file))
-		mask |= POLLHUP;
-	return mask;
+	return 0;
 }
 
 static int
@@ -637,8 +592,18 @@ ppp_async_push(struct asyncppp *ap)
 	int tty_stuffed = 0;
 
 	set_bit(XMIT_WAKEUP, &ap->xmit_flags);
-	if (!spin_trylock_bh(&ap->xmit_lock))
+	/*
+	 * We can get called recursively here if the tty write
+	 * function calls our wakeup function.  This can happen
+	 * for example on a pty with both the master and slave
+	 * set to PPP line discipline.
+	 * We use the XMIT_BUSY bit to detect this and get out,
+	 * leaving the XMIT_WAKEUP bit set to tell the other
+	 * instance that it may now be able to write more now.
+	 */
+	if (test_and_set_bit(XMIT_BUSY, &ap->xmit_flags))
 		return 0;
+	spin_lock_bh(&ap->xmit_lock);
 	for (;;) {
 		if (test_and_clear_bit(XMIT_WAKEUP, &ap->xmit_flags))
 			tty_stuffed = 0;
@@ -653,7 +618,7 @@ ppp_async_push(struct asyncppp *ap)
 				tty_stuffed = 1;
 			continue;
 		}
-		if (ap->optr == ap->olim && ap->tpkt != 0) {
+		if (ap->optr >= ap->olim && ap->tpkt != 0) {
 			if (ppp_async_encode(ap)) {
 				/* finished processing ap->tpkt */
 				clear_bit(XMIT_FULL, &ap->xmit_flags);
@@ -661,17 +626,29 @@ ppp_async_push(struct asyncppp *ap)
 			}
 			continue;
 		}
-		/* haven't made any progress */
-		spin_unlock_bh(&ap->xmit_lock);
+		/*
+		 * We haven't made any progress this time around.
+		 * Clear XMIT_BUSY to let other callers in, but
+		 * after doing so we have to check if anyone set
+		 * XMIT_WAKEUP since we last checked it.  If they
+		 * did, we should try again to set XMIT_BUSY and go
+		 * around again in case XMIT_BUSY was still set when
+		 * the other caller tried.
+		 */
+		clear_bit(XMIT_BUSY, &ap->xmit_flags);
+		/* any more work to do? if not, exit the loop */
 		if (!(test_bit(XMIT_WAKEUP, &ap->xmit_flags)
 		      || (!tty_stuffed && ap->tpkt != 0)))
 			break;
-		if (!spin_trylock_bh(&ap->xmit_lock))
+		/* more work to do, see if we can do it now */
+		if (test_and_set_bit(XMIT_BUSY, &ap->xmit_flags))
 			break;
 	}
+	spin_unlock_bh(&ap->xmit_lock);
 	return done;
 
 flush:
+	clear_bit(XMIT_BUSY, &ap->xmit_flags);
 	if (ap->tpkt != 0) {
 		kfree_skb(ap->tpkt);
 		ap->tpkt = 0;

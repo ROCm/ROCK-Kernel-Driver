@@ -148,7 +148,7 @@ void flush_scheduled_tasks(void)
 	
 int start_context_thread(void)
 {
-	kernel_thread(context_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	kernel_thread(context_thread, NULL, CLONE_FS | CLONE_FILES);
 	return 0;
 }
 

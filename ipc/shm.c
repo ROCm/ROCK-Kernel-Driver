@@ -121,6 +121,7 @@ static void shm_destroy (struct shmid_kernel *shp)
 {
 	shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	shm_rmid (shp->id);
+	shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
 	kfree (shp);
 }
@@ -467,10 +468,10 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 		if(err)
 			goto out_unlock;
 		if(cmd==SHM_LOCK) {
-			shp->shm_file->f_dentry->d_inode->u.shmem_i.locked = 1;
+			shmem_lock(shp->shm_file, 1);
 			shp->shm_flags |= SHM_LOCKED;
 		} else {
-			shp->shm_file->f_dentry->d_inode->u.shmem_i.locked = 0;
+			shmem_lock(shp->shm_file, 0);
 			shp->shm_flags &= ~SHM_LOCKED;
 		}
 		shm_unlock(shmid);

@@ -310,6 +310,8 @@ struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, i
 	}
 	/* We have the page */
 	SetPageUptodate (page);
+	if (info->locked)
+		page_cache_get(page);
 
 cached_page:
 	UnlockPage (page);
@@ -374,8 +376,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 			inode->i_fop = &shmem_dir_operations;
 			break;
 		case S_IFLNK:
-			inode->i_op = &page_symlink_inode_operations;
-			break;
+			BUG();
 		}
 		spin_lock (&shmem_ilock);
 		list_add (&inode->u.shmem_i.list, &shmem_inodes);
@@ -399,6 +400,32 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 	spin_unlock (&sb->u.shmem_sb.stat_lock);
 	buf->f_namelen = 255;
 	return 0;
+}
+
+void shmem_lock(struct file * file, int lock)
+{
+	struct inode * inode = file->f_dentry->d_inode;
+	struct shmem_inode_info * info = &inode->u.shmem_i;
+	struct page * page;
+	unsigned long idx, size;
+
+	if (info->locked == lock)
+		return;
+	down(&inode->i_sem);
+	info->locked = lock;
+	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	for (idx = 0; idx < size; idx++) {
+		page = find_lock_page(inode->i_mapping, idx);
+		if (!page)
+			continue;
+		if (!lock) {
+			/* release the extra count and our reference */
+			page_cache_release(page);
+			page_cache_release(page);
+		}
+		UnlockPage(page);
+	}
+	up(&inode->i_sem);
 }
 
 /*
@@ -524,19 +551,6 @@ static int shmem_rename(struct inode * old_dir, struct dentry *old_dentry, struc
 			dput(new_dentry);
 		}
 		error = 0;
-	}
-	return error;
-}
-
-static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
-{
-	int error;
-
-	error = shmem_mknod(dir, dentry, S_IFLNK | S_IRWXUGO, 0);
-	if (!error) {
-		int l = strlen(symname)+1;
-		struct inode *inode = dentry->d_inode;
-		error = block_symlink(inode, symname, l);
 	}
 	return error;
 }
@@ -677,7 +691,6 @@ static struct inode_operations shmem_dir_inode_operations = {
 	lookup:		shmem_lookup,
 	link:		shmem_link,
 	unlink:		shmem_unlink,
-	symlink:	shmem_symlink,
 	mkdir:		shmem_mkdir,
 	rmdir:		shmem_rmdir,
 	mknod:		shmem_mknod,

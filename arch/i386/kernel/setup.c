@@ -2008,7 +2008,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 */
 
 	/* TSC disabled? */
-#ifdef CONFIG_TSC
+#ifndef CONFIG_X86_TSC
 	if ( tsc_disable )
 		clear_bit(X86_FEATURE_TSC, &c->x86_capability);
 #endif

@@ -288,6 +288,7 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #include <linux/hfs_fs_i.h>
 #include <linux/adfs_fs_i.h>
 #include <linux/qnx4_fs_i.h>
+#include <linux/reiserfs_fs_i.h>
 #include <linux/bfs_fs_i.h>
 #include <linux/udf_fs_i.h>
 #include <linux/ncp_fs_i.h>
@@ -450,6 +451,7 @@ struct inode {
 		struct hfs_inode_info		hfs_i;
 		struct adfs_inode_info		adfs_i;
 		struct qnx4_inode_info		qnx4_i;
+		struct reiserfs_inode_info	reiserfs_i;
 		struct bfs_inode_info		bfs_i;
 		struct udf_inode_info		udf_i;
 		struct ncp_inode_info		ncpfs_i;
@@ -459,35 +461,6 @@ struct inode {
 		void				*generic_ip;
 	} u;
 };
-
-/* Inode state bits.. */
-#define I_DIRTY_SYNC		1 /* Not dirty enough for O_DATASYNC */
-#define I_DIRTY_DATASYNC	2 /* Data-related inode changes pending */
-#define I_DIRTY_PAGES		4 /* Data-related inode changes pending */
-#define I_LOCK			8
-#define I_FREEING		16
-#define I_CLEAR			32
-
-#define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
-
-extern void __mark_inode_dirty(struct inode *, int);
-static inline void mark_inode_dirty(struct inode *inode)
-{
-	if ((inode->i_state & I_DIRTY) != I_DIRTY)
-		__mark_inode_dirty(inode, I_DIRTY);
-}
-
-static inline void mark_inode_dirty_sync(struct inode *inode)
-{
-	if (!(inode->i_state & I_DIRTY_SYNC))
-		__mark_inode_dirty(inode, I_DIRTY_SYNC);
-}
-
-static inline void mark_inode_dirty_pages(struct inode *inode)
-{
-	if (inode && !(inode->i_state & I_DIRTY_PAGES))
-		__mark_inode_dirty(inode, I_DIRTY_PAGES);
-}
 
 struct fown_struct {
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
@@ -654,6 +627,7 @@ struct quota_mount_options
 #include <linux/hfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
 #include <linux/qnx4_fs_sb.h>
+#include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
 #include <linux/ncp_fs_sb.h>
@@ -702,6 +676,7 @@ struct super_block {
 		struct hfs_sb_info	hfs_sb;
 		struct adfs_sb_info	adfs_sb;
 		struct qnx4_sb_info	qnx4_sb;
+		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
 		struct udf_sb_info	udf_sb;
 		struct ncp_sb_info	ncpfs_sb;
@@ -815,16 +790,56 @@ struct inode_operations {
  */
 struct super_operations {
 	void (*read_inode) (struct inode *);
+  
+  	/* reiserfs kludge.  reiserfs needs 64 bits of information to
+    	** find an inode.  We are using the read_inode2 call to get
+   	** that information.  We don't like this, and are waiting on some
+   	** VFS changes for the real solution.
+   	** iget4 calls read_inode2, iff it is defined
+   	*/
+    	void (*read_inode2) (struct inode *, void *) ;
+   	void (*dirty_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
+	void (*write_super_lockfs) (struct super_block *);
+	void (*unlockfs) (struct super_block *);
 	int (*statfs) (struct super_block *, struct statfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
 };
+
+/* Inode state bits.. */
+#define I_DIRTY_SYNC		1 /* Not dirty enough for O_DATASYNC */
+#define I_DIRTY_DATASYNC	2 /* Data-related inode changes pending */
+#define I_DIRTY_PAGES		4 /* Data-related inode changes pending */
+#define I_LOCK			8
+#define I_FREEING		16
+#define I_CLEAR			32
+
+#define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
+
+extern void __mark_inode_dirty(struct inode *, int);
+static inline void mark_inode_dirty(struct inode *inode)
+{
+	if ((inode->i_state & I_DIRTY) != I_DIRTY)
+		__mark_inode_dirty(inode, I_DIRTY);
+}
+
+static inline void mark_inode_dirty_sync(struct inode *inode)
+{
+	if (!(inode->i_state & I_DIRTY_SYNC))
+		__mark_inode_dirty(inode, I_DIRTY_SYNC);
+}
+
+static inline void mark_inode_dirty_pages(struct inode *inode)
+{
+	if (inode && !(inode->i_state & I_DIRTY_PAGES))
+		__mark_inode_dirty(inode, I_DIRTY_PAGES);
+}
 
 struct dquot_operations {
 	void (*initialize) (struct inode *, short);
@@ -987,6 +1002,9 @@ extern int fs_may_remount_ro(struct super_block *);
 
 extern int try_to_free_buffers(struct page *, int);
 extern void refile_buffer(struct buffer_head * buf);
+
+/* reiserfs_writepage needs this */
+extern void set_buffer_async_io(struct buffer_head *bh) ;
 
 #define BUF_CLEAN	0
 #define BUF_LOCKED	1	/* Buffers scheduled for write */

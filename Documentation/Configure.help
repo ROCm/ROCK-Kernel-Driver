@@ -10745,6 +10745,46 @@ CONFIG_MINIX_FS
   called minix.o. Note that the file system of your root partition
   (the one containing the directory /) cannot be compiled as a module.
 
+Reiserfs support
+CONFIG_REISERFS_FS
+
+  Stores not just filenames but the files themselves in a balanced
+  tree.  Uses journaling.
+
+  Balanced trees are more efficient than traditional
+  filesystem architectural foundations.
+
+  You can use reiserfs in all cases where you use the ext2fs file
+  system, and you will gain in speed and disk space.  It has fewer
+  worst case performance situations than other file systems
+  because balanced trees are hardier creatures than other algorithms
+  are (if that is not technical enough, read www.namesys.com....:-) )
+
+  It is more easily extended to have features currently found in
+  database and keyword search systems than block allocation based
+  filesystems are.  The next version will be so extended, and will
+  support plugins consistent with our motto ``It takes more than a
+  license to make source code open.''
+
+  Read www.namesys.com to learn more about reiserfs.
+
+  Sponsored by Threshold Networks, Emusic.com, and Bigstorage.com.
+
+  If you like it, you can pay us to add new features to it that you
+  need, buy a support contract, or pay us to port it to another OS.
+
+Enable Reiserfs consistency checks
+CONFIG_REISERFS_CHECK
+  If you set this to yes, then ReiserFS will perform every check it
+  can possibly imagine of its internal consistency throughout its
+  operation.  It will also go substantially slower.  More than once we
+  have forgotten that this was on, and then gone despondent over the
+  latest benchmarks.:-) Use of this option allows our team to go all
+  out in checking for consistency when debugging without fear of its
+  effect on end users.  If you are on the verge of sending in a bug
+  report, say yes and you might get a useful error message.  Almost
+  everyone should say no.
+
 Second extended fs support
 CONFIG_EXT2_FS
   This is the de facto standard Linux file system (method to organize

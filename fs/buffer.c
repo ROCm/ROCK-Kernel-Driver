@@ -834,6 +834,10 @@ still_busy:
 	return;
 }
 
+void set_buffer_async_io(struct buffer_head *bh) {
+    bh->b_end_io = end_buffer_io_async ;
+}
+
 /*
  * Synchronise all the inode's dirty buffers to the disk.
  *
@@ -2411,6 +2415,7 @@ busy_buffer_page:
 			loop = 1;
 			goto cleaned_buffers_try_again;
 		}
+		wakeup_bdflush(0);
 	}
 	return 0;
 }

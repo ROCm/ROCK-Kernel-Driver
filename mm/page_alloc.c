@@ -452,12 +452,9 @@ try_again:
 		 * 	  the inactive clean list. (done by page_launder)
 		 */
 		if (gfp_mask & __GFP_WAIT) {
-			shrink_icache_memory(6, gfp_mask);
-			shrink_dcache_memory(6, gfp_mask);
-			kmem_cache_reap(gfp_mask);
-
-			page_launder(gfp_mask, 1);
-
+			memory_pressure++;
+			try_to_free_pages(gfp_mask);
+			wakeup_bdflush(0);
 			if (!order)
 				goto try_again;
 		}

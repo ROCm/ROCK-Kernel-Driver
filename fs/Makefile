@@ -58,6 +58,7 @@ subdir-$(CONFIG_UDF_FS)		+= udf
 subdir-$(CONFIG_AUTOFS_FS)	+= autofs
 subdir-$(CONFIG_AUTOFS4_FS)	+= autofs4
 subdir-$(CONFIG_ADFS_FS)	+= adfs
+subdir-$(CONFIG_REISERFS_FS)	+= reiserfs
 subdir-$(CONFIG_DEVPTS_FS)	+= devpts
 subdir-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs
 

@@ -317,7 +317,7 @@ static void __init pagetable_init (void)
 	pgd_t *pgd, *pgd_base;
 	int i, j, k;
 	pmd_t *pmd;
-	pte_t *pte;
+	pte_t *pte, *pte_base;
 
 	/*
 	 * This can be zero as well - no problem, in that case we exit
@@ -366,11 +366,7 @@ static void __init pagetable_init (void)
 				continue;
 			}
 
-			pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-
-			if (pte != pte_offset(pmd, 0))
-				BUG();
+			pte_base = pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 
 			for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
 				vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
@@ -378,6 +374,10 @@ static void __init pagetable_init (void)
 					break;
 				*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
 			}
+			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
+			if (pte_base != pte_offset(pmd, 0))
+				BUG();
+
 		}
 	}
 
