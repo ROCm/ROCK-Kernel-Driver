@@ -138,48 +138,33 @@ config DASD
 	  S/390s channel subsystem commands. This is necessary for running
 	  natively on a single image or an LPAR.
 
+config DASD_PROFILE
+	bool "Profiling support for dasd devices"
+	help
+	  Enable this option if you want to see profiling information
+          in /proc/dasd/statistics.
+
 config DASD_ECKD
 	tristate "Support for ECKD Disks"
 	depends on DASD
 	help
-	  ECKD devices are the most commonly used devices. you should enable
+	  ECKD devices are the most commonly used devices. You should enable
 	  this option unless you are very sure to have no ECKD device.
-
-config DASD_AUTO_ECKD
-	bool "Automatic activation of ECKD module"
-	depends on DASD && DASD_ECKD=m
-	help
-	  Enable this option if you want your ECKD discipline module loaded
-	  on DASD driver startup.
 
 config DASD_FBA
 	tristate "Support for FBA  Disks"
 	depends on DASD
 	help
-	  FBA devices are currently unsupported.
+	  Select this option to be able to access FBA devices. It is safe to
+	  say "Y".
 
-config DASD_AUTO_FBA
-	bool "Automatic activation of FBA  module"
-	depends on DASD && DASD_FBA=m
-	help
-	  Enable this option if you want your FBA discipline module loaded
-	  on DASD driver startup.
-
-#  dep_tristate '   Support for CKD  Disks' CONFIG_DASD_CKD $CONFIG_DASD
 config DASD_DIAG
 	tristate "Support for DIAG access to CMS reserved Disks"
-	depends on !ARCH_S390X && DASD
+	depends on DASD
 	help
 	  Select this option if you want to use CMS reserved Disks under VM
 	  with the Diagnose250 command.  If you are not running under VM or
 	  unsure what it is, say "N".
-
-config DASD_AUTO_DIAG
-	bool "Automatic activation of DIAG module"
-	depends on DASD && !ARCH_S390X && DASD_DIAG=m
-	help
-	  Enable this option if you want your DIAG discipline module loaded
-	  on DASD driver startup.
 
 endmenu
 

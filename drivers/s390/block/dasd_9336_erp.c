@@ -3,6 +3,11 @@
  * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000
+ *
+ * $Revision: 1.6 $
+ *
+ * History of changes 
+ *
  */
 
 #define PRINTK_HEADER "dasd_erp(9336)"
@@ -27,11 +32,11 @@
  *   dasd_era_recover	for all others.
  */
 dasd_era_t
-dasd_9336_erp_examine(dasd_ccw_req_t * cqr, devstat_t * stat)
+dasd_9336_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
 {
 	/* check for successful execution first */
-	if (stat->cstat == 0x00 &&
-	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
+	if (irb->scsw.cstat == 0x00 &&
+	    irb->scsw.dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
 		return dasd_era_none;
 
 	/* examine the 24 byte sense data */
