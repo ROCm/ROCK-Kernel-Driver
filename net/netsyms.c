@@ -444,6 +444,7 @@ EXPORT_SYMBOL(arp_find);
 #endif  /* CONFIG_INET */
 
 #ifdef CONFIG_TR
+EXPORT_SYMBOL(tr_source_route);
 EXPORT_SYMBOL(tr_type_trans);
 #endif
 
@@ -462,6 +463,7 @@ EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);
 EXPORT_SYMBOL(__dev_get_by_name);
+EXPORT_SYMBOL(dev_getbyhwaddr);
 EXPORT_SYMBOL(netdev_finish_unregister);
 EXPORT_SYMBOL(netdev_set_master);
 EXPORT_SYMBOL(eth_type_trans);
