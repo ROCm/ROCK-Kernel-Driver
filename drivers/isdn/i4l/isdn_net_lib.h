@@ -69,6 +69,29 @@ int  register_isdn_netif(int encap, struct isdn_netif_ops *ops);
 
 /* ====================================================================== */
 
+/* Feature- and status-flags for a net-interface */
+#define ISDN_NET_SECURE     0x02       /* Accept calls from phonelist only  */
+#define ISDN_NET_CALLBACK   0x04       /* activate callback                 */
+#define ISDN_NET_CBHUP      0x08       /* hangup before callback            */
+#define ISDN_NET_CBOUT      0x10       /* remote machine does callback      */
+
+#define ISDN_NET_MAGIC      0x49344C02 /* for paranoia-checking             */
+
+/* Phone-list-element */
+struct isdn_net_phone {
+	struct list_head list;
+	char num[ISDN_MSNLEN];
+};
+
+/*
+   Principles when extending structures for generic encapsulation protocol
+   ("concap") support:
+   - Stuff which is hardware specific (here i4l-specific) goes in 
+     the netdev -> local structure (here: isdn_net_local)
+   - Stuff which is encapsulation protocol specific goes in the structure
+     which holds the linux device structure (here: isdn_net_device)
+*/
+
 /* per network interface data (dev->priv) */
 
 struct isdn_net_local_s {
@@ -128,18 +151,8 @@ struct isdn_net_local_s {
   struct slcompress     *slcomp;
 #endif
 #endif
-
-  /* use an own struct for that in later versions */
-  ulong cisco_myseq;                   /* Local keepalive seq. for Cisco   */
-  ulong cisco_mineseen;                /* returned keepalive seq. from remote */
-  ulong cisco_yourseq;                 /* Remote keepalive seq. for Cisco  */
-  int cisco_keepalive_period;		/* keepalive period */
-  ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
-  char cisco_line_state;		/* state of line according to keepalive packets */
-  char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
-
-  struct timer_list       cisco_timer;
-
+  void                  *inl_priv;      /* interface types can put their
+					   private data here               */
   struct isdn_netif_ops  *ops;
 
   struct net_device       dev;          /* interface to upper levels        */

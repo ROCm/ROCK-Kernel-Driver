@@ -55,6 +55,7 @@ static int
 isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	isdn_net_local *mlp = dev->priv;
+	struct inl_cisco *cisco = mlp->inl_priv;
 	unsigned long len = 0;
 	int period;
 	char debserint;
@@ -66,13 +67,13 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	switch (cmd) {
 		/* get/set keepalive period */
 		case SIOCGKEEPPERIOD:
-			len = sizeof(mlp->cisco_keepalive_period);
+			len = sizeof(cisco->keepalive_period);
 			if (copy_to_user((char *)ifr->ifr_ifru.ifru_data,
-					 (char *)&mlp->cisco_keepalive_period, len))
+					 (char *)&cisco->keepalive_period, len))
 				rc = -EFAULT;
 			break;
 		case SIOCSKEEPPERIOD:
-			len = sizeof(mlp->cisco_keepalive_period);
+			len = sizeof(cisco->keepalive_period);
 			if (copy_from_user((char *)&period,
 					   (char *)ifr->ifr_ifru.ifru_data, len)) {
 				rc = -EFAULT;
@@ -82,21 +83,21 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				rc = -EINVAL;
 				break;
 			}
-			mod_timer(&mlp->cisco_timer, jiffies + period * HZ);
+			mod_timer(&cisco->timer, jiffies + period * HZ);
 			printk(KERN_INFO "%s: Keepalive period set "
 			       "to %d seconds.\n", dev->name, period);
-			mlp->cisco_keepalive_period = period;
+			cisco->keepalive_period = period;
 			break;
 
 		/* get/set debugging */
 		case SIOCGDEBSERINT:
-			len = sizeof(mlp->cisco_debserint);
+			len = sizeof(cisco->debserint);
 			if (copy_to_user((char *)ifr->ifr_ifru.ifru_data,
-					 (char *)&mlp->cisco_debserint, len))
+					 (char *)&cisco->debserint, len))
 				rc = -EFAULT;
 			break;
 		case SIOCSDEBSERINT:
-			len = sizeof(mlp->cisco_debserint);
+			len = sizeof(cisco->debserint);
 			if (copy_from_user((char *)&debserint,
 					   (char *)ifr->ifr_ifru.ifru_data, len)) {
 				rc = -EFAULT;
@@ -106,7 +107,7 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 				rc = -EINVAL;
 				break;
 			}
-			mlp->cisco_debserint = debserint;
+			cisco->debserint = debserint;
 			break;
 
 		default:
@@ -121,10 +122,11 @@ static void
 isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 {
 	isdn_net_local *mlp = (isdn_net_local *) data;
-	isdn_net_dev *idev;
+ 	isdn_net_dev *idev;
+	struct inl_cisco *cisco = mlp->inl_priv;
 	struct sk_buff *skb;
 	unsigned char *p;
-	unsigned long last_cisco_myseq = mlp->cisco_myseq;
+	unsigned long last_cisco_myseq = cisco->myseq;
 	int myseq_diff = 0;
 
 	if (list_empty(&mlp->online)) {
@@ -132,33 +134,33 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 		return;
 	}
 	idev = list_entry(mlp->online.next, isdn_net_dev, online);
-	mlp->cisco_myseq++;
+	cisco->myseq++;
 
-	myseq_diff = (mlp->cisco_myseq - mlp->cisco_mineseen);
-	if (mlp->cisco_line_state && (myseq_diff >= 3 || myseq_diff <= -3)) {
+	myseq_diff = cisco->myseq - cisco->mineseen;
+	if (cisco->line_state && (myseq_diff >= 3 || myseq_diff <= -3)) {
 		/* line up -> down */
-		mlp->cisco_line_state = 0;
+		cisco->line_state = 0;
 		printk (KERN_WARNING
 				"UPDOWN: Line protocol on Interface %s,"
 				" changed state to down\n", idev->name);
 		/* should stop routing higher-level data accross */
-	} else if (!mlp->cisco_line_state &&
+	} else if (!cisco->line_state &&
 		myseq_diff >= 0 && myseq_diff <= 2) {
 		/* line down -> up */
-		mlp->cisco_line_state = 1;
+		cisco->line_state = 1;
 		printk (KERN_WARNING
 				"UPDOWN: Line protocol on Interface %s,"
 				" changed state to up\n", idev->name);
 		/* restart routing higher-level data accross */
 	}
 
-	if (mlp->cisco_debserint)
+	if (cisco->debserint)
 		printk (KERN_DEBUG "%s: HDLC "
-			"myseq %lu, mineseen %lu%c, yourseen %lu, %s\n",
-			idev->name, last_cisco_myseq, mlp->cisco_mineseen,
-			(last_cisco_myseq == mlp->cisco_mineseen) ? '*' : 040,
-			mlp->cisco_yourseq,
-			(mlp->cisco_line_state) ? "line up" : "line down");
+			"myseq %u, mineseen %u%c, yourseen %u, %s\n",
+			idev->name, cisco->myseq, cisco->mineseen,
+			(last_cisco_myseq == cisco->mineseen) ? '*' : 040,
+			cisco->yourseq,
+			(cisco->line_state) ? "line up" : "line down");
 
 	skb = isdn_net_ciscohdlck_alloc_skb(idev, 4 + 14);
 	if (!skb)
@@ -173,13 +175,13 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 
 	/* slarp keepalive */
 	p += put_u32(p, CISCO_SLARP_KEEPALIVE);
-	p += put_u32(p, mlp->cisco_myseq);
-	p += put_u32(p, mlp->cisco_yourseq);
+	p += put_u32(p, cisco->myseq);
+	p += put_u32(p, cisco->yourseq);
 	p += put_u16(p, 0xffff); // reliablity, always 0xffff
 
 	isdn_net_write_super(idev, skb);
 
-	mod_timer(&mlp->cisco_timer, jiffies + mlp->cisco_keepalive_period * HZ);
+	mod_timer(&cisco->timer, jiffies + cisco->keepalive_period * HZ);
 }
 
 static void
@@ -219,24 +221,25 @@ static void
 isdn_ciscohdlck_connected(isdn_net_dev *idev)
 {
 	isdn_net_local *lp = idev->mlp;
+	struct inl_cisco *cisco = lp->inl_priv;
 
-	lp->cisco_myseq = 0;
-	lp->cisco_mineseen = 0;
-	lp->cisco_yourseq = 0;
-	lp->cisco_keepalive_period = ISDN_TIMER_KEEPINT;
-	lp->cisco_last_slarp_in = 0;
-	lp->cisco_line_state = 0;
-	lp->cisco_debserint = 0;
+	cisco->myseq = 0;
+	cisco->mineseen = 0;
+	cisco->yourseq = 0;
+	cisco->keepalive_period = ISDN_TIMER_KEEPINT;
+	cisco->last_slarp_in = 0;
+	cisco->line_state = 0;
+	cisco->debserint = 0;
 
 	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK) {
 		/* send slarp request because interface/seq.no.s reset */
 		isdn_net_ciscohdlck_slarp_send_request(lp);
 
-		init_timer(&lp->cisco_timer);
-		lp->cisco_timer.data = (unsigned long) lp;
-		lp->cisco_timer.function = isdn_net_ciscohdlck_slarp_send_keepalive;
-		lp->cisco_timer.expires = jiffies + lp->cisco_keepalive_period * HZ;
-		add_timer(&lp->cisco_timer);
+		init_timer(&cisco->timer);
+		cisco->timer.data = (unsigned long) lp;
+		cisco->timer.function = isdn_net_ciscohdlck_slarp_send_keepalive;
+		cisco->timer.expires = jiffies + cisco->keepalive_period * HZ;
+		add_timer(&cisco->timer);
 	}
 	netif_wake_queue(&lp->dev);
 }
@@ -245,9 +248,10 @@ static void
 isdn_ciscohdlck_disconnected(isdn_net_dev *idev)
 {
 	isdn_net_local *lp = idev->mlp;
+	struct inl_cisco *cisco = lp->inl_priv;
 
 	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK) {
-		del_timer(&lp->cisco_timer);
+		del_timer(&cisco->timer);
 	}
 }
 
@@ -295,6 +299,7 @@ static void
 isdn_net_ciscohdlck_slarp_in(isdn_net_dev *idev, struct sk_buff *skb)
 {
 	isdn_net_local *mlp = idev->mlp;
+	struct inl_cisco *cisco = mlp->inl_priv;
 	unsigned char *p;
 	int period;
 	u32 code;
@@ -311,7 +316,7 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_dev *idev, struct sk_buff *skb)
 	
 	switch (code) {
 	case CISCO_SLARP_REQUEST:
-		mlp->cisco_yourseq = 0;
+		cisco->yourseq = 0;
 		isdn_net_ciscohdlck_slarp_send_reply(idev);
 		break;
 	case CISCO_SLARP_REPLY:
@@ -338,21 +343,20 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_dev *idev, struct sk_buff *skb)
 				 HIPQUAD(addr), HIPQUAD(mask));
 		break;
 	case CISCO_SLARP_KEEPALIVE:
-		period = (int)((jiffies - mlp->cisco_last_slarp_in
-				+ HZ/2 - 1) / HZ);
-		if (mlp->cisco_debserint &&
-				(period != mlp->cisco_keepalive_period) &&
-				mlp->cisco_last_slarp_in) {
+		period = (jiffies - cisco->last_slarp_in + HZ/2 - 1) / HZ;
+		if (cisco->debserint &&
+				(period != cisco->keepalive_period) &&
+				cisco->last_slarp_in) {
 			printk(KERN_DEBUG "%s: Keepalive period mismatch - "
 				"is %d but should be %d.\n",
-				idev->name, period, mlp->cisco_keepalive_period);
+				idev->name, period, cisco->keepalive_period);
 		}
-		mlp->cisco_last_slarp_in = jiffies;
+		cisco->last_slarp_in = jiffies;
 		p += get_u32(p, &my_seq);
 		p += get_u32(p, &your_seq);
 		p += get_u16(p, &unused);
-		mlp->cisco_yourseq = my_seq;
-		mlp->cisco_mineseen = your_seq;
+		cisco->yourseq = my_seq;
+		cisco->mineseen = your_seq;
 		break;
 	}
 }
@@ -361,6 +365,7 @@ static void
 isdn_ciscohdlck_receive(isdn_net_local *lp, isdn_net_dev *idev,
 			struct sk_buff *skb)
 {
+	struct inl_cisco *cisco = lp->inl_priv;
 	unsigned char *p;
  	u8 addr;
  	u8 ctrl;
@@ -387,7 +392,7 @@ isdn_ciscohdlck_receive(isdn_net_local *lp, isdn_net_dev *idev,
 		isdn_net_ciscohdlck_slarp_in(idev, skb);
 		goto out_free;
 	case CISCO_TYPE_CDP:
-		if (lp->cisco_debserint)
+		if (cisco->debserint)
 			printk(KERN_DEBUG "%s: Received CDP packet. use "
 				"\"no cdp enable\" on cisco.\n", idev->name);
 		goto out_free;
@@ -417,6 +422,22 @@ isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev,
 	return 4;
 }
 
+static int
+isdn_ciscohdlck_open(isdn_net_local *lp)
+{
+	lp->inl_priv = kmalloc(sizeof(struct inl_cisco), GFP_KERNEL);
+	if (!lp->inl_priv)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static void
+isdn_ciscohdlck_close(isdn_net_local *lp)
+{
+	kfree(lp->inl_priv);
+}
+
 struct isdn_netif_ops isdn_ciscohdlck_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_ciscohdlck_header,
@@ -426,4 +447,6 @@ struct isdn_netif_ops isdn_ciscohdlck_ops = {
 	.receive             = isdn_ciscohdlck_receive,
 	.connected           = isdn_ciscohdlck_connected,
 	.disconnected        = isdn_ciscohdlck_disconnected,
+	.open                = isdn_ciscohdlck_open,
+	.close               = isdn_ciscohdlck_close,
 };

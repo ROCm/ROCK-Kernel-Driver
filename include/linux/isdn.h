@@ -253,33 +253,6 @@ typedef struct {
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
 
-/*=================== Start of ip-over-ISDN stuff =========================*/
-
-/* Feature- and status-flags for a net-interface */
-#define ISDN_NET_SECURE     0x02       /* Accept calls from phonelist only  */
-#define ISDN_NET_CALLBACK   0x04       /* activate callback                 */
-#define ISDN_NET_CBHUP      0x08       /* hangup before callback            */
-#define ISDN_NET_CBOUT      0x10       /* remote machine does callback      */
-
-#define ISDN_NET_MAGIC      0x49344C02 /* for paranoia-checking             */
-
-/* Phone-list-element */
-struct isdn_net_phone {
-	struct list_head list;
-	char num[ISDN_MSNLEN];
-};
-
-/*
-   Principles when extending structures for generic encapsulation protocol
-   ("concap") support:
-   - Stuff which is hardware specific (here i4l-specific) goes in 
-     the netdev -> local structure (here: isdn_net_local)
-   - Stuff which is encapsulation protocol specific goes in the structure
-     which holds the linux device structure (here: isdn_net_device)
-*/
-
-/*===================== End of ip-over-ISDN stuff ===========================*/
-
 /*======================= Start of ISDN-tty stuff ===========================*/
 
 #define ISDN_ASYNC_MAGIC          0x49344C01 /* for paranoia-checking        */

@@ -12,4 +12,15 @@
 
 extern struct isdn_netif_ops isdn_ciscohdlck_ops;
 
+struct inl_cisco {
+	u32 myseq;             /* local keepalive seq. for Cisco */
+	u32 mineseen;          /* returned keepalive seq. from remote */
+	u32 yourseq;           /* remote keepalive seq. for Cisco  */
+	int keepalive_period;  /* keepalive period */
+	int last_slarp_in;     /* jiffie of last recvd keepalive pkt */
+	char line_state;       /* state of line */
+	char debserint;	       /* debugging flags */
+	struct timer_list timer;
+};
+
 #endif
