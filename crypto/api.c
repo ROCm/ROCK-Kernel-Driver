@@ -58,16 +58,16 @@ static int c_show(struct seq_file *m, void *p)
 	
 	seq_printf(m, "name       : %s\n", alg->cra_name);
 	seq_printf(m, "id         : 0x%08x\n", alg->cra_id);
-	seq_printf(m, "blocksize  : %d\n", alg->cra_blocksize);
+	seq_printf(m, "blocksize  : %Zd\n", alg->cra_blocksize);
 	
 	switch (alg->cra_id & CRYPTO_TYPE_MASK) {
 	case CRYPTO_TYPE_CIPHER:
-		seq_printf(m, "keysize    : %d\n", alg->cra_cipher.cia_keysize);
-		seq_printf(m, "ivsize     : %d\n", alg->cra_cipher.cia_ivsize);
+		seq_printf(m, "keysize    : %Zd\n", alg->cra_cipher.cia_keysize);
+		seq_printf(m, "ivsize     : %Zd\n", alg->cra_cipher.cia_ivsize);
 		break;
 		
 	case CRYPTO_TYPE_DIGEST:
-		seq_printf(m, "digestsize : %d\n",
+		seq_printf(m, "digestsize : %Zd\n",
 		           alg->cra_digest.dia_digestsize);
 		break;
 	}

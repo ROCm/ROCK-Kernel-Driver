@@ -70,7 +70,7 @@ static void test_md5(void)
 	
 	tsize = sizeof(md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	
@@ -127,7 +127,7 @@ static void test_md5(void)
 	
 	tsize = sizeof(hmac_md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	
@@ -190,7 +190,7 @@ static void test_sha1(void)
 	
 	tsize = sizeof(sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	
@@ -247,7 +247,7 @@ static void test_sha1(void)
 
 	tsize = sizeof(hmac_sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	
@@ -310,7 +310,7 @@ void test_des(void)
 	
 	tsize = sizeof(des_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	
@@ -735,7 +735,7 @@ void test_des(void)
 
 	tsize = sizeof(des_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_dec_tv_template, tsize);
@@ -893,7 +893,7 @@ void test_des(void)
 
 	tsize = sizeof(des_cbc_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_cbc_enc_tv_template, tsize);
@@ -994,7 +994,7 @@ void test_des(void)
 
 	tsize = sizeof(des_cbc_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%d) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_cbc_dec_tv_template, tsize);

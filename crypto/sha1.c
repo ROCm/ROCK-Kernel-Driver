@@ -22,11 +22,15 @@
 #include <linux/mm.h>
 #include <linux/crypto.h>
 #include <asm/scatterlist.h>
+#include <asm/byteorder.h>
 
 #define SHA1_DIGEST_SIZE	20
 #define SHA1_HMAC_BLOCK_SIZE	64
 
-#define rol(value, bits) (((value) << (bits)) | ((value) >> (32 - (bits))))
+static inline u32 rol(u32 value, u32 bits)
+{
+	return (((value) << (bits)) | ((value) >> (32 - (bits))));
+}
 
 /* blk0() and blk() perform the initial expand. */
 /* I got the idea of expanding during the round function from SSLeay */

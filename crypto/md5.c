@@ -20,6 +20,8 @@
 #include <linux/string.h>
 #include <linux/crypto.h>
 
+#include <asm/byteorder.h>
+
 #define MD5_DIGEST_SIZE		16
 #define MD5_HMAC_BLOCK_SIZE	64
 #define MD5_BLOCK_WORDS		16
