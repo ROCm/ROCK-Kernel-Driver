@@ -5,7 +5,7 @@
  *
  * This file is released under the GPLv2
  *
- * See Documentation/driver-model/*.txt for more information.
+ * See Documentation/driver-model/ for more information.
  */
 
 #ifndef _DEVICE_H_
