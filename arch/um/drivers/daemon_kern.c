@@ -28,14 +28,14 @@ void daemon_init(struct net_device *dev, void *data)
 	pri = dev->priv;
 	dpri = (struct daemon_data *) pri->user;
 	*dpri = ((struct daemon_data)
-		{ sock_type :		init->sock_type,
-		  ctl_sock :		init->ctl_sock,
-		  ctl_addr :		NULL,
-		  data_addr :		NULL,
-		  local_addr :		NULL,
-		  fd :			-1,
-		  control :		-1,
-		  dev :			dev });
+		{ .sock_type 		= init->sock_type,
+		  .ctl_sock 		= init->ctl_sock,
+		  .ctl_addr 		= NULL,
+		  .data_addr 		= NULL,
+		  .local_addr 		= NULL,
+		  .fd 			= -1,
+		  .control 		= -1,
+		  .dev 			= dev });
 
 	printk("daemon backend (uml_switch version %d) - %s:%s", 
 	       SWITCH_VERSION, dpri->sock_type, dpri->ctl_sock);
@@ -59,10 +59,10 @@ static int daemon_write(int fd, struct sk_buff **skb,
 }
 
 static struct net_kern_info daemon_kern_info = {
-	init:			daemon_init,
-	protocol:		eth_protocol,
-	read:			daemon_read,
-	write:			daemon_write,
+	.init			= daemon_init,
+	.protocol		= eth_protocol,
+	.read			= daemon_read,
+	.write			= daemon_write,
 };
 
 int daemon_setup(char *str, char **mac_out, void *data)
@@ -71,8 +71,8 @@ int daemon_setup(char *str, char **mac_out, void *data)
 	char *remain;
 
 	*init = ((struct daemon_init)
-		{ sock_type :		"unix",
-		  ctl_sock :		"/tmp/uml.ctl" });
+		{ .sock_type 		= "unix",
+		  .ctl_sock 		= "/tmp/uml.ctl" });
 	
 	remain = split_if_spec(str, mac_out, &init->sock_type, &init->ctl_sock,
 			       NULL);
@@ -84,13 +84,13 @@ int daemon_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport daemon_transport = {
-	list :		LIST_HEAD_INIT(daemon_transport.list),
-	name :		"daemon",
-	setup : 	daemon_setup,
-	user :		&daemon_user_info,
-	kern :		&daemon_kern_info,
-	private_size :	sizeof(struct daemon_data),
-	setup_size :	sizeof(struct daemon_init),
+	.list 		= LIST_HEAD_INIT(daemon_transport.list),
+	.name 		= "daemon",
+	.setup  	= daemon_setup,
+	.user 		= &daemon_user_info,
+	.kern 		= &daemon_kern_info,
+	.private_size 	= sizeof(struct daemon_data),
+	.setup_size 	= sizeof(struct daemon_init),
 };
 
 static int register_daemon(void)
