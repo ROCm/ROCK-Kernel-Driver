@@ -138,7 +138,8 @@ do {	spin_lock(&(next)->switch_lock);	\
 do {	spin_unlock_irq(&(prev)->switch_lock);	\
 } while (0)
 
-
+#define task_running(rq, p) \
+	((rq)->curr == (p) || spin_is_locked(&(p)->switch_lock))
 
 #ifndef CONFIG_DEBUG_SPINLOCK
 #define CHECK_LOCKS(PREV)	do { } while(0)
