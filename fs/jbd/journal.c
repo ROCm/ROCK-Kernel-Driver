@@ -1890,7 +1890,6 @@ static int __init journal_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Journalled Block Device driver loaded\n");
 	ret = journal_init_caches();
 	if (ret != 0)
 		journal_destroy_caches();

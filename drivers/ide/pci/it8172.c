@@ -42,7 +42,6 @@
 #include <asm/io.h>
 #include <asm/it8172/it8172_int.h>
 
-#include "ide_modes.h"
 #include "it8172.h"
 
 /*

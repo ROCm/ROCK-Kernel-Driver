@@ -39,7 +39,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "serverworks.h"
 
 static u8 svwks_revision = 0;

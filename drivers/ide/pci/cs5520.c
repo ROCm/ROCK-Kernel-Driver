@@ -51,7 +51,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "cs5520.h"
 
 #if defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS)

@@ -36,8 +36,8 @@ static int __init netwinder_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		return IRQ_NETWINDER_ETHER10;
 
 	default:
-		printk(KERN_ERR "PCI: unknown device in slot %s: %s\n",
-			pci_name(dev), dev->dev.name);
+		printk(KERN_ERR "PCI: unknown device in slot %s\n",
+			pci_name(dev));
 		return 0;
 	}
 }

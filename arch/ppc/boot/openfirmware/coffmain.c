@@ -32,15 +32,15 @@ char *avail_ram;
 char *begin_avail, *end_avail;
 char *avail_high;
 
-#define RAM_START	0
-#define RAM_END		(RAM_START + 0x800000)	/* only 8M mapped with BATs */
-
-#define PROG_START	RAM_START
-#define PROG_SIZE	0x00700000
-
 #define SCRATCH_SIZE	(128 << 10)
 
 static char heap[SCRATCH_SIZE];
+
+static unsigned long ram_start = 0;
+static unsigned long ram_end = 0x1000000;
+static unsigned long prog_start = 0x800000;
+static unsigned long prog_size = 0x800000;
+
 
 typedef void (*kernel_start_t)(int, int, void *);
 
@@ -52,32 +52,34 @@ void boot(int a1, int a2, void *prom)
     unsigned initrd_start, initrd_size;
     
     printf("coffboot starting: loaded at 0x%p\n", &_start);
-    setup_bats(RAM_START);
+    setup_bats(ram_start);
 
     initrd_size = (char *)(&__ramdisk_end) - (char *)(&__ramdisk_begin);
     if (initrd_size) {
-	initrd_start = (RAM_END - initrd_size) & ~0xFFF;
+	initrd_start = (ram_end - initrd_size) & ~0xFFF;
 	a1 = initrd_start;
 	a2 = initrd_size;
-	claim(initrd_start, RAM_END - initrd_start, 0);
+	claim(initrd_start, ram_end - initrd_start, 0);
 	printf("initial ramdisk moving 0x%x <- 0x%p (%x bytes)\n\r",
 	       initrd_start, (char *)(&__ramdisk_begin), initrd_size);
 	memcpy((char *)initrd_start, (char *)(&__ramdisk_begin), initrd_size);
+	prog_size = initrd_start - prog_start;
     } else
 	a2 = 0xdeadbeef;
 
     im = (char *)(&__image_begin);
     len = (char *)(&__image_end) - (char *)(&__image_begin);
-    /* claim 4MB starting at 0 */
-    claim(0, PROG_SIZE, 0);
-    dst = (void *) RAM_START;
+    /* claim 4MB starting at PROG_START */
+    claim(prog_start, prog_size, 0);
+    map(prog_start, prog_start, prog_size);
+    dst = (void *) prog_start;
     if (im[0] == 0x1f && im[1] == 0x8b) {
 	/* set up scratch space */
 	begin_avail = avail_high = avail_ram = heap;
 	end_avail = heap + sizeof(heap);
 	printf("heap at 0x%p\n", avail_ram);
 	printf("gunzipping (0x%p <- 0x%p:0x%p)...", dst, im, im+len);
-	gunzip(dst, PROG_SIZE, im, &len);
+	gunzip(dst, prog_size, im, &len);
 	printf("done %u bytes\n", len);
 	printf("%u bytes of heap consumed, max in use %u\n",
 	       avail_high - begin_avail, heap_max);
@@ -87,9 +89,9 @@ void boot(int a1, int a2, void *prom)
 
     flush_cache(dst, len);
     make_bi_recs(((unsigned long) dst + len), "coffboot", _MACH_Pmac,
-		    (PROG_START + PROG_SIZE));
+		    (prog_start + prog_size));
 
-    sa = (unsigned long)PROG_START;
+    sa = (unsigned long)prog_start;
     printf("start address = 0x%x\n", sa);
 
     (*(kernel_start_t)sa)(a1, a2, prom);

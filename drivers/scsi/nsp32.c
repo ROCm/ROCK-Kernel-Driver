@@ -2809,13 +2809,13 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 		for (j = 0; j < NUMBER(data->lunt[0]); j++) {
 			int offset = i * NUMBER(data->lunt[0]) + j;
 			nsp32_lunt tmp = {
-				SCpnt:       NULL,
-				save_datp:   0,
-				msgin03:     FALSE,
-				sg_num:      0,
-				cur_entry:   0,
-				sglun:       &(data->sg_list[offset]),
-				sglun_paddr: data->sg_paddr + (offset * sizeof(nsp32_sglun)),
+				.SCpnt       = NULL,
+				.save_datp   = 0,
+				.msgin03     = FALSE,
+				.sg_num      = 0,
+				.cur_entry   = 0,
+				.sglun       = &(data->sg_list[offset]),
+				.sglun_paddr = data->sg_paddr + (offset * sizeof(nsp32_sglun)),
 			};
 
 			data->lunt[i][j] = tmp;

@@ -8,7 +8,6 @@
 static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 {
 	struct block_device *bdevp;
-	int holder;
 	struct gendisk *disk;
 	struct blkpg_ioctl_arg a;
 	struct blkpg_partition p;
@@ -41,8 +40,11 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 					return -EINVAL;
 			}
 			/* partition number in use? */
-			if (disk->part[part - 1])
+			down(&bdev->bd_sem);
+			if (disk->part[part - 1]) {
+				up(&bdev->bd_sem);
 				return -EBUSY;
+			}
 			/* overlap? */
 			for (i = 0; i < disk->minors - 1; i++) {
 				struct hd_struct *s = disk->part[i];
@@ -50,22 +52,26 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 				if (!s)
 					continue;
 				if (!(start+length <= s->start_sect ||
-				      start >= s->start_sect + s->nr_sects))
+				      start >= s->start_sect + s->nr_sects)) {
+					up(&bdev->bd_sem);
 					return -EBUSY;
+				}
 			}
 			/* all seems OK */
 			add_partition(disk, part, start, length);
+			up(&bdev->bd_sem);
 			return 0;
 		case BLKPG_DEL_PARTITION:
 			if (!disk->part[part-1])
 				return -ENXIO;
 			if (disk->part[part - 1]->nr_sects == 0)
 				return -ENXIO;
-			/* partition in use? Incomplete check for now. */
 			bdevp = bdget_disk(disk, part);
 			if (!bdevp)
 				return -ENOMEM;
-			if (bd_claim(bdevp, &holder) < 0) {
+			down(&bdevp->bd_sem);
+			if (bdevp->bd_openers) {
+				up(&bdevp->bd_sem);
 				bdput(bdevp);
 				return -EBUSY;
 			}
@@ -73,9 +79,12 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			fsync_bdev(bdevp);
 			invalidate_bdev(bdevp, 0);
 
+			down(&bdev->bd_sem);
 			delete_partition(disk, part);
-			bd_release(bdevp);
+			up(&bdev->bd_sem);
+			up(&bdevp->bd_sem);
 			bdput(bdevp);
+
 			return 0;
 		default:
 			return -EINVAL;

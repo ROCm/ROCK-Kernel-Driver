@@ -615,8 +615,6 @@ L:	blinux-list@redhat.com
 S:	Maintained
 
 DRM DRIVERS
-P:	Rik Faith
-M:	faith@redhat.com
 L:	dri-devel@lists.sourceforge.net
 S:	Supported
 
@@ -1087,6 +1085,14 @@ M:	mec@shout.net
 L:	kbuild-devel@lists.sourceforge.net
 W:	http://kbuild.sourceforge.net
 S:	Maintained 
+
+KERNEL JANITORS
+P:	Several
+L:	kernel-janitor-discuss@lists.sf.net
+W:	http://www.kerneljanitors.org/
+W:	http://sf.net/projects/kernel-janitor/
+W:	http://developer.osdl.org/rddunlap/kj-patches/
+S:	Maintained
 
 KERNEL NFSD
 P:	Neil Brown

@@ -709,6 +709,14 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
+	if (aic->seek_samples == 0 || aic->ttime_samples == 0) {
+		/*
+		 * Process has just started IO so default to not anticipate.
+		 * Maybe should be smarter.
+		 */
+		return 1;
+	}
+
 	if (aic->ttime_mean > ad->antic_expire) {
 		/* the process thinks too much between requests */
 		return 1;

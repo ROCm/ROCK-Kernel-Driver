@@ -33,6 +33,30 @@
 			*(.intv.mach)	/* Machine-specific int. vectors.  */ \
 		__intv_end = . ;
 
+#define RODATA_CONTENTS							      \
+		. = ALIGN (16) ;					      \
+			*(.rodata) *(.rodata.*)				      \
+			*(__vermagic)		/* Kernel version magic */    \
+			*(.rodata1)					      \
+		/* Kernel symbol table: Normal symbols */		      \
+		___start___ksymtab = .;					      \
+			*(__ksymtab)					      \
+		___stop___ksymtab = .;					      \
+		/* Kernel symbol table: GPL-only symbols */		      \
+		___start___ksymtab_gpl = .;				      \
+			*(__ksymtab_gpl)				      \
+		___stop___ksymtab_gpl = .;				      \
+		/* Kernel symbol table: strings */			      \
+			*(__ksymtab_strings)				      \
+		/* Kernel symbol table: Normal symbols */		      \
+		___start___kcrctab = .;					      \
+			*(__kcrctab)					      \
+		___stop___kcrctab = .;					      \
+		/* Kernel symbol table: GPL-only symbols */		      \
+		___start___kcrctab_gpl = .;				      \
+			*(__kcrctab_gpl)				      \
+		___stop___kcrctab_gpl = .;				      \
+
 /* Kernel text segment, and some constant data areas.  */
 #define TEXT_CONTENTS							      \
 		__stext = . ;						      \
@@ -42,7 +66,7 @@
 			*(.text.lock)					      \
 			*(.exitcall.exit)				      \
 		__real_etext = . ;	/* There may be data after here.  */  \
-		RODATA                                                        \
+		RODATA_CONTENTS						      \
 		. = ALIGN (4) ;						      \
 		    	*(.call_table_data)				      \
 			*(.call_table_text)				      \

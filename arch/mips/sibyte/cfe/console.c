@@ -9,7 +9,6 @@
 #include "cfe_error.h"
 
 extern int cfe_cons_handle;
-static kdev_t cfe_consdev;
 
 static void cfe_console_write(struct console *cons, const char *str,
 		       unsigned int count)
@@ -57,15 +56,12 @@ static int cfe_console_setup(struct console *cons, char *str)
 #ifdef CONFIG_SIBYTE_SB1250_DUART
 		if (!strcmp(consdev, "uart0")) {
 			setleds("u0cn");
-//			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 0);
 		} else if (!strcmp(consdev, "uart1")) {
 			setleds("u1cn");
-//			cfe_consdev = MKDEV(TTY_MAJOR, SB1250_DUART_MINOR_BASE + 1);
 #endif
 #ifdef CONFIG_VGA_CONSOLE
 		} else if (!strcmp(consdev, "pcconsole0")) {
 			setleds("pccn");
-//			cfe_consdev = MKDEV(TTY_MAJOR, 0);
 #endif
 		} else
 			return -ENODEV;
@@ -74,12 +70,12 @@ static int cfe_console_setup(struct console *cons, char *str)
 }
 
 static struct console sb1250_cfe_cons = {
-	name:		"cfe",
-	write:		cfe_console_write,
-	device:		cfe_console_device,
-	setup:		cfe_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "cfe",
+	.write		= cfe_console_write,
+	.device		= cfe_console_device,
+	.setup		= cfe_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 static int __init sb1250_cfe_console_init(void)

@@ -653,11 +653,14 @@ MODULE_LICENSE("GPL");
 
 static int __init uss720_init(void)
 {
-	if (usb_register(&uss720_driver) < 0)
-		return -1;
+	int retval;
+	retval = usb_register(&uss720_driver);
+	if (retval)
+		goto out;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit uss720_cleanup(void)

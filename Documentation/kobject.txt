@@ -245,7 +245,9 @@ the object-specific fields, which include:
   see the sysfs documentation for more information. 
 
 - default_attrs: Default attributes to be exported via sysfs when the
-  object is registered. 
+  object is registered.Note that the last attribute has to be
+  initialized to NULL ! You can find a complete implementation
+  in drivers/block/genhd.c
 
 
 Instances of struct kobj_type are not registered; only referenced by

@@ -518,6 +518,7 @@ static int rose_create(struct socket *sock, int protocol)
 	rose = rose_sk(sk);
 
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	skb_queue_head_init(&rose->ack_queue);
 #ifdef M_BIT
@@ -556,6 +557,7 @@ static struct sock *rose_make_new(struct sock *osk)
 	rose = rose_sk(sk);
 
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	skb_queue_head_init(&rose->ack_queue);
 #ifdef M_BIT
@@ -1549,6 +1551,7 @@ MODULE_PARM_DESC(rose_ndevs, "number of ROSE devices");
 MODULE_AUTHOR("Jonathan Naylor G4KLX <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The amateur radio ROSE network layer protocol");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_ROSE);
 
 static void __exit rose_exit(void)
 {

@@ -2916,7 +2916,7 @@ static int vwsnd_audio_mmap(struct file *file, struct vm_area_struct *vma)
 static int vwsnd_audio_open(struct inode *inode, struct file *file)
 {
 	vwsnd_dev_t *devc;
-	dev_t minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	int sw_samplefmt;
 
 	DBGE("(inode=0x%p, file=0x%p)\n", inode, file);
@@ -3063,7 +3063,7 @@ static int vwsnd_mixer_open(struct inode *inode, struct file *file)
 
 	INC_USE_COUNT;
 	for (devc = vwsnd_dev_list; devc; devc = devc->next_dev)
-		if (devc->mixer_minor == minor(inode->i_rdev))
+		if (devc->mixer_minor == iminor(inode))
 			break;
 
 	if (devc == NULL) {

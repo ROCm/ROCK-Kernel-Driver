@@ -99,7 +99,7 @@ static DECLARE_MUTEX(videodev_lock);
 
 struct video_device* video_devdata(struct file *file)
 {
-	return video_device[minor(file->f_dentry->d_inode->i_rdev)];
+	return video_device[iminor(file->f_dentry->d_inode)];
 }
 
 /*
@@ -107,7 +107,7 @@ struct video_device* video_devdata(struct file *file)
  */
 static int video_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
+	unsigned int minor = iminor(inode);
 	int err = 0;
 	struct video_device *vfl;
 	struct file_operations *old_fops;
@@ -349,9 +349,9 @@ void video_unregister_device(struct video_device *vfd)
 	if(video_device[vfd->minor]!=vfd)
 		panic("videodev: bad unregister");
 
-	class_device_unregister(&vfd->class_dev);
 	devfs_remove(vfd->devfs_name);
 	video_device[vfd->minor]=NULL;
+	class_device_unregister(&vfd->class_dev);
 	up(&videodev_lock);
 }
 

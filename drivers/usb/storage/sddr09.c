@@ -34,6 +34,7 @@
 #include "debug.h"
 #include "sddr09.h"
 
+#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/slab.h>

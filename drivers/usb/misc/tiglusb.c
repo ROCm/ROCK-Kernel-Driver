@@ -24,7 +24,6 @@
 
 #include <linux/module.h>
 #include <linux/socket.h>
-#include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
@@ -93,7 +92,7 @@ clear_pipes (struct usb_device *dev)
 static int
 tiglusb_open (struct inode *inode, struct file *filp)
 {
-	int devnum = minor (inode->i_rdev);
+	int devnum = iminor(inode);
 	ptiglusb_t s;
 
 	if (devnum < TIUSB_MINOR || devnum >= (TIUSB_MINOR + MAXTIGL))

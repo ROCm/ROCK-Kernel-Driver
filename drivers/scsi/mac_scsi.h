@@ -32,9 +32,6 @@
 #define MACSCSI_PUBLIC_RELEASE 2
 
 #ifndef ASM
-#ifndef NULL
-#define NULL 0
-#endif
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2

@@ -54,8 +54,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 #if (DISK_RECOVERY_TIME > 0)
 
 #error So the User Has To Fix the Compilation And Stop Hacking Port 0x43. Does anyone ever use this anyway ??

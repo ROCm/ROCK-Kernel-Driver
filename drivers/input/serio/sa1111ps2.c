@@ -62,9 +62,9 @@ static irqreturn_t ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 
 		serio_interrupt(&ps2if->io, scancode, flag, regs);
 
-               	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
+		status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
 
-               	handled = IRQ_HANDLED;
+		handled = IRQ_HANDLED;
         }
 
         return handled;
@@ -232,9 +232,8 @@ static int __init ps2_test(struct ps2if *ps2if)
 /*
  * Add one device to this driver.
  */
-static int ps2_probe(struct device *dev)
+static int ps2_probe(struct sa1111_dev *dev)
 {
-	struct sa1111_dev *sadev = SA1111_DEV(dev);
 	struct ps2if *ps2if;
 	int ret;
 
@@ -249,20 +248,20 @@ static int ps2_probe(struct device *dev)
 	ps2if->io.write		= ps2_write;
 	ps2if->io.open		= ps2_open;
 	ps2if->io.close		= ps2_close;
-	ps2if->io.name		= dev->name;
-	ps2if->io.phys		= dev->bus_id;
+	ps2if->io.name		= dev->dev.bus_id;
+	ps2if->io.phys		= dev->dev.bus_id;
 	ps2if->io.driver	= ps2if;
-	ps2if->dev		= sadev;
-	dev->driver_data	= ps2if;
+	ps2if->dev		= dev;
+	sa1111_set_drvdata(dev, ps2if);
 
 	spin_lock_init(&ps2if->lock);
 
 	/*
 	 * Request the physical region for this PS2 port.
 	 */
-	if (!request_mem_region(sadev->res.start,
-				sadev->res.end - sadev->res.start + 1,
-				SA1111_DRIVER_NAME(sadev))) {
+	if (!request_mem_region(dev->res.start,
+				dev->res.end - dev->res.start + 1,
+				SA1111_DRIVER_NAME(dev))) {
 		ret = -EBUSY;
 		goto free;
 	}
@@ -270,7 +269,7 @@ static int ps2_probe(struct device *dev)
 	/*
 	 * Our parent device has already mapped the region.
 	 */
-	ps2if->base = (unsigned long)sadev->mapbase;
+	ps2if->base = (unsigned long)dev->mapbase;
 
 	sa1111_enable_device(ps2if->dev);
 
@@ -301,10 +300,10 @@ static int ps2_probe(struct device *dev)
 
  out:
 	sa1111_disable_device(ps2if->dev);
-	release_mem_region(sadev->res.start,
-			   sadev->res.end - sadev->res.start + 1);
+	release_mem_region(dev->res.start,
+			   dev->res.end - dev->res.start + 1);
  free:
-	dev->driver_data = NULL;
+	sa1111_set_drvdata(dev, NULL);
 	kfree(ps2if);
 	return ret;
 }
@@ -312,31 +311,17 @@ static int ps2_probe(struct device *dev)
 /*
  * Remove one device from this driver.
  */
-static int ps2_remove(struct device *dev)
+static int ps2_remove(struct sa1111_dev *dev)
 {
-	struct ps2if *ps2if = dev->driver_data;
-	struct sa1111_dev *sadev = SA1111_DEV(dev);
+	struct ps2if *ps2if = sa1111_get_drvdata(dev);
 
 	serio_unregister_port(&ps2if->io);
-	release_mem_region(sadev->res.start,
-			   sadev->res.end - sadev->res.start + 1);
+	release_mem_region(dev->res.start,
+			   dev->res.end - dev->res.start + 1);
+	sa1111_set_drvdata(dev, NULL);
+
 	kfree(ps2if);
 
-	dev->driver_data = NULL;
-
-	return 0;
-}
-
-/*
- * We should probably do something here, but what?
- */
-static int ps2_suspend(struct device *dev, u32 state, u32 level)
-{
-	return 0;
-}
-
-static int ps2_resume(struct device *dev, u32 level)
-{
 	return 0;
 }
 
@@ -345,24 +330,21 @@ static int ps2_resume(struct device *dev, u32 level)
  */
 static struct sa1111_driver ps2_driver = {
 	.drv = {
-		.name		= "sa1111-ps2",
-		.bus		= &sa1111_bus_type,
-		.probe		= ps2_probe,
-		.remove		= ps2_remove,
-		.suspend	= ps2_suspend,
-		.resume		= ps2_resume,
+		.name	= "sa1111-ps2",
 	},
-	.devid			= SA1111_DEVID_PS2,
+	.devid		= SA1111_DEVID_PS2,
+	.probe		= ps2_probe,
+	.remove		= ps2_remove,
 };
 
 static int __init ps2_init(void)
 {
-	return driver_register(&ps2_driver.drv);
+	return sa1111_driver_register(&ps2_driver);
 }
 
 static void __exit ps2_exit(void)
 {
-	driver_unregister(&ps2_driver.drv);
+	sa1111_driver_unregister(&ps2_driver);
 }
 
 module_init(ps2_init);

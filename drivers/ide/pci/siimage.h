@@ -13,12 +13,6 @@
 #undef SIIMAGE_BUFFERED_TASKFILE
 #undef SIIMAGE_LARGE_DMA
 
-#if 0
-typedef struct ide_io_ops_s siimage_iops {
-
-}
-#endif
-
 #define SII_DEBUG 0
 
 #if SII_DEBUG
@@ -26,12 +20,6 @@ typedef struct ide_io_ops_s siimage_iops {
 #else
 #define siiprintk(x...)
 #endif
-
-#define ADJREG(B,R)	((B)|(R)|((hwif->channel)<<(4+(2*(hwif->mmio)))))
-#define SELREG(R)	ADJREG((0xA0),(R))
-#define SELADDR(R)	((((unsigned long)hwif->hwif_data)*(hwif->mmio))|SELREG((R)))
-#define HWIFADDR(R)	((((unsigned long)hwif->hwif_data)*(hwif->mmio))|(R))
-#define DEVADDR(R)	(((unsigned long) pci_get_drvdata(dev))|(R))
 
 
 #if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
@@ -76,6 +64,19 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
 		.vendor		= PCI_VENDOR_ID_CMD,
 		.device		= PCI_DEVICE_ID_SII_3112,
 		.name		= "SiI3112 Serial ATA",
+		.init_chipset	= init_chipset_siimage,
+		.init_iops	= init_iops_siimage,
+		.init_hwif	= init_hwif_siimage,
+		.init_dma	= init_dma_siimage,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
+		.bootable	= ON_BOARD,
+		.extra		= 0,
+	},{	/* 2 */
+		.vendor		= PCI_VENDOR_ID_CMD,
+		.device		= PCI_DEVICE_ID_SII_1210SA,
+		.name		= "Adaptec AAR-1210SA",
 		.init_chipset	= init_chipset_siimage,
 		.init_iops	= init_iops_siimage,
 		.init_hwif	= init_hwif_siimage,

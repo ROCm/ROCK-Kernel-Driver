@@ -76,6 +76,8 @@ static int multicast_filter_limit = 32;
 
 #define NUM_TX_DESC	64	/* Number of Tx descriptor registers */
 #define NUM_RX_DESC	64	/* Number of Rx descriptor registers */
+#define TX_DESC_TOTAL_SIZE	(NUM_TX_DESC * sizeof (struct TxDesc))
+#define RX_DESC_TOTAL_SIZE	(NUM_RX_DESC * sizeof (struct RxDesc))
 #define RX_BUF_SIZE	1536	/* Rx Buffer size */
 
 #define SiS190_MIN_IO_SIZE 0x80
@@ -311,12 +313,8 @@ struct sis190_private {
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
 	unsigned long dirty_tx;
-	void *tx_desc_raw;		/* Tx descriptor buffer */
-	dma_addr_t tx_dma_raw;
-	dma_addr_t tx_dma_aligned;
-	void *rx_desc_raw;		/* Rx descriptor buffer */
-	dma_addr_t rx_dma_raw;
-	dma_addr_t rx_dma_aligned;
+	dma_addr_t tx_dma;
+	dma_addr_t rx_dma;
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
 	unsigned char *RxBufferRings;	/* Index of Rx Buffer  */
@@ -470,6 +468,10 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	if (rc)
 		goto err_out;
 
+	rc = pci_set_dma_mask(pdev, 0xffffffffULL);
+	if (rc)
+		goto err_out;
+
 	mmio_start = pci_resource_start(pdev, 0);
 	mmio_end = pci_resource_end(pdev, 0);
 	mmio_flags = pci_resource_flags(pdev, 0);
@@ -521,7 +523,6 @@ err_out_free_res:
 
 err_out:
 	pci_disable_device(pdev);
-	unregister_netdev(dev);
 	kfree(dev);
 	return rc;
 }
@@ -536,6 +537,7 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int printed_version = 0;
 	int i, rc;
 	u16 reg31;
+	int val;
 
 	assert(pdev != NULL);
 	assert(ent != NULL);
@@ -620,7 +622,7 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	       dev->dev_addr[2], dev->dev_addr[3],
 	       dev->dev_addr[4], dev->dev_addr[5], dev->irq);
 
-	int val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
+	val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
 
 	printk(KERN_INFO "%s: Auto-negotiation Enabled.\n", dev->name);
 
@@ -714,54 +716,50 @@ static int
 SiS190_open(struct net_device *dev)
 {
 	struct sis190_private *tp = dev->priv;
-	int retval;
-	u8 diff;
 	int rc;
 
-	retval =
-	    request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
-	if (retval) {
-		return retval;
-	}
+	rc = request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
+	if (rc)
+		goto out;
 
-	tp->tx_desc_raw = pci_alloc_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		&tp->tx_dma_raw);
-	if (!tp->tx_desc_raw) {
+	/*
+	 * Rx and Tx descriptors need 256 bytes alignment.
+	 * pci_alloc_consistent() guarantees a stronger alignment.
+	 */
+	tp->TxDescArray = pci_alloc_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE,
+		&tp->tx_dma);
+	if (!tp->TxDescArray) {
 		rc = -ENOMEM;
 		goto err_out;
 	}
-	// Tx Desscriptor needs 256 bytes alignment;
-	diff = 256 - (tp->tx_dma_raw - ((tp->tx_dma_raw >> 8) << 8));
-	tp->tx_dma_aligned = tp->tx_dma_raw + diff;
-	tp->TxDescArray = (struct TxDesc *) (tp->tx_desc_raw + diff);
 
-	tp->rx_desc_raw = pci_alloc_consistent(tp->pci_dev,
-		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
-		&tp->rx_dma_raw);
-	if (!tp->rx_desc_raw) {
+	tp->RxDescArray = pci_alloc_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE,
+		&tp->rx_dma);
+	if (!tp->RxDescArray) {
 		rc = -ENOMEM;
 		goto err_out_free_tx;
 	}
-	// Rx Desscriptor needs 256 bytes alignment;
-	diff = 256 - (tp->rx_dma_raw - ((tp->rx_dma_raw >> 8) << 8));
-	tp->rx_dma_aligned = tp->rx_dma_raw + diff;
-	tp->RxDescArray = (struct RxDesc *) (tp->rx_desc_raw + diff);
 
 	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
 	if (tp->RxBufferRings == NULL) {
-		printk(KERN_INFO "Allocate RxBufferRing failed\n");
+		printk(KERN_INFO "%s: allocate RxBufferRing failed\n",
+			dev->name);
+		rc = -ENOMEM;
+		goto err_out_free_rx;
 	}
 
 	SiS190_init_ring(dev);
 	SiS190_hw_start(dev);
 
-	return 0;
+out:
+	return rc;
 
+err_out_free_rx:
+	pci_free_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE, tp->RxDescArray,
+		tp->rx_dma);
 err_out_free_tx:
-	pci_free_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		tp->tx_desc_raw, tp->tx_dma_raw);
+	pci_free_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE, tp->TxDescArray,
+		tp->tx_dma);
 err_out:
 	free_irq(dev->irq, dev);
 	return rc;
@@ -780,10 +778,10 @@ SiS190_hw_start(struct net_device *dev)
 	SiS_W32(IntrControl, 0x0);
 
 	SiS_W32(0x0, 0x01a00);
-	SiS_W32(0x4, tp->tx_dma_aligned);
+	SiS_W32(0x4, tp->tx_dma);
 
 	SiS_W32(0x10, 0x1a00);
-	SiS_W32(0x14, tp->rx_dma_aligned);
+	SiS_W32(0x14, tp->rx_dma);
 
 	SiS_W32(0x20, 0xffffffff);
 	SiS_W32(0x24, 0x0);
@@ -830,19 +828,19 @@ SiS190_init_ring(struct net_device *dev)
 		tp->Tx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < NUM_RX_DESC; i++) {
+		struct RxDesc *desc = tp->RxDescArray + i;
 
-		tp->RxDescArray[i].PSize = 0x0;
+		desc->PSize = 0x0;
 
 		if (i == (NUM_RX_DESC - 1))
-			tp->RxDescArray[i].buf_Len = BIT_31 + RX_BUF_SIZE;	//bit 31 is End bit
+			desc->buf_Len = BIT_31 + RX_BUF_SIZE;	//bit 31 is End bit
 		else
-			tp->RxDescArray[i].buf_Len = RX_BUF_SIZE;
+			desc->buf_Len = RX_BUF_SIZE;
 
-#warning Replace virt_to_bus with DMA mapping
-		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
-		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
-		tp->RxDescArray[i].status = OWNbit | INTbit;
-
+		tp->RxBufferRing[i] = tp->RxBufferRings + i * RX_BUF_SIZE;
+		desc->buf_addr = pci_map_single(tp->pci_dev,
+			tp->RxBufferRing[i], RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+		desc->status = OWNbit | INTbit;
 	}
 
 }
@@ -855,7 +853,14 @@ SiS190_tx_clear(struct sis190_private *tp)
 	tp->cur_tx = 0;
 	for (i = 0; i < NUM_TX_DESC; i++) {
 		if (tp->Tx_skbuff[i] != NULL) {
-			dev_kfree_skb(tp->Tx_skbuff[i]);
+			struct sk_buff *skb;
+
+			skb = tp->Tx_skbuff[i];
+			pci_unmap_single(tp->pci_dev,
+				le32_to_cpu(tp->TxDescArray[i].buf_addr),
+				skb->len < ETH_ZLEN ? ETH_ZLEN : skb->len,
+				PCI_DMA_TODEVICE);
+			dev_kfree_skb(skb);
 			tp->Tx_skbuff[i] = NULL;
 			tp->stats.tx_dropped++;
 		}
@@ -894,46 +899,58 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct sis190_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	int entry = tp->cur_tx % NUM_TX_DESC;
+	u32 len;
 
-	if (skb->len < ETH_ZLEN) {
+	if (unlikely(skb->len < ETH_ZLEN)) {
 		skb = skb_padto(skb, ETH_ZLEN);
 		if (skb == NULL)
-			return 0;
+			goto drop_tx;
+		len = ETH_ZLEN;
+	} else {
+		len = skb->len;
 	}
 
 	spin_lock_irq(&tp->lock);
 
-	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-#warning Replace virt_to_bus with DMA mapping
-		tp->Tx_skbuff[entry] = skb;
-		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
-		tp->TxDescArray[entry].PSize =
-		    ((skb->len > ETH_ZLEN) ? skb->len : ETH_ZLEN);
+	if ((le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit) == 0) {
+		dma_addr_t mapping;
 
-		if (entry != (NUM_TX_DESC - 1)) {
+		mapping = pci_map_single(tp->pci_dev, skb->data, len,
+					 PCI_DMA_TODEVICE);
+
+		tp->Tx_skbuff[entry] = skb;
+		tp->TxDescArray[entry].buf_addr = cpu_to_le32(mapping);
+		tp->TxDescArray[entry].PSize = cpu_to_le32(len);
+
+		if (entry != (NUM_TX_DESC - 1))
+			tp->TxDescArray[entry].buf_Len = cpu_to_le32(len);
+		else
 			tp->TxDescArray[entry].buf_Len =
-			    tp->TxDescArray[entry].PSize;
-		} else {
-			tp->TxDescArray[entry].buf_Len =
-			    tp->TxDescArray[entry].PSize | ENDbit;
-		}
+				cpu_to_le32(len | ENDbit);
 
 		tp->TxDescArray[entry].status |=
-		    (OWNbit | INTbit | DEFbit | CRCbit | PADbit);
+		    cpu_to_le32(OWNbit | INTbit | DEFbit | CRCbit | PADbit);
 
 		SiS_W32(TxControl, 0x1a11);	//Start Send
 
 		dev->trans_start = jiffies;
 
 		tp->cur_tx++;
+	} else {
+		spin_unlock_irq(&tp->lock);
+		goto drop_tx;
 	}
+
+	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx)
+		netif_stop_queue(dev);
 
 	spin_unlock_irq(&tp->lock);
 
-	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx) {
-		netif_stop_queue(dev);
-	}
+	return 0;
 
+drop_tx:
+	tp->stats.tx_dropped++;
+	dev_kfree_skb(skb);
 	return 0;
 }
 
@@ -952,10 +969,18 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 	tx_left = tp->cur_tx - dirty_tx;
 
 	while (tx_left > 0) {
-		if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-			dev_kfree_skb_irq(tp->
-					  Tx_skbuff[dirty_tx % NUM_TX_DESC]);
-			tp->Tx_skbuff[dirty_tx % NUM_TX_DESC] = NULL;
+		if ((le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit) == 0) {
+			struct sk_buff *skb;
+
+			skb = tp->Tx_skbuff[entry];
+
+			pci_unmap_single(tp->pci_dev,
+				le32_to_cpu(tp->TxDescArray[entry].buf_addr),
+				skb->len < ETH_ZLEN ? ETH_ZLEN : skb->len,
+				PCI_DMA_TODEVICE);
+
+			dev_kfree_skb_irq(skb);
+			tp->Tx_skbuff[entry] = NULL;
 			tp->stats.tx_packets++;
 			dirty_tx++;
 			tx_left--;
@@ -965,8 +990,7 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 
 	if (tp->dirty_tx != dirty_tx) {
 		tp->dirty_tx = dirty_tx;
-		if (netif_queue_stopped(dev))
-			netif_wake_queue(dev);
+		netif_wake_queue(dev);
 	}
 }
 
@@ -974,29 +998,30 @@ static void
 SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 		    void *ioaddr)
 {
-	int cur_rx;
-	struct sk_buff *skb;
-	int pkt_size = 0;
+	int cur_rx = tp->cur_rx;
+	struct RxDesc *desc = tp->RxDescArray + cur_rx;
 
 	assert(dev != NULL);
 	assert(tp != NULL);
 	assert(ioaddr != NULL);
 
-	cur_rx = tp->cur_rx;
-	while ((tp->RxDescArray[cur_rx].status & OWNbit) == 0) {
+	while ((desc->status & OWNbit) == 0) {
 
-		if (tp->RxDescArray[cur_rx].PSize & 0x0080000) {
+		if (desc->PSize & 0x0080000) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
 			tp->stats.rx_length_errors++;
-		} else if (!(tp->RxDescArray[cur_rx].PSize & 0x0010000)) {
+		} else if (!(desc->PSize & 0x0010000)) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
 			tp->stats.rx_errors++;
 			tp->stats.rx_crc_errors++;
 		} else {
-			pkt_size =
-			    (int) (tp->RxDescArray[cur_rx].
-				   PSize & 0x0000FFFF) - 4;
+			struct sk_buff *skb;
+			int pkt_size;
+
+			pkt_size = (int) (desc->PSize & 0x0000FFFF) - 4;
+			pci_dma_sync_single(tp->pci_dev, desc->buf_addr,
+				RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 			skb = dev_alloc_skb(pkt_size + 2);
 			if (skb != NULL) {
 				skb->dev = dev;
@@ -1007,24 +1032,18 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
 
-				tp->RxDescArray[cur_rx].PSize = 0x0;
+				desc->PSize = 0x0;
 
 				if (cur_rx == (NUM_RX_DESC - 1))
-					tp->RxDescArray[cur_rx].buf_Len =
-					    ENDbit + RX_BUF_SIZE;
+					desc->buf_Len = ENDbit + RX_BUF_SIZE;
 				else
-					tp->RxDescArray[cur_rx].buf_Len =
-					    RX_BUF_SIZE;
+					desc->buf_Len = RX_BUF_SIZE;
 
-#warning Replace virt_to_bus with DMA mapping
-				tp->RxDescArray[cur_rx].buf_addr =
-				    virt_to_bus(tp->RxBufferRing[cur_rx]);
 				dev->last_rx = jiffies;
 				tp->stats.rx_bytes += pkt_size;
 				tp->stats.rx_packets++;
 
-				tp->RxDescArray[cur_rx].status =
-				    OWNbit | INTbit;
+				desc->status = OWNbit | INTbit;
 			} else {
 				printk(KERN_WARNING
 				       "%s: Memory squeeze, deferring packet.\n",
@@ -1036,7 +1055,7 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 		}
 
 		cur_rx = (cur_rx + 1) % NUM_RX_DESC;
-
+		desc = tp->RxDescArray + cur_rx;
 	}
 
 	tp->cur_rx = cur_rx;
@@ -1111,22 +1130,22 @@ SiS190_close(struct net_device *dev)
 
 	spin_unlock_irq(&tp->lock);
 
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 	free_irq(dev->irq, dev);
 
 	SiS190_tx_clear(tp);
-	pci_free_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		tp->tx_desc_raw, tp->tx_dma_raw);
-	pci_free_consistent(tp->pci_dev,
-		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
-		tp->rx_desc_raw, tp->rx_dma_raw);
+	pci_free_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE, tp->TxDescArray,
+		tp->tx_dma);
+	pci_free_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE, tp->RxDescArray,
+		tp->rx_dma);
 	tp->TxDescArray = NULL;
-	tp->RxDescArray = NULL;
-	kfree(tp->RxBufferRings);
 	for (i = 0; i < NUM_RX_DESC; i++) {
+		pci_unmap_single(tp->pci_dev, tp->RxDescArray[i].buf_addr,
+			RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
 		tp->RxBufferRing[i] = NULL;
 	}
+	tp->RxDescArray = NULL;
+	kfree(tp->RxBufferRings);
 
 	return 0;
 }

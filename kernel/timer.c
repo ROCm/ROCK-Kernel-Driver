@@ -338,6 +338,7 @@ del_again:
 			break;
 		}
 	}
+	smp_rmb();
 	if (timer_pending(timer))
 		goto del_again;
 

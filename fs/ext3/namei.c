@@ -1306,7 +1306,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 
 	/* The 0th block becomes the root, move the dirents out */
 	fde = &root->dotdot;
-	de = (struct ext3_dir_entry_2 *)((char *)fde + fde->rec_len);
+	de = (struct ext3_dir_entry_2 *)((char *)fde + le16_to_cpu(fde->rec_len));
 	len = ((char *) root) + blocksize - (char *) de;
 	memcpy (data1, de, len);
 	de = (struct ext3_dir_entry_2 *) data1;

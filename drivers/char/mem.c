@@ -607,7 +607,7 @@ static struct file_operations kmsg_fops = {
 
 static int memory_open(struct inode * inode, struct file * filp)
 {
-	switch (minor(inode->i_rdev)) {
+	switch (iminor(inode)) {
 		case 1:
 			filp->f_op = &mem_fops;
 			break;

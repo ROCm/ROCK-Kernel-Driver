@@ -248,7 +248,7 @@ probe_ti_parallel(int minor)
 static int
 tipar_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev) - TIPAR_MINOR;
+	unsigned int minor = iminor(inode) - TIPAR_MINOR;
 
 	if (minor > tp_count - 1)
 		return -ENXIO;
@@ -266,7 +266,7 @@ tipar_open(struct inode *inode, struct file *file)
 static int
 tipar_close(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev) - TIPAR_MINOR;
+	unsigned int minor = iminor(inode) - TIPAR_MINOR;
 
 	if (minor > tp_count - 1)
 		return -ENXIO;
@@ -279,8 +279,7 @@ tipar_close(struct inode *inode, struct file *file)
 static ssize_t
 tipar_write(struct file *file, const char *buf, size_t count, loff_t * ppos)
 {
-	unsigned int minor =
-	    minor(file->f_dentry->d_inode->i_rdev) - TIPAR_MINOR;
+	unsigned int minor = iminor(file->f_dentry->d_inode) - TIPAR_MINOR;
 	ssize_t n;
 
 	parport_claim_or_block(table[minor].dev);
@@ -308,8 +307,7 @@ static ssize_t
 tipar_read(struct file *file, char *buf, size_t count, loff_t * ppos)
 {
 	int b = 0;
-	unsigned int minor =
-	    minor(file->f_dentry->d_inode->i_rdev) - TIPAR_MINOR;
+	unsigned int minor = iminor(file->f_dentry->d_inode) - TIPAR_MINOR;
 	ssize_t retval = 0;
 	ssize_t n = 0;
 

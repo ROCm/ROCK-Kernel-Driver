@@ -790,10 +790,13 @@ static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 	struct sa1111 *sachip = dev_get_drvdata(dev);
 	struct sa1111_save_data *save;
 	unsigned long flags;
+	unsigned int val;
 	char *base;
 
-	if (!dev->saved_state && level == SUSPEND_NOTIFY)
-		dev->saved_state = kmalloc(sizeof(struct sa1111_save_data), GFP_KERNEL);
+	if (level != SUSPEND_DISABLE)
+		return 0;
+
+	dev->saved_state = kmalloc(sizeof(struct sa1111_save_data), GFP_KERNEL);
 	if (!dev->saved_state)
 		return -ENOMEM;
 
@@ -804,36 +807,31 @@ static int sa1111_suspend(struct device *dev, u32 state, u32 level)
 	/*
 	 * Save state.
 	 */
-	if (level == SUSPEND_SAVE_STATE) {
-		base = sachip->base;
-		save->skcr     = sa1111_readl(base + SA1111_SKCR);
-		save->skpcr    = sa1111_readl(base + SA1111_SKPCR);
-		save->skcdr    = sa1111_readl(base + SA1111_SKCDR);
-		save->skaud    = sa1111_readl(base + SA1111_SKAUD);
-		save->skpwm0   = sa1111_readl(base + SA1111_SKPWM0);
-		save->skpwm1   = sa1111_readl(base + SA1111_SKPWM1);
+	base = sachip->base;
+	save->skcr     = sa1111_readl(base + SA1111_SKCR);
+	save->skpcr    = sa1111_readl(base + SA1111_SKPCR);
+	save->skcdr    = sa1111_readl(base + SA1111_SKCDR);
+	save->skaud    = sa1111_readl(base + SA1111_SKAUD);
+	save->skpwm0   = sa1111_readl(base + SA1111_SKPWM0);
+	save->skpwm1   = sa1111_readl(base + SA1111_SKPWM1);
 
-		base = sachip->base + SA1111_INTC;
-		save->intpol0  = sa1111_readl(base + SA1111_INTPOL0);
-		save->intpol1  = sa1111_readl(base + SA1111_INTPOL1);
-		save->inten0   = sa1111_readl(base + SA1111_INTEN0);
-		save->inten1   = sa1111_readl(base + SA1111_INTEN1);
-		save->wakepol0 = sa1111_readl(base + SA1111_WAKEPOL0);
-		save->wakepol1 = sa1111_readl(base + SA1111_WAKEPOL1);
-		save->wakeen0  = sa1111_readl(base + SA1111_WAKEEN0);
-		save->wakeen1  = sa1111_readl(base + SA1111_WAKEEN1);
-	}
+	base = sachip->base + SA1111_INTC;
+	save->intpol0  = sa1111_readl(base + SA1111_INTPOL0);
+	save->intpol1  = sa1111_readl(base + SA1111_INTPOL1);
+	save->inten0   = sa1111_readl(base + SA1111_INTEN0);
+	save->inten1   = sa1111_readl(base + SA1111_INTEN1);
+	save->wakepol0 = sa1111_readl(base + SA1111_WAKEPOL0);
+	save->wakepol1 = sa1111_readl(base + SA1111_WAKEPOL1);
+	save->wakeen0  = sa1111_readl(base + SA1111_WAKEEN0);
+	save->wakeen1  = sa1111_readl(base + SA1111_WAKEEN1);
 
 	/*
 	 * Disable.
 	 */
-	if (level == SUSPEND_POWER_DOWN && state == 4) {
-		unsigned int val = sa1111_readl(sachip->base + SA1111_SKCR);
-
-		sa1111_writel(val | SKCR_SLEEP, sachip->base + SA1111_SKCR);
-		sa1111_writel(0, sachip->base + SA1111_SKPWM0);
-		sa1111_writel(0, sachip->base + SA1111_SKPWM1);
-	}
+	val = sa1111_readl(sachip->base + SA1111_SKCR);
+	sa1111_writel(val | SKCR_SLEEP, sachip->base + SA1111_SKCR);
+	sa1111_writel(0, sachip->base + SA1111_SKPWM0);
+	sa1111_writel(0, sachip->base + SA1111_SKPWM1);
 
 	spin_unlock_irqrestore(&sachip->lock, flags);
 
@@ -857,6 +855,9 @@ static int sa1111_resume(struct device *dev, u32 level)
 	unsigned long flags, id;
 	char *base;
 
+	if (level != RESUME_ENABLE)
+		return 0;
+
 	save = (struct sa1111_save_data *)dev->saved_state;
 	if (!save)
 		return 0;
@@ -878,39 +879,32 @@ static int sa1111_resume(struct device *dev, u32 level)
 	/*
 	 * First of all, wake up the chip.
 	 */
-	if (level == RESUME_POWER_ON) {
-		sa1111_wake(sachip);
+	sa1111_wake(sachip);
+	sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN0);
+	sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN1);
 
-		sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN0);
-		sa1111_writel(0, sachip->base + SA1111_INTC + SA1111_INTEN1);
-	}
+	base = sachip->base;
+	sa1111_writel(save->skcr,     base + SA1111_SKCR);
+	sa1111_writel(save->skpcr,    base + SA1111_SKPCR);
+	sa1111_writel(save->skcdr,    base + SA1111_SKCDR);
+	sa1111_writel(save->skaud,    base + SA1111_SKAUD);
+	sa1111_writel(save->skpwm0,   base + SA1111_SKPWM0);
+	sa1111_writel(save->skpwm1,   base + SA1111_SKPWM1);
 
-	if (level == RESUME_RESTORE_STATE) {
-		base = sachip->base;
-		sa1111_writel(save->skcr,     base + SA1111_SKCR);
-		sa1111_writel(save->skpcr,    base + SA1111_SKPCR);
-		sa1111_writel(save->skcdr,    base + SA1111_SKCDR);
-		sa1111_writel(save->skaud,    base + SA1111_SKAUD);
-		sa1111_writel(save->skpwm0,   base + SA1111_SKPWM0);
-		sa1111_writel(save->skpwm1,   base + SA1111_SKPWM1);
-
-		base = sachip->base + SA1111_INTC;
-		sa1111_writel(save->intpol0,  base + SA1111_INTPOL0);
-		sa1111_writel(save->intpol1,  base + SA1111_INTPOL1);
-		sa1111_writel(save->inten0,   base + SA1111_INTEN0);
-		sa1111_writel(save->inten1,   base + SA1111_INTEN1);
-		sa1111_writel(save->wakepol0, base + SA1111_WAKEPOL0);
-		sa1111_writel(save->wakepol1, base + SA1111_WAKEPOL1);
-		sa1111_writel(save->wakeen0,  base + SA1111_WAKEEN0);
-		sa1111_writel(save->wakeen1,  base + SA1111_WAKEEN1);
-	}
+	base = sachip->base + SA1111_INTC;
+	sa1111_writel(save->intpol0,  base + SA1111_INTPOL0);
+	sa1111_writel(save->intpol1,  base + SA1111_INTPOL1);
+	sa1111_writel(save->inten0,   base + SA1111_INTEN0);
+	sa1111_writel(save->inten1,   base + SA1111_INTEN1);
+	sa1111_writel(save->wakepol0, base + SA1111_WAKEPOL0);
+	sa1111_writel(save->wakepol1, base + SA1111_WAKEPOL1);
+	sa1111_writel(save->wakeen0,  base + SA1111_WAKEEN0);
+	sa1111_writel(save->wakeen1,  base + SA1111_WAKEEN1);
 
 	spin_unlock_irqrestore(&sachip->lock, flags);
 
-	if (level == RESUME_ENABLE) {
-		dev->saved_state = NULL;
-		kfree(save);
-	}
+	dev->saved_state = NULL;
+	kfree(save);
 
 	return 0;
 }
@@ -1135,9 +1129,55 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
 	return dev->devid == drv->devid;
 }
 
+static int sa1111_bus_suspend(struct device *dev, u32 state)
+{
+	struct sa1111_dev *sadev = SA1111_DEV(dev);
+	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+	int ret = 0;
+
+	if (drv && drv->suspend)
+		ret = drv->suspend(sadev, state);
+	return ret;
+}
+
+static int sa1111_bus_resume(struct device *dev)
+{
+	struct sa1111_dev *sadev = SA1111_DEV(dev);
+	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+	int ret = 0;
+
+	if (drv && drv->resume)
+		ret = drv->resume(sadev);
+	return ret;
+}
+
+static int sa1111_bus_probe(struct device *dev)
+{
+	struct sa1111_dev *sadev = SA1111_DEV(dev);
+	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+	int ret = -ENODEV;
+
+	if (drv->probe)
+		ret = drv->probe(sadev);
+	return ret;
+}
+
+static int sa1111_bus_remove(struct device *dev)
+{
+	struct sa1111_dev *sadev = SA1111_DEV(dev);
+	struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+	int ret = 0;
+
+	if (drv->remove)
+		ret = drv->remove(sadev);
+	return ret;
+}
+
 struct bus_type sa1111_bus_type = {
-	.name	= "RAB",
-	.match	= sa1111_match,
+	.name		= "sa1111-rab",
+	.match		= sa1111_match,
+	.suspend	= sa1111_bus_suspend,
+	.resume		= sa1111_bus_resume,
 };
 
 static int sa1111_rab_bus_init(void)
@@ -1147,6 +1187,19 @@ static int sa1111_rab_bus_init(void)
 
 postcore_initcall(sa1111_rab_bus_init);
 
+int sa1111_driver_register(struct sa1111_driver *driver)
+{
+	driver->drv.probe = sa1111_bus_probe;
+	driver->drv.remove = sa1111_bus_remove;
+	driver->drv.bus = &sa1111_bus_type;
+	return driver_register(&driver->drv);
+}
+
+void sa1111_driver_unregister(struct sa1111_driver *driver)
+{
+	driver_unregister(&driver->drv);
+}
+
 EXPORT_SYMBOL(sa1111_check_dma_bug);
 EXPORT_SYMBOL(sa1111_select_audio_mode);
 EXPORT_SYMBOL(sa1111_set_audio_rate);
@@ -1155,3 +1208,5 @@ EXPORT_SYMBOL(sa1111_enable_device);
 EXPORT_SYMBOL(sa1111_disable_device);
 EXPORT_SYMBOL(sa1111_pll_clock);
 EXPORT_SYMBOL(sa1111_bus_type);
+EXPORT_SYMBOL(sa1111_driver_register);
+EXPORT_SYMBOL(sa1111_driver_unregister);

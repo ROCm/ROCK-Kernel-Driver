@@ -355,7 +355,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
 	tristate "Adaptec I2O RAID support "
-	depends on !X86_64 && SCSI
+	depends on !X86_64 && SCSI && BROKEN
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
@@ -398,7 +398,7 @@ config SCSI_IN2000
 # does not use pci dma and seems to be onboard only for old machines
 config SCSI_AM53C974
 	tristate "AM53/79C974 PCI SCSI support"
-	depends on X86 && PCI && SCSI
+	depends on X86 && PCI && SCSI && BROKEN
 	---help---
 	  This is support for the AM53/79C974 SCSI host adapters.  Please read
 	  <file:Documentation/scsi/AM53C974.txt> for details.  Also, the
@@ -742,7 +742,7 @@ config SCSI_IPS
 
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the Initio 91XXU(W) SCSI host adapter.  Please
 	  read the SCSI-HOWTO, available from
@@ -1161,7 +1161,7 @@ config SCSI_NCR53C8XX_SYMBIOS_COMPAT
 
 config SCSI_MCA_53C9X
 	tristate "NCR MCA 53C9x SCSI support"
-	depends on MCA && SCSI
+	depends on MCA && SCSI && BROKEN_ON_SMP
 	help
 	  Some MicroChannel machines, notably the NCR 35xx line, use a SCSI
 	  controller based on the NCR 53C94.  This driver will allow use of
@@ -1189,7 +1189,7 @@ config SCSI_PAS16
 
 config SCSI_PCI2000
 	tristate "PCI2000 support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the PCI2000I EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
@@ -1202,7 +1202,7 @@ config SCSI_PCI2000
 
 config SCSI_PCI2220I
 	tristate "PCI2220i support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the PCI2220i EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
@@ -1314,7 +1314,7 @@ config SCSI_QLOGICPTI
 
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
-	depends on X86 && ISA && SCSI
+	depends on X86 && ISA && SCSI && BROKEN
 	---help---
 	  These are 8-bit SCSI controllers; the ST-01 is also supported by
 	  this driver.  It is explained in section 3.9 of the SCSI-HOWTO,
@@ -1381,7 +1381,7 @@ config SCSI_DC395x
 
 config SCSI_DC390T
 	tristate "Tekram DC390(T) and Am53/79C974 SCSI support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	---help---
 	  This driver supports PCI SCSI host adapters based on the Am53C974A
 	  chip, e.g. Tekram DC390(T), DawiControl 2974 and some onboard

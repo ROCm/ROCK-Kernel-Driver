@@ -149,26 +149,26 @@ static spinlock_t tx4927_pic_lock = SPIN_LOCK_UNLOCKED;
 
 #define TX4927_CP0_NAME "TX4927-CP0"
 static struct hw_interrupt_type tx4927_irq_cp0_type = {
-	typename:	TX4927_CP0_NAME,
-	startup:	tx4927_irq_cp0_startup,
-	shutdown:	tx4927_irq_cp0_shutdown,
-	enable:		tx4927_irq_cp0_enable,
-	disable:	tx4927_irq_cp0_disable,
-	ack:		tx4927_irq_cp0_mask_and_ack,
-	end:		tx4927_irq_cp0_end,
-	set_affinity:	NULL
+	.typename	= TX4927_CP0_NAME,
+	.startup	= tx4927_irq_cp0_startup,
+	.shutdown	= tx4927_irq_cp0_shutdown,
+	.enable		= tx4927_irq_cp0_enable,
+	.disable	= tx4927_irq_cp0_disable,
+	.ack		= tx4927_irq_cp0_mask_and_ack,
+	.end		= tx4927_irq_cp0_end,
+	.set_affinity	= NULL
 };
 
 #define TX4927_PIC_NAME "TX4927-PIC"
 static struct hw_interrupt_type tx4927_irq_pic_type = {
-	typename:	TX4927_PIC_NAME,
-	startup:	tx4927_irq_pic_startup,
-	shutdown:	tx4927_irq_pic_shutdown,
-	enable:		tx4927_irq_pic_enable,
-	disable:	tx4927_irq_pic_disable,
-	ack:		tx4927_irq_pic_mask_and_ack,
-	end:		tx4927_irq_pic_end,
-	set_affinity:	NULL
+	.typename	= TX4927_PIC_NAME,
+	.startup	= tx4927_irq_pic_startup,
+	.shutdown	= tx4927_irq_pic_shutdown,
+	.enable		= tx4927_irq_pic_enable,
+	.disable	= tx4927_irq_pic_disable,
+	.ack		= tx4927_irq_pic_mask_and_ack,
+	.end		= tx4927_irq_pic_end,
+	.set_affinity	= NULL
 };
 
 #define TX4927_PIC_ACTION(s) { no_action, 0, 0, s, NULL, NULL }

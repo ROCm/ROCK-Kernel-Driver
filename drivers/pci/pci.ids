@@ -3247,7 +3247,8 @@
 		1148 5061  SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
 		1148 5071  SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
 		1148 9521  SK-9521 10/100/1000Base-T Adapter
-	4400  Gigabit Ethernet
+	4400 SK-9Dxx Gigabit Ethernet Adapter
+	4500 SK-9Mxx Gigabit Ethernet Adapter
 1149  Win System Corporation
 114a  VMIC
 	5579  VMIPCI-5579 (Reflective Memory Card)
@@ -5313,9 +5314,12 @@
 		1166 1648  NetXtreme CIOB-E 1000Base-T
 	164d  NetXtreme BCM5702FE Gigabit Ethernet
 	1653  NetXtreme BCM5705 Gigabit Ethernet
+	1654  NetXtreme BCM5705 Gigabit Ethernet
 	165d  NetXtreme BCM5705M Gigabit Ethernet
+	165e  NetXtreme BCM5705M Gigabit Ethernet
 	1696  NetXtreme BCM5782 Gigabit Ethernet
 		14e4 000d  NetXtreme BCM5782 1000Base-T
+	169c  NetXtreme BCM5788 Gigabit Ethernet
 	16a6  NetXtreme BCM5702 Gigabit Ethernet
 		0e11 00bb  NC7760 Gigabit Server Adapter (PCI-X, 10/100/1000-T)
 		1028 0126  BCM5702 1000Base-T
@@ -5337,6 +5341,8 @@
 	16c7  NetXtreme BCM5703 Gigabit Ethernet
 		14e4 0009  NetXtreme BCM5703 1000Base-T
 		14e4 000a  NetXtreme BCM5703 1000Base-SX
+	170d  NetXtreme BCM5901 Gigabit Ethernet
+	170e  NetXtreme BCM5901 Gigabit Ethernet
 	4210  BCM4210 iLine10 HomePNA 2.0
 	4211  BCM4211 iLine10 HomePNA 2.0 + V.90 56k modem
 	4212  BCM4212 v.90 56k modem
@@ -5877,6 +5883,8 @@
 	03e8  AC1000 Gigabit Ethernet
 	03e9  AC1001 Gigabit Ethernet
 	03ea  AC9100 Gigabit Ethernet
+		173b 0001  AC1002
+	03eb  AC1003 Gigabit Ethernet
 1743  Peppercon AG
 	8139  ROL/F-100 Fast Ethernet Adapter with ROL
 174b  PC Partner Limited

@@ -227,7 +227,8 @@ out:
 #define IOCTL_HASHSIZE 256
 struct ioctl_trans *ioctl32_hash_table[IOCTL_HASHSIZE];
 
-extern struct ioctl_trans ioctl_start[], ioctl_end[]; 
+extern struct ioctl_trans ioctl_start[];
+extern int ioctl_table_size;
 
 static inline unsigned long ioctl32_hash(unsigned long cmd)
 {
@@ -255,7 +256,7 @@ static int __init init_sys32_ioctl(void)
 {
 	int i;
 
-	for (i = 0; &ioctl_start[i] < &ioctl_end[0]; i++) {
+	for (i = 0; i < ioctl_table_size; i++) {
 		if (ioctl_start[i].next != 0) { 
 			printk("ioctl translation %d bad\n",i); 
 			return -1;
@@ -318,8 +319,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 
 static inline int builtin_ioctl(struct ioctl_trans *t)
 { 
-	return t >= (struct ioctl_trans *)ioctl_start &&
-	       t < (struct ioctl_trans *)ioctl_end; 
+	return t >= ioctl_start && t < (ioctl_start + ioctl_table_size);
 } 
 
 /* Problem: 

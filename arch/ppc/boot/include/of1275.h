@@ -20,6 +20,7 @@ extern prom_entry of_prom_entry;
 /* function declarations */
 
 void *	claim(unsigned int virt, unsigned int size, unsigned int align);
+int	map(unsigned int phys, unsigned int virt, unsigned int size);
 void	enter(void);
 void	exit(void);
 phandle	finddevice(const char *name);

@@ -42,7 +42,6 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 static int identify  (volatile u8 *p);
 static void print_fixed (volatile u8 *p);
 static void print_funcid (int func);

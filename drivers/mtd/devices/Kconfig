@@ -102,7 +102,7 @@ config MTDRAM_ABS_POS
 
 config MTD_BLKMTD
 	tristate "MTD emulation using block device"
-	depends on MTD && BROKEN
+	depends on MTD
 	help
 	  This driver allows a block device to appear as an MTD. It would
 	  generally be used in the following cases:

@@ -3844,9 +3844,9 @@ static int floppy_open(struct inode * inode, struct file * filp)
 		}
 	}
 
-	UDRS->fd_device = minor(inode->i_rdev);
-	set_capacity(disks[drive], floppy_sizes[minor(inode->i_rdev)]);
-	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
+	UDRS->fd_device = iminor(inode);
+	set_capacity(disks[drive], floppy_sizes[iminor(inode)]);
+	if (old_dev != -1 && old_dev != iminor(inode)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
 	}
@@ -3989,22 +3989,6 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	return 0;
 }
 
-static int floppy_read_block_0(struct gendisk *disk)
-{
-	struct block_device *bdev;
-	int ret;
-
-	bdev = bdget_disk(disk, 0);
-	if (!bdev) {
-		printk("No block device for %s\n", disk->disk_name);
-		BUG();
-	}
-	bdev->bd_disk = disk;	/* ewww */
-	ret = __floppy_read_block_0(bdev);
-	atomic_dec(&bdev->bd_count);
-	return ret;
-}
-
 /* revalidate the floppy disk, i.e. trigger format autodetection by reading
  * the bootblock (block 0). "Autodetection" is also needed to check whether
  * there is a disk in the drive at all... Thus we also do it for fixed
@@ -4040,7 +4024,7 @@ static int floppy_revalidate(struct gendisk *disk)
 			UDRS->generation++;
 		if (NO_GEOM){
 			/* auto-sensing */
-			res = floppy_read_block_0(disk);
+			res = __floppy_read_block_0(opened_bdev[drive]);
 		} else {
 			if (cf)
 				poll_drive(0, FD_RAW_NEED_DISK);

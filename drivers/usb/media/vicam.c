@@ -1388,11 +1388,13 @@ vicam_disconnect(struct usb_interface *intf)
 static int __init
 usb_vicam_init(void)
 {
+	int retval;
 	DBG(KERN_INFO "ViCam-based WebCam driver startup\n");
 	vicam_create_proc_root();
-	if (usb_register(&vicam_driver) != 0)
+	retval = usb_register(&vicam_driver);
+	if (retval)
 		printk(KERN_WARNING "usb_register failed!\n");
-	return 0;
+	return retval;
 }
 
 static void __exit

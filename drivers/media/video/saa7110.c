@@ -86,6 +86,7 @@ saa7110_write (struct i2c_client *client,
 	       u8                 value)
 {
 	struct saa7110 *decoder = i2c_get_clientdata(client);
+
 	decoder->reg[reg] = value;
 	return i2c_smbus_write_byte_data(client, reg, value);
 }
@@ -97,6 +98,7 @@ saa7110_write_block (struct i2c_client *client,
 {
 	int ret = -1;
 	u8 reg = *data++;
+
 	len--;
 
 	/* the saa7110 has an autoincrement function, use it if
@@ -105,6 +107,7 @@ saa7110_write_block (struct i2c_client *client,
 		struct saa7110 *decoder = i2c_get_clientdata(client);
 		struct i2c_msg msg;
 		u8 block_data[54];
+
 		msg.len = 0;
 		msg.buf = (char *) block_data;
 		msg.addr = client->addr;
@@ -119,8 +122,8 @@ saa7110_write_block (struct i2c_client *client,
 		}
 	} else {
 		while (len-- >= 1) {
-			if ((ret =
-			     saa7110_write(client, reg++, *data++)) < 0)
+			if ((ret = saa7110_write(client, reg++,
+						 *data++)) < 0)
 				break;
 		}
 	}
@@ -279,6 +282,7 @@ saa7110_command (struct i2c_client *client,
 	case DECODER_GET_CAPABILITIES:
 	{
 		struct video_decoder_capability *dc = arg;
+
 		dc->flags =
 		    VIDEO_DECODER_PAL | VIDEO_DECODER_NTSC |
 		    VIDEO_DECODER_SECAM | VIDEO_DECODER_AUTO;

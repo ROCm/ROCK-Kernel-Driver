@@ -1,8 +1,8 @@
 /*
  * Edgeport USB Serial Converter driver
  *
- * Copyright(c) 2000-2002 Inside Out Networks, All rights reserved.
- * Copyright(c) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright (C) 2000-2002 Inside Out Networks, All rights reserved.
+ * Copyright (C) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -127,6 +127,7 @@ static struct usb_device_id edgeport_1port_id_table [] = {
 
 static struct usb_device_id edgeport_2port_id_table [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2) },
+	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2C) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2I) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_421) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_421_BOOT) },
@@ -145,6 +146,7 @@ static struct usb_device_id edgeport_2port_id_table [] = {
 static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_1) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2) },
+	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2C) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_2I) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_421) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_TI_EDGEPORT_421_BOOT) },
@@ -1575,17 +1577,17 @@ static void handle_new_msr (struct edgeport_port *edge_port, __u8 msr)
 
 	dbg ("%s - %02x", __FUNCTION__, msr);
 
-	if (msr & (MSR_DELTA_CTS | MSR_DELTA_DSR | MSR_DELTA_RI | MSR_DELTA_CD)) {
+	if (msr & (EDGEPORT_MSR_DELTA_CTS | EDGEPORT_MSR_DELTA_DSR | EDGEPORT_MSR_DELTA_RI | EDGEPORT_MSR_DELTA_CD)) {
 		icount = &edge_port->icount;
 
 		/* update input line counters */
-		if (msr & MSR_DELTA_CTS)
+		if (msr & EDGEPORT_MSR_DELTA_CTS)
 			icount->cts++;
-		if (msr & MSR_DELTA_DSR)
+		if (msr & EDGEPORT_MSR_DELTA_DSR)
 			icount->dsr++;
-		if (msr & MSR_DELTA_CD)
+		if (msr & EDGEPORT_MSR_DELTA_CD)
 			icount->dcd++;
-		if (msr & MSR_DELTA_RI)
+		if (msr & EDGEPORT_MSR_DELTA_RI)
 			icount->rng++;
 		wake_up_interruptible (&edge_port->delta_msr_wait);
 	}
@@ -2447,10 +2449,10 @@ static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 	mcr = edge_port->shadow_mcr;
 	result = ((mcr & MCR_DTR)	? TIOCM_DTR: 0)	  /* 0x002 */
 		  | ((mcr & MCR_RTS)	? TIOCM_RTS: 0)   /* 0x004 */
-		  | ((msr & MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
-		  | ((msr & MSR_CD)	? TIOCM_CAR: 0)   /* 0x040 */
-		  | ((msr & MSR_RI)	? TIOCM_RI:  0)   /* 0x080 */
-		  | ((msr & MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
+		  | ((msr & EDGEPORT_MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
+		  | ((msr & EDGEPORT_MSR_CD)	? TIOCM_CAR: 0)   /* 0x040 */
+		  | ((msr & EDGEPORT_MSR_RI)	? TIOCM_RI:  0)   /* 0x080 */
+		  | ((msr & EDGEPORT_MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
 
 
 	dbg("%s -- %x", __FUNCTION__, result);
@@ -2679,11 +2681,24 @@ static struct usb_serial_device_type edgeport_2port_device = {
 
 static int __init edgeport_init(void)
 {
-	usb_serial_register (&edgeport_1port_device);
-	usb_serial_register (&edgeport_2port_device);
-	usb_register (&io_driver);
+	int retval;
+	retval = usb_serial_register(&edgeport_1port_device);
+	if (retval)
+		goto failed_1port_device_register;
+	retval = usb_serial_register(&edgeport_2port_device);
+	if (retval)
+		goto failed_2port_device_register;
+	retval = usb_register(&io_driver);
+	if (retval) 
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&edgeport_2port_device);
+failed_2port_device_register:
+	usb_serial_deregister(&edgeport_1port_device);
+failed_1port_device_register:
+	return retval;
 }
 
 static void __exit edgeport_exit (void)

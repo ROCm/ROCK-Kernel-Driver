@@ -22,6 +22,9 @@
 #include <linux/signal.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
+#include <linux/adb.h>
+#include <linux/pmu.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>
@@ -506,7 +509,7 @@ pmac_pic_init(void)
 #endif	/* CONFIG_XMON */
 }
 
-#ifdef CONFIG_PMAC_PBOOK
+#ifdef CONFIG_PM
 /*
  * These procedures are used in implementing sleep on the powerbooks.
  * sleep_save_intrs() saves the states of all interrupt enables
@@ -515,9 +518,32 @@ pmac_pic_init(void)
  */
 unsigned long sleep_save_mask[2];
 
-void __pmac
-pmac_sleep_save_intrs(int viaint)
+/* This used to be passed by the PMU driver but that link got
+ * broken with the new driver model. We use this tweak for now...
+ */
+static int pmacpic_find_viaint(void)
 {
+	int viaint = -1;
+	
+#ifdef CONFIG_ADB_PMU
+	struct device_node *np;
+
+	if (pmu_get_model() != PMU_OHARE_BASED)
+		goto not_found;
+	np = of_find_node_by_name(NULL, "via-pmu");
+	if (np == NULL)
+		goto not_found;
+	viaint = np->intrs[0].line;
+#endif /* CONFIG_ADB_PMU */
+
+not_found:
+	return viaint;
+}
+
+static int pmacpic_suspend(struct sys_device *sysdev, u32 state)
+{
+	int viaint = pmacpic_find_viaint();
+	
 	sleep_save_mask[0] = ppc_cached_irq_mask[0];
 	sleep_save_mask[1] = ppc_cached_irq_mask[1];
 	ppc_cached_irq_mask[0] = 0;
@@ -531,10 +557,11 @@ pmac_sleep_save_intrs(int viaint)
 	/* make sure mask gets to controller before we return to caller */
 	mb();
         (void)in_le32(&pmac_irq_hw[0]->enable);
+
+        return 0;
 }
 
-void __pmac
-pmac_sleep_restore_intrs(void)
+static int pmacpic_resume(struct sys_device *sysdev)
 {
 	int i;
 
@@ -545,5 +572,39 @@ pmac_sleep_restore_intrs(void)
 	for (i = 0; i < max_real_irqs; ++i)
 		if (test_bit(i, sleep_save_mask))
 			pmac_unmask_irq(i);
+
+	return 0;
 }
-#endif /* CONFIG_PMAC_PBOOK */
+
+#endif /* CONFIG_PM */
+
+static struct sysdev_class pmacpic_sysclass = {
+	set_kset_name("pmac_pic"),
+};
+
+static struct sys_device device_pmacpic = {
+	.id		= 0,
+	.cls		= &pmacpic_sysclass,
+};
+
+static struct sysdev_driver driver_pmacpic = {
+#ifdef CONFIG_PM
+	.suspend	= &pmacpic_suspend,
+	.resume		= &pmacpic_resume,
+#endif /* CONFIG_PM */	
+};
+
+static int __init init_pmacpic_sysfs(void)
+{
+	if (max_irqs == 0)
+		return -ENODEV;
+
+	printk(KERN_DEBUG "Registering pmac pic with sysfs...\n");
+	sysdev_class_register(&pmacpic_sysclass);
+	sys_device_register(&device_pmacpic);
+	sysdev_driver_register(&pmacpic_sysclass, &driver_pmacpic);
+	return 0;
+}
+
+subsys_initcall(init_pmacpic_sysfs);
+

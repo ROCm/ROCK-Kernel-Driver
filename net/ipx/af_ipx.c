@@ -1365,6 +1365,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			atomic_read(&ipx_sock_nr));
 #endif
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_no_check = 1;		/* Checksum off by default */
 	rc = 0;
 out:
@@ -2020,3 +2021,4 @@ static void __exit ipx_proto_finito(void)
 module_init(ipx_init);
 module_exit(ipx_proto_finito);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_IPX);

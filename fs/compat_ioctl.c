@@ -1573,7 +1573,7 @@ static int vt_check(struct file *file)
 		return -EINVAL;
 	                
 	tty = (struct tty_struct *)file->private_data;
-	if (tty_paranoia_check(tty, inode->i_rdev, "tty_ioctl"))
+	if (tty_paranoia_check(tty, inode, "tty_ioctl"))
 		return -EINVAL;
 	                                                
 	if (tty->driver->ioctl != vt_ioctl)

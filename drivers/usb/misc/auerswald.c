@@ -1380,7 +1380,7 @@ static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp)
 /* Open a new character device */
 static int auerchar_open (struct inode *inode, struct file *file)
 {
-	int dtindex = minor(inode->i_rdev);
+	int dtindex = iminor(inode);
 	pauerswald_t cp = NULL;
 	pauerchar_t ccp = NULL;
 	struct usb_interface *intf;

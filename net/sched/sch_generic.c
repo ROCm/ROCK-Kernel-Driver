@@ -121,7 +121,7 @@ int qdisc_restart(struct net_device *dev)
 					printk(KERN_DEBUG "Dead loop on netdevice %s, fix it urgently!\n", dev->name);
 				return -1;
 			}
-			netdev_rx_stat[smp_processor_id()].cpu_collision++;
+			__get_cpu_var(netdev_rx_stat).cpu_collision++;
 		}
 
 		/* Device kicked us out :(

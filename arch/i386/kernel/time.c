@@ -60,6 +60,8 @@
 #include <linux/timex.h>
 #include <linux/config.h>
 
+#include <asm/hpet.h>
+
 #include <asm/arch_hooks.h>
 
 #include "io_ports.h"
@@ -291,8 +293,38 @@ static int time_init_device(void)
 
 device_initcall(time_init_device);
 
+#ifdef CONFIG_HPET_TIMER
+extern void (*late_time_init)(void);
+/* Duplicate of time_init() below, with hpet_enable part added */
+void __init hpet_time_init(void)
+{
+	xtime.tv_sec = get_cmos_time();
+	wall_to_monotonic.tv_sec = -xtime.tv_sec;
+	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+
+	if (hpet_enable() >= 0) {
+		printk("Using HPET for base-timer\n");
+	}
+
+	cur_timer = select_timer();
+	time_init_hook();
+}
+#endif
+
 void __init time_init(void)
 {
+#ifdef CONFIG_HPET_TIMER
+	if (is_hpet_capable()) {
+		/*
+		 * HPET initialization needs to do memory-mapped io. So, let
+		 * us do a late initialization after mem_init().
+		 */
+		late_time_init = hpet_time_init;
+		return;
+	}
+#endif
+
 	xtime.tv_sec = get_cmos_time();
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);

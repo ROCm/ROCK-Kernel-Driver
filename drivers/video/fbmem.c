@@ -768,7 +768,7 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 
 	if (!info || ! info->screen_base)
@@ -802,7 +802,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	int err;
 
@@ -964,7 +964,7 @@ static int
 fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	 unsigned long arg)
 {
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	struct fb_var_screeninfo var;
@@ -1050,7 +1050,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int 
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
-	int fbidx = minor(file->f_dentry->d_inode->i_rdev);
+	int fbidx = iminor(file->f_dentry->d_inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	unsigned long off;
@@ -1149,7 +1149,7 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 static int
 fb_open(struct inode *inode, struct file *file)
 {
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info;
 	int res = 0;
 
@@ -1174,7 +1174,7 @@ fb_open(struct inode *inode, struct file *file)
 static int 
 fb_release(struct inode *inode, struct file *file)
 {
-	int fbidx = minor(inode->i_rdev);
+	int fbidx = iminor(inode);
 	struct fb_info *info;
 
 	lock_kernel();

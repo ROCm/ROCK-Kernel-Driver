@@ -336,10 +336,8 @@ struct address_space {
 };
 
 struct block_device {
-	struct list_head	bd_hash;
-	atomic_t		bd_count;
-	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
+	struct inode *		bd_inode;	/* will die */
 	int			bd_openers;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
@@ -347,10 +345,11 @@ struct block_device {
 	int			bd_holders;
 	struct block_device *	bd_contains;
 	unsigned		bd_block_size;
-	sector_t		bd_offset;
+	struct hd_struct *	bd_part;
 	unsigned		bd_part_count;
 	int			bd_invalidated;
 	struct gendisk *	bd_disk;
+	struct list_head	bd_list;
 };
 
 /*
@@ -466,6 +465,16 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 #else
 	inode->i_size = i_size;
 #endif
+}
+
+static inline unsigned iminor(struct inode *inode)
+{
+	return minor(inode->i_rdev);
+}
+
+static inline unsigned imajor(struct inode *inode)
+{
+	return major(inode->i_rdev);
 }
 
 struct fown_struct {
@@ -599,6 +608,10 @@ extern int fcntl_setlk(struct file *, unsigned int, struct flock __user *);
 extern int fcntl_getlk64(struct file *, struct flock64 __user *);
 extern int fcntl_setlk64(struct file *, unsigned int, struct flock64 __user *);
 #endif
+
+extern void send_sigio(struct fown_struct *fown, int fd, int band);
+extern int fcntl_setlease(unsigned int fd, struct file *filp, long arg);
+extern int fcntl_getlease(struct file *filp);
 
 /* fs/locks.c */
 extern void locks_init_lock(struct file_lock *);
@@ -1176,6 +1189,12 @@ extern int invalidate_partition(struct gendisk *, int);
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 					pgoff_t start, pgoff_t end);
 unsigned long invalidate_inode_pages(struct address_space *mapping);
+static inline void invalidate_remote_inode(struct inode *inode)
+{
+	if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
+	    S_ISLNK(inode->i_mode))
+		invalidate_inode_pages(inode->i_mapping);
+}
 extern void invalidate_inode_pages2(struct address_space *mapping);
 extern void write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);

@@ -717,12 +717,12 @@ titan_agp_translate(alpha_agp_info *agp, dma_addr_t addr)
 
 struct alpha_agp_ops titan_agp_ops =
 {
-	setup:		titan_agp_setup,
-	cleanup:	titan_agp_cleanup,
-	configure:	titan_agp_configure,
-	bind:		titan_agp_bind_memory,
-	unbind:		titan_agp_unbind_memory,
-	translate:	titan_agp_translate
+	.setup		= titan_agp_setup,
+	.cleanup	= titan_agp_cleanup,
+	.configure	= titan_agp_configure,
+	.bind		= titan_agp_bind_memory,
+	.unbind		= titan_agp_unbind_memory,
+	.translate	= titan_agp_translate
 };
 
 alpha_agp_info *

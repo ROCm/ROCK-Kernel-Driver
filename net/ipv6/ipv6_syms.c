@@ -45,3 +45,4 @@ EXPORT_SYMBOL(ipv6_ext_hdr);
 EXPORT_SYMBOL(ip6_append_data);
 EXPORT_SYMBOL(ip6_flush_pending_frames);
 EXPORT_SYMBOL(ip6_push_pending_frames);
+EXPORT_SYMBOL(ipv6_push_nfrag_opts);

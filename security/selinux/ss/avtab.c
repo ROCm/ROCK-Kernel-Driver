@@ -106,7 +106,7 @@ void avtab_destroy(struct avtab *h)
 		}
 		h->htable[i] = NULL;
 	}
-	kfree(h->htable);
+	vfree(h->htable);
 }
 
 
@@ -138,7 +138,7 @@ int avtab_init(struct avtab *h)
 {
 	int i;
 
-	h->htable = kmalloc(sizeof(*(h->htable)) * AVTAB_SIZE, GFP_KERNEL);
+	h->htable = vmalloc(sizeof(*(h->htable)) * AVTAB_SIZE);
 	if (!h->htable)
 		return -ENOMEM;
 	for (i = 0; i < AVTAB_SIZE; i++)

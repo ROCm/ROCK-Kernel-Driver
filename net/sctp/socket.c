@@ -852,7 +852,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		associd = sinfo->sinfo_assoc_id;
 	}
 
-	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
+	SCTP_DEBUG_PRINTK("msg_len: %d, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
 	/* MSG_EOF or MSG_ABORT cannot be set on a TCP-style socket. */

@@ -30,6 +30,7 @@
 
 /*
  * Copyright (C) 2003 David Brownell
+ * Copyright (C) 2003 NetChip Technologies
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -49,6 +50,7 @@
 #define DEBUG	1
 // #define	VERBOSE		/* extra debug messages (success too) */
 
+#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -76,7 +78,7 @@
 
 
 #define	DRIVER_DESC		"NetChip 2280 USB Peripheral Controller"
-#define	DRIVER_VERSION		"May Day 2003"
+#define	DRIVER_VERSION		"Bastille Day 2003"
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 #define	EP_DONTUSE		13	/* nonzero */
@@ -448,7 +450,7 @@ net2280_alloc_buffer (
 	struct net2280_ep	*ep;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!_ep || (!ep->desc && ep->num != 0))
+	if (!_ep)
 		return 0;
 
 	*dma = DMA_ADDR_INVALID;
@@ -1344,11 +1346,12 @@ show_registers (struct device *_dev, char *buf)
 		s = "(none)";
 
 	/* Main Control Registers */
-	t = snprintf (next, size, "%s " DRIVER_VERSION "\n"
+	t = snprintf (next, size, "%s version " DRIVER_VERSION
+			", chiprev %04x\n"
 			"devinit %03x fifoctl %08x gadget '%s'\n"
 			"pci irqenb0 %02x irqenb1 %08x "
 			"irqstat0 %04x irqstat1 %08x\n",
-			driver_name,
+			driver_name, dev->chiprev,
 			readl (&dev->regs->devinit),
 			readl (&dev->regs->fifoctl),
 			s,
@@ -1393,16 +1396,33 @@ show_registers (struct device *_dev, char *buf)
 			continue;
 
 		t1 = readl (&ep->regs->ep_cfg);
+		t2 = readl (&ep->regs->ep_rsp) & 0xff;
 		t = snprintf (next, size,
-				"%s\tcfg %05x rsp %02x enb %02x ",
-				ep->ep.name, t1,
-				readl (&ep->regs->ep_rsp) & 0xff,
+				"%s\tcfg %05x rsp (%02x) %s%s%s%s%s%s%s%s"
+					"irqenb %02x\n",
+				ep->ep.name, t1, t2,
+				(t2 & (1 << CLEAR_NAK_OUT_PACKETS))
+					? "NAK " : "",
+				(t2 & (1 << CLEAR_EP_HIDE_STATUS_PHASE))
+					? "hide " : "",
+				(t2 & (1 << CLEAR_EP_FORCE_CRC_ERROR))
+					? "CRC " : "",
+				(t2 & (1 << CLEAR_INTERRUPT_MODE))
+					? "interrupt " : "",
+				(t2 & (1<<CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE))
+					? "status " : "",
+				(t2 & (1 << CLEAR_NAK_OUT_PACKETS_MODE))
+					? "NAKmode " : "",
+				(t2 & (1 << CLEAR_ENDPOINT_TOGGLE))
+					? "DATA1 " : "DATA0 ",
+				(t2 & (1 << CLEAR_ENDPOINT_HALT))
+					? "HALT " : "",
 				readl (&ep->regs->ep_irqenb));
 		size -= t;
 		next += t;
 
 		t = snprintf (next, size,
-				"stat %08x avail %04x "
+				"\tstat %08x avail %04x "
 				"(ep%d%s-%s)%s\n",
 				readl (&ep->regs->ep_stat),
 				readl (&ep->regs->ep_avail),
@@ -1796,6 +1816,7 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 		dev->ep [i].irqs = 0;
 
 	/* hook up the driver ... */
+	driver->driver.bus = 0;
 	dev->driver = driver;
 	dev->gadget.dev.driver = &driver->driver;
 	retval = driver->bind (&dev->gadget);
@@ -1806,10 +1827,6 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 		dev->gadget.dev.driver = 0;
 		return retval;
 	}
-
-	// FIXME
-	// driver_register (&driver->driver);
-	// device_register (&dev->gadget.dev);
 
 	device_create_file (&dev->pdev->dev, &dev_attr_function);
 	device_create_file (&dev->pdev->dev, &dev_attr_queues);
@@ -1876,10 +1893,6 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 	net2280_led_active (dev, 0);
 	device_remove_file (&dev->pdev->dev, &dev_attr_function);
 	device_remove_file (&dev->pdev->dev, &dev_attr_queues);
-
-	// FIXME
-	// device_unregister()
-	// driver_unregister (&driver->driver);
 
 	DEBUG (dev, "unregistered driver '%s'\n", driver->driver.name);
 	return 0;
@@ -2049,9 +2062,9 @@ static void handle_ep_small (struct net2280_ep *ep)
 
 		/* maybe advance queue to next request */
 		if (ep->num == 0) {
-			/* FIXME need mechanism (request flag?) so control OUT
-			 * can decide to stall ep0 after that done() returns,
-			 * from non-irq context
+			/* NOTE:  net2280 could let gadget driver start the
+			 * status stage later. since not all controllers let
+			 * them control that, the api doesn't (yet) allow it.
 			 */
 			if (!ep->stopped)
 				allow_status (ep);
@@ -2174,6 +2187,8 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 
 		/* watch control traffic at the token level, and force
 		 * synchronization before letting the status stage happen.
+		 * FIXME ignore tokens we'll NAK, until driver responds.
+		 * that'll mean a lot less irqs for some drivers.
 		 */
 		ep->is_in = (u.r.bRequestType & USB_DIR_IN) != 0;
 		if (ep->is_in)
@@ -2417,6 +2432,28 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 			if ((tmp & (1 << DMA_SCATTER_GATHER_ENABLE)) == 0
 					|| (tmp & (1 << DMA_ENABLE)) == 0)
 				restart_dma (ep);
+#ifdef USE_DMA_CHAINING
+			else if (ep->desc->bEndpointAddress & USB_DIR_IN) {
+				struct net2280_request	*req;
+				u32			dmacount;
+
+				/* the descriptor at the head of the chain
+				 * may still have VALID_BIT clear; that's
+				 * used to trigger changing DMA_FIFO_VALIDATE
+				 * (affects automagic zlp writes).
+				 */
+				req = list_entry (ep->queue.next,
+						struct net2280_request, queue);
+				dmacount = req->td->dmacount;
+				dmacount &= __constant_cpu_to_le32 (
+						(1 << VALID_BIT)
+						| DMA_BYTE_COUNT_MASK);
+				if (dmacount && (dmacount & valid_bit) == 0) {
+					stop_dma (ep->dma);
+					restart_dma (ep);
+				}
+			}
+#endif
 		}
 		ep->irqs++;
 	}
@@ -2458,6 +2495,13 @@ static irqreturn_t net2280_irq (int irq, void *_dev, struct pt_regs * r)
 
 /*-------------------------------------------------------------------------*/
 
+static void gadget_release (struct device *_dev)
+{
+	struct net2280	*dev = dev_get_drvdata (_dev);
+
+	kfree (dev);
+}
+
 /* tear down the binding between this driver and the pci device */
 
 static void net2280_remove (struct pci_dev *pdev)
@@ -2493,12 +2537,12 @@ static void net2280_remove (struct pci_dev *pdev)
 				pci_resource_len (pdev, 0));
 	if (dev->enabled)
 		pci_disable_device (pdev);
+	device_unregister (&dev->gadget.dev);
 	device_remove_file (&pdev->dev, &dev_attr_registers);
 	pci_set_drvdata (pdev, 0);
 
-	INFO (dev, "unbind from pci %s\n", pci_name(pdev));
+	INFO (dev, "unbind\n");
 
-	kfree (dev);
 	the_controller = 0;
 }
 
@@ -2518,7 +2562,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	 * usb_gadget_driver_{register,unregister}() must change.
 	 */
 	if (the_controller) {
-		WARN (the_controller, "ignoring %s\n", pci_name(pdev));
+		dev_warn (&pdev->dev, "ignoring\n");
 		return -EBUSY;
 	}
 
@@ -2534,9 +2578,11 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->pdev = pdev;
 	dev->gadget.ops = &net2280_ops;
 
-	strcpy (dev->gadget.dev.bus_id, pci_name(pdev));
+	/* the "gadget" abstracts/virtualizes the controller */
+	strcpy (dev->gadget.dev.bus_id, "gadget");
 	dev->gadget.dev.parent = &pdev->dev;
 	dev->gadget.dev.dma_mask = pdev->dev.dma_mask;
+	dev->gadget.dev.release = gadget_release;
 	dev->gadget.name = driver_name;
 
 	/* now all the pci goodies ... */
@@ -2650,6 +2696,7 @@ static int net2280_probe (struct pci_dev *pdev, const struct pci_device_id *id)
 	INFO (dev, "version: %s\n", bufp);
 	the_controller = dev;
 
+	device_register (&dev->gadget.dev);
 	device_create_file (&pdev->dev, &dev_attr_registers);
 
 	return 0;

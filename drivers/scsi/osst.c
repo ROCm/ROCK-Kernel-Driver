@@ -132,9 +132,9 @@ static int debugging = 1;
 #define OSST_TIMEOUT (200 * HZ)
 #define OSST_LONG_TIMEOUT (1800 * HZ)
 
-#define TAPE_NR(x) (minor(x) & ~(-1 << ST_MODE_SHIFT))
-#define TAPE_MODE(x) ((minor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
-#define TAPE_REWIND(x) ((minor(x) & 0x80) == 0)
+#define TAPE_NR(x) (iminor(x) & ~(-1 << ST_MODE_SHIFT))
+#define TAPE_MODE(x) ((iminor(x) & ST_MODE_MASK) >> ST_MODE_SHIFT)
+#define TAPE_REWIND(x) ((iminor(x) & 0x80) == 0)
 #define TAPE_IS_RAW(x) (TAPE_MODE(x) & (ST_NBR_MODES >> 1))
 
 /* Internal ioctl to set both density (uppermost 8 bits) and blocksize (lower
@@ -4215,8 +4215,8 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	ST_mode      * STm;
 	ST_partstat  * STps;
 	char         * name;
-	int            dev  = TAPE_NR(inode->i_rdev);
-	int            mode = TAPE_MODE(inode->i_rdev);
+	int            dev  = TAPE_NR(inode);
+	int            mode = TAPE_MODE(inode);
 
 	write_lock(&os_scsi_tapes_lock);
 	if (dev >= osst_max_dev || os_scsi_tapes == NULL ||
@@ -4244,7 +4244,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	filp->private_data = STp;
 	STp->in_use = 1;
 	write_unlock(&os_scsi_tapes_lock);
-	STp->rew_at_close = TAPE_REWIND(inode->i_rdev);
+	STp->rew_at_close = TAPE_REWIND(inode);
 
 	if( !scsi_block_when_processing_errors(STp->device) ) {
 		return -ENXIO;
@@ -4264,7 +4264,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	flags = filp->f_flags;
 	STp->write_prot = ((flags & O_ACCMODE) == O_RDONLY);
 
-	STp->raw = TAPE_IS_RAW(inode->i_rdev);
+	STp->raw = TAPE_IS_RAW(inode);
 	if (STp->raw)
 		STp->header_ok = 0;
 

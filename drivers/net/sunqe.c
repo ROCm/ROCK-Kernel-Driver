@@ -4,11 +4,11 @@
  *          controller out there can be most efficiently programmed
  *          if you make it look like a LANCE.
  *
- * Copyright (C) 1996, 1999 David S. Miller (davem@redhat.com)
+ * Copyright (C) 1996, 1999, 2003 David S. Miller (davem@redhat.com)
  */
 
 static char version[] =
-        "sunqe.c:v2.9 9/11/99 David S. Miller (davem@redhat.com)\n";
+        "sunqe.c:v3.0 8/24/03 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -26,6 +26,7 @@ static char version[] =
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -684,6 +685,35 @@ static void qe_set_multicast(struct net_device *dev)
 	netif_wake_queue(dev);
 }
 
+/* Ethtool support... */
+static void qe_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct sunqe *qep = dev->priv;
+
+	strcpy(info->driver, "sunqe");
+	strcpy(info->version, "3.0");
+	sprintf(info->bus_info, "SBUS:%d",
+		qep->qe_sdev->slot);
+}
+
+static u32 qe_get_link(struct net_device *dev)
+{
+	struct sunqe *qep = dev->priv;
+	unsigned long mregs = qep->mregs;
+	u8 phyconfig;
+
+	spin_lock_irq(&qep->lock);
+	phyconfig = sbus_readb(mregs + MREGS_PHYCONFIG);
+	spin_unlock_irq(&qep->lock);
+
+	return (phyconfig & MREGS_PHYCONFIG_LSTAT);
+}
+
+static struct ethtool_ops qe_ethtool_ops = {
+	.get_drvinfo		= qe_get_drvinfo,
+	.get_link		= qe_get_link,
+};
+
 /* This is only called once at boot time for each card probed. */
 static inline void qec_init_once(struct sunqec *qecp, struct sbus_dev *qsdev)
 {
@@ -850,6 +880,7 @@ static int __init qec_ether_init(struct net_device *dev, struct sbus_dev *sdev)
 		qe_devs[i]->watchdog_timeo = 5*HZ;
 		qe_devs[i]->irq = sdev->irqs[0];
 		qe_devs[i]->dma = 0;
+		qe_devs[i]->ethtool_ops = &qe_ethtool_ops;
 	}
 
 	/* QEC receives interrupts from each QE, then it sends the actual

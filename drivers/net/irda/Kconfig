@@ -256,7 +256,7 @@ config WINBOND_FIR
 
 config TOSHIBA_OLD
 	tristate "Toshiba Type-O IR Port (old driver)"
-	depends on IRDA
+	depends on IRDA && BROKEN_ON_SMP
 	help
 	  Say Y here if you want to build support for the Toshiba Type-O IR
 	  chipset.  This chipset is used by the Toshiba Libretto 100CT, and
@@ -319,7 +319,7 @@ config ALI_FIR
 
 config VLSI_FIR
 	tristate "VLSI 82C147 SIR/MIR/FIR (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IRDA
+	depends on EXPERIMENTAL && IRDA && PCI
 	help
 	  Say Y here if you want to build support for the VLSI 82C147
 	  PCI-IrDA Controller. This controller is used by the HP OmniBook 800

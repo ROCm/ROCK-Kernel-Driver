@@ -105,6 +105,9 @@ static int ray_dev_config(struct net_device *dev, struct ifmap *map);
 static struct net_device_stats *ray_get_stats(struct net_device *dev);
 static int ray_dev_init(struct net_device *dev);
 static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
+
+static struct ethtool_ops netdev_ethtool_ops;
+
 static int ray_open(struct net_device *dev);
 static int ray_dev_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
@@ -408,6 +411,7 @@ static dev_link_t *ray_attach(void)
     dev->set_config = &ray_dev_config;
     dev->get_stats  = &ray_get_stats;
     dev->do_ioctl = &ray_dev_ioctl;
+    SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 #if WIRELESS_EXT > 7	/* If wireless extension exist in the kernel */
     dev->get_wireless_stats = ray_get_wireless_stats;
 #endif
@@ -1226,25 +1230,15 @@ AP to AP        1    1        dest AP    src AP          dest     source
 
 /*===========================================================================*/
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-	
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "ray_cs", sizeof(info.driver)-1);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, "ray_cs");
 }
+
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+};
 
 /*====================================================================*/
 
@@ -1265,10 +1259,6 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
     /* Validate the command */
     switch (cmd)
     {
-    case SIOCETHTOOL:
-      err = netdev_ethtool_ioctl(dev, (void *) ifr->ifr_data);
-      break;
-
 #if WIRELESS_EXT > 7
       /* --------------- WIRELESS EXTENSIONS --------------- */
       /* Get name */

@@ -215,7 +215,7 @@ static int dsp_rec_stop(struct saa7134_dev *dev)
 
 static int dsp_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct saa7134_dev *h,*dev = NULL;
 	struct list_head *list;
 	int err;
@@ -598,7 +598,7 @@ mixer_level(struct saa7134_dev *dev, enum saa7134_audio_in src, int level)
 
 static int mixer_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct saa7134_dev *h,*dev = NULL;
 	struct list_head *list;
 

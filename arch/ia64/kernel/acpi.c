@@ -130,7 +130,7 @@ acpi_request_vector (u32 int_type)
 	int vector = -1;
 
 	if (int_type < ACPI_MAX_PLATFORM_INTERRUPTS) {
-		/* correctable platform error interrupt */
+		/* corrected platform error interrupt */
 		vector = platform_intr_list[int_type];
 	} else
 		printk(KERN_ERR "acpi_request_vector(): invalid interrupt type\n");
