@@ -161,7 +161,7 @@ ifneq ($(wildcard $(srctree)/rpm-release),)
 RPM_RELEASE := -$(shell cat $(srctree)/rpm-release)
 endif
 
-KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(RPM_RELEASE)$(EXTRAVERSION)$(LOCALVERSION)
+KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(RPM_RELEASE)$(LOCALVERSION)
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
