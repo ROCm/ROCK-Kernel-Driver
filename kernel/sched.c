@@ -1962,7 +1962,7 @@ int idle_cpu(int cpu)
 	return cpu_curr(cpu) == cpu_rq(cpu)->idle;
 }
 
-EXPORT_SYMBOL(idle_cpu);
+EXPORT_SYMBOL_GPL(idle_cpu);
 
 /**
  * find_process_by_pid - find a process with a matching PID value.

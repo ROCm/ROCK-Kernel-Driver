@@ -265,7 +265,6 @@ EXPORT_SYMBOL(iomem_resource);
 /* process management */
 EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(schedule_timeout);
-EXPORT_SYMBOL_GPL(idle_cpu);
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 EXPORT_SYMBOL(kernel_flag);
 #endif
