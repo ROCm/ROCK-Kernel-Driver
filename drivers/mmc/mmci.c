@@ -197,6 +197,7 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 
 	do {
 		unsigned long flags;
+		unsigned int bio_remain;
 		char *buffer;
 
 		/*
@@ -208,23 +209,44 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 		/*
 		 * Map the BIO buffer.
 		 */
-		buffer = bio_kmap_irq(req->bio, &flags);
+		buffer = bio_kmap_irq(req->cbio, &flags);
+		bio_remain = (req->current_nr_sectors << 9) - host->offset;
 
 		do {
 			int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
+
+			if (count > bio_remain)
+				count = bio_remain;
 
 			if (count > 0) {
 				ret = 1;
 				readsl(base + MMCIFIFO, buffer + host->offset, count >> 2);
 				host->offset += count;
 				host->size -= count;
+				bio_remain -= count;
+				if (bio_remain == 0)
+					goto next_bio;
 			}
 
 			status = readl(base + MMCISTATUS);
-		} while (status & MCI_RXDATAAVLBL && host->size);
+		} while (status & MCI_RXDATAAVLBL);
 
 		bio_kunmap_irq(buffer, &flags);
 		break;
+
+	 next_bio:
+		bio_kunmap_irq(buffer, &flags);
+
+		/*
+		 * Ok, we've completed that BIO, move on to next
+		 * BIO in the chain.  Note: this doesn't actually
+		 * complete the BIO!
+		 */
+		if (!process_that_request_first(req, req->current_nr_sectors))
+			break;
+
+		host->offset = 0;
+		status = readl(base + MMCISTATUS);
 	} while (1);
 
 	return ret;
@@ -237,6 +259,7 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 
 	do {
 		unsigned long flags;
+		unsigned int bio_remain;
 		char *buffer;
 
 		/*
@@ -250,26 +273,45 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 		/*
 		 * Map the BIO buffer.
 		 */
-		buffer = bio_kmap_irq(req->bio, &flags);
+		buffer = bio_kmap_irq(req->cbio, &flags);
+		bio_remain = (req->current_nr_sectors << 9) - host->offset;
 
 		do {
 			unsigned int count, maxcnt;
 
 			maxcnt = status & MCI_TXFIFOEMPTY ?
 				 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
-			count = min(host->size, maxcnt);
+			count = min(bio_remain, maxcnt);
 
 			writesl(base + MMCIFIFO, buffer + host->offset, count >> 2);
 			host->offset += count;
 			host->size -= count;
+			bio_remain -= count;
 
 			ret = 1;
 
+			if (bio_remain == 0)
+				goto next_bio;
+
 			status = readl(base + MMCISTATUS);
-		} while (status & MCI_TXFIFOHALFEMPTY && host->size);
+		} while (status & MCI_TXFIFOHALFEMPTY);
 
 		bio_kunmap_irq(buffer, &flags);
 		break;
+
+	 next_bio:
+		bio_kunmap_irq(buffer, &flags);
+
+		/*
+		 * Ok, we've completed that BIO, move on to next
+		 * BIO in the chain.  Note: this doesn't actually
+		 * complete the BIO!
+		 */
+		if (!process_that_request_first(req, req->current_nr_sectors))
+			break;
+
+		host->offset = 0;
+		status = readl(base + MMCISTATUS);
 	} while (1);
 
 	return ret;
@@ -482,6 +524,25 @@ static int mmci_probe(struct amba_device *dev, void *id)
 	mmc->f_min = (host->mclk + 511) / 512;
 	mmc->f_max = min(host->mclk, fmax);
 	mmc->ocr_avail = plat->ocr_mask;
+
+	/*
+	 * We can do SGIO
+	 */
+	mmc->max_hw_segs = 16;
+	mmc->max_phys_segs = 16;
+
+	/*
+	 * Since we only have a 16-bit data length register, we must
+	 * ensure that we don't exceed 2^16-1 bytes in a single request.
+	 * Choose 64 (512-byte) sectors as the limit.
+	 */
+	mmc->max_sectors = 64;
+
+	/*
+	 * Set the maximum segment size.  Since we aren't doing DMA
+	 * (yet) we are only limited by the data length register.
+	 */
+	mmc->max_seg_size = mmc->max_sectors << 9;
 
 	spin_lock_init(&host->lock);
 
