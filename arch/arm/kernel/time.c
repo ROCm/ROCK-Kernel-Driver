@@ -116,7 +116,7 @@ static inline void do_set_rtc(void)
 		return;
 
 	if (next_rtc_update &&
-	    time_before(xtime.tv_sec, next_rtc_update))
+	    time_before((unsigned long)xtime.tv_sec, next_rtc_update))
 		return;
 
 	if (xtime.tv_nsec < 500000000 - ((unsigned) tick_nsec >> 1) &&

@@ -159,9 +159,14 @@ static struct resource sa11x0mcp_resources[] = {
 	},
 };
 
+static u64 sa11x0mcp_dma_mask = 0xffffffffUL;
+
 static struct platform_device sa11x0mcp_device = {
 	.name		= "sa11x0-mcp",
 	.id		= 0,
+	.dev = {
+		.dma_mask = &sa11x0mcp_dma_mask,
+	},
 	.num_resources	= ARRAY_SIZE(sa11x0mcp_resources),
 	.resource	= sa11x0mcp_resources,
 };
