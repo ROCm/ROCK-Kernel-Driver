@@ -770,7 +770,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct sctp_endpoint *ep;
 	struct sctp_association *new_asoc=NULL, *asoc=NULL;
 	struct sctp_transport *transport, *chunk_tp;
-	struct sctp_chunk *chunk = NULL;
+	struct sctp_chunk *chunk;
 	union sctp_addr to;
 	struct sockaddr *msg_name = NULL;
 	struct sctp_sndrcvinfo default_sinfo = { 0 };
@@ -1066,19 +1066,19 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	} else
 		chunk_tp = NULL;
 
-	/* Break the message into multiple chunks of maximum size. */
-	datamsg = sctp_datamsg_from_user(asoc, sinfo, msg, msg_len);
-	if (!datamsg) {
-		err = -ENOMEM;
-		goto out_free;
-	}
-
 	/* Auto-connect, if we aren't connected already. */
 	if (SCTP_STATE_CLOSED == asoc->state) {
 		err = sctp_primitive_ASSOCIATE(asoc, NULL);
 		if (err < 0)
 			goto out_free;
 		SCTP_DEBUG_PRINTK("We associated primitively.\n");
+	}
+
+	/* Break the message into multiple chunks of maximum size. */
+	datamsg = sctp_datamsg_from_user(asoc, sinfo, msg, msg_len);
+	if (!datamsg) {
+		err = -ENOMEM;
+		goto out_free;
 	}
 
 	/* Now send the (possibly) fragmented message. */
@@ -1096,25 +1096,16 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		SCTP_DEBUG_PRINTK("We sent primitively.\n");
 	}
 	sctp_datamsg_free(datamsg);
+	err = msg_len;
 
-	if (!err) {
-		err = msg_len;
-		goto out_unlock;
-	}
 	/* If we are already past ASSOCIATE, the lower
 	 * layers are responsible for association cleanup.
 	 */
-	goto out_free_chunk;
+	goto out_unlock;
 
 out_free:
 	if (new_asoc)
 		sctp_association_free(asoc);
-
-out_free_chunk:
-	/* The datamsg struct will auto-destruct via ref counting. */
-	if (chunk)
-		sctp_chunk_free(chunk);
-
 out_unlock:
 	sctp_release_sock(sk);
 
