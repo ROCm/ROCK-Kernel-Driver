@@ -1,7 +1,7 @@
 /**
  * dir.c - NTFS kernel directory operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -200,7 +200,8 @@ found_it:
 						"and if that doesn't find any "
 						"errors please report you saw "
 						"this message to "
-						"linux-ntfs-dev@lists.sf.net.");
+						"linux-ntfs-dev@lists."
+						"sourceforge.net.");
 				goto dir_err_out;
 			}
 
@@ -457,7 +458,8 @@ found_it2:
 						"and if that doesn't find any "
 						"errors please report you saw "
 						"this message to "
-						"linux-ntfs-dev@lists.sf.net.");
+						"linux-ntfs-dev@lists."
+						"sourceforge.net.");
 				ntfs_unmap_page(page);
 				goto dir_err_out;
 			}
