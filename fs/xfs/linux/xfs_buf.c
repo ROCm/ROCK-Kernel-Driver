@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1202,7 +1202,7 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 	page_buf_t		*pb,	/* buffer to start		  */
 	page_buf_flags_t	flags)	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
 					/* PBF_WRITE, PBF_DELWRI,	  */
-					/* PBF_SYNC, PBF_DONT_BLOCK	  */
+					/* PBF_DONT_BLOCK		  */
 {
 	int			status = 0;
 
@@ -1210,16 +1210,15 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 
 	if (flags & PBF_DELWRI) {
 		pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC);
-		pb->pb_flags |= flags &
-				(PBF_DELWRI | PBF_ASYNC | PBF_SYNC);
+		pb->pb_flags |= flags & (PBF_DELWRI | PBF_ASYNC);
 		pagebuf_delwri_queue(pb, 1);
 		return status;
 	}
 
-	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | \
-			PBF_DELWRI | PBF_READ_AHEAD | PBF_RUN_QUEUES);
+	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_DELWRI | \
+			PBF_READ_AHEAD | PBF_RUN_QUEUES);
 	pb->pb_flags |= flags & (PBF_READ | PBF_WRITE | PBF_ASYNC | \
-			PBF_SYNC | PBF_READ_AHEAD | PBF_RUN_QUEUES);
+			PBF_READ_AHEAD | PBF_RUN_QUEUES);
 
 	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
