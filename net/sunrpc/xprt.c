@@ -448,7 +448,10 @@ xprt_init_autodisconnect(unsigned long data)
 		goto out_abort;
 	spin_unlock(&xprt->sock_lock);
 	/* Let keventd close the socket */
-	schedule_work(&xprt->task_cleanup);
+	if (test_bit(XPRT_CONNECTING, &xprt->sockstate) != 0)
+		xprt_release_write(xprt, NULL);
+	else
+		schedule_work(&xprt->task_cleanup);
 	return;
 out_abort:
 	spin_unlock(&xprt->sock_lock);
@@ -460,12 +463,8 @@ static void xprt_socket_connect(void *args)
 	struct socket *sock = xprt->sock;
 	int status = -EIO;
 
-	if (xprt->shutdown) {
-		rpc_wake_up_status(&xprt->pending, -EIO);
-		return;
-	}
-	if (!xprt->addr.sin_port)
-		goto out_err;
+	if (xprt->shutdown || xprt->addr.sin_port == 0)
+		goto out;
 
 	/*
 	 * Start by resetting any existing state
@@ -475,12 +474,12 @@ static void xprt_socket_connect(void *args)
 	if (sock == NULL) {
 		/* couldn't create socket or bind to reserved port;
 		 * this is likely a permanent error, so cause an abort */
-		goto out_err;
-		return;
+		goto out;
 	}
 	xprt_bind_socket(xprt, sock);
 	xprt_sock_setbufsize(xprt);
 
+	status = 0;
 	if (!xprt->stream)
 		goto out;
 
@@ -491,29 +490,22 @@ static void xprt_socket_connect(void *args)
 			sizeof(xprt->addr), O_NONBLOCK);
 	dprintk("RPC: %p  connect status %d connected %d sock state %d\n",
 			xprt, -status, xprt_connected(xprt), sock->sk->sk_state);
-	if (status >= 0)
-		goto out;
-	switch (status) {
-		case -EINPROGRESS:
-		case -EALREADY:
-			return;
-		default:
-			goto out_err;
+	if (status < 0) {
+		switch (status) {
+			case -EINPROGRESS:
+			case -EALREADY:
+				goto out_clear;
+		}
 	}
 out:
-	spin_lock_bh(&xprt->sock_lock);
-	if (xprt->snd_task)
-		rpc_wake_up_task(xprt->snd_task);
-	spin_unlock_bh(&xprt->sock_lock);
-	return;
-out_err:
-	spin_lock_bh(&xprt->sock_lock);
-	if (xprt->snd_task) {
-		xprt->snd_task->tk_status = status;
-		rpc_wake_up_task(xprt->snd_task);
-	} else
-		rpc_wake_up_status(&xprt->pending, -ENOTCONN);
-	spin_unlock_bh(&xprt->sock_lock);
+	if (status < 0)
+		rpc_wake_up_status(&xprt->pending, status);
+	else
+		rpc_wake_up(&xprt->pending);
+out_clear:
+	smp_mb__before_clear_bit();
+	clear_bit(XPRT_CONNECTING, &xprt->sockstate);
+	smp_mb__after_clear_bit();
 }
 
 /*
@@ -545,7 +537,8 @@ void xprt_connect(struct rpc_task *task)
 
 	task->tk_timeout = RPC_CONNECT_TIMEOUT;
 	rpc_sleep_on(&xprt->pending, task, xprt_connect_status, NULL);
-	schedule_work(&xprt->sock_connect);
+	if (!test_and_set_bit(XPRT_CONNECTING, &xprt->sockstate))
+		schedule_work(&xprt->sock_connect);
 	return;
  out_write:
 	xprt_release_write(xprt, task);
@@ -1027,9 +1020,6 @@ tcp_state_change(struct sock *sk)
 			xprt->tcp_reclen = 0;
 			xprt->tcp_copied = 0;
 			xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
-
-			if (xprt->snd_task)
-				rpc_wake_up_task(xprt->snd_task);
 			rpc_wake_up(&xprt->pending);
 		}
 		spin_unlock_bh(&xprt->sock_lock);
@@ -1038,7 +1028,8 @@ tcp_state_change(struct sock *sk)
 	case TCP_SYN_RECV:
 		break;
 	default:
-		xprt_disconnect(xprt);
+		if (xprt_test_and_clear_connected(xprt))
+			rpc_wake_up_status(&xprt->pending, -ENOTCONN);
 		break;
 	}
  out:
