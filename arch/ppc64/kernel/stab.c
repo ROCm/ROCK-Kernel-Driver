@@ -346,7 +346,12 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
 	if (cpu_has_slb()) {
-		if (!STAB_PRESSURE && test_thread_flag(TIF_32BIT)) {
+		/*
+		 * XXX disable 32bit slb invalidate optimisation until we fix
+		 * the issue where a 32bit app execed out of a 64bit app can
+		 * cause segments above 4GB not to be flushed - Anton
+		 */
+		if (0 && !STAB_PRESSURE && test_thread_flag(TIF_32BIT)) {
 			union {
 				unsigned long word0;
 				slb_dword0 data;
