@@ -137,6 +137,46 @@ cifs_open(struct inode *inode, struct file *file)
 	return rc;
 }
 
+/* Try to reaquire byte range locks that were released when session */
+/* to server was lost */
+int relock_files(struct cifsFileInfo * cifsFile)
+{
+	int rc = 0;
+
+/* list all locks open on this file */
+	return rc;
+}
+
+/* Try to reopen files that were closed when session to server was lost */
+int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
+{
+	int rc = 0;
+	struct cifsFileInfo *open_file = NULL;
+	struct list_head *tmp;
+
+/* list all files open on tree connection */
+	list_for_each(tmp, &pTcon->openFileList) {            
+		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		if(open_file)
+			if(open_file->pfile) {
+				if(open_file->pfile->private_data) {
+					kfree(open_file->pfile->private_data);
+				}
+				rc = cifs_open(open_file->pfile->f_dentry->d_inode,
+						  open_file->pfile);
+				if(rc) {
+					cFYI(1,("reconnecting file %s failed with %d",
+							open_file->pfile->f_dentry->d_name.name,rc));
+				} else {
+					cFYI(1,("reconnection of %s succeeded",
+							open_file->pfile->f_dentry->d_name.name));
+				}
+			}
+	}
+
+	return rc;
+}
+
 int
 cifs_close(struct inode *inode, struct file *file)
 {

@@ -1,3 +1,10 @@
+Version 0.66
+------------
+Reconnect tids and fids after session reconnection (still do not
+reconnect byte range locks though).  Fix problem caching
+lookup information for directory inodes, improving performance,
+especially in deep directory trees.  Fix various build warnings.
+
 Version 0.65
 ------------
 Finish fixes to commit write for caching/readahead consistency.  fsx 

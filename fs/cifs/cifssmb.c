@@ -59,6 +59,8 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
 					nls_codepage);
 				cFYI(1, ("reconnect tcon rc = %d", rc));
+				if(!rc)
+					reopen_files(tcon,nls_codepage);
 			}
 		}
 	}
