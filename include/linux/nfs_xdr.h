@@ -611,6 +611,13 @@ struct nfs4_statfs_arg {
 	const u32 *			bitmask;
 };
 
+struct nfs4_server_caps_res {
+	u32				attr_bitmask[2];
+	u32				acl_bitmask;
+	u32				has_links;
+	u32				has_symlinks;
+};
+
 #endif /* CONFIG_NFS_V4 */
 
 struct nfs_page;

@@ -204,7 +204,7 @@ nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 		.share_access = state->state,
 		.clientid = server->nfs4_state->cl_clientid,
 		.claim = NFS4_OPEN_CLAIM_PREVIOUS,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs_openres o_res = {
 		.f_attr = &fattr,
@@ -248,7 +248,7 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 		.createmode     = (flags & O_EXCL) ? NFS4_CREATE_EXCLUSIVE : NFS4_CREATE_UNCHECKED,
 		.name           = name,
 		.server         = server,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs_openres o_res = {
 		.f_attr         = &f_attr,
@@ -370,7 +370,7 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 .fh             = fhandle,
                 .iap            = sattr,
 		.server		= server,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
         };
         struct nfs_setattrres  res = {
 		.fattr		= fattr,
@@ -517,6 +517,31 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 	return 0;
 }
 
+
+static int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fhandle)
+{
+	struct nfs4_server_caps_res res = {};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_SERVER_CAPS],
+		.rpc_argp = fhandle,
+		.rpc_resp = &res,
+	};
+	int status;
+
+	status = rpc_call_sync(server->client, &msg, 0);
+	if (status == 0) {
+		memcpy(server->attr_bitmask, res.attr_bitmask, sizeof(server->attr_bitmask));
+		if (res.attr_bitmask[0] & FATTR4_WORD0_ACL)
+			server->caps |= NFS_CAP_ACLS;
+		if (res.has_links != 0)
+			server->caps |= NFS_CAP_HARDLINKS;
+		if (res.has_symlinks != 0)
+			server->caps |= NFS_CAP_SYMLINKS;
+		server->acl_bitmask = res.acl_bitmask;
+	}
+	return status;
+}
+
 static int nfs4_lookup_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		struct nfs_fsinfo *info)
 {
@@ -592,6 +617,8 @@ static int nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		break;
 	}
 	if (status == 0)
+		status = nfs4_server_capabilities(server, fhandle);
+	if (status == 0)
 		status = nfs4_do_fsinfo(server, fhandle, info);
 out:
 	return nfs4_map_errors(status);
@@ -599,13 +626,14 @@ out:
 
 static int nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 {
+	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs4_getattr_arg args = {
 		.fh = NFS_FH(inode),
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_getattr_res res = {
 		.fattr = fattr,
-		.server = NFS_SERVER(inode),
+		.server = server,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GETATTR],
@@ -681,13 +709,14 @@ static int nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	int		       status;
+	struct nfs_server *server = NFS_SERVER(dir);
 	struct nfs4_lookup_arg args = {
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 		.dir_fh = NFS_FH(dir),
 		.name = name,
 	};
 	struct nfs4_lookup_res res = {
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.fattr = fattr,
 		.fh = fhandle,
 	};
@@ -1046,16 +1075,17 @@ static int nfs4_proc_symlink(struct inode *dir, struct qstr *name,
 		struct qstr *path, struct iattr *sattr, struct nfs_fh *fhandle,
 		struct nfs_fattr *fattr)
 {
+	struct nfs_server *server = NFS_SERVER(dir);
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.name = name,
 		.attrs = sattr,
 		.ftype = NF4LNK,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_create_res res = {
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.fh = fhandle,
 		.fattr = fattr,
 	};
@@ -1079,16 +1109,17 @@ static int nfs4_proc_mkdir(struct inode *dir, struct qstr *name,
 		struct iattr *sattr, struct nfs_fh *fhandle,
 		struct nfs_fattr *fattr)
 {
+	struct nfs_server *server = NFS_SERVER(dir);
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.name = name,
 		.attrs = sattr,
 		.ftype = NF4DIR,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_create_res res = {
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.fh = fhandle,
 		.fattr = fattr,
 	};
@@ -1140,15 +1171,16 @@ static int nfs4_proc_mknod(struct inode *dir, struct qstr *name,
 		struct iattr *sattr, dev_t rdev, struct nfs_fh *fh,
 		struct nfs_fattr *fattr)
 {
+	struct nfs_server *server = NFS_SERVER(dir);
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.name = name,
 		.attrs = sattr,
-		.bitmask = nfs4_fattr_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_create_res res = {
-		.server = NFS_SERVER(dir),
+		.server = server,
 		.fh = fh,
 		.fattr = fattr,
 	};
@@ -1190,7 +1222,7 @@ static int nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_statfs_arg args = {
 		.fh = fhandle,
-		.bitmask = nfs4_statfs_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_STATFS],
@@ -1207,7 +1239,7 @@ static int nfs4_do_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_fsinfo_arg args = {
 		.fh = fhandle,
-		.bitmask = nfs4_fsinfo_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_FSINFO],
@@ -1229,13 +1261,19 @@ static int nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 {
 	struct nfs4_pathconf_arg args = {
 		.fh = fhandle,
-		.bitmask = nfs4_pathconf_bitmap,
+		.bitmask = server->attr_bitmask,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PATHCONF],
 		.rpc_argp = &args,
 		.rpc_resp = pathconf,
 	};
+
+	/* None of the pathconf attributes are mandatory to implement */
+	if ((args.bitmask[0] & nfs4_pathconf_bitmap[0]) == 0) {
+		memset(pathconf, 0, sizeof(*pathconf));
+		return 0;
+	}
 
 	pathconf->fattr->valid = 0;
 	return nfs4_map_errors(rpc_call_sync(server->client, &msg, 0));

@@ -47,6 +47,11 @@
 #define NFS4_ACE_SYSTEM_AUDIT_ACE_TYPE   2
 #define NFS4_ACE_SYSTEM_ALARM_ACE_TYPE   3
 
+#define ACL4_SUPPORT_ALLOW_ACL 0x01
+#define ACL4_SUPPORT_DENY_ACL  0x02
+#define ACL4_SUPPORT_AUDIT_ACL 0x04
+#define ACL4_SUPPORT_ALARM_ACL 0x08
+
 typedef struct { char data[NFS4_VERIFIER_SIZE]; } nfs4_verifier;
 typedef struct { char data[16]; } nfs4_stateid;
 
@@ -314,6 +319,7 @@ enum {
 	NFSPROC4_CLNT_STATFS,
 	NFSPROC4_CLNT_READLINK,
 	NFSPROC4_CLNT_READDIR,
+	NFSPROC4_CLNT_SERVER_CAPS,
 };
 
 #endif

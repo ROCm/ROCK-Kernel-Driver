@@ -335,6 +335,10 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_statfs_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 12)
+#define NFS4_enc_server_caps_sz (compound_encode_hdr_maxsz + \
+				encode_getattr_maxsz)
+#define NFS4_dec_server_caps_sz (compound_decode_hdr_maxsz + \
+				decode_getattr_maxsz)
 
 static struct {
 	unsigned int	mode;
@@ -1637,6 +1641,28 @@ static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, uint32_t *p, const struct n
 }
 
 /*
+ * GETATTR_BITMAP request
+ */
+static int nfs4_xdr_enc_server_caps(struct rpc_rqst *req, uint32_t *p, const struct nfs_fh *fhandle)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, fhandle);
+	if (status == 0)
+		status = encode_getattr_one(&xdr, FATTR4_WORD0_SUPPORTED_ATTRS|
+				FATTR4_WORD0_LINK_SUPPORT|
+				FATTR4_WORD0_SYMLINK_SUPPORT|
+				FATTR4_WORD0_ACLSUPPORT);
+	return status;
+}
+
+/*
  * a RENEW request
  */
 static int nfs4_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
@@ -1785,6 +1811,17 @@ static inline int decode_attr_length(struct xdr_stream *xdr, uint32_t *attrlen, 
 	return 0;
 }
 
+static int decode_attr_supported(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *bitmask)
+{
+	if (likely(bitmap[0] & FATTR4_WORD0_SUPPORTED_ATTRS)) {
+		decode_attr_bitmap(xdr, bitmask);
+		bitmap[0] &= ~FATTR4_WORD0_SUPPORTED_ATTRS;
+	} else
+		bitmask[0] = bitmask[1] = 0;
+	dprintk("%s: bitmask=0x%x%x\n", __FUNCTION__, bitmask[0], bitmask[1]);
+	return 0;
+}
+
 static int decode_attr_type(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *type)
 {
 	uint32_t *p;
@@ -1838,6 +1875,38 @@ static int decode_attr_size(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t *
 	return 0;
 }
 
+static int decode_attr_link_support(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *res)
+{
+	uint32_t *p;
+
+	*res = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_LINK_SUPPORT - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_LINK_SUPPORT)) {
+		READ_BUF(4);
+		READ32(*res);
+		bitmap[0] &= ~FATTR4_WORD0_LINK_SUPPORT;
+	}
+	dprintk("%s: link support=%s\n", __FUNCTION__, *res == 0 ? "false" : "true");
+	return 0;
+}
+
+static int decode_attr_symlink_support(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *res)
+{
+	uint32_t *p;
+
+	*res = 0;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_SYMLINK_SUPPORT - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_SYMLINK_SUPPORT)) {
+		READ_BUF(4);
+		READ32(*res);
+		bitmap[0] &= ~FATTR4_WORD0_SYMLINK_SUPPORT;
+	}
+	dprintk("%s: symlink support=%s\n", __FUNCTION__, *res == 0 ? "false" : "true");
+	return 0;
+}
+
 static int decode_attr_fsid(struct xdr_stream *xdr, uint32_t *bitmap, struct nfs4_fsid *fsid)
 {
 	uint32_t *p;
@@ -1871,6 +1940,22 @@ static int decode_attr_lease_time(struct xdr_stream *xdr, uint32_t *bitmap, uint
 		bitmap[0] &= ~FATTR4_WORD0_LEASE_TIME;
 	}
 	dprintk("%s: file size=%u\n", __FUNCTION__, (unsigned int)*res);
+	return 0;
+}
+
+static int decode_attr_aclsupport(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *res)
+{
+	uint32_t *p;
+
+	*res = ACL4_SUPPORT_ALLOW_ACL|ACL4_SUPPORT_DENY_ACL;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_ACLSUPPORT - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_ACLSUPPORT)) {
+		READ_BUF(4);
+		READ32(*res);
+		bitmap[0] &= ~FATTR4_WORD0_ACLSUPPORT;
+	}
+	dprintk("%s: ACLs supported=%u\n", __FUNCTION__, (unsigned int)*res);
 	return 0;
 }
 
@@ -2354,6 +2439,34 @@ static int decode_create(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 	return 0;
 }
 
+static int decode_server_caps(struct xdr_stream *xdr, struct nfs4_server_caps_res *res)
+{
+	uint32_t *savep;
+	uint32_t attrlen, 
+		 bitmap[2] = {0};
+	int status;
+
+	if ((status = decode_op_hdr(xdr, OP_GETATTR)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_bitmap(xdr, bitmap)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_length(xdr, &attrlen, &savep)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_supported(xdr, bitmap, res->attr_bitmask)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_link_support(xdr, bitmap, &res->has_links)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_symlink_support(xdr, bitmap, &res->has_symlinks)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_aclsupport(xdr, bitmap, &res->acl_bitmask)) != 0)
+		goto xdr_error;
+	status = verify_attr_len(xdr, savep, attrlen);
+xdr_error:
+	if (status != 0)
+		printk(KERN_NOTICE "%s: xdr error %d!\n", __FUNCTION__, -status);
+	return status;
+}
+	
 static int decode_statfs(struct xdr_stream *xdr, struct nfs_fsstat *fsstat)
 {
 	uint32_t *savep;
@@ -3476,6 +3589,25 @@ static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs_fss
 }
 
 /*
+ * GETATTR_BITMAP request
+ */
+static int nfs4_xdr_dec_server_caps(struct rpc_rqst *req, uint32_t *p, struct nfs4_server_caps_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	status = decode_server_caps(&xdr, res);
+out:
+	return status;
+}
+
+/*
  * Decode RENEW response
  */
 static int nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
@@ -3676,6 +3808,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(STATFS,		enc_statfs,	dec_statfs),
   PROC(READLINK,	enc_readlink,	dec_readlink),
   PROC(READDIR,		enc_readdir,	dec_readdir),
+  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps),
 };
 
 struct rpc_version		nfs_version4 = {

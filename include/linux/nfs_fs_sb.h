@@ -38,10 +38,19 @@ struct nfs_server {
 	struct list_head	nfs4_siblings;	/* List of other nfs_server structs
 						 * that share the same clientid
 						 */
+	u32			attr_bitmask[2];/* V4 bitmask representing the set
+						   of attributes supported on this
+						   filesystem */
+	u32			acl_bitmask;	/* V4 bitmask representing the ACEs
+						   that are supported on this
+						   filesystem */
 #endif
 };
 
 /* Server capabilities */
-#define NFS_CAP_READDIRPLUS	(1)
+#define NFS_CAP_READDIRPLUS	(1U << 0)
+#define NFS_CAP_HARDLINKS	(1U << 1)
+#define NFS_CAP_SYMLINKS	(1U << 2)
+#define NFS_CAP_ACLS		(1U << 3)
 
 #endif
