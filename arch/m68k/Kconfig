@@ -361,7 +361,7 @@ config AMIGA_PCMCIA
 
 config STRAM_SWAP
 	bool "Support for ST-RAM as swap space"
-	depends on ATARI
+	depends on ATARI && BROKEN
 	---help---
 	  Some Atari 68k macines (including the 520STF and 1020STE) divide
 	  their addressible memory into ST and TT sections.  The TT section
