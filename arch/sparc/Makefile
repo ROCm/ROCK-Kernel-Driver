@@ -38,7 +38,7 @@ endif
 LDFLAGS_vmlinux = -r
 
 head-y := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
-HEAD := $(head-y)
+HEAD_Y := $(head-y)
 
 core-y += arch/sparc/kernel/ arch/sparc/mm/ arch/sparc/math-emu/
 libs-y += arch/sparc/prom/ arch/sparc/lib/
@@ -52,7 +52,7 @@ CORE_Y		:= $(patsubst %/, %/built-in.o, $(CORE_Y))
 DRIVERS_Y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 NET_Y		:= $(patsubst %/, %/built-in.o, $(net-y))
 LIBS_Y		:= $(patsubst %/, %/lib.a, $(libs-y))
-export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD
+export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD_Y
 
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/$(ARCH)/boot $(1)
 

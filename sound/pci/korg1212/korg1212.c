@@ -598,7 +598,7 @@ static void snd_korg1212_WaitForCardStopAck(korg1212_t *korg1212)
                         return;
                 if (!korg1212->inIRQ)
                         schedule();
-        } while (jiffies < endtime);
+        } while (time_before(jiffies, endtime));
 
         writel(0, &korg1212->sharedBufferPtr->cardCommand);
 }

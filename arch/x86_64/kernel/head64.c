@@ -13,6 +13,8 @@
 #include <linux/string.h>
 
 #include <asm/processor.h>
+#include <asm/proto.h>
+#include <asm/smp.h>
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
    yet. */
@@ -70,9 +72,6 @@ static void __init setup_boot_cpu_data(void)
 	boot_cpu_data.x86_mask = eax & 0xf;
 }
 
-extern void start_kernel(void), pda_init(int), setup_early_printk(char *); 
-extern int disable_apic;
-
 void __init x86_64_start_kernel(char * real_mode_data)
 {
 	char *s;
@@ -83,6 +82,11 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	s = strstr(saved_command_line, "earlyprintk="); 
 	if (s != NULL)
 		setup_early_printk(s+12); 
+#ifdef CONFIG_DISCONTIGMEM
+	s = strstr(saved_command_line, "numa=");
+	if (s != NULL)
+		numa_setup(s+5);
+#endif
 #ifdef CONFIG_X86_IO_APIC
 	if (strstr(saved_command_line, "disableapic"))
 		disable_apic = 1;

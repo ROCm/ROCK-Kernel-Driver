@@ -754,5 +754,8 @@ EXPORT_SYMBOL(agp_generic_alloc_by_type);
 EXPORT_SYMBOL(agp_generic_free_by_type);
 EXPORT_SYMBOL(global_cache_flush);
 
+EXPORT_SYMBOL(agp_device_command);
+EXPORT_SYMBOL(agp_collect_device_status);
+
 EXPORT_SYMBOL_GPL(agp_num_entries);
 

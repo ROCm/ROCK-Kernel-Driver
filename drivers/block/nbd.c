@@ -149,7 +149,7 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 			spin_lock_irqsave(&current->sighand->siglock, flags);
 			printk(KERN_WARNING "NBD (pid %d: %s) got signal %d\n",
 				current->pid, current->comm, 
-				dequeue_signal(&current->blocked, &info));
+				dequeue_signal(current, &current->blocked, &info));
 			spin_unlock_irqrestore(&current->sighand->siglock, flags);
 			result = -EINTR;
 			break;

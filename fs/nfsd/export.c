@@ -606,7 +606,8 @@ exp_export(struct nfsctl_export *nxp)
 
 	dprintk("exp_export called for %s:%s (%x/%ld fl %x).\n",
 			nxp->ex_client, nxp->ex_path,
-			nxp->ex_dev, (long) nxp->ex_ino, nxp->ex_flags);
+			(unsigned)nxp->ex_dev, (long)nxp->ex_ino,
+			nxp->ex_flags);
 
 	/* Try to lock the export table for update */
 	exp_writelock();
@@ -760,8 +761,8 @@ exp_unexport(struct nfsctl_export *nxp)
 			expkey_put(&key->h, &svc_expkey_cache);
 		} else
 			dprintk("nfsd: no export %x/%lx for %s\n",
-				nxp->ex_dev, (unsigned long) nxp->ex_ino,
-				nxp->ex_client);
+				(unsigned)nxp->ex_dev,
+				(unsigned long) nxp->ex_ino, nxp->ex_client);
 		auth_domain_put(dom);
 		cache_flush();
 	} else

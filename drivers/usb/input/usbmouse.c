@@ -76,6 +76,7 @@ static void usb_mouse_irq(struct urb *urb, struct pt_regs *regs)
 		goto resubmit;
 	}
 
+	input_regs(dev, regs);
 
 	input_report_key(dev, BTN_LEFT,   data[0] & 0x01);
 	input_report_key(dev, BTN_RIGHT,  data[0] & 0x02);

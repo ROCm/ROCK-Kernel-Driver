@@ -14,15 +14,10 @@
 
 typedef __u32 __sighandler_t32;
 
-#include <linux/signal.h>
-typedef struct {
-	unsigned int sig[_NSIG_WORDS * 2];
-} sigset_t32;
-
 struct sigaction32 {
 	__sighandler_t32 sa_handler;
 	unsigned int sa_flags;
-	sigset_t32 sa_mask;		/* mask last for extensibility */
+	compat_sigset_t sa_mask;		/* mask last for extensibility */
 };
 
 #endif

@@ -24,6 +24,7 @@
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 #include <asm/nmi.h>
+#include <asm/msr.h>
 
 extern void default_do_nmi(struct pt_regs *);
 
@@ -71,13 +72,14 @@ int __init check_nmi_watchdog (void)
 
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
-	for_each_cpu(cpu) { 
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
 		counts[cpu] = cpu_pda[cpu].__nmi_count; 
-	}
 	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
-	for_each_cpu(cpu) { 
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (!cpu_online(cpu))
+			continue;
 		if (cpu_pda[cpu].__nmi_count - counts[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck (%d)!\n", 
 			       cpu,
@@ -173,7 +175,7 @@ static inline void nmi_pm_init(void) { }
  * Original code written by Keith Owens.
  */
 
-static void __pminit setup_k7_watchdog(void)
+static void setup_k7_watchdog(void)
 {
 	int i;
 	unsigned int evntsel;
@@ -183,8 +185,10 @@ static void __pminit setup_k7_watchdog(void)
 	nmi_perfctr_msr = MSR_K7_PERFCTR0;
 
 	for(i = 0; i < 4; ++i) {
-		wrmsr(MSR_K7_EVNTSEL0+i, 0, 0);
-		wrmsr(MSR_K7_PERFCTR0+i, 0, 0);
+		/* Simulator may not support it */
+		if (checking_wrmsrl(MSR_K7_EVNTSEL0+i, 0UL))
+			return;
+		wrmsrl(MSR_K7_PERFCTR0+i, 0UL);
 	}
 
 	evntsel = K7_EVNTSEL_INT
@@ -200,15 +204,11 @@ static void __pminit setup_k7_watchdog(void)
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-void __pminit setup_apic_nmi_watchdog (void)
+void setup_apic_nmi_watchdog (void)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 		if (boot_cpu_data.x86 < 6)
-			return;
-		/* Simics masquerades as AMD, but does not support 
-		   performance counters */
-		if (strstr(boot_cpu_data.x86_model_id, "Screwdriver"))
 			return;
 		setup_k7_watchdog();
 		break;

@@ -1004,7 +1004,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	for (;;) {
 		int signr;
 
-		signr = dequeue_signal(&current->blocked, &info);
+		signr = dequeue_signal(current, &current->blocked, &info);
 
 		if (!signr)
 			break;

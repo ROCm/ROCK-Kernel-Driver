@@ -293,7 +293,8 @@ int allow_signal(int sig)
 	spin_unlock_irq(&current->sighand->siglock);
 	return 0;
 }
-	
+
+EXPORT_SYMBOL(allow_signal);
 
 /*
  *	Put all the gunge required to become a kernel thread without
@@ -308,6 +309,7 @@ void daemonize(const char *name, ...)
 
 	va_start(args, name);
 	vsnprintf(current->comm, sizeof(current->comm), name, args);
+	va_end(args);
 
 	/*
 	 * If we were started as result of loading a module, close all of the

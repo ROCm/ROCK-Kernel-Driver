@@ -220,7 +220,7 @@ static struct notifier_block acq_notifier =
 
 static int __init acq_init(void)
 {
-	printk("WDT driver for Acquire single board computer initialising.\n");
+	printk(KERN_INFO "WDT driver for Acquire single board computer initialising.\n");
 
 	spin_lock_init(&acq_lock);
 	if (misc_register(&acq_miscdev))

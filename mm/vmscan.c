@@ -757,7 +757,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  */
 static int
 shrink_caches(struct zone *classzone, int priority, int *total_scanned,
-		int gfp_mask, const int nr_pages, struct page_state *ps)
+		int gfp_mask, int nr_pages, struct page_state *ps)
 {
 	struct zone *first_classzone;
 	struct zone *zone;

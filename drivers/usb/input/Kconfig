@@ -49,7 +49,7 @@ config HID_FF
 	  If unsure, say N.
 
 config HID_PID
-	bool "PID Devices"
+	bool "PID Devices (Microsoft Sidewinder Force Feedback 2)"
 	depends on HID_FF
 	help
 	  Say Y here if you have a PID-compliant joystick and wish to enable force
@@ -67,6 +67,15 @@ config LOGITECH_FF
 	  Note: if you say N here, this device will still be supported, but without
 	  force feedback.
 
+config THRUSTMASTER_FF
+	bool "ThrustMaster FireStorm Dual Power 2 support (EXPERIMENTAL)"
+	depends on HID_FF && EXPERIMENTAL
+	help
+	  Say Y here if you have a THRUSTMASTER FireStore Dual Power 2,
+	  and want to enable force feedback support for it.
+	  Note: if you say N here, this device will still be supported, but without
+	  force feedback.
+
 config USB_HIDDEV
 	bool "/dev/hiddev raw HID device support"
 	depends on USB_HID
@@ -80,7 +89,6 @@ config USB_HIDDEV
 	  This driver requires CONFIG_USB_HID.
 
 	  If unsure, say Y.
-
 
 menu "USB HID Boot Protocol drivers"
 	depends on USB!=n && USB_HID!=y

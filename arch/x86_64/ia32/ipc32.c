@@ -626,9 +626,7 @@ static long semtimedop32(int semid, struct sembuf *sb,
 		return -E2BIG;
 	if (!access_ok(VERIFY_READ, sb, nsops * sizeof(struct sembuf)))
 		return -EFAULT; 
-	if (ts32 && 
-	    (get_user(ts.tv_sec, &ts32->tv_sec)  || 
-	     __get_user(ts.tv_nsec, &ts32->tv_nsec)))
+	if (ts32 && get_compat_timespec(&ts, ts32))
 		return -EFAULT;
 
 	set_fs(KERNEL_DS);  

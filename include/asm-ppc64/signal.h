@@ -143,4 +143,6 @@ typedef struct sigaltstack {
 	size_t ss_size;
 } stack_t;
 
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #endif /* _ASMPPC64_SIGNAL_H */

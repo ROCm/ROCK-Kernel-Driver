@@ -19,13 +19,17 @@
 #include <asm/proto.h>
 #include <asm/bootsetup.h>
 
-extern unsigned long table_start, table_end;
 extern char _end[];
+
+/* 
+ * PFN of last memory page.
+ */
+unsigned long end_pfn; 
 
 /* 
  * end_pfn only includes RAM, while end_pfn_map includes all e820 entries.
  * The direct mapping extends to end_pfn_map, so that we can directly access
- * ACPI and other tables without having to play with fixmaps.
+ * apertures, ACPI and other tables without having to play with fixmaps.
  */ 
 unsigned long end_pfn_map; 
 
@@ -42,18 +46,16 @@ static inline int bad_addr(unsigned long *addrp, unsigned long size)
 	unsigned long addr = *addrp, last = addr + size; 
 
 	/* various gunk below that needed for SMP startup */
-	if (addr < 7*PAGE_SIZE) { 
-		*addrp = 7*PAGE_SIZE; 
+	if (addr < 0x8000) { 
+		*addrp = 0x8000;
 		return 1; 
 	}
 
-#if 0
 	/* direct mapping tables of the kernel */
 	if (last >= table_start<<PAGE_SHIFT && addr < table_end<<PAGE_SHIFT) { 
 		*addrp = table_end << PAGE_SHIFT; 
 		return 1;
 	} 
-#endif
 
 	/* initrd */ 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -145,10 +147,10 @@ void __init e820_bootmem_free(pg_data_t *pgdat, unsigned long start,unsigned lon
 /*
  * Find the highest page frame number we have available
  */
-void __init e820_end_of_ram(void)
+unsigned long __init e820_end_of_ram(void)
 {
 	int i;
-	end_pfn = 0;
+	unsigned long end_pfn = 0;
 	
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i]; 
@@ -175,6 +177,8 @@ void __init e820_end_of_ram(void)
 		end_pfn = end_user_pfn;
 	if (end_pfn > end_pfn_map) 
 		end_pfn = end_pfn_map; 
+
+	return end_pfn;	
 }
 
 /* 

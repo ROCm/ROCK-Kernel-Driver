@@ -46,7 +46,7 @@ MODULE_LICENSE("GPL");
 #define NS558_ISA	1
 #define NS558_PNP	2
 
-static int ns558_isa_portlist[] = { 0x200, 0x201, 0x202, 0x203, 0x204, 0x205, 0x207, 0x209,
+static int ns558_isa_portlist[] = { 0x201, 0x200, 0x202, 0x203, 0x204, 0x205, 0x207, 0x209,
 				    0x20b, 0x20c, 0x20e, 0x20f, 0x211, 0x219, 0x101, 0 };
 
 struct ns558 {
@@ -140,7 +140,7 @@ static void ns558_isa_probe(int io)
 	
 	port->type = NS558_ISA;
 	port->size = (1 << i);
-	port->gameport.io = io & (-1 << i);
+	port->gameport.io = io;
 	port->gameport.phys = port->phys;
 	port->gameport.name = port->name;
 	port->gameport.id.bustype = BUS_ISA;
@@ -148,7 +148,7 @@ static void ns558_isa_probe(int io)
 	sprintf(port->phys, "isa%04x/gameport0", io & (-1 << i));
 	sprintf(port->name, "NS558 ISA");
 
-	request_region(port->gameport.io, (1 << i), "ns558-isa");
+	request_region(io & (-1 << i), (1 << i), "ns558-isa");
 
 	gameport_register_port(&port->gameport);
 
@@ -275,7 +275,7 @@ void __exit ns558_exit(void)
 				/* fall through */
 #endif
 			case NS558_ISA:
-				release_region(port->gameport.io, port->size);
+				release_region(port->gameport.io & ~(port->size - 1), port->size);
 				break;
 		
 			default:

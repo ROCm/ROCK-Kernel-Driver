@@ -185,7 +185,6 @@ extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
 extern int mp_current_pci_id;
 extern unsigned long mp_lapic_addr;
 extern int pic_mode;
-extern int using_apic_timer;
 
 #ifdef CONFIG_ACPI_BOOT
 extern void mp_register_lapic (u8 id, u8 enabled);
@@ -198,6 +197,8 @@ extern void mp_config_acpi_legacy_irqs (void);
 extern void mp_parse_prt (void);
 #endif /*CONFIG_X86_IO_APIC*/
 #endif
+
+extern int using_apic_timer;
 
 #endif
 

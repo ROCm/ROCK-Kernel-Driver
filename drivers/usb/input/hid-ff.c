@@ -38,6 +38,7 @@
 extern int hid_lgff_init(struct hid_device* hid);
 extern int hid_lg3d_init(struct hid_device* hid);
 extern int hid_pid_init(struct hid_device* hid);
+extern int hid_tmff_init(struct hid_device* hid);
 
 /*
  * This table contains pointers to initializers. To add support for new
@@ -56,6 +57,9 @@ static struct hid_ff_initializer inits[] = {
 #endif
 #ifdef CONFIG_HID_PID
 	{0x45e, 0x001b, hid_pid_init},
+#endif
+#ifdef CONFIG_THRUSTMASTER_FF
+	{0x44f, 0xb304, hid_tmff_init},
 #endif
 	{0, 0, NULL} /* Terminating entry */
 };

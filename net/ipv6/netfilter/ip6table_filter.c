@@ -35,12 +35,12 @@ static struct
 } initial_table __initdata
 = { { "filter", FILTER_VALID_HOOKS, 4,
       sizeof(struct ip6t_standard) * 3 + sizeof(struct ip6t_error),
-      { [NF_IP6_LOCAL_IN] 0,
-	[NF_IP6_FORWARD] sizeof(struct ip6t_standard),
-	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) * 2 },
-      { [NF_IP6_LOCAL_IN] 0,
-	[NF_IP6_FORWARD] sizeof(struct ip6t_standard),
-	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) * 2 },
+      { [NF_IP6_LOCAL_IN] = 0,
+	[NF_IP6_FORWARD] = sizeof(struct ip6t_standard),
+	[NF_IP6_LOCAL_OUT] = sizeof(struct ip6t_standard) * 2 },
+      { [NF_IP6_LOCAL_IN] = 0,
+	[NF_IP6_FORWARD] = sizeof(struct ip6t_standard),
+	[NF_IP6_LOCAL_OUT] = sizeof(struct ip6t_standard) * 2 },
       0, NULL, { } },
     {
 	    /* LOCAL_IN */

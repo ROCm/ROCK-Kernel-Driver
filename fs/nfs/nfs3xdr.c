@@ -146,7 +146,7 @@ xdr_decode_time3(u32 *p, struct timespec *timep)
 static u32 *
 xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 {
-	unsigned int	type;
+	unsigned int	type, major, minor;
 	int		fmode;
 
 	type = ntohl(*p++);
@@ -160,9 +160,12 @@ xdr_decode_fattr(u32 *p, struct nfs_fattr *fattr)
 	fattr->gid = ntohl(*p++);
 	p = xdr_decode_hyper(p, &fattr->size);
 	p = xdr_decode_hyper(p, &fattr->du.nfs3.used);
+
 	/* Turn remote device info into Linux-specific dev_t */
-	fattr->rdev = ntohl(*p++) << MINORBITS;
-	fattr->rdev |= ntohl(*p++) & MINORMASK;
+	major = ntohl(*p++);
+	minor = ntohl(*p++);
+	fattr->rdev = MKDEV(major, minor);
+
 	p = xdr_decode_hyper(p, &fattr->fsid_u.nfs3);
 	p = xdr_decode_hyper(p, &fattr->fileid);
 	p = xdr_decode_time3(p, &fattr->atime);
@@ -412,8 +415,8 @@ nfs3_xdr_mknodargs(struct rpc_rqst *req, u32 *p, struct nfs3_mknodargs *args)
 	*p++ = htonl(args->type);
 	p = xdr_encode_sattr(p, args->sattr);
 	if (args->type == NF3CHR || args->type == NF3BLK) {
-		*p++ = htonl(args->rdev >> MINORBITS);
-		*p++ = htonl(args->rdev & MINORMASK);
+		*p++ = htonl(MAJOR(args->rdev));
+		*p++ = htonl(MINOR(args->rdev));
 	}
 
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);

@@ -596,6 +596,7 @@ static inline int de_thread(struct task_struct *tsk)
 		newsig->group_exit_code = 0;
 		newsig->group_exit_task = NULL;
 		newsig->group_stop_count = 0;
+		newsig->curr_target = NULL;
 		init_sigpending(&newsig->shared_pending);
 	}
 

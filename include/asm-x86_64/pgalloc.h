@@ -14,8 +14,7 @@
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	set_pmd(pmd, __pmd(_PAGE_TABLE | 
-			   ((u64)(pte - mem_map) << PAGE_SHIFT))); 
+	set_pmd(pmd, __pmd(_PAGE_TABLE | (page_to_pfn(pte) << PAGE_SHIFT)));
 }
 
 extern __inline__ pmd_t *get_pmd(void)
@@ -76,6 +75,6 @@ extern inline void pte_free(struct page *pte)
 } 
 
 #define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
-#define __pmd_free_tlb(tlb,x)   do { } while (0)
+#define __pmd_free_tlb(tlb,x)   pmd_free(x)
 
 #endif /* _X86_64_PGALLOC_H */

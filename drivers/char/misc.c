@@ -50,8 +50,6 @@
 #include <linux/tty.h>
 #include <linux/kmod.h>
 
-#include "busmouse.h"
-
 /*
  * Head entry for the doubly linked miscdevice list
  */
@@ -64,7 +62,6 @@ static DECLARE_MUTEX(misc_sem);
 #define DYNAMIC_MINORS 64 /* like dynamic majors */
 static unsigned char misc_minors[DYNAMIC_MINORS / 8];
 
-extern int psaux_init(void);
 #ifdef CONFIG_SGI_NEWPORT_GFX
 extern void gfx_register(void);
 #endif

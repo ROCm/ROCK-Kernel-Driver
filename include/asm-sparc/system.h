@@ -62,8 +62,6 @@ static __inline__ int con_is_present(void)
 	return serial_console ? 0 : 1;
 }
 
-extern struct pt_regs *kbd_pt_regs;
-
 /* When a context switch happens we must flush all user windows so that
  * the windows of the current process are flushed onto its stack. This
  * way the windows are all clean for the next process and the stack

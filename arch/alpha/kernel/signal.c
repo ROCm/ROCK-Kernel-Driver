@@ -619,11 +619,11 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs);
+	signr = get_signal_to_deliver(&info, regs, NULL);
 
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
-		struct k_sigaction *ka = &current->sig->action[signr-1];
+		struct k_sigaction *ka = &current->sighand->action[signr-1];
 
 		if (r0) syscall_restart(r0, r19, regs, ka);
 		handle_signal(signr, ka, &info, oldset, regs, sw);

@@ -3378,7 +3378,7 @@ jffs_garbage_collect_thread(void *ptr)
 			unsigned long signr = 0;
 
 			spin_lock_irq(&current->sighand->siglock);
-			signr = dequeue_signal(&current->blocked, &info);
+			signr = dequeue_signal(current, &current->blocked, &info);
 			spin_unlock_irq(&current->sighand->siglock);
 
 			switch(signr) {

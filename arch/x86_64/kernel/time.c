@@ -9,6 +9,7 @@
  *  Copyright (c) 1996  Ingo Molnar
  *  Copyright (c) 1998  Andrea Arcangeli
  *  Copyright (c) 2002  Vojtech Pavlik
+ *  Copyright (c) 2003  Andi Kleen
  *
  */
 
@@ -25,8 +26,13 @@
 #include <linux/bcd.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
+#ifdef CONFIG_X86_LOCAL_APIC
+#include <asm/apic.h>
+#endif
 
 u64 jiffies_64; 
+
+extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
@@ -56,12 +62,10 @@ struct timezone __sys_tz __section_sys_tz;
  * together by xtime_lock.
          */
 
-static spinlock_t time_offset_lock = SPIN_LOCK_UNLOCKED;
-static unsigned long timeoffset = 0;
-
 inline unsigned int do_gettimeoffset(void)
 {
 	unsigned long t;
+	sync_core();
 	rdtscll(t);	
 	return (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset;
 }
@@ -74,10 +78,9 @@ inline unsigned int do_gettimeoffset(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags, t, seq;
+	unsigned long seq, t;
  	unsigned int sec, usec;
 
-	spin_lock_irqsave(&time_offset_lock, flags);
 	do {
 		seq = read_seqbegin(&xtime_lock);
 
@@ -85,11 +88,9 @@ void do_gettimeofday(struct timeval *tv)
 		usec = xtime.tv_nsec / 1000;
 
 		t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
-		if (t > timeoffset) timeoffset = t;
-		usec += timeoffset;
+		usec += t;
 
 	} while (read_seqretry(&xtime_lock, seq));
-	spin_unlock_irqrestore(&time_offset_lock, flags);
 
 	tv->tv_sec = sec + usec / 1000000;
 	tv->tv_usec = usec % 1000000;
@@ -104,7 +105,6 @@ void do_gettimeofday(struct timeval *tv)
 void do_settimeofday(struct timeval *tv)
 {
 	write_seqlock_irq(&xtime_lock);
-	vxtime_lock();
 
 	tv->tv_usec -= do_gettimeoffset() +
 		(jiffies - wall_jiffies) * tick_usec;
@@ -116,7 +116,6 @@ void do_settimeofday(struct timeval *tv)
 
 	xtime.tv_sec = tv->tv_sec;
 	xtime.tv_nsec = (tv->tv_usec * 1000);
-	vxtime_unlock();
 
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
@@ -207,11 +206,11 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 
 	write_seqlock(&xtime_lock);
-	vxtime_lock();
 
 	{
 		unsigned long t;
 
+		sync_core();
 		rdtscll(t);
 		hpet.offset = (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset - 1000000L / HZ;
 		if (hpet.offset >= 1000000L / HZ)
@@ -219,7 +218,6 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		hpet.ticks = min_t(long, max_t(long, (t  - hpet.last_tsc) * (1000000L / HZ) / (1000000L / HZ - hpet.offset),
 				cpu_khz * 1000/HZ * 15 / 16), cpu_khz * 1000/HZ * 16 / 15); 
 		hpet.last_tsc = t;
-		timeoffset = 0;
 	}
 
 /*
@@ -255,7 +253,6 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		rtc_update = xtime.tv_sec + 660;
 	}
  
-	vxtime_unlock();
 	write_sequnlock(&xtime_lock);
 }
 
@@ -348,8 +345,9 @@ static unsigned int __init pit_calibrate_tsc(void)
 	outb((1193182 / (1000 / 50)) & 0xff, 0x42);
 	outb((1193182 / (1000 / 50)) >> 8, 0x42);
 	rdtscll(start);
-      	
+	sync_core();
 	while ((inb(0x61) & 0x20) == 0);
+	sync_core();
 	rdtscll(end);
 
 
@@ -382,12 +380,12 @@ void __init time_init(void)
 
 	pit_init();
 	printk(KERN_INFO "time.c: Using 1.1931816 MHz PIT timer.\n");
-	setup_irq(0, &irq0);
 	cpu_khz = pit_calibrate_tsc();
 	printk(KERN_INFO "time.c: Detected %d.%03d MHz processor.\n",
 		cpu_khz / 1000, cpu_khz % 1000);
 	hpet.ticks = cpu_khz * (1000 / HZ);
 	rdtscll(hpet.last_tsc);
+	setup_irq(0, &irq0);
 }
 
 __setup("report_lost_ticks", time_setup);

@@ -44,7 +44,7 @@
 #include <linux/seq_file.h>
 #include <linux/version.h>
 
-#include <acconfig.h>
+#include <acpi/acconfig.h>
 #define OLD_ACPI_INTERFACE (ACPI_CA_VERSION < 0x20020000)
 
 #if OLD_ACPI_INTERFACE
@@ -52,7 +52,7 @@
 extern struct proc_dir_entry* bm_proc_root;
 #define acpi_root_dir bm_proc_root
 #else
-#include "acpi_drivers.h"
+#include <acpi/acpi_drivers.h>
 #endif
 
 MODULE_AUTHOR("John Belmonte");

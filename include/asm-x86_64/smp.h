@@ -44,7 +44,9 @@ extern void smp_send_reschedule(int cpu);
 extern void smp_send_reschedule_all(void);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
-extern void zap_low_mappings (void);
+extern void zap_low_mappings(void);
+
+#define SMP_TRAMPOLINE_BASE 0x6000
 
 /*
  * On x86 all CPUs are mapped 1:1 to the APIC space.
@@ -55,37 +57,25 @@ extern void zap_low_mappings (void);
 extern volatile unsigned long cpu_callout_map;
 
 #define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
-extern inline int cpu_logical_map(int cpu)
+#define for_each_cpu(cpu, mask) \
+	for(mask = cpu_online_map; \
+	    cpu = __ffs(mask), mask != 0; \
+	    mask &= ~(1UL<<cpu))
+
+extern inline int any_online_cpu(unsigned int mask)
 {
-	return cpu;
-}
-extern inline int cpu_number_map(int cpu)
-{
-	return cpu;
-}
+	if (mask & cpu_online_map)
+		return __ffs(mask & cpu_online_map);
+
+		return -1; 
+} 
 
 extern inline unsigned int num_online_cpus(void)
-{
+{ 
 	return hweight32(cpu_online_map);
-}
-
-extern inline int find_next_cpu(unsigned cpu) 
-{ 
-	unsigned long left = cpu_online_map >> (cpu+1); 
-	if (!left) 
-		return -1; 
-	return ffz(~left) + cpu; 		
 } 
-
-extern inline int find_first_cpu(void)
-{ 
-	return ffz(~cpu_online_map); 	
-} 
-
-/* RED-PEN different from i386 */
-#define for_each_cpu(i) \
-	for((i) = find_first_cpu(); (i)>=0; (i)=find_next_cpu(i))
 
 static inline int num_booting_cpus(void)
 {
@@ -94,27 +84,24 @@ static inline int num_booting_cpus(void)
 
 extern volatile unsigned long cpu_callout_map;
 
-/*
- * Some lowlevel functions might want to know about
- * the real APIC ID <-> CPU # mapping.
- */
-extern volatile int x86_apicid_to_cpu[NR_CPUS];
-extern volatile int x86_cpu_to_apicid[NR_CPUS];
-
-/*
- * This function is needed by all SMP systems. It must _always_ be valid
- * from the initial startup. We map APIC_BASE very early in page_setup(),
- * so this is correct in the x86 case.
- */
-
 #define smp_processor_id() read_pda(cpunumber)
-
 
 extern __inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
+
+extern int disable_apic;
+extern int slow_smp_processor_id(void);
+
+extern inline int safe_smp_processor_id(void)
+{ 
+	if (disable_apic)
+		return slow_smp_processor_id(); 
+	else
+		return hard_smp_processor_id();
+} 
 
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 #endif /* !ASSEMBLY */
@@ -128,6 +115,7 @@ extern __inline int hard_smp_processor_id(void)
 
 #ifndef CONFIG_SMP
 #define stack_smp_processor_id() 0
+#define safe_smp_processor_id() 0
 #define for_each_cpu(x) (x)=0;
 #define cpu_logical_map(x) (x)
 #else
@@ -135,7 +123,7 @@ extern __inline int hard_smp_processor_id(void)
 #define stack_smp_processor_id() \
 ({ 								\
 	struct thread_info *ti;					\
-	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));	\
+	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));	\
 	ti->cpu;						\
 })
 #endif

@@ -1507,6 +1507,11 @@ M:	emoenke@gwdg.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+SC1200 WDT DRIVER
+P:	Zwane Mwaikambo
+M:	zwane@commfireservices.com
+S:	Maintained
+
 SCHEDULER
 P:	Ingo Molnar
 M:	mingo@elte.hu

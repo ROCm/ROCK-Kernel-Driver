@@ -1522,7 +1522,8 @@ void tcp_send_probe0(struct sock *sk)
 	}
 
 	if (err <= 0) {
-		tp->backoff++;
+		if (tp->backoff < sysctl_tcp_retries2)
+			tp->backoff++;
 		tp->probes_out++;
 		tcp_reset_xmit_timer (sk, TCP_TIME_PROBE0, 
 				      min(tp->rto << tp->backoff, TCP_RTO_MAX));

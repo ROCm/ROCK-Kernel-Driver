@@ -93,6 +93,7 @@ struct rpc_program		nfs_program = {
 	.nrvers			= sizeof(nfs_version) / sizeof(nfs_version[0]),
 	.version		= nfs_version,
 	.stats			= &nfs_rpcstat,
+	.pipe_dir_name		= "/nfs",
 };
 
 static inline unsigned long

@@ -124,9 +124,11 @@ struct usb_xpad {
  *	 http://euc.jp/periphs/xbox-controller.ja.html
  */
 
-static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *data)
+static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *data, struct pt_regs *regs)
 {
 	struct input_dev *dev = &xpad->dev;
+
+	input_regs(dev, regs);
 	
 	/* left stick */
 	input_report_abs(dev, ABS_X, (__s16) (((__s16)data[13] << 8) | data[12]));
@@ -183,7 +185,7 @@ static void xpad_irq_in(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 	
-	xpad_process_packet(xpad, 0, xpad->idata);
+	xpad_process_packet(xpad, 0, xpad->idata, regs);
 
 exit:
 	retval = usb_submit_urb (urb, GFP_ATOMIC);

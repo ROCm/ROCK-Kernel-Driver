@@ -2832,7 +2832,7 @@ static void moxadelay(int tick)
 
 	st = jiffies;
 	et = st + tick;
-	while (jiffies < et);
+	while (time_before(jiffies, et));
 }
 
 static void moxafunc(unsigned long ofsAddr, int cmd, ushort arg)

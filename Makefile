@@ -36,7 +36,8 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
 ARCH := $(SUBARCH)
 
-KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
+# Remove hyphens since they have special meaning in RPM filenames
+KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
 UTS_MACHINE := $(ARCH)
 
@@ -355,7 +356,7 @@ LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 #	It's a three stage process:
 #	o .tmp_vmlinux1 has all symbols and sections, but __kallsyms is
 #	  empty
-#	  Running kallsyms on that gives as .tmp_kallsyms1.o with
+#	  Running kallsyms on that gives us .tmp_kallsyms1.o with
 #	  the right size
 #	o .tmp_vmlinux2 now has a __kallsyms section of the right size,
 #	  but due to the added section, some addresses have shifted
@@ -689,7 +690,7 @@ defconfig: scripts/kconfig/conf
 # make clean     Delete all automatically generated files, including
 #                tools and firmware.
 # make mrproper  Delete the current configuration, and related files
-#                Any core files spread around is deleted as well
+#                Any core files spread around are deleted as well
 # make distclean Remove editor backup files, patch leftover files and the like
 
 # Files removed with 'make clean'
@@ -884,9 +885,9 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))';) \
 	$(cmd_$(1)); \
-	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
@@ -913,19 +914,19 @@ define update-if-changed
 	fi
 endef
 
-# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=dir
 # Usage:
 # $(Q)$(MAKE) $(build)=dir
 build := -f scripts/Makefile.build obj
 
-# Shorthand for $(Q)$(MAKE) scripts/Makefile.clean obj=dir
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=dir
 # Usage:
 # $(Q)$(MAKE) $(clean)=dir
 clean := -f scripts/Makefile.clean obj
 
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target>
-# Usage is deprecated, because make do not see this as an invocation of make.
+# Usage is deprecated, because make does not see this as an invocation of make.
 descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:

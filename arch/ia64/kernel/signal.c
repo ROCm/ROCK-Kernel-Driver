@@ -517,7 +517,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 		restart = 0;
 
 	while (1) {
-		int signr = get_signal_to_deliver(&info, &scr->pt);
+		int signr = get_signal_to_deliver(&info, &scr->pt, NULL);
 
 		if (signr <= 0)
 			break;

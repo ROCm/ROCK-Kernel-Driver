@@ -108,6 +108,7 @@ static void action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
         int down = (GPLR & GPIO_BITSY_ACTION_BUTTON) ? 0 : 1;
 	struct input_dev *dev = (struct input_dev *) dev_id;
 
+	input_regs(dev, regs);
 	input_report_key(dev, KEY_ENTER, down);
 	input_sync(dev);
 }
@@ -121,6 +122,7 @@ static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	 * This interrupt is only called when we release the key. So we have 
 	 * to fake a key press.
 	 */ 	
+	input_regs(dev, regs);
 	input_report_key(dev, KEY_SUSPEND, 1);
 	input_report_key(dev, KEY_SUSPEND, down); 	
 	input_sync(dev);
@@ -183,11 +185,13 @@ static int h3600ts_pm_callback(struct pm_dev *pm_dev, pm_request_t req,
  * packets. Some packets coming from serial are not touchscreen related. In
  * this case we send them off to be processed elsewhere. 
  */
-static void h3600ts_process_packet(struct h3600_dev *ts)
+static void h3600ts_process_packet(struct h3600_dev *ts, struct pt_regs *regs)
 {
         struct input_dev *dev = &ts->dev;
 	static int touched = 0;
 	int key, down = 0;
+
+	input_regs(dev, regs);
 
         switch (ts->event) {
                 /*

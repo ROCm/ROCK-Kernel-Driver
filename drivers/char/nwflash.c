@@ -47,7 +47,7 @@ static int write_block(unsigned long p, const char *buf, int count);
 static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cmd, unsigned long arg);
 static ssize_t flash_read(struct file *file, char *buf, size_t count, loff_t * ppos);
 static ssize_t flash_write(struct file *file, const char *buf, size_t count, loff_t * ppos);
-static long long flash_llseek(struct file *file, long long offset, int orig);
+static loff_t flash_llseek(struct file *file, loff_t offset, int orig);
 
 #define KFLASH_SIZE	1024*1024	//1 Meg
 #define KFLASH_SIZE4	4*1024*1024	//4 Meg
@@ -301,9 +301,9 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff
  * also note that seeking relative to the "end of file" isn't supported:
  * it has no meaning, so it returns -EINVAL.
  */
-static long long flash_llseek(struct file *file, long long offset, int orig)
+static loff_t flash_llseek(struct file *file, loff_t offset, int orig)
 {
-	long long ret;
+	loff_t ret;
 
 	lock_kernel();
 	if (flashdebug)

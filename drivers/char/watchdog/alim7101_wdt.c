@@ -100,7 +100,7 @@ static void wdt_timer_ping(unsigned long data)
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp & ~ALI_WDT_ARM));
 		pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, (tmp | ALI_WDT_ARM));
 	} else {
-		printk(OUR_NAME ": Heartbeat lost! Will not ping the watchdog\n");
+		printk(KERN_INFO OUR_NAME ": Heartbeat lost! Will not ping the watchdog\n");
 	}
 	/* Re-set the timer interval */
 	timer.expires = jiffies + WDT_INTERVAL;
@@ -136,7 +136,7 @@ static void wdt_startup(void)
 	add_timer(&timer);
 
 
-	printk(OUR_NAME ": Watchdog timer is now enabled.\n");  
+	printk(KERN_INFO OUR_NAME ": Watchdog timer is now enabled.\n");  
 }
 
 static void wdt_turnoff(void)
@@ -144,7 +144,7 @@ static void wdt_turnoff(void)
 	/* Stop the timer */
 	del_timer_sync(&timer);
 	wdt_change(WDT_DISABLE);
-	printk(OUR_NAME ": Watchdog timer is now disabled...\n");
+	printk(KERN_INFO OUR_NAME ": Watchdog timer is now disabled...\n");
 }
 
 /*
@@ -203,7 +203,7 @@ static int fop_close(struct inode * inode, struct file * file)
 	if(wdt_expect_close)
 		wdt_turnoff();
 	else
-		printk(OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
+		printk(KERN_INFO OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
 
 	clear_bit(0, &wdt_is_open);
 	return 0;
@@ -262,7 +262,7 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void 
 		 * reboot with no heartbeat
 		 */
 		wdt_change(WDT_ENABLE);
-		printk(OUR_NAME ": Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second.\n");
+		printk(KERN_INFO OUR_NAME ": Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second.\n");
 	}
 	return NOTIFY_DONE;
 }

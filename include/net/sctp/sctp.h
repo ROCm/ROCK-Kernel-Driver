@@ -1,8 +1,8 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
- * Copyright (c) 2001 Intel Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -36,7 +36,9 @@
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
- *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Daisy Chang           <daisyc@us.ibm.com>
+ *    Sridhar Samudrala     <sri@us.ibm.com>
+ *    Ardelle Fan           <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -147,7 +149,9 @@ extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 /*
  * sctp_crc32c.c
  */
-extern __u32 count_crc(__u8 *ptr, __u16 count);
+extern __u32 sctp_start_cksum(__u8 *ptr, __u16 count);
+extern __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
+extern __u32 sctp_end_cksum(__u32 cksum);
 
 /*
  * sctp_input.c
@@ -162,6 +166,9 @@ extern void sctp_hash_endpoint(sctp_endpoint_t *);
 extern void __sctp_hash_endpoint(sctp_endpoint_t *);
 extern void sctp_unhash_endpoint(sctp_endpoint_t *);
 extern void __sctp_unhash_endpoint(sctp_endpoint_t *);
+extern sctp_association_t *__sctp_lookup_association(const union sctp_addr *,
+						     const union sctp_addr *,
+						     struct sctp_transport **);
 
 /*
  * sctp_hashdriver.c
@@ -266,6 +273,7 @@ extern atomic_t sctp_dbg_objcnt_transport;
 extern atomic_t sctp_dbg_objcnt_chunk;
 extern atomic_t sctp_dbg_objcnt_bind_addr;
 extern atomic_t sctp_dbg_objcnt_addr;
+extern atomic_t sctp_dbg_objcnt_ssnmap;
 
 /* Macros to atomically increment/decrement objcnt counters.  */
 #define SCTP_DBG_OBJCNT_INC(name) \
@@ -416,6 +424,23 @@ static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 	}
 
 	return retval;
+}
+
+/* Generate a random jitter in the range of -50% ~ +50% of input RTO. */
+static inline __s32 sctp_jitter(__u32 rto)
+{
+	static __u32 sctp_rand;
+	__s32 ret;
+
+	sctp_rand += jiffies;
+	sctp_rand ^= (sctp_rand << 12);
+	sctp_rand ^= (sctp_rand >> 20);
+
+	/* Choose random number from 0 to rto, then move to -50% ~ +50% 
+	 * of rto. 
+	 */
+	ret = sctp_rand % rto - (rto >> 1);
+	return ret;
 }
 
 /* Walk through a list of TLV parameters.  Don't trust the

@@ -141,13 +141,33 @@ int max_queued_signals = 1024;
 	(((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_DFL) &&	\
 	 ((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_IGN))
 
-#define sig_ignored(t, signr) \
-	(!((t)->ptrace & PT_PTRACED) && \
-	 (t)->sighand->action[(signr)-1].sa.sa_handler == SIG_IGN)
-
 #define sig_fatal(t, signr) \
 	(!T(signr, SIG_KERNEL_IGNORE_MASK|SIG_KERNEL_STOP_MASK) && \
 	 (t)->sighand->action[(signr)-1].sa.sa_handler == SIG_DFL)
+
+static inline int sig_ignored(struct task_struct *t, int sig)
+{
+	void * handler;
+
+	/*
+	 * Tracers always want to know about signals..
+	 */
+	if (t->ptrace & PT_PTRACED)
+		return 0;
+
+	/*
+	 * Blocked signals are never ignored, since the
+	 * signal handler may change by the time it is
+	 * unblocked.
+	 */
+	if (sigismember(&t->blocked, sig))
+		return 0;
+
+	/* Is it explicitly or implicitly ignored? */
+	handler = t->sighand->action[sig-1].sa.sa_handler;
+	return   handler == SIG_IGN ||
+		(handler == SIG_DFL && sig_kernel_ignore(sig));
+}
 
 /*
  * Re-calculate pending state from the set of locally pending
@@ -465,11 +485,11 @@ static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
  *
  * All callers have to hold the siglock.
  */
-int dequeue_signal(sigset_t *mask, siginfo_t *info)
+int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 {
-	int signr = __dequeue_signal(&current->pending, mask, info);
+	int signr = __dequeue_signal(&tsk->pending, mask, info);
 	if (!signr)
-		signr = __dequeue_signal(&current->signal->shared_pending,
+		signr = __dequeue_signal(&tsk->signal->shared_pending,
 					 mask, info);
 	return signr;
 }
@@ -642,7 +662,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * TIF_SIGPENDING
 			 */
 			state = TASK_STOPPED;
-			if (!sigismember(&t->blocked, SIGCONT)) {
+			if (sig_user_defined(t, SIGCONT) && !sigismember(&t->blocked, SIGCONT)) {
 				set_tsk_thread_flag(t, TIF_SIGPENDING);
 				state |= TASK_INTERRUPTIBLE;
 			}
@@ -1405,7 +1425,7 @@ do_signal_stop(int signr)
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
-int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
+int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
 {
 	sigset_t *mask = &current->blocked;
 
@@ -1436,13 +1456,15 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 			continue;
 		}
 	dequeue:
-		signr = dequeue_signal(mask, info);
+		signr = dequeue_signal(current, mask, info);
 		spin_unlock_irq(&current->sighand->siglock);
 
 		if (!signr)
 			break;
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
+			ptrace_signal_deliver(regs, cookie);
+
 			/*
 			 * If there is a group stop in progress,
 			 * we must participate in the bookkeeping.
@@ -1789,7 +1811,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 	}
 
 	spin_lock_irq(&current->sighand->siglock);
-	sig = dequeue_signal(&these, &info);
+	sig = dequeue_signal(current, &these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1809,7 +1831,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			timeout = schedule_timeout(timeout);
 
 			spin_lock_irq(&current->sighand->siglock);
-			sig = dequeue_signal(&these, &info);
+			sig = dequeue_signal(current, &these, &info);
 			current->blocked = current->real_blocked;
 			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();

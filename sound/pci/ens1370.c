@@ -1664,7 +1664,7 @@ static int snd_ensoniq_joy_enable(ensoniq_t *ensoniq)
 	if (!request_region(ensoniq->gameport.io, 8, "ens137x: gameport")) {
 #define ES___GAMEPORT_LOG_DELAY (30*HZ)
 		// avoid log pollution: limit to 2 infos per minute
-		if (jiffies > last_jiffies + ES___GAMEPORT_LOG_DELAY) {
+		if (time_after(jiffies, last_jiffies + ES___GAMEPORT_LOG_DELAY)) {
 			last_jiffies = jiffies;
 			snd_printk("gameport io port 0x%03x in use", ensoniq->gameport.io);
 		}

@@ -135,10 +135,10 @@ void serio_rescan(struct serio *serio)
 	wake_up(&serio_wait);
 }
 
-void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {       
         if (serio->dev && serio->dev->interrupt) 
-                serio->dev->interrupt(serio, data, flags);
+                serio->dev->interrupt(serio, data, flags, regs);
 	else 
 		if (!flags)
 			serio_rescan(serio);

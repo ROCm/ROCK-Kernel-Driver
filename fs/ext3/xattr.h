@@ -73,7 +73,8 @@ extern int ext3_removexattr(struct dentry *, const char *);
 
 extern int ext3_xattr_get(struct inode *, int, const char *, void *, size_t);
 extern int ext3_xattr_list(struct inode *, char *, size_t);
-extern int ext3_xattr_set(handle_t *handle, struct inode *, int, const char *, const void *, size_t, int);
+extern int ext3_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
+extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *, const void *, size_t, int);
 
 extern void ext3_xattr_delete_inode(handle_t *, struct inode *);
 extern void ext3_xattr_put_super(struct super_block *);
@@ -101,7 +102,14 @@ ext3_xattr_list(struct inode *inode, void *buffer, size_t size, int flags)
 }
 
 static inline int
-ext3_xattr_set(handle_t *handle, struct inode *inode, int name_index,
+ext3_xattr_set(struct inode *inode, int name_index, const char *name,
+	       const void *value, size_t size, int flags)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	       const char *name, const void *value, size_t size, int flags)
 {
 	return -EOPNOTSUPP;

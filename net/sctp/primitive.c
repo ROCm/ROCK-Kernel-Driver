@@ -203,23 +203,3 @@ DECLARE_PRIMITIVE(SEND);
  */
 
 DECLARE_PRIMITIVE(REQUESTHEARTBEAT);
-
-/* COMMENT BUG.  Find out where this is mentioned in the spec.  */
-int sctp_other_icmp_unreachfrag(sctp_association_t *asoc, void *arg)
-{
-	int error = 0;
-	sctp_event_t event_type;
-	sctp_subtype_t subtype;
-	sctp_state_t state;
-	sctp_endpoint_t *ep;
-
-	event_type = SCTP_EVENT_T_OTHER;
-	subtype = SCTP_ST_OTHER(SCTP_EVENT_ICMP_UNREACHFRAG);
-	state = asoc ? asoc->state : SCTP_STATE_CLOSED;
-	ep = asoc ? asoc->ep : NULL;
-
-	error = sctp_do_sm(event_type, subtype, state, ep,
-			   asoc, arg, GFP_ATOMIC);
-
-	return error;
-}

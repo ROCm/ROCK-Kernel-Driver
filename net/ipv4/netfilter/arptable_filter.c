@@ -37,10 +37,10 @@ static struct
 } initial_table __initdata
 = { { "filter", FILTER_VALID_HOOKS, 3,
       sizeof(struct arpt_standard) * 2 + sizeof(struct arpt_error),
-      { [NF_ARP_IN] 0,
-	[NF_ARP_OUT] sizeof(struct arpt_standard) },
-      { [NF_ARP_IN] 0,
-	[NF_ARP_OUT] sizeof(struct arpt_standard), },
+      { [NF_ARP_IN] = 0,
+	[NF_ARP_OUT] = sizeof(struct arpt_standard) },
+      { [NF_ARP_IN] = 0,
+	[NF_ARP_OUT] = sizeof(struct arpt_standard), },
       0, NULL, { } },
     {
 	    /* ARP_IN */

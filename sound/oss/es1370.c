@@ -2669,7 +2669,8 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	}
 	set_fs(fs);
 	/* register gameport */
-	gameport_register_port(&s->gameport);
+	if (s->gameport.io)
+		gameport_register_port(&s->gameport);
 
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);

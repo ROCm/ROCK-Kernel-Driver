@@ -61,7 +61,6 @@ static int
 ext3_xattr_user_set(struct inode *inode, const char *name,
 		    const void *value, size_t size, int flags)
 {
-	handle_t *handle;
 	int error;
 
 	if (strcmp(name, "") == 0)
@@ -79,16 +78,9 @@ ext3_xattr_user_set(struct inode *inode, const char *name,
 	if (error)
 		return error;
   
-	lock_kernel();
-	handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
-	if (IS_ERR(handle))
-		return PTR_ERR(handle);
-	error = ext3_xattr_set(handle, inode, EXT3_XATTR_INDEX_USER, name,
-			       value, size, flags);
-	ext3_journal_stop(handle, inode);
-	unlock_kernel();
+	return ext3_xattr_set(inode, EXT3_XATTR_INDEX_USER, name,
+			      value, size, flags);
 
-	return error;
 }
 
 struct ext3_xattr_handler ext3_xattr_user_handler = {

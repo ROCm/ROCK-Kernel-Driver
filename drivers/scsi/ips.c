@@ -195,14 +195,14 @@
  * DRIVER_VER
  */
 #define IPS_VERSION_HIGH        "5.99"
-#define IPS_VERSION_LOW         ".00-BETA"
+#define IPS_VERSION_LOW         ".01-BETA"
 
 
 #if !defined(__i386__) && !defined(__ia64__)
    #error "This driver has only been tested on the x86/ia64 platforms"
 #endif
 
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
     #include "sd.h"
     #define IPS_SG_ADDRESS(sg)       ((sg)->address)
     #define IPS_LOCK_SAVE(lock,flags) spin_lock_irqsave(&io_request_lock,flags)
@@ -241,6 +241,7 @@ static ips_ha_t    *ips_ha[IPS_MAX_ADAPTERS];        /* Array of HA structures *
 static unsigned int ips_next_controller = 0;
 static unsigned int ips_num_controllers = 0;
 static unsigned int ips_released_controllers = 0;
+static int          ips_hotplug;
 static int          ips_cmd_timeout = 60;
 static int          ips_reset_timeout = 60 * 5;
 static int          ips_force_memio = 1;             /* Always use Memory Mapped I/O    */
@@ -572,7 +573,7 @@ ips_detect(Scsi_Host_Template *SHT) {
          ips_free(ips_ha[i]);
          ips_released_controllers++;
    } 
-
+   ips_hotplug = 1;
    return (ips_num_controllers);
 }
 
@@ -702,6 +703,7 @@ ips_release(struct Scsi_Host *sh) {
    /* free IRQ */
    free_irq(ha->irq, ha);
 
+   IPS_REMOVE_HOST(sh);
    scsi_unregister(sh);
 
    ips_released_controllers++;
@@ -1136,16 +1138,20 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 static int
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+ips_biosparam(Disk *disk, kdev_t dev, int geom[]) {
+   ips_ha_t         *ha = (ips_ha_t *) disk->device->host->hostdata;
+   unsigned long     capacity = disk->capacity;
+#else
 ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]) {
-   ips_ha_t         *ha;
+   ips_ha_t         *ha = (ips_ha_t *) sdev->host->hostdata;
+#endif
    int               heads;
    int               sectors;
    int               cylinders;
 
    METHOD_TRACE("ips_biosparam", 1);
-
-   ha = (ips_ha_t *) sdev->host->hostdata;
 
    if (!ha)
       /* ?!?! host adater info invalid */
@@ -1178,7 +1184,7 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 
    return (0);
 }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_select_queue_depth                                     */
@@ -1188,7 +1194,7 @@ ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 /*   Select queue depths for the devices on the contoller                   */
 /*                                                                          */
 /****************************************************************************/
-/*static void
+static void
 ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
    Scsi_Device *device;
    ips_ha_t    *ha;
@@ -1221,8 +1227,8 @@ ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
       }
    }
 }
-*/
 
+#else
 /****************************************************************************/
 /*                                                                          */
 /* Routine Name: ips_slave_configure                                        */
@@ -1247,6 +1253,7 @@ ips_slave_configure(Scsi_Device *SDptr)
    }
    return 0;
 }
+#endif
 
 /****************************************************************************/
 /*                                                                          */
@@ -3375,8 +3382,8 @@ ips_map_status(ips_ha_t *ha, ips_scb_t *scb, ips_stat_t *sp) {
                 ips_name,
                 ha->host_num,
                 scb->scsi_cmd->device->channel,
-                scb->scsi_cmd->channel->id,
-                scb->scsi_cmd->channel->lun,
+                scb->scsi_cmd->device->id,
+                scb->scsi_cmd->device->lun,
                 scb->basic_status,
                 scb->extended_status,
                 scb->extended_status == IPS_ERR_CKCOND ? scb->dcdb.sense_info[2] & 0xf : 0,
@@ -4222,6 +4229,12 @@ ips_msense(ips_ha_t *ha, ips_scb_t *scb) {
       mdata.pdata.pg4.flags = 0;
       mdata.pdata.pg4.RotationalOffset = 0;
       mdata.pdata.pg4.MediumRotationRate = 0;
+      break;
+   case 0x8:
+      mdata.pdata.pg8.PageCode = 8;
+      mdata.pdata.pg8.PageLength = sizeof(IPS_SCSI_MODE_PAGE8);
+      mdata.hdr.DataLength = 3 + mdata.hdr.BlockDescLength + mdata.pdata.pg8.PageLength;
+      /* everything else is left set to 0 */
       break;
 
    default:
@@ -6744,7 +6757,7 @@ ips_register_scsi( int index){
 	sh->unchecked_isa_dma = sh->hostt->unchecked_isa_dma;
 	sh->use_clustering = sh->hostt->use_clustering;
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
 	sh->max_sectors = 128;
 #endif 
 
@@ -6753,6 +6766,7 @@ ips_register_scsi( int index){
 	sh->max_channel = ha->nbus - 1;
 	sh->can_queue = ha->max_cmds-1;
 
+	IPS_ADD_HOST(sh, NULL);
 	return 0;
 }
 
@@ -6793,11 +6807,11 @@ ips_module_init(void){
 		return -ENODEV;
 	ips_driver_template.module = THIS_MODULE;
 	ips_order_controllers();
-	if( scsi_register_host(&ips_driver_template) ){
+	if( IPS_REGISTER_HOSTS(&ips_driver_template) ){
 		pci_unregister_driver(&ips_pci_driver);
 		return -ENODEV;
 	}
-
+	register_reboot_notifier(&ips_notifier);
 	return 0;
 }
 
@@ -6810,7 +6824,7 @@ ips_module_init(void){
 /****************************************************************************/
 static void __exit
 ips_module_exit(void){
-	scsi_unregister_host(&ips_driver_template);
+	IPS_UNREGISTER_HOSTS(&ips_driver_template);
 	pci_unregister_driver(&ips_pci_driver);
 	unregister_reboot_notifier(&ips_notifier);
 }
@@ -6839,6 +6853,12 @@ static int __devinit ips_insert_device(struct pci_dev *pci_dev, const struct pci
     rc = ips_init_phase1(pci_dev, &index);
     if (rc == SUCCESS)
        rc = ips_init_phase2(index);  
+
+    if(ips_hotplug)
+       if(ips_register_scsi(index)){
+          ips_free(ips_ha[index]);
+          rc = -1;
+       }
 
     if (rc == SUCCESS)
        ips_num_controllers++;
@@ -7127,7 +7147,7 @@ static int ips_init_phase2( int index )
 }
 
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,9)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,9)
 MODULE_LICENSE("GPL");
 #endif
 
