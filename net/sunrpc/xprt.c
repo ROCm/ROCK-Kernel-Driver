@@ -67,9 +67,6 @@
 
 #include <asm/uaccess.h>
 
-/* Following value should be > 32k + RPC overhead */
-#define XPRT_MIN_WRITE_SPACE (35000 + SOCK_MIN_WRITE_SPACE)
-
 extern spinlock_t rpc_queue_lock;
 
 /*
@@ -1099,9 +1096,8 @@ udp_write_space(struct sock *sk)
 	if (xprt->shutdown)
 		return;
 
-
-	/* Wait until we have enough socket memory */
-	if (sock_wspace(sk) < min_t(int, sk->sndbuf,XPRT_MIN_WRITE_SPACE))
+	/* Wait until we have enough socket memory. */
+	if (sock_writeable(sk))
 		return;
 
 	if (!xprt_test_and_set_wspace(xprt)) {

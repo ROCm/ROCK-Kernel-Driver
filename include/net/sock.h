@@ -750,16 +750,13 @@ static inline void sk_wake_async(struct sock *sk, int how, int band)
 
 #define SOCK_MIN_SNDBUF 2048
 #define SOCK_MIN_RCVBUF 256
-/* Must be less or equal SOCK_MIN_SNDBUF */
-#define SOCK_MIN_WRITE_SPACE	SOCK_MIN_SNDBUF
 
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO
- *	Kernel internally doesn't use the MIN_WRITE_SPACE threshold.
  */
 static inline int sock_writeable(struct sock *sk) 
 {
-	return sock_wspace(sk) >= SOCK_MIN_WRITE_SPACE;
+	return atomic_read(&sk->wmem_alloc) < (sk->sndbuf / 2);
 }
 
 static inline int gfp_any(void)
