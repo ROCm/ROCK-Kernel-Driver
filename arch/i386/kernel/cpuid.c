@@ -37,6 +37,8 @@
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>
@@ -156,10 +158,48 @@ static struct file_operations cpuid_fops = {
 	.open = cpuid_open,
 };
 
+static void cpuid_class_simple_device_remove(void)
+{
+	int i = 0;
+	for_each_online_cpu(i)
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	return;
+}
+
+static int cpuid_class_simple_device_add(int i) 
+{
+	int err = 0;
+	struct class_device *class_err;
+
+	class_err = class_simple_device_add(cpuid_class, MKDEV(CPUID_MAJOR, i), NULL, "cpu%d",i);
+	if (IS_ERR(class_err)) {
+		err = PTR_ERR(class_err);
+	}
+	return err;
+}
+static int __devinit cpuid_class_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+
+	switch(action) {
+	case CPU_ONLINE:
+		cpuid_class_simple_device_add(cpu);
+		break;
+	case CPU_DEAD:
+		cpuid_class_simple_device_remove();
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block cpuid_class_cpu_notifier =
+{
+	.notifier_call = cpuid_class_cpu_callback,
+};
+
 int __init cpuid_init(void)
 {
 	int i, err = 0;
-	struct class_device *class_err;
 	i = 0;
 
 	if (register_chrdev(CPUID_MAJOR, "cpu/cpuid", &cpuid_fops)) {
@@ -174,19 +214,17 @@ int __init cpuid_init(void)
 		goto out_chrdev;
 	}
 	for_each_online_cpu(i) {
-		class_err = class_simple_device_add(cpuid_class, MKDEV(CPUID_MAJOR, i), NULL, "cpu%d",i);
-		if (IS_ERR(class_err)) {
-			err = PTR_ERR(class_err);
+		err = cpuid_class_simple_device_add(i);
+		if (err != 0) 
 			goto out_class;
-		}
 	}
+	register_cpu_notifier(&cpuid_class_cpu_notifier);
+
 	err = 0;
 	goto out;
 
 out_class:
-	i = 0;
-	for_each_online_cpu(i)
-		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	cpuid_class_simple_device_remove();
 	class_simple_destroy(cpuid_class);
 out_chrdev:
 	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");	
@@ -196,11 +234,10 @@ out:
 
 void __exit cpuid_exit(void)
 {
-	int i = 0;
-	for_each_online_cpu(i)
-		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	cpuid_class_simple_device_remove();
 	class_simple_destroy(cpuid_class);
 	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");
+	unregister_cpu_notifier(&cpuid_class_cpu_notifier);
 }
 
 module_init(cpuid_init);
