@@ -546,11 +546,6 @@ static inline struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *s
 {
 	return pci_scan_bus_parented(NULL, bus, ops, sysdata);
 }
-struct pci_bus *pci_alloc_primary_bus_parented(struct device * parent, int bus);
-static inline struct pci_bus *pci_alloc_primary_bus(int bus)
-{
-	return pci_alloc_primary_bus_parented(NULL, bus);
-}
 int pci_scan_slot(struct pci_bus *bus, int devfn);
 void pci_bus_add_devices(struct pci_bus *bus);
 int pci_proc_attach_device(struct pci_dev *dev);
@@ -561,7 +556,6 @@ void pci_name_device(struct pci_dev *dev);
 char *pci_class_name(u32 class);
 void pci_read_bridge_bases(struct pci_bus *child);
 struct resource *pci_find_parent_resource(const struct pci_dev *dev, struct resource *res);
-int pci_setup_device(struct pci_dev *dev);
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
 extern struct pci_dev *pci_get_dev(struct pci_dev *dev);
 extern void pci_put_dev(struct pci_dev *dev);
