@@ -15,10 +15,18 @@
 #include <linux/bio.h>
 #include <linux/workqueue.h>
 
+#define TAPE_DBF_AREA	tape_34xx_dbf
+
 #include "tape.h"
 #include "tape_std.h"
 
 #define PRINTK_HEADER "TAPE_34XX: "
+
+/*
+ * Pointer to debug area.
+ */
+debug_info_t *TAPE_DBF_AREA = NULL;
+EXPORT_SYMBOL(TAPE_DBF_AREA);
 
 enum tape_34xx_type {
 	tape_3480,
@@ -1343,7 +1351,13 @@ tape_34xx_init (void)
 {
 	int rc;
 
-	DBF_EVENT(3, "34xx init: $Revision: 1.20 $\n");
+	TAPE_DBF_AREA = debug_register ( "tape_34xx", 1, 2, 4*sizeof(long));
+	debug_register_view(TAPE_DBF_AREA, &debug_sprintf_view);
+#ifdef DBF_LIKE_HELL
+	debug_set_level(TAPE_DBF_AREA, 6);
+#endif
+
+	DBF_EVENT(3, "34xx init: $Revision: 1.21 $\n");
 	/* Register driver for 3480/3490 tapes. */
 	rc = ccw_driver_register(&tape_34xx_driver);
 	if (rc)
@@ -1357,12 +1371,14 @@ static void
 tape_34xx_exit(void)
 {
 	ccw_driver_unregister(&tape_34xx_driver);
+
+	debug_unregister(TAPE_DBF_AREA);
 }
 
 MODULE_DEVICE_TABLE(ccw, tape_34xx_ids);
 MODULE_AUTHOR("(C) 2001-2002 IBM Deutschland Entwicklung GmbH");
 MODULE_DESCRIPTION("Linux on zSeries channel attached 3480 tape "
-		   "device driver ($Revision: 1.20 $)");
+		   "device driver ($Revision: 1.21 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_34xx_init);
