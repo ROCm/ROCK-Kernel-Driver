@@ -144,7 +144,7 @@ static int synaptics_enable_device(struct psmouse *psmouse)
 static void print_ident(struct synaptics_data *priv)
 {
 	printk(KERN_INFO "Synaptics Touchpad, model: %ld\n", SYN_ID_MODEL(priv->identity));
-	printk(KERN_INFO " Firware: %ld.%ld\n", SYN_ID_MAJOR(priv->identity),
+	printk(KERN_INFO " Firmware: %ld.%ld\n", SYN_ID_MAJOR(priv->identity),
 	       SYN_ID_MINOR(priv->identity));
 
 	if (SYN_MODEL_ROT180(priv->model_id))
@@ -228,7 +228,7 @@ int synaptics_init(struct psmouse *psmouse)
 	/*
 	 * The x/y limits are taken from the Synaptics TouchPad interfacing Guide,
 	 * which says that they should be valid regardless of the actual size of
-	 * the senser.
+	 * the sensor.
 	 */
 	set_bit(EV_ABS, psmouse->dev.evbit);
 	set_abs_params(&psmouse->dev, ABS_X, 1472, 5472, 0, 0);
@@ -258,6 +258,9 @@ int synaptics_init(struct psmouse *psmouse)
 void synaptics_disconnect(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
+
+	/* Restore touchpad to power on default state */
+	synaptics_set_mode(psmouse, 0);
 
 	kfree(priv);
 }

@@ -478,9 +478,10 @@ static void psmouse_cleanup(struct serio *serio)
 static void psmouse_disconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
+	if (psmouse->type == PSMOUSE_SYNAPTICS)
+		synaptics_disconnect(psmouse);
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
-	synaptics_disconnect(psmouse);
 	kfree(psmouse);
 }
 
