@@ -142,11 +142,11 @@ unknown:
  */
 
 /* Debug switch - level and trace mask */
-u32                                 acpi_dbg_level = 0;
+u32                                 acpi_dbg_level = ACPI_DEBUG_DEFAULT;
 
 /* Debug switch - layer (component) mask */
 
-u32                                 acpi_dbg_layer = 0;
+u32                                 acpi_dbg_layer = ACPI_COMPONENT_DEFAULT | ACPI_ALL_DRIVERS;
 u32                                 acpi_gbl_nesting_level = 0;
 
 

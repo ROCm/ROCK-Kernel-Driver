@@ -1214,7 +1214,7 @@ static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 			(u32) pr->performance->states[i].transition_latency);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
@@ -1936,7 +1936,7 @@ static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 			pr->flags.limit ? "yes" : "no");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
@@ -1991,7 +1991,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
@@ -2035,7 +2035,7 @@ static int acpi_processor_throttling_seq_show(struct seq_file *seq, void *offset
 			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
@@ -2096,7 +2096,7 @@ static int acpi_processor_limit_seq_show(struct seq_file *seq, void *offset)
 			pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)

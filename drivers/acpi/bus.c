@@ -332,7 +332,7 @@ acpi_bus_receive_event (
 	ACPI_FUNCTION_TRACE("acpi_bus_receive_event");
 
 	if (!event)
-		return -EINVAL;
+		return_VALUE(-EINVAL);
 
 	if (list_empty(&acpi_bus_event_list)) {
 
@@ -599,7 +599,7 @@ acpi_early_init (void)
 	ACPI_FUNCTION_TRACE("acpi_early_init");
 
 	if (acpi_disabled)
-		return;
+		return_VOID;
 
 	/* enable workarounds, unless strict ACPI spec. compliance */
 	if (!acpi_strict)
@@ -652,11 +652,11 @@ acpi_early_init (void)
 		goto error0;
 	}
 
-	return;
+	return_VOID;
 
 error0:
 	disable_acpi();
-	return;
+	return_VOID;
 }
 
 static int __init
@@ -743,7 +743,7 @@ static int __init acpi_init (void)
 
 	if (acpi_disabled) {
 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
-		return -ENODEV;
+		return_VALUE(-ENODEV);
 	}
 
 	firmware_register(&acpi_subsys);

@@ -304,7 +304,8 @@ static void pnpacpi_parse_irq_option(struct pnp_option *option,
 		return;
 
 	for(i = 0; i < p->number_of_interrupts; i++)
-		__set_bit(p->interrupts[i], irq->map);
+		if (p->interrupts[i])
+			__set_bit(p->interrupts[i], irq->map);
 	irq->flags = irq_flags(p->edge_level, p->active_high_low);
 
 	pnp_register_irq_resource(option, irq);
@@ -324,7 +325,8 @@ static void pnpacpi_parse_ext_irq_option(struct pnp_option *option,
 		return;
 
 	for(i = 0; i < p->number_of_interrupts; i++)
-		__set_bit(p->interrupts[i], irq->map);
+		if (p->interrupts[i])
+			__set_bit(p->interrupts[i], irq->map);
 	irq->flags = irq_flags(p->edge_level, p->active_high_low);
 
 	pnp_register_irq_resource(option, irq);
