@@ -1048,9 +1048,7 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 /*
  * VFS calls readdir without BKL but with i_sem held. This protects the VFS
  * parts (e.g. ->f_pos and ->i_size, and it also protects against directory
- * modifications). Together with the rw semaphore taken by the call to
- * map_mft_record(), the directory is truly locked down so we have a race free
- * ntfs_readdir() without the BKL. (-:
+ * modifications).
  *
  * We use the same basic approach as the old NTFS driver, i.e. we parse the
  * index root entries and then the index allocation entries that are marked
@@ -1181,7 +1179,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 */
 	put_attr_search_ctx(ctx);
 	unmap_mft_record(ndir);
-	m = NULL; 
+	m = NULL;
 	ctx = NULL;
 	/* If there is no index allocation attribute we are finished. */
 	if (!NInoIndexAllocPresent(ndir))
