@@ -2486,11 +2486,14 @@ static int
 putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 {
 	int err;
+	u64 hdev;
 
 	if (clear_user(ubuf, sizeof(*ubuf)))
 		return -EFAULT;
 
-	err  = __put_user(huge_encode_dev(kbuf->dev), &ubuf->st_dev);
+	hdev = huge_encode_dev(kbuf->dev);
+	err  = __put_user(hdev, (u32*)&ubuf->st_dev);
+	err |= __put_user(hdev >> 32, ((u32*)&ubuf->st_dev) + 1);
 	err |= __put_user(kbuf->ino, &ubuf->__st_ino);
 	err |= __put_user(kbuf->ino, &ubuf->st_ino_lo);
 	err |= __put_user(kbuf->ino >> 32, &ubuf->st_ino_hi);
@@ -2498,7 +2501,9 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	err |= __put_user(kbuf->nlink, &ubuf->st_nlink);
 	err |= __put_user(kbuf->uid, &ubuf->st_uid);
 	err |= __put_user(kbuf->gid, &ubuf->st_gid);
-	err |= __put_user(huge_encode_dev(kbuf->rdev), &ubuf->st_rdev);
+	hdev = huge_encode_dev(kbuf->rdev);
+	err  = __put_user(hdev, (u32*)&ubuf->st_rdev);
+	err |= __put_user(hdev >> 32, ((u32*)&ubuf->st_rdev) + 1);
 	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
 	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
 	err |= __put_user(kbuf->atime.tv_sec, &ubuf->st_atime);
