@@ -88,8 +88,8 @@
 #define Set8Bits(value)		((value)&0xff)
 
 /* HW cursor parameters */
-#define DEFAULT_CURSOR_BLINK_RATE	(40)
-#define CURSOR_HIDE_DELAY		(20)
+#define DEFAULT_CURSOR_BLINK_RATE	(20)
+#define CURSOR_HIDE_DELAY		(10)
 #define CURSOR_SHOW_DELAY		(3)
 
 #define CURSOR_COLOR		0x7fff
@@ -381,8 +381,8 @@ static void riva_cursor_timer_handler(unsigned long dev_addr)
 
 	if (!par->cursor->enable) goto out;
 
-	if (par->cursor->last_move_delay < 1000)
-		par->cursor->last_move_delay++;
+	par->cursor->prev_slice_moves = par->cursor->last_slice_moves;
+	par->cursor->last_slice_moves = 0;
 
 	if (par->cursor->vbl_cnt && --par->cursor->vbl_cnt == 0) {
 		par->cursor->on ^= 1;
@@ -394,7 +394,7 @@ static void riva_cursor_timer_handler(unsigned long dev_addr)
 			par->cursor->vbl_cnt = par->cursor->blink_rate;
 	}
 out:
-	par->cursor->timer->expires = jiffies + (HZ / 100);
+	par->cursor->timer->expires = jiffies + (HZ / 50);
 	add_timer(par->cursor->timer);
 }
 
@@ -429,7 +429,7 @@ static struct riva_cursor * __init rivafb_init_cursor(struct fb_info *info)
 	cursor->blink_rate = DEFAULT_CURSOR_BLINK_RATE;
 
 	init_timer(cursor->timer);
-	cursor->timer->expires = jiffies + (HZ / 100);
+	cursor->timer->expires = jiffies + (HZ / 50);
 	cursor->timer->data = (unsigned long)info;
 	cursor->timer->function = riva_cursor_timer_handler;
 	add_timer(cursor->timer);
@@ -587,7 +587,7 @@ static void rivafb_cursor(struct display *p, int mode, int x, int y)
 		break;
 	case CM_DRAW:
 	case CM_MOVE:
-		if (c->last_move_delay <= 1) { /* rapid cursor movement */
+		if (c->last_slice_moves > 2 || c->prev_slice_moves > 2) {
 			c->vbl_cnt = CURSOR_SHOW_DELAY;
 		} else {
 			*(par->riva.CURSORPOS) = (x & 0xFFFF) | (y << 16);
@@ -595,7 +595,7 @@ static void rivafb_cursor(struct display *p, int mode, int x, int y)
 			if (!noblink) c->vbl_cnt = CURSOR_HIDE_DELAY;
 			c->on = 1;
 		}
-		c->last_move_delay = 0;
+		c->last_slice_moves++;
 		c->enable = 1;
 		break;
 	}
@@ -801,6 +801,11 @@ static void riva_load_video_mode(struct fb_info *info,
 				  hTotal, height, vDisplay, vStart, vEnd,
 				  vTotal, dotClock);
 
+	if (video_mode->sync & FB_SYNC_HOR_HIGH_ACT)
+		newmode.misc_output &= ~0x40;
+	if (video_mode->sync & FB_SYNC_VERT_HIGH_ACT)
+		newmode.misc_output &= ~0x80;
+
 	par->current_state = newmode;
 	riva_load_state(par, &par->current_state);
 
@@ -908,34 +913,6 @@ static int rivafb_do_maximize(struct fb_info *info,
 
 /* acceleration routines */
 
-static u8 byte_rev[256] = {
-        0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0, 0x10, 0x90, 0x50, 0xd0, 0x30, 0xb0, 0x70, 0xf0,
-        0x08, 0x88, 0x48, 0xc8, 0x28, 0xa8, 0x68, 0xe8, 0x18, 0x98, 0x58, 0xd8, 0x38, 0xb8, 0x78, 0xf8,
-        0x04, 0x84, 0x44, 0xc4, 0x24, 0xa4, 0x64, 0xe4, 0x14, 0x94, 0x54, 0xd4, 0x34, 0xb4, 0x74, 0xf4,
-        0x0c, 0x8c, 0x4c, 0xcc, 0x2c, 0xac, 0x6c, 0xec, 0x1c, 0x9c, 0x5c, 0xdc, 0x3c, 0xbc, 0x7c, 0xfc,
-        0x02, 0x82, 0x42, 0xc2, 0x22, 0xa2, 0x62, 0xe2, 0x12, 0x92, 0x52, 0xd2, 0x32, 0xb2, 0x72, 0xf2,
-        0x0a, 0x8a, 0x4a, 0xca, 0x2a, 0xaa, 0x6a, 0xea, 0x1a, 0x9a, 0x5a, 0xda, 0x3a, 0xba, 0x7a, 0xfa,
-        0x06, 0x86, 0x46, 0xc6, 0x26, 0xa6, 0x66, 0xe6, 0x16, 0x96, 0x56, 0xd6, 0x36, 0xb6, 0x76, 0xf6,
-        0x0e, 0x8e, 0x4e, 0xce, 0x2e, 0xae, 0x6e, 0xee, 0x1e, 0x9e, 0x5e, 0xde, 0x3e, 0xbe, 0x7e, 0xfe,
-        0x01, 0x81, 0x41, 0xc1, 0x21, 0xa1, 0x61, 0xe1, 0x11, 0x91, 0x51, 0xd1, 0x31, 0xb1, 0x71, 0xf1,
-        0x09, 0x89, 0x49, 0xc9, 0x29, 0xa9, 0x69, 0xe9, 0x19, 0x99, 0x59, 0xd9, 0x39, 0xb9, 0x79, 0xf9,
-        0x05, 0x85, 0x45, 0xc5, 0x25, 0xa5, 0x65, 0xe5, 0x15, 0x95, 0x55, 0xd5, 0x35, 0xb5, 0x75, 0xf5,
-        0x0d, 0x8d, 0x4d, 0xcd, 0x2d, 0xad, 0x6d, 0xed, 0x1d, 0x9d, 0x5d, 0xdd, 0x3d, 0xbd, 0x7d, 0xfd,
-        0x03, 0x83, 0x43, 0xc3, 0x23, 0xa3, 0x63, 0xe3, 0x13, 0x93, 0x53, 0xd3, 0x33, 0xb3, 0x73, 0xf3,
-        0x0b, 0x8b, 0x4b, 0xcb, 0x2b, 0xab, 0x6b, 0xeb, 0x1b, 0x9b, 0x5b, 0xdb, 0x3b, 0xbb, 0x7b, 0xfb,
-        0x07, 0x87, 0x47, 0xc7, 0x27, 0xa7, 0x67, 0xe7, 0x17, 0x97, 0x57, 0xd7, 0x37, 0xb7, 0x77, 0xf7,
-        0x0f, 0x8f, 0x4f, 0xcf, 0x2f, 0xaf, 0x6f, 0xef, 0x1f, 0x9f, 0x5f, 0xdf, 0x3f, 0xbf, 0x7f, 0xff,
-};
-
-static inline void reverse_order(u32 *l)
-{
-        u8 *a = (u8 *)l;
-        *a++ = byte_rev[*a];
-/*      *a++ = byte_rev[*a];
-        *a++ = byte_rev[*a];*/
-        *a = byte_rev[*a];
-}
-
 static inline void convert_bgcolor_16(u32 *col)
 {
         *col = ((*col & 0x00007C00) << 9)
@@ -1039,7 +1016,6 @@ static void rivafb_imageblit(struct fb_info *info, struct fb_image *image)
                                 cdat2 = *image->data++;
                         else
                                 cdat2 = *((u16*)image->data)++;
-                        reverse_order(&cdat2);
                         d[j] = cdat2;
                 }
         }
@@ -1484,12 +1460,6 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 		goto err_out_kfree;
 	}
 
-	if (!request_mem_region(rivafb_fix.smem_start,
-				rivafb_fix.smem_len, "rivafb")) {
-		printk(KERN_ERR PFX "cannot reserve FB region\n");
-		goto err_out_free_base0;
-	}
-	
 	default_par->ctrl_base = ioremap(rivafb_fix.mmio_start,
 				   		rivafb_fix.mmio_len);
 	if (!default_par->ctrl_base) {
@@ -1497,27 +1467,6 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 		goto err_out_free_base1;
 	}
 	
-	info->screen_base = ioremap(rivafb_fix.smem_start,
-				 	  rivafb_fix.smem_len);
-	if (!info->screen_base) {
-		printk(KERN_ERR PFX "cannot ioremap FB base\n");
-		goto err_out_iounmap_ctrl;
-	}
-	
-#ifdef CONFIG_MTRR
-	if (!nomtrr) {
-		default_par->mtrr.vram = mtrr_add(rivafb_fix.smem_start,
-					    rivafb_fix.smem_len, MTRR_TYPE_WRCOMB, 1);
-		if (default_par->mtrr.vram < 0) {
-			printk(KERN_ERR PFX "unable to setup MTRR\n");
-		} else {
-			default_par->mtrr.vram_valid = 1;
-			/* let there be speed */
-			printk(KERN_INFO PFX "RIVA MTRR set to ON\n");
-		}
-	}
-#endif /* CONFIG_MTRR */
-
 	default_par->riva.EnableIRQ = 0;
 	default_par->riva.PRAMDAC = (unsigned *)(default_par->ctrl_base + 0x00680000);
 	default_par->riva.PFB = (unsigned *)(default_par->ctrl_base + 0x00100000);
@@ -1531,11 +1480,27 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	default_par->riva.PCIO = (U008 *)(default_par->ctrl_base + 0x00601000);
 	default_par->riva.PDIO = (U008 *)(default_par->ctrl_base + 0x00681000);
 	default_par->riva.PVIO = (U008 *)(default_par->ctrl_base + 0x000C0000);
-
 	default_par->riva.IO = (MISCin(default_par) & 0x01) ? 0x3D0 : 0x3B0;
 
 	switch (default_par->riva.Architecture) {
 	case NV_ARCH_03:
+		/*
+		 * We have to map the full BASE_1 aperture for Riva128's
+		 * because they use the PRAMIN set in "framebuffer" space
+		 */
+		if (!request_mem_region(rivafb_fix.smem_start,
+					rivafb_fix.smem_len, "rivafb")) {
+			printk(KERN_ERR PFX "cannot reserve FB region\n");
+			goto err_out_free_base0;
+		}
+
+		info->screen_base = ioremap(rivafb_fix.smem_start,
+				 	  	rivafb_fix.smem_len);
+		if (!info->screen_base) {
+			printk(KERN_ERR PFX "cannot ioremap FB base\n");
+			goto err_out_iounmap_ctrl;
+		}
+
 		default_par->riva.PRAMIN = (unsigned *)(info->screen_base + 0x00C00000);
 		rivafb_fix.accel = FB_ACCEL_NV3;
 		break;
@@ -1560,6 +1525,41 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 
 	default_par->ram_amount = default_par->riva.RamAmountKBytes * 1024;
 	default_par->dclk_max = default_par->riva.MaxVClockFreqKHz * 1000;
+
+	if (default_par->riva.Architecture != NV_ARCH_03) {
+		/*
+	 	 * Now the _normal_ chipsets can just map the amount of real
+	 	 * physical ram instead of the whole aperture	
+	 	 */
+		rivafb_fix.smem_len = default_par->ram_amount;
+
+		if (!request_mem_region(rivafb_fix.smem_start,
+					rivafb_fix.smem_len, "rivafb")) {
+			printk(KERN_ERR PFX "cannot reserve FB region\n");
+			goto err_out_free_base0;
+		}
+
+		info->screen_base = ioremap(rivafb_fix.smem_start,
+				 	  	rivafb_fix.smem_len);
+		if (!info->screen_base) {
+			printk(KERN_ERR PFX "cannot ioremap FB base\n");
+			goto err_out_iounmap_ctrl;
+		}
+	}
+
+#ifdef CONFIG_MTRR
+	if (!nomtrr) {
+		default_par->mtrr.vram = mtrr_add(rivafb_fix.smem_start,
+					    rivafb_fix.smem_len, MTRR_TYPE_WRCOMB, 1);
+		if (default_par->mtrr.vram < 0) {
+			printk(KERN_ERR PFX "unable to setup MTRR\n");
+		} else {
+			default_par->mtrr.vram_valid = 1;
+			/* let there be speed */
+			printk(KERN_INFO PFX "RIVA MTRR set to ON\n");
+		}
+	}
+#endif /* CONFIG_MTRR */
 
 	if (!nohwcursor) default_par->cursor = rivafb_init_cursor(info);
 

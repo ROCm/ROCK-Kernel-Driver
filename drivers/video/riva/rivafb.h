@@ -34,7 +34,7 @@ struct riva_cursor {
         int enable;
         int on;
         int vbl_cnt;
-        int last_move_delay;
+        int last_slice_moves, prev_slice_moves;
         int blink_rate;
         struct {
                 u16 x, y;
