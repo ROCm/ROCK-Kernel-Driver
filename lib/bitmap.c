@@ -273,7 +273,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 	int c, old_c, totaldigits, ndigits, nchunks, nbits;
 	u32 chunk;
 
-	bitmap_clear(maskp, nmaskbits);
+	bitmap_zero(maskp, nmaskbits);
 
 	nchunks = nbits = totaldigits = c = 0;
 	do {

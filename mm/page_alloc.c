@@ -1222,7 +1222,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	local_node = pgdat->node_id;
 	load = numnodes;
 	prev_node = local_node;
-	CLEAR_BITMAP(used_mask, MAX_NUMNODES);
+	bitmap_zero(used_mask, MAX_NUMNODES);
 	while ((node = find_next_best_node(local_node, used_mask)) >= 0) {
 		/*
 		 * We don't want to pressure a particular node.
