@@ -185,7 +185,7 @@ alpha_core_agp_setup(void)
 	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
 	agp_bridge->mode = agp->capability.lw;
 	agp_bridge->cant_use_aperture = 1;
-	agp_bridgevm_ops =  &alpha_core_agp_vm_ops;
+	agp_bridge->vm_ops =  &alpha_core_agp_vm_ops;
 
 	alpha_core_agp_driver.dev = agp_bridge->dev;
 	agp_register_driver(&alpha_core_agp_driver);
