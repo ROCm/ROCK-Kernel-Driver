@@ -163,4 +163,6 @@
 #define IBM_TTY3270_MAJOR	227
 #define IBM_FS3270_MAJOR	228
 
+#define VIOTAPE_MAJOR		230
+
 #endif

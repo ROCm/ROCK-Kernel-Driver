@@ -235,7 +235,7 @@ extern u32 acpiphp_get_address (struct acpiphp_slot *slot);
 extern struct pci_dev *acpiphp_allocate_pcidev (struct pci_bus *pbus, int dev, int fn);
 extern int acpiphp_configure_slot (struct acpiphp_slot *slot);
 extern int acpiphp_configure_function (struct acpiphp_func *func);
-extern int acpiphp_unconfigure_function (struct acpiphp_func *func);
+extern void acpiphp_unconfigure_function (struct acpiphp_func *func);
 extern int acpiphp_detect_pci_resource (struct acpiphp_bridge *bridge);
 extern int acpiphp_init_func_resource (struct acpiphp_func *func);
 

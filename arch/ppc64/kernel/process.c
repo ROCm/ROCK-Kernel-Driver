@@ -161,28 +161,6 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	local_irq_save(flags);
 	last = _switch(old_thread, new_thread);
 
-	/*
-	 * force our kernel stack out of the ERAT and SLB, this is to
-	 * avoid the race where we it hangs around in the ERAT but not the
-	 * SLB and the ERAT gets invalidated at just the wrong moment by
-	 * another CPU doing a tlbie.
-	 *
-	 * We definitely dont want to flush our bolted segment, so check
-	 * for that first.
-	 */
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_SLB) &&
-	    GET_ESID(__get_SP()) != GET_ESID(PAGE_OFFSET)) {
-		union {
-			unsigned long word0;
-			slb_dword0 data;
-		} esid_data;
-
-		esid_data.word0 = 0;
-		/* class bit is in valid field for slbie instruction */
-		esid_data.data.v = 1;
-		esid_data.data.esid = GET_ESID(__get_SP());
-		asm volatile("isync; slbie %0; isync" : : "r" (esid_data));
-	}
 	local_irq_restore(flags);
 
 	return last;

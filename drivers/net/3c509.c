@@ -1655,14 +1655,14 @@ static int __init el3_init_module(void)
 	}
 
 #ifdef CONFIG_EISA
-	if (eisa_driver_register (&el3_eisa_driver) <= 0) {
+	if (eisa_driver_register (&el3_eisa_driver) < 0) {
 		eisa_driver_unregister (&el3_eisa_driver);
 	}
 #endif
 #ifdef CONFIG_MCA
 	mca_register_driver(&el3_mca_driver);
 #endif
-	return el3_cards ? 0 : -ENODEV;
+	return 0;
 }
 
 static void __exit el3_cleanup_module(void)
@@ -1670,7 +1670,7 @@ static void __exit el3_cleanup_module(void)
 	struct net_device *next_dev;
 
 	while (el3_root_dev) {
-		struct el3_private *lp = el3_root_dev->priv;
+		struct el3_private *lp = netdev_priv(el3_root_dev);
 
 		next_dev = lp->next_dev;
 		el3_common_remove (el3_root_dev);

@@ -6,65 +6,12 @@
  *  inode VFS functions
  */
 
-#include <linux/fs.h>
-#include <linux/time.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
-static struct file_operations hpfs_file_ops =
+void hpfs_init_inode(struct inode *i)
 {
-	.llseek		= generic_file_llseek,
-	.read		= generic_file_read,
-	.write		= hpfs_file_write,
-	.mmap		= generic_file_mmap,
-	.open		= hpfs_open,
-	.release	= hpfs_file_release,
-	.fsync		= hpfs_file_fsync,
-	.sendfile	= generic_file_sendfile,
-};
-
-static struct inode_operations hpfs_file_iops =
-{
-	.truncate	= hpfs_truncate,
-	.setattr	= hpfs_notify_change,
-};
-
-static struct file_operations hpfs_dir_ops =
-{
-	.llseek		= hpfs_dir_lseek,
-	.read		= generic_read_dir,
-	.readdir	= hpfs_readdir,
-	.open		= hpfs_open,
-	.release	= hpfs_dir_release,
-	.fsync		= hpfs_file_fsync,
-};
-
-static struct inode_operations hpfs_dir_iops =
-{
-	.create		= hpfs_create,
-	.lookup		= hpfs_lookup,
-	.unlink		= hpfs_unlink,
-	.symlink	= hpfs_symlink,
-	.mkdir		= hpfs_mkdir,
-	.rmdir		= hpfs_rmdir,
-	.mknod		= hpfs_mknod,
-	.rename		= hpfs_rename,
-	.setattr	= hpfs_notify_change,
-};
-
-struct address_space_operations hpfs_symlink_aops = {
-	.readpage	= hpfs_symlink_readpage
-};
-
-void hpfs_read_inode(struct inode *i)
-{
-	struct buffer_head *bh;
-	struct fnode *fnode;
 	struct super_block *sb = i->i_sb;
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
-	unsigned char *ea;
-	int ea_size;
 
 	i->i_uid = hpfs_sb(sb)->sb_uid;
 	i->i_gid = hpfs_sb(sb)->sb_gid;
@@ -91,17 +38,17 @@ void hpfs_read_inode(struct inode *i)
 	i->i_ctime.tv_sec = i->i_ctime.tv_nsec = 0;
 	i->i_mtime.tv_sec = i->i_mtime.tv_nsec = 0;
 	i->i_atime.tv_sec = i->i_atime.tv_nsec = 0;
+}
 
-	if (!hpfs_sb(i->i_sb)->sb_rd_inode)
-		hpfs_error(i->i_sb, "read_inode: sb_rd_inode == 0");
-	if (hpfs_sb(i->i_sb)->sb_rd_inode == 2) {
-		i->i_mode |= S_IFREG;
-		i->i_mode &= ~0111;
-		i->i_op = &hpfs_file_iops;
-		i->i_fop = &hpfs_file_ops;
-		i->i_nlink = 1;
-		return;
-	}
+void hpfs_read_inode(struct inode *i)
+{
+	struct buffer_head *bh;
+	struct fnode *fnode;
+	struct super_block *sb = i->i_sb;
+	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
+	unsigned char *ea;
+	int ea_size;
+
 	if (!(fnode = hpfs_map_fnode(sb, i->i_ino, &bh))) {
 		/*i->i_mode |= S_IFREG;
 		i->i_mode &= ~0111;
@@ -233,21 +180,33 @@ void hpfs_write_inode(struct inode *i)
 {
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct inode *parent;
-	if (!i->i_nlink) return;
 	if (i->i_ino == hpfs_sb(i->i_sb)->sb_root) return;
 	if (hpfs_inode->i_rddir_off && !atomic_read(&i->i_count)) {
 		if (*hpfs_inode->i_rddir_off) printk("HPFS: write_inode: some position still there\n");
 		kfree(hpfs_inode->i_rddir_off);
 		hpfs_inode->i_rddir_off = NULL;
 	}
-	hpfs_inode->i_dirty = 0;
-	hpfs_lock_iget(i->i_sb, 1);
-	parent = iget(i->i_sb, hpfs_inode->i_parent_dir);
-	hpfs_unlock_iget(i->i_sb);
-	hpfs_lock_inode(parent);
-	hpfs_write_inode_nolock(i);
-	hpfs_unlock_inode(parent);
-	iput(parent);
+	down(&hpfs_inode->i_parent);
+	if (!i->i_nlink) {
+		up(&hpfs_inode->i_parent);
+		return;
+	}
+	parent = iget_locked(i->i_sb, hpfs_inode->i_parent_dir);
+	if (parent) {
+		hpfs_inode->i_dirty = 0;
+		if (parent->i_state & I_NEW) {
+			hpfs_init_inode(parent);
+			hpfs_read_inode(parent);
+			unlock_new_inode(parent);
+		}
+		down(&hpfs_inode->i_sem);
+		hpfs_write_inode_nolock(i);
+		up(&hpfs_inode->i_sem);
+		iput(parent);
+	} else {
+		mark_inode_dirty(i);
+	}
+	up(&hpfs_inode->i_parent);
 }
 
 void hpfs_write_inode_nolock(struct inode *i)

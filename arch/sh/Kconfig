@@ -483,10 +483,9 @@ config SMP
 	  People using multiprocessor machines who say Y here should also say
 	  Y to "Enhanced Real Time Clock Support", below.
 
-	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/nmi_watchdog.txt>
-	  and the SMP-HOWTO available at
-	  <http://www.tldp.org/docs.html#howto>.
+	  See also the <file:Documentation/smp.txt>,
+	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available
+	  at <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
 
@@ -522,7 +521,7 @@ config CPU_FREQ
 	  CPU clock scaling allows you to change the clock speed of the
 	  running CPU on the fly.
 
-	  For details, take a look at <file:Documentation/cpufreq>.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If unsure, say N.
 
@@ -543,7 +542,7 @@ config SH_CPU_FREQ
 	  This adds the cpufreq driver for SuperH. At present, only
 	  the SH-4 is supported.
 
-	  For details, take a look at <file:Documentation/cpufreq>.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If unsure, say N.
 

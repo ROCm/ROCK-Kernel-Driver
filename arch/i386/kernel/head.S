@@ -18,12 +18,7 @@
 #include <asm/cache.h>
 #include <asm/thread_info.h>
 #include <asm/asm_offsets.h>
-
-#define OLD_CL_MAGIC_ADDR	0x90020
-#define OLD_CL_MAGIC		0xA33F
-#define OLD_CL_BASE_ADDR	0x90000
-#define OLD_CL_OFFSET		0x90022
-#define NEW_CL_POINTER		0x228	/* Relative to real mode data */
+#include <asm/setup.h>
 
 /*
  * References to members of the new_cpu_data structure.
@@ -195,22 +190,15 @@ ENTRY(startup_32_smp)
 	call setup_idt
 
 /*
- * Copy bootup parameters out of the way. First 2kB of
- * _empty_zero_page is for boot parameters, second 2kB
- * is for the command line.
- *
+ * Copy bootup parameters out of the way.
  * Note: %esi still has the pointer to the real-mode data.
  */
-	movl $empty_zero_page,%edi
-	movl $512,%ecx
+	movl $boot_params,%edi
+	movl $(PARAM_SIZE/4),%ecx
 	cld
 	rep
 	movsl
-	xorl %eax,%eax
-	movl $512,%ecx
-	rep
-	stosl
-	movl empty_zero_page+NEW_CL_POINTER,%esi
+	movl boot_params+NEW_CL_POINTER,%esi
 	andl %esi,%esi
 	jnz 2f			# New command line protocol
 	cmpw $(OLD_CL_MAGIC),OLD_CL_MAGIC_ADDR
@@ -218,8 +206,8 @@ ENTRY(startup_32_smp)
 	movzwl OLD_CL_OFFSET,%esi
 	addl $(OLD_CL_BASE_ADDR),%esi
 2:
-	movl $empty_zero_page+2048,%edi
-	movl $512,%ecx
+	movl $saved_command_line,%edi
+	movl $(COMMAND_LINE_SIZE/4),%ecx
 	rep
 	movsl
 1:

@@ -3,7 +3,8 @@
  */
 
 #include <asm-generic/vmlinux.lds.h>
-	
+#include <asm/thread_info.h>
+
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
 ENTRY(startup_32)
@@ -48,7 +49,7 @@ SECTIONS
 
   _edata = .;			/* End of data section */
 
-  . = ALIGN(8192);		/* init_task */
+  . = ALIGN(THREAD_SIZE);	/* init_task */
   .data.init_task : { *(.data.init_task) }
 
   /* will be freed after init */

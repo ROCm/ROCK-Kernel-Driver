@@ -914,6 +914,17 @@ static inline void mark_inode_dirty_sync(struct inode *inode)
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
 
+static inline void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
+{
+	/* per-mountpoint checks will go here */
+	update_atime(dentry->d_inode);
+}
+
+static inline void file_accessed(struct file *file)
+{
+	touch_atime(file->f_vfsmnt, file->f_dentry);
+}
+
 
 /**
  * &export_operations - for nfsd to communicate with file systems
@@ -1286,7 +1297,7 @@ extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
 extern void destroy_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
-extern void remove_suid(struct dentry *);
+extern int remove_suid(struct dentry *);
 
 extern void __insert_inode_hash(struct inode *, unsigned long hashval);
 extern void remove_inode_hash(struct inode *);
@@ -1321,7 +1332,8 @@ extern ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t l
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void __user *);
-extern void do_generic_mapping_read(struct address_space *, struct file_ra_state *, struct file *,
+extern void do_generic_mapping_read(struct address_space *mapping,
+				    struct file_ra_state *, struct file *,
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);

@@ -243,7 +243,7 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "noapic", 6)) 
 			skip_ioapic_setup = 1;
 
-		if (!memcmp(from, "apic", 6)) { 
+		if (!memcmp(from, "apic", 4)) { 
 			skip_ioapic_setup = 0;
 			ioapic_force = 1;
 		}
@@ -464,9 +464,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 
 #ifndef CONFIG_SMP
-	/* Temporary hack: disable the IO-APIC for UP Nvidia and 
-	   This is until we sort out the ACPI problems. */
-	if (!acpi_disabled) 
+	/* Temporary hack: disable the IO-APIC for UP Nvidia and VIA. */
 		check_ioapic();
 #endif
 #ifdef CONFIG_ACPI_BOOT

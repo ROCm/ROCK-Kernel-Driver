@@ -63,6 +63,7 @@ extern struct semaphore cpucontrol;
 	static struct notifier_block fn##_nb = { fn, pri };	\
 	register_cpu_notifier(&fn##_nb);			\
 }
+int cpu_down(unsigned int cpu);
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 #else
 #define lock_cpu_hotplug()	do { } while (0)

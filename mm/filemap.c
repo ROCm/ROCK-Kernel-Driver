@@ -725,7 +725,7 @@ no_cached_page:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	update_atime(inode);
+	file_accessed(filp);
 }
 
 EXPORT_SYMBOL(do_generic_mapping_read);
@@ -820,7 +820,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 			if (retval > 0)
 				*ppos = pos + retval;
 		}
-		update_atime(filp->f_dentry->d_inode);
+		file_accessed(filp);
 		goto out;
 	}
 
@@ -1353,11 +1353,10 @@ static struct vm_operations_struct generic_file_vm_ops = {
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	struct address_space *mapping = file->f_mapping;
-	struct inode *inode = mapping->host;
 
 	if (!mapping->a_ops->readpage)
 		return -ENOEXEC;
-	update_atime(inode);
+	file_accessed(file);
 	vma->vm_ops = &generic_file_vm_ops;
 	return 0;
 }
@@ -1503,10 +1502,11 @@ repeat:
  *	if suid or (sgid and xgrp)
  *		remove privs
  */
-void remove_suid(struct dentry *dentry)
+int remove_suid(struct dentry *dentry)
 {
 	mode_t mode = dentry->d_inode->i_mode;
 	int kill = 0;
+	int result = 0;
 
 	/* suid always must be killed */
 	if (unlikely(mode & S_ISUID))
@@ -1523,8 +1523,9 @@ void remove_suid(struct dentry *dentry)
 		struct iattr newattrs;
 
 		newattrs.ia_valid = ATTR_FORCE | kill;
-		notify_change(dentry, &newattrs);
+		result = notify_change(dentry, &newattrs);
 	}
+	return result;
 }
 EXPORT_SYMBOL(remove_suid);
 
@@ -1778,11 +1779,13 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	if (err)
 		goto out;
 
-
 	if (count == 0)
 		goto out;
 
-	remove_suid(file->f_dentry);
+	err = remove_suid(file->f_dentry);
+	if (err)
+		goto out;
+
 	inode_update_time(inode, 1);
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */

@@ -722,6 +722,10 @@ static void pcnet_config(dev_link_t *link)
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = ei_poll;
+#endif
+
     if (register_netdev(dev) != 0) {
 	printk(KERN_NOTICE "pcnet_cs: register_netdev() failed\n");
 	link->dev = NULL;

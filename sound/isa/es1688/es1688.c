@@ -182,7 +182,7 @@ static int __init snd_audiodrive_legacy_auto_probe(unsigned long xport)
 static int __init alsa_card_es1688_init(void)
 {
 	static unsigned long possible_ports[] = {0x220, 0x240, 0x260, -1};
-	int dev, cards = 0;
+	int dev, cards = 0, i;
 
 	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++) {
 		if (port[dev] == SNDRV_AUTO_PORT)
@@ -190,7 +190,10 @@ static int __init alsa_card_es1688_init(void)
 		if (snd_audiodrive_probe(dev) >= 0)
 			cards++;
 	}
-	cards += snd_legacy_auto_probe(possible_ports, snd_audiodrive_legacy_auto_probe);
+	i = snd_legacy_auto_probe(possible_ports, snd_audiodrive_legacy_auto_probe);
+	if (i > 0)
+		cards += i;
+
 	if (!cards) {
 #ifdef MODULE
 		printk(KERN_ERR "ESS AudioDrive ES1688 soundcard not found or device busy\n");

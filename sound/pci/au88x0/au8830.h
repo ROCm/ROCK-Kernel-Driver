@@ -14,16 +14,6 @@
 #define CARD_NAME "Aureal Vortex 2 3D Sound Processor"
 #define CARD_NAME_SHORT "au8830"
 
-#ifndef PCI_VENDOR_ID_AUREAL
-#define PCI_VENDOR_ID_AUREAL 0x12eb
-#endif
-#ifndef PCI_VENDOR_ID_AUREAL_VORTEX2
-#define PCI_DEVICE_ID_AUREAL_VORTEX2 0x0002
-#endif
-
-#define hwread(x,y) readl((x)+((y)>>2))
-#define hwwrite(x,y,z) writel((z),(x)+((y)>>2))
-
 #define NR_ADB 0x20
 #define NR_SRC 0x10
 #define NR_A3D 0x10

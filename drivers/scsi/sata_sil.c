@@ -22,7 +22,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -50,27 +49,9 @@ enum {
 	SIL_MASK_4PORT		= SIL_MASK_2PORT |
 				  SIL_MASK_IDE2_INT | SIL_MASK_IDE3_INT,
 
-	SIL_IDE0_TF		= 0x80,
-	SIL_IDE0_CTL		= 0x8A,
-	SIL_IDE0_BMDMA		= 0x00,
-	SIL_IDE0_SCR		= 0x100,
-
-	SIL_IDE1_TF		= 0xC0,
-	SIL_IDE1_CTL		= 0xCA,
-	SIL_IDE1_BMDMA		= 0x08,
-	SIL_IDE1_SCR		= 0x180,
-
-	SIL_IDE2_TF		= 0x280,
-	SIL_IDE2_CTL		= 0x28A,
 	SIL_IDE2_BMDMA		= 0x200,
-	SIL_IDE2_SCR		= 0x300,
+
 	SIL_INTR_STEERING	= (1 << 1),
-
-	SIL_IDE3_TF		= 0x2C0,
-	SIL_IDE3_CTL		= 0x2CA,
-	SIL_IDE3_BMDMA		= 0x208,
-	SIL_IDE3_SCR		= 0x380,
-
 	SIL_QUIRK_MOD15WRITE	= (1 << 0),
 	SIL_QUIRK_UDMA5MAX	= (1 << 1),
 };
@@ -79,6 +60,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev);
 static u32 sil_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
+static void sil_post_set_mode (struct ata_port *ap);
 
 static struct pci_device_id sil_pci_tbl[] = {
 	{ 0x1095, 0x3112, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
@@ -142,7 +124,7 @@ static struct ata_port_operations sil_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
+	.post_set_mode		= sil_post_set_mode,
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,
@@ -160,7 +142,7 @@ static struct ata_port_info sil_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x03,			/* pio3-4 */
-		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
+		.udma_mask	= 0x3f,			/* udma0-5 */
 		.port_ops	= &sil_ops,
 	}, /* sil_3114 */
 	{
@@ -168,15 +150,60 @@ static struct ata_port_info sil_port_info[] = {
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x03,			/* pio3-4 */
-		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
+		.udma_mask	= 0x3f,			/* udma0-5 */
 		.port_ops	= &sil_ops,
 	},
+};
+
+/* per-port register offsets */
+/* TODO: we can probably calculate rather than use a table */
+static const struct {
+	unsigned long tf;	/* ATA taskfile register block */
+	unsigned long ctl;	/* ATA control/altstatus register block */
+	unsigned long bmdma;	/* DMA register block */
+	unsigned long scr;	/* SATA control register block */
+	unsigned long sien;	/* SATA Interrupt Enable register */
+	unsigned long xfer_mode;/* data transfer mode register */
+} sil_port[] = {
+	/* port 0 ... */
+	{ 0x80, 0x8A, 0x00, 0x100, 0x148, 0xb4 },
+	{ 0xC0, 0xCA, 0x08, 0x180, 0x1c8, 0xf4 },
+	{ 0x280, 0x28A, 0x200, 0x300, 0x348, 0x2b4 },
+	{ 0x2C0, 0x2CA, 0x208, 0x380, 0x3c8, 0x2f4 },
+	/* ... port 3 */
 };
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("low-level driver for Silicon Image SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sil_pci_tbl);
+
+static void sil_post_set_mode (struct ata_port *ap)
+{
+	struct ata_host_set *host_set = ap->host_set;
+	struct ata_device *dev;
+	void *addr = host_set->mmio_base + sil_port[ap->port_no].xfer_mode;
+	u32 tmp, dev_mode[2];
+	unsigned int i;
+
+	for (i = 0; i < 2; i++) {
+		dev = &ap->device[i];
+		if (!ata_dev_present(dev))
+			dev_mode[i] = 0;	/* PIO0/1/2 */
+		else if (dev->flags & ATA_DFLAG_PIO)
+			dev_mode[i] = 1;	/* PIO3/4 */
+		else
+			dev_mode[i] = 3;	/* UDMA */
+		/* value 2 indicates MDMA */
+	}
+
+	tmp = readl(addr);
+	tmp &= ~((1<<5) | (1<<4) | (1<<1) | (1<<0));
+	tmp |= dev_mode[0];
+	tmp |= (dev_mode[1] << 4);
+	writel(tmp, addr);
+	readl(addr);	/* flush */
+}
 
 static inline unsigned long sil_scr_addr(struct ata_port *ap, unsigned int sc_reg)
 {
@@ -283,6 +310,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long base;
 	void *mmio_base;
 	int rc;
+	unsigned int i;
 	u32 tmp, irq_mask;
 
 	if (!printed_version++)
@@ -301,6 +329,9 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
+	if (rc)
+		goto err_out_regions;
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
 
@@ -332,35 +363,17 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->mmio_base = mmio_base;
 
 	base = (unsigned long) mmio_base;
-	probe_ent->port[0].cmd_addr = base + SIL_IDE0_TF;
-	probe_ent->port[0].altstatus_addr =
-	probe_ent->port[0].ctl_addr = base + SIL_IDE0_CTL;
-	probe_ent->port[0].bmdma_addr = base + SIL_IDE0_BMDMA;
-	probe_ent->port[0].scr_addr = base + SIL_IDE0_SCR;
-	ata_std_ports(&probe_ent->port[0]);
 
-	probe_ent->port[1].cmd_addr = base + SIL_IDE1_TF;
-	probe_ent->port[1].altstatus_addr =
-	probe_ent->port[1].ctl_addr = base + SIL_IDE1_CTL;
-	probe_ent->port[1].bmdma_addr = base + SIL_IDE1_BMDMA;
-	probe_ent->port[1].scr_addr = base + SIL_IDE1_SCR;
-	ata_std_ports(&probe_ent->port[1]);
+	for (i = 0; i < probe_ent->n_ports; i++) {
+		probe_ent->port[i].cmd_addr = base + sil_port[i].tf;
+		probe_ent->port[i].altstatus_addr =
+		probe_ent->port[i].ctl_addr = base + sil_port[i].ctl;
+		probe_ent->port[i].bmdma_addr = base + sil_port[i].bmdma;
+		probe_ent->port[i].scr_addr = base + sil_port[i].scr;
+		ata_std_ports(&probe_ent->port[i]);
+	}
 
 	if (ent->driver_data == sil_3114) {
-		probe_ent->port[2].cmd_addr = base + SIL_IDE2_TF;
-		probe_ent->port[2].altstatus_addr =
-		probe_ent->port[2].ctl_addr = base + SIL_IDE2_CTL;
-		probe_ent->port[2].bmdma_addr = base + SIL_IDE2_BMDMA;
-		probe_ent->port[2].scr_addr = base + SIL_IDE2_SCR;
-		ata_std_ports(&probe_ent->port[2]);
-
-		probe_ent->port[3].cmd_addr = base + SIL_IDE3_TF;
-		probe_ent->port[3].altstatus_addr =
-		probe_ent->port[3].ctl_addr = base + SIL_IDE3_CTL;
-		probe_ent->port[3].bmdma_addr = base + SIL_IDE3_BMDMA;
-		probe_ent->port[3].scr_addr = base + SIL_IDE3_SCR;
-		ata_std_ports(&probe_ent->port[3]);
-
 		irq_mask = SIL_MASK_4PORT;
 
 		/* flip the magic "make 4 ports work" bit */
@@ -380,6 +393,11 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		writel(tmp, mmio_base + SIL_SYSCFG);
 		readl(mmio_base + SIL_SYSCFG);	/* flush */
 	}
+
+	/* mask all SATA phy-related interrupts */
+	/* TODO: unmask bit 6 (SError N bit) for hotplug */
+	for (i = 0; i < probe_ent->n_ports; i++)
+		writel(0, mmio_base + sil_port[i].sien);
 
 	pci_set_master(pdev);
 

@@ -20,6 +20,18 @@ static int init_dir(struct inode * inode)
 	return 0;
 }
 
+static void sysfs_d_iput(struct dentry * dentry, struct inode * inode)
+{
+	struct kobject * kobj = dentry->d_fsdata;
+
+	if (kobj)
+		kobject_put(kobj);
+	iput(inode);
+}
+
+static struct dentry_operations sysfs_dentry_operations = {
+	.d_iput	= &sysfs_d_iput,
+};
 
 static int create_dir(struct kobject * k, struct dentry * p,
 		      const char * n, struct dentry ** d)
@@ -33,7 +45,8 @@ static int create_dir(struct kobject * k, struct dentry * p,
 					 S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO,
 					 init_dir);
 		if (!error) {
-			(*d)->d_fsdata = k;
+			(*d)->d_op = &sysfs_dentry_operations;
+			(*d)->d_fsdata = kobject_get(k);
 			p->d_inode->i_nlink++;
 		}
 		dput(*d);
@@ -120,13 +133,14 @@ void sysfs_remove_dir(struct kobject * kobj)
 	down(&dentry->d_inode->i_sem);
 
 	spin_lock(&dcache_lock);
+restart:
 	node = dentry->d_subdirs.next;
 	while (node != &dentry->d_subdirs) {
 		struct dentry * d = list_entry(node,struct dentry,d_child);
-		list_del_init(node);
 
+		node = node->next;
 		pr_debug(" o %s (%d): ",d->d_name.name,atomic_read(&d->d_count));
-		if (d->d_inode) {
+		if (!d_unhashed(d) && (d->d_inode)) {
 			d = dget_locked(d);
 			pr_debug("removing");
 
@@ -137,12 +151,12 @@ void sysfs_remove_dir(struct kobject * kobj)
 			d_delete(d);
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
+			pr_debug(" done\n");
 			spin_lock(&dcache_lock);
+			/* re-acquired dcache_lock, need to restart */
+			goto restart;
 		}
-		pr_debug(" done\n");
-		node = dentry->d_subdirs.next;
 	}
-	list_del_init(&dentry->d_child);
 	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
 

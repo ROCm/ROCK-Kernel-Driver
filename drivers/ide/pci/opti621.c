@@ -367,6 +367,7 @@ static struct pci_device_id opti621_pci_tbl[] = {
 	{ PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C825, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
 	{ 0, },
 };
+MODULE_DEVICE_TABLE(pci, opti621_pci_tbl);
 
 static struct pci_driver driver = {
 	.name		= "Opti621 IDE",

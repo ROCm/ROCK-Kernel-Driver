@@ -1640,9 +1640,8 @@ random_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	/*
 	 * If we gave the user some bytes, update the access time.
 	 */
-	if (count != 0) {
-		update_atime(file->f_dentry->d_inode);
-	}
+	if (count)
+		file_accessed(file);
 	
 	return (count ? count : retval);
 }

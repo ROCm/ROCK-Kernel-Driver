@@ -17,9 +17,6 @@
 #include <qheader.h>
 #include <qfiledialog.h>
 #include <qregexp.h>
-#if QT_VERSION >= 300
-#include <qsettings.h>
-#endif
 
 #include <stdlib.h>
 
@@ -30,9 +27,54 @@
 #include "images.c"
 
 static QApplication *configApp;
+
+ConfigSettings::ConfigSettings()
+	: showAll(false), showName(false), showRange(false), showData(false)
+{
+}
+
 #if QT_VERSION >= 300
-static QSettings *configSettings;
+/**
+ * Reads the list column settings from the application settings.
+ */
+void ConfigSettings::readListSettings()
+{
+	showAll = readBoolEntry("/kconfig/qconf/showAll", false);
+	showName = readBoolEntry("/kconfig/qconf/showName", false);
+	showRange = readBoolEntry("/kconfig/qconf/showRange", false);
+	showData = readBoolEntry("/kconfig/qconf/showData", false);
+}
+
+/**
+ * Reads a list of integer values from the application settings.
+ */
+QValueList<int> ConfigSettings::readSizes(const QString& key, bool *ok)
+{
+	QValueList<int> result;
+	QStringList entryList = readListEntry(key, ok);
+	if (ok) {
+		QStringList::Iterator it;
+		for (it = entryList.begin(); it != entryList.end(); ++it)
+			result.push_back((*it).toInt());
+	}
+
+	return result;
+}
+
+/**
+ * Writes a list of integer values to the application settings.
+ */
+bool ConfigSettings::writeSizes(const QString& key, const QValueList<int>& value)
+{
+	QStringList stringList;
+	QValueList<int>::ConstIterator it;
+
+	for (it = value.begin(); it != value.end(); ++it)
+		stringList.push_back(QString::number(*it));
+	return writeEntry(key, stringList);
+}
 #endif
+
 
 /*
  * update all the children of a menu entry
@@ -327,7 +369,7 @@ void ConfigLineEdit::keyPressEvent(QKeyEvent* e)
 	hide();
 }
 
-ConfigList::ConfigList(ConfigView* p, ConfigMainWindow* cv)
+ConfigList::ConfigList(ConfigView* p, ConfigMainWindow* cv, ConfigSettings* configSettings)
 	: Parent(p), cview(cv),
 	  updateAll(false),
 	  symbolYesPix(xpm_symbol_yes), symbolModPix(xpm_symbol_mod), symbolNoPix(xpm_symbol_no),
@@ -347,6 +389,13 @@ ConfigList::ConfigList(ConfigView* p, ConfigMainWindow* cv)
 
 	connect(this, SIGNAL(selectionChanged(void)),
 		SLOT(updateSelection(void)));
+
+	if (configSettings) {
+		showAll = configSettings->showAll;
+		showName = configSettings->showName;
+		showRange = configSettings->showRange;
+		showData = configSettings->showData;
+	}
 
 	for (i = 0; i < colNr; i++)
 		colMap[i] = colRevMap[i] = -1;
@@ -702,10 +751,11 @@ void ConfigList::focusInEvent(QFocusEvent *e)
 
 ConfigView* ConfigView::viewList;
 
-ConfigView::ConfigView(QWidget* parent, ConfigMainWindow* cview)
+ConfigView::ConfigView(QWidget* parent, ConfigMainWindow* cview,
+		       ConfigSettings *configSettings)
 	: Parent(parent)
 {
-	list = new ConfigList(this, cview);
+	list = new ConfigList(this, cview, configSettings);
 	lineEdit = new ConfigLineEdit(this);
 	lineEdit->hide();
 
@@ -747,13 +797,12 @@ void ConfigView::updateListAll(void)
 ConfigMainWindow::ConfigMainWindow(void)
 {
 	QMenuBar* menu;
-	QSplitter* split1;
-	QSplitter* split2;
 	bool ok;
 	int x, y, width, height;
 
 	QWidget *d = configApp->desktop();
 
+	ConfigSettings* configSettings = new ConfigSettings();
 #if QT_VERSION >= 300
 	width = configSettings->readNumEntry("/kconfig/qconf/window width", d->width() - 64);
 	height = configSettings->readNumEntry("/kconfig/qconf/window height", d->height() - 64);
@@ -763,26 +812,29 @@ ConfigMainWindow::ConfigMainWindow(void)
 		y = configSettings->readNumEntry("/kconfig/qconf/window y", 0, &ok);
 	if (ok)
 		move(x, y);
+	showDebug = configSettings->readBoolEntry("/kconfig/qconf/showDebug", false);
+
+	// read list settings into configSettings, will be used later for ConfigList setup
+	configSettings->readListSettings();
 #else
 	width = d->width() - 64;
 	height = d->height() - 64;
 	resize(width, height);
-#endif
-
 	showDebug = false;
+#endif
 
 	split1 = new QSplitter(this);
 	split1->setOrientation(QSplitter::Horizontal);
 	setCentralWidget(split1);
 
-	menuView = new ConfigView(split1, this);
+	menuView = new ConfigView(split1, this, configSettings);
 	menuList = menuView->list;
 
 	split2 = new QSplitter(split1);
 	split2->setOrientation(QSplitter::Vertical);
 
 	// create config tree
-	configView = new ConfigView(split2, this);
+	configView = new ConfigView(split2, this, configSettings);
 	configList = configView->list;
 
 	helpText = new QTextView(split2);
@@ -886,7 +938,27 @@ ConfigMainWindow::ConfigMainWindow(void)
 	connect(menuList, SIGNAL(gotFocus(void)),
 		SLOT(listFocusChanged(void)));
 
+#if QT_VERSION >= 300
+	QString listMode = configSettings->readEntry("/kconfig/qconf/listMode", "symbol");
+	if (listMode == "single")
+		showSingleView();
+	else if (listMode == "full")
+		showFullView();
+	else /*if (listMode == "split")*/
+		showSplitView();
+
+	// UI setup done, restore splitter positions
+	QValueList<int> sizes = configSettings->readSizes("/kconfig/qconf/split1", &ok);
+	if (ok)
+		split1->setSizes(sizes);
+
+	sizes = configSettings->readSizes("/kconfig/qconf/split2", &ok);
+	if (ok)
+		split2->setSizes(sizes);
+#else
 	showSplitView();
+#endif
+	delete configSettings;
 }
 
 static QString print_filter(const char *str)
@@ -1234,6 +1306,43 @@ void ConfigMainWindow::showAbout(void)
 	QMessageBox::information(this, "qconf", str);
 }
 
+void ConfigMainWindow::saveSettings(void)
+{
+#if QT_VERSION >= 300
+	ConfigSettings *configSettings = new ConfigSettings;
+	configSettings->writeEntry("/kconfig/qconf/window x", pos().x());
+	configSettings->writeEntry("/kconfig/qconf/window y", pos().y());
+	configSettings->writeEntry("/kconfig/qconf/window width", size().width());
+	configSettings->writeEntry("/kconfig/qconf/window height", size().height());
+	configSettings->writeEntry("/kconfig/qconf/showName", configList->showName);
+	configSettings->writeEntry("/kconfig/qconf/showRange", configList->showRange);
+	configSettings->writeEntry("/kconfig/qconf/showData", configList->showData);
+	configSettings->writeEntry("/kconfig/qconf/showAll", configList->showAll);
+	configSettings->writeEntry("/kconfig/qconf/showDebug", showDebug);
+
+	QString entry;
+	switch(configList->mode) {
+	case singleMode :
+		entry = "single";
+		break;
+
+	case symbolMode :
+		entry = "split";
+		break;
+
+	case fullMode :
+		entry = "full";
+		break;
+	}
+	configSettings->writeEntry("/kconfig/qconf/listMode", entry);
+
+	configSettings->writeSizes("/kconfig/qconf/split1", split1->sizes());
+	configSettings->writeSizes("/kconfig/qconf/split2", split2->sizes());
+
+	delete configSettings;
+#endif
+}
+
 void fixup_rootmenu(struct menu *menu)
 {
 	struct menu *child;
@@ -1269,9 +1378,6 @@ int main(int ac, char** av)
 
 	progname = av[0];
 	configApp = new QApplication(ac, av);
-#if QT_VERSION >= 300
-	configSettings = new QSettings;
-#endif
 	if (ac > 1 && av[1][0] == '-') {
 		switch (av[1][1]) {
 		case 'h':
@@ -1294,14 +1400,8 @@ int main(int ac, char** av)
 	//zconfdump(stdout);
 	v->show();
 	configApp->connect(configApp, SIGNAL(lastWindowClosed()), SLOT(quit()));
+	configApp->connect(configApp, SIGNAL(aboutToQuit()), v, SLOT(saveSettings()));
 	configApp->exec();
 
-#if QT_VERSION >= 300
-	configSettings->writeEntry("/kconfig/qconf/window x", v->pos().x());
-	configSettings->writeEntry("/kconfig/qconf/window y", v->pos().y());
-	configSettings->writeEntry("/kconfig/qconf/window width", v->size().width());
-	configSettings->writeEntry("/kconfig/qconf/window height", v->size().height());
-	delete configSettings;
-#endif
 	return 0;
 }

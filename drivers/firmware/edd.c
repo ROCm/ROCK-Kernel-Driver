@@ -52,7 +52,7 @@
 #include <linux/pci.h>
 #include <linux/device.h>
 #include <linux/blkdev.h>
-#include <asm/edd.h>
+#include <linux/edd.h>
 /* FIXME - this really belongs in include/scsi/scsi.h */
 #include <../drivers/scsi/scsi.h>
 #include <../drivers/scsi/hosts.h>
@@ -658,7 +658,7 @@ struct edd_match_data {
  * edd_match_scsidev()
  * @edev - EDD device is a known SCSI device
  * @sd - scsi_device with host who's parent is a PCI controller
- * 
+ *
  * returns 1 if a match is found, 0 if not.
  */
 static int edd_match_scsidev(struct device * dev, void * d)
@@ -682,7 +682,7 @@ static int edd_match_scsidev(struct device * dev, void * d)
  * edd_find_matching_device()
  * @edev - edd_device to match
  *
- * Search the SCSI devices for a drive that matches the EDD 
+ * Search the SCSI devices for a drive that matches the EDD
  * device descriptor we have. If we find a match, return it,
  * otherwise, return NULL.
  */

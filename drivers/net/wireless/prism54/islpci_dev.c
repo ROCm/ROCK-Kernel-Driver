@@ -577,6 +577,7 @@ islpci_alloc_memory(islpci_private *priv)
 		if (!(skb = dev_alloc_skb(MAX_FRAGMENT_SIZE_RX + 2))) {
 			/* error allocating an sk_buff structure elements */
 			printk(KERN_ERR "Error allocating skb.\n");
+			skb = NULL;
 			goto out_free;
 		}
 		/* add the new allocated sk_buff to the buffer array */
@@ -711,7 +712,7 @@ islpci_setup(struct pci_dev *pdev)
 #endif
 
 	/* allocate a private device structure to the network device  */
-	priv = ndev->priv;
+	priv = netdev_priv(ndev);
 	priv->ndev = ndev;
 	priv->pdev = pdev;
 

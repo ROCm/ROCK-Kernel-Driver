@@ -2053,14 +2053,18 @@ static void vortex_connect_default(vortex_t * vortex, int en)
 	// Connect DSP interface for SQ3500 turbo (not here i think...)
 
 	// Connect AC98 modem codec
-
-	/* Fast Play Workaround */
-#ifndef CHIP_AU8820
-	vortex->fixed_res[VORTEX_RESOURCE_DMA] = 0x00000001;
-#endif
-	// Channel swapping workaround. We are nuking registers somewhere, or
-	// its a hardware bug.
-	vortex->fixed_res[VORTEX_RESOURCE_SRC] = 0x00000001;
+ 	
+ 	/* Fast Play Workaround. Revision 0xFE does not seem to need it. */
+ 	printk(KERN_INFO "vortex: revision = 0x%x, device = %d\n", vortex->rev, vortex->device);
+ 	if (IS_BAD_CHIP(vortex)) {
+ 		printk(KERN_INFO "vortex: Erratum workaround enabled.\n");
+ #ifndef CHIP_AU8820
+ 		vortex->fixed_res[VORTEX_RESOURCE_DMA] = 0x00000001;
+ #endif
+ 		// Channel swapping workaround. We are nuking registers somewhere, or
+ 		// its a hardware bug.
+ 		vortex->fixed_res[VORTEX_RESOURCE_SRC] = 0x00000001;
+ 	}
 }
 
 /*
@@ -2161,8 +2165,8 @@ vortex_adb_allocroute(vortex_t * vortex, int dma, int nr_ch, int dir, int type)
 		for (i = 0; i < nr_ch; i++) {
 			if (stream->type == VORTEX_PCM_ADB) {
 				vortex_connection_adbdma_src(vortex, en,
-							     //src[nr_ch - 1], 
-							     src[0], 
+							     src[nr_ch - 1], 
+							     //src[0], 
 							     dma,
 							     src[i]);
 				vortex_connection_src_mixin(vortex, en,
@@ -2644,7 +2648,7 @@ static void vortex_spdif_init(vortex_t * vortex, int spdif_sr, int spdif_mode)
 static int vortex_core_init(vortex_t * vortex)
 {
 
-	printk(KERN_INFO "Vortex: hardware init.... ");
+	printk(KERN_INFO "Vortex: init.... ");
 	/* Hardware Init. */
 	hwwrite(vortex->mmio, VORTEX_CTRL, 0xffffffff);
 	udelay(5000);
@@ -2698,7 +2702,7 @@ static int vortex_core_init(vortex_t * vortex)
 static int vortex_core_shutdown(vortex_t * vortex)
 {
 
-	printk(KERN_INFO "Vortex: hardware shutdown...");
+	printk(KERN_INFO "Vortex: shutdown...");
 #ifndef CHIP_AU8820
 	vortex_eq_free(vortex);
 	vortex_Vort3D(vortex, 0);

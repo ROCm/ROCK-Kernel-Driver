@@ -362,7 +362,7 @@ struct ata_port_operations {
 	u8   (*check_status)(struct ata_port *ap);
 
 	void (*phy_reset) (struct ata_port *ap);
-	void (*phy_config) (struct ata_port *ap);
+	void (*post_set_mode) (struct ata_port *ap);
 
 	void (*bmdma_start) (struct ata_queued_cmd *qc);
 	void (*fill_sg) (struct ata_queued_cmd *qc);
@@ -396,7 +396,6 @@ struct pci_bits {
 };
 
 extern void ata_port_probe(struct ata_port *);
-extern void pata_phy_config(struct ata_port *ap);
 extern void sata_phy_reset(struct ata_port *ap);
 extern void ata_bus_reset(struct ata_port *ap);
 extern void ata_port_disable(struct ata_port *);

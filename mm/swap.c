@@ -27,6 +27,9 @@
 #include <linux/module.h>
 #include <linux/percpu_counter.h>
 #include <linux/percpu.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
+#include <linux/init.h>
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
@@ -381,7 +384,37 @@ void vm_acct_memory(long pages)
 	preempt_enable();
 }
 EXPORT_SYMBOL(vm_acct_memory);
-#endif
+
+#ifdef CONFIG_HOTPLUG_CPU
+static void lru_drain_cache(unsigned int cpu)
+{
+	struct pagevec *pvec = &per_cpu(lru_add_pvecs, cpu);
+
+	/* CPU is dead, so no locking needed. */
+	if (pagevec_count(pvec))
+		__pagevec_lru_add(pvec);
+	pvec = &per_cpu(lru_add_active_pvecs, cpu);
+	if (pagevec_count(pvec))
+		__pagevec_lru_add_active(pvec);
+}
+
+/* Drop the CPU's cached committed space back into the central pool. */
+static int cpu_swap_callback(struct notifier_block *nfb,
+			     unsigned long action,
+			     void *hcpu)
+{
+	long *committed;
+
+	committed = &per_cpu(committed_space, (long)hcpu);
+	if (action == CPU_DEAD) {
+		atomic_add(*committed, &vm_committed_space);
+		*committed = 0;
+		lru_drain_cache((long)hcpu);
+	}
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+#endif /* CONFIG_SMP */
 
 #ifdef CONFIG_SMP
 void percpu_counter_mod(struct percpu_counter *fbc, long amount)
@@ -420,4 +453,5 @@ void __init swap_setup(void)
 	 * Right now other parts of the system means that we
 	 * _really_ don't want to cluster much more
 	 */
+	hotcpu_notifier(cpu_swap_callback, 0);
 }

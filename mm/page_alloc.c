@@ -1716,9 +1716,29 @@ struct seq_operations vmstat_op = {
 
 #endif /* CONFIG_PROC_FS */
 
+#ifdef CONFIG_HOTPLUG_CPU
+static int page_alloc_cpu_notify(struct notifier_block *self,
+				 unsigned long action, void *hcpu)
+{
+	int cpu = (unsigned long)hcpu;
+	long *count;
+
+	if (action == CPU_DEAD) {
+		/* Drain local pagecache count. */
+		count = &per_cpu(nr_pagecache_local, cpu);
+		atomic_add(*count, &nr_pagecache);
+		*count = 0;
+		local_irq_disable();
+		__drain_pages(cpu);
+		local_irq_enable();
+	}
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 void __init page_alloc_init(void)
 {
+	hotcpu_notifier(page_alloc_cpu_notify, 0);
 }
 
 /*

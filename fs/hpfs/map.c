@@ -6,7 +6,6 @@
  *  mapping structures to memory with some minimal checks
  */
 
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 unsigned *hpfs_map_dnode_bitmap(struct super_block *s, struct quad_buffer_head *qbh)

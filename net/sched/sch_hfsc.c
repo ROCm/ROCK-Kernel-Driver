@@ -118,7 +118,7 @@ enum hfsc_class_flags
 
 struct hfsc_class
 {
-	u32	classid;	/* class id */
+	u32		classid;	/* class id */
 	unsigned int	refcnt;		/* usage count */
 
 	struct tc_stats	stats;		/* generic statistics */
@@ -138,28 +138,28 @@ struct hfsc_class
 	struct list_head hlist;		/* hash list member */
 	struct list_head dlist;		/* drop list member */
 
-	u64	cl_total;	/* total work in bytes */
-	u64	cl_cumul;	/* cumulative work in bytes done by
+	u64	cl_total;		/* total work in bytes */
+	u64	cl_cumul;		/* cumulative work in bytes done by
 					   real-time criteria */
 
-	u64 	cl_d;		/* deadline*/
-	u64 	cl_e;		/* eligible time */
-	u64	cl_vt;		/* virtual time */
-	u64	cl_f;		/* time when this class will fit for
+	u64 	cl_d;			/* deadline*/
+	u64 	cl_e;			/* eligible time */
+	u64	cl_vt;			/* virtual time */
+	u64	cl_f;			/* time when this class will fit for
 					   link-sharing, max(myf, cfmin) */
-	u64	cl_myf;		/* my fit-time (calculated from this
+	u64	cl_myf;			/* my fit-time (calculated from this
 					   class's own upperlimit curve) */
-	u64	cl_myfadj;	/* my fit-time adjustment (to cancel
+	u64	cl_myfadj;		/* my fit-time adjustment (to cancel
 					   history dependence) */
-	u64	cl_cfmin;	/* earliest children's fit-time (used
+	u64	cl_cfmin;		/* earliest children's fit-time (used
 					   with cl_myf to obtain cl_f) */
-	u64	cl_cvtmin;	/* minimal virtual time among the
+	u64	cl_cvtmin;		/* minimal virtual time among the
 					   children fit for link-sharing
 					   (monotonic within a period) */
-	u64	cl_vtadj;	/* intra-period cumulative vt
+	u64	cl_vtadj;		/* intra-period cumulative vt
 					   adjustment */
-	u64	cl_vtoff;	/* inter-period cumulative vt offset */
-	u64	cl_cvtmax;	/* max child's vt in the last period */
+	u64	cl_vtoff;		/* inter-period cumulative vt offset */
+	u64	cl_cvtmax;		/* max child's vt in the last period */
 
 	struct internal_sc cl_rsc;	/* internal real-time service curve */
 	struct internal_sc cl_fsc;	/* internal fair service curve */
@@ -179,15 +179,13 @@ struct hfsc_class
 
 struct hfsc_sched
 {
-	u16	defcls;			/* default class id */
-
+	u16	defcls;				/* default class id */
 	struct hfsc_class root;			/* root class */
-	struct hfsc_class *last_xmit;		/* class that transmitted last
-						   packet (for requeueing) */
 	struct list_head clhash[HFSC_HSIZE];	/* class hash */
 	struct list_head eligible;		/* eligible list */
 	struct list_head droplist;		/* active leaf class list (for
 						   dropping) */
+	struct sk_buff_head requeue;		/* requeued packet */
 	struct timer_list wd_timer;		/* watchdog timer */
 };
 
@@ -566,8 +564,7 @@ sc2isc(struct tc_service_curve *sc, struct internal_sc *isc)
  * service curve starting at (x, y).
  */
 static void
-rtsc_init(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x,
-                                                            u64 y)
+rtsc_init(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x, u64 y)
 {
 	rtsc->x	   = x;
 	rtsc->y    = y;
@@ -626,8 +623,7 @@ rtsc_x2y(struct runtime_sc *rtsc, u64 x)
  * runtime service curve and the service curve starting at (x, y).
  */
 static void
-rtsc_min(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x,
-                                                           u64 y)
+rtsc_min(struct runtime_sc *rtsc, struct internal_sc *isc, u64 x, u64 y)
 {
 	u64 y1, y2, dx, dy;
 	u32 dsm;
@@ -1231,9 +1227,6 @@ hfsc_delete_class(struct Qdisc *sch, unsigned long arg)
 	list_del(&cl->siblings);
 	hfsc_adjust_levels(cl->cl_parent);
 	hfsc_purge_queue(sch, cl);
-	if (q->last_xmit == cl)
-		q->last_xmit = NULL;
-
 	if (--cl->refcnt == 0)
 		hfsc_destroy_class(sch, cl);
 
@@ -1541,6 +1534,7 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 		INIT_LIST_HEAD(&q->clhash[i]);
 	INIT_LIST_HEAD(&q->eligible);
 	INIT_LIST_HEAD(&q->droplist);
+	skb_queue_head_init(&q->requeue);
 
 	q->root.refcnt  = 1;
 	q->root.classid = sch->handle;
@@ -1619,10 +1613,9 @@ hfsc_reset_qdisc(struct Qdisc *sch)
 		list_for_each_entry(cl, &q->clhash[i], hlist)
 			hfsc_reset_class(cl);
 	}
-
+	__skb_queue_purge(&q->requeue);
 	INIT_LIST_HEAD(&q->eligible);
 	INIT_LIST_HEAD(&q->droplist);
-	q->last_xmit = NULL;
 	del_timer(&q->wd_timer);
 	sch->flags &= ~TCQ_F_THROTTLED;
 	sch->q.qlen = 0;
@@ -1639,7 +1632,7 @@ hfsc_destroy_qdisc(struct Qdisc *sch)
 		list_for_each_entry_safe(cl, next, &q->clhash[i], hlist)
 			hfsc_destroy_class(sch, cl);
 	}
-
+	__skb_queue_purge(&q->requeue);
 	del_timer(&q->wd_timer);
 }
 
@@ -1708,6 +1701,8 @@ hfsc_dequeue(struct Qdisc *sch)
 
 	if (sch->q.qlen == 0)
 		return NULL;
+	if ((skb = __skb_dequeue(&q->requeue)))
+		goto out;
 
 	PSCHED_GET_TIME(cur_time);
 
@@ -1757,7 +1752,7 @@ hfsc_dequeue(struct Qdisc *sch)
 		set_passive(cl);
 	}
 
-	q->last_xmit = cl;
+ out:
 	sch->flags &= ~TCQ_F_THROTTLED;
 	sch->q.qlen--;
 
@@ -1768,28 +1763,10 @@ static int
 hfsc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct hfsc_sched *q = (struct hfsc_sched *)sch->data;
-	struct hfsc_class *cl = q->last_xmit;
-	unsigned int len = skb->len;
-	int ret;
 
-	if (cl == NULL) {
-		kfree_skb(skb);
-		sch->stats.drops++;
-		return NET_XMIT_DROP;
-	}
-
-	ret = cl->qdisc->ops->requeue(skb, cl->qdisc);
-	if (ret == NET_XMIT_SUCCESS) {
-		if (cl->qdisc->q.qlen == 1)
-			set_active(cl, len);
-		sch->q.qlen++;
-	} else {
-		cl->stats.drops++;
-		sch->stats.drops++;
-	}
-	q->last_xmit = NULL;
-
-	return ret;
+	__skb_queue_head(&q->requeue, skb);
+	sch->q.qlen++;
+	return NET_XMIT_SUCCESS;
 }
 
 static unsigned int

@@ -7,16 +7,6 @@
 #define CARD_NAME "Aureal Advantage 3D Sound Processor"
 #define CARD_NAME_SHORT "au8810"
 
-#ifndef PCI_VENDOR_ID_AUREAL
-#define PCI_VENDOR_ID_AUREAL 0x12eb
-#endif
-#ifndef PCI_VENDOR_ID_AUREAL_ADVANTAGE
-#define PCI_DEVICE_ID_AUREAL_ADVANTAGE 0x0003
-#endif
-
-#define hwread(x,y) readl((x)+((y)>>2))
-#define hwwrite(x,y,z) writel((z),(x)+((y)>>2))
-
 #define NR_ADB		0x20
 #define NR_WT		0x00
 #define NR_SRC		0x10
