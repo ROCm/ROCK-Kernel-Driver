@@ -127,9 +127,9 @@ int bond_alb_init_slave(struct bonding *bond, struct slave *slave);
 void bond_alb_deinit_slave(struct bonding *bond, struct slave *slave);
 void bond_alb_handle_link_change(struct bonding *bond, struct slave *slave, char link);
 void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave);
-int bond_alb_xmit(struct sk_buff *skb, struct net_device *dev);
+int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev);
 void bond_alb_monitor(struct bonding *bond);
-int bond_alb_set_mac_address(struct net_device *dev, void *addr);
+int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr);
 
 #endif /* __BOND_ALB_H__ */
 
