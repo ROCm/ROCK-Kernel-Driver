@@ -17,14 +17,6 @@
 
 #define SMP_CACHE_BYTES 32
 
-#ifdef MODULE
-#define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
-#else
-#define __cacheline_aligned					\
-  __attribute__((__aligned__(SMP_CACHE_BYTES),			\
-		 __section__(".data.cacheline_aligned")))
-#endif
-
 /* Direct access to the instruction cache is provided through and
  * alternate address space.  The IDC bit must be off in the ICCR on
  * HyperSparcs for these accesses to work.  The code below does not do
