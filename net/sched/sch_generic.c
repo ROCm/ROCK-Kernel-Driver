@@ -148,8 +148,10 @@ int qdisc_restart(struct net_device *dev)
 					spin_lock(&dev->queue_lock);
 					return -1;
 				}
-				if (ret == NETDEV_TX_LOCKED && nolock)
+				if (ret == NETDEV_TX_LOCKED && nolock) {
+					spin_lock(&dev->queue_lock);
 					goto collision; 
+				}
 			}
 
 			/* NETDEV_TX_BUSY - we need to requeue */
