@@ -5221,31 +5221,6 @@ e1000_set_vco_speed(struct e1000_hw *hw)
     return E1000_SUCCESS;
 }
 
-/******************************************************************************
- * Verifies the hardware needs to allow ARPs to be processed by the host
- *
- * hw - Struct containing variables accessed by shared code
- *
- * returns: - TRUE/FALSE
- *
- *****************************************************************************/
-uint32_t
-e1000_enable_mng_pass_thru(struct e1000_hw *hw)
-{
-    uint32_t manc;
-
-    if (hw->asf_firmware_present) {
-        manc = E1000_READ_REG(hw, MANC);
-
-        if (!(manc & E1000_MANC_RCV_TCO_EN) ||
-            !(manc & E1000_MANC_EN_MAC_ADDR_FILTER))
-            return FALSE;
-        if ((manc & E1000_MANC_SMBUS_EN) && !(manc & E1000_MANC_ASF_EN))
-            return TRUE;
-    }
-    return FALSE;
-}
-
 static int32_t
 e1000_polarity_reversal_workaround(struct e1000_hw *hw)
 {
