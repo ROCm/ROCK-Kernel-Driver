@@ -416,14 +416,15 @@ out:
 	return rc;
 }
 
-static inline void avc_print_ipv6_addr(struct in6_addr *addr, u16 port,
+static inline void avc_print_ipv6_addr(struct audit_buffer *ab,
+				       struct in6_addr *addr, u16 port,
 				       char *name1, char *name2)
 {
 	if (!ipv6_addr_any(addr))
-		printk(" %s=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x",
-		       name1, NIP6(*addr));
+		audit_log_format(ab, " %s=%04x:%04x:%04x:%04x:%04x:"
+				 "%04x:%04x:%04x", name1, NIP6(*addr));
 	if (port)
-		printk(" %s=%d", name2, ntohs(port));
+		audit_log_format(ab, " %s=%d", name2, ntohs(port));
 }
 
 static inline void avc_print_ipv4_addr(struct audit_buffer *ab, u32 addr,
@@ -625,10 +626,10 @@ void avc_audit(u32 ssid, u32 tsid,
 					struct inet_opt *inet = inet_sk(sk);
 					struct ipv6_pinfo *inet6 = inet6_sk(sk);
 
-					avc_print_ipv6_addr(&inet6->rcv_saddr,
+					avc_print_ipv6_addr(ab, &inet6->rcv_saddr,
 							    inet->sport,
 							    "laddr", "lport");
-					avc_print_ipv6_addr(&inet6->daddr,
+					avc_print_ipv6_addr(ab, &inet6->daddr,
 							    inet->dport,
 							    "faddr", "fport");
 					break;
@@ -666,10 +667,10 @@ void avc_audit(u32 ssid, u32 tsid,
 						    "daddr", "dest");
 				break;
 			case AF_INET6:
-				avc_print_ipv6_addr(&a->u.net.v6info.saddr,
+				avc_print_ipv6_addr(ab, &a->u.net.v6info.saddr,
 						    a->u.net.sport,
 						    "saddr", "src");
-				avc_print_ipv6_addr(&a->u.net.v6info.daddr,
+				avc_print_ipv6_addr(ab, &a->u.net.v6info.daddr,
 						    a->u.net.dport,
 						    "daddr", "dest");
 				break;
