@@ -28,6 +28,7 @@
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <linux/irq.h>
+#include <linux/module.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
@@ -465,6 +466,7 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 	acpi_gsi_to_irq(gsi, &irq);
 	return irq;
 }
+EXPORT_SYMBOL(acpi_register_gsi);
 
 static unsigned long __init
 acpi_scan_rsdp (
