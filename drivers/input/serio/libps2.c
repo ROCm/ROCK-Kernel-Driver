@@ -52,7 +52,7 @@ struct ps2work {
  * ps2_sendbyte() can only be called from a process context
  */
 
-int ps2_sendbyte(struct ps2dev *ps2dev, unsigned char byte)
+int ps2_sendbyte(struct ps2dev *ps2dev, unsigned char byte, int timeout)
 {
 	serio_pause_rx(ps2dev->serio);
 	ps2dev->nak = 1;
@@ -62,7 +62,7 @@ int ps2_sendbyte(struct ps2dev *ps2dev, unsigned char byte)
 	if (serio_write(ps2dev->serio, byte) == 0)
 		wait_event_interruptible_timeout(ps2dev->wait,
 					!(ps2dev->flags & PS2_FLAG_ACK),
-					msecs_to_jiffies(200));
+					msecs_to_jiffies(timeout));
 
 	serio_pause_rx(ps2dev->serio);
 	ps2dev->flags &= ~PS2_FLAG_ACK;
@@ -88,8 +88,6 @@ int ps2_command(struct ps2dev *ps2dev, unsigned char *param, int command)
 
 	down(&ps2dev->cmd_sem);
 
-	timeout = msecs_to_jiffies(command == PS2_CMD_RESET_BAT ? 4000 : 500);
-
 	serio_pause_rx(ps2dev->serio);
 	ps2dev->flags = command == PS2_CMD_GETID ? PS2_FLAG_WAITID : 0;
 	ps2dev->cmdcnt = receive;
@@ -98,23 +96,47 @@ int ps2_command(struct ps2dev *ps2dev, unsigned char *param, int command)
 			ps2dev->cmdbuf[(receive - 1) - i] = param[i];
 	serio_continue_rx(ps2dev->serio);
 
+	/*
+	 * Some devices (Synaptics) peform the reset before
+	 * ACKing the reset command, and so it can take a long
+	 * time before the ACK arrrives.
+	 */
 	if (command & 0xff)
-		if (ps2_sendbyte(ps2dev, command & 0xff))
+		if (ps2_sendbyte(ps2dev, command & 0xff,
+			command == PS2_CMD_RESET_BAT ? 1000 : 200))
 			goto out;
 
 	for (i = 0; i < send; i++)
-		if (ps2_sendbyte(ps2dev, param[i]))
+		if (ps2_sendbyte(ps2dev, param[i], 200))
 			goto out;
 
-	timeout = wait_event_interruptible_timeout(ps2dev->wait,
-				!(ps2dev->flags & PS2_FLAG_CMD1), timeout);
+	/*
+	 * The reset command takes a long time to execute.
+	 */
+	timeout = msecs_to_jiffies(command == PS2_CMD_RESET_BAT ? 4000 : 500);
+
+	wait_event_interruptible_timeout(ps2dev->wait,
+		!(ps2dev->flags & PS2_FLAG_CMD1), timeout);
 
 	if (ps2dev->cmdcnt && timeout > 0) {
-		if (command == PS2_CMD_RESET_BAT && jiffies_to_msecs(timeout) > 100)
+
+		if (command == PS2_CMD_RESET_BAT && timeout > msecs_to_jiffies(100)) {
+			/*
+			 * Device has sent the first response byte
+			 * after a reset command, reset is thus done,
+			 * shorten the timeout. The next byte will come
+			 * soon (keyboard) or not at all (mouse).
+			 */
 			timeout = msecs_to_jiffies(100);
+		}
 
 		if (command == PS2_CMD_GETID &&
-		    ps2dev->cmdbuf[receive - 1] != 0xab && ps2dev->cmdbuf[receive - 1] != 0xac) {
+		    ps2dev->cmdbuf[receive - 1] != 0xab && /* Regular keyboards */
+		    ps2dev->cmdbuf[receive - 1] != 0xac && /* NCD Sun keyboard */
+		    ps2dev->cmdbuf[receive - 1] != 0x2b && /* Trust keyboard, translated */
+		    ps2dev->cmdbuf[receive - 1] != 0x5d && /* Trust keyboard */
+		    ps2dev->cmdbuf[receive - 1] != 0x60 && /* NMB SGI keyboard, translated */
+		    ps2dev->cmdbuf[receive - 1] != 0x47) { /* NMB SGI keyboard */
 			/*
 			 * Device behind the port is not a keyboard
 			 * so we don't need to wait for the 2nd byte
