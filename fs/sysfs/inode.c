@@ -76,11 +76,6 @@ int sysfs_create(struct dentry * dentry, int mode, int (*init)(struct inode *))
 	return error;
 }
 
-int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
-{
-	return sysfs_create(dentry, mode, NULL);
-}
-
 struct dentry * sysfs_get_dentry(struct dentry * parent, const char * name)
 {
 	struct qstr qstr;

@@ -209,12 +209,12 @@ void device_initialize(struct device *dev)
  */
 int device_add(struct device *dev)
 {
-	struct device * parent;
-	int error;
+	struct device *parent = NULL;
+	int error = -EINVAL;
 
 	dev = get_device(dev);
 	if (!dev || !strlen(dev->bus_id))
-		return -EINVAL;
+		goto Error;
 
 	parent = get_device(dev->parent);
 
