@@ -3,38 +3,43 @@
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 
-/**
- * find_exported_dentry - helper routine to implement export_operations->decode_fh
- * @sb:		The &super_block identifying the filesystem
- * @obj:	An opaque identifier of the object to be found - passed to get_inode
- * @parent:	An optional opqaue identifier of the parent of the object.
- * @acceptable:	A function used to test possible &dentries to see of they are acceptable
- * @context:	A parameter to @acceptable so that it knows on what basis to judge.
- *
- * find_exported_dentry is the central helper routine to enable file systems to provide
- * the decode_fh() export_operation.  It's main task is to take an &inode, find or create an
- * appropriate &dentry structure, and possibly splice this into the dcache in the
- * correct place.
- *
- * The decode_fh() operation provided by the filesystem should call find_exported_dentry()
- * with the same parameters that it received except that instead of the file handle fragment,
- * pointers to opaque identifiers for the object and optionally its parent are passed.
- * The default decode_fh routine passes one pointer to the start of the filehandle fragment, and
- * one 8 bytes into the fragment.  It is expected that most filesystems will take this
- * approach, though the offset to the parent identifier may well be different.
- *
- * find_exported_dentry() will call get_dentry to get an dentry pointer from the file system.  If
- * any &dentry in the d_alias list is acceptable, it will be returned.  Otherwise
- * find_exported_dentry() will attempt to splice a new &dentry into the dcache using get_name() and
- * get_parent() to find the appropriate place.
- *
- */
-
 struct export_operations export_op_default;
 
 #define	CALL(ops,fun) ((ops->fun)?(ops->fun):export_op_default.fun)
 
-#define dprintk(x, a...) do{}while(0)
+#define dprintk(fmt, args...) do{}while(0)
+
+/**
+ * find_exported_dentry - helper routine to implement export_operations->decode_fh
+ * @sb:		The &super_block identifying the filesystem
+ * @obj:	An opaque identifier of the object to be found - passed to
+ *		get_inode
+ * @parent:	An optional opqaue identifier of the parent of the object.
+ * @acceptable:	A function used to test possible &dentries to see if they are
+ *		acceptable
+ * @context:	A parameter to @acceptable so that it knows on what basis to
+ *		judge.
+ *
+ * find_exported_dentry is the central helper routine to enable file systems
+ * to provide the decode_fh() export_operation.  It's main task is to take
+ * an &inode, find or create an appropriate &dentry structure, and possibly
+ * splice this into the dcache in the correct place.
+ *
+ * The decode_fh() operation provided by the filesystem should call
+ * find_exported_dentry() with the same parameters that it received except
+ * that instead of the file handle fragment, pointers to opaque identifiers
+ * for the object and optionally its parent are passed.  The default decode_fh
+ * routine passes one pointer to the start of the filehandle fragment, and
+ * one 8 bytes into the fragment.  It is expected that most filesystems will
+ * take this approach, though the offset to the parent identifier may well be
+ * different.
+ *
+ * find_exported_dentry() will call get_dentry to get an dentry pointer from
+ * the file system.  If any &dentry in the d_alias list is acceptable, it will
+ * be returned.  Otherwise find_exported_dentry() will attempt to splice a new
+ * &dentry into the dcache using get_name() and get_parent() to find the
+ * appropriate place.
+ */
 
 struct dentry *
 find_exported_dentry(struct super_block *sb, void *obj, void *parent,
@@ -123,12 +128,12 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	 * We then repeat.
 	 */
 
-	/* it is possible that a confused file system might not let us complete the
-	 * path to the root.  For example, if get_parent returns a directory
-	 * in which we cannot find a name for the child.  While this implies a very
-	 * sick filesystem we don't want it to cause knfsd to spin.  Hence the noprogress
-	 * counter.  If we go through the loop 10 times (2 is probably enough) without
-	 * getting anywhere, we just give up
+	/* it is possible that a confused file system might not let us complete 
+	 * the path to the root.  For example, if get_parent returns a directory
+	 * in which we cannot find a name for the child.  While this implies a
+	 * very sick filesystem we don't want it to cause knfsd to spin.  Hence
+	 * the noprogress counter.  If we go through the loop 10 times (2 is
+	 * probably enough) without getting anywhere, we just give up
 	 */
 	lock_kernel();
 	noprogress= 0;
@@ -155,8 +160,8 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			 * to find parent and connect
 			 * note: racing with some other process renaming a
 			 * directory isn't much of a problem here.  If someone
-			 * renames the directory, it will end up properly connected,
-			 * which is what we want
+			 * renames the directory, it will end up properly
+			 * connected, which is what we want
 			 */
 			struct dentry *ppd;
 			struct dentry *npd;
@@ -178,8 +183,8 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			if (err) {
 				dput(ppd);
 				if (err == -ENOENT)
-					/* some race between get_parent and get_name?
-					 * just try again
+					/* some race between get_parent and
+					 * get_name?  just try again
 					 */
 					continue;
 				dput(pd);
@@ -208,7 +213,7 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			dput(npd);
 			dput(ppd);
 			if (IS_ROOT(pd)) {
-				/* something went wrong, we will have to give up */
+				/* something went wrong, we have to give up */
 				dput(pd);
 				break;
 			}
@@ -293,7 +298,8 @@ static struct dentry *get_parent(struct dentry *child)
 
 
 struct getdents_callback {
-	char *name;		/* name that was found. It already points to a buffer NAME_MAX+1 is size */
+	char *name;		/* name that was found. It already points to a
+				   buffer NAME_MAX+1 is size */
 	unsigned long ino;	/* the inum we are looking for */
 	int found;		/* inode matched? */
 	int sequence;		/* sequence counter */
@@ -386,11 +392,11 @@ static struct dentry *export_iget(struct super_block *sb, unsigned long ino, __u
 	/* iget isn't really right if the inode is currently unallocated!!
 	 * This should really all be done inside each filesystem
 	 *
-	 * ext2fs' read_inode has been strengthed to return a bad_inode if the inode
-	 *   had been deleted.
+	 * ext2fs' read_inode has been strengthed to return a bad_inode if
+	 * the inode had been deleted.
 	 *
-	 * Currently we don't know the generation for parent directory, so a generation
-	 * of 0 means "accept any"
+	 * Currently we don't know the generation for parent directory, so
+	 * a generation of 0 means "accept any"
 	 */
 	struct inode *inode;
 	struct dentry *result;
@@ -437,10 +443,10 @@ static struct dentry *get_object(struct super_block *sb, void *vobjp)
 
 /**
  * export_encode_fh - default export_operations->encode_fh function
- * dentry:  the dentry to encode
- * fh:      where to store the file handle fragment
- * max_len: maximum length to store there
- * connectable: whether to store parent infomation
+ * @dentry:  the dentry to encode
+ * @fh:      where to store the file handle fragment
+ * @max_len: maximum length to store there
+ * @connectable: whether to store parent infomation
  *
  * This default encode_fh function assumes that the 32 inode number
  * is suitable for locating an inode, and that the generation number
@@ -474,11 +480,11 @@ static int export_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
 
 /**
  * export_decode_fh - default export_operations->decode_fh function
- * sb:  The superblock
- * fh:  pointer to the file handle fragment
- * fh_len: length of file handle fragment
- * acceptable: function for testing acceptability of dentrys
- * context:   context for @acceptable
+ * @sb:  The superblock
+ * @fh:  pointer to the file handle fragment
+ * @fh_len: length of file handle fragment
+ * @acceptable: function for testing acceptability of dentrys
+ * @context:   context for @acceptable
  *
  * This is the default decode_fh() function.
  * a fileid_type of 1 indicates that the filehandlefragment
