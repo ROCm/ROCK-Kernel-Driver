@@ -257,6 +257,26 @@ static inline void serial8250_clear_fifos(struct uart_8250_port *p)
 	}
 }
 
+/*
+ * Sleep support.
+ */
+static inline void serial8250_set_sleep(struct uart_8250_port *p, int sleep)
+{
+	if (up->capabilities & UART_STARTECH) {
+		serial_outp(up, UART_LCR, 0xBF);
+		serial_outp(up, UART_EFR, UART_EFR_ECB);
+		serial_outp(up, UART_LCR, 0);
+		serial_outp(up, UART_IER, sleep ? UART_IERX_SLEEP : 0);
+		serial_outp(up, UART_LCR, 0xBF);
+		serial_outp(up, UART_EFR, 0);
+		serial_outp(up, UART_LCR, 0);
+	}
+	if (up->port.type == PORT_16750) {
+		/* Arrange to enter sleep mode */
+		serial_outp(up, UART_IER, sleep ? UART_IERX_SLEEP : 0);
+	}
+}
+
 #ifdef CONFIG_SERIAL_8250_RSA
 /*
  * Attempts to turn on the RSA FIFO.  Returns zero on failure.
@@ -1575,54 +1595,12 @@ static void
 serial8250_pm(struct uart_port *port, unsigned int state,
 	      unsigned int oldstate)
 {
-	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	if (state) {
-		/* sleep */
-		if (up->capabilities & UART_STARTECH) {
-			/* Arrange to enter sleep mode */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, UART_EFR_ECB);
-			serial_outp(up, UART_LCR, 0);
-			serial_outp(up, UART_IER, UART_IERX_SLEEP);
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, 0);
-			serial_outp(up, UART_LCR, 0);
-		}
-		if (up->port.type == PORT_16750) {
-			/* Arrange to enter sleep mode */
-			serial_outp(up, UART_IER, UART_IERX_SLEEP);
-		}
+	struct uart_8250_port *p = (struct uart_8250_port *)port;
 
-		if (up->pm)
-			up->pm(port, state, oldstate);
-	} else {
-		/* wake */
-		if (up->capabilities & UART_STARTECH) {
-			/* Wake up UART */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, UART_EFR_ECB);
-			/*
-			 * Turn off LCR == 0xBF so we actually set the IER
-			 * register on the XR16C850
-			 */
-			serial_outp(up, UART_LCR, 0);
-			serial_outp(up, UART_IER, 0);
-			/*
-			 * Now reset LCR so we can turn off the ECB bit
-			 */
-			serial_outp(up, UART_LCR, 0xBF);
-			serial_outp(up, UART_EFR, 0);
-			serial_outp(up, UART_LCR, 0);
-		}
+	serial8250_set_sleep(p, state != 0);
 
-		if (up->port.type == PORT_16750) {
-			/* Wake up UART */
-			serial_outp(up, UART_IER, 0);
-		}
-
-		if (up->pm)
-			up->pm(port, state, oldstate);
-	}
+	if (p->pm)
+		p->pm(port, state, oldstate);
 }
 
 /*
