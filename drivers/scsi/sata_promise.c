@@ -315,7 +315,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA:
 	case ATA_PROT_NODATA:
-		printk(KERN_ERR "ata%u: DMA timeout\n", ap->id);
+		printk(KERN_ERR "ata%u: command timeout\n", ap->id);
 		ata_qc_complete(qc, ata_wait_idle(ap) | ATA_ERR);
 		break;
 
