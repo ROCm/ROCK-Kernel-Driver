@@ -246,7 +246,7 @@ int swsusp_swap_check(void) /* This is called before saving image */
  * we make the device unusable. A new call to
  * lock_swapdevices can unlock the devices. 
  */
-void swsusp_swap_lock(void)
+static void lock_swapdevices(void)
 {
 	int i;
 
@@ -439,7 +439,7 @@ static int write_pagedir(void)
  *
  */
 
-int write_suspend_image(void)
+static int write_suspend_image(void)
 {
 	int error;
 
@@ -862,20 +862,22 @@ int suspend_prepare_image(void)
 	return 0;
 }
 
-static void suspend_save_image(void)
+
+/* It is important _NOT_ to umount filesystems at this point. We want
+ * them synced (in case something goes wrong) but we DO not want to mark
+ * filesystem clean: it is not. (And it does not matter, if we resume
+ * correctly, we'll mark system clean, anyway.)
+ */
+int swsusp_write(void)
 {
+	int error;
 	device_resume();
-
-	swsusp_swap_lock();
-	write_suspend_image();
+	lock_swapdevices();
+	error = write_suspend_image();
 	/* This will unlock ignored swap devices since writing is finished */
-	swsusp_swap_lock();
+	lock_swapdevices();
+	return error;
 
-	/* It is important _NOT_ to umount filesystems at this point. We want
-	 * them synced (in case something goes wrong) but we DO not want to mark
-	 * filesystem clean: it is not. (And it does not matter, if we resume
-	 * correctly, we'll mark system clean, anyway.)
-	 */
 }
 
 static void suspend_power_down(void)
@@ -1011,7 +1013,7 @@ int software_suspend(void)
 			res = swsusp_save();
 
 			if (!res && in_suspend) {
-				suspend_save_image();
+				swsusp_write();
 				suspend_power_down();
 			}
 			in_suspend = 0;

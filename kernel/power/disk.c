@@ -24,7 +24,7 @@ extern u32 pm_disk_mode;
 extern struct pm_ops * pm_ops;
 
 extern int swsusp_suspend(void);
-extern int pmdisk_write(void);
+extern int swsusp_write(void);
 extern int swsusp_read(void);
 extern int swsusp_resume(void);
 extern int pmdisk_free(void);
@@ -173,7 +173,7 @@ int pm_suspend_disk(void)
 		mb();
 		barrier();
 
-		error = pmdisk_write();
+		error = swsusp_write();
 		if (!error) {
 			error = power_down(pm_disk_mode);
 			pr_debug("PM: Power down failed.\n");

@@ -42,49 +42,6 @@ extern suspend_pagedir_t *pagedir_save;
  */
 
 
-extern void swsusp_swap_lock(void);
-
-/**
- *	suspend_save_image - Prepare and write saved image to swap.
- *
- *	IRQs are re-enabled here so we can resume devices and safely write
- *	to the swap devices. We disable them again before we leave.
- *
- *	The second swsusp_swap_lock() will unlock ignored swap devices since
- *	writing is finished.
- *	It is important _NOT_ to umount filesystems at this point. We want
- *	them synced (in case something goes wrong) but we DO not want to mark
- *	filesystem clean: it is not. (And it does not matter, if we resume
- *	correctly, we'll mark system clean, anyway.)
- */
-
-static int suspend_save_image(void)
-{
-	extern int write_suspend_image(void);
-	int error;
-	device_resume();
-	swsusp_swap_lock();
-	error = write_suspend_image();
-	swsusp_swap_lock();
-	return error;
-}
-
-
-/**
- *	pmdisk_write - Write saved memory image to swap.
- *
- *	pmdisk_arch_suspend(0) returns after system is resumed.
- *
- *	pmdisk_arch_suspend() copies all "used" memory to "free" memory,
- *	then unsuspends all device drivers, and writes memory to disk
- *	using normal kernel mechanism.
- */
-
-int pmdisk_write(void)
-{
-	return suspend_save_image();
-}
-
 /**
  *	pmdisk_free - Free memory allocated to hold snapshot.
  */
