@@ -345,7 +345,7 @@ struct block_device *bdget(dev_t dev)
 		bdev->bd_part_count = 0;
 		bdev->bd_invalidated = 0;
 		inode->i_mode = S_IFBLK;
-		inode->i_rdev = to_kdev_t(dev);
+		inode->i_rdev = dev;
 		inode->i_bdev = bdev;
 		inode->i_data.a_ops = &def_blk_aops;
 		mapping_set_gfp_mask(&inode->i_data, GFP_USER);
@@ -386,7 +386,7 @@ int bd_acquire(struct inode *inode)
 		return 0;
 	}
 	spin_unlock(&bdev_lock);
-	bdev = bdget(kdev_t_to_nr(inode->i_rdev));
+	bdev = bdget(inode->i_rdev);
 	if (!bdev)
 		return -ENOMEM;
 	spin_lock(&bdev_lock);

@@ -241,7 +241,7 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 
 	si = SYSV_I(inode);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		si->i_data[0] = cpu_to_fs32(sbi, kdev_t_to_nr(inode->i_rdev));
+		si->i_data[0] = cpu_to_fs32(sbi, inode->i_rdev);
 	for (block = 0; block < 10+1+1+1; block++)
 		write3byte(sbi, (u8 *)&si->i_data[block],
 			&raw_inode->i_data[3*block]);

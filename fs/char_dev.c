@@ -265,7 +265,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 		struct kobject *kobj;
 		int idx;
 		spin_unlock(&cdev_lock);
-		kobj = kobj_lookup(cdev_map, kdev_t_to_nr(inode->i_rdev), &idx);
+		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
 			return -ENODEV;
 		new = container_of(kobj, struct cdev, kobj);

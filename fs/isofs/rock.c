@@ -228,9 +228,9 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	   * stored in the low field, and use that.
 	   */
 	  if((low & ~0xff) && high == 0) {
-	    inode->i_rdev = mk_kdev(low >> 8, low & 0xff);
+	    inode->i_rdev = MKDEV(low >> 8, low & 0xff);
 	  } else {
-	    inode->i_rdev = mk_kdev(high, low);
+	    inode->i_rdev = MKDEV(high, low);
 	  }
 	}
 	break;

@@ -3043,7 +3043,7 @@ static int copy_from_dinode(struct dinode * dip, struct inode *ip)
 	jfs_ip->acltype = le32_to_cpu(dip->di_acltype);
 
 	if (S_ISCHR(ip->i_mode) || S_ISBLK(ip->i_mode))
-		ip->i_rdev = to_kdev_t(le32_to_cpu(dip->di_rdev));
+		ip->i_rdev = le32_to_cpu(dip->di_rdev);
 
 	if (S_ISDIR(ip->i_mode)) {
 		memcpy(&jfs_ip->i_dirtable, &dip->di_dirtable, 384);
@@ -3102,7 +3102,7 @@ static void copy_to_dinode(struct dinode * dip, struct inode *ip)
 	dip->di_acltype = cpu_to_le32(jfs_ip->acltype);
 
 	if (S_ISCHR(ip->i_mode) || S_ISBLK(ip->i_mode))
-		dip->di_rdev = cpu_to_le32(kdev_t_to_nr(ip->i_rdev));
+		dip->di_rdev = cpu_to_le32(ip->i_rdev);
 }
 
 #ifdef	_JFS_DEBUG_IMAP

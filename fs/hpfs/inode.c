@@ -225,7 +225,7 @@ void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 				hpfs_inode->i_ea_mode = 1;
 			}
 		if (S_ISBLK(i->i_mode) || S_ISCHR(i->i_mode)) {
-			int d = kdev_t_to_nr(i->i_rdev);
+			dev_t d = i->i_rdev;
 			ea[0] = d & 0xff;
 			ea[1] = (d >> 8) & 0xff;
 			ea[2] = (d >> 16) & 0xff;

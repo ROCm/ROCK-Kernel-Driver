@@ -619,7 +619,7 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 	}
 
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		ufs_inode->ui_u2.ui_addr.ui_db[0] = cpu_to_fs32(sb, kdev_t_to_nr(inode->i_rdev));
+		ufs_inode->ui_u2.ui_addr.ui_db[0] = cpu_to_fs32(sb, inode->i_rdev);
 	else if (inode->i_blocks) {
 		for (i = 0; i < (UFS_NDADDR + UFS_NINDIR); i++)
 			ufs_inode->ui_u2.ui_addr.ui_db[i] = ufsi->i_u1.i_data[i];

@@ -373,7 +373,7 @@ struct inode {
 	unsigned int		i_nlink;
 	uid_t			i_uid;
 	gid_t			i_gid;
-	kdev_t			i_rdev;
+	dev_t			i_rdev;
 	loff_t			i_size;
 	struct timespec		i_atime;
 	struct timespec		i_mtime;
@@ -469,12 +469,12 @@ static inline void i_size_write(struct inode *inode, loff_t i_size)
 
 static inline unsigned iminor(struct inode *inode)
 {
-	return minor(inode->i_rdev);
+	return MINOR(inode->i_rdev);
 }
 
 static inline unsigned imajor(struct inode *inode)
 {
-	return major(inode->i_rdev);
+	return MAJOR(inode->i_rdev);
 }
 
 struct fown_struct {

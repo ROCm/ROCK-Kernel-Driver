@@ -1329,8 +1329,7 @@ static void isofs_read_inode(struct inode * inode)
 		inode->i_data.a_ops = &isofs_symlink_aops;
 	} else
 		/* XXX - parse_rock_ridge_inode() had already set i_rdev. */
-		init_special_inode(inode, inode->i_mode,
-				   kdev_t_to_nr(inode->i_rdev));
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 
  out:
 	if (tmpde)

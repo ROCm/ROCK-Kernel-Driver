@@ -178,7 +178,7 @@ linvfs_mknod(
 		ip = LINVFS_GET_IP(vp);
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
-			ip->i_rdev = to_kdev_t(rdev);
+			ip->i_rdev = rdev;
 		else if (S_ISDIR(mode))
 			validate_fields(ip);
 		d_instantiate(dentry, ip);

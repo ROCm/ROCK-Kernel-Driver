@@ -2012,11 +2012,11 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     inode->i_fop = &devfs_fops;
     if ( S_ISCHR (de->mode) )
     {
-	inode->i_rdev = to_kdev_t(de->u.cdev.dev);
+	inode->i_rdev = de->u.cdev.dev;
     }
     else if ( S_ISBLK (de->mode) )
     {
-	inode->i_rdev = to_kdev_t(de->u.bdev.dev);
+	inode->i_rdev = de->u.bdev.dev;
 	if (bd_acquire (inode) != 0)
 		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
     }

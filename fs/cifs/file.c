@@ -1024,7 +1024,7 @@ fill_in_inode(struct inode *tmp_inode,
 	} else {
 		cFYI(1, (" Init special inode "));
 		init_special_inode(tmp_inode, tmp_inode->i_mode,
-				   kdev_t_to_nr(tmp_inode->i_rdev));
+				   tmp_inode->i_rdev);
 	}
 }
 
@@ -1094,7 +1094,7 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	} else {
 		cFYI(1, (" Init special inode "));
 		init_special_inode(tmp_inode, tmp_inode->i_mode,
-				   kdev_t_to_nr(tmp_inode->i_rdev));
+				   tmp_inode->i_rdev);
 	}
 }
 

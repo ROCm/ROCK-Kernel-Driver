@@ -1295,7 +1295,7 @@ static int tty_open(struct inode * inode, struct file * filp)
 	int noctty, retval;
 	struct tty_driver *driver;
 	int index;
-	dev_t device = kdev_t_to_nr(inode->i_rdev);
+	dev_t device = inode->i_rdev;
 	unsigned short saved_flags = filp->f_flags;
 retry_open:
 	noctty = filp->f_flags & O_NOCTTY;
