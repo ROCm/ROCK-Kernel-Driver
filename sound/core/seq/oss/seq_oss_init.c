@@ -211,7 +211,7 @@ snd_seq_oss_open(struct file *file, int level)
 	snd_seq_oss_midi_setup(dp);
 
 	if (dp->synth_opened == 0 && dp->max_mididev == 0) {
-		snd_printk(KERN_ERR "no device found\n");
+		/* snd_printk(KERN_ERR "no device found\n"); */
 		rc = -ENODEV;
 		goto _error;
 	}
