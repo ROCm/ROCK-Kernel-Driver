@@ -22,6 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/version.h>
@@ -51,7 +52,7 @@
 #define DEBUG if (rndis_debug) printk 
 static int rndis_debug = 0;
 
-MODULE_PARM (rndis_debug, "i");
+module_param (rndis_debug, bool, 0);
 MODULE_PARM_DESC (rndis_debug, "enable debugging");
 
 #else

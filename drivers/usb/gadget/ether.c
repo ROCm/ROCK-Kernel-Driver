@@ -40,6 +40,7 @@
 #include <linux/version.h>
 #include <linux/device.h>
 #include <linux/moduleparam.h>
+#include <linux/ctype.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -192,6 +193,16 @@ MODULE_PARM_DESC(iManufacturer, "USB Manufacturer string");
 static char *__initdata iProduct;
 module_param(iProduct, charp, S_IRUGO);
 MODULE_PARM_DESC(iProduct, "USB Product string");
+
+/* initial value, changed by "ifconfig usb0 hw ether xx:xx:xx:xx:xx:xx" */
+static char *__initdata dev_addr;
+module_param(dev_addr, charp, S_IRUGO);
+MODULE_PARM_DESC(iProduct, "Device Ethernet Address");
+
+/* this address is invisible to ifconfig */
+static char *__initdata host_addr;
+module_param(host_addr, charp, S_IRUGO);
+MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 
 
 /*-------------------------------------------------------------------------*/
@@ -2199,6 +2210,36 @@ eth_unbind (struct usb_gadget *gadget)
 	set_gadget_data (gadget, 0);
 }
 
+static u8 __init nibble (unsigned char c)
+{
+	if (likely (isdigit (c)))
+		return c - '0';
+	c = toupper (c);
+	if (likely (isxdigit (c)))
+		return 10 + c - 'A';
+	return 0;
+}
+
+static void __init get_ether_addr (const char *str, u8 *dev_addr)
+{
+	if (str) {
+		unsigned	i;
+
+		for (i = 0; i < 6; i++) {
+			unsigned char num;
+
+			if((*str == '.') || (*str == ':'))
+				str++;
+			num = nibble(*str++) << 4;
+			num |= (nibble(*str++));
+			dev_addr [i] = num;
+		}
+		if (is_valid_ether_addr (dev_addr))
+			return;
+	}
+	random_ether_addr(dev_addr);
+}
+
 static int __init
 eth_bind (struct usb_gadget *gadget)
 {
@@ -2393,21 +2434,13 @@ autoconf_fail:
 	dev->cdc = cdc;
 	dev->zlp = zlp;
 
-	/* FIXME make these addresses configurable with module params.
-	 * also the manufacturer and product strings.
+	/* Module params for these addresses should come from ID proms.
+	 * The host side address is used with CDC and RNDIS, and commonly
+	 * end ups in a persistent config database.
 	 */
-
-	/* one random address for the gadget device ... both of these could
-	 * reasonably come from an id prom or a module parameter.
-	 */
-	random_ether_addr(net->dev_addr);
-
-	/* ... another address for the host, on the other end of the
-	 * link, gets exported through CDC (see CDC spec table 41)
-	 * and RNDIS.
-	 */
+	get_ether_addr(dev_addr, net->dev_addr);
 	if (cdc || rndis) {
-		random_ether_addr(dev->host_mac);
+		get_ether_addr(host_addr, dev->host_mac);
 #ifdef	DEV_CONFIG_CDC
 		snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
 			dev->host_mac [0], dev->host_mac [1],
