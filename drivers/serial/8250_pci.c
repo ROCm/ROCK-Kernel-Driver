@@ -28,7 +28,6 @@
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
-#include <asm/serial.h>
 #include <asm/io.h>
 
 #include "8250.h"
@@ -1585,7 +1584,7 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 	struct pci_board *board, tmp;
 	struct pci_serial_quirk *quirk;
 	struct serial_struct serial_req;
-	int base_baud, rc, nr_ports, i;
+	int rc, nr_ports, i;
 
 	if (ent->driver_data >= ARRAY_SIZE(pci_boards)) {
 		printk(KERN_ERR "pci_init_one: invalid driver_data: %ld\n",
@@ -1663,16 +1662,11 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 	priv->quirk = quirk;
 	pci_set_drvdata(dev, priv);
 
-	base_baud = board->base_baud;
-	if (!base_baud) {
-		moan_device("Board entry does not specify baud rate.", dev);
-		base_baud = BASE_BAUD;
-	}
 	for (i = 0; i < nr_ports; i++) {
 		memset(&serial_req, 0, sizeof(serial_req));
 		serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE |
 				   UPF_RESOURCES | UPF_SHARE_IRQ;
-		serial_req.baud_base = base_baud;
+		serial_req.baud_base = board->base_baud;
 		serial_req.irq = get_pci_irq(dev, board, i);
 		if (quirk->setup(dev, board, &serial_req, i))
 			break;
