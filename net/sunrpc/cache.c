@@ -19,6 +19,7 @@
 #include <linux/kmod.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/ctype.h>
 #include <asm/uaccess.h>
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
@@ -863,4 +864,64 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
 	spin_unlock(&queue_lock);
 	wake_up(&queue_wait);
 	return 0;
+}
+
+/*
+ * parse a message from user-space and pass it
+ * to an appropriate cache
+ * Messages are, like requests, separated into fields by
+ * spaces and dequotes as \xHEXSTRING or embedded \nnn octal
+ *
+ * Message is 
+ *   reply cachename expiry key ... content....
+ *
+ * key and content are both parsed by cache 
+ */
+
+#define isodigit(c) (isdigit(c) && c <= '7')
+int get_word(char **bpp, char *dest, int bufsize)
+{
+	/* return bytes copied, or -1 on error */
+	char *bp = *bpp;
+	int len = 0;
+
+	while (*bp == ' ') bp++;
+
+	if (bp[0] == '\\' && bp[1] == 'x') {
+		/* HEX STRING */
+		bp += 2;
+		while (isxdigit(bp[0]) && isxdigit(bp[1]) && len < bufsize) {
+			int byte = isdigit(*bp) ? *bp-'0' : toupper(*bp)-'A'+10;
+			bp++;
+			byte <<= 4;
+			byte |= isdigit(*bp) ? *bp-'0' : toupper(*bp)-'A'+10;
+			*dest++ = byte;
+			bp++;
+			len++;
+		}
+	} else {
+		/* text with \nnn octal quoting */
+		while (*bp != ' ' && *bp && len < bufsize-1) {
+			if (*bp == '\\' &&
+			    isodigit(bp[1]) && (bp[1] <= '3') &&
+			    isodigit(bp[2]) &&
+			    isodigit(bp[3])) {
+				int byte = (*++bp -'0');
+				bp++;
+				byte = (byte << 3) | (*bp++ - '0');
+				byte = (byte << 3) | (*bp++ - '0');
+				*dest++ = byte;
+				len++;
+			} else {
+				*dest++ = *bp++;
+				len++;
+			}
+		}
+		*dest = '\0';
+	}
+
+	*bpp = bp;
+	if (*bp == ' ' || *bp == '\n' || *bp == '\0')
+		return len;
+	return -1;
 }

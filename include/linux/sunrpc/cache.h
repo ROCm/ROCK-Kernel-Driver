@@ -273,5 +273,6 @@ extern void cache_drop(struct cache_detail *detail);
 
 extern void add_word(char **bpp, int *lp, char *str);
 extern void add_hex(char **bpp, int *lp, char *buf, int blen);
+extern int get_word(char **bpp, char *dest, int bufsize);
 
 #endif /*  _LINUX_SUNRPC_CACHE_H_ */
