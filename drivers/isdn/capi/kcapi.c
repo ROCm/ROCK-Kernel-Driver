@@ -112,11 +112,13 @@ static char capi_manufakturer[64] = "AVM Berlin";
 
 static struct capi_appl applications[CAPI_MAXAPPL];
 static struct capi_ctr cards[CAPI_MAXCONTR];
-static int ncards = 0;
+static int ncards;
 static struct sk_buff_head recv_queue;
-static struct capi_interface_user *capi_users = 0;
-static spinlock_t capi_users_lock = SPIN_LOCK_UNLOCKED;
-static struct capi_driver *drivers;
+
+static LIST_HEAD(users);
+static spinlock_t users_lock = SPIN_LOCK_UNLOCKED;
+
+static LIST_HEAD(drivers);
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 
 static struct tq_struct tq_state_notify;
@@ -276,11 +278,14 @@ endloop:
 static int proc_driver_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
+	struct list_head *l;
 	struct capi_driver *driver;
 	int len = 0;
 
 	spin_lock(&drivers_lock);
-	for (driver = drivers; driver; driver = driver->next) {
+	list_for_each(l, &drivers) {
+		driver = list_entry(l, struct capi_driver, driver_list);
+
 		len += sprintf(page+len, "%-32s %d %s\n",
 					driver->name,
 					driver->ncontroller,
@@ -310,11 +315,13 @@ endloop:
 static int proc_users_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
+	struct list_head *l;
         struct capi_interface_user *cp;
 	int len = 0;
 
-	spin_lock(&capi_users_lock);
-        for (cp = capi_users; cp ; cp = cp->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		cp = list_entry(l, struct capi_interface_user, user_list);
 		len += sprintf(page+len, "%s\n", cp->name);
 		if (len <= off) {
 			off -= len;
@@ -325,7 +332,7 @@ static int proc_users_read_proc(char *page, char **start, off_t off,
 		}
 	}
 endloop:
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 	*start = page+off;
 	if (len < count)
 		*eof = 1;
@@ -596,63 +603,74 @@ static int notify_push(unsigned int cmd, u32 controller,
 
 static void notify_up(u32 contr)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
 
         printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_CONTRUP, contr, &CARD(contr)->profile);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_CONTRDOWN ------------------------------------- */
 
 static void notify_down(u32 contr)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
+
         printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_CONTRDOWN, contr, 0);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 }
 
 /* -------- KCI_NCCIUP ---------------------------------------- */
 
 static void notify_ncciup(u32 contr, u16 applid, u32 ncci)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
+
 	n.applid = applid;
 	n.ncci = ncci;
         /*printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);*/
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_NCCIUP, contr, &n);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 };
 
 /* -------- KCI_NCCIDOWN -------------------------------------- */
 
 static void notify_nccidown(u32 contr, u16 applid, u32 ncci)
 {
+	struct list_head *l;
 	struct capi_interface_user *p;
 	struct capi_ncciinfo n;
+
 	n.applid = applid;
 	n.ncci = ncci;
         /*printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);*/
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
+	spin_lock(&users_lock);
+	list_for_each(l, &users) {
+		p = list_entry(l, struct capi_interface_user, user_list);
 		if (!p->callback) continue;
 		(*p->callback) (KCI_NCCIDOWN, contr, &n);
 	}
-	spin_unlock(&capi_users_lock);
+	spin_unlock(&users_lock);
 };
 
 /* ------------------------------------------------------------ */
@@ -964,7 +982,7 @@ static void controllercb_resume_output(struct capi_ctr *card)
 struct capi_ctr *
 drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
 {
-	struct capi_ctr *card, **pp;
+	struct capi_ctr *card;
 	int i;
 
 	for (i=0; i < CAPI_MAXCONTR && cards[i].cardstate != CARD_FREE; i++) ;
@@ -991,9 +1009,7 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
         card->new_ncci = controllercb_new_ncci;
         card->free_ncci = controllercb_free_ncci;
 
-	for (pp = &driver->controller; *pp; pp = &(*pp)->next) ;
-	card->next = 0;
-	*pp = card;
+	list_add_tail(&card->driver_list, &driver->contr_head);
 	driver->ncontroller++;
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
 	card->procent = create_proc_entry(card->procfn, 0, 0);
@@ -1013,20 +1029,16 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
 static int drivercb_detach_ctr(struct capi_ctr *card)
 {
 	struct capi_driver *driver = card->driver;
-	struct capi_ctr **pp;
 
         if (card->cardstate == CARD_FREE)
 		return 0;
         if (card->cardstate != CARD_DETECTED)
 		controllercb_reseted(card);
-	for (pp = &driver->controller; *pp ; pp = &(*pp)->next) {
-        	if (*pp == card) {
-	        	*pp = card->next;
-			driver->ncontroller--;
-			ncards--;
-	        	break;
-		}
-	}
+
+	list_del(&card->driver_list);
+	driver->ncontroller--;
+	ncards--;
+
 	if (card->procent) {
 	   remove_proc_entry(card->procfn, 0);
 	   card->procent = 0;
@@ -1066,13 +1078,9 @@ static struct capi_driver_interface di = {
 
 struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
 {
-	struct capi_driver **pp;
-
-	MOD_INC_USE_COUNT;
+	INIT_LIST_HEAD(&driver->contr_head);
 	spin_lock(&drivers_lock);
-	for (pp = &drivers; *pp; pp = &(*pp)->next) ;
-	driver->next = 0;
-	*pp = driver;
+	list_add_tail(&driver->driver_list, &drivers);
 	spin_unlock(&drivers_lock);
 	printk(KERN_NOTICE "kcapi: driver %s attached\n", driver->name);
 	sprintf(driver->procfn, "capi/drivers/%s", driver->name);
@@ -1092,21 +1100,15 @@ struct capi_driver_interface *attach_capi_driver(struct capi_driver *driver)
 
 void detach_capi_driver(struct capi_driver *driver)
 {
-	struct capi_driver **pp;
 	spin_lock(&drivers_lock);
-	for (pp = &drivers; *pp && *pp != driver; pp = &(*pp)->next) ;
-	if (*pp) {
-		*pp = (*pp)->next;
-		printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
-	} else {
-		printk(KERN_ERR "kcapi: driver %s double detach ?\n", driver->name);
-	}
+	list_del(&driver->driver_list);
 	spin_unlock(&drivers_lock);
+
+	printk(KERN_NOTICE "kcapi: driver %s detached\n", driver->name);
 	if (driver->procent) {
 	   remove_proc_entry(driver->procfn, 0);
 	   driver->procent = 0;
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -1310,11 +1312,16 @@ static u16 capi_get_profile(u32 contr, struct capi_profile *profp)
 
 static struct capi_driver *find_driver(char *name)
 {
+	struct list_head *l;
 	struct capi_driver *dp;
 	spin_lock(&drivers_lock);
-	for (dp = drivers; dp; dp = dp->next)
+	list_for_each(l, &drivers) {
+		dp = list_entry(l, struct capi_driver, driver_list);
 		if (strcmp(dp->name, name) == 0)
-			break;
+			goto found;
+	}
+	dp = NULL;
+ found:
 	spin_unlock(&drivers_lock);
 	return dp;
 }
@@ -1611,22 +1618,10 @@ struct capi_interface avmb1_interface =
 
 struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
 {
-	struct capi_interface_user *p;
 
-	MOD_INC_USE_COUNT;
-	spin_lock(&capi_users_lock);
-	for (p = capi_users; p; p = p->next) {
-		if (p == userp) {
-			spin_unlock(&capi_users_lock);
-			printk(KERN_ERR "kcapi: double attach from %s\n",
-			       userp->name);
-			MOD_DEC_USE_COUNT;
-			return 0;
-		}
-	}
-	userp->next = capi_users;
-	capi_users = userp;
-	spin_unlock(&capi_users_lock);
+	spin_lock(&users_lock);
+	list_add_tail(&userp->user_list, &users);
+	spin_unlock(&users_lock);
 	printk(KERN_NOTICE "kcapi: %s attached\n", userp->name);
 
 	return &avmb1_interface;
@@ -1634,22 +1629,10 @@ struct capi_interface *attach_capi_interface(struct capi_interface_user *userp)
 
 int detach_capi_interface(struct capi_interface_user *userp)
 {
-	struct capi_interface_user **pp;
-
-	spin_lock(&capi_users_lock);
-	for (pp = &capi_users; *pp; pp = &(*pp)->next) {
-		if (*pp == userp) {
-			*pp = userp->next;
-			spin_unlock(&capi_users_lock);
-			userp->next = 0;
-			printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
-			MOD_DEC_USE_COUNT;
-			return 0;
-		}
-	}
-	spin_unlock(&capi_users_lock);
-	printk(KERN_ERR "kcapi: double detach from %s\n", userp->name);
-	return -1;
+	spin_lock(&users_lock);
+	list_del(&userp->user_list);
+	printk(KERN_NOTICE "kcapi: %s detached\n", userp->name);
+	return 0;
 }
 
 /* ------------------------------------------------------------- */

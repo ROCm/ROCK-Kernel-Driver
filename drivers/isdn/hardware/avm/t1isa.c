@@ -344,6 +344,7 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 {
 	struct capi_ctr *ctrl;
+	struct list_head *l;
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
@@ -376,8 +377,11 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 		retval = -EINVAL;
 		goto err_free;
 	}
-	for (ctrl = driver->controller; ctrl; ctrl = ctrl->next) {
-	        avmcard *cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
+	list_for_each(l, &driver->contr_head) {
+	        avmcard *cardp;
+
+		ctrl = list_entry(l, struct capi_ctr, driver_list);
+		cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
 		if (cardp->cardnr == card->cardnr) {
 			printk(KERN_WARNING "%s: card with number %d already installed at 0x%x.\n",
 					driver->name, card->cardnr, cardp->port);

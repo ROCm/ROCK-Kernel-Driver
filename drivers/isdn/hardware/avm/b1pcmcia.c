@@ -188,10 +188,12 @@ int b1pcmcia_addcard_m2(unsigned int port, unsigned irq)
 
 int b1pcmcia_delcard(unsigned int port, unsigned irq)
 {
+	struct list_head *l;
 	struct capi_ctr *ctrl;
 	avmcard *card;
-
-	for (ctrl = b1pcmcia_driver.controller; ctrl; ctrl = ctrl->next) {
+	
+	list_for_each(l, &b1pcmcia_driver.contr_head) {
+		ctrl = list_entry(l, struct capi_ctr, driver_list);
 		card = ((avmctrl_info *)(ctrl->driverdata))->card;
 		if (card->port == port && card->irq == irq) {
 			b1pcmcia_remove_ctr(ctrl);

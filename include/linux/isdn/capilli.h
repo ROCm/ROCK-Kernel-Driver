@@ -12,6 +12,8 @@
 #ifndef __CAPILLI_H__
 #define __CAPILLI_H__
 
+#include <linux/list.h>
+
 typedef struct capiloaddatapart {
 	int user;		/* data in userspace ? */
 	int len;
@@ -34,7 +36,7 @@ typedef struct capicardparams {
 struct capi_driver;
 
 struct capi_ctr {
-        struct capi_ctr *next;			/* next ctr of same driver */
+        struct list_head driver_list;		/* contrs by driver */
         struct capi_driver *driver;
 	int cnr;				/* controller number */
 	char name[32];				/* name of controller */
@@ -99,8 +101,8 @@ struct capi_driver {
 	int (*add_card)(struct capi_driver *driver, capicardparams *data);
 	
 	/* intitialized by kcapi */
-	struct capi_ctr	*controller;		/* list of controllers */
-	struct capi_driver *next;
+	struct list_head contr_head;		/* list of controllers */
+	struct list_head driver_list;
 	int ncontroller;
 	struct proc_dir_entry *procent;
 	char procfn[128];
