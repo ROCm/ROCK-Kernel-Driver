@@ -28,8 +28,8 @@ struct lustre_intent_data {
 #define INTENT_MAGIC 0x19620323
 struct lookup_intent {
 	int     it_magic;
-	void    (*it_op_release)(struct lookup_intent *);
 	int     it_op;
+	void    (*it_op_release)(struct lookup_intent *);
 	int	it_flags;
 	int	it_create_mode;
 	union {
