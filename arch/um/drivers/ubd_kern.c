@@ -106,8 +106,6 @@ struct ubd {
 	__u64 size;
 	struct openflags boot_openflags;
 	struct openflags openflags;
-	devfs_handle_t real;
-	devfs_handle_t fake;
 	struct cow cow;
 };
 
@@ -127,8 +125,6 @@ struct ubd {
 	.size =			-1, \
 	.boot_openflags =	OPEN_FLAGS, \
 	.openflags =		OPEN_FLAGS, \
-	.real =			NULL, \
-	.fake =			NULL, \
         .cow =			DEFAULT_COW, \
 }
 
@@ -485,8 +481,8 @@ static int ubd_open_dev(struct ubd *dev)
 }
 
 static int ubd_new_disk(int major, u64 size, char *name, int unit,
-			struct gendisk **disk_out, devfs_handle_t dir_handle,
-			devfs_handle_t *handle_out)
+			struct gendisk **disk_out)
+			
 {
 	char devfs_name[sizeof("ubd/nnnnnn\0")];
 	struct gendisk *disk;
@@ -516,10 +512,6 @@ static int ubd_new_disk(int major, u64 size, char *name, int unit,
 	return(0);
 }
 
-/* Initialized in an initcall, and unchanged thereafter */
-devfs_handle_t ubd_dir_handle;
-devfs_handle_t ubd_fake_dir_handle;
-
 static int ubd_add(int n)
 {
 	struct ubd *dev = &ubd_dev[n];
@@ -538,15 +530,13 @@ static int ubd_add(int n)
 	if(err)
 		return(err);
 
-	err = ubd_new_disk(MAJOR_NR, dev->size, "ubd", n, &ubd_gendisk[n], 
-			   ubd_dir_handle, &dev->real);
+	err = ubd_new_disk(MAJOR_NR, dev->size, "ubd", n, &ubd_gendisk[n]);
 	if(err) 
 		return(err);
  
 	if(fake_major)
 		ubd_new_disk(fake_major, dev->size, "ubd%d", n, 
-			     &fake_gendisk[n], ubd_fake_dir_handle, 
-			     &dev->fake);
+			     &fake_gendisk[n]);
 
 	/* perhaps this should also be under the "if (fake_major)" above */
 	/* using the fake_disk->disk_name and also the fakehd_set name */
@@ -645,15 +635,13 @@ static int ubd_remove(char *str)
 	del_gendisk(ubd_gendisk[n]);
 	put_disk(ubd_gendisk[n]);
 	ubd_gendisk[n] = NULL;
-	if(dev->real != NULL) 
-		devfs_unregister(dev->real);
+	devfs_remove("ubd/%d", n);
 
 	if(fake_gendisk[n] != NULL){
 		del_gendisk(fake_gendisk[n]);
 		put_disk(fake_gendisk[n]);
 		fake_gendisk[n] = NULL;
-		if(dev->fake != NULL) 
-			devfs_unregister(dev->fake);
+		devfs_remove("ubd/%d", n);
 	}
 
 	*dev = ((struct ubd) DEFAULT_UBD);
@@ -682,7 +670,7 @@ int ubd_init(void)
 {
         int i;
 
-	ubd_dir_handle = devfs_mk_dir("ubd");
+	devfs_mk_dir("ubd");
 	if (register_blkdev(MAJOR_NR, "ubd"))
 		return -1;
 
@@ -693,7 +681,7 @@ int ubd_init(void)
 		char name[sizeof("ubd_nnn\0")];
 
 		snprintf(name, sizeof(name), "ubd_%d", fake_major);
-		ubd_fake_dir_handle = devfs_mk_dir(name);
+		devfs_mk_dir(name);
 		if (register_blkdev(fake_major, "ubd"))
 			return -1;
 	}
