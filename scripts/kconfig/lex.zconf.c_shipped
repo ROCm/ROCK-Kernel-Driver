@@ -2148,7 +2148,7 @@ YY_RULE_SETUP
 {
 		append_string(yytext, yyleng);
 		zconflval.string = text;
-		return T_STRING;
+		return T_WORD_QUOTE;
 	}
 	YY_BREAK
 case 47:
@@ -2165,7 +2165,7 @@ YY_RULE_SETUP
 {
 		append_string(yytext + 1, yyleng - 1);
 		zconflval.string = text;
-		return T_STRING;
+		return T_WORD_QUOTE;
 	}
 	YY_BREAK
 case 49:
@@ -2180,7 +2180,7 @@ YY_RULE_SETUP
 		if (str == yytext[0]) {
 			BEGIN(PARAM);
 			zconflval.string = text;
-			return T_STRING;
+			return T_WORD_QUOTE;
 		} else
 			append_string(yytext, 1);
 	}

@@ -152,7 +152,7 @@ n	[A-Za-z0-9_]
 	[^'"\\\n]+/\n	{
 		append_string(yytext, yyleng);
 		zconflval.string = text;
-		return T_STRING;
+		return T_WORD_QUOTE;
 	}
 	[^'"\\\n]+	{
 		append_string(yytext, yyleng);
@@ -160,7 +160,7 @@ n	[A-Za-z0-9_]
 	\\.?/\n	{
 		append_string(yytext + 1, yyleng - 1);
 		zconflval.string = text;
-		return T_STRING;
+		return T_WORD_QUOTE;
 	}
 	\\.?	{
 		append_string(yytext + 1, yyleng - 1);
@@ -169,7 +169,7 @@ n	[A-Za-z0-9_]
 		if (str == yytext[0]) {
 			BEGIN(PARAM);
 			zconflval.string = text;
-			return T_STRING;
+			return T_WORD_QUOTE;
 		} else
 			append_string(yytext, 1);
 	}

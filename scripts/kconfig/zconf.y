@@ -57,10 +57,11 @@ struct symbol *symbol_hash[257];
 %token T_DEFAULT
 %token T_TRISTATE
 %token T_BOOLEAN
+%token T_STRING
 %token T_INT
 %token T_HEX
 %token <string> T_WORD
-%token <string> T_STRING
+%token <string> T_WORD_QUOTE
 %token T_UNEQUAL
 %token T_EOF
 %token T_EOL
@@ -386,7 +387,7 @@ prompt_stmt_opt:
 };
 
 prompt:	  T_WORD
-	| T_STRING
+	| T_WORD_QUOTE
 ;
 
 end:	  T_ENDMENU		{ $$ = T_ENDMENU; }
@@ -411,7 +412,7 @@ expr:	  symbol				{ $$ = expr_alloc_symbol($1); }
 ;
 
 symbol:	  T_WORD	{ $$ = sym_lookup($1, 0); free($1); }
-	| T_STRING	{ $$ = sym_lookup($1, 1); free($1); }
+	| T_WORD_QUOTE	{ $$ = sym_lookup($1, 1); free($1); }
 ;
 
 %%
