@@ -504,7 +504,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.eflags = 0x286;
 
 	/* Ok, create the new process.. */
-	p = do_fork(flags | CLONE_VM, 0, &regs, 0);
+	p = do_fork(flags | CLONE_VM, 0, &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -588,11 +588,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	}
 
 	/*
-	 * The common fastpath:
-	 */
-	if (!(clone_flags & (CLONE_SETTLS | CLONE_SETTID | CLONE_CLEARTID)))
-		return 0;
-	/*
 	 * Set a new TLS for the child thread?
 	 */
 	if (clone_flags & CLONE_SETTLS) {
@@ -613,19 +608,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->a = LDT_entry_a(&info);
 		desc->b = LDT_entry_b(&info);
 	}
-
-	/*
-	 * Notify the child of the TID?
-	 */
-	if (clone_flags & CLONE_SETTID)
-		if (put_user(p->pid, (pid_t *)childregs->edx))
-			return -EFAULT;
-
-	/*
-	 * Does the userspace VM want the TID cleared on mm_release()?
-	 */
-	if (clone_flags & CLONE_CLEARTID)
-		p->user_tid = (int *) childregs->edx;
 	return 0;
 }
 
@@ -779,7 +761,7 @@ asmlinkage int sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
 
-	p = do_fork(SIGCHLD, regs.esp, &regs, 0);
+	p = do_fork(SIGCHLD, regs.esp, &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -788,12 +770,14 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	struct task_struct *p;
 	unsigned long clone_flags;
 	unsigned long newsp;
+	int *user_tid;
 
 	clone_flags = regs.ebx;
 	newsp = regs.ecx;
+	user_tid = (int *)regs.edx;
 	if (!newsp)
 		newsp = regs.esp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -811,7 +795,7 @@ asmlinkage int sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
 
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
