@@ -134,16 +134,4 @@ int snd_info_minor_unregister(void)
 	return 0;
 }
 
-#else
-
-int snd_info_minor_register(void)
-{
-	return 0;
-}
-
-int snd_info_minor_unregister(void)
-{
-	return 0;
-}
-
 #endif /* CONFIG_SND_OSSEMUL */

@@ -272,7 +272,7 @@ int snd_oss_init_module(void);
 #else
 #define snd_minor_info_oss_init() /*NOP*/
 #define snd_minor_info_oss_done() /*NOP*/
-#define snd_oss_init_module() /*NOP*/
+#define snd_oss_init_module() 0
 #endif
 
 /* memory.c */
