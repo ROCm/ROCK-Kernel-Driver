@@ -234,6 +234,7 @@ xfs_map_at_offset(
 	sector_shift = block_bits - BBSHIFT;
 	bn = iomapp->iomap_bn >> sector_shift;
 	bn += delta;
+	BUG_ON(!bn && !(iomapp->iomap_flags & IOMAP_REALTIME));
 	ASSERT((bn << sector_shift) >= iomapp->iomap_bn);
 
 	lock_buffer(bh);
@@ -938,9 +939,8 @@ linvfs_get_block_core(
 
 			bn = iomap.iomap_bn >> (inode->i_blkbits - BBSHIFT);
 			bn += delta;
-
+			BUG_ON(!bn && !(iomap.iomap_flags & IOMAP_REALTIME));
 			bh_result->b_blocknr = bn;
-			bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
 			set_buffer_mapped(bh_result);
 		}
 		if (create && (iomap.iomap_flags & IOMAP_UNWRITTEN)) {
@@ -965,21 +965,18 @@ linvfs_get_block_core(
 	}
 
 	if (iomap.iomap_flags & IOMAP_DELAY) {
-		if (unlikely(direct))
-			BUG();
+		BUG_ON(direct);
 		if (create) {
 			set_buffer_mapped(bh_result);
 			set_buffer_uptodate(bh_result);
 		}
-		bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
 		set_buffer_delay(bh_result);
 	}
 
 	if (blocks) {
-		loff_t iosize;
-		iosize = (iomap.iomap_bsize - iomap.iomap_delta);
-		bh_result->b_size =
-		    (ssize_t)min(iosize, (loff_t)(blocks << inode->i_blkbits));
+		bh_result->b_size = (ssize_t)min(
+			(loff_t)(iomap.iomap_bsize - iomap.iomap_delta),
+			(loff_t)(blocks << inode->i_blkbits));
 	}
 
 	return 0;

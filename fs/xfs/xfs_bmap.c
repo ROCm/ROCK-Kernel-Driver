@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -3429,6 +3429,19 @@ xfs_bmap_do_search_extents(
 	int		high;		/* high index of binary search */
 	int		low;		/* low index of binary search */
 
+	/* Initialize the extent entry structure to catch access to
+	* uninitialized br_startblock field.
+	*/
+
+        got.br_startoff = 0xffa5a5a5a5a5a5a5;
+        got.br_blockcount = 0xa55a5a5a5a5a5a5a;
+        got.br_state = XFS_EXT_INVALID;
+
+	#if XFS_BIG_BLKNOS
+        	got.br_startblock = 0xffffa5a5a5a5a5a5;
+	#else
+		got.br_startblock = 0xffffa5a5;
+	#endif
 	if (lastx != NULLEXTNUM && lastx < nextents)
 		ep = base + lastx;
 	else
@@ -3527,6 +3540,8 @@ xfs_bmap_search_extents(
 	xfs_bmbt_rec_t  *base;          /* base of extent list */
 	xfs_extnum_t    lastx;          /* last extent index used */
 	xfs_extnum_t    nextents;       /* extent list size */
+	xfs_bmbt_rec_t  *ep;            /* extent list entry pointer */
+	int		rt;		/* realtime flag    */
 
 	XFS_STATS_INC(xs_look_exlist);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
@@ -3534,8 +3549,18 @@ xfs_bmap_search_extents(
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	base = &ifp->if_u1.if_extents[0];
 
-	return xfs_bmap_do_search_extents(base, lastx, nextents, bno, eofp,
+	ep = xfs_bmap_do_search_extents(base, lastx, nextents, bno, eofp,
 					  lastxp, gotp, prevp);
+	rt = ip->i_d.di_flags & XFS_DIFLAG_REALTIME;
+	if(!rt && !gotp->br_startblock && (*lastxp != NULLEXTNUM)) {
+                cmn_err(CE_PANIC,"Access to block zero: fs: <%s> inode: %lld "
+			"start_block : %llx start_off : %llx blkcnt : %llx "
+			"extent-state : %x \n",
+			(ip->i_mount)->m_fsname,(long long)ip->i_ino,
+			gotp->br_startblock, gotp->br_startoff,
+			gotp->br_blockcount,gotp->br_state);
+        }
+        return ep;
 }
 
 

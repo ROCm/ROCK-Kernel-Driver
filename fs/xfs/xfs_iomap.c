@@ -165,20 +165,24 @@ xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (pbm = 0; imaps && pbm < iomaps; imaps--, iomapp++, imap++, pbm++) {
-		iomapp->iomap_target = io->io_flags & XFS_IOCORE_RT ?
-			mp->m_rtdev_targp : mp->m_ddev_targp;
 		iomapp->iomap_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		iomapp->iomap_delta = offset - iomapp->iomap_offset;
 		iomapp->iomap_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
 		iomapp->iomap_flags = flags;
 
+		if (io->io_flags & XFS_IOCORE_RT) {
+			iomapp->iomap_flags |= IOMAP_REALTIME;
+			iomapp->iomap_target = mp->m_rtdev_targp;
+		} else {
+			iomapp->iomap_target = mp->m_ddev_targp;
+		}
 		start_block = imap->br_startblock;
 		if (start_block == HOLESTARTBLOCK) {
 			iomapp->iomap_bn = IOMAP_DADDR_NULL;
-			iomapp->iomap_flags = IOMAP_HOLE;
+			iomapp->iomap_flags |= IOMAP_HOLE;
 		} else if (start_block == DELAYSTARTBLOCK) {
 			iomapp->iomap_bn = IOMAP_DADDR_NULL;
-			iomapp->iomap_flags = IOMAP_DELAY;
+			iomapp->iomap_flags |= IOMAP_DELAY;
 		} else {
 			iomapp->iomap_bn = XFS_FSB_TO_DB_IO(io, start_block);
 			if (ISUNWRITTEN(imap))
@@ -512,6 +516,15 @@ xfs_iomap_write_direct(
 
 	*ret_imap = imap[0];
 	*nmaps = 1;
+	if ( !(io->io_flags & XFS_IOCORE_RT)  && !ret_imap->br_startblock) {
+                cmn_err(CE_PANIC,"Access to block zero:  fs <%s> inode: %lld "
+                        "start_block : %llx start_off : %llx blkcnt : %llx "
+                        "extent-state : %x \n",
+                        (ip->i_mount)->m_fsname,
+                        (long long)ip->i_ino,
+                        ret_imap->br_startblock, ret_imap->br_startoff,
+                        ret_imap->br_blockcount,ret_imap->br_state);
+        }
 	return 0;
 
  error0:	/* Cancel bmap, unlock inode, and cancel trans */
@@ -598,6 +611,20 @@ retry:
 				return error;
 			}
 			for (n = 0; n < nimaps; n++) {
+				if ( !(io->io_flags & XFS_IOCORE_RT)  && 
+					!imap[n].br_startblock) {
+					cmn_err(CE_PANIC,"Access to block "
+						"zero:  fs <%s> inode: %lld "
+						"start_block : %llx start_off "
+						": %llx blkcnt : %llx "
+						"extent-state : %x \n",
+						(ip->i_mount)->m_fsname,
+						(long long)ip->i_ino,
+						imap[n].br_startblock,
+						imap[n].br_startoff,
+						imap[n].br_blockcount,
+						imap[n].br_state);
+        			}
 				if ((imap[n].br_startblock != HOLESTARTBLOCK) &&
 				    (imap[n].br_startblock != DELAYSTARTBLOCK)) {
 					goto write_map;
@@ -695,6 +722,15 @@ write_map:
 
 	*ret_imap = imap[0];
 	*nmaps = 1;
+	if ( !(io->io_flags & XFS_IOCORE_RT)  && !ret_imap->br_startblock) {
+		cmn_err(CE_PANIC,"Access to block zero:  fs <%s> inode: %lld "
+                        "start_block : %llx start_off : %llx blkcnt : %llx "
+                        "extent-state : %x \n",
+                        (ip->i_mount)->m_fsname,
+                        (long long)ip->i_ino,
+                        ret_imap->br_startblock, ret_imap->br_startoff,
+                        ret_imap->br_blockcount,ret_imap->br_state);
+	}
 	return 0;
 }
 
@@ -712,6 +748,7 @@ xfs_iomap_write_allocate(
 	int		*retmap)
 {
 	xfs_mount_t	*mp = ip->i_mount;
+	xfs_iocore_t    *io = &ip->i_iocore;
 	xfs_fileoff_t	offset_fsb, last_block;
 	xfs_fileoff_t	end_fsb, map_start_fsb;
 	xfs_fsblock_t	first_block;
@@ -817,6 +854,18 @@ xfs_iomap_write_allocate(
 		 */
 
 		for (i = 0; i < nimaps; i++) {
+			if ( !(io->io_flags & XFS_IOCORE_RT)  && 
+				!imap[i].br_startblock) {
+				cmn_err(CE_PANIC,"Access to block zero:  "
+					"fs <%s> inode: %lld "
+					"start_block : %llx start_off : %llx " 
+					"blkcnt : %llx extent-state : %x \n",
+					(ip->i_mount)->m_fsname,
+					(long long)ip->i_ino,
+					imap[i].br_startblock,
+					imap[i].br_startoff,
+				        imap[i].br_blockcount,imap[i].br_state);
+                        }
 			if ((map->br_startoff >= imap[i].br_startoff) &&
 			    (map->br_startoff < (imap[i].br_startoff +
 						 imap[i].br_blockcount))) {
@@ -852,6 +901,7 @@ xfs_iomap_write_unwritten(
 	size_t		count)
 {
 	xfs_mount_t	*mp = ip->i_mount;
+	xfs_iocore_t    *io = &ip->i_iocore;
 	xfs_trans_t	*tp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_filblks_t	count_fsb;
@@ -914,6 +964,16 @@ xfs_iomap_write_unwritten(
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		if (error)
 			goto error0;
+		
+		if ( !(io->io_flags & XFS_IOCORE_RT)  && !imap.br_startblock) {
+			cmn_err(CE_PANIC,"Access to block zero:  fs <%s> "
+				"inode: %lld start_block : %llx start_off : "
+				"%llx blkcnt : %llx extent-state : %x \n",
+				(ip->i_mount)->m_fsname,
+				(long long)ip->i_ino,
+				imap.br_startblock,imap.br_startoff,
+				imap.br_blockcount,imap.br_state);
+        	}
 
 		if ((numblks_fsb = imap.br_blockcount) == 0) {
 			/*
