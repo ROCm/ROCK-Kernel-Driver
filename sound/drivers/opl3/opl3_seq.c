@@ -272,7 +272,7 @@ static int snd_opl3_seq_new_device(snd_seq_device_t *dev)
 	spin_lock_init(&opl3->sys_timer_lock);
 	opl3->sys_timer_status = 0;
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_opl3_init_seq_oss(opl3, cinfo.name);
 #endif
 	return 0;
@@ -286,7 +286,7 @@ static int snd_opl3_seq_delete_device(snd_seq_device_t *dev)
 	if (opl3 == NULL)
 		return -EINVAL;
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_opl3_free_seq_oss(opl3);
 #endif
 	if (opl3->seq_client >= 0) {

@@ -198,6 +198,7 @@ static inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, get_info_t *get_info)
 	{ return NULL; }
 
+struct tty_driver;
 static inline void proc_tty_register_driver(struct tty_driver *driver) {};
 static inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
 

@@ -141,7 +141,7 @@ void show_trace_task(struct task_struct * tsk)
 	}
 }
 
-int kstack_depth_to_print = 24;
+static int kstack_depth_to_print = 24;
 
 void show_stack(unsigned long *sp)
 {

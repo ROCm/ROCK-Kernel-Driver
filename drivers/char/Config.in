@@ -148,7 +148,7 @@ comment 'Watchdog Cards'
 bool 'Watchdog Timer Support'	CONFIG_WATCHDOG
 if [ "$CONFIG_WATCHDOG" != "n" ]; then
    bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT
-   tristate '  Software Watchdog' CONFIG_SOFT_WATCHDOG
+   tristate '  Software watchdog' CONFIG_SOFT_WATCHDOG
    tristate '  WDT Watchdog timer' CONFIG_WDT
    tristate '  WDT PCI Watchdog timer' CONFIG_WDTPCI
    if [ "$CONFIG_WDT" != "n" ]; then
@@ -192,14 +192,14 @@ if [ "$CONFIG_IA64" = "y" ]; then
    bool 'EFI Real Time Clock Services' CONFIG_EFI_RTC
 fi
 if [ "$CONFIG_OBSOLETE" = "y" -a "$CONFIG_ALPHA_BOOK1" = "y" ]; then
-   bool 'Tadpole ANA H8 Support'  CONFIG_H8
+   bool 'Tadpole ANA H8 Support (OBSOLETE)'  CONFIG_H8
 fi
 
 tristate 'Double Talk PC internal speech card support' CONFIG_DTLK
 tristate 'Siemens R3964 line discipline' CONFIG_R3964
 tristate 'Applicom intelligent fieldbus card support' CONFIG_APPLICOM
 if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_X86" = "y" ]; then
-   dep_tristate 'Sony Vaio Programmable I/O Control Device support' CONFIG_SONYPI $CONFIG_PCI
+   dep_tristate 'Sony Vaio Programmable I/O Control Device support (EXPERIMENTAL)' CONFIG_SONYPI $CONFIG_PCI
 fi
 
 mainmenu_option next_comment

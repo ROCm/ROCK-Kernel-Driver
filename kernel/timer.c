@@ -187,7 +187,7 @@ void add_timer(struct timer_list *timer)
 	unsigned long flags;
 
 	spin_lock_irqsave(&timerlist_lock, flags);
-	if (timer_pending(timer))
+	if (unlikely(timer_pending(timer)))
 		goto bug;
 	internal_add_timer(timer);
 	spin_unlock_irqrestore(&timerlist_lock, flags);

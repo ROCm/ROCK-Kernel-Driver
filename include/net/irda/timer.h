@@ -11,7 +11,7 @@
  * 
  *     Copyright (c) 1997, 1998-1999 Dag Brattli <dagb@cs.uit.no>, 
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -27,15 +27,17 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include <linux/netdevice.h>
+#include <linux/timer.h>
 
 #include <asm/param.h>  /* for HZ */
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
-#include <net/irda/irlap.h>
-#include <net/irda/irlmp.h>
-#include <net/irda/irda_device.h>
+
+/* A few forward declarations (to make compiler happy) */
+struct irlmp_cb;
+struct irlap_cb;
+struct lsap_cb;
+struct lap_cb;
 
 /* 
  *  Timeout definitions, some defined in IrLAP p. 92
@@ -81,8 +83,6 @@ inline void irlap_start_backoff_timer(struct irlap_cb *self, int timeout);
 void irlap_start_mbusy_timer(struct irlap_cb *self, int timeout);
 void irlap_stop_mbusy_timer(struct irlap_cb *);
 
-struct lsap_cb;
-struct lap_cb;
 inline void irlmp_start_watchdog_timer(struct lsap_cb *, int timeout);
 inline void irlmp_start_discovery_timer(struct irlmp_cb *, int timeout);
 inline void irlmp_start_idle_timer(struct lap_cb *, int timeout);

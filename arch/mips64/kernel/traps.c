@@ -51,8 +51,6 @@ char dedicated_iv_available = 0;
 char vce_available = 0;
 char mips4_available = 0;
 
-int kstack_depth_to_print = 24;
-
 /*
  * These constant is for searching for possible module text segments.
  * MODULE_RANGE is a guess of how much space is likely to be vmalloced.

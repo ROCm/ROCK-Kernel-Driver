@@ -18,5 +18,6 @@ obj-$(CONFIG_NET_IPIP) += ipip.o
 obj-$(CONFIG_NET_IPGRE) += ip_gre.o
 obj-$(CONFIG_SYN_COOKIES) += syncookies.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
+obj-$(CONFIG_NETFILTER)	+= netfilter/
 
 include $(TOPDIR)/Rules.make

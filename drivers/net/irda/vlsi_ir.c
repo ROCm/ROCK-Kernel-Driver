@@ -37,7 +37,6 @@
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/wrapper.h>
-#include <net/irda/irlap.h>
 
 #include <net/irda/vlsi_ir.h>
 

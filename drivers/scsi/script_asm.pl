@@ -53,7 +53,8 @@ $debug = 0;		# Print general debugging messages
 $debug_external = 0;	# Print external/forward reference messages
 $list_in_array = 1;	# Emit original SCRIPTS assembler in comments in
 			# script.h
-$prefix = '';		# define all arrays having this prefix so we 
+#$prefix;		# (set by perl -s)
+                        # define all arrays having this prefix so we 
 			# don't have name space collisions after 
 			# assembling this file in different ways for
 			# different host adapters
@@ -382,12 +383,10 @@ print STDERR "looking for data in $conditional\n" if ($debug);
     }
 }
 
-# Parse command line 
-foreach $arg (@argv) {
-    if ($arg =~ /^-prefix\s*=\s*([_a-zA-Z][_a-zA-Z0-9]*)$/i) {
-	$prefix = $1
-    }
-}
+# Parse command line
+$output = shift;
+$outputu = shift;
+
     
 # Main loop
 while (<STDIN>) {

@@ -185,8 +185,8 @@ static int trm290_udma_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 
-	drive->waiting_for_dma = 0;
 	udma_destroy_table(ch);	/* purge DMA mappings */
+
 	return (inw(ch->dma_base + 2) != 0x00ff);
 }
 
@@ -224,7 +224,6 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 	trm290_prepare_drive(drive, 1);	/* select DMA xfer */
 
 	outl(ch->dmatable_dma|reading|writing, ch->dma_base);
-	drive->waiting_for_dma = 1;
 	outw((count * 2) - 1, ch->dma_base+2); /* start DMA */
 
 	if (drive->type == ATA_DISK) {

@@ -301,7 +301,7 @@ static int snd_pmac_burgundy_put_volume_out(snd_kcontrol_t *kcontrol, snd_ctl_el
   put: snd_pmac_burgundy_put_volume_out,\
   private_value: (ADDR2BASE(addr) | ((stereo) << 24)) }
 
-static snd_kcontrol_new_t snd_pmac_burgundy_mixers[] = {
+static snd_kcontrol_new_t snd_pmac_burgundy_mixers[] __initdata = {
 	BURGUNDY_VOLUME("Master Playback Volume", 0, MASK_ADDR_BURGUNDY_MASTER_VOLUME, 8),
 	BURGUNDY_VOLUME("Line Playback Volume", 0, MASK_ADDR_BURGUNDY_VOLLINE, 16),
 	BURGUNDY_VOLUME("CD Playback Volume", 0, MASK_ADDR_BURGUNDY_VOLCD, 16),
@@ -309,11 +309,48 @@ static snd_kcontrol_new_t snd_pmac_burgundy_mixers[] = {
 	BURGUNDY_OUTPUT_VOLUME("PC Speaker Playback Volume", 0, MASK_ADDR_BURGUNDY_ATTENHP, 0),
 	/*BURGUNDY_OUTPUT_VOLUME("PCM Playback Volume", 0, MASK_ADDR_BURGUNDY_ATTENLINEOUT, 1),*/
 	BURGUNDY_OUTPUT_VOLUME("Headphone Playback Volume", 0, MASK_ADDR_BURGUNDY_ATTENSPEAKER, 1),
-	BURGUNDY_OUTPUT_SWITCH("PC Speaker Playback Switch", 0, BURGUNDY_OUTPUT_INTERN, 0, 0),
-	BURGUNDY_OUTPUT_SWITCH("Headphone Playback Switch", 0, BURGUNDY_OUTPUT_LEFT, BURGUNDY_OUTPUT_RIGHT, 1),
 };	
+static snd_kcontrol_new_t snd_pmac_burgundy_master_sw __initdata = 
+BURGUNDY_OUTPUT_SWITCH("Headphone Playback Switch", 0, BURGUNDY_OUTPUT_LEFT, BURGUNDY_OUTPUT_RIGHT, 1);
+static snd_kcontrol_new_t snd_pmac_burgundy_speaker_sw __initdata = 
+BURGUNDY_OUTPUT_SWITCH("PC Speaker Playback Switch", 0, BURGUNDY_OUTPUT_INTERN, 0, 0);
 
 #define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
+
+
+#ifdef PMAC_SUPPORT_AUTOMUTE
+/*
+ * auto-mute stuffs
+ */
+static int snd_pmac_burgundy_detect_headphone(pmac_t *chip)
+{
+	return (in_le32(&chip->awacs->codec_stat) & chip->hp_stat_mask) ? 1 : 0;
+}
+
+static void snd_pmac_burgundy_update_automute(pmac_t *chip, int do_notify)
+{
+	if (chip->auto_mute) {
+		int reg, oreg;
+		reg = oreg = snd_pmac_burgundy_rcb(chip, MASK_ADDR_BURGUNDY_MORE_OUTPUTENABLES);
+		reg &= ~(BURGUNDY_OUTPUT_LEFT | BURGUNDY_OUTPUT_RIGHT | BURGUNDY_OUTPUT_INTERN);
+		if (snd_pmac_burgundy_detect_headphone(chip))
+			reg |= BURGUNDY_OUTPUT_LEFT | BURGUNDY_OUTPUT_RIGHT;
+		else
+			reg |= BURGUNDY_OUTPUT_INTERN;
+		if (do_notify && reg == oreg)
+			return;
+		snd_pmac_burgundy_wcb(chip, MASK_ADDR_BURGUNDY_MORE_OUTPUTENABLES, reg);
+		if (do_notify) {
+			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
+				       &chip->master_sw_ctl->id);
+			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
+				       &chip->speaker_sw_ctl->id);
+			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
+				       &chip->hp_detect_ctl->id);
+		}
+	}
+}
+#endif /* PMAC_SUPPORT_AUTOMUTE */
 
 
 /*
@@ -365,6 +402,10 @@ int __init snd_pmac_burgundy_init(pmac_t *chip)
 	snd_pmac_burgundy_wcw(chip, MASK_ADDR_BURGUNDY_VOLMIC,
 			   DEF_BURGUNDY_VOLMIC);
 
+	if (chip->hp_stat_mask == 0)
+		/* set headphone-jack detection bit */
+		chip->hp_stat_mask = 0x04;
+
 	/*
 	 * build burgundy mixers
 	 */
@@ -374,5 +415,20 @@ int __init snd_pmac_burgundy_init(pmac_t *chip)
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_pmac_burgundy_mixers[i], chip))) < 0)
 			return err;
 	}
+	chip->master_sw_ctl = snd_ctl_new1(&snd_pmac_burgundy_master_sw, chip);
+	if ((err = snd_ctl_add(chip->card, chip->master_sw_ctl)) < 0)
+		return err;
+	chip->speaker_sw_ctl = snd_ctl_new1(&snd_pmac_burgundy_speaker_sw, chip);
+	if ((err = snd_ctl_add(chip->card, chip->speaker_sw_ctl)) < 0)
+		return err;
+#ifdef PMAC_SUPPORT_AUTOMUTE
+	if ((err = snd_pmac_add_automute(chip)) < 0)
+		return err;
+
+	chip->detect_headphone = snd_pmac_burgundy_detect_headphone;
+	chip->update_automute = snd_pmac_burgundy_update_automute;
+	snd_pmac_burgundy_update_automute(chip, 0); /* update the status only */
+#endif
+
 	return 0;
 }

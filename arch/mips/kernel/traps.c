@@ -69,8 +69,6 @@ char watch_available = 0;
 void (*ibe_board_handler)(struct pt_regs *regs);
 void (*dbe_board_handler)(struct pt_regs *regs);
 
-int kstack_depth_to_print = 24;
-
 /*
  * These constant is for searching for possible module text segments.
  * MODULE_RANGE is a guess of how much space is likely to be vmalloced.

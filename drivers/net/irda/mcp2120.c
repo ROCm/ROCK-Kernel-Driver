@@ -25,7 +25,6 @@
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/irtty.h>
 
@@ -56,7 +55,7 @@ int __init mcp2120_init(void)
 	return irda_device_register_dongle(&dongle);
 }
 
-void mcp2120_cleanup(void)
+void __exit mcp2120_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
@@ -222,7 +221,6 @@ static int mcp2120_reset(struct irda_task *task)
 	return ret;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Felix Tang <tangf@eyetap.org>");
 MODULE_DESCRIPTION("Microchip MCP2120");
 MODULE_LICENSE("GPL");
@@ -234,10 +232,7 @@ MODULE_LICENSE("GPL");
  *    Initialize MCP2120 module
  *
  */
-int init_module(void)
-{
-	return mcp2120_init();
-}
+module_init(mcp2120_init);
 
 /*
  * Function cleanup_module (void)
@@ -245,8 +240,4 @@ int init_module(void)
  *    Cleanup MCP2120 module
  *
  */
-void cleanup_module(void)
-{
-        mcp2120_cleanup();
-}
-#endif /* MODULE */
+module_exit(mcp2120_cleanup);

@@ -26,7 +26,6 @@
 #include <linux/socket.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irias_object.h>
 
 hashbin_t *objects = NULL;

@@ -36,6 +36,7 @@
 
 #include <linux/ptrace.h>
 #include <linux/skbuff.h>
+#include <linux/tqueue.h>
 
 
 /*****************************************************************************/

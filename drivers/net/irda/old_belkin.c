@@ -36,7 +36,6 @@
 #include <linux/irda.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 
 /*
@@ -90,7 +89,7 @@ int __init old_belkin_init(void)
 	return irda_device_register_dongle(&dongle);
 }
 
-void old_belkin_cleanup(void)
+void __exit old_belkin_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
@@ -149,7 +148,6 @@ static int old_belkin_reset(struct irda_task *task)
 	return 0;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("Belkin (old) SmartBeam dongle driver");	
 MODULE_LICENSE("GPL");
@@ -161,10 +159,7 @@ MODULE_LICENSE("GPL");
  *    Initialize Old-Belkin module
  *
  */
-int init_module(void)
-{
-	return old_belkin_init();
-}
+module_init(old_belkin_init);
 
 /*
  * Function cleanup_module (void)
@@ -172,9 +167,4 @@ int init_module(void)
  *    Cleanup Old-Belkin module
  *
  */
-void cleanup_module(void)
-{
-	old_belkin_cleanup();
-}
-#endif /* MODULE */
-
+module_exit(old_belkin_cleanup);

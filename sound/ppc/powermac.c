@@ -125,6 +125,8 @@ static int __init snd_pmac_probe(void)
 
 	if ((err = snd_pmac_pcm_new(chip)) < 0)
 		goto __error;
+
+	chip->initialized = 1;
 	if (snd_enable_beep)
 		snd_pmac_attach_beep(chip);
 

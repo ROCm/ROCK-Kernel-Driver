@@ -18,7 +18,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-velleman.c,v 1.19 2000/01/24 02:06:33 mds Exp $ */
+/* $Id: i2c-velleman.c,v 1.23 2001/11/19 18:45:02 mds Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/ioport.h>
@@ -27,7 +27,6 @@
 #include <linux/string.h>  /* for 2.0 kernels to get NULL   */
 #include <asm/errno.h>     /* for 2.0 kernels to get ENODEV */
 #include <asm/io.h>
-
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
 
@@ -91,7 +90,7 @@ static int bit_velle_getsda(void *data)
 static int bit_velle_init(void)
 {
 	if (check_region(base,(base == 0x3bc)? 3 : 8) < 0 ) {
-		DEBE(printk("i2c-velleman.o: Port %#x already in use.\n",
+		DEBE(printk(KERN_DEBUG "i2c-velleman.o: Port %#x already in use.\n",
 		     base));
 		return -ENODEV;
 	} else {
@@ -160,7 +159,7 @@ static struct i2c_adapter bit_velle_ops = {
 
 int __init  i2c_bitvelle_init(void)
 {
-	printk("i2c-velleman.o: i2c Velleman K8000 adapter module\n");
+	printk(KERN_INFO "i2c-velleman.o: i2c Velleman K8000 adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	if (base==0) {
 		/* probe some values */
 		base=DEFAULT_BASE;
@@ -180,7 +179,7 @@ int __init  i2c_bitvelle_init(void)
 			return -ENODEV;
 		}
 	}
-	printk("i2c-velleman.o: found device at %#x.\n",base);
+	printk(KERN_DEBUG "i2c-velleman.o: found device at %#x.\n",base);
 	return 0;
 }
 

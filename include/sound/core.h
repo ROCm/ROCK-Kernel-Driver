@@ -103,7 +103,7 @@ typedef struct _snd_kcontrol snd_kcontrol_t;
 typedef struct _snd_timer snd_timer_t;
 typedef struct _snd_timer_instance snd_timer_instance_t;
 typedef struct _snd_hwdep snd_hwdep_t;
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 typedef struct _snd_oss_mixer snd_mixer_oss_t;
 #endif
 
@@ -145,7 +145,7 @@ struct _snd_card {
 	wait_queue_head_t power_sleep;
 #endif
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	snd_mixer_oss_t *mixer_oss;
 	int mixer_oss_change_count;
 #endif
@@ -251,16 +251,22 @@ char *snd_kmalloc_strdup(const char *string, int flags);
 void *snd_malloc_pages(unsigned long size, unsigned int dma_flags);
 void *snd_malloc_pages_fallback(unsigned long size, unsigned int dma_flags, unsigned long *res_size);
 void snd_free_pages(void *ptr, unsigned long size);
-#ifdef CONFIG_ISA
-void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr);
-void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
-#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
-#endif
 #ifdef CONFIG_PCI
 void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
 void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
 void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
 #endif
+#ifdef CONFIG_ISA
+#ifdef CONFIG_PCI
+#define snd_malloc_isa_pages(size, dma_addr) snd_malloc_pci_pages(NULL, size, dma_addr)
+#define snd_malloc_isa_pages_fallback(size, dma_addr, res_size) snd_malloc_pci_pages_fallback(NULL, size, dma_addr, res_size)
+#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pci_pages(NULL, size, ptr, dma_addr)
+#else /* !CONFIG_PCI */
+void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr);
+void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
+#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
+#endif /* CONFIG_PCI */
+#endif /* CONFIG_ISA */
 int copy_to_user_fromio(void *dst, unsigned long src, size_t count);
 int copy_from_user_toio(unsigned long dst, const void *src, size_t count);
 
@@ -269,7 +275,7 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count);
 extern int snd_cards_count;
 extern snd_card_t *snd_cards[SNDRV_CARDS];
 extern rwlock_t snd_card_rwlock;
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 extern int (*snd_mixer_oss_notify_callback)(snd_card_t *card, int free_flag);
 #endif
 

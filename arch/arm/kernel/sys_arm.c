@@ -279,10 +279,3 @@ asmlinkage int sys_execve(char *filenamei, char **argv, char **envp, struct pt_r
 out:
 	return error;
 }
-
-asmlinkage int sys_pause(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	return -ERESTARTNOHAND;
-}

@@ -40,7 +40,6 @@ struct elevator_s
  */
 extern void __elv_add_request(request_queue_t *, struct request *,
 			      struct list_head *);
-extern struct request *__elv_next_request(request_queue_t *);
 extern void elv_merge_cleanup(request_queue_t *, struct request *, int);
 extern int elv_merge(request_queue_t *, struct request **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,

@@ -1,11 +1,7 @@
 /*
- * Keywest i2c code
+ * common keywest i2c layer
  *
  * Copyright (c) by Takashi Iwai <tiwai@suse.de>
- *
- *
- * based on i2c-keywest.c from lm_sensors.
- *    Copyright (c) 2000 Philip Edelbrock <phil@stimpy.netroedge.com>
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -26,203 +22,108 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
 #include <sound/core.h>
 #include "pmac.h"
 
-/* The Tumbler audio equalizer can be really slow sometimes */
-#define KW_POLL_SANITY 10000
+/*
+ * we have to keep a static variable here since i2c attach_adapter
+ * callback cannot pass a private data.
+ */
+static pmac_keywest_t *keywest_ctx;
 
-/* address indices */
-#define KW_ADDR_MODE	0
-#define KW_ADDR_CONTROL	1
-#define KW_ADDR_STATUS	2
-#define KW_ADDR_ISR	3
-#define KW_ADDR_IER	4
-#define KW_ADDR_ADDR	5
-#define KW_ADDR_SUBADDR	6
-#define KW_ADDR_DATA	7
 
-#define KW_I2C_ADDR(i2c,type)	((i2c)->base + (type) * (i2c)->steps)
+#define I2C_DRIVERID_KEYWEST	0xFEBA
 
-/* keywest needs a small delay to defuddle itself after changing a setting */
-inline static void keywest_writeb_wait(pmac_keywest_t *i2c, int addr, int value)
+static int keywest_attach_adapter(struct i2c_adapter *adapter);
+static int keywest_detach_client(struct i2c_client *client);
+
+struct i2c_driver keywest_driver = {  
+	name: "PMac Keywest Audio",
+	id: I2C_DRIVERID_KEYWEST,
+	flags: I2C_DF_NOTIFY,
+	attach_adapter: &keywest_attach_adapter,
+	detach_client: &keywest_detach_client,
+};
+
+
+static int keywest_attach_adapter(struct i2c_adapter *adapter)
 {
-	writeb(value, KW_I2C_ADDR(i2c, addr));
-	udelay(10);
-}
+	int err;
+	struct i2c_client *new_client;
 
-inline static void keywest_writeb(pmac_keywest_t *i2c, int addr, int value)
-{
-	writeb(value, KW_I2C_ADDR(i2c, addr));
-}
-
-inline unsigned char keywest_readb(pmac_keywest_t *i2c, int addr)
-{
-	return readb(KW_I2C_ADDR(i2c, addr));
-}
-
-static int keywest_poll_interrupt(pmac_keywest_t *i2c)
-{
-	int i, res;
-	for (i = 0; i < KW_POLL_SANITY; i++) {
-		udelay(100);
-		res = keywest_readb(i2c, KW_ADDR_ISR) & 0x0f;
-		if (res > 0)
-			return res;
-	}
-
-	//snd_printd("Sanity check failed!  Expected interrupt never happened.\n");
-	return -ENODEV;
-}
-
-
-static void keywest_reset(pmac_keywest_t *i2c)
-{
-	int interrupt_state;
-
-	/* Clear all past interrupts */
-	interrupt_state = keywest_readb(i2c, KW_ADDR_ISR) & 0x0f;
-	if (interrupt_state > 0)
-		keywest_writeb_wait(i2c, KW_ADDR_ISR, interrupt_state);
-}
-
-static int keywest_start(pmac_keywest_t *i2c, unsigned char cmd, int is_read)
-{
-	int interrupt_state;
-	int ack;
-
-	keywest_reset(i2c);
-
-	/* Set up address and r/w bit */
-	keywest_writeb_wait(i2c, KW_ADDR_ADDR, (i2c->addr << 1) | (is_read ? 1 : 0));
-
-	/* Set up 'sub address' which I'm guessing is the command field? */
-	keywest_writeb_wait(i2c, KW_ADDR_SUBADDR, cmd);
-	
-	/* Start sending address */
-	keywest_writeb_wait(i2c, KW_ADDR_CONTROL, keywest_readb(i2c, KW_ADDR_CONTROL) | 2);
-	interrupt_state = keywest_poll_interrupt(i2c);
-	if (interrupt_state < 0)
-		return interrupt_state;
-
-	ack = keywest_readb(i2c, KW_ADDR_STATUS) & 0x0f;
-	if ((ack & 0x02) == 0) {
-		snd_printd("Ack Status on addr expected but got: 0x%02x on addr: 0x%02x\n", ack, i2c->addr);
-		return -EINVAL;
-	} 
-	return interrupt_state;
-}
-
-/* exported */
-int snd_pmac_keywest_write(pmac_keywest_t *i2c, unsigned char cmd, int len, unsigned char *data)
-{
-	int interrupt_state;
-	int error_state = 0;
-	int i;
-
-	snd_assert(len >= 1 && len <= 32, return -EINVAL);
-
-	if ((interrupt_state = keywest_start(i2c, cmd, 0)) < 0)
+	if (! keywest_ctx)
 		return -EINVAL;
 
-	for(i = 0; i < len; i++) {
-		keywest_writeb_wait(i2c, KW_ADDR_DATA, data[i]);
+	if (strncmp(adapter->name, "mac-io", 6))
+		return 0;
 
-		/* Clear interrupt and go */
-		keywest_writeb_wait(i2c, KW_ADDR_ISR, interrupt_state);
+	new_client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
+	if (! new_client)
+		return -ENOMEM;
 
-		interrupt_state = keywest_poll_interrupt(i2c);
-		if (interrupt_state < 0) {
-			error_state = -EINVAL;
-			interrupt_state = 0;
-		}
-		if ((keywest_readb(i2c, KW_ADDR_STATUS) & 0x02) == 0) {
-			snd_printd("Ack Expected by not received(block)!\n");
-			error_state = -EINVAL;
-		}
+	new_client->addr = keywest_ctx->addr;
+	new_client->data = keywest_ctx;
+	new_client->adapter = adapter;
+	new_client->driver = &keywest_driver;
+	new_client->flags = 0;
+
+	strcpy(new_client->name, keywest_ctx->name);
+
+	new_client->id = keywest_ctx->id++; /* Automatically unique */
+	keywest_ctx->client = new_client;
+
+	if ((err = keywest_ctx->init_client(keywest_ctx)) < 0)
+		goto __err;
+
+	/* Tell the i2c layer a new client has arrived */
+	if (i2c_attach_client(new_client)) {
+		err = -ENODEV;
+		goto __err;
 	}
 
-	/* Send stop */
-	keywest_writeb_wait(i2c, KW_ADDR_CONTROL,
-			    keywest_readb(i2c, KW_ADDR_CONTROL) | 4);
+	return 0;
 
-	keywest_writeb_wait(i2c, KW_ADDR_CONTROL, interrupt_state);
-		
-	interrupt_state = keywest_poll_interrupt(i2c);
-	if (interrupt_state < 0) {
-		error_state = -EINVAL;
-		interrupt_state = 0;
-	}
-	keywest_writeb_wait(i2c, KW_ADDR_ISR, interrupt_state);
+ __err:
+	kfree(new_client);
+	keywest_ctx->client = NULL;
+	return err;
+}
 
-	return error_state;
+static int keywest_detach_client(struct i2c_client *client)
+{
+	if (! keywest_ctx)
+		return 0;
+	if (client == keywest_ctx->client)
+		keywest_ctx->client = NULL;
+
+	i2c_detach_client(client);
+	kfree(client);
+	return 0;
 }
 
 /* exported */
 void snd_pmac_keywest_cleanup(pmac_keywest_t *i2c)
 {
-	if (i2c->base) {
-		iounmap((void*)i2c->base);
-		i2c->base = 0;
+	if (keywest_ctx && keywest_ctx == i2c) {
+		i2c_del_driver(&keywest_driver);
+		keywest_ctx = NULL;
 	}
 }
 
 /* exported */
-int snd_pmac_keywest_find(pmac_t *chip, pmac_keywest_t *i2c, int addr,
-			  int (*init_client)(pmac_t *, pmac_keywest_t *))
+int __init snd_pmac_keywest_init(pmac_keywest_t *i2c)
 {
-	struct device_node *i2c_device;
-	void **temp;
-	void *base = NULL;
-	u32 steps = 0;
+	int err;
 
-	i2c_device = find_compatible_devices("i2c", "keywest");
-	
-	if (i2c_device == 0) {
-		printk(KERN_ERR "pmac: No Keywest i2c devices found.\n");
-		return -ENODEV;
+	if (keywest_ctx)
+		return -EBUSY;
+
+	if ((err = i2c_add_driver(&keywest_driver))) {
+		snd_printk(KERN_ERR "cannot register keywest i2c driver\n");
+		return err;
 	}
-	
-	for (; i2c_device; i2c_device = i2c_device->next) {
-		snd_printd("Keywest device found: %s\n", i2c_device->full_name);
-		temp = (void **) get_property(i2c_device, "AAPL,address", NULL);
-		if (temp != NULL) {
-			base = *temp;
-		} else {
-			snd_printd("pmac: no 'address' prop!\n");
-			continue;
-		}
-
-		temp = (void **) get_property(i2c_device, "AAPL,address-step", NULL);
-		if (temp != NULL) {
-			steps = *(uint *)temp;
-		} else {
-			snd_printd("pmac: no 'address-step' prop!\n");
-			continue;
-		}
-		
-		i2c->base = (unsigned long)ioremap((unsigned long)base, steps * 8);
-		i2c->steps = steps;
-
-		/* Select standard sub mode 
-		 *  
-		 * ie for <Address><Ack><Command><Ack><data><Ack>... style transactions
-		 */
-		keywest_writeb_wait(i2c, KW_ADDR_MODE, 0x08);
-
-		/* Enable interrupts */
-		keywest_writeb_wait(i2c, KW_ADDR_IER, 1 + 2 + 4 + 8);
-
-		keywest_reset(i2c);
-
-		i2c->addr = addr;
-		if (init_client(chip, i2c) < 0) {
-			snd_pmac_keywest_cleanup(i2c);
-			continue;
-		}
-
-		return 0; /* ok */
-	}
-	
-	return -ENODEV;
+	keywest_ctx = i2c;
+	return 0;
 }

@@ -329,7 +329,7 @@ source drivers/isdn/Config.in
 mainmenu_option next_comment
 comment 'Old CD-ROM drivers (not SCSI, not IDE)'
 
-bool 'Support non-SCSI/IDE/ATAPI drives' CONFIG_CD_NO_IDESCSI
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
 if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
   source drivers/cdrom/Config.in
 fi

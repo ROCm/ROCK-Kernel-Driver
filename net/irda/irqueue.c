@@ -36,7 +36,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irqueue.h>
-#include <net/irda/irmod.h>
 
 static irda_queue_t *dequeue_general( irda_queue_t **queue, irda_queue_t* element);
 static __u32 hash( char* name);

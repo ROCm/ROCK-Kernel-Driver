@@ -70,8 +70,8 @@ if [ "$CONFIG_WAN" = "y" ]; then
 
       dep_tristate '    Cyclades-PC300 support (RS-232/V.35, X.21, T1/E1 boards)' CONFIG_PC300 $CONFIG_HDLC $CONFIG_PCI
       if [ "$CONFIG_PC300" != "n" ]; then
-         if [ "$CONFIG_PPP" != "n" -a "$CONFIG_PPP_MULTLINK" != "n" -a \
-	      "$CONFIG_PPP_SYNCTTY" != "n" -a "$CONFIG_HDLC_PPP" = "y" ]; then
+         if [ "$CONFIG_PPP" != "n" -a "$CONFIG_PPP_MULTILINK" != "n" -a \
+	      "$CONFIG_PPP_SYNC_TTY" != "n" -a "$CONFIG_HDLC_PPP" = "y" ]; then
 	    bool '      Cyclades-PC300 MLPPP support' CONFIG_PC300_MLPPP
 	 else
 	    comment 'Cyclades-PC300 MLPPP support is disabled.'
@@ -111,7 +111,7 @@ if [ "$CONFIG_WAN" = "y" ]; then
 	 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	    dep_tristate '    Cyclom 2X(tm) cards (EXPERIMENTAL)' CONFIG_CYCLADES_SYNC $CONFIG_WAN_ROUTER_DRIVERS
 	    if [ "$CONFIG_CYCLADES_SYNC" != "n" ]; then
-	       bool '      Cyclom 2X X.25 support' CONFIG_CYCLOMX_X25
+	       bool '      Cyclom 2X X.25 support (EXPERIMENTAL)' CONFIG_CYCLOMX_X25
 	    fi
 	 fi
       fi

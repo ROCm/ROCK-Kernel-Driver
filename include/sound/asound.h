@@ -602,7 +602,8 @@ enum sndrv_ctl_elem_type {
 	SNDRV_CTL_ELEM_TYPE_ENUMERATED,		/* enumerated type */
 	SNDRV_CTL_ELEM_TYPE_BYTES,		/* byte array */
 	SNDRV_CTL_ELEM_TYPE_IEC958,		/* IEC958 (S/PDIF) setup */
-	SNDRV_CTL_ELEM_TYPE_LAST = SNDRV_CTL_ELEM_TYPE_IEC958,
+	SNDRV_CTL_ELEM_TYPE_INTEGER64,		/* 64-bit integer type */
+	SNDRV_CTL_ELEM_TYPE_LAST = SNDRV_CTL_ELEM_TYPE_INTEGER64,
 };
 
 enum sndrv_ctl_elem_iface {
@@ -664,6 +665,11 @@ struct sndrv_ctl_elem_info {
 			long step;		/* R: step (0 variable) */
 		} integer;
 		struct {
+			long long min;		/* R: minimum value */
+			long long max;		/* R: maximum value */
+			long long step;		/* R: step (0 variable) */
+		} integer64;
+		struct {
 			unsigned int items;	/* R: number of items */
 			unsigned int item;	/* W: item number */
 			char name[64];		/* R: value name */
@@ -681,6 +687,10 @@ struct sndrv_ctl_elem_value {
 			long value[128];
 			long *value_ptr;
 		} integer;
+		union {
+			long long value[64];
+			long long *value_ptr;
+		} integer64;
 		union {
 			unsigned int item[128];
 			unsigned int *item_ptr;

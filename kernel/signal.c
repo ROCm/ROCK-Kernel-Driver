@@ -1488,3 +1488,15 @@ sys_signal(int sig, __sighandler_t handler)
 	return ret ? ret : (unsigned long)old_sa.sa.sa_handler;
 }
 #endif /* !alpha && !__ia64__ && !defined(__mips__) && !defined(__arm__) */
+
+#ifndef HAVE_ARCH_SYS_PAUSE
+
+asmlinkage int
+sys_pause(void)
+{
+	current->state = TASK_INTERRUPTIBLE;
+	schedule();
+	return -ERESTARTNOHAND;
+}
+
+#endif /* HAVE_ARCH_SYS_PAUSE */

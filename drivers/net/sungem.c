@@ -41,6 +41,7 @@
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/random.h>
+#include <linux/tqueue.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>

@@ -121,17 +121,12 @@ obj-$(CONFIG_FBCON_HGA)           += fbcon-hga.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 obj-$(CONFIG_FBCON_ACCEL)	  += fbcon-accel.o
 
-host-progs := ../conmakehash
+host-progs := ../char/conmakehash
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s
-
-promcon_tbl.c: prom.uni ../char/conmakehash
-	../char/conmakehash prom.uni | \
+$(obj)/promcon_tbl.c: $(src)/prom.uni $(obj)/../char/conmakehash
+	$(obj)/../char/conmakehash $< | \
 	sed -e '/#include <[^>]*>/p' -e 's/types/init/' \
-	    -e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > promcon_tbl.c
-
-promcon_tbl.o: promcon_tbl.c $(TOPDIR)/include/linux/types.h
+	    -e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > $@
 

@@ -48,27 +48,17 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/init.h>
-#include <linux/if_arp.h>
 #include <linux/net.h>
 #include <linux/irda.h>
 #include <linux/poll.h>
 
+#include <asm/ioctls.h>		/* TIOCOUTQ, TIOCINQ */
 #include <asm/uaccess.h>
 
 #include <net/sock.h>
 #include <net/tcp.h>
 
-#include <net/irda/irda.h>
-#include <net/irda/iriap.h>
-#include <net/irda/irias_object.h>
-#include <net/irda/irlmp.h>
-#include <net/irda/irttp.h>
-#include <net/irda/discovery.h>
-
-extern int  irda_init(void);
-extern void irda_cleanup(void);
-extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *,
-			     struct packet_type *);
+#include <net/irda/af_irda.h>
 
 static int irda_create(struct socket *sock, int protocol);
 
@@ -82,10 +72,6 @@ static struct proto_ops irda_ultra_ops;
 #endif /* CONFIG_IRDA_ULTRA */
 
 #define IRDA_MAX_HEADER (TTP_MAX_HEADER)
-
-#ifdef CONFIG_IRDA_DEBUG
-__u32 irda_debug = IRDA_DEBUG_LEVEL;
-#endif
 
 /*
  * Function irda_data_indication (instance, sap, skb)
@@ -140,8 +126,10 @@ static void irda_disconnect_indication(void *instance, void *sap,
 		dev_kfree_skb(skb);
 
 	sk = self->sk;
-	if (sk == NULL)
+	if (sk == NULL) {
+		IRDA_DEBUG(0, __FUNCTION__ "(%p) : BUG : sk is NULL\n", self);
 		return;
+	}
 
 	/* Prevent race conditions with irda_release() and irda_shutdown() */
 	if ((!sk->dead) && (sk->state != TCP_CLOSE)) {
@@ -1317,12 +1305,12 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		len = self->max_data_size;
 	}
 
-	skb = sock_alloc_send_skb(sk, len + self->max_header_size,
+	skb = sock_alloc_send_skb(sk, len + self->max_header_size + 16, 
 				  msg->msg_flags & MSG_DONTWAIT, &err);
 	if (!skb)
 		return -ENOBUFS;
 
-	skb_reserve(skb, self->max_header_size);
+	skb_reserve(skb, self->max_header_size + 16);
 
 	asmptr = skb->h.raw = skb_put(skb, len);
 	memcpy_fromiovec(asmptr, msg->msg_iov, len);
@@ -1395,30 +1383,6 @@ static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
 }
 
 /*
- * Function irda_data_wait (sk)
- *
- *    Sleep until data has arrive. But check for races..
- *
- *    The caller is expected to deal with the situation when we return
- *    due to pending signals. And even if not, the peeked skb might have
- *    been already dequeued due to concurrent operation.
- *    Currently irda_recvmsg_stream() is the only caller and is ok.
- * Return 0 if condition packet has arrived, -ERESTARTSYS if signal_pending()
- * Only used once in irda_recvmsg_stream() -> inline
- */
-static inline int irda_data_wait(struct sock *sk)
-{
-	int ret = 0;
-	if (!skb_peek(&sk->receive_queue)) {
-		set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
-		__wait_event_interruptible(*(sk->sleep),
-			(skb_peek(&sk->receive_queue)!=NULL), ret);
-		clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
-	}
-	return(ret);
-}
-
-/*
  * Function irda_recvmsg_stream (sock, msg, size, flags, scm)
  */
 static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
@@ -1429,6 +1393,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 	int noblock = flags & MSG_DONTWAIT;
 	int copied = 0;
 	int target = 1;
+	DECLARE_WAITQUEUE(waitq, current);
 
 	IRDA_DEBUG(3, __FUNCTION__ "()\n");
 
@@ -1451,25 +1416,43 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 
 		skb=skb_dequeue(&sk->receive_queue);
 		if (skb==NULL) {
+			int ret = 0;
+
 			if (copied >= target)
 				break;
+
+			/* The following code is a cut'n'paste of the
+			 * wait_event_interruptible() macro.
+			 * We don't us the macro because the test condition
+			 * is messy. - Jean II */
+			set_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
+			add_wait_queue(sk->sleep, &waitq);
+			set_current_state(TASK_INTERRUPTIBLE);
 
 			/*
 			 *	POSIX 1003.1g mandates this order.
 			 */
+			if (sk->err)
+				ret = sock_error(sk);
+			else if (sk->shutdown & RCV_SHUTDOWN)
+				;
+			else if (noblock)
+				ret = -EAGAIN;
+			else if (signal_pending(current))
+				ret = -ERESTARTSYS;
+			else if (skb_peek(&sk->receive_queue) == NULL)
+				/* Wait process until data arrives */
+				schedule();
 
-			if (sk->err) {
-				return sock_error(sk);
-			}
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sleep, &waitq);
+			clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
 
+			if(ret)
+				return(ret);
 			if (sk->shutdown & RCV_SHUTDOWN)
 				break;
 
-			if (noblock)
-				return -EAGAIN;
-			/* Wait process until data arrives */
-			if (irda_data_wait(sk))
-				return -ERESTARTSYS;
 			continue;
 		}
 
@@ -2383,11 +2366,11 @@ bed:
 				   "(), nothing discovered yet, going to sleep...\n");
 
 			/* Set watchdog timer to expire in <val> ms. */
+			self->errno = 0;
 			self->watchdog.function = irda_discovery_timeout;
 			self->watchdog.data = (unsigned long) self;
 			self->watchdog.expires = jiffies + (val * HZ/1000);
 			add_timer(&(self->watchdog));
-			self->errno = 0;
 
 			/* Wait for IR-LMP to call us back */
 			__wait_event_interruptible(self->query_wait,
@@ -2530,118 +2513,27 @@ SOCKOPS_WRAP(irda_ultra, PF_IRDA);
 #endif /* CONFIG_IRDA_ULTRA */
 
 /*
- * Function irda_device_event (this, event, ptr)
+ * Function irsock_init (pro)
  *
- *    Called when a device is taken up or down
- *
- */
-static int irda_device_event(struct notifier_block *this, unsigned long event,
-			     void *ptr)
-{
-	struct net_device *dev = (struct net_device *) ptr;
-
-        /* Reject non IrDA devices */
-	if (dev->type != ARPHRD_IRDA)
-		return NOTIFY_DONE;
-
-        switch (event) {
-	case NETDEV_UP:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_UP\n");
-		/* irda_dev_device_up(dev); */
-		break;
-	case NETDEV_DOWN:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_DOWN\n");
-		/* irda_kill_by_device(dev); */
-		/* irda_rt_device_down(dev); */
-		/* irda_dev_device_down(dev); */
-		break;
-	default:
-		break;
-        }
-
-        return NOTIFY_DONE;
-}
-
-static struct packet_type irda_packet_type =
-{
-	0,	/* MUTTER ntohs(ETH_P_IRDA),*/
-	NULL,
-	irlap_driver_rcv,
-	NULL,
-	NULL,
-};
-
-static struct notifier_block irda_dev_notifier = {
-	irda_device_event,
-	NULL,
-	0
-};
-
-/*
- * Function irda_proc_modcount (inode, fill)
- *
- *    Use by the proc file system functions to prevent the irda module
- *    being removed while the use is standing in the net/irda directory
- */
-void irda_proc_modcount(struct inode *inode, int fill)
-{
-#ifdef MODULE
-#ifdef CONFIG_PROC_FS
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-#endif /* CONFIG_PROC_FS */
-#endif /* MODULE */
-}
-
-/*
- * Function irda_proto_init (pro)
- *
- *    Initialize IrDA protocol layer
+ *    Initialize IrDA protocol
  *
  */
-int __init irda_proto_init(void)
+int __init irsock_init(void)
 {
 	sock_register(&irda_family_ops);
 
-	irda_packet_type.type = htons(ETH_P_IRDA);
-        dev_add_pack(&irda_packet_type);
-
-	register_netdevice_notifier(&irda_dev_notifier);
-
-	irda_init();
-	irda_device_init();
 	return 0;
 }
 
-late_initcall(irda_proto_init);
-
 /*
- * Function irda_proto_cleanup (void)
+ * Function irsock_cleanup (void)
  *
- *    Remove IrDA protocol layer
+ *    Remove IrDA protocol
  *
  */
-#ifdef MODULE
-void irda_proto_cleanup(void)
+void __exit irsock_cleanup(void)
 {
-	irda_packet_type.type = htons(ETH_P_IRDA);
-        dev_remove_pack(&irda_packet_type);
-
-        unregister_netdevice_notifier(&irda_dev_notifier);
-
 	sock_unregister(PF_IRDA);
-	irda_cleanup();
 
         return;
 }
-module_exit(irda_proto_cleanup);
-
-MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
-MODULE_DESCRIPTION("The Linux IrDA Protocol Subsystem");
-MODULE_LICENSE("GPL");
-#ifdef CONFIG_IRDA_DEBUG
-MODULE_PARM(irda_debug, "1l");
-#endif
-#endif /* MODULE */

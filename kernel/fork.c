@@ -99,7 +99,7 @@ void __init fork_init(unsigned long mempages)
 	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
-struct task_struct *dup_task_struct(struct task_struct *orig)
+static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;

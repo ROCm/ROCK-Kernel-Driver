@@ -442,14 +442,6 @@ sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
 	return ret;
 }
 
-/* Just in case some old old binary calls this. */
-asmlinkage int sys_pause(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	return -ERESTARTNOHAND;
-}
-
 asmlinkage int sys_getdomainname(char *name, int len)
 {
  	int nlen;

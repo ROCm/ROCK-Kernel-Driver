@@ -81,7 +81,7 @@ extern int exception_trace;
 
 struct notifier_block *die_chain;
 
-int kstack_depth_to_print = 10;
+static int kstack_depth_to_print = 10;
 
 #ifdef CONFIG_KALLSYMS
 #include <linux/kallsyms.h> 

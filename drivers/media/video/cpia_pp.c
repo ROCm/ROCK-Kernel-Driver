@@ -32,6 +32,7 @@
 #include <linux/parport.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/tqueue.h>
 #include <linux/smp_lock.h>
 
 #include <linux/kmod.h>

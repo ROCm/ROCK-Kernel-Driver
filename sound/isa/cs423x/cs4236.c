@@ -229,6 +229,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0x4536,0x0000,0x0010,0x0003),
 	/* TerraTec AudioSystem EWS64XL - CS4236B */
 	ISAPNP_CS4232('C','S','C',0xa836,0xa800,0xa810,0xa803),
+	/* TerraTec AudioSystem EWS64XL - CS4236B */
+	ISAPNP_CS4232_WOMPU('C','S','C',0xa836,0xa800,0xa810),
 	/* Crystal Semiconductors CS4237B */
 	ISAPNP_CS4232('C','S','C',0x4637,0x0000,0x0010,0x0003),
 	/* NewClear 3D - CX4237B-XQ3 */
@@ -259,6 +261,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0xd937,0x0000,0x0010,0x0003),
 	/* CS4235 without MPU401 */
 	ISAPNP_CS4232_WOMPU('C','S','C',0xe825,0x0100,0x0110),
+	/* Some noname CS4236 based card */
+	ISAPNP_CS4232('C','S','C',0xe936,0x0000,0x0010,0x0003),
 	/* CS4236B */
 	ISAPNP_CS4232('C','S','C',0xf235,0x0000,0x0010,0x0003),
 	/* CS4236B */
@@ -326,20 +330,22 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 	snd_printdd("isapnp WSS: irq=%i, dma1=%i, dma2=%i\n",
 			snd_irq[dev], snd_dma1[dev], snd_dma2[dev]);
 	/* CTRL initialization */
-	pdev = acard->ctrl;
-	if (pdev->prepare(pdev) < 0) {
-		acard->wss->deactivate(acard->wss);
-		return -EAGAIN;
+	if (acard->ctrl && snd_cport[dev] >= 0) {
+		pdev = acard->ctrl;
+		if (pdev->prepare(pdev) < 0) {
+			acard->wss->deactivate(acard->wss);
+			return -EAGAIN;
+		}
+		if (snd_cport[dev] != SNDRV_AUTO_PORT)
+			isapnp_resource_change(&pdev->resource[0], snd_cport[dev], 8);
+		if (pdev->activate(pdev)<0) {
+			printk(KERN_ERR IDENT " isapnp configure failed for control (out of resources?)\n");
+			acard->wss->deactivate(acard->wss);
+			return -EBUSY;
+		}
+		snd_cport[dev] = pdev->resource[0].start;
+		snd_printdd("isapnp CTRL: control port=0x%lx\n", snd_cport[dev]);
 	}
-	if (snd_cport[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_cport[dev], 8);
-	if (pdev->activate(pdev)<0) {
-		printk(KERN_ERR IDENT " isapnp configure failed for control (out of resources?)\n");
-		acard->wss->deactivate(acard->wss);
-		return -EBUSY;
-	}
-	snd_cport[dev] = pdev->resource[0].start;
-	snd_printdd("isapnp CTRL: control port=0x%lx\n", snd_cport[dev]);
 	/* MPU initialization */
 	if (acard->mpu && snd_mpu_port[dev] >= 0) {
 		pdev = acard->mpu;

@@ -187,6 +187,7 @@ struct sigstack {
 #include <asm/sigcontext.h>
 
 #define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+#define HAVE_ARCH_SYS_PAUSE
 
 #endif
 

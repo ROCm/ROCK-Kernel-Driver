@@ -47,6 +47,7 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 	u8 *argbuf = vals;
 	int argsize = 4;
 	struct ata_taskfile args;
+	struct request req;
 
 	/* Second phase.
 	 */
@@ -77,7 +78,17 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 		memset(argbuf + 4, 0, argsize - 4);
 	}
 
-	err = ide_raw_taskfile(drive, &args, argbuf + 4);
+	/* Issue ATA command and wait for completion.
+	 */
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
+	args.XXX_handler = ata_special_intr;
+
+	memset(&req, 0, sizeof(req));
+	req.flags = REQ_SPECIAL;
+	req.special = &args;
+
+	req.buffer = argbuf + 4;
+	err = ide_do_drive_cmd(drive, &req, ide_wait);
 
 	argbuf[0] = drive->status;
 	argbuf[1] = args.taskfile.feature;

@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1999 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -34,10 +35,22 @@
 #include <asm/param.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irqueue.h>
+#include <net/irda/irqueue.h>		/* irda_queue_t */
+#include <net/irda/irlap_event.h>	/* LAP_REASON */
 
 #define DISCOVERY_EXPIRE_TIMEOUT (2*sysctl_discovery_timeout*HZ)
 #define DISCOVERY_DEFAULT_SLOTS  0
+
+/*
+ *  This type is used by the protocols that transmit 16 bits words in 
+ *  little endian format. A little endian machine stores MSB of word in
+ *  byte[1] and LSB in byte[0]. A big endian machine stores MSB in byte[0] 
+ *  and LSB in byte[1].
+ */
+typedef union {
+	__u16 word;
+	__u8  byte[2];
+} __u16_host_order;
 
 /* Types of discovery */
 typedef enum {

@@ -676,13 +676,3 @@ asmlinkage int sys_getpagesize(void)
 {
 	return PAGE_SIZE;
 }
-
-/*
- * Old cruft
- */
-asmlinkage int sys_pause(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	return -ERESTARTNOHAND;
-}

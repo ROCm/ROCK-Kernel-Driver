@@ -1971,7 +1971,7 @@ static void es1968_update_hw_volume(unsigned long private_data)
 	val = chip->ac97->regs[AC97_MASTER];
 	if (x & 1) {
 		/* mute */
-		snd_ac97_write_cache(chip->ac97, 0, val ^ 0x8000);
+		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val ^ 0x8000);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_switch->id);
 	} else {
@@ -1980,7 +1980,7 @@ static void es1968_update_hw_volume(unsigned long private_data)
 			/* volume up */
 			if ((val & 0xff) > 0)
 				val--;
-			if ((val & 0xff00) > 0x100)
+			if ((val & 0xff00) > 0)
 				val -= 0x0100;
 		} else {
 			/* volume down */
@@ -1989,7 +1989,7 @@ static void es1968_update_hw_volume(unsigned long private_data)
 			if ((val & 0xff00) < 0x1f00)
 				val += 0x0100;
 		}
-		snd_ac97_write_cache(chip->ac97, 0, val);
+		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_volume->id);
 	}

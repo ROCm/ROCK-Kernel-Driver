@@ -155,7 +155,7 @@ int __init irlan_init(void)
 	return 0;
 }
 
-void irlan_cleanup(void) 
+void __exit irlan_cleanup(void) 
 {
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
@@ -1194,8 +1194,6 @@ void irlan_mod_dec_use_count(void)
 #endif
 }
 
-#ifdef MODULE
-
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("The Linux IrDA LAN protocol"); 
 MODULE_LICENSE("GPL");
@@ -1211,10 +1209,7 @@ MODULE_PARM_DESC(access, "Access type DIRECT=1, PEER=2, HOSTED=3");
  *    Initialize the IrLAN module, this function is called by the
  *    modprobe(1) program.
  */
-int init_module(void) 
-{
-	return irlan_init();
-}
+module_init(irlan_init);
 
 /*
  * Function cleanup_module (void)
@@ -1222,11 +1217,5 @@ int init_module(void)
  *    Remove the IrLAN module, this function is called by the rmmod(1)
  *    program
  */
-void cleanup_module(void) 
-{
-	/* Free some memory */
- 	irlan_cleanup();
-}
-
-#endif /* MODULE */
+module_exit(irlan_cleanup);
 

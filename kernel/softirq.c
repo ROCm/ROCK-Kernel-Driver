@@ -61,7 +61,7 @@ static inline void wakeup_softirqd(unsigned cpu)
 
 asmlinkage void do_softirq()
 {
-	int cpu = smp_processor_id();
+	unsigned long cpu;
 	__u32 pending;
 	long flags;
 	__u32 mask;
@@ -71,6 +71,7 @@ asmlinkage void do_softirq()
 
 	local_irq_save(flags);
 
+	cpu = smp_processor_id();
 	pending = softirq_pending(cpu);
 
 	if (pending) {

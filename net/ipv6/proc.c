@@ -56,7 +56,7 @@ int afinet6_get_info(char *buffer, char **start, off_t offset, int length)
 }
 
 
-struct snmp6_item
+static struct snmp6_item
 {
 	char *name;
 	unsigned long *ptr;

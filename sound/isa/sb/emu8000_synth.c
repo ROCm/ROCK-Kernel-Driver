@@ -70,6 +70,7 @@ static int snd_emu8000_new_device(snd_seq_device_t *dev)
 	emu->memhdr = hw->memhdr;
 	emu->midi_ports = hw->seq_ports < 2 ? hw->seq_ports : 2; /* number of virmidi ports */
 	emu->midi_devidx = 1;
+	emu->linear_panning = 1;
 
 	if (snd_emux_register(emu, dev->card, hw->index, "Emu8000") < 0) {
 		snd_emux_free(emu);
@@ -78,6 +79,9 @@ static int snd_emu8000_new_device(snd_seq_device_t *dev)
 		hw->memhdr = NULL;
 		return -ENOMEM;
 	}
+
+	if (hw->mem_size > 0)
+		snd_emu8000_pcm_new(dev->card, hw, 1);
 
 	dev->driver_data = hw;
 
@@ -96,6 +100,8 @@ static int snd_emu8000_delete_device(snd_seq_device_t *dev)
 		return 0; /* no synth was allocated actually */
 
 	hw = dev->driver_data;
+	if (hw->pcm)
+		snd_device_free(dev->card, hw->pcm);
 	if (hw->emu)
 		snd_emux_free(hw->emu);
 	if (hw->memhdr)

@@ -56,7 +56,6 @@
 #include <asm/byteorder.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/w83977af.h>
@@ -135,8 +134,7 @@ int __init w83977af_init(void)
  *    Close all configured chips
  *
  */
-#ifdef MODULE
-void w83977af_cleanup(void)
+void __exit w83977af_cleanup(void)
 {
 	int i;
 
@@ -147,7 +145,6 @@ void w83977af_cleanup(void)
 			w83977af_close(dev_self[i]);
 	}
 }
-#endif /* MODULE */
 
 /*
  * Function w83977af_open (iobase, irq)
@@ -1374,8 +1371,6 @@ static struct net_device_stats *w83977af_net_get_stats(struct net_device *dev)
 	return &self->stats;
 }
 
-#ifdef MODULE
-
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Winbond W83977AF IrDA Device Driver");
 MODULE_LICENSE("GPL");
@@ -1394,10 +1389,7 @@ MODULE_PARM_DESC(irq, "IRQ lines");
  *    
  *
  */
-int init_module(void)
-{
-	return w83977af_init();
-}
+module_init(w83977af_init);
 
 /*
  * Function cleanup_module (void)
@@ -1405,8 +1397,4 @@ int init_module(void)
  *    
  *
  */
-void cleanup_module(void)
-{
-	w83977af_cleanup();
-}
-#endif /* MODULE */
+module_exit(w83977af_cleanup);

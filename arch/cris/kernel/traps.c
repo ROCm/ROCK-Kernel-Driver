@@ -28,7 +28,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 
-int kstack_depth_to_print = 24;
+static int kstack_depth_to_print = 24;
 
 void show_trace(unsigned long * stack)
 {

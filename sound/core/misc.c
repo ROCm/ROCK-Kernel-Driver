@@ -90,10 +90,10 @@ void snd_printd(const char *format, ...)
 	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
 		char tmp[] = "<0>";
 		tmp[1] = format[1];
-		printk("%sALSA %s:%d: ", tmp, file, line);
+		printk("%sALSA: ", tmp);
 		format += 3;
 	} else {
-		printk(KERN_DEBUG "ALSA %s:%d: ", file, line);
+		printk(KERN_DEBUG "ALSA: ");
 	}
 	va_start(args, format);
 	vsnprintf(tmpbuf, sizeof(tmpbuf)-1, format, args);

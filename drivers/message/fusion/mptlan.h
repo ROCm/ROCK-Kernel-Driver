@@ -21,6 +21,7 @@
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
 #include <linux/tqueue.h>
+#include <linux/delay.h>
 // #include <linux/trdevice.h>
 
 #include <asm/uaccess.h>
@@ -43,13 +44,15 @@ MODULE_DESCRIPTION(LANAME);
 
 #define MPT_LAN_MAX_BUCKETS_OUT 256
 #define MPT_LAN_BUCKET_THRESH	18 /* 9 buckets in one message */
+#define MPT_LAN_BUCKETS_REMAIN_MISMATCH_THRESH 10
 #define MPT_LAN_RX_COPYBREAK	200
-#define MPT_LAN_TX_TIMEOUT 	(1*HZ)
+#define MPT_LAN_TX_TIMEOUT	(1*HZ)
 #define MPT_TX_MAX_OUT_LIM      127
 
 #define MPT_LAN_MIN_MTU		96		/* RFC2625 */
 #define MPT_LAN_MAX_MTU		65280		/* RFC2625 */
-#define MPT_LAN_MTU             16128		/* be nice to slab allocator */
+#define MPT_LAN_MTU             13312		/* Max perf range + lower mem
+						   usage than 16128 */
 
 #define MPT_LAN_NAA_RFC2625     0x1
 #define MPT_LAN_NAA_QLOGIC      0x2
@@ -64,6 +67,12 @@ MODULE_DESCRIPTION(LANAME);
 #define dioprintk(x)  printk x
 #else
 #define dioprintk(x)
+#endif
+
+#ifdef MPT_LAN_DEBUG
+#define dlprintk(x)  printk x
+#else
+#define dlprintk(x)
 #endif
 
 #define NETDEV_TO_LANPRIV_PTR(d)	((struct mpt_lan_priv *)(d)->priv)

@@ -36,13 +36,10 @@ MODULE_LICENSE("GPL");
 
 static kmem_cache_t * jfs_inode_cachep;
 
-static int in_shutdown;
+int jfs_stop_threads;
 static pid_t jfsIOthread;
 static pid_t jfsCommitThread;
 static pid_t jfsSyncThread;
-struct task_struct *jfsIOtask;
-struct task_struct *jfsCommitTask;
-struct task_struct *jfsSyncTask;
 DECLARE_COMPLETION(jfsIOwait);
 
 #ifdef CONFIG_JFS_DEBUG
@@ -76,19 +73,9 @@ extern void jfs_proc_init(void);
 extern void jfs_proc_clean(void);
 #endif
 
-int jfs_thread_stopped(void)
-{
-	unsigned long signr;
-	siginfo_t info;
-
-	spin_lock_irq(&current->sigmask_lock);
-	signr = dequeue_signal(&current->blocked, &info);
-	spin_unlock_irq(&current->sigmask_lock);
-
-	if (signr == SIGKILL && in_shutdown)
-		return 1;
-	return 0;
-}
+extern wait_queue_head_t jfs_IO_thread_wait;
+extern wait_queue_head_t jfs_commit_thread_wait;
+extern wait_queue_head_t jfs_sync_thread_wait;
 
 static struct inode *jfs_alloc_inode(struct super_block *sb)
 {
@@ -469,10 +456,12 @@ static int __init init_jfs_fs(void)
 
 
 kill_committask:
-	send_sig(SIGKILL, jfsCommitTask, 1);
+	jfs_stop_threads = 1;
+	wake_up(&jfs_commit_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Commit thread exits */
 kill_iotask:
-	send_sig(SIGKILL, jfsIOtask, 1);
+	jfs_stop_threads = 1;
+	wake_up(&jfs_IO_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until IO thread exits */
 end_txmngr:
 	txExit();
@@ -487,14 +476,14 @@ static void __exit exit_jfs_fs(void)
 {
 	jFYI(1, ("exit_jfs_fs called\n"));
 
-	in_shutdown = 1;
+	jfs_stop_threads = 1;
 	txExit();
 	metapage_exit();
-	send_sig(SIGKILL, jfsIOtask, 1);
+	wake_up(&jfs_IO_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until IO thread exits */
-	send_sig(SIGKILL, jfsCommitTask, 1);
+	wake_up(&jfs_commit_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Commit thread exits */
-	send_sig(SIGKILL, jfsSyncTask, 1);
+	wake_up(&jfs_sync_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Sync thread exits */
 #if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
 	jfs_proc_clean();

@@ -180,7 +180,7 @@ if [ "$CONFIG_NET" = "y" ]; then
           tristate '  Ethertap network tap (OBSOLETE)' CONFIG_ETHERTAP
         fi
       fi
-      tristate '  PPP (point-to-point) support' CONFIG_PPP
+      tristate '  PPP (point-to-point protocol) support' CONFIG_PPP
       if [ ! "$CONFIG_PPP" = "n" ]; then
         dep_tristate '  PPP support for async serial ports' CONFIG_PPP_ASYNC $CONFIG_PPP
         dep_tristate '  PPP support for sync tty ports' CONFIG_PPP_SYNC_TTY $CONFIG_PPP

@@ -49,7 +49,7 @@ dep_tristate '  Miro DC10(+) support' CONFIG_VIDEO_ZORAN_DC10 $CONFIG_VIDEO_ZORA
 dep_tristate '  Linux Media Labs LML33 support' CONFIG_VIDEO_ZORAN_LML33 $CONFIG_VIDEO_ZORAN $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_I2C
 dep_tristate '  Zoran ZR36120/36125 Video For Linux' CONFIG_VIDEO_ZR36120 $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_I2C
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-  dep_tristate '  Sony Vaio Picturebook Motion Eye Video For Linux' CONFIG_VIDEO_MEYE $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_SONYPI
+  dep_tristate '  Sony Vaio Picturebook Motion Eye Video For Linux (EXPERIMENTAL)' CONFIG_VIDEO_MEYE $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_SONYPI
 fi
 
 endmenu

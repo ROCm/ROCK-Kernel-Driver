@@ -25,6 +25,7 @@ ifeq ($(subst m,y,$(CONFIG_RTC)),y)
   obj-$(CONFIG_SND_RTCTIMER) += snd-rtctimer.o
 endif
 obj-$(CONFIG_SND_HWDEP) += snd-hwdep.o
+
 obj-$(CONFIG_SND_MIXER_OSS) += oss/
 obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o oss/
 obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o seq/
@@ -58,8 +59,8 @@ obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o sn
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_OPTI93X) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_SB8) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
-obj-$(CONFIG_SND_SB16) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
-obj-$(CONFIG_SND_SBAWE) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
+obj-$(CONFIG_SND_SB16) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
+obj-$(CONFIG_SND_SBAWE) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ES968) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ALS4000) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
@@ -84,12 +85,16 @@ obj-$(CONFIG_SND_EMU10K1) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep
 obj-$(CONFIG_SND_KORG1212) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_NM256) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME9652) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_HDSP) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_TRIDENT) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_YMFPCI) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_POWERMAC) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_SA11XX_UDA1341) += snd-pcm.o snd-timer.o snd.o
 ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
+
+obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

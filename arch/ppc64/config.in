@@ -47,9 +47,9 @@ if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
 fi
 
-bool 'Kernel Support for 64 bit ELF binaries' CONFIG_BINFMT_ELF
+bool 'Kernel support for 64-bit ELF binaries' CONFIG_BINFMT_ELF
 
-tristate 'Kernel support for 32 bit binaries' CONFIG_BINFMT_ELF32
+tristate 'Kernel support for 32-bit ELF binaries' CONFIG_BINFMT_ELF32
 
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 

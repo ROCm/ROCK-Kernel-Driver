@@ -319,6 +319,19 @@
 #define __NR_readahead			379
 #define __NR_security			380 /* syscall for security modules */
 #define __NR_tkill			381
+#define __NR_setxattr			382
+#define __NR_lsetxattr			383
+#define __NR_fsetxattr			384
+#define __NR_getxattr			385
+#define __NR_lgetxattr			386
+#define __NR_fgetxattr			387
+#define __NR_listxattr			388
+#define __NR_llistxattr			389
+#define __NR_flistxattr			390
+#define __NR_removexattr		391
+#define __NR_lremovexattr		392
+#define __NR_fremovexattr		393
+
 
 #if defined(__GNUC__)
 

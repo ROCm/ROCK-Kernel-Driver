@@ -35,7 +35,7 @@ int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 
 	if (!(inode->i_state & I_DIRTY))
 		return rc;
-	if (datasync || !(inode->i_state & I_DIRTY_DATASYNC))
+	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
 		return rc;
 
 	IWRITE_LOCK(inode);

@@ -128,6 +128,7 @@ extern int snd_timer_set_resolution(snd_timer_instance_t * timeri, unsigned long
 extern unsigned long snd_timer_resolution(snd_timer_instance_t * timeri);
 extern int snd_timer_start(snd_timer_instance_t * timeri, unsigned int ticks);
 extern int snd_timer_stop(snd_timer_instance_t * timeri);
+extern int snd_timer_del(snd_timer_instance_t * timeri);
 extern int snd_timer_continue(snd_timer_instance_t * timeri);
 
 extern void snd_timer_interrupt(snd_timer_t * timer, unsigned long ticks_left);

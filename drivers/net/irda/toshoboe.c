@@ -69,8 +69,6 @@ static char *rcsid = "$Id: toshoboe.c,v 1.91 1999/06/29 14:21:06 root Exp $";
 
 #include <net/irda/wrapper.h>
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
-#include <net/irda/irlap_frame.h>
 #include <net/irda/irda_device.h>
 
 #include <linux/pm.h>

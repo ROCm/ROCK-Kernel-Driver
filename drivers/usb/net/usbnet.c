@@ -116,6 +116,7 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/ethtool.h>
+#include <linux/tqueue.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 

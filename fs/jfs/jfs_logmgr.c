@@ -74,10 +74,11 @@
 
 
 /*
- * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIOtask)
+ * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIO thread)
  */
 static lbuf_t *log_redrive_list;
 static spinlock_t log_redrive_lock = SPIN_LOCK_UNLOCKED;
+DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 
 
 /*
@@ -160,8 +161,7 @@ do {						\
  * external references
  */
 extern void txLazyUnlock(tblock_t * tblk);
-extern int jfs_thread_stopped(void);
-extern struct task_struct *jfsIOtask;
+extern int jfs_stop_threads;
 extern struct completion jfsIOwait;
 
 /*
@@ -291,8 +291,7 @@ int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 			tblk->lsn = mp->lsn;
 
 			/* move tblock after page on logsynclist */
-			list_del(&tblk->synclist);
-			list_add(&tblk->synclist, &mp->synclist);
+			list_move(&tblk->synclist, &mp->synclist);
 		}
 	}
 
@@ -1093,7 +1092,7 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * initialize log.
 	 */
 	if ((rc = lmLogInit(log)))
-		goto errout10;
+		goto free;
 	goto out;
 
 	/*
@@ -1103,18 +1102,19 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 */
       externalLog:
 
-	/*
-	 * TODO: Check for already opened log devices
-	 */
-
 	if (!(bdev = bdget(kdev_t_to_nr(JFS_SBI(sb)->logdev)))) {
 		rc = ENODEV;
-		goto errout10;
+		goto free;
 	}
 
 	if ((rc = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS))) {
 		rc = -rc;
-		goto errout10;
+		goto bdput;
+	}
+
+	if ((rc = bd_claim(bdev, log))) {
+		rc = -rc;
+		goto close;
 	}
 
 	log->bdev = bdev;
@@ -1124,13 +1124,13 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 * initialize log:
 	 */
 	if ((rc = lmLogInit(log)))
-		goto errout20;
+		goto unclaim;
 
 	/*
 	 * add file system to log active file system list
 	 */
 	if ((rc = lmLogFileSystem(log, JFS_SBI(sb)->uuid, 1)))
-		goto errout30;
+		goto shutdown;
 
       out:
 	jFYI(1, ("lmLogOpen: exit(0)\n"));
@@ -1140,13 +1140,19 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	/*
 	 *      unwind on error
 	 */
-      errout30:		/* unwind lbmLogInit() */
+      shutdown:		/* unwind lbmLogInit() */
 	lbmLogShutdown(log);
 
-      errout20:		/* close external log device */
+      unclaim:
+	bd_release(bdev);
+
+      close:		/* close external log device */
 	blkdev_put(bdev, BDEV_FS);
 
-      errout10:		/* free log descriptor */
+      bdput:
+	bdput(bdev);
+
+      free:		/* free log descriptor */
 	kfree(log);
 
 	jFYI(1, ("lmLogOpen: exit(%d)\n", rc));
@@ -1369,6 +1375,7 @@ static int lmLogInit(log_t * log)
  */
 int lmLogClose(struct super_block *sb, log_t * log)
 {
+	struct block_device *bdev = log->bdev;
 	int rc;
 
 	jFYI(1, ("lmLogClose: log:0x%p\n", log));
@@ -1388,7 +1395,10 @@ int lmLogClose(struct super_block *sb, log_t * log)
       externalLog:
 	lmLogFileSystem(log, JFS_SBI(sb)->uuid, 0);
 	rc = lmLogShutdown(log);
-	blkdev_put(log->bdev, BDEV_FS);
+
+	bd_release(bdev);
+	blkdev_put(bdev, BDEV_FS);
+	bdput(bdev);
 
       out:
 	jFYI(0, ("lmLogClose: exit(%d)\n", rc));
@@ -1780,7 +1790,7 @@ static inline void lbmRedrive(lbuf_t *bp)
 	log_redrive_list = bp;
 	spin_unlock_irqrestore(&log_redrive_lock, flags);
 
-	wake_up_process(jfsIOtask);
+	wake_up(&jfs_IO_thread_wait);
 }
 
 
@@ -2155,17 +2165,16 @@ int jfsIOWait(void *arg)
 
 	unlock_kernel();
 
-	jfsIOtask = current;
-
 	spin_lock_irq(&current->sigmask_lock);
-	siginitsetinv(&current->blocked,
-		      sigmask(SIGHUP) | sigmask(SIGKILL) | sigmask(SIGSTOP)
-		      | sigmask(SIGCONT));
+	sigfillset(&current->blocked);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	complete(&jfsIOwait);
 
 	do {
+		DECLARE_WAITQUEUE(wq, current);
+
 		spin_lock_irq(&log_redrive_lock);
 		while ((bp = log_redrive_list)) {
 			log_redrive_list = bp->l_redrive_next;
@@ -2174,11 +2183,13 @@ int jfsIOWait(void *arg)
 			lbmStartIO(bp);
 			spin_lock_irq(&log_redrive_lock);
 		}
-		spin_unlock_irq(&log_redrive_lock);
-
+		add_wait_queue(&jfs_IO_thread_wait, &wq);
 		set_current_state(TASK_INTERRUPTIBLE);
+		spin_unlock_irq(&log_redrive_lock);
 		schedule();
-	} while (!jfs_thread_stopped());
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&jfs_IO_thread_wait, &wq);
+	} while (!jfs_stop_threads);
 
 	jFYI(1,("jfsIOWait being killed!\n"));
 	complete(&jfsIOwait);

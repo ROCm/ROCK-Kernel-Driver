@@ -1801,7 +1801,7 @@ irnet_proc_read(char *	buf,
 /*
  * Prepare the IrNET layer for operation...
  */
-int
+int __init
 irda_irnet_init(void)
 {
   int		err = 0;
@@ -1844,7 +1844,7 @@ irda_irnet_init(void)
 /*
  * Cleanup at exit...
  */
-void
+void __exit
 irda_irnet_cleanup(void)
 {
   DENTER(MODULE_TRACE, "()\n");

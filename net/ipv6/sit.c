@@ -146,7 +146,7 @@ static void ipip6_tunnel_link(struct ip_tunnel *t)
 	*tp = t;
 }
 
-struct ip_tunnel * ipip6_tunnel_locate(struct ip_tunnel_parm *parms, int create)
+static struct ip_tunnel * ipip6_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 {
 	u32 remote = parms->iph.daddr;
 	u32 local = parms->iph.saddr;
@@ -231,7 +231,7 @@ static void ipip6_tunnel_uninit(struct net_device *dev)
 }
 
 
-void ipip6_err(struct sk_buff *skb, u32 info)
+static void ipip6_err(struct sk_buff *skb, u32 info)
 {
 #ifndef I_WISH_WORLD_WERE_PERFECT
 
@@ -381,7 +381,7 @@ static inline void ipip6_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 }
 
-int ipip6_rcv(struct sk_buff *skb)
+static int ipip6_rcv(struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	struct ip_tunnel *tunnel;

@@ -1102,7 +1102,7 @@ static void get_client_info(client_t *cptr, snd_seq_client_info_t *info)
 	strcpy(info->name, cptr->name);
 	info->filter = cptr->filter;
 	info->event_lost = cptr->event_lost;
-	*info->event_filter = *cptr->event_filter;
+	memcpy(info->event_filter, cptr->event_filter, 32);
 	info->num_ports = cptr->num_ports;
 	memset(info->reserved, 0, sizeof(info->reserved));
 }
@@ -1151,7 +1151,7 @@ static int snd_seq_ioctl_set_client_info(client_t * client, unsigned long arg)
 	}
 	client->filter = client_info.filter;
 	client->event_lost = client_info.event_lost;
-	*client->event_filter = *client_info.event_filter;
+	memcpy(client->event_filter, client_info.event_filter, 32);
 
 	return 0;
 }

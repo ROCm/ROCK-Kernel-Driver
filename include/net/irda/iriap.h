@@ -29,11 +29,10 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 
-#include <net/irda/qos.h>
 #include <net/irda/iriap_event.h>
 #include <net/irda/irias_object.h>
-#include <net/irda/irqueue.h>
-#include <net/irda/timer.h>
+#include <net/irda/irqueue.h>		/* irda_queue_t */
+#include <net/irda/timer.h>		/* struct timer_list */
 
 #define IAP_LST 0x80
 #define IAP_ACK 0x40

@@ -197,13 +197,6 @@ asmlinkage int sys_uname(struct old_utsname * name)
 	return err?-EFAULT:0;
 }
 
-asmlinkage int sys_pause(void)
-{
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule();
-	return -ERESTARTNOHAND;
-}
-
 extern asmlinkage int sys_newuname(struct new_utsname * name);
 
 asmlinkage int s390x_newuname(struct new_utsname * name)
