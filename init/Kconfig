@@ -326,7 +326,7 @@ config SHMEM
 	  which may be appropriate on small systems without swap.
 
 config CC_ALIGN_FUNCTIONS
-	int "Function alignment"
+	int "Function alignment" if EMBDEDDED
 	default 0
 	help
 	  Align the start of functions to the next power-of-two greater than n,
@@ -336,7 +336,7 @@ config CC_ALIGN_FUNCTIONS
 	  Zero means use compiler's default.
 
 config CC_ALIGN_LABELS
-	int "Label alignment"
+	int "Label alignment" if EMBEDDED
 	default 0
 	help
 	  Align all branch targets to a power-of-two boundary, skipping
@@ -346,14 +346,14 @@ config CC_ALIGN_LABELS
 	  Zero means use compiler's default.
 
 config CC_ALIGN_LOOPS
-	int "Loop alignment"
+	int "Loop alignment" if EMBEDDED
 	default 0
 	help
 	  Align loops to a power-of-two boundary, skipping up to n bytes.
 	  Zero means use compiler's default.
 
 config CC_ALIGN_JUMPS
-	int "Jump alignment"
+	int "Jump alignment" if EMBEDDED
 	default 0
 	help
 	  Align branch targets to a power-of-two boundary, for branch
