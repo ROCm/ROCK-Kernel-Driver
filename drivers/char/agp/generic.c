@@ -311,12 +311,15 @@ EXPORT_SYMBOL(agp_copy_info);
  *	It returns -EINVAL if the pointer == NULL.
  *	It returns -EBUSY if the area of the table requested is already in use.
  */
-int agp_bind_memory(agp_memory * curr, off_t pg_start)
+int agp_bind_memory(agp_memory *curr, off_t pg_start)
 {
 	int ret_val;
 
-	if ((agp_bridge->type == NOT_SUPPORTED) ||
-	    (curr == NULL) || (curr->is_bound == TRUE)) {
+	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
+		return -EINVAL;
+
+	if (curr->is_bound == TRUE) {
+		printk (KERN_INFO PFX "memory %p is already bound!\n", curr);
 		return -EINVAL;
 	}
 	if (curr->is_flushed == FALSE) {
@@ -343,15 +346,17 @@ EXPORT_SYMBOL(agp_bind_memory);
  * It returns -EINVAL if this piece of agp_memory is not currently bound to
  * the graphics aperture translation table or if the agp_memory pointer == NULL
  */
-int agp_unbind_memory(agp_memory * curr)
+int agp_unbind_memory(agp_memory *curr)
 {
 	int ret_val;
 
 	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
 		return -EINVAL;
 
-	if (curr->is_bound != TRUE)
+	if (curr->is_bound != TRUE) {
+		printk (KERN_INFO PFX "memory %p was not bound!\n", curr);
 		return -EINVAL;
+	}
 
 	ret_val = agp_bridge->driver->remove_memory(curr, curr->pg_start, curr->type);
 
@@ -373,10 +378,6 @@ static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 	/* disable SBA if it's not supported */
 	if (!((*cmd & AGPSTAT_SBA) && (*tmp & AGPSTAT_SBA) && (*mode & AGPSTAT_SBA)))
 		*cmd &= ~AGPSTAT_SBA;
-
-	/* disable FW if it's not supported */
-	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
-		*cmd &= ~AGPSTAT_FW;
 
 	/* Set speed */
 	if (!((*cmd & AGPSTAT2_4X) && (*tmp & AGPSTAT2_4X) && (*mode & AGPSTAT2_4X)))
@@ -414,10 +415,6 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	/* SBA *must* be supported for AGP v3 */
 	*cmd |= AGPSTAT_SBA;
-
-	/* disable FW if it's not supported */
-	if (!((*cmd & AGPSTAT_FW) && (*tmp & AGPSTAT_FW) && (*mode & AGPSTAT_FW)))
-		*cmd &= ~AGPSTAT_FW;
 
 	/*
 	 * Set speed.
@@ -486,9 +483,12 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
 			 min_t(u32, (cmd & AGPSTAT_RQ_DEPTH), (tmp & AGPSTAT_RQ_DEPTH))));
 		
-		pci_read_config_dword(device, cap_ptr+AGPSTAT, &agp3);
+		/* disable FW if it's not supported */
+		if (!((cmd & AGPSTAT_FW) && (tmp & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
+			cmd &= ~AGPSTAT_FW;
 
 		/* Check to see if we are operating in 3.0 mode */
+		pci_read_config_dword(device, cap_ptr+AGPSTAT, &agp3);
 		if (agp3 & AGPSTAT_MODE_3_0) {
 			agp_v3_parse_one(&mode, &cmd, &tmp);
 		} else {
