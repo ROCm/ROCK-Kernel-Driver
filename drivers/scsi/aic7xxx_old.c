@@ -3956,6 +3956,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
   unsigned char target, lun, tindex;
   unsigned char queue_flag = FALSE;
   char channel;
+  int result;
 
   target = ((aic_inb(p, SAVED_TCL) >> 4) & 0x0f);
   if ( (p->chip & AHC_CHIPID_MASK) == AHC_AIC7770 )
@@ -4457,69 +4458,42 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
                   printk(INFO_LEAD "Target busy\n", p->host_no, CTL_OF_SCB(scb));
               }
 #endif
-#if 0
               if (queue_flag)
               {
-                if ( p->dev_last_queue_full[tindex] !=
-                     p->dev_active_cmds[tindex] )
-                {
-                  p->dev_last_queue_full[tindex] = 
-                      p->dev_active_cmds[tindex];
-                  p->dev_last_queue_full_count[tindex] = 0;
-                }
-                else
-                {
-                  p->dev_last_queue_full_count[tindex]++;
-                }
-                if ( (p->dev_last_queue_full_count[tindex] > 14) &&
-                     (p->dev_active_cmds[tindex] > 4) )
-                {
-		  int diff, lun;
-		  if (p->dev_active_cmds[tindex] > p->dev_lun_queue_depth[tindex])
-		    /* We don't know what to do here, so bail. */
-		    break;
+		int diff;
+		result = scsi_track_queue_full(cmd->device,
+			       	aic_dev->active_cmds);
+		if ( result < 0 )
+		{
+                  if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
+                    printk(INFO_LEAD "Tagged Command Queueing disabled.\n",
+			p->host_no, CTL_OF_SCB(scb));
+		  diff = aic_dev->max_q_depth - p->host->cmd_per_lun;
+		  aic_dev->temp_q_depth = 1;
+		  aic_dev->max_q_depth = 1;
+		}
+		else if ( result > 0 )
+		{
                   if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
                     printk(INFO_LEAD "Queue depth reduced to %d\n", p->host_no,
-                      CTL_OF_SCB(scb), p->dev_active_cmds[tindex]);
-		  diff = p->dev_lun_queue_depth[tindex] -
-			 p->dev_active_cmds[tindex];
-		  p->dev_lun_queue_depth[tindex] -= diff;
-		  for(lun = 0; lun < p->host->max_lun; lun++)
-		  {
-		    if(p->Scsi_Dev[tindex][lun] != NULL)
-		    {
-		      p->dev_max_queue_depth[tindex] -= diff;
-		      scsi_adjust_queue_depth(p->Scsi_Dev[tindex][lun], 1,
-				              p->dev_lun_queue_depth[tindex]);
-		      if(p->dev_temp_queue_depth[tindex] > p->dev_max_queue_depth[tindex])
-		        p->dev_temp_queue_depth[tindex] = p->dev_max_queue_depth[tindex];
-		    }
-		  }
-                  p->dev_last_queue_full[tindex] = 0;
-                  p->dev_last_queue_full_count[tindex] = 0;
-                }
-                else if (p->dev_active_cmds[tindex] == 0)
-                {
-                  if (aic7xxx_verbose & VERBOSE_NEGOTIATION)
-                  {
-                    printk(INFO_LEAD "QUEUE_FULL status received with 0 "
-                           "commands active.\n", p->host_no, CTL_OF_SCB(scb));
-                    printk(INFO_LEAD "Tagged Command Queueing disabled\n",
-                           p->host_no, CTL_OF_SCB(scb));
-                  }
-                  p->dev_max_queue_depth[tindex] = 1;
-                  p->dev_temp_queue_depth[tindex] = 1;
-                  scb->tag_action = 0;
-                  scb->hscb->control &= ~(MSG_ORDERED_Q_TAG|MSG_SIMPLE_Q_TAG);
-                }
-                else
-                {
-                  aic_dev->flags[tindex] |= DEVICE_WAS_BUSY;
-                  p->dev_temp_queue_depth[tindex] = 
-                    p->dev_active_cmds[tindex];
-                }
-              }
-#endif
+                      CTL_OF_SCB(scb), result);
+		  diff = aic_dev->max_q_depth - result;
+		  aic_dev->max_q_depth = result;
+		  /* temp_q_depth could have been dropped to 1 for an untagged
+		   * command that might be coming up */
+		  if(aic_dev->temp_q_depth > result)
+		    aic_dev->temp_q_depth = result;
+		}
+		/* We should free up the no unused SCB entries.  But, that's
+		 * a difficult thing to do because we use a direct indexed
+		 * array, so we can't just take any entries and free them,
+		 * we *have* to free the ones at the end of the array, and
+		 * they very well could be in use right now, which means
+		 * in order to do this right, we have to add a delayed
+		 * freeing mechanism tied into the scb_free() code area.
+		 * We'll add that later.
+		 */
+	      }
               break;
             }
             
@@ -11003,7 +10977,7 @@ aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
     if(capacity > (65535 * heads * sectors))
       cylinders = 65535;
     else
-      cylinders = ((unsigned int)capacity) / (heads * sectors);
+      cylinders = ((unsigned int)capacity) / (unsigned int)(heads * sectors);
   }
 
   geom[0] = (int)heads;

@@ -466,6 +466,7 @@ extern void scsi_bottom_half_handler(void);
 extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
+extern int scsi_track_queue_full(Scsi_Device *, int);
 extern int scsi_slave_attach(struct scsi_device *sdev);
 extern void scsi_slave_detach(struct scsi_device *sdev);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
@@ -592,6 +593,11 @@ struct scsi_device {
         Scsi_Cmnd *current_cmnd;	/* currently active command */
 	unsigned short current_queue_depth;/* How deep of a queue we have */
 	unsigned short new_queue_depth; /* How deep of a queue we want */
+	unsigned short last_queue_full_depth; /* These two are used by */
+	unsigned short last_queue_full_count; /* scsi_track_queue_full() */
+	unsigned long last_queue_full_time;/* don't let QUEUE_FULLs on the same
+					   jiffie count on our counter, they
+					   could all be from the same event. */
 
 	unsigned int id, lun, channel;
 

@@ -1663,6 +1663,58 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 }
 
 /*
+ * Function:	scsi_track_queue_full()
+ *
+ * Purpose:	This function will track successive QUEUE_FULL events on a
+ * 		specific SCSI device to determine if and when there is a
+ * 		need to adjust the queue depth on the device.
+ *
+ * Arguments:	SDpnt	- SCSI Device in question
+ * 		depth	- Current number of outstanding SCSI commands on
+ * 			  this device, not counting the one returned as
+ * 			  QUEUE_FULL.
+ *
+ * Returns:	0 - No change needed
+ * 		>0 - Adjust queue depth to this new depth
+ * 		-1 - Drop back to untagged operation using host->cmd_per_lun
+ * 			as the untagged command depth
+ *
+ * Lock Status:	None held on entry
+ *
+ * Notes:	Low level drivers may call this at any time and we will do
+ * 		"The Right Thing."  We are interrupt context safe.
+ */
+int scsi_track_queue_full(Scsi_Device *SDptr, int depth)
+{
+	if((jiffies >> 4) != SDptr->last_queue_full_time) {
+		SDptr->last_queue_full_time = (jiffies >> 4);
+		if(SDptr->last_queue_full_depth == depth)
+			SDptr->last_queue_full_count++;
+		else {
+			SDptr->last_queue_full_count = 1;
+			SDptr->last_queue_full_depth = depth;
+		}
+		if(SDptr->last_queue_full_count > 10) {
+			if(SDptr->last_queue_full_depth < 8) {
+				/* Drop back to untagged */
+				scsi_adjust_queue_depth(SDptr, 0 /* untagged */,
+						SDptr->host->cmd_per_lun);
+				return -1;
+			}
+			if(SDptr->ordered_tags)
+				scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG,
+						depth);
+			else
+				scsi_adjust_queue_depth(SDptr, MSG_SIMPLE_TAG,
+						depth);
+			return depth;
+		}
+	}
+	return 0;
+}
+
+
+/*
  * scsi_strcpy_devinfo: called from scsi_dev_info_list_add to copy into
  * devinfo vendor and model strings.
  */
