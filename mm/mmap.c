@@ -53,11 +53,6 @@ int sysctl_overcommit_memory = 0;	/* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 
-inline void vm_unacct_memory(long pages)
-{	
-	atomic_sub(pages, &vm_committed_space);
-}
-
 /*
  * Check that a process has enough memory to allocate a new virtual
  * mapping. 1 means there is enough memory for the allocation to
@@ -73,7 +68,7 @@ int vm_enough_memory(long pages)
 {
 	unsigned long free, allowed;
 
-	atomic_add(pages, &vm_committed_space);
+	vm_acct_memory(pages);
 
         /*
 	 * Sometimes we want to use more memory than we have
