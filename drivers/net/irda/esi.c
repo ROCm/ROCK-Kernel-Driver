@@ -44,12 +44,12 @@ static int  esi_change_speed(struct irda_task *task);
 static int  esi_reset(struct irda_task *task);
 
 static struct dongle_reg dongle = {
-	Q_NULL,
-	IRDA_ESI_DONGLE,
-	esi_open,
-	esi_close,
-	esi_reset,
-	esi_change_speed,
+	.type = IRDA_ESI_DONGLE,
+	.open = esi_open,
+	.close = esi_close,
+	.reset = esi_reset,
+	.change_speed = esi_change_speed,
+	.owner = THIS_MODULE,
 };
 
 int __init esi_init(void)
@@ -66,16 +66,12 @@ static void esi_open(dongle_t *self, struct qos_info *qos)
 {
 	qos->baud_rate.bits &= IR_9600|IR_19200|IR_115200;
 	qos->min_turn_time.bits = 0x01; /* Needs at least 10 ms */
-
-	MOD_INC_USE_COUNT;
 }
 
 static void esi_close(dongle_t *dongle)
 {		
 	/* Power off dongle */
 	dongle->set_dtr_rts(dongle->dev, FALSE, FALSE);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /*
