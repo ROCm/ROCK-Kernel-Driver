@@ -795,8 +795,8 @@ static int  get_empty_nodes(
   else /* If we have enough already then there is nothing to do. */
     return CARRY_ON;
 
-  if ( reiserfs_new_blocknrs (p_s_tb->transaction_handle, a_n_blocknrs,
-			      PATH_PLAST_BUFFER(p_s_tb->tb_path)->b_blocknr, n_amount_needed) == NO_DISK_SPACE )
+  if ( reiserfs_new_form_blocknrs (p_s_tb, a_n_blocknrs,
+                                   n_amount_needed) == NO_DISK_SPACE )
     return NO_DISK_SPACE;
 
   /* for each blocknumber we just got, get a buffer and stick it on FEB */
