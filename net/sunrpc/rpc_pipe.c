@@ -342,19 +342,19 @@ struct rpc_filelist {
 static struct rpc_filelist files[] = {
 	[RPCAUTH_lockd] = {
 		.name = "lockd",
-		.mode = S_IFDIR | S_IRUSR | S_IXUSR,
+		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
 	},
 	[RPCAUTH_nfs] = {
 		.name = "nfs",
-		.mode = S_IFDIR | S_IRUSR | S_IXUSR,
+		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
 	},
 	[RPCAUTH_portmap] = {
 		.name = "portmap",
-		.mode = S_IFDIR | S_IRUSR | S_IXUSR,
+		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
 	},
 	[RPCAUTH_statd] = {
 		.name = "statd",
-		.mode = S_IFDIR | S_IRUSR | S_IXUSR,
+		.mode = S_IFDIR | S_IRUGO | S_IXUGO,
 	},
 };
 
@@ -425,7 +425,7 @@ rpc_lookup_path(char *path, struct nameidata *nd, int flags)
 		return -ENODEV;
 	}
 	nd->mnt = mntget(rpc_mount);
-	nd->dentry = dget(rpc_mount->mnt_sb->s_root);
+	nd->dentry = dget(rpc_mount->mnt_root);
 	nd->last_type = LAST_ROOT;
 	nd->flags = flags;
 
