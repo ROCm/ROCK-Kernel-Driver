@@ -577,6 +577,24 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case CCISS_REVALIDVOLS:
                 return( revalidate_allvol(inode->i_rdev));
 
+ 	case CCISS_GETLUNINFO: {
+ 		LogvolInfo_struct luninfo;
+ 		struct gendisk *disk = hba[ctlr]->gendisk[dsk];
+ 		drive_info_struct *drv = &hba[ctlr]->drv[dsk];
+ 		int i;
+ 		
+ 		luninfo.LunID = drv->LunID;
+ 		luninfo.num_opens = drv->usage_count;
+ 		luninfo.num_parts = 0;
+ 		/* count partitions 1 to 15 with sizes > 0 */
+ 		for(i=1; i <MAX_PART; i++)
+ 			if (disk->part[i].nr_sects != 0)
+ 				luninfo.num_parts++;
+ 		if (copy_to_user((void *) arg, &luninfo,
+ 				sizeof(LogvolInfo_struct)))
+ 			return -EFAULT;
+ 		return(0);
+ 	}
 	case CCISS_DEREGDISK:
 		return( deregister_disk(ctlr,dsk));
 
