@@ -24,7 +24,6 @@
 int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] = -1};
 int numa_memory_lookup_table[MAX_MEMORY >> MEMORY_INCREMENT_SHIFT] =
 	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] = -1};
-int numa_node_exists[MAX_NUMNODES];
 
 struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
@@ -145,7 +144,8 @@ new_range:
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
-		numa_node_exists[numa_domain] = 1;
+		node_data[numa_domain].node_start_pfn = start / PAGE_SIZE;
+		node_data[numa_domain].node_size = size / PAGE_SIZE;
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
 			numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] =
@@ -176,27 +176,17 @@ void __init do_init_bootmem(void)
 		BUG();
 
 	for (nid = 0; nid < numnodes; nid++) {
-		unsigned long start, end;
 		unsigned long start_paddr, end_paddr;
 		int i;
 		unsigned long bootmem_paddr;
 		unsigned long bootmap_pages;
 
-		if (!numa_node_exists[nid])
+		if (node_data[nid].node_size == 0)
 			continue;
 
-		/* Find start and end of this zone */
-		start = 0;
-		while (numa_memory_lookup_table[start] != nid)
-			start++;
-
-		end = (MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1;
-		while (numa_memory_lookup_table[end] != nid)
-			end--;
-		end++;
-
-		start_paddr = start << MEMORY_INCREMENT_SHIFT;
-		end_paddr = end << MEMORY_INCREMENT_SHIFT;
+		start_paddr = node_data[nid].node_start_pfn * PAGE_SIZE;
+		end_paddr = start_paddr + 
+				(node_data[nid].node_size * PAGE_SIZE);
 
 		dbg("node %d\n", nid);
 		dbg("start_paddr = %lx\n", start_paddr);
@@ -278,7 +268,7 @@ void __init paging_init(void)
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
-		if (!numa_node_exists[nid])
+		if (node_data[nid].node_size == 0)
 			continue;
 
 		start_pfn = plat_node_bdata[nid].node_boot_start >> PAGE_SHIFT;

@@ -532,7 +532,7 @@ void __init mem_init(void)
 	int nid;
 
         for (nid = 0; nid < numnodes; nid++) {
-		if (numa_node_exists[nid]) {
+		if (node_data[nid].node_size != 0) {
 			printk("freeing bootmem node %x\n", nid);
 			totalram_pages +=
 				free_all_bootmem_node(NODE_DATA(nid));
