@@ -282,23 +282,25 @@ static int bus_match(struct device * dev, struct device_driver * drv)
  *	Walk the list of drivers that the bus has and call bus_match() 
  *	for each pair. If a compatible pair is found, break out and return.
  */
-static void device_attach(struct device * dev)
+static int device_attach(struct device * dev)
 {
  	struct bus_type * bus = dev->bus;
 	struct list_head * entry;
 
 	if (dev->driver) {
 		device_bind_driver(dev);
-		return;
+		return 1;
 	}
 
 	if (bus->match) {
 		list_for_each(entry,&bus->drivers.list) {
 			struct device_driver * drv = to_drv(entry);
 			if (!bus_match(dev,drv))
-				break;
+				return 1;
 		}
 	}
+
+	return 0;
 }
 
 
@@ -476,6 +478,38 @@ void bus_remove_driver(struct device_driver * drv)
 	}
 }
 
+
+/* Helper for bus_rescan_devices's iter */
+static int bus_rescan_devices_helper(struct device *dev, void *data)
+{
+	int *count = data;
+
+	if (!dev->driver && device_attach(dev))
+		(*count)++;
+
+	return 0;
+}
+
+
+/**
+ *	bus_rescan_devices - rescan devices on the bus for possible drivers
+ *	@bus:	the bus to scan.
+ *
+ *	This function will look for devices on the bus with no driver
+ *	attached and rescan it against existing drivers to see if it
+ *	matches any. Calls device_attach(). Returns the number of devices
+ *	that were sucessfully bound to a driver.
+ */
+int bus_rescan_devices(struct bus_type * bus)
+{
+	int count = 0;
+
+	bus_for_each_dev(bus, NULL, &count, bus_rescan_devices_helper);
+
+	return count;
+}
+
+
 struct bus_type * get_bus(struct bus_type * bus)
 {
 	return bus ? container_of(subsys_get(&bus->subsys),struct bus_type,subsys) : NULL;
@@ -560,6 +594,7 @@ EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
 EXPORT_SYMBOL(bus_register);
 EXPORT_SYMBOL(bus_unregister);
+EXPORT_SYMBOL(bus_rescan_devices);
 EXPORT_SYMBOL(get_bus);
 EXPORT_SYMBOL(put_bus);
 EXPORT_SYMBOL(find_bus);
