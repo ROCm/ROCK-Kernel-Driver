@@ -160,5 +160,5 @@ void __init init_umc8672 (void)	/* called from ide.c */
 	ide_hwifs[1].tuneproc = &tune_umc;
 	ide_hwifs[0].mate = &ide_hwifs[1];
 	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	ide_hwifs[1].unit = 1;
 }

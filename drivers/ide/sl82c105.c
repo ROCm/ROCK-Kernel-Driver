@@ -63,7 +63,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 	unsigned short drv_ctrl = 0x909;
 	unsigned int xfer_mode, reg;
 
-	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
+	reg = (hwif->unit ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
 	if (pio == 255)
 		xfer_mode = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
@@ -100,7 +100,7 @@ static int config_for_dma(ide_drive_t *drive)
 	unsigned short drv_ctrl = 0x909;
 	unsigned int reg;
 
-	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
+	reg = (hwif->unit ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
 	if (ide_config_drive_speed(drive, XFER_MW_DMA_2) == 0)
 		drv_ctrl = 0x0240;

@@ -99,7 +99,7 @@ static void promise_selectproc (ide_drive_t *drive)
 {
 	unsigned int number;
 
-	number = (drive->channel->channel << 1) + drive->select.b.unit;
+	number = (drive->channel->unit << 1) + drive->select.b.unit;
 	OUT_BYTE(number,IDE_FEATURE_REG);
 }
 
@@ -226,7 +226,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	hwif->chipset	= hwif2->chipset = ide_pdc4030;
 	hwif->mate	= hwif2;
 	hwif2->mate	= hwif;
-	hwif2->channel	= 1;
+	hwif2->unit	= 1;
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 

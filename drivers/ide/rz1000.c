@@ -71,7 +71,7 @@ static void __init init_rz1000 (struct pci_dev *dev, const char *name)
 				hwif->drives[0].no_unmask = 1;
 				hwif->drives[1].no_unmask = 1;
 				if (hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
-					hwif->channel = 1;
+					hwif->unit = 1;
 				printk("%s: serialized, disabled unmasking (buggy %s)\n", hwif->name, name);
 			}
 		}

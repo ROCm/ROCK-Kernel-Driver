@@ -224,7 +224,7 @@ static void program_drive_counts (ide_drive_t *drive, int setup_count, int activ
 			{ DRWTIM0, DRWTIM1 },
 			{ DRWTIM2, DRWTIM3 }
 		};
-	int channel = (int) drive->channel->channel;
+	int channel = drive->channel->unit;
 	int slave = (drives != drive);  /* Is this really the best way to determine this?? */
 
 	cmdprintk("program_drive_count parameters = s(%d),a(%d),r(%d),p(%d)\n", setup_count,
@@ -336,7 +336,7 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 static byte cmd680_taskfile_timing(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
-	byte addr_mask		= (hwif->channel) ? 0xB2 : 0xA2;
+	byte addr_mask		= (hwif->unit) ? 0xB2 : 0xA2;
 	unsigned short		timing;
 
 	pci_read_config_word(dev, addr_mask, &timing);
@@ -397,7 +397,7 @@ static void config_cmd680_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	u8 unit			= (drive->select.b.unit & 0x01);
-	u8 addr_mask		= (hwif->channel) ? 0x84 : 0x80;
+	u8 addr_mask		= (hwif->unit) ? 0x84 : 0x80;
 	u8 speed		= 0x00;
 	u8 mode_pci		= 0x00;
 	u8 channel_timings	= cmd680_taskfile_timing(hwif);
@@ -435,8 +435,8 @@ static int cmd64x_tune_chipset (ide_drive_t *drive, byte speed)
 	int err			= 0;
 
 	u8 unit			= (drive->select.b.unit & 0x01);
-	u8 pciU			= (hwif->channel) ? UDIDETCR1 : UDIDETCR0;
-	u8 pciD			= (hwif->channel) ? BMIDESR1 : BMIDESR0;
+	u8 pciU			= (hwif->unit) ? UDIDETCR1 : UDIDETCR0;
+	u8 pciD			= (hwif->unit) ? BMIDESR1 : BMIDESR0;
 	u8 regU			= 0;
 	u8 regD			= 0;
 
@@ -500,7 +500,7 @@ static int cmd680_tune_chipset (ide_drive_t *drive, byte speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
-	u8 addr_mask		= (hwif->channel) ? 0x84 : 0x80;
+	u8 addr_mask		= (hwif->unit) ? 0x84 : 0x80;
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 dma_pci		= 0;
 	u8 udma_pci		= 0;
@@ -841,7 +841,7 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
 	byte dma_stat		= 0;
 	byte dma_alt_stat	= 0;
-	byte mask		= (drive->channel->channel) ? MRDMODE_INTR_CH1 : MRDMODE_INTR_CH0;
+	byte mask		= (drive->channel->unit) ? MRDMODE_INTR_CH1 : MRDMODE_INTR_CH0;
 	unsigned long dma_base	= drive->channel->dma_base;
 	struct pci_dev *dev	= drive->channel->pci_dev;
 	byte jack_slap		= ((dev->device == PCI_DEVICE_ID_CMD_648) || (dev->device == PCI_DEVICE_ID_CMD_649)) ? 1 : 0;
@@ -856,8 +856,8 @@ static int cmd64x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
 			if (jack_slap) {
 				byte dma_intr	= 0;
-				byte dma_mask	= (drive->channel->channel) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
-				byte dma_reg	= (drive->channel->channel) ? ARTTIM2 : CFR;
+				byte dma_mask	= (drive->channel->unit) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
+				byte dma_reg	= (drive->channel->unit) ? ARTTIM2 : CFR;
 				(void) pci_read_config_byte(dev, dma_reg, &dma_intr);
 				/*
 				 * DAMN BMIDE is not connected to PCI space!
@@ -918,7 +918,7 @@ static int cmd680_busproc (ide_drive_t * drive, int state)
 {
 #if 0
 	struct ata_channel *hwif	= drive->channel;
-	u8 addr_mask		= (hwif->channel) ? 0xB0 : 0xA0;
+	u8 addr_mask		= (hwif->unit) ? 0xB0 : 0xA0;
 	u32 stat_config		= 0;
 
         pci_read_config_dword(hwif->pci_dev, addr_mask, &stat_config);
@@ -951,7 +951,7 @@ static void cmd680_reset (ide_drive_t *drive)
 {
 #if 0
 	struct ata_channel *hwif = drive->channel;
-	u8 addr_mask		= (hwif->channel) ? 0xB0 : 0xA0;
+	u8 addr_mask		= (hwif->unit) ? 0xB0 : 0xA0;
 	byte reset		= 0;
 
 	pci_read_config_byte(hwif->pci_dev, addr_mask, &reset);
@@ -1084,7 +1084,7 @@ unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
 unsigned int cmd680_ata66(struct ata_channel *hwif)
 {
 	byte ata66	= 0;
-	byte addr_mask	= (hwif->channel) ? 0xB0 : 0xA0;
+	byte addr_mask	= (hwif->unit) ? 0xB0 : 0xA0;
 
 	pci_read_config_byte(hwif->pci_dev, addr_mask, &ata66);
 	return (ata66 & 0x01) ? 1 : 0;
@@ -1093,7 +1093,7 @@ unsigned int cmd680_ata66(struct ata_channel *hwif)
 unsigned int cmd64x_ata66(struct ata_channel *hwif)
 {
 	byte ata66 = 0;
-	byte mask = (hwif->channel) ? 0x02 : 0x01;
+	byte mask = (hwif->unit) ? 0x02 : 0x01;
 
 	pci_read_config_byte(hwif->pci_dev, BMIDECSR, &ata66);
 	return (ata66 & mask) ? 1 : 0;

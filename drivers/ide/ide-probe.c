@@ -118,7 +118,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		byte type = (id->config >> 8) & 0x1f;
 		printk("ATAPI ");
 #ifdef CONFIG_BLK_DEV_PDC4030
-		if (drive->channel->channel == 1 && drive->channel->chipset == ide_pdc4030) {
+		if (drive->channel->unit == 1 && drive->channel->chipset == ide_pdc4030) {
 			printk(" -- not supported on 2nd Promise port\n");
 			goto err_misc;
 		}
@@ -461,16 +461,16 @@ static void hwif_register(struct ata_channel *hwif)
 {
 	/* Register this hardware interface within the global device tree.
 	 */
-	sprintf(hwif->device.bus_id, "%04x", hwif->io_ports[IDE_DATA_OFFSET]);
-	sprintf(hwif->device.name, "ide");
-	hwif->device.driver_data = hwif;
+	sprintf(hwif->dev.bus_id, "%04x", hwif->io_ports[IDE_DATA_OFFSET]);
+	sprintf(hwif->dev.name, "ide");
+	hwif->dev.driver_data = hwif;
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	if (hwif->pci_dev)
-		hwif->device.parent = &hwif->pci_dev->dev;
+		hwif->dev.parent = &hwif->pci_dev->dev;
 	else
 #endif
-		hwif->device.parent = NULL; /* Would like to do = &device_legacy */
-	device_register(&hwif->device);
+		hwif->dev.parent = NULL; /* Would like to do = &device_legacy */
+	device_register(&hwif->dev);
 
 	if (((unsigned long)hwif->io_ports[IDE_DATA_OFFSET] | 7) ==
 	    ((unsigned long)hwif->io_ports[IDE_STATUS_OFFSET])) {
@@ -517,7 +517,7 @@ static void probe_hwif(struct ata_channel *hwif)
 
 	if (
 #if CONFIG_BLK_DEV_PDC4030
-	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
+	    (hwif->chipset != ide_pdc4030 || hwif->unit == 0) &&
 #endif
 	    hwif_check_regions(hwif)) {
 		int msgout = 0;
@@ -824,11 +824,11 @@ static void init_gendisk(struct ata_channel *hwif)
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		char name[80];
 		ide_add_generic_settings(hwif->drives + unit);
-		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
+		hwif->drives[unit].dn = ((hwif->unit ? 2 : 0) + unit);
 		sprintf (name, "host%d/bus%d/target%d/lun%d",
-			(hwif->channel && hwif->mate) ?
+			(hwif->unit && hwif->mate) ?
 			hwif->mate->index : hwif->index,
-			hwif->channel, unit, hwif->drives[unit].lun);
+			hwif->unit, unit, hwif->drives[unit].lun);
 		if (hwif->drives[unit].present)
 			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
 	}

@@ -621,7 +621,7 @@ static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 			hwif->hw.dma  = ec->dma;
 			hwif->hw.priv = (void *)
 					(port + ICS_ARCIN_V6_INTRSTAT_1);
-			hwif->channel = 0;
+			hwif->unit = 0;
 			icside_setup_dma(hwif, autodma);
 		}
 		if (mate) {
@@ -630,7 +630,7 @@ static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 			mate->hw.dma  = ec->dma;
 			mate->hw.priv = (void *)
 					(port + ICS_ARCIN_V6_INTRSTAT_2);
-			mate->channel = 1;
+			mate->unit = 1;
 			icside_setup_dma(mate, autodma);
 		}
 	}

@@ -344,7 +344,7 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 
 static void via82cxxx_tune_drive(ide_drive_t *drive, unsigned char pio)
 {
-	if (!((via_enabled >> drive->channel->channel) & 1))
+	if (!((via_enabled >> drive->channel->unit) & 1))
 		return;
 
 	if (pio == 255) {
@@ -525,7 +525,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 
 unsigned int __init ata66_via82cxxx(struct ata_channel *hwif)
 {
-	return ((via_enabled & via_80w) >> hwif->channel) & 1;
+	return ((via_enabled & via_80w) >> hwif->unit) & 1;
 }
 
 void __init ide_init_via82cxxx(struct ata_channel *hwif)
@@ -540,7 +540,7 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
 		hwif->drives[i].io_32bit = 1;
 		hwif->drives[i].unmask = (via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
 		hwif->drives[i].autotune = 1;
-		hwif->drives[i].dn = hwif->channel * 2 + i;
+		hwif->drives[i].dn = hwif->unit * 2 + i;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -561,6 +561,6 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
 
 void __init ide_dmacapable_via82cxxx(struct ata_channel *hwif, unsigned long dmabase)
 {
-	if ((via_enabled >> hwif->channel) & 1)
+	if ((via_enabled >> hwif->unit) & 1)
 		ide_setup_dma(hwif, dmabase, 8);
 }

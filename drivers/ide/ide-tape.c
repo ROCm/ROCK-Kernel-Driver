@@ -3103,10 +3103,10 @@ static ide_startstop_t idetape_read_position_callback (ide_drive_t *drive)
 	idetape_tape_t *tape = drive->driver_data;
 	idetape_read_position_result_t *result;
 	
-//#if IDETAPE_DEBUG_LOG
-//	if (tape->debug_level >= 4)
+#if IDETAPE_DEBUG_LOG
+	if (tape->debug_level >= 4)
 		printk (KERN_INFO "ide-tape: Reached idetape_read_position_callback\n");
-//#endif /* IDETAPE_DEBUG_LOG */
+#endif /* IDETAPE_DEBUG_LOG */
 
 	if (!tape->pc->error) {
 		result = (idetape_read_position_result_t *) tape->pc->buffer;
@@ -3280,10 +3280,10 @@ static int idetape_read_position (ide_drive_t *drive)
 	idetape_pc_t pc;
 	int position;
 
-//#if IDETAPE_DEBUG_LOG
-//        if (tape->debug_level >= 4)
-	printk (KERN_INFO "ide-tape: Reached idetape_read_position\n");
-//#endif /* IDETAPE_DEBUG_LOG */
+#if IDETAPE_DEBUG_LOG
+	if (tape->debug_level >= 4)
+	    printk (KERN_INFO "ide-tape: Reached idetape_read_position\n");
+#endif /* IDETAPE_DEBUG_LOG */
 
 #ifdef NO_LONGER_REQUIRED
 	idetape_flush_tape_buffers(drive);

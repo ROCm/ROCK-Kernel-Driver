@@ -259,7 +259,7 @@ static int aec6260_tune_chipset (ide_drive_t *drive, byte speed)
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
-	byte ultra_pci		= hwif->channel ? 0x45 : 0x44;
+	byte ultra_pci		= hwif->unit ? 0x45 : 0x44;
 	int err			= 0;
 	byte drive_conf		= 0x00;
 	byte ultra_conf		= 0x00;
@@ -532,7 +532,7 @@ unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 
 unsigned int __init ata66_aec62xx(struct ata_channel *hwif)
 {
-	byte mask	= hwif->channel ? 0x02 : 0x01;
+	byte mask	= hwif->unit ? 0x02 : 0x01;
 	byte ata66	= 0;
 
 	pci_read_config_byte(hwif->pci_dev, 0x49, &ata66);
@@ -565,7 +565,7 @@ void __init ide_dmacapable_aec62xx(struct ata_channel *hwif, unsigned long dmaba
 	__cli();		/* local CPU only */
 
 	pci_read_config_byte(hwif->pci_dev, 0x54, &reg54h);
-	pci_write_config_byte(hwif->pci_dev, 0x54, reg54h & ~(hwif->channel ? 0xF0 : 0x0F));
+	pci_write_config_byte(hwif->pci_dev, 0x54, reg54h & ~(hwif->unit ? 0xF0 : 0x0F));
 
 	__restore_flags(flags);	/* local CPU only */
 #endif /* CONFIG_AEC62XX_TUNING */

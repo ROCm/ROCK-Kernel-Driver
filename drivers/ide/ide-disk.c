@@ -1036,7 +1036,7 @@ static void idedisk_setup(ide_drive_t *drive)
 	    sprintf(drive->device.bus_id, "%d", drvid);
 	    sprintf(drive->device.name, "ide-disk");
 	    drive->device.driver = &idedisk_devdrv;
-	    drive->device.parent = &drive->channel->device;
+	    drive->device.parent = &drive->channel->dev;
 	    drive->device.driver_data = drive;
 	    device_register(&drive->device);
 	}

@@ -101,7 +101,7 @@ static unsigned int cs5530_pio_timings[2][5] =
  * After chip reset, the PIO timings are set to 0x0000e132, which is not valid.
  */
 #define CS5530_BAD_PIO(timings) (((timings)&~0x80000000)==0x0000e132)
-#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->channel ? 0x30 : 0x20))
+#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->unit ? 0x30 : 0x20))
 
 /*
  * cs5530_tuneproc() handles selection/setting of PIO modes

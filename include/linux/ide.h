@@ -271,14 +271,14 @@ struct ide_settings_s;
 typedef struct ide_drive_s {
 	struct ata_channel *channel;	/* parent pointer to the channel we are attached to  */
 
-	unsigned int	usage;		/* current "open()" count for drive */
+	unsigned int usage;		/* current "open()" count for drive */
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
 
 	/* NOTE: If we had proper separation between channel and host chip, we
 	 * could move this to the chanell and many sync problems would
 	 * magically just go away.
 	 */
-	request_queue_t		 queue;	/* per device request queue */
+	request_queue_t	queue;	/* per device request queue */
 
 	struct ide_drive_s	*next;	/* circular list of hwgroup drives */
 
@@ -300,7 +300,6 @@ typedef struct ide_drive_s {
 	byte     slow;			/* flag: slow data port */
 	byte     bswap;			/* flag: byte swap data */
 	byte     dsc_overlap;		/* flag: DSC overlap */
-	byte     nice1;			/* flag: give potential excess bandwidth */
 	unsigned waiting_for_dma: 1;	/* dma currently in progress */
 	unsigned present	: 1;	/* drive is physically present */
 	unsigned noprobe	: 1;	/* from:  hdx=noprobe */
@@ -312,8 +311,6 @@ typedef struct ide_drive_s {
 	unsigned nobios		: 1;	/* flag: do not probe bios for drive */
 	unsigned revalidate	: 1;	/* request revalidation */
 	unsigned atapi_overlap	: 1;	/* flag: ATAPI overlap (not supported) */
-	unsigned nice0		: 1;	/* flag: give obvious excess bandwidth */
-	unsigned nice2		: 1;	/* flag: give a share in our own bandwidth */
 	unsigned doorlocking	: 1;	/* flag: for removable only: door lock/unlock works */
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
@@ -440,10 +437,17 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
 typedef int (ide_busproc_t) (ide_drive_t *, int);
 
 struct ata_channel {
+	struct device	dev;		/* device handle */
+	int		unit;		/* channel number */
+
 	struct ata_channel *next;	/* for linked-list in ide_hwgroup_t */
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
+
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	struct pci_dev	*pci_dev;	/* for pci chipsets */
+#endif
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
 	struct gendisk	*gd;		/* gendisk structure */
 	ide_tuneproc_t	*tuneproc;	/* routine to tune PIO mode for drives */
@@ -480,17 +484,12 @@ struct ata_channel {
 	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
 	unsigned	highmem	   : 1; /* can do full 32-bit dma */
-	byte		channel;	/* for dual-port chips: 0=primary, 1=secondary */
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	struct pci_dev	*pci_dev;	/* for pci chipsets */
-#endif
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
 	byte		straight8;	/* Alan's straight 8 check */
 	ide_busproc_t	*busproc;	/* driver soft-power interface */
 	byte		bus_state;	/* power state of the IDE bus */
-	struct device	device;		/* global device tree handle */
 };
 
 /*

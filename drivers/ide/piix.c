@@ -357,7 +357,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 
 static void piix_tune_drive(ide_drive_t *drive, unsigned char pio)
 {
-	if (!((piix_enabled >> drive->channel->channel) & 1))
+	if (!((piix_enabled >> drive->channel->unit) & 1))
 		return;
 
 	if (pio == 255) {
@@ -535,7 +535,7 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 
 unsigned int __init ata66_piix(struct ata_channel *hwif)
 {
-	return ((piix_enabled & piix_80w) >> hwif->channel) & 1;
+	return ((piix_enabled & piix_80w) >> hwif->unit) & 1;
 }
 
 void __init ide_init_piix(struct ata_channel *hwif)
@@ -550,7 +550,7 @@ void __init ide_init_piix(struct ata_channel *hwif)
 		hwif->drives[i].io_32bit = 1;
 		hwif->drives[i].unmask = 1;
 		hwif->drives[i].autotune = 1;
-		hwif->drives[i].dn = hwif->channel * 2 + i;
+		hwif->drives[i].dn = hwif->unit * 2 + i;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -572,7 +572,7 @@ void __init ide_init_piix(struct ata_channel *hwif)
 
 void __init ide_dmacapable_piix(struct ata_channel *hwif, unsigned long dmabase)
 {
-	if (((piix_enabled >> hwif->channel) & 1)
+	if (((piix_enabled >> hwif->unit) & 1)
 		&& !(piix_config->flags & PIIX_NODMA))
 			ide_setup_dma(hwif, dmabase, 8);
 }

@@ -844,7 +844,7 @@ unsigned int __init pci_init_sis5513(struct pci_dev *dev)
 unsigned int __init ata66_sis5513(struct ata_channel *hwif)
 {
 	byte reg48h = 0, ata66 = 0;
-	byte mask = hwif->channel ? 0x20 : 0x10;
+	byte mask = hwif->unit ? 0x20 : 0x10;
 	pci_read_config_byte(hwif->pci_dev, 0x48, &reg48h);
 
 	if (dma_capability >= ATA_66) {
@@ -856,7 +856,7 @@ unsigned int __init ata66_sis5513(struct ata_channel *hwif)
 void __init ide_init_sis5513(struct ata_channel *hwif)
 {
 
-	hwif->irq = hwif->channel ? 15 : 14;
+	hwif->irq = hwif->unit ? 15 : 14;
 
 	hwif->tuneproc = &sis5513_tune_drive;
 	hwif->speedproc = &sis5513_tune_chipset;

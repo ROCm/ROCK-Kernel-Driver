@@ -442,7 +442,7 @@ static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, co
 	 */
 
 	if (hwif->mate && hwif->mate->dma_base)
-		dma_base = hwif->mate->dma_base - (hwif->channel ? 0 : 8);
+		dma_base = hwif->mate->dma_base - (hwif->unit ? 0 : 8);
 	else
 		dma_base = pci_resource_start(dev, 4);
 
@@ -452,7 +452,7 @@ static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, co
 	if (extra) /* PDC20246, PDC20262, HPT343, & HPT366 */
 		request_region(dma_base + 16, extra, name);
 
-	dma_base += hwif->channel ? 8 : 0;
+	dma_base += hwif->unit ? 8 : 0;
 	hwif->dma_extra = extra;
 
 	if ((dev->vendor == PCI_VENDOR_ID_AL && dev->device == PCI_DEVICE_ID_AL_M5219) ||
@@ -610,7 +610,7 @@ controller_ok:
 
 	hwif->chipset = ide_pci;
 	hwif->pci_dev = dev;
-	hwif->channel = port;
+	hwif->unit = port;
 	if (!hwif->irq)
 		hwif->irq = pciirq;
 

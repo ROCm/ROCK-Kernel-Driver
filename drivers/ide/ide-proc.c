@@ -183,7 +183,7 @@ static int proc_ide_read_channel
 	struct ata_channel *hwif = data;
 	int		len;
 
-	page[0] = hwif->channel ? '1' : '0';
+	page[0] = hwif->unit ? '1' : '0';
 	page[1] = '\n';
 	len = 2;
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);

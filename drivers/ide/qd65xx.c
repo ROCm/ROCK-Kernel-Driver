@@ -291,7 +291,7 @@ static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 		printk(KERN_INFO "%s: PIO mode%d\n", drive->name, pio - XFER_PIO_0);
 	}
 
-	if (!drive->channel->channel && drive->type != ATA_DISK) {
+	if (!drive->channel->unit && drive->type != ATA_DISK) {
 		qd_write_reg(0x5f,QD_CONTROL_PORT);
 		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name, drive->channel->name);
 	}
@@ -420,7 +420,7 @@ int __init probe (int base)
 
 				ide_hwifs[i].chipset = ide_qd65xx;
 				ide_hwifs[i].mate = &ide_hwifs[i^1];
-				ide_hwifs[i].channel = i;
+				ide_hwifs[i].unit = i;
 
 				ide_hwifs[i].select_data = base;
 				ide_hwifs[i].config_data = config | (control <<8);

@@ -43,12 +43,12 @@ static void ns87415_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 	new = *old;
 
 	/* Adjust IRQ enable bit */
-	bit = 1 << (8 + hwif->channel);
+	bit = 1 << (8 + hwif->unit);
 	new = drive->present ? (new & ~bit) : (new | bit);
 
 	/* Select PIO or DMA, DMA may only be selected for one drive/channel. */
-	bit   = 1 << (20 + drive->select.b.unit       + (hwif->channel << 1));
-	other = 1 << (20 + (1 - drive->select.b.unit) + (hwif->channel << 1));
+	bit   = 1 << (20 + drive->select.b.unit       + (hwif->unit << 1));
+	other = 1 << (20 + (1 - drive->select.b.unit) + (hwif->unit << 1));
 	new = use_dma ? ((new & ~other) | bit) : (new & ~bit);
 
 	if (new != *old) {
@@ -138,9 +138,9 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 	(void) pci_read_config_dword(dev, 0x40, &ctrl);
 	(void) pci_read_config_byte(dev, 0x09, &progif);
 	/* is irq in "native" mode? */
-	using_inta = progif & (1 << (hwif->channel << 1));
+	using_inta = progif & (1 << (hwif->unit << 1));
 	if (!using_inta)
-		using_inta = ctrl & (1 << (4 + hwif->channel));
+		using_inta = ctrl & (1 << (4 + hwif->unit));
 	if (hwif->mate) {
 		hwif->select_data = hwif->mate->select_data;
 	} else {
@@ -180,7 +180,7 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 		outb(0x60, hwif->dma_base + 2);
 
 	if (!using_inta)
-		hwif->irq = hwif->channel ? 15 : 14;	/* legacy mode */
+		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
 	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
 		hwif->irq = hwif->mate->irq;	/* share IRQ with mate */
 

@@ -660,7 +660,7 @@ void ide_release_dma(struct ata_channel *hwif)
 		kfree(hwif->sg_table);
 		hwif->sg_table = NULL;
 	}
-	if ((hwif->dma_extra) && (hwif->channel == 0))
+	if ((hwif->dma_extra) && (hwif->unit == 0))
 		release_region((hwif->dma_base + 16), hwif->dma_extra);
 	release_region(hwif->dma_base, 8);
 	hwif->dma_base = 0;

@@ -247,8 +247,8 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 	int s_time, a_time, c_time;
 	byte s_clc, a_clc, r_clc;
 	unsigned long flags;
-	int port = hwif->index ? 0x5c : 0x58;
-	int portFIFO = hwif->channel ? 0x55 : 0x54;
+	int port = hwif->unit ? 0x5c : 0x58;
+	int portFIFO = hwif->unit ? 0x55 : 0x54;
 	byte cd_dma_fifo = 0;
 
 	if (pio == 255)
@@ -309,7 +309,7 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte tmpbyte		= 0x00;
-	int m5229_udma		= hwif->channel? 0x57 : 0x56;
+	int m5229_udma		= hwif->unit ? 0x57 : 0x56;
 	int err			= 0;
 
 	if (speed < XFER_UDMA_0) {
@@ -597,7 +597,7 @@ unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
 		/*
 		 * Allow ata66 if cable of current channel has 80 pins
 		 */
-		ata66 = (hwif->channel)?cable_80_pin[1]:cable_80_pin[0];
+		ata66 = (hwif->unit)?cable_80_pin[1]:cable_80_pin[0];
 	} else {
 		/*
 		 * revision 0x20 (1543-E, 1543-F)
@@ -639,7 +639,7 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 	byte irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
 				      1, 11, 0, 12, 0, 14, 0, 15 };
 
-	hwif->irq = hwif->channel ? 15 : 14;
+	hwif->irq = hwif->unit ? 15 : 14;
 
 	if (isa_dev) {
 		/*
@@ -651,14 +651,14 @@ void __init ide_init_ali15x3(struct ata_channel *hwif)
 		ideic = ideic & 0x03;
 
 		/* get IRQ for IDE Controller */
-		if ((hwif->channel && ideic == 0x03) || (!hwif->channel && !ideic)) {
+		if ((hwif->unit && ideic == 0x03) || (!hwif->unit && !ideic)) {
 			/*
 			 * get SIRQ1 routing table
 			 */
 			pci_read_config_byte(isa_dev, 0x44, &inmir);
 			inmir = inmir & 0x0f;
 			hwif->irq = irq_routing_table[inmir];
-		} else if (hwif->channel && !(ideic & 0x01)) {
+		} else if (hwif->unit && !(ideic & 0x01)) {
 			/*
 			 * get SIRQ2 routing table
 			 */

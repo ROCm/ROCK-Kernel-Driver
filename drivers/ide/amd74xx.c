@@ -263,7 +263,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 
 static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
 {
-	if (!((amd_enabled >> drive->channel->channel) & 1))
+	if (!((amd_enabled >> drive->channel->unit) & 1))
 		return;
 
 	if (pio == 255) {
@@ -411,7 +411,7 @@ unsigned int __init pci_init_amd74xx(struct pci_dev *dev, const char *name)
 
 unsigned int __init ata66_amd74xx(struct ata_channel *hwif)
 {
-	return ((amd_enabled & amd_80w) >> hwif->channel) & 1;
+	return ((amd_enabled & amd_80w) >> hwif->unit) & 1;
 }
 
 void __init ide_init_amd74xx(struct ata_channel *hwif)
@@ -426,7 +426,7 @@ void __init ide_init_amd74xx(struct ata_channel *hwif)
 		hwif->drives[i].io_32bit = 1;
 		hwif->drives[i].unmask = 1;
 		hwif->drives[i].autotune = 1;
-		hwif->drives[i].dn = hwif->channel * 2 + i;
+		hwif->drives[i].dn = hwif->unit * 2 + i;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -447,6 +447,6 @@ void __init ide_init_amd74xx(struct ata_channel *hwif)
 
 void __init ide_dmacapable_amd74xx(struct ata_channel *hwif, unsigned long dmabase)
 {
-	if ((amd_enabled >> hwif->channel) & 1)
+	if ((amd_enabled >> hwif->unit) & 1)
 		ide_setup_dma(hwif, dmabase, 8);
 }

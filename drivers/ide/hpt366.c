@@ -485,7 +485,7 @@ static unsigned int pci_bus_clock_list (byte speed, struct chipset_bus_clock_lis
 static void hpt366_tune_chipset (ide_drive_t *drive, byte speed)
 {
 	byte regtime		= (drive->select.b.unit & 0x01) ? 0x44 : 0x40;
-	byte regfast		= (drive->channel->channel) ? 0x55 : 0x51;
+	byte regfast		= (drive->channel->unit) ? 0x55 : 0x51;
 			/*
 			 * since the channel is always 0 it does not matter.
 			 */
@@ -536,7 +536,7 @@ static void hpt366_tune_chipset (ide_drive_t *drive, byte speed)
 
 static void hpt370_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	byte regfast		= (drive->channel->channel) ? 0x55 : 0x51;
+	byte regfast		= (drive->channel->unit) ? 0x55 : 0x51;
 	unsigned int list_conf	= 0;
 	unsigned int drive_conf = 0;
 	unsigned int conf_mask	= (speed >= XFER_MW_DMA_0) ? 0xc0000000 : 0x30070000;
@@ -840,8 +840,8 @@ int hpt370_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
-	byte regstate = hwif->channel ? 0x54 : 0x50;
-	byte reginfo = hwif->channel ? 0x56 : 0x52;
+	byte regstate = hwif->unit ? 0x54 : 0x50;
+	byte reginfo = hwif->unit ? 0x56 : 0x52;
 	byte dma_stat;
 
 	switch (func) {
@@ -900,7 +900,7 @@ void hpt3xx_reset (ide_drive_t *drive)
 {
 #if 0
 	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
-	byte reset		= (drive->channel->channel) ? 0x80 : 0x40;
+	byte reset		= (drive->channel->unit) ? 0x80 : 0x40;
 	byte reg59h		= 0;
 
 	pci_read_config_byte(drive->channel->pci_dev, 0x59, &reg59h);
@@ -914,8 +914,8 @@ static int hpt3xx_tristate (ide_drive_t * drive, int state)
 {
 	struct ata_channel *hwif	= drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
-	byte reset		= (hwif->channel) ? 0x80 : 0x40;
-	byte state_reg		= (hwif->channel) ? 0x57 : 0x53;
+	byte reset		= (hwif->unit) ? 0x80 : 0x40;
+	byte state_reg		= (hwif->unit) ? 0x57 : 0x53;
 	byte reg59h		= 0;
 	byte regXXh		= 0;
 
@@ -960,7 +960,7 @@ static int hpt370_busproc(ide_drive_t * drive, int state)
 
 	hwif->bus_state = state;
 
-	if (hwif->channel) { 
+	if (hwif->unit) { 
 		/* secondary channel */
 		tristate = 0x56;
 		resetmask = 0x80; 
@@ -1139,7 +1139,7 @@ unsigned int __init pci_init_hpt366(struct pci_dev *dev)
 unsigned int __init ata66_hpt366(struct ata_channel *hwif)
 {
 	byte ata66	= 0;
-	byte regmask	= (hwif->channel) ? 0x01 : 0x02;
+	byte regmask	= (hwif->unit) ? 0x01 : 0x02;
 
 	pci_read_config_byte(hwif->pci_dev, 0x5a, &ata66);
 #ifdef DEBUG
@@ -1214,8 +1214,8 @@ void __init ide_dmacapable_hpt366(struct ata_channel *hwif, unsigned long dmabas
 {
 	byte masterdma = 0, slavedma = 0;
 	byte dma_new = 0, dma_old = inb(dmabase+2);
-	byte primary	= hwif->channel ? 0x4b : 0x43;
-	byte secondary	= hwif->channel ? 0x4f : 0x47;
+	byte primary	= hwif->unit ? 0x4b : 0x43;
+	byte secondary	= hwif->unit ? 0x4f : 0x47;
 	unsigned long flags;
 
 	__save_flags(flags);	/* local CPU only */

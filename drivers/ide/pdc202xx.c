@@ -530,7 +530,7 @@ static int pdc202xx_new_tune_chipset (ide_drive_t *drive, byte speed)
 #else
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
-	unsigned long indexreg	= high_16 + (hwif->channel ? 0x09 : 0x01);
+	unsigned long indexreg	= high_16 + (hwif->unit ? 0x09 : 0x01);
 	unsigned long datareg	= (indexreg + 2);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 	byte thold		= 0x10;
@@ -725,8 +725,8 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 	byte udma_66		= ((eighty_ninty_three(drive)) && udma_33) ? 1 : 0;
 	byte udma_100		= 0;
 	byte udma_133		= 0;
-	byte mask		= hwif->channel ? 0x08 : 0x02;
-	unsigned short c_mask	= hwif->channel ? (1<<11) : (1<<10);
+	byte mask		= hwif->unit ? 0x08 : 0x02;
+	unsigned short c_mask	= hwif->unit ? (1<<11) : (1<<10);
 
 	byte ultra_66		= ((id->dma_ultra & 0x0010) ||
 				   (id->dma_ultra & 0x0008)) ? 1 : 0;
@@ -792,14 +792,14 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 	if (((ultra_66) || (ultra_100) || (ultra_133)) && (cable)) {
 #ifdef DEBUG
-		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->channel ? "Secondary" : "Primary");
+		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->unit ? "Secondary" : "Primary");
 		printk("         Switching to Ultra33 mode.\n");
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */
 		/* Secondary : zero out fourth bit */
 		if (!jumpbit)
 			OUT_BYTE(CLKSPD & ~mask, (high_16 + 0x11));
-		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
+		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->unit ? "Secondary":"Primary");
 		printk("%s reduced to Ultra33 mode.\n", drive->name);
 		udma_66 = 0; udma_100 = 0; udma_133 = 0;
 	} else {
@@ -990,7 +990,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned long high_16	= pci_resource_start(dev, 4);
-	unsigned long atapi_reg	= high_16 + (hwif->channel ? 0x24 : 0x00);
+	unsigned long atapi_reg	= high_16 + (hwif->unit ? 0x24 : 0x00);
 	unsigned long dma_base	= hwif->dma_base;
 
 	switch (dev->device) {
@@ -1023,7 +1023,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				struct request *rq = HWGROUP(drive)->rq;
 				unsigned long word_count = 0;
 
-				outb(clock|(hwif->channel ? 0x08 : 0x02), high_16 + 0x11);
+				outb(clock|(hwif->unit ? 0x08 : 0x02), high_16 + 0x11);
 				word_count = (rq->nr_sectors << 8);
 				word_count = (rq_data_dir(rq) == READ) ? word_count | 0x05000000 : word_count | 0x06000000;
 				outl(word_count, atapi_reg);
@@ -1033,7 +1033,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			if ((drive->addressing) && (hardware48hack)) {
 				outl(0, atapi_reg);	/* zero out extra */
 				clock = IN_BYTE(high_16 + 0x11);
-				OUT_BYTE(clock & ~(hwif->channel ? 0x08:0x02), high_16 + 0x11);
+				OUT_BYTE(clock & ~(hwif->unit ? 0x08:0x02), high_16 + 0x11);
 			}
 			break;
 		case ide_dma_test_irq:	/* returns 1 if dma irq issued, 0 otherwise */
@@ -1042,7 +1042,7 @@ int pdc202xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				return (dma_stat & 4) == 4;
 
 			sc1d = IN_BYTE(high_16 + 0x001d);
-			if (drive->channel->channel) {
+			if (drive->channel->unit) {
 				if ((sc1d & 0x50) == 0x50) goto somebody_else;
 				else if ((sc1d & 0x40) == 0x40)
 					return (dma_stat & 4) == 4;
@@ -1071,7 +1071,7 @@ void pdc202xx_new_reset (ide_drive_t *drive)
 	OUT_BYTE(0x00,IDE_CONTROL_REG);
 	mdelay(1000);
 	printk("PDC202XX: %s channel reset.\n",
-		drive->channel->channel ? "Secondary" : "Primary");
+		drive->channel->unit ? "Secondary" : "Primary");
 }
 
 void pdc202xx_reset (ide_drive_t *drive)
@@ -1084,7 +1084,7 @@ void pdc202xx_reset (ide_drive_t *drive)
 	OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
 	mdelay(2000);		/* 2 seconds ?! */
 	printk("PDC202XX: %s channel reset.\n",
-		drive->channel->channel ? "Secondary" : "Primary");
+		drive->channel->unit ? "Secondary" : "Primary");
 }
 
 /*
@@ -1218,7 +1218,7 @@ fttk_tx_series:
 
 unsigned int __init ata66_pdc202xx(struct ata_channel *hwif)
 {
-	unsigned short mask = (hwif->channel) ? (1<<11) : (1<<10);
+	unsigned short mask = (hwif->unit) ? (1<<11) : (1<<10);
 	unsigned short CIS;
 
         switch(hwif->pci_dev->device) {

@@ -1213,40 +1213,20 @@ static inline ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 {
 	ide_drive_t *drive, *best;
 
-repeat:
 	best = NULL;
 	drive = hwgroup->drive;
 	do {
-		if (!list_empty(&drive->queue.queue_head) && (!drive->PADAM_sleep || 0 <= (signed long)(jiffies - drive->PADAM_sleep))) {
+		if (!list_empty(&drive->queue.queue_head)
+		&& (!drive->PADAM_sleep	|| time_after_eq(drive->PADAM_sleep, jiffies))) {
 			if (!best
-			 || (drive->PADAM_sleep && (!best->PADAM_sleep || 0 < (signed long)(best->PADAM_sleep - drive->PADAM_sleep)))
-			 || (!best->PADAM_sleep && 0 < (signed long)((best->PADAM_service_start + 2 * best->PADAM_service_time)
-					 - (drive->PADAM_service_start + 2 * drive->PADAM_service_time))))
+			 || (drive->PADAM_sleep && (!best->PADAM_sleep || time_after(best->PADAM_sleep, drive->PADAM_sleep)))
+			 || (!best->PADAM_sleep && time_after(best->PADAM_service_start + 2 * best->PADAM_service_time, drive->PADAM_service_start + 2 * drive->PADAM_service_time)))
 			{
 				if (!blk_queue_plugged(&drive->queue))
 					best = drive;
 			}
 		}
 	} while ((drive = drive->next) != hwgroup->drive);
-	if (best && best->nice1 && !best->PADAM_sleep && best != hwgroup->drive && best->PADAM_service_time > WAIT_MIN_SLEEP) {
-		long t = (signed long)((best->PADAM_service_start + 2 * best->PADAM_service_time) - jiffies);
-		if (t >= WAIT_MIN_SLEEP) {
-			/*
-			 * We *may* have some time to spare, but first let's see if
-			 * someone can potentially benefit from our nice mood today..
-			 */
-			drive = best->next;
-			do {
-				if (!drive->PADAM_sleep
-				 && 0 < (signed long)((drive->PADAM_service_start + 2 * drive->PADAM_service_time) - (jiffies - best->PADAM_service_time))
-				 && 0 < (signed long)((jiffies + t) - (drive->PADAM_service_start + 2 * drive->PADAM_service_time)))
-				{
-					ide_stall_queue(best, min(t, 10L * WAIT_MIN_SLEEP));
-					goto repeat;
-				}
-			} while ((drive = drive->next) != best);
-		}
-	}
 	return best;
 }
 
@@ -1298,7 +1278,7 @@ static void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq)
 			hwgroup->rq = NULL;
 			drive = hwgroup->drive;
 			do {
-				if (drive->PADAM_sleep && (!sleep || 0 < (signed long)(sleep - drive->PADAM_sleep)))
+				if (drive->PADAM_sleep && (!sleep || time_after(sleep, drive->PADAM_sleep)))
 					sleep = drive->PADAM_sleep;
 			} while ((drive = drive->next) != hwgroup->drive);
 			if (sleep) {
@@ -1968,23 +1948,22 @@ static void hwif_unregister(struct ata_channel *hwif)
 #endif
 }
 
-void ide_unregister(struct ata_channel *hwif)
+void ide_unregister(struct ata_channel *channel)
 {
 	struct gendisk *gd;
 	ide_drive_t *drive, *d;
-	struct ata_channel *g;
 	ide_hwgroup_t *hwgroup;
-	int irq_count = 0, unit, i;
+	int unit, i;
 	unsigned long flags;
 	unsigned int p, minor;
 	struct ata_channel old_hwif;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	if (!hwif->present)
+	if (!channel->present)
 		goto abort;
-	put_device(&hwif->device);
+	put_device(&channel->dev);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		drive = &hwif->drives[unit];
+		drive = &channel->drives[unit];
 		if (!drive->present)
 			continue;
 		if (drive->busy || drive->usage)
@@ -1997,43 +1976,47 @@ void ide_unregister(struct ata_channel *hwif)
 				ide_unregister_subdriver(drive);
 		}
 	}
-	hwif->present = 0;
+	channel->present = 0;
 
 	/*
 	 * All clear?  Then blow away the buffer cache
 	 */
 	spin_unlock_irqrestore(&ide_lock, flags);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		drive = &hwif->drives[unit];
+		drive = &channel->drives[unit];
 		if (!drive->present)
 			continue;
 		minor = drive->select.b.unit << PARTN_BITS;
 		for (p = 0; p < (1<<PARTN_BITS); ++p) {
 			if (drive->part[p].nr_sects > 0) {
-				kdev_t devp = mk_kdev(hwif->major, minor+p);
+				kdev_t devp = mk_kdev(channel->major, minor+p);
 				invalidate_device(devp, 0);
 			}
 		}
 	}
 #ifdef CONFIG_PROC_FS
-	destroy_proc_ide_drives(hwif);
+	destroy_proc_ide_drives(channel);
 #endif
 	spin_lock_irqsave(&ide_lock, flags);
-	hwgroup = hwif->hwgroup;
+	hwgroup = channel->hwgroup;
 
 	/*
 	 * free the irq if we were the only hwif using it
 	 */
-	g = hwgroup->hwif;
-	do {
-		if (g->irq == hwif->irq)
-			++irq_count;
-		g = g->next;
-	} while (g != hwgroup->hwif);
-	if (irq_count == 1)
-		free_irq(hwif->irq, hwgroup);
+	{
+		struct ata_channel *g;
+		int irq_count = 0;
 
-	hwif_unregister(hwif);
+		g = hwgroup->hwif;
+		do {
+			if (g->irq == channel->irq)
+				++irq_count;
+			g = g->next;
+		} while (g != hwgroup->hwif);
+		if (irq_count == 1)
+			free_irq(channel->irq, hwgroup);
+	}
+	hwif_unregister(channel);
 
 	/*
 	 * Remove us from the hwgroup, and free
@@ -2041,7 +2024,7 @@ void ide_unregister(struct ata_channel *hwif)
 	 */
 	d = hwgroup->drive;
 	for (i = 0; i < MAX_DRIVES; ++i) {
-		drive = &hwif->drives[i];
+		drive = &channel->drives[i];
 		if (drive->de) {
 			devfs_unregister (drive->de);
 			drive->de = NULL;
@@ -2062,27 +2045,27 @@ void ide_unregister(struct ata_channel *hwif)
 	}
 	if (d->present)
 		hwgroup->drive = d;
-	while (hwgroup->hwif->next != hwif)
+	while (hwgroup->hwif->next != channel)
 		hwgroup->hwif = hwgroup->hwif->next;
-	hwgroup->hwif->next = hwif->next;
-	if (hwgroup->hwif == hwif)
+	hwgroup->hwif->next = channel->next;
+	if (hwgroup->hwif == channel)
 		kfree(hwgroup);
 	else
 		hwgroup->hwif = hwgroup->drive->channel;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	ide_release_dma(hwif);
+	ide_release_dma(channel);
 #endif
 
 	/*
 	 * Remove us from the kernel's knowledge
 	 */
-	unregister_blkdev(hwif->major, hwif->name);
-	kfree(blksize_size[hwif->major]);
-	blk_dev[hwif->major].data = NULL;
-	blk_dev[hwif->major].queue = NULL;
-	blk_clear(hwif->major);
-	gd = hwif->gd;
+	unregister_blkdev(channel->major, channel->name);
+	kfree(blksize_size[channel->major]);
+	blk_dev[channel->major].data = NULL;
+	blk_dev[channel->major].queue = NULL;
+	blk_clear(channel->major);
+	gd = channel->gd;
 	if (gd) {
 		del_gendisk(gd);
 		kfree(gd->sizes);
@@ -2092,45 +2075,45 @@ void ide_unregister(struct ata_channel *hwif)
 		if (gd->flags)
 			kfree (gd->flags);
 		kfree(gd);
-		hwif->gd = NULL;
+		channel->gd = NULL;
 	}
 
 	/*
-	 * Reinitialize the hwif handler, but preserve any special methods for
+	 * Reinitialize the channel handler, but preserve any special methods for
 	 * it.
 	 */
 
-	old_hwif		= *hwif;
-	init_hwif_data(hwif, hwif->index);
-	hwif->hwgroup		= old_hwif.hwgroup;
-	hwif->tuneproc		= old_hwif.tuneproc;
-	hwif->speedproc		= old_hwif.speedproc;
-	hwif->selectproc	= old_hwif.selectproc;
-	hwif->resetproc		= old_hwif.resetproc;
-	hwif->intrproc		= old_hwif.intrproc;
-	hwif->maskproc		= old_hwif.maskproc;
-	hwif->quirkproc		= old_hwif.quirkproc;
-	hwif->rwproc		= old_hwif.rwproc;
-	hwif->ideproc		= old_hwif.ideproc;
-	hwif->dmaproc		= old_hwif.dmaproc;
-	hwif->busproc		= old_hwif.busproc;
-	hwif->bus_state		= old_hwif.bus_state;
-	hwif->dma_base		= old_hwif.dma_base;
-	hwif->dma_extra		= old_hwif.dma_extra;
-	hwif->config_data	= old_hwif.config_data;
-	hwif->select_data	= old_hwif.select_data;
-	hwif->proc		= old_hwif.proc;
+	old_hwif		= *channel;
+	init_hwif_data(channel, channel->index);
+	channel->hwgroup = old_hwif.hwgroup;
+	channel->tuneproc = old_hwif.tuneproc;
+	channel->speedproc = old_hwif.speedproc;
+	channel->selectproc = old_hwif.selectproc;
+	channel->resetproc = old_hwif.resetproc;
+	channel->intrproc = old_hwif.intrproc;
+	channel->maskproc = old_hwif.maskproc;
+	channel->quirkproc = old_hwif.quirkproc;
+	channel->rwproc	= old_hwif.rwproc;
+	channel->ideproc = old_hwif.ideproc;
+	channel->dmaproc = old_hwif.dmaproc;
+	channel->busproc = old_hwif.busproc;
+	channel->bus_state = old_hwif.bus_state;
+	channel->dma_base = old_hwif.dma_base;
+	channel->dma_extra = old_hwif.dma_extra;
+	channel->config_data = old_hwif.config_data;
+	channel->select_data = old_hwif.select_data;
+	channel->proc = old_hwif.proc;
 #ifndef CONFIG_BLK_DEV_IDECS
-	hwif->irq		= old_hwif.irq;
+	channel->irq = old_hwif.irq;
 #endif
-	hwif->major		= old_hwif.major;
-	hwif->chipset		= old_hwif.chipset;
-	hwif->autodma		= old_hwif.autodma;
-	hwif->udma_four		= old_hwif.udma_four;
+	channel->major = old_hwif.major;
+	channel->chipset = old_hwif.chipset;
+	channel->autodma = old_hwif.autodma;
+	channel->udma_four = old_hwif.udma_four;
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	hwif->pci_dev		= old_hwif.pci_dev;
+	channel->pci_dev = old_hwif.pci_dev;
 #endif
-	hwif->straight8		= old_hwif.straight8;
+	channel->straight8 = old_hwif.straight8;
 abort:
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
@@ -2419,7 +2402,6 @@ void ide_add_generic_settings (ide_drive_t *drive)
  */
 	ide_add_setting(drive,	"io_32bit",		drive->no_io_32bit ? SETTING_READ : SETTING_RW,	HDIO_GET_32BIT,		HDIO_SET_32BIT,		TYPE_BYTE,	0,	1 + (SUPPORT_VLB_SYNC << 1),	1,		1,		&drive->io_32bit,		set_io_32bit);
 	ide_add_setting(drive,	"keepsettings",		SETTING_RW,					HDIO_GET_KEEPSETTINGS,	HDIO_SET_KEEPSETTINGS,	TYPE_BYTE,	0,	1,				1,		1,		&drive->keep_settings,		NULL);
-	ide_add_setting(drive,	"nice1",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->nice1,			NULL);
 	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
 	ide_add_setting(drive,	"slow",			SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	1,				1,		1,		&drive->slow,			NULL);
 	ide_add_setting(drive,	"unmaskirq",		drive->no_unmask ? SETTING_READ : SETTING_RW,	HDIO_GET_UNMASKINTR,	HDIO_SET_UNMASKINTR,	TYPE_BYTE,	0,	1,				1,		1,		&drive->unmask,			NULL);
@@ -2545,10 +2527,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 
 		case HDIO_GET_NICE:
 			return put_user(drive->dsc_overlap	<<	IDE_NICE_DSC_OVERLAP	|
-					drive->atapi_overlap	<<	IDE_NICE_ATAPI_OVERLAP	|
-					drive->nice0		<< 	IDE_NICE_0		|
-					drive->nice1		<<	IDE_NICE_1		|
-					drive->nice2		<<	IDE_NICE_2,
+					drive->atapi_overlap	<<	IDE_NICE_ATAPI_OVERLAP,
 					(long *) arg);
 
 		case HDIO_DRIVE_CMD:
@@ -2563,7 +2542,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 
 		case HDIO_SET_NICE:
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-			if (arg != (arg & ((1 << IDE_NICE_DSC_OVERLAP) | (1 << IDE_NICE_1))))
+			if (arg != (arg & ((1 << IDE_NICE_DSC_OVERLAP))))
 				return -EPERM;
 			drive->dsc_overlap = (arg >> IDE_NICE_DSC_OVERLAP) & 1;
 			/* Only CD-ROM's and tapes support DSC overlap. */
@@ -2571,7 +2550,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 				drive->dsc_overlap = 0;
 				return -EPERM;
 			}
-			drive->nice1 = (arg >> IDE_NICE_1) & 1;
 			return 0;
 		case BLKGETSIZE:
 		case BLKGETSIZE64:
@@ -3151,7 +3129,7 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 	}
 
 	/* FIXME: This will be pushed to the drivers! Thus allowing us to
-	 * save one parameter here eparate this out.
+	 * save one parameter here separate this out.
 	 */
 
 	drive->driver = driver;
@@ -3175,7 +3153,6 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 		/* Only CD-ROMs and tape drives support DSC overlap. */
 		drive->dsc_overlap = (drive->next != drive
 				&& (drive->type == ATA_ROM || drive->type == ATA_TAPE));
-		drive->nice1 = 1;
 	}
 	drive->revalidate = 1;
 	drive->suspend_reset = 0;
