@@ -16,6 +16,7 @@
 #include "linux/binfmts.h"
 #include "asm/signal.h"
 #include "asm/uaccess.h"
+#include "asm/unistd.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "signal_kern.h"
@@ -70,6 +71,9 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 
 	ret = 0;
 	switch(error){
+	case -ERESTART_RESTARTBLOCK:
+		current_thread_info()->restart_block.fn = 
+			do_no_restart_syscall;
 	case -ERESTARTNOHAND:
 		ret = -EINTR;
 		break;
@@ -161,6 +165,10 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 			PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
 			PT_REGS_RESTART_SYSCALL(regs);
 		}
+		else if(PT_REGS_SYSCALL_RET(regs) == -ERESTART_RESTARTBLOCK){
+			PT_REGS_SYSCALL_RET(regs) = __NR_restart_syscall;
+			PT_REGS_RESTART_SYSCALL(regs);
+ 		}
 	}
 
 	/* This closes a way to execute a system call on the host.  If

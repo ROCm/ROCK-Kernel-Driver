@@ -8,10 +8,12 @@
 #include "linux/version.h"
 #include "linux/sys.h"
 #include "linux/swap.h"
+#include "linux/sysctl.h"
 #include "asm/signal.h"
 #include "sysdep/syscalls.h"
 #include "kern_util.h"
 
+extern syscall_handler_t sys_restart_syscall;
 extern syscall_handler_t sys_ni_syscall;
 extern syscall_handler_t sys_exit;
 extern syscall_handler_t sys_fork;
@@ -253,7 +255,7 @@ extern syscall_handler_t um_stime;
 #endif
 
 syscall_handler_t *sys_call_table[] = {
-	[ 0 ] = sys_ni_syscall,
+	[ __NR_restart_syscall ] = sys_restart_syscall,
 	[ __NR_exit ] = sys_exit,
 	[ __NR_fork ] = sys_fork,
 	[ __NR_read ] = (syscall_handler_t *) sys_read,
