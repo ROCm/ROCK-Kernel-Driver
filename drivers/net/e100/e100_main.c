@@ -1010,7 +1010,11 @@ e100_open(struct net_device *dev)
 
 	mod_timer(&(bdp->watchdog_timer), jiffies + (2 * HZ));
 
-	netif_start_queue(dev);
+	if (dev->flags & IFF_UP)
+		/* Otherwise process may sleep forever */
+		netif_wake_queue(dev);
+	else
+		netif_start_queue(dev);
 
 	e100_start_ru(bdp);
 	if ((rc = request_irq(dev->irq, &e100intr, SA_SHIRQ,
@@ -1072,7 +1076,8 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 		goto exit2;
 	}
 
-	if (!TCBS_AVAIL(bdp->tcb_pool) ||
+	/* tcb list may be empty temporarily during releasing resources */
+	if (!TCBS_AVAIL(bdp->tcb_pool) || (bdp->tcb_phys == 0) ||
 	    (bdp->non_tx_command_state != E100_NON_TX_IDLE)) {
 		notify_stop = true;
 		rc = 1;
@@ -3430,7 +3435,13 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	if ((ecmd.autoneg == AUTONEG_ENABLE)
 	    && (bdp->speed_duplex_caps & SUPPORTED_Autoneg)) {
 		bdp->params.e100_speed_duplex = E100_AUTONEG;
-		e100_set_speed_duplex(bdp);
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
 	} else {
 		if (ecmd.speed == SPEED_10) {
 			if (ecmd.duplex == DUPLEX_HALF) {
@@ -3461,7 +3472,13 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 		if (bdp->speed_duplex_caps & ethtool_new_speed_duplex) {
 			bdp->params.e100_speed_duplex =
 				e100_new_speed_duplex;
-			e100_set_speed_duplex(bdp);
+			if (netif_running(dev)) {
+				spin_lock_bh(&dev->xmit_lock);
+				e100_close(dev);
+				spin_unlock_bh(&dev->xmit_lock);
+				e100_hw_init(bdp);
+				e100_open(dev);
+			}
 		} else {
 			return -EOPNOTSUPP;
 		} 
@@ -3563,7 +3580,13 @@ e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 
 	if ((bdp->speed_duplex_caps & SUPPORTED_Autoneg) &&
 	    (bdp->params.e100_speed_duplex == E100_AUTONEG)) {
-		e100_set_speed_duplex(bdp);
+		if (netif_running(dev)) {
+			spin_lock_bh(&dev->xmit_lock);
+			e100_close(dev);
+			spin_unlock_bh(&dev->xmit_lock);
+			e100_hw_init(bdp);
+			e100_open(dev);
+		}
 	} else {
 		return -EFAULT;
 	}
@@ -4016,7 +4039,13 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					bdp->params.e100_speed_duplex = E100_SPEED_10_FULL;
 				else
 					bdp->params.e100_speed_duplex = E100_SPEED_10_HALF;
-				e100_set_speed_duplex(bdp);
+				if (netif_running(dev)) {
+					spin_lock_bh(&dev->xmit_lock);
+					e100_close(dev);
+					spin_unlock_bh(&dev->xmit_lock);
+					e100_hw_init(bdp);
+					e100_open(dev);
+				}
 		}
 		else 
 			/* Only allows changing speed/duplex */
