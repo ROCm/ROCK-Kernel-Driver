@@ -904,7 +904,7 @@ static unsigned int parse_hex_value(const char __user *buffer,
 		return -EFAULT;
 
 	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
+	 * Parse the first HEX_DIGITS characters as a hex string, any non-hex char
 	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
 
