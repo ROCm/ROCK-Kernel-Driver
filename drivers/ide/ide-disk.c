@@ -1638,9 +1638,9 @@ static barrier_mode_t chosen_barrier_mode = barrier_default;
 
 static int __init barrier_setup (char *str)
 {
-	if (!strncmp (str, "on", 2))
+	if (!strcmp (str, "on"))
 		chosen_barrier_mode = barrier_on;
-	else if (!strncmp (str, "off", 3))
+	else if (!strcmp (str, "off"))
 		chosen_barrier_mode = barrier_off;
 	return 1;
 }
