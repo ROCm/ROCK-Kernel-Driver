@@ -57,15 +57,15 @@ struct fw_filter
 	u32			id;
 	struct tcf_result	res;
 #ifdef CONFIG_NET_CLS_ACT
-       struct tc_action        *action;
+	struct tc_action        *action;
 #ifdef CONFIG_NET_CLS_IND
-       char			indev[IFNAMSIZ];
-#endif
-#else
+	char			indev[IFNAMSIZ];
+#endif /* CONFIG_NET_CLS_IND */
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
 	struct tcf_police	*police;
-#endif
-#endif
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 };
 
 static __inline__ int fw_hash(u32 handle)
@@ -158,14 +158,14 @@ static void fw_destroy(struct tcf_proto *tp)
 			head->ht[h] = f->next;
 			tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action) {
-               tcf_action_destroy(f->action,TCA_ACT_UNBIND);
-       }
-#else
+			if (f->action)
+				tcf_action_destroy(f->action, TCA_ACT_UNBIND);
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-			tcf_police_release(f->police,TCA_ACT_UNBIND);
-#endif
-#endif
+			if (f->police)
+				tcf_police_release(f->police, TCA_ACT_UNBIND);
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 
 			kfree(f);
 		}
@@ -189,14 +189,13 @@ static int fw_delete(struct tcf_proto *tp, unsigned long arg)
 			tcf_tree_unlock(tp);
 			tcf_unbind_filter(tp, &f->res);
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action) {
-               tcf_action_destroy(f->action,TCA_ACT_UNBIND);
-       }
-#else
+			if (f->action)
+				tcf_action_destroy(f->action,TCA_ACT_UNBIND);
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
 			tcf_police_release(f->police,TCA_ACT_UNBIND);
-#endif
-#endif
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 			kfree(f);
 			return 0;
 		}
@@ -358,15 +357,15 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 
 	t->tcm_handle = f->id;
 
-       if (!f->res.classid
+	if (!f->res.classid
 #ifdef CONFIG_NET_CLS_ACT
-           && !f->action
+		&& !f->action
 #else
 #ifdef CONFIG_NET_CLS_POLICE
-           && !f->police
+		&& !f->police
 #endif
 #endif
-           )
+		)
 		return skb->len;
 
 	rta = (struct rtattr*)b;
@@ -390,19 +389,19 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 
 	rta->rta_len = skb->tail - b;
 #ifdef CONFIG_NET_CLS_ACT
-       if (f->action && f->action->type == TCA_OLD_COMPAT) {
-               if (tcf_action_copy_stats(skb,f->action))
-                       goto rtattr_failure;
-       }
-#else
+	if (f->action && f->action->type == TCA_OLD_COMPAT) {
+		if (tcf_action_copy_stats(skb,f->action))
+			goto rtattr_failure;
+	}
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
 	if (f->police) {
 		if (qdisc_copy_stats(skb, &f->police->stats,
-				     f->police->stats_lock))
+			f->police->stats_lock))
 			goto rtattr_failure;
 	}
-#endif
-#endif
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
 	return skb->len;
 
 rtattr_failure:
