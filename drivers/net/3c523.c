@@ -210,10 +210,11 @@ struct priv {
 	volatile struct iscp_struct *iscp;	/* volatile is important */
 	volatile struct scb_struct *scb;	/* volatile is important */
 	volatile struct tbd_struct *xmit_buffs[NUM_XMIT_BUFFS];
-	volatile struct transmit_cmd_struct *xmit_cmds[NUM_XMIT_BUFFS];
 #if (NUM_XMIT_BUFFS == 1)
+	volatile struct transmit_cmd_struct *xmit_cmds[2];
 	volatile struct nop_cmd_struct *nop_cmds[2];
 #else
+	volatile struct transmit_cmd_struct *xmit_cmds[NUM_XMIT_BUFFS];
 	volatile struct nop_cmd_struct *nop_cmds[NUM_XMIT_BUFFS];
 #endif
 	volatile int nop_point, num_recv_buffs;
