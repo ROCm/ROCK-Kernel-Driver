@@ -1,7 +1,9 @@
-/* 
-    Driver for Zarlink MT312 Satellite Channel Decoder
+/*
+    cx24110 - Single Chip Satellite Channel Receiver driver module
 
-    Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>
+    Copyright (C) 2002 Peter Hettkamp <peter.hettkamp@t-online.de> based on
+    work
+    Copyright (C) 1999 Convergence Integrated Media GmbH <ralph@convergence.de>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,17 +20,14 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    References:
-    http://products.zarlink.com/product_profiles/MT312.htm
-    http://products.zarlink.com/product_profiles/SL1935.htm
 */
 
-#ifndef MT312_H
-#define MT312_H
+#ifndef CX24110_H
+#define CX24110_H
 
 #include <linux/dvb/frontend.h>
 
-struct mt312_config
+struct cx24110_config
 {
 	/* the demodulator's i2c address */
 	u8 demod_address;
@@ -38,7 +37,9 @@ struct mt312_config
 	int (*pll_set)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
 };
 
-extern struct dvb_frontend* mt312_attach(const struct mt312_config* config,
-					 struct i2c_adapter* i2c);
+extern struct dvb_frontend* cx24110_attach(const struct cx24110_config* config,
+					   struct i2c_adapter* i2c);
 
-#endif // MT312_H
+extern int cx24110_pll_write(struct dvb_frontend* fe, u32 data);
+
+#endif // CX24110_H

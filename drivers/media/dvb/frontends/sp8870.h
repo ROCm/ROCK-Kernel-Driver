@@ -1,7 +1,7 @@
-/* 
-    Driver for Zarlink MT312 Satellite Channel Decoder
+/*
+    Driver for Spase SP8870 demodulator
 
-    Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>
+    Copyright (C) 1999 Juergen Peitz
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,17 +18,15 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    References:
-    http://products.zarlink.com/product_profiles/MT312.htm
-    http://products.zarlink.com/product_profiles/SL1935.htm
 */
 
-#ifndef MT312_H
-#define MT312_H
+#ifndef SP8870_H
+#define SP8870_H
 
 #include <linux/dvb/frontend.h>
+#include <linux/firmware.h>
 
-struct mt312_config
+struct sp8870_config
 {
 	/* the demodulator's i2c address */
 	u8 demod_address;
@@ -36,9 +34,12 @@ struct mt312_config
 	/* PLL maintenance */
 	int (*pll_init)(struct dvb_frontend* fe);
 	int (*pll_set)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
+
+	/* request firmware for device */
+	int (*request_firmware)(struct dvb_frontend* fe, const struct firmware **fw, char* name);
 };
 
-extern struct dvb_frontend* mt312_attach(const struct mt312_config* config,
-					 struct i2c_adapter* i2c);
+extern struct dvb_frontend* sp8870_attach(const struct sp8870_config* config,
+					  struct i2c_adapter* i2c);
 
-#endif // MT312_H
+#endif // SP8870_H

@@ -1,7 +1,13 @@
-/* 
-    Driver for Zarlink MT312 Satellite Channel Decoder
+/*
+    Conexant 22702 DVB OFDM demodulator driver
 
-    Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>
+    based on:
+        Alps TDMB7 DVB OFDM demodulator driver
+
+    Copyright (C) 2001-2002 Convergence Integrated Media GmbH
+	  Holger Waechtler <holger@convergence.de>
+
+    Copyright (C) 2004 Steven Toth <steve@toth.demon.co.uk>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -11,24 +17,20 @@
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-    References:
-    http://products.zarlink.com/product_profiles/MT312.htm
-    http://products.zarlink.com/product_profiles/SL1935.htm
 */
 
-#ifndef MT312_H
-#define MT312_H
+#ifndef CX22702_H
+#define CX22702_H
 
 #include <linux/dvb/frontend.h>
 
-struct mt312_config
+struct cx22702_config
 {
 	/* the demodulator's i2c address */
 	u8 demod_address;
@@ -38,7 +40,7 @@ struct mt312_config
 	int (*pll_set)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
 };
 
-extern struct dvb_frontend* mt312_attach(const struct mt312_config* config,
-					 struct i2c_adapter* i2c);
+extern struct dvb_frontend* cx22702_attach(const struct cx22702_config* config,
+					   struct i2c_adapter* i2c);
 
-#endif // MT312_H
+#endif // CX22702_H
