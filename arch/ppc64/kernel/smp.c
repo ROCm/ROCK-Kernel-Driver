@@ -389,8 +389,6 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 
 	/* Fixup atomic count: it exited inside IRQ handler. */
 	paca[lcpu].__current->thread_info->preempt_count	= 0;
-	/* Fixup SLB round-robin so next segment (kernel) goes in segment 0 */
-	paca[lcpu].stab_next_rr = 0;
 
 	/* At boot this is done in prom.c. */
 	paca[lcpu].hw_cpu_id = pcpu;
