@@ -108,8 +108,8 @@ u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message **msg,
 #if BITS_PER_LONG == 64
 /**
  *      i2o_cntxt_list_add - Append a pointer to context list and return a id
- *	@ptr: pointer to add to the context list
  *	@c: controller to which the context list belong
+ *	@ptr: pointer to add to the context list
  *
  *	Because the context field in I2O is only 32-bit large, on 64-bit the
  *	pointer is to large to fit in the context field. The i2o_cntxt_list
@@ -117,7 +117,7 @@ u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message **msg,
  *
  *	Returns context id > 0 on success or 0 on failure.
  */
-u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
+u32 i2o_cntxt_list_add(struct i2o_controller *c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	unsigned long flags;
@@ -154,15 +154,15 @@ u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
 
 /**
  *      i2o_cntxt_list_remove - Remove a pointer from the context list
- *	@ptr: pointer which should be removed from the context list
  *	@c: controller to which the context list belong
+ *	@ptr: pointer which should be removed from the context list
  *
  *	Removes a previously added pointer from the context list and returns
  *	the matching context id.
  *
  *	Returns context id on succes or 0 on failure.
  */
-u32 i2o_cntxt_list_remove(struct i2o_controller * c, void *ptr)
+u32 i2o_cntxt_list_remove(struct i2o_controller *c, void *ptr)
 {
 	struct i2o_context_list_element *entry;
 	u32 context = 0;
@@ -189,9 +189,11 @@ u32 i2o_cntxt_list_remove(struct i2o_controller * c, void *ptr)
 
 /**
  *      i2o_cntxt_list_get - Get a pointer from the context list and remove it
- *	@context: context id to which the pointer belong
  *	@c: controller to which the context list belong
- *	returns pointer to the matching context id
+ *	@context: context id to which the pointer belong
+ *
+ *	Returns pointer to the matching context id on success or NULL on
+ *	failure.
  */
 void *i2o_cntxt_list_get(struct i2o_controller *c, u32 context)
 {
@@ -215,6 +217,37 @@ void *i2o_cntxt_list_get(struct i2o_controller *c, u32 context)
 	pr_debug("get ptr from context list %d -> %p\n", context, ptr);
 
 	return ptr;
+};
+
+/**
+ *      i2o_cntxt_list_get_ptr - Get a context id from the context list
+ *	@c: controller to which the context list belong
+ *	@ptr: pointer to which the context id should be fetched
+ *
+ *	Returns context id which matches to the pointer on succes or 0 on
+ *	failure.
+ */
+u32 i2o_cntxt_list_get_ptr(struct i2o_controller * c, void *ptr)
+{
+	struct i2o_context_list_element *entry;
+	u32 context = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&c->context_list_lock, flags);
+	list_for_each_entry(entry, &c->context_list, list)
+	    if (entry->ptr == ptr) {
+		context = entry->context;
+		break;
+	}
+	spin_unlock_irqrestore(&c->context_list_lock, flags);
+
+	if (!context)
+		printk(KERN_WARNING "i2o: Could not find nonexistent ptr "
+		       "%p\n", ptr);
+
+	pr_debug("get context id from context list %p -> %d\n", ptr, context);
+
+	return context;
 };
 #endif
 
@@ -782,6 +815,8 @@ void i2o_iop_remove(struct i2o_controller *c)
 
 	pr_debug("Deleting controller %s\n", c->name);
 
+	i2o_driver_notify_all(I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE, c);
+
 	list_del(&c->list);
 
 	list_for_each_entry_safe(dev, tmp, &c->devices, list)
@@ -1098,6 +1133,8 @@ int i2o_iop_add(struct i2o_controller *c)
 
 	list_add(&c->list, &i2o_controllers);
 
+	i2o_driver_notify_all(I2O_DRIVER_NOTIFY_CONTROLLER_ADD, c);
+
 	printk(KERN_INFO "%s: Controller added\n", c->name);
 
 	return 0;
@@ -1209,6 +1246,7 @@ MODULE_LICENSE("GPL");
 EXPORT_SYMBOL(i2o_cntxt_list_add);
 EXPORT_SYMBOL(i2o_cntxt_list_get);
 EXPORT_SYMBOL(i2o_cntxt_list_remove);
+EXPORT_SYMBOL(i2o_cntxt_list_get_ptr);
 #endif
 EXPORT_SYMBOL(i2o_msg_get_wait);
 EXPORT_SYMBOL(i2o_msg_nop);

@@ -34,6 +34,10 @@
 /* message queue empty */
 #define I2O_QUEUE_EMPTY		0xffffffff
 
+enum i2o_driver_notify {
+	I2O_DRIVER_NOTIFY_CONTROLLER_ADD = 0,
+	I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE = 1,
+};
 
 /*
  *	Message structures
@@ -112,6 +116,9 @@ struct i2o_driver {
 	struct workqueue_struct *event_queue;	/* Event queue */
 
 	struct device_driver driver;
+
+	/* notification of changes */
+	void (*notify)(enum i2o_driver_notify, void *);
 
 	struct semaphore lock;
 };
@@ -201,6 +208,8 @@ struct i2o_controller
 #endif
 	spinlock_t lock;			/* lock for controller
 						   configuration */
+
+	void *driver_data[I2O_MAX_DRIVERS];	/* storage for drivers */
 };
 
 /*
@@ -275,6 +284,7 @@ extern struct i2o_controller *i2o_find_iop(int);
 extern u32 i2o_cntxt_list_add(struct i2o_controller *, void *);
 extern void *i2o_cntxt_list_get(struct i2o_controller *, u32);
 extern u32 i2o_cntxt_list_remove(struct i2o_controller *, void *);
+extern u32 i2o_cntxt_list_get_ptr(struct i2o_controller *, void *);
 
 static inline u32 i2o_ptr_low(void *ptr)
 {
@@ -301,6 +311,11 @@ static inline u32 i2o_cntxt_list_remove(struct i2o_controller *c, void *ptr)
 	return (u32)ptr;
 };
 
+static inline u32 i2o_cntxt_list_get_ptr(struct i2o_controller *c, void *ptr)
+{
+	return (u32)ptr;
+};
+
 static inline u32 i2o_ptr_low(void *ptr)
 {
 	return (u32)ptr;
@@ -315,6 +330,19 @@ static inline u32 i2o_ptr_high(void *ptr)
 /* I2O driver (OSM) functions */
 extern int i2o_driver_register(struct i2o_driver *);
 extern void i2o_driver_unregister(struct i2o_driver *);
+
+/**
+ *	i2o_driver_notify - Send notification to a single I2O drivers
+ *
+ *	Send notifications to a single registered driver.
+ */
+static inline void i2o_driver_notify(struct i2o_driver *drv,
+			enum i2o_driver_notify notify, void *data) {
+	if(drv->notify)
+			drv->notify(notify, data);
+}
+
+extern void i2o_driver_notify_all(enum i2o_driver_notify, void *);
 
 /* I2O device functions */
 extern int i2o_device_claim(struct i2o_device *);
@@ -890,6 +918,7 @@ extern void i2o_debug_state(struct i2o_controller *c);
 #define I2O_TIMEOUT_RESET		30
 #define I2O_TIMEOUT_STATUS_GET		5
 #define I2O_TIMEOUT_LCT_GET		20
+#define I2O_TIMEOUT_SCSI_SCB_ABORT	240
 
 /* retries */
 #define I2O_HRT_GET_TRIES		3

@@ -72,6 +72,7 @@ struct bus_type i2o_bus_type = {
  */
 int i2o_driver_register(struct i2o_driver *drv)
 {
+	struct i2o_controller *c;
 	int i;
 	int rc = 0;
 	unsigned long flags;
@@ -109,6 +110,9 @@ int i2o_driver_register(struct i2o_driver *drv)
 
 	pr_debug("driver %s gets context id %d\n", drv->name, drv->context);
 
+	list_for_each_entry(c, &i2o_controllers, list)
+		i2o_driver_notify(drv, I2O_DRIVER_NOTIFY_CONTROLLER_ADD, c);
+
 	rc = driver_register(&drv->driver);
 	if (rc)
 		destroy_workqueue(drv->event_queue);
@@ -125,11 +129,15 @@ int i2o_driver_register(struct i2o_driver *drv)
  */
 void i2o_driver_unregister(struct i2o_driver *drv)
 {
+	struct i2o_controller *c;
 	unsigned long flags;
 
 	pr_debug("unregister driver %s\n", drv->name);
 
 	driver_unregister(&drv->driver);
+
+	list_for_each_entry(c, &i2o_controllers, list)
+		i2o_driver_notify(drv, I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE, c);
 
 	spin_lock_irqsave(&i2o_drivers_lock, flags);
 	i2o_drivers[drv->context] = NULL;
@@ -220,6 +228,23 @@ int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
 }
 
 /**
+ *	i2o_driver_notify_all - Send notification to all I2O drivers
+ *
+ *	Send notifications to all registered drivers.
+ */
+void i2o_driver_notify_all(enum i2o_driver_notify evt, void *data) {
+	int i;
+	struct i2o_driver *drv;
+
+	for(i = 0; i < I2O_MAX_DRIVERS; i ++) {
+		drv = i2o_drivers[i];
+
+		if(drv)
+			i2o_driver_notify(drv, evt, data);
+	}
+}
+
+/**
  *	i2o_driver_init - initialize I2O drivers (OSMs)
  *
  *	Registers the I2O bus and allocate memory for the array of OSMs.
@@ -267,3 +292,4 @@ void __exit i2o_driver_exit(void)
 
 EXPORT_SYMBOL(i2o_driver_register);
 EXPORT_SYMBOL(i2o_driver_unregister);
+EXPORT_SYMBOL(i2o_driver_notify_all);

@@ -67,32 +67,18 @@
 
 #define VERSION_STRING        "Version 0.1.2"
 
+static struct i2o_driver i2o_scsi_driver;
+
 static int i2o_scsi_max_id = 16;
 static int i2o_scsi_max_lun = 8;
 
-static LIST_HEAD(i2o_scsi_hosts);
-
 struct i2o_scsi_host {
-	struct list_head list;	/* node in in i2o_scsi_hosts */
 	struct Scsi_Host *scsi_host;	/* pointer to the SCSI host */
 	struct i2o_controller *iop;	/* pointer to the I2O controller */
 	struct i2o_device *channel[0];	/* channel->i2o_dev mapping table */
 };
 
 static struct scsi_host_template i2o_scsi_host_template;
-
-/*
- * This is only needed, because we can only set the hostdata after the device is
- * added to the scsi core. So we need this little workaround.
- */
-static DECLARE_MUTEX(i2o_scsi_probe_lock);
-static struct i2o_device *i2o_scsi_probe_dev = NULL;
-
-static int i2o_scsi_slave_alloc(struct scsi_device *sdp)
-{
-	sdp->hostdata = i2o_scsi_probe_dev;
-	return 0;
-};
 
 #define I2O_SCSI_CAN_QUEUE	4
 
@@ -169,37 +155,11 @@ static struct i2o_scsi_host *i2o_scsi_host_alloc(struct i2o_controller *c)
  *	is returned, otherwise the I2O controller is added to the SCSI
  *	core.
  *
- *	Returns pointer to the I2O SCSI host on success or negative error code
- *	on failure.
+ *	Returns pointer to the I2O SCSI host on success or NULL on failure.
  */
 static struct i2o_scsi_host *i2o_scsi_get_host(struct i2o_controller *c)
 {
-	struct i2o_scsi_host *i2o_shost;
-	int rc;
-
-	/* skip if already registered as I2O SCSI host */
-	list_for_each_entry(i2o_shost, &i2o_scsi_hosts, list)
-	    if (i2o_shost->iop == c)
-		return i2o_shost;
-
-	i2o_shost = i2o_scsi_host_alloc(c);
-	if (IS_ERR(i2o_shost)) {
-		printk(KERN_ERR "scsi-osm: Could not initialize SCSI host\n");
-		return i2o_shost;
-	}
-
-	rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
-	if (rc) {
-		printk(KERN_ERR "scsi-osm: Could not add SCSI host\n");
-		scsi_host_put(i2o_shost->scsi_host);
-		return ERR_PTR(rc);
-	}
-
-	list_add(&i2o_shost->list, &i2o_scsi_hosts);
-	pr_debug("new I2O SCSI host added\n");
-
-	return i2o_shost;
-
+	return c->driver_data[i2o_scsi_driver.context];
 };
 
 /**
@@ -252,8 +212,8 @@ static int i2o_scsi_probe(struct device *dev)
 	int i;
 
 	i2o_shost = i2o_scsi_get_host(c);
-	if (IS_ERR(i2o_shost))
-		return PTR_ERR(i2o_shost);
+	if (!i2o_shost)
+		return -EFAULT;
 
 	scsi_host = i2o_shost->scsi_host;
 
@@ -292,11 +252,8 @@ static int i2o_scsi_probe(struct device *dev)
 		return -EFAULT;
 	}
 
-	down_interruptible(&i2o_scsi_probe_lock);
-	i2o_scsi_probe_dev = i2o_dev;
-	scsi_dev = scsi_add_device(i2o_shost->scsi_host, channel, id, lun);
-	i2o_scsi_probe_dev = NULL;
-	up(&i2o_scsi_probe_lock);
+	scsi_dev =
+	    __scsi_add_device(i2o_shost->scsi_host, channel, id, lun, i2o_dev);
 
 	if (!scsi_dev) {
 		printk(KERN_WARNING "scsi-osm: can not add SCSI device "
@@ -536,13 +493,67 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 				 cmd->request_bufflen, cmd->sc_data_direction);
 
 	return 1;
-}
+};
+
+/**
+ *	i2o_scsi_notify - Retrieve notifications of controller added or removed
+ *	@notify: the notification event which occurs
+ *	@data: pointer to additional data
+ *
+ *	If a I2O controller is added, we catch the notification to add a
+ *	corresponding Scsi_Host. On removal also remove the Scsi_Host.
+ */
+void i2o_scsi_notify(enum i2o_driver_notify notify, void *data)
+{
+	struct i2o_controller *c = data;
+	struct i2o_scsi_host *i2o_shost;
+	int rc;
+
+	switch (notify) {
+	case I2O_DRIVER_NOTIFY_CONTROLLER_ADD:
+		i2o_shost = i2o_scsi_host_alloc(c);
+		if (IS_ERR(i2o_shost)) {
+			printk(KERN_ERR "scsi-osm: Could not initialize"
+			       " SCSI host\n");
+			return;
+		}
+
+		rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
+		if (rc) {
+			printk(KERN_ERR "scsi-osm: Could not add SCSI "
+			       "host\n");
+			scsi_host_put(i2o_shost->scsi_host);
+			return;
+		}
+
+		c->driver_data[i2o_scsi_driver.context] = i2o_shost;
+
+		pr_debug("new I2O SCSI host added\n");
+		break;
+
+	case I2O_DRIVER_NOTIFY_CONTROLLER_REMOVE:
+		i2o_shost = i2o_scsi_get_host(c);
+		if (!i2o_shost)
+			return;
+
+		c->driver_data[i2o_scsi_driver.context] = NULL;
+
+		scsi_remove_host(i2o_shost->scsi_host);
+		scsi_host_put(i2o_shost->scsi_host);
+		pr_debug("I2O SCSI host removed\n");
+		break;
+
+	default:
+		break;
+	}
+};
 
 /* SCSI OSM driver struct */
 static struct i2o_driver i2o_scsi_driver = {
 	.name = "scsi-osm",
 	.reply = i2o_scsi_reply,
 	.classes = i2o_scsi_class_id,
+	.notify = i2o_scsi_notify,
 	.driver = {
 		   .probe = i2o_scsi_probe,
 		   .remove = i2o_scsi_remove,
@@ -736,53 +747,46 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	return 0;
 };
 
-#if 0
-FIXME
 /**
- *	i2o_scsi_abort	-	abort a running command
+ *	i2o_scsi_abort - abort a running command
  *	@SCpnt: command to abort
  *
  *	Ask the I2O controller to abort a command. This is an asynchrnous
- *	process and our callback handler will see the command complete
- *	with an aborted message if it succeeds.
+ *	process and our callback handler will see the command complete with an
+ *	aborted message if it succeeds.
  *
- *	Locks: no locks are held or needed
+ *	Returns 0 if the command is successfully aborted or negative error code
+ *	on failure.
  */
 int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 {
+	struct i2o_device *i2o_dev;
 	struct i2o_controller *c;
-	struct Scsi_Host *host;
-	struct i2o_scsi_host *hostdata;
-	u32 msg[5];
+	struct i2o_message *msg;
+	u32 m;
 	int tid;
 	int status = FAILED;
 
 	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
 
-	host = SCpnt->device->host;
-	hostdata = (struct i2o_scsi_host *)host->hostdata;
-	tid = hostdata->task[SCpnt->device->id][SCpnt->device->lun];
-	if (tid == -1) {
-		printk(KERN_ERR "i2o_scsi: Impossible command to abort!\n");
-		return status;
-	}
-	c = hostdata->controller;
+	i2o_dev = SCpnt->device->hostdata;
+	c = i2o_dev->iop;
+	tid = i2o_dev->lct_data.tid;
 
-	spin_unlock_irq(host->host_lock);
+	m = i2o_msg_get_wait(c, &msg, I2O_TIMEOUT_MESSAGE_GET);
+	if (m == I2O_QUEUE_EMPTY)
+		return SCSI_MLQUEUE_HOST_BUSY;
 
-	msg[0] = FIVE_WORD_MSG_SIZE;
-	msg[1] = I2O_CMD_SCSI_ABORT << 24 | HOST_TID << 12 | tid;
-	msg[2] = scsi_context;
-	msg[3] = 0;
-	msg[4] = i2o_context_list_remove(SCpnt, c);
-	if (i2o_post_wait(c, msg, sizeof(msg), 240))
+	writel(FIVE_WORD_MSG_SIZE | SGL_OFFSET_0, &msg->u.head[0]);
+	writel(I2O_CMD_SCSI_ABORT << 24 | HOST_TID << 12 | tid,
+	       &msg->u.head[1]);
+	writel(i2o_cntxt_list_get_ptr(c, SCpnt), &msg->body[0]);
+
+	if (i2o_msg_post_wait(c, m, I2O_TIMEOUT_SCSI_SCB_ABORT))
 		status = SUCCESS;
 
-	spin_lock_irq(host->host_lock);
 	return status;
 }
-
-#endif
 
 /**
  *	i2o_scsi_bios_param	-	Invent disk geometry
@@ -817,15 +821,12 @@ static struct scsi_host_template i2o_scsi_host_template = {
 	.name = "I2O SCSI Peripheral OSM",
 	.info = i2o_scsi_info,
 	.queuecommand = i2o_scsi_queuecommand,
-/*
-	.eh_abort_handler	= i2o_scsi_abort,
-*/
+	.eh_abort_handler = i2o_scsi_abort,
 	.bios_param = i2o_scsi_bios_param,
 	.can_queue = I2O_SCSI_CAN_QUEUE,
 	.sg_tablesize = 8,
 	.cmd_per_lun = 6,
 	.use_clustering = ENABLE_CLUSTERING,
-	.slave_alloc = i2o_scsi_slave_alloc,
 };
 
 /*
@@ -867,14 +868,6 @@ static int __init i2o_scsi_init(void)
  */
 static void __exit i2o_scsi_exit(void)
 {
-	struct i2o_scsi_host *i2o_shost, *tmp;
-
-	/* Remove I2O SCSI hosts */
-	list_for_each_entry_safe(i2o_shost, tmp, &i2o_scsi_hosts, list) {
-		scsi_remove_host(i2o_shost->scsi_host);
-		scsi_host_put(i2o_shost->scsi_host);
-	}
-
 	/* Unregister I2O SCSI OSM from I2O core */
 	i2o_driver_unregister(&i2o_scsi_driver);
 };
