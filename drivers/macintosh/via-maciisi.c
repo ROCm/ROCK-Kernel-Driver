@@ -312,8 +312,7 @@ maciisi_write(struct adb_request* req)
 	req->complete = 0;
 	req->reply_len = 0;
 	
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	if (current_req) {
 		last_req->next = req;
@@ -327,7 +326,7 @@ maciisi_write(struct adb_request* req)
 		i = maciisi_start();
 		if(i != 0)
 		{
-			restore_flags(flags);
+			local_irq_restore(flags);
 			return i;
 		}
 	}
@@ -336,11 +335,11 @@ maciisi_write(struct adb_request* req)
 #ifdef DEBUG_MACIISI_ADB
 		printk(KERN_DEBUG "maciisi_write: would start, but state is %d\n", maciisi_state);
 #endif
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return -EBUSY;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 }
@@ -401,15 +400,14 @@ maciisi_poll(void)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	if (via[IFR] & SR_INT) {
 		maciisi_interrupt(0, 0, 0);
 	}
 	else /* avoid calling this function too quickly in a loop */
 		udelay(ADB_DELAY);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Shift register interrupt - this is *supposed* to mean that the
@@ -426,8 +424,7 @@ maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 	int i;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	status = via[B] & (TIP|TREQ);
 #ifdef DEBUG_MACIISI_ADB
@@ -437,7 +434,7 @@ maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 	if (!(via[IFR] & SR_INT)) {
 		/* Shouldn't happen, we hope */
 		printk(KERN_ERR "maciisi_interrupt: called without interrupt flag set\n");
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 
@@ -636,7 +633,7 @@ maciisi_interrupt(int irq, void* arg, struct pt_regs* regs)
 	default:
 		printk("maciisi_interrupt: unknown maciisi_state %d?\n", maciisi_state);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void
