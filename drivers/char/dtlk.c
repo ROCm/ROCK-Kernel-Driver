@@ -418,12 +418,11 @@ static int __init dtlk_dev_probe(void)
 		       dtlk_portlist[i], (testval = inw_p(dtlk_portlist[i])));
 #endif
 
-		if (check_region(dtlk_portlist[i], DTLK_IO_EXTENT))
+		if (!request_region(dtlk_portlist[i], DTLK_IO_EXTENT, 
+			       "dtlk"))
 			continue;
 		testval = inw_p(dtlk_portlist[i]);
 		if ((testval &= 0xfbff) == 0x107f) {
-			request_region(dtlk_portlist[i], DTLK_IO_EXTENT, 
-				       "dtlk");
 			dtlk_port_lpc = dtlk_portlist[i];
 			dtlk_port_tts = dtlk_port_lpc + 1;
 
@@ -508,6 +507,7 @@ for (i = 0; i < 10; i++)			\
 
 			return 0;
 		}
+		release_region(dtlk_portlist[i], DTLK_IO_EXTENT);
 	}
 
 	printk(KERN_INFO "\nDoubleTalk PC - not found\n");
