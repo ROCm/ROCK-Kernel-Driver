@@ -344,19 +344,14 @@ static dev_link_t *ray_attach(void)
 	    return NULL;
 
     /* Allocate space for private device-specific data */
-    dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
+    dev = alloc_etherdev(sizeof(ray_dev_t));
 
     if (!dev)
 	    goto fail_alloc_dev;
 
-    local = kmalloc(sizeof(ray_dev_t), GFP_KERNEL);
-
-    if (!local)
-	    goto fail_alloc_local;
+    local = dev->priv;
 
     memset(link, 0, sizeof(struct dev_link_t));
-    memset(dev, 0, sizeof(struct net_device));
-    memset(local, 0, sizeof(ray_dev_t));
 
     /* The io structure describes IO port mapping. None used here */
     link->io.NumPorts1 = 0;
@@ -379,7 +374,6 @@ static dev_link_t *ray_attach(void)
     link->priv = dev;
     link->irq.Instance = dev;
     
-    dev->priv = local;
     local->finder = link;
     local->card_status = CARD_INSERTED;
     local->authentication_state = UNAUTHENTICATED;
@@ -401,7 +395,6 @@ static dev_link_t *ray_attach(void)
 
     DEBUG(2,"ray_cs ray_attach calling ether_setup.)\n");
     SET_MODULE_OWNER(dev);
-    ether_setup(dev);
     dev->init = &ray_dev_init;
     dev->open = &ray_open;
     dev->stop = &ray_dev_close;
@@ -434,8 +427,6 @@ static dev_link_t *ray_attach(void)
     DEBUG(2,"ray_cs ray_attach ending\n");
     return link;
 
-fail_alloc_local:
-    kfree(dev);
 fail_alloc_dev:
     kfree(link);
     return NULL;
@@ -478,9 +469,7 @@ static void ray_detach(dev_link_t *link)
     if (link->priv) {
         struct net_device *dev = link->priv;
 	if (link->dev) unregister_netdev(dev);
-        if (dev->priv)
-            kfree(dev->priv);
-        kfree(link->priv);
+        free_netdev(dev);
     }
     kfree(link);
     DEBUG(2,"ray_cs ray_detach ending\n");
