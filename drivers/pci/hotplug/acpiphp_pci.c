@@ -488,7 +488,6 @@ int acpiphp_configure_function (struct acpiphp_func *func)
 void acpiphp_unconfigure_function (struct acpiphp_func *func)
 {
 	struct acpiphp_bridge *bridge;
-	int retval = 0;
 
 	/* if pci_dev is NULL, ignore it */
 	if (!func->pci_dev)
