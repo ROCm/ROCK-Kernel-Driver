@@ -508,6 +508,7 @@ EXPORT_SYMBOL(tr_type_trans);
 /* Device callback registration */
 EXPORT_SYMBOL(register_netdevice_notifier);
 EXPORT_SYMBOL(unregister_netdevice_notifier);
+EXPORT_SYMBOL(call_netdevice_notifiers);
 
 /* support for loadable net drivers */
 #ifdef CONFIG_NET

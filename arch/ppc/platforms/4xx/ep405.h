@@ -1,11 +1,15 @@
 /*
- *    Copyright 2000 MontaVista Software Inc.
- *    	http://www.mvista.com
- *	<mlocke@mvista.com>
+ * arch/ppc/platforms/4xx/ep405.h
  *
- *         Embedded Planet 405GP board
- *         http://www.embeddedplanet.com
+ * Embedded Planet 405GP board
+ * http://www.embeddedplanet.com
  *
+ * Author: Matthew Locke <mlocke@mvista.com>
+ *
+ * 2000 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #ifdef __KERNEL__

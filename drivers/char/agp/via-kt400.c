@@ -100,6 +100,9 @@ static void __init via_kt400_enable(u32 mode)
 		printk (KERN_INFO PFX "agp_generic_agp_3_0_enable() failed\n");
 }
 
+static struct agp_driver via_kt400_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -147,9 +150,10 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 	agp_bridge.cant_use_aperture = 0;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 
-	agp_register_driver(dev);
+	via_kt400_agp_driver.dev = dev;
+	agp_register_driver(&via_kt400_agp_driver);
 	return 0;
 }
 
@@ -186,7 +190,7 @@ static int __init agp_via_init(void)
 
 static void __exit agp_via_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&via_kt400_agp_driver);
 	pci_unregister_driver(&agp_via_pci_driver);
 }
 

@@ -1,20 +1,6 @@
 # sound/Config.in
 #
 
-menu "Open Sound System"
-	depends on SOUND!=n
-
-config SOUND_PRIME
-	tristate "Open Sound System"
-	depends on SOUND
-	help
-	  Say 'Y' or 'M' to enable Open Sound System drivers.
-
-source "sound/oss/Kconfig"
-
-endmenu
-
-
 menu "Advanced Linux Sound Architecture"
 	depends on SOUND!=n
 
@@ -42,3 +28,15 @@ source "sound/sparc/Kconfig"
 
 endmenu
 
+menu "Open Sound System"
+	depends on SOUND!=n
+
+config SOUND_PRIME
+	tristate "Open Sound System (DEPRECATED)"
+	depends on SOUND
+	help
+	  Say 'Y' or 'M' to enable Open Sound System drivers.
+
+source "sound/oss/Kconfig"
+
+endmenu

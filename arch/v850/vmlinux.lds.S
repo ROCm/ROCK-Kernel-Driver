@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <asm-generic/vmlinux.lds.h>
 
 
 /* The following macros contain the usual definitions for various data areas.
@@ -38,9 +39,7 @@
 			*(.text.lock)					      \
 			*(.exitcall.exit)				      \
 		__real_etext = . ;	/* There may be data after here.  */  \
-			*(.rodata)					      \
-		. = ALIGN (0x4) ;					      \
-			*(.kstrtab)					      \
+		RODATA                                                        \
 		. = ALIGN (4) ;						      \
 		    	*(.call_table_data)				      \
 			*(.call_table_text)				      \
@@ -48,12 +47,6 @@
 		___start___ex_table = . ;				      \
 			*(__ex_table)					      \
 		___stop___ex_table = . ;				      \
-		___start___ksymtab = . ;/* Kernel symbol table.  */	      \
-			*(__ksymtab)					      \
-		___stop___ksymtab = . ;					      \
-		___start___gpl_ksymtab = . ; /* Same for GPL symbols.  */     \
-			*(__gpl_ksymtab)				      \
-		___stop___gpl_ksymtab = . ;				      \
 		. = ALIGN (4) ;						      \
 		__etext = . ;
 

@@ -4,6 +4,9 @@
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
+#define LOAD_OFFSET PAGE_OFFSET
+#include <asm-generic/vmlinux.lds.h>
+	
 OUTPUT_FORMAT("elf64-ia64-little")
 OUTPUT_ARCH(ia64)
 ENTRY(phys_start)
@@ -60,23 +63,6 @@ SECTIONS
   machvec_end = .;
 #endif
 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : AT(ADDR(__ksymtab) - PAGE_OFFSET)
-	{ *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL only */
-  __gpl_ksymtab : AT(ADDR(__gpl_ksymtab) - PAGE_OFFSET)
-	{ *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
-	{
-	  __start___kallsyms = .;	/* All kernel symbols */
-	  *(__kallsyms)
-	  __stop___kallsyms = .;
-	}
-
   /* Unwind info & table: */
   . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
@@ -86,10 +72,8 @@ SECTIONS
 	{ *(.IA_64.unwind*) }
   ia64_unw_end = .;
 
-  .rodata : AT(ADDR(.rodata) - PAGE_OFFSET)
-	{ *(.rodata) *(.rodata.*) }
-  .kstrtab : AT(ADDR(.kstrtab) - PAGE_OFFSET)
-	{ *(.kstrtab) }
+  RODATA
+
   .opd : AT(ADDR(.opd) - PAGE_OFFSET)
 	{ *(.opd) }
 

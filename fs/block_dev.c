@@ -799,6 +799,49 @@ const char *__bdevname(dev_t dev)
 }
 
 /**
+ * lookup_bdev  - lookup a struct block_device by name
+ *
+ * @path:	special file representing the block device
+ *
+ * Get a reference to the blockdevice at @path in the current
+ * namespace if possible and return it.  Return ERR_PTR(error)
+ * otherwise.
+ */
+struct block_device *lookup_bdev(const char *path)
+{
+	struct block_device *bdev;
+	struct inode *inode;
+	struct nameidata nd;
+	int error;
+
+	if (!path || !*path)
+		return ERR_PTR(-EINVAL);
+
+	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
+	if (error)
+		return ERR_PTR(error);
+
+	inode = nd.dentry->d_inode;
+	error = -ENOTBLK;
+	if (!S_ISBLK(inode->i_mode))
+		goto fail;
+	error = -EACCES;
+	if (nd.mnt->mnt_flags & MNT_NODEV)
+		goto fail;
+	error = bd_acquire(inode);
+	if (error)
+		goto fail;
+	bdev = inode->i_bdev;
+
+out:
+	path_release(&nd);
+	return bdev;
+fail:
+	bdev = ERR_PTR(error);
+	goto out;
+}
+
+/**
  * open_bdev_excl  -  open a block device by name and set it up for use
  *
  * @path:	special file representing the block device
@@ -812,33 +855,13 @@ const char *__bdevname(dev_t dev)
 struct block_device *open_bdev_excl(const char *path, int flags,
 				    int kind, void *holder)
 {
-	struct inode *inode;
 	struct block_device *bdev;
-	struct nameidata nd;
 	mode_t mode = FMODE_READ;
 	int error = 0;
 
-	if (!path || !*path)
-		return ERR_PTR(-EINVAL);
-
-	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
-	if (error)
-		return ERR_PTR(error);
-
-	inode = nd.dentry->d_inode;
-	error = -ENOTBLK;
-	if (!S_ISBLK(inode->i_mode))
-		goto path_release;
-	error = -EACCES;
-	if (nd.mnt->mnt_flags & MNT_NODEV)
-		goto path_release;
-	error = bd_acquire(inode);
-	if (error)
-		goto path_release;
-	bdev = inode->i_bdev;
-
-	/* Done with lookups */
-	path_release(&nd);
+	bdev = lookup_bdev(path);
+	if (IS_ERR(bdev))
+		return bdev;
 
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
@@ -856,10 +879,6 @@ struct block_device *open_bdev_excl(const char *path, int flags,
 	
 blkdev_put:
 	blkdev_put(bdev, BDEV_FS);
-	return ERR_PTR(error);
-
-path_release:
-	path_release(&nd);
 	return ERR_PTR(error);
 }
 

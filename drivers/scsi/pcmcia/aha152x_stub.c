@@ -350,12 +350,15 @@ static void aha152x_release_cs(u_long arg)
 
     DEBUG(0, "aha152x_release_cs(0x%p)\n", link);
 
+#warning This doesn't protect you.  You need some real fix for your races.
+#if 0
     if (GET_USE_COUNT(driver_template.module) != 0) {
 	DEBUG(1, "aha152x_cs: release postponed, "
 	      "device still open\n");
 	link->state |= DEV_STALE_CONFIG;
 	return;
     }
+#endif
 
     scsi_unregister_host(&driver_template);
     link->dev = NULL;

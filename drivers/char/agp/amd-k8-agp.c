@@ -336,7 +336,6 @@ static void agp_x86_64_agp_enable(u32 mode)
 	struct pci_dev *device = NULL;
 	u32 command, scratch; 
 	u8 cap_ptr;
-	u8 agp_v3;
 	u8 v3_devs=0;
 
 	/* FIXME: If 'mode' is x1/x2/x4 should we call the AGPv2 routines directly ?
@@ -369,77 +368,14 @@ static void agp_x86_64_agp_enable(u32 mode)
 	}
 
 
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &command);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &command);
 
-	/*
-	 * PASS2: go through all devices that claim to be
-	 *        AGP devices and collect their data.
-	 */
-
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			/*
-			 * Ok, here we have a AGP device. Disable impossible 
-			 * settings, and adjust the readqueue to the minimum.
-			 */
-
-			printk (KERN_INFO "AGP: Setting up AGPv3 capable device at %d:%d:%d\n",
-					device->bus->number, PCI_FUNC(device->devfn), PCI_SLOT(device->devfn));
-			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-			agp_v3 = (scratch & (1<<3) ) >>3;
-
-			/* adjust RQ depth */
-			command =
-			    ((command & ~0xff000000) |
-			     min_t(u32, (mode & 0xff000000),
-				 min_t(u32, (command & 0xff000000),
-				     (scratch & 0xff000000))));
-
-			/* disable SBA if it's not supported */
-			if (!((command & 0x200) && (scratch & 0x200) && (mode & 0x200)))
-				command &= ~0x200;
-
-			/* disable FW if it's not supported */
-			if (!((command & 0x10) && (scratch & 0x10) && (mode & 0x10)))
-				command &= ~0x10;
-
-			if (!((command & 2) && (scratch & 2) && (mode & 2))) {
-				command &= ~2;		/* 8x */
-				printk (KERN_INFO "AGP: Putting device into 8x mode\n");
-			}
-
-			if (!((command & 1) && (scratch & 1) && (mode & 1))) {
-				command &= ~1;		/* 4x */
-				printk (KERN_INFO "AGP: Putting device into 4x mode\n");
-			}
-		}
-	}
-	/*
-	 * PASS3: Figure out the 8X/4X setting and enable the
-	 *        target (our motherboard chipset).
-	 */
-
-	if (command & 2)
-		command &= ~5;	/* 8X */
-
-	if (command & 1)
-		command &= ~6;	/* 4X */
-
+	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
-	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+8, command);
+	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_COMMAND, command);
 
-	/*
-	 * PASS4: Go through all AGP devices and update the
-	 *        command registers.
-	 */
-
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00)
-			pci_write_config_dword(device, cap_ptr + 8, command);
-	}
+	agp_device_command(command, 1);
 }
 
 
@@ -472,6 +408,9 @@ static int __init amd_8151_setup (struct pci_dev *pdev)
 	return 0;
 }
 
+static struct agp_driver amd_k8_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -485,9 +424,10 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	agp_bridge.capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 	amd_8151_setup(dev);
-	agp_register_driver(dev);
+	amd_k8_agp_driver.dev = dev;
+	agp_register_driver(&amd_k8_agp_driver);
 	return 0;
 }
 
@@ -527,7 +467,7 @@ int __init agp_amdk8_init(void)
 
 static void __exit agp_amdk8_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&amd_k8_agp_driver);
 	pci_unregister_driver(&agp_amdk8_pci_driver);
 }
 

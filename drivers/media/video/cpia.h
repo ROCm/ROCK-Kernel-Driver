@@ -41,6 +41,7 @@
 
 #include <asm/uaccess.h>
 #include <linux/videodev.h>
+#include <linux/list.h>
 #include <linux/smp_lock.h>
 
 struct cpia_camera_ops
@@ -239,8 +240,7 @@ enum v4l_camstates {
 #define FRAME_NUM	2	/* double buffering for now */
 
 struct cam_data {
-	struct cam_data **previous;
-	struct cam_data *next;
+	struct list_head cam_data_list;
 
         struct semaphore busy_lock;     /* guard against SMP multithreading */
 	struct cpia_camera_ops *ops;	/* lowlevel driver operations */
@@ -420,28 +420,6 @@ void cpia_unregister_camera(struct cam_data *cam);
   DBG("%1d %1d %1d %1d %1d %1d %1d %1d \n",\
       (p)&0x80?1:0, (p)&0x40?1:0, (p)&0x20?1:0, (p)&0x10?1:0,\
         (p)&0x08?1:0, (p)&0x04?1:0, (p)&0x02?1:0, (p)&0x01?1:0);
-
-static inline void cpia_add_to_list(struct cam_data** l, struct cam_data** drv_p)
-{
-	struct cam_data* drv;
-	drv = *drv_p;
-	drv->next = *l;
-	drv->previous = l;
-	*l = drv;
-}
-
-static inline void cpia_remove_from_list(struct cam_data** drv_p)
-{
-	struct cam_data* drv;
-	drv = *drv_p;
-	if (drv->previous != NULL) {
-		if (drv->next != NULL)
-			drv->next->previous = drv->previous;
-		*(drv->previous) = drv->next;
-		drv->previous = NULL;
-		drv->next = NULL;
-	}
-}
 
 #endif /* __KERNEL__ */
 

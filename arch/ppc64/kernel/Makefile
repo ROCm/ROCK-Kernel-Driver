@@ -6,7 +6,7 @@ EXTRA_CFLAGS	+= -mno-minimal-toc
 EXTRA_TARGETS	:= head.o
 export-objs	:= ppc_ksyms.o
 
-obj-y               :=	ppc_ksyms.o setup.o entry.o traps.o irq.o idle.o \
+obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \
 			align.o semaphore.o bitops.o stab.o htab.o pacaData.o \
 			udbg.o binfmt_elf32.o sys_ppc32.o sys32.o ioctl32.o \
@@ -30,3 +30,4 @@ obj-y			  += open_pic.o xics.o pSeries_htab.o rtas.o \
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o
 obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_PROFILING)		+= profile.o
+obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o

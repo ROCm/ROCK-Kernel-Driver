@@ -82,6 +82,7 @@ void (*mach_process_int) (int, struct pt_regs *) = NULL;
 unsigned long (*mach_gettimeoffset) (void);
 int (*mach_hwclk) (int, struct rtc_time*) = NULL;
 int (*mach_set_clock_mmss) (unsigned long) = NULL;
+unsigned int (*mach_get_ss)(void) = NULL;
 int (*mach_get_rtc_pll)(struct rtc_pll_info *) = NULL;
 int (*mach_set_rtc_pll)(struct rtc_pll_info *) = NULL;
 void (*mach_reset)( void );

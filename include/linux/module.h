@@ -36,7 +36,7 @@
 struct kernel_symbol
 {
 	unsigned long value;
-	char name[MODULE_NAME_LEN];
+	const char *name;
 };
 
 /* These are either module local, or the kernel's dummy ones. */
@@ -140,17 +140,23 @@ void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
 /* For every exported symbol, place a struct in the __ksymtab section */
-#define EXPORT_SYMBOL(sym)				\
-	const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab")))		\
-	= { (unsigned long)&sym, MODULE_SYMBOL_PREFIX #sym }
+#define EXPORT_SYMBOL(sym)					\
+	static const char __kstrtab_##sym[]			\
+	__attribute__((section("__ksymtab_strings")))		\
+	= MODULE_SYMBOL_PREFIX #sym;                    	\
+	static const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__ksymtab")))			\
+	= { (unsigned long)&sym, __kstrtab_##sym }
 
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
 
-#define EXPORT_SYMBOL_GPL(sym)				\
-	const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__gpl_ksymtab")))	\
-	= { (unsigned long)&sym, #sym }
+#define EXPORT_SYMBOL_GPL(sym)					\
+	static const char __kstrtab_##sym[]			\
+	__attribute__((section("__ksymtab_strings")))		\
+	= MODULE_SYMBOL_PREFIX #sym;                    	\
+	static const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__gpl_ksymtab")))		\
+	= { (unsigned long)&sym, __kstrtab_##sym }
 
 struct module_ref
 {
@@ -431,8 +437,6 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 #endif
 }
 #define EXPORT_NO_SYMBOLS
-extern int module_dummy_usage;
-#define GET_USE_COUNT(module) (module_dummy_usage)
 #define MOD_IN_USE 0
 #define __MODULE_STRING(x) __stringify(x)
 

@@ -465,18 +465,13 @@ osf_shmat(int shmid, void *shmaddr, int shmflg)
 	unsigned long raddr;
 	long err;
 
-	lock_kernel();
 	err = sys_shmat(shmid, shmaddr, shmflg, &raddr);
-	if (err)
-		goto out;
+
 	/*
 	 * This works because all user-level addresses are
 	 * non-negative longs!
 	 */
-	err = raddr;
- out:
-	unlock_kernel();
-	return err;
+	return err ? err : (long)raddr;
 }
 
 

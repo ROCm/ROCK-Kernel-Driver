@@ -96,6 +96,10 @@ core-y			+= arch/alpha/kernel/ arch/alpha/mm/
 core-$(CONFIG_MATHEMU)  += arch/alpha/math-emu/
 libs-y			+= arch/alpha/lib/
 
+# export what is needed by arch/alpha/boot/Makefile
+LIBS_Y := $(patsubst %/, %/lib.a, $(libs-y))
+export LIBS_Y
+
 boot := arch/alpha/boot
 
 #Default target when executing make with no arguments

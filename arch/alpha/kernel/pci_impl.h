@@ -155,6 +155,10 @@ extern u8 common_swizzle(struct pci_dev *, u8 *);
 extern struct pci_controller *alloc_pci_controller(void);
 extern struct resource *alloc_resource(void);
 
+extern struct pci_iommu_arena *iommu_arena_new_node(int,
+						    struct pci_controller *,
+					            dma_addr_t, unsigned long,
+					            unsigned long);
 extern struct pci_iommu_arena *iommu_arena_new(struct pci_controller *,
 					       dma_addr_t, unsigned long,
 					       unsigned long);

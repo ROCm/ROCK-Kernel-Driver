@@ -36,7 +36,6 @@
 #include <linux/serio.h>
 #include <linux/interrupt.h>
 
-#include <asm/keyboard.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -69,33 +68,38 @@ static struct serio q40kbd_port =
 
 static void q40kbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	if (IRQ_KEYB_MASK & master_inb(INTERRUPT_REG))
+	if (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG))
 		if (q40kbd_port.dev)
                          q40kbd_port.dev->interrupt(&q40kbd_port, master_inb(KEYCODE_REG), 0);
 
 	master_outb(-1, KEYBOARD_UNLOCK_REG);
 }
 
-void __init q40kbd_init(void)
+static int __init q40kbd_init(void)
 {
 	int maxread = 100;
+
+	if (!MACH_IS_Q40)
+		return -EIO;
 
 	/* allocate the IRQ */
 	request_irq(Q40_IRQ_KEYBOARD, q40kbd_interrupt, 0, "q40kbd", NULL);
 
 	/* flush any pending input */
-	while (maxread-- && (IRQ_KEYB_MASK & master_inb(INTERRUPT_REG)))
+	while (maxread-- && (Q40_IRQ_KEYB_MASK & master_inb(INTERRUPT_REG)))
 		master_inb(KEYCODE_REG);
-	
+
 	/* off we go */
 	master_outb(-1,KEYBOARD_UNLOCK_REG);
 	master_outb(1,KEY_IRQ_ENABLE_REG);
 
 	serio_register_port(&q40kbd_port);
 	printk(KERN_INFO "serio: Q40 kbd registered\n");
+
+	return 0;
 }
 
-void __exit q40kbd_exit(void)
+static void __exit q40kbd_exit(void)
 {
 	master_outb(0,KEY_IRQ_ENABLE_REG);
 	master_outb(-1,KEYBOARD_UNLOCK_REG);

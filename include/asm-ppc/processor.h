@@ -50,7 +50,11 @@
 #else
 #define MSR_		(MSR_ME|MSR_RI)
 #endif
+#ifdef CONFIG_4xx
+#define MSR_KERNEL	(MSR_|MSR_IR|MSR_DR|MSR_CE|MSR_DE)
+#else
 #define MSR_KERNEL      (MSR_|MSR_IR|MSR_DR)
+#endif
 #define MSR_USER	(MSR_KERNEL|MSR_PR|MSR_EE)
 
 /* Floating Point Status and Control Register (FPSCR) Fields */
@@ -159,6 +163,7 @@
 #define	SPRN_DBCR1	0x3BD	/* Debug Control Register 1 */		  
 #define	SPRN_DBSR	0x3F0	/* Debug Status Register */		  
 #define   DBSR_IC	    0x80000000	/* Instruction Completion          */
+#define   DBSR_BT	    0x40000000	/* Branch taken */
 #define   DBSR_TIE	    0x10000000	/* Trap Instruction debug Event    */
 #define	SPRN_DCCR	0x3FA	/* Data Cache Cacheability Register */
 #define	  DCCR_NOCACHE		0	/* Noncacheable */
@@ -642,6 +647,10 @@ struct thread_struct {
 	void		*pgdir;		/* root of page-table tree */
 	int		fpexc_mode;	/* floating-point exception mode */
 	signed long     last_syscall;
+#ifdef CONFIG_4xx
+	unsigned long	dbcr0;		/* debug control register values */
+	unsigned long	dbcr1;
+#endif
 	double		fpr[32];	/* Complete floating point set */
 	unsigned long	fpscr_pad;	/* fpr ... fpscr must be contiguous */
 	unsigned long	fpscr;		/* Floating point status */
