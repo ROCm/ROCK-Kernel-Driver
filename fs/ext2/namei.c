@@ -31,6 +31,7 @@
 
 #include "ext2.h"
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>		/* for block_symlink() */
 
 /*
  * Couple of helper functions - make the code slightly cleaner.

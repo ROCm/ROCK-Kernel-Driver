@@ -27,6 +27,7 @@
 #include "udfdecl.h"
 
 #include <linux/quotaops.h>
+#include <linux/buffer_head.h>
 #include <asm/bitops.h>
 
 #include "udf_i.h"

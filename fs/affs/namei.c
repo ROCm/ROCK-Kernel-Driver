@@ -16,6 +16,7 @@
 #include <linux/fcntl.h>
 #include <linux/amigaffs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>

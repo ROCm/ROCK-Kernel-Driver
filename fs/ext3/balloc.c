@@ -18,6 +18,7 @@
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
 #include <linux/quotaops.h>
+#include <linux/buffer_head.h>
 
 /*
  * balloc.c contains the blocks allocation and deallocation routines

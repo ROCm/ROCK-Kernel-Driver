@@ -9,6 +9,7 @@
 //#define DBG
 //#define DEBUG_LOCKS
 
+#include <linux/buffer_head.h>
 #include <linux/fs.h>
 #include <linux/hpfs_fs.h>
 #include <linux/hpfs_fs_i.h>

@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
 #include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
 
 #include "ntfs.h"
 #include "sysctl.h"

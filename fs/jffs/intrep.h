@@ -85,7 +85,4 @@ int jffs_print_file(struct jffs_file *f);
 void jffs_print_hash_table(struct jffs_control *c);
 void jffs_print_tree(struct jffs_file *first_file, int indent);
 
-struct buffer_head *jffs_get_write_buffer(kdev_t dev, int block);
-void jffs_put_write_buffer(struct buffer_head *bh);
-
 #endif /* __LINUX_JFFS_INTREP_H__  */

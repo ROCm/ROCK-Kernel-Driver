@@ -28,6 +28,7 @@
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
 #include <linux/namei.h>
+#include <linux/buffer_head.h>		/* for fsync_super() */
 #include <asm/uaccess.h>
 
 void get_filesystem(struct file_system_type *fs);

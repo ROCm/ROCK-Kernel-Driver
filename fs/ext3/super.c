@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_JBD_DEBUG

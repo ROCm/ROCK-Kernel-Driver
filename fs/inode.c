@@ -14,6 +14,16 @@
 #include <linux/writeback.h>
 #include <linux/module.h>
 #include <linux/backing-dev.h>
+/*
+ * This is needed for the following functions:
+ *  - inode_has_buffers
+ *  - invalidate_inode_buffers
+ *  - fsync_bdev
+ *  - invalidate_bdev
+ *
+ * FIXME: remove all knowledge of the buffer layer from this file
+ */
+#include <linux/buffer_head.h>
 
 /*
  * New inode.c implementation.

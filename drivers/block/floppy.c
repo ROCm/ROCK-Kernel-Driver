@@ -174,6 +174,7 @@ static int print_unex=1;
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/device.h>
+#include <linux/buffer_head.h>		/* for invalidate_buffers() */
 
 /*
  * PS/2 floppies have much slower step rates than regular floppies.
@@ -3793,6 +3794,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
+		/* umm, invalidate_buffers() in ->open??  --hch */
 		invalidate_buffers(mk_kdev(FLOPPY_MAJOR,old_dev));
 	}
 

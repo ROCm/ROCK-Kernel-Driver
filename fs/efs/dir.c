@@ -4,6 +4,7 @@
  * Copyright (c) 1999 Al Smith
  */
 
+#include <linux/buffer_head.h>
 #include <linux/efs_fs.h>
 #include <linux/smp_lock.h>
 

@@ -27,6 +27,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/quotaops.h>
+#include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 
 

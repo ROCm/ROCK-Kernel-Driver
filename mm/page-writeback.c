@@ -478,7 +478,10 @@ EXPORT_SYMBOL(write_one_page);
  *
  * For now, we treat swapper_space specially.  It doesn't use the normal
  * block a_ops.
+ *
+ * FIXME: this should move over to fs/buffer.c - buffer_heads have no business in mm/
  */
+#include <linux/buffer_head.h>
 int __set_page_dirty_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;

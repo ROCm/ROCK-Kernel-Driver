@@ -7,6 +7,7 @@
 #include <linux/reiserfs_fs.h>
 #include <asm/bitops.h>
 #include <linux/list.h>
+#include <linux/buffer_head.h>
 
 #ifdef CONFIG_REISERFS_CHECK
 

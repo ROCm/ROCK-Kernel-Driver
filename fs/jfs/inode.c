@@ -17,6 +17,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_imap.h"

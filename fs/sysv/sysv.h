@@ -1,7 +1,7 @@
 #ifndef _SYSV_H
 #define _SYSV_H
 
-#include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/sysv_fs.h>
 
 /*

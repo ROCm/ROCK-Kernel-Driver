@@ -25,6 +25,7 @@
 #define jfs_debug jbd_debug
 #else
 
+#include <linux/buffer_head.h>
 #include <linux/journal-head.h>
 #include <linux/stddef.h>
 #include <asm/semaphore.h>

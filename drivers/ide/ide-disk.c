@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/suspend.h>
+#include <linux/buffer_head.h>		/* for invalidate_bdev() */
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -392,6 +393,7 @@ static void idedisk_release(struct inode *inode, struct file *filp, struct ata_d
 	if (drive->removable && !drive->usage) {
 		struct ata_taskfile args;
 
+		/* XXX I don't think this is up to the lowlevel drivers..  --hch */
 		invalidate_bdev(inode->i_bdev, 0);
 
 		memset(&args, 0, sizeof(args));

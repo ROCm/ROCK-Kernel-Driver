@@ -48,6 +48,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <asm/uaccess.h>
 
 /*

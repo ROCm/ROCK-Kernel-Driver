@@ -32,6 +32,7 @@
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start

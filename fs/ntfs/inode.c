@@ -20,6 +20,7 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 
 #include "ntfs.h"
 

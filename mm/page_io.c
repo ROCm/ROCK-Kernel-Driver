@@ -15,6 +15,7 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/swapctl.h>
+#include <linux/buffer_head.h>		/* for brw_page() */
 
 #include <asm/pgtable.h>
 

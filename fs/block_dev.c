@@ -19,6 +19,7 @@
 #include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/blkpg.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 

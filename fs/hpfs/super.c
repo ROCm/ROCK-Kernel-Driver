@@ -6,6 +6,7 @@
  *  mounting, unmounting, error handling
  */
 
+#include <linux/buffer_head.h>
 #include <linux/string.h>
 #include "hpfs_fn.h"
 #include <linux/module.h>

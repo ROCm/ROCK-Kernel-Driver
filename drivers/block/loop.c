@@ -73,6 +73,7 @@
 #include <linux/slab.h>
 #include <linux/loop.h>
 #include <linux/suspend.h>
+#include <linux/buffer_head.h>		/* for invalidate_bdev() */
 
 #include <asm/uaccess.h>
 

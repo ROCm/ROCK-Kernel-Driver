@@ -6,6 +6,7 @@
  *  file VFS functions
  */
 
+#include <linux/buffer_head.h>
 #include <linux/string.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>

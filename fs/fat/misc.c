@@ -8,6 +8,7 @@
 
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
+#include <linux/buffer_head.h>
 
 #if 0
 #  define PRINTK(x)	printk x

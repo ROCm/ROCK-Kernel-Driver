@@ -6,6 +6,7 @@
  *  minix regular file handling primitives
  */
 
+#include <linux/buffer_head.h>		/* for fsync_inode_buffers() */
 #include "minix.h"
 
 /*

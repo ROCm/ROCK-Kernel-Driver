@@ -25,6 +25,7 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
+#include <linux/buffer_head.h>
 
 #include "ntfs.h"
 

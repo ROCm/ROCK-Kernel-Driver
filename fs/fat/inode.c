@@ -17,6 +17,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 
 //#include <asm/uaccess.h>
 #include <asm/unaligned.h>

@@ -25,6 +25,7 @@
 #include <linux/bootmem.h>
 #include <linux/completion.h>
 #include <linux/compiler.h>
+#include <linux/buffer_head.h>
 #include <scsi/scsi.h>
 #include <linux/backing-dev.h>
 
