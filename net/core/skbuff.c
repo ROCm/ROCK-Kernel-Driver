@@ -583,6 +583,8 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 	 */
 	struct sk_buff *n = alloc_skb(newheadroom + skb->len + newtailroom,
 				      gfp_mask);
+	int head_copy_len, head_copy_off;
+
 	if (!n)
 		return NULL;
 
@@ -591,8 +593,16 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 	/* Set the tail pointer and length */
 	skb_put(n, skb->len);
 
-	/* Copy the data only. */
-	if (skb_copy_bits(skb, 0, n->data, skb->len))
+	head_copy_len = skb_headroom(skb);
+	head_copy_off = 0;
+	if (newheadroom < head_copy_len) {
+		head_copy_off = head_copy_len - newheadroom;
+		head_copy_len = newheadroom;
+	}
+
+	/* Copy the linear header and data. */
+	if (skb_copy_bits(skb, -head_copy_len, n->head + head_copy_off,
+			  skb->len + head_copy_len))
 		BUG();
 
 	copy_skb_header(n, skb);
