@@ -184,6 +184,18 @@ char *snd_pcm_format_names[] = {
 	FORMAT(MPEG),
 	FORMAT(GSM),
 	FORMAT(SPECIAL),
+	FORMAT(S24_3LE),
+	FORMAT(S24_3BE),
+	FORMAT(U24_3LE),
+	FORMAT(U24_3BE),
+	FORMAT(S20_3LE),
+	FORMAT(S20_3BE),
+	FORMAT(U20_3LE),
+	FORMAT(U20_3BE),
+	FORMAT(S18_3LE),
+	FORMAT(S18_3BE),
+	FORMAT(U18_3LE),
+	FORMAT(U18_3BE),
 };
 
 char *snd_pcm_subformat_names[] = {

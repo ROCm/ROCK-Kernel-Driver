@@ -366,9 +366,9 @@ static void snd_via8233_setup_periods(via8233_t *chip, viadev_t *viadev,
 		switch (runtime->channels) {
 		case 1: slots = (1<<0); break;
 		case 2: slots = (1<<0) | (2<<4); break;
-		case 4: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12);
+		case 4: slots = (1<<0) | (2<<4) | (3<<8) | (4<<12); break;
 		case 6: slots = (1<<0) | (2<<4) | (5<<8) | (6<<12) | (3<<16) | (4<<20); break;
-		default: slots = 0;
+		default: slots = 0; break;
 		}
 		/* STOP index is never reached */
 		outl(0xff000000 | slots, chip->port + VIA_REG_MULTPLAY_STOP_IDX);

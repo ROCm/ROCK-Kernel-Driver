@@ -810,12 +810,26 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 }				    
 
 int snd_pcm_hw_constraint_mask(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
-			       unsigned int mask)
+			       u_int32_t mask)
 {
 	snd_pcm_hw_constraints_t *constrs = &runtime->hw_constraints;
-	unsigned int *maskp = constrs_mask(constrs, var);
-	*maskp &= mask;
-	if (*maskp == 0)
+	snd_mask_t *maskp = constrs_mask(constrs, var);
+	*maskp->bits &= mask;
+	memset(maskp->bits + 1, 0, (SNDRV_MASK_MAX-32) / 8); /* clear rest */
+	if (*maskp->bits == 0)
+		return -EINVAL;
+	return 0;
+}
+
+int snd_pcm_hw_constraint_mask64(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
+				 u_int64_t mask)
+{
+	snd_pcm_hw_constraints_t *constrs = &runtime->hw_constraints;
+	snd_mask_t *maskp = constrs_mask(constrs, var);
+	maskp->bits[0] &= (u_int32_t)mask;
+	maskp->bits[1] &= (u_int32_t)(mask >> 32);
+	memset(maskp->bits + 2, 0, (SNDRV_MASK_MAX-64) / 8); /* clear rest */
+	if (! maskp->bits[0] && ! maskp->bits[1])
 		return -EINVAL;
 	return 0;
 }
@@ -982,7 +996,9 @@ void _snd_pcm_hw_params_any(snd_pcm_hw_params_t *params)
 {
 	unsigned int k;
 	memset(params, 0, sizeof(*params));
-	for (k = 0; k <= SNDRV_PCM_HW_PARAM_LAST; k++)
+	for (k = SNDRV_PCM_HW_PARAM_FIRST_MASK; k <= SNDRV_PCM_HW_PARAM_LAST_MASK; k++)
+		_snd_pcm_hw_param_any(params, k);
+	for (k = SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++)
 		_snd_pcm_hw_param_any(params, k);
 	params->info = ~0U;
 }

@@ -303,12 +303,94 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 }
 
 
+struct sndrv_pcm_hw_params_old32 {
+	u32 flags;
+	u32 masks[SNDRV_PCM_HW_PARAM_SUBFORMAT -
+			   SNDRV_PCM_HW_PARAM_ACCESS + 1];
+	struct sndrv_interval32 intervals[SNDRV_PCM_HW_PARAM_TICK_TIME -
+					SNDRV_PCM_HW_PARAM_SAMPLE_BITS + 1];
+	u32 rmask;
+	u32 cmask;
+	u32 info;
+	u32 msbits;
+	u32 rate_num;
+	u32 rate_den;
+	u32 fifo_size;
+	unsigned char reserved[64];
+} __attribute__((packed));
+
+#define __OLD_TO_NEW_MASK(x) ((x&7)|((x&0x07fffff8)<<5))
+#define __NEW_TO_OLD_MASK(x) ((x&7)|((x&0xffffff00)>>5))
+
+static void snd_pcm_hw_convert_from_old_params(snd_pcm_hw_params_t *params, struct sndrv_pcm_hw_params_old32 *oparams)
+{
+	unsigned int i;
+
+	memset(params, 0, sizeof(*params));
+	params->flags = oparams->flags;
+	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+		params->masks[i].bits[0] = oparams->masks[i];
+	memcpy(params->intervals, oparams->intervals, sizeof(oparams->intervals));
+	params->rmask = __OLD_TO_NEW_MASK(oparams->rmask);
+	params->cmask = __OLD_TO_NEW_MASK(oparams->cmask);
+	params->info = oparams->info;
+	params->msbits = oparams->msbits;
+	params->rate_num = oparams->rate_num;
+	params->rate_den = oparams->rate_den;
+	params->fifo_size = oparams->fifo_size;
+}
+
+static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old32 *oparams, snd_pcm_hw_params_t *params)
+{
+	unsigned int i;
+
+	memset(oparams, 0, sizeof(*oparams));
+	oparams->flags = params->flags;
+	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+		oparams->masks[i] = params->masks[i].bits[0];
+	memcpy(oparams->intervals, params->intervals, sizeof(oparams->intervals));
+	oparams->rmask = __NEW_TO_OLD_MASK(params->rmask);
+	oparams->cmask = __NEW_TO_OLD_MASK(params->cmask);
+	oparams->info = params->info;
+	oparams->msbits = params->msbits;
+	oparams->rate_num = params->rate_num;
+	oparams->rate_den = params->rate_den;
+	oparams->fifo_size = params->fifo_size;
+}
+
+static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+{
+	struct sndrv_pcm_hw_params_old32 data32;
+	struct sndrv_pcm_hw_params data;
+	mm_segment_t oldseg = get_fs();
+	int err;
+	set_fs(KERNEL_DS);
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
+	snd_pcm_hw_convert_from_old_params(&data, &data32);
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	if (err < 0)
+		goto __err;
+	snd_pcm_hw_convert_to_old_params(&data32, &data);
+	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
+	  err = -EFAULT;
+	  goto __err;
+	}
+ __err: set_fs(oldseg);
+	return err;
+}
+
+
 /*
  */
 
 DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_refine, pcm_hw_params, SNDRV_PCM_IOCTL_HW_REFINE);
-DEFINE_ALSA_IOCTL_ENTRY(pcm_sw_params, pcm_sw_params, SNDRV_PCM_IOCTL_SW_PARAMS);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_params, pcm_hw_params, SNDRV_PCM_IOCTL_HW_PARAMS);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_sw_params, pcm_sw_params, SNDRV_PCM_IOCTL_SW_PARAMS);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_refine_old, pcm_hw_params_old, SNDRV_PCM_IOCTL_HW_REFINE);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_params_old, pcm_hw_params_old, SNDRV_PCM_IOCTL_HW_PARAMS);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_status, pcm_status, SNDRV_PCM_IOCTL_STATUS);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_delay, pcm_sframes_str, SNDRV_PCM_IOCTL_DELAY);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_channel_info, pcm_channel_info, SNDRV_PCM_IOCTL_CHANNEL_INFO);
@@ -335,6 +417,9 @@ enum {
 	SNDRV_PCM_IOCTL_READI_FRAMES32 = _IOR('A', 0x51, struct sndrv_xferi32),
 	SNDRV_PCM_IOCTL_WRITEN_FRAMES32 = _IOW('A', 0x52, struct sndrv_xfern32),
 	SNDRV_PCM_IOCTL_READN_FRAMES32 = _IOR('A', 0x53, struct sndrv_xfern32),
+	SNDRV_PCM_IOCTL_HW_REFINE_OLD32 = _IOWR('A', 0x10, struct sndrv_pcm_hw_params_old32),
+	SNDRV_PCM_IOCTL_HW_PARAMS_OLD32 = _IOWR('A', 0x11, struct sndrv_pcm_hw_params_old32),
+
 };
 
 struct ioctl32_mapper pcm_mappers[] = {
@@ -342,6 +427,8 @@ struct ioctl32_mapper pcm_mappers[] = {
 	{ SNDRV_PCM_IOCTL_INFO, NULL },
 	{ SNDRV_PCM_IOCTL_HW_REFINE32, AP(pcm_hw_refine) },
 	{ SNDRV_PCM_IOCTL_HW_PARAMS32, AP(pcm_hw_params) },
+	{ SNDRV_PCM_IOCTL_HW_REFINE_OLD32, AP(pcm_hw_refine_old) },
+	{ SNDRV_PCM_IOCTL_HW_PARAMS_OLD32, AP(pcm_hw_params_old) },
 	{ SNDRV_PCM_IOCTL_HW_FREE, NULL },
 	{ SNDRV_PCM_IOCTL_SW_PARAMS32, AP(pcm_sw_params) },
 	{ SNDRV_PCM_IOCTL_STATUS32, AP(pcm_status) },
