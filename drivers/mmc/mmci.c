@@ -501,7 +501,7 @@ static int mmci_probe(struct amba_device *dev, void *id)
 	 * We can do SGIO
 	 */
 	mmc->max_hw_segs = 16;
-	mmc->max_phys_segs = 16;
+	mmc->max_phys_segs = NR_SG;
 
 	/*
 	 * Since we only have a 16-bit data length register, we must
