@@ -983,20 +983,7 @@ encode_op:
 	}
 
 out:
-	if (args->ops != args->iops) {
-		kfree(args->ops);
-		args->ops = args->iops;
-	}
-	if (args->tmpp) {
-		kfree(args->tmpp);
-		args->tmpp = NULL;
-	}
-	while (args->to_free) {
-		struct tmpbuf *tb = args->to_free;
-		args->to_free = tb->next;
-		kfree(tb->buf);
-		kfree(tb);
-	}
+	nfsd4_release_compoundargs(args);
 	if (current_fh)
 		fh_put(current_fh);
 	kfree(current_fh);

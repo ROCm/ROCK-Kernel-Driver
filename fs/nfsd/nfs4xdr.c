@@ -287,27 +287,40 @@ u32 *read_buf(struct nfsd4_compoundargs *argp, int nbytes)
 	return p;
 }
 
-char *savemem(struct nfsd4_compoundargs *argp, u32 *p, int nbytes)
+static int
+defer_free(struct nfsd4_compoundargs *argp,
+		void (*release)(const void *), void *p)
 {
 	struct tmpbuf *tb;
+
+	tb = kmalloc(sizeof(*tb), GFP_KERNEL);
+	if (!tb)
+		return -ENOMEM;
+	tb->buf = p;
+	tb->release = release;
+	tb->next = argp->to_free;
+	argp->to_free = tb;
+	return 0;
+}
+
+char *savemem(struct nfsd4_compoundargs *argp, u32 *p, int nbytes)
+{
+	void *new = NULL;
 	if (p == argp->tmp) {
-		p = kmalloc(nbytes, GFP_KERNEL);
-		if (!p) return NULL;
+		new = kmalloc(nbytes, GFP_KERNEL);
+		if (!new) return NULL;
+		p = new;
 		memcpy(p, argp->tmp, nbytes);
 	} else {
 		if (p != argp->tmpp)
 			BUG();
 		argp->tmpp = NULL;
 	}
-	tb = kmalloc(sizeof(*tb), GFP_KERNEL);
-	if (!tb) {
-		kfree(p);
+	if (defer_free(argp, kfree, p)) {
+		kfree(new);
 		return NULL;
-	}
-	tb->buf = p;
-	tb->next = argp->to_free;
-	argp->to_free = tb;
-	return (char*)p;
+	} else
+		return (char *)p;
 }
 
 
@@ -2461,6 +2474,24 @@ nfs4svc_encode_voidres(struct svc_rqst *rqstp, u32 *p, void *dummy)
         return xdr_ressize_check(rqstp, p);
 }
 
+void nfsd4_release_compoundargs(struct nfsd4_compoundargs *args)
+{
+	if (args->ops != args->iops) {
+		kfree(args->ops);
+		args->ops = args->iops;
+	}
+	if (args->tmpp) {
+		kfree(args->tmpp);
+		args->tmpp = NULL;
+	}
+	while (args->to_free) {
+		struct tmpbuf *tb = args->to_free;
+		args->to_free = tb->next;
+		tb->release(tb->buf);
+		kfree(tb);
+	}
+}
+
 int
 nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoundargs *args)
 {
@@ -2477,20 +2508,7 @@ nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoun
 
 	status = nfsd4_decode_compound(args);
 	if (status) {
-		if (args->ops != args->iops) {
-			kfree(args->ops);
-			args->ops = args->iops;
-		}
-		if (args->tmpp) {
-			kfree(args->tmpp);
-			args->tmpp = NULL;
-		}
-		while (args->to_free) {
-			struct tmpbuf *tb = args->to_free;
-			args->to_free = tb->next;
-			kfree(tb->buf);
-			kfree(tb);
-		}
+		nfsd4_release_compoundargs(args);
 	}
 	return !status;
 }
