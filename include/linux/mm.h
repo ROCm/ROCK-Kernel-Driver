@@ -112,9 +112,6 @@ struct vm_area_struct {
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
 
-/* It makes sense to apply VM_ACCOUNT to this vma. */
-#define VM_MAYACCT(vma) (!!((vma)->vm_flags & VM_HUGETLB))
-
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
 #endif
