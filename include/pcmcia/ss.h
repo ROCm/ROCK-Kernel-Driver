@@ -52,16 +52,6 @@
 #define SS_XVCARD	0x2000
 #define SS_PENDING	0x4000
 
-/* for InquireSocket */
-typedef struct socket_cap_t {
-    u_int	features;
-    u_int	irq_mask;
-    u_int	map_size;
-    ioaddr_t	io_offset;
-    u_char	pci_irq;
-    struct pci_dev *cb_dev;
-} socket_cap_t;
-
 /* InquireSocket capabilities */
 #define SS_CAP_PAGE_REGS	0x0001
 #define SS_CAP_VIRTUAL_BUS	0x0002
@@ -133,7 +123,6 @@ struct pccard_operations {
 	int (*init)(struct pcmcia_socket *sock);
 	int (*suspend)(struct pcmcia_socket *sock);
 	int (*register_callback)(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info);
-	int (*inquire_socket)(struct pcmcia_socket *sock, socket_cap_t *cap);
 	int (*get_status)(struct pcmcia_socket *sock, u_int *value);
 	int (*get_socket)(struct pcmcia_socket *sock, socket_state_t *state);
 	int (*set_socket)(struct pcmcia_socket *sock, socket_state_t *state);
@@ -183,7 +172,6 @@ struct pcmcia_socket {
 	spinlock_t			lock;
 	struct pccard_operations *	ss_entry;
 	socket_state_t			socket;
-	socket_cap_t			cap;
 	u_int				state;
 	u_short				functions;
 	u_short				lock_count;
@@ -208,6 +196,15 @@ struct pcmcia_socket {
 
  	/* deprecated */
 	unsigned int			sock;		/* socket number */
+
+
+	/* socket capabilities */
+	u_int				features;
+	u_int				irq_mask;
+	u_int				map_size;
+	ioaddr_t			io_offset;
+	u_char				pci_irq;
+	struct pci_dev *		cb_dev;
 
 	/* state thread */
 	struct semaphore		skt_sem;	/* protects socket h/w state */

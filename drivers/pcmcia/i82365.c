@@ -161,7 +161,6 @@ struct i82365_socket {
     u_short		type, flags;
     struct pcmcia_socket	socket;
     unsigned int	number;
-    socket_cap_t	cap;
     ioaddr_t		ioaddr;
     u_short		psock;
     u_char		cs_irq, intr;
@@ -758,9 +757,9 @@ static void __init add_pcic(int ns, int type)
     
     /* Update socket interrupt information, capabilities */
     for (i = 0; i < ns; i++) {
-	t[i].cap.features |= SS_CAP_PCCARD;
-	t[i].cap.map_size = 0x1000;
-	t[i].cap.irq_mask = mask;
+	t[i].socket.features |= SS_CAP_PCCARD;
+	t[i].socket.map_size = 0x1000;
+	t[i].socket.irq_mask = mask;
 	t[i].cs_irq = isa_irq;
     }
 
@@ -907,7 +906,7 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 	active = 0;
 	for (i = 0; i < sockets; i++) {
 	    if ((socket[i].cs_irq != irq) &&
-		(socket[i].cap.pci_irq != irq))
+		(socket[i].socket.pci_irq != irq))
 		continue;
 	    handled = 1;
 	    ISA_LOCK(i, flags);
@@ -976,15 +975,6 @@ static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void 
     socket[sock].info = info;
     return 0;
 } /* pcic_register_callback */
-
-/*====================================================================*/
-
-static int pcic_inquire_socket(struct pcmcia_socket *s, socket_cap_t *cap)
-{
-    unsigned int sock = container_of(s, struct i82365_socket, socket)->number;
-    *cap = socket[sock].cap;
-    return 0;
-} /* pcic_inquire_socket */
 
 /*====================================================================*/
 
@@ -1109,7 +1099,7 @@ static int i365_set_socket(u_short sock, socket_state_t *state)
     
     /* IO card, RESET flag, IO interrupt */
     reg = t->intr;
-    if (state->io_irq != t->cap.pci_irq) reg |= state->io_irq;
+    if (state->io_irq != t->socket.pci_irq) reg |= state->io_irq;
     reg |= (state->flags & SS_RESET) ? 0 : I365_PC_RESET;
     reg |= (state->flags & SS_IOCARD) ? I365_PC_IOCARD : 0;
     i365_set(sock, I365_INTCTL, reg);
@@ -1414,7 +1404,6 @@ static struct pccard_operations pcic_operations = {
 	.init			= pcic_init,
 	.suspend		= pcic_suspend,
 	.register_callback	= pcic_register_callback,
-	.inquire_socket		= pcic_inquire_socket,
 	.get_status		= pcic_get_status,
 	.get_socket		= pcic_get_socket,
 	.set_socket		= pcic_set_socket,

@@ -515,22 +515,13 @@ static unsigned int yenta_probe_irq(struct yenta_socket *socket, u32 isa_irq_mas
  */
 static void yenta_get_socket_capabilities(struct yenta_socket *socket, u32 isa_irq_mask)
 {
-	socket->cap.features |= SS_CAP_PAGE_REGS | SS_CAP_PCCARD | SS_CAP_CARDBUS;
-	socket->cap.map_size = 0x1000;
-	socket->cap.pci_irq = socket->cb_irq;
-	socket->cap.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
-	socket->cap.cb_dev = socket->dev;
+	socket->socket.features |= SS_CAP_PAGE_REGS | SS_CAP_PCCARD | SS_CAP_CARDBUS;
+	socket->socket.map_size = 0x1000;
+	socket->socket.pci_irq = socket->cb_irq;
+	socket->socket.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
+	socket->socket.cb_dev = socket->dev;
 
-	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->cap.irq_mask, socket->cb_irq);
-}
-
-static int yenta_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-
-	*cap = socket->cap;
-
-	return 0;
+	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->socket.irq_mask, socket->cb_irq);
 }
 
 
@@ -793,7 +784,6 @@ static struct pccard_operations yenta_socket_operations = {
 	.init			= yenta_init,
 	.suspend		= yenta_suspend,
 	.register_callback	= yenta_register_callback,
-	.inquire_socket		= yenta_inquire_socket,
 	.get_status		= yenta_get_status,
 	.get_socket		= yenta_get_socket,
 	.set_socket		= yenta_set_socket,
