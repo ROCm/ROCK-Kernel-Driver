@@ -35,6 +35,8 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 
+extern int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir); /* BB removeme BB */
+
 int
 cifs_open(struct inode *inode, struct file *file)
 {
@@ -452,20 +454,44 @@ cifs_closedir(struct inode *inode, struct file *file)
 {
 	int rc = 0;
 	int xid;
-	struct cifsFileInfo *pSMBFileStruct =
+	struct cifsFileInfo *pCFileStruct =
 	    (struct cifsFileInfo *) file->private_data;
+	char * ptmp;
 
 	cFYI(1, ("Closedir inode = 0x%p with ", inode));
 
 	xid = GetXid();
 
-/* BB add code to close search if not end of search BB */
+	if (pCFileStruct) {
+		struct cifsTconInfo *pTcon;
+		struct cifs_sb_info * cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 
-	if (pSMBFileStruct) {
+		pTcon = cifs_sb->tcon;
+
 		cFYI(1, ("Freeing private data in close dir"));
+		if(pCFileStruct->srch_inf.endOfSearch == FALSE) {
+			pCFileStruct->invalidHandle = TRUE;
+			rc = CIFSFindClose(xid, pTcon, pCFileStruct->netfid);
+			cFYI(1,("Closing uncompleted readdir with rc %d",rc));
+			/* not much we can do if it fails anywway, ignore rc */
+			rc = 0;
+		}
+		ptmp = pCFileStruct->srch_inf.ntwrk_buf_start;
+		if(ptmp) {
+			cFYI(1,("freeing smb buf in srch struct in closedir")); /* BB removeme BB */
+			pCFileStruct->srch_inf.ntwrk_buf_start = NULL;
+			cifs_buf_release(ptmp);
+		}
+		ptmp = pCFileStruct->search_resume_name;
+		if(ptmp) {
+			cFYI(1,("freeing resume name in closedir")); /* BB removeme BB */
+			pCFileStruct->search_resume_name = NULL;
+			kfree(ptmp);
+		}
 		kfree(file->private_data);
 		file->private_data = NULL;
 	}
+	/* BB can we lock the filestruct while this is going on? */
 	FreeXid(xid);
 	return rc;
 }
@@ -1519,7 +1545,7 @@ unix_fill_in_inode(struct inode *tmp_inode,
 
 /* Returns one if new inode created (which therefore needs to be hashed) */
 /* Might check in the future if inode number changed so we can rehash inode */
-static int
+int
 construct_dentry(struct qstr *qstring, struct file *file,
 		 struct inode **ptmp_inode, struct dentry **pnew_dentry)
 {
@@ -1695,6 +1721,13 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	FILE_DIRECTORY_INFO *pfindData;
 	FILE_DIRECTORY_INFO *lastFindData;
 	FILE_UNIX_INFO *pfindDataUnix;
+
+
+    /* BB removeme begin */
+    if(experimEnabled)
+		return cifs_readdir2(file,direntry,filldir);
+    /* BB removeme end */
+
 
 	xid = GetXid();
 

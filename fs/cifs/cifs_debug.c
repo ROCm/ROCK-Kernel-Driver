@@ -337,7 +337,7 @@ cifs_proc_init(void)
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
 
-	pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
+	pde = create_proc_read_entry("NewReaddirEnabled", 0, proc_fs_cifs,
 				quotaEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = quotaEnabled_write;
@@ -396,7 +396,7 @@ cifs_proc_clean(void)
 	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
 	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);
 	remove_proc_entry("LinuxExtensionsEnabled",proc_fs_cifs);
-	remove_proc_entry("QuotaEnabled",proc_fs_cifs);
+	remove_proc_entry("NewReaddirEnabled",proc_fs_cifs);
 	remove_proc_entry("LookupCacheEnabled",proc_fs_cifs);
 	remove_proc_entry("cifs", proc_root_fs);
 }
@@ -485,7 +485,7 @@ quotaEnabled_read(char *page, char **start, off_t off,
 {
         int len;
 
-        len = sprintf(page, "%d\n", quotaEnabled);
+        len = sprintf(page, "%d\n", experimEnabled);
 /* could also check if quotas are enabled in kernel
 	as a whole first */
         len -= off;
@@ -512,9 +512,9 @@ quotaEnabled_write(struct file *file, const char __user *buffer,
         if (rc)
                 return rc;
         if (c == '0' || c == 'n' || c == 'N')
-                quotaEnabled = 0;
+                experimEnabled = 0;
         else if (c == '1' || c == 'y' || c == 'Y')
-                quotaEnabled = 1;
+                experimEnabled = 1;
 
         return count;
 }

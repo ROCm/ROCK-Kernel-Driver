@@ -243,7 +243,7 @@ struct cifsLockInfo {
 struct cifs_search_info {
 	loff_t index_of_last_entry;
 	__u16 entries_in_buffer;
-	unsigned info_level;
+	__u16 info_level;
 	char * ntwrk_buf_start;
 	char * srch_entries_start;
 	unsigned endOfSearch:1;
@@ -418,7 +418,7 @@ GLOBAL_EXTERN unsigned int multiuser_mount;	/* if enabled allows new sessions
 				have the uid/password or Kerberos credential 
 				or equivalent for current user */
 GLOBAL_EXTERN unsigned int oplockEnabled;
-GLOBAL_EXTERN unsigned int quotaEnabled;
+GLOBAL_EXTERN unsigned int experimEnabled;
 GLOBAL_EXTERN unsigned int lookupCacheEnabled;
 GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent 
 				with more secure ntlmssp2 challenge/resp */

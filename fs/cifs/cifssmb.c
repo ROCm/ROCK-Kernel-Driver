@@ -2096,7 +2096,6 @@ findFirstRetry:
 	return rc;
 }
 
-#ifdef CIFS_EXPERIMENTAL
 /* xid, tcon, searchName and codepage are input parms, rest are returned */
 int
 CIFSFindFirst2(const int xid, struct cifsTconInfo *tcon,
@@ -2166,16 +2165,8 @@ findFirst2Retry:
 	pSMB->SearchCount= cpu_to_le16(CIFS_MAX_MSGSIZE/sizeof(FILE_UNIX_INFO));
 	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | 
 		CIFS_SEARCH_RETURN_RESUME);
+	pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
 
-	/* test for Unix extensions */
-	if (tcon->ses->capabilities & CAP_UNIX) {
-		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
-		psrch_inf->info_level = SMB_FIND_FILE_UNIX;
-	} else {
-		pSMB->InformationLevel =
-		    cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
-		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
-	}
 	/* BB what should we set StorageType to? Does it matter? BB */
 	pSMB->SearchStorageType = 0;
 	pSMB->hdr.smb_buf_length += byte_count;
@@ -2271,14 +2262,15 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SearchCount =
 		cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_UNIX_INFO));
 	/* test for Unix extensions */
-	if (tcon->ses->capabilities & CAP_UNIX) {
+/*	if (tcon->ses->capabilities & CAP_UNIX) {
 		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
 		psrch_inf->info_level = SMB_FIND_FILE_UNIX;
 	} else {
 		pSMB->InformationLevel =
 		   cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
 		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
-	}
+	} */
+    pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
 	pSMB->ResumeKey = 0;  /* BB fixme add resume_key BB */
 	pSMB->SearchFlags =
 	      cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
@@ -2344,8 +2336,6 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
                                                                                               
 	return rc;
 }
-
-#endif /* CIFS_EXPERIMENTAL */
 
 int
 CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
