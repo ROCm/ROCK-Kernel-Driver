@@ -48,7 +48,7 @@ config ARCH_S390_31
 	depends on ARCH_S390X = 'n'
 	default y
 
-choice 
+choice
 	prompt "Processor type"
 	default MARCH_G5
 
@@ -73,8 +73,7 @@ config MARCH_Z990
 	  This will be slightly faster but does not work on
 	  older machines such as the z900.
 
-endchoice 
-
+endchoice
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -121,7 +120,7 @@ config MATHEMU
 	depends on MARCH_G5
 	help
 	  This option is required for IEEE compliant floating point arithmetic
-	  on older S/390 machines. Say Y unless you know your machine doesn't 
+	  on older S/390 machines. Say Y unless you know your machine doesn't
 	  need this.
 
 config S390_SUPPORT
@@ -156,7 +155,7 @@ config MACHCHK_WARNING
 	bool "Process warning machine checks"
 	help
 	  Select this option if you want the machine check handler on IBM S/390 or
-	  zSeries to process warning machine checks (e.g. on power failures). 
+	  zSeries to process warning machine checks (e.g. on power failures).
 	  If unsure, say "Y".
 
 config QDIO
@@ -388,64 +387,10 @@ source "fs/Kconfig"
 
 source "arch/s390/oprofile/Kconfig"
 
-menu "Kernel hacking"
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-	help
-	  Say Y here if you are developing drivers or trying to debug and
-	  identify kernel problems.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  If you say Y here, you will have some control over the system even
-	  if the system crashes for example during kernel debugging (e.g., you
-	  will be able to flush the buffer cache to disk, reboot the system
-	  immediately or dump some status information). This is accomplished
-	  by pressing various keys while holding SysRq (Alt+PrintScreen). It
-	  also works on a serial console (on PC hardware at least), if you
-	  send a BREAK and then within 5 seconds a command keypress. The
-	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
-	  unless you really know what this hack does.
-
-config DEBUG_SLAB
-	bool "Debug memory allocations"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to have the kernel do limited verification on memory
-	  allocation as well as poisoning memory on free to catch use of freed
-	  memory.
-
-config KALLSYMS
-	bool "Load all symbols for debugging/kksymoops"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to let the kernel print out symbolic crash information and
-	  symbolic stack backtraces. This increases the size of the kernel
-	  somewhat, as all symbols have to be loaded into the kernel image.
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-	  
-config DEBUG_SPINLOCK_SLEEP
-	bool "Sleep-inside-spinlock checking"
-	help
-	  If you say Y here, various routines which may sleep will become very
-	  noisy if they are called with a spinlock held.	
-
-endmenu
+source "arch/s390/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-

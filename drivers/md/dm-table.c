@@ -900,6 +900,28 @@ void dm_table_unplug_all(struct dm_table *t)
 	}
 }
 
+int dm_table_flush_all(struct dm_table *t)
+{
+	struct list_head *d, *devices = dm_table_get_devices(t);
+	int ret = 0;
+
+	for (d = devices->next; d != devices; d = d->next) {
+		struct dm_dev *dd = list_entry(d, struct dm_dev, list);
+		request_queue_t *q = bdev_get_queue(dd->bdev);
+		int err;
+
+		if (!q->issue_flush_fn)
+			err = -EOPNOTSUPP;
+		else
+			err = q->issue_flush_fn(q, dd->bdev->bd_disk, NULL);
+
+		if (!ret)
+			ret = err;
+	}
+
+	return ret;
+}
+
 EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
@@ -908,3 +930,4 @@ EXPORT_SYMBOL(dm_table_get_mode);
 EXPORT_SYMBOL(dm_table_put);
 EXPORT_SYMBOL(dm_table_get);
 EXPORT_SYMBOL(dm_table_unplug_all);
+EXPORT_SYMBOL(dm_table_flush_all);

@@ -146,7 +146,7 @@ void nlmclnt_mark_reclaim(struct nlm_host *host)
 		inode = fl->fl_file->f_dentry->d_inode;
 		if (inode->i_sb->s_magic != NFS_SUPER_MAGIC)
 			continue;
-		if (fl->fl_u.nfs_fl.host != host)
+		if (fl->fl_u.nfs_fl.owner->host != host)
 			continue;
 		if (!(fl->fl_u.nfs_fl.flags & NFS_LCK_GRANTED))
 			continue;
@@ -215,7 +215,7 @@ restart:
 		inode = fl->fl_file->f_dentry->d_inode;
 		if (inode->i_sb->s_magic != NFS_SUPER_MAGIC)
 			continue;
-		if (fl->fl_u.nfs_fl.host != host)
+		if (fl->fl_u.nfs_fl.owner->host != host)
 			continue;
 		if (!(fl->fl_u.nfs_fl.flags & NFS_LCK_RECLAIM))
 			continue;

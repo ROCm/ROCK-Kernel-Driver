@@ -59,8 +59,6 @@ unsigned long cache_decay_ticks;
 
 cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
-cpumask_t cpu_available_map = CPU_MASK_NONE;
-cpumask_t cpu_present_at_boot = CPU_MASK_NONE;
 
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(cpu_possible_map);
@@ -124,9 +122,8 @@ static int smp_iSeries_numProcs(void)
 	np = 0;
         for (i=0; i < NR_CPUS; ++i) {
                 if (paca[i].lppaca.xDynProcStatus < 2) {
-			cpu_set(i, cpu_available_map);
 			cpu_set(i, cpu_possible_map);
-			cpu_set(i, cpu_present_at_boot);
+			cpu_set(i, cpu_present_map);
                         ++np;
                 }
         }
@@ -224,7 +221,6 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 	do_openpic_setup_cpu();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 /* Get state of physical CPU.
  * Return codes:
  *	0	- The processor is in the RTAS stopped state
@@ -233,13 +229,14 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
  *	-1	- Hardware Error
  *	-2	- Hardware Busy, Try again later.
  */
-static int query_cpu_stopped(unsigned int pcpu)
+int query_cpu_stopped(unsigned int pcpu)
 {
 	int cpu_status;
 	int status, qcss_tok;
 
 	qcss_tok = rtas_token("query-cpu-stopped-state");
-	BUG_ON(qcss_tok == RTAS_UNKNOWN_SERVICE);
+	if (qcss_tok == RTAS_UNKNOWN_SERVICE)
+		return -1;
 	status = rtas_call(qcss_tok, 1, 2, &cpu_status, pcpu);
 	if (status != 0) {
 		printk(KERN_ERR
@@ -249,6 +246,8 @@ static int query_cpu_stopped(unsigned int pcpu)
 
 	return cpu_status;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
 
 int __cpu_disable(void)
 {
@@ -272,13 +271,13 @@ void __cpu_die(unsigned int cpu)
 	int cpu_status;
 	unsigned int pcpu = get_hard_smp_processor_id(cpu);
 
-	for (tries = 0; tries < 5; tries++) {
+	for (tries = 0; tries < 25; tries++) {
 		cpu_status = query_cpu_stopped(pcpu);
 
 		if (cpu_status == 0)
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
+		schedule_timeout(HZ/5);
 	}
 	if (cpu_status != 0) {
 		printk("Querying DEAD? cpu %i (%i) shows %i\n",
@@ -487,11 +486,11 @@ static void __init smp_space_timers(unsigned int max_cpus)
 #ifdef CONFIG_PPC_PSERIES
 void vpa_init(int cpu)
 {
-	unsigned long flags;
+	unsigned long flags, pcpu = get_hard_smp_processor_id(cpu);
 
 	/* Register the Virtual Processor Area (VPA) */
 	flags = 1UL << (63 - 18);
-	register_vpa(flags, cpu, __pa((unsigned long)&(paca[cpu].lppaca)));
+	register_vpa(flags, pcpu, __pa((unsigned long)&(paca[cpu].lppaca)));
 }
 
 static inline void smp_xics_do_message(int cpu, int msg)
@@ -751,6 +750,8 @@ out:
 	return ret;
 }
 
+EXPORT_SYMBOL(smp_call_function);
+
 void smp_call_function_interrupt(void)
 {
 	void (*func) (void *info);
@@ -843,6 +844,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 * number of msecs off until someone does a settimeofday()
 	 */
 	do_gtod.tb_orig_stamp = tb_last_stamp;
+	systemcfg->tb_orig_stamp = tb_last_stamp;
 
 	look_for_more_cpus();
 #endif
@@ -875,7 +877,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	int c;
 
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
-	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
+	if (system_state == SYSTEM_BOOTING && !cpu_present(cpu))
 		return -ENOENT;
 
 	paca[cpu].prof_counter = 1;

@@ -230,6 +230,9 @@ static int page_referenced_one(struct page *page,
 	if (ptep_clear_flush_young(vma, address, pte))
 		referenced++;
 
+	if (mm != current->mm && has_swap_token(mm))
+		referenced++;
+
 	(*mapcount)--;
 
 out_unmap:
@@ -277,15 +280,14 @@ static inline int page_referenced_file(struct page *page)
 	unsigned int mapcount = page->mapcount;
 	struct address_space *mapping = page->mapping;
 	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 	int referenced = 0;
 
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return 0;
 
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
+	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		if ((vma->vm_flags & (VM_LOCKED|VM_MAYSHARE))
 				  == (VM_LOCKED|VM_MAYSHARE)) {
 			referenced++;
@@ -658,7 +660,7 @@ static inline int try_to_unmap_file(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 	int ret = SWAP_AGAIN;
 	unsigned long cursor;
@@ -669,8 +671,7 @@ static inline int try_to_unmap_file(struct page *page)
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return ret;
 
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap,
-					&iter, pgoff, pgoff)) != NULL) {
+	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		ret = try_to_unmap_one(page, vma);
 		if (ret == SWAP_FAIL || !page->mapcount)
 			goto out;

@@ -1856,6 +1856,8 @@ nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *request)
 	nfs4_put_lock_state(lsp);
 out:
 	up(&state->lock_sema);
+	if (status == 0)
+		posix_lock_file(request->fl_file, request);
 	return nfs4_map_errors(status);
 }
 
@@ -1932,6 +1934,12 @@ nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
 	nfs4_put_lock_state(lsp);
 out:
 	up(&state->lock_sema);
+	if (status == 0) {
+		/* Note: we always want to sleep here! */
+		request->fl_flags |= FL_SLEEP;
+		if (posix_lock_file_wait(request->fl_file, request) < 0)
+			printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n", __FUNCTION__);
+	}
 	return nfs4_map_errors(status);
 }
 

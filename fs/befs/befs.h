@@ -96,7 +96,6 @@ void befs_dump_super_block(const struct super_block *sb, befs_super_block *);
 void befs_dump_inode(const struct super_block *sb, befs_inode *);
 void befs_dump_index_entry(const struct super_block *sb, befs_btree_super *);
 void befs_dump_index_node(const struct super_block *sb, befs_btree_nodehead *);
-void befs_dump_inode_addr(const struct super_block *sb, befs_inode_addr);
 /****************************/
 
 

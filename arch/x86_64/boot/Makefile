@@ -30,7 +30,7 @@ targets		:= vmlinux.bin bootsect bootsect.o \
 
 EXTRA_CFLAGS := -m32
 
-host-progs	:= tools/build
+hostprogs-y	:= tools/build
 subdir-		:= compressed/	#Let make clean descend in compressed/
 # ---------------------------------------------------------------------------
 

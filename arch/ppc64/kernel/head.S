@@ -580,7 +580,7 @@ __end_systemcfg:
 	 * VSID generation algorithm.  See include/asm/mmu_context.h.
 	 */
 
-	.llong	1		/* # ESIDs to be mapped by hypervisor	 */
+	.llong	2		/* # ESIDs to be mapped by hypervisor	 */
 	.llong	1		/* # memory ranges to be mapped by hypervisor */
 	.llong	STAB0_PAGE	/* Page # of segment table within load area	*/
 	.llong	0		/* Reserved */
@@ -588,8 +588,12 @@ __end_systemcfg:
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
-	.llong	0x0c00000000	/* ESID to map (Kernel at EA = 0xC000000000000000) */
-	.llong	0x06a99b4b14	/* VSID to map (Kernel at VA = 0x6a99b4b140000000) */
+	.llong	0xc00000000	/* KERNELBASE ESID */
+	.llong	0x6a99b4b14	/* KERNELBASE VSID */
+	/* We have to list the bolted VMALLOC segment here, too, so that it
+	 * will be restored on shared processor switch */
+	.llong	0xd00000000	/* VMALLOCBASE ESID */
+	.llong	0x08d12e6ab	/* VMALLOCBASE VSID */
 	.llong	8192		/* # pages to map (32 MB) */
 	.llong	0		/* Offset from start of loadarea to start of map */
 	.llong	0x0006a99b4b140000	/* VPN of first page to map */

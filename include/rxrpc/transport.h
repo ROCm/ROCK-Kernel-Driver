@@ -78,8 +78,6 @@ struct rxrpc_transport
 	volatile char		error_rcvd;	/* T if received ICMP error outstanding */
 };
 
-extern struct list_head rxrpc_transports;
-
 extern int rxrpc_create_transport(unsigned short port,
 				  struct rxrpc_transport **_trans);
 

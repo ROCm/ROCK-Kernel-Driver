@@ -103,7 +103,7 @@ sb_lib-objs	:= sb_common.o sb_audio.o sb_midi.o sb_mixer.o sb_ess.o
 vidc_mod-objs	:= vidc.o vidc_fill.o
 wavefront-objs  := wavfront.o wf_midi.o yss225.o
 
-host-progs	:= bin2hex hex2hex
+hostprogs-y	:= bin2hex hex2hex
 
 # Files generated that shall be removed upon make clean
 clean-files := maui_boot.h msndperm.c msndinit.c pndsperm.c pndspini.c \

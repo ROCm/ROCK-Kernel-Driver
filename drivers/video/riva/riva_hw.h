@@ -89,12 +89,14 @@ typedef unsigned int   U032;
 #define VGA_RD08(p,i)   NV_RD08(p,i)
 
 /*
- * Define supported architectures.
+ * Define different architectures.
  */
 #define NV_ARCH_03  0x03
 #define NV_ARCH_04  0x04
 #define NV_ARCH_10  0x10
 #define NV_ARCH_20  0x20
+#define NV_ARCH_30  0x30
+#define NV_ARCH_40  0x40
 
 /***************************************************************************\
 *                                                                           *

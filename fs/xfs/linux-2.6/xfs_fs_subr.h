@@ -40,7 +40,6 @@ struct cred;
 
 extern int	fs_noerr(void);
 extern int	fs_nosys(void);
-extern int	fs_nodev(void);
 extern void	fs_noval(void);
 extern void	fs_tosspages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 extern void	fs_flushinval_pages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);

@@ -87,15 +87,17 @@ static int vesafb_pan_display(struct fb_var_screeninfo *var,
 	return 0;
 }
 
-static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned blue)
+static void vesa_setpalette(int regno, unsigned red, unsigned green,
+			    unsigned blue, struct fb_var_screeninfo *var)
 {
 #ifdef __i386__
 	struct { u_char blue, green, red, pad; } entry;
+	int shift = 16 - var->green.length;
 
 	if (pmi_setpal) {
-		entry.red   = red   >> 10;
-		entry.green = green >> 10;
-		entry.blue  = blue  >> 10;
+		entry.red   = red   >> shift;
+		entry.green = green >> shift;
+		entry.blue  = blue  >> shift;
 		entry.pad   = 0;
 	        __asm__ __volatile__(
                 "call *(%%esi)"
@@ -109,9 +111,9 @@ static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned bl
 	} else {
 		/* without protected mode interface, try VGA registers... */
 		outb_p(regno,       dac_reg);
-		outb_p(red   >> 10, dac_val);
-		outb_p(green >> 10, dac_val);
-		outb_p(blue  >> 10, dac_val);
+		outb_p(red   >> shift, dac_val);
+		outb_p(green >> shift, dac_val);
+		outb_p(blue  >> shift, dac_val);
 	}
 #endif
 }
@@ -132,7 +134,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		vesa_setpalette(regno,red,green,blue);
+		vesa_setpalette(regno,red,green,blue, &info->var);
 		break;
 	case 16:
 		if (info->var.red.offset == 10) {
@@ -331,30 +333,26 @@ static int __init vesafb_probe(struct device *device)
 	vesafb_defined.left_margin  = (vesafb_defined.xres / 8) & 0xf8;
 	vesafb_defined.hsync_len    = (vesafb_defined.xres / 8) & 0xf8;
 	
-	if (vesafb_defined.bits_per_pixel > 8) {
-		vesafb_defined.red.offset    = screen_info.red_pos;
-		vesafb_defined.red.length    = screen_info.red_size;
-		vesafb_defined.green.offset  = screen_info.green_pos;
-		vesafb_defined.green.length  = screen_info.green_size;
-		vesafb_defined.blue.offset   = screen_info.blue_pos;
-		vesafb_defined.blue.length   = screen_info.blue_size;
-		vesafb_defined.transp.offset = screen_info.rsvd_pos;
-		vesafb_defined.transp.length = screen_info.rsvd_size;
-		printk(KERN_INFO "vesafb: directcolor: "
-		       "size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
-		       screen_info.rsvd_size,
-		       screen_info.red_size,
-		       screen_info.green_size,
-		       screen_info.blue_size,
-		       screen_info.rsvd_pos,
-		       screen_info.red_pos,
-		       screen_info.green_pos,
-		       screen_info.blue_pos);
-	} else {
-		vesafb_defined.red.length   = 6;
-		vesafb_defined.green.length = 6;
-		vesafb_defined.blue.length  = 6;
-	}
+	vesafb_defined.red.offset    = screen_info.red_pos;
+	vesafb_defined.red.length    = screen_info.red_size;
+	vesafb_defined.green.offset  = screen_info.green_pos;
+	vesafb_defined.green.length  = screen_info.green_size;
+	vesafb_defined.blue.offset   = screen_info.blue_pos;
+	vesafb_defined.blue.length   = screen_info.blue_size;
+	vesafb_defined.transp.offset = screen_info.rsvd_pos;
+	vesafb_defined.transp.length = screen_info.rsvd_size;
+	printk(KERN_INFO "vesafb: %s: "
+	       "size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
+	       (vesafb_defined.bits_per_pixel > 8) ?
+	       "Truecolor" : "Pseudocolor",
+	       screen_info.rsvd_size,
+	       screen_info.red_size,
+	       screen_info.green_size,
+	       screen_info.blue_size,
+	       screen_info.rsvd_pos,
+	       screen_info.red_pos,
+	       screen_info.green_pos,
+	       screen_info.blue_pos);
 
 	vesafb_fix.ypanstep  = ypan     ? 1 : 0;
 	vesafb_fix.ywrapstep = (ypan>1) ? 1 : 0;

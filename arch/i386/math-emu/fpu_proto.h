@@ -69,7 +69,6 @@ extern int isNaN(FPU_REG const *ptr);
 extern void FPU_pop(void);
 extern int FPU_empty_i(int stnr);
 extern int FPU_stackoverflow(FPU_REG **st_new_ptr);
-extern void FPU_sync_tags(void);
 extern void FPU_copy_to_regi(FPU_REG const *r, u_char tag, int stnr);
 extern void FPU_copy_to_reg1(FPU_REG const *r, u_char tag);
 extern void FPU_copy_to_reg0(FPU_REG const *r, u_char tag);

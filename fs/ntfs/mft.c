@@ -391,7 +391,7 @@ map_err_out:
 	ni->ext.base_ntfs_ino = base_ni;
 	/* Now map the record. */
 	m = map_mft_record(ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		ntfs_clear_extent_inode(ni);
@@ -571,7 +571,7 @@ static int sync_mft_mirror(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	/* Get the page containing the mirror copy of the mft record @m. */
 	page = ntfs_map_page(vol->mftmirr_ino->i_mapping, ni->mft_no >>
 			(PAGE_CACHE_SHIFT - vol->mft_record_size_bits));
-	if (unlikely(IS_ERR(page))) {
+	if (IS_ERR(page)) {
 		ntfs_error(vol->sb, "Failed to map mft mirror page.");
 		err = PTR_ERR(page);
 		goto err_out;

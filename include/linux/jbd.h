@@ -840,6 +840,7 @@ struct journal_s
 #define JFS_ACK_ERR	0x004	/* The errno in the sb has been acked */
 #define JFS_FLUSHED	0x008	/* The journal superblock has been flushed */
 #define JFS_LOADED	0x010	/* The journal superblock has been loaded */
+#define JFS_BARRIER	0x020	/* Use IDE barriers */
 
 /* 
  * Function declarations for the journaling transaction and buffer

@@ -52,10 +52,25 @@ struct nlm_host {
 	wait_queue_head_t	h_gracewait;	/* wait while reclaiming */
 	u32			h_state;	/* pseudo-state counter */
 	u32			h_nsmstate;	/* true remote NSM state */
-	unsigned int		h_count;	/* reference count */
+	u32			h_pidcount;	/* Pseudopids */
+	atomic_t		h_count;	/* reference count */
 	struct semaphore	h_sema;		/* mutex for pmap binding */
 	unsigned long		h_nextrebind;	/* next portmap call */
 	unsigned long		h_expires;	/* eligible for GC */
+	struct list_head	h_lockowners;	/* Lockowners for the client */
+	spinlock_t		h_lock;
+};
+
+/*
+ * Map an fl_owner_t into a unique 32-bit "pid"
+ */
+struct nlm_lockowner {
+	struct list_head list;
+	atomic_t count;
+
+	struct nlm_host *host;
+	fl_owner_t owner;
+	uint32_t pid;
 };
 
 /*
@@ -77,7 +92,7 @@ struct nlm_rqst {
 struct nlm_file {
 	struct nlm_file *	f_next;		/* linked list */
 	struct nfs_fh		f_handle;	/* NFS file handle */
-	struct file		f_file;		/* VFS file pointer */
+	struct file *		f_file;		/* VFS file pointer */
 	struct nlm_share *	f_shares;	/* DOS shares */
 	struct nlm_block *	f_blocks;	/* blocked locks */
 	unsigned int		f_locks;	/* guesstimate # of locks */
@@ -180,7 +195,7 @@ void		  nlmsvc_invalidate_all(void);
 static __inline__ struct inode *
 nlmsvc_file_inode(struct nlm_file *file)
 {
-	return file->f_file.f_dentry->d_inode;
+	return file->f_file->f_dentry->d_inode;
 }
 
 /*
@@ -204,6 +219,8 @@ nlm_compare_locks(struct file_lock *fl1, struct file_lock *fl2)
 	     && fl1->fl_end   == fl2->fl_end
 	     &&(fl1->fl_type  == fl2->fl_type || fl2->fl_type == F_UNLCK);
 }
+
+extern struct lock_manager_operations nlmsvc_lock_operations;
 
 #endif /* __KERNEL__ */
 

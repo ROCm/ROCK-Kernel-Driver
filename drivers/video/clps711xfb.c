@@ -372,7 +372,7 @@ int __init clps711xfb_init(void)
 	strcpy(cfb->fix.id, "clps711x");
 
 	cfb->fbops		= &clps7111fb_ops;
-	cfb->flags		= FBINFO_FLAG_DEFAULT;
+	cfb->flags		= FBINFO_DEFAULT;
 
 	clps711x_guess_lcd_params(cfb);
 

@@ -128,22 +128,10 @@ static void nbd_end_request(struct request *req)
 {
 	int uptodate = (req->errors == 0) ? 1 : 0;
 	request_queue_t *q = req->q;
-	struct nbd_device *lo = req->rq_disk->private_data;
 	unsigned long flags;
 
 	dprintk(DBG_BLKDEV, "%s: request %p: %s\n", req->rq_disk->disk_name,
 			req, uptodate? "done": "failed");
-
-	spin_lock(&lo->queue_lock);
-	while (req->ref_count > 1) { /* still in send */
-		spin_unlock(&lo->queue_lock);
-		printk(KERN_DEBUG "%s: request %p still in use (%d), waiting\n",
-		    lo->disk->disk_name, req, req->ref_count);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ); /* wait a second */
-		spin_lock(&lo->queue_lock);
-	}
-	spin_unlock(&lo->queue_lock);
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	if (!end_that_request_first(req, uptodate, req->nr_sectors)) {
@@ -228,7 +216,7 @@ static inline int sock_send_bvec(struct socket *sock, struct bio_vec *bvec,
 	return result;
 }
 
-void nbd_send_req(struct nbd_device *lo, struct request *req)
+static int nbd_send_req(struct nbd_device *lo, struct request *req)
 {
 	int result, i, flags;
 	struct nbd_request request;
@@ -288,11 +276,11 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 		}
 	}
 	up(&lo->tx_lock);
-	return;
+	return 0;
 
 error_out:
 	up(&lo->tx_lock);
-	req->errors++;
+	return 1;
 }
 
 static struct request *nbd_find_request(struct nbd_device *lo, char *handle)
@@ -477,26 +465,19 @@ static void do_nbd_request(request_queue_t * q)
 		}
 
 		list_add(&req->queuelist, &lo->queue_head);
-		req->ref_count++; /* make sure req does not get freed */
 		spin_unlock(&lo->queue_lock);
 
-		nbd_send_req(lo, req);
-
-		if (req->errors) {
+		if (nbd_send_req(lo, req) != 0) {
 			printk(KERN_ERR "%s: Request send failed\n",
 					lo->disk->disk_name);
-			spin_lock(&lo->queue_lock);
-			list_del_init(&req->queuelist);
-			req->ref_count--;
-			spin_unlock(&lo->queue_lock);
-			nbd_end_request(req);
-			spin_lock_irq(q->queue_lock);
-			continue;
+			if (nbd_find_request(lo, (char *)&req) != NULL) {
+				/* we still own req */
+				req->errors++;
+				nbd_end_request(req);
+			} else /* we're racing with nbd_clear_que */
+				printk(KERN_DEBUG "nbd: can't find req\n");
 		}
 
-		spin_lock(&lo->queue_lock);
-		req->ref_count--;
-		spin_unlock(&lo->queue_lock);
 		spin_lock_irq(q->queue_lock);
 		continue;
 

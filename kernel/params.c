@@ -340,6 +340,12 @@ int param_set_copystring(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
+int param_get_string(char *buffer, struct kernel_param *kp)
+{
+	struct kparam_string *kps = kp->arg;
+	return strlcpy(buffer, kps->string, kps->maxlen);
+}
+
 EXPORT_SYMBOL(param_set_byte);
 EXPORT_SYMBOL(param_get_byte);
 EXPORT_SYMBOL(param_set_short);
@@ -363,3 +369,4 @@ EXPORT_SYMBOL(param_get_invbool);
 EXPORT_SYMBOL(param_array_set);
 EXPORT_SYMBOL(param_array_get);
 EXPORT_SYMBOL(param_set_copystring);
+EXPORT_SYMBOL(param_get_string);

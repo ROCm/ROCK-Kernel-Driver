@@ -33,6 +33,19 @@ struct display {
     short yscroll;                  /* Hardware scrolling */
     int vrows;                      /* number of virtual rows */
     int cursor_shape;
+    u32 xres_virtual;
+    u32 yres_virtual;
+    u32 height;
+    u32 width;
+    u32 bits_per_pixel;
+    u32 grayscale;
+    u32 nonstd;
+    u32 accel_flags;
+    struct fb_bitfield red;
+    struct fb_bitfield green;
+    struct fb_bitfield blue;
+    struct fb_bitfield transp;
+    struct fb_videomode *mode;
 };
 
 /* drivers/video/console/fbcon.c */
@@ -56,8 +69,8 @@ extern int set_con2fb_map(int unit, int newidx);
 /* Monochrome */
 #define attr_bold(s) \
 	((s) & 0x200)
-#define attr_reverse(s, inverse) \
-	(((s) & 0x800) ^ (inverse ? 0x800 : 0))
+#define attr_reverse(s) \
+	((s) & 0x800)
 #define attr_underline(s) \
 	((s) & 0x400)
 #define attr_blink(s) \

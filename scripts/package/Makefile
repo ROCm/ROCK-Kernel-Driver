@@ -51,7 +51,7 @@ rpm-pkg rpm: $(objtree)/kernel.spec
 	$(RPM) --target $(UTS_MACHINE) -ta ../$(KERNELPATH).tar.gz
 	rm ../$(KERNELPATH).tar.gz
 
-clean-rule +=  rm -f $(objtree)/kernel.spec
+clean-files := $(objtree)/kernel.spec
 
 # binrpm-pkg
 .PHONY: binrpm-pkg
@@ -67,7 +67,7 @@ binrpm-pkg: $(objtree)/binkernel.spec
 
 	$(RPM) --define "_builddir $(srctree)" --target $(UTS_MACHINE) -bb $<
 
-clean-rule += rm -f $(objtree)/binkernel.spec
+clean-files += $(objtree)/binkernel.spec
 
 # Deb target
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ deb-pkg:
 	$(MAKE)
 	$(CONFIG_SHELL) $(srctree)/scripts/package/builddeb
 
-clean-rule += && rm -rf $(objtree)/debian/
+clean-dirs += $(objtree)/debian/
 
 
 # Help text displayed when executing 'make help'

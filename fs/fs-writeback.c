@@ -304,14 +304,20 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		long pages_skipped;
 
 		if (bdi->memory_backed) {
+			list_move(&inode->i_list, &sb->s_dirty);
 			if (sb == blockdev_superblock) {
 				/*
 				 * Dirty memory-backed blockdev: the ramdisk
-				 * driver does this.
+				 * driver does this.  Skip just this inode
 				 */
-				list_move(&inode->i_list, &sb->s_dirty);
 				continue;
 			}
+			/*
+			 * Dirty memory-backed inode against a filesystem other
+			 * than the kernel-internal bdev filesystem.  Skip the
+			 * entire superblock.
+			 */
+			break;
 		}
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {

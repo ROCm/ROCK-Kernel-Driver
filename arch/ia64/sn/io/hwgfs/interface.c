@@ -42,7 +42,7 @@ walk_parents_mkdir(
 
 		nd->dentry = lookup_create(nd, is_dir);
 		nd->flags |= LOOKUP_PARENT;
-		if (unlikely(IS_ERR(nd->dentry)))
+		if (IS_ERR(nd->dentry))
 			return PTR_ERR(nd->dentry);
 
 		if (!nd->dentry->d_inode)
@@ -89,7 +89,7 @@ hwgfs_decode(
 
 	*dentry = lookup_create(&nd, is_dir);
 
-	if (unlikely(IS_ERR(*dentry)))
+	if (IS_ERR(*dentry))
 		return PTR_ERR(*dentry);
 	*parent_inode = (*dentry)->d_parent->d_inode;
 	return 0;

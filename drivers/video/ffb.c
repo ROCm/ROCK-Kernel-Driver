@@ -1027,7 +1027,7 @@ static void ffb_init_one(int node, int parent)
 	all->par.prom_node = node;
 	all->par.prom_parent_node = parent;
 
-	all->info.flags = FBINFO_FLAG_DEFAULT;
+	all->info.flags = FBINFO_DEFAULT;
 	all->info.fbops = &ffb_ops;
 	all->info.screen_base = (char *) all->par.physbase + FFB_DFB24_POFF;
 	all->info.currcon = -1;

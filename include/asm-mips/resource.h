@@ -53,7 +53,7 @@
 	{ INR_OPEN,      INR_OPEN      },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
-	{ 0,             0             },		\
+	{ MLOCK_LIMIT,     MLOCK_LIMIT },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ MAX_SIGPENDING, MAX_SIGPENDING },		\

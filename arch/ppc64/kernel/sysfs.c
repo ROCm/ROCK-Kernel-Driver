@@ -5,6 +5,7 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/module.h>
 #include <asm/current.h>
 #include <asm/processor.h>
 #include <asm/cputable.h>
@@ -146,8 +147,9 @@ void ppc64_enable_pmcs(void)
 			reset = 0;
 			ret = plpar_hcall_norets(H_PERFMON, set, reset);
 			if (ret)
-				printk(KERN_ERR "H_PERFMON call returned %d",
-				       ret);
+				printk(KERN_ERR "H_PERFMON call on cpu %u "
+						"returned %d\n",
+						smp_processor_id(), ret);
 			break;
 
 		default:
@@ -171,6 +173,8 @@ void ppc64_enable_pmcs(void)
 	}
 }
 #endif
+
+EXPORT_SYMBOL(ppc64_enable_pmcs);
 
 /* XXX convert to rusty's on_one_cpu */
 static unsigned long run_on_cpu(unsigned long cpu,

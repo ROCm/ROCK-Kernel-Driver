@@ -46,6 +46,8 @@ static unsigned int rtas_event_scan_rate;
 static unsigned int rtas_error_log_max;
 static unsigned int rtas_error_log_buffer_max;
 
+static int full_rtas_msgs = 0;
+
 extern volatile int no_more_logging;
 
 volatile int error_log_cnt = 0;
@@ -56,6 +58,37 @@ volatile int error_log_cnt = 0;
  * make it big enough.
  */
 static unsigned char logdata[RTAS_ERROR_LOG_MAX];
+
+static int get_eventscan_parms(void);
+
+static char *rtas_type[] = {
+	"Unknown", "Retry", "TCE Error", "Internal Device Failure",
+	"Timeout", "Data Parity", "Address Parity", "Cache Parity",
+	"Address Invalid", "ECC Uncorrected", "ECC Corrupted",
+};
+
+static char *rtas_event_type(int type)
+{
+	if ((type > 0) && (type < 11))
+		return rtas_type[type];
+
+	switch (type) {
+		case RTAS_TYPE_EPOW:
+			return "EPOW";
+		case RTAS_TYPE_PLATFORM:
+			return "Platform Error";
+		case RTAS_TYPE_IO:
+			return "I/O Event";
+		case RTAS_TYPE_INFO:
+			return "Platform Information Event";
+		case RTAS_TYPE_DEALLOC:
+			return "Resource Deallocation Event";
+		case RTAS_TYPE_DUMP:
+			return "Dump Notification Event";
+	}
+
+	return rtas_type[0];
+}
 
 /* To see this info, grep RTAS /var/log/messages and each entry
  * will be collected together with obvious begin/end.
@@ -78,33 +111,43 @@ static void printk_log_rtas(char *buf, int len)
 	char buffer[64];
 	char * str = "RTAS event";
 
-	printk(RTAS_DEBUG "%d -------- %s begin --------\n", error_log_cnt, str);
+	if (full_rtas_msgs) {
+		printk(RTAS_DEBUG "%d -------- %s begin --------\n",
+		       error_log_cnt, str);
 
-	/*
-	 * Print perline bytes on each line, each line will start
-	 * with RTAS and a changing number, so syslogd will
-	 * print lines that are otherwise the same.  Separate every
-	 * 4 bytes with a space.
-	 */
-	for (i=0; i < len; i++) {
-		j = i % perline;
-		if (j == 0) {
-			memset(buffer, 0, sizeof(buffer));
-			n = sprintf(buffer, "RTAS %d:", i/perline);
+		/*
+		 * Print perline bytes on each line, each line will start
+		 * with RTAS and a changing number, so syslogd will
+		 * print lines that are otherwise the same.  Separate every
+		 * 4 bytes with a space.
+		 */
+		for (i = 0; i < len; i++) {
+			j = i % perline;
+			if (j == 0) {
+				memset(buffer, 0, sizeof(buffer));
+				n = sprintf(buffer, "RTAS %d:", i/perline);
+			}
+
+			if ((i % 4) == 0)
+				n += sprintf(buffer+n, " ");
+
+			n += sprintf(buffer+n, "%02x", (unsigned char)buf[i]);
+
+			if (j == (perline-1))
+				printk(KERN_DEBUG "%s\n", buffer);
 		}
-
-		if ((i % 4) == 0)
-			n += sprintf(buffer+n, " ");
-
-		n += sprintf(buffer+n, "%02x", (unsigned char)buf[i]);
-
-		if (j == (perline-1))
+		if ((i % perline) != 0)
 			printk(KERN_DEBUG "%s\n", buffer);
-	}
-	if ((i % perline) != 0)
-		printk(KERN_DEBUG "%s\n", buffer);
 
-	printk(RTAS_DEBUG "%d -------- %s end ----------\n", error_log_cnt, str);
+		printk(RTAS_DEBUG "%d -------- %s end ----------\n",
+		       error_log_cnt, str);
+	} else {
+		struct rtas_error_log *errlog = (struct rtas_error_log *)buf;
+
+		printk(RTAS_DEBUG "event: %d, Type: %s, Severity: %d\n",
+		       error_log_cnt, rtas_event_type(errlog->type),
+		       errlog->severity);
+	}
 }
 
 static int log_rtas_len(char * buf)
@@ -121,6 +164,9 @@ static int log_rtas_len(char * buf)
 		len += err->extended_log_length;
 	}
 
+	if (rtas_error_log_max == 0) {
+		get_eventscan_parms();
+	}
 	if (len > rtas_error_log_max)
 		len = rtas_error_log_max;
 
@@ -148,7 +194,6 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	int len = 0;
 
 	DEBUG("logging event\n");
-
 	if (buf == NULL)
 		return;
 
@@ -170,6 +215,13 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	/* Write error to NVRAM */
 	if (!no_more_logging && !(err_type & ERR_FLAG_BOOT))
 		nvram_write_error_log(buf, len, err_type);
+
+	/* rtas errors can occur during boot, and we do want to capture
+	 * those somewhere, even if nvram isn't ready (why not?), and even
+	 * if rtasd isn't ready. Put them into the boot log, at least.  */
+	if ((err_type & ERR_TYPE_MASK) == ERR_TYPE_RTAS_LOG) {
+		printk_log_rtas(buf, len);
+	}
 
 	/* Check to see if we need to or have stopped logging */
 	if (fatal || no_more_logging) {
@@ -473,5 +525,15 @@ static int __init surveillance_setup(char *str)
 	return 1;
 }
 
+static int __init rtasmsgs_setup(char *str)
+{
+	if (strcmp(str, "on") == 0)
+		full_rtas_msgs = 1;
+	else if (strcmp(str, "off") == 0)
+		full_rtas_msgs = 0;
+
+	return 1;
+}
 __initcall(rtas_init);
 __setup("surveillance=", surveillance_setup);
+__setup("rtasmsgs=", rtasmsgs_setup);

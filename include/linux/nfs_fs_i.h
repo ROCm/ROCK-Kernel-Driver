@@ -5,13 +5,15 @@
 #include <linux/list.h>
 #include <linux/nfs.h>
 
+struct nlm_lockowner;
+
 /*
  * NFS lock info
  */
 struct nfs_lock_info {
 	u32		state;
 	u32		flags;
-	struct nlm_host	*host;
+	struct nlm_lockowner *owner;
 };
 
 /*

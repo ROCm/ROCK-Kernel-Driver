@@ -900,7 +900,7 @@ skip_attr_list_load:
 		ctx = NULL;
 		/* Get the index bitmap attribute inode. */
 		bvi = ntfs_attr_iget(vi, AT_BITMAP, I30, 4);
-		if (unlikely(IS_ERR(bvi))) {
+		if (IS_ERR(bvi)) {
 			ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
 			err = PTR_ERR(bvi);
 			goto unm_err_out;
@@ -1552,7 +1552,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	ctx = NULL;
 	/* Get the index bitmap attribute inode. */
 	bvi = ntfs_attr_iget(base_vi, AT_BITMAP, ni->name, ni->name_len);
-	if (unlikely(IS_ERR(bvi))) {
+	if (IS_ERR(bvi)) {
 		ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
 		err = PTR_ERR(bvi);
 		goto unm_err_out;
@@ -2336,7 +2336,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 	}
 	/* Map, pin, and lock the mft record belonging to the inode. */
 	m = map_mft_record(ni);
-	if (unlikely(IS_ERR(m))) {
+	if (IS_ERR(m)) {
 		err = PTR_ERR(m);
 		goto err_out;
 	}
@@ -2391,7 +2391,7 @@ void ntfs_write_inode(struct inode *vi, int sync)
 				MFT_RECORD *tm = map_mft_record(tni);
 				int ret;
 
-				if (unlikely(IS_ERR(tm))) {
+				if (IS_ERR(tm)) {
 					if (!err || err == -ENOMEM)
 						err = PTR_ERR(tm);
 					continue;

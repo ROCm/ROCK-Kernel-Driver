@@ -56,13 +56,11 @@ endif
 #
 cflags-y			:= -I $(TOPDIR)/include/asm/gcc
 cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
-cflags-y			+= $(call check_gcc, -finline-limit=100000,)
+cflags-y			+= $(call cc-option, -finline-limit=100000)
 LDFLAGS_vmlinux			+= -G 0 -static -n
 MODFLAGS			+= -mlong-calls
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= -mno-sched-prolog -fno-omit-frame-pointer
-
-check_warning = $(shell if $(CC) $(1) -c -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
 
 #
 # Use: $(call set_gccflags,<cpu0>,<isa0>,<cpu1>,<isa1>,<isa2>)
@@ -162,7 +160,7 @@ cflags-$(CONFIG_CPU_R5432)	+= \
 cflags-$(CONFIG_CPU_NEVADA)	+= \
 			$(call set_gccflags,rm5200,mips4,r5000,mips4,mips2) \
 			-Wa,--trap
-#			$(call check_gcc,-mmad,)
+#			$(call cc-option,-mmad)
 
 cflags-$(CONFIG_CPU_RM7000)	+= \
 			$(call set_gccflags,rm7000,mips4,r5000,mips4,mips2) \
@@ -643,7 +641,7 @@ endif
 # none has been choosen above.
 #
 
-AFLAGS_vmlinux.lds.o := \
+CPPFLAGS_vmlinux.lds := \
 	-D"LOADADDR=$(load-y)" \
 	-D"JIFFIES=$(JIFFIES)" \
 	-imacros $(srctree)/include/asm-$(ARCH)/sn/mapped_kernel.h

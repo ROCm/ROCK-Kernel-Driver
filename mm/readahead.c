@@ -384,25 +384,10 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		first_access=1;
 		ra->next_size = max / 2;
 		ra->prev_page = offset;
-		ra->serial_cnt++;
+		ra->currnt_wnd_hit++;
 		goto do_io;
 	}
 
-	if (offset == ra->prev_page + 1) {
-		if (ra->serial_cnt <= (max * 2))
-			ra->serial_cnt++;
-	} else {
-		/*
-		 * to avoid rounding errors, ensure that 'average'
-		 * tends towards the value of ra->serial_cnt.
-		 */
-		average = ra->average;
-		if (average < ra->serial_cnt) {
-			average++;
-		}
-		ra->average = (average + ra->serial_cnt) / 2;
-		ra->serial_cnt = 1;
-	}
 	ra->prev_page = offset;
 
 	if (offset >= ra->start && offset <= (ra->start + ra->size)) {
@@ -411,12 +396,22 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		 * page beyond the end.  Expand the next readahead size.
 		 */
 		ra->next_size += 2;
+
+		if (ra->currnt_wnd_hit <= (max * 2))
+			ra->currnt_wnd_hit++;
 	} else {
 		/*
 		 * A miss - lseek, pagefault, pread, etc.  Shrink the readahead
 		 * window.
 		 */
 		ra->next_size -= 2;
+
+		average = ra->average;
+		if (average < ra->currnt_wnd_hit) {
+			average++;
+		}
+		ra->average = (average + ra->currnt_wnd_hit) / 2;
+		ra->currnt_wnd_hit = 1;
 	}
 
 	if ((long)ra->next_size > (long)max)
@@ -469,8 +464,8 @@ do_io:
 			  * current window.
 			  */
 			average = ra->average;
-			if (ra->serial_cnt > average)
-				average = (ra->serial_cnt + ra->average + 1) / 2;
+			if (ra->currnt_wnd_hit > average)
+				average = (ra->currnt_wnd_hit + ra->average + 1) / 2;
 
 			ra->next_size = min(average , (unsigned long)max);
 		}
@@ -505,8 +500,8 @@ do_io:
 			 * random. Hence don't bother to readahead.
 			 */
 			average = ra->average;
-			if (ra->serial_cnt > average)
-				average = (ra->serial_cnt + ra->average + 1) / 2;
+			if (ra->currnt_wnd_hit > average)
+				average = (ra->currnt_wnd_hit + ra->average + 1) / 2;
 
 			if (average > max) {
 				ra->ahead_start = ra->start + ra->size;

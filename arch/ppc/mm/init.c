@@ -104,6 +104,7 @@ extern unsigned long sysmap_size;
  * -- Cort
  */
 int __map_without_bats;
+int __map_without_ltlbs;
 
 /* max amount of RAM to use */
 unsigned long __max_memory;
@@ -202,6 +203,10 @@ void MMU_setup(void)
 	/* Check for nobats option (used in mapin_ram). */
 	if (strstr(cmd_line, "nobats")) {
 		__map_without_bats = 1;
+	}
+
+	if (strstr(cmd_line, "noltlbs")) {
+		__map_without_ltlbs = 1;
 	}
 
 	/* Look for mem= option on command line */

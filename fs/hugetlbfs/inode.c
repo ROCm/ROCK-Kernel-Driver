@@ -272,11 +272,10 @@ static void hugetlbfs_drop_inode(struct inode *inode)
 static inline void
 hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 {
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 
-	while ((vma = vma_prio_tree_next(vma, root, &iter,
-					h_pgoff, ULONG_MAX)) != NULL) {
+	vma_prio_tree_foreach(vma, &iter, root, h_pgoff, ULONG_MAX) {
 		unsigned long h_vm_pgoff;
 		unsigned long v_length;
 		unsigned long v_offset;
@@ -721,12 +720,13 @@ static unsigned long hugetlbfs_counter(void)
 static int can_do_hugetlb_shm(void)
 {
 	return likely(capable(CAP_IPC_LOCK) ||
-			in_group_p(sysctl_hugetlb_shm_group));
+			in_group_p(sysctl_hugetlb_shm_group) ||
+			can_do_mlock());
 }
 
 struct file *hugetlb_zero_setup(size_t size)
 {
-	int error;
+	int error = -ENOMEM;
 	struct file *file;
 	struct inode *inode;
 	struct dentry *dentry, *root;
@@ -739,6 +739,9 @@ struct file *hugetlb_zero_setup(size_t size)
 	if (!is_hugepage_mem_enough(size))
 		return ERR_PTR(-ENOMEM);
 
+	if (!user_shm_lock(size, current->user))
+		return ERR_PTR(-ENOMEM);
+
 	root = hugetlbfs_vfsmount->mnt_root;
 	snprintf(buf, 16, "%lu", hugetlbfs_counter());
 	quick_string.name = buf;
@@ -746,7 +749,7 @@ struct file *hugetlb_zero_setup(size_t size)
 	quick_string.hash = 0;
 	dentry = d_alloc(root, &quick_string);
 	if (!dentry)
-		return ERR_PTR(-ENOMEM);
+		goto out_shm_unlock;
 
 	error = -ENFILE;
 	file = get_empty_filp();
@@ -773,6 +776,8 @@ out_file:
 	put_filp(file);
 out_dentry:
 	dput(dentry);
+out_shm_unlock:
+	user_shm_unlock(size, current->user);
 	return ERR_PTR(error);
 }
 

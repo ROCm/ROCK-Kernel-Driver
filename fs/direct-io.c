@@ -561,7 +561,11 @@ static int dio_bio_add_page(struct dio *dio)
 	ret = bio_add_page(dio->bio, dio->cur_page,
 			dio->cur_page_len, dio->cur_page_offset);
 	if (ret == dio->cur_page_len) {
-		dio->pages_in_io--;
+		/*
+		 * Decrement count only, if we are done with this page
+		 */
+		if ((dio->cur_page_len + dio->cur_page_offset) == PAGE_SIZE)
+			dio->pages_in_io--;
 		page_cache_get(dio->cur_page);
 		dio->final_block_in_bio = dio->cur_page_block +
 			(dio->cur_page_len >> dio->blkbits);
@@ -954,8 +958,12 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->waiter = NULL;
 
 	dio->pages_in_io = 0;
-	for (seg = 0; seg < nr_segs; seg++) 
-		dio->pages_in_io += (iov[seg].iov_len >> blkbits) + 2; 
+	for (seg = 0; seg < nr_segs; seg++) {
+		user_addr = (unsigned long)iov[seg].iov_base;
+		dio->pages_in_io +=
+			((user_addr+iov[seg].iov_len +PAGE_SIZE-1)/PAGE_SIZE
+				- user_addr/PAGE_SIZE);
+	}
 
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;

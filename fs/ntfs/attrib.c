@@ -507,7 +507,7 @@ run_list_element *ntfs_merge_run_lists(run_list_element *drl,
 	/* Check for silly calling... */
 	if (unlikely(!srl))
 		return drl;
-	if (unlikely(IS_ERR(srl) || IS_ERR(drl)))
+	if (IS_ERR(srl) || IS_ERR(drl))
 		return ERR_PTR(-EINVAL);
 
 	/* Check for the case where the first mapping is being done now. */
@@ -977,7 +977,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 
 		rl = decompress_mapping_pairs(ni->vol, ctx->attr,
 				ni->run_list.rl);
-		if (unlikely(IS_ERR(rl)))
+		if (IS_ERR(rl))
 			err = PTR_ERR(rl);
 		else
 			ni->run_list.rl = rl;

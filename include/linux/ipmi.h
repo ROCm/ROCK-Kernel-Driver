@@ -406,6 +406,12 @@ int ipmi_unregister_for_cmd(ipmi_user_t   user,
 			    unsigned char cmd);
 
 /*
+ * Allow run-to-completion mode to be set for the interface of
+ * a specific user.
+ */
+void ipmi_user_set_run_to_completion(ipmi_user_t user, int val);
+
+/*
  * When the user is created, it will not receive IPMI events by
  * default.  The user must set this to TRUE to get incoming events.
  * The first user that sets this to TRUE will receive all events that

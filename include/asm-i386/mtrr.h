@@ -67,8 +67,6 @@ struct mtrr_gentry
 
 #ifdef __KERNEL__
 
-extern char *mtrr_strings[]; 
-
 /*  The following functions are for use by other drivers  */
 # ifdef CONFIG_MTRR
 extern int mtrr_add (unsigned long base, unsigned long size,

@@ -749,17 +749,13 @@ static void	stli_stalreset(stlibrd_t *brdp);
 
 static stliport_t *stli_getport(int brdnr, int panelnr, int portnr);
 
-static inline int	stli_initbrds(void);
-static inline int	stli_initecp(stlibrd_t *brdp);
-static inline int	stli_initonb(stlibrd_t *brdp);
-static inline int	stli_findeisabrds(void);
-static inline int	stli_eisamemprobe(stlibrd_t *brdp);
-static inline int	stli_initports(stlibrd_t *brdp);
-static inline int	stli_getbrdnr(void);
+static int	stli_initecp(stlibrd_t *brdp);
+static int	stli_initonb(stlibrd_t *brdp);
+static int	stli_eisamemprobe(stlibrd_t *brdp);
+static int	stli_initports(stlibrd_t *brdp);
 
 #ifdef	CONFIG_PCI
-static inline int	stli_findpcibrds(void);
-static inline int	stli_initpcibrd(int brdtype, struct pci_dev *devp);
+static int	stli_initpcibrd(int brdtype, struct pci_dev *devp);
 #endif
 
 /*****************************************************************************/
@@ -2751,7 +2747,7 @@ static void stli_sendcmd(stlibrd_t *brdp, stliport_t *portp, unsigned long cmd, 
  *	more chars to unload.
  */
 
-static inline void stli_read(stlibrd_t *brdp, stliport_t *portp)
+static void stli_read(stlibrd_t *brdp, stliport_t *portp)
 {
 	volatile cdkasyrq_t	*rp;
 	volatile char		*shbuf;
@@ -2819,7 +2815,7 @@ static inline void stli_read(stlibrd_t *brdp, stliport_t *portp)
  *	difficult to deal with them here.
  */
 
-static inline void stli_dodelaycmd(stliport_t *portp, volatile cdkctrl_t *cp)
+static void stli_dodelaycmd(stliport_t *portp, volatile cdkctrl_t *cp)
 {
 	int	cmd;
 
@@ -2867,7 +2863,7 @@ static inline void stli_dodelaycmd(stliport_t *portp, volatile cdkctrl_t *cp)
  *	then port is still busy, otherwise no longer busy.
  */
 
-static inline int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
+static int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
 {
 	volatile cdkasy_t	*ap;
 	volatile cdkctrl_t	*cp;
@@ -3026,7 +3022,7 @@ static inline int stli_hostcmd(stlibrd_t *brdp, stliport_t *portp)
  *	at the cdk header structure.
  */
 
-static inline void stli_brdpoll(stlibrd_t *brdp, volatile cdkhdr_t *hdrp)
+static void stli_brdpoll(stlibrd_t *brdp, volatile cdkhdr_t *hdrp)
 {
 	stliport_t	*portp;
 	unsigned char	hostbits[(STL_MAXCHANS / 8) + 1];
@@ -3299,7 +3295,7 @@ static long stli_mktiocm(unsigned long sigvalue)
  *	we need to do here is set up the appropriate per port data structures.
  */
 
-static inline int stli_initports(stlibrd_t *brdp)
+static int stli_initports(stlibrd_t *brdp)
 {
 	stliport_t	*portp;
 	int		i, panelnr, panelport;
@@ -3911,7 +3907,7 @@ static void stli_stalreset(stlibrd_t *brdp)
  *	board types.
  */
 
-static inline int stli_initecp(stlibrd_t *brdp)
+static int stli_initecp(stlibrd_t *brdp)
 {
 	cdkecpsig_t	sig;
 	cdkecpsig_t	*sigsp;
@@ -4072,7 +4068,7 @@ static inline int stli_initecp(stlibrd_t *brdp)
  *	This handles only these board types.
  */
 
-static inline int stli_initonb(stlibrd_t *brdp)
+static int stli_initonb(stlibrd_t *brdp)
 {
 	cdkonbsig_t	sig;
 	cdkonbsig_t	*sigsp;
@@ -4414,7 +4410,7 @@ static int __init stli_brdinit(stlibrd_t *brdp)
  *	might be. This is a bit if hack, but it is the best we can do.
  */
 
-static inline int stli_eisamemprobe(stlibrd_t *brdp)
+static int stli_eisamemprobe(stlibrd_t *brdp)
 {
 	cdkecpsig_t	ecpsig, *ecpsigp;
 	cdkonbsig_t	onbsig, *onbsigp;
@@ -4506,7 +4502,7 @@ static inline int stli_eisamemprobe(stlibrd_t *brdp)
 	return(0);
 }
 
-static inline int stli_getbrdnr(void)
+static int stli_getbrdnr(void)
 {
 	int i;
 
@@ -4532,7 +4528,7 @@ static inline int stli_getbrdnr(void)
  *	do is go probing around in the usual places hoping we can find it.
  */
 
-static inline int stli_findeisabrds(void)
+static int stli_findeisabrds(void)
 {
 	stlibrd_t	*brdp;
 	unsigned int	iobase, eid;
@@ -4616,7 +4612,7 @@ static inline int stli_findeisabrds(void)
  *	configuration space.
  */
 
-static inline int stli_initpcibrd(int brdtype, struct pci_dev *devp)
+static int stli_initpcibrd(int brdtype, struct pci_dev *devp)
 {
 	stlibrd_t	*brdp;
 
@@ -4662,7 +4658,7 @@ static inline int stli_initpcibrd(int brdtype, struct pci_dev *devp)
  *	one as it is found.
  */
 
-static inline int stli_findpcibrds(void)
+static int stli_findpcibrds(void)
 {
 	struct pci_dev	*dev = NULL;
 	int		rc;
@@ -4711,7 +4707,7 @@ static stlibrd_t *stli_allocbrd(void)
  *	can find.
  */
 
-static inline int stli_initbrds(void)
+static int stli_initbrds(void)
 {
 	stlibrd_t	*brdp, *nxtbrdp;
 	stlconf_t	*confp;

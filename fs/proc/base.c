@@ -180,7 +180,6 @@ static inline int proc_type(struct inode *inode)
 int proc_pid_stat(struct task_struct*,char*);
 int proc_pid_status(struct task_struct*,char*);
 int proc_pid_statm(struct task_struct*,char*);
-int proc_pid_cpu(struct task_struct*,char*);
 
 static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
 {
@@ -329,6 +328,8 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 	struct mm_struct *mm = get_task_mm(task);
 	if (!mm)
 		goto out;
+	if (!mm->arg_end)
+		goto out;	/* Shh! No looking before we're done */
 
  	len = mm->arg_end - mm->arg_start;
  

@@ -93,8 +93,8 @@ void reset_vc(unsigned int new_console);
  * vc_screen.c shares this temporary buffer with the console write code so that
  * we can easily avoid touching user space while holding the console spinlock.
  */
-extern char con_buf[PAGE_SIZE];
 #define CON_BUF_SIZE	PAGE_SIZE
+extern char con_buf[CON_BUF_SIZE];
 extern struct semaphore con_buf_sem;
 
 #endif /* _VT_KERN_H */

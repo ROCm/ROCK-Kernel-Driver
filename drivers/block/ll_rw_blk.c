@@ -265,6 +265,45 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 EXPORT_SYMBOL(blk_queue_make_request);
 
 /**
+ * blk_queue_ordered - does this queue support ordered writes
+ * @q:     the request queue
+ * @flag:  see below
+ *
+ * Description:
+ *   For journalled file systems, doing ordered writes on a commit
+ *   block instead of explicitly doing wait_on_buffer (which is bad
+ *   for performance) can be a big win. Block drivers supporting this
+ *   feature should call this function and indicate so.
+ *
+ **/
+void blk_queue_ordered(request_queue_t *q, int flag)
+{
+	if (flag)
+		set_bit(QUEUE_FLAG_ORDERED, &q->queue_flags);
+	else
+		clear_bit(QUEUE_FLAG_ORDERED, &q->queue_flags);
+}
+
+EXPORT_SYMBOL(blk_queue_ordered);
+
+/**
+ * blk_queue_issue_flush_fn - set function for issuing a flush
+ * @q:     the request queue
+ * @iff:   the function to be called issuing the flush
+ *
+ * Description:
+ *   If a driver supports issuing a flush command, the support is notified
+ *   to the block layer by defining it through this call.
+ *
+ **/
+void blk_queue_issue_flush_fn(request_queue_t *q, issue_flush_fn *iff)
+{
+	q->issue_flush_fn = iff;
+}
+
+EXPORT_SYMBOL(blk_queue_issue_flush_fn);
+
+/**
  * blk_queue_bounce_limit - set bounce buffer limit for queue
  * @q:  the request queue for the device
  * @dma_addr:   bus address limit
@@ -484,15 +523,14 @@ struct request *blk_queue_find_tag(request_queue_t *q, int tag)
 EXPORT_SYMBOL(blk_queue_find_tag);
 
 /**
- * blk_queue_free_tags - release tag maintenance info
+ * __blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
  *
  *  Notes:
  *    blk_cleanup_queue() will take care of calling this function, if tagging
- *    has been used. So there's usually no need to call this directly, unless
- *    tagging is just being disabled but the queue remains in function.
+ *    has been used. So there's no need to call this directly.
  **/
-void blk_queue_free_tags(request_queue_t *q)
+static void __blk_queue_free_tags(request_queue_t *q)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
 
@@ -516,12 +554,27 @@ void blk_queue_free_tags(request_queue_t *q)
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
 
+/**
+ * blk_queue_free_tags - release tag maintenance info
+ * @q:  the request queue for the device
+ *
+ *  Notes:
+ *	This is used to disabled tagged queuing to a device, yet leave
+ *	queue in function.
+ **/
+void blk_queue_free_tags(request_queue_t *q)
+{
+	clear_bit(QUEUE_FLAG_QUEUED, &q->queue_flags);
+}
+
 EXPORT_SYMBOL(blk_queue_free_tags);
 
 static int
 init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 {
 	int bits, i;
+	struct request **tag_index;
+	unsigned long *tag_map;
 
 	if (depth > q->nr_requests * 2) {
 		depth = q->nr_requests * 2;
@@ -529,32 +582,31 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 				__FUNCTION__, depth);
 	}
 
-	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
-	if (!tags->tag_index)
+	tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tag_index)
 		goto fail;
 
 	bits = (depth / BLK_TAGS_PER_LONG) + 1;
-	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
-	if (!tags->tag_map)
+	tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tag_map)
 		goto fail;
 
-	memset(tags->tag_index, 0, depth * sizeof(struct request *));
-	memset(tags->tag_map, 0, bits * sizeof(unsigned long));
+	memset(tag_index, 0, depth * sizeof(struct request *));
+	memset(tag_map, 0, bits * sizeof(unsigned long));
 	tags->max_depth = depth;
 	tags->real_max_depth = bits * BITS_PER_LONG;
+	tags->tag_index = tag_index;
+	tags->tag_map = tag_map;
 
 	/*
 	 * set the upper bits if the depth isn't a multiple of the word size
 	 */
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		__set_bit(i, tags->tag_map);
+		__set_bit(i, tag_map);
 
-	INIT_LIST_HEAD(&tags->busy_list);
-	tags->busy = 0;
-	atomic_set(&tags->refcnt, 1);
 	return 0;
 fail:
-	kfree(tags->tag_index);
+	kfree(tag_index);
 	return -ENOMEM;
 }
 
@@ -566,13 +618,26 @@ fail:
 int blk_queue_init_tags(request_queue_t *q, int depth,
 			struct blk_queue_tag *tags)
 {
-	if (!tags) {
+	int rc;
+
+	BUG_ON(tags && q->queue_tags && tags != q->queue_tags);
+
+	if (!tags && !q->queue_tags) {
 		tags = kmalloc(sizeof(struct blk_queue_tag), GFP_ATOMIC);
 		if (!tags)
 			goto fail;
 
 		if (init_tag_map(q, tags, depth))
 			goto fail;
+
+		INIT_LIST_HEAD(&tags->busy_list);
+		tags->busy = 0;
+		atomic_set(&tags->refcnt, 1);
+	} else if (q->queue_tags) {
+		if ((rc = blk_queue_resize_tags(q, depth)))
+			return rc;
+		set_bit(QUEUE_FLAG_QUEUED, &q->queue_flags);
+		return 0;
 	} else
 		atomic_inc(&tags->refcnt);
 
@@ -1337,8 +1402,8 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (rl->rq_pool)
 		mempool_destroy(rl->rq_pool);
 
-	if (blk_queue_tagged(q))
-		blk_queue_free_tags(q);
+	if (q->queue_tags)
+		__blk_queue_free_tags(q);
 
 	kmem_cache_free(requestq_cachep, q);
 }
@@ -1927,10 +1992,11 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 	}
 
 	rq->flags |= REQ_NOMERGE;
-	rq->waiting = &wait;
+	if (!rq->waiting)
+		rq->waiting = &wait;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
-	wait_for_completion(&wait);
+	wait_for_completion(rq->waiting);
 	rq->waiting = NULL;
 
 	if (rq->errors)
@@ -1940,6 +2006,72 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 }
 
 EXPORT_SYMBOL(blk_execute_rq);
+
+/**
+ * blkdev_issue_flush - queue a flush
+ * @bdev:	blockdev to issue flush for
+ * @error_sector:	error sector
+ *
+ * Description:
+ *    Issue a flush for the block device in question. Caller can supply
+ *    room for storing the error offset in case of a flush error, if they
+ *    wish to.  Caller must run wait_for_completion() on its own.
+ */
+int blkdev_issue_flush(struct block_device *bdev, sector_t *error_sector)
+{
+	request_queue_t *q;
+
+	if (bdev->bd_disk == NULL)
+		return -ENXIO;
+
+	q = bdev_get_queue(bdev);
+	if (!q)
+		return -ENXIO;
+	if (!q->issue_flush_fn)
+		return -EOPNOTSUPP;
+
+	return q->issue_flush_fn(q, bdev->bd_disk, error_sector);
+}
+
+EXPORT_SYMBOL(blkdev_issue_flush);
+
+/**
+ * blkdev_scsi_issue_flush_fn - issue flush for SCSI devices
+ * @q:		device queue
+ * @disk:	gendisk
+ * @error_sector:	error offset
+ *
+ * Description:
+ *    Devices understanding the SCSI command set, can use this function as
+ *    a helper for issuing a cache flush. Note: driver is required to store
+ *    the error offset (in case of error flushing) in ->sector of struct
+ *    request.
+ */
+int blkdev_scsi_issue_flush_fn(request_queue_t *q, struct gendisk *disk,
+			       sector_t *error_sector)
+{
+	struct request *rq = blk_get_request(q, WRITE, __GFP_WAIT);
+	int ret;
+
+	rq->flags |= REQ_BLOCK_PC | REQ_SOFTBARRIER;
+	rq->sector = 0;
+	memset(rq->cmd, 0, sizeof(rq->cmd));
+	rq->cmd[0] = 0x35;
+	rq->cmd_len = 12;
+	rq->data = NULL;
+	rq->data_len = 0;
+	rq->timeout = 60 * HZ;
+
+	ret = blk_execute_rq(q, disk, rq);
+
+	if (ret && error_sector)
+		*error_sector = rq->sector;
+
+	blk_put_request(rq);
+	return ret;
+}
+
+EXPORT_SYMBOL(blkdev_scsi_issue_flush_fn);
 
 void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
@@ -2194,7 +2326,7 @@ EXPORT_SYMBOL(__blk_attempt_remerge);
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, ra;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, err;
 	sector_t sector;
 
 	sector = bio->bi_sector;
@@ -2212,9 +2344,11 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	spin_lock_prefetch(q->queue_lock);
 
-	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
-
-	ra = bio->bi_rw & (1 << BIO_RW_AHEAD);
+	barrier = bio_barrier(bio);
+	if (barrier && !(q->queue_flags & (1 << QUEUE_FLAG_ORDERED))) {
+		err = -EOPNOTSUPP;
+		goto end_io;
+	}
 
 again:
 	spin_lock_irq(q->queue_lock);
@@ -2294,7 +2428,8 @@ get_rq:
 			/*
 			 * READA bit set
 			 */
-			if (ra)
+			err = -EWOULDBLOCK;
+			if (bio_rw_ahead(bio))
 				goto end_io;
 	
 			freereq = get_request_wait(q, rw);
@@ -2305,10 +2440,9 @@ get_rq:
 	req->flags |= REQ_CMD;
 
 	/*
-	 * inherit FAILFAST from bio and don't stack up
-	 * retries for read ahead
+	 * inherit FAILFAST from bio (for read-ahead, and explicit FAILFAST)
 	 */
-	if (ra || test_bit(BIO_RW_FAILFAST, &bio->bi_rw))	
+	if (bio_rw_ahead(bio) || bio_failfast(bio))
 		req->flags |= REQ_FAILFAST;
 
 	/*
@@ -2342,7 +2476,7 @@ out:
 	return 0;
 
 end_io:
-	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
+	bio_endio(bio, nr_sectors << 9, err);
 	return 0;
 }
 
@@ -2649,8 +2783,15 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 static int __end_that_request_first(struct request *req, int uptodate,
 				    int nr_bytes)
 {
-	int total_bytes, bio_nbytes, error = 0, next_idx = 0;
+	int total_bytes, bio_nbytes, error, next_idx = 0;
 	struct bio *bio;
+
+	/*
+	 * extend uptodate bool to allow < 0 value to be direct io error
+	 */
+	error = 0;
+	if (end_io_error(uptodate))
+		error = !uptodate ? -EIO : uptodate;
 
 	/*
 	 * for a REQ_BLOCK_PC request, we want to carry any eventual
@@ -2660,7 +2801,6 @@ static int __end_that_request_first(struct request *req, int uptodate,
 		req->errors = 0;
 
 	if (!uptodate) {
-		error = -EIO;
 		if (blk_fs_request(req) && !(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
@@ -2743,7 +2883,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 /**
  * end_that_request_first - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 0 for I/O error
+ * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
  * @nr_sectors: number of sectors to end I/O on
  *
  * Description:
@@ -2764,7 +2904,7 @@ EXPORT_SYMBOL(end_that_request_first);
 /**
  * end_that_request_chunk - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 0 for I/O error
+ * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
  * @nr_bytes: number of bytes to complete
  *
  * Description:

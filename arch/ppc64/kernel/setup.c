@@ -112,15 +112,12 @@ static struct notifier_block ppc64_panic_block = {
  * these processors use on existing boards.  -- Dan
  */ 
 struct screen_info screen_info = {
-	0, 25,			/* orig-x, orig-y */
-	0,			/* unused */
-	0,			/* orig-video-page */
-	0,			/* orig-video-mode */
-	80,			/* orig-video-cols */
-	0,0,0,			/* ega_ax, ega_bx, ega_cx */
-	25,			/* orig-video-lines */
-	1,			/* orig-video-isVGA */
-	16			/* orig-video-points */
+	.orig_x = 0,
+	.orig_y = 25,
+	.orig_video_cols = 80,
+	.orig_video_lines = 25,
+	.orig_video_isVGA = 1,
+	.orig_video_points = 16
 };
 
 /*
@@ -232,16 +229,17 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		chrp_init(r3, r4, r5, r6, r7);
 
 #ifdef CONFIG_SMP
-		/* Start secondary threads on SMT systems */
-		for (i = 0; i < NR_CPUS; i++) {
-			if (cpu_available(i) && !cpu_possible(i)) {
+		/* Start secondary threads on SMT systems; primary threads
+		 * are already in the running state.
+		 */
+		for_each_present_cpu(i) {
+			if (query_cpu_stopped
+			    (get_hard_smp_processor_id(i)) == 0) {
 				printk("%16.16x : starting thread\n", i);
 				rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
 					  get_hard_smp_processor_id(i), 
 					  (u32)*((unsigned long *)pseries_secondary_smp_init),
 					  i);
-				cpu_set(i, cpu_possible_map);
-				systemcfg->processorCount++;
 			}
 		}
 #endif /* CONFIG_SMP */
@@ -516,10 +514,29 @@ static int __init set_preferred_console(void)
 					return -ENODEV;
 			}
 		}
-	} else if (strcmp(name, "vty") == 0)
-		/* pSeries LPAR virtual console */
-		return add_preferred_console("hvc", 0, NULL);
-	else if (strcmp(name, "ch-a") == 0)
+	} else if (strcmp(name, "vty") == 0) {
+ 		u32 *reg = (u32 *)get_property(prom_stdout, "reg", NULL);
+ 		char *compat = (char *)get_property(prom_stdout, "compatible", NULL);
+
+ 		if (reg && compat && (strcmp(compat, "hvterm-protocol") == 0)) {
+ 			/* Host Virtual Serial Interface */
+ 			int offset;
+ 			switch (reg[0]) {
+ 				case 0x30000000:
+ 					offset = 0;
+ 					break;
+ 				case 0x30000001:
+ 					offset = 1;
+ 					break;
+ 				default:
+ 					return -ENODEV;
+ 			}
+ 			return add_preferred_console("hvsi", offset, NULL);
+ 		} else {
+ 			/* pSeries LPAR virtual console */
+ 			return add_preferred_console("hvc", 0, NULL);
+ 		}
+	} else if (strcmp(name, "ch-a") == 0)
 		offset = 0;
 	else if (strcmp(name, "ch-b") == 0)
 		offset = 1;

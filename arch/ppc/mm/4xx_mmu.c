@@ -52,6 +52,7 @@
 #include <asm/setup.h>
 #include "mmu_decl.h"
 
+extern int __map_without_ltlbs;
 /*
  * MMU_init_hw does the chip-specific initialization of the MMU hardware.
  */
@@ -101,6 +102,10 @@ unsigned long __init mmu_mapin_ram(void)
 	v = KERNELBASE;
 	p = PPC_MEMSTART;
 	s = 0;
+
+	if (__map_without_ltlbs) {
+		return s;
+	}
 
 	while (s <= (total_lowmem - LARGE_PAGE_SIZE_16M)) {
 		pmd_t *pmdp;

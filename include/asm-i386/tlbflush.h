@@ -131,7 +131,7 @@ struct tlb_state
 	int state;
 	char __cacheline_padding[L1_CACHE_BYTES-8];
 };
-extern struct tlb_state cpu_tlbstate[NR_CPUS];
+DECLARE_PER_CPU(struct tlb_state, cpu_tlbstate);
 
 
 #endif

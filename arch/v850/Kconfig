@@ -68,7 +68,6 @@ menu "Processor type and features"
       	     bool "Anna"
    endchoice
 
-
    #### V850E processor-specific config
 
    # All CPUs currently supported use the v850e architecture
@@ -153,7 +152,6 @@ menu "Processor type and features"
    	  bool
 	  default RTE_MB_A_PCI
 
-
    #### Some feature-specific configs
 
    # Everything except for the GDB simulator uses the same interrupt controller
@@ -180,7 +178,6 @@ menu "Processor type and features"
    config NO_CACHE
    	  bool
 	  default !V850E_CACHE && !V850E2_CACHE
-
 
    #### Misc config
 
@@ -305,34 +302,7 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
-
-menu "Kernel hacking"
-
-config DEBUG_KERNEL
-	bool "Kernel debugging"
-
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-
-config MAGIC_SYSRQ
-	bool "Magic SysRq key"
-	depends on DEBUG_KERNEL
-	help
-	  Enables console device to interprent special characters as
-	  commands to dump state information.
-
-config NO_KERNEL_MSG
-	bool "Suppress Kernel BUG Messages"
-	help
-	  Do not output any debug BUG messages within the kernel.
-
-endmenu
+source "arch/v850/Kconfig.debug"
 
 source "security/Kconfig"
 

@@ -762,10 +762,16 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 		/* stupid readdir cookie */
 		memcpy(p, resp->verf, 8); p += 2;
 		xdr_ressize_check(rqstp, p);
-		p = resp->buffer;
+		if (rqstp->rq_res.head[0].iov_len + (2<<2) > PAGE_SIZE)
+			return 1; /*No room for trailer */
+		rqstp->rq_res.page_len = (resp->count) << 2;
+
+		/* add the 'tail' to the end of the 'head' page - page 0. */
+		rqstp->rq_restailpage = 0;
+		rqstp->rq_res.tail[0].iov_base = p;
 		*p++ = 0;		/* no more entries */
 		*p++ = htonl(resp->common.err == nfserr_eof);
-		rqstp->rq_res.page_len = (resp->count + 2) << 2;
+		rqstp->rq_res.tail[0].iov_len = 2<<2;
 		return 1;
 	} else
 		return xdr_ressize_check(rqstp, p);

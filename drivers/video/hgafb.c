@@ -558,7 +558,7 @@ int __init hgafb_init(void)
 	hga_fix.smem_start = VGA_MAP_MEM(hga_vram_base);
 	hga_fix.smem_len = hga_vram_len;
 
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	fb_info.var = hga_default_var;
 	fb_info.fix = hga_fix;
 	fb_info.monspecs.hfmin = 0;

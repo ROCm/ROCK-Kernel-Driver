@@ -705,8 +705,7 @@ static void icmp_unreach(struct sk_buff *skb)
 	read_unlock(&raw_v4_lock);
 
 	rcu_read_lock();
-	ipprot = inet_protos[hash];
-	smp_read_barrier_depends();
+	ipprot = rcu_dereference(inet_protos[hash]);
 	if (ipprot && ipprot->err_handler)
 		ipprot->err_handler(skb, info);
 	rcu_read_unlock();

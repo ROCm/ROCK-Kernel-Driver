@@ -52,6 +52,7 @@
 #include <linux/nfs4.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
+#include <linux/nfs4_acl.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
@@ -620,7 +621,7 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 		status = nfserr_bad_stateid;
 		if (ZERO_STATEID(&setattr->sa_stateid) || ONE_STATEID(&setattr->sa_stateid)) {
 			dprintk("NFSD: nfsd4_setattr: magic stateid!\n");
-			return status;
+			goto out;
 		}
 
 		nfs4_lock_state();
@@ -628,17 +629,25 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 						&setattr->sa_stateid, 
 						CHECK_FH | RDWR_STATE, &stp))) {
 			dprintk("NFSD: nfsd4_setattr: couldn't process stateid!\n");
-			goto out;
+			goto out_unlock;
 		}
 		status = nfserr_openmode;
 		if (!access_bits_permit_write(stp->st_access_bmap)) {
 			dprintk("NFSD: nfsd4_setattr: not opened for write!\n");
-			goto out;
+			goto out_unlock;
 		}
 		nfs4_unlock_state();
 	}
-	return (nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0));
+	status = nfs_ok;
+	if (setattr->sa_acl != NULL)
+		status = nfsd4_set_nfs4_acl(rqstp, current_fh, setattr->sa_acl);
+	if (status)
+		goto out;
+	status = nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr,
+				0, (time_t)0);
 out:
+	return status;
+out_unlock:
 	nfs4_unlock_state();
 	return status;
 }

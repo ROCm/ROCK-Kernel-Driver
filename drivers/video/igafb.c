@@ -357,7 +357,7 @@ static int __init iga_init(struct fb_info *info, struct iga_par *par)
                 video_cmap_len = 256;
 
 	info->fbops = &igafb_ops;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT;
 
 	fb_alloc_cmap(&info->cmap, video_cmap_len, 0);
 

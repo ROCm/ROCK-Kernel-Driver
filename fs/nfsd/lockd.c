@@ -10,6 +10,7 @@
 
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/file.h>
 #include <linux/mount.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svc.h>
@@ -22,7 +23,7 @@
  * Note: we hold the dentry use count while the file is open.
  */
 static u32
-nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
+nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file **filp)
 {
 	u32		nfserr;
 	struct svc_fh	fh;
@@ -35,10 +36,6 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 
 	exp_readlock();
 	nfserr = nfsd_open(rqstp, &fh, S_IFREG, MAY_LOCK, filp);
-	if (!nfserr) {
-		dget(filp->f_dentry);
-		mntget(filp->f_vfsmnt);
-	}
 	fh_put(&fh);
 	rqstp->rq_client = NULL;
 	exp_readunlock();
@@ -60,9 +57,7 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 static void
 nlm_fclose(struct file *filp)
 {
-	nfsd_close(filp);
-	dput(filp->f_dentry);
-	mntput(filp->f_vfsmnt);
+	fput(filp);
 }
 
 struct nlmsvc_binding		nfsd_nlm_ops = {

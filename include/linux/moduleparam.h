@@ -73,7 +73,7 @@ struct kparam_array
 #define module_param_string(name, string, len, perm)			\
 	static struct kparam_string __param_string_##name		\
 		= { len, string };					\
-	module_param_call(name, param_set_copystring, param_get_charp,	\
+	module_param_call(name, param_set_copystring, param_get_string,	\
 		   &__param_string_##name, perm)
 
 /* Called on module insert or kernel boot */
@@ -144,6 +144,7 @@ extern int param_array_set(const char *val, struct kernel_param *kp);
 extern int param_array_get(char *buffer, struct kernel_param *kp);
 
 extern int param_set_copystring(const char *val, struct kernel_param *kp);
+extern int param_get_string(char *buffer, struct kernel_param *kp);
 
 int param_array(const char *name,
 		const char *val,

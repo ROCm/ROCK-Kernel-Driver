@@ -991,11 +991,6 @@ static int __devinit init_hpt37x(struct pci_dev *dev)
 	if (pci_get_drvdata(dev)) 
 		goto init_hpt37X_done;
 	
-	if (hpt_minimum_revision(dev,8))
-	{
-		printk(KERN_ERR "HPT374: Only 33MHz PCI timings are supported.\n");
-		return -EOPNOTSUPP;
-	}
 	/*
 	 * adjust PLL based upon PCI clock, enable it, and wait for
 	 * stabilization.

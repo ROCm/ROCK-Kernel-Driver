@@ -71,7 +71,6 @@ struct adfs_discmap {
 int adfs_get_block(struct inode *inode, sector_t block,
 		   struct buffer_head *bh, int create);
 struct inode *adfs_iget(struct super_block *sb, struct object_info *obj);
-void adfs_read_inode(struct inode *inode);
 void adfs_write_inode(struct inode *inode,int unused);
 int adfs_notify_change(struct dentry *dentry, struct iattr *attr);
 

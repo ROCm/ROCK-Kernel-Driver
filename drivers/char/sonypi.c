@@ -50,12 +50,13 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
+static int verbose; /* = 0 */
+
 #include "sonypi.h"
 #include <linux/sonypi.h>
 
 static struct sonypi_device sonypi_device;
 static int minor = -1;
-static int verbose; /* = 0 */
 static int fnkeyinit; /* = 0 */
 static int camera; /* = 0 */
 static int compat; /* = 0 */

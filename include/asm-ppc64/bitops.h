@@ -22,6 +22,15 @@
  * it will be a bad memory reference since we want to store in chunks
  * of unsigned long (64 bits here) size.
  *
+ * There are a few little-endian macros used mostly for filesystem bitmaps,
+ * these work on similar bit arrays layouts, but byte-oriented:
+ *
+ *   |7...0|15...8|23...16|31...24|39...32|47...40|55...48|63...56|
+ *
+ * The main difference is that bit 3-5 in the bit number field needs to be
+ * reversed compared to the big-endian bit fields. This can be achieved
+ * by XOR with 0b111000 (0x38).
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version
@@ -306,71 +315,34 @@ static __inline__ int test_le_bit(unsigned long nr, __const__ unsigned long * ad
 	return (ADDR[nr >> 3] >> (nr & 7)) & 1;
 }
 
+#define test_and_clear_le_bit(nr, addr) \
+	test_and_clear_bit((nr) ^ 0x38, (addr))
+#define test_and_set_le_bit(nr, addr) \
+	test_and_set_bit((nr) ^ 0x38, (addr))
+
 /*
  * non-atomic versions
  */
-static __inline__ void __set_le_bit(unsigned long nr, unsigned long *addr)
-{
-	unsigned char *ADDR = (unsigned char *)addr;
 
-	ADDR += nr >> 3;
-	*ADDR |= 1 << (nr & 0x07);
-}
-
-static __inline__ void __clear_le_bit(unsigned long nr, unsigned long *addr)
-{
-	unsigned char *ADDR = (unsigned char *)addr;
-
-	ADDR += nr >> 3;
-	*ADDR &= ~(1 << (nr & 0x07));
-}
-
-static __inline__ int __test_and_set_le_bit(unsigned long nr, unsigned long *addr)
-{
-	int mask, retval;
-	unsigned char *ADDR = (unsigned char *)addr;
-
-	ADDR += nr >> 3;
-	mask = 1 << (nr & 0x07);
-	retval = (mask & *ADDR) != 0;
-	*ADDR |= mask;
-	return retval;
-}
-
-static __inline__ int __test_and_clear_le_bit(unsigned long nr, unsigned long *addr)
-{
-	int mask, retval;
-	unsigned char *ADDR = (unsigned char *)addr;
-
-	ADDR += nr >> 3;
-	mask = 1 << (nr & 0x07);
-	retval = (mask & *ADDR) != 0;
-	*ADDR &= ~mask;
-	return retval;
-}
+#define __set_le_bit(nr, addr) \
+	__set_bit((nr) ^ 0x38, (addr))
+#define __clear_le_bit(nr, addr) \
+	__clear_bit((nr) ^ 0x38, (addr))
+#define __test_and_clear_le_bit(nr, addr) \
+	__test_and_clear_bit((nr) ^ 0x38, (addr))
+#define __test_and_set_le_bit(nr, addr) \
+	__test_and_set_bit((nr) ^ 0x38, (addr))
 
 #define ext2_set_bit(nr,addr) \
-	__test_and_set_le_bit((nr),(unsigned long*)addr)
+	__test_and_set_le_bit((nr), (unsigned long*)addr)
 #define ext2_clear_bit(nr, addr) \
-	__test_and_clear_le_bit((nr),(unsigned long*)addr)
+	__test_and_clear_le_bit((nr), (unsigned long*)addr)
 
-#define ext2_set_bit_atomic(lock, nr, addr)		\
-	({						\
-		int ret;				\
-		spin_lock(lock);			\
-		ret = ext2_set_bit((nr), (addr));	\
-		spin_unlock(lock);			\
-		ret;					\
-	})
+#define ext2_set_bit_atomic(lock, nr, addr) \
+	test_and_set_le_bit((nr), (unsigned long*)addr)
+#define ext2_clear_bit_atomic(lock, nr, addr) \
+	test_and_clear_le_bit((nr), (unsigned long*)addr)
 
-#define ext2_clear_bit_atomic(lock, nr, addr)		\
-	({						\
-		int ret;				\
-		spin_lock(lock);			\
-		ret = ext2_clear_bit((nr), (addr));	\
-		spin_unlock(lock);			\
-		ret;					\
-	})
 
 #define ext2_test_bit(nr, addr)      test_le_bit((nr),(unsigned long*)addr)
 #define ext2_find_first_zero_bit(addr, size) \

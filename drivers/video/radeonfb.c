@@ -2250,7 +2250,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 	info->currcon = -1;
 	info->par = rinfo;
 	info->pseudo_palette = rinfo->pseudo_palette;
-        info->flags = FBINFO_FLAG_DEFAULT;
+        info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
         info->fbops = &radeonfb_ops;
         info->screen_base = (char *)rinfo->fb_base;
 

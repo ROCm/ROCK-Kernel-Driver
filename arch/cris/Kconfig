@@ -20,8 +20,11 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
-source "init/Kconfig"
+config CRIS
+	bool
+	default y
 
+source "init/Kconfig"
 
 menu "General setup"
 
@@ -51,7 +54,7 @@ config ETRAX_FAST_TIMER
        bool "Enable ETRAX fast timer API"
        help
          This options enables the API to a fast timer implementation using
-	 timer1 to get sub jiffie resolution timers (primarily one-shot 
+	 timer1 to get sub jiffie resolution timers (primarily one-shot
 	 timers).
 	 This is needed if CONFIG_ETRAX_SERIAL_FAST_TIMER is enabled.
 
@@ -68,7 +71,6 @@ config PREEMPT
 	  or real-time system.  Say N if you are unsure.
 
 endmenu
-
 
 menu "Hardware setup"
 
@@ -96,7 +98,7 @@ endchoice
 config ETRAX_ARCH_V10
        bool
        default y if ETRAX100LX || ETRAX100LX_V2
-       default n if !(ETRAX100LX || ETRAX100LX_V2) 
+       default n if !(ETRAX100LX || ETRAX100LX_V2)
 
 config ETRAX_DRAM_SIZE
 	int "DRAM size (dec, in MB)"
@@ -165,54 +167,10 @@ source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
 
-
-menu "Kernel hacking"
-
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-config PROFILE
-	bool "Kernel profiling support"
-
-config PROFILE_SHIFT
-	int "Profile shift count"
-	depends on PROFILE
-	default "2"
-
-config ETRAX_KGDB
-	bool "Use kernel GDB debugger"
-	---help---
-	  The CRIS version of gdb can be used to remotely debug a running
-	  Linux kernel via the serial debug port.  Provided you have gdb-cris
-	  installed, run gdb-cris vmlinux, then type
-
-	  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
-	  (gdb) target remote /dev/ttyS0        <- maybe you use another port
-
-	  This should connect you to your booted kernel (or boot it now if you
-	  didn't before).  The kernel halts when it boots, waiting for gdb if
-	  this option is turned on!
-
-
-config DEBUG_INFO
-        bool "Compile the kernel with debug info"
-        help
-          If you say Y here the resulting kernel image will include
-          debugging info resulting in a larger kernel image.
-          Say Y here only if you plan to use gdb to debug the kernel.
-          If you don't debug the kernel, you can say N.
-
-config FRAME_POINTER
-        bool "Compile the kernel with frame pointers"
-        help
-          If you say Y here the resulting kernel image will be slightly larger
-          and slower, but it will give very useful debugging information.
-          If you don't debug the kernel, you can say N, but we may not be able
-          to solve problems without frame pointers.
-
-endmenu
+source "arch/cris/Kconfig.debug"
 
 source "security/Kconfig"
 
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-

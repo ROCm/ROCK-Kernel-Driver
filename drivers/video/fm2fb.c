@@ -280,7 +280,7 @@ static int __devinit fm2fb_probe(struct zorro_dev *z,
 	info->pseudo_palette = info->par;
 	info->par = NULL;
 	info->fix = fb_fix;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_DEFAULT;
 
 	if (register_framebuffer(info) < 0) {
 		fb_dealloc_cmap(&info->cmap);

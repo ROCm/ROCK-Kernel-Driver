@@ -420,11 +420,11 @@ static inline void list_splice_init(struct list_head *list,
  */
 #define list_for_each_rcu(pos, head) \
 	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
-        	pos = pos->next, ({ smp_read_barrier_depends(); 0;}), prefetch(pos->next))
+        	pos = rcu_dereference(pos->next), prefetch(pos->next))
 
 #define __list_for_each_rcu(pos, head) \
 	for (pos = (head)->next; pos != (head); \
-        	pos = pos->next, ({ smp_read_barrier_depends(); 0;}))
+        	pos = rcu_dereference(pos->next))
 
 /**
  * list_for_each_safe_rcu	-	iterate over an rcu-protected list safe
@@ -439,7 +439,7 @@ static inline void list_splice_init(struct list_head *list,
  */
 #define list_for_each_safe_rcu(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
-		pos = n, ({ smp_read_barrier_depends(); 0;}), n = pos->next)
+		pos = rcu_dereference(n), n = pos->next)
 
 /**
  * list_for_each_entry_rcu	-	iterate over rcu list of given type
@@ -455,8 +455,8 @@ static inline void list_splice_init(struct list_head *list,
 	for (pos = list_entry((head)->next, typeof(*pos), member),	\
 		     prefetch(pos->member.next);			\
 	     &pos->member != (head); 					\
-	     pos = list_entry(pos->member.next, typeof(*pos), member),	\
-		     ({ smp_read_barrier_depends(); 0;}),		\
+	     pos = rcu_dereference(list_entry(pos->member.next, 	\
+					typeof(*pos), member)),		\
 		     prefetch(pos->member.next))
 
 
@@ -472,7 +472,7 @@ static inline void list_splice_init(struct list_head *list,
  */
 #define list_for_each_continue_rcu(pos, head) \
 	for ((pos) = (pos)->next, prefetch((pos)->next); (pos) != (head); \
-        	(pos) = (pos)->next, ({ smp_read_barrier_depends(); 0;}), prefetch((pos)->next))
+        	(pos) = rcu_dereference((pos)->next), prefetch((pos)->next))
 
 /*
  * Double linked lists with a single pointer list head.
@@ -578,12 +578,9 @@ static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
  * or hlist_del_rcu(), running on this same list.
  * However, it is perfectly legal to run concurrently with
  * the _rcu list-traversal primitives, such as
- * hlist_for_each_entry(), but only if smp_read_barrier_depends()
- * is used to prevent memory-consistency problems on Alpha CPUs.
- * Regardless of the type of CPU, the list-traversal primitive
- * must be guarded by rcu_read_lock().
- *
- * OK, so why don't we have an hlist_for_each_entry_rcu()???
+ * hlist_for_each_rcu(), used to prevent memory-consistency
+ * problems on Alpha CPUs.  Regardless of the type of CPU, the
+ * list-traversal primitive must be guarded by rcu_read_lock().
  */
 static inline void hlist_add_head_rcu(struct hlist_node *n,
 					struct hlist_head *h)
@@ -627,6 +624,10 @@ static inline void hlist_add_after(struct hlist_node *n,
 #define hlist_for_each_safe(pos, n, head) \
 	for (pos = (head)->first; pos && ({ n = pos->next; 1; }); \
 	     pos = n)
+
+#define hlist_for_each_rcu(pos, head) \
+	for ((pos) = (head)->first; pos && ({ prefetch((pos)->next); 1; }); \
+		(pos) = rcu_dereference((pos)->next))
 
 /**
  * hlist_for_each_entry	- iterate over list of given type
@@ -693,7 +694,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 	for (pos = (head)->first;					 \
 	     pos && ({ prefetch(pos->next); 1;}) &&			 \
 		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
-	     pos = pos->next, ({ smp_read_barrier_depends(); 0; }) )
+	     pos = rcu_dereference(pos->next))
 
 #else
 #warning "don't include kernel headers in userspace"

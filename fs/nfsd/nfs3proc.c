@@ -492,8 +492,16 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 		count += PAGE_SIZE;
 	}
 	resp->count = count >> 2;
-	if (resp->offset)
-		xdr_encode_hyper(resp->offset, offset);
+	if (resp->offset) {
+		if (unlikely(resp->offset1)) {
+			/* we ended up with offset on a page boundary */
+			*resp->offset = htonl(offset >> 32);
+			*resp->offset1 = htonl(offset & 0xffffffff);
+			resp->offset1 = NULL;
+		} else {
+			xdr_encode_hyper(resp->offset, offset);
+		}
+	}
 
 	RETURN_STATUS(nfserr);
 }

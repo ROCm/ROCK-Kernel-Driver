@@ -780,6 +780,7 @@ typedef struct ide_drive_s {
 	u8	sect;		/* "real" sectors per track */
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
+	u8	doing_barrier;	/* state, 1=currently doing flush */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -1293,6 +1294,11 @@ extern ide_startstop_t ide_do_reset (ide_drive_t *);
 extern void ide_init_drive_cmd (struct request *rq);
 
 /*
+ * this function returns error location sector offset in case of a write error
+ */
+extern u64 ide_get_error_location(ide_drive_t *, char *);
+
+/*
  * "action" parameter type for ide_do_drive_cmd() below.
  */
 typedef enum {
@@ -1663,5 +1669,12 @@ extern struct semaphore ide_cfg_sem;
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
 
 extern struct bus_type ide_bus_type;
+
+/* check if CACHE FLUSH (EXT) command is supported (bits defined in ATA-6) */
+#define ide_id_has_flush_cache(id)	((id)->cfs_enable_2 & 0x3000)
+
+/* some Maxtor disks have bit 13 defined incorrectly so check bit 10 too */
+#define ide_id_has_flush_cache_ext(id)	\
+	(((id)->cfs_enable_2 & 0x2400) == 0x2400)
 
 #endif /* _IDE_H */

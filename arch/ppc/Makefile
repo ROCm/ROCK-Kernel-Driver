@@ -13,7 +13,7 @@
 # This must match PAGE_OFFSET in include/asm-ppc/page.h.
 KERNELLOAD	:= $(CONFIG_KERNEL_START)
 
-HAS_BIARCH	:= $(shell if $(CC) -m32 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+HAS_BIARCH	:= $(call cc-option-yn, -m32)
 ifeq ($(HAS_BIARCH),y)
 AS		:= $(AS) -a32
 LD		:= $(LD) -m elf32ppc
@@ -27,7 +27,7 @@ CFLAGS		+= -Iarch/$(ARCH) -msoft-float -pipe \
 		-ffixed-r2 -Wno-uninitialized -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
 
-CHECK		:= $(CHECK) -D__powerpc__=1
+CHECKFLAGS	+= -D__powerpc__=1
 
 ifndef CONFIG_E500
 CFLAGS		+= -mstring
@@ -70,7 +70,7 @@ BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 all: zImage
 
-AFLAGS_vmlinux.lds.o	:= -Upowerpc
+CPPFLAGS_vmlinux.lds	:= -Upowerpc
 
 # All the instructions talk about "make bzImage".
 bzImage: zImage
@@ -112,7 +112,7 @@ else
 NEW_AS	:= 0
 endif
 # gcc-3.4 and binutils-2.14 are a fatal combination.
-GCC_VERSION	:= $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
+GCC_VERSION	:= $(call cc-version)
 BAD_GCC_AS	:= $(shell echo mftb 5 | $(AS) -mppc -many -o /dev/null >/dev/null 2>&1 && echo 0 || echo 1)
 
 checkbin:

@@ -127,12 +127,16 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(MODE_SENSE),
 		safe_for_read(MODE_SENSE_10),
 		safe_for_read(START_STOP),
+		safe_for_read(GPCMD_VERIFY_10),
+		safe_for_read(VERIFY_16),
+		safe_for_read(READ_BUFFER),
 
 		/* Audio CD commands */
 		safe_for_read(GPCMD_PLAY_CD),
 		safe_for_read(GPCMD_PLAY_AUDIO_10),
 		safe_for_read(GPCMD_PLAY_AUDIO_MSF),
 		safe_for_read(GPCMD_PLAY_AUDIO_TI),
+		safe_for_read(GPCMD_PAUSE_RESUME),
 
 		/* CD/DVD data reading */
 		safe_for_read(GPCMD_READ_CD),
@@ -146,6 +150,12 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(GPCMD_READ_TOC_PMA_ATIP),
 		safe_for_read(GPCMD_REPORT_KEY),
 		safe_for_read(GPCMD_SCAN),
+		safe_for_read(GPCMD_GET_CONFIGURATION),
+		safe_for_read(GPCMD_READ_FORMAT_CAPACITIES),
+		safe_for_read(GPCMD_GET_EVENT_STATUS_NOTIFICATION),
+		safe_for_read(GPCMD_GET_PERFORMANCE),
+		safe_for_read(GPCMD_SEEK),
+		safe_for_read(GPCMD_STOP_PLAY_SCAN),
 
 		/* Basic writing commands */
 		safe_for_write(WRITE_6),
@@ -155,6 +165,23 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(WRITE_VERIFY_12),
 		safe_for_write(WRITE_16),
 		safe_for_write(WRITE_LONG),
+		safe_for_write(ERASE),
+		safe_for_write(GPCMD_MODE_SELECT_10),
+		safe_for_write(MODE_SELECT),
+		safe_for_write(GPCMD_BLANK),
+		safe_for_write(GPCMD_CLOSE_TRACK),
+		safe_for_write(GPCMD_FLUSH_CACHE),
+		safe_for_write(GPCMD_FORMAT_UNIT),
+		safe_for_write(GPCMD_REPAIR_RZONE_TRACK),
+		safe_for_write(GPCMD_RESERVE_RZONE_TRACK),
+		safe_for_write(GPCMD_SEND_DVD_STRUCTURE),
+		safe_for_write(GPCMD_SEND_EVENT),
+		safe_for_write(GPCMD_SEND_KEY),
+		safe_for_write(GPCMD_SEND_OPC),
+		safe_for_write(GPCMD_SET_SPEED),
+		safe_for_write(GPCMD_PREVENT_ALLOW_MEDIUM_REMOVAL),
+		safe_for_write(GPCMD_LOAD_UNLOAD),
+		safe_for_write(GPCMD_SET_STREAMING),
 	};
 	unsigned char type = cmd_type[cmd[0]];
 

@@ -48,6 +48,7 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/profile.h>
+#include <linux/cpu.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -100,6 +101,8 @@ struct gettimeofday_struct do_gtod;
 extern unsigned long wall_jiffies;
 extern unsigned long lpevent_count;
 extern int smp_tb_synchronized;
+
+extern struct timezone sys_tz;
 
 void ppc_adjtimex(void);
 
@@ -233,6 +236,8 @@ static void iSeries_tb_recal(void)
 				do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 				tb_to_xs = divres.result_low;
 				do_gtod.varp->tb_to_xs = tb_to_xs;
+				systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
+				systemcfg->tb_to_xs = tb_to_xs;
 			}
 			else {
 				printk( "Titan recalibrate: FAILED (difference > 4 percent)\n"
@@ -281,8 +286,20 @@ int timer_interrupt(struct pt_regs * regs)
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
 #ifdef CONFIG_SMP
-		smp_local_timer_interrupt(regs);
+		/*
+		 * We cannot disable the decrementer, so in the period
+		 * between this cpu's being marked offline in cpu_online_map
+		 * and calling stop-self, it is taking timer interrupts.
+		 * Avoid calling into the scheduler rebalancing code if this
+		 * is the case.
+		 */
+		if (!cpu_is_offline(cpu))
+			smp_local_timer_interrupt(regs);
 #endif
+		/*
+		 * No need to check whether cpu is offline here; boot_cpuid
+		 * should have been fixed up by now.
+		 */
 		if (cpu == boot_cpuid) {
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
@@ -408,6 +425,7 @@ int do_settimeofday(struct timespec *tv)
 	new_xsec += new_sec * XSEC_PER_SEC;
 	if ( new_xsec > delta_xsec ) {
 		do_gtod.varp->stamp_xsec = new_xsec - delta_xsec;
+		systemcfg->stamp_xsec = new_xsec - delta_xsec;
 	}
 	else {
 		/* This is only for the case where the user is setting the time
@@ -416,7 +434,12 @@ int do_settimeofday(struct timespec *tv)
 		 * the time to Jan 5, 1970 */
 		do_gtod.varp->stamp_xsec = new_xsec;
 		do_gtod.tb_orig_stamp = tb_last_stamp;
+		systemcfg->stamp_xsec = new_xsec;
+		systemcfg->tb_orig_stamp = tb_last_stamp;
 	}
+
+	systemcfg->tz_minuteswest = sys_tz.tz_minuteswest;
+	systemcfg->tz_dsttime = sys_tz.tz_dsttime;
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	clock_was_set();
@@ -520,6 +543,11 @@ void __init time_init(void)
 	do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 	do_gtod.varp->tb_to_xs = tb_to_xs;
 	do_gtod.tb_to_us = tb_to_us;
+	systemcfg->tb_orig_stamp = tb_last_stamp;
+	systemcfg->tb_update_count = 0;
+	systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
+	systemcfg->stamp_xsec = xtime.tv_sec * XSEC_PER_SEC;
+	systemcfg->tb_to_xs = tb_to_xs;
 
 	xtime_sync_interval = tb_ticks_per_sec - (tb_ticks_per_sec/8);
 	next_xtime_sync_tb = tb_last_stamp + xtime_sync_interval;
@@ -654,6 +682,22 @@ void ppc_adjtimex(void)
 	mb();
 	do_gtod.varp = temp_varp;
 	do_gtod.var_idx = temp_idx;
+
+	/*
+	 * tb_update_count is used to allow the problem state gettimeofday code
+	 * to assure itself that it sees a consistent view of the tb_to_xs and
+	 * stamp_xsec variables.  It reads the tb_update_count, then reads
+	 * tb_to_xs and stamp_xsec and then reads tb_update_count again.  If
+	 * the two values of tb_update_count match and are even then the
+	 * tb_to_xs and stamp_xsec values are consistent.  If not, then it
+	 * loops back and reads them again until this criteria is met.
+	 */
+	++(systemcfg->tb_update_count);
+	wmb();
+	systemcfg->tb_to_xs = new_tb_to_xs;
+	systemcfg->stamp_xsec = new_stamp_xsec;
+	wmb();
+	++(systemcfg->tb_update_count);
 
 	write_sequnlock_irqrestore( &xtime_lock, flags );
 

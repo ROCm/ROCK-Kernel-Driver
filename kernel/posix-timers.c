@@ -1168,15 +1168,10 @@ void exit_itimers(struct signal_struct *sig)
  */
 static int do_posix_gettime(struct k_clock *clock, struct timespec *tp)
 {
-	struct timeval tv;
-
 	if (clock->clock_get)
 		return clock->clock_get(tp);
 
-	do_gettimeofday(&tv);
-	tp->tv_sec = tv.tv_sec;
-	tp->tv_nsec = tv.tv_usec * NSEC_PER_USEC;
-
+	getnstimeofday(tp);
 	return 0;
 }
 
@@ -1192,23 +1187,15 @@ static u64 do_posix_clock_monotonic_gettime_parts(
 	struct timespec *tp, struct timespec *mo)
 {
 	u64 jiff;
-	struct timeval tpv;
 	unsigned int seq;
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
-		do_gettimeofday(&tpv);
+		getnstimeofday(tp);
 		*mo = wall_to_monotonic;
 		jiff = jiffies_64;
 
 	} while(read_seqretry(&xtime_lock, seq));
-
-	/*
-	 * Love to get this before it is converted to usec.
-	 * It would save a div AND a mpy.
-	 */
-	tp->tv_sec = tpv.tv_sec;
-	tp->tv_nsec = tpv.tv_usec * NSEC_PER_USEC;
 
 	return jiff;
 }

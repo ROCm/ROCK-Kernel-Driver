@@ -88,7 +88,7 @@ static char *args[1024], **argptr = args;
 static int indent;
 static struct termios ios_org;
 static int rows = 0, cols = 0;
-static struct menu *current_menu;
+struct menu *current_menu;
 static int child_count;
 static int do_resize;
 static int single_menu_mode;

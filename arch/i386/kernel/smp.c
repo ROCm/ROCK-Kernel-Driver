@@ -22,7 +22,6 @@
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
-#include <mach_ipi.h>
 #include <mach_apic.h>
 
 /*
@@ -104,7 +103,7 @@
  *	about nothing of note with C stepping upwards.
  */
 
-struct tlb_state cpu_tlbstate[NR_CPUS] __cacheline_aligned = {[0 ... NR_CPUS-1] = { &init_mm, 0, }};
+DEFINE_PER_CPU(struct tlb_state, cpu_tlbstate) ____cacheline_aligned = { &init_mm, 0, };
 
 /*
  * the following functions deal with sending IPIs between CPUs.
@@ -122,7 +121,7 @@ static inline int __prepare_ICR2 (unsigned int mask)
 	return SET_APIC_DEST_FIELD(mask);
 }
 
-inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
+void __send_IPI_shortcut(unsigned int shortcut, int vector)
 {
 	/*
 	 * Subtle. In the case of the 'never do double writes' workaround
@@ -157,7 +156,7 @@ void fastcall send_IPI_self(int vector)
 /*
  * This is only used on smaller machines.
  */
-inline void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
+void send_IPI_mask_bitmask(cpumask_t cpumask, int vector)
 {
 	unsigned long mask = cpus_addr(cpumask)[0];
 	unsigned long cfg;
@@ -230,6 +229,8 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	local_irq_restore(flags);
 }
 
+#include <mach_ipi.h> /* must come after the send_IPI functions above for inlining */
+
 /*
  *	Smarter SMP flushing macros. 
  *		c/o Linus Torvalds.
@@ -255,9 +256,9 @@ static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
  */
 static inline void leave_mm (unsigned long cpu)
 {
-	if (cpu_tlbstate[cpu].state == TLBSTATE_OK)
+	if (per_cpu(cpu_tlbstate, cpu).state == TLBSTATE_OK)
 		BUG();
-	cpu_clear(cpu, cpu_tlbstate[cpu].active_mm->cpu_vm_mask);
+	cpu_clear(cpu, per_cpu(cpu_tlbstate, cpu).active_mm->cpu_vm_mask);
 	load_cr3(swapper_pg_dir);
 }
 
@@ -324,8 +325,8 @@ asmlinkage void smp_invalidate_interrupt (void)
 		 * BUG();
 		 */
 		 
-	if (flush_mm == cpu_tlbstate[cpu].active_mm) {
-		if (cpu_tlbstate[cpu].state == TLBSTATE_OK) {
+	if (flush_mm == per_cpu(cpu_tlbstate, cpu).active_mm) {
+		if (per_cpu(cpu_tlbstate, cpu).state == TLBSTATE_OK) {
 			if (flush_va == FLUSH_ALL)
 				local_flush_tlb();
 			else
@@ -457,7 +458,7 @@ static void do_flush_tlb_all(void* info)
 	unsigned long cpu = smp_processor_id();
 
 	__flush_tlb_all();
-	if (cpu_tlbstate[cpu].state == TLBSTATE_LAZY)
+	if (per_cpu(cpu_tlbstate, cpu).state == TLBSTATE_LAZY)
 		leave_mm(cpu);
 }
 

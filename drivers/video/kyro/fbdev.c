@@ -712,7 +712,7 @@ static int __devinit kyrofb_probe(struct pci_dev *pdev,
 	info->fix		= kyro_fix;
 	info->par		= currentpar;
 	info->pseudo_palette	= (void *)(currentpar + 1);
-	info->flags		= FBINFO_FLAG_DEFAULT;
+	info->flags		= FBINFO_DEFAULT;
 
 	SetCoreClockPLL(deviceInfo.pSTGReg, pdev);
 

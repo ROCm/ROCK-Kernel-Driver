@@ -485,8 +485,9 @@ static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 		 * and we don't want to recurse into the FS that called us
 		 * in clear_inode() and friends..
 	 	 */
-		if (gfp_mask & __GFP_FS)
-			prune_icache(nr);
+		if (!(gfp_mask & __GFP_FS))
+			return -1;
+		prune_icache(nr);
 	}
 	return (inodes_stat.nr_unused / 100) * sysctl_vfs_cache_pressure;
 }

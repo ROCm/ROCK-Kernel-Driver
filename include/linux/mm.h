@@ -496,8 +496,19 @@ int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new);
 struct mempolicy *shmem_get_policy(struct vm_area_struct *vma,
 					unsigned long addr);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
-void shmem_lock(struct file * file, int lock);
+int shmem_lock(struct file *file, int lock, struct user_struct *user);
 int shmem_zero_setup(struct vm_area_struct *);
+
+static inline int can_do_mlock(void)
+{
+	if (capable(CAP_IPC_LOCK))
+		return 1;
+	if (current->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
+		return 1;
+	return 0;
+}
+extern int user_shm_lock(size_t, struct user_struct *);
+extern void user_shm_unlock(size_t, struct user_struct *);
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
@@ -598,21 +609,23 @@ extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void si_meminfo_node(struct sysinfo *val, int nid);
 
-static inline void vma_prio_tree_init(struct vm_area_struct *vma)
-{
-	vma->shared.vm_set.list.next = NULL;
-	vma->shared.vm_set.list.prev = NULL;
-	vma->shared.vm_set.parent = NULL;
-	vma->shared.vm_set.head = NULL;
-}
-
 /* prio_tree.c */
 void vma_prio_tree_add(struct vm_area_struct *, struct vm_area_struct *old);
 void vma_prio_tree_insert(struct vm_area_struct *, struct prio_tree_root *);
 void vma_prio_tree_remove(struct vm_area_struct *, struct prio_tree_root *);
-struct vm_area_struct *vma_prio_tree_next(
-	struct vm_area_struct *, struct prio_tree_root *,
-	struct prio_tree_iter *, pgoff_t begin, pgoff_t end);
+struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
+	struct prio_tree_iter *iter);
+
+#define vma_prio_tree_foreach(vma, iter, root, begin, end)	\
+	for (prio_tree_iter_init(iter, root, begin, end), vma = NULL;	\
+		(vma = vma_prio_tree_next(vma, iter)); )
+
+static inline void vma_nonlinear_insert(struct vm_area_struct *vma,
+					struct list_head *list)
+{
+	vma->shared.vm_set.parent = NULL;
+	list_add_tail(&vma->shared.vm_set.list, list);
+}
 
 /* mmap.c */
 extern void vma_adjust(struct vm_area_struct *vma, unsigned long start,

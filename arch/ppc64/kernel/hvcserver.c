@@ -61,14 +61,21 @@ int hvcs_convert(long to_convert)
 	}
 }
 
+/**
+ * hvcs_free_partner_info - free pi allocated by hvcs_get_partner_info
+ * @head: list_head pointer for an allocated list of partner info structs to
+ *	free.
+ *
+ * This function is used to free the partner info list that was returned by
+ * calling hvcs_get_partner_info().
+ */
 int hvcs_free_partner_info(struct list_head *head)
 {
 	struct hvcs_partner_info *pi;
 	struct list_head *element;
 
-	if (!head) {
+	if (!head)
 		return -EINVAL;
-	}
 
 	while (!list_empty(head)) {
 		element = head->next;
@@ -82,7 +89,7 @@ int hvcs_free_partner_info(struct list_head *head)
 EXPORT_SYMBOL(hvcs_free_partner_info);
 
 /* Helper function for hvcs_get_partner_info */
-int hvcs_next_partner(unsigned int unit_address,
+int hvcs_next_partner(uint32_t unit_address,
 		unsigned long last_p_partition_ID,
 		unsigned long last_p_unit_address, unsigned long *pi_buff)
 
@@ -94,25 +101,37 @@ int hvcs_next_partner(unsigned int unit_address,
 	return hvcs_convert(retval);
 }
 
-/*
- * The unit_address parameter is the unit address of the vty-server vdevice
- * in whose partner information the caller is interested.  This function
- * uses a pointer to a list_head instance in which to store the partner info.
+/**
+ * hvcs_get_partner_info - Get all of the partner info for a vty-server adapter
+ * @unit_address: The unit_address of the vty-server adapter for which this
+ *	function is fetching partner info.
+ * @head: An initialized list_head pointer to an empty list to use to return the
+ *	list of partner info fetched from the hypervisor to the caller.
+ * @pi_buff: A page sized buffer pre-allocated prior to calling this function
+ *	that is to be used to be used by firmware as an iterator to keep track
+ *	of the partner info retrieval.
+ *
  * This function returns non-zero on success, or if there is no partner info.
+ *
+ * The pi_buff is pre-allocated prior to calling this function because this
+ * function may be called with a spin_lock held and kmalloc of a page is not
+ * recommended as GFP_ATOMIC.
+ *
+ * The first long of this buffer is used to store a partner unit address.  The
+ * second long is used to store a partner partition ID and starting at
+ * pi_buff[2] is the 79 character Converged Location Code (diff size than the
+ * unsigned longs, hence the casting mumbo jumbo you see later).
  *
  * Invocation of this function should always be followed by an invocation of
  * hvcs_free_partner_info() using a pointer to the SAME list head instance
- * that was used to store the partner_info list.
+ * that was passed as a parameter to this function.
  */
-int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head,
+int hvcs_get_partner_info(uint32_t unit_address, struct list_head *head,
 		unsigned long *pi_buff)
 {
 	/*
-	 * This is a page sized buffer to be passed to hvcall per invocation.
-	 * NOTE: the first long returned is unit_address.  The second long
-	 * returned is the partition ID and starting with pi_buff[2] are
-	 * HVCS_CLC_LENGTH characters, which are diff size than the unsigned
-	 * long, hence the casting mumbojumbo you see later.
+	 * Dealt with as longs because of the hcall interface even though the
+	 * values are uint32_t.
 	 */
 	unsigned long	last_p_partition_ID;
 	unsigned long	last_p_unit_address;
@@ -122,14 +141,11 @@ int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head,
 
 	memset(pi_buff, 0x00, PAGE_SIZE);
 	/* invalid parameters */
-	if (!head)
+	if (!head || !pi_buff)
 		return -EINVAL;
 
 	last_p_partition_ID = last_p_unit_address = ~0UL;
 	INIT_LIST_HEAD(head);
-
-	if (!pi_buff)
-		return -ENOMEM;
 
 	do {
 		retval = hvcs_next_partner(unit_address, last_p_partition_ID,
@@ -183,21 +199,29 @@ int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head,
 }
 EXPORT_SYMBOL(hvcs_get_partner_info);
 
-/*
+/**
+ * hvcs_register_connection - establish a connection between this vty-server and
+ *	a vty.
+ * @unit_address: The unit address of the vty-server adapter that is to be
+ *	establish a connection.
+ * @p_partition_ID: The partition ID of the vty adapter that is to be connected.
+ * @p_unit_address: The unit address of the vty adapter to which the vty-server
+ *	is to be connected.
+ *
  * If this function is called once and -EINVAL is returned it may
  * indicate that the partner info needs to be refreshed for the
  * target unit address at which point the caller must invoke
  * hvcs_get_partner_info() and then call this function again.  If,
  * for a second time, -EINVAL is returned then it indicates that
  * there is probably already a partner connection registered to a
- * different vty-server@ vdevice.  It is also possible that a second
+ * different vty-server adapter.  It is also possible that a second
  * -EINVAL may indicate that one of the parms is not valid, for
- * instance if the link was removed between the vty-server@ vdevice
- * and the vty@ vdevice that you are trying to open.  Don't shoot the
+ * instance if the link was removed between the vty-server adapter
+ * and the vty adapter that you are trying to open.  Don't shoot the
  * messenger.  Firmware implemented it this way.
  */
-int hvcs_register_connection( unsigned int unit_address,
-		unsigned int p_partition_ID, unsigned int p_unit_address)
+int hvcs_register_connection( uint32_t unit_address,
+		uint32_t p_partition_ID, uint32_t p_unit_address)
 {
 	long retval;
 	retval = plpar_hcall_norets(H_REGISTER_VTERM, unit_address,
@@ -206,11 +230,17 @@ int hvcs_register_connection( unsigned int unit_address,
 }
 EXPORT_SYMBOL(hvcs_register_connection);
 
-/*
- * If -EBUSY is returned continue to call this function
- * until 0 is returned.
+/**
+ * hvcs_free_connection - free the connection between a vty-server and vty
+ * @unit_address: The unit address of the vty-server that is to have its
+ *	connection severed.
+ *
+ * This function is used to free the partner connection between a vty-server
+ * adapter and a vty adapter.
+ *
+ * If -EBUSY is returned continue to call this function until 0 is returned.
  */
-int hvcs_free_connection(unsigned int unit_address)
+int hvcs_free_connection(uint32_t unit_address)
 {
 	long retval;
 	retval = plpar_hcall_norets(H_FREE_VTERM, unit_address);

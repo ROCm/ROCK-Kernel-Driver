@@ -297,7 +297,7 @@ static void p9100_init_one(struct sbus_dev *sdev)
 		sbus_ioremap(&sdev->resource[0], 0,
 			     sizeof(struct p9100_regs), "p9100 regs");
 
-	all->info.flags = FBINFO_FLAG_DEFAULT;
+	all->info.flags = FBINFO_DEFAULT;
 	all->info.fbops = &p9100_ops;
 #ifdef CONFIG_SPARC32
 	all->info.screen_base = (char *)

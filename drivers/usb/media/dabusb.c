@@ -61,7 +61,7 @@
 
 static dabusb_t dabusb[NRDABUSB];
 static int buffers = 256;
-extern struct usb_driver dabusb_driver;
+static struct usb_driver dabusb_driver;
 
 /*-------------------------------------------------------------------*/
 

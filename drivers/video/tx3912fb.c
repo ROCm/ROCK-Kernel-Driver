@@ -60,6 +60,9 @@ static struct fb_var_screeninfo tx3912fb_var = {
 	.blue =		{ 0, 2, 0 },
 #else
 	.bits_per_pixel =4,
+	.red =		{ 0, 4, 0 },	/* ??? */
+	.green =	{ 0, 4, 0 },
+	.blue =		{ 0, 4, 0 },
 #endif
 	.activate =	FB_ACTIVATE_NOW,
 	.width =	-1,
@@ -296,7 +299,7 @@ int __init tx3912fb_init(void)
 	fb_info.var = tx3912fb_var;
 	fb_info.fix = tx3912fb_fix;
 	fb_info.pseudo_palette = pseudo_palette;
-	fb_info.flags = FBINFO_FLAG_DEFAULT;
+	fb_info.flags = FBINFO_DEFAULT;
 
 	/* Clear the framebuffer */
 	memset((void *) fb_info.fix.smem_start, 0xff, fb_info.fix.smem_len);
