@@ -664,7 +664,7 @@ static void igmp6_group_dropped(struct ifmcaddr6 *mc)
 		goto done;
 	spin_unlock_bh(&mc->mca_lock);
 
-	if (dev->flags&IFF_UP)
+	if (!mc->idev->dead)
 		igmp6_leave_group(mc);
 
 	spin_lock_bh(&mc->mca_lock);
