@@ -898,6 +898,11 @@ static inline void skb_set_owner_r(struct sk_buff *skb, struct sock *sk)
 	atomic_add(skb->truesize, &sk->sk_rmem_alloc);
 }
 
+extern void sk_reset_timer(struct sock *sk, struct timer_list* timer,
+			   unsigned long expires);
+
+extern void sk_stop_timer(struct sock *sk, struct timer_list* timer);
+
 static inline int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err = 0;
