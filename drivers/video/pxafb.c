@@ -1237,7 +1237,6 @@ int __init pxafb_probe(struct device *dev)
 {
 	struct pxafb_info *fbi;
 	struct pxafb_mach_info *inf;
-	unsigned long flags;
 	int ret;
 
 	dev_dbg(dev, "pxafb_probe\n");
@@ -1301,9 +1300,7 @@ int __init pxafb_probe(struct device *dev)
 		goto failed;
 	}
 	/* enable LCD controller clock */
-	local_irq_save(flags);
-	CKEN |= CKEN16_LCD;
-	local_irq_restore(flags);
+	pxa_set_cken(CKEN16_LCD, 1);
 
 	ret = request_irq(IRQ_LCD, pxafb_handle_irq, SA_INTERRUPT, "LCD", fbi);
 	if (ret) {
