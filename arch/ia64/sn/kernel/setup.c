@@ -361,13 +361,6 @@ sn_init_pdas(char **cmdline_p)
 {
 	cnodeid_t	cnode;
 
-	/*
-	 * Make sure that the PDA fits entirely in the same page as the 
-	 * cpu_data area.
-	 */
-	if ((((unsigned long)pda & (~PAGE_MASK)) + sizeof(pda_t)) > PAGE_SIZE)
-		panic("overflow of cpu_data page");
-
 	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
 	for (cnode=0; cnode<numnodes; cnode++)
 		pda->cnodeid_to_nasid_table[cnode] = pxm_to_nasid(nid_to_pxm_map[cnode]);
