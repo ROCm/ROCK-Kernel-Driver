@@ -404,15 +404,7 @@ typedef struct scsi_request Scsi_Request;
  * Here is where we prototype most of the mid-layer.
  */
 
-/*
- *  Initializes all SCSI devices.  This scans all scsi busses.
- */
-
 extern unsigned int scsi_logging_level;		/* What do we log? */
-extern unsigned int scsi_dma_free_sectors;	/* How much room do we have left */
-extern unsigned int scsi_need_isa_buffer;	/* True if some devices need indirection
-						   * buffers */
-extern volatile int in_scan_scsis;
 
 extern struct bus_type scsi_driverfs_bus_type;
 
@@ -499,12 +491,6 @@ extern void scsi_do_req(Scsi_Request *, const void *cmnd,
 			int timeout, int retries);
 extern int scsi_insert_special_req(Scsi_Request * SRpnt, int);
 extern void scsi_init_cmd_from_req(Scsi_Cmnd *, Scsi_Request *);
-
-
-/*
- * Prototypes for functions/data in hosts.c
- */
-extern int max_scsi_hosts;
 
 /*
  * Prototypes for functions in scsi_proc.c
@@ -836,25 +822,6 @@ struct scsi_cmnd {
  */
 #define SCSI_MLQUEUE_HOST_BUSY   0x1055
 #define SCSI_MLQUEUE_DEVICE_BUSY 0x1056
-
-#define SCSI_SLEEP(QUEUE, CONDITION) {		    \
-    if (CONDITION) {			            \
-	DECLARE_WAITQUEUE(wait, current);	    \
-	add_wait_queue(QUEUE, &wait);		    \
-	for(;;) {			            \
-	set_current_state(TASK_UNINTERRUPTIBLE);    \
-	if (CONDITION) {		            \
-            if (in_interrupt())	                    \
-	        panic("scsi: trying to call schedule() in interrupt" \
-		      ", file %s, line %d.\n", __FILE__, __LINE__);  \
-	    schedule();			\
-        }				\
-	else			        \
-	    break;      		\
-	}			        \
-	remove_wait_queue(QUEUE, &wait);\
-	current->state = TASK_RUNNING;	\
-    }; }
 
 /*
  * old style reset request from external source

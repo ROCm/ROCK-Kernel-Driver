@@ -177,8 +177,7 @@ void scsi_times_out(Scsi_Cmnd *scmd)
  **/
 int scsi_block_when_processing_errors(Scsi_Device *sdev)
 {
-
-	SCSI_SLEEP(&sdev->host->host_wait, sdev->host->in_recovery);
+	wait_event(sdev->host->host_wait, (sdev->host->in_recovery == 0));
 
 	SCSI_LOG_ERROR_RECOVERY(5, printk("%s: rtn: %d\n", __FUNCTION__,
 					  sdev->online));
