@@ -296,13 +296,4 @@ wlock_again:
 	}
 }
 
-int atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock)
-{
-	spin_lock(lock);
-	if (atomic_dec_and_test(atomic))
-		return 1;
-	spin_unlock(lock);
-	return 0;
-}
-
 #endif /* CONFIG_SMP && CONFIG_DEBUG_SPINLOCK */
