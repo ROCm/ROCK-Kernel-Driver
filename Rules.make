@@ -312,7 +312,7 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 	$(call if_changed_dep,cc_o_c)
 
 quiet_cmd_cc_lst_c = MKLST   $(echo_target)
-cmd_cc_lst_c       = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
+cmd_cc_lst_c       = $(CC) $(c_flags) -g -c -o $*.o $< && sh scripts/makelst $*.o System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
 	$(call if_changed_dep,cc_lst_c)
