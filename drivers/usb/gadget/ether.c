@@ -118,6 +118,7 @@ struct eth_dev {
 	unsigned		zlp:1;
 	unsigned		cdc:1;
 	unsigned		rndis:1;
+	unsigned		suspended:1;
 	u16			cdc_filter;
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
@@ -1355,11 +1356,13 @@ static void rndis_response_complete (struct usb_ep *ep, struct usb_request *req)
 static void rndis_command_complete (struct usb_ep *ep, struct usb_request *req)
 {
 	struct eth_dev          *dev = ep->driver_data;
+	int			status;
 	
 	/* received RNDIS command from CDC_SEND_ENCAPSULATED_COMMAND */
 	spin_lock(&dev->lock);
-	if (rndis_msg_parser (dev->rndis_config, (u8 *) req->buf))
-		ERROR(dev, "%s: rndis parse error\n", __FUNCTION__ );
+	status = rndis_msg_parser (dev->rndis_config, (u8 *) req->buf);
+	if (status < 0)
+		ERROR(dev, "%s: rndis parse error %d\n", __FUNCTION__, status);
 	spin_unlock(&dev->lock);
 }
 
@@ -2561,6 +2564,26 @@ fail:
 
 /*-------------------------------------------------------------------------*/
 
+static void
+eth_suspend (struct usb_gadget *gadget)
+{
+	struct eth_dev		*dev = get_gadget_data (gadget);
+
+	DEBUG (dev, "suspend\n");
+	dev->suspended = 1;
+}
+
+static void
+eth_resume (struct usb_gadget *gadget)
+{
+	struct eth_dev		*dev = get_gadget_data (gadget);
+
+	DEBUG (dev, "resume\n");
+	dev->suspended = 0;
+}
+
+/*-------------------------------------------------------------------------*/
+
 static struct usb_gadget_driver eth_driver = {
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed		= USB_SPEED_HIGH,
@@ -2573,6 +2596,9 @@ static struct usb_gadget_driver eth_driver = {
 
 	.setup		= eth_setup,
 	.disconnect	= eth_disconnect,
+
+	.suspend	= eth_suspend,
+	.resume		= eth_resume,
 
 	.driver 	= {
 		.name		= (char *) shortname,
