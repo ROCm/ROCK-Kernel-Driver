@@ -9,4 +9,4 @@ obj-$(CONFIG_PCMCIA_NINJA_SCSI)	+= nsp_cs.o
 
 aha152x_cs-objs	:= aha152x_stub.o aha152x_core.o
 fdomain_cs-objs	:= fdomain_stub.o fdomain_core.o
-qlogic_cs-objs	:= qlogic_stub.o qlogic_core.o
+qlogic_cs-objs	:= qlogic_stub.o
