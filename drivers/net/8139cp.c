@@ -1649,14 +1649,27 @@ err_out_gregs:
 static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct cp_private *cp = dev->priv;
+	struct mii_ioctl_data *mii;
 	int rc = 0;
 
+	mii = (struct mii_ioctl_data *) &rq->ifr_data;
 	if (!netif_running(dev))
 		return -EINVAL;
 
+	if (cmd != SIOCETHTOOL) 
+		mii->reg_num &= 0x1f;
+	
 	switch (cmd) {
 	case SIOCETHTOOL:
 		return cp_ethtool_ioctl(cp, (void *) rq->ifr_data);
+		
+ 	case SIOCGMIIPHY:	/* Get the address of the PHY in use. */
+		mii->phy_id = CP_INTERNAL_PHY;
+		/* Fall Through */
+
+	case SIOCGMIIREG:	/* Read the specified MII register. */
+		mii->val_out = mdio_read (dev, CP_INTERNAL_PHY, mii->reg_num);
+		break;
 
 	default:
 		rc = -EOPNOTSUPP;
