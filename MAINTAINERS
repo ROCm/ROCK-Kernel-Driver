@@ -379,13 +379,6 @@ P:	Gergely Madarasz
 M:	Gergely Madarasz <gorgo@itc.hu>
 S:	Supported
 
-CONFIGURE, MENUCONFIG, XCONFIG
-P:	Michael Elizabeth Chastain
-M:	mec@shout.net
-L:	kbuild-devel@lists.sourceforge.net
-W:	http://kbuild.sourceforge.net
-S:	Maintained
-
 COSA/SRP SYNC SERIAL DRIVER
 P:	Jan "Yenya" Kasprzak
 M:	kas@fi.muni.cz
@@ -940,6 +933,12 @@ P:	Vojtech Pavlik
 M:	vojtech@suse.cz
 L:	linux-joystick@atrey.karlin.mff.cuni.cz
 W:	http://www.suse.cz/development/joystick/
+S:	Maintained
+
+KCONFIG
+P:	Roman Zippel
+M:	zippel@linux-m68k.org
+L:	kbuild-devel@lists.sourceforge.net
 S:	Maintained
 
 KERNEL AUTOMOUNTER (AUTOFS)

@@ -64,6 +64,8 @@
  *	Trond Myklebust :	Add in preliminary support for NFSv3 and TCP.
  *				Fix bug in root_nfs_addr(). nfs_data.namlen
  *				is NOT for the length of the hostname.
+ *	Hua Qin		:	Support for mounting root file system via
+ *				NFS over TCP.
  */
 
 #include <linux/config.h>
@@ -440,12 +442,14 @@ static int __init root_nfs_get_handle(void)
 {
 	struct sockaddr_in sin;
 	int status;
+	int protocol = (nfs_data.flags & NFS_MOUNT_TCP) ?
+					IPPROTO_TCP : IPPROTO_UDP;
+	int version = (nfs_data.flags & NFS_MOUNT_VER3) ?
+					NFS_MNT3_VERSION : NFS_MNT_VERSION;
 
 	set_sockaddr(&sin, servaddr, mount_port);
-	if (nfs_data.flags & NFS_MOUNT_VER3)
-		status = nfs3_mount(&sin, nfs_path, &nfs_data.root);
-	else
-		status = nfs_mount(&sin, nfs_path, &nfs_data.root);
+	status = nfsroot_mount(&sin, nfs_path, &nfs_data.root,
+							version, protocol);
 	if (status < 0)
 		printk(KERN_ERR "Root-NFS: Server returned error %d "
 				"while mounting %s\n", status, nfs_path);

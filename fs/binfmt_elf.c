@@ -109,7 +109,7 @@ static void padzero(unsigned long elf_bss)
 }
 
 /* Let's use some macros to make this stack manipulation a litle clearer */
-#ifdef ARCH_STACK_GROWSUP
+#ifdef CONFIG_STACK_GROWSUP
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
 #define STACK_ROUND(sp, items) \
 	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
@@ -207,7 +207,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	bprm->p = STACK_ROUND(sp, items);
 
 	/* Point sp at the lowest address on the stack */
-#ifdef ARCH_STACK_GROWSUP
+#ifdef CONFIG_STACK_GROWSUP
 	sp = (elf_addr_t *)bprm->p - items - ei_index;
 	bprm->exec = (unsigned long) sp; /* XXX: PARISC HACK */
 #else

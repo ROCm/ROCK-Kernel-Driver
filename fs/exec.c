@@ -331,7 +331,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	struct mm_struct *mm = current->mm;
 	int i;
 
-#ifdef ARCH_STACK_GROWSUP
+#ifdef CONFIG_STACK_GROWSUP
 	/* Move the argument and environment strings to the bottom of the
 	 * stack space.
 	 */
@@ -390,7 +390,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	down_write(&mm->mmap_sem);
 	{
 		mpnt->vm_mm = mm;
-#ifdef ARCH_STACK_GROWSUP
+#ifdef CONFIG_STACK_GROWSUP
 		mpnt->vm_start = stack_base;
 		mpnt->vm_end = PAGE_MASK &
 			(PAGE_SIZE - 1 + (unsigned long) bprm->p);

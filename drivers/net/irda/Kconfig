@@ -9,29 +9,12 @@ config IRTTY_SIR
 	depends on IRDA
 	help
 	  Say Y here if you want to build support for the IrTTY line
-	  discipline.  If you want to compile it as a module (irtty.o), say M
+	  discipline.  If you want to compile it as a module (irtty-sir.o), say M
 	  here and read <file:Documentation/modules.txt>.  IrTTY makes it
 	  possible to use Linux's own serial driver for all IrDA ports that
 	  are 16550 compatible.  Most IrDA chips are 16550 compatible so you
 	  should probably say Y to this option.  Using IrTTY will however
 	  limit the speed of the connection to 115200 bps (IrDA SIR mode).
-
-	  If unsure, say Y.
-
-config IRPORT_SIR
-	tristate "IrPORT (IrDA serial driver)"
-	depends on IRDA
-	---help---
-	  Say Y here if you want to build support for the IrPORT IrDA device
-	  driver. If you want to compile it as a module (irport.o), say M here
-	  and read <file:Documentation/modules.txt>.  IrPORT can be used
-	  instead of IrTTY and sometimes this can be better.  One example is
-	  if your IrDA port does not have echo-canceling, which will work OK
-	  with IrPORT since this driver is working in half-duplex mode only.
-	  You don't need to use irattach with IrPORT, but you just insert it
-	  the same way as FIR drivers (insmod irport io=0x3e8 irq=11).  Notice
-	  that IrPORT is a SIR device driver which means that speed is limited
-	  to 115200 bps.
 
 	  If unsure, say Y.
 
@@ -82,9 +65,89 @@ config TEKRAM_DONGLE
 	  by IrTTY.  To activate support for Tekram dongles you will have to
 	  start irattach like this: "irattach -d tekram".
 
+comment "Old SIR device drivers"
+
+config IRTTY_OLD
+	tristate "Old IrTTY (broken)"
+	depends on IRDA
+	help
+	  Say Y here if you want to build support for the IrTTY line
+	  discipline.  If you want to compile it as a module (irtty.o), say M
+	  here and read <file:Documentation/modules.txt>.  IrTTY makes it
+	  possible to use Linux's own serial driver for all IrDA ports that
+	  are 16550 compatible.  Most IrDA chips are 16550 compatible so you
+	  should probably say Y to this option.  Using IrTTY will however
+	  limit the speed of the connection to 115200 bps (IrDA SIR mode).
+
+	  If unsure, say N.
+
+config IRPORT_SIR
+	tristate "IrPORT (IrDA serial driver)"
+	depends on IRDA
+	---help---
+	  Say Y here if you want to build support for the IrPORT IrDA device
+	  driver. If you want to compile it as a module (irport.o), say M here
+	  and read <file:Documentation/modules.txt>.  IrPORT can be used
+	  instead of IrTTY and sometimes this can be better.  One example is
+	  if your IrDA port does not have echo-canceling, which will work OK
+	  with IrPORT since this driver is working in half-duplex mode only.
+	  You don't need to use irattach with IrPORT, but you just insert it
+	  the same way as FIR drivers (insmod irport io=0x3e8 irq=11).  Notice
+	  that IrPORT is a SIR device driver which means that speed is limited
+	  to 115200 bps.
+
+	  If unsure, say Y.
+
+comment "Old Serial dongle support"
+
+config DONGLE_OLD
+	bool "Old Serial dongle support"
+	help
+	  Say Y here if you have an infrared device that connects to your
+	  computer's serial port. These devices are called dongles. Then say Y
+	  or M to the driver for your particular dongle below.
+
+	  Note that the answer to this question won't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about serial dongles.
+
+config ESI_DONGLE_OLD
+	tristate "ESI JetEye PC dongle"
+	depends on DONGLE_OLD && IRDA
+	help
+	  Say Y here if you want to build support for the Extended Systems
+	  JetEye PC dongle.  If you want to compile it as a module, say M here
+	  and read <file:Documentation/modules.txt>.  The ESI dongle attaches
+	  to the normal 9-pin serial port connector, and can currently only be
+	  used by IrTTY.  To activate support for ESI dongles you will have to
+	  start irattach like this: "irattach -d esi".
+
+config ACTISYS_DONGLE_OLD
+	tristate "ACTiSYS IR-220L and IR220L+ dongle"
+	depends on DONGLE_OLD && IRDA
+	help
+	  Say Y here if you want to build support for the ACTiSYS IR-220L and
+	  IR220L+ dongles.  If you want to compile it as a module, say M here
+	  and read <file:Documentation/modules.txt>.  The ACTiSYS dongles
+	  attaches to the normal 9-pin serial port connector, and can
+	  currently only be used by IrTTY.  To activate support for ACTiSYS
+	  dongles you will have to start irattach like this:
+	  "irattach -d actisys" or "irattach -d actisys+".
+
+config TEKRAM_DONGLE_OLD
+	tristate "Tekram IrMate 210B dongle"
+	depends on DONGLE_OLD && IRDA
+	help
+	  Say Y here if you want to build support for the Tekram IrMate 210B
+	  dongle.  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  The Tekram dongle attaches to the
+	  normal 9-pin serial port connector, and can currently only be used
+	  by IrTTY.  To activate support for Tekram dongles you will have to
+	  start irattach like this: "irattach -d tekram".
+
 config GIRBIL_DONGLE
 	tristate "Greenwich GIrBIL dongle"
-	depends on DONGLE && IRDA
+	depends on DONGLE_OLD && IRDA
 	help
 	  Say Y here if you want to build support for the Greenwich GIrBIL
 	  dongle.  If you want to compile it as a module, say M here and read
@@ -95,7 +158,7 @@ config GIRBIL_DONGLE
 
 config LITELINK_DONGLE
 	tristate "Parallax LiteLink dongle"
-	depends on DONGLE && IRDA
+	depends on DONGLE_OLD && IRDA
 	help
 	  Say Y here if you want to build support for the Parallax Litelink
 	  dongle.  If you want to compile it as a module, say M here and read
@@ -106,7 +169,7 @@ config LITELINK_DONGLE
 
 config MCP2120_DONGLE
 	tristate "Microchip MCP2120"
-	depends on DONGLE && IRDA
+	depends on DONGLE_OLD && IRDA
 	help
 	  Say Y here if you want to build support for the Microchip MCP2120
 	  dongle.  If you want to compile it as a module, say M here and read
@@ -120,7 +183,7 @@ config MCP2120_DONGLE
 
 config OLD_BELKIN_DONGLE
 	tristate "Old Belkin dongle"
-	depends on DONGLE && IRDA
+	depends on DONGLE_OLD && IRDA
 	help
 	  Say Y here if you want to build support for the Adaptec Airport 1000
 	  and 2000 dongles.  If you want to compile it as a module, say M here
@@ -130,11 +193,11 @@ config OLD_BELKIN_DONGLE
 
 config EP7211_IR
 	tristate "EP7211 I/R support"
-	depends on DONGLE && ARCH_EP7211 && IRDA
+	depends on DONGLE_OLD && ARCH_EP7211 && IRDA
 
 config ACT200L_DONGLE
 	tristate "ACTiSYS IR-200L dongle (EXPERIMENTAL)"
-	depends on DONGLE && EXPERIMENTAL && IRDA
+	depends on DONGLE_OLD && EXPERIMENTAL && IRDA
 	help
 	  Say Y here if you want to build support for the ACTiSYS IR-200L
 	  dongle. If you want to compile it as a module, say M here and read
@@ -145,7 +208,7 @@ config ACT200L_DONGLE
 
 config MA600_DONGLE
 	tristate "Mobile Action MA600 dongle (EXPERIMENTAL)"
-	depends on DONGLE && EXPERIMENTAL && IRDA
+	depends on DONGLE_OLD && EXPERIMENTAL && IRDA
 	---help---
 	  Say Y here if you want to build support for the Mobile Action MA600
 	  dongle.  If you want to compile it as a module, say M here and read

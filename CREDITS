@@ -533,6 +533,10 @@ S: Tamsui town, Taipei county,
 S: Taiwan 251
 S: Republic of China
 
+N: Michael Elizabeth Chastain
+E: mec@shout.net
+D: Configure, Menuconfig, xconfig
+
 N: Raymond Chen
 E: raymondc@microsoft.com
 D: Author of Configure script

@@ -25,10 +25,10 @@
 #include <asm/pgtable.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
+#include <asm/irq.h>
 #ifdef CONFIG_PMAC_PBOOK
 #include <linux/adb.h>
 #include <linux/pmu.h>
-#include <asm/irq.h>
 #endif
 #include "bmac.h"
 
@@ -1053,7 +1053,7 @@ static void bmac_set_multicast(struct net_device *dev)
 {
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
-	int i, j, bit, byte;
+	int i;
 	unsigned short rx_cfg;
 	u32 crc;
 

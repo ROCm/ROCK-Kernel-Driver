@@ -180,13 +180,16 @@ EXPORT_SYMBOL(irtty_set_packet_mode);
 __u32 irda_debug = IRDA_DEBUG_LEVEL;
 #endif
 
+/* Packet type handler.
+ * Tell the kernel how IrDA packets should be handled.
+ */
 static struct packet_type irda_packet_type = 
 {
-	0,	/* MUTTER ntohs(ETH_P_IRDA),*/
-	NULL,
-	irlap_driver_rcv,
-	NULL,
-	NULL,
+	.type	= __constant_htons(ETH_P_IRDA),
+	.dev	= NULL,			/* Wildcard : All devices */
+	.func	= irlap_driver_rcv,	/* Packet type handler irlap_frame.c */
+	.data	= (void*) 1,		/* Understand shared skbs */
+	//.next	= NULL,
 };
 
 /*
@@ -267,7 +270,6 @@ int __init irda_init(void)
 	irsock_init();
 	
 	/* Add IrDA packet type (Start receiving packets) */
-	irda_packet_type.type = htons(ETH_P_IRDA);
         dev_add_pack(&irda_packet_type);
 
 	/* Notifier for Interface changes */

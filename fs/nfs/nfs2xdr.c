@@ -233,7 +233,6 @@ nfs_xdr_readargs(struct rpc_rqst *req, u32 *p, struct nfs_readargs *args)
 static int
 nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 {
-	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	struct iovec *iov = req->rq_rvec;
 	int	status, count, recvd, hdrlen;
 
@@ -243,11 +242,6 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 
 	count = ntohl(*p++);
 	res->eof = 0;
-	if (rcvbuf->page_len) {
-		u32 end = page_offset(rcvbuf->pages[0]) + rcvbuf->page_base + count;
-		if (end >= res->fattr->size)
-			res->eof = 1;
-	}
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
 	if (iov->iov_len < hdrlen) {
 		printk(KERN_WARNING "NFS: READ reply header overflowed:"
@@ -263,7 +257,6 @@ nfs_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 			"count %d > recvd %d\n", count, recvd);
 		count = recvd;
-		res->eof = 0;
 	}
 
 	dprintk("RPC:      readres OK count %d\n", count);
