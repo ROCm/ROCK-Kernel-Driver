@@ -249,10 +249,20 @@ static inline void usb_serial_console_init (int debug, int minor) { }
 static inline void usb_serial_console_exit (void) { }
 #endif
 
-/* Functions needed by the usb serial console code */
+/* Functions needed by other parts of the usbserial core */
 extern struct usb_serial *usb_serial_get_by_minor (unsigned int minor);
 extern int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp);
 extern int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+extern void usb_serial_generic_close (struct usb_serial_port *port, struct file *filp);
+extern int usb_serial_generic_write_room (struct usb_serial_port *port);
+extern int usb_serial_generic_chars_in_buffer (struct usb_serial_port *port);
+extern void usb_serial_generic_read_bulk_callback (struct urb *urb);
+extern void usb_serial_generic_write_bulk_callback (struct urb *urb);
+extern void usb_serial_generic_shutdown (struct usb_serial *serial);
+extern int usb_serial_generic_register (int debug);
+extern void usb_serial_generic_deregister (void);
+
+extern struct usb_serial_device_type usb_serial_generic_device;
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)
