@@ -110,6 +110,7 @@ void ext3_free_blocks (handle_t *handle, struct inode * inode,
 	struct super_block * sb;
 	struct ext3_group_desc * gdp;
 	struct ext3_super_block * es;
+	struct ext3_sb_info *sbi;
 	int err = 0, ret;
 	int dquot_freed_blocks = 0;
 
@@ -118,6 +119,7 @@ void ext3_free_blocks (handle_t *handle, struct inode * inode,
 		printk ("ext3_free_blocks: nonexistent device");
 		return;
 	}
+	sbi = EXT3_SB(sb);
 	es = EXT3_SB(sb)->s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) ||
 	    block + count < block ||
@@ -242,11 +244,12 @@ do_more:
 		}
 	}
 
-	spin_lock(bg_lock(sb, block_group));
+	spin_lock(sb_bgl_lock(sbi, block_group));
 	gdp->bg_free_blocks_count =
 		cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count) +
 			dquot_freed_blocks);
-	spin_unlock(bg_lock(sb, block_group));
+	spin_unlock(sb_bgl_lock(sbi, block_group));
+	percpu_counter_mod(&sbi->s_freeblocks_counter, count);
 
 	/* We dirtied the bitmap block */
 	BUFFER_TRACE(bitmap_bh, "dirtied bitmap block");
@@ -429,7 +432,7 @@ got:
 		have_access = 1;
 	}
 
-	if (!claim_block(bg_lock(sb, group), goal, bitmap_bh)) {
+	if (!claim_block(sb_bgl_lock(EXT3_SB(sb), group), goal, bitmap_bh)) {
 		/*
 		 * The block was allocated by another thread, or it was
 		 * allocated and then freed by another thread
@@ -477,11 +480,11 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	int target_block;			/* tmp */
 	int fatal = 0, err;
 	int performed_allocation = 0;
-	int free;
-	int use_reserve = 0;
+	int free_blocks, root_blocks;
 	struct super_block *sb;
 	struct ext3_group_desc *gdp;
 	struct ext3_super_block *es;
+	struct ext3_sb_info *sbi;
 #ifdef EXT3FS_DEBUG
 	static int goal_hits = 0, goal_attempts = 0;
 #endif
@@ -500,8 +503,18 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 		return 0;
 	}
 
+	sbi = EXT3_SB(sb);
 	es = EXT3_SB(sb)->s_es;
 	ext3_debug("goal=%lu.\n", goal);
+
+	free_blocks = percpu_counter_read_positive(&sbi->s_freeblocks_counter);
+	root_blocks = le32_to_cpu(es->s_r_blocks_count);
+	if (free_blocks < root_blocks + 1 && !capable(CAP_SYS_RESOURCE) &&
+		sbi->s_resuid != current->fsuid &&
+		(sbi->s_resgid == 0 || !in_group_p (sbi->s_resgid))) {
+		*errp = -ENOSPC;
+		return 0;
+	}
 
 	/*
 	 * First, test whether the goal block is free.
@@ -515,9 +528,8 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	if (!gdp)
 		goto io_error;
 
-	free = le16_to_cpu(gdp->bg_free_blocks_count);
-	free -= EXT3_SB(sb)->s_bgi[group_no].bg_reserved;
-	if (free > 0) {
+	free_blocks = le16_to_cpu(gdp->bg_free_blocks_count);
+	if (free_blocks > 0) {
 		ret_block = ((goal - le32_to_cpu(es->s_first_data_block)) %
 				EXT3_BLOCKS_PER_GROUP(sb));
 		bitmap_bh = read_block_bitmap(sb, group_no);
@@ -535,7 +547,6 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	 * Now search the rest of the groups.  We assume that 
 	 * i and gdp correctly point to the last group visited.
 	 */
-repeat:
 	for (bgi = 0; bgi < EXT3_SB(sb)->s_groups_count; bgi++) {
 		group_no++;
 		if (group_no >= EXT3_SB(sb)->s_groups_count)
@@ -545,10 +556,8 @@ repeat:
 			*errp = -EIO;
 			goto out;
 		}
-		free = le16_to_cpu(gdp->bg_free_blocks_count);
-		if (!use_reserve) 
-			free -= EXT3_SB(sb)->s_bgi[group_no].bg_reserved;
-		if (free <= 0)
+		free_blocks = le16_to_cpu(gdp->bg_free_blocks_count);
+		if (free_blocks <= 0)
 			continue;
 
 		brelse(bitmap_bh);
@@ -561,15 +570,6 @@ repeat:
 			goto out;
 		if (ret_block >= 0) 
 			goto allocated;
-	}
-
-	if (!use_reserve &&
-		(EXT3_SB(sb)->s_resuid == current->fsuid ||
-		  (EXT3_SB(sb)->s_resgid != 0 && in_group_p(EXT3_SB(sb)->s_resgid)) ||
-		  capable(CAP_SYS_RESOURCE))) {
-		use_reserve = 1;
-		group_no = 0;
-		goto repeat;
 	}
 
 	/* No space left on the device */
@@ -612,13 +612,13 @@ allocated:
 		}
 	}
 #endif
-	spin_lock(bg_lock(sb, group_no));
+	spin_lock(sb_bgl_lock(sbi, group_no));
 	if (buffer_jbd(bitmap_bh) && bh2jh(bitmap_bh)->b_committed_data)
 		J_ASSERT_BH(bitmap_bh,
 			!ext3_test_bit(ret_block,
 					bh2jh(bitmap_bh)->b_committed_data));
 	ext3_debug("found bit %d\n", ret_block);
-	spin_unlock(bg_lock(sb, group_no));
+	spin_unlock(sb_bgl_lock(sbi, group_no));
 
 	/* ret_block was blockgroup-relative.  Now it becomes fs-relative */
 	ret_block = target_block;
@@ -639,10 +639,11 @@ allocated:
 	ext3_debug("allocating block %d. Goal hits %d of %d.\n",
 			ret_block, goal_hits, goal_attempts);
 
-	spin_lock(bg_lock(sb, group_no));
+	spin_lock(sb_bgl_lock(sbi, group_no));
 	gdp->bg_free_blocks_count =
 			cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count) - 1);
-	spin_unlock(bg_lock(sb, group_no));
+	spin_unlock(sb_bgl_lock(sbi, group_no));
+	percpu_counter_mod(&sbi->s_freeblocks_counter, -1);
 
 	BUFFER_TRACE(gdp_bh, "journal_dirty_metadata for group descriptor");
 	err = ext3_journal_dirty_metadata(handle, gdp_bh);

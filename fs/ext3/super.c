@@ -460,7 +460,7 @@ void ext3_put_super (struct super_block * sb)
 	for (i = 0; i < sbi->s_gdb_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
-	kfree(sbi->s_bgi);
+	kfree(sbi->s_debts);
 	brelse(sbi->s_sbh);
 
 	/* Debugging code just in case the in-memory inode orphan list
@@ -902,7 +902,6 @@ static int ext3_check_descriptors (struct super_block * sb)
 	unsigned long block = le32_to_cpu(sbi->s_es->s_first_data_block);
 	struct ext3_group_desc * gdp = NULL;
 	unsigned long total_free;
-	unsigned int reserved = le32_to_cpu(sbi->s_es->s_r_blocks_count);
 	int desc_block = 0;
 	int i;
 
@@ -956,25 +955,6 @@ static int ext3_check_descriptors (struct super_block * sb)
 				le32_to_cpu(EXT3_SB(sb)->s_es->s_free_blocks_count),
 				total_free);
 		EXT3_SB(sb)->s_es->s_free_blocks_count = cpu_to_le32(total_free);
-	}
-
-	/* distribute reserved blocks over groups -bzzz */
-	for(i = sbi->s_groups_count - 1; reserved && total_free && i >= 0; i--) {
-		int free;
-
-		gdp = ext3_get_group_desc (sb, i, NULL);
-		if (!gdp) {
-			ext3_error (sb, "ext3_check_descriptors",
-					"cant get descriptor for group %d", i);
-			return 0;
-		}
-
-		free = le16_to_cpu(gdp->bg_free_blocks_count);
-		if (free > reserved)
-			free = reserved;
-		sbi->s_bgi[i].bg_reserved = free;
-		reserved -= free;
-		total_free -= free;
 	}
 
 	total_free = ext3_count_free_inodes(sb);
@@ -1346,17 +1326,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		printk (KERN_ERR "EXT3-fs: not enough memory\n");
 		goto failed_mount;
 	}
-	sbi->s_bgi = kmalloc(sbi->s_groups_count * sizeof(struct ext3_bg_info),
+	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(u8),
 			GFP_KERNEL);
-	if (!sbi->s_bgi) {
+	if (!sbi->s_debts) {
 		printk("EXT3-fs: not enough memory to allocate s_bgi\n");
 		goto failed_mount2;
 	}
-	memset(sbi->s_bgi, 0,  sbi->s_groups_count * sizeof(struct ext3_bg_info));
-	for (i = 0; i < sbi->s_groups_count; i++) {
-		spin_lock_init(&sbi->s_bgi[i].bg_balloc_lock);
-		spin_lock_init(&sbi->s_bgi[i].bg_ialloc_lock);
-	}
+	memset(sbi->s_debts, 0,  sbi->s_groups_count * sizeof(u8));
+
+	percpu_counter_init(&sbi->s_freeblocks_counter);
+	percpu_counter_init(&sbi->s_freeinodes_counter);
+	percpu_counter_init(&sbi->s_dirs_counter);
+	bgl_lock_init(&sbi->s_blockgroup_lock);
+
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -1469,12 +1451,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA ? "ordered":
 		"writeback");
 
+	percpu_counter_mod(&sbi->s_freeblocks_counter,
+		ext3_count_free_blocks(sb));
+	percpu_counter_mod(&sbi->s_freeinodes_counter,
+		ext3_count_free_inodes(sb));
+	percpu_counter_mod(&sbi->s_dirs_counter,
+		ext3_count_dirs(sb));
+
 	return 0;
 
 failed_mount3:
 	journal_destroy(sbi->s_journal);
 failed_mount2:
-	kfree(sbi->s_bgi);
+	kfree(sbi->s_debts);
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
