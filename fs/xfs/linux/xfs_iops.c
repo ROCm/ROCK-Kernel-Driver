@@ -52,17 +52,17 @@ validate_fields(
 	ip->i_blocks = va.va_nblocks;
 }
 
-#ifdef CONFIG_XFS_POSIX_ACL
 /*
  * Determine whether a process has a valid fs_struct (kernel daemons
  * like knfsd don't have an fs_struct).
+ *
+ * XXX(hch):  nfsd is broken, better fix it instead.
  */
 STATIC int inline
 has_fs_struct(struct task_struct *task)
 {
 	return (task->fs != init_task.fs);
 }
-#endif
 
 STATIC int
 linvfs_mknod(
