@@ -43,10 +43,9 @@ int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	rcu_read_lock();
 	if (dest[0] & 1) 
 		br_flood_deliver(br, skb, 0);
-	else if ((dst = br_fdb_get(br, dest)) != NULL) {
+	else if ((dst = __br_fdb_get(br, dest)) != NULL)
 		br_deliver(dst->dst, skb);
-		br_fdb_put(dst);
-	} else
+	else
 		br_flood_deliver(br, skb, 0);
 
 	rcu_read_unlock();

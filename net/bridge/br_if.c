@@ -149,7 +149,7 @@ static struct net_device *new_bridge_dev(const char *name)
 
 	br->lock = SPIN_LOCK_UNLOCKED;
 	INIT_LIST_HEAD(&br->port_list);
-	br->hash_lock = RW_LOCK_UNLOCKED;
+	br->hash_lock = SPIN_LOCK_UNLOCKED;
 
 	br->bridge_id.prio[0] = 0x80;
 	br->bridge_id.prio[1] = 0x00;

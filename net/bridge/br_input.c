@@ -83,19 +83,17 @@ int br_handle_frame_finish(struct sk_buff *skb)
 		goto out;
 	}
 
-	dst = br_fdb_get(br, dest);
+	dst = __br_fdb_get(br, dest);
 	if (dst != NULL && dst->is_local) {
 		if (!passedup)
 			br_pass_frame_up(br, skb);
 		else
 			kfree_skb(skb);
-		br_fdb_put(dst);
 		goto out;
 	}
 
 	if (dst != NULL) {
 		br_forward(dst->dst, skb);
-		br_fdb_put(dst);
 		goto out;
 	}
 
