@@ -250,7 +250,7 @@
 
 #define DRIVER_DESC		"File-backed Storage Gadget"
 #define DRIVER_NAME		"g_file_storage"
-#define DRIVER_VERSION		"31 August 2004"
+#define DRIVER_VERSION		"20 October 2004"
 
 static const char longname[] = DRIVER_DESC;
 static const char shortname[] = DRIVER_NAME;
@@ -430,9 +430,9 @@ MODULE_PARM_DESC(stall, "false to prevent bulk stalls");
 
 /* Command Block Wrapper */
 struct bulk_cb_wrap {
-	u32	Signature;		// Contains 'USBC'
+	__le32	Signature;		// Contains 'USBC'
 	u32	Tag;			// Unique per command id
-	u32	DataTransferLength;	// Size of the data
+	__le32	DataTransferLength;	// Size of the data
 	u8	Flags;			// Direction in bit 7
 	u8	Lun;			// LUN (normally 0)
 	u8	Length;			// Of the CDB, <= MAX_COMMAND_SIZE
@@ -445,9 +445,9 @@ struct bulk_cb_wrap {
 
 /* Command Status Wrapper */
 struct bulk_cs_wrap {
-	u32	Signature;		// Should = 'USBS'
+	__le32	Signature;		// Should = 'USBS'
 	u32	Tag;			// Same as original command
-	u32	Residue;		// Amount not transferred
+	__le32	Residue;		// Amount not transferred
 	u8	Status;			// See below
 };
 
@@ -3717,30 +3717,30 @@ static int __init check_parameters(struct fsg_dev *fsg)
 
 	if (mod_data.release == 0xffff) {	// Parameter wasn't set
 		if (gadget_is_net2280(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0301);
+			mod_data.release = 0x0301;
 		else if (gadget_is_dummy(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0302);
+			mod_data.release = 0x0302;
 		else if (gadget_is_pxa(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0303);
+			mod_data.release = 0x0303;
 		else if (gadget_is_sh(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0304);
+			mod_data.release = 0x0304;
 
 		/* The sa1100 controller is not supported */
 
 		else if (gadget_is_goku(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0306);
+			mod_data.release = 0x0306;
 		else if (gadget_is_mq11xx(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0307);
+			mod_data.release = 0x0307;
 		else if (gadget_is_omap(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0308);
+			mod_data.release = 0x0308;
 		else if (gadget_is_lh7a40x(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16 (0x0309);
+			mod_data.release = 0x0309;
 		else if (gadget_is_n9604(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16 (0x030a);
+			mod_data.release = 0x0310;
 		else {
 			WARN(fsg, "controller '%s' not recognized\n",
 				fsg->gadget->name);
-			mod_data.release = __constant_cpu_to_le16(0x0399);
+			mod_data.release = 0x0399;
 		}
 	}
 
