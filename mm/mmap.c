@@ -846,7 +846,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			ret = is_hugepage_only_range(addr, len);
 		}
 		if (ret)
-			return ret;
+			return -EINVAL;
 		return addr;
 	}
 
