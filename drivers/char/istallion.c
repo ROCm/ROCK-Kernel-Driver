@@ -5323,7 +5323,7 @@ int __init stli_init(void)
 			       S_IFCHR | S_IRUSR | S_IWUSR,
 			       "staliomem/%d", i);
 		class_simple_device_add(istallion_class, MKDEV(STL_SIOMEMMAJOR, i), 
-				NULL, "staliomem/%d", i);
+				NULL, "staliomem%d", i);
 	}
 
 /*
