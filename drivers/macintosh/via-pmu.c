@@ -2880,6 +2880,7 @@ pmu_ioctl(struct inode * inode, struct file *filp,
 		     u_int cmd, u_long arg)
 {
 	struct pmu_private *pp = filp->private_data;
+	__u32 __user *argp = (__u32 __user *)arg;
 	int error;
 
 	switch (cmd) {
@@ -2906,7 +2907,7 @@ pmu_ioctl(struct inode * inode, struct file *filp,
 		sleep_in_progress = 0;
 		return error;
 	case PMU_IOC_CAN_SLEEP:
-		return put_user((u32)can_sleep, (__u32 *)arg);
+		return put_user((u32)can_sleep, argp);
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 	/* Backlight should have its own device or go via
@@ -2918,13 +2919,13 @@ pmu_ioctl(struct inode * inode, struct file *filp,
 		error = get_backlight_level();
 		if (error < 0)
 			return error;
-		return put_user(error, (__u32 *)arg);
+		return put_user(error, argp);
 	case PMU_IOC_SET_BACKLIGHT:
 	{
 		__u32 value;
 		if (sleep_in_progress)
 			return -EBUSY;
-		error = get_user(value, (__u32 *)arg);
+		error = get_user(value, argp);
 		if (!error)
 			error = set_backlight_level(value);
 		return error;
@@ -2943,9 +2944,9 @@ pmu_ioctl(struct inode * inode, struct file *filp,
 #endif /* CONFIG_INPUT_ADBHID */
 #endif /* CONFIG_PMAC_BACKLIGHT */
 	case PMU_IOC_GET_MODEL:
-	    	return put_user(pmu_kind, (__u32 *)arg);
+	    	return put_user(pmu_kind, argp);
 	case PMU_IOC_HAS_ADB:
-		return put_user(pmu_has_adb, (__u32 *)arg);
+		return put_user(pmu_has_adb, argp);
 	}
 	return -EINVAL;
 }
