@@ -77,7 +77,7 @@ CONFIG_MOUSE_AMIGA
   The module will be called amimouse.o. If you want to compile it as a
   module, say M here and read <file.:Documentation/modules.txt>.
 
-CONFIG_MOUSE_ACORN
+CONFIG_MOUSE_RISCPC
   Say Y here if you have the Acorn RiscPC computer and want its
   native mouse supported.
 

@@ -12,12 +12,8 @@ if [ "$CONFIG_Q40" = "y" ]; then
 fi
 dep_tristate '  Parallel port keyboard adapter' CONFIG_SERIO_PARKBD $CONFIG_SERIO $CONFIG_PARPORT
 
-if [ "$CONFIG_ARCH_ACORN" = "y" ]; then
-   dep_tristate '  Acorn RiscPC keyboard controller' CONFIG_SERIO_ACORN $CONFIG_SERIO
-fi
-if [ "$CONFIG_ARCH_INTEGRATOR" = "y" ]; then
-   dep_tristate '  AMBA KMI keyboard controller' CONFIG_SERIO_AMBAKMI $CONFIG_SERIO
-fi
-if [ "$CONFIG_SA1111" = "y" ]; then
-   dep_tristate '  Intel SA1111 keyboard controller' CONFIG_SERIO_SA1111 $CONFIG_SERIO
+if [ "$CONFIG_ARM" = "y" ]; then
+   dep_tristate '  Acorn RiscPC keyboard controller' CONFIG_SERIO_RPCKBD $CONFIG_SERIO $CONFIG_ARCH_RPC
+   dep_tristate '  AMBA KMI keyboard controller' CONFIG_SERIO_AMBAKMI $CONFIG_SERIO $CONFIG_ARCH_INTEGRATOR
+   dep_tristate '  Intel SA1111 keyboard controller' CONFIG_SERIO_SA1111 $CONFIG_SERIO $CONFIG_SA1111
 fi
