@@ -21,7 +21,7 @@
    All SMBus-related things are written by Frodo Looijaard <frodol@dds.nl>
    SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com>                */
 
-/* $Id: i2c-core.c,v 1.86 2002/09/12 06:47:26 ac9410 Exp $ */
+/* $Id: i2c-core.c,v 1.89 2002/11/03 16:47:16 mds Exp $ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -77,7 +77,8 @@ static int i2c_debug;
 
 #ifdef CONFIG_PROC_FS
 
-static int i2cproc_init(void);
+int __init i2cproc_init(void);
+void __exit i2cproc_exit(void);
 static int i2cproc_cleanup(void);
 
 static ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count, 
@@ -1332,15 +1333,15 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 		if (read_write == I2C_SMBUS_READ) {
 			msg[1].len = I2C_SMBUS_I2C_BLOCK_MAX;
 		} else {
-			msg[0].len = data->block[0] + 2;
-			if (msg[0].len > I2C_SMBUS_I2C_BLOCK_MAX + 2) {
+			msg[0].len = data->block[0] + 1;
+			if (msg[0].len > I2C_SMBUS_I2C_BLOCK_MAX + 1) {
 				printk("i2c-core.o: i2c_smbus_xfer_emulated called with "
 				       "invalid block write size (%d)\n",
 				       data->block[0]);
 				return -1;
 			}
-			for (i = 0; i < data->block[0]; i++)
-				msgbuf0[i] = data->block[i+1];
+			for (i = 1; i <= data->block[0]; i++)
+				msgbuf0[i] = data->block[i];
 		}
 		break;
 	default:
@@ -1456,7 +1457,7 @@ static int __init i2c_init(void)
 	return 0;
 }
 
-static void __exit i2c_exit(void)
+void __exit i2c_exit(void)
 {
 	i2cproc_cleanup();
 }
