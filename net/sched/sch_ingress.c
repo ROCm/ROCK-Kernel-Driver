@@ -222,11 +222,6 @@ used on the egress (might slow things for an iota)
 */
 
 	if (dev->qdisc_ingress) {
-		/* FIXME: Push down to ->enqueue functions --RR */
-		if (skb_is_nonlinear(*pskb)
-		    && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-			return NF_DROP;
-
 		spin_lock(&dev->queue_lock);
 		if ((q = dev->qdisc_ingress) != NULL)
 			fwres = q->enqueue(skb, q);
