@@ -97,14 +97,19 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 	cardnum %= SNDRV_CARDS;
 	device %= SNDRV_MINOR_HWDEPS;
 	hw = snd_hwdep_devices[(cardnum * SNDRV_MINOR_HWDEPS) + device];
+	if (hw == NULL)
+		return -ENODEV;
 
-	snd_assert(hw != NULL, return -ENODEV);
 	if (!hw->ops.open)
 		return -ENXIO;
 #ifdef CONFIG_SND_OSSEMUL
 	if (major == SOUND_MAJOR && hw->oss_type < 0)
 		return -ENXIO;
 #endif
+
+	if (!try_module_get(hw->card->module))
+		return -EFAULT;
+
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&hw->open_wait, &wait);
 	down(&hw->open_mutex);
@@ -137,9 +142,14 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 		if (err >= 0) {
 			file->private_data = hw;
 			hw->used++;
+		} else {
+			if (hw->ops.release)
+				hw->ops.release(hw, file);
 		}
 	}
 	up(&hw->open_mutex);
+	if (err < 0)
+		module_put(hw->card->module);
 	return err;
 }
 
@@ -156,7 +166,8 @@ static int snd_hwdep_release(struct inode *inode, struct file * file)
 		hw->used--;
 	snd_card_file_remove(hw->card, file);
 	up(&hw->open_mutex);
-	return -ENXIO;	
+	module_put(hw->card->module);
+	return err;
 }
 
 static unsigned int snd_hwdep_poll(struct file * file, poll_table * wait)
