@@ -616,10 +616,12 @@ static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * If the host/device isn't busy, assume that something actually
 	 * completed, and that we should be able to queue a command now.
 	 *
-	 * Note that there is an implicit assumption that every host can
-	 * always queue at least one command.  If a host is inactive and
-	 * cannot queue any commands, I don't see how things could
-	 * possibly work anyways.
+	 * Note that the prior mid-layer assumption that any host could
+	 * always queue at least one command is now broken.  The mid-layer
+	 * will implement a user specifiable stall (see
+	 * scsi_host.max_host_blocked and scsi_device.max_device_blocked)
+	 * if a command is requeued with no other commands outstanding
+	 * either for the device or for the host.
 	 */
 	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
 		host->host_blocked = host->max_host_blocked;
