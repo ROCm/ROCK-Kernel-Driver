@@ -99,7 +99,7 @@ static int	debug = 0;	/* debugging output */
 #ifdef DDB
 #undef DDB
 #endif
-#define DDB(x) {if (debug) x;}
+#define DDB(x) do {if (debug) x;} while (0)
 
 static unsigned char mad_read(int port)
 {
@@ -278,7 +278,8 @@ static int __init detect_mad16(void)
 	}
 	for (i = 0xf8d; i <= 0xf98; i++)
 		if (!c924pnp)
-			DDB(printk("Port %0x (init value) = %0x\n", i, mad_read(i))) else
+			DDB(printk("Port %0x (init value) = %0x\n", i, mad_read(i)));
+		else
 			DDB(printk("Port %0x (init value) = %0x\n", i-0x80, mad_read(i)));
 
 	if (board_type == C930)
