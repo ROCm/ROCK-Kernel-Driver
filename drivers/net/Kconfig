@@ -1398,16 +1398,6 @@ config EEPRO100
 	  will be called eepro100.
 
 
-config EEPRO100_PIO
-	bool "Use PIO instead of MMIO" if !X86_VISWS
-	depends on EEPRO100
-	default y if X86_VISWS
-	help
-	  This instructs the driver to use programmed I/O ports (PIO) instead
-	  of PCI shared memory (MMIO).  This can possibly solve some problems
-	  in case your mainboard has memory consistency issues.  If unsure,
-	  say N.
-
 config E100
 	tristate "Intel(R) PRO/100+ support"
 	depends on NET_PCI && PCI
