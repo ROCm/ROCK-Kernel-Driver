@@ -159,6 +159,7 @@ xfs_buftarg_t *xlog_target;
 #endif
 
 #if defined(XFS_LOG_TRACE)
+
 void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 {
@@ -178,31 +179,6 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
 		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
 		     (void *)string,
-		     (void *)((unsigned long)13),
-		     (void *)((unsigned long)14),
-		     (void *)((unsigned long)15),
-		     (void *)((unsigned long)16));
-}
-
-void
-xlog_trace_tic(xlog_t *log, xlog_ticket_t *tic)
-{
-	if (! log->l_trace)
-		log->l_trace = ktrace_alloc(256, KM_SLEEP);
-
-	ktrace_enter(log->l_trace,
-		     (void *)tic,
-		     (void *)((unsigned long)tic->t_curr_res),
-		     (void *)((unsigned long)tic->t_unit_res),
-		     (void *)((unsigned long)tic->t_ocnt),
-		     (void *)((unsigned long)tic->t_cnt),
-		     (void *)((unsigned long)tic->t_flags),
-		     (void *)((unsigned long)7),
-		     (void *)((unsigned long)8),
-		     (void *)((unsigned long)9),
-		     (void *)((unsigned long)10),
-		     (void *)((unsigned long)11),
-		     (void *)((unsigned long)12),
 		     (void *)((unsigned long)13),
 		     (void *)((unsigned long)14),
 		     (void *)((unsigned long)15),
@@ -1578,7 +1554,7 @@ xlog_unalloc_log(xlog_t *log)
 		sv_destroy(&iclog->ic_forcesema);
 		sv_destroy(&iclog->ic_writesema);
 		xfs_buf_free(iclog->ic_bp);
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
 		}
@@ -1609,7 +1585,7 @@ xlog_unalloc_log(xlog_t *log)
 		}
 	}
 	xfs_buf_free(log->l_xbuf);
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);
 	}
