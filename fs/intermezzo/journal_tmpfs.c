@@ -97,13 +97,13 @@ static int presto_tmpfs_has_all_data(struct inode *inode)
 }
 
 struct journal_ops presto_tmpfs_journal_ops = {
-        tr_all_data: presto_tmpfs_has_all_data,
-        tr_avail: presto_tmpfs_freespace,
-        tr_start:  presto_tmpfs_trans_start,
-        tr_commit: presto_tmpfs_trans_commit,
-        tr_journal_data: presto_tmpfs_journal_file_data,
-        tr_ilookup: presto_tmpfs_ilookup,
-        tr_add_ilookup: presto_add_ilookup_dentry
+        .tr_all_data            = presto_tmpfs_has_all_data,
+        .tr_avail               = presto_tmpfs_freespace,
+        .tr_start               = presto_tmpfs_trans_start,
+        .tr_commit              = presto_tmpfs_trans_commit,
+        .tr_journal_data        = presto_tmpfs_journal_file_data,
+        .tr_ilookup             = presto_tmpfs_ilookup,
+        .tr_add_ilookup         = presto_add_ilookup_dentry
 };
 
 #endif /* CONFIG_EXT3_FS */
