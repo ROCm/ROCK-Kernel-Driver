@@ -405,7 +405,7 @@ void hpte_init_native(void)
 	root = of_find_node_by_path("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
-		if (!strcmp(model, "CHRP IBM,9076-N81")) {
+		if (model && !strcmp(model, "IBM,9076-N81")) {
 			of_node_put(root);
 			goto bail;
 		}

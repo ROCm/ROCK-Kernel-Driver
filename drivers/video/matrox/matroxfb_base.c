@@ -1183,11 +1183,11 @@ static int matroxfb_blank(int blank, struct fb_info *info)
 		return 1;
 
 	switch (blank) {
-		case 1:  seq = 0x20; crtc = 0x00; break; /* works ??? */
-		case 2:  seq = 0x20; crtc = 0x10; break;
-		case 3:  seq = 0x20; crtc = 0x20; break;
-		case 4:  seq = 0x20; crtc = 0x30; break;
-		default: seq = 0x00; crtc = 0x00; break;
+	case FB_BLANK_NORMAL:  seq = 0x20; crtc = 0x00; break; /* works ??? */
+	case FB_BLANK_VSYNC_SUSPEND:  seq = 0x20; crtc = 0x10; break;
+	case FB_BLANK_HSYNC_SUSPEND:  seq = 0x20; crtc = 0x20; break;
+	case FB_BLANK_POWERDOWN:  seq = 0x20; crtc = 0x30; break;
+	default: seq = 0x00; crtc = 0x00; break;
 	}
 
 	CRITBEGIN

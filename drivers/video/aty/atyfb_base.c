@@ -2045,7 +2045,7 @@ static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
 	aty_reset_engine(par);
 
 	/* Blank display and LCD */
-	atyfb_blank(VESA_POWERDOWN + 1, info);
+	atyfb_blank(FB_BLANK_POWERDOWN, info);
 
 	par->asleep = 1;
 	par->lock_blank = 1;
@@ -2054,7 +2054,7 @@ static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
 	if (aty_power_mgmt(1, par)) {
 		par->asleep = 0;
 		par->lock_blank = 0;
-		atyfb_blank(0, info);
+		atyfb_blank(FB_BLANK_UNBLANK, info);
 		fb_set_suspend(info, 0);
 		release_console_sem();
 		return -EIO;
@@ -2089,7 +2089,7 @@ static int atyfb_pci_resume(struct pci_dev *pdev)
 
 	/* Unblank */
 	par->lock_blank = 0;
-	atyfb_blank(0, info);
+	atyfb_blank(FB_BLANK_UNBLANK, info);
 
 	release_console_sem();
 
@@ -2625,22 +2625,23 @@ static int atyfb_blank(int blank, struct fb_info *info)
 #endif
 
 	gen_cntl = aty_ld_8(CRTC_GEN_CNTL, par);
-	if (blank > 0)
-		switch (blank - 1) {
-		case VESA_NO_BLANKING:
+	switch (blank) {
+        	case FB_BLANK_UNBLANK:
+			gen_cntl &= ~(0x4c);
+			break;
+		case FB_BLANK_NORMAL:
 			gen_cntl |= 0x40;
 			break;
-		case VESA_VSYNC_SUSPEND:
+		case FB_BLANK_VSYNC_SUSPEND:
 			gen_cntl |= 0x8;
 			break;
-		case VESA_HSYNC_SUSPEND:
+		case FB_BLANK_HSYNC_SUSPEND:
 			gen_cntl |= 0x4;
 			break;
-		case VESA_POWERDOWN:
+		case FB_BLANK_POWERDOWN:
 			gen_cntl |= 0x4c;
 			break;
-	} else
-		gen_cntl &= ~(0x4c);
+	}
 	aty_st_8(CRTC_GEN_CNTL, gen_cntl, par);
 
 #ifdef CONFIG_PMAC_BACKLIGHT

@@ -3177,17 +3177,17 @@ static const char *dma[PARPORT_PC_MAX_PORTS];
 static const char *init_mode;
 
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
-MODULE_PARM(io, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io_hi, "Base I/O address (ECR)");
-MODULE_PARM(io_hi, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "i");
+module_param_array(io_hi, int, NULL, 0);
 MODULE_PARM_DESC(irq, "IRQ line");
-MODULE_PARM(irq, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "s");
+module_param_array(irq, charp, NULL, 0);
 MODULE_PARM_DESC(dma, "DMA channel");
-MODULE_PARM(dma, "1-" __MODULE_STRING(PARPORT_PC_MAX_PORTS) "s");
+module_param_array(dma, charp, NULL, 0);
 #if defined(CONFIG_PARPORT_PC_SUPERIO) || \
        (defined(CONFIG_PARPORT_1284) && defined(CONFIG_PARPORT_PC_FIFO))
 MODULE_PARM_DESC(verbose_probing, "Log chit-chat during initialisation");
-MODULE_PARM(verbose_probing, "i");
+module_param(verbose_probing, int, 0644);
 #endif
 MODULE_PARM_DESC(init_mode, "Initialise mode for VIA VT8231 port (spp, ps2, epp, ecp or ecpepp)");
 MODULE_PARM(init_mode, "s");

@@ -306,11 +306,11 @@ static int fs_debug = 0;
 
 #ifdef MODULE
 #ifdef DEBUG 
-MODULE_PARM(fs_debug, "i");
+module_param(fs_debug, int, 0644);
 #endif
-MODULE_PARM(loopback, "i");
-MODULE_PARM(num, "i");
-MODULE_PARM(fs_keystream, "i");
+module_param(loopback, int, 0);
+module_param(num, int, 0);
+module_param(fs_keystream, int, 0);
 /* XXX Add rx_buf_sizes, and rx_pool_sizes As per request Amar. -- REW */
 #endif
 

@@ -1340,7 +1340,7 @@ int neofb_blank(int blank_mode, struct fb_info *info)
 	int seqflags, lcdflags, dpmsflags, reg;
 
 	switch (blank_mode) {
-	case 4:		/* powerdown - both sync lines down */
+	case FB_BLANK_POWERDOWN:	/* powerdown - both sync lines down */
 		seqflags = VGA_SR01_SCREEN_OFF; /* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_HSYNC |
@@ -1358,22 +1358,22 @@ int neofb_blank(int blank_mode, struct fb_info *info)
 		}
 #endif
 		break;
-	case 3:		/* hsync off */
+	case FB_BLANK_HSYNC_SUSPEND:		/* hsync off */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_HSYNC;
 		break;
-	case 2:		/* vsync off */
+	case FB_BLANK_VSYNC_SUSPEND:		/* vsync off */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = 0;			/* LCD off */
 		dpmsflags = NEO_GR01_SUPPRESS_VSYNC;
 		break;
-	case 1:		/* just blank screen (backlight stays on) */
+	case FB_BLANK_NORMAL:		/* just blank screen (backlight stays on) */
 		seqflags = VGA_SR01_SCREEN_OFF;	/* Disable sequencer */
 		lcdflags = par->PanelDispCntlReg1 & 0x02; /* LCD normal */
 		dpmsflags = 0;			/* no hsync/vsync suppression */
 		break;
-	case 0:		/* unblank */
+	case FB_BLANK_UNBLANK:		/* unblank */
 		seqflags = 0;			/* Enable sequencer */
 		lcdflags = par->PanelDispCntlReg1 & 0x02; /* LCD normal */
 		dpmsflags = 0x00;	/* no hsync/vsync suppression */

@@ -288,22 +288,25 @@ static int epson1355fb_blank(int blank_mode, struct fb_info *info)
 	struct epson1355_par *par = info->par;
 
 	switch (blank_mode) {
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANKING:
+	case FB_BLANK_NORMAL:
 		lcd_enable(par, 1);
 		backlight_enable(1);
 		break;
-	case VESA_VSYNC_SUSPEND:
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		backlight_enable(0);
 		break;
-	case VESA_POWERDOWN:
+	case FB_BLANK_POWERDOWN:
 		backlight_enable(0);
 		lcd_enable(par, 0);
 		break;
 	default:
 		return -EINVAL;
 	}
-	return 0;
+
+	/* let fbcon do a soft blank for us */
+	return (blank_mode == FB_BLANK_NORMAL) ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------------- */

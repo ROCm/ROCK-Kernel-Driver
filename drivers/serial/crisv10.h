@@ -16,7 +16,7 @@
 #ifdef __KERNEL__
 /*
  * This is our internal structure for each serial port's state.
- * 
+ *
  * Many fields are paralleled by the structure used by the serial_struct
  * structure.
  *
@@ -102,7 +102,7 @@ struct e100_serial {
 #else
 	struct wait_queue	*open_wait;
 	struct wait_queue	*close_wait;
-#endif  
+#endif
 
 	unsigned long		char_time_usec;       /* The time for 1 char, in usecs */
 	unsigned long		flush_time_usec;      /* How often we should flush */

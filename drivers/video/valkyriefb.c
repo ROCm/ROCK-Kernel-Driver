@@ -207,13 +207,13 @@ static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 		return 1;
 
 	switch (blank_mode) {
-	case 0:			/* unblank */
+	case FB_BLANK_UNBLANK:			/* unblank */
 		out_8(&p->valkyrie_regs->mode.r, init->mode);
 		break;
-	case 1:
+	case FB_BLANK_NORMAL:
 		return 1;	/* get caller to set CLUT to all black */
-	case VESA_VSYNC_SUSPEND+1:
-	case VESA_HSYNC_SUSPEND+1:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		/*
 		 * [kps] Value extracted from MacOS. I don't know
 		 * whether this bit disables hsync or vsync, or
@@ -221,7 +221,7 @@ static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 		 */
 		out_8(&p->valkyrie_regs->mode.r, init->mode | 0x40);
 		break;
-	case VESA_POWERDOWN+1:
+	case FB_BLANK_POWERDOWN:
 		out_8(&p->valkyrie_regs->mode.r, 0x66);
 		break;
 	}

@@ -1463,6 +1463,7 @@ static void __init poke_hypersparc(void)
 static void __init init_hypersparc(void)
 {
 	srmmu_name = "ROSS HyperSparc";
+	srmmu_modtype = HyperSparc;
 
 	init_vac_layout();
 

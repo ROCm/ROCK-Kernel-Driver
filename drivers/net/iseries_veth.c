@@ -248,7 +248,7 @@ static int veth_allocate_events(HvLpIndex rlp, int number)
 {
 	struct veth_allocation vc = { COMPLETION_INITIALIZER(vc.c), 0 };
 
-	mf_allocateLpEvents(rlp, HvLpEvent_Type_VirtualLan,
+	mf_allocate_lp_events(rlp, HvLpEvent_Type_VirtualLan,
 			    sizeof(struct VethLpEvent), number,
 			    &veth_complete_allocation, &vc);
 	wait_for_completion(&vc.c);
@@ -662,12 +662,12 @@ static void veth_destroy_connection(u8 rlp)
 	del_timer_sync(&cnx->ack_timer);
 
 	if (cnx->num_events > 0)
-		mf_deallocateLpEvents(cnx->remote_lp,
+		mf_deallocate_lp_events(cnx->remote_lp,
 				      HvLpEvent_Type_VirtualLan,
 				      cnx->num_events,
 				      NULL, NULL);
 	if (cnx->num_ack_events > 0)
-		mf_deallocateLpEvents(cnx->remote_lp,
+		mf_deallocate_lp_events(cnx->remote_lp,
 				      HvLpEvent_Type_VirtualLan,
 				      cnx->num_ack_events,
 				      NULL, NULL);

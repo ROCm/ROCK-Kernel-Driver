@@ -7739,7 +7739,7 @@ static struct class_device_attribute *ncr53c8xx_host_attrs[] = {
 */
 #ifdef	MODULE
 char *ncr53c8xx;	/* command line passed by insmod */
-MODULE_PARM(ncr53c8xx, "s");
+module_param(ncr53c8xx, charp, 0);
 #endif
 
 static int __init ncr53c8xx_setup(char *str)

@@ -201,7 +201,7 @@
 
 #ifdef MODULE
 static char *ips = NULL;
-MODULE_PARM(ips, "s");
+module_param(ips, charp, 0);
 #endif
 
 /*

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-vbi.c,v 1.12 2004/10/11 13:45:51 kraxel Exp $
+ * $Id: cx88-vbi.c,v 1.14 2004/11/07 13:17:15 kraxel Exp $
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -143,7 +143,7 @@ void cx8800_vbi_timeout(unsigned long data)
 /* ------------------------------------------------------------------ */
 
 static int
-vbi_setup(void *priv, unsigned int *count, unsigned int *size)
+vbi_setup(struct videobuf_queue *q, unsigned int *count, unsigned int *size)
 {
 	*size = VBI_LINE_COUNT * VBI_LINE_LENGTH * 2;
 	if (0 == *count)
@@ -156,12 +156,12 @@ vbi_setup(void *priv, unsigned int *count, unsigned int *size)
 }
 
 static int
-vbi_prepare(void *priv, struct videobuf_buffer *vb,
+vbi_prepare(struct videobuf_queue *q, struct videobuf_buffer *vb,
 	    enum v4l2_field field)
 {
-	struct cx8800_fh   *fh  = priv;
+	struct cx8800_fh   *fh  = q->priv_data;
 	struct cx8800_dev  *dev = fh->dev;
-	struct cx88_buffer *buf = (struct cx88_buffer*)vb;
+	struct cx88_buffer *buf = container_of(vb,struct cx88_buffer,vb);
 	unsigned int size;
 	int rc;
 
@@ -192,11 +192,11 @@ vbi_prepare(void *priv, struct videobuf_buffer *vb,
 }
 
 static void
-vbi_queue(void *priv, struct videobuf_buffer *vb)
+vbi_queue(struct videobuf_queue *vq, struct videobuf_buffer *vb)
 {
-	struct cx88_buffer    *buf  = (struct cx88_buffer*)vb;
+	struct cx88_buffer    *buf = container_of(vb,struct cx88_buffer,vb);
 	struct cx88_buffer    *prev;
-	struct cx8800_fh      *fh   = priv;
+	struct cx8800_fh      *fh   = vq->priv_data;
 	struct cx8800_dev     *dev  = fh->dev;
 	struct cx88_dmaqueue  *q    = &dev->vbiq;
 
@@ -224,10 +224,10 @@ vbi_queue(void *priv, struct videobuf_buffer *vb)
 	}
 }
 
-static void vbi_release(void *priv, struct videobuf_buffer *vb)
+static void vbi_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx88_buffer *buf = (struct cx88_buffer*)vb;
-	struct cx8800_fh   *fh  = priv;
+	struct cx88_buffer *buf = container_of(vb,struct cx88_buffer,vb);
+	struct cx8800_fh   *fh  = q->priv_data;
 
 	cx88_free_buffer(fh->dev->pci,buf);
 }

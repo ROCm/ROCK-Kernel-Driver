@@ -729,8 +729,8 @@ static unsigned int cy_isa_addresses[] = {
 static long maddr[NR_CARDS] = { 0, };
 static int irq[NR_CARDS]  = { 0, };
 
-MODULE_PARM(maddr, "1-" __MODULE_STRING(NR_CARDS) "l");
-MODULE_PARM(irq, "1-" __MODULE_STRING(NR_CARDS) "i");
+module_param_array(maddr, long, NULL, 0);
+module_param_array(irq, int, NULL, 0);
 #endif
 
 #endif /* CONFIG_ISA */

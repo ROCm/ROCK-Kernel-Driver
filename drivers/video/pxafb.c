@@ -371,9 +371,10 @@ static int pxafb_blank(int blank, struct fb_info *info)
 	DPRINTK("pxafb_blank: blank=%d\n", blank);
 
 	switch (blank) {
-	case VESA_POWERDOWN:
-	case VESA_VSYNC_SUSPEND:
-	case VESA_HSYNC_SUSPEND:
+	case FB_BLANK_POWERDOWN:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
+	case FB_BLANK_NORMAL:
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
 			for (i = 0; i < fbi->palette_size; i++)
@@ -383,7 +384,7 @@ static int pxafb_blank(int blank, struct fb_info *info)
 		//TODO if (pxafb_blank_helper) pxafb_blank_helper(blank);
 		break;
 
-	case VESA_NO_BLANKING:
+	case FB_BLANK_UNBLANK:
 		//TODO if (pxafb_blank_helper) pxafb_blank_helper(blank);
 		if (fbi->fb.fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.fix.visual == FB_VISUAL_STATIC_PSEUDOCOLOR)

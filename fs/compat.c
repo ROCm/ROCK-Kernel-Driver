@@ -117,9 +117,16 @@ static int put_compat_statfs(struct compat_statfs __user *ubuf, struct kstatfs *
 {
 	
 	if (sizeof ubuf->f_blocks == 4) {
-		if ((kbuf->f_blocks | kbuf->f_bfree |
-		     kbuf->f_bavail | kbuf->f_files | kbuf->f_ffree) &
+		if ((kbuf->f_blocks | kbuf->f_bfree | kbuf->f_bavail) &
 		    0xffffffff00000000ULL)
+			return -EOVERFLOW;
+		/* f_files and f_ffree may be -1; it's okay
+		 * to stuff that into 32 bits */
+		if (kbuf->f_files != 0xffffffffffffffffULL
+		 && (kbuf->f_files & 0xffffffff00000000ULL))
+			return -EOVERFLOW;
+		if (kbuf->f_ffree != 0xffffffffffffffffULL
+		 && (kbuf->f_ffree & 0xffffffff00000000ULL))
 			return -EOVERFLOW;
 	}
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
@@ -184,9 +191,16 @@ out:
 static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstatfs *kbuf)
 {
 	if (sizeof ubuf->f_blocks == 4) {
-		if ((kbuf->f_blocks | kbuf->f_bfree |
-		     kbuf->f_bavail | kbuf->f_files | kbuf->f_ffree) &
+		if ((kbuf->f_blocks | kbuf->f_bfree | kbuf->f_bavail) &
 		    0xffffffff00000000ULL)
+			return -EOVERFLOW;
+		/* f_files and f_ffree may be -1; it's okay
+		 * to stuff that into 32 bits */
+		if (kbuf->f_files != 0xffffffffffffffffULL
+		 && (kbuf->f_files & 0xffffffff00000000ULL))
+			return -EOVERFLOW;
+		if (kbuf->f_ffree != 0xffffffffffffffffULL
+		 && (kbuf->f_ffree & 0xffffffff00000000ULL))
 			return -EOVERFLOW;
 	}
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
@@ -205,7 +219,7 @@ static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstat
 	return 0;
 }
 
-asmlinkage long compat_statfs64(const char __user *path, compat_size_t sz, struct compat_statfs64 __user *buf)
+asmlinkage long compat_sys_statfs64(const char __user *path, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct nameidata nd;
 	int error;
@@ -224,7 +238,7 @@ asmlinkage long compat_statfs64(const char __user *path, compat_size_t sz, struc
 	return error;
 }
 
-asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user *buf)
+asmlinkage long compat_sys_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
@@ -860,7 +874,7 @@ efault:
 	return -EFAULT;
 }
 
-asmlinkage long compat_old_readdir(unsigned int fd,
+asmlinkage long compat_sys_old_readdir(unsigned int fd,
 	struct compat_old_linux_dirent __user *dirent, unsigned int count)
 {
 	int error;

@@ -486,8 +486,6 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	if (unlikely(ret != 0))
 		goto out_release_sem;
 
-	queue_me(&q, -1, NULL);
-
 	/*
 	 * Access the page after the futex is queued.
 	 * We hold the mmap semaphore, so the mapping cannot have changed
@@ -495,12 +493,14 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	 */
 	if (get_user(curval, (int __user *)uaddr) != 0) {
 		ret = -EFAULT;
-		goto out_unqueue;
+		goto out_release_sem;
 	}
 	if (curval != val) {
 		ret = -EWOULDBLOCK;
-		goto out_unqueue;
+		goto out_release_sem;
 	}
+
+	queue_me(&q, -1, NULL);
 
 	/*
 	 * Now the futex is queued and we have checked the data, we
@@ -542,11 +542,10 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	WARN_ON(!signal_pending(current));
 	return -EINTR;
 
- out_unqueue:
 	/* If we were woken (and unqueued), we succeeded, whatever. */
 	if (!unqueue_me(&q))
 		ret = 0;
- out_release_sem:
+out_release_sem:
 	up_read(&current->mm->mmap_sem);
 	return ret;
 }

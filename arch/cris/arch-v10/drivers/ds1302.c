@@ -7,6 +7,9 @@
 *! Functions exported: ds1302_readreg, ds1302_writereg, ds1302_init
 *!
 *! $Log: ds1302.c,v $
+*! Revision 1.14  2004/08/24 06:48:43  starvik
+*! Whitespace cleanup
+*!
 *! Revision 1.13  2004/05/28 09:26:59  starvik
 *! Modified I2C initialization to work in 2.6.
 *!
@@ -123,7 +126,7 @@
 *!
 *! (C) Copyright 1999, 2000, 2001  Axis Communications AB, LUND, SWEDEN
 *!
-*! $Id: ds1302.c,v 1.13 2004/05/28 09:26:59 starvik Exp $
+*! $Id: ds1302.c,v 1.14 2004/08/24 06:48:43 starvik Exp $
 *!
 *!***************************************************************************/
 

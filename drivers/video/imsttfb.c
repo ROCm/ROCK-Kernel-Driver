@@ -940,9 +940,9 @@ imsttfb_blank(int blank, struct fb_info *info)
 
 	ctrl = read_reg_le32(par->dc_regs, STGCTL);
 	if (blank > 0) {
-		switch (blank - 1) {
-		case VESA_NO_BLANKING:
-		case VESA_POWERDOWN:
+		switch (blank) {
+		case FB_BLANK_NORMAL:
+		case FB_BLANK_POWERDOWN:
 			ctrl &= ~0x00000380;
 			if (par->ramdac == IBM) {
 				par->cmap_regs[PIDXHI] = 0;		eieio();
@@ -958,10 +958,10 @@ imsttfb_blank(int blank, struct fb_info *info)
 				par->cmap_regs[PIDXDATA] = 0xc0;
 			}
 			break;
-		case VESA_VSYNC_SUSPEND:
+		case FB_BLANK_VSYNC_SUSPEND:
 			ctrl &= ~0x00000020;
 			break;
-		case VESA_HSYNC_SUSPEND:
+		case FB_BLANK_HSYNC_SUSPEND:
 			ctrl &= ~0x00000010;
 			break;
 		}
