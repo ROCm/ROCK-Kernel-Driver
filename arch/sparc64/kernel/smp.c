@@ -1121,7 +1121,7 @@ static void __init smp_tune_scheduling(void)
 	 * of moving a process from one cpu to another).
 	 */
 	printk("SMP: Calibrating ecache flush... ");
-	if (tlb_type == cheetah) {
+	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		cacheflush_time = cheetah_tune_scheduling();
 		goto report;
 	}
