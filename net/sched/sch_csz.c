@@ -1012,40 +1012,40 @@ static struct tcf_proto ** csz_find_tcf(struct Qdisc *sch, unsigned long cl)
 
 struct Qdisc_class_ops csz_class_ops =
 {
-	csz_graft,
-	csz_leaf,
+	.graft		= csz_graft,
+	.leaf		= csz_leaf,
 
-	csz_get,
-	csz_put,
-	csz_change,
-	csz_delete,
-	csz_walk,
+	.get		= csz_get,
+	.put		= csz_put,
+	.change		= csz_change,
+	.delete		= csz_delete,
+	.walk		= csz_walk,
 
-	csz_find_tcf,
-	csz_bind,
-	csz_put,
+	.tcf_chain	= csz_find_tcf,
+	.bind_tcf	= csz_bind,
+	.unbind_tcf	= csz_put,
 
-	csz_dump_class,
+	.dump		= csz_dump_class,
 };
 
 struct Qdisc_ops csz_qdisc_ops =
 {
-	NULL,
-	&csz_class_ops,
-	"csz",
-	sizeof(struct csz_sched_data),
+	.next		= NULL,
+	.cl_ops		= &csz_class_ops,
+	.id		= "csz",
+	.priv_size	= sizeof(struct csz_sched_data),
 
-	csz_enqueue,
-	csz_dequeue,
-	NULL,
-	NULL,
+	.enqueue	= csz_enqueue,
+	.dequeue	= csz_dequeue,
+	.requeue	= NULL,
+	.drop		= NULL,
 
-	csz_init,
-	csz_reset,
-	csz_destroy,
-	NULL /* csz_change */,
+	.init		= csz_init,
+	.reset		= csz_reset,
+	.destroy	= csz_destroy,
+	.change		= NULL,
 
-	csz_dump,
+	.dump		= csz_dump,
 };
 
 

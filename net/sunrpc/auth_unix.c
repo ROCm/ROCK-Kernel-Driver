@@ -239,20 +239,20 @@ unx_validate(struct rpc_task *task, u32 *p)
 }
 
 struct rpc_authops	authunix_ops = {
-	RPC_AUTH_UNIX,
+	.au_flavor	= RPC_AUTH_UNIX,
 #ifdef RPC_DEBUG
-	"UNIX",
+	.au_name	= "UNIX",
 #endif
-	unx_create,
-	unx_destroy,
-	unx_create_cred
+	.create		= unx_create,
+	.destroy	= unx_destroy,
+	.crcreate	= unx_create_cred,
 };
 
 static
 struct rpc_credops	unix_credops = {
-	unx_destroy_cred,
-	unx_match,
-	unx_marshal,
-	unx_refresh,
-	unx_validate
+	.crdestroy	= unx_destroy_cred,
+	.crmatch	= unx_match,
+	.crmarshal	= unx_marshal,
+	.crrefresh	= unx_refresh,
+	.crvalidate	= unx_validate,
 };

@@ -603,19 +603,22 @@ static void gred_destroy(struct Qdisc *sch)
 
 struct Qdisc_ops gred_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"gred",
-	sizeof(struct gred_sched),
-	gred_enqueue,
-	gred_dequeue,
-	gred_requeue,
-	gred_drop,
-	gred_init,
-	gred_reset,
-	gred_destroy,
-	gred_change, /* change */
-	gred_dump,
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "gred",
+	.priv_size	= sizeof(struct gred_sched),
+
+	.enqueue	= gred_enqueue,
+	.dequeue	= gred_dequeue,
+	.requeue	= gred_requeue,
+	.drop		= gred_drop,
+
+	.init		= gred_init,
+	.reset		= gred_reset,
+	.destroy	= gred_destroy,
+	.change		= gred_change,
+
+	.dump		= gred_dump,
 };
 
 

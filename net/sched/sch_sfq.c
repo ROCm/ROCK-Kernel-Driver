@@ -470,22 +470,22 @@ rtattr_failure:
 
 struct Qdisc_ops sfq_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"sfq",
-	sizeof(struct sfq_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "sfq",
+	.priv_size	= sizeof(struct sfq_sched_data),
 
-	sfq_enqueue,
-	sfq_dequeue,
-	sfq_requeue,
-	sfq_drop,
+	.enqueue	= sfq_enqueue,
+	.dequeue	= sfq_dequeue,
+	.requeue	= sfq_requeue,
+	.drop		= sfq_drop,
 
-	sfq_init,
-	sfq_reset,
-	sfq_destroy,
-	NULL, /* sfq_change */
+	.init		= sfq_init,
+	.reset		= sfq_reset,
+	.destroy	= sfq_destroy,
+	.change		= NULL,
 
-	sfq_dump,
+	.dump		= sfq_dump,
 };
 
 #ifdef MODULE

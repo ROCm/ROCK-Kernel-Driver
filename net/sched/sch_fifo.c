@@ -170,39 +170,40 @@ rtattr_failure:
 
 struct Qdisc_ops pfifo_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"pfifo",
-	sizeof(struct fifo_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "pfifo",
+	.priv_size	= sizeof(struct fifo_sched_data),
 
-	pfifo_enqueue,
-	pfifo_dequeue,
-	pfifo_requeue,
-	fifo_drop,
+	.enqueue	= pfifo_enqueue,
+	.dequeue	= pfifo_dequeue,
+	.requeue	= pfifo_requeue,
+	.drop		= fifo_drop,
 
-	fifo_init,
-	fifo_reset,
-	NULL,
-	fifo_init,
+	.init		= fifo_init,
+	.reset		= fifo_reset,
+	.destroy	= NULL,
+	.change		= fifo_init,
 
-	fifo_dump,
+	.dump		= fifo_dump,
 };
 
 struct Qdisc_ops bfifo_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"bfifo",
-	sizeof(struct fifo_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "bfifo",
+	.priv_size	= sizeof(struct fifo_sched_data),
 
-	bfifo_enqueue,
-	bfifo_dequeue,
-	bfifo_requeue,
-	fifo_drop,
+	.enqueue	= bfifo_enqueue,
+	.dequeue	= bfifo_dequeue,
+	.requeue	= bfifo_requeue,
+	.drop		= fifo_drop,
 
-	fifo_init,
-	fifo_reset,
-	NULL,
-	fifo_init,
-	fifo_dump,
+	.init		= fifo_init,
+	.reset		= fifo_reset,
+	.destroy	= NULL,
+	.change		= fifo_init,
+
+	.dump		= fifo_dump,
 };

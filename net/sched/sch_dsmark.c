@@ -434,39 +434,39 @@ rtattr_failure:
 
 static struct Qdisc_class_ops dsmark_class_ops =
 {
-	dsmark_graft,			/* graft */
-	dsmark_leaf,			/* leaf */
-	dsmark_get,			/* get */
-	dsmark_put,			/* put */
-	dsmark_change,			/* change */
-	dsmark_delete,			/* delete */
-	dsmark_walk,			/* walk */
+	.graft		= dsmark_graft,
+	.leaf		= dsmark_leaf,
+	.get		= dsmark_get,
+	.put		= dsmark_put,
+	.change		= dsmark_change,
+	.delete		= dsmark_delete,
+	.walk		= dsmark_walk,
 
-	dsmark_find_tcf,		/* tcf_chain */
-	dsmark_bind_filter,		/* bind_tcf */
-	dsmark_put,			/* unbind_tcf */
+	.tcf_chain	= dsmark_find_tcf,
+	.bind_tcf	= dsmark_bind_filter,
+	.unbind_tcf	= dsmark_put,
 
-	dsmark_dump_class,		/* dump */
+	.dump		= dsmark_dump_class,
 };
 
 struct Qdisc_ops dsmark_qdisc_ops =
 {
-	NULL,				/* next */
-	&dsmark_class_ops,		/* cl_ops */
-	"dsmark",
-	sizeof(struct dsmark_qdisc_data),
+	.next		= NULL,
+	.cl_ops		= &dsmark_class_ops,
+	.id		= "dsmark",
+	.priv_size	= sizeof(struct dsmark_qdisc_data),
 
-	dsmark_enqueue,			/* enqueue */
-	dsmark_dequeue,			/* dequeue */
-	dsmark_requeue,			/* requeue */
-	dsmark_drop,			/* drop */
+	.enqueue	= dsmark_enqueue,
+	.dequeue	= dsmark_dequeue,
+	.requeue	= dsmark_requeue,
+	.drop		= dsmark_drop,
 
-	dsmark_init,			/* init */
-	dsmark_reset,			/* reset */
-	dsmark_destroy,			/* destroy */
-	NULL,				/* change */
+	.init		= dsmark_init,
+	.reset		= dsmark_reset,
+	.destroy	= dsmark_destroy,
+	.change		= NULL,
 
-	dsmark_dump			/* dump */
+	.dump		= dsmark_dump
 };
 
 #ifdef MODULE

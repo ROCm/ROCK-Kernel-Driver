@@ -440,20 +440,20 @@ static int teql_master_init(struct net_device *dev)
 
 static struct teql_master the_master = {
 {
-	NULL,
-	NULL,
-	"",
-	sizeof(struct teql_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "",
+	.priv_size	= sizeof(struct teql_sched_data),
 
-	teql_enqueue,
-	teql_dequeue,
-	teql_requeue,
-	NULL,
+	.enqueue	= teql_enqueue,
+	.dequeue	= teql_dequeue,
+	.requeue	= teql_requeue,
+	.drop		= NULL,
 
-	teql_qdisc_init,
-	teql_reset,
-	teql_destroy,
-	NULL,
+	.init		= teql_qdisc_init,
+	.reset		= teql_reset,
+	.destroy	= teql_destroy,
+	.dump		= NULL,
 },};
 
 

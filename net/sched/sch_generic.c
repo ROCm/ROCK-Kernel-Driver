@@ -224,49 +224,48 @@ noop_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 
 struct Qdisc_ops noop_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"noop",
-	0,
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "noop",
+	.priv_size	= 0,
 
-	noop_enqueue,
-	noop_dequeue,
-	noop_requeue,
+	.enqueue	= noop_enqueue,
+	.dequeue	= noop_dequeue,
+	.requeue	= noop_requeue,
 };
 
 struct Qdisc noop_qdisc =
 {
-	noop_enqueue,
-	noop_dequeue,
-	TCQ_F_BUILTIN,
-	&noop_qdisc_ops,	
+	.enqueue	= noop_enqueue,
+	.dequeue	= noop_dequeue,
+	.flags		= TCQ_F_BUILTIN,
+	.ops		= &noop_qdisc_ops,	
 };
 
 
 struct Qdisc_ops noqueue_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"noqueue",
-	0,
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "noqueue",
+	.priv_size	= 0,
 
-	noop_enqueue,
-	noop_dequeue,
-	noop_requeue,
-
+	.enqueue	= noop_enqueue,
+	.dequeue	= noop_dequeue,
+	.requeue	= noop_requeue,
 };
 
 struct Qdisc noqueue_qdisc =
 {
-	NULL,
-	noop_dequeue,
-	TCQ_F_BUILTIN,
-	&noqueue_qdisc_ops,
+	.enqueue	= NULL,
+	.dequeue	= noop_dequeue,
+	.flags		= TCQ_F_BUILTIN,
+	.ops		= &noqueue_qdisc_ops,
 };
 
 
 static const u8 prio2band[TC_PRIO_MAX+1] =
-{ 1, 2, 2, 2, 1, 2, 0, 0 , 1, 1, 1, 1, 1, 1, 1, 1 };
+	{ 1, 2, 2, 2, 1, 2, 0, 0 , 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* 3-band FIFO queue: old style, but should be a bit faster than
    generic prio+fifo combination.
@@ -346,18 +345,17 @@ static int pfifo_fast_init(struct Qdisc *qdisc, struct rtattr *opt)
 
 static struct Qdisc_ops pfifo_fast_ops =
 {
-	NULL,
-	NULL,
-	"pfifo_fast",
-	3 * sizeof(struct sk_buff_head),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "pfifo_fast",
+	.priv_size	= 3 * sizeof(struct sk_buff_head),
 
-	pfifo_fast_enqueue,
-	pfifo_fast_dequeue,
-	pfifo_fast_requeue,
-	NULL,
+	.enqueue	= pfifo_fast_enqueue,
+	.dequeue	= pfifo_fast_dequeue,
+	.requeue	= pfifo_fast_requeue,
 
-	pfifo_fast_init,
-	pfifo_fast_reset,
+	.init		= pfifo_fast_init,
+	.reset		= pfifo_fast_reset,
 };
 
 struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)

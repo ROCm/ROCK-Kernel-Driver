@@ -463,22 +463,22 @@ static void red_destroy(struct Qdisc *sch)
 
 struct Qdisc_ops red_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"red",
-	sizeof(struct red_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "red",
+	.priv_size	= sizeof(struct red_sched_data),
 
-	red_enqueue,
-	red_dequeue,
-	red_requeue,
-	red_drop,
+	.enqueue	= red_enqueue,
+	.dequeue	= red_dequeue,
+	.requeue	= red_requeue,
+	.drop		= red_drop,
 
-	red_init,
-	red_reset,
-	red_destroy,
-	red_change,
+	.init		= red_init,
+	.reset		= red_reset,
+	.destroy	= red_destroy,
+	.change		= red_change,
 
-	red_dump,
+	.dump		= red_dump,
 };
 
 

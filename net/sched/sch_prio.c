@@ -365,40 +365,40 @@ static struct tcf_proto ** prio_find_tcf(struct Qdisc *sch, unsigned long cl)
 
 static struct Qdisc_class_ops prio_class_ops =
 {
-	prio_graft,
-	prio_leaf,
+	.graft		= prio_graft,
+	.leaf		= prio_leaf,
 
-	prio_get,
-	prio_put,
-	prio_change,
-	prio_delete,
-	prio_walk,
+	.get		= prio_get,
+	.put		= prio_put,
+	.change		= prio_change,
+	.delete		= prio_delete,
+	.walk		= prio_walk,
 
-	prio_find_tcf,
-	prio_bind,
-	prio_put,
+	.tcf_chain	= prio_find_tcf,
+	.bind_tcf	= prio_bind,
+	.unbind_tcf	= prio_put,
 
-	prio_dump_class,
+	.dump		= prio_dump_class,
 };
 
 struct Qdisc_ops prio_qdisc_ops =
 {
-	NULL,
-	&prio_class_ops,
-	"prio",
-	sizeof(struct prio_sched_data),
+	next:		NULL,
+	cl_ops:		&prio_class_ops,
+	id:		"prio",
+	priv_size:	sizeof(struct prio_sched_data),
 
-	prio_enqueue,
-	prio_dequeue,
-	prio_requeue,
-	prio_drop,
+	enqueue:	prio_enqueue,
+	dequeue:	prio_dequeue,
+	requeue:	prio_requeue,
+	drop:		prio_drop,
 
-	prio_init,
-	prio_reset,
-	prio_destroy,
-	prio_tune,
+	init:		prio_init,
+	reset:		prio_reset,
+	destroy:	prio_destroy,
+	change:		prio_tune,
 
-	prio_dump,
+	dump:		prio_dump,
 };
 
 #ifdef MODULE

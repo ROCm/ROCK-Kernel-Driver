@@ -326,39 +326,39 @@ rtattr_failure:
 
 static struct Qdisc_class_ops ingress_class_ops =
 {
-	ingress_graft,			/* graft */
-	ingress_leaf,			/* leaf */
-	ingress_get,			/* get */
-	ingress_put,			/* put */
-	ingress_change,			/* change */
-	NULL,				/* delete */
-	ingress_walk,				/* walk */
+	.graft		= ingress_graft,
+	.leaf		= ingress_leaf,
+	.get		= ingress_get,
+	.put		= ingress_put,
+	.change		= ingress_change,
+	.delete		= NULL,
+	.walk		= ingress_walk,
 
-	ingress_find_tcf,		/* tcf_chain */
-	ingress_bind_filter,		/* bind_tcf */
-	ingress_put,			/* unbind_tcf */
+	.tcf_chain	= ingress_find_tcf,
+	.bind_tcf	= ingress_bind_filter,
+	.unbind_tcf	= ingress_put,
 
-	NULL,		/* dump */
+	.dump		= NULL,
 };
 
 struct Qdisc_ops ingress_qdisc_ops =
 {
-	NULL,				/* next */
-	&ingress_class_ops,		/* cl_ops */
-	"ingress",
-	sizeof(struct ingress_qdisc_data),
+	.next		= NULL,
+	.cl_ops		= &ingress_class_ops,
+	.id		= "ingress",
+	.priv_size	= sizeof(struct ingress_qdisc_data),
 
-	ingress_enqueue,		/* enqueue */
-	ingress_dequeue,		/* dequeue */
-	ingress_requeue,		/* requeue */
-	ingress_drop,			/* drop */
+	.enqueue	= ingress_enqueue,
+	.dequeue	= ingress_dequeue,
+	.requeue	= ingress_requeue,
+	.drop		= ingress_drop,
 
-	ingress_init,			/* init */
-	ingress_reset,			/* reset */
-	ingress_destroy,		/* destroy */
-	NULL,				/* change */
+	.init		= ingress_init,
+	.reset		= ingress_reset,
+	.destroy	= ingress_destroy,
+	.change		= NULL,
 
-	ingress_dump,			/* dump */
+	.dump		= ingress_dump,
 };
 
 

@@ -243,36 +243,50 @@ xdr_decode_bool(struct rpc_rqst *req, u32 *p, unsigned int *boolp)
 }
 
 static struct rpc_procinfo	pmap_procedures[4] = {
-	{ "pmap_null",
-		(kxdrproc_t) xdr_error,	
-		(kxdrproc_t) xdr_error,	0, 0 },
-	{ "pmap_set",
-		(kxdrproc_t) xdr_encode_mapping,	
-		(kxdrproc_t) xdr_decode_bool, 4, 1 },
-	{ "pmap_unset",
-		(kxdrproc_t) xdr_encode_mapping,	
-		(kxdrproc_t) xdr_decode_bool, 4, 1 },
-	{ "pmap_get",
-		(kxdrproc_t) xdr_encode_mapping,
-		(kxdrproc_t) xdr_decode_port, 4, 1 },
+	{ .p_procname		= "pmap_null",
+	  .p_encode		= (kxdrproc_t) xdr_error,	
+	  .p_decode		= (kxdrproc_t) xdr_error,
+	  .p_bufsiz		= 0,
+	  .p_count		= 0,
+	},
+	{ .p_procname		= "pmap_set",
+	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,	
+	  .p_decode		= (kxdrproc_t) xdr_decode_bool,
+	  .p_bufsiz		= 4,
+	  .p_count		= 1,
+	},
+	{ .p_procname		= "pmap_unset",
+	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,	
+	  .p_decode		= (kxdrproc_t) xdr_decode_bool,
+	  .p_bufsiz		= 4,
+	  .p_count		= 1,
+	},
+	{ .p_procname		= "pmap_get",
+	  .p_encode		= (kxdrproc_t) xdr_encode_mapping,
+	  .p_decode		= (kxdrproc_t) xdr_decode_port,
+	  .p_bufsiz		= 4,
+	  .p_count		= 1,
+	},
 };
 
 static struct rpc_version	pmap_version2 = {
-	2, 4, pmap_procedures
+	.number		= 2,
+	.nrprocs	= 4,
+	.procs		= pmap_procedures
 };
 
 static struct rpc_version *	pmap_version[] = {
 	NULL,
 	NULL,
-	&pmap_version2,
+	&pmap_version2
 };
 
 static struct rpc_stat		pmap_stats;
 
 struct rpc_program	pmap_program = {
-	"portmap",
-	RPC_PMAP_PROGRAM,
-	sizeof(pmap_version)/sizeof(pmap_version[0]),
-	pmap_version,
-	&pmap_stats,
+	.name		= "portmap",
+	.number		= RPC_PMAP_PROGRAM,
+	.nrvers		= sizeof(pmap_version)/sizeof(pmap_version[0]),
+	.version	= pmap_version,
+	.stats		= &pmap_stats,
 };

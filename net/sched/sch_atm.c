@@ -668,39 +668,39 @@ static int atm_tc_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 static struct Qdisc_class_ops atm_class_ops =
 {
-	atm_tc_graft,			/* graft */
-	atm_tc_leaf,			/* leaf */
-	atm_tc_get,			/* get */
-	atm_tc_put,			/* put */
-	atm_tc_change,			/* change */
-	atm_tc_delete,			/* delete */
-	atm_tc_walk,			/* walk */
+	.graft		= atm_tc_graft,
+	.leaf		= atm_tc_leaf,
+	.get		= atm_tc_get,
+	.put		= atm_tc_put,
+	.change		= atm_tc_change,
+	.delete		= atm_tc_delete,
+	.walk		= atm_tc_walk,
 
-	atm_tc_find_tcf,		/* tcf_chain */
-	atm_tc_bind_filter,		/* bind_tcf */
-	atm_tc_put,			/* unbind_tcf */
+	.tcf_chain	= atm_tc_find_tcf,
+	.bind_tcf	= atm_tc_bind_filter,
+	.unbind_tcf	= atm_tc_put,
 
-	atm_tc_dump_class,		/* dump */
+	.dump		= atm_tc_dump_class,
 };
 
 struct Qdisc_ops atm_qdisc_ops =
 {
-	NULL,				/* next */
-	&atm_class_ops,			/* cl_ops */
-	"atm",
-	sizeof(struct atm_qdisc_data),
+	.next		= NULL,
+	.cl_ops		= &atm_class_ops,
+	.id		= "atm",
+	.priv_size	= sizeof(struct atm_qdisc_data),
 
-	atm_tc_enqueue,			/* enqueue */
-	atm_tc_dequeue,			/* dequeue */
-	atm_tc_requeue,			/* requeue */
-	atm_tc_drop,			/* drop */
+	.enqueue	= atm_tc_enqueue,
+	.dequeue	= atm_tc_dequeue,
+	.requeue	= atm_tc_requeue,
+	.drop		= atm_tc_drop,
 
-	atm_tc_init,			/* init */
-	atm_tc_reset,			/* reset */
-	atm_tc_destroy,			/* destroy */
-	NULL,				/* change */
+	.init		= atm_tc_init,
+	.reset		= atm_tc_reset,
+	.destroy	= atm_tc_destroy,
+	.change		= NULL,
 
-	atm_tc_dump			/* dump */
+	.dump		= atm_tc_dump
 };
 
 

@@ -2066,39 +2066,39 @@ static void cbq_walk(struct Qdisc *sch, struct qdisc_walker *arg)
 
 static struct Qdisc_class_ops cbq_class_ops =
 {
-	cbq_graft,
-	cbq_leaf,
-	cbq_get,
-	cbq_put,
-	cbq_change_class,
-	cbq_delete,
-	cbq_walk,
+	.graft		= cbq_graft,
+	.leaf		= cbq_leaf,
+	.get		= cbq_get,
+	.put		= cbq_put,
+	.change		= cbq_change_class,
+	.delete		= cbq_delete,
+	.walk		= cbq_walk,
 
-	cbq_find_tcf,
-	cbq_bind_filter,
-	cbq_unbind_filter,
+	.tcf_chain	= cbq_find_tcf,
+	.bind_tcf	= cbq_bind_filter,
+	.unbind_tcf	= cbq_unbind_filter,
 
-	cbq_dump_class,
+	.dump		= cbq_dump_class,
 };
 
 struct Qdisc_ops cbq_qdisc_ops =
 {
-	NULL,
-	&cbq_class_ops,
-	"cbq",
-	sizeof(struct cbq_sched_data),
+	.next		= NULL,
+	.cl_ops		= &cbq_class_ops,
+	.id		= "cbq",
+	.priv_size	= sizeof(struct cbq_sched_data),
 
-	cbq_enqueue,
-	cbq_dequeue,
-	cbq_requeue,
-	cbq_drop,
+	.enqueue	= cbq_enqueue,
+	.dequeue	= cbq_dequeue,
+	.requeue	= cbq_requeue,
+	.drop		= cbq_drop,
 
-	cbq_init,
-	cbq_reset,
-	cbq_destroy,
-	NULL /* cbq_change */,
+	.init		= cbq_init,
+	.reset		= cbq_reset,
+	.destroy	= cbq_destroy,
+	.change		= NULL,
 
-	cbq_dump,
+	.dump		= cbq_dump,
 };
 
 #ifdef MODULE

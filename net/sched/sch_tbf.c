@@ -393,22 +393,22 @@ rtattr_failure:
 
 struct Qdisc_ops tbf_qdisc_ops =
 {
-	NULL,
-	NULL,
-	"tbf",
-	sizeof(struct tbf_sched_data),
+	.next		= NULL,
+	.cl_ops		= NULL,
+	.id		= "tbf",
+	.priv_size	= sizeof(struct tbf_sched_data),
 
-	tbf_enqueue,
-	tbf_dequeue,
-	tbf_requeue,
-	tbf_drop,
+	.enqueue	= tbf_enqueue,
+	.dequeue	= tbf_dequeue,
+	.requeue	= tbf_requeue,
+	.drop		= tbf_drop,
 
-	tbf_init,
-	tbf_reset,
-	tbf_destroy,
-	tbf_change,
+	.init		= tbf_init,
+	.reset		= tbf_reset,
+	.destroy	= tbf_destroy,
+	.change		= tbf_change,
 
-	tbf_dump,
+	.dump		= tbf_dump,
 };
 
 
