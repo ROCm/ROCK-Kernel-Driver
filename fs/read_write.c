@@ -12,6 +12,7 @@
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
 #include <linux/security.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 
