@@ -65,7 +65,7 @@ dc21285_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 		    int size, u32 *value)
 {
 	unsigned long addr = dc21285_base_address(bus, devfn);
-	u32 v;
+	u32 v = 0xffffffff;
 
 	if (addr)
 		switch (size) {
@@ -82,8 +82,6 @@ dc21285_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 				: "=r" (v) : "r" (addr), "r" (where));
 			break;
 		}
-	else
-		v = 0xffffffff;
 
 	*value = v;
 

@@ -72,7 +72,8 @@ static unsigned long sa1100_gettimeoffset (void)
  * lost_ticks (updated in do_timer()) and the match reg value, so we
  * can use do_gettimeofday() from interrupt handlers.
  */
-static void sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int next_match;
 
@@ -85,6 +86,8 @@ static void sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} while ((signed long)(next_match - OSCR) <= 0);
 
 	do_profile(regs);
+
+	return IRQ_HANDLED;
 }
 
 void __init time_init(void)

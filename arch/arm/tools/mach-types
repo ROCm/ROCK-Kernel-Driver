@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sat Apr 26 11:41:41 2003
+# Last update: Wed May 7 23:43:08 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -328,3 +328,14 @@ m7100			SA1100_M7100		M7100			316
 nipc2			ARCH_NIPC2		NIPC2			317
 fu7202			ARCH_FU7202		FU7202			318
 adsagx			ARCH_ADSAGX		ADSAGX			319
+pxa_pooh		ARCH_PXA_POOH		PXA_POOH		320
+bandon			ARCH_BANDON		BANDON			321
+pcm7210			ARCH_PCM7210		PCM7210			322
+nms9200			ARCH_NMS9200		NMS9200			323
+gealog			ARCH_GEALOG		GEALOG			324
+m7140			SA1100_M7140		M7140			325
+korebot			ARCH_KOREBOT		KOREBOT			326
+iq31244			ARCH_IQ31244		IQ31244			327
+koan393			SA1100_KOAN393		KOAN393			328
+inhandftip3		ARCH_INHANDFTIP3	INHANDFTIP3		329
+gonzo			ARCH_GONZO		GONZO			330
