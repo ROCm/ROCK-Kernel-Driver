@@ -390,7 +390,7 @@ spi_dv_retrain(struct scsi_request *sreq, u8 *buffer, u8 *ptr,
 {
 	struct spi_internal *i = to_spi_internal(sreq->sr_host->transportt);
 	struct scsi_device *sdev = sreq->sr_device;
-	int period, prevperiod = 0; 
+	int period = 0, prevperiod = 0; 
 
 
 	for (;;) {
