@@ -373,7 +373,7 @@ static void udpv6_close(struct sock *sk, long timeout)
  * 	return it, otherwise we block.
  */
 
-static int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, int len,
+static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -765,7 +765,7 @@ static int udpv6_getfrag(const void *data, struct in6_addr *addr,
 	return 0;
 }
 
-static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
+static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int ulen)
 {
 	struct ipv6_txoptions opt_space;
 	struct udpv6fakehdr udh;
@@ -794,7 +794,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 
 	if (sin6) {
 		if (sin6->sin6_family == AF_INET)
-			return udp_sendmsg(sk, msg, ulen);
+			return udp_sendmsg(iocb, sk, msg, ulen);
 
 		if (addr_len < SIN6_LEN_RFC2133)
 			return -EINVAL;
@@ -848,7 +848,7 @@ static int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, int ulen)
 		msg->msg_namelen = sizeof(sin);
 		fl6_sock_release(flowlabel);
 
-		return udp_sendmsg(sk, msg, ulen);
+		return udp_sendmsg(iocb, sk, msg, ulen);
 	}
 
 	udh.daddr = NULL;

@@ -1491,8 +1491,8 @@ freeit:
 	return 0;
 }
 
-static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-			 struct scm_cookie *scm)
+static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+			 int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct atalk_sock *at = at_sk(sk);
@@ -1650,8 +1650,8 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	return len;
 }
 
-static int atalk_recvmsg(struct socket *sock, struct msghdr *msg, int size,
-			 int flags, struct scm_cookie *scm)
+static int atalk_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+			 int size, int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_at *sat = (struct sockaddr_at *)msg->msg_name;

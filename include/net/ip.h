@@ -174,7 +174,7 @@ static inline
 int ip_decrease_ttl(struct iphdr *iph)
 {
 	u32 check = iph->check;
-	check += __constant_htons(0x0100);
+	check += htons(0x0100);
 	iph->check = check + (check>=0xFFFF);
 	return --iph->ttl;
 }
@@ -191,7 +191,7 @@ extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more
 
 static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, struct sock *sk)
 {
-	if (iph->frag_off&__constant_htons(IP_DF)) {
+	if (iph->frag_off & htons(IP_DF)) {
 		/* This is only to work around buggy Windows95/2000
 		 * VJ compression implementations.  If the ID field
 		 * does not change, they drop every other packet in
@@ -205,7 +205,7 @@ static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, str
 
 static inline void ip_select_ident_more(struct iphdr *iph, struct dst_entry *dst, struct sock *sk, int more)
 {
-	if (iph->frag_off&__constant_htons(IP_DF)) {
+	if (iph->frag_off & htons(IP_DF)) {
 		if (sk && inet_sk(sk)->daddr) {
 			iph->id = htons(inet_sk(sk)->id);
 			inet_sk(sk)->id += 1 + more;
@@ -279,5 +279,7 @@ extern void	ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 			      u16 port, u32 info, u8 *payload);
 extern void	ip_local_error(struct sock *sk, int err, u32 daddr, u16 dport,
 			       u32 info);
+
+extern int ipv4_proc_init(void);
 
 #endif	/* _IP_H */

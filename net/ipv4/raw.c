@@ -295,7 +295,8 @@ static int raw_getrawfrag(const void *p, char *to, unsigned int offset,
 	return 0;
 }
 
-static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
+static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		       int len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
@@ -402,8 +403,14 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, int len)
 			rfh.saddr = inet->mc_addr;
 	}
 
-	err = ip_route_output(&rt, daddr, rfh.saddr, tos, ipc.oif);
-
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = daddr,
+						.saddr = rfh.saddr,
+						.tos = tos } },
+				    .oif = ipc.oif };
+		err = ip_route_output_key(&rt, &fl);
+	}
 	if (err)
 		goto done;
 
@@ -476,8 +483,8 @@ out:	return ret;
  *	we return it, otherwise we block.
  */
 
-int raw_recvmsg(struct sock *sk, struct msghdr *msg, int len,
-		int noblock, int flags, int *addr_len)
+int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		int len, int noblock, int flags, int *addr_len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	int copied = 0;

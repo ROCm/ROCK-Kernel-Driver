@@ -509,6 +509,7 @@ int clip_setentry(struct atm_vcc *vcc,u32 ip)
 	struct atmarp_entry *entry;
 	int error;
 	struct clip_vcc *clip_vcc;
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = ip, .tos = 1 } } };
 	struct rtable *rt;
 
 	if (vcc->push != clip_push) {
@@ -525,7 +526,7 @@ int clip_setentry(struct atm_vcc *vcc,u32 ip)
 		unlink_clip_vcc(clip_vcc);
 		return 0;
 	}
-	error = ip_route_output(&rt,ip,0,1,0);
+	error = ip_route_output_key(&rt,&fl);
 	if (error) return error;
 	neigh = __neigh_lookup(&clip_tbl,&ip,rt->u.dst.dev,1);
 	ip_rt_put(rt);

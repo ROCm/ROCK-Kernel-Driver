@@ -154,7 +154,7 @@ static int route4_classify(struct sk_buff *skb, struct tcf_proto *tp,
 	if (head == NULL)
 		goto old_method;
 
-	iif = ((struct rtable*)dst)->key.iif;
+	iif = ((struct rtable*)dst)->fl.iif;
 
 	h = route4_fastmap_hash(id, iif);
 	if (id == head->fastmap[h].id &&

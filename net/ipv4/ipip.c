@@ -355,6 +355,7 @@ out:
 	int rel_code = 0;
 	int rel_info = 0;
 	struct sk_buff *skb2;
+	struct flowi fl;
 	struct rtable *rt;
 
 	if (len < hlen + sizeof(struct iphdr))
@@ -417,7 +418,10 @@ out:
 	skb2->nh.raw = skb2->data;
 
 	/* Try to guess incoming interface */
-	if (ip_route_output(&rt, eiph->saddr, 0, RT_TOS(eiph->tos), 0)) {
+	memset(&fl, 0, sizeof(fl));
+	fl.fl4_daddr = eiph->saddr;
+	fl.fl4_tos = RT_TOS(eiph->tos);
+	if (ip_route_output_key(&rt, &key)) {
 		kfree_skb(skb2);
 		return;
 	}
@@ -427,7 +431,10 @@ out:
 	if (rt->rt_flags&RTCF_LOCAL) {
 		ip_rt_put(rt);
 		rt = NULL;
-		if (ip_route_output(&rt, eiph->daddr, eiph->saddr, eiph->tos, 0) ||
+		fl.fl4_daddr = eiph->daddr;
+		fl.fl4_src = eiph->saddr;
+		fl.fl4_tos = eiph->tos;
+		if (ip_route_output_key(&rt, &fl) ||
 		    rt->u.dst.dev->type != ARPHRD_IPGRE) {
 			ip_rt_put(rt);
 			kfree_skb(skb2);
@@ -560,9 +567,16 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 			goto tx_error_icmp;
 	}
 
-	if (ip_route_output(&rt, dst, tiph->saddr, RT_TOS(tos), tunnel->parms.link)) {
-		tunnel->stat.tx_carrier_errors++;
-		goto tx_error_icmp;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = dst,
+						.saddr = tiph->saddr,
+						.tos = RT_TOS(tos) } },
+				    .oif = tunnel->parms.link };
+		if (ip_route_output_key(&rt, &fl)) {
+			tunnel->stat.tx_carrier_errors++;
+			goto tx_error_icmp;
+		}
 	}
 	tdev = rt->u.dst.dev;
 
@@ -822,8 +836,13 @@ static int ipip_tunnel_init(struct net_device *dev)
 	ipip_tunnel_init_gen(dev);
 
 	if (iph->daddr) {
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = iph->daddr,
+						.saddr = iph->saddr,
+						.tos = RT_TOS(iph->tos) } },
+				    .oif = tunnel->parms.link };
 		struct rtable *rt;
-		if (!ip_route_output(&rt, iph->daddr, iph->saddr, RT_TOS(iph->tos), tunnel->parms.link)) {
+		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;
 			ip_rt_put(rt);
 		}

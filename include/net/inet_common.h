@@ -20,10 +20,12 @@ extern int			inet_dgram_connect(struct socket *sock,
 						   int addr_len, int flags);
 extern int			inet_accept(struct socket *sock, 
 					    struct socket *newsock, int flags);
-extern int			inet_recvmsg(struct socket *sock, 
+extern int			inet_recvmsg(struct kiocb *iocb,
+					     struct socket *sock, 
 					     struct msghdr *ubuf, 
 					     int size, int flags, struct scm_cookie *scm);
-extern int			inet_sendmsg(struct socket *sock, 
+extern int			inet_sendmsg(struct kiocb *iocb,
+					     struct socket *sock, 
 					     struct msghdr *msg, 
 					     int size, struct scm_cookie *scm);
 extern int			inet_shutdown(struct socket *sock, int how);

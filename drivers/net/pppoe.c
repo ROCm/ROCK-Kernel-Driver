@@ -773,7 +773,7 @@ int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 }
 
 
-int pppoe_sendmsg(struct socket *sock, struct msghdr *m,
+int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		  int total_len, struct scm_cookie *scm)
 {
 	struct sk_buff *skb = NULL;
@@ -934,7 +934,7 @@ int pppoe_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 
 struct ppp_channel_ops pppoe_chan_ops = { pppoe_xmit , NULL };
 
-int pppoe_rcvmsg(struct socket *sock, struct msghdr *m, int total_len, int flags, struct scm_cookie *scm)
+int pppoe_rcvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m, int total_len, int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb = NULL;
