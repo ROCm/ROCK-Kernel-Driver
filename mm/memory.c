@@ -1811,7 +1811,7 @@ unsigned long vmalloc_to_pfn(void * vmalloc_addr)
 
 EXPORT_SYMBOL(vmalloc_to_pfn);
 
-#if !defined(CONFIG_ARCH_GATE_AREA)
+#if !defined(__HAVE_ARCH_GATE_AREA)
 
 #if defined(AT_SYSINFO_EHDR)
 struct vm_area_struct gate_vma;
@@ -1846,4 +1846,4 @@ int in_gate_area(struct task_struct *task, unsigned long addr)
 	return 0;
 }
 
-#endif
+#endif	/* __HAVE_ARCH_GATE_AREA */

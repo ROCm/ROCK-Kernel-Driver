@@ -799,10 +799,8 @@ kernel_map_pages(struct page *page, int numpages, int enable)
 }
 #endif
 
-#ifndef CONFIG_ARCH_GATE_AREA
 extern struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
 int in_gate_area(struct task_struct *task, unsigned long addr);
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
