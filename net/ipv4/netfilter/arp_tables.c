@@ -179,11 +179,10 @@ static inline int arp_packet_match(const struct arphdr *arphdr,
 		return 0;
 	}
 
-	/* Look for ifname matches; this should unroll nicely. */
+	/* Look for ifname matches.  */
 	for (i = 0, ret = 0; i < IFNAMSIZ/sizeof(unsigned long); i++) {
-		ret |= (((const unsigned long *)indev)[i]
-			^ ((const unsigned long *)arpinfo->iniface)[i])
-			& ((const unsigned long *)arpinfo->iniface_mask)[i];
+		ret |= (indev[i] ^ arpinfo->iniface[i])
+			& arpinfo->iniface_mask[i];
 	}
 
 	if (FWINV(ret != 0, ARPT_INV_VIA_IN)) {
