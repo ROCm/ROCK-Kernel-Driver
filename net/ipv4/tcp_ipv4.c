@@ -2598,6 +2598,7 @@ void tcp4_proc_exit(void)
 
 struct proto tcp_prot = {
 	.name			= "TCP",
+	.owner			= THIS_MODULE,
 	.close			= tcp_close,
 	.connect		= tcp_v4_connect,
 	.disconnect		= tcp_disconnect,

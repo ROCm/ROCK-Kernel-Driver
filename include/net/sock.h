@@ -556,6 +556,8 @@ struct proto {
 	kmem_cache_t		*slab;
 	int			slab_obj_size;
 
+	struct module		*owner;
+
 	char			name[32];
 
 	struct {

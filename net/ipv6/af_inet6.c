@@ -174,7 +174,7 @@ static int inet6_create(struct socket *sock, int protocol)
 		goto out;
 
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, THIS_MODULE);
+	sk_set_owner(sk, sk->sk_prot->owner);
 
 	rc = 0;
 	sk->sk_prot = answer_prot;

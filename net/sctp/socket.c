@@ -4652,6 +4652,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 /* This proto struct describes the ULP interface for SCTP.  */
 struct proto sctp_prot = {
 	.name        =	"SCTP",
+	.owner       =	THIS_MODULE,
 	.close       =	sctp_close,
 	.connect     =	sctp_connect,
 	.disconnect  =	sctp_disconnect,
@@ -4675,6 +4676,7 @@ struct proto sctp_prot = {
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 struct proto sctpv6_prot = {
 	.name		= "SCTPv6",
+	.owner		= THIS_MODULE,
 	.close		= sctp_close,
 	.connect	= sctp_connect,
 	.disconnect	= sctp_disconnect,

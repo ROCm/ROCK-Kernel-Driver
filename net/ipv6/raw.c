@@ -975,6 +975,7 @@ static int rawv6_init_sk(struct sock *sk)
 
 struct proto rawv6_prot = {
 	.name =		"RAW",
+	.owner =	THIS_MODULE,
 	.close =	rawv6_close,
 	.connect =	ip6_datagram_connect,
 	.disconnect =	udp_disconnect,
