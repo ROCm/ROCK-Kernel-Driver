@@ -4500,13 +4500,21 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 	if (asoc) {
 		vtag = asoc->peer.i.init_tag;
 	} else {
-		/* Special case the INIT as there is no vtag yet. */
-		if (SCTP_CID_INIT == chunk->chunk_hdr->type) {
+		/* Special case the INIT and stale COOKIE_ECHO as there is no
+		 * vtag yet.
+		 */
+		switch(chunk->chunk_hdr->type) {
+		case SCTP_CID_INIT:
+		{
 			sctp_init_chunk_t *init;
+
 			init = (sctp_init_chunk_t *)chunk->chunk_hdr;
 			vtag = ntohl(init->init_hdr.init_tag);
-		} else {
+			break;
+		}
+		default:	
 			vtag = ntohl(chunk->sctp_hdr->vtag);
+			break;
 		}
 	}
 
@@ -4557,6 +4565,12 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 	if (err_chunk) {
 		packet = sctp_ootb_pkt_new(asoc, chunk);
 		if (packet) {
+			sctp_signed_cookie_t *cookie;
+
+			/* Override the OOTB vtag from the cookie. */
+			cookie = chunk->subh.cookie_hdr;
+			packet->vtag = cookie->c.peer_vtag;
+			
 			/* Set the skb to the belonging sock for accounting. */
 			err_chunk->skb->sk = ep->base.sk;
 			sctp_packet_append_chunk(packet, err_chunk);
