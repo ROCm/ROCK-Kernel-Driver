@@ -1448,7 +1448,13 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 					void *kaddr;
 					flush_cache_page(vma, addr);
 					kaddr = kmap(page);
-					DUMP_WRITE(kaddr, PAGE_SIZE);
+					if ((size += PAGE_SIZE) > limit ||
+					    !dump_write(file, kaddr,
+					    PAGE_SIZE)) {
+						kunmap(page);
+						page_cache_release(page);
+						goto end_coredump;
+					}
 					kunmap(page);
 				}
 				page_cache_release(page);
