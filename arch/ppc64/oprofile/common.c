@@ -90,6 +90,13 @@ static int op_ppc64_create_files(struct super_block *sb, struct dentry *root)
 {
 	int i;
 
+        /* There is one mmcr0, mmcr1 and mmcra for setting the events for all of the
+	   counters.
+	*/
+	oprofilefs_create_ulong(sb, root, "mmcr0", &sys.mmcr0);
+	oprofilefs_create_ulong(sb, root, "mmcr1", &sys.mmcr1);
+	oprofilefs_create_ulong(sb, root, "mmcra", &sys.mmcra);
+
 	for (i = 0; i < model->num_counters; ++i) {
 		struct dentry *dir;
 		char buf[3];
