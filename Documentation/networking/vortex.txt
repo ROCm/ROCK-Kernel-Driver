@@ -216,6 +216,19 @@ watchdog=N
   to increase this value on LANs which have very high collision rates.
   The default value is 5000 (5.0 seconds).
 
+enable_wol=N1,N2,N3,...
+
+  Enable Wake-on-LAN support for the relevant interface.  Donald
+  Becker's `ether-wake' application may be used to wake suspended
+  machines.
+
+  Also enables the NIC's power management support.
+
+global_enable_wol=N
+
+  Sets enable_wol mode for all 3c59x NICs in the machine.  Entries in
+  the `enable_wol' array above will override any setting of this.
+
 Media selection
 ---------------
 
