@@ -343,6 +343,7 @@ struct pcnet32_private {
     char		tx_full;
     int			options;
     int	shared_irq:1,			/* shared irq possible */
+	ltint:1,			/* enable TxDone-intr inhibitor */
 	dxsuflo:1,			/* disable transmit stop on uflo */
 	mii:1;				/* mii port available */
     struct net_device	*next;
@@ -998,7 +999,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     struct pcnet32_private *lp;
     dma_addr_t lp_dma_addr;
     int i, media;
-    int fdx, mii, fset, dxsuflo;
+    int fdx, mii, fset, dxsuflo, ltint;
     int chip_version;
     char *chipname;
     struct net_device *dev;
@@ -1029,7 +1030,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     }
 
     /* initialize variables */
-    fdx = mii = fset = dxsuflo = 0;
+    fdx = mii = fset = dxsuflo = ltint = 0;
     chip_version = (chip_version >> 12) & 0xffff;
 
     switch (chip_version) {
@@ -1049,6 +1050,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     case 0x2623:
 	chipname = "PCnet/FAST 79C971"; /* PCI */
 	fdx = 1; mii = 1; fset = 1;
+	ltint = 1;
 	break;
     case 0x2624:
 	chipname = "PCnet/FAST+ 79C972"; /* PCI */
@@ -1100,6 +1102,14 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	a->write_bcr(ioaddr, 18, (a->read_bcr(ioaddr, 18) | 0x0860));
 	a->write_csr(ioaddr, 80, (a->read_csr(ioaddr, 80) & 0x0C00) | 0x0c00);
 	dxsuflo = 1;
+	ltint = 0;
+    }
+
+    if (ltint) {
+	/* Enable timer to prevent skbuffs from remaining on the tx ring
+	 * forever if no other tx being done.  Set timer period to about
+	 * 122 ms */
+	a->write_bcr(ioaddr, 31, 0x253b);
     }
 
     dev = alloc_etherdev(0);
@@ -1178,6 +1188,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     lp->mii_if.phy_id_mask = 0x1f;
     lp->mii_if.reg_num_mask = 0x1f;
     lp->dxsuflo = dxsuflo;
+    lp->ltint = ltint;
     lp->mii = mii;
     lp->msg_enable = pcnet32_debug;
     if ((cards_found >= MAX_UNITS) || (options[cards_found] > sizeof(options_mapping)))
@@ -1396,6 +1407,12 @@ pcnet32_open(struct net_device *dev)
     }
 #endif
 
+    if (lp->ltint) { /* Enable TxDone-intr inhibitor */
+	val = lp->a.read_csr (ioaddr, 5);
+	val |= (1<<14);
+	lp->a.write_csr (ioaddr, 5, val);
+    }
+
     lp->init_block.mode = le16_to_cpu((lp->options & PCNET32_PORT_PORTSEL) << 7);
     pcnet32_load_multicast(dev);
 
@@ -1412,6 +1429,11 @@ pcnet32_open(struct net_device *dev)
 
     lp->a.write_csr (ioaddr, 4, 0x0915);
     lp->a.write_csr (ioaddr, 0, 0x0001);
+
+    if (lp->ltint) {
+	/* start the software timer */
+	lp->a.write_csr(ioaddr, 7, 0x0400);	/* set STINTE */
+    }
 
     netif_start_queue(dev);
 
@@ -1626,6 +1648,18 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
      */
     status = 0x8300;
     entry = (lp->cur_tx - lp->dirty_tx) & TX_RING_MOD_MASK;
+    if ((lp->ltint) &&
+	((entry == TX_RING_SIZE/3) ||
+	 (entry == (TX_RING_SIZE*2)/3) ||
+	 (entry >= TX_RING_SIZE-2)))
+    {
+	/* Enable Successful-TxDone interrupt if we have
+	 * 1/3, 2/3 or nearly all of, our ring buffer Tx'd
+	 * but not yet cleaned up.  Thus, most of the time,
+	 * we will not enable Successful-TxDone interrupts.
+	 */
+	status = 0x9300;
+    }
 
     /* Fill in a Tx ring entry */
 
@@ -1687,7 +1721,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
     rap = lp->a.read_rap(ioaddr);
     csr0 = lp->a.read_csr (ioaddr, 0);
-    csr7 = 0;
+    csr7 = lp->ltint ? lp->a.read_csr(ioaddr, 7) : 0;
 
     while ((csr0 & 0x8600 || csr7 & 0x0800) && --boguscnt >= 0) {
 	if (csr0 == 0xffff) {
@@ -1817,7 +1851,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
 
 	csr0 = lp->a.read_csr (ioaddr, 0);
-	csr7 = 0;
+	csr7 = lp->ltint ? lp->a.read_csr(ioaddr, 7) : 0;
     }
 
     /* Clear any other interrupt, and set interrupt enable. */
@@ -1967,6 +2001,10 @@ pcnet32_close(struct net_device *dev)
 
     /* We stop the PCNET32 here -- it occasionally polls memory if we don't. */
     lp->a.write_csr (ioaddr, 0, 0x0004);
+
+    if (lp->ltint) {	/* Disable timer interrupts */
+	lp->a.write_csr(ioaddr, 7, 0x0000);
+    }
 
     /*
      * Switch back to 16bit mode to avoid problems with dumb
