@@ -30,7 +30,6 @@
  **********************************************************************
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
@@ -983,11 +982,11 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 	unsigned long pgoff;
 	int rd, wr;
 
-	DPF(4, "emu10k1_mm_nopage()\n");
-	DPD(4, "addr: %#lx\n", address);
+	DPF(3, "emu10k1_mm_nopage()\n");
+	DPD(3, "addr: %#lx\n", address);
 
 	if (address > vma->vm_end) {
-		DPF(2, "EXIT, returning NOPAGE_SIGBUS\n");
+		DPF(1, "EXIT, returning NOPAGE_SIGBUS\n");
 		return NOPAGE_SIGBUS; /* Disallow mremap */
 	}
 
@@ -1009,14 +1008,14 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 			pgoff -= woinst->buffer.pages;
 			dmapage = virt_to_page ((u8 *) wiinst->buffer.addr + pgoff * PAGE_SIZE);
 		} else
-			dmapage = virt_to_page (woinst->buffer.mem[0].addr[pgoff]);
+			dmapage = virt_to_page (woinst->voice[0].mem.addr[pgoff]);
 	} else {
 		dmapage = virt_to_page ((u8 *) wiinst->buffer.addr + pgoff * PAGE_SIZE);
 	}
 
 	get_page (dmapage);
 
-	DPD(4, "page: %#lx\n", dmapage);
+	DPD(3, "page: %#lx\n", (unsigned long) dmapage);
 	return dmapage;
 }
 
@@ -1083,8 +1082,8 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 	n_pages = ((vma->vm_end - vma->vm_start) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	pgoffset = vma->vm_pgoff;
 
-	DPD(3, "vma_start: %#lx, vma_end: %#lx, vma_offset: %d\n", vma->vm_start, vma->vm_end, pgoffset);
-	DPD(3, "n_pages: %d, max_pages: %d\n", n_pages, max_pages);
+	DPD(2, "vma_start: %#lx, vma_end: %#lx, vma_offset: %ld\n", vma->vm_start, vma->vm_end, pgoffset);
+	DPD(2, "n_pages: %ld, max_pages: %ld\n", n_pages, max_pages);
 
 	if (pgoffset + n_pages > max_pages)
 		return -EINVAL;
@@ -1092,7 +1091,6 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_ops = &emu10k1_mm_ops;
 	vma->vm_private_data = wave_dev;
-
 	return 0;
 }
 
@@ -1136,7 +1134,8 @@ match:
 
 		if ((wiinst = (struct wiinst *) kmalloc(sizeof(struct wiinst), GFP_KERNEL)) == NULL) {
 			ERROR();
-			return -ENODEV;
+			kfree(wave_dev);
+			return -ENOMEM;
 		}
 
 		wiinst->recsrc = card->wavein.recsrc;
@@ -1162,6 +1161,8 @@ match:
 			wiinst->format.channels = hweight32(wiinst->fxwc);
 			break;
 		default:
+			kfree(wave_dev);
+			kfree(wiinst);
 			BUG();
 			break;
 		}
@@ -1211,7 +1212,7 @@ match:
 		woinst->num_voices = 1;
 		for (i = 0; i < WAVEOUT_MAXVOICES; i++) {
 			woinst->voice[i].usage = VOICE_USAGE_FREE;
-			woinst->buffer.mem[i].emupageindex = -1;
+			woinst->voice[i].mem.emupageindex = -1;
 		}
 
 		init_waitqueue_head(&woinst->wait_queue);
@@ -1330,23 +1331,13 @@ static unsigned int emu10k1_audio_poll(struct file *file, struct poll_table_stru
 	if (file->f_mode & FMODE_READ) {
 		spin_lock_irqsave(&wiinst->lock, flags);
 
-		if (wiinst->state == WAVE_STATE_CLOSED) {
-			calculate_ifrag(wiinst);
-			if (emu10k1_wavein_open(wave_dev) < 0) {
-				spin_unlock_irqrestore(&wiinst->lock, flags);
-				return (mask |= POLLERR);
-			}
-		}
+		if (wiinst->state & WAVE_STATE_OPEN) {
+			emu10k1_wavein_update(wave_dev->card, wiinst);
+			emu10k1_wavein_getxfersize(wiinst, &bytestocopy);
 
-		if (!(wiinst->state & WAVE_STATE_STARTED)) {
-			wave_dev->enablebits |= PCM_ENABLE_INPUT;
-			emu10k1_wavein_start(wave_dev);
+			if (bytestocopy >= wiinst->buffer.fragment_size)
+				mask |= POLLIN | POLLRDNORM;
 		}
-		emu10k1_wavein_update(wave_dev->card, wiinst);
-		emu10k1_wavein_getxfersize(wiinst, &bytestocopy);
-
-		if (bytestocopy >= wiinst->buffer.fragment_size)
-			mask |= POLLIN | POLLRDNORM;
 
 		spin_unlock_irqrestore(&wiinst->lock, flags);
 	}
@@ -1376,6 +1367,13 @@ static void calculate_ofrag(struct woinst *woinst)
 
 	buffer->fragment_size = 1 << buffer->ossfragshift;
 
+	while (buffer->fragment_size * WAVEOUT_MINFRAGS > WAVEOUT_MAXBUFSIZE)
+		buffer->fragment_size >>= 1;
+
+	/* now we are sure that:
+	 (2^WAVEOUT_MINFRAGSHIFT) <= (fragment_size = 2^n) <= (WAVEOUT_MAXBUFSIZE / WAVEOUT_MINFRAGS)
+	*/
+
 	if (!buffer->numfrags) {
 		u32 numfrags;
 
@@ -1390,19 +1388,14 @@ static void calculate_ofrag(struct woinst *woinst)
 		}
 	}
 
-	if (buffer->numfrags < MINFRAGS)
-		buffer->numfrags = MINFRAGS;
+	if (buffer->numfrags < WAVEOUT_MINFRAGS)
+		buffer->numfrags = WAVEOUT_MINFRAGS;
 
-	if (buffer->numfrags * buffer->fragment_size > WAVEOUT_MAXBUFSIZE) {
+	if (buffer->numfrags * buffer->fragment_size > WAVEOUT_MAXBUFSIZE)
 		buffer->numfrags = WAVEOUT_MAXBUFSIZE / buffer->fragment_size;
 
-		if (buffer->numfrags < MINFRAGS) {
-			buffer->numfrags = MINFRAGS;
-			buffer->fragment_size = WAVEOUT_MAXBUFSIZE / MINFRAGS;
-		}
-
-	} else if (buffer->numfrags * buffer->fragment_size < WAVEOUT_MINBUFSIZE)
-		buffer->numfrags = WAVEOUT_MINBUFSIZE / buffer->fragment_size;
+	if (buffer->numfrags < WAVEOUT_MINFRAGS)
+		BUG();
 
 	buffer->size = buffer->fragment_size * buffer->numfrags;
 	buffer->pages = buffer->size / PAGE_SIZE + ((buffer->size % PAGE_SIZE) ? 1 : 0);
@@ -1436,24 +1429,29 @@ static void calculate_ifrag(struct wiinst *wiinst)
 
 	buffer->fragment_size = 1 << buffer->ossfragshift;
 
+	while (buffer->fragment_size * WAVEIN_MINFRAGS > WAVEIN_MAXBUFSIZE)
+		buffer->fragment_size >>= 1;
+
+	/* now we are sure that:
+	   (2^WAVEIN_MINFRAGSHIFT) <= (fragment_size = 2^n) <= (WAVEIN_MAXBUFSIZE / WAVEIN_MINFRAGS)
+        */
+
+
 	if (!buffer->numfrags)
 		buffer->numfrags = (wiinst->format.bytespersec * WAVEIN_DEFAULTBUFLEN) / (buffer->fragment_size * 1000) - 1;
 
-	if (buffer->numfrags < MINFRAGS)
-		buffer->numfrags = MINFRAGS;
+	if (buffer->numfrags < WAVEIN_MINFRAGS)
+		buffer->numfrags = WAVEIN_MINFRAGS;
 
-	if (buffer->numfrags * buffer->fragment_size > WAVEIN_MAXBUFSIZE) {
+	if (buffer->numfrags * buffer->fragment_size > WAVEIN_MAXBUFSIZE)
 		buffer->numfrags = WAVEIN_MAXBUFSIZE / buffer->fragment_size;
 
-		if (buffer->numfrags < MINFRAGS) {
-			buffer->numfrags = MINFRAGS;
-			buffer->fragment_size = WAVEIN_MAXBUFSIZE / MINFRAGS;
-		}
-	} else if (buffer->numfrags * buffer->fragment_size < WAVEIN_MINBUFSIZE)
-		buffer->numfrags = WAVEIN_MINBUFSIZE / buffer->fragment_size;
+	if (buffer->numfrags < WAVEIN_MINFRAGS)
+		BUG();
 
 	bufsize = buffer->fragment_size * buffer->numfrags;
 
+	/* the buffer size for recording is restricted to certain values, adjust it now */
 	if (bufsize >= 0x10000) {
 		buffer->size = 0x10000;
 		buffer->sizeregval = 0x1f;
@@ -1479,10 +1477,12 @@ static void calculate_ifrag(struct wiinst *wiinst)
 		}
 	}
 
+	/* adjust the fragment size so that buffer size is an integer multiple */
+	while (buffer->size % buffer->fragment_size)
+		buffer->fragment_size >>= 1;
+
 	buffer->numfrags = buffer->size / buffer->fragment_size;
 	buffer->pages =  buffer->size / PAGE_SIZE + ((buffer->size % PAGE_SIZE) ? 1 : 0);
-	if (buffer->size % buffer->fragment_size)
-		BUG();
 
 	DPD(2, " calculated recording fragment_size -> %d\n", buffer->fragment_size);
 	DPD(2, " calculated recording numfrags -> %d\n", buffer->numfrags);

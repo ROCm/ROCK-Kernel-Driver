@@ -33,8 +33,6 @@
 #ifndef _AUDIO_H
 #define _AUDIO_H
 
-#define MINFRAGS	2	/* _don't_ got bellow 2 */
-
 struct emu10k1_wavedevice
 {
         struct emu10k1_card *card;

@@ -64,6 +64,12 @@ struct voice_param
 	u32 byampl_env_decay;
 };
 
+struct voice_mem {
+	int emupageindex;
+	void *addr[BUFMAXPAGES];
+	dma_addr_t dma_handle[BUFMAXPAGES];
+	u32 pages;
+};
 
 struct emu_voice
 {
@@ -72,16 +78,20 @@ struct emu_voice
 	u8 num;			/* Voice ID */
 	u8 flags;		/* Stereo/mono, 8/16 bit */
 
-        u32 startloop;
-        u32 endloop;
+	u32 startloop;
+	u32 endloop;
 	u32 start;
 
 	u32 initial_pitch;
 	u32 pitch_target;
 
 	struct voice_param params[2];
+
+	struct voice_mem mem;
 };
 
+int emu10k1_voice_alloc_buffer(struct emu10k1_card *, struct voice_mem *, u32);
+void emu10k1_voice_free_buffer(struct emu10k1_card *, struct voice_mem *);
 int emu10k1_voice_alloc(struct emu10k1_card *, struct emu_voice *);
 void emu10k1_voice_free(struct emu_voice *);
 void emu10k1_voice_playback_setup(struct emu_voice *);

@@ -36,17 +36,17 @@ struct emu_timer
 	struct list_head list;
 	struct tasklet_struct tasklet;
 	u8 state; 
-	u32 count;				/* current number of interrupts */
-	u32 count_max;				/* number of interrupts needed to schedule the bh */
-	u32 delay;                              /* timer delay */
+	u16 count;				/* current number of interrupts */
+	u16 count_max;				/* number of interrupts needed to schedule the bh */
+	u16 delay;                              /* timer delay */
 };
 
-void emu10k1_timer_install(struct emu10k1_card *, struct emu_timer *, u32);
+void emu10k1_timer_install(struct emu10k1_card *, struct emu_timer *, u16);
 void emu10k1_timer_uninstall(struct emu10k1_card *, struct emu_timer *);
 void emu10k1_timer_enable(struct emu10k1_card *, struct emu_timer *);
 void emu10k1_timer_disable(struct emu10k1_card *, struct emu_timer *);
 
-#define TIMER_STOPPED 			0xffffffff 
+#define TIMER_STOPPED 			0xffff 
 #define TIMER_STATE_INSTALLED 		0x01
 #define TIMER_STATE_ACTIVE		0x02
 #define TIMER_STATE_UNINSTALLED 	0x04

@@ -40,9 +40,9 @@
 #define WAVERECORD_MIC		0x02
 #define WAVERECORD_FX		0x03
 
+void emu10k1_reset_record(struct emu10k1_card *card, struct wavein_buffer *buffer);
 void emu10k1_start_record(struct emu10k1_card *, struct wavein_buffer *);
 void emu10k1_stop_record(struct emu10k1_card *, struct wavein_buffer *);
 void emu10k1_set_record_src(struct emu10k1_card *, struct wiinst *wiinst);
-
 
 #endif /* _RECORDMGR_H */

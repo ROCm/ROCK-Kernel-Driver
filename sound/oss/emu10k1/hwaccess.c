@@ -187,6 +187,15 @@ u32 emu10k1_readfn0(struct emu10k1_card * card, u32 reg)
 	}
 }
 
+void emu10k1_timer_set(struct emu10k1_card * card, u16 data)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&card->lock, flags);
+	outw(data & TIMER_RATE_MASK, card->iobase + TIMER);
+	spin_unlock_irqrestore(&card->lock, flags);
+}
+
 /************************************************************************
 * write/read Emu10k1 pointer-offset register set, accessed through      *
 *  the PTR and DATA registers                                           *
