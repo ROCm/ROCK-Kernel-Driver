@@ -226,15 +226,19 @@ running once the system is up.
 
 	atascsi=	[HW,SCSI] Atari SCSI
 
-	atkbd.extra=	[HW] Enable extra LEDs and keys on IBM RapidAccess, EzKey
-			and similar keyboards
+	atkbd.extra=	[HW] Enable extra LEDs and keys on IBM RapidAccess,
+			EzKey and similar keyboards
 
 	atkbd.reset=	[HW] Reset keyboard during initialization
 
 	atkbd.set=	[HW] Select keyboard code set 
 			Format: <int> (2 = AT (default) 3 = PS/2)
 
-	atkbd.scroll=	[HW] Enable scroll wheel on MS Office and similar keyboards
+	atkbd.scroll=	[HW] Enable scroll wheel on MS Office and similar
+			keyboards
+
+	atkbd.softraw=	[HW] Choose between synthetic and real raw mode
+			Format: <bool> (0 = real, 1 = synthetic (default))
 	
 	atkbd.softrepeat=
 			[HW] Use software keyboard repeat
