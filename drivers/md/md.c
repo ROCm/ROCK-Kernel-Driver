@@ -253,13 +253,12 @@ char * partition_name(kdev_t dev)
 	struct gendisk *hd;
 	static char nomem [] = "<nomem>";
 	dev_name_t *dname;
-	struct list_head *tmp = device_names.next;
+	struct list_head *tmp;
 
-	while (tmp != &device_names) {
+	list_for_each(tmp, &device_names) {
 		dname = list_entry(tmp, dev_name_t, list);
 		if (kdev_same(dname->dev, dev))
 			return dname->name;
-		tmp = tmp->next;
 	}
 
 	dname = (dev_name_t *) kmalloc(sizeof(*dname), GFP_KERNEL);
@@ -279,7 +278,6 @@ char * partition_name(kdev_t dev)
 	}
 
 	dname->dev = dev;
-	INIT_LIST_HEAD(&dname->list);
 	list_add(&dname->list, &device_names);
 
 	return dname->name;
@@ -632,8 +630,7 @@ static void unbind_rdev_from_array(mdk_rdev_t * rdev)
 		MD_BUG();
 		return;
 	}
-	list_del(&rdev->same_set);
-	INIT_LIST_HEAD(&rdev->same_set);
+	list_del_init(&rdev->same_set);
 	rdev->mddev->nb_dev--;
 	printk(KERN_INFO "md: unbind<%s,%d>\n", partition_name(rdev->dev),
 						 rdev->mddev->nb_dev);
@@ -686,13 +683,11 @@ static void export_rdev(mdk_rdev_t * rdev)
 		MD_BUG();
 	unlock_rdev(rdev);
 	free_disk_sb(rdev);
-	list_del(&rdev->all);
-	INIT_LIST_HEAD(&rdev->all);
-	if (rdev->pending.next != &rdev->pending) {
+	list_del_init(&rdev->all);
+	if (!list_empty(&rdev->pending)) {
 		printk(KERN_INFO "md: (%s was pending)\n",
 			partition_name(rdev->dev));
-		list_del(&rdev->pending);
-		INIT_LIST_HEAD(&rdev->pending);
+		list_del_init(&rdev->pending);
 	}
 #ifndef MODULE
 	md_autodetect_dev(rdev->dev);
@@ -752,7 +747,6 @@ static void free_mddev(mddev_t *mddev)
 
 	del_mddev_mapping(mddev, mk_kdev(MD_MAJOR, mdidx(mddev)));
 	list_del(&mddev->all_mddevs);
-	INIT_LIST_HEAD(&mddev->all_mddevs);
 	kfree(mddev);
 	MOD_DEC_USE_COUNT;
 }
@@ -896,12 +890,10 @@ static mdk_rdev_t * find_rdev_all(kdev_t dev)
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 
-	tmp = all_raid_disks.next;
-	while (tmp != &all_raid_disks) {
+	list_for_each(tmp, &all_raid_disks) {
 		rdev = list_entry(tmp, mdk_rdev_t, all);
 		if (kdev_same(rdev->dev, dev))
 			return rdev;
-		tmp = tmp->next;
 	}
 	return NULL;
 }
@@ -1126,6 +1118,7 @@ static int md_import_device(kdev_t newdev, int on_disk)
 	}
 	list_add(&rdev->all, &all_raid_disks);
 	INIT_LIST_HEAD(&rdev->pending);
+	INIT_LIST_HEAD(&rdev->same_set);
 
 	if (rdev->faulty && rdev->sb)
 		free_disk_sb(rdev);
@@ -1883,7 +1876,7 @@ static void autorun_array(mddev_t *mddev)
 	struct list_head *tmp;
 	int err;
 
-	if (mddev->disks.prev == &mddev->disks) {
+	if (list_empty(&mddev->disks)) {
 		MD_BUG();
 		return;
 	}
@@ -1928,7 +1921,7 @@ static void autorun_devices(kdev_t countdev)
 
 
 	printk(KERN_INFO "md: autorun ...\n");
-	while (pending_raid_disks.next != &pending_raid_disks) {
+	while (!list_empty(&pending_raid_disks)) {
 		rdev0 = list_entry(pending_raid_disks.next,
 					 mdk_rdev_t, pending);
 
@@ -1971,8 +1964,7 @@ static void autorun_devices(kdev_t countdev)
 		printk(KERN_INFO "md: created md%d\n", mdidx(mddev));
 		ITERATE_RDEV_GENERIC(candidates,pending,rdev,tmp) {
 			bind_rdev_to_array(rdev, mddev);
-			list_del(&rdev->pending);
-			INIT_LIST_HEAD(&rdev->pending);
+			list_del_init(&rdev->pending);
 		}
 		autorun_array(mddev);
 	}
@@ -3086,7 +3078,7 @@ static int status_unused(char * page)
 	sz += sprintf(page + sz, "unused devices: ");
 
 	ITERATE_RDEV_ALL(rdev,tmp) {
-		if (!rdev->same_set.next && !rdev->same_set.prev) {
+		if (list_empty(&rdev->same_set)) {
 			/*
 			 * The device is not yet used by any array.
 			 */
@@ -3988,9 +3980,10 @@ int init_module(void)
 
 static void free_device_names(void)
 {
-	while (device_names.next != &device_names) {
-		struct list_head *tmp = device_names.next;
-		list_del(tmp);
+	while (!list_empty(&device_names)) {
+		struct dname *tmp = list_entry(device_names.next,
+					       dev_name_t, list);
+		list_del(&tmp->list);
 		kfree(tmp);
 	}
 }
