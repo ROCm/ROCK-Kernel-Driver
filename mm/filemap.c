@@ -1866,6 +1866,8 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 	if (unlikely(pos < 0))
 		return -EINVAL;
 
+	pagevec_init(&lru_pvec);
+
 	if (unlikely(file->f_error)) {
 		err = file->f_error;
 		file->f_error = 0;
@@ -1976,7 +1978,6 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 		goto out_status;
 	}
 
-	pagevec_init(&lru_pvec);
 	do {
 		unsigned long index;
 		unsigned long offset;

@@ -275,16 +275,17 @@ static void __init print_memory_map(char *who)
  * replaces the original e820 map with a new one, removing overlaps.
  *
  */
+struct change_member {
+	struct e820entry *pbios; /* pointer to original bios entry */
+	unsigned long long addr; /* address for this change point */
+};
+struct change_member change_point_list[2*E820MAX] __initdata;
+struct change_member *change_point[2*E820MAX] __initdata;
+struct e820entry *overlap_list[E820MAX] __initdata;
+struct e820entry new_bios[E820MAX] __initdata;
+
 static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
-	struct change_member {
-		struct e820entry *pbios; /* pointer to original bios entry */
-		unsigned long long addr; /* address for this change point */
-	};
-	struct change_member change_point_list[2*E820MAX];
-	struct change_member *change_point[2*E820MAX];
-	struct e820entry *overlap_list[E820MAX];
-	struct e820entry new_bios[E820MAX];
 	struct change_member *change_tmp;
 	unsigned long current_type, last_type;
 	unsigned long long last_addr;
