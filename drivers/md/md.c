@@ -2490,10 +2490,10 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	 * Commands creating/starting a new array:
 	 */
 
-	mddev = mddev_find(minor);
+	mddev = inode->i_bdev->bd_inode->u.generic_ip;
 
 	if (!mddev) {
-		err = -ENOMEM;
+		BUG();
 		goto abort;
 	}
 
@@ -2679,7 +2679,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 done_unlock:
 abort_unlock:
 	unlock_mddev(mddev);
-	mddev_put(mddev);
 
 	return err;
 done:
