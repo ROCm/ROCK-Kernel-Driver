@@ -324,6 +324,13 @@ M:	scott@spiteful.org
 L:	pcihpd-discuss@lists.sourceforge.net
 S:	Supported
 
+COMPACTPCI HOTPLUG ZIATECH ZT5550 DRIVER
+P:	Scott Murray
+M:	scottm@somanetworks.com
+M:	scott@spiteful.org
+L:	pcihpd-discuss@lists.sourceforge.net
+S:	Supported
+
 COMPAQ FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
 P:	Amy Vanzant-Hodge 
 M:	Amy Vanzant-Hodge (fibrechannel@compaq.com)
