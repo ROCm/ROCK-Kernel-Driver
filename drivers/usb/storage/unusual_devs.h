@@ -137,7 +137,8 @@ UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
 		"LS-120 Camera",
 		US_SC_UFI, US_PR_CBI, NULL, 0),
 
-/* From Yukihiro Nakai, via zaitcev@yahoo.com. */
+/* From Yukihiro Nakai, via zaitcev@yahoo.com.
+ * This is needed for CB instead of CBI */
 UNUSUAL_DEV(  0x04da, 0x0d05, 0x0000, 0x0000,
 		"Sharp CE-CW05",
 		"CD-R/RW Drive",
