@@ -69,6 +69,14 @@ S: Status, one of the following:
 			it has been replaced by a better system and you
 			should be using that.
 
+3C359 NETWORK DRIVER
+P:	Mike Phillips
+M:	mikep@linuxtr.net
+L:	linux-net@vger.rutgers.edu
+L:	linux-tr@linuxtr.net
+W:	http://www.linuxtr.net
+S:	Maintained
+
 3C501 NETWORK DRIVER
 P:	Alan Cox
 M:	alan@the.3c501.cabal.tm

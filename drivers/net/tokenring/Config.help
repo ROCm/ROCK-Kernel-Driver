@@ -129,3 +129,21 @@ CONFIG_SMCTR
   The module will be called smctr.o. If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
 
+3COM 3C359 Token Link Velocity XL PCI adapter support
+CONFIG_3C359
+  This is support for the 3Com PCI Velocity XL cards, specifically
+  the 3Com 3C359, please note this is not for the 3C339 cards, you
+  should use the tms380 driver instead.
+
+  If you have such an adapter, say Y and read the Token-Ring
+  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will will be called 3c359.o. If you want to compile it
+  as a module, say M here and read Documentation/modules.txt.
+
+  Also read the file <file:Documentation/networking/3c359.txt> or check the 
+  Linux Token Ring Project site for the latest information at
+  <http://www.linuxtr.net>
+
