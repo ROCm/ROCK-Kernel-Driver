@@ -243,8 +243,7 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 		return -ENOMEM;
 
 	if (old_prot)
-		if (copy_from_user(page, (void *) PAGE_START(start), PAGE_SIZE))
-			return -EFAULT;
+		copy_from_user(page, (void *) PAGE_START(start), PAGE_SIZE);
 
 	down_write(&current->mm->mmap_sem);
 	{
