@@ -23,7 +23,7 @@
    	notice, this list of conditions and the following disclaimer in the
    	documentation and/or other materials provided with the distribution.
 
-	3. The name of InnoSys Incorprated may not be used to endorse or promote
+	3. The name of InnoSys Incorporated may not be used to endorse or promote
    	products derived from this software without specific prior written
    	permission.
 

@@ -1086,7 +1086,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		return -ENODEV;
 	}
 
-	/* now wait for the port to be completly opened */
+	/* now wait for the port to be completely opened */
 	timeout = OPEN_TIMEOUT;
 	while (timeout && edge_port->openPending == TRUE) {
 		timeout = interruptible_sleep_on_timeout (&edge_port->wait_open, timeout);

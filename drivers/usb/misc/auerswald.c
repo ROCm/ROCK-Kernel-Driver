@@ -687,10 +687,10 @@ static int auerchain_start_wait_urb (pauerchain_t acp, struct urb *urb, int time
    This function sends a simple control message to a specified endpoint
    and waits for the message to complete, or timeout.
 
-   If successful, it returns the transfered length, othwise a negative error number.
+   If successful, it returns the transferred length, otherwise a negative error number.
 
    Don't use this function from within an interrupt context, like a
-   bottom half handler.  If you need a asyncronous message, or need to send
+   bottom half handler.  If you need an asynchronous message, or need to send
    a message from within interrupt context, use auerchain_submit_urb()
 */
 static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsigned int pipe, __u8 request, __u8 requesttype,
@@ -814,7 +814,7 @@ static int auerbuf_setup (pauerbufctl_t bcp, unsigned int numElements, unsigned 
         }
         return 0;
 
-bl_fail:/* not enought memory. Free allocated elements */
+bl_fail:/* not enough memory. Free allocated elements */
         dbg ("auerbuf_setup: no more memory");
         auerbuf_free_buffers (bcp);
         return -ENOMEM;
@@ -1083,7 +1083,7 @@ static void auerswald_int_complete (struct urb * urb, struct pt_regs *regs)
                 /* can we do something more?
 		   This is a big problem: if this int packet is ignored, the
 		   device will wait forever and not signal any more data.
-		   The only real solution is: having enought buffers!
+		   The only real solution is: having enough buffers!
 		   Or perhaps temporary disabling the int endpoint?
 		*/
 		goto exit;
@@ -1130,7 +1130,7 @@ static void auerswald_int_free (pauerswald_t cp)
 }
 
 /* This function is called to activate the interrupt
-   endpoint. This function returns 0 if successfull or an error code.
+   endpoint. This function returns 0 if successful or an error code.
    NOTE: no mutex please!
 */
 static int auerswald_int_open (pauerswald_t cp)
@@ -1181,7 +1181,7 @@ intoend:
 }
 
 /* This function is called to deactivate the interrupt
-   endpoint. This function returns 0 if successfull or an error code.
+   endpoint. This function returns 0 if successful or an error code.
    NOTE: no mutex please!
 */
 static int auerswald_int_release (pauerswald_t cp)
@@ -1713,7 +1713,7 @@ doreadlist:
 		return -ERESTARTSYS;
 	}
 
-	/* try to read the incomming data again */
+	/* try to read the incoming data again */
 	goto doreadlist;
 }
 
@@ -2075,7 +2075,7 @@ pfail:	auerswald_delete (cp);
    The argument  dev specifies the device context and the  driver_context
    returns a pointer to the previously registered  driver_context of the
    probe function. After returning from the disconnect function the USB
-   framework completly deallocates all data structures associated with
+   framework completely deallocates all data structures associated with
    this device. So especially the usb_device structure must not be used
    any longer by the usb driver.
 */
