@@ -17,8 +17,7 @@ snd-maestro3-objs := maestro3.o
 snd-rme32-objs := rme32.o
 snd-rme96-objs := rme96.o
 snd-sonicvibes-objs := sonicvibes.o
-snd-via686-objs := via686.o
-snd-via8233-objs := via8233.o
+snd-via82xx-objs := via82xx.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS4000) += snd-als4000.o
@@ -35,8 +34,7 @@ obj-$(CONFIG_SND_MAESTRO3) += snd-maestro3.o
 obj-$(CONFIG_SND_RME32) += snd-rme32.o
 obj-$(CONFIG_SND_RME96) += snd-rme96.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-sonicvibes.o
-obj-$(CONFIG_SND_VIA686) += snd-via686.o
-obj-$(CONFIG_SND_VIA8233) += snd-via8233.o
+obj-$(CONFIG_SND_VIA82XX) += snd-via82xx.o
 
 obj-$(CONFIG_SND) += ac97/ ali5451/ cs46xx/ emu10k1/ korg1212/ nm256/ rme9652/ trident/ ymfpci/
 

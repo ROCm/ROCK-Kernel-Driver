@@ -414,7 +414,8 @@ MODULE_PARM_SYNTAX(snd_omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 #define ICE1712_6FIRE_TX2		0x40	/* MIDI2 */
 #define ICE1712_6FIRE_RX2		0x80	/* MIDI2 */
 
-#define ICE1712_6FIRE_CS8427_ADDR	(0x22>>1) /* ?? */
+#define ICE1712_6FIRE_PCF9554_ADDR	(0x40>>1)
+#define ICE1712_6FIRE_CS8427_ADDR	(0x22>>1)
 
 /*
  * DMA mode values
@@ -509,7 +510,7 @@ struct _snd_ice1712 {
 	snd_i2c_device_t *cs8404;	/* CS8404A I2C device */
 	snd_i2c_device_t *cs8427;	/* CS8427 I2C device */
 	snd_i2c_device_t *pcf8574[2];	/* PCF8574 Output/Input (EWS88MT) */
-	snd_i2c_device_t *pcf8575;	/* PCF8575 (EWS88D) */
+	snd_i2c_device_t *pcf8575;	/* PCF8575 (EWS88D) / PCF9554 (6Fire) */
 	
 	unsigned char cs8403_spdif_bits;
 	unsigned char cs8403_spdif_stream_bits;
@@ -2411,14 +2412,13 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		ac97.read = snd_ice1712_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {
+		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize ac97 for consumer, skipped\n");
-			// return err;
-		} else {
+		else {
 			if ((err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_mixer_digmix_route_ac97, ice))) < 0)
 				return err;
+			return 0;
 		}
-		return 0;
 	}
 	/* hmm.. can we have both consumer and pro ac97 mixers? */
 	if (! (ice->eeprom.aclink & ICE1712_CFG_PRO_I2S)) {
@@ -2428,11 +2428,10 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 		ac97.read = snd_ice1712_pro_ac97_read;
 		ac97.private_data = ice;
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0) {
+		if ((err = snd_ac97_mixer(ice->card, &ac97, &ice->ac97)) < 0)
 			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
-			// return err;
-		}
-		return 0;
+		else
+			return 0;
 	}
 	/* I2S mixer only */
 	strcat(ice->card->mixername, "ICE1712 - multitrack");
@@ -3111,7 +3110,7 @@ static snd_kcontrol_new_t snd_ice1712_mixer_pro_peak __devinitdata = {
 
 static int snd_ice1712_ewx_io_sense_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo){
 
-	static char *texts[4] = {
+	static char *texts[2] = {
 		"+4dBu", "-10dBV",
 	};
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
@@ -3354,26 +3353,32 @@ static snd_kcontrol_new_t snd_ice1712_ews88d_controls[] __devinitdata = {
  * DMX 6Fire controls
  */
 
-#if 0 // XXX not working yet
-static int snd_ice1712_6fire_read_pca(ice1712_t *ice)
+#define PCF9554_REG_INPUT	0
+#define PCF9554_REG_OUTPUT	1
+#define PCF9554_REG_POLARITY	2
+#define PCF9554_REG_CONFIG	3
+
+static int snd_ice1712_6fire_read_pca(ice1712_t *ice, unsigned char reg)
 {
 	unsigned char byte;
 	snd_i2c_lock(ice->i2c);
-	byte = 0; /* read port */
+	byte = reg;
 	snd_i2c_sendbytes(ice->pcf8575, &byte, 1);
+	byte = 0;
 	if (snd_i2c_readbytes(ice->pcf8575, &byte, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
+		printk("cannot read pca\n");
 		return -EIO;
 	}
 	snd_i2c_unlock(ice->i2c);
 	return byte;
 }
 
-static int snd_ice1712_6fire_write_pca(ice1712_t *ice, unsigned char data)
+static int snd_ice1712_6fire_write_pca(ice1712_t *ice, unsigned char reg, unsigned char data)
 {
 	unsigned char bytes[2];
 	snd_i2c_lock(ice->i2c);
-	bytes[0] = 1; /* write port */
+	bytes[0] = reg;
 	bytes[1] = data;
 	if (snd_i2c_sendbytes(ice->pcf8575, bytes, 2) != 2) {
 		snd_i2c_unlock(ice->i2c);
@@ -3399,7 +3404,7 @@ static int snd_ice1712_6fire_control_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 	int invert = (kcontrol->private_value >> 8) & 1;
 	int data;
 	
-	if ((data = snd_ice1712_6fire_read_pca(ice)) < 0)
+	if ((data = snd_ice1712_6fire_read_pca(ice, PCF9554_REG_OUTPUT)) < 0)
 		return data;
 	data = (data >> shift) & 1;
 	if (invert)
@@ -3415,7 +3420,7 @@ static int snd_ice1712_6fire_control_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 	int invert = (kcontrol->private_value >> 8) & 1;
 	int data, ndata;
 	
-	if ((data = snd_ice1712_6fire_read_pca(ice)) < 0)
+	if ((data = snd_ice1712_6fire_read_pca(ice, PCF9554_REG_OUTPUT)) < 0)
 		return data;
 	ndata = data & ~(1 << shift);
 	if (ucontrol->value.integer.value[0])
@@ -3423,27 +3428,77 @@ static int snd_ice1712_6fire_control_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 	if (invert)
 		ndata ^= (1 << shift);
 	if (data != ndata) {
-		snd_ice1712_6fire_write_pca(ice, (unsigned char)ndata);
+		snd_ice1712_6fire_write_pca(ice, PCF9554_REG_OUTPUT, (unsigned char)ndata);
 		return 1;
 	}
 	return 0;
 }
 
-#define DMX6FIRE_CONTROL(xiface, xname, xshift, xinvert, xaccess) \
-{ .iface = xiface,\
+static int snd_ice1712_6fire_select_input_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	static char *texts[4] = {
+		"Internal", "Front Input", "Rear Input", "Wave Table"
+	};
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 4;
+	if (uinfo->value.enumerated.item >= 4)
+		uinfo->value.enumerated.item = 1;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+     
+static int snd_ice1712_6fire_select_input_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	int data;
+	
+	if ((data = snd_ice1712_6fire_read_pca(ice, PCF9554_REG_OUTPUT)) < 0)
+		return data;
+	ucontrol->value.integer.value[0] = data & 3;
+	return 0;
+}
+
+static int snd_ice1712_6fire_select_input_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	int data, ndata;
+	
+	if ((data = snd_ice1712_6fire_read_pca(ice, PCF9554_REG_OUTPUT)) < 0)
+		return data;
+	ndata = data & ~3;
+	ndata |= (ucontrol->value.integer.value[0] & 3);
+	if (data != ndata) {
+		snd_ice1712_6fire_write_pca(ice, PCF9554_REG_OUTPUT, (unsigned char)ndata);
+		return 1;
+	}
+	return 0;
+}
+
+
+#define DMX6FIRE_CONTROL(xname, xshift, xinvert) \
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
   .name = xname,\
-  .access = xaccess,\
   .info = snd_ice1712_6fire_control_info,\
   .get = snd_ice1712_6fire_control_get,\
   .put = snd_ice1712_6fire_control_put,\
   .private_value = xshift | (xinvert << 8),\
 }
 
-static snd_kcontrol_new_t snd_ice1712_6fire_led __devinitdata =
-DMX6FIRE_CONTROL(SNDRV_CTL_ELEM_IFACE_MIXER, "Breakbox LED", 6, 0, 0);
-
-#endif // XXX not working yet
-
+static snd_kcontrol_new_t snd_ice1712_6fire_controls[] __devinitdata = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Analog Input Select",
+		.info = snd_ice1712_6fire_select_input_info,
+		.get = snd_ice1712_6fire_select_input_get,
+		.put = snd_ice1712_6fire_select_input_put,
+	},
+	DMX6FIRE_CONTROL("Front Digital Input Switch", 2, 0),
+	// DMX6FIRE_CONTROL("Master Clock Select", 3, 0),
+	DMX6FIRE_CONTROL("Optical Digital Input Switch", 4, 0),
+	DMX6FIRE_CONTROL("Phono Analog Input Switch", 5, 0),
+	DMX6FIRE_CONTROL("Breakbox LED", 6, 0),
+};
 
 /*
  *
@@ -3808,14 +3863,16 @@ static int __devinit snd_ice1712_chip_init(ice1712_t *ice)
 			}
 			break;
 		case ICE1712_SUBDEVICE_DMX6FIRE:
-#if 0 // XXX not working yet
-			if ((err = snd_i2c_device_create(ice->i2c, "PCF9554", 0x40>>1, &ice->pcf8575)) < 0)
+			if ((err = snd_i2c_device_create(ice->i2c, "PCF9554", ICE1712_6FIRE_PCF9554_ADDR, &ice->pcf8575)) < 0) {
+				snd_printk("PCF9554 initialization failed\n");
 				return err;
-			if ((err = snd_cs8427_create(ice->i2c, 0x11, &ice->cs8427)) < 0) {
+			}
+#if 0 // XXX not working...
+			if ((err = snd_cs8427_create(ice->i2c, ICE1712_6FIRE_CS8427_ADDR, &ice->cs8427)) < 0) {
 				snd_printk("CS8427 initialization failed\n");
 				return err;
 			}
-#endif // XXX not working yet
+#endif
 			break;
 		case ICE1712_SUBDEVICE_EWS88MT:
 			if ((err = snd_i2c_device_create(ice->i2c, "CS8404", ICE1712_EWS88MT_CS8404_ADDR, &ice->cs8404)) < 0)
@@ -4052,11 +4109,11 @@ static int __init snd_ice1712_build_controls(ice1712_t *ice)
 		}
 		break;
 	case ICE1712_SUBDEVICE_DMX6FIRE:
-#if 0 // XXX not working yet
-		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_6fire_led, ice));
-		if (err < 0)
-			return err;
-#endif
+		for (idx = 0; idx < sizeof(snd_ice1712_6fire_controls)/sizeof(snd_ice1712_6fire_controls[0]); idx++) {
+			err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_6fire_controls[idx], ice));
+			if (err < 0)
+				return err;
+		}
 		break;
 	}
 

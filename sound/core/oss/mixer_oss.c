@@ -1169,10 +1169,14 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int free_flag)
 			return err;
 		}
 		mixer->card = card;
-		strcpy(mixer->name, name);
+		if (*card->mixername) {
+			strncpy(mixer->name, card->mixername, sizeof(mixer->name) - 1);
+			mixer->name[sizeof(mixer->name)-1] = 0;
+		} else
+			strcpy(mixer->name, name);
 		snd_oss_info_register(SNDRV_OSS_INFO_DEV_MIXERS,
 				      card->number,
-				      name);
+				      mixer->name);
 		for (idx = 0; idx < SNDRV_OSS_MAX_MIXERS; idx++)
 			mixer->slots[idx].number = idx;
 		card->mixer_oss = mixer;

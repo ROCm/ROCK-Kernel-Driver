@@ -1517,10 +1517,8 @@ static int
 snd_rme32_info_inputtype_control(snd_kcontrol_t * kcontrol,
 				 snd_ctl_elem_info_t * uinfo)
 {
-	static char *_texts[5] =
-	    { "Optical", "Coaxial", "Internal", "XLR" };
 	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
-	char *texts[4] = { _texts[0], _texts[1], _texts[2], _texts[3] };
+	static char *texts[4] = { "Optical", "Coaxial", "Internal", "XLR" };
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1614,8 +1612,8 @@ snd_rme32_info_clockmode_control(snd_kcontrol_t * kcontrol,
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
 	uinfo->value.enumerated.items = 4;
-	if (uinfo->value.enumerated.item > 4) {
-		uinfo->value.enumerated.item = 4;
+	if (uinfo->value.enumerated.item > 3) {
+		uinfo->value.enumerated.item = 3;
 	}
 	strcpy(uinfo->value.enumerated.name,
 	       texts[uinfo->value.enumerated.item]);

@@ -82,8 +82,5 @@ CONFIG_SND_INTEL8X0
 CONFIG_SND_SONICVIBES
   Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.
 
-CONFIG_SND_VIA686
-  Say 'Y' or 'M' to include support for VIA VT82C686A/B South Bridge.
-
-CONFIG_SND_VIA8233
-  Say 'Y' or 'M' to include support for VIA VT8233 South Bridge.
+CONFIG_SND_VIA82XX
+  Say 'Y' or 'M' to include support for VIA VT82C686A/B, VT8233 South Bridge.

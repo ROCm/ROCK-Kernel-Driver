@@ -74,11 +74,14 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter)
 	new_client->id = keywest_ctx->id++; /* Automatically unique */
 	keywest_ctx->client = new_client;
 
-	if ((err = keywest_ctx->init_client(keywest_ctx)) < 0)
+	if ((err = keywest_ctx->init_client(keywest_ctx)) < 0) {
+		snd_printk(KERN_ERR "tumbler: cannot initialize the MCS\n");
 		goto __err;
+	}
 
 	/* Tell the i2c layer a new client has arrived */
 	if (i2c_attach_client(new_client)) {
+		snd_printk(KERN_ERR "tumbler: cannot attach i2c client\n");
 		err = -ENODEV;
 		goto __err;
 	}

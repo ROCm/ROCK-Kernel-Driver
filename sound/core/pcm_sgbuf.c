@@ -80,6 +80,9 @@ int snd_pcm_sgbuf_delete(snd_pcm_substream_t *substream)
 {
 	struct snd_sg_buf *sgbuf;
 
+	/* return in case, when sgbuf is not initialized */
+	if (substream->dma_private == NULL)
+		return -EINVAL;
 	sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 	sgbuf_shrink(sgbuf, 0);
 	if (sgbuf->table)

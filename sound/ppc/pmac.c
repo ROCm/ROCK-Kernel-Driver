@@ -1170,9 +1170,17 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		// chip->can_byte_swap = 0; /* FIXME: check this */
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
-	if (device_is_compatible(sound, "tumbler") ||
-	    device_is_compatible(sound, "snapper")) {
+	if (device_is_compatible(sound, "tumbler")) {
 		chip->model = PMAC_TUMBLER;
+		chip->can_capture = 0;  /* no capture */
+		chip->can_duplex = 0;
+		// chip->can_byte_swap = 0; /* FIXME: check this */
+		chip->num_freqs = 2;
+		chip->freq_table = tumbler_freqs;
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	if (device_is_compatible(sound, "snapper")) {
+		chip->model = PMAC_SNAPPER;
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
 		// chip->can_byte_swap = 0; /* FIXME: check this */

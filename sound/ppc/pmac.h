@@ -40,6 +40,7 @@
 #endif
 #endif
 #include <linux/nvram.h>
+#include <linux/tty.h>
 #include <linux/vt_kern.h>
 #include <asm/dbdma.h>
 #include <asm/prom.h>
@@ -115,7 +116,7 @@ struct snd_pmac_beep {
  */
 
 enum snd_pmac_model {
-	PMAC_AWACS, PMAC_SCREAMER, PMAC_BURGUNDY, PMAC_DACA, PMAC_TUMBLER
+	PMAC_AWACS, PMAC_SCREAMER, PMAC_BURGUNDY, PMAC_DACA, PMAC_TUMBLER, PMAC_SNAPPER
 };
 
 struct snd_pmac {

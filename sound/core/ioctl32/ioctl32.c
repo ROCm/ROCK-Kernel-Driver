@@ -47,14 +47,10 @@ int snd_ioctl32_register(struct ioctl32_mapper *mappers)
 	int err;
 	struct ioctl32_mapper *m;
 
-	lock_kernel();
 	for (m = mappers; m->cmd; m++) {
 		err = register_ioctl32_conversion(m->cmd, m->handler);
-		if (err < 0) {
-			unlock_kernel();
-			return err;
-		}
-		m->registered++;
+		if (err >= 0)
+			m->registered++;
 	}
 	return 0;
 }
@@ -63,14 +59,12 @@ void snd_ioctl32_unregister(struct ioctl32_mapper *mappers)
 {
 	struct ioctl32_mapper *m;
 
-	lock_kernel();
 	for (m = mappers; m->cmd; m++) {
 		if (m->registered) {
 			unregister_ioctl32_conversion(m->cmd);
 			m->registered = 0;
 		}
 	}
-	unlock_kernel();
 }
 
 
@@ -100,36 +94,32 @@ static int _snd_ioctl32_ctl_elem_list(unsigned int fd, unsigned int cmd, unsigne
 {
 	struct sndrv_ctl_elem_list32 data32;
 	struct sndrv_ctl_elem_list data;
-	mm_segment_t oldseg = get_fs();
+	mm_segment_t oldseg;
 	int err;
 
-	set_fs(KERNEL_DS);
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.offset = data32.offset;
 	data.space = data32.space;
 	data.used = data32.used;
 	data.count = data32.count;
 	data.pids = A(data32.pids);
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	set_fs(oldseg);
 	if (err < 0)
-		goto __err;
+		return err;
 	/* copy the result */
 	data32.offset = data.offset;
 	data32.space = data.space;
 	data32.used = data.used;
 	data32.count = data.count;
 	//data.pids = data.pids;
-	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
- __err:
-	set_fs(oldseg);
-	return err;
+	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
+		return -EFAULT;
+	return 0;
 }
 
 DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_list, ctl_elem_list, SNDRV_CTL_IOCTL_ELEM_LIST);
@@ -171,22 +161,22 @@ static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigne
 	struct sndrv_ctl_elem_info data;
 	struct sndrv_ctl_elem_info32 data32;
 	int err;
-	mm_segment_t oldseg = get_fs();
+	mm_segment_t oldseg;
 
-	set_fs(KERNEL_DS);
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.id = data32.id;
 	/* we need to copy the item index.
 	 * hope this doesn't break anything..
 	 */
 	data.value.enumerated.item = data32.value.enumerated.item;
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	set_fs(oldseg);
 	if (err < 0)
-		goto __err;
+		return err;
 	/* restore info to 32bit */
 	data32.id = data.id;
 	data32.type = data.type;
@@ -215,10 +205,8 @@ static int _snd_ioctl32_ctl_elem_info(unsigned int fd, unsigned int cmd, unsigne
 		break;
 	}
 	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		err = -EFAULT;
- __err:
-	set_fs(oldseg);
-	return err;
+		return -EFAULT;
+	return 0;
 }
 
 DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_info, ctl_elem_info, SNDRV_CTL_IOCTL_ELEM_INFO);
@@ -281,26 +269,20 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 	struct sndrv_ctl_elem_value32 data32;
 	int err, i;
 	int type;
-	mm_segment_t oldseg = get_fs();
-
-	set_fs(KERNEL_DS);
+	mm_segment_t oldseg;
 
 	/* FIXME: check the sane ioctl.. */
 
-	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
-		err = -EFAULT;
-		goto __err;
-	}
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32)))
+		return -EFAULT;
 	memset(&data, 0, sizeof(data));
 	data.id = data32.id;
 	data.indirect = data32.indirect;
 	if (data.indirect) /* FIXME: this is not correct for long arrays */
 		data.value.integer.value_ptr = (void*)TO_PTR(data32.value.integer.value_ptr);
 	type = get_ctl_type(file, &data.id);
-	if (type < 0) {
-		err = type;
-		goto __err;
-	}
+	if (type < 0)
+		return type;
 	if (! data.indirect) {
 		switch (type) {
 		case SNDRV_CTL_ELEM_TYPE_BOOLEAN:
@@ -329,9 +311,12 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 		}
 	}
 
+	oldseg = get_fs();
+	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	set_fs(oldseg);
 	if (err < 0)
-		goto __err;
+		return err;
 	/* restore info to 32bit */
 	if (! data.indirect) {
 		switch (type) {
@@ -360,10 +345,8 @@ static int _snd_ioctl32_ctl_elem_value(unsigned int fd, unsigned int cmd, unsign
 		}
 	}
 	if (copy_to_user((void*)arg, &data32, sizeof(data32)))
-		err = -EFAULT;
- __err:
-	set_fs(oldseg);
-	return err;
+		return -EFAULT;
+	return 0;
 }
 
 DEFINE_ALSA_IOCTL_ENTRY(ctl_elem_read, ctl_elem_value, SNDRV_CTL_IOCTL_ELEM_READ);
@@ -392,6 +375,7 @@ static struct ioctl32_mapper control_mappers[] = {
 	{ SNDRV_CTL_IOCTL_ELEM_LOCK, NULL },
 	{ SNDRV_CTL_IOCTL_ELEM_UNLOCK, NULL },
 	{ SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS, NULL },
+	{ SNDRV_CTL_IOCTL_HWDEP_INFO, NULL },
 	{ SNDRV_CTL_IOCTL_HWDEP_NEXT_DEVICE, NULL },
 	{ SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE, NULL },
 	{ SNDRV_CTL_IOCTL_PCM_INFO, NULL },
@@ -427,37 +411,13 @@ static void snd_ioctl32_done(void)
 
 static int __init snd_ioctl32_init(void)
 {
-	int err;
-	
-	err = snd_ioctl32_register(control_mappers);
-	if (err < 0)
-		return err;
-	err = snd_ioctl32_register(pcm_mappers);
-	if (err < 0) {
-		snd_ioctl32_done();
-		return err;
-	}
-	err = snd_ioctl32_register(rawmidi_mappers);
-	if (err < 0) {
-		snd_ioctl32_done();
-		return err;
-	}
-	err = snd_ioctl32_register(timer_mappers);
-	if (err < 0) {
-		snd_ioctl32_done();
-		return err;
-	}
-	err = snd_ioctl32_register(hwdep_mappers);
-	if (err < 0) {
-		snd_ioctl32_done();
-		return err;
-	}
+	snd_ioctl32_register(control_mappers);
+	snd_ioctl32_register(pcm_mappers);
+	snd_ioctl32_register(rawmidi_mappers);
+	snd_ioctl32_register(timer_mappers);
+	snd_ioctl32_register(hwdep_mappers);
 #ifdef CONFIG_SND_SEQUENCER
-	err = snd_ioctl32_register(seq_mappers);
-	if (err < 0) {
-		snd_ioctl32_done();
-		return err;
-	}
+	snd_ioctl32_register(seq_mappers);
 #endif
 	return 0;
 }

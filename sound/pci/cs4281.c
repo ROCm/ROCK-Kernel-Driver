@@ -629,6 +629,9 @@ static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return -ENXIO);
 	int count;
 	unsigned short result;
+	// FIXME: volatile is necessary in the following due to a bug of
+	// some gcc versions
+	volatile int ac97_num = ((volatile ac97_t *)ac97)->num;
 
 	/*
 	 *  1. Write ACCAD = Command Address Register = 46Ch for AC97 register address
@@ -639,7 +642,7 @@ static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 	 *  6. Read ACSTS = Status Register = 464h, check VSTS bit
 	 */
 
-	snd_cs4281_peekBA0(chip, ac97->num ? BA0_ACSDA2 : BA0_ACSDA);
+	snd_cs4281_peekBA0(chip, ac97_num ? BA0_ACSDA2 : BA0_ACSDA);
 
 	/*
 	 *  Setup the AC97 control registers on the CS461x to send the
@@ -658,7 +661,7 @@ static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 	snd_cs4281_pokeBA0(chip, BA0_ACCDA, 0);
 	snd_cs4281_pokeBA0(chip, BA0_ACCTL, BA0_ACCTL_DCV | BA0_ACCTL_CRW |
 					    BA0_ACCTL_VFRM | BA0_ACCTL_ESYN |
-			   (ac97->num ? BA0_ACCTL_TC : 0));
+			   (ac97_num ? BA0_ACCTL_TC : 0));
 
 
 	/*
@@ -691,7 +694,7 @@ static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 		 *  ACSTS = Status Register = 464h
 		 *  VSTS - Valid Status
 		 */
-		if (snd_cs4281_peekBA0(chip, ac97->num ? BA0_ACSTS2 : BA0_ACSTS) & BA0_ACSTS_VSTS)
+		if (snd_cs4281_peekBA0(chip, ac97_num ? BA0_ACSTS2 : BA0_ACSTS) & BA0_ACSTS_VSTS)
 			goto __ok2;
 		udelay(10);
 	}
@@ -705,7 +708,7 @@ static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 	 *  Read the data returned from the AC97 register.
 	 *  ACSDA = Status Data Register = 474h
 	 */
-	result = snd_cs4281_peekBA0(chip, ac97->num ? BA0_ACSDA2 : BA0_ACSDA);
+	result = snd_cs4281_peekBA0(chip, ac97_num ? BA0_ACSDA2 : BA0_ACSDA);
 
       __end:
 	return result;
@@ -2107,7 +2110,8 @@ static void cs4281_suspend(cs4281_t *chip)
 
 	/* remember the status registers */
 	for (i = 0; number_of(saved_regs); i++)
-		chip->suspend_regs[i] = snd_cs4281_peekBA0(chip, saved_regs[i]);
+		if (saved_regs[i])
+			chip->suspend_regs[i] = snd_cs4281_peekBA0(chip, saved_regs[i]);
 
 	/* Turn off the serial ports. */
 	snd_cs4281_pokeBA0(chip, BA0_SERMC, 0);
@@ -2150,7 +2154,8 @@ static void cs4281_resume(cs4281_t *chip)
 
 	/* restore the status registers */
 	for (i = 0; number_of(saved_regs); i++)
-		snd_cs4281_pokeBA0(chip, saved_regs[i], chip->suspend_regs[i]);
+		if (saved_regs[i])
+			snd_cs4281_pokeBA0(chip, saved_regs[i], chip->suspend_regs[i]);
 
 	if (chip->ac97)
 		snd_ac97_resume(chip->ac97);

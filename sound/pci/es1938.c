@@ -1,5 +1,5 @@
 /*
- *  Driver for ESS Solo-1 (ES1938, ES1946) soundcard
+ *  Driver for ESS Solo-1 (ES1938, ES1946, ES1969) soundcard
  *  Copyright (c) by Jaromir Koutek <miri@punknet.cz>,
  *                   Jaroslav Kysela <perex@suse.cz>,
  *                   Thomas Sailer <sailer@ife.ee.ethz.ch>,
@@ -70,6 +70,8 @@ MODULE_DESCRIPTION("ESS Solo-1");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{ESS,ES1938},"
+                "{ESS,ES1946},"
+                "{ESS,ES1969},"
 		"{TerraTec,128i PCI}}");
 
 #ifndef PCI_VENDOR_ID_ESS

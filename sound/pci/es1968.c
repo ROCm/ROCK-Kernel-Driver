@@ -2501,11 +2501,13 @@ static int snd_es1968_set_power_state(snd_card_t *card, unsigned int power_state
 
 static int snd_es1968_free(es1968_t *chip)
 {
+	if (chip->res_io_port)
+		snd_es1968_reset(chip);
+
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
 	if (chip->res_io_port) {
-		snd_es1968_reset(chip);
 		release_resource(chip->res_io_port);
 		kfree_nocheck(chip->res_io_port);
 	}

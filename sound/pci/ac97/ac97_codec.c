@@ -65,6 +65,7 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x41445300, 0xffffff00, "Analog Devices",	NULL },
 { 0x414c4300, 0xffffff00, "Realtek",		NULL },
 { 0x414c4700, 0xffffff00, "Avance Logic",	NULL },
+{ 0x434d4900, 0xffffff00, "C-Media Electronics", NULL },
 { 0x43525900, 0xffffff00, "Cirrus Logic",	NULL },
 { 0x43585400, 0xffffff00, "Conexant",           NULL },
 { 0x45838300, 0xffffff00, "ESS Technology",	NULL },
@@ -95,6 +96,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445360, 0xffffffff, "AD1885",		patch_ad1885 },
 { 0x41445361, 0xffffffff, "AD1886",		patch_ad1886 },
 { 0x41445362, 0xffffffff, "AD1887",		patch_ad1881 },
+{ 0x41445363, 0xffffffff, "AD1886A",		patch_ad1881 },
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1881 },
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL },
@@ -104,6 +106,8 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4730, 0xffffffff, "ALC101",		NULL },
 { 0x414c4740, 0xfffffff0, "ALC202",		NULL },
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL },
+{ 0x434d4941, 0xffffffff, "CMI9738",		NULL },
+{ 0x434d4961, 0xffffffff, "CMI9739",		NULL },
 { 0x43525900, 0xfffffff8, "CS4297",		NULL },
 { 0x43525910, 0xfffffff8, "CS4297A",		patch_cirrus_spdif },
 { 0x43525920, 0xfffffff8, "CS4294/4298",	NULL },
@@ -122,6 +126,8 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x4e534331, 0xffffffff, "LM4549",		NULL },
 { 0x53494c22, 0xffffffff, "Si3036",		NULL },
 { 0x53494c23, 0xffffffff, "Si3038",		NULL },
+{ 0x54524102, 0xffffffff, "TR28022",		NULL },
+{ 0x54524106, 0xffffffff, "TR28026",		NULL },
 { 0x54524108, 0xffffffff, "TR28028",		patch_tritech_tr28028 }, // added by xin jin [07/09/99]
 { 0x54524123, 0xffffffff, "TR28602",		NULL }, // only guess --jk [TR28023 = eMicro EM28023 (new CT1297)]
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL },
@@ -130,14 +136,19 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x574d4c00, 0xffffffff, "WM9701A",		patch_wolfson00 },
 { 0x574d4c03, 0xffffffff, "WM9703/9707",	patch_wolfson03 },
 { 0x574d4c04, 0xffffffff, "WM9704 (quad)",	patch_wolfson04 },
+{ 0x574d4c05, 0xffffffff, "WM9705",		NULL },	// patch?
 { 0x594d4800, 0xffffffff, "YMF743",		NULL },
+{ 0x594d4802, 0xffffffff, "YMF752",		NULL },
+{ 0x594d4803, 0xffffffff, "YMF753",		NULL },
 { 0x83847600, 0xffffffff, "STAC9700/83/84",	NULL },
 { 0x83847604, 0xffffffff, "STAC9701/3/4/5",	NULL },
 { 0x83847605, 0xffffffff, "STAC9704",		NULL },
 { 0x83847608, 0xffffffff, "STAC9708/11",	patch_sigmatel_stac9708 },
 { 0x83847609, 0xffffffff, "STAC9721/23",	patch_sigmatel_stac9721 },
 { 0x83847644, 0xffffffff, "STAC9744",		patch_sigmatel_stac9744 },
+{ 0x83847650, 0xffffffff, "STAC9750/51",	NULL },	// patch?
 { 0x83847656, 0xffffffff, "STAC9756/57",	patch_sigmatel_stac9756 },
+{ 0x83847666, 0xffffffff, "STAC9766/67",	NULL }, // patch?
 { 0, 	      0,	  NULL,			NULL }
 };
 
@@ -201,6 +212,7 @@ static int snd_ac97_valid_reg(ac97_t *ac97, unsigned short reg)
 		return 1;
 	case AC97_ID_AD1885:	/* AD1885 */
 	case AC97_ID_AD1886:	/* AD1886 */
+	case AC97_ID_AD1886A:	/* AD1886A - !!verify!! --jk */
 	case AC97_ID_AD1887:	/* AD1887 - !!verify!! --jk */
 		if (reg == 0x5a)
 			return 1;

@@ -146,6 +146,8 @@ snd_seq_oss_synth_register(snd_seq_device_t *dev)
 	debug_printk(("synth %s registered %d\n", rec->name, i));
 	spin_unlock_irqrestore(&register_lock, flags);
 	dev->driver_data = rec;
+	if (i < SNDRV_CARDS)
+		snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, i, rec->name);
 	return 0;
 }
 
@@ -176,6 +178,8 @@ snd_seq_oss_synth_unregister(snd_seq_device_t *dev)
 		max_synth_devs = index + 1;
 	}
 	spin_unlock_irqrestore(&register_lock, flags);
+	if (rec->seq_device < SNDRV_CARDS)
+		snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, rec->seq_device, NULL);
 
 	snd_use_lock_sync(&rec->use_lock);
 	kfree(rec);

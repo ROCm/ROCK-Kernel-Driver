@@ -326,10 +326,6 @@ struct _snd_intel8x0 {
 	char ac97_name[32];
 	char ctrl_name[32];
 
-	unsigned long dma_playback_size;
-	unsigned long dma_capture_size;
-	unsigned long dma_mic_size;
-
 	int irq;
 
 	unsigned int mmio;
@@ -428,7 +424,7 @@ static void iputbyte(intel8x0_t *chip, u32 offset, u8 val)
 	if (chip->bm_mmio)
 		writeb(val, chip->remap_bmaddr + offset);
 	else
-		return outb(val, chip->bmaddr + offset);
+		outb(val, chip->bmaddr + offset);
 }
 
 static void iputword(intel8x0_t *chip, u32 offset, u16 val)
@@ -436,7 +432,7 @@ static void iputword(intel8x0_t *chip, u32 offset, u16 val)
 	if (chip->bm_mmio)
 		writew(val, chip->remap_bmaddr + offset);
 	else
-		return outw(val, chip->bmaddr + offset);
+		outw(val, chip->bmaddr + offset);
 }
 
 static void iputdword(intel8x0_t *chip, u32 offset, u32 val)
@@ -444,7 +440,7 @@ static void iputdword(intel8x0_t *chip, u32 offset, u32 val)
 	if (chip->bm_mmio)
 		writel(val, chip->remap_bmaddr + offset);
 	else
-		return outl(val, chip->bmaddr + offset);
+		outl(val, chip->bmaddr + offset);
 }
 
 /*
@@ -464,7 +460,7 @@ static void iaputword(intel8x0_t *chip, u32 offset, u16 val)
 	if (chip->mmio)
 		writew(val, chip->remap_addr + offset);
 	else
-		return outw(val, chip->addr + offset);
+		outw(val, chip->addr + offset);
 }
 
 /*
@@ -1583,6 +1579,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	if (codecs < 2)
 		goto __skip_secondary;
 	for (i = 1; i < codecs; i++) {
+		ac97.num = i;
 		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
 			return err;
 		chip->ac97[i] = x97;
@@ -1995,7 +1992,13 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	snd_intel8x0_setup_periods(chip, ichdev);
 	port = ichdev->reg_offset;
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM); /* trigger */
+	/* trigger */
+	if (chip->device_type != DEVICE_ALI)
+		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM);
+	else {
+		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE);
+		iputbyte(chip, ICHREG(ALI_DMACR), 1 << ichdev->ali_slot);
+	}
 	do_gettimeofday(&start_time);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 #if 0
@@ -2014,7 +2017,10 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 		pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << 1;
 	pos += ichdev->position;
 	do_gettimeofday(&stop_time);
-	iputbyte(chip, port + ICH_REG_OFF_CR, 0); /* stop */
+	/* stop */
+	if (chip->device_type == DEVICE_ALI)
+		iputbyte(chip, ICHREG(ALI_DMACR), 1 << (ichdev->ali_slot + 8));
+	iputbyte(chip, port + ICH_REG_OFF_CR, 0);
 	/* reset whole DMA things */
 	while (!(igetbyte(chip, port + ichdev->roff_sr) & ICH_DCH))
 		;
@@ -2279,6 +2285,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
+	{ 0x5455, "ALi M5455" },
 	{ 0, 0 },
 };
 
