@@ -320,7 +320,7 @@ static int usb_stor_control_thread(void * __us)
 	spin_lock_irq(&current->sigmask_lock);
 	flush_signals(current);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/* set our name for identification purposes */

@@ -62,7 +62,7 @@ ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 	{
 		oldset = current->blocked;
 		current->blocked = set;
-		recalc_sigpending(current);
+		recalc_sigpending();
 	}
 	spin_unlock_irq(&current->sigmask_lock);
 
@@ -259,7 +259,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 	spin_lock_irq(&current->sigmask_lock);
 	{
 		current->blocked = set;
-		recalc_sigpending(current);
+		recalc_sigpending();
 	}
 	spin_unlock_irq(&current->sigmask_lock);
 
@@ -438,7 +438,7 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 		{
 			sigorsets(&current->blocked, &current->blocked, &ka->sa.sa_mask);
 			sigaddset(&current->blocked, sig);
-			recalc_sigpending(current);
+			recalc_sigpending();
 		}
 		spin_unlock_irq(&current->sigmask_lock);
 	}

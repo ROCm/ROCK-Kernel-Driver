@@ -438,7 +438,7 @@ int handle_vm86_trap(struct kernel_vm86_regs * regs, long error_code, int trapno
 		unsigned long flags;
 		spin_lock_irqsave(&current->sigmask_lock, flags);
 		sigdelset(&current->blocked, SIGTRAP);
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sigmask_lock, flags);
 	}
 	send_sig(SIGTRAP, current, 1);

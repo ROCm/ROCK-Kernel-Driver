@@ -282,14 +282,14 @@ static void jdelay(unsigned long delay)
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(delay);
 
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = oldblocked;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 }
 

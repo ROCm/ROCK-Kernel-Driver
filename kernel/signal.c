@@ -153,7 +153,7 @@ sig_exit(int sig, int exit_code, struct siginfo *info)
 	struct task_struct *t;
 
 	sigaddset(&current->pending.signal, sig);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	current->flags |= PF_SIGNALED;
 
 	/* Propagate the signal to all the tasks in
@@ -202,7 +202,7 @@ unblock_all_signals(void)
 	spin_lock_irqsave(&current->sigmask_lock, flags);
 	current->notifier = NULL;
 	current->notifier_data = NULL;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, flags);
 }
 
@@ -288,7 +288,7 @@ printk("SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 		/* XXX: Once POSIX.1b timers are in, if si_code == SI_TIMER,
 		   we need to xchg out the timer overrun values.  */
 	}
-	recalc_sigpending(current);
+	recalc_sigpending();
 
 #if DEBUG_SIG
 printk(" %d -> %d\n", signal_pending(current), sig);
@@ -598,7 +598,7 @@ force_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 	if (t->sig->action[sig-1].sa.sa_handler == SIG_IGN)
 		t->sig->action[sig-1].sa.sa_handler = SIG_DFL;
 	sigdelset(&t->blocked, sig);
-	recalc_sigpending(t);
+	recalc_sigpending_tsk(t);
 	spin_unlock_irqrestore(&t->sigmask_lock, flags);
 
 	return send_sig_info(sig, info, t);
@@ -835,7 +835,6 @@ EXPORT_SYMBOL(kill_proc_info);
 EXPORT_SYMBOL(kill_sl);
 EXPORT_SYMBOL(kill_sl_info);
 EXPORT_SYMBOL(notify_parent);
-EXPORT_SYMBOL(recalc_sigpending);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
 EXPORT_SYMBOL(block_all_signals);
@@ -887,7 +886,7 @@ sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
 		}
 
 		current->blocked = new_set;
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 		if (error)
 			goto out;
@@ -979,7 +978,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			 * be awakened when they arrive.  */
 			sigset_t oldblocked = current->blocked;
 			sigandsets(&current->blocked, &current->blocked, &these);
-			recalc_sigpending(current);
+			recalc_sigpending();
 			spin_unlock_irq(&current->sigmask_lock);
 
 			current->state = TASK_INTERRUPTIBLE;
@@ -988,7 +987,7 @@ sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 			spin_lock_irq(&current->sigmask_lock);
 			sig = dequeue_signal(&these, &info);
 			current->blocked = oldblocked;
-			recalc_sigpending(current);
+			recalc_sigpending();
 		}
 	}
 	spin_unlock_irq(&current->sigmask_lock);
@@ -1114,7 +1113,7 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 			    sig == SIGWINCH))) {
 			spin_lock_irq(&current->sigmask_lock);
 			if (rm_sig_from_queue(sig, current))
-				recalc_sigpending(current);
+				recalc_sigpending();
 			spin_unlock_irq(&current->sigmask_lock);
 		}
 	}
@@ -1227,7 +1226,7 @@ sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset)
 			break;
 		}
 
-		recalc_sigpending(current);
+		recalc_sigpending();
 		spin_unlock_irq(&current->sigmask_lock);
 		if (error)
 			goto out;
@@ -1295,7 +1294,7 @@ sys_ssetmask(int newmask)
 
 	siginitset(&current->blocked, newmask & ~(sigmask(SIGKILL)|
 						  sigmask(SIGSTOP)));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	return old;

@@ -79,7 +79,7 @@ asmlinkage int do_sigsuspend(struct pt_regs *regs)
 	mask &= _BLOCKABLE;
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
-	recalc_sigpending(current);
+	recalc_sigpending();
 
 	regs->d0 = -EINTR;
 	while (1) {
@@ -107,7 +107,7 @@ do_rt_sigsuspend(struct pt_regs *regs)
 
 	saveset = current->blocked;
 	current->blocked = newset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 
 	regs->d0 = -EINTR;
 	while (1) {
@@ -552,7 +552,7 @@ asmlinkage int do_sigreturn(unsigned long __unused)
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	
 	if (restore_sigcontext(regs, &frame->sc, frame + 1, &d0))
 		goto badframe;
@@ -579,7 +579,7 @@ asmlinkage int do_rt_sigreturn(unsigned long __unused)
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	
 	if (rt_restore_ucontext(regs, sw, &frame->uc, &d0))
 		goto badframe;
@@ -1011,7 +1011,7 @@ handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
 	sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 	if (!(ka->sa.sa_flags & SA_NODEFER))
 		sigaddset(&current->blocked,sig);
-	recalc_sigpending(current);
+	recalc_sigpending();
 }
 
 /*

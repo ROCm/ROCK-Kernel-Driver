@@ -221,7 +221,7 @@ void rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset)
 	spin_lock_irqsave(&current->sigmask_lock, irqflags);
 	*oldset = current->blocked;
 	siginitsetinv(&current->blocked, sigallow & ~oldset->sig[0]);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
 }
 
@@ -231,7 +231,7 @@ void rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset)
 	
 	spin_lock_irqsave(&current->sigmask_lock, irqflags);
 	current->blocked = *oldset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
 }
 

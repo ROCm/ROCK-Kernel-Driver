@@ -104,7 +104,7 @@ lockd(struct svc_rqst *rqstp)
 	/* Process request with signals blocked.  */
 	spin_lock_irq(&current->sigmask_lock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/* kick rpciod */
@@ -312,7 +312,7 @@ lockd_down(void)
 		nlmsvc_pid = 0;
 	}
 	spin_lock_irq(&current->sigmask_lock);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 out:
 	up(&nlmsvc_sema);

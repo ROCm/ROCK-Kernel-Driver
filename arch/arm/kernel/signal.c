@@ -98,7 +98,7 @@ asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t m
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	regs->ARM_r0 = -EINTR;
 
@@ -126,7 +126,7 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 	spin_lock_irq(&current->sigmask_lock);
 	saveset = current->blocked;
 	current->blocked = newset;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 	regs->ARM_r0 = -EINTR;
 
@@ -245,7 +245,7 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext(regs, &frame->sc))
@@ -285,7 +285,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
 	current->blocked = set;
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
@@ -512,7 +512,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 			sigorsets(&tsk->blocked, &tsk->blocked,
 				  &ka->sa.sa_mask);
 			sigaddset(&tsk->blocked, sig);
-			recalc_sigpending(tsk);
+			recalc_sigpending();
 			spin_unlock_irq(&tsk->sigmask_lock);
 		}
 		return;

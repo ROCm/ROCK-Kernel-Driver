@@ -308,7 +308,7 @@ ecard_task(void * unused)
 	 */
 	sigfillset(&tsk->blocked);
 	sigemptyset(&tsk->pending.signal);
-	recalc_sigpending(tsk);
+	recalc_sigpending();
 	strcpy(tsk->comm, "kecardd");
 	daemonize();
 

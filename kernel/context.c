@@ -77,7 +77,7 @@ static int context_thread(void *startup)
 
 	spin_lock_irq(&curtask->sigmask_lock);
 	siginitsetinv(&curtask->blocked, sigmask(SIGCHLD));
-	recalc_sigpending(curtask);
+	recalc_sigpending();
 	spin_unlock_irq(&curtask->sigmask_lock);
 
 	complete((struct completion *)startup);
@@ -106,7 +106,7 @@ static int context_thread(void *startup)
 				;
 			spin_lock_irq(&curtask->sigmask_lock);
 			flush_signals(curtask);
-			recalc_sigpending(curtask);
+			recalc_sigpending();
 			spin_unlock_irq(&curtask->sigmask_lock);
 		}
 	}
