@@ -331,6 +331,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
+	p->user_tid = NULL;
+
 	CHECK_FULL_REGS(regs);
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);
@@ -444,7 +446,10 @@ int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
 {
  	struct task_struct *p;
+
 	CHECK_FULL_REGS(regs);
+	if ((p1 & (CLONE_SETTID | CLONE_CLEARTID)) == 0)
+		p3 = 0;
  	p = do_fork(p1 & ~CLONE_IDLETASK, p2, regs, 0, (int *)p3);
  	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
