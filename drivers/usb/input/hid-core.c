@@ -1108,7 +1108,9 @@ static int hid_submit_ctrl(struct hid_device *hid)
 	hid->cr->wIndex = cpu_to_le16(hid->ifnum);
 	hid->cr->wLength = cpu_to_le16(len);
 
-	dbg("submitting ctrl urb");
+	dbg("submitting ctrl urb: %s wValue=0x%04x wIndex=0x%04x wLength=%u",
+	    hid->cr->bRequest == HID_REQ_SET_REPORT ? "Set_Report" : "Get_Report",
+	    hid->cr->wValue, hid->cr->wIndex, hid->cr->wLength);
 
 	if (usb_submit_urb(hid->urbctrl, GFP_ATOMIC)) {
 		err("usb_submit_urb(ctrl) failed");
@@ -1286,6 +1288,23 @@ void hid_init_reports(struct hid_device *hid)
 	struct list_head *list;
 	int err, ret;
 
+	/*
+	 * The Set_Idle request is supposed to affect only the
+	 * "Interrupt In" pipe. Unfortunately, buggy devices such as
+	 * the BTC keyboard (ID 046e:5303) the request also affects
+	 * Get_Report requests on the control pipe.  In the worst
+	 * case, if the device was put on idle for an indefinite
+	 * amount of time (as we do below) and there are no input
+	 * events to report, the Get_Report requests will just hang
+	 * until we get a USB timeout.  To avoid this, we temporarily
+	 * establish a minimal idle time of 1ms.  This shouldn't hurt
+	 * bugfree devices and will cause a worst-case extra delay of
+	 * 1ms for buggy ones.
+	 */
+	usb_control_msg(hid->dev, usb_sndctrlpipe(hid->dev, 0),
+			HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE, (1 << 8),
+			hid->ifnum, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+
 	report_enum = hid->report_enum + HID_INPUT_REPORT;
 	list = report_enum->report_list.next;
 	while (list != &report_enum->report_list) {
@@ -1319,7 +1338,7 @@ void hid_init_reports(struct hid_device *hid)
 	while (list != &report_enum->report_list) {
 		report = (struct hid_report *) list;
 		usb_control_msg(hid->dev, usb_sndctrlpipe(hid->dev, 0),
-			0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE, report->id,
+			HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE, report->id,
 			hid->ifnum, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 		list = list->next;
 	}
