@@ -1304,6 +1304,9 @@ _GLOBAL(sys_call_table)
 	.long sys_io_getevents
 	.long sys_io_submit	/* 230 */
 	.long sys_io_cancel
+	.long sys_ni_syscall	/* reserved for alloc_hugepages */
+	.long sys_ni_syscall	/* reserved for free_hugepages */
+	.long sys_exit_group
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

@@ -479,17 +479,17 @@ void sched_exit(task_t * p)
 {
 	local_irq_disable();
 	if (p->first_time_slice) {
-		current->time_slice += p->time_slice;
-		if (unlikely(current->time_slice > MAX_TIMESLICE))
-			current->time_slice = MAX_TIMESLICE;
+		p->parent->time_slice += p->time_slice;
+		if (unlikely(p->parent->time_slice > MAX_TIMESLICE))
+			p->parent->time_slice = MAX_TIMESLICE;
 	}
 	local_irq_enable();
 	/*
 	 * If the child was a (relative-) CPU hog then decrease
 	 * the sleep_avg of the parent as well.
 	 */
-	if (p->sleep_avg < current->sleep_avg)
-		current->sleep_avg = (current->sleep_avg * EXIT_WEIGHT +
+	if (p->sleep_avg < p->parent->sleep_avg)
+		p->parent->sleep_avg = (p->parent->sleep_avg * EXIT_WEIGHT +
 			p->sleep_avg) / (EXIT_WEIGHT + 1);
 }
 
@@ -2055,8 +2055,7 @@ static int migration_call(struct notifier_block *nfb,
 	case CPU_ONLINE:
 		printk("Starting migration thread for cpu %li\n",
 		       (long)hcpu);
-		kernel_thread(migration_thread, hcpu,
-			      CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+		kernel_thread(migration_thread, hcpu, CLONE_KERNEL);
 		while (!cpu_rq((long)hcpu)->migration_thread)
 			yield();
 		break;

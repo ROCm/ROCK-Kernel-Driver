@@ -159,12 +159,12 @@ flags_err:
 			int ret = 0;
 
 			set_current_state(TASK_INTERRUPTIBLE);
-			add_wait_queue(&sb->u.ext3_sb.ro_wait_queue, &wait);
-			if (timer_pending(&sb->u.ext3_sb.turn_ro_timer)) {
+			add_wait_queue(&EXT3_SB(sb)->ro_wait_queue, &wait);
+			if (timer_pending(&EXT3_SB(sb)->turn_ro_timer)) {
 				schedule();
 				ret = 1;
 			}
-			remove_wait_queue(&sb->u.ext3_sb.ro_wait_queue, &wait);
+			remove_wait_queue(&EXT3_SB(sb)->ro_wait_queue, &wait);
 			return ret;
 		}
 #endif

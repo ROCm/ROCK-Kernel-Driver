@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.35-ac1 2002/08/19 Alan Exp $
+ * $Id: via82cxxx.c,v 3.35-ac2 2002/09/111 Alan Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -33,6 +33,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
@@ -161,7 +162,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	via_print("Highest DMA rate:                   %s",
 		via_dma[via_config->flags & VIA_UDMA]);
 
-	via_print("BM-DMA base:                        %#x", via_base);
+	via_print("BM-DMA base:                        %#lx", via_base);
 	via_print("PCI clock:                          %d.%dMHz",
 		via_clock / 1000, via_clock / 100 % 10);
 
@@ -634,38 +635,56 @@ static void __init init_dma_via82cxxx(ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-/*
- *	FIXME: should not be needed
- */
- 
-static void __init init_setup_via82cxxx (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &via82cxxx_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-/**
- *	via82cxxx_scan_pcidev	-	set up any via devices
- *	@dev: PCI device we are offered
- *
- *	Any controller we are offered that we can configure we set up 
- *	and return 1. Anything we cannot drive we return 0
- */
- 
-int __init via82cxxx_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_VIA)
-		return 0;
-
-	for (d = via82cxxx_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	via_remove_one	-	called with a VIA IDE interface is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect a VIA IDE device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void via_remove_one(struct pci_dev *dev)
+{
+	panic("VIA IDE removal not yet supported");
+}
+
+static struct pci_device_id via_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C576_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"VIA IDE",
+	id_table:	via_pci_tbl,
+	probe:		via_init_one,
+	remove:		__devexit_p(via_remove_one),
+};
+
+static int via_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void via_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(via_ide_init);
+module_exit(via_ide_exit);
+
+MODULE_AUTHOR("Vojtech Pavlik, Michel Aubry, Jeff Garzik, Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for VIA IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

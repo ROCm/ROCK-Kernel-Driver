@@ -19,6 +19,7 @@
 
 #include <linux/config.h> /* for CONFIG_BLK_DEV_IDEPCI */
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -55,26 +56,57 @@ static void __init init_hwif_rz1000 (ide_hwif_t *hwif)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_rz1000 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit rz1000_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &rz1000_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init rz1000_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_PCTECH)
-		return 0;
-
-	for (d = rz1000_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
+
+/**
+ *	rz1000_remove_one	-	called with an RZ1000 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an RZ1000 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void rz1000_remove_one(struct pci_dev *dev)
+{
+	panic("RZ1000 removal not yet supported");
+}
+
+static struct pci_device_id rz1000_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"RZ1000 IDE",
+	id_table:	rz1000_pci_tbl,
+	probe:		rz1000_init_one,
+	remove:		__devexit_p(rz1000_remove_one),
+};
+
+static int rz1000_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void rz1000_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(rz1000_ide_init);
+module_exit(rz1000_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for RZ1000 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;
 

@@ -128,6 +128,7 @@ enum
 	KERN_TAINTED=53,	/* int: various kernel tainted flags */
 	KERN_CADPID=54,		/* int: PID of the process to notify on CAD */
 	KERN_PIDMAX=55,		/* int: PID # limit */
+	KERN_HUGETLB_PAGE_NUM=56, /* int: Number of available Huge Pages */
 };
 
 
@@ -151,6 +152,7 @@ enum
 	VM_DIRTY_EXPIRE_CS=15,	/* dirty_expire_centisecs */
 	VM_NR_PDFLUSH_THREADS=16, /* nr_pdflush_threads */
 	VM_OVERCOMMIT_RATIO=17, /* percent of RAM to allow overcommit in */
+	VM_PAGEBUF=18		/* struct: Control pagebuf parameters */
 };
 
 
@@ -554,6 +556,7 @@ enum
 	FS_DIR_NOTIFY=14,	/* int: directory notification enabled */
 	FS_LEASE_TIME=15,	/* int: maximum time to wait for a lease break */
 	FS_DQSTATS=16,	/* disc quota usage statistics */
+	FS_XFS=17,	/* struct: control xfs parameters */
 };
 
 /* /proc/sys/fs/quota/ */

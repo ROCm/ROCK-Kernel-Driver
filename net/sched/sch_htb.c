@@ -162,12 +162,12 @@ struct htb_class
 		    struct list_head drop_list;
 	    } leaf;
 	    struct htb_class_inner {
-		    rb_root_t feed[TC_HTB_NUMPRIO];	/* feed trees */
-		    rb_node_t *ptr[TC_HTB_NUMPRIO];	/* current class ptr */
+		    struct rb_root feed[TC_HTB_NUMPRIO]; /* feed trees */
+		    struct rb_node *ptr[TC_HTB_NUMPRIO]; /* current class ptr */
 	    } inner;
     } un;
-    rb_node_t node[TC_HTB_NUMPRIO];	/* node for self or feed tree */
-    rb_node_t pq_node;			/* node for event queue */
+    struct rb_node node[TC_HTB_NUMPRIO]; /* node for self or feed tree */
+    struct rb_node pq_node;		 /* node for event queue */
     unsigned long pq_key;	/* the same type as jiffies global */
     
     int prio_activity;		/* for which prios are we active */
@@ -207,12 +207,12 @@ struct htb_sched
     struct list_head drops[TC_HTB_NUMPRIO];	/* active leaves (for drops) */
     
     /* self list - roots of self generating tree */
-    rb_root_t row[TC_HTB_MAXDEPTH][TC_HTB_NUMPRIO];
+    struct rb_root row[TC_HTB_MAXDEPTH][TC_HTB_NUMPRIO];
     int row_mask[TC_HTB_MAXDEPTH];
-    rb_node_t *ptr[TC_HTB_MAXDEPTH][TC_HTB_NUMPRIO];
+    struct rb_node *ptr[TC_HTB_MAXDEPTH][TC_HTB_NUMPRIO];
 
     /* self wait list - roots of wait PQs per row */
-    rb_root_t wait_pq[TC_HTB_MAXDEPTH];
+    struct rb_root wait_pq[TC_HTB_MAXDEPTH];
 
     /* time of nearest event per level (row) */
     unsigned long near_ev_cache[TC_HTB_MAXDEPTH];
@@ -324,9 +324,9 @@ static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 }
 
 #ifdef HTB_DEBUG
-static void htb_next_rb_node(rb_node_t **n);
+static void htb_next_rb_node(struct rb_node **n);
 #define HTB_DUMTREE(root,memb) if(root) { \
-	rb_node_t *n = (root)->rb_node; \
+	struct rb_node *n = (root)->rb_node; \
 	while (n->rb_left) n = n->rb_left; \
 	while (n) { \
 		struct htb_class *cl = rb_entry(n, struct htb_class, memb); \
@@ -375,10 +375,10 @@ static void htb_debug_dump (struct htb_sched *q)
  * Routine adds class to the list (actually tree) sorted by classid.
  * Make sure that class is not already on such list for given prio.
  */
-static void htb_add_to_id_tree (HTB_ARGQ rb_root_t *root,
+static void htb_add_to_id_tree (HTB_ARGQ struct rb_root *root,
 		struct htb_class *cl,int prio)
 {
-	rb_node_t **p = &root->rb_node, *parent = NULL;
+	struct rb_node **p = &root->rb_node, *parent = NULL;
 	HTB_DBG(7,3,"htb_add_id_tree cl=%X prio=%d\n",cl->classid,prio);
 #ifdef HTB_DEBUG
 	if (cl->node[prio].rb_color != -1) { BUG_TRAP(0); return; }
@@ -411,7 +411,7 @@ static void htb_add_to_id_tree (HTB_ARGQ rb_root_t *root,
 static void htb_add_to_wait_tree (struct htb_sched *q,
 		struct htb_class *cl,long delay,int debug_hint)
 {
-	rb_node_t **p = &q->wait_pq[cl->level].rb_node, *parent = NULL;
+	struct rb_node **p = &q->wait_pq[cl->level].rb_node, *parent = NULL;
 	HTB_DBG(7,3,"htb_add_wt cl=%X key=%lu\n",cl->classid,cl->pq_key);
 #ifdef HTB_DEBUG
 	if (cl->pq_node.rb_color != -1) { BUG_TRAP(0); return; }
@@ -447,20 +447,9 @@ static void htb_add_to_wait_tree (struct htb_sched *q,
  * When we are past last key we return NULL.
  * Average complexity is 2 steps per call.
  */
-static void htb_next_rb_node(rb_node_t **n)
+static void htb_next_rb_node(struct rb_node **n)
 {
-	rb_node_t *p;
-	if ((*n)->rb_right) {
-		*n = (*n)->rb_right;
-		while ((*n)->rb_left) 
-			*n = (*n)->rb_left;
-		return;
-	}
-	while ((p = (*n)->rb_parent) != NULL) {
-		if (p->rb_left == *n) break;
-		*n = p;
-	}
-	*n = p;
+	*n = rb_next(*n);
 }
 
 /**
@@ -869,7 +858,7 @@ static long htb_do_events(struct htb_sched *q,int level)
 	for (i = 0; i < 500; i++) {
 		struct htb_class *cl;
 		long diff;
-		rb_node_t *p = q->wait_pq[level].rb_node;
+		struct rb_node *p = q->wait_pq[level].rb_node;
 		if (!p) return 0;
 		while (p->rb_left) p = p->rb_left;
 
@@ -906,12 +895,12 @@ static long htb_do_events(struct htb_sched *q,int level)
  * Find leaf where current feed pointers points to.
  */
 static struct htb_class *
-htb_lookup_leaf(rb_root_t *tree,int prio,rb_node_t **pptr)
+htb_lookup_leaf(struct rb_root *tree,int prio,struct rb_node **pptr)
 {
 	int i;
 	struct {
-		rb_node_t *root;
-		rb_node_t **pptr;
+		struct rb_node *root;
+		struct rb_node **pptr;
 	} stk[TC_HTB_MAXDEPTH],*sp = stk;
 	
 	sp->root = tree->rb_node;

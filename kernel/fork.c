@@ -633,6 +633,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
+	sig->group_exit_task = NULL;
 	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
@@ -672,16 +673,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		return ERR_PTR(-EINVAL);
 
 	/*
-	 * Thread groups must share signals as well:
+	 * Thread groups must share signals as well, and detached threads
+	 * can only be started up within the thread group.
 	 */
-	if (clone_flags & CLONE_THREAD)
-		clone_flags |= CLONE_SIGHAND;
-	/*
-	 * Detached threads can only be started up within the thread
-	 * group.
-	 */
-	if (clone_flags & CLONE_DETACHED)
-		clone_flags |= CLONE_THREAD;
+	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
+		return ERR_PTR(-EINVAL);
+	if ((clone_flags & CLONE_DETACHED) && !(clone_flags & CLONE_THREAD))
+		return ERR_PTR(-EINVAL);
 
 	retval = security_ops->task_create(clone_flags);
 	if (retval)

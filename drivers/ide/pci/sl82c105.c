@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linuyx/module.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/mm.h>
@@ -281,26 +282,54 @@ static void __init init_hwif_sl82c105(ide_hwif_t *hwif)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_sl82c105 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit sl82c105_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &slc82c105_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init sl82c105_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_WINBOND)
-		return 0;
-
-	for (d = sl82c105_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	sl82c105_remove_one	-	called with an SLC82c105 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an W82C105 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void sl82c105_remove_one(struct pci_dev *dev)
+{
+	panic("W82C105 removal not yet supported");
+}
+
+static struct pci_device_id sl82c105_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"W82C105 IDE",
+	id_table:	sl82c105_pci_tbl,
+	probe:		sl82c105_init_one,
+	remove:		__devexit_p(sl82c105_remove_one),
+};
+
+static int sl82c105_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void sl82c105_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(sl82c105_ide_init);
+module_exit(sl82c105_ide_exit);
+
+MODULE_DESCRIPTION("PCI driver module for W82C105 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

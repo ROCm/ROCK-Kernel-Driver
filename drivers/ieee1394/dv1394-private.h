@@ -27,6 +27,7 @@
 #define _DV_1394_PRIVATE_H
 
 #include "ieee1394.h"
+#include "ohci1394.h"
 #include <linux/pci.h>
 #include <asm/scatterlist.h>
 
@@ -91,20 +92,20 @@ static inline void fill_output_more_immediate(struct output_more_immediate *omi,
 					      unsigned char sync_tag,
 					      unsigned int  payload_size)
 {
-	omi->q[0] = 0x02000000 | 8 ; /* OUTPUT_MORE_IMMEDIATE; 8 is the size of the IT header */
+	omi->q[0] = cpu_to_le32(0x02000000 | 8); /* OUTPUT_MORE_IMMEDIATE; 8 is the size of the IT header */
 	omi->q[1] = 0;
 	omi->q[2] = 0;
 	omi->q[3] = 0;
 	
 	/* IT packet header */
-	omi->q[4] = (0x0 << 16)  /* DMA_SPEED_100 */
-			| (tag << 14)
-			| (channel << 8)
-			| (TCODE_ISO_DATA << 4) 
-			| (sync_tag);
+	omi->q[4] = cpu_to_le32(  (0x0 << 16)  /* DMA_SPEED_100 */
+				  | (tag << 14)
+				  | (channel << 8)
+				  | (TCODE_ISO_DATA << 4) 
+				  | (sync_tag) );
 
-	omi->q[5] = payload_size << 16;
-	omi->q[5] |= (0x7F << 8) | 0xA0; /* reserved field; mimic behavior of my Sony DSR-40 */
+	/* reserved field; mimic behavior of my Sony DSR-40 */
+	omi->q[5] = cpu_to_le32((payload_size << 16) | (0x7F << 8) | 0xA0);
 	
 	omi->q[6] = 0;
 	omi->q[7] = 0;
@@ -114,10 +115,8 @@ static inline void fill_output_more(struct output_more *om,
 				    unsigned int data_size,
 				    unsigned long data_phys_addr)
 {
-	om->q[0] = 0; /* OUTPUT_MORE */
-	om->q[0] |= data_size;
-
-	om->q[1] = data_phys_addr;
+	om->q[0] = cpu_to_le32(data_size);
+	om->q[1] = cpu_to_le32(data_phys_addr);
 	om->q[2] = 0;
 	om->q[3] = 0;
 }
@@ -128,19 +127,20 @@ static inline void fill_output_last(struct output_last *ol,
 				    unsigned int data_size,
 				    unsigned long data_phys_addr)
 {
-	ol->q[0] = 0;
-	ol->q[0] |= 1 << 28; /* OUTPUT_LAST */
+	u32 temp = 0;
+	temp |= 1 << 28; /* OUTPUT_LAST */
 
 	if(want_timestamp) /* controller will update timestamp at DMA time */
-		ol->q[0] |= 1 << 27;
+		temp |= 1 << 27;
 
 	if(want_interrupt)
-		ol->q[0] |= 3 << 20;
+		temp |= 3 << 20;
 
-	ol->q[0] |= 3 << 18; /* must take branch */
-	ol->q[0] |= data_size;
-	
-	ol->q[1] = data_phys_addr;
+	temp |= 3 << 18; /* must take branch */
+	temp |= data_size;
+
+	ol->q[0] = cpu_to_le32(temp);
+	ol->q[1] = cpu_to_le32(data_phys_addr);
 	ol->q[2] = 0;
 	ol->q[3] = 0;
 }
@@ -152,15 +152,16 @@ static inline void fill_input_more(struct input_more *im,
 				   unsigned int data_size,
 				   unsigned long data_phys_addr)
 {
-	im->q[0] =  2 << 28; /* INPUT_MORE */
-	im->q[0] |= 8 << 24; /* s = 1, update xferStatus and resCount */
+	u32 temp =  2 << 28; /* INPUT_MORE */
+	temp |= 8 << 24; /* s = 1, update xferStatus and resCount */
 	if (want_interrupt)
-		im->q[0] |= 0 << 20; /* interrupts, i=0 in packet-per-buffer mode */
-	im->q[0] |= 0x0 << 16; /* disable branch to address for packet-per-buffer mode */
+		temp |= 0 << 20; /* interrupts, i=0 in packet-per-buffer mode */
+	temp |= 0x0 << 16; /* disable branch to address for packet-per-buffer mode */
 	                       /* disable wait on sync field, not used in DV :-( */
-       	im->q[0] |= data_size;
+       	temp |= data_size;
 
-	im->q[1] = data_phys_addr;
+	im->q[0] = cpu_to_le32(temp);
+	im->q[1] = cpu_to_le32(data_phys_addr);
 	im->q[2] = 0; /* branchAddress and Z not use in packet-per-buffer mode */
 	im->q[3] = 0; /* xferStatus & resCount, resCount must be initialize to data_size */
 }
@@ -169,16 +170,17 @@ static inline void fill_input_last(struct input_last *il,
 				    unsigned int data_size,
 				    unsigned long data_phys_addr)
 {
-	il->q[0] =  3 << 28; /* INPUT_LAST */
-	il->q[0] |= 8 << 24; /* s = 1, update xferStatus and resCount */
-	il->q[0] |= 3 << 20; /* enable interrupts */
-	il->q[0] |= 0xC << 16; /* enable branch to address */
+	u32 temp =  3 << 28; /* INPUT_LAST */
+	temp |= 8 << 24; /* s = 1, update xferStatus and resCount */
+	temp |= 3 << 20; /* enable interrupts */
+	temp |= 0xC << 16; /* enable branch to address */
 	                       /* disable wait on sync field, not used in DV :-( */
-	il->q[0] |= data_size;
+	temp |= data_size;
 
-	il->q[1] = data_phys_addr;
-	il->q[2] = 1; /* branchAddress (filled in later) and Z = 1 descriptor in next block */
-	il->q[3] = data_size; /* xferStatus & resCount, resCount must be initialize to data_size */
+	il->q[0] = cpu_to_le32(temp);
+	il->q[1] = cpu_to_le32(data_phys_addr);
+	il->q[2] = cpu_to_le32(1); /* branchAddress (filled in later) and Z = 1 descriptor in next block */
+	il->q[3] = cpu_to_le32(data_size); /* xferStatus & resCount, resCount must be initialize to data_size */
 }
 
 
@@ -434,6 +436,7 @@ struct video_card {
 
 	/* OHCI card IT DMA context number, -1 if not in use */
 	int ohci_it_ctx;
+	struct ohci1394_iso_tasklet it_tasklet;
 
 	/* register offsets for current IT DMA context, 0 if not in use */
 	u32 ohci_IsoXmitContextControlSet;
@@ -441,6 +444,7 @@ struct video_card {
 	u32 ohci_IsoXmitCommandPtr;
 	
 	/* OHCI card IR DMA context number, -1 if not in use */
+	struct ohci1394_iso_tasklet ir_tasklet;
 	int ohci_ir_ctx;
 
 	/* register offsets for current IR DMA context, 0 if not in use */
@@ -476,6 +480,9 @@ struct video_card {
 	     immediately. This is safe because the interrupt handler will never
 	     advance active_frame onto a frame that is not READY (and the spinlock
 	     must be held while marking a frame READY).
+
+	     spinlock is also used to protect ohci_it_ctx and ohci_ir_ctx,
+	     which can be accessed from both process and interrupt context
 	 */
 	spinlock_t spinlock;
 
@@ -602,7 +609,7 @@ static int do_dv1394_shutdown(struct video_card *video, int free_user_buf);
    calibrated against a Sony DSR-40 DVCAM deck */
 
 #define CIP_N_NTSC   68000000
-#define CIP_D_NTSC 1000000000
+#define CIP_D_NTSC 1068000000
 
 #define CIP_N_PAL  1
 #define CIP_D_PAL 16

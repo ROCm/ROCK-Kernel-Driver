@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -91,8 +92,8 @@ static u8 nforce_ratemask (ide_drive_t *drive)
  */
 static int nforce_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
-	u8 drive_pci[]		= { 0x63, 0x62, 0x61, 0x60 };
-	u8 drive_pci2[]		= { 0x5b, 0x5a, 0x59, 0x58 };
+	static const u8 drive_pci[] = { 0x63, 0x62, 0x61, 0x60 };
+	static const u8 drive_pci2[] = { 0x5b, 0x5a, 0x59, 0x58 };
 
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -336,27 +337,55 @@ static void __init init_dma_nforce (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-/* FIXME - not needed */
-static void __init init_setup_nforce (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit nforce_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
+	ide_pci_device_t *d = &nvidia_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
 	ide_setup_pci_device(dev, d);
-}
-
-int __init nforce_scan_pcidev (struct pci_dev *dev)
-{
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_NVIDIA)
-		return 0;
-
-	for (d = nvidia_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
 	return 0;
 }
 
+/**
+ *	nforce_remove_one	-	called with an nForce is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an nForce device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void nforce_remove_one(struct pci_dev *dev)
+{
+	panic("nForce removal not yet supported");
+}
+
+static struct pci_device_id nforce_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"nForce IDE",
+	id_table:	nforce_pci_tbl,
+	probe:		nforce_init_one,
+	remove:		__devexit_p(nforce_remove_one),
+};
+
+static int nforce_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void nforce_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(nforce_ide_init);
+module_exit(nforce_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for nVidia nForce IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

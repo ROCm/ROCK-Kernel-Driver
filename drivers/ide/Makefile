@@ -19,21 +19,26 @@ ide-obj-y	:=
 subdir-$(CONFIG_BLK_DEV_IDEPCI)	+= pci
 subdir-$(CONFIG_BLK_DEV_IDE) += legacy ppc arm pci
 
+# First come modules that register themselves with the core
+obj-y		+=	pci/idedriver-pci.o
+
+# Core IDE code - must come before legacy
+
 obj-$(CONFIG_BLK_DEV_IDE)		+= ide-probe.o ide-geometry.o ide-iops.o ide-taskfile.o ide.o ide-lib.o
 obj-$(CONFIG_BLK_DEV_IDEDISK)		+= ide-disk.o
 obj-$(CONFIG_BLK_DEV_IDECD)		+= ide-cd.o
 obj-$(CONFIG_BLK_DEV_IDETAPE)		+= ide-tape.o
 obj-$(CONFIG_BLK_DEV_IDEFLOPPY)		+= ide-floppy.o
 
+obj-$(CONFIG_BLK_DEV_IDEPCI)		+= setup-pci.o
 obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
 obj-$(CONFIG_BLK_DEV_ISAPNP)		+= ide-pnp.o
 
-obj-$(CONFIG_PROC_FS)			+= ide-proc.o
-
-obj-$(CONFIG_BLK_DEV_IDEPCI)		+= setup-pci.o
+ifeq ($(CONFIG_BLK_DEV_IDE),y)
+obj-$(CONFIG_PROC_FS)                  += ide-proc.o
+endif
 
 ifeq ($(CONFIG_BLK_DEV_IDE),y)
-  obj-y		+= pci/idedriver-pci.o
   obj-y		+= legacy/idedriver-legacy.o
   obj-y		+= ppc/idedriver-ppc.o
   obj-y		+= arm/idedriver-arm.o

@@ -51,7 +51,11 @@ struct exec_domain;
 #define CLONE_CLEARTID	0x00200000	/* clear the userspace TID */
 #define CLONE_DETACHED	0x00400000	/* parent wants no child-exit signal */
 
-#define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
+/*
+ * List of flags we want to share for kernel threads,
+ * if only because they are not used by them anyway.
+ */
+#define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
 
 /*
  * These are the constant used to fake the fixed-point load-average
@@ -173,7 +177,7 @@ struct namespace;
 
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
-	rb_root_t mm_rb;
+	struct rb_root mm_rb;
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
 	pgd_t * pgd;
 	atomic_t mm_users;			/* How many users with user space? */
@@ -222,6 +226,8 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
+
+	struct task_struct	*group_exit_task;
 };
 
 /*
@@ -418,6 +424,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
 #define PF_SYNC		0x00080000	/* performing fsync(), etc */
+#define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
 
 /*
  * Ptrace flags
@@ -552,6 +559,7 @@ extern int dequeue_signal(struct sigpending *pending, sigset_t *mask, siginfo_t 
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
+extern void release_task(struct task_struct * p);
 extern int send_sig_info(int, struct siginfo *, struct task_struct *);
 extern int force_sig_info(int, struct siginfo *, struct task_struct *);
 extern int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp);
@@ -683,7 +691,11 @@ extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 
+#ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);
+#else
+#define wait_task_inactive(p)	do { } while (0)
+#endif
 extern void kick_if_running(task_t * p);
 
 #define __wait_event(wq, condition) 					\
@@ -948,6 +960,34 @@ static inline void cond_resched(void)
 	if (need_resched())
 		__cond_resched();
 }
+
+#ifdef CONFIG_PREEMPT
+
+/*
+ * cond_resched_lock() - if a reschedule is pending, drop the given lock,
+ * call schedule, and on return reacquire the lock.
+ *
+ * Note: this does not assume the given lock is the _only_ lock held.
+ * The kernel preemption counter gives us "free" checking that we are
+ * atomic -- let's use it.
+ */
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+	if (need_resched() && preempt_count() == 1) {
+		_raw_spin_unlock(lock);
+		preempt_enable_no_resched();
+		__cond_resched();
+		spin_lock(lock);
+	}
+}
+
+#else
+
+static inline void cond_resched_lock(spinlock_t * lock)
+{
+}
+
+#endif
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.

@@ -638,7 +638,7 @@ pcibios_assign_resources(void)
 
 
 int
-pcibios_enable_resources(struct pci_dev *dev)
+pcibios_enable_resources(struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
@@ -647,6 +647,10 @@ pcibios_enable_resources(struct pci_dev *dev)
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	old_cmd = cmd;
 	for (idx=0; idx<6; idx++) {
+		/* Only set up the requested stuff */
+		if (!(mask & (1<<idx)))
+			continue;
+		
 		r = &dev->resource[idx];
 		if (r->flags & IORESOURCE_UNSET) {
 			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
@@ -1191,7 +1195,7 @@ pcibios_update_irq(struct pci_dev *dev, int irq)
 	/* XXX FIXME - update OF device tree node interrupt property */
 }
 
-int pcibios_enable_device(struct pci_dev *dev)
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	u16 cmd, old_cmd;
 	int idx;
@@ -1553,6 +1557,7 @@ fake_pci_bus(struct pci_controller *hose, int busnr)
 			printk(KERN_ERR "Can't find hose for PCI bus %d!\n", busnr);
 	}
 	bus.number = busnr;
+	bus.sysdata = hose;
 	bus.ops = hose? hose->ops: &null_pci_ops;
 	return &bus;
 }

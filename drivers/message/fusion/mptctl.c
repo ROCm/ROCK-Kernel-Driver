@@ -34,7 +34,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptctl.c,v 1.55 2002/06/20 13:28:16 pdelaney Exp $
+ *  $Id: mptctl.c,v 1.59 2002/09/05 22:30:10 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -637,8 +637,8 @@ mptctl_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned 
 	iocnumX = khdr.iocnum & 0xFF;
 	if (((iocnum = mpt_verify_adapter(iocnumX, &iocp)) < 0) ||
 	    (iocp == NULL)) {
-		printk(KERN_ERR "%s::mptctl_ioctl() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnumX);
+		dtmprintk((KERN_ERR "%s::mptctl_ioctl() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnumX));
 		return -ENODEV;
 	}
 
@@ -708,9 +708,9 @@ static int mptctl_do_reset(unsigned long arg)
 	}
 
 	if (mpt_verify_adapter(krinfo.hdr.iocnum, &iocp) < 0) {
-		printk(KERN_ERR "%s@%d::mptctl_do_reset - ioc%d not found!\n",
-				__FILE__, __LINE__, krinfo.hdr.iocnum);
-		return -ENXIO; /* (-6) No such device or address */
+		dtmprintk((KERN_ERR "%s@%d::mptctl_do_reset - ioc%d not found!\n",
+				__FILE__, __LINE__, krinfo.hdr.iocnum));
+		return -ENODEV; /* (-6) No such device or address */
 	}
 
 	if (mpt_HardResetHandler(iocp, NO_SLEEP) != 0) {
@@ -816,9 +816,9 @@ mptctl_do_fw_download(int ioc, char *ufwbuf, size_t fwlen)
 	dctlprintk((KERN_INFO "DbG: kfwdl.ioc   = %04xh\n", ioc));
 
 	if ((ioc = mpt_verify_adapter(ioc, &iocp)) < 0) {
-		printk("%s@%d::_ioctl_fwdl - ioc%d not found!\n",
-				__FILE__, __LINE__, ioc);
-		return -ENXIO; /* (-6) No such device or address */
+		dtmprintk(("%s@%d::_ioctl_fwdl - ioc%d not found!\n",
+				__FILE__, __LINE__, ioc));
+		return -ENODEV; /* (-6) No such device or address */
 	}
 
 	/*  Valid device. Get a message frame and construct the FW download message.
@@ -1252,8 +1252,8 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_getiocinfo() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_getiocinfo() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1379,8 +1379,8 @@ mptctl_gettargetinfo (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_gettargetinfo() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_gettargetinfo() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1510,8 +1510,8 @@ mptctl_readtest (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_readtest() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_readtest() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1568,8 +1568,8 @@ mptctl_eventquery (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_eventquery() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_eventquery() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1606,8 +1606,8 @@ mptctl_eventenable (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_eventenable() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_eventenable() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1654,8 +1654,8 @@ mptctl_eventreport (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_eventreport() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_eventreport() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1708,8 +1708,8 @@ mptctl_replace_fw (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_replace_fw() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_replace_fw() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1794,8 +1794,8 @@ mptctl_mpt_command (unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_mpt_command() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_mpt_command() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -1842,8 +1842,8 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 
 	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_do_mpt_command() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_do_mpt_command() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 	if (!ioc->ioctl) {
@@ -1948,10 +1948,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 
 			if (pTarget &&(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES))
 				qtag = MPI_SCSIIO_CONTROL_SIMPLEQ;
-			else {
-				rc = -EPERM;
-				goto done_free_mem;
-			}
 
 			/* Have the IOCTL driver set the direction based
 			 * on the dataOutSize (ordering issue with Sparc).
@@ -2334,7 +2330,7 @@ done_free_mem:
 			this_sge++;	/* go to next structure */
 			this_alloc = bufOut.len;
 			pci_free_consistent(ioc->pcidev,
-				this_alloc, (void *) &bufOut, dma_addr);
+				this_alloc, (void *) bufOut.kptr, dma_addr);
 		}
 
 		if (bufIn.kptr != NULL ) {
@@ -2342,7 +2338,7 @@ done_free_mem:
 			this_alloc = bufIn.len;
 
 			pci_free_consistent(ioc->pcidev,
-					this_alloc, (void *) &bufIn, dma_addr);
+					this_alloc, (void *) bufIn.kptr, dma_addr);
 		}
 
 		this_alloc = sgSize * sizeof(MptSge_t);
@@ -2393,8 +2389,8 @@ mptctl_compaq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(iocnumX, &iocp)) < 0) ||
 	    (iocp == NULL)) {
-		printk(KERN_ERR "%s::mptctl_compaq_ioctl() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnumX);
+		dtmprintk((KERN_ERR "%s::mptctl_compaq_ioctl() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnumX));
 		return -ENODEV;
 	}
 
@@ -2466,8 +2462,8 @@ mptctl_cpq_getpciinfo(unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_pciinfo() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_pciinfo() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -2567,8 +2563,8 @@ mptctl_cpq_getdriver(unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_cpq_getdriver() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_cpq_getdriver() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -2631,8 +2627,8 @@ mptctl_cpq_ctlr_status(unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_cpq_ctlr_status() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_cpq_ctlr_status() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -2687,8 +2683,8 @@ mptctl_cpq_target_address(unsigned long arg)
 
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_cpq_target_address() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_cpq_target_address() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -2790,8 +2786,8 @@ mptctl_cpq_passthru(unsigned long arg)
 	iocnumX = karg.lc & 0xFF;
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR "%s::mptctl_cpq_passthru() @%d - ioc%d not found!\n",
-				__FILE__, __LINE__, iocnum);
+		dtmprintk((KERN_ERR "%s::mptctl_cpq_passthru() @%d - ioc%d not found!\n",
+				__FILE__, __LINE__, iocnum));
 		return -ENODEV;
 	}
 
@@ -2920,12 +2916,12 @@ mptctl_compaq_scsiio(VENDOR_IOCTL_REQ *pVenReq, cpqfc_passthru_t *pPass)
 
 static struct file_operations mptctl_fops = {
 	owner_THIS_MODULE
-	llseek:		no_llseek,
-	read:		mptctl_read,
-	write:		mptctl_write,
-	ioctl:		mptctl_ioctl,
-	open:		mptctl_open,
-	release:	mptctl_release,
+	.llseek =	no_llseek,
+	.read =		mptctl_read,
+	.write =	mptctl_write,
+	.ioctl =	mptctl_ioctl,
+	.open =		mptctl_open,
+	.release =	mptctl_release,
 };
 
 static struct miscdevice mptctl_miscdev = {
@@ -2975,8 +2971,8 @@ sparc32_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
 	iocnumX = kfw32.iocnum & 0xFF;
 	if (((iocnum = mpt_verify_adapter(iocnumX, &iocp)) < 0) ||
 	    (iocp == NULL)) {
-		printk(KERN_ERR MYNAM "::sparc32_mptfwxfer_ioctl @%d - ioc%d not found!\n",
-				__LINE__, iocnumX);
+		dtmprintk((KERN_ERR MYNAM "::sparc32_mptfwxfer_ioctl @%d - ioc%d not found!\n",
+				__LINE__, iocnumX));
 		return -ENODEV;
 	}
 
@@ -3015,8 +3011,8 @@ sparc32_mpt_command(unsigned int fd, unsigned int cmd,
 	iocnumX = karg32.hdr.iocnum & 0xFF;
 	if (((iocnum = mpt_verify_adapter(iocnumX, &iocp)) < 0) ||
 	    (iocp == NULL)) {
-		printk(KERN_ERR MYNAM "::sparc32_mpt_command @%d - ioc%d not found!\n",
-				__LINE__, iocnumX);
+		dtmprintk((KERN_ERR MYNAM "::sparc32_mpt_command @%d - ioc%d not found!\n",
+				__LINE__, iocnumX));
 		return -ENODEV;
 	}
 
@@ -3072,8 +3068,8 @@ sparc32_mptctl_cpq_passthru(unsigned int fd, unsigned int cmd,
 	iocnumX = karg32.lc & 0xFF;
 	if (((iocnum = mpt_verify_adapter(iocnumX, &ioc)) < 0) ||
 	    (ioc == NULL)) {
-		printk(KERN_ERR MYNAM "::sparc32_mpt_command @%d - ioc%d not found!\n",
-				__LINE__, iocnumX);
+		dtmprintk((KERN_ERR MYNAM "::sparc32_mpt_command @%d - ioc%d not found!\n",
+				__LINE__, iocnumX));
 		return -ENODEV;
 	}
 

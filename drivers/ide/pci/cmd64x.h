@@ -79,17 +79,15 @@ static ide_pci_host_proc_t cmd64x_procs[] __initdata = {
 };
 #endif  /* defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-static void init_setup_cmd64x(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_cmd64x(struct pci_dev *, const char *);
 static void init_hwif_cmd64x(ide_hwif_t *);
 static void init_dma_cmd64x(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t cmd64x_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:		PCI_DEVICE_ID_CMD_643,
 		name:		"CMD643",
-		init_setup:	init_setup_cmd64x,
 		init_chipset:	init_chipset_cmd64x,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cmd64x,
@@ -99,11 +97,10 @@ static ide_pci_device_t cmd64x_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 1 */
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:		PCI_DEVICE_ID_CMD_646,
 		name:		"CMD646",
-		init_setup:	init_setup_cmd64x,
 		init_chipset:	init_chipset_cmd64x,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cmd64x,
@@ -113,11 +110,10 @@ static ide_pci_device_t cmd64x_chipsets[] __initdata = {
 		enablebits:	{{0x00,0x00,0x00}, {0x51,0x80,0x80}},
 		bootable:	ON_BOARD,
 		extra:		0,
-	},{
+	},{	/* 2 */
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:	PCI_DEVICE_ID_CMD_648,
 		name:		"CMD648",
-		init_setup:	init_setup_cmd64x,
 		init_chipset:	init_chipset_cmd64x,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cmd64x,
@@ -131,7 +127,6 @@ static ide_pci_device_t cmd64x_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_CMD,
 		device:		PCI_DEVICE_ID_CMD_649,
 		name:		"CMD649",
-		init_setup:	init_setup_cmd64x,
 		init_chipset:	init_chipset_cmd64x,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_cmd64x,

@@ -536,6 +536,20 @@ shrink_caches(struct zone *classzone, int priority,
 
 /*
  * This is the main entry point to page reclaim.
+ *
+ * If a full scan of the inactive list fails to free enough memory then we
+ * are "out of memory" and something needs to be killed.
+ *
+ * If the caller is !__GFP_FS then the probability of a failure is reasonably
+ * high - the zone may be full of dirty or under-writeback pages, which this
+ * caller can't do much about.  So for !__GFP_FS callers, we just perform a
+ * small LRU walk and if that didn't work out, fail the allocation back to the
+ * caller.  GFP_NOFS allocators need to know how to deal with it.  Kicking
+ * bdflush, waiting and retrying will work.
+ *
+ * This is a fairly lame algorithm - it can result in excessive CPU burning and
+ * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
+ * yes?
  */
 int
 try_to_free_pages(struct zone *classzone,
@@ -546,13 +560,16 @@ try_to_free_pages(struct zone *classzone,
 
 	KERNEL_STAT_INC(pageoutrun);
 
-	do {
+	for (priority = DEF_PRIORITY; priority; priority--) {
 		nr_pages = shrink_caches(classzone, priority,
 					gfp_mask, nr_pages);
 		if (nr_pages <= 0)
 			return 1;
-	} while (--priority);
-	out_of_memory();
+		if (!(gfp_mask & __GFP_FS))
+			break;
+	}
+	if (gfp_mask & __GFP_FS)
+		out_of_memory();
 	return 0;
 }
 
@@ -705,7 +722,7 @@ static int __init kswapd_init(void)
 {
 	printk("Starting kswapd\n");
 	swap_setup();
-	kernel_thread(kswapd, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	kernel_thread(kswapd, NULL, CLONE_KERNEL);
 	return 0;
 }
 

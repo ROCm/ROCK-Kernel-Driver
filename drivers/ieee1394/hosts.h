@@ -15,7 +15,6 @@ struct hpsb_packet;
 struct hpsb_host {
         struct list_head host_list;
 
-        struct hpsb_host_operations *ops;
         void *hostdata;
 
         atomic_t generation;
@@ -59,7 +58,6 @@ struct hpsb_host {
         struct csr_control csr;
 
         struct hpsb_host_driver *driver;
-        struct list_head driver_list;
 
 	struct pci_dev *pdev;
 };
@@ -113,7 +111,9 @@ enum reset_types {
         SHORT_RESET
 };
 
-struct hpsb_host_operations {
+struct hpsb_host_driver {
+	const char *name;
+
         /* This function must store a pointer to the configuration ROM into the
          * location referenced to by pointer and return the size of the ROM. It
          * may not fail.  If any allocation is required, it must be done
@@ -149,18 +149,6 @@ struct hpsb_host_operations {
                                  quadlet_t data, quadlet_t compare);
 };
 
-struct hpsb_host_driver {
-        struct list_head list;
-
-        struct list_head hosts;
-
-        int number_of_hosts;
-        const char *name;
-
-        struct hpsb_host_operations *ops;
-};
-
-
 /* core internal use */
 void register_builtin_lowlevels(void);
 
@@ -183,9 +171,5 @@ void hpsb_unref_host(struct hpsb_host *host);
 struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra);
 void hpsb_add_host(struct hpsb_host *host);
 void hpsb_remove_host(struct hpsb_host *h);
-
-struct hpsb_host_driver *hpsb_register_lowlevel(struct hpsb_host_operations *op,
-                                                const char *name);
-void hpsb_unregister_lowlevel(struct hpsb_host_driver *drv);
 
 #endif /* _IEEE1394_HOSTS_H */

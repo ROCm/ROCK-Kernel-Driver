@@ -25,6 +25,15 @@ CONFIG_SMP
 
   If you don't know what to do here, say N.
 
+CONFIG_HUGETLB_PAGE
+  This enables support for huge pages.  User space applications
+  can make use of this support with the sys_alloc_hugepages and
+  sys_free_hugepages system calls.  If your applications are
+  huge page aware and your processor (Pentium or later for x86)
+  supports this, then say Y here.
+
+  Otherwise, say N.
+
 CONFIG_PREEMPT
   This option reduces the latency of the kernel when reacting to
   real-time or interactive events by allowing a low priority process to

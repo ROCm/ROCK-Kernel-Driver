@@ -194,6 +194,8 @@ int noautodma = 0;
 int noautodma = 1;
 #endif
 
+EXPORT_SYMBOL(noautodma);
+
 /*
  * ide_modules keeps track of the available IDE chipset/probe/driver modules.
  */
@@ -1376,7 +1378,6 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 
 	if ((handler = hwgroup->handler) == NULL ||
 	    hwgroup->poll_timeout != 0) {
-		printk("ide_intr: unexpected interrupt!\n");
 		/*
 		 * Not expecting an interrupt from this drive.
 		 * That means this could be:

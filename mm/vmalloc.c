@@ -11,6 +11,8 @@
 #include <linux/highmem.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
+
 #include <linux/vmalloc.h>
 
 #include <asm/uaccess.h>
@@ -309,6 +311,7 @@ void __vunmap(void *addr, int deallocate_pages)
  */
 void vfree(void *addr)
 {
+	BUG_ON(in_interrupt());
 	__vunmap(addr, 1);
 }
 
@@ -324,6 +327,7 @@ void vfree(void *addr)
  */
 void vunmap(void *addr)
 {
+	BUG_ON(in_interrupt());
 	__vunmap(addr, 0);
 }
 

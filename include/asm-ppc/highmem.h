@@ -128,6 +128,17 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	dec_preempt_count();
 }
 
+static inline struct page *kmap_atomic_to_page(void *ptr)
+{
+	unsigned long idx, vaddr = (unsigned long) ptr;
+
+	if (vaddr < KMAP_FIX_BEGIN)
+		return virt_to_page(ptr);
+
+	idx = (vaddr - KMAP_FIX_BEGIN) >> PAGE_SHIFT;
+	return pte_page(kmap_pte[idx]);
+}
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_HIGHMEM_H */

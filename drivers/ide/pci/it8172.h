@@ -20,7 +20,7 @@ static void init_hwif_it8172(ide_hwif_t *);
 static void init_dma_it8172(ide_hwif_t *, unsigned long);
 
 static ide_pci_device_t it8172_chipsets[] __initdata = {
-	{
+	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_ITE,
 		device:		PCI_DEVICE_ID_ITE_IT8172G,
 		name:		"IT8172G",

@@ -26,6 +26,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/highmem.h>
@@ -202,7 +203,7 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 		err = map_page(v+i, p+i, flags);
 	if (err) {
 		if (mem_init_done)
-			vfree((void *)v);
+			vunmap((void *)v);
 		return NULL;
 	}
 
@@ -219,7 +220,7 @@ void iounmap(void *addr)
 	if (v_mapped_by_bats((unsigned long)addr)) return;
 
 	if (addr > high_memory && (unsigned long) addr < ioremap_bot)
-		vfree((void *) (PAGE_MASK & (unsigned long) addr));
+		vunmap((void *) (PAGE_MASK & (unsigned long)addr));
 }
 #endif /* CONFIG_PPC_ISERIES */
 

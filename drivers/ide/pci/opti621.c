@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/opti621.c		Version 0.6	Jan 02, 1999
+ *  linux/drivers/ide/opti621.c		Version 0.7	Sept 10, 2002
  *
  *  Copyright (C) 1996-1998  Linus Torvalds & authors (see below)
  */
@@ -91,6 +91,7 @@
 #define OPTI621_DEBUG		/* define for debug messages */
 
 #include <linux/types.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
@@ -363,21 +364,56 @@ static void __init init_setup_opti621 (struct pci_dev *dev, ide_pci_device_t *d)
 	ide_setup_pci_device(dev, d);
 }
 
-int __init opti621_scan_pcidev (struct pci_dev *dev)
+static int __devinit opti621_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
-
-	if (dev->vendor != PCI_VENDOR_ID_OPTI)
-		return 0;
-
-	for (d = opti621_chipsets; d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	ide_pci_device_t *d = &opti621_chipsets[id->driver_data];
+	if (dev->device != d->device)
+		BUG();
+	ide_setup_pci_device(dev, d);
 	return 0;
 }
 
+/**
+ *	opti621_remove_one	-	called with an Opti621 is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an Opti621 device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void opti621_remove_one(struct pci_dev *dev)
+{
+	panic("Opti621 removal not yet supported");
+}
+
+static struct pci_device_id opti621_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C621, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_OPTI, PCI_DEVICE_ID_OPTI_82C825, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"Opti621 IDE",
+	id_table:	opti621_pci_tbl,
+	probe:		opti621_init_one,
+	remove:		__devexit_p(opti621_remove_one),
+};
+
+static int opti621_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void opti621_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(opti621_ide_init);
+module_exit(opti621_ide_exit);
+
+MODULE_AUTHOR("Jaromir Koutek, Jan Harkes, Mark Lord");
+MODULE_DESCRIPTION("PCI driver module for Opti621 IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

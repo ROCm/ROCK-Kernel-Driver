@@ -38,8 +38,6 @@ static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 	char *chipset_nums[] = {"error", "error", "error", "error",
 				"error", "error", "850UF",   "860",
 				 "860R",   "865",  "865R", "error"  };
-//	char *modes_33[] = {};
-//	char *modes_34[] = {};
 	int i;
 
 	for (i = 0; i < n_aec_devs; i++) {
@@ -516,22 +514,69 @@ static void __init init_setup_aec6x80 (struct pci_dev *dev, ide_pci_device_t *d)
 	ide_setup_pci_device(dev, d);
 }
 
-int __init aec62xx_scan_pcidev (struct pci_dev *dev)
+/**
+ *	aec62xx_init_one	-	called when a AEC is found
+ *	@dev: the aec62xx device
+ *	@id: the matching pci id
+ *
+ *	Called when the PCI registration layer (or the IDE initialization)
+ *	finds a device matching our IDE device tables.
+ */
+ 
+static int __devinit aec62xx_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d;
+	ide_pci_device_t *d = &aec62xx_chipsets[id->driver_data];
 
-	if (dev->vendor != PCI_VENDOR_ID_ARTOP)
-		return 0;
-
-	for (d = aec62xx_chipsets;
-		d && d->vendor && d->device; ++d) {
-		if (((d->vendor == dev->vendor) &&
-		     (d->device == dev->device)) &&
-		    (d->init_setup)) {
-			d->init_setup(dev, d);
-			return 1;
-		}
-	}
+	if (dev->device != d->device)
+		BUG();
+	d->init_setup(dev, d);
 	return 0;
 }
 
+/**
+ *	aec62xx_remove_one	-	called when an AEC is unplugged
+ *	@dev: the device that was removed
+ *
+ *	Disconnect an AEC device that has been unplugged either by hotplug
+ *	or by a more civilized notification scheme. Not yet supported.
+ */
+ 
+static void aec62xx_remove_one(struct pci_dev *dev)
+{
+	panic("AEC62xx removal not yet supported");
+}
+
+static struct pci_device_id aec62xx_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP850UF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP860,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },
+	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP860R,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2 },
+	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP865,   PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3 },
+	{ PCI_VENDOR_ID_ARTOP, PCI_DEVICE_ID_ARTOP_ATP865R,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4 },
+	{ 0, },
+};
+
+static struct pci_driver driver = {
+	name:		"AEC62xx IDE",
+	id_table:	aec62xx_pci_tbl,
+	probe:		aec62xx_init_one,
+	remove:		__devexit_p(aec62xx_remove_one),
+};
+
+static int aec62xx_ide_init(void)
+{
+	return ide_pci_register_driver(&driver);
+}
+
+static void aec62xx_ide_exit(void)
+{
+	ide_pci_unregister_driver(&driver);
+}
+
+module_init(aec62xx_ide_init);
+module_exit(aec62xx_ide_exit);
+
+MODULE_AUTHOR("Andre Hedrick");
+MODULE_DESCRIPTION("PCI driver module for ARTOP AEC62xx IDE");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;

@@ -19,12 +19,23 @@
  * AMDTP_FORMAT_IEC958_AC3 will transmit the samples with the data bit
  * set, suitable for transmitting compressed AC-3 audio.
  *
- * The rate field specifies the transmission rate; supported values are
- * AMDTP_RATE_32KHZ, AMDTP_RATE_44K1HZ and AMDTP_RATE_48KHZ.
+ * The rate field specifies the transmission rate; supported values
+ * are 32000, 44100, 48000, 88200, 96000, 176400 and 192000.
  *
  * The dimension field specifies the dimension of the signal, that is,
  * the number of audio channels.  Only AMDTP_FORMAT_RAW supports
  * settings greater than 2.  
+ *
+ * The mode field specifies which transmission mode to use. The AMDTP
+ * specifies two different transmission modes: blocking and
+ * non-blocking.  The blocking transmission mode always send a fixed
+ * number of samples, typically 8, 16 or 32.  To exactly match the
+ * transmission rate, the driver alternates between sending empty and
+ * non-empty packets.  In non-blocking mode, the driver transmits as
+ * small packets as possible.  For example, for a transmission rate of
+ * 44100Hz, the driver should send 5 41/80 samples in every cycle, but
+ * this is not possible so instead the driver alternates between
+ * sending 5 and 6 samples.
  *
  * The last thing to specify is either the isochronous channel to use
  * or the output plug to connect to.  If you know what channel the
@@ -60,15 +71,20 @@ enum {
 };
 
 enum {
-	AMDTP_RATE_32KHZ,
-	AMDTP_RATE_44K1HZ,
-	AMDTP_RATE_48KHZ,
+	AMDTP_MODE_BLOCKING,
+	AMDTP_MODE_NON_BLOCKING,
+};
+
+enum {
+	AMDTP_INPUT_LE16,
+	AMDTP_INPUT_BE16,
 };
 
 struct amdtp_ioctl {
 	__u32 format;
 	__u32 rate;
 	__u32 dimension;
+	__u32 mode;
 	union { __u32 channel; __u32 plug; } u;
 };
 
