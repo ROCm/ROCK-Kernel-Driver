@@ -116,13 +116,15 @@ int sequencer_read(int dev, struct file *file, char *buf, int count)
 	while (iqlen && c >= ev_len)
 	{
 		char *fixit = (char *) &iqueue[iqhead * IEV_SZ];
-		copy_to_user(&(buf)[p], fixit, ev_len);
+		if (copy_to_user(&(buf)[p], fixit, ev_len))
+			goto out;
 		p += ev_len;
 		c -= ev_len;
 
 		iqhead = (iqhead + 1) % SEQ_MAX_QUEUE;
 		iqlen--;
 	}
+out:
 	restore_flags(flags);
 	return count - c;
 }
@@ -226,7 +228,8 @@ int sequencer_write(int dev, struct file *file, const char *buf, int count)
 
 	while (c >= 4)
 	{
-		copy_from_user((char *) event_rec, &(buf)[p], 4);
+		if (copy_from_user((char *) event_rec, &(buf)[p], 4))
+			goto out;
 		ev_code = event_rec[0];
 
 		if (ev_code == SEQ_FULLSIZE)
@@ -262,7 +265,9 @@ int sequencer_write(int dev, struct file *file, const char *buf, int count)
 					seq_startplay();
 				return count - c;
 			}
-			copy_from_user((char *) &event_rec[4], &(buf)[p + 4], 4);
+			if (copy_from_user((char *)&event_rec[4],
+					   &(buf)[p + 4], 4))
+				goto out;
 
 		}
 		else
@@ -320,7 +325,7 @@ int sequencer_write(int dev, struct file *file, const char *buf, int count)
 
 	if (!seq_playing)
 		seq_startplay();
-
+out:
 	return count;
 }
 

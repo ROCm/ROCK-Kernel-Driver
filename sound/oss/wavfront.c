@@ -1525,8 +1525,9 @@ wavefront_load_gus_patch (int devno, int format, const char *addr,
 	/* Copy in the header of the GUS patch */
 
 	sizeof_patch = (long) &guspatch.data[0] - (long) &guspatch; 
-	copy_from_user (&((char *) &guspatch)[offs],
-			&(addr)[offs], sizeof_patch - offs);
+	if (copy_from_user(&((char *) &guspatch)[offs],
+			   &(addr)[offs], sizeof_patch - offs))
+		return -EFAULT;
 
 	if ((i = wavefront_find_free_patch ()) == -1) {
 		return -EBUSY;
@@ -1662,7 +1663,7 @@ wavefront_load_patch (const char *addr)
 	if (copy_from_user (&header, addr, sizeof(wavefront_patch_info) -
 			    sizeof(wavefront_any))) {
 		printk (KERN_WARNING LOGNAME "bad address for load patch.\n");
-		return -(EINVAL);
+		return -EFAULT;
 	}
 
 	DPRINT (WF_DEBUG_LOAD_PATCH, "download "
@@ -1676,47 +1677,53 @@ wavefront_load_patch (const char *addr)
 	switch (header.subkey) {
 	case WF_ST_SAMPLE:  /* sample or sample_header, based on patch->size */
 
-		copy_from_user ((unsigned char *) &header.hdr.s,
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_sample));
+		if (copy_from_user((unsigned char *) &header.hdr.s,
+				   (unsigned char *) header.hdrptr,
+				   sizeof (wavefront_sample)))
+			return -EFAULT;
 
 		return wavefront_send_sample (&header, header.dataptr, 0);
 
 	case WF_ST_MULTISAMPLE:
 
-		copy_from_user ((unsigned char *) &header.hdr.s,
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_multisample));
+		if (copy_from_user((unsigned char *) &header.hdr.s,
+				   (unsigned char *) header.hdrptr,
+				   sizeof(wavefront_multisample)))
+			return -EFAULT;
 
 		return wavefront_send_multisample (&header);
 
 
 	case WF_ST_ALIAS:
 
-		copy_from_user ((unsigned char *) &header.hdr.a,
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_alias));
+		if (copy_from_user((unsigned char *) &header.hdr.a,
+				   (unsigned char *) header.hdrptr,
+				   sizeof (wavefront_alias)))
+			return -EFAULT;
 
 		return wavefront_send_alias (&header);
 
 	case WF_ST_DRUM:
-		copy_from_user ((unsigned char *) &header.hdr.d, 
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_drum));
+		if (copy_from_user((unsigned char *) &header.hdr.d, 
+				   (unsigned char *) header.hdrptr,
+				   sizeof (wavefront_drum)))
+			return -EFAULT;
 
 		return wavefront_send_drum (&header);
 
 	case WF_ST_PATCH:
-		copy_from_user ((unsigned char *) &header.hdr.p, 
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_patch));
+		if (copy_from_user((unsigned char *) &header.hdr.p, 
+				   (unsigned char *) header.hdrptr,
+				   sizeof (wavefront_patch)))
+			return -EFAULT;
 
 		return wavefront_send_patch (&header);
 
 	case WF_ST_PROGRAM:
-		copy_from_user ((unsigned char *) &header.hdr.pr, 
-				(unsigned char *) header.hdrptr,
-				sizeof (wavefront_program));
+		if (copy_from_user((unsigned char *) &header.hdr.pr, 
+				   (unsigned char *) header.hdrptr,
+				   sizeof (wavefront_program)))
+			return -EFAULT;
 
 		return wavefront_send_program (&header);
 
@@ -1931,10 +1938,12 @@ wavefront_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 
 	case WFCTL_WFCMD:
-		copy_from_user (&wc, (void *) arg, sizeof (wc));
+		if (copy_from_user(&wc, (void *) arg, sizeof (wc)))
+			return -EFAULT;
 		
 		if ((err = wavefront_synth_control (cmd, &wc)) == 0) {
-			copy_to_user ((void *) arg, &wc, sizeof (wc));
+			if (copy_to_user ((void *) arg, &wc, sizeof (wc)))
+				return -EFAULT;
 		}
 
 		return err;
@@ -2995,8 +3004,10 @@ wffx_ioctl (wavefront_fx_info *r)
 					"> 255 bytes to FX\n");
 				return -(EINVAL);
 			}
-			copy_from_user (page_data, (unsigned char *) r->data[3],
-					r->data[2]);
+			if (copy_from_user(page_data,
+					   (unsigned char *)r->data[3],
+					   r->data[2]))
+				return -EFAULT;
 			pd = page_data;
 		}
 

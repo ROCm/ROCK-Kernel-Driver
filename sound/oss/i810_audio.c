@@ -2020,7 +2020,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETOPTR %d, %d, %d, %d\n", cinfo.bytes,
 			cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -2059,8 +2061,9 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		printk("SNDCTL_DSP_GETIPTR %d, %d, %d, %d\n", cinfo.bytes,
 			cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
-
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+			return -EFAULT;
+		return 0;
 	case SNDCTL_DSP_NONBLOCK:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_NONBLOCK\n");
