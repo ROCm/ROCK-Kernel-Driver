@@ -84,10 +84,6 @@ EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_single);
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(ia64_cpu_to_sapicid);
-
-#include <asm/smplock.h>
-EXPORT_SYMBOL(kernel_flag);
-
 #else /* !CONFIG_SMP */
 
 EXPORT_SYMBOL(__flush_tlb_all);

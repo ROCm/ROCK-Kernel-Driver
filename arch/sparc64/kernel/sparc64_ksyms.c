@@ -101,9 +101,7 @@ extern int __ashrdi3(int, int);
 extern void dump_thread(struct pt_regs *, struct user *);
 extern int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs);
 
-#ifdef CONFIG_SMP
-extern spinlock_t kernel_flag;
-#ifdef CONFIG_DEBUG_SPINLOCK
+#if defined(CONFIG_SMP) && defined(CONFIG_DEBUG_SPINLOCK)
 extern void _do_spin_lock (spinlock_t *lock, char *str);
 extern void _do_spin_unlock (spinlock_t *lock);
 extern int _spin_trylock (spinlock_t *lock);
@@ -111,7 +109,6 @@ extern void _do_read_lock(rwlock_t *rw, char *str);
 extern void _do_read_unlock(rwlock_t *rw, char *str);
 extern void _do_write_lock(rwlock_t *rw, char *str);
 extern void _do_write_unlock(rwlock_t *rw);
-#endif
 #endif
 
 extern unsigned long phys_base;
@@ -126,9 +123,6 @@ EXPORT_SYMBOL(__read_unlock);
 EXPORT_SYMBOL(__write_lock);
 EXPORT_SYMBOL(__write_unlock);
 #endif
-
-/* Kernel wide locking */
-EXPORT_SYMBOL(kernel_flag);
 
 /* Hard IRQ locking */
 #ifdef CONFIG_SMP

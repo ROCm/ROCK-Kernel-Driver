@@ -66,9 +66,6 @@ cycles_t cacheflush_time = 0; /* XXX */
  * instruction which is much better...
  */
 
-/* Kernel spinlock */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 /* Used to make bitops atomic */
 unsigned char bitops_spinlock = 0;
 

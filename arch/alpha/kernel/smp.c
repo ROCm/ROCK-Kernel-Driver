@@ -67,8 +67,6 @@ enum ipi_message_type {
 	IPI_CPU_STOP,
 };
 
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 /* Set to a secondary's cpuid when it comes online.  */
 static int smp_secondary_alive __initdata = 0;
 

@@ -35,9 +35,6 @@ EXPORT_SYMBOL(boot_cpu_data);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
 
-#include <asm/smplock.h>
-EXPORT_SYMBOL(kernel_flag);
-
 #include <asm/system.h>
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_cli);
