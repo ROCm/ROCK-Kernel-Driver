@@ -46,7 +46,7 @@ static u16 ide_inw (unsigned long port)
 
 static void ide_insw (unsigned long port, void *addr, u32 count)
 {
-	return insw(port, addr, count);
+	insw(port, addr, count);
 }
 
 static u32 ide_inl (unsigned long port)
