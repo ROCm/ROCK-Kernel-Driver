@@ -69,7 +69,12 @@ SECTIONS
 		*(.initcall6.init);
 		*(.initcall7.init);
 		__initcall_end = .;
-
+	}
+	.con_initcall.init : {
+		__con_initcall_start = .;
+		*(.con_initcall.init)
+		__con_initcall_end = .;
+	
 		/* We fill to the next page, so we can discard all init
 		   pages without needing to consider what payload might be
 		   appended to the kernel image.  */

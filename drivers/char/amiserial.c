@@ -2320,10 +2320,11 @@ static struct console sercons = {
 /*
  *	Register console.
  */
-void __init serial_console_init(void)
+static void __init amiserial_console_init(void)
 {
 	register_console(&sercons);
 }
+console_initcall(amiserial_console_init);
 #endif
 
 MODULE_LICENSE("GPL");

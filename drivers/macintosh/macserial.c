@@ -3043,10 +3043,12 @@ static struct console sercons = {
 /*
  *	Register console.
  */
-void __init mac_scc_console_init(void)
+static void __init mac_scc_console_init(void)
 {
 	register_console(&sercons);
 }
+console_initcall(mac_scc_console_init);
+
 #endif /* ifdef CONFIG_SERIAL_CONSOLE */
 
 #ifdef CONFIG_KGDB
