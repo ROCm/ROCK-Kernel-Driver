@@ -489,9 +489,9 @@ e1000_check_fiber_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "Duplex not valid for fiber adapters, "
 		       "parameter ignored\n");
 	}
-	if((AutoNeg[bd] != OPTION_UNSET)) {
-		printk(KERN_INFO "AutoNeg not valid for fiber adapters, "
-		       "parameter ignored\n");
+	if((AutoNeg[bd] != OPTION_UNSET) && (AutoNeg[bd] != 0x20)) {
+		printk(KERN_INFO "AutoNeg other than Full/1000 is "
+		       "not valid for fiber adapters, parameter ignored\n");
 	}
 }
 
