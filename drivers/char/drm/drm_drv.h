@@ -452,51 +452,49 @@ static int DRM(takedown)( drm_device_t *dev )
 	}
 
 	if( dev->maplist ) {
-		for(list = dev->maplist->head.next;
-		    list != &dev->maplist->head;
-		    list = list_next) {
-			list_next = list->next;
+		list_for_each_safe( list, list_next, &dev->maplist->head ) {
 			r_list = (drm_map_list_t *)list;
-			map = r_list->map;
-			DRM(free)(r_list, sizeof(*r_list), DRM_MEM_MAPS);
-			if(!map) continue;
 
-			switch ( map->type ) {
-			case _DRM_REGISTERS:
-			case _DRM_FRAME_BUFFER:
+			if ( ( map = r_list->map ) ) {
+				switch ( map->type ) {
+				case _DRM_REGISTERS:
+				case _DRM_FRAME_BUFFER:
 #if __REALLY_HAVE_MTRR
-				if ( map->mtrr >= 0 ) {
-					int retcode;
-					retcode = mtrr_del( map->mtrr,
-							    map->offset,
-							    map->size );
-					DRM_DEBUG( "mtrr_del=%d\n", retcode );
-				}
+					if ( map->mtrr >= 0 ) {
+						int retcode;
+						retcode = mtrr_del( map->mtrr,
+								    map->offset,
+								    map->size );
+						DRM_DEBUG( "mtrr_del=%d\n", retcode );
+					}
 #endif
-				DRM(ioremapfree)( map->handle, map->size, dev );
-				break;
-			case _DRM_SHM:
-				vfree(map->handle);
-				break;
+					DRM(ioremapfree)( map->handle, map->size, dev );
+					break;
+				case _DRM_SHM:
+					vfree(map->handle);
+					break;
 
-			case _DRM_AGP:
-				/* Do nothing here, because this is all
-				 * handled in the AGP/GART driver.
-				 */
-				break;
-                       case _DRM_SCATTER_GATHER:
-				/* Handle it, but do nothing, if HAVE_SG
-				 * isn't defined.
-				 */
+				case _DRM_AGP:
+					/* Do nothing here, because this is all
+					 * handled in the AGP/GART driver.
+					 */
+					break;
+				case _DRM_SCATTER_GATHER:
+					/* Handle it, but do nothing, if HAVE_SG
+					 * isn't defined.
+					 */
 #if __HAVE_SG
-				if(dev->sg) {
-					DRM(sg_cleanup)(dev->sg);
-					dev->sg = NULL;
-				}
+					if(dev->sg) {
+						DRM(sg_cleanup)(dev->sg);
+						dev->sg = NULL;
+					}
 #endif
-				break;
+					break;
+				}
+				DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
 			}
- 			DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
+			list_del( list );
+			DRM(free)(r_list, sizeof(*r_list), DRM_MEM_MAPS);
  		}
 		DRM(free)(dev->maplist, sizeof(*dev->maplist), DRM_MEM_MAPS);
 		dev->maplist = NULL;
