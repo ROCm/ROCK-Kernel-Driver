@@ -35,7 +35,7 @@ void line_timer_cb(void *arg)
 	line_interrupt(dev->driver->read_irq, dev, NULL);
 }
 
-void buffer_data(struct line *line, const char *buf, int len)
+static void buffer_data(struct line *line, const char *buf, int len)
 {
 	int end;
 
@@ -452,11 +452,19 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 
 void lines_init(struct line *lines, int nlines)
 {
+	struct line *line;
 	int i;
 
 	for(i = 0; i < nlines; i++){
-		INIT_LIST_HEAD(&lines[i].chan_list);
-		sema_init(&lines[i].sem, 1);
+		line = &lines[i];
+		INIT_LIST_HEAD(&line->chan_list);
+		sema_init(&line->sem, 1);
+		if(line->init_str != NULL){
+			line->init_str = uml_strdup(line->init_str);
+			if(line->init_str == NULL)
+				printk("lines_init - uml_strdup returned "
+				       "NULL\n");
+		}
 	}
 }
 
@@ -511,11 +519,11 @@ void register_winch_irq(int fd, int tty_fd, int pid, void *line)
 		printk("register_winch_irq - kmalloc failed\n");
 		goto out;
 	}
-	*winch = ((struct winch) { list : 	LIST_HEAD_INIT(winch->list),
-				   fd : 	fd,
-				   tty_fd :	tty_fd,
-				   pid : 	pid,
-				   line :	line });
+	*winch = ((struct winch) { .list  	= LIST_HEAD_INIT(winch->list),
+				   .fd  	= fd,
+				   .tty_fd 	= tty_fd,
+				   .pid  	= pid,
+				   .line 	= line });
 	list_add(&winch->list, &winch_handlers);
 	if(um_request_irq(WINCH_IRQ, fd, IRQ_READ, winch_interrupt, 
 			  SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 

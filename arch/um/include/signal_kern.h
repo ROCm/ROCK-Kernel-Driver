@@ -1,15 +1,11 @@
 /* 
- * Copyright (C) 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
 #ifndef __SIGNAL_KERN_H__
 #define __SIGNAL_KERN_H__
 
-#include "sysdep/ptrace.h"
-
-extern void signal_deliverer(int sig);
-extern int probe_stack(unsigned long sp, int delta);
 extern int have_signals(void *t);
 
 #endif

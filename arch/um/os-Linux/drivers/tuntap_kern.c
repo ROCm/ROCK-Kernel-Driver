@@ -28,11 +28,11 @@ static void tuntap_init(struct net_device *dev, void *data)
 	pri = dev->priv;
 	tpri = (struct tuntap_data *) pri->user;
 	*tpri = ((struct tuntap_data)
-		{ dev_name :		init->dev_name,
-		  fixed_config :	(init->dev_name != NULL),
-		  gate_addr :		init->gate_addr,
-		  fd :			-1,
-		  dev :			dev });
+		{ .dev_name 		= init->dev_name,
+		  .fixed_config 	= (init->dev_name != NULL),
+		  .gate_addr 		= init->gate_addr,
+		  .fd 			= -1,
+		  .dev 			= dev });
 	printk("TUN/TAP backend - ");
 	if(tpri->gate_addr != NULL) 
 		printk("IP = %s", tpri->gate_addr);
@@ -55,10 +55,10 @@ static int tuntap_write(int fd, struct sk_buff **skb,
 }
 
 struct net_kern_info tuntap_kern_info = {
-	init:			tuntap_init,
-	protocol:		eth_protocol,
-	read:			tuntap_read,
-	write: 			tuntap_write,
+	.init			= tuntap_init,
+	.protocol		= eth_protocol,
+	.read			= tuntap_read,
+	.write 			= tuntap_write,
 };
 
 int tuntap_setup(char *str, char **mac_out, void *data)
@@ -66,8 +66,8 @@ int tuntap_setup(char *str, char **mac_out, void *data)
 	struct tuntap_init *init = data;
 
 	*init = ((struct tuntap_init)
-		{ dev_name :	NULL,
-		  gate_addr :	NULL });
+		{ .dev_name 	= NULL,
+		  .gate_addr 	= NULL });
 	if(tap_setup_common(str, "tuntap", &init->dev_name, mac_out,
 			    &init->gate_addr))
 		return(0);
@@ -76,13 +76,13 @@ int tuntap_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport tuntap_transport = {
-	list :		LIST_HEAD_INIT(tuntap_transport.list),
-	name :		"tuntap",
-	setup : 	tuntap_setup,
-	user :		&tuntap_user_info,
-	kern :		&tuntap_kern_info,
-	private_size :	sizeof(struct tuntap_data),
-	setup_size :	sizeof(struct tuntap_init),
+	.list 		= LIST_HEAD_INIT(tuntap_transport.list),
+	.name 		= "tuntap",
+	.setup  	= tuntap_setup,
+	.user 		= &tuntap_user_info,
+	.kern 		= &tuntap_kern_info,
+	.private_size 	= sizeof(struct tuntap_data),
+	.setup_size 	= sizeof(struct tuntap_init),
 };
 
 static int register_tuntap(void)
