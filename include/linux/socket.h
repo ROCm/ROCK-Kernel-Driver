@@ -140,7 +140,6 @@ __KINLINE struct cmsghdr * cmsg_nxthdr (struct msghdr *__msg, struct cmsghdr *__
 
 #define	SCM_RIGHTS	0x01		/* rw: access rights (array of int) */
 #define SCM_CREDENTIALS 0x02		/* rw: struct ucred		*/
-#define SCM_CONNECT	0x03		/* rw: struct scm_connect	*/
 
 struct ucred {
 	__u32	pid;
