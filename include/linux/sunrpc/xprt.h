@@ -33,11 +33,11 @@
  * MAXREQS value: At 32 outstanding reqs with 8 megs of RAM, fragment
  * reassembly will frequently run out of memory.
  */
-#define RPC_MAXCONG		16
-#define RPC_MAXREQS		(RPC_MAXCONG + 1)
-#define RPC_CWNDSCALE		256
+#define RPC_MAXCONG		(16)
+#define RPC_MAXREQS		RPC_MAXCONG
+#define RPC_CWNDSCALE		(256)
 #define RPC_MAXCWND		(RPC_MAXCONG * RPC_CWNDSCALE)
-#define RPC_INITCWND		RPC_CWNDSCALE
+#define RPC_INITCWND		(RPC_MAXCWND >> 1)
 #define RPCXPRT_CONGESTED(xprt) ((xprt)->cong >= (xprt)->cwnd)
 
 /* Default timeout values */
@@ -121,7 +121,6 @@ struct rpc_xprt {
 
 	unsigned long		cong;		/* current congestion */
 	unsigned long		cwnd;		/* congestion window */
-	unsigned long		congtime;	/* hold cwnd until then */
 
 	struct rpc_wait_queue	sending;	/* requests waiting to send */
 	struct rpc_wait_queue	pending;	/* requests in flight */

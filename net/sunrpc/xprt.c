@@ -304,30 +304,20 @@ xprt_adjust_cwnd(struct rpc_xprt *xprt, int result)
 	 */
 	spin_lock(&xprt->xprt_lock);
 	cwnd = xprt->cwnd;
-	if (result >= 0) {
-		if (xprt->cong < cwnd || time_before(jiffies, xprt->congtime))
-			goto out;
+	if (result >= 0 && xprt->cong <= cwnd) {
 		/* The (cwnd >> 1) term makes sure
 		 * the result gets rounded properly. */
 		cwnd += (RPC_CWNDSCALE * RPC_CWNDSCALE + (cwnd >> 1)) / cwnd;
 		if (cwnd > RPC_MAXCWND)
 			cwnd = RPC_MAXCWND;
-		else
-			pprintk("RPC: %lu %ld cwnd\n", jiffies, cwnd);
-		xprt->congtime = jiffies + ((cwnd * HZ) << 2) / RPC_CWNDSCALE;
-		dprintk("RPC:      cong %08lx, cwnd was %08lx, now %08lx, "
-			"time %ld ms\n", xprt->cong, xprt->cwnd, cwnd,
-			(xprt->congtime-jiffies)*1000/HZ);
+		__xprt_lock_write_next(xprt);
 	} else if (result == -ETIMEDOUT) {
-		if ((cwnd >>= 1) < RPC_CWNDSCALE)
+		cwnd >>= 1;
+		if (cwnd < RPC_CWNDSCALE)
 			cwnd = RPC_CWNDSCALE;
-		xprt->congtime = jiffies + ((cwnd * HZ) << 3) / RPC_CWNDSCALE;
-		dprintk("RPC:      cong %ld, cwnd was %ld, now %ld, "
-			"time %ld ms\n", xprt->cong, xprt->cwnd, cwnd,
-			(xprt->congtime-jiffies)*1000/HZ);
-		pprintk("RPC: %lu %ld cwnd\n", jiffies, cwnd);
 	}
-
+	dprintk("RPC:      cong %ld, cwnd was %ld, now %ld\n",
+			xprt->cong, xprt->cwnd, cwnd);
 	xprt->cwnd = cwnd;
  out:
 	spin_unlock(&xprt->xprt_lock);
@@ -1344,7 +1334,6 @@ xprt_setup(struct socket *sock, int proto,
 		xprt->nocong = 1;
 	} else
 		xprt->cwnd = RPC_INITCWND;
-	xprt->congtime = jiffies;
 	spin_lock_init(&xprt->sock_lock);
 	spin_lock_init(&xprt->xprt_lock);
 	init_waitqueue_head(&xprt->cong_wait);
