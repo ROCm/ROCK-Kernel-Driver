@@ -1528,7 +1528,7 @@ static int __init ace_init(struct net_device *dev)
 	ace_set_rxtx_parms(dev, 0);
 
 	if (board_idx == BOARD_IDX_OVERFLOW) {
-		printk(KERN_WARNING "%s: more then %i NICs detected, "
+		printk(KERN_WARNING "%s: more than %i NICs detected, "
 		       "ignoring module parameters!\n",
 		       dev->name, ACE_MAX_MOD_PARMS);
 	} else if (board_idx >= 0) {

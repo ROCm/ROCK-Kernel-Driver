@@ -171,7 +171,7 @@
 
 /* WARNING :
  * EVENT_PCM* must be last in the above list
- * if more then two ports are used, EVENT_PCM .. EVENT_PCMA+NUM_PHYS-1
+ * if more than two ports are used, EVENT_PCM .. EVENT_PCMA+NUM_PHYS-1
  * are used !
  */
 

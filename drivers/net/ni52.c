@@ -40,7 +40,7 @@
  *   The internal sysbus seems to be slow. So we often lose packets because of
  *   overruns while receiving from a fast remote host.
  *   This can slow down TCP connections. Maybe the newer ni5210 cards are better.
- *   my experience is, that if a machine sends with more then about 500-600K/s
+ *   my experience is, that if a machine sends with more than about 500-600K/s
  *   the fifo/sysbus overflows.
  *
  * IMPORTANT NOTE:
