@@ -12,7 +12,7 @@ config CAPI_EICON
 
 config ISDN_DIVAS
 	tristate "Support Eicon DIVA Server cards"
-	depends on CAPI_EICON && PROC_FS && PCI && m
+	depends on CAPI_EICON && PROC_FS && PCI
 	help
 	  Say Y here if you have an Eicon Networks DIVA Server PCI ISDN card.
 	  In order to use this card, additional firmware is necessary, which
@@ -23,12 +23,6 @@ config ISDN_DIVAS_BRIPCI
 	depends on ISDN_DIVAS
 	help
 	  Enable support for DIVA Server BRI-PCI.
-
-config ISDN_DIVAS_4BRIPCI
-	bool "DIVA Server 4BRI/PCI support"
-	depends on ISDN_DIVAS
-	help
-	  Enable support for DIVA Server 4BRI-PCI.
 
 config ISDN_DIVAS_PRIPCI
 	bool "DIVA Server PRI/PCI support"
@@ -43,17 +37,17 @@ config ISDN_DIVAS_DIVACAPI
 	  You need this to provide the CAPI interface
 	  for DIVA Server cards.
 
-config ISDN_DIVAS_MAINT
-	tristate "DIVA Maint driver support"
-	depends on ISDN_DIVAS
-	help
-	  Enable Divas Maintainance driver.
-
 config ISDN_DIVAS_USERIDI
 	tristate "DIVA User-IDI interface support"
 	depends on ISDN_DIVAS
 	help
 	  Enable support for user-mode IDI interface.
+
+config ISDN_DIVAS_MAINT
+	tristate "DIVA Maint driver support"
+	depends on ISDN_DIVAS && m
+	help
+	  Enable Divas Maintainance driver.
 
 endmenu
 
