@@ -6,8 +6,6 @@
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by AMD.
  *
- *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
- *
  * Errata 5: Processor may fail to execute a FID/VID change in presence of interrupt.
  * - We cli/sti on stepping A0 CPUs around the FID/VID transition.
  * Errata 15: Processors with half frequency multipliers may hang upon wakeup from disconnect.
@@ -35,14 +33,6 @@
 #endif
 
 #include "powernow-k7.h"
-
-#define DEBUG
-
-#ifdef DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
 
 #define PFX "powernow: "
 
@@ -97,6 +87,7 @@ static int fid_codes[32] = {
  */
 
 static int acpi_force;
+static int debug;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -108,6 +99,21 @@ static unsigned int number_scales;
 static unsigned int fsb;
 static unsigned int latency;
 static char have_a0;
+
+static void dprintk(const char *fmt, ...)
+{
+	char s[256];
+	va_list args;
+
+	if (debug==0)
+		return;
+
+	va_start(args,fmt);
+	vsprintf(s, fmt, args);
+	printk(s);
+	va_end(args);
+}
+
 
 static int check_fsb(unsigned int fsbspeed)
 {
@@ -196,7 +202,7 @@ static int get_ranges (unsigned char *pst)
 #endif
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])\t", fid,
+		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
 			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
 
 		if (speed < minimum_speed)
@@ -285,7 +291,7 @@ static void change_speed (unsigned int index)
 		change_VID(vid);
 		change_FID(fid);
 	}
-	
+
 
 	if (have_a0 == 1)
 		local_irq_enable();
@@ -377,7 +383,7 @@ static int powernow_acpi_init(void)
 				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
 		}
 
-		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])\t", fid,
+		dprintk (KERN_INFO PFX "   FID: 0x%x (%d.%dx [%dMHz])  ", fid,
 			fid_codes[fid] / 10, fid_codes[fid] % 10, speed/1000);
 		dprintk ("VID: 0x%x (%d.%03dV)\n", vid,	mobile_vid_table[vid]/1000,
 			mobile_vid_table[vid]%1000);
@@ -467,9 +473,9 @@ static int powernow_decode_bios (int maxfid, int startvid)
 				    (maxfid==pst->maxfid) && (startvid==pst->startvid))
 				{
 					dprintk (KERN_INFO PFX "PST:%d (@%p)\n", i, pst);
-					dprintk (KERN_INFO PFX " cpuid: 0x%x\t", pst->cpuid);
-					dprintk ("fsb: %d\t", pst->fsbspeed);
-					dprintk ("maxFID: 0x%x\t", pst->maxfid);
+					dprintk (KERN_INFO PFX " cpuid: 0x%x  ", pst->cpuid);
+					dprintk ("fsb: %d  ", pst->fsbspeed);
+					dprintk ("maxFID: 0x%x  ", pst->maxfid);
 					dprintk ("startvid: 0x%x\n", pst->startvid);
 
 					ret = get_ranges ((char *) pst + sizeof (struct pst_s));
@@ -591,7 +597,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
 
 	/* A K7 with powernow technology is set to max frequency by BIOS */
-	fsb = (10 * cpu_khz) / fid_codes[fidvidstatus.bits.CFID];
+	fsb = (10 * cpu_khz) / fid_codes[fidvidstatus.bits.MFID];
 	if (!fsb) {
 		printk(KERN_WARNING PFX "can not determine bus frequency\n");
 		return -EINVAL;
@@ -648,14 +654,14 @@ static struct freq_attr* powernow_table_attr[] = {
 };
 
 static struct cpufreq_driver powernow_driver = {
-	.verify 	= powernow_verify,
-	.target 	= powernow_target,
-	.get		= powernow_get,	
-	.init		= powernow_cpu_init,
-	.exit		= powernow_cpu_exit,
-	.name		= "powernow-k7",
-	.owner		= THIS_MODULE,
-	.attr		= powernow_table_attr,
+	.verify	= powernow_verify,
+	.target	= powernow_target,
+	.get	= powernow_get,
+	.init	= powernow_cpu_init,
+	.exit	= powernow_cpu_exit,
+	.name	= "powernow-k7",
+	.owner	= THIS_MODULE,
+	.attr	= powernow_table_attr,
 };
 
 static int __init powernow_init (void)
@@ -679,8 +685,10 @@ static void __exit powernow_exit (void)
 		kfree(powernow_table);
 }
 
+module_param(debug, int, 0444);
+MODULE_PARM_DESC(debug, "enable debug output.");
 module_param(acpi_force,  int, 0444);
-MODULE_PARM_DESC(acpi_force, "Force ACPI to be used");
+MODULE_PARM_DESC(acpi_force, "Force ACPI to be used.");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");

@@ -82,6 +82,13 @@ userspace_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 {
         struct cpufreq_freqs *freq = data;
 
+	/* Don't update cur_freq if CPU is managed and we're
+	 * waking up: else we won't remember what frequency 
+	 * we need to set the CPU to.
+	 */
+	if (cpu_is_managed[freq->cpu] && (val == CPUFREQ_RESUMECHANGE))
+		return 0;
+
 	cpu_cur_freq[freq->cpu] = freq->new;
 
         return 0;
@@ -521,6 +528,9 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 			      CPUFREQ_RELATION_H);
 		else if (policy->min > cpu_cur_freq[cpu])
 			__cpufreq_driver_target(&current_policy[cpu], policy->min, 
+			      CPUFREQ_RELATION_L);
+		else
+			__cpufreq_driver_target(&current_policy[cpu], cpu_cur_freq[cpu],
 			      CPUFREQ_RELATION_L);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
