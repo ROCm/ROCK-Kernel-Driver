@@ -14,6 +14,7 @@
  *
  */
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 
@@ -32,17 +33,16 @@
  * Standard IO mapping for all IOP310 based systems
  */
 static struct map_desc iop80310_std_desc[] __initdata = {
- /* virtual     physical      length      domain     r  w  c  b */
+ /* virtual     physical      length       type */
  // IOP310 Memory Mapped Registers
- { 0xe8001000,  0x00001000,   0x00001000,  DOMAIN_IO, 0, 1, 0, 0 },
+ { 0xe8001000,  0x00001000,   0x00001000,  MT_DEVICE },
  // PCI I/O Space
- { 0xfe000000,  0x90000000,   0x00020000,  DOMAIN_IO, 0, 1, 0, 0 },
- LAST_DESC
+ { 0xfe000000,  0x90000000,   0x00020000,  MT_DEVICE }
 };
 
 void __init iop310_map_io(void)
 {
-	iotable_init(iop80310_std_desc);
+	iotable_init(iop80310_std_desc, ARRAY_SIZE(iop80310_std_desc));
 }
 
 /*
@@ -50,10 +50,9 @@ void __init iop310_map_io(void)
  */
 #ifdef CONFIG_ARCH_IQ80310
 static struct map_desc iq80310_io_desc[] __initdata = {
- /* virtual     physical      length        domain     r  w  c  b */
+ /* virtual     physical      length        type */
  // IQ80310 On-Board Devices
- { 0xfe800000,  0xfe800000,   0x00100000,   DOMAIN_IO, 0, 1, 0, 0 },
- LAST_DESC
+ { 0xfe800000,  0xfe800000,   0x00100000,   MT_DEVICE }
 };
 
 void __init iq80310_map_io(void)
@@ -65,7 +64,7 @@ void __init iq80310_map_io(void)
 
 	iop310_map_io();
 
-	iotable_init(iq80310_io_desc);
+	iotable_init(iq80310_io_desc, ARRAY_SIZE(iq80310_io_desc));
 }
 #endif // CONFIG_ARCH_IQ80310
 

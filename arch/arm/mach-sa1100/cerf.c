@@ -36,20 +36,19 @@ static void __init cerf_init_irq(void)
 }
 
 static struct map_desc cerf_io_desc[] __initdata = {
-  /* virtual	 physical    length	 domain     r  w  c  b */
-  { 0xf0000000, 0x08000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Crystal Ethernet Chip */
+  /* virtual	 physical    length	 type */
+  { 0xf0000000, 0x08000000, 0x00100000, MT_DEVICE }  /* Crystal Ethernet Chip */
 #ifdef CONFIG_SA1100_CERF_CPLD
-  { 0xf1000000, 0x40000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD Chip */
-  { 0xf2000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* CerfPDA Bluetooth */
-  { 0xf3000000, 0x18000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* CerfPDA Serial */
+ ,{ 0xf1000000, 0x40000000, 0x00100000, MT_DEVICE }, /* CPLD Chip */
+  { 0xf2000000, 0x10000000, 0x00100000, MT_DEVICE }, /* CerfPDA Bluetooth */
+  { 0xf3000000, 0x18000000, 0x00100000, MT_DEVICE }  /* CerfPDA Serial */
 #endif
-  LAST_DESC
 };
 
 static void __init cerf_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(cerf_io_desc);
+	iotable_init(cerf_io_desc, ARRAY_SIZE(cerf_io_desc));
 
 	sa1100_register_uart(0, 3);
 #ifdef CONFIG_SA1100_CERF_IRDA_ENABLED

@@ -16,15 +16,14 @@
 #include "generic.h"
 
 static struct map_desc empeg_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { EMPEG_FLASHBASE, 0x00000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { EMPEG_FLASHBASE, 0x00000000, 0x00200000, MT_DEVICE } /* Flash */
 };
 
 static void __init empeg_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(empeg_io_desc);
+	iotable_init(empeg_io_desc, ARRAY_SIZE(empeg_io_desc));
 
 	sa1100_register_uart(0, 1);
 	sa1100_register_uart(1, 3);

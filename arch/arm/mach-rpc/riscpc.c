@@ -9,6 +9,7 @@
  *
  *  Architecture specific fixups.
  */
+#include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/delay.h>
 #include <linux/pm.h>
@@ -61,15 +62,14 @@ __tagtable(ATAG_ACORN, parse_tag_acorn);
 #endif
 
 static struct map_desc rpc_io_desc[] __initdata = {
- { SCREEN_BASE,	SCREEN_START,	2*1048576, DOMAIN_IO, 0, 1, 0, 0 }, /* VRAM		*/
- { IO_BASE,	IO_START,	IO_SIZE	 , DOMAIN_IO, 0, 1, 0, 0 }, /* IO space		*/
- { EASI_BASE,	EASI_START,	EASI_SIZE, DOMAIN_IO, 0, 1, 0, 0 }, /* EASI space	*/
- LAST_DESC
+ { SCREEN_BASE,	SCREEN_START,	2*1048576, MT_DEVICE }, /* VRAM		*/
+ { IO_BASE,	IO_START,	IO_SIZE	 , MT_DEVICE }, /* IO space		*/
+ { EASI_BASE,	EASI_START,	EASI_SIZE, MT_DEVICE }  /* EASI space	*/
 };
 
 void __init rpc_map_io(void)
 {
-	iotable_init(rpc_io_desc);
+	iotable_init(rpc_io_desc, ARRAY_SIZE(rpc_io_desc));
 
 	/*
 	 * RiscPC can't handle half-word loads and stores

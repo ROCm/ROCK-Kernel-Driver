@@ -9,6 +9,7 @@
  *
  *  Extra MM routines for the EBSA-110 architecture
  */
+#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 
@@ -71,22 +72,21 @@ static struct map_desc ebsa110_io_desc[] __initdata = {
 	/*
 	 * sparse external-decode ISAIO space
 	 */
-	{ IRQ_STAT,    TRICK4_PHYS, PGDIR_SIZE,  DOMAIN_IO, 0, 1, 0, 0 }, /* IRQ_STAT/IRQ_MCLR */
-	{ IRQ_MASK,    TRICK3_PHYS, PGDIR_SIZE,  DOMAIN_IO, 0, 1, 0, 0 }, /* IRQ_MASK/IRQ_MSET */
-	{ SOFT_BASE,   TRICK1_PHYS, PGDIR_SIZE,  DOMAIN_IO, 0, 1, 0, 0 }, /* SOFT_BASE */
-	{ PIT_BASE,    TRICK0_PHYS, PGDIR_SIZE,  DOMAIN_IO, 0, 1, 0, 0 }, /* PIT_BASE */
+	{ IRQ_STAT,    TRICK4_PHYS, PGDIR_SIZE,  MT_DEVICE }, /* IRQ_STAT/IRQ_MCLR */
+	{ IRQ_MASK,    TRICK3_PHYS, PGDIR_SIZE,  MT_DEVICE }, /* IRQ_MASK/IRQ_MSET */
+	{ SOFT_BASE,   TRICK1_PHYS, PGDIR_SIZE,  MT_DEVICE }, /* SOFT_BASE */
+	{ PIT_BASE,    TRICK0_PHYS, PGDIR_SIZE,  MT_DEVICE }, /* PIT_BASE */
 
 	/*
 	 * self-decode ISAIO space
 	 */
-	{ ISAIO_BASE,  ISAIO_PHYS,  ISAIO_SIZE,  DOMAIN_IO, 0, 1, 0, 0 },
-	{ ISAMEM_BASE, ISAMEM_PHYS, ISAMEM_SIZE, DOMAIN_IO, 0, 1, 0, 0 },
-	LAST_DESC
+	{ ISAIO_BASE,  ISAIO_PHYS,  ISAIO_SIZE,  MT_DEVICE },
+	{ ISAMEM_BASE, ISAMEM_PHYS, ISAMEM_SIZE, MT_DEVICE }
 };
 
 static void __init ebsa110_map_io(void)
 {
-	iotable_init(ebsa110_io_desc);
+	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
 }
 
 MACHINE_START(EBSA110, "EBSA110")

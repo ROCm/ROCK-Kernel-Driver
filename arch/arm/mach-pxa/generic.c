@@ -88,16 +88,15 @@ EXPORT_SYMBOL(pxa_gpio_mode);
  * cache flush area.
  */
 static struct map_desc standard_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf6000000, 0x20000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* PCMCIA0 IO */
-  { 0xf7000000, 0x30000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* PCMCIA1 IO */
-  { 0xfc000000, 0x40000000, 0x01400000, DOMAIN_IO, 0, 1, 0, 0 }, /* Devs */
-  { 0xfe000000, 0x44000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* LCD */
-  { 0xff000000, 0x48000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* Mem Ctl */
-  LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf6000000, 0x20000000, 0x01000000, MT_DEVICE }, /* PCMCIA0 IO */
+  { 0xf7000000, 0x30000000, 0x01000000, MT_DEVICE }, /* PCMCIA1 IO */
+  { 0xfc000000, 0x40000000, 0x01400000, MT_DEVICE }, /* Devs */
+  { 0xfe000000, 0x44000000, 0x00200000, MT_DEVICE }, /* LCD */
+  { 0xff000000, 0x48000000, 0x00200000, MT_DEVICE }  /* Mem Ctl */
 };
 
 void __init pxa_map_io(void)
 {
-	iotable_init(standard_io_desc);
+	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
 }

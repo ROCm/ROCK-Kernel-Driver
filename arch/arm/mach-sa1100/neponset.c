@@ -2,7 +2,7 @@
  * linux/arch/arm/mach-sa1100/neponset.c
  *
  */
-
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -18,7 +18,9 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/assabet.h>
+#include <asm/arch/neponset.h>
 #include <asm/hardware/sa1111.h>
+#include <asm/sizes.h>
 
 #include "sa1111.h"
 
@@ -216,13 +218,12 @@ static int __init neponset_init(void)
 __initcall(neponset_init);
 
 static struct map_desc neponset_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf3000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* System Registers */
-  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
-  LAST_DESC
+ /* virtual     physical    length type */
+  { 0xf3000000, 0x10000000, SZ_1M, MT_DEVICE }, /* System Registers */
+  { 0xf4000000, 0x40000000, SZ_1M, MT_DEVICE }  /* SA-1111 */
 };
 
 void __init neponset_map_io(void)
 {
-	iotable_init(neponset_io_desc);
+	iotable_init(neponset_io_desc, ARRAY_SIZE(neponset_io_desc));
 }

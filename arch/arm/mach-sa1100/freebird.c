@@ -43,8 +43,6 @@ static int __init freebird_init(void)
 	if (machine_is_freebird()) {
 		sa1100fb_backlight_power = freebird_backlight_power;
 		sa1100fb_lcd_power = freebird_lcd_power;
-
-		set_GPIO_IRQ_edge(GPIO_FREEBIRD_UCB1300, GPIO_RISING_EDGE);
 	}
 	return 0;
 }
@@ -52,16 +50,15 @@ static int __init freebird_init(void)
 __initcall(freebird_init);
 
 static struct map_desc freebird_io_desc[] __initdata = {
- /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x12000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Board Control Register */
-  { 0xf2000000, 0x19000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0},
-   LAST_DESC
+ /* virtual     physical    length      type */
+  { 0xf0000000, 0x12000000, 0x00100000, MT_DEVICE }, /* Board Control Register */
+  { 0xf2000000, 0x19000000, 0x00100000, MT_DEVICE }
 };
 
 static void __init freebird_map_io(void)
 {
 	sa1100_map_io();
-	iotable_init(freebird_io_desc);
+	iotable_init(freebird_io_desc, ARRAY_SIZE(freebird_io_desc));
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);

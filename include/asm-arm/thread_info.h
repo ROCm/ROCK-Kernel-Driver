@@ -86,8 +86,10 @@ extern void free_thread_info(struct thread_info *);
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
 
-#define thread_saved_pc(tsk)	(pc_pointer((tsk)->thread_info->cpu_context.pc))
-#define thread_saved_fp(tsk)	((tsk)->thread_info->cpu_context.fp)
+#define thread_saved_pc(tsk)	\
+	((unsigned long)(pc_pointer((tsk)->thread_info->cpu_context.pc)))
+#define thread_saved_fp(tsk)	\
+	((unsigned long)((tsk)->thread_info->cpu_context.fp))
 
 #else /* !__ASSEMBLY__ */
 
