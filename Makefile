@@ -214,7 +214,7 @@ SUBDIRS		:=
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
-include-config := 1
+export include-config := 1
 
 -include .config
 

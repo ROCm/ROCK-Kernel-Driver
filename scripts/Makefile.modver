@@ -4,6 +4,8 @@
 
 src := $(obj)
 
+MODVERDIR := include/linux/modules
+
 .PHONY: modver
 modver:
 
@@ -27,8 +29,6 @@ else
 
 # This sets version suffixes on exported symbols
 # ---------------------------------------------------------------------------
-
-MODVERDIR := include/linux/modules
 
 #
 # Added the SMP separator to stop module accidents between uniprocessor
