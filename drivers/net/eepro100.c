@@ -113,6 +113,7 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
