@@ -263,6 +263,7 @@
 #include <linux/cdrom.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/blkpg.h>
 #include <linux/init.h>
 
 #include <asm/fcntl.h>
@@ -1724,6 +1725,11 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	   because they fill up the sys log when CD players poll
 	   the drive. */
 	switch (cmd) {
+	case BLKROSET:
+	case BLKROGET:
+	case BLKFLSBUF:
+	case BLKSSZGET:
+		return blk_ioctl(ip->i_rdev, cmd, arg);
 	case CDROMSUBCHNL: {
 		struct cdrom_subchnl q;
 		u_char requested, back;
