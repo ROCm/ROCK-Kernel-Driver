@@ -215,15 +215,6 @@ EXPORT_SYMBOL(unregister_tcf_proto_ops);
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
 
-#ifdef CONFIG_NET_RADIO
-#include <net/iw_handler.h>		/* Wireless Extensions driver API */
-EXPORT_SYMBOL(wireless_send_event);
-EXPORT_SYMBOL(iw_handler_set_spy);
-EXPORT_SYMBOL(iw_handler_get_spy);
-EXPORT_SYMBOL(iw_handler_set_thrspy);
-EXPORT_SYMBOL(iw_handler_get_thrspy);
-EXPORT_SYMBOL(wireless_spy_update);
-#endif	/* CONFIG_NET_RADIO */
 
 EXPORT_SYMBOL(linkwatch_fire_event);
 
