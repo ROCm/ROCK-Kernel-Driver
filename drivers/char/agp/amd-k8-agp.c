@@ -340,6 +340,8 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	if (cap_ptr == 0)
 		return -ENODEV;
 
+	printk (KERN_INFO PFX "Detected AMD64 on-CPU GART\n");
+
 	agp_bridge->dev = dev;
 	agp_bridge->capndx = cap_ptr;
 
