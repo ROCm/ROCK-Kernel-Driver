@@ -31,8 +31,6 @@ core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
-core-$(CONFIG_PT_PROXY)	+= $(ARCH_DIR)/ptproxy/
-
 ARCH_INCLUDE = $(TOPDIR)/$(ARCH_DIR)/include
 
 # -Derrno=kernel_errno - This turns all kernel references to errno into

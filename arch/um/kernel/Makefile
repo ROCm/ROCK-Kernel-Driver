@@ -18,14 +18,14 @@ obj-$(CONFIG_GPROF)	+= gprof_syms.o
 obj-$(CONFIG_GCOV)	+= gmon_syms.o
 obj-$(CONFIG_TTY_LOG)	+= tty_log.o
 
-subdir-$(CONFIG_PTPROXY) += tt
+obj-$(CONFIG_PT_PROXY) += tt/
 
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
 # user_syms.o not included here because Rules.make has its own ideas about
 # building anything in export-objs
 
-USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o 
+USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
 	process.o tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
 USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/kernel/$(file))
 

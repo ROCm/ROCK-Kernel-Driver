@@ -3,7 +3,7 @@
 # Licensed under the GPL
 #
 
-subdir-$(CONFIG_PT_PROXY) += ptproxy
+obj-$(CONFIG_PT_PROXY) += ptproxy/
 
 include $(TOPDIR)/Rules.make
 
