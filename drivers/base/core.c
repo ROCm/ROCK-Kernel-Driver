@@ -149,36 +149,16 @@ void driver_detach(struct device_driver * drv)
 	spin_unlock(&device_lock);
 }
 
-/**
- * device_register - register a device
- * @dev:	pointer to the device structure
- *
- * First, make sure that the device has a parent, create
- * a directory for it, then add it to the parent's list of
- * children.
- *
- * Maintains a global list of all devices, in depth-first ordering.
- * The head for that list is device_root.g_list.
- */
-int device_register(struct device *dev)
+int device_add(struct device *dev)
 {
 	int error;
 
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
-	INIT_LIST_HEAD(&dev->node);
-	INIT_LIST_HEAD(&dev->children);
-	INIT_LIST_HEAD(&dev->g_list);
-	INIT_LIST_HEAD(&dev->driver_list);
-	INIT_LIST_HEAD(&dev->bus_list);
-	INIT_LIST_HEAD(&dev->intf_list);
-	spin_lock_init(&dev->lock);
-	atomic_set(&dev->refcount,2);
-	dev->present = 1;
 	spin_lock(&device_lock);
+	dev->present = 1;
 	if (dev->parent) {
-		get_device_locked(dev->parent);
 		list_add_tail(&dev->g_list,&dev->parent->g_list);
 		list_add_tail(&dev->node,&dev->parent->children);
 	} else
@@ -209,10 +189,48 @@ int device_register(struct device *dev)
 		list_del_init(&dev->g_list);
 		list_del_init(&dev->node);
 		spin_unlock(&device_lock);
-		if (dev->parent)
-			put_device(dev->parent);
 	}
-	put_device(dev);
+	return error;
+}
+
+void device_initialize(struct device *dev)
+{
+	INIT_LIST_HEAD(&dev->node);
+	INIT_LIST_HEAD(&dev->children);
+	INIT_LIST_HEAD(&dev->g_list);
+	INIT_LIST_HEAD(&dev->driver_list);
+	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->intf_list);
+	spin_lock_init(&dev->lock);
+	atomic_set(&dev->refcount,1);
+	if (dev->parent)
+		get_device(dev->parent);
+}
+
+/**
+ * device_register - register a device
+ * @dev:	pointer to the device structure
+ *
+ * First, make sure that the device has a parent, create
+ * a directory for it, then add it to the parent's list of
+ * children.
+ *
+ * Maintains a global list of all devices, in depth-first ordering.
+ * The head for that list is device_root.g_list.
+ */
+int device_register(struct device *dev)
+{
+	int error;
+
+	if (!dev || !strlen(dev->bus_id))
+		return -EINVAL;
+
+	device_initialize(dev);
+	if (dev->parent)
+		get_device(dev->parent);
+	error = device_add(dev);
+	if (error && dev->parent)
+		put_device(dev->parent);
 	return error;
 }
 
@@ -257,16 +275,7 @@ void put_device(struct device * dev)
 		put_device(parent);
 }
 
-/**
- * device_unregister - unlink device
- * @dev:	device going away
- *
- * The device has been removed from the system, so we disavow knowledge
- * of it. It might not be the final reference to the device, so we mark
- * it as !present, so no more references to it can be acquired.
- * In the end, we decrement the final reference count for it.
- */
-void device_unregister(struct device * dev)
+void device_del(struct device * dev)
 {
 	spin_lock(&device_lock);
 	dev->present = 0;
@@ -293,7 +302,20 @@ void device_unregister(struct device * dev)
 
 	/* remove the driverfs directory */
 	device_remove_dir(dev);
+}
 
+/**
+ * device_unregister - unlink device
+ * @dev:	device going away
+ *
+ * The device has been removed from the system, so we disavow knowledge
+ * of it. It might not be the final reference to the device, so we mark
+ * it as !present, so no more references to it can be acquired.
+ * In the end, we decrement the final reference count for it.
+ */
+void device_unregister(struct device * dev)
+{
+	device_del(dev);
 	put_device(dev);
 }
 
