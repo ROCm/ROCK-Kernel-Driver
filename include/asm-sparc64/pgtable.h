@@ -195,9 +195,18 @@ extern unsigned long pfn_base;
 extern struct page *mem_map_zero;
 #define ZERO_PAGE(vaddr)	(mem_map_zero)
 
+/* PFNs are real physical page numbers.  However, mem_map only begins to record
+ * per-page information starting at pfn_base.  This is to handle systems where
+ * the first physical page in the machine is at some huge physical address, such
+ * as 4GB.   This is common on a partitioned E10000, for example.
+ */
+
 #define pfn_pte(pfn, prot)	\
-	__pte((((pfn)+(pfn_base)) << PAGE_SHIFT) | pgprot_val(prot) | _PAGE_SZBITS)
+	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot) | _PAGE_SZBITS)
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
+
+#define pte_pfn(x)		((pte_val(x) & _PAGE_PADDR)>>PAGE_SHIFT)
+#define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
@@ -245,9 +254,6 @@ extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 
 /* Permanent address of a page. */
 #define __page_address(page)	page_address(page)
-
-#define pte_pfn(x)		(pte_val(x) & _PAGE_PADDR)
-#define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 /* Be very careful when you change these three, they are delicate. */
 #define pte_mkyoung(pte)	(__pte(pte_val(pte) | _PAGE_ACCESSED | _PAGE_R))
