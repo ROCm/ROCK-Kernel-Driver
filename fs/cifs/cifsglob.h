@@ -327,6 +327,7 @@ struct oplock_q_entry {
 #define   MID_REQUEST_SUBMITTED 2
 #define   MID_RESPONSE_RECEIVED 4
 #define   MID_RETRY_NEEDED      8 /* session closed while this request out */
+#define   MID_NO_RESP_NEEDED 0x10
 
 /*
  *****************************************************************

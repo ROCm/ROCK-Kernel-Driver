@@ -1755,7 +1755,7 @@ CIFSSMBQPathInfo(const int xid, struct cifsTconInfo *tcon,
 	int name_len;
 	__u16 params, byte_count;
 
-	cFYI(1, ("In QPathInfo path %s", searchName));
+/* cFYI(1, ("In QPathInfo path %s", searchName)); */ /* BB fixme BB */
 QPathInfoRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
@@ -2218,8 +2218,9 @@ findFirst2Retry:
 				psrch_inf->endOfSearch = FALSE;
 
 			psrch_inf->entries_in_buffer  = le16_to_cpu(parms->SearchCount);
-			psrch_inf->index_of_last_entry += 
+			psrch_inf->index_of_last_entry = 
 				psrch_inf->entries_in_buffer;
+/*cFYI(1,("entries in buf %d index_of_last %d",psrch_inf->entries_in_buffer,psrch_inf->index_of_last_entry));  */
 			*pnetfid = parms->SearchHandle;
 		} else {
 			if(pSMB)
@@ -2325,6 +2326,8 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 			psrch_inf->entries_in_buffer  = le16_to_cpu(parms->SearchCount);
 			psrch_inf->index_of_last_entry +=
 				psrch_inf->entries_in_buffer;
+/*  cFYI(1,("fnxt2 entries in buf %d index_of_last %d",psrch_inf->entries_in_buffer,psrch_inf->index_of_last_entry)); */
+
 			/* BB fixme add unlock here */
 		}
 
