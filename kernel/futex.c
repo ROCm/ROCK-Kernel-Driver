@@ -45,7 +45,7 @@
    the relevent ones (hashed queues may be shared) */
 struct futex_q {
 	struct list_head list;
-	struct task_struct *task;
+	wait_queue_head_t waiters;
 	/* Page struct and offset within it. */
 	struct page *page;
 	unsigned int offset;
@@ -65,6 +65,11 @@ static inline struct list_head *hash_futex(struct page *page,
 	return &futex_queues[hash_long(h, FUTEX_HASHBITS)];
 }
 
+static inline void tell_waiter(struct futex_q *q)
+{
+	wake_up_all(&q->waiters);
+}
+
 static int futex_wake(struct list_head *head,
 		      struct page *page,
 		      unsigned int offset,
@@ -79,7 +84,7 @@ static int futex_wake(struct list_head *head,
 
 		if (this->page == page && this->offset == offset) {
 			list_del_init(i);
-			wake_up_process(this->task);
+			tell_waiter(this);
 			num_woken++;
 			if (num_woken >= num) break;
 		}
@@ -90,11 +95,12 @@ static int futex_wake(struct list_head *head,
 
 /* Add at end to avoid starvation */
 static inline void queue_me(struct list_head *head,
+			    wait_queue_t *wait,
 			    struct futex_q *q,
 			    struct page *page,
 			    unsigned int offset)
 {
-	q->task = current;
+	add_wait_queue(&q->waiters, wait);
 	q->page = page;
 	q->offset = offset;
 
@@ -146,10 +152,11 @@ static int futex_wait(struct list_head *head,
 {
 	int curval;
 	struct futex_q q;
+	DECLARE_WAITQUEUE(wait, current);
 	int ret = 0;
 
 	set_current_state(TASK_INTERRUPTIBLE);
-	queue_me(head, &q, page, offset);
+	queue_me(head, &wait, &q, page, offset);
 
 	/* Page is pinned, but may no longer be in this address space. */
 	if (get_user(curval, uaddr) != 0) {
