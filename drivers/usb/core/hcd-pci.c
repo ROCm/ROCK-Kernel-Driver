@@ -81,7 +81,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	
         if (!dev->irq) {
         	err ("Found HC with no IRQ.  Check BIOS/PCI %s setup!",
-			dev->slot_name);
+			pci_name(dev));
    	        return -ENODEV;
         }
 	
@@ -99,7 +99,7 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 			retval = -EFAULT;
 clean_1:
 			release_mem_region (resource, len);
-			err ("init %s fail, %d", dev->slot_name, retval);
+			err ("init %s fail, %d", pci_name(dev), retval);
 			return retval;
 		}
 
@@ -136,7 +136,7 @@ clean_2:
 			goto clean_1;
 		} else {
 			release_region (resource, len);
-			err ("init %s fail, %d", dev->slot_name, retval);
+			err ("init %s fail, %d", pci_name(dev), retval);
 			return retval;
 		}
 	}
@@ -144,7 +144,7 @@ clean_2:
 	hcd->driver = driver;
 	hcd->description = driver->description;
 	hcd->pdev = dev;
-	hcd->self.bus_name = dev->slot_name;
+	hcd->self.bus_name = pci_name(dev);
 	hcd->product_desc = dev->dev.name;
 	hcd->self.controller = &dev->dev;
 	hcd->controller = hcd->self.controller;
