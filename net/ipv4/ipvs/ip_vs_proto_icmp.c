@@ -163,11 +163,7 @@ static void icmp_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_icmp = {
 	.name =			"ICMP",
 	.protocol =		IPPROTO_ICMP,
-	.minhlen =		sizeof(struct icmphdr),
-	.minhlen_icmp =		8,
 	.dont_defrag =		0,
-	.skip_nonexisting =	0,
-	.slave =		0,
 	.init =			icmp_init,
 	.exit =			icmp_exit,
 	.conn_schedule =	icmp_conn_schedule,

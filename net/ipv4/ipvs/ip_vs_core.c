@@ -660,7 +660,7 @@ static int ip_vs_out_icmp(struct sk_buff **pskb, int *related)
 
 	/* Is the embedded protocol header present? */
 	if (unlikely(ciph.frag_off & __constant_htons(IP_OFFSET) &&
-		     (pp->minhlen || pp->dont_defrag)))
+		     pp->dont_defrag))
 		return NF_ACCEPT;
 
 	IP_VS_DBG_PKT(11, pp, skb, offset, "Checking outgoing ICMP for");
@@ -911,7 +911,7 @@ static int ip_vs_in_icmp(struct sk_buff **pskb, int *related)
 
 	/* Is the embedded protocol header present? */
 	if (unlikely(ciph.frag_off & __constant_htons(IP_OFFSET) &&
-		     (pp->minhlen || pp->dont_defrag)))
+		     pp->dont_defrag))
 		return NF_ACCEPT;
 
 	IP_VS_DBG_PKT(11, pp, skb, offset, "Checking incoming ICMP for");

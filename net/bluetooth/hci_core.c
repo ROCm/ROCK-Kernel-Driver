@@ -161,7 +161,6 @@ static int __hci_request(struct hci_dev *hdev, void (*req)(struct hci_dev *hdev,
 	req(hdev, opt);
 	schedule_timeout(timeout);
 
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hdev->req_wait_q, &wait);
 
 	if (signal_pending(current))

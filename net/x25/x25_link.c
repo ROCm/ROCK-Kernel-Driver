@@ -51,15 +51,9 @@ static void x25_t20timer_expiry(unsigned long);
 /*
  *	Linux set/reset timer routines
  */
-static void x25_start_t20timer(struct x25_neigh *nb)
+static inline void x25_start_t20timer(struct x25_neigh *nb)
 {
-	del_timer(&nb->t20timer);
-
-	nb->t20timer.data     = (unsigned long)nb;
-	nb->t20timer.function = &x25_t20timer_expiry;
-	nb->t20timer.expires  = jiffies + nb->t20;
-
-	add_timer(&nb->t20timer);
+	mod_timer(&nb->t20timer, jiffies + nb->t20);
 }
 
 static void x25_t20timer_expiry(unsigned long param)
@@ -71,12 +65,12 @@ static void x25_t20timer_expiry(unsigned long param)
 	x25_start_t20timer(nb);
 }
 
-static void x25_stop_t20timer(struct x25_neigh *nb)
+static inline void x25_stop_t20timer(struct x25_neigh *nb)
 {
 	del_timer(&nb->t20timer);
 }
 
-static int x25_t20timer_pending(struct x25_neigh *nb)
+static inline int x25_t20timer_pending(struct x25_neigh *nb)
 {
 	return timer_pending(&nb->t20timer);
 }
@@ -291,6 +285,8 @@ void x25_link_device_up(struct net_device *dev)
 	skb_queue_head_init(&nb->queue);
 
 	init_timer(&nb->t20timer);
+	nb->t20timer.data     = (unsigned long)nb;
+	nb->t20timer.function = &x25_t20timer_expiry;
 
 	dev_hold(dev);
 	nb->dev      = dev;

@@ -89,14 +89,18 @@ static int lapbeth_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 	int len, err;
 	struct lapbethdev *lapbeth;
 
-	skb->sk = NULL;		/* Initially we don't know who it's for */
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
+
+	if (!pskb_may_pull(skb, 2))
+		goto drop;
 
 	rcu_read_lock();
 	lapbeth = lapbeth_get_x25_dev(dev);
 	if (!lapbeth)
-		goto drop;
+		goto drop_unlock;
 	if (!netif_running(lapbeth->axdev))
-		goto drop;
+		goto drop_unlock;
 
 	lapbeth->stats.rx_packets++;
 
@@ -108,14 +112,17 @@ static int lapbeth_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 
 	if ((err = lapb_data_received(lapbeth, skb)) != LAPB_OK) {
 		printk(KERN_DEBUG "lapbether: lapb_data_received err - %d\n", err);
-		goto drop;
+		goto drop_unlock;
 	}
 out:
 	rcu_read_unlock();
 	return 0;
-drop:
+drop_unlock:
 	kfree_skb(skb);
 	goto out;
+drop:
+	kfree_skb(skb);
+	return 0;
 }
 
 static int lapbeth_data_indication(void *token, struct sk_buff *skb)
@@ -123,7 +130,12 @@ static int lapbeth_data_indication(void *token, struct sk_buff *skb)
 	struct lapbethdev *lapbeth = (struct lapbethdev *)token;
 	unsigned char *ptr;
 
-	ptr  = skb_push(skb, 1);
+	skb_push(skb, 1);
+
+	if (skb_cow(skb, 1))
+		return NET_RX_DROP;
+
+	ptr  = skb->data;
 	*ptr = 0x00;
 
 	skb->dev      = lapbeth->axdev;

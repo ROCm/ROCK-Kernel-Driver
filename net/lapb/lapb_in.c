@@ -702,7 +702,10 @@ void lapb_data_input(struct lapb_cb *lapb, struct sk_buff *skb)
 {
 	struct lapb_frame frame;
 
-	lapb_decode(lapb, skb, &frame);
+	if (lapb_decode(lapb, skb, &frame) < 0) {
+		kfree_skb(skb);
+		return;
+	}
 
 	switch (lapb->state) {
 	case LAPB_STATE_0:
