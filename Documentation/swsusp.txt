@@ -156,6 +156,20 @@ Drivers that need support
 - do IDE cdroms need some kind of support?
 - IDE CD-RW -- how to deal with that?
 
+Sleep states summary (thanx, Ducrot)
+====================================
+
+In a really perfect world:
+echo 1 > /proc/acpi/sleep       # for standby
+echo 2 > /proc/acpi/sleep       # for suspend to ram
+echo 3 > /proc/acpi/sleep       # for suspend to ram, but with more power conservative
+echo 4 > /proc/acpi/sleep       # for suspend to disk
+echo 5 > /proc/acpi/sleep       # for shutdown unfriendly the system
+
+and perhaps
+echo 4b > /proc/acpi/sleep      # for suspend to disk via s4bios
+
+
 FAQ:
 
 Q: well, suspending a server is IMHO a really stupid thing,
