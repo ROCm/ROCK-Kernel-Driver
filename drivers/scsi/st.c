@@ -109,6 +109,7 @@ static struct st_dev_parm {
 	},
 	{
 		"try_direct_io", &try_direct_io
+	}
 };
 #endif
 
