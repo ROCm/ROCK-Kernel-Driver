@@ -1237,8 +1237,7 @@ static int __init xfrm_user_init(void)
 
 	xfrm_nl = netlink_kernel_create(NETLINK_XFRM, xfrm_netlink_rcv);
 	if (xfrm_nl == NULL)
-		panic("xfrm_user_init: cannot initialize xfrm_nl\n");
-
+		return -ENOMEM;
 
 	xfrm_register_km(&netlink_mgr);
 
