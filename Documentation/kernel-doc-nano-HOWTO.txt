@@ -139,8 +139,7 @@ collected from files listed in Documentation/DocBook/Makefile.
 _not_ exported using EXPORT_SYMBOL.
 
 !D<filename> is used to name additional files to search for functions
-exported using EXPORT_SYMBOL. For example many symbols are only exported
-in kernel/ksyms.c, therefore kernel-api.sgml include this file with !D.
+exported using EXPORT_SYMBOL.
 
 !F<filename> <function [functions...]> is replaced by the
 documentation, in <filename>, for the functions listed.

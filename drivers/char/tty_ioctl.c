@@ -69,6 +69,8 @@ stop_waiting:
 	remove_wait_queue(&tty->write_wait, &wait);
 }
 
+EXPORT_SYMBOL(tty_wait_until_sent);
+
 static void unset_locked_termios(struct termios *termios,
 				 struct termios *old,
 				 struct termios *locked)

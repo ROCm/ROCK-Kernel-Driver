@@ -9,6 +9,7 @@
  *
  */
 #include <linux/bcd.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -238,6 +239,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 void do_settimeofday(struct timeval *tv)
 {
 	write_seqlock_irq(&xtime_lock);
@@ -263,6 +266,8 @@ void do_settimeofday(struct timeval *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be

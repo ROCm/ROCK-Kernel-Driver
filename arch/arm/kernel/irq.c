@@ -19,6 +19,7 @@
  */
 #include <linux/config.h>
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
@@ -653,6 +654,8 @@ int request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_
 	return retval;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 /**
  *	free_irq - free an interrupt
  *	@irq: Interrupt line to free
@@ -695,6 +698,8 @@ void free_irq(unsigned int irq, void *dev_id)
 		kfree(action);
 	}
 }
+
+EXPORT_SYMBOL(free_irq);
 
 static DECLARE_MUTEX(probe_sem);
 
@@ -750,6 +755,8 @@ unsigned long probe_irq_on(void)
 	return irqs;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 unsigned int probe_irq_mask(unsigned long irqs)
 {
 	unsigned int mask = 0, i;
@@ -800,6 +807,8 @@ out:
 
 	return irq_found;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 void __init init_irq_proc(void)
 {

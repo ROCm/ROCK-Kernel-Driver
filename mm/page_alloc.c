@@ -679,6 +679,8 @@ got_pg:
 	return page;
 }
 
+EXPORT_SYMBOL(__alloc_pages);
+
 /*
  * Common helper functions.
  */
@@ -691,6 +693,8 @@ unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
 		return 0;
 	return (unsigned long) page_address(page);
 }
+
+EXPORT_SYMBOL(__get_free_pages);
 
 unsigned long get_zeroed_page(unsigned int gfp_mask)
 {
@@ -711,6 +715,8 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 	return 0;
 }
 
+EXPORT_SYMBOL(get_zeroed_page);
+
 void __pagevec_free(struct pagevec *pvec)
 {
 	int i = pagevec_count(pvec);
@@ -729,6 +735,8 @@ void __free_pages(struct page *page, unsigned int order)
 	}
 }
 
+EXPORT_SYMBOL(__free_pages);
+
 void free_pages(unsigned long addr, unsigned int order)
 {
 	if (addr != 0) {
@@ -736,6 +744,8 @@ void free_pages(unsigned long addr, unsigned int order)
 		__free_pages(virt_to_page(addr), order);
 	}
 }
+
+EXPORT_SYMBOL(free_pages);
 
 /*
  * Total amount of free (allocatable) RAM:
@@ -750,6 +760,7 @@ unsigned int nr_free_pages(void)
 
 	return sum;
 }
+
 EXPORT_SYMBOL(nr_free_pages);
 
 unsigned int nr_used_zone_pages(void)
@@ -916,6 +927,8 @@ void si_meminfo(struct sysinfo *val)
 #endif
 	val->mem_unit = PAGE_SIZE;
 }
+
+EXPORT_SYMBOL(si_meminfo);
 
 #ifdef CONFIG_NUMA
 void si_meminfo_node(struct sysinfo *val, int nid)
@@ -1383,6 +1396,8 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 #ifndef CONFIG_DISCONTIGMEM
 static bootmem_data_t contig_bootmem_data;
 struct pglist_data contig_page_data = { .bdata = &contig_bootmem_data };
+
+EXPORT_SYMBOL(contig_page_data);
 
 void __init free_area_init(unsigned long *zones_size)
 {

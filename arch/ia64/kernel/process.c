@@ -82,6 +82,8 @@ dump_stack (void)
 	show_stack(NULL, NULL);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void
 show_regs (struct pt_regs *regs)
 {

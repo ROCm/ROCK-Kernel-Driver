@@ -6,6 +6,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
@@ -60,6 +61,8 @@ void machine_power_off(void)
 	}
 	machine_halt();
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 #ifdef CONFIG_PCI
 static int powerd(void *__unused)

@@ -330,6 +330,7 @@ void unlock_page(struct page *page)
 }
 
 EXPORT_SYMBOL(unlock_page);
+EXPORT_SYMBOL(lock_page);
 
 /*
  * End writeback against a page.

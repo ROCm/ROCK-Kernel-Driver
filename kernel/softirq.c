@@ -113,6 +113,8 @@ restart:
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(do_softirq);
+
 void local_bh_enable(void)
 {
 	__local_bh_enable();
@@ -144,6 +146,8 @@ inline void raise_softirq_irqoff(unsigned int nr)
 		wakeup_softirqd();
 }
 
+EXPORT_SYMBOL(raise_softirq_irqoff);
+
 void raise_softirq(unsigned int nr)
 {
 	unsigned long flags;
@@ -153,12 +157,15 @@ void raise_softirq(unsigned int nr)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(raise_softirq);
+
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
 	softirq_vec[nr].data = data;
 	softirq_vec[nr].action = action;
 }
 
+EXPORT_SYMBOL(open_softirq);
 
 /* Tasklets */
 struct tasklet_head
@@ -182,6 +189,8 @@ void __tasklet_schedule(struct tasklet_struct *t)
 	local_irq_restore(flags);
 }
 
+EXPORT_SYMBOL(__tasklet_schedule);
+
 void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
@@ -192,6 +201,8 @@ void __tasklet_hi_schedule(struct tasklet_struct *t)
 	raise_softirq_irqoff(HI_SOFTIRQ);
 	local_irq_restore(flags);
 }
+
+EXPORT_SYMBOL(__tasklet_hi_schedule);
 
 static void tasklet_action(struct softirq_action *a)
 {
@@ -270,6 +281,8 @@ void tasklet_init(struct tasklet_struct *t,
 	t->data = data;
 }
 
+EXPORT_SYMBOL(tasklet_init);
+
 void tasklet_kill(struct tasklet_struct *t)
 {
 	if (in_interrupt())
@@ -284,6 +297,7 @@ void tasklet_kill(struct tasklet_struct *t)
 	clear_bit(TASKLET_STATE_SCHED, &t->state);
 }
 
+EXPORT_SYMBOL(tasklet_kill);
 
 static void tasklet_init_cpu(int cpu)
 {

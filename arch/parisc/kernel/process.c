@@ -14,6 +14,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/personality.h>
 #include <linux/ptrace.h>
 #include <linux/sched.h>
@@ -39,10 +40,14 @@ void disable_hlt(void)
 	hlt_counter++;
 }
 
+EXPORT_SYMBOL(disable_hlt);
+
 void enable_hlt(void)
 {
 	hlt_counter--;
 }
+
+EXPORT_SYMBOL(enable_hlt);
 
 void default_idle(void)
 {
@@ -119,6 +124,8 @@ void machine_restart(char *cmd)
 
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_halt(void)
 {
 	/*
@@ -126,6 +133,8 @@ void machine_halt(void)
 	** function, called by the reboot notifier chain.
 	*/
 }
+
+EXPORT_SYMBOL(machine_halt);
 
 
 /*
@@ -151,6 +160,8 @@ void machine_power_off(void)
 	printk(KERN_EMERG "System shut down completed.\n"
 	       KERN_EMERG "Please power this system off now.");
 }
+
+EXPORT_SYMBOL(machine_power_off);
 
 
 /*

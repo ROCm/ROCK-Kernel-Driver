@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -51,6 +52,8 @@ cpumask_t cpu_online_map;
 cpumask_t cpu_possible_map;
 int smp_hw_index[NR_CPUS];
 struct thread_info *secondary_ti;
+
+EXPORT_SYMBOL(cpu_online_map);
 
 /* SMP operations for this machine */
 static struct smp_ops_t *smp_ops;

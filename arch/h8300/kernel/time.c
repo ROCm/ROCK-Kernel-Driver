@@ -18,6 +18,7 @@
 
 #include <linux/config.h> /* CONFIG_HEARTBEAT */
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -32,6 +33,8 @@
 #define	TICK_SIZE (tick_nsec / 1000)
 
 u64 jiffies_64;
+
+EXPORT_SYMBOL(jiffies_64);
 
 static inline void do_profile (unsigned long pc)
 {
@@ -110,6 +113,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
@@ -136,3 +141,5 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);

@@ -9,6 +9,7 @@
  * Copyright 1999 D. Jeff Dionne <jeff@rt-control.com>
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -172,6 +173,8 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= NR_IRQS) {
@@ -190,6 +193,8 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	IMR |= 1<<irq;
 }
+
+EXPORT_SYMBOL(free_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {

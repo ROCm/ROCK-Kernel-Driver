@@ -9,6 +9,7 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/buffer_head.h>	/* grr. try_to_release_page,
@@ -175,6 +176,8 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 	}
 }
 
+EXPORT_SYMBOL(truncate_inode_pages);
+
 /**
  * invalidate_mapping_pages - Invalidate all the unlocked pages of one inode
  * @mapping: the address_space which holds the pages to invalidate
@@ -228,6 +231,8 @@ unsigned long invalidate_inode_pages(struct address_space *mapping)
 	return invalidate_mapping_pages(mapping, 0, ~0UL);
 }
 
+EXPORT_SYMBOL(invalidate_inode_pages);
+
 /**
  * invalidate_inode_pages2 - remove all unmapped pages from an address_space
  * @mapping - the address_space
@@ -264,3 +269,5 @@ void invalidate_inode_pages2(struct address_space *mapping)
 		cond_resched();
 	}
 }
+
+EXPORT_SYMBOL_GPL(invalidate_inode_pages2);

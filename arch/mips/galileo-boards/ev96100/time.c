@@ -34,6 +34,7 @@
  */
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 
@@ -222,6 +223,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 void do_settimeofday(struct timeval *tv)
 {
 	write_seqlock_irq(&xtime_lock);
@@ -247,6 +250,8 @@ void do_settimeofday(struct timeval *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /*
  * There are a lot of conceptually broken versions of the MIPS timer interrupt
