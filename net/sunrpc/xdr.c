@@ -371,6 +371,7 @@ _shift_data_right_pages(struct page **pages, size_t pgto_base,
 	do {
 		/* Are any pointers crossing a page boundary? */
 		if (pgto_base == 0) {
+			flush_dcache_page(*pgto);
 			pgto_base = PAGE_CACHE_SIZE;
 			pgto--;
 		}
@@ -394,6 +395,7 @@ _shift_data_right_pages(struct page **pages, size_t pgto_base,
 		kunmap_atomic(vto, KM_USER0);
 
 	} while ((len -= copy) != 0);
+	flush_dcache_page(*pgto);
 }
 
 /*
@@ -427,12 +429,14 @@ _copy_to_pages(struct page **pages, size_t pgbase, const char *p, size_t len)
 
 		pgbase += copy;
 		if (pgbase == PAGE_CACHE_SIZE) {
+			flush_dcache_page(*pgto);
 			pgbase = 0;
 			pgto++;
 		}
 		p += copy;
 
 	} while ((len -= copy) != 0);
+	flush_dcache_page(*pgto);
 }
 
 /*
