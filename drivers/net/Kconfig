@@ -1181,6 +1181,7 @@ config IBMVETH
 config IBM_EMAC
 	tristate "IBM PPC4xx EMAC driver support"
 	depends on 4xx
+	select CRC32
 	---help---
 	  This driver supports the IBM PPC4xx EMAC family of on-chip
 	  Ethernet controllers.
