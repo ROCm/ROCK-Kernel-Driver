@@ -17,7 +17,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
-#include <asm/types.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -87,6 +86,7 @@
 #include <linux/cache.h>
 #include <linux/compiler.h>
 #include <linux/threads.h>
+#include <linux/types.h>
 
 #include <asm/fpu.h>
 #include <asm/offsets.h>
@@ -369,7 +369,7 @@ struct task_struct;
  * do_basic_setup() and the timing is such that free_initmem() has
  * been called already.
  */
-extern int kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
+extern pid_t kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
 
 /* Get wait channel for task P.  */
 extern unsigned long get_wchan (struct task_struct *p);

@@ -134,6 +134,18 @@ EXPORT_SYMBOL_NOVERS(xor_ia64_3);
 EXPORT_SYMBOL_NOVERS(xor_ia64_4);
 EXPORT_SYMBOL_NOVERS(xor_ia64_5);
 
+#ifdef CONFIG_MD_RAID5
+extern void xor_ia64_2(void);
+extern void xor_ia64_3(void);
+extern void xor_ia64_4(void);
+extern void xor_ia64_5(void);
+
+EXPORT_SYMBOL_NOVERS(xor_ia64_2);
+EXPORT_SYMBOL_NOVERS(xor_ia64_3);
+EXPORT_SYMBOL_NOVERS(xor_ia64_4);
+EXPORT_SYMBOL_NOVERS(xor_ia64_5);
+#endif
+
 extern unsigned long ia64_iobase;
 EXPORT_SYMBOL(ia64_iobase);
 

@@ -753,7 +753,7 @@ SET_REG(b5);
 	 *   r29    - available for use.
 	 *   r30    - available for use.
 	 *   r31    - address of lock, available for use.
-	 *   b7     - return address
+	 *   b6     - return address
 	 *   p14    - available for use.
 	 *
 	 * If you patch this code to use more registers, do not forget to update
