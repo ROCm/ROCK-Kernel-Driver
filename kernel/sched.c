@@ -1782,9 +1782,11 @@ repeat:
 		cpu_src = p->thread_info->cpu;
 		rq_src = cpu_rq(cpu_src);
 
+		local_irq_save(flags);
 		double_rq_lock(rq_src, rq_dest);
 		if (p->thread_info->cpu != cpu_src) {
 			double_rq_unlock(rq_src, rq_dest);
+			local_irq_restore(flags);
 			goto repeat;
 		}
 		if (rq_src == rq) {
@@ -1795,6 +1797,7 @@ repeat:
 			}
 		}
 		double_rq_unlock(rq_src, rq_dest);
+		local_irq_restore(flags);
 
 		up(&req->sem);
 	}
