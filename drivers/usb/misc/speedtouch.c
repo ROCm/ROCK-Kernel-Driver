@@ -477,6 +477,9 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 		return -EINVAL;
 	}
 
+	if (!instance->firmware_loaded)
+		return -EAGAIN;
+
 	switch (vcc->qos.aal) {
 	case ATM_AAL5:
 		new = atmsar_encode_aal5 (dev_data->atmsar_vcc, skb);
@@ -674,9 +677,6 @@ static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_v
 	unsigned long flags;
 
 	PDEBUG ("udsl_usb_send_data entered, sending packet %p with length %d\n", skb, skb->len);
-
-	if (!instance->firmware_loaded)
-		return -EAGAIN;
 
 	PACKETDEBUG (skb->data, skb->len);
 
