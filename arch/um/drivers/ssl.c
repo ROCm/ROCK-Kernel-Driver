@@ -44,6 +44,7 @@ static struct chan_opts opts = {
 	xterm_title:	"Serial Line #%d",
 	raw:		1,
 	tramp_stack :	0,
+	in_kernel :	1,
 };
 
 static struct line_driver driver = {

@@ -15,7 +15,7 @@ CHAN_OBJS := chan_kern.o chan_user.o line.o
 # So, what this does is figure out by hand (crudely) what file -lpcap really 
 # is and just use it.
 
-PCAP = $(shell for f in echo {/lib,/usr/lib}/libpcap.{a,so}; do \
+PCAP = $(shell for f in echo {/lib,/usr/lib}/libpcap.a; do \
        [ -f $$f ] && echo $$f ; done | head -1)
 
 slip-objs := slip_kern.o slip_user.o
@@ -47,7 +47,7 @@ obj-$(CONFIG_NULL_CHAN) += null.o
 obj-$(CONFIG_PORT_CHAN) += port.o
 obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
-obj-$(CONFIG_XTERM_CHAN) += xterm.o
+obj-$(CONFIG_XTERM_CHAN) += xterm.o xterm_kern.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
 
 CFLAGS_pcap_user.o = -I/usr/include/pcap
