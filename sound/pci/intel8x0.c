@@ -886,6 +886,7 @@ static int snd_intel8x0_ali_trigger(snd_pcm_substream_t *substream, int cmd)
 static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 				  snd_pcm_hw_params_t * hw_params)
 {
+	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
 	int err;
 
@@ -899,8 +900,12 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	err = snd_ac97_pcm_open(ichdev->pcm, params_rate(hw_params),
 				params_channels(hw_params),
 				ichdev->pcm->r[0].slots);
-	if (err >= 0)
+	if (err >= 0) {
 		ichdev->pcm_open_flag = 1;
+		/* FIXME: hack to enable spdif support */
+		if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
+			snd_ac97_set_rate(ichdev->pcm->r[0].codec[0], AC97_SPDIF, params_rate(hw_params));
+	}
 	return err;
 }
 
@@ -963,9 +968,6 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 		snd_intel8x0_setup_multi_channels(chip, runtime->channels);
 		spin_unlock(&chip->reg_lock);
 	}
-	/* FIXME: hack to enable spdif support */
-	if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
-		snd_ac97_set_rate(ichdev->pcm->r[0].codec[0], AC97_SPDIF, runtime->rate);
 	snd_intel8x0_setup_periods(chip, ichdev);
 	return 0;
 }
@@ -1590,6 +1592,7 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 	/* S/PDIF PCM */
 	{
 		.exclusive = 1,
+		.spdif = 1,
 		.r = {	{
 				.slots = (1 << AC97_SLOT_SPDIF_LEFT2) |
 					 (1 << AC97_SLOT_SPDIF_RIGHT2)

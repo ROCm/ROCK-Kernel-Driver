@@ -345,7 +345,8 @@ struct ac97_pcm {
 	ac97_bus_t *bus;
 	unsigned int stream: 1,	   	   /* stream type: 1 = capture */
 		     exclusive: 1,	   /* exclusive mode, don't override with other pcms */
-		     copy_flag: 1;	   /* lowlevel driver must fill all entries */
+		     copy_flag: 1,	   /* lowlevel driver must fill all entries */
+		     spdif: 1;		   /* spdif pcm */
 	unsigned short aslots;		   /* active slots */
 	unsigned int rates;		   /* available rates */
 	struct {
