@@ -1748,10 +1748,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 void ide_revalidate_drive (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
-	g->part[0].nr_sects = current_capacity(drive);
+	drive->disk->part[0].nr_sects = current_capacity(drive);
 }
 
 /*
@@ -2058,13 +2055,13 @@ void ide_unregister (unsigned int index)
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
 	blk_clear(hwif->major);
-	gd = hwif->gd[0];
+	gd = hwif->drives[0].disk;
 	if (gd) {
 		int i;
 		kfree(gd->part);
 		kfree(gd);
 		for (i = 0; i < MAX_DRIVES; i++)
-			hwif->gd[i] = NULL;
+			hwif->drives[i].disk = NULL;
 	}
 	old_hwif		= *hwif;
 	init_hwif_data (index);	/* restore hwif data to pristine status */

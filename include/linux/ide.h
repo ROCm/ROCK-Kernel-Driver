@@ -530,6 +530,7 @@ typedef struct ide_drive_s {
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 	struct list_head list;
+	struct gendisk *disk;
 } ide_drive_t;
 
 /*
@@ -716,7 +717,6 @@ typedef struct hwif_s {
  */
 	hw_regs_t	hw;		/* Hardware info */
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
-	struct gendisk	*gd[MAX_DRIVES];/* gendisk structure */
 	int		addressing;	/* hosts addressing */
 	void		(*tuneproc)(ide_drive_t *, byte);	/* routine to tune PIO mode for drives */
 	int		(*speedproc)(ide_drive_t *, byte);	/* routine to retune DMA modes for drives */

@@ -2593,9 +2593,8 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
-	int minor = (drive->select.b.unit) << PARTN_BITS;
 
-	devinfo->dev = mk_kdev(HWIF(drive)->major, minor);
+	devinfo->dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
 	devinfo->ops = &ide_cdrom_dops;
 	devinfo->mask = 0;
 	*(int *)&devinfo->speed = CDROM_STATE_FLAGS (drive)->current_speed;
@@ -2622,7 +2621,8 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 
 	devinfo->de = devfs_register(drive->de, "cd", DEVFS_FL_DEFAULT,
-				     HWIF(drive)->major, minor,
+				     drive->disk->major,
+				     drive->disk->first_minor,
 				     S_IFBLK | S_IRUGO | S_IWUGO,
 				     ide_fops, NULL);
 
@@ -2823,13 +2823,12 @@ int ide_cdrom_setup (ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
-	int minor = drive->select.b.unit << PARTN_BITS;
 	int nslots;
 
 	/*
 	 * default to read-only always and fix latter at the bottom
 	 */
-	set_device_ro(mk_kdev(HWIF(drive)->major, minor), 1);
+	set_device_ro(mk_kdev(drive->disk->major, drive->disk->first_minor), 1);
 	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	blk_queue_prep_rq(&drive->queue, ll_10byte_cmd_build);
@@ -2951,7 +2950,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
-		set_device_ro(mk_kdev(HWIF(drive)->major, minor), 0);
+		set_device_ro(mk_kdev(drive->disk->major, drive->disk->first_minor), 0);
 
 	if (ide_cdrom_register (drive, nslots)) {
 		printk ("%s: ide_cdrom_setup failed to register device with the cdrom driver.\n", drive->name);
@@ -2998,8 +2997,8 @@ void ide_cdrom_release (struct inode *inode, struct file *file,
 static
 int ide_cdrom_check_media_change (ide_drive_t *drive)
 {
-	return cdrom_media_changed(mk_kdev(HWIF (drive)->major,
-			(drive->select.b.unit) << PARTN_BITS));
+	return cdrom_media_changed(mk_kdev(drive->disk->major,
+			drive->disk->first_minor));
 }
 
 static
@@ -3025,9 +3024,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
@@ -3092,9 +3089,7 @@ MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 static int ide_cdrom_reinit (ide_drive_t *drive)
 {
 	struct cdrom_info *info;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 	struct request_sense sense;
 
 	if (!strstr("ide-cdrom", drive->driver_req))

@@ -1618,9 +1618,7 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1672,9 +1670,7 @@ MODULE_DESCRIPTION("ATA DISK Driver");
 
 static int idedisk_reinit(ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 
 	/* strstr("foo", "") is non-NULL */
 	if (!strstr("ide-disk", drive->driver_req))

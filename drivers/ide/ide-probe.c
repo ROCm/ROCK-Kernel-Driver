@@ -848,7 +848,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 		gd[unit].major_name = names + 4*unit;
 		gd[unit].minor_shift = PARTN_BITS; 
 		gd[unit].fops = ide_fops;
-		hwif->gd[unit] = gd + unit;
+		hwif->drives[unit].disk = gd + unit;
 	}
 
 	for (unit = 0; unit < units; ++unit) {

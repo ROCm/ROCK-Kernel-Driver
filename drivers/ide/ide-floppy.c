@@ -2112,9 +2112,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 static int idefloppy_cleanup (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
@@ -2181,9 +2179,7 @@ static ide_driver_t idefloppy_driver = {
 static int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
+	struct gendisk *g = drive->disk;
 	if (!strstr("ide-floppy", drive->driver_req))
 		goto failed;
 	if (!drive->present)
