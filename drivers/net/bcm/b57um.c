@@ -1077,7 +1077,8 @@ bcm5700_init_one(struct pci_dev *pdev,
 #ifdef BCM_VLAN
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 #endif
-#ifdef BCM_TSO
+/* Disable TSO for now, it's slow and broken */
+#if 0 && defined(BCM_TSO)
 	if ((pDevice->TaskToOffload & LM_TASK_OFFLOAD_TCP_SEGMENTATION) &&
 		enable_tso[board_idx]) {
 		dev->features |= NETIF_F_TSO;
