@@ -34,6 +34,7 @@
 #include <asm/hpet.h>
 #include <asm/sections.h>
 #include <linux/cpufreq.h>
+#include <linux/hpet.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
@@ -725,6 +726,55 @@ static unsigned int __init pit_calibrate_tsc(void)
 	
 	return (end - start) / 50;
 }
+
+#ifdef	CONFIG_HPET
+static __init int late_hpet_init(void)
+{
+	struct hpet_data	hd;
+	unsigned int 		ntimer;
+
+	if (!vxtime.hpet_address)
+          return -1;
+
+	memset(&hd, 0, sizeof (hd));
+
+	ntimer = hpet_readl(HPET_ID);
+	ntimer = (ntimer & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+	ntimer++;
+
+	/*
+	 * Register with driver.
+	 * Timer0 and Timer1 is used by platform.
+	 */
+	hd.hd_address = (void *)fix_to_virt(FIX_HPET_BASE);
+	hd.hd_nirqs = ntimer;
+	hd.hd_flags = HPET_DATA_PLATFORM;
+	hpet_reserve_timer(&hd, 0);
+#ifdef	CONFIG_HPET_EMULATE_RTC
+	hpet_reserve_timer(&hd, 1);
+#endif
+	hd.hd_irq[0] = HPET_LEGACY_8254;
+	hd.hd_irq[1] = HPET_LEGACY_RTC;
+	if (ntimer > 2) {
+		struct hpet		*hpet;
+		struct hpet_timer	*timer;
+		int			i;
+
+		hpet = (struct hpet *) fix_to_virt(FIX_HPET_BASE);
+
+		for (i = 2, timer = &hpet->hpet_timers[2]; i < ntimer;
+		     timer++, i++)
+			hd.hd_irq[i] = (timer->hpet_config &
+					Tn_INT_ROUTE_CNF_MASK) >>
+				Tn_INT_ROUTE_CNF_SHIFT;
+
+	}
+
+	hpet_alloc(&hd);
+	return 0;
+}
+fs_initcall(late_hpet_init);
+#endif
 
 static int hpet_init(void)
 {

@@ -72,7 +72,8 @@ config HPET_TIMER
 	  If unsure, say Y.
 
 config HPET_EMULATE_RTC
-	def_bool HPET_TIMER && RTC=y
+	bool "Provide RTC interrupt"
+	depends on HPET_TIMER && RTC=y
 
 config GENERIC_ISA_DMA
 	bool
