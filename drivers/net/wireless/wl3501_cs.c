@@ -681,6 +681,7 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 	struct wl3501_scan_req signal;
 	int rc = 1;
 
+	dprintk(3, "entry");
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_SCAN_REQ;
 	signal.ssid[0] = 0;
@@ -705,6 +706,7 @@ static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 			rc = 0;
 		}
 	}
+	dprintk(3, "exit, rc=%d", rc);
 	return rc;
 }
 
@@ -777,8 +779,10 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 	int matchflag = 0;
 	struct wl3501_scan_confirm signal;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &signal, sizeof(signal));
 	if (signal.status == WL3501_STATUS_SUCCESS) {
+		dprintk(3, "success");
 		if (this->driver_state == WL3501_SIG_SCAN_REQ) {
 			for (i = 0; i < this->bss_cnt; i++) {
 				if (!memcmp((char *)this->bss_set[i].bssid,
@@ -829,6 +833,7 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		}
 	} else if (signal.status == WL3501_STATUS_TIMEOUT &&
 		   this->driver_state != WL3501_SIG_SCAN_REQ) {
+		dprintk(3, "timeout");
 		this->join_sta_bss = 0;
 		for (j = this->join_sta_bss; j < this->bss_cnt; j++)
 			if (!wl3501_mgmt_join(this, j))
@@ -1035,6 +1040,7 @@ static int wl3501_mgmt_auth(struct wl3501_card *this)
 	struct wl3501_auth_req signal;
 	u16 ptr;
 
+	dprintk(3, "entry");
 	signal.next_blk = 0;
 	signal.sig_id = WL3501_SIG_AUTH_REQ;
 	signal.type = WL3501_SYS_TYPE_OPEN;
@@ -1056,6 +1062,7 @@ static int wl3501_mgmt_association(struct wl3501_card *this)
 	struct wl3501_assoc_req signal;
 	u16 ptr;
 
+	dprintk(3, "entry");
 	signal.next_blk		= 0;
 	signal.sig_id		= WL3501_SIG_ASSOC_REQ;
 	signal.timeout		= 1000;
@@ -1079,6 +1086,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_join_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	if (sig.status == WL3501_STATUS_SUCCESS) {
 		if (this->net_type == IW_MODE_INFRA) {
@@ -1137,6 +1145,7 @@ static inline void wl3501_md_confirm_interrupt(struct net_device *dev,
 {
 	struct wl3501_md_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	wl3501_free_tx_buffer(this, sig.data);
 	if (netif_queue_stopped(dev))
@@ -1198,6 +1207,7 @@ static inline void wl3501_get_confirm_interrupt(struct wl3501_card *this,
 {
 	struct wl3501_get_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 #if 0
 	if (!sig.mib_status) {
@@ -1217,6 +1227,7 @@ static inline void wl3501_start_confirm_interrupt(struct net_device *dev,
 {
 	struct wl3501_start_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	if (sig.status == WL3501_STATUS_SUCCESS)
 		netif_wake_queue(dev);
@@ -1228,6 +1239,7 @@ static inline void wl3501_assoc_confirm_interrupt(struct net_device *dev,
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_assoc_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 
 	if (sig.status == WL3501_STATUS_SUCCESS)
@@ -1239,6 +1251,7 @@ static inline void wl3501_auth_confirm_interrupt(struct wl3501_card *this,
 {
 	struct wl3501_auth_confirm sig;
 
+	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 
 	if (sig.status == WL3501_STATUS_SUCCESS)
@@ -1253,6 +1266,8 @@ static inline void wl3501_rx_interrupt(struct net_device *dev)
 	u16 addr;
 	u8 sig_id;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+
+	dprintk(3, "entry");
 loop:
 	morepkts = 0;
 	if (!wl3501_esbq_confirm(this))
@@ -1970,8 +1985,8 @@ static int wl3501_set_essid(struct net_device *dev,
 	int rc = 0;
 
 	if (wrqu->data.flags) {
-		strlcpy(this->essid, extra, min_t(u16, wrqu->data.length,
-						  IW_ESSID_MAX_SIZE));
+		strlcpy(this->essid + 2, extra, min_t(u16, wrqu->data.length,
+						      IW_ESSID_MAX_SIZE));
 		rc = wl3501_reset(dev);
 	}
 	return rc;
@@ -1987,7 +2002,7 @@ static int wl3501_get_essid(struct net_device *dev,
 	spin_lock_irqsave(&this->lock, flags);
 	wrqu->essid.flags  = 1;
 	wrqu->essid.length = IW_ESSID_MAX_SIZE;
-	strlcpy(extra, this->essid, IW_ESSID_MAX_SIZE);
+	strlcpy(extra, this->essid + 2, IW_ESSID_MAX_SIZE);
 	spin_unlock_irqrestore(&this->lock, flags);
 	return 0;
 }
