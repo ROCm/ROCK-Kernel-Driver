@@ -54,7 +54,7 @@ struct agp_kern_info {
 	struct pci_dev *device;
 	enum chipset_type chipset;
 	unsigned long mode;
-	off_t aper_base;
+	unsigned long aper_base;
 	size_t aper_size;
 	int max_memory;		/* In pages */
 	int current_memory;
