@@ -32,10 +32,11 @@ static __inline__ struct x25_route *x25_get_route_idx(loff_t pos)
 
 	list_for_each(route_entry, &x25_route_list) {
 		rt = list_entry(route_entry, struct x25_route, node);
-		if (--pos)
-			break;
+		if (!pos--)
+			goto found;
 	}
-
+	rt = NULL;
+found:
 	return rt;
 }
 
