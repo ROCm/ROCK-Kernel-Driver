@@ -311,6 +311,7 @@ shmem_truncate_indirect(struct shmem_inode_info *info, unsigned long index)
 	return shmem_truncate_direct(base, start, len);
 }
 
+/* SMP-safe */
 static void shmem_truncate (struct inode * inode)
 {
 	unsigned long index;

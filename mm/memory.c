@@ -1048,11 +1048,8 @@ do_expand:
 	inode->i_size = offset;
 
 out_truncate:
-	if (inode->i_op && inode->i_op->truncate) {
-		lock_kernel();
+	if (inode->i_op && inode->i_op->truncate)
 		inode->i_op->truncate(inode);
-		unlock_kernel();
-	}
 out:
 	return 0;
 }

@@ -371,6 +371,8 @@ void sysv_truncate (struct inode * inode)
 	if (n == 0)
 		return;
 
+	lock_kernel();
+
 	if (n == 1) {
 		free_data(inode, i_data+offsets[0], i_data + DIRECT);
 		goto do_indirects;
@@ -409,6 +411,7 @@ do_indirects:
 		sysv_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
+	unlock_kernel();
 }
 
 static int sysv_writepage(struct page *page)

@@ -62,11 +62,14 @@ secno hpfs_bmap(struct inode *inode, unsigned file_secno)
 void hpfs_truncate(struct inode *i)
 {
 	if (IS_IMMUTABLE(i)) return /*-EPERM*/;
+	lock_kernel();
 	hpfs_i(i)->i_n_secs = 0;
 	i->i_blocks = 1 + ((i->i_size + 511) >> 9);
 	hpfs_i(i)->mmu_private = i->i_size;
 	hpfs_truncate_btree(i->i_sb, i->i_ino, 1, ((i->i_size + 511) >> 9));
 	hpfs_write_inode(i);
+	hpfs_i(i)->i_n_secs = 0;
+	unlock_kernel();
 }
 
 int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)

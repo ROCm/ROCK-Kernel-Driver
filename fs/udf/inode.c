@@ -108,20 +108,19 @@ void udf_put_inode(struct inode * inode)
  */
 void udf_delete_inode(struct inode * inode)
 {
-	lock_kernel();
-
 	if (is_bad_inode(inode))
 		goto no_delete;
 
 	inode->i_size = 0;
 	udf_truncate(inode);
+	lock_kernel();
+
 	udf_update_inode(inode, IS_SYNC(inode));
 	udf_free_inode(inode);
 
 	unlock_kernel();
 	return;
 no_delete:
-	unlock_kernel();
 	clear_inode(inode);
 }
 
@@ -858,6 +857,7 @@ void udf_truncate(struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
+	lock_kernel();
 	if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
 	{
 		if (inode->i_sb->s_blocksize < (udf_file_entry_alloc_offset(inode) +
@@ -867,6 +867,7 @@ void udf_truncate(struct inode * inode)
 			if (UDF_I_ALLOCTYPE(inode) == ICB_FLAG_AD_IN_ICB)
 			{
 				inode->i_size = UDF_I_LENALLOC(inode);
+				unlock_kernel();
 				return;
 			}
 			else
@@ -899,6 +900,7 @@ void udf_truncate(struct inode * inode)
 		udf_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
+	unlock_kernel();
 }
 
 /*

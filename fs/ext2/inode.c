@@ -57,10 +57,10 @@ void ext2_delete_inode (struct inode * inode)
 	mark_inode_dirty(inode);
 	ext2_update_inode(inode, IS_SYNC(inode));
 
-	lock_kernel();
 	inode->i_size = 0;
 	if (inode->i_blocks)
 		ext2_truncate (inode);
+	lock_kernel();
 	ext2_free_inode (inode);
 	unlock_kernel();
 
@@ -801,7 +801,6 @@ void ext2_truncate (struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
-	unlock_kernel();
 	ext2_discard_prealloc(inode);
 
 	blocksize = inode->i_sb->s_blocksize;
@@ -875,7 +874,6 @@ do_indirects:
 		ext2_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
-	lock_kernel();
 }
 
 void ext2_read_inode (struct inode * inode)

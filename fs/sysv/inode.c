@@ -260,9 +260,9 @@ int sysv_sync_inode(struct inode * inode)
 
 static void sysv_delete_inode(struct inode *inode)
 {
-	lock_kernel();
 	inode->i_size = 0;
 	sysv_truncate(inode);
+	lock_kernel();
 	sysv_free_inode(inode);
 	unlock_kernel();
 }

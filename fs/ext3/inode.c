@@ -1848,11 +1848,14 @@ void ext3_truncate(struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
+	lock_kernel();
 	ext3_discard_prealloc(inode);
 
 	handle = start_transaction(inode);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return;		/* AKPM: return what? */
+	}
 
 	blocksize = inode->i_sb->s_blocksize;
 	last_block = (inode->i_size + blocksize-1)
@@ -1974,6 +1977,7 @@ out_stop:
 		ext3_orphan_del(handle, inode);
 
 	ext3_journal_stop(handle, inode);
+	unlock_kernel();
 }
 
 /* 

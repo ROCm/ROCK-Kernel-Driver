@@ -807,6 +807,7 @@ affs_truncate(struct inode *inode)
 
 	pr_debug("AFFS: truncate(inode=%d, size=%u)\n", (u32)inode->i_ino, (u32)inode->i_size);
 
+	lock_kernel();
 	last_blk = 0;
 	ext = 0;
 	if (inode->i_size) {
@@ -821,8 +822,10 @@ affs_truncate(struct inode *inode)
 		int res;
 
 		page = grab_cache_page(mapping, size >> PAGE_CACHE_SHIFT);
-		if (!page)
+		if (!page) {
+			unlock_kernel();
 			return;
+		}
 		size = (size & (PAGE_CACHE_SIZE - 1)) + 1;
 		res = mapping->a_ops->prepare_write(NULL, page, size, size);
 		if (!res)
@@ -830,9 +833,12 @@ affs_truncate(struct inode *inode)
 		UnlockPage(page);
 		page_cache_release(page);
 		mark_inode_dirty(inode);
+		unlock_kernel();
 		return;
-	} else if (inode->i_size == AFFS_I(inode)->mmu_private)
+	} else if (inode->i_size == AFFS_I(inode)->mmu_private) {
+		unlock_kernel();
 		return;
+	}
 
 	// lock cache
 	ext_bh = affs_get_extblock(inode, ext);
@@ -888,4 +894,5 @@ affs_truncate(struct inode *inode)
 		ext_key = be32_to_cpu(AFFS_TAIL(sb, ext_bh)->extension);
 		affs_brelse(ext_bh);
 	}
+	unlock_kernel();
 }

@@ -275,11 +275,11 @@ void
 affs_delete_inode(struct inode *inode)
 {
 	pr_debug("AFFS: delete_inode(ino=%lu, nlink=%u)\n", inode->i_ino, inode->i_nlink);
-	lock_kernel();
 	inode->i_size = 0;
 	if (S_ISREG(inode->i_mode))
 		affs_truncate(inode);
 	clear_inode(inode);
+	lock_kernel();
 	affs_free_block(inode->i_sb, inode->i_ino);
 	unlock_kernel();
 }

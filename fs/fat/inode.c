@@ -147,10 +147,8 @@ out:
 void fat_delete_inode(struct inode *inode)
 {
 	if (!is_bad_inode(inode)) {
-		lock_kernel();
 		inode->i_size = 0;
 		fat_truncate(inode);
-		unlock_kernel();
 	}
 	clear_inode(inode);
 }

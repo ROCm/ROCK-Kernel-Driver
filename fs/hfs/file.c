@@ -20,6 +20,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/smp_lock.h>
 
 /*================ Forward declarations ================*/
 
@@ -223,8 +224,10 @@ static hfs_rwret_t hfs_file_write(struct file * filp, const char * buf,
  */
 static void hfs_file_truncate(struct inode * inode)
 {
-	struct hfs_fork *fork = HFS_I(inode)->fork;
+	struct hfs_fork *fork;
 
+	lock_kernel();
+	fork = HFS_I(inode)->fork;
 	fork->lsize = inode->i_size;
 	hfs_extent_adj(fork);
 	hfs_cat_mark_dirty(HFS_I(inode)->entry);
@@ -232,6 +235,7 @@ static void hfs_file_truncate(struct inode * inode)
 	inode->i_size = fork->lsize;
 	inode->i_blocks = fork->psize;
 	mark_inode_dirty(inode);
+	unlock_kernel();
 }
 
 /*

@@ -19,7 +19,7 @@ Declare
 		/* fs-private stuff */
 		struct inode vfs_inode;
 	};
-	static inline FOO_I(struct inode *inode)
+	static inline struct foo_inode_info *FOO_I(struct inode *inode)
 	{
 		return list_entry(inode, struct foo_inode_info, vfs_inode);
 	}
@@ -84,3 +84,8 @@ can relax your locking.
 - that will guarantee the same locking you used to have.  If your ->lookup()
 or its parts do not need BKL - better yet, now you can shift lock_kernel()/
 unlock_kernel() so that they would protect exactly what needs to be protected.
+
+---
+[mandatory]
+
+->truncate() is called without BKL now (same as above).

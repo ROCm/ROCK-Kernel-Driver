@@ -10,6 +10,7 @@
 #include <linux/locks.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
+#include <linux/smp_lock.h>
 
 #define PRINTK(x)
 #define Printk(x) printk x
@@ -119,8 +120,10 @@ void fat_truncate(struct inode *inode)
 	if (MSDOS_I(inode)->mmu_private > inode->i_size)
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 
+	lock_kernel();
 	fat_free(inode, (inode->i_size + (cluster - 1)) >> sbi->cluster_bits);
 	MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
+	unlock_kernel();
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 }

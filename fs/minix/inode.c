@@ -27,12 +27,10 @@ static int minix_remount (struct super_block * sb, int * flags, char * data);
 
 static void minix_delete_inode(struct inode *inode)
 {
-	lock_kernel();
-
 	inode->i_size = 0;
 	minix_truncate(inode);
+	lock_kernel();
 	minix_free_inode(inode);
-
 	unlock_kernel();
 }
 
@@ -551,10 +549,12 @@ int minix_sync_inode(struct inode * inode)
  */
 void minix_truncate(struct inode * inode)
 {
+	lock_kernel();
 	if (INODE_VERSION(inode) == MINIX_V1)
 		V1_minix_truncate(inode);
 	else
 		V2_minix_truncate(inode);
+	unlock_kernel();
 }
 
 static struct super_block *minix_get_sb(struct file_system_type *fs_type,

@@ -37,6 +37,7 @@
 #include <linux/stat.h>
 #include <linux/locks.h>
 #include <linux/string.h>
+#include <linux/smp_lock.h>
 
 #include "swab.h"
 #include "util.h"
@@ -439,6 +440,7 @@ void ufs_truncate (struct inode * inode)
 		return;
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
+	lock_kernel();
 	while (1) {
 		retry = ufs_trunc_direct(inode);
 		retry |= ufs_trunc_indirect (inode, UFS_IND_BLOCK,
@@ -464,6 +466,7 @@ void ufs_truncate (struct inode * inode)
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	ufsi->i_lastfrag = DIRECT_FRAGMENT;
+	unlock_kernel();
 	mark_inode_dirty(inode);
 	UFSD(("EXIT\n"))
 }

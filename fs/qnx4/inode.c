@@ -63,9 +63,9 @@ int qnx4_sync_inode(struct inode *inode)
 static void qnx4_delete_inode(struct inode *inode)
 {
 	QNX4DEBUG(("qnx4: deleting inode [%lu]\n", (unsigned long) inode->i_ino));
-	lock_kernel();
 	inode->i_size = 0;
 	qnx4_truncate(inode);
+	lock_kernel();
 	qnx4_free_inode(inode);
 	unlock_kernel();
 }
