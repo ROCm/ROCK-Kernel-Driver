@@ -171,6 +171,9 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (!attr->ia_valid)
 		return 0;
 
+	if (ia_valid & ATTR_SIZE)
+		down_write(&dentry->d_inode->i_alloc_sem);
+
 	if (inode->i_op && inode->i_op->setattr) {
 		error = security_inode_setattr(dentry, attr);
 		if (!error)
@@ -187,6 +190,10 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 				error = inode_setattr(inode, attr);
 		}
 	}
+
+	if (ia_valid & ATTR_SIZE)
+		up_write(&dentry->d_inode->i_alloc_sem);
+
 	if (!error) {
 		unsigned long dn_mask = setattr_mask(ia_valid);
 		if (dn_mask)
