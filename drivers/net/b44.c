@@ -331,6 +331,29 @@ static int b44_writephy(struct b44 *bp, int reg, u32 val)
 	return b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
 }
 
+/* miilib interface */
+/* FIXME FIXME: phy_id is ignored, bp->phy_addr use is unconditional
+ * due to code existing before miilib use was added to this driver.
+ * Someone should remove this artificial driver limitation in
+ * b44_{read,write}phy.  bp->phy_addr itself is fine (and needed).
+ */
+static int b44_mii_read(struct net_device *dev, int phy_id, int location)
+{
+	u32 val;
+	struct b44 *bp = netdev_priv(dev);
+	int rc = b44_readphy(bp, location, &val);
+	if (rc)
+		return 0xffffffff;
+	return val;
+}
+
+static void b44_mii_write(struct net_device *dev, int phy_id, int location,
+			 int val)
+{
+	struct b44 *bp = netdev_priv(dev);
+	b44_writephy(bp, location, val);
+}
+
 static int b44_phy_reset(struct b44 *bp)
 {
 	u32 val;
@@ -1607,38 +1630,11 @@ static int b44_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct b44 *bp = netdev_priv(dev);
 	int err;
 
-	switch (cmd) {
-	case SIOCGMIIPHY:
-		data->phy_id = bp->phy_addr;
+	spin_lock_irq(&bp->lock);
+	err = generic_mii_ioctl(&bp->mii_if, data, cmd, NULL);
+	spin_unlock_irq(&bp->lock);
 
-		/* fallthru */
-	case SIOCGMIIREG: {
-		u32 mii_regval;
-
-		spin_lock_irq(&bp->lock);
-		err = b44_readphy(bp, data->reg_num & 0x1f, &mii_regval);
-		spin_unlock_irq(&bp->lock);
-
-		data->val_out = mii_regval;
-
-		return err;
-	}
-
-	case SIOCSMIIREG:
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
-		spin_lock_irq(&bp->lock);
-		err = b44_writephy(bp, data->reg_num & 0x1f, data->val_in);
-		spin_unlock_irq(&bp->lock);
-
-		return err;
-
-	default:
-		/* do nothing */
-		break;
-	};
-	return -EOPNOTSUPP;
+	return err;
 }
 
 /* Read 128-bytes of EEPROM. */
@@ -1789,6 +1785,13 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 		       "aborting.\n");
 		goto err_out_iounmap;
 	}
+
+	bp->mii_if.dev = dev;
+	bp->mii_if.mdio_read = b44_mii_read;
+	bp->mii_if.mdio_write = b44_mii_write;
+	bp->mii_if.phy_id = bp->phy_addr;
+	bp->mii_if.phy_id_mask = 0x1f;
+	bp->mii_if.reg_num_mask = 0x1f;
 
 	/* By default, advertise all speed/duplex settings. */
 	bp->flags |= (B44_FLAG_ADV_10HALF | B44_FLAG_ADV_10FULL |
