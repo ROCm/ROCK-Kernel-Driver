@@ -964,6 +964,55 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 }
 
 /**
+ * usb_reset_configuration - lightweight device reset
+ * @dev: the device whose configuration is being reset
+ *
+ * This issues a standard SET_CONFIGURATION request to the device using
+ * the current configuration.  The effect is to reset most USB-related
+ * state in the device, including interface altsettings (reset to zero),
+ * endpoint halts (cleared), and data toggle (only for bulk and interrupt
+ * endpoints).  Other usbcore state is unchanged, including bindings of
+ * usb device drivers to interfaces.
+ *
+ * Because this affects multiple interfaces, avoid using this with composite
+ * (multi-interface) devices.  Instead, the driver for each interface may
+ * use usb_set_interface() on the interfaces it claims.  Resetting the whole
+ * configuration would affect other drivers' interfaces.
+ *
+ * Returns zero on success, else a negative error code.
+ */
+int usb_reset_configuration(struct usb_device *dev)
+{
+	int			i, retval;
+	struct usb_host_config	*config;
+
+	for (i = 1; i < 16; ++i) {
+		usb_disable_endpoint(dev, i);
+		usb_disable_endpoint(dev, i + USB_DIR_IN);
+	}
+
+	config = dev->actconfig;
+	retval = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			USB_REQ_SET_CONFIGURATION, 0,
+			config->desc.bConfigurationValue, 0,
+			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+	if (retval < 0)
+		return retval;
+
+	dev->toggle[0] = dev->toggle[1] = 0;
+	dev->halted[0] = dev->halted[1] = 0;
+
+	/* re-init hc/hcd interface/endpoint state */
+	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+		struct usb_interface *intf = config->interface[i];
+
+		intf->act_altsetting = 0;
+		usb_enable_interface(dev, intf);
+	}
+	return 0;
+}
+
+/**
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
@@ -1136,7 +1185,10 @@ EXPORT_SYMBOL(usb_get_device_descriptor);
 EXPORT_SYMBOL(usb_get_status);
 EXPORT_SYMBOL(usb_get_string);
 EXPORT_SYMBOL(usb_string);
+
+// synchronous calls that also maintain usbcore state
 EXPORT_SYMBOL(usb_clear_halt);
+EXPORT_SYMBOL(usb_reset_configuration);
 EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 

@@ -1335,7 +1335,10 @@ int usb_physical_reset_device(struct usb_device *dev)
 
 	kfree(descriptor);
 
-	ret = usb_set_configuration(dev, dev->actconfig->desc.bConfigurationValue);
+	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			USB_REQ_SET_CONFIGURATION, 0,
+			dev->actconfig->desc.bConfigurationValue, 0,
+			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
 	if (ret < 0) {
 		err("failed to set dev %s active configuration (error=%d)",
 			dev->devpath, ret);

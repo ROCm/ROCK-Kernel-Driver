@@ -2560,8 +2560,8 @@ static int snd_usb_extigy_boot_quirk(struct usb_device *dev, struct usb_interfac
 		err = usb_get_device_descriptor(dev);
 		config = dev->actconfig;
 		if (err < 0) snd_printdd("error usb_get_device_descriptor: %d\n", err);
-		err = usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue);
-		if (err < 0) snd_printdd("error usb_set_configuration: %d\n", err);
+		err = usb_reset_configuration(dev);
+		if (err < 0) snd_printdd("error usb_reset_configuration: %d\n", err);
 		snd_printdd("extigy_boot: new boot length = %d\n", get_cfg_desc(config)->wTotalLength);
 		return -ENODEV; /* quit this anyway */
 	}
@@ -2761,8 +2761,8 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		 * now look for an empty slot and create a new card instance
 		 */
 		/* first, set the current configuration for this device */
-		if (usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue) < 0) {
-			snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", get_cfg_desc(config)->bConfigurationValue);
+		if (usb_reset_configuration(dev) < 0) {
+			snd_printk(KERN_ERR "cannot reset configuration (value 0x%x)\n", get_cfg_desc(config)->bConfigurationValue);
 			goto __error;
 		}
 		for (i = 0; i < SNDRV_CARDS; i++)

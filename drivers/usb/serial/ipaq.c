@@ -555,8 +555,12 @@ static void ipaq_destroy_lists(struct usb_serial_port *port)
 static int ipaq_startup(struct usb_serial *serial)
 {
 	dbg("%s", __FUNCTION__);
-	usb_set_configuration(serial->dev, 1);
-	return 0;
+	if (serial->dev->actconfig->desc.bConfigurationValue != 1) {
+		err("active config #%d != 1 ??",
+			serial->dev->actconfig->desc.bConfigurationValue);
+		return -ENODEV;
+	}
+	return usb_reset_configuration (serial->dev);
 }
 
 static void ipaq_shutdown(struct usb_serial *serial)
