@@ -791,7 +791,7 @@ static ide_startstop_t cdrom_transfer_packet_command (ide_drive_t *drive,
 	ide_set_handler(drive, handler, timeout, cdrom_timer_expiry);
 
 	/* Send the command to the device. */
-	atapi_output_bytes(drive, cmd, CDROM_PACKET_SIZE);
+	atapi_write(drive, cmd, CDROM_PACKET_SIZE);
 
 	return ide_started;
 }
@@ -830,7 +830,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 	/* Read the data into the buffer. */
 	dest = info->buffer + info->nsectors_buffered * SECTOR_SIZE;
 	while (sectors_to_buffer > 0) {
-		atapi_input_bytes (drive, dest, SECTOR_SIZE);
+		atapi_read(drive, dest, SECTOR_SIZE);
 		--sectors_to_buffer;
 		--sectors_to_transfer;
 		++info->nsectors_buffered;
@@ -840,7 +840,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 	/* Throw away any remaining data. */
 	while (sectors_to_transfer > 0) {
 		char dum[SECTOR_SIZE];
-		atapi_input_bytes (drive, dum, sizeof (dum));
+		atapi_read(drive, dum, sizeof (dum));
 		--sectors_to_transfer;
 	}
 }
@@ -866,7 +866,7 @@ int cdrom_read_check_ireason (ide_drive_t *drive, int len, int ireason)
 		   and quit this request. */
 		while (len > 0) {
 			int dum = 0;
-			atapi_output_bytes (drive, &dum, sizeof (dum));
+			atapi_write(drive, &dum, sizeof (dum));
 			len -= sizeof (dum);
 		}
 	} else  if (ireason == 1) {
@@ -963,7 +963,7 @@ static ide_startstop_t cdrom_read_intr(ide_drive_t *drive)
 	while (nskip > 0) {
 		/* We need to throw away a sector. */
 		char dum[SECTOR_SIZE];
-		atapi_input_bytes (drive, dum, sizeof (dum));
+		atapi_read(drive, dum, SECTOR_SIZE);
 
 		--rq->current_nr_sectors;
 		--nskip;
@@ -994,7 +994,7 @@ static ide_startstop_t cdrom_read_intr(ide_drive_t *drive)
 			/* Read this_transfer sectors
 			   into the current buffer. */
 			while (this_transfer > 0) {
-				atapi_input_bytes(drive, rq->buffer, SECTOR_SIZE);
+				atapi_read(drive, rq->buffer, SECTOR_SIZE);
 				rq->buffer += SECTOR_SIZE;
 				--rq->nr_sectors;
 				--rq->current_nr_sectors;
@@ -1290,13 +1290,14 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 	/* The drive wants to be written to. */
 	if ((ireason & 3) == 0) {
 		/* Transfer the data. */
-		atapi_output_bytes (drive, pc->buffer, thislen);
+		atapi_write(drive, pc->buffer, thislen);
 
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
 			int dum = 0;
-			atapi_output_bytes (drive, &dum, sizeof (dum));
+
+			atapi_write(drive, &dum, sizeof (dum));
 			len -= sizeof (dum);
 		}
 
@@ -1307,15 +1308,14 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 
 	/* Same drill for reading. */
 	else if ((ireason & 3) == 2) {
-
 		/* Transfer the data. */
-		atapi_input_bytes (drive, pc->buffer, thislen);
+		atapi_read(drive, pc->buffer, thislen);
 
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
 			int dum = 0;
-			atapi_input_bytes (drive, &dum, sizeof (dum));
+			atapi_read(drive, &dum, sizeof (dum));
 			len -= sizeof (dum);
 		}
 
@@ -1458,7 +1458,7 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 		   and quit this request. */
 		while (len > 0) {
 			int dum = 0;
-			atapi_output_bytes(drive, &dum, sizeof(dum));
+			atapi_write(drive, &dum, sizeof(dum));
 			len -= sizeof(dum);
 		}
 	} else {
@@ -1549,7 +1549,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		this_transfer = MIN(sectors_to_transfer,rq->current_nr_sectors);
 
 		while (this_transfer > 0) {
-			atapi_output_bytes(drive, rq->buffer, SECTOR_SIZE);
+			atapi_write(drive, rq->buffer, SECTOR_SIZE);
 			rq->buffer += SECTOR_SIZE;
 			--rq->nr_sectors;
 			--rq->current_nr_sectors;

@@ -183,7 +183,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 			"%s: Failed Promise read config!\n",hwif->name);
 		return 0;
 	}
-	ata_input_data(drive, &ident, SECTOR_WORDS);
+	ata_read(drive, &ident, SECTOR_WORDS);
 	if (ident.id[1] != 'P' || ident.id[0] != 'T') {
 		return 0;
 	}
@@ -332,7 +332,7 @@ read_next:
 		nsect = sectors_avail;
 	sectors_avail -= nsect;
 	to = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
-	ata_input_data(drive, to, nsect * SECTOR_WORDS);
+	ata_read(drive, to, nsect * SECTOR_WORDS);
 #ifdef DEBUG_READ
 	printk(KERN_DEBUG "%s:  promise_read: sectors(%ld-%ld), "
 	       "buf=0x%08lx, rem=%ld\n", drive->name, rq->sector,
@@ -460,7 +460,7 @@ int promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 		 * Ok, we're all setup for the interrupt
 		 * re-entering us on the last transfer.
 		 */
-		taskfile_output_data(drive, buffer, nsect<<7);
+		ata_write(drive, buffer, nsect << 7);
 		bio_kunmap_irq(buffer, &flags);
 	} while (mcount);
 

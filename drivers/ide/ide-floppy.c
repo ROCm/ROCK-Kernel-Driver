@@ -717,7 +717,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 			return;
 		}
 		count = IDEFLOPPY_MIN (bio->bi_size - pc->b_count, bcount);
-		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
+		atapi_read(drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 	}
 }
@@ -744,7 +744,7 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 			return;
 		}
 		count = IDEFLOPPY_MIN (pc->b_count, bcount);
-		atapi_output_bytes (drive, pc->b_data, count);
+		atapi_write(drive, pc->b_data, count);
 		bcount -= count; pc->b_data += count; pc->b_count -= count;
 	}
 }
@@ -979,12 +979,12 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 	}
 	if (test_bit (PC_WRITING, &pc->flags)) {
 		if (pc->buffer != NULL)
-			atapi_output_bytes (drive,pc->current_position,bcount.all);	/* Write the current buffer */
+			atapi_write(drive,pc->current_position,bcount.all);	/* Write the current buffer */
 		else
 			idefloppy_output_buffers (drive, pc, bcount.all);
 	} else {
 		if (pc->buffer != NULL)
-			atapi_input_bytes (drive,pc->current_position,bcount.all);	/* Read the current buffer */
+			atapi_read(drive,pc->current_position,bcount.all);	/* Read the current buffer */
 		else
 			idefloppy_input_buffers (drive, pc, bcount.all);
 	}
@@ -1020,7 +1020,7 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, &idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+	atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
 
 	return ide_started;
 }
@@ -1042,7 +1042,7 @@ static int idefloppy_transfer_pc2 (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 
-	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+	atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
 	return IDEFLOPPY_WAIT_CMD;		/* Timeout for the packet command */
 }
 
