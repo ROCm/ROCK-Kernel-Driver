@@ -1,0 +1,32 @@
+#
+# MMC subsystem configuration
+#
+
+menu "MMC/SD Card support"
+
+config MMC
+	tristate "MMC support"
+	help
+	  MMC is the "multi-media card" bus protocol.
+
+	  If you want MMC support, you should say Y here and also
+	  to the specific driver for your MMC interface.
+
+config MMC_DEBUG
+	bool "MMC debugging"
+	depends on MMC != n
+	help
+	  This is an option for use by developers; most people should
+	  say N here.  This enables MMC core and driver debugging.
+
+config MMC_BLOCK
+	tristate "MMC block device driver"
+	depends on MMC
+	default y
+	help
+	  Say Y here to enable the MMC block device driver support.
+	  This provides a block device driver, which you can use to
+	  mount the filesystem. Almost everyone wishing MMC support
+	  should say Y or M here.
+
+endmenu
