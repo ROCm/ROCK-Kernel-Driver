@@ -355,5 +355,11 @@ config ACPI_INITRD
 	  one found in the initrd, the DSDT from the BIOS is used. Even you do not 
 	  need a new one at the moment, you may want to use a better implemented 
 	  DSDT later. It is save to say yes here
-
+config ACPI_ENABLE_OBJECT_CACHE
+	bool "Enable ACPI object cache"
+	depends on ACPI
+	default y
+	help
+	  Improves performance for ACPI drivers especially when ACPI_DEBUG is
+          compiled in.
 endmenu
