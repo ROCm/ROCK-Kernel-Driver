@@ -1040,6 +1040,20 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 		sk->sk_stamp = *stamp;
 }
 
+/**
+ * sk_eat_skb - Release a skb if it is no longer needed
+ * @sk - socket to eat this skb from
+ * @skb - socket buffer to eat
+ *
+ * This routine must be called with interrupts disabled or with the socket
+ * locked so that the sk_buff queue operation is ok.
+*/
+static inline void sk_eat_skb(struct sock *sk, struct sk_buff *skb)
+{
+	__skb_unlink(skb, &sk->sk_receive_queue);
+	__kfree_skb(skb);
+}
+
 extern atomic_t netstamp_needed;
 extern void sock_enable_timestamp(struct sock *sk);
 extern void sock_disable_timestamp(struct sock *sk);
