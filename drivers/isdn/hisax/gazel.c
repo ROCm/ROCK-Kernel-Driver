@@ -382,12 +382,16 @@ reset_gazel(struct IsdnCardState *cs)
 			outb(INT_ISAC_EN + INT_HSCX_EN + INT_PCI_EN, addr + PLX_INCSR);
 			break;
 		case R753:
-			plxcntrl = inl(addr + PLX_CNTRL);
+			if (test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags))
+				/* we can't read, assume the default */
+				plxcntrl = 0x18784db6;
+			else
+				plxcntrl = inl(addr + PLX_CNTRL);
 			plxcntrl |= (RESET_9050 + RESET_GAZEL);
 			outl(plxcntrl, addr + PLX_CNTRL);
-			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
 			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x20);
 			HZDELAY(4);
+			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
 			outl(plxcntrl, addr + PLX_CNTRL);
 			HZDELAY(10);
 			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x00);
@@ -549,6 +553,7 @@ setup_gazelpci(struct IsdnCardState *cs)
 	u_int pci_ioaddr0 = 0, pci_ioaddr1 = 0;
 	u_char pci_irq = 0, found;
 	u_int nbseek, seekcard;
+	u_char pci_rev;
 
 	printk(KERN_WARNING "Gazel: PCI card automatic recognition\n");
 
@@ -623,6 +628,18 @@ setup_gazelpci(struct IsdnCardState *cs)
 			printk(KERN_INFO
 			    "Gazel: config irq:%d ipac:0x%X  cfg:0x%X\n",
 			cs->irq, cs->hw.gazel.ipac, cs->hw.gazel.cfg_reg);
+			/* 
+			 * Erratum for PLX9050, revision 1:
+			 * If bit 7 of BAR 0/1 is set, local config registers
+			 * can not be read (write is okay)
+			 */
+			if (cs->hw.gazel.cfg_reg & 0x80) {
+				pci_read_config_byte(dev_tel, PCI_REVISION_ID, &pci_rev);
+				if (pci_rev == 1) {
+					printk(KERN_INFO "Gazel: PLX9050 rev1 workaround activated");
+					set_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags);
+				}
+			}
 			break;
 	}
 

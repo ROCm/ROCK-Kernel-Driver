@@ -859,6 +859,7 @@ struct icc_chip {
 #define FLG_ARCOFI_TIMER	8
 #define FLG_ARCOFI_ERROR	9
 #define FLG_HW_L1_UINT		10
+#define FLG_BUGGY_PLX9050       11
 
 struct IsdnCardState {
 	unsigned char typ;

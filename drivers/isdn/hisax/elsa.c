@@ -396,7 +396,8 @@ elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	if (cs->subtyp == ELSA_QS1000PCI || cs->subtyp == ELSA_QS3000PCI) {
 		val = bytein(cs->hw.elsa.cfg + 0x4c); /* PCI IRQ */
-		if (!(val & ELSA_PCI_IRQ_MASK))
+		if (!test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags) && 
+		    !(val & ELSA_PCI_IRQ_MASK))
 			return;
 	}
 #if ARCOFI_USE
@@ -868,7 +869,7 @@ setup_elsa(struct IsdnCard *card)
 {
 	long flags;
 	int bytecnt;
-	u_char val;
+	u_char val, pci_rev;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -992,6 +993,7 @@ setup_elsa(struct IsdnCard *card)
 			cs->irq = dev_qs1000->irq;
 			cs->hw.elsa.cfg = pci_resource_start(dev_qs1000, 1);
 			cs->hw.elsa.base = pci_resource_start(dev_qs1000, 3);
+			pci_read_config_byte(dev_qs1000, PCI_REVISION_ID, &pci_rev);
 		} else if ((dev_qs3000 = pci_find_device(PCI_VENDOR_ID_ELSA,
 			PCI_DEVICE_ID_ELSA_QS3000, dev_qs3000))) {
 			if (pci_enable_device(dev_qs3000))
@@ -1000,6 +1002,7 @@ setup_elsa(struct IsdnCard *card)
 			cs->irq = dev_qs3000->irq;
 			cs->hw.elsa.cfg = pci_resource_start(dev_qs3000, 1);
 			cs->hw.elsa.base = pci_resource_start(dev_qs3000, 3);
+			pci_read_config_byte(dev_qs1000, PCI_REVISION_ID, &pci_rev);
 		} else {
 			printk(KERN_WARNING "Elsa: No PCI card found\n");
 			return(0);
@@ -1013,15 +1016,9 @@ setup_elsa(struct IsdnCard *card)
 			printk(KERN_WARNING "Elsa: No IO-Adr for PCI card found\n");
 			return(0);
 		}
-		if ((cs->hw.elsa.cfg & 0xff) || (cs->hw.elsa.base & 0xf)) {
-			printk(KERN_WARNING "Elsa: You may have a wrong PCI bios\n");
-			printk(KERN_WARNING "Elsa: If your system hangs now, read\n");
-			printk(KERN_WARNING "Elsa: Documentation/isdn/README.HiSax\n");
-			printk(KERN_WARNING "Elsa: Waiting 5 sec to sync discs\n");
-			save_flags(flags);
-			sti();
-			HZDELAY(500);	/* wait 500*10 ms */
-			restore_flags(flags);
+		if (cs->hw.elsa.cfg & 0x80 && pci_rev == 1) {
+			printk(KERN_INFO "Elsa: PLX9050 rev1 workaround activated");
+			set_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags);
 		}
 		cs->hw.elsa.ale  = cs->hw.elsa.base;
 		cs->hw.elsa.isac = cs->hw.elsa.base +1;
