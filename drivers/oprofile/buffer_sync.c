@@ -236,8 +236,6 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 	struct vm_area_struct * vma;
 
 	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
-		if (!vma)
-			goto out;
  
 		if (!vma->vm_file)
 			continue;
@@ -250,7 +248,7 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 		*offset = (vma->vm_pgoff << PAGE_SHIFT) + addr - vma->vm_start; 
 		break;
 	}
-out:
+
 	return cookie;
 }
 
