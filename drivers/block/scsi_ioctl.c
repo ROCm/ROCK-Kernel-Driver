@@ -139,6 +139,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(GPCMD_PAUSE_RESUME),
 
 		/* CD/DVD data reading */
+		safe_for_read(GPCMD_READ_BUFFER_CAPACITY),
 		safe_for_read(GPCMD_READ_CD),
 		safe_for_read(GPCMD_READ_CD_MSF),
 		safe_for_read(GPCMD_READ_DISC_INFO),
