@@ -201,9 +201,15 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	 * A zero mmap always succeeds in Linux, independent of whether or not the
 	 * remaining arguments are valid.
 	 */
-	len = PAGE_ALIGN(len);
 	if (len == 0)
 		goto out;
+
+	/* Careful about overflows.. */
+	len = PAGE_ALIGN(len);
+	if (!len || len > TASK_SIZE) {
+		addr = -EINVAL;
+		goto out;
+	}
 
 	/*
 	 * Don't permit mappings into unmapped space, the virtual page table of a region,
