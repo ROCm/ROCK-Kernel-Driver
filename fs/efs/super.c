@@ -15,6 +15,9 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 
+static int efs_statfs(struct super_block *s, struct kstatfs *buf);
+static int efs_fill_super(struct super_block *s, void *d, int silent);
+
 static struct super_block *efs_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
@@ -71,7 +74,7 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "efs_inode_cache: not all structures were freed\n");
 }
 
-void efs_put_super(struct super_block *s)
+static void efs_put_super(struct super_block *s)
 {
 	kfree(s->s_fs_info);
 	s->s_fs_info = NULL;
@@ -213,7 +216,7 @@ static int efs_validate_super(struct efs_sb_info *sb, struct efs_super *super) {
 	return 0;    
 }
 
-int efs_fill_super(struct super_block *s, void *d, int silent)
+static int efs_fill_super(struct super_block *s, void *d, int silent)
 {
 	struct efs_sb_info *sb;
 	struct buffer_head *bh;
@@ -292,7 +295,7 @@ out_no_fs:
 	return -EINVAL;
 }
 
-int efs_statfs(struct super_block *s, struct kstatfs *buf) {
+static int efs_statfs(struct super_block *s, struct kstatfs *buf) {
 	struct efs_sb_info *sb = SUPER_INFO(s);
 
 	buf->f_type    = EFS_SUPER_MAGIC;	/* efs magic number */
