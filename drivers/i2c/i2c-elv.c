@@ -88,34 +88,31 @@ static int bit_elv_getsda(void *data)
 
 static int bit_elv_init(void)
 {
-	if (check_region(base,(base == 0x3bc)? 3 : 8) < 0 ) {
-		return -ENODEV;	
-	} else {
-						/* test for ELV adap. 	*/
-		if (inb(base+1) & 0x80) {	/* BUSY should be high	*/
-			DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Busy was low.\n"));
-			return -ENODEV;
-		} else {
-			outb(0x0c,base+2);	/* SLCT auf low		*/
-			udelay(400);
-			if ( !(inb(base+1) && 0x10) ) {
-				outb(0x04,base+2);
-				DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Select was high.\n"));
-				return -ENODEV;
-			}
-		}
-		request_region(base,(base == 0x3bc)? 3 : 8,
-			"i2c (ELV adapter)");
-		PortData = 0;
-		bit_elv_setsda((void*)base,1);
-		bit_elv_setscl((void*)base,1);
-	}
-	return 0;
-}
+	if (!request_region(base, (base == 0x3bc) ? 3 : 8,
+				"i2c (ELV adapter)"))
+		return -ENODEV;
 
-static void __exit bit_elv_exit(void)
-{
-	release_region( base , (base == 0x3bc)? 3 : 8 );
+	if (inb(base+1) & 0x80) {	/* BUSY should be high	*/
+		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Busy was low.\n"));
+		goto fail;
+	} 
+
+	outb(0x0c,base+2);	/* SLCT auf low		*/
+	udelay(400);
+	if (!(inb(base+1) && 0x10)) {
+		outb(0x04,base+2);
+		DEBINIT(printk(KERN_DEBUG "i2c-elv.o: Select was high.\n"));
+		goto fail;
+	}
+
+	PortData = 0;
+	bit_elv_setsda((void*)base,1);
+	bit_elv_setscl((void*)base,1);
+	return 0;
+
+fail:
+	release_region(base , (base == 0x3bc) ? 3 : 8);
+	return -ENODEV;
 }
 
 static int bit_elv_reg(struct i2c_client *client)

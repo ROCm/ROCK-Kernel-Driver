@@ -648,6 +648,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 					I2C_FUNC_SMBUS_QUICK)) return -1;
 
 	for (addr = 0x00; addr <= (is_isa ? 0xffff : 0x7f); addr++) {
+		/* XXX: WTF is going on here??? */
 		if ((is_isa && check_region(addr, 1)) ||
 		    (!is_isa && i2c_check_addr(adapter, addr)))
 			continue;

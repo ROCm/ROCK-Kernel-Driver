@@ -142,11 +142,11 @@ static void pcf_isa_handler(int this_irq, void *dev_id, struct pt_regs *regs) {
 static int pcf_isa_init(void)
 {
 	if (!mmapped) {
-		if (check_region(base, 2) < 0 ) {
-			printk(KERN_ERR "i2c-elektor.o: requested I/O region (0x%X:2) is in use.\n", base);
+		if (!request_region(base, 2, "i2c (isa bus adapter)"))
+			printk(KERN_ERR
+			       "i2c-elektor.o: requested I/O region (0x%X:2) "
+			       "is in use.\n", base);
 			return -ENODEV;
-		} else {
-			request_region(base, 2, "i2c (isa bus adapter)");
 		}
 	}
 	if (irq > 0) {
