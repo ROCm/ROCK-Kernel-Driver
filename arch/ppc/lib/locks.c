@@ -22,7 +22,7 @@
  * since they may inhibit forward progress by other CPUs in getting
  * a lock.
  */
-unsigned long __spin_trylock(volatile unsigned long *lock)
+static inline unsigned long __spin_trylock(volatile unsigned long *lock)
 {
 	unsigned long ret;
 
@@ -62,6 +62,7 @@ void _raw_spin_lock(spinlock_t *lock)
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	lock->owner_cpu = cpu;
 }
+EXPORT_SYMBOL(_raw_spin_lock);
 
 int _raw_spin_trylock(spinlock_t *lock)
 {
@@ -71,6 +72,7 @@ int _raw_spin_trylock(spinlock_t *lock)
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	return 1;
 }
+EXPORT_SYMBOL(_raw_spin_trylock);
 
 void _raw_spin_unlock(spinlock_t *lp)
 {
@@ -86,6 +88,7 @@ void _raw_spin_unlock(spinlock_t *lp)
 	wmb();
 	lp->lock = 0;
 }
+EXPORT_SYMBOL(_raw_spin_unlock);
 
 
 /*
@@ -119,6 +122,7 @@ again:
 	}
 	wmb();
 }
+EXPORT_SYMBOL(_raw_read_lock);
 
 void _raw_read_unlock(rwlock_t *rw)
 {
@@ -129,6 +133,7 @@ void _raw_read_unlock(rwlock_t *rw)
 	wmb();
 	atomic_dec((atomic_t *) &(rw)->lock);
 }
+EXPORT_SYMBOL(_raw_read_unlock);
 
 void _raw_write_lock(rwlock_t *rw)
 {
@@ -169,6 +174,22 @@ again:
 	}
 	wmb();
 }
+EXPORT_SYMBOL(_raw_write_lock);
+
+int _raw_write_trylock(rwlock_t *rw)
+{
+	if (test_and_set_bit(31, &(rw)->lock)) /* someone has a write lock */
+		return 0;
+
+	if ((rw)->lock & ~(1<<31)) {	/* someone has a read lock */
+		/* clear our write lock and wait for reads to go away */
+		clear_bit(31,&(rw)->lock);
+		return 0;
+	}
+	wmb();
+	return 1;
+}
+EXPORT_SYMBOL(_raw_write_trylock);
 
 void _raw_write_unlock(rwlock_t *rw)
 {
@@ -179,5 +200,6 @@ void _raw_write_unlock(rwlock_t *rw)
 	wmb();
 	clear_bit(31,&(rw)->lock);
 }
+EXPORT_SYMBOL(_raw_write_unlock);
 
 #endif
