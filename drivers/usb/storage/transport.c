@@ -878,7 +878,7 @@ void usb_stor_abort_transport(struct us_data *us)
 	up(&(us->current_urb_sem));
 
 	/* If we are waiting for an IRQ, simulate it */
-	if (test_bit(IP_WANTED, &us->bitflags)) {
+	if (test_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("-- simulating missing IRQ\n");
 		usb_stor_CBI_irq(us->irq_urb);
 	}
@@ -903,7 +903,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 
 		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(IP_WANTED, &us->bitflags)) {
+		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 			US_DEBUGP("ERROR: Unwanted interrupt received!\n");
 			return;
 		}
@@ -919,7 +919,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 		US_DEBUGP("-- device has been removed\n");
 
 		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(IP_WANTED, &us->bitflags))
+		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags))
 			return;
 
 		/* indicate a transport error -- this is the best we can do */
@@ -943,7 +943,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 	}
 
 	/* was this a wanted interrupt? */
-	if (!test_and_clear_bit(IP_WANTED, &us->bitflags)) {
+	if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("ERROR: Unwanted interrupt received!\n");
 		return;
 	}
@@ -965,7 +965,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	init_MUTEX_LOCKED(&(us->ip_waitq));
 
 	/* Set up for status notification */
-	set_bit(IP_WANTED, &us->bitflags);
+	set_bit(US_FLIDX_IP_WANTED, &us->flags);
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
@@ -978,7 +978,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	US_DEBUGP("Call to usb_stor_control_msg() returned %d\n", result);
 	if (result < 0) {
 		/* Reset flag for status notification */
-		clear_bit(IP_WANTED, &us->bitflags);
+		clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 	}
 
 	/* did we abort this command? */
@@ -1016,11 +1016,11 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* report any errors */
 		if (result == US_BULK_TRANSFER_ABORTED) {
-			clear_bit(IP_WANTED, &us->bitflags);
+			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_ABORTED;
 		}
 		if (result == US_BULK_TRANSFER_FAILED) {
-			clear_bit(IP_WANTED, &us->bitflags);
+			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 	}

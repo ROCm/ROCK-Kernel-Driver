@@ -396,7 +396,7 @@ static int usb_stor_control_thread(void * __us)
 		}
 
 		/* our device has gone - pretend not ready */
-		else if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+		else if (!(us->flags & US_FL_DEV_ATTACHED)) {
 			US_DEBUGP("Request is for removed device\n");
 			/* For REQUEST_SENSE, it's the data.  But
 			 * for anything else, it should look like
@@ -420,7 +420,7 @@ static int usb_stor_control_thread(void * __us)
 				       sizeof(usb_stor_sense_notready));
 				us->srb->result = CHECK_CONDITION << 1;
 			}
-		}  /* test_bit(DEV_ATTACHED, &us->bitflags) */
+		}  /* !(us->flags & US_FL_DEV_ATTACHED) */
 
 		/* Handle those devices which need us to fake 
 		 * their inquiry data */
@@ -570,7 +570,7 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 	}
 
 	/* mark the device as gone */
-	clear_bit(DEV_ATTACHED, &ss->bitflags);
+	ss->flags &= ~ US_FL_DEV_ATTACHED;
 	usb_put_dev(ss->pusb_dev);
 	ss->pusb_dev = NULL;
 }
@@ -726,7 +726,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 	 */
 	ss = us_list;
 	while ((ss != NULL) && 
-	           (test_bit(DEV_ATTACHED, &ss->bitflags) ||
+	           ((ss->flags & US_FL_DEV_ATTACHED) ||
 		    !GUID_EQUAL(guid, ss->guid)))
 		ss = ss->next;
 
@@ -741,7 +741,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
-		set_bit(DEV_ATTACHED, &ss->bitflags);
+		ss->flags |= US_FL_DEV_ATTACHED;
 
 		/* copy over the endpoint data */
 		ss->ep_in = ep_in->bEndpointAddress & 
@@ -785,7 +785,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* copy over the subclass and protocol data */
 		ss->subclass = subclass;
 		ss->protocol = protocol;
-		ss->flags = flags;
+		ss->flags = flags | US_FL_DEV_ATTACHED;
 		ss->unusual_dev = unusual_dev;
 
 		/* copy over the endpoint data */
@@ -1000,7 +1000,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* start up our control thread */
 		atomic_set(&ss->sm_state, US_STATE_IDLE);
-		set_bit(DEV_ATTACHED, &ss->bitflags);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {

@@ -198,7 +198,7 @@ static int device_reset( Scsi_Cmnd *srb )
 	US_DEBUGP("device_reset() called\n" );
 
 	/* if the device was removed, then we're already reset */
-	if (!test_bit(DEV_ATTACHED, &us->bitflags))
+	if (!(us->flags & US_FL_DEV_ATTACHED))
 		return SUCCESS;
 
 	scsi_unlock(srb->host);
@@ -229,7 +229,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	US_DEBUGP("bus_reset() called\n");
 
 	/* if the device has been removed, this worked */
-	if (!test_bit(DEV_ATTACHED, &us->bitflags)) {
+	if (!(us->flags & US_FL_DEV_ATTACHED)) {
 		US_DEBUGP("-- device removed already\n");
 		return SUCCESS;
 	}
@@ -331,8 +331,8 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
 
 	/* show the GUID of the device */
 	SPRINTF("         GUID: " GUID_FORMAT "\n", GUID_ARGS(us->guid));
-	SPRINTF("     Attached: %s\n", (test_bit(DEV_ATTACHED, &us->bitflags)
-			? "Yes" : "No"));
+	SPRINTF("     Attached: %s\n", (us->flags & US_FL_DEV_ATTACHED ?
+			"Yes" : "No"));
 
 	/*
 	 * Calculate start of next buffer, and return value.
