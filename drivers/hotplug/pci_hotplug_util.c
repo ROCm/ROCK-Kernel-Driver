@@ -96,7 +96,7 @@ static int pci_visit_bridge (struct pci_visit * fn, struct pci_dev_wrapped *wrap
 {
 	struct pci_bus *bus;
 	struct pci_bus_wrapped wrapped_bus;
-	int result;
+	int result = 0;
 
 	dbg("scanning bridge %02x, %02x\n", PCI_SLOT(wrapped_dev->dev->devfn),
 	    PCI_FUNC(wrapped_dev->dev->devfn));
