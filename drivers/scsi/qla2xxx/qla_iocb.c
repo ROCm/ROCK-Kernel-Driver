@@ -527,8 +527,6 @@ __qla2x00_marker(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun,
 {
 	mrk_entry_t	*pkt;
 
-	ENTER(__func__);
-
 	pkt = (mrk_entry_t *)qla2x00_req_pkt(ha);
 	if (pkt == NULL) {
 		DEBUG2_3(printk("%s(): **** FAILED ****\n", __func__));
@@ -546,8 +544,6 @@ __qla2x00_marker(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun,
 
 	/* Issue command to ISP */
 	qla2x00_isp_cmd(ha);
-
-	LEAVE(__func__);
 
 	return (QLA_SUCCESS);
 }
@@ -583,8 +579,6 @@ qla2x00_req_pkt(scsi_qla_host_t *ha)
 	uint32_t	*dword_ptr;
 	uint32_t	timer;
 	uint16_t	req_cnt = 1;
-
-	ENTER(__func__);
 
 	/* Wait 1 second for slot. */
 	for (timer = HZ; timer; timer--) {
@@ -632,8 +626,6 @@ qla2x00_req_pkt(scsi_qla_host_t *ha)
 		DEBUG2_3(printk("%s(): **** FAILED ****\n", __func__));
 	}
 
-	LEAVE(__func__);
-
 	return (pkt);
 }
 
@@ -657,8 +649,6 @@ qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 	uint32_t	timer;
 	uint8_t		found = 0;
 	uint16_t	req_cnt = 1;
-
-	ENTER(__func__);
 
 	/* Wait 1 second for slot. */
 	for (timer = HZ; timer; timer--) {
@@ -729,8 +719,6 @@ qla2x00_ms_req_pkt(scsi_qla_host_t *ha, srb_t  *sp)
 	if (!pkt) {
 		DEBUG2_3(printk("%s(): **** FAILED ****\n", __func__));
 	}
-
-	LEAVE(__func__);
 
 	return (pkt);
 }

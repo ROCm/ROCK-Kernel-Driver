@@ -238,6 +238,8 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	generic_unplug_device(sreq->sr_device->request_queue);
 	wait_for_completion(&wait);
 	sreq->sr_request->waiting = NULL;
+	if (sreq->sr_request->rq_status != RQ_SCSI_DONE)
+		sreq->sr_result |= (DRIVER_ERROR << 24);
 
 	__scsi_release_request(sreq);
 }
@@ -340,7 +342,6 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	unsigned long flags;
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
 	current_sdev->sdev_target->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
@@ -352,10 +353,6 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	 */
 	blk_run_queue(current_sdev->request_queue);
 
-	/*
-	 * After unlock, this races with anyone clearing starget_sdev_user,
-	 * but we always enter this function again, avoiding any problems.
-	 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (current_sdev->sdev_target->starget_sdev_user)
 		goto out;
@@ -1287,6 +1284,15 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
+ 
+	/*
+	 * Set the queue's mask to require a mere 8-byte alignment for
+	 * DMA buffers, rather than the default 512.  This shouldn't
+	 * inconvenience any user programs and should be okay for most
+	 * host adapters.  A host driver can alter this mask in its
+	 * slave_alloc() or slave_configure() callback if necessary.
+	 */
+	blk_queue_dma_alignment(q, (8 - 1));
 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
