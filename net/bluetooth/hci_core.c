@@ -183,9 +183,21 @@ static void hci_reset_req(struct hci_dev *hdev, unsigned long opt)
 
 static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 {
+	struct sk_buff *skb;
 	__u16 param;
 
 	BT_DBG("%s %ld", hdev->name, opt);
+
+	/* Driver initialization */
+
+	/* Special commands */
+	while ((skb = skb_dequeue(&hdev->driver_init))) {
+		skb->pkt_type = HCI_COMMAND_PKT;
+		skb->dev = (void *) hdev;
+		skb_queue_tail(&hdev->cmd_q, skb);
+		hci_sched_cmd(hdev);
+	}
+	skb_queue_purge(&hdev->driver_init);
 
 	/* Mandatory initialization */
 
@@ -792,6 +804,8 @@ struct hci_dev *hci_alloc_dev(void)
 
 	memset(hdev, 0, sizeof(struct hci_dev));
 
+	skb_queue_head_init(&hdev->driver_init);
+
 	return hdev;
 }
 EXPORT_SYMBOL(hci_alloc_dev);
@@ -799,6 +813,8 @@ EXPORT_SYMBOL(hci_alloc_dev);
 /* Free HCI device */
 void hci_free_dev(struct hci_dev *hdev)
 {
+	skb_queue_purge(&hdev->driver_init);
+
 	/* will free via class release */
 	class_device_put(&hdev->class_dev);
 }
