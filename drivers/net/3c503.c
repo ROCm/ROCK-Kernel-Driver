@@ -80,7 +80,7 @@ static void el2_block_input(struct net_device *dev, int count, struct sk_buff *s
 			   int ring_offset);
 static void el2_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr,
 			 int ring_page);
-static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops netdev_ethtool_ops;
 
 
 /* This routine probes for a memory-mapped 3c503 board by looking for
@@ -308,7 +308,7 @@ el2_probe1(struct net_device *dev, int ioaddr)
 
     dev->open = &el2_open;
     dev->stop = &el2_close;
-    dev->do_ioctl = &netdev_ioctl;
+    dev->ethtool_ops = &netdev_ethtool_ops;
 
     if (dev->mem_start)
 	printk("%s: %s - %dkB RAM, 8kB shared mem window at %#6lx-%#6lx.\n",
@@ -617,69 +617,18 @@ el2_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring
     return;
 }
 
-/**
- * netdev_ethtool_ioctl: Handle network interface SIOCETHTOOL ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @useraddr: userspace address to which data is to be read and returned
- *
- * Process the various commands of the SIOCETHTOOL interface.
- */
 
-static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
-
-	if (get_user(ethcmd, (u32 *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		sprintf(info.bus_info, "ISA 0x%lx", dev->base_addr);
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	sprintf(info->bus_info, "ISA 0x%lx", dev->base_addr);
 }
 
-/**
- * netdev_ioctl: Handle network interface ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @rq: user request data
- * @cmd: command issued by user
- *
- * Process the various out-of-band ioctls passed to this driver.
- */
-
-static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	int rc = 0;
-
-	switch (cmd) {
-	case SIOCETHTOOL:
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-		break;
-
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
-
-	return rc;
-}
- 
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+};
 
 #ifdef MODULE
 #define MAX_EL2_CARDS	4	/* Max number of EL2 cards per module */
