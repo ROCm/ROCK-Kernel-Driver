@@ -1000,29 +1000,30 @@ static int se401_newframe(struct usb_se401 *se401, int framenr)
  ***************************************************************************/
 
 
-static int se401_open(struct video_device *dev, int flags)
+static int se401_open(struct inode *inode, struct file *file)
 {
+	struct video_device *dev = video_devdata(file);
 	struct usb_se401 *se401 = (struct usb_se401 *)dev;
 	int err = 0;
 
-	/* we are called with the BKL held */
-	MOD_INC_USE_COUNT;
-
+	if (se401->user)
+		return -EBUSY;
 	se401->user=1;
 	se401->fbuf=rvmalloc(se401->maxframesize * SE401_NUMFRAMES);
 	if(!se401->fbuf) err=-ENOMEM;
 
-        if (err) {
-		MOD_DEC_USE_COUNT;
+        if (0 != err) {
 		se401->user = 0;
+	} else {
+		file->private_data = dev;
 	}
 
 	return err;
 }
 
-static void se401_close(struct video_device *dev)
+static int se401_close(struct inode *inode, struct file *file)
 {
-	/* called with BKL held */
+	struct video_device *dev = file->private_data;
         struct usb_se401 *se401 = (struct usb_se401 *)dev;
 	int i;
 
@@ -1035,34 +1036,20 @@ static void se401_close(struct video_device *dev)
 	se401->user=0;
 
         if (se401->removed) {
-                video_unregister_device(&se401->vdev);
 		kfree(se401->width);
 		kfree(se401->height);
                 kfree(se401);
                 se401 = NULL;
 		info("device unregistered");
 	}
-
-        MOD_DEC_USE_COUNT;
+	file->private_data = NULL;
+	return 0;
 }
 
-static int se401_init_done(struct video_device *dev)
+static int se401_ioctl(struct inode *inode, struct file *file,
+		       unsigned int cmd, void *arg)
 {
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-        create_proc_se401_cam((struct usb_se401 *)dev);
-#endif
-
-        return 0;
-}
-
-static long se401_write(struct video_device *dev, const char *buf, unsigned long
- count, int noblock)
-{
-        return -EINVAL;
-}
-
-static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
-{
+	struct video_device *vdev = file->private_data;
         struct usb_se401 *se401 = (struct usb_se401 *)vdev;
 
         if (!se401->dev)
@@ -1071,138 +1058,104 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
         switch (cmd) {
 	case VIDIOCGCAP:
 	{
-		struct video_capability b;
-		strcpy(b.name, se401->camera_name);
-		b.type = VID_TYPE_CAPTURE;
-		b.channels = 1;
-		b.audios = 0;
-		b.maxwidth = se401->width[se401->sizes-1];
-		b.maxheight = se401->height[se401->sizes-1];
-		b.minwidth = se401->width[0];
-		b.minheight = se401->height[0];
-
-		if (copy_to_user(arg, &b, sizeof(b)))
-			return -EFAULT;
-
+		struct video_capability *b = arg;
+		strcpy(b->name, se401->camera_name);
+		b->type = VID_TYPE_CAPTURE;
+		b->channels = 1;
+		b->audios = 0;
+		b->maxwidth = se401->width[se401->sizes-1];
+		b->maxheight = se401->height[se401->sizes-1];
+		b->minwidth = se401->width[0];
+		b->minheight = se401->height[0];
 		return 0;
 	}
 	case VIDIOCGCHAN:
 	{
-		struct video_channel v;
+		struct video_channel *v = arg;
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-		if (v.channel != 0)
+		if (v->channel != 0)
 			return -EINVAL;
-
-		v.flags = 0;
-		v.tuners = 0;
-		v.type = VIDEO_TYPE_CAMERA;
-		strcpy(v.name, "Camera");
-
-		if (copy_to_user(arg, &v, sizeof(v)))
-			return -EFAULT;
-
+		v->flags = 0;
+		v->tuners = 0;
+		v->type = VIDEO_TYPE_CAMERA;
+		strcpy(v->name, "Camera");
 		return 0;
 	}
 	case VIDIOCSCHAN:
 	{
-		int v;
+		struct video_channel *v = arg;
 
-		if (copy_from_user(&v, arg, sizeof(v)))
-			return -EFAULT;
-
-		if (v != 0)
+		if (v->channel != 0)
 			return -EINVAL;
-
 		return 0;
 	}
         case VIDIOCGPICT:
         {
-		struct video_picture p;
+		struct video_picture *p = arg;
 
-		se401_get_pict(se401, &p);
-
-		if (copy_to_user(arg, &p, sizeof(p)))
-			return -EFAULT;
+		se401_get_pict(se401, p);
 		return 0;
 	}
 	case VIDIOCSPICT:
 	{
-		struct video_picture p;
+		struct video_picture *p = arg;
 
-		if (copy_from_user(&p, arg, sizeof(p)))
-			return -EFAULT;
-
-		if (se401_set_pict(se401, &p))
+		if (se401_set_pict(se401, p))
 			return -EINVAL;
 		return 0;
 	}
 	case VIDIOCSWIN:
 	{
-		struct video_window vw;
+		struct video_window *vw = arg;
 
-		if (copy_from_user(&vw, arg, sizeof(vw)))
-			return -EFAULT;
-		if (vw.flags)
+		if (vw->flags)
 			return -EINVAL;
-		if (vw.clipcount)
+		if (vw->clipcount)
 			return -EINVAL;
-		if (se401_set_size(se401, vw.width, vw.height))
+		if (se401_set_size(se401, vw->width, vw->height))
 			return -EINVAL;
-
 		return 0;
         }
 	case VIDIOCGWIN:
 	{
-		struct video_window vw;
+		struct video_window *vw = arg;
 
-		vw.x = 0;               /* FIXME */
-		vw.y = 0;
-		vw.chromakey = 0;
-		vw.flags = 0;
-		vw.clipcount = 0;
-		vw.width = se401->cwidth;
-		vw.height = se401->cheight;
-
-		if (copy_to_user(arg, &vw, sizeof(vw)))
-			return -EFAULT;
-
+		vw->x = 0;               /* FIXME */
+		vw->y = 0;
+		vw->chromakey = 0;
+		vw->flags = 0;
+		vw->clipcount = 0;
+		vw->width = se401->cwidth;
+		vw->height = se401->cheight;
 		return 0;
 	}
 	case VIDIOCGMBUF:
 	{
-		struct video_mbuf vm;
+		struct video_mbuf *vm = arg;
 		int i;
 
-		memset(&vm, 0, sizeof(vm));
-		vm.size = SE401_NUMFRAMES * se401->maxframesize;
-		vm.frames = SE401_NUMFRAMES;
+		memset(vm, 0, sizeof(*vm));
+		vm->size = SE401_NUMFRAMES * se401->maxframesize;
+		vm->frames = SE401_NUMFRAMES;
 		for (i=0; i<SE401_NUMFRAMES; i++)
-			vm.offsets[i] = se401->maxframesize * i;
-
-		if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-		return -EFAULT;
-
+			vm->offsets[i] = se401->maxframesize * i;
 		return 0;
 	}
 	case VIDIOCMCAPTURE:
 	{
-		struct video_mmap vm;
+		struct video_mmap *vm = arg;
 
-		if (copy_from_user(&vm, arg, sizeof(vm)))
-		return -EFAULT;
-		if (vm.format != VIDEO_PALETTE_RGB24)
+		if (vm->format != VIDEO_PALETTE_RGB24)
 			return -EINVAL;
-		if (vm.frame >= SE401_NUMFRAMES)
+		if (vm->frame >= SE401_NUMFRAMES)
 			return -EINVAL;
-		if (se401->frame[vm.frame].grabstate != FRAME_UNUSED)
+		if (se401->frame[vm->frame].grabstate != FRAME_UNUSED)
 			return -EBUSY;
 
 		/* Is this according to the v4l spec??? */
-		if (se401_set_size(se401, vm.width, vm.height))
+		if (se401_set_size(se401, vm->width, vm->height))
 			return -EINVAL;
-		se401->frame[vm.frame].grabstate=FRAME_READY;
+		se401->frame[vm->frame].grabstate=FRAME_READY;
 
 		if (!se401->streaming)
 			se401_start_stream(se401);
@@ -1218,28 +1171,21 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 	}
 	case VIDIOCSYNC:
 	{
-		int frame, ret=0;
+		int *frame = arg;
+		int ret=0;
 
-		if (copy_from_user((void *)&frame, arg, sizeof(int)))
-			return -EFAULT;
-
-		if(frame <0 || frame >= SE401_NUMFRAMES)
+		if(*frame <0 || *frame >= SE401_NUMFRAMES)
 			return -EINVAL;
 
-		ret=se401_newframe(se401, frame);
-		se401->frame[frame].grabstate=FRAME_UNUSED;
+		ret=se401_newframe(se401, *frame);
+		se401->frame[*frame].grabstate=FRAME_UNUSED;
 		return ret;
 	}
 	case VIDIOCGFBUF:
 	{
-		struct video_buffer vb;
+		struct video_buffer *vb = arg;
 
-		memset(&vb, 0, sizeof(vb));
-		vb.base = NULL; /* frame buffer not supported, not used */
-
-		if (copy_to_user((void *)arg, (void *)&vb, sizeof(vb)))
-			return -EFAULT;
-
+		memset(vb, 0, sizeof(*vb));
 		return 0;
 	}
 	case VIDIOCKEY:
@@ -1264,10 +1210,11 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
         return 0;
 }
 
-static long se401_read(struct video_device *dev, char *buf, unsigned long count,
- int noblock)
+static int se401_read(struct file *file, char *buf,
+		     size_t count, loff_t *ppos)
 {
 	int realcount=count, ret=0;
+	struct video_device *dev = file->private_data;
 	struct usb_se401 *se401 = (struct usb_se401 *)dev;
 
 
@@ -1304,11 +1251,12 @@ static long se401_read(struct video_device *dev, char *buf, unsigned long count,
 	return realcount;
 }
 
-static int se401_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr,
-        unsigned long size)
+static int se401_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	struct video_device *dev = file->private_data;
 	struct usb_se401 *se401 = (struct usb_se401 *)dev;
-	unsigned long start = (unsigned long)adr;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 
 	down(&se401->lock);
@@ -1340,17 +1288,22 @@ static int se401_mmap(struct vm_area_struct *vma, struct video_device *dev, cons
         return 0;
 }
 
+static struct file_operations se401_fops = {
+	owner:		THIS_MODULE,
+        open:           se401_open,
+        release:        se401_close,
+        read:           se401_read,
+        mmap:           se401_mmap,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
 static struct video_device se401_template = {
+	owner:		THIS_MODULE,
         name:           "se401 USB camera",
         type:           VID_TYPE_CAPTURE,
         hardware:       VID_HARDWARE_SE401,
-        open:           se401_open,
-        close:          se401_close,
-        read:           se401_read,
-        write:          se401_write,
-        ioctl:          se401_ioctl,
-        mmap:           se401_mmap,
-        initialize:     se401_init_done,
+	fops:           &se401_fops,
+        kernel_ioctl:   se401_ioctl,
 };
 
 
@@ -1515,6 +1468,9 @@ static void* __devinit se401_probe(struct usb_device *dev, unsigned int ifnum,
 		err("video_register_device failed");
 		return NULL;
 	}
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+        create_proc_se401_cam(se401);
+#endif
 	info("registered new video device: video%d", se401->vdev.minor);
 
         return se401;
@@ -1524,15 +1480,12 @@ static void se401_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct usb_se401 *se401 = (struct usb_se401 *) ptr;
 
-	lock_kernel();
-	/* We don't want people trying to open up the device */
+	video_unregister_device(&se401->vdev);
 	if (!se401->user){
-		video_unregister_device(&se401->vdev);
 		usb_se401_remove_disconnected(se401);
 	} else {
 		se401->removed = 1;
 	}
-	unlock_kernel();
 }
 
 static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
