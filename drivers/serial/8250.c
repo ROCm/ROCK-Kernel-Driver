@@ -32,6 +32,7 @@
 #include <linux/serialP.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/8250.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -41,7 +42,6 @@
 #endif
 
 #include <linux/serial_core.h>
-#include "8250.h"
 
 /*
  * Configuration:
@@ -112,11 +112,17 @@ unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 #define SERIAL_PORT_DFNS
 #endif
 
+#ifndef ARCH_HAS_GET_LEGACY_SERIAL_PORTS
 static struct old_serial_port old_serial_port[] = {
 	SERIAL_PORT_DFNS /* defined in asm/serial.h */
 };
-
+static inline struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
+{
+	*count = ARRAY_SIZE(old_serial_port);
+	return old_serial_port;
+}
 #define UART_NR	(ARRAY_SIZE(old_serial_port) + CONFIG_SERIAL_8250_NR_UARTS)
+#endif /* ARCH_HAS_DYNAMIC_LEGACY_SERIAL_PORTS */
 
 #ifdef CONFIG_SERIAL_8250_RSA
 
@@ -1958,22 +1964,27 @@ static void __init serial8250_isa_init_ports(void)
 {
 	struct uart_8250_port *up;
 	static int first = 1;
+	struct old_serial_port *old_ports;
+	int count;
 	int i;
 
 	if (!first)
 		return;
 	first = 0;
 
-	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
-	     i++, up++) {
-		up->port.iobase   = old_serial_port[i].port;
-		up->port.irq      = irq_canonicalize(old_serial_port[i].irq);
-		up->port.uartclk  = old_serial_port[i].baud_base * 16;
-		up->port.flags    = old_serial_port[i].flags;
-		up->port.hub6     = old_serial_port[i].hub6;
-		up->port.membase  = old_serial_port[i].iomem_base;
-		up->port.iotype   = old_serial_port[i].io_type;
-		up->port.regshift = old_serial_port[i].iomem_reg_shift;
+	old_ports = get_legacy_serial_ports(&count);
+	if (old_ports == NULL)
+		return;
+
+	for (i = 0, up = serial8250_ports; i < count; i++, up++) {
+		up->port.iobase   = old_ports[i].port;
+		up->port.irq      = irq_canonicalize(old_ports[i].irq);
+		up->port.uartclk  = old_ports[i].baud_base * 16;
+		up->port.flags    = old_ports[i].flags;
+		up->port.hub6     = old_ports[i].hub6;
+		up->port.membase  = old_ports[i].iomem_base;
+		up->port.iotype   = old_ports[i].io_type;
+		up->port.regshift = old_ports[i].iomem_reg_shift;
 		up->port.ops      = &serial8250_pops;
 		if (share_irqs)
 			up->port.flags |= UPF_SHARE_IRQ;
@@ -1989,6 +2000,13 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
+
+		/* Don't register "empty" ports, setting "ops" on them
+		 * makes the console driver "setup" routine to succeed,
+		 * which is wrong. --BenH.
+		 */
+		if (!up->port.iobase)
+			continue;
 
 		up->port.line = i;
 		up->port.ops = &serial8250_pops;

@@ -26,11 +26,10 @@
 #include <linux/serialP.h>
 #include <linux/serial_core.h>
 #include <linux/bitops.h>
+#include <linux/8250.h>
 
 #include <asm/byteorder.h>
 #include <asm/serial.h>
-
-#include "8250.h"
 
 #define UNKNOWN_DEV 0x3000
 
