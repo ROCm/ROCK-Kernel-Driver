@@ -563,8 +563,11 @@ acpi_status
 acpi_ex_store_object_to_node (
 	union acpi_operand_object       *source_desc,
 	struct acpi_namespace_node      *node,
-	struct acpi_walk_state          *walk_state);
+	struct acpi_walk_state          *walk_state,
+	u8                              implicit_conversion);
 
+#define ACPI_IMPLICIT_CONVERSION        TRUE
+#define ACPI_NO_IMPLICIT_CONVERSION     FALSE
 
 /*
  * exstoren

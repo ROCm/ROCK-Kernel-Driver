@@ -277,7 +277,7 @@ acpi_ex_access_region (
 				rgn_desc->region.space_id));
 		}
 		else if (status == AE_NOT_EXIST) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			ACPI_REPORT_ERROR ((
 				"Region %s(%X) has no handler\n",
 				acpi_ut_get_region_name (rgn_desc->region.space_id),
 				rgn_desc->region.space_id));

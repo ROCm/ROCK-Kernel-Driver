@@ -50,6 +50,9 @@
 #include <acpi/acnamesp.h>
 #include <acpi/acevents.h>
 
+#ifdef _ACPI_ASL_COMPILER
+#include <acpi/acdisasm.h>
+#endif
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dswload")
@@ -180,7 +183,17 @@ acpi_ds_load1_begin_op (
 		status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 		if (ACPI_FAILURE (status)) {
+#ifdef _ACPI_ASL_COMPILER
+			if (status == AE_NOT_FOUND) {
+				acpi_dm_add_to_external_list (path);
+				status = AE_OK;
+			}
+			else {
+				ACPI_REPORT_NSERROR (path, status);
+			}
+#else
 			ACPI_REPORT_NSERROR (path, status);
+#endif
 			return (status);
 		}
 
@@ -529,7 +542,16 @@ acpi_ds_load2_begin_op (
 		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
 				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 		if (ACPI_FAILURE (status)) {
+#ifdef _ACPI_ASL_COMPILER
+			if (status == AE_NOT_FOUND) {
+				status = AE_OK;
+			}
+			else {
+				ACPI_REPORT_NSERROR (buffer_ptr, status);
+			}
+#else
 			ACPI_REPORT_NSERROR (buffer_ptr, status);
+#endif
 			return_ACPI_STATUS (status);
 		}
 		/*

@@ -306,11 +306,10 @@ acpi_ev_get_gpe_type (
 
 	status = acpi_ut_evaluate_object (obj_handle, METHOD_NAME__PRW,
 			 ACPI_BTYPE_PACKAGE, &pkg_desc);
-	if (status == AE_NOT_FOUND) {
+	if (ACPI_FAILURE (status)) {
+		/* Ignore all errors from _PRW, we don't want to abort the subsystem */
+
 		return_ACPI_STATUS (AE_OK);
-	}
-	else if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
 	}
 
 	/* The returned _PRW package must have at least two elements */
@@ -378,8 +377,7 @@ acpi_ev_get_gpe_type (
 
 cleanup:
 	acpi_ut_remove_reference (pkg_desc);
-
-	return_ACPI_STATUS (status);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

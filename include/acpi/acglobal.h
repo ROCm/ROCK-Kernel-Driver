@@ -46,15 +46,17 @@
 
 
 /*
- * Ensure that the globals are actually defined only once.
+ * Ensure that the globals are actually defined and initialized only once.
  *
- * The use of these defines allows a single list of globals (here) in order
+ * The use of these macros allows a single list of globals (here) in order
  * to simplify maintenance of the code.
  */
 #ifdef DEFINE_ACPI_GLOBALS
 #define ACPI_EXTERN
+#define ACPI_INIT_GLOBAL(a,b) a=b
 #else
 #define ACPI_EXTERN extern
+#define ACPI_INIT_GLOBAL(a,b) a
 #endif
 
 /*
@@ -63,6 +65,7 @@
  */
 ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1a_enable;
 ACPI_EXTERN struct acpi_generic_address         acpi_gbl_xpm1b_enable;
+
 
 /*****************************************************************************
  *
@@ -79,15 +82,35 @@ extern      u32                                 acpi_dbg_layer;
 
 extern      u32                                 acpi_gbl_nesting_level;
 
+
 /*****************************************************************************
  *
- * Runtime configuration
+ * Runtime configuration (static defaults that can be overriden at runtime)
  *
  ****************************************************************************/
 
-ACPI_EXTERN u8                                  acpi_gbl_create_osi_method;
-ACPI_EXTERN u8                                  acpi_gbl_all_methods_serialized;
-ACPI_EXTERN u8                                  acpi_gbl_leave_wake_gpes_disabled;
+/*
+ * Create the predefined _OSI method in the namespace? Default is TRUE
+ * because ACPI CA is fully compatible with other ACPI implementations.
+ * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_create_osi_method, TRUE);
+
+/*
+ * Automatically serialize ALL control methods? Default is FALSE, meaning
+ * to use the Serialized/not_serialized method flags on a per method basis.
+ * Only change this if the ASL code is poorly written and cannot handle
+ * reentrancy even though methods are marked "not_serialized".
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_all_methods_serialized, FALSE);
+
+/*
+ * Disable wakeup GPEs during runtime? Default is TRUE because WAKE and
+ * RUNTIME GPEs should never be shared, and WAKE GPEs should typically only
+ * be enabled just before going to sleep.
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_leave_wake_gpes_disabled, TRUE);
+
 
 /*****************************************************************************
  *
@@ -102,7 +125,6 @@ ACPI_EXTERN u8                                  acpi_gbl_leave_wake_gpes_disable
  *
  * These tables are single-table only; meaning that there can be at most one
  * of each in the system.  Each global points to the actual table.
- *
  */
 ACPI_EXTERN u32                                 acpi_gbl_table_flags;
 ACPI_EXTERN u32                                 acpi_gbl_rsdt_table_count;

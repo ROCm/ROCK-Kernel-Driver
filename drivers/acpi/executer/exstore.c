@@ -102,7 +102,8 @@ acpi_ex_store (
 		 * Storing an object into a Named node.
 		 */
 		status = acpi_ex_store_object_to_node (source_desc,
-				 (struct acpi_namespace_node *) dest_desc, walk_state);
+				 (struct acpi_namespace_node *) dest_desc, walk_state,
+				 ACPI_IMPLICIT_CONVERSION);
 
 		return_ACPI_STATUS (status);
 	}
@@ -153,7 +154,7 @@ acpi_ex_store (
 		/* Storing an object into a Name "container" */
 
 		status = acpi_ex_store_object_to_node (source_desc, ref_desc->reference.object,
-				  walk_state);
+				  walk_state, ACPI_IMPLICIT_CONVERSION);
 		break;
 
 
@@ -399,6 +400,7 @@ acpi_ex_store_object_to_index (
  * PARAMETERS:  source_desc             - Value to be stored
  *              Node                    - Named object to receive the value
  *              walk_state              - Current walk state
+ *              implicit_conversion     - Perform implicit conversion (yes/no)
  *
  * RETURN:      Status
  *
@@ -421,7 +423,8 @@ acpi_status
 acpi_ex_store_object_to_node (
 	union acpi_operand_object       *source_desc,
 	struct acpi_namespace_node      *node,
-	struct acpi_walk_state          *walk_state)
+	struct acpi_walk_state          *walk_state,
+	u8                              implicit_conversion)
 {
 	acpi_status                     status = AE_OK;
 	union acpi_operand_object       *target_desc;
@@ -449,6 +452,14 @@ acpi_ex_store_object_to_node (
 	status = acpi_ex_resolve_object (&source_desc, target_type, walk_state);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
+	}
+
+	/* If no implicit conversion, drop into the default case below */
+
+	if (!implicit_conversion) {
+		/* Force execution of default (no implicit conversion) */
+
+		target_type = ACPI_TYPE_ANY;
 	}
 
 	/*

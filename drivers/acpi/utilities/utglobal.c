@@ -561,25 +561,36 @@ acpi_ut_get_node_name (
 	struct acpi_namespace_node      *node = (struct acpi_namespace_node *) object;
 
 
+	/* Must return a string of exactly 4 characters == ACPI_NAME_SIZE */
+
 	if (!object)
 	{
-		return ("NULL NODE");
+		return ("NULL");
 	}
 
-	if (object == ACPI_ROOT_OBJECT)
+	/* Check for Root node */
+
+	if ((object == ACPI_ROOT_OBJECT) ||
+		(object == acpi_gbl_root_node))
 	{
-		node = acpi_gbl_root_node;
+		return ("\"\\\" ");
 	}
+
+	/* Descriptor must be a namespace node */
 
 	if (node->descriptor != ACPI_DESC_TYPE_NAMED)
 	{
-		return ("****");
+		return ("####");
 	}
+
+	/* Name must be a valid ACPI name */
 
 	if (!acpi_ut_valid_acpi_name (* (u32 *) node->name.ascii))
 	{
-		return ("----");
+		return ("????");
 	}
+
+	/* Return the name */
 
 	return (node->name.ascii);
 }
@@ -783,11 +794,6 @@ acpi_ut_init_globals (
 
 	ACPI_FUNCTION_TRACE ("ut_init_globals");
 
-	/* Runtime configuration */
-
-	acpi_gbl_create_osi_method = TRUE;
-	acpi_gbl_all_methods_serialized = FALSE;
-	acpi_gbl_leave_wake_gpes_disabled = TRUE;
 
 	/* Memory allocation and cache lists */
 

@@ -139,7 +139,7 @@ acpi_ev_queue_notify_request (
 				acpi_notify_value_names[notify_value]));
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "notify value: 0x2.2_x **Device Specific**\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Notify value: 0x%2.2X **Device Specific**\n",
 				notify_value));
 	}
 
