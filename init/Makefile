@@ -4,6 +4,7 @@
 
 obj-y			:= main.o version.o do_mounts.o initramfs.o
 obj-$(CONFIG_DEVFS_FS)	+= do_mounts_devfs.o
+obj-$(CONFIG_BLK_DEV_MD)+= do_mounts_md.o
 
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h

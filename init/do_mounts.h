@@ -7,12 +7,15 @@
 #include <linux/slab.h>
 #include <linux/mount.h>
 
-extern asmlinkage long sys_unlink(const char *name);
-extern asmlinkage long sys_mknod(const char *name, int mode, dev_t dev);
-extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
-extern asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
+asmlinkage long sys_unlink(const char *name);
+asmlinkage long sys_mknod(const char *name, int mode, dev_t dev);
+asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
+asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
+asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
 				 unsigned long flags, void *data);
-extern asmlinkage long sys_umount(char *name, int flags);
+asmlinkage long sys_umount(char *name, int flags);
+
+dev_t name_to_dev_t(char *name);
 
 #ifdef CONFIG_DEVFS_FS
 
@@ -31,5 +34,15 @@ static inline int create_dev(char *name, dev_t dev, char *devfs_name)
 	sys_unlink(name);
 	return sys_mknod(name, S_IFBLK|0600, dev);
 }
+
+#endif
+
+#ifdef CONFIG_BLK_DEV_MD
+
+void md_run_setup(void);
+
+#else
+
+static inline void md_run_setup(void) {}
 
 #endif
