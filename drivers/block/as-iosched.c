@@ -657,6 +657,7 @@ static int as_close_req(struct as_data *ad, struct as_rq *arq)
 	return (last - (delta>>1) <= next) && (next <= last + delta);
 }
 
+static void as_update_thinktime(struct as_data *ad, struct as_io_context *aic, unsigned long ttime);
 /*
  * as_can_break_anticipation returns true if we have been anticipating this
  * request.
@@ -686,6 +687,15 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 
 	if (arq && arq->is_sync == REQ_SYNC && as_close_req(ad, arq)) {
 		/* close request */
+		struct as_io_context *aic = ioc->aic;
+		if (aic) {
+			unsigned long thinktime;
+			spin_lock(&aic->lock);
+			thinktime = jiffies - aic->last_end_request;
+			aic->last_end_request = jiffies;
+			as_update_thinktime(ad, aic, thinktime);
+			spin_unlock(&aic->lock);
+		}
 		return 1;
 	}
 
