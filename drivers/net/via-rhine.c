@@ -896,7 +896,10 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, dev);
 
 	{
+		u16 mii_cmd;
 		int mii_status = mdio_read(dev, phy_id, 1);
+		mii_cmd = mdio_read(dev, phy_id, MII_BMCR) & ~BMCR_ISOLATE;
+		mdio_write(dev, phy_id, MII_BMCR, mii_cmd);
 		if (mii_status != 0xffff && mii_status != 0x0000) {
 			rp->mii_if.advertising = mdio_read(dev, phy_id, 4);
 			printk(KERN_INFO "%s: MII PHY found at address "
