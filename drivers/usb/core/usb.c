@@ -991,8 +991,8 @@ int usb_set_address(struct usb_device *dev)
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Only hub drivers (including virtual root hub drivers for host
- * controllers) should ever call this.
+ * Only the hub driver should ever call this; root hub registration
+ * uses it only indirectly.
  */
 #define NEW_DEVICE_RETRYS	2
 #define SET_ADDRESS_RETRYS	2
@@ -1509,7 +1509,6 @@ EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);
 EXPORT_SYMBOL(usb_ifnum_to_if);
 
-EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_disconnect);
 
