@@ -39,8 +39,10 @@
 #include <linux/pci.h>
 #include "cpqphp.h"
 
-static u32 configure_new_device(struct controller* ctrl, struct pci_func *func,u8 behind_bridge, struct resource_lists *resources);
-static int configure_new_function(struct controller* ctrl, struct pci_func *func,u8 behind_bridge, struct resource_lists *resources);
+static u32 configure_new_device(struct controller* ctrl, struct pci_func *func,
+			u8 behind_bridge, struct resource_lists *resources);
+static int configure_new_function(struct controller* ctrl, struct pci_func *func,
+			u8 behind_bridge, struct resource_lists *resources);
 static void interrupt_event_handler(struct controller *ctrl);
 
 static struct semaphore event_semaphore;	/* mutex for process loop (up if something to process) */
@@ -53,7 +55,7 @@ static struct semaphore		delay_sem;
 static wait_queue_head_t	delay_wait;
 
 /* delay is in jiffies to wait for */
-static void long_delay (int delay)
+static void long_delay(int delay)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	
@@ -64,7 +66,7 @@ static void long_delay (int delay)
 	 */
 	down (&delay_sem);
 
-	init_waitqueue_head (&delay_wait);
+	init_waitqueue_head(&delay_wait);
 
 	add_wait_queue(&delay_wait, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
@@ -72,7 +74,7 @@ static void long_delay (int delay)
 	remove_wait_queue(&delay_wait, &wait);
 	set_current_state(TASK_RUNNING);
 	
-	up (&delay_sem);
+	up(&delay_sem);
 }
 
 
@@ -97,7 +99,8 @@ static u8 handle_switch_change(u8 change, struct controller * ctrl)
 			//*********************************
 			// this one changed.
 			//*********************************
-			func = cpqhp_slot_find(ctrl->bus, (hp_slot + ctrl->slot_device_offset), 0);
+			func = cpqhp_slot_find(ctrl->bus,
+				(hp_slot + ctrl->slot_device_offset), 0);
 
 			//this is the structure that tells the worker thread
 			//what to do
@@ -138,7 +141,7 @@ static u8 handle_switch_change(u8 change, struct controller * ctrl)
 /*
  * cpqhp_find_slot
  */
-struct slot *cpqhp_find_slot (struct controller * ctrl, u8 device)
+struct slot *cpqhp_find_slot(struct controller *ctrl, u8 device)
 {
 	struct slot *slot;
 
@@ -179,7 +182,8 @@ static u8 handle_presence_change(u16 change, struct controller * ctrl)
 			//*********************************
 			// this one changed.
 			//*********************************
-			func = cpqhp_slot_find(ctrl->bus, (hp_slot + ctrl->slot_device_offset), 0);
+			func = cpqhp_slot_find(ctrl->bus,
+				(hp_slot + ctrl->slot_device_offset), 0);
 
 			taskInfo = &(ctrl->event_queue[ctrl->next_event]);
 			ctrl->next_event = (ctrl->next_event + 1) % 10;
@@ -271,7 +275,8 @@ static u8 handle_power_fault(u8 change, struct controller * ctrl)
 			//*********************************
 			// this one changed.
 			//*********************************
-			func = cpqhp_slot_find(ctrl->bus, (hp_slot + ctrl->slot_device_offset), 0);
+			func = cpqhp_slot_find(ctrl->bus,
+				(hp_slot + ctrl->slot_device_offset), 0);
 
 			taskInfo = &(ctrl->event_queue[ctrl->next_event]);
 			ctrl->next_event = (ctrl->next_event + 1) % 10;
@@ -320,11 +325,9 @@ static u8 handle_power_fault(u8 change, struct controller * ctrl)
 }
 
 
-/*
- * sort_by_size
- *
- * Sorts nodes on the list by their length.
- * Smallest first.
+/**
+ * sort_by_size: sort nodes on the list by their length, smallest first.
+ * @head: list to sort
  *
  */
 static int sort_by_size(struct pci_resource **head)
@@ -334,10 +337,10 @@ static int sort_by_size(struct pci_resource **head)
 	int out_of_order = 1;
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	if (!((*head)->next))
-		return(0);
+		return 0;
 
 	while (out_of_order) {
 		out_of_order = 0;
@@ -367,15 +370,13 @@ static int sort_by_size(struct pci_resource **head)
 		}
 	}  // End of out_of_order loop
 
-	return(0);
+	return 0;
 }
 
 
-/*
- * sort_by_max_size
- *
- * Sorts nodes on the list by their length.
- * Largest first.
+/**
+ * sort_by_max_size: sort nodes on the list by their length, largest first.
+ * @head: list to sort
  *
  */
 static int sort_by_max_size(struct pci_resource **head)
@@ -385,10 +386,10 @@ static int sort_by_max_size(struct pci_resource **head)
 	int out_of_order = 1;
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	if (!((*head)->next))
-		return(0);
+		return 0;
 
 	while (out_of_order) {
 		out_of_order = 0;
@@ -418,17 +419,16 @@ static int sort_by_max_size(struct pci_resource **head)
 		}
 	}  // End of out_of_order loop
 
-	return(0);
+	return 0;
 }
 
 
-/*
- * do_pre_bridge_resource_split
- *
- *	Returns zero or one node of resources that aren't in use
+/**
+ * do_pre_bridge_resource_split: find node of resources that are unused
  *
  */
-static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **head, struct pci_resource **orig_head, u32 alignment)
+static struct pci_resource *do_pre_bridge_resource_split(struct pci_resource **head,
+				struct pci_resource **orig_head, u32 alignment)
 {
 	struct pci_resource *prevnode = NULL;
 	struct pci_resource *node;
@@ -438,18 +438,18 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 	dbg("do_pre_bridge_resource_split\n");
 
 	if (!(*head) || !(*orig_head))
-		return(NULL);
+		return NULL;
 
 	rc = cpqhp_resource_sort_and_combine(head);
 
 	if (rc)
-		return(NULL);
+		return NULL;
 
 	if ((*head)->base != (*orig_head)->base)
-		return(NULL);
+		return NULL;
 
 	if ((*head)->length == (*orig_head)->length)
-		return(NULL);
+		return NULL;
 
 
 	// If we got here, there the bridge requires some of the resource, but
@@ -463,7 +463,7 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 		if (!split_node)
-			return(NULL);
+			return NULL;
 
 		temp_dword = (node->length | (alignment-1)) + 1 - alignment;
 
@@ -479,7 +479,7 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 	}
 
 	if (node->length < alignment) {
-		return(NULL);
+		return NULL;
 	}
 
 	// Now unlink it
@@ -495,17 +495,15 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		node->next = NULL;
 	}
 
-	return(node);
+	return node;
 }
 
 
-/*
- * do_bridge_resource_split
- *
- *	Returns zero or one node of resources that aren't in use
+/**
+ * do_bridge_resource_split: find one node of resources that aren't in use
  *
  */
-static struct pci_resource *do_bridge_resource_split (struct pci_resource **head, u32 alignment)
+static struct pci_resource *do_bridge_resource_split(struct pci_resource **head, u32 alignment)
 {
 	struct pci_resource *prevnode = NULL;
 	struct pci_resource *node;
@@ -513,12 +511,12 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	rc = cpqhp_resource_sort_and_combine(head);
 
 	if (rc)
-		return(NULL);
+		return NULL;
 
 	node = *head;
 
@@ -530,7 +528,7 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 
 	if (node->length < alignment) {
 		kfree(node);
-		return(NULL);
+		return NULL;
 	}
 
 	if (node->base & (alignment - 1)) {
@@ -538,7 +536,7 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 		temp_dword = (node->base | (alignment-1)) + 1;
 		if ((node->length - (temp_dword - node->base)) < alignment) {
 			kfree(node);
-			return(NULL);
+			return NULL;
 		}
 
 		node->length -= (temp_dword - node->base);
@@ -548,24 +546,24 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 	if (node->length & (alignment - 1)) {
 		// There's stuff in use after this node
 		kfree(node);
-		return(NULL);
+		return NULL;
 	}
 
-	return(node);
+	return node;
 }
 
 
-/*
- * get_io_resource
+/**
+ * get_io_resource: find first node of given size not in ISA aliasing window.
+ * @head: list to search
+ * @size: size of node to find, must be a power of two.
  *
- * this function sorts the resource list by size and then
- * returns the first node of "size" length that is not in the
- * ISA aliasing window.  If it finds a node larger than "size"
- * it will split it up.
+ * Description: this function sorts the resource list by size and then returns
+ * returns the first node of "size" length that is not in the ISA aliasing
+ * window.  If it finds a node larger than "size" it will split it up.
  *
- * size must be a power of two.
  */
-static struct pci_resource *get_io_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_io_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *prevnode;
 	struct pci_resource *node;
@@ -573,13 +571,13 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if ( cpqhp_resource_sort_and_combine(head) )
-		return(NULL);
+		return NULL;
 
 	if ( sort_by_size(head) )
-		return(NULL);
+		return NULL;
 
 	for (node = *head; node; node = node->next) {
 		if (node->length < size)
@@ -597,7 +595,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base;
 			split_node->length = temp_dword - node->base;
@@ -616,7 +614,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base + size;
 			split_node->length = node->length - size;
@@ -647,18 +645,20 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 		break;
 	}
 
-	return(node);
+	return node;
 }
 
 
-/*
- * get_max_resource
+/**
+ * get_max_resource: get largest node which has at least the given size.
+ * @head: the list to search the node in
+ * @size: the minimum size of the node to find
  *
- * Gets the largest node that is at least "size" big from the
+ * Description: Gets the largest node that is at least "size" big from the
  * list pointed to by head.  It aligns the node on top and bottom
  * to "size" alignment before returning it.
  */
-static struct pci_resource *get_max_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_max_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *max;
 	struct pci_resource *temp;
@@ -666,15 +666,15 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if (cpqhp_resource_sort_and_combine(head))
-		return(NULL);
+		return NULL;
 
 	if (sort_by_max_size(head))
-		return(NULL);
+		return NULL;
 
-	for (max = *head;max; max = max->next) {
+	for (max = *head; max; max = max->next) {
 
 		// If not big enough we could probably just bail, 
 		// instead we'll continue to the next.
@@ -693,7 +693,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = max->base;
 			split_node->length = temp_dword - max->base;
@@ -711,7 +711,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 			temp_dword = ((max->base + max->length) & ~(size - 1));
 			split_node->base = temp_dword;
 			split_node->length = max->length + max->base
@@ -740,24 +740,26 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 		}
 
 		max->next = NULL;
-		return(max);
+		return max;
 	}
 
 	// If we get here, we couldn't find one
-	return(NULL);
+	return NULL;
 }
 
 
-/*
- * get_resource
+/**
+ * get_resource: find resource of given size and split up larger ones.
+ * @head: the list to search for resources
+ * @size: the size limit to use
  *
- * this function sorts the resource list by size and then
+ * Description: This function sorts the resource list by size and then
  * returns the first node of "size" length.  If it finds a node
  * larger than "size" it will split it up.
  *
  * size must be a power of two.
  */
-static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *prevnode;
 	struct pci_resource *node;
@@ -765,13 +767,13 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if ( cpqhp_resource_sort_and_combine(head) )
-		return(NULL);
+		return NULL;
 
 	if ( sort_by_size(head) )
-		return(NULL);
+		return NULL;
 
 	for (node = *head; node; node = node->next) {
 		dbg("%s: req_size =%x node=%p, base=%x, length=%x\n",
@@ -792,7 +794,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base;
 			split_node->length = temp_dword - node->base;
@@ -812,7 +814,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base + size;
 			split_node->length = node->length - size;
@@ -839,14 +841,15 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 		// Stop looping
 		break;
 	}
-	return(node);
+	return node;
 }
 
 
-/*
- * cpqhp_resource_sort_and_combine
+/**
+ * cpqhp_resource_sort_and_combine: sort nodes by base addresses and clean up.
+ * @head: the list to sort and clean up
  *
- * Sorts all of the nodes in the list in ascending order by
+ * Description: Sorts all of the nodes in the list in ascending order by
  * their base addresses.  Also does garbage collection by
  * combining adjacent nodes.
  *
@@ -861,12 +864,12 @@ int cpqhp_resource_sort_and_combine(struct pci_resource **head)
 	dbg("%s: head = %p, *head = %p\n", __FUNCTION__, head, *head);
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	dbg("*head->next = %p\n",(*head)->next);
 
 	if (!(*head)->next)
-		return(0);	/* only one item on the list, already sorted! */
+		return 0;	/* only one item on the list, already sorted! */
 
 	dbg("*head->base = 0x%x\n",(*head)->base);
 	dbg("*head->next->base = 0x%x\n",(*head)->next->base);
@@ -912,7 +915,7 @@ int cpqhp_resource_sort_and_combine(struct pci_resource **head)
 			node1 = node1->next;
 	}
 
-	return(0);
+	return 0;
 }
 
 
@@ -1005,7 +1008,7 @@ struct pci_func *cpqhp_slot_create(u8 busnumber)
 	if (new_slot == NULL) {
 		// I'm not dead yet!
 		// You will be.
-		return(new_slot);
+		return new_slot;
 	}
 
 	memset(new_slot, 0, sizeof(struct pci_func));
@@ -1021,11 +1024,11 @@ struct pci_func *cpqhp_slot_create(u8 busnumber)
 			next = next->next;
 		next->next = new_slot;
 	}
-	return(new_slot);
+	return new_slot;
 }
 
 
-/*
+/**
  * slot_remove - Removes a node from the linked list of slots.
  * @old_slot: slot to remove
  *
@@ -1036,19 +1039,19 @@ static int slot_remove(struct pci_func * old_slot)
 	struct pci_func *next;
 
 	if (old_slot == NULL)
-		return(1);
+		return 1;
 
 	next = cpqhp_slot_list[old_slot->bus];
 
 	if (next == NULL) {
-		return(1);
+		return 1;
 	}
 
 	if (next == old_slot) {
 		cpqhp_slot_list[old_slot->bus] = old_slot->next;
 		cpqhp_destroy_board_resources(old_slot);
 		kfree(old_slot);
-		return(0);
+		return 0;
 	}
 
 	while ((next->next != old_slot) && (next->next != NULL)) {
@@ -1059,9 +1062,9 @@ static int slot_remove(struct pci_func * old_slot)
 		next->next = old_slot->next;
 		cpqhp_destroy_board_resources(old_slot);
 		kfree(old_slot);
-		return(0);
+		return 0;
 	} else
-		return(2);
+		return 2;
 }
 
 
@@ -1078,7 +1081,7 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	struct pci_func *next;
 
 	if (bridge == NULL)
-		return(1);
+		return 1;
 
 	secondaryBus = (bridge->config_space[0x06] >> 8) & 0xFF;
 	subordinateBus = (bridge->config_space[0x06] >> 16) & 0xFF;
@@ -1094,13 +1097,13 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	next = cpqhp_slot_list[bridge->bus];
 
 	if (next == NULL) {
-		return(1);
+		return 1;
 	}
 
 	if (next == bridge) {
 		cpqhp_slot_list[bridge->bus] = bridge->next;
 		kfree(bridge);
-		return(0);
+		return 0;
 	}
 
 	while ((next->next != bridge) && (next->next != NULL)) {
@@ -1110,9 +1113,9 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	if (next->next == bridge) {
 		next->next = bridge->next;
 		kfree(bridge);
-		return(0);
+		return 0;
 	} else
-		return(2);
+		return 2;
 }
 
 
@@ -1132,7 +1135,7 @@ struct pci_func *cpqhp_slot_find(u8 bus, u8 device, u8 index)
 	func = cpqhp_slot_list[bus];
 
 	if ((func == NULL) || ((func->device == device) && (index == 0)))
-		return(func);
+		return func;
 
 	if (func->device == device)
 		found++;
@@ -1144,10 +1147,10 @@ struct pci_func *cpqhp_slot_find(u8 bus, u8 device, u8 index)
 			found++;
 
 		if (found == index)
-			return(func);
+			return func;
 	}
 
-	return(NULL);
+	return NULL;
 }
 
 
@@ -1239,7 +1242,7 @@ static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
 		up(&ctrl->crit_sect);
 
 		if (rc)
-			return(rc);
+			return rc;
 
 		// Wait for exclusive access to hardware
 		down(&ctrl->crit_sect);
@@ -1295,9 +1298,9 @@ static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
 				up(&ctrl->crit_sect);
 
 				if (rc)
-					return(rc);
+					return rc;
 				else
-					return(1);
+					return 1;
 			}
 
 			func->status = 0;
@@ -1330,7 +1333,7 @@ static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
 				// Done with exclusive hardware access
 				up(&ctrl->crit_sect);
 
-				return(rc);
+				return rc;
 			}
 			// Done configuring so turn LED on full time
 
@@ -1371,7 +1374,7 @@ static u32 board_replaced(struct pci_func * func, struct controller * ctrl)
 		}
 
 	}
-	return(rc);
+	return rc;
 
 }
 
@@ -1403,7 +1406,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 	down(&ctrl->crit_sect);
 
 	// turn on board without attaching to the bus
-	enable_slot_power (ctrl, hp_slot);
+	enable_slot_power(ctrl, hp_slot);
 
 	set_SOGO(ctrl);
 
@@ -1432,13 +1435,13 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 	set_SOGO(ctrl);
 
 	// Wait for SOBS to be unset
-	wait_for_ctrl_irq (ctrl);
+	wait_for_ctrl_irq(ctrl);
 
 	// Done with exclusive hardware access
 	up(&ctrl->crit_sect);
 
 	if (rc)
-		return(rc);
+		return rc;
 	
 	p_slot = cpqhp_find_slot(ctrl, hp_slot + ctrl->slot_device_offset);
 
@@ -1536,7 +1539,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 
 			// Done with exclusive hardware access
 			up(&ctrl->crit_sect);
-			return(rc);
+			return rc;
 		} else {
 			cpqhp_save_slot_config(ctrl, func);
 		}
@@ -1584,7 +1587,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 		// Done with exclusive hardware access
 		up(&ctrl->crit_sect);
 
-		return(rc);
+		return rc;
 	}
 	return 0;
 }
@@ -1606,10 +1609,10 @@ static u32 remove_board(struct pci_func * func, u32 replace_flag, struct control
 	struct pci_func *temp_func;
 
 	if (func == NULL)
-		return(1);
+		return 1;
 
 	if (cpqhp_unconfigure_device(func))
-		return(1);
+		return 1;
 
 	device = func->device;
 
@@ -1695,7 +1698,7 @@ static u32 remove_board(struct pci_func * func, u32 replace_flag, struct control
 
 		if (func == NULL) {
 			// Out of memory
-			return(1);
+			return 1;
 		}
 
 		func->bus = ctrl->bus;
@@ -1710,8 +1713,7 @@ static u32 remove_board(struct pci_func * func, u32 replace_flag, struct control
 	return 0;
 }
 
-
-static void pushbutton_helper_thread (unsigned long data)
+static void pushbutton_helper_thread(unsigned long data)
 {
 	pushbutton_pending = data;
 	up(&event_semaphore);
@@ -1745,7 +1747,7 @@ static int event_thread(void* data)
 }
 
 
-int cpqhp_event_start_thread (void)
+int cpqhp_event_start_thread(void)
 {
 	int pid;
 
@@ -1765,7 +1767,7 @@ int cpqhp_event_start_thread (void)
 }
 
 
-void cpqhp_event_stop_thread (void)
+void cpqhp_event_stop_thread(void)
 {
 	event_finished = 1;
 	dbg("event_thread finish command given\n");
@@ -1775,7 +1777,7 @@ void cpqhp_event_stop_thread (void)
 }
 
 
-static int update_slot_info (struct controller *ctrl, struct slot *slot)
+static int update_slot_info(struct controller *ctrl, struct slot *slot)
 {
 	struct hotplug_slot_info *info;
 	int result;
@@ -2000,7 +2002,7 @@ int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
 	int physical_slot = 0;
 
 	if (!ctrl)
-		return(1);
+		return 1;
 
 	tempdword = 0;
 
@@ -2015,7 +2017,7 @@ int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
 	tempdword = readl(ctrl->hpc_reg + INT_INPUT_CLEAR);
 
 	if (tempdword & (0x01 << hp_slot)) {
-		return(1);
+		return 1;
 	}
 
 	if (func->is_a_board) {
@@ -2026,7 +2028,7 @@ int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
 
 		func = cpqhp_slot_create(ctrl->bus);
 		if (func == NULL) {
-			return(1);
+			return 1;
 		}
 
 		func->bus = ctrl->bus;
@@ -2058,7 +2060,7 @@ int cpqhp_process_SI (struct controller *ctrl, struct pci_func *func)
 
 			if (func == NULL) {
 				// Out of memory
-				return(1);
+				return 1;
 			}
 
 			func->bus = ctrl->bus;
@@ -2157,7 +2159,7 @@ int cpqhp_process_SS (struct controller *ctrl, struct pci_func *func)
 	if (p_slot)
 		update_slot_info(ctrl, p_slot);
 
-	return(rc);
+	return rc;
 }
 
 
@@ -2183,7 +2185,8 @@ int cpqhp_hardware_test(struct controller *ctrl, int test_num)
 			// Do stuff here!
 
 			// Do that funky LED thing
-			save_LED = readl(ctrl->hpc_reg + LED_CONTROL);	// so we can restore them later
+			/* so we can restore them later */
+			save_LED = readl(ctrl->hpc_reg + LED_CONTROL);
 			work_LED = 0x01010101;
 			writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
 			for (loop = 0; loop < num_of_slots; loop++) {
@@ -2313,7 +2316,8 @@ int cpqhp_hardware_test(struct controller *ctrl, int test_num)
 				writel(work_LED, ctrl->hpc_reg + LED_CONTROL);
 			}
 
-			writel (save_LED, ctrl->hpc_reg + LED_CONTROL);	// put it back the way it was
+			/* put it back the way it was */
+			writel (save_LED, ctrl->hpc_reg + LED_CONTROL);
 
 			set_SOGO(ctrl);
 
@@ -2383,7 +2387,7 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 					cpqhp_return_board_resources(new_slot, resources);
 			}
 
-			return(rc);
+			return rc;
 		}
 
 		function++;
@@ -2404,7 +2408,7 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 
 				if (new_slot == NULL) {
 					// Out of memory
-					return(1);
+					return 1;
 				}
 
 				new_slot->bus = func->bus;
@@ -2442,8 +2446,9 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
  * Returns 0 if success
  *
  */
-static int configure_new_function (struct controller * ctrl, struct pci_func * func,
-				   u8 behind_bridge, struct resource_lists * resources)
+static int configure_new_function(struct controller *ctrl, struct pci_func *func,
+				   u8 behind_bridge,
+				   struct resource_lists *resources)
 {
 	int cloop;
 	u8 IRQ = 0;
@@ -2476,14 +2481,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 	devfn = PCI_DEVFN(func->device, func->function);
 
 	// Check for Bridge
-	rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_HEADER_TYPE, &temp_byte);
+	rc = pci_bus_read_config_byte(pci_bus, devfn, PCI_HEADER_TYPE, &temp_byte);
 	if (rc)
 		return rc;
 
 	if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_BRIDGE) { // PCI-PCI Bridge
 		// set Primary bus
 		dbg("set Primary bus = %d\n", func->bus);
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_PRIMARY_BUS, func->bus);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_PRIMARY_BUS, func->bus);
 		if (rc)
 			return rc;
 
@@ -2498,29 +2503,29 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		// set Secondary bus
 		temp_byte = bus_node->base;
 		dbg("set Secondary bus = %d\n", bus_node->base);
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SECONDARY_BUS, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_SECONDARY_BUS, temp_byte);
 		if (rc)
 			return rc;
 
 		// set subordinate bus
 		temp_byte = bus_node->base + bus_node->length - 1;
 		dbg("set subordinate bus = %d\n", bus_node->base + bus_node->length - 1);
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
 		if (rc)
 			return rc;
 
 		// set subordinate Latency Timer and base Latency Timer
 		temp_byte = 0x40;
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SEC_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_SEC_LATENCY_TIMER, temp_byte);
 		if (rc)
 			return rc;
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_LATENCY_TIMER, temp_byte);
 		if (rc)
 			return rc;
 
 		// set Cache Line size
 		temp_byte = 0x08;
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_CACHE_LINE_SIZE, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_CACHE_LINE_SIZE, temp_byte);
 		if (rc)
 			return rc;
 
@@ -2537,11 +2542,14 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			return -ENOMEM;
 		dbg("Setup the IO, memory, and prefetchable windows\n");
 		dbg("io_node\n");
-		dbg("(base, len, next) (%x, %x, %p)\n", io_node->base, io_node->length, io_node->next);
+		dbg("(base, len, next) (%x, %x, %p)\n", io_node->base,
+					io_node->length, io_node->next);
 		dbg("mem_node\n");
-		dbg("(base, len, next) (%x, %x, %p)\n", mem_node->base, mem_node->length, mem_node->next);
+		dbg("(base, len, next) (%x, %x, %p)\n", mem_node->base,
+					mem_node->length, mem_node->next);
 		dbg("p_mem_node\n");
-		dbg("(base, len, next) (%x, %x, %p)\n", p_mem_node->base, p_mem_node->length, p_mem_node->next);
+		dbg("(base, len, next) (%x, %x, %p)\n", p_mem_node->base,
+					p_mem_node->length, p_mem_node->next);
 
 		// set up the IRQ info
 		if (!resources->irqs) {
@@ -2585,7 +2593,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			if (hold_p_mem_node)
 				kfree(hold_p_mem_node);
 
-			return(1);
+			return 1;
 		}
 
 		memcpy(hold_bus_node, bus_node, sizeof(struct pci_resource));
@@ -2594,50 +2602,50 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		bus_node->length -= 1;
 		bus_node->next = NULL;
 
-		// If we have IO resources copy them and fill in the bridge's
-		// IO range registers
+		/* If we have IO resources copy them and fill in the bridge's
+		 * IO range registers */
 		if (io_node) {
 			memcpy(hold_IO_node, io_node, sizeof(struct pci_resource));
 			io_node->next = NULL;
 
 			// set IO base and Limit registers
 			temp_byte = io_node->base >> 8;
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_BASE, temp_byte);
 
 			temp_byte = (io_node->base + io_node->length - 1) >> 8;
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+			rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
 		} else {
 			kfree(hold_IO_node);
 			hold_IO_node = NULL;
 		}
 
-		// If we have memory resources copy them and fill in the bridge's
-		// memory range registers.  Otherwise, fill in the range
-		// registers with values that disable them.
+		/* If we have memory resources copy them and fill in the bridge's
+		 * memory range registers.  Otherwise, fill in the range
+		 * registers with values that disable them. */
 		if (mem_node) {
 			memcpy(hold_mem_node, mem_node, sizeof(struct pci_resource));
 			mem_node->next = NULL;
 
 			// set Mem base and Limit registers
 			temp_word = mem_node->base >> 16;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = (mem_node->base + mem_node->length - 1) >> 16;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 		} else {
 			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
 
 			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+			rc = pci_bus_write_config_word(pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
 
 			kfree(hold_mem_node);
 			hold_mem_node = NULL;
 		}
 
-		// If we have prefetchable memory resources copy them and 
-		// fill in the bridge's memory range registers.  Otherwise,
-		// fill in the range registers with values that disable them.
+		/* If we have prefetchable memory resources copy them and 
+		 * fill in the bridge's memory range registers.  Otherwise,
+		 * fill in the range registers with values that disable them. */
 		if (p_mem_node) {
 			memcpy(hold_p_mem_node, p_mem_node, sizeof(struct pci_resource));
 			p_mem_node->next = NULL;
@@ -2701,7 +2709,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			return_resource(&(resources->io_head), hold_IO_node);
 			return_resource(&(resources->mem_head), hold_mem_node);
 			return_resource(&(resources->p_mem_head), hold_p_mem_node);
-			return(rc);
+			return rc;
 		}
 		// save the interrupt routing information
 		if (resources->irqs) {
@@ -2900,16 +2908,23 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 			hold_p_mem_node->next = func->p_mem_head;
 			func->p_mem_head = hold_p_mem_node;
 		}
-		// We should be configuring an IRQ and the bridge's base address
-		// registers if it needs them.  Although we have never seen such
-		// a device
+		/* We should be configuring an IRQ and the bridge's base address
+		 * registers if it needs them.  Although we have never seen such
+		 * a device */
 
 		// enable card
-		command = 0x0157;	// = PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |  PCI_COMMAND_INVALIDATE | PCI_COMMAND_PARITY | PCI_COMMAND_SERR
+		command = 0x0157;	/* = PCI_COMMAND_IO |
+					 *   PCI_COMMAND_MEMORY |
+					 *   PCI_COMMAND_MASTER |
+					 *   PCI_COMMAND_INVALIDATE |
+					 *   PCI_COMMAND_PARITY |
+					 *   PCI_COMMAND_SERR */
 		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_COMMAND, command);
 
 		// set Bridge Control Register
-		command = 0x07;		// = PCI_BRIDGE_CTL_PARITY | PCI_BRIDGE_CTL_SERR | PCI_BRIDGE_CTL_NO_ISA
+		command = 0x07;		/* = PCI_BRIDGE_CTL_PARITY |
+					 *   PCI_BRIDGE_CTL_SERR |
+					 *   PCI_BRIDGE_CTL_NO_ISA */
 		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_BRIDGE_CONTROL, command);
 	} else if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_NORMAL) {
 		// Standard device
@@ -2917,7 +2932,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 		if (class_code == PCI_BASE_CLASS_DISPLAY) {
 			// Display (video) adapter (not supported)
-			return(DEVICE_TYPE_NOT_SUPPORTED);
+			return DEVICE_TYPE_NOT_SUPPORTED;
 		}
 		// Figure out IO and memory needs
 		for (cloop = 0x10; cloop <= 0x24; cloop += 4) {
@@ -3001,13 +3016,13 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 						return -ENOMEM;
 				} else if ((temp_register & 0x0BL) == 0x06) {
 					// Those bits are reserved, we can't handle this
-					return(1);
+					return 1;
 				} else {
 					// Requesting space below 1M
-					return(NOT_ENOUGH_RESOURCES);
+					return NOT_ENOUGH_RESOURCES;
 				}
 
-				rc = pci_bus_write_config_dword (pci_bus, devfn, cloop, base);
+				rc = pci_bus_write_config_dword(pci_bus, devfn, cloop, base);
 
 				// Check for 64-bit base
 				if ((temp_register & 0x07L) == 0x04) {
@@ -3016,7 +3031,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					// Upper 32 bits of address always zero on today's systems
 					// FIXME this is probably not true on Alpha and ia64???
 					base = 0;
-					rc = pci_bus_write_config_dword (pci_bus, devfn, cloop, base);
+					rc = pci_bus_write_config_dword(pci_bus, devfn, cloop, base);
 				}
 			}
 		}		// End of base register loop
@@ -3052,7 +3067,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 		if (!behind_bridge) {
 			rc = cpqhp_set_irq(func->bus, func->device, temp_byte + 0x09, IRQ);
 			if (rc)
-				return(1);
+				return 1;
 		} else {
 			//TBD - this code may also belong in the other clause of this If statement
 			resources->irqs->interrupt[(temp_byte + resources->irqs->barber_pole - 1) & 0x03] = IRQ;
@@ -3061,23 +3076,31 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 
 		// Latency Timer
 		temp_byte = 0x40;
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_LATENCY_TIMER, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn,
+					PCI_LATENCY_TIMER, temp_byte);
 
 		// Cache Line size
 		temp_byte = 0x08;
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_CACHE_LINE_SIZE, temp_byte);
+		rc = pci_bus_write_config_byte(pci_bus, devfn,
+					PCI_CACHE_LINE_SIZE, temp_byte);
 
 		// disable ROM base Address
 		temp_dword = 0x00L;
-		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_ROM_ADDRESS, temp_dword);
+		rc = pci_bus_write_config_word(pci_bus, devfn,
+					PCI_ROM_ADDRESS, temp_dword);
 
 		// enable card
-		temp_word = 0x0157;	// = PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |  PCI_COMMAND_INVALIDATE | PCI_COMMAND_PARITY | PCI_COMMAND_SERR
-		rc = pci_bus_write_config_word (pci_bus, devfn, PCI_COMMAND, temp_word);
-	}			// End of Not-A-Bridge else
-	else {
+		temp_word = 0x0157;	/* = PCI_COMMAND_IO |
+					 *   PCI_COMMAND_MEMORY |
+					 *   PCI_COMMAND_MASTER |
+					 *   PCI_COMMAND_INVALIDATE |
+					 *   PCI_COMMAND_PARITY |
+					 *   PCI_COMMAND_SERR */
+		rc = pci_bus_write_config_word (pci_bus, devfn,
+					PCI_COMMAND, temp_word);
+	} else {		// End of Not-A-Bridge else
 		// It's some strange type of PCI adapter (Cardbus?)
-		return(DEVICE_TYPE_NOT_SUPPORTED);
+		return DEVICE_TYPE_NOT_SUPPORTED;
 	}
 
 	func->configured = 1;
