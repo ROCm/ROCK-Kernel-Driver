@@ -703,6 +703,8 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 
 	PDEBUG ("udsl_atm_dev_close: killing tasklet\n");
 	tasklet_kill (&instance->send_tasklet);
+	PDEBUG ("udsl_atm_dev_close: freeing USB device\n");
+	usb_put_dev (instance->usb_dev);
 	PDEBUG ("udsl_atm_dev_close: freeing instance\n");
 	kfree (instance);
 }
@@ -984,6 +986,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	instance->atm_dev->dev_data = instance;
 
 	usb_set_intfdata (intf, instance);
+
+	usb_get_dev (dev);
 
 	return 0;
 
