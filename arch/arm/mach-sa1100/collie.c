@@ -89,7 +89,7 @@ static struct platform_device *devices[] __initdata = {
 	&locomo_device,
 };
 
-static int __init collie_init(void)
+static void __init collie_init(void)
 {
 	int ret = 0;
 
@@ -120,13 +120,8 @@ static int __init collie_init(void)
 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
 	if (ret) {
 		printk(KERN_WARNING "collie: Unable to register LoCoMo device\n");
-		return ret;
 	}
-
-	return ret;
 }
-
-arch_initcall(collie_init);
 
 static struct map_desc collie_io_desc[] __initdata = {
 	/* virtual     physical    length      type */
@@ -145,4 +140,5 @@ MACHINE_START(COLLIE, "Sharp-Collie")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(collie_map_io)
 	INITIRQ(sa1100_init_irq)
+	INIT_MACHINE(collie_init)
 MACHINE_END
