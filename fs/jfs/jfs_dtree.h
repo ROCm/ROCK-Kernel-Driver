@@ -265,9 +265,6 @@ extern int dtInsert(tid_t tid, struct inode *ip, struct component_name * key,
 extern int dtDelete(tid_t tid, struct inode *ip, struct component_name * key,
 		    ino_t * data, int flag);
 
-extern int dtRelocate(tid_t tid,
-		      struct inode *ip, s64 lmxaddr, pxd_t * opxd, s64 nxaddr);
-
 extern int dtModify(tid_t tid, struct inode *ip, struct component_name * key,
 		    ino_t * orig_ino, ino_t new_ino, int flag);
 

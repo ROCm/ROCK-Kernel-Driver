@@ -168,25 +168,23 @@ extern struct completion jfsIOwait;
 /*
  * forward references
  */
-int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
-	  struct tlock * tlck, struct commit * cd);
-int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
-	    struct tlock * tlck);
-void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
-	   struct tlock * tlck);
-void inlineLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
-	       struct tlock * tlck);
-void mapLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
-	    struct tlock * tlck);
+static int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+		struct tlock * tlck, struct commit * cd);
+static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+		struct tlock * tlck);
+static void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+		struct tlock * tlck);
+static void mapLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+		struct tlock * tlck);
 static void txAbortCommit(struct commit * cd);
 static void txAllocPMap(struct inode *ip, struct maplock * maplock,
-			struct tblock * tblk);
-void txForce(struct tblock * tblk);
-static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd);
-int txMoreLock(void);
+		struct tblock * tblk);
+static void txForce(struct tblock * tblk);
+static int txLog(struct jfs_log * log, struct tblock * tblk,
+		struct commit * cd);
 static void txUpdateMap(struct tblock * tblk);
 static void txRelease(struct tblock * tblk);
-void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	   struct tlock * tlck);
 static void LogSyncRelease(struct metapage * mp);
 
@@ -1399,7 +1397,7 @@ static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd)
  *
  * function:    log inode tlock and format maplock to update bmap;
  */
-int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+static int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	  struct tlock * tlck, struct commit * cd)
 {
 	int rc = 0;
@@ -1514,7 +1512,7 @@ int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
  *
  * function:    log data tlock
  */
-int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	    struct tlock * tlck)
 {
 	struct metapage *mp;
@@ -1560,7 +1558,7 @@ int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
  *
  * function:    log dtree tlock and format maplock to update bmap;
  */
-void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+static void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	   struct tlock * tlck)
 {
 	struct metapage *mp;
@@ -1665,7 +1663,7 @@ void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
  *
  * function:    log xtree tlock and format maplock to update bmap;
  */
-void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	   struct tlock * tlck)
 {
 	struct inode *ip;
@@ -2719,7 +2717,7 @@ static void txAbortCommit(struct commit * cd)
  *	allocation maps are updated in order.  For synchronous transactions,
  *	let the user thread finish processing after txUpdateMap() is called.
  */
-void txLazyCommit(struct tblock * tblk)
+static void txLazyCommit(struct tblock * tblk)
 {
 	struct jfs_log *log;
 

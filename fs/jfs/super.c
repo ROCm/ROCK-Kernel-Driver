@@ -321,7 +321,7 @@ cleanup:
 	return 0;
 }
 
-int jfs_remount(struct super_block *sb, int *flags, char *data)
+static int jfs_remount(struct super_block *sb, int *flags, char *data)
 {
 	s64 newLVSize = 0;
 	int rc = 0;

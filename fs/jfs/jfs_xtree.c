@@ -1736,7 +1736,7 @@ int xtExtend(tid_t tid,		/* transaction id */
 	return rc;
 }
 
-
+#ifdef _NOTYET
 /*
  *      xtTailgate()
  *
@@ -1918,7 +1918,7 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 
 	return rc;
 }
-
+#endif /* _NOTYET */
 
 /*
  *      xtUpdate()

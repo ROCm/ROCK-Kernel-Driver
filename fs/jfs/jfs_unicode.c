@@ -78,8 +78,8 @@ int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
  * FUNCTION:	Convert character string to unicode string
  *
  */
-int jfs_strtoUCS(wchar_t * to,
-		 const char *from, int len, struct nls_table *codepage)
+static int jfs_strtoUCS(wchar_t * to, const char *from, int len,
+		struct nls_table *codepage)
 {
 	int charlen;
 	int i;
