@@ -154,7 +154,8 @@ typedef struct siginfo {
 #define ILL_BADSTK	(__SI_FAULT|8)	/* internal stack error */
 #define ILL_BADIADDR	(__SI_FAULT|9)	/* unimplemented instruction address */
 #define __ILL_BREAK	(__SI_FAULT|10)	/* illegal break */
-#define NSIGILL		10
+#define __ILL_BNDMOD	(__SI_FAULT|11)	/* bundle-update (modification) in progress */
+#define NSIGILL		11
 
 /*
  * SIGFPE si_codes
