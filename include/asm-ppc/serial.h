@@ -19,7 +19,7 @@
 #elif defined(CONFIG_MCPN765)
 #include <platforms/mcpn765.h>
 #elif defined(CONFIG_MVME5100)
-#include <platforms/mvme5100_serial.h>
+#include <platforms/mvme5100.h>
 #elif defined(CONFIG_PRPMC750)
 #include <platforms/prpmc750.h>
 #elif defined(CONFIG_PRPMC800)

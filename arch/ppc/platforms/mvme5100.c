@@ -1,11 +1,11 @@
 /*
- * arch/ppc/platforms/mvme5100_setup.c
+ * arch/ppc/platforms/mvme5100.c
  *
  * Board setup routines for the Motorola MVME5100.
  *
  * Author: Matt Porter <mporter@mvista.com>
  *
- * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -16,55 +16,141 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/errno.h>
-#include <linux/reboot.h>
 #include <linux/pci.h>
-#include <linux/kdev_t.h>
-#include <linux/major.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
+#include <linux/kdev_t.h>
 #include <linux/root_dev.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
-#include <asm/time.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
-#include <asm/prom.h>
-#include <asm/smp.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>
-#include <platforms/mvme5100.h>
 #include <asm/todc.h>
 #include <asm/pci-bridge.h>
 #include <asm/bootinfo.h>
-#include <asm/pplus.h>
+#include <asm/hawk.h>
 
-extern char cmd_line[];
+#include <platforms/pplus.h>
+#include <platforms/mvme5100.h>
 
-static u_char mvme5100_openpic_initsenses[] __initdata = {
-	0,	/* 16: i8259 cascade (active high) */
-	1,	/* 17: TL16C550 UART 1,2 */
-	1,	/* 18: Enet 1 (front panel or P2) */
-	1,	/* 19: Hawk Watchdog 1,2 */
-	1,	/* 20: DS1621 thermal alarm */
-	1,	/* 21: Universe II LINT0# */
-	1,	/* 22: Universe II LINT1# */
-	1,	/* 23: Universe II LINT2# */
-	1,	/* 24: Universe II LINT3# */
-	1,	/* 25: PMC1 INTA#, PMC2 INTB# */
-	1,	/* 26: PMC1 INTB#, PMC2 INTC# */
-	1,	/* 27: PMC1 INTC#, PMC2 INTD# */
-	1,	/* 28: PMC1 INTD#, PMC2 INTA# */
-	1,	/* 29: Enet 2 (front panel) */
-	1,	/* 30: Abort Switch */
-	1,	/* 31: RTC Alarm */
+static u_char mvme5100_openpic_initsenses[16] __initdata = {
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE), /* i8259 cascade */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* TL16C550 UART 1,2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Enet1 front panel or P2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Hawk Watchdog 1,2 */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* DS1621 thermal alarm */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Universe II LINT0# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Universe II LINT1# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Universe II LINT2# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Universe II LINT3# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* PMC1 INTA#, PMC2 INTB# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* PMC1 INTB#, PMC2 INTC# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* PMC1 INTC#, PMC2 INTD# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* PMC1 INTD#, PMC2 INTA# */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Enet 2 (front panel) */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* Abort Switch */
+	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE), /* RTC Alarm */
 };
+
+static inline int
+mvme5100_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	int irq;
+
+	static char pci_irq_table[][4] =
+	/*
+	 *	PCI IDSEL/INTPIN->INTLINE
+	 * 	   A   B   C   D
+	 */
+	{
+		{  0,  0,  0,  0 },	/* IDSEL 11 - Winbond */
+		{  0,  0,  0,  0 },	/* IDSEL 12 - unused */
+		{ 21, 22, 23, 24 },	/* IDSEL 13 - Universe II */
+		{ 18,  0,  0,  0 },	/* IDSEL 14 - Enet 1 */
+		{  0,  0,  0,  0 },	/* IDSEL 15 - unused */
+		{ 25, 26, 27, 28 },	/* IDSEL 16 - PMC Slot 1 */
+		{ 28, 25, 26, 27 },	/* IDSEL 17 - PMC Slot 2 */
+		{  0,  0,  0,  0 },	/* IDSEL 18 - unused */
+		{ 29,  0,  0,  0 },	/* IDSEL 19 - Enet 2 */
+		{  0,  0,  0,  0 },	/* IDSEL 20 - PMCSPAN */
+	};
+
+	const long min_idsel = 11, max_idsel = 20, irqs_per_slot = 4;
+	irq = PCI_IRQ_TABLE_LOOKUP;
+	/* If lookup is zero, always return 0 */
+	if (!irq)
+		return 0;
+	else
+#ifdef CONFIG_MVME5100_IPMC761_PRESENT
+	/* If IPMC761 present, return table value */
+	return irq;
+#else
+	/* If IPMC761 not present, we don't have an i8259 so adjust */
+	return (irq - NUM_8259_INTERRUPTS);
+#endif
+}
+
+static void
+mvme5100_pcibios_fixup_resources(struct pci_dev *dev)
+{
+	int i;
+
+	if ((dev->vendor == PCI_VENDOR_ID_MOTOROLA) &&
+			(dev->device == PCI_DEVICE_ID_MOTOROLA_HAWK))
+		for (i=0; i<DEVICE_COUNT_RESOURCE; i++)
+		{
+			dev->resource[i].start = 0;
+			dev->resource[i].end = 0;
+		}
+}
+
+static void __init
+mvme5100_setup_bridge(void)
+{
+	struct pci_controller*	hose;
+
+	hose = pcibios_alloc_controller();
+
+	if (!hose)
+		return;
+
+	hose->first_busno = 0;
+	hose->last_busno = 0xff;
+	hose->pci_mem_offset = MVME5100_PCI_MEM_OFFSET;
+
+	pci_init_resource(&hose->io_resource, MVME5100_PCI_LOWER_IO,
+			MVME5100_PCI_UPPER_IO, IORESOURCE_IO,
+			"PCI host bridge");
+
+	pci_init_resource(&hose->mem_resources[0], MVME5100_PCI_LOWER_MEM,
+			MVME5100_PCI_UPPER_MEM, IORESOURCE_MEM,
+			"PCI host bridge");
+
+	hose->io_space.start = MVME5100_PCI_LOWER_IO;
+	hose->io_space.end = MVME5100_PCI_UPPER_IO;
+	hose->mem_space.start = MVME5100_PCI_LOWER_MEM;
+	hose->mem_space.end = MVME5100_PCI_UPPER_MEM;
+	hose->io_base_virt = (void *)MVME5100_ISA_IO_BASE;
+
+	/* Use indirect method of Hawk */
+	setup_indirect_pci(hose, MVME5100_PCI_CONFIG_ADDR,
+			MVME5100_PCI_CONFIG_DATA);
+
+	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
+
+	ppc_md.pcibios_fixup_resources = mvme5100_pcibios_fixup_resources;
+	ppc_md.pci_swizzle = common_swizzle;
+	ppc_md.pci_map_irq = mvme5100_map_irq;
+}
 
 static void __init
 mvme5100_setup_arch(void)
@@ -96,7 +182,7 @@ mvme5100_setup_arch(void)
 	mvme5100_setup_bridge();
 
 	/* Find and map our OpenPIC */
-	pplus_mpic_init(MVME5100_PCI_MEM_OFFSET);
+	hawk_mpic_init(MVME5100_PCI_MEM_OFFSET);
 	OpenPIC_InitSenses = mvme5100_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(mvme5100_openpic_initsenses);
 
@@ -136,16 +222,19 @@ mvme5100_init_IRQ(void)
 	if ( ppc_md.progress )
 		ppc_md.progress("init_irq: enter", 0);
 
+	openpic_set_sources(0, 16, OpenPIC_Addr + 0x10000);
 #ifdef CONFIG_MVME5100_IPMC761_PRESENT
-	openpic_init(1, NUM_8259_INTERRUPTS, NULL, -1);
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS,"82c59 cascade",&i8259_irq);
+	openpic_init(NUM_8259_INTERRUPTS);
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			&i8259_irq);
 
-	for(i=0; i < NUM_8259_INTERRUPTS; i++)
+	/* Map i8259 interrupts. */
+	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
 	i8259_init(NULL);
 #else
-	openpic_init(1, 0, NULL, -1);
+	openpic_init(0);
 #endif
 
 	if ( ppc_md.progress )
@@ -160,32 +249,16 @@ mvme5100_init_IRQ(void)
 static __inline__ void
 mvme5100_set_bat(void)
 {
-	unsigned long bat3u, bat3l;
-	static int mapping_set = 0;
-
-	if (!mapping_set) {
-
-		__asm__ __volatile__(
-		" lis %0,0xf000\n \
-		  ori %1,%0,0x002a\n \
-		  ori %0,%0,0x1ffe\n \
-		  mtspr 0x21e,%0\n \
-		  mtspr 0x21f,%1\n \
-		  isync\n \
-		  sync "
-		: "=r" (bat3u), "=r" (bat3l));
-
-		mapping_set = 1;
-	}
-
-	return;
+	mb();
+	mtspr(DBAT1U, 0xf0001ffe);
+	mtspr(DBAT1L, 0xf000002a);
+	mb();
 }
 
 static unsigned long __init
 mvme5100_find_end_of_memory(void)
 {
-	mvme5100_set_bat();
-	return pplus_get_mem_size(MVME5100_HAWK_SMC_BASE);
+	return hawk_get_mem_size(MVME5100_HAWK_SMC_BASE);
 }
 
 static void __init
@@ -248,6 +321,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
+	mvme5100_set_bat();
 
 	isa_io_base = MVME5100_ISA_IO_BASE;
 	isa_mem_base = MVME5100_ISA_MEM_BASE;
@@ -266,11 +340,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.find_end_of_memory = mvme5100_find_end_of_memory;
 	ppc_md.setup_io_mappings = mvme5100_map_io;
 
-	TODC_INIT(TODC_TYPE_MK48T37,
-		  MVME5100_NVRAM_AS0,
-		  MVME5100_NVRAM_AS1,
-		  MVME5100_NVRAM_DATA,
-		  8);
+	TODC_INIT(TODC_TYPE_MK48T37, MVME5100_NVRAM_AS0, MVME5100_NVRAM_AS1,
+			MVME5100_NVRAM_DATA, 8);
 
 	ppc_md.time_init = todc_time_init;
 	ppc_md.set_rtc_time = todc_set_rtc_time;
@@ -279,6 +350,4 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.nvram_read_val = todc_m48txx_read_val;
 	ppc_md.nvram_write_val = todc_m48txx_write_val;
-
-	ppc_md.progress = NULL;
 }

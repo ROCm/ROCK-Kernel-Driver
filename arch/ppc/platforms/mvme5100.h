@@ -63,10 +63,29 @@
 #define MVME5100_SERIAL_IRQ		1
 #endif
 
-#define MVME5100_WINBOND_DEVFN		0x58
-#define MVME5100_WINBOND_VIDDID		0x056510ad
+#define RS_TABLE_SIZE  4
 
-extern void mvme5100_setup_bridge(void);
+#define BASE_BAUD ( MVME5100_BASE_BAUD / 16 )
+
+#define STD_COM_FLAGS ASYNC_BOOT_AUTOCONF
+
+/* All UART IRQ's are wire-OR'd to one MPIC IRQ */
+#define STD_SERIAL_PORT_DFNS \
+        { 0, BASE_BAUD, MVME5100_SERIAL_1, \
+		MVME5100_SERIAL_IRQ, \
+		STD_COM_FLAGS, /* ttyS0 */ \
+		iomem_base: (unsigned char *)MVME5100_SERIAL_1,		\
+		iomem_reg_shift: 4,					\
+		io_type: SERIAL_IO_MEM },				\
+        { 0, BASE_BAUD, MVME5100_SERIAL_2, \
+		MVME5100_SERIAL_IRQ, \
+		STD_COM_FLAGS, /* ttyS1 */ \
+		iomem_base: (unsigned char *)MVME5100_SERIAL_2,		\
+		iomem_reg_shift: 4,					\
+		io_type: SERIAL_IO_MEM },
+
+#define SERIAL_PORT_DFNS \
+        STD_SERIAL_PORT_DFNS
 
 #endif /* __ASM_MVME5100_H__ */
 #endif /* __KERNEL__ */
