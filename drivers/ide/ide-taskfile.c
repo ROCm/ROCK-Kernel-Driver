@@ -456,11 +456,39 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
-		/* for dma commands we down set the handler */
-		if (drive->using_dma &&
-		!(drive->channel->udma(((args->taskfile.command == WIN_WRITEDMA)
-					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
-					? ide_dma_write : ide_dma_read, drive, rq)));
+		ide_dma_action_t dma_act;
+		int tcq = 0;
+
+		if (!drive->using_dma)
+			return ide_started;
+
+		/* for dma commands we don't set the handler */
+		if (args->taskfile.command == WIN_WRITEDMA || args->taskfile.command == WIN_WRITEDMA_EXT)
+			dma_act = ide_dma_write;
+		else if (args->taskfile.command == WIN_READDMA || args->taskfile.command == WIN_READDMA_EXT)
+			dma_act = ide_dma_read;
+		else if (args->taskfile.command == WIN_WRITEDMA_QUEUED || args->taskfile.command == WIN_WRITEDMA_QUEUED_EXT) {
+			tcq = 1;
+			dma_act = ide_dma_write_queued;
+		} else if (args->taskfile.command == WIN_READDMA_QUEUED || args->taskfile.command == WIN_READDMA_QUEUED_EXT) {
+			tcq = 1;
+			dma_act = ide_dma_read_queued;
+		} else {
+			printk("ata_taskfile: unknown command %x\n", args->taskfile.command);
+			return ide_stopped;
+		}
+
+		/*
+		 * FIXME: this is a gross hack, need to unify tcq dma proc and
+		 * regular dma proc -- basically split stuff that needs to act
+		 * on a request from things like ide_dma_check etc.
+		 */
+		if (tcq)
+			return drive->channel->udma(dma_act, drive, rq);
+		else {
+			if (drive->channel->udma(dma_act, drive, rq))
+				return ide_stopped;
+		}
 	}
 
 	return ide_started;
@@ -523,7 +551,7 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 	ide__sti();	/* local CPU only */
 
 	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT)) {
-		/* Keep quite for NOP becouse they are expected to fail. */
+		/* Keep quiet for NOP because it is expected to fail. */
 		if (args && args->taskfile.command != WIN_NOP)
 			return ide_error(drive, "task_no_data_intr", stat);
 	}

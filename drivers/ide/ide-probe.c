@@ -199,6 +199,16 @@ static inline void do_identify(struct ata_device *drive, u8 cmd)
 	if (drive->channel->quirkproc)
 		drive->quirk_list = drive->channel->quirkproc(drive);
 
+	/* Initialize queue depth settings */
+	drive->queue_depth = 1;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
+	drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
+#else
+	drive->queue_depth = drive->id->queue_depth + 1;
+#endif
+	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
+		drive->queue_depth = IDE_MAX_TAG;
+
 	return;
 
 err_misc:
@@ -565,34 +575,6 @@ static void channel_probe(struct ata_channel *ch)
 not_found:
 	__restore_flags(flags);
 }
-
-#if MAX_HWIFS > 1
-/*
- * This is used to simplify logic in init_irq() below.
- *
- * A loophole here is that we may not know about a particular hwif's irq until
- * after that hwif is actually probed/initialized..  This could be a problem
- * for the case where an hwif is on a dual interface that requires
- * serialization (eg. cmd640) and another hwif using one of the same irqs is
- * initialized beforehand.
- *
- * This routine detects and reports such situations, but does not fix them.
- */
-static struct ata_channel *save_match(struct ata_channel *ch, struct ata_channel *h,
-		struct ata_channel *match)
-{
-	if (match && match->hwgroup && match->hwgroup != h->hwgroup) {
-		if (!h->hwgroup)
-			return match;
-
-		printk("%s: potential irq problem with %s and %s\n", ch->name,h->name, match->name);
-	}
-	if (!match || match->irq != ch->irq) /* don't undo a prior perfect match */
-		match = h;
-
-	return match;
-}
-#endif
 
 /*
  * This routine sets up the irq for an ide interface, and creates a new hwgroup

@@ -311,7 +311,10 @@ int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate
 
 	if (!end_that_request_first(rq, uptodate, nr_secs)) {
 		add_blkdev_randomness(major(rq->rq_dev));
-		blkdev_dequeue_request(rq);
+		if (!blk_rq_tagged(rq))
+			blkdev_dequeue_request(rq);
+		else
+			blk_queue_end_tag(&drive->queue, rq);
 		HWGROUP(drive)->rq = NULL;
 		end_that_request_last(rq);
 		ret = 0;
@@ -1219,11 +1222,6 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 }
 
 
-/* Place holders for later expansion of functionality.
- */
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
-
 /*
  * Feed commands to a drive until it barfs.  Called with ide_lock/DRIVE_LOCK
  * held and busy channel.
@@ -1263,7 +1261,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 		 * still a severe BUG!
 		 */
 		if (blk_queue_plugged(&drive->queue)) {
-			BUG();
+			BUG_ON(!drive->using_tcq);
 			break;
 		}
 
@@ -1675,7 +1673,8 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 		} else {
 			printk("%s: %s: huh? expected NULL handler on exit\n", drive->name, __FUNCTION__);
 		}
-	}
+	} else if (startstop == ide_released)
+		queue_commands(drive, ch->irq);
 
 out_lock:
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -3204,6 +3203,9 @@ int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *driver)
 
 			drive->channel->udma(ide_dma_off_quietly, drive, NULL);
 			drive->channel->udma(ide_dma_check, drive, NULL);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+			drive->channel->udma(ide_dma_queued_on, drive, NULL);
+#endif
 		}
 
 		/* Only CD-ROMs and tape drives support DSC overlap.  But only
