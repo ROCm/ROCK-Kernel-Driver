@@ -17,8 +17,9 @@
 *
 ******************************************************************************/
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/moduleparam.h>
 
 #include "qlfo.h"
 #include "qlfolimits.h"
@@ -298,7 +299,7 @@ qla2x00_process_failover(scsi_qla_host_t *ha)
 			}
 		}
 	}
-	qla2x00_restart_queues(ha, FALSE);
+	qla2x00_restart_queues(ha, 0);
 
 	DEBUG(printk("%s() - done", __func__));
 }
@@ -310,8 +311,8 @@ qla2x00_search_failover_queue(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
 	unsigned long flags;
 	srb_t *sp;
 
-	DEBUG3(printk("qla2xxx_eh_abort: searching sp %p in "
-				"failover queue.\n", sp);)
+	DEBUG3(printk("qla2xxx_eh_abort: searching sp %p in failover queue.\n",
+	    CMD_SP(cmd));)
 
 	spin_lock_irqsave(&ha->list_lock, flags);
 	list_for_each_safe(list, temp, &ha->failover_queue) {

@@ -22,8 +22,9 @@
  *
  */
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <asm/uaccess.h>
 
 #include "qlfo.h"
 #include "qlfolimits.h"
@@ -62,8 +63,8 @@ static fc_lun_t *qla2x00_find_matching_lun(uint8_t , mp_device_t *, mp_path_t *)
 static mp_path_t *qla2x00_find_path_by_id(mp_device_t *, uint8_t);
 static mp_device_t *qla2x00_find_mp_dev_by_id(mp_host_t *, uint16_t);
 static mp_device_t *qla2x00_find_mp_dev_by_nodename(mp_host_t *, uint8_t *);
-static mp_device_t *qla2x00_find_mp_dev_by_portname(mp_host_t *, uint8_t *,
-    uint16_t *);
+mp_device_t *
+qla2x00_find_mp_dev_by_portname(mp_host_t *, uint8_t *, uint16_t *);
 static mp_device_t *qla2x00_find_dp_by_pn_from_all_hosts(uint8_t *, uint16_t *);
 
 static mp_path_t *qla2x00_get_visible_path(mp_device_t *dp);
@@ -110,6 +111,7 @@ int qla2x00_export_target( void *, uint16_t , fc_port_t *, uint16_t );
  * Global data items
  */
 mp_host_t  *mp_hosts_base = NULL;
+DECLARE_MUTEX(mp_hosts_lock);
 int   mp_config_required = 0;
 static int mp_num_hosts;
 static int mp_initialized;
@@ -580,6 +582,7 @@ qla2x00_cfg_init(scsi_qla_host_t *ha)
 	/* First HBA, initialize the failover global properties */
 	qla2x00_fo_init_params(ha);
 
+	down(&mp_hosts_lock);
 	/*
 	 * If the user specified a device configuration then it is use as the
 	 * configuration. Otherwise, we wait for path discovery.
@@ -587,6 +590,7 @@ qla2x00_cfg_init(scsi_qla_host_t *ha)
 	if (mp_config_required)
 		qla2x00_cfg_build_path_tree(ha);
 	rval = qla2x00_cfg_path_discovery(ha);
+	up(&mp_hosts_lock);
 	clear_bit(CFG_ACTIVE, &ha->cfg_flags);
 
 	LEAVE("qla2x00_cfg_init");
@@ -711,8 +715,9 @@ qla2x00_cfg_event_notify(scsi_qla_host_t *ha, uint32_t i_type)
 			 * Update our path tree in case we are
 			 * losing the adapter
 			 */
+			down(&mp_hosts_lock);
 			qla2x00_update_mp_tree();
-			/* Free our resources for adapter */
+			up(&mp_hosts_lock);
 			break;
 		case MP_NOTIFY_LOOP_UP:
 			DEBUG(printk("scsi%ld: MP_NOTIFY_LOOP_UP - "
@@ -723,7 +728,9 @@ qla2x00_cfg_event_notify(scsi_qla_host_t *ha, uint32_t i_type)
 				host->flags |= MP_HOST_FLAG_NEEDS_UPDATE;
 				host->fcports = &ha->fcports;
 				set_bit(CFG_FAILOVER, &ha->cfg_flags);
+				down(&mp_hosts_lock);
 				qla2x00_update_mp_tree();
+				up(&mp_hosts_lock);
 				clear_bit(CFG_FAILOVER, &ha->cfg_flags);
 			}
 			break;
@@ -4851,7 +4858,7 @@ DEBUG(printk("%s mpdev_nodename=%0x nodename_from_gui=%0x",__func__,dp->nodename
  * Context:
  *      Kernel context.
  */
-static mp_device_t  *
+mp_device_t  *
 qla2x00_find_mp_dev_by_portname(mp_host_t *host, uint8_t *name, uint16_t *pidx)
 {
 	int		id;
@@ -5003,10 +5010,10 @@ qla2x00_map_os_targets(mp_host_t *host)
 				path->port->os_target_id = t;
 				if (TGT_Q(ha, t) == NULL) {
 					tgt = qla2x00_tgt_alloc(ha, t);
-					memcpy(tgt->node_name,dp->nodename,
+					memcpy(tgt->node_name, dp->nodename,
 					    WWN_SIZE);
-					memcpy(tgt->port_name,
-					    path->port->port_name, WWN_SIZE);
+					memcpy(tgt->port_name, path->portname,
+					    WWN_SIZE);
 					tgt->fcport = path->port;
 				}
 				DEBUG3(printk("%s(%ld): host instance =%d, "

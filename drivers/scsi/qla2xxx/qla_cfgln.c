@@ -23,7 +23,6 @@
  *
  */
 
-#include "qla_os.h"
 #include "qla_def.h"
 #include "qla_foln.h"
 

@@ -65,9 +65,9 @@ extern "C"
 
 /* MACROS */
 #define qla2x00_is_portname_equal(N1,N2) \
-	((memcmp((N1),(N2),WWN_SIZE)==0?TRUE:FALSE))
+	((memcmp((N1),(N2),WWN_SIZE)==0 ? 1: 0))
 #define qla2x00_is_nodename_equal(N1,N2) \
-	((memcmp((N1),(N2),WWN_SIZE)==0?TRUE:FALSE))
+	((memcmp((N1),(N2),WWN_SIZE)==0 ? 1: 0))
 
 /*
  * Per-multipath driver parameters

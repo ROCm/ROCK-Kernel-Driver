@@ -5,6 +5,26 @@
  *
  * Revision History
  *
+ *  Rev  8.00.00b14	June 21, 2004	DG/RA/AV
+ *	- Resync with Linux Kernel 2.6.7.
+ *	- Resync with 7.00.04b2.
+ *	- Add modules parameter to enable ZIO -- Support mode 5 only.
+ *	- Remove incorrect and unused ISP2100 #define
+ *	  SS_RESIDUAL_LEN_VALID.
+ *	- Fix several additional tape-handling issues.
+ *	- Correct interrupt-handler problems while the RISC is paused.
+ *	- Fix problem where an incorrect status would be returned for
+ *	  qla2x00_configure_fabric() if the driver was unable to log
+ *	  into a fabric's SNS.
+ *	- Check for the additional WAIT_FOR_AL_PA state in
+ *	  qla2x00_fw_ready() since switch vendors may push NOS/OLS
+ *	  primitives during a 'port disabled' state.
+ *	- Add firmware dump support for ISPs with memory chips larger
+ *	  than 128KB (512/1024KB).
+ *	- Remove TRUE/FALSE #define usage within the driver.
+ *	- Remove dependency on depricated drivers/scsi/* headers.
+ *	- Add new 2300/2322 IPX and 6312/6322 FLX firmwares (3.02.30):
+ *
  *  Rev  8.00.00b13	May 21, 2004	DG/RA/AV
  *	- Resync with Linux Kernel 2.6.6-mm3.
  *	- Resync with 7.00.00b27.

@@ -19,8 +19,9 @@
 * Failover include file
 ******************************************************************************/
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <asm/uaccess.h>
 
 #include "qlfo.h"
 #include "qlfolimits.h"
@@ -106,8 +107,8 @@ qla2x00_get_hba(unsigned long instance)
  *
  * Input:
  *	stat_p = Pointer to FO_HBA_STAT union.
- *      reset  = Flag, TRUE = reset statistics.
- *                     FALSE = return statistics values.
+ *      reset  = Flag, 1 = reset statistics.
+ *                     0 = return statistics values.
  *
  * Returns:
  *	0 = success
@@ -138,7 +139,7 @@ qla2x00_fo_stats(FO_HBA_STAT *stat_p, uint8_t reset)
 			stat_p->info.HbaCount = 1;
 			idx = inst;
 		}
-		if (reset == TRUE) {
+		if (reset) {
 			DEBUG9(printk("%s: reset stats.\n", __func__);)
 			ha->IosRequested = 0;
 			ha->BytesRequested = 0;
@@ -300,14 +301,9 @@ qla2x00_fo_get_lun_data(EXT_IOCTL *pext, FO_LUN_DATA_INPUT *bp, int mode)
 			}
 
 			kfree(list);
-		} else {
-			DEBUG2_9_10(printk(
-			    "%s: no HOST for ha inst %ld.\n",
-			    __func__, ha->instance);)
-				pext->Status = EXT_STATUS_DEV_NOT_FOUND;
-		}
 
-		return (ret);
+			return (ret);
+		}
 	}
 
 	list = kmalloc(sizeof(FO_LUN_DATA_LIST), GFP_KERNEL);
@@ -1169,7 +1165,7 @@ qla2x00_fo_get_tgt(mp_host_t *host, scsi_qla_host_t *ha, EXT_IOCTL *pext,
 				entry->TargetId = dp->dev_id;
 				entry->Dev_No = path->id;
 
-				if (path->config == TRUE ||
+				if (path->config ||
 				    !mp_config_required) {
 					entry->MultipathControl = path->mp_byte;
 				} else {
@@ -1548,10 +1544,10 @@ qla2x00_fo_ioctl(scsi_qla_host_t *ha, int ioctl_code, EXT_IOCTL *pext, int mode)
 			    &buff.set_path,mode);
 			break;
 		case FO_CC_RESET_HBA_STAT:
-			rval = qla2x00_fo_stats(&buff.stat, TRUE);
+			rval = qla2x00_fo_stats(&buff.stat, 1);
 			break;
 		case FO_CC_GET_HBA_STAT:
-			rval = qla2x00_fo_stats(&buff.stat, FALSE);
+			rval = qla2x00_fo_stats(&buff.stat, 0);
 			break;
 		case FO_CC_GET_LUN_DATA:
 
@@ -1628,8 +1624,8 @@ done_fo_ioctl:
  *	sp = Pointer to command.
  *
  * Returns:
- *	TRUE -- retry
- * 	FALSE -- don't retry
+ *	1 -- retry
+ * 	0 -- don't retry
  *
  * Context:
  *	Kernel context.
@@ -1637,7 +1633,7 @@ done_fo_ioctl:
 static uint8_t
 qla2x00_fo_count_retries(scsi_qla_host_t *ha, srb_t *sp)
 {
-	uint8_t		retry = TRUE;
+	uint8_t		retry = 1;
 	os_lun_t	*lq;
 	os_tgt_t	*tq;
 	scsi_qla_host_t	*vis_ha;
@@ -1646,7 +1642,7 @@ qla2x00_fo_count_retries(scsi_qla_host_t *ha, srb_t *sp)
 
 	if (++sp->fo_retry_cnt >  qla_fo_params.MaxRetriesPerIo) {
 		/* no more failovers for this request */
-		retry = FALSE;
+		retry = 0;
 		sp->fo_retry_cnt = 0;
 		printk(KERN_INFO
 		    "qla2x00: no more failovers for request - pid= %ld\n",
@@ -1697,7 +1693,7 @@ qla2x00_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 {
 	int		retry = 0;
 	os_lun_t	*lq;
-	Scsi_Cmnd 	 *cp;
+	struct scsi_cmnd *cp;
 	fc_port_t 	 *fcport;
 	
 	if ( !(sp->flags & SRB_GOT_SENSE) )
@@ -1764,7 +1760,7 @@ qla2x00_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 uint8_t
 qla2x00_fo_check(scsi_qla_host_t *ha, srb_t *sp)
 {
-	uint8_t		retry = FALSE;
+	uint8_t		retry = 0;
 	int host_status;
 #if DEBUG_QLA2100
 	static char *reason[] = {
@@ -1794,7 +1790,7 @@ qla2x00_fo_check(scsi_qla_host_t *ha, srb_t *sp)
 			 * we are processing the failover.
 			 */
 			sp->cmd->result = DID_BUS_BUSY << 16;
-			retry = TRUE;
+			retry = 1;
 		}
 		DEBUG(printk("qla2x00_fo_check: pid= %ld sp %p/%d/%d retry count=%d, "
 		    "retry flag = %d, host status (%s)\n",
@@ -2232,7 +2228,7 @@ qla2x00_send_fo_notification(fc_lun_t *old_lp, fc_lun_t *new_lp)
  *      instance = HBA number.
  *
  * Returns:
- *      TRUE when failover is authorized else FALSE
+ *      1 when failover is authorized else 0
  *
  * Context:
  *      Kernel context.
@@ -2316,7 +2312,7 @@ qla2x00_fo_missing_port_summary(scsi_qla_host_t *ha,
 			if (qla2x00_is_wwn_zero(path->portname))
 				continue;
 
-			if (path->config == TRUE && path->port == NULL) {
+			if (path->config && path->port == NULL) {
 				/* This path was created from config file
 				 * but has not been configured.
 				 */

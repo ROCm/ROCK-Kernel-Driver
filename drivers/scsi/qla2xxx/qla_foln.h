@@ -26,6 +26,11 @@
 #include "qla_fo.h"
 #include "qla_cfg.h"
 
+// Inbound or Outbound tranfer of data
+#define QLA2X00_UNKNOWN  0
+#define QLA2X00_READ	1
+#define QLA2X00_WRITE	2
+
 /* 
  * Device configuration table
  *
@@ -95,6 +100,8 @@ extern int mp_config_required;
  * Global Function Prototypes in qla_cfg.c source file.
  */
 
+extern mp_device_t *qla2x00_find_mp_dev_by_portname(mp_host_t *, uint8_t *,
+    uint16_t *);
 extern mp_host_t *qla2x00_cfg_find_host(scsi_qla_host_t *);
 extern int qla2x00_is_portname_in_device(mp_device_t *, uint8_t *);
 extern int qla2x00_cfg_path_discovery(scsi_qla_host_t *);

@@ -17,8 +17,10 @@
  *
  ******************************************************************************/
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/delay.h>
+#include <asm/uaccess.h>
 
 static uint16_t qla2x00_nvram_request(scsi_qla_host_t *, uint32_t);
 static void qla2x00_nv_deselect(scsi_qla_host_t *);
@@ -946,5 +948,279 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image, uint32_t saddr,
 	qla2x00_flash_disable(ha);
 
 	return (status);
+}
+
+
+/* qla2x00_cmd_wait
+ *	Stall driver until all outstanding commands are returned.
+ *
+ * Input:
+ *	ha = adapter state pointer.
+ *
+ * Return;
+ *  0 -- Done
+ *  1 -- cmds still outstanding
+ *
+ * Context:
+ *  This routine must be called without hardware_lock held.
+ */
+int
+qla2x00_cmd_wait(scsi_qla_host_t *ha) 
+{
+	int status = 0;
+	int index = 0;
+	int wait_cnt = 30; 
+	unsigned long cpu_flags;
+
+	DEBUG(printk("%s(%ld): Started\n",__func__,ha->host_no));
+
+	while (wait_cnt) {
+		/* Find a command that hasn't completed. */
+		for (index = 1; index < MAX_OUTSTANDING_COMMANDS; index++) {
+			spin_lock_irqsave(&ha->hardware_lock, cpu_flags);  
+			if (ha->outstanding_cmds[index] != NULL) {
+				spin_unlock_irqrestore(&ha->hardware_lock,
+				    cpu_flags); 
+				break;
+			}
+			spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);  
+		}
+
+		/* If No Commands are pending wait is complete */
+		if (index == MAX_OUTSTANDING_COMMANDS)
+			break;
+
+		/*
+		 * If we timed out on waiting for commands to come back Reset
+		 * the ISP
+		 */
+		wait_cnt--;
+		if (wait_cnt == 0) {
+			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+			status = 1;
+			DEBUG(printk("%s(%ld): ISP abort - handle %d\n",
+			    __func__, ha->host_no, index));
+		} else {
+			/* sleep a second */
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ);
+		}
+	}
+
+	DEBUG(printk("%s(%ld): Done waiting on commands - ind=%d\n",
+	    __func__, ha->host_no, index));
+
+	return status;
+}
+
+/*
+ *  qla2x00_suspend_target
+ *	Suspend target
+ *
+ * Input:
+ *	ha = visable adapter block pointer.
+ *  target = target queue
+ *  time = time in seconds
+ *
+ * Return:
+ *     QL_STATUS_SUCCESS  -- suspended lun 
+ *     QL_STATUS_ERROR  -- Didn't suspend lun
+ *
+ * Context:
+ *	Interrupt context.
+ */
+int
+qla2x00_suspend_target(scsi_qla_host_t *ha, os_tgt_t *tq, int time)
+{
+	srb_t *sp, *sptemp;
+	unsigned long flags;
+
+	if (test_bit(TQF_SUSPENDED, &tq->flags))
+		return QLA_FUNCTION_FAILED;
+
+	/* now suspend the lun */
+	set_bit(TQF_SUSPENDED, &tq->flags);
+
+	DEBUG2(printk(KERN_INFO
+	    "scsi%ld: Starting - suspend target for %d secs\n", ha->host_no,
+	    time));
+
+	/*
+	 * Remove all (TARGET) pending commands from request queue and put them
+	 * in the scsi_retry queue.
+	 */
+	spin_lock_irqsave(&ha->list_lock, flags);
+	list_for_each_entry_safe(sp, sptemp, &ha->pending_queue, list) {
+		if (sp->tgt_queue != tq)
+			continue;
+
+		DEBUG3(printk("scsi%ld: %s requeue for suspended target %p\n",
+		    ha->host_no, __func__, sp));
+
+		__del_from_pending_queue(ha, sp);
+		__add_to_scsi_retry_queue(ha,sp);
+	}
+	spin_unlock_irqrestore(&ha->list_lock, flags);
+
+	return QLA_SUCCESS;
+}
+
+/*
+ *  qla2x00_unsuspend_all_target
+ *	Unsuspend all target. 
+ *
+ * Input:
+ *	ha = visable adapter block pointer.
+ *
+ * Return:
+ *
+ * Context:
+ *	Process context.
+ */
+void
+qla2x00_unsuspend_all_target(scsi_qla_host_t *ha)
+{
+	os_tgt_t *tq;
+	int 	 t;
+
+	for (t = 0; t < ha->max_targets; t++) {
+		if ((tq = ha->otgt[t]) == NULL)
+			continue;
+
+		clear_bit(TQF_SUSPENDED, &tq->flags); 
+	}
+}
+
+/*
+ *  qla2x00_suspend_all_target
+ *	Suspend all target indefinitely. Caller need to make sure
+ *	to explicitly unsuspend it later on.
+ *
+ * Input:
+ *	ha = visable adapter block pointer.
+ *  target = target queue
+ *  time = time in seconds
+ *
+ * Return:
+ *     QL_STATUS_SUCCESS  -- suspended lun 
+ *     QL_STATUS_ERROR  -- Didn't suspend lun
+ *
+ * Context:
+ *	qla2x00_suspend_target can be called in Interrupt context.
+ *	Hold the hardware lock for synchronisation.
+ */
+int
+qla2x00_suspend_all_target(scsi_qla_host_t *ha)
+{
+	int  status = 0;	
+	os_tgt_t *tq;
+	int 	 t, time;
+	unsigned long cpu_flags = 0;
+
+	/* Suspend the Target until explicitly cleared */
+	time = 0;
+
+	for (t = 0; t < ha->max_targets; t++) {
+		if ((tq = ha->otgt[t]) == NULL)
+			continue;
+
+		spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
+		status = qla2x00_suspend_target(ha, tq, time);
+		spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+	}
+
+	return status;
+}
+
+uint16_t
+qla2x00_read_flash_image(scsi_qla_host_t *ha, uint8_t *usr_tmp, uint32_t saddr,
+    uint32_t length)
+{
+	device_reg_t	*reg = ha->iobase;
+	uint32_t	midpoint;
+	uint8_t		data;
+	uint32_t	ilength;
+	uint16_t	status = 0;
+
+	midpoint = length / 2;
+	qla2x00_flash_enable(ha);
+	WRT_REG_WORD(&reg->nvram, 0);
+	RD_REG_WORD(&reg->nvram);
+	for (ilength = 0; ilength < length; saddr++, ilength++, usr_tmp++) {
+		if (ilength == midpoint) {
+			WRT_REG_WORD(&reg->nvram, NVR_SELECT);
+			RD_REG_WORD(&reg->nvram);
+		}
+		data = qla2x00_read_flash_byte(ha, saddr);
+		if (saddr % 100)
+			udelay(10);
+		__put_user(data, usr_tmp);
+	}
+	qla2x00_flash_disable(ha);
+	
+	return (status);
+}
+
+uint16_t
+qla2x00_update_or_read_flash(scsi_qla_host_t *ha, uint8_t *image,
+    uint32_t saddr, uint32_t length, uint8_t direction)
+{
+	uint16_t    status;	
+	unsigned long flags;
+	uint32_t	cnt;
+	device_reg_t	*reg = ha->iobase;
+
+	/* Not setting the timer so that tgt remains unsuspended */
+	qla2x00_suspend_all_target(ha);
+
+	/* wait for big hammer to complete if it fails */
+	status = qla2x00_cmd_wait(ha);
+	if (status)
+		qla2x00_wait_for_hba_online(ha);
+
+	/* Dont process mailbox cmd until flash operation is done */
+	set_bit(MBX_UPDATE_FLASH_ACTIVE, &ha->mbx_cmd_flags);
+
+	qla2x00_disable_intrs(ha);
+
+	/* Pause RISC. */
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	WRT_REG_WORD(&reg->hccr, HCCR_PAUSE_RISC);
+	RD_REG_WORD(&reg->hccr);
+	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
+		for (cnt = 0; cnt < 30000; cnt++) {
+			if ((RD_REG_WORD(&reg->hccr) &
+			    HCCR_RISC_PAUSE) != 0)
+				break;
+			udelay(100);
+		}
+	} else {
+		udelay(10);
+	}
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	switch (direction) {
+	case QLA2X00_READ:
+		status = qla2x00_read_flash_image(ha, image, saddr, length);
+		break;
+
+	case QLA2X00_WRITE:
+		status = qla2x00_set_flash_image(ha, image, saddr, length);
+		break;
+	default:
+		printk(KERN_INFO "%s unknown operation\n", __func__);
+		break;
+	}
+
+	/* Schedule DPC to restart the RISC */
+	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+	up(ha->dpc_wait);
+	qla2x00_wait_for_hba_online(ha);
+
+	clear_bit(MBX_UPDATE_FLASH_ACTIVE, &ha->mbx_cmd_flags);
+	
+	qla2x00_unsuspend_all_target(ha);
+
+	return status;
 }
 #endif

@@ -23,6 +23,8 @@
 #ifndef __QLA_GBL_H
 #define	__QLA_GBL_H
 
+#include <linux/interrupt.h>
+
 extern void qla2x00_remove_one(struct pci_dev *);
 extern int qla2x00_probe_one(struct pci_dev *, struct qla_board_info *);
 
@@ -148,7 +150,7 @@ qla2x00_execute_fw(scsi_qla_host_t *);
 
 extern void
 qla2x00_get_fw_version(scsi_qla_host_t *, uint16_t *,
-    uint16_t *, uint16_t *, uint16_t *);
+    uint16_t *, uint16_t *, uint16_t *, uint32_t *);
 
 extern int
 qla2x00_get_fw_options(scsi_qla_host_t *, uint16_t *);
@@ -273,6 +275,9 @@ extern uint16_t qla2x00_get_flash_version(scsi_qla_host_t *);
 extern uint16_t qla2x00_get_flash_image(scsi_qla_host_t *, uint8_t *);
 extern uint16_t qla2x00_set_flash_image(scsi_qla_host_t *, uint8_t *, uint32_t,
     uint32_t);
+extern uint16_t
+qla2x00_update_or_read_flash(scsi_qla_host_t *, uint8_t *, uint32_t, uint32_t,
+    uint8_t);
 #endif
 /*
  * Global Function Prototypes in qla_dbg.c source file.

@@ -17,12 +17,10 @@
  *
  ******************************************************************************/
 
-#include <linux/device.h>
-#include <linux/kdev_t.h>
-#include <linux/err.h>
-
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/blkdev.h>
+#include <asm/uaccess.h>
 
 #include "qla_foln.h"
 
@@ -1037,7 +1035,8 @@ qla2x00_get_driver_specifics(EXT_IOCTL *pext)
 	if (ret) {
 		pext->Status = EXT_STATUS_COPY_ERR;
 		DEBUG9_10(printk("%s: ERROR copy resp buf\n", __func__);)
-	}
+	} else
+		pext->Status = EXT_STATUS_OK;
 
 	DEBUG9(printk("%s: exiting. ret=%d.\n", __func__, ret);)
 
@@ -2616,7 +2615,10 @@ qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
 	uint32_t	transfer_size;
 	fc_port_t	*fcport;
 	os_tgt_t	*tq;
-
+	mp_host_t	*host = NULL;
+	uint16_t	idx;
+	mp_device_t	*tmp_dp = NULL;
+			 
 	DEBUG9(printk("%s(%ld): inst=%ld entered.\n",
 	    __func__, ha->host_no, ha->instance);)
 
@@ -2686,6 +2688,25 @@ qla2x00_get_fcport_summary(scsi_qla_host_t *ha, EXT_DEVICEDATAENTRY *pdd_entry,
 				}
 				break;
 			}
+		}
+		if (tgt == MAX_TARGETS) {
+			if (qla2x00_failover_enabled(ha)) {
+				if (((host = qla2x00_cfg_find_host(ha)) !=
+				    NULL) && (fcport->flags & FCF_XP_DEVICE) &&
+					!(device_types &
+					    EXT_DEF_GET_TRUE_NN_DEVICE)) {
+					if ((tmp_dp =
+					    qla2x00_find_mp_dev_by_portname(
+						    host, fcport->port_name,
+						    &idx)) != NULL)
+						memcpy(pdd_entry->NodeWWN,
+						    tmp_dp->nodename, WWN_SIZE);
+				} else
+					memcpy(pdd_entry->NodeWWN,
+					    fcport->node_name, WWN_SIZE);
+			} else
+				memcpy(pdd_entry->NodeWWN, fcport->node_name,
+				    WWN_SIZE);
 		}
 		memcpy(pdd_entry->PortWWN, fcport->port_name, WWN_SIZE);
 
@@ -2965,6 +2986,7 @@ qla2x00_msiocb_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext, int cmd,
 	fc_lun_t	*ptemp_fclun = NULL;	/* buf from scrap mem */
 	fc_port_t	*ptemp_fcport = NULL;	/* buf from scrap mem */
 	struct scsi_cmnd *pscsi_cmd = NULL;	/* buf from scrap mem */
+	struct request *request = NULL;
 
 	DEBUG9(printk("%s(%ld): inst=%ld entered.\n",
 	    __func__, ha->host_no, ha->instance);)
@@ -3021,6 +3043,20 @@ qla2x00_msiocb_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext, int cmd,
 		    (ulong)sizeof(struct scsi_cmnd));)
 		return (ret);
 	}
+
+	if (qla2x00_get_ioctl_scrap_mem(ha, (void **)&request,
+	    sizeof(struct request))) {
+		/* not enough memory */
+		pext->Status = EXT_STATUS_NO_MEMORY;
+		DEBUG9_10(printk("%s(%ld): inst=%ld scrap not big enough. "
+		    "size requested=%ld.\n",
+		    __func__, ha->host_no, ha->instance,
+		    (ulong)sizeof(struct request));)
+		qla2x00_free_ioctl_scrap_mem(ha);
+		return (ret);
+	}
+	pscsi_cmd->request = request;
+	pscsi_cmd->request->nr_hw_segments = 1;
 
 	if (qla2x00_get_ioctl_scrap_mem(ha, (void **)&ptemp_fcport,
 	    sizeof(fc_port_t))) {
@@ -3099,7 +3135,7 @@ qla2x00_send_els_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext,
 {
 	int		ret = 0;
 
-	uint8_t		invalid_wwn = FALSE;
+	uint8_t		invalid_wwn = 0;
 	uint8_t		*ptmp_stat;
 	uint8_t		*pusr_req_buf;
 	uint8_t		*presp_payload;
@@ -3596,7 +3632,7 @@ qla2x00_start_ms_cmd(scsi_qla_host_t *ha, EXT_IOCTL *pext, srb_t *sp,
 	DEBUG9_10(printk("%s(%ld): inst=%ld using loop_id=%02x req_len=%d, "
 	    "resp_len=%d. Initializing pkt.\n",
 	    __func__, ha->host_no, ha->instance,
-	    pkt->loop_id, usr_req_len, usr_resp_len);)
+	    pkt->loop_id.extended, usr_req_len, usr_resp_len);)
 
 	pkt->timeout = cpu_to_le16(ql2xioctltimeout);
 	pkt->cmd_dsd_count = __constant_cpu_to_le16(1);
@@ -3796,6 +3832,7 @@ qla2x00_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	int		ret = 0;
 	struct scsi_cmnd *pscsi_cmd = NULL;
 	struct scsi_device *pscsi_device = NULL;
+	struct request *request = NULL;
 
 	DEBUG9(printk("%s(%ld): entered.\n",
 	    __func__, ha->host_no);)
@@ -3822,6 +3859,21 @@ qla2x00_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		qla2x00_free_ioctl_scrap_mem(ha);
 		return (ret);
 	}
+	pscsi_cmd->device = pscsi_device;
+
+	if (qla2x00_get_ioctl_scrap_mem(ha, (void **)&request,
+	    sizeof(struct request))) {
+		/* not enough memory */
+		pext->Status = EXT_STATUS_NO_MEMORY;
+		DEBUG9_10(printk("%s(%ld): inst=%ld scrap not big enough. "
+		    "size requested=%ld.\n",
+		    __func__, ha->host_no, ha->instance,
+		    (ulong)sizeof(struct request));)
+		qla2x00_free_ioctl_scrap_mem(ha);
+		return (ret);
+	}
+	pscsi_cmd->request = request;
+	pscsi_cmd->request->nr_hw_segments = 1;
 
 	switch(pext->SubCode) {
 	case EXT_SC_SEND_SCSI_PASSTHRU:
@@ -3967,8 +4019,6 @@ qla2x00_ioctl_scsi_queuecommand(scsi_qla_host_t *ha, EXT_IOCTL *pext,
 
 	/* mark this as a special delivery and collection command */
 	pscsi_cmd->scsi_done = qla2x00_scsi_pt_done;
-
-	pscsi_cmd->device               = pscsi_dev;
 	pscsi_cmd->device->tagged_supported = 0;
 	pscsi_cmd->use_sg               = 0; /* no ScatterGather */
 	pscsi_cmd->request_bufflen      = pext->ResponseLen;
@@ -4204,10 +4254,16 @@ qla2x00_sc_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext,
 	DEBUG9(qla2x00_dump_buffer((uint8_t *)&pscsi_cmd->data_cmnd[0],
 	    pscsi_cmd->cmd_len);)
 
-	if (pscsi_pass->Direction == EXT_DEF_SCSI_PASSTHRU_DATA_OUT) {
+	switch (pscsi_pass->Direction) {
+	case EXT_DEF_SCSI_PASSTHRU_DATA_OUT:
 		pscsi_cmd->sc_data_direction = DMA_TO_DEVICE;
-	} else {
+		break;
+	case EXT_DEF_SCSI_PASSTHRU_DATA_IN:
 		pscsi_cmd->sc_data_direction = DMA_FROM_DEVICE;
+		break;
+	default :	
+		pscsi_cmd->sc_data_direction = DMA_NONE;
+		break;
 	}
 
 	/* send command to adapter */
@@ -4556,10 +4612,16 @@ qla2x00_sc_fc_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext,
 	DEBUG9(printk("%s Dump of cdb buffer:\n", __func__);)
 	DEBUG9(qla2x00_dump_buffer((uint8_t *)&pfc_scsi_cmd->data_cmnd[0], 16);)
 
-	if (pfc_scsi_pass->Direction == EXT_DEF_SCSI_PASSTHRU_DATA_OUT) {
+	switch (pfc_scsi_pass->Direction) {
+	case EXT_DEF_SCSI_PASSTHRU_DATA_OUT:
 		pfc_scsi_cmd->sc_data_direction = DMA_TO_DEVICE;
-	} else {
+		break;
+	case EXT_DEF_SCSI_PASSTHRU_DATA_IN:
 		pfc_scsi_cmd->sc_data_direction = DMA_FROM_DEVICE;
+		break;
+	default :	
+		pfc_scsi_cmd->sc_data_direction = DMA_NONE;
+		break;
 	}
 
 	/* send command to adapter */
@@ -4874,11 +4936,18 @@ qla2x00_sc_scsi3_passthru(scsi_qla_host_t *ha, EXT_IOCTL *pext,
 	memcpy(pscsi3_cmd->data_cmnd, pscsi3_pass->Cdb, pscsi3_cmd->cmd_len);
 	memcpy(pscsi3_cmd->cmnd, pscsi3_pass->Cdb, pscsi3_cmd->cmd_len);
 
-	if (pscsi3_pass->Direction == EXT_DEF_SCSI_PASSTHRU_DATA_OUT) {
+	switch (pscsi3_pass->Direction) {
+	case EXT_DEF_SCSI_PASSTHRU_DATA_OUT:
 		pscsi3_cmd->sc_data_direction = DMA_TO_DEVICE;
-	} else {
+		break;
+	case EXT_DEF_SCSI_PASSTHRU_DATA_IN:
 		pscsi3_cmd->sc_data_direction = DMA_FROM_DEVICE;
+		break;
+	default :	
+		pscsi3_cmd->sc_data_direction = DMA_NONE;
+		break;
 	}
+
  	if (pscsi3_pass->Timeout)
 		pscsi3_cmd->timeout_per_command = pscsi3_pass->Timeout * HZ;
 

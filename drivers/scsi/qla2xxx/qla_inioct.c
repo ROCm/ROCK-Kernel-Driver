@@ -17,8 +17,10 @@
  *
  ******************************************************************************/
 
-#include "qla_os.h"
 #include "qla_def.h"
+
+#include <linux/delay.h>
+#include <asm/uaccess.h>
 
 #include "exioct.h"
 #include "inioct.h"
@@ -506,14 +508,6 @@ qla2x00_send_loopback(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 int
 qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
-	uint8_t		*usr_tmp;
-	uint32_t	addr;
-	uint32_t	midpoint;
-	uint32_t	transfer_size;
-	uint8_t		data;
-	device_reg_t	*reg = ha->iobase;
-	unsigned long	cpu_flags;
-
 	if (pext->SubCode)
 		return qla2x00_read_option_rom_ext(ha, pext, mode);
 
@@ -530,45 +524,23 @@ qla2x00_read_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return (1);
 	}
 
-	transfer_size = FLASH_IMAGE_SIZE;
-
-	midpoint = FLASH_IMAGE_SIZE / 2;
-	usr_tmp = (uint8_t *)pext->ResponseAdr;
-
 	/* Dump FLASH. */
-	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-	qla2x00_flash_enable(ha);
-	WRT_REG_WORD(&reg->nvram, 0);
-	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
-	for (addr = 0; addr < transfer_size; addr++, usr_tmp++) {
-		if (addr == midpoint)
-			WRT_REG_WORD(&reg->nvram, NVR_SELECT);
-
-		data = qla2x00_read_flash_byte(ha, addr);
-		if (addr % 100)
-			udelay(10);
-		__put_user(data, usr_tmp);
-	}
-	qla2x00_flash_disable(ha);
-	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+ 	qla2x00_update_or_read_flash(ha, (uint8_t *)pext->ResponseAdr, 0,
+	    FLASH_IMAGE_SIZE, QLA2X00_READ); 
 
 	pext->Status = EXT_STATUS_OK;
 	pext->DetailStatus = EXT_STATUS_OK;
 
 	DEBUG9(printk("%s: exiting.\n", __func__);)
 
-	return (0);
+	return 0;
 }
 
 int
 qla2x00_read_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
-	uint8_t		*usr_tmp;
-	uint8_t		data;
-	device_reg_t	*reg = ha->iobase;
-	unsigned long	cpu_flags;
 	int		iter, found;
-	uint32_t	saddr, length, ilength;
+	uint32_t	saddr, length;
 
 	DEBUG9(printk("%s: entered.\n", __func__);)
 
@@ -605,23 +577,9 @@ qla2x00_read_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return 1;
 	}
 
-	usr_tmp = (uint8_t *)pext->ResponseAdr;
-
 	/* Dump FLASH. */
-	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-	qla2x00_flash_enable(ha);
-	WRT_REG_WORD(&reg->nvram, 0);
-	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
-	WRT_REG_WORD(&reg->nvram, NVR_SELECT);
-	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
-	for (ilength = 0; ilength < length; saddr++, ilength++, usr_tmp++) {
-		data = qla2x00_read_flash_byte(ha, saddr);
-		if (saddr % 100)
-			udelay(10);
-		__put_user(data, usr_tmp);
-	}
-	qla2x00_flash_disable(ha);
-	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+ 	qla2x00_update_or_read_flash(ha, (uint8_t *)pext->ResponseAdr, saddr,
+	    length, QLA2X00_READ); 
 
 	pext->Status = EXT_STATUS_OK;
 	pext->DetailStatus = EXT_STATUS_OK;
@@ -631,13 +589,13 @@ qla2x00_read_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	return 0;
 }
 
-int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
+int
+qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 {
 	int		ret;
 	uint8_t		*usr_tmp;
 	uint8_t		*kern_tmp;
 	uint16_t	status;
-	unsigned long	cpu_flags;
 
 	if (pext->SubCode)
 		return qla2x00_update_option_rom_ext(ha, pext, mode);
@@ -654,9 +612,6 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		pext->Status = EXT_STATUS_COPY_ERR;
 		return (1);
 	}
-
-	pext->Status = EXT_STATUS_OK;
-	pext->DetailStatus = EXT_STATUS_OK;
 
 	/* Read from user buffer */
 	kern_tmp = kmalloc(FLASH_IMAGE_SIZE, GFP_KERNEL);
@@ -678,14 +633,12 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return (ret);
 	}
 
-	/* Go with update */
-	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-	status = qla2x00_set_flash_image(ha, kern_tmp, 0, FLASH_IMAGE_SIZE);
-	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+	pext->Status = EXT_STATUS_OK;
+	pext->DetailStatus = EXT_STATUS_OK;
 
-	/* Schedule DPC to restart the RISC */
-	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-	up(ha->dpc_wait);
+	/* Go with update */
+	status = qla2x00_update_or_read_flash(ha, kern_tmp, 0, FLASH_IMAGE_SIZE,
+	    QLA2X00_WRITE); 
 
 	kfree(kern_tmp);
 
@@ -697,7 +650,7 @@ int qla2x00_update_option_rom(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 
 	DEBUG9(printk("%s: exiting.\n", __func__);)
 
-	return qla2x00_wait_for_hba_online(ha);
+	return ret;
 }
 
 
@@ -708,7 +661,6 @@ qla2x00_update_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 	uint8_t		*usr_tmp;
 	uint8_t		*kern_tmp;
 	uint16_t	status;
-	unsigned long	cpu_flags;
 	int		iter, found;
 	uint32_t	saddr, length;
 
@@ -747,9 +699,6 @@ qla2x00_update_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return 1;
 	}
 
-	pext->Status = EXT_STATUS_OK;
-	pext->DetailStatus = EXT_STATUS_OK;
-
 	/* Read from user buffer */
 	usr_tmp = (uint8_t *)pext->RequestAdr;
 
@@ -769,10 +718,12 @@ qla2x00_update_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		return (ret);
 	}
 
+	pext->Status = EXT_STATUS_OK;
+	pext->DetailStatus = EXT_STATUS_OK;
+
 	/* Go with update */
-	spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
-	status = qla2x00_set_flash_image(ha, kern_tmp, saddr, length);
-	spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
+	status = qla2x00_update_or_read_flash(ha, kern_tmp, saddr, length,
+	    QLA2X00_WRITE);
 
 	kfree(kern_tmp);
 
@@ -782,14 +733,9 @@ qla2x00_update_option_rom_ext(scsi_qla_host_t *ha, EXT_IOCTL *pext, int mode)
 		DEBUG9_10(printk("%s: ERROR updating flash.\n", __func__);)
 	}
 
-
-	/* Schedule DPC to restart the RISC */
-	set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-	up(ha->dpc_wait);
-
 	DEBUG9(printk("%s: exiting.\n", __func__);)
 
-	return qla2x00_wait_for_hba_online(ha);
+	return ret;
 }
 
 int

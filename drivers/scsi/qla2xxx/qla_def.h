@@ -20,6 +20,24 @@
 #ifndef __QLA_DEF_H
 #define __QLA_DEF_H
 
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/types.h>
+#include <linux/module.h>
+#include <linux/list.h>
+#include <linux/pci.h>
+#include <linux/sched.h>
+#include <linux/slab.h>
+#include <linux/mempool.h>
+#include <linux/spinlock.h>
+#include <linux/completion.h>
+#include <asm/semaphore.h>
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_cmnd.h>
+
 /* XXX(hch): move to pci_ids.h */
 #ifndef PCI_DEVICE_ID_QLOGIC_ISP2300
 #define PCI_DEVICE_ID_QLOGIC_ISP2300	0x2300
@@ -160,12 +178,14 @@
 #define WRT_REG_BYTE(addr, data)	writeb(data,addr)
 #define WRT_REG_WORD(addr, data)	writew(data,addr)
 #define WRT_REG_DWORD(addr, data)	writel(data,addr)
+#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
 /*
  * The ISP2312 v2 chip cannot access the FLASH/GPIO registers via MMIO in an
  * 133Mhz slot.
  */
 #define RD_REG_WORD_IOMEM(addr)		(inw((unsigned long)addr))
 #define WRT_REG_WORD_IOMEM(addr, data)	(outw(data,(unsigned long)addr))
+#endif
 
 /*
  * Fibre Channel device definitions.
@@ -1309,8 +1329,7 @@ typedef struct {
 #define SS_RESIDUAL_UNDER		BIT_11
 #define SS_RESIDUAL_OVER		BIT_10
 #define SS_SENSE_LEN_VALID		BIT_9
-#define SS_RESIDUAL_LEN_VALID		BIT_8	/* ISP2100 only */
-#define SS_RESPONSE_INFO_LEN_VALID	BIT_8	/* ISP2200 and 23xx */
+#define SS_RESPONSE_INFO_LEN_VALID	BIT_8
 
 #define SS_RESERVE_CONFLICT		(BIT_4 | BIT_3)
 #define SS_BUSY_CONDITION		BIT_3
@@ -2287,7 +2306,8 @@ typedef struct scsi_qla_host {
 	mbx_cmd_t	*mcp;
 	unsigned long	mbx_cmd_flags;
 #define MBX_INTERRUPT	1
-#define MBX_INTR_WAIT   2
+#define MBX_INTR_WAIT	2
+#define MBX_UPDATE_FLASH_ACTIVE	3
 
 	spinlock_t	mbx_reg_lock;   /* Mbx Cmd Register Lock */
 
@@ -2323,6 +2343,7 @@ typedef struct scsi_qla_host {
 	uint16_t	fw_minor_version;
 	uint16_t	fw_subminor_version;
 	uint16_t	fw_attributes;
+	uint32_t	fw_memory_size;
 	uint32_t	fw_transfer_size;
 
 	uint16_t	fw_options[16];		/* slots: 1,2,3,10,11 */
@@ -2460,5 +2481,18 @@ struct _qla2x00stats  {
 #include "qla_dbg.h"
 #include "qla_inline.h"
 #include "qla_listops.h"
+
+/*
+* String arrays
+*/
+#define LINESIZE    256
+#define MAXARGS      26
+
+#define CMD_SP(Cmnd)		((Cmnd)->SCp.ptr)
+#define CMD_COMPL_STATUS(Cmnd)  ((Cmnd)->SCp.this_residual)
+#define CMD_RESID_LEN(Cmnd)	((Cmnd)->SCp.buffers_residual)
+#define CMD_SCSI_STATUS(Cmnd)	((Cmnd)->SCp.Status)
+#define CMD_ACTUAL_SNSLEN(Cmnd)	((Cmnd)->SCp.Message)
+#define CMD_ENTRY_STATUS(Cmnd)	((Cmnd)->SCp.have_data_in)
 
 #endif
