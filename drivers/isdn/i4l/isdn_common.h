@@ -99,9 +99,6 @@ extern void  isdn_slot_set_priv(int sl, int usage, void *priv, int (*stat_cb)(in
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 
-int   isdn_slot_queue_empty(int sl);
-void  isdn_slot_queue_tail(int sl, struct sk_buff *skb, int len);
-void  isdn_slot_queue_purge(int sl);
 int   isdn_drv_maxbufsize(int di);
 int   isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
 int   isdn_drv_hdrlen(int di);

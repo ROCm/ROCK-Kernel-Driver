@@ -299,13 +299,8 @@ slot_data_req(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
 	struct sk_buff *skb = arg;
-	int retval;
 
-	/* Update statistics */
-//	slots[sl].ibytes += skb->len;
-	
-	retval = isdn_drv_writebuf_skb(slot->di, slot->ch, 1, skb);
-	return retval;
+	return isdn_drv_writebuf_skb(slot->di, slot->ch, 1, skb);
 }
 
 static int
@@ -401,7 +396,6 @@ slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 	slot->iv110.v110 = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
 	isdn_slot_set_usage(sl, ISDN_USAGE_NONE);
-	isdn_slot_queue_purge(sl);
 	return 0;
 }
 
@@ -497,12 +491,6 @@ struct isdn_driver {
 	int                 maxbufsize;       /* Maximum Buffersize supported*/
 	int                 stavail;          /* Chars avail on Status-device*/
 	isdn_if            *interface;        /* Interface to driver         */
-	int                *rcverr;           /* Error-counters for B rx     */
-	int                *rcvcount;         /* Byte-counters for B rx      */
-	struct sk_buff_head *rpqueue;
-#ifdef CONFIG_ISDN_AUDIO
-	unsigned long      DLEflag;           /* Insert DLE at next read     */
-#endif
 	char               msn2eaz[10][ISDN_MSNLEN];  /*  MSN->EAZ           */
 	struct fsm_inst    fi;
 } driver;
@@ -578,13 +566,6 @@ isdn_drv_lookup(char *drvid)
 static void
 drv_destroy(struct isdn_driver *drv)
 {
-	int i;
-
-	kfree(drv->rcverr);
-	kfree(drv->rcvcount);
-	for (i = 0; i < drv->channels; i++)
-		skb_queue_purge(&drv->rpqueue[i]);
-	kfree(drv->rpqueue);
 	kfree(drv);
 }
 
@@ -1446,108 +1427,6 @@ isdn_getnum(char **p)
 
 #define DLE 0x10
 
-/*
- * isdn_slot_readbchan() tries to get data from the read-queue.
- * It MUST be called with interrupts off.
- */
-int
-isdn_slot_readbchan(int sl, u_char * buf, u_char * fp, int len)
-{
-	int count;
-	int count_pull;
-	int count_put;
-	int dflag;
-	int di = isdn_slot_driver(sl);
-	int ch = isdn_slot_channel(sl);
-	struct sk_buff *skb;
-	u_char *cp;
-
-	if (!drivers[di])
-		return 0;
-	if (skb_queue_empty(&drivers[di]->rpqueue[ch]))
-		return 0;
-
-	if (len > drivers[di]->rcvcount[ch])
-		len = drivers[di]->rcvcount[ch];
-	cp = buf;
-	count = 0;
-	while (len) {
-		if (!(skb = skb_peek(&drivers[di]->rpqueue[ch])))
-			break;
-#ifdef CONFIG_ISDN_AUDIO
-		if (ISDN_AUDIO_SKB_LOCK(skb))
-			break;
-		ISDN_AUDIO_SKB_LOCK(skb) = 1;
-		if ((ISDN_AUDIO_SKB_DLECOUNT(skb)) || (drivers[di]->DLEflag & (1 << ch))) {
-			char *p = skb->data;
-			unsigned long DLEmask = (1 << ch);
-
-			dflag = 0;
-			count_pull = count_put = 0;
-			while ((count_pull < skb->len) && (len > 0)) {
-				len--;
-				if (drivers[di]->DLEflag & DLEmask) {
-					*cp++ = DLE;
-					drivers[di]->DLEflag &= ~DLEmask;
-				} else {
-					*cp++ = *p;
-					if (*p == DLE) {
-						drivers[di]->DLEflag |= DLEmask;
-						(ISDN_AUDIO_SKB_DLECOUNT(skb))--;
-					}
-					p++;
-					count_pull++;
-				}
-				count_put++;
-			}
-			if (count_pull >= skb->len)
-				dflag = 1;
-		} else {
-#endif
-			/* No DLE's in buff, so simply copy it */
-			dflag = 1;
-			if ((count_pull = skb->len) > len) {
-				count_pull = len;
-				dflag = 0;
-			}
-			count_put = count_pull;
-			memcpy(cp, skb->data, count_put);
-			cp += count_put;
-			len -= count_put;
-#ifdef CONFIG_ISDN_AUDIO
-		}
-#endif
-		count += count_put;
-		if (fp) {
-			memset(fp, 0, count_put);
-			fp += count_put;
-		}
-		if (dflag) {
-			/* We got all the data in this buff.
-			 * Now we can dequeue it.
-			 */
-			if (fp)
-				*(fp - 1) = 0xff;
-#ifdef CONFIG_ISDN_AUDIO
-			ISDN_AUDIO_SKB_LOCK(skb) = 0;
-#endif
-			skb = skb_dequeue(&drivers[di]->rpqueue[ch]);
-			dev_kfree_skb(skb);
-		} else {
-			/* Not yet emptied this buff, so it
-			 * must stay in the queue, for further calls
-			 * but we pull off the data we got until now.
-			 */
-			skb_pull(skb, count_pull);
-#ifdef CONFIG_ISDN_AUDIO
-			ISDN_AUDIO_SKB_LOCK(skb) = 0;
-#endif
-		}
-		drivers[di]->rcvcount[ch] -= count_put;
-	}
-	return count;
-}
-
 static __inline int
 isdn_minor2drv(int minor)
 {
@@ -2380,40 +2259,6 @@ isdn_add_channels(struct isdn_driver *d, int drvidx, int n, int adding)
 		       ISDN_MAX_CHANNELS);
 		return -1;
 	}
-	if ((adding) && (d->rcverr))
-		kfree(d->rcverr);
-	if (!(d->rcverr = kmalloc(sizeof(int) * m, GFP_KERNEL))) {
-		printk(KERN_WARNING "register_isdn: Could not alloc rcverr\n");
-		return -1;
-	}
-	memset((char *) d->rcverr, 0, sizeof(int) * m);
-
-	if ((adding) && (d->rcvcount))
-		kfree(d->rcvcount);
-	if (!(d->rcvcount = kmalloc(sizeof(int) * m, GFP_KERNEL))) {
-		printk(KERN_WARNING "register_isdn: Could not alloc rcvcount\n");
-		if (!adding) kfree(d->rcverr);
-		return -1;
-	}
-	memset((char *) d->rcvcount, 0, sizeof(int) * m);
-
-	if ((adding) && (d->rpqueue)) {
-		for (j = 0; j < d->channels; j++)
-			skb_queue_purge(&d->rpqueue[j]);
-		kfree(d->rpqueue);
-	}
-	if (!(d->rpqueue = kmalloc(sizeof(struct sk_buff_head) * m, GFP_KERNEL))) {
-		printk(KERN_WARNING "register_isdn: Could not alloc rpqueue\n");
-		if (!adding) {
-			kfree(d->rcvcount);
-			kfree(d->rcverr);
-		}
-		return -1; 
-	}
-	for (j = 0; j < m; j++) {
-		skb_queue_head_init(&d->rpqueue[j]);
-	}
-
 	dev->channels += n;
 	save_flags(flags);
 	cli();
@@ -2687,31 +2532,6 @@ isdn_slot_priv(int sl)
 	BUG_ON(sl < 0);
 
 	return slots[sl].priv;
-}
-
-int
-isdn_slot_queue_empty(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return skb_queue_empty(&drivers[slots[sl].di]->rpqueue[slots[sl].ch]);
-}
-
-void
-isdn_slot_queue_tail(int sl, struct sk_buff *skb, int len)
-{
-	BUG_ON(sl < 0);
-
-	__skb_queue_tail(&drivers[slots[sl].di]->rpqueue[slots[sl].ch], skb);
-	drivers[slots[sl].di]->rcvcount[slots[sl].ch] += len;
-}
-
-void
-isdn_slot_queue_purge(int sl)
-{
-	BUG_ON(sl < 0);
-
-	skb_queue_purge(&drivers[slots[sl].di]->rpqueue[slots[sl].ch]);
 }
 
 int

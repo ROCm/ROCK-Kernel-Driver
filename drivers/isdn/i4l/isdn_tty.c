@@ -110,6 +110,103 @@ isdn_tty_try_read(modem_info * info, struct sk_buff *skb)
 	return 0;
 }
 
+/*
+ * isdn_slot_readbchan() tries to get data from the read-queue.
+ * It MUST be called with interrupts off.
+ */
+static int
+isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
+{
+	int count;
+	int count_pull;
+	int count_put;
+	int dflag;
+	struct sk_buff *skb;
+	u_char *cp;
+
+	if (skb_queue_empty(&info->rpqueue))
+		return 0;
+
+	if (len > info->rcvcount)
+		len = info->rcvcount;
+	cp = buf;
+	count = 0;
+	while (len) {
+		if (!(skb = skb_peek(&info->rpqueue)))
+			break;
+#ifdef CONFIG_ISDN_AUDIO
+		if (ISDN_AUDIO_SKB_LOCK(skb))
+			break;
+		ISDN_AUDIO_SKB_LOCK(skb) = 1;
+		if (ISDN_AUDIO_SKB_DLECOUNT(skb) || info->DLEflag) {
+			char *p = skb->data;
+
+			dflag = 0;
+			count_pull = count_put = 0;
+			while ((count_pull < skb->len) && (len > 0)) {
+				len--;
+				if (info->DLEflag) {
+					*cp++ = DLE;
+					info->DLEflag = 0;
+				} else {
+					*cp++ = *p;
+					if (*p == DLE) {
+						info->DLEflag = 1;
+						(ISDN_AUDIO_SKB_DLECOUNT(skb))--;
+					}
+					p++;
+					count_pull++;
+				}
+				count_put++;
+			}
+			if (count_pull >= skb->len)
+				dflag = 1;
+		} else {
+#endif
+			/* No DLE's in buff, so simply copy it */
+			dflag = 1;
+			if ((count_pull = skb->len) > len) {
+				count_pull = len;
+				dflag = 0;
+			}
+			count_put = count_pull;
+			memcpy(cp, skb->data, count_put);
+			cp += count_put;
+			len -= count_put;
+#ifdef CONFIG_ISDN_AUDIO
+		}
+#endif
+		count += count_put;
+		if (fp) {
+			memset(fp, 0, count_put);
+			fp += count_put;
+		}
+		if (dflag) {
+			/* We got all the data in this buff.
+			 * Now we can dequeue it.
+			 */
+			if (fp)
+				*(fp - 1) = 0xff;
+#ifdef CONFIG_ISDN_AUDIO
+			ISDN_AUDIO_SKB_LOCK(skb) = 0;
+#endif
+			skb = skb_dequeue(&info->rpqueue);
+			dev_kfree_skb(skb);
+		} else {
+			/* Not yet emptied this buff, so it
+			 * must stay in the queue, for further calls
+			 * but we pull off the data we got until now.
+			 */
+			skb_pull(skb, count_pull);
+#ifdef CONFIG_ISDN_AUDIO
+			ISDN_AUDIO_SKB_LOCK(skb) = 0;
+#endif
+		}
+		info->rcvcount -= count_put;
+	}
+	return count;
+}
+
 /* isdn_tty_readmodem() is called periodically from within timer-interrupt.
  * It tries getting received data from the receive queue an stuff it into
  * the tty's flip-buffer.
@@ -142,7 +239,7 @@ isdn_tty_readmodem(void)
 						if (c > 0) {
 							save_flags(flags);
 							cli();
-							r = isdn_slot_readbchan(info->isdn_slot,
+							r = isdn_tty_readbchan(info,
 									   tty->flip.char_buf_ptr,
 									   tty->flip.flag_buf_ptr, c);
 							/* CISCO AsyncPPP Hack */
@@ -263,7 +360,7 @@ isdn_tty_rcv_skb(int i, struct sk_buff *skb)
 	/* Try to deliver directly via tty-flip-buf if queue is empty */
 	save_flags(flags);
 	cli();
-	if (isdn_slot_queue_empty(i))
+	if (skb_queue_empty(&info->rpqueue))
 		if (isdn_tty_try_read(info, skb)) {
 			restore_flags(flags);
 			return 1;
@@ -271,7 +368,7 @@ isdn_tty_rcv_skb(int i, struct sk_buff *skb)
 	/* Direct deliver failed or queue wasn't empty.
 	 * Queue up for later dequeueing via timer-irq.
 	 */
-	isdn_slot_queue_tail(i, skb, skb->len
+	isdn_tty_queue_tail(info, skb, skb->len
 #ifdef CONFIG_ISDN_AUDIO
 		 + ISDN_AUDIO_SKB_DLECOUNT(skb)
 #endif
@@ -739,6 +836,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
 
 	isdn_slot_all_eaz(slot);
 	info->emu.mdmreg[REG_RINGCNT] = 0;
+	skb_queue_purge(&info->rpqueue);
 	isdn_slot_free(slot);
 	isdn_slot_set_priv(slot, 0, NULL, NULL, NULL);
 	info->isdn_slot = -1;
@@ -2025,6 +2123,7 @@ isdn_tty_init(void)
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->isdn_slot = -1;
+		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
 #ifdef CONFIG_ISDN_AUDIO
@@ -2067,6 +2166,7 @@ isdn_tty_exit(void)
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		info = &isdn_mdm.info[i];
 		isdn_tty_cleanup_xmit(info);
+		skb_queue_purge(&info->rpqueue);
 #ifdef CONFIG_ISDN_TTY_FAX
 		kfree(info->fax);
 #endif
@@ -2430,7 +2530,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 		di = -1; ch = -1;
 	}
 	if ((info->online) && (((tty->flip.count + strlen(msg)) >= TTY_FLIPBUF_SIZE) ||
-	    (!isdn_slot_queue_empty(info->isdn_slot)))) {
+	    (!skb_queue_empty(&info->rpqueue)))) {
 		skb = alloc_skb(strlen(msg)
 #ifdef CONFIG_ISDN_AUDIO
 			+ sizeof(isdn_audio_skb)
@@ -2473,7 +2573,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 		}
 	}
 	if (skb) {
-		isdn_slot_queue_tail(info->isdn_slot, skb, skb->len);
+		isdn_tty_queue_tail(info, skb, skb->len);
 		restore_flags(flags);
 		/* Schedule dequeuing */
 		if ((dev->modempoll) && (info->rcvsched))

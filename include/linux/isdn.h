@@ -328,6 +328,8 @@ typedef struct modem_info {
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
   int                   isdn_slot;	 /* Index to isdn-driver/channel   */
+  struct sk_buff_head   rpqueue;         /* Queue of recv'd packets        */
+  int                   rcvcount;        /* Byte-counters for B rx         */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */
   unsigned char         last_cause[8];   /* Last cause message             */
   unsigned char         last_num[ISDN_MSNLEN];
@@ -344,6 +346,7 @@ typedef struct modem_info {
   struct sk_buff_head   xmit_queue;      /* transmit queue                 */
   atomic_t              xmit_lock;       /* Semaphore for isdn_tty_write   */
 #ifdef CONFIG_ISDN_AUDIO
+  unsigned long         DLEflag;         /* Insert DLE at next read     */
   int                   vonline;         /* Voice-channel status           */
 					 /* Bit 0 = recording              */
 					 /* Bit 1 = playback               */

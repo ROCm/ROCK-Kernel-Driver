@@ -129,3 +129,10 @@ struct isdn_modem {
 };
 
 extern struct isdn_modem isdn_mdm;
+
+static inline void
+isdn_tty_queue_tail(modem_info *info, struct sk_buff *skb, int len)
+{
+	__skb_queue_tail(&info->rpqueue, skb);
+	info->rcvcount += len;
+}

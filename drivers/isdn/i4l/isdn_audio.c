@@ -14,6 +14,7 @@
 #include <linux/isdn.h>
 #include "isdn_audio.h"
 #include "isdn_common.h"
+#include "isdn_tty.h"
 
 /*
  * Misc. lookup-tables.
@@ -564,7 +565,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			cli();
 			di = isdn_slot_driver(info->isdn_slot);
 			ch = isdn_slot_channel(info->isdn_slot);
-			isdn_slot_queue_tail(info->isdn_slot, skb, 2);
+			isdn_tty_queue_tail(info, skb, 2);
 			restore_flags(flags);
 			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
@@ -683,7 +684,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	cli();
 	di = isdn_slot_driver(info->isdn_slot);
 	ch = isdn_slot_channel(info->isdn_slot);
-	isdn_slot_queue_tail(info->isdn_slot, skb, 2);
+	isdn_tty_queue_tail(info, skb, 2);
 	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
