@@ -7,6 +7,7 @@
 #define ASM_MSI_H
 
 #include <asm/desc.h>
+#include <asm/mach_apic.h>
 #include <asm/smp.h>
 
 #define LAST_DEVICE_VECTOR		232
