@@ -458,13 +458,6 @@ static void __init prom_initialize_naca(void)
 		PROM_BUG();
 	}
 
-	/* 
-	 * Hardcode to GP size.  I am not sure where to get this info
-	 * in general, as there does not appear to be a slb-size OF
-	 * entry.  At least in Condor and earlier.  DRENG 
-	 */
-	_naca->slb_size = 64;
-
 	/* Add an eye catcher and the systemcfg layout version number */
 	strcpy(_systemcfg->eye_catcher, RELOC("SYSTEMCFG:PPC64"));
 	_systemcfg->version.major = SYSTEMCFG_MAJOR;

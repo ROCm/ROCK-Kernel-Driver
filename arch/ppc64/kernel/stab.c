@@ -356,7 +356,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		 * We bolt in the first kernel segment and the first
 		 * vmalloc segment.
 		 */
-		if (castout_entry >= naca->slb_size)
+		if (castout_entry >= SLB_NUM_ENTRIES)
 			castout_entry = 2;
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
