@@ -59,62 +59,8 @@ static const char version[] = "DLCI driver v0.35, 4 Jan 1997, mike.mclagan@linux
 
 static LIST_HEAD(dlci_devs);
 static spinlock_t dlci_dev_lock = SPIN_LOCK_UNLOCKED;
-static char *basename[16];
 
 static void dlci_setup(struct net_device *);
-
-/* allow FRAD's to register their name as a valid FRAD */
-int register_frad(const char *name)
-{
-	int i;
-
-	if (!name)
-		return(-EINVAL);
-
-	for (i=0;i<sizeof(basename) / sizeof(char *);i++)
-	{
-		if (!basename[i])
-			break;
-
-		/* take care of multiple registrations */
-		if (strcmp(basename[i], name) == 0)
-			return(0);
-	}
-
-	if (i == sizeof(basename) / sizeof(char *))
-		return(-EMLINK);
-
-	basename[i] = kmalloc(strlen(name) + 1, GFP_KERNEL);
-	if (!basename[i])
-		return(-ENOMEM);
-
-	strcpy(basename[i], name);
-
-	return(0);
-}
-
-EXPORT_SYMBOL(register_frad);
-
-int unregister_frad(const char *name)
-{
-	int i;
-
-	if (!name)
-		return(-EINVAL);
-
-	for (i=0;i<sizeof(basename) / sizeof(char *);i++)
-		if (basename[i] && (strcmp(basename[i], name) == 0))
-			break;
-
-	if (i == sizeof(basename) / sizeof(char *))
-		return(-EINVAL);
-
-	kfree(basename[i]);
-	basename[i] = NULL;
-
-	return(0);
-}
-EXPORT_SYMBOL(unregister_frad);
 
 /* 
  * these encapsulate the RFC 1490 requirements as well as 
@@ -414,7 +360,7 @@ static int dlci_add(struct dlci_add *dlci)
 	struct net_device	*master, *slave;
 	struct dlci_local	*dlp;
 	struct frad_local	*flp;
-	int			err, i;
+	int			err;
 
 
 	/* validate slave device */
@@ -423,18 +369,6 @@ static int dlci_add(struct dlci_add *dlci)
 		return(-ENODEV);
 
 	if (slave->type != ARPHRD_FRAD) {
-		dev_put(slave);
-		return(-EINVAL);
-	}
-
-	/* check for registration */
-	for (i=0;i<sizeof(basename) / sizeof(char *); i++)
-		if ((basename[i]) && 
-			 (strncmp(dlci->devname, basename[i], strlen(basename[i])) == 0) && 
-			 (strlen(dlci->devname) > strlen(basename[i])))
-			break;
-
-	if (i == sizeof(basename) / sizeof(char *)) {
 		dev_put(slave);
 		return(-EINVAL);
 	}
@@ -571,13 +505,9 @@ static void dlci_setup(struct net_device *dev)
 
 int __init init_dlci(void)
 {
-	int i;
 	dlci_ioctl_set(dlci_ioctl);
 
 	printk("%s.\n", version);
-
-	for(i=0;i<sizeof(basename) / sizeof(char *);i++)
-		basename[i] = NULL;
 
 	return 0;
 }

@@ -60,8 +60,6 @@
 
 static const char* version = "SDLA driver v0.30, 12 Sep 1996, mike.mclagan@linux.org";
 
-static const char* devname = "sdla";
-
 static unsigned int valid_port[] __initdata = { 0x250, 0x270, 0x280, 0x300, 0x350, 0x360, 0x380, 0x390};
 
 static unsigned int valid_mem[]  __initdata = {
@@ -1664,12 +1662,6 @@ static int __init init_sdla(void)
 	int err;
 
 	printk("%s.\n", version);
-	err = register_frad(devname);
-	if (err) {
-		printk(KERN_ERR "%s: frad registration failed %d\n",
-		       devname, err);
-		return err;
-	}
 
 	sdla = alloc_netdev(sizeof(struct frad_local), "sdla0", setup_sdla);
 	if (!sdla) 
@@ -1693,8 +1685,6 @@ static void __exit exit_sdla(void)
 	flp = sdla->priv;
 	del_timer_sync(&flp->timer);
 	free_netdev(sdla);
-	
-	unregister_frad(devname);
 }
 
 MODULE_LICENSE("GPL");
