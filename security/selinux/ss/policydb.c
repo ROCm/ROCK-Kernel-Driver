@@ -832,7 +832,6 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 	}
 
 	lc = NULL;
-	rc = -EINVAL;
 	for (i = 0; i < ncons; i++) {
 		c = kmalloc(sizeof(*c), GFP_KERNEL);
 		if (!c) {
@@ -875,6 +874,7 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 			e->attr = le32_to_cpu(buf[1]);
 			e->op = le32_to_cpu(buf[2]);
 
+			rc = -EINVAL;
 			switch (e->expr_type) {
 			case CEXPR_NOT:
 				if (depth < 0)
@@ -915,6 +915,8 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 	rc = hashtab_insert(h, key, cladatum);
 	if (rc)
 		goto bad;
+
+	rc = 0;
 out:
 	return rc;
 bad:
@@ -1110,7 +1112,6 @@ int policydb_read(struct policydb *p, void *fp)
 	if (rc)
 		goto out;
 
-	rc = -EINVAL;
 	/* Read the magic number and string length. */
 	rc = next_entry(buf, fp, sizeof(u32)* 2);
 	if (rc < 0)
@@ -1503,12 +1504,16 @@ int policydb_read(struct policydb *p, void *fp)
 	rc = mls_read_trusted(p, fp);
 	if (rc)
 		goto bad;
+
+	rc = 0;
 out:
 	policydb_loaded_version = r_policyvers;
 	return rc;
 bad_newc:
 	ocontext_destroy(newc,OCON_FSUSE);
 bad:
+	if (!rc)
+		rc = -EINVAL;
 	policydb_destroy(p);
 	goto out;
 }
