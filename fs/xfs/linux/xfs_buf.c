@@ -1741,10 +1741,7 @@ pagebuf_daemon(
 
 				pb->pb_flags &= ~PBF_DELWRI;
 				pb->pb_flags |= PBF_WRITE;
-
-				list_del(&pb->pb_list);
-				list_add(&pb->pb_list, &tmp);
-
+				list_move(&pb->pb_list, &tmp);
 				count++;
 			}
 		}
