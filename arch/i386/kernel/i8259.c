@@ -238,35 +238,31 @@ spurious_8259A_irq:
 	}
 }
 
-static int i8259A_resume(struct device *dev, u32 level)
+static int i8259A_resume(struct sys_device *dev)
 {
-	if (level == RESUME_POWER_ON)
-		init_8259A(0);
+	init_8259A(0);
 	return 0;
 }
 
-static struct device_driver i8259A_driver = {
-	.name		= "pic",
-	.bus		= &system_bus_type,
-	.resume		= i8259A_resume,
+static struct sysdev_class i8259_sysdev_class = {
+	set_kset_name("i8259"),
+	.resume = i8259A_resume,
 };
 
 static struct sys_device device_i8259A = {
-	.name		= "pic",
-	.id		= 0,
-	.dev		= {
-		.name	= "i8259A PIC",
-		.driver	= &i8259A_driver,
-	},
+	.id	= 0,
+	.cls	= &i8259_sysdev_class,
 };
 
-static int __init init_8259A_devicefs(void)
+static int __init i8259A_init_sysfs(void)
 {
-	driver_register(&i8259A_driver);
-	return sys_device_register(&device_i8259A);
+	int error = sysdev_class_register(&i8259_sysdev_class);
+	if (!error)
+		error = sys_device_register(&device_i8259A);
+	return error;
 }
 
-device_initcall(init_8259A_devicefs);
+device_initcall(i8259A_init_sysfs);
 
 void init_8259A(int auto_eoi)
 {
@@ -385,35 +381,31 @@ static void setup_timer(void)
 	spin_unlock_irqrestore(&i8253_lock, flags);
 }
 
-static int timer_resume(struct device *dev, u32 level)
+static int timer_resume(struct sys_device *dev)
 {
-	if (level == RESUME_POWER_ON)
-		setup_timer();
+	setup_timer();
 	return 0;
 }
 
-static struct device_driver timer_driver = {
-	.name		= "timer",
-	.bus		= &system_bus_type,
-	.resume		= timer_resume,
+static struct sysdev_class timer_sysclass = {
+	set_kset_name("timer"),
+	.resume	= timer_resume,
 };
 
 static struct sys_device device_timer = {
-	.name		= "timer",
-	.id		= 0,
-	.dev		= {
-		.name	= "timer",
-		.driver	= &timer_driver,
-	},
+	.id	= 0,
+	.cls	= &timer_sysclass,
 };
 
-static int __init init_timer_devicefs(void)
+static int __init init_timer_sysfs(void)
 {
-	driver_register(&timer_driver);
-	return sys_device_register(&device_timer);
+	int error = sysdev_class_register(&timer_sysclass);
+	if (!error)
+		error = sys_device_register(&device_timer);
+	return error;
 }
 
-device_initcall(init_timer_devicefs);
+device_initcall(init_timer_sysfs);
 
 void __init init_IRQ(void)
 {
