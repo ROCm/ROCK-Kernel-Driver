@@ -117,6 +117,8 @@
 
 /* For initializing controller (mask in an HCFS mode too) */
 #define	OHCI_CONTROL_INIT 	OHCI_CTRL_CBSR
+#define	OHCI_INTR_INIT \
+	(OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_RD | OHCI_INTR_WDH)
 
 /*-------------------------------------------------------------------------*/
 
@@ -515,8 +517,11 @@ static int hc_start (struct ohci_hcd *ohci)
  	writel (ohci->hc_control, &ohci->regs->control);
 	ohci->hcd.state = USB_STATE_RUNNING;
 
+	/* wake on ConnectStatusChange, matching external hubs */
+	writel (RH_HS_DRWE, &ohci->regs->roothub.status);
+
 	/* Choose the interrupts we care about now, others later on demand */
-	mask = OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_WDH;
+	mask = OHCI_INTR_INIT;
 	writel (mask, &ohci->regs->intrstatus);
 	writel (mask, &ohci->regs->intrenable);
 
@@ -612,6 +617,11 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 		hc_reset (ohci);
 	}
 
+	if (ints & OHCI_INTR_RD) {
+		ohci_vdbg (ohci, "resume detect\n");
+		schedule_work(&ohci->rh_resume);
+	}
+
 	if (ints & OHCI_INTR_WDH) {
 		if (HCD_IS_RUNNING(hcd->state))
 			writel (OHCI_INTR_WDH, &regs->intrdisable);	
@@ -657,6 +667,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 		ohci->hcd.state);
 	ohci_dump (ohci, 1);
 
+	flush_scheduled_work();
 	if (HCD_IS_RUNNING(ohci->hcd.state))
 		hc_reset (ohci);
 	
