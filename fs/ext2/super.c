@@ -113,7 +113,7 @@ static void ext2_put_super (struct super_block * sb)
 	if (!(sb->s_flags & MS_RDONLY)) {
 		struct ext2_super_block *es = sbi->s_es;
 
-		es->s_state = le16_to_cpu(sbi->s_mount_state);
+		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		ext2_sync_super(sb, es);
 	}
 	db_count = sbi->s_gdb_count;
@@ -428,8 +428,8 @@ static int ext2_setup_super (struct super_block * sb,
 		(le32_to_cpu(es->s_lastcheck) + le32_to_cpu(es->s_checkinterval) <= get_seconds()))
 		printk ("EXT2-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
-	if (!(__s16) le16_to_cpu(es->s_max_mnt_count))
-		es->s_max_mnt_count = (__s16) cpu_to_le16(EXT2_DFL_MAX_MNT_COUNT);
+	if (!le16_to_cpu(es->s_max_mnt_count))
+		es->s_max_mnt_count = cpu_to_le16(EXT2_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
 	ext2_write_super(sb);
 	if (test_opt (sb, DEBUG))
@@ -551,7 +551,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	int blocksize = BLOCK_SIZE;
 	int db_count;
 	int i, j;
-	__u32 features;
+	__le32 features;
 
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
@@ -675,7 +675,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		}
 		es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 		sbi->s_es = es;
-		if (es->s_magic != le16_to_cpu(EXT2_SUPER_MAGIC)) {
+		if (es->s_magic != cpu_to_le16(EXT2_SUPER_MAGIC)) {
 			printk ("EXT2-fs: Magic mismatch, very weird !\n");
 			goto failed_mount;
 		}
@@ -918,7 +918,7 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		es->s_mtime = cpu_to_le32(get_seconds());
 	} else {
-		__u32 ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
+		__le32 ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
 					       ~EXT2_FEATURE_RO_COMPAT_SUPP);
 		if (ret) {
 			printk("EXT2-fs: %s: couldn't remount RDWR because of "
