@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.10 $
+ * $Revision: 1.11 $
  */
 
 #include <linux/config.h>
@@ -67,7 +67,8 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 	}
 	strncpy((char *) &cqr->magic, magic, 4);
 	ASCEBC((char *) &cqr->magic, 4);
-	atomic_inc(&device->ref_count);
+	set_bit(DASD_CQR_FLAGS_USE_ERP, &cqr->flags);
+	dasd_get_device(device);
 	return cqr;
 }
 
