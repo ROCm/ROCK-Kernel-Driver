@@ -339,10 +339,6 @@ struct swap_info_struct;
  *	@mnt is the vfsmount where the dentry was looked up
  *	@dentry contains the dentry structure for the file.
  *	Return 0 if permission is granted.
- * @inode_post_lookup:
- *	Set the security attributes for a file after it has been looked up.
- *	@inode contains the inode structure for parent directory.
- *	@d contains the dentry structure for the file.
  * @inode_delete:
  *	@inode contains the inode structure for deleted inode.
  *	This hook is called when a deleted inode is released (i.e. an inode
@@ -814,6 +810,7 @@ struct security_operations {
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
+	int (*sb_kern_mount) (struct super_block *sb);
 	int (*sb_statfs) (struct super_block * sb);
 	int (*sb_mount) (char *dev_name, struct nameidata * nd,
 			 char *type, unsigned long flags, void *data);
@@ -867,7 +864,6 @@ struct security_operations {
 	int (*inode_permission_lite) (struct inode *inode, int mask);
 	int (*inode_setattr)	(struct dentry *dentry, struct iattr *attr);
 	int (*inode_getattr) (struct vfsmount *mnt, struct dentry *dentry);
-	void (*inode_post_lookup) (struct inode *inode, struct dentry *d);
         void (*inode_delete) (struct inode *inode);
 	int (*inode_setxattr) (struct dentry *dentry, char *name, void *value,
 			       size_t size, int flags);
@@ -952,6 +948,8 @@ struct security_operations {
 	                          struct security_operations *ops);
 	int (*unregister_security) (const char *name,
 	                            struct security_operations *ops);
+
+	void (*d_instantiate) (struct dentry * dentry, struct inode * inode);
 };
 
 /* global variables */
@@ -1032,6 +1030,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 static inline void security_sb_free (struct super_block *sb)
 {
 	security_ops->sb_free_security (sb);
+}
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return security_ops->sb_kern_mount (sb);
 }
 
 static inline int security_sb_statfs (struct super_block *sb)
@@ -1238,12 +1241,6 @@ static inline int security_inode_getattr (struct vfsmount *mnt,
 					  struct dentry *dentry)
 {
 	return security_ops->inode_getattr (mnt, dentry);
-}
-
-static inline void security_inode_post_lookup (struct inode *inode,
-					       struct dentry *dentry)
-{
-	security_ops->inode_post_lookup (inode, dentry);
 }
 
 static inline void security_inode_delete (struct inode *inode)
@@ -1543,6 +1540,11 @@ static inline int security_sem_semop (struct sem_array * sma,
 	return security_ops->sem_semop(sma, sops, nsops, alter);
 }
 
+static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
+{
+	security_ops->d_instantiate (dentry, inode);
+}
+
 /* prototypes */
 extern int security_scaffolding_startup	(void);
 extern int register_security	(struct security_operations *ops);
@@ -1638,6 +1640,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 
 static inline void security_sb_free (struct super_block *sb)
 { }
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return 0;
+}
 
 static inline int security_sb_statfs (struct super_block *sb)
 {
@@ -1816,10 +1823,6 @@ static inline int security_inode_getattr (struct vfsmount *mnt,
 {
 	return 0;
 }
-
-static inline void security_inode_post_lookup (struct inode *inode,
-					       struct dentry *dentry)
-{ }
 
 static inline void security_inode_delete (struct inode *inode)
 { }
@@ -2103,6 +2106,9 @@ static inline int security_sem_semop (struct sem_array * sma,
 {
 	return 0;
 }
+
+static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
+{ }
 
 #endif	/* CONFIG_SECURITY */
 
