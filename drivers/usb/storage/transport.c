@@ -579,7 +579,7 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 
 	/* was the entire command transferred? */
 	if (result < size) {
-		US_DEBUGP("-- transfer was short\n");
+		US_DEBUGP("-- transferred only %d bytes\n", result);
 		return USB_STOR_XFER_SHORT;
 	}
 
@@ -614,7 +614,8 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x,"
+				" stalled at %d bytes\n", pipe, partial);
 		if (usb_stor_clear_halt(us, pipe) < 0)
 			return USB_STOR_XFER_ERROR;
 		return USB_STOR_XFER_STALLED;

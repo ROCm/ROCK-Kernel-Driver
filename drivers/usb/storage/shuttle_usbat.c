@@ -63,7 +63,7 @@ int usbat_read(struct us_data *us,
 
 	int result;
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->recv_ctrl_pipe,
 		access,
 		0xC0,
@@ -82,7 +82,7 @@ int usbat_write(struct us_data *us,
 
 	int result;
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		access|0x01,
 		0x40,
@@ -108,7 +108,7 @@ int usbat_set_shuttle_features(struct us_data *us,
 		test_pattern, mask_byte, subcountL, subcountH
 	};
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		0x80,
 		0x40,
@@ -133,7 +133,10 @@ int usbat_read_block(struct us_data *us,
 		LSB_of(len), MSB_of(len)
 	};
 
-	result = usb_storage_send_control(us,
+	if (!len)
+		return USB_STOR_TRANSPORT_GOOD;
+
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		0x80,
 		0x40,
@@ -142,10 +145,11 @@ int usbat_read_block(struct us_data *us,
 		command,
 		8);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_READ, content, len, use_sg);
+	result = usb_stor_bulk_transfer_sg(us, us->recv_bulk_pipe,
+			content, len, use_sg, NULL);
 
 	return (result == USB_STOR_XFER_GOOD ?
 			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
@@ -172,8 +176,8 @@ int usbat_wait_not_busy(struct us_data *us, int minutes) {
 
  		result = usbat_read(us, USBAT_ATA, 0x17, &status);
 
-		if (result!=USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (result!=USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 		if (status&0x01) { // check condition
 			result = usbat_read(us, USBAT_ATA, 0x10, &status);
 			return USB_STOR_TRANSPORT_FAILED;
@@ -215,7 +219,10 @@ int usbat_write_block(struct us_data *us,
 		LSB_of(len), MSB_of(len)
 	};
 
-	result = usb_storage_send_control(us,
+	if (!len)
+		return USB_STOR_TRANSPORT_GOOD;
+
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		0x80,
 		0x40,
@@ -224,10 +231,11 @@ int usbat_write_block(struct us_data *us,
 		command,
 		8);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_WRITE, content, len, use_sg);
+	result = usb_stor_bulk_transfer_sg(us, us->send_bulk_pipe,
+			content, len, use_sg, NULL);
 
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
@@ -251,6 +259,8 @@ int usbat_rw_block_test(struct us_data *us,
 	     int minutes) {
 
 	int result;
+	unsigned int pipe = (direction == SCSI_DATA_READ) ?
+			us->recv_bulk_pipe : us->send_bulk_pipe;
 
 	// Not really sure the 0x07, 0x17, 0xfc, 0xe7 is necessary here,
 	// but that's what came out of the trace every single time.
@@ -286,7 +296,7 @@ int usbat_rw_block_test(struct us_data *us,
 		 * that, we just return a failure.
 		 */
 
-		result = usb_storage_send_control(us,
+		result = usb_stor_ctrl_transfer(us,
 			us->send_ctrl_pipe,
 			0x80,
 			0x40,
@@ -295,16 +305,16 @@ int usbat_rw_block_test(struct us_data *us,
 			(i==0 ? command : command+8),
 			(i==0 ? 16 : 8));
 
-		if (result != USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (result != USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
 		if (i==0) {
 
-			result = usb_storage_bulk_transport(us,
-				SCSI_DATA_WRITE, 
-				data, num_registers*2, 0);
+			result = usb_stor_bulk_transfer_buf(us,
+					us->send_bulk_pipe,
+					data, num_registers*2, NULL);
 
-			if (result!=USB_STOR_XFER_GOOD)
+			if (result != USB_STOR_XFER_GOOD)
 				return USB_STOR_TRANSPORT_ERROR;
 
 		}
@@ -314,8 +324,8 @@ int usbat_rw_block_test(struct us_data *us,
 		//	direction == SCSI_DATA_WRITE ? "out" : "in",
 		//	len, use_sg);
 
-		result = usb_storage_bulk_transport(us,
-			direction, content, len, use_sg);
+		result = usb_stor_bulk_transfer_sg(us,
+			pipe, content, len, use_sg, NULL);
 
 		/*
 		 * If we get a stall on the bulk download, we'll retry
@@ -358,8 +368,8 @@ int usbat_rw_block_test(struct us_data *us,
 				direction==SCSI_DATA_WRITE ? 0x17 : 0x0E, 
 				&status);
 
-			if (result!=USB_STOR_TRANSPORT_GOOD)
-				return result;
+			if (result!=USB_STOR_XFER_GOOD)
+				return USB_STOR_TRANSPORT_ERROR;
 			if (status&0x01) // check condition
 				return USB_STOR_TRANSPORT_FAILED;
 			if (status&0x20) // device fault
@@ -405,7 +415,7 @@ int usbat_multiple_write(struct us_data *us,
 		data[1+(i<<1)] = data_out[i];
 	}
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		0x80,
 		0x40,
@@ -414,11 +424,11 @@ int usbat_multiple_write(struct us_data *us,
 		command,
 		8);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
-	result = usb_storage_bulk_transport(us,
-		SCSI_DATA_WRITE, data, num_registers*2, 0);
+	result = usb_stor_bulk_transfer_buf(us,
+		us->send_bulk_pipe, data, num_registers*2, NULL);
 
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
@@ -431,7 +441,7 @@ int usbat_read_user_io(struct us_data *us,
 
 	int result;
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->recv_ctrl_pipe,
 		0x82,
 		0xC0,
@@ -449,7 +459,7 @@ int usbat_write_user_io(struct us_data *us,
 
 	int result;
 
-	result = usb_storage_send_control(us,
+	result = usb_stor_ctrl_transfer(us,
 		us->send_ctrl_pipe,
 		0x82,
 		0x40,
@@ -582,7 +592,6 @@ int usbat_handle_read10(struct us_data *us,
 
 static int hp_8200e_select_and_test_registers(struct us_data *us) {
 
-	int result;
 	int selector;
 	unsigned char status;
 
@@ -590,44 +599,44 @@ static int hp_8200e_select_and_test_registers(struct us_data *us) {
 
 	for (selector = 0xA0; selector <= 0xB0; selector += 0x10) {
 
-		if ( (result = usbat_write(us, USBAT_ATA, 0x16, selector)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_write(us, USBAT_ATA, 0x16, selector) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x17, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x17, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x16, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x16, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x14, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x14, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x15, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x15, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_write(us, USBAT_ATA, 0x14, 0x55)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_write(us, USBAT_ATA, 0x14, 0x55) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_write(us, USBAT_ATA, 0x15, 0xAA)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_write(us, USBAT_ATA, 0x15, 0xAA) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x14, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x14, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x15, &status)) != 
-				USB_STOR_TRANSPORT_GOOD)
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x15, &status) != 
+				USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 	}
 
-	return result;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 int init_8200e(struct us_data *us) {
@@ -637,44 +646,44 @@ int init_8200e(struct us_data *us) {
 
 	// Enable peripheral control signals
 
-	if ( (result = usbat_write_user_io(us,
+	if (usbat_write_user_io(us,
 	  USBAT_UIO_OE1 | USBAT_UIO_OE0,
-	  USBAT_UIO_EPAD | USBAT_UIO_1)) != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	  USBAT_UIO_EPAD | USBAT_UIO_1) != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 1\n");
 
 	wait_ms(2000);
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 2\n");
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 3\n");
 
 	// Reset peripheral, enable periph control signals
 	// (bring reset signal up)
 
-	if ( (result = usbat_write_user_io(us,
+	if (usbat_write_user_io(us,
 	  USBAT_UIO_DRVRST | USBAT_UIO_OE1 | USBAT_UIO_OE0,
-	  USBAT_UIO_EPAD | USBAT_UIO_1)) != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	  USBAT_UIO_EPAD | USBAT_UIO_1) != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 4\n");
 
 	// Enable periph control signals
 	// (bring reset signal down)
 
-	if ( (result = usbat_write_user_io(us,
+	if (usbat_write_user_io(us,
 	  USBAT_UIO_OE1 | USBAT_UIO_OE0,
-	  USBAT_UIO_EPAD | USBAT_UIO_1)) != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	  USBAT_UIO_EPAD | USBAT_UIO_1) != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 5\n");
 
@@ -682,23 +691,23 @@ int init_8200e(struct us_data *us) {
 
 	// Write 0x80 to ISA port 0x3F
 
-	if ( (result = usbat_write(us, USBAT_ISA, 0x3F, 0x80)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_write(us, USBAT_ISA, 0x3F, 0x80) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 6\n");
 
 	// Read ISA port 0x27
 
-	if ( (result = usbat_read(us, USBAT_ISA, 0x27, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read(us, USBAT_ISA, 0x27, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 7\n");
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 8\n");
 
@@ -708,32 +717,32 @@ int init_8200e(struct us_data *us) {
 
 	US_DEBUGP("INIT 9\n");
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 10\n");
 
 	// Enable periph control signals and card detect
 
-	if ( (result = usbat_write_user_io(us,
+	if (usbat_write_user_io(us,
 	  USBAT_UIO_ACKD |USBAT_UIO_OE1 | USBAT_UIO_OE0,
-	  USBAT_UIO_EPAD | USBAT_UIO_1)) != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	  USBAT_UIO_EPAD | USBAT_UIO_1) != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 11\n");
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 12\n");
 
 	wait_ms(1400);
 
-	if ( (result = usbat_read_user_io(us, &status)) !=
-			USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_read_user_io(us, &status) !=
+			USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 13\n");
 
@@ -743,14 +752,14 @@ int init_8200e(struct us_data *us) {
 
 	US_DEBUGP("INIT 14\n");
 
-	if ( (result = usbat_set_shuttle_features(us, 
-			0x83, 0x00, 0x88, 0x08, 0x15, 0x14)) !=
-			 USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (usbat_set_shuttle_features(us, 
+			0x83, 0x00, 0x88, 0x08, 0x15, 0x14) !=
+			 USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("INIT 15\n");
 
-	return result;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 /*
@@ -857,17 +866,16 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		// How many bytes to read in? Check cylL register
 
-		if ( (result = usbat_read(us, USBAT_ATA, 0x14, &status)) != 
-		    USB_STOR_TRANSPORT_GOOD) {
-			return result;
+		if (usbat_read(us, USBAT_ATA, 0x14, &status) != 
+		    	USB_STOR_XFER_GOOD) {
+			return USB_STOR_TRANSPORT_ERROR;
 		}
 
-		if (len>0xFF) { // need to read cylH also
+		if (len > 0xFF) { // need to read cylH also
 			len = status;
-			if ( (result = usbat_read(us, USBAT_ATA, 0x15,
-				&status)) !=
-				    USB_STOR_TRANSPORT_GOOD) {
-				return result;
+			if (usbat_read(us, USBAT_ATA, 0x15, &status) !=
+				    USB_STOR_XFER_GOOD) {
+				return USB_STOR_TRANSPORT_ERROR;
 			}
 			len += ((unsigned int)status)<<8;
 		}

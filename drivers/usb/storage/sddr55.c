@@ -75,10 +75,13 @@ static int
 sddr55_bulk_transport(struct us_data *us, int direction,
 		      unsigned char *data, unsigned int len) {
 	struct sddr55_card_info *info = (struct sddr55_card_info *)us->extra;
+	unsigned int pipe = (direction == SCSI_DATA_READ) ?
+			us->recv_bulk_pipe : us->send_bulk_pipe;
 
-	if (len)
-		info->last_access = jiffies;
-	return usb_storage_bulk_transport(us, direction, data, len, 0);
+	if (!len)
+		return USB_STOR_XFER_GOOD;
+	info->last_access = jiffies;
+	return usb_stor_bulk_transfer_buf(us, pipe, data, len, NULL);
 }
 
 /* check if card inserted, if there is, update read_only status
