@@ -179,7 +179,6 @@ static void mddev_put(mddev_t *mddev)
 		mddev_map[mdidx(mddev)] = NULL;
 		blk_put_queue(mddev->queue);
 		kfree(mddev);
-		MOD_DEC_USE_COUNT;
 	}
 	spin_unlock(&all_mddevs_lock);
 }
@@ -201,7 +200,6 @@ static mddev_t * mddev_find(int unit)
 		mddev_map[unit] = new;
 		list_add(&new->all_mddevs, &all_mddevs);
 		spin_unlock(&all_mddevs_lock);
-		MOD_INC_USE_COUNT;
 		return new;
 	}
 	spin_unlock(&all_mddevs_lock);
@@ -3590,6 +3588,7 @@ static __exit void md_exit(void)
 		if (!disks[i])
 			continue;
 		mddev = disk->private_data;
+		export_array(mddev);
 		del_gendisk(disk);
 		put_disk(disk);
 		mddev_put(mddev);
