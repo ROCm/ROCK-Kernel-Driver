@@ -574,8 +574,9 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 			       "sg_write: data in/out %d/%d bytes for SCSI command 0x%x--"
 			       "guessing data in;\n" KERN_WARNING "   "
 			       "program %s not setting count and/or reply_len properly\n",
-			       old_hdr.reply_len - SZ_SG_HEADER, input_size,
-			       (unsigned int) cmnd[0], current->comm);
+			       old_hdr.reply_len - (int)SZ_SG_HEADER,
+			       input_size, (unsigned int) cmnd[0],
+			       current->comm);
 	k = sg_common_write(sfp, srp, cmnd, sfp->timeout, blocking);
 	return (k < 0) ? k : count;
 }
