@@ -8,7 +8,9 @@ DRIVER_OBJS = $(addprefix ../../../drivers/oprofile/, \
 oprofile-y				:= $(DRIVER_OBJS) common.o
 oprofile-$(CONFIG_ALPHA_GENERIC)	+= op_model_ev4.o \
 					   op_model_ev5.o \
-					   op_model_ev6.o
+					   op_model_ev6.o \
+					   op_model_ev67.o
 oprofile-$(CONFIG_ALPHA_EV4)		+= op_model_ev4.o
 oprofile-$(CONFIG_ALPHA_EV5)		+= op_model_ev5.o
-oprofile-$(CONFIG_ALPHA_EV6)		+= op_model_ev6.o
+oprofile-$(CONFIG_ALPHA_EV6)		+= op_model_ev6.o \
+					   op_model_ev67.o

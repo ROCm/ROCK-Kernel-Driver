@@ -37,6 +37,7 @@ enum oprofile_cpu {
 	OPROFILE_CPU_AXP_EV5,
 	OPROFILE_CPU_AXP_PCA56,
 	OPROFILE_CPU_AXP_EV6,
+	OPROFILE_CPU_AXP_EV67,
 };
 
 /* Operations structure to be filled in */

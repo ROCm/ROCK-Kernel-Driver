@@ -15,6 +15,10 @@ struct op_counter_config {
 	unsigned long enabled;
 	unsigned long event;
 	unsigned long count;
+	/* Dummies because I am too lazy to hack the userspace tools.  */
+	unsigned long kernel;
+	unsigned long user;
+	unsigned long unit_mask;
 };
 
 /* System-wide configuration as set via oprofilefs.  */
@@ -41,6 +45,8 @@ struct op_axp_model {
 			   struct op_system_config *);
 	void (*cpu_setup) (void *);
 	void (*reset_ctr) (struct op_register_config *, unsigned long);
+	void (*handle_interrupt) (unsigned long, struct pt_regs *,
+				  struct op_counter_config *);
 	enum oprofile_cpu cpu;
 	unsigned char num_counters;
 	unsigned char can_set_proc_mode;

@@ -20,13 +20,14 @@ extern struct op_axp_model op_model_ev4 __attribute__((weak));
 extern struct op_axp_model op_model_ev5 __attribute__((weak));
 extern struct op_axp_model op_model_pca56 __attribute__((weak));
 extern struct op_axp_model op_model_ev6 __attribute__((weak));
+extern struct op_axp_model op_model_ev67 __attribute__((weak));
 
 static struct op_axp_model *model;
 
 extern void (*perf_irq)(unsigned long, struct pt_regs *);
 static void (*save_perf_irq)(unsigned long, struct pt_regs *);
 
-static struct op_counter_config ctr[3];
+static struct op_counter_config ctr[20];
 static struct op_system_config sys;
 static struct op_register_config reg;
 
@@ -35,14 +36,17 @@ static struct op_register_config reg;
 static void
 op_handle_interrupt(unsigned long which, struct pt_regs *regs)
 {
-	/* EV4 can't properly disable counters individually.
-	   Discard "disabled" events now.  */
-	if (!ctr[which].enabled)
-		return;
+	if (model->handle_interrupt) {
+		model->handle_interrupt(which, regs, ctr);
+	} else {
+		/* EV4 can't properly disable counters individually.
+		   Discard "disabled" events now.  */
+		if (!ctr[which].enabled)
+			return;
 
-	/* Record the sample.  */
-	oprofile_add_sample(regs->pc, which, smp_processor_id());
-
+		/* Record the sample.  */
+		oprofile_add_sample(regs->pc, which, smp_processor_id());
+	}
 	/* If the user has selected an interrupt frequency that is
 	   not exactly the width of the counter, write a new value
 	   into the counter such that it'll overflow after N more
@@ -117,15 +121,18 @@ op_axp_create_files(struct super_block * sb, struct dentry * root)
 
 	for (i = 0; i < model->num_counters; ++i) {
 		struct dentry *dir;
-		char buf[2];
+		char buf[3];
 
-		buf[0] = i + '0';
-		buf[1] = 0;
+		snprintf(buf, sizeof buf, "%d", i);
 		dir = oprofilefs_mkdir(sb, root, buf);
 
 		oprofilefs_create_ulong(sb, dir, "enabled", &ctr[i].enabled);
                 oprofilefs_create_ulong(sb, dir, "event", &ctr[i].event);
 		oprofilefs_create_ulong(sb, dir, "count", &ctr[i].count);
+		/* Dummies.  */
+		oprofilefs_create_ulong(sb, dir, "kernel", &ctr[i].kernel);
+		oprofilefs_create_ulong(sb, dir, "user", &ctr[i].user);
+		oprofilefs_create_ulong(sb, dir, "unit_mask", &ctr[i].unit_mask);
 	}
 
 	if (model->can_set_proc_mode) {
@@ -171,8 +178,15 @@ oprofile_arch_init(struct oprofile_operations **ops, enum oprofile_cpu *cpu)
 		}
 		break;
 	case IMPLVER_EV6:
-		lmodel = &op_model_ev6;
-		vername = "EV6";
+		/* 21264A supports ProfileMe.
+		   Recognize the chip by the presence of the CIX insns.  */
+		if (!amask(AMASK_CIX)) {
+			lmodel = &op_model_ev67;
+			vername = "EV67";
+		} else {
+			lmodel = &op_model_ev6;
+			vername = "EV6";
+		}
 		break;
 	}
 
