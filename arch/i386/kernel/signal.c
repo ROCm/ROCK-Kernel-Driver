@@ -270,6 +270,7 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 		 struct pt_regs *regs, unsigned long mask)
 {
 	int tmp, err = 0;
+	unsigned long eflags;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -291,7 +292,11 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user(regs->eip, &sc->eip);
 	err |= __put_user(regs->xcs, (unsigned int __user *)&sc->cs);
-	err |= __put_user(regs->eflags, &sc->eflags);
+	eflags = regs->eflags;
+	if (current->ptrace & PT_PTRACED) {
+		eflags &= ~TF_MASK;
+	}
+	err |= __put_user(eflags, &sc->eflags);
 	err |= __put_user(regs->esp, &sc->esp_at_signal);
 	err |= __put_user(regs->xss, (unsigned int __user *)&sc->ss);
 

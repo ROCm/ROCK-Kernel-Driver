@@ -181,6 +181,7 @@ static inline int
 setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs, unsigned long mask, struct task_struct *me)
 {
 	int err = 0;
+	unsigned long eflags;
 
 	err |= __put_user(0, &sc->gs);
 	err |= __put_user(0, &sc->fs);
@@ -204,7 +205,11 @@ setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs, unsigned lo
 	err |= __put_user(me->thread.trap_no, &sc->trapno);
 	err |= __put_user(me->thread.error_code, &sc->err);
 	err |= __put_user(regs->rip, &sc->rip);
-	err |= __put_user(regs->eflags, &sc->eflags);
+	eflags = regs->eflags;
+	if (current->ptrace & PT_PTRACED) {
+		eflags &= ~TF_MASK;
+	}
+	err |= __put_user(eflags, &sc->eflags);
 	err |= __put_user(mask, &sc->oldmask);
 	err |= __put_user(me->thread.cr2, &sc->cr2);
 

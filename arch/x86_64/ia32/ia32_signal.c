@@ -349,6 +349,7 @@ ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __
 		 struct pt_regs *regs, unsigned int mask)
 {
 	int tmp, err = 0;
+	u32 eflags;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -373,7 +374,11 @@ ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __
 	err |= __put_user(current->thread.trap_no, &sc->trapno);
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user((u32)regs->rip, &sc->eip);
-	err |= __put_user((u32)regs->eflags, &sc->eflags);
+	eflags = regs->eflags;
+	if (current->ptrace & PT_PTRACED) {
+		eflags &= ~TF_MASK;
+	}
+	err |= __put_user((u32)eflags, &sc->eflags);
 	err |= __put_user((u32)regs->rsp, &sc->esp_at_signal);
 
 	tmp = save_i387_ia32(current, fpstate, regs, 0);
