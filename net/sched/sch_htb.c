@@ -290,6 +290,11 @@ static __inline__ struct htb_class *htb_find(u32 handle, struct Qdisc *sch)
  * then finish and return direct queue.
  */
 #define HTB_DIRECT (struct htb_class*)-1
+static inline u32 htb_classid(struct htb_class *cl)
+{
+	return (cl && cl != HTB_DIRECT) ? cl->classid : TC_H_UNSPEC;
+}
+
 static struct htb_class *htb_classify(struct sk_buff *skb, struct Qdisc *sch)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
@@ -703,7 +708,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
     sch->q.qlen++;
     sch->stats.packets++; sch->stats.bytes += skb->len;
-    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",cl?cl->classid:0,skb);
+    HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",htb_classid(cl),skb);
     return NET_XMIT_SUCCESS;
 }
 
@@ -731,7 +736,7 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 	    htb_activate (q,cl);
 
     sch->q.qlen++;
-    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",cl?cl->classid:0,skb);
+    HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",htb_classid(cl),skb);
     return NET_XMIT_SUCCESS;
 }
 
