@@ -517,41 +517,41 @@ static void accel_putc(struct vc_data *vc, struct display *p,
                       int c, int ypos, int xpos)
 {
 	struct fb_image image;
-        struct fb_info *info = p->fb_info;
-        unsigned short charmask = p->charmask;
-       unsigned int width = (vc->vc_font.width + 7)/8;
-       unsigned int size, pitch;
-       unsigned int scan_align = info->pixmap.scan_align - 1;
-       unsigned int buf_align = info->pixmap.buf_align - 1;
-       void (*move_data)(u8 *dst, u8 *src, u32 s_pitch, u32 d_pitch,
-                         u32 height, struct fb_info *info);
-       u8 *src, *dst;
+	struct fb_info *info = p->fb_info;
+	unsigned short charmask = p->charmask;
+	unsigned int width = (vc->vc_font.width + 7)/8;
+	unsigned int size, pitch;
+	unsigned int scan_align = info->pixmap.scan_align - 1;
+	unsigned int buf_align = info->pixmap.buf_align - 1;
+	void (*move_data)(u8 *dst, u8 *src, u32 s_pitch, u32 d_pitch,
+			u32 height, struct fb_info *info);
+	u8 *src, *dst;
 
-       if (info->pixmap.outbuf != NULL)
-               move_data = iomove_buf_aligned;
-       else
-               move_data = sysmove_buf_aligned;
+	if (info->pixmap.outbuf != NULL)
+		move_data = iomove_buf_aligned;
+	else
+		move_data = sysmove_buf_aligned;
 
-       image.dx = xpos * vc->vc_font.width;
-       image.dy = ypos * vc->vc_font.height;
-       image.width = vc->vc_font.width;
-       image.height = vc->vc_font.height;
-       image.fg_color = attr_fgcol(p, c);
-       image.bg_color = attr_bgcol(p, c);
-       image.depth = 0;
+	image.dx = xpos * vc->vc_font.width;
+	image.dy = ypos * vc->vc_font.height;
+	image.width = vc->vc_font.width;
+	image.height = vc->vc_font.height;
+	image.fg_color = attr_fgcol(p, c);
+	image.bg_color = attr_bgcol(p, c);
+	image.depth = 0;
 
-       pitch = width + scan_align;
-       pitch &= ~scan_align;
-       size = pitch * vc->vc_font.height;
-       size += buf_align;
-       size &= ~buf_align;
-       dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
-       image.data = dst;
-       src = p->fontdata + (c & charmask) * vc->vc_font.height * width;
+	pitch = width + scan_align;
+	pitch &= ~scan_align;
+	size = pitch * vc->vc_font.height;
+	size += buf_align;
+	size &= ~buf_align;
+	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
+	image.data = dst;
+	src = p->fontdata + (c & charmask) * vc->vc_font.height * width;
 
-       move_data(dst, src, pitch, width, image.height, info);
+	move_data(dst, src, pitch, width, image.height, info);
 
-       info->fbops->fb_imageblit(info, &image);
+	info->fbops->fb_imageblit(info, &image);
 }
 
 void accel_putcs(struct vc_data *vc, struct display *p,
@@ -589,7 +589,7 @@ void accel_clear_margins(struct vc_data *vc, struct display *p,
 	region.color = attr_bgcol_ec(p, vc);
 	region.rop = ROP_COPY;
 
-	if (rw & !bottom_only) {
+	if (rw && !bottom_only) {
 		region.dx = info->var.xoffset + rs;
 		region.dy = 0;
 		region.width = rw;
