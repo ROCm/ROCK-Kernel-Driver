@@ -258,7 +258,7 @@ void __init paging_init(void)
 	printk ("before free_area_init\n");
 #endif
 	zones_size[0] = (mach_max_dma_address < (unsigned long)high_memory ?
-			 mach_max_dma_address : (unsigned long)high_memory);
+			 (mach_max_dma_address+1) : (unsigned long)high_memory);
 	zones_size[1] = (unsigned long)high_memory - zones_size[0];
 
 	zones_size[0] = (zones_size[0] - PAGE_OFFSET) >> PAGE_SHIFT;
