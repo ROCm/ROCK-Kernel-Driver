@@ -530,9 +530,17 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 	 * to a given transport address if it has cwnd or more bytes
 	 * of data outstanding to that transport address.
 	 */
-	if (transport->flight_size >= transport->cwnd) {
-		retval = SCTP_XMIT_RWND_FULL;
-		goto finish;
+	/* RFC 7.2.4 & the Implementers Guide 2.8.
+	 *
+	 * 3) ...
+	 *    When a Fast Retransmit is being performed the sender SHOULD
+	 *    ignore the value of cwnd and SHOULD NOT delay retransmission.
+	 */
+	if (!chunk->fast_retransmit) {
+		if (transport->flight_size >= transport->cwnd) {
+			retval = SCTP_XMIT_RWND_FULL;
+			goto finish;
+		}
 	}
 
 	/* Keep track of how many bytes are in flight over this transport. */

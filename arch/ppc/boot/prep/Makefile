@@ -13,65 +13,79 @@
 # modified by Cort (cort@cs.nmt.edu)
 #
 
+boot: zImage
+
 TFTPIMAGE			= /tftpboot/zImage.prep
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE			= $(TFTPBOOT).smp
 endif
 
-LD_ARGS				= -T ../ld.script -Ttext 0x00800000 -Bstatic
-boot-y				:= head.o ../simple/legacy.o misc.o \
-					../common/util.o ../common/string.o \
-					../common/misc-common.o \
-					../common/mpc10x_memory.o
+LD_ARGS				= -T $(boot)/ld.script -Ttext 0x00800000 -Bstatic
 OBJCOPY_ARGS			= -O elf32-powerpc
-LIBS 				= ../lib/lib.a
+LIBS 				= $(common)/lib.a $(bootlib)/lib.a
 
-boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
+boot-y				:= head.o misc.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
-EXTRA_TARGETS			:= $(boot-y)
-
-# Tools
-MKPREP				:= ../utils/mkprep
-SIZE				:= ../utils/size
-OFFSET				:= ../utils/offset
-
-# Extra include search dirs
-CFLAGS_kbd.o			+= -I$(TOPDIR)/drivers/char
-
-all: zImage
-
-zImage: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz ../common/dummy.o \
-		$(MKPREP)
-	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
-		--add-section=.image=../images/vmlinux.gz \
-		--set-section-flags=.image=contents,alloc,load,readonly,data \
-		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
-	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr
-	$(MKPREP) -pbp $@ ../images/$@.prep
-	rm -f $@
-
-zImage.initrd: $(boot-y) $(LIBS) ../ld.script ../images/vmlinux.gz $(MKPREP) \
-		../common/dummy.o
-	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
-		--add-section=.ramdisk=../images/ramdisk.image.gz \
-		--set-section-flags=.ramdisk=contents,alloc,load,readonly,data \
-		--add-section=.image=../images/vmlinux.gz \
-		--set-section-flags=.image=contents,alloc,load,readonly,data \
-		../common/dummy.o image.o
-	$(LD) $(LD_ARGS) -o $@ $(boot-y) image.o $(LIBS)
-	$(OBJCOPY) $(OBJCOPY_ARGS) $@ $@ -R .comment -R .stab -R .stabstr
-	$(MKPREP) -pbp $@ ../images/$@.prep
-	rm -f $@
-
-floppy: zImage
-	dd if=../images/zImage.prep of=/dev/fd0H1440 bs=64b
-
-znetboot : zImage
-	cp ../images/zImage.prep $(TFTPIMAGE)
-
-znetboot.initrd : zImage.initrd
-	cp ../images/zImage.initrd.prep $(TFTPIMAGE)
+EXTRA_TARGETS			:= $(boot-y) ../simple/legacy.o
 
 include $(TOPDIR)/Rules.make
+
+boot := arch/ppc/boot
+common := $(boot)/common
+utils := $(boot)/utils
+bootlib := $(boot)/lib
+of1275 := $(boot)/of1275
+images := $(boot)/images
+simple := $(boot)/simple
+
+OBJS	:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o 
+
+# Tools
+MKPREP				:= $(utils)/mkprep
+SIZE				:= $(utils)/size
+OFFSET				:= $(utils)/offset
+
+# Extra include search dirs
+CFLAGS_kbd.o			+= -Idrivers/char
+
+zImage: $(images)/zImage.prep
+zImage.initrd: $(images)/zImage.initrd.prep
+
+$(obj)/dummy.o: $(common)/dummy.c
+	$(CC) -c -o $@ $(common)/dummy.c
+
+$(images)/zImage.prep: $(OBJS) $(LIBS) $(boot)/ld.script \
+		$(images)/vmlinux.gz $(obj)/dummy.o
+	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
+		--add-section=.image=$(images)/vmlinux.gz \
+		--set-section-flags=.image=contents,alloc,load,readonly,data \
+		$(obj)/dummy.o $(obj)/image.o
+	$(LD) $(LD_ARGS) -o $(obj)/zImage $(OBJS) $(obj)/image.o $(LIBS)
+	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/zImage $(obj)/zImage \
+		-R .comment -R .stab -R .stabstr
+	$(MKPREP) -pbp $(obj)/zImage $@
+	rm -f $(obj)/zImage
+
+$(images)/zImage.initrd.prep: $(OBJS) $(LIBS) $(boot)/ld.script \
+		$(images)/vmlinux.gz $(obj)/dummy.o
+	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
+		--add-section=.ramdisk=$(images)/ramdisk.image.gz \
+		--set-section-flags=.ramdisk=contents,alloc,load,readonly,data \
+		--add-section=.image=$(images)/vmlinux.gz \
+		--set-section-flags=.image=contents,alloc,load,readonly,data \
+		$(obj)/dummy.o $(obj)/image.o
+	$(LD) $(LD_ARGS) -o $(obj)/zImage.initrd $(OBJS) $(obj)/image.o $(LIBS)
+	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/zImage.initrd $(obj)/zImage.initrd \
+		-R .comment -R .stab -R .stabstr
+	$(MKPREP) -pbp $(obj)/zImage.initrd $@
+	rm -f  $(obj)/zImage.initrd
+
+floppy: zImage
+	dd if=$(images)/zImage.prep of=/dev/fd0H1440 bs=64b
+
+znetboot : zImage
+	cp $(images)/zImage.prep $(TFTPIMAGE)
+
+znetboot.initrd : zImage.initrd
+	cp $(images)/zImage.initrd.prep $(TFTPIMAGE)

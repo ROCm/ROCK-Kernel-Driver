@@ -40,11 +40,11 @@ SECTIONS
   __stop___kallsyms = .;
   . = ALIGN(8192);
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  .init.text : { *(.init.text) }
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup_init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {

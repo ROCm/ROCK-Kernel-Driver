@@ -253,11 +253,7 @@ xfs_bmbt_trace_cursor(
 	xfs_bmbt_trace_enter(func, cur, s, XFS_BMBT_KTRACE_CUR, line,
 		(cur->bc_nlevels << 24) | (cur->bc_private.b.flags << 16) |
 		cur->bc_private.b.allocated,
-#if BMBT_USE_64
 		INT_GET(r.l0, ARCH_CONVERT) >> 32, (int)INT_GET(r.l0, ARCH_CONVERT), INT_GET(r.l1, ARCH_CONVERT) >> 32, (int)INT_GET(r.l1, ARCH_CONVERT),
-#else
-		INT_GET(r.l0, ARCH_CONVERT), INT_GET(r.l1, ARCH_CONVERT), INT_GET(r.l2, ARCH_CONVERT), INT_GET(r.l3, ARCH_CONVERT),
-#endif
 		(unsigned long)cur->bc_bufs[0], (unsigned long)cur->bc_bufs[1],
 		(unsigned long)cur->bc_bufs[2], (unsigned long)cur->bc_bufs[3],
 		(cur->bc_ptrs[0] << 16) | cur->bc_ptrs[1],

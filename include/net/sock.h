@@ -439,10 +439,6 @@ extern void sock_def_destruct(struct sock *);
 /* Initialise core socket variables */
 extern void sock_init_data(struct socket *sock, struct sock *sk);
 
-extern void sklist_remove_socket(struct sock **list, struct sock *sk);
-extern void sklist_insert_socket(struct sock **list, struct sock *sk);
-extern void sklist_destroy_socket(struct sock **list, struct sock *sk);
-
 #ifdef CONFIG_FILTER
 
 /**

@@ -58,7 +58,7 @@
 #define MPC10X_MCTLR_EXT_MEM_START_2	0x8c	/* Banks 4-7 */
 
 #define MPC10X_MCTLR_MEM_END_1		0x90	/* Banks 0-3 */
-#define MPC10X_MCTLR_MEM_END_2i		0x94	/* Banks 4-7 */
+#define MPC10X_MCTLR_MEM_END_2		0x94	/* Banks 4-7 */
 #define MPC10X_MCTLR_EXT_MEM_END_1	0x98	/* Banks 0-3 */
 #define MPC10X_MCTLR_EXT_MEM_END_2	0x9c	/* Banks 4-7 */
 

@@ -658,8 +658,8 @@ xfs_bmbt_disk_set_allf(
 #else
 #define xfs_bmbt_disk_set_all(r, s) \
 	xfs_bmbt_set_all(r, s)
-#define xfs_bmbt_disk_set_allf(r, 0, b, c, v) \
-	xfs_bmbt_set_allf(r, 0, b, c, v)
+#define xfs_bmbt_disk_set_allf(r, o, b, c, v) \
+	xfs_bmbt_set_allf(r, o, b, c, v)
 #endif
 
 void

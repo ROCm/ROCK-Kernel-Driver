@@ -70,7 +70,7 @@ static inline const char *slot_name(const struct pci_pool *pool)
  * @size: size of the blocks in this pool.
  * @align: alignment requirement for blocks; must be a power of two
  * @allocation: returned blocks won't cross this boundary (or zero)
- * @mem_flags: SLAB_* flags.
+ * Context: !in_interrupt()
  *
  * Returns a pci allocation pool with the requested characteristics, or
  * null if one can't be created.  Given one of these pools, pci_pool_alloc()
@@ -86,7 +86,7 @@ static inline const char *slot_name(const struct pci_pool *pool)
  */
 struct pci_pool *
 pci_pool_create (const char *name, struct pci_dev *pdev,
-	size_t size, size_t align, size_t allocation, int mem_flags)
+	size_t size, size_t align, size_t allocation)
 {
 	struct pci_pool		*retval;
 
@@ -110,7 +110,7 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	} else if (allocation < size)
 		return 0;
 
-	if (!(retval = kmalloc (sizeof *retval, mem_flags)))
+	if (!(retval = kmalloc (sizeof *retval, SLAB_KERNEL)))
 		return retval;
 
 	strncpy (retval->name, name, sizeof retval->name);

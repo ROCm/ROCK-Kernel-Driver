@@ -98,17 +98,6 @@ extern int		ip_do_nat(struct sk_buff *skb);
 extern void		ip_send_check(struct iphdr *ip);
 extern int		ip_queue_xmit(struct sk_buff *skb);
 extern void		ip_init(void);
-extern int		ip_build_xmit(struct sock *sk,
-				      int getfrag (const void *,
-						   char *,
-						   unsigned int,
-						   unsigned int,
-						   struct sk_buff *),
-				      const void *frag,
-				      unsigned length,
-				      struct ipcm_cookie *ipc,
-				      struct rtable *rt,
-				      int flags);
 extern int		ip_append_data(struct sock *sk,
 				       int getfrag(void *from, char *to, int offset, int len,
 						   int odd, struct sk_buff *skb),
@@ -116,7 +105,7 @@ extern int		ip_append_data(struct sock *sk,
 				struct ipcm_cookie *ipc,
 				struct rtable *rt,
 				unsigned int flags);
-extern int		generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb);
+extern int		ip_generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb);
 extern ssize_t		ip_append_page(struct sock *sk, struct page *page,
 				int offset, size_t size, int flags);
 extern int		ip_push_pending_frames(struct sock *sk);
@@ -141,8 +130,7 @@ static inline void ip_tr_mc_map(u32 addr, char *buf)
 }
 
 struct ip_reply_arg {
-	struct iovec iov[2];   
-	int          n_iov;    /* redundant */
+	struct iovec iov[1];   
 	u32 	     csum; 
 	int	     csumoffset; /* u16 offset of csum in iov[0].iov_base */
 				 /* -1 if not needed */ 

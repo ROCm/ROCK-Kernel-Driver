@@ -24,6 +24,7 @@
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/kmod.h>
 
 
 static rwlock_t gendisk_lock;
@@ -33,22 +34,74 @@ static rwlock_t gendisk_lock;
  */
 static LIST_HEAD(gendisk_list);
 
-/*
- *  TEMPORARY KLUDGE.
- */
-static struct {
-	struct list_head list;
-	struct gendisk *(*get)(int minor);
-} gendisks[MAX_BLKDEV];
+struct blk_probe {
+	struct blk_probe *next;
+	dev_t dev;
+	unsigned long range;
+	struct module *owner;
+	struct gendisk *(*get)(dev_t dev, int *part, void *data);
+	void (*lock)(dev_t, void *);
+	void *data;
+} *probes[MAX_BLKDEV];
 
-void blk_set_probe(int major, struct gendisk *(p)(int))
+/* index in the above */
+static inline int dev_to_index(dev_t dev)
 {
+	return MAJOR(dev);
+}
+
+void blk_register_region(dev_t dev, unsigned long range, struct module *module,
+		    struct gendisk *(*probe)(dev_t, int *, void *),
+		    void (*lock)(dev_t, void *), void *data)
+{
+	int index = dev_to_index(dev);
+	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
+	struct blk_probe **s;
+	p->owner = module;
+	p->get = probe;
+	p->lock = lock;
+	p->dev = dev;
+	p->range = range;
+	p->data = data;
 	write_lock(&gendisk_lock);
-	gendisks[major].get = p;
+	for (s = &probes[index]; *s && (*s)->range < range; s = &(*s)->next)
+		;
+	p->next = *s;
+	*s = p;
 	write_unlock(&gendisk_lock);
 }
-EXPORT_SYMBOL(blk_set_probe);	/* Will go away */
-	
+
+void blk_unregister_region(dev_t dev, unsigned long range)
+{
+	int index = dev_to_index(dev);
+	struct blk_probe **s;
+	write_lock(&gendisk_lock);
+	for (s = &probes[index]; *s; s = &(*s)->next) {
+		struct blk_probe *p = *s;
+		if (p->dev == dev || p->range == range) {
+			*s = p->next;
+			kfree(p);
+			break;
+		}
+	}
+	write_unlock(&gendisk_lock);
+}
+
+EXPORT_SYMBOL(blk_register_region);
+EXPORT_SYMBOL(blk_unregister_region);
+
+static struct gendisk *exact_match(dev_t dev, int *part, void *data)
+{
+	struct gendisk *p = data;
+	*part = MINOR(dev) - p->first_minor;
+	return p;
+}
+
+static void exact_lock(dev_t dev, void *data)
+{
+	struct gendisk *p = data;
+	get_disk(p);
+}
 
 /**
  * add_gendisk - add partitioning information to kernel list
@@ -60,10 +113,11 @@ EXPORT_SYMBOL(blk_set_probe);	/* Will go away */
 void add_disk(struct gendisk *disk)
 {
 	write_lock(&gendisk_lock);
-	list_add(&disk->list, &gendisks[disk->major].list);
 	list_add_tail(&disk->full_list, &gendisk_list);
 	write_unlock(&gendisk_lock);
 	disk->flags |= GENHD_FL_UP;
+	blk_register_region(MKDEV(disk->major, disk->first_minor), disk->minors,
+			NULL, exact_match, exact_lock, disk);
 	register_disk(disk);
 }
 
@@ -74,8 +128,9 @@ void unlink_gendisk(struct gendisk *disk)
 {
 	write_lock(&gendisk_lock);
 	list_del_init(&disk->full_list);
-	list_del_init(&disk->list);
 	write_unlock(&gendisk_lock);
+	blk_unregister_region(MKDEV(disk->major, disk->first_minor),
+			      disk->minors);
 }
 
 /**
@@ -88,30 +143,40 @@ void unlink_gendisk(struct gendisk *disk)
 struct gendisk *
 get_gendisk(dev_t dev, int *part)
 {
+	int index = dev_to_index(dev);
 	struct gendisk *disk;
-	struct list_head *p;
-	int major = MAJOR(dev);
-	int minor = MINOR(dev);
+	struct blk_probe *p;
+	unsigned best = ~0U;
 
-	*part = 0;
+retry:
 	read_lock(&gendisk_lock);
-	if (gendisks[major].get) {
-		disk = gendisks[major].get(minor);
+	for (p = probes[index]; p; p = p->next) {
+		struct gendisk *(*probe)(dev_t, int *, void *);
+		struct module *owner;
+		void *data;
+		if (p->dev > dev || p->dev + p->range <= dev)
+			continue;
+		if (p->range >= best) {
+			read_unlock(&gendisk_lock);
+			return NULL;
+		}
+		if (!try_inc_mod_count(p->owner))
+			continue;
+		owner = p->owner;
+		data = p->data;
+		probe = p->get;
+		best = p->range;
+		*part = dev - p->dev;
+		if (p->lock)
+			p->lock(dev, data);
+		read_unlock(&gendisk_lock);
+		disk = probe(dev, part, data);
+		/* Currently ->owner protects _only_ ->probe() itself. */
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
 		if (disk)
-			get_disk(disk);
-		read_unlock(&gendisk_lock);
-		return disk;
-	}
-	list_for_each(p, &gendisks[major].list) {
-		disk = list_entry(p, struct gendisk, list);
-		if (disk->first_minor > minor)
-			continue;
-		if (disk->first_minor + disk->minors <= minor)
-			continue;
-		get_disk(disk);
-		read_unlock(&gendisk_lock);
-		*part = minor - disk->first_minor;
-		return disk;
+			return disk;
+		goto retry;
 	}
 	read_unlock(&gendisk_lock);
 	return NULL;
@@ -183,8 +248,6 @@ struct seq_operations partitions_op = {
 
 
 extern int blk_dev_init(void);
-extern int soc_probe(void);
-extern int atmdev_init(void);
 
 struct device_class disk_devclass = {
 	.name		= "disk",
@@ -193,13 +256,26 @@ struct device_class disk_devclass = {
 static struct bus_type disk_bus = {
 	name:		"block",
 };
+ 
+static struct gendisk *base_probe(dev_t dev, int *part, void *data)
+{
+	char name[20];
+	sprintf(name, "block-major-%d", MAJOR(dev));
+	request_module(name);
+	return NULL;
+}
 
 int __init device_init(void)
 {
+	struct blk_probe *base = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
 	int i;
 	rwlock_init(&gendisk_lock);
-	for (i = 0; i < MAX_BLKDEV; i++)
-		INIT_LIST_HEAD(&gendisks[i].list);
+	memset(base, 0, sizeof(struct blk_probe));
+	base->dev = MKDEV(1,0);
+	base->range = MKDEV(MAX_BLKDEV-1, 255) - base->dev + 1;
+	base->get = base_probe;
+	for (i = 1; i < MAX_BLKDEV; i++)
+		probes[i] = base;
 	blk_dev_init();
 	devclass_register(&disk_devclass);
 	bus_register(&disk_bus);

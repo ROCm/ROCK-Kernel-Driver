@@ -46,6 +46,7 @@
 
 static struct proto_ops econet_ops;
 static struct sock *econet_sklist;
+static rwlock_t econet_lock = RW_LOCK_UNLOCKED;
 
 /* Since there are only 256 possible network numbers (or fewer, depends
    how you count) it makes sense to use a simple lookup table. */
@@ -91,6 +92,33 @@ struct ec_cb
 	void (*sent)(struct sk_buff *, int result);
 #endif
 };
+
+static void econet_remove_socket(struct sock **list, struct sock *sk)
+{
+	struct sock *s;
+
+	write_lock_bh(&econet_lock);
+
+	while ((s = *list) != NULL) {
+		if (s == sk) {
+			*list = s->next;
+			break;
+		}
+		list = &s->next;
+	}
+
+	write_unlock_bh(&econet_lock);
+	if (s)
+		sock_put(s);
+}
+
+static void econet_insert_socket(struct sock **list, struct sock *sk)
+{
+	write_lock_bh(&econet_lock);
+	sk->next = *list;
+	sock_hold(sk);
+	write_unlock_bh(&econet_lock);
+}
 
 /*
  *	Pull a packet from our receive queue and hand it to the user.
@@ -494,7 +522,7 @@ static int econet_release(struct socket *sock)
 	if (!sk)
 		return 0;
 
-	sklist_remove_socket(&econet_sklist, sk);
+	econet_remove_socket(&econet_sklist, sk);
 
 	/*
 	 *	Now the socket is dead. No more input will appear.
@@ -557,7 +585,7 @@ static int econet_create(struct socket *sock, int protocol)
 	sk->family = PF_ECONET;
 	eo->num = protocol;
 
-	sklist_insert_socket(&econet_sklist, sk);
+	econet_insert_socket(&econet_sklist, sk);
 	return(0);
 
 out_free:

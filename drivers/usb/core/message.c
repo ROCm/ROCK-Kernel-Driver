@@ -847,7 +847,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		usb_settoggle (dev, ep, out, 0);
 		(out ? dev->epmaxpacketout : dev->epmaxpacketin) [ep]
-			= iface_as->endpoint [ep].wMaxPacketSize;
+			= iface_as->endpoint [i].wMaxPacketSize;
 	}
 
 	return 0;

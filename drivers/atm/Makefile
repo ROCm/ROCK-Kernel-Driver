@@ -8,6 +8,10 @@ export-objs	:= uPD98402.o suni.o idt77105.o
 fore_200e-objs	:= fore200e.o
 host-progs	:= fore200e_mkfirm
 
+# Files generated that shall be removed upon make clean
+clean-files := {atmsar11,pca200e,pca200e_ecd,sba200e_ecd}.{bin,bin1,bin2}
+# Firmware generated that shall be removed upon make clean
+clean-files += fore200e_pca_fw.c fore200e_sba_fw.c
 
 obj-$(CONFIG_ATM_ZATM)		+= zatm.o uPD98402.o
 obj-$(CONFIG_ATM_NICSTAR)	+= nicstar.o
@@ -61,6 +65,6 @@ $(obj)/fore200e_sba_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_SBA_FW)) \
 	  -i $(CONFIG_ATM_FORE200E_SBA_FW) -o $@
 
 # deal with the various suffixes of the binary firmware images
-$(obj)/%.bin $(obj)/%.bin1 $(obj)/%.bin2: $(obj)/%.data
+$(obj)/%.bin $(obj)/%.bin1 $(obj)/%.bin2: $(src)/%.data
 	objcopy -Iihex $< -Obinary $@.gz
 	gzip -df $@.gz

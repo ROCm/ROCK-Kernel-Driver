@@ -407,7 +407,6 @@
     */
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
  #define IPS {                            \
-    next : NULL,                          \
     module : NULL,                        \
     proc_info : NULL,                     \
     proc_dir : NULL,                      \
@@ -437,7 +436,6 @@
 }
 #elif LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
  #define IPS {                            \
-    next : NULL,                          \
     module : NULL,                        \
     proc_info : NULL,                     \
     name : NULL,                          \
@@ -466,7 +464,6 @@
 }
 #else
  #define IPS {                            \
-    next : NULL,                          \
     module : NULL,                        \
     proc_info : NULL,                     \
     name : NULL,                          \

@@ -88,6 +88,6 @@ install: vmlinux
 	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	+@$(call makeboot,clean)
+	$(MAKE) -rR -f scripts/Makefile.clean obj=arch/i386/boot
 
 archmrproper:

@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/100 Family of Adapters
 ==============================================================
 
-April 9, 2002
+September 16, 2002
 
 
 Contents
@@ -19,25 +19,8 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/100 Family of
-Adapters, version 2.0.x.  This driver includes support for Itanium(TM)-based 
+Adapters, version 2.1.x.  This driver includes support for Itanium(TM)-based 
 systems.
-
-New for this release:
-
-   - Additional ethtool functionality, including link status test and EEPROM 
-     read/write. A third-party application can use the ethtool interface to 
-     get and set driver parameters.
-
-   - Support for Zero copy on 82550-based adapters. This feature provides 
-     faster data throughput and significant CPU usage improvement in systems 
-     that use the relevant system call (sendfile(2)).
-
-   - Support for large MTU-enabling interface (1504 bytes) with kernel's 
-     VLAN module
-
-   - Support for polling on RX
-
-   - Support for Wake On LAN* on 82550 and 82559-based adapters
 
 
 Supported Adapters
@@ -96,8 +79,7 @@ CNR         PRO/100 VE Desktop Adapter              A10386-xxx, A10725-xxx,
 
 To verify that your adapter is supported, find the board ID number on the 
 adapter. Look for a label that has a barcode and a number in the format 
-123456-001 (six digits hyphen three digits). Match this to the list of 
-numbers above.
+A12345-001. Match this to the list of numbers above.
 
 For more information on how to identify your adapter, go to the Adapter & 
 Driver ID Guide at:
@@ -106,15 +88,20 @@ Driver ID Guide at:
 
 For the latest Intel PRO/100 network driver for Linux, see:
 
-  http://appsr.intel.com/scripts-df/support_intel.asp
+  http://downloadfinder.intel.com/scripts-df/support_intel.asp
 
 
 Command Line Parameters
 =======================
 
-The following parameters are used by entering them on the command line with 
-the modprobe or insmod command. For example, with two Intel PRO/100 PCI 
-adapters, entering:
+The following optional parameters are used by entering them on the command 
+line with the modprobe or insmod command using this syntax:
+
+     modprobe e100 [<option>=<VAL1>,<VAL2>,...]
+
+     insmod e100 [<option>=<VAL1>,<VAL2>,...] 
+
+For example, with two Intel PRO/100 PCI adapters, entering:
 	
      modprobe e100 TxDescriptors=32,128
 
@@ -122,16 +109,20 @@ loads the e100 driver with 32 TX resources for the first adapter and 128 TX
 resources for the second adapter. This configuration favors the second 
 adapter. The driver supports up to 16 network adapters concurrently.
 
+The default value for each parameter is generally the recommended setting,
+unless otherwise noted.
+
 NOTE: Giving any command line option the value "-1" causes the driver to use 
       the appropriate default value for that option, as if no value was 
       specified.
 
 
 BundleMax
-Valid Range: 0x1-0xFFFF
+Valid Range: 1-65535
 Default Value: 6
-   This parameter holds the maximum number of packets in a bundle. Suggested 
-   values range from 2 to 10. See "CPU Cycle Saver."
+   This parameter holds the maximum number of small packets (less than 128
+   bytes) in a bundle. Suggested values range from 2 to 10. See "CPU Cycle 
+   Saver."
 
 BundleSmallFr
 Valid Range: 0-1 (0=off, 1=on)
@@ -142,48 +133,33 @@ Default Value: 0
 e100_speed_duplex
 Valid Range: 0-4 (1=10half;2=10full;3=100half;4=100full)
 Default Value: 0
-   The default value of 0 is set to auto-negotiate if the link partner is set
-   to auto-negotiate. If the link partner is forced, e100_speed_duplex 
-   defaults to half-duplex. 
+   The default value of 0 sets the adapter to auto-negotiate. Other values
+   set the adapter to forced speed and duplex. 
    Example usage: insmod e100.o e100_speed_duplex=4,4 (for two adapters)
 
 flow_control
 Valid Range: 0-1 (0=off, 1=on)
 Default Value: 0
    This parameter controls the automatic generation(Tx) and response(Rx) to 
-   Ethernet PAUSE frames. flow_control should NOT be set to 1 when the e100 
+   Ethernet PAUSE frames. flow_control should NOT be set to 1 when the 
    adapter is connected to an interface that does not support Ethernet PAUSE 
    frames and when the e100_speed_duplex parameter is NOT set to zero. 
 
 IntDelay
-Valid Range: 0-0xFFFF (0=off)
+Valid Range: 0-65535 (0=off)
 Default Value: 1536
    This parameter holds the number of time units (in adapter terminology)
    until the adapter generates an interrupt. The recommended value for 
-   IntDelay is 0x600 (upon initialization). Suggested values range from 
-   0x200h to 0x800. See "CPU Cycle Saver."
+   IntDelay is 1536 (upon initialization). Suggested values range from 
+   512 to 2048. See "CPU Cycle Saver."
 
 IFS
 Valid Range: 0-1 (0=off, 1=on)
 Default Value: 1
   Inter Frame Spacing (IFS) aims to reduce the number of Ethernet frame
   collisions by altering the time between frame transmissions. When IFS is 
-  enabled the driver tries to find an optimal IFS value. However, some 
-  switches function better when IFS is disabled.
-
-PollingMaxWork
-Valid Range: 1-1024 (max number of RxDescriptors)
-Default Value: Specified number of RxDescriptors
-  This value specifies the maximum number of receive packets that are 
-  processed on a single polling call. This parameter is invalid if 
-  RxCongestionControl is set to 0.
-
-RxCongestionControl
-Valid Range: 0-1 (0=off, 1=on)
-Default Value: 1
-  1 enables polling mode. When the link is congested, the driver can decide 
-  to handle received packets by polling them, instead of waiting until 
-  interrupts occur.
+  enabled the driver tries to find an optimal IFS value. It is used only at 
+  half duplex.
 
 RxDescriptors
 Valid Range: 8-1024
@@ -200,19 +176,23 @@ Default Value: 64
    Increasing this value allows the protocol stack to queue more transmits at
    the driver level. The maximum value for Itanium-based systems is 64.
 
-ucode (not available for 82557-based adapters)
+ucode
 Valid Range: 0-1 (0=off, 1=on)
 Default Value: 0 for 82558-based adapters
-               1 for 82559(and higher)-based adapters
+               1 for 82559, 82550, and 82551-based adapters
    On uploads the micro code to the adapter, which enables CPU Cycle Saver. 
    See the section "CPU Cycle Saver" below.
-   Example usage: insmod e100.o ucode=0  (does not reduce CPU usage)
+   Example usage: insmod e100.o ucode=1
+
+   Not available on 82557-based adapters.
 
 XsumRX
 Valid Range: 0-1 (0=off, 1=on)
 Default Value: 1
    On allows Rx checksum offloading for TCP/UDP packets. Requires that the 
    hardware support this feature.
+
+   Not available on 82557 and 82558-based adapters.
 
 
 CPU Cycle Saver
@@ -234,10 +214,11 @@ switching to and from the driver.
 CPU Cycle Saver consists of these arguments: IntDelay, BundleMax and 
 BundleSmallFr. When IntDelay is increased, the adapter waits longer for 
 frames to arrive before generating the interrupt. By increasing BundleMax, 
-the network adapter waits for the number of frames specified to arrive before 
-generating the interrupt. When BundleSmallFr is disabled, the adapter does 
-not bundle packets that are smaller than 128 bytes. Such small packets are 
-often, but not always, control packets that are better served immediately.
+the network adapter waits for the number of small frames (less than 128 bytes)
+specified to arrive before generating the interrupt. When BundleSmallFr is 
+disabled, the adapter does not bundle small packets. Such small packets are 
+often, but not always, control packets that are better served immediately;
+therefore, BundleSmallFr is disabled by default.
 
 For most users, it is recommended that CPU Cycle Saver be used with the 
 default values specified in the Command Line Parameters section. However, in 
@@ -249,7 +230,7 @@ ucode=0.
 Support
 =======
 
-For general information and support, go to the Intel support website at:
+For general information, go to the Intel support website at:
 
     http://support.intel.com
 

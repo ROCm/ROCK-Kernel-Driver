@@ -1188,7 +1188,6 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 	arg.csum = csum_tcpudp_nofold(skb->nh.iph->daddr,
 				      skb->nh.iph->saddr, /*XXX*/
 				      sizeof(struct tcphdr), IPPROTO_TCP, 0);
-	arg.n_iov = 1;
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2;
 
 	inet_sk(tcp_socket->sk)->ttl = sysctl_ip_default_ttl;
@@ -1217,7 +1216,6 @@ static void tcp_v4_send_ack(struct sk_buff *skb, u32 seq, u32 ack,
 
 	arg.iov[0].iov_base = (unsigned char *)&rep;
 	arg.iov[0].iov_len  = sizeof(rep.th);
-	arg.n_iov = 1;
 	if (ts) {
 		rep.tsopt[0] = htonl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16) |
 				     (TCPOPT_TIMESTAMP << 8) |

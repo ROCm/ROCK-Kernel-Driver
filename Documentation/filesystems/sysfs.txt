@@ -1,0 +1,342 @@
+
+sysfs - _The_ filesystem for exporting kernel objects. 
+
+Patrick Mochel	<mochel@osdl.org>
+
+17 October 2002
+
+
+Note (17 Oct 2002): the name has just been changed from driverfs to
+sysfs. Updates to the documentation will come soon; after the
+conversion to use it is completely finished.
+
+
+
+What it is:
+~~~~~~~~~~~
+driverfs is a ram-based filesystem. It was created by copying
+ramfs/inode.c to driverfs/inode.c and doing a little search-and-replace. 
+
+driverfs is a means to export kernel data structures, their
+attributes, and the linkages between them to userspace. 
+
+driverfs provides a unified interface for exporting attributes to
+userspace. Currently, this interface is available only to device and
+bus drivers. 
+
+
+Using driverfs
+~~~~~~~~~~~~~~
+driverfs is always compiled in. You can access it by doing something like:
+
+    mount -t driverfs driverfs /devices 
+
+
+Top Level Directory Layout
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The driverfs directory arrangement exposes the relationship of kernel
+data structures. 
+
+The top level driverfs diretory looks like:
+
+bus/
+root/
+
+root/ contains a filesystem representation of the device tree. It maps
+directly to the internal kernel device tree, which is a hierarchy of
+struct device. 
+
+bus/ contains flat directory layout of the various bus types in the
+kernel. Each bus's directory contains two subdirectories:
+
+	devices/
+	drivers/
+
+devices/ contains symlinks for each device discovered in the system
+that point to the device's directory under root/.
+
+drivers/ contains a directory for each device driver that is loaded
+for devices on that particular bus (this assmumes that drivers do not
+span multiple bus types).
+
+
+More information can device-model specific features can be found in
+Documentation/device-model/. 
+
+
+Directory Contents
+~~~~~~~~~~~~~~~~~~
+Each object that is represented in driverfs gets a directory, rather
+than a file, to make it simple to export attributes of that object. 
+Attributes are exported via ASCII text files. The programming
+interface is discussed below. 
+
+Instead of having monolithic files that are difficult to parse, all
+files are intended to export one attribute. The name of the attribute
+is the name of the file. The value of the attribute are the contents
+of the file. 
+
+There should be few, if any, exceptions to this rule. You should not
+violate it, for fear of public humilation.
+
+
+The Two-Tier Model
+~~~~~~~~~~~~~~~~~~
+
+driverfs is a very simple, low-level interface. In order for kernel
+objects to use it, there must be an intermediate layer in place for
+each object type. 
+
+All calls in driverfs are intended to be as type-safe as possible. 
+In order to extend driverfs to support multiple data types, a layer of
+abstraction was required. This intermediate layer converts between the
+generic calls and data structures of the driverfs core to the
+subsystem-specific objects and calls. 
+
+
+The Subsystem Interface
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The subsystems bear the responsibility of implementing driverfs
+extensions for the objects they control. Fortunately, it's intended to
+be really easy to do so. 
+
+It's divided into three sections: directories, files, and operations.
+
+
+Directories
+~~~~~~~~~~~
+
+struct driver_dir_entry {
+        char                    * name;
+        struct dentry           * dentry;
+        mode_t                  mode;
+        struct driverfs_ops     * ops;
+};
+
+
+int
+driverfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
+
+void
+driverfs_remove_dir(struct driver_dir_entry * entry);
+
+The directory structure should be statically allocated, and reside in
+a subsystem-specific data structure:
+
+struct device {
+       ...
+       struct driver_dir_entry	dir;
+};
+
+The subsystem is responsible for initializing the name, mode, and ops
+fields of the directory entry. (More on struct driverfs_ops later)
+
+
+Files
+~~~~~
+
+struct attribute {
+        char                    * name;
+        mode_t                  mode;
+};
+
+
+int
+driverfs_create_file(struct attribute * attr, struct driver_dir_entry * parent);
+
+void
+driverfs_remove_file(struct driver_dir_entry *, const char * name);
+
+
+The attribute structure is a simple, common token that the driverfs
+core handles. It has little use on its own outside of the
+core. Objects cannot use a plain struct attribute to export
+attributes, since there are no callbacks for reading and writing data.
+
+Therefore, the subsystem is required to define a data structure that
+encapsulates the attribute structure, and provides type-safe callbacks
+for reading and writing data.
+
+An example looks like this:
+
+struct device_attribute {
+        struct attribute        attr;
+        ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
+        ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
+
+
+Note that there is a struct attribute embedded in the structure. In
+order to relieve pain in declaring attributes, the subsystem should
+also define a macro, like:
+
+#define DEVICE_ATTR(_name,_mode,_show,_store)      \
+struct device_attribute dev_attr_##_name = {            \
+        .attr = {.name  = __stringify(_name) , .mode   = _mode },      \
+        .show   = _show,                                \
+        .store  = _store,                               \
+};
+
+This hides the initialization of the embedded struct, and in general,
+the internals of each structure. It yields a structure by the name of
+dev_attr_<name>.
+
+In order for objects to create files, the subsystem should create
+wrapper functions, like this:
+
+int device_create_file(struct device *device, struct device_attribute * entry);
+void device_remove_file(struct device * dev, struct device_attribute * attr);
+
+..and forward the call on to the driverfs functions.
+
+Note that there is no unique information in the attribute structures,
+so the same structure can be used to describe files of several
+different object instances. 
+
+
+Operations
+~~~~~~~~~~
+
+struct driverfs_ops {
+        int     (*open)(struct driver_dir_entry *);
+        int     (*close)(struct driver_dir_entry *);
+        ssize_t (*show)(struct driver_dir_entry *, struct attribute *,char *, size_t, loff_t);
+        ssize_t (*store)(struct driver_dir_entry *,struct attribute *,const char *, size_t, loff_t);
+};
+
+
+Subsystems are required to implement this set of callbacks. Their
+purpose is to translate the generic data structures into the specific
+objects, and operate on them. This can be done by defining macros like
+this:
+
+#define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
+
+#define to_device(d) container_of(d, struct device, dir)
+
+
+Since the directories are statically allocated in the object, you can
+derive the pointer to the object that owns the file. Ditto for the
+attribute structures. 
+
+Current Interfaces
+~~~~~~~~~~~~~~~~~~
+
+The following interface layers currently exist in driverfs:
+
+
+- devices (include/linux/device.h)
+----------------------------------
+Structure:
+
+struct device_attribute {
+        struct attribute        attr;
+        ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
+        ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
+
+Declaring:
+
+DEVICE_ATTR(_name,_str,_mode,_show,_store);
+
+Creation/Removal:
+
+int device_create_file(struct device *device, struct device_attribute * entry);
+void device_remove_file(struct device * dev, struct device_attribute * attr);
+
+
+- bus drivers (include/linux/device.h)
+--------------------------------------
+Structure:
+
+struct bus_attribute {
+        struct attribute        attr;
+        ssize_t (*show)(struct bus_type *, char * buf, size_t count, loff_t off);
+        ssize_t (*store)(struct bus_type *, const char * buf, size_t count, loff_t off);
+};
+
+Declaring:
+
+BUS_ATTR(_name,_mode,_show,_store)
+
+Creation/Removal:
+
+int bus_create_file(struct bus_type *, struct bus_attribute *);
+void bus_remove_file(struct bus_type *, struct bus_attribute *);
+
+
+- device drivers (include/linux/device.h)
+-----------------------------------------
+
+Structure:
+
+struct driver_attribute {
+        struct attribute        attr;
+        ssize_t (*show)(struct device_driver *, char * buf, size_t count, loff_t off);
+        ssize_t (*store)(struct device_driver *, const char * buf, size_t count, loff_t off);
+};
+
+Declaring:
+
+DRIVER_ATTR(_name,_mode,_show,_store)
+
+Creation/Removal:
+
+int driver_create_file(struct device_driver *, struct driver_attribute *);
+void driver_remove_file(struct device_driver *, struct driver_attribute *);
+
+
+Reading/Writing Data
+~~~~~~~~~~~~~~~~~~~~
+The callback functionality is similar to the way procfs works. When a
+user performs a read(2) or write(2) on the file, it first calls a
+driverfs function. This calls to the subsystem, which then calls to
+the object's show() or store() function.
+
+The buffer pointer, offset, and length should be passed to each
+function. The downstream callback should fill the buffer and return
+the number of bytes read/written.
+
+
+What driverfs is not:
+~~~~~~~~~~~~~~~~~~~~~
+It is not a replacement for either devfs or procfs.
+
+It does not handle device nodes, like devfs is intended to do. I think
+this functionality is possible, but indeed think that integration of
+the device nodes and control files should be done. Whether driverfs or
+devfs, or something else, is the place to do it, I don't know.
+
+It is not intended to be a replacement for all of the procfs
+functionality. I think that many of the driver files should be moved
+out of /proc (and maybe a few other things as well ;).
+
+
+
+Limitations:
+~~~~~~~~~~~~
+The driverfs functions assume that at most a page is being either read
+or written each time.
+
+There is a race condition that is really, really hard to fix; if not 
+impossible. There exists a race between a driverfs file being opened
+and the object that owns the file going away. During the driverfs
+open() callback, the reference count for the owning object needs to be
+incremented. 
+
+For drivers, we can put a struct module * owner in struct driver_dir_entry 
+and do try_inc_mod_count() when we open a file. However, this won't
+work for devices, that aren't tied to a module. And, it is still not
+guaranteed to solve the race. 
+
+I'm looking into fixing this, but it may not be doable without making
+a separate filesystem instance for each object. It's fun stuff. Please
+mail me with creative ideas that you know will work. 
+
+
+Possible bugs:
+~~~~~~~~~~~~~~
+It may not deal with offsets and/or seeks very well, especially if
+they cross a page boundary.
+

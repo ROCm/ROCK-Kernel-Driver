@@ -71,7 +71,7 @@ typedef struct {
 
 /*      Count nr of 1's in pattern.
  */
-extern inline int count_ones(unsigned long mask)
+static inline int count_ones(unsigned long mask)
 {
 	int bits;
 

@@ -131,6 +131,7 @@ if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ]; then
 	 Motorola-Sandpoint	CONFIG_SANDPOINT	\
 	 SBS-Adirondack		CONFIG_ADIR		\
 	 SBS-K2			CONFIG_K2		\
+	 SBS-Palomar4		CONFIG_PAL4		\
 	 Synergy-Gemini		CONFIG_GEMINI		\
 	 Zynx-ZX4500		CONFIG_ZX4500"		CHRP/PowerMac/PReP
 
@@ -584,23 +585,31 @@ source lib/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
-bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
-bool 'Include kgdb kernel debugger' CONFIG_KGDB
-if [ "$CONFIG_KGDB" = "y" ]; then
-   choice 'Serial Port'			\
-	"ttyS0	CONFIG_KGDB_TTYS0	\
-	 ttyS1	CONFIG_KGDB_TTYS1	\
-	 ttyS2	CONFIG_KGDB_TTYS2	\
-	 ttyS3	CONFIG_KGDB_TTYS3"	ttyS1
-fi
-bool 'Include xmon kernel debugger' CONFIG_XMON
-bool 'Include BDI-2000 user context switcher' CONFIG_BDI_SWITCH
-if [ "$CONFIG_KGDB" = "y" -o "$CONFIG_XMON" = "y" \
-     -o "$CONFIG_BDI_SWITCH" = "y" ]; then
-   bool 'Add any additional compile options' CONFIG_MORE_COMPILE_OPTIONS
-   if [ "$CONFIG_MORE_COMPILE_OPTIONS" = "y" ]; then
-      string 'Additional compile arguments' CONFIG_COMPILE_OPTIONS "-g -ggdb"
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" = "y" ]; then
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   if [ "$CONFIG_HIGHMEM" = "y" ]; then
+      bool '  Highmem debugging' CONFIG_DEBUG_HIGHMEM
+   fi
+   bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS
+   bool '  Include kgdb kernel debugger' CONFIG_KGDB
+   if [ "$CONFIG_KGDB" = "y" ]; then
+      choice '    Serial Port'			\
+	"ttyS0	CONFIG_KGDB_TTYS0		\
+	 ttyS1	CONFIG_KGDB_TTYS1		\
+	 ttyS2	CONFIG_KGDB_TTYS2		\
+	 ttyS3	CONFIG_KGDB_TTYS3"		ttyS1
+   fi
+   bool '  Include xmon kernel debugger' CONFIG_XMON
+   bool '  Include BDI-2000 user context switcher' CONFIG_BDI_SWITCH
+   if [ "$CONFIG_KGDB" = "y" -o "$CONFIG_XMON" = "y" \
+	-o "$CONFIG_BDI_SWITCH" = "y" ]; then
+      bool '  Add any additional compile options' CONFIG_MORE_COMPILE_OPTIONS
+      if [ "$CONFIG_MORE_COMPILE_OPTIONS" = "y" ]; then
+	 string '    Additional compile arguments' CONFIG_COMPILE_OPTIONS "-g -ggdb"
+      fi
    fi
 fi
 

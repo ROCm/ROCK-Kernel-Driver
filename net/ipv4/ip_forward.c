@@ -53,7 +53,7 @@ static inline int ip_forward_finish(struct sk_buff *skb)
 
 		if (rt->rt_flags&RTCF_FAST && !netdev_fastroute_obstacles) {
 			struct dst_entry *old_dst;
-			unsigned h = ((*(u8*)&rt->key.dst)^(*(u8*)&rt->key.src))&NETDEV_FASTROUTE_HMASK;
+			unsigned h = ((*(u8*)&rt->fl.fl4_dst)^(*(u8*)&rt->fl.fl4_src))&NETDEV_FASTROUTE_HMASK;
 
 			write_lock_irq(&skb->dev->fastpath_lock);
 			old_dst = skb->dev->fastpath[h];

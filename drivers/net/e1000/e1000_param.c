@@ -197,8 +197,7 @@ E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096
 
-#define DEFAULT_RDTR                 128
-#define DEFAULT_RDTR_82544             0
+#define DEFAULT_RDTR                   0
 #define MAX_RXDELAY               0xFFFF
 #define MIN_RXDELAY                    0
 
@@ -315,7 +314,8 @@ e1000_check_options(struct e1000_adapter *adapter)
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.arg.r.max = mac_type < e1000_82544 ? MAX_TXD : MAX_82544_TXD;
+		opt.arg.r.max = mac_type < e1000_82544 ? 
+			MAX_TXD : MAX_82544_TXD;
 
 		tx_ring->count = TxDescriptors[bd];
 		e1000_validate_option(&tx_ring->count, &opt);
@@ -398,16 +398,13 @@ e1000_check_options(struct e1000_adapter *adapter)
 	}
 	{ /* Receive Interrupt Delay */
 		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
-		char *rdtr_82544 = "using default of "
-		       		   __MODULE_STRING(DEFAULT_RDTR_82544);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Receive Interrupt Delay",
 			.arg  = { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
 		};
-		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.def = mac_type > e1000_82544 ? DEFAULT_RDTR : 0;
-		opt.err = mac_type > e1000_82544 ? rdtr : rdtr_82544;
+		opt.def = DEFAULT_RDTR;
+		opt.err = rdtr;
 
 		adapter->rx_int_delay = RxIntDelay[bd];
 		e1000_validate_option(&adapter->rx_int_delay, &opt);

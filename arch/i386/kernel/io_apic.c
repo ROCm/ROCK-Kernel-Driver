@@ -856,7 +856,9 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG "IO APIC #%d......\n", mp_ioapics[apic].mpc_apicid);
 	printk(KERN_DEBUG ".... register #00: %08X\n", *(int *)&reg_00);
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
-	if (reg_00.__reserved_1 || reg_00.__reserved_2)
+	printk(KERN_DEBUG ".......    : Delivery Type: %X\n", reg_00.delivery_type);
+	printk(KERN_DEBUG ".......    : LTS          : %X\n", reg_00.LTS);
+	if (reg_00.__reserved_0 || reg_00.__reserved_1 || reg_00.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);

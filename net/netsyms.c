@@ -224,9 +224,6 @@ EXPORT_SYMBOL(dev_change_flags);
 EXPORT_SYMBOL(vlan_ioctl_hook);
 #endif
 
-EXPORT_SYMBOL(sklist_destroy_socket);
-EXPORT_SYMBOL(sklist_insert_socket);
-
 EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
@@ -434,7 +431,6 @@ EXPORT_SYMBOL(neigh_dump_info);
 
 EXPORT_SYMBOL(dev_set_allmulti);
 EXPORT_SYMBOL(dev_set_promiscuity);
-EXPORT_SYMBOL(sklist_remove_socket);
 EXPORT_SYMBOL(rtnl_sem);
 EXPORT_SYMBOL(rtnl_lock);
 EXPORT_SYMBOL(rtnl_unlock);

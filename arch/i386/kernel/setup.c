@@ -36,6 +36,7 @@
 #include <linux/highmem.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
+#include <asm/edd.h>
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include "setup_arch_pre.h"
@@ -466,6 +467,22 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
 	return 0;
 }
 
+#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+unsigned char eddnr;
+struct edd_info edd[EDDNR];
+/**
+ * copy_edd() - Copy the BIOS EDD information into a safe place.
+ *
+ */
+static inline void copy_edd(void)
+{
+     eddnr = EDD_NR;
+     memcpy(edd, EDD_BUF, sizeof(edd));
+}
+#else
+#define copy_edd() do {} while (0)
+#endif
+
 /*
  * Do NOT EVER look at the BIOS memory size location.
  * It does not work on many machines.
@@ -843,6 +860,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	ARCH_SETUP
 	setup_memory_region();
+	copy_edd();
 
 	if (!MOUNT_ROOT_RDONLY)
 		root_mountflags &= ~MS_RDONLY;

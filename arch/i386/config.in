@@ -216,6 +216,10 @@ tristate '/dev/cpu/microcode - Intel IA32 CPU microcode support' CONFIG_MICROCOD
 tristate '/dev/cpu/*/msr - Model-specific register support' CONFIG_X86_MSR
 tristate '/dev/cpu/*/cpuid - CPU information support' CONFIG_X86_CPUID
 
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   tristate 'BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)' CONFIG_EDD
+fi
+
 choice 'High Memory Support' \
 	"off           CONFIG_NOHIGHMEM \
 	 4GB           CONFIG_HIGHMEM4G \
@@ -453,6 +457,7 @@ fi
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Check for stack overflows' CONFIG_DEBUG_STACKOVERFLOW
    bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
    bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ

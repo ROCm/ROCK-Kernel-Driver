@@ -119,35 +119,44 @@ static int proc_scsi_write(struct file * file, const char * buf,
 	return(ret);
 }
 
-void build_proc_dir_entries(Scsi_Host_Template * tpnt)
+void scsi_proc_host_mkdir(Scsi_Host_Template *shost_tp)
 {
-	struct Scsi_Host *hpnt;
-	char name[10];	/* see scsi_unregister_host() */
-
-	tpnt->proc_dir = proc_mkdir(tpnt->proc_name, proc_scsi);
-        if (!tpnt->proc_dir) {
-                printk(KERN_ERR "Unable to proc_mkdir in scsi.c/build_proc_dir_entries");
+	shost_tp->proc_dir = proc_mkdir(shost_tp->proc_name, proc_scsi);
+        if (!shost_tp->proc_dir) {
+		printk(KERN_ERR "%s: proc_mkdir failed for %s\n",
+		       __FUNCTION__, shost_tp->proc_name);
                 return;
         }
-	tpnt->proc_dir->owner = tpnt->module;
+	shost_tp->proc_dir->owner = shost_tp->module;
+}
 
-	hpnt = scsi_hostlist;
-	while (hpnt) {
-		if (tpnt == hpnt->hostt) {
-			struct proc_dir_entry *p;
-			sprintf(name,"%d",hpnt->host_no);
-			p = create_proc_read_entry(name,
-					S_IFREG | S_IRUGO | S_IWUSR,
-					tpnt->proc_dir,
-					proc_scsi_read,
-					(void *)hpnt);
-			if (!p)
-				panic("Not enough memory to register SCSI HBA in /proc/scsi !\n");
-			p->write_proc=proc_scsi_write;
-			p->owner = tpnt->module;
-		}
-		hpnt = hpnt->next;
+void scsi_proc_host_add(struct Scsi_Host *shost)
+{
+	char name[10];
+	struct proc_dir_entry *p;
+
+	sprintf(name,"%d",shost->host_no);
+	p = create_proc_read_entry(name,
+			S_IFREG | S_IRUGO | S_IWUSR,
+			shost->hostt->proc_dir,
+			proc_scsi_read,
+			(void *)shost);
+	if (!p) {
+		printk(KERN_ERR "%s: Failed to register host %d in"
+		       "%s\n", __FUNCTION__, shost->host_no,
+		       shost->hostt->proc_name);
+	} else {
+		p->write_proc=proc_scsi_write;
+		p->owner = shost->hostt->module;
 	}
+
+}
+
+void scsi_proc_host_rm(struct Scsi_Host *shost)
+{
+	char name[10];
+	sprintf(name,"%d",shost->host_no);
+	remove_proc_entry(name, shost->hostt->proc_dir);
 }
 
 /*

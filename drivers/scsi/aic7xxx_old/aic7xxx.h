@@ -30,14 +30,10 @@
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX	{						\
-	next: NULL,						\
-	module: NULL,						\
 	proc_info: aic7xxx_proc_info,				\
-	name: NULL,						\
 	detect: aic7xxx_detect,					\
 	release: aic7xxx_release,				\
 	info: aic7xxx_info,					\
-	command: NULL,						\
 	queuecommand: aic7xxx_queue,				\
 	eh_strategy_handler: NULL,				\
 	eh_abort_handler: NULL,					\

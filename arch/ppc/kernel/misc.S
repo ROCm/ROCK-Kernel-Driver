@@ -752,21 +752,6 @@ _GLOBAL(copy_page)
 #endif /* CONFIG_PPC_ISERIES */
 
 /*
- * Atomic [test&set] exchange
- *
- *	unsigned long xchg_u32(void *ptr, unsigned long val)
- * Changes the memory location '*ptr' to be val and returns
- * the previous value stored there.
- */
-_GLOBAL(xchg_u32)
-	mr	r5,r3		/* Save pointer */
-10:	lwarx	r3,0,r5		/* Fetch old value & reserve */
-	PPC405_ERR77(0,r5)
-	stwcx.	r4,0,r5		/* Update with new value */
-	bne-	10b		/* Retry if "reservation" (i.e. lock) lost */
-	blr
-
-/*
  * void atomic_clear_mask(atomic_t mask, atomic_t *addr)
  * void atomic_set_mask(atomic_t mask, atomic_t *addr);
  */

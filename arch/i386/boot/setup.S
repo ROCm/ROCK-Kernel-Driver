@@ -44,6 +44,9 @@
  *
  * New A20 code ported from SYSLINUX by H. Peter Anvin. AMD Elan bugfixes
  * by Robert Schwebel, December 2001 <robert@schwebel.de>
+ *    
+ * BIOS Enhanced Disk Drive support
+ * by Matt Domsch <Matt_Domsch@dell.com> September 2002 
  *
  */
 
@@ -53,6 +56,7 @@
 #include <linux/compile.h>
 #include <asm/boot.h>
 #include <asm/e820.h>
+#include <asm/edd.h>    
 #include <asm/page.h>
 	
 /* Signature words to ensure LILO loaded us right */
@@ -541,6 +545,49 @@ apm_disconnect:					# Tidy up
 no_32_apm_bios:
 	andw	$0xfffd, (76)			# remove 32 bit support bit
 done_apm_bios:
+#endif
+
+#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+# Do the BIOS Enhanced Disk Drive calls
+# This code is sensitive to the size of the structs in edd.h
+edd_start:  
+						# %ds points to the bootsector
+       						# result buffer for fn48
+    	movw	$EDDBUF+EDDEXTSIZE, %si		# in ds:si, fn41 results
+						# kept just before that    
+	movb	$0, (EDDNR)			# zero value at EDDNR
+    	movb	$0x80, %dl			# BIOS device 0x80
+
+edd_check_ext:
+	movb	$0x41, %ah			# Function 41
+	movw	$0x55aa, %bx			# magic
+	int	$0x13				# make the call
+	jc	edd_done			# no more BIOS devices
+
+    	cmpw	$0xAA55, %bx			# is magic right?
+	jne	edd_next			# nope, next...
+
+    	movb	%dl, %ds:-4(%si)		# store device number
+    	movb	%ah, %ds:-3(%si)		# store version
+	movw	%cx, %ds:-2(%si)		# store extensions
+	incb	(EDDNR)				# note that we stored something
+        
+edd_get_device_params:  
+	movw	$EDDPARMSIZE, %ds:(%si)		# put size
+    	movb	$0x48, %ah			# Function 48
+	int	$0x13				# make the call
+						# Don't check for fail return
+						# it doesn't matter.
+	movw	%si, %ax			# increment si
+	addw	$EDDPARMSIZE+EDDEXTSIZE, %ax
+	movw	%ax, %si
+
+edd_next:
+        incb	%dl				# increment to next device
+       	cmpb	$EDDMAXNR, (EDDNR) 		# Out of space?
+	jb	edd_check_ext			# keep looping
+    
+edd_done:   
 #endif
 
 # Now we want to move to protected mode ...

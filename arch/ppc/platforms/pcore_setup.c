@@ -168,13 +168,7 @@ pcore_init_IRQ(void)
 	for ( i = 0 ; i < 16 ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 
-	i8259_init(NULL);
-}
-
-static int
-pcore_get_irq(struct pt_regs *regs)
-{
-	return i8259_poll();
+	i8259_init(0);
 }
 
 /*
@@ -184,22 +178,16 @@ static __inline__ void
 pcore_set_bat(void)
 {
 	unsigned long   bat3u, bat3l;
-	static int	mapping_set = 0;
 
-	if (!mapping_set) {
-		__asm__ __volatile__(
-				" lis %0,0xf000\n \
-				ori %1,%0,0x002a\n \
-				ori %0,%0,0x1ffe\n \
-				mtspr 0x21e,%0\n \
-				mtspr 0x21f,%1\n \
-				isync\n \
-				sync "
-				: "=r" (bat3u), "=r" (bat3l));
-
-		mapping_set = 1;
-	}
-	return;
+	__asm__ __volatile__(
+			" lis %0,0xf000\n \
+			ori %1,%0,0x002a\n \
+			ori %0,%0,0x1ffe\n \
+			mtspr 0x21e,%0\n \
+			mtspr 0x21f,%1\n \
+			isync\n \
+			sync "
+			: "=r" (bat3u), "=r" (bat3l));
 }
 
 static unsigned long __init
@@ -233,7 +221,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch	= pcore_setup_arch;
 	ppc_md.show_cpuinfo	= pcore_show_cpuinfo;
 	ppc_md.init_IRQ		= pcore_init_IRQ;
-	ppc_md.get_irq		= pcore_get_irq;
+	ppc_md.get_irq		= i8259_irq;
 
 	ppc_md.find_end_of_memory = pcore_find_end_of_memory;
 	ppc_md.setup_io_mappings = pcore_map_io;

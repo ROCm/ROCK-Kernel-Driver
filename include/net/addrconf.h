@@ -191,5 +191,21 @@ static inline int ipv6_addr_is_multicast(struct in6_addr *addr)
 	return (addr->s6_addr32[0] & __constant_htonl(0xFF000000)) == __constant_htonl(0xFF000000);
 }
 
+static inline int ipv6_addr_is_ll_all_nodes(const struct in6_addr *addr)
+{
+	return (addr->s6_addr32[0] == htonl(0xff020000) &&
+		addr->s6_addr32[1] == 0 &&
+		addr->s6_addr32[2] == 0 &&
+		addr->s6_addr32[3] == htonl(0x00000001));
+}
+
+static inline int ipv6_addr_is_ll_all_routers(const struct in6_addr *addr)
+{
+	return (addr->s6_addr32[0] == htonl(0xff020000) &&
+		addr->s6_addr32[1] == 0 &&
+		addr->s6_addr32[2] == 0 &&
+		addr->s6_addr32[3] == htonl(0x00000002));
+}
+
 #endif
 #endif

@@ -877,6 +877,12 @@ struct scsi_cmnd {
 
 extern int scsi_reset_provider(Scsi_Device *, int);
 
+#define MSG_SIMPLE_TAG	0x20
+#define MSG_HEAD_TAG	0x21
+#define MSG_ORDERED_TAG	0x22
+
+#define SCSI_NO_TAG	(-1)    /* identify no tag in use */
+
 /**
  * scsi_activate_tcq - turn on tag command queueing
  * @SDpnt:	device to turn on TCQ for
@@ -892,7 +898,7 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
 
         if(SDpnt->tagged_supported && !blk_queue_tagged(q)) {
                 blk_queue_init_tags(q, depth);
-                SDpnt->tagged_queue = 1;
+		scsi_adjust_queue_depth(SDpnt, MSG_ORDERED_TAG, depth);
         }
 }
 
@@ -902,13 +908,8 @@ static inline void scsi_activate_tcq(Scsi_Device *SDpnt, int depth) {
  **/
 static inline void scsi_deactivate_tcq(Scsi_Device *SDpnt) {
         blk_queue_free_tags(&SDpnt->request_queue);
-        SDpnt->tagged_queue = 0;
+	scsi_adjust_queue_depth(SDpnt, 0, 2);
 }
-#define MSG_SIMPLE_TAG	0x20
-#define MSG_HEAD_TAG	0x21
-#define MSG_ORDERED_TAG	0x22
-
-#define SCSI_NO_TAG	(-1)    /* identify no tag in use */
 
 /**
  * scsi_populate_tag_msg - place a tag message in a buffer

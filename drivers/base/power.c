@@ -8,6 +8,8 @@
  *
  */
 
+#define DEBUG 0
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include "base.h"
@@ -28,34 +30,21 @@
 int device_suspend(u32 state, u32 level)
 {
 	struct list_head * node;
-	struct device * prev = NULL;
 	int error = 0;
 
-	if(level == SUSPEND_POWER_DOWN)
-		printk(KERN_EMERG "Shutting down devices\n");
-	else
-		printk(KERN_EMERG "Suspending devices\n");
+	printk(KERN_EMERG "Suspending devices\n");
 
-	spin_lock(&device_lock);
+	down(&device_sem);
 	list_for_each(node,&global_device_list) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			spin_unlock(&device_lock);
-			if(dev->driver) {
-				if(level == SUSPEND_POWER_DOWN) {
-				       	if(dev->driver->remove)
-						dev->driver->remove(dev);
-				} else if(dev->driver->suspend) 
-					error = dev->driver->suspend(dev,state,level);
-			}
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
+		struct device * dev = to_dev(node);
+		if (device_present(dev) && dev->driver && dev->driver->suspend) {
+			pr_debug("suspending device %s\n",dev->name);
+			error = dev->driver->suspend(dev,state,level);
+			if (error)
+				printk(KERN_ERR "%s: suspend returned %d\n",dev->name,error);
 		}
 	}
-	spin_unlock(&device_lock);
-
+	up(&device_sem);
 	return error;
 }
 
@@ -70,33 +59,38 @@ int device_suspend(u32 state, u32 level)
 void device_resume(u32 level)
 {
 	struct list_head * node;
-	struct device * prev = NULL;
 
-	spin_lock(&device_lock);
+	down(&device_sem);
 	list_for_each_prev(node,&global_device_list) {
-		struct device * dev = get_device_locked(to_dev(node));
-		if (dev) {
-			spin_unlock(&device_lock);
-			if (dev->driver && dev->driver->resume)
-				dev->driver->resume(dev,level);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			spin_lock(&device_lock);
+		struct device * dev = to_dev(node);
+		if (device_present(dev) && dev->driver && dev->driver->resume) {
+			pr_debug("resuming device %s\n",dev->name);
+			dev->driver->resume(dev,level);
 		}
 	}
-	spin_unlock(&device_lock);
+	up(&device_sem);
 
 	printk(KERN_EMERG "Devices Resumed\n");
 }
 
 /**
- * device_shutdown - call device_suspend with status set to shutdown, to 
- * cause all devices to remove themselves cleanly 
+ * device_shutdown - call ->remove() on each device to shutdown. 
  */
 void device_shutdown(void)
 {
-	device_suspend(4, SUSPEND_POWER_DOWN);
+	struct list_head * entry;
+	
+	printk(KERN_EMERG "Shutting down devices\n");
+
+	down(&device_sem);
+	list_for_each(entry,&global_device_list) {
+		struct device * dev = to_dev(entry);
+		if (device_present(dev) && dev->driver && dev->driver->shutdown) {
+			pr_debug("shutting down %s\n",dev->name);
+			dev->driver->shutdown(dev);
+		}
+	}
+	up(&device_sem);
 }
 
 EXPORT_SYMBOL(device_suspend);

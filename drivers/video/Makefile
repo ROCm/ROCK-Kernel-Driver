@@ -119,6 +119,9 @@ obj-$(CONFIG_FBCON_HGA)           += fbcon-hga.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 obj-$(CONFIG_FBCON_ACCEL)	  += fbcon-accel.o
 
+# Files generated that shall be removed upon make clean
+clean-files := promcon_tbl.c
+
 include $(TOPDIR)/Rules.make
 
 $(obj)/promcon_tbl.c: $(src)/prom.uni

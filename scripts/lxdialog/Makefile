@@ -42,6 +42,3 @@ ncurses:
 		echo ;\
 		exit 1 ;\
 	fi
-
-mrproper:
-	@rm -f $(host-progs) $(addprefix $(obj)/,$(lxdialog-objs))

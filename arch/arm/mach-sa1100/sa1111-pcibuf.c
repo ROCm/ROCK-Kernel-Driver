@@ -61,8 +61,7 @@ create_safe_buffer_pools(void)
 					    SA1111_FAKE_PCIDEV,
 					    SIZE_SMALL,
 					    0 /* byte alignment */,
-					    0 /* no page-crossing issues */,
-					    SLAB_KERNEL);
+					    0 /* no page-crossing issues */);
 	if (0 == small_buffer_pool) {
 		printk(KERN_ERR
 		       "sa1111_pcibuf: could not allocate small pci pool\n");
@@ -73,8 +72,7 @@ create_safe_buffer_pools(void)
 					    SA1111_FAKE_PCIDEV,
 					    SIZE_LARGE,
 					    0 /* byte alignment */,
-					    0 /* no page-crossing issues */,
-					    SLAB_KERNEL);
+					    0 /* no page-crossing issues */);
 	if (0 == large_buffer_pool) {
 		printk(KERN_ERR
 		       "sa1111_pcibuf: could not allocate large pci pool\n");

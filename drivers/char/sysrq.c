@@ -349,8 +349,8 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* 8 */	&sysrq_loglevel_op,
 /* 9 */	&sysrq_loglevel_op,
 /* a */	NULL, /* Don't use for system provided sysrqs,
-		 it is handled specially on the spark
-		 and will never arive */
+		 it is handled specially on the sparc
+		 and will never arrive */
 /* b */	&sysrq_reboot_op,
 /* c */	NULL,
 /* d */	NULL,

@@ -213,9 +213,7 @@ int fcal_proc_info (char *buffer, char **start, off_t offset, int length, int ho
 	char *pos = buffer;
 	int i, j;
 
-	for (host=scsi_hostlist; host; host=host->next)
-		if (host->host_no == hostno)
-                      break;
+	host = scsi_host_hn_get(hostno);
 
 	if (!host) return -ESRCH;
 

@@ -43,6 +43,6 @@ obj-$(CONFIG_CPU_26) += uaccess-armo.o
 
 include $(TOPDIR)/Rules.make
 
-csumpartialcopy.o: csumpartialcopygeneric.S
-csumpartialcopyuser.o: csumpartialcopygeneric.S
+$(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
+$(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
 

@@ -65,7 +65,6 @@ static int multicast_filter_limit = 64;
    e.g. "options=16" for FD, "options=32" for 100mbps-only. */
 static int full_duplex[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int debug = -1;			/* The debug level */
 
 /* A few values that may be tweaked. */
 /* The ring sizes should be a power of two for efficiency. */
@@ -119,6 +118,16 @@ static int debug = -1;			/* The debug level */
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
+#include <linux/mii.h>
+
+static int debug = -1;
+#define DEBUG_DEFAULT		(NETIF_MSG_DRV		| \
+				 NETIF_MSG_IFDOWN	| \
+				 NETIF_MSG_IFUP		| \
+				 NETIF_MSG_RX_ERR	| \
+				 NETIF_MSG_TX_ERR)
+#define DEBUG			((debug >= 0) ? (1<<debug)-1 : DEBUG_DEFAULT)
+
 
 MODULE_AUTHOR("Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>");
 MODULE_DESCRIPTION("Intel i82557/i82558/i82559 PCI EtherExpressPro driver");
@@ -167,7 +176,6 @@ static inline int null_set_power_state(struct pci_dev *dev, int state)
 								} while(0)
 
 
-static int speedo_debug = 1;
 
 /*
 				Theory of Operation
@@ -316,23 +324,11 @@ static inline void io_outw(unsigned int val, unsigned long port)
 #define outl writel
 #endif
 
-/* How to wait for the command unit to accept a command.
-   Typically this takes 0 ticks. */
-static inline void wait_for_cmd_done(long cmd_ioaddr)
-{
-	int wait = 1000;
-	do  udelay(1) ;
-	while(inb(cmd_ioaddr) && --wait >= 0);
-#ifndef final_version
-	if (wait < 0)
-		printk(KERN_ALERT "eepro100: wait_for_cmd_done timeout!\n");
-#endif
-}
-
 /* Offsets to the various registers.
    All accesses need not be longword aligned. */
 enum speedo_offsets {
 	SCBStatus = 0, SCBCmd = 2,	/* Rx/Command Unit command and status. */
+	SCBIntmask = 3,
 	SCBPointer = 4,				/* General purpose pointer. */
 	SCBPort = 8,				/* Misc. commands and operands.  */
 	SCBflash = 12, SCBeeprom = 14, /* EEPROM and flash memory control. */
@@ -488,7 +484,6 @@ struct speedo_private {
 	unsigned char acpi_pwr;
 	signed char rx_mode;			/* Current PROMISC/ALLMULTI setting. */
 	unsigned int tx_full:1;			/* The Tx queue is full. */
-	unsigned int full_duplex:1;		/* Full-duplex operation requested. */
 	unsigned int flow_ctrl:1;		/* Use 802.3x flow control. */
 	unsigned int rx_bug:1;			/* Work around receiver hang errata. */
 	unsigned char default_port:8;		/* Last dev->if_port value. */
@@ -496,6 +491,7 @@ struct speedo_private {
 	unsigned short phy[2];			/* PHY media interfaces available. */
 	unsigned short partner;			/* Link partner caps. */
 	struct mii_if_info mii_if;		/* MII API hooks, info */
+	u32 msg_enable;				/* debug message level */
 #ifdef CONFIG_PM
 	u32 pm_state[16];
 #endif
@@ -559,6 +555,26 @@ static int mii_ctrl[8] = { 0x3300, 0x3100, 0x0000, 0x0100,
 						   0x2000, 0x2100, 0x0400, 0x3100};
 #endif
 
+/* How to wait for the command unit to accept a command.
+   Typically this takes 0 ticks. */
+static inline unsigned char wait_for_cmd_done(struct net_device *dev)
+{
+	int wait = 1000;
+	long cmd_ioaddr = dev->base_addr + SCBCmd;
+	unsigned char r;
+
+	do  {
+		udelay(1);
+		r = inb(cmd_ioaddr);
+	} while(r && --wait >= 0);
+
+#ifndef final_version
+	if (wait < 0)
+		printk(KERN_ALERT "%s: wait_for_cmd_done timeout!\n", dev->name);
+#endif
+	return r;
+}
+
 static int __devinit eepro100_init_one (struct pci_dev *pdev,
 		const struct pci_device_id *ent)
 {
@@ -567,9 +583,12 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 	int acpi_idle_state = 0, pm;
 	static int cards_found /* = 0 */;
 
-	static int did_version /* = 0 */;		/* Already printed version info. */
-	if (speedo_debug > 0  &&  did_version++ == 0)
+#ifndef MODULE
+	/* when built-in, we only print version if device is found */
+	static int did_version;
+	if (did_version++ == 0)
 		printk(version);
+#endif
 
 	/* save power state before pci_enable_device overwrites it */
 	pm = pci_find_capability(pdev, PCI_CAP_ID_PM);
@@ -598,7 +617,7 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 	irq = pdev->irq;
 #ifdef USE_IO
 	ioaddr = pci_resource_start(pdev, 1);
-	if (speedo_debug > 2)
+	if (DEBUG & NETIF_MSG_PROBE)
 		printk("Found Intel i82557 PCI Speedo at I/O %#lx, IRQ %d.\n",
 			   ioaddr, irq);
 #else
@@ -609,7 +628,7 @@ static int __devinit eepro100_init_one (struct pci_dev *pdev,
 				pci_resource_len(pdev, 0), pci_resource_start(pdev, 0));
 		goto err_out_free_mmio_region;
 	}
-	if (speedo_debug > 2)
+	if (DEBUG & NETIF_MSG_PROBE)
 		printk("Found Intel i82557 PCI Speedo, MMIO at %#lx, IRQ %d.\n",
 			   pci_resource_start(pdev, 0), irq);
 #endif
@@ -815,6 +834,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 
 	sp = dev->priv;
 	sp->pdev = pdev;
+	sp->msg_enable = DEBUG;
 	sp->acpi_pwr = acpi_idle_state;
 	sp->tx_ring = tx_ring_space;
 	sp->tx_ring_dma = tx_ring_dma;
@@ -960,7 +980,7 @@ speedo_open(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int retval;
 
-	if (speedo_debug > 1)
+	if (netif_msg_ifup(sp))
 		printk(KERN_DEBUG "%s: speedo_open() irq %d.\n", dev->name, dev->irq);
 
 	pci_set_power_state(sp->pdev, 0);
@@ -1017,12 +1037,9 @@ speedo_open(struct net_device *dev)
 	if ((sp->phy[0] & 0x8000) == 0)
 		sp->mii_if.advertising = mdio_read(dev, sp->phy[0] & 0x1f, MII_ADVERTISE);
 
-	if (mdio_read(dev, sp->phy[0] & 0x1f, MII_BMSR) & BMSR_LSTATUS)
-		netif_carrier_on(dev);
-	else
-		netif_carrier_off(dev);
+	mii_check_link(&sp->mii_if);
 
-	if (speedo_debug > 2) {
+	if (netif_msg_ifup(sp)) {
 		printk(KERN_DEBUG "%s: Done speedo_open(), status %8.8x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
 	}
@@ -1054,8 +1071,7 @@ static void speedo_resume(struct net_device *dev)
 	sp->tx_threshold = 0x01208000;
 
 	/* Set the segment registers to '0'. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	if (inb(ioaddr + SCBCmd)) {
+	if (wait_for_cmd_done(dev) != 0) {
 		outl(PortPartialReset, ioaddr + SCBPort);
 		udelay(10);
 	}
@@ -1074,10 +1090,10 @@ static void speedo_resume(struct net_device *dev)
 
 	outb(CUStatsAddr, ioaddr + SCBCmd);
 	sp->lstats->done_marker = 0;
-	wait_for_cmd_done(ioaddr + SCBCmd);
+	wait_for_cmd_done(dev);
 
 	if (sp->rx_ringp[sp->cur_rx % RX_RING_SIZE] == NULL) {
-		if (speedo_debug > 2)
+		if (netif_msg_rx_err(sp))
 			printk(KERN_DEBUG "%s: NULL cur_rx in speedo_resume().\n",
 					dev->name);
 	} else {
@@ -1133,8 +1149,7 @@ speedo_rx_soft_reset(struct net_device *dev)
 	long ioaddr;
 
 	ioaddr = dev->base_addr;
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	if (inb(ioaddr + SCBCmd) != 0) {
+	if (wait_for_cmd_done(dev) != 0) {
 		printk("%s: previous command stalled\n", dev->name);
 		return;
 	}
@@ -1147,9 +1162,7 @@ speedo_rx_soft_reset(struct net_device *dev)
 
 	rfd->rx_buf_addr = 0xffffffff;
 
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	if (inb(ioaddr + SCBCmd) != 0) {
+	if (wait_for_cmd_done(dev) != 0) {
 		printk("%s: RxAbort command stalled\n", dev->name);
 		return;
 	}
@@ -1172,7 +1185,7 @@ static void speedo_timer(unsigned long data)
 		int partner = mdio_read(dev, phy_num, MII_LPA);
 		if (partner != sp->partner) {
 			int flow_ctrl = sp->mii_if.advertising & partner & 0x0400 ? 1 : 0;
-			if (speedo_debug > 2) {
+			if (netif_msg_link(sp)) {
 				printk(KERN_DEBUG "%s: Link status change.\n", dev->name);
 				printk(KERN_DEBUG "%s: Old partner %x, new %x, adv %x.\n",
 					   dev->name, sp->partner, partner, sp->mii_if.advertising);
@@ -1182,16 +1195,10 @@ static void speedo_timer(unsigned long data)
 				sp->flow_ctrl = flow_ctrl;
 				sp->rx_mode = -1;	/* Trigger a reload. */
 			}
-			/* Clear sticky bit. */
-			mdio_read(dev, phy_num, MII_BMSR);
-			/* If link beat has returned... */
-			if (mdio_read(dev, phy_num, MII_BMSR) & BMSR_LSTATUS)
-				netif_carrier_on(dev);
-			else
-				netif_carrier_off(dev);
 		}
 	}
-	if (speedo_debug > 3) {
+	mii_check_link(&sp->mii_if);
+	if (netif_msg_timer(sp)) {
 		printk(KERN_DEBUG "%s: Media control tick, status %4.4x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
 	}
@@ -1200,7 +1207,7 @@ static void speedo_timer(unsigned long data)
 		/* We haven't received a packet in a Long Time.  We might have been
 		   bitten by the receiver hang bug.  This can be cleared by sending
 		   a set multicast list command. */
-		if (speedo_debug > 3)
+		if (netif_msg_rx_err(sp))
 			printk(KERN_DEBUG "%s: Sending a multicast list set command"
 				   " from a timer routine,"
 				   " m=%d, j=%ld, l=%ld.\n",
@@ -1218,20 +1225,17 @@ static void speedo_show_state(struct net_device *dev)
 	int i;
 
 	/* Print a few items for debugging. */
-	if (speedo_debug > 0) {
-		int i;
-		printk(KERN_DEBUG "%s: Tx ring dump,  Tx queue %u / %u:\n", dev->name,
-			   sp->cur_tx, sp->dirty_tx);
-		for (i = 0; i < TX_RING_SIZE; i++)
-			printk(KERN_DEBUG "%s:  %c%c%2d %8.8x.\n", dev->name,
-				   i == sp->dirty_tx % TX_RING_SIZE ? '*' : ' ',
-				   i == sp->cur_tx % TX_RING_SIZE ? '=' : ' ',
-				   i, sp->tx_ring[i].status);
-	}
+	printk(KERN_DEBUG "%s: Tx ring dump,  Tx queue %u / %u:\n", dev->name,
+		   sp->cur_tx, sp->dirty_tx);
+	for (i = 0; i < TX_RING_SIZE; i++)
+		printk(KERN_DEBUG "%s:  %c%c%2d %8.8x.\n", dev->name,
+			   i == sp->dirty_tx % TX_RING_SIZE ? '*' : ' ',
+			   i == sp->cur_tx % TX_RING_SIZE ? '=' : ' ',
+			   i, sp->tx_ring[i].status);
+
 	printk(KERN_DEBUG "%s: Printing Rx ring"
 		   " (next to receive into %u, dirty index %u).\n",
 		   dev->name, sp->cur_rx, sp->dirty_rx);
-
 	for (i = 0; i < RX_RING_SIZE; i++)
 		printk(KERN_DEBUG "%s: %c%c%c%2d %8.8x.\n", dev->name,
 			   sp->rx_ringp[i] == sp->last_rxf ? 'l' : ' ',
@@ -1324,7 +1328,7 @@ static void speedo_purge_tx(struct net_device *dev)
 	}
 	while (sp->mc_setup_head != NULL) {
 		struct speedo_mc_block *t;
-		if (speedo_debug > 1)
+		if (netif_msg_tx_err(sp))
 			printk(KERN_DEBUG "%s: freeing mc frame.\n", dev->name);
 		pci_unmap_single(sp->pdev, sp->mc_setup_head->frame_dma,
 				sp->mc_setup_head->len, PCI_DMA_TODEVICE);
@@ -1367,13 +1371,15 @@ static void speedo_tx_timeout(struct net_device *dev)
 	int status = inw(ioaddr + SCBStatus);
 	unsigned long flags;
 
-	printk(KERN_WARNING "%s: Transmit timed out: status %4.4x "
+	if (netif_msg_tx_err(sp)) {
+		printk(KERN_WARNING "%s: Transmit timed out: status %4.4x "
 		   " %4.4x at %d/%d command %8.8x.\n",
 		   dev->name, status, inw(ioaddr + SCBCmd),
 		   sp->dirty_tx, sp->cur_tx,
 		   sp->tx_ring[sp->dirty_tx % TX_RING_SIZE].status);
 
-	speedo_show_state(dev);
+		speedo_show_state(dev);
+	}
 #if 0
 	if ((status & 0x00C0) != 0x0080
 		&&  (status & 0x003C) == 0x0010) {
@@ -1462,13 +1468,13 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* workaround for hardware bug on 10 mbit half duplex */
 
 	if ((sp->partner == 0) && (sp->chip_id == 1)) {
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		outb(0 , ioaddr + SCBCmd);
 		udelay(1);
 	}
 
 	/* Trigger the command unit resume. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
+	wait_for_cmd_done(dev);
 	clear_suspend(sp->last_cmd);
 	/* We want the time window between clearing suspend flag on the previous
 	   command and resuming CU to be as small as possible.
@@ -1500,14 +1506,14 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 		int entry = dirty_tx % TX_RING_SIZE;
 		int status = le32_to_cpu(sp->tx_ring[entry].status);
 
-		if (speedo_debug > 5)
+		if (netif_msg_tx_done(sp))
 			printk(KERN_DEBUG " scavenge candidate %d status %4.4x.\n",
 				   entry, status);
 		if ((status & StatusComplete) == 0)
 			break;			/* It still hasn't been processed. */
 		if (status & TxUnderrun)
 			if (sp->tx_threshold < 0x01e08000) {
-				if (speedo_debug > 2)
+				if (netif_msg_tx_err(sp))
 					printk(KERN_DEBUG "%s: TX underrun, threshold adjusted.\n",
 						   dev->name);
 				sp->tx_threshold += 0x00040000;
@@ -1525,7 +1531,7 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 		dirty_tx++;
 	}
 
-	if (speedo_debug && (int)(sp->cur_tx - dirty_tx) > TX_RING_SIZE) {
+	if (netif_msg_tx_err(sp) && (int)(sp->cur_tx - dirty_tx) > TX_RING_SIZE) {
 		printk(KERN_ERR "out-of-sync dirty pointer, %d vs. %d,"
 			   " full=%d.\n",
 			   dirty_tx, sp->cur_tx, sp->tx_full);
@@ -1535,7 +1541,7 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 	while (sp->mc_setup_head != NULL
 		   && (int)(dirty_tx - sp->mc_setup_head->tx - 1) > 0) {
 		struct speedo_mc_block *t;
-		if (speedo_debug > 1)
+		if (netif_msg_tx_err(sp))
 			printk(KERN_DEBUG "%s: freeing mc frame.\n", dev->name);
 		pci_unmap_single(sp->pdev, sp->mc_setup_head->frame_dma,
 				sp->mc_setup_head->len, PCI_DMA_TODEVICE);
@@ -1585,7 +1591,7 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		   FCP and ER interrupts --Dragan */
 		outw(status & 0xfc00, ioaddr + SCBStatus);
 
-		if (speedo_debug > 4)
+		if (netif_msg_intr(sp))
 			printk(KERN_DEBUG "%s: interrupt  status=%#4.4x.\n",
 				   dev->name, status);
 
@@ -1647,7 +1653,7 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		}
 	} while (1);
 
-	if (speedo_debug > 3)
+	if (netif_msg_intr(sp))
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
 
@@ -1708,7 +1714,7 @@ static int speedo_refill_rx_buf(struct net_device *dev, int force)
 		if (rxf == NULL) {
 			unsigned int forw;
 			int forw_entry;
-			if (speedo_debug > 2 || !(sp->rx_ring_state & RrOOMReported)) {
+			if (netif_msg_rx_err(sp) || !(sp->rx_ring_state & RrOOMReported)) {
 				printk(KERN_WARNING "%s: can't fill rx buffer (force %d)!\n",
 						dev->name, force);
 				speedo_show_state(dev);
@@ -1754,8 +1760,9 @@ speedo_rx(struct net_device *dev)
 	int entry = sp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = sp->dirty_rx + RX_RING_SIZE - sp->cur_rx;
 	int alloc_ok = 1;
+	int npkts = 0;
 
-	if (speedo_debug > 4)
+	if (netif_msg_intr(sp))
 		printk(KERN_DEBUG " In speedo_rx().\n");
 	/* If we own the next entry, it's a new packet. Send it up. */
 	while (sp->rx_ringp[entry] != NULL) {
@@ -1778,14 +1785,14 @@ speedo_rx(struct net_device *dev)
 		if (sp->last_rxf == sp->rx_ringp[entry]) {
 			/* Postpone the packet.  It'll be reaped at an interrupt when this
 			   packet is no longer the last packet in the ring. */
-			if (speedo_debug > 2)
+			if (netif_msg_rx_err(sp))
 				printk(KERN_DEBUG "%s: RX packet postponed!\n",
 					   dev->name);
 			sp->rx_ring_state |= RrPostponed;
 			break;
 		}
 
-		if (speedo_debug > 4)
+		if (netif_msg_intr(sp))
 			printk(KERN_DEBUG "  speedo_rx() status %8.8x len %d.\n", status,
 				   pkt_len);
 		if ((status & (RxErrTooBig|RxOK|0x0f90)) != RxOK) {
@@ -1820,6 +1827,7 @@ speedo_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), sp->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				npkts++;
 			} else {
 				/* Pass up the already-filled skbuff. */
 				skb = sp->rx_skbuff[entry];
@@ -1830,6 +1838,7 @@ speedo_rx(struct net_device *dev)
 				}
 				sp->rx_skbuff[entry] = NULL;
 				skb_put(skb, pkt_len);
+				npkts++;
 				sp->rx_ringp[entry] = NULL;
 				pci_unmap_single(sp->pdev, sp->rx_ring_dma[entry],
 						PKT_BUF_SZ + sizeof(struct RxFD), PCI_DMA_FROMDEVICE);
@@ -1851,7 +1860,8 @@ speedo_rx(struct net_device *dev)
 	/* Try hard to refill the recently taken buffers. */
 	speedo_refill_rx_buffers(dev, 1);
 
-	sp->last_rx_time = jiffies;
+	if (npkts)
+		sp->last_rx_time = jiffies;
 
 	return 0;
 }
@@ -1866,20 +1876,27 @@ speedo_close(struct net_device *dev)
 	netdevice_stop(dev);
 	netif_stop_queue(dev);
 
-	if (speedo_debug > 1)
+	if (netif_msg_ifdown(sp))
 		printk(KERN_DEBUG "%s: Shutting down ethercard, status was %4.4x.\n",
 			   dev->name, inw(ioaddr + SCBStatus));
 
 	/* Shut off the media monitoring timer. */
 	del_timer_sync(&sp->timer);
 
+	outw(SCBMaskAll, ioaddr + SCBCmd);
+
 	/* Shutting down the chip nicely fails to disable flow control. So.. */
 	outl(PortPartialReset, ioaddr + SCBPort);
+	inl(ioaddr + SCBPort); /* flush posted write */
+	/*
+	 * The chip requires a 10 microsecond quiet period.  Wait here!
+	 */
+	udelay(10);
 
 	free_irq(dev->irq, dev);
 
 	/* Print a few items for debugging. */
-	if (speedo_debug > 3)
+	if (netif_msg_ifdown(sp))
 		speedo_show_state(dev);
 
     /* Free all the skbuffs in the Rx and Tx queues. */
@@ -1915,7 +1932,7 @@ speedo_close(struct net_device *dev)
 		sp->mc_setup_head = t;
 	}
 	sp->mc_setup_tail = NULL;
-	if (speedo_debug > 0)
+	if (netif_msg_ifdown(sp))
 		printk(KERN_DEBUG "%s: %d multicast blocks dropped.\n", dev->name, i);
 
 	pci_set_power_state(sp->pdev, 2);
@@ -1956,7 +1973,7 @@ speedo_get_stats(struct net_device *dev)
 			/* Take a spinlock to make wait_for_cmd_done and sending the
 			   command atomic.  --SAW */
 			spin_lock_irqsave(&sp->lock, flags);
-			wait_for_cmd_done(ioaddr + SCBCmd);
+			wait_for_cmd_done(dev);
 			outb(CUDumpStats, ioaddr + SCBCmd);
 			spin_unlock_irqrestore(&sp->lock, flags);
 		}
@@ -2016,6 +2033,22 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		edata.data = mii_link_ok(&sp->mii_if);
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
+		return 0;
+	}
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = sp->msg_enable;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		sp->msg_enable = edata.data;
 		return 0;
 	}
 
@@ -2092,7 +2125,7 @@ static void set_rx_mode(struct net_device *dev)
 	} else
 		new_rx_mode = 0;
 
-	if (speedo_debug > 3)
+	if (netif_msg_rx_status(sp))
 		printk(KERN_DEBUG "%s: set_rx_mode %d -> %d\n", dev->name,
 				sp->rx_mode, new_rx_mode);
 
@@ -2133,7 +2166,7 @@ static void set_rx_mode(struct net_device *dev)
 			config_cmd_data[8] = 0;
 		}
 		/* Trigger the command unit resume. */
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		outb(CUResume, ioaddr + SCBCmd);
 		if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
@@ -2170,7 +2203,7 @@ static void set_rx_mode(struct net_device *dev)
 			*setup_params++ = *eaddrs++;
 		}
 
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		/* Immediately trigger the command unit resume. */
 		outb(CUResume, ioaddr + SCBCmd);
@@ -2203,7 +2236,7 @@ static void set_rx_mode(struct net_device *dev)
 		mc_setup_frm = &mc_blk->frame;
 
 		/* Fill the setup frame. */
-		if (speedo_debug > 1)
+		if (netif_msg_ifup(sp))
 			printk(KERN_DEBUG "%s: Constructing a setup frame at %p.\n",
 				   dev->name, mc_setup_frm);
 		mc_setup_frm->cmd_status =
@@ -2246,7 +2279,7 @@ static void set_rx_mode(struct net_device *dev)
 		pci_dma_sync_single(sp->pdev, mc_blk->frame_dma,
 				mc_blk->len, PCI_DMA_TODEVICE);
 
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		/* Immediately trigger the command unit resume. */
 		outb(CUResume, ioaddr + SCBCmd);
@@ -2257,7 +2290,7 @@ static void set_rx_mode(struct net_device *dev)
 		}
 		spin_unlock_irqrestore(&sp->lock, flags);
 
-		if (speedo_debug > 5)
+		if (netif_msg_rx_status(sp))
 			printk(" CmdMCSetup frame length %d in entry %d.\n",
 				   dev->mc_count, entry);
 	}
@@ -2400,11 +2433,9 @@ static int pci_module_init(struct pci_driver *pdev)
 
 static int __init eepro100_init_module(void)
 {
-	if (debug >= 0 && speedo_debug != debug)
-		printk(KERN_INFO "eepro100.c: Debug level is %d.\n", debug);
-	if (debug >= 0)
-		speedo_debug = debug;
-
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init(&eepro100_driver);
 }
 

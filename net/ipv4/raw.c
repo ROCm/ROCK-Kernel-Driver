@@ -64,6 +64,7 @@
 #include <net/raw.h>
 #include <net/inet_common.h>
 #include <net/checksum.h>
+#include <linux/netfilter.h>
 
 struct sock *raw_v4_htable[RAWV4_HTABLE_SIZE];
 rwlock_t raw_v4_lock = RW_LOCK_UNLOCKED;
@@ -243,59 +244,71 @@ int raw_rcv(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-struct rawfakehdr 
+static int raw_send_hdrinc(struct sock *sk, void *from, int length,
+			struct rtable *rt, 
+			unsigned int flags)
 {
-	struct	iovec *iov;
-	u32	saddr;
-	struct	dst_entry *dst;
-};
+	struct inet_opt *inet = inet_sk(sk);
+	int hh_len;
+	struct iphdr *iph;
+	struct sk_buff *skb;
+	int err;
 
-/*
- *	Send a RAW IP packet.
- */
+	if (length > rt->u.dst.dev->mtu) {
+		ip_local_error(sk, EMSGSIZE, rt->rt_dst, inet->dport,
+			       rt->u.dst.dev->mtu);
+		return -EMSGSIZE;
+	}
+	if (flags&MSG_PROBE)
+		goto out;
 
-/*
- *	Callback support is trivial for SOCK_RAW
- */
-  
-static int raw_getfrag(const void *p, char *to, unsigned int offset,
-			unsigned int fraglen, struct sk_buff *skb)
-{
-	struct rawfakehdr *rfh = (struct rawfakehdr *) p;
-	skb->ip_summed = CHECKSUM_NONE; /* Is there any good place to set it? */
-	return memcpy_fromiovecend(to, rfh->iov, offset, fraglen);
-}
+	hh_len = (rt->u.dst.dev->hard_header_len&~15) + 16;
 
-/*
- *	IPPROTO_RAW needs extra work.
- */
- 
-static int raw_getrawfrag(const void *p, char *to, unsigned int offset,
-				unsigned int fraglen, struct sk_buff *skb)
-{
-	struct rawfakehdr *rfh = (struct rawfakehdr *) p;
+	skb = sock_alloc_send_skb(sk, length+hh_len+15,
+				  flags&MSG_DONTWAIT, &err);
+	if (skb == NULL)
+		goto error; 
+	skb_reserve(skb, hh_len);
 
-	skb->ip_summed = CHECKSUM_NONE; /* Is there any good place to set it? */
+	skb->priority = sk->priority;
+	skb->dst = dst_clone(&rt->u.dst);
 
-	if (memcpy_fromiovecend(to, rfh->iov, offset, fraglen))
-		return -EFAULT;
+	skb->nh.iph = iph = (struct iphdr *)skb_put(skb, length);
 
-	if (!offset) {
-		struct iphdr *iph = (struct iphdr *)to;
+	skb->ip_summed = CHECKSUM_NONE;
+
+	skb->h.raw = skb->nh.raw;
+	err = memcpy_fromiovecend((void *)iph, from, 0, length);
+	if (err)
+		goto error_fault;
+
+	/* We don't modify invalid header */
+	if (length >= sizeof(*iph) && iph->ihl * 4 <= length) {
 		if (!iph->saddr)
-			iph->saddr = rfh->saddr;
+			iph->saddr = rt->rt_src;
 		iph->check   = 0;
-		iph->tot_len = htons(fraglen); /* This is right as you can't
-						  frag RAW packets */
-		/*
-	 	 *	Deliberate breach of modularity to keep 
-	 	 *	ip_build_xmit clean (well less messy).
-		 */
+		iph->tot_len = htons(length);
 		if (!iph->id)
-			ip_select_ident(iph, rfh->dst, NULL);
+			ip_select_ident(iph, &rt->u.dst, NULL);
+
 		iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
 	}
+
+	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
+		      dst_output);
+	if (err > 0)
+		err = inet->recverr ? net_xmit_errno(err) : 0;
+	if (err)
+		goto error;
+out:
 	return 0;
+
+error_fault:
+	err = -EFAULT;
+	kfree_skb(skb);
+error:
+	IP_INC_STATS(IpOutDiscards);
+	return err; 
 }
 
 static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
@@ -303,10 +316,10 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
-	struct rawfakehdr rfh;
 	struct rtable *rt = NULL;
 	int free = 0;
 	u32 daddr;
+	u32 saddr;
 	u8  tos;
 	int err;
 
@@ -376,7 +389,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			free = 1;
 	}
 
-	rfh.saddr = ipc.addr;
+	saddr = ipc.addr;
 	ipc.addr = daddr;
 
 	if (!ipc.opt)
@@ -402,14 +415,14 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	if (MULTICAST(daddr)) {
 		if (!ipc.oif)
 			ipc.oif = inet->mc_index;
-		if (!rfh.saddr)
-			rfh.saddr = inet->mc_addr;
+		if (!saddr)
+			saddr = inet->mc_addr;
 	}
 
 	{
 		struct flowi fl = { .nl_u = { .ip4_u =
 					      { .daddr = daddr,
-						.saddr = rfh.saddr,
+						.saddr = saddr,
 						.tos = tos } },
 				    .oif = ipc.oif };
 		err = ip_route_output_key(&rt, &fl);
@@ -425,14 +438,22 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		goto do_confirm;
 back_from_confirm:
 
-	rfh.iov		= msg->msg_iov;
-	rfh.saddr	= rt->rt_src;
-	rfh.dst		= &rt->u.dst;
-	if (!ipc.addr)
-		ipc.addr = rt->rt_dst;
-	err = ip_build_xmit(sk, inet->hdrincl ? raw_getrawfrag :
-		       	    raw_getfrag, &rfh, len, &ipc, rt, msg->msg_flags);
-
+	if (inet->hdrincl)
+		err = raw_send_hdrinc(sk, msg->msg_iov, len, 
+					rt, msg->msg_flags);
+	
+	 else {
+		if (!ipc.addr)
+			ipc.addr = rt->rt_dst;
+		lock_sock(sk);
+		err = ip_append_data(sk, ip_generic_getfrag, msg->msg_iov, len, 0,
+					&ipc, rt, msg->msg_flags);
+		if (err)
+			ip_flush_pending_frames(sk);
+		else if (!(msg->msg_flags & MSG_MORE))
+			err = ip_push_pending_frames(sk);
+		release_sock(sk);
+	}
 done:
 	if (free)
 		kfree(ipc.opt);

@@ -80,7 +80,7 @@ static long madvise_willneed(struct vm_area_struct * vma,
 	if ((vma->vm_mm->rss + (end - start)) > rlim_rss)
 		return error;
 
-	do_page_cache_readahead(file, start, end - start);
+	do_page_cache_readahead(file->f_dentry->d_inode->i_mapping, file, start, end - start);
 	return 0;
 }
 
