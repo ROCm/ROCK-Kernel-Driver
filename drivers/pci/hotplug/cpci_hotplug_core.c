@@ -81,37 +81,6 @@ static struct hotplug_slot_ops cpci_hotplug_slot_ops = {
 	.get_adapter_status = get_adapter_status,
 };
 
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int
-slot_paranoia_check(struct slot *slot, const char *function)
-{
-	if(!slot) {
-		dbg("%s - slot == NULL", function);
-		return -1;
-	}
-	if(!slot->hotplug_slot) {
-		dbg("%s - slot->hotplug_slot == NULL!", function);
-		return -1;
-	}
-	return 0;
-}
-
-static inline struct slot *
-get_slot(struct hotplug_slot *hotplug_slot, const char *function)
-{
-	struct slot *slot;
-
-	if(!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL", function);
-		return NULL;
-	}
-
-	slot = (struct slot *) hotplug_slot->private;
-	if(slot_paranoia_check(slot, function))
-		return NULL;
-	return slot;
-}
-
 static int
 update_latch_status(struct hotplug_slot *hotplug_slot, u8 value)
 {
@@ -135,7 +104,7 @@ update_adapter_status(struct hotplug_slot *hotplug_slot, u8 value)
 static int
 enable_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s", __FUNCTION__, hotplug_slot->name);
@@ -150,7 +119,7 @@ enable_slot(struct hotplug_slot *hotplug_slot)
 static int
 disable_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s", __FUNCTION__, hotplug_slot->name);
@@ -201,7 +170,7 @@ cpci_get_power_status(struct slot *slot)
 static int
 get_power_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 
 	*value = cpci_get_power_status(slot);
 	return 0;
@@ -210,7 +179,7 @@ get_power_status(struct hotplug_slot *hotplug_slot, u8 * value)
 static int
 get_attention_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 
 	*value = cpci_get_attention_status(slot);
 	return 0;
@@ -238,7 +207,7 @@ get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 
 	kfree(slot->hotplug_slot->info);
 	kfree(slot->hotplug_slot->name);
