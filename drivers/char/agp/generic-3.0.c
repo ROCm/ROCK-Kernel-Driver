@@ -393,8 +393,7 @@ static int agp_3_0_node_enable(u32 mode, u32 minor)
 
 		if(mcapndx == 0) {
 			printk(KERN_ERR PFX "woah!  Non-AGP device "
-				"found on the secondary bus of an AGP 3.0 "
-				"bridge!\n");
+				"found on the secondary bus of an AGP 3.0 bridge!\n");
 			ret = -ENODEV;
 			goto free_and_exit;
 		}
@@ -442,9 +441,8 @@ static int agp_3_0_node_enable(u32 mode, u32 minor)
 		rate = 0x2;
 		break;
 	default:
-		printk(KERN_ERR PFX "woah!  Bogus AGP rate "
-			"value found advertised behind an AGP 3.0 "
-			"bridge!\n");
+		printk(KERN_ERR PFX "woah!  Bogus AGP rate (%d) "
+			"value found advertised behind an AGP 3.0 bridge!\n", rate);
 		ret = -ENODEV;
 		goto free_and_exit;
 	}
@@ -455,12 +453,10 @@ static int agp_3_0_node_enable(u32 mode, u32 minor)
 	 * whether isochronous transfers are supported.
 	 */
 	if(isoch != 0) {
-		if((ret = agp_3_0_isochronous_node_enable(dev_list,
-		                                          ndevs)) != 0)
+		if((ret = agp_3_0_isochronous_node_enable(dev_list, ndevs)) != 0)
 			goto free_and_exit;
 	} else {
-		if((ret = agp_3_0_nonisochronous_node_enable(dev_list,
-		                                             ndevs)) != 0)
+		if((ret = agp_3_0_nonisochronous_node_enable(dev_list,ndevs)) != 0)
 			goto free_and_exit;
 	}
 
@@ -534,8 +530,7 @@ int agp_generic_agp_3_0_enable(u32 mode)
 	major = (ncapid >> 20) & 0xf;
 	minor = (ncapid >> 16) & 0xf;
 
-	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",
-		  major, minor);
+	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",major, minor);
 
 	if(major >= 3) {
 		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 0x4, &agp_3_0);

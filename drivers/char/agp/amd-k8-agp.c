@@ -50,8 +50,6 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	u32 pte;
 	u64 addr;
 
-	temp = agp_bridge.current_size;
-
 	num_entries = agp_num_entries();
 
 	if (type != 0 || mem->type != 0)
