@@ -61,6 +61,7 @@ extern unsigned long get_kmem_end(void);
 #define FIXADDR_START	(FIXADDR_TOP - FIXADDR_SIZE)
 
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
+#define __virt_to_fix(x)      ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 
 extern void __this_fixmap_does_not_exist(void);
 
@@ -84,6 +85,12 @@ static inline unsigned long fix_to_virt(const unsigned int idx)
 		__this_fixmap_does_not_exist();
 
         return __fix_to_virt(idx);
+}
+
+static inline unsigned long virt_to_fix(const unsigned long vaddr)
+{
+      BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
+      return __virt_to_fix(vaddr);
 }
 
 #endif
