@@ -210,6 +210,7 @@ static void sis900_set_capability( struct net_device *net_dev ,struct mii_phy *p
 static u16 sis900_reset_phy(struct net_device *net_dev, int phy_addr);
 static void sis900_auto_negotiate(struct net_device *net_dev, int phy_addr);
 static void sis900_set_mode (long ioaddr, int speed, int duplex);
+static struct ethtool_ops sis900_ethtool_ops;
 
 /**
  *	sis900_get_mac_addr - Get MAC address for stand alone SiS900 model
@@ -440,6 +441,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	net_dev->do_ioctl = &mii_ioctl;
 	net_dev->tx_timeout = sis900_tx_timeout;
 	net_dev->watchdog_timeo = TX_TIMEOUT;
+	net_dev->ethtool_ops = &sis900_ethtool_ops;
 	
 	ret = register_netdev(net_dev);
 	if (ret)
@@ -1853,38 +1855,26 @@ sis900_close(struct net_device *net_dev)
 }
 
 /**
- *	netdev_ethtool_ioctl - For the basic support of ethtool
- *	@net_dev: the net device to command for
- *	@useraddr: start address of interface request
+ *	sis900_get_drvinfo - Return information about driver
+ *	@net_dev: the net device to probe
+ *	@info: container for info returned
  *
  *	Process ethtool command such as "ehtool -i" to show information
  */
-
-static int netdev_ethtool_ioctl (struct net_device *net_dev, void *useraddr)
+ 
+static void sis900_get_drvinfo(struct net_device *net_dev,
+			       struct ethtool_drvinfo *info)
 {
  	struct sis900_private *sis_priv = net_dev->priv;
- 	u32 ethcmd;
 
-	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-	
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:
-		{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strcpy (info.driver, SIS900_MODULE_NAME);
-			strcpy (info.version, SIS900_DRV_VERSION);
-			strcpy (info.bus_info, pci_name(sis_priv->pci_dev));
-			if (copy_to_user (useraddr, &info, sizeof (info)))
-				return -EFAULT;
-			return 0;
-		}
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	strcpy (info->driver, SIS900_MODULE_NAME);
+	strcpy (info->version, SIS900_DRV_VERSION);
+	strcpy (info->bus_info, pci_name(sis_priv->pci_dev));
 }
+
+static struct ethtool_ops sis900_ethtool_ops = {
+	.get_drvinfo =		sis900_get_drvinfo,
+};
 
 /**
  *	mii_ioctl - process MII i/o control command 
@@ -1901,9 +1891,6 @@ static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(net_dev, (void *) rq->ifr_data);
-
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = sis_priv->mii->phy_addr;
 		/* Fall Through */
