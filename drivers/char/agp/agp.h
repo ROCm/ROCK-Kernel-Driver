@@ -139,6 +139,8 @@ struct agp_bridge_data {
 	int max_memory_agp;	/* in number of pages */
 	int aperture_size_idx;
 	int capndx;
+	char major_version;
+	char minor_version;
 };
 
 #define OUTREG64(mmap, addr, val)	__raw_writeq((val), (mmap)+(addr))
@@ -388,27 +390,38 @@ void agp_free_key(int key);
 int agp_num_entries(void);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
-int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor);
+int agp_3_0_enable(struct agp_bridge_data *bridge, u32 mode);
+int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode);
 void global_cache_flush(void);
+void get_agp_version(struct agp_bridge_data *bridge);
 
 /* Standard agp registers */
 #define AGPSTAT			0x4
 #define AGPCMD			0x8
+#define AGPNISTAT		0xc
 #define AGPNEPG			0x16
+#define AGPNICMD		0x20
 
 #define AGP_MAJOR_VERSION_SHIFT	(20)
 #define AGP_MINOR_VERSION_SHIFT	(16)
 
 #define AGPSTAT_RQ_DEPTH	(0xff000000)
 
+#define AGPSTAT_CAL_MASK	(1<<12|1<<11|1<<10)
+#define AGPSTAT_ARQSZ		(1<<15|1<<14|1<<13)
 #define AGPSTAT_ARQSZ_SHIFT	13
 
-#define AGPSTAT_AGP_ENABLE	(1<<8)
 #define AGPSTAT_SBA		(1<<9)
+#define AGPSTAT_AGP_ENABLE	(1<<8)
+#define AGPSTAT_FW		(1<<4)
+#define AGPSTAT_MODE_3_0	(1<<3)
 
 #define AGPSTAT2_1X		(1<<0)
 #define AGPSTAT2_2X		(1<<1)
 #define AGPSTAT2_4X		(1<<2)
-#define AGPSTAT_FW		(1<<4)
+
+#define AGPSTAT3_RSVD		(1<<2)
+#define AGPSTAT3_8X		(1<<1)
+#define AGPSTAT3_4X		(1)
 
 #endif				/* _AGP_BACKEND_PRIV_H */
