@@ -111,7 +111,7 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 #define SF( x ) ( r -> x )
 #define SFP( x ) SF( s_proc_info_data.x )
 #define SFPL( x ) SFP( x[ level ] )
-#define SFPF( x ) SFP( find_forward.x )
+#define SFPF( x ) SFP( scan_bitmap.x )
 #define SFPJ( x ) SFP( journal.x )
 
 #define D2C( x ) le16_to_cpu( x )
@@ -184,7 +184,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 			reiserfs_no_unhashed_relocation( sb ) ? "NO_UNHASHED_RELOCATION " : "",
 			reiserfs_hashed_relocation( sb ) ? "UNHASHED_RELOCATION " : "",
 			reiserfs_test4( sb ) ? "TEST4 " : "",
-			dont_have_tails( sb ) ? "NO_TAILS " : "TAILS ",
+			have_large_tails( sb ) ? "TAILS " : have_small_tails(sb)?"SMALL_TAILS ":"NO_TAILS ",
 			replay_only( sb ) ? "REPLAY_ONLY " : "",
 			reiserfs_dont_log( sb ) ? "DONT_LOG " : "LOG ",
 			convert_reiserfs( sb ) ? "CONV " : "",
@@ -314,27 +314,30 @@ int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
 	r = REISERFS_SB(sb);
 
 	len += sprintf( &buffer[ len ], "free_block: %lu\n"
-			"find_forward:"
-			"         wait"
-			"         bmap"
-			"        retry"
-			" journal_hint"
-			"  journal_out"
+			"  scan_bitmap:"
+			"          wait"
+			"          bmap"
+			"         retry"
+			"        stolen"
+			"  journal_hint"
+			"journal_nohint"
 			"\n"
-			" %12lu"
-			" %12lu"
-			" %12lu"
-			" %12lu"
-			" %12lu"
-			" %12lu"
+			" %14lu"
+			" %14lu"
+			" %14lu"
+			" %14lu"
+			" %14lu"
+			" %14lu"
+			" %14lu"
 			"\n",
 			SFP( free_block ),
 			SFPF( call ), 
 			SFPF( wait ), 
 			SFPF( bmap ),
 			SFPF( retry ),
+			SFPF( stolen ),
 			SFPF( in_journal_hint ),
-			SFPF( in_journal_out ) );
+			SFPF( in_journal_nohint ) );
 
 	procinfo_epilogue( sb );
 	return reiserfs_proc_tail( len, buffer, start, offset, count, eof );

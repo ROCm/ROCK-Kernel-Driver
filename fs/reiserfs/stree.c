@@ -1620,9 +1620,9 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     
     do_balance(&s_cut_balance, NULL, NULL, c_mode);
     if ( n_is_inode_locked ) {
-	/* we've done an indirect->direct conversion.  when the data block 
-	** was freed, it was removed from the list of blocks that must 
-	** be flushed before the transaction commits, so we don't need to 
+	/* we've done an indirect->direct conversion.  when the data block
+	** was freed, it was removed from the list of blocks that must
+	** be flushed before the transaction commits, so we don't need to
 	** deal with it here.
 	*/
 	REISERFS_I(p_s_inode)->i_flags &= ~i_pack_on_close_mask ;
@@ -1813,6 +1813,9 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
     int                 retval;
 
     init_tb_struct(th, &s_paste_balance, th->t_super, p_s_search_path, n_pasted_size);
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    s_paste_balance.key = p_s_key->on_disk_key;
+#endif
     
     while ( (retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) == REPEAT_SEARCH ) {
 	/* file system changed while we were in the fix_nodes */
@@ -1823,7 +1826,7 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
 	    goto error_out ;
 	}
 	if (retval == POSITION_FOUND) {
-	    reiserfs_warning ("PAP-5710: reiserfs_paste_into_item: entry or pasted byte (%K) exists", p_s_key);
+	    reiserfs_warning ("PAP-5710: reiserfs_paste_into_item: entry or pasted byte (%K) exists\n", p_s_key);
 	    retval = -EEXIST ;
 	    goto error_out ;
 	}
@@ -1858,6 +1861,9 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
     int                 retval;
 
     init_tb_struct(th, &s_ins_balance, th->t_super, p_s_path, IH_SIZE + ih_item_len(p_s_ih));
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    s_ins_balance.key = key->on_disk_key;
+#endif
 
     /*
     if (p_c_body == 0)
