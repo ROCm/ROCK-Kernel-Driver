@@ -126,7 +126,7 @@ static void ap_cs8427_codec_deassert(ice1712_t *ice, unsigned char tmp)
 /* sequential write */
 static int ap_cs8427_sendbytes(snd_i2c_device_t *device, unsigned char *bytes, int count)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, device->bus->private_data, return -EIO);
+	ice1712_t *ice = device->bus->private_data;
 	int res = count;
 	unsigned char tmp;
 
@@ -143,7 +143,7 @@ static int ap_cs8427_sendbytes(snd_i2c_device_t *device, unsigned char *bytes, i
 /* sequential read */
 static int ap_cs8427_readbytes(snd_i2c_device_t *device, unsigned char *bytes, int count)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, device->bus->private_data, return -EIO);
+	ice1712_t *ice = device->bus->private_data;
 	int res = count;
 	unsigned char tmp;
 	

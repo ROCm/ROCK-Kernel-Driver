@@ -180,8 +180,6 @@ struct snd_vortex {
 	u8 rev;
 };
 
-#define chip_t vortex_t
-
 /* Functions. */
 
 /* SRC */

@@ -152,7 +152,6 @@ MODULE_PARM_SYNTAX(digital_rate, SNDRV_ENABLED);
 /* SYNC, one WRITE per line, one extra WRITE per page boundary, SYNC, JUMP */
 #define MAX_RISC_SIZE ((1 + 255 + (PAGE_ALIGN(255 * 4092) / PAGE_SIZE - 1) + 1 + 1) * 8)
 
-#define chip_t bt87x_t
 typedef struct snd_bt87x bt87x_t;
 struct snd_bt87x {
 	snd_card_t *card;
@@ -251,7 +250,7 @@ static void snd_bt87x_free_risc(bt87x_t *chip)
 
 static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, dev_id, return IRQ_NONE);
+	bt87x_t *chip = dev_id;
 	unsigned int status;
 
 	status = snd_bt87x_readl(chip, REG_INT_STAT);
@@ -661,13 +660,13 @@ static int snd_bt87x_free(bt87x_t *chip)
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_bt87x_dev_free(snd_device_t *device)
 {
-	bt87x_t *chip = snd_magic_cast(bt87x_t, device->device_data, return -ENXIO);
+	bt87x_t *chip = device->device_data;
 	return snd_bt87x_free(chip);
 }
 
@@ -705,7 +704,7 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 	if (err < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(bt87x_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
 	chip->card = card;

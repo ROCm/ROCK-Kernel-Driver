@@ -33,8 +33,6 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
-#define chip_t emu10k1_t
-
 #if 0		/* for testing purposes - digital out -> capture */
 #define EMU10K1_CAPTURE_DIGITAL_OUT
 #endif
@@ -2016,7 +2014,7 @@ static int snd_emu10k1_fx8010_info(emu10k1_t *emu, emu10k1_fx8010_info_t *info)
 
 static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, hw->private_data, return -ENXIO);
+	emu10k1_t *emu = hw->private_data;
 	emu10k1_fx8010_info_t *info;
 	emu10k1_fx8010_code_t *icode;
 	emu10k1_fx8010_pcm_t *ipcm;

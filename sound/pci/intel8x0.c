@@ -400,7 +400,6 @@ typedef struct {
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
-#define chip_t intel8x0_t
 
 struct _snd_intel8x0 {
 	unsigned int device_type;
@@ -609,7 +608,7 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 				     unsigned short reg,
 				     unsigned short val)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 	
 	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_codec_semaphore(chip, ac97->num) < 0) {
@@ -623,7 +622,7 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 					      unsigned short reg)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return ~0);
+	intel8x0_t *chip = ac97->private_data;
 	unsigned short res;
 	unsigned int tmp;
 
@@ -673,7 +672,7 @@ static int snd_intel8x0_ali_codec_semaphore(intel8x0_t *chip)
 
 static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short reg)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return ~0);
+	intel8x0_t *chip = ac97->private_data;
 	unsigned short data = 0xffff;
 
 	spin_lock(&chip->ac97_lock);
@@ -693,7 +692,7 @@ static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short r
 
 static void snd_intel8x0_ali_codec_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 
 	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_ali_codec_semaphore(chip)) {
@@ -826,7 +825,7 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 
 static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return IRQ_NONE);
+	intel8x0_t *chip = dev_id;
 	ichdev_t *ichdev;
 	unsigned int status;
 	unsigned int i;
@@ -1637,13 +1636,13 @@ static int __devinit snd_intel8x0_pcm(intel8x0_t *chip)
 
 static void snd_intel8x0_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, bus->private_data, return);
+	intel8x0_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 	chip->ac97[ac97->num] = NULL;
 }
 
@@ -2208,7 +2207,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
@@ -2218,7 +2217,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
  */
 static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
+	intel8x0_t *chip = card->pm_private_data;
 	int i;
 
 	for (i = 0; i < chip->pcm_devs; i++)
@@ -2233,7 +2232,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 
 static int intel8x0_resume(snd_card_t *card, unsigned int state)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
+	intel8x0_t *chip = card->pm_private_data;
 	int i;
 
 	pci_restore_state(chip->pci, chip->pci_state);
@@ -2356,7 +2355,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 static void snd_intel8x0_proc_read(snd_info_entry_t * entry,
 				   snd_info_buffer_t * buffer)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, entry->private_data, return);
+	intel8x0_t *chip = entry->private_data;
 	unsigned int tmp;
 
 	snd_iprintf(buffer, "Intel8x0\n\n");
@@ -2389,7 +2388,7 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, device->device_data, return -ENXIO);
+	intel8x0_t *chip = device->device_data;
 	return snd_intel8x0_free(chip);
 }
 
@@ -2448,7 +2447,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(intel8x0_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

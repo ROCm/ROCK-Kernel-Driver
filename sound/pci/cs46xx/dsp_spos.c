@@ -462,7 +462,7 @@ symbol_entry_t * cs46xx_dsp_lookup_symbol_addr (cs46xx_t * chip, u32 address, in
 
 static void cs46xx_dsp_proc_symbol_table_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i;
 
@@ -489,7 +489,7 @@ static void cs46xx_dsp_proc_symbol_table_read (snd_info_entry_t *entry, snd_info
 
 static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j;
 
@@ -511,7 +511,7 @@ static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buff
 
 static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j,col;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
@@ -538,7 +538,7 @@ static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_bu
 
 static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i;
 
@@ -570,7 +570,7 @@ static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t
 
 static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	/*dsp_spos_instance_t * ins = chip->dsp_spos_instance; */
 	unsigned int i,col = 0;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
@@ -597,7 +597,7 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 
 static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	int i,col = 0;
 	unsigned long dst = chip->region.idx[2].remap_addr;
 

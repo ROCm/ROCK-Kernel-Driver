@@ -47,8 +47,6 @@ module_param(enable_loopback, bool, 0444);
 MODULE_PARM_DESC(enable_loopback, "Enable AC97 ADC/DAC Loopback Control");
 MODULE_PARM_SYNTAX(enable_loopback, SNDRV_BOOLEAN_FALSE_DESC);
 
-#define chip_t ac97_t
-
 /*
 
  */
@@ -1044,14 +1042,14 @@ static int snd_ac97_bus_free(ac97_bus_t *bus)
 			kfree(bus->pcms);
 		if (bus->private_free)
 			bus->private_free(bus);
-		snd_magic_kfree(bus);
+		kfree(bus);
 	}
 	return 0;
 }
 
 static int snd_ac97_bus_dev_free(snd_device_t *device)
 {
-	ac97_bus_t *bus = snd_magic_cast(ac97_bus_t, device->device_data, return -ENXIO);
+	ac97_bus_t *bus = device->device_data;
 	return snd_ac97_bus_free(bus);
 }
 
@@ -1063,14 +1061,14 @@ static int snd_ac97_free(ac97_t *ac97)
 			ac97->bus->codec[ac97->num] = NULL;
 		if (ac97->private_free)
 			ac97->private_free(ac97);
-		snd_magic_kfree(ac97);
+		kfree(ac97);
 	}
 	return 0;
 }
 
 static int snd_ac97_dev_free(snd_device_t *device)
 {
-	ac97_t *ac97 = snd_magic_cast(ac97_t, device->device_data, return -ENXIO);
+	ac97_t *ac97 = device->device_data;
 	snd_ac97_powerdown(ac97); /* for avoiding click noises during shut down */
 	return snd_ac97_free(ac97);
 }
@@ -1771,7 +1769,7 @@ int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus)
 
 	snd_assert(card != NULL, return -EINVAL);
 	snd_assert(_bus != NULL && rbus != NULL, return -EINVAL);
-	bus = snd_magic_kmalloc(ac97_bus_t, 0, GFP_KERNEL);
+	bus = kmalloc(sizeof(*bus), GFP_KERNEL);
 	if (bus == NULL)
 		return -ENOMEM;
 	*bus = *_bus;
@@ -1826,7 +1824,7 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	snd_assert(bus != NULL && _ac97 != NULL, return -EINVAL);
 	snd_assert(_ac97->num < 4 && bus->codec[_ac97->num] == NULL, return -EINVAL);
 	card = bus->card;
-	ac97 = snd_magic_kmalloc(ac97_t, 0, GFP_KERNEL);
+	ac97 = kmalloc(sizeof(*ac97), GFP_KERNEL);
 	if (ac97 == NULL)
 		return -ENOMEM;
 	*ac97 = *_ac97;

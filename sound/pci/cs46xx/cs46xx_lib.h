@@ -22,8 +22,6 @@
 #ifndef __CS46XX_LIB_H__
 #define __CS46XX_LIB_H__
 
-#define chip_t cs46xx_t
-
 /*
  *  constants
  */

@@ -290,7 +290,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 
 static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
+	ac97_t *ac97 = entry->private_data;
 	
 	down(&ac97->mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86
@@ -325,7 +325,7 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 /* direct register write for debugging */
 static void snd_ac97_proc_regs_write(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
+	ac97_t *ac97 = entry->private_data;
 	char line[64];
 	unsigned int reg, val;
 	down(&ac97->mutex);
@@ -353,7 +353,7 @@ static void snd_ac97_proc_regs_read_main(ac97_t *ac97, snd_info_buffer_t * buffe
 static void snd_ac97_proc_regs_read(snd_info_entry_t *entry, 
 				    snd_info_buffer_t * buffer)
 {
-	ac97_t *ac97 = snd_magic_cast(ac97_t, entry->private_data, return);
+	ac97_t *ac97 = entry->private_data;
 
 	down(&ac97->mutex);
 	if ((ac97->id & 0xffffff40) == AC97_ID_AD1881) {	// Analog Devices AD1881/85/86

@@ -27,8 +27,6 @@
 #include <asm/io.h>
 #include "vx222.h"
 
-#define chip_t vx_core_t
-
 
 static int vx2_reg_offset[VX_REG_MAX] = {
 	[VX_ICR]    = 0x00,

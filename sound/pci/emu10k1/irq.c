@@ -32,7 +32,7 @@
 
 irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, dev_id, return IRQ_NONE);
+	emu10k1_t *emu = dev_id;
 	unsigned int status, orig_status;
 	int handled = 0;
 

@@ -106,8 +106,6 @@ MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
 
-#define chip_t sb_t
-
 typedef struct {
 	unsigned long gcr;
 	struct resource *res_gcr;
@@ -368,7 +366,7 @@ static snd_pcm_uframes_t snd_als4000_playback_pointer(snd_pcm_substream_t * subs
 
 static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
+	sb_t *chip = dev_id;
 	unsigned long flags;
 	unsigned gcr_status;
 	unsigned sb_status;
@@ -506,7 +504,7 @@ static snd_pcm_ops_t snd_als4000_capture_ops = {
 
 static void snd_als4000_pcm_free(snd_pcm_t *pcm)
 {
-	sb_t *chip = snd_magic_cast(sb_t, pcm->private_data, return);
+	sb_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }

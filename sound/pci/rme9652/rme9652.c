@@ -858,7 +858,7 @@ static int snd_rme9652_control_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem
 
 static int snd_rme9652_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	
 	snd_rme9652_convert_to_aes(&ucontrol->value.iec958, rme9652->creg_spdif);
 	return 0;
@@ -866,7 +866,7 @@ static int snd_rme9652_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem
 
 static int snd_rme9652_control_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;
@@ -888,7 +888,7 @@ static int snd_rme9652_control_spdif_stream_info(snd_kcontrol_t *kcontrol, snd_c
 
 static int snd_rme9652_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	
 	snd_rme9652_convert_to_aes(&ucontrol->value.iec958, rme9652->creg_spdif_stream);
 	return 0;
@@ -896,7 +896,7 @@ static int snd_rme9652_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_c
 
 static int snd_rme9652_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;
@@ -977,7 +977,7 @@ static int snd_rme9652_info_adat1_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 
 static int snd_rme9652_get_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -988,7 +988,7 @@ static int snd_rme9652_get_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static int snd_rme9652_put_adat1_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1050,7 +1050,7 @@ static int snd_rme9652_info_spdif_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 
 static int snd_rme9652_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1061,7 +1061,7 @@ static int snd_rme9652_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static int snd_rme9652_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1121,7 +1121,7 @@ static int snd_rme9652_info_spdif_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_rme9652_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1132,7 +1132,7 @@ static int snd_rme9652_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static int snd_rme9652_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1210,7 +1210,7 @@ static int snd_rme9652_info_sync_mode(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_rme9652_get_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1221,7 +1221,7 @@ static int snd_rme9652_get_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static int snd_rme9652_put_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1291,7 +1291,7 @@ static int rme9652_set_sync_pref(rme9652_t *rme9652, int pref)
 static int snd_rme9652_info_sync_pref(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[4] = {"IEC958 In", "ADAT1 In", "ADAT2 In", "ADAT3 In"};
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1304,7 +1304,7 @@ static int snd_rme9652_info_sync_pref(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_rme9652_get_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1315,7 +1315,7 @@ static int snd_rme9652_get_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static int snd_rme9652_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change, max;
 	unsigned int val;
@@ -1333,7 +1333,7 @@ static int snd_rme9652_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static int snd_rme9652_info_thru(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
 	uinfo->count = rme9652->ss_channels;
 	uinfo->value.integer.min = 0;
@@ -1343,7 +1343,7 @@ static int snd_rme9652_info_thru(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 
 static int snd_rme9652_get_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned int k;
 	u32 thru_bits = rme9652->thru_bits;
 
@@ -1355,7 +1355,7 @@ static int snd_rme9652_get_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 
 static int snd_rme9652_put_thru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int chn;
@@ -1399,7 +1399,7 @@ static int snd_rme9652_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_inf
 
 static int snd_rme9652_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1410,7 +1410,7 @@ static int snd_rme9652_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static int snd_rme9652_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1447,7 +1447,7 @@ static int snd_rme9652_info_spdif_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 
 static int snd_rme9652_get_spdif_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -1477,7 +1477,7 @@ static int snd_rme9652_info_adat_sync(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_rme9652_get_adat_sync(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	unsigned int mask1, mask2, val;
 	
 	switch (kcontrol->private_value) {
@@ -1509,7 +1509,7 @@ static int snd_rme9652_info_tc_valid(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 
 static int snd_rme9652_get_tc_valid(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	rme9652_t *rme9652 = _snd_kcontrol_chip(kcontrol);
+	rme9652_t *rme9652 = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.integer.value[0] = 
 		(rme9652_read(rme9652, RME9652_status_register) & RME9652_tc_valid) ? 1 : 0;
@@ -1984,7 +1984,7 @@ static irqreturn_t snd_rme9652_interrupt(int irq, void *dev_id, struct pt_regs *
 
 static snd_pcm_uframes_t snd_rme9652_hw_pointer(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	return rme9652_hw_pointer(rme9652);
 }
 
@@ -2013,7 +2013,7 @@ static char *rme9652_channel_buffer_location(rme9652_t *rme9652,
 static int snd_rme9652_playback_copy(snd_pcm_substream_t *substream, int channel,
 				     snd_pcm_uframes_t pos, void __user *src, snd_pcm_uframes_t count)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	snd_assert(pos + count <= RME9652_CHANNEL_BUFFER_BYTES / 4, return -EINVAL);
@@ -2030,7 +2030,7 @@ static int snd_rme9652_playback_copy(snd_pcm_substream_t *substream, int channel
 static int snd_rme9652_capture_copy(snd_pcm_substream_t *substream, int channel,
 				    snd_pcm_uframes_t pos, void __user *dst, snd_pcm_uframes_t count)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	snd_assert(pos + count <= RME9652_CHANNEL_BUFFER_BYTES / 4, return -EINVAL);
@@ -2047,7 +2047,7 @@ static int snd_rme9652_capture_copy(snd_pcm_substream_t *substream, int channel,
 static int snd_rme9652_hw_silence(snd_pcm_substream_t *substream, int channel,
 				  snd_pcm_uframes_t pos, snd_pcm_uframes_t count)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	channel_buf = rme9652_channel_buffer_location (rme9652,
@@ -2061,7 +2061,7 @@ static int snd_rme9652_hw_silence(snd_pcm_substream_t *substream, int channel,
 static int snd_rme9652_reset(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	snd_pcm_substream_t *other;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		other = rme9652->capture_substream;
@@ -2089,7 +2089,7 @@ static int snd_rme9652_reset(snd_pcm_substream_t *substream)
 static int snd_rme9652_hw_params(snd_pcm_substream_t *substream,
 				 snd_pcm_hw_params_t *params)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	int err;
 	pid_t this_pid;
 	pid_t other_pid;
@@ -2154,7 +2154,7 @@ static int snd_rme9652_hw_params(snd_pcm_substream_t *substream,
 static int snd_rme9652_channel_info(snd_pcm_substream_t *substream,
 				    snd_pcm_channel_info_t *info)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	int chn;
 
 	snd_assert(info->channel < RME9652_NCHANNELS, return -EINVAL);
@@ -2197,7 +2197,7 @@ static void rme9652_silence_playback(rme9652_t *rme9652)
 static int snd_rme9652_trigger(snd_pcm_substream_t *substream,
 			       int cmd)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	snd_pcm_substream_t *other;
 	int running;
 	spin_lock(&rme9652->lock);
@@ -2260,7 +2260,7 @@ static int snd_rme9652_trigger(snd_pcm_substream_t *substream,
 
 static int snd_rme9652_prepare(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	int result = 0;
 
 	spin_lock(&rme9652->lock);
@@ -2386,7 +2386,7 @@ static int snd_rme9652_hw_rule_rate_channels(snd_pcm_hw_params_t *params,
 
 static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
@@ -2429,7 +2429,7 @@ static int snd_rme9652_playback_open(snd_pcm_substream_t *substream)
 
 static int snd_rme9652_playback_release(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme9652->lock, flags);
@@ -2448,7 +2448,7 @@ static int snd_rme9652_playback_release(snd_pcm_substream_t *substream)
 
 static int snd_rme9652_capture_open(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
@@ -2486,7 +2486,7 @@ static int snd_rme9652_capture_open(snd_pcm_substream_t *substream)
 
 static int snd_rme9652_capture_release(snd_pcm_substream_t *substream)
 {
-	rme9652_t *rme9652 = _snd_pcm_substream_chip(substream);
+	rme9652_t *rme9652 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme9652->lock, flags);

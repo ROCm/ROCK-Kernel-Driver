@@ -122,8 +122,7 @@ static void __devinit snd_vortex_workaround(struct pci_dev *vortex, int fix)
 // (see "Management of Cards and Components")
 static int snd_vortex_dev_free(snd_device_t * device)
 {
-	vortex_t *vortex = snd_magic_cast(vortex_t, device->device_data,
-					  return -ENXIO);
+	vortex_t *vortex = device->device_data;
 
 	vortex_gameport_unregister(vortex);
 	vortex_core_shutdown(vortex);
@@ -132,7 +131,7 @@ static int snd_vortex_dev_free(snd_device_t * device)
 	free_irq(vortex->irq, vortex);
 	pci_release_regions(vortex->pci_dev);
 	pci_disable_device(vortex->pci_dev);
-	snd_magic_kfree(vortex);
+	kfree(vortex);
 
 	return 0;
 }
@@ -159,7 +158,7 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
 	}
 	pci_set_dma_mask(pci, VORTEX_DMA_MASK);
 
-	chip = snd_magic_kcalloc(vortex_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 

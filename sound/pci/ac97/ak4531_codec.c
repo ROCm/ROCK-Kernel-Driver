@@ -30,8 +30,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Universal routines for AK4531 codec");
 MODULE_LICENSE("GPL");
 
-#define chip_t ak4531_t
-
 static void snd_ak4531_proc_init(snd_card_t * card, ak4531_t * ak4531);
 
 /*
@@ -315,14 +313,14 @@ static int snd_ak4531_free(ak4531_t *ak4531)
 	if (ak4531) {
 		if (ak4531->private_free)
 			ak4531->private_free(ak4531);
-		snd_magic_kfree(ak4531);
+		kfree(ak4531);
 	}
 	return 0;
 }
 
 static int snd_ak4531_dev_free(snd_device_t *device)
 {
-	ak4531_t *ak4531 = snd_magic_cast(ak4531_t, device->device_data, return -ENXIO);
+	ak4531_t *ak4531 = device->device_data;
 	return snd_ak4531_free(ak4531);
 }
 
@@ -367,7 +365,7 @@ int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 	snd_assert(rak4531 != NULL, return -EINVAL);
 	*rak4531 = NULL;
 	snd_assert(card != NULL && _ak4531 != NULL, return -EINVAL);
-	ak4531 = snd_magic_kcalloc(ak4531_t, 0, GFP_KERNEL);
+	ak4531 = kcalloc(1, sizeof(*ak4531), GFP_KERNEL);
 	if (ak4531 == NULL)
 		return -ENOMEM;
 	*ak4531 = *_ak4531;
@@ -411,7 +409,7 @@ int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 static void snd_ak4531_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t * buffer)
 {
-	ak4531_t *ak4531 = snd_magic_cast(ak4531_t, entry->private_data, return);
+	ak4531_t *ak4531 = entry->private_data;
 
 	snd_iprintf(buffer, "Asahi Kasei AK4531\n\n");
 	snd_iprintf(buffer, "Recording source   : %s\n"

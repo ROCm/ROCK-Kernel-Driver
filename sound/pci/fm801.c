@@ -40,8 +40,6 @@
 #define TEA575X_RADIO 1
 #endif
 
-#define chip_t fm801_t
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ForteMedia FM801");
 MODULE_LICENSE("GPL");
@@ -233,7 +231,7 @@ static void snd_fm801_codec_write(ac97_t *ac97,
 				  unsigned short reg,
 				  unsigned short val)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, ac97->private_data, return);
+	fm801_t *chip = ac97->private_data;
 	int idx;
 
 	/*
@@ -264,7 +262,7 @@ static void snd_fm801_codec_write(ac97_t *ac97,
 
 static unsigned short snd_fm801_codec_read(ac97_t *ac97, unsigned short reg)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, ac97->private_data, return -ENXIO);
+	fm801_t *chip = ac97->private_data;
 	int idx;
 
 	/*
@@ -522,7 +520,7 @@ static snd_pcm_uframes_t snd_fm801_capture_pointer(snd_pcm_substream_t * substre
 
 static irqreturn_t snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, dev_id, return IRQ_NONE);
+	fm801_t *chip = dev_id;
 	unsigned short status;
 	unsigned int tmp;
 
@@ -680,7 +678,7 @@ static snd_pcm_ops_t snd_fm801_capture_ops = {
 
 static void snd_fm801_pcm_free(snd_pcm_t *pcm)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, pcm->private_data, return);
+	fm801_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1176,13 +1174,13 @@ FM801_SINGLE("IEC958 Playback Switch", FM801_GEN_CTRL, 2, 1, 0),
 
 static void snd_fm801_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, bus->private_data, return);
+	fm801_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, ac97->private_data, return);
+	fm801_t *chip = ac97->private_data;
 	if (ac97->num == 0) {
 		chip->ac97 = NULL;
 	} else {
@@ -1252,13 +1250,13 @@ static int snd_fm801_free(fm801_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_fm801_dev_free(snd_device_t *device)
 {
-	fm801_t *chip = snd_magic_cast(fm801_t, device->device_data, return -ENXIO);
+	fm801_t *chip = device->device_data;
 	return snd_fm801_free(chip);
 }
 
@@ -1279,7 +1277,7 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	*rchip = NULL;
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	chip = snd_magic_kcalloc(fm801_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

@@ -776,8 +776,6 @@ MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
 typedef struct snd_m3_dma m3_dma_t;
 typedef struct snd_m3 m3_t;
-#define chip_t m3_t
-
 
 /* quirk lists */
 struct m3_quirk {
@@ -1573,7 +1571,7 @@ static void snd_m3_update_ptr(m3_t *chip, m3_dma_t *s)
 static irqreturn_t
 snd_m3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	m3_t *chip = snd_magic_cast(m3_t, dev_id, );
+	m3_t *chip = dev_id;
 	u8 status;
 	int i;
 
@@ -1848,7 +1846,7 @@ static int snd_m3_ac97_wait(m3_t *chip)
 static unsigned short
 snd_m3_ac97_read(ac97_t *ac97, unsigned short reg)
 {
-	m3_t *chip = snd_magic_cast(m3_t, ac97->private_data, return -ENXIO);
+	m3_t *chip = ac97->private_data;
 	unsigned short ret = 0;
 	unsigned long flags;
 
@@ -1867,7 +1865,7 @@ __error:
 static void
 snd_m3_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
-	m3_t *chip = snd_magic_cast(m3_t, ac97->private_data, return);
+	m3_t *chip = ac97->private_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -2402,7 +2400,7 @@ static int snd_m3_free(m3_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
@@ -2413,7 +2411,7 @@ static int snd_m3_free(m3_t *chip)
 #ifdef CONFIG_PM
 static int m3_suspend(snd_card_t *card, unsigned int state)
 {
-	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
+	m3_t *chip = card->pm_private_data;
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
@@ -2444,7 +2442,7 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 
 static int m3_resume(snd_card_t *card, unsigned int state)
 {
-	m3_t *chip = snd_magic_cast(m3_t, card->pm_private_data, return -EINVAL);
+	m3_t *chip = card->pm_private_data;
 	int i, index;
 
 	if (chip->suspend_mem == NULL)
@@ -2489,7 +2487,7 @@ static int m3_resume(snd_card_t *card, unsigned int state)
 
 static int snd_m3_dev_free(snd_device_t *device)
 {
-	m3_t *chip = snd_magic_cast(m3_t, device->device_data, return -ENXIO);
+	m3_t *chip = device->device_data;
 	return snd_m3_free(chip);
 }
 
@@ -2519,7 +2517,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		return -ENXIO;
 	}
 
-	chip = snd_magic_kcalloc(m3_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 
@@ -2562,7 +2560,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->num_substreams = NR_DSPS;
 	chip->substreams = kmalloc(sizeof(m3_dma_t) * chip->num_substreams, GFP_KERNEL);
 	if (chip->substreams == NULL) {
-		snd_magic_kfree(chip);
+		kfree(chip);
 		return -ENOMEM;
 	}
 	memset(chip->substreams, 0, sizeof(m3_dma_t) * chip->num_substreams);

@@ -190,7 +190,7 @@ static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 					    unsigned short reg)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return -ENXIO);
+	cs46xx_t *chip = ac97->private_data;
 	unsigned short val;
 	int codec_index = -1;
 
@@ -281,7 +281,7 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 				   unsigned short reg,
 				   unsigned short val)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return);
+	cs46xx_t *chip = ac97->private_data;
 	int codec_index = -1;
 
 	/* UGGLY: nr_ac97_codecs == 0 primery codec detection is in progress */
@@ -692,7 +692,7 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream)
 {
 	/* cs46xx_t *chip = snd_pcm_substream_chip(substream); */
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	cs46xx_pcm_t * cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
+	cs46xx_pcm_t * cpcm = runtime->private_data;
 	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
 	snd_pcm_sframes_t diff = appl_ptr - cpcm->appl_ptr;
 	int buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
@@ -773,7 +773,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_direct_pointer(snd_pcm_substream_t 
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr;
-	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
+	cs46xx_pcm_t *cpcm = substream->runtime->private_data;
 	snd_assert (cpcm->pcm_channel,return -ENXIO);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -789,7 +789,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	size_t ptr;
-	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
+	cs46xx_pcm_t *cpcm = substream->runtime->private_data;
 	ssize_t bytes;
 	int buffer_size = substream->runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
@@ -847,7 +847,7 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 	int result = 0;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
+	cs46xx_pcm_t *cpcm = substream->runtime->private_data;
 #else
 	spin_lock(&chip->reg_lock);
 #endif
@@ -987,7 +987,7 @@ static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 	int sample_rate = params_rate(hw_params);
 	int period_size = params_period_bytes(hw_params);
 #endif
-	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
+	cpcm = runtime->private_data;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	snd_assert (sample_rate != 0, return -ENXIO);
@@ -1084,7 +1084,7 @@ static int snd_cs46xx_playback_hw_free(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	cs46xx_pcm_t *cpcm;
 
-	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
+	cpcm = runtime->private_data;
 
 	/* if play_back open fails, then this function
 	   is called and cpcm can actually be NULL here */
@@ -1108,7 +1108,7 @@ static int snd_cs46xx_playback_prepare(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	cs46xx_pcm_t *cpcm;
 
-	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
+	cpcm = runtime->private_data;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
     snd_assert (cpcm->pcm_channel != NULL, return -ENXIO);
@@ -1234,7 +1234,7 @@ static int snd_cs46xx_capture_prepare(snd_pcm_substream_t * substream)
 
 static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, dev_id, return IRQ_NONE);
+	cs46xx_t *chip = dev_id;
 	u32 status1;
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
@@ -1265,7 +1265,7 @@ static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *r
 					if (ins->pcm_channels[i].active &&
 					    ins->pcm_channels[i].private_data &&
 					    !ins->pcm_channels[i].unlinked) {
-						cpcm = snd_magic_cast(cs46xx_pcm_t, ins->pcm_channels[i].private_data, continue);
+						cpcm = ins->pcm_channels[i].private_data;
 						snd_pcm_period_elapsed(cpcm->substream);
 					}
 				}
@@ -1275,7 +1275,7 @@ static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *r
 				if (ins->pcm_channels[i].active && 
 				    ins->pcm_channels[i].private_data &&
 				    !ins->pcm_channels[i].unlinked) {
-					cpcm = snd_magic_cast(cs46xx_pcm_t, ins->pcm_channels[i].private_data, continue);
+					cpcm = ins->pcm_channels[i].private_data;
 					snd_pcm_period_elapsed(cpcm->substream);
 				}
 			}
@@ -1382,10 +1382,8 @@ static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
 
 static void snd_cs46xx_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
-	cs46xx_pcm_t * cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return);
-	
-	if (cpcm)
-		snd_magic_kfree(cpcm);
+	cs46xx_pcm_t * cpcm = runtime->private_data;
+	kfree(cpcm);
 }
 
 static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pcm_channel_id)
@@ -1394,11 +1392,11 @@ static int _cs46xx_playback_open_channel (snd_pcm_substream_t * substream,int pc
 	cs46xx_pcm_t * cpcm;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	cpcm = snd_magic_kcalloc(cs46xx_pcm_t, 0, GFP_KERNEL);
+	cpcm = kcalloc(1, sizeof(*cpcm), GFP_KERNEL);
 	if (cpcm == NULL)
 		return -ENOMEM;
 	if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_SIZE, &cpcm->hw_buf) < 0) {
-		snd_magic_kfree(cpcm);
+		kfree(cpcm);
 		return -ENOMEM;
 	}
 
@@ -1510,7 +1508,7 @@ static int snd_cs46xx_playback_close(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	cs46xx_pcm_t * cpcm;
 
-	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
+	cpcm = runtime->private_data;
 
 	/* when playback_open fails, then cpcm can be NULL */
 	if (!cpcm) return -ENXIO;
@@ -1664,7 +1662,7 @@ snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
 
 static void snd_cs46xx_pcm_free(snd_pcm_t *pcm)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
+	cs46xx_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1672,21 +1670,21 @@ static void snd_cs46xx_pcm_free(snd_pcm_t *pcm)
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 static void snd_cs46xx_pcm_rear_free(snd_pcm_t *pcm)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
+	cs46xx_t *chip = pcm->private_data;
 	chip->pcm_rear = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 static void snd_cs46xx_pcm_center_lfe_free(snd_pcm_t *pcm)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
+	cs46xx_t *chip = pcm->private_data;
 	chip->pcm_center_lfe = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 static void snd_cs46xx_pcm_iec958_free(snd_pcm_t *pcm)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pcm->private_data, return);
+	cs46xx_t *chip = pcm->private_data;
 	chip->pcm_iec958 = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1824,14 +1822,14 @@ int __devinit snd_cs46xx_pcm_iec958(cs46xx_t *chip, int device, snd_pcm_t ** rpc
  */
 static void snd_cs46xx_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, bus->private_data, return);
+	cs46xx_t *chip = bus->private_data;
 
 	chip->ac97_bus = NULL;
 }
 
 static void snd_cs46xx_mixer_free_ac97(ac97_t *ac97)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, ac97->private_data, return);
+	cs46xx_t *chip = ac97->private_data;
 
 	snd_assert ((ac97 == chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]) ||
 		    (ac97 == chip->ac97[CS46XX_SECONDARY_CODEC_INDEX]),
@@ -2420,7 +2418,7 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 {
 	unsigned long end_time;
 	int err;
-	cs46xx_t * chip = snd_magic_cast(cs46xx_t,ac97->private_data,return /* -ENXIO */);
+	cs46xx_t * chip = ac97->private_data;
 
 	/* reset to defaults */
 	snd_ac97_write(ac97, AC97_RESET, 0);	
@@ -2606,7 +2604,7 @@ static void snd_cs46xx_midi_reset(cs46xx_t *chip)
 static int snd_cs46xx_midi_input_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return -ENXIO);
+	cs46xx_t *chip = substream->rmidi->private_data;
 
 	chip->active_ctrl(chip, 1);
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -2625,7 +2623,7 @@ static int snd_cs46xx_midi_input_open(snd_rawmidi_substream_t * substream)
 static int snd_cs46xx_midi_input_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return -ENXIO);
+	cs46xx_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->midcr &= ~(MIDCR_RXE | MIDCR_RIE);
@@ -2644,7 +2642,7 @@ static int snd_cs46xx_midi_input_close(snd_rawmidi_substream_t * substream)
 static int snd_cs46xx_midi_output_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return -ENXIO);
+	cs46xx_t *chip = substream->rmidi->private_data;
 
 	chip->active_ctrl(chip, 1);
 
@@ -2664,7 +2662,7 @@ static int snd_cs46xx_midi_output_open(snd_rawmidi_substream_t * substream)
 static int snd_cs46xx_midi_output_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return -ENXIO);
+	cs46xx_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->midcr &= ~(MIDCR_TXE | MIDCR_TIE);
@@ -2683,7 +2681,7 @@ static int snd_cs46xx_midi_output_close(snd_rawmidi_substream_t * substream)
 static void snd_cs46xx_midi_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return);
+	cs46xx_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	if (up) {
@@ -2703,7 +2701,7 @@ static void snd_cs46xx_midi_input_trigger(snd_rawmidi_substream_t * substream, i
 static void snd_cs46xx_midi_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, substream->rmidi->private_data, return);
+	cs46xx_t *chip = substream->rmidi->private_data;
 	unsigned char byte;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -2781,7 +2779,7 @@ static void snd_cs46xx_gameport_trigger(struct gameport *gameport)
 	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
 	cs46xx_t *chip;
 	snd_assert(gp, return);
-	chip = snd_magic_cast(cs46xx_t, gp->chip, return);
+	chip = gp->chip;
 	snd_cs46xx_pokeBA0(chip, BA0_JSPT, 0xFF);  //outb(gameport->io, 0xFF);
 }
 
@@ -2790,7 +2788,7 @@ static unsigned char snd_cs46xx_gameport_read(struct gameport *gameport)
 	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
 	cs46xx_t *chip;
 	snd_assert(gp, return 0);
-	chip = snd_magic_cast(cs46xx_t, gp->chip, return 0);
+	chip = gp->chip;
 	return snd_cs46xx_peekBA0(chip, BA0_JSPT); //inb(gameport->io);
 }
 
@@ -2801,7 +2799,7 @@ static int snd_cs46xx_gameport_cooked_read(struct gameport *gameport, int *axes,
 	unsigned js1, js2, jst;
 	
 	snd_assert(gp, return 0);
-	chip = snd_magic_cast(cs46xx_t, gp->chip, return 0);
+	chip = gp->chip;
 
 	js1 = snd_cs46xx_peekBA0(chip, BA0_JSC1);
 	js2 = snd_cs46xx_peekBA0(chip, BA0_JSC2);
@@ -3011,13 +3009,13 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	}
 #endif
 	
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_cs46xx_dev_free(snd_device_t *device)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, device->device_data, return -ENXIO);
+	cs46xx_t *chip = device->device_data;
 	return snd_cs46xx_free(chip);
 }
 
@@ -3786,7 +3784,7 @@ static struct cs_card_type __devinitdata cards[] = {
 #ifdef CONFIG_PM
 static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, card->pm_private_data, return -EINVAL);
+	cs46xx_t *chip = card->pm_private_data;
 	int amp_saved;
 
 	snd_pcm_suspend_all(chip->pcm);
@@ -3810,7 +3808,7 @@ static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_cs46xx_resume(snd_card_t *card, unsigned int state)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, card->pm_private_data, return -EINVAL);
+	cs46xx_t *chip = card->pm_private_data;
 	int amp_saved;
 
 	pci_enable_device(chip->pci);
@@ -3869,7 +3867,7 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(cs46xx_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

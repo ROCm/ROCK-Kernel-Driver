@@ -416,7 +416,7 @@ int __devinit snd_ice1712_init_cs8427(ice1712_t *ice, int addr)
 
 static irqreturn_t snd_ice1712_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return IRQ_NONE);
+	ice1712_t *ice = dev_id;
 	unsigned char status;
 	int handled = 0;
 
@@ -874,7 +874,7 @@ static snd_pcm_ops_t snd_ice1712_capture_ops = {
 
 static void snd_ice1712_pcm_free(snd_pcm_t *pcm)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, pcm->private_data, return);
+	ice1712_t *ice = pcm->private_data;
 	ice->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -912,7 +912,7 @@ static int __devinit snd_ice1712_pcm(ice1712_t * ice, int device, snd_pcm_t ** r
 
 static void snd_ice1712_pcm_free_ds(snd_pcm_t *pcm)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, pcm->private_data, return);
+	ice1712_t *ice = pcm->private_data;
 	ice->pcm_ds = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1238,7 +1238,7 @@ static int snd_ice1712_capture_pro_close(snd_pcm_substream_t * substream)
 
 static void snd_ice1712_pcm_profi_free(snd_pcm_t *pcm)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, pcm->private_data, return);
+	ice1712_t *ice = pcm->private_data;
 	ice->pcm_pro = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1511,7 +1511,7 @@ static int __devinit snd_ice1712_build_pro_mixer(ice1712_t *ice)
 
 static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, ac97->private_data, return);
+	ice1712_t *ice = ac97->private_data;
 	ice->ac97 = NULL;
 }
 
@@ -1570,7 +1570,7 @@ static inline unsigned int eeprom_double(ice1712_t *ice, int idx)
 static void snd_ice1712_proc_read(snd_info_entry_t *entry, 
 				  snd_info_buffer_t * buffer)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, entry->private_data, return);
+	ice1712_t *ice = entry->private_data;
 	unsigned int idx;
 
 	snd_iprintf(buffer, "%s\n\n", ice->card->longname);
@@ -2496,13 +2496,13 @@ static int snd_ice1712_free(ice1712_t *ice)
 		kfree_nocheck(ice->res_profi_port);
 	}
 	snd_ice1712_akm4xxx_free(ice);
-	snd_magic_kfree(ice);
+	kfree(ice);
 	return 0;
 }
 
 static int snd_ice1712_dev_free(snd_device_t *device)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, device->device_data, return -ENXIO);
+	ice1712_t *ice = device->device_data;
 	return snd_ice1712_free(ice);
 }
 
@@ -2531,7 +2531,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		return -ENXIO;
 	}
 
-	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
+	ice = kcalloc(1, sizeof(*ice), GFP_KERNEL);
 	if (ice == NULL)
 		return -ENOMEM;
 	ice->omni = omni ? 1 : 0;

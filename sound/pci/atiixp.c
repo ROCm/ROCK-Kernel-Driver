@@ -207,7 +207,6 @@ MODULE_PARM_SYNTAX(spdif_aclink, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 typedef struct snd_atiixp atiixp_t;
 typedef struct snd_atiixp_dma atiixp_dma_t;
 typedef struct snd_atiixp_dma_ops atiixp_dma_ops_t;
-#define chip_t atiixp_t
 
 
 /*
@@ -491,7 +490,7 @@ static void snd_atiixp_codec_write(atiixp_t *chip, unsigned short codec, unsigne
 
 static unsigned short snd_atiixp_ac97_read(ac97_t *ac97, unsigned short reg)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, ac97->private_data, return 0xffff);
+	atiixp_t *chip = ac97->private_data;
 	unsigned short data;
 	spin_lock(&chip->ac97_lock);
 	data = snd_atiixp_codec_read(chip, ac97->num, reg);
@@ -502,7 +501,7 @@ static unsigned short snd_atiixp_ac97_read(ac97_t *ac97, unsigned short reg)
 
 static void snd_atiixp_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, ac97->private_data, return);
+	atiixp_t *chip = ac97->private_data;
 	spin_lock(&chip->ac97_lock);
 	snd_atiixp_codec_write(chip, ac97->num, reg, val);
 	spin_unlock(&chip->ac97_lock);
@@ -1309,7 +1308,7 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
  */
 static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, dev_id, return IRQ_NONE);
+	atiixp_t *chip = dev_id;
 	unsigned int status;
 
 	status = atiixp_read(chip, ISR);
@@ -1412,7 +1411,7 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
  */
 static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, card->pm_private_data, return -EINVAL);
+	atiixp_t *chip = card->pm_private_data;
 	int i;
 
 	for (i = 0; i < NUM_ATI_PCMDEVS; i++)
@@ -1433,7 +1432,7 @@ static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, card->pm_private_data, return -EINVAL);
+	atiixp_t *chip = card->pm_private_data;
 	int i;
 
 	pci_enable_device(chip->pci);
@@ -1459,7 +1458,7 @@ static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 
 static void snd_atiixp_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, entry->private_data, return);
+	atiixp_t *chip = entry->private_data;
 	int i;
 
 	for (i = 0; i < 256; i += 4)
@@ -1495,13 +1494,13 @@ static int snd_atiixp_free(atiixp_t *chip)
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_atiixp_dev_free(snd_device_t *device)
 {
-	atiixp_t *chip = snd_magic_cast(atiixp_t, device->device_data, return -ENXIO);
+	atiixp_t *chip = device->device_data;
 	return snd_atiixp_free(chip);
 }
 
@@ -1521,7 +1520,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(atiixp_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 

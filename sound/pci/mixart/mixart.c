@@ -50,8 +50,6 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;              /* ID for this ca
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;     /* Enable this card */
 static int boot_devs;
 
-#define chip_t mixart_t
-
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Digigram " CARD_NAME " soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
@@ -987,13 +985,13 @@ static int snd_mixart_pcm_digital(mixart_t *chip)
 
 static int snd_mixart_chip_free(mixart_t *chip)
 {
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_mixart_chip_dev_free(snd_device_t *device)
 {
-	mixart_t *chip = snd_magic_cast(mixart_t, device->device_data, return -ENXIO);
+	mixart_t *chip = device->device_data;
 	return snd_mixart_chip_free(chip);
 }
 
@@ -1008,7 +1006,7 @@ static int __devinit snd_mixart_create(mixart_mgr_t *mgr, snd_card_t *card, int 
 		.dev_free = snd_mixart_chip_dev_free,
 	};
 
-	mgr->chip[idx] = chip = snd_magic_kcalloc(mixart_t, 0, GFP_KERNEL);
+	mgr->chip[idx] = chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (! chip) {
 		snd_printk(KERN_ERR "cannot allocate chip\n");
 		return -ENOMEM;
@@ -1099,7 +1097,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 		mgr->bufferinfo.area = NULL;
 	}
 
-	snd_magic_kfree(mgr);
+	kfree(mgr);
 	return 0;
 }
 
@@ -1164,7 +1162,7 @@ static long long snd_mixart_BA1_llseek(snd_info_entry_t *entry,
 static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data,
 				struct file *file, char __user *buf, long count)
 {
-	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
+	mixart_mgr_t *mgr = entry->private_data;
 
 	count = count & ~3; /* make sure the read size is a multiple of 4 bytes */
 	if(count <= 0)
@@ -1183,7 +1181,7 @@ static long snd_mixart_BA0_read(snd_info_entry_t *entry, void *file_private_data
 static long snd_mixart_BA1_read(snd_info_entry_t *entry, void *file_private_data,
 				struct file *file, char __user *buf, long count)
 {
-	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, entry->private_data, return -ENXIO);
+	mixart_mgr_t *mgr = entry->private_data;
 
 	count = count & ~3; /* make sure the read size is a multiple of 4 bytes */
 	if(count <= 0)
@@ -1210,7 +1208,7 @@ static struct snd_info_entry_ops snd_mixart_proc_ops_BA1 = {
 static void snd_mixart_proc_read(snd_info_entry_t *entry, 
                                  snd_info_buffer_t * buffer)
 {
-	mixart_t *chip = snd_magic_cast(mixart_t, entry->private_data, return);        
+	mixart_t *chip = entry->private_data;        
 	u32 ref; 
 
 	snd_iprintf(buffer, "Digigram miXart (alsa card %d)\n\n", chip->chip_idx);
@@ -1305,7 +1303,7 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 
 	/*
 	 */
-	mgr = snd_magic_kcalloc(mixart_mgr_t, 0, GFP_KERNEL);
+	mgr = kcalloc(1, sizeof(*mgr), GFP_KERNEL);
 	if (! mgr)
 		return -ENOMEM;
 

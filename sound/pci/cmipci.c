@@ -405,8 +405,6 @@ MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201
 typedef struct snd_stru_cmipci cmipci_t;
 typedef struct snd_stru_cmipci_pcm cmipci_pcm_t;
 
-#define chip_t cmipci_t
-
 struct snd_stru_cmipci_pcm {
 	snd_pcm_substream_t *substream;
 	int running;		/* dac/adc running? */
@@ -1306,7 +1304,7 @@ static int snd_cmipci_capture_spdif_hw_free(snd_pcm_substream_t *subs)
  */
 static irqreturn_t snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return IRQ_NONE);
+	cmipci_t *cm = dev_id;
 	unsigned int status, mask = 0;
 	
 	/* fastpath out, to ease interrupt sharing */
@@ -2463,7 +2461,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 static void snd_cmipci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t *buffer)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, entry->private_data, return);
+	cmipci_t *cm = entry->private_data;
 	int i;
 	
 	snd_iprintf(buffer, "%s\n\n", cm->card->longname);
@@ -2587,13 +2585,13 @@ static int snd_cmipci_free(cmipci_t *cm)
 		release_resource(cm->res_iobase);
 		kfree_nocheck(cm->res_iobase);
 	}
-	snd_magic_kfree(cm);
+	kfree(cm);
 	return 0;
 }
 
 static int snd_cmipci_dev_free(snd_device_t *device)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, device->device_data, return -ENXIO);
+	cmipci_t *cm = device->device_data;
 	return snd_cmipci_free(cm);
 }
 
@@ -2615,7 +2613,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	cm = snd_magic_kcalloc(cmipci_t, 0, GFP_KERNEL);
+	cm = kcalloc(1, sizeof(*cm), GFP_KERNEL);
 	if (cm == NULL)
 		return -ENOMEM;
 

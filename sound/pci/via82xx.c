@@ -318,7 +318,6 @@ DEFINE_VIA_REGSET(CAPTURE_8233, 0x60);
 
 typedef struct _snd_via82xx via82xx_t;
 typedef struct via_dev viadev_t;
-#define chip_t via82xx_t
 
 /*
  * pcm stream
@@ -556,7 +555,7 @@ static int snd_via82xx_codec_valid(via82xx_t *chip, int secondary)
  
 static void snd_via82xx_codec_wait(ac97_t *ac97)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, ac97->private_data, return);
+	via82xx_t *chip = ac97->private_data;
 	int err;
 	err = snd_via82xx_codec_ready(chip, ac97->num);
 	/* here we need to wait fairly for long time.. */
@@ -568,7 +567,7 @@ static void snd_via82xx_codec_write(ac97_t *ac97,
 				    unsigned short reg,
 				    unsigned short val)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, ac97->private_data, return);
+	via82xx_t *chip = ac97->private_data;
 	unsigned int xval;
 	
 	xval = !ac97->num ? VIA_REG_AC97_CODEC_ID_PRIMARY : VIA_REG_AC97_CODEC_ID_SECONDARY;
@@ -583,7 +582,7 @@ static void snd_via82xx_codec_write(ac97_t *ac97,
 
 static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, ac97->private_data, return ~0);
+	via82xx_t *chip = ac97->private_data;
 	unsigned int xval, val = 0xffff;
 	int again = 0;
 
@@ -632,7 +631,7 @@ static void snd_via82xx_channel_reset(via82xx_t *chip, viadev_t *viadev)
 
 static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, dev_id, return IRQ_NONE);
+	via82xx_t *chip = dev_id;
 	unsigned int status;
 	unsigned int i;
 
@@ -1546,13 +1545,13 @@ static snd_kcontrol_new_t snd_via8233_dxs_volume_control __devinitdata = {
 
 static void snd_via82xx_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, bus->private_data, return);
+	via82xx_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, ac97->private_data, return);
+	via82xx_t *chip = ac97->private_data;
 	chip->ac97 = NULL;
 }
 
@@ -1748,7 +1747,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
  */
 static void snd_via82xx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, entry->private_data, return);
+	via82xx_t *chip = entry->private_data;
 	int i;
 	
 	snd_iprintf(buffer, "%s\n\n", chip->card->longname);
@@ -1885,7 +1884,7 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
  */
 static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, card->pm_private_data, return -EINVAL);
+	via82xx_t *chip = card->pm_private_data;
 	int i;
 
 	for (i = 0; i < 2; i++)
@@ -1912,7 +1911,7 @@ static int snd_via82xx_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_via82xx_resume(snd_card_t *card, unsigned int state)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, card->pm_private_data, return -EINVAL);
+	via82xx_t *chip = card->pm_private_data;
 	int idx, i;
 
 	pci_enable_device(chip->pci);
@@ -1979,13 +1978,13 @@ static int snd_via82xx_free(via82xx_t *chip)
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, chip->old_legacy);
 		pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, chip->old_legacy_cfg);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_via82xx_dev_free(snd_device_t *device)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, device->device_data, return -ENXIO);
+	via82xx_t *chip = device->device_data;
 	return snd_via82xx_free(chip);
 }
 
@@ -2005,7 +2004,7 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	if ((chip = snd_magic_kcalloc(via82xx_t, 0, GFP_KERNEL)) == NULL)
+	if ((chip = kcalloc(1, sizeof(*chip), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 
 	chip->chip_type = chip_type;

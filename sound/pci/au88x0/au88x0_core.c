@@ -2362,7 +2362,7 @@ static void vortex_disable_int(vortex_t * card)
 
 static irqreturn_t vortex_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	vortex_t *vortex = snd_magic_cast(vortex_t, dev_id, return IRQ_NONE);
+	vortex_t *vortex = dev_id;
 	int i, handled;
 	u32 source;
 

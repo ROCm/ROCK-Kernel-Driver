@@ -28,8 +28,6 @@
 #include <sound/initval.h>
 #include "vx222.h"
 
-#define chip_t vx_core_t
-
 #define CARD_NAME "VX222"
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
@@ -130,13 +128,13 @@ static int snd_vx222_free(vx_core_t *chip)
 			kfree_nocheck(vx->port_res[i]);
 		}
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_vx222_dev_free(snd_device_t *device)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, device->device_data, return -ENXIO);
+	vx_core_t *chip = device->device_data;
 	return snd_vx222_free(chip);
 }
 

@@ -285,7 +285,7 @@ static int snd_rme32_playback_silence(snd_pcm_substream_t * substream, int chann
 				      snd_pcm_uframes_t pos,
 				      snd_pcm_uframes_t count)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	count <<= rme32->playback_frlog;
 	pos <<= rme32->playback_frlog;
 	memset_io(rme32->iobase + RME32_IO_DATA_BUFFER + pos, 0, count);
@@ -296,7 +296,7 @@ static int snd_rme32_playback_copy(snd_pcm_substream_t * substream, int channel,
 				   snd_pcm_uframes_t pos,
 				   void __user *src, snd_pcm_uframes_t count)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	count <<= rme32->playback_frlog;
 	pos <<= rme32->playback_frlog;
 	if (copy_from_user_toio(rme32->iobase + RME32_IO_DATA_BUFFER + pos,
@@ -309,7 +309,7 @@ static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	
 				  snd_pcm_uframes_t pos,
 				  void __user *dst, snd_pcm_uframes_t count)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	count <<= rme32->capture_frlog;
 	pos <<= rme32->capture_frlog;
 	if (copy_to_user_fromio(dst,
@@ -677,7 +677,7 @@ snd_rme32_playback_hw_params(snd_pcm_substream_t * substream,
 			     snd_pcm_hw_params_t * params)
 {
 	int err, rate, dummy;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	runtime->dma_area = (void *)(rme32->iobase + RME32_IO_DATA_BUFFER);
@@ -727,7 +727,7 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 {
 	unsigned long flags;
 	int err, isadat, rate;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	runtime->dma_area = (void *)(rme32->iobase + RME32_IO_DATA_BUFFER);
@@ -858,7 +858,7 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	int rate, dummy;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_pcm_set_sync(substream);
@@ -903,7 +903,7 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
 	int isadat, rate;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_pcm_set_sync(substream);
@@ -945,7 +945,7 @@ snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
 {
 	unsigned long flags;
 	int rate, dummy;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
 	snd_pcm_set_sync(substream);
@@ -980,7 +980,7 @@ snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 {
 	unsigned long flags;
 	int isadat, rate;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	runtime->hw = snd_rme32_capture_adat_info;
@@ -1013,7 +1013,7 @@ snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	int spdif = 0;
 
 	spin_lock_irqsave(&rme32->lock, flags);
@@ -1033,7 +1033,7 @@ static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 static int snd_rme32_capture_close(snd_pcm_substream_t * substream)
 {
 	unsigned long flags;
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 
 	spin_lock_irqsave(&rme32->lock, flags);
 	rme32->capture_substream = NULL;
@@ -1044,7 +1044,7 @@ static int snd_rme32_capture_close(snd_pcm_substream_t * substream)
 
 static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme32->lock, flags);
@@ -1061,7 +1061,7 @@ static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 
 static int snd_rme32_capture_prepare(snd_pcm_substream_t * substream)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme32->lock, flags);
@@ -1076,7 +1076,7 @@ static int snd_rme32_capture_prepare(snd_pcm_substream_t * substream)
 static int
 snd_rme32_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		if (!RME32_ISWORKING(rme32)) {
@@ -1117,7 +1117,7 @@ snd_rme32_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 static int
 snd_rme32_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -1160,14 +1160,14 @@ snd_rme32_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 static snd_pcm_uframes_t
 snd_rme32_playback_pointer(snd_pcm_substream_t * substream)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	return snd_rme32_playback_ptr(rme32);
 }
 
 static snd_pcm_uframes_t
 snd_rme32_capture_pointer(snd_pcm_substream_t * substream)
 {
-	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	return snd_rme32_capture_ptr(rme32);
 }
 
@@ -1480,7 +1480,7 @@ static int
 snd_rme32_get_loopback_control(snd_kcontrol_t * kcontrol,
 			       snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme32->lock, flags);
@@ -1493,7 +1493,7 @@ static int
 snd_rme32_put_loopback_control(snd_kcontrol_t * kcontrol,
 			       snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	unsigned int val;
 	int change;
@@ -1516,7 +1516,7 @@ static int
 snd_rme32_info_inputtype_control(snd_kcontrol_t * kcontrol,
 				 snd_ctl_elem_info_t * uinfo)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	static char *texts[4] = { "Optical", "Coaxial", "Internal", "XLR" };
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
@@ -1546,7 +1546,7 @@ static int
 snd_rme32_get_inputtype_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	unsigned int items = 3;
 
@@ -1576,7 +1576,7 @@ static int
 snd_rme32_put_inputtype_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	unsigned int val;
 	int change, items = 3;
@@ -1625,7 +1625,7 @@ static int
 snd_rme32_get_clockmode_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 
 	spin_lock_irqsave(&rme32->lock, flags);
@@ -1637,7 +1637,7 @@ static int
 snd_rme32_put_clockmode_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	unsigned int val;
 	int change;
@@ -1681,7 +1681,7 @@ static int snd_rme32_control_spdif_info(snd_kcontrol_t * kcontrol,
 static int snd_rme32_control_spdif_get(snd_kcontrol_t * kcontrol,
 				       snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 
 	snd_rme32_convert_to_aes(&ucontrol->value.iec958,
 				 rme32->wcreg_spdif);
@@ -1691,7 +1691,7 @@ static int snd_rme32_control_spdif_get(snd_kcontrol_t * kcontrol,
 static int snd_rme32_control_spdif_put(snd_kcontrol_t * kcontrol,
 				       snd_ctl_elem_value_t * ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;
@@ -1716,7 +1716,7 @@ static int snd_rme32_control_spdif_stream_get(snd_kcontrol_t * kcontrol,
 					      snd_ctl_elem_value_t *
 					      ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 
 	snd_rme32_convert_to_aes(&ucontrol->value.iec958,
 				 rme32->wcreg_spdif_stream);
@@ -1727,7 +1727,7 @@ static int snd_rme32_control_spdif_stream_put(snd_kcontrol_t * kcontrol,
 					      snd_ctl_elem_value_t *
 					      ucontrol)
 {
-	rme32_t *rme32 = _snd_kcontrol_chip(kcontrol);
+	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;

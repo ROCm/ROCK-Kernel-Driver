@@ -104,7 +104,7 @@ static int __devinit snd_vortex_midi(vortex_t * vortex)
 			 ~CTRL_MIDI_PORT) & ~CTRL_MIDI_EN);
 		return temp;
 	}
-	mpu = snd_magic_cast(mpu401_t, rmidi->private_data, return -ENOMEM);
+	mpu = rmidi->private_data;
 	mpu->cport = (unsigned long)(vortex->mmio + (VORTEX_MIDI_CMD >> 2));
 #endif
 	vortex->rmidi = rmidi;

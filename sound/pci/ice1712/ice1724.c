@@ -222,7 +222,7 @@ static unsigned int snd_vt1724_get_gpio_data(ice1712_t *ice)
 
 static irqreturn_t snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return IRQ_NONE);
+	ice1712_t *ice = dev_id;
 	unsigned char status;
 	int handled = 0;
 
@@ -1212,7 +1212,7 @@ static inline unsigned int eeprom_triple(ice1712_t *ice, int idx)
 static void snd_vt1724_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t * buffer)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, entry->private_data, return);
+	ice1712_t *ice = entry->private_data;
 	unsigned int idx;
 
 	snd_iprintf(buffer, "%s\n\n", ice->card->longname);
@@ -2060,13 +2060,13 @@ static int snd_vt1724_free(ice1712_t *ice)
 		kfree_nocheck(ice->res_profi_port);
 	}
 	snd_ice1712_akm4xxx_free(ice);
-	snd_magic_kfree(ice);
+	kfree(ice);
 	return 0;
 }
 
 static int snd_vt1724_dev_free(snd_device_t *device)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, device->device_data, return -ENXIO);
+	ice1712_t *ice = device->device_data;
 	return snd_vt1724_free(ice);
 }
 
@@ -2088,7 +2088,7 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
+	ice = kcalloc(1, sizeof(*ice), GFP_KERNEL);
 	if (ice == NULL)
 		return -ENOMEM;
 	ice->vt1724 = 1;

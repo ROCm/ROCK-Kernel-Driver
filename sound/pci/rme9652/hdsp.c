@@ -1563,7 +1563,7 @@ static int snd_hdsp_control_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 
 static int snd_hdsp_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	snd_hdsp_convert_to_aes(&ucontrol->value.iec958, hdsp->creg_spdif);
 	return 0;
@@ -1571,7 +1571,7 @@ static int snd_hdsp_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 
 static int snd_hdsp_control_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;
@@ -1593,7 +1593,7 @@ static int snd_hdsp_control_spdif_stream_info(snd_kcontrol_t *kcontrol, snd_ctl_
 
 static int snd_hdsp_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	snd_hdsp_convert_to_aes(&ucontrol->value.iec958, hdsp->creg_spdif_stream);
 	return 0;
@@ -1601,7 +1601,7 @@ static int snd_hdsp_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_ctl_
 
 static int snd_hdsp_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	u32 val;
@@ -1653,7 +1653,7 @@ static int hdsp_set_spdif_input(hdsp_t *hdsp, int in)
 static int snd_hdsp_info_spdif_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[4] = {"Optical", "Coaxial", "Internal", "AES"};
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1666,7 +1666,7 @@ static int snd_hdsp_info_spdif_in(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 
 static int snd_hdsp_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_spdif_in(hdsp);
 	return 0;
@@ -1674,7 +1674,7 @@ static int snd_hdsp_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 static int snd_hdsp_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1722,7 +1722,7 @@ static int snd_hdsp_info_spdif_bits(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_
 
 static int snd_hdsp_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.integer.value[0] = hdsp_spdif_out(hdsp);
 	return 0;
@@ -1730,7 +1730,7 @@ static int snd_hdsp_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 
 static int snd_hdsp_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1768,7 +1768,7 @@ static int hdsp_set_spdif_professional(hdsp_t *hdsp, int val)
 
 static int snd_hdsp_get_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.integer.value[0] = hdsp_spdif_professional(hdsp);
 	return 0;
@@ -1776,7 +1776,7 @@ static int snd_hdsp_get_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_el
 
 static int snd_hdsp_put_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1814,7 +1814,7 @@ static int hdsp_set_spdif_emphasis(hdsp_t *hdsp, int val)
 
 static int snd_hdsp_get_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.integer.value[0] = hdsp_spdif_emphasis(hdsp);
 	return 0;
@@ -1822,7 +1822,7 @@ static int snd_hdsp_get_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 
 static int snd_hdsp_put_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1860,7 +1860,7 @@ static int hdsp_set_spdif_nonaudio(hdsp_t *hdsp, int val)
 
 static int snd_hdsp_get_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.integer.value[0] = hdsp_spdif_nonaudio(hdsp);
 	return 0;
@@ -1868,7 +1868,7 @@ static int snd_hdsp_get_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 
 static int snd_hdsp_put_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -1895,7 +1895,7 @@ static int snd_hdsp_put_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 static int snd_hdsp_info_spdif_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[] = {"32000", "44100", "48000", "64000", "88200", "96000", "None", "128000", "176400", "192000"};
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1908,7 +1908,7 @@ static int snd_hdsp_info_spdif_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_ele
 
 static int snd_hdsp_get_spdif_sample_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	switch (hdsp_spdif_sample_rate(hdsp)) {
 	case 32000:
@@ -1962,7 +1962,7 @@ static int snd_hdsp_info_system_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_el
 
 static int snd_hdsp_get_system_sample_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp->system_sample_rate;
 	return 0;
@@ -1979,7 +1979,7 @@ static int snd_hdsp_get_system_sample_rate(snd_kcontrol_t * kcontrol, snd_ctl_el
 
 static int snd_hdsp_info_autosync_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	static char *texts[] = {"32000", "44100", "48000", "64000", "88200", "96000", "None", "128000", "176400", "192000"};	
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -1992,7 +1992,7 @@ static int snd_hdsp_info_autosync_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_
 
 static int snd_hdsp_get_autosync_sample_rate(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	switch (hdsp_external_sample_rate(hdsp)) {
 	case 32000:
@@ -2062,7 +2062,7 @@ static int snd_hdsp_info_system_clock_mode(snd_kcontrol_t *kcontrol, snd_ctl_ele
 
 static int snd_hdsp_get_system_clock_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_system_clock_mode(hdsp);
 	return 0;
@@ -2159,7 +2159,7 @@ static int hdsp_set_clock_source(hdsp_t *hdsp, int mode)
 static int snd_hdsp_info_clock_source(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[] = {"AutoSync", "Internal 32.0 kHz", "Internal 44.1 kHz", "Internal 48.0 kHz", "Internal 64.0 kHz", "Internal 88.2 kHz", "Internal 96.0 kHz", "Internal 128 kHz", "Internal 176.4 kHz", "Internal 192.0 KHz" };
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -2175,7 +2175,7 @@ static int snd_hdsp_info_clock_source(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_hdsp_get_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_clock_source(hdsp);
 	return 0;
@@ -2183,7 +2183,7 @@ static int snd_hdsp_get_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 
 static int snd_hdsp_put_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2266,7 +2266,7 @@ static int snd_hdsp_info_da_gain(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 
 static int snd_hdsp_get_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_da_gain(hdsp);
 	return 0;
@@ -2274,7 +2274,7 @@ static int snd_hdsp_get_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 
 static int snd_hdsp_put_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2353,7 +2353,7 @@ static int snd_hdsp_info_ad_gain(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 
 static int snd_hdsp_get_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_ad_gain(hdsp);
 	return 0;
@@ -2361,7 +2361,7 @@ static int snd_hdsp_get_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 
 static int snd_hdsp_put_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2440,7 +2440,7 @@ static int snd_hdsp_info_phone_gain(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_
 
 static int snd_hdsp_get_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_phone_gain(hdsp);
 	return 0;
@@ -2448,7 +2448,7 @@ static int snd_hdsp_get_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 
 static int snd_hdsp_put_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2507,7 +2507,7 @@ static int snd_hdsp_info_xlr_breakout_cable(snd_kcontrol_t *kcontrol, snd_ctl_el
 
 static int snd_hdsp_get_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_xlr_breakout_cable(hdsp);
 	return 0;
@@ -2515,7 +2515,7 @@ static int snd_hdsp_get_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_el
 
 static int snd_hdsp_put_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2573,7 +2573,7 @@ static int snd_hdsp_info_aeb(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uin
 
 static int snd_hdsp_get_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_aeb(hdsp);
 	return 0;
@@ -2581,7 +2581,7 @@ static int snd_hdsp_get_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uc
 
 static int snd_hdsp_put_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int val;
@@ -2662,7 +2662,7 @@ static int hdsp_set_pref_sync_ref(hdsp_t *hdsp, int pref)
 static int snd_hdsp_info_pref_sync_ref(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[] = {"Word", "IEC958", "ADAT1", "ADAT Sync", "ADAT2", "ADAT3" };
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
@@ -2691,7 +2691,7 @@ static int snd_hdsp_info_pref_sync_ref(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 
 static int snd_hdsp_get_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_pref_sync_ref(hdsp);
 	return 0;
@@ -2699,7 +2699,7 @@ static int snd_hdsp_get_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 
 static int snd_hdsp_put_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change, max;
 	unsigned int val;
@@ -2780,7 +2780,7 @@ static int snd_hdsp_info_autosync_ref(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_hdsp_get_autosync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
 	ucontrol->value.enumerated.item[0] = hdsp_pref_sync_ref(hdsp);
 	return 0;
@@ -2806,7 +2806,7 @@ static int snd_hdsp_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t
 
 static int snd_hdsp_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 
 	spin_lock_irqsave(&hdsp->lock, flags);
@@ -2817,7 +2817,7 @@ static int snd_hdsp_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -2871,7 +2871,7 @@ static int snd_hdsp_info_line_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 
 static int snd_hdsp_get_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	
 	spin_lock_irqsave(&hdsp->lock, flags);
@@ -2882,7 +2882,7 @@ static int snd_hdsp_get_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 static int snd_hdsp_put_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	unsigned int val;
@@ -2920,7 +2920,7 @@ static int snd_hdsp_info_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * u
 
 static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int source;
 	int destination;
@@ -2943,7 +2943,7 @@ static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 
 static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 	int change;
 	int source;
@@ -3011,7 +3011,7 @@ static int hdsp_wc_sync_check(hdsp_t *hdsp)
 
 static int snd_hdsp_get_wc_sync_check(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	ucontrol->value.enumerated.item[0] = hdsp_wc_sync_check(hdsp);
 	return 0;
@@ -3043,7 +3043,7 @@ static int hdsp_spdif_sync_check(hdsp_t *hdsp)
 
 static int snd_hdsp_get_spdif_sync_check(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	ucontrol->value.enumerated.item[0] = hdsp_spdif_sync_check(hdsp);
 	return 0;
@@ -3074,7 +3074,7 @@ static int hdsp_adatsync_sync_check(hdsp_t *hdsp)
 
 static int snd_hdsp_get_adatsync_sync_check(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	ucontrol->value.enumerated.item[0] = hdsp_adatsync_sync_check(hdsp);
 	return 0;
@@ -3105,7 +3105,7 @@ static int hdsp_adat_sync_check(hdsp_t *hdsp, int idx)
 static int snd_hdsp_get_adat_sync_check(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	int offset;
-	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 
 	offset = ucontrol->id.index - 1;
 	snd_assert(offset >= 0);
@@ -3809,7 +3809,7 @@ static irqreturn_t snd_hdsp_interrupt(int irq, void *dev_id, struct pt_regs *reg
 
 static snd_pcm_uframes_t snd_hdsp_hw_pointer(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	return hdsp_hw_pointer(hdsp);
 }
 
@@ -3836,7 +3836,7 @@ static char *hdsp_channel_buffer_location(hdsp_t *hdsp,
 static int snd_hdsp_playback_copy(snd_pcm_substream_t *substream, int channel,
 				  snd_pcm_uframes_t pos, void __user *src, snd_pcm_uframes_t count)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	snd_assert(pos + count <= HDSP_CHANNEL_BUFFER_BYTES / 4, return -EINVAL);
@@ -3851,7 +3851,7 @@ static int snd_hdsp_playback_copy(snd_pcm_substream_t *substream, int channel,
 static int snd_hdsp_capture_copy(snd_pcm_substream_t *substream, int channel,
 				 snd_pcm_uframes_t pos, void __user *dst, snd_pcm_uframes_t count)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	snd_assert(pos + count <= HDSP_CHANNEL_BUFFER_BYTES / 4, return -EINVAL);
@@ -3866,7 +3866,7 @@ static int snd_hdsp_capture_copy(snd_pcm_substream_t *substream, int channel,
 static int snd_hdsp_hw_silence(snd_pcm_substream_t *substream, int channel,
 				  snd_pcm_uframes_t pos, snd_pcm_uframes_t count)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	char *channel_buf;
 
 	channel_buf = hdsp_channel_buffer_location (hdsp, substream->pstr->stream, channel);
@@ -3878,7 +3878,7 @@ static int snd_hdsp_hw_silence(snd_pcm_substream_t *substream, int channel,
 static int snd_hdsp_reset(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	snd_pcm_substream_t *other;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		other = hdsp->capture_substream;
@@ -3906,7 +3906,7 @@ static int snd_hdsp_reset(snd_pcm_substream_t *substream)
 static int snd_hdsp_hw_params(snd_pcm_substream_t *substream,
 				 snd_pcm_hw_params_t *params)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	int err;
 	pid_t this_pid;
 	pid_t other_pid;
@@ -3989,7 +3989,7 @@ static int snd_hdsp_hw_params(snd_pcm_substream_t *substream,
 static int snd_hdsp_channel_info(snd_pcm_substream_t *substream,
 				    snd_pcm_channel_info_t *info)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	int mapped_channel;
 
 	snd_assert(info->channel < hdsp->max_channels, return -EINVAL);
@@ -4026,7 +4026,7 @@ static int snd_hdsp_ioctl(snd_pcm_substream_t *substream,
 
 static int snd_hdsp_trigger(snd_pcm_substream_t *substream, int cmd)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	snd_pcm_substream_t *other;
 	int running;
 	
@@ -4105,7 +4105,7 @@ static int snd_hdsp_trigger(snd_pcm_substream_t *substream, int cmd)
 
 static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	int result = 0;
 
 	if (hdsp_check_for_iobox (hdsp)) {
@@ -4364,7 +4364,7 @@ static int snd_hdsp_hw_rule_rate_in_channels(snd_pcm_hw_params_t *params,
 
 static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
@@ -4430,7 +4430,7 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 
 static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&hdsp->lock, flags);
@@ -4449,7 +4449,7 @@ static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 
 static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
@@ -4509,7 +4509,7 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 
 static int snd_hdsp_capture_release(snd_pcm_substream_t *substream)
 {
-	hdsp_t *hdsp = _snd_pcm_substream_chip(substream);
+	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
 	unsigned long flags;
 
 	spin_lock_irqsave(&hdsp->lock, flags);

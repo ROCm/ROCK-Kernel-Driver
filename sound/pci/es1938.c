@@ -63,8 +63,6 @@
 
 #include <asm/io.h>
 
-#define chip_t es1938_t
-
 MODULE_AUTHOR("Jaromir Koutek <miri@punknet.cz>");
 MODULE_DESCRIPTION("ESS Solo-1");
 MODULE_LICENSE("GPL");
@@ -1129,7 +1127,7 @@ static int snd_es1938_get_hw_switch(snd_kcontrol_t * kcontrol, snd_ctl_elem_valu
 
 static void snd_es1938_hwv_free(snd_kcontrol_t *kcontrol)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, _snd_kcontrol_chip(kcontrol), return);
+	es1938_t *chip = snd_kcontrol_chip(kcontrol);
 	chip->master_volume = NULL;
 	chip->master_switch = NULL;
 	chip->hw_volume = NULL;
@@ -1370,13 +1368,13 @@ static int snd_es1938_free(es1938_t *chip)
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_es1938_dev_free(snd_device_t *device)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, device->device_data, return -ENXIO);
+	es1938_t *chip = device->device_data;
 	return snd_es1938_free(chip);
 }
 
@@ -1402,7 +1400,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
                 return -ENXIO;
         }
 
-	chip = snd_magic_kcalloc(es1938_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);
@@ -1492,7 +1490,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
  * -------------------------------------------------------------------- */
 static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return IRQ_NONE);
+	es1938_t *chip = dev_id;
 	unsigned char status, audiostatus;
 	int handled = 0;
 

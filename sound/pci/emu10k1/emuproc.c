@@ -174,7 +174,7 @@ static void snd_emu10k1_proc_read(snd_info_entry_t *entry,
 		/* 33 */ "???"
 	};
 
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, entry->private_data, return);
+	emu10k1_t *emu = entry->private_data;
 	unsigned int val;
 	int nefx = emu->audigy ? 64 : 32;
 	char **outputs = emu->audigy ? audigy_outs : creative_outs;
@@ -225,7 +225,7 @@ static void snd_emu10k1_proc_acode_read(snd_info_entry_t *entry,
 				        snd_info_buffer_t * buffer)
 {
 	u32 pc;
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, entry->private_data, return);
+	emu10k1_t *emu = entry->private_data;
 
 	snd_iprintf(buffer, "FX8010 Instruction List '%s'\n", emu->fx8010.name);
 	snd_iprintf(buffer, "  Code dump      :\n");
@@ -264,7 +264,7 @@ static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_
 				    struct file *file, char __user *buf, long count)
 {
 	long size;
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, entry->private_data, return -ENXIO);
+	emu10k1_t *emu = entry->private_data;
 	unsigned int offset;
 	
 	if (!strcmp(entry->name, "fx8010_tram_addr")) {

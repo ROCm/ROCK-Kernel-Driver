@@ -146,7 +146,7 @@ static int mixart_load_elf(mixart_mgr_t *mgr, snd_hwdep_dsp_image_t *dsp )
 
 static int mixart_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
 {
-	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, hw->private_data, return -ENXIO);
+	mixart_mgr_t *mgr = hw->private_data;
 
 	strcpy(info->id, "miXart");
         info->num_dsps = MIXART_HARDW_FILES_MAX_INDEX;
@@ -346,7 +346,7 @@ static int mixart_first_init(mixart_mgr_t *mgr)
 
 static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 {
-	mixart_mgr_t* mgr = snd_magic_cast(mixart_mgr_t, hw->private_data, return -ENXIO);
+	mixart_mgr_t* mgr = hw->private_data;
 	int           err, card_index;
 	u32           status_xilinx, status_elf, status_daught;
 	u32           val;

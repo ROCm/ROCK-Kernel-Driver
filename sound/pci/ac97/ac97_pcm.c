@@ -36,8 +36,6 @@
 #include "ac97_id.h"
 #include "ac97_local.h"
 
-#define chip_t ac97_t
-
 /*
  *  PCM support
  */
