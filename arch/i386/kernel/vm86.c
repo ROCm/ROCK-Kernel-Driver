@@ -2,7 +2,34 @@
  *  linux/kernel/vm86.c
  *
  *  Copyright (C) 1994  Linus Torvalds
+ *
+ *  29 dec 2001 - Fixed oopses caused by unchecked access to the vm86
+ *                stack - Manfred Spraul <manfreds@colorfullife.com>
+ *
+ *  22 mar 2002 - Manfred detected the stackfaults, but didn't handle
+ *                them correctly. Now the emulation will be in a
+ *                consistent state after stackfaults - Kasper Dupont
+ *                <kasperd@daimi.au.dk>
+ *
+ *  22 mar 2002 - Added missing clear_IF in set_vflags_* Kasper Dupont
+ *                <kasperd@daimi.au.dk>
+ *
+ *  ?? ??? 2002 - Fixed premature returns from handle_vm86_fault
+ *                caused by Kasper Dupont's changes - Stas Sergeev
+ *
+ *   4 apr 2002 - Fixed CHECK_IF_IN_TRAP broken by Stas' changes.
+ *                Kasper Dupont <kasperd@daimi.au.dk>
+ *
+ *   9 apr 2002 - Changed syntax of macros in handle_vm86_fault.
+ *                Kasper Dupont <kasperd@daimi.au.dk>
+ *
+ *   9 apr 2002 - Changed stack access macros to jump to a label
+ *                instead of returning to userspace. This simplifies
+ *                do_int, and is needed by handle_vm6_fault. Kasper
+ *                Dupont <kasperd@daimi.au.dk>
+ *
  */
+
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -17,6 +44,7 @@
 #include <asm/pgalloc.h>
 #include <asm/io.h>
 #include <asm/tlbflush.h>
+#include <asm/irq.h>
 
 /*
  * Known problems:
@@ -97,23 +125,24 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 	pte_t *pte, *mapped;
 	int i;
 
+	preempt_disable();
+	spin_lock(&tsk->mm->page_table_lock);
 	pgd = pgd_offset(tsk->mm, 0xA0000);
 	if (pgd_none(*pgd))
-		return;
+		goto out;
 	if (pgd_bad(*pgd)) {
 		pgd_ERROR(*pgd);
 		pgd_clear(pgd);
-		return;
+		goto out;
 	}
 	pmd = pmd_offset(pgd, 0xA0000);
 	if (pmd_none(*pmd))
-		return;
+		goto out;
 	if (pmd_bad(*pmd)) {
 		pmd_ERROR(*pmd);
 		pmd_clear(pmd);
-		return;
+		goto out;
 	}
-	preempt_disable();
 	pte = mapped = pte_offset_map(pmd, 0xA0000);
 	for (i = 0; i < 32; i++) {
 		if (pte_present(*pte))
@@ -121,6 +150,8 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 		pte++;
 	}
 	pte_unmap(mapped);
+out:
+	spin_unlock(&tsk->mm->page_table_lock);
 	preempt_enable();
 	flush_tlb();
 }
@@ -293,12 +324,30 @@ static inline void clear_TF(struct kernel_vm86_regs * regs)
 	regs->eflags &= ~TF_MASK;
 }
 
+static inline void clear_AC(struct kernel_vm86_regs * regs)
+{
+	regs->eflags &= ~AC_MASK;
+}
+
+/* It is correct to call set_IF(regs) from the set_vflags_*
+ * functions. However someone forgot to call clear_IF(regs)
+ * in the opposite case.
+ * After the command sequence CLI PUSHF STI POPF you should
+ * end up with interrups disabled, but you ended up with
+ * interrupts enabled.
+ *  ( I was testing my own changes, but the only bug I
+ *    could find was in a function I had not changed. )
+ * [KD]
+ */
+
 static inline void set_vflags_long(unsigned long eflags, struct kernel_vm86_regs * regs)
 {
 	set_flags(VEFLAGS, eflags, current->thread.v86mask);
 	set_flags(regs->eflags, eflags, SAFE_MASK);
 	if (eflags & IF_MASK)
 		set_IF(regs);
+	else
+		clear_IF(regs);
 }
 
 static inline void set_vflags_short(unsigned short flags, struct kernel_vm86_regs * regs)
@@ -307,6 +356,8 @@ static inline void set_vflags_short(unsigned short flags, struct kernel_vm86_reg
 	set_flags(regs->eflags, flags, SAFE_MASK);
 	if (flags & IF_MASK)
 		set_IF(regs);
+	else
+		clear_IF(regs);
 }
 
 static inline unsigned long get_vflags(struct kernel_vm86_regs * regs)
@@ -326,80 +377,90 @@ static inline int is_revectored(int nr, struct revectored_struct * bitmap)
 	return nr;
 }
 
-/*
- * Boy are these ugly, but we need to do the correct 16-bit arithmetic.
- * Gcc makes a mess of it, so we do it inline and use non-obvious calling
- * conventions..
+#define val_byte(val, n) (((__u8 *)&val)[n])
+
+#define pushb(base, ptr, val, err_label) \
+	do { \
+		__u8 __val = val; \
+		ptr--; \
+		if (put_user(__val, base + ptr) < 0) \
+			goto err_label; \
+	} while(0)
+
+#define pushw(base, ptr, val, err_label) \
+	do { \
+		__u16 __val = val; \
+		ptr--; \
+		if (put_user(val_byte(__val, 1), base + ptr) < 0) \
+			goto err_label; \
+		ptr--; \
+		if (put_user(val_byte(__val, 0), base + ptr) < 0) \
+			goto err_label; \
+	} while(0)
+
+#define pushl(base, ptr, val, err_label) \
+	do { \
+		__u32 __val = val; \
+		ptr--; \
+		if (put_user(val_byte(__val, 3), base + ptr) < 0) \
+			goto err_label; \
+		ptr--; \
+		if (put_user(val_byte(__val, 2), base + ptr) < 0) \
+			goto err_label; \
+		ptr--; \
+		if (put_user(val_byte(__val, 1), base + ptr) < 0) \
+			goto err_label; \
+		ptr--; \
+		if (put_user(val_byte(__val, 0), base + ptr) < 0) \
+			goto err_label; \
+	} while(0)
+
+#define popb(base, ptr, err_label) \
+	({ \
+		__u8 __res; \
+		if (get_user(__res, base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		__res; \
+	})
+
+#define popw(base, ptr, err_label) \
+	({ \
+		__u16 __res; \
+		if (get_user(val_byte(__res, 0), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		if (get_user(val_byte(__res, 1), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		__res; \
+	})
+
+#define popl(base, ptr, err_label) \
+	({ \
+		__u32 __res; \
+		if (get_user(val_byte(__res, 0), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		if (get_user(val_byte(__res, 1), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		if (get_user(val_byte(__res, 2), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		if (get_user(val_byte(__res, 3), base + ptr) < 0) \
+			goto err_label; \
+		ptr++; \
+		__res; \
+	})
+
+/* There are so many possible reasons for this function to return
+ * VM86_INTx, so adding another doesn't bother me. We can expect
+ * userspace programs to be able to handle it. (Getting a problem
+ * in userspace is always better than an Oops anyway.) [KD]
  */
-#define pushb(base, ptr, val) \
-__asm__ __volatile__( \
-	"decw %w0\n\t" \
-	"movb %2,0(%1,%0)" \
-	: "=r" (ptr) \
-	: "r" (base), "q" (val), "0" (ptr))
-
-#define pushw(base, ptr, val) \
-__asm__ __volatile__( \
-	"decw %w0\n\t" \
-	"movb %h2,0(%1,%0)\n\t" \
-	"decw %w0\n\t" \
-	"movb %b2,0(%1,%0)" \
-	: "=r" (ptr) \
-	: "r" (base), "q" (val), "0" (ptr))
-
-#define pushl(base, ptr, val) \
-__asm__ __volatile__( \
-	"decw %w0\n\t" \
-	"rorl $16,%2\n\t" \
-	"movb %h2,0(%1,%0)\n\t" \
-	"decw %w0\n\t" \
-	"movb %b2,0(%1,%0)\n\t" \
-	"decw %w0\n\t" \
-	"rorl $16,%2\n\t" \
-	"movb %h2,0(%1,%0)\n\t" \
-	"decw %w0\n\t" \
-	"movb %b2,0(%1,%0)" \
-	: "=r" (ptr) \
-	: "r" (base), "q" (val), "0" (ptr))
-
-#define popb(base, ptr) \
-({ unsigned long __res; \
-__asm__ __volatile__( \
-	"movb 0(%1,%0),%b2\n\t" \
-	"incw %w0" \
-	: "=r" (ptr), "=r" (base), "=q" (__res) \
-	: "0" (ptr), "1" (base), "2" (0)); \
-__res; })
-
-#define popw(base, ptr) \
-({ unsigned long __res; \
-__asm__ __volatile__( \
-	"movb 0(%1,%0),%b2\n\t" \
-	"incw %w0\n\t" \
-	"movb 0(%1,%0),%h2\n\t" \
-	"incw %w0" \
-	: "=r" (ptr), "=r" (base), "=q" (__res) \
-	: "0" (ptr), "1" (base), "2" (0)); \
-__res; })
-
-#define popl(base, ptr) \
-({ unsigned long __res; \
-__asm__ __volatile__( \
-	"movb 0(%1,%0),%b2\n\t" \
-	"incw %w0\n\t" \
-	"movb 0(%1,%0),%h2\n\t" \
-	"incw %w0\n\t" \
-	"rorl $16,%2\n\t" \
-	"movb 0(%1,%0),%b2\n\t" \
-	"incw %w0\n\t" \
-	"movb 0(%1,%0),%h2\n\t" \
-	"incw %w0\n\t" \
-	"rorl $16,%2" \
-	: "=r" (ptr), "=r" (base), "=q" (__res) \
-	: "0" (ptr), "1" (base)); \
-__res; })
-
-static void do_int(struct kernel_vm86_regs *regs, int i, unsigned char * ssp, unsigned long sp)
+static void do_int(struct kernel_vm86_regs *regs, int i,
+    unsigned char * ssp, unsigned short sp)
 {
 	unsigned long *intr_ptr, segoffs;
 
@@ -414,14 +475,15 @@ static void do_int(struct kernel_vm86_regs *regs, int i, unsigned char * ssp, un
 		goto cannot_handle;
 	if ((segoffs >> 16) == BIOSSEG)
 		goto cannot_handle;
-	pushw(ssp, sp, get_vflags(regs));
-	pushw(ssp, sp, regs->cs);
-	pushw(ssp, sp, IP(regs));
+	pushw(ssp, sp, get_vflags(regs), cannot_handle);
+	pushw(ssp, sp, regs->cs, cannot_handle);
+	pushw(ssp, sp, IP(regs), cannot_handle);
 	regs->cs = segoffs >> 16;
 	SP(regs) -= 6;
 	IP(regs) = segoffs & 0xffff;
 	clear_TF(regs);
 	clear_IF(regs);
+	clear_AC(regs);
 	return;
 
 cannot_handle:
@@ -453,75 +515,80 @@ int handle_vm86_trap(struct kernel_vm86_regs * regs, long error_code, int trapno
 
 void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 {
-	unsigned char *csp, *ssp;
-	unsigned long ip, sp;
+	unsigned char *csp, *ssp, opcode;
+	unsigned short ip, sp;
+	int data32, pref_done;
 
 #define CHECK_IF_IN_TRAP \
 	if (VMPI.vm86dbg_active && VMPI.vm86dbg_TFpendig) \
-		pushw(ssp,sp,popw(ssp,sp) | TF_MASK);
-#define VM86_FAULT_RETURN \
+		newflags |= TF_MASK
+#define VM86_FAULT_RETURN do { \
 	if (VMPI.force_return_for_pic  && (VEFLAGS & (IF_MASK | VIF_MASK))) \
 		return_to_32bit(regs, VM86_PICRETURN); \
-	return;
-	                                   
+	return; } while (0)
+
 	csp = (unsigned char *) (regs->cs << 4);
 	ssp = (unsigned char *) (regs->ss << 4);
 	sp = SP(regs);
 	ip = IP(regs);
 
-	switch (popb(csp, ip)) {
-
-	/* operand size override */
-	case 0x66:
-		switch (popb(csp, ip)) {
-
-		/* pushfd */
-		case 0x9c:
-			SP(regs) -= 4;
-			IP(regs) += 2;
-			pushl(ssp, sp, get_vflags(regs));
-			VM86_FAULT_RETURN;
-
-		/* popfd */
-		case 0x9d:
-			SP(regs) += 4;
-			IP(regs) += 2;
-			CHECK_IF_IN_TRAP
-			set_vflags_long(popl(ssp, sp), regs);
-			VM86_FAULT_RETURN;
-
-		/* iretd */
-		case 0xcf:
-			SP(regs) += 12;
-			IP(regs) = (unsigned short)popl(ssp, sp);
-			regs->cs = (unsigned short)popl(ssp, sp);
-			CHECK_IF_IN_TRAP
-			set_vflags_long(popl(ssp, sp), regs);
-			VM86_FAULT_RETURN;
-		/* need this to avoid a fallthrough */
-		default:
-			return_to_32bit(regs, VM86_UNKNOWN);
+	data32 = 0;
+	pref_done = 0;
+	do {
+		switch (opcode = popb(csp, ip, simulate_sigsegv)) {
+			case 0x66:      /* 32-bit data */     data32=1; break;
+			case 0x67:      /* 32-bit address */  break;
+			case 0x2e:      /* CS */              break;
+			case 0x3e:      /* DS */              break;
+			case 0x26:      /* ES */              break;
+			case 0x36:      /* SS */              break;
+			case 0x65:      /* GS */              break;
+			case 0x64:      /* FS */              break;
+			case 0xf2:      /* repnz */       break;
+			case 0xf3:      /* rep */             break;
+			default: pref_done = 1;
 		}
+	} while (!pref_done);
+
+	switch (opcode) {
 
 	/* pushf */
 	case 0x9c:
-		SP(regs) -= 2;
-		IP(regs)++;
-		pushw(ssp, sp, get_vflags(regs));
+		if (data32) {
+			pushl(ssp, sp, get_vflags(regs), simulate_sigsegv);
+			SP(regs) -= 4;
+		} else {
+			pushw(ssp, sp, get_vflags(regs), simulate_sigsegv);
+			SP(regs) -= 2;
+		}
+		IP(regs) = ip;
 		VM86_FAULT_RETURN;
 
 	/* popf */
 	case 0x9d:
-		SP(regs) += 2;
-		IP(regs)++;
-		CHECK_IF_IN_TRAP
-		set_vflags_short(popw(ssp, sp), regs);
+		{
+		unsigned long newflags;
+		if (data32) {
+			newflags=popl(ssp, sp, simulate_sigsegv);
+			SP(regs) += 4;
+		} else {
+			newflags = popw(ssp, sp, simulate_sigsegv);
+			SP(regs) += 2;
+		}
+		IP(regs) = ip;
+		CHECK_IF_IN_TRAP;
+		if (data32) {
+			set_vflags_long(newflags, regs);
+		} else {
+			set_vflags_short(newflags, regs);
+		}
 		VM86_FAULT_RETURN;
+		}
 
 	/* int xx */
 	case 0xcd: {
-	        int intno=popb(csp, ip);
-		IP(regs) += 2;
+		int intno=popb(csp, ip, simulate_sigsegv);
+		IP(regs) = ip;
 		if (VMPI.vm86dbg_active) {
 			if ( (1 << (intno &7)) & VMPI.vm86dbg_intxxtab[intno >> 3] )
 				return_to_32bit(regs, VM86_INTx + (intno << 8));
@@ -532,16 +599,35 @@ void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 
 	/* iret */
 	case 0xcf:
-		SP(regs) += 6;
-		IP(regs) = popw(ssp, sp);
-		regs->cs = popw(ssp, sp);
-		CHECK_IF_IN_TRAP
-		set_vflags_short(popw(ssp, sp), regs);
+		{
+		unsigned long newip;
+		unsigned long newcs;
+		unsigned long newflags;
+		if (data32) {
+			newip=popl(ssp, sp, simulate_sigsegv);
+			newcs=popl(ssp, sp, simulate_sigsegv);
+			newflags=popl(ssp, sp, simulate_sigsegv);
+			SP(regs) += 12;
+		} else {
+			newip = popw(ssp, sp, simulate_sigsegv);
+			newcs = popw(ssp, sp, simulate_sigsegv);
+			newflags = popw(ssp, sp, simulate_sigsegv);
+			SP(regs) += 6;
+		}
+		IP(regs) = newip;
+		regs->cs = newcs;
+		CHECK_IF_IN_TRAP;
+		if (data32) {
+			set_vflags_long(newflags, regs);
+		} else {
+			set_vflags_short(newflags, regs);
+		}
 		VM86_FAULT_RETURN;
+		}
 
 	/* cli */
 	case 0xfa:
-		IP(regs)++;
+		IP(regs) = ip;
 		clear_IF(regs);
 		VM86_FAULT_RETURN;
 
@@ -553,13 +639,28 @@ void handle_vm86_fault(struct kernel_vm86_regs * regs, long error_code)
 	 * Probably needs some horsing around with the TF flag. Aiee..
 	 */
 	case 0xfb:
-		IP(regs)++;
+		IP(regs) = ip;
 		set_IF(regs);
 		VM86_FAULT_RETURN;
 
 	default:
 		return_to_32bit(regs, VM86_UNKNOWN);
 	}
+
+	return;
+
+simulate_sigsegv:
+	/* FIXME: After a long discussion with Stas we finally
+	 *        agreed, that this is wrong. Here we should
+	 *        really send a SIGSEGV to the user program.
+	 *        But how do we create the correct context? We
+	 *        are inside a general protection fault handler
+	 *        and has just returned from a page fault handler.
+	 *        The correct context for the signal handler
+	 *        should be a mixture of the two, but how do we
+	 *        get the information? [KD]
+	 */
+	return_to_32bit(regs, VM86_UNKNOWN);
 }
 
 /* ---------------- vm86 special IRQ passing stuff ----------------- */
@@ -621,6 +722,14 @@ static inline int task_valid(struct task_struct *tsk)
 out:
 	read_unlock(&tasklist_lock);
 	return ret;
+}
+
+void release_x86_irqs(struct task_struct *task)
+{
+	int i;
+	for (i=3; i<16; i++)
+	    if (vm86_irqs[i].tsk == task)
+		free_vm86_irq(i);
 }
 
 static inline void handle_irq_zombies(void)
