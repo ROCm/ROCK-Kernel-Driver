@@ -954,8 +954,15 @@ KBUILD_MODULES := 1
 crmodverdir: FORCE
 	$(Q)mkdir -p $(MODVERDIR)
 
+check-Module.symvers: FORCE
+	@[ -e $(objtree)/Module.symvers ] || \
+	echo; \
+	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
+	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
+	echo
+
 .PHONY: $(KBUILD_EXTMOD)
-$(KBUILD_EXTMOD): crmodverdir FORCE
+$(KBUILD_EXTMOD): crmodverdir check-Module.symvers FORCE
 	$(Q)$(MAKE) $(build)=$@
 
 .PHONY: modules
