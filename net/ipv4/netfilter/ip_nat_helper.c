@@ -217,6 +217,12 @@ ip_nat_mangle_udp_packet(struct sk_buff **pskb,
 	struct iphdr *iph;
 	struct udphdr *udph;
 
+	/* UDP helpers might accidentally mangle the wrong packet */
+	iph = (*pskb)->nh.iph;
+	if ((*pskb)->len < iph->ihl*4 + sizeof(*udph) + 
+	                       match_offset + match_len)
+		return 0;
+
 	if (!skb_ip_make_writable(pskb, (*pskb)->len))
 		return 0;
 
