@@ -24,7 +24,6 @@
 #include <asm/macintosh.h> 
 #include <asm/macints.h> 
 #include <asm/mac_psc.h>
-#include <asm/unistd.h>
 
 #define DEBUG_PSC
 

@@ -15,7 +15,6 @@
 #include <asm/intersil.h>
 #include <asm/oplib.h>
 #include <asm/sun3ints.h>
-#include <asm/unistd.h>
 #include <linux/seq_file.h>
 
 extern void sun3_leds (unsigned char);
