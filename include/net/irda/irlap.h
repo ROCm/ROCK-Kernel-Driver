@@ -31,8 +31,6 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/ppp_defs.h>
-#include <linux/ppp-comp.h>
 #include <linux/timer.h>
 
 #include <net/irda/irlap_event.h>
@@ -239,5 +237,25 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now);
 
 #define IRLAP_GET_HEADER_SIZE(self) (LAP_MAX_HEADER)
 #define IRLAP_GET_TX_QUEUE_LEN(self) skb_queue_len(&self->txq)
+
+/* Return TRUE if the node is in primary mode (i.e. master)
+ * - Jean II */
+static inline int irlap_is_primary(struct irlap_cb *self)
+{
+	int ret;
+	switch(self->state) {
+	case LAP_XMIT_P:
+	case LAP_NRM_P:
+		ret = 1;
+		break;
+	case LAP_XMIT_S:
+	case LAP_NRM_S:
+		ret = 0;
+		break;
+	default:
+		ret = -1;
+	}
+	return(ret);
+}
 
 #endif

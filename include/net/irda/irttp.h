@@ -197,6 +197,18 @@ static inline void irttp_listen(struct tsap_cb *self)
 	self->dtsap_sel = LSAP_ANY;
 }
 
+/* Return TRUE if the node is in primary mode (i.e. master)
+ * - Jean II */
+static inline int irttp_is_primary(struct tsap_cb *self)
+{
+	if ((self == NULL) ||
+	    (self->lsap == NULL) ||
+	    (self->lsap->lap == NULL) ||
+	    (self->lsap->lap->irlap == NULL))
+		return -2;
+	return(irlap_is_primary(self->lsap->lap->irlap));
+}
+
 extern struct irttp_cb *irttp;
 
 #endif /* IRTTP_H */
