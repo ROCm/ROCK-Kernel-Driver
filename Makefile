@@ -513,7 +513,7 @@ modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
 #	Install modules
 
 .PHONY: modules_install
-modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS)) _modinst_post
+modules_install: _modinst_ _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
@@ -521,6 +521,7 @@ _modinst_:
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
 	@ln -s $(TOPDIR) $(MODLIB)/build
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
 # dependency on System.map since that would run the dependency tree on
@@ -533,12 +534,8 @@ else
 depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
 endif
 .PHONY: _modinst_post
-_modinst_post:
+_modinst_post: _modinst_
 	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
-
-.PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
-$(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 
 else # CONFIG_MODULES
 
