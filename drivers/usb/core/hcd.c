@@ -26,18 +26,18 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
+
+#ifdef CONFIG_USB_DEBUG
+#	define DEBUG
+#else
+#	undef DEBUG
+#endif
+
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/uts.h>			/* for UTS_SYSNAME */
 #include <linux/pci.h>			/* for hcd->pdev and dma addressing */
 #include <asm/byteorder.h>
-
-
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 
 #include <linux/usb.h>
 #include "hcd.h"
@@ -1090,6 +1090,7 @@ static int hcd_unlink_urb (struct urb *urb)
 {
 	struct hcd_dev			*dev;
 	struct usb_hcd			*hcd = 0;
+	struct device			*sys = 0;
 	unsigned long			flags;
 	struct completion_splice	splice;
 	int				retval;
@@ -1110,38 +1111,31 @@ static int hcd_unlink_urb (struct urb *urb)
 	 */
 	spin_lock_irqsave (&urb->lock, flags);
 	spin_lock (&hcd_data_lock);
-	if (!urb->hcpriv || urb->transfer_flags & URB_TIMEOUT_KILLED) {
-		retval = -EINVAL;
-		goto done;
-	}
 
 	if (!urb->dev || !urb->dev->bus) {
 		retval = -ENODEV;
 		goto done;
 	}
 
-	/* giveback clears dev; non-null means it's linked at this level */
 	dev = urb->dev->hcpriv;
+	sys = &urb->dev->dev;
 	hcd = urb->dev->bus->hcpriv;
 	if (!dev || !hcd) {
 		retval = -ENODEV;
 		goto done;
 	}
 
-	/* Except for interrupt transfers, any status except -EINPROGRESS
-	 * means the HCD already started to unlink this URB from the hardware.
-	 * So there's no more work to do.
+	if (!urb->hcpriv) {
+		retval = -EINVAL;
+		goto done;
+	}
+
+	/* Any status except -EINPROGRESS means something already started to
+	 * unlink this URB from the hardware.  So there's no more work to do.
 	 *
-	 * For interrupt transfers, this is the only way to trigger unlinking
-	 * from the hardware.  Since we (currently) overload urb->status to
-	 * tell the driver to unlink, error status might get clobbered ...
-	 * unless that transfer hasn't yet restarted.  One such case is when
-	 * the URB gets unlinked from its completion handler.
-	 *
-	 * FIXME use an URB_UNLINKED flag to match URB_TIMEOUT_KILLED
+	 * FIXME use better explicit urb state
 	 */
-	if (urb->status != -EINPROGRESS
-			&& usb_pipetype (urb->pipe) != PIPE_INTERRUPT) {
+	if (urb->status != -EINPROGRESS) {
 		retval = -EINVAL;
 		goto done;
 	}
@@ -1150,9 +1144,7 @@ static int hcd_unlink_urb (struct urb *urb)
 	 * lower level hcd code is always async, locking on urb->status
 	 * updates; an intercepted completion unblocks us.
 	 */
-	if ((urb->transfer_flags & URB_TIMEOUT_KILLED))
-		urb->status = -ETIMEDOUT;
-	else if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
+	if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
 		if (in_interrupt ()) {
 			dbg ("non-async unlink in_interrupt");
 			retval = -EWOULDBLOCK;
@@ -1177,29 +1169,34 @@ static int hcd_unlink_urb (struct urb *urb)
 		retval = 0;
 	} else {
 		retval = hcd->driver->urb_dequeue (hcd, urb);
-// FIXME:  if retval and we tried to splice, whoa!!
-if (retval && urb->status == -ENOENT) err ("whoa! retval %d", retval);
+
+		/* hcds shouldn't really fail these calls, but... */
+		if (retval) {
+			dev_dbg (*sys, "dequeue %p --> %d\n", urb, retval);
+			if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
+				spin_lock_irqsave (&urb->lock, flags);
+				urb->complete = splice.complete;
+				urb->context = splice.context;
+				spin_unlock_irqrestore (&urb->lock, flags);
+			}
+			goto bye;
+		}
 	}
 
     	/* block till giveback, if needed */
-	if (!(urb->transfer_flags & (URB_ASYNC_UNLINK|URB_TIMEOUT_KILLED))
-			&& HCD_IS_RUNNING (hcd->state)
-			&& !retval) {
-		dbg ("%s: wait for giveback urb %p",
-			hcd->self.bus_name, urb);
-		wait_for_completion (&splice.done);
-	} else if ((urb->transfer_flags & URB_ASYNC_UNLINK) && retval == 0) {
+	if (urb->transfer_flags & URB_ASYNC_UNLINK)
 		return -EINPROGRESS;
-	}
-	goto bye;
+
+	dev_dbg (*sys, "wait for giveback urb %p\n", urb);
+	wait_for_completion (&splice.done);
+	return 0;
+
 done:
 	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
 bye:
-	if (retval)
-		dbg ("%s: hcd_unlink_urb fail %d",
-		    hcd ? hcd->self.bus_name : "(no bus?)",
-		    retval);
+	if (retval && sys)
+		dev_dbg (*sys, "hcd_unlink_urb %p fail %d\n", urb, retval);
 	return retval;
 }
 
