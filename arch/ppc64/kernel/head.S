@@ -897,18 +897,8 @@ _GLOBAL(do_stab_bolted)
 
 	mfspr   r22,DSISR
 	andis.  r22,r22,0x0020
-	bne+    2f
-	ld	r22,8(r21)	/* get SRR1 */
-	andi.	r22,r22,MSR_PR	/* check if from user */
-	bne+	stab_bolted_user_return  /* from user, send the error on up */
-#if 0
-	li	r3,0
-#ifdef CONFIG_XMON
-	bl	.xmon
-#endif
-1:	b	1b
-#endif
-2:
+	beq-	stab_bolted_user_return
+
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
 	mfspr	r21,DAR
 	rldicl  r20,r21,36,32   /* Permits a full 32b of ESID */
@@ -1106,9 +1096,11 @@ SLB_NUM_ENTRIES = 64
 	oris    r21,r23,2048   /* valid bit    */
 	rldimi  r21,r22,0,52   /* Insert entry */
 
-	isync
+	/* 
+	 * No need for an isync before or after this slbmte. The exception
+	 * we enter with and the rfid we exit with are context synchronizing .
+	 */
 	slbmte  r20,r21
-	isync
 
 	/* All done -- return from exception. */
 	mfsprg  r20,3                   /* Load the PACA pointer  */
@@ -1861,9 +1853,9 @@ _STATIC(start_here_common)
 	li	r5,0
 	std	r0,PACAKSAVE(r13)
 
-	/* ptr to hardware interrupt stack for processor 0                */
+	/* ptr to hardware interrupt stack for boot processor */
 	LOADADDR(r3, hardware_int_paca0)
-	li      r5,0x1000
+	li      r5,PAGE_SIZE
 	sldi    r5,r5,3
 	subi    r5,r5,STACK_FRAME_OVERHEAD
 
@@ -1991,7 +1983,7 @@ ioremap_dir:
 
 	.globl  hardware_int_paca0
 hardware_int_paca0:
-	.space	8*4096
+	.space	8*PAGE_SIZE
 
 /* 1 page segment table per cpu (max 48, cpu0 allocated at STAB0_PHYS_ADDR) */
 	.globl	stab_array

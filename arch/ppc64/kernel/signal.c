@@ -69,13 +69,11 @@ struct rt_sigframe {
 };
 
 
-extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
-
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int p6,
-		  int p7, struct pt_regs *regs)
+long sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4,
+		       int p6, int p7, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
 
@@ -390,8 +388,6 @@ syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-extern int do_signal32(sigset_t *oldset, struct pt_regs *regs);
-
 int do_signal(sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;

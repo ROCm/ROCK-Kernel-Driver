@@ -113,7 +113,7 @@ static int smp_iSeries_numProcs(void)
 	struct ItLpPaca * lpPaca;
 
 	np = 0;
-        for (i=0; i < MAX_PACAS; ++i) {
+        for (i=0; i < NR_CPUS; ++i) {
                 lpPaca = paca[i].xLpPacaPtr;
                 if ( lpPaca->xDynProcStatus < 2 ) {
                         ++np;
@@ -128,7 +128,7 @@ static int smp_iSeries_probe(void)
 	unsigned np = 0;
 	struct ItLpPaca *lpPaca;
 
-	for (i=0; i < MAX_PACAS; ++i) {
+	for (i=0; i < NR_CPUS; ++i) {
 		lpPaca = paca[i].xLpPacaPtr;
 		if (lpPaca->xDynProcStatus < 2) {
 			paca[i].active = 1;
@@ -144,7 +144,7 @@ static void smp_iSeries_kick_cpu(int nr)
 	struct ItLpPaca * lpPaca;
 	/* Verify we have a Paca for processor nr */
 	if ( ( nr <= 0 ) ||
-	     ( nr >= MAX_PACAS ) )
+	     ( nr >= NR_CPUS ) )
 		return;
 	/* Verify that our partition has a processor nr */
 	lpPaca = paca[nr].xLpPacaPtr;
@@ -228,7 +228,7 @@ smp_kick_cpu(int nr)
 {
 	/* Verify we have a Paca for processor nr */
 	if ( ( nr <= 0 ) ||
-	     ( nr >= MAX_PACAS ) )
+	     ( nr >= NR_CPUS ) )
 		return;
 
 	/* The information for processor bringup must
