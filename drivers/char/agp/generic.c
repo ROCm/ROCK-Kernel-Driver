@@ -1,6 +1,6 @@
 /*
  * AGPGART driver.
- * Copyright (C) 2002-2003 Dave Jones.
+ * Copyright (C) 2002-2004 Dave Jones.
  * Copyright (C) 1999 Jeff Hartmann.
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -18,12 +18,12 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
+ * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * TODO: 
+ * TODO:
  * - Allocate more than order 0 pages to avoid too much linear map splitting.
  */
 #include <linux/config.h>
@@ -37,7 +37,7 @@
 #include <linux/vmalloc.h>
 #include "agp.h"
 
-__u32 *agp_gatt_table; 
+__u32 *agp_gatt_table;
 int agp_memory_reserved;
 
 /*
@@ -46,7 +46,7 @@ int agp_memory_reserved;
  */
 EXPORT_SYMBOL_GPL(agp_memory_reserved);
 
-/* 
+/*
  * Generic routines for handling agp_memory structures -
  * They use the basic page allocation routines to do the brunt of the work.
  */
@@ -142,12 +142,12 @@ EXPORT_SYMBOL(agp_free_memory);
  *	agp_allocate_memory  -  allocate a group of pages of a certain type.
  *
  *	@page_count:	size_t argument of the number of pages
- *	@type:	u32 argument of the type of memory to be allocated.  
+ *	@type:	u32 argument of the type of memory to be allocated.
  *
  *	Every agp bridge device will allow you to allocate AGP_NORMAL_MEMORY which
  *	maps to physical ram.  Any other type is device dependent.
  *
- *	It returns NULL whenever memory is unavailable. 
+ *	It returns NULL whenever memory is unavailable.
  */
 struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
@@ -311,7 +311,7 @@ EXPORT_SYMBOL(agp_copy_info);
 
 /**
  *	agp_bind_memory  -  Bind an agp_memory structure into the GATT.
- * 
+ *
  *	@curr:		agp_memory pointer
  *	@pg_start:	an offset into the graphics aperture translation table
  *
@@ -347,9 +347,9 @@ EXPORT_SYMBOL(agp_bind_memory);
 
 /**
  *	agp_unbind_memory  -  Removes an agp_memory structure from the GATT
- * 
+ *
  * @curr:	agp_memory pointer to be removed from the GATT.
- * 
+ *
  * It returns -EINVAL if this piece of agp_memory is not currently bound to
  * the graphics aperture translation table or if the agp_memory pointer == NULL
  */
@@ -480,7 +480,7 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 			continue;
 
 		/*
-		 * Ok, here we have a AGP device. Disable impossible 
+		 * Ok, here we have a AGP device. Disable impossible
 		 * settings, and adjust the readqueue to the minimum.
 		 */
 		pci_read_config_dword(device, cap_ptr+PCI_AGP_STATUS, &tmp);
@@ -489,7 +489,7 @@ u32 agp_collect_device_status(u32 mode, u32 cmd)
 		cmd = ((cmd & ~AGPSTAT_RQ_DEPTH) |
 		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
 			 min_t(u32, (cmd & AGPSTAT_RQ_DEPTH), (tmp & AGPSTAT_RQ_DEPTH))));
-		
+
 		/* disable FW if it's not supported */
 		if (!((cmd & AGPSTAT_FW) && (tmp & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
 			cmd &= ~AGPSTAT_FW;
@@ -663,7 +663,7 @@ int agp_generic_create_gatt_table(void)
 					    agp_bridge->current_size;
 					break;
 				}
-				temp = agp_bridge->current_size;	
+				temp = agp_bridge->current_size;
 			} else {
 				agp_bridge->aperture_size_idx = i;
 			}
@@ -684,7 +684,7 @@ int agp_generic_create_gatt_table(void)
 		SetPageReserved(page);
 
 	agp_bridge->gatt_table_real = (u32 *) table;
-	agp_gatt_table = (void *)table; 
+	agp_gatt_table = (void *)table;
 
 	agp_bridge->driver->cache_flush();
 	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
@@ -870,9 +870,9 @@ void agp_generic_free_by_type(struct agp_memory *curr)
 EXPORT_SYMBOL(agp_generic_free_by_type);
 
 
-/* 
+/*
  * Basic Page Allocation Routines -
- * These routines handle page allocation and by default they reserve the allocated 
+ * These routines handle page allocation and by default they reserve the allocated
  * memory.  They also handle incrementing the current_memory_agp value, Which is checked
  * against a maximum value.
  */
@@ -914,9 +914,9 @@ EXPORT_SYMBOL(agp_generic_destroy_page);
 /* End Basic Page Allocation Routines */
 
 
-/** 
+/**
  * agp_enable  -  initialise the agp point-to-point connection.
- * 
+ *
  * @mode:	agp mode register value to configure with.
  */
 void agp_enable(u32 mode)
