@@ -1496,12 +1496,19 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 		break;
 	}
 
-	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-
 	if (ret != -EINPROGRESS) {
+		/* Submit failed, so delete it from the urb_list */
+		struct urb_priv *urbp = urb->hcpriv;
+
+		list_del_init(&urbp->urb_list);
+		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 		uhci_destroy_urb_priv (uhci, urb);
+
 		return ret;
 	}
+
+	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
+
 	return 0;
 }
 
