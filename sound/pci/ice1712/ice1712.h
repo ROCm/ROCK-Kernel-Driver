@@ -363,7 +363,11 @@ struct _snd_ice1712 {
 		/* additional i2c devices for EWS boards*/
 		snd_i2c_device_t *i2cdevs[3];
 		/* AC97 register cache for Aureon */
-		unsigned short stac9744[64];
+		struct aureon_spec {
+			unsigned short stac9744[64];
+			unsigned short master[2];
+			unsigned short vol[8];
+		} aureon;
 		/* Hoontech-specific setting */
 		struct hoontech_spec {
 			unsigned char boxbits[4];
