@@ -59,7 +59,8 @@
 #define USE_INODE_GENERATION_COUNTER
 
 #define REISERFS_PREALLOCATE
-#define PREALLOCATION_SIZE 8
+#define DISPLACE_NEW_PACKING_LOCALITIES
+#define PREALLOCATION_SIZE 9
 
 /* n must be power of 2 */
 #define _ROUND_UP(x,n) (((x)+(n)-1u) & ~((n)-1u))
@@ -326,7 +327,7 @@ static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)
    time cost for a 4 block file and saves an amount of space that is
    less significant as a percentage of space, or so goes the hypothesis.
    -Hans */
-#define STORE_TAIL_IN_UNFM(n_file_size,n_tail_size,n_block_size) \
+#define STORE_TAIL_IN_UNFM_S1(n_file_size,n_tail_size,n_block_size) \
 (\
   (!(n_tail_size)) || \
   (((n_tail_size) > MAX_DIRECT_ITEM_LEN(n_block_size)) || \
@@ -338,6 +339,18 @@ static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)
    ( ( (n_file_size) >= (n_block_size) ) && \
      ( (n_tail_size) >=   (MAX_DIRECT_ITEM_LEN(n_block_size) * 3)/4) ) ) \
 )
+
+/* Another strategy for tails, this one means only create a tail if all the
+   file would fit into one DIRECT item.
+   Primary intention for this one is to increase performance by decreasing
+   seeking.
+*/   
+#define STORE_TAIL_IN_UNFM_S2(n_file_size,n_tail_size,n_block_size) \
+(\
+  (!(n_tail_size)) || \
+  (((n_file_size) > MAX_DIRECT_ITEM_LEN(n_block_size)) ) \
+)
+
 
 
 /*
@@ -1433,6 +1446,10 @@ struct tree_balance
 
   int fs_gen;                  /* saved value of `reiserfs_generation' counter
 			          see FILESYSTEM_CHANGED() macro in reiserfs_fs.h */
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+  struct key  key;	      /* key pointer, to pass to block allocator or
+				 another low-level subsystem */
+#endif
 } ;
 
 /* These are modes of balancing */
@@ -1673,7 +1690,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *, struct super_block 
 int push_journal_writer(char *w) ;
 int pop_journal_writer(int windex) ;
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
-int reiserfs_in_journal(struct super_block *p_s_sb, unsigned long bl, int searchall, unsigned long *next) ;
+int reiserfs_in_journal(struct super_block *p_s_sb, int bmap_nr, int bit_nr, int searchall, unsigned long *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
 void flush_async_commits(struct super_block *p_s_sb) ;
 
@@ -1818,8 +1835,8 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 #define file_size(inode) ((inode)->i_size)
 #define tail_size(inode) (file_size (inode) & (i_block_size (inode) - 1))
 
-#define tail_has_to_be_packed(inode) (!dont_have_tails ((inode)->i_sb) &&\
-!STORE_TAIL_IN_UNFM(file_size (inode), tail_size(inode), i_block_size (inode)))
+#define tail_has_to_be_packed(inode) (have_large_tails ((inode)->i_sb)?\
+!STORE_TAIL_IN_UNFM_S1(file_size (inode), tail_size(inode), inode->i_sb->s_blocksize):have_small_tails ((inode)->i_sb)?!STORE_TAIL_IN_UNFM_S2(file_size (inode), tail_size(inode), inode->i_sb->s_blocksize):0 )
 
 void padd_item (char * item, int total_length, int length);
 
@@ -2015,22 +2032,87 @@ void make_empty_node (struct buffer_info *);
 struct buffer_head * get_FEB (struct tree_balance *);
 
 /* bitmap.c */
+
+/* structure contains hints for block allocator, and it is a container for
+ * arguments, such as node, search path, transaction_handle, etc. */
+ struct __reiserfs_blocknr_hint {
+     struct inode * inode;		/* inode passed to allocator, if we allocate unf. nodes */
+     long block;			/* file offset, in blocks */
+     struct key key;
+     struct path * path;		/* search path, used by allocator to deternine search_start by
+					 * various ways */
+     struct reiserfs_transaction_handle * th; /* transaction handle is needed to log super blocks and
+					       * bitmap blocks changes  */
+     b_blocknr_t beg, end;
+     b_blocknr_t search_start;		/* a field used to transfer search start value (block number)
+					 * between different block allocator procedures
+					 * (determine_search_start() and others) */
+    int prealloc_size;			/* is set in determine_prealloc_size() function, used by underlayed
+					 * function that do actual allocation */
+
+    int formatted_node:1;		/* the allocator uses different polices for getting disk space for
+					 * formatted/unformatted blocks with/without preallocation */
+    int preallocate:1;
+};
+
+typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;
+
+int reiserfs_parse_alloc_options (struct super_block *, char *);
 int is_reusable (struct super_block * s, unsigned long block, int bit_value);
 void reiserfs_free_block (struct reiserfs_transaction_handle *th, unsigned long);
-int reiserfs_new_blocknrs (struct reiserfs_transaction_handle *th,
-			   unsigned long * pblocknrs, unsigned long start_from, int amount_needed);
-int reiserfs_new_unf_blocknrs (struct reiserfs_transaction_handle *th,
-			       unsigned long * pblocknr, unsigned long start_from);
+int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *, b_blocknr_t * , int, int);
+extern inline int reiserfs_new_form_blocknrs (struct tree_balance * tb,
+					      b_blocknr_t *new_blocknrs, int amount_needed)
+{
+    reiserfs_blocknr_hint_t hint = {
+	th:tb->transaction_handle,
+	path: tb->tb_path,
+	inode: NULL,
+	key: tb->key,
+	block: 0,
+	formatted_node:1
+    };
+    return reiserfs_allocate_blocknrs(&hint, new_blocknrs, amount_needed, 0);
+}
+
+extern inline int reiserfs_new_unf_blocknrs (struct reiserfs_transaction_handle *th,
+					     b_blocknr_t *new_blocknrs,
+					     struct path * path, long block)
+{
+    reiserfs_blocknr_hint_t hint = {
+	th: th,
+	path: path,
+	inode: NULL,
+	block: block,
+	formatted_node: 0,
+	preallocate: 0
+    };
+    return reiserfs_allocate_blocknrs(&hint, new_blocknrs, 1, 0);
+}
+
 #ifdef REISERFS_PREALLOCATE
-int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th, 
-				struct inode * inode,
-				unsigned long * pblocknr, 
-				unsigned long start_from);
+extern inline int reiserfs_new_unf_blocknrs2(struct reiserfs_transaction_handle *th,
+					     struct inode * inode,
+					     b_blocknr_t *new_blocknrs,
+					     struct path * path, long block)
+{
+    reiserfs_blocknr_hint_t hint = {
+	th: th,
+	path: path,
+	inode: inode,
+	block: block,
+	formatted_node: 0,
+	preallocate: 1
+    };
+    return reiserfs_allocate_blocknrs(&hint, new_blocknrs, 1, 0);
+}
 
 void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th, 
 				struct inode * inode);
 void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th);
 #endif
+void reiserfs_claim_blocks_to_be_allocated( struct super_block *sb, int blocks);
+void reiserfs_release_claimed_blocks( struct super_block *sb, int blocks);
 
 /* hashes.c */
 __u32 keyed_hash (const signed char *msg, int len);

@@ -2200,8 +2200,9 @@ int page_symlink(struct inode *inode, const char *symname, int len)
 	err = mapping->a_ops->prepare_write(NULL, page, 0, len-1);
 	if (err)
 		goto fail_map;
-	kaddr = page_address(page);
+	kaddr = kmap_atomic(page, KM_USER0);
 	memcpy(kaddr, symname, len-1);
+	kunmap_atomic(kaddr, KM_USER0);
 	mapping->a_ops->commit_write(NULL, page, 0, len-1);
 	/*
 	 * Notice that we are _not_ going to block here - end of page is

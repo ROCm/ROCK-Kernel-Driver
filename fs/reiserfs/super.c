@@ -13,6 +13,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/vmalloc.h>
 #include <linux/time.h>
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
@@ -374,9 +375,9 @@ static void reiserfs_put_super (struct super_block * s)
   journal_release(&th, s) ;
 
   for (i = 0; i < SB_BMAP_NR (s); i ++)
-    brelse (SB_AP_BITMAP (s)[i]);
+    brelse (SB_AP_BITMAP (s)[i].bh);
 
-  reiserfs_kfree (SB_AP_BITMAP (s), sizeof (struct buffer_head *) * SB_BMAP_NR (s), s);
+  vfree (SB_AP_BITMAP (s));
 
   brelse (SB_BUFFER_WITH_SB (s));
 
@@ -385,6 +386,11 @@ static void reiserfs_put_super (struct super_block * s)
   if (REISERFS_SB(s)->s_kmallocs != 0) {
     reiserfs_warning ("vs-2004: reiserfs_put_super: allocated memory left %d\n",
 		      REISERFS_SB(s)->s_kmallocs);
+  }
+
+  if (REISERFS_SB(s)->reserved_blocks != 0) {
+    reiserfs_warning ("green-2005: reiserfs_put_super: reserved blocks left %d\n",
+		      REISERFS_SB(s)->reserved_blocks);
   }
 
   reiserfs_proc_unregister( s, "journal" );
@@ -518,6 +524,13 @@ const arg_desc_t balloc[] = {
     {NULL, -1}
 };
 
+const arg_desc_t tails[] = {
+    {"on", REISERFS_LARGETAIL},
+    {"off", -1},
+    {"small", REISERFS_SMALLTAIL},
+    {NULL, 0}
+};
+
 
 /* proceed only one option from a list *cur - string containing of mount options
    opts - array of options which are accepted
@@ -525,7 +538,7 @@ const arg_desc_t balloc[] = {
    in the input - pointer to the argument is stored here
    bit_flags - if option requires to set a certain bit - it is set here
    return -1 if unknown option is found, opt->arg_required otherwise */
-static int reiserfs_getopt (char ** cur, opt_desc_t * opts, char ** opt_arg,
+static int reiserfs_getopt ( struct super_block * s, char ** cur, opt_desc_t * opts, char ** opt_arg,
 			    unsigned long * bit_flags)
 {
     char * p;
@@ -547,7 +560,16 @@ static int reiserfs_getopt (char ** cur, opt_desc_t * opts, char ** opt_arg,
 	*(*cur) = '\0';
 	(*cur) ++;
     }
-    
+
+    if ( !strncmp (p, "alloc=", 6) ) {
+	/* Ugly special case, probably we should redo options parser so that
+	   it can understand several arguments for some options, also so that
+	   it can fill several bitfields with option values. */
+	reiserfs_parse_alloc_options( s, p + 6);
+	return 0;
+    }
+
+ 
     /* for every option in the list */
     for (opt = opts; opt->option_name; opt ++) {
 	if (!strncmp (p, opt->option_name, strlen (opt->option_name))) {
@@ -612,7 +634,7 @@ static int reiserfs_getopt (char ** cur, opt_desc_t * opts, char ** opt_arg,
 
 
 /* returns 0 if something is wrong in option string, 1 - otherwise */
-static int reiserfs_parse_options (char * options, /* string given via mount's -o */
+static int reiserfs_parse_options (struct super_block * s, char * options, /* string given via mount's -o */
 				   unsigned long * mount_options,
 				   /* after the parsing phase, contains the
 				      collection of bitflags defining what
@@ -624,14 +646,14 @@ static int reiserfs_parse_options (char * options, /* string given via mount's -
     char * arg = NULL;
     char * pos;
     opt_desc_t opts[] = {
-		{"notail", 0, 0, NOTAIL},
+		{"tails", 't', tails, -1},
+		{"notail", 0, 0, -1}, /* Compatibility stuff, so that -o notail
+for old setups still work */
 		{"conv", 0, 0, REISERFS_CONVERT}, 
 		{"attrs", 0, 0, REISERFS_ATTRS}, 
 		{"nolog", 0, 0, -1},
 		{"replayonly", 0, 0, REPLAYONLY},
-		
 		{"block-allocator", 'a', balloc, -1}, 
-		
 		{"resize", 'r', 0, -1},
 		{"jdev", 'j', 0, -1},
 		{NULL, 0, 0, -1}
@@ -642,9 +664,12 @@ static int reiserfs_parse_options (char * options, /* string given via mount's -
 	/* use default configuration: create tails, journaling on, no
 	   conversion to newest format */
 	return 1;
+    else
+	/* Drop defaults to zeroes */
+	*mount_options = 0;
     
     for (pos = options; pos; ) {
-	c = reiserfs_getopt (&pos, opts, &arg, mount_options);
+	c = reiserfs_getopt (s, &pos, opts, &arg, mount_options);
 	if (c == -1)
 	    /* wrong option is given */
 	    return 0;
@@ -681,7 +706,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
 
   rs = SB_DISK_SUPER_BLOCK (s);
 
-  if (!reiserfs_parse_options(arg, &mount_options, &blocks, NULL))
+  if (!reiserfs_parse_options(s, arg, &mount_options, &blocks, NULL))
     return -EINVAL;
   
   if(blocks) {
@@ -731,32 +756,84 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   return 0;
 }
 
+/* load_bitmap_info_data - Sets up the reiserfs_bitmap_info structure from disk.
+ * @sb - superblock for this filesystem
+ * @bi - the bitmap info to be loaded. Requires that bi->bh is valid.
+ *
+ * This routine counts how many free bits there are, finding the first zero
+ * as a side effect. Could also be implemented as a loop of test_bit() calls, or
+ * a loop of find_first_zero_bit() calls. This implementation is similar to
+ * find_first_zero_bit(), but doesn't return after it finds the first bit.
+ * Should only be called on fs mount, but should be fairly efficient anyways.
+ *
+ * bi->first_zero_hint is considered unset if it == 0, since the bitmap itself
+ * will * invariably occupt block 0 represented in the bitmap. The only
+ * exception to this is when free_count also == 0, since there will be no
+ * free blocks at all.
+ */
 
+static void load_bitmap_info_data (struct super_block *sb,
+                                   struct reiserfs_bitmap_info *bi)
+{
+    unsigned long *cur = (unsigned long *)bi->bh->b_data;
+
+    while ((char *)cur < (bi->bh->b_data + sb->s_blocksize)) {
+
+	/* No need to scan if all 0's or all 1's.
+	 * Since we're only counting 0's, we can simply ignore all 1's */
+	if (*cur == 0) {
+	    if (bi->first_zero_hint == 0) {
+		bi->first_zero_hint = ((char *)cur - bi->bh->b_data) << 3;
+	    }
+	    bi->free_count += sizeof(unsigned long)*8;
+	} else if (*cur != ~0L) {
+	    int b;
+	    for (b = 0; b < sizeof(unsigned long)*8; b++) {
+		if (!reiserfs_test_le_bit (b, cur)) {
+		    bi->free_count ++;
+		    if (bi->first_zero_hint == 0)
+			bi->first_zero_hint =
+					(((char *)cur - bi->bh->b_data) << 3) + b;
+		    }
+		}
+	    }
+	cur ++;
+    }
+
+#ifdef CONFIG_REISERFS_CHECK
+// This outputs a lot of unneded info on big FSes
+//    reiserfs_warning ("bitmap loaded from block %d: %d free blocks\n",
+//		      bi->bh->b_blocknr, bi->free_count);
+#endif
+}
+  
 static int read_bitmaps (struct super_block * s)
 {
     int i, bmap_nr;
 
-    SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * SB_BMAP_NR(s), GFP_NOFS, s);
+    SB_AP_BITMAP (s) = vmalloc (sizeof (struct reiserfs_bitmap_info) * SB_BMAP_NR(s));
     if (SB_AP_BITMAP (s) == 0)
 	return 1;
+    memset (SB_AP_BITMAP (s), 0, sizeof (struct reiserfs_bitmap_info) * SB_BMAP_NR(s));
     for (i = 0, bmap_nr = REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize + 1;
 	 i < SB_BMAP_NR(s); i++, bmap_nr = s->s_blocksize * 8 * i) {
-	SB_AP_BITMAP (s)[i] = sb_getblk(s, bmap_nr);
-	if (!buffer_uptodate(SB_AP_BITMAP(s)[i]))
-	    ll_rw_block(READ, 1, SB_AP_BITMAP(s) + i);
+	SB_AP_BITMAP (s)[i].bh = sb_getblk(s, bmap_nr);
+	if (!buffer_uptodate(SB_AP_BITMAP(s)[i].bh))
+	    ll_rw_block(READ, 1, &SB_AP_BITMAP(s)[i].bh);
     }
     for (i = 0; i < SB_BMAP_NR(s); i++) {
-	wait_on_buffer(SB_AP_BITMAP (s)[i]);
-	if (!buffer_uptodate(SB_AP_BITMAP(s)[i])) {
+	wait_on_buffer(SB_AP_BITMAP (s)[i].bh);
+	if (!buffer_uptodate(SB_AP_BITMAP(s)[i].bh)) {
 	    reiserfs_warning("sh-2029: reiserfs read_bitmaps: "
 			 "bitmap block (#%lu) reading failed\n",
-			 SB_AP_BITMAP(s)[i]->b_blocknr);
+			 SB_AP_BITMAP(s)[i].bh->b_blocknr);
 	    for (i = 0; i < SB_BMAP_NR(s); i++)
-		brelse(SB_AP_BITMAP(s)[i]);
-	    reiserfs_kfree(SB_AP_BITMAP(s), sizeof(struct buffer_head *) * SB_BMAP_NR(s), s);
+		brelse(SB_AP_BITMAP(s)[i].bh);
+	    vfree(SB_AP_BITMAP(s));
 	    SB_AP_BITMAP(s) = NULL;
 	    return 1;
 	}
+	load_bitmap_info_data (s, SB_AP_BITMAP (s) + i);
     }
     return 0;
 }
@@ -768,16 +845,17 @@ static int read_old_bitmaps (struct super_block * s)
   int bmp1 = (REISERFS_OLD_DISK_OFFSET_IN_BYTES / s->s_blocksize) + 1;  /* first of bitmap blocks */
 
   /* read true bitmap */
-  SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * sb_bmap_nr(rs), GFP_NOFS, s);
+  SB_AP_BITMAP (s) = vmalloc (sizeof (struct reiserfs_buffer_info *) * sb_bmap_nr(rs));
   if (SB_AP_BITMAP (s) == 0)
     return 1;
 
-  memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
+  memset (SB_AP_BITMAP (s), 0, sizeof (struct reiserfs_buffer_info *) * sb_bmap_nr(rs));
 
   for (i = 0; i < sb_bmap_nr(rs); i ++) {
-    SB_AP_BITMAP (s)[i] = sb_bread (s, bmp1 + i);
-    if (!SB_AP_BITMAP (s)[i])
+    SB_AP_BITMAP (s)[i].bh = sb_bread (s, bmp1 + i);
+    if (!SB_AP_BITMAP (s)[i].bh)
       return 1;
+    load_bitmap_info_data (s, SB_AP_BITMAP (s) + i);
   }
 
   return 0;
@@ -790,7 +868,7 @@ void check_bitmap (struct super_block * s)
   char * buf;
 
   while (i < SB_BLOCK_COUNT (s)) {
-    buf = SB_AP_BITMAP (s)[i / (s->s_blocksize * 8)]->b_data;
+    buf = SB_AP_BITMAP (s)[i / (s->s_blocksize * 8)].bh->b_data;
     if (!reiserfs_test_le_bit (i % (s->s_blocksize * 8), buf))
       free ++;
     i ++;
@@ -899,10 +977,11 @@ static int reread_meta_blocks(struct super_block *s) {
   }
 
   for (i = 0; i < SB_BMAP_NR(s) ; i++) {
-    ll_rw_block(READ, 1, &(SB_AP_BITMAP(s)[i])) ;
-    wait_on_buffer(SB_AP_BITMAP(s)[i]) ;
-    if (!buffer_uptodate(SB_AP_BITMAP(s)[i])) {
-      printk("reread_meta_blocks, error reading bitmap block number %d at %ld\n", i, SB_AP_BITMAP(s)[i]->b_blocknr) ;
+    ll_rw_block(READ, 1, &(SB_AP_BITMAP(s)[i].bh)) ;
+    wait_on_buffer(SB_AP_BITMAP(s)[i].bh) ;
+    if (!buffer_uptodate(SB_AP_BITMAP(s)[i].bh)) {
+      printk("reread_meta_blocks, error reading bitmap block number %d at
+      %ld\n", i, SB_AP_BITMAP(s)[i].bh->b_blocknr) ;
       return 1 ;
     }
   }
@@ -1087,9 +1166,17 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     }
     s->u.generic_sbp = sbi;
     memset (sbi, 0, sizeof (struct reiserfs_sb_info));
+    /* Set default values for options: non-aggressive tails */
+    REISERFS_SB(s)->s_mount_opt = ( 1 << REISERFS_SMALLTAIL );
+    /* default block allocator option: skip_busy */
+    REISERFS_SB(s)->s_alloc_options.bits = ( 1 << 5);
+    /* If file grew past 4 blocks, start preallocation blocks for it. */
+    REISERFS_SB(s)->s_alloc_options.preallocmin = 4;
+    /* Preallocate by 8 blocks (9-1) at once */
+    REISERFS_SB(s)->s_alloc_options.preallocsize = 9;
 
     jdev_name = NULL;
-    if (reiserfs_parse_options ((char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
+    if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
 	goto error;
     }
 
@@ -1236,10 +1323,10 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     if (SB_DISK_SUPER_BLOCK (s)) {
 	for (j = 0; j < SB_BMAP_NR (s); j ++) {
 	    if (SB_AP_BITMAP (s))
-		brelse (SB_AP_BITMAP (s)[j]);
+		brelse (SB_AP_BITMAP (s)[j].bh);
 	}
 	if (SB_AP_BITMAP (s))
-	    reiserfs_kfree (SB_AP_BITMAP (s), sizeof (struct buffer_head *) * SB_BMAP_NR (s), s);
+	    vfree (SB_AP_BITMAP (s));
     }
     if (SB_BUFFER_WITH_SB (s))
 	brelse(SB_BUFFER_WITH_SB (s));

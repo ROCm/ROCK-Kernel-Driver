@@ -807,9 +807,6 @@ static int init_irq (ide_hwif_t *hwif)
 static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
-	struct hd_struct *part;
-	devfs_handle_t *de_arr;
-	char *flags;
 	unsigned int unit, units, minors;
 	extern devfs_handle_t ide_devfs_handle;
 	char *names;
@@ -830,40 +827,19 @@ static void init_gendisk (ide_hwif_t *hwif)
 		goto err_kmalloc_gd;
 	memset(gd, 0, MAX_DRIVES * sizeof(struct gendisk));
 
-	part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
-	if (!part)
-		goto err_kmalloc_gd_part;
-
-	memset(part, 0, minors * sizeof(struct hd_struct));
-
-	de_arr = kmalloc(sizeof(devfs_handle_t) * MAX_DRIVES, GFP_KERNEL);
-	if (!de_arr)
-		goto err_kmalloc_gd_de_arr;
-	memset(de_arr, 0, sizeof(devfs_handle_t) * MAX_DRIVES);
-
-	flags = kmalloc(sizeof(char) * MAX_DRIVES, GFP_KERNEL);
-	if (!flags)
-		goto err_kmalloc_gd_flags;
-	memset(flags, 0, sizeof(char) * MAX_DRIVES);
-
 	names = kmalloc (4 * MAX_DRIVES, GFP_KERNEL);
 	if (!names)
 		goto err_kmalloc_gd_names;
 	memset(names, 0, 4 * MAX_DRIVES);
 
 	for (unit = 0; unit < units; ++unit) {
-		gd[unit].part = part + (unit << PARTN_BITS);
-		gd[unit].de_arr = de_arr + unit;
-		gd[unit].flags = flags + unit;
-		hwif->drives[unit].part = gd[unit].part;
 		gd[unit].major  = hwif->major;
 		gd[unit].first_minor = unit << PARTN_BITS;
 		sprintf(names + 4*unit, "hd%c",'a'+hwif->index*MAX_DRIVES+unit);
 		gd[unit].major_name = names + 4*unit;
 		gd[unit].minor_shift = PARTN_BITS; 
-		gd[unit].nr_real = 1;
 		gd[unit].fops = ide_fops;
-		hwif->gd[unit] = gd + unit;
+		hwif->drives[unit].disk = gd + unit;
 	}
 
 	for (unit = 0; unit < units; ++unit) {
@@ -892,12 +868,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 	return;
 
 err_kmalloc_gd_names:
-	kfree(names);
-err_kmalloc_gd_flags:
-	kfree(de_arr);
-err_kmalloc_gd_de_arr:
-	kfree(part);
-err_kmalloc_gd_part:
 	kfree(gd);
 err_kmalloc_gd:
 	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");

@@ -75,7 +75,6 @@ MODULE_LICENSE("GPL");
 
 static int nr_ctlr;
 static ctlr_info_t *hba[MAX_CTLR];
-static devfs_handle_t de_arr[MAX_CTLR][NWD];
 
 static int eisa[8];
 
@@ -103,7 +102,6 @@ static struct board_type products[] = {
 	{ 0x40580E11, "Smart Array 431",	&smart4_access },
 };
 
-static struct hd_struct * ida;
 static char *ida_names;
 static struct gendisk ida_gendisk[MAX_CTLR * NWD];
 
@@ -321,7 +319,6 @@ void cleanup_module(void)
 	}
 	devfs_find_and_unregister(NULL, "ida", 0, 0, 0, 0);
 	remove_proc_entry("cpqarray", proc_root_driver);
-	kfree(ida);
 	kfree(ida_names);
 }
 #endif /* MODULE */
@@ -347,15 +344,12 @@ int __init cpqarray_init(void)
 	printk("Found %d controller(s)\n", nr_ctlr);
 
 	/* allocate space for disk structs */
-	ida = kmalloc(sizeof(struct hd_struct)*nr_ctlr*NWD*16, GFP_KERNEL);
 	ida_names = kmalloc(nr_ctlr*NWD*10, GFP_KERNEL);
-	if (!ida || !ida_names) {
+	if (!ida_names) {
 		printk( KERN_ERR "cpqarray: out of memory");
-		kfree(ida);
 		kfree(ida_names);
 		return(num_cntlrs_reg);
 	}
-	memset(ida, 0, sizeof(struct hd_struct)*nr_ctlr*NWD*16);
 	/* 
 	 * register block devices
 	 * Find disks and fill in structs
@@ -408,7 +402,6 @@ int __init cpqarray_init(void)
 	
 			if (num_cntlrs_reg == 0) 
 			{
-				kfree(ida);
 				kfree(ida_names);
 			}
                 	return(num_cntlrs_reg);
@@ -450,9 +443,7 @@ int __init cpqarray_init(void)
 			disk->major = MAJOR_NR + i;
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->minor_shift = NWD_SHIFT;
-			disk->part = ida + i*256 + (j<<NWD_SHIFT);
-			disk->nr_real = 1; 
-			disk->de_arr = &de_arr[i][j]; 
+			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
 				continue;
@@ -1461,11 +1452,9 @@ static int revalidate_allvol(kdev_t dev)
 		struct gendisk *disk = ida_gendisk + ctlr*NWD + i;
 		if (!disk->major_name)
 			continue;
-		wipe_partitions(mk_kdev(disk->major, disk->first_minor));
 		del_gendisk(disk);
 		disk->major_name = NULL;
 	}
-	memset(ida+(ctlr*256),            0, sizeof(struct hd_struct)*NWD*16);
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
 
 	/*
@@ -1500,7 +1489,7 @@ static int ida_revalidate(kdev_t dev)
         int ctlr = major(dev) - MAJOR_NR;
 	int target = DEVICE_NR(dev);
         struct gendisk *gdev = &ida_gendisk[ctlr*NWD+target];
-	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blks;
+	set_capacity(gdev, hba[ctlr]->drv[target].nr_blks);
 	return 0;
 }
 
@@ -1667,6 +1656,7 @@ static void getgeometry(int ctlr)
 	     (log_index < id_ctlr_buf->nr_drvs)
 	     && (log_unit < NWD);
 	     log_unit++) {
+		struct gendisk *disk = ida_gendisk + ctlr * NWD + log_unit;
 
 		size = sizeof(sense_log_drv_stat_t);
 
@@ -1731,13 +1721,10 @@ static void getgeometry(int ctlr)
                 			return;
 
 				}
-				if (!de_arr[ctlr][log_unit]) {
+				if (!disk->de) {
 					char txt[16];
-
-					sprintf(txt, "ida/c%dd%d", ctlr,
-						log_unit);
-					de_arr[ctlr][log_unit] =
-						devfs_mk_dir(NULL, txt, NULL);
+					sprintf(txt,"ida/c%dd%d",ctlr,log_unit);
+					disk->de = devfs_mk_dir(NULL,txt,NULL);
 				}
 				info_p->phys_drives =
 				    sense_config_buf->ctlr_phys_drv;

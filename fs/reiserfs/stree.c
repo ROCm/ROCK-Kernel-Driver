@@ -1245,6 +1245,8 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 
+	PROC_INFO_INC( p_s_sb, delete_item_restarted );
+
 	// file system changed, repeat search
 	n_ret_value = search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path);
 	if (n_ret_value == IO_ERROR)
@@ -1284,15 +1286,15 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
         **
         ** p_s_un_bh is from the page cache (all unformatted nodes are
         ** from the page cache) and might be a highmem page.  So, we
-        ** can't use p_s_un_bh->b_data.  But, the page has already been
-        ** kmapped, so we can use page_address()
+        ** can't use p_s_un_bh->b_data.
 	** -clm
 	*/
 
-        data = page_address(p_s_un_bh->b_page) ;
+        data = kmap_atomic(p_s_un_bh->b_page, KM_USER0);
 	off = ((le_ih_k_offset (&s_ih) - 1) & (PAGE_CACHE_SIZE - 1));
 	memcpy(data + off,
 	       B_I_PITEM(PATH_PLAST_BUFFER(p_s_path), &s_ih), n_ret_value);
+	kunmap_atomic(data, KM_USER0);
     }
 
     /* Perform balancing after all resources have been collected at once. */ 
@@ -1355,8 +1357,10 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 
 	retval = fix_nodes (M_DELETE, &tb, NULL, 0);
-	if (retval == REPEAT_SEARCH)
+	if (retval == REPEAT_SEARCH) {
+	    PROC_INFO_INC( th -> t_super, delete_solid_item_restarted );
 	    continue;
+	}
 
 	if (retval == CARRY_ON) {
 	    do_balance (&tb, 0, 0, M_DELETE);
@@ -1543,6 +1547,8 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
       	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 	
+	PROC_INFO_INC( p_s_sb, cut_from_item_restarted );
+
 	n_ret_value = search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path);
 	if (n_ret_value == POSITION_FOUND)
 	    continue;
@@ -1614,9 +1620,9 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     
     do_balance(&s_cut_balance, NULL, NULL, c_mode);
     if ( n_is_inode_locked ) {
-	/* we've done an indirect->direct conversion.  when the data block 
-	** was freed, it was removed from the list of blocks that must 
-	** be flushed before the transaction commits, so we don't need to 
+	/* we've done an indirect->direct conversion.  when the data block
+	** was freed, it was removed from the list of blocks that must
+	** be flushed before the transaction commits, so we don't need to
 	** deal with it here.
 	*/
 	REISERFS_I(p_s_inode)->i_flags &= ~i_pack_on_close_mask ;
@@ -1807,16 +1813,20 @@ int reiserfs_paste_into_item (struct reiserfs_transaction_handle *th,
     int                 retval;
 
     init_tb_struct(th, &s_paste_balance, th->t_super, p_s_search_path, n_pasted_size);
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    s_paste_balance.key = p_s_key->on_disk_key;
+#endif
     
     while ( (retval = fix_nodes(M_PASTE, &s_paste_balance, NULL, p_c_body)) == REPEAT_SEARCH ) {
 	/* file system changed while we were in the fix_nodes */
+	PROC_INFO_INC( th -> t_super, paste_into_item_restarted );
 	retval = search_for_position_by_key (th->t_super, p_s_key, p_s_search_path);
 	if (retval == IO_ERROR) {
 	    retval = -EIO ;
 	    goto error_out ;
 	}
 	if (retval == POSITION_FOUND) {
-	    reiserfs_warning ("PAP-5710: reiserfs_paste_into_item: entry or pasted byte (%K) exists", p_s_key);
+	    reiserfs_warning ("PAP-5710: reiserfs_paste_into_item: entry or pasted byte (%K) exists\n", p_s_key);
 	    retval = -EEXIST ;
 	    goto error_out ;
 	}
@@ -1851,6 +1861,9 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
     int                 retval;
 
     init_tb_struct(th, &s_ins_balance, th->t_super, p_s_path, IH_SIZE + ih_item_len(p_s_ih));
+#ifdef DISPLACE_NEW_PACKING_LOCALITIES
+    s_ins_balance.key = key->on_disk_key;
+#endif
 
     /*
     if (p_c_body == 0)
@@ -1860,6 +1873,7 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 
     while ( (retval = fix_nodes(M_INSERT, &s_ins_balance, p_s_ih, p_c_body)) == REPEAT_SEARCH) {
 	/* file system changed while we were in the fix_nodes */
+	PROC_INFO_INC( th -> t_super, insert_item_restarted );
 	retval = search_item (th->t_super, key, p_s_path);
 	if (retval == IO_ERROR) {
 	    retval = -EIO;

@@ -83,11 +83,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	     unsigned long *pci_addr, unsigned char *type1)
 {
 	unsigned long addr;
-	u8 bus = bus_dev->number;
+	u8 bus = pbus->number;
 
 	DBG_CFG(("mk_conf_addr(bus=%d ,device_fn=0x%x, where=0x%x, "
 		 "pci_addr=0x%p, type1=0x%p)\n",
@@ -113,7 +113,18 @@ irongate_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	*value = __kernel_ldbu(*(vucp)addr);
+	switch (size) {
+	case 1:
+		*value = __kernel_ldbu(*(vucp)addr);
+		break;
+	case 2:
+		*value = __kernel_ldwu(*(vusp)addr);
+		break;
+	case 4:
+		*value = *(vuip)addr;
+		break;
+	}
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
@@ -127,12 +138,26 @@ irongate_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	__kernel_stb(value, *(vucp)addr);
-	mb();
-	__kernel_ldbu(*(vucp)addr);
+	switch (size) {
+	case 1:
+		__kernel_stb(value, *(vucp)addr);
+		mb();
+		__kernel_ldbu(*(vucp)addr);
+		break;
+	case 2:
+		__kernel_stw(value, *(vusp)addr);
+		mb();
+		__kernel_ldwu(*(vusp)addr);
+		break;
+	case 4:
+		*(vuip)addr = value;
+		mb();
+		*(vuip)addr;
+		break;
+	}
+
 	return PCIBIOS_SUCCESSFUL;
 }
-
 
 struct pci_ops irongate_pci_ops =
 {

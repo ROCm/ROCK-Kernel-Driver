@@ -52,15 +52,16 @@ struct pci_iommu_arena;
 #define APECS_AND_LCA_DEFAULT_MEM_BASE ((16+2)*1024*1024)
 
 /*
- * Because the MCPCIA core logic supports more bits for physical addresses,
- * it should allow an expanded range of SPARSE memory addresses.
- * However, we do not use them all, in order to avoid the HAE manipulation
- * that would be needed.
+ * Because MCPCIA and T2 core logic support more bits for
+ * physical addresses, they should allow an expanded range of SPARSE
+ * memory addresses.  However, we do not use them all, in order to
+ * avoid the HAE manipulation that would be needed.
  */
 #define MCPCIA_DEFAULT_MEM_BASE ((32+2)*1024*1024)
+#define T2_DEFAULT_MEM_BASE ((16+1)*1024*1024)
 
 /*
- * Because CIA and PYXIS and T2 have more bits for physical addresses,
+ * Because CIA and PYXIS have more bits for physical addresses,
  * they support an expanded range of SPARSE memory addresses.
  */
 #define DEFAULT_MEM_BASE ((128+16)*1024*1024)
@@ -157,8 +158,6 @@ extern struct resource *alloc_resource(void);
 extern struct pci_iommu_arena *iommu_arena_new(struct pci_controller *,
 					       dma_addr_t, unsigned long,
 					       unsigned long);
-extern long iommu_arena_alloc(struct pci_iommu_arena *arena, long n);
-
 extern const char *const pci_io_names[];
 extern const char *const pci_mem_names[];
 extern const char pci_hae0_name[];

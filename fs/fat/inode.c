@@ -982,11 +982,24 @@ static int fat_readpage(struct file *file, struct page *page)
 {
 	return block_read_full_page(page,fat_get_block);
 }
-static int fat_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
+
+static int
+fat_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
 {
+	kmap(page);
 	return cont_prepare_write(page,from,to,fat_get_block,
 		&MSDOS_I(page->mapping->host)->mmu_private);
 }
+
+static int
+fat_commit_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
+{
+	kunmap(page);
+	return generic_commit_write(file, page, from, to);
+}
+
 static int _fat_bmap(struct address_space *mapping, long block)
 {
 	return generic_block_bmap(mapping,block,fat_get_block);
@@ -996,7 +1009,7 @@ static struct address_space_operations fat_aops = {
 	writepage: fat_writepage,
 	sync_page: block_sync_page,
 	prepare_write: fat_prepare_write,
-	commit_write: generic_commit_write,
+	commit_write: fat_commit_write,
 	bmap: _fat_bmap
 };
 

@@ -27,6 +27,7 @@
 #include <linux/fs.h>
 #include <linux/amigaffs.h>
 #include <linux/mm.h>
+#include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
 
@@ -518,6 +519,7 @@ affs_do_readpage_ofs(struct file *file, struct page *page, unsigned from, unsign
 	pr_debug("AFFS: read_page(%u, %ld, %d, %d)\n", (u32)inode->i_ino, page->index, from, to);
 	if (from > to || to > PAGE_CACHE_SIZE)
 		BUG();
+	kmap(page);
 	data = page_address(page);
 	bsize = AFFS_SB(sb)->s_data_blksize;
 	tmp = (page->index << PAGE_CACHE_SHIFT) + from;
@@ -537,6 +539,8 @@ affs_do_readpage_ofs(struct file *file, struct page *page, unsigned from, unsign
 		from += tmp;
 		boff = 0;
 	}
+	flush_dcache_page(page);
+	kunmap(page);
 	return 0;
 }
 
@@ -656,7 +660,11 @@ static int affs_prepare_write_ofs(struct file *file, struct page *page, unsigned
 			return err;
 	}
 	if (to < PAGE_CACHE_SIZE) {
-		memset(page_address(page) + to, 0, PAGE_CACHE_SIZE - to);
+		char *kaddr = kmap_atomic(page, KM_USER0);
+
+		memset(kaddr + to, 0, PAGE_CACHE_SIZE - to);
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		if (size > offset + to) {
 			if (size < offset + PAGE_CACHE_SIZE)
 				tmp = size & ~PAGE_CACHE_MASK;

@@ -251,7 +251,7 @@ struct alpha_machine_vector alcor_mv __initmv = {
 	DO_CIA_IO,
 	DO_CIA_BUS,
 	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
+	max_dma_address:	ALPHA_ALCOR_MAX_DMA_ADDRESS,
 	min_io_address:		EISA_DEFAULT_IO_BASE,
 	min_mem_address:	CIA_DEFAULT_MEM_BASE,
 

@@ -386,6 +386,9 @@ struct pci_dev {
 	int		ro;		/* ISAPnP: read only */
 	unsigned short	regs;		/* ISAPnP: supported registers */
 
+	/* These fields are used by common fixups */
+	unsigned short	transparent:1;	/* Transparent PCI bridge */
+
 	int (*prepare)(struct pci_dev *dev);	/* ISAPnP hooks */
 	int (*activate)(struct pci_dev *dev);
 	int (*deactivate)(struct pci_dev *dev);
@@ -406,6 +409,10 @@ struct pci_dev {
 #define PCI_ROM_RESOURCE 6
 #define PCI_BRIDGE_RESOURCES 7
 #define PCI_NUM_RESOURCES 11
+
+#ifndef PCI_BUS_NUM_RESOURCES
+#define PCI_BUS_NUM_RESOURCES 4
+#endif
   
 #define PCI_REGION_FLAG_MASK 0x0fU	/* These bits of resource flags tell us the PCI region flags */
 
@@ -415,7 +422,8 @@ struct pci_bus {
 	struct list_head children;	/* list of child buses */
 	struct list_head devices;	/* list of devices on this bus */
 	struct pci_dev	*self;		/* bridge device as seen by parent */
-	struct resource	*resource[4];	/* address space routed to this bus */
+	struct resource	*resource[PCI_BUS_NUM_RESOURCES];
+					/* address space routed to this bus */
 
 	struct pci_ops	*ops;		/* configuration access functions */
 	void		*sysdata;	/* hook for sys-specific extension */
