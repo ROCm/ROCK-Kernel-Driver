@@ -224,7 +224,7 @@ static void e100_check_options(int board, struct e100_private *bdp);
 static void e100_set_int_option(int *, int, int, int, int, char *);
 static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
-unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8);
+unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
 
 /**
@@ -443,9 +443,21 @@ e100_wait_exec_simple(struct e100_private *bdp, u8 scb_cmd_low)
 	if (!e100_wait_scb(bdp)) {
 		printk(KERN_DEBUG "e100: %s: e100_wait_exec_simple: failed\n",
 		       bdp->device->name);
+#ifdef E100_CU_DEBUG		
+		printk(KERN_ERR "e100: %s: Last command (%x/%x) "
+			"timeout\n", bdp->device->name, 
+			bdp->last_cmd, bdp->last_sub_cmd);
+		printk(KERN_ERR "e100: %s: Current simple command (%x) "
+			"can't be executed\n", 
+			bdp->device->name, scb_cmd_low);
+#endif		
 		return false;
 	}
 	e100_exec_cmd(bdp, scb_cmd_low);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = scb_cmd_low;
+	bdp->last_sub_cmd = 0;
+#endif	
 	return true;
 }
 
@@ -458,12 +470,24 @@ e100_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd)
 }
 
 unsigned char
-e100_wait_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd)
+e100_wait_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd, u8 sub_cmd)
 {
 	if (!e100_wait_scb(bdp)) {
+#ifdef E100_CU_DEBUG		
+		printk(KERN_ERR "e100: %s: Last command (%x/%x) "
+			"timeout\n", bdp->device->name, 
+			bdp->last_cmd, bdp->last_sub_cmd);
+		printk(KERN_ERR "e100: %s: Current complex command "
+			"(%x/%x) can't be executed\n", 
+			bdp->device->name, cmd, sub_cmd);
+#endif		
 		return false;
 	}
 	e100_exec_cmplx(bdp, phys_addr, cmd);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = cmd;
+	bdp->last_sub_cmd = sub_cmd;
+#endif	
 	return true;
 }
 
@@ -494,18 +518,23 @@ e100_wait_cus_idle(struct e100_private *bdp)
 }
 
 /**
- * e100_dis_intr - disable interrupts
+ * e100_disable_clear_intr - disable and clear/ack interrupts
  * @bdp: atapter's private data struct
  *
  * This routine disables interrupts at the hardware, by setting
  * the M (mask) bit in the adapter's CSR SCB command word.
+ * It also clear/ack interrupts.
  */
 static inline void
-e100_dis_intr(struct e100_private *bdp)
+e100_disable_clear_intr(struct e100_private *bdp)
 {
+	u16 intr_status;
 	/* Disable interrupts on our PCI board by setting the mask bit */
 	writeb(SCB_INT_MASK, &bdp->scb->scb_cmd_hi);
-	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
+	intr_status = readw(&bdp->scb->scb_status);
+	/* ack and clear intrs */
+	writew(intr_status, &bdp->scb->scb_status);
+	readw(&bdp->scb->scb_status);
 }
 
 /**
@@ -958,12 +987,12 @@ e100_open(struct net_device *dev)
 		goto err_exit;
 	}
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE)) {
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0)) {
 		rc = -EAGAIN;
 		goto err_exit;
 	}
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE)) {
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0)) {
 		rc = -EAGAIN;
 		goto err_exit;
 	}
@@ -1240,7 +1269,8 @@ e100_init(struct e100_private *bdp)
 		printk(KERN_ERR "e100: hw init failed\n");
 		return false;
 	}
-	e100_dis_intr(bdp);
+	/* Interrupts are enabled after device reset */
+	e100_disable_clear_intr(bdp);
 
 	return true;
 }
@@ -1308,10 +1338,10 @@ e100_hw_init(struct e100_private *bdp, u32 reset_cmd)
 	e100_sw_reset(bdp, reset_cmd);
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE))
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
 		return false;
 
-	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE))
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
 		return false;
 
 	/* Load interrupt microcode  */
@@ -1595,6 +1625,12 @@ e100_watchdog(struct net_device *dev)
 {
 	struct e100_private *bdp = dev->priv;
 
+#ifdef E100_CU_DEBUG
+	if (e100_cu_unknown_state(bdp)) {
+		printk(KERN_ERR "e100: %s: CU unknown state in e100_watchdog\n",
+			dev->name);
+	}
+#endif	
 	if (!netif_running(dev)) {
 		return;
 	}
@@ -1651,7 +1687,8 @@ e100_watchdog(struct net_device *dev)
 		if (netif_running(dev))
 			netif_wake_queue(dev);
 	} else {
-		netif_stop_queue(dev);
+		if (netif_running(dev))
+			netif_stop_queue(dev);
 	}
 
 	rmb();
@@ -1779,11 +1816,8 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		return;
 	}
 
-	/* disable intr before we ack & after identifying the intr as ours */
-	e100_dis_intr(bdp);
-
-	writew(intr_status, &bdp->scb->scb_status);	/* ack intrs */
-	readw(&bdp->scb->scb_status);
+	/* disable and ack intr */
+	e100_disable_clear_intr(bdp);
 
 	/* the device is closed, don't continue or else bad things may happen. */
 	if (!netif_running(dev)) {
@@ -2213,10 +2247,11 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
  *
  * e100_start_cu must be called while holding the tx_lock ! 
  */
-void
+u8
 e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 {
 	unsigned long lock_flag;
+	u8 ret = true;
 
 	spin_lock_irqsave(&(bdp->bd_lock), lock_flag);
 	switch (bdp->next_cu_cmd) {
@@ -2247,12 +2282,13 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 			       "e100: %s: cu_start: timeout waiting for cu\n",
 			       bdp->device->name);
 		if (!e100_wait_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
-					  SCB_CUC_START)) {
+					  SCB_CUC_START, CB_TRANSMIT)) {
 			printk(KERN_DEBUG
 			       "e100: %s: cu_start: timeout waiting for scb\n",
 			       bdp->device->name);
 			e100_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					SCB_CUC_START);
+			ret = false;
 		}
 
 		bdp->next_cu_cmd = RESUME_WAIT;
@@ -2264,6 +2300,7 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 	bdp->last_tcb = tcb;
 
 	spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
+	return ret;
 }
 
 /* ====================================================================== */
@@ -2311,8 +2348,9 @@ e100_selftest(struct e100_private *bdp, u32 *st_timeout, u32 *st_result)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 100 + 1);
 
-	/* disable interrupts since the're now enabled */
-	e100_dis_intr(bdp);
+	/* disable interrupts since they are enabled */
+	/* after device reset during selftest        */
+	e100_disable_clear_intr(bdp);
 
 	/* if The First Self Test DWORD Still Zero, We've timed out. If the
 	 * second DWORD is not zero then we have an error. */
@@ -2410,7 +2448,7 @@ e100_start_ru(struct e100_private *bdp)
 
 	spin_lock(&bdp->bd_lock);
 
-	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START)) {
+	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START, 0)) {
 		printk(KERN_DEBUG
 		       "e100: %s: start_ru: wait_scb failed\n", 
 		       bdp->device->name);
@@ -2478,7 +2516,7 @@ e100_clr_cntrs(struct e100_private *bdp)
 	*pcmd_complete = 0;
 	wmb();
 
-	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR))
+	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR, 0))
 		return false;
 
 	/* wait 10 microseconds for the command to complete */
@@ -2600,8 +2638,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	unsigned long lock_flag;
 	unsigned long expiration_time;
 	unsigned char rc = true;
+	u8 sub_cmd;
 
 	ntcb_hdr = (cb_header_t *) command->non_tx_cmd;	/* get hdr of non tcb cmd */
+	sub_cmd = cpu_to_le16(ntcb_hdr->cb_cmd);
 
 	/* Set the Command Block to be the last command block */
 	ntcb_hdr->cb_cmd |= __constant_cpu_to_le16(CB_EL_BIT);
@@ -2634,7 +2674,7 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 
 	spin_lock_irqsave(&bdp->bd_lock, lock_flag);
 
-	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START)) {
+	if (!e100_wait_exec_cmplx(bdp, command->dma_addr, SCB_CUC_START, sub_cmd)) {
 		spin_unlock_irqrestore(&(bdp->bd_lock), lock_flag);
 		rc = false;
 		goto exit;
@@ -2654,6 +2694,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 			yield();
 			spin_lock_bh(&(bdp->bd_non_tx_lock));
 		} else {
+#ifdef E100_CU_DEBUG			
+			printk(KERN_ERR "e100: %s: non-TX command (%x) "
+				"timeout\n", bdp->device->name, sub_cmd);
+#endif			
 			rc = false;
 			goto exit;
 		}
@@ -2699,7 +2743,12 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 	}
 
 	/* Mask off our interrupt line -- its unmasked after reset */
-	e100_dis_intr(bdp);
+	e100_disable_clear_intr(bdp);
+#ifdef E100_CU_DEBUG	
+	bdp->last_cmd = 0;
+	bdp->last_sub_cmd = 0;
+#endif	
+
 }
 
 /**
@@ -3055,63 +3104,51 @@ e100_tcb_add_C_bit(struct e100_private *bdp)
 }
 
 /* 
- * Procedure:   e100_hw_reset_recover
+ * Procedure:   e100_configure_device
  *
- * Description: This routine will recover the hw after reset.
+ * Description: This routine will configure device
  *
  * Arguments:
  *      bdp - Ptr to this card's e100_bdconfig structure
- *        reset_cmd - s/w reset or selective reset. 
  *
  * Returns:
  *        true upon success
  *        false upon failure
  */
 unsigned char
-e100_hw_reset_recover(struct e100_private *bdp, u32 reset_cmd)
+e100_configure_device(struct e100_private *bdp)
 {
-	bdp->last_tcb = NULL;
-	if (reset_cmd == PORT_SOFTWARE_RESET) {
+	/*load CU & RU base */
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
+		return false;
 
-		/*load CU & RU base */
-		if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE)) {
-			return false;
-		}
+	if (e100_load_microcode(bdp))
+		bdp->flags |= DF_UCODE_LOADED;
 
-		if (e100_load_microcode(bdp)) {
-			bdp->flags |= DF_UCODE_LOADED;
-		}
+	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
+		return false;
 
-		if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE)) {
-			return false;
-		}
+	/* Issue the load dump counters address command */
+	if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys, SCB_CUC_DUMP_ADDR, 0))
+		return false;
 
-		/* Issue the load dump counters address command */
-		if (!e100_wait_exec_cmplx(bdp, bdp->stat_cnt_phys,
-					  SCB_CUC_DUMP_ADDR)) {
-			return false;
-		}
+	if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
+		printk(KERN_ERR "e100: e100_configure_device: "
+			"setup iaaddr failed\n");
+		return false;
+	}
 
-		if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
-			printk(KERN_ERR
-			       "e100: e100_hw_reset_recover: "
-			       "setup iaaddr failed\n");
-			return false;
-		}
+	e100_set_multi_exec(bdp->device);
 
-		e100_set_multi_exec(bdp->device);
-
-		/* Change for 82558 enhancement */
-		/* If 82558/9 and if the user has enabled flow control, set up * the
-		 * Flow Control Reg. in the CSR */
-		if ((bdp->flags & IS_BACHELOR)
-		    && (bdp->params.b_params & PRM_FC)) {
-			writeb(DFLT_FC_THLD,
-			       &bdp->scb->scb_ext.d101_scb.scb_fc_thld);
-			writeb(DFLT_FC_CMD,
-			       &bdp->scb->scb_ext.d101_scb.scb_fc_xon_xoff);
-		}
-
+	/* Change for 82558 enhancement                                */
+	/* If 82558/9 and if the user has enabled flow control, set up */
+	/* flow Control Reg. in the CSR                                */
+	if ((bdp->flags & IS_BACHELOR)
+	    && (bdp->params.b_params & PRM_FC)) {
+		writeb(DFLT_FC_THLD,
+			&bdp->scb->scb_ext.d101_scb.scb_fc_thld);
+		writeb(DFLT_FC_CMD,
+			&bdp->scb->scb_ext.d101_scb.scb_fc_xon_xoff);
 	}
 
 	e100_force_config(bdp);
@@ -3125,7 +3162,7 @@ e100_deisolate_driver(struct e100_private *bdp, u8 full_reset)
 	u32 cmd = full_reset ? PORT_SOFTWARE_RESET : PORT_SELECTIVE_RESET;
 	e100_sw_reset(bdp, cmd);
 	if (cmd == PORT_SOFTWARE_RESET) {
-		if (!e100_hw_reset_recover(bdp, cmd))
+		if (!e100_configure_device(bdp))
 			printk(KERN_ERR "e100: e100_deisolate_driver:" 
 		       		" device configuration failed\n");
 	} 
@@ -3948,6 +3985,8 @@ e100_non_tx_background(unsigned long ptr)
 	struct e100_private *bdp = (struct e100_private *) ptr;
 	nxmit_cb_entry_t *active_command;
 	int restart = true;
+	cb_header_t *non_tx_cmd;
+	u8 sub_cmd;
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
 
@@ -3975,6 +4014,15 @@ e100_non_tx_background(unsigned long ptr)
 		    && time_before(jiffies, active_command->expiration_time)) {
 			goto exit;
 		} else {
+			non_tx_cmd = (cb_header_t *) active_command->non_tx_cmd;
+			sub_cmd = CB_CMD_MASK & le16_to_cpu(non_tx_cmd->cb_cmd);
+#ifdef E100_CU_DEBUG			
+			if (!(non_tx_cmd->cb_status 
+			    & __constant_cpu_to_le16(CB_STATUS_COMPLETE)))
+				printk(KERN_ERR "e100: %s: Queued "
+					"command (%x) timeout\n", 
+					bdp->device->name, sub_cmd);
+#endif			
 			list_del(&(active_command->list_elem));
 			e100_free_non_tx_cmd(bdp, active_command);
 		}
@@ -3997,9 +4045,10 @@ e100_non_tx_background(unsigned long ptr)
 		bdp->non_tx_command_state = E100_WAIT_NON_TX_FINISH;
 		active_command = list_entry(bdp->non_tx_cmd_list.next,
 					    nxmit_cb_entry_t, list_elem);
+		sub_cmd = ((cb_header_t *) active_command->non_tx_cmd)->cb_cmd;
 		spin_lock_irq(&(bdp->bd_lock));
 		e100_wait_exec_cmplx(bdp, active_command->dma_addr,
-				     SCB_CUC_START);
+				     SCB_CUC_START, sub_cmd);
 		spin_unlock_irq(&(bdp->bd_lock));
 		active_command->expiration_time = jiffies + HZ;
 		cmd_type = CB_CMD_MASK &
@@ -4092,17 +4141,13 @@ e100_resume(struct pci_dev *pcid)
 {
 	struct net_device *netdev = pci_get_drvdata(pcid);
 	struct e100_private *bdp = netdev->priv;
-	u8 full_reset = false;
 
 	pci_set_power_state(pcid, 0);
 	pci_enable_wake(pcid, 0, 0);	/* Clear PME status and disable PME */
 	pci_restore_state(pcid, bdp->pci_state);
 
-	if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
-		full_reset = true;
-	}
-
-	e100_deisolate_driver(bdp, full_reset);
+	/* Also do device full reset because device was in D3 state */
+	e100_deisolate_driver(bdp, true);
 
 	return 0;
 }
@@ -4229,3 +4274,20 @@ static void e100_hwi_restore(struct e100_private *bdp)
 	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
 	return;
 }
+
+#ifdef E100_CU_DEBUG
+unsigned char
+e100_cu_unknown_state(struct e100_private *bdp)
+{
+	u8 scb_cmd_low;
+	u16 scb_status;
+	scb_cmd_low = bdp->scb->scb_cmd_low;
+	scb_status = le16_to_cpu(bdp->scb->scb_status);
+	/* If CU is active and executing unknown cmd */
+	if (scb_status & SCB_CUS_ACTIVE && scb_cmd_low & SCB_CUC_UNKNOWN)
+		return true;
+	else
+		return false;
+}
+#endif
+
