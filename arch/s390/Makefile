@@ -20,36 +20,37 @@ LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
 
 CFLAGS += -pipe -fno-strength-reduce
 
-HEAD := arch/s390/kernel/head.o arch/s390/kernel/init_task.o
+HEAD := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
 
-core-y				+= arch/s390/mm/ arch/s390/kernel/
-drivers-y			+= drivers/s390/
-drivers-$(CONFIG_MATHEMU)	+= arch/s390/math-emu/
-libs-y				+= arch/s390/lib/
+core-y		+= arch/$(ARCH)/mm/ arch/$(ARCH)/kernel/
+libs-y		+= arch/$(ARCH)/lib/
+drivers-y	+= drivers/s390/
+drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/
+
+
+makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/$(ARCH)/boot $(1)
 
 all: image listing
 
-makeboot = $(call descend,arch/$(ARCH)/boot,$(1))
-BOOTIMAGE= arch/$(ARCH)/boot/image
+listing image: vmlinux
+	$(call makeboot,arch/$(ARCH)/boot/$@)
 
-listing install image: vmlinux
-	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) $@)
-
-archclean:
-	+@$(call makeboot,clean)
+install: vmlinux
+	$(call makeboot, $@)
 
 archmrproper:
+archclean:
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
+
 
 prepare: include/asm-$(ARCH)/offsets.h
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
 CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
