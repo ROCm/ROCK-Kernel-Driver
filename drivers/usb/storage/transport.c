@@ -351,6 +351,29 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
  * Data transfer routines
  ***********************************************************************/
 
+/*
+ * This is subtle, so pay attention:
+ * ---------------------------------
+ * We're very concered about races with a command abort.  Hanging this code is
+ * a sure fire way to hang the kernel.
+ *
+ * The abort function first sets the machine state, then tries to acquire the
+ * lock on the current_urb to abort it.
+ *
+ * Once a function grabs the current_urb_sem, then it -MUST- test the state to
+ * see if we just got aborted before the lock was grabbed.  If so, it's
+ * essential to release the lock and return.
+ *
+ * The idea is that, once the current_urb_sem is held, the state can't really
+ * change anymore without also engaging the usb_unlink_urb() call _after_ the
+ * URB is actually submitted.
+ *
+ * So, we've guaranteed that (after the sm_state test), if we do submit the
+ * URB it will get aborted when we release the current_urb_sem.  And we've
+ * also guaranteed that if the abort code was called before we held the
+ * current_urb_sem, we can safely get out before the URB is submitted.
+ */
+
 /* This is the completion handler which will wake us up when an URB
  * completes.
  */
@@ -363,6 +386,9 @@ static void usb_stor_blocking_completion(struct urb *urb)
 
 /* This is the common part of the URB message submission code
  * This function expects the current_urb_sem to be held upon entry.
+ *
+ * All URBs from the usb-storage driver _must_ pass through this function
+ * (or something like it) for the abort mechanisms to work properly.
  */
 static int usb_stor_msg_common(struct us_data *us)
 {
@@ -384,16 +410,6 @@ static int usb_stor_msg_common(struct us_data *us)
 		/* something went wrong */
 		return status;
 	}
-
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-
-		/* avoid a race with usb_stor_abort_transport():
-		 *  if the abort took place before we submitted
-		 *  the URB, we must cancel it ourselves */
-		if (us->current_urb->status == -EINPROGRESS)
-			usb_unlink_urb(us->current_urb);
-		}
 
 	/* wait for the completion of the URB */
 	up(&(us->current_urb_sem));
@@ -428,6 +444,12 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	/* lock the URB */
 	down(&(us->current_urb_sem));
 
+	/* has the current command been aborted? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		up(&(us->current_urb_sem));
+		return 0;
+	}
+
 	/* fill the URB */
 	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
 			 (unsigned char*) dr, data, size, 
@@ -455,6 +477,12 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 
 	/* lock the URB */
 	down(&(us->current_urb_sem));
+
+	/* has the current command been aborted? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		up(&(us->current_urb_sem));
+		return 0;
+	}
 
 	/* fill the URB */
 	FILL_BULK_URB(us->current_urb, us->pusb_dev, pipe, data, len,
@@ -831,24 +859,31 @@ void usb_stor_abort_transport(struct us_data *us)
 
 	/* If the current state is wrong or if there's
 	 *  no srb, then there's nothing to do */
-	if ( !(state == US_STATE_RUNNING || state == US_STATE_RESETTING)
-		    || !us->srb) {
-		US_DEBUGP("-- invalid current state\n");
-		return;
-	}
+	BUG_ON((state != US_STATE_RUNNING && state != US_STATE_RESETTING));
+	BUG_ON(!(us->srb));
+
+	/* set state to abort */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
 
 	/* If the state machine is blocked waiting for an URB or an IRQ,
-	 *  let's wake it up */
+	 * let's wake it up */
 
-	/* if we have an URB pending, cancel it */
+	/* If we have an URB pending, cancel it.  Note that we guarantee with
+	 * the current_urb_sem that either (a) an URB has just been submitted,
+	 * or (b) the URB will never get submitted.  But, because of the use
+	 * of us->sm_state and current_urb_sem, we can't get an URB sumbitted
+	 * _after_ we set the state to US_STATE_ABORTING and this section of
+	 * code runs.  Thus we avoid deadlocks.
+	 */
+	down(&(us->current_urb_sem));
 	if (us->current_urb->status == -EINPROGRESS) {
 		US_DEBUGP("-- cancelling URB\n");
 		usb_unlink_urb(us->current_urb);
 	}
+	up(&(us->current_urb_sem));
 
-	/* if we are waiting for an IRQ, simulate it */
-	else if (test_bit(IP_WANTED, &us->bitflags)) {
+	/* If we are waiting for an IRQ, simulate it */
+	if (test_bit(IP_WANTED, &us->bitflags)) {
 		US_DEBUGP("-- simulating missing IRQ\n");
 		usb_stor_CBI_irq(us->irq_urb);
 	}
