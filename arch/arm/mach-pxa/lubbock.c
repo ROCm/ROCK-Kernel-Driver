@@ -33,57 +33,41 @@
 
 #include "generic.h"
 
-static void lubbock_ack_irq(unsigned int irq)
-{
-	int lubbock_irq = (irq - LUBBOCK_IRQ(0));
-	LUB_IRQ_SET_CLR &= ~(1 << lubbock_irq);
-}
+
+static unsigned long lubbock_irq_enabled;
 
 static void lubbock_mask_irq(unsigned int irq)
 {
 	int lubbock_irq = (irq - LUBBOCK_IRQ(0));
-	LUB_IRQ_MASK_EN &= ~(1 << lubbock_irq);
+	LUB_IRQ_MASK_EN = (lubbock_irq_enabled &= ~(1 << lubbock_irq));
 }
 
 static void lubbock_unmask_irq(unsigned int irq)
 {
 	int lubbock_irq = (irq - LUBBOCK_IRQ(0));
-	LUB_IRQ_MASK_EN |= (1 << lubbock_irq);
+	/* the irq can be acknowledged only if deasserted, so it's done here */
+	LUB_IRQ_SET_CLR &= ~(1 << lubbock_irq);
+	LUB_IRQ_MASK_EN = (lubbock_irq_enabled |= (1 << lubbock_irq));
 }
 
 static struct irqchip lubbock_irq_chip = {
-	.ack		= lubbock_ack_irq,
+	.ack		= lubbock_mask_irq,
 	.mask		= lubbock_mask_irq,
 	.unmask		= lubbock_unmask_irq,
 };
 
-void lubbock_irq_handler(unsigned int irq, struct irqdesc *desc,
-			 struct pt_regs *regs)
+static void lubbock_irq_handler(unsigned int irq, struct irqdesc *desc,
+				struct pt_regs *regs)
 {
-	unsigned int enabled, pending;
-
-	/* get active pending irq mask */
-	enabled = LUB_IRQ_MASK_EN & 0x003f;
-	pending = LUB_IRQ_SET_CLR & enabled;
-
+	unsigned long pending = LUB_IRQ_SET_CLR & lubbock_irq_enabled;
 	do {
-//printk("%s a: set_clr %#x, mask_en %#x LR/DR %d/%d\n", __FUNCTION__, LUB_IRQ_SET_CLR, LUB_IRQ_MASK_EN, GPLR(0)&1, GEDR(0)&1 );
-		/* clear our parent irq */
-		GEDR(0) = GPIO_bit(0);
-
-		/* process them */
-		irq = LUBBOCK_IRQ(0);
-		desc = irq_desc + irq;
-		do {
-			if (pending & 1)
-				desc->handle(irq, desc, regs);
-			irq++;
-			desc++;
-			pending >>= 1;
-		} while (pending);
-//printk("%s b: set_clr %#x, mask_en %#x LR/DR %d/%d\n", __FUNCTION__, LUB_IRQ_SET_CLR, LUB_IRQ_MASK_EN, GPLR(0)&1, GEDR(0)&1 );
-		enabled = LUB_IRQ_MASK_EN & 0x003f;
-		pending = LUB_IRQ_SET_CLR & enabled;
+		GEDR(0) = GPIO_bit(0);	/* clear our parent irq */
+		if (likely(pending)) {
+			irq = LUBBOCK_IRQ(0) + __ffs(pending);
+			desc = irq_desc + irq;
+			desc->handle(irq, desc, regs);
+		}
+		pending = LUB_IRQ_SET_CLR & lubbock_irq_enabled;
 	} while (pending);
 }
 

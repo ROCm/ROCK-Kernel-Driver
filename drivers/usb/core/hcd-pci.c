@@ -209,7 +209,8 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 		return;
 	dev_info (hcd->controller, "remove, state %x\n", hcd->state);
 
-	if (in_interrupt ()) BUG ();
+	if (in_interrupt ())
+		BUG ();
 
 	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;

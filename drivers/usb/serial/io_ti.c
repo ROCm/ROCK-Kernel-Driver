@@ -1553,7 +1553,8 @@ static __u8 MapLineStatus (__u8 ti_lsr)
 	__u8 lsr = 0;
 
 #define MAP_FLAG(flagUmp, flagUart)    \
-	if (ti_lsr & flagUmp) lsr |= flagUart;
+	if (ti_lsr & flagUmp) \
+		lsr |= flagUart;
 
 	MAP_FLAG(UMP_UART_LSR_OV_MASK, LSR_OVER_ERR)	/* overrun */
 	MAP_FLAG(UMP_UART_LSR_PE_MASK, LSR_PAR_ERR)	/* parity error */

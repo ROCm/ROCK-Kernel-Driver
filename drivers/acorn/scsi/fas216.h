@@ -351,11 +351,11 @@ extern int fas216_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
  */
 extern int fas216_command (Scsi_Cmnd *);
 
-/* Function: void fas216_intr (FAS216_Info *info)
+/* Function: irqreturn_t fas216_intr (FAS216_Info *info)
  * Purpose : handle interrupts from the interface to progress a command
  * Params  : info - interface to service
  */
-extern void fas216_intr (FAS216_Info *info);
+extern irqreturn_t fas216_intr (FAS216_Info *info);
 
 extern void fas216_remove (struct Scsi_Host *instance);
 

@@ -14,7 +14,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static int count = 25;
 	unsigned char stat = __raw_readb(DUART_BASE + 0x14);
@@ -40,7 +41,9 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	__raw_readb(DUART_BASE + 0x14);
 	__raw_readb(DUART_BASE + 0x14);
 
-	do_timer(regs);	
+	do_timer(regs);
+
+	return IRQ_HANDLED;
 }
 
 void __init time_init(void)

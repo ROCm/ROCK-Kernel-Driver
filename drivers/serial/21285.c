@@ -85,7 +85,7 @@ static void serial21285_enable_ms(struct uart_port *port)
 {
 }
 
-static void serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	struct tty_struct *tty = port->info->tty;
@@ -97,7 +97,7 @@ static void serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
 				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
-				return;
+				goto out;
 			}
 		}
 
@@ -143,9 +143,12 @@ static void serial21285_rx_chars(int irq, void *dev_id, struct pt_regs *regs)
 		status = *CSR_UARTFLG;
 	}
 	tty_flip_buffer_push(tty);
+
+ out:
+	return IRQ_HANDLED;
 }
 
-static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_port *port = dev_id;
 	struct circ_buf *xmit = &port->info->xmit;
@@ -155,11 +158,11 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 		*CSR_UARTDR = port->x_char;
 		port->icount.tx++;
 		port->x_char = 0;
-		return;
+		goto out;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
 		serial21285_stop_tx(port, 0);
-		return;
+		goto out;
 	}
 
 	do {
@@ -175,6 +178,9 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (uart_circ_empty(xmit))
 		serial21285_stop_tx(port, 0);
+
+ out:
+	return IRQ_HANDLED;
 }
 
 static unsigned int serial21285_tx_empty(struct uart_port *port)

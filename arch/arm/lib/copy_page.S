@@ -13,11 +13,7 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 
-#ifndef PLD
-#define COPY_COUNT PAGE_SZ/64
-#else
-#define COPY_COUNT PAGE_SZ/64-1
-#endif
+#define COPY_COUNT (PAGE_SZ/64 PLD( -1 ))
 
 		.text
 		.align	5

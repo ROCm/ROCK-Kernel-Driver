@@ -10,9 +10,10 @@
  * published by the Free Software Foundation.
  */
 
-#define PXA_IRQ_SKIP	8	/* The first 8 IRQs are reserved */
+#define PXA_IRQ_SKIP	7	/* The first 7 IRQs are not yet used */
 #define PXA_IRQ(x)		((x) - PXA_IRQ_SKIP)
 
+#define IRQ_HWUART	PXA_IRQ(7)	/* HWUART Transmit/Receive/Error */
 #define	IRQ_GPIO0	PXA_IRQ(8)	/* GPIO0 Edge Detect */
 #define	IRQ_GPIO1	PXA_IRQ(9)	/* GPIO1 Edge Detect */
 #define	IRQ_GPIO_2_80	PXA_IRQ(10)	/* GPIO[2-80] Edge Detect */
@@ -20,6 +21,8 @@
 #define	IRQ_PMU		PXA_IRQ(12)	/* Performance Monitoring Unit */
 #define	IRQ_I2S		PXA_IRQ(13)	/* I2S Interrupt */
 #define	IRQ_AC97	PXA_IRQ(14)	/* AC97 Interrupt */
+#define IRQ_ASSP	PXA_IRQ(15)	/* Audio SSP Service Request */
+#define IRQ_NSSP	PXA_IRQ(16)	/* Network SSP Service Request */
 #define	IRQ_LCD		PXA_IRQ(17)	/* LCD Controller Service Request */
 #define	IRQ_I2C		PXA_IRQ(18)	/* I2C Service Request */
 #define	IRQ_ICP		PXA_IRQ(19)	/* ICP Transmit/Receive/Error */

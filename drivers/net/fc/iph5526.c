@@ -2984,8 +2984,7 @@ static int iph5526_send_packet(struct sk_buff *skb, struct net_device *dev)
 	 */
 	if ((type == ETH_P_ARP) || (status == 0))
 		dev_kfree_skb(skb);
-	else
-		netif_wake_queue(dev);
+	netif_wake_queue(dev);
 	LEAVE("iph5526_send_packet");
 	return 0;
 }

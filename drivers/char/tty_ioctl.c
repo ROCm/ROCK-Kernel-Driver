@@ -394,7 +394,7 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 				return -EFAULT;
 			return 0;
 		case TCSETSF:
-			return set_termios(real_tty, arg,  TERMIOS_FLUSH);
+			return set_termios(real_tty, arg,  TERMIOS_FLUSH | TERMIOS_WAIT);
 		case TCSETSW:
 			return set_termios(real_tty, arg, TERMIOS_WAIT);
 		case TCSETS:
@@ -402,7 +402,7 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 		case TCGETA:
 			return get_termio(real_tty,(struct termio *) arg);
 		case TCSETAF:
-			return set_termios(real_tty, arg, TERMIOS_FLUSH | TERMIOS_TERMIO);
+			return set_termios(real_tty, arg, TERMIOS_FLUSH | TERMIOS_WAIT | TERMIOS_TERMIO);
 		case TCSETAW:
 			return set_termios(real_tty, arg, TERMIOS_WAIT | TERMIOS_TERMIO);
 		case TCSETA:

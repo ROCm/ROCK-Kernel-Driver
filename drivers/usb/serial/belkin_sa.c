@@ -285,10 +285,13 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	if (port_paranoia_check (port, __FUNCTION__)) return;
+	if (port_paranoia_check (port, __FUNCTION__))
+		return;
 
 	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__)) return;
+
+	if (serial_paranoia_check (serial, __FUNCTION__))
+		return;
 	
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 

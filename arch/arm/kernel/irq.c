@@ -58,6 +58,11 @@ void dummy_mask_unmask_irq(unsigned int irq)
 {
 }
 
+irqreturn_t no_action(int irq, void *dev_id, struct pt_regs *regs)
+{
+	return IRQ_NONE;
+}
+
 void do_bad_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	irq_err_count += 1;
@@ -222,6 +227,7 @@ static void
 __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 {
 	unsigned int status;
+	int retval = 0;
 
 	spin_unlock(&irq_controller_lock);
 
@@ -231,7 +237,7 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 	status = 0;
 	do {
 		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		retval |= action->handler(irq, action->dev_id, regs);
 		action = action->next;
 	} while (action);
 
@@ -239,6 +245,19 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 		add_interrupt_randomness(irq);
 
 	spin_lock_irq(&irq_controller_lock);
+
+	if (retval != 1) {
+		static int count = 100;
+		if (count) {
+			count--;
+			if (retval) {
+				printk("irq event %d: bogus retval mask %x\n",
+					irq, retval);
+			} else {
+				printk("irq %d: nobody cared\n", irq);
+			}
+		}
+	}
 }
 
 /*
@@ -606,7 +625,7 @@ int setup_irq(unsigned int irq, struct irqaction *new)
  *	SA_SAMPLE_RANDOM	The interrupt can be used for entropy
  *
  */
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		 unsigned long irq_flags, const char * devname, void *dev_id)
 {
 	unsigned long retval;

@@ -14,10 +14,11 @@
 #ifndef __ASM_ARCH_TIME_H
 #define __ASM_ARCH_TIME_H
 
-static void
+static irqreturn_t
 anakin_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
+	return IRQ_HANDLED;
 }
 
 void __init time_init(void)

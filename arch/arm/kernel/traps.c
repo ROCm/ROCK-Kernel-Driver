@@ -34,7 +34,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
-#include <asm/semaphore.h>
+#include <asm/traps.h>
 
 #include "ptrace.h"
 
@@ -240,17 +240,56 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
     	die(str, regs, err);
 }
 
+static LIST_HEAD(undef_hook);
+static spinlock_t undef_lock = SPIN_LOCK_UNLOCKED;
+
+void register_undef_hook(struct undef_hook *hook)
+{
+	spin_lock_irq(&undef_lock);
+	list_add(&hook->node, &undef_hook);
+	spin_unlock_irq(&undef_lock);
+}
+
+void unregister_undef_hook(struct undef_hook *hook)
+{
+	spin_lock_irq(&undef_lock);
+	list_del(&hook->node);
+	spin_unlock_irq(&undef_lock);
+}
+
 asmlinkage void do_undefinstr(struct pt_regs *regs)
 {
-	unsigned long *pc;
+	unsigned int correction = thumb_mode(regs) ? 2 : 4;
+	unsigned int instr;
+	struct undef_hook *hook;
 	siginfo_t info;
+	void *pc;
 
 	/*
-	 * According to the ARM ARM, PC is 2 or 4 bytes ahead, depending
-	 * whether we're in Thumb mode or not.
+	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
+	 * depending whether we're in Thumb mode or not.
+	 * Correct this offset.
 	 */
-	regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-	pc = (unsigned long *)instruction_pointer(regs);
+	regs->ARM_pc -= correction;
+
+	pc = (void *)instruction_pointer(regs);
+	if (thumb_mode(regs)) {
+		get_user(instr, (u16 *)pc);
+	} else {
+		get_user(instr, (u32 *)pc);
+	}
+
+	spin_lock_irq(&undef_lock);
+	list_for_each_entry(hook, &undef_hook, node) {
+		if ((instr & hook->instr_mask) == hook->instr_val &&
+		    (regs->ARM_cpsr & hook->cpsr_mask) == hook->cpsr_val) {
+			if (hook->fn(regs, instr) == 0) {
+				spin_unlock_irq(&undef_lock);
+				return;
+			}
+		}
+	}
+	spin_unlock_irq(&undef_lock);
 
 #ifdef CONFIG_DEBUG_USER
 	printk(KERN_INFO "%s (%d): undefined instruction: pc=%p\n",
@@ -377,6 +416,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		return 0;
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
+		regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
 		ptrace_break(current, regs);
 		return regs->ARM_r0;
 

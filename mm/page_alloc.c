@@ -1041,7 +1041,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 
 	local_node = pgdat->node_id;
 	printk("Building zonelist for node : %d\n", local_node);
-	for (i = 0; i <= GFP_ZONEMASK; i++) {
+	for (i = 0; i < MAX_NR_ZONES; i++) {
 		struct zonelist *zonelist;
 
 		zonelist = pgdat->node_zonelists + i;

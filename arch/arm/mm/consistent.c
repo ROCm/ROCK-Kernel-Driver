@@ -330,7 +330,7 @@ static int __init consistent_init(void)
 core_initcall(consistent_init);
 
 /*
- * make an area consistent for devices.
+ * Make an area consistent for devices.
  */
 void consistent_sync(void *vaddr, size_t size, int direction)
 {

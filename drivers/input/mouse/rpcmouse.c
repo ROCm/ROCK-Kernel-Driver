@@ -49,7 +49,7 @@ static struct input_dev rpcmouse_dev = {
 	},
 };
 
-static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct input_dev *dev = dev_id;
 	short x, y, dx, dy, b;
@@ -74,6 +74,8 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_key(dev, BTN_RIGHT,  b & 0x10);
 
 	input_sync(dev);
+
+	return IRQ_HANDLED;
 }
 
 static int __init rpcmouse_init(void)

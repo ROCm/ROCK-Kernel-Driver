@@ -1824,9 +1824,10 @@ static void fas216_bus_reset(FAS216_Info *info)
  *
  * Handle interrupts from the interface to progress a command
  */
-void fas216_intr(FAS216_Info *info)
+irqreturn_t fas216_intr(FAS216_Info *info)
 {
 	unsigned char isr, ssr, stat;
+	int handled = IRQ_NONE;
 
 	fas216_checkmagic(info);
 
@@ -1857,7 +1858,9 @@ void fas216_intr(FAS216_Info *info)
 		    	fas216_log(info, 0, "unknown interrupt received:"
 				" phase %s isr %02X ssr %02X stat %02X",
 				fas216_drv_phase(info), isr, ssr, stat);
+		handled = IRQ_HANDLED;
 	}
+	return handled;
 }
 
 static void __fas216_start_command(FAS216_Info *info, Scsi_Cmnd *SCpnt)

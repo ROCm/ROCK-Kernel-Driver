@@ -69,7 +69,8 @@ static unsigned long isa_gettimeoffset(void)
 	return count;
 }
 
-static void isa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+isa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (machine_is_netwinder())
 		do_leds();
@@ -77,6 +78,8 @@ static void isa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 	do_set_rtc();
 	do_profile(regs);
+
+	return IRQ_HANDLED;
 }
 
 static unsigned long __init get_isa_cmos_time(void)
@@ -186,7 +189,8 @@ static unsigned long timer1_gettimeoffset (void)
 	return ((tick_nsec / 1000) * value) / LATCH;
 }
 
-static void timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	*CSR_TIMER1_CLR = 0;
 
@@ -195,6 +199,8 @@ static void timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do_timer(regs);
 	do_set_rtc();
 	do_profile(regs);
+
+	return IRQ_HANDLED;
 }
 
 /*
