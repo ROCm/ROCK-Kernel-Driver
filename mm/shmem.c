@@ -50,6 +50,10 @@
 #include <asm/div64.h>
 #include <asm/pgtable.h>
 
+#ifdef CONFIG_TMPFS_POSIX_ACL
+#include <linux/mem_acl.h>
+#endif
+
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC	0x01021994
 
@@ -1617,6 +1621,9 @@ static int shmem_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
+struct mem_acl_operations shmem_acl_ops;
+static void shmem_destroy_inode(struct inode *inode);
+
 /*
  * File creation. Allocate an inode, and we're done..
  */
@@ -1627,6 +1634,13 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	int error = -ENOSPC;
 
 	if (inode) {
+#ifdef CONFIG_TMPFS_POSIX_ACL
+		error = mem_acl_init(inode, dir, &shmem_acl_ops);
+		if (error) {
+			shmem_destroy_inode(inode);
+			return error;
+		}
+#endif
 		if (dir->i_mode & S_ISGID) {
 			inode->i_gid = dir->i_gid;
 			if (S_ISDIR(mode))
@@ -1993,6 +2007,9 @@ static int shmem_fill_super(struct super_block *sb,
 		sbinfo->free_inodes = inodes;
 	}
 	sb->s_xattr = shmem_xattr_handlers;
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	sb->s_flags |= MS_POSIXACL;
+#endif
 #else
 	sb->s_flags |= MS_NOUSER;
 #endif
@@ -2037,6 +2054,16 @@ static void shmem_destroy_inode(struct inode *inode)
 		/* only struct inode is valid if it's an inline symlink */
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	}
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	if (SHMEM_I(inode)->i_acl) {
+		posix_acl_release(SHMEM_I(inode)->i_acl);
+		SHMEM_I(inode)->i_acl = NULL;
+	}
+	if (SHMEM_I(inode)->i_default_acl) {
+		posix_acl_release(SHMEM_I(inode)->i_default_acl);
+		SHMEM_I(inode)->i_default_acl = NULL;
+	}
+#endif
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
@@ -2047,6 +2074,10 @@ static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&p->vfs_inode);
+#ifdef CONFIG_TMPFS_POSIX_ACL
+		p->i_acl = NULL;
+		p->i_default_acl = NULL;
+#endif
 	}
 }
 
@@ -2065,6 +2096,147 @@ static void destroy_inodecache(void)
 	if (kmem_cache_destroy(shmem_inode_cachep))
 		printk(KERN_INFO "shmem_inode_cache: not all structures were freed\n");
 }
+
+#ifdef CONFIG_TMPFS_POSIX_ACL
+static struct posix_acl *shmem_get_acl(struct inode *inode, int type)
+{
+	struct posix_acl *acl = NULL;
+
+	spin_lock(&inode->i_lock);
+	switch(type) {
+		case ACL_TYPE_ACCESS:
+			acl = posix_acl_dup(SHMEM_I(inode)->i_acl);
+			break;
+
+		case ACL_TYPE_DEFAULT:
+			acl = posix_acl_dup(SHMEM_I(inode)->i_default_acl);
+			break;
+	}
+	spin_unlock(&inode->i_lock);
+
+	return acl;
+}
+
+static void shmem_set_acl(struct inode *inode, int type, struct posix_acl *acl)
+{
+	spin_lock(&inode->i_lock);
+	switch(type) {
+		case ACL_TYPE_ACCESS:
+			if (SHMEM_I(inode)->i_acl)
+				posix_acl_release(SHMEM_I(inode)->i_acl);
+			SHMEM_I(inode)->i_acl = posix_acl_dup(acl);
+			break;
+			
+		case ACL_TYPE_DEFAULT:
+			if (SHMEM_I(inode)->i_default_acl)
+				posix_acl_release(SHMEM_I(inode)->i_default_acl);
+			SHMEM_I(inode)->i_default_acl = posix_acl_dup(acl);
+			break;
+	}
+	spin_unlock(&inode->i_lock);
+}
+
+struct mem_acl_operations shmem_acl_ops = {
+	.getacl = shmem_get_acl,
+	.setacl = shmem_set_acl,
+};
+
+static size_t shmem_list_acl_access(struct inode *inode, char *list,
+				    size_t list_size, const char *name,
+				    size_t name_len)
+{
+	return mem_acl_list(inode, &shmem_acl_ops, ACL_TYPE_ACCESS,
+			    list, list_size);
+}
+
+static size_t shmem_list_acl_default(struct inode *inode, char *list,
+				     size_t list_size, const char *name,
+				     size_t name_len)
+{
+	return mem_acl_list(inode, &shmem_acl_ops, ACL_TYPE_DEFAULT,
+			    list, list_size);
+}
+
+static int shmem_get_acl_access(struct inode *inode, const char *name,
+				void *buffer, size_t size)
+{
+	if (strcmp(name, "") != 0)
+		return -EINVAL;
+	return mem_acl_get(inode, &shmem_acl_ops, ACL_TYPE_ACCESS, buffer,
+			   size);
+}
+
+static int shmem_get_acl_default(struct inode *inode, const char *name,
+				 void *buffer, size_t size)
+{
+	if (strcmp(name, "") != 0)
+		return -EINVAL;
+	return mem_acl_get(inode, &shmem_acl_ops, ACL_TYPE_DEFAULT, buffer,
+			   size);
+}
+
+static int shmem_set_acl_access(struct inode *inode, const char *name,
+				const void *value, size_t size, int flags)
+{
+	if (strcmp(name, "") != 0)
+		return -EINVAL;
+	return mem_acl_set(inode, &shmem_acl_ops, ACL_TYPE_ACCESS, value, size);
+}
+
+static int shmem_set_acl_default(struct inode *inode, const char *name,
+				 const void *value, size_t size, int flags)
+{
+	if (strcmp(name, "") != 0)
+		return -EINVAL;
+	return mem_acl_set(inode, &shmem_acl_ops, ACL_TYPE_DEFAULT, value,
+			   size);
+}
+
+struct xattr_handler shmem_xattr_acl_access_handler = {
+	.prefix = XATTR_NAME_ACL_ACCESS,
+	.list	= shmem_list_acl_access,
+	.get	= shmem_get_acl_access,
+	.set	= shmem_set_acl_access,
+};
+
+struct xattr_handler shmem_xattr_acl_default_handler = {
+	.prefix = XATTR_NAME_ACL_DEFAULT,
+	.list	= shmem_list_acl_default,
+	.get	= shmem_get_acl_default,
+	.set	= shmem_set_acl_default,
+};
+
+static int shmem_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+	struct inode *inode = dentry->d_inode;
+	int error;
+	
+	error = inode_change_ok(inode, iattr);
+	if (error)
+		return error;
+	error = inode_setattr(inode, iattr);
+	if (!error && (iattr->ia_valid & ATTR_MODE))
+		error = mem_acl_chmod(inode, &shmem_acl_ops);
+	return error;
+}
+
+static int shmem_check_acl(struct inode *inode, int mask)
+{
+	struct posix_acl *acl = shmem_get_acl(inode, ACL_TYPE_ACCESS);
+
+	if (acl) {
+		int error = posix_acl_permission(inode, acl, mask);
+		posix_acl_release(acl);
+		return error;
+	}
+	return -EAGAIN;
+}
+
+static int shmem_permission(struct inode *inode, int mask, struct nameidata *nd)
+{
+	return generic_permission(inode, mask, shmem_check_acl);
+}
+#endif
 
 static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
@@ -2095,6 +2267,10 @@ static struct inode_operations shmem_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
+#endif
 };
 
 static struct inode_operations shmem_dir_inode_operations = {
@@ -2114,6 +2290,10 @@ static struct inode_operations shmem_dir_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
+#endif
 #endif
 };
 
@@ -2123,6 +2303,10 @@ static struct inode_operations shmem_special_inode_operations = {
 	.getxattr	= generic_getxattr,
 	.listxattr	= generic_listxattr,
 	.removexattr	= generic_removexattr,
+#endif
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
 #endif
 };
 
@@ -2146,7 +2330,6 @@ static struct vm_operations_struct shmem_vm_ops = {
 	.get_policy     = shmem_get_policy,
 #endif
 };
-
 
 #ifdef CONFIG_TMPFS_SECURITY
 
@@ -2182,6 +2365,10 @@ struct xattr_handler shmem_xattr_security_handler = {
 #ifdef CONFIG_TMPFS_XATTR
 
 static struct xattr_handler *shmem_xattr_handlers[] = {
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	&shmem_xattr_acl_access_handler,
+	&shmem_xattr_acl_default_handler,
+#endif
 #ifdef CONFIG_TMPFS_SECURITY
 	&shmem_xattr_security_handler,
 #endif

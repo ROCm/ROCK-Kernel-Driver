@@ -31,6 +31,7 @@ obj-$(CONFIG_BINFMT_FLAT)	+= binfmt_flat.o
 
 obj-$(CONFIG_FS_MBCACHE)	+= mbcache.o
 obj-$(CONFIG_FS_POSIX_ACL)	+= posix_acl.o xattr_acl.o
+obj-$(CONFIG_MEM_ACL)		+= mem_acl.o
 obj-$(CONFIG_NFS_ACL_SUPPORT)	+= nfsacl.o
 
 obj-$(CONFIG_QUOTA)		+= dquot.o
