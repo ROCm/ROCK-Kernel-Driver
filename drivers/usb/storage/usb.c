@@ -970,20 +970,28 @@ BadDevice:
 /* Handle a disconnect event from the USB core */
 static void storage_disconnect(struct usb_interface *intf)
 {
-	struct us_data *ss = usb_get_intfdata(intf);
+	struct us_data *ss;
 
 	US_DEBUGP("storage_disconnect() called\n");
 
+       	ss = usb_get_intfdata(intf);
 	usb_set_intfdata(intf, NULL);
 
-	/* this is the odd case -- we disconnected but weren't using it */
-	if (!ss) {
-		US_DEBUGP("-- device was not in use\n");
-		return;
-	}
+	/* serious error -- we're attempting to disconnect an interface but
+	 * cannot locate the local data structure
+	 */
+	BUG_ON(ss == NULL);
+
+	/* TODO: set devices offline -- need host lock for this */
 
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(ss->dev_semaphore));
+
+	/* TODO: complete all pending commands with
+	 * cmd->result = DID_ERROR << 16 */
+
+	/* TODO: somehow, wait for the device to
+	 * be 'idle' (tasklet completion) */
 
 	/* remove the pointer to the data structure we were using */
 	(struct us_data*)ss->host->hostdata[0] = NULL;
@@ -1025,6 +1033,10 @@ static void storage_disconnect(struct usb_interface *intf)
 		US_DEBUGP("-- freeing the data structure\n");
 		kfree(ss->extra);
 	}
+
+	/* up the semaphore so auto-code-checkers won't complain about
+	 * the down/up imbalance */
+	up(&(ss->dev_semaphore));
 
 	/* free the structure itself */
 	kfree (ss);
