@@ -576,13 +576,24 @@ CONFIG_MAGIC_SYSRQ
   unless you really know what this hack does.
 
 CONFIG_SRM_ENV
-  If you enable this option, a subdirectory called srm_environment
-  will give you access to the most important SRM environment
-  variables. If you've got an Alpha style system supporting
-  SRC, then it is a good idea to say Yes or Module to this driver.
+  If you enable this option, a subdirectory inside /proc called
+  /proc/srm_environment will give you access to the all important
+  SRM environment variables (those which have a name) and also
+  to all others (by their internal number).
+
+  SRM is something like a BIOS for Alpha machines. There are some
+  other such BIOSes, like AlphaBIOS, which this driver cannot
+  support (hey, that's not SRM!).
+
+  Despite the fact that this driver doesn't work on all Alphas (but
+  only on those which have SRM as their firmware), it's save to
+  build it even if your particular machine doesn't know about SRM
+  (or if you intend to compile a generic kernel). It will simply
+  not create those subdirectory in /proc (and give you some warning,
+  of course).
 
   This driver is also available as a module and will be called
-  srm_env.o if you build it as a module.
+  srm_env.o then.
 
 CONFIG_DEBUG_KERNEL
   Say Y here if you are developing drivers or trying to debug and
