@@ -45,8 +45,7 @@ pci_config_attr(irq, "%u\n");
 
 static ssize_t local_cpus_show(struct device *dev, char *buf)
 {		
-	struct pci_dev *pdev = to_pci_dev(dev);
-	cpumask_t mask = pcibus_to_cpumask(pdev->bus->number);
+	cpumask_t mask = pcibus_to_cpumask(to_pci_dev(dev)->bus->number);
 	int len = cpumask_scnprintf(buf, PAGE_SIZE-2, mask);
 	strcat(buf,"\n"); 
 	return 1+len;
