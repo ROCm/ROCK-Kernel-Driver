@@ -1149,7 +1149,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	}
 
 	/* ATM init */
-	if (!(instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0))) {
+	if (!(instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, NULL))) {
 		dbg ("udsl_usb_probe: failed to register ATM device!");
 		goto fail;
 	}

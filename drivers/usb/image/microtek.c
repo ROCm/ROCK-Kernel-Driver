@@ -534,7 +534,7 @@ mts_build_transfer_context( Scsi_Cmnd *srb, struct mts_desc* desc )
 
 	if (!srb->use_sg) {
 		if ( !srb->bufflen ){
-			desc->context.data = 0;
+			desc->context.data = NULL;
 			desc->context.data_length = 0;
 			return;
 		} else {

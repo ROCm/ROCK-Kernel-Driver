@@ -182,7 +182,7 @@ static void powermate_sync_state(struct powermate_device *pm)
 	pm->configcr->wLength = 0;
 
 	usb_fill_control_urb(pm->config, pm->udev, usb_sndctrlpipe(pm->udev, 0),
-			     (void *) pm->configcr, 0, 0,
+			     (void *) pm->configcr, NULL, 0,
 			     powermate_config_complete, pm);
 	pm->config->setup_dma = pm->configcr_dma;
 	pm->config->transfer_flags |= URB_NO_SETUP_DMA_MAP;

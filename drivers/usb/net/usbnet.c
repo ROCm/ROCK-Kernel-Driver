@@ -316,7 +316,7 @@ get_endpoints (struct usbnet *dev, struct usb_interface *intf)
 	for (tmp = 0; tmp < intf->num_altsetting; tmp++) {
 		unsigned	ep;
 
-		in = out = 0;
+		in = out = NULL;
 		alt = intf->altsetting + tmp;
 
 		/* take the first altsetting with in-bulk + out-bulk;
@@ -1086,7 +1086,7 @@ static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
 		/* ensure immediate exit from usbnet_disconnect */
 		usb_set_intfdata(info->data, NULL);
 		usb_driver_release_interface (&usbnet_driver, info->data);
-		info->data = 0;
+		info->data = NULL;
 	}
 
 	/* and vice versa (just in case) */
@@ -1094,7 +1094,7 @@ static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
 		/* ensure immediate exit from usbnet_disconnect */
 		usb_set_intfdata(info->control, NULL);
 		usb_driver_release_interface (&usbnet_driver, info->control);
-		info->control = 0;
+		info->control = NULL;
 	}
 }
 
@@ -1641,7 +1641,7 @@ nc_vendor_write (struct usbnet *dev, u8 req, u8 regnum, u16 value)
 		req,
 		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		value, regnum,
-		0, 0,			// data is in setup packet
+		NULL, 0,			// data is in setup packet
 		CONTROL_TIMEOUT_JIFFIES);
 }
 
@@ -2084,7 +2084,7 @@ pl_vendor_req (struct usbnet *dev, u8 req, u8 val, u8 index)
 		req,
 		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		val, index,
-		0, 0,
+		NULL, 0,
 		CONTROL_TIMEOUT_JIFFIES);
 }
 
@@ -2418,7 +2418,7 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 
 	skb_put (skb, urb->actual_length);
 	entry->state = rx_done;
-	entry->urb = 0;
+	entry->urb = NULL;
 
 	switch (urb_status) {
 	    // success
@@ -2462,7 +2462,7 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 block:
 		entry->state = rx_cleanup;
 		entry->urb = urb;
-		urb = 0;
+		urb = NULL;
 		break;
 
 	    // data overrun ... flush fifo?
@@ -2557,7 +2557,7 @@ static int usbnet_stop (struct net_device *net)
 		schedule_timeout (UNLINK_TIMEOUT_JIFFIES);
 		devdbg (dev, "waited for %d urb completions", temp);
 	}
-	dev->wait = 0;
+	dev->wait = NULL;
 	remove_wait_queue (&unlink_wakeup, &wait); 
 
 	/* deferred work (task, timer, softirq) must also stop.
@@ -2716,7 +2716,7 @@ kevent (void *data)
 
 	/* tasklet could resubmit itself forever if memory is tight */
 	if (test_bit (EVENT_RX_MEMORY, &dev->flags)) {
-		struct urb	*urb = 0;
+		struct urb	*urb = NULL;
 
 		if (netif_running (dev->net))
 			urb = usb_alloc_urb (0, GFP_KERNEL);
@@ -2771,7 +2771,7 @@ static void tx_complete (struct urb *urb, struct pt_regs *regs)
 		}
 	}
 
-	urb->dev = 0;
+	urb->dev = NULL;
 	entry->state = tx_done;
 	defer_bh (dev, skb);
 }
@@ -2795,13 +2795,13 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	struct usbnet		*dev = (struct usbnet *) net->priv;
 	int			length;
 	int			retval = NET_XMIT_SUCCESS;
-	struct urb		*urb = 0;
+	struct urb		*urb = NULL;
 	struct skb_data		*entry;
 	struct driver_info	*info = dev->driver_info;
 	unsigned long		flags;
 #ifdef	CONFIG_USB_NET1080
-	struct nc_header	*header = 0;
-	struct nc_trailer	*trailer = 0;
+	struct nc_header	*header = NULL;
+	struct nc_trailer	*trailer = NULL;
 #endif	/* CONFIG_USB_NET1080 */
 
 	// some devices want funky USB-level framing, for
