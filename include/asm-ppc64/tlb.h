@@ -15,7 +15,14 @@
 #include <asm/tlbflush.h>
 
 struct mmu_gather;
-static inline void tlb_flush(struct mmu_gather *tlb);
+
+extern void pte_free_finish(void);
+
+static inline void tlb_flush(struct mmu_gather *tlb)
+{
+	flush_tlb_pending();
+	pte_free_finish();
+}
 
 /* Avoid pulling in another include just for this */
 #define check_pgt_cache()	do { } while (0)
@@ -28,13 +35,5 @@ static inline void tlb_flush(struct mmu_gather *tlb);
 #define tlb_end_vma(tlb, vma)	do { } while (0)
 
 #define __tlb_remove_tlb_entry(tlb, pte, address) do { } while (0)
-
-extern void pte_free_finish(void);
-
-static inline void tlb_flush(struct mmu_gather *tlb)
-{
-	flush_tlb_pending();
-	pte_free_finish();
-}
 
 #endif /* _PPC64_TLB_H */
