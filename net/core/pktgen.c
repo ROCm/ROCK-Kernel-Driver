@@ -1355,7 +1355,7 @@ static int __init init(void)
 		pginfos[i].udp_dst_max = 9;
 		
 		sprintf(pginfos[i].fname, "net/%s/pg%i", PG_PROC_DIR, i);
-		pginfos[i].proc_ent = create_proc_entry(pginfos[i].fname, 0600, 0);
+		pginfos[i].proc_ent = create_proc_entry(pginfos[i].fname, 0600, NULL);
 		if (!pginfos[i].proc_ent) {
 			printk("pktgen: Error: cannot create net/%s/pg procfs entry.\n", PG_PROC_DIR);
 			goto cleanup_mem;
@@ -1366,7 +1366,7 @@ static int __init init(void)
 		pginfos[i].proc_ent->owner = THIS_MODULE;
 
 		sprintf(pginfos[i].busy_fname, "net/%s/pg_busy%i",  PG_PROC_DIR, i);
-		pginfos[i].busy_proc_ent = create_proc_entry(pginfos[i].busy_fname, 0, 0);
+		pginfos[i].busy_proc_ent = create_proc_entry(pginfos[i].busy_fname, 0, NULL);
 		if (!pginfos[i].busy_proc_ent) {
 			printk("pktgen: Error: cannot create net/%s/pg_busy procfs entry.\n", PG_PROC_DIR);
 			goto cleanup_mem;

@@ -471,7 +471,7 @@ static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call,
 					      rxrpc_seq_t seq)
 {
 	struct rxrpc_message *msg;
-	struct iovec diov[3];
+	struct kvec diov[3];
 	unsigned aux[4];
 	int delta, ret;
 
@@ -717,7 +717,7 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 	/* send a special ACK if one is required */
 	if (special_ACK) {
 		struct rxrpc_ackpacket ack;
-		struct iovec diov[2];
+		struct kvec diov[2];
 		uint8_t acks[1] = { RXRPC_ACK_TYPE_ACK };
 
 		/* fill out the appropriate form */
@@ -838,7 +838,7 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 {
 	struct rxrpc_connection *conn = call->conn;
 	struct rxrpc_message *msg;
-	struct iovec diov[1];
+	struct kvec diov[1];
 	int ret;
 	u32 _error;
 
@@ -1919,14 +1919,14 @@ int rxrpc_call_read_data(struct rxrpc_call *call,
  */
 int rxrpc_call_write_data(struct rxrpc_call *call,
 			  size_t sioc,
-			  struct iovec siov[],
+			  struct kvec *siov,
 			  u8 rxhdr_flags,
 			  int alloc_flags,
 			  int dup_data,
 			  size_t *size_sent)
 {
 	struct rxrpc_message *msg;
-	struct iovec *sptr;
+	struct kvec *sptr;
 	size_t space, size, chunk, tmp;
 	char *buf;
 	int ret;

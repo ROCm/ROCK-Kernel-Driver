@@ -2199,7 +2199,7 @@ static struct cirrusfb_info *cirrusfb_pci_setup (struct pci_dev *pdev,
 	} else {
 		DPRINTK ("Attempt to get PCI info for Cirrus Graphics Card\n");
 		get_pci_addrs (pdev, &board_addr, &cinfo->fbregs_phys);
-		cinfo->regbase = 0;		/* FIXME: this forces VGA.  alternatives? */
+		cinfo->regbase = NULL;		/* FIXME: this forces VGA.  alternatives? */
 	}
 
 	DPRINTK ("Board address: 0x%lx, register address: 0x%lx\n", board_addr, cinfo->fbregs_phys);

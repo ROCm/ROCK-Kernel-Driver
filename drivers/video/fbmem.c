@@ -1459,7 +1459,7 @@ fbmem_init(void)
 {
 	int i;
 
-	create_proc_read_entry("fb", 0, 0, fbmem_read_proc, NULL);
+	create_proc_read_entry("fb", 0, NULL, fbmem_read_proc, NULL);
 
 	devfs_mk_dir("fb");
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))

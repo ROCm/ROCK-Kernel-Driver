@@ -1250,7 +1250,7 @@ static int lmc_ifdown (struct net_device *dev) /*fold00*/
     for (i = 0; i < LMC_RXDESCS; i++)
     {
         struct sk_buff *skb = sc->lmc_rxq[i];
-        sc->lmc_rxq[i] = 0;
+        sc->lmc_rxq[i] = NULL;
         sc->lmc_rxring[i].status = 0;
         sc->lmc_rxring[i].length = 0;
         sc->lmc_rxring[i].buffer1 = 0xDEADBEEF;
@@ -1394,7 +1394,7 @@ static irqreturn_t lmc_interrupt (int irq, void *dev_instance, struct pt_regs *r
                 
                 //                dev_kfree_skb(sc->lmc_txq[i]);
                 dev_kfree_skb_irq(sc->lmc_txq[i]);
-                sc->lmc_txq[i] = 0;
+                sc->lmc_txq[i] = NULL;
 
                 badtx++;
                 i = badtx % LMC_TXDESCS;
@@ -1667,7 +1667,7 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
              */
         give_it_anyways:
 
-            sc->lmc_rxq[i] = 0x0;
+            sc->lmc_rxq[i] = NULL;
             sc->lmc_rxring[i].buffer1 = 0x0;
 
             skb_put (skb, len);
@@ -1965,7 +1965,7 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
             dev_kfree_skb(sc->lmc_txq[i]);	/* free it */
             sc->stats.tx_dropped++;      /* We just dropped a packet */
         }
-        sc->lmc_txq[i] = 0;
+        sc->lmc_txq[i] = NULL;
         sc->lmc_txring[i].status = 0x00000000;
         sc->lmc_txring[i].buffer2 = virt_to_bus (&sc->lmc_txring[i + 1]);
     }

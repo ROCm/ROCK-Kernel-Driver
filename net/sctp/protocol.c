@@ -134,7 +134,7 @@ void sctp_proc_exit(void)
 
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
-		remove_proc_entry("net/sctp", 0);
+		remove_proc_entry("net/sctp", NULL);
 	}
 }
 

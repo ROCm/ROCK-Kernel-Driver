@@ -134,7 +134,7 @@ found:
 	printk("power: Control reg at %016lx ... ", power_reg);
 	poweroff_method = machine_halt;  /* able to use the standard halt */
 	if (has_button_interrupt(edev)) {
-		if (kernel_thread(powerd, 0, CLONE_FS) < 0) {
+		if (kernel_thread(powerd, NULL, CLONE_FS) < 0) {
 			printk("Failed to start power daemon.\n");
 			return;
 		}

@@ -361,7 +361,7 @@ static void kobil_close (struct usb_serial_port *port, struct file *filp)
 	if (port->write_urb){
 		usb_unlink_urb( port->write_urb );
 		usb_free_urb( port->write_urb );
-		port->write_urb = 0;
+		port->write_urb = NULL;
 	}
 	if (port->interrupt_in_urb){
 		usb_unlink_urb (port->interrupt_in_urb);

@@ -263,9 +263,9 @@ tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 	hose->sparse_mem_base = 0;
 	hose->sparse_io_base = 0;
 	hose->dense_mem_base
-	  = (TSUNAMI_MEM(index) & 0xffffffffff) | 0x80000000000;
+	  = (TSUNAMI_MEM(index) & 0xffffffffffL) | 0x80000000000L;
 	hose->dense_io_base
-	  = (TSUNAMI_IO(index) & 0xffffffffff) | 0x80000000000;
+	  = (TSUNAMI_IO(index) & 0xffffffffffL) | 0x80000000000L;
 
 	hose->config_space_base = TSUNAMI_CONF(index);
 	hose->index = index;

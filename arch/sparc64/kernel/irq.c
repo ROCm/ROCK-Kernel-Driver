@@ -1256,6 +1256,6 @@ static void register_irq_proc (unsigned int irq)
 void init_irq_proc (void)
 {
 	/* create /proc/irq */
-	root_irq_dir = proc_mkdir("irq", 0);
+	root_irq_dir = proc_mkdir("irq", NULL);
 }
 

@@ -160,7 +160,7 @@ static inline int dvb_dmx_swfilter_payload (struct dvb_demux_feed *feed, const u
 
 	feed->peslen += count;
 
-	return feed->cb.ts (&buf[p], count, 0, 0, &feed->feed.ts, DMX_OK); 
+	return feed->cb.ts (&buf[p], count, NULL, 0, &feed->feed.ts, DMX_OK); 
 }
 
 
@@ -183,7 +183,7 @@ static int dvb_dmx_swfilter_sectionfilter (struct dvb_demux_feed *feed,
 		return 0;
 
 	return feed->cb.sec (feed->feed.sec.secbuf, feed->feed.sec.seclen, 
-			     0, 0, &f->filter, DMX_OK); 
+			     NULL, 0, &f->filter, DMX_OK); 
 }
 
 
@@ -373,7 +373,7 @@ static inline void dvb_dmx_swfilter_packet_type(struct dvb_demux_feed *feed, con
 			if (feed->ts_type & TS_PAYLOAD_ONLY)
 				dvb_dmx_swfilter_payload(feed, buf);
 			else
-				feed->cb.ts(buf, 188, 0, 0, &feed->feed.ts, DMX_OK); 
+				feed->cb.ts(buf, 188, NULL, 0, &feed->feed.ts, DMX_OK); 
 		}
 		if (feed->ts_type & TS_DECODER) 
 			if (feed->demux->write_to_decoder)
@@ -422,7 +422,7 @@ void dvb_dmx_swfilter_packet(struct dvb_demux *demux, const u8 *buf)
 		}
 
 		if (feed->pid == 0x2000)
-			feed->cb.ts(buf, 188, 0, 0, &feed->feed.ts, DMX_OK);
+			feed->cb.ts(buf, 188, NULL, 0, &feed->feed.ts, DMX_OK);
 	}
 }
 
@@ -637,7 +637,7 @@ static int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type,
 
 	if (feed->buffer_size) {
 #ifdef NOBUFS
-		feed->buffer=0;
+		feed->buffer=NULL;
 #else
 		feed->buffer = vmalloc(feed->buffer_size);
 		if (!feed->buffer) {
@@ -736,11 +736,11 @@ static int dvbdmx_allocate_ts_feed (struct dmx_demux *dmx, struct dmx_ts_feed **
 	feed->demux = demux;
 	feed->pid = 0xffff;
 	feed->peslen = 0xfffa;
-	feed->buffer = 0;
+	feed->buffer = NULL;
 
 	(*ts_feed) = &feed->feed.ts;
 	(*ts_feed)->parent = dmx;
-	(*ts_feed)->priv = 0;
+	(*ts_feed)->priv = NULL;
 	(*ts_feed)->is_filtering = 0;
 	(*ts_feed)->start_filtering = dmx_ts_feed_start_filtering;
 	(*ts_feed)->stop_filtering = dmx_ts_feed_stop_filtering;
@@ -820,7 +820,7 @@ static int dmx_section_feed_allocate_filter(struct dmx_section_feed* feed,
 	spin_lock_irq(&dvbdemux->lock);
 	*filter=&dvbdmxfilter->filter;
 	(*filter)->parent=feed;
-	(*filter)->priv=0;
+	(*filter)->priv=NULL;
 	dvbdmxfilter->feed=dvbdmxfeed;
 	dvbdmxfilter->type=DMX_TYPE_SEC;
 	dvbdmxfilter->state=DMX_STATE_READY;
@@ -858,7 +858,7 @@ static int dmx_section_feed_set(struct dmx_section_feed* feed,
 
 	dvbdmxfeed->feed.sec.check_crc=check_crc;
 #ifdef NOBUFS
-	dvbdmxfeed->buffer=0;
+	dvbdmxfeed->buffer=NULL;
 #else
 	dvbdmxfeed->buffer=vmalloc(dvbdmxfeed->buffer_size);
 	if (!dvbdmxfeed->buffer) {
@@ -1015,13 +1015,13 @@ static int dvbdmx_allocate_section_feed(struct dmx_demux *demux,
 	dvbdmxfeed->feed.sec.secbuf = dvbdmxfeed->feed.sec.secbuf_base;
 	dvbdmxfeed->feed.sec.secbufp = dvbdmxfeed->feed.sec.seclen = 0;
 	dvbdmxfeed->feed.sec.tsfeedp = 0;
-	dvbdmxfeed->filter=0;
-	dvbdmxfeed->buffer=0;
+	dvbdmxfeed->filter=NULL;
+	dvbdmxfeed->buffer=NULL;
 
 	(*feed)=&dvbdmxfeed->feed.sec;
 	(*feed)->is_filtering=0;
 	(*feed)->parent=demux;
-	(*feed)->priv=0;
+	(*feed)->priv=NULL;
 
 	(*feed)->set=dmx_section_feed_set;
 	(*feed)->allocate_filter=dmx_section_feed_allocate_filter;
@@ -1223,7 +1223,7 @@ int dvb_dmx_init(struct dvb_demux *dvbdemux)
 	 if (!dvbdemux->memcopy)
 		 dvbdemux->memcopy = dvb_dmx_memcopy;
 
-	dmx->frontend=0;
+	dmx->frontend=NULL;
 	dmx->reg_list.prev = dmx->reg_list.next = &dmx->reg_list;
 	dmx->priv=(void *) dvbdemux;
 	dmx->open=dvbdmx_open;

@@ -174,8 +174,8 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 		return -EAGAIN;
 
 	ed->state = ED_OPER;
-	ed->ed_prev = 0;
-	ed->ed_next = 0;
+	ed->ed_prev = NULL;
+	ed->ed_next = NULL;
 	ed->hwNextED = 0;
 	wmb ();
 
@@ -333,7 +333,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ohci->ed_controltail == ed) {
 			ohci->ed_controltail = ed->ed_prev;
 			if (ohci->ed_controltail)
-				ohci->ed_controltail->ed_next = 0;
+				ohci->ed_controltail->ed_next = NULL;
 		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
@@ -357,7 +357,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ohci->ed_bulktail == ed) {
 			ohci->ed_bulktail = ed->ed_prev;
 			if (ohci->ed_bulktail)
-				ohci->ed_bulktail->ed_next = 0;
+				ohci->ed_bulktail->ed_next = NULL;
 		} else if (ed->ed_next) {
 			ed->ed_next->ed_prev = ed->ed_prev;
 		}
@@ -412,7 +412,7 @@ static struct ed *ed_get (
  		if (!td) {
 			/* out of memory */
 			ed_free (ohci, ed);
-			ed = 0;
+			ed = NULL;
 			goto done;
 		}
 		ed->dummy = td;
@@ -474,7 +474,7 @@ static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 
 	/* rm_list is just singly linked, for simplicity */
 	ed->ed_next = ohci->ed_rm_list;
-	ed->ed_prev = 0;
+	ed->ed_prev = NULL;
 	ohci->ed_rm_list = ed;
 
 	/* enable SOF interrupt */
@@ -950,7 +950,7 @@ skip_ed:
 		 * entries (which we'd ignore), but paranoia won't hurt.
 		 */
 		*last = ed->ed_next;
-		ed->ed_next = 0;
+		ed->ed_next = NULL;
 		modified = 0;
 
 		/* unlink urbs as requested, but rescan the list after

@@ -354,7 +354,7 @@ static int __init bt_init(void)
 	/* Init socket cache */
 	bt_sock_cache = kmem_cache_create("bt_sock",
 			sizeof(struct bt_sock), 0,
-			SLAB_HWCACHE_ALIGN, 0, 0);
+			SLAB_HWCACHE_ALIGN, NULL, NULL);
 
 	if (!bt_sock_cache) {
 		BT_ERR("Socket cache creation failed");

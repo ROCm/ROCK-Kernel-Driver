@@ -12,11 +12,6 @@
 #include <linux/module.h>
 #include <linux/uio.h>
 
-struct kvec {
-	void *iov_base; /* and that should *never* hold a userland pointer */
-	size_t iov_len;
-};
-
 #endif /* __KERNEL__ */
 
 struct erase_info_user {

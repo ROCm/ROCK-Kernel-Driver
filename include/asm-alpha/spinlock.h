@@ -26,9 +26,9 @@ typedef struct {
 } spinlock_t;
 
 #ifdef CONFIG_DEBUG_SPINLOCK
-#define SPIN_LOCK_UNLOCKED (spinlock_t) {0, -1, 0, 0, 0, 0}
+#define SPIN_LOCK_UNLOCKED (spinlock_t) {0, -1, 0, NULL, NULL, NULL}
 #define spin_lock_init(x)						\
-	((x)->lock = 0, (x)->on_cpu = -1, (x)->previous = 0, (x)->task = 0)
+	((x)->lock = 0, (x)->on_cpu = -1, (x)->previous = NULL, (x)->task = NULL)
 #else
 #define SPIN_LOCK_UNLOCKED	(spinlock_t) { 0 }
 #define spin_lock_init(x)	((x)->lock = 0)

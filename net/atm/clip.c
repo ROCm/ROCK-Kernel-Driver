@@ -998,7 +998,7 @@ static int __init atm_clip_init(void)
 
 	/* so neigh_ifdown() doesn't complain */
 	clip_tbl.proxy_timer.data = 0;
-	clip_tbl.proxy_timer.function = 0;
+	clip_tbl.proxy_timer.function = NULL;
 	init_timer(&clip_tbl.proxy_timer);
 	skb_queue_head_init(&clip_tbl.proxy_queue);
 

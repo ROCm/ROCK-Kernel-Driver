@@ -114,10 +114,9 @@ void
 jffs_cleanup_fmcontrol(struct jffs_fmcontrol *fmc)
 {
 	if (fmc) {
-		struct jffs_fm *cur;
 		struct jffs_fm *next = fmc->head;
-
-		while ((cur = next)) {
+		while (next) {
+			struct jffs_fm *cur = next;
 			next = next->next;
 			jffs_free_fm(cur);
 		}

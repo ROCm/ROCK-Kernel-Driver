@@ -214,7 +214,7 @@ static struct cpu_model models[] =
 	BANIAS(1500),
 	BANIAS(1600),
 	BANIAS(1700),
-	{ 0, }
+	{ NULL, }
 };
 #undef _BANIAS
 #undef BANIAS

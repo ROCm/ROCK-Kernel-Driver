@@ -251,7 +251,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	 W840_FLAGS, 128, CanHaveMII | HasBrokenTx},
 	{"Compex RL100-ATX", { 0x201111F6, 0xffffffff,},
 	 W840_FLAGS, 128, CanHaveMII | HasBrokenTx},
-	{0,},						/* 0 terminated list. */
+	{NULL,},					/* 0 terminated list. */
 };
 
 /* This driver was written to use PCI memory space, however some x86 systems
@@ -851,7 +851,7 @@ static void init_rxtx_rings(struct net_device *dev)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		np->rx_ring[i].length = np->rx_buf_sz;
 		np->rx_ring[i].status = 0;
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 	/* Mark the last entry as wrapping the ring. */
 	np->rx_ring[i-1].length |= DescEndRing;
@@ -875,7 +875,7 @@ static void init_rxtx_rings(struct net_device *dev)
 
 	/* Initialize the Tx descriptors */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 		np->tx_ring[i].status = 0;
 	}
 	np->tx_full = 0;
@@ -900,7 +900,7 @@ static void free_rxtx_rings(struct netdev_private* np)
 						PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(np->rx_skbuff[i]);
 		}
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (np->tx_skbuff[i]) {
@@ -910,7 +910,7 @@ static void free_rxtx_rings(struct netdev_private* np)
 						PCI_DMA_TODEVICE);
 			dev_kfree_skb(np->tx_skbuff[i]);
 		}
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 	}
 }
 
@@ -1145,7 +1145,7 @@ static void netdev_tx_done(struct net_device *dev)
 					PCI_DMA_TODEVICE);
 		np->tx_q_bytes -= np->tx_skbuff[entry]->len;
 		dev_kfree_skb_irq(np->tx_skbuff[entry]);
-		np->tx_skbuff[entry] = 0;
+		np->tx_skbuff[entry] = NULL;
 	}
 	if (np->tx_full &&
 		np->cur_tx - np->dirty_tx < TX_QUEUE_LEN_RESTART &&

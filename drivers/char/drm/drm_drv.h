@@ -532,7 +532,7 @@ static int DRM(takedown)( drm_device_t *dev )
 #endif
 	if ( dev->lock.hw_lock ) {
 		dev->sigdata.lock = dev->lock.hw_lock = NULL; /* SHM removed */
-		dev->lock.filp = 0;
+		dev->lock.filp = NULL;
 		wake_up_interruptible( &dev->lock.lock_queue );
 	}
 	up( &dev->struct_sem );

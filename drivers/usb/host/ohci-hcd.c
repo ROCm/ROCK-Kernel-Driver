@@ -229,7 +229,7 @@ static int ohci_urb_enqueue (
 	if (urb->status != -EINPROGRESS) {
 		spin_unlock (&urb->lock);
 		urb->hcpriv = urb_priv;
-		finish_urb (ohci, urb, 0);
+		finish_urb (ohci, urb, NULL);
 		retval = 0;
 		goto fail;
 	}
@@ -341,7 +341,7 @@ rescan:
 
 	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
 		ed->state = ED_IDLE;
-		finish_unlinks (ohci, 0, 0);
+		finish_unlinks (ohci, 0, NULL);
 	}
 
 	switch (ed->state) {
@@ -369,7 +369,7 @@ rescan:
 		td_free (ohci, ed->dummy);
 		break;
 	}
-	dev->ep [epnum] = 0;
+	dev->ep [epnum] = NULL;
 done:
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return;
@@ -728,7 +728,7 @@ static int hc_restart (struct ohci_hcd *ohci)
 			ed_deschedule (ohci, ed);
 
 			ed->ed_next = ohci->ed_rm_list;
-			ed->ed_prev = 0;
+			ed->ed_prev = NULL;
 			ohci->ed_rm_list = ed;
 			/* FALLTHROUGH */
 		case ED_UNLINK:
@@ -742,7 +742,7 @@ static int hc_restart (struct ohci_hcd *ohci)
 		urb->status = -ESHUTDOWN;
 		spin_unlock (&urb->lock);
 	}
-	finish_unlinks (ohci, 0, 0);
+	finish_unlinks (ohci, 0, NULL);
 	spin_unlock_irq(&ohci->lock);
 
 	/* paranoia, in case that didn't work: */

@@ -320,11 +320,11 @@ void init_8259A(int auto_eoi)
 
 static irqreturn_t math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
 {
-	extern void math_error(void *);
+	extern void math_error(void __user *);
 	outb(0,0xF0);
 	if (ignore_fpu_irq || !boot_cpu_data.hard_math)
 		return IRQ_NONE;
-	math_error((void *)regs->eip);
+	math_error((void __user *)regs->eip);
 	return IRQ_HANDLED;
 }
 

@@ -182,7 +182,7 @@ static struct vfsmount *afs_mntpt_do_automount(struct dentry *mntpt)
 		goto error;
 
 	/* read the contents of the AFS special symlink */
-	filler = mntpt->d_inode->i_mapping->a_ops->readpage;
+	filler = (filler_t *)mntpt->d_inode->i_mapping->a_ops->readpage;
 
 	page = read_cache_page(mntpt->d_inode->i_mapping, 0, filler, NULL);
 	if (IS_ERR(page)) {

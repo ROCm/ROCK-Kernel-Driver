@@ -361,7 +361,7 @@ init_irq_proc (void)
 	int i;
 
 	/* create /proc/irq */
-	root_irq_dir = proc_mkdir("irq", 0);
+	root_irq_dir = proc_mkdir("irq", NULL);
 
 #ifdef CONFIG_SMP 
 	/* create /proc/irq/prof_cpu_mask */

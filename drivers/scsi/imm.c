@@ -793,7 +793,7 @@ static void imm_interrupt(void *data)
 	imm_pb_dismiss(dev);
 
 	spin_lock_irqsave(host->host_lock, flags);
-	dev->cur_cmd = 0;
+	dev->cur_cmd = NULL;
 	cmd->scsi_done(cmd);
 	spin_unlock_irqrestore(host->host_lock, flags);
 	return;

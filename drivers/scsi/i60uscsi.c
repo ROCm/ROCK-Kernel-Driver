@@ -621,7 +621,7 @@ int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target)
 	pScb->SCB_XferLen = 0;
 	pScb->SCB_SGLen = 0;
 
-	pVirEscb->SCB_Srb = 0;
+	pVirEscb->SCB_Srb = NULL;
 	pVirEscb->SCB_Srb = SCpnt;
 	orc_exec_scb(pHCB, pScb);	/* Start execute SCB            */
 	spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);

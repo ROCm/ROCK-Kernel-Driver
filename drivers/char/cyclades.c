@@ -721,7 +721,7 @@ static unsigned char *cy_isa_addresses[] = {
         (unsigned char *) 0xDA000,
         (unsigned char *) 0xDC000,
         (unsigned char *) 0xDE000,
-        0,0,0,0,0,0,0,0
+        NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL
 };
 #define NR_ISA_ADDRS (sizeof(cy_isa_addresses)/sizeof(unsigned char*))
 
@@ -2236,7 +2236,7 @@ shutdown(struct cyclades_port * info)
 	    if (info->xmit_buf){
 		unsigned char * temp;
 		temp = info->xmit_buf;
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 		free_page((unsigned long) temp);
 	    }
 	    cy_writeb((u_long)base_addr+(CyCAR<<index), (u_char)channel);
@@ -2288,7 +2288,7 @@ shutdown(struct cyclades_port * info)
 	    if (info->xmit_buf){
 		unsigned char * temp;
 		temp = info->xmit_buf;
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 		free_page((unsigned long) temp);
 	    }
 	    
@@ -2856,7 +2856,7 @@ cy_close(struct tty_struct *tty, struct file *filp)
 
     tty->closing = 0;
     info->event = 0;
-    info->tty = 0;
+    info->tty = NULL;
     if (info->blocked_open) {
 	CY_UNLOCK(info, flags);
         if (info->close_delay) {
@@ -4583,7 +4583,7 @@ cy_hangup(struct tty_struct *tty)
 #ifdef CY_DEBUG_COUNT
     printk("cyc:cy_hangup (%d): setting count to 0\n", current->pid);
 #endif
-    info->tty = 0;
+    info->tty = NULL;
     info->flags &= ~ASYNC_NORMAL_ACTIVE;
     wake_up_interruptible(&info->open_wait);
 } /* cy_hangup */
@@ -5471,7 +5471,7 @@ cy_init(void)
                     info->line = port;
 		    info->chip_rev = 0;
                     info->flags = STD_COM_FLAGS;
-                    info->tty = 0;
+                    info->tty = NULL;
 		    if (mailbox == ZO_V1)
 			info->xmit_fifo_size = CYZ_FIFO_SIZE;
 		    else
@@ -5533,7 +5533,7 @@ cy_init(void)
                     info->card = board;
                     info->line = port;
                     info->flags = STD_COM_FLAGS;
-                    info->tty = 0;
+                    info->tty = NULL;
                     info->xmit_fifo_size = CyMAX_CHAR_FIFO;
                     info->cor1 = CyPARITY_NONE|Cy_1_STOP|Cy_8_BITS;
                     info->cor2 = CyETC;

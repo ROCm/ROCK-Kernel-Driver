@@ -59,7 +59,7 @@ int afs_rxfs_get_root_volume(struct afs_server *server,
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[2];
+	struct kvec piov[2];
 	size_t sent;
 	int ret;
 	u32 param[1];
@@ -189,7 +189,7 @@ int afs_rxfs_get_volume_info(struct afs_server *server,
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[3];
+	struct kvec piov[3];
 	size_t sent;
 	int ret;
 	u32 param[2], *bp, zero;
@@ -304,7 +304,7 @@ int afs_rxfs_fetch_file_status(struct afs_server *server,
 {
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	size_t sent;
 	int ret;
 	u32 *bp;
@@ -429,7 +429,7 @@ int afs_rxfs_fetch_file_data(struct afs_server *server,
 {
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	size_t sent;
 	int ret;
 	u32 *bp;
@@ -580,7 +580,7 @@ int afs_rxfs_give_up_callback(struct afs_server *server,
 {
 	struct afs_server_callslot callslot;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	size_t sent;
 	int ret;
 	u32 *bp;
@@ -686,7 +686,7 @@ int afs_rxfs_lookup(struct afs_server *server,
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[3];
+	struct kvec piov[3];
 	size_t sent;
 	int ret;
 	u32 *bp, zero;

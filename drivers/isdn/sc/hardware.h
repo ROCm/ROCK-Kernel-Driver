@@ -105,7 +105,7 @@
  */
 
 /* Return the number of jiffies in a given number of msecs */
-#define milliseconds(x)	(x/(1000/HZ))
+#define milliseconds(x)	(((x)*HZ)/1000)
 
 /* Determine if a channel number is valid for the adapter */
 #define IS_VALID_CHANNEL(y,x)	((x>0) && (x <= sc_adapter[y]->channels))

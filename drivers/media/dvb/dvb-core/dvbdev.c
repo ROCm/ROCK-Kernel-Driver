@@ -191,7 +191,7 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 	if ((id = dvbdev_get_free_id (adap, type)) < 0) {
 		up (&dvbdev_register_lock);
-		*pdvbdev = 0;
+		*pdvbdev = NULL;
 		printk ("%s: could get find free device id...\n", __FUNCTION__);
 		return -ENFILE;
 	}

@@ -448,7 +448,7 @@ asmlinkage void sparc_breakpoint(struct pt_regs *regs)
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
-	info.si_addr = (void *)regs->tpc;
+	info.si_addr = (void __user *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGTRAP, &info, current);
 #ifdef DEBUG_SPARC_BREAKPOINT

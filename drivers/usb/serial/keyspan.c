@@ -1175,7 +1175,7 @@ static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 			stop_urb(p_priv->out_urbs[i]);
 		}
 	}
-	port->tty = 0;
+	port->tty = NULL;
 }
 
 

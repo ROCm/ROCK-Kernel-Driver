@@ -305,14 +305,14 @@ static const struct usb_descriptor_header *fs_source_sink_function [] = {
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
-	0,
+	NULL,
 };
 
 static const struct usb_descriptor_header *fs_loopback_function [] = {
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &fs_sink_desc,
 	(struct usb_descriptor_header *) &fs_source_desc,
-	0,
+	NULL,
 };
 
 #ifdef	CONFIG_USB_GADGET_DUALSPEED
@@ -359,14 +359,14 @@ static const struct usb_descriptor_header *hs_source_sink_function [] = {
 	(struct usb_descriptor_header *) &source_sink_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 };
 
 static const struct usb_descriptor_header *hs_loopback_function [] = {
 	(struct usb_descriptor_header *) &loopback_intf,
 	(struct usb_descriptor_header *) &hs_source_desc,
 	(struct usb_descriptor_header *) &hs_sink_desc,
-	0,
+	NULL,
 };
 
 /* maxpacket and other transfer characteristics vary by speed. */
@@ -468,7 +468,7 @@ alloc_ep_req (struct usb_ep *ep, unsigned length)
 				&req->dma, GFP_ATOMIC);
 		if (!req->buf) {
 			usb_ep_free_request (ep, req);
-			req = 0;
+			req = NULL;
 		}
 	}
 	return req;
@@ -599,7 +599,7 @@ source_sink_start_ep (struct usb_ep *ep, int gfp_flags)
 
 	req = alloc_ep_req (ep, buflen);
 	if (!req)
-		return 0;
+		return NULL;
 
 	memset (req->buf, 0, req->length);
 	req->complete = source_sink_complete;
@@ -613,7 +613,7 @@ source_sink_start_ep (struct usb_ep *ep, int gfp_flags)
 
 		ERROR (dev, "start %s --> %d\n", ep->name, status);
 		free_ep_req (ep, req);
-		req = 0;
+		req = NULL;
 	}
 
 	return req;
@@ -804,11 +804,11 @@ static void zero_reset_config (struct zero_dev *dev)
 	 */
 	if (dev->in_ep) {
 		usb_ep_disable (dev->in_ep);
-		dev->in_ep = 0;
+		dev->in_ep = NULL;
 	}
 	if (dev->out_ep) {
 		usb_ep_disable (dev->out_ep);
-		dev->out_ep = 0;
+		dev->out_ep = NULL;
 	}
 	dev->config = 0;
 }
@@ -1098,7 +1098,7 @@ zero_unbind (struct usb_gadget *gadget)
 		free_ep_req (gadget->ep0, dev->req);
 	del_timer_sync (&dev->resume);
 	kfree (dev);
-	set_gadget_data (gadget, 0);
+	set_gadget_data (gadget, NULL);
 }
 
 static int

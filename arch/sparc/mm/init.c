@@ -100,7 +100,7 @@ void __init sparc_context_init(int numctx)
 
 		clist = (ctx_list_pool + ctx);
 		clist->ctx_number = ctx;
-		clist->ctx_mm = 0;
+		clist->ctx_mm = NULL;
 	}
 	ctx_free.next = ctx_free.prev = &ctx_free;
 	ctx_used.next = ctx_used.prev = &ctx_used;

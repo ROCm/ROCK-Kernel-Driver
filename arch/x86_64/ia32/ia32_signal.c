@@ -109,7 +109,7 @@ int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
 	err |= __get_user(to->si_pid, &from->si_pid);
 	err |= __get_user(to->si_uid, &from->si_uid);
 	err |= __get_user(ptr32, &from->si_ptr);
-	to->si_ptr = (void*)(u64)ptr32;
+	to->si_ptr = compat_ptr(ptr32);
 
 	return err;
 }
@@ -146,12 +146,12 @@ sys32_sigaltstack(const stack_ia32_t __user *uss_ptr,
 	if (uss_ptr) { 
 		u32 ptr;
 		memset(&uss,0,sizeof(stack_t));
-	if (!access_ok(VERIFY_READ,uss_ptr,sizeof(stack_ia32_t)) ||
-		    __get_user(ptr, &uss_ptr->ss_sp) ||
-		    __get_user(uss.ss_flags, &uss_ptr->ss_flags) ||
-		    __get_user(uss.ss_size, &uss_ptr->ss_size))
-		return -EFAULT;
-		uss.ss_sp = (void *)(u64)ptr;
+		if (!access_ok(VERIFY_READ,uss_ptr,sizeof(stack_ia32_t)) ||
+			    __get_user(ptr, &uss_ptr->ss_sp) ||
+			    __get_user(uss.ss_flags, &uss_ptr->ss_flags) ||
+			    __get_user(uss.ss_size, &uss_ptr->ss_size))
+			return -EFAULT;
+		uss.ss_sp = compat_ptr(ptr);
 	}
 	seg = get_fs(); 
 	set_fs(KERNEL_DS); 
@@ -448,7 +448,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 
 	/* Return stub is in 32bit vsyscall page */
 	{ 
-		void *restorer = VSYSCALL32_SIGRETURN; 
+		void __user *restorer = VSYSCALL32_SIGRETURN; 
 		if (ka->sa.sa_flags & SA_RESTORER)
 			restorer = ka->sa.sa_restorer;       
 		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);
@@ -541,7 +541,7 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	
 	{ 
-		void *restorer = VSYSCALL32_RTSIGRETURN; 
+		void __user *restorer = VSYSCALL32_RTSIGRETURN; 
 		if (ka->sa.sa_flags & SA_RESTORER)
 			restorer = ka->sa.sa_restorer;       
 		err |= __put_user(ptr_to_u32(restorer), &frame->pretcode);

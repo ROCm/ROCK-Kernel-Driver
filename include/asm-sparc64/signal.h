@@ -186,9 +186,14 @@ struct sigstack {
 
 /* Type of a signal handler.  */
 #ifdef __KERNEL__
-typedef void (*__sighandler_t)(int, struct sigcontext *);
+typedef void __signalfn_t(int);
+typedef __signalfn_t __user *__sighandler_t;
+
+typedef void __restorefn_t(void);
+typedef __restorefn_t __user *__sigrestore_t;
 #else
 typedef void (*__sighandler_t)(int);
+typedef void (*__sigrestore_t)(void);
 #endif
 
 #define SIG_DFL	((__sighandler_t)0)	/* default signal handling */
@@ -198,7 +203,7 @@ typedef void (*__sighandler_t)(int);
 struct __new_sigaction {
 	__sighandler_t		sa_handler;
 	unsigned long		sa_flags;
-	void 			(*sa_restorer)(void);     /* not used by Linux/SPARC yet */
+	__sigrestore_t 		sa_restorer;  /* not used by Linux/SPARC yet */
 	__new_sigset_t		sa_mask;
 };
 
@@ -233,7 +238,7 @@ struct __old_sigaction32 {
 #endif
 
 typedef struct sigaltstack {
-	void			*ss_sp;
+	void			__user *ss_sp;
 	int			ss_flags;
 	size_t			ss_size;
 } stack_t;

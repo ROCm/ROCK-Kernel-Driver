@@ -132,7 +132,7 @@ static struct {
 	{"Holtek HT80232", ONLY_16BIT_IO | HOLTEK_FDX},
 	{"Holtek HT80229", ONLY_32BIT_IO | HOLTEK_FDX | STOP_PG_0x60 },
 	{"Winbond W89C940(misprogrammed)", 0},
-	{0,}
+	{NULL,}
 };
 
 

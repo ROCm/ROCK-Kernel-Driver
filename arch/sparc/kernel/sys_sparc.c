@@ -375,7 +375,7 @@ sparc_breakpoint (struct pt_regs *regs)
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
-	info.si_addr = (void *)regs->pc;
+	info.si_addr = (void __user *)regs->pc;
 	info.si_trapno = 0;
 	force_sig_info(SIGTRAP, &info, current);
 

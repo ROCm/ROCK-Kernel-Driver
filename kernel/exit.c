@@ -296,7 +296,7 @@ int allow_signal(int sig)
 		   Let the signal code know it'll be handled, so
 		   that they don't get converted to SIGKILL or
 		   just silently dropped */
-		current->sighand->action[(sig)-1].sa.sa_handler = (void *)2;
+		current->sighand->action[(sig)-1].sa.sa_handler = (void __user *)2;
 	}
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);

@@ -1344,7 +1344,7 @@ static void UpdateFifoState
     {
         case NV_ARCH_04:
             LOAD_FIXED_STATE(nv4,FIFO);
-            chip->Tri03 = 0L;
+            chip->Tri03 = NULL;
             chip->Tri05 = (RivaTexturedTriangle05 *)&(chip->FIFO[0x0000E000/4]);
             break;
         case NV_ARCH_10:
@@ -1354,7 +1354,7 @@ static void UpdateFifoState
              */
             LOAD_FIXED_STATE(nv10tri05,PGRAPH);
             LOAD_FIXED_STATE(nv10,FIFO);
-            chip->Tri03 = 0L;
+            chip->Tri03 = NULL;
             chip->Tri05 = (RivaTexturedTriangle05 *)&(chip->FIFO[0x0000E000/4]);
             break;
     }
@@ -1394,13 +1394,13 @@ static void LoadStateExt
                 case 32:
                     LOAD_FIXED_STATE_32BPP(nv3,PRAMIN);
                     LOAD_FIXED_STATE_32BPP(nv3,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
                 case 8:
                 default:
                     LOAD_FIXED_STATE_8BPP(nv3,PRAMIN);
                     LOAD_FIXED_STATE_8BPP(nv3,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
             }
             for (i = 0x00000; i < 0x00800; i++)
@@ -1438,13 +1438,13 @@ static void LoadStateExt
                 case 32:
                     LOAD_FIXED_STATE_32BPP(nv4,PRAMIN);
                     LOAD_FIXED_STATE_32BPP(nv4,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
                 case 8:
                 default:
                     LOAD_FIXED_STATE_8BPP(nv4,PRAMIN);
                     LOAD_FIXED_STATE_8BPP(nv4,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
             }
             chip->PGRAPH[0x00000640/4] = state->offset0;
@@ -1483,13 +1483,13 @@ static void LoadStateExt
                 case 32:
                     LOAD_FIXED_STATE_32BPP(nv10,PRAMIN);
                     LOAD_FIXED_STATE_32BPP(nv10,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
                 case 8:
                 default:
                     LOAD_FIXED_STATE_8BPP(nv10,PRAMIN);
                     LOAD_FIXED_STATE_8BPP(nv10,PGRAPH);
-                    chip->Tri03 = 0L;
+                    chip->Tri03 = NULL;
                     break;
             }
 

@@ -677,7 +677,7 @@ static int dvb_net_filter_sec_set(struct net_device *dev,
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
 	int ret;
 
-	*secfilter=0;
+	*secfilter=NULL;
 	ret = priv->secfeed->allocate_filter(priv->secfeed, secfilter);
 	if (ret<0) {
 		printk("%s: could not get filter\n", dev->name);
@@ -726,9 +726,9 @@ static int dvb_net_feed_start(struct net_device *dev)
 	if (priv->secfeed || priv->secfilter || priv->multi_secfilter[0])
 		printk("%s: BUG %d\n", __FUNCTION__, __LINE__);
 
-	priv->secfeed=0;
-	priv->secfilter=0;
-	priv->tsfeed = 0;
+	priv->secfeed=NULL;
+	priv->secfilter=NULL;
+	priv->tsfeed = NULL;
 
 	if (priv->feedtype == DVB_NET_FEEDTYPE_MPE) {
 	dprintk("%s: alloc secfeed\n", __FUNCTION__);
@@ -744,7 +744,7 @@ static int dvb_net_feed_start(struct net_device *dev)
 	if (ret<0) {
 		printk("%s: could not set section feed\n", dev->name);
 		priv->demux->release_section_feed(priv->demux, priv->secfeed);
-		priv->secfeed=0;
+		priv->secfeed=NULL;
 		return ret;
 	}
 
@@ -799,7 +799,7 @@ static int dvb_net_feed_start(struct net_device *dev)
 		if (ret < 0) {
 			printk("%s: could not set ts feed\n", dev->name);
 			priv->demux->release_ts_feed(priv->demux, priv->tsfeed);
-			priv->tsfeed = 0;
+			priv->tsfeed = NULL;
 			return ret;
 		}
 
@@ -828,7 +828,7 @@ static int dvb_net_feed_stop(struct net_device *dev)
 			dprintk("%s: release secfilter\n", __FUNCTION__);
 			priv->secfeed->release_filter(priv->secfeed,
 					       priv->secfilter);
-		priv->secfilter=0;
+		priv->secfilter=NULL;
 		}
 
 		for (i=0; i<priv->multi_num; i++) {
@@ -837,12 +837,12 @@ static int dvb_net_feed_stop(struct net_device *dev)
 						__FUNCTION__, i);
 				priv->secfeed->release_filter(priv->secfeed,
 						       priv->multi_secfilter[i]);
-			priv->multi_secfilter[i]=0;
+			priv->multi_secfilter[i]=NULL;
 		}
 		}
 
 		priv->demux->release_section_feed(priv->demux, priv->secfeed);
-		priv->secfeed=0;
+		priv->secfeed=NULL;
 	} else
 		printk("%s: no feed to stop\n", dev->name);
 	} else if (priv->feedtype == DVB_NET_FEEDTYPE_ULE) {
@@ -852,7 +852,7 @@ static int dvb_net_feed_stop(struct net_device *dev)
 				priv->tsfeed->stop_filtering(priv->tsfeed);
 			}
 			priv->demux->release_ts_feed(priv->demux, priv->tsfeed);
-			priv->tsfeed = 0;
+			priv->tsfeed = NULL;
 		}
 		else
 			printk("%s: no ts feed to stop\n", dev->name);
@@ -1178,16 +1178,13 @@ static int dvb_net_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations dvb_net_fops = {
 	.owner = THIS_MODULE,
-        .read =	0,
-	.write = 0,
 	.ioctl = dvb_net_ioctl,
 	.open =	dvb_generic_open,
 	.release = dvb_generic_release,
-	.poll =	0,
 };
 
 static struct dvb_device dvbdev_net = {
-        .priv = 0,
+        .priv = NULL,
         .users = 1,
         .writers = 1,
         .fops = &dvb_net_fops,

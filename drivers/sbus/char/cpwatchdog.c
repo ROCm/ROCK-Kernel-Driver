@@ -337,6 +337,7 @@ static int wd_ioctl(struct inode *inode, struct file *file,
 {
 	int 	setopt 				= 0;
 	struct 	wd_timer* pTimer 	= (struct wd_timer*)file->private_data;
+	void __user *argp = (void __user *)arg;
 	struct 	watchdog_info info 	= {
 		0,
 		0,
@@ -351,22 +352,20 @@ static int wd_ioctl(struct inode *inode, struct file *file,
 	{
 		/* Generic Linux IOCTLs */
 		case WDIOC_GETSUPPORT:
-			if(copy_to_user((struct watchdog_info *)arg, 
-							(struct watchdog_info *)&info, 
-							sizeof(struct watchdog_info))) {
+			if(copy_to_user(argp, &info, sizeof(struct watchdog_info))) {
 				return(-EFAULT);
 			}
 			break;
 		case WDIOC_GETSTATUS:
 		case WDIOC_GETBOOTSTATUS:
-			if (put_user(0, (int *) arg))
+			if (put_user(0, (int __user *)argp))
 				return -EFAULT;
 			break;
 		case WDIOC_KEEPALIVE:
 			wd_pingtimer(pTimer);
 			break;
 		case WDIOC_SETOPTIONS:
-			if(copy_from_user(&setopt, (void*) arg, sizeof(unsigned int))) {
+			if(copy_from_user(&setopt, argp, sizeof(unsigned int))) {
 				return -EFAULT;
 			}
 			if(setopt & WDIOS_DISABLECARD) {
@@ -388,7 +387,7 @@ static int wd_ioctl(struct inode *inode, struct file *file,
 		/* Solaris-compatible IOCTLs */
 		case WIOCGSTAT:
 			setopt = wd_getstatus(pTimer);
-			if(copy_to_user((void*)arg, &setopt, sizeof(unsigned int))) {
+			if(copy_to_user(argp, &setopt, sizeof(unsigned int))) {
 				return(-EFAULT);
 			}
 			break;
@@ -409,10 +408,10 @@ static int wd_ioctl(struct inode *inode, struct file *file,
 	return(0);
 }
 
-static ssize_t wd_write(	struct file 	*file, 
-							const char		*buf, 
-							size_t 			count, 
-							loff_t 			*ppos)
+static ssize_t wd_write(struct file 	*file, 
+			const char	__user *buf, 
+			size_t 		count, 
+			loff_t 		*ppos)
 {
 	struct wd_timer* pTimer = (struct wd_timer*)file->private_data;
 
@@ -430,7 +429,7 @@ static ssize_t wd_write(	struct file 	*file,
 	return 0;
 }
 
-static ssize_t wd_read(struct file * file, char * buffer,
+static ssize_t wd_read(struct file * file, char __user *buffer,
 		        size_t count, loff_t *ppos)
 {
 #ifdef WD_DEBUG

@@ -1091,7 +1091,7 @@ static int econet_notifier(struct notifier_block *this, unsigned long msg, void 
 		if (edev)
 		{
 			if (net2dev_map[0] == dev)
-				net2dev_map[0] = 0;
+				net2dev_map[0] = NULL;
 			net2dev_map[edev->net] = NULL;
 			kfree(edev);
 			dev->ec_ptr = NULL;

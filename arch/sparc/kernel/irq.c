@@ -336,7 +336,7 @@ void handler_irq(int irq, struct pt_regs * regs)
 	kstat_cpu(cpu).irqs[irq]++;
 	do {
 		if (!action || !action->handler)
-			unexpected_irq(irq, 0, regs);
+			unexpected_irq(irq, NULL, regs);
 		action->handler(irq, action->dev_id, regs);
 		action = action->next;
 	} while (action);

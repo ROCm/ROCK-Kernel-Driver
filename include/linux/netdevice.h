@@ -565,7 +565,7 @@ typedef int gifconf_func_t(struct net_device * dev, char __user * bufptr, int le
 extern int		register_gifconf(unsigned int family, gifconf_func_t * gifconf);
 static inline int unregister_gifconf(unsigned int family)
 {
-	return register_gifconf(family, 0);
+	return register_gifconf(family, NULL);
 }
 
 /*

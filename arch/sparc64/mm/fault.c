@@ -218,9 +218,9 @@ static void do_fault_siginfo(int code, int sig, struct pt_regs *regs,
 	info.si_signo = sig;
 	info.si_errno = 0;
 	if (fault_code & FAULT_CODE_ITLB)
-		info.si_addr = (void *) regs->tpc;
+		info.si_addr = (void __user *) regs->tpc;
 	else
-		info.si_addr = (void *)
+		info.si_addr = (void __user *)
 			compute_effective_address(regs, insn, 0);
 	info.si_trapno = 0;
 	force_sig_info(sig, &info, current);

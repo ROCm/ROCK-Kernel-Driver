@@ -588,7 +588,7 @@ osf_sigstack(struct sigstack __user *uss, struct sigstack __user *uoss)
 	int error;
 
 	if (uss) {
-		void *ss_sp;
+		void __user *ss_sp;
 
 		error = -EFAULT;
 		if (get_user(ss_sp, &uss->ss_sp))
@@ -762,7 +762,7 @@ osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
 			info.si_signo = SIGFPE;
 			info.si_errno = 0;
 			info.si_code = si_code;
-			info.si_addr = 0;  /* FIXME */
+			info.si_addr = NULL;  /* FIXME */
  			send_sig_info(SIGFPE, &info, current);
  		}
 
@@ -956,7 +956,7 @@ osf_utimes(char __user *filename, struct timeval32 __user *tvs)
 			return -EFAULT;
 	}
 
-	return do_utimes(filename, tvs ? ktvs : 0);
+	return do_utimes(filename, tvs ? ktvs : NULL);
 }
 
 #define MAX_SELECT_SECONDS \
@@ -1303,7 +1303,7 @@ osf_fix_iov_len(const struct iovec __user *iov, unsigned long count)
 	unsigned long i;
 
 	for (i = 0 ; i < count ; i++) {
-		int *iov_len_high = (int __user *)&iov[i].iov_len + 1;
+		int __user *iov_len_high = (int __user *)&iov[i].iov_len + 1;
 
 		if (put_user(0, iov_len_high))
 			return -EFAULT;
