@@ -191,6 +191,8 @@ struct mddev_s
 	int				sb_dirty;
 	int				ro;
 
+	struct gendisk			*gendisk;
+
 	/* Superblock information */
 	int				major_version,
 					minor_version,
