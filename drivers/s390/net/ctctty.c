@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.12 2003/06/17 11:36:44 mschwide Exp $
+ * $Id: ctctty.c,v 1.13 2003/09/26 14:48:36 mschwide Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -758,7 +758,7 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			printk(KERN_DEBUG "%s%d ioctl TIOCGSOFTCAR\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			error = verify_area(VERIFY_WRITE, (void *) arg, sizeof(long));
+			error = put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
 			if (error)
 				return error;
 			put_user(C_CLOCAL(tty) ? 1 : 0, (ulong *) arg);
@@ -768,10 +768,9 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			printk(KERN_DEBUG "%s%d ioctl TIOCSSOFTCAR\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			error = verify_area(VERIFY_READ, (void *) arg, sizeof(long));
+			error = get_user(arg, (ulong *) arg);
 			if (error)
 				return error;
-			get_user(arg, (ulong *) arg);
 			tty->termios->c_cflag =
 			    ((tty->termios->c_cflag & ~CLOCAL) |
 			     (arg ? CLOCAL : 0));
