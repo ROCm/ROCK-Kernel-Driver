@@ -38,4 +38,4 @@ obj-$(CONFIG_TUNER_3036) += tuner-3036.o
 
 obj-$(CONFIG_VIDEO_TUNER) += tuner.o tda9887.o
 obj-$(CONFIG_VIDEO_BUF)   += video-buf.o
-
+obj-$(CONFIG_VIDEO_BTCX)  += btcx-risc.o

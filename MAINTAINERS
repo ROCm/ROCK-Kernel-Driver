@@ -533,6 +533,11 @@ W:	http://www.sucs.swan.ac.uk/~rohan/DECnet/index.html
 L:	linux-decnet-user@lists.sourceforge.net
 S:	Maintained
 
+DEFXX FDDI NETWORK DRIVER
+P:	Maciej W. Rozycki
+M:	macro@ds2.pg.gda.pl
+S:	Maintained
+
 DELL LAPTOP SMM DRIVER
 P:	Massimo Dal Zotto
 M:	dz@debian.org

@@ -27,7 +27,6 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #ifdef __ELF__
-# include <asm/elf.h>
 # include <linux/elf.h>
 #endif
 

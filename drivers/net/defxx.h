@@ -12,17 +12,11 @@
  *   Contains all definitions specified by port specification and required
  *   by the defxx.c driver.
  *
+ * The original author:
+ *   LVS	Lawrence V. Stefani <lstefani@yahoo.com>
+ *
  * Maintainers:
- *   LVS	Lawrence V. Stefani
- *
- * Contact:
- *	 The author may be reached at:
- *
- *		Inet: stefani@lkg.dec.com
- *		Mail: Digital Equipment Corporation
- *			  550 King Street
- *			  M/S: LKG1-3/M07
- *			  Littleton, MA  01460
+ *   macro	Maciej W. Rozycki <macro@ds2.pg.gda.pl>
  *
  * Modification History:
  *		Date		Name	Description
@@ -30,6 +24,7 @@
  *		09-Sep-96	LVS		Added group_prom field.  Moved read/write I/O
  *							macros to DEFXX.C.
  *		12-Sep-96	LVS		Removed packet request header pointers.
+ *		04 Aug 2003	macro		Converted to the DMA API.
  */
 
 #ifndef _DEFXX_H_
@@ -1697,17 +1692,19 @@ typedef struct DFX_board_tag
 	{
 	/* Keep virtual and physical pointers to locked, physically contiguous memory */
 
-	char				*kmalloced;					/* kfree this on unload */ 
+	char				*kmalloced;					/* pci_free_consistent this on unload */ 
+	dma_addr_t			kmalloced_dma;
+	/* DMA handle for the above */
 	PI_DESCR_BLOCK			*descr_block_virt;				/* PDQ descriptor block virt address */
-	u32				descr_block_phys;				/* PDQ descriptor block phys address */
+	dma_addr_t			descr_block_phys;				/* PDQ descriptor block phys address */
 	PI_DMA_CMD_REQ			*cmd_req_virt;					/* Command request buffer virt address */
-	u32				cmd_req_phys;					/* Command request buffer phys address */
+	dma_addr_t			cmd_req_phys;					/* Command request buffer phys address */
 	PI_DMA_CMD_RSP			*cmd_rsp_virt;					/* Command response buffer virt address */
-	u32				cmd_rsp_phys;					/* Command response buffer phys address */
+	dma_addr_t			cmd_rsp_phys;					/* Command response buffer phys address */
 	char				*rcv_block_virt;				/* LLC host receive queue buf blk virt */
-	u32				rcv_block_phys;					/* LLC host receive queue buf blk phys */
+	dma_addr_t			rcv_block_phys;					/* LLC host receive queue buf blk phys */
 	PI_CONSUMER_BLOCK		*cons_block_virt;				/* PDQ consumer block virt address */
-	u32				cons_block_phys;				/* PDQ consumer block phys address */
+	dma_addr_t			cons_block_phys;				/* PDQ consumer block phys address */
 
 	/* Keep local copies of Type 1 and Type 2 register data */
 

@@ -260,6 +260,7 @@ extern void __put_user_bad(void);
 ({									\
 	long __pu_err = -EFAULT;					\
 	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	might_sleep();						\
 	if (access_ok(VERIFY_WRITE,__pu_addr,size))			\
 		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
 	__pu_err;							\
@@ -469,6 +470,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 static inline unsigned long
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
+	might_sleep();
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __copy_to_user(to, from, n);
 	return n;
@@ -493,6 +495,7 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
 static inline unsigned long
 copy_from_user(void *to, const void __user *from, unsigned long n)
 {
+	might_sleep();
 	if (access_ok(VERIFY_READ, from, n))
 		n = __copy_from_user(to, from, n);
 	else

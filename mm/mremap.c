@@ -56,7 +56,6 @@ end:
 	return pte;
 }
 
-#ifdef CONFIG_HIGHPTE	/* Save a few cycles on the sane machines */
 static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
@@ -68,9 +67,6 @@ static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
 	pmd = pmd_offset(pgd, addr);
 	return pmd_present(*pmd);
 }
-#else
-#define page_table_present(mm, addr)	(1)
-#endif
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
