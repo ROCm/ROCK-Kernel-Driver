@@ -105,16 +105,6 @@ int request_module(const char *fmt, ...)
 	}
 
 	ret = call_usermodehelper(modprobe_path, argv, envp, 1);
-	if (ret != 0) {
-		static unsigned long last;
-		unsigned long now = jiffies;
-		if (now - last > HZ) {
-			last = now;
-			printk(KERN_DEBUG
-			       "request_module: failed %s -- %s. error = %d\n",
-			       modprobe_path, module_name, ret);
-		}
-	}
 	atomic_dec(&kmod_concurrent);
 	return ret;
 }
