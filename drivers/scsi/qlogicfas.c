@@ -467,6 +467,7 @@ int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	return 0;
 }
 
+#ifndef PCMCIA
 /*
  *	Look for qlogic card and init if found 
  */
@@ -561,6 +562,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
 	priv->qbase = qbase;
 	priv->qlirq = qlirq;
 	priv->qinitid = qinitid;
+	priv->shost = hreg;
 
 	sprintf(priv->qinfo,
 		"Qlogicfas Driver version 0.46, chip %02X at %03X, IRQ %d, TPdma:%d",
@@ -589,6 +591,7 @@ err_release_mem:
 }
 
 #define MAX_QLOGICFAS	8
+static qlogicfas_priv_t cards;
 static int iobase[MAX_QLOGICFAS];
 static int irq[MAX_QLOGICFAS] = { [0 ... MAX_QLOGICFAS-1] = -1 };
 MODULE_PARM(iobase, "1-" __MODULE_STRING(MAX_QLOGICFAS) "i");
@@ -598,14 +601,20 @@ MODULE_PARM_DESC(irq, "IRQ");
 
 int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 {
+	struct Scsi_Host	*shost;
+	qlogicfas_priv_t	priv;
 	int	i,
 		num = 0;
 
 	for (i = 0; i < MAX_QLOGICFAS; i++) {
-		if (__qlogicfas_detect(sht, iobase[num], irq[num]) == NULL) {
+		shost = __qlogicfas_detect(sht, iobase[num], irq[num]);
+		if (shost == NULL) {
 			/* no more devices */
 			break;
 		}
+		priv = (qlogicfas_priv_t)&(shost->hostdata[0]);
+		priv->next = cards;
+		cards = priv;
 		num++;
 	}
 
@@ -632,6 +641,7 @@ static int qlogicfas_release(struct Scsi_Host *shost)
 
 	return 0;
 }
+#endif	/* ifndef PCMCIA */
 
 /* 
  *	Return bios parameters 
@@ -722,8 +732,6 @@ Scsi_Host_Template qlogicfas_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= qlogicfas_name,
 	.proc_name		= qlogicfas_name,
-	.detect			= qlogicfas_detect,
-	.release		= qlogicfas_release,
 	.info			= qlogicfas_info,
 	.queuecommand		= qlogicfas_queuecommand,
 	.eh_abort_handler	= qlogicfas_abort,
@@ -739,6 +747,25 @@ Scsi_Host_Template qlogicfas_driver_template = {
 };
 
 #ifndef PCMCIA
-#define driver_template qlogicfas_driver_template
-#include "scsi_module.c"
-#endif
+static __init int qlogicfas_init(void)
+{
+	if (!qlogicfas_detect(&qlogicfas_driver_template)) {
+		/* no cards found */
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static __exit void qlogicfas_exit(void)
+{
+	qlogicfas_priv_t	priv;
+
+	for (priv = cards; priv != NULL; priv = priv->next)
+		qlogicfas_release(priv->shost);
+}
+
+module_init(qlogicfas_init);
+module_exit(qlogicfas_exit);
+#endif	/* ifndef PCMCIA */
+

@@ -84,6 +84,8 @@
 #define QL_INT_ACTIVE_HIGH 0
 #endif
 
+struct qlogicfas_priv;
+typedef struct qlogicfas_priv *qlogicfas_priv_t;
 struct qlogicfas_priv {
 	 int		qbase;		/* Port */
 	 int		qinitid;	/* initiator ID */
@@ -91,8 +93,9 @@ struct qlogicfas_priv {
 	 int		qlirq;		/* IRQ being used */
 	 char		qinfo[80];	/* description */
 	 Scsi_Cmnd 	*qlcmd;		/* current command being processed */
+	 struct Scsi_Host	*shost;	/* pointer back to host */
+	 qlogicfas_priv_t	next;	/* next private struct */
 };
-typedef struct qlogicfas_priv *qlogicfas_priv_t;
 
 extern int qlcfg5;
 extern int qlcfg6;
