@@ -1058,6 +1058,11 @@ static struct thread_info *sun4c_alloc_thread_info(void)
 #ifndef CONFIG_SUN4	
 	sun4c_put_pte(addr + PAGE_SIZE, BUCKET_PTE(pages + PAGE_SIZE));
 #endif
+
+#ifdef CONFIG_DEBUG_STACK_USAGE
+	memset((void *)addr, 0, PAGE_SIZE << THREAD_INFO_ORDER);
+#endif /* DEBUG_STACK_USAGE */
+
 	return (struct thread_info *) addr;
 }
 
