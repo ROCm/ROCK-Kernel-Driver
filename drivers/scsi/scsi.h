@@ -588,7 +588,8 @@ struct scsi_device {
 	int access_count;	/* Count of open channels/mounts */
 
 	void *hostdata;		/* available to low-level driver */
-	devfs_handle_t de;      /* directory for the device      */
+	char devfs_name[256];	/* devfs junk */
+	devfs_handle_t de;	/* will go away soon */
 	char type;
 	char scsi_level;
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */

@@ -1244,9 +1244,10 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 	
 	scsi_device_register(sdev);
 
-	sdev->de = devfs_mk_dir("scsi/host%d/bus%d/target%d/lun%d",
+	sprintf(sdev->devfs_name, "scsi/host%d/bus%d/target%d/lun%d",
 				sdev->host->host_no, sdev->channel,
 				sdev->id, sdev->lun);
+	sdev->de = devfs_mk_dir(sdev->devfs_name);
 
 	/*
 	 * End driverfs/devfs code.
@@ -1733,7 +1734,7 @@ int scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->attached)
 		return -EINVAL;
 
-	devfs_unregister(sdev->de);
+	devfs_remove(sdev->devfs_name);
 	scsi_device_unregister(sdev);
 
 	scsi_free_sdev(sdev);
