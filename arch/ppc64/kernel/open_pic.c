@@ -573,7 +573,7 @@ void openpic_request_IPIs(void)
  * Get IPI's working and start taking interrupts.
  *   -- Cort
  */
-static spinlock_t openpic_setup_lock __initdata = SPIN_LOCK_UNLOCKED;
+static spinlock_t openpic_setup_lock __devinitdata = SPIN_LOCK_UNLOCKED;
 
 void __devinit do_openpic_setup_cpu(void)
 {
