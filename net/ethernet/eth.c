@@ -275,7 +275,8 @@ void ether_setup(struct net_device *dev)
 	dev->hard_header_cache	= eth_header_cache;
 	dev->header_cache_update= eth_header_cache_update;
 	dev->hard_header_parse	= eth_header_parse;
-
+	dev->generate_eui64	= NULL;
+	dev->dev_id		= 0;
 	dev->type		= ARPHRD_ETHER;
 	dev->hard_header_len 	= ETH_HLEN;
 	dev->mtu		= 1500; /* eth_mtu */

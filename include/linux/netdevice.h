@@ -469,6 +469,7 @@ struct net_device
 						     unsigned char *haddr);
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
+	int                     (*generate_eui64)(u8 *eui, struct net_device *dev);
 #ifdef CONFIG_NETPOLL
 	int			netpoll_rx;
 #endif
@@ -486,6 +487,10 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
+
+	/* use dev_id in conjunction with shared network cards*/
+	unsigned short           dev_id; 
+
 	/* how much padding had been added by alloc_netdev() */
 	int padded;
 };
