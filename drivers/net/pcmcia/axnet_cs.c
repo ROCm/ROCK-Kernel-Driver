@@ -258,7 +258,7 @@ static void axnet_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
+    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
 	axnet_release((u_long)link);
 	if (link->state & DEV_STALE_CONFIG) {
@@ -706,7 +706,7 @@ static int axnet_close(struct net_device *dev)
     
     link->open--;
     netif_stop_queue(dev);
-    del_timer(&info->watchdog);
+    del_timer_sync(&info->watchdog);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
 
