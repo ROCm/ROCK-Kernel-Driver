@@ -23,6 +23,7 @@
 #include <linux/param.h>
 #include <linux/spinlock.h>
 
+#include "csr1212.h"
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394.h"
@@ -35,7 +36,10 @@ static int fcp = 1;
 module_param(fcp, int, 0444);
 MODULE_PARM_DESC(fcp, "Map FCP registers (default = 1, disable = 0).");
 
+static struct csr1212_keyval *node_cap = NULL;
+
 static void add_host(struct hpsb_host *host);
+static void remove_host(struct hpsb_host *host);
 static void host_reset(struct hpsb_host *host);
 static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 		     u64 addr, size_t length, u16 fl);
@@ -49,10 +53,15 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
 		     u64 addr, quadlet_t data, quadlet_t arg, int extcode, u16 fl);
 static int lock64_regs(struct hpsb_host *host, int nodeid, octlet_t * store,
 		       u64 addr, octlet_t data, octlet_t arg, int extcode, u16 fl);
+static int read_config_rom(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+			   u64 addr, size_t length, u16 fl);
+static u64 allocate_addr_range(u64 size, u32 alignment, void *__host);
+static void release_addr_range(u64 addr, void *__host);
 
 static struct hpsb_highlevel csr_highlevel = {
 	.name =		"standard registers",
 	.add_host =	add_host,
+	.remove_host =	remove_host,
 	.host_reset =	host_reset,
 };
 
@@ -69,6 +78,15 @@ static struct hpsb_address_ops reg_ops = {
 	.write = write_regs,
 	.lock = lock_regs,
 	.lock64 = lock64_regs,
+};
+
+static struct hpsb_address_ops config_rom_ops = {
+	.read = read_config_rom,
+};
+
+struct csr1212_bus_ops csr_bus_ops = {
+	.allocate_addr_range =	allocate_addr_range,
+	.release_addr =		release_addr_range,
 };
 
 
@@ -162,10 +180,13 @@ static inline void calculate_expire(struct csr_control *csr)
 
 static void add_host(struct hpsb_host *host)
 {
+	struct csr1212_keyval *root;
+	quadlet_t bus_info[CSR_BUS_INFO_SIZE];
+
 	hpsb_register_addrspace(&csr_highlevel, host, &reg_ops,
 				CSR_REGISTER_BASE,
 				CSR_REGISTER_BASE + CSR_CONFIG_ROM);
-	hpsb_register_addrspace(&csr_highlevel, host, &map_ops,
+	hpsb_register_addrspace(&csr_highlevel, host, &config_rom_ops,
 				CSR_REGISTER_BASE + CSR_CONFIG_ROM,
 				CSR_REGISTER_BASE + CSR_CONFIG_ROM_END);
 	if (fcp) {
@@ -182,8 +203,6 @@ static void add_host(struct hpsb_host *host)
 
         host->csr.lock = SPIN_LOCK_UNLOCKED;
 
-        host->csr.rom_size = host->driver->get_rom(host, &host->csr.rom);
-        host->csr.rom_version           = 0;
         host->csr.state                 = 0;
         host->csr.node_ids              = 0;
         host->csr.split_timeout_hi      = 0;
@@ -202,43 +221,100 @@ static void add_host(struct hpsb_host *host)
 			host->driver->hw_csr_reg(host, 2, 0xfffffffe, ~0);
 		}
 	}
+
+	if (host->csr.max_rec >= 9)
+		host->csr.max_rom = 2;
+	else if (host->csr.max_rec >= 5)
+		host->csr.max_rom = 1;
+	else
+		host->csr.max_rom = 0;
+
+	host->csr.generation = 2;
+
+	bus_info[1] = __constant_cpu_to_be32(0x31333934);
+	bus_info[2] = cpu_to_be32((1 << CSR_IRMC_SHIFT) |
+				  (1 << CSR_CMC_SHIFT) |
+				  (1 << CSR_ISC_SHIFT) |
+				  (0 << CSR_BMC_SHIFT) |
+				  (0 << CSR_PMC_SHIFT) |
+				  (host->csr.cyc_clk_acc << CSR_CYC_CLK_ACC_SHIFT) |
+				  (host->csr.max_rec << CSR_MAX_REC_SHIFT) |
+				  (host->csr.max_rom << CSR_MAX_ROM_SHIFT) |
+				  (host->csr.generation << CSR_GENERATION_SHIFT) |
+				  host->csr.lnk_spd);
+
+	bus_info[3] = cpu_to_be32(host->csr.guid_hi);
+	bus_info[4] = cpu_to_be32(host->csr.guid_lo);
+
+	/* The hardware copy of the bus info block will be set later when a
+	 * bus reset is issued. */
+
+	csr1212_init_local_csr(host->csr.rom, bus_info, host->csr.max_rom);
+
+	host->csr.rom->max_rom = host->csr.max_rom;
+
+	root = host->csr.rom->root_kv;
+
+	if(csr1212_attach_keyval_to_directory(root, node_cap) != CSR1212_SUCCESS) {
+		HPSB_ERR("Failed to attach Node Capabilities to root directory");
+	}
+
+	host->update_config_rom = 1;
 }
+
+static void remove_host(struct hpsb_host *host)
+{
+	quadlet_t bus_info[CSR_BUS_INFO_SIZE];
+
+	bus_info[1] = __constant_cpu_to_be32(0x31333934);
+	bus_info[2] = cpu_to_be32((0 << CSR_IRMC_SHIFT) |
+				  (0 << CSR_CMC_SHIFT) |
+				  (0 << CSR_ISC_SHIFT) |
+				  (0 << CSR_BMC_SHIFT) |
+				  (0 << CSR_PMC_SHIFT) |
+				  (host->csr.cyc_clk_acc << CSR_CYC_CLK_ACC_SHIFT) |
+				  (host->csr.max_rec << CSR_MAX_REC_SHIFT) |
+				  (0 << CSR_MAX_ROM_SHIFT) |
+				  (0 << CSR_GENERATION_SHIFT) |
+				  host->csr.lnk_spd);
+
+	bus_info[3] = cpu_to_be32(host->csr.guid_hi);
+	bus_info[4] = cpu_to_be32(host->csr.guid_lo);
+
+	csr1212_detach_keyval_from_directory(host->csr.rom->root_kv, node_cap);
+
+	csr1212_init_local_csr(host->csr.rom, bus_info, 0);
+	host->update_config_rom = 1;
+}
+
 
 int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom, 
-	size_t size, unsigned char rom_version)
+	size_t buffersize, unsigned char rom_version)
 {
 	unsigned long flags;
 	int ret;
 
-        spin_lock_irqsave(&host->csr.lock, flags); 
-        if (rom_version != host->csr.rom_version)
-                 ret = -1;
-        else if (size > (CSR_CONFIG_ROM_SIZE << 2))
-                 ret = -2;
-        else {
-                 memcpy(host->csr.rom,new_rom,size);
-                 host->csr.rom_size=size;
-                 host->csr.rom_version++;
-                 ret=0;
-        }
-        spin_unlock_irqrestore(&host->csr.lock, flags);
-        return ret;
-}
-
-int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer, 
-	size_t buffersize, size_t *rom_size, unsigned char *rom_version)
-{
-	unsigned long flags;
-	int ret;
+	HPSB_NOTICE("hpsb_update_config_rom() is deprecated");
 
         spin_lock_irqsave(&host->csr.lock, flags); 
-        *rom_version=host->csr.rom_version;
-        *rom_size=host->csr.rom_size;
-        if (buffersize < host->csr.rom_size)
-                 ret = -1;
+	if (rom_version != host->csr.generation)
+                ret = -1;
+	else if (buffersize > host->csr.rom->cache_head->size)
+		ret = -2;
         else {
-                 memcpy(buffer,host->csr.rom,host->csr.rom_size);
-                 ret=0;
+		/* Just overwrite the generated ConfigROM image with new data,
+		 * it can be regenerated later. */
+		memcpy(host->csr.rom->cache_head->data, new_rom, buffersize);
+		host->csr.rom->cache_head->len = buffersize;
+
+		if (host->driver->set_hw_config_rom)
+			host->driver->set_hw_config_rom(host, host->csr.rom->bus_info_data);
+		/* Increment the generation number to keep some sort of sync
+		 * with the newer ConfigROM manipulation method. */
+		host->csr.generation++;
+		if (host->csr.generation > 0xf || host->csr.generation < 2)
+			host->csr.generation = 2;
+		ret=0;
         }
         spin_unlock_irqrestore(&host->csr.lock, flags);
         return ret;
@@ -255,13 +331,7 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 
         spin_lock_irqsave(&host->csr.lock, flags); 
 
-        if (csraddr < CSR_TOPOLOGY_MAP) {
-                if (csraddr + length > CSR_CONFIG_ROM + host->csr.rom_size) {
-                        spin_unlock_irqrestore(&host->csr.lock, flags);
-                        return RCODE_ADDRESS_ERROR;
-                }
-                src = ((char *)host->csr.rom) + csraddr - CSR_CONFIG_ROM;
-        } else if (csraddr < CSR_SPEED_MAP) {
+	if (csraddr < CSR_SPEED_MAP) {
                 src = ((char *)host->csr.topology_map) + csraddr 
                         - CSR_TOPOLOGY_MAP;
         } else {
@@ -738,14 +808,52 @@ static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
         return RCODE_COMPLETE;
 }
 
-
-
-void init_csr(void)
+static int read_config_rom(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+			   u64 addr, size_t length, u16 fl)
 {
+	u32 offset = addr - CSR1212_REGISTER_SPACE_BASE;
+
+	if (csr1212_read(host->csr.rom, offset, buffer, length) == CSR1212_SUCCESS)
+		return RCODE_COMPLETE;
+	else
+		return RCODE_ADDRESS_ERROR;
+}
+
+static u64 allocate_addr_range(u64 size, u32 alignment, void *__host)
+{
+ 	struct hpsb_host *host = (struct hpsb_host*)__host;
+
+	return hpsb_allocate_and_register_addrspace(&csr_highlevel,
+						    host,
+						    &config_rom_ops,
+						    size, alignment,
+						    CSR1212_UNITS_SPACE_BASE,
+						    CSR1212_UNITS_SPACE_END);
+}
+
+static void release_addr_range(u64 addr, void *__host)
+{
+ 	struct hpsb_host *host = (struct hpsb_host*)__host;
+	hpsb_unregister_addrspace(&csr_highlevel, host, addr);
+}
+
+
+int init_csr(void)
+{
+	node_cap = csr1212_new_immediate(CSR1212_KV_ID_NODE_CAPABILITIES, 0x0083c0);
+	if (!node_cap) {
+		HPSB_ERR("Failed to allocate memory for Node Capabilties ConfigROM entry!");
+		return -ENOMEM;
+	}
+
 	hpsb_register_highlevel(&csr_highlevel);
+
+	return 0;
 }
 
 void cleanup_csr(void)
 {
+	if (node_cap)
+		csr1212_release_keyval(node_cap);
         hpsb_unregister_highlevel(&csr_highlevel);
 }

@@ -43,6 +43,7 @@
 #include <asm/atomic.h>
 #include <linux/devfs_fs_kernel.h>
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
@@ -1822,9 +1823,9 @@ static int arm_get_buf(struct file_info *fi, struct pending_request *req)
 			if (req->req.address + req->req.length <= arm_addr->end) {
 				offset = req->req.address - arm_addr->start;
 
-				DBGMSG("arm_get_buf copy_to_user( %08X, %08X, %u )",
+				DBGMSG("arm_get_buf copy_to_user( %08X, %p, %u )",
 				       (u32) req->req.recvb,
-				       (u32) (arm_addr->addr_space_buffer+offset),
+				       arm_addr->addr_space_buffer+offset,
 				       (u32) req->req.length);
 
 				if (copy_to_user(int2ptr(req->req.recvb), arm_addr->addr_space_buffer+offset, req->req.length)) {
@@ -1833,7 +1834,10 @@ static int arm_get_buf(struct file_info *fi, struct pending_request *req)
 				}
 
 				spin_unlock_irqrestore(&host_info_lock, flags);
-				free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+				/* We have to free the request, because we
+				 * queue no response, and therefore nobody
+				 * will free it. */
+				free_pending_request(req);
 				return sizeof(struct raw1394_request);
 			} else {
 				DBGMSG("arm_get_buf request exceeded mapping");
@@ -1873,8 +1877,8 @@ static int arm_set_buf(struct file_info *fi, struct pending_request *req)
 			if (req->req.address + req->req.length <= arm_addr->end) {
 				offset = req->req.address - arm_addr->start;
 
-				DBGMSG("arm_set_buf copy_from_user( %08X, %08X, %u )",
-				       (u32) (arm_addr->addr_space_buffer+offset),
+				DBGMSG("arm_set_buf copy_from_user( %p, %08X, %u )",
+				       arm_addr->addr_space_buffer+offset,
 				       (u32) req->req.sendb,
 				       (u32) req->req.length);
 
@@ -1941,22 +1945,22 @@ static int write_phypacket(struct file_info *fi, struct pending_request *req)
 
 static int get_config_rom(struct file_info *fi, struct pending_request *req)
 {
-        size_t return_size;
-        unsigned char rom_version;
         int ret=sizeof(struct raw1394_request);
         quadlet_t *data = kmalloc(req->req.length, SLAB_KERNEL);
         int status;
+
         if (!data) return -ENOMEM;
-        status = hpsb_get_config_rom(fi->host, data, 
-                req->req.length, &return_size, &rom_version);
+
+	status = csr1212_read(fi->host->csr.rom, CSR1212_CONFIG_ROM_SPACE_OFFSET,
+			      data, req->req.length);
         if (copy_to_user(int2ptr(req->req.recvb), data, 
                 req->req.length))
                 ret = -EFAULT;
-        if (copy_to_user(int2ptr(req->req.tag), &return_size, 
-                sizeof(return_size)))
+	if (copy_to_user(int2ptr(req->req.tag), &fi->host->csr.rom->cache_head->len,
+			 sizeof(fi->host->csr.rom->cache_head->len)))
                 ret = -EFAULT;
-        if (copy_to_user(int2ptr(req->req.address), &rom_version, 
-                sizeof(rom_version)))
+	if (copy_to_user(int2ptr(req->req.address), &fi->host->csr.generation,
+			 sizeof(fi->host->csr.generation)))
                 ret = -EFAULT;
         if (copy_to_user(int2ptr(req->req.sendb), &status, 
                 sizeof(status)))
@@ -1987,8 +1991,120 @@ static int update_config_rom(struct file_info *fi, struct pending_request *req)
         kfree(data);
         if (ret >= 0) {
                 free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+		fi->cfgrom_upd = 1;
         }
         return ret;
+}
+
+static int modify_config_rom(struct file_info *fi, struct pending_request *req)
+{
+	struct csr1212_keyval *kv;
+	struct csr1212_csr_rom_cache *cache;
+	struct csr1212_dentry *dentry;
+	u32 dr;
+	int ret = 0;
+
+	if (req->req.misc == ~0) {
+		if (req->req.length == 0) return -EINVAL;
+
+		/* Find an unused slot */
+		for (dr = 0; dr < RAW1394_MAX_USER_CSR_DIRS && fi->csr1212_dirs[dr]; dr++);
+
+		if (dr == RAW1394_MAX_USER_CSR_DIRS) return -ENOMEM;
+
+		fi->csr1212_dirs[dr] = csr1212_new_directory(CSR1212_KV_ID_VENDOR);
+		if (!fi->csr1212_dirs[dr]) return -ENOMEM;
+	} else {
+		dr = req->req.misc;
+		if (!fi->csr1212_dirs[dr]) return -EINVAL;
+
+		/* Delete old stuff */
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv,
+							     dentry->kv);
+		}
+
+		if (req->req.length == 0) {
+			csr1212_release_keyval(fi->csr1212_dirs[dr]);
+			fi->csr1212_dirs[dr] = NULL;
+
+			hpsb_update_config_rom_image(fi->host);
+			free_pending_request(req);
+			return sizeof(struct raw1394_request);
+		}
+	}
+
+	cache = csr1212_rom_cache_malloc(0, req->req.length);
+	if (!cache) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		return -ENOMEM;
+	}
+
+	cache->filled_head = kmalloc(sizeof(struct csr1212_cache_region), GFP_KERNEL);
+	if (!cache->filled_head) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		CSR1212_FREE(cache);
+		return -ENOMEM;
+	}
+	cache->filled_tail = cache->filled_head;
+
+	if (copy_from_user(cache->data, int2ptr(req->req.sendb),
+			   req->req.length)) {
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		CSR1212_FREE(cache);
+		ret= -EFAULT;
+	} else {
+		cache->len = req->req.length;
+		cache->filled_head->offset_start = 0;
+		cache->filled_head->offset_end = cache->size -1;
+
+		cache->layout_head = cache->layout_tail = fi->csr1212_dirs[dr];
+
+		ret = CSR1212_SUCCESS;
+		/* parse all the items */
+		for (kv = cache->layout_head; ret == CSR1212_SUCCESS && kv;
+		     kv = kv->next) {
+			ret = csr1212_parse_keyval(kv, cache);
+		}
+
+		/* attach top level items to the root directory */
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     ret == CSR1212_SUCCESS && dentry; dentry = dentry->next) {
+			ret = csr1212_attach_keyval_to_directory(fi->host->csr.rom->root_kv,
+								 dentry->kv);
+		}
+
+		if (ret == CSR1212_SUCCESS) {
+			ret = hpsb_update_config_rom_image(fi->host);
+
+			if (ret >= 0 && copy_to_user(int2ptr(req->req.recvb), 
+						    &dr, sizeof(dr))) {
+				ret = -ENOMEM;
+			}
+		}
+	}
+	kfree(cache->filled_head);
+	kfree(cache);
+
+	if (ret >= 0) {
+		/* we have to free the request, because we queue no response,
+		 * and therefore nobody will free it */		
+		free_pending_request(req);
+		return sizeof(struct raw1394_request);
+	} else {
+		for (dentry = fi->csr1212_dirs[dr]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv,
+							     dentry->kv);
+		}
+		csr1212_release_keyval(fi->csr1212_dirs[dr]);
+		fi->csr1212_dirs[dr] = NULL;
+		return ret;
+	}
 }
 
 static int state_connected(struct file_info *fi, struct pending_request *req)
@@ -2049,6 +2165,9 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
 
         case RAW1394_REQ_UPDATE_ROM:
                 return update_config_rom(fi, req);
+
+	case RAW1394_REQ_MODIFY_ROM:
+		return modify_config_rom(fi, req);
         }
 
         if (req->req.generation != get_hpsb_generation(fi->host)) {
@@ -2500,6 +2619,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
         struct file_info *fi_hlp = NULL;
         struct arm_addr  *arm_addr = NULL;
         int another_host;
+	int csr_mod = 0;
 
 	if (fi->iso_state != RAW1394_ISO_INACTIVE)
 		raw1394_iso_shutdown(fi);
@@ -2586,6 +2706,22 @@ static int raw1394_release(struct inode *inode, struct file *file)
 
                 if (!done) down_interruptible(&fi->complete_sem);
         }
+
+	/* Remove any sub-trees left by user space programs */
+	for (i = 0; i < RAW1394_MAX_USER_CSR_DIRS; i++) {
+		struct csr1212_dentry *dentry;
+		if (!fi->csr1212_dirs[i]) continue;
+		for (dentry = fi->csr1212_dirs[i]->value.directory.dentries_head;
+		     dentry; dentry = dentry->next) {
+			csr1212_detach_keyval_from_directory(fi->host->csr.rom->root_kv, dentry->kv);
+		}
+		csr1212_release_keyval(fi->csr1212_dirs[i]);
+		fi->csr1212_dirs[i] = NULL;
+		csr_mod = 1;
+	}
+
+	if ((csr_mod || fi->cfgrom_upd) && hpsb_update_config_rom_image(fi->host) < 0)
+		HPSB_ERR("Failed to generate Configuration ROM image for host %d", fi->host->id);
 
         if (fi->state == connected) {
                 spin_lock_irq(&host_info_lock);
