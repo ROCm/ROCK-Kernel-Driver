@@ -1039,7 +1039,6 @@
 /*	PCI_VPD_NITEM		 8 bit (ML)	Next Item Ptr */
 /*	PCI_VPD_ADR_REG		16 bit (ML)	VPD Address Register */
 #define	PCI_VPD_FLAG	(1<<15)		/* Bit 15	starts VPD rd/wd cycle*/
-#define PCI_VPD_ADDR	(0x3fff<<0)	/* Bit  0..14	VPD address */
 
 /*	PCI_VPD_DAT_REG		32 bit (ML)	VPD Data Register */
 
