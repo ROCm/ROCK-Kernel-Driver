@@ -715,7 +715,8 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
 	retval = usb_new_device (usb_dev, parent_dev);
 	if (retval)
-		err("%s - usb_new_device failed with value %d", __FUNCTION__, retval);
+		dev_err (*parent_dev, "can't register root hub for %s, %d\n",
+				usb_dev->dev.bus_id, retval);
 	return retval;
 }
 EXPORT_SYMBOL (usb_register_root_hub);
@@ -1286,13 +1287,7 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 
 	// NOTE:  a generic device/urb monitoring hook would go here.
 	// hcd_monitor_hook(MONITOR_URB_FINISH, urb, dev)
-	// It would catch exit/unlink paths for all urbs, but non-exit
-	// completions for periodic urbs need hooks inside the HCD.
-	// hcd_monitor_hook(MONITOR_URB_UPDATE, urb, dev)
-
-	if (urb->status)
-		dbg ("giveback urb %p status %d len %d",
-			urb, urb->status, urb->actual_length);
+	// It would catch exit/unlink paths for all urbs.
 
 	/* lower level hcd code should use *_dma exclusively */
 	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {

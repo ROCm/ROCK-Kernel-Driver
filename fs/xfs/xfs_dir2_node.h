@@ -36,7 +36,6 @@
  * Directory version 2, btree node format structures
  */
 
-struct dirent;
 struct uio;
 struct xfs_dabuf;
 struct xfs_da_args;

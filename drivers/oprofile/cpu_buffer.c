@@ -21,6 +21,7 @@
 #include <linux/vmalloc.h>
 #include <linux/smp.h>
 #include <linux/errno.h>
+#include <linux/cache.h>
  
 #include "cpu_buffer.h"
 #include "oprof.h"

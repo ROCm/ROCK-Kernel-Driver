@@ -239,18 +239,14 @@ extern __inline__ struct async *async_getpending(struct dev_state *ps, void *use
 {
         unsigned long flags;
         struct async *as;
-        struct list_head *p;
 
         spin_lock_irqsave(&ps->lock, flags);
-        for (p = ps->async_pending.next; p != &ps->async_pending; ) {
-                as = list_entry(p, struct async, asynclist);
-                p = p->next;
-                if (as->userurb != userurb)
-                        continue;
-                list_del_init(&as->asynclist);
-                spin_unlock_irqrestore(&ps->lock, flags);
-                return as;
-        }
+	list_for_each_entry(as, &ps->async_pending, asynclist)
+		if (as->userurb == userurb) {
+			list_del_init(&as->asynclist);
+			spin_unlock_irqrestore(&ps->lock, flags);
+			return as;
+		}
         spin_unlock_irqrestore(&ps->lock, flags);
         return NULL;
 }
@@ -295,19 +291,14 @@ static void destroy_async (struct dev_state *ps, struct list_head *list)
 
 static void destroy_async_on_interface (struct dev_state *ps, unsigned int intf)
 {
-	struct async *as;
-	struct list_head *p, hitlist;
+	struct list_head *p, *q, hitlist;
 	unsigned long flags;
 
 	INIT_LIST_HEAD(&hitlist);
 	spin_lock_irqsave(&ps->lock, flags);
-	for (p = ps->async_pending.next; p != &ps->async_pending; ) {
-		as = list_entry(p, struct async, asynclist);
-		p = p->next;
-
-		if (as->intf == intf)
-			list_move_tail(&as->asynclist, &hitlist);
-	}
+	list_for_each_safe(p, q, &ps->async_pending)
+		if (intf == list_entry(p, struct async, asynclist)->intf)
+			list_move_tail(p, &hitlist);
 	spin_unlock_irqrestore(&ps->lock, flags);
 	destroy_async(ps, &hitlist);
 }
@@ -869,7 +860,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 		if (uurb.buffer_length > 16384)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
-			return -EFAULT;   
+			return -EFAULT;
 		break;
 
 	default:
@@ -964,10 +955,10 @@ static int processcompl(struct async *as)
 	if (!(usb_pipeisoc(urb->pipe)))
 		return 0;
 	for (i = 0; i < urb->number_of_packets; i++) {
-		if (put_user(urb->iso_frame_desc[i].actual_length, 
+		if (put_user(urb->iso_frame_desc[i].actual_length,
 			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].actual_length))
 			return -EFAULT;
-		if (put_user(urb->iso_frame_desc[i].status, 
+		if (put_user(urb->iso_frame_desc[i].status,
 			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].status))
 			return -EFAULT;
 	}
@@ -1099,12 +1090,10 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
        else switch (ctrl.ioctl_code) {
 
        /* disconnect kernel driver from interface, leaving it unbound.  */
+       /* maybe unbound - you get no guarantee it stays unbound */
        case USBDEVFS_DISCONNECT:
-		/* this function is voodoo. */
-		/* which function ... usb_device_remove()?
-		 * FIXME either the module lock (BKL) should be involved
-		 * here too, or the 'default' case below is broken
-		 */
+		/* this function is misdesigned - retained for compatibility */
+		lock_kernel();
 		driver = ifp->driver;
 		if (driver) {
 			dbg ("disconnect '%s' from dev %d interface %d",
@@ -1112,11 +1101,14 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			usb_device_remove(&ifp->dev);
 		} else
 			retval = -ENODATA;
+		unlock_kernel();
 		break;
 
 	/* let kernel drivers try to (re)bind to the interface */
 	case USBDEVFS_CONNECT:
+		lock_kernel();
 		retval = usb_device_probe (&ifp->dev);
+		unlock_kernel();
 		break;
 
 	/* talk directly to the interface's driver */
@@ -1131,20 +1123,17 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			unlock_kernel();
 			retval = -ENOSYS;
 		} else {
-			if (driver->owner
-					&& !try_inc_mod_count (driver->owner)) {
+			if (!try_module_get (driver->owner)) {
 				unlock_kernel();
 				retval = -ENOSYS;
 				break;
 			}
 			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
-			if (driver->owner)
-				__MOD_DEC_USE_COUNT (driver->owner);
+			if (retval == -ENOIOCTLCMD)
+				retval = -ENOTTY;
+			module_put (driver->owner);
 		}
-		
-		if (retval == -ENOIOCTLCMD)
-			retval = -ENOTTY;
 	}
 
 	/* cleanup and return */
@@ -1197,7 +1186,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	case USBDEVFS_RESET:
 		ret = proc_resetdevice(ps);
 		break;
-	
+
 	case USBDEVFS_CLEAR_HALT:
 		ret = proc_clearhalt(ps, (void *)arg);
 		if (ret >= 0)

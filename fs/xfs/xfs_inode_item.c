@@ -433,7 +433,6 @@ xfs_inode_item_format(
 		ASSERT(!(iip->ili_format.ilf_fields &
 			 (XFS_ILOG_ADATA | XFS_ILOG_ABROOT)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_AEXT) {
-			ASSERT(!(iip->ili_format.ilf_fields & XFS_ILOG_DEXT));
 			ASSERT(ip->i_afp->if_bytes > 0);
 			ASSERT(ip->i_afp->if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_anextents > 0);

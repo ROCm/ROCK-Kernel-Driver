@@ -11,7 +11,7 @@ endif
 AFLAGS_entry.o := -traditional
 AFLAGS_pacache.o := -traditional
 
-export-objs	:= parisc_ksyms.o keyboard.o
+export-objs	:= parisc_ksyms.o 
 
 obj-y	     	:= cache.o pacache.o setup.o traps.o time.o irq.o \
 		   pa7300lc.o syscall.o entry.o sys_parisc.o firmware.o \
@@ -22,7 +22,6 @@ obj-y	     	:= cache.o pacache.o setup.o traps.o time.o irq.o \
 obj-$(CONFIG_SMP) += smp.o 
 obj-$(CONFIG_PA11) += pci-dma.o
 obj-$(CONFIG_PCI) += pci.o
-obj-$(CONFIG_VT) += keyboard.o
 obj-$(CONFIG_PARISC64) += binfmt_elf32.o sys_parisc32.o \
 		ioctl32.o signal32.o
 # only supported for PCX-W/U in 64-bit mode at the moment

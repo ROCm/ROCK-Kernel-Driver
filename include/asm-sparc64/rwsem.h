@@ -279,7 +279,7 @@ static __inline__ int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 		"mov		%%g7, %0\n\t"
 		: "=&r" (tmp)
 		: "0" (tmp), "r" (sem)
-		: "g5", "g7", "memory");
+		: "g5", "g7", "memory", "cc");
 
 	return tmp + delta;
 }

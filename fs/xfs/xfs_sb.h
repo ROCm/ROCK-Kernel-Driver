@@ -34,7 +34,7 @@
 
 /*
  * Super block
- * Fits into a 512-byte buffer at daddr_t 0 of each allocation group.
+ * Fits into a sector-sized buffer at address 0 of each allocation group.
  * Only the first of these is ever updated except during growfs.
  */
 
@@ -140,7 +140,8 @@ typedef struct xfs_sb
 	__uint32_t	sb_unit;	/* stripe or raid unit */
 	__uint32_t	sb_width;	/* stripe or raid width */
 	__uint8_t	sb_dirblklog;	/* log2 of dir block size (fsbs) */
-	__uint8_t	sb_dummy[3];	/* padding */
+	__uint8_t	sb_logsectlog;	/* log2 of the log sector size */
+	__uint16_t	sb_logsectsize;	/* sector size for the log, bytes */
 	__uint32_t	sb_logsunit;	/* stripe unit size for the log */
 } xfs_sb_t;
 
@@ -159,7 +160,7 @@ typedef enum {
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, XFS_SBS_UQUOTINO,
 	XFS_SBS_GQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_FLAGS, XFS_SBS_SHARED_VN,
 	XFS_SBS_INOALIGNMT, XFS_SBS_UNIT, XFS_SBS_WIDTH, XFS_SBS_DIRBLKLOG,
-	XFS_SBS_DUMMY, XFS_SBS_LOGSUNIT,
+	XFS_SBS_LOGSECTLOG, XFS_SBS_LOGSECTSIZE, XFS_SBS_LOGSUNIT,
 	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
@@ -444,7 +445,7 @@ int xfs_sb_version_subextflgbit(xfs_sb_t *sbp);
  * end of superblock version macros
  */
 
-#define XFS_SB_DADDR	((xfs_daddr_t)0)		/* daddr in filesystem/ag */
+#define XFS_SB_DADDR	((xfs_daddr_t)0)	/* daddr in filesystem/ag */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_BLOCK)
 xfs_agblock_t xfs_sb_block(struct xfs_mount *mp);
 #define XFS_SB_BLOCK(mp)	xfs_sb_block(mp)
@@ -474,6 +475,28 @@ xfs_daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 			 XFS_FSB_TO_AGBNO(mp,fsbno))
 #endif
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBP)
+xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
+#define XFS_BUF_TO_SBP(bp)	xfs_buf_to_sbp(bp)
+#else
+#define XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)XFS_BUF_PTR(bp))
+#endif
+
+/*
+ * File system sector to basic block conversions.
+ */
+#define XFS_FSS_TO_BB(mp,sec)	((sec) << (mp)->m_sectbb_log)
+#define XFS_LOGS_TO_BB(mp,sec)	((sec) << ((mp)->m_sb.sb_logsectlog - BBSHIFT))
+#define XFS_BB_TO_FSS(mp,bb)	\
+	(((bb) + (XFS_FSS_TO_BB(mp,1) - 1)) >> (mp)->m_sectbb_log)
+#define XFS_BB_TO_FSST(mp,bb)	((bb) >> (mp)->m_sectbb_log)
+
+/*
+ * File system sector to byte conversions.
+ */
+#define XFS_FSS_TO_B(mp,sectno)	((xfs_fsize_t)(sectno) << (mp)->m_sb.sb_sectlog)
+#define XFS_B_TO_FSST(mp,b)	(((__uint64_t)(b)) >> (mp)->m_sb.sb_sectlog)
+
 /*
  * File system block to basic block conversions.
  */
@@ -492,12 +515,5 @@ xfs_daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 	((((__uint64_t)(b)) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
 #define XFS_B_TO_FSBT(mp,b)	(((__uint64_t)(b)) >> (mp)->m_sb.sb_blocklog)
 #define XFS_B_FSB_OFFSET(mp,b)	((b) & (mp)->m_blockmask)
-
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBP)
-xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
-#define XFS_BUF_TO_SBP(bp)	xfs_buf_to_sbp(bp)
-#else
-#define XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)XFS_BUF_PTR(bp))
-#endif
 
 #endif	/* __XFS_SB_H__ */
