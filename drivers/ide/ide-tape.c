@@ -866,8 +866,6 @@ typedef struct {
  */
 typedef struct {
 	ide_drive_t *drive;
-	devfs_handle_t de_r, de_n;
-
 	/*
 	 *	Since a typical character device operation requires more
 	 *	than one packet command, we provide here enough memory
@@ -6170,8 +6168,8 @@ static int idetape_cleanup (ide_drive_t *drive)
 	DRIVER(drive)->busy = 0;
 	(void) ide_unregister_subdriver(drive);
 	drive->driver_data = NULL;
-	devfs_unregister(tape->de_r);
-	devfs_unregister(tape->de_n);
+	devfs_remove("%s/mt");
+	devfs_remove("%s/mtn");
 	devfs_unregister_tape(drive->disk->number);
 	kfree (tape);
 	drive->disk->fops = ide_fops;
@@ -6272,6 +6270,7 @@ static struct block_device_operations idetape_block_ops = {
 static int idetape_attach (ide_drive_t *drive)
 {
 	idetape_tape_t *tape;
+	char devfs_name[64];
 	int minor;
 
 	if (!strstr("ide-tape", drive->driver_req))
@@ -6306,16 +6305,19 @@ static int idetape_attach (ide_drive_t *drive)
 		;
 	idetape_setup(drive, tape, minor);
 	idetape_chrdevs[minor].drive = drive;
-	tape->de_r =
-	    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
-			    HWIF(drive)->major, minor,
-			    S_IFCHR | S_IRUGO | S_IWUGO,
-			    &idetape_fops, NULL);
-	tape->de_n =
-	    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
-			    HWIF(drive)->major, minor + 128,
-			    S_IFCHR | S_IRUGO | S_IWUGO,
-			    &idetape_fops, NULL);
+
+	sprintf(devfs_name, "%s/mt", drive->devfs_name);
+	tape->de_r = devfs_register (NULL, devfs_name, 0,
+			HWIF(drive)->major, minor,
+			S_IFCHR | S_IRUGO | S_IWUGO,
+			&idetape_fops, NULL);
+
+	sprintf(devfs_name, "%s/mtn", drive->devfs_name);
+	tape->de_n = devfs_register (NULL, devfs_name, 0,
+			HWIF(drive)->major, minor + 128,
+			S_IFCHR | S_IRUGO | S_IWUGO,
+			&idetape_fops, NULL);
+
 	drive->disk->number = devfs_register_tape(drive->de);
 	drive->disk->fops = &idetape_block_ops;
 	return 0;

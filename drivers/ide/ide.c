@@ -650,9 +650,9 @@ void ide_unregister (unsigned int index)
 	 */
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		drive = &hwif->drives[i];
-		if (drive->de) {
-			devfs_unregister(drive->de);
-			drive->de = NULL;
+		if (drive->devfs_name[0] != '\0') {
+			devfs_remove(drive->devfs_name);
+			drive->devfs_name[0] = '\0';
 		}
 		if (!drive->present)
 			continue;
