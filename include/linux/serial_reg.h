@@ -141,6 +141,21 @@
 #define UART_MSR_ANY_DELTA 0x0F	/* Any of the delta bits! */
 
 /*
+ * The Intel PXA2xx chip defines those bits
+ */
+#define UART_IER_DMAE	0x80	/* DMA Requests Enable */
+#define UART_IER_UUE	0x40	/* UART Unit Enable */
+#define UART_IER_NRZE	0x20	/* NRZ coding Enable */
+#define UART_IER_RTOIE	0x10	/* Receiver Time Out Interrupt Enable */
+
+#define UART_IIR_TOD	0x08	/* Character Timeout Indication Detected */
+
+#define UART_FCR_PXAR1	0x00	/* receive FIFO treshold = 1 */
+#define UART_FCR_PXAR8	0x40	/* receive FIFO treshold = 8 */
+#define UART_FCR_PXAR16	0x80	/* receive FIFO treshold = 16 */
+#define UART_FCR_PXAR32	0xc0	/* receive FIFO treshold = 32 */
+
+/*
  * These are the definitions for the Extended Features Register
  * (StarTech 16C660 only, when DLAB=1)
  */
