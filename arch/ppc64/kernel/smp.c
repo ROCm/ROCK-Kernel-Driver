@@ -76,13 +76,6 @@ extern long register_vpa(unsigned long flags, unsigned long proc,
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
-static inline void set_tb(unsigned int upper, unsigned int lower)
-{
-	mttbl(0);
-	mttbu(upper);
-	mttbl(lower);
-}
-
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
 
