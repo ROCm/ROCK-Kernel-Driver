@@ -859,7 +859,9 @@ static void do_mirror(struct mirror_set *ms)
 	do_recovery(ms);
 	do_reads(ms, &reads);
 	do_writes(ms, &writes);
-	blk_run_queues();
+	dm_table_get(ms->ti->table);
+	dm_table_unplug_all(ms->ti->table);
+	dm_table_put(ms->ti->table);
 }
 
 static void do_work(void *ignored)

@@ -409,8 +409,6 @@ static void do_work(void *ignored)
 	process_jobs(&_complete_jobs, run_complete_job);
 	process_jobs(&_pages_jobs, run_pages_job);
 	process_jobs(&_io_jobs, run_io_job);
-
-	blk_run_queues();
 }
 
 /*

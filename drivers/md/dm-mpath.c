@@ -234,6 +234,7 @@ static int map_io(struct multipath *m, struct bio *bio)
 static void dispatch_failed_ios(void *data)
 {
 	struct multipath *m = (struct multipath *) data;
+	struct dm_table *map;
 
 	int r;
 	unsigned long flags;
@@ -246,6 +247,8 @@ static void dispatch_failed_ios(void *data)
 	while (bio) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
+
+		bio->bi_rw |= BIO_RW_SYNC;
 
 		r = map_io(m, bio);
 		if (r)
@@ -260,12 +263,6 @@ static void dispatch_failed_ios(void *data)
 
 		bio = next;
 	}
-
-	/*
-	 * FIXME: this now gets called once for each mpath
-	 * target, rather than once per daemon cycle.
-	 */
- 	blk_run_queues();
 }
 
 static void trigger_event(void *data)

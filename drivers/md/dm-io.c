@@ -475,10 +475,13 @@ static void do_region(int rw, unsigned int region, struct io_region *where,
 
 static void dispatch_io(int rw, unsigned int num_regions,
 			struct io_region *where, struct dpages *dp,
-			struct io *io)
+			struct io *io, int sync)
 {
 	int i;
 	struct dpages old_pages = *dp;
+
+	if (sync)
+		rw |= BIO_RW_SYNC;
 
 	/*
 	 * For multiple regions we need to be careful to rewind
@@ -508,8 +511,7 @@ int sync_io(unsigned int num_regions, struct io_region *where,
 	atomic_set(&io.count, 1); /* see dispatch_io() */
 	io.sleeper = current;
 
-	dispatch_io(rw, num_regions, where, dp, &io);
-	blk_run_queues();
+	dispatch_io(rw, num_regions, where, dp, &io, 1);
 
 	while (1) {
 		/* FIXME: handle signals */
@@ -537,7 +539,7 @@ int async_io(unsigned int num_regions, struct io_region *where, int rw,
 	io->callback = fn;
 	io->context = context;
 
-	dispatch_io(rw, num_regions, where, dp, io);
+	dispatch_io(rw, num_regions, where, dp, io, 0);
 	return 0;
 }
 

@@ -707,11 +707,6 @@ int software_suspend(void)
 
 		free_some_memory();
 		
-		/* No need to invalidate any vfsmnt list -- 
-		 * they will be valid after resume, anyway.
-		 */
-		blk_run_queues();
-
 		/* Save state of all device drivers, and stop them. */		   
 		if ((res = device_suspend(4))==0)
 			/* If stopping device drivers worked, we proceed basically into

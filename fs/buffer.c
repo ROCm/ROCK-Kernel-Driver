@@ -132,7 +132,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
 		if (buffer_locked(bh)) {
-			blk_run_queues();
+			blk_run_address_space(bh->b_bdev->bd_inode->i_mapping);
 			io_schedule();
 		}
 	} while (buffer_locked(bh));
@@ -502,7 +502,6 @@ static void free_more_memory(void)
 	pg_data_t *pgdat;
 
 	wakeup_bdflush(1024);
-	blk_run_queues();
 	yield();
 
 	for_each_pgdat(pgdat) {
@@ -2940,7 +2939,7 @@ EXPORT_SYMBOL(try_to_free_buffers);
 
 int block_sync_page(struct page *page)
 {
-	blk_run_queues();
+	blk_run_address_space(page->mapping);
 	return 0;
 }
 

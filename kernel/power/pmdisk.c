@@ -859,7 +859,6 @@ static int end_io(struct bio * bio, unsigned int num, int err)
 
 static void wait_io(void)
 {
-	blk_run_queues();
 	while(atomic_read(&io_done))
 		io_schedule();
 }
@@ -895,6 +894,7 @@ static int submit(int rw, pgoff_t page_off, void * page)
 		goto Done;
 	}
 
+	rw |= BIO_RW_SYNC;
 	if (rw == WRITE)
 		bio_set_pages_dirty(bio);
 	start_io();

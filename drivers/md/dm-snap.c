@@ -565,6 +565,7 @@ static void snapshot_dtr(struct dm_target *ti)
  */
 static void flush_bios(struct bio *bio)
 {
+	request_queue_t *target = bdev_get_queue(bio->bi_bdev);
 	struct bio *n;
 
 	DMDEBUG("begin flush");
@@ -576,7 +577,8 @@ static void flush_bios(struct bio *bio)
 		bio = n;
 	}
 
-	blk_run_queues();
+	if (target)
+		blk_run_queue(target);
 }
 
 /*

@@ -1017,7 +1017,7 @@ pagebuf_lock(
 {
 	PB_TRACE(pb, "lock", 0);
 	if (atomic_read(&pb->pb_io_remaining))
-		blk_run_queues();
+		blk_run_address_space(pb->pb_target->pbr_mapping);
 	down(&pb->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, "locked", 0);
@@ -1113,7 +1113,7 @@ _pagebuf_wait_unpin(
 		if (atomic_read(&pb->pb_pin_count) == 0)
 			break;
 		if (atomic_read(&pb->pb_io_remaining))
-			blk_run_queues();
+			blk_run_address_space(pb->pb_target->pbr_mapping);
 		schedule();
 	}
 	remove_wait_queue(&pb->pb_waiters, &wait);
@@ -1411,7 +1411,7 @@ submit_io:
 	if (pb->pb_flags & PBF_RUN_QUEUES) {
 		pb->pb_flags &= ~PBF_RUN_QUEUES;
 		if (atomic_read(&pb->pb_io_remaining) > 1)
-			blk_run_queues();
+			blk_run_address_space(pb->pb_target->pbr_mapping);
 	}
 }
 
@@ -1475,7 +1475,7 @@ pagebuf_iowait(
 {
 	PB_TRACE(pb, "iowait", 0);
 	if (atomic_read(&pb->pb_io_remaining))
-		blk_run_queues();
+		blk_run_address_space(pb->pb_target->pbr_mapping);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, "iowaited", (long)pb->pb_error);
 	return pb->pb_error;
@@ -1621,7 +1621,6 @@ STATIC int
 pagebuf_daemon(
 	void			*data)
 {
-	int			count;
 	xfs_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
 
@@ -1644,7 +1643,6 @@ pagebuf_daemon(
 
 		spin_lock(&pbd_delwrite_lock);
 
-		count = 0;
 		list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 			pb = list_entry(curr, xfs_buf_t, pb_list);
 
@@ -1661,7 +1659,6 @@ pagebuf_daemon(
 				pb->pb_flags &= ~PBF_DELWRI;
 				pb->pb_flags |= PBF_WRITE;
 				list_move(&pb->pb_list, &tmp);
-				count++;
 			}
 		}
 
@@ -1671,12 +1668,11 @@ pagebuf_daemon(
 			list_del_init(&pb->pb_list);
 
 			pagebuf_iostrategy(pb);
+			blk_run_address_space(pb->pb_target->pbr_mapping);
 		}
 
 		if (as_list_len > 0)
 			purge_addresses();
-		if (count)
-			blk_run_queues();
 
 		force_flush = 0;
 	} while (pagebuf_daemon_active);
@@ -1693,7 +1689,6 @@ pagebuf_delwri_flush(
 	xfs_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
 	int			pincount = 0;
-	int			flush_cnt = 0;
 
 	pagebuf_runall_queues(pagebuf_dataio_workqueue);
 	pagebuf_runall_queues(pagebuf_logio_workqueue);
@@ -1737,13 +1732,7 @@ pagebuf_delwri_flush(
 
 		pagebuf_lock(pb);
 		pagebuf_iostrategy(pb);
-		if (++flush_cnt > 32) {
-			blk_run_queues();
-			flush_cnt = 0;
-		}
 	}
-
-	blk_run_queues();
 
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, xfs_buf_t, pb_list);
