@@ -2109,8 +2109,9 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = dev_id;
 	struct tg3 *tp = dev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
+	unsigned long flags;
 
-	spin_lock(&tp->lock);
+	spin_lock_irqsave(&tp->lock, flags);
 
 	if (sblk->status & SD_STATUS_UPDATED) {
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
@@ -2124,7 +2125,7 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 	}
 
-	spin_unlock(&tp->lock);
+	spin_unlock_irqrestore(&tp->lock, flags);
 }
 
 static void tg3_init_rings(struct tg3 *);
