@@ -537,7 +537,10 @@ static int sync_io(unsigned int num_regions, struct io_region *where,
 {
 	struct io io;
 
-	BUG_ON(num_regions > 1 && rw != WRITE);
+	if (num_regions > 1 && rw != WRITE) {
+		WARN_ON(1);
+		return -EIO;
+	}
 
 	io.error = 0;
 	atomic_set(&io.count, 1); /* see dispatch_io() */
@@ -565,8 +568,15 @@ static int sync_io(unsigned int num_regions, struct io_region *where,
 static int async_io(unsigned int num_regions, struct io_region *where, int rw,
 	     struct dpages *dp, io_notify_fn fn, void *context)
 {
-	struct io *io = mempool_alloc(_io_pool, GFP_NOIO);
+	struct io *io;
 
+	if (num_regions > 1 && rw != WRITE) {
+		WARN_ON(1);
+		fn(1, context);
+		return -EIO;
+	}
+
+	io = mempool_alloc(_io_pool, GFP_NOIO);
 	io->error = 0;
 	atomic_set(&io->count, 1); /* see dispatch_io() */
 	io->sleeper = NULL;
