@@ -4,7 +4,6 @@
 #ifdef CONFIG_HUGETLB_PAGE
 
 struct ctl_table;
-struct hugetlb_key;
 
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 {
