@@ -743,7 +743,8 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 
 		retval = convert_tail_for_hole(inode, bh_result, tail_offset) ;
 		if (retval) {
-		    printk("clm-6004: convert tail failed inode %lu, error %d\n", inode->i_ino, retval) ;
+		    if ( retval != -ENOSPC )
+			printk("clm-6004: convert tail failed inode %lu, error %d\n", inode->i_ino, retval) ;
 		    if (allocated_block_nr)
 			reiserfs_free_block (&th, allocated_block_nr);
 		    goto failure ;

@@ -1338,8 +1338,10 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 	if (retval != ITEM_FOUND) {
 	    pathrelse (&path);
-	    reiserfs_warning ("vs-5355: reiserfs_delete_solid_item: %k not found",
-			      key);
+	    // No need for a warning, if there is just no free space to insert '..' item into the newly-created subdir
+	    if ( !( (unsigned long long) GET_HASH_VALUE (le_key_k_offset (le_key_version (key), key)) == 0 && \
+		 (unsigned long long) GET_GENERATION_NUMBER (le_key_k_offset (le_key_version (key), key)) == 1 ) )
+		reiserfs_warning ("vs-5355: reiserfs_delete_solid_item: %k not found", key);
 	    break;
 	}
 	if (!tb_init) {

@@ -284,7 +284,8 @@ void add_save_link (struct reiserfs_transaction_handle * th,
     /* look for its place in the tree */
     retval = search_item (inode->i_sb, &key, &path);
     if (retval != ITEM_NOT_FOUND) {
-	reiserfs_warning ("vs-2100: add_save_link:"
+	if ( retval != -ENOSPC )
+	    reiserfs_warning ("vs-2100: add_save_link:"
 			  "search_by_key (%K) returned %d\n", &key, retval);
 	pathrelse (&path);
 	return;
