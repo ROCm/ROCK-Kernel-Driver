@@ -1068,7 +1068,7 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 	reporter = im->reporter;
 	igmp_stop_timer(im);
 
-	if (in_dev->dev->flags & IFF_UP) {
+	if (!in_dev->dead) {
 		if (IGMP_V1_SEEN(in_dev))
 			goto done;
 		if (IGMP_V2_SEEN(in_dev)) {
@@ -1099,6 +1099,8 @@ static void igmp_group_added(struct ip_mc_list *im)
 	if (im->multiaddr == IGMP_ALL_HOSTS)
 		return;
 
+	if (in_dev->dead)
+		return;
 	if (IGMP_V1_SEEN(in_dev) || IGMP_V2_SEEN(in_dev)) {
 		spin_lock_bh(&im->lock);
 		igmp_start_timer(im, IGMP_Initial_Report_Delay);
@@ -1172,7 +1174,7 @@ void ip_mc_inc_group(struct in_device *in_dev, u32 addr)
 	igmpv3_del_delrec(in_dev, im->multiaddr);
 #endif
 	igmp_group_added(im);
-	if (in_dev->dev->flags & IFF_UP)
+	if (!in_dev->dead)
 		ip_rt_multicast_event(in_dev);
 out:
 	return;
@@ -1196,7 +1198,7 @@ void ip_mc_dec_group(struct in_device *in_dev, u32 addr)
 				write_unlock_bh(&in_dev->lock);
 				igmp_group_dropped(i);
 
-				if (in_dev->dev->flags & IFF_UP)
+				if (!in_dev->dead)
 					ip_rt_multicast_event(in_dev);
 
 				ip_ma_put(i);
@@ -1215,8 +1217,8 @@ void ip_mc_down(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
-	if (!in_dev->mc_initted)
-		return;
+	for (i=in_dev->mc_list; i; i=i->next)
+		igmp_group_dropped(i);
 
 #ifdef CONFIG_IP_MULTICAST
 	in_dev->mr_ifc_count = 0;
@@ -1225,24 +1227,14 @@ void ip_mc_down(struct in_device *in_dev)
 	in_dev->mr_gq_running = 0;
 	if (del_timer(&in_dev->mr_gq_timer))
 		__in_dev_put(in_dev);
-#endif
-
-	for (i=in_dev->mc_list; i; i=i->next)
-		igmp_group_dropped(i);
-
-#ifdef CONFIG_IP_MULTICAST
 	igmpv3_clear_delrec(in_dev);
 #endif
 
 	ip_mc_dec_group(in_dev, IGMP_ALL_HOSTS);
 }
 
-/* Device going up */
-
-void ip_mc_up(struct in_device *in_dev)
+void ip_mc_init_dev(struct in_device *in_dev)
 {
-	struct ip_mc_list *i;
-
 	ASSERT_RTNL();
 
 	in_dev->mc_tomb = 0;
@@ -1259,12 +1251,20 @@ void ip_mc_up(struct in_device *in_dev)
 #endif
 
 	in_dev->mc_lock = RW_LOCK_UNLOCKED;
+}
+
+/* Device going up */
+
+void ip_mc_up(struct in_device *in_dev)
+{
+	struct ip_mc_list *i;
+
+	ASSERT_RTNL();
+
 	ip_mc_inc_group(in_dev, IGMP_ALL_HOSTS);
 
 	for (i=in_dev->mc_list; i; i=i->next)
 		igmp_group_added(i);
-
-	in_dev->mc_initted = 1;
 }
 
 /*
@@ -1276,6 +1276,9 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 	struct ip_mc_list *i;
 
 	ASSERT_RTNL();
+
+	/* Deactivate timers */
+	ip_mc_down(in_dev);
 
 	write_lock_bh(&in_dev->lock);
 	while ((i = in_dev->mc_list) != NULL) {
