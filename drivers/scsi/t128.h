@@ -121,19 +121,19 @@ static int t128_proc_info (char *buffer, char **start, off_t offset,
  */
 
 #define TRANTOR_T128 {					\
-	name:           "Trantor T128/T128F/T228",	\
-	detect:         t128_detect,			\
-	queuecommand:   t128_queue_command,		\
-	eh_abort_handler: t128_abort,			\
-	eh_bus_reset_handler:    t128_bus_reset,	\
-	eh_host_reset_handler:   t128_host_reset,	\
-	eh_device_reset_handler: t128_device_reset,	\
-	bios_param:     t128_biosparam,			\
-	can_queue:      CAN_QUEUE,			\
-        this_id:        7,				\
-	sg_tablesize:   SG_ALL,				\
-	cmd_per_lun:    CMD_PER_LUN,			\
-	use_clustering: DISABLE_CLUSTERING}
+	.name           = "Trantor T128/T128F/T228",	\
+	.detect         = t128_detect,			\
+	.queuecommand   = t128_queue_command,		\
+	.eh_abort_handler = t128_abort,			\
+	.eh_bus_reset_handler    = t128_bus_reset,	\
+	.eh_host_reset_handler   = t128_host_reset,	\
+	.eh_device_reset_handler = t128_device_reset,	\
+	.bios_param     = t128_biosparam,			\
+	.can_queue      = CAN_QUEUE,			\
+        .this_id        = 7,				\
+	.sg_tablesize   = SG_ALL,				\
+	.cmd_per_lun    = CMD_PER_LUN,			\
+	.use_clustering = DISABLE_CLUSTERING}
 
 #ifndef HOSTS_C
 
