@@ -2138,8 +2138,8 @@ findFirst2Retry:
 			else
 				psrch_inf->unicode = FALSE;
 
-			psrch_inf->start_of_network_buffer = (char *)pSMBr;
-			psrch_inf->start_of_search_entries = 
+			psrch_inf->ntwrk_buf_start = (char *)pSMBr;
+			psrch_inf->srch_entries_start = 
 				(char *) &pSMBr->hdr.Protocol + 
 					le16_to_cpu(pSMBr->t2.DataOffset);
 
@@ -2248,9 +2248,9 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 			response_data = (char *)&pSMBr->hdr.Protocol +
 				le16_to_cpu(pSMBr->t2.DataOffset);
 			parms = (T2_FNEXT_RSP_PARMS *)response_data;
-			cifs_buf_release(psrch_inf->start_of_network_buffer);
-			psrch_inf->start_of_search_entries = response_data;
-			psrch_inf->start_of_network_buffer = (char *)pSMB;
+			cifs_buf_release(psrch_inf->ntwrk_buf_start);
+			psrch_inf->srch_entries_start = response_data;
+			psrch_inf->ntwrk_buf_start = (char *)pSMB;
 			if(parms->EndofSearch)
 				psrch_inf->endOfSearch = TRUE;
 			else

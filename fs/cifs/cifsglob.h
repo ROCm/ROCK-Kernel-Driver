@@ -244,8 +244,8 @@ struct cifs_search_info {
 	loff_t index_of_last_entry;
 	__u16 entries_in_buffer;
 	unsigned info_level;
-	char * start_of_network_buffer;
-	char * start_of_search_entries;
+	char * ntwrk_buf_start;
+	char * srch_entries_start;
 	unsigned endOfSearch:1;
 	unsigned emptyDir:1;
 	unsigned unicode:1;
