@@ -26,12 +26,6 @@ static inline unsigned long calculate_ldr(unsigned long old)
 #define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
 #define check_apicid_used(bitmap, apicid) (0)
 
-static inline void summit_check(char *oem, char *productid)
-{
-	if (!strncmp(oem, "IBM ENSW", 8) && !strncmp(str, "VIGIL SMP", 9))
-		x86_summit = 1;
-}
-
 static inline void clustered_apic_check(void)
 {
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
@@ -46,12 +40,25 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 		return mps_cpu;
 }
 
+static inline ulong ioapic_phys_id_map(ulong phys_map)
+{
+	/* For clustered we don't have a good way to do this yet - hack */
+	return (x86_summit ? 0x0F : phys_map);
+}
+
 static inline unsigned long apicid_to_phys_cpu_present(int apicid)
 {
 	if (x86_summit)
 		return (1ul << (((apicid >> 4) << 2) | (apicid & 0x3)));
 	else
 		return (1ul << apicid);
+}
+
+#define wakeup_secondary_cpu(apicid, start_eip) \
+	wakeup_secondary_via_INIT(apicid, start_eip)
+
+static inline void setup_portio_remap(void)
+{
 }
 
 #endif /* __ASM_MACH_APIC_H */
