@@ -111,22 +111,6 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 #define MODULE_DEVICE_TABLE(type,name)		\
   MODULE_GENERIC_TABLE(type##_device,name)
 
-struct kernel_symbol_group
-{
-	/* Links us into the global symbol list */
-	struct list_head list;
-
-	/* Module which owns it (if any) */
-	struct module *owner;
-
-	/* Are we internal use only? */
-	int gplonly;
-
-	unsigned int num_syms;
-	const struct kernel_symbol *syms;
-	const unsigned long *crcs;
-};
-
 /* Given an address, look for it in the exception tables */
 const struct exception_table_entry *search_exception_tables(unsigned long add);
 
@@ -204,10 +188,14 @@ struct module
 	char name[MODULE_NAME_LEN];
 
 	/* Exported symbols */
-	struct kernel_symbol_group symbols;
+	const struct kernel_symbol *syms;
+	unsigned int num_ksyms;
+	const unsigned long *crcs;
 
 	/* GPL-only exported symbols. */
-	struct kernel_symbol_group gpl_symbols;
+	const struct kernel_symbol *gpl_syms;
+	unsigned int num_gpl_syms;
+	const unsigned long *gpl_crcs;
 
 	/* Exception tables */
 	struct exception_table extable;
@@ -401,8 +389,6 @@ extern struct module __this_module;
 struct module __this_module
 __attribute__((section(".gnu.linkonce.this_module"))) = {
 	.name = __stringify(KBUILD_MODNAME),
-	.symbols = { .owner = &__this_module },
-	.gpl_symbols = { .owner = &__this_module, .gplonly = 1 },
 	.init = init_module,
 #ifdef CONFIG_MODULE_UNLOAD
 	.exit = cleanup_module,
@@ -453,14 +439,6 @@ static inline void __deprecated MOD_DEC_USE_COUNT(struct module *module)
 #endif
 
 #define __MODULE_STRING(x) __stringify(x)
-
-/*
- * The exception and symbol tables, and the lock
- * to protect them.
- */
-extern spinlock_t modlist_lock;
-extern struct list_head extables;
-extern struct list_head symbols;
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE

@@ -58,7 +58,6 @@ static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 /* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
 static LIST_HEAD(modules);
-static LIST_HEAD(symbols);
 static LIST_HEAD(extables);
 
 /* We require a truly strong try_module_get() */
@@ -92,25 +91,60 @@ static unsigned int find_sec(Elf_Ehdr *hdr,
 	return 0;
 }
 
-/* Find a symbol, return value and the symbol group */
+/* Provided by the linker */
+extern const struct kernel_symbol __start___ksymtab[];
+extern const struct kernel_symbol __stop___ksymtab[];
+extern const struct kernel_symbol __start___ksymtab_gpl[];
+extern const struct kernel_symbol __stop___ksymtab_gpl[];
+extern const unsigned long __start___kcrctab[];
+extern const unsigned long __start___kcrctab_gpl[];
+
+#ifndef CONFIG_MODVERSIONS
+#define symversion(base, idx) NULL
+#else
+#define symversion(base, idx) ((base) ? ((base) + (idx)) : NULL)
+#endif
+
+/* Find a symbol, return value, crc and module which owns it */
 static unsigned long __find_symbol(const char *name,
-				   struct kernel_symbol_group **group,
-				   unsigned int *symidx,
+				   struct module **owner,
+				   const unsigned long **crc,
 				   int gplok)
 {
-	struct kernel_symbol_group *ks;
- 
-	list_for_each_entry(ks, &symbols, list) {
- 		unsigned int i;
+	struct module *mod;
+	unsigned int i;
 
-		if (ks->gplonly && !gplok)
-			continue;
-		for (i = 0; i < ks->num_syms; i++) {
-			if (strcmp(ks->syms[i].name, name) == 0) {
-				*group = ks;
-				if (symidx)
-					*symidx = i;
-				return ks->syms[i].value;
+	/* Core kernel first. */ 
+	*owner = NULL;
+	for (i = 0; __start___ksymtab+i < __stop___ksymtab; i++) {
+		if (strcmp(__start___ksymtab[i].name, name) == 0) {
+			*crc = symversion(__start___kcrctab, i);
+			return __start___ksymtab[i].value;
+		}
+	}
+	if (gplok) {
+		for (i = 0; __start___ksymtab_gpl+i<__stop___ksymtab_gpl; i++)
+			if (strcmp(__start___ksymtab_gpl[i].name, name) == 0) {
+				*crc = symversion(__start___kcrctab_gpl, i);
+				return __start___ksymtab_gpl[i].value;
+			}
+	}
+
+	/* Now try modules. */ 
+	list_for_each_entry(mod, &modules, list) {
+		*owner = mod;
+		for (i = 0; i < mod->num_ksyms; i++)
+			if (strcmp(mod->syms[i].name, name) == 0) {
+				*crc = symversion(mod->crcs, i);
+				return mod->syms[i].value;
+			}
+
+		if (gplok) {
+			for (i = 0; i < mod->num_gpl_syms; i++) {
+				if (strcmp(mod->gpl_syms[i].name, name) == 0) {
+					*crc = symversion(mod->crcs, i);
+					return mod->gpl_syms[i].value;
+				}
 			}
 		}
 	}
@@ -539,13 +573,14 @@ static void print_unload_info(struct seq_file *m, struct module *mod)
 
 void __symbol_put(const char *symbol)
 {
-	struct kernel_symbol_group *ksg;
+	struct module *owner;
 	unsigned long flags;
+	const unsigned long *crc;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	if (!__find_symbol(symbol, &ksg, NULL, 1))
+	if (!__find_symbol(symbol, &owner, &crc, 1))
 		BUG();
-	module_put(ksg->owner);
+	module_put(owner);
 	spin_unlock_irqrestore(&modlist_lock, flags);
 }
 EXPORT_SYMBOL(__symbol_put);
@@ -743,18 +778,14 @@ static int check_version(Elf_Shdr *sechdrs,
 			 unsigned int versindex,
 			 const char *symname,
 			 struct module *mod, 
-			 struct kernel_symbol_group *ksg,
-			 unsigned int symidx)
+			 const unsigned long *crc)
 {
-	unsigned long crc;
 	unsigned int i, num_versions;
 	struct modversion_info *versions;
 
 	/* Exporting module didn't supply crcs?  OK, we're already tainted. */
-	if (!ksg->crcs)
+	if (!crc)
 		return 1;
-
-	crc = ksg->crcs[symidx];
 
 	versions = (void *) sechdrs[versindex].sh_addr;
 	num_versions = sechdrs[versindex].sh_size
@@ -764,12 +795,12 @@ static int check_version(Elf_Shdr *sechdrs,
 		if (strcmp(versions[i].name, symname) != 0)
 			continue;
 
-		if (versions[i].crc == crc)
+		if (versions[i].crc == *crc)
 			return 1;
 		printk("%s: disagrees about version of symbol %s\n",
 		       mod->name, symname);
 		DEBUGP("Found checksum %lX vs module %lX\n",
-		       crc, versions[i].crc);
+		       *crc, versions[i].crc);
 		return 0;
 	}
 	/* Not in module's version table.  OK, but that taints the kernel. */
@@ -805,8 +836,7 @@ static inline int check_version(Elf_Shdr *sechdrs,
 				unsigned int versindex,
 				const char *symname,
 				struct module *mod, 
-				struct kernel_symbol_group *ksg,
-				unsigned int symidx)
+				const unsigned long *crc)
 {
 	return 1;
 }
@@ -831,17 +861,16 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 				    const char *name,
 				    struct module *mod)
 {
-	struct kernel_symbol_group *ksg;
+	struct module *owner;
 	unsigned long ret;
-	unsigned int symidx;
+	const unsigned long *crc;
 
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, &ksg, &symidx, mod->license_gplok);
+	ret = __find_symbol(name, &owner, &crc, mod->license_gplok);
 	if (ret) {
 		/* use_module can fail due to OOM, or module unloading */
-		if (!check_version(sechdrs, versindex, name, mod,
-				   ksg, symidx) ||
-		    !use_module(mod, ksg->owner))
+		if (!check_version(sechdrs, versindex, name, mod, crc) ||
+		    !use_module(mod, owner))
 			ret = 0;
 	}
 	spin_unlock_irq(&modlist_lock);
@@ -854,8 +883,6 @@ static void free_module(struct module *mod)
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
-	list_del(&mod->symbols.list);
-	list_del(&mod->gpl_symbols.list);
 	list_del(&mod->extable.list);
 	spin_unlock_irq(&modlist_lock);
 
@@ -872,12 +899,13 @@ static void free_module(struct module *mod)
 
 void *__symbol_get(const char *symbol)
 {
-	struct kernel_symbol_group *ksg;
+	struct module *owner;
 	unsigned long value, flags;
+	const unsigned long *crc;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	value = __find_symbol(symbol, &ksg, NULL, 1);
-	if (value && !strong_try_module_get(ksg->owner))
+	value = __find_symbol(symbol, &owner, &crc, 1);
+	if (value && !strong_try_module_get(owner))
 		value = 0;
 	spin_unlock_irqrestore(&modlist_lock, flags);
 
@@ -1223,21 +1251,17 @@ static struct module *load_module(void *umod,
 		goto cleanup;
 
 	/* Set up EXPORTed & EXPORT_GPLed symbols (section 0 is 0 length) */
-	mod->symbols.num_syms = (sechdrs[exportindex].sh_size
-				 / sizeof(*mod->symbols.syms));
-	mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
+	mod->num_syms = sechdrs[exportindex].sh_size / sizeof(*mod->syms);
+	mod->syms = (void *)sechdrs[exportindex].sh_addr;
 	if (crcindex)
-		mod->symbols.crcs = (void *)sechdrs[crcindex].sh_addr;
-
-	mod->gpl_symbols.num_syms = (sechdrs[gplindex].sh_size
-				 / sizeof(*mod->symbols.syms));
-	mod->gpl_symbols.syms = (void *)sechdrs[gplindex].sh_addr;
+		mod->crcs = (void *)sechdrs[crcindex].sh_addr;
+	mod->num_gpl_syms = sechdrs[gplindex].sh_size / sizeof(*mod->gpl_syms);
+	mod->gpl_syms = (void *)sechdrs[gplindex].sh_addr;
 	if (gplcrcindex)
-		mod->gpl_symbols.crcs = (void *)sechdrs[gplcrcindex].sh_addr;
+		mod->gpl_crcs = (void *)sechdrs[gplcrcindex].sh_addr;
 
 #ifdef CONFIG_MODVERSIONS
-	if ((mod->symbols.num_syms && !crcindex)
-	    || (mod->gpl_symbols.num_syms && !gplcrcindex)) {
+	if ((mod->num_ksyms&&!crcindex) || (mod->num_gpl_syms&&!gplcrcindex)) {
 		printk(KERN_WARNING "%s: No versions for exported symbols."
 		       " Tainting kernel.\n", mod->name);
 		tainted |= TAINT_FORCED_MODULE;
@@ -1351,8 +1375,6 @@ sys_init_module(void *umod,
            strong_try_module_get() will fail. */
 	spin_lock_irq(&modlist_lock);
 	list_add(&mod->extable.list, &extables);
-	list_add_tail(&mod->symbols.list, &symbols);
-	list_add_tail(&mod->gpl_symbols.list, &symbols);
 	list_add(&mod->list, &modules);
 	spin_unlock_irq(&modlist_lock);
 
@@ -1546,39 +1568,6 @@ struct module *module_text_address(unsigned long addr)
 			return mod;
 	return NULL;
 }
-
-/* Provided by the linker */
-extern const struct kernel_symbol __start___ksymtab[];
-extern const struct kernel_symbol __stop___ksymtab[];
-extern const struct kernel_symbol __start___ksymtab_gpl[];
-extern const struct kernel_symbol __stop___ksymtab_gpl[];
-extern const unsigned long __start___kcrctab[];
-extern const unsigned long __stop___kcrctab[];
-extern const unsigned long __start___kcrctab_gpl[];
-extern const unsigned long __stop___kcrctab_gpl[];
-
-static struct kernel_symbol_group kernel_symbols, kernel_gpl_symbols;
-
-static int __init symbols_init(void)
-{
-	/* Add kernel symbols to symbol table */
-	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
-	kernel_symbols.syms = __start___ksymtab;
-	kernel_symbols.crcs = __start___kcrctab;
-	kernel_symbols.gplonly = 0;
-	list_add(&kernel_symbols.list, &symbols);
-
-	kernel_gpl_symbols.num_syms = (__stop___ksymtab_gpl
-				       - __start___ksymtab_gpl);
-	kernel_gpl_symbols.syms = __start___ksymtab_gpl;
-	kernel_gpl_symbols.crcs = __start___kcrctab_gpl;
-	kernel_gpl_symbols.gplonly = 1;
-	list_add(&kernel_gpl_symbols.list, &symbols);
-
-	return 0;
-}
-
-__initcall(symbols_init);
 
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for struct module here, too, for modversions. */
