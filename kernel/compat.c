@@ -446,8 +446,12 @@ asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 	int ret;
 	cpumask_t mask;
 	unsigned long *k;
+	unsigned int min_length = sizeof(cpumask_t);
 
-	if (len < sizeof(cpumask_t))
+	if (NR_CPUS <= BITS_PER_COMPAT_LONG)
+		min_length = sizeof(compat_ulong_t);
+
+	if (len < min_length)
 		return -EINVAL;
 
 	ret = sched_getaffinity(pid, &mask);
@@ -455,11 +459,11 @@ asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 		return ret;
 
 	k = cpus_addr(mask);
-	ret = compat_put_bitmap(user_mask_ptr, k, sizeof(cpumask_t) * 8);
+	ret = compat_put_bitmap(user_mask_ptr, k, min_length * 8);
 	if (ret)
 		return ret;
 
-	return sizeof(cpumask_t);
+	return min_length;
 }
 
 static int get_compat_itimerspec(struct itimerspec *dst, 
