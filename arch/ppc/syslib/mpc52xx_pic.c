@@ -180,6 +180,7 @@ void __init
 mpc52xx_init_irq(void)
 {
 	int i;
+	u32 intr_ctrl;
 
 	/* Remap the necessary zones */
 	intr = (struct mpc52xx_intr *)
@@ -195,12 +196,13 @@ mpc52xx_init_irq(void)
 	out_be32(&sdma->IntMask, 0xffffffff);	/* 1 means disabled */
 	out_be32(&intr->per_mask, 0x7ffffc00);	/* 1 means disabled */
 	out_be32(&intr->main_mask, 0x00010fff);	/* 1 means disabled */
-	out_be32(&intr->ctrl,
-			0x0f000000 |	/* clear IRQ 0-3 */
-			0x00c00000 |	/* IRQ0: level-sensitive, active low */
+	intr_ctrl = in_be32(&intr->ctrl);
+	intr_ctrl &=    0x00ff0000;	/* Keeps IRQ[0-3] config */
+	intr_ctrl |=	0x0f000000 |	/* clear IRQ 0-3 */
 			0x00001000 |	/* MEE master external enable */
 			0x00000000 |	/* 0 means disable IRQ 0-3 */
-			0x00000001);	/* CEb route critical normally */
+			0x00000001;	/* CEb route critical normally */
+	out_be32(&intr->ctrl, intr_ctrl);
 
 	/* Zero a bunch of the priority settings.  */
 	out_be32(&intr->per_pri1, 0);
@@ -213,6 +215,14 @@ mpc52xx_init_irq(void)
 	for (i = 0; i < NR_IRQS; i++) {
 		irq_desc[i].handler = &mpc52xx_ic;
 		irq_desc[i].status = IRQ_LEVEL;
+	}
+
+	#define IRQn_MODE(intr_ctrl,irq) (((intr_ctrl) >> (22-(i<<1))) & 0x03)
+	for (i=0 ; i<4 ; i++) {
+		int mode;
+		mode = IRQn_MODE(intr_ctrl,i);
+		if ((mode == 0x1) || (mode == 0x2))
+			irq_desc[i?MPC52xx_IRQ1+i-1:MPC52xx_IRQ0].status = 0;
 	}
 }
 

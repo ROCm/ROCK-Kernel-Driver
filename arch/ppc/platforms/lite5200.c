@@ -78,10 +78,41 @@ lite5200_show_cpuinfo(struct seq_file *m)
 }
 
 static void __init
+lite5200_setup_cpu(void)
+{
+	struct mpc52xx_intr *intr;
+
+	u32 intr_ctrl;
+
+	/* Map zones */
+	intr = (struct mpc52xx_intr *)
+		ioremap(MPC52xx_INTR,sizeof(struct mpc52xx_intr));
+
+	if (!intr) {
+		printk("lite5200.c: Error while mapping INTR during lite5200_setup_cpu\n");
+		goto unmap_regs;
+	}
+
+	/* IRQ[0-3] setup : IRQ0     - Level Active Low  */
+	/*                  IRQ[1-3] - Level Active High */
+	intr_ctrl = in_be32(&intr->ctrl);
+	intr_ctrl &= ~0x00ff0000;
+	intr_ctrl |=  0x00c00000;
+	out_be32(&intr->ctrl, intr_ctrl);
+
+	/* Unmap reg zone */
+unmap_regs:
+	if (intr) iounmap(intr);
+}
+
+static void __init
 lite5200_setup_arch(void)
 {
 	/* Add board OCP definitions */
 	mpc52xx_add_board_devices(board_ocp);
+
+	/* CPU & Port mux setup */
+	lite5200_setup_cpu();
 }
 
 void __init
