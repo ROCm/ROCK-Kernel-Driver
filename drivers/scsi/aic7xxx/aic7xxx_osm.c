@@ -5033,7 +5033,6 @@ static void
 ahc_linux_exit(void)
 {
 	struct ahc_softc *ahc;
-	u_long l;
 
 	/*
 	 * Shutdown DV threads before going into the SCSI mid-layer.
@@ -5041,12 +5040,10 @@ ahc_linux_exit(void)
 	 * kernel so that waiting for our DV threads to exit leads
 	 * to deadlock.
 	 */
-	ahc_list_lock(&l);
 	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
 
 		ahc_linux_kill_dv_thread(ahc);
 	}
-	ahc_list_unlock(&l);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*

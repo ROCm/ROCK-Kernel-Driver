@@ -5032,7 +5032,6 @@ static void __exit
 ahd_linux_exit(void)
 {
 	struct ahd_softc *ahd;
-	u_long l;
 
 	/*
 	 * Shutdown DV threads before going into the SCSI mid-layer.
@@ -5040,12 +5039,11 @@ ahd_linux_exit(void)
 	 * kernel so that waiting for our DV threads to exit leads
 	 * to deadlock.
 	 */
-	ahd_list_lock(&l);
 	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
 
 		ahd_linux_kill_dv_thread(ahd);
 	}
-	ahd_list_unlock(&l);
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	/*
 	 * In 2.4 we have to unregister from the PCI core _after_
