@@ -13,6 +13,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/highmem.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -20,6 +21,7 @@
 #include <asm/rmap.h>
 #include <asm/io.h>
 #include <asm/setup.h>
+#include <asm/tlbflush.h>
 
 #include <asm/mach/map.h>
 

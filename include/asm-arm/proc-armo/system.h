@@ -10,8 +10,6 @@
 #ifndef __ASM_PROC_SYSTEM_H
 #define __ASM_PROC_SYSTEM_H
 
-#include <asm/proc-fns.h>
-
 #define vectors_base()	(0)
 
 static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)

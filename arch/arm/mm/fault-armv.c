@@ -16,8 +16,10 @@
 #include <linux/bitops.h>
 #include <linux/init.h>
 
+#include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 #include "fault.h"
 
