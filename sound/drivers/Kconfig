@@ -3,6 +3,21 @@
 menu "Generic devices"
 	depends on SND!=n
 
+config SND_MPU401_UART
+        tristate
+	select SND_TIMER
+        select SND_RAWMIDI
+
+config SND_OPL3_LIB
+	tristate
+	select SND_TIMER
+	select SND_HWDEP
+
+config SND_OPL4_LIB
+	tristate
+	select SND_TIMER
+	select SND_HWDEP
+
 config SND_DUMMY
 	tristate "Dummy (/dev/null) soundcard"
 	depends on SND
@@ -42,8 +57,7 @@ config SND_SERIAL_U16550
 config SND_MPU401
 	tristate "Generic MPU-401 UART driver"
 	depends on SND
-	select SND_TIMER
-	select SND_RAWMIDI
+	select SND_MPU401_UART
 	help
 	  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
 
