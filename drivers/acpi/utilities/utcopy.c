@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 105 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -419,7 +419,8 @@ acpi_ut_copy_esimple_to_isimple (
 
 	case ACPI_TYPE_STRING:
 
-		internal_object->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) external_object->string.length + 1);
+		internal_object->string.pointer =
+			ACPI_MEM_CALLOCATE ((ACPI_SIZE) external_object->string.length + 1);
 		if (!internal_object->string.pointer) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -434,7 +435,8 @@ acpi_ut_copy_esimple_to_isimple (
 
 	case ACPI_TYPE_BUFFER:
 
-		internal_object->buffer.pointer = ACPI_MEM_CALLOCATE (external_object->buffer.length);
+		internal_object->buffer.pointer =
+			ACPI_MEM_CALLOCATE (external_object->buffer.length);
 		if (!internal_object->buffer.pointer) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
@@ -471,10 +473,10 @@ acpi_ut_copy_esimple_to_isimple (
  * FUNCTION:    Acpi_ut_copy_epackage_to_ipackage
  *
  * PARAMETERS:  *Internal_object   - Pointer to the object we are returning
- *              *Buffer         - Where the object is returned
- *              *Space_used     - Where the length of the object is returned
+ *              *Buffer            - Where the object is returned
+ *              *Space_used        - Where the length of the object is returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to place a package object in a user
  *              buffer.  A package object by definition contains other objects.
@@ -607,7 +609,8 @@ acpi_ut_copy_simple_object (
 
 	/* Copy the entire source object over the destination object*/
 
-	ACPI_MEMCPY ((char *) dest_desc, (char *) source_desc, sizeof (acpi_operand_object));
+	ACPI_MEMCPY ((char *) dest_desc, (char *) source_desc,
+			  sizeof (acpi_operand_object));
 
 	/* Restore the saved fields */
 
@@ -687,26 +690,36 @@ acpi_ut_copy_ielement_to_ielement (
 			   &state->pkg.dest_object->package.elements[this_index];
 
 	switch (object_type) {
-	case 0:
+	case ACPI_COPY_TYPE_SIMPLE:
 
-		/*
-		 * This is a simple object, just copy it
-		 */
-		target_object = acpi_ut_create_internal_object (ACPI_GET_OBJECT_TYPE (source_object));
-		if (!target_object) {
-			return (AE_NO_MEMORY);
+		/* A null source object indicates a (legal) null package element */
+
+		if (source_object) {
+			/*
+			 * This is a simple object, just copy it
+			 */
+			target_object = acpi_ut_create_internal_object (
+					   ACPI_GET_OBJECT_TYPE (source_object));
+			if (!target_object) {
+				return (AE_NO_MEMORY);
+			}
+
+			status = acpi_ut_copy_simple_object (source_object, target_object);
+			if (ACPI_FAILURE (status)) {
+				return (status);
+			}
+
+			*this_target_ptr = target_object;
 		}
+		else {
+			/* Pass through a null element */
 
-		status = acpi_ut_copy_simple_object (source_object, target_object);
-		if (ACPI_FAILURE (status)) {
-			return (status);
+			*this_target_ptr = NULL;
 		}
-
-		*this_target_ptr = target_object;
 		break;
 
 
-	case 1:
+	case ACPI_COPY_TYPE_PACKAGE:
 
 		/*
 		 * This object is a package - go down another nesting level
@@ -719,6 +732,17 @@ acpi_ut_copy_ielement_to_ielement (
 
 		target_object->package.count = source_object->package.count;
 		target_object->common.flags = source_object->common.flags;
+
+		/*
+		 * Create the object array
+		 */
+		target_object->package.elements =
+			ACPI_MEM_CALLOCATE (((ACPI_SIZE) source_object->package.count + 1) *
+					 sizeof (void *));
+		if (!target_object->package.elements) {
+			ACPI_MEM_FREE (target_object);
+			return (AE_NO_MEMORY);
+		}
 
 		/*
 		 * Pass the new package object back to the package walk routine
