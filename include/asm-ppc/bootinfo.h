@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.bootinfo.h 1.11 08/17/01 15:23:17 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Non-machine dependent bootinfo structure.  Basic idea
@@ -19,9 +19,9 @@
 #else
 
 struct bi_record {
-    unsigned long tag;			/* tag ID */
-    unsigned long size;			/* size of record (in bytes) */
-    unsigned long data[0];		/* data */
+	unsigned long tag;		/* tag ID */
+	unsigned long size;		/* size of record (in bytes) */
+	unsigned long data[0];		/* data */
 };
 
 #define BI_FIRST		0x1010  /* first record - marker */
@@ -32,6 +32,9 @@ struct bi_record {
 #define BI_SYSMAP		0x1015
 #define BI_MACHTYPE		0x1016
 #define BI_MEMSIZE		0x1017
+
+extern struct bi_record *find_bootinfo(void);
+extern void parse_bootinfo(struct bi_record *rec);
 
 #endif /* CONFIG_APUS */
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.30 11/13/01 21:26:07 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -45,8 +45,9 @@
 #include <asm/mpc8260.h>
 #include <asm/immap_8260.h>
 #include <asm/machdep.h>
-
+#include <asm/bootinfo.h>
 #include <asm/time.h>
+
 #include "ppc8260_pic.h"
 
 static int m8260_set_rtc_time(unsigned long time);
@@ -98,17 +99,25 @@ static uint rtc_time;
 static static int
 m8260_set_rtc_time(unsigned long time)
 {
+#ifdef CONFIG_TQM8260
+	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt = time;
+	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcntsc = 0x3;
+#else
 	rtc_time = time;
+#endif
 	return(0);
 }
 
 static unsigned long
 m8260_get_rtc_time(void)
 {
-
+#ifdef CONFIG_TQM8260
+	return ((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt;
+#else
 	/* Get time from the RTC.
 	*/
 	return((unsigned long)rtc_time);
+#endif
 }
 
 static void
@@ -121,8 +130,11 @@ m8260_restart(char *cmd)
 	 * of the reset vector.  If that doesn't work for you, change this
 	 * or the reboot program to send a proper address.
 	 */
+#ifdef CONFIG_TQM8260
+	startaddr = 0x40000104;
+#else
 	startaddr = 0xff000104;
-
+#endif
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "startaddr=", 10))
 			startaddr = simple_strtoul(&cmd[10], NULL, 0);
@@ -150,14 +162,13 @@ m8260_show_percpuinfo(struct seq_file *m, int i)
 	bd_t	*bp;
 
 	bp = (bd_t *)__res;
-			
+
 	seq_printf(m, "core clock\t: %d MHz\n"
 		   "CPM  clock\t: %d MHz\n"
 		   "bus  clock\t: %d MHz\n",
 		   bp->bi_intfreq / 1000000,
 		   bp->bi_cpmfreq / 1000000,
 		   bp->bi_busfreq / 1000000);
-
 	return 0;
 }
 
@@ -178,7 +189,7 @@ m8260_init_IRQ(void)
 #endif
         for ( i = 0 ; i < NR_SIU_INTS ; i++ )
                 irq_desc[i].handler = &ppc8260_pic;
-	
+
 	/* Initialize the default interrupt mapping priorities,
 	 * in case the boot rom changed something on us.
 	 */
@@ -197,7 +208,7 @@ m8260_find_end_of_memory(void)
 {
 	bd_t	*binfo;
 	extern unsigned char __res[];
-	
+
 	binfo = (bd_t *)__res;
 
 	return binfo->bi_memsize;
@@ -219,22 +230,20 @@ void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
+	parse_bootinfo(find_bootinfo());
 
 	if ( r3 )
 		memcpy( (void *)__res,(void *)(r3+KERNELBASE), sizeof(bd_t) );
-	
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* take care of initrd if we have one */
-	if ( r4 )
-	{
+	if ( r4 ) {
 		initrd_start = r4 + KERNELBASE;
 		initrd_end = r5 + KERNELBASE;
 	}
 #endif /* CONFIG_BLK_DEV_INITRD */
 	/* take care of cmd line */
-	if ( r6 )
-	{
-		
+	if ( r6 ) {
 		*(char *)(r7+KERNELBASE) = 0;
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.enet.c 1.17 10/11/01 11:55:47 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Ethernet driver for Motorola MPC8xx.
@@ -139,6 +139,11 @@ struct scc_enet_private {
 	cbd_t	*cur_rx, *cur_tx;		/* The next free ring entry */
 	cbd_t	*dirty_tx;	/* The ring entries to be free()ed. */
 	scc_t	*sccp;
+
+	/* Virtual addresses for the receive buffers because we can't
+	 * do a __va() on them anymore.
+	 */
+	unsigned char *rx_vaddr[RX_RING_SIZE];
 	struct	net_device_stats stats;
 	uint	tx_full;
 	spinlock_t lock;
@@ -507,7 +512,7 @@ for (;;) {
 			skb->dev = dev;
 			skb_put(skb,pkt_len-4);	/* Make room */
 			eth_copy_and_sum(skb,
-				(unsigned char *)__va(bdp->cbd_bufaddr),
+				cep->rx_vaddr[bdp - cep->rx_bd_base],
 				pkt_len-4, 0);
 			skb->protocol=eth_type_trans(skb,dev);
 			netif_rx(skb);
@@ -641,10 +646,9 @@ int __init scc_enet_init(void)
 {
 	struct net_device *dev;
 	struct scc_enet_private *cep;
-	int i, j;
-	unsigned char	*eap;
-	unsigned long	mem_addr;
-	pte_t		*pte;
+	int i, j, k;
+	unsigned char	*eap, *ba;
+	dma_addr_t	mem_addr;
 	bd_t		*bd;
 	volatile	cbd_t		*bdp;
 	volatile	cpm8xx_t	*cp;
@@ -834,24 +838,21 @@ int __init scc_enet_init(void)
 	bdp->cbd_sc |= BD_SC_WRAP;
 
 	bdp = cep->rx_bd_base;
+	k = 0;
 	for (i=0; i<CPM_ENET_RX_PAGES; i++) {
 
 		/* Allocate a page.
 		*/
-		mem_addr = __get_free_page(GFP_KERNEL);
-
-		/* Make it uncached.
-		*/
-		pte = va_to_pte(mem_addr);
-		pte_val(*pte) |= _PAGE_NO_CACHE;
-		flush_tlb_page(init_mm.mmap, mem_addr);
+		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
 
 		/* Initialize the BD for every fragment in the page.
 		*/
 		for (j=0; j<CPM_ENET_RX_FRPPG; j++) {
 			bdp->cbd_sc = BD_ENET_RX_EMPTY | BD_ENET_RX_INTR;
-			bdp->cbd_bufaddr = __pa(mem_addr);
+			bdp->cbd_bufaddr = mem_addr;
+			cep->rx_vaddr[k++] = ba;
 			mem_addr += CPM_ENET_RX_FRSIZE;
+			ba += CPM_ENET_RX_FRSIZE;
 			bdp++;
 		}
 	}

@@ -3,10 +3,10 @@
  *
  * Misc. bootloader code for many machines.  This assumes you have are using
  * a 6xx/7xx/74xx CPU in your machine.  This assumes the chunk of memory
- * below 8MB is free.  Finally, it assumes you have a NS16550-style uart for 
+ * below 8MB is free.  Finally, it assumes you have a NS16550-style uart for
  * your serial console.  If a machine meets these requirements, it can quite
  * likely use this code during boot.
- * 
+ *
  * Author: Matt Porter <mporter@mvista.com>
  * Derived from arch/ppc/boot/prep/misc.c
  *
@@ -25,41 +25,59 @@
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/mmu.h>
+#include <asm/bootinfo.h>
 
 #include "nonstdio.h"
 #include "zlib.h"
 
-unsigned long com_port;
-
-char *avail_ram;
-char *end_avail;
-extern char _end[];
-
+/* Default cmdline */
 #ifdef CONFIG_CMDLINE
 #define CMDLINE CONFIG_CMDLINE
 #else
 #define CMDLINE ""
 #endif
+
+/* Keyboard (and VGA console)? */
+#ifdef CONFIG_VGA_CONSOLE
+#define HAS_KEYB 1
+#else
+#define HAS_KEYB 0
+#endif
+
+char *avail_ram;
+char *end_avail;
+char *zimage_start;
 char cmd_preset[] = CMDLINE;
 char cmd_buf[256];
 char *cmd_line = cmd_buf;
-
-unsigned long initrd_start = 0, initrd_end = 0;
-char *zimage_start;
+int keyb_present = HAS_KEYB;
 int zimage_size;
 
-extern void gunzip(void *, int, unsigned char *, int *);
-extern unsigned long serial_init(int chan);
+unsigned long com_port;
+unsigned long initrd_size = 0;
 
-void
+/* The linker tells us various locations in the image */
+extern char __image_begin, __image_end;
+extern char __ramdisk_begin, __ramdisk_end;
+extern char _end[];
+/* Original location */
+extern unsigned long start;
+
+extern int CRT_tstc(void);
+extern unsigned long serial_init(int chan, void *ignored);
+extern void serial_close(unsigned long com_port);
+extern void gunzip(void *, int, unsigned char *, int *);
+extern void setup_legacy(void);
+
+struct bi_record *
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 {
-
 	int timer = 0;
-	extern unsigned long start;
 	char *cp, ch;
+	struct bi_record *rec, *birecs;
 
-	com_port = serial_init(0);
+	setup_legacy();
+	com_port = serial_init(0, NULL);
 
 	/* assume the chunk below 8M is free */
 	end_avail = (char *)0x00800000;
@@ -69,7 +87,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	 * were relocated to.
 	 */
 	puts("loaded at:     "); puthex(load_addr);
-	puts(" "); puthex((unsigned long)(load_addr + (4*num_words))); puts("\n");
+	puts(" "); puthex((unsigned long)(load_addr + (4*num_words)));
+	puts("\n");
 	if ( (unsigned long)load_addr != (unsigned long)&start )
 	{
 		puts("relocated to:  "); puthex((unsigned long)&start);
@@ -78,49 +97,31 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 		puts("\n");
 	}
 
-	/* we have to subtract 0x10000 here to correct for objdump including
-	   the size of the elf header which we strip -- Cort */
-	zimage_start = (char *)(load_addr - 0x10000 + ZIMAGE_OFFSET);
-	zimage_size = ZIMAGE_SIZE;
+	/*
+	 * We link ourself to 0x00800000.  When we run, we relocate
+	 * ourselves there.  So we just need __image_begin for the
+	 * start. -- Tom
+	 */
+	zimage_start = (char *)(unsigned long)(&__image_begin);
+	zimage_size = (unsigned long)(&__image_end) -
+			(unsigned long)(&__image_begin);
 
-	if ( INITRD_OFFSET )
-		initrd_start = load_addr - 0x10000 + INITRD_OFFSET;
-	else
-		initrd_start = 0;
-	initrd_end = INITRD_SIZE + initrd_start;
+	initrd_size = (unsigned long)(&__ramdisk_end) -
+		(unsigned long)(&__ramdisk_begin);
 
 	/*
-	 * Find a place to stick the zimage and initrd and 
-	 * relocate them if we have to. -- Cort
+	 * The zImage and initrd will be between start and _end, so they've
+	 * already been moved once.  We're good to go now. -- Tom
 	 */
 	avail_ram = (char *)PAGE_ALIGN((unsigned long)_end);
 	puts("zimage at:     "); puthex((unsigned long)zimage_start);
-	puts(" "); puthex((unsigned long)(zimage_size+zimage_start)); puts("\n");
-	if ( (unsigned long)zimage_start <= 0x00800000 )
-	{
-		memcpy( (void *)avail_ram, (void *)zimage_start, zimage_size );
-		zimage_start = (char *)avail_ram;
-		puts("relocated to:  "); puthex((unsigned long)zimage_start);
-		puts(" ");
-		puthex((unsigned long)zimage_size+(unsigned long)zimage_start);
-		puts("\n");
+	puts(" "); puthex((unsigned long)(zimage_size+zimage_start));
+	puts("\n");
 
-		/* relocate initrd */
-		if ( initrd_start )
-		{
-			puts("initrd at:     "); puthex(initrd_start);
-			puts(" "); puthex(initrd_end); puts("\n");
-			avail_ram = (char *)PAGE_ALIGN(
-				(unsigned long)zimage_size+(unsigned long)zimage_start);
-			memcpy ((void *)avail_ram, (void *)initrd_start, INITRD_SIZE );
-			initrd_start = (unsigned long)avail_ram;
-			initrd_end = initrd_start + INITRD_SIZE;
-			puts("relocated to:  "); puthex(initrd_start);
-			puts(" "); puthex(initrd_end); puts("\n");
-		}
-	} else if ( initrd_start ) {
-		puts("initrd at:     "); puthex(initrd_start);
-		puts(" "); puthex(initrd_end); puts("\n");
+	if ( initrd_size ) {
+		puts("initrd at:     ");
+		puthex((unsigned long)(&__ramdisk_begin));
+		puts(" "); puthex((unsigned long)(&__ramdisk_end));puts("\n");
 	}
 
 	avail_ram = (char *)0x00400000;
@@ -128,11 +129,28 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	puts("avail ram:     "); puthex((unsigned long)avail_ram); puts(" ");
 	puthex((unsigned long)end_avail); puts("\n");
 
+	if (keyb_present)
+		CRT_tstc();  /* Forces keyboard to be initialized */
+#ifdef CONFIG_GEMINI
+	/*
+	 * If cmd_line is empty and cmd_preset is not, copy cmd_preset
+	 * to cmd_line.  This way we can override cmd_preset with the
+	 * command line from Smon.
+	 */
+
+	if ( (cmd_line[0] == '\0') && (cmd_preset[0] != '\0'))
+		memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
+#endif
+
 	/* Display standard Linux/PPC boot prompt for kernel args */
 	puts("\nLinux/PPC load: ");
 	cp = cmd_line;
 	memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
 	while ( *cp ) putc(*cp++);
+
+#ifndef CONFIG_GEMINI
+	/* Val Henson has requested that Gemini doesn't wait for the
+	 * user to edit the cmdline or not. */
 	while (timer++ < 5*1000) {
 		if (tstc()) {
 			while ((ch = getc()) != '\n' && ch != '\r') {
@@ -158,18 +176,44 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 		udelay(1000);  /* 1 msec */
 	}
 	*cp = 0;
+#endif
 	puts("\n");
 
-	/* mappings on early boot can only handle 16M */
-	if ( (int)(cmd_line[0]) > (16<<20))
-		puts("cmd_line located > 16M\n");
-	if ( initrd_start > (16<<20))
-		puts("initrd_start located > 16M\n");
-       
 	puts("Uncompressing Linux...");
-
 	gunzip(0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
 
+	/*
+	 * Create bi_recs for cmd_line and initrds
+	 */
+	rec = (struct bi_record *)_ALIGN((unsigned long)(zimage_size) +
+			(1 << 20) - 1, (1 << 20));
+	birecs = rec;
+
+	rec->tag = BI_FIRST;
+	rec->size = sizeof(struct bi_record);
+	rec = (struct bi_record *)((unsigned long)rec + rec->size);
+
+	rec->tag = BI_CMD_LINE;
+	memcpy( (char *)rec->data, cmd_line, strlen(cmd_line)+1);
+	rec->size = sizeof(struct bi_record) + strlen(cmd_line) + 1;
+	rec = (struct bi_record *)((unsigned long)rec + rec->size);
+
+	if ( initrd_size ) {
+		rec->tag = BI_INITRD;
+		rec->data[0] = (unsigned long)(&__ramdisk_begin);
+		rec->data[1] = initrd_size;
+		rec->size = sizeof(struct bi_record) + 2 *
+			sizeof(unsigned long);
+		rec = (struct bi_record *)((unsigned long)rec +
+				rec->size);
+	}
+
+	rec->tag = BI_LAST;
+	rec->size = sizeof(struct bi_record);
+	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 	puts("Now booting the kernel\n");
+	serial_close(com_port);
+
+	return birecs;
 }

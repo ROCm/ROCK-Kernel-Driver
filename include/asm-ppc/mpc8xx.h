@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mpc8xx.h 1.15 11/01/01 12:48:53 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 
 /* This is the single file included by all MPC8xx build options.
@@ -17,40 +17,60 @@
 #ifdef CONFIG_8xx
 
 #ifdef CONFIG_MBX
-#include <asm/mbx.h>
+#include <platforms/mbx.h>
 #endif
 
 #ifdef CONFIG_FADS
-#include <asm/fads.h>
+#include <platforms/fads.h>
 #endif
 
 #ifdef CONFIG_RPXLITE
-#include <asm/rpxlite.h>
+#include <platforms/rpxlite.h>
 #endif
 
 #ifdef CONFIG_BSEIP
-#include <asm/bseip.h>
+#include <platforms/bseip.h>
 #endif
 
 #ifdef CONFIG_RPXCLASSIC
-#include <asm/rpxclassic.h>
+#include <platforms/rpxclassic.h>
 #endif
 
 #if defined(CONFIG_TQM8xxL)
-#include <asm/tqm8xx.h>
+#include <platforms/tqm8xx.h>
 #endif
 
 #if defined(CONFIG_SPD823TS)
-#include <asm/spd8xx.h>
+#include <platforms/spd8xx.h>
 #endif
 
 #if defined(CONFIG_IVMS8) || defined(CONFIG_IVML24)
-#include <asm/ivms8.h>
+#include <platforms/ivms8.h>
 #endif
 
-/* I need this to get pt_regs.......
-*/
-#include <asm/ptrace.h>
+#if defined(CONFIG_HERMES_PRO)
+#include <platforms/hermes.h>
+#endif
+
+#if defined(CONFIG_IP860)
+#include <platforms/ip860.h>
+#endif
+
+#if defined(CONFIG_LWMON)
+#include <platforms/lwmon.h>
+#endif
+
+#if defined(CONFIG_PCU_E)
+#include <platforms/pcu_e.h>
+#endif
+
+#if defined(CONFIG_CCM)
+#include <platforms/ccm.h>
+#endif
+
+#if defined(CONFIG_LANTEC)
+#include <platforms/lantec.h>
+#endif
 
 /* Currently, all 8xx boards that support a processor to PCI/ISA bridge
  * use the same memory map.
@@ -74,15 +94,12 @@
 #endif
 
 #ifndef __ASSEMBLY__
-extern unsigned long isa_io_base;
-extern unsigned long isa_mem_base;
-extern unsigned long pci_dram_offset;
-
 /* The "residual" data board information structure the boot loader
  * hands to us.
  */
 extern unsigned char __res[];
 
+struct pt_regs;
 extern int request_8xxirq(unsigned int irq,
 		       void (*handler)(int, void *, struct pt_regs *),
 		       unsigned long flags, 
@@ -90,5 +107,5 @@ extern int request_8xxirq(unsigned int irq,
 		       void *dev_id);
 #endif /* !__ASSEMBLY__ */
 #endif /* CONFIG_8xx */
-#endif
+#endif /* __CONFIG_8xx_DEFS */
 #endif /* __KERNEL__ */

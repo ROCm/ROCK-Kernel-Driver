@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.65 11/18/01 20:57:25 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -29,33 +29,31 @@
 #include <asm/smp.h>
 #include <asm/elf.h>
 #include <asm/cputable.h>
-#ifdef CONFIG_8xx
-#include <asm/mpc8xx.h>
-#include <asm/8xx_immap.h>
-#endif
-#ifdef CONFIG_8260
-#include <asm/mpc8260.h>
-#include <asm/immap_8260.h>
-#endif
-#ifdef CONFIG_4xx
-#include <asm/ppc4xx.h>
-#endif
 #include <asm/bootx.h>
 #include <asm/btext.h>
 #include <asm/machdep.h>
-#include <asm/feature.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <asm/pmac_feature.h>
+#include <asm/thread_info.h>
+
+#if defined CONFIG_KGDB
+#include <asm/kgdb.h>
+#endif
 
 extern void platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7);
 extern void bootx_init(unsigned long r4, unsigned long phys);
-extern unsigned long reloc_offset(void);
 extern void identify_cpu(unsigned long offset, unsigned long cpu);
 extern void do_cpu_ftr_fixups(unsigned long offset);
+extern void reloc_got2(unsigned long offset);
 
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
+#endif
+
+#ifdef CONFIG_KGDB
+extern void kgdb_map_scc(void);
 #endif
 
 extern boot_infos_t *boot_infos;
@@ -68,8 +66,6 @@ unsigned long sysmap_size;
 /* Used with the BI_MEMSIZE bootinfo parameter to store the memory
    size value reported by the boot loader. */ 
 unsigned int boot_mem_size;
-
-int parse_bootinfo(void);
 
 unsigned long ISA_DMA_THRESHOLD;
 unsigned long DMA_MODE_READ, DMA_MODE_WRITE;
@@ -103,7 +99,8 @@ int dcache_bsize;
 int icache_bsize;
 int ucache_bsize;
 
-#ifdef CONFIG_VGA_CONSOLE
+#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_FB_VGA16) || \
+    defined(CONFIG_FB_VGA16_MODULE) || defined(CONFIG_FB_VESA)
 struct screen_info screen_info = {
 	0, 25,			/* orig-x, orig-y */
 	0,			/* unused */
@@ -115,7 +112,7 @@ struct screen_info screen_info = {
 	1,			/* orig-video-isVGA */
 	16			/* orig-video-points */
 };
-#endif /* CONFIG_VGA_CONSOLE */
+#endif /* CONFIG_VGA_CONSOLE || CONFIG_FB_VGA16 || CONFIG_FB_VESA */
 
 void machine_restart(char *cmd)
 {
@@ -291,22 +288,22 @@ early_init(int r3, int r4, int r5)
 	do_cpu_ftr_fixups(offset);
 
 #if defined(CONFIG_ALL_PPC)
+	reloc_got2(offset);
+
 	/* If we came here from BootX, clear the screen,
 	 * set up some pointers and return. */
-	if ((r3 == 0x426f6f58) && (r5 == 0)) {
+	if ((r3 == 0x426f6f58) && (r5 == 0))
 		bootx_init(r4, phys);
-		return phys;
-	}
 
-	/* check if we're prep, return if we are */
-	if ( *(unsigned long *)(0) == 0xdeadc0de )
-		return phys;
-
-	/* 
+	/*
+	 * don't do anything on prep
 	 * for now, don't use bootinfo because it breaks yaboot 0.5
 	 * and assume that if we didn't find a magic number, we have OF
 	 */
-	phys = prom_init(r3, r4, (prom_entry)r5);
+	else if (*(unsigned long *)(0) != 0xdeadc0de)
+		phys = prom_init(r3, r4, (prom_entry)r5);
+
+	reloc_got2(-offset);
 #endif
 
 	return phys;
@@ -343,13 +340,13 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_BOOTX_TEXT
-	extern boot_infos_t *disp_bi;
-
-	if (disp_bi) {
+	if (boot_text_mapped) {
 		btext_clearscreen();
-		btext_welcome(disp_bi);
+		btext_welcome();
 	}
 #endif	
+
+	parse_bootinfo(find_bootinfo());
 
 	/* if we didn't get any bootinfo telling us what we are... */
 	if (_machine == 0) {
@@ -409,15 +406,14 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		char *p;
 			
 #ifdef CONFIG_BLK_DEV_INITRD
-		if (r3 && r4 && r4 != 0xdeadbeef)
-			{
-				if (r3 < KERNELBASE)
-					r3 += KERNELBASE;
-				initrd_start = r3;
-				initrd_end = r3 + r4;
-				ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
-				initrd_below_start_ok = 1;
-			}
+		if (r3 && r4 && r4 != 0xdeadbeef) {
+			if (r3 < KERNELBASE)
+				r3 += KERNELBASE;
+			initrd_start = r3;
+			initrd_end = r3 + r4;
+			ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+			initrd_below_start_ok = 1;
+		}
 #endif
 		chosen = find_devices("chosen");
 		if (chosen != NULL) {
@@ -429,6 +425,12 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		}
 	}
 	cmd_line[sizeof(cmd_line) - 1] = 0;
+#ifdef CONFIG_ADB
+	if (strstr(cmd_line, "adb_sync")) {
+		extern int __adb_probe_sync;
+		__adb_probe_sync = 1;
+	}
+#endif /* CONFIG_ADB */	
 
 	switch (_machine) {
 	case _MACH_Pmac:
@@ -441,7 +443,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 }
 #endif /* CONFIG_ALL_PPC */
 
-int parse_bootinfo(void)
+struct bi_record *find_bootinfo(void)
 {
 	struct bi_record *rec;
 	extern char __bss_start[];
@@ -455,11 +457,16 @@ int parse_bootinfo(void)
 		 */
 		rec = (struct bi_record *)_ALIGN((ulong)__bss_start+0x10000+(1<<20)-1,(1<<20));
 		if ( rec->tag != BI_FIRST )
-			return -1;
+			return NULL;
 	}
-	for ( ; rec->tag != BI_LAST ;
-	      rec = (struct bi_record *)((ulong)rec + rec->size) )
-	{
+	return rec;
+}
+
+void parse_bootinfo(struct bi_record *rec)
+{
+	if (rec == NULL || rec->tag != BI_FIRST)
+		return;
+	while (rec->tag != BI_LAST) {
 		ulong *data = rec->data;
 		switch (rec->tag) {
 		case BI_CMD_LINE:
@@ -485,9 +492,8 @@ int parse_bootinfo(void)
 			boot_mem_size = data[0];
 			break;
 		}
+		rec = (struct bi_record *)((ulong)rec + rec->size);
 	}
-
-	return 0;
 }
 
 /*
@@ -503,8 +509,6 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_CMDLINE
 	strcpy(cmd_line, CONFIG_CMDLINE);
 #endif /* CONFIG_CMDLINE */
-
-	parse_bootinfo();
 
 	platform_init(r3, r4, r5, r6, r7);
 
@@ -525,7 +529,7 @@ int __init ppc_setup_l2cr(char *str)
 }
 __setup("l2cr=", ppc_setup_l2cr);
 
-void __init ppc_init(void)
+int __init ppc_init(void)
 {
 	/* clear the progress line */
 	if ( ppc_md.progress ) ppc_md.progress("             ", 0xffff);
@@ -533,9 +537,13 @@ void __init ppc_init(void)
 	if (ppc_md.init != NULL) {
 		ppc_md.init();
 	}
+	return 0;
 }
 
-subsys_initcall(ppc_init);
+arch_initcall(ppc_init);
+
+/* Initial thread_info struct, copied into init_task_union */
+struct thread_info init_thread_values __initdata = INIT_THREAD_INFO(init_task);
 
 /* Warning, IO base is not yet inited */
 void __init setup_arch(char **cmdline_p)
@@ -545,12 +553,20 @@ void __init setup_arch(char **cmdline_p)
 	extern char *klimit;
 	extern void do_init_bootmem(void);
 
+	/* initialize the thread_info for the init task */
+	init_thread_info = init_thread_values;
+
 	/* so udelay does something sensible, assume <= 1000 bogomips */
 	loops_per_jiffy = 500000000 / HZ;
 
 #ifdef CONFIG_ALL_PPC
-	feature_init();
-#endif
+	/* This could be called "early setup arch", it must be done
+	 * now because xmon need it
+	 */
+	if (_machine == _MACH_Pmac)
+		pmac_feature_init();	/* New cool way */
+#endif /* CONFIG_ALL_PPC */
+
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
@@ -561,7 +577,12 @@ void __init setup_arch(char **cmdline_p)
 #if defined(CONFIG_KGDB)
 	kgdb_map_scc();
 	set_debug_traps();
-	breakpoint();
+	if (strstr(cmd_line, "nokgdb"))
+		printk("kgdb default breakpoint deactivated on command line\n");
+	else {
+		printk("kgdb default breakpoint activated\n");
+		breakpoint();
+	}
 #endif
 
 	/*
@@ -596,24 +617,6 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 	if ( ppc_md.progress ) ppc_md.progress("arch: exit", 0x3eab);
 
-#if defined(CONFIG_PCI) && defined(CONFIG_ALL_PPC)
-	/* We create the "pci-OF-bus-map" property now so it appear in the
-	 * /proc device tree
-	 */
-	if (have_of) {
-		struct property* of_prop;
-		
-		of_prop = (struct property*)alloc_bootmem(sizeof(struct property) + 256);
-		if (of_prop && find_path_device("/")) {
-			memset(of_prop, -1, sizeof(struct property) + 256);
-			of_prop->name = "pci-OF-bus-map";
-			of_prop->length = 256;
-			of_prop->value = (unsigned char *)&of_prop[1];
-			prom_add_property(find_path_device("/"), of_prop);
-		}
-	}
-#endif /* CONFIG_PCI && CONFIG_ALL_PPC */
-
 	paging_init();
 	sort_exception_table();
 
@@ -621,6 +624,7 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.ppc_machine = _machine;
 }
 
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 /* Convert the shorts/longs in hd_driveid from little to big endian;
  * chars are endian independant, of course, but strings need to be flipped.
  * (Despite what it says in drivers/block/ide.h, they come up as little
@@ -715,3 +719,4 @@ void ppc_generic_ide_fix_driveid(struct hd_driveid *id)
 		id->words206_254[i] = __le16_to_cpu(id->words206_254[i]);
 	id->integrity_word  = __le16_to_cpu(id->integrity_word);
 }
+#endif

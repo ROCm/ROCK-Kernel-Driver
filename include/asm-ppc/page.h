@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.page.h 1.8 08/19/01 20:06:47 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _PPC_PAGE_H
 #define _PPC_PAGE_H
@@ -13,7 +13,11 @@
 #include <linux/config.h>
 
 /* Be sure to change arch/ppc/Makefile to match */
+#ifdef CONFIG_KERNEL_START_BOOL
+#define PAGE_OFFSET	CONFIG_KERNEL_START
+#else
 #define PAGE_OFFSET	0xc0000000
+#endif /* CONFIG_KERNEL_START_BOOL */
 #define KERNELBASE	PAGE_OFFSET
 
 #ifndef __ASSEMBLY__
@@ -83,9 +87,20 @@ typedef unsigned long pgprot_t;
 
 extern void clear_page(void *page);
 extern void copy_page(void *to, void *from);
-#define clear_user_page(page, vaddr)	clear_page(page)
-#define copy_user_page(to, from, vaddr)	copy_page(to, from)
+extern void clear_user_page(void *page, unsigned long vaddr);
+extern void copy_user_page(void *to, void *from, unsigned long vaddr);
 
+extern unsigned long ppc_memstart;
+extern unsigned long ppc_memoffset;
+#ifndef CONFIG_APUS
+#define PPC_MEMSTART	0
+#define PPC_MEMOFFSET	PAGE_OFFSET
+#else
+#define PPC_MEMSTART	ppc_memstart
+#define PPC_MEMOFFSET	ppc_memoffset
+#endif
+
+#if defined(CONFIG_APUS) && !defined(MODULE)
 /* map phys->virtual and virtual->phys for RAM pages */
 static inline unsigned long ___pa(unsigned long v)
 { 
@@ -113,8 +128,13 @@ static inline void* ___va(unsigned long p)
 
 	return (void*) v;
 }
-#define __pa(x) ___pa ((unsigned long)(x))
-#define __va(x) ___va ((unsigned long)(x))
+#else
+#define ___pa(vaddr) ((vaddr)-PPC_MEMOFFSET)
+#define ___va(paddr) ((paddr)+PPC_MEMOFFSET)
+#endif
+
+#define __pa(x) ___pa((unsigned long)(x))
+#define __va(x) ((void *)(___va((unsigned long)(x))))
 
 #define MAP_PAGE_RESERVED	(1<<15)
 #define virt_to_page(kaddr)	(mem_map + (((unsigned long)kaddr-PAGE_OFFSET) >> PAGE_SHIFT))

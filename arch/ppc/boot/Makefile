@@ -17,29 +17,32 @@ CFLAGS	+= -fno-builtin -D__BOOTER__ -I$(TOPDIR)/arch/$(ARCH)/boot/include
 AFLAGS	+= -D__BOOTER__
 OBJCOPY_ARGS = -O elf32-powerpc
 
-ifeq ($(CONFIG_SMP),y)
-TFTPSIMAGE=/tftpboot/sImage.smp
-else
-TFTPSIMAGE=/tftpboot/sImage
-endif
+MKIMAGE				:= ./utils/mkimage.wrapper
 
-lib/zlib.a:
+lib/zlib.a: lib/zlib.c
 	$(MAKE) -C lib
 
 images/vmlinux.gz: $(TOPDIR)/vmlinux
 	$(MAKE) -C images vmlinux.gz
 
-# Subdirs and tools needed for each.
-subdir-y			:= lib images common
-subdir-$(CONFIG_ALL_PPC)	+= chrp pmac prep
-tools-$(CONFIG_ALL_PPC)		:= addnote piggyback mknote hack-coff mkprep
-subdir-$(CONFIG_4xx)		+= tree
-subdir-$(CONFIG_8xx)		+= mbx
-subdir-$(CONFIG_8260)		+= mbx
-tools-$(CONFIG_GEMINI)		:= mksimage
+# Subdirs and tools needed for each.  Assume we always need to go into
+# 'simple' unless told otherwise.
+subdir-y			:= lib common simple
+subdir-$(CONFIG_ALL_PPC)	:= chrp pmac prep
+tools-$(CONFIG_ALL_PPC)		:= addnote mknote hack-coff mkprep
+tools-$(CONFIG_PPLUS)		:= mkbugboot mkprep
+tools-$(CONFIG_4xx)		:= mktree
+tools-$(CONFIG_LOPEC)		:= mkbugboot mkprep
+tools-$(CONFIG_MCPN765)		:= mkbugboot mkprep
+tools-$(CONFIG_MENF1)		:= mkprep
+tools-$(CONFIG_MVME5100)	:= mkbugboot mkprep
+tools-$(CONFIG_PRPMC750)	:= mkbugboot mkprep
+tools-$(CONFIG_PRPMC800)	:= mkbugboot mkprep
+tools-$(CONFIG_SPRUCE)		:= mktree
 
-# These are dirs we don't want to go into on BOOT_TARGETS
-NONBOOT				:= lib images common
+# These are dirs we don't want to go into on BOOT_TARGETS.  We have them for
+# the 'depend' stage.
+NONBOOT				:= lib common
 
 # These are the subdirs we want to use
 BOOTDIRS			= $(filter-out $(NONBOOT), $(subdir-y))
@@ -50,19 +53,11 @@ maketools:
 	$(MAKE) -C utils $(tools-y)
 
 # The targets all boards support for boot images.
-BOOT_TARGETS = zImage
-ifndef CONFIG_GEMINI
-BOOT_TARGETS += zImage.initrd znetboot znetboot.initrd
-endif
+BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
 
-$(BOOT_TARGETS): sImage vmapus lib/zlib.a images/vmlinux.gz maketools
+$(BOOT_TARGETS): vmapus lib/zlib.a images/vmlinux.gz maketools
 ifneq ($(BOOTDIRS),)
 	for d in $(BOOTDIRS); do $(MAKE) -C $$d $@; done
-endif
-
-sImage: $(TOPDIR)/vmlinux
-ifdef CONFIG_GEMINI
-	$(OBJCOPY) -I elf32-powerpc -O binary $(TOPDIR)/vmlinux images/sImage
 endif
 
 vmapus: $(TOPDIR)/vmlinux
@@ -71,16 +66,19 @@ ifdef CONFIG_APUS
 	gzip $(GZIP_FLAGS) images/vmapus
 endif
 
-ifdef CONFIG_GEMINI
-znetboot : zImage
-	cp images/sImage $(TFTPSIMAGE)
-endif
+# Make an image for PPCBoot
+pImage: images/vmlinux.gz
+	$(MKIMAGE) -A ppc -O linux -T kernel -C gzip -a 00000000 -e 00000000 \
+	-n 'Linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)' \
+	-d $< images/vmlinux.PPCBoot
+	ln -sf vmlinux.PPCBoot images/pImage
 
-# Clean up after ourselves.  We have to do it like this since only some dirs
-# need to be gone into. -- Tom
+vmlinux.sm: $(TOPDIR)/vmlinux utils/addSystemMap
+	./utils/addSystemMap $(TOPDIR)/System.map $(TOPDIR)/vmlinux images/vmlinux.sm
+
+# These are subdirs with files not normally rm'ed. -- Tom
 clean:
 	$(MAKE) -C images clean
-	$(MAKE) -C tree clean
 	$(MAKE) -C utils clean
 
 include $(TOPDIR)/Rules.make

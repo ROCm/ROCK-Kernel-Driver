@@ -4,6 +4,7 @@
 # CONFIG_UID16 is not set
 # CONFIG_RWSEM_GENERIC_SPINLOCK is not set
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
+CONFIG_HAVE_DEC_LOCK=y
 
 #
 # Code maturity level options
@@ -25,14 +26,30 @@ CONFIG_PPC32=y
 # CONFIG_6xx is not set
 CONFIG_4xx=y
 # CONFIG_POWER3 is not set
-# CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
+# CONFIG_PPC_ISERIES is not set
 # CONFIG_PPC_STD_MMU is not set
+# CONFIG_CEDER is not set
+# CONFIG_CPCI405 is not set
+# CONFIG_EP405 is not set
 # CONFIG_OAK is not set
+# CONFIG_REDWOOD_4 is not set
+# CONFIG_REDWOOD_5 is not set
+# CONFIG_TIVO is not set
 CONFIG_WALNUT=y
 # CONFIG_ALL_PPC is not set
 # CONFIG_SMP is not set
 # CONFIG_MATH_EMULATION is not set
+CONFIG_405GP=y
+CONFIG_BIOS_FIXUP=y
+CONFIG_TREEBOOT=y
+CONFIG_IBM405_ERR77=y
+CONFIG_IBM_OCP=y
+# CONFIG_405_DMA is not set
+CONFIG_UART0_TTYS0=y
+# CONFIG_UART0_TTYS1 is not set
+CONFIG_IBM405_ERR51=y
+CONFIG_NOT_COHERENT_CACHE=y
 
 #
 # General setup
@@ -42,7 +59,8 @@ CONFIG_WALNUT=y
 # CONFIG_EISA is not set
 # CONFIG_SBUS is not set
 # CONFIG_MCA is not set
-# CONFIG_PCI is not set
+CONFIG_PCI=y
+# CONFIG_PC_KEYBOARD is not set
 CONFIG_NET=y
 CONFIG_SYSCTL=y
 CONFIG_SYSVIPC=y
@@ -51,6 +69,7 @@ CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 CONFIG_KERNEL_ELF=y
 # CONFIG_BINFMT_MISC is not set
+# CONFIG_PCI_NAMES is not set
 # CONFIG_HOTPLUG is not set
 # CONFIG_PCMCIA is not set
 
@@ -58,6 +77,7 @@ CONFIG_KERNEL_ELF=y
 # Parallel port support
 #
 # CONFIG_PARPORT is not set
+CONFIG_PPC_RTC=y
 # CONFIG_CMDLINE_BOOL is not set
 
 #
@@ -102,7 +122,7 @@ CONFIG_BLK_DEV_INITRD=y
 # Networking options
 #
 # CONFIG_PACKET is not set
-# CONFIG_NETLINK is not set
+# CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
 # CONFIG_FILTER is not set
 CONFIG_UNIX=y
@@ -116,6 +136,7 @@ CONFIG_IP_PNP_RARP=y
 # CONFIG_NET_IPIP is not set
 # CONFIG_NET_IPGRE is not set
 # CONFIG_IP_MROUTE is not set
+# CONFIG_ARPD is not set
 # CONFIG_INET_ECN is not set
 CONFIG_SYN_COOKIES=y
 # CONFIG_IPV6 is not set
@@ -128,6 +149,18 @@ CONFIG_SYN_COOKIES=y
 #
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
+
+#
+# Appletalk devices
+#
+# CONFIG_DEV_APPLETALK is not set
+# CONFIG_LTPC is not set
+# CONFIG_COPS is not set
+# CONFIG_COPS_DAYNA is not set
+# CONFIG_COPS_TANGENT is not set
+# CONFIG_IPDDP is not set
+# CONFIG_IPDDP_ENCAP is not set
+# CONFIG_IPDDP_DECAP is not set
 # CONFIG_DECNET is not set
 # CONFIG_BRIDGE is not set
 # CONFIG_X25 is not set
@@ -157,6 +190,30 @@ CONFIG_SYN_COOKIES=y
 # CONFIG_SCSI is not set
 
 #
+# Fusion MPT device support
+#
+# CONFIG_FUSION is not set
+# CONFIG_FUSION_BOOT is not set
+# CONFIG_FUSION_ISENSE is not set
+# CONFIG_FUSION_CTL is not set
+# CONFIG_FUSION_LAN is not set
+
+#
+# IEEE 1394 (FireWire) support (EXPERIMENTAL)
+#
+# CONFIG_IEEE1394 is not set
+
+#
+# I2O device support
+#
+# CONFIG_I2O is not set
+# CONFIG_I2O_PCI is not set
+# CONFIG_I2O_BLOCK is not set
+# CONFIG_I2O_LAN is not set
+# CONFIG_I2O_SCSI is not set
+# CONFIG_I2O_PROC is not set
+
+#
 # Network device support
 #
 CONFIG_NETDEVICES=y
@@ -169,6 +226,7 @@ CONFIG_NETDEVICES=y
 # CONFIG_BONDING is not set
 # CONFIG_EQUALIZER is not set
 # CONFIG_TUN is not set
+# CONFIG_ETHERTAP is not set
 
 #
 # Ethernet (10 or 100Mbit)
@@ -177,7 +235,13 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
+CONFIG_IBM_OCP_ENET=y
+# CONFIG_IBM_OCP_ENET_ERROR_MSG is not set
+CONFIG_IBM_OCP_ENET_RX_BUFF=64
+CONFIG_IBM_OCP_ENET_TX_BUFF=8
+CONFIG_IBM_OCP_ENET_GAP=8
 # CONFIG_SUNLANCE is not set
+# CONFIG_HAPPYMEAL is not set
 # CONFIG_SUNBMAC is not set
 # CONFIG_SUNQE is not set
 # CONFIG_SUNLANCE is not set
@@ -186,6 +250,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
+# CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 # CONFIG_NET_PCI is not set
 # CONFIG_NET_POCKET is not set
@@ -315,6 +380,7 @@ CONFIG_I2C=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
+# CONFIG_PPC405_GPIO is not set
 
 #
 # Ftape, the floppy tape device driver
@@ -336,11 +402,15 @@ CONFIG_I2C=y
 # CONFIG_AUTOFS4_FS is not set
 # CONFIG_REISERFS_FS is not set
 # CONFIG_REISERFS_CHECK is not set
+# CONFIG_REISERFS_PROC_INFO is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BFS_FS is not set
+# CONFIG_EXT3_FS is not set
+# CONFIG_JBD is not set
+# CONFIG_JBD_DEBUG is not set
 # CONFIG_FAT_FS is not set
 # CONFIG_MSDOS_FS is not set
 # CONFIG_UMSDOS_FS is not set
@@ -353,6 +423,7 @@ CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set
 # CONFIG_ISO9660_FS is not set
 # CONFIG_JOLIET is not set
+# CONFIG_ZISOFS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
@@ -377,6 +448,7 @@ CONFIG_EXT2_FS=y
 # Network File Systems
 #
 # CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 CONFIG_ROOT_NFS=y
@@ -394,6 +466,8 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_SMALLDOS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
+# CONFIG_ZISOFS_FS is not set
+# CONFIG_ZLIB_FS_INFLATE is not set
 
 #
 # Partition Types
@@ -407,6 +481,10 @@ CONFIG_MSDOS_PARTITION=y
 # Sound
 #
 # CONFIG_SOUND is not set
+
+#
+# MPC4xx Driver Options
+#
 
 #
 # USB support
@@ -487,6 +565,7 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_USB_SERIAL_EMPEG is not set
 # CONFIG_USB_SERIAL_FTDI_SIO is not set
 # CONFIG_USB_SERIAL_VISOR is not set
+# CONFIG_USB_SERIAL_IPAQ is not set
 # CONFIG_USB_SERIAL_IR is not set
 # CONFIG_USB_SERIAL_EDGEPORT is not set
 # CONFIG_USB_SERIAL_KEYSPAN_PDA is not set
@@ -500,6 +579,7 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_USB_SERIAL_KEYSPAN_USA19W is not set
 # CONFIG_USB_SERIAL_KEYSPAN_USA49W is not set
 # CONFIG_USB_SERIAL_MCT_U232 is not set
+# CONFIG_USB_SERIAL_KLSI is not set
 # CONFIG_USB_SERIAL_PL2303 is not set
 # CONFIG_USB_SERIAL_CYBERJACK is not set
 # CONFIG_USB_SERIAL_XIRCOM is not set
@@ -521,3 +601,5 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_MAGIC_SYSRQ is not set
 # CONFIG_KGDB is not set
 # CONFIG_XMON is not set
+# CONFIG_BDI_SWITCH is not set
+# CONFIG_SERIAL_TEXT_DEBUG is not set

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.start.c 1.16 08/20/01 22:17:58 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Copyright (C) 1996 Paul Mackerras.
@@ -13,9 +13,13 @@
 #include <linux/pmu.h>
 #include <linux/cuda.h>
 #include <linux/kernel.h>
+#include <linux/errno.h>
+#include <linux/sysrq.h>
 #include <asm/prom.h>
 #include <asm/bootx.h>
-#include <asm/feature.h>
+#include <asm/machdep.h>
+#include <asm/errno.h>
+#include <asm/pmac_feature.h>
 #include <asm/processor.h>
 #include <asm/delay.h>
 #include <asm/btext.h>
@@ -24,15 +28,14 @@
 #endif
 
 static volatile unsigned char *sccc, *sccd;
-unsigned long TXRDY, RXRDY;
+unsigned int TXRDY, RXRDY, DLAB;
 extern void xmon_printf(const char *fmt, ...);
 static int xmon_expect(const char *str, unsigned int timeout);
 
-static int console;
 static int use_screen;
 static int via_modem;
 static int xmon_use_sccb;
-static struct device_node *macio_node;
+static struct device_node *channel_node;
 
 #define TB_SPEED	25000000
 
@@ -46,11 +49,64 @@ static inline unsigned int readtb(void)
 
 void buf_access(void)
 {
-	if ( _machine == _MACH_chrp )
-		sccd[3] &= ~0x80;	/* reset DLAB */
+	if (DLAB)
+		sccd[3] &= ~DLAB;	/* reset DLAB */
 }
 
 extern int adb_init(void);
+
+#ifdef CONFIG_ALL_PPC
+/*
+ * This looks in the "ranges" property for the primary PCI host bridge
+ * to find the physical address of the start of PCI/ISA I/O space.
+ * It is basically a cut-down version of pci_process_bridge_OF_ranges.
+ */
+static unsigned long chrp_find_phys_io_base(void)
+{
+	struct device_node *node;
+	unsigned int *ranges;
+	unsigned long base = CHRP_ISA_IO_BASE;
+	int rlen = 0;
+	int np;
+
+	node = find_devices("isa");
+	if (node != NULL) {
+		node = node->parent;
+		if (node == NULL || node->type == NULL
+		    || strcmp(node->type, "pci") != 0)
+			node = NULL;
+	}
+	if (node == NULL)
+		node = find_devices("pci");
+	if (node == NULL)
+		return base;
+
+	ranges = (unsigned int *) get_property(node, "ranges", &rlen);
+	np = prom_n_addr_cells(node) + 5;
+	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
+		if ((ranges[0] >> 24) == 1 && ranges[2] == 0) {
+			/* I/O space starting at 0, grab the phys base */
+			base = ranges[np - 3];
+			break;
+		}
+		ranges += np;
+	}
+	return base;
+}
+#endif /* CONFIG_ALL_PPC */
+
+static void sysrq_handle_xmon(int key, struct pt_regs *regs,
+			      struct kbd_struct *kbd, struct tty_struct *tty)
+{
+	xmon(regs);
+}
+
+static struct sysrq_key_op sysrq_xmon_op = 
+{
+	handler:	sysrq_handle_xmon,
+	help_msg:	"Xmon",
+	action_msg:	"Entering xmon\n",
+};
 
 void
 xmon_map_scc(void)
@@ -65,8 +121,6 @@ xmon_map_scc(void)
 		unsigned long addr;
 #ifdef CONFIG_BOOTX_TEXT
 		if (!machine_is_compatible("iMac")) {
-			extern boot_infos_t *disp_bi;
-
 			/* see if there is a keyboard in the device tree
 			   with a parent of type "adb" */
 			for (np = find_devices("keyboard"); np; np = np->next)
@@ -77,11 +131,11 @@ xmon_map_scc(void)
 			/* needs to be hacked if xmon_printk is to be used
 			   from within find_via_pmu() */
 #ifdef CONFIG_ADB_PMU
-			if (np != NULL && disp_bi && find_via_pmu())
+			if (np != NULL && boot_text_mapped && find_via_pmu())
 				use_screen = 1;
 #endif
 #ifdef CONFIG_ADB_CUDA
-			if (np != NULL && disp_bi && find_via_cuda())
+			if (np != NULL && boot_text_mapped && find_via_cuda())
 				use_screen = 1;
 #endif
 		}
@@ -99,6 +153,7 @@ xmon_map_scc(void)
 				np = np->sibling;
 			if (np != NULL) {
 				/* XXX should parse this properly */
+				channel_node = np;
 				slots = get_property(np, "slot-names", &l);
 				if (slots != NULL && l >= 10
 				    && strcmp(slots+4, "Modem") == 0)
@@ -126,25 +181,27 @@ xmon_map_scc(void)
 		RXRDY = 1;
 		
 		np = find_devices("mac-io");
-		if (np && np->n_addrs) {
-			macio_node = np;
+		if (np && np->n_addrs)
 			addr = np->addrs[0].address + 0x13020;
-		}
 		base = (volatile unsigned char *) ioremap(addr & PAGE_MASK, PAGE_SIZE);
 		sccc = base + (addr & ~PAGE_MASK);
 		sccd = sccc + 0x10;
-	}
-	else
-	{
-		/* should already be mapped by the kernel boot */
-		sccc = (volatile unsigned char *) (isa_io_base + 0x3fd);
-		sccd = (volatile unsigned char *) (isa_io_base + 0x3f8);
+
+	} else {
+		base = (volatile unsigned char *) isa_io_base;
+		if (_machine == _MACH_chrp)
+			base = (volatile unsigned char *)
+				ioremap(chrp_find_phys_io_base(), 0x1000);
+
+		sccc = base + 0x3fd;
+		sccd = base + 0x3f8;
 		if (xmon_use_sccb) {
 			sccc -= 0x100;
 			sccd -= 0x100;
 		}
 		TXRDY = 0x20;
 		RXRDY = 1;
+		DLAB = 0x80;
 	}
 #elif defined(CONFIG_GEMINI)
 	/* should already be mapped by the kernel boot */
@@ -152,8 +209,16 @@ xmon_map_scc(void)
 	sccd = (volatile unsigned char *) 0xffeffb08;
 	TXRDY = 0x20;
 	RXRDY = 1;
-	console = 1;
+	DLAB = 0x80;
+#elif defined(CONFIG_405GP)
+	sccc = (volatile unsigned char *)0xef600305;
+	sccd = (volatile unsigned char *)0xef600300;
+	TXRDY = 0x20;
+	RXRDY = 1;
+	DLAB = 0x80;
 #endif /* platform */
+
+	__sysrq_put_key_op('x', &sysrq_xmon_op);
 }
 
 static int scc_initialized = 0;
@@ -210,8 +275,6 @@ xmon_write(void *handle, void *ptr, int nb)
 			ct = 1;
 			--i;
 		} else {
-			if (console)
-				printk("%c", c);
 			ct = 0;
 		}
 		buf_access();
@@ -349,12 +412,19 @@ xmon_init_scc()
 	{
 		int i, x;
 
-		if (macio_node != 0)
-			feature_set(macio_node, FEATURE_Serial_enable);
-		if (via_modem && macio_node != 0) {
+		if (channel_node != 0)
+			pmac_call_feature(
+				PMAC_FTR_SCC_ENABLE,
+				channel_node,
+				PMAC_SCC_ASYNC | PMAC_SCC_FLAG_XMON, 1);
+			printk(KERN_INFO "Serial port locked ON by debugger !\n");
+		if (via_modem && channel_node != 0) {
 			unsigned int t0;
 
-			feature_set(macio_node, FEATURE_Modem_power);
+			pmac_call_feature(
+				PMAC_FTR_MODEM_ENABLE,
+				channel_node, 0, 1);
+			printk(KERN_INFO "Modem powered up by debugger !\n");
 			t0 = readtb();
 			while (readtb() - t0 < 3*TB_SPEED)
 				eieio();

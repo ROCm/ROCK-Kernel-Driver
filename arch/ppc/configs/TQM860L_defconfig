@@ -25,10 +25,11 @@ CONFIG_PPC32=y
 # CONFIG_6xx is not set
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
-# CONFIG_POWER4 is not set
 CONFIG_8xx=y
+# CONFIG_PPC_ISERIES is not set
 # CONFIG_PPC_STD_MMU is not set
 CONFIG_SERIAL_CONSOLE=y
+CONFIG_NOT_COHERENT_CACHE=y
 # CONFIG_RPXLITE is not set
 # CONFIG_RPXCLASSIC is not set
 # CONFIG_BSEIP is not set
@@ -38,12 +39,18 @@ CONFIG_SERIAL_CONSOLE=y
 # CONFIG_TQM855L is not set
 CONFIG_TQM860L=y
 # CONFIG_FPS850L is not set
-# CONFIG_TQM860 is not set
 # CONFIG_SPD823TS is not set
 # CONFIG_IVMS8 is not set
 # CONFIG_IVML24 is not set
 # CONFIG_SM850 is not set
+# CONFIG_HERMES_PRO is not set
+# CONFIG_IP860 is not set
+# CONFIG_LWMON is not set
+# CONFIG_PCU_E is not set
+# CONFIG_CCM is not set
+# CONFIG_LANTEC is not set
 # CONFIG_MBX is not set
+# CONFIG_IDIF860 is not set
 # CONFIG_WINCEPT is not set
 CONFIG_TQM8xxL=y
 # CONFIG_ALL_PPC is not set
@@ -93,6 +100,7 @@ CONFIG_PPC_RTC=y
 # Block devices
 #
 # CONFIG_BLK_DEV_FD is not set
+# CONFIG_VIODASD is not set
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
@@ -263,6 +271,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
+# CONFIG_VETH is not set
 # CONFIG_FDDI is not set
 # CONFIG_HIPPI is not set
 # CONFIG_PLIP is not set
@@ -338,6 +347,7 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_SERIAL_NONSTANDARD is not set
 CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=32
+# CONFIG_VIOCONS is not set
 
 #
 # I2C support
@@ -363,6 +373,7 @@ CONFIG_UNIX98_PTY_COUNT=32
 # Input core support is needed for joysticks
 #
 # CONFIG_QIC02_TAPE is not set
+# CONFIG_VIOTAPE is not set
 
 #
 # Watchdog Cards
@@ -489,10 +500,20 @@ CONFIG_SCC1_ENET=y
 # CONFIG_SCC3_ENET is not set
 # CONFIG_FEC_ENET is not set
 CONFIG_ENET_BIG_BUFFERS=y
+CONFIG_SMC1_UART_RX_BDNUM=4
+CONFIG_SMC1_UART_RX_BDSIZE=32
+CONFIG_SMC1_UART_TX_BDNUM=4
+CONFIG_SMC1_UART_TX_BDSIZE=32
 CONFIG_SMC2_UART=y
 # CONFIG_ALTSMC2 is not set
 # CONFIG_CONS_SMC2 is not set
+CONFIG_UART_MAXIDL_SMC2=1
+CONFIG_SMC2_UART_RX_BDNUM=4
+CONFIG_SMC2_UART_RX_BDSIZE=32
+CONFIG_SMC2_UART_TX_BDNUM=4
+CONFIG_SMC2_UART_TX_BDSIZE=32
 # CONFIG_USE_SCC_IO is not set
+CONFIG_STATUS_LED=y
 
 #
 # Generic MPC8xx Options
@@ -614,3 +635,4 @@ CONFIG_8xx_COPYBACK=y
 # CONFIG_MAGIC_SYSRQ is not set
 # CONFIG_KGDB is not set
 # CONFIG_XMON is not set
+# CONFIG_BDI_SWITCH is not set

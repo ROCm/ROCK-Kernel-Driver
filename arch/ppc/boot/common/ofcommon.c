@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ofcommon.c 1.1 07/27/01 20:24:18 trini
+ * BK Id: %F% %I% %G% %U% %#%
  *
  * Copyright (C) Paul Mackerras 1997.
  *
@@ -13,6 +13,9 @@
 #include "nonstdio.h"
 #include <asm/bootinfo.h>
 #include <asm/page.h>
+
+/* Information from the linker */
+extern char __sysmap_begin, __sysmap_end;
 
 extern int strcmp(const char *s1, const char *s2);
 extern char *avail_ram, *avail_high;
@@ -126,14 +129,21 @@ void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp)
     inflateEnd(&s);
 }
 
-/* Make a bi_rec in OF.  We need to be passed a name for BI_BOOTLOADER_ID, 
+/* Make a bi_rec in OF.  We need to be passed a name for BI_BOOTLOADER_ID,
  * a machine type for BI_MACHTYPE, and the location where the end of the
  * bootloader is (PROG_START + PROG_SIZE)
  */
 void make_bi_recs(unsigned long addr, char *name, unsigned int mach,
 		unsigned long progend)
 {
+	unsigned long sysmap_size;
 	struct bi_record *rec;
+
+	/* FIgure out the size of a possible System.map we're going to
+	 * pass along.
+	 * */
+	sysmap_size = (unsigned long)(&__sysmap_end) -
+		(unsigned long)(&__sysmap_begin);
 
 	/* leave a 1MB gap then align to the next 1MB boundary */
 	addr = _ALIGN(addr+ (1<<20) - 1, (1<<20));
@@ -150,21 +160,22 @@ void make_bi_recs(unsigned long addr, char *name, unsigned int mach,
 	sprintf( (char *)rec->data, name);
 	rec->size = sizeof(struct bi_record) + strlen(name) + 1;
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
-	    
+
 	rec->tag = BI_MACHTYPE;
 	rec->data[0] = mach;
 	rec->data[1] = 1;
 	rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 
-#ifdef SYSMAP_OFFSET
-	rec->tag = BI_SYSMAP;
-	rec->data[0] = SYSMAP_OFFSET;
-	rec->data[1] = SYSMAP_SIZE;
-	rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
-	rec = (struct bi_record *)((unsigned long)rec + rec->size);
-#endif /* SYSMAP_OFFSET */
-	
+	if (sysmap_size) {
+		rec->tag = BI_SYSMAP;
+		rec->data[0] = (unsigned long)(&__sysmap_begin);
+		rec->data[1] = sysmap_size;
+		rec->size = sizeof(struct bi_record) + 2 *
+			sizeof(unsigned long);
+		rec = (struct bi_record *)((unsigned long)rec + rec->size);
+	}
+
 	rec->tag = BI_LAST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);

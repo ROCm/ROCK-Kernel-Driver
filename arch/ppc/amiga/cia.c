@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.cia.c 1.7 05/21/01 00:48:24 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  linux/arch/m68k/amiga/cia.c - CIA support
@@ -16,10 +16,10 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/errno.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
-#include <linux/seq_file.h>
 
 #include <asm/irq.h>
 #include <asm/amigahw.h>
@@ -31,7 +31,6 @@ struct ciabase {
 	u_short int_mask;
 	int handler_irq, cia_irq, server_irq;
 	char *name;
-	irq_handler_t irq_list[CIA_IRQS];
 } ciaa_base = {
 	&ciaa, 0, 0, IF_PORTS,
 	IRQ_AMIGA_AUTO_2, IRQ_AMIGA_CIAA,
@@ -100,15 +99,13 @@ unsigned char cia_get_irq_mask(unsigned int irq)
 }
 
 /*
- *  Enable or disable CIA interrupts, return old interrupt mask,
- *  interrupts will only be enabled if a handler exists
+ *  Enable or disable CIA interrupts, return old interrupt mask.
  */
 
 static unsigned char cia_able_irq_private(struct ciabase *base,
 					  unsigned char mask)
 {
-	u_char old, tmp;
-	int i;
+	u_char old;
 
 	old = base->icr_mask;
 	base->icr_data |= base->cia->icr;
@@ -118,12 +115,7 @@ static unsigned char cia_able_irq_private(struct ciabase *base,
 	else
 		base->icr_mask &= ~mask;
 	base->icr_mask &= CIA_ICR_ALL;
-	for (i = 0, tmp = 1; i < CIA_IRQS; i++, tmp <<= 1) {
-		if ((tmp & base->icr_mask) && !base->irq_list[i].handler) {
-			base->icr_mask &= ~tmp;
-			base->cia->icr = tmp;
-		}
-	}
+
 	if (base->icr_data & base->icr_mask)
 		custom.intreq = IF_SETCLR | base->int_mask;
 	return old;
@@ -145,94 +137,45 @@ unsigned char cia_able_irq(unsigned int irq, int enable)
 	return cia_able_irq_private(base, mask);
 }
 
-int cia_request_irq(unsigned int irq,
-                    void (*handler)(int, void *, struct pt_regs *),
-                    unsigned long flags, const char *devname, void *dev_id)
-{
-	u_char mask;
-	struct ciabase *base;
-
-	CIA_SET_BASE_ADJUST_IRQ(base, irq);
-
-	base->irq_list[irq].handler = handler;
-	base->irq_list[irq].flags   = flags;
-	base->irq_list[irq].dev_id  = dev_id;
-	base->irq_list[irq].devname = devname;
-
-	/* enable the interrupt */
-	mask = 1 << irq;
-	cia_set_irq_private(base, mask);
-	cia_able_irq_private(base, CIA_ICR_SETCLR | mask);
-	return 0;
-}
-
-void cia_free_irq(unsigned int irq, void *dev_id)
-{
-	struct ciabase *base;
-
-	CIA_SET_BASE_ADJUST_IRQ(base, irq);
-
-	if (base->irq_list[irq].dev_id != dev_id)
-		printk("%s: removing probably wrong IRQ %i from %s\n",
-		       __FUNCTION__, base->cia_irq + irq,
-		       base->irq_list[irq].devname);
-
-	base->irq_list[irq].handler = NULL;
-	base->irq_list[irq].flags   = 0;
-
-	cia_able_irq_private(base, 1 << irq);
-}
-
 static void cia_handler(int irq, void *dev_id, struct pt_regs *fp)
 {
 	struct ciabase *base = (struct ciabase *)dev_id;
-	int mach_irq, i;
+	irq_desc_t *desc;
+	struct irqaction *action;
+	int i;
 	unsigned char ints;
 
-	mach_irq = base->cia_irq;
-	irq = SYS_IRQS + mach_irq;
+	irq = base->cia_irq;
+	desc = irq_desc + irq;
 	ints = cia_set_irq_private(base, CIA_ICR_ALL);
 	custom.intreq = base->int_mask;
-	for (i = 0; i < CIA_IRQS; i++, irq++, mach_irq++) {
+	for (i = 0; i < CIA_IRQS; i++, irq++) {
 		if (ints & 1) {
 			kstat.irqs[0][irq]++;
-			base->irq_list[i].handler(mach_irq, base->irq_list[i].dev_id, fp);
+			action = desc->action;
+			action->handler(irq, action->dev_id, fp);
 		}
 		ints >>= 1;
+		desc++;
 	}
 	amiga_do_irq_list(base->server_irq, fp);
 }
 
 void __init cia_init_IRQ(struct ciabase *base)
 {
-	int i;
-
-	/* init isr handlers */
-	for (i = 0; i < CIA_IRQS; i++) {
-		base->irq_list[i].handler = NULL;
-		base->irq_list[i].flags   = 0;
-	}
+	extern struct irqaction amiga_sys_irqaction[AUTO_IRQS];
+	struct irqaction *action;
 
 	/* clear any pending interrupt and turn off all interrupts */
 	cia_set_irq_private(base, CIA_ICR_ALL);
 	cia_able_irq_private(base, CIA_ICR_ALL);
 
 	/* install CIA handler */
-	request_irq(base->handler_irq, cia_handler, 0, base->name, base);
+	action = &amiga_sys_irqaction[base->handler_irq-IRQ_AMIGA_AUTO];
+	action->handler = cia_handler;
+	action->dev_id = base;
+	action->name = base->name;
+	setup_irq(base->handler_irq, &amiga_sys_irqaction[base->handler_irq-IRQ_AMIGA_AUTO]);
 
 	custom.intena = IF_SETCLR | base->int_mask;
-}
-
-int cia_get_irq_list(struct ciabase *base, struct seq_file *p)
-{
-	int i, j;
-
-	j = base->cia_irq;
-	for (i = 0; i < CIA_IRQS; i++) {
-		seq_printf(p, "cia  %2d: %10d ", j + i,
-			       kstat.irqs[0][SYS_IRQS + j + i]);
-		seq_puts(p, "  ");
-		seq_printf(p, "%s\n", base->irq_list[i].devname);
-	}
-	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.hashtable.S 1.18 08/15/01 22:43:07 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  arch/ppc/kernel/hashtable.S
@@ -27,11 +27,12 @@
  */
 
 #include <linux/config.h>
-#include "../kernel/ppc_asm.h"
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
+#include <asm/ppc_asm.h>
+#include <kernel/ppc_defs.h>
 
 #ifdef CONFIG_SMP
 	.comm	hash_table_lock,4
@@ -63,7 +64,7 @@ hash_page:
 	addis	r2,r7,hash_table_lock@h
 	ori	r2,r2,hash_table_lock@l
 	mfspr	r5,SPRG3
-	lwz	r0,PROCESSOR-THREAD(r5)
+	lwz	r0,CPU-THREAD(r5)
 	oris	r0,r0,0x0fff
 	b	10f
 11:	lwz	r6,0(r2)
@@ -214,7 +215,7 @@ _GLOBAL(add_hash_page)
 #ifdef CONFIG_SMP
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,PROCESSOR(r2)
+	lwz	r8,CPU(r2)
 	oris	r8,r8,10
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
@@ -333,25 +334,6 @@ _GLOBAL(create_hpte)
 	ori	r8,r8,_PAGE_COHERENT	/* set M (coherence required) */
 #endif
 
-#ifdef CONFIG_POWER4
-	/*
-	 * XXX hack hack hack - translate 32-bit "physical" addresses
-	 * in the linux page tables to 42-bit real addresses in such
-	 * a fashion that we can get at the I/O we need to access.
-	 *	-- paulus
-	 */
-	cmpwi	r8,0
-	rlwinm	r0,r8,16,16,30
-	bge	57f
-	cmplwi	r0,0xfe00
-	li	r0,0x3fd
-	bne	56f
-	li	r0,0x3ff
-56:	sldi	r0,r0,32
-	or	r8,r8,r0
-57:
-#endif
-
 	/* Construct the high word of the PPC-style PTE (r5) */
 #ifndef CONFIG_PPC64BRIDGE
 	rlwinm	r5,r3,7,1,24		/* put VSID in 0x7fffff80 bits */
@@ -448,21 +430,6 @@ hash_page_patch_C:
 	lwz	r6,next_slot@l(r4)
 	addi	r6,r6,PTE_SIZE
 	andi.	r6,r6,7*PTE_SIZE
-#ifdef CONFIG_POWER4
-	/*
-	 * Since we don't have BATs on POWER4, we rely on always having
-	 * PTEs in the hash table to map the hash table and the code
-	 * that manipulates it in virtual mode, namely flush_hash_page and
-	 * flush_hash_segments.  Otherwise we can get a DSI inside those
-	 * routines which leads to a deadlock on the hash_table_lock on
-	 * SMP machines.  We avoid this by never overwriting the first
-	 * PTE of each PTEG if it is already valid.
-	 *	-- paulus.
-	 */
-	bne	102f
-	li	r6,PTE_SIZE
-102:
-#endif /* CONFIG_POWER4 */
 	stw	r6,next_slot@l(r4)
 	add	r4,r3,r6
 
@@ -544,7 +511,7 @@ _GLOBAL(flush_hash_page)
 #ifdef CONFIG_SMP
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,PROCESSOR(r2)
+	lwz	r8,CPU(r2)
 	oris	r8,r8,9
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0

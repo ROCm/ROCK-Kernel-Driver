@@ -1,0 +1,115 @@
+#!/bin/bash 
+####################################################
+# Build a hex ebcdic representation of the 
+# KERNELRELEASE for use in the iSeries
+# hvReleaseData structure
+####################################################
+
+if [ $# -ne 1 ]
+then
+   echo "Syntax: createReleaseData kernelversion"
+   exit 1
+fi
+
+len=${#1}
+
+rd=''
+####################################################
+# ReleaseData is maximum of 12 chars
+####################################################
+if [ $len -gt 12 ]
+then
+   len=12
+fi
+
+#for (( i=0 ; $i < $len ; i=$i+1 )) ;
+i=0
+while (($i<$len));
+do
+   char=${1:$i:1}
+   case $char in
+    'a') xchar='0x81';;
+    'b') xchar='0x82';;
+    'c') xchar='0x83';;
+    'd') xchar='0x84';;
+    'e') xchar='0x85';;
+    'f') xchar='0x86';;
+    'g') xchar='0x87';;
+    'h') xchar='0x88';;
+    'i') xchar='0x89';;
+    'j') xchar='0x91';;
+    'k') xchar='0x92';;
+    'l') xchar='0x93';;
+    'm') xchar='0x94';;
+    'n') xchar='0x95';;
+    'o') xchar='0x96';;
+    'p') xchar='0x97';;
+    'q') xchar='0x98';;
+    'r') xchar='0x99';;
+    's') xchar='0xA2';;
+    't') xchar='0xA3';;
+    'u') xchar='0xA4';;
+    'v') xchar='0xA5';;
+    'w') xchar='0xA6';;
+    'x') xchar='0xA7';;
+    'y') xchar='0xA8';;
+    'z') xchar='0xA9';;
+    'A') xchar='0xC1';;
+    'B') xchar='0xC2';;
+    'C') xchar='0xC3';;
+    'D') xchar='0xC4';;
+    'E') xchar='0xC5';;
+    'F') xchar='0xC6';;
+    'G') xchar='0xC7';;
+    'H') xchar='0xC8';;
+    'I') xchar='0xC9';;
+    'J') xchar='0xD1';;
+    'K') xchar='0xD2';;
+    'L') xchar='0xD3';;
+    'M') xchar='0xD4';;
+    'N') xchar='0xD5';;
+    'O') xchar='0xD6';;
+    'P') xchar='0xD7';;
+    'Q') xchar='0xD8';;
+    'R') xchar='0xD9';;
+    'S') xchar='0xE2';;
+    'T') xchar='0xE3';;
+    'U') xchar='0xE4';;
+    'V') xchar='0xE5';;
+    'W') xchar='0xE6';;
+    'X') xchar='0xE7';;
+    'Y') xchar='0xE8';;
+    'Z') xchar='0xE9';;
+    '0') xchar='0xF0';;
+    '1') xchar='0xF1';;
+    '2') xchar='0xF2';;
+    '3') xchar='0xF3';;
+    '4') xchar='0xF4';;
+    '5') xchar='0xF5';;
+    '6') xchar='0xF6';;
+    '7') xchar='0xF7';;
+    '8') xchar='0xF8';;
+    '9') xchar='0xF9';;
+    '.') xchar='0x4B';;
+    '-') xchar='0x60';;
+    '_') xchar='0x6D';;
+    '+') xchar='0x4E';;
+    '@') xchar='0x7C';;
+    '$') xchar='0x5B';;
+    '%') xchar='0x6C';;
+      *) xchar='';;
+   esac
+
+   rd=${rd}${xchar}
+   if [ $(($i+1)) -lt $len ]
+   then
+      rd=${rd}', '
+   fi
+   i=$i+1
+done
+
+#echo "#define RELEASEDATA { $rd }">ReleaseData.h
+
+echo "#define RELEASEDATA { $rd }"
+
+

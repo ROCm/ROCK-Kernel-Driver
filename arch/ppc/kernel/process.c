@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.process.c 1.31 10/02/01 09:51:41 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  linux/arch/ppc/kernel/process.c
@@ -34,6 +34,8 @@
 #include <linux/user.h>
 #include <linux/elf.h>
 #include <linux/init.h>
+#include <linux/prctl.h>
+#include <linux/init_task.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -42,20 +44,24 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/prom.h>
+#ifdef CONFIG_PPC_ISERIES
+#include <asm/iSeries/Paca.h>
+#endif
 
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
 extern unsigned long _get_SP(void);
 
 struct task_struct *last_task_used_math = NULL;
 struct task_struct *last_task_used_altivec = NULL;
+
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
-/* this is 16-byte aligned because it has a stack in it */
-union task_union __attribute((aligned(16))) init_task_union = {
-	INIT_TASK(init_task_union.task)
-};
+
+/* initial task structure */
+struct task_struct init_task = INIT_TASK(init_task);
+
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
 
@@ -260,7 +266,7 @@ void show_regs(struct pt_regs * regs)
 	printk("\nlast math %p last altivec %p", last_task_used_math,
 	       last_task_used_altivec);
 
-#ifdef CONFIG_4xx
+#if defined(CONFIG_4xx) && defined(DCRN_PLB0_BEAR)
 	printk("\nPLB0: bear= 0x%8.8x acr=   0x%8.8x besr=  0x%8.8x\n",
 	    mfdcr(DCRN_POB0_BEAR), mfdcr(DCRN_PLB0_ACR),
 	    mfdcr(DCRN_PLB0_BESR));
@@ -325,7 +331,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 {
 	struct pt_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
-	unsigned long sp = (unsigned long)p + sizeof(union task_union);
+	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
 	/* Copy registers */
@@ -336,9 +342,10 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		/* for kernel thread, set `current' and stackptr in new task */
 		childregs->gpr[1] = sp + sizeof(struct pt_regs);
 		childregs->gpr[2] = (unsigned long) p;
-	}
+		p->thread.regs = NULL;	/* no user register state */
+	} else
+		p->thread.regs = childregs;
 	childregs->gpr[3] = 0;  /* Result from fork() */
-	p->thread.regs = childregs;
 	sp -= STACK_FRAME_OVERHEAD;
 	childframe = sp;
 
@@ -355,6 +362,9 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
 	kregs->nip = (unsigned long)ret_from_fork;
+#ifdef CONFIG_PPC_ISERIES
+	kregs->softEnable = ((struct Paca *)mfspr(SPRG1))->xProcEnabled;
+#endif	
 
 	/*
 	 * copy fpu info - assume lazy fpu switch now always
@@ -391,7 +401,10 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 {
 	set_fs(USER_DS);
 	memset(regs->gpr, 0, sizeof(regs->gpr));
-	memset(&regs->ctr, 0, 5 * sizeof(regs->ctr));
+	regs->ctr = 0;
+	regs->link = 0;
+	regs->xer = 0;
+	regs->ccr = 0;
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER;
@@ -399,8 +412,29 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 		last_task_used_math = 0;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = 0;
+	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
 	current->thread.fpscr = 0;
+#ifdef CONFIG_ALTIVEC
+	memset(current->thread.vr, 0, sizeof(current->thread.vr));
+	memset(&current->thread.vscr, 0, sizeof(current->thread.vscr));
+	current->thread.vrsave = 0;
+#endif /* CONFIG_ALTIVEC */
 }
+
+#if 0
+int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
+{
+	struct pt_regs *regs = tsk->thread.regs;
+
+	if (val > PR_FP_EXC_PRECISE)
+		return -EINVAL;
+	tsk->thread.fpexc_mode = __pack_fe01(val);
+	if (regs != NULL && (regs->msr & MSR_FP) != 0)
+		regs->msr = (regs->msr & ~(MSR_FE0|MSR_FE1))
+			| tsk->thread.fpexc_mode;
+	return 0;
+}
+#endif
 
 int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
@@ -463,6 +497,27 @@ print_backtrace(unsigned long *sp)
 			break;
 	}
 	printk("\n");
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	unsigned long stack_top = (unsigned long) tsk->thread_info + THREAD_SIZE;
+	unsigned long sp, prev_sp;
+	int count = 0;
+
+	if (tsk == NULL)
+		return;
+	sp = (unsigned long) &tsk->thread.ksp;
+	do {
+		prev_sp = sp;
+		sp = *(unsigned long *)sp;
+		if (sp <= prev_sp || sp >= stack_top || (sp & 3) != 0)
+			break;
+		if (count > 0)
+			printk("[%08lx] ", *(unsigned long *)(sp + 4));
+	} while (++count < 16);
+	if (count > 1)
+		printk("\n");
 }
 
 #if 0
@@ -566,7 +621,7 @@ extern void scheduling_functions_end_here(void);
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long ip, sp;
-	unsigned long stack_page = (unsigned long) p;
+	unsigned long stack_page = (unsigned long) p->thread_info;
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;

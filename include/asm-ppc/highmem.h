@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.highmem.h 1.10 06/28/01 15:50:17 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * highmem.h: virtual kernel memory mappings for high memory
@@ -44,13 +44,17 @@ extern void kmap_init(void) __init;
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
+#ifdef CONFIG_HIGHMEM_START_BOOL
+#define PKMAP_BASE CONFIG_HIGHMEM_START
+#else
 #define PKMAP_BASE (0xfe000000UL)
+#endif /* CONFIG_HIGHMEM_START_BOOL */
 #define LAST_PKMAP 1024
 #define LAST_PKMAP_MASK (LAST_PKMAP-1)
 #define PKMAP_NR(virt)  ((virt-PKMAP_BASE) >> PAGE_SHIFT)
 #define PKMAP_ADDR(nr)  (PKMAP_BASE + ((nr) << PAGE_SHIFT))
 
-#define KMAP_FIX_BEGIN	(0xfe400000UL)
+#define KMAP_FIX_BEGIN	(PKMAP_BASE + 0x00400000UL)
 
 extern void *kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);

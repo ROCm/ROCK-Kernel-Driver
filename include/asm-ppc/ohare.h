@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ohare.h 1.5 05/17/01 18:14:25 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * ohare.h: definitions for using the "O'Hare" I/O controller chip.
@@ -11,7 +11,8 @@
  */
 
 /* offset from ohare base for feature control register */
-#define OHARE_FEATURE_REG	0x38
+#define OHARE_MBCR	0x34
+#define OHARE_FCR	0x38
 
 /*
  * Bits in feature control register.
@@ -25,6 +26,7 @@
 #define OH_BAY_FLOPPY_ENABLE	0x10
 #define OH_IDE0_ENABLE		0x20
 #define OH_IDE0_RESET_N		0x40	/* a guess */
+#define OH_BAY_DEV_MASK		0x1c
 #define OH_BAY_RESET_N		0x80
 #define OH_IOBUS_ENABLE		0x100	/* IOBUS seems to be IDE */
 #define OH_SCC_ENABLE		0x200

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.commproc.c 1.15 10/16/01 16:21:52 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 
 /*
@@ -55,7 +55,63 @@ struct	cpm_action {
 static	struct	cpm_action cpm_vecs[CPMVEC_NR];
 static	void	cpm_interrupt(int irq, void * dev, struct pt_regs * regs);
 static	void	cpm_error_interrupt(void *, struct pt_regs * regs);
+static	void	alloc_host_memory(void);
 
+#if 1
+void
+m8xx_cpm_reset()
+{
+	volatile immap_t	 *imp;
+	volatile cpm8xx_t	*commproc;
+	pte_t			*pte;
+
+	imp = (immap_t *)IMAP_ADDR;
+	commproc = (cpm8xx_t *)&imp->im_cpm;
+
+#ifdef CONFIG_UCODE_PATCH
+	/* Perform a reset.
+	*/
+	commproc->cp_cpcr = (CPM_CR_RST | CPM_CR_FLG);
+
+	/* Wait for it.
+	*/
+	while (commproc->cp_cpcr & CPM_CR_FLG);
+
+	cpm_load_patch(imp);
+#endif
+
+	/* Set SDMA Bus Request priority 5.
+	 * On 860T, this also enables FEC priority 6.  I am not sure
+	 * this is what we realy want for some applications, but the
+	 * manual recommends it.
+	 * Bit 25, FAM can also be set to use FEC aggressive mode (860T).
+	 */
+	imp->im_siu_conf.sc_sdcr = 1;
+
+	/* Reclaim the DP memory for our use.
+	*/
+	dp_alloc_base = CPM_DATAONLY_BASE;
+	dp_alloc_top = dp_alloc_base + CPM_DATAONLY_SIZE;
+
+	/* Tell everyone where the comm processor resides.
+	*/
+	cpmp = (cpm8xx_t *)commproc;
+}
+
+/* We used to do this earlier, but have to postpone as long as possible
+ * to ensure the kernel VM is now running.
+ */
+static void
+alloc_host_memory()
+{
+	uint	physaddr;
+
+	/* Set the host page for allocation.
+	*/
+	host_buffer = (uint)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &physaddr);
+	host_end = host_buffer + PAGE_SIZE;
+}
+#else
 void
 m8xx_cpm_reset(uint host_page_addr)
 {
@@ -111,6 +167,7 @@ m8xx_cpm_reset(uint host_page_addr)
 	*/
 	cpmp = (cpm8xx_t *)commproc;
 }
+#endif
 
 /* This is called during init_IRQ.  We used to do it above, but this
  * was too early since init_IRQ was not yet called.
@@ -222,6 +279,12 @@ m8xx_cpm_dpalloc(uint size)
 	return(retloc);
 }
 
+uint
+m8xx_cpm_dpalloc_index(void)
+{
+	return dp_alloc_base;
+}
+
 /* We also own one page of host buffer space for the allocation of
  * UART "fifos" and the like.
  */
@@ -229,6 +292,11 @@ uint
 m8xx_cpm_hostalloc(uint size)
 {
 	uint	retloc;
+
+#if 1
+	if (host_buffer == 0)
+		alloc_host_memory();
+#endif
 
 	if ((host_buffer + size) >= host_end)
 		return(0);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.vreset.c 1.11 07/25/01 18:13:07 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * vreset.c
@@ -29,7 +29,7 @@ extern int lines, cols;
 struct VaRegs;
 
 /*
- * VGA Register  
+ * VGA Register
  */
 struct VgaRegs
 {
@@ -108,51 +108,6 @@ struct VgaRegs GenVgaTextRegs[NREGS+1] = {
 	{ ENDMK }
 };
 
-struct VgaRegs S3TextRegs[NREGS+1] = {
-	/* port		index	value */
-	/* SR Regs */
-	{ 0x3c4,	0x1,	0x0 },
-	{ 0x3c4,	0x2,	0x3 },
-	{ 0x3c4,	0x3,	0x0 },
-	{ 0x3c4,	0x4,	0x2 },
-	/* CR Regs */
-	{ 0x3d4,	0x0,	0x5f },
-	{ 0x3d4,	0x1,	0x4f },
-	{ 0x3d4,	0x2,	0x50 },
-	{ 0x3d4,	0x3,	0x82 },
-	{ 0x3d4,	0x4,	0x55 },
-	{ 0x3d4,	0x5,	0x81 },
-	{ 0x3d4,	0x6,	0xbf },
-	{ 0x3d4,	0x7,	0x1f },
-	{ 0x3d4,	0x8,	0x00 },
-	{ 0x3d4,	0x9,	0x4f },
-	{ 0x3d4,	0xa,	0x0d },
-	{ 0x3d4,	0xb,	0x0e },
-	{ 0x3d4,	0xc,	0x00 },
-	{ 0x3d4,	0xd,	0x00 },
-	{ 0x3d4,	0xe,	0x00 },
-	{ 0x3d4,	0xf,	0x00 },
-	{ 0x3d4,	0x10,	0x9c },
-	{ 0x3d4,	0x11,	0x8e },
-	{ 0x3d4,	0x12,	0x8f },
-	{ 0x3d4,	0x13,	0x28 },
-	{ 0x3d4,	0x14,	0x1f },
-	{ 0x3d4,	0x15,	0x96 },
-	{ 0x3d4,	0x16,	0xb9 },
-	{ 0x3d4,	0x17,	0xa3 },
-	/* GR Regs */
-	{ 0x3ce,	0x0,	0x0 },
-	{ 0x3ce,	0x1,	0x0 },
-	{ 0x3ce,	0x2,	0x0 },
-	{ 0x3ce,	0x3,	0x0 },
-	{ 0x3ce,	0x4,	0x0 },
-	{ 0x3ce,	0x5,	0x10 },
-	{ 0x3ce,	0x6,	0xe },
-	{ 0x3ce,	0x7,	0x0 },
-	{ 0x3ce,	0x8,	0xff },
-	{ ENDMK }
-};
-
 struct RGBColors
 {
   unsigned char r, g, b;
@@ -161,9 +116,9 @@ struct RGBColors
 /*
  * Default console text mode color table.
  * These values were obtained by booting Linux with
- * text mode firmware & then dumping the registers.  
+ * text mode firmware & then dumping the registers.
  */
-struct RGBColors TextCLUT[256] = 
+struct RGBColors TextCLUT[256] =
 {
 	/* red	green	blue  */
 	{ 0x0,	0x0,	0x0 },
@@ -424,8 +379,8 @@ struct RGBColors TextCLUT[256] =
 };
 
 unsigned char AC[21] = {
-    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 
-    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07,
+    0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
     0x0C, 0x00, 0x0F, 0x08, 0x00};
 
 static int scanPCI(int start_slt);
@@ -443,20 +398,13 @@ outw(int port, unsigned short val)
 	outb(port, val >> 8);
 	outb(port+1, val);
 }
- 
-#define PPC_601 1
 
 int
 vga_init(unsigned char *ISA_mem)
 {
 	int slot;
 	struct VgaRegs *VgaTextRegs;
-#if 0
-	if ((_get_PVR()>>16) == PPC_601) {
-		return(old_vga_init(ISA_mem));
-	}
-#endif
-	
+
 	/* See if VGA already in TEXT mode - exit if so! */
 	outb(0x3CE, 0x06);
 	if ((inb(0x3CF) & 0x01) == 0){
@@ -470,20 +418,19 @@ vga_init(unsigned char *ISA_mem)
 	while((slot = scanPCI(slot)) > -1) { /* find video card in use  */
 		unlockVideo(slot);           /* enable I/O to card      */
 		VgaTextRegs = GenVgaTextRegs;
-	
+
 		switch (PCIVendor(slot)) {
 		default:
 			break;
 		case(S3Vendor):
 			unlockS3();
-			VgaTextRegs = S3TextRegs;
 			break;
-	
+
 		case(CirrusVendor):
 			outw(0x3C4, 0x0612);       /* unlock ext regs */
 			outw(0x3C4, 0x0700);       /* reset ext sequence mode */
 			break;
-	
+
 		case(ParadiseVendor):                 /* IBM Portable 850 */
 			outw(0x3ce, 0x0f05);      /* unlock pardise registers */
 			outw(0x3c4, 0x0648);
@@ -508,7 +455,7 @@ vga_init(unsigned char *ISA_mem)
 			}
 			outw(0x3d4, 0x34a0);
 			break;
-	
+
 	#if 0 /* Untested - probably doesn't work */
 		case(MatroxVendor):
 		case(DiamondVendor):
@@ -518,7 +465,7 @@ vga_init(unsigned char *ISA_mem)
 			mdelay(1000);
 	#endif
 		};
-	
+
 		outw(0x3C4, 0x0120);           /* disable video              */
 		setTextRegs(VgaTextRegs);      /* initial register setup     */
 		setTextCLUT(0);                /* load color lookup table    */
@@ -526,23 +473,23 @@ vga_init(unsigned char *ISA_mem)
 		setTextRegs(VgaTextRegs);      /* reload registers           */
 		outw(0x3C4, 0x0100);           /* re-enable video            */
 		clearVideoMemory();
-	
+
 		if (PCIVendor(slot) == S3Vendor) {
 			outb(0x3c2, 0x63);                  /* MISC */
 		} /* endif */
-	
+
 	#ifdef DEBUG
 		printslots();
 		mdelay(5000);
 	#endif
-	
+
 		mdelay(1000);	/* give time for the video monitor to come up */
         }
 	return (1);  /* 'CRT' I/O supported */
 }
 
 /*
- * Write to VGA Attribute registers.  
+ * Write to VGA Attribute registers.
  */
 void
 writeAttr(unsigned char index, unsigned char data, unsigned char videoOn)
@@ -563,18 +510,18 @@ setTextRegs(struct VgaRegs *svp)
 
 	/*
 	 *  saved settings
-	 */ 
+	 */
 	while( svp->io_port != ENDMK ) {
 		outb(svp->io_port,   svp->io_index);
 		outb(svp->io_port+1, svp->io_value);
-		svp++; 
+		svp++;
 	}
 
 	outb(0x3c2, 0x67);  /* MISC */
 	outb(0x3c6, 0xff);  /* MASK */
 
 	for ( i = 0; i < 0x10; i++)
-		writeAttr(i, AC[i], 0);  /* pallete */ 
+		writeAttr(i, AC[i], 0);  /* pallete */
 	writeAttr(0x10, 0x0c, 0);    /* text mode */
 	writeAttr(0x11, 0x00, 0);    /* overscan color (border) */
 	writeAttr(0x12, 0x0f, 0);    /* plane enable */
@@ -587,9 +534,9 @@ setTextCLUT(int shift)
 {
 	int i;
 
-	outb(0x3C6, 0xFF); 
+	outb(0x3C6, 0xFF);
 	i = inb(0x3C7);
-	outb(0x3C8, 0); 
+	outb(0x3C8, 0);
 	i = inb(0x3C7);
 
 	for ( i = 0; i < 256; i++) {
@@ -604,14 +551,14 @@ loadFont(unsigned char *ISA_mem)
 {
 	int i, j;
 	unsigned char *font_page = (unsigned char *) &ISA_mem[0xA0000];
-    
+
 	outb(0x3C2, 0x67);
-	/* 
-	 * Load font 
+	/*
+	 * Load font
 	 */
 	i = inb(0x3DA);  /* Reset Attr toggle */
 
-	outb(0x3C0,0x30); 
+	outb(0x3C0,0x30);
 	outb(0x3C0, 0x01);      /* graphics mode */
 
 	outw(0x3C4, 0x0001);    /* reset sequencer */
@@ -706,7 +653,7 @@ unlockS3(void)
 }
 
 /*
- * cursor() sets an offset (0-1999) into the 80x25 text area   
+ * cursor() sets an offset (0-1999) into the 80x25 text area.
  */
 void
 cursor(int x, int y)
@@ -737,14 +684,14 @@ clearVideoMemory(void)
 #define NPCIREGS  5
 
 
-/* 
- should use devfunc number/indirect method to be totally safe on 
- all machines, this works for now on 3 slot Moto boxes 
+/*
+ should use devfunc number/indirect method to be totally safe on
+ all machines, this works for now on 3 slot Moto boxes
 */
 
 struct PCI_ConfigInfo {
   unsigned long * config_addr;
-  unsigned long regs[NPCIREGS];  
+  unsigned long regs[NPCIREGS];
 } PCI_slots [NSLOTS] = {
 
     { (unsigned long *)0x80808000, 0xDEADBEEF },   /* onboard */
@@ -761,10 +708,10 @@ struct PCI_ConfigInfo {
 
 /*
  * The following code modifies the PCI Command register
- * to enable memory and I/O accesses.    
- */ 
+ * to enable memory and I/O accesses.
+ */
 void
-unlockVideo(int slot)        
+unlockVideo(int slot)
 {
        volatile unsigned char * ppci;
 
@@ -811,13 +758,13 @@ scanPCI(int start_slt)
 			pslot->regs[r] = SwapBytes ( pslot->config_addr[r] );
 		}
 		/* card in slot ? */
-		if ( pslot->regs[DEVID] != 0xFFFFFFFF ) {     
+		if ( pslot->regs[DEVID] != 0xFFFFFFFF ) {
 			/* VGA ? */
-			if ( ((pslot->regs[CLASS] & 0xFFFFFF00) == 0x03000000) || 
+			if ( ((pslot->regs[CLASS] & 0xFFFFFF00) == 0x03000000) ||
 			     ((pslot->regs[CLASS] & 0xFFFFFF00) == 0x00010000)) {
 				highVgaSlot = slt;
 				/* did firmware enable it ? */
-				if ( (pslot->regs[CMD] & 0x03) ) { 
+				if ( (pslot->regs[CMD] & 0x03) ) {
 					theSlot = slt;
 					break;
 				}
@@ -840,7 +787,7 @@ return (pslot->regs[DEVID] & 0xFFFF);
 
 #ifdef DEBUG
 static
-void printslots(void) 
+void printslots(void)
 {
 	int i;
 #if 0
@@ -853,7 +800,7 @@ void printslots(void)
 		       i, pslot->config_addr, pslot->regs[0], pslot->regs[2]);
 #else
 		puts("PCI Slot number: "); puthex(i);
-		puts(" Vendor ID: "); 
+		puts(" Vendor ID: ");
 		puthex(PCIVendor(i)); puts("\n");
 #endif
 	}

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uart.c 1.19 10/26/01 09:59:32 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  UART driver for MPC860 CPM SCC or SMC
@@ -49,9 +49,7 @@
 #endif
 
 #ifdef CONFIG_KGDB
-extern void breakpoint(void);
-extern void set_debug_traps(void);
-extern int  kgdb_output_string (const char* s, unsigned int count);
+#include <asm/kgdb.h>
 #endif
 
 #ifdef CONFIG_SERIAL_CONSOLE
@@ -135,6 +133,16 @@ static unsigned long break_pressed; /* break, really ... */
 #define NUM_IS_SCC	((int)0x00010000)
 #define PORT_NUM(P)	((P) & 0x0000ffff)
 
+/* The choice of serial port to use for KGDB.  If the system has
+ * two ports, you can use one for console and one for KGDB (which
+ * doesn't make sense to me, but people asked for it).
+ */
+#ifdef CONFIG_KGDB_TTYS1
+#define KGDB_SER_IDX 1		/* SCC2/SMC2 */
+#else
+#define KGDB_SER_IDX 0		/* SCC1/SMC1 */
+#endif
+
 /* Processors other than the 860 only get SMCs configured by default.
  * Either they don't have SCCs or they are allocated somewhere else.
  * Of course, there are now 860s without some SCCs, so we will need to
@@ -211,6 +219,12 @@ typedef struct serial_info {
 	cbd_t			*rx_cur;
 	cbd_t			*tx_bd_base;
 	cbd_t			*tx_cur;
+
+	/* Virtual addresses for the FIFOs because we can't __va() a
+	 * physical address anymore.
+	 */
+	 unsigned char		*rx_va_base;
+	 unsigned char		*tx_va_base;
 } ser_info_t;
 
 static struct console sercons = {
@@ -387,8 +401,15 @@ static _INLINE_ void receive_chars(ser_info_t *info, struct pt_regs *regs)
 		/* Get the number of characters and the buffer pointer.
 		*/
 		i = bdp->cbd_datlen;
-		cp = (unsigned char *)__va(bdp->cbd_bufaddr);
+		cp = info->rx_va_base + ((bdp - info->rx_bd_base) * RX_BUF_SIZE);
 		status = bdp->cbd_sc;
+#ifdef CONFIG_KGDB
+		if (info->state->smc_scc_num == KGDB_SER_IDX) {
+			if (*cp == 0x03 || *cp == '$')
+				breakpoint();
+			return;
+		}
+#endif
 
 		/* Check to see if there is room in the tty buffer for
 		 * the characters in our BD buffer.  If not, we exit
@@ -1027,6 +1048,7 @@ static void rs_8xx_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	ser_info_t *info = (ser_info_t *)tty->driver_data;
 	volatile cbd_t	*bdp;
+	unsigned char *cp;
 
 	if (serial_paranoia_check(info, tty->device, "rs_put_char"))
 		return;
@@ -1037,7 +1059,8 @@ static void rs_8xx_put_char(struct tty_struct *tty, unsigned char ch)
 	bdp = info->tx_cur;
 	while (bdp->cbd_sc & BD_SC_READY);
 
-	*((char *)__va(bdp->cbd_bufaddr)) = ch;
+	cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
+	*cp = ch;
 	bdp->cbd_datlen = 1;
 	bdp->cbd_sc |= BD_SC_READY;
 
@@ -1058,6 +1081,7 @@ static int rs_8xx_write(struct tty_struct * tty, int from_user,
 	int	c, ret = 0;
 	ser_info_t *info = (ser_info_t *)tty->driver_data;
 	volatile cbd_t *bdp;
+	unsigned char	*cp;
 
 #ifdef CONFIG_KGDB
         /* Try to let stub handle output. Returns true if it did. */ 
@@ -1084,14 +1108,15 @@ static int rs_8xx_write(struct tty_struct * tty, int from_user,
 			break;
 		}
 
+		cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
 		if (from_user) {
-			if (copy_from_user(__va(bdp->cbd_bufaddr), buf, c)) {
+			if (copy_from_user((void *)cp, buf, c)) {
 				if (!ret)
 					ret = -EFAULT;
 				break;
 			}
 		} else {
-			memcpy(__va(bdp->cbd_bufaddr), buf, c);
+			memcpy((void *)cp, buf, c);
 		}
 
 		bdp->cbd_datlen = c;
@@ -1166,6 +1191,7 @@ static void rs_8xx_flush_buffer(struct tty_struct *tty)
 static void rs_8xx_send_xchar(struct tty_struct *tty, char ch)
 {
 	volatile cbd_t	*bdp;
+	unsigned char	*cp;
 
 	ser_info_t *info = (ser_info_t *)tty->driver_data;
 
@@ -1175,7 +1201,8 @@ static void rs_8xx_send_xchar(struct tty_struct *tty, char ch)
 	bdp = info->tx_cur;
 	while (bdp->cbd_sc & BD_SC_READY);
 
-	*((char *)__va(bdp->cbd_bufaddr)) = ch;
+	cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
+	*cp = ch;
 	bdp->cbd_datlen = 1;
 	bdp->cbd_sc |= BD_SC_READY;
 
@@ -1800,7 +1827,7 @@ static void rs_8xx_wait_until_sent(struct tty_struct *tty, int timeout)
 		schedule_timeout(char_time);
 		if (signal_pending(current))
 			break;
-		if (timeout && ((orig_jiffies + timeout) < jiffies))
+		if (timeout && time_after(jiffies, orig_jiffies + timeout))
 			break;
 
 		/* The 'tx_cur' is really the next buffer to send.  We
@@ -2202,6 +2229,11 @@ static _INLINE_ void show_serial_version(void)
 
 #ifdef CONFIG_SERIAL_CONSOLE
 
+/* I need this just so I can store the virtual addresses and have
+ * common functions for the early console printing.
+ */
+static ser_info_t consinfo;
+
 /*
  * Print a string to the serial port trying not to disturb any possible
  * real use of the port...
@@ -2234,6 +2266,8 @@ static void my_console_write(int idx, const char *s,
 		/* Get the address of the host memory buffer.
 		 */
 		bdp = bdbase = (cbd_t *)&cpmp->cp_dpmem[up->smc_tbase];
+		
+		info = &consinfo;
 	}
 
 	/*
@@ -2261,7 +2295,7 @@ static void my_console_write(int idx, const char *s,
 		if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
 			cp = (u_char *)(bdp->cbd_bufaddr);
 		else
-			cp = __va(bdp->cbd_bufaddr);
+			cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
 		*cp = *s;
 		
 		bdp->cbd_datlen = 1;
@@ -2275,7 +2309,7 @@ static void my_console_write(int idx, const char *s,
 		/* if a LF, also do CR... */
 		if (*s == 10) {
 			while (bdp->cbd_sc & BD_SC_READY);
-			cp = __va(bdp->cbd_bufaddr);
+			cp = info->tx_va_base + ((bdp - info->tx_bd_base) * TX_BUF_SIZE);
 			*cp = 13;
 			bdp->cbd_datlen = 1;
 			bdp->cbd_sc |= BD_SC_READY;
@@ -2350,10 +2384,13 @@ static int my_console_wait_key(int idx, int xmon, char *obuf)
 	 * If the port has been initialized for general use, we must
 	 * use information from the port structure.
 	 */
-	if ((info = (ser_info_t *)ser->info))
+	if ((info = (ser_info_t *)ser->info)) {
 		bdp = info->rx_cur;
-	else
+	}
+	else {
 		bdp = (cbd_t *)&cpmp->cp_dpmem[up->smc_rbase];
+		info = &consinfo;
+	}
 
 	/*
 	 * We need to gracefully shut down the receiver, disable
@@ -2375,7 +2412,7 @@ static int my_console_wait_key(int idx, int xmon, char *obuf)
 	if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
 		cp = (u_char *)(bdp->cbd_bufaddr);
 	else
-		cp = __va(bdp->cbd_bufaddr);
+		cp = info->rx_va_base + ((bdp - info->rx_bd_base) * RX_BUF_SIZE);
 
 	if (obuf) {
 		i = c = bdp->cbd_datlen;
@@ -2418,7 +2455,7 @@ xmon_8xx_read_char(void)
 static char kgdb_buf[RX_BUF_SIZE], *kgdp;
 static int kgdb_chars;
 
-unsigned char
+char
 getDebugChar(void)
 {
 	if (kgdb_chars <= 0) {
@@ -2430,9 +2467,18 @@ getDebugChar(void)
 	return(*kgdp++);
 }
 
-void kgdb_interruptible(int state)
+void kgdb_interruptible(int yes)
 {
+	volatile smc_t	*smcp;
+
+	smcp = &cpmp->cp_smc[KGDB_SER_IDX];
+
+	if (yes == 1)
+		smcp->smc_smcm |= SMCM_RX;
+	else
+		smcp->smc_smcm &= ~SMCM_RX;
 }
+
 void kgdb_map_scc(void)
 {
 	struct		serial_state *ser;
@@ -2459,7 +2505,7 @@ void kgdb_map_scc(void)
 	/* Allocate space for an input FIFO, plus a few bytes for output.
 	 * Allocate bytes to maintain word alignment.
 	 */
-	mem_addr = (uint)(&cpmp->cp_dpmem[0x1000]);
+	mem_addr = (uint)(&cpmp->cp_dpmem[0xa00]);
 
 	/* Set the physical address of the host memory buffers in
 	 * the buffer descriptors.
@@ -2522,7 +2568,11 @@ int __init rs_8xx_init(void)
 	__clear_user(&serial_driver,sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
+#ifdef CONFIG_DEVFS_FS
+	serial_driver.name = "tts/%d";
+#else
 	serial_driver.name = "ttyS";
+#endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
 	serial_driver.num = NR_PORTS;
@@ -2560,7 +2610,11 @@ int __init rs_8xx_init(void)
 	 * major number and the subtype code.
 	 */
 	callout_driver = serial_driver;
+#ifdef CONFIG_DEVFS_FS
+	callout_driver.name = "cua/%d";
+#else
 	callout_driver.name = "cua";
+#endif
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 	callout_driver.read_proc = 0;
@@ -2672,6 +2726,7 @@ int __init rs_8xx_init(void)
 			/* Allocate space for FIFOs in the host memory.
 			*/
 			mem_addr = m8xx_cpm_hostalloc(RX_NUM_FIFO * RX_BUF_SIZE);
+			info->rx_va_base = (unsigned char *)mem_addr;
 
 			/* Set the physical address of the host memory
 			 * buffers in the buffer descriptors, and the
@@ -2681,12 +2736,12 @@ int __init rs_8xx_init(void)
 			info->rx_cur = info->rx_bd_base = (cbd_t *)bdp;
 
 			for (j=0; j<(RX_NUM_FIFO-1); j++) {
-				bdp->cbd_bufaddr = __pa(mem_addr);
+				bdp->cbd_bufaddr = iopa(mem_addr);
 				bdp->cbd_sc = BD_SC_EMPTY | BD_SC_INTRPT;
 				mem_addr += RX_BUF_SIZE;
 				bdp++;
 			}
-			bdp->cbd_bufaddr = __pa(mem_addr);
+			bdp->cbd_bufaddr = iopa(mem_addr);
 			bdp->cbd_sc = BD_SC_WRAP | BD_SC_EMPTY | BD_SC_INTRPT;
 
 			idx = PORT_NUM(info->state->smc_scc_num);
@@ -2706,6 +2761,7 @@ int __init rs_8xx_init(void)
 			/* Allocate space for FIFOs in the host memory.
 			*/
 			mem_addr = m8xx_cpm_hostalloc(TX_NUM_FIFO * TX_BUF_SIZE);
+			info->tx_va_base = (unsigned char *)mem_addr;
 
 			/* Set the physical address of the host memory
 			 * buffers in the buffer descriptors, and the
@@ -2715,12 +2771,12 @@ int __init rs_8xx_init(void)
 			info->tx_cur = info->tx_bd_base = (cbd_t *)bdp;
 
 			for (j=0; j<(TX_NUM_FIFO-1); j++) {
-				bdp->cbd_bufaddr = __pa(mem_addr);
+				bdp->cbd_bufaddr = iopa(mem_addr);
 				bdp->cbd_sc = BD_SC_INTRPT;
 				mem_addr += TX_BUF_SIZE;
 				bdp++;
 			}
-			bdp->cbd_bufaddr = __pa(mem_addr);
+			bdp->cbd_bufaddr = iopa(mem_addr);
 			bdp->cbd_sc = (BD_SC_WRAP | BD_SC_INTRPT);
 
 			if (info->state->smc_scc_num & NUM_IS_SCC) {
@@ -2926,20 +2982,28 @@ static int __init serial_console_setup(struct console *co, char *options)
 	 * from dual port ram, and a character buffer area from host mem.
 	 */
 
+	/* Allocate space for two FIFOs.  We can't allocate from host
+	 * memory yet because vm allocator isn't initialized
+	 * during this early console init.
+	 */
+	dp_addr = m8xx_cpm_dpalloc(8);
+	mem_addr = (uint)(&cpmp->cp_dpmem[dp_addr]);
+
 	/* Allocate space for two buffer descriptors in the DP ram.
 	*/
 	dp_addr = m8xx_cpm_dpalloc(sizeof(cbd_t) * 2);
-
-	/* Allocate space for two 2 byte FIFOs in the host memory.
-	*/
-	mem_addr = m8xx_cpm_hostalloc(8);
 
 	/* Set the physical address of the host memory buffers in
 	 * the buffer descriptors.
 	 */
 	bdp = (cbd_t *)&cp->cp_dpmem[dp_addr];
-	bdp->cbd_bufaddr = __pa(mem_addr);
-	(bdp+1)->cbd_bufaddr = __pa(mem_addr+4);
+	bdp->cbd_bufaddr = iopa(mem_addr);
+	(bdp+1)->cbd_bufaddr = iopa(mem_addr+4);
+
+	consinfo.rx_va_base = mem_addr;
+	consinfo.rx_bd_base = bdp;
+	consinfo.tx_va_base = mem_addr + 4;
+	consinfo.tx_bd_base = bdp+1;
 
 	/* For the receive, set empty and wrap.
 	 * For transmit, set wrap.
@@ -3044,3 +3108,18 @@ static int __init serial_console_setup(struct console *co, char *options)
 	return 0;
 }
 
+#ifdef CONFIG_INPUT_KEYBDEV
+
+void handle_scancode(unsigned char scancode, int down)
+{
+  printk("handle_scancode(scancode=0x%x, down=%d)\n", scancode, down);
+}
+
+static void kbd_bh(unsigned long dummy)
+{
+}
+
+DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
+void (*kbd_ledfunc)(unsigned int led);
+
+#endif

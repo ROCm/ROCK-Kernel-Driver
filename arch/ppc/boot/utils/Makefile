@@ -10,7 +10,8 @@ HOSTCFLAGS += -I$(TOPDIR)/arch/$(ARCH)/boot/include
 all: dummy
 
 # Simple programs with 1 file and no extra CFLAGS
-UTILS = addnote hack-coff mkprep mksimage mknote piggyback mkpmon mkbugboot
+UTILS = addnote hack-coff mkprep mknote mkbugboot mktree \
+	addSystemMap addRamdDisk
 
 $(UTILS):
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $@.c

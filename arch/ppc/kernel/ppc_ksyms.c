@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.59 11/04/01 22:58:20 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -12,18 +12,17 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
 #include <linux/nvram.h>
-#include <linux/spinlock.h>
 #include <linux/console.h>
 #include <linux/irq.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/ide.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <linux/ide.h>
 #include <asm/ide.h>
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -36,7 +35,7 @@
 #include <asm/system.h>
 #include <asm/pci-bridge.h>
 #include <asm/irq.h>
-#include <asm/feature.h>
+#include <asm/pmac_feature.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/hw_irq.h>
@@ -60,7 +59,7 @@
 
 extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
 extern void transfer_to_handler(void);
-extern void syscall_trace(void);
+extern void do_syscall_trace(void);
 extern void do_IRQ(struct pt_regs *regs);
 extern void MachineCheckException(struct pt_regs *regs);
 extern void AlignmentException(struct pt_regs *regs);
@@ -82,7 +81,7 @@ extern unsigned long mm_ptov (unsigned long paddr);
 
 EXPORT_SYMBOL(clear_page);
 EXPORT_SYMBOL(do_signal);
-EXPORT_SYMBOL(syscall_trace);
+EXPORT_SYMBOL(do_syscall_trace);
 EXPORT_SYMBOL(transfer_to_handler);
 EXPORT_SYMBOL(do_IRQ);
 EXPORT_SYMBOL(MachineCheckException);
@@ -161,14 +160,18 @@ EXPORT_SYMBOL(_insw_ns);
 EXPORT_SYMBOL(_outsw_ns);
 EXPORT_SYMBOL(_insl_ns);
 EXPORT_SYMBOL(_outsl_ns);
+EXPORT_SYMBOL(iopa);
+EXPORT_SYMBOL(mm_ptov);
+#ifndef CONFIG_PPC_ISERIES
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
-EXPORT_SYMBOL(iopa);
-EXPORT_SYMBOL(mm_ptov);
+#endif
 
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 EXPORT_SYMBOL(ppc_ide_md);
 EXPORT_SYMBOL(ppc_generic_ide_fix_driveid);
+#endif
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL_NOVERS(isa_io_base);
@@ -176,19 +179,32 @@ EXPORT_SYMBOL_NOVERS(isa_mem_base);
 EXPORT_SYMBOL_NOVERS(pci_dram_offset);
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
+EXPORT_SYMBOL(pci_bus_io_base);
+EXPORT_SYMBOL(pci_bus_io_base_phys);
+EXPORT_SYMBOL(pci_bus_mem_base_phys);
+EXPORT_SYMBOL(pci_bus_to_hose);
+EXPORT_SYMBOL(pci_resource_to_bus);
+EXPORT_SYMBOL(pci_phys_to_bus);
+EXPORT_SYMBOL(pci_bus_to_phys);
 #endif /* CONFIG_PCI */
+
+#ifdef CONFIG_NOT_COHERENT_CACHE
+EXPORT_SYMBOL(consistent_alloc);
+EXPORT_SYMBOL(consistent_free);
+EXPORT_SYMBOL(consistent_sync);
+#endif
 
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
 
-/*EXPORT_SYMBOL(__restore_flags);*/
-/*EXPORT_SYMBOL(_disable_interrupts);
-  EXPORT_SYMBOL(_enable_interrupts);*/
 EXPORT_SYMBOL(flush_instruction_cache);
 EXPORT_SYMBOL(giveup_fpu);
 EXPORT_SYMBOL(enable_kernel_fp);
 EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_dcache_range);
+EXPORT_SYMBOL(flush_icache_user_range);
+EXPORT_SYMBOL(flush_icache_page);
+EXPORT_SYMBOL(flush_dcache_page);
 EXPORT_SYMBOL(xchg_u32);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
@@ -196,7 +212,6 @@ EXPORT_SYMBOL(giveup_altivec);
 #endif /* CONFIG_ALTIVEC */
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(global_irq_lock);
-EXPORT_SYMBOL(global_irq_count);
 EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
@@ -247,26 +262,11 @@ EXPORT_SYMBOL(device_is_compatible);
 EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
-EXPORT_SYMBOL(pci_bus_io_base);
-EXPORT_SYMBOL(pci_bus_io_base_phys);
-EXPORT_SYMBOL(pci_bus_mem_base_phys);
+EXPORT_SYMBOL(request_OF_resource);
+EXPORT_SYMBOL(release_OF_resource);
 EXPORT_SYMBOL(pci_device_to_OF_node);
 EXPORT_SYMBOL(pci_device_from_OF_node);
-EXPORT_SYMBOL(pci_bus_to_hose);
-EXPORT_SYMBOL(pci_resource_to_bus);
-EXPORT_SYMBOL(pci_phys_to_bus);
-EXPORT_SYMBOL(pci_bus_to_phys);
 EXPORT_SYMBOL(pmac_newworld);
-EXPORT_SYMBOL(feature_set);
-EXPORT_SYMBOL(feature_clear);
-EXPORT_SYMBOL(feature_test);
-EXPORT_SYMBOL(feature_set_gmac_power);
-EXPORT_SYMBOL(feature_gmac_phy_reset);
-EXPORT_SYMBOL(feature_set_usb_power);
-EXPORT_SYMBOL(feature_set_firewire_power);
-EXPORT_SYMBOL(feature_set_firewire_cable_power);
-EXPORT_SYMBOL(feature_set_modem_power);
-EXPORT_SYMBOL(feature_set_airport_power);
 #endif /* defined(CONFIG_ALL_PPC) */
 #if defined(CONFIG_BOOTX_TEXT)
 EXPORT_SYMBOL(btext_update_display);
@@ -293,14 +293,16 @@ EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(memmove);
 EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(memcmp);
+EXPORT_SYMBOL_NOVERS(memchr);
 
 EXPORT_SYMBOL(abs);
 
-#ifdef CONFIG_VGA_CONSOLE
+#if defined(CONFIG_FB_VGA16_MODULE)
 EXPORT_SYMBOL(screen_info);
 #endif
 
 EXPORT_SYMBOL(__delay);
+#ifndef INLINE_IRQS
 EXPORT_SYMBOL(__sti);
 EXPORT_SYMBOL(__sti_end);
 EXPORT_SYMBOL(__cli);
@@ -309,6 +311,7 @@ EXPORT_SYMBOL(__save_flags_ptr);
 EXPORT_SYMBOL(__save_flags_ptr_end);
 EXPORT_SYMBOL(__restore_flags);
 EXPORT_SYMBOL(__restore_flags_end);
+#endif
 EXPORT_SYMBOL(timer_interrupt_intercept);
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(do_IRQ_intercept);
@@ -319,7 +322,9 @@ EXPORT_SYMBOL(tb_ticks_per_jiffy);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
 #ifdef CONFIG_XMON
+extern void xmon_printf(char *fmt, ...);
 EXPORT_SYMBOL(xmon);
+EXPORT_SYMBOL(xmon_printf);
 #endif
 EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(__down);
@@ -343,10 +348,12 @@ EXPORT_SYMBOL(debugger_fault_handler);
 
 #ifdef  CONFIG_8xx
 EXPORT_SYMBOL(__res);
-EXPORT_SYMBOL(request_8xxirq);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
+#if defined(CONFIG_8xx) || defined(CONFIG_8260)
+EXPORT_SYMBOL(request_8xxirq);
+#endif
 
 EXPORT_SYMBOL(ret_to_user_hook);
 EXPORT_SYMBOL(next_mmu_context);
@@ -361,3 +368,7 @@ EXPORT_SYMBOL(intercept_table);
 extern long *ret_from_intercept;
 EXPORT_SYMBOL(ret_from_intercept);
 EXPORT_SYMBOL(cur_cpu_spec);
+#if defined(CONFIG_ALL_PPC)
+extern unsigned long agp_special_page;
+EXPORT_SYMBOL_NOVERS(agp_special_page);
+#endif /* defined(CONFIG_ALL_PPC) */
