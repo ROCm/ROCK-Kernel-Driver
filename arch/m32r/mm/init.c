@@ -9,8 +9,6 @@
  *      Copyright (C) 1995  Linus Torvalds
  */
 
-/* $Id$ */
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -19,6 +17,7 @@
 #include <linux/swap.h>
 #include <linux/highmem.h>
 #include <linux/bitops.h>
+#include <linux/nodemask.h>
 #include <asm/types.h>
 #include <asm/processor.h>
 #include <asm/page.h>
