@@ -696,7 +696,7 @@ static int __init alsa_card_sb16_setup(char *str)
 		isapnp[nr_dev] = pnp;
 #endif
 #ifdef CONFIG_SND_SB16_CSP
-	if (csp != INT_MAX)
+	if (xcsp != INT_MAX)
 		csp[nr_dev] = xcsp;
 #endif
 	nr_dev++;

@@ -76,7 +76,7 @@ struct usb_mixer_elem_info {
 	snd_usb_audio_t *chip;
 	unsigned int ctrlif;
 	unsigned int id;
-	unsigned int control;
+	unsigned int control;	/* CS or ICN (high byte) */
 	unsigned int cmask; /* channel mask bitmap: 0 = master */ 
 	int channels;
 	int val_type;
@@ -252,6 +252,8 @@ static int convert_bytes_value(usb_mixer_elem_info_t *cval, int val)
 
 static int get_relative_value(usb_mixer_elem_info_t *cval, int val)
 {
+	if (! cval->res)
+		cval->res = 1;
 	if (val < cval->min)
 		return 0;
 	else if (val > cval->max)
@@ -264,6 +266,8 @@ static int get_abs_value(usb_mixer_elem_info_t *cval, int val)
 {
 	if (val < 0)
 		return cval->min;
+	if (! cval->res)
+		cval->res = 1;
 	val *= cval->res;
 	val += cval->min;
 	if (val > cval->max)
@@ -1003,7 +1007,7 @@ static int mixer_ctl_procunit_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
 	int err, val;
 
-	err = get_cur_ctl_value(cval, cval->control, &val);
+	err = get_cur_ctl_value(cval, cval->control << 8, &val);
 #ifdef IGNORE_CTL_ERROR
 	if (err < 0) {
 		ucontrol->value.integer.value[0] = cval->min;
@@ -1023,7 +1027,7 @@ static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
 	int val, oval, err;
 
-	err = get_cur_ctl_value(cval, cval->control, &oval);
+	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
 #ifdef IGNORE_CTL_ERROR
 	if (err < 0)
 		return 0;
@@ -1033,7 +1037,7 @@ static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	val = ucontrol->value.integer.value[0];
 	val = get_abs_value(cval, val);
 	if (val != oval) {
-		set_cur_ctl_value(cval, cval->control, val);
+		set_cur_ctl_value(cval, cval->control << 8, val);
 		return 1;
 	}
 	return 0;
@@ -1347,6 +1351,7 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 	cval->channels = 1;
 	cval->min = 1;
 	cval->max = num_ins;
+	cval->res = 1;
 	cval->initialized = 1;
 
 	namelist = kmalloc(sizeof(char *) * num_ins, GFP_KERNEL);

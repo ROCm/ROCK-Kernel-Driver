@@ -39,9 +39,9 @@ struct usbmix_ctl_map {
 /*
  * Topology of SB Extigy (see on the wide screen :)
 
-USB_IN[1] --->FU[2]------------------------------+->MU[16]-->PE[17]-+->FU[18]--+->EU[27]--+->EU[21]-->FU[22]--+->FU[23] > Dig_OUT[24]
+USB_IN[1] --->FU[2]------------------------------+->MU[16]-->PU[17]-+->FU[18]--+->EU[27]--+->EU[21]-->FU[22]--+->FU[23] > Dig_OUT[24]
                                                  ^                  |          |          |                   |
-USB_IN[3] -+->SU[5]-->FU[6]--+->MU[14] ->PE[15]->+                  |          |          |                   +->FU[25] > Dig_OUT[26]
+USB_IN[3] -+->SU[5]-->FU[6]--+->MU[14] ->PU[15]->+                  |          |          |                   +->FU[25] > Dig_OUT[26]
            ^                 ^                   |                  |          |          |
 Dig_IN[4] -+                 |                   |                  |          |          +->FU[28]---------------------> Spk_OUT[19]
                              |                   |                  |          |
@@ -69,9 +69,9 @@ static struct usbmix_name_map extigy_map[] = {
 	{ 12, "Capture" }, /* FU */
 	/* 13: OT pcm capture */
 	/* 14: MU (w/o controls) */
-	/* 15: PE (3D enh) */
+	/* 15: PU (3D enh) */
 	/* 16: MU (w/o controls) */
-	/* 17: PE (updown) */		/* FIXME: what control? */
+	/* 17: PU (updown) */		/* FIXME: what control? */
 	{ 18, "Tone Control - Bass", USB_FEATURE_BASS }, /* FU */
 	{ 18, "Tone Control - Treble", USB_FEATURE_TREBLE }, /* FU */
 	{ 18, "Master Playback" }, /* FU; others */

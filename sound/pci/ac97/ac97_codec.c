@@ -1317,7 +1317,7 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	/* build master tone controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER_TONE)) {
 		for (idx = 0; idx < 2; idx++) {
-			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_tone[idx], ac97))) < 0)
+			if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_tone[idx], ac97))) < 0)
 				return err;
 			if (ac97->id == AC97_ID_YMF753) {
 				kctl->private_value &= ~(0xff << 16);

@@ -1514,6 +1514,8 @@ static int snd_ensoniq_control_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	return 0;
 }
 
+#ifdef CHIP1370
+
 static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
@@ -1531,8 +1533,6 @@ static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	return change;
 }
-
-#ifdef CHIP1370
 
 #define ES1370_CONTROLS 2
 
