@@ -55,14 +55,14 @@ static int __devinit serial_card_probe(struct expansion_card *ec, const struct e
 	unsigned long cardaddr, address;
 	int port;
 
-	ecard_claim (ec);
-
 	info = kmalloc(sizeof(struct serial_card_info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
 	memset(info, 0, sizeof(struct serial_card_info));
 	info->num_ports = type->num_ports;
+
+	ecard_set_drvdata(ec, info);
 
 	cardaddr = ecard_address(ec, type->type, type->speed);
 
@@ -98,8 +98,6 @@ static void __devexit serial_card_remove(struct expansion_card *ec)
 	}
 
 	kfree(info);
-
-	ecard_release(ec);
 }
 
 static struct serial_card_type atomwide_type = {

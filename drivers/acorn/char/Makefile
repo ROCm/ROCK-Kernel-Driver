@@ -2,7 +2,6 @@
 # Makefile for the acorn character device drivers.
 #
 
-# All the objects that export symbols.
 obj-arc		:= keyb_arc.o defkeymap-acorn.o
 
 obj-$(CONFIG_ARCH_ACORN)	+= i2c.o pcf8583.o

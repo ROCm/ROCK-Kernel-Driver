@@ -44,8 +44,6 @@
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
-#include <linux/unistd.h>
-#include <linux/stat.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 
