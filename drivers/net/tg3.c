@@ -6370,6 +6370,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			(0x7 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
 			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
 			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
+		/* XXX 5705 note: set MIN_DMA to zero here */
 	} else {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
 			tp->dma_rwctrl =
@@ -6387,12 +6388,19 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 				(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
 
 		/* Wheee, some more chip bugs... */
-		if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A2 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A3 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
-			tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			u32 ccval = (tr32(TG3PCI_CLOCK_CTRL) & 0x1f);
+
+			if (ccval == 0x6 || ccval == 0x7)
+				tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
+		}
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
+				    << DMA_RWCTRL_MIN_DMA_SHIFT);
 
 	/* We don't do this on x86 because it seems to hurt performace.
 	 * It does help things on other platforms though.
