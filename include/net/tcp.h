@@ -1468,7 +1468,7 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 		  tcp_minshall_check(tp))));
 }
 
-extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int, unsigned int);
+extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int);
 
 /* This checks if the data bearing packet SKB (usually sk->sk_send_head)
  * should be put on the wire right now.
@@ -1479,7 +1479,7 @@ static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 	int pkts = TCP_SKB_CB(skb)->tso_factor;
 
 	if (!pkts) {
-		tcp_set_skb_tso_factor(skb, cur_mss, tp->mss_cache_std);
+		tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 		pkts = TCP_SKB_CB(skb)->tso_factor;
 	}
 
