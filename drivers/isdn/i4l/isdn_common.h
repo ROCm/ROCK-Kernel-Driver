@@ -60,7 +60,6 @@ extern void isdn_unlock_drivers(void);
 extern void isdn_free_channel(int di, int ch, int usage);
 extern void isdn_info_update(void);
 extern char *isdn_map_eaz2msn(char *msn, int di);
-extern void isdn_timer_ctrl(int tf, int onoff);
 extern int isdn_getnum(char **);
 extern int isdn_msncmp( const char *,  const char *);
 #if defined(ISDN_DEBUG_NET_DUMP) || defined(ISDN_DEBUG_MODEM_DUMP)

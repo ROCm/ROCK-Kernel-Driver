@@ -506,7 +506,7 @@ isdn_audio_goertzel(int *sample, modem_info * info)
 		    ((sk2 * sk2) >> AMP_BITS);
 	}
 	skb_queue_tail(&info->dtmf_queue, skb);
-	isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
+	mod_timer(&info->read_timer, jiffies + 4);
 }
 
 void
@@ -565,7 +565,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			restore_flags(flags);
 			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
-				isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
+				mod_timer(&info->read_timer, jiffies + 4);
 		} else
 			kfree_skb(skb);
 		s->last = what;
@@ -680,7 +680,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
-		isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
+		mod_timer(&info->read_timer, jiffies + 4);
 }
 
 void

@@ -1153,43 +1153,6 @@ isdn_dc2minor(int di, int ch)
 	return -1;
 }
 
-static void
-isdn_timer_funct(ulong dummy)
-{
-	int tf = dev->tflags;
-	if (tf & ISDN_TIMER_FAST) {
-		if (tf & ISDN_TIMER_MODEMREAD)
-			isdn_tty_readmodem();
-	}
-	if (tf) 
-	{
-		unsigned long flags;
-
-		save_flags(flags);
-		cli();
-		mod_timer(&dev->timer, jiffies+ISDN_TIMER_RES);
-		restore_flags(flags);
-	}
-}
-
-void
-isdn_timer_ctrl(int tf, int onoff)
-{
-	unsigned long flags;
-	int old_tflags;
-
-	save_flags(flags);
-	cli();
-	old_tflags = dev->tflags;
-	if (onoff)
-		dev->tflags |= tf;
-	else
-		dev->tflags &= ~tf;
-	if (dev->tflags && !old_tflags)
-		mod_timer(&dev->timer, jiffies+ISDN_TIMER_RES);
-	restore_flags(flags);
-}
-
 static int
 __drv_command(struct isdn_driver *drv, isdn_ctrl *c)
 {
@@ -2366,8 +2329,6 @@ static int __init isdn_init(void)
 		goto err_drv_fsm;
 	}
 	memset(dev, 0, sizeof(*dev));
-	init_timer(&dev->timer);
-	dev->timer.function = isdn_timer_funct;
 	init_MUTEX(&dev->sem);
 	init_waitqueue_head(&dev->info_waitq);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
@@ -2435,7 +2396,6 @@ static void __exit isdn_exit(void)
 	isdn_tty_exit();
 	unregister_chrdev(ISDN_MAJOR, "isdn");
 	isdn_cleanup_devfs();
-	del_timer_sync(&dev->timer);
 	vfree(dev);
 	fsm_free(&drv_fsm);
 	fsm_free(&slot_fsm);

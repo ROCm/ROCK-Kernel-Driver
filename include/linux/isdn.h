@@ -235,11 +235,6 @@ typedef struct {
 #define USG_MODEMORVOICE(x) (((x & ISDN_USAGE_MASK)==ISDN_USAGE_MODEM) || \
                              ((x & ISDN_USAGE_MASK)==ISDN_USAGE_VOICE)     )
 
-/* Timer-delays and scheduling-flags */
-#define ISDN_TIMER_RES         4                         /* Main Timer-Resolution   */
-#define ISDN_TIMER_MODEMREAD   1
-#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD)
-
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
 
@@ -355,6 +350,7 @@ typedef struct modem_info {
   struct timer_list     escape_timer;    /* to recognize +++ escape        */
   struct timer_list     ring_timer;      /* for writing 'RING' responses   */
   struct timer_list     connect_timer;   /* waiting for CONNECT            */
+  struct timer_list     read_timer;      /* read incoming data             */
   struct termios	normal_termios;  /* For saving termios structs     */
   struct termios	callout_termios;
   wait_queue_head_t	open_wait, close_wait;
@@ -409,7 +405,6 @@ typedef struct isdn_devt {
 	int               global_flags;
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
-	struct timer_list timer;		       /* Misc.-function Timer       */
 	struct task_struct *profd;                   /* For iprofd                 */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;

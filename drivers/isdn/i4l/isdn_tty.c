@@ -229,61 +229,53 @@ isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
  * It tries getting received data from the receive queue an stuff it into
  * the tty's flip-buffer.
  */
-void
-isdn_tty_readmodem(void)
+static void
+isdn_tty_readmodem(unsigned long data)
 {
-	int resched = 0;
-	int midx;
-	int i;
+	struct modem_info *info = (struct modem_info *) data;
 	int c;
 	int r;
 	ulong flags;
 	struct tty_struct *tty;
-	modem_info *info;
 
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		if ((midx = isdn_slot_m_idx(i)) >= 0) {
-			info = &isdn_mdm.info[midx];
-			if (info->online) {
-				r = 0;
+	if (!info->online)
+		return;
+
+	r = 0;
 #ifdef CONFIG_ISDN_AUDIO
-				isdn_audio_eval_dtmf(info);
-				if ((info->vonline & 1) && (info->emu.vpar[1]))
-					isdn_audio_eval_silence(info);
+	isdn_audio_eval_dtmf(info);
+	if ((info->vonline & 1) && (info->emu.vpar[1]))
+		isdn_audio_eval_silence(info);
 #endif
-				if ((tty = info->tty)) {
-					if (info->mcr & UART_MCR_RTS) {
-						c = TTY_FLIPBUF_SIZE - tty->flip.count;
-						if (c > 0) {
-							save_flags(flags);
-							cli();
-							r = isdn_tty_readbchan(info,
-									   tty->flip.char_buf_ptr,
-									   tty->flip.flag_buf_ptr, c);
-							/* CISCO AsyncPPP Hack */
-							if (!(info->emu.mdmreg[REG_CPPP] & BIT_CPPP))
-								memset(tty->flip.flag_buf_ptr, 0, r);
-							tty->flip.count += r;
-							tty->flip.flag_buf_ptr += r;
-							tty->flip.char_buf_ptr += r;
-							if (r)
-								schedule_delayed_work(&tty->flip.work, 1);
-							restore_flags(flags);
-						}
-					} else
-						r = 1;
-				} else
-					r = 1;
-				if (r) {
-					info->rcvsched = 0;
-					resched = 1;
-				} else
-					info->rcvsched = 1;
+	if ((tty = info->tty)) {
+		if (info->mcr & UART_MCR_RTS) {
+			c = TTY_FLIPBUF_SIZE - tty->flip.count;
+			if (c > 0) {
+				save_flags(flags);
+				cli();
+				r = isdn_tty_readbchan(info,
+						       tty->flip.char_buf_ptr,
+						       tty->flip.flag_buf_ptr, c);
+				/* CISCO AsyncPPP Hack */
+				if (!(info->emu.mdmreg[REG_CPPP] & BIT_CPPP))
+					memset(tty->flip.flag_buf_ptr, 0, r);
+				tty->flip.count += r;
+				tty->flip.flag_buf_ptr += r;
+				tty->flip.char_buf_ptr += r;
+				if (r)
+					schedule_delayed_work(&tty->flip.work, 1);
+				restore_flags(flags);
 			}
-		}
-	}
-	if (!resched)
-		isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 0);
+		} else
+			r = 1;
+	} else
+		r = 1;
+
+	if (r) {
+		info->rcvsched = 0;
+		mod_timer(&info->read_timer, jiffies + 4);
+	} else
+		info->rcvsched = 1;
 }
 
 static int
@@ -393,8 +385,8 @@ isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb)
 			    );
 	restore_flags(flags);
 	/* Schedule dequeuing */
-	if ((dev->modempoll) && (info->rcvsched))
-		isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
+	if (dev->modempoll && info->rcvsched)
+		mod_timer(&info->read_timer, jiffies + 4);
 	return 1;
 }
 
@@ -2138,6 +2130,9 @@ isdn_tty_init(void)
 		init_timer(&info->connect_timer);
 		info->connect_timer.data = (unsigned long) info;
 		info->connect_timer.function = isdn_tty_connect_timer;
+		init_timer(&info->read_timer);
+		info->read_timer.data = (unsigned long) info;
+		info->read_timer.function = isdn_tty_readmodem;
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -2570,9 +2565,8 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 		isdn_tty_queue_tail(info, skb, skb->len);
 		restore_flags(flags);
 		/* Schedule dequeuing */
-		if ((dev->modempoll) && (info->rcvsched))
-			isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
-
+		if (dev->modempoll && info->rcvsched)
+			mod_timer(&info->read_timer, jiffies + 4);
 	} else {
 		restore_flags(flags);
 		schedule_delayed_work(&tty->flip.work, 1);

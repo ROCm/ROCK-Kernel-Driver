@@ -99,7 +99,6 @@
 	 (info->emu.mdmreg[REG_L3PROT] == ISDN_PROTO_L3_FCLASS2))
 
 extern int isdn_tty_init(void);
-extern void isdn_tty_readmodem(void);
 extern int isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup);
 extern void isdn_tty_cleanup_xmit(modem_info *);
 extern int isdn_tty_capi_facility(capi_msg *cm); 
