@@ -1,6 +1,7 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/seq_file.h>
+#include <asm/elf.h>
 #include <asm/uaccess.h>
 
 char *task_mem(struct mm_struct *mm, char *buffer)
@@ -75,6 +76,23 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 	return size;
 }
 
+#ifdef AT_SYSINFO_EHDR
+
+char gate_dso_path[256] = "";
+static struct vm_area_struct gate_vmarea = {
+	/* Do _not_ mark this area as readable, cuz not the entire range may be readable
+	   (e.g., due to execute-only pages or holes) and the tools that read
+	   /proc/PID/maps should read the interesting bits from the gate-DSO file
+	   instead.  */
+	.vm_start = FIXADDR_USER_START,
+	.vm_end = FIXADDR_USER_END
+};
+
+# define gate_map()	&gate_vmarea
+#else
+# define gate_map()	NULL
+#endif
+
 static int show_map(struct seq_file *m, void *v)
 {
 	struct vm_area_struct *map = v;
@@ -100,12 +118,15 @@ static int show_map(struct seq_file *m, void *v)
 			map->vm_pgoff << PAGE_SHIFT,
 			MAJOR(dev), MINOR(dev), ino, &len);
 
-	if (map->vm_file) {
+	if (map->vm_file || map == gate_map()) {
 		len = 25 + sizeof(void*) * 6 - len;
 		if (len < 1)
 			len = 1;
 		seq_printf(m, "%*c", len, ' ');
-		seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
+		if (map == gate_map())
+			seq_printf (m, "%s", gate_dso_path);
+		else
+			seq_path(m, file->f_vfsmnt, file->f_dentry, " \t\n\\");
 	}
 	seq_putc(m, '\n');
 	return 0;
@@ -128,6 +149,8 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 	if (!map) {
 		up_read(&mm->mmap_sem);
 		mmput(mm);
+		if (l == -1)
+			map = gate_map();
 	}
 	return map;
 }
@@ -135,7 +158,7 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 static void m_stop(struct seq_file *m, void *v)
 {
 	struct vm_area_struct *map = v;
-	if (map) {
+	if (map && map != gate_map()) {
 		struct mm_struct *mm = map->vm_mm;
 		up_read(&mm->mmap_sem);
 		mmput(mm);
@@ -149,6 +172,8 @@ static void *m_next(struct seq_file *m, void *v, loff_t *pos)
 	if (map->vm_next)
 		return map->vm_next;
 	m_stop(m, v);
+	if (map != gate_map())
+		return gate_map();
 	return NULL;
 }
 

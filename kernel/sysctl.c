@@ -37,6 +37,7 @@
 #include <linux/hugetlb.h>
 #include <linux/security.h>
 #include <linux/initrd.h>
+#include <asm/elf.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS
@@ -69,6 +70,9 @@ extern int min_free_kbytes;
 static int maxolduid = 65535;
 static int minolduid;
 
+#ifdef AT_SYSINFO_EHDR
+extern char gate_dso_path[];
+#endif
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
 #endif
@@ -399,6 +403,17 @@ static ctl_table kern_table[] = {
 		.strategy	= &sysctl_string,
 	},
 #endif
+#ifdef AT_SYSINFO_EHDR
+	{
+		.ctl_name	= KERN_GATE_DSO,
+		.procname	= "gate_dso",
+		.data		= &gate_dso_path,
+		.maxlen		= 256,
+		.mode		= 0644,
+		.proc_handler	= &proc_dostring,
+		.strategy	= &sysctl_string,
+	},
+#endif
 #ifdef CONFIG_CHR_DEV_SG
 	{
 		.ctl_name	= KERN_SG_BIG_BUFF,
@@ -583,16 +598,6 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_SMP
-	{
-		.ctl_name	= KERN_CACHEDECAYTICKS,
-		.procname	= "cache_decay_ticks",
-		.data		= &cache_decay_ticks,
-		.maxlen		= sizeof(cache_decay_ticks),
-		.mode		= 0644,
-		.proc_handler	= &proc_doulongvec_minmax,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 

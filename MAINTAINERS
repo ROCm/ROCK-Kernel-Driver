@@ -929,8 +929,9 @@ W:	http://www.linuxia64.org/
 S:	Maintained
 
 SN-IA64 (Itanium) SUB-PLATFORM
-P:	John Hesterberg
-M:	jh@sgi.com
+P:	Jesse Barnes
+M:	jbarnes@sgi.com
+L:	linux-altix@sgi.com
 L:	linux-ia64@linuxia64.org
 W:	http://www.sgi.com/altix
 S:	Maintained

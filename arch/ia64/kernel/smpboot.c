@@ -466,7 +466,7 @@ smp_build_cpu_map (void)
 #ifdef CONFIG_NUMA
 
 /* on which node is each logical CPU (one cacheline even for 64 CPUs) */
-volatile char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+volatile u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 /* which logical CPUs are on which nodes */
 volatile cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
 

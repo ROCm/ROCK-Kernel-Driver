@@ -153,7 +153,7 @@ alloc_resource (char *name, struct resource *root, unsigned long start, unsigned
 	res->end = end;
 	res->flags = flags;
 
-	if (request_resource(root, res))
+	if (insert_resource(root, res))
 		return -EBUSY;
 
 	return 0;
@@ -260,7 +260,6 @@ pci_acpi_scan_root (struct acpi_device *device, int domain, int bus)
 	unsigned int windows = 0;
 	char *name;
 
-	printk("PCI: Probing PCI hardware on bus (%04x:%02x)\n", domain, bus);
 	controller = alloc_pci_controller(domain);
 	if (!controller)
 		goto out1;

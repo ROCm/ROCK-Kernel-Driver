@@ -27,6 +27,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/ctype.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
@@ -997,21 +998,37 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	unsigned int irq = (unsigned long) data;
 	int full_count = count, err;
 	cpumask_t new_value, tmp;
-	const char *buf = buffer;
+#	define R_PREFIX_LEN 16
+	char rbuf[R_PREFIX_LEN];
+	int rlen;
+	int prelen;
 	irq_desc_t *desc = irq_descp(irq);
-	int redir;
 
 	if (!desc->handler->set_affinity)
 		return -EIO;
 
-	if (buf[0] == 'r' || buf[0] == 'R') {
-		++buf;
-		while (*buf == ' ') ++buf;
-		redir = 1;
-	} else
-		redir = 0;
+	/*
+	 * If string being written starts with a prefix of 'r' or 'R'
+	 * and some limited number of spaces, set IA64_IRQ_REDIRECTED.
+	 * If more than (R_PREFIX_LEN - 2) spaces are passed, they won't
+	 * all be trimmed as part of prelen, the untrimmed spaces will
+	 * cause the hex parsing to fail, and this write() syscall will
+	 * fail with EINVAL.
+	 */
 
-	err = parse_hex_value(buf, count, &new_value);
+	if (!count)
+		return -EINVAL;
+	rlen = min(sizeof(rbuf)-1, count);
+	if (copy_from_user(rbuf, buffer, rlen))
+		return -EFAULT;
+	rbuf[rlen] = 0;
+	prelen = 0;
+	if (tolower(*rbuf) == 'r') {
+		prelen = strspn(rbuf, "Rr ");
+		irq |= IA64_IRQ_REDIRECTED;
+	}
+
+	err = parse_hex_value(buffer+prelen, count-prelen, &new_value);
 	if (err)
 		return err;
 
@@ -1024,7 +1041,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (cpus_empty(tmp))
 		return -EINVAL;
 
-	desc->handler->set_affinity(irq | (redir? IA64_IRQ_REDIRECTED : 0), new_value);
+	desc->handler->set_affinity(irq, new_value);
 	return full_count;
 }
 

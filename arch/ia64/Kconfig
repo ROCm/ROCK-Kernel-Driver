@@ -375,6 +375,11 @@ config COMPAT
 	depends on IA32_SUPPORT
 	default y
 
+config HAVE_DEC_LOCK
+	bool
+	depends on (SMP || PREEMPT)
+	default y
+
 config PERFMON
 	bool "Performance monitor support"
 	help
@@ -390,16 +395,6 @@ config IA64_PALINFO
 	  Layer) information in /proc/pal.  This contains useful information
 	  about the processors in your systems, such as cache and TLB sizes
 	  and the PAL firmware version in use.
-
-	  To use this option, you have to ensure that the "/proc file system
-	  support" (CONFIG_PROC_FS) is enabled, too.
-
-config IA64_SALINFO
-	tristate "/proc/sal support"
-	help
-	  The /proc/sal directory exports the SAL (system abstraction layer)
-	  feature bits, like whether the platform is subject to ITC drift.  It
-	  is intended to be used by user programs that care about such things.
 
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
@@ -579,6 +574,7 @@ config IA64_GRANULE_16MB
 
 config IA64_GRANULE_64MB
 	bool "64MB"
+	depends on !(IA64_GENERIC || IA64_HP_ZX1)
 
 endchoice
 
