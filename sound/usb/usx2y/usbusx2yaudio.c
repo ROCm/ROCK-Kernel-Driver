@@ -457,7 +457,7 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 		(*purb)->number_of_packets = nr_of_packs();
 		(*purb)->context = subs;
 		(*purb)->interval = 1;
-		(*purb)->complete = snd_usb_complete_callback(i_usX2Y_subs_startup);
+		(*purb)->complete = i_usX2Y_subs_startup;
 	}
 	return 0;
 }
