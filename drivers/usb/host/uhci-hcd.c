@@ -1283,7 +1283,8 @@ static int isochronous_find_limits(struct uhci_hcd *uhci, struct urb *urb, unsig
 	}
 
 	if (last_urb) {
-		*end = (last_urb->start_frame + last_urb->number_of_packets) & 1023;
+		*end = (last_urb->start_frame + last_urb->number_of_packets *
+				last_urb->interval) & (UHCI_NUMFRAMES-1);
 		ret = 0;
 	} else
 		ret = -1;	/* no previous urb found */
@@ -1933,9 +1934,10 @@ static void suspend_hc(struct uhci_hcd *uhci)
 
 	dbg("%x: suspend_hc", io_addr);
 
-	outw(USBCMD_EGSM, io_addr + USBCMD);
-
 	uhci->is_suspended = 1;
+	smp_wmb();
+
+	outw(USBCMD_EGSM, io_addr + USBCMD);
 }
 
 static void wakeup_hc(struct uhci_hcd *uhci)
@@ -1945,6 +1947,9 @@ static void wakeup_hc(struct uhci_hcd *uhci)
 
 	dbg("%x: wakeup_hc", io_addr);
 
+	/* Global resume for 20ms */
+	outw(USBCMD_FGR | USBCMD_EGSM, io_addr + USBCMD);
+	wait_ms(20);
 	outw(0, io_addr + USBCMD);
 	
 	/* wait for EOP to be sent */
@@ -1965,7 +1970,7 @@ static int ports_active(struct uhci_hcd *uhci)
 	int i;
 
 	for (i = 0; i < uhci->rh_numports; i++)
-		connection |= (inw(io_addr + USBPORTSC1 + i * 2) & 0x1);
+		connection |= (inw(io_addr + USBPORTSC1 + i * 2) & USBPORTSC_CCS);
 
 	return connection;
 }
