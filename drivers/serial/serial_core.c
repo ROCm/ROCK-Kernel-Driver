@@ -529,8 +529,7 @@ static void uart_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	struct uart_state *state = tty->driver_data;
 
-	if (tty)
-		__uart_put_char(state->port, &state->info->xmit, ch);
+	__uart_put_char(state->port, &state->info->xmit, ch);
 }
 
 static void uart_flush_chars(struct tty_struct *tty)
@@ -545,7 +544,7 @@ uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
 	struct uart_state *state = tty->driver_data;
 	int ret;
 
-	if (!tty || !state->info->xmit.buf)
+	if (!state->info->xmit.buf)
 		return 0;
 
 	if (from_user)
