@@ -369,3 +369,9 @@ rpcauth_uptodatecred(struct rpc_task *task)
 		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_UPTODATE);
 }
 
+int
+rpcauth_deadcred(struct rpc_task *task)
+{
+	return !(task->tk_msg.rpc_cred) ||
+		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_DEAD);
+}

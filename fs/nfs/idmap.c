@@ -106,7 +106,7 @@ nfs_idmap_new(struct nfs_server *server)
 	    "%s/idmap", idmap->idmap_server->client->cl_pathname);
 
         idmap->idmap_dentry = rpc_mkpipe(idmap->idmap_path,
-	    idmap->idmap_server, &idmap_upcall_ops);
+	    idmap->idmap_server, &idmap_upcall_ops, 0);
         if (IS_ERR(idmap->idmap_dentry))
 		goto err_free;
 
