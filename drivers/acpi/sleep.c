@@ -28,6 +28,9 @@
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("sleep")
 
+#define ACPI_SYSTEM_FILE_SLEEP		"sleep"
+#define ACPI_SYSTEM_FILE_ALARM		"alarm"
+
 static u8 sleep_states[ACPI_S_STATE_COUNT];
 
 static void
