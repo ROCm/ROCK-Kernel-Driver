@@ -55,6 +55,10 @@ mcore-y  := mach-default
 mflags-$(CONFIG_VISWS) := -Iinclude/asm-i386/mach-visws
 mcore-$(CONFIG_VISWS)  := mach-visws
 
+#NUMAQ subarch support
+mflags-$(CONFIG_X86_NUMAQ) := -Iinclude/asm-i386/mach-numaq
+mcore-$(CONFIG_X86_NUMAQ)  := mach-default
+
 #add other subarch support here
 
 #default subarch .h files

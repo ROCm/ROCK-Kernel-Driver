@@ -11,11 +11,7 @@ static inline unsigned long calculate_ldr(unsigned long old)
 
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
-#ifdef CONFIG_SMP
- #define TARGET_CPUS (cpu_online_map)
-#else
- #define TARGET_CPUS 0x01
-#endif
+#define TARGET_CPUS (0xf)
 
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
@@ -27,12 +23,12 @@ static inline void summit_check(char *oem, char *productid)
 static inline void clustered_apic_check(void)
 {
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
-					"Flat", nr_ioapics);
+		"NUMA-Q", nr_ioapics);
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return  mps_cpu;
+	return ( ((mps_cpu/4)*16) + (1<<(mps_cpu%4)) );
 }
 
 static inline unsigned long apicid_to_cpu_present(int apicid)
