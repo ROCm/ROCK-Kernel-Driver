@@ -51,7 +51,8 @@ struct mapped_device;
  * Functions for manipulating a struct mapped_device.
  * Drop the reference with dm_put when you finish with the object.
  *---------------------------------------------------------------*/
-int dm_create(int minor, struct dm_table *table, struct mapped_device **md);
+int dm_create(unsigned int minor, struct dm_table *table,
+	      struct mapped_device **md);
 
 /*
  * Reference counting for md.
@@ -96,7 +97,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 int dm_table_complete(struct dm_table *t);
 void dm_table_event(struct dm_table *t);
 sector_t dm_table_get_size(struct dm_table *t);
-struct dm_target *dm_table_get_target(struct dm_table *t, int index);
+struct dm_target *dm_table_get_target(struct dm_table *t, unsigned int index);
 struct dm_target *dm_table_find_target(struct dm_table *t, sector_t sector);
 void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q);
 unsigned int dm_table_get_num_targets(struct dm_table *t);

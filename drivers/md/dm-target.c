@@ -146,7 +146,7 @@ int dm_unregister_target(struct target_type *t)
  * io-err: always fails an io, useful for bringing
  * up LVs that have holes in them.
  */
-static int io_err_ctr(struct dm_target *ti, int argc, char **args)
+static int io_err_ctr(struct dm_target *ti, unsigned int argc, char **args)
 {
 	return 0;
 }
