@@ -433,9 +433,9 @@ static int verify_userspi_info(struct xfrm_userspi_info *p)
 
 	case IPPROTO_COMP:
 		/* IPCOMP spi is 16-bits. */
-		if (p->min >= 0x10000 ||
-		    p->max >= 0x10000)
+		if (p->max >= 0x10000)
 			return -EINVAL;
+		break;
 
 	default:
 		return -EINVAL;
@@ -470,7 +470,7 @@ static int xfrm_alloc_userspi(struct sk_buff *skb, struct nlmsghdr *nlh, void **
 
 	spin_lock_bh(&x->lock);
 	if (x->km.state != XFRM_STATE_DEAD) {
-		xfrm_alloc_spi(x, p->min, p->max);
+		xfrm_alloc_spi(x, htonl(p->min), htonl(p->max));
 		if (x->id.spi)
 			resp_skb = xfrm_state_netlink(skb, x, nlh->nlmsg_seq);
 	}
