@@ -144,11 +144,6 @@ extern struct kernel_param __setup_start, __setup_end;
 #define device_initcall(fn)		module_init(fn)
 #define late_initcall(fn)		module_init(fn)
 
-/* Each module knows its own name. */
-#define __DEFINE_MODULE_NAME						\
-	char __module_name[] __attribute__((section(".modulename"))) =	\
-	__stringify(KBUILD_MODNAME)
-
 /* These macros create a dummy inline: gcc 2.9x does not count alias
  as usage, hence the `unused function' warning when __init functions
  are declared static. We use the dummy __*_module_inline functions
@@ -157,12 +152,9 @@ extern struct kernel_param __setup_start, __setup_end;
 
 /* Each module must use one module_init(), or one no_module_init */
 #define module_init(initfn)					\
-	__DEFINE_MODULE_NAME;					\
 	static inline initcall_t __inittest(void)		\
 	{ return initfn; }					\
 	int __initfn(void) __attribute__((alias(#initfn)));
-
-#define no_module_init __DEFINE_MODULE_NAME
 
 /* This is only required if you want to be unloadable. */
 #define module_exit(exitfn)					\
