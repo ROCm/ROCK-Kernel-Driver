@@ -86,9 +86,9 @@
 #define DPRINTK(a,b...)
 #endif 
 
-#define BANSHEE_MAX_PIXCLOCK 270000.0
-#define VOODOO3_MAX_PIXCLOCK 300000.0
-#define VOODOO5_MAX_PIXCLOCK 350000.0
+#define BANSHEE_MAX_PIXCLOCK 270000
+#define VOODOO3_MAX_PIXCLOCK 300000
+#define VOODOO5_MAX_PIXCLOCK 350000
 
 static struct fb_fix_screeninfo tdfx_fix __initdata = {
 	.id =		"3Dfx",

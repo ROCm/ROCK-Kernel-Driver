@@ -20,7 +20,7 @@ current state:
 		extracted from the Windows driver (Sc_main.mc).
 - tda1004x: firmware is loaded from path specified in
 		DVB_TDA1004X_FIRMWARE_FILE kernel config
-		variable (default /etc/dvb/tda1004x.bin); the
+		variable (default /usr/lib/hotplug/firmware/tda1004x.bin); the
 		firmware binary must be extracted from the windows
 		driver
 - ttusb-dec: see "ttusb-dec.txt" for details
@@ -76,10 +76,14 @@ you want to upload the firmware by hand, however, this might be too fast.
 Step c) Getting a usable firmware file for the dvb-ttpci driver/av7110 card.
 
 You can download the firmware files from
-http://www.linuxtv.org/download/dvb/
+http://linuxtv.org/download/dvb/
 
 Please note that in case of the dvb-ttpci driver this is *not* the "Root"
 file you probably know from the 2.4 DVB releases driver.
+
+The ttpci-firmware utility from linuxtv.org CVS can be used to
+convert Dpram and Root files into a usable firmware image.
+See dvb-kerrnel/scripts/ in http://linuxtv.org/cvs/.
 
 > wget http://www.linuxtv.org/download/dvb/dvb-ttpci-01.fw
 gets you the version 01 of the firmware fot the ttpci driver.

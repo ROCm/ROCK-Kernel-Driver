@@ -75,12 +75,25 @@ ia64_get_scratch_nat_bits (struct pt_regs *pt, unsigned long scratch_unat)
 	({										\
 		unsigned long bit = ia64_unat_pos(&pt->r##first);			\
 		unsigned long mask = ((1UL << (last - first + 1)) - 1) << first;	\
-		(ia64_rotl(unat, first) >> bit) & mask;					\
+		unsigned long dist;							\
+		if (bit < first)							\
+			dist = 64 + bit - first;					\
+		else									\
+			dist = bit - first;						\
+		ia64_rotr(unat, dist) & mask;						\
 	})
 	unsigned long val;
 
-	val  = GET_BITS( 1,  3, scratch_unat);
-	val |= GET_BITS(12, 15, scratch_unat);
+	/*
+	 * Registers that are stored consecutively in struct pt_regs can be handled in
+	 * parallel.  If the register order in struct_pt_regs changes, this code MUST be
+	 * updated.
+	 */
+	val  = GET_BITS( 1,  1, scratch_unat);
+	val |= GET_BITS( 2,  3, scratch_unat);
+	val |= GET_BITS(12, 13, scratch_unat);
+	val |= GET_BITS(14, 14, scratch_unat);
+	val |= GET_BITS(15, 15, scratch_unat);
 	val |= GET_BITS( 8, 11, scratch_unat);
 	val |= GET_BITS(16, 31, scratch_unat);
 	return val;
@@ -96,16 +109,29 @@ ia64_get_scratch_nat_bits (struct pt_regs *pt, unsigned long scratch_unat)
 unsigned long
 ia64_put_scratch_nat_bits (struct pt_regs *pt, unsigned long nat)
 {
+#	define PUT_BITS(first, last, nat)						\
+	({										\
+		unsigned long bit = ia64_unat_pos(&pt->r##first);			\
+		unsigned long mask = ((1UL << (last - first + 1)) - 1) << first;	\
+		long dist;								\
+		if (bit < first)							\
+			dist = 64 + bit - first;					\
+		else									\
+			dist = bit - first;						\
+		ia64_rotl(nat & mask, dist);						\
+	})
 	unsigned long scratch_unat;
 
-#	define PUT_BITS(first, last, nat)					\
-	({									\
-		unsigned long bit = ia64_unat_pos(&pt->r##first);		\
-		unsigned long mask = ((1UL << (last - first + 1)) - 1) << bit;	\
-		(ia64_rotr(nat, first) << bit) & mask;				\
-	})
-	scratch_unat  = PUT_BITS( 1,  3, nat);
-	scratch_unat |= PUT_BITS(12, 15, nat);
+	/*
+	 * Registers that are stored consecutively in struct pt_regs can be handled in
+	 * parallel.  If the register order in struct_pt_regs changes, this code MUST be
+	 * updated.
+	 */
+	scratch_unat  = PUT_BITS( 1,  1, nat);
+	scratch_unat |= PUT_BITS( 2,  3, nat);
+	scratch_unat |= PUT_BITS(12, 13, nat);
+	scratch_unat |= PUT_BITS(14, 14, nat);
+	scratch_unat |= PUT_BITS(15, 15, nat);
 	scratch_unat |= PUT_BITS( 8, 11, nat);
 	scratch_unat |= PUT_BITS(16, 31, nat);
 

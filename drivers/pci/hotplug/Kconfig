@@ -212,5 +212,13 @@ config HOTPLUG_PCI_RPA_DLPAR
  
  	  When in doubt, say N.
 
+config HOTPLUG_PCI_SGI
+	tristate "SGI PCI Hotplug Support"
+	depends on HOTPLUG_PCI && IA64_SGI_SN2
+	help
+	  Say Y here if you have an SGI IA64 Altix system.
+
+	  When in doubt, say N.
+
 endmenu
 

@@ -275,6 +275,5 @@ void tty_set_operations(struct tty_driver *driver, struct tty_operations *op);
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 
 #endif /* #ifdef _LINUX_TTY_DRIVER_H */

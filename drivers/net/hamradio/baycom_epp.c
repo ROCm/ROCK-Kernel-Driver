@@ -59,9 +59,6 @@
 #include <net/ax25.h> 
 #endif /* CONFIG_AX25 || CONFIG_AX25_MODULE */
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 /* --------------------------------------------------------------------- */
 
 #define BAYCOM_DEBUG

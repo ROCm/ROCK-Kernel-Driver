@@ -99,7 +99,6 @@ int sysctl_ieee_emulation_warnings=1;
 
 static void display_emulation_not_implemented(struct pt_regs *regs, char *instr)
 {
-        struct pt_regs *regs;
         __u16 *location;
         
 #ifdef CONFIG_SYSCTL

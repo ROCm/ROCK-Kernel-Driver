@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.123 $
+ * $Revision: 1.129 $
  */
 
 #include <linux/config.h>
@@ -668,7 +668,7 @@ dasd_check_cqr(struct dasd_ccw_req *cqr)
 
 /*
  * Terminate the current i/o and set the request to failed.
- * ccw_device_halt/ccw_device_clear can fail if the i/o subsystem 
+ * ccw_device_clear can fail if the i/o subsystem
  * is in a bad mood.
  */
 int
@@ -684,10 +684,7 @@ dasd_term_IO(struct dasd_ccw_req * cqr)
 	retries = 0;
 	device = (struct dasd_device *) cqr->device;
 	while ((retries < 5) && (cqr->status == DASD_CQR_IN_IO)) {
-		if (retries < 2)
-			rc = ccw_device_halt(device->cdev, (long) cqr);
-		else
-			rc = ccw_device_clear(device->cdev, (long) cqr);
+		rc = ccw_device_clear(device->cdev, (long) cqr);
 		switch (rc) {
 		case 0:	/* termination successful */
 			cqr->status = DASD_CQR_FAILED;
@@ -736,6 +733,7 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
 		return rc;
 	device = (struct dasd_device *) cqr->device;
 	cqr->startclk = get_clock();
+	cqr->starttime = jiffies;
 	rc = ccw_device_start(device->cdev, cqr->cpaddr, (long) cqr,
 			      cqr->lpm, 0);
 	switch (rc) {
@@ -788,14 +786,11 @@ dasd_timeout_device(unsigned long ptr)
 }
 
 /*
- * Setup timeout for a device.
+ * Setup timeout for a device in jiffies.
  */
 void
 dasd_set_timer(struct dasd_device *device, int expires)
 {
-	/* FIXME: timeouts are based on jiffies but the timeout
-	 * comparision in __dasd_check_expire is based on the
-	 * TOD clock. */
 	if (expires == 0) {
 		if (timer_pending(&device->timer))
 			del_timer(&device->timer);
@@ -1002,8 +997,7 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 				"no memory for dstat...ignoring");
 #ifdef ERP_DEBUG
 		/* dump sense data */
-		if (device->discipline && device->discipline->dump_sense)
-			device->discipline->dump_sense(device, cqr);
+		dasd_log_sense(cqr, irb);
 #endif
 		switch (era) {
 		case dasd_era_fatal:
@@ -1079,8 +1073,11 @@ restart:
 				cqr->status = DASD_CQR_FAILED;
 				cqr->stopclk = get_clock();
 			} else {
-				erp_fn = device->discipline->erp_action(cqr);
-				erp_fn(cqr);
+				if (cqr->dstat->esw.esw0.erw.cons) {
+					erp_fn = device->discipline->erp_action(cqr);
+					erp_fn(cqr);
+				} else
+					dasd_default_erp_action(cqr);
 			}
 			goto restart;
 		}
@@ -1196,7 +1193,7 @@ __dasd_check_expire(struct dasd_device * device)
 	cqr = list_entry(device->ccw_queue.next, struct dasd_ccw_req, list);
 	if (cqr->status == DASD_CQR_IN_IO && cqr->expires != 0) {
 		now = get_clock();
-		if (cqr->expires * (TOD_SEC / HZ) + cqr->startclk < now) {
+		if (time_after_eq(jiffies, cqr->expires + cqr->starttime)) {
 			if (device->discipline->term_IO(cqr) != 0)
 				/* Hmpf, try again in 1/100 sec */
 				dasd_set_timer(device, 1);
@@ -1476,6 +1473,7 @@ _dasd_term_running_cqr(struct dasd_device *device)
 		/* termination successful */
 		cqr->status = DASD_CQR_QUEUED;
 		cqr->startclk = cqr->stopclk = 0;
+		cqr->starttime = 0;
 	}
 	return rc;
 }
@@ -1782,9 +1780,19 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	if (IS_ERR(device))
 		return PTR_ERR(device);
 
-	if (device->use_diag_flag)
+	if (device->use_diag_flag) {
+	  	if (!dasd_diag_discipline_pointer) {
+		        printk (KERN_WARNING
+				"dasd_generic couldn't online device %s "
+				"- discipline DIAG not available\n",
+				cdev->dev.bus_id);
+			dasd_delete_device(device);
+			return -ENODEV;
+		}
 		discipline = dasd_diag_discipline_pointer;
+	}
 	device->discipline = discipline;
+
 	rc = discipline->check_device(device);
 	if (rc) {
 		printk (KERN_WARNING
@@ -1980,6 +1988,7 @@ EXPORT_SYMBOL(dasd_term_IO);
 
 EXPORT_SYMBOL_GPL(dasd_generic_probe);
 EXPORT_SYMBOL_GPL(dasd_generic_remove);
+EXPORT_SYMBOL_GPL(dasd_generic_notify);
 EXPORT_SYMBOL_GPL(dasd_generic_set_online);
 EXPORT_SYMBOL_GPL(dasd_generic_set_offline);
 EXPORT_SYMBOL_GPL(dasd_generic_auto_online);

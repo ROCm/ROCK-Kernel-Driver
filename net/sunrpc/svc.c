@@ -6,13 +6,11 @@
  * Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de>
  */
 
-#define __KERNEL_SYSCALLS__
 #include <linux/linkage.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/net.h>
 #include <linux/in.h>
-#include <linux/unistd.h>
 #include <linux/mm.h>
 
 #include <linux/sunrpc/types.h>

@@ -234,6 +234,8 @@ static int __init longhaul_get_ranges (void)
 	case 2:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
+		//TODO: Nehemiah may have borken MaxMHzBR.
+		// need to extrapolate from FSB.
 		invalue = longhaul.bits.MaxMHzBR;
 		if (longhaul.bits.MaxMHzBR4)
 			invalue += 16;
@@ -245,7 +247,16 @@ static int __init longhaul_get_ranges (void)
 		else
 			minmult = multipliers[invalue];
 
-		fsb = guess_fsb(maxmult);
+		switch (longhaul.bits.MaxMHzFSB) {
+		case 0x0:	fsb=133;
+				break;
+		case 0x1:	fsb=100;
+				break;
+		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
+			return -EINVAL;
+		case 0x3:	fsb=66;
+				break;
+		}
 		break;
 	}
 
@@ -438,15 +449,34 @@ static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = calc_speed (longhaul_get_cpu_mult(), fsb);
 
-	return cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
+	ret = cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
+	if (ret)
+		return ret;
+
+	cpufreq_frequency_table_get_attr(longhaul_table, policy->cpu);
+
+	return 0;
 }
+
+static int longhaul_cpu_exit(struct cpufreq_policy *policy)
+{
+	cpufreq_frequency_table_put_attr(policy->cpu);
+	return 0;
+}
+
+static struct freq_attr* longhaul_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver longhaul_driver = {
 	.verify 	= longhaul_verify,
 	.target 	= longhaul_target,
 	.init		= longhaul_cpu_init,
+	.exit		= longhaul_cpu_exit,
 	.name		= "longhaul",
 	.owner		= THIS_MODULE,
+	.attr		= longhaul_attr,
 };
 
 static int __init longhaul_init (void)

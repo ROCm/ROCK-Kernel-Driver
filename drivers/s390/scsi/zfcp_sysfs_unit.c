@@ -5,7 +5,8 @@
  *
  * sysfs unit related routines
  *
- * Copyright (C) 2003 IBM Entwicklung GmbH, IBM Corporation
+ * (C) Copyright IBM Corp. 2003, 2004
+ *
  * Authors:
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
@@ -25,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.19 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.23 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -34,7 +35,6 @@
 #include "zfcp_def.h"
 
 #define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_CONFIG
-#define ZFCP_LOG_AREA_PREFIX            ZFCP_LOG_AREA_PREFIX_CONFIG
 
 /**
  * zfcp_sysfs_unit_release - gets called when a struct device unit is released
@@ -104,13 +104,9 @@ zfcp_sysfs_unit_failed_store(struct device *dev, const char *buf, size_t count)
 		goto out;
 	}
 
-	/* restart error recovery only if adapter is online */
-	if (unit->port->adapter->ccw_device->online != 1) {
-		retval = -ENXIO;
-		goto out;
-	}
 	zfcp_erp_modify_unit_status(unit, ZFCP_STATUS_COMMON_RUNNING, ZFCP_SET);
 	zfcp_erp_unit_reopen(unit, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_wait(unit->port->adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval ? retval : count;
@@ -199,4 +195,3 @@ zfcp_sysfs_unit_remove_files(struct device *dev)
 }
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX

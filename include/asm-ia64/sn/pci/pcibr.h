@@ -325,9 +325,27 @@ extern int		pcibr_asic_rev(vertex_hdl_t);
 #define PCIBR			'p'
 #define _PCIBR(x)		((PCIBR << 8) | (x))
 
-#define PCIBR_SLOT_STARTUP	_PCIBR(1)
-#define PCIBR_SLOT_SHUTDOWN     _PCIBR(2)
-#define PCIBR_SLOT_QUERY	_PCIBR(3)
+/*
+ * Bit defintions for variable slot_status in struct
+ * pcibr_soft_slot_s.  They are here so that the user
+ * hot-plug utility can interpret the slot's power
+ * status.
+ */
+#ifdef CONFIG_HOTPLUG_PCI_SGI
+#define PCI_SLOT_ENABLE_CMPLT       0x01    
+#define PCI_SLOT_ENABLE_INCMPLT     0x02    
+#define PCI_SLOT_DISABLE_CMPLT      0x04    
+#define PCI_SLOT_DISABLE_INCMPLT    0x08    
+#define PCI_SLOT_POWER_ON           0x10    
+#define PCI_SLOT_POWER_OFF          0x20    
+#define PCI_SLOT_IS_SYS_CRITICAL    0x40    
+#define PCI_SLOT_PCIBA_LOADED       0x80    
+
+#define PCI_SLOT_STATUS_MASK        (PCI_SLOT_ENABLE_CMPLT | \
+				     PCI_SLOT_ENABLE_INCMPLT | \
+                                     PCI_SLOT_DISABLE_CMPLT | \
+				     PCI_SLOT_DISABLE_INCMPLT)
+#define PCI_SLOT_POWER_MASK         (PCI_SLOT_POWER_ON | PCI_SLOT_POWER_OFF)
 
 /*
  * Bit defintions for variable slot_status in struct
@@ -356,25 +374,19 @@ extern int		pcibr_asic_rev(vertex_hdl_t);
 #define FUNC_IS_SYS_CRITICAL    0x02
 
 /*
- * Structures for requesting PCI bridge information and receiving a response
+ * L1 slot power operations for PCI hot-plug
  */
-typedef struct pcibr_slot_req_s *pcibr_slot_req_t;
-typedef struct pcibr_slot_up_resp_s *pcibr_slot_up_resp_t;
-typedef struct pcibr_slot_down_resp_s *pcibr_slot_down_resp_t;
-typedef struct pcibr_slot_info_resp_s *pcibr_slot_info_resp_t;
-typedef struct pcibr_slot_func_info_resp_s *pcibr_slot_func_info_resp_t;
+#define PCI_REQ_SLOT_POWER_ON       1
+#define PCI_L1_QSIZE                128      /* our L1 message buffer size */
+
 
 #define L1_QSIZE                128      /* our L1 message buffer size */
-struct pcibr_slot_req_s {
-    int                      req_slot;
-    union {
-        pcibr_slot_up_resp_t     up;
-        pcibr_slot_down_resp_t   down;
-        pcibr_slot_info_resp_t   query;
-        void                    *any;
-    }                       req_respp;
-    int                     req_size;
+
+enum pcibr_slot_disable_action_e {
+    PCI_REQ_SLOT_ELIGIBLE,
+    PCI_REQ_SLOT_DISABLE
 };
+
 
 struct pcibr_slot_up_resp_s {
     int                     resp_sub_errno;
@@ -443,6 +455,45 @@ struct pcibr_slot_info_resp_s {
 
     } resp_func[8];
 };
+
+struct pcibr_slot_req_s {
+    int                      req_slot;
+    union {
+        enum pcibr_slot_disable_action_e up;
+        struct pcibr_slot_down_resp_s *down;
+        struct pcibr_slot_info_resp_s *query;
+        void                    *any;
+    }                       req_respp;
+    int                     req_size;
+};
+
+struct pcibr_slot_enable_resp_s {
+    int                     resp_sub_errno;
+    char                    resp_l1_msg[PCI_L1_QSIZE + 1];
+};
+
+struct pcibr_slot_disable_resp_s {
+    int                     resp_sub_errno;
+    char                    resp_l1_msg[PCI_L1_QSIZE + 1];
+};
+
+struct pcibr_slot_enable_req_s {
+    pciio_slot_t              	     req_device;
+    struct pcibr_slot_enable_resp_s  req_resp;
+};
+
+struct pcibr_slot_disable_req_s {
+    pciio_slot_t                     req_device;
+    enum pcibr_slot_disable_action_e req_action;
+    struct pcibr_slot_disable_resp_s req_resp;
+};
+
+struct pcibr_slot_info_req_s {
+    pciio_slot_t              	     req_device;
+    struct pcibr_slot_info_resp_s    req_resp;
+};
+
+#endif	/* CONFIG_HOTPLUG_PCI_SGI */
 
 
 /*

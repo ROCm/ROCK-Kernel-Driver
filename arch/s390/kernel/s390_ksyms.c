@@ -19,6 +19,9 @@
 #ifdef CONFIG_IP_MULTICAST
 #include <net/arp.h>
 #endif
+#ifdef CONFIG_VIRT_TIMER
+#include <asm/timer.h>
+#endif
 
 /*
  * memory management
@@ -29,6 +32,7 @@ EXPORT_SYMBOL_NOVERS(_zb_findmap);
 EXPORT_SYMBOL_NOVERS(__copy_from_user_asm);
 EXPORT_SYMBOL_NOVERS(__copy_to_user_asm);
 EXPORT_SYMBOL_NOVERS(__clear_user_asm);
+EXPORT_SYMBOL(diag10);
 
 /*
  * semaphore ops
@@ -54,6 +58,7 @@ EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(strrchr);
 EXPORT_SYMBOL_NOVERS(strstr);
 EXPORT_SYMBOL_NOVERS(strpbrk);
+EXPORT_SYMBOL_NOVERS(strcpy);
 
 /*
  * binfmt_elf loader 
@@ -63,6 +68,17 @@ EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(overflowuid);
 EXPORT_SYMBOL(overflowgid);
 EXPORT_SYMBOL(empty_zero_page);
+
+/*
+ * virtual CPU timer
+ */
+#ifdef CONFIG_VIRT_TIMER
+EXPORT_SYMBOL(init_virt_timer);
+EXPORT_SYMBOL(add_virt_timer);
+EXPORT_SYMBOL(add_virt_timer_periodic);
+EXPORT_SYMBOL(mod_virt_timer);
+EXPORT_SYMBOL(del_virt_timer);
+#endif
 
 /*
  * misc.
@@ -76,5 +92,5 @@ EXPORT_SYMBOL(console_device);
 EXPORT_SYMBOL_NOVERS(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);
+EXPORT_SYMBOL(smp_call_function_on);
 EXPORT_SYMBOL(sys_ioctl);
-

@@ -810,40 +810,6 @@ int dev_change_name(struct net_device *dev, char *newname)
 }
 
 /**
- *	dev_alloc - allocate a network device and name
- *	@name: name format string
- *	@err: error return pointer
- *
- *	Passed a format string, eg. "lt%d", it will allocate a network device
- *	and space for the name. %NULL is returned if no memory is available.
- *	If the allocation succeeds then the name is assigned and the
- *	device pointer returned. %NULL is returned if the name allocation
- *	failed. The cause of an error is returned as a negative errno code
- *	in the variable @err points to.
- *
- *	This call is deprecated in favor of alloc_netdev because
- *	the caller must hold the @dev_base or RTNL locks when doing this in
- *	order to avoid duplicate name allocations.
- */
-
-struct net_device *__dev_alloc(const char *name, int *err)
-{
-	struct net_device *dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-
-	if (!dev)
-		*err = -ENOBUFS;
-	else {
-		memset(dev, 0, sizeof(*dev));
-		*err = dev_alloc_name(dev, name);
-		if (*err < 0) {
-			kfree(dev);
-			dev = NULL;
-		}
-	}
-	return dev;
-}
-
-/**
  *	netdev_state_change - device changes state
  *	@dev: device to cause notification
  *
@@ -3232,7 +3198,6 @@ EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
 EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(dev_add_pack);
-EXPORT_SYMBOL(__dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);

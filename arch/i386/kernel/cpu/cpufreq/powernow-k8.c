@@ -802,6 +802,8 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 		return -EINVAL;
 	}
 
+	cpufreq_frequency_table_get_attr(powernow_table, pol->cpu);
+
 	printk(KERN_INFO PFX "cpu_init done, current fid 0x%x, vid 0x%x\n",
 	       currfid, currvid);
 
@@ -813,11 +815,18 @@ static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 	if (pol->cpu != 0)
 		return -EINVAL;
 
+	cpufreq_frequency_table_put_attr(pol->cpu);
+
 	if (powernow_table)
 		kfree(powernow_table);
 
 	return 0;
 }
+
+static struct freq_attr* powernow_k8_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver cpufreq_amd64_driver = {
 	.verify = powernowk8_verify,
@@ -826,6 +835,7 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 	.exit = powernowk8_cpu_exit,
 	.name = "powernow-k8",
 	.owner = THIS_MODULE,
+	.attr = powernow_k8_attr,
 };
 
 
