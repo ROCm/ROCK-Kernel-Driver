@@ -321,6 +321,20 @@ static  void __init pSeries_discover_pic(void)
 	}
 }
 
+static void pSeries_cpu_die(void)
+{
+	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
+	pSeriesLP_cppr_info(0, 0);
+	rtas_stop_self();
+	/* Should never get here... */
+	BUG();
+	for(;;);
+}
+
+
 /*
  * Early initialization.  Relocation is on but do not reference unbolted pages
  */
@@ -588,6 +602,7 @@ struct machdep_calls __initdata pSeries_md = {
 	.power_off		= rtas_power_off,
 	.halt			= rtas_halt,
 	.panic			= rtas_os_term,
+	.cpu_die		= pSeries_cpu_die,
 	.get_boot_time		= pSeries_get_boot_time,
 	.get_rtc_time		= pSeries_get_rtc_time,
 	.set_rtc_time		= pSeries_set_rtc_time,

@@ -1308,3 +1308,10 @@ static int __init early_xmon(char *p)
 early_param("xmon", early_xmon);
 #endif
 
+void cpu_die(void)
+{
+	if (ppc_md.cpu_die)
+		ppc_md.cpu_die();
+	local_irq_disable();
+	for (;;);
+}

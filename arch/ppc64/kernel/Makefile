@@ -53,6 +53,8 @@ obj-$(CONFIG_U3_DART)		+= u3_iommu.o
 
 ifdef CONFIG_SMP
 obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o smp-tbsync.o
+obj-$(CONFIG_PPC_ISERIES)	+= iSeries_smp.o
+obj-$(CONFIG_PPC_PSERIES)	+= pSeries_smp.o
 endif
 
 obj-$(CONFIG_ALTIVEC)		+= vecemu.o vector.o

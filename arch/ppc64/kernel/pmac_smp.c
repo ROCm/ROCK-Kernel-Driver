@@ -21,6 +21,9 @@
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
  */
+
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -51,6 +54,11 @@
 
 #include "mpic.h"
 
+#ifdef DEBUG
+#define DBG(fmt...) udbg_printf(fmt)
+#else
+#define DBG(fmt...)
+#endif
 
 extern void pmac_secondary_start_1(void);
 extern void pmac_secondary_start_2(void);
@@ -102,15 +110,16 @@ static void __init smp_core99_kick_cpu(int nr)
 	 *   b .pmac_secondary_start - KERNELBASE
 	 */
 	switch(nr) {
-		case 1:
-			new_vector = (unsigned long)pmac_secondary_start_1;
-			break;
-		case 2:
-			new_vector = (unsigned long)pmac_secondary_start_2;
-			break;
-		case 3:
-			new_vector = (unsigned long)pmac_secondary_start_3;
-			break;
+	case 1:
+		new_vector = (unsigned long)pmac_secondary_start_1;
+		break;
+	case 2:
+		new_vector = (unsigned long)pmac_secondary_start_2;
+		break;			
+	case 3:
+	default:
+		new_vector = (unsigned long)pmac_secondary_start_3;
+		break;
 	}
 	*vector = 0x48000002 + (new_vector - KERNELBASE);
 
@@ -149,12 +158,9 @@ static void __init smp_core99_setup_cpu(int cpu_nr)
 		 */
 		if (num_online_cpus() < 2)		
 			g5_phy_disable_cpu1();
-		if (ppc_md.progress) ppc_md.progress("core99_setup_cpu 0 done", 0x349);
+		if (ppc_md.progress) ppc_md.progress("smp_core99_setup_cpu 0 done", 0x349);
 	}
 }
-
-extern void smp_generic_give_timebase(void);
-extern void smp_generic_take_timebase(void);
 
 struct smp_ops_t core99_smp_ops __pmacdata = {
 	.message_pass	= smp_mpic_message_pass,
