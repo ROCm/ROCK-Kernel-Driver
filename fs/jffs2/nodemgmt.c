@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodemgmt.c,v 1.109 2004/10/07 15:08:47 havasi Exp $
+ * $Id: nodemgmt.c,v 1.110 2004/11/16 15:45:13 dedekind Exp $
  *
  */
 
@@ -604,7 +604,7 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 	}
 }
 
-#if CONFIG_JFFS2_FS_DEBUG > 0
+#if CONFIG_JFFS2_FS_DEBUG >= 2
 void jffs2_dump_block_lists(struct jffs2_sb_info *c)
 {
 

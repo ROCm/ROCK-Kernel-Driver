@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.140 2004/11/13 10:59:22 dedekind Exp $
+ * $Id: gc.c,v 1.142 2004/11/16 17:52:10 dwmw2 Exp $
  *
  */
 
@@ -103,7 +103,7 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 		ret->wasted_size = 0;
 	}
 
-	D1(jffs2_dump_block_lists(c));
+	D2(jffs2_dump_block_lists(c));
 	return ret;
 }
 
@@ -134,7 +134,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		if (c->checked_ino > c->highest_ino) {
 			printk(KERN_CRIT "Checked all inodes but still 0x%x bytes of unchecked space?\n",
 			       c->unchecked_size);
-			D1(jffs2_dump_block_lists(c));
+			D2(jffs2_dump_block_lists(c));
 			spin_unlock(&c->erase_completion_lock);
 			BUG();
 		}

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.55 2003/10/28 17:02:44 dwmw2 Exp $
+ * $Id: build.c,v 1.56 2004/11/16 15:45:13 dedekind Exp $
  *
  */
 
@@ -101,7 +101,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		return ret;
 
 	D1(printk(KERN_DEBUG "Scanned flash completely\n"));
-	D1(jffs2_dump_block_lists(c));
+	D2(jffs2_dump_block_lists(c));
 
 	/* Now scan the directory tree, increasing nlink according to every dirent found. */
 	for_each_inode(i, c, ic) {
@@ -164,7 +164,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		cond_resched();
 	}
 	D1(printk(KERN_DEBUG "Pass 3 complete\n"));
-	D1(jffs2_dump_block_lists(c));
+	D2(jffs2_dump_block_lists(c));
 
 	/* Rotate the lists by some number to ensure wear levelling */
 	jffs2_rotate_lists(c);

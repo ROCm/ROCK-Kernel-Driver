@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: readinode.c,v 1.114 2004/11/14 17:07:07 dedekind Exp $
+ * $Id: readinode.c,v 1.115 2004/11/16 15:45:13 dedekind Exp $
  *
  */
 
@@ -22,7 +22,7 @@
 
 static int jffs2_add_frag_to_fragtree(struct jffs2_sb_info *c, struct rb_root *list, struct jffs2_node_frag *newfrag);
 
-#if CONFIG_JFFS2_FS_DEBUG >= 1
+#if CONFIG_JFFS2_FS_DEBUG >= 2
 static void jffs2_print_fragtree(struct rb_root *list, int permitbug)
 {
 	struct jffs2_node_frag *this = frag_first(list);
@@ -56,7 +56,9 @@ void jffs2_print_frag_list(struct jffs2_inode_info *f)
 		printk(KERN_DEBUG "metadata at 0x%08x\n", ref_offset(f->metadata->raw));
 	}
 }
+#endif
 
+#if CONFIG_JFFS2_FS_DEBUG >= 1
 static int jffs2_sanitycheck_fragtree(struct jffs2_inode_info *f)
 {
 	struct jffs2_node_frag *frag;
