@@ -1882,10 +1882,10 @@ static int tcp_v6_init_sock(struct sock *sk)
 	sk->sk_write_space = sk_stream_write_space;
 	sk->sk_use_write_queue = 1;
 
-	sk->sk_sndbuf = sysctl_tcp_wmem[1];
-	sk->sk_rcvbuf = sysctl_tcp_rmem[1];
+	sk->sk_sndbuf = tcp_prot.sysctl_wmem[1];
+	sk->sk_rcvbuf = tcp_prot.sysctl_rmem[1];
 
-	atomic_inc(&tcp_sockets_allocated);
+	atomic_inc(&tcp_prot.sockets_allocated);
 
 	return 0;
 }
@@ -1909,7 +1909,7 @@ static int tcp_v6_destroy_sock(struct sock *sk)
 	if (tcp_sk(sk)->bind_hash)
 		tcp_put_port(sk);
 
-	atomic_dec(&tcp_sockets_allocated);
+	atomic_dec(&tcp_prot.sockets_allocated);
 
 	return inet6_destroy_sock(sk);
 }

@@ -801,7 +801,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 #ifdef INET_REFCNT_DEBUG
 		atomic_inc(&inet_sock_nr);
 #endif
-		atomic_inc(&tcp_sockets_allocated);
+		atomic_inc(&tcp_prot.sockets_allocated);
 
 		if (sock_flag(newsk, SOCK_KEEPOPEN))
 			tcp_reset_keepalive_timer(newsk,
