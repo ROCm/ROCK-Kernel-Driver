@@ -163,7 +163,7 @@ config SENSORS_W83781D
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for the Winbond W8378x series
-	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
+	  of sensor chips: the W83781D, W83782D, W83783S and W83627HF,
 	  and the similar Asus AS99127F.
 	  
 	  This driver can also be built as a module.  If so, the module
