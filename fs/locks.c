@@ -391,6 +391,16 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 }
 #endif
 
+/* default lease lock manager operations */
+static void lease_break_callback(struct file_lock *fl)
+{
+	kill_fasync(&fl->fl_fasync, SIGIO, POLL_MSG);
+}
+
+struct lock_manager_operations lease_manager_ops = {
+	.fl_break = lease_break_callback,
+};
+
 /* Allocate a file_lock initialised to this type of lease */
 static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 {
@@ -1127,7 +1137,10 @@ int __break_lease(struct inode *inode, unsigned int mode)
 		if (fl->fl_type != future) {
 			fl->fl_type = future;
 			fl->fl_break_time = break_time;
-			kill_fasync(&fl->fl_fasync, SIGIO, POLL_MSG);
+			if (fl->fl_lmops && fl->fl_lmops->fl_break)
+				fl->fl_lmops->fl_break(fl);
+			else    /* lease must have lmops break callback */
+				BUG();
 		}
 	}
 
