@@ -52,7 +52,7 @@ extern int hp_plus_probe(struct net_device *dev);
 extern struct net_device *express_probe(int unit);
 extern struct net_device *eepro_probe(int unit);
 extern int at1500_probe(struct net_device *);
-extern int at1700_probe(struct net_device *);
+extern struct net_device *at1700_probe(int unit);
 extern struct net_device *fmv18x_probe(int unit);
 extern struct net_device *eth16i_probe(int unit);
 extern struct net_device *i82596_probe(int unit);
@@ -241,13 +241,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_CS89x0
  	{cs89x0_probe, 0},
 #endif
-#ifdef CONFIG_AT1700
-	{at1700_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_AT1700
+	{at1700_probe, 0},
+#endif
 #ifdef CONFIG_FMV18X		/* Fujitsu FMV-181/182 */
 	{fmv18x_probe, 0},
 #endif
