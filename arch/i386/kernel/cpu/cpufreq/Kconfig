@@ -104,11 +104,22 @@ config X86_SPEEDSTEP
 	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for certain mobile Intel Pentium III
-	  (Coppermine), all mobile Intel Pentium III-M (Tulatin) and all
+	  (Coppermine), all mobile Intel Pentium III-M (Tualatin) and all
 	  mobile Intel Pentium 4 P4-Ms.
 
 	  For details, take a look at linux/Documentation/cpu-freq. 
 
+	  If in doubt, say N.
+
+config X86_SPEEDSTEP_CENTRINO
+	tristate "Intel Enhanced SpeedStep"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for Enhanced SpeedStep enabled
+	  mobile CPUs.  This means Intel Pentium M (Centrino) CPUs.
+	  
+	  For details, take a look at linux/Documentation/cpu-freq. 
+	  
 	  If in doubt, say N.
 
 config X86_P4_CLOCKMOD

@@ -58,6 +58,7 @@ AMD mobile Athlon
 Cyrix Media GXm
 Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
+Intel Pentium M (Centrino)
 National Semiconductors Geode GX
 Transmeta Crusoe
 VIA Cyrix 3 / C3

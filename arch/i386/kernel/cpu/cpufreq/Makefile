@@ -7,6 +7,7 @@ obj-$(CONFIG_ELAN_CPUFREQ)	+= elanfreq.o
 obj-$(CONFIG_X86_LONGRUN)	+= longrun.o  
 obj-$(CONFIG_X86_GX_SUSPMOD)    += gx-suspmod.o
 obj-$(CONFIG_X86_ACPI_CPUFREQ)	+= acpi.o
+obj-$(CONFIG_X86_SPEEDSTEP_CENTRINO) += speedstep-centrino.o
 
 ifdef CONFIG_X86_ACPI_CPUFREQ
   ifdef CONFIG_ACPI_DEBUG
