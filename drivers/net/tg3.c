@@ -7828,6 +7828,19 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		printk("%2.2x%c", dev->dev_addr[i],
 		       i == 5 ? '\n' : ':');
 
+	printk(KERN_INFO "%s: HostTXDS[%d] RXcsums[%d] LinkChgREG[%d] "
+	       "MIirq[%d] ASF[%d] Split[%d] WireSpeed[%d] "
+	       "TSOcap[%d] \n",
+	       dev->name,
+	       (tp->tg3_flags & TG3_FLAG_HOST_TXDS) != 0,
+	       (tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0,
+	       (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) != 0,
+	       (tp->tg3_flags & TG3_FLAG_USE_MI_INTERRUPT) != 0,
+	       (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0,
+	       (tp->tg3_flags & TG3_FLAG_SPLIT_MODE) != 0,
+	       (tp->tg3_flags2 & TG3_FLG2_NO_ETH_WIRE_SPEED) == 0,
+	       (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) != 0);
+
 	return 0;
 
 err_out_iounmap:
