@@ -99,10 +99,10 @@ static struct pid_entry base_stuff[] = {
 };
 #ifdef CONFIG_SECURITY
 static struct pid_entry attr_stuff[] = {
-  E(PROC_PID_ATTR_CURRENT,	"current",	S_IFREG|S_IRUGO|S_IWUSR),
-  E(PROC_PID_ATTR_PREV,	"prev",	S_IFREG|S_IRUGO|S_IWUSR),
-  E(PROC_PID_ATTR_EXEC,	"exec",	S_IFREG|S_IRUGO|S_IWUSR),
-  E(PROC_PID_ATTR_FSCREATE,	"fscreate",	S_IFREG|S_IRUGO|S_IWUSR),
+  E(PROC_PID_ATTR_CURRENT,	"current",	S_IFREG|S_IRUGO|S_IWUGO),
+  E(PROC_PID_ATTR_PREV,	"prev",	S_IFREG|S_IRUGO),
+  E(PROC_PID_ATTR_EXEC,	"exec",	S_IFREG|S_IRUGO|S_IWUGO),
+  E(PROC_PID_ATTR_FSCREATE,	"fscreate",	S_IFREG|S_IRUGO|S_IWUGO),
   {0,0,NULL,0}
 };
 #endif
