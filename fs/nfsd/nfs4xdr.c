@@ -1800,7 +1800,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	 */
 	bmval0 = cd->rd_bmval[0];
 	bmval1 = cd->rd_bmval[1];
-	if ((bmval0 & ~(FATTR4_WORD0_RDATTR_ERROR | FATTR4_WORD0_FILEID)) || bmval1)  {
+	if ((bmval0 & ~(FATTR4_WORD0_RDATTR_ERROR)) || bmval1)  {
 		/*
 		 * "Heavyweight" case: we have no choice except to
 		 * call nfsd4_encode_fattr(). 
@@ -1876,8 +1876,6 @@ error:
 	attrlenp = p++;
 	if (bmval0 & FATTR4_WORD0_RDATTR_ERROR)
 		*p++ = nfserr;       /* no htonl */
-	if (bmval0 & FATTR4_WORD0_FILEID)
-		p = xdr_encode_hyper(p, (u64)ino);
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 
 out:
