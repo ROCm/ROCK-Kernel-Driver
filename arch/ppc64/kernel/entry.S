@@ -124,7 +124,7 @@ _GLOBAL(DoSyscall)
 	addi	r9,r1,STACK_FRAME_OVERHEAD
 	blrl			/* Call handler */
 _GLOBAL(ret_from_syscall_1)
-20:	std	r3,RESULT(r1)	/* Save result */
+	std	r3,RESULT(r1)	/* Save result */
 #ifdef SHOW_SYSCALLS
 #ifdef SHOW_SYSCALLS_TASK
 	ld	r10, PACACURRENT(13)
@@ -195,7 +195,7 @@ _GLOBAL(ret_from_syscall_1)
 	addi	r9,r1,STACK_FRAME_OVERHEAD
 	blrl			/* Call handler */
 _GLOBAL(ret_from_syscall_2)
-58:	std	r3,RESULT(r1)	/* Save result */	
+	std	r3,RESULT(r1)	/* Save result */	
 	std	r3,GPR0(r1)	/* temporary gross hack to make strace work */
 	li	r10,-_LAST_ERRNO
 	cmpl	0,r3,r10
@@ -240,9 +240,9 @@ _GLOBAL(ppc64_rt_sigreturn)
 	bne-	81f
 	cmpi	0,r3,0
 	bge	.ret_from_except
-	b	20b
+	b	.ret_from_syscall_1
 81:	cmpi	0,r3,0
-	blt	58b
+	blt	.ret_from_syscall_2
 	bl	.do_syscall_trace
 	b	.ret_from_except
 

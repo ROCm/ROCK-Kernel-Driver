@@ -434,6 +434,7 @@ pcibios_init(void)
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware done.\n");
 	//ppc64_boot_msg(0x41, "PCI Done");
 
+	return 0;
 }
 
 subsys_initcall(pcibios_init);

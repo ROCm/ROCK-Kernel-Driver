@@ -23,6 +23,7 @@
 #include "i8259.h"
 #include "xics.h"
 #include <asm/ppcdebug.h>
+#include <asm/machdep.h>
 
 void xics_enable_irq(u_int irq);
 void xics_disable_irq(u_int irq);
