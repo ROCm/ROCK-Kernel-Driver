@@ -2721,7 +2721,7 @@ static int ace_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 		link = readl(&regs->FastLnkState);
 		if (link & LNK_100MB)
 			ecmd->speed = SPEED_100;
-		else if (link & LNK_100MB)
+		else if (link & LNK_10MB)
 			ecmd->speed = SPEED_10;
 		else
 			ecmd->speed = 0;
@@ -2764,7 +2764,7 @@ static int ace_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 		link = readl(&regs->FastLnkState);
 		if (link & LNK_100MB)
 			speed = SPEED_100;
-		else if (link & LNK_100MB)
+		else if (link & LNK_10MB)
 			speed = SPEED_10;
 		else
 			speed = SPEED_100;
