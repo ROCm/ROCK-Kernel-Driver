@@ -192,13 +192,14 @@ static void cpc_tty_signal_on(pc300dev_t *pc300dev, unsigned char signal)
  */
 void cpc_tty_init(pc300dev_t *pc300dev)
 {
-	int port, aux;
+	unsigned long port;
+	int aux;
 	st_cpc_tty_area * cpc_tty;
 
 	/* hdlcX - X=interface number */
 	port = pc300dev->dev->name[4] - '0';
 	if (port >= CPC_TTY_NPORTS) {
-		printk("%s-tty: invalid interface selected (0-%i): %i", 
+		printk("%s-tty: invalid interface selected (0-%i): %li",
 			pc300dev->dev->name,
 			CPC_TTY_NPORTS-1,port);
 		return;
@@ -682,7 +683,8 @@ static void cpc_tty_hangup(struct tty_struct *tty)
  */
 static void cpc_tty_rx_work(void * data)
 {
-	int port, i, j;
+	unsigned long port;
+	int i, j;
 	st_cpc_tty_area *cpc_tty; 
 	volatile st_cpc_rx_buf * buf;
 	char flags=0,flg_rx=1; 
@@ -693,17 +695,14 @@ static void cpc_tty_rx_work(void * data)
 	
 	for (i=0; (i < 4) && flg_rx ; i++) {
 		flg_rx = 0;
-		port = (int) data;
+		port = (unsigned long)data;
 		for (j=0; j < CPC_TTY_NPORTS; j++) {
 			cpc_tty = &cpc_tty_area[port];
 		
 			if ((buf=cpc_tty->buf_rx.first) != 0) {
-				
-				if(cpc_tty->tty)
-				{											
-					ld = tty_ldisc_ref(cpc_tty);
-					if(ld)
-					{
+				if(cpc_tty->tty) {
+					ld = tty_ldisc_ref(cpc_tty->tty);
+					if(ld) {
 						if (ld->receive_buf) {
 							CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
 							ld->receive_buf(cpc_tty->tty, (char *)(buf->data), &flags, buf->size);
