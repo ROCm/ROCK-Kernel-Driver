@@ -238,20 +238,59 @@ tcx_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map __tcx_mmap_map[TCX_MMAP_ENTRIES] = {
-	{ TCX_RAM8BIT,		0,		SBUS_MMAP_FBSIZE(1) },
-	{ TCX_RAM24BIT,		0,		SBUS_MMAP_FBSIZE(4) },
-	{ TCX_UNK3,		0,		SBUS_MMAP_FBSIZE(8) },
-	{ TCX_UNK4,		0,		SBUS_MMAP_FBSIZE(8) },
-	{ TCX_CONTROLPLANE,	0,		SBUS_MMAP_FBSIZE(4) },
-	{ TCX_UNK6,		0,		SBUS_MMAP_FBSIZE(8) },
-	{ TCX_UNK7,		0,		SBUS_MMAP_FBSIZE(8) },
-	{ TCX_TEC,		0,		PAGE_SIZE	    },
-	{ TCX_BTREGS,		0,		PAGE_SIZE	    },
-	{ TCX_THC,		0,		PAGE_SIZE	    },
-	{ TCX_DHC,		0,		PAGE_SIZE	    },
-	{ TCX_ALT,		0,		PAGE_SIZE	    },
-	{ TCX_UNK2,		0,		0x20000		    },
-	{ 0,			0,		0		    }
+	{
+		.voff	= TCX_RAM8BIT,
+		.size	= SBUS_MMAP_FBSIZE(1)
+	},
+	{
+		.voff	= TCX_RAM24BIT,
+		.size	= SBUS_MMAP_FBSIZE(4)
+	},
+	{
+		.voff	= TCX_UNK3,
+		.size	= SBUS_MMAP_FBSIZE(8)
+	},
+	{
+		.voff	= TCX_UNK4,
+		.size	= SBUS_MMAP_FBSIZE(8)
+	},
+	{
+		.voff	= TCX_CONTROLPLANE,
+		.size	= SBUS_MMAP_FBSIZE(4)
+	},
+	{
+		.voff	= TCX_UNK6,
+		.size	= SBUS_MMAP_FBSIZE(8)
+	},
+	{
+		.voff	= TCX_UNK7,
+		.size	= SBUS_MMAP_FBSIZE(8)
+	},
+	{
+		.voff	= TCX_TEC,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= TCX_BTREGS,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= TCX_THC,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= TCX_DHC,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= TCX_ALT,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= TCX_UNK2,
+		.size	= 0x20000
+	},
+	{ .size = 0 }
 };
 
 static int tcx_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)

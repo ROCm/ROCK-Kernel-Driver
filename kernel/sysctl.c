@@ -93,6 +93,7 @@ extern int sem_ctls[];
 #ifdef __sparc__
 extern char reboot_command [];
 extern int stop_a_enabled;
+extern int scons_pwroff;
 #endif
 
 #ifdef __hppa__
@@ -321,6 +322,14 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_SPARC_STOP_A,
 		.procname	= "stop-a",
 		.data		= &stop_a_enabled,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_SPARC_SCONS_PWROFF,
+		.procname	= "scons-poweroff",
+		.data		= &scons_pwroff,
 		.maxlen		= sizeof (int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
