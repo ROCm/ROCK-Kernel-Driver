@@ -26,7 +26,6 @@ unsigned int pg_iobits;
 
 extern void ld_mmu_sun4c(void);
 extern void ld_mmu_srmmu(void);
-extern void ioport_init(void);
 
 void __init load_mmu(void)
 {
@@ -44,5 +43,4 @@ void __init load_mmu(void)
 		prom_halt();
 	}
 	btfixup();
-	ioport_init();
 }

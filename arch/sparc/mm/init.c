@@ -88,8 +88,6 @@ void show_mem(void)
 #endif
 }
 
-extern pgprot_t protection_map[16];
-
 void __init sparc_context_init(int numctx)
 {
 	int ctx;
