@@ -131,13 +131,6 @@ int vm_enough_memory(long pages)
 	return 0;
 }
 
-void vm_unacct_vma(struct vm_area_struct *vma)
-{
-	int len = vma->vm_end - vma->vm_start;
-	if (vma->vm_flags & VM_ACCOUNT)
-		vm_unacct_memory(len >> PAGE_SHIFT);
-}
-
 /* Remove one vm structure from the inode's i_mapping address space. */
 static inline void __remove_shared_vm_struct(struct vm_area_struct *vma)
 {
@@ -1225,7 +1218,7 @@ void exit_mmap(struct mm_struct * mm)
 		 * removal
 		 */
 		if (mpnt->vm_flags & VM_ACCOUNT)
-			vm_unacct_vma(mpnt);
+			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
 		unmap_page_range(tlb, mpnt, start, end);
