@@ -48,14 +48,16 @@ struct klock_info_struct klock_info = { KLOCK_CLEAR, 0 };
 atomic_t ipi_recv;
 atomic_t ipi_sent;
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-unsigned int prof_multiplier[NR_CPUS];
-unsigned int prof_counter[NR_CPUS];
-unsigned long cache_decay_ticks;
-static int max_cpus __initdata = NR_CPUS;
-unsigned long cpu_online_map;
+unsigned int prof_multiplier[NR_CPUS] = { [1 ... NR_CPUS-1] = 1 };
+unsigned int prof_counter[NR_CPUS] = { [1 ... NR_CPUS-1] = 1 };
+unsigned long cache_decay_ticks = HZ/100;
+unsigned long cpu_online_map = 1UL;
+unsigned long cpu_possible_map = 1UL;
 int smp_hw_index[NR_CPUS];
-static struct smp_ops_t *smp_ops;
 struct thread_info *secondary_ti;
+
+/* SMP operations for this machine */
+static struct smp_ops_t *smp_ops;
 
 /* all cpu mappings are 1-1 -- Cort */
 volatile unsigned long cpu_callin_map[NR_CPUS];
@@ -69,10 +71,6 @@ extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 static int __smp_call_function(void (*func) (void *info), void *info,
 			       int wait, int target);
-
-#ifdef CONFIG_PPC_ISERIES
-extern void smp_iSeries_space_timers( unsigned nr );
-#endif
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  * 
@@ -291,6 +289,7 @@ void smp_call_function_interrupt(void)
 		atomic_inc(&call_data->finished);
 }
 
+#if 0 /* Old boot code. */
 void __init smp_boot_cpus(void)
 {
 	int i, cpu_nr;
@@ -556,3 +555,156 @@ static int __init maxcpus(char *str)
 }
 
 __setup("maxcpus=", maxcpus);
+#else /* New boot code */
+/* FIXME: Do this properly for all archs --RR */
+static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int timebase_upper = 0, timebase_lower = 0;
+
+void __devinit
+smp_generic_give_timebase(void)
+{
+	spin_lock(&timebase_lock);
+	do {
+		timebase_upper = get_tbu();
+		timebase_lower = get_tbl();
+	} while (timebase_upper != get_tbu());
+	spin_unlock(&timebase_lock);
+
+	while (timebase_upper || timebase_lower)
+		rmb();
+}
+
+void __devinit
+smp_generic_take_timebase(void)
+{
+	int done = 0;
+
+	while (!done) {
+		spin_lock(&timebase_lock);
+		if (timebase_upper || timebase_lower) {
+			set_tb(timebase_upper, timebase_lower);
+			timebase_upper = 0;
+			timebase_lower = 0;
+			done = 1;
+		}
+		spin_unlock(&timebase_lock);
+	}
+}
+
+static void __devinit smp_store_cpu_info(int id)
+{
+        struct cpuinfo_PPC *c = &cpu_data[id];
+
+	/* assume bogomips are same for everything */
+        c->loops_per_jiffy = loops_per_jiffy;
+        c->pvr = mfspr(PVR);
+}
+
+void __init smp_prepare_cpus(unsigned int max_cpus)
+{
+	int num_cpus;
+
+	/* Fixup boot cpu */
+        smp_store_cpu_info(smp_processor_id());
+	cpu_callin_map[smp_processor_id()] = 1;
+
+	smp_ops = ppc_md.smp_ops;
+	if (smp_ops == NULL) {
+		printk("SMP not supported on this machine.\n");
+		return;
+	}
+
+	/* Probe platform for CPUs: always linear. */
+	num_cpus = smp_ops->probe();
+	cpu_possible_map = (1 << num_cpus)-1;
+
+	if (smp_ops->space_timers)
+		smp_ops->space_timers(num_cpus);
+}
+
+int __init setup_profiling_timer(unsigned int multiplier)
+{
+	return 0;
+}
+
+/* Processor coming up starts here */
+int __devinit start_secondary(void *unused)
+{
+	int cpu;
+
+	atomic_inc(&init_mm.mm_count);
+	current->active_mm = &init_mm;
+
+	cpu = smp_processor_id();
+        smp_store_cpu_info(cpu);
+	set_dec(tb_ticks_per_jiffy);
+	cpu_callin_map[cpu] = 1;
+
+	printk("CPU %i done callin...\n", cpu);
+	smp_ops->setup_cpu(cpu);
+	printk("CPU %i done setup...\n", cpu);
+	smp_ops->take_timebase();
+	printk("CPU %i done timebase take...\n", cpu);
+
+	return cpu_idle(NULL);
+}
+
+int __cpu_up(unsigned int cpu)
+{
+	struct pt_regs regs;
+	struct task_struct *p;
+	char buf[32];
+	int c;
+
+	/* create a process for the processor */
+	/* only regs.msr is actually used, and 0 is OK for it */
+	memset(&regs, 0, sizeof(struct pt_regs));
+	p = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0);
+	if (IS_ERR(p))
+		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
+
+	init_idle(p, cpu);
+	unhash_process(p);
+
+	secondary_ti = p->thread_info;
+	p->thread_info->cpu = cpu;
+
+	/*
+	 * There was a cache flush loop here to flush the cache
+	 * to memory for the first 8MB of RAM.  The cache flush
+	 * has been pushed into the kick_cpu function for those
+	 * platforms that need it.
+	 */
+
+	/* wake up cpu */
+	smp_ops->kick_cpu(cpu);
+		
+	/*
+	 * wait to see if the cpu made a callin (is actually up).
+	 * use this value that I found through experimentation.
+	 * -- Cort
+	 */
+	for (c = 1000; c && !cpu_callin_map[cpu]; c--)
+		udelay(100);
+
+	if (!cpu_callin_map[cpu]) {
+		sprintf(buf, "didn't find cpu %u", cpu);
+		if (ppc_md.progress) ppc_md.progress(buf, 0x360+cpu);
+		printk("Processor %u is stuck.\n", cpu);
+		return -ENOENT;
+	}
+
+	sprintf(buf, "found cpu %u", cpu);
+	if (ppc_md.progress) ppc_md.progress(buf, 0x350+cpu);
+	printk("Processor %d found.\n", cpu);
+
+	smp_ops->give_timebase();
+	set_bit(cpu, &cpu_online_map);
+	return 0;
+}
+
+void smp_cpus_done(unsigned int max_cpus)
+{
+	smp_ops->setup_cpu(0);
+}
+#endif

@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
@@ -30,7 +31,7 @@
 /*
  * This is the list of registered PCI chipset driver data structures.
  */
-static struct ata_pci_device *ata_pci_device_list = NULL;
+static struct ata_pci_device *ata_pci_device_list; /* = NULL */
 
 /*
  * This function supplies the data necessary to detect the particular chipset.

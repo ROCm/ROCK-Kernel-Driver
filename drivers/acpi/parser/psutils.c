@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 52 $
+ *              $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -88,7 +88,7 @@ acpi_ps_init_op (
 	op->common.data_type = ACPI_DESC_TYPE_PARSER;
 	op->common.aml_opcode = opcode;
 
-	ACPI_DEBUG_ONLY_MEMBERS (ACPI_STRNCPY (op->common.aml_op_name,
+	ACPI_DISASM_ONLY_MEMBERS (ACPI_STRNCPY (op->common.aml_op_name,
 			(acpi_ps_get_opcode_info (opcode))->name, sizeof (op->common.aml_op_name)));
 }
 
@@ -186,7 +186,7 @@ acpi_ps_free_op (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Free retval op: %p\n", op));
 	}
 
-	if (op->common.flags == ACPI_PARSEOP_GENERIC) {
+	if (op->common.flags & ACPI_PARSEOP_GENERIC) {
 		acpi_ut_release_to_cache (ACPI_MEM_LIST_PSNODE, op);
 	}
 	else {

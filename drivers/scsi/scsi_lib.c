@@ -51,53 +51,6 @@
  */
 
 /*
- * Function:	__scsi_insert_special()
- *
- * Purpose:	worker for scsi_insert_special_*()
- *
- * Arguments:	q - request queue where request should be inserted
- *		rq - request to be inserted
- * 		data - private data
- *		at_head - insert request at head or tail of queue
- *
- * Lock status:	Assumed that queue lock is not held upon entry.
- *
- * Returns:	Nothing
- */
-static void __scsi_insert_special(request_queue_t *q, struct request *rq,
-				  void *data, int at_head)
-{
-	unsigned long flags;
-
-	ASSERT_LOCK(q->queue_lock, 0);
-
-	/*
-	 * tell I/O scheduler that this isn't a regular read/write (ie it
-	 * must not attempt merges on this) and that it acts as a soft
-	 * barrier
-	 */
-	rq->flags &= REQ_QUEUED;
-	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
-
-	rq->special = data;
-
-	/*
-	 * We have the option of inserting the head or the tail of the queue.
-	 * Typically we use the tail for new ioctls and so forth.  We use the
-	 * head of the queue for things like a QUEUE_FULL message from a
-	 * device, or a host that is unable to accept a particular command.
-	 */
-	spin_lock_irqsave(q->queue_lock, flags);
-	/* If command is tagged, release the tag */
-	if(blk_rq_tagged(rq))
-		blk_queue_end_tag(q, rq);
-	_elv_add_request(q, rq, !at_head, 0);
-	q->request_fn(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
-}
-
-
-/*
  * Function:    scsi_insert_special_cmd()
  *
  * Purpose:     Insert pre-formed command into request queue.
@@ -121,7 +74,7 @@ int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int at_head)
 {
 	request_queue_t *q = &SCpnt->device->request_queue;
 
-	__scsi_insert_special(q, SCpnt->request, SCpnt, at_head);
+	blk_insert_request(q, SCpnt->request, at_head, SCpnt);
 	return 0;
 }
 
@@ -149,7 +102,7 @@ int scsi_insert_special_req(Scsi_Request * SRpnt, int at_head)
 {
 	request_queue_t *q = &SRpnt->sr_device->request_queue;
 
-	__scsi_insert_special(q, SRpnt->sr_request, SRpnt, at_head);
+	blk_insert_request(q, SRpnt->sr_request, at_head, SRpnt);
 	return 0;
 }
 

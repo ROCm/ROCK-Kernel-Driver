@@ -827,7 +827,7 @@ typedef struct {
 	/*
 	 *	Read position information
 	 */
-	byte partition;
+	u8 partition;
 	unsigned int first_frame_position;		/* Current block */
 	unsigned int last_frame_position;
 	unsigned int blocks_in_buffer;
@@ -835,7 +835,7 @@ typedef struct {
 	/*
 	 *	Last error information
 	 */
-	byte sense_key, asc, ascq;
+	u8 sense_key, asc, ascq;
 
 	/*
 	 *	Character device operation
@@ -1237,7 +1237,7 @@ static int idetape_chrdev_present = 0;
  * DO NOT REMOVE, BUILDING A VERBOSE DEBUG SCHEME FOR ATAPI
  */
 
-char *idetape_sense_key_verbose (byte idetape_sense_key)
+char *idetape_sense_key_verbose(u8 idetape_sense_key)
 {
 	switch (idetape_sense_key) {
 		default: {

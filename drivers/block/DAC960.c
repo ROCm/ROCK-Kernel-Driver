@@ -2884,7 +2884,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   Command->BufferHeader = Request->bio;
   Command->RequestBuffer = Request->buffer;
   blkdev_dequeue_request(Request);
-  blkdev_release_request(Request);
+  blk_put_request(Request);
   DAC960_QueueReadWriteCommand(Command);
   return true;
 }

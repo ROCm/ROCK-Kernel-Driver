@@ -718,8 +718,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		u32	cmd = readl (&ehci->regs->command);
 
 		/* in case a clear of CMD_ASE didn't take yet */
-		while (readl (&ehci->regs->status) & STS_ASS)
-			udelay (100);
+		(void) handshake (&ehci->regs->status, STS_ASS, 0, 150);
 
 		qh->hw_info1 |= __constant_cpu_to_le32 (QH_HEAD); /* [4.8] */
 		qh->qh_next.qh = qh;
@@ -917,11 +916,8 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		if (ehci->hcd.state != USB_STATE_HALT) {
 			if (cmd & CMD_PSE)
 				writel (cmd & ~CMD_ASE, &ehci->regs->command);
-			else {
+			else
 				ehci_ready (ehci);
-				while (readl (&ehci->regs->status) & STS_ASS)
-					udelay (100);
-			}
 		}
 		qh->qh_next.qh = ehci->async = 0;
 

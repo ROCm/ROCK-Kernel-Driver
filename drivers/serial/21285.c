@@ -344,33 +344,33 @@ static int serial21285_verify_port(struct uart_port *port, struct serial_struct 
 }
 
 static struct uart_ops serial21285_ops = {
-	tx_empty:	serial21285_tx_empty,
-	get_mctrl:	serial21285_get_mctrl,
-	set_mctrl:	serial21285_set_mctrl,
-	stop_tx:	serial21285_stop_tx,
-	start_tx:	serial21285_start_tx,
-	stop_rx:	serial21285_stop_rx,
-	enable_ms:	serial21285_enable_ms,
-	break_ctl:	serial21285_break_ctl,
-	startup:	serial21285_startup,
-	shutdown:	serial21285_shutdown,
-	change_speed:	serial21285_change_speed,
-	type:		serial21285_type,
-	release_port:	serial21285_release_port,
-	request_port:	serial21285_request_port,
-	config_port:	serial21285_config_port,
-	verify_port:	serial21285_verify_port,
+	.tx_empty	= serial21285_tx_empty,
+	.get_mctrl	= serial21285_get_mctrl,
+	.set_mctrl	= serial21285_set_mctrl,
+	.stop_tx	= serial21285_stop_tx,
+	.start_tx	= serial21285_start_tx,
+	.stop_rx	= serial21285_stop_rx,
+	.enable_ms	= serial21285_enable_ms,
+	.break_ctl	= serial21285_break_ctl,
+	.startup	= serial21285_startup,
+	.shutdown	= serial21285_shutdown,
+	.change_speed	= serial21285_change_speed,
+	.type		= serial21285_type,
+	.release_port	= serial21285_release_port,
+	.request_port	= serial21285_request_port,
+	.config_port	= serial21285_config_port,
+	.verify_port	= serial21285_verify_port,
 };
 
 static struct uart_port serial21285_port = {
-	membase:	0,
-	mapbase:	0x42000160,
-	iotype:		SERIAL_IO_MEM,
-	irq:		NO_IRQ,
-	uartclk:	0,
-	fifosize:	16,
-	ops:		&serial21285_ops,
-	flags:		ASYNC_BOOT_AUTOCONF,
+	.membase	= 0,
+	.mapbase	= 0x42000160,
+	.iotype		= SERIAL_IO_MEM,
+	.irq		= NO_IRQ,
+	.uartclk	= 0,
+	.fifosize	= 16,
+	.ops		= &serial21285_ops,
+	.flags		= ASYNC_BOOT_AUTOCONF,
 };
 
 static void serial21285_setup_ports(void)
@@ -466,23 +466,23 @@ static int __init serial21285_console_setup(struct console *co, char *options)
 #ifdef CONFIG_SERIAL_21285_OLD
 static struct console serial21285_old_cons =
 {
-	name:		SERIAL_21285_OLD_NAME,
-	write:		serial21285_console_write,
-	device:		serial21285_console_device,
-	setup:		serial21285_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= SERIAL_21285_OLD_NAME,
+	.write		= serial21285_console_write,
+	.device		= serial21285_console_device,
+	.setup		= serial21285_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 #endif
 
 static struct console serial21285_console =
 {
-	name:		SERIAL_21285_NAME,
-	write:		serial21285_console_write,
-	device:		serial21285_console_device,
-	setup:		serial21285_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= SERIAL_21285_NAME,
+	.write		= serial21285_console_write,
+	.device		= serial21285_console_device,
+	.setup		= serial21285_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init rs285_console_init(void)
@@ -497,17 +497,17 @@ void __init rs285_console_init(void)
 #endif
 
 static struct uart_driver serial21285_reg = {
-	owner:			THIS_MODULE,
-	driver_name:		"ttyFB",
+	.owner			= THIS_MODULE,
+	.driver_name		= "ttyFB",
 #ifdef CONFIG_DEVFS_FS
-	dev_name:		"ttyFB%d",
+	.dev_name		= "ttyFB%d",
 #else
-	dev_name:		"ttyFB",
+	.dev_name		= "ttyFB",
 #endif
-	major:			SERIAL_21285_MAJOR,
-	minor:			SERIAL_21285_MINOR,
-	nr:			1,
-	cons:			SERIAL_21285_CONSOLE,
+	.major			= SERIAL_21285_MAJOR,
+	.minor			= SERIAL_21285_MINOR,
+	.nr			= 1,
+	.cons			= SERIAL_21285_CONSOLE,
 };
 
 static int __init serial21285_init(void)

@@ -281,12 +281,13 @@ extern int wipe_partitions(kdev_t dev);
 extern void register_disk(struct gendisk *dev, kdev_t first, unsigned minors, struct block_device_operations *ops, long size);
 extern void generic_make_request(struct bio *bio);
 extern inline request_queue_t *bdev_get_queue(struct block_device *bdev);
-extern void blkdev_release_request(struct request *);
+extern void blk_put_request(struct request *);
 extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern void __blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
 extern struct request *__blk_get_request(request_queue_t *, int);
 extern void blk_put_request(struct request *);
+extern void blk_insert_request(request_queue_t *, struct request *, int, void *);
 extern void blk_plug_device(request_queue_t *);
 extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
@@ -309,19 +310,20 @@ extern int blk_init_queue(request_queue_t *, request_fn_proc *, spinlock_t *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void blk_queue_bounce_limit(request_queue_t *, u64);
-extern void blk_queue_max_sectors(request_queue_t *q, unsigned short);
-extern void blk_queue_max_phys_segments(request_queue_t *q, unsigned short);
-extern void blk_queue_max_hw_segments(request_queue_t *q, unsigned short);
-extern void blk_queue_max_segment_size(request_queue_t *q, unsigned int);
-extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
-extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
-extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
-extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
+extern void blk_queue_max_sectors(request_queue_t *, unsigned short);
+extern void blk_queue_max_phys_segments(request_queue_t *, unsigned short);
+extern void blk_queue_max_hw_segments(request_queue_t *, unsigned short);
+extern void blk_queue_max_segment_size(request_queue_t *, unsigned int);
+extern void blk_queue_hardsect_size(request_queue_t *, unsigned short);
+extern void blk_queue_segment_boundary(request_queue_t *, unsigned long);
+extern void blk_queue_assign_lock(request_queue_t *, spinlock_t *);
+extern void blk_queue_prep_rq(request_queue_t *, prep_rq_fn *pfn);
 extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
+
 
 /*
  * tag stuff
@@ -348,15 +350,12 @@ extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
 
 extern void drive_stat_acct(struct request *, int, int);
 
-extern inline void blk_clear(int major)
+static inline void blk_clear(int major)
 {
 	blk_size[major] = NULL;
-#if 0
-	blk_size_in_bytes[major] = NULL;
-#endif
 }
 
-extern inline int queue_hardsect_size(request_queue_t *q)
+static inline int queue_hardsect_size(request_queue_t *q)
 {
 	int retval = 512;
 
@@ -366,7 +365,7 @@ extern inline int queue_hardsect_size(request_queue_t *q)
 	return retval;
 }
 
-extern inline int bdev_hardsect_size(struct block_device *bdev)
+static inline int bdev_hardsect_size(struct block_device *bdev)
 {
 	return queue_hardsect_size(bdev_get_queue(bdev));
 }
@@ -375,7 +374,7 @@ extern inline int bdev_hardsect_size(struct block_device *bdev)
 #define blk_started_io(nsects)	do { } while (0)
 
 /* assumes size > 256 */
-extern inline unsigned int blksize_bits(unsigned int size)
+static inline unsigned int blksize_bits(unsigned int size)
 {
 	unsigned int bits = 8;
 	do {

@@ -268,6 +268,16 @@ CONFIG_USB_SERIAL_EDGEPORT
   The module will be called io_edgeport.o.  If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_SERIAL_EDGEPORT_TI
+  Say Y here if you want to use any of the devices from Inside Out
+  Networks (Digi) that are not supported by the io_edgeport driver.
+  This includes the Edgeport/1 device.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called io_ti.o.  If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_USB_SERIAL_KLSI
   Say Y here if you want to use a KL5KUSB105 - based single port
   serial adapter. The most widely known -- and currently the only

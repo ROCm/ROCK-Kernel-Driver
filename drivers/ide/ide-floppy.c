@@ -245,8 +245,8 @@ typedef struct {
 	/*
 	 *	Last error information
 	 */
-	byte sense_key, asc, ascq;
-	byte ticks;		/* delay this long before sending packet command */
+	u8 sense_key, asc, ascq;
+	u8 ticks;		/* delay this long before sending packet command */
 	int progress_indication;
 
 	/*

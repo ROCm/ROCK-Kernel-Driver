@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 67 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -70,9 +70,11 @@ acpi_ds_init_callbacks (
 		break;
 
 	case 3:
+#ifndef ACPI_NO_METHOD_EXECUTION
 		walk_state->parse_flags      |= ACPI_PARSE_EXECUTE  | ACPI_PARSE_DELETE_TREE;
 		walk_state->descending_callback = acpi_ds_exec_begin_op;
 		walk_state->ascending_callback = acpi_ds_exec_end_op;
+#endif
 		break;
 
 	default:
@@ -169,6 +171,11 @@ acpi_ds_load1_begin_op (
 
 	op->named.name = node->name.integer;
 
+#if (defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY))
+	op->named.path = (u8 *) path;
+#endif
+
+
 	/*
 	 * Put the Node in the "op" object that the parser uses, so we
 	 * can get it again quickly when this scope is closed
@@ -221,6 +228,7 @@ acpi_ds_load1_end_op (
 
 	object_type = walk_state->op_info->object_type;
 
+#ifndef ACPI_NO_METHOD_EXECUTION
 	if (walk_state->op_info->flags & AML_FIELD) {
 		if (walk_state->opcode == AML_FIELD_OP         ||
 			walk_state->opcode == AML_BANK_FIELD_OP    ||
@@ -238,6 +246,7 @@ acpi_ds_load1_end_op (
 			return (status);
 		}
 	}
+#endif
 
 	if (op->common.aml_opcode == AML_NAME_OP) {
 		/* For Name opcode, get the object type from the argument */
@@ -430,7 +439,9 @@ acpi_ds_load2_end_op (
 	acpi_namespace_node     *node;
 	acpi_parse_object       *arg;
 	acpi_namespace_node     *new_node;
+#ifndef ACPI_NO_METHOD_EXECUTION
 	u32                     i;
+#endif
 
 
 	ACPI_FUNCTION_NAME ("Ds_load2_end_op");
@@ -478,6 +489,7 @@ acpi_ds_load2_end_op (
 		}
 	}
 
+
 	/*
 	 * Named operations are as follows:
 	 *
@@ -515,6 +527,8 @@ acpi_ds_load2_end_op (
 	arg = op->common.value.arg;
 
 	switch (walk_state->op_info->type) {
+#ifndef ACPI_NO_METHOD_EXECUTION
+
 	case AML_TYPE_CREATE_FIELD:
 
 		/*
@@ -604,7 +618,7 @@ acpi_ds_load2_end_op (
 		}
 
 		break;
-
+#endif /* ACPI_NO_METHOD_EXECUTION */
 
 	case AML_TYPE_NAMED_COMPLEX:
 
@@ -629,6 +643,7 @@ acpi_ds_load2_end_op (
 			break;
 
 
+#ifndef ACPI_NO_METHOD_EXECUTION
 		case AML_REGION_OP:
 			/*
 			 * The Op_region is not fully parsed at this time. Only valid argument is the Space_id.
@@ -656,6 +671,7 @@ acpi_ds_load2_end_op (
 
 			status = acpi_ds_create_node (walk_state, node, op);
 			break;
+#endif /* ACPI_NO_METHOD_EXECUTION */
 
 
 		default:

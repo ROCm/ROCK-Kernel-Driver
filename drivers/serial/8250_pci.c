@@ -1112,10 +1112,10 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 #endif
 
 static struct pci_driver serial_pci_driver = {
-	name:		"serial",
-	probe:		pci_init_one,
-	remove:		__devexit_p(pci_remove_one),
-	id_table:	serial_pci_tbl,
+	.name		= "serial",
+	.probe		= pci_init_one,
+	.remove		= __devexit_p(pci_remove_one),
+	.id_table	= serial_pci_tbl,
 };
 
 static int __init serial8250_pci_init(void)

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 62 $
+ *       $Revision: 63 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,6 @@
 
 
 #define ACPI_DEBUG_BUFFER_SIZE  4196
-
 
 typedef struct command_info
 {
@@ -186,47 +185,6 @@ acpi_db_walk_for_specific_objects (
 
 
 /*
- * dbdisasm - AML disassembler
- */
-
-void
-acpi_db_display_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *origin,
-	u32                     num_opcodes);
-
-void
-acpi_db_display_namestring (
-	NATIVE_CHAR             *name);
-
-void
-acpi_db_display_path (
-	acpi_parse_object       *op);
-
-void
-acpi_db_display_opcode (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
-
-void
-acpi_db_decode_internal_object (
-	acpi_operand_object     *obj_desc);
-
-void
-acpi_db_decode_node (
-	acpi_namespace_node     *node);
-
-u32
-acpi_db_block_type (
-	acpi_parse_object       *op);
-
-acpi_status
-acpi_ps_display_object_pathname (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
-
-
-/*
  * dbdisply - debug display commands
  */
 
@@ -281,6 +239,10 @@ acpi_db_dump_parser_descriptor (
 void *
 acpi_db_get_pointer (
 	void                    *target);
+
+void
+acpi_db_decode_internal_object (
+	acpi_operand_object     *obj_desc);
 
 
 /*

@@ -1006,14 +1006,20 @@ int parport_claim_or_block(struct pardevice *dev)
 #ifdef PARPORT_DEBUG_SHARING
 		printk(KERN_DEBUG "%s: parport_claim() returned -EAGAIN\n", dev->name);
 #endif
-		save_flags (flags);
-		cli();
+		/*
+		 * FIXME!!! Use the proper locking for dev->waiting,
+		 * and make this use the "wait_event_interruptible()"
+		 * interfaces. The cli/sti that used to be here
+		 * did nothing.
+		 *
+		 * See also parport_release()
+		 */
+
 		/* If dev->waiting is clear now, an interrupt
 		   gave us the port and we would deadlock if we slept.  */
 		if (dev->waiting) {
 			interruptible_sleep_on (&dev->wait_q);
 			if (signal_pending (current)) {
-				restore_flags (flags);
 				return -EINTR;
 			}
 			r = 1;
@@ -1024,7 +1030,7 @@ int parport_claim_or_block(struct pardevice *dev)
 			       dev->name);
 #endif
 		}
-		restore_flags(flags);
+
 #ifdef PARPORT_DEBUG_SHARING
 		if (dev->port->physport->cad != dev)
 			printk(KERN_DEBUG "%s: exiting parport_claim_or_block "

@@ -126,7 +126,7 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned int ctrl, using_inta;
-	byte progif;
+	u8 progif;
 
 	/* Set a good latency timer and cache line size value. */
 	(void) pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);

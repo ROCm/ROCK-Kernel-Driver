@@ -1,5 +1,5 @@
 /*
- *  acpi_fan.c - ACPI Fan Driver ($Revision: 28 $)
+ *  acpi_fan.c - ACPI Fan Driver ($Revision: 29 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -47,13 +47,13 @@ int acpi_fan_add (struct acpi_device *device);
 int acpi_fan_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_fan_driver = {
-	name:			ACPI_FAN_DRIVER_NAME,
-	class:			ACPI_FAN_CLASS,
-	ids:			ACPI_FAN_HID,
-	ops:			{
-					add:	acpi_fan_add,
-					remove:	acpi_fan_remove,
-				},
+	.name =		ACPI_FAN_DRIVER_NAME,
+	.class =	ACPI_FAN_CLASS,
+	.ids =		ACPI_FAN_HID,
+	.ops =		{
+				.add =		acpi_fan_add,
+				.remove =	acpi_fan_remove,
+			},
 };
 
 struct acpi_fan {

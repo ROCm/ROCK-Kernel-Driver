@@ -756,6 +756,8 @@ static struct smp_ops_t prep_smp_ops __prepdata = {
 	smp_prep_probe,
 	smp_prep_kick_cpu,
 	smp_prep_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
 #endif /* CONFIG_SMP */
 

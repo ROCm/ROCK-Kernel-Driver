@@ -31,15 +31,21 @@ struct ed {
 
 	/* rest are purely for the driver's use */
 	dma_addr_t		dma;		/* addr of ED */
+	struct td		*dummy;		/* next TD to activate */
+
+	/* host's view of schedule */
+	struct ed		*ed_next;	/* on schedule or rm_list */
 	struct ed		*ed_prev;	/* for non-interrupt EDs */
-	struct td		*dummy;
 	struct list_head	td_list;	/* "shadow list" of our TDs */
 
-	u8			state;		/* ED_{NEW,UNLINK,OPER} */
-#define ED_NEW 		0x00		/* unused, no dummy td */
-#define ED_UNLINK 	0x01		/* dummy td, maybe linked to hc */
-#define ED_OPER		0x02		/* dummy td, _is_ linked to hc */
-#define ED_URB_DEL  	0x08		/* for unlinking; masked in */
+	/* create --> IDLE --> OPER --> ... --> IDLE --> destroy
+	 * usually:  OPER --> UNLINK --> (IDLE | OPER) --> ...
+	 * some special cases :  OPER --> IDLE ...
+	 */
+	u8			state;		/* ED_{IDLE,UNLINK,OPER} */
+#define ED_IDLE 	0x00		/* NOT linked to HC */
+#define ED_UNLINK 	0x01		/* being unlinked from hc */
+#define ED_OPER		0x02		/* IS linked to hc */
 
 	u8			type; 		/* PIPE_{BULK,...} */
 	u16			interval;	/* interrupt, isochronous */
@@ -53,7 +59,6 @@ struct ed {
 
 	/* HC may see EDs on rm_list until next frame (frame_no == tick) */
 	u16			tick;
-	struct ed		*ed_rm_list;
 } __attribute__ ((aligned(16)));
 
 #define ED_MASK	((u32)~0x0f)		/* strip hw status in low addr bits */
@@ -396,5 +401,5 @@ struct ohci_hcd {
 	struct usb_hcd		hcd;
 };
 
-#define hcd_to_ohci(hcd_ptr) list_entry(hcd_ptr, struct ohci_hcd, hcd)
+#define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
 

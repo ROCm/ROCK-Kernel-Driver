@@ -60,5 +60,7 @@ extern int notifier_call_chain(struct notifier_block **n, unsigned long val, voi
 
 #define NETLINK_URELEASE	0x0001	/* Unicast netlink socket released */
 
+#define CPU_ONLINE	0x0002 /* CPU (unsigned)v coming up */
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_NOTIFIER_H */

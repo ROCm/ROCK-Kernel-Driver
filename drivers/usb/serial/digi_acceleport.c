@@ -1263,7 +1263,7 @@ static int digi_write( struct usb_serial_port *port, int from_user,
 	unsigned long flags = 0;
 
 
-dbg( "digi_write: TOP: port=%d, count=%d, from_user=%d, in_interrupt=%d",
+dbg( "digi_write: TOP: port=%d, count=%d, from_user=%d, in_interrupt=%ld",
 priv->dp_port_num, count, from_user, in_interrupt() );
 
 	/* copy user data (which can sleep) before getting spin lock */
@@ -1744,7 +1744,7 @@ static void digi_shutdown( struct usb_serial *serial )
 	int i;
 
 
-dbg( "digi_shutdown: TOP, in_interrupt()=%d", in_interrupt() );
+dbg( "digi_shutdown: TOP, in_interrupt()=%ld", in_interrupt() );
 
 	/* stop reads and writes on all ports */
 	for( i=0; i<serial->type->num_ports+1; i++ ) {

@@ -18,13 +18,13 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/hdreg.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #define CMD_DEBUG 0
@@ -81,8 +81,8 @@
  * Registers and masks for easy access by drive index:
  */
 #if 0
-static byte prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
-static byte prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
+static u8 prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
+static u8 prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
 #endif
 
 /*
@@ -93,15 +93,15 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
 {
 	unsigned long flags;
 	struct ata_device *drives = drive->channel->drives;
-	byte temp_b;
-	static const byte setup_counts[] = {0x40, 0x40, 0x40, 0x80, 0, 0xc0};
-	static const byte recovery_counts[] =
+	u8 temp_b;
+	static const u8 setup_counts[] = {0x40, 0x40, 0x40, 0x80, 0, 0xc0};
+	static const u8 recovery_counts[] =
 		{15, 15, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0};
-	static const byte arttim_regs[2][2] = {
+	static const u8 arttim_regs[2][2] = {
 			{ ARTTIM0, ARTTIM1 },
 			{ ARTTIM23, ARTTIM23 }
 		};
-	static const byte drwtim_regs[2][2] = {
+	static const u8 drwtim_regs[2][2] = {
 			{ DRWTIM0, DRWTIM1 },
 			{ DRWTIM2, DRWTIM3 }
 		};
@@ -142,11 +142,11 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
 	 */
 	(void) pci_read_config_byte(drive->channel->pci_dev, arttim_regs[channel][slave], &temp_b);
 	(void) pci_write_config_byte(drive->channel->pci_dev, arttim_regs[channel][slave],
-		((byte) setup_count) | (temp_b & 0x3f));
+		((u8) setup_count) | (temp_b & 0x3f));
 	(void) pci_write_config_byte(drive->channel->pci_dev, drwtim_regs[channel][slave],
-		(byte) ((active_count << 4) | recovery_count));
-	cmdprintk ("Write %x to %x\n", ((byte) setup_count) | (temp_b & 0x3f), arttim_regs[channel][slave]);
-	cmdprintk ("Write %x to %x\n", (byte) ((active_count << 4) | recovery_count), drwtim_regs[channel][slave]);
+		(u8) ((active_count << 4) | recovery_count));
+	cmdprintk ("Write %x to %x\n", ((u8) setup_count) | (temp_b & 0x3f), arttim_regs[channel][slave]);
+	cmdprintk ("Write %x to %x\n", (u8) ((active_count << 4) | recovery_count), drwtim_regs[channel][slave]);
 	local_irq_restore(flags);
 }
 
@@ -405,7 +405,7 @@ static int cmd64x_tune_chipset(struct ata_device *drive, u8 speed)
 	return ide_config_drive_speed(drive, speed);
 }
 
-static int cmd680_tune_chipset(struct ata_device *drive, byte speed)
+static int cmd680_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
@@ -520,9 +520,9 @@ static int cmd64x_udma_stop(struct ata_device *drive)
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
 	if (jack_slap) {
-		byte dma_intr = 0;
-		byte dma_mask = (ch->unit) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
-		byte dma_reg = (ch->unit) ? ARTTIM2 : CFR;
+		u8 dma_intr = 0;
+		u8 dma_mask = (ch->unit) ? ARTTIM23_INTR_CH1 : CFR_INTR_CH0;
+		u8 dma_reg = (ch->unit) ? ARTTIM2 : CFR;
 		(void) pci_read_config_byte(dev, dma_reg, &dma_intr);
 		/*
 		 * DAMN BMIDE is not connected to PCI space!

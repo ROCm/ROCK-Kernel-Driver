@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 65 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -837,7 +837,7 @@ acpi_ds_create_walk_state (
 
 	/* Init the method args/local */
 
-#ifndef _ACPI_ASL_COMPILER
+#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
 	acpi_ds_method_data_init (walk_state);
 #endif
 
@@ -858,7 +858,6 @@ acpi_ds_create_walk_state (
 }
 
 
-#ifndef _ACPI_ASL_COMPILER
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ds_init_aml_walk
@@ -943,7 +942,6 @@ acpi_ds_init_aml_walk (
 	status = acpi_ds_init_callbacks (walk_state, pass_number);
 	return_ACPI_STATUS (status);
 }
-#endif
 
 
 /*******************************************************************************

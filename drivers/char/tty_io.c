@@ -545,6 +545,7 @@ void tty_vhangup(struct tty_struct * tty)
 #endif
 	do_tty_hangup((void *) tty);
 }
+EXPORT_SYMBOL(tty_vhangup);
 
 int tty_hung_up_p(struct file * filp)
 {

@@ -34,8 +34,9 @@
 #include <linux/jiffies.h>
 #include <linux/init.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/pci.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/prom.h>
 #include <asm/io.h>
@@ -51,7 +52,7 @@
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #endif
-#include "ata-timing.h"
+#include "timing.h"
 
 #undef IDE_PMAC_DEBUG
 
@@ -262,8 +263,8 @@ static int pmac_udma_init(struct ata_device *drive, struct request *rq);
 static int pmac_udma_irq_status(struct ata_device *drive);
 static int pmac_udma_setup(struct ata_device *drive, int map);
 static int pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr);
-static int pmac_ide_tune_chipset(struct ata_device *drive, byte speed);
-static void pmac_ide_tuneproc(struct ata_device *drive, byte pio);
+static int pmac_ide_tune_chipset(struct ata_device *drive, u8 speed);
+static void pmac_ide_tuneproc(struct ata_device *drive, u8 pio);
 static void pmac_ide_selectproc(struct ata_device *drive);
 
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
@@ -457,7 +458,7 @@ out:
 
 /* Calculate PIO timings */
 static void __pmac
-pmac_ide_tuneproc(struct ata_device *drive, byte pio)
+pmac_ide_tuneproc(struct ata_device *drive, u8 pio)
 {
 	struct ata_timing *t;
 	int i;
@@ -472,7 +473,7 @@ pmac_ide_tuneproc(struct ata_device *drive, byte pio)
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	else
-		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+		pio = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	t = ata_timing_data(pio);
 
@@ -523,8 +524,7 @@ pmac_ide_tuneproc(struct ata_device *drive, byte pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
-static int __pmac
-set_timings_udma(u32 *timings, byte speed)
+static int __pmac set_timings_udma(u32 *timings, u8 speed)
 {
 	unsigned rdyToPauseTicks, wrDataSetupTicks, addrTicks;
 
@@ -546,7 +546,7 @@ set_timings_udma(u32 *timings, byte speed)
 }
 
 static int __pmac
-set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
+set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 {
 	int cycleTime, accessTime, recTime;
 	unsigned accessTicks, recTicks;
@@ -659,7 +659,7 @@ set_timings_mdma(int intf_type, u32 *timings, byte speed, int drive_cycle_time)
  * our, normal mdma function is supposed to be more precise
  */
 static int __pmac
-pmac_ide_tune_chipset (struct ata_device *drive, byte speed)
+pmac_ide_tune_chipset (struct ata_device *drive, u8 speed)
 {
 	int intf		= pmac_ide_find(drive);
 	int unit		= (drive->select.b.unit & 0x01);
@@ -1211,8 +1211,8 @@ udma_bits_to_command(unsigned char bits, int high_speed)
 static int __pmac
 pmac_ide_mdma_enable(struct ata_device *drive, int idx)
 {
-	byte bits = drive->id->dma_mword & 0x07;
-	byte feature = dma_bits_to_command(bits);
+	u8 bits = drive->id->dma_mword & 0x07;
+	u8 feature = dma_bits_to_command(bits);
 	u32 *timings;
 	int drive_cycle_time;
 	struct hd_driveid *id = drive->id;
@@ -1249,8 +1249,8 @@ pmac_ide_mdma_enable(struct ata_device *drive, int idx)
 static int __pmac
 pmac_ide_udma_enable(struct ata_device *drive, int idx, int high_speed)
 {
-	byte bits = drive->id->dma_ultra & 0x1f;
-	byte feature = udma_bits_to_command(bits, high_speed);
+	u8 bits = drive->id->dma_ultra & 0x1f;
+	u8 feature = udma_bits_to_command(bits, high_speed);
 	u32 *timings;
 	int ret;
 

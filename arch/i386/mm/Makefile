@@ -9,7 +9,7 @@
 
 O_TARGET := mm.o
 
-obj-y	 := init.o fault.o ioremap.o extable.o pageattr.o
+obj-y	 := init.o pgtable.o fault.o ioremap.o extable.o pageattr.o 
 export-objs := pageattr.o
 
 include $(TOPDIR)/Rules.make

@@ -61,7 +61,7 @@ nbd_end_request(struct request *req)
 		bio->bi_next = NULL;
 		bio_endio(bio, uptodate);
 	}
-	blkdev_release_request(req);
+	blk_put_request(req);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 

@@ -66,7 +66,13 @@ inline fixp_t fixp_new16(s16 a)
 inline fixp_t fixp_cos(unsigned int degrees)
 {
 	int quadrant = (degrees / 90) & 3;
-	unsigned int i = (degrees % 90) >> 1;
+	unsigned int i = degrees % 90;
+
+	if (quadrant == 1 || quadrant == 3) {
+		i = 89 - i;
+	}
+
+	i >>= 1;
 
 	return (quadrant == 1 || quadrant == 2)? -cos_table[i] : cos_table[i];
 }

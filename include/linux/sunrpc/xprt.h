@@ -122,6 +122,9 @@ struct rpc_xprt {
 	unsigned long		cong;		/* current congestion */
 	unsigned long		cwnd;		/* congestion window */
 
+	unsigned int		rcvsize,	/* socket receive buffer size */
+				sndsize;	/* socket send buffer size */
+
 	struct rpc_wait_queue	sending;	/* requests waiting to send */
 	struct rpc_wait_queue	resend;		/* requests waiting to resend */
 	struct rpc_wait_queue	pending;	/* requests in flight */
@@ -177,13 +180,9 @@ int			xprt_adjust_timeout(struct rpc_timeout *);
 void			xprt_release(struct rpc_task *);
 void			xprt_reconnect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);
+void			xprt_sock_setbufsize(struct rpc_xprt *);
 
-#define XPRT_WSPACE	0
-#define XPRT_CONNECT	1
-
-#define xprt_wspace(xp)			(test_bit(XPRT_WSPACE, &(xp)->sockstate))
-#define xprt_test_and_set_wspace(xp)	(test_and_set_bit(XPRT_WSPACE, &(xp)->sockstate))
-#define xprt_clear_wspace(xp)		(clear_bit(XPRT_WSPACE, &(xp)->sockstate))
+#define XPRT_CONNECT	0
 
 #define xprt_connected(xp)		(!(xp)->stream || test_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_set_connected(xp)		(set_bit(XPRT_CONNECT, &(xp)->sockstate))

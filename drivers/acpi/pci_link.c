@@ -1,5 +1,5 @@
 /*
- *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 33 $)
+ *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -54,13 +54,13 @@ static int acpi_pci_link_add (struct acpi_device *device);
 static int acpi_pci_link_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_pci_link_driver = {
-        name:                   ACPI_PCI_LINK_DRIVER_NAME,
-        class:                  ACPI_PCI_LINK_CLASS,
-        ids:                    ACPI_PCI_LINK_HID,
-        ops:                    {
-                                        add:    acpi_pci_link_add,
-                                        remove: acpi_pci_link_remove,
-                                },
+        .name =		ACPI_PCI_LINK_DRIVER_NAME,
+        .class =	ACPI_PCI_LINK_CLASS,
+        .ids =		ACPI_PCI_LINK_HID,
+        .ops =		{
+				.add =		acpi_pci_link_add,
+				.remove =	acpi_pci_link_remove,
+			},
 };
 
 struct acpi_pci_link_irq {

@@ -18,27 +18,34 @@ CONFIG_USB_HID
 
 CONFIG_USB_HIDINPUT
   Say Y here if you want to use a USB keyboard, mouse or joystick,
-  or any other HID input device. You also need Input layer support, 
-  (CONFIG_INPUT) which you select under "Input core support".
+  or any other HID input device. You also need "Input core support", 
+  (CONFIG_INPUT), which you select under "Input device support", above.
 
   If unsure, say Y.
 
 CONFIG_HID_FF
-  Say Y here is you want force feedback support for a few hid devices. See
+  Say Y here is you want force feedback support for a few HID devices. See
   below for a list of supported devices.
   See Documentation/input/ff.txt for a description of the force feedback API.
 
   If unsure, say N.
 
-CONFIG_LOGITECH_RUMBLE
-  Say Y here if you have a Logitech WingMan Cordless rumble pad and if you
-  want to enable force feedback. Note: if you say N here, this device will
-  still be supported, but without force feedback.
+CONFIG_LOGITECH_FF
+  Say Y here if you have one of these devices:
+  - Logitech WingMan Cordless RumblePad
+  - Logitech WingMan Force 3D
+  and if you want to enable force feedback for them.
+  Note: if you say N here, this device will still be supported, but without
+  force feedback.
 
 CONFIG_HID_PID
-  Say Y yes if you have a PID-compliant joystick and wish to enable force
+  Say Y here if you have a PID-compliant joystick and wish to enable force
   feedback for it. The Microsoft Sidewinder Force Feedback 2 is one such
   device.
+
+CONFIG_LOGITECH_3D
+  Say Y here if you have a Logitech force feedback device from the
+  *3D family.
 
 CONFIG_USB_HIDDEV
   Say Y here if you want to support HID devices (from the USB

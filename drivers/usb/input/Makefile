@@ -16,11 +16,8 @@ endif
 ifeq ($(CONFIG_HID_PID),y)
 	hid-objs	+= pid.o
 endif
-ifeq ($(CONFIG_LOGITECH_RUMBLE),y)
+ifeq ($(CONFIG_LOGITECH_FF),y)
 	hid-objs	+= hid-lgff.o
-endif
-ifeq ($(CONFIG_LOGITECH_3D),y)
-	hid-objs	+= hid-lg3dff.o
 endif
 ifeq ($(CONFIG_HID_FF),y)
 	hid-objs	+= hid-ff.o

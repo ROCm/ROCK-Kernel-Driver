@@ -126,9 +126,9 @@ fi
 source drivers/telephony/Config.in
 
 mainmenu_option next_comment
-comment 'ATA/IDE/MFM/RLL support'
+comment 'ATA/ATAPI/MFM/RLL support'
 
-tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
 
 if [ "$CONFIG_IDE" != "n" ]; then
   source drivers/ide/Config.in

@@ -105,10 +105,10 @@ static int hptraid_ioctl(struct inode *inode, struct file *file,
 			if (!loc)
 				return -EINVAL;
 			val = 255;
-			if (put_user(val, (byte *) & loc->heads))
+			if (put_user(val, (u8 *) & loc->heads))
 				return -EFAULT;
 			val = 63;
-			if (put_user(val, (byte *) & loc->sectors))
+			if (put_user(val, (u8 *) & loc->sectors))
 				return -EFAULT;
 			bios_cyl = raid[minor].sectors / 63 / 255;
 			if (put_user

@@ -82,6 +82,8 @@ int __init check_nmi_watchdog (void)
 	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
+	/* FIXME: Only boot CPU is online at this stage.  Check CPUs
+           as they come up. */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (!cpu_online(cpu))
 			continue;

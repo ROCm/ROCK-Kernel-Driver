@@ -38,13 +38,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 
@@ -61,7 +61,7 @@
  *    bit3 (0x08): "1" 3 cycle time, "0" 2 cycle time	      (?)
  */
 #define HT_CONFIG_PORT	  0x3e6
-#define HT_CONFIG(drivea) (byte)(((drivea)->drive_data & 0xff00) >> 8)
+#define HT_CONFIG(drivea) (u8)(((drivea)->drive_data & 0xff00) >> 8)
 /*
  * FIFO + PREFETCH (both a/b-model)
  */
@@ -107,7 +107,7 @@
  * Active Time for each drive. Smaller value gives higher speed.
  * In case of failures you should probably fall back to a higher value.
  */
-#define HT_TIMING(drivea) (byte)((drivea)->drive_data & 0x00ff)
+#define HT_TIMING(drivea) (u8)((drivea)->drive_data & 0x00ff)
 #define HT_TIMING_DEFAULT 0xff
 
 /*
@@ -194,7 +194,7 @@ static int __init try_to_init_ht6560b(void)
 	return 1;
 }
 
-static byte ht_pio2timings(struct ata_device *drive, byte pio)
+static u8 ht_pio2timings(struct ata_device *drive, u8 pio)
 {
 	int active_time, recovery_time;
 	int active_cycles, recovery_cycles;
@@ -204,7 +204,7 @@ static byte ht_pio2timings(struct ata_device *drive, byte pio)
 		if (pio == 255)
 			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 		else
-			pio = XFER_PIO_0 + min_t(byte, pio, 4);
+			pio = XFER_PIO_0 + min_t(u8, pio, 4);
 
 		t = ata_timing_data(pio);
 
@@ -233,7 +233,7 @@ static byte ht_pio2timings(struct ata_device *drive, byte pio)
 			drive->name, pio - XFER_PIO_0, recovery_cycles, recovery_time, active_cycles, active_time);
 #endif
 
-		return (byte)((recovery_cycles << 4) | active_cycles);
+		return (u8)((recovery_cycles << 4) | active_cycles);
 	} else {
 
 #ifdef DEBUG
@@ -247,7 +247,7 @@ static byte ht_pio2timings(struct ata_device *drive, byte pio)
 /*
  *  Enable/Disable so called prefetch mode
  */
-static void ht_set_prefetch(struct ata_device *drive, byte state)
+static void ht_set_prefetch(struct ata_device *drive, u8 state)
 {
 	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
@@ -274,10 +274,10 @@ static void ht_set_prefetch(struct ata_device *drive, byte state)
 #endif
 }
 
-static void tune_ht6560b(struct ata_device *drive, byte pio)
+static void tune_ht6560b(struct ata_device *drive, u8 pio)
 {
 	unsigned long flags;
-	byte timing;
+	u8 timing;
 
 	switch (pio) {
 	case 8:         /* set prefetch off */

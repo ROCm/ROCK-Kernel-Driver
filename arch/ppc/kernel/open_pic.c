@@ -602,7 +602,7 @@ void openpic_request_IPIs(void)
  *   -- Cort
  */
 
-void __init do_openpic_setup_cpu(void)
+void __devinit do_openpic_setup_cpu(void)
 {
  	int i;
 	u32 msk = 1 << smp_hw_index[smp_processor_id()];

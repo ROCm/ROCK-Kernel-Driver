@@ -796,9 +796,9 @@ void __setup_APIC_LVTT(unsigned int clocks)
 	apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
-void setup_APIC_timer(void * data)
+static void setup_APIC_timer(unsigned int clocks)
 {
-	unsigned int clocks = (unsigned int) data, slice, t0, t1;
+	unsigned int slice, t0, t1;
 	unsigned long flags;
 	int delta;
 
@@ -924,7 +924,7 @@ static unsigned int calibration_result;
 
 int dont_use_local_apic_timer __initdata = 0;
 
-void __init setup_APIC_clocks (void)
+void __init setup_boot_APIC_clock(void)
 {
 	/* Disabled by DMI scan or kernel option? */
 	if (dont_use_local_apic_timer)
@@ -939,12 +939,16 @@ void __init setup_APIC_clocks (void)
 	/*
 	 * Now set up the timer for real.
 	 */
-	setup_APIC_timer((void *)calibration_result);
+	setup_APIC_timer(calibration_result);
 
 	local_irq_enable();
+}
 
-	/* and update all other cpus */
-	smp_call_function(setup_APIC_timer, (void *)calibration_result, 1, 1);
+void __init setup_secondary_APIC_clock(void)
+{
+	local_irq_disable(); /* FIXME: Do we need this? --RR */
+	setup_APIC_timer(calibration_result);
+	local_irq_enable();
 }
 
 void __init disable_APIC_timer(void)
@@ -1177,7 +1181,7 @@ int __init APIC_init_uniprocessor (void)
 		if (!skip_ioapic_setup && nr_ioapics)
 			setup_IO_APIC();
 #endif
-	setup_APIC_clocks();
+	setup_boot_APIC_clock();
 
 	return 0;
 }

@@ -11,12 +11,17 @@ CONFIG_USB
   to the PC via those ports.
 
   Say Y here if your computer has a USB port and you want to use USB
-  devices.  You then need to say Y to at least one of "UHCI support"
-  or "OHCI support" below (the type of interface that the USB hardware
+  devices.  You then need to say Y to at least one of "UHCI HCD support"
+  or "OHCI HCD support" below (the type of interface that the USB hardware
   in your computer provides to the operating system) and then choose
-  from among the drivers for USB peripherals.  You may want to check
+  from amongst the drivers for USB peripherals.  You may want to check
   out the information provided in <file:Documentation/usb/> and
   especially the links given in <file:Documentation/usb/usb-help.txt>.
+
+  If you have a new USB 2.0 High Speed system, you should also choose
+  "EHCI HCD (USB 2.0) support" as well as at least one of UHCI or OHCI.
+
+  It doesn't normally hurt to select them all if you are not certain.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -39,7 +44,7 @@ CONFIG_USB_LONG_TIMEOUT
 
 CONFIG_USB_DEVICEFS
   If you say Y here (and to "/proc file system support" in the "File
-  systems section, above), you will get a file /proc/bus/usb/devices
+  systems" section, above), you will get a file /proc/bus/usb/devices
   which lists the devices currently connected to your USB bus or
   busses, a file /proc/bus/usb/drivers which lists the USB kernel
   client drivers currently loaded, and for every connected device a

@@ -1450,6 +1450,9 @@ uart_block_til_ready(struct file *filp, struct uart_info *info)
 	if (signal_pending(current))
 		return -ERESTARTSYS;
 
+	if (info->tty->flags & (1 << TTY_IO_ERROR))
+		return 0;
+
 	if (tty_hung_up_p(filp) || !(info->flags & UIF_INITIALIZED))
 		return (port->flags & UPF_HUP_NOTIFY) ?
 			-EAGAIN : -ERESTARTSYS;
@@ -2425,7 +2428,7 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 		state->port->regshift = port->regshift;
 		state->port->iotype   = port->iotype;
 		state->port->flags    = port->flags;
-		state->port->line     = drv->state - state;
+		state->port->line     = state - drv->state;
 
 		__uart_register_port(drv, state, state->port);
 
@@ -2469,6 +2472,8 @@ EXPORT_SYMBOL(uart_register_driver);
 EXPORT_SYMBOL(uart_unregister_driver);
 EXPORT_SYMBOL(uart_register_port);
 EXPORT_SYMBOL(uart_unregister_port);
+EXPORT_SYMBOL(uart_add_one_port);
+EXPORT_SYMBOL(uart_remove_one_port);
 
 MODULE_DESCRIPTION("Serial driver core");
 MODULE_LICENSE("GPL");

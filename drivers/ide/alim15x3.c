@@ -26,30 +26,30 @@
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
-static byte m5229_revision;
-static byte chip_is_1543c_e;
+static u8 m5229_revision;
+static int chip_is_1543c_e;
 
 static struct pci_dev *isa_dev;
 
-static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
+static void ali15x3_tune_drive(struct ata_device *drive, u8 pio)
 {
 	struct ata_timing *t;
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	int s_time, a_time, c_time;
-	byte s_clc, a_clc, r_clc;
+	u8 s_clc, a_clc, r_clc;
 	unsigned long flags;
 	int port = hwif->unit ? 0x5c : 0x58;
 	int portFIFO = hwif->unit ? 0x55 : 0x54;
-	byte cd_dma_fifo = 0;
+	u8 cd_dma_fifo = 0;
 
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	else
-		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+		pio = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	t = ata_timing_data(pio);
 
@@ -100,15 +100,15 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 	local_irq_restore(flags);
 }
 
-static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
+static int ali15x3_tune_chipset(struct ata_device *drive, u8 speed)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
-	byte unit		= (drive->select.b.unit & 0x01);
-	byte tmpbyte		= 0x00;
-	int m5229_udma		= drive->channel->unit ? 0x57 : 0x56;
+	u8 unit	= (drive->select.b.unit & 0x01);
+	u8 tmpbyte = 0x00;
+	int m5229_udma = drive->channel->unit ? 0x57 : 0x56;
 
 	if (speed < XFER_UDMA_0) {
-		byte ultra_enable	= (unit) ? 0x7f : 0xf7;
+		u8 ultra_enable	= unit ? 0x7f : 0xf7;
 		/*
 		 * clear "ultra enable" bit
 		 */
@@ -135,7 +135,7 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 			pci_write_config_byte(dev, 0x4b, tmpbyte);
 		}
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 	return ide_config_drive_speed(drive, speed);
 }
@@ -212,10 +212,10 @@ static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int ata66	= 0;
-	byte cable_80_pin[2]	= { 0, 0 };
+	u8 cable_80_pin[2]	= { 0, 0 };
 
 	unsigned long flags;
-	byte tmpbyte;
+	u8 tmpbyte;
 
 	local_irq_save(flags);
 
@@ -305,8 +305,8 @@ static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 static void __init ali15x3_init_channel(struct ata_channel *hwif)
 {
 #ifndef CONFIG_SPARC64
-	byte ideic, inmir;
-	byte irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
+	u8 ideic, inmir;
+	u8 irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
 				      1, 11, 0, 12, 0, 14, 0, 15 };
 
 	hwif->irq = hwif->unit ? 15 : 14;

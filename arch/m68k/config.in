@@ -160,9 +160,9 @@ if [ "$CONFIG_MAC" = "y" ]; then
 fi
 
 mainmenu_option next_comment
-comment 'ATA/IDE/MFM/RLL support'
+comment 'ATA/ATAPI/MFM/RLL device support'
 
-tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+tristate 'ATA/ATAPI/MFM/RLL device support' CONFIG_IDE
 
 if [ "$CONFIG_IDE" != "n" ]; then
   source drivers/ide/Config.in
@@ -172,9 +172,9 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'SCSI support'
+comment 'SCSI device support'
 
-tristate 'SCSI support' CONFIG_SCSI
+tristate 'SCSI device support' CONFIG_SCSI
 
 if [ "$CONFIG_SCSI" != "n" ]; then
 

@@ -1589,7 +1589,7 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 
 	p = buf;
 
-	if ((num_online_cpus() == 1) &&
+	if ((num_possible_cpus() == 1) &&
 	    !(error = apm_get_power_status(&bx, &cx, &dx))) {
 		ac_line_status = (bx >> 8) & 0xff;
 		battery_status = bx & 0xff;
@@ -1720,7 +1720,7 @@ static int apm(void *unused)
 		}
 	}
 
-	if (debug && (num_online_cpus() == 1)) {
+	if (debug && (num_possible_cpus() == 1)) {
 		error = apm_get_power_status(&bx, &cx, &dx);
 		if (error)
 			printk(KERN_INFO "apm: power status not available\n");
@@ -1764,7 +1764,7 @@ static int apm(void *unused)
 		pm_power_off = apm_power_off;
 	register_sysrq_key('o', &sysrq_poweroff_op);
 
-	if (num_online_cpus() == 1) {
+	if (num_possible_cpus() == 1) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
 		console_blank_hook = apm_console_blank;
 #endif
@@ -1907,9 +1907,7 @@ static int __init apm_init(void)
 		printk(KERN_NOTICE "apm: disabled on user request.\n");
 		return -ENODEV;
 	}
-	/* FIXME: When boot code changes, this will need to be
-           deactivated when/if a CPU comes up --RR */
-	if ((num_online_cpus() > 1) && !power_off) {
+	if ((num_possible_cpus() > 1) && !power_off) {
 		printk(KERN_NOTICE "apm: disabled - APM is not SMP safe.\n");
 		return -ENODEV;
 	}
@@ -1924,35 +1922,38 @@ static int __init apm_init(void)
 	 * that extends up to the end of page zero (that we have reserved).
 	 * This is for buggy BIOS's that refer to (real mode) segment 0x40
 	 * even though they are called in protected mode.
+	 *
+	 * NOTE: on SMP we call into the APM BIOS only on CPU#0, so it's
+	 * enough to modify CPU#0's GDT.
 	 */
-	set_base(gdt[APM_40 >> 3],
+	set_base(cpu_gdt_table[0][APM_40 >> 3],
 		 __va((unsigned long)0x40 << 4));
-	_set_limit((char *)&gdt[APM_40 >> 3], 4095 - (0x40 << 4));
+	_set_limit((char *)&cpu_gdt_table[0][APM_40 >> 3], 4095 - (0x40 << 4));
 
 	apm_bios_entry.offset = apm_info.bios.offset;
 	apm_bios_entry.segment = APM_CS;
-	set_base(gdt[APM_CS >> 3],
+	set_base(cpu_gdt_table[0][APM_CS >> 3],
 		 __va((unsigned long)apm_info.bios.cseg << 4));
-	set_base(gdt[APM_CS_16 >> 3],
+	set_base(cpu_gdt_table[0][APM_CS_16 >> 3],
 		 __va((unsigned long)apm_info.bios.cseg_16 << 4));
-	set_base(gdt[APM_DS >> 3],
+	set_base(cpu_gdt_table[0][APM_DS >> 3],
 		 __va((unsigned long)apm_info.bios.dseg << 4));
 #ifndef APM_RELAX_SEGMENTS
 	if (apm_info.bios.version == 0x100) {
 #endif
 		/* For ASUS motherboard, Award BIOS rev 110 (and others?) */
-		_set_limit((char *)&gdt[APM_CS >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS >> 3], 64 * 1024 - 1);
 		/* For some unknown machine. */
-		_set_limit((char *)&gdt[APM_CS_16 >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS_16 >> 3], 64 * 1024 - 1);
 		/* For the DEC Hinote Ultra CT475 (and others?) */
-		_set_limit((char *)&gdt[APM_DS >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_DS >> 3], 64 * 1024 - 1);
 #ifndef APM_RELAX_SEGMENTS
 	} else {
-		_set_limit((char *)&gdt[APM_CS >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS >> 3],
 			(apm_info.bios.cseg_len - 1) & 0xffff);
-		_set_limit((char *)&gdt[APM_CS_16 >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS_16 >> 3],
 			(apm_info.bios.cseg_16_len - 1) & 0xffff);
-		_set_limit((char *)&gdt[APM_DS >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_DS >> 3],
 			(apm_info.bios.dseg_len - 1) & 0xffff);
 	}
 #endif
@@ -1963,9 +1964,7 @@ static int __init apm_init(void)
 
 	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
 
-	/* FIXME: When boot code changes, this will need to be
-           deactivated when/if a CPU comes up --RR */
-	if (num_online_cpus() > 1) {
+	if (num_possible_cpus() > 1) {
 		printk(KERN_NOTICE
 		   "apm: disabled - APM is not SMP safe (power off active).\n");
 		return 0;
