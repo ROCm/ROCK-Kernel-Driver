@@ -31,9 +31,6 @@
 #include "pci_socket.h"
 
 
-extern struct socket_info_t *pcmcia_register_socket (int slot,
-		struct pccard_operations *vtable, int use_bus_pm);
-extern void pcmcia_unregister_socket (struct socket_info_t *socket);
 extern void pcmcia_suspend_socket (struct socket_info_t *socket);
 extern void pcmcia_resume_socket (struct socket_info_t *socket);
 

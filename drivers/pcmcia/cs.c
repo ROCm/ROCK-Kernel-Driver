@@ -356,7 +356,7 @@ int pcmcia_register_socket(struct device *dev)
 #ifdef CONFIG_PROC_FS
 		if (proc_pccard) {
 			char name[3];
-			sprintf(name, "%02d", i);
+			sprintf(name, "%02d", j);
 			s->proc = proc_mkdir(name, proc_pccard);
 			if (s->proc)
 				s->ss_entry->proc_setup(i, s->proc);
