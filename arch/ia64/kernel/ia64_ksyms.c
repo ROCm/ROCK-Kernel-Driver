@@ -41,7 +41,7 @@ EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(clear_page);
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
-#include <asm/pgtable.h>
+#include <linux/bootmem.h>
 EXPORT_SYMBOL(max_low_pfn);	/* defined by bootmem.c, but not exported by generic code */
 #endif
 
