@@ -350,13 +350,13 @@ out:
 }
 
 struct inode_operations ufs_dir_inode_operations = {
-	create:		ufs_create,
-	lookup:		ufs_lookup,
-	link:		ufs_link,
-	unlink:		ufs_unlink,
-	symlink:	ufs_symlink,
-	mkdir:		ufs_mkdir,
-	rmdir:		ufs_rmdir,
-	mknod:		ufs_mknod,
-	rename:		ufs_rename,
+	.create		= ufs_create,
+	.lookup		= ufs_lookup,
+	.link		= ufs_link,
+	.unlink		= ufs_unlink,
+	.symlink	= ufs_symlink,
+	.mkdir		= ufs_mkdir,
+	.rmdir		= ufs_rmdir,
+	.mknod		= ufs_mknod,
+	.rename		= ufs_rename,
 };

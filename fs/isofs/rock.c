@@ -590,5 +590,5 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 }
 
 struct address_space_operations isofs_symlink_aops = {
-	readpage:	rock_ridge_symlink_readpage
+	.readpage	= rock_ridge_symlink_readpage
 };

@@ -290,7 +290,7 @@ static int __init elanfreq_init(void)
 	if (!driver)
 		return -ENOMEM;
 
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 	if (!max_freq)
 		max_freq = elanfreq_get_cpu_frequency();

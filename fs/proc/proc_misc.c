@@ -246,10 +246,10 @@ static int cpuinfo_open(struct inode *inode, struct file *file)
 	return seq_open(file, &cpuinfo_op);
 }
 static struct file_operations proc_cpuinfo_operations = {
-	open:		cpuinfo_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= cpuinfo_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 #ifdef CONFIG_PROC_HARDWARE
@@ -276,10 +276,10 @@ static int partitions_open(struct inode *inode, struct file *file)
 	return seq_open(file, &partitions_op);
 }
 static struct file_operations proc_partitions_operations = {
-	open:		partitions_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= partitions_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 #ifdef CONFIG_MODULES
@@ -289,10 +289,10 @@ static int modules_open(struct inode *inode, struct file *file)
 	return seq_open(file, &modules_op);
 }
 static struct file_operations proc_modules_operations = {
-	open:		modules_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= modules_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 extern struct seq_operations ksyms_op;
 static int ksyms_open(struct inode *inode, struct file *file)
@@ -300,10 +300,10 @@ static int ksyms_open(struct inode *inode, struct file *file)
 	return seq_open(file, &ksyms_op);
 }
 static struct file_operations proc_ksyms_operations = {
-	open:		ksyms_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= ksyms_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 #endif
 
@@ -314,11 +314,11 @@ static int slabinfo_open(struct inode *inode, struct file *file)
 	return seq_open(file, &slabinfo_op);
 }
 static struct file_operations proc_slabinfo_operations = {
-	open:		slabinfo_open,
-	read:		seq_read,
-	write:		slabinfo_write,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= slabinfo_open,
+	.read		= seq_read,
+	.write		= slabinfo_write,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static int kstat_read_proc(char *page, char **start, off_t off,
@@ -456,10 +456,10 @@ static int interrupts_open(struct inode *inode, struct file *file)
 	return res;
 }
 static struct file_operations proc_interrupts_operations = {
-	open:		interrupts_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	single_release,
+	.open		= interrupts_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
 };
 
 static int filesystems_read_proc(char *page, char **start, off_t off,
@@ -587,8 +587,8 @@ static ssize_t write_profile(struct file * file, const char * buf,
 }
 
 static struct file_operations proc_profile_operations = {
-	read:		read_profile,
-	write:		write_profile,
+	.read		= read_profile,
+	.write		= write_profile,
 };
 
 struct proc_dir_entry *proc_root_kcore;

@@ -51,7 +51,7 @@ static int minix_hash(struct dentry *dentry, struct qstr *qstr)
 }
 
 struct dentry_operations minix_dentry_operations = {
-	d_hash:		minix_hash,
+	.d_hash		= minix_hash,
 };
 
 static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry)
@@ -298,14 +298,14 @@ out:
  * directories can handle most operations...
  */
 struct inode_operations minix_dir_inode_operations = {
-	create:		minix_create,
-	lookup:		minix_lookup,
-	link:		minix_link,
-	unlink:		minix_unlink,
-	symlink:	minix_symlink,
-	mkdir:		minix_mkdir,
-	rmdir:		minix_rmdir,
-	mknod:		minix_mknod,
-	rename:		minix_rename,
-	getattr:	minix_getattr,
+	.create		= minix_create,
+	.lookup		= minix_lookup,
+	.link		= minix_link,
+	.unlink		= minix_unlink,
+	.symlink	= minix_symlink,
+	.mkdir		= minix_mkdir,
+	.rmdir		= minix_rmdir,
+	.mknod		= minix_mknod,
+	.rename		= minix_rename,
+	.getattr	= minix_getattr,
 };

@@ -130,12 +130,12 @@ int __init proc_init_inodecache(void)
 }
 
 static struct super_operations proc_sops = { 
-	alloc_inode:	proc_alloc_inode,
-	destroy_inode:	proc_destroy_inode,
-	read_inode:	proc_read_inode,
-	drop_inode:	generic_delete_inode,
-	delete_inode:	proc_delete_inode,
-	statfs:		simple_statfs,
+	.alloc_inode	= proc_alloc_inode,
+	.destroy_inode	= proc_destroy_inode,
+	.read_inode	= proc_read_inode,
+	.drop_inode	= generic_delete_inode,
+	.delete_inode	= proc_delete_inode,
+	.statfs		= simple_statfs,
 };
 
 static int parse_options(char *options,uid_t *uid,gid_t *gid)

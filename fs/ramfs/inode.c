@@ -276,35 +276,35 @@ static int ramfs_sync_file(struct file * file, struct dentry *dentry, int datasy
 }
 
 static struct address_space_operations ramfs_aops = {
-	readpage:	ramfs_readpage,
-	writepage:	fail_writepage,
-	prepare_write:	ramfs_prepare_write,
-	commit_write:	ramfs_commit_write
+	.readpage	= ramfs_readpage,
+	.writepage	= fail_writepage,
+	.prepare_write	= ramfs_prepare_write,
+	.commit_write	= ramfs_commit_write
 };
 
 static struct file_operations ramfs_file_operations = {
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		generic_file_mmap,
-	fsync:		ramfs_sync_file,
-	sendfile:	generic_file_sendfile,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= ramfs_sync_file,
+	.sendfile	= generic_file_sendfile,
 };
 
 static struct inode_operations ramfs_dir_inode_operations = {
-	create:		ramfs_create,
-	lookup:		simple_lookup,
-	link:		ramfs_link,
-	unlink:		ramfs_unlink,
-	symlink:	ramfs_symlink,
-	mkdir:		ramfs_mkdir,
-	rmdir:		ramfs_rmdir,
-	mknod:		ramfs_mknod,
-	rename:		ramfs_rename,
+	.create		= ramfs_create,
+	.lookup		= simple_lookup,
+	.link		= ramfs_link,
+	.unlink		= ramfs_unlink,
+	.symlink	= ramfs_symlink,
+	.mkdir		= ramfs_mkdir,
+	.rmdir		= ramfs_rmdir,
+	.mknod		= ramfs_mknod,
+	.rename		= ramfs_rename,
 };
 
 static struct super_operations ramfs_ops = {
-	statfs:		simple_statfs,
-	drop_inode:	generic_delete_inode,
+	.statfs		= simple_statfs,
+	.drop_inode	= generic_delete_inode,
 };
 
 static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
@@ -342,14 +342,14 @@ static struct super_block *rootfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ramfs_fs_type = {
-	name:		"ramfs",
-	get_sb:		ramfs_get_sb,
-	kill_sb:	kill_litter_super,
+	.name		= "ramfs",
+	.get_sb		= ramfs_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 static struct file_system_type rootfs_fs_type = {
-	name:		"rootfs",
-	get_sb:		rootfs_get_sb,
-	kill_sb:	kill_litter_super,
+	.name		= "rootfs",
+	.get_sb		= rootfs_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 
 static int __init init_ramfs_fs(void)

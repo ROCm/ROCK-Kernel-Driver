@@ -1,5 +1,5 @@
 /*
- *  $Id: speedstep.c,v 1.50 2002/09/22 08:16:25 db Exp $
+ *  $Id: speedstep.c,v 1.53 2002/09/29 23:43:11 db Exp $
  *
  * (C) 2001  Dave Jones, Arjan van de ven.
  * (C) 2002  Dominik Brodowski <linux@brodo.de>
@@ -91,6 +91,7 @@ static unsigned int                     speedstep_high_freq;
  */
 static int speedstep_get_state (unsigned int *state)
 {
+	unsigned long   flags;
 	u32             pmbase;
 	u8              value;
 
@@ -110,9 +111,9 @@ static int speedstep_get_state (unsigned int *state)
 			return -EIO;
 
 		/* read state */
-		local_irq_disable();
+		local_irq_save(flags);
 		value = inb(pmbase + 0x50);
-		local_irq_enable();
+		local_irq_restore(flags);
 
 		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
@@ -132,7 +133,7 @@ static int speedstep_get_state (unsigned int *state)
  *
  *   Tries to change the SpeedStep state. 
  */
-static void speedstep_set_state (unsigned int state)
+static void speedstep_set_state (unsigned int state, int notify)
 {
 	u32                     pmbase;
 	u8	                pm2_blk;
@@ -154,7 +155,8 @@ static void speedstep_set_state (unsigned int state)
 	freqs.new = (state == SPEEDSTEP_HIGH) ? speedstep_high_freq : speedstep_low_freq;
 	freqs.cpu = CPUFREQ_ALL_CPUS; /* speedstep.c is UP only driver */
 	
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	if (notify)
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	switch (speedstep_chipset) {
 	case SPEEDSTEP_CHIPSET_ICH2M:
@@ -173,10 +175,11 @@ static void speedstep_set_state (unsigned int state)
 			return;
 		}
 
+		/* Disable IRQs */
+		local_irq_save(flags);
+
 		/* read state */
-		local_irq_disable();
 		value = inb(pmbase + 0x50);
-		local_irq_enable();
 
 		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
@@ -185,10 +188,6 @@ static void speedstep_set_state (unsigned int state)
 		value |= state;
 
 		dprintk(KERN_DEBUG "cpufreq: writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
-
-		/* Disable IRQs */
-		local_irq_save(flags);
-		local_irq_disable();
 
 		/* Disable bus master arbitration */
 		pm2_blk = inb(pmbase + 0x20);
@@ -202,14 +201,11 @@ static void speedstep_set_state (unsigned int state)
 		pm2_blk &= 0xfe;
 		outb(pm2_blk, (pmbase + 0x20));
 
-		/* Enable IRQs */
-		local_irq_enable();
-		local_irq_restore(flags);
-
 		/* check if transition was sucessful */
-		local_irq_disable();
 		value = inb(pmbase + 0x50);
-		local_irq_enable();
+
+		/* Enable IRQs */
+		local_irq_restore(flags);
 
 		dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
@@ -223,7 +219,8 @@ static void speedstep_set_state (unsigned int state)
 		printk (KERN_ERR "cpufreq: setting CPU frequency on this chipset unsupported.\n");
 	}
 
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	if (notify)
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return;
 }
@@ -526,10 +523,13 @@ static unsigned int speedstep_detect_processor (void)
  */
 static int speedstep_detect_speeds (void)
 {
+	unsigned long   flags;
 	unsigned int    state;
-	unsigned int    low = 0, high = 0;
 	int             i, result;
-    
+
+	/* Disable irqs for entire detection process */
+	local_irq_save(flags);
+
 	for (i=0; i<2; i++) {
 		/* read the current state */
 		result = speedstep_get_state(&state);
@@ -541,31 +541,30 @@ static int speedstep_detect_speeds (void)
 			switch (speedstep_processor) {
 			case SPEEDSTEP_PROCESSOR_PIII_C:
 			case SPEEDSTEP_PROCESSOR_PIII_T:
-				low = pentium3_get_frequency();
+				speedstep_low_freq = pentium3_get_frequency();
 				break;
 			case SPEEDSTEP_PROCESSOR_P4M:
-				low = pentium4_get_frequency();
+				speedstep_low_freq = pentium4_get_frequency();
 			}
-			speedstep_set_state(SPEEDSTEP_HIGH);
+			speedstep_set_state(SPEEDSTEP_HIGH, 0);
 		} else {
 			switch (speedstep_processor) {
 			case SPEEDSTEP_PROCESSOR_PIII_C:
 			case SPEEDSTEP_PROCESSOR_PIII_T:
-				high = pentium3_get_frequency();
+				speedstep_high_freq = pentium3_get_frequency();
 				break;
 			case SPEEDSTEP_PROCESSOR_P4M:
-				high = pentium4_get_frequency();
+				speedstep_high_freq = pentium4_get_frequency();
 			}
-			speedstep_set_state(SPEEDSTEP_LOW);
+			speedstep_set_state(SPEEDSTEP_LOW, 0);
 		}
-
-		if (!low || !high || 
-		    (speedstep_low_freq == speedstep_high_freq))
-			return -EIO;
 	}
 
-	speedstep_low_freq = low;
-	speedstep_high_freq = high;
+	local_irq_restore(flags);
+
+	if (!speedstep_low_freq || !speedstep_high_freq || 
+	    (speedstep_low_freq == speedstep_high_freq))
+		return -EIO;
 
 	return 0;
 }
@@ -583,16 +582,16 @@ static void speedstep_setpolicy (struct cpufreq_policy *policy)
 		return;
 
 	if (policy->min > speedstep_low_freq) 
-		speedstep_set_state(SPEEDSTEP_HIGH);
+		speedstep_set_state(SPEEDSTEP_HIGH, 1);
 	else {
 		if (policy->max < speedstep_high_freq)
-			speedstep_set_state(SPEEDSTEP_LOW);
+			speedstep_set_state(SPEEDSTEP_LOW, 1);
 		else {
 			/* both frequency states are allowed */
 			if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
-				speedstep_set_state(SPEEDSTEP_LOW);
+				speedstep_set_state(SPEEDSTEP_LOW, 1);
 			else
-				speedstep_set_state(SPEEDSTEP_HIGH);
+				speedstep_set_state(SPEEDSTEP_HIGH, 1);
 		}
 	}
 }
@@ -649,7 +648,7 @@ static int __init speedstep_init(void)
 		return -ENODEV;
 	}
 
-	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.50 $\n");
+	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.53 $\n");
 	dprintk(KERN_DEBUG "cpufreq: chipset 0x%x - processor 0x%x\n", 
 	       speedstep_chipset, speedstep_processor);
 
@@ -659,8 +658,6 @@ static int __init speedstep_init(void)
 		return result;
 
 	/* detect low and high frequency */
-	speedstep_low_freq = 100000;
-	speedstep_high_freq = 200000;
 	result = speedstep_detect_speeds();
 	if (result)
 		return result;
@@ -682,8 +679,8 @@ static int __init speedstep_init(void)
 	if (!driver)
 		return -ENOMEM;
 
-	driver->policy = (struct cpufreq_policy *) (driver + sizeof(struct cpufreq_driver));
-	
+	driver->policy = (struct cpufreq_policy *) (driver + 1);
+
 #ifdef CONFIG_CPU_FREQ_24_API
 	driver->cpu_min_freq    = speedstep_low_freq;
 	driver->cpu_cur_freq[0] = speed;

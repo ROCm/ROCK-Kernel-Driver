@@ -54,5 +54,5 @@ fail:
 }
 
 struct address_space_operations efs_symlink_aops = {
-	readpage:	efs_symlink_readpage
+	.readpage	= efs_symlink_readpage
 };
