@@ -870,7 +870,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 /*
  *	device multicast group del
  */
-static int __ipv6_dev_mc_dec(struct net_device *dev, struct inet6_dev *idev, struct in6_addr *addr)
+static int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr)
 {
 	struct ifmcaddr6 *ma, **map;
 
@@ -903,7 +903,7 @@ int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
 	if (!idev)
 		return -ENODEV;
 
-	err = __ipv6_dev_mc_dec(dev, idev, addr);
+	err = __ipv6_dev_mc_dec(idev, addr);
 
 	in6_dev_put(idev);
 
@@ -2108,11 +2108,11 @@ void ipv6_mc_destroy_dev(struct inet6_dev *idev)
 	 * addrconf.c has NULL'd out dev->ip6_ptr so in6_dev_get() will
 	 * fail.
 	 */
-	__ipv6_dev_mc_dec(idev->dev, idev, &maddr);
+	__ipv6_dev_mc_dec(idev, &maddr);
 
 	if (idev->cnf.forwarding) {
 		ipv6_addr_all_routers(&maddr);
-		__ipv6_dev_mc_dec(idev->dev, idev, &maddr);
+		__ipv6_dev_mc_dec(idev, &maddr);
 	}
 
 	write_lock_bh(&idev->lock);
