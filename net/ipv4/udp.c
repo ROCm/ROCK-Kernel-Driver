@@ -976,34 +976,6 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 			/* Must be an IKE packet.. pass it through */
 			return 1;
 
-	decaps:
-		/* At this point we are sure that this is an ESPinUDP packet,
-		 * so we need to remove 'len' bytes from the packet (the UDP
-		 * header and optional ESP marker bytes) and then modify the
-		 * protocol to ESP, and then call into the transform receiver.
-		 */
-
-		/* Now we can update and verify the packet length... */
-		iph = skb->nh.iph;
-		iphlen = iph->ihl << 2;
-		iph->tot_len = htons(ntohs(iph->tot_len) - len);
-		if (skb->len < iphlen + len) {
-			/* packet is too small!?! */
-			return 0;
-		}
-
-		/* pull the data buffer up to the ESP header and set the
-		 * transport header to point to ESP.  Keep UDP on the stack
-		 * for later.
-		 */
-		skb->h.raw = skb_pull(skb, len);
-
-		/* modify the protocol (it's ESP!) */
-		iph->protocol = IPPROTO_ESP;
-
-		/* and let the caller know to send this into the ESP processor... */
-		return -1;
-
 	case UDP_ENCAP_ESPINUDP_NON_IKE:
 		/* Check if this is a keepalive packet.  If so, eat it. */
 		if (len == 1 && udpdata[0] == 0xff) {
@@ -1013,11 +985,37 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 			
 			/* ESP Packet with Non-IKE marker */
 			len = sizeof(struct udphdr) + 2 * sizeof(u32);
-			goto decaps;
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
 	}
+
+	/* At this point we are sure that this is an ESPinUDP packet,
+	 * so we need to remove 'len' bytes from the packet (the UDP
+	 * header and optional ESP marker bytes) and then modify the
+	 * protocol to ESP, and then call into the transform receiver.
+	 */
+
+	/* Now we can update and verify the packet length... */
+	iph = skb->nh.iph;
+	iphlen = iph->ihl << 2;
+	iph->tot_len = htons(ntohs(iph->tot_len) - len);
+	if (skb->len < iphlen + len) {
+		/* packet is too small!?! */
+		return 0;
+	}
+
+	/* pull the data buffer up to the ESP header and set the
+	 * transport header to point to ESP.  Keep UDP on the stack
+	 * for later.
+	 */
+	skb->h.raw = skb_pull(skb, len);
+
+	/* modify the protocol (it's ESP!) */
+	iph->protocol = IPPROTO_ESP;
+
+	/* and let the caller know to send this into the ESP processor... */
+	return -1;
 #endif
 }
 
