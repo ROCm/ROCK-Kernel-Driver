@@ -33,34 +33,11 @@
 
 struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
 
-/*
- * prom_init() is called very early on, before the kernel text
- * and data have been mapped to KERNELBASE.  At this point the code
- * is running at whatever address it has been loaded at, so
- * references to extern and static variables must be relocated
- * explicitly.  The procedure reloc_offset() returns the address
- * we're currently running at minus the address we were linked at.
- * (Note that strings count as static variables.)
- *
- * Because OF may have mapped I/O devices into the area starting at
- * KERNELBASE, particularly on CHRP machines, we can't safely call
- * OF once the kernel has been mapped to KERNELBASE.  Therefore all
- * OF calls should be done within prom_init(), and prom_init()
- * and all routines called within it must be careful to relocate
- * references as necessary.
- *
- * Note that the bss is cleared *after* prom_init runs, so we have
- * to make sure that any static or extern variables it accesses
- * are put in the data segment.
- */
-
 struct rtas_t rtas = { 
 	.lock = SPIN_LOCK_UNLOCKED
 };
 
 char rtas_err_buf[RTAS_ERROR_LOG_MAX];
-
-extern unsigned long reloc_offset(void);
 
 spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
