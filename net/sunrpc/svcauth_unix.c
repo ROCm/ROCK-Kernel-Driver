@@ -51,6 +51,8 @@ struct auth_domain *unix_domain_find(char *name)
 		return rv;
 
 	new = kmalloc(sizeof(*new), GFP_KERNEL);
+	if (new == NULL)
+		return NULL;
 	cache_init(&new->h.h);
 	atomic_inc(&new->h.h.refcnt);
 	new->h.name = strdup(name);

@@ -232,6 +232,7 @@ void irda_task_delete(struct irda_task *task)
 
 	__irda_task_delete(task);
 }
+EXPORT_SYMBOL(irda_task_delete);
 
 /*
  * Function irda_task_kick (task)
