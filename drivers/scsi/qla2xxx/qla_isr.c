@@ -1139,6 +1139,10 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		if ((sp->flags & SRB_IOCTL) ||
 		    atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
 			cp->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 			add_to_done_queue(ha, sp);
 		} else {
 			qla2x00_extend_timeout(cp, EXTEND_CMD_TIMEOUT);

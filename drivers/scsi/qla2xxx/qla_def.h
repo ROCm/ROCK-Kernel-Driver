@@ -265,6 +265,10 @@ typedef struct srb {
 	/* Raw completion info for use by failover ? */
 	uint8_t	fo_retry_cnt;		/* Retry count this request */
 	uint8_t	err_id;			/* error id */
+#define SRB_ERR_PORT	1		/* Request failed -- "port down" */
+#define SRB_ERR_LOOP	2		/* Request failed -- "loop down" */
+#define SRB_ERR_DEVICE	3		/* Request failed -- "device error" */
+#define SRB_ERR_OTHER	4
 
 	/* Segment/entries counts */
 	uint16_t	req_cnt;	/* !0 indicates counts determined */

@@ -736,6 +736,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	}
 
 	sp->fo_retry_cnt = 0;
+	sp->err_id = 0;
 
 	/* Generate LU queue on bus, target, LUN */
 	b = cmd->device->channel;
@@ -755,6 +756,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 
 	if (l >= ha->max_luns) {
 		cmd->result = DID_NO_CONNECT << 16;
+		sp->err_id = SRB_ERR_PORT;
 
 		spin_lock_irq(ha->host->host_lock);
 
@@ -801,6 +803,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		    ha->host_no,t,l));
 
 		cmd->result = DID_NO_CONNECT << 16;
+		sp->err_id = SRB_ERR_PORT;
 
 		spin_lock_irq(ha->host->host_lock);
 
@@ -846,6 +849,11 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		 * processing
 		 */
 		cmd->result = DID_NO_CONNECT << 16;
+		if (atomic_read(&ha2->loop_state) == LOOP_DOWN) 
+			sp->err_id = SRB_ERR_LOOP;
+		else
+			sp->err_id = SRB_ERR_PORT;
+
 		add_to_done_queue(ha, sp);
 		if (!list_empty(&ha->done_queue))
 			qla2x00_done(ha);
@@ -3253,6 +3261,11 @@ qla2x00_do_dpc(void *data)
 
 					__del_from_retry_queue(ha, sp);
 					sp->cmd->result = DID_NO_CONNECT << 16;
+					if (atomic_read(&fcport->ha->loop_state) ==
+					    LOOP_DOWN) 
+						sp->err_id = SRB_ERR_LOOP;
+					else
+						sp->err_id = SRB_ERR_PORT;
 					sp->cmd->host_scribble =
 					    (unsigned char *) NULL;
 					__add_to_done_queue(ha, sp);
@@ -3940,6 +3953,10 @@ qla2x00_cmd_timeout(srb_t *sp)
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD ||
 		    atomic_read(&vis_ha->loop_state) == LOOP_DEAD) {
 			cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&fcport->ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 		} else {
 			cmd->result = DID_BUS_BUSY << 16;
 		}
@@ -3978,6 +3995,10 @@ qla2x00_cmd_timeout(srb_t *sp)
 		    atomic_read(&dest_ha->loop_state) == LOOP_DEAD) {
 			qla2x00_extend_timeout(cmd, EXTEND_CMD_TIMEOUT);
 			cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&dest_ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 		} else {
 			cmd->result = DID_BUS_BUSY << 16;
 		}
@@ -4237,20 +4258,16 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 
 		/* If device is dead then send request back to OS */
 		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
-
 			sp->cmd->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&dest_ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 
-			if (!atomic_read(&dest_ha->loop_down_timer) &&
-			    atomic_read(&dest_ha->loop_state) == LOOP_DOWN) {
-				sp->err_id = 2;
-			} else {
-				sp->err_id = 1;
-			}
-			DEBUG3(printk("scsi(%ld): loop/port is down - "
-			    "pid=%ld, sp=%p loopid=0x%x queued to dest HBA "
-			    "scsi%ld.\n",
-			    dest_ha->host_no,
-			    sp->cmd->serial_number, sp,
+			DEBUG3(printk("scsi(%ld): loop/port is down - pid=%ld, "
+			    "sp=%p err_id=%d loopid=0x%x queued to dest HBA "
+			    "scsi%ld.\n", dest_ha->host_no,
+			    sp->cmd->serial_number, sp, sp->err_id,
 			    fcport->loop_id, dest_ha->host_no));
 			/* 
 			 * Initiate a failover - done routine will initiate.
