@@ -1,5 +1,5 @@
 /*
- * $Id: ir-common.c,v 1.5 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: ir-common.c,v 1.6 2004/12/10 12:33:39 kraxel Exp $
  *
  * some common structs and functions to handle infrared remotes via
  * input layer ...
@@ -22,6 +22,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include <media/ir-common.h>
 
