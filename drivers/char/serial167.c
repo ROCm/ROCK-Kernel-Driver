@@ -2395,6 +2395,7 @@ scrn[1] = '\0';
     
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
+    cy_serial_driver.owner = THIS_MODULE;
 #ifdef CONFIG_DEVFS_FS
     cy_serial_driver.name = "tts/";
 #else
