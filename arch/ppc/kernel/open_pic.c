@@ -25,6 +25,7 @@
 #include <asm/sections.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>
+#include <asm/hardirq.h>
 
 #include "open_pic_defs.h"
 
@@ -798,7 +799,8 @@ static void openpic_ack_irq(unsigned int irq_nr)
 
 static void openpic_end_irq(unsigned int irq_nr)
 {
-	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))
+	    && irq_desc[irq_nr].action)
 		openpic_enable_irq(irq_nr);
 }
 
