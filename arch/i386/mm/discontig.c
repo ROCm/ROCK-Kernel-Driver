@@ -236,6 +236,13 @@ unsigned long __init setup_memory(void)
 	unsigned long bootmap_size, system_start_pfn, system_max_low_pfn;
 	unsigned long reserve_pages;
 
+	/*
+	 * When mapping a NUMA machine we allocate the node_mem_map arrays
+	 * from node local memory.  They are then mapped directly into KVA
+	 * between zone normal and vmalloc space.  Calculate the size of
+	 * this space and use it to adjust the boundry between ZONE_NORMAL
+	 * and ZONE_HIGHMEM.
+	 */
 	get_memcfg_numa();
 	reserve_pages = calculate_numa_remap_pages();
 
@@ -243,7 +250,10 @@ unsigned long __init setup_memory(void)
 	system_start_pfn = min_low_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
-	system_max_low_pfn = max_low_pfn = find_max_low_pfn();
+	system_max_low_pfn = max_low_pfn = find_max_low_pfn() - reserve_pages;
+	printk("reserve_pages = %ld find_max_low_pfn() ~ %ld\n",
+			reserve_pages, max_low_pfn + reserve_pages);
+	printk("max_pfn = %ld\n", max_pfn);
 #ifdef CONFIG_HIGHMEM
 	highstart_pfn = highend_pfn = max_pfn;
 	if (max_pfn > system_max_low_pfn)
@@ -251,7 +261,6 @@ unsigned long __init setup_memory(void)
 	printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
 	       pages_to_mb(highend_pfn - highstart_pfn));
 #endif
-	system_max_low_pfn = max_low_pfn = max_low_pfn - reserve_pages;
 	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
 			pages_to_mb(system_max_low_pfn));
 	printk("min_low_pfn = %ld, max_low_pfn = %ld, highstart_pfn = %ld\n", 
@@ -261,15 +270,16 @@ unsigned long __init setup_memory(void)
 			(ulong) pfn_to_kaddr(max_low_pfn));
 	for (nid = 0; nid < numnodes; nid++) {
 		node_remap_start_vaddr[nid] = pfn_to_kaddr(
-			highstart_pfn - node_remap_offset[nid]);
+			(highstart_pfn + reserve_pages) - node_remap_offset[nid]);
 		allocate_pgdat(nid);
 		printk ("node %d will remap to vaddr %08lx - %08lx\n", nid,
 			(ulong) node_remap_start_vaddr[nid],
-			(ulong) pfn_to_kaddr(highstart_pfn
+			(ulong) pfn_to_kaddr(highstart_pfn + reserve_pages
 			    - node_remap_offset[nid] + node_remap_size[nid]));
 	}
 	printk("High memory starts at vaddr %08lx\n",
 			(ulong) pfn_to_kaddr(highstart_pfn));
+	vmalloc_earlyreserve = reserve_pages * PAGE_SIZE;
 	for (nid = 0; nid < numnodes; nid++)
 		find_max_pfn_node(nid);
 

@@ -66,12 +66,21 @@ EXPORT_SYMBOL(mem_map);
 #endif
 
 unsigned long num_physpages;
+/*
+ * A number of key systems in x86 including ioremap() rely on the assumption
+ * that high_memory defines the upper bound on direct map memory, then end
+ * of ZONE_NORMAL.  Under CONFIG_DISCONTIG this means that max_low_pfn and
+ * highstart_pfn must be the same; there must be no gap between ZONE_NORMAL
+ * and ZONE_HIGHMEM.
+ */
 void * high_memory;
 struct page *highmem_start_page;
+unsigned long vmalloc_earlyreserve;
 
 EXPORT_SYMBOL(num_physpages);
 EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(high_memory);
+EXPORT_SYMBOL(vmalloc_earlyreserve);
 
 /*
  * We special-case the C-O-W ZERO_PAGE, because it's such
