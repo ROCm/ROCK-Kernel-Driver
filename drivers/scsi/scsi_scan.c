@@ -1001,6 +1001,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
 
+ repeat_inquiry:
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: INQUIRY to host %d"
 			" channel %d id %d lun %d\n", sdev->host->host_no,
 			sdev->channel, sdev->id, sdev->lun));
@@ -1067,8 +1068,14 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 2nd INQUIRY"
 				" %s with code 0x%x\n", sreq->sr_result ?
 				"failed" : "successful", sreq->sr_result));
-		if (sreq->sr_result)
-			return;
+		if (sreq->sr_result) {
+			/* if the longer inquiry has failed, flag the device
+			 * as only accepting 36 byte inquiries and retry the
+			 * 36 byte inquiry */
+			printk(KERN_INFO "scsi scan: %d byte inquiry failed with code %d.  Consider BLIST_INQUIRY_36 for this device\n", sreq->sr_result);
+			*bflags |= BLIST_INQUIRY_36;
+			goto repeat_inquiry;
+		}
 
 		/*
 		 * The INQUIRY can change, this means the length can change.
