@@ -1639,7 +1639,8 @@ nfs4_proc_async_renew(struct nfs4_client *clp)
 		.rpc_cred	= clp->cl_cred,
 	};
 
-	return rpc_call_async(clp->cl_rpcclient, &msg, 0, renew_done, (void *)jiffies);
+	return rpc_call_async(clp->cl_rpcclient, &msg, RPC_TASK_SOFT,
+			renew_done, (void *)jiffies);
 }
 
 int

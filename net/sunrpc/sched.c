@@ -731,8 +731,11 @@ rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt,
 	list_add(&task->tk_task, &all_tasks);
 	spin_unlock(&rpc_sched_lock);
 
-	if (clnt)
+	if (clnt) {
 		atomic_inc(&clnt->cl_users);
+		if (clnt->cl_softrtry)
+			task->tk_flags |= RPC_TASK_SOFT;
+	}
 
 #ifdef RPC_DEBUG
 	task->tk_magic = 0xf00baa;

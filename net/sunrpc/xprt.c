@@ -488,7 +488,7 @@ xprt_connect(struct rpc_task *task)
 	case -ECONNREFUSED:
 	case -ECONNRESET:
 	case -ENOTCONN:
-		if (!task->tk_client->cl_softrtry) {
+		if (!RPC_IS_SOFT(task)) {
 			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
 			task->tk_status = -ENOTCONN;
 			break;
@@ -496,7 +496,7 @@ xprt_connect(struct rpc_task *task)
 	default:
 		/* Report myriad other possible returns.  If this file
 		 * system is soft mounted, just error out, like Solaris.  */
-		if (task->tk_client->cl_softrtry) {
+		if (RPC_IS_SOFT(task)) {
 			printk(KERN_WARNING
 			"RPC: error %d connecting to server %s, exiting\n",
 					-status, task->tk_client->cl_server);
@@ -530,7 +530,7 @@ xprt_connect_status(struct rpc_task *task)
 	}
 
 	/* if soft mounted, just cause this RPC to fail */
-	if (task->tk_client->cl_softrtry)
+	if (RPC_IS_SOFT(task))
 		task->tk_status = -EIO;
 
 	switch (task->tk_status) {

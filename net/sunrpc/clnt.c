@@ -798,7 +798,7 @@ call_timeout(struct rpc_task *task)
 	to->to_retries = clnt->cl_timeout.to_retries;
 
 	dprintk("RPC: %4d call_timeout (major)\n", task->tk_pid);
-	if (clnt->cl_softrtry) {
+	if (RPC_IS_SOFT(task)) {
 		if (clnt->cl_chatty)
 			printk(KERN_NOTICE "%s: server %s not responding, timed out\n",
 				clnt->cl_protname, clnt->cl_server);
@@ -841,7 +841,7 @@ call_decode(struct rpc_task *task)
 	}
 
 	if (task->tk_status < 12) {
-		if (!clnt->cl_softrtry) {
+		if (!RPC_IS_SOFT(task)) {
 			task->tk_action = call_bind;
 			clnt->cl_stats->rpcretrans++;
 			goto out_retry;
