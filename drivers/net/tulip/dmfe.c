@@ -92,6 +92,7 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 
 /* Board/System/Debug information/definition ---------------- */
