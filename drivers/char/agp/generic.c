@@ -462,12 +462,12 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 //We need a function we pass an agp_device to.
 u32 agp_collect_device_status(u32 mode, u32 cmd)
 {
-	struct pci_dev *device;
+	struct pci_dev *device = NULL;
 	u8 cap_ptr;
 	u32 tmp;
 	u32 agp3;
 
-	pci_for_each_dev(device) {
+	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
 		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!cap_ptr)
 			continue;
@@ -502,14 +502,14 @@ EXPORT_SYMBOL(agp_collect_device_status);
 
 void agp_device_command(u32 command, int agp_v3)
 {
-	struct pci_dev *device;
+	struct pci_dev *device = NULL;
 	int mode;
 
 	mode = command & 0x7;
 	if (agp_v3)
 		mode *= 4;
 
-	pci_for_each_dev(device) {
+	while ((device = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device)) != NULL) {
 		u8 agp = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (!agp)
 			continue;
