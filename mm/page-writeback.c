@@ -47,6 +47,8 @@
 #define SYNC_WRITEBACK_PAGES	1500
 
 
+/* The following parameters are exported via /proc/sys/vm */
+
 /*
  * Dirty memory thresholds, in percentages
  */
@@ -67,14 +69,17 @@ int dirty_async_ratio = 50;
 int dirty_sync_ratio = 60;
 
 /*
- * The interval between `kupdate'-style writebacks.
+ * The interval between `kupdate'-style writebacks, in centiseconds
+ * (hundredths of a second)
  */
 int dirty_writeback_centisecs = 5 * 100;
 
 /*
- * The largest amount of time for which data is allowed to remain dirty
+ * The longest amount of time for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
+
+/* End of sysctl-exported parameters */
 
 
 static void background_writeout(unsigned long _min_pages);
@@ -233,7 +238,8 @@ static void wb_kupdate(unsigned long arg)
 static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
-		mod_timer(&wb_timer, jiffies + HZ);
+		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
+
 }
 
 static int __init wb_timer_init(void)

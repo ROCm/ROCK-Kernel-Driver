@@ -49,15 +49,22 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
+/* These 5 are exported to sysctl. */
 extern int dirty_background_ratio;
 extern int dirty_async_ratio;
 extern int dirty_sync_ratio;
 extern int dirty_writeback_centisecs;
 extern int dirty_expire_centisecs;
 
+
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
 int do_writepages(struct address_space *mapping, int *nr_to_write);
+
+/* pdflush.c */
+extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl
+				   read-only. */
+
 
 #endif		/* WRITEBACK_H */
