@@ -497,7 +497,7 @@ static int init_shared_mem(struct s2io_nic *nic)
 				ba = &nic->ba[i][j][k];
 
 				ba->ba_0_org = (void *) kmalloc
-				    (BUF0_LEN + ALIGN_SIZE, GFP_ATOMIC);
+				    (BUF0_LEN + ALIGN_SIZE, GFP_KERNEL);
 				if (!ba->ba_0_org)
 					return -ENOMEM;
 				tmp = (u64) ba->ba_0_org;
@@ -506,7 +506,7 @@ static int init_shared_mem(struct s2io_nic *nic)
 				ba->ba_0 = (void *) tmp;
 
 				ba->ba_1_org = (void *) kmalloc
-				    (BUF1_LEN + ALIGN_SIZE, GFP_ATOMIC);
+				    (BUF1_LEN + ALIGN_SIZE, GFP_KERNEL);
 				if (!ba->ba_1_org)
 					return -ENOMEM;
 				tmp = (u64) ba->ba_1_org;
@@ -1791,8 +1791,7 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 #ifndef	CONFIG_2BUFF_MODE
 		skb = dev_alloc_skb(size + NET_IP_ALIGN);
 #else
-		skb = dev_alloc_skb(dev->mtu + ALIGN_SIZE +
-				    /*BUF0_LEN + */ 22);
+		skb = dev_alloc_skb(dev->mtu + ALIGN_SIZE + BUF0_LEN + 4);
 #endif
 		if (!skb) {
 			DBG_PRINT(ERR_DBG, "%s: Out of ", dev->name);
@@ -1813,14 +1812,16 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 		mac_control->rx_curr_put_info[ring_no].offset = off;
 #else
 		ba = &nic->ba[ring_no][block_no][off];
+		skb_reserve(skb, BUF0_LEN);
 		tmp = (u64) skb->data;
 		tmp += ALIGN_SIZE;
 		tmp &= ~ALIGN_SIZE;
 		skb->data = (void *) tmp;
+		skb->tail = (void *) tmp;
 
 		memset(rxdp, 0, sizeof(RxD_t));
 		rxdp->Buffer2_ptr = pci_map_single
-		    (nic->pdev, skb->data, dev->mtu + 22,
+		    (nic->pdev, skb->data, dev->mtu + BUF0_LEN + 4,
 		     PCI_DMA_FROMDEVICE);
 		rxdp->Buffer0_ptr =
 		    pci_map_single(nic->pdev, ba->ba_0, BUF0_LEN,
@@ -1829,7 +1830,7 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 		    pci_map_single(nic->pdev, ba->ba_1, BUF1_LEN,
 				   PCI_DMA_FROMDEVICE);
 
-		rxdp->Control_2 = SET_BUFFER2_SIZE(dev->mtu + 22);
+		rxdp->Control_2 = SET_BUFFER2_SIZE(dev->mtu + 4);
 		rxdp->Control_2 |= SET_BUFFER0_SIZE(BUF0_LEN);
 		rxdp->Control_2 |= SET_BUFFER1_SIZE(1);	/* dummy. */
 		rxdp->Control_2 |= BIT(0);	/* Set Buffer_Empty bit. */
@@ -1919,7 +1920,7 @@ static void free_rx_buffers(struct s2io_nic *sp)
 						 PCI_DMA_FROMDEVICE);
 				pci_unmap_single(sp->pdev, (dma_addr_t)
 						 rxdp->Buffer2_ptr,
-						 dev->mtu + 22,
+						 dev->mtu + BUF0_LEN + 4,
 						 PCI_DMA_FROMDEVICE);
 #endif
 				dev_kfree_skb(skb);
@@ -2073,7 +2074,7 @@ static int s2io_poll(struct net_device *dev, int *budget)
 					 BUF1_LEN, PCI_DMA_FROMDEVICE);
 			pci_unmap_single(nic->pdev, (dma_addr_t)
 					 rxdp->Buffer2_ptr,
-					 dev->mtu + 22,
+					 dev->mtu + BUF0_LEN + 4,
 					 PCI_DMA_FROMDEVICE);
 			ba = &nic->ba[i][get_block][get_info.offset];
 
@@ -2270,7 +2271,7 @@ static void rx_intr_handler(struct s2io_nic *nic)
 					 BUF1_LEN, PCI_DMA_FROMDEVICE);
 			pci_unmap_single(nic->pdev, (dma_addr_t)
 					 rxdp->Buffer2_ptr,
-					 dev->mtu + 22,
+					 dev->mtu + BUF0_LEN + 4,
 					 PCI_DMA_FROMDEVICE);
 			ba = &nic->ba[i][get_block][get_info.offset];
 
@@ -4471,7 +4472,7 @@ static int rx_osm_handler(nic_t * sp, RxD_t * rxdp, int ring_no,
 	u16 l3_csum, l4_csum;
 #ifdef CONFIG_2BUFF_MODE
 	int buf0_len, buf2_len;
-	struct ethhdr *eth = (struct ethhdr *) ba->ba_0;
+	unsigned char *buff;
 #endif
 
 	l3_csum = RXD_GET_L3_CKSUM(rxdp->Control_1);
@@ -4510,21 +4511,10 @@ static int rx_osm_handler(nic_t * sp, RxD_t * rxdp, int ring_no,
 	skb_put(skb, len);
 	skb->protocol = eth_type_trans(skb, dev);
 #else
+	buff = skb_push(skb, buf0_len);
+	memcpy(buff, ba->ba_0, buf0_len);
 	skb_put(skb, buf2_len);
-	/* 
-	 * Reproducing eth_type_trans functionality and running
-	 * on the ethernet header 'eth' stripped and given to us
-	 * by the hardware in 2Buff mode.
-	 */
-	if (*eth->h_dest & 1) {
-		if (!memcmp(eth->h_dest, dev->broadcast, ETH_ALEN))
-			skb->pkt_type = PACKET_BROADCAST;
-		else
-			skb->pkt_type = PACKET_MULTICAST;
-	} else if (memcmp(eth->h_dest, dev->dev_addr, ETH_ALEN)) {
-		skb->pkt_type = PACKET_OTHERHOST;
-	}
-	skb->protocol = eth->h_proto;
+	skb->protocol = eth_type_trans(skb, dev);
 #endif
 
 #ifdef CONFIG_S2IO_NAPI
