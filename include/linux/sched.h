@@ -769,15 +769,7 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
-static inline void unhash_process(struct task_struct *p)
-{
-	write_lock_irq(&tasklist_lock);
-	nr_threads--;
-	unhash_pid(p);
-	REMOVE_LINKS(p);
-	list_del(&p->thread_group);
-	write_unlock_irq(&tasklist_lock);
-}
+extern void unhash_process(struct task_struct *p);
 
 /* Protects ->fs, ->files, ->mm, and synchronises with wait4().  Nests inside tasklist_lock */
 static inline void task_lock(struct task_struct *p)
