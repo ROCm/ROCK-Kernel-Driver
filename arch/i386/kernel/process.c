@@ -566,6 +566,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct_cpy(childregs, regs);
 	childregs->eax = 0;
 	childregs->esp = esp;
+	p->user_vm_lock = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);
@@ -579,6 +580,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	unlazy_fpu(tsk);
 	struct_cpy(&p->thread.i387, &tsk->thread.i387);
 
+	if (unlikely(NULL != tsk->thread.ts_io_bitmap)) {
+		p->thread.ts_io_bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
+		if (!p->thread.ts_io_bitmap)
+			return -ENOMEM;
+		memcpy(p->thread.ts_io_bitmap, tsk->thread.ts_io_bitmap,
+			IO_BITMAP_BYTES);
+	}
+
+	/*
+	 * The common fastpath:
+	 */
+	if (!(clone_flags & (CLONE_SETTLS | CLONE_SETTID | CLONE_RELEASE_VM)))
+		return 0;
 	/*
 	 * Set a new TLS for the child thread?
 	 */
@@ -608,14 +622,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		if (put_user(p->pid, (pid_t *)childregs->edx))
 			return -EFAULT;
 
-	if (unlikely(NULL != tsk->thread.ts_io_bitmap)) {
-		p->thread.ts_io_bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
-		if (!p->thread.ts_io_bitmap)
-			return -ENOMEM;
-		memcpy(p->thread.ts_io_bitmap, tsk->thread.ts_io_bitmap,
-			IO_BITMAP_BYTES);
+	/*
+	 * Does the userspace VM want any unlock on mm_release()?
+	 */
+	if (clone_flags & CLONE_RELEASE_VM) {
+		childregs->esp -= sizeof(0UL);
+		p->user_vm_lock = (long *) esp;
 	}
-
 	return 0;
 }
 

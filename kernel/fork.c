@@ -367,6 +367,12 @@ void mm_release(void)
 		tsk->vfork_done = NULL;
 		complete(vfork_done);
 	}
+	if (tsk->user_vm_lock)
+		/*
+		 * We dont check the error code - if userspace has
+		 * not set up a proper pointer then tough luck.
+		 */
+		put_user(0UL, tsk->user_vm_lock);
 }
 
 static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
