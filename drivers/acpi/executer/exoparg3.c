@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exoparg3 - AML execution - opcodes with 3 arguments
- *              $Revision: 3 $
+ *              $Revision: 9 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exoparg3")
+	 ACPI_MODULE_NAME    ("exoparg3")
 
 
 /*!
@@ -79,7 +79,7 @@ acpi_ex_opcode_3A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
@@ -112,11 +112,10 @@ acpi_ex_opcode_3A_0T_0R (
 
 	default:
 
-		REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
-		break;
 	}
 
 
@@ -150,7 +149,7 @@ acpi_ex_opcode_3A_1T_1R (
 	u32                     length;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_3A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
@@ -188,30 +187,29 @@ acpi_ex_opcode_3A_1T_1R (
 
 			buffer = ACPI_MEM_CALLOCATE (length + 1);
 			if (!buffer) {
-				return (AE_NO_MEMORY);
+				status = AE_NO_MEMORY;
+				goto cleanup;
 			}
 
 			/* Copy the portion requested */
 
-			MEMCPY (buffer, operand[0]->string.pointer + index,
-					length);
+			ACPI_MEMCPY (buffer, operand[0]->string.pointer + index,
+					  length);
 
 			/* Set the length of the new String/Buffer */
 
 			return_desc->string.pointer = buffer;
 			return_desc->string.length = length;
 		}
-
 		break;
 
 
 	default:
 
-		REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
-		break;
 	}
 
 	/* Store the result in the target */

@@ -15,10 +15,9 @@
 #include <linux/smb.h>
 
 /* structure access macros */
-#define server_from_inode(inode) (&(inode)->i_sb->u.smbfs_sb)
-#define server_from_dentry(dentry) (&(dentry)->d_sb->u.smbfs_sb)
-#define SB_of(server) ((struct super_block *) ((char *)(server) - \
-	(unsigned long)(&((struct super_block *)0)->u.smbfs_sb)))
+#define server_from_inode(inode) SMB_SB((inode)->i_sb)
+#define server_from_dentry(dentry) SMB_SB((dentry)->d_sb)
+#define SB_of(server) ((server)->super_block)
 
 struct smb_sb_info {
         enum smb_conn_state state;
@@ -55,6 +54,7 @@ struct smb_sb_info {
 	char *name_buf;
 
 	struct smb_ops *ops;
+	struct super_block *super_block;
 };
 
 

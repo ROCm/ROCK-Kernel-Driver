@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dbdisasm - parser op tree display routines
- *              $Revision: 50 $
+ *              $Revision: 61 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,10 +34,9 @@
 #ifdef ENABLE_DEBUGGER
 
 #define _COMPONENT          ACPI_DEBUGGER
-	 MODULE_NAME         ("dbdisasm")
+	 ACPI_MODULE_NAME    ("dbdisasm")
 
 
-#define MAX_SHOW_ENTRY      128
 #define BLOCK_PAREN         1
 #define BLOCK_BRACE         2
 #define DB_NO_OP_INFO       "            [%2.2d]  "
@@ -67,14 +66,12 @@ acpi_db_block_type (
 	switch (op->opcode) {
 	case AML_METHOD_OP:
 		return (BLOCK_BRACE);
-		break;
 
 	default:
 		break;
 	}
 
 	return (BLOCK_PAREN);
-
 }
 
 
@@ -101,11 +98,23 @@ acpi_ps_display_object_pathname (
 	acpi_parse_object       *op)
 {
 	acpi_parse_object       *target_op;
+	char                    *name;
 
+
+	if (op->flags & ACPI_PARSEOP_GENERIC) {
+		name = op->value.name;
+		if (name[0] == '\\') {
+			acpi_os_printf (" (Fully Qualified Pathname)");
+			return (AE_OK);
+		}
+	}
+	else {
+		name = (char *) &((acpi_parse2_object *) op)->name;
+	}
 
 	/* Search parent tree up to the root if necessary */
 
-	target_op = acpi_ps_find (op, op->value.name, 0, 0);
+	target_op = acpi_ps_find (op, name, 0, 0);
 	if (!target_op) {
 		/*
 		 * Didn't find the name in the parse tree.  This may be
@@ -115,7 +124,6 @@ acpi_ps_display_object_pathname (
 		 */
 		acpi_os_printf (" **** Path not found in parse tree");
 	}
-
 	else {
 		/* The target was found, print the name and complete path */
 
@@ -136,8 +144,7 @@ acpi_ps_display_object_pathname (
 {
 	acpi_status             status;
 	acpi_namespace_node     *node;
-	NATIVE_CHAR             buffer[MAX_SHOW_ENTRY];
-	u32                     buffer_size = MAX_SHOW_ENTRY;
+	acpi_buffer             buffer;
 	u32                     debug_level;
 
 
@@ -153,7 +160,7 @@ acpi_ps_display_object_pathname (
 		/* Node not defined in this scope, look it up */
 
 		status = acpi_ns_lookup (walk_state->scope_info, op->value.string, ACPI_TYPE_ANY,
-				  IMODE_EXECUTE, NS_SEARCH_PARENT, walk_state, &(node));
+				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 
 		if (ACPI_FAILURE (status)) {
 			/*
@@ -172,13 +179,15 @@ acpi_ps_display_object_pathname (
 
 	/* Convert Named_desc/handle to a full pathname */
 
-	status = acpi_ns_handle_to_pathname (node, &buffer_size, buffer);
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+	status = acpi_ns_handle_to_pathname (node, &buffer);
 	if (ACPI_FAILURE (status)) {
 		acpi_os_printf ("****Could not get pathname****)");
 		goto exit;
 	}
 
-	acpi_os_printf (" (Path %s)", buffer);
+	acpi_os_printf (" (Path %s)", buffer.pointer);
+	ACPI_MEM_FREE (buffer.pointer);
 
 
 exit:
@@ -219,118 +228,115 @@ acpi_db_display_op (
 	u32                     j;
 
 
-	if (op) {
-		while (op) {
-			/* indentation */
+	if (!op) {
+		acpi_db_display_opcode (walk_state, op);
+		return;
+	}
 
-			depth_count = 0;
-			if (!acpi_gbl_db_opt_verbose) {
-				depth_count++;
+
+	while (op) {
+		/* Indentation */
+
+		depth_count = 0;
+		if (!acpi_gbl_db_opt_verbose) {
+			depth_count++;
+		}
+
+		/* Determine the nesting depth of this argument */
+
+		for (depth = op->parent; depth; depth = depth->parent) {
+			arg = acpi_ps_get_arg (depth, 0);
+			while (arg && arg != origin) {
+				arg = arg->next;
 			}
 
-			/* Determine the nesting depth of this argument */
-
-			for (depth = op->parent; depth; depth = depth->parent) {
-				arg = acpi_ps_get_arg (depth, 0);
-				while (arg && arg != origin) {
-					arg = arg->next;
-				}
-
-				if (arg) {
-					break;
-				}
-
-				depth_count++;
+			if (arg) {
+				break;
 			}
 
+			depth_count++;
+		}
 
-			/* Open a new block if we are nested further than last time */
+		/* Open a new block if we are nested further than last time */
 
-			if (depth_count > last_depth) {
-				VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth));
-				for (i = 0; i < last_depth; i++) {
+		if (depth_count > last_depth) {
+			VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth));
+			for (i = 0; i < last_depth; i++) {
+				acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
+			}
+
+			if (acpi_db_block_type (op) == BLOCK_PAREN) {
+				acpi_os_printf ("(\n");
+			}
+			else {
+				acpi_os_printf ("{\n");
+			}
+		}
+
+		/* Close a block if we are nested less than last time */
+
+		else if (depth_count < last_depth) {
+			for (j = 0; j < (last_depth - depth_count); j++) {
+				VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - j));
+				for (i = 0; i < (last_depth - j - 1); i++) {
 					acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 				}
 
 				if (acpi_db_block_type (op) == BLOCK_PAREN) {
-					acpi_os_printf ("(\n");
+					acpi_os_printf (")\n");
 				}
 				else {
-					acpi_os_printf ("{\n");
+					acpi_os_printf ("}\n");
 				}
-			}
-
-			/* Close a block if we are nested less than last time */
-
-			else if (depth_count < last_depth) {
-				for (j = 0; j < (last_depth - depth_count); j++) {
-					VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - j));
-					for (i = 0; i < (last_depth - j - 1); i++) {
-						acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
-					}
-
-					if (acpi_db_block_type (op) == BLOCK_PAREN) {
-						acpi_os_printf (")\n");
-					}
-					else {
-						acpi_os_printf ("}\n");
-					}
-				}
-			}
-
-			/* In verbose mode, print the AML offset, opcode and depth count */
-
-			VERBOSE_PRINT ((DB_FULL_OP_INFO, (unsigned) op->aml_offset, op->opcode, depth_count));
-
-
-			/* Indent the output according to the depth count */
-
-			for (i = 0; i < depth_count; i++) {
-				acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
-			}
-
-
-			/* Now print the opcode */
-
-			acpi_db_display_opcode (walk_state, op);
-
-			/* Resolve a name reference */
-
-			if ((op->opcode == AML_INT_NAMEPATH_OP && op->value.name)  &&
-				(op->parent) &&
-				(acpi_gbl_db_opt_verbose)) {
-				acpi_ps_display_object_pathname (walk_state, op);
-			}
-
-			acpi_os_printf ("\n");
-
-			/* Get the next node in the tree */
-
-			op = acpi_ps_get_depth_next (origin, op);
-			last_depth = depth_count;
-
-			num_opcodes--;
-			if (!num_opcodes) {
-				op = NULL;
 			}
 		}
 
-		/* Close the last block(s) */
+		/* In verbose mode, print the AML offset, opcode and depth count */
 
-		depth_count = last_depth -1;
-		for (i = 0; i < last_depth; i++) {
-			VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - i));
-			for (j = 0; j < depth_count; j++) {
-				acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
-			}
-			acpi_os_printf ("}\n");
-			depth_count--;
+		VERBOSE_PRINT ((DB_FULL_OP_INFO, (unsigned) op->aml_offset, op->opcode, depth_count));
+
+
+		/* Indent the output according to the depth count */
+
+		for (i = 0; i < depth_count; i++) {
+			acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
 		}
 
+		/* Now print the opcode */
+
+		acpi_db_display_opcode (walk_state, op);
+
+		/* Resolve a name reference */
+
+		if ((op->opcode == AML_INT_NAMEPATH_OP && op->value.name)  &&
+			(op->parent) &&
+			(acpi_gbl_db_opt_verbose)) {
+			acpi_ps_display_object_pathname (walk_state, op);
+		}
+
+		acpi_os_printf ("\n");
+
+		/* Get the next node in the tree */
+
+		op = acpi_ps_get_depth_next (origin, op);
+		last_depth = depth_count;
+
+		num_opcodes--;
+		if (!num_opcodes) {
+			op = NULL;
+		}
 	}
 
-	else {
-		acpi_db_display_opcode (walk_state, op);
+	/* Close the last block(s) */
+
+	depth_count = last_depth -1;
+	for (i = 0; i < last_depth; i++) {
+		VERBOSE_PRINT ((DB_NO_OP_INFO, last_depth - i));
+		for (j = 0; j < depth_count; j++) {
+			acpi_os_printf ("%s", acpi_gbl_db_disasm_indent);
+		}
+		acpi_os_printf ("}\n");
+		depth_count--;
 	}
 }
 
@@ -352,7 +358,6 @@ acpi_db_display_namestring (
 	NATIVE_CHAR             *name)
 {
 	u32                     seg_count;
-	u8                      do_dot = FALSE;
 
 
 	if (!name) {
@@ -360,21 +365,27 @@ acpi_db_display_namestring (
 		return;
 	}
 
-	if (acpi_ps_is_prefix_char (GET8 (name))) {
-		/* append prefix character */
+	/* Handle all Scope Prefix operators */
 
-		acpi_os_printf ("%1c", GET8 (name));
+	while (acpi_ps_is_prefix_char (ACPI_GET8 (name))) {
+		/* Append prefix character */
+
+		acpi_os_printf ("%1c", ACPI_GET8 (name));
 		name++;
 	}
 
-	switch (GET8 (name)) {
+	switch (ACPI_GET8 (name)) {
+	case 0:
+		seg_count = 0;
+		break;
+
 	case AML_DUAL_NAME_PREFIX:
 		seg_count = 2;
 		name++;
 		break;
 
 	case AML_MULTI_NAME_PREFIX_OP:
-		seg_count = (u32) GET8 (name + 1);
+		seg_count = (u32) ACPI_GET8 (name + 1);
 		name += 2;
 		break;
 
@@ -383,19 +394,18 @@ acpi_db_display_namestring (
 		break;
 	}
 
-	while (seg_count--) {
-		/* append Name segment */
+	while (seg_count) {
+		/* Append Name segment */
 
-		if (do_dot) {
-			/* append dot */
+		acpi_os_printf ("%4.4s", name);
+
+		seg_count--;
+		if (seg_count) {
+			/* Not last name, append dot separator */
 
 			acpi_os_printf (".");
 		}
-
-		acpi_os_printf ("%4.4s", name);
-		do_dot = TRUE;
-
-		name += 4;
+		name += ACPI_NAME_SIZE;
 	}
 }
 
@@ -432,7 +442,6 @@ acpi_db_display_path (
 	if (!(op_info->flags & AML_NSNODE)) {
 		return;
 	}
-
 
 	if (op_info->flags & AML_CREATE) {
 		/* Field creation - check for a fully qualified namepath */
@@ -492,7 +501,6 @@ acpi_db_display_path (
 						acpi_os_printf ("%4.4s", name_path->value.string);
 					}
 				}
-
 				else {
 					name = acpi_ps_get_name (search);
 					acpi_os_printf ("%4.4s", &name);
@@ -538,21 +546,17 @@ acpi_db_display_opcode (
 		acpi_os_printf ("<NULL OP PTR>");
 	}
 
-
 	/* op and arguments */
 
 	switch (op->opcode) {
-
 	case AML_BYTE_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
 			acpi_os_printf ("(u8) 0x%2.2X", op->value.integer8);
 		}
-
 		else {
 			acpi_os_printf ("0x%2.2X", op->value.integer8);
 		}
-
 		break;
 
 
@@ -561,11 +565,9 @@ acpi_db_display_opcode (
 		if (acpi_gbl_db_opt_verbose) {
 			acpi_os_printf ("(u16) 0x%4.4X", op->value.integer16);
 		}
-
 		else {
 			acpi_os_printf ("0x%4.4X", op->value.integer16);
 		}
-
 		break;
 
 
@@ -574,11 +576,9 @@ acpi_db_display_opcode (
 		if (acpi_gbl_db_opt_verbose) {
 			acpi_os_printf ("(u32) 0x%8.8X", op->value.integer32);
 		}
-
 		else {
 			acpi_os_printf ("0x%8.8X", op->value.integer32);
 		}
-
 		break;
 
 
@@ -588,12 +588,10 @@ acpi_db_display_opcode (
 			acpi_os_printf ("(u64) 0x%8.8X%8.8X", op->value.integer64.hi,
 					 op->value.integer64.lo);
 		}
-
 		else {
 			acpi_os_printf ("0x%8.8X%8.8X", op->value.integer64.hi,
 					 op->value.integer64.lo);
 		}
-
 		break;
 
 
@@ -602,11 +600,9 @@ acpi_db_display_opcode (
 		if (op->value.string) {
 			acpi_os_printf ("\"%s\"", op->value.string);
 		}
-
 		else {
 			acpi_os_printf ("<\"NULL STRING PTR\">");
 		}
-
 		break;
 
 
@@ -615,11 +611,9 @@ acpi_db_display_opcode (
 		if (op->value.string) {
 			acpi_os_printf ("\"%s\"", op->value.string);
 		}
-
 		else {
 			acpi_os_printf ("\"<NULL STATIC STRING PTR>\"");
 		}
-
 		break;
 
 
@@ -652,7 +646,6 @@ acpi_db_display_opcode (
 		if (acpi_gbl_db_opt_verbose) {
 			acpi_os_printf ("Byte_list   (Length 0x%8.8X)  ", op->value.integer32);
 		}
-
 		else {
 			acpi_os_printf ("0x%2.2X", op->value.integer32);
 
@@ -663,7 +656,6 @@ acpi_db_display_opcode (
 				acpi_os_printf (", 0x%2.2X", byte_data[i]);
 			}
 		}
-
 		break;
 
 
@@ -682,7 +674,6 @@ acpi_db_display_opcode (
 			acpi_db_decode_internal_object (walk_state->results->results.obj_desc [walk_state->results->results.num_results-1]);
 		}
 #endif
-
 		break;
 	}
 
@@ -702,14 +693,11 @@ acpi_db_display_opcode (
 		name = acpi_ps_get_name (op);
 		acpi_os_printf (" %4.4s", &name);
 
-		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf (" (Path \\");
-			acpi_db_display_path (op);
-			acpi_os_printf (")");
+		if ((acpi_gbl_db_opt_verbose) && (op->opcode != AML_INT_NAMEDFIELD_OP)) {
+			acpi_ps_display_object_pathname (walk_state, op);
 		}
 	}
 }
-
 
 #endif  /* ENABLE_DEBUGGER */
 

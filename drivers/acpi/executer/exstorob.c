@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 37 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,12 +35,12 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exstorob")
+	 ACPI_MODULE_NAME    ("exstorob")
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_copy_buffer_to_buffer
+ * FUNCTION:    Acpi_ex_store_buffer_to_buffer
  *
  * PARAMETERS:  Source_desc         - Source object to copy
  *              Target_desc         - Destination object of the copy
@@ -52,7 +52,7 @@
  ******************************************************************************/
 
 acpi_status
-acpi_ex_copy_buffer_to_buffer (
+acpi_ex_store_buffer_to_buffer (
 	acpi_operand_object     *source_desc,
 	acpi_operand_object     *target_desc)
 {
@@ -60,7 +60,7 @@ acpi_ex_copy_buffer_to_buffer (
 	u8                      *buffer;
 
 
-	PROC_NAME ("Ex_copy_buffer_to_buffer");
+	ACPI_FUNCTION_NAME ("Ex_store_buffer_to_buffer");
 
 
 	/*
@@ -89,15 +89,15 @@ acpi_ex_copy_buffer_to_buffer (
 	if (length <= target_desc->buffer.length) {
 		/* Clear existing buffer and copy in the new one */
 
-		MEMSET (target_desc->buffer.pointer, 0, target_desc->buffer.length);
-		MEMCPY (target_desc->buffer.pointer, buffer, length);
+		ACPI_MEMSET (target_desc->buffer.pointer, 0, target_desc->buffer.length);
+		ACPI_MEMCPY (target_desc->buffer.pointer, buffer, length);
 	}
 
 	else {
 		/*
 		 * Truncate the source, copy only what will fit
 		 */
-		MEMCPY (target_desc->buffer.pointer, buffer, target_desc->buffer.length);
+		ACPI_MEMCPY (target_desc->buffer.pointer, buffer, target_desc->buffer.length);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 			"Truncating src buffer from %X to %X\n",
@@ -110,7 +110,7 @@ acpi_ex_copy_buffer_to_buffer (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_copy_string_to_string
+ * FUNCTION:    Acpi_ex_store_string_to_string
  *
  * PARAMETERS:  Source_desc         - Source object to copy
  *              Target_desc         - Destination object of the copy
@@ -122,7 +122,7 @@ acpi_ex_copy_buffer_to_buffer (
  ******************************************************************************/
 
 acpi_status
-acpi_ex_copy_string_to_string (
+acpi_ex_store_string_to_string (
 	acpi_operand_object     *source_desc,
 	acpi_operand_object     *target_desc)
 {
@@ -130,7 +130,7 @@ acpi_ex_copy_string_to_string (
 	u8                      *buffer;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*
@@ -145,8 +145,8 @@ acpi_ex_copy_string_to_string (
 	if (length < target_desc->string.length) {
 		/* Clear old string and copy in the new one */
 
-		MEMSET (target_desc->string.pointer, 0, target_desc->string.length);
-		MEMCPY (target_desc->string.pointer, buffer, length);
+		ACPI_MEMSET (target_desc->string.pointer, 0, target_desc->string.length);
+		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 
 	else {
@@ -168,7 +168,7 @@ acpi_ex_copy_string_to_string (
 		}
 
 		target_desc->string.length = length;
-		MEMCPY (target_desc->string.pointer, buffer, length);
+		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 
 	return (AE_OK);

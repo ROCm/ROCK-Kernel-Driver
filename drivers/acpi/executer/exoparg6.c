@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exoparg6 - AML execution - opcodes with 6 arguments
- *              $Revision: 4 $
+ *              $Revision: 10 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exoparg6")
+	 ACPI_MODULE_NAME    ("exoparg6")
 
 
 /*!
@@ -158,7 +158,7 @@ acpi_ex_opcode_6A_0T_1R (
 	acpi_operand_object     *this_element;
 
 
-	FUNCTION_TRACE_STR ("Ex_opcode_6A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_6A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	switch (walk_state->opcode) {
@@ -199,6 +199,7 @@ acpi_ex_opcode_6A_0T_1R (
 		 * Examine each element until a match is found.  Within the loop,
 		 * "continue" signifies that the current element does not match
 		 * and the next should be examined.
+		 *
 		 * Upon finding a match, the loop will terminate via "break" at
 		 * the bottom.  If it terminates "normally", Match_value will be -1
 		 * (its initial value) indicating that no match was found.  When
@@ -209,26 +210,20 @@ acpi_ex_opcode_6A_0T_1R (
 
 			/*
 			 * Treat any NULL or non-numeric elements as non-matching.
-			 * TBD [Unhandled] - if an element is a Name,
-			 *      should we examine its value?
 			 */
 			if (!this_element ||
 				this_element->common.type != ACPI_TYPE_INTEGER) {
 				continue;
 			}
 
-
 			/*
-			 * Within these switch statements:
-			 *      "break" (exit from the switch) signifies a match;
-			 *      "continue" (proceed to next iteration of enclosing
-			 *          "for" loop) signifies a non-match.
+			 * "continue" (proceed to next iteration of enclosing
+			 * "for" loop) signifies a non-match.
 			 */
 			if (!acpi_ex_do_match ((u32) operand[1]->integer.value,
 					   this_element->integer.value, operand[2]->integer.value)) {
 				continue;
 			}
-
 
 			if (!acpi_ex_do_match ((u32) operand[3]->integer.value,
 					   this_element->integer.value, operand[4]->integer.value)) {
@@ -246,18 +241,16 @@ acpi_ex_opcode_6A_0T_1R (
 
 	case AML_LOAD_TABLE_OP:
 
-		status = AE_NOT_IMPLEMENTED;
-		goto cleanup;
+		status = acpi_ex_load_table_op (walk_state, &return_desc);
 		break;
 
 
 	default:
 
-		REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_3A_0T_0R: Unknown opcode %X\n",
 				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
-		break;
 	}
 
 

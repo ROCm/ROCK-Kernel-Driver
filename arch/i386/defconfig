@@ -77,6 +77,11 @@ CONFIG_HAVE_DEC_LOCK=y
 #
 # General options
 #
+
+#
+# ACPI Support
+#
+# CONFIG_ACPI is not set
 CONFIG_X86_IO_APIC=y
 CONFIG_X86_LOCAL_APIC=y
 CONFIG_PCI=y
@@ -830,6 +835,7 @@ CONFIG_USB_UHCI_ALT=y
 # USB Device Class drivers
 #
 # CONFIG_USB_AUDIO is not set
+# CONFIG_USB_EMI26 is not set
 # CONFIG_USB_BLUETOOTH is not set
 CONFIG_USB_STORAGE=y
 # CONFIG_USB_STORAGE_DEBUG is not set

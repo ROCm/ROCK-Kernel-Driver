@@ -12,6 +12,7 @@
 #ifdef CONFIG_SYSCTL
 
 extern int netdev_max_backlog;
+extern int weight_p;
 extern int no_cong_thresh;
 extern int no_cong;
 extern int lo_cong;
@@ -46,6 +47,9 @@ ctl_table core_table[] = {
 	 &proc_dointvec},
 	{NET_CORE_RMEM_DEFAULT, "rmem_default",
 	 &sysctl_rmem_default, sizeof(int), 0644, NULL,
+	 &proc_dointvec},
+	{NET_CORE_DEV_WEIGHT, "dev_weight",
+	 &weight_p, sizeof(int), 0644, NULL,
 	 &proc_dointvec},
 	{NET_CORE_MAX_BACKLOG, "netdev_max_backlog",
 	 &netdev_max_backlog, sizeof(int), 0644, NULL,

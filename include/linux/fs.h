@@ -648,16 +648,13 @@ struct quota_mount_options
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
 #include <linux/ntfs_fs_sb.h>
-#include <linux/msdos_fs_sb.h>
 #include <linux/iso_fs_sb.h>
 #include <linux/sysv_fs_sb.h>
 #include <linux/affs_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
-#include <linux/smb_fs_sb.h>
 #include <linux/hfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
-#include <linux/qnx4_fs_sb.h>
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
@@ -700,17 +697,14 @@ struct super_block {
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
 		struct ntfs_sb_info	ntfs_sb;
-		struct msdos_sb_info	msdos_sb;
 		struct isofs_sb_info	isofs_sb;
 		struct sysv_sb_info	sysv_sb;
 		struct affs_sb_info	affs_sb;
 		struct ufs_sb_info	ufs_sb;
 		struct shmem_sb_info	shmem_sb;
 		struct romfs_sb_info	romfs_sb;
-		struct smb_sb_info	smbfs_sb;
 		struct hfs_sb_info	hfs_sb;
 		struct adfs_sb_info	adfs_sb;
-		struct qnx4_sb_info	qnx4_sb;
 		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
 		struct udf_sb_info	udf_sb;
@@ -1456,7 +1450,6 @@ extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, r
 extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
-extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern int generic_file_open(struct inode * inode, struct file * filp);
 
 extern struct file_operations generic_ro_fops;
@@ -1468,7 +1461,6 @@ extern int page_follow_link(struct dentry *, struct nameidata *);
 extern struct inode_operations page_symlink_inode_operations;
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
-extern int dcache_readdir(struct file *, void *, filldir_t);
 
 extern int vfs_stat(char *, struct kstat *);
 extern int vfs_lstat(char *, struct kstat *);
@@ -1480,6 +1472,12 @@ extern void drop_super(struct super_block *sb);
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 
+extern int dcache_readdir(struct file *, void *, filldir_t);
+extern int simple_statfs(struct super_block *, struct statfs *);
+extern struct dentry *simple_lookup(struct inode *, struct dentry *);
+extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
+extern struct file_operations simple_dir_operations;
+extern struct inode_operations simple_dir_inode_operations;
 
 extern void show_buffers(void);
 

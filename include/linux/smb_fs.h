@@ -11,6 +11,7 @@
 
 #include <linux/smb.h>
 #include <linux/smb_fs_i.h>
+#include <linux/smb_fs_sb.h>
 
 /*
  * ioctl commands
@@ -28,6 +29,11 @@
 #include <linux/vmalloc.h>
 #include <linux/smb_mount.h>
 #include <asm/unaligned.h>
+
+static inline struct smb_sb_info *SMB_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct smb_inode_info *SMB_I(struct inode *inode)
 {

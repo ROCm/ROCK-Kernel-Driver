@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 81 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "acnamesp.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dsobject")
+	 ACPI_MODULE_NAME    ("dsobject")
 
 
 /*******************************************************************************
@@ -62,13 +62,13 @@ acpi_ds_init_one_object (
 	void                    *context,
 	void                    **return_value)
 {
-	acpi_object_type8       type;
+	acpi_object_type        type;
 	acpi_status             status;
 	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
 	u8                      table_revision;
 
 
-	PROC_NAME ("Ds_init_one_object");
+	ACPI_FUNCTION_NAME ("Ds_init_one_object");
 
 
 	info->object_count++;
@@ -89,7 +89,6 @@ acpi_ds_init_one_object (
 	type = acpi_ns_get_type (obj_handle);
 
 	switch (type) {
-
 	case ACPI_TYPE_REGION:
 
 		acpi_ds_initialize_region (obj_handle);
@@ -121,7 +120,7 @@ acpi_ds_init_one_object (
 		status = acpi_ds_parse_method (obj_handle);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Method %p [%4.4s] - parse failure, %s\n",
-				obj_handle, (char*)&((acpi_namespace_node *)obj_handle)->name,
+				obj_handle, (char *) &((acpi_namespace_node *) obj_handle)->name,
 				acpi_format_exception (status)));
 
 			/* This parse failed, but we will continue parsing more methods */
@@ -134,6 +133,7 @@ acpi_ds_init_one_object (
 		 * for every execution since there isn't much overhead
 		 */
 		acpi_ns_delete_namespace_subtree (obj_handle);
+		acpi_ns_delete_namespace_by_owner (((acpi_namespace_node *) obj_handle)->object->method.owning_id);
 		break;
 
 	default:
@@ -170,7 +170,7 @@ acpi_ds_initialize_objects (
 	acpi_init_walk_info     info;
 
 
-	FUNCTION_TRACE ("Ds_initialize_objects");
+	ACPI_FUNCTION_TRACE ("Ds_initialize_objects");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -235,7 +235,7 @@ acpi_ds_init_object_from_op (
 	acpi_operand_object     *obj_desc;
 
 
-	PROC_NAME ("Ds_init_object_from_op");
+	ACPI_FUNCTION_NAME ("Ds_init_object_from_op");
 
 
 	obj_desc = *ret_obj_desc;
@@ -251,6 +251,8 @@ acpi_ds_init_object_from_op (
 
 	switch (obj_desc->common.type) {
 	case ACPI_TYPE_BUFFER:
+
+		obj_desc->buffer.node = (acpi_namespace_node *) walk_state->operands[0];
 
 		/* First arg is a number */
 
@@ -285,7 +287,7 @@ acpi_ds_init_object_from_op (
 
 		if (obj_desc->buffer.length == 0) {
 			obj_desc->buffer.pointer = NULL;
-			REPORT_WARNING (("Buffer created with zero length in AML\n"));
+			ACPI_REPORT_WARNING (("Buffer created with zero length in AML\n"));
 			break;
 		}
 
@@ -312,8 +314,8 @@ acpi_ds_init_object_from_op (
 				return (AE_TYPE);
 			}
 
-			MEMCPY (obj_desc->buffer.pointer, byte_list->data,
-					obj_desc->buffer.length);
+			ACPI_MEMCPY (obj_desc->buffer.pointer, byte_list->data,
+					  obj_desc->buffer.length);
 		}
 
 		break;
@@ -339,7 +341,7 @@ acpi_ds_init_object_from_op (
 
 	case ACPI_TYPE_STRING:
 		obj_desc->string.pointer = op->value.string;
-		obj_desc->string.length = STRLEN (op->value.string);
+		obj_desc->string.length = ACPI_STRLEN (op->value.string);
 
 		/*
 		 * The string is contained in the ACPI table, don't ever try
@@ -422,42 +424,38 @@ acpi_ds_build_internal_simple_obj (
 	acpi_operand_object     **obj_desc_ptr)
 {
 	acpi_operand_object     *obj_desc;
-	acpi_object_type8       type;
 	acpi_status             status;
-	u32                     length;
 	char                    *name;
 
 
-	FUNCTION_TRACE ("Ds_build_internal_simple_obj");
+	ACPI_FUNCTION_TRACE ("Ds_build_internal_simple_obj");
 
 
 	if (op->opcode == AML_INT_NAMEPATH_OP) {
 		/*
-		 * This is an object reference.  If The name was
-		 * previously looked up in the NS, it is stored in this op.
+		 * This is an object reference.  If this name was
+		 * previously looked up in the namespace, it was stored in this op.
 		 * Otherwise, go ahead and look it up now
 		 */
 		if (!op->node) {
-			status = acpi_ns_lookup (walk_state->scope_info,
-					  op->value.string, ACPI_TYPE_ANY,
-					  IMODE_EXECUTE,
-					  NS_SEARCH_PARENT | NS_DONT_OPEN_SCOPE,
-					  NULL,
-					  (acpi_namespace_node **)&(op->node));
+			status = acpi_ns_lookup (walk_state->scope_info, op->value.string,
+					  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+					  ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
+					  (acpi_namespace_node **) &(op->node));
 
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_NOT_FOUND) {
 					name = NULL;
-					acpi_ns_externalize_name (ACPI_UINT32_MAX, op->value.string, &length, &name);
+					acpi_ns_externalize_name (ACPI_UINT32_MAX, op->value.string, NULL, &name);
 
 					if (name) {
-						REPORT_WARNING (("Reference %s at AML %X not found\n",
+						ACPI_REPORT_WARNING (("Reference %s at AML %X not found\n",
 								 name, op->aml_offset));
 						ACPI_MEM_FREE (name);
 					}
 
 					else {
-						REPORT_WARNING (("Reference %s at AML %X not found\n",
+						ACPI_REPORT_WARNING (("Reference %s at AML %X not found\n",
 								   op->value.string, op->aml_offset));
 					}
 
@@ -469,23 +467,11 @@ acpi_ds_build_internal_simple_obj (
 				}
 			}
 		}
-
-		/*
-		 * The reference will be a Reference
-		 * TBD: [Restructure] unless we really need a separate
-		 *  type of INTERNAL_TYPE_REFERENCE change
-		 *  Acpi_ds_map_opcode_to_data_type to handle this case
-		 */
-		type = INTERNAL_TYPE_REFERENCE;
 	}
-	else {
-		type = acpi_ds_map_opcode_to_data_type (op->opcode, NULL);
-	}
-
 
 	/* Create and init the internal ACPI object */
 
-	obj_desc = acpi_ut_create_internal_object (type);
+	obj_desc = acpi_ut_create_internal_object ((acpi_ps_get_opcode_info (op->opcode))->object_type);
 	if (!obj_desc) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -527,7 +513,7 @@ acpi_ds_build_internal_package_obj (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE ("Ds_build_internal_package_obj");
+	ACPI_FUNCTION_TRACE ("Ds_build_internal_package_obj");
 
 
 	obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_PACKAGE);
@@ -651,7 +637,7 @@ acpi_ds_create_node (
 	acpi_operand_object     *obj_desc;
 
 
-	FUNCTION_TRACE_PTR ("Ds_create_node", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ds_create_node", op);
 
 
 	/*
@@ -659,7 +645,7 @@ acpi_ds_create_node (
 	 * parts of the table, we can arrive here twice.  Only init
 	 * the named object node the first time through
 	 */
-	if (node->object) {
+	if (acpi_ns_get_attached_object (node)) {
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -682,7 +668,7 @@ acpi_ds_create_node (
 
 	/* Init obj */
 
-	status = acpi_ns_attach_object (node, obj_desc, (u8) node->type);
+	status = acpi_ns_attach_object (node, obj_desc, node->type);
 
 	/* Remove local reference to the object */
 

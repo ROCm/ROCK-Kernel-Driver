@@ -38,28 +38,8 @@
 
 static struct super_operations ramfs_ops;
 static struct address_space_operations ramfs_aops;
-static struct file_operations ramfs_dir_operations;
 static struct file_operations ramfs_file_operations;
 static struct inode_operations ramfs_dir_inode_operations;
-
-static int ramfs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = RAMFS_MAGIC;
-	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_namelen = 255;
-	return 0;
-}
-
-/*
- * Lookup the data. This is trivial - if the dentry didn't already
- * exist, we know it is negative.
- */
-/* SMP-safe */
-static struct dentry * ramfs_lookup(struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
-}
 
 /*
  * Read a page. Again trivial. If it didn't already exist
@@ -122,7 +102,7 @@ struct inode *ramfs_get_inode(struct super_block *sb, int mode, int dev)
 			break;
 		case S_IFDIR:
 			inode->i_op = &ramfs_dir_inode_operations;
-			inode->i_fop = &ramfs_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		case S_IFLNK:
 			inode->i_op = &page_symlink_inode_operations;
@@ -284,15 +264,9 @@ static struct file_operations ramfs_file_operations = {
 	fsync:		ramfs_sync_file,
 };
 
-static struct file_operations ramfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-	fsync:		ramfs_sync_file,
-};
-
 static struct inode_operations ramfs_dir_inode_operations = {
 	create:		ramfs_create,
-	lookup:		ramfs_lookup,
+	lookup:		simple_lookup,
 	link:		ramfs_link,
 	unlink:		ramfs_unlink,
 	symlink:	ramfs_symlink,
@@ -303,7 +277,7 @@ static struct inode_operations ramfs_dir_inode_operations = {
 };
 
 static struct super_operations ramfs_ops = {
-	statfs:		ramfs_statfs,
+	statfs:		simple_statfs,
 	put_inode:	force_delete,
 };
 

@@ -123,7 +123,7 @@ void __init smp_boot_cpus(void)
 		/* Spawn a new process normally.  Grab a pointer to
 		   its task struct so we can mess with it */
 		do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
-		p = init_task.prev_task;
+		p = prev_task(&init_task);
 
 		/* Schedule the first task manually */
 		p->processor = i;
@@ -152,7 +152,7 @@ void __init smp_boot_cpus(void)
 		 * Linux can schedule processes on this slave.
 		 */
 		kernel_thread(0, NULL, CLONE_PID);
-		p = init_task.prev_task;
+		p = prev_task(&init_task);
 		sprintf(p->comm, "%s%d", "Idle", i);
 		init_tasks[i] = p;
 		p->processor = i;

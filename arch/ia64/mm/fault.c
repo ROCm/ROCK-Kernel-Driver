@@ -49,7 +49,6 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	int signal = SIGSEGV, code = SEGV_MAPERR;
 	struct vm_area_struct *vma, *prev_vma;
 	struct mm_struct *mm = current->mm;
-	struct exception_fixup fix;
 	struct siginfo si;
 	unsigned long mask;
 
@@ -167,15 +166,8 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		return;
 	}
 
-#ifdef GAS_HAS_LOCAL_TAGS
-	fix = search_exception_table(regs->cr_iip + ia64_psr(regs)->ri);
-#else
-	fix = search_exception_table(regs->cr_iip);
-#endif
-	if (fix.cont) {
-		handle_exception(regs, fix);
+	if (done_with_exception(regs))
 		return;
-	}
 
 	/*
 	 * Oops. The kernel tried to access some bad page. We'll have to terminate things

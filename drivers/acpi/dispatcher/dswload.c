@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 50 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dswload")
+	 ACPI_MODULE_NAME    ("dswload")
 
 
 /*******************************************************************************
@@ -77,7 +77,6 @@ acpi_ds_init_callbacks (
 
 	default:
 		return (AE_BAD_PARAMETER);
-		break;
 	}
 
 	return (AE_OK);
@@ -106,15 +105,19 @@ acpi_ds_load1_begin_op (
 	acpi_parse_object       *op;
 	acpi_namespace_node     *node;
 	acpi_status             status;
-	acpi_object_type8       data_type;
+	acpi_object_type        object_type;
 	NATIVE_CHAR             *path;
 
 
-	PROC_NAME ("Ds_load1_begin_op");
+	ACPI_FUNCTION_NAME ("Ds_load1_begin_op");
 
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
 
+
+	if (op && (op->opcode == AML_INT_NAMEDFIELD_OP)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
+	}
 
 	/* We are only interested in opcodes that have an associated name */
 
@@ -136,25 +139,18 @@ acpi_ds_load1_begin_op (
 
 	/* Map the raw opcode into an internal object type */
 
-	data_type = acpi_ds_map_named_opcode_to_data_type (walk_state->opcode);
-
+	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p Type=%x\n", walk_state, op, data_type));
-
-
-	if (walk_state->opcode == AML_SCOPE_OP) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-			"State=%p Op=%p Type=%x\n", walk_state, op, data_type));
-	}
+		"State=%p Op=%p Type=%x\n", walk_state, op, object_type));
 
 	/*
 	 * Enter the named type into the internal namespace.  We enter the name
 	 * as we go downward in the parse tree.  Any necessary subobjects that involve
 	 * arguments to the opcode must be created as we go back up the parse tree later.
 	 */
-	status = acpi_ns_lookup (walk_state->scope_info, path, data_type,
-			  IMODE_LOAD_PASS1, NS_NO_UPSEARCH, walk_state, &(node));
+	status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
+			  ACPI_IMODE_LOAD_PASS1, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
 
 	if (ACPI_FAILURE (status)) {
 		return (status);
@@ -205,10 +201,10 @@ acpi_ds_load1_end_op (
 	acpi_walk_state         *walk_state)
 {
 	acpi_parse_object       *op;
-	acpi_object_type8       data_type;
+	acpi_object_type        object_type;
 
 
-	PROC_NAME ("Ds_load1_end_op");
+	ACPI_FUNCTION_NAME ("Ds_load1_end_op");
 
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
@@ -216,30 +212,44 @@ acpi_ds_load1_end_op (
 
 	/* We are only interested in opcodes that have an associated name */
 
-	if (!(walk_state->op_info->flags & AML_NAMED)) {
+	if (!(walk_state->op_info->flags & (AML_NAMED | AML_FIELD))) {
 		return (AE_OK);
 	}
 
-	/* Get the type to determine if we should pop the scope */
+	/* Get the object type to determine if we should pop the scope */
 
-	data_type = acpi_ds_map_named_opcode_to_data_type (op->opcode);
+	object_type = walk_state->op_info->object_type;
+
+	if (walk_state->op_info->flags & AML_FIELD) {
+		if (walk_state->opcode == AML_FIELD_OP         ||
+			walk_state->opcode == AML_BANK_FIELD_OP    ||
+			walk_state->opcode == AML_INDEX_FIELD_OP) {
+			acpi_ds_init_field_objects (op, walk_state);
+		}
+		return (AE_OK);
+	}
+
+
+	if (op->opcode == AML_REGION_OP) {
+		/*Status = */acpi_ex_create_region (((acpi_parse2_object *) op)->data,
+				  ((acpi_parse2_object *) op)->length,
+						 (ACPI_ADR_SPACE_TYPE) ((op->value.arg)->value.integer), walk_state);
+	}
 
 	if (op->opcode == AML_NAME_OP) {
-		/* For Name opcode, check the argument */
+		/* For Name opcode, get the object type from the argument */
 
 		if (op->value.arg) {
-			data_type = acpi_ds_map_opcode_to_data_type (
-					  (op->value.arg)->opcode, NULL);
-			((acpi_namespace_node *)op->node)->type =
-					  (u8) data_type;
+			object_type = (acpi_ps_get_opcode_info ((op->value.arg)->opcode))->object_type;
+			op->node->type = (u8) object_type;
 		}
 	}
 
 	/* Pop the scope stack */
 
-	if (acpi_ns_opens_scope (data_type)) {
+	if (acpi_ns_opens_scope (object_type)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s): Popping scope for Op %p\n",
-			acpi_ut_get_type_name (data_type), op));
+			acpi_ut_get_type_name (object_type), op));
 
 		acpi_ds_scope_stack_pop (walk_state);
 	}
@@ -270,28 +280,22 @@ acpi_ds_load2_begin_op (
 	acpi_parse_object       *op;
 	acpi_namespace_node     *node;
 	acpi_status             status;
-	acpi_object_type8       data_type;
+	acpi_object_type        object_type;
 	NATIVE_CHAR             *buffer_ptr;
 	void                    *original = NULL;
 
 
-	PROC_NAME ("Ds_load2_begin_op");
+	ACPI_FUNCTION_NAME ("Ds_load2_begin_op");
+
 
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
 
-
 	if (op) {
 		/* We only care about Namespace opcodes here */
 
-		if (!(walk_state->op_info->flags & AML_NSOPCODE) &&
-			walk_state->opcode != AML_INT_NAMEPATH_OP) {
-			return (AE_OK);
-		}
-
-		/* TBD: [Restructure] Temp! same code as in psparse */
-
-		if (!(walk_state->op_info->flags & AML_NAMED)) {
+		if ((!(walk_state->op_info->flags & AML_NSOPCODE) && (walk_state->opcode != AML_INT_NAMEPATH_OP)) ||
+			(!(walk_state->op_info->flags & AML_NAMED))) {
 			return (AE_OK);
 		}
 
@@ -315,16 +319,17 @@ acpi_ds_load2_begin_op (
 		}
 	}
 	else {
+		/* Get the namestring from the raw AML */
+
 		buffer_ptr = acpi_ps_get_next_namestring (&walk_state->parser_state);
 	}
 
+	/* Map the opcode into an internal object type */
 
-	/* Map the raw opcode into an internal object type */
-
-	data_type = acpi_ds_map_named_opcode_to_data_type (walk_state->opcode);
+	object_type = walk_state->op_info->object_type;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"State=%p Op=%p Type=%x\n", walk_state, op, data_type));
+		"State=%p Op=%p Type=%x\n", walk_state, op, object_type));
 
 
 	if (walk_state->opcode == AML_FIELD_OP         ||
@@ -333,23 +338,21 @@ acpi_ds_load2_begin_op (
 		node = NULL;
 		status = AE_OK;
 	}
-
 	else if (walk_state->opcode == AML_INT_NAMEPATH_OP) {
 		/*
 		 * The Name_path is an object reference to an existing object. Don't enter the
 		 * name into the namespace, but look it up for use later
 		 */
-		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, data_type,
-				  IMODE_EXECUTE, NS_SEARCH_PARENT, walk_state, &(node));
+		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
+				  ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, walk_state, &(node));
 	}
-
 	else {
 		if (op && op->node) {
 			original = op->node;
 			node = op->node;
 
-			if (acpi_ns_opens_scope (data_type)) {
-				status = acpi_ds_scope_stack_push (node, data_type, walk_state);
+			if (acpi_ns_opens_scope (object_type)) {
+				status = acpi_ds_scope_stack_push (node, object_type, walk_state);
 				if (ACPI_FAILURE (status)) {
 					return (status);
 				}
@@ -363,8 +366,8 @@ acpi_ds_load2_begin_op (
 		 * as we go downward in the parse tree.  Any necessary subobjects that involve
 		 * arguments to the opcode must be created as we go back up the parse tree later.
 		 */
-		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, data_type,
-				  IMODE_EXECUTE, NS_NO_UPSEARCH, walk_state, &(node));
+		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
+				  ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
 	}
 
 	if (ACPI_SUCCESS (status)) {
@@ -376,7 +379,7 @@ acpi_ds_load2_begin_op (
 				return (AE_NO_MEMORY);
 			}
 
-			/* Initialize */
+			/* Initialize the new op */
 
 			((acpi_parse2_object *)op)->name = node->name;
 			*out_op = op;
@@ -423,18 +426,18 @@ acpi_ds_load2_end_op (
 {
 	acpi_parse_object       *op;
 	acpi_status             status = AE_OK;
-	acpi_object_type8       data_type;
+	acpi_object_type        object_type;
 	acpi_namespace_node     *node;
 	acpi_parse_object       *arg;
 	acpi_namespace_node     *new_node;
 	u32                     i;
 
 
-	PROC_NAME ("Ds_load2_end_op");
+	ACPI_FUNCTION_NAME ("Ds_load2_end_op");
 
 	op = walk_state->op;
-	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Op=%p State=%p\n", op, walk_state));
-
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Opcode [%s] Op %p State %p\n",
+			walk_state->op_info->name, op, walk_state));
 
 	/* Only interested in opcodes that have namespace objects */
 
@@ -446,7 +449,7 @@ acpi_ds_load2_end_op (
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 			"Ending scope Op=%p State=%p\n", op, walk_state));
 
-		if (((acpi_parse2_object *)op)->name == -1) {
+		if (((acpi_parse2_object *)op)->name == ACPI_UINT16_MAX) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unnamed scope! Op=%p State=%p\n",
 				op, walk_state));
 			return (AE_OK);
@@ -454,7 +457,7 @@ acpi_ds_load2_end_op (
 	}
 
 
-	data_type = acpi_ds_map_named_opcode_to_data_type (op->opcode);
+	object_type = walk_state->op_info->object_type;
 
 	/*
 	 * Get the Node/name from the earlier lookup
@@ -471,10 +474,9 @@ acpi_ds_load2_end_op (
 
 	/* Pop the scope stack */
 
-	if (acpi_ns_opens_scope (data_type)) {
-
+	if (acpi_ns_opens_scope (object_type)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s) Popping scope for Op %p\n",
-			acpi_ut_get_type_name (data_type), op));
+			acpi_ut_get_type_name (object_type), op));
 		acpi_ds_scope_stack_pop (walk_state);
 	}
 
@@ -527,7 +529,6 @@ acpi_ds_load2_end_op (
 
 	 case AML_TYPE_NAMED_FIELD:
 
-		arg = op->value.arg;
 		switch (op->opcode) {
 		case AML_INDEX_FIELD_OP:
 
@@ -535,12 +536,10 @@ acpi_ds_load2_end_op (
 					   walk_state);
 			break;
 
-
 		case AML_BANK_FIELD_OP:
 
 			status = acpi_ds_create_bank_field (op, arg->node, walk_state);
 			break;
-
 
 		case AML_FIELD_OP:
 
@@ -563,24 +562,20 @@ acpi_ds_load2_end_op (
 			status = acpi_ex_create_processor (walk_state);
 			break;
 
-
 		case AML_POWER_RES_OP:
 
 			status = acpi_ex_create_power_resource (walk_state);
 			break;
-
 
 		case AML_MUTEX_OP:
 
 			status = acpi_ex_create_mutex (walk_state);
 			break;
 
-
 		case AML_EVENT_OP:
 
 			status = acpi_ex_create_event (walk_state);
 			break;
-
 
 		case AML_DATA_REGION_OP:
 
@@ -597,7 +592,6 @@ acpi_ds_load2_end_op (
 
 			status = AE_OK;
 			goto cleanup;
-			break;
 		}
 
 		/* Delete operands */
@@ -615,13 +609,13 @@ acpi_ds_load2_end_op (
 		switch (op->opcode) {
 		case AML_METHOD_OP:
 			/*
-			 * Method_op Pkg_length Names_string Method_flags Term_list
+			 * Method_op Pkg_length Name_string Method_flags Term_list
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 				"LOADING-Method: State=%p Op=%p Named_obj=%p\n",
 				walk_state, op, node));
 
-			if (!node->object) {
+			if (!acpi_ns_get_attached_object (node)) {
 				status = acpi_ds_create_operands (walk_state, arg);
 				if (ACPI_FAILURE (status)) {
 					goto cleanup;
@@ -639,9 +633,21 @@ acpi_ds_load2_end_op (
 			 * The Op_region is not fully parsed at this time. Only valid argument is the Space_id.
 			 * (We must save the address of the AML of the address and length operands)
 			 */
-			status = acpi_ex_create_region (((acpi_parse2_object *) op)->data,
-					  ((acpi_parse2_object *) op)->length,
-							 (ACPI_ADR_SPACE_TYPE) arg->value.integer, walk_state);
+			/*
+			 * If we have a valid region, initialize it
+			 * Namespace is NOT locked at this point.
+			 */
+			status = acpi_ev_initialize_region (acpi_ns_get_attached_object (node), FALSE);
+			if (ACPI_FAILURE (status)) {
+				/*
+				 *  If AE_NOT_EXIST is returned, it is not fatal
+				 *  because many regions get created before a handler
+				 *  is installed for said region.
+				 */
+				if (AE_NOT_EXIST == status) {
+					status = AE_OK;
+				}
+			}
 			break;
 
 
@@ -669,14 +675,17 @@ acpi_ds_load2_end_op (
 		 * Lookup the method name and save the Node
 		 */
 		status = acpi_ns_lookup (walk_state->scope_info, arg->value.string,
-				  ACPI_TYPE_ANY, IMODE_LOAD_PASS2,
-				  NS_SEARCH_PARENT | NS_DONT_OPEN_SCOPE,
+				  ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS2,
+				  ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE,
 				  walk_state, &(new_node));
 		if (ACPI_SUCCESS (status)) {
-			/* TBD: has name already been resolved by here ??*/
-
-			/* TBD: [Restructure] Make sure that what we found is indeed a method! */
-			/* We didn't search for a method on purpose, to see if the name would resolve! */
+			/*
+			 * Make sure that what we found is indeed a method
+			 * We didn't search for a method on purpose, to see if the name would resolve
+			 */
+			if (new_node->type != ACPI_TYPE_METHOD) {
+				status = AE_AML_OPERAND_TYPE;
+			}
 
 			/* We could put the returned object (Node) on the object stack for later, but
 			 * for now, we will put it in the "op" object that the parser uses, so we

@@ -14,7 +14,6 @@ export-objs	  := config.o fsm.o hisax_isac.o hisax_hscx.o
 
 # Multipart objects.
 
-list-multi	  := hisax.o hisax_st5481.o
 hisax-objs	  := config.o isdnl1.o tei.o isdnl2.o isdnl3.o \
 		     lmgr.o q931.o callc.o fsm.o cert.o
 hisax_st5481-objs := st5481_init.o st5481_usb.o st5481_d.o st5481_b.o \
@@ -54,7 +53,7 @@ hisax-objs-$(CONFIG_HISAX_GAZEL) += gazel.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_W6692) += w6692.o
 #hisax-objs-$(CONFIG_HISAX_TESTEMU) += testemu.o
 
-hisax-objs += $(sort $(hisax-objs-y))
+hisax-objs += $(hisax-objs-y)
 
 # Each configuration option enables a list of files.
 
@@ -70,11 +69,3 @@ CERT := $(shell md5sum -c md5sums.asc >> /dev/null;echo $$?)
 CFLAGS_cert.o := -DCERTIFICATION=$(CERT)
 
 include $(TOPDIR)/Rules.make
-
-# Link rules for multi-part drivers.
-
-hisax.o: $(hisax-objs)
-	$(LD) -r -o $@ $(hisax-objs)
-
-hisax_st5481.o: $(hisax_st5481-objs)
-	$(LD) -r -o $@ $(hisax_st5481-objs)

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: psscope - Parser scope stack management routines
- *              $Revision: 30 $
+ *              $Revision: 35 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@
 #include "acparser.h"
 
 #define _COMPONENT          ACPI_PARSER
-	 MODULE_NAME         ("psscope")
+	 ACPI_MODULE_NAME    ("psscope")
 
 
 /*******************************************************************************
@@ -95,7 +95,7 @@ acpi_ps_init_scope (
 	acpi_generic_state      *scope;
 
 
-	FUNCTION_TRACE_PTR ("Ps_init_scope", root_op);
+	ACPI_FUNCTION_TRACE_PTR ("Ps_init_scope", root_op);
 
 
 	scope = acpi_ut_create_generic_state ();
@@ -141,12 +141,12 @@ acpi_ps_push_scope (
 	acpi_generic_state      *scope;
 
 
-	FUNCTION_TRACE_PTR ("Ps_push_scope", op);
+	ACPI_FUNCTION_TRACE_PTR ("Ps_push_scope", op);
 
 
 	scope = acpi_ut_create_generic_state ();
 	if (!scope) {
-		return (AE_NO_MEMORY);
+		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 
@@ -170,7 +170,7 @@ acpi_ps_push_scope (
 	else {
 		/* single argument */
 
-		scope->parse_scope.arg_end = ACPI_MAX_AML;
+		scope->parse_scope.arg_end = ACPI_TO_POINTER (ACPI_MAX_PTR);
 	}
 
 	return_ACPI_STATUS (AE_OK);
@@ -203,7 +203,7 @@ acpi_ps_pop_scope (
 	acpi_generic_state      *scope = parser_state->scope;
 
 
-	FUNCTION_TRACE ("Ps_pop_scope");
+	ACPI_FUNCTION_TRACE ("Ps_pop_scope");
 
 
 	/*
@@ -257,7 +257,7 @@ acpi_ps_cleanup_scope (
 {
 	acpi_generic_state      *scope;
 
-	FUNCTION_TRACE_PTR ("Ps_cleanup_scope", parser_state);
+	ACPI_FUNCTION_TRACE_PTR ("Ps_cleanup_scope", parser_state);
 
 
 	if (!parser_state) {

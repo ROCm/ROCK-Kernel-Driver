@@ -82,17 +82,6 @@ static void proc_read_inode(struct inode * inode)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 }
 
-static int proc_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = PROC_SUPER_MAGIC;
-	buf->f_bsize = PAGE_SIZE/sizeof(long);
-	buf->f_bfree = 0;
-	buf->f_bavail = 0;
-	buf->f_ffree = 0;
-	buf->f_namelen = NAME_MAX;
-	return 0;
-}
-
 static kmem_cache_t * proc_inode_cachep;
 
 static struct inode *proc_alloc_inode(struct super_block *sb)
@@ -135,7 +124,7 @@ static struct super_operations proc_sops = {
 	read_inode:	proc_read_inode,
 	put_inode:	force_delete,
 	delete_inode:	proc_delete_inode,
-	statfs:		proc_statfs,
+	statfs:		simple_statfs,
 };
 
 static int parse_options(char *options,uid_t *uid,gid_t *gid)

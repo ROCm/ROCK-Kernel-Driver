@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-
+#include <linux/acpi.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
@@ -21,6 +21,8 @@
 
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
+
+int pci_use_acpi_routing = 0;
 
 static struct irq_routing_table *pirq_table;
 
@@ -512,6 +514,41 @@ static void __init pirq_find_router(void)
 		pirq_router_dev->slot_name);
 }
 
+static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
+{
+}
+
+#ifdef CONFIG_ACPI_PCI
+
+static int acpi_lookup_irq (
+	struct pci_dev		*dev,
+	u8			pin,
+	int			assign)
+{
+	int			result = 0;
+	int			irq = 0;
+
+	/* TBD: Select IRQ from possible to improve routing performance. */
+
+	result = acpi_prt_get_irq(dev, pin, &irq);
+	if ((0 != result) || !irq) {
+		printk(KERN_ERR "PCI: Unable to resolve IRQ for device %s\n",
+			dev->slot_name);
+		return result;
+	}
+
+	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", irq, 
+		dev->slot_name);
+
+	dev->irq = irq;
+
+	pirq_penalty[irq]++;
+
+	return 1;
+}
+
+#endif /* CONFIG_ACPI_PCI */
+
 static struct irq_info *pirq_get_info(struct pci_dev *dev)
 {
 	struct irq_routing_table *rt = pirq_table;
@@ -524,38 +561,25 @@ static struct irq_info *pirq_get_info(struct pci_dev *dev)
 	return NULL;
 }
 
-static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
+static int pirq_lookup_irq(struct pci_dev *dev, u8 pin, int assign)
 {
-}
-
-static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
-{
-	u8 pin;
-	struct irq_info *info;
-	int i, pirq, newirq;
-	int irq = 0;
-	u32 mask;
 	struct irq_router *r = pirq_router;
+	struct irq_info *info;
+	int  newirq, pirq, i, irq = 0;
 	struct pci_dev *dev2;
 	char *msg = NULL;
+	u32 mask;
 
 	if (!pirq_table)
 		return 0;
 
-	/* Find IRQ routing entry */
-	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-	if (!pin) {
-		DBG(" -> no interrupt pin\n");
-		return 0;
-	}
-	pin = pin - 1;
-	
 	DBG("IRQ for %s:%d", dev->slot_name, pin);
 	info = pirq_get_info(dev);
 	if (!info) {
 		DBG(" -> not found in routing table\n");
 		return 0;
 	}
+
 	pirq = info->irq[pin].link;
 	mask = info->irq[pin].bitmap;
 	if (!pirq) {
@@ -643,10 +667,42 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
+static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
+{
+	u8 pin;
+
+	/* Find IRQ routing entry */
+	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
+	if (!pin) {
+		DBG("PCI: %s: no interrupt pin\n", dev->slot_name);
+		return 0;
+	}
+	pin -= 1;
+
+#ifdef CONFIG_ACPI_PCI
+	if (pci_use_acpi_routing)
+		return acpi_lookup_irq(dev, pin, assign);
+	else
+#endif
+		return pirq_lookup_irq(dev, pin, assign);
+}
+
 void __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
+
+#ifdef CONFIG_ACPI_PCI
+	if (acpi_prts.count && !(pci_probe & PCI_NO_ACPI_ROUTING)) {
+		printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+		pci_use_acpi_routing = 1;
+		return;
+	}
+	if (!acpi_prts.count)
+		printk(KERN_INFO "PCI: Invalid acpi_prts [%d]\n", acpi_prts.count);
+#endif
+
 	pirq_table = pirq_find_routing_table();
+
 #ifdef CONFIG_PCI_BIOS
 	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
 		pirq_table = pcibios_get_irq_routing_table();

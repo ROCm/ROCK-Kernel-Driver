@@ -9,7 +9,7 @@
 
 O_TARGET := netfilter.o
 
-export-objs = ip_conntrack_standalone.o ip_conntrack_ftp.o ip_fw_compat.o ip_nat_standalone.o ip_tables.o
+export-objs = ip_conntrack_standalone.o ip_conntrack_ftp.o ip_fw_compat.o ip_nat_standalone.o ip_tables.o arp_tables.o
 
 # Multipart objects.
 list-multi		:= ip_conntrack.o iptable_nat.o ipfwadm.o ipchains.o
@@ -74,6 +74,12 @@ obj-$(CONFIG_IP_NF_NAT_SNMP_BASIC) += ip_nat_snmp_basic.o
 obj-$(CONFIG_IP_NF_TARGET_LOG) += ipt_LOG.o
 obj-$(CONFIG_IP_NF_TARGET_ULOG) += ipt_ULOG.o
 obj-$(CONFIG_IP_NF_TARGET_TCPMSS) += ipt_TCPMSS.o
+
+# generic ARP tables
+obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o
+
+# just filtering instance of ARP tables for now
+obj-$(CONFIG_IP_NF_ARPFILTER) += arptable_filter.o
 
 # backwards compatibility 
 obj-$(CONFIG_IP_NF_COMPAT_IPCHAINS) += ipchains.o

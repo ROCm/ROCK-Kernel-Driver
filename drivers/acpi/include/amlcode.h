@@ -3,12 +3,12 @@
  * Name: amlcode.h - Definitions for AML, as included in "definition blocks"
  *                   Declarations and definitions contained herein are derived
  *                   directly from the ACPI specification.
- *       $Revision: 58 $
+ *       $Revision: 66 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -218,6 +218,9 @@
  * Resolved argument types for the AML Interpreter
  * Each field in the Arg_types u32 is 5 bits, allowing for a maximum of 6 arguments.
  * There can be up to 31 unique argument types (0 is end-of-arg-list indicator)
+ *
+ * Note: If and when 5 bits becomes insufficient, it would probably be best
+ * to convert to a 6-byte array of argument types, allowing 8 bits per argument.
  */
 
 /* "Standard" ACPI types are 1-15 (0x0F) */
@@ -247,6 +250,7 @@
 #define ARGI_FIXED_TARGET           0x1B     /* Target, no implicit conversion */
 #define ARGI_SIMPLE_TARGET          0x1C     /* Name, Local, Arg -- no implicit conversion */
 #define ARGI_BUFFERSTRING           0x1D
+#define ARGI_REF_OR_STRING          0x1E     /* Reference or String (Used by DEREFOF op only) */
 
 #define ARGI_INVALID_OPCODE         0xFFFFFFFF
 
@@ -369,7 +373,8 @@ typedef enum
 	REGION_SMBUS,
 	REGION_CMOS,
 	REGION_PCI_BAR,
-	REGION_FIXED_HW                 = 0x7F,
+	REGION_DATA_TABLE,              /* Internal use only */
+	REGION_FIXED_HW                 = 0x7F
 
 } AML_REGION_TYPES;
 
@@ -390,50 +395,74 @@ typedef enum
 #define MAX_MATCH_OPERATOR          5
 
 
-/* Field Access Types */
+/*
+ * Field_flags
+ *
+ * This byte is extracted from the AML and includes three separate
+ * pieces of information about the field:
+ * 1) The field access type
+ * 2) The field update rule
+ * 3) The lock rule for the field
+ *
+ * Bits 00 - 03 : Access_type (Any_acc, Byte_acc, etc.)
+ *      04      : Lock_rule (1 == Lock)
+ *      05 - 06 : Update_rule
+ */
+#define AML_FIELD_ACCESS_TYPE_MASK  0x0F
+#define AML_FIELD_LOCK_RULE_MASK    0x10
+#define AML_FIELD_UPDATE_RULE_MASK  0x60
 
-#define ACCESS_TYPE_MASK            0x0f
-#define ACCESS_TYPE_SHIFT           0
+
+/* 1) Field Access Types */
 
 typedef enum
 {
-	ACCESS_ANY_ACC                  = 0,
-	ACCESS_BYTE_ACC                 = 1,
-	ACCESS_WORD_ACC                 = 2,
-	ACCESS_DWORD_ACC                = 3,
-	ACCESS_QWORD_ACC                = 4,    /* ACPI 2.0 */
-	ACCESS_BLOCK_ACC                = 4,
-	ACCESS_SMBSEND_RECV_ACC         = 5,
-	ACCESS_SMBQUICK_ACC             = 6
+	AML_FIELD_ACCESS_ANY            = 0x00,
+	AML_FIELD_ACCESS_BYTE           = 0x01,
+	AML_FIELD_ACCESS_WORD           = 0x02,
+	AML_FIELD_ACCESS_DWORD          = 0x03,
+	AML_FIELD_ACCESS_QWORD          = 0x04,    /* ACPI 2.0 */
+	AML_FIELD_ACCESS_BUFFER         = 0x05     /* ACPI 2.0 */
 
 } AML_ACCESS_TYPE;
 
 
-/* Field Lock Rules */
-
-#define LOCK_RULE_MASK              0x10
-#define LOCK_RULE_SHIFT             4
+/* 2) Field Lock Rules */
 
 typedef enum
 {
-	GLOCK_NEVER_LOCK                = 0,
-	GLOCK_ALWAYS_LOCK               = 1
+	AML_FIELD_LOCK_NEVER            = 0x00,
+	AML_FIELD_LOCK_ALWAYS           = 0x10
 
 } AML_LOCK_RULE;
 
 
-/* Field Update Rules */
-
-#define UPDATE_RULE_MASK            0x060
-#define UPDATE_RULE_SHIFT           5
+/* 3) Field Update Rules */
 
 typedef enum
 {
-	UPDATE_PRESERVE                 = 0,
-	UPDATE_WRITE_AS_ONES            = 1,
-	UPDATE_WRITE_AS_ZEROS           = 2
+	AML_FIELD_UPDATE_PRESERVE       = 0x00,
+	AML_FIELD_UPDATE_WRITE_AS_ONES  = 0x20,
+	AML_FIELD_UPDATE_WRITE_AS_ZEROS = 0x40
 
 } AML_UPDATE_RULE;
+
+
+/*
+ * Field Access Attributes.
+ * This byte is extracted from the AML via the
+ * Access_as keyword
+ */
+typedef enum
+{
+	AML_FIELD_ATTRIB_SMB_QUICK      = 0x02,
+	AML_FIELD_ATTRIB_SMB_SEND_RCV   = 0x04,
+	AML_FIELD_ATTRIB_SMB_BYTE       = 0x06,
+	AML_FIELD_ATTRIB_SMB_WORD       = 0x08,
+	AML_FIELD_ATTRIB_SMB_BLOCK      = 0x0A,
+	AML_FIELD_ATTRIB_SMB_CALL       = 0x0E
+
+} AML_ACCESS_ATTRIBUTE;
 
 
 /* bit fields in Method_flags byte */
@@ -445,15 +474,11 @@ typedef enum
 
 /* Array sizes.  Used for range checking also */
 
-#define NUM_REGION_TYPES            7
-#define NUM_ACCESS_TYPES            7
+#define NUM_ACCESS_TYPES            6
 #define NUM_UPDATE_RULES            3
 #define NUM_MATCH_OPS               7
 #define NUM_OPCODES                 256
 #define NUM_FIELD_NAMES             2
-
-
-#define USER_REGION_BEGIN           0x80
 
 
 #endif /* __AMLCODE_H__ */

@@ -2,12 +2,12 @@
  *
  * Module Name: evsci - System Control Interrupt configuration and
  *                      legacy to ACPI mode state transition functions
- *              $Revision: 74 $
+ *              $Revision: 83 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,17 +31,7 @@
 
 
 #define _COMPONENT          ACPI_EVENTS
-	 MODULE_NAME         ("evsci")
-
-
-/*
- * Elements correspond to counts for TMR, NOT_USED, GBL, PWR_BTN, SLP_BTN, RTC,
- * and GENERAL respectively.  These counts are modified by the ACPI interrupt
- * handler.
- *
- * TBD: [Investigate] Note that GENERAL should probably be split out into
- * one element for each bit in the GPE registers
- */
+	 ACPI_MODULE_NAME    ("evsci")
 
 
 /*******************************************************************************
@@ -58,23 +48,24 @@
  *
  ******************************************************************************/
 
-static u32
-acpi_ev_sci_handler (void *context)
+static u32 ACPI_SYSTEM_XFACE
+acpi_ev_sci_handler (
+	void                    *context)
 {
-	u32                     interrupt_handled = INTERRUPT_NOT_HANDLED;
+	u32                     interrupt_handled = ACPI_INTERRUPT_NOT_HANDLED;
 
 
-	FUNCTION_TRACE("Ev_sci_handler");
+	ACPI_FUNCTION_TRACE("Ev_sci_handler");
 
 
 	/*
 	 * Make sure that ACPI is enabled by checking SCI_EN.  Note that we are
 	 * required to treat the SCI interrupt as sharable, level, active low.
 	 */
-	if (!acpi_hw_register_bit_access (ACPI_READ, ACPI_MTX_DO_NOT_LOCK, SCI_EN)) {
+	if (!acpi_hw_bit_register_read (ACPI_BITREG_SCI_ENABLE, ACPI_MTX_DO_NOT_LOCK)) {
 		/* ACPI is not enabled;  this interrupt cannot be for us */
 
-		return_VALUE (INTERRUPT_NOT_HANDLED);
+		return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 	}
 
 	/*
@@ -113,7 +104,7 @@ acpi_ev_install_sci_handler (void)
 	u32                     status = AE_OK;
 
 
-	FUNCTION_TRACE ("Ev_install_sci_handler");
+	ACPI_FUNCTION_TRACE ("Ev_install_sci_handler");
 
 
 	status = acpi_os_install_interrupt_handler ((u32) acpi_gbl_FADT->sci_int,
@@ -123,7 +114,6 @@ acpi_ev_install_sci_handler (void)
 
 
 /******************************************************************************
-
  *
  * FUNCTION:    Acpi_ev_remove_sci_handler
  *
@@ -132,151 +122,28 @@ acpi_ev_install_sci_handler (void)
  * RETURN:      E_OK if handler uninstalled OK, E_ERROR if handler was not
  *              installed to begin with
  *
- * DESCRIPTION: Restores original status of all fixed event enable bits and
- *              removes SCI handler.
+ * DESCRIPTION: Remove the SCI interrupt handler.  No further SCIs will be
+ *              taken.
+ *
+ * Note:  It doesn't seem important to disable all events or set the event
+ *        enable registers to their original values.  The OS should disable
+ *        the SCI interrupt level when the handler is removed, so no more
+ *        events will come in.
  *
  ******************************************************************************/
 
 acpi_status
 acpi_ev_remove_sci_handler (void)
 {
-	FUNCTION_TRACE ("Ev_remove_sci_handler");
+	ACPI_FUNCTION_TRACE ("Ev_remove_sci_handler");
 
 
-#if 0
-	/* TBD:[Investigate] Figure this out!!  Disable all events first ???  */
-
-	if (original_fixed_enable_bit_status ^ 1 << acpi_event_index (TMR_FIXED_EVENT)) {
-		acpi_event_disable_event (TMR_FIXED_EVENT);
-	}
-
-	if (original_fixed_enable_bit_status ^ 1 << acpi_event_index (GBL_FIXED_EVENT)) {
-		acpi_event_disable_event (GBL_FIXED_EVENT);
-	}
-
-	if (original_fixed_enable_bit_status ^ 1 << acpi_event_index (PWR_BTN_FIXED_EVENT)) {
-		acpi_event_disable_event (PWR_BTN_FIXED_EVENT);
-	}
-
-	if (original_fixed_enable_bit_status ^ 1 << acpi_event_index (SLP_BTN_FIXED_EVENT)) {
-		acpi_event_disable_event (SLP_BTN_FIXED_EVENT);
-	}
-
-	if (original_fixed_enable_bit_status ^ 1 << acpi_event_index (RTC_FIXED_EVENT)) {
-		acpi_event_disable_event (RTC_FIXED_EVENT);
-	}
-
-	original_fixed_enable_bit_status = 0;
-
-#endif
+	/* Just let the OS remove the handler and disable the level */
 
 	acpi_os_remove_interrupt_handler ((u32) acpi_gbl_FADT->sci_int,
 			   acpi_ev_sci_handler);
 
 	return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ev_restore_acpi_state
- *
- * PARAMETERS:  none
- *
- * RETURN:      none
- *
- * DESCRIPTION: Restore the original ACPI state of the machine
- *
- ******************************************************************************/
-
-void
-acpi_ev_restore_acpi_state (void)
-{
-	u32                     index;
-
-
-	FUNCTION_TRACE ("Ev_restore_acpi_state");
-
-
-	/* Restore the state of the chipset enable bits. */
-
-	if (acpi_gbl_restore_acpi_chipset == TRUE) {
-		/* Restore the fixed events */
-
-		if (acpi_hw_register_read (ACPI_MTX_LOCK, PM1_EN) !=
-				acpi_gbl_pm1_enable_register_save) {
-			acpi_hw_register_write (ACPI_MTX_LOCK, PM1_EN,
-				acpi_gbl_pm1_enable_register_save);
-		}
-
-
-		/* Ensure that all status bits are clear */
-
-		acpi_hw_clear_acpi_status ();
-
-
-		/* Now restore the GPEs */
-
-		for (index = 0; index < DIV_2 (acpi_gbl_FADT->gpe0blk_len); index++) {
-			if (acpi_hw_register_read (ACPI_MTX_LOCK, GPE0_EN_BLOCK | index) !=
-					acpi_gbl_gpe0enable_register_save[index]) {
-				acpi_hw_register_write (ACPI_MTX_LOCK, GPE0_EN_BLOCK | index,
-					acpi_gbl_gpe0enable_register_save[index]);
-			}
-		}
-
-		/* GPE 1 present? */
-
-		if (acpi_gbl_FADT->gpe1_blk_len) {
-			for (index = 0; index < DIV_2 (acpi_gbl_FADT->gpe1_blk_len); index++) {
-				if (acpi_hw_register_read (ACPI_MTX_LOCK, GPE1_EN_BLOCK | index) !=
-					acpi_gbl_gpe1_enable_register_save[index]) {
-					acpi_hw_register_write (ACPI_MTX_LOCK, GPE1_EN_BLOCK | index,
-						acpi_gbl_gpe1_enable_register_save[index]);
-				}
-			}
-		}
-
-		if (acpi_hw_get_mode() != acpi_gbl_original_mode) {
-			acpi_hw_set_mode (acpi_gbl_original_mode);
-		}
-	}
-
-	return_VOID;
-}
-
-
-/******************************************************************************
- *
- * FUNCTION:    Acpi_ev_terminate
- *
- * PARAMETERS:  none
- *
- * RETURN:      none
- *
- * DESCRIPTION: free memory allocated for table storage.
- *
- ******************************************************************************/
-
-void
-acpi_ev_terminate (void)
-{
-
-	FUNCTION_TRACE ("Ev_terminate");
-
-
-	/*
-	 * Free global tables, etc.
-	 */
-	if (acpi_gbl_gpe_registers) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_registers);
-	}
-
-	if (acpi_gbl_gpe_info) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_info);
-	}
-
-	return_VOID;
 }
 
 

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 105 $
+ *              $Revision: 127 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,10 +32,51 @@
 
 
 #define _COMPONENT          ACPI_NAMESPACE
-	 MODULE_NAME         ("nsdump")
-
+	 ACPI_MODULE_NAME    ("nsdump")
 
 #if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ns_print_pathname
+ *
+ * PARAMETERS:  Num_segment         - Number of ACPI name segments
+ *              Pathname            - The compressed (internal) path
+ *
+ * DESCRIPTION: Print an object's full namespace pathname
+ *
+ ******************************************************************************/
+
+void
+acpi_ns_print_pathname (
+	u32                     num_segments,
+	char                    *pathname)
+{
+	ACPI_FUNCTION_NAME ("Acpi_ns_print_pathname");
+
+
+	if (!(acpi_dbg_level & ACPI_LV_NAMES) || !(acpi_dbg_layer & ACPI_NAMESPACE)) {
+		return;
+	}
+
+		/* Print the entire name */
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "["));
+
+	while (num_segments) {
+		acpi_os_printf ("%4.4s", pathname);
+		pathname += ACPI_NAME_SIZE;
+
+		num_segments--;
+		if (num_segments) {
+			acpi_os_printf (".");
+		}
+	}
+
+	acpi_os_printf ("]\n");
+}
+
 
 /*******************************************************************************
  *
@@ -58,11 +99,11 @@ acpi_ns_dump_pathname (
 	u32                     level,
 	u32                     component)
 {
-	NATIVE_CHAR             *buffer;
-	u32                     length;
+	acpi_buffer             buffer;
+	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ns_dump_pathname");
+	ACPI_FUNCTION_TRACE ("Ns_dump_pathname");
 
 
 	/* Do this only if the requested debug level and component are enabled */
@@ -71,21 +112,17 @@ acpi_ns_dump_pathname (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	buffer = ACPI_MEM_ALLOCATE (PATHNAME_MAX);
-	if (!buffer) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
 	/* Convert handle to a full pathname and print it (with supplied message) */
 
-	length = PATHNAME_MAX;
-	if (ACPI_SUCCESS (acpi_ns_handle_to_pathname (handle, &length, buffer))) {
-		acpi_os_printf ("%s %s (%p)\n", msg, buffer, handle);
+	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+	status = acpi_ns_handle_to_pathname (handle, &buffer);
+	if (ACPI_SUCCESS (status)) {
+		acpi_os_printf ("%s %s (Node %p)\n", msg, buffer.pointer, handle);
+		ACPI_MEM_FREE (buffer.pointer);
 	}
 
-	ACPI_MEM_FREE (buffer);
-
-	return_ACPI_STATUS (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 
@@ -112,16 +149,17 @@ acpi_ns_dump_one_object (
 	acpi_walk_info          *info = (acpi_walk_info *) context;
 	acpi_namespace_node     *this_node;
 	acpi_operand_object     *obj_desc = NULL;
-	acpi_object_type8       obj_type;
-	acpi_object_type8       type;
+	acpi_object_type        obj_type;
+	acpi_object_type        type;
 	u32                     bytes_to_dump;
 	u32                     downstream_sibling_mask = 0;
 	u32                     level_tmp;
 	u32                     which_bit;
 	u32                     i;
+	u32                     dbg_level;
 
 
-	PROC_NAME ("Ns_dump_one_object");
+	ACPI_FUNCTION_NAME ("Ns_dump_one_object");
 
 
 	this_node = acpi_ns_map_handle_to_node (obj_handle);
@@ -147,68 +185,63 @@ acpi_ns_dump_one_object (
 		return (AE_OK);
 	}
 
-
 	/* Indent the object according to the level */
 
 	while (level_tmp--) {
-
 		/* Print appropriate characters to form tree structure */
 
 		if (level_tmp) {
 			if (downstream_sibling_mask & which_bit) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "|"));
+				acpi_os_printf ("|");
 			}
-
 			else {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " "));
+				acpi_os_printf (" ");
 			}
 
 			which_bit <<= 1;
 		}
-
 		else {
 			if (acpi_ns_exist_downstream_sibling (this_node + 1)) {
 				downstream_sibling_mask |= (1 << (level - 1));
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "+"));
+				acpi_os_printf ("+");
 			}
-
 			else {
 				downstream_sibling_mask &= ACPI_UINT32_MAX ^ (1 << (level - 1));
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "+"));
+				acpi_os_printf ("+");
 			}
 
 			if (this_node->child == NULL) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "-"));
+				acpi_os_printf ("-");
 			}
-
 			else if (acpi_ns_exist_downstream_sibling (this_node->child)) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "+"));
+				acpi_os_printf ("+");
 			}
-
 			else {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "-"));
+				acpi_os_printf ("-");
 			}
 		}
 	}
 
-
 	/* Check the integrity of our data */
 
 	if (type > INTERNAL_TYPE_MAX) {
-		type = INTERNAL_TYPE_DEF_ANY;                                /* prints as *ERROR* */
+		type = INTERNAL_TYPE_DEF_ANY;  /* prints as *ERROR* */
 	}
 
 	if (!acpi_ut_valid_acpi_name (this_node->name)) {
-		REPORT_WARNING (("Invalid ACPI Name %08X\n", this_node->name));
+		ACPI_REPORT_WARNING (("Invalid ACPI Name %08X\n", this_node->name));
 	}
 
 	/*
 	 * Now we can print out the pertinent information
 	 */
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " %4.4s %-12s %p",
-			(char*)&this_node->name, acpi_ut_get_type_name (type), this_node));
+	acpi_os_printf (" %4.4s %-12s %p",
+			(char *) &this_node->name, acpi_ut_get_type_name (type), this_node);
 
-	obj_desc = this_node->object;
+	dbg_level = acpi_dbg_level;
+	acpi_dbg_level = 0;
+	obj_desc = acpi_ns_get_attached_object (this_node);
+	acpi_dbg_level = dbg_level;
 
 	switch (info->display_type) {
 	case ACPI_DISPLAY_SUMMARY:
@@ -216,110 +249,109 @@ acpi_ns_dump_one_object (
 		if (!obj_desc) {
 			/* No attached object, we are done */
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+			acpi_os_printf ("\n");
 			return (AE_OK);
 		}
 
-
 		switch (type) {
 		case ACPI_TYPE_PROCESSOR:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " ID %d Addr %.4X Len %.4X\n",
+			acpi_os_printf (" ID %d Addr %.4X Len %.4X\n",
 					 obj_desc->processor.proc_id,
 					 obj_desc->processor.address,
-					 obj_desc->processor.length));
+					 obj_desc->processor.length);
 			break;
 
 		case ACPI_TYPE_DEVICE:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Notification object: %p", obj_desc));
+			acpi_os_printf (" Notification object: %p", obj_desc);
 			break;
 
 		case ACPI_TYPE_METHOD:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Args %d Len %.4X Aml %p \n",
+			acpi_os_printf (" Args %d Len %.4X Aml %p \n",
 					 obj_desc->method.param_count,
 					 obj_desc->method.aml_length,
-					 obj_desc->method.aml_start));
+					 obj_desc->method.aml_start);
 			break;
 
 		case ACPI_TYPE_INTEGER:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " = %8.8X%8.8X\n",
-					 HIDWORD (obj_desc->integer.value),
-					 LODWORD (obj_desc->integer.value)));
+			acpi_os_printf (" = %8.8X%8.8X\n",
+					 ACPI_HIDWORD (obj_desc->integer.value),
+					 ACPI_LODWORD (obj_desc->integer.value));
 			break;
 
 		case ACPI_TYPE_PACKAGE:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Elements %.2X\n",
-					 obj_desc->package.count));
+			acpi_os_printf (" Elements %.2X\n",
+					 obj_desc->package.count);
 			break;
 
 		case ACPI_TYPE_BUFFER:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Len %.2X",
-					 obj_desc->buffer.length));
+			acpi_os_printf (" Len %.2X",
+					 obj_desc->buffer.length);
 
 			/* Dump some of the buffer */
 
 			if (obj_desc->buffer.length > 0) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " ="));
+				acpi_os_printf (" =");
 				for (i = 0; (i < obj_desc->buffer.length && i < 12); i++) {
-					ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " %.2X",
-							obj_desc->buffer.pointer[i]));
+					acpi_os_printf (" %.2X", obj_desc->buffer.pointer[i]);
 				}
 			}
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+			acpi_os_printf ("\n");
 			break;
 
 		case ACPI_TYPE_STRING:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Len %.2X",
-					 obj_desc->string.length));
+			acpi_os_printf (" Len %.2X", obj_desc->string.length);
 
 			if (obj_desc->string.length > 0) {
-				 ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " = \"%.32s\"...",
-						 obj_desc->string.pointer));
+				 acpi_os_printf (" = \"%.32s\"...", obj_desc->string.pointer);
 			}
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+			acpi_os_printf ("\n");
 			break;
 
 		case ACPI_TYPE_REGION:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " [%s]",
-					 acpi_ut_get_region_name (obj_desc->region.space_id)));
+			acpi_os_printf (" [%s]", acpi_ut_get_region_name (obj_desc->region.space_id));
 			if (obj_desc->region.flags & AOPOBJ_DATA_VALID) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Addr %8.8X%8.8X Len %.4X\n",
-						 HIDWORD(obj_desc->region.address),
-						 LODWORD(obj_desc->region.address),
-						 obj_desc->region.length));
+				acpi_os_printf (" Addr %8.8X%8.8X Len %.4X\n",
+						 ACPI_HIDWORD (obj_desc->region.address),
+						 ACPI_LODWORD (obj_desc->region.address),
+						 obj_desc->region.length);
 			}
 			else {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " [Address/Length not evaluated]\n"));
+				acpi_os_printf (" [Address/Length not evaluated]\n");
 			}
 			break;
 
 		case INTERNAL_TYPE_REFERENCE:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " [%s]\n",
-					 acpi_ps_get_opcode_name (obj_desc->reference.opcode)));
+			acpi_os_printf (" [%s]\n",
+					acpi_ps_get_opcode_name (obj_desc->reference.opcode));
 			break;
 
 		case ACPI_TYPE_BUFFER_FIELD:
-
-			/* TBD: print Buffer name when we can easily get it */
+			if (obj_desc->buffer_field.buffer_obj &&
+				obj_desc->buffer_field.buffer_obj->buffer.node) {
+				acpi_os_printf (" Buf [%4.4s]",
+						(char *) &obj_desc->buffer_field.buffer_obj->buffer.node->name);
+			}
 			break;
 
 		case INTERNAL_TYPE_REGION_FIELD:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Rgn [%4.4s]",
-					 (char *) &obj_desc->common_field.region_obj->region.node->name));
+			acpi_os_printf (" Rgn [%4.4s]",
+					(char *) &obj_desc->common_field.region_obj->region.node->name);
 			break;
 
 		case INTERNAL_TYPE_BANK_FIELD:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Rgn [%4.4s]",
-					 (char *) &obj_desc->common_field.region_obj->region.node->name));
+			acpi_os_printf (" Rgn [%4.4s] Bnk [%4.4s]",
+					(char *) &obj_desc->common_field.region_obj->region.node->name,
+					(char *) &obj_desc->bank_field.bank_obj->common_field.node->name);
 			break;
 
 		case INTERNAL_TYPE_INDEX_FIELD:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Rgn [%4.4s]",
-					 (char *) &obj_desc->index_field.index_obj->common_field.region_obj->region.node->name));
+			acpi_os_printf (" Idx [%4.4s] Dat [%4.4s]",
+					(char *) &obj_desc->index_field.index_obj->common_field.node->name,
+					(char *) &obj_desc->index_field.data_obj->common_field.node->name);
 			break;
 
 		default:
-
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Object %p\n", obj_desc));
+			acpi_os_printf (" Object %p\n", obj_desc);
 			break;
 		}
 
@@ -330,10 +362,11 @@ acpi_ns_dump_one_object (
 		case INTERNAL_TYPE_REGION_FIELD:
 		case INTERNAL_TYPE_BANK_FIELD:
 		case INTERNAL_TYPE_INDEX_FIELD:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " Off %.2X Len %.2X Acc %.2d\n",
-					 (obj_desc->common_field.base_byte_offset * 8) + obj_desc->common_field.start_field_bit_offset,
-					 obj_desc->common_field.bit_length,
-					 obj_desc->common_field.access_bit_width));
+			acpi_os_printf (" Off %.2X Len %.2X Acc %.2d\n",
+					(obj_desc->common_field.base_byte_offset * 8)
+						+ obj_desc->common_field.start_field_bit_offset,
+					obj_desc->common_field.bit_length,
+					obj_desc->common_field.access_byte_width);
 			break;
 		}
 
@@ -342,61 +375,56 @@ acpi_ns_dump_one_object (
 
 	case ACPI_DISPLAY_OBJECTS:
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "%p O:%p",
-				this_node, obj_desc));
+		acpi_os_printf ("%p O:%p",
+				this_node, obj_desc);
 
 		if (!obj_desc) {
 			/* No attached object, we are done */
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+			acpi_os_printf ("\n");
 			return (AE_OK);
 		}
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "(R%d)",
-				obj_desc->common.reference_count));
+		acpi_os_printf ("(R%d)",
+				obj_desc->common.reference_count);
 
 		switch (type) {
-
 		case ACPI_TYPE_METHOD:
 
 			/* Name is a Method and its AML offset/length are set */
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " M:%p-%X\n",
-					 obj_desc->method.aml_start,
-					 obj_desc->method.aml_length));
-
+			acpi_os_printf (" M:%p-%X\n", obj_desc->method.aml_start,
+					  obj_desc->method.aml_length);
 			break;
-
 
 		case ACPI_TYPE_INTEGER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " N:%X%X\n",
-					 HIDWORD(obj_desc->integer.value),
-					 LODWORD(obj_desc->integer.value)));
+			acpi_os_printf (" N:%X%X\n", ACPI_HIDWORD(obj_desc->integer.value),
+					 ACPI_LODWORD(obj_desc->integer.value));
 			break;
-
 
 		case ACPI_TYPE_STRING:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " S:%p-%X\n",
-					 obj_desc->string.pointer,
-					 obj_desc->string.length));
+			acpi_os_printf (" S:%p-%X\n", obj_desc->string.pointer,
+					  obj_desc->string.length);
 			break;
-
 
 		case ACPI_TYPE_BUFFER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " B:%p-%X\n",
-					 obj_desc->buffer.pointer,
-					 obj_desc->buffer.length));
+			acpi_os_printf (" B:%p-%X\n", obj_desc->buffer.pointer,
+					  obj_desc->buffer.length);
 			break;
-
 
 		default:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+			acpi_os_printf ("\n");
 			break;
 		}
+		break;
+
+
+	default:
+		acpi_os_printf ("\n");
 		break;
 	}
 
@@ -409,48 +437,55 @@ acpi_ns_dump_one_object (
 
 	/* If there is an attached object, display it */
 
-	obj_desc = this_node->object;
+	dbg_level = acpi_dbg_level;
+	acpi_dbg_level = 0;
+	obj_desc = acpi_ns_get_attached_object (this_node);
+	acpi_dbg_level = dbg_level;
 
 	/* Dump attached objects */
 
 	while (obj_desc) {
 		obj_type = INTERNAL_TYPE_INVALID;
+		acpi_os_printf ("      Attached Object %p: ", obj_desc);
 
 		/* Decode the type of attached object and dump the contents */
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "        Attached Object %p: ", obj_desc));
+		switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
+		case ACPI_DESC_TYPE_NAMED:
 
-		if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "(Ptr to Node)\n"));
+			acpi_os_printf ("(Ptr to Node)\n");
 			bytes_to_dump = sizeof (acpi_namespace_node);
-		}
+			break;
 
 
-		else if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_INTERNAL)) {
+		case ACPI_DESC_TYPE_INTERNAL:
+
 			obj_type = obj_desc->common.type;
 
 			if (obj_type > INTERNAL_TYPE_MAX) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "(Ptr to ACPI Object type %X [UNKNOWN])\n", obj_type));
+				acpi_os_printf ("(Ptr to ACPI Object type %X [UNKNOWN])\n", obj_type);
 				bytes_to_dump = 32;
 			}
-
 			else {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "(Ptr to ACPI Object type %2.2X [%s])\n",
-						   obj_type, acpi_ut_get_type_name (obj_type)));
+				acpi_os_printf ("(Ptr to ACPI Object type %2.2X [%s])\n",
+						   obj_type, acpi_ut_get_type_name (obj_type));
 				bytes_to_dump = sizeof (acpi_operand_object);
 			}
-		}
+			break;
 
-		else {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "(String or Buffer - not descriptor)\n"));
+
+		default:
+
+			acpi_os_printf ("(String or Buffer ptr - not an object descriptor)\n");
 			bytes_to_dump = 16;
+			break;
 		}
 
-		DUMP_BUFFER (obj_desc, bytes_to_dump);
+		ACPI_DUMP_BUFFER (obj_desc, bytes_to_dump);
 
 		/* If value is NOT an internal object, we are done */
 
-		if (VALID_DESCRIPTOR_TYPE (obj_desc, ACPI_DESC_TYPE_NAMED)) {
+		if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_INTERNAL) {
 			goto cleanup;
 		}
 
@@ -494,11 +529,11 @@ acpi_ns_dump_one_object (
 			goto cleanup;
 		}
 
-		obj_type = INTERNAL_TYPE_INVALID;    /* Terminate loop after next pass */
+		obj_type = INTERNAL_TYPE_INVALID;  /* Terminate loop after next pass */
 	}
 
 cleanup:
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "\n"));
+	acpi_os_printf ("\n");
 	return (AE_OK);
 }
 
@@ -521,7 +556,7 @@ cleanup:
 
 void
 acpi_ns_dump_objects (
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	u8                      display_type,
 	u32                     max_depth,
 	u32                     owner_id,
@@ -530,7 +565,7 @@ acpi_ns_dump_objects (
 	acpi_walk_info          info;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	info.debug_level = ACPI_LV_TABLES;
@@ -538,7 +573,7 @@ acpi_ns_dump_objects (
 	info.display_type = display_type;
 
 
-	acpi_ns_walk_namespace (type, start_handle, max_depth, NS_WALK_NO_UNLOCK, acpi_ns_dump_one_object,
+	acpi_ns_walk_namespace (type, start_handle, max_depth, ACPI_NS_WALK_NO_UNLOCK, acpi_ns_dump_one_object,
 			   (void *) &info, NULL);
 }
 
@@ -569,7 +604,7 @@ acpi_ns_dump_one_device (
 	u32                     i;
 
 
-	PROC_NAME ("Ns_dump_one_device");
+	ACPI_FUNCTION_NAME ("Ns_dump_one_device");
 
 
 	status = acpi_ns_dump_one_object (obj_handle, level, context, return_value);
@@ -581,7 +616,9 @@ acpi_ns_dump_one_device (
 		}
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %x\n",
-				  info.hardware_id, HIDWORD(info.address), LODWORD(info.address), info.current_status));
+				  info.hardware_id,
+				  ACPI_HIDWORD (info.address), ACPI_LODWORD (info.address),
+				  info.current_status));
 	}
 
 	return (status);
@@ -604,7 +641,7 @@ acpi_ns_dump_root_devices (void)
 	acpi_handle             sys_bus_handle;
 
 
-	PROC_NAME ("Ns_dump_root_devices");
+	ACPI_FUNCTION_NAME ("Ns_dump_root_devices");
 
 
 	/* Only dump the table if tracing is enabled */
@@ -613,10 +650,10 @@ acpi_ns_dump_root_devices (void)
 		return;
 	}
 
-	acpi_get_handle (0, NS_SYSTEM_BUS, &sys_bus_handle);
+	acpi_get_handle (0, ACPI_NS_SYSTEM_BUS, &sys_bus_handle);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Display of all devices in the namespace:\n"));
-	acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, sys_bus_handle, ACPI_UINT32_MAX, NS_WALK_NO_UNLOCK,
+	acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, sys_bus_handle, ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
 			   acpi_ns_dump_one_device, NULL, NULL);
 }
 
@@ -643,7 +680,7 @@ acpi_ns_dump_tables (
 	acpi_handle             search_handle = search_base;
 
 
-	FUNCTION_TRACE ("Ns_dump_tables");
+	ACPI_FUNCTION_TRACE ("Ns_dump_tables");
 
 
 	if (!acpi_gbl_root_node) {
@@ -655,7 +692,7 @@ acpi_ns_dump_tables (
 		return_VOID;
 	}
 
-	if (NS_ALL == search_base) {
+	if (ACPI_NS_ALL == search_base) {
 		/*  entire namespace    */
 
 		search_handle = acpi_gbl_root_node;
@@ -688,11 +725,12 @@ acpi_ns_dump_entry (
 	acpi_walk_info          info;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	info.debug_level = debug_level;
 	info.owner_id = ACPI_UINT32_MAX;
+	info.display_type = ACPI_DISPLAY_SUMMARY;
 
 	acpi_ns_dump_one_object (handle, 1, &info, NULL);
 }

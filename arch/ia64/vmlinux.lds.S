@@ -1,5 +1,6 @@
 #include <linux/config.h>
 
+#include <asm/cache.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
@@ -70,11 +71,6 @@ SECTIONS
 	{ *(__ksymtab) }
   __stop___ksymtab = .;
 
-  __start___kallsyms = .;	/* All kernel symbols for debugging */
-  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
-	{ *(__kallsyms) }
-  __stop___kallsyms = .;
-
   /* Unwind info & table: */
   . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
@@ -124,16 +120,24 @@ SECTIONS
   .data.init_task : AT(ADDR(.data.init_task) - PAGE_OFFSET)
 	{ *(.data.init_task) }
 
-  .data.page_aligned : AT(ADDR(.data.page_aligned) - PAGE_OFFSET)
-        { *(.data.idt) }
-
-  . = ALIGN(64);
+  . = ALIGN(SMP_CACHE_BYTES);
   .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - PAGE_OFFSET)
         { *(.data.cacheline_aligned) }
 
   /* Kernel symbol names for modules: */
   .kstrtab : AT(ADDR(.kstrtab) - PAGE_OFFSET)
 	{ *(.kstrtab) }
+
+  /* Per-cpu data: */
+  . = ALIGN(PAGE_SIZE);
+  __phys_per_cpu_start = .;
+  .data.percpu PERCPU_ADDR : AT(__phys_per_cpu_start - PAGE_OFFSET)
+	{
+		__per_cpu_start = .;
+		*(.data.percpu)
+		__per_cpu_end = .;
+	}
+  . = __phys_per_cpu_start + 4096;	/* ensure percpu fits into smallest page size (4KB) */
 
   .data : AT(ADDR(.data) - PAGE_OFFSET)
 	{ *(.data) *(.gnu.linkonce.d*) CONSTRUCTORS }
@@ -151,7 +155,7 @@ SECTIONS
 	{ *(.sbss) *(.scommon) }
   .bss : AT(ADDR(.bss) - PAGE_OFFSET)
 	{ *(.bss) *(COMMON) }
-  . = ALIGN(64 / 8);
+
   _end = .;
 
   /* Stabs debugging sections.  */

@@ -24,7 +24,7 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 	if (!(child->ptrace & PT_PTRACED))
 		return -ESRCH;
 
-	if (child->p_pptr != current)
+	if (child->parent != current)
 		return -ESRCH;
 
 	if (!kill) {
@@ -70,9 +70,9 @@ int ptrace_attach(struct task_struct *task)
 	task_unlock(task);
 
 	write_lock_irq(&tasklist_lock);
-	if (task->p_pptr != current) {
+	if (task->parent != current) {
 		REMOVE_LINKS(task);
-		task->p_pptr = current;
+		task->parent = current;
 		SET_LINKS(task);
 	}
 	write_unlock_irq(&tasklist_lock);
@@ -98,7 +98,7 @@ int ptrace_detach(struct task_struct *child, unsigned int data)
 	child->exit_code = data;
 	write_lock_irq(&tasklist_lock);
 	REMOVE_LINKS(child);
-	child->p_pptr = child->p_opptr;
+	child->parent = child->real_parent;
 	SET_LINKS(child);
 	write_unlock_irq(&tasklist_lock);
 

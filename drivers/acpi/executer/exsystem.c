@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exsystem - Interface to OS services
- *              $Revision: 67 $
+ *              $Revision: 71 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "acevents.h"
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exsystem")
+	 ACPI_MODULE_NAME    ("exsystem")
 
 
 /*******************************************************************************
@@ -56,9 +56,10 @@ acpi_ex_system_wait_semaphore (
 	u32                     timeout)
 {
 	acpi_status             status;
+	acpi_status             status2;
 
 
-	FUNCTION_TRACE ("Ex_system_wait_semaphore");
+	ACPI_FUNCTION_TRACE ("Ex_system_wait_semaphore");
 
 
 	status = acpi_os_wait_semaphore (semaphore, 1, 0);
@@ -78,11 +79,11 @@ acpi_ex_system_wait_semaphore (
 
 		/* Reacquire the interpreter */
 
-		status = acpi_ex_enter_interpreter ();
-		if (ACPI_SUCCESS (status)) {
-			/* Restore the timeout exception */
+		status2 = acpi_ex_enter_interpreter ();
+		if (ACPI_FAILURE (status2)) {
+			/* Report fatal error, could not acquire interpreter */
 
-			status = AE_TIME;
+			return_ACPI_STATUS (status2);
 		}
 	}
 
@@ -96,17 +97,20 @@ acpi_ex_system_wait_semaphore (
  *
  * PARAMETERS:  How_long            - The amount of time to stall
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: Suspend running thread for specified amount of time.
  *
  ******************************************************************************/
 
-void
+acpi_status
 acpi_ex_system_do_stall (
 	u32                     how_long)
 {
-	FUNCTION_ENTRY ();
+	acpi_status             status = AE_OK;
+
+
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if (how_long > 1000) /* 1 millisecond */ {
@@ -118,12 +122,14 @@ acpi_ex_system_do_stall (
 
 		/* And now we must get the interpreter again */
 
-		acpi_ex_enter_interpreter ();
+		status = acpi_ex_enter_interpreter ();
 	}
 
 	else {
 		acpi_os_sleep (0, (how_long / 1000) + 1);
 	}
+
+	return (status);
 }
 
 
@@ -139,12 +145,14 @@ acpi_ex_system_do_stall (
  *
  ******************************************************************************/
 
-void
+acpi_status
 acpi_ex_system_do_suspend (
 	u32                     how_long)
 {
+	acpi_status             status;
 
-	FUNCTION_ENTRY ();
+
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Since this thread will sleep, we must release the interpreter */
@@ -156,7 +164,8 @@ acpi_ex_system_do_suspend (
 
 	/* And now we must get the interpreter again */
 
-	acpi_ex_enter_interpreter ();
+	status = acpi_ex_enter_interpreter ();
+	return (status);
 }
 
 
@@ -183,7 +192,7 @@ acpi_ex_system_acquire_mutex (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE_PTR ("Ex_system_acquire_mutex", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("Ex_system_acquire_mutex", obj_desc);
 
 
 	if (!obj_desc) {
@@ -194,7 +203,7 @@ acpi_ex_system_acquire_mutex (
 	 * Support for the _GL_ Mutex object -- go get the global lock
 	 */
 	if (obj_desc->mutex.semaphore == acpi_gbl_global_lock_semaphore) {
-		status = acpi_ev_acquire_global_lock ();
+		status = acpi_ev_acquire_global_lock ((u32) time_desc->integer.value);
 		return_ACPI_STATUS (status);
 	}
 
@@ -226,7 +235,7 @@ acpi_ex_system_release_mutex (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE ("Ex_system_release_mutex");
+	ACPI_FUNCTION_TRACE ("Ex_system_release_mutex");
 
 
 	if (!obj_desc) {
@@ -266,7 +275,7 @@ acpi_ex_system_signal_event (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE ("Ex_system_signal_event");
+	ACPI_FUNCTION_TRACE ("Ex_system_signal_event");
 
 
 	if (obj_desc) {
@@ -300,14 +309,13 @@ acpi_ex_system_wait_event (
 	acpi_status             status = AE_OK;
 
 
-	FUNCTION_TRACE ("Ex_system_wait_event");
+	ACPI_FUNCTION_TRACE ("Ex_system_wait_event");
 
 
 	if (obj_desc) {
 		status = acpi_ex_system_wait_semaphore (obj_desc->event.semaphore,
 				  (u32) time_desc->integer.value);
 	}
-
 
 	return_ACPI_STATUS (status);
 }
@@ -333,7 +341,7 @@ acpi_ex_system_reset_event (
 	void                    *temp_semaphore;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/*

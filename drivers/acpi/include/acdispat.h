@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 45 $
+ *       $Revision: 51 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ acpi_ds_exec_end_control_op (
 acpi_status
 acpi_ds_get_predicate_value (
 	acpi_walk_state         *walk_state,
-	u32                     has_result_obj);
+	acpi_operand_object     *result_obj);
 
 acpi_status
 acpi_ds_exec_begin_op (
@@ -120,6 +120,11 @@ acpi_ds_create_index_field (
 
 acpi_status
 acpi_ds_create_buffer_field (
+	acpi_parse_object       *op,
+	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ds_init_field_objects (
 	acpi_parse_object       *op,
 	acpi_walk_state         *walk_state);
 
@@ -175,7 +180,7 @@ u8
 acpi_ds_is_method_value (
 	acpi_operand_object     *obj_desc);
 
-acpi_object_type8
+acpi_object_type
 acpi_ds_method_data_get_type (
 	u16                     opcode,
 	u32                     index,
@@ -200,18 +205,19 @@ acpi_ds_method_data_init_args (
 	u32                     max_param_count,
 	acpi_walk_state         *walk_state);
 
-acpi_namespace_node *
+acpi_status
 acpi_ds_method_data_get_node (
 	u16                     opcode,
 	u32                     index,
-	acpi_walk_state         *walk_state);
+	acpi_walk_state         *walk_state,
+	acpi_namespace_node     **node);
 
 acpi_status
 acpi_ds_method_data_init (
 	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ds_method_data_set_entry (
+acpi_ds_method_data_set_value (
 	u16                     opcode,
 	u32                     index,
 	acpi_operand_object     *object,
@@ -226,7 +232,7 @@ acpi_ds_parse_method (
 
 acpi_status
 acpi_ds_call_control_method (
-	acpi_walk_list          *walk_list,
+	ACPI_THREAD_STATE       *thread,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
 
@@ -331,15 +337,6 @@ acpi_status
 acpi_ds_resolve_operands (
 	acpi_walk_state         *walk_state);
 
-acpi_object_type8
-acpi_ds_map_opcode_to_data_type (
-	u16                     opcode,
-	u32                     *out_flags);
-
-acpi_object_type8
-acpi_ds_map_named_opcode_to_data_type (
-	u16                     opcode);
-
 
 /*
  * dswscope - Scope Stack manipulation
@@ -348,7 +345,7 @@ acpi_ds_map_named_opcode_to_data_type (
 acpi_status
 acpi_ds_scope_stack_push (
 	acpi_namespace_node     *node,
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_walk_state         *walk_state);
 
 
@@ -368,7 +365,7 @@ acpi_ds_create_walk_state (
 	acpi_owner_id           owner_id,
 	acpi_parse_object       *origin,
 	acpi_operand_object     *mth_desc,
-	acpi_walk_list          *walk_list);
+	ACPI_THREAD_STATE       *thread);
 
 acpi_status
 acpi_ds_init_aml_walk (
@@ -396,12 +393,12 @@ acpi_ds_delete_walk_state (
 
 acpi_walk_state *
 acpi_ds_pop_walk_state (
-	acpi_walk_list          *walk_list);
+	ACPI_THREAD_STATE       *thread);
 
 void
 acpi_ds_push_walk_state (
 	acpi_walk_state         *walk_state,
-	acpi_walk_list          *walk_list);
+	ACPI_THREAD_STATE       *thread);
 
 acpi_status
 acpi_ds_result_stack_pop (
@@ -417,7 +414,7 @@ acpi_ds_result_stack_clear (
 
 acpi_walk_state *
 acpi_ds_get_current_walk_state (
-	acpi_walk_list          *walk_list);
+	ACPI_THREAD_STATE       *thread);
 
 void
 acpi_ds_delete_walk_state_cache (

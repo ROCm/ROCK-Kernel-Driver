@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 48 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 #include "amlcode.h"
 
 #define _COMPONENT          ACPI_EVENTS
-	 MODULE_NAME         ("evrgnini")
+	 ACPI_MODULE_NAME    ("evrgnini")
 
 
 /*******************************************************************************
@@ -56,7 +56,10 @@ acpi_ev_system_memory_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	FUNCTION_TRACE ("Ev_system_memory_region_setup");
+	acpi_operand_object     *region_desc = (acpi_operand_object *) handle;
+	acpi_mem_space_context  *local_region_context;
+
+	ACPI_FUNCTION_TRACE ("Ev_system_memory_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -70,11 +73,17 @@ acpi_ev_system_memory_region_setup (
 
 	/* Activate.  Create a new context */
 
-	*region_context = ACPI_MEM_CALLOCATE (sizeof (acpi_mem_space_context));
-	if (!(*region_context)) {
+	local_region_context = ACPI_MEM_CALLOCATE (sizeof (acpi_mem_space_context));
+	if (!(local_region_context)) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
+	/* Save the region length and address for use in the handler */
+
+	local_region_context->length = region_desc->region.length;
+	local_region_context->address = region_desc->region.address;
+
+	*region_context = local_region_context;
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -101,7 +110,7 @@ acpi_ev_io_space_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	FUNCTION_TRACE ("Ev_io_space_region_setup");
+	ACPI_FUNCTION_TRACE ("Ev_io_space_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -148,7 +157,7 @@ acpi_ev_pci_config_region_setup (
 	acpi_device_id          object_hID;
 
 
-	FUNCTION_TRACE ("Ev_pci_config_region_setup");
+	ACPI_FUNCTION_TRACE ("Ev_pci_config_region_setup");
 
 
 	handler_obj = region_obj->region.addr_handler;
@@ -188,7 +197,7 @@ acpi_ev_pci_config_region_setup (
 	 *  First get device and function numbers from the _ADR object
 	 *  in the parent's scope.
 	 */
-	node = acpi_ns_get_parent_object (region_obj->region.node);
+	node = acpi_ns_get_parent_node (region_obj->region.node);
 
 
 	/* Acpi_evaluate the _ADR object */
@@ -200,8 +209,8 @@ acpi_ev_pci_config_region_setup (
 	 *  do nothing on failures.
 	 */
 	if (ACPI_SUCCESS (status)) {
-		pci_id->device = HIWORD (temp);
-		pci_id->function = LOWORD (temp);
+		pci_id->device  = ACPI_HIWORD (temp);
+		pci_id->function = ACPI_LOWORD (temp);
 	}
 
 	/*
@@ -224,16 +233,16 @@ acpi_ev_pci_config_region_setup (
 		while (node != acpi_gbl_root_node) {
 			status = acpi_ut_execute_HID (node, &object_hID);
 			if (ACPI_SUCCESS (status)) {
-				if (!(STRNCMP (object_hID.buffer, PCI_ROOT_HID_STRING,
+				if (!(ACPI_STRNCMP (object_hID.buffer, PCI_ROOT_HID_STRING,
 						   sizeof (PCI_ROOT_HID_STRING)))) {
-					acpi_install_address_space_handler (node,
+					acpi_install_address_space_handler ((acpi_handle) node,
 							   ACPI_ADR_SPACE_PCI_CONFIG,
 							   ACPI_DEFAULT_HANDLER, NULL, NULL);
 					break;
 				}
 			}
 
-			node = acpi_ns_get_parent_object (node);
+			node = acpi_ns_get_parent_node (node);
 		}
 	}
 	else {
@@ -245,7 +254,7 @@ acpi_ev_pci_config_region_setup (
 	 */
 	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__SEG, node, &temp);
 	if (ACPI_SUCCESS (status)) {
-		pci_id->segment = LOWORD (temp);
+		pci_id->segment = ACPI_LOWORD (temp);
 	}
 
 	/*
@@ -253,7 +262,7 @@ acpi_ev_pci_config_region_setup (
 	 */
 	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__BBN, node, &temp);
 	if (ACPI_SUCCESS (status)) {
-		pci_id->bus = LOWORD (temp);
+		pci_id->bus = ACPI_LOWORD (temp);
 	}
 
 	*region_context = pci_id;
@@ -286,7 +295,7 @@ acpi_ev_pci_bar_region_setup (
 	void                    **region_context)
 {
 
-	FUNCTION_TRACE ("Ev_pci_bar_region_setup");
+	ACPI_FUNCTION_TRACE ("Ev_pci_bar_region_setup");
 
 
 	return_ACPI_STATUS (AE_OK);
@@ -318,7 +327,7 @@ acpi_ev_cmos_region_setup (
 	void                    **region_context)
 {
 
-	FUNCTION_TRACE ("Ev_cmos_region_setup");
+	ACPI_FUNCTION_TRACE ("Ev_cmos_region_setup");
 
 
 	return_ACPI_STATUS (AE_OK);
@@ -347,7 +356,7 @@ acpi_ev_default_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	FUNCTION_TRACE ("Ev_default_region_setup");
+	ACPI_FUNCTION_TRACE ("Ev_default_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -394,21 +403,33 @@ acpi_ev_initialize_region (
 	acpi_status             status;
 	acpi_namespace_node     *method_node;
 	acpi_name               *reg_name_ptr = (acpi_name *) METHOD_NAME__REG;
+	acpi_operand_object     *region_obj2;
 
 
-	FUNCTION_TRACE_U32 ("Ev_initialize_region", acpi_ns_locked);
+	ACPI_FUNCTION_TRACE_U32 ("Ev_initialize_region", acpi_ns_locked);
 
 
 	if (!region_obj) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	node = acpi_ns_get_parent_object (region_obj->region.node);
+	if (region_obj->common.flags & AOPOBJ_OBJECT_INITIALIZED) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	region_obj2 = acpi_ns_get_secondary_object (region_obj);
+	if (!region_obj2) {
+		return_ACPI_STATUS (AE_NOT_EXIST);
+	}
+	node = acpi_ns_get_parent_node (region_obj->region.node);
+
+
 	space_id = region_obj->region.space_id;
 
 	region_obj->region.addr_handler = NULL;
-	region_obj->region.extra->extra.method_REG = NULL;
-	region_obj->region.flags &= ~(AOPOBJ_INITIALIZED);
+	region_obj2->extra.method_REG = NULL;
+	region_obj->common.flags &= ~(AOPOBJ_SETUP_COMPLETE);
+	region_obj->common.flags |= AOPOBJ_OBJECT_INITIALIZED;
 
 	/*
 	 *  Find any "_REG" associated with this region definition
@@ -421,7 +442,7 @@ acpi_ev_initialize_region (
 		 *  definition.  This will be executed when the handler is attached
 		 *  or removed
 		 */
-		region_obj->region.extra->extra.method_REG = method_node;
+		region_obj2->extra.method_REG = method_node;
 	}
 
 	/*
@@ -470,6 +491,7 @@ acpi_ev_initialize_region (
 					 */
 					acpi_ev_associate_region_and_handler (handler_obj, region_obj,
 							acpi_ns_locked);
+
 					return_ACPI_STATUS (AE_OK);
 				}
 
@@ -482,7 +504,7 @@ acpi_ev_initialize_region (
 		 *  This one does not have the handler we need
 		 *  Pop up one level
 		 */
-		node = acpi_ns_get_parent_object (node);
+		node = acpi_ns_get_parent_node (node);
 
 	} /* while Node != ROOT */
 

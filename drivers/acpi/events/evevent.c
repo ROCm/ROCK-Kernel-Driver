@@ -1,13 +1,12 @@
 /******************************************************************************
  *
- * Module Name: evevent - Fixed and General Purpose Acpi_event
- *                          handling and dispatch
- *              $Revision: 51 $
+ * Module Name: evevent - Fixed and General Purpose Even handling and dispatch
+ *              $Revision: 71 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +29,7 @@
 #include "acnamesp.h"
 
 #define _COMPONENT          ACPI_EVENTS
-	 MODULE_NAME         ("evevent")
+	 ACPI_MODULE_NAME    ("evevent")
 
 
 /*******************************************************************************
@@ -41,9 +40,7 @@
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Ensures that the system control interrupt (SCI) is properly
- *              configured, disables SCI event sources, installs the SCI
- *              handler
+ * DESCRIPTION: Initialize global data structures for events.
  *
  ******************************************************************************/
 
@@ -54,7 +51,7 @@ acpi_ev_initialize (
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ev_initialize");
+	ACPI_FUNCTION_TRACE ("Ev_initialize");
 
 
 	/* Make sure we have ACPI tables */
@@ -64,17 +61,6 @@ acpi_ev_initialize (
 		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
 	}
 
-
-	/* Make sure the BIOS supports ACPI mode */
-
-	if (SYS_MODE_LEGACY == acpi_hw_get_mode_capabilities()) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "ACPI Mode is not supported!\n"));
-		return_ACPI_STATUS (AE_ERROR);
-	}
-
-
-	acpi_gbl_original_mode = acpi_hw_get_mode();
-
 	/*
 	 * Initialize the Fixed and General Purpose Acpi_events prior. This is
 	 * done prior to enabling SCIs to prevent interrupts from occuring
@@ -82,30 +68,63 @@ acpi_ev_initialize (
 	 */
 	status = acpi_ev_fixed_event_initialize ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Unable to initialize fixed events.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL,
+				"Unable to initialize fixed events, %s\n",
+				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
 
 	status = acpi_ev_gpe_initialize ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Unable to initialize general purpose events.\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL,
+				"Unable to initialize general purpose events, %s\n",
+				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
+
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ev_handler_initialize
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Install handlers for the SCI, Global Lock, and GPEs.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_handler_initialize (
+	void)
+{
+	acpi_status             status;
+
+
+	ACPI_FUNCTION_TRACE ("Ev_initialize");
+
 
 	/* Install the SCI handler */
 
 	status = acpi_ev_install_sci_handler ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Unable to install System Control Interrupt Handler\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL,
+				"Unable to install System Control Interrupt Handler, %s\n",
+				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
-
 
 	/* Install handlers for control method GPE handlers (_Lxx, _Exx) */
 
 	status = acpi_ev_init_gpe_control_methods ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Unable to initialize Gpe control methods\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL,
+				"Unable to initialize GPE control methods, %s\n",
+				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
 
@@ -113,10 +132,11 @@ acpi_ev_initialize (
 
 	status = acpi_ev_init_global_lock_handler ();
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL, "Unable to initialize Global Lock handler\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_FATAL,
+				"Unable to initialize Global Lock handler, %s\n",
+				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
-
 
 	return_ACPI_STATUS (status);
 }
@@ -130,27 +150,32 @@ acpi_ev_initialize (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Initialize the Fixed Acpi_event data structures
+ * DESCRIPTION: Install the fixed event handlers and enable the fixed events.
  *
  ******************************************************************************/
 
 acpi_status
-acpi_ev_fixed_event_initialize(void)
+acpi_ev_fixed_event_initialize (
+	void)
 {
-	int                     i = 0;
+	NATIVE_UINT             i;
 
-	/* Initialize the structure that keeps track of fixed event handlers */
 
+	/*
+	 * Initialize the structure that keeps track of fixed event handlers
+	 * and enable the fixed events.
+	 */
 	for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
 		acpi_gbl_fixed_event_handlers[i].handler = NULL;
 		acpi_gbl_fixed_event_handlers[i].context = NULL;
-	}
 
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, TMR_EN, 0);
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, GBL_EN, 0);
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, PWRBTN_EN, 0);
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, SLPBTN_EN, 0);
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_LOCK, RTC_EN, 0);
+		/* Enable the fixed event */
+
+		if (acpi_gbl_fixed_event_info[i].enable_register_id != 0xFF) {
+			acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[i].enable_register_id,
+					 0, ACPI_MTX_LOCK);
+		}
+	}
 
 	return (AE_OK);
 }
@@ -169,54 +194,41 @@ acpi_ev_fixed_event_initialize(void)
  ******************************************************************************/
 
 u32
-acpi_ev_fixed_event_detect (void)
+acpi_ev_fixed_event_detect (
+	void)
 {
-	u32                     int_status = INTERRUPT_NOT_HANDLED;
-	u32                     status_register;
-	u32                     enable_register;
+	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
+	u32                     gpe_status;
+	u32                     gpe_enable;
+	NATIVE_UINT             i;
 
 
-	PROC_NAME ("Ev_fixed_event_detect");
+	ACPI_FUNCTION_NAME ("Ev_fixed_event_detect");
 
 
 	/*
 	 * Read the fixed feature status and enable registers, as all the cases
 	 * depend on their values.
 	 */
-	status_register = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, PM1_STS);
-	enable_register = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, PM1_EN);
+	gpe_status = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_STATUS);
+	gpe_enable = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_ENABLE);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
 		"Fixed Acpi_event Block: Enable %08X Status %08X\n",
-		enable_register, status_register));
+		gpe_enable, gpe_status));
 
+	/*
+	 * Check for all possible Fixed Events and dispatch those that are active
+	 */
+	for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
+		/* Both the status and enable bits must be on for this event */
 
-	/* power management timer roll over */
+		if ((gpe_status & acpi_gbl_fixed_event_info[i].status_bit_mask) &&
+			(gpe_enable & acpi_gbl_fixed_event_info[i].enable_bit_mask)) {
+			/* Found an active (signalled) event */
 
-	if ((status_register & ACPI_STATUS_PMTIMER) &&
-		(enable_register & ACPI_ENABLE_PMTIMER)) {
-		int_status |= acpi_ev_fixed_event_dispatch (ACPI_EVENT_PMTIMER);
-	}
-
-	/* global event (BIOS wants the global lock) */
-
-	if ((status_register & ACPI_STATUS_GLOBAL) &&
-		(enable_register & ACPI_ENABLE_GLOBAL)) {
-		int_status |= acpi_ev_fixed_event_dispatch (ACPI_EVENT_GLOBAL);
-	}
-
-	/* power button event */
-
-	if ((status_register & ACPI_STATUS_POWER_BUTTON) &&
-		(enable_register & ACPI_ENABLE_POWER_BUTTON)) {
-		int_status |= acpi_ev_fixed_event_dispatch (ACPI_EVENT_POWER_BUTTON);
-	}
-
-	/* sleep button event */
-
-	if ((status_register & ACPI_STATUS_SLEEP_BUTTON) &&
-		(enable_register & ACPI_ENABLE_SLEEP_BUTTON)) {
-		int_status |= acpi_ev_fixed_event_dispatch (ACPI_EVENT_SLEEP_BUTTON);
+			int_status |= acpi_ev_fixed_event_dispatch (i);
+		}
 	}
 
 	return (int_status);
@@ -240,60 +252,32 @@ u32
 acpi_ev_fixed_event_dispatch (
 	u32                     event)
 {
-	u32                     register_id;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Clear the status bit */
 
-	switch (event) {
-	case ACPI_EVENT_PMTIMER:
-		register_id = TMR_STS;
-		break;
-
-	case ACPI_EVENT_GLOBAL:
-		register_id = GBL_STS;
-		break;
-
-	case ACPI_EVENT_POWER_BUTTON:
-		register_id = PWRBTN_STS;
-		break;
-
-	case ACPI_EVENT_SLEEP_BUTTON:
-		register_id = SLPBTN_STS;
-		break;
-
-	case ACPI_EVENT_RTC:
-		register_id = RTC_STS;
-		break;
-
-	default:
-		return 0;
-		break;
-	}
-
-	acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK, register_id, 1);
+	acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[event].status_register_id,
+			 1, ACPI_MTX_DO_NOT_LOCK);
 
 	/*
 	 * Make sure we've got a handler.  If not, report an error.
 	 * The event is disabled to prevent further interrupts.
 	 */
 	if (NULL == acpi_gbl_fixed_event_handlers[event].handler) {
-		register_id = (PM1_EN | REGISTER_BIT_ID(register_id));
+		acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[event].enable_register_id,
+				0, ACPI_MTX_DO_NOT_LOCK);
 
-		acpi_hw_register_bit_access (ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK,
-				 register_id, 0);
-
-		REPORT_ERROR (
+		ACPI_REPORT_ERROR (
 			("Ev_gpe_dispatch: No installed handler for fixed event [%08X]\n",
 			event));
 
-		return (INTERRUPT_NOT_HANDLED);
+		return (ACPI_INTERRUPT_NOT_HANDLED);
 	}
 
-	/* Invoke the handler */
+	/* Invoke the Fixed Event handler */
 
 	return ((acpi_gbl_fixed_event_handlers[event].handler)(
 			  acpi_gbl_fixed_event_handlers[event].context));
@@ -315,138 +299,171 @@ acpi_ev_fixed_event_dispatch (
 acpi_status
 acpi_ev_gpe_initialize (void)
 {
-	u32                     i;
-	u32                     j;
-	u32                     register_index;
+	NATIVE_UINT             i;
+	NATIVE_UINT             j;
+	NATIVE_UINT             gpe_block;
+	u32                     gpe_register;
+	u32                     gpe_number_index;
 	u32                     gpe_number;
-	u16                     gpe0register_count;
-	u16                     gpe1_register_count;
+	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
 
 
-	FUNCTION_TRACE ("Ev_gpe_initialize");
+	ACPI_FUNCTION_TRACE ("Ev_gpe_initialize");
+
 
 	/*
-	 * Set up various GPE counts
+	 * Initialize the GPE Block globals
 	 *
-	 * You may ask,why are the GPE register block lengths divided by 2?
-	 * From the ACPI 2.0 Spec, section, 4.7.1.6 General-Purpose Event
-	 * Registers, we have,
+	 * Why the GPE register block lengths divided by 2:  From the ACPI Spec,
+	 * section "General-Purpose Event Registers", we have:
 	 *
 	 * "Each register block contains two registers of equal length
-	 * GPEx_STS and GPEx_EN (where x is 0 or 1). The length of the
-	 * GPE0_STS and GPE0_EN registers is equal to half the GPE0_LEN
-	 * The length of the GPE1_STS and GPE1_EN registers is equal to
-	 * half the GPE1_LEN. If a generic register block is not supported
-	 * then its respective block pointer and block length values in the
-	 * FADT table contain zeros. The GPE0_LEN and GPE1_LEN do not need
-	 * to be the same size."
+	 *  GPEx_STS and GPEx_EN (where x is 0 or 1). The length of the
+	 *  GPE0_STS and GPE0_EN registers is equal to half the GPE0_LEN
+	 *  The length of the GPE1_STS and GPE1_EN registers is equal to
+	 *  half the GPE1_LEN. If a generic register block is not supported
+	 *  then its respective block pointer and block length values in the
+	 *  FADT table contain zeros. The GPE0_LEN and GPE1_LEN do not need
+	 *  to be the same size."
 	 */
-	gpe0register_count          = (u16) DIV_2 (acpi_gbl_FADT->gpe0blk_len);
-	gpe1_register_count         = (u16) DIV_2 (acpi_gbl_FADT->gpe1_blk_len);
-	acpi_gbl_gpe_register_count = gpe0register_count + gpe1_register_count;
+	acpi_gbl_gpe_block_info[0].register_count = (u16) ACPI_DIV_2 (acpi_gbl_FADT->gpe0_blk_len);
+	acpi_gbl_gpe_block_info[1].register_count = (u16) ACPI_DIV_2 (acpi_gbl_FADT->gpe1_blk_len);
 
+	acpi_gbl_gpe_block_info[0].block_address = (u16) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0_blk.address);
+	acpi_gbl_gpe_block_info[1].block_address = (u16) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address);
+
+	acpi_gbl_gpe_block_info[0].block_base_number = 0;
+	acpi_gbl_gpe_block_info[1].block_base_number = acpi_gbl_FADT->gpe1_base;
+
+	acpi_gbl_gpe_register_count = acpi_gbl_gpe_block_info[0].register_count +
+			 acpi_gbl_gpe_block_info[1].register_count;
 	if (!acpi_gbl_gpe_register_count) {
-		REPORT_WARNING (("Zero GPEs are defined in the FADT\n"));
+		ACPI_REPORT_WARNING (("Zero GPEs are defined in the FADT\n"));
 		return_ACPI_STATUS (AE_OK);
 	}
 
+	/* Determine the maximum GPE number for this machine */
+
+	acpi_gbl_gpe_number_max = ACPI_MUL_8 (acpi_gbl_gpe_block_info[0].register_count) - 1;
+
+	if (acpi_gbl_gpe_block_info[1].register_count) {
+		/* Check for GPE0/GPE1 overlap */
+
+		if (acpi_gbl_gpe_number_max >= acpi_gbl_FADT->gpe1_base) {
+			ACPI_REPORT_ERROR (("GPE0 block overlaps the GPE1 block\n"));
+			return_ACPI_STATUS (AE_BAD_VALUE);
+		}
+
+		/* GPE0 and GPE1 do not have to be contiguous in the GPE number space */
+
+		acpi_gbl_gpe_number_max = acpi_gbl_FADT->gpe1_base + (ACPI_MUL_8 (acpi_gbl_gpe_block_info[1].register_count) - 1);
+	}
+
+	/* Check for Max GPE number out-of-range */
+
+	if (acpi_gbl_gpe_number_max > ACPI_GPE_MAX) {
+		ACPI_REPORT_ERROR (("Maximum GPE number from FADT is too large: 0x%X\n", acpi_gbl_gpe_number_max));
+		return_ACPI_STATUS (AE_BAD_VALUE);
+	}
+
 	/*
-	 * Allocate the Gpe information block
+	 * Allocate the GPE number-to-index translation table
 	 */
-	acpi_gbl_gpe_registers = ACPI_MEM_CALLOCATE (acpi_gbl_gpe_register_count *
-			  sizeof (acpi_gpe_registers));
-	if (!acpi_gbl_gpe_registers) {
+	acpi_gbl_gpe_number_to_index = ACPI_MEM_CALLOCATE (sizeof (ACPI_GPE_INDEX_INFO) *
+			   (acpi_gbl_gpe_number_max + 1));
+	if (!acpi_gbl_gpe_number_to_index) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Could not allocate the Gpe_registers block\n"));
+			"Could not allocate the Gpe_number_to_index table\n"));
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-	/*
-	 * Allocate the Gpe dispatch handler block
-	 * There are eight distinct GP events per register.
-	 * Initialization to zeros is sufficient
-	 */
-	acpi_gbl_gpe_info = ACPI_MEM_CALLOCATE (MUL_8 (acpi_gbl_gpe_register_count) *
-			  sizeof (acpi_gpe_level_info));
-	if (!acpi_gbl_gpe_info) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_registers);
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not allocate the Gpe_info block\n"));
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
+	/* Set the Gpe index table to GPE_INVALID */
 
-	/* Set the Gpe validation table to GPE_INVALID */
-
-	MEMSET (acpi_gbl_gpe_valid, (int) ACPI_GPE_INVALID, ACPI_NUM_GPE);
+	ACPI_MEMSET (acpi_gbl_gpe_number_to_index, (int) ACPI_GPE_INVALID,
+			sizeof (ACPI_GPE_INDEX_INFO) * (acpi_gbl_gpe_number_max + 1));
 
 	/*
-	 * Initialize the Gpe information and validation blocks.  A goal of these
-	 * blocks is to hide the fact that there are two separate GPE register sets
-	 * In a given block, the status registers occupy the first half, and
-	 * the enable registers occupy the second half.
+	 * Allocate the GPE register information block
 	 */
-
-	/* GPE Block 0 */
-
-	register_index = 0;
-
-	for (i = 0; i < gpe0register_count; i++) {
-		acpi_gbl_gpe_registers[register_index].status_addr =
-				 (u16) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) + i);
-
-		acpi_gbl_gpe_registers[register_index].enable_addr =
-				 (u16) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) + i + gpe0register_count);
-
-		acpi_gbl_gpe_registers[register_index].gpe_base = (u8) MUL_8 (i);
-
-		for (j = 0; j < 8; j++) {
-			gpe_number = acpi_gbl_gpe_registers[register_index].gpe_base + j;
-			acpi_gbl_gpe_valid[gpe_number] = (u8) register_index;
-		}
-
-		/*
-		 * Clear the status/enable registers.  Note that status registers
-		 * are cleared by writing a '1', while enable registers are cleared
-		 * by writing a '0'.
-		 */
-		acpi_os_write_port (acpi_gbl_gpe_registers[register_index].enable_addr, 0x00, 8);
-		acpi_os_write_port (acpi_gbl_gpe_registers[register_index].status_addr, 0xFF, 8);
-
-		register_index++;
+	acpi_gbl_gpe_register_info = ACPI_MEM_CALLOCATE (acpi_gbl_gpe_register_count *
+			  sizeof (ACPI_GPE_REGISTER_INFO));
+	if (!acpi_gbl_gpe_register_info) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Could not allocate the Gpe_register_info table\n"));
+		goto error_exit1;
 	}
 
-	/* GPE Block 1 */
+	/*
+	 * Allocate the GPE dispatch handler block.  There are eight distinct GPEs
+	 * per register.  Initialization to zeros is sufficient.
+	 */
+	acpi_gbl_gpe_number_info = ACPI_MEM_CALLOCATE (ACPI_MUL_8 (acpi_gbl_gpe_register_count) *
+			  sizeof (ACPI_GPE_NUMBER_INFO));
+	if (!acpi_gbl_gpe_number_info) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not allocate the Gpe_number_info table\n"));
+		goto error_exit2;
+	}
 
-	for (i = 0; i < gpe1_register_count; i++) {
-		acpi_gbl_gpe_registers[register_index].status_addr =
-				 (u16) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) + i);
+	/*
+	 * Initialize the GPE information and validation tables.  A goal of these
+	 * tables is to hide the fact that there are two separate GPE register sets
+	 * in a given gpe hardware block, the status registers occupy the first half,
+	 * and the enable registers occupy the second half.  Another goal is to hide
+	 * the fact that there may be multiple GPE hardware blocks.
+	 */
+	gpe_register = 0;
+	gpe_number_index = 0;
 
-		acpi_gbl_gpe_registers[register_index].enable_addr =
-				 (u16) (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) + i + gpe1_register_count);
+	for (gpe_block = 0; gpe_block < ACPI_MAX_GPE_BLOCKS; gpe_block++) {
+		for (i = 0; i < acpi_gbl_gpe_block_info[gpe_block].register_count; i++) {
+			gpe_register_info = &acpi_gbl_gpe_register_info[gpe_register];
 
-		acpi_gbl_gpe_registers[register_index].gpe_base =
-				 (u8) (acpi_gbl_FADT->gpe1_base + MUL_8 (i));
+			/* Init the Register info for this entire GPE register (8 GPEs) */
 
-		for (j = 0; j < 8; j++) {
-			gpe_number = acpi_gbl_gpe_registers[register_index].gpe_base + j;
-			acpi_gbl_gpe_valid[gpe_number] = (u8) register_index;
+			gpe_register_info->base_gpe_number = (u8) (acpi_gbl_gpe_block_info[gpe_block].block_base_number + (ACPI_MUL_8 (i)));
+			gpe_register_info->status_addr = (u16) (acpi_gbl_gpe_block_info[gpe_block].block_address + i);
+			gpe_register_info->enable_addr = (u16) (acpi_gbl_gpe_block_info[gpe_block].block_address + i +
+					  acpi_gbl_gpe_block_info[gpe_block].register_count);
+
+			/* Init the Index mapping info for each GPE number within this register */
+
+			for (j = 0; j < 8; j++) {
+				gpe_number = gpe_register_info->base_gpe_number + j;
+				acpi_gbl_gpe_number_to_index[gpe_number].number_index = (u8) gpe_number_index;
+
+				acpi_gbl_gpe_number_info[gpe_number_index].bit_mask = acpi_gbl_decode_to8bit[j];
+				gpe_number_index++;
+			}
+
+			/*
+			 * Clear the status/enable registers.  Note that status registers
+			 * are cleared by writing a '1', while enable registers are cleared
+			 * by writing a '0'.
+			 */
+			acpi_os_write_port (gpe_register_info->enable_addr, 0x00, 8);
+			acpi_os_write_port (gpe_register_info->status_addr, 0xFF, 8);
+
+			gpe_register++;
 		}
-
-		/*
-		 * Clear the status/enable registers.  Note that status registers
-		 * are cleared by writing a '1', while enable registers are cleared
-		 * by writing a '0'.
-		 */
-		acpi_os_write_port (acpi_gbl_gpe_registers[register_index].enable_addr, 0x00, 8);
-		acpi_os_write_port (acpi_gbl_gpe_registers[register_index].status_addr, 0xFF, 8);
-
-		register_index++;
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE registers: %X@%8.8X%8.8X (Blk0) %X@%8.8X%8.8X (Blk1)\n",
-		gpe0register_count, HIDWORD(acpi_gbl_FADT->Xgpe0blk.address), LODWORD(acpi_gbl_FADT->Xgpe0blk.address),
-		gpe1_register_count, HIDWORD(acpi_gbl_FADT->Xgpe1_blk.address), LODWORD(acpi_gbl_FADT->Xgpe1_blk.address)));
+		acpi_gbl_gpe_block_info[0].register_count,
+		ACPI_HIDWORD (acpi_gbl_FADT->Xgpe0_blk.address), ACPI_LODWORD (acpi_gbl_FADT->Xgpe0_blk.address),
+		acpi_gbl_gpe_block_info[1].register_count,
+		ACPI_HIDWORD (acpi_gbl_FADT->Xgpe1_blk.address), ACPI_LODWORD (acpi_gbl_FADT->Xgpe1_blk.address)));
 
 	return_ACPI_STATUS (AE_OK);
+
+
+	/* Error cleanup */
+
+error_exit2:
+	ACPI_MEM_FREE (acpi_gbl_gpe_register_info);
+
+error_exit1:
+	ACPI_MEM_FREE (acpi_gbl_gpe_number_to_index);
+	return_ACPI_STATUS (AE_NO_MEMORY);
 }
 
 
@@ -468,7 +485,7 @@ acpi_ev_gpe_initialize (void)
  *              Where:
  *                  L      - means that the GPE is level triggered
  *                  E      - means that the GPE is edge triggered
- *                  nn     - is the GPE number
+ *                  nn     - is the GPE number [in HEX]
  *
  ******************************************************************************/
 
@@ -480,28 +497,33 @@ acpi_ev_save_method_info (
 	void                    **return_value)
 {
 	u32                     gpe_number;
+	u32                     gpe_number_index;
 	NATIVE_CHAR             name[ACPI_NAME_SIZE + 1];
 	u8                      type;
 
 
-	PROC_NAME ("Ev_save_method_info");
+	ACPI_FUNCTION_NAME ("Ev_save_method_info");
 
 
 	/* Extract the name from the object and convert to a string */
 
-	MOVE_UNALIGNED32_TO_32 (name, &((acpi_namespace_node *) obj_handle)->name);
+	ACPI_MOVE_UNALIGNED32_TO_32 (name,
+			  &((acpi_namespace_node *) obj_handle)->name);
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
-	 * Edge/Level determination is based on the 2nd s8 of the method name
+	 * Edge/Level determination is based on the 2nd character of the method name
 	 */
-	if (name[1] == 'L') {
+	switch (name[1]) {
+	case 'L':
 		type = ACPI_EVENT_LEVEL_TRIGGERED;
-	}
-	else if (name[1] == 'E') {
+		break;
+
+	case 'E':
 		type = ACPI_EVENT_EDGE_TRIGGERED;
-	}
-	else {
+		break;
+
+	default:
 		/* Unknown method type, just ignore it! */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -510,9 +532,9 @@ acpi_ev_save_method_info (
 		return (AE_OK);
 	}
 
-	/* Convert the last two characters of the name to the Gpe Number */
+	/* Convert the last two characters of the name to the GPE Number */
 
-	gpe_number = STRTOUL (&name[2], NULL, 16);
+	gpe_number = ACPI_STRTOUL (&name[2], NULL, 16);
 	if (gpe_number == ACPI_UINT32_MAX) {
 		/* Conversion failed; invalid method, just ignore it */
 
@@ -522,9 +544,10 @@ acpi_ev_save_method_info (
 		return (AE_OK);
 	}
 
-	/* Ensure that we have a valid GPE number */
+	/* Get GPE index and ensure that we have a valid GPE number */
 
-	if (acpi_gbl_gpe_valid[gpe_number] == ACPI_GPE_INVALID) {
+	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
+	if (gpe_number_index == ACPI_GPE_INVALID) {
 		/* Not valid, all we can do here is ignore it */
 
 		return (AE_OK);
@@ -534,9 +557,8 @@ acpi_ev_save_method_info (
 	 * Now we can add this information to the Gpe_info block
 	 * for use during dispatch of this GPE.
 	 */
-	acpi_gbl_gpe_info [gpe_number].type         = type;
-	acpi_gbl_gpe_info [gpe_number].method_handle = obj_handle;
-
+	acpi_gbl_gpe_number_info [gpe_number_index].type    = type;
+	acpi_gbl_gpe_number_info [gpe_number_index].method_handle = obj_handle;
 
 	/*
 	 * Enable the GPE (SCIs should be disabled at this point)
@@ -555,10 +577,9 @@ acpi_ev_save_method_info (
  *
  * PARAMETERS:  None
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: Obtain the control methods associated with the GPEs.
- *
  *              NOTE: Must be called AFTER namespace initialization!
  *
  ******************************************************************************/
@@ -569,7 +590,7 @@ acpi_ev_init_gpe_control_methods (void)
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ev_init_gpe_control_methods");
+	ACPI_FUNCTION_TRACE ("Ev_init_gpe_control_methods");
 
 
 	/* Get a permanent handle to the _GPE object */
@@ -597,21 +618,23 @@ acpi_ev_init_gpe_control_methods (void)
  *
  * RETURN:      INTERRUPT_HANDLED or INTERRUPT_NOT_HANDLED
  *
- * DESCRIPTION: Detect if any GP events have occurred
+ * DESCRIPTION: Detect if any GP events have occurred.  This function is
+ *              executed at interrupt level.
  *
  ******************************************************************************/
 
 u32
 acpi_ev_gpe_detect (void)
 {
-	u32                     int_status = INTERRUPT_NOT_HANDLED;
+	u32                     int_status = ACPI_INTERRUPT_NOT_HANDLED;
 	u32                     i;
 	u32                     j;
 	u8                      enabled_status_byte;
 	u8                      bit_mask;
+	ACPI_GPE_REGISTER_INFO  *gpe_register_info;
 
 
-	PROC_NAME ("Ev_gpe_detect");
+	ACPI_FUNCTION_NAME ("Ev_gpe_detect");
 
 
 	/*
@@ -620,23 +643,24 @@ acpi_ev_gpe_detect (void)
 	 * Find all currently active GP events.
 	 */
 	for (i = 0; i < acpi_gbl_gpe_register_count; i++) {
-		acpi_os_read_port (acpi_gbl_gpe_registers[i].status_addr,
-				&acpi_gbl_gpe_registers[i].status, 8);
+		gpe_register_info = &acpi_gbl_gpe_register_info[i];
 
-		acpi_os_read_port (acpi_gbl_gpe_registers[i].enable_addr,
-				&acpi_gbl_gpe_registers[i].enable, 8);
+		acpi_os_read_port (gpe_register_info->status_addr,
+				  &gpe_register_info->status, 8);
+
+		acpi_os_read_port (gpe_register_info->enable_addr,
+				  &gpe_register_info->enable, 8);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
 			"GPE block at %X - Enable %08X Status %08X\n",
-			acpi_gbl_gpe_registers[i].enable_addr,
-			acpi_gbl_gpe_registers[i].status,
-			acpi_gbl_gpe_registers[i].enable));
+			gpe_register_info->enable_addr,
+			gpe_register_info->status,
+			gpe_register_info->enable));
 
 		/* First check if there is anything active at all in this register */
 
-		enabled_status_byte = (u8) (acpi_gbl_gpe_registers[i].status &
-				   acpi_gbl_gpe_registers[i].enable);
-
+		enabled_status_byte = (u8) (gpe_register_info->status &
+				   gpe_register_info->enable);
 		if (!enabled_status_byte) {
 			/* No active GPEs in this register, move on */
 
@@ -654,7 +678,7 @@ acpi_ev_gpe_detect (void)
 				 * or method.
 				 */
 				int_status |= acpi_ev_gpe_dispatch (
-						  acpi_gbl_gpe_registers[i].gpe_base + j);
+						  gpe_register_info->base_gpe_number + j);
 			}
 		}
 	}
@@ -667,7 +691,7 @@ acpi_ev_gpe_detect (void)
  *
  * FUNCTION:    Acpi_ev_asynch_execute_gpe_method
  *
- * PARAMETERS:  Gpe_number      - The 0-based Gpe number
+ * PARAMETERS:  Gpe_number      - The 0-based GPE number
  *
  * RETURN:      None
  *
@@ -679,38 +703,49 @@ acpi_ev_gpe_detect (void)
  *
  ******************************************************************************/
 
-static void
+static void ACPI_SYSTEM_XFACE
 acpi_ev_asynch_execute_gpe_method (
 	void                    *context)
 {
-	u32                     gpe_number = (u32) context;
-	acpi_gpe_level_info     gpe_info;
+	u32                     gpe_number = (u32) ACPI_TO_INTEGER (context);
+	u32                     gpe_number_index;
+	ACPI_GPE_NUMBER_INFO    gpe_info;
 
 
-	FUNCTION_TRACE ("Ev_asynch_execute_gpe_method");
+	ACPI_FUNCTION_TRACE ("Ev_asynch_execute_gpe_method");
 
-	/*
-	 * Take a snapshot of the GPE info for this level
-	 */
-	acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	gpe_info = acpi_gbl_gpe_info [gpe_number];
-	acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 
-	/*
-	 * Method Handler (_Lxx, _Exx):
-	 * ----------------------------
-	 * Evaluate the _Lxx/_Exx control method that corresponds to this GPE.
-	 */
-	if (gpe_info.method_handle) {
-		acpi_ns_evaluate_by_handle (gpe_info.method_handle, NULL, NULL);
+	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
+	if (gpe_number_index == ACPI_GPE_INVALID) {
+		return_VOID;
 	}
 
 	/*
-	 * Level-Triggered?
-	 * ----------------
-	 * If level-triggered we clear the GPE status bit after handling the event.
+	 * Take a snapshot of the GPE info for this level - we copy the
+	 * info to prevent a race condition with Remove_handler.
 	 */
+	if (ACPI_FAILURE (acpi_ut_acquire_mutex (ACPI_MTX_EVENTS))) {
+		return_VOID;
+	}
+
+	gpe_info = acpi_gbl_gpe_number_info [gpe_number_index];
+	if (ACPI_FAILURE (acpi_ut_release_mutex (ACPI_MTX_EVENTS))) {
+		return_VOID;
+	}
+
+	if (gpe_info.method_handle) {
+		/*
+		 * Invoke the GPE Method (_Lxx, _Exx):
+		 * (Evaluate the _Lxx/_Exx control method that corresponds to this GPE.)
+		 */
+		acpi_ns_evaluate_by_handle (gpe_info.method_handle, NULL, NULL);
+	}
+
 	if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
+		/*
+		 * GPE is level-triggered, we clear the GPE status bit after handling
+		 * the event.
+		 */
 		acpi_hw_clear_gpe (gpe_number);
 	}
 
@@ -718,7 +753,6 @@ acpi_ev_asynch_execute_gpe_method (
 	 * Enable the GPE.
 	 */
 	acpi_hw_enable_gpe (gpe_number);
-
 	return_VOID;
 }
 
@@ -727,18 +761,13 @@ acpi_ev_asynch_execute_gpe_method (
  *
  * FUNCTION:    Acpi_ev_gpe_dispatch
  *
- * PARAMETERS:  Gpe_number      - The 0-based Gpe number
+ * PARAMETERS:  Gpe_number      - The 0-based GPE number
  *
  * RETURN:      INTERRUPT_HANDLED or INTERRUPT_NOT_HANDLED
  *
- * DESCRIPTION: Handle and dispatch a General Purpose Acpi_event.
- *              Clears the status bit for the requested event.
- *
- * TBD: [Investigate] is this still valid or necessary:
- * The Gpe handler differs from the fixed events in that it clears the enable
- * bit rather than the status bit to clear the interrupt.  This allows
- * software outside of interrupt context to determine what caused the SCI and
- * dispatch the correct AML.
+ * DESCRIPTION: Dispatch a General Purpose Event to either a function (e.g. EC)
+ *              or method (e.g. _Lxx/_Exx) handler.  This function executes
+ *              at interrupt level.
  *
  ******************************************************************************/
 
@@ -746,82 +775,79 @@ u32
 acpi_ev_gpe_dispatch (
 	u32                     gpe_number)
 {
-	acpi_gpe_level_info     gpe_info;
+	u32                     gpe_number_index;
+	ACPI_GPE_NUMBER_INFO    *gpe_info;
 
 
-	FUNCTION_TRACE ("Ev_gpe_dispatch");
+	ACPI_FUNCTION_TRACE ("Ev_gpe_dispatch");
 
 
-	/*
-	 * Valid GPE number?
-	 */
-	if (acpi_gbl_gpe_valid[gpe_number] == ACPI_GPE_INVALID) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid GPE bit [%X].\n", gpe_number));
-		return_VALUE (INTERRUPT_NOT_HANDLED);
+	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
+	if (gpe_number_index == ACPI_GPE_INVALID) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid event, GPE[%X].\n", gpe_number));
+		return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
 	}
 
 	/*
-	 * Disable the GPE.
+	 * We don't have to worry about mutex on Gpe_info because we are
+	 * executing at interrupt level.
 	 */
-	acpi_hw_disable_gpe (gpe_number);
-
-	gpe_info = acpi_gbl_gpe_info [gpe_number];
+	gpe_info = &acpi_gbl_gpe_number_info [gpe_number_index];
 
 	/*
-	 * Edge-Triggered?
-	 * ---------------
 	 * If edge-triggered, clear the GPE status bit now.  Note that
 	 * level-triggered events are cleared after the GPE is serviced.
 	 */
-	if (gpe_info.type & ACPI_EVENT_EDGE_TRIGGERED) {
+	if (gpe_info->type & ACPI_EVENT_EDGE_TRIGGERED) {
 		acpi_hw_clear_gpe (gpe_number);
 	}
+
+	/*
+	 * Dispatch the GPE to either an installed handler, or the control
+	 * method associated with this GPE (_Lxx or _Exx).
+	 * If a handler exists, we invoke it and do not attempt to run the method.
+	 * If there is neither a handler nor a method, we disable the level to
+	 * prevent further events from coming in here.
+	 */
+	if (gpe_info->handler) {
+		/* Invoke the installed handler (at interrupt level) */
+
+		gpe_info->handler (gpe_info->context);
+	}
+	else if (gpe_info->method_handle) {
 		/*
-		 * Function Handler (e.g. EC)?
+		 * Execute the method associated with the GPE.
 		 */
-	if (gpe_info.handler) {
-		/* Invoke function handler (at interrupt level). */
+		if (ACPI_FAILURE (acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
+				 acpi_ev_asynch_execute_gpe_method,
+				 ACPI_TO_POINTER (gpe_number)))) {
+			ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE[%X], disabling event\n", gpe_number));
 
-		gpe_info.handler (gpe_info.context);
-
-		/* Level-Triggered? */
-
-		if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
-			acpi_hw_clear_gpe (gpe_number);
-		}
-
-		/* Enable GPE */
-
-		acpi_hw_enable_gpe (gpe_number);
-	}
-
-	/*
-	 * Method Handler (e.g. _Exx/_Lxx)?
-	 */
-	else if (gpe_info.method_handle) {
-		if (ACPI_FAILURE(acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
-			acpi_ev_asynch_execute_gpe_method, (void*) gpe_number))) {
 			/*
-			 * Shoudn't occur, but if it does report an error. Note that
-			 * the GPE will remain disabled until the ACPI Core Subsystem
-			 * is restarted, or the handler is removed/reinstalled.
+			 * Disable the GPE on error.  The GPE will remain disabled until the ACPI
+			 * Core Subsystem is restarted, or the handler is reinstalled.
 			 */
-			REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE bit [%X]\n", gpe_number));
+			acpi_hw_disable_gpe (gpe_number);
 		}
+	}
+	else {
+		/* No handler or method to run! */
+
+		ACPI_REPORT_ERROR (("Acpi_ev_gpe_dispatch: No handler or method for GPE[%X], disabling event\n", gpe_number));
+
+		/*
+		 * Disable the GPE.  The GPE will remain disabled until the ACPI
+		 * Core Subsystem is restarted, or the handler is reinstalled.
+		 */
+		acpi_hw_disable_gpe (gpe_number);
 	}
 
 	/*
-	 * No Handler? Report an error and leave the GPE disabled.
+	 * It is now safe to clear level-triggered evnets.
 	 */
-	else {
-		REPORT_ERROR (("Acpi_ev_gpe_dispatch: No installed handler for GPE [%X]\n", gpe_number));
-
-		/* Level-Triggered? */
-
-		if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
-			acpi_hw_clear_gpe (gpe_number);
-		}
+	if (gpe_info->type & ACPI_EVENT_LEVEL_TRIGGERED) {
+		acpi_hw_clear_gpe (gpe_number);
 	}
 
-	return_VALUE (INTERRUPT_HANDLED);
+	return_VALUE (ACPI_INTERRUPT_HANDLED);
 }

@@ -39,13 +39,12 @@ static void autofs_put_super(struct super_block *sb)
 	DPRINTK(("autofs: shutting down\n"));
 }
 
-static int autofs_statfs(struct super_block *sb, struct statfs *buf);
 static void autofs_read_inode(struct inode *inode);
 
 static struct super_operations autofs_sops = {
 	read_inode:	autofs_read_inode,
 	put_super:	autofs_put_super,
-	statfs:		autofs_statfs,
+	statfs:		simple_statfs,
 };
 
 static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid, pid_t *pgrp, int *minproto, int *maxproto)
@@ -191,14 +190,6 @@ fail_unlock:
 	return -EINVAL;
 }
 
-static int autofs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = AUTOFS_SUPER_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_namelen = NAME_MAX;
-	return 0;
-}
-
 static void autofs_read_inode(struct inode *inode)
 {
 	ino_t ino = inode->i_ino;
@@ -207,8 +198,8 @@ static void autofs_read_inode(struct inode *inode)
 
 	/* Initialize to the default case (stub directory) */
 
-	inode->i_op = &autofs_dir_inode_operations;
-	inode->i_fop = &autofs_dir_operations;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
 	inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO;
 	inode->i_nlink = 2;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;

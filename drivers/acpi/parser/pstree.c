@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: pstree - Parser op tree manipulation/traversal/search
- *              $Revision: 35 $
+ *              $Revision: 37 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 #include "amlcode.h"
 
 #define _COMPONENT          ACPI_PARSER
-	 MODULE_NAME         ("pstree")
+	 ACPI_MODULE_NAME    ("pstree")
 
 
 /*******************************************************************************
@@ -54,7 +54,7 @@ acpi_ps_get_arg (
 	const acpi_opcode_info  *op_info;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* Get the info structure for this opcode */
@@ -108,7 +108,7 @@ acpi_ps_append_arg (
 	const acpi_opcode_info  *op_info;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if (!op) {
@@ -121,7 +121,7 @@ acpi_ps_append_arg (
 	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Invalid opcode */
 
-		REPORT_ERROR (("Ps_append_arg: Invalid AML Opcode: 0x%2.2X\n", op->opcode));
+		ACPI_REPORT_ERROR (("Ps_append_arg: Invalid AML Opcode: 0x%2.2X\n", op->opcode));
 		return;
 	}
 
@@ -181,7 +181,7 @@ acpi_ps_get_child (
 	acpi_parse_object       *child = NULL;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	switch (op->opcode) {
@@ -249,7 +249,7 @@ acpi_ps_get_depth_next (
 	acpi_parse_object       *arg;
 
 
-	FUNCTION_ENTRY ();
+	ACPI_FUNCTION_ENTRY ();
 
 
 	if (!op) {

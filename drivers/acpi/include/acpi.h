@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acpi.h - Master include file, Publics and external data.
- *       $Revision: 54 $
+ *       $Revision: 55 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

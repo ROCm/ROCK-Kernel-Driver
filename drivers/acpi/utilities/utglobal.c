@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 133 $
+ *              $Revision: 153 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 
 
 #define _COMPONENT          ACPI_UTILITIES
-	 MODULE_NAME         ("utglobal")
+	 ACPI_MODULE_NAME    ("utglobal")
 
 
 /******************************************************************************
@@ -136,10 +136,9 @@ u8                          acpi_gbl_method_executing = FALSE;
 
 /* System flags */
 
-u32                         acpi_gbl_system_flags = 0;
 u32                         acpi_gbl_startup_flags = 0;
 
-/* System starts unitialized! */
+/* System starts uninitialized */
 
 u8                          acpi_gbl_shutdown = TRUE;
 
@@ -168,7 +167,7 @@ const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
  *    during the initialization sequence.
  */
 
-const predefined_names      acpi_gbl_pre_defined_names[] =
+const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
 { {"_GPE",    INTERNAL_TYPE_DEF_ANY},
 	{"_PR_",    INTERNAL_TYPE_DEF_ANY},
 	{"_SB_",    ACPI_TYPE_DEVICE},
@@ -188,44 +187,45 @@ const predefined_names      acpi_gbl_pre_defined_names[] =
  * and the table is indexed by values of acpi_object_type
  */
 
-const u8                    acpi_gbl_ns_properties[] =
+const u8                        acpi_gbl_ns_properties[] =
 {
-	NSP_NORMAL,                 /* 00 Any              */
-	NSP_NORMAL,                 /* 01 Number           */
-	NSP_NORMAL,                 /* 02 String           */
-	NSP_NORMAL,                 /* 03 Buffer           */
-	NSP_LOCAL,                  /* 04 Package          */
-	NSP_NORMAL,                 /* 05 Field_unit       */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 06 Device           */
-	NSP_LOCAL,                  /* 07 Acpi_event       */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 08 Method           */
-	NSP_LOCAL,                  /* 09 Mutex            */
-	NSP_LOCAL,                  /* 10 Region           */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 11 Power            */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 12 Processor        */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 13 Thermal          */
-	NSP_NORMAL,                 /* 14 Buffer_field     */
-	NSP_NORMAL,                 /* 15 Ddb_handle       */
-	NSP_NORMAL,                 /* 16 Debug Object     */
-	NSP_NORMAL,                 /* 17 Def_field        */
-	NSP_NORMAL,                 /* 18 Bank_field       */
-	NSP_NORMAL,                 /* 19 Index_field      */
-	NSP_NORMAL,                 /* 20 Reference        */
-	NSP_NORMAL,                 /* 21 Alias            */
-	NSP_NORMAL,                 /* 22 Notify           */
-	NSP_NORMAL,                 /* 23 Address Handler  */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 24 Resource Desc    */
-	NSP_NEWSCOPE | NSP_LOCAL,   /* 25 Resource Field   */
-	NSP_NORMAL,                 /* 26 Def_field_defn   */
-	NSP_NORMAL,                 /* 27 Bank_field_defn  */
-	NSP_NORMAL,                 /* 28 Index_field_defn */
-	NSP_NORMAL,                 /* 29 If               */
-	NSP_NORMAL,                 /* 30 Else             */
-	NSP_NORMAL,                 /* 31 While            */
-	NSP_NEWSCOPE,               /* 32 Scope            */
-	NSP_LOCAL,                  /* 33 Def_any          */
-	NSP_NORMAL,                 /* 34 Extra            */
-	NSP_NORMAL                  /* 35 Invalid          */
+	ACPI_NS_NORMAL,                     /* 00 Any              */
+	ACPI_NS_NORMAL,                     /* 01 Number           */
+	ACPI_NS_NORMAL,                     /* 02 String           */
+	ACPI_NS_NORMAL,                     /* 03 Buffer           */
+	ACPI_NS_LOCAL,                      /* 04 Package          */
+	ACPI_NS_NORMAL,                     /* 05 Field_unit       */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 06 Device           */
+	ACPI_NS_LOCAL,                      /* 07 Acpi_event       */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 08 Method           */
+	ACPI_NS_LOCAL,                      /* 09 Mutex            */
+	ACPI_NS_LOCAL,                      /* 10 Region           */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 11 Power            */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 12 Processor        */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 13 Thermal          */
+	ACPI_NS_NORMAL,                     /* 14 Buffer_field     */
+	ACPI_NS_NORMAL,                     /* 15 Ddb_handle       */
+	ACPI_NS_NORMAL,                     /* 16 Debug Object     */
+	ACPI_NS_NORMAL,                     /* 17 Def_field        */
+	ACPI_NS_NORMAL,                     /* 18 Bank_field       */
+	ACPI_NS_NORMAL,                     /* 19 Index_field      */
+	ACPI_NS_NORMAL,                     /* 20 Reference        */
+	ACPI_NS_NORMAL,                     /* 21 Alias            */
+	ACPI_NS_NORMAL,                     /* 22 Notify           */
+	ACPI_NS_NORMAL,                     /* 23 Address Handler  */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 24 Resource Desc    */
+	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 25 Resource Field   */
+	ACPI_NS_NORMAL,                     /* 26 Def_field_defn   */
+	ACPI_NS_NORMAL,                     /* 27 Bank_field_defn  */
+	ACPI_NS_NORMAL,                     /* 28 Index_field_defn */
+	ACPI_NS_NORMAL,                     /* 29 If               */
+	ACPI_NS_NORMAL,                     /* 30 Else             */
+	ACPI_NS_NORMAL,                     /* 31 While            */
+	ACPI_NS_NEWSCOPE,                   /* 32 Scope            */
+	ACPI_NS_LOCAL,                      /* 33 Def_any          */
+	ACPI_NS_NORMAL,                     /* 34 Extra            */
+	ACPI_NS_NORMAL,                     /* 35 Data             */
+	ACPI_NS_NORMAL                      /* 36 Invalid          */
 };
 
 
@@ -261,11 +261,14 @@ acpi_ut_hex_to_ascii_char (
 
 /******************************************************************************
  *
- * Table globals
+ * Table name globals
  *
  * NOTE: This table includes ONLY the ACPI tables that the subsystem consumes.
  * it is NOT an exhaustive list of all possible ACPI tables.  All ACPI tables
  * that are not used by the subsystem are simply ignored.
+ *
+ * Do NOT add any table to this list that is not consumed directly by this
+ * subsystem.
  *
  ******************************************************************************/
 
@@ -275,16 +278,145 @@ acpi_table_desc             acpi_gbl_acpi_tables[NUM_ACPI_TABLES];
 
 ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES] =
 {
-	/***********    Name,    Signature,  Signature size,    How many allowed?,   Supported?  Global typed pointer */
+	/***********    Name,   Signature, Global typed pointer     Signature size,      How many allowed?,    Contains valid AML? */
 
-	/* RSDP 0 */ {RSDP_NAME, RSDP_SIG, sizeof (RSDP_SIG)-1, ACPI_TABLE_SINGLE,   AE_OK,      NULL},
-	/* DSDT 1 */ {DSDT_SIG,  DSDT_SIG, sizeof (DSDT_SIG)-1, ACPI_TABLE_SINGLE,   AE_OK,      (void **) &acpi_gbl_DSDT},
-	/* FADT 2 */ {FADT_SIG,  FADT_SIG, sizeof (FADT_SIG)-1, ACPI_TABLE_SINGLE,   AE_OK,      (void **) &acpi_gbl_FADT},
-	/* FACS 3 */ {FACS_SIG,  FACS_SIG, sizeof (FACS_SIG)-1, ACPI_TABLE_SINGLE,   AE_OK,      (void **) &acpi_gbl_FACS},
-	/* PSDT 4 */ {PSDT_SIG,  PSDT_SIG, sizeof (PSDT_SIG)-1, ACPI_TABLE_MULTIPLE, AE_OK,      NULL},
-	/* SSDT 5 */ {SSDT_SIG,  SSDT_SIG, sizeof (SSDT_SIG)-1, ACPI_TABLE_MULTIPLE, AE_OK,      NULL},
-	/* XSDT 6 */ {XSDT_SIG,  XSDT_SIG, sizeof (RSDT_SIG)-1, ACPI_TABLE_SINGLE,   AE_OK,      NULL},
+	/* RSDP 0 */ {RSDP_NAME, RSDP_SIG, NULL,                    sizeof (RSDP_SIG)-1, ACPI_TABLE_SINGLE},
+	/* DSDT 1 */ {DSDT_SIG,  DSDT_SIG, (void **) &acpi_gbl_DSDT, sizeof (DSDT_SIG)-1, ACPI_TABLE_SINGLE  | ACPI_TABLE_EXECUTABLE},
+	/* FADT 2 */ {FADT_SIG,  FADT_SIG, (void **) &acpi_gbl_FADT, sizeof (FADT_SIG)-1, ACPI_TABLE_SINGLE},
+	/* FACS 3 */ {FACS_SIG,  FACS_SIG, (void **) &acpi_gbl_FACS, sizeof (FACS_SIG)-1, ACPI_TABLE_SINGLE},
+	/* PSDT 4 */ {PSDT_SIG,  PSDT_SIG, NULL,                    sizeof (PSDT_SIG)-1, ACPI_TABLE_MULTIPLE | ACPI_TABLE_EXECUTABLE},
+	/* SSDT 5 */ {SSDT_SIG,  SSDT_SIG, NULL,                    sizeof (SSDT_SIG)-1, ACPI_TABLE_MULTIPLE | ACPI_TABLE_EXECUTABLE},
+	/* XSDT 6 */ {XSDT_SIG,  XSDT_SIG, NULL,                    sizeof (RSDT_SIG)-1, ACPI_TABLE_SINGLE},
 };
+
+
+/******************************************************************************
+ *
+ * Event and Hardware globals
+ *
+ ******************************************************************************/
+
+ACPI_BIT_REGISTER_INFO      acpi_gbl_bit_register_info[ACPI_NUM_BITREG] =
+{
+	/* Name                                     Parent Register             Register Bit Position                   Register Bit Mask       */
+
+	/* ACPI_BITREG_TIMER_STATUS         */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_TIMER_STATUS,          ACPI_BITMASK_TIMER_STATUS},
+	/* ACPI_BITREG_BUS_MASTER_STATUS    */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_BUS_MASTER_STATUS,     ACPI_BITMASK_BUS_MASTER_STATUS},
+	/* ACPI_BITREG_GLOBAL_LOCK_STATUS   */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_GLOBAL_LOCK_STATUS,    ACPI_BITMASK_GLOBAL_LOCK_STATUS},
+	/* ACPI_BITREG_POWER_BUTTON_STATUS  */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_POWER_BUTTON_STATUS,   ACPI_BITMASK_POWER_BUTTON_STATUS},
+	/* ACPI_BITREG_SLEEP_BUTTON_STATUS  */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_SLEEP_BUTTON_STATUS,   ACPI_BITMASK_SLEEP_BUTTON_STATUS},
+	/* ACPI_BITREG_RT_CLOCK_STATUS      */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_RT_CLOCK_STATUS,       ACPI_BITMASK_RT_CLOCK_STATUS},
+	/* ACPI_BITREG_WAKE_STATUS          */   {ACPI_REGISTER_PM1_STATUS,   ACPI_BITPOSITION_WAKE_STATUS,           ACPI_BITMASK_WAKE_STATUS},
+
+	/* ACPI_BITREG_TIMER_ENABLE         */   {ACPI_REGISTER_PM1_ENABLE,   ACPI_BITPOSITION_TIMER_ENABLE,          ACPI_BITMASK_TIMER_ENABLE},
+	/* ACPI_BITREG_GLOBAL_LOCK_ENABLE   */   {ACPI_REGISTER_PM1_ENABLE,   ACPI_BITPOSITION_GLOBAL_LOCK_ENABLE,    ACPI_BITMASK_GLOBAL_LOCK_ENABLE},
+	/* ACPI_BITREG_POWER_BUTTON_ENABLE  */   {ACPI_REGISTER_PM1_ENABLE,   ACPI_BITPOSITION_POWER_BUTTON_ENABLE,   ACPI_BITMASK_POWER_BUTTON_ENABLE},
+	/* ACPI_BITREG_SLEEP_BUTTON_ENABLE  */   {ACPI_REGISTER_PM1_ENABLE,   ACPI_BITPOSITION_SLEEP_BUTTON_ENABLE,   ACPI_BITMASK_SLEEP_BUTTON_ENABLE},
+	/* ACPI_BITREG_RT_CLOCK_ENABLE      */   {ACPI_REGISTER_PM1_ENABLE,   ACPI_BITPOSITION_RT_CLOCK_ENABLE,       ACPI_BITMASK_RT_CLOCK_ENABLE},
+	/* ACPI_BITREG_WAKE_ENABLE          */   {ACPI_REGISTER_PM1_ENABLE,   0,                                      0},
+
+	/* ACPI_BITREG_SCI_ENABLE           */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_SCI_ENABLE,            ACPI_BITMASK_SCI_ENABLE},
+	/* ACPI_BITREG_BUS_MASTER_RLD       */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_BUS_MASTER_RLD,        ACPI_BITMASK_BUS_MASTER_RLD},
+	/* ACPI_BITREG_GLOBAL_LOCK_RELEASE  */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_GLOBAL_LOCK_RELEASE,   ACPI_BITMASK_GLOBAL_LOCK_RELEASE},
+	/* ACPI_BITREG_SLEEP_TYPE_A         */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_SLEEP_TYPE_X,          ACPI_BITMASK_SLEEP_TYPE_X},
+	/* ACPI_BITREG_SLEEP_TYPE_B         */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_SLEEP_TYPE_X,          ACPI_BITMASK_SLEEP_TYPE_X},
+	/* ACPI_BITREG_SLEEP_ENABLE         */   {ACPI_REGISTER_PM1_CONTROL,  ACPI_BITPOSITION_SLEEP_ENABLE,          ACPI_BITMASK_SLEEP_ENABLE},
+
+	/* ACPI_BITREG_ARB_DIS              */   {ACPI_REGISTER_PM2_CONTROL,  ACPI_BITPOSITION_ARB_DISABLE,           ACPI_BITMASK_ARB_DISABLE}
+};
+
+
+acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
+{
+	/* ACPI_EVENT_PMTIMER       */  {ACPI_BITREG_TIMER_STATUS,          ACPI_BITREG_TIMER_ENABLE,        ACPI_BITMASK_TIMER_STATUS,          ACPI_BITMASK_TIMER_ENABLE},
+	/* ACPI_EVENT_GLOBAL        */  {ACPI_BITREG_GLOBAL_LOCK_STATUS,    ACPI_BITREG_GLOBAL_LOCK_ENABLE,  ACPI_BITMASK_GLOBAL_LOCK_STATUS,    ACPI_BITMASK_GLOBAL_LOCK_ENABLE},
+	/* ACPI_EVENT_POWER_BUTTON  */  {ACPI_BITREG_POWER_BUTTON_STATUS,   ACPI_BITREG_POWER_BUTTON_ENABLE, ACPI_BITMASK_POWER_BUTTON_STATUS,   ACPI_BITMASK_POWER_BUTTON_ENABLE},
+	/* ACPI_EVENT_SLEEP_BUTTON  */  {ACPI_BITREG_SLEEP_BUTTON_STATUS,   ACPI_BITREG_SLEEP_BUTTON_ENABLE, ACPI_BITMASK_SLEEP_BUTTON_STATUS,   ACPI_BITMASK_SLEEP_BUTTON_ENABLE},
+	/* ACPI_EVENT_RTC           */  {ACPI_BITREG_RT_CLOCK_STATUS,       ACPI_BITREG_RT_CLOCK_ENABLE,     0,                                  0},
+};
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_get_region_name
+ *
+ * PARAMETERS:  None.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Translate a Space ID into a name string (Debug only)
+ *
+ ****************************************************************************/
+
+/* Region type decoding */
+
+const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
+{
+	"System_memory",
+	"System_iO",
+	"PCIConfig",
+	"Embedded_control",
+	"SMBus",
+	"CMOS",
+	"PCIBar_target",
+	"Data_table",
+};
+
+
+NATIVE_CHAR *
+acpi_ut_get_region_name (
+	u8                      space_id)
+{
+
+	if (space_id >= ACPI_USER_REGION_BEGIN)
+	{
+		return ("User_defined_region");
+	}
+
+	else if (space_id >= ACPI_NUM_PREDEFINED_REGIONS)
+	{
+		return ("Invalid_space_iD");
+	}
+
+	return ((NATIVE_CHAR *) acpi_gbl_region_types[space_id]);
+}
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_get_event_name
+ *
+ * PARAMETERS:  None.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Translate a Event ID into a name string (Debug only)
+ *
+ ****************************************************************************/
+
+/* Event type decoding */
+
+const NATIVE_CHAR *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
+{
+	"PM_Timer",
+	"Global_lock",
+	"Power_button",
+	"Sleep_button",
+	"Real_time_clock",
+};
+
+
+NATIVE_CHAR *
+acpi_ut_get_event_name (
+	u32                     event_id)
+{
+
+	if (event_id > ACPI_EVENT_MAX)
+	{
+		return ("Invalid_event_iD");
+	}
+
+	return ((NATIVE_CHAR *) acpi_gbl_event_types[event_id]);
+}
 
 
 #ifdef ACPI_DEBUG
@@ -320,6 +452,18 @@ acpi_ut_get_mutex_name (
 	return (acpi_gbl_mutex_names[mutex_id]);
 }
 
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_get_type_name
+ *
+ * PARAMETERS:  None.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Translate a Type ID into a name string (Debug only)
+ *
+ ****************************************************************************/
 
 /*
  * Elements of Acpi_gbl_Ns_type_names below must match
@@ -370,25 +514,14 @@ static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of AC
 	/* 32 */ "Scope",
 	/* 33 */ "Def_any",
 	/* 34 */ "Extra",
-	/* 35 */ "Invalid"
+	/* 35 */ "Data",
+	/* 36 */ "Invalid"
 };
 
 
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_ut_get_type_name
- *
- * PARAMETERS:  None.
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Translate a Type ID into a name string (Debug only)
- *
- ****************************************************************************/
-
 NATIVE_CHAR *
 acpi_ut_get_type_name (
-	u32                     type)
+	acpi_object_type        type)
 {
 
 	if (type > INTERNAL_TYPE_INVALID)
@@ -397,51 +530,6 @@ acpi_ut_get_type_name (
 	}
 
 	return ((NATIVE_CHAR *) acpi_gbl_ns_type_names[type]);
-}
-
-
-/* Region type decoding */
-
-const NATIVE_CHAR *acpi_gbl_region_types[NUM_REGION_TYPES] =
-{
-	"System_memory",
-	"System_iO",
-	"PCIConfig",
-	"Embedded_control",
-	"SMBus",
-	"CMOS",
-	"PCIBar_target",
-};
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_ut_get_region_name
- *
- * PARAMETERS:  None.
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Translate a Space ID into a name string (Debug only)
- *
- ****************************************************************************/
-
-NATIVE_CHAR *
-acpi_ut_get_region_name (
-	u8                      space_id)
-{
-
-	if (space_id >= USER_REGION_BEGIN)
-	{
-		return ("User_defined_region");
-	}
-
-	else if (space_id >= NUM_REGION_TYPES)
-	{
-		return ("Invalid_space_iD");
-	}
-
-	return ((NATIVE_CHAR *) acpi_gbl_region_types[space_id]);
 }
 
 
@@ -474,9 +562,8 @@ const NATIVE_CHAR *acpi_gbl_access_types[NUM_ACCESS_TYPES] =
 	"Byte_acc",
 	"Word_acc",
 	"DWord_acc",
-	"Block_acc",
-	"SMBSend_recv_acc",
-	"SMBQuick_acc"
+	"QWord_acc",
+	"Buffer_acc",
 };
 
 
@@ -506,7 +593,7 @@ const NATIVE_CHAR *acpi_gbl_update_rules[NUM_UPDATE_RULES] =
 
 u8
 acpi_ut_valid_object_type (
-	u32                     type)
+	acpi_object_type        type)
 {
 
 	if (type > ACPI_TYPE_MAX)
@@ -539,40 +626,41 @@ acpi_ut_allocate_owner_id (
 	acpi_owner_id           owner_id = 0xFFFF;
 
 
-	FUNCTION_TRACE ("Ut_allocate_owner_id");
+	ACPI_FUNCTION_TRACE ("Ut_allocate_owner_id");
 
 
-	acpi_ut_acquire_mutex (ACPI_MTX_CACHES);
+	if (ACPI_FAILURE (acpi_ut_acquire_mutex (ACPI_MTX_CACHES)))
+	{
+		return (0);
+	}
 
 	switch (id_type)
 	{
-	case OWNER_TYPE_TABLE:
+	case ACPI_OWNER_TYPE_TABLE:
 
 		owner_id = acpi_gbl_next_table_owner_id;
 		acpi_gbl_next_table_owner_id++;
 
-		if (acpi_gbl_next_table_owner_id == FIRST_METHOD_ID)
+		if (acpi_gbl_next_table_owner_id == ACPI_FIRST_METHOD_ID)
 		{
-			acpi_gbl_next_table_owner_id = FIRST_TABLE_ID;
+			acpi_gbl_next_table_owner_id = ACPI_FIRST_TABLE_ID;
 		}
 		break;
 
 
-	case OWNER_TYPE_METHOD:
+	case ACPI_OWNER_TYPE_METHOD:
 
 		owner_id = acpi_gbl_next_method_owner_id;
 		acpi_gbl_next_method_owner_id++;
 
-		if (acpi_gbl_next_method_owner_id == FIRST_TABLE_ID)
+		if (acpi_gbl_next_method_owner_id == ACPI_FIRST_TABLE_ID)
 		{
-			acpi_gbl_next_method_owner_id = FIRST_METHOD_ID;
+			acpi_gbl_next_method_owner_id = ACPI_FIRST_METHOD_ID;
 		}
 		break;
 	}
 
-
-	acpi_ut_release_mutex (ACPI_MTX_CACHES);
-
+	(void) acpi_ut_release_mutex (ACPI_MTX_CACHES);
 	return_VALUE (owner_id);
 }
 
@@ -595,17 +683,17 @@ acpi_ut_init_globals (
 	u32                     i;
 
 
-	FUNCTION_TRACE ("Ut_init_globals");
+	ACPI_FUNCTION_TRACE ("Ut_init_globals");
 
 	/* Memory allocation and cache lists */
 
-	MEMSET (acpi_gbl_memory_lists, 0, sizeof (ACPI_MEMORY_LIST) * ACPI_NUM_MEM_LISTS);
+	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (ACPI_MEMORY_LIST) * ACPI_NUM_MEM_LISTS);
 
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) (NATIVE_UINT) &(((acpi_generic_state *) NULL)->common.next);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) (NATIVE_UINT) &(((acpi_parse_object *) NULL)->next);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) (NATIVE_UINT) &(((acpi_parse2_object *) NULL)->next);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].link_offset    = (u16) (NATIVE_UINT) &(((acpi_operand_object *) NULL)->cache.next);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].link_offset       = (u16) (NATIVE_UINT) &(((acpi_walk_state *) NULL)->next);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((acpi_generic_state *) NULL)->common.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) ACPI_PTR_DIFF (&(((acpi_parse2_object *) NULL)->next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].link_offset    = (u16) ACPI_PTR_DIFF (&(((acpi_operand_object *) NULL)->cache.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].link_offset       = (u16) ACPI_PTR_DIFF (&(((acpi_walk_state *) NULL)->next), NULL);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (acpi_namespace_node);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (acpi_generic_state);
@@ -640,15 +728,6 @@ acpi_ut_init_globals (
 		acpi_gbl_acpi_tables[i].count       = 0;
 	}
 
-
-	/* Address Space handler array */
-
-	for (i = 0; i < ACPI_NUM_ADDRESS_SPACES; i++)
-	{
-		acpi_gbl_address_spaces[i].handler  = NULL;
-		acpi_gbl_address_spaces[i].context  = NULL;
-	}
-
 	/* Mutex locked flags */
 
 	for (i = 0; i < NUM_MTX; i++)
@@ -675,11 +754,10 @@ acpi_ut_init_globals (
 
 	acpi_gbl_global_lock_acquired       = FALSE;
 	acpi_gbl_global_lock_thread_count   = 0;
+	acpi_gbl_global_lock_handle         = 0;
 
 	/* Miscellaneous variables */
 
-	acpi_gbl_system_flags               = 0;
-	acpi_gbl_startup_flags              = 0;
 	acpi_gbl_rsdp_original_location     = 0;
 	acpi_gbl_cm_single_step             = FALSE;
 	acpi_gbl_db_terminate_threads       = FALSE;
@@ -687,24 +765,22 @@ acpi_ut_init_globals (
 	acpi_gbl_ns_lookup_count            = 0;
 	acpi_gbl_ps_find_count              = 0;
 	acpi_gbl_acpi_hardware_present      = TRUE;
-	acpi_gbl_next_table_owner_id        = FIRST_TABLE_ID;
-	acpi_gbl_next_method_owner_id       = FIRST_METHOD_ID;
+	acpi_gbl_next_table_owner_id        = ACPI_FIRST_TABLE_ID;
+	acpi_gbl_next_method_owner_id       = ACPI_FIRST_METHOD_ID;
 	acpi_gbl_debugger_configuration     = DEBUGGER_THREADING;
+	acpi_gbl_db_output_flags            = ACPI_DB_CONSOLE_OUTPUT;
 
 	/* Hardware oriented */
 
-	acpi_gbl_gpe0enable_register_save   = NULL;
-	acpi_gbl_gpe1_enable_register_save  = NULL;
-	acpi_gbl_original_mode              = SYS_MODE_UNKNOWN;   /*  original ACPI/legacy mode   */
-	acpi_gbl_gpe_registers              = NULL;
-	acpi_gbl_gpe_info                   = NULL;
+	acpi_gbl_gpe_register_info          = NULL;
+	acpi_gbl_gpe_number_info            = NULL;
 
 	/* Namespace */
 
 	acpi_gbl_root_node                  = NULL;
 
 	acpi_gbl_root_node_struct.name      = ACPI_ROOT_NAME;
-	acpi_gbl_root_node_struct.data_type = ACPI_DESC_TYPE_NAMED;
+	acpi_gbl_root_node_struct.descriptor = ACPI_DESC_TYPE_NAMED;
 	acpi_gbl_root_node_struct.type      = ACPI_TYPE_ANY;
 	acpi_gbl_root_node_struct.child     = NULL;
 	acpi_gbl_root_node_struct.peer      = NULL;

@@ -220,7 +220,7 @@ void __init smp4d_boot_cpus(void)
 
 			cpucount++;
 
-			p = init_task.prev_task;
+			p = prev_task(&init_task);
 
 			p->cpu = i;
 

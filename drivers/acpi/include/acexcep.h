@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 50 $
+ *       $Revision: 57 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@
 #define AE_NO_MEMORY                    (acpi_status) (0x0004 | AE_CODE_ENVIRONMENTAL)
 #define AE_NOT_FOUND                    (acpi_status) (0x0005 | AE_CODE_ENVIRONMENTAL)
 #define AE_NOT_EXIST                    (acpi_status) (0x0006 | AE_CODE_ENVIRONMENTAL)
-#define AE_EXIST                        (acpi_status) (0x0007 | AE_CODE_ENVIRONMENTAL)
+#define AE_ALREADY_EXISTS               (acpi_status) (0x0007 | AE_CODE_ENVIRONMENTAL)
 #define AE_TYPE                         (acpi_status) (0x0008 | AE_CODE_ENVIRONMENTAL)
 #define AE_NULL_OBJECT                  (acpi_status) (0x0009 | AE_CODE_ENVIRONMENTAL)
 #define AE_NULL_ENTRY                   (acpi_status) (0x000A | AE_CODE_ENVIRONMENTAL)
@@ -85,8 +85,9 @@
 #define AE_BAD_PATHNAME                 (acpi_status) (0x0003 | AE_CODE_PROGRAMMER)
 #define AE_BAD_DATA                     (acpi_status) (0x0004 | AE_CODE_PROGRAMMER)
 #define AE_BAD_ADDRESS                  (acpi_status) (0x0005 | AE_CODE_PROGRAMMER)
+#define AE_ALIGNMENT                    (acpi_status) (0x0006 | AE_CODE_PROGRAMMER)
 
-#define AE_CODE_PGM_MAX                 0x0005
+#define AE_CODE_PGM_MAX                 0x0006
 
 
 /*
@@ -96,8 +97,9 @@
 #define AE_BAD_HEADER                   (acpi_status) (0x0002 | AE_CODE_ACPI_TABLES)
 #define AE_BAD_CHECKSUM                 (acpi_status) (0x0003 | AE_CODE_ACPI_TABLES)
 #define AE_BAD_VALUE                    (acpi_status) (0x0004 | AE_CODE_ACPI_TABLES)
+#define AE_TABLE_NOT_SUPPORTED          (acpi_status) (0x0005 | AE_CODE_ACPI_TABLES)
 
-#define AE_CODE_TBL_MAX                 0x0003
+#define AE_CODE_TBL_MAX                 0x0005
 
 
 /*
@@ -129,8 +131,11 @@
 #define AE_AML_MUTEX_ORDER              (acpi_status) (0x0017 | AE_CODE_AML)
 #define AE_AML_MUTEX_NOT_ACQUIRED       (acpi_status) (0x0018 | AE_CODE_AML)
 #define AE_AML_INVALID_RESOURCE_TYPE    (acpi_status) (0x0019 | AE_CODE_AML)
+#define AE_AML_INVALID_INDEX            (acpi_status) (0x001A | AE_CODE_AML)
+#define AE_AML_REGISTER_LIMIT           (acpi_status) (0x001B | AE_CODE_AML)
+#define AE_AML_NO_WHILE                 (acpi_status) (0x001C | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x0019
+#define AE_CODE_AML_MAX                 0x001C
 
 /*
  * Internal exceptions used for control
@@ -143,8 +148,10 @@
 #define AE_CTRL_DEPTH                   (acpi_status) (0x0006 | AE_CODE_CONTROL)
 #define AE_CTRL_END                     (acpi_status) (0x0007 | AE_CODE_CONTROL)
 #define AE_CTRL_TRANSFER                (acpi_status) (0x0008 | AE_CODE_CONTROL)
+#define AE_CTRL_BREAK                   (acpi_status) (0x0009 | AE_CODE_CONTROL)
+#define AE_CTRL_CONTINUE                (acpi_status) (0x000A | AE_CODE_CONTROL)
 
-#define AE_CODE_CTRL_MAX                0x0008
+#define AE_CODE_CTRL_MAX                0x000A
 
 
 #ifdef DEFINE_ACPI_GLOBALS
@@ -162,7 +169,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_env[] =
 	"AE_NO_MEMORY",
 	"AE_NOT_FOUND",
 	"AE_NOT_EXIST",
-	"AE_EXIST",
+	"AE_ALREADY_EXISTS",
 	"AE_TYPE",
 	"AE_NULL_OBJECT",
 	"AE_NULL_ENTRY",
@@ -181,7 +188,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_env[] =
 	"AE_NOT_ACQUIRED",
 	"AE_ALREADY_ACQUIRED",
 	"AE_NO_HARDWARE_RESPONSE",
-	"AE_NO_GLOBAL_LOCK",
+	"AE_NO_GLOBAL_LOCK"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_pgm[] =
@@ -191,6 +198,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_pgm[] =
 	"AE_BAD_PATHNAME",
 	"AE_BAD_DATA",
 	"AE_BAD_ADDRESS",
+	"AE_ALIGNMENT"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_tbl[] =
@@ -199,6 +207,7 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_tbl[] =
 	"AE_BAD_HEADER",
 	"AE_BAD_CHECKSUM",
 	"AE_BAD_VALUE",
+	"AE_TABLE_NOT_SUPPORTED"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
@@ -228,6 +237,9 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_aml[] =
 	"AE_AML_MUTEX_ORDER",
 	"AE_AML_MUTEX_NOT_ACQUIRED",
 	"AE_AML_INVALID_RESOURCE_TYPE",
+	"AE_AML_INVALID_INDEX",
+	"AE_AML_REGISTER_LIMIT",
+	"AE_AML_NO_WHILE"
 };
 
 NATIVE_CHAR const   *acpi_gbl_exception_names_ctrl[] =
@@ -240,6 +252,8 @@ NATIVE_CHAR const   *acpi_gbl_exception_names_ctrl[] =
 	"AE_CTRL_DEPTH",
 	"AE_CTRL_END",
 	"AE_CTRL_TRANSFER",
+	"AE_CTRL_BREAK",
+	"AE_CTRL_CONTINUE"
 };
 
 #endif /* ACPI GLOBALS */

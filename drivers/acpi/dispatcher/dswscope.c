@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 49 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 
 #define _COMPONENT          ACPI_DISPATCHER
-	 MODULE_NAME         ("dswscope")
+	 ACPI_MODULE_NAME    ("dswscope")
 
 
 #define STACK_POP(head) head
@@ -53,7 +53,7 @@ acpi_ds_scope_stack_clear (
 {
 	acpi_generic_state      *scope_info;
 
-	PROC_NAME ("Ds_scope_stack_clear");
+	ACPI_FUNCTION_NAME ("Ds_scope_stack_clear");
 
 
 	while (walk_state->scope_info) {
@@ -84,26 +84,26 @@ acpi_ds_scope_stack_clear (
 acpi_status
 acpi_ds_scope_stack_push (
 	acpi_namespace_node     *node,
-	acpi_object_type8       type,
+	acpi_object_type        type,
 	acpi_walk_state         *walk_state)
 {
 	acpi_generic_state      *scope_info;
 
 
-	FUNCTION_TRACE ("Ds_scope_stack_push");
+	ACPI_FUNCTION_TRACE ("Ds_scope_stack_push");
 
 
 	if (!node) {
 		/* Invalid scope   */
 
-		REPORT_ERROR (("Ds_scope_stack_push: null scope passed\n"));
+		ACPI_REPORT_ERROR (("Ds_scope_stack_push: null scope passed\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Make sure object type is valid */
 
 	if (!acpi_ex_validate_object_type (type)) {
-		REPORT_WARNING (("Ds_scope_stack_push: type code out of range\n"));
+		ACPI_REPORT_WARNING (("Ds_scope_stack_push: type code out of range\n"));
 	}
 
 
@@ -152,7 +152,7 @@ acpi_ds_scope_stack_pop (
 	acpi_generic_state      *scope_info;
 
 
-	FUNCTION_TRACE ("Ds_scope_stack_pop");
+	ACPI_FUNCTION_TRACE ("Ds_scope_stack_pop");
 
 
 	/*

@@ -147,7 +147,7 @@ static int qnx4_remount(struct super_block *sb, int *flags, char *data)
 {
 	struct qnx4_sb_info *qs;
 
-	qs = &sb->u.qnx4_sb;
+	qs = qnx4_sb(sb);
 	qs->Version = QNX4_VERSION;
 	if (*flags & MS_RDONLY) {
 		return 0;
@@ -280,7 +280,7 @@ static int qnx4_statfs(struct super_block *sb, struct statfs *buf)
 {
 	buf->f_type    = sb->s_magic;
 	buf->f_bsize   = sb->s_blocksize;
-	buf->f_blocks  = le32_to_cpu(sb->u.qnx4_sb.BitMap->di_size) * 8;
+	buf->f_blocks  = le32_to_cpu(qnx4_sb(sb)->BitMap->di_size) * 8;
 	buf->f_bfree   = qnx4_count_free_blocks(sb);
 	buf->f_bavail  = buf->f_bfree;
 	buf->f_namelen = QNX4_NAME_MAX;
@@ -301,12 +301,12 @@ static const char *qnx4_checkroot(struct super_block *sb)
 	int i, j;
 	int found = 0;
 
-	if (*(sb->u.qnx4_sb.sb->RootDir.di_fname) != '/') {
+	if (*(qnx4_sb(sb)->sb->RootDir.di_fname) != '/') {
 		return "no qnx4 filesystem (no root dir).";
 	} else {
 		QNX4DEBUG(("QNX4 filesystem found on dev %s.\n", sb->s_id));
-		rd = le32_to_cpu(sb->u.qnx4_sb.sb->RootDir.di_first_xtnt.xtnt_blk) - 1;
-		rl = le32_to_cpu(sb->u.qnx4_sb.sb->RootDir.di_first_xtnt.xtnt_size);
+		rd = le32_to_cpu(qnx4_sb(sb)->sb->RootDir.di_first_xtnt.xtnt_blk) - 1;
+		rl = le32_to_cpu(qnx4_sb(sb)->sb->RootDir.di_first_xtnt.xtnt_size);
 		for (j = 0; j < rl; j++) {
 			bh = sb_bread(sb, rd + j);	/* root dir, first block */
 			if (bh == NULL) {
@@ -318,8 +318,8 @@ static const char *qnx4_checkroot(struct super_block *sb)
 					QNX4DEBUG(("Rootdir entry found : [%s]\n", rootdir->di_fname));
 					if (!strncmp(rootdir->di_fname, QNX4_BMNAME, sizeof QNX4_BMNAME)) {
 						found = 1;
-						sb->u.qnx4_sb.BitMap = kmalloc( sizeof( struct qnx4_inode_entry ), GFP_KERNEL );
-						memcpy( sb->u.qnx4_sb.BitMap, rootdir, sizeof( struct qnx4_inode_entry ) );	/* keep bitmap inode known */
+						qnx4_sb(sb)->BitMap = kmalloc( sizeof( struct qnx4_inode_entry ), GFP_KERNEL );
+						memcpy( qnx4_sb(sb)->BitMap, rootdir, sizeof( struct qnx4_inode_entry ) );	/* keep bitmap inode known */
 						break;
 					}
 				}
@@ -341,6 +341,13 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 	struct buffer_head *bh;
 	struct inode *root;
 	const char *errmsg;
+	struct qnx4_sb_info *qs;
+
+	qs = kmalloc(sizeof(struct qnx4_sb_info), GFP_KERNEL);
+	if (!qs)
+		return -ENOMEM;
+	s->u.generic_sbp = qs;
+	memset(qs, 0, sizeof(struct qnx4_sb_info));
 
 	sb_set_blocksize(s, QNX4_BLOCK_SIZE);
 
@@ -369,8 +376,8 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
 #ifndef CONFIG_QNX4FS_RW
 	s->s_flags |= MS_RDONLY;	/* Yup, read-only yet */
 #endif
-	s->u.qnx4_sb.sb_buf = bh;
-	s->u.qnx4_sb.sb = (struct qnx4_super_block *) bh->b_data;
+	qnx4_sb(s)->sb_buf = bh;
+	qnx4_sb(s)->sb = (struct qnx4_super_block *) bh->b_data;
 
 
  	/* check before allocating dentries, inodes, .. */
@@ -401,13 +408,17 @@ static int qnx4_fill_super(struct super_block *s, void *data, int silent)
       out:
 	brelse(bh);
       outnobh:
-
+	kfree(qs);
+	s->u.generic_sbp = NULL;
 	return -EINVAL;
 }
 
 static void qnx4_put_super(struct super_block *sb)
 {
-	kfree( sb->u.qnx4_sb.BitMap );
+	struct qnx4_sb_info *qs = qnx4_sb(sb);
+	kfree( qs->BitMap );
+	kfree( qs );
+	sb->u.generic_sbp = NULL;
 	return;
 }
 

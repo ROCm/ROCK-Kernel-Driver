@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 43 $
+ *              $Revision: 50 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000, 2001 R. Byron Moore
+ *  Copyright (C) 2000 - 2002, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 
 
 #define _COMPONENT          ACPI_EXECUTER
-	 MODULE_NAME         ("exresnte")
+	 ACPI_MODULE_NAME    ("exresnte")
 
 
 /*******************************************************************************
@@ -75,24 +75,23 @@ acpi_ex_resolve_node_to_value (
 	acpi_operand_object     *source_desc;
 	acpi_operand_object     *obj_desc = NULL;
 	acpi_namespace_node     *node;
-	acpi_object_type8       entry_type;
+	acpi_object_type        entry_type;
 	acpi_integer            temp_val;
 
 
-	FUNCTION_TRACE ("Ex_resolve_node_to_value");
+	ACPI_FUNCTION_TRACE ("Ex_resolve_node_to_value");
 
 
 	/*
 	 * The stack pointer points to a acpi_namespace_node (Node).  Get the
 	 * object that is attached to the Node.
 	 */
-	node      = *object_ptr;
-	source_desc  = acpi_ns_get_attached_object (node);
+	node       = *object_ptr;
+	source_desc = acpi_ns_get_attached_object (node);
 	entry_type = acpi_ns_get_type ((acpi_handle) node);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p Type=%X\n",
 		 node, source_desc, entry_type));
-
 
 	/*
 	 * Several object types require no further processing:
@@ -115,7 +114,6 @@ acpi_ex_resolve_node_to_value (
 	 * of the attached object or pointer
 	 */
 	switch (entry_type) {
-
 	case ACPI_TYPE_PACKAGE:
 
 		if (ACPI_TYPE_PACKAGE != source_desc->common.type) {
@@ -187,7 +185,6 @@ acpi_ex_resolve_node_to_value (
 		status = acpi_ex_read_data_from_field (source_desc, &obj_desc);
 		break;
 
-
 	/*
 	 * For these objects, just return the object attached to the Node
 	 */
@@ -214,7 +211,6 @@ acpi_ex_resolve_node_to_value (
 			node));
 
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);  /* Cannot be AE_TYPE */
-		break;
 
 
 	/*

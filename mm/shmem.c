@@ -42,7 +42,6 @@ static struct super_operations shmem_ops;
 static struct address_space_operations shmem_aops;
 static struct file_operations shmem_file_operations;
 static struct inode_operations shmem_inode_operations;
-static struct file_operations shmem_dir_operations;
 static struct inode_operations shmem_dir_inode_operations;
 static struct vm_operations_struct shmem_vm_ops;
 
@@ -708,7 +707,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_nlink++;
 			inode->i_op = &shmem_dir_inode_operations;
-			inode->i_fop = &shmem_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		case S_IFLNK:
 			break;
@@ -758,6 +757,11 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	long		status;
 	int		err;
 
+	if ((ssize_t) count < 0)
+		return -EINVAL;
+
+	if (!access_ok(VERIFY_READ, buf, count))
+		return -EFAULT;
 
 	down(&inode->i_sem);
 
@@ -971,17 +975,6 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 }
 
 /*
- * Lookup the data. This is trivial - if the dentry didn't already
- * exist, we know it is negative.
- */
-/* SMP-safe */
-static struct dentry * shmem_lookup(struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
-}
-
-/*
  * File creation. Allocate an inode, and we're done..
  */
 /* SMP-safe */
@@ -1020,6 +1013,9 @@ static int shmem_create(struct inode *dir, struct dentry *dentry, int mode)
 static int shmem_link(struct dentry *old_dentry, struct inode * dir, struct dentry * dentry)
 {
 	struct inode *inode = old_dentry->d_inode;
+
+	if (S_ISDIR(inode->i_mode))
+		return -EPERM;
 
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink++;
@@ -1111,16 +1107,14 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 	char *kaddr;
 	struct shmem_inode_info * info;
 
+	len = strlen(symname) + 1;
+	if (len > PAGE_CACHE_SIZE)
+		return -ENAMETOOLONG;
+
 	inode = shmem_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
 	if (!inode)
 		return -ENOSPC;
 
-	len = strlen(symname) + 1;
-	if (len > PAGE_CACHE_SIZE) {
-		iput(inode);
-		return -ENAMETOOLONG;
-	}
-		
 	info = SHMEM_I(inode);
 	inode->i_size = len-1;
 	if (len <= sizeof(struct shmem_inode_info)) {
@@ -1201,7 +1195,7 @@ static struct inode_operations shmem_symlink_inode_operations = {
 	follow_link:	shmem_follow_link,
 };
 
-static int shmem_parse_options(char *options, int *mode, unsigned long * blocks, unsigned long *inodes)
+static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid, unsigned long * blocks, unsigned long *inodes)
 {
 	char *this_char, *value, *rest;
 
@@ -1213,7 +1207,7 @@ static int shmem_parse_options(char *options, int *mode, unsigned long * blocks,
 			*value++ = 0;
 		} else {
 			printk(KERN_ERR 
-			    "shmem_parse_options: No value for option '%s'\n", 
+			    "tmpfs: No value for mount option '%s'\n", 
 			    this_char);
 			return 1;
 		}
@@ -1238,8 +1232,20 @@ static int shmem_parse_options(char *options, int *mode, unsigned long * blocks,
 			*mode = simple_strtoul(value,&rest,8);
 			if (*rest)
 				goto bad_val;
+		} else if (!strcmp(this_char,"uid")) {
+			if (!uid)
+				continue;
+			*uid = simple_strtoul(value,&rest,0);
+			if (*rest)
+				goto bad_val;
+		} else if (!strcmp(this_char,"gid")) {
+			if (!gid)
+				continue;
+			*gid = simple_strtoul(value,&rest,0);
+			if (*rest)
+				goto bad_val;
 		} else {
-			printk(KERN_ERR "shmem_parse_options: Bad option %s\n",
+			printk(KERN_ERR "tmpfs: Bad mount option %s\n",
 			       this_char);
 			return 1;
 		}
@@ -1247,7 +1253,7 @@ static int shmem_parse_options(char *options, int *mode, unsigned long * blocks,
 	return 0;
 
 bad_val:
-	printk(KERN_ERR "shmem_parse_options: Bad value '%s' for option '%s'\n", 
+	printk(KERN_ERR "tmpfs: Bad value '%s' for mount option '%s'\n", 
 	       value, this_char);
 	return 1;
 
@@ -1259,7 +1265,7 @@ static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)
 	unsigned long max_blocks = sbinfo->max_blocks;
 	unsigned long max_inodes = sbinfo->max_inodes;
 
-	if (shmem_parse_options (data, NULL, &max_blocks, &max_inodes))
+	if (shmem_parse_options (data, NULL, NULL, NULL, &max_blocks, &max_inodes))
 		return -EINVAL;
 	return shmem_set_size(sbinfo, max_blocks, max_inodes);
 }
@@ -1276,6 +1282,8 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	struct dentry * root;
 	unsigned long blocks, inodes;
 	int mode   = S_IRWXUGO | S_ISVTX;
+	uid_t uid = current->fsuid;
+	gid_t gid = current->fsgid;
 	struct shmem_sb_info *sbinfo = SHMEM_SB(sb);
 	struct sysinfo si;
 
@@ -1287,10 +1295,8 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	blocks = inodes = si.totalram / 2;
 
 #ifdef CONFIG_TMPFS
-	if (shmem_parse_options (data, &mode, &blocks, &inodes)) {
-		printk(KERN_ERR "tmpfs invalid option\n");
+	if (shmem_parse_options (data, &mode, &uid, &gid, &blocks, &inodes))
 		return -EINVAL;
-	}
 #endif
 
 	spin_lock_init (&sbinfo->stat_lock);
@@ -1307,6 +1313,8 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	if (!inode)
 		return -ENOMEM;
 
+	inode->i_uid = uid;
+	inode->i_gid = gid;
 	root = d_alloc_root(inode);
 	if (!root) {
 		iput(inode);
@@ -1376,18 +1384,10 @@ static struct inode_operations shmem_inode_operations = {
 	truncate:	shmem_truncate,
 };
 
-static struct file_operations shmem_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-#ifdef CONFIG_TMPFS
-	fsync:		shmem_sync_file,
-#endif
-};
-
 static struct inode_operations shmem_dir_inode_operations = {
 #ifdef CONFIG_TMPFS
 	create:		shmem_create,
-	lookup:		shmem_lookup,
+	lookup:		simple_lookup,
 	link:		shmem_link,
 	unlink:		shmem_unlink,
 	symlink:	shmem_symlink,
