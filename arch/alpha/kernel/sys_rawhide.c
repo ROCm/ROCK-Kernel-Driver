@@ -124,13 +124,13 @@ rawhide_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type rawhide_irq_type = {
-	typename:	"RAWHIDE",
-	startup:	rawhide_startup_irq,
-	shutdown:	rawhide_disable_irq,
-	enable:		rawhide_enable_irq,
-	disable:	rawhide_disable_irq,
-	ack:		rawhide_mask_and_ack_irq,
-	end:		rawhide_end_irq,
+	.typename	= "RAWHIDE",
+	.startup	= rawhide_startup_irq,
+	.shutdown	= rawhide_disable_irq,
+	.enable		= rawhide_enable_irq,
+	.disable	= rawhide_disable_irq,
+	.ack		= rawhide_mask_and_ack_irq,
+	.end		= rawhide_end_irq,
 };
 
 static void 
@@ -246,26 +246,26 @@ rawhide_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
  */
 
 struct alpha_machine_vector rawhide_mv __initmv = {
-	vector_name:		"Rawhide",
+	.vector_name		= "Rawhide",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_MCPCIA_IO,
 	DO_MCPCIA_BUS,
-	machine_check:		mcpcia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	MCPCIA_DEFAULT_MEM_BASE,
-	pci_dac_offset:		MCPCIA_DAC_OFFSET,
+	.machine_check		= mcpcia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= MCPCIA_DEFAULT_MEM_BASE,
+	.pci_dac_offset		= MCPCIA_DAC_OFFSET,
 
-	nr_irqs:		128,
-	device_interrupt:	rawhide_srm_device_interrupt,
+	.nr_irqs		= 128,
+	.device_interrupt	= rawhide_srm_device_interrupt,
 
-	init_arch:		mcpcia_init_arch,
-	init_irq:		rawhide_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		common_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		rawhide_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= mcpcia_init_arch,
+	.init_irq		= rawhide_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= common_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= rawhide_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(rawhide)
