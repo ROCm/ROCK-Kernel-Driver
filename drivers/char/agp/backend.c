@@ -181,13 +181,16 @@ err_out:
 /* cannot be __exit b/c as it could be called from __init code */
 static void agp_backend_cleanup(void)
 {
-	agp_bridge.cleanup();
-	agp_bridge.free_gatt_table();
-	vfree(agp_bridge.key_list);
+	if (agp_bridge.cleanup != NULL)
+		agp_bridge.cleanup();
+	if (agp_bridge.free_gatt_table != NULL)
+		agp_bridge.free_gatt_table();
+	if (agp_bridge.key_list)
+		vfree(agp_bridge.key_list);
 
-	if (agp_bridge.needs_scratch_page == TRUE) {
+	if ((agp_bridge.agp_destroy_page!=NULL) &&
+			(agp_bridge.needs_scratch_page == TRUE))
 		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page_real));
-	}
 }
 
 static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
