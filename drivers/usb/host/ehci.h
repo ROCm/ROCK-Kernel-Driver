@@ -426,16 +426,6 @@ static inline int hcd_register_root (struct usb_hcd *hcd)
 
 #else	/* LINUX_VERSION_CODE */
 
-// hcd_to_bus() eventually moves to hcd.h on 2.5 too
-static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
-	{ return &hcd->self; }
-// ... as does hcd_register_root()
-static inline int hcd_register_root (struct usb_hcd *hcd)
-{
-	return usb_register_root_hub (
-		hcd_to_bus (hcd)->root_hub, &hcd->pdev->dev);
-}
-
 #define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb,mem_flags)
 
 #ifndef DEBUG

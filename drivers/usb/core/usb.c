@@ -1224,7 +1224,8 @@ void usb_buffer_free (
  *
  * Return value is either null (indicating no buffer could be mapped), or
  * the parameter.  URB_NO_DMA_MAP is added to urb->transfer_flags if the
- * operation succeeds.
+ * operation succeeds.  If the device is connected to this system through
+ * a non-DMA controller, this operation always succeeds.
  *
  * This call would normally be used for an urb which is reused, perhaps
  * as the target of a large periodic transfer, with usb_buffer_dmasync()
@@ -1245,12 +1246,15 @@ struct urb *usb_buffer_map (struct urb *urb)
 			|| !(controller = bus->controller))
 		return 0;
 
-	urb->transfer_dma = dma_map_single (controller,
+	if (controller->dma_mask) {
+		urb->transfer_dma = dma_map_single (controller,
 			urb->transfer_buffer, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 	// FIXME generic api broken like pci, can't report errors
 	// if (urb->transfer_dma == DMA_ADDR_INVALID) return 0;
+	} else
+		urb->transfer_dma = ~0;
 	urb->transfer_flags |= URB_NO_DMA_MAP;
 	return urb;
 }
@@ -1271,7 +1275,8 @@ void usb_buffer_dmasync (struct urb *urb)
 			|| !(controller = bus->controller))
 		return;
 
-	dma_sync_single (controller,
+	if (controller->dma_mask)
+		dma_sync_single (controller,
 			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
@@ -1295,10 +1300,12 @@ void usb_buffer_unmap (struct urb *urb)
 			|| !(controller = bus->controller))
 		return;
 
-	dma_unmap_single (controller,
+	if (controller->dma_mask)
+		dma_unmap_single (controller,
 			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
+	urb->transfer_flags &= ~URB_NO_DMA_MAP;
 }
 
 /**
@@ -1336,7 +1343,8 @@ int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
 	if (!dev
 			|| usb_pipecontrol (pipe)
 			|| !(bus = dev->bus)
-			|| !(controller = bus->controller))
+			|| !(controller = bus->controller)
+			|| !controller->dma_mask)
 		return -1;
 
 	// FIXME generic api broken like pci, can't report errors
@@ -1362,7 +1370,8 @@ void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(controller = bus->controller))
+			|| !(controller = bus->controller)
+			|| !controller->dma_mask)
 		return;
 
 	dma_sync_sg (controller, sg, n_hw_ents,
@@ -1386,7 +1395,8 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(controller = bus->controller))
+			|| !(controller = bus->controller)
+			|| !controller->dma_mask)
 		return;
 
 	dma_unmap_sg (controller, sg, n_hw_ents,

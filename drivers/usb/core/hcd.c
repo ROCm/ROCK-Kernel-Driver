@@ -1029,8 +1029,11 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 		return status;
 	}
 
-	/* lower level hcd code should use *_dma exclusively */
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
+	/* lower level hcd code should use *_dma exclusively,
+	 * unless it uses pio or talks to another transport.
+	 */
+	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
+			&& hcd->controller->dma_mask) {
 		if (usb_pipecontrol (urb->pipe))
 			urb->setup_dma = dma_map_single (
 					hcd->controller,
