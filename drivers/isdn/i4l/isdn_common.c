@@ -114,22 +114,35 @@ static void isdn_receive_skb_callback(int di, int ch, struct sk_buff *skb);
 static int  isdn_status_callback(isdn_ctrl * c);
 static void set_global_features(void);
 
+/* 
+ * Helper keeping track of the features the drivers support
+ */
+static void
+set_global_features(void)
+{
+	unsigned long flags;
+	int drvidx;
+
+	dev->global_features = 0;
+	spin_lock_irqsave(&drivers_lock, flags);
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
+		if (!drivers[drvidx])
+			continue;
+		if (drivers[drvidx]->interface)
+			dev->global_features |= drivers[drvidx]->interface->features;
+	}
+	spin_unlock_irqrestore(&drivers_lock, flags);
+}
+
 /*
  * Register a new ISDN interface
  */
-
 int
 register_isdn(isdn_if *iif)
 {
 	struct isdn_driver *drv;
 	unsigned long flags;
 	int drvidx;
-
-	if (dev->drivers >= ISDN_MAX_DRIVERS) {
-		printk(KERN_WARNING "register_isdn: Max. %d drivers supported\n",
-		       ISDN_MAX_DRIVERS);
-		goto fail;
-	}
 
 	drv = kmalloc(sizeof(*drv), GFP_KERNEL);
 	if (!drv) {
@@ -149,6 +162,9 @@ register_isdn(isdn_if *iif)
 	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
 		if (!drivers[drvidx])
 			break;
+
+	if (drvidx == ISDN_MAX_DRIVERS)
+		goto fail_unlock;
 
 	if (!strlen(iif->id))
 		sprintf(iif->id, "line%d", drvidx);
@@ -170,7 +186,6 @@ register_isdn(isdn_if *iif)
 	iif->statcallb = isdn_status_callback;
 
 	isdn_info_update();
-	dev->drivers++;
 	set_global_features();
 
 	return 1;
@@ -200,10 +215,14 @@ static int isdn_command(isdn_ctrl *cmd);
 void
 isdn_lock_drivers(void)
 {
+	isdn_ctrl cmd;
+	unsigned long flags;
 	int i;
 
-	for (i = 0; i < dev->drivers; i++) {
-		isdn_ctrl cmd;
+	spin_lock_irqsave(&drivers_lock, flags);
+	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
+		if (!drivers[i])
+			continue;
 
 		cmd.driver = i;
 		cmd.arg = 0;
@@ -211,6 +230,7 @@ isdn_lock_drivers(void)
 		isdn_command(&cmd);
 		drivers[i]->locks++;
 	}
+	spin_unlock_irqrestore(&drivers_lock, flags);
 }
 
 void
@@ -223,18 +243,24 @@ isdn_MOD_INC_USE_COUNT(void)
 void
 isdn_unlock_drivers(void)
 {
+	isdn_ctrl cmd;
+	unsigned long flags;
 	int i;
 
-	for (i = 0; i < dev->drivers; i++)
-		if (drivers[i]->locks > 0) {
-			isdn_ctrl cmd;
+	spin_lock_irqsave(&drivers_lock, flags);
+	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
+		if (!drivers[i])
+			continue;
 
+		if (drivers[i]->locks > 0) {
 			cmd.driver = i;
 			cmd.arg = 0;
 			cmd.command = ISDN_CMD_UNLOCK;
 			isdn_command(&cmd);
 			drivers[i]->locks--;
 		}
+	}
+	spin_unlock_irqrestore(&drivers_lock, flags);
 }
 
 void
@@ -785,7 +811,6 @@ isdn_status_callback(isdn_ctrl * c)
 					slot[i].usage &= ~ISDN_USAGE_DISABLED;
 					isdn_unregister_devfs(i);
 				}
-			dev->drivers--;
 			dev->channels -= drivers[di]->channels;
 			kfree(drivers[di]->rcverr);
 			kfree(drivers[di]->rcvcount);
@@ -1868,20 +1893,6 @@ isdn_add_channels(struct isdn_driver *d, int drvidx, int n, int adding)
 /*
  * Low-level-driver registration
  */
-
-static void
-set_global_features(void)
-{
-	int drvidx;
-
-	dev->global_features = 0;
-	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
-		if (!drivers[drvidx])
-			continue;
-		if (drivers[drvidx]->interface)
-			dev->global_features |= drivers[drvidx]->interface->features;
-	}
-}
 
 #if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 

@@ -417,7 +417,6 @@ typedef struct {
 typedef struct isdn_devt {
 	unsigned short    flags;		       /* Bitmapped Flags:           */
 	/*                            */
-	int               drivers;		       /* Current number of drivers  */
 	int               channels;		       /* Current number of channels */
 	int               net_verbose;               /* Verbose-Flag               */
 	int               modempoll;		       /* Flag: tty-read active      */
