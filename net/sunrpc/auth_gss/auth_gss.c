@@ -720,6 +720,7 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 		goto out_put_ctx;
 	}
 	p = xdr_encode_netobj(p, &bufout);
+	kfree(bufout.data);
 	return p;
 out_put_ctx:
 	gss_put_ctx(ctx);
