@@ -46,63 +46,63 @@ MODULE_DEVICES("{{Yamaha,YMF719E-S},"
 		"{Intel,AL440LX sound},"
 	        "{NeoMagic,MagicWave 3DX}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
 #ifdef __ISAPNP__
-static int snd_isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0xf86,0x370,0x100 */
-static long snd_sb_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
-static long snd_wss_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* 0x530,0xe80,0xf40,0x604 */
-static long snd_fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x388 */
-static long snd_midi_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* 0x330,0x300 */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 0,1,3,5,9,11,12,15 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
-static int snd_dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
-static int snd_opl3sa3_ymode[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 };   /* 0,1,2,3 */ /*SL Added*/
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0xf86,0x370,0x100 */
+static long sb_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x220,0x240,0x260 */
+static long wss_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* 0x530,0xe80,0xf40,0x604 */
+static long fm_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x388 */
+static long midi_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;/* 0x330,0x300 */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 0,1,3,5,9,11,12,15 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
+static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 1,3,5,6,7 */
+static int opl3sa3_ymode[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 };   /* 0,1,2,3 */ /*SL Added*/
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for OPL3-SA soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for OPL3-SA soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable OPL3-SA soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for OPL3-SA soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for OPL3-SA soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable OPL3-SA soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #ifdef __ISAPNP__
-MODULE_PARM(snd_isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_isapnp, "ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
+MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
+MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 #endif
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0xf86},{0x370},{0x100}},dialog:list");
-MODULE_PARM(snd_sb_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_sb_port, "SB port # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_sb_port, SNDRV_ENABLED ",allows:{{0x220},{0x240},{0x260}},dialog:list");
-MODULE_PARM(snd_wss_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_wss_port, "WSS port # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_wss_port, SNDRV_ENABLED ",allows:{{0x530},{0xe80},{0xf40},{0x604}},dialog:list");
-MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_fm_port, "FM port # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{0x388}},dialog:list");
-MODULE_PARM(snd_midi_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_midi_port, "MIDI port # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_midi_port, SNDRV_ENABLED ",allows:{{0x330},{0x300}},dialog:list");
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_ENABLED ",allows:{{0},{1},{3},{5},{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "DMA1 # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_ENABLED ",allows:{{1},{3},{5},{6},{7}},dialog:list");
-MODULE_PARM(snd_dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma2, "DMA2 # for OPL3-SA driver.");
-MODULE_PARM_SYNTAX(snd_dma2, SNDRV_ENABLED ",allows:{{1},{3},{5},{6},{7}},dialog:list");
-MODULE_PARM(snd_opl3sa3_ymode, "1-" __MODULE_STRING(SNDRV_CARDS) "i"); /* SL Added */
-MODULE_PARM_DESC(snd_opl3sa3_ymode, "Speaker size selection for 3D Enhancement mode: Desktop/Large Notebook/Small Notebook/HiFi.");
-MODULE_PARM_SYNTAX(snd_opl3sa3_ymode, SNDRV_ENABLED ",allows:{{0,3}},dialog:list");  /* SL Added */
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0xf86},{0x370},{0x100}},dialog:list");
+MODULE_PARM(sb_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(sb_port, "SB port # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(sb_port, SNDRV_ENABLED ",allows:{{0x220},{0x240},{0x260}},dialog:list");
+MODULE_PARM(wss_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(wss_port, "WSS port # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(wss_port, SNDRV_ENABLED ",allows:{{0x530},{0xe80},{0xf40},{0x604}},dialog:list");
+MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(fm_port, "FM port # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0x388}},dialog:list");
+MODULE_PARM(midi_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(midi_port, "MIDI port # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(midi_port, SNDRV_ENABLED ",allows:{{0x330},{0x300}},dialog:list");
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{0},{1},{3},{5},{9},{11},{12},{15}},dialog:list");
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "DMA1 # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_ENABLED ",allows:{{1},{3},{5},{6},{7}},dialog:list");
+MODULE_PARM(dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma2, "DMA2 # for OPL3-SA driver.");
+MODULE_PARM_SYNTAX(dma2, SNDRV_ENABLED ",allows:{{1},{3},{5},{6},{7}},dialog:list");
+MODULE_PARM(opl3sa3_ymode, "1-" __MODULE_STRING(SNDRV_CARDS) "i"); /* SL Added */
+MODULE_PARM_DESC(opl3sa3_ymode, "Speaker size selection for 3D Enhancement mode: Desktop/Large Notebook/Small Notebook/HiFi.");
+MODULE_PARM_SYNTAX(opl3sa3_ymode, SNDRV_ENABLED ",allows:{{0,3}},dialog:list");  /* SL Added */
 
 /* control ports */
 #define OPL3SA2_PM_CTRL		0x01
@@ -648,38 +648,38 @@ static int __init snd_opl3sa2_isapnp(int dev, opl3sa2_t *chip)
 	pdev = chip->dev;
 	if (pdev->prepare(pdev)<0)
 		return -EAGAIN;
-	if (snd_sb_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_sb_port[dev], 16);
-	if (snd_wss_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[1], snd_wss_port[dev], 8);
-	if (snd_fm_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[2], snd_fm_port[dev], 4);
-	if (snd_midi_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[3], snd_midi_port[dev], 2);
-	if (snd_port[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[4], snd_port[dev], 2);
-	if (snd_dma1[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], snd_dma1[dev], 1);
-	if (snd_dma2[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], snd_dma2[dev], 1);
-	if (snd_irq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
+	if (sb_port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[0], sb_port[dev], 16);
+	if (wss_port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[1], wss_port[dev], 8);
+	if (fm_port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[2], fm_port[dev], 4);
+	if (midi_port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[3], midi_port[dev], 2);
+	if (port[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[4], port[dev], 2);
+	if (dma1[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[0], dma1[dev], 1);
+	if (dma2[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[1], dma2[dev], 1);
+	if (irq[dev] != SNDRV_AUTO_IRQ)
+		isapnp_resource_change(&pdev->irq_resource[0], irq[dev], 1);
 	if (pdev->activate(pdev)<0) {
 		snd_printk("isapnp configure failure (out of resources?)\n");
 		return -EBUSY;
 	}
-	snd_sb_port[dev] = pdev->resource[0].start;
-	snd_wss_port[dev] = pdev->resource[1].start;
-	snd_fm_port[dev] = pdev->resource[2].start;
-	snd_midi_port[dev] = pdev->resource[3].start;
-	snd_port[dev] = pdev->resource[4].start;
-	snd_dma1[dev] = pdev->dma_resource[0].start;
-	snd_dma2[dev] = pdev->dma_resource[1].start;
-	snd_irq[dev] = pdev->irq_resource[0].start;
+	sb_port[dev] = pdev->resource[0].start;
+	wss_port[dev] = pdev->resource[1].start;
+	fm_port[dev] = pdev->resource[2].start;
+	midi_port[dev] = pdev->resource[3].start;
+	port[dev] = pdev->resource[4].start;
+	dma1[dev] = pdev->dma_resource[0].start;
+	dma2[dev] = pdev->dma_resource[1].start;
+	irq[dev] = pdev->irq_resource[0].start;
 	snd_printdd("isapnp OPL3-SA: sb port=0x%lx, wss port=0x%lx, fm port=0x%lx, midi port=0x%lx\n",
-		snd_sb_port[dev], snd_wss_port[dev], snd_fm_port[dev], snd_midi_port[dev]);
+		sb_port[dev], wss_port[dev], fm_port[dev], midi_port[dev]);
 	snd_printdd("isapnp OPL3-SA: control port=0x%lx, dma1=%i, dma2=%i, irq=%i\n",
-		snd_port[dev], snd_dma1[dev], snd_dma2[dev], snd_irq[dev]);
+		port[dev], dma1[dev], dma2[dev], irq[dev]);
 	return 0;
 }
 
@@ -719,7 +719,7 @@ static int snd_opl3sa2_dev_free(snd_device_t *device)
 
 static int __init snd_opl3sa2_probe(int dev)
 {
-	int irq, dma1, dma2;
+	int xirq, xdma1, xdma2;
 	snd_card_t *card;
 	struct snd_opl3sa2 *chip;
 	cs4231_t *cs4231;
@@ -730,28 +730,28 @@ static int __init snd_opl3sa2_probe(int dev)
 	int err;
 
 #ifdef __ISAPNP__
-	if (!snd_isapnp[dev]) {
+	if (!isapnp[dev]) {
 #endif
-		if (snd_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_port\n");
+		if (port[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify port\n");
 			return -EINVAL;
 		}
-		if (snd_wss_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_wss_port\n");
+		if (wss_port[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify wss_port\n");
 			return -EINVAL;
 		}
-		if (snd_fm_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_fm_port\n");
+		if (fm_port[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify fm_port\n");
 			return -EINVAL;
 		}
-		if (snd_midi_port[dev] == SNDRV_AUTO_PORT) {
-			snd_printk("specify snd_midi_port\n");
+		if (midi_port[dev] == SNDRV_AUTO_PORT) {
+			snd_printk("specify midi_port\n");
 			return -EINVAL;
 		}
 #ifdef __ISAPNP__
 	}
 #endif
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 	strcpy(card->driver, "OPL3SA2");
@@ -765,31 +765,31 @@ static int __init snd_opl3sa2_probe(int dev)
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
 #ifdef __ISAPNP__
-	if (snd_isapnp[dev] && (err = snd_opl3sa2_isapnp(dev, chip)) < 0)
+	if (isapnp[dev] && (err = snd_opl3sa2_isapnp(dev, chip)) < 0)
 		goto __error;
 #endif
-	chip->ymode = snd_opl3sa3_ymode[dev] & 0x03 ; /* initialise this card from supplied (or default) parameter*/ 
+	chip->ymode = opl3sa3_ymode[dev] & 0x03 ; /* initialise this card from supplied (or default) parameter*/ 
 	chip->card = card;
-	chip->port = snd_port[dev];
-	irq = snd_irq[dev];
-	dma1 = snd_dma1[dev];
-	dma2 = snd_dma2[dev];
-	if (dma2 < 0)
+	chip->port = port[dev];
+	xirq = irq[dev];
+	xdma1 = dma1[dev];
+	xdma2 = dma2[dev];
+	if (xdma2 < 0)
 		chip->single_dma = 1;
 	if ((err = snd_opl3sa2_detect(chip)) < 0)
 		goto __error;
-	if (request_irq(irq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
+	if (request_irq(xirq, snd_opl3sa2_interrupt, SA_INTERRUPT, "OPL3-SA2/3", (void *)chip)) {
 		err = -ENODEV;
 		goto __error;
 	}
-	chip->irq = irq;
+	chip->irq = xirq;
 	if ((err = snd_cs4231_create(card,
-				     snd_wss_port[dev] + 4, -1,
-				     irq, dma1, dma2,
+				     wss_port[dev] + 4, -1,
+				     xirq, xdma1, xdma2,
 				     CS4231_HW_OPL3SA2,
 				     CS4231_HWSHARE_IRQ,
 				     &cs4231)) < 0) {
-		snd_printd("Oops, WSS not detected at 0x%lx\n", snd_wss_port[dev] + 4);
+		snd_printd("Oops, WSS not detected at 0x%lx\n", wss_port[dev] + 4);
 		goto __error;
 	}
 	chip->cs4231 = cs4231;
@@ -801,9 +801,9 @@ static int __init snd_opl3sa2_probe(int dev)
 		goto __error;
 	if ((err = snd_cs4231_timer(cs4231, 0, NULL)) < 0)
 		goto __error;
-	if (snd_fm_port[dev] >= 0x340 && snd_fm_port[dev] < 0x400) {
-		if ((err = snd_opl3_create(card, snd_fm_port[dev],
-					   snd_fm_port[dev] + 2,
+	if (fm_port[dev] >= 0x340 && fm_port[dev] < 0x400) {
+		if ((err = snd_opl3_create(card, fm_port[dev],
+					   fm_port[dev] + 2,
 					   OPL3_HW_OPL3, 0, &opl3)) < 0)
 			goto __error;
 		if ((err = snd_opl3_timer_new(opl3, 1, 2)) < 0)
@@ -811,10 +811,10 @@ static int __init snd_opl3sa2_probe(int dev)
 		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, &chip->synth)) < 0)
 			goto __error;
 	}
-	if (snd_midi_port[dev] >= 0x300 && snd_midi_port[dev] < 0x340) {
+	if (midi_port[dev] >= 0x300 && midi_port[dev] < 0x340) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_OPL3SA2,
-					       snd_midi_port[dev], 0,
-					       irq, 0, &chip->rmidi)) < 0)
+					       midi_port[dev], 0,
+					       xirq, 0, &chip->rmidi)) < 0)
 			goto __error;
 	}
 #ifdef CONFIG_PM
@@ -837,9 +837,9 @@ static int __init snd_opl3sa2_probe(int dev)
 #endif
 
 	sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
-		card->shortname, chip->port, irq, dma1);
+		card->shortname, chip->port, xirq, xdma1);
 	if (dma2 >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", dma2);
+		sprintf(card->longname + strlen(card->longname), "&%d", xdma2);
 
 	if ((err = snd_card_register(card)) < 0)
 		goto __error;
@@ -860,7 +860,7 @@ static int __init snd_opl3sa2_isapnp_detect(struct isapnp_card *card,
         int res;
 
         for ( ; dev < SNDRV_CARDS; dev++) {
-                if (!snd_enable[dev])
+                if (!enable[dev])
                         continue;
                 snd_opl3sa2_isapnp_cards[dev] = card;
                 snd_opl3sa2_isapnp_id[dev] = id;
@@ -879,10 +879,10 @@ static int __init alsa_card_opl3sa2_init(void)
 	int dev, cards = 0;
 
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev])
+		if (!enable[dev])
 			continue;
 #ifdef __ISAPNP__
-		if (snd_isapnp[dev])
+		if (isapnp[dev])
 			continue;
 #endif
 		if (snd_opl3sa2_probe(dev) >= 0)
@@ -913,10 +913,10 @@ module_exit(alsa_card_opl3sa2_exit)
 
 #ifndef MODULE
 
-/* format is: snd-opl3sa2=snd_enable,snd_index,snd_id,snd_isapnp,
-			  snd_port,snd_sb_port,snd_wss_port,snd_fm_port,
-			  snd_midi_port,snd_irq,snd_dma1,snd_dma2,
-			  snd_opl3sa3_ymode */
+/* format is: snd-opl3sa2=enable,index,id,isapnp,
+			  port,sb_port,wss_port,fm_port,
+			  midi_port,irq,dma1,dma2,
+			  opl3sa3_ymode */
 
 static int __init alsa_card_opl3sa2_setup(char *str)
 {
@@ -925,22 +925,22 @@ static int __init alsa_card_opl3sa2_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_sb_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_wss_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_fm_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_midi_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma1[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma2[nr_dev]) == 2 &&
-	       get_option(&str,&snd_opl3sa3_ymode[nr_dev]) == 2);
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&sb_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&wss_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&midi_port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2 &&
+	       get_option(&str,&dma2[nr_dev]) == 2 &&
+	       get_option(&str,&opl3sa3_ymode[nr_dev]) == 2);
 #ifdef __ISAPNP__
 	if (pnp != INT_MAX)
-		snd_isapnp[nr_dev] = pnp;
+		isapnp[nr_dev] = pnp;
 #endif
 	nr_dev++;
 	return 1;

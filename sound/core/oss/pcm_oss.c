@@ -37,22 +37,22 @@
 #include <linux/soundcard.h>
 #include <sound/initval.h>
 
-static int snd_dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
-static int snd_adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
-static int snd_nonblock_open;
+static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
+static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
+static int nonblock_open;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
 MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
-MODULE_PARM(snd_dsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dsp_map, "PCM device number assigned to 1st OSS device.");
-MODULE_PARM_SYNTAX(snd_dsp_map, "default:0,skill:advanced");
-MODULE_PARM(snd_adsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_adsp_map, "PCM device number assigned to 2nd OSS device.");
-MODULE_PARM_SYNTAX(snd_adsp_map, "default:1,skill:advanced");
-MODULE_PARM(snd_nonblock_open, "i");
-MODULE_PARM_DESC(snd_nonblock_open, "Don't block opening busy PCM devices.");
-MODULE_PARM_SYNTAX(snd_nonblock_open, "default:0,skill:advanced");
+MODULE_PARM(dsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
+MODULE_PARM_SYNTAX(dsp_map, "default:0,skill:advanced");
+MODULE_PARM(adsp_map, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
+MODULE_PARM_SYNTAX(adsp_map, "default:1,skill:advanced");
+MODULE_PARM(nonblock_open, "i");
+MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
+MODULE_PARM_SYNTAX(nonblock_open, "default:0,skill:advanced");
 
 extern int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long arg);
 static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file);
@@ -1536,7 +1536,7 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 
 	snd_assert(cardnum >= 0 && cardnum < SNDRV_CARDS, return -ENXIO);
 	device = SNDRV_MINOR_OSS_DEVICE(minor) == SNDRV_MINOR_OSS_PCM1 ?
-		snd_adsp_map[cardnum] : snd_dsp_map[cardnum];
+		adsp_map[cardnum] : dsp_map[cardnum];
 
 #ifdef LINUX_2_2
 	MOD_INC_USE_COUNT;
@@ -1572,7 +1572,7 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 			nonblock = 0;
 	}
 	if (!nonblock)
-		nonblock = snd_nonblock_open;
+		nonblock = nonblock_open;
 
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&pcm->open_wait, &wait);
@@ -2115,7 +2115,7 @@ static int snd_pcm_oss_register_minor(unsigned short native_minor,
 				      snd_pcm_t * pcm)
 {
 	pcm->oss.reg = 0;
-	if (snd_dsp_map[pcm->card->number] == pcm->device) {
+	if (dsp_map[pcm->card->number] == pcm->device) {
 		char name[128];
 		int duplex;
 		register_oss_dsp(native_minor, pcm, 0);
@@ -2130,7 +2130,7 @@ static int snd_pcm_oss_register_minor(unsigned short native_minor,
 #endif
 		pcm->oss.reg++;
 	}
-	if (snd_adsp_map[pcm->card->number] == pcm->device) {
+	if (adsp_map[pcm->card->number] == pcm->device) {
 		register_oss_dsp(native_minor, pcm, 1);
 		pcm->oss.reg++;
 	}
@@ -2145,14 +2145,14 @@ static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
 				        snd_pcm_t * pcm)
 {
 	if (pcm->oss.reg) {
-		if (snd_dsp_map[pcm->card->number] == pcm->device) {
+		if (dsp_map[pcm->card->number] == pcm->device) {
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
 						  pcm->card, 0);
 #ifdef SNDRV_OSS_INFO_DEV_AUDIO
 			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_AUDIO, pcm->card->number);
 #endif
 		}
-		if (snd_adsp_map[pcm->card->number] == pcm->device)
+		if (adsp_map[pcm->card->number] == pcm->device)
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
 						  pcm->card, 1);
 		pcm->oss.reg = 0;
@@ -2176,13 +2176,13 @@ static int __init alsa_pcm_oss_init(void)
 		return err;
 	/* check device map table */
 	for (i = 0; i < SNDRV_CARDS; i++) {
-		if (snd_dsp_map[i] < 0 || snd_dsp_map[i] >= SNDRV_PCM_DEVICES) {
-			snd_printk("invalid dsp_map[%d] = %d\n", i, snd_dsp_map[i]);
-			snd_dsp_map[i] = 0;
+		if (dsp_map[i] < 0 || dsp_map[i] >= SNDRV_PCM_DEVICES) {
+			snd_printk("invalid dsp_map[%d] = %d\n", i, dsp_map[i]);
+			dsp_map[i] = 0;
 		}
-		if (snd_adsp_map[i] < 0 || snd_adsp_map[i] >= SNDRV_PCM_DEVICES) {
-			snd_printk("invalid adsp_map[%d] = %d\n", i, snd_adsp_map[i]);
-			snd_adsp_map[i] = 1;
+		if (adsp_map[i] < 0 || adsp_map[i] >= SNDRV_PCM_DEVICES) {
+			snd_printk("invalid adsp_map[%d] = %d\n", i, adsp_map[i]);
+			adsp_map[i] = 1;
 		}
 	}
 	return 0;

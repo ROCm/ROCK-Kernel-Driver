@@ -53,31 +53,31 @@ MODULE_DEVICES("{{S3,SonicVibes PCI}}");
 #define PCI_DEVICE_ID_S3_SONICVIBES  0xca00
 #endif
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_reverb[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_mge[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static unsigned int snd_dmaio = 0x7a00;	/* DDMA i/o address */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int reverb[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int mge[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static unsigned int dmaio = 0x7a00;	/* DDMA i/o address */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_reverb, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_reverb, "Enable reverb (SRAM is present) for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_reverb, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_mge, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_mge, "MIC Gain Enable for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_mge, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_dmaio, "i");
-MODULE_PARM_DESC(snd_dmaio, "DDMA i/o base address for S3 SonicVibes soundcard.");
-MODULE_PARM_SYNTAX(snd_dmaio, "global," SNDRV_PORT_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(reverb, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(reverb, "Enable reverb (SRAM is present) for S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(reverb, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
+MODULE_PARM(mge, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(mge, "MIC Gain Enable for S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(mge, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
+MODULE_PARM(dmaio, "i");
+MODULE_PARM_DESC(dmaio, "DDMA i/o base address for S3 SonicVibes soundcard.");
+MODULE_PARM_SYNTAX(dmaio, "global," SNDRV_PORT_DESC);
 
 /*
  * Enhanced port direct registers
@@ -1313,17 +1313,17 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 
 	pci_read_config_dword(pci, 0x40, &dmaa);
 	pci_read_config_dword(pci, 0x48, &dmac);
-	snd_dmaio &= ~0x0f;
+	dmaio &= ~0x0f;
 	dmaa &= ~0x0f;
 	dmac &= ~0x0f;
 	if (!dmaa) {
-		dmaa = snd_dmaio;
-		snd_dmaio += 0x10;
+		dmaa = dmaio;
+		dmaio += 0x10;
 		snd_printk("BIOS did not allocate DDMA channel A i/o, allocated at 0x%x\n", dmaa);
 	}
 	if (!dmac) {
-		dmac = snd_dmaio;
-		snd_dmaio += 0x10;
+		dmac = dmaio;
+		dmaio += 0x10;
 		snd_printk("BIOS did not allocate DDMA channel C i/o, allocated at 0x%x\n", dmac);
 	}
 	pci_write_config_dword(pci, 0x40, dmaa);
@@ -1450,7 +1450,7 @@ static int __devinit snd_sonicvibes_midi(sonicvibes_t * sonic, snd_rawmidi_t * r
 }
 
 static int __devinit snd_sonic_probe(struct pci_dev *pci,
-				     const struct pci_device_id *id)
+				     const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -1461,12 +1461,12 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
  
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 	for (idx = 0; idx < 5; idx++) {
@@ -1477,8 +1477,8 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 		}
 	}
 	if ((err = snd_sonicvibes_create(card, pci,
-					 snd_reverb[dev] ? 1 : 0,
-					 snd_mge[dev] ? 1 : 0,
+					 reverb[dev] ? 1 : 0,
+					 mge[dev] ? 1 : 0,
 					 &sonic)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1567,8 +1567,8 @@ module_exit(alsa_card_sonicvibes_exit)
 
 #ifndef MODULE
 
-/* format is: snd-sonicvibes=snd_enable,snd_index,snd_id,
-			     snd_reverb,snd_mge,snd_dmaio */
+/* format is: snd-sonicvibes=enable,index,id,
+			     reverb,mge,dmaio */
 
 static int __init alsa_card_sonicvibes_setup(char *str)
 {
@@ -1576,12 +1576,12 @@ static int __init alsa_card_sonicvibes_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_reverb[nr_dev]) == 2 &&
-	       get_option(&str,&snd_mge[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_dmaio) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&reverb[nr_dev]) == 2 &&
+	       get_option(&str,&mge[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&dmaio) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -41,13 +41,13 @@
 #define DEFAULT_TIMER_LIMIT 2
 #endif
 
-int snd_timer_limit = DEFAULT_TIMER_LIMIT;
+int timer_limit = DEFAULT_TIMER_LIMIT;
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA timer interface");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
-MODULE_PARM(snd_timer_limit, "i");
-MODULE_PARM_DESC(snd_timer_limit, "Maximum global timers in system.");
+MODULE_PARM(timer_limit, "i");
+MODULE_PARM_DESC(timer_limit, "Maximum global timers in system.");
 
 typedef struct {
 	snd_timer_instance_t *timeri;
@@ -152,7 +152,7 @@ static void snd_timer_request(snd_timer_id_t *tid)
 	
 	switch (tid->dev_class) {
 	case SNDRV_TIMER_CLASS_GLOBAL:
-		if (tid->device >= snd_timer_limit)
+		if (tid->device >= timer_limit)
 			return;
 		sprintf(str, "snd-timer-%i", tid->device);
 		break;

@@ -57,27 +57,27 @@ MODULE_DEVICES("{{ESS,Maestro3 PCI},"
 		"{ESS,Allegro-1 PCI},"
 	        "{ESS,Canyon3D-2/LE PCI}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP; /* all enabled */
-static int snd_external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
-static int snd_amp_gpio[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP; /* all enabled */
+static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int amp_gpio[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_external_amp, "Enable external amp for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
-MODULE_PARM(snd_amp_gpio, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_amp_gpio, "GPIO pin number for external amp. (default = -1)");
-MODULE_PARM_SYNTAX(snd_amp_gpio, SNDRV_ENABLED);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable this soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(external_amp, "Enable external amp for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+MODULE_PARM(amp_gpio, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(amp_gpio, "GPIO pin number for external amp. (default = -1)");
+MODULE_PARM_SYNTAX(amp_gpio, SNDRV_ENABLED);
 
 #define MAX_PLAYBACKS	2
 #define MAX_CAPTURES	1
@@ -2652,7 +2652,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 /*
  */
 static int __devinit
-snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *id)
+snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -2665,12 +2665,12 @@ snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *id)
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -2689,8 +2689,8 @@ snd_m3_probe(struct pci_dev *pci, const struct pci_device_id *id)
 	}
 
 	if ((err = snd_m3_create(card, pci,
-				 snd_external_amp[dev],
-				 snd_amp_gpio[dev],
+				 external_amp[dev],
+				 amp_gpio[dev],
 				 &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2752,7 +2752,7 @@ module_exit(alsa_card_m3_exit)
 
 #ifndef MODULE
 
-/* format is: snd-maestro3=snd_enable,snd_index,snd_id,snd_external_amp,snd_amp_gpio */
+/* format is: snd-maestro3=enable,index,id,external_amp,amp_gpio */
 
 static int __init alsa_card_maestro3_setup(char *str)
 {
@@ -2760,11 +2760,11 @@ static int __init alsa_card_maestro3_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_external_amp[nr_dev]) == 2 &&
-	       get_option(&str,&snd_amp_gpio[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&external_amp[nr_dev]) == 2 &&
+	       get_option(&str,&amp_gpio[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

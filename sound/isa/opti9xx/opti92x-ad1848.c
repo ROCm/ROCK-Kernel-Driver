@@ -72,54 +72,54 @@ MODULE_DEVICES("{{OPTi,82C924 (AD1848)},"
 #endif	/* CS4231 */
 #endif	/* OPTi93X */
 
-static int snd_index = SNDRV_DEFAULT_IDX1;	/* Index 0-MAX */
-static char *snd_id = SNDRV_DEFAULT_STR1;		/* ID for this card */
-//static int snd_enable = SNDRV_DEFAULT_ENABLE1;	/* Enable this card */
-static int snd_isapnp = 1;			/* Enable ISA PnP detection */
-static long snd_port = SNDRV_DEFAULT_PORT1; 	/* 0x530,0xe80,0xf40,0x604 */
-static long snd_mpu_port = SNDRV_DEFAULT_PORT1;	/* 0x300,0x310,0x320,0x330 */
-static long snd_fm_port = SNDRV_DEFAULT_PORT1;	/* 0x388 */
-static int snd_irq = SNDRV_DEFAULT_IRQ1;		/* 5,7,9,10,11 */
-static int snd_mpu_irq = SNDRV_DEFAULT_IRQ1;	/* 5,7,9,10 */
-static int snd_dma1 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
+static int index = SNDRV_DEFAULT_IDX1;	/* Index 0-MAX */
+static char *id = SNDRV_DEFAULT_STR1;		/* ID for this card */
+//static int enable = SNDRV_DEFAULT_ENABLE1;	/* Enable this card */
+static int isapnp = 1;			/* Enable ISA PnP detection */
+static long port = SNDRV_DEFAULT_PORT1; 	/* 0x530,0xe80,0xf40,0x604 */
+static long mpu_port = SNDRV_DEFAULT_PORT1;	/* 0x300,0x310,0x320,0x330 */
+static long fm_port = SNDRV_DEFAULT_PORT1;	/* 0x388 */
+static int irq = SNDRV_DEFAULT_IRQ1;		/* 5,7,9,10,11 */
+static int mpu_irq = SNDRV_DEFAULT_IRQ1;	/* 5,7,9,10 */
+static int dma1 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 #if defined(CS4231) || defined(OPTi93X)
-static int snd_dma2 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
+static int dma2 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 #endif	/* CS4231 || OPTi93X */
 
-MODULE_PARM(snd_index, "i");
-MODULE_PARM_DESC(snd_index, "Index value for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "s");
-MODULE_PARM_DESC(snd_id, "ID string for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-//MODULE_PARM(snd_enable, "i");
-//MODULE_PARM_DESC(snd_enable, "Enable opti9xx soundcard.");
-//MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_isapnp, "i");
-MODULE_PARM_DESC(snd_isapnp, "Enable ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
-MODULE_PARM(snd_port, "l");
-MODULE_PARM_DESC(snd_port, "WSS port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_PORT_DESC);
-MODULE_PARM(snd_mpu_port, "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_PORT_DESC);
-MODULE_PARM(snd_fm_port, "l");
-MODULE_PARM_DESC(snd_fm_port, "FM port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_PORT_DESC);
-MODULE_PARM(snd_irq, "i");
-MODULE_PARM_DESC(snd_irq, "WSS irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_mpu_irq, "i");
-MODULE_PARM_DESC(snd_mpu_irq, "MPU-401 irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_mpu_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_dma1, "i");
-MODULE_PARM_DESC(snd_dma1, "1st dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA_DESC);
+MODULE_PARM(index, "i");
+MODULE_PARM_DESC(index, "Index value for opti9xx based soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "s");
+MODULE_PARM_DESC(id, "ID string for opti9xx based soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+//MODULE_PARM(enable, "i");
+//MODULE_PARM_DESC(enable, "Enable opti9xx soundcard.");
+//MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(isapnp, "i");
+MODULE_PARM_DESC(isapnp, "Enable ISA PnP detection for specified soundcard.");
+MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
+MODULE_PARM(port, "l");
+MODULE_PARM_DESC(port, "WSS port # for opti9xx driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_PORT_DESC);
+MODULE_PARM(mpu_port, "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port # for opti9xx driver.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
+MODULE_PARM(fm_port, "l");
+MODULE_PARM_DESC(fm_port, "FM port # for opti9xx driver.");
+MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT_DESC);
+MODULE_PARM(irq, "i");
+MODULE_PARM_DESC(irq, "WSS irq # for opti9xx driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+MODULE_PARM(mpu_irq, "i");
+MODULE_PARM_DESC(mpu_irq, "MPU-401 irq # for opti9xx driver.");
+MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
+MODULE_PARM(dma1, "i");
+MODULE_PARM_DESC(dma1, "1st dma # for opti9xx driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 #if defined(CS4231) || defined(OPTi93X)
-MODULE_PARM(snd_dma2, "i");
-MODULE_PARM_DESC(snd_dma2, "2nd dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(snd_dma2, SNDRV_DMA_DESC);
+MODULE_PARM(dma2, "i");
+MODULE_PARM_DESC(dma2, "2nd dma # for opti9xx driver.");
+MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 #endif	/* CS4231 || OPTi93X */
 
 #define OPTi9XX_HW_DETECT	0
@@ -1729,22 +1729,22 @@ static int __init snd_card_opti9xx_isapnp(opti9xx_t *chip)
 		return -EAGAIN;
 
 #ifdef OPTi93X
-	if (snd_port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_port + 4, 4);
+	if (port != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[0], port + 4, 4);
 #else
-	if ((pid->card_device != ISAPNP_DEVICE(0x0924)) && (snd_port != SNDRV_AUTO_PORT))
-		isapnp_resource_change(&pdev->resource[1], snd_port, 4);
+	if ((pid->card_device != ISAPNP_DEVICE(0x0924)) && (port != SNDRV_AUTO_PORT))
+		isapnp_resource_change(&pdev->resource[1], port, 4);
 #endif	/* OPTi93X */
-	if (snd_irq != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], snd_irq, 1);
-	if (snd_dma1 != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], snd_dma1, 1);
+	if (irq != SNDRV_AUTO_IRQ)
+		isapnp_resource_change(&pdev->irq_resource[0], irq, 1);
+	if (dma1 != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[0], dma1, 1);
 #if defined(CS4231) || defined(OPTi93X)
-	if (snd_dma2 != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], snd_dma2, 1);
+	if (dma2 != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[1], dma2, 1);
 #endif	/* CS4231 || OPTi93X */
-	if (snd_fm_port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[1], snd_fm_port, 4);
+	if (fm_port != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[1], fm_port, 4);
 
 	if (pdev->activate(pdev) < 0) {
 		snd_printk("AUDIO isapnp configure failure\n");
@@ -1752,38 +1752,38 @@ static int __init snd_card_opti9xx_isapnp(opti9xx_t *chip)
 	}
 
 #ifdef OPTi93X
-	snd_port = pdev->resource[0].start - 4;
-	snd_fm_port = pdev->resource[1].start;
+	port = pdev->resource[0].start - 4;
+	fm_port = pdev->resource[1].start;
 #else
 	if (pid->card_device != ISAPNP_DEVICE(0x0924))
-		snd_port = pdev->resource[1].start;
-	snd_fm_port = pdev->resource[2].start;
+		port = pdev->resource[1].start;
+	fm_port = pdev->resource[2].start;
 #endif	/* OPTi93X */
-	snd_irq = pdev->irq_resource[0].start;
-	snd_dma1 = pdev->dma_resource[0].start;
+	irq = pdev->irq_resource[0].start;
+	dma1 = pdev->dma_resource[0].start;
 #if defined(CS4231) || defined(OPTi93X)
-	snd_dma2 = pdev->dma_resource[1].start;
+	dma2 = pdev->dma_resource[1].start;
 #endif	/* CS4231 || OPTi93X */
 
 	pdev = chip->devmpu;
 	if (pdev == NULL || pdev->prepare(pdev) < 0) {
-		snd_mpu_port = -1;
+		mpu_port = -1;
 		chip->devmpu = NULL;
 		return pid->card_device;
 	}
 
-	if (snd_mpu_port != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_mpu_port, 2);
-	if (snd_mpu_irq != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], snd_mpu_irq, 1);
+	if (mpu_port != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[0], mpu_port, 2);
+	if (mpu_irq != SNDRV_AUTO_IRQ)
+		isapnp_resource_change(&pdev->irq_resource[0], mpu_irq, 1);
 
 	if (pdev->activate(pdev) < 0) {
 		snd_printk("MPU-401 isapnp configure failure\n");
-		snd_mpu_port = -1;
+		mpu_port = -1;
 		chip->devmpu = NULL;
 	} else {
-		snd_mpu_port = pdev->resource[0].start;
-		snd_mpu_irq = pdev->irq_resource[0].start;
+		mpu_port = pdev->resource[0].start;
+		mpu_irq = pdev->irq_resource[0].start;
 	}
 	return pid->card_device;
 }
@@ -1809,55 +1809,55 @@ static int __init snd_card_opti9xx_resources(struct snd_card_opti9xx *chip,
 
 #ifndef OPTi93X
 	if (chip->chip->hardware == OPTi9XX_HW_82C928)
-		snd_mpu_port = -1;
+		mpu_port = -1;
 #endif	/* OPTi93X */
 	error = 0;
-	if (!pnp && (snd_mpu_port == SNDRV_DEFAULT_PORT1)) {
+	if (!pnp && (mpu_port == SNDRV_DEFAULT_PORT1)) {
 		for (i = 0; possible_mpu_ports[i] != -1; i++)
 			if (!snd_register_ioport(card, possible_mpu_ports[i], 2,
 					DRIVER_NAME" - MPU-401", NULL)) {
-				snd_mpu_port = possible_mpu_ports[i];
+				mpu_port = possible_mpu_ports[i];
 				break;
 			}
-		if (snd_mpu_port == SNDRV_DEFAULT_PORT1)
+		if (mpu_port == SNDRV_DEFAULT_PORT1)
 			error = -EBUSY;
 	}
 	else
-		error = (snd_mpu_port == -1) ? -ENODEV :
-			snd_register_ioport(card, snd_mpu_port, 2,
+		error = (mpu_port == -1) ? -ENODEV :
+			snd_register_ioport(card, mpu_port, 2,
 			DRIVER_NAME" - MPU-401", NULL);
 	if (error)
 		chip->chip->mpu_port = -1;
-	else if (pnp && (snd_irq == snd_mpu_irq))
-		chip->chip->mpu_irq = snd_mpu_irq;
+	else if (pnp && (irq == mpu_irq))
+		chip->chip->mpu_irq = mpu_irq;
 	else if (!snd_register_interrupt(card,
 			DRIVER_NAME" - MPU-401",
-			snd_mpu_irq, SNDRV_IRQ_TYPE_ISA,
+			mpu_irq, SNDRV_IRQ_TYPE_ISA,
 			snd_card_opti9xx_mpu_interrupt, chip,
 			pnp ? no_alternatives : possible_mpu_irqs,
 			&chip->mpuirqptr)) {
-		chip->chip->mpu_port = snd_mpu_port;
+		chip->chip->mpu_port = mpu_port;
 		chip->chip->mpu_irq = chip->mpuirqptr->irq;
 	}
 	else
 		chip->chip->mpu_port = -1;
 
-	if (!pnp && (snd_port == SNDRV_DEFAULT_PORT1)) {
+	if (!pnp && (port == SNDRV_DEFAULT_PORT1)) {
 		for (i = 0; possible_ports[i] != -1; i++)
 			if (!snd_register_ioport(card, possible_ports[i], 8,
 					DRIVER_NAME" - WSS", NULL)) {
-				snd_port = possible_ports[i];
+				port = possible_ports[i];
 				break;
 			}
-		if (snd_port == SNDRV_DEFAULT_PORT1)
+		if (port == SNDRV_DEFAULT_PORT1)
 			return -EBUSY;
 	}
-	else if ((error = snd_register_ioport(card, snd_port, 8,
+	else if ((error = snd_register_ioport(card, port, 8,
 			DRIVER_NAME" - WSS", NULL)) < 0)
 		return error;
-	chip->chip->wss_base = snd_port;
+	chip->chip->wss_base = port;
 	if ((error = snd_register_interrupt(card, DRIVER_NAME" - WSS",
-			snd_irq, SNDRV_IRQ_TYPE_ISA,
+			irq, SNDRV_IRQ_TYPE_ISA,
 			snd_card_opti9xx_interrupt, chip,
 			pnp ? no_alternatives : possible_irqs,
 			&chip->irqptr)) < 0)
@@ -1869,14 +1869,14 @@ static int __init snd_card_opti9xx_resources(struct snd_card_opti9xx *chip,
 #else
 			DRIVER_NAME" - WSS",
 #endif	/* CS4231 || OPTi93X */
-			snd_dma1, SNDRV_DMA_TYPE_ISA, snd_dma1_size,
+			dma1, SNDRV_DMA_TYPE_ISA, dma1_size,
 			pnp ? no_alternatives : possible_dma1s,
 			&chip->dma1ptr)) < 0)
 		return error;
 	chip->chip->dma1 = chip->dma1ptr->dma;
 #if defined(CS4231) || defined(OPTi93X)
 	if ((error = snd_register_dma_channel(card, DRIVER_NAME" - WSS capture",
-			snd_dma2, SNDRV_DMA_TYPE_ISA, snd_dma2_size,
+			dma2, SNDRV_DMA_TYPE_ISA, dma2_size,
 			pnp ? no_alternatives :
 				possible_dma2s[chip->dma1ptr->dma],
 			&chip->dma2ptr)) < 0)
@@ -1885,10 +1885,10 @@ static int __init snd_card_opti9xx_resources(struct snd_card_opti9xx *chip,
 #endif	/* CS4231 || OPTi93X */
 
 	if (snd_register_ioport(card,
-			pnp ? snd_fm_port : snd_fm_port = 0x388, 4,
+			pnp ? fm_port : fm_port = 0x388, 4,
 			DRIVER_NAME" - OPL", NULL) < 0)
-		snd_fm_port = -1;
-	chip->chip->fm_port = snd_fm_port;
+		fm_port = -1;
+	chip->chip->fm_port = fm_port;
 
 	return 0;
 }
@@ -1941,14 +1941,14 @@ static int __init snd_card_opti9xx_probe(void)
 	int hw;
 #endif	/* __ISAPNP__ */
 
-	if (!(card = snd_card_new(snd_index, snd_id, THIS_MODULE,
+	if (!(card = snd_card_new(index, id, THIS_MODULE,
 				  sizeof(opti9xx_t))))
 		return -ENOMEM;
 	card->private_free = snd_card_opti9xx_free;
 	chip = (opti9xx_t *)card->private_data;
 
 #ifdef __ISAPNP__
-	if (snd_isapnp && (hw = snd_card_opti9xx_isapnp(chip)) > 0) {
+	if (isapnp && (hw = snd_card_opti9xx_isapnp(chip)) > 0) {
 		switch (hw) {
 		case ISAPNP_DEVICE(0x0924):
 			hw = OPTi9XX_HW_82C924;
@@ -1985,18 +1985,18 @@ static int __init snd_card_opti9xx_probe(void)
 		return -ENOMEM;
 	}
 
-	chip->wss_base = snd_port;
-	chip->fm_port = snd_fm_port;
-	chip->mpu_port = snd_mpu_port;
-	chip->irq = snd_irq;
-	chip->mpu_irq = snd_mpu_irq;
-	chip->dma1 = snd_dma1;
+	chip->wss_base = port;
+	chip->fm_port = fm_port;
+	chip->mpu_port = mpu_port;
+	chip->irq = irq;
+	chip->mpu_irq = mpu_irq;
+	chip->dma1 = dma1;
 #if defined(CS4231) || defined(OPTi93X)
-	chip->dma2 = snd_dma2;
+	chip->dma2 = dma2;
 #endif
 
 #ifdef __ISAPNP__
-	if (!snd_isapnp) {
+	if (!isapnp) {
 #endif
 	if (chip->wss_base == SNDRV_AUTO_PORT) {
 		if ((chip->wss_base = snd_legacy_find_free_ioport(possible_ports, 4)) < 0) {
@@ -2183,10 +2183,10 @@ module_exit(alsa_card_opti9xx_exit)
 
 #ifndef MODULE
 
-/* format is: snd-opti9xx=snd_enable,snd_index,snd_id,snd_isapnp,
-			  snd_port,snd_mpu_port,snd_fm_port,
-			  snd_irq,snd_mpu_irq,
-			  snd_dma1,[snd_dma2] */
+/* format is: snd-opti9xx=enable,index,id,isapnp,
+			  port,mpu_port,fm_port,
+			  irq,mpu_irq,
+			  dma1,[dma2] */
 
 static int __init alsa_card_opti9xx_setup(char *str)
 {
@@ -2194,23 +2194,23 @@ static int __init alsa_card_opti9xx_setup(char *str)
 	int __attribute__ ((__unused__)) pnp = INT_MAX;
 
 	(void)(get_option(&str,&enable) == 2 &&
-	       get_option(&str,&snd_index) == 2 &&
-	       get_id(&str,&snd_id) == 2 &&
+	       get_option(&str,&index) == 2 &&
+	       get_id(&str,&id) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&snd_port) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port) == 2 &&
-	       get_option(&str,(int *)&snd_fm_port) == 2 &&
-	       get_option(&str,&snd_irq) == 2 &&
-	       get_option(&str,&snd_mpu_irq) == 2 &&
-	       get_option(&str,&snd_dma1) == 2
+	       get_option(&str,(int *)&port) == 2 &&
+	       get_option(&str,(int *)&mpu_port) == 2 &&
+	       get_option(&str,(int *)&fm_port) == 2 &&
+	       get_option(&str,&irq) == 2 &&
+	       get_option(&str,&mpu_irq) == 2 &&
+	       get_option(&str,&dma1) == 2
 #if defined(CS4231) || defined(OPTi93X)
 	       &&
-	       get_option(&str,&snd_dma2) == 2
+	       get_option(&str,&dma2) == 2
 #endif
 	       );
 #ifdef __ISAPNP__
 	if (pnp != INT_MAX)
-		snd_isapnp = pnp;
+		isapnp = pnp;
 #endif
 	return 1;
 }

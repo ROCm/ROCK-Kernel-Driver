@@ -27,12 +27,12 @@
 #include "seq_queue.h"
 #include "seq_info.h"
 
-extern int snd_seq_default_timer_class;
-extern int snd_seq_default_timer_sclass;
-extern int snd_seq_default_timer_card;
-extern int snd_seq_default_timer_device;
-extern int snd_seq_default_timer_subdevice;
-extern int snd_seq_default_timer_resolution;
+extern int seq_default_timer_class;
+extern int seq_default_timer_sclass;
+extern int seq_default_timer_card;
+extern int seq_default_timer_device;
+extern int seq_default_timer_subdevice;
+extern int seq_default_timer_resolution;
 
 #define SKEW_BASE	0x10000	/* 16bit shift */
 
@@ -103,12 +103,12 @@ void snd_seq_timer_defaults(seq_timer_t * tmr)
 	tmr->running = 0;
 
 	tmr->type = SNDRV_SEQ_TIMER_ALSA;
-	tmr->alsa_id.dev_class = snd_seq_default_timer_class;
-	tmr->alsa_id.dev_sclass = snd_seq_default_timer_sclass;
-	tmr->alsa_id.card = snd_seq_default_timer_card;
-	tmr->alsa_id.device = snd_seq_default_timer_device;
-	tmr->alsa_id.subdevice = snd_seq_default_timer_subdevice;
-	tmr->preferred_resolution = snd_seq_default_timer_resolution;
+	tmr->alsa_id.dev_class = seq_default_timer_class;
+	tmr->alsa_id.dev_sclass = seq_default_timer_sclass;
+	tmr->alsa_id.card = seq_default_timer_card;
+	tmr->alsa_id.device = seq_default_timer_device;
+	tmr->alsa_id.subdevice = seq_default_timer_subdevice;
+	tmr->preferred_resolution = seq_default_timer_resolution;
 
 	tmr->skew = tmr->skew_base = SKEW_BASE;
 }

@@ -41,19 +41,19 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for RME Digi32 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for RME Digi32 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable RME Digi32 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for RME Digi32 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for RME Digi32 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable RME Digi32 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Martin Langer <martin-langer@gmx.de>");
 MODULE_DESCRIPTION("RME Digi32, Digi32/8, Digi32 PRO");
 MODULE_LICENSE("GPL");
@@ -1840,7 +1840,7 @@ static void snd_rme32_card_free(snd_card_t * card)
 }
 
 static int __devinit
-snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *id)
+snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 {
 	static int dev = 0;
 	rme32_t *rme32;
@@ -1848,7 +1848,7 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *id)
 	int err;
 
 	for (; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev]) {
+		if (!enable[dev]) {
 			dev++;
 			return -ENOENT;
 		}
@@ -1857,7 +1857,7 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *id)
 	if (dev >= SNDRV_CARDS) {
 		return -ENODEV;
 	}
-	if ((card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE,
+	if ((card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 				 sizeof(rme32_t))) == NULL)
 		return -ENOMEM;
 	card->private_free = snd_rme32_card_free;
@@ -1935,9 +1935,9 @@ static int __init alsa_card_rme32_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void) (get_option(&str, &snd_enable[nr_dev]) == 2 &&
-		get_option(&str, &snd_index[nr_dev]) == 2 &&
-		get_id(&str, &snd_id[nr_dev]) == 2);
+	(void) (get_option(&str, &enable[nr_dev]) == 2 &&
+		get_option(&str, &index[nr_dev]) == 2 &&
+		get_id(&str, &id[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -122,35 +122,35 @@ MODULE_DEVICES("{{ESS,Maestro 2e},"
 		"{ESS,Maestro 1},"
 		"{TerraTec,DMX}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 1-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_total_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1024 };
-static int snd_pcm_substreams_p[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4 };
-static int snd_pcm_substreams_c[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1 };
-static int snd_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 1-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int total_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1024 };
+static int pcm_substreams_p[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4 };
+static int pcm_substreams_c[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1 };
+static int clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_total_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_total_bufsize, "Total buffer size in kB.");
-MODULE_PARM_SYNTAX(snd_total_bufsize, SNDRV_ENABLED ",allows:{{1,4096}},skill:advanced");
-MODULE_PARM(snd_pcm_substreams_p, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pcm_substreams_p, "PCM Playback substreams for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_pcm_substreams_p, SNDRV_ENABLED ",allows:{{1,8}}");
-MODULE_PARM(snd_pcm_substreams_c, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pcm_substreams_c, "PCM Capture substreams for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_pcm_substreams_c, SNDRV_ENABLED ",allows:{{0,8}}");
-MODULE_PARM(snd_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
-MODULE_PARM_SYNTAX(snd_clock, SNDRV_ENABLED);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(total_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(total_bufsize, "Total buffer size in kB.");
+MODULE_PARM_SYNTAX(total_bufsize, SNDRV_ENABLED ",allows:{{1,4096}},skill:advanced");
+MODULE_PARM(pcm_substreams_p, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pcm_substreams_p, "PCM Playback substreams for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(pcm_substreams_p, SNDRV_ENABLED ",allows:{{1,8}}");
+MODULE_PARM(pcm_substreams_c, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pcm_substreams_c, "PCM Capture substreams for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(pcm_substreams_c, SNDRV_ENABLED ",allows:{{0,8}}");
+MODULE_PARM(clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
+MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
 
 
 /* PCI Dev ID's */
@@ -2667,7 +2667,7 @@ static snd_kcontrol_new_t snd_es1968_control_switches[] __devinitdata = {
 /*
  */
 static int __devinit snd_es1968_probe(struct pci_dev *pci,
-				      const struct pci_device_id *id)
+				      const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -2676,23 +2676,23 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (!card)
 		return -ENOMEM;
                 
-	if (snd_total_bufsize[dev] < 128)
-		snd_total_bufsize[dev] = 128;
-	if (snd_total_bufsize[dev] > 4096)
-		snd_total_bufsize[dev] = 4096;
+	if (total_bufsize[dev] < 128)
+		total_bufsize[dev] = 128;
+	if (total_bufsize[dev] > 4096)
+		total_bufsize[dev] = 4096;
 	if ((err = snd_es1968_create(card, pci,
-				     snd_total_bufsize[dev] * 1024, /* in bytes */
-				     snd_pcm_substreams_p[dev], 
-				     snd_pcm_substreams_c[dev],
+				     total_bufsize[dev] * 1024, /* in bytes */
+				     pcm_substreams_p[dev], 
+				     pcm_substreams_c[dev],
 				     &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2738,7 +2738,7 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 		}
 	}
 
-	chip->clock = snd_clock[dev];
+	chip->clock = clock[dev];
 	if (! chip->clock)
 		es1968_measure_clock(chip);
 
@@ -2817,11 +2817,11 @@ module_exit(alsa_card_es1968_exit)
 
 #ifndef MODULE
 
-/* format is: snd-es1968=snd_enable,snd_index,snd_id,
-			 snd_total_bufsize,
-			 snd_pcm_substreams_p,
-			 snd_pcm_substreams_c,
-			 snd_clock
+/* format is: snd-es1968=enable,index,id,
+			 total_bufsize,
+			 pcm_substreams_p,
+			 pcm_substreams_c,
+			 clock
 */
 
 static int __init alsa_card_es1968_setup(char *str)
@@ -2830,13 +2830,13 @@ static int __init alsa_card_es1968_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_total_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&snd_pcm_substreams_p[nr_dev]) == 2 &&
-	       get_option(&str,&snd_pcm_substreams_c[nr_dev]) == 2 &&
-	       get_option(&str,&snd_clock[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&total_bufsize[nr_dev]) == 2 &&
+	       get_option(&str,&pcm_substreams_p[nr_dev]) == 2 &&
+	       get_option(&str,&pcm_substreams_c[nr_dev]) == 2 &&
+	       get_option(&str,&clock[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

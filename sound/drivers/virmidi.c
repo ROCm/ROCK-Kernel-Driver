@@ -30,7 +30,7 @@
  *
  * Typical usage is like following:
  * - Load snd-virmidi module.
- *	# modprobe snd-virmidi snd_index=2
+ *	# modprobe snd-virmidi index=2
  *   Then, sequencer clients 72:0 to 75:0 will be created, which are
  *   mapped from /dev/snd/midiC1D0 to /dev/snd/midiC1D3, respectively.
  *
@@ -59,23 +59,23 @@ MODULE_DEVICES("{{ALSA,Virtual rawmidi device}}");
 
 #define MAX_MIDI_DEVICES	8
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = {1, [1 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_midi_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = {1, [1 ... (SNDRV_CARDS - 1)] = 0};
+static int midi_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for virmidi soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for virmidi soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_midi_devs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_midi_devs, "MIDI devices # (1-8)");
-MODULE_PARM_SYNTAX(snd_midi_devs, SNDRV_ENABLED ",allows:{{1,8}}");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for virmidi soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for virmidi soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable this soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(midi_devs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(midi_devs, "MIDI devices # (1-8)");
+MODULE_PARM_SYNTAX(midi_devs, SNDRV_ENABLED ",allows:{{1,8}}");
 
 typedef struct snd_card_virmidi {
 	snd_card_t *card;
@@ -91,20 +91,20 @@ static int __init snd_card_virmidi_probe(int dev)
 	struct snd_card_virmidi *vmidi;
 	int idx, err;
 
-	if (!snd_enable[dev])
+	if (!enable[dev])
 		return -ENODEV;
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE,
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 			    sizeof(struct snd_card_virmidi));
 	if (card == NULL)
 		return -ENOMEM;
 	vmidi = (struct snd_card_virmidi *)card->private_data;
 	vmidi->card = card;
 
-	if (snd_midi_devs[dev] > MAX_MIDI_DEVICES) {
+	if (midi_devs[dev] > MAX_MIDI_DEVICES) {
 		snd_printk("too much midi devices for virmidi %d: force to use %d\n", dev, MAX_MIDI_DEVICES);
-		snd_midi_devs[dev] = MAX_MIDI_DEVICES;
+		midi_devs[dev] = MAX_MIDI_DEVICES;
 	}
-	for (idx = 0; idx < snd_midi_devs[dev]; idx++) {
+	for (idx = 0; idx < midi_devs[dev]; idx++) {
 		snd_rawmidi_t *rmidi;
 		snd_virmidi_dev_t *rdev;
 		if ((err = snd_virmidi_new(card, idx, &rmidi)) < 0)
@@ -131,7 +131,7 @@ static int __init alsa_card_virmidi_init(void)
 {
 	int dev, cards;
 
-	for (dev = cards = 0; dev < SNDRV_CARDS && snd_enable[dev]; dev++) {
+	for (dev = cards = 0; dev < SNDRV_CARDS && enable[dev]; dev++) {
 		if (snd_card_virmidi_probe(dev) < 0) {
 #ifdef MODULE
 			printk(KERN_ERR "Card-VirMIDI #%i not found or device busy\n", dev + 1);
@@ -162,7 +162,7 @@ module_exit(alsa_card_virmidi_exit)
 
 #ifndef MODULE
 
-/* format is: snd-virmidi=snd_enable,snd_index,snd_id,snd_midi_devs */
+/* format is: snd-virmidi=enable,index,id,midi_devs */
 
 static int __init alsa_card_virmidi_setup(char *str)
 {
@@ -170,10 +170,10 @@ static int __init alsa_card_virmidi_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_midi_devs[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&midi_devs[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }
