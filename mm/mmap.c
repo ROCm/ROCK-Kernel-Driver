@@ -323,31 +323,6 @@ __insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 }
 
 /*
- * Dummy version of vma_prio_tree_next, just for this patch:
- * no radix priority search tree whatsoever, just implement interface
- * using the old lists: return the next vma overlapping [begin,end].
- */
-struct vm_area_struct *vma_prio_tree_next(
-	struct vm_area_struct *vma, struct prio_tree_root *root,
-	struct prio_tree_iter *iter, pgoff_t begin, pgoff_t end)
-{
-	struct list_head *next;
-	pgoff_t vba, vea;
-
-	next = vma? vma->shared.next: root->list.next;
-	while (next != &root->list) {
-		vma = list_entry(next, struct vm_area_struct, shared);
-		vba = vma->vm_pgoff;
-		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
-		/* Return vma if it overlaps [begin,end] */
-		if (vba <= end && vea >= begin)
-			return vma;
-		next = next->next;
-	}
-	return NULL;
-}
-
-/*
  * We cannot adjust vm_start, vm_end, vm_pgoff fields of a vma that is
  * already present in an i_mmap{_shared} tree without adjusting the tree.
  * The following helper function should be used when such adjustments

@@ -73,7 +73,15 @@ struct vm_area_struct {
 	 * For areas with an address space and backing store,
 	 * one of the address_space->i_mmap{,shared} trees.
 	 */
-	struct list_head shared;
+	union {
+		struct {
+			struct list_head list;
+			void *parent;	/* aligns with prio_tree_node parent */
+			struct vm_area_struct *head;
+		} vm_set;
+
+		struct prio_tree_node prio_tree_node;
+	} shared;
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;
@@ -589,27 +597,16 @@ extern void si_meminfo_node(struct sysinfo *val, int nid);
 
 static inline void vma_prio_tree_init(struct vm_area_struct *vma)
 {
-	INIT_LIST_HEAD(&vma->shared);
+	vma->shared.vm_set.list.next = NULL;
+	vma->shared.vm_set.list.prev = NULL;
+	vma->shared.vm_set.parent = NULL;
+	vma->shared.vm_set.head = NULL;
 }
 
-static inline void vma_prio_tree_add(struct vm_area_struct *vma,
-				     struct vm_area_struct *old)
-{
-	list_add(&vma->shared, &old->shared);
-}
-
-static inline void vma_prio_tree_insert(struct vm_area_struct *vma,
-					struct prio_tree_root *root)
-{
-	list_add_tail(&vma->shared, &root->list);
-}
-
-static inline void vma_prio_tree_remove(struct vm_area_struct *vma,
-					struct prio_tree_root *root)
-{
-	list_del_init(&vma->shared);
-}
-
+/* prio_tree.c */
+void vma_prio_tree_add(struct vm_area_struct *, struct vm_area_struct *old);
+void vma_prio_tree_insert(struct vm_area_struct *, struct prio_tree_root *);
+void vma_prio_tree_remove(struct vm_area_struct *, struct prio_tree_root *);
 struct vm_area_struct *vma_prio_tree_next(
 	struct vm_area_struct *, struct prio_tree_root *,
 	struct prio_tree_iter *, pgoff_t begin, pgoff_t end);
