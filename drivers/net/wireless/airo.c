@@ -1021,6 +1021,8 @@ struct airo_info {
 #define FLAG_UPDATE_MULTI 0x40
 #define FLAG_UPDATE_UNI   0x80
 #define FLAG_802_11    0x200
+#define FLAG_PENDING_XMIT   0x400
+#define FLAG_PENDING_XMIT11 0x800
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -1345,6 +1347,7 @@ static void airo_do_xmit(struct net_device *dev) {
 	u32 *fids = priv->fids;
 
 	if (down_trylock(&priv->sem) != 0) {
+		priv->flags |= FLAG_PENDING_XMIT;
 		netif_stop_queue(dev);
 		priv->xmit.task.func = (void (*)(void *))airo_do_xmit;
 		priv->xmit.task.data = (void *)dev;
@@ -1353,6 +1356,7 @@ static void airo_do_xmit(struct net_device *dev) {
 	}
 	status = transmit_802_3_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
+	priv->flags &= ~FLAG_PENDING_XMIT;
 
 	i = 0;
 	if ( status == SUCCESS ) {
@@ -1364,14 +1368,12 @@ static void airo_do_xmit(struct net_device *dev) {
 	}
 	if (i < MAX_FIDS / 2)
 		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 	dev_kfree_skb(skb);
 }
 
 static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	s16 len;
-	int i;
+	int i, j;
 	struct airo_info *priv = dev->priv;
 	u32 *fids = priv->fids;
 
@@ -1382,19 +1384,23 @@ static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 
 	/* Find a vacant FID */
 	for( i = 0; i < MAX_FIDS / 2 && (fids[i] & 0xffff0000); i++ );
+	for( j = i + 1; j < MAX_FIDS / 2 && (fids[j] & 0xffff0000); j++ );
 
-	if ( i == MAX_FIDS / 2 ) {
-		priv->stats.tx_fifo_errors++;
-		dev_kfree_skb(skb);
-	} else {
-		/* check min length*/
-		len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
-	        /* Mark fid as used & save length for later */
-		fids[i] |= (len << 16);
-		priv->xmit.skb = skb;
-		priv->xmit.fid = i;
-		airo_do_xmit(dev);
+	if ( j >= MAX_FIDS / 2 ) {
+		netif_stop_queue(dev);
+
+		if (i == MAX_FIDS / 2) {
+			priv->stats.tx_fifo_errors++;
+			return 1;
+		}
 	}
+	/* check min length*/
+	len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+        /* Mark fid as used & save length for later */
+	fids[i] |= (len << 16);
+	priv->xmit.skb = skb;
+	priv->xmit.fid = i;
+	airo_do_xmit(dev);
 	return 0;
 }
 
@@ -1407,6 +1413,7 @@ static void airo_do_xmit11(struct net_device *dev) {
 	u32 *fids = priv->fids;
 
 	if (down_trylock(&priv->sem) != 0) {
+		priv->flags |= FLAG_PENDING_XMIT11;
 		netif_stop_queue(dev);
 		priv->xmit11.task.func = (void (*)(void *))airo_do_xmit11;
 		priv->xmit11.task.data = (void *)dev;
@@ -1415,6 +1422,7 @@ static void airo_do_xmit11(struct net_device *dev) {
 	}
 	status = transmit_802_11_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
+	priv->flags &= ~FLAG_PENDING_XMIT11;
 
 	i = MAX_FIDS / 2;
 	if ( status == SUCCESS ) {
@@ -1426,14 +1434,12 @@ static void airo_do_xmit11(struct net_device *dev) {
 	}
 	if (i < MAX_FIDS)
 		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 	dev_kfree_skb(skb);
 }
 
 static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 	s16 len;
-	int i;
+	int i, j;
 	struct airo_info *priv = dev->priv;
 	u32 *fids = priv->fids;
 
@@ -1444,19 +1450,23 @@ static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 
 	/* Find a vacant FID */
 	for( i = MAX_FIDS / 2; i < MAX_FIDS && (fids[i] & 0xffff0000); i++ );
+	for( j = i + 1; j < MAX_FIDS && (fids[j] & 0xffff0000); j++ );
 
-	if ( i == MAX_FIDS ) {
-		priv->stats.tx_fifo_errors++;
-		dev_kfree_skb(skb);
-	} else {
-		/* check min length*/
-		len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
-	        /* Mark fid as used & save length for later */
-		fids[i] |= (len << 16);
-		priv->xmit11.skb = skb;
-		priv->xmit11.fid = i;
-		airo_do_xmit11(dev);
+	if ( j >= MAX_FIDS ) {
+		netif_stop_queue(dev);
+
+		if (i == MAX_FIDS) {
+			priv->stats.tx_fifo_errors++;
+			return 1;
+		}
 	}
+	/* check min length*/
+	len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+        /* Mark fid as used & save length for later */
+	fids[i] |= (len << 16);
+	priv->xmit11.skb = skb;
+	priv->xmit11.fid = i;
+	airo_do_xmit11(dev);
 	return 0;
 }
 
@@ -1593,6 +1603,8 @@ void stop_airo_card( struct net_device *dev, int freeres )
 {
 	struct airo_info *ai = dev->priv;
 	flush_scheduled_work();
+	disable_interrupts(ai);
+	free_irq( dev->irq, dev );
 	if (ai->flash)
 		kfree(ai->flash);
 	if (ai->rssi)
@@ -1607,8 +1619,6 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		}
 		ai->registered = 0;
 	}
-	disable_interrupts(ai);
-	free_irq( dev->irq, dev );
 	if (auto_wep) del_timer_sync(&ai->timer);
 	if (freeres) {
 		/* PCMCIA frees this stuff, so only for PCI and ISA */
@@ -2188,7 +2198,13 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
 				/* Set up to be used again */
 				apriv->fids[index] &= 0xffff;
-				netif_wake_queue(dev);
+				if (index < MAX_FIDS / 2) {
+					if (!(apriv->flags & FLAG_PENDING_XMIT))
+						netif_wake_queue(dev);
+				} else {
+					if (!(apriv->flags & FLAG_PENDING_XMIT11))
+						netif_wake_queue(apriv->wifidev);
+				}
 			} else {
 				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
 				printk( KERN_ERR "airo: Unallocated FID was used to xmit\n" );
@@ -2710,6 +2726,7 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
    one for now. */
 static u16 transmit_allocate(struct airo_info *ai, int lenPayload, int raw)
 {
+	unsigned int loop = 3000;
 	Cmd cmd;
 	Resp rsp;
 	u16 txFid;
@@ -2730,7 +2747,12 @@ static u16 transmit_allocate(struct airo_info *ai, int lenPayload, int raw)
 	/* wait for the allocate event/indication
 	 * It makes me kind of nervous that this can just sit here and spin,
 	 * but in practice it only loops like four times. */
-	while ( (IN4500(ai, EVSTAT) & EV_ALLOC) == 0) ;
+	while (((IN4500(ai, EVSTAT) & EV_ALLOC) == 0) && --loop);
+	if (!loop) {
+		txFid = ERROR;
+		goto done;
+	}
+
 	// get the allocated fid and acknowledge
 	txFid = IN4500(ai, TXALLOCFID);
 	OUT4500(ai, EVACK, EV_ALLOC);
@@ -3288,15 +3310,18 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 			ai->config.rmode &= 0xfe00;
 			ai->flags &= ~FLAG_802_11;
 			ai->config.opmode &= 0xFF00;
+			ai->config.scanMode = SCANMODE_ACTIVE;
 			if ( line[0] == 'a' ) {
 				ai->config.opmode |= 0;
 			} else {
 				ai->config.opmode |= 1;
 				if ( line[0] == 'r' ) {
 					ai->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
+					ai->config.scanMode = SCANMODE_PASSIVE;
 					ai->flags |= FLAG_802_11;
 				} else if ( line[0] == 'y' ) {
 					ai->config.rmode |= RXMODE_RFMON_ANYBSS | RXMODE_DISABLE_802_3_HEADER;
+					ai->config.scanMode = SCANMODE_PASSIVE;
 					ai->flags |= FLAG_802_11;
 				} else if ( line[0] == 'l' )
 					ai->config.rmode |= RXMODE_LANMON;
@@ -4571,24 +4596,28 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_IBSS;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_INFRA:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_ESS;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_MASTER:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_REPEAT:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP_RPTR;
 			local->config.rmode &= 0xfe00;
+			local->config.scanMode = SCANMODE_ACTIVE;
 			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_MONITOR:
@@ -4596,6 +4625,7 @@ static int airo_set_mode(struct net_device *dev,
 			local->config.opmode |= MODE_STA_ESS;
 			local->config.rmode &= 0xfe00;
 			local->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
+			local->config.scanMode = SCANMODE_PASSIVE;
 			local->flags |= FLAG_802_11;
 			break;
 		default:
@@ -5952,7 +5982,6 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  *
  * TODO :
  *	o Check if work in Ad-Hoc mode (otherwise, use SPY, as in wvlan_cs)
- *	o Find the noise level
  *
  * Jean
  */
@@ -5976,8 +6005,13 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 		local->wstats.qual.level = 0x100 - local->rssi[status_rid.sigQuality].rssidBm;
 	else
 		local->wstats.qual.level = (status_rid.normalizedSignalStrength + 321) / 2;
-	local->wstats.qual.noise = 0;
-	local->wstats.qual.updated = 3;
+	if (status_rid.len >= 124) {
+		local->wstats.qual.noise = 256 - status_rid.noisedBm;
+		local->wstats.qual.updated = 7;
+	} else {
+		local->wstats.qual.noise = 0;
+		local->wstats.qual.updated = 3;
+	}
 
 	/* Packets discarded in the wireless adapter due to wireless
 	 * specific problems */
