@@ -135,21 +135,26 @@ inline void bio_init(struct bio *bio)
  **/
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
-	struct bio *bio = mempool_alloc(bio_pool, gfp_mask);
+	struct bio *bio;
 	struct bio_vec *bvl = NULL;
 
+	current->flags |= PF_NOWARN;
+	bio = mempool_alloc(bio_pool, gfp_mask);
 	if (unlikely(!bio))
-		return NULL;
+		goto out;
 
 	if (!nr_iovecs || (bvl = bvec_alloc(gfp_mask,nr_iovecs,&bio->bi_max))) {
 		bio_init(bio);
 		bio->bi_destructor = bio_destructor;
 		bio->bi_io_vec = bvl;
-		return bio;
+		goto out;
 	}
 
 	mempool_free(bio, bio_pool);
-	return NULL;
+	bio = NULL;
+out:
+	current->flags &= ~PF_NOWARN;
+	return bio;
 }
 
 /**
