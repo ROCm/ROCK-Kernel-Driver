@@ -410,7 +410,7 @@ static inline loff_t
 nfs_size_to_loff_t(__u64 size)
 {
 	loff_t maxsz = (((loff_t) ULONG_MAX) << PAGE_CACHE_SHIFT) + PAGE_CACHE_SIZE - 1;
-	if (size > maxsz)
+	if (size > (__u64) maxsz)
 		return maxsz;
 	return (loff_t) size;
 }
