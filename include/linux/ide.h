@@ -1242,20 +1242,6 @@ typedef struct ide_driver_s {
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
 
-/*
- * IDE modules.
- */
-#define IDE_PROBE_MODULE		1
-
-typedef int	(ide_module_init_proc)(void);
-
-typedef struct ide_module_s {
-	int				type;
-	ide_module_init_proc		*init;
-	void				*info;
-	struct ide_module_s		*next;
-} ide_module_t;
-
 typedef struct ide_devices_s {
 	char			name[4];		/* hdX */
 	unsigned		attached	: 1;	/* native */
@@ -1273,7 +1259,7 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern	ide_module_t	*ide_probe;
+extern int (*ide_probe)(void);
 
 extern ide_devices_t   *idedisk;
 extern ide_devices_t   *idecd;

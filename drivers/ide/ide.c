@@ -190,7 +190,7 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 
-ide_module_t *ide_probe;
+int (*ide_probe)(void);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -448,7 +448,7 @@ void ide_probe_module (void)
 		(void) request_module("ide-probe-mod");
 #endif /* (CONFIG_KMOD) && (CONFIG_BLK_DEV_IDE_MODULE) */
 	} else {
-		(void) ide_probe->init();
+		(void)ide_probe();
 	}
 }
 

@@ -1298,13 +1298,6 @@ out:
 
 EXPORT_SYMBOL(hwif_init);
 
-int ideprobe_init (void);
-static ide_module_t ideprobe_module = {
-	IDE_PROBE_MODULE,
-	ideprobe_init,
-	NULL
-};
-
 int ideprobe_init (void)
 {
 	unsigned int index;
@@ -1336,7 +1329,7 @@ int ideprobe_init (void)
 		}
 	}
 	if (!ide_probe)
-		ide_probe = &ideprobe_module;
+		ide_probe = &ideprobe_init;
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
