@@ -358,6 +358,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 			  addr -= (long) &dummy->u_debugreg;
 			  addr = addr >> 2;
+
+			  if (addr == 7 && (enable_debugreg(child->thread.debugreg[addr], data)) < 0) {
+				  ret = -EBUSY;
+				  break;
+			  }
 			  child->thread.debugreg[addr] = data;
 			  ret = 0;
 		  }

@@ -27,6 +27,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/security.h>
 #include <linux/audit.h>
+#include <linux/trigevent_hooks.h>
 #include <asm/uaccess.h>
 
 #include "util.h"
@@ -300,6 +301,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	}
 	up(&shm_ids.sem);
 
+	TRIG_EVENT(ipc_shm_create_hook, err, shmflg);
 	return audit_result(err);
 }
 

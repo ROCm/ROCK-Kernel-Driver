@@ -46,6 +46,7 @@
 #include <linux/objrmap.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -1298,6 +1299,7 @@ static int do_swap_page(struct mm_struct * mm,
 	ret = VM_FAULT_MINOR;
 	page = lookup_swap_cache(entry);
 	if (!page) {
+	        TRIG_EVENT(mm_swap_in_hook, address);
  		swapin_readahead(entry, address, vma);
  		page = read_swap_cache_async(entry, vma, address);
 		if (!page) {
@@ -1833,4 +1835,8 @@ struct page * kdb_follow_page(struct mm_struct *mm, unsigned long address, int w
 
 	return page;
 }
+#endif
+
+#ifdef CONFIG_DPROBES_MODULE
+EXPORT_SYMBOL(handle_mm_fault);
 #endif

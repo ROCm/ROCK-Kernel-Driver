@@ -31,6 +31,7 @@
 #include <linux/topology.h>
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/tlbflush.h>
 
@@ -277,6 +278,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	LIST_HEAD(list);
 	int i;
 
+	TRIG_EVENT(mm_page_free_hook, order);
 	arch_free_page(page, order);
 
 	mod_page_state(pgfree, 1 << order);
@@ -789,6 +791,7 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;
+	TRIG_EVENT(mm_page_alloc_hook, order);
 	return (unsigned long) page_address(page);
 }
 

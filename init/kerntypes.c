@@ -21,6 +21,7 @@
 #include <linux/utsname.h>
 #include <linux/kernel_stat.h>
 #include <linux/dump.h>
+#include <linux/ltt.h>
 
 #include <asm/kerntypes.h>
 

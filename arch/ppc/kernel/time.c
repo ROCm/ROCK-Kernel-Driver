@@ -56,6 +56,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/time.h>
 #include <linux/init.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -152,6 +153,7 @@ void timer_interrupt(struct pt_regs * regs)
 	if (atomic_read(&ppc_n_lost_interrupts) != 0)
 		do_IRQ(regs);
 
+	TRIG_EVENT(trap_entry_hook, regs->trap, instruction_pointer(regs));
 	irq_enter();
 
 	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
@@ -199,6 +201,7 @@ void timer_interrupt(struct pt_regs * regs)
 	last_jiffy_stamp(cpu) = jiffy_stamp;
 
 #ifdef CONFIG_SMP
+	TRIG_EVENT(timer_hook, regs);
 	smp_local_timer_interrupt(regs);
 #endif /* CONFIG_SMP */
 
@@ -206,6 +209,7 @@ void timer_interrupt(struct pt_regs * regs)
 		ppc_md.heartbeat();
 
 	irq_exit();
+	TRIG_EVENT(trap_exit_hook);
 }
 
 /*

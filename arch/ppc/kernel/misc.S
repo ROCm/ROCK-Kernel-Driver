@@ -1066,7 +1066,11 @@ _GLOBAL(cvt_df)
  * Create a kernel thread
  *   kernel_thread(fn, arg, flags)
  */
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK 
+_GLOBAL(original_kernel_thread)
+#else
 _GLOBAL(kernel_thread)
+#endif /* CONFIG_TRIGEVENT_SYSCALL_HOOK */
 	stwu	r1,-16(r1)
 	stw	r30,8(r1)
 	stw	r31,12(r1)

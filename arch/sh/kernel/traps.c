@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -67,7 +68,9 @@ asmlinkage void do_##name(unsigned long r4, unsigned long r5,		\
 	tsk->thread.error_code = error_code;				\
 	tsk->thread.trap_no = trapnr;					\
         CHK_REMOTE_DEBUG(&regs);					\
+	TRIG_EVENT(trap_entry_hook, trapnr, regs.pc);			\
 	force_sig(signr, tsk);						\
+	TRIG_EVENT(trap_exit_hook);					\
 	die_if_no_fixup(str,&regs,error_code);				\
 }
 
@@ -500,6 +503,7 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 
 	asm volatile("stc       r2_bank,%0": "=r" (error_code));
 
+	TRIG_EVENT(trap_entry_hook, error_code >> 5, regs->pc);
 	oldfs = get_fs();
 
 	if (user_mode(regs)) {
@@ -523,8 +527,10 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 		tmp = handle_unaligned_access(instruction, regs);
 		set_fs(oldfs);
 
-		if (tmp==0)
+		if (tmp==0) {
+			TRIG_EVENT(trap_exit_hook);
 			return; /* sorted */
+		}
 
 	uspace_segv:
 		printk(KERN_NOTICE "Killing process \"%s\" due to unaligned access\n", current->comm);
@@ -545,6 +551,7 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 		handle_unaligned_access(instruction, regs);
 		set_fs(oldfs);
 	}
+	TRIG_EVENT(trap_exit_hook);
 }
 
 #ifdef CONFIG_SH_DSP

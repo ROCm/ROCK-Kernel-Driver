@@ -30,6 +30,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -118,7 +119,9 @@ _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 	info.si_errno = 0;
 	info.si_code = code;
 	info.si_addr = (void *) addr;
+	TRIG_EVENT(trap_entry_hook, regs->trap, instruction_pointer(regs));
 	force_sig_info(signr, &info, current);
+	TRIG_EVENT(trap_exit_hook);
 }
 
 /*

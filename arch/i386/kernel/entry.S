@@ -302,9 +302,29 @@ ENTRY(system_call)
 	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 syscall_call:
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	movl pre_syscall_enabled, %eax
+	testl %eax, %eax
+	jz pre_syscall_done
+	movl %esp, %eax                 # copy the stack pointer
+	pushl %eax                      # pass the stack pointer copy
+	call pre_syscall
+	addl $4,%esp                    # return stack to state before pass
+pre_syscall_done:
+	movl ORIG_EAX(%esp),%eax	# restore eax to it's original content
+#endif
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	pushl %ebx
+	movl post_syscall_enabled, %eax
+	testl %eax, %eax                   # are we tracing system call exits
+	jz post_syscall_done
+	call post_syscall
+post_syscall_done:
+	popl %ebx	
+#endif
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -507,9 +527,16 @@ ENTRY(debug)
 	jne debug_stack_correct
 	FIX_STACK(12, debug_stack_correct, debug_esp_fix_insn)
 debug_stack_correct:
-	pushl $0
-	pushl $do_debug
-	jmp error_code
+	pushl $-1			# mark this as an int
+	SAVE_ALL
+	movl %esp,%edx
+  	pushl $0
+	pushl %edx
+	call do_debug
+	addl $8,%esp
+	testl %eax,%eax 
+	jnz restore_all
+	jmp ret_from_exception
 
 /*
  * NMI is doubly nasty. It can happen _while_ we're handling
@@ -558,9 +585,16 @@ nmi_debug_stack_fixup:
 	jmp nmi_stack_correct
 
 ENTRY(int3)
+	pushl $-1			# mark this as an int
+	SAVE_ALL
+	movl %esp,%edx
 	pushl $0
-	pushl $do_int3
-	jmp error_code
+	pushl %edx
+	call do_int3
+	addl $8,%esp
+	testl %eax,%eax 
+	jnz restore_all
+	jmp ret_from_exception
 
 ENTRY(overflow)
 	pushl $0
