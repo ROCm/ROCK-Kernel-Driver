@@ -610,6 +610,7 @@ mpage_writepages(struct address_space *mapping,
 	struct pagevec pvec;
 	int nr_pages;
 	pgoff_t index;
+	int scanned = 0;
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
 		wbc->encountered_congestion = 1;
@@ -621,11 +622,18 @@ mpage_writepages(struct address_space *mapping,
 		writepage = mapping->a_ops->writepage;
 
 	pagevec_init(&pvec, 0);
-	index = 0;
+	if (wbc->sync_mode == WB_SYNC_NONE) {
+		index = mapping->writeback_index; /* Start from prev offset */
+	} else {
+		index = 0;			  /* whole-file sweep */
+		scanned = 1;
+	}
+retry:
 	while (!done && (nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
 					PAGECACHE_TAG_DIRTY, PAGEVEC_SIZE))) {
 		unsigned i;
 
+		scanned = 1;
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
@@ -672,6 +680,16 @@ mpage_writepages(struct address_space *mapping,
 		}
 		pagevec_release(&pvec);
 	}
+	if (!scanned && !done) {
+		/*
+		 * We hit the last page and there is more work to be done: wrap
+		 * back to the start of the file
+		 */
+		scanned = 1;
+		index = 0;
+		goto retry;
+	}
+	mapping->writeback_index = index;
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;
