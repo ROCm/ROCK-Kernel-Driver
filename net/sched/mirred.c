@@ -195,9 +195,9 @@ tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 bad_mirred:
 		if (NULL != skb2)
 			kfree_skb(skb2);
-		p->stats.overlimits++;
-		p->stats.bytes += skb->len;
-		p->stats.packets++;
+		p->qstats.overlimits++;
+		p->bstats.bytes += skb->len;
+		p->bstats.packets++;
 		spin_unlock(&p->lock);
 		/* should we be asking for packet to be dropped?
 		 * may make sense for redirect case only 
@@ -216,8 +216,8 @@ bad_mirred:
 		goto bad_mirred;
 	}
 
-	p->stats.bytes += skb2->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb2->len;
+	p->bstats.packets++;
 	if ( !(at & AT_EGRESS)) {
 		if (p->ok_push) {
 			skb_push(skb2, skb2->dev->hard_header_len);
@@ -268,18 +268,6 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 	return -1;
 }
 
-int
-tcf_mirred_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_mirred *p;
-	p = PRIV(a,mirred);
-
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
-}
-
 static struct tc_action_ops act_mirred_ops = {
 	.next		=	NULL,
 	.kind		=	"mirred",
@@ -287,7 +275,6 @@ static struct tc_action_ops act_mirred_ops = {
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_mirred,
-	.get_stats	=	tcf_mirred_stats,
 	.dump		=	tcf_mirred_dump,
 	.cleanup	=	tcf_mirred_cleanup,
 	.lookup		=	tcf_hash_search,
