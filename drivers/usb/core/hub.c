@@ -29,6 +29,7 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
+#include "hcd.h"
 #include "hub.h"
 
 /* Wakes up khubd */

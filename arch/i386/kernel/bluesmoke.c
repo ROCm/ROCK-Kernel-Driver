@@ -284,7 +284,7 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	 *	Check for MCE support
 	 */
 
-	if( !test_bit(X86_FEATURE_MCE, &c->x86_capability) )
+	if( !test_bit(X86_FEATURE_MCE, c->x86_capability) )
 		return;	
 	
 	/*
@@ -314,7 +314,7 @@ static void __init intel_mcheck_init(struct cpuinfo_x86 *c)
 	 *	Check for PPro style MCA
 	 */
 	 		
-	if( !test_bit(X86_FEATURE_MCA, &c->x86_capability) )
+	if( !test_bit(X86_FEATURE_MCA, c->x86_capability) )
 		return;
 		
 	/* Ok machine check is available */

@@ -749,7 +749,7 @@ static void uhci_inc_fsbr(struct uhci *uhci, struct urb *urb)
 
 	if ((!(urb->transfer_flags & USB_NO_FSBR)) && !urbp->fsbr) {
 		urbp->fsbr = 1;
-		if (!uhci->fsbr++)
+		if (!uhci->fsbr++ && !uhci->fsbrtimeout)
 			uhci->skel_term_qh->link = uhci->skel_hs_control_qh->dma_handle | UHCI_PTR_QH;
 	}
 
@@ -1631,8 +1631,7 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 
 	if (urb->status != -EINPROGRESS) {
 		info("uhci_transfer_result: called for URB %p not in flight?", urb);
-		spin_unlock_irqrestore(&urb->lock, flags);
-		return;
+		goto out;
 	}
 
 	switch (usb_pipetype(urb->pipe)) {
@@ -1652,10 +1651,8 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 
 	urbp->status = ret;
 
-	if (ret == -EINPROGRESS) {
-		spin_unlock_irqrestore(&urb->lock, flags);
-		return;
-	}
+	if (ret == -EINPROGRESS)
+		goto out;
 
 	switch (usb_pipetype(urb->pipe)) {
 	case PIPE_CONTROL:
@@ -1669,11 +1666,8 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 		break;
 	case PIPE_INTERRUPT:
 		/* Interrupts are an exception */
-		if (urb->interval) {
-			uhci_add_complete(urb);
-			spin_unlock_irqrestore(&urb->lock, flags);
-			return;		/* <-- note return */
-		}
+		if (urb->interval)
+			goto out_complete;
 
 		/* Release bandwidth for Interrupt or Isoc. transfers */
 		/* Spinlock needed ? */
@@ -1689,8 +1683,10 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 	/* Remove it from uhci->urb_list */
 	list_del_init(&urb->urb_list);
 
+out_complete:
 	uhci_add_complete(urb);
 
+out:
 	spin_unlock_irqrestore(&urb->lock, flags);
 }
 
@@ -1820,6 +1816,9 @@ static int uhci_unlink_urb(struct urb *urb)
 		} else {
 			urb->status = -ENOENT;
 
+			spin_unlock(&urb->lock);
+			spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
+
 			if (in_interrupt()) {	/* wait at least 1 frame */
 				static int errorcount = 10;
 
@@ -1828,9 +1827,6 @@ static int uhci_unlink_urb(struct urb *urb)
 				udelay(1000);
 			} else
 				schedule_timeout(1+1*HZ/1000); 
-
-			spin_unlock(&urb->lock);
-			spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
 			uhci_call_completion(urb);
 		}
@@ -1846,10 +1842,6 @@ static int uhci_fsbr_timeout(struct uhci *uhci, struct urb *urb)
 
 	uhci_dec_fsbr(uhci, urb);
 
-	/* There is a race with updating IOC in here, but it's not worth */
-	/*  trying to fix since this is merely an optimization. The only */
-	/*  time we'd lose is if the status of the packet got updated */
-	/*  and we'd be turning on FSBR next frame anyway, so it's a wash */
 	urbp->fsbr_timeout = 1;
 
 	head = &urbp->td_list;
@@ -2013,23 +2005,23 @@ static void rh_int_timer_do(unsigned long ptr)
 	tmp = head->next;
 	while (tmp != head) {
 		struct urb *u = list_entry(tmp, struct urb, urb_list);
-		struct urb_priv *urbp = (struct urb_priv *)u->hcpriv;
+		struct urb_priv *up = (struct urb_priv *)u->hcpriv;
 
 		tmp = tmp->next;
 
-		spin_lock(&urb->lock);
+		spin_lock(&u->lock);
 
 		/* Check if the FSBR timed out */
-		if (urbp->fsbr && !urbp->fsbr_timeout && time_after_eq(jiffies, urbp->fsbrtime + IDLE_TIMEOUT))
+		if (up->fsbr && !up->fsbr_timeout && time_after_eq(jiffies, up->fsbrtime + IDLE_TIMEOUT))
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, urbp->inserttime + u->timeout)) {
+		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
 			list_del(&u->urb_list);
 			list_add_tail(&u->urb_list, &list);
 		}
 
-		spin_unlock(&urb->lock);
+		spin_unlock(&u->lock);
 	}
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
@@ -2202,12 +2194,12 @@ static int rh_submit_urb(struct urb *urb)
 			OK(0);
 		case RH_PORT_RESET:
 			SET_RH_PORTSTAT(USBPORTSC_PR);
-			wait_ms(50);	/* USB v1.1 7.1.7.3 */
+			mdelay(50);	/* USB v1.1 7.1.7.3 */
 			uhci->rh.c_p_r[wIndex - 1] = 1;
 			CLR_RH_PORTSTAT(USBPORTSC_PR);
 			udelay(10);
 			SET_RH_PORTSTAT(USBPORTSC_PE);
-			wait_ms(10);
+			mdelay(10);
 			SET_RH_PORTSTAT(0xa);
 			OK(0);
 		case RH_PORT_POWER:
@@ -2724,6 +2716,7 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	}
 
 	uhci->dev = dev;
+	uhci->irq = dev->irq;
 	uhci->io_addr = io_addr;
 	uhci->io_size = io_size;
 	pci_set_drvdata(dev, uhci);
@@ -2749,6 +2742,11 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 	/* Reset here so we don't get any interrupts from an old setup */
 	/*  or broken setup */
 	reset_hc(uhci);
+
+	uhci->fsbr = 0;
+	uhci->fsbrtimeout = 0;
+
+	uhci->is_suspended = 0;
 
 	spin_lock_init(&uhci->qh_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->qh_remove_list);
@@ -2931,8 +2929,6 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 
 	if (request_irq(dev->irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci))
 		goto err_request_irq;
-
-	uhci->irq = dev->irq;
 
 	/* disable legacy emulation */
 	pci_write_config_word(uhci->dev, USBLEGSUP, USBLEGSUP_DEFAULT);

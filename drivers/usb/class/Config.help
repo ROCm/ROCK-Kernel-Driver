@@ -1,0 +1,44 @@
+CONFIG_USB_ACM
+  This driver supports USB modems and ISDN adapters which support the
+  Communication Device Class Abstract Control Model interface.
+  Please read <file:Documentation/usb/acm.txt> for details.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called acm.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_AUDIO
+  Say Y here if you want to connect USB audio equipment such as
+  speakers to your computer's USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called audio.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_BLUETOOTH_TTY
+  Say Y here if you want to connect a USB Bluetooth device to your
+  computer's USB port. You will need the Bluetooth stack (available
+  at <http://developer.axis.com/software/index.shtml>) to fully use
+  the device.
+
+  This driver implements a tty inteface to a Bluetooth device.  If
+  you want to use a socket based Bluetooth stack (like the BlueZ
+  stack), do not use this driver.
+
+  If in doubt, say N here.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called bluetty.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_PRINTER
+  Say Y here if you want to connect a USB printer to your computer's
+  USB port.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called printer.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.

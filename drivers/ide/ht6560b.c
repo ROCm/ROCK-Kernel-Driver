@@ -319,10 +319,9 @@ void __init init_ht6560b (void)
 			ide_hwifs[1].tuneproc = &tune_ht6560b;
 			ide_hwifs[0].serialized = 1;  /* is this needed? */
 			ide_hwifs[1].serialized = 1;  /* is this needed? */
-			ide_hwifs[0].mate = &ide_hwifs[1];
-			ide_hwifs[1].mate = &ide_hwifs[0];
-			ide_hwifs[1].unit = 1;
-			
+			ide_hwifs[0].unit = ATA_PRIMARY;
+			ide_hwifs[1].unit = ATA_SECONDARY;
+
 			/*
 			 * Setting default configurations for drives
 			 */

@@ -164,19 +164,6 @@ static int proc_ide_read_imodel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_read_mate
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_channel *hwif = data;
-	int		len;
-
-	if (hwif && hwif->mate && hwif->mate->present)
-		len = sprintf(page, "%s\n", hwif->mate->name);
-	else
-		len = sprintf(page, "(none)\n");
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
 static int proc_ide_read_channel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -493,7 +480,6 @@ void destroy_proc_ide_drives(struct ata_channel *hwif)
 
 static ide_proc_entry_t hwif_entries[] = {
 	{ "channel",	S_IFREG|S_IRUGO,	proc_ide_read_channel,	NULL },
-	{ "mate",	S_IFREG|S_IRUGO,	proc_ide_read_mate,	NULL },
 	{ "model",	S_IFREG|S_IRUGO,	proc_ide_read_imodel,	NULL },
 	{ NULL,	0, NULL, NULL }
 };

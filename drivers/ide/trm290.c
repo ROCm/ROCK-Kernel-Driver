@@ -248,8 +248,19 @@ void __init ide_init_trm290(struct ata_channel *hwif)
 
 	if ((reg & 0x10))
 		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
-	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
-		hwif->irq = hwif->mate->irq;		/* sharing IRQ with mate */
+	else {
+		static int primary_irq = 0;
+
+		/* Ugly way to let the primary and secondary channel on the
+		 * chip use the same IRQ line.
+		 */
+
+		if (hwif->unit == ATA_PRIMARY)
+			primary_irq = hwif->irq;
+		else if (!hwif->irq)
+			hwif->irq = primary_irq;
+	}
+
 	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->unit ? 0x0080 : 0x0000), 3);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA

@@ -72,16 +72,6 @@ extern volatile int smp_msg_id;
 #define MSG_RESCHEDULE		0x0003	/* Reschedule request from master CPU*/
 #define MSG_CALL_FUNCTION       0x0004  /* Call function on all other CPUs */
 
-#define __per_cpu_data	__attribute__((section(".data.percpu")))
-
-#ifndef __HAVE_ARCH_PER_CPU
-extern unsigned long __per_cpu_offset[NR_CPUS];
-
-/* var is in discarded region: offset to particular copy we want */
-#define per_cpu(var, cpu) RELOC_HIDE(var, per_cpu_offset(cpu))
-
-#define this_cpu(var) per_cpu(var, smp_processor_id())
-#endif /* !__HAVE_ARCH_PER_CPU */
 #else /* !SMP */
 
 /*

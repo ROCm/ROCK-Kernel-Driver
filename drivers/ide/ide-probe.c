@@ -140,7 +140,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 				/* kludge for Apple PowerBook internal zip */
 				if (!strstr(id->model, "CD-ROM") && strstr(id->model, "ZIP")) {
 					printk ("FLOPPY");
-					type = ide_floppy;
+					type = ATA_FLOPPY;
 					break;
 				}
 #endif
@@ -666,13 +666,12 @@ static int init_irq(struct ata_channel *hwif)
 				hwif->sharing_irq = h->sharing_irq = 1;
 				if (hwif->chipset != ide_pci || h->chipset != ide_pci)
 					save_match(hwif, h, &match);
-			}
-			if (hwif->serialized) {
-				if (hwif->mate && hwif->mate->irq == h->irq)
-					save_match(hwif, h, &match);
-			}
-			if (h->serialized) {
-				if (h->mate && hwif->irq == h->mate->irq)
+
+				/* FIXME: This is still confusing. What would
+				 * happen if we match-ed two times?
+				 */
+
+				if (hwif->serialized || h->serialized)
 					save_match(hwif, h, &match);
 			}
 		}
@@ -823,12 +822,11 @@ static void init_gendisk(struct ata_channel *hwif)
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		char name[80];
+
 		ide_add_generic_settings(hwif->drives + unit);
 		hwif->drives[unit].dn = ((hwif->unit ? 2 : 0) + unit);
 		sprintf (name, "host%d/bus%d/target%d/lun%d",
-			(hwif->unit && hwif->mate) ?
-			hwif->mate->index : hwif->index,
-			hwif->unit, unit, hwif->drives[unit].lun);
+			hwif->index, hwif->unit, unit, hwif->drives[unit].lun);
 		if (hwif->drives[unit].present)
 			hwif->drives[unit].de = devfs_mk_dir(ide_devfs_handle, name, NULL);
 	}

@@ -40,7 +40,7 @@ struct cpuinfo_x86 {
 	char	hard_math;
 	char	rfu;
        	int	cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
-	__u32	x86_capability[NCAPINTS];
+	unsigned long	x86_capability[NCAPINTS];
 	char	x86_vendor_id[16];
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB - valid for CPUS which support this

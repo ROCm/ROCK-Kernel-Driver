@@ -70,6 +70,10 @@ Driver details:
 
 Change history:
 
+	Version 0.9.7:
+	* Support other i8xx chipsets too (by adding 82801BA(M) and
+	  82801CA(M) detection)
+
 	Version 0.9.6:
 	* Internal driver cleanups, prep for 1.0.0 release.
 
