@@ -748,7 +748,7 @@ int ___pskb_trim(struct sk_buff *skb, unsigned int len, int realloc)
 			if (skb_cloned(skb)) {
 				if (!realloc)
 					BUG();
-				if (!pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+				if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 					return -ENOMEM;
 			}
 			if (len <= offset) {
