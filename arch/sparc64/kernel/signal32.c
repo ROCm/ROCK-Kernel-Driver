@@ -749,6 +749,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	regs->u_regs[UREG_FP] = (unsigned long) sf;
 	regs->u_regs[UREG_I0] = signo;
 	regs->u_regs[UREG_I1] = (unsigned long) &sf->info;
+	regs->u_regs[UREG_I2] = (unsigned long) &sf->info;
 
 	/* 4. signal handler */
 	regs->tpc = (unsigned long) ka->sa.sa_handler;
@@ -1157,6 +1158,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	regs->u_regs[UREG_FP] = (unsigned long) sf;
 	regs->u_regs[UREG_I0] = signr;
 	regs->u_regs[UREG_I1] = (unsigned long) &sf->info;
+	regs->u_regs[UREG_I2] = (unsigned long) &sf->regs;
 
 	/* 4. signal handler */
 	regs->tpc = (unsigned long) ka->sa.sa_handler;

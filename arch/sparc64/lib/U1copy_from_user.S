@@ -1,9 +1,9 @@
-/* U3copy_to_user.S: UltraSparc-III optimized copy to userspace.
+/* U1copy_from_user.S: UltraSparc-I/II/IIi/IIe optimized copy from userspace.
  *
  * Copyright (C) 1999, 2000, 2004 David S. Miller (davem@redhat.com)
  */
 
-#define EX_ST(x)		\
+#define EX_LD(x)		\
 98:	x;			\
 	.section .fixup;	\
 	.align 4;		\
@@ -15,9 +15,9 @@
 	.text;			\
 	.align 4;
 
-#define FUNC_NAME		U3copy_to_user
-#define STORE(type,src,addr)	type##a src, [addr] ASI_AIUS
-#define STORE_BLK(src,addr)	stda src, [addr] ASI_BLK_AIUS
+#define FUNC_NAME		___copy_from_user
+#define LOAD(type,addr,dest)	type##a [addr] %asi, dest
+#define LOAD_BLK(addr,dest)	ldda [addr] ASI_BLK_AIUS, dest
 #define EX_RETVAL(x)		0
 
 	/* Writing to %asi is _expensive_ so we hardcode it.
@@ -30,4 +30,4 @@
 	bne,pn		%icc, memcpy_user_stub;		\
 	 nop;						\
 
-#include "U3memcpy.S"
+#include "U1memcpy.S"
