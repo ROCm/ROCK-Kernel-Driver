@@ -21,6 +21,7 @@
 #include <asm/uaccess.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
+#include <linux/cpu.h>
 #include "vpurr.h"
 
 #define SAMPLE_TICK HZ
@@ -31,20 +32,25 @@ static void collect_startpurr(int cpu);
 
 /*
  * This is a timer handler.  There is on per CPU. It gets scheduled
- * every SAMPLE_TICK ticks.
+ * every SAMPLE_TICK ticks. 
  */
 
 static void util_timer_func(unsigned long data)
 {
-	struct cpu_util_store * cus = &__get_cpu_var(cpu_util_sampler);
-	struct timer_list *tl = &cus->cpu_util_timer;
+	/* check to see if the cpu is online */
 
-	cus->current_purr = mfspr(PURR);
-	cus->tb = mftb();
+	if (!cpu_is_offline(data)) 
+	{
+		struct cpu_util_store * cus = &__get_cpu_var(cpu_util_sampler);
+		struct timer_list *tl = &cus->cpu_util_timer;
 
-	/*printk(KERN_INFO "PURR VAL %ld %lld %lld\n", data, cus->current_purr, cus->tb);*/
+		cus->current_purr = mfspr(PURR);
+		cus->tb = mftb();
 
-	mod_timer(tl, jiffies + SAMPLE_TICK);
+		/*printk(KERN_INFO "PURR VAL %ld %lld %lld\n", data, cus->current_purr, cus->tb);*/
+
+		mod_timer(tl, jiffies + SAMPLE_TICK);
+        }
 }
 
 /*
@@ -93,12 +99,18 @@ static void collect_startpurr(int cpu)
 	cpumask_t cpumask;
 	struct cpu_util_store * cus = &per_cpu(cpu_util_sampler, cpu);	
 
+	/* Store the current cpu mask */
 	cpumask = current->cpus_allowed;
+
+	/* Move to the cpu that we want to collect starting purr from */
 	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(smp_processor_id() != cpu);
 
+	/* Collect Purr & Time base */
 	cus->start_purr = mfspr(PURR);
 	cus->tb = mftb();
+
+	/* reset the mask */
 	set_cpus_allowed(current, cpumask);
 }
 
