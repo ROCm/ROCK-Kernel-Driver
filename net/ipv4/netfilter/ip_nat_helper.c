@@ -382,9 +382,9 @@ int ip_nat_helper_register(struct ip_nat_helper *me)
 			const char *tmp = me->me->name;
 			
 			if (strlen(tmp) + 6 > MODULE_MAX_NAMELEN) {
-				printk(__FUNCTION__ ": unable to "
+				printk("%s: unable to "
 				       "compute conntrack helper name "
-				       "from %s\n", tmp);
+				       "from %s\n", __FUNCTION__, tmp);
 				return -EBUSY;
 			}
 			tmp += 6;
@@ -467,7 +467,8 @@ void ip_nat_helper_unregister(struct ip_nat_helper *me)
 		    && ct_helper->me) {
 			__MOD_DEC_USE_COUNT(ct_helper->me);
 		} else 
-			printk(__FUNCTION__ ": unable to decrement usage count"
-			       " of conntrack helper %s\n", me->me->name);
+			printk("%s: unable to decrement usage count"
+			       " of conntrack helper %s\n",
+			       __FUNCTION__, me->me->name);
 	}
 }

@@ -1559,7 +1559,7 @@ void __init paging_init(void)
 		zholes_size[ZONE_DMA] = npages - pages_avail;
 
 		free_area_init_node(0, NULL, NULL, zones_size,
-				    phys_base, zholes_size);
+				    phys_base >> PAGE_SHIFT, zholes_size);
 	}
 
 	device_scan();

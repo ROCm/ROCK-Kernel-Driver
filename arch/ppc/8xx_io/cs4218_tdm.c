@@ -1376,7 +1376,7 @@ static void cs_nosound(unsigned long xx)
 }
 
 static struct timer_list beep_timer = {
-	function: cs_nosound
+	.function = cs_nosound
 };
 
 static void cs_mksound(unsigned int hz, unsigned int ticks)
@@ -1468,21 +1468,21 @@ static void CS_release(void)
 }
 
 static MACHINE mach_cs4218 = {
-	name:		"HIOX CS4218",
-	name2:		"Built-in Sound",
-	open:		CS_open,
-	release:	CS_release,
-	dma_alloc:	CS_Alloc,
-	dma_free:	CS_Free,
-	irqinit:	CS_IrqInit,
+	.name =		"HIOX CS4218",
+	.name2 =	"Built-in Sound",
+	.open =		CS_open,
+	.release =	CS_release,
+	.dma_alloc =	CS_Alloc,
+	.dma_free =	CS_Free,
+	.irqinit =	CS_IrqInit,
 #ifdef MODULE
-	irqcleanup:	CS_IrqCleanup,
+	.irqcleanup =	CS_IrqCleanup,
 #endif /* MODULE */
-	init:		CS_Init,
-	silence:	CS_Silence,
-	setFormat:	CS_SetFormat,
-	setVolume:	CS_SetVolume,
-	play:		CS_Play
+	.init =		CS_Init,
+	.silence =	CS_Silence,
+	.setFormat =	CS_SetFormat,
+	.setVolume =	CS_SetVolume,
+	.play =		CS_Play
 };
 
 
@@ -1724,11 +1724,11 @@ static int mixer_ioctl(struct inode *inode, struct file *file, u_int cmd,
 
 static struct file_operations mixer_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		sound_lseek,
-	ioctl:		mixer_ioctl,
-	open:		mixer_open,
-	release:	mixer_release,
+	.owner =	THIS_MODULE,
+	.llseek =	sound_lseek,
+	.ioctl =	mixer_ioctl,
+	.open =		mixer_open,
+	.release =	mixer_release,
 };
 
 
@@ -2314,13 +2314,13 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 
 static struct file_operations sq_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		sound_lseek,
-	read:		sq_read,			/* sq_read */
-	write:		sq_write,
-	ioctl:		sq_ioctl,
-	open:		sq_open,
-	release:	sq_release,
+	.owner =	THIS_MODULE,
+	.llseek =	sound_lseek,
+	.read =		sq_read,			/* sq_read */
+	.write =	sq_write,
+	.ioctl =	sq_ioctl,
+	.open =		sq_open,
+	.release =	sq_release,
 };
 
 
@@ -2451,11 +2451,11 @@ static ssize_t state_read(struct file *file, char *buf, size_t count,
 
 static struct file_operations state_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		sound_lseek,
-	read:		state_read,
-	open:		state_open,
-	release:	state_release,
+	.owner =	THIS_MODULE,
+	.llseek =	sound_lseek,
+	.read =		state_read,
+	.open =		state_open,
+	.release =	state_release,
 };
 
 

@@ -1992,11 +1992,11 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		 * not a complete bvec done
 		 */
 		if (unlikely(nsect > nr_sectors)) {
-			int residual = (nsect - nr_sectors) << 9;
+			int partial = nr_sectors << 9;
 
-			bio->bi_size -= residual;
-			bio_iovec(bio)->bv_offset += residual;
-			bio_iovec(bio)->bv_len -= residual;
+			bio->bi_size -= partial;
+			bio_iovec(bio)->bv_offset += partial;
+			bio_iovec(bio)->bv_len -= partial;
 			blk_recalc_rq_sectors(req, nr_sectors);
 			blk_recalc_rq_segments(req);
 			return 1;

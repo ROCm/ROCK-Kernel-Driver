@@ -1056,7 +1056,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	sctp_ulpevent_t *ev;
 	sctp_chunk_t *repl;
 	sctp_transport_t *new_addr, *addr;
-	list_t *pos, *pos2, *temp;
+	struct list_head *pos, *pos2, *temp;
 	int found, error;
 
 	/* new_asoc is a brand-new association, so these are not yet

@@ -234,8 +234,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pmd_page_kernel(pmd) \
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
-#define pmd_page(pmd) \
-	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
+#ifndef CONFIG_DISCONTIGMEM
+#define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
+#endif /* !CONFIG_DISCONTIGMEM */
 
 #define pmd_large(pmd) \
 	((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
@@ -280,7 +281,9 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #endif /* !__ASSEMBLY__ */
 
+#ifndef CONFIG_DISCONTIGMEM
 #define kern_addr_valid(addr)	(1)
+#endif /* !CONFIG_DISCONTIGMEM */
 
 #define io_remap_page_range remap_page_range
 

@@ -253,7 +253,7 @@ void __init paging_init(void)
 
 		zones_size[ZONE_DMA] = end_pfn + 1 - start_pfn;
 		free_area_init_node(node, NODE_DATA(node), 0, zones_size, 
-						start_pfn << PAGE_SHIFT, 0);
+						start_pfn, 0);
 		if ((PLAT_NODE_DATA_STARTNR(node) + 
 					PLAT_NODE_DATA_SIZE(node)) > pagenr)
 			pagenr = PLAT_NODE_DATA_STARTNR(node) +

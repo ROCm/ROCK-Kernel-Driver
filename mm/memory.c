@@ -1033,11 +1033,11 @@ no_mem:
 	return VM_FAULT_OOM;
 }
 
-static void vmtruncate_list(list_t *head, unsigned long pgoff)
+static void vmtruncate_list(struct list_head *head, unsigned long pgoff)
 {
 	unsigned long start, end, len, diff;
 	struct vm_area_struct *vma;
-	list_t *curr;
+	struct list_head *curr;
 
 	list_for_each(curr, head) {
 		vma = list_entry(curr, struct vm_area_struct, shared);

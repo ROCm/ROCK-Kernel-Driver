@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.semaphore.h 1.15 05/17/01 18:14:25 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _PPC_SEMAPHORE_H
 #define _PPC_SEMAPHORE_H
@@ -12,7 +12,7 @@
  * -- Ani Joshi (ajoshi@unixbox.com)
  *
  * Remove spinlock-based RW semaphores; RW semaphore definitions are
- * now in rwsem.h and we use the the generic lib/rwsem.c implementation.
+ * now in rwsem.h and we use the generic lib/rwsem.c implementation.
  * Rework semaphores to use atomic_dec_if_positive.
  * -- Paul Mackerras (paulus@samba.org)
  */

@@ -257,7 +257,7 @@ sctp_association_t *__sctp_endpoint_lookup_assoc(const sctp_endpoint_t *endpoint
 {
 	int rport;
 	sctp_association_t *asoc;
-	list_t *pos;
+	struct list_head *pos;
 
 	rport = paddr->v4.sin_port;
 

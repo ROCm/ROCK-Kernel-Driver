@@ -15,7 +15,6 @@
  *     +1 (416) 297-6433 Facsimile
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include "includes.h"		/* This must be first */
 #include "hardware.h"

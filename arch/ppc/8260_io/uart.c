@@ -2463,12 +2463,12 @@ static kdev_t serial_console_device(struct console *c)
 
 
 static struct console sercons = {
-	name:		"ttyS",
-	write:		serial_console_write,
-	device:		serial_console_device,
-	setup:		serial_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		CONFIG_SERIAL_CONSOLE_PORT,
+	.name =		"ttyS",
+	.write =	serial_console_write,
+	.device =	serial_console_device,
+	.setup =	serial_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	CONFIG_SERIAL_CONSOLE_PORT,
 };
 
 /*

@@ -14115,7 +14115,7 @@ printk("ncr_user_command: data=%ld\n", uc->data);
 	if (len)
 		return -EINVAL;
 	else {
-		long flags;
+		unsigned long flags;
 
 		NCR_LOCK_NCB(np, flags);
 		ncr_usercmd (np);

@@ -296,7 +296,7 @@ void sctp_association_free(sctp_association_t *asoc)
 {
 	sctp_transport_t *transport;
 	sctp_endpoint_t *ep;
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 	int i;
 
 	ep = asoc->ep;
@@ -482,7 +482,7 @@ sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
 					  const sockaddr_storage_t *address)
 {
 	sctp_transport_t *t;
-	list_t *pos;
+	struct list_head *pos;
 
 	/* Cycle through all transports searching for a peer address. */
 
@@ -508,7 +508,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	sctp_transport_t *first;
 	sctp_transport_t *second;
 	sctp_ulpevent_t *event;
-	list_t *pos;
+	struct list_head *pos;
 	int spc_state = 0;
 
 	/* Record the transition on the transport.  */
@@ -780,7 +780,7 @@ sctp_transport_t *sctp_assoc_lookup_tsn(sctp_association_t *asoc, __u32 tsn)
 {
 	sctp_transport_t *active;
 	sctp_transport_t *match;
-	list_t *entry, *pos;
+	struct list_head *entry, *pos;
 	sctp_transport_t *transport;
 	sctp_chunk_t *chunk;
 	__u32 key = htonl(tsn);
@@ -983,8 +983,8 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
 sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 {
 	sctp_transport_t *t, *next;
-	list_t *head = &asoc->peer.transport_addr_list;
-	list_t *pos;
+	struct list_head *head = &asoc->peer.transport_addr_list;
+	struct list_head *pos;
 
 	/* If this is the first time SHUTDOWN is sent, use the active
 	 * path.

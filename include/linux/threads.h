@@ -19,7 +19,6 @@
 /*
  * This controls the maximum pid allocated to a process
  */
-#define PID_MASK 0x3fffffff
-#define PID_MAX (PID_MASK+1)
+#define DEFAULT_PID_MAX 0x8000
 
 #endif

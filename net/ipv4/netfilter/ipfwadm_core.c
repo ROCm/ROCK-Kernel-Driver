@@ -156,7 +156,7 @@
 #define dprint_ip(a)
 #endif
 
-static rwlock_t ip_fw_lock = RW_LOCK_UNLOCKED;
+static DECLARE_RWLOCK(ip_fw_lock);
 
 #if defined(CONFIG_IP_ACCT) || defined(CONFIG_IP_FIREWALL)
 

@@ -276,9 +276,14 @@ static int futex_fd(struct list_head *head,
 	filp->f_dentry = dget(futex_mnt->mnt_root);
 
 	if (signal) {
-		filp->f_owner.pid = current->tgid;
-		filp->f_owner.uid = current->uid;
-		filp->f_owner.euid = current->euid;
+		int ret;
+		
+		ret = f_setown(filp, current->tgid, 1);
+		if (ret) {
+			put_unused_fd(fd);
+			put_filp(filp);
+			return ret;
+		}
 		filp->f_owner.signum = signal;
 	}
 

@@ -275,7 +275,6 @@ static void init_hwif_data (unsigned int index)
 		drive->name[1]			= 'd';
 		drive->name[2]			= 'a' + (index * MAX_DRIVES) + unit;
 		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
-		init_waitqueue_head(&drive->wqueue);
 		INIT_LIST_HEAD(&drive->list);
 	}
 }
@@ -1805,8 +1804,6 @@ static int ide_open (struct inode * inode, struct file * filp)
 #endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 	}
 #endif /* CONFIG_KMOD */
-	while (drive->busy)
-		sleep_on(&drive->wqueue);
 	drive->usage++;
 	if (drive->driver != NULL)
 		return DRIVER(drive)->open(inode, filp, drive);
@@ -1877,7 +1874,7 @@ struct seq_operations ide_drivers_op = {
  */
 int ide_replace_subdriver (ide_drive_t *drive, const char *driver)
 {
-	if (!drive->present || drive->busy || drive->usage)
+	if (!drive->present || drive->usage)
 		goto abort;
 	if (drive->driver != NULL && DRIVER(drive)->cleanup(drive))
 		goto abort;
@@ -1961,7 +1958,7 @@ void ide_unregister (unsigned int index)
 		drive = &hwif->drives[unit];
 		if (!drive->present)
 			continue;
-		if (drive->busy || drive->usage)
+		if (drive->usage)
 			goto abort;
 		if (drive->driver != NULL && DRIVER(drive)->cleanup(drive))
 			goto abort;
@@ -2653,18 +2650,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			}
 			return 0;
 		}
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKSSZGET:
-		case BLKPG:
-		case BLKELVGET:
-		case BLKELVSET:
-		case BLKBSZGET:
-		case BLKBSZSET:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
@@ -3362,7 +3347,7 @@ static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, byte 
 static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg)
 {
-	return -EIO;
+	return -EINVAL;
 }
 
 static int default_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
@@ -3434,7 +3419,7 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	
 	spin_lock_irqsave(&ide_lock, flags);
 	if (version != IDE_SUBDRIVER_VERSION || !drive->present ||
-	    drive->driver != NULL || drive->busy || drive->usage) {
+	    drive->driver != NULL || drive->usage) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
@@ -3463,8 +3448,7 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	unsigned long flags;
 	
 	spin_lock_irqsave(&ide_lock, flags);
-	if (drive->usage || drive->busy ||
-	    drive->driver == NULL || DRIVER(drive)->busy) {
+	if (drive->usage || drive->driver == NULL || DRIVER(drive)->busy) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}

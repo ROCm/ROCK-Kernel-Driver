@@ -224,12 +224,12 @@ typedef struct serial_info {
 } ser_info_t;
 
 static struct console sercons = {
-	name:		"ttyS",
-	write:		serial_console_write,
-	device:		serial_console_device,
-	setup:		serial_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		CONFIG_SERIAL_CONSOLE_PORT,
+	.name =		"ttyS",
+	.write =	serial_console_write,
+	.device =	serial_console_device,
+	.setup =	serial_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	CONFIG_SERIAL_CONSOLE_PORT,
 };
 
 static void change_speed(ser_info_t *info);

@@ -439,7 +439,7 @@ err_bindx_add:
 #if CONFIG_IP_SCTP_ADDIP
 	/* Add these addresses to all associations on this endpoint.  */
 	if (retval >= 0) {
-		list_t *pos;
+		struct list_head *pos;
 		sctp_endpoint_t *ep;
 		sctp_association_t *asoc;
 		ep = sctp_sk(sk)->ep;
@@ -560,7 +560,7 @@ err_bindx_rem:
 #if CONFIG_IP_SCTP_ADDIP
 	/* Remove these addresses from all associations on this endpoint.  */
 	if (retval >= 0) {
-		list_t *pos;
+		struct list_head *pos;
 		sctp_endpoint_t *ep;
 		sctp_association_t *asoc;
 
@@ -666,7 +666,7 @@ static void sctp_close(struct sock *sk, long timeout)
 {
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
-	list_t *pos, *temp;
+	struct list_head *pos, *temp;
 
 	SCTP_DEBUG_PRINTK("sctp_close(sk: 0x%p...)\n", sk);
 
@@ -1238,7 +1238,7 @@ static int sctp_setsockopt(struct sock *sk, int level, int optname,
 	int retval = 0;
 	char * tmp;
 	sctp_protocol_t *proto = sctp_get_protocol();
-	list_t *pos;
+	struct list_head *pos;
 	sctp_func_t *af;
 
 	SCTP_DEBUG_PRINTK("sctp_setsockopt(sk: %p... optname: %d)\n",
@@ -1661,7 +1661,7 @@ static int sctp_getsockopt(struct sock *sk, int level, int optname,
 	int retval = 0;
 	sctp_protocol_t *proto = sctp_get_protocol();
 	sctp_func_t *af;
-	list_t *pos;
+	struct list_head *pos;
 	int len;
 
 	SCTP_DEBUG_PRINTK("sctp_getsockopt(sk: %p, ...)\n", sk);
@@ -2649,7 +2649,7 @@ static void __sctp_write_space(sctp_association_t *asoc)
 void sctp_write_space(struct sock *sk)
 {
 	sctp_association_t *asoc;
-	list_t *pos;
+	struct list_head *pos;
 
 	/* Wake up the tasks in each wait queue.  */
 	list_for_each(pos, &((sctp_sk(sk))->ep->asocs)) {

@@ -751,7 +751,7 @@ static struct {
 
 #ifdef CONFIG_AGP_ALI
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1541_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1541,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1541,
 		.vendor_name	= "Ali",
@@ -759,7 +759,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1621_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1621,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1621,
 		.vendor_name	= "Ali",
@@ -767,7 +767,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1631_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1631,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1631,
 		.vendor_name	= "Ali",
@@ -775,7 +775,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1632_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1632,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1632,
 		.vendor_name	= "Ali",
@@ -783,7 +783,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1641_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1641,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1641,
 		.vendor_name	= "Ali",
@@ -791,7 +791,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1644_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1644,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1644,
 		.vendor_name	= "Ali",
@@ -799,7 +799,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1647_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1647,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1647,
 		.vendor_name	= "Ali",
@@ -807,7 +807,7 @@ static struct {
 		.chipset_setup	= ali_generic_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AL_M1651_0,
+		.device_id	= PCI_DEVICE_ID_AL_M1651,
 		.vendor_id	= PCI_VENDOR_ID_AL,
 		.chipset	= ALI_M1651,
 		.vendor_name	= "Ali",
@@ -826,7 +826,7 @@ static struct {
 
 #ifdef CONFIG_AGP_AMD
 	{
-		.device_id	= PCI_DEVICE_ID_AMD_IRONGATE_0,
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
 		.vendor_id	= PCI_VENDOR_ID_AMD,
 		.chipset	= AMD_IRONGATE,
 		.vendor_name	= "AMD",
@@ -834,7 +834,7 @@ static struct {
 		.chipset_setup	= amd_irongate_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AMD_761_0,
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700E,
 		.vendor_id	= PCI_VENDOR_ID_AMD,
 		.chipset	= AMD_761,
 		.vendor_name	= "AMD",
@@ -842,7 +842,7 @@ static struct {
 		.chipset_setup	= amd_irongate_setup,
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_AMD_762_0,
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700C,
 		.vendor_id	= PCI_VENDOR_ID_AMD,
 		.chipset	= AMD_762,
 		.vendor_name	= "AMD",
@@ -885,7 +885,7 @@ static struct {
 		.chipset_setup	= intel_generic_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_815_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82815_MC,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I815,
 		.vendor_name	= "Intel",
@@ -893,7 +893,7 @@ static struct {
 		.chipset_setup	= intel_815_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_820_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82820_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I820,
 		.vendor_name	= "Intel",
@@ -901,7 +901,7 @@ static struct {
 		.chipset_setup	= intel_820_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_820_UP_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82820_UP_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I820,
 		.vendor_name	= "Intel",
@@ -909,7 +909,7 @@ static struct {
 		.chipset_setup	= intel_820_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_830_M_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82830_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I830_M,
 		.vendor_name	= "Intel",
@@ -917,7 +917,7 @@ static struct {
 		.chipset_setup	= intel_830mp_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_845_G_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82845G_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I845_G,
 		.vendor_name	= "Intel",
@@ -925,7 +925,7 @@ static struct {
 		.chipset_setup	= intel_830mp_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_840_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82840_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I840,
 		.vendor_name	= "Intel",
@@ -933,7 +933,7 @@ static struct {
 		.chipset_setup	= intel_840_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_845_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82845_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I845,
 		.vendor_name	= "Intel",
@@ -941,7 +941,7 @@ static struct {
 		.chipset_setup	= intel_845_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_850_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82850_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I850,
 		.vendor_name	= "Intel",
@@ -949,7 +949,7 @@ static struct {
 		.chipset_setup	= intel_850_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_INTEL_860_0,
+		.device_id	= PCI_DEVICE_ID_INTEL_82860_HB,
 		.vendor_id	= PCI_VENDOR_ID_INTEL,
 		.chipset	= INTEL_I860,
 		.vendor_name	= "Intel",
@@ -1092,7 +1092,7 @@ static struct {
 		.chipset_setup	= via_generic_setup
 	},
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_82C691_0,
+		.device_id	= PCI_DEVICE_ID_VIA_82C691,
 		.vendor_id	= PCI_VENDOR_ID_VIA,
 		.chipset	= VIA_APOLLO_PRO,
 		.vendor_name	= "Via",
@@ -1166,7 +1166,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	       (agp_bridge_info[i].vendor_id == pdev->vendor)) {
 		if (pdev->device == agp_bridge_info[i].device_id) {
 #ifdef CONFIG_AGP_ALI
-			if (pdev->device == PCI_DEVICE_ID_AL_M1621_0) {
+			if (pdev->device == PCI_DEVICE_ID_AL_M1621) {
 				u8 hidden_1621_id;
 
 				pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
@@ -1237,9 +1237,9 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		struct pci_dev *i810_dev;
 
 		switch (dev->device) {
-		case PCI_DEVICE_ID_INTEL_810_0:
+		case PCI_DEVICE_ID_INTEL_82810_MC1:
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					       PCI_DEVICE_ID_INTEL_810_1,
+					       PCI_DEVICE_ID_INTEL_82810_IG1,
 						   NULL);
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "Detected an Intel i810,"
@@ -1252,9 +1252,9 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge.type = INTEL_I810;
 			return intel_i810_setup (i810_dev);
 
-		case PCI_DEVICE_ID_INTEL_810_DC100_0:
+		case PCI_DEVICE_ID_INTEL_82810_MC3:
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					 PCI_DEVICE_ID_INTEL_810_DC100_1,
+					 PCI_DEVICE_ID_INTEL_82810_IG3,
 						   NULL);
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "Detected an Intel i810 "
@@ -1267,9 +1267,9 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge.type = INTEL_I810;
 			return intel_i810_setup(i810_dev);
 
-		case PCI_DEVICE_ID_INTEL_810_E_0:
+		case PCI_DEVICE_ID_INTEL_82810E_MC:
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					     PCI_DEVICE_ID_INTEL_810_E_1,
+					     PCI_DEVICE_ID_INTEL_82810E_IG,
 						   NULL);
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "Detected an Intel i810 E"
@@ -1282,14 +1282,14 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge.type = INTEL_I810;
 			return intel_i810_setup(i810_dev);
 
-		 case PCI_DEVICE_ID_INTEL_815_0:
+		 case PCI_DEVICE_ID_INTEL_82815_MC:
 		   /* The i815 can operate either as an i810 style
 		    * integrated device, or as an AGP4X motherboard.
 		    *
 		    * This only addresses the first mode:
 		    */
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-						   PCI_DEVICE_ID_INTEL_815_1,
+						PCI_DEVICE_ID_INTEL_82815_CGC,
 						   NULL);
 			if (i810_dev == NULL) {
 				printk(KERN_ERR PFX "agpgart: Detected an "
@@ -1303,12 +1303,12 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge.type = INTEL_I810;
 			return intel_i810_setup(i810_dev);
 
-		case PCI_DEVICE_ID_INTEL_845_G_0:
+		case PCI_DEVICE_ID_INTEL_82845G_HB:
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					PCI_DEVICE_ID_INTEL_845_G_1, NULL);
+					PCI_DEVICE_ID_INTEL_82845G_IG, NULL);
 			if(i810_dev && PCI_FUNC(i810_dev->devfn) != 0) {
 				i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-					PCI_DEVICE_ID_INTEL_845_G_1, i810_dev);
+					PCI_DEVICE_ID_INTEL_82845G_IG, i810_dev);
 			}
 
 			if (i810_dev == NULL) {
@@ -1325,13 +1325,13 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge.type = INTEL_I810;
 			return intel_i830_setup(i810_dev);
 		   
-		case PCI_DEVICE_ID_INTEL_830_M_0:
+		case PCI_DEVICE_ID_INTEL_82830_HB:
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-						   PCI_DEVICE_ID_INTEL_830_M_1,
+						   PCI_DEVICE_ID_INTEL_82830_CGC,
 						   NULL);
 			if(i810_dev && PCI_FUNC(i810_dev->devfn) != 0) {
 				i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
-							   PCI_DEVICE_ID_INTEL_830_M_1,
+							   PCI_DEVICE_ID_INTEL_82830_CGC,
 							   i810_dev);
 			}
 

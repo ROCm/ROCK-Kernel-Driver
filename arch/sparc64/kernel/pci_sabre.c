@@ -258,160 +258,26 @@ static int __sabre_out_of_range(struct pci_pbm_info *pbm,
 		 PCI_SLOT(devfn) > 8));
 }
 
-static int __sabre_read_byte(struct pci_dev *dev, int where, u8 *value)
+static int __sabre_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
+				int where, int size, u32 *value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
-	u8 *addr;
-
-	*value = 0xff;
-	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
-	if (!addr)
-		return PCIBIOS_SUCCESSFUL;
-
-	if (__sabre_out_of_range(pbm, bus, devfn))
-		return PCIBIOS_SUCCESSFUL;
-	pci_config_read8(addr, value);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int __sabre_read_word(struct pci_dev *dev, int where, u16 *value)
-{
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
-	u16 *addr;
-
-	*value = 0xffff;
-	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
-	if (!addr)
-		return PCIBIOS_SUCCESSFUL;
-
-	if (__sabre_out_of_range(pbm, bus, devfn))
-		return PCIBIOS_SUCCESSFUL;
-
-	if (where & 0x01) {
-		printk("pcibios_read_config_word: misaligned reg [%x]\n",
-		       where);
-		return PCIBIOS_SUCCESSFUL;
-	}
-	pci_config_read16(addr, value);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int __sabre_read_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
+	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	unsigned char bus = bus_dev->number;
 	u32 *addr;
+	u16 tmp16;
+	u8 tmp8;
 
-	*value = 0xffffffff;
-	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
-	if (!addr)
-		return PCIBIOS_SUCCESSFUL;
-
-	if (__sabre_out_of_range(pbm, bus, devfn))
-		return PCIBIOS_SUCCESSFUL;
-
-	if (where & 0x03) {
-		printk("pcibios_read_config_dword: misaligned reg [%x]\n",
-		       where);
-		return PCIBIOS_SUCCESSFUL;
-	}
-	pci_config_read32(addr, value);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int sabre_read_byte(struct pci_dev *dev, int where, u8 *value)
-{
-	if (dev->bus->number)
-		return __sabre_read_byte(dev, where, value);
-
-	if (sabre_out_of_range(dev->devfn)) {
+	switch (size) {
+	case 1:
 		*value = 0xff;
-		return PCIBIOS_SUCCESSFUL;
-	}
-
-	if (where < 8) {
-		u16 tmp;
-
-		__sabre_read_word(dev, where & ~1, &tmp);
-		if (where & 1)
-			*value = tmp >> 8;
-		else
-			*value = tmp & 0xff;
-		return PCIBIOS_SUCCESSFUL;
-	} else
-		return __sabre_read_byte(dev, where, value);
-}
-
-static int sabre_read_word(struct pci_dev *dev, int where, u16 *value)
-{
-	if (dev->bus->number)
-		return __sabre_read_word(dev, where, value);
-
-	if (sabre_out_of_range(dev->devfn)) {
+		break;
+	case 2:
 		*value = 0xffff;
-		return PCIBIOS_SUCCESSFUL;
-	}
-
-	if (where < 8)
-		return __sabre_read_word(dev, where, value);
-	else {
-		u8 tmp;
-
-		__sabre_read_byte(dev, where, &tmp);
-		*value = tmp;
-		__sabre_read_byte(dev, where + 1, &tmp);
-		*value |= tmp << 8;
-		return PCIBIOS_SUCCESSFUL;
-	}
-}
-
-static int sabre_read_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	u16 tmp;
-
-	if (dev->bus->number)
-		return __sabre_read_dword(dev, where, value);
-
-	if (sabre_out_of_range(dev->devfn)) {
+		break;
+	case 4:
 		*value = 0xffffffff;
-		return PCIBIOS_SUCCESSFUL;
+		break;
 	}
-
-	sabre_read_word(dev, where, &tmp);
-	*value = tmp;
-	sabre_read_word(dev, where + 2, &tmp);
-	*value |= tmp << 16;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int __sabre_write_byte(struct pci_dev *dev, int where, u8 value)
-{
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
-	u8 *addr;
-
-	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
-	if (!addr)
-		return PCIBIOS_SUCCESSFUL;
-
-	if (__sabre_out_of_range(pbm, bus, devfn))
-		return PCIBIOS_SUCCESSFUL;
-	pci_config_write8(addr, value);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int __sabre_write_word(struct pci_dev *dev, int where, u16 value)
-{
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
-	u16 *addr;
 
 	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
 	if (!addr)
@@ -420,20 +286,109 @@ static int __sabre_write_word(struct pci_dev *dev, int where, u16 value)
 	if (__sabre_out_of_range(pbm, bus, devfn))
 		return PCIBIOS_SUCCESSFUL;
 
-	if (where & 0x01) {
-		printk("pcibios_write_config_word: misaligned reg [%x]\n",
-		       where);
-		return PCIBIOS_SUCCESSFUL;
+	switch (size) {
+	case 1:
+		pci_config_read8((u8 *) addr, &tmp8);
+		*value = tmp8;
+		break;
+
+	case 2:
+		if (where & 0x01) {
+			printk("pci_read_config_word: misaligned reg [%x]\n",
+			       where);
+			return PCIBIOS_SUCCESSFUL;
+		}
+		pci_config_read16((u16 *) addr, &tmp16);
+		*value = tmp16;
+		break;
+
+	case 4:
+		if (where & 0x03) {
+			printk("pci_read_config_dword: misaligned reg [%x]\n",
+			       where);
+			return PCIBIOS_SUCCESSFUL;
+		}
+		pci_config_read32(addr, value);
+		break;
 	}
-	pci_config_write16(addr, value);
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int __sabre_write_dword(struct pci_dev *dev, int where, u32 value)
+static int sabre_read_pci_cfg(struct pci_bus *bus, unsigned int devfn,
+			      int where, int size, u32 *value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[dev->bus->number];
-	unsigned char bus = dev->bus->number;
-	unsigned int devfn = dev->devfn;
+	if (bus->number)
+		return __sabre_read_pci_cfg(bus, devfn, where, size, value);
+
+	if (sabre_out_of_range(devfn)) {
+		switch (size) {
+		case 1:
+			*value = 0xff;
+			break;
+		case 2:
+			*value = 0xffff;
+			break;
+		case 4:
+			*value = 0xffffffff;
+			break;
+		}
+		return PCIBIOS_SUCCESSFUL;
+	}
+
+	switch (size) {
+	case 1:
+		if (where < 8) {
+			u32 tmp32;
+			u16 tmp16;
+
+			__sabre_read_pci_cfg(bus, devfn, where & ~1, 2, &tmp32);
+			tmp16 = (u16) tmp32;
+			if (where & 1)
+				*value = tmp16 >> 8;
+			else
+				*value = tmp16 & 0xff;
+		} else
+			return __sabre_read_pci_cfg(bus, devfn, where, 1, value);
+		break;
+
+	case 2:
+		if (where < 8)
+			return __sabre_read_pci_cfg(bus, devfn, where, 2, value);
+		else {
+			u32 tmp32;
+			u8 tmp8;
+
+			__sabre_read_pci_cfg(bus, devfn, where, 1, &tmp32);
+			tmp8 = (u8) tmp32;
+			*value = tmp8;
+			__sabre_read_pci_cfg(bus, devfn, where + 1, 1, &tmp32);
+			tmp8 = (u8) tmp32;
+			*value |= tmp8 << 8;
+		}
+		break;
+
+	case 4: {
+		u32 tmp32;
+		u16 tmp16;
+
+		sabre_read_pci_cfg(bus, devfn, where, 2, &tmp32);
+		tmp16 = (u16) tmp32;
+		*value = tmp16;
+		sabre_read_pci_cfg(bus, devfn, where + 2, 2, &tmp32);
+		tmp16 = (u16) tmp32;
+		*value |= tmp16 << 16;
+		break;
+	}
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
+
+static int __sabre_write_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
+				 int where, int size, u32 value)
+{
+	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	unsigned char bus = bus_dev->number;
 	u32 *addr;
 
 	addr = sabre_pci_config_mkaddr(pbm, bus, devfn, where);
@@ -443,76 +398,81 @@ static int __sabre_write_dword(struct pci_dev *dev, int where, u32 value)
 	if (__sabre_out_of_range(pbm, bus, devfn))
 		return PCIBIOS_SUCCESSFUL;
 
-	if (where & 0x03) {
-		printk("pcibios_write_config_dword: misaligned reg [%x]\n",
-		       where);
-		return PCIBIOS_SUCCESSFUL;
+	switch (size) {
+	case 1:
+		pci_config_write8((u8 *) addr, value);
+		break;
+
+	case 2:
+		if (where & 0x01) {
+			printk("pci_write_config_word: misaligned reg [%x]\n",
+			       where);
+			return PCIBIOS_SUCCESSFUL;
+		}
+		pci_config_write16((u16 *) addr, value);
+		break;
+
+	case 4:
+		if (where & 0x03) {
+			printk("pci_write_config_dword: misaligned reg [%x]\n",
+			       where);
+			return PCIBIOS_SUCCESSFUL;
+		}
+		pci_config_write32(addr, value);
+		break;
 	}
-	pci_config_write32(addr, value);
+
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int sabre_write_byte(struct pci_dev *dev, int where, u8 value)
+static int sabre_write_pci_cfg(struct pci_bus *bus, unsigned int devfn,
+			       int where, int size, u32 value)
 {
-	if (dev->bus->number)
-		return __sabre_write_byte(dev, where, value);
+	if (bus->number)
+		return __sabre_write_pci_cfg(bus, devfn, where, size, value);
 
-	if (sabre_out_of_range(dev->devfn))
+	if (sabre_out_of_range(devfn))
 		return PCIBIOS_SUCCESSFUL;
 
-	if (where < 8) {
-		u16 tmp;
+	switch (size) {
+	case 1:
+		if (where < 8) {
+			u32 tmp32;
+			u16 tmp16;
 
-		__sabre_read_word(dev, where & ~1, &tmp);
-		if (where & 1) {
-			value &= 0x00ff;
-			value |= tmp << 8;
-		} else {
-			value &= 0xff00;
-			value |= tmp;
+			__sabre_read_pci_cfg(bus, devfn, where & ~1, 2, &tmp32);
+			tmp16 = (u16) tmp32;
+			if (where & 1) {
+				value &= 0x00ff;
+				value |= tmp16 << 8;
+			} else {
+				value &= 0xff00;
+				value |= tmp16;
+			}
+			tmp32 = (u32) tmp16;
+			return __sabre_write_pci_cfg(bus, devfn, where & ~1, 2, tmp32);
+		} else
+			return __sabre_write_pci_cfg(bus, devfn, where, 1, value);
+		break;
+	case 2:
+		if (where < 8)
+			return __sabre_write_pci_cfg(bus, devfn, where, 2, value);
+		else {
+			__sabre_write_pci_cfg(bus, devfn, where, 1, value & 0xff);
+			__sabre_write_pci_cfg(bus, devfn, where + 1, 1, value >> 8);
 		}
-		return __sabre_write_word(dev, where & ~1, tmp);
-	} else
-		return __sabre_write_byte(dev, where, value);
-}
-
-static int sabre_write_word(struct pci_dev *dev, int where, u16 value)
-{
-	if (dev->bus->number)
-		return __sabre_write_word(dev, where, value);
-
-	if (sabre_out_of_range(dev->devfn))
-		return PCIBIOS_SUCCESSFUL;
-
-	if (where < 8)
-		return __sabre_write_word(dev, where, value);
-	else {
-		__sabre_write_byte(dev, where, value & 0xff);
-		__sabre_write_byte(dev, where + 1, value >> 8);
-		return PCIBIOS_SUCCESSFUL;
+		break;
+	case 4:
+		sabre_write_pci_cfg(bus, devfn, where, 2, value & 0xffff);
+		sabre_write_pci_cfg(bus, devfn, where + 2, 2, value >> 16);
+		break;
 	}
-}
-
-static int sabre_write_dword(struct pci_dev *dev, int where, u32 value)
-{
-	if (dev->bus->number)
-		return __sabre_write_dword(dev, where, value);
-
-	if (sabre_out_of_range(dev->devfn))
-		return PCIBIOS_SUCCESSFUL;
-
-	sabre_write_word(dev, where, value & 0xffff);
-	sabre_write_word(dev, where + 2, value >> 16);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops sabre_ops = {
-	sabre_read_byte,
-	sabre_read_word,
-	sabre_read_dword,
-	sabre_write_byte,
-	sabre_write_word,
-	sabre_write_dword
+	.read =		sabre_read_pci_cfg,
+	.write =	sabre_write_pci_cfg,
 };
 
 static unsigned long sabre_pcislot_imap_offset(unsigned long ino)
@@ -1112,31 +1072,41 @@ static void __init apb_init(struct pci_controller_info *p, struct pci_bus *sabre
 
 		if (pdev->vendor == PCI_VENDOR_ID_SUN &&
 		    pdev->device == PCI_DEVICE_ID_SUN_SIMBA) {
-			u16 word;
+			u32 word32;
+			u16 word16;
 
-			sabre_read_word(pdev, PCI_COMMAND, &word);
-			word |= PCI_COMMAND_SERR | PCI_COMMAND_PARITY |
+			sabre_read_pci_cfg(pdev->bus, pdev->devfn,
+					   PCI_COMMAND, 2, &word32);
+			word16 = (u16) word32;
+			word16 |= PCI_COMMAND_SERR | PCI_COMMAND_PARITY |
 				PCI_COMMAND_MASTER | PCI_COMMAND_MEMORY |
 				PCI_COMMAND_IO;
-			sabre_write_word(pdev, PCI_COMMAND, word);
+			word32 = (u32) word16;
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_COMMAND, 2, word32);
 
 			/* Status register bits are "write 1 to clear". */
-			sabre_write_word(pdev, PCI_STATUS, 0xffff);
-			sabre_write_word(pdev, PCI_SEC_STATUS, 0xffff);
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_STATUS, 2, 0xffff);
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_SEC_STATUS, 2, 0xffff);
 
 			/* Use a primary/seconday latency timer value
 			 * of 64.
 			 */
-			sabre_write_byte(pdev, PCI_LATENCY_TIMER, 64);
-			sabre_write_byte(pdev, PCI_SEC_LATENCY_TIMER, 64);
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_LATENCY_TIMER, 1, 64);
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_SEC_LATENCY_TIMER, 1, 64);
 
 			/* Enable reporting/forwarding of master aborts,
 			 * parity, and SERR.
 			 */
-			sabre_write_byte(pdev, PCI_BRIDGE_CONTROL,
-					 (PCI_BRIDGE_CTL_PARITY |
-					  PCI_BRIDGE_CTL_SERR |
-					  PCI_BRIDGE_CTL_MASTER_ABORT));
+			sabre_write_pci_cfg(pdev->bus, pdev->devfn,
+					    PCI_BRIDGE_CONTROL, 1,
+					    (PCI_BRIDGE_CTL_PARITY |
+					     PCI_BRIDGE_CTL_SERR |
+					     PCI_BRIDGE_CTL_MASTER_ABORT));
 		}
 	}
 }

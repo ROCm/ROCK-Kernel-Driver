@@ -2295,17 +2295,15 @@ static inline void end_request(struct request *req, int uptodate)
 {
 	kdev_t dev = req->rq_dev;
 
-	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
+	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
 	add_blkdev_randomness(major(dev));
 	floppy_off(DEVICE_NR(dev));
+	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 
-	/* Get the next request */
-	req = elv_next_request(QUEUE);
-	if (req)
-		blkdev_dequeue_request(req);
-	CURRENT = req;
+	/* We're done with the request */
+	CURRENT = NULL;
 }
 
 
@@ -2336,27 +2334,8 @@ static void request_done(int uptodate)
 
 		/* unlock chained buffers */
 		spin_lock_irqsave(q->queue_lock, flags);
-		while (current_count_sectors && CURRENT &&
-		       current_count_sectors >= req->current_nr_sectors){
-			current_count_sectors -= req->current_nr_sectors;
-			req->nr_sectors -= req->current_nr_sectors;
-			req->sector += req->current_nr_sectors;
-			end_request(req, 1);
-		}
+		end_request(req, 1);
 		spin_unlock_irqrestore(q->queue_lock, flags);
-
-		if (current_count_sectors && CURRENT) {
-			/* "unlock" last subsector */
-			req->buffer += current_count_sectors <<9;
-			req->current_nr_sectors -= current_count_sectors;
-			req->nr_sectors -= current_count_sectors;
-			req->sector += current_count_sectors;
-			return;
-		}
-
-		if (current_count_sectors && !CURRENT)
-			DPRINT("request list destroyed in floppy request done\n");
-
 	} else {
 		if (rq_data_dir(req) == WRITE) {
 			/* record write error information */
@@ -2939,7 +2918,6 @@ static void redo_fd_request(void)
 				unlock_fdc();
 				return;
 			}
-			blkdev_dequeue_request(req);
 			CURRENT = req;
 		}
 		if (major(CURRENT->rq_dev) != MAJOR_NR)

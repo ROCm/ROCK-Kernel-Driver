@@ -10,6 +10,8 @@
  *            nlgroup now global (sysctl)
  * 2001/04/19 ulog-queue reworked, now fixed buffer size specified at
  * 	      module loadtime -HW
+ * 2002/07/07 remove broken nflog_rcv() function -HW
+ * 2002/08/29 fix shifted/unshifted nlgroup bug -HW
  *
  * Released under the terms of the GPL
  *
@@ -29,7 +31,7 @@
  *   Specify, after how many clock ticks (intel: 100 per second) the queue
  * should be flushed even if it is not full yet.
  *
- * ipt_ULOG.c,v 1.18 2002/04/16 07:33:00 laforge Exp
+ * ipt_ULOG.c,v 1.21 2002/08/29 10:54:34 laforge Exp
  */
 
 #include <linux/module.h>
@@ -48,8 +50,11 @@
 #include <linux/netfilter_ipv4/ipt_ULOG.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
 #include <net/sock.h>
+#include <asm/bitops.h>
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
+MODULE_DESCRIPTION("IP tables userspace logging module");
 
 #define ULOG_NL_EVENT		111		/* Harald's favorite number */
 #define ULOG_MAXNLGROUPS	32		/* numer of nlgroups */
@@ -62,10 +67,6 @@ MODULE_LICENSE("GPL");
 #endif
 
 #define PRINTR(format, args...) do { if (net_ratelimit()) printk(format, ## args); } while (0)
-
-MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
-MODULE_DESCRIPTION("IP tables userspace logging module");
-
 
 static unsigned int nlbufsiz = 4096;
 MODULE_PARM(nlbufsiz, "i");
@@ -91,9 +92,9 @@ static size_t qlen;		/* current length of multipart-nlmsg */
 DECLARE_LOCK(ulog_lock);	/* spinlock */
 
 /* send one ulog_buff_t to userspace */
-static void ulog_send(unsigned int nlgroup)
+static void ulog_send(unsigned int nlgroupnum)
 {
-	ulog_buff_t *ub = &ulog_buffers[nlgroup];
+	ulog_buff_t *ub = &ulog_buffers[nlgroupnum];
 
 	if (timer_pending(&ub->timer)) {
 		DEBUGP("ipt_ULOG: ulog_send: timer was pending, deleting\n");
@@ -104,10 +105,10 @@ static void ulog_send(unsigned int nlgroup)
 	if (ub->qlen > 1)
 		ub->lastnlh->nlmsg_type = NLMSG_DONE;
 
-	NETLINK_CB(ub->skb).dst_groups = nlgroup;
+	NETLINK_CB(ub->skb).dst_groups = (1 << nlgroupnum);
 	DEBUGP("ipt_ULOG: throwing %d packets to netlink mask %u\n",
 		ub->qlen, nlgroup);
-	netlink_broadcast(nflognl, ub->skb, 0, nlgroup, GFP_ATOMIC);
+	netlink_broadcast(nflognl, ub->skb, 0, (1 << nlgroupnum), GFP_ATOMIC);
 
 	ub->qlen = 0;
 	ub->skb = NULL;
@@ -126,11 +127,6 @@ static void ulog_timer(unsigned long data)
 	LOCK_BH(&ulog_lock);
 	ulog_send(data);
 	UNLOCK_BH(&ulog_lock);
-}
-
-static void nflog_rcv(struct sock *sk, int len)
-{
-	printk("ipt_ULOG:nflog_rcv() did receive netlink message ?!?\n");
 }
 
 struct sk_buff *ulog_alloc_skb(unsigned int size)
@@ -169,6 +165,11 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 	struct nlmsghdr *nlh;
 	struct ipt_ulog_info *loginfo = (struct ipt_ulog_info *) targinfo;
 
+	/* ffs == find first bit set, necessary because userspace
+	 * is already shifting groupnumber, but we need unshifted.
+	 * ffs() returns [1..32], we need [0..31] */
+	unsigned int groupnum = ffs(loginfo->nl_group) - 1;
+
 	/* calculate the size of the skb needed */
 	if ((loginfo->copy_range == 0) ||
 	    (loginfo->copy_range > (*pskb)->len)) {
@@ -179,7 +180,7 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 
 	size = NLMSG_SPACE(sizeof(*pm) + copy_len);
 
-	ub = &ulog_buffers[loginfo->nl_group];
+	ub = &ulog_buffers[groupnum];
 	
 	LOCK_BH(&ulog_lock);
 
@@ -191,7 +192,7 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 		/* either the queue len is too high or we don't have 
 		 * enough room in nlskb left. send it to userspace. */
 
-		ulog_send(loginfo->nl_group);
+		ulog_send(groupnum);
 
 		if (!(ub->skb = ulog_alloc_skb(size)))
 			goto alloc_failure;
@@ -325,7 +326,7 @@ static int __init init(void)
 		ulog_buffers[i].timer.data = i;
 	}
 
-	nflognl = netlink_kernel_create(NETLINK_NFLOG, nflog_rcv);
+	nflognl = netlink_kernel_create(NETLINK_NFLOG, NULL);
 	if (!nflognl)
 		return -ENOMEM;
 

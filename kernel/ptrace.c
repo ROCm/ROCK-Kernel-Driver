@@ -29,7 +29,7 @@ void __ptrace_link(task_t *child, task_t *new_parent)
 	if (!list_empty(&child->ptrace_list))
 		BUG();
 	if (child->parent == new_parent)
-		BUG();
+		return;
 	list_add(&child->ptrace_list, &child->parent->ptrace_children);
 	REMOVE_LINKS(child);
 	child->parent = new_parent;

@@ -26,7 +26,7 @@ extern void pgd_free(pgd_t *pgd);
 #define pmd_populate_kernel(mm, pmd, pte)	\
 		(pmd_val(*(pmd)) = __pa(pte))
 #define pmd_populate(mm, pmd, pte)	\
-		(pmd_val(*(pmd)) = ((pte) - mem_map) << PAGE_SHIFT)
+		(pmd_val(*(pmd)) = (page_to_pfn(pte) << PAGE_SHIFT))
 
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 extern struct page *pte_alloc_one(struct mm_struct *mm, unsigned long addr);

@@ -12,7 +12,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "act2000.h"
 #include "act2000_isa.h"
 #include "capi.h"

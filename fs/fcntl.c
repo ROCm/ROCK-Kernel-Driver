@@ -11,13 +11,13 @@
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/iobuf.h>
+#include <linux/module.h>
 #include <linux/security.h>
 
 #include <asm/poll.h>
 #include <asm/siginfo.h>
 #include <asm/uaccess.h>
 
-extern int sock_fcntl (struct file *, unsigned int cmd, unsigned long arg);
 extern int fcntl_setlease(unsigned int fd, struct file *filp, long arg);
 extern int fcntl_getlease(struct file *filp);
 
@@ -259,6 +259,35 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 	return error;
 }
 
+static void f_modown(struct file *filp, unsigned long pid,
+                     uid_t uid, uid_t euid, int force)
+{
+	write_lock_irq(&filp->f_owner.lock);
+	if (force || !filp->f_owner.pid) {
+		filp->f_owner.pid = pid;
+		filp->f_owner.uid = uid;
+		filp->f_owner.euid = euid;
+	}
+	write_unlock_irq(&filp->f_owner.lock);
+}
+
+int f_setown(struct file *filp, unsigned long arg, int force)
+{
+	int err;
+	
+	err = security_ops->file_set_fowner(filp);
+	if (err)
+		return err;
+
+	f_modown(filp, arg, current->uid, current->euid, force);
+	return 0;
+}
+
+void f_delown(struct file *filp)
+{
+	f_modown(filp, 0, 0, 0, 1);
+}
+
 static long do_fcntl(unsigned int fd, unsigned int cmd,
 		     unsigned long arg, struct file * filp)
 {
@@ -302,21 +331,7 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			err = filp->f_owner.pid;
 			break;
 		case F_SETOWN:
-			lock_kernel();
-
-			err = security_ops->file_set_fowner(filp);
-			if (err) {
-				unlock_kernel();
-				break;
-			}
-
-			filp->f_owner.pid = arg;
-			filp->f_owner.uid = current->uid;
-			filp->f_owner.euid = current->euid;
-			err = 0;
-			if (S_ISSOCK (filp->f_dentry->d_inode->i_mode))
-				err = sock_fcntl (filp, F_SETOWN, arg);
-			unlock_kernel();
+			err = f_setown(filp, arg, 1);
 			break;
 		case F_GETSIG:
 			err = filp->f_owner.signum;
@@ -339,10 +354,6 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			err = fcntl_dirnotify(fd, filp, arg);
 			break;
 		default:
-			/* sockets need a few special fcntls. */
-			err = -EINVAL;
-			if (S_ISSOCK (filp->f_dentry->d_inode->i_mode))
-				err = sock_fcntl (filp, cmd, arg);
 			break;
 	}
 
@@ -418,14 +429,20 @@ static long band_table[NSIGPOLL] = {
 	POLLHUP | POLLERR			/* POLL_HUP */
 };
 
+static inline int sigio_perm(struct task_struct *p,
+                             struct fown_struct *fown)
+{
+	return ((fown->euid == 0) ||
+ 	        (fown->euid == p->suid) || (fown->euid == p->uid) ||
+ 	        (fown->uid == p->suid) || (fown->uid == p->uid));
+}
+
 static void send_sigio_to_task(struct task_struct *p,
 			       struct fown_struct *fown, 
 			       int fd,
 			       int reason)
 {
-	if ((fown->euid != 0) &&
-	    (fown->euid ^ p->suid) && (fown->euid ^ p->uid) &&
-	    (fown->uid ^ p->suid) && (fown->uid ^ p->uid))
+	if (!sigio_perm(p, fown))
 		return;
 
 	if (security_ops->file_send_sigiotask(p, fown, fd, reason))
@@ -464,12 +481,17 @@ static void send_sigio_to_task(struct task_struct *p,
 void send_sigio(struct fown_struct *fown, int fd, int band)
 {
 	struct task_struct * p;
-	int   pid	= fown->pid;
+	int pid;
+	
+	read_lock(&fown->lock);
+	pid = fown->pid;
+	if (!pid)
+		goto out_unlock_fown;
 	
 	read_lock(&tasklist_lock);
 	if ( (pid > 0) && (p = find_task_by_pid(pid)) ) {
 		send_sigio_to_task(p, fown, fd, band);
-		goto out;
+		goto out_unlock_task;
 	}
 	for_each_task(p) {
 		int match = p->pid;
@@ -479,8 +501,49 @@ void send_sigio(struct fown_struct *fown, int fd, int band)
 			continue;
 		send_sigio_to_task(p, fown, fd, band);
 	}
-out:
+out_unlock_task:
 	read_unlock(&tasklist_lock);
+out_unlock_fown:
+	read_unlock(&fown->lock);
+}
+
+static void send_sigurg_to_task(struct task_struct *p,
+                                struct fown_struct *fown)
+{
+	if (sigio_perm(p, fown))
+		send_sig(SIGURG, p, 1);
+}
+
+int send_sigurg(struct fown_struct *fown)
+{
+	struct task_struct *p;
+	int pid, ret = 0;
+	
+	read_lock(&fown->lock);
+	pid = fown->pid;
+	if (!pid)
+		goto out_unlock_fown;
+
+	ret = 1;
+	
+	read_lock(&tasklist_lock);
+	if ((pid > 0) && (p = find_task_by_pid(pid))) {
+		send_sigurg_to_task(p, fown);
+		goto out_unlock_task;
+	}
+	for_each_task(p) {
+		int match = p->pid;
+		if (pid < 0)
+			match = -p->pgrp;
+		if (pid != match)
+			continue;
+		send_sigurg_to_task(p, fown);
+	}
+out_unlock_task:
+	read_unlock(&tasklist_lock);
+out_unlock_fown:
+	read_unlock(&fown->lock);
+	return ret;
 }
 
 static rwlock_t fasync_lock = RW_LOCK_UNLOCKED;
@@ -543,7 +606,7 @@ void __kill_fasync(struct fasync_struct *fa, int sig, int band)
 		/* Don't send SIGURG to processes which have not set a
 		   queued signum: SIGURG has its own default signalling
 		   mechanism. */
-		if (fown->pid && !(sig == SIGURG && fown->signum == 0))
+		if (!(sig == SIGURG && fown->signum == 0))
 			send_sigio(fown, fa->fa_fd, band);
 		fa = fa->fa_next;
 	}
@@ -566,3 +629,6 @@ static int __init fasync_init(void)
 }
 
 module_init(fasync_init)
+
+EXPORT_SYMBOL(f_setown);
+EXPORT_SYMBOL(f_delown);
