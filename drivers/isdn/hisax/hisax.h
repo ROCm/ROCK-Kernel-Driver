@@ -684,8 +684,6 @@ struct hfcPCI_hw {
         unsigned char bswapped;
         unsigned char nt_mode;
         int nt_timer;
-	unsigned char pci_bus;
-        unsigned char pci_device_fn;
         unsigned char *pci_io; /* start of PCI IO memory */
         void *fifos; /* FIFO memory */ 
         dma_addr_t fifos_dma;

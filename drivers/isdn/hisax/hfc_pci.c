@@ -87,7 +87,7 @@ release_io_hfcpci(struct IsdnCardState *cs)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30 * HZ) / 1000);	/* Timeout 30ms */
 	Write_hfc(cs, HFCPCI_CIRM, 0);	/* Reset Off */
-	pcibios_write_config_word(cs->hw.hfcpci.pci_bus, cs->hw.hfcpci.pci_device_fn, PCI_COMMAND, 0);	/* disable memory mapped ports + busmaster */
+	pci_disable_device(cs->hw.hfcpci.pdev);
 	del_timer(&cs->hw.hfcpci.timer);
 	iounmap(cs->hw.hfcpci.pci_io);
 	pci_free_consistent(cs->hw.hfcpci.pdev, 32768, cs->hw.hfcpci.fifos, cs->hw.hfcpci.fifos_dma);
@@ -104,12 +104,12 @@ reset_hfcpci(struct IsdnCardState *cs)
 
 	save_flags(flags);
 	cli();
-	pcibios_write_config_word(cs->hw.hfcpci.pci_bus, cs->hw.hfcpci.pci_device_fn, PCI_COMMAND, PCI_ENA_MEMIO);	/* enable memory mapped ports, disable busmaster */
+	pci_disable_device(cs->hw.hfcpci.pdev);
 	cs->hw.hfcpci.int_m2 = 0;	/* interrupt output off ! */
 	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
 
 	printk(KERN_INFO "HFC_PCI: resetting card\n");
-	pcibios_write_config_word(cs->hw.hfcpci.pci_bus, cs->hw.hfcpci.pci_device_fn, PCI_COMMAND, PCI_ENA_MEMIO + PCI_ENA_MASTER);	/* enable memory ports + busmaster */
+	pci_set_master(cs->hw.hfcpci.pdev);
 	Write_hfc(cs, HFCPCI_CIRM, HFCPCI_RESET);	/* Reset On */
 	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -1710,8 +1710,6 @@ setup_hfcpci(struct IsdnCard *card)
 		if (tmp_hfcpci) {
 			i--;
 			dev_hfcpci = tmp_hfcpci;	/* old device */
-			cs->hw.hfcpci.pci_bus = dev_hfcpci->bus->number;
-			cs->hw.hfcpci.pci_device_fn = dev_hfcpci->devfn;
 			cs->irq = dev_hfcpci->irq;
 			cs->hw.hfcpci.pdev = tmp_hfcpci;
 			if (!cs->irq) {
@@ -1729,16 +1727,13 @@ setup_hfcpci(struct IsdnCard *card)
 			return (0);
 		}
 		/* Allocate memory for FIFOS */
-		/* Because the HFC-PCI needs a 32K physical alignment, we */
-		/* need to allocate the double mem and align the address */
 		cs->hw.hfcpci.fifos = pci_alloc_consistent(tmp_hfcpci, 32768, &cs->hw.hfcpci.fifos_dma);
 		if (!cs->hw.hfcpci.fifos) {
 			printk(KERN_WARNING "HFC-PCI: Error allocating memory for FIFO!\n");
 			return 0;
 		}
-		pcibios_write_config_dword(cs->hw.hfcpci.pci_bus,
-					cs->hw.hfcpci.pci_device_fn, 0x80,
-					(u_int)cs->hw.hfcpci.fifos_dma);
+		pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
+				       (u_int)cs->hw.hfcpci.fifos_dma);
 		cs->hw.hfcpci.pci_io = ioremap((ulong) cs->hw.hfcpci.pci_io, 256);
 		printk(KERN_INFO
 		       "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d HZ %d\n",
@@ -1747,7 +1742,6 @@ setup_hfcpci(struct IsdnCard *card)
 		       (u_int) cs->hw.hfcpci.fifos_dma,
 		       cs->irq, HZ);
 		printk("ChipID: %x\n", Read_hfc(cs, HFCPCI_CHIP_ID));
-		pcibios_write_config_word(cs->hw.hfcpci.pci_bus, cs->hw.hfcpci.pci_device_fn, PCI_COMMAND, PCI_ENA_MEMIO);	/* enable memory mapped ports, disable busmaster */
 		cs->hw.hfcpci.int_m2 = 0;	/* disable alle interrupts */
 		cs->hw.hfcpci.int_m1 = 0;
 		Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
