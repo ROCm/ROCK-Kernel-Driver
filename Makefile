@@ -704,6 +704,8 @@ MRPROPER_FILES += \
 	sound/oss/pndspini.c \
 	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
 	.version .config* config.in config.old \
+	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
+	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
