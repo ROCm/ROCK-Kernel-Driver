@@ -177,11 +177,24 @@ out_unlock:
 int i2c_del_adapter(struct i2c_adapter *adap)
 {
 	struct list_head  *item, *_n;
+	struct i2c_adapter *adap_from_list;
 	struct i2c_driver *driver;
 	struct i2c_client *client;
 	int res = 0;
 
 	down(&core_lists);
+
+	/* First make sure that this adapter was ever added */
+	list_for_each_entry(adap_from_list, &adapters, list) {
+		if (adap_from_list == adap)
+			break;
+	}
+	if (adap_from_list != adap) {
+		pr_debug("I2C: Attempting to delete an unregistered "
+			 "adapter\n");
+		res = -EINVAL;
+		goto out_unlock;
+	}
 
 	list_for_each(item,&drivers) {
 		driver = list_entry(item, struct i2c_driver, list);
