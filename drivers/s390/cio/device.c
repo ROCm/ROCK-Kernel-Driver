@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.113 $
+ *   $Revision: 1.113.2.2 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -26,6 +26,7 @@
 #include "cio.h"
 #include "css.h"
 #include "device.h"
+#include "ioasm.h"
 
 /******************* bus type handling ***********************/
 
@@ -138,6 +139,7 @@ struct css_driver io_subchannel_driver = {
 };
 
 struct workqueue_struct *ccw_device_work;
+struct workqueue_struct *ccw_device_notify_work;
 static wait_queue_head_t ccw_device_init_wq;
 static atomic_t ccw_device_init_count;
 
@@ -149,20 +151,37 @@ init_ccw_bus_type (void)
 	init_waitqueue_head(&ccw_device_init_wq);
 	atomic_set(&ccw_device_init_count, 0);
 
-	ccw_device_work = create_workqueue("cio");
+	ccw_device_work = create_singlethread_workqueue("cio");
 	if (!ccw_device_work)
 		return -ENOMEM; /* FIXME: better errno ? */
-
+	ccw_device_notify_work = create_singlethread_workqueue("cio_notify");
+	if (!ccw_device_notify_work) {
+		ret = -ENOMEM; /* FIXME: better errno ? */
+		goto out_err;
+	}
+	slow_path_wq = create_singlethread_workqueue("kslowcrw");
+	if (!slow_path_wq) {
+		ret = -ENOMEM; /* FIXME: better errno ? */
+		goto out_err;
+	}
 	if ((ret = bus_register (&ccw_bus_type)))
-		return ret;
+		goto out_err;
 
 	if ((ret = driver_register(&io_subchannel_driver.drv)))
-		return ret;
+		goto out_err;
 
 	wait_event(ccw_device_init_wq,
 		   atomic_read(&ccw_device_init_count) == 0);
 	flush_workqueue(ccw_device_work);
 	return 0;
+out_err:
+	if (ccw_device_work)
+		destroy_workqueue(ccw_device_work);
+	if (ccw_device_notify_work)
+		destroy_workqueue(ccw_device_notify_work);
+	if (slow_path_wq)
+		destroy_workqueue(slow_path_wq);
+	return ret;
 }
 
 static void __exit
@@ -170,6 +189,7 @@ cleanup_ccw_bus_type (void)
 {
 	driver_unregister(&io_subchannel_driver.drv);
 	bus_unregister(&ccw_bus_type);
+	destroy_workqueue(ccw_device_notify_work);
 	destroy_workqueue(ccw_device_work);
 }
 
@@ -487,20 +507,94 @@ ccw_device_register(struct ccw_device *cdev)
 	return ret;
 }
 
+static struct ccw_device *
+get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
+{
+	struct ccw_device *cdev;
+	struct list_head *entry;
+	struct device *dev;
+
+	if (!get_bus(&ccw_bus_type))
+		return NULL;
+	down_read(&ccw_bus_type.subsys.rwsem);
+	cdev = NULL;
+	list_for_each(entry, &ccw_bus_type.devices.list) {
+		dev = get_device(container_of(entry,
+					      struct device, bus_list));
+		if (!dev)
+			continue;
+		cdev = to_ccwdev(dev);
+		if ((cdev->private->state == DEV_STATE_DISCONNECTED) &&
+		    (cdev->private->devno == devno) &&
+		    (!strncmp(cdev->dev.bus_id, sibling->dev.bus_id,
+			      BUS_ID_SIZE))) {
+			cdev->private->state = DEV_STATE_NOT_OPER;
+			break;
+		}
+		put_device(dev);
+		cdev = NULL;
+	}
+	up_read(&ccw_bus_type.subsys.rwsem);
+	put_bus(&ccw_bus_type);
+
+	return cdev;
+}
+
 void
 ccw_device_do_unreg_rereg(void *data)
 {
-	struct device *dev;
+	struct ccw_device *cdev;
+	struct subchannel *sch;
+	int need_rename;
 
-	dev = (struct device *)data;
-	device_remove_files(dev);
-	device_del(dev);
-	if (device_add(dev)) {
-		put_device(dev);
+	cdev = (struct ccw_device *)data;
+	sch = to_subchannel(cdev->dev.parent);
+	if (cdev->private->devno != sch->schib.pmcw.dev) {
+		/*
+		 * The device number has changed. This is usually only when
+		 * a device has been detached under VM and then re-appeared
+		 * on another subchannel because of a different attachment
+		 * order than before. Ideally, we should should just switch
+		 * subchannels, but unfortunately, this is not possible with
+		 * the current implementation.
+		 * Instead, we search for the old subchannel for this device
+		 * number and deregister so there are no collisions with the
+		 * newly registered ccw_device.
+		 * FIXME: Find another solution so the block layer doesn't
+		 *        get possibly sick...
+		 */
+		struct ccw_device *other_cdev;
+
+		need_rename = 1;
+		other_cdev = get_disc_ccwdev_by_devno(sch->schib.pmcw.dev,
+						      cdev);
+		if (other_cdev) {
+			struct subchannel *other_sch;
+
+			other_sch = to_subchannel(other_cdev->dev.parent);
+			if (get_device(&other_sch->dev)) {
+				stsch(other_sch->irq, &other_sch->schib);
+				if (other_sch->schib.pmcw.dnv) {
+					other_sch->schib.pmcw.intparm = 0;
+					cio_modify(other_sch);
+				}
+				device_unregister(&other_sch->dev);
+			}
+		}
+		cdev->private->devno = sch->schib.pmcw.dev;
+	} else
+		need_rename = 0;
+	device_remove_files(&cdev->dev);
+	device_del(&cdev->dev);
+	if (need_rename)
+		snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",
+			  sch->schib.pmcw.dev);
+	if (device_add(&cdev->dev)) {
+		put_device(&cdev->dev);
 		return;
 	}
-	if (device_add_files(dev))
-		device_unregister(dev);
+	if (device_add_files(&cdev->dev))
+		device_unregister(&cdev->dev);
 }
 
 static void
@@ -553,8 +647,8 @@ out:
 	wake_up(&cdev->private->wait_q);
 }
 
-static void
-device_call_sch_unregister(void *data)
+void
+ccw_device_call_sch_unregister(void *data)
 {
 	struct ccw_device *cdev = data;
 	struct subchannel *sch;
@@ -565,6 +659,7 @@ device_call_sch_unregister(void *data)
 	sch->schib.pmcw.intparm = 0;
 	cio_modify(sch);
 	put_device(&cdev->dev);
+	put_device(&sch->dev);
 }
 
 /*
@@ -587,8 +682,8 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 			break;
 		sch = to_subchannel(cdev->dev.parent);
 		INIT_WORK(&cdev->private->kick_work,
-			  device_call_sch_unregister, (void *) cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
+			  ccw_device_call_sch_unregister, (void *) cdev);
+		queue_work(slow_path_wq, &cdev->private->kick_work);
 		break;
 	case DEV_STATE_BOXED:
 		/* Device did not respond in time. */
@@ -982,3 +1077,4 @@ EXPORT_SYMBOL(ccw_driver_unregister);
 EXPORT_SYMBOL(get_ccwdev_by_busid);
 EXPORT_SYMBOL(ccw_bus_type);
 EXPORT_SYMBOL(ccw_device_work);
+EXPORT_SYMBOL(ccw_device_notify_work);
