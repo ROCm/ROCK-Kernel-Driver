@@ -375,10 +375,19 @@ static void omninet_shutdown (struct usb_serial *serial)
 
 static int __init omninet_init (void)
 {
-	usb_serial_register (&zyxel_omninet_device);
-	usb_register (&omninet_driver);
+	int retval;
+	retval = usb_serial_register(&zyxel_omninet_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&omninet_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&zyxel_omninet_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 
