@@ -221,9 +221,23 @@
 #define __NR_setgid32		214
 #define __NR_setfsuid32		215
 #define __NR_setfsgid32		216
+#define __NR_pivot_root		217
 #define __NR_getdents64		220
 #define __NR_gettid		221
 #define __NR_tkill		222
+#define __NR_setxattr		223
+#define __NR_lsetxattr		224
+#define __NR_fsetxattr		225
+#define __NR_getxattr		226
+#define __NR_lgetxattr		227
+#define __NR_fgetxattr		228
+#define __NR_listxattr		229
+#define __NR_llistxattr		230
+#define __NR_flistxattr		231
+#define __NR_removexattr	232
+#define __NR_lremovexattr	233
+#define __NR_fremovexattr	234
+#define __NR_futex		235
 
 /* user-visible error numbers are in the range -1 - -122: see
    <asm-m68k/errno.h> */

@@ -460,7 +460,7 @@ sys_call_table:
 	.long sys_ni_syscall				/* old gtty syscall holder */
 	.long sys_access
 	.long sys_nice
-	.long sys_ni_syscall	/* 35 */		/* old ftime syscall holder */
+	.long sys_ni_syscall	/* 35 */	/* old ftime syscall holder */
 	.long sys_sync
 	.long sys_kill
 	.long sys_rename
@@ -477,7 +477,7 @@ sys_call_table:
 	.long sys_geteuid16
 	.long sys_getegid16	/* 50 */
 	.long sys_acct
-	.long sys_umount					/* recycled never used phys() */
+	.long sys_umount				/* recycled never used phys() */
 	.long sys_ni_syscall				/* old lock syscall holder */
 	.long sys_ioctl
 	.long sys_fcntl		/* 55 */
@@ -535,10 +535,10 @@ sys_call_table:
 	.long sys_newlstat
 	.long sys_newfstat
 	.long sys_ni_syscall
-	.long sys_ni_syscall	/* iopl for i386 */ /* 110 */
+	.long sys_ni_syscall	/* 110 */	/* iopl for i386 */
 	.long sys_vhangup
-	.long sys_ni_syscall	/* obsolete idle() syscall */
-	.long sys_ni_syscall	/* vm86old for i386 */
+	.long sys_ni_syscall				/* obsolete idle() syscall */
+	.long sys_ni_syscall				/* vm86old for i386 */
 	.long sys_wait4
 	.long sys_swapoff	/* 115 */
 	.long sys_sysinfo
@@ -548,7 +548,7 @@ sys_call_table:
 	.long sys_clone		/* 120 */
 	.long sys_setdomainname
 	.long sys_newuname
-	.long sys_cacheflush	/* modify_ldt for i386 */
+	.long sys_cacheflush				/* modify_ldt for i386 */
 	.long sys_adjtimex
 	.long sys_mprotect	/* 125 */
 	.long sys_sigprocmask
@@ -562,7 +562,7 @@ sys_call_table:
 	.long sys_bdflush
 	.long sys_sysfs		/* 135 */
 	.long sys_personality
-	.long sys_ni_syscall	/* for afs_syscall */
+	.long sys_ni_syscall				/* for afs_syscall */
 	.long sys_setfsuid16
 	.long sys_setfsgid16
 	.long sys_llseek	/* 140 */
@@ -580,7 +580,7 @@ sys_call_table:
 	.long sys_mlockall
 	.long sys_munlockall
 	.long sys_sched_setparam
-	.long sys_sched_getparam   /* 155 */
+	.long sys_sched_getparam	/* 155 */
 	.long sys_sched_setscheduler
 	.long sys_sched_getscheduler
 	.long sys_sched_yield
@@ -613,8 +613,8 @@ sys_call_table:
 	.long sys_capset	/* 185 */
 	.long sys_sigaltstack
 	.long sys_sendfile
-	.long sys_ni_syscall	/* streams1 */
-	.long sys_ni_syscall	/* streams2 */
+	.long sys_ni_syscall				/* streams1 */
+	.long sys_ni_syscall				/* streams2 */
 	.long sys_vfork		/* 190 */
 	.long sys_getrlimit
 	.long sys_mmap2
@@ -642,12 +642,25 @@ sys_call_table:
 	.long sys_setgid
 	.long sys_setfsuid	/* 215 */
 	.long sys_setfsgid
-	.long sys_ni_syscall
+	.long sys_pivot_root
 	.long sys_ni_syscall
 	.long sys_ni_syscall
 	.long sys_getdents64	/* 220 */
 	.long sys_gettid
 	.long sys_tkill
+	.long sys_setxattr
+	.long sys_lsetxattr
+	.long sys_fsetxattr	/* 225 */
+	.long sys_getxattr
+	.long sys_lgetxattr
+	.long sys_fgetxattr
+	.long sys_listxattr
+	.long sys_llistxattr	/* 230 */
+	.long sys_flistxattr
+	.long sys_removexattr
+	.long sys_lremovexattr
+	.long sys_fremovexattr
+	.long sys_futex		/* 235 */
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall
