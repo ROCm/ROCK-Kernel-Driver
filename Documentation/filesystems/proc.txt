@@ -55,7 +55,7 @@ This work is  based on the 2.2.*  kernel version and the  upcoming 2.4.*. I'm
 afraid it's still far from complete, but we  hope it will be useful. As far as
 we know, it is the first 'all-in-one' document about the /proc file system. It
 is focused  on the Intel  x86 hardware,  so if you  are looking for  PPC, ARM,
-SPARC, APX, etc., features, you probably  won't find what you are looking for.
+SPARC, AXP, etc., features, you probably  won't find what you are looking for.
 It also only covers IPv4 networking, not IPv6 nor other protocols - sorry. But
 additions and patches  are welcome and will  be added to this  document if you
 mail them to Bodo.
