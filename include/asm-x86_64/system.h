@@ -83,7 +83,7 @@ extern void load_gs_index(unsigned);
 #define loadsegment(seg,value)	\
 	asm volatile("\n"			\
 		"1:\t"				\
-		"movl %0,%%" #seg "\n"		\
+		"movl %k0,%%" #seg "\n"		\
 		"2:\n"				\
 		".section .fixup,\"ax\"\n"	\
 		"3:\t"				\
@@ -94,7 +94,7 @@ extern void load_gs_index(unsigned);
 		".align 8\n\t"			\
 		".quad 1b,3b\n"			\
 		".previous"			\
-		: :"r" ((int)(value)))
+		: :"r" (value))
 
 #define set_debug(value,register) \
                 __asm__("movq %0,%%db" #register  \
@@ -117,6 +117,13 @@ static inline unsigned long read_cr0(void)
 static inline void write_cr0(unsigned long val) 
 { 
 	asm volatile("movq %0,%%cr0" :: "r" (val));
+} 
+
+static inline unsigned long read_cr3(void)
+{ 
+	unsigned long cr3;
+	asm("movq %%cr3,%0" : "=r" (cr3));
+	return cr3;
 } 
 
 static inline unsigned long read_cr4(void)

@@ -350,7 +350,7 @@ static int fpga_write(int iobase, unsigned char wrd)
 		wrd <<= 1;
 		outb(0xfc, THR(iobase));
 		while ((inb(LSR(iobase)) & LSR_TSRE) == 0)
-			if (jiffies > timeout)
+			if (time_after(jiffies, timeout))
 				return -1;
 	}
 

@@ -103,6 +103,8 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define ptep_get_and_clear(xp)	__pte(xchg(&(xp)->pte, 0))
 #define pte_same(a, b)		((a).pte == (b).pte)
 
+#define PML4_SIZE	(1UL << PML4_SHIFT)
+#define PML4_MASK       (~(PML4_SIZE-1))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
@@ -317,7 +319,8 @@ static inline pgd_t *current_pgd_offset_k(unsigned long address)
 
 /* PMD  - Level 2 access */
 #define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
-#define pmd_page(pmd)        (mem_map + ((pmd_val(pmd) & PTE_MASK)>>PAGE_SHIFT))
+#define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
+
 #define __pmd_offset(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 #define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
 			__pmd_offset(address))
@@ -372,7 +375,9 @@ typedef pte_t *pte_addr_t;
 
 #endif /* !__ASSEMBLY__ */
 
+#ifndef CONFIG_DISCONTIGMEM
 #define kern_addr_valid(addr)	(1)
+#endif
 
 #define io_remap_page_range remap_page_range
 

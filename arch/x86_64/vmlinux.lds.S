@@ -47,10 +47,10 @@ SECTIONS
   .vsyscall_0 -10*1024*1024: AT ((LOADADDR(.data.cacheline_aligned) + SIZEOF(.data.cacheline_aligned) + 4095) & ~(4095)) { *(.vsyscall_0) }
   __vsyscall_0 = LOADADDR(.vsyscall_0);
   . = ALIGN(64);
-  .vxtime_sequence : AT ((LOADADDR(.vsyscall_0) + SIZEOF(.vsyscall_0) + 63) & ~(63)) { *(.vxtime_sequence) }
-  vxtime_sequence = LOADADDR(.vxtime_sequence);
+  .xtime_lock : AT ((LOADADDR(.vsyscall_0) + SIZEOF(.vsyscall_0) + 63) & ~(63)) { *(.xtime_lock) }
+  xtime_lock = LOADADDR(.xtime_lock);
   . = ALIGN(16);
-  .hpet : AT ((LOADADDR(.vxtime_sequence) + SIZEOF(.vxtime_sequence) + 15) & ~(15)) { *(.hpet) }
+  .hpet : AT ((LOADADDR(.xtime_lock) + SIZEOF(.xtime_lock) + 15) & ~(15)) { *(.hpet) }
   hpet = LOADADDR(.hpet);
   . = ALIGN(16);
   .wall_jiffies : AT ((LOADADDR(.hpet) + SIZEOF(.hpet) + 15) & ~(15)) { *(.wall_jiffies) }
@@ -59,7 +59,10 @@ SECTIONS
   .sys_tz : AT ((LOADADDR(.wall_jiffies) + SIZEOF(.wall_jiffies) + 15) & ~(15)) { *(.sys_tz) }
   sys_tz = LOADADDR(.sys_tz);
   . = ALIGN(16);
-  .jiffies : AT ((LOADADDR(.sys_tz) + SIZEOF(.sys_tz) + 15) & ~(15)) { *(.jiffies) }
+  .sysctl_vsyscall : AT ((LOADADDR(.sys_tz) + SIZEOF(.sys_tz) + 15) & ~(15)) { *(.sysctl_vsyscall) }
+  sysctl_vsyscall = LOADADDR(.sysctl_vsyscall);
+  . = ALIGN(16);
+  .jiffies : AT ((LOADADDR(.sysctl_vsyscall) + SIZEOF(.sysctl_vsyscall) + 15) & ~(15)) { *(.jiffies) }
   jiffies = LOADADDR(.jiffies);
   . = ALIGN(16);
   .xtime : AT ((LOADADDR(.jiffies) + SIZEOF(.jiffies) + 15) & ~(15)) { *(.xtime) }

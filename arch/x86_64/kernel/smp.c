@@ -3,6 +3,7 @@
  *
  *	(c) 1995 Alan Cox, Building #3 <alan@redhat.com>
  *	(c) 1998-99, 2000 Ingo Molnar <mingo@redhat.com>
+ *      (c) 2002,2003 Andi Kleen, SuSE Labs.
  *
  *	This code is released under the GNU General Public License version 2 or
  *	later.
@@ -491,3 +492,24 @@ asmlinkage void smp_call_function_interrupt(void)
 	}
 }
 
+
+/* Slow. Should be only used for debugging. */
+int slow_smp_processor_id(void)
+{ 
+	int stack_location;
+	unsigned long sp = (unsigned long)&stack_location; 
+	int cpu;
+	unsigned long mask;
+
+	for_each_cpu(cpu, mask) { 
+		if (sp >= (u64)cpu_pda[cpu].irqstackptr - IRQSTACKSIZE && 
+		    sp <= (u64)cpu_pda[cpu].irqstackptr)
+			return cpu;
+
+		unsigned long estack = init_tss[cpu].ist[0] - EXCEPTION_STKSZ;
+		if (sp >= estack && sp <= estack+(1<<(PAGE_SHIFT+EXCEPTION_STK_ORDER)))
+			return cpu;			
+	}
+
+	return stack_smp_processor_id();
+} 

@@ -857,7 +857,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		while (!(inb(info->base + UART_LSR) & UART_LSR_TEMT)) {
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(5);
-			if (jiffies > timeout)
+			if (time_after(jiffies, timeout))
 				break;
 		}
 	}

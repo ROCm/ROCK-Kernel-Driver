@@ -492,11 +492,11 @@ static int COMX_open(struct net_device *dev)
 
 	COMX_CMD(dev, COMX_CMD_INIT); 
 	jiffs = jiffies;
-	while (COMX_readw(dev, OFF_A_L2_LINKUP) != 1 && jiffies < jiffs + HZ) {
+	while (COMX_readw(dev, OFF_A_L2_LINKUP) != 1 && time_before(jiffies, jiffs + HZ)) {
 		schedule_timeout(1);
 	}
 	
-	if (jiffies >= jiffs + HZ) {
+	if (time_after_eq(jiffies, jiffs + HZ)) {
 		printk(KERN_ERR "%s: board timeout on INIT command\n", dev->name);
 		ch->HW_release_board(dev, savep);
 		retval=-EIO;
@@ -507,11 +507,11 @@ static int COMX_open(struct net_device *dev)
 	COMX_CMD(dev, COMX_CMD_OPEN);
 
 	jiffs = jiffies;
-	while (COMX_readw(dev, OFF_A_L2_LINKUP) != 3 && jiffies < jiffs + HZ) {
+	while (COMX_readw(dev, OFF_A_L2_LINKUP) != 3 && time_before(jiffies, jiffs + HZ)) {
 		schedule_timeout(1);
 	}
 	
-	if (jiffies >= jiffs + HZ) {
+	if (time_after_eq(jiffies, jiffs + HZ)) {
 		printk(KERN_ERR "%s: board timeout on OPEN command\n", dev->name);
 		ch->HW_release_board(dev, savep);
 		retval=-EIO;

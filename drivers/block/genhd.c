@@ -299,7 +299,7 @@ static struct sysfs_ops disk_sysfs_ops = {
 static ssize_t disk_dev_read(struct gendisk * disk, char *page)
 {
 	dev_t base = MKDEV(disk->major, disk->first_minor); 
-	return sprintf(page, "%04x\n",base);
+	return sprintf(page, "%04x\n", (unsigned)base);
 }
 static ssize_t disk_range_read(struct gendisk * disk, char *page)
 {

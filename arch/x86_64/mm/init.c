@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1995  Linus Torvalds
  *  Copyright (C) 2000  Pavel Machek <pavel@suse.cz>
- *  Copyright (C) 2002  Andi Kleen <ak@suse.de>
+ *  Copyright (C) 2002,2003 Andi Kleen <ak@suse.de>
  */
 
 #include <linux/config.h>
@@ -37,8 +37,9 @@
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
 #include <asm/proto.h>
+#include <asm/smp.h>
 
-unsigned long start_pfn, end_pfn;
+#define Dprintk(x...) printk(x)
 
 struct mmu_gather mmu_gathers[NR_CPUS];
 
@@ -90,9 +91,11 @@ static void *spp_getpage(void)
 	if (after_bootmem)
 		ptr = (void *) get_zeroed_page(GFP_ATOMIC); 
 	else
-		ptr = alloc_bootmem_low(PAGE_SIZE); 
-	if (!ptr)
+		ptr = alloc_bootmem_pages(PAGE_SIZE);
+	if (!ptr || ((unsigned long)ptr & ~PAGE_MASK))
 		panic("set_pte_phys: cannot allocate page data %s\n", after_bootmem?"after bootmem":"");
+
+	Dprintk("spp_getpage %p\n", ptr);
 	return ptr;
 } 
 
@@ -104,6 +107,8 @@ static void set_pte_phys(unsigned long vaddr,
 	pmd_t *pmd;
 	pte_t *pte;
 
+	Dprintk("set_pte_phys %lx to %lx\n", vaddr, phys);
+
 	level4 = pml4_offset_k(vaddr);
 	if (pml4_none(*level4)) {
 		printk("PML4 FIXMAP MISSING, it should be setup in head.S!\n");
@@ -114,7 +119,7 @@ static void set_pte_phys(unsigned long vaddr,
 		pmd = (pmd_t *) spp_getpage(); 
 		set_pgd(pgd, __pgd(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
 		if (pmd != pmd_offset(pgd, 0)) {
-			printk("PAGETABLE BUG #01!\n");
+			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pgd,0));
 			return;
 		}
 	}
@@ -128,6 +133,7 @@ static void set_pte_phys(unsigned long vaddr,
 		}
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
+	/* CHECKME: */
 	if (pte_val(*pte))
 		pte_ERROR(*pte);
 	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, prot));
@@ -151,7 +157,8 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
 	set_pte_phys(address, phys, prot);
 }
 
-extern unsigned long start_pfn, end_pfn; 
+unsigned long __initdata table_start, table_end; 
+
 extern pmd_t temp_boot_pmds[]; 
 
 static  struct temp_map { 
@@ -168,21 +175,21 @@ static __init void *alloc_low_page(int *index, unsigned long *phys)
 { 
 	struct temp_map *ti;
 	int i; 
-	unsigned long pfn = start_pfn++, paddr; 
+	unsigned long pfn = table_end++, paddr; 
 	void *adr;
 
-	if (pfn >= end_pfn_map) 
+	if (pfn >= end_pfn) 
 		panic("alloc_low_page: ran out of memory"); 
 	for (i = 0; temp_mappings[i].allocated; i++) {
 		if (!temp_mappings[i].pmd) 
 			panic("alloc_low_page: ran out of temp mappings"); 
 	} 
 	ti = &temp_mappings[i];
-	paddr = (pfn & (~511)) << PAGE_SHIFT; 
+	paddr = (pfn << PAGE_SHIFT) & PMD_MASK; 
 	set_pmd(ti->pmd, __pmd(paddr | _KERNPG_TABLE | _PAGE_PSE)); 
 	ti->allocated = 1; 
 	__flush_tlb(); 	       
-	adr = ti->address + (pfn & 511)*PAGE_SIZE; 
+	adr = ti->address + ((pfn << PAGE_SHIFT) & ~PMD_MASK); 
 	*index = i; 
 	*phys  = pfn * PAGE_SIZE;  
 	return adr; 
@@ -203,20 +210,26 @@ static void __init phys_pgd_init(pgd_t *pgd, unsigned long address, unsigned lon
 	pgd = pgd + i;
 	for (; i < PTRS_PER_PGD; pgd++, i++) {
 		int map; 
-		unsigned long paddr = i*PGDIR_SIZE, pmd_phys;
+		unsigned long paddr, pmd_phys;
 		pmd_t *pmd;
 
+		paddr = (address & PML4_MASK) + i*PGDIR_SIZE;
 		if (paddr >= end) { 
 			for (; i < PTRS_PER_PGD; i++, pgd++) 
 				set_pgd(pgd, __pgd(0)); 
 			break;
 		} 
+
+		if (!e820_mapped(paddr, paddr+PGDIR_SIZE, 0)) { 
+			set_pgd(pgd, __pgd(0)); 
+			continue;
+		} 
+
 		pmd = alloc_low_page(&map, &pmd_phys);
 		set_pgd(pgd, __pgd(pmd_phys | _KERNPG_TABLE));
-		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
+		for (j = 0; j < PTRS_PER_PMD; pmd++, j++, paddr += PMD_SIZE) {
 			unsigned long pe;
 
-			paddr = i*PGDIR_SIZE + j*PMD_SIZE;
 			if (paddr >= end) { 
 				for (; j < PTRS_PER_PMD; j++, pmd++)
 					set_pmd(pmd,  __pmd(0)); 
@@ -239,13 +252,37 @@ void __init init_memory_mapping(void)
 	unsigned long adr;	       
 	unsigned long end;
 	unsigned long next; 
+	unsigned long pgds, pmds, tables; 
 
-	end = PAGE_OFFSET + (end_pfn_map * PAGE_SIZE); 
+	Dprintk("init_memory_mapping\n");
+
+	end = end_pfn_map << PAGE_SHIFT;
+
+	/* 
+	 * Find space for the kernel direct mapping tables.
+	 * Later we should allocate these tables in the local node of the memory
+	 * mapped.  Unfortunately this is done currently before the nodes are 
+	 * discovered.
+	 */
+
+	pgds = (end + PGDIR_SIZE - 1) >> PGDIR_SHIFT;
+	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT; 
+	tables = round_up(pgds*8, PAGE_SIZE) + round_up(pmds * 8, PAGE_SIZE); 
+
+	table_start = find_e820_area(0x8000, __pa_symbol(&_text), tables); 
+	if (table_start == -1UL) 
+		panic("Cannot find space for the kernel page tables"); 
+
+	table_start >>= PAGE_SHIFT; 
+	table_end = table_start;
+       
+	end += __PAGE_OFFSET; /* turn virtual */  	
+
 	for (adr = PAGE_OFFSET; adr < end; adr = next) { 
 		int map;
 		unsigned long pgd_phys; 
 		pgd_t *pgd = alloc_low_page(&map, &pgd_phys);
-		next = adr + (512UL * 1024 * 1024 * 1024);
+		next = adr + PML4_SIZE;
 		if (next > end) 
 			next = end; 
 		phys_pgd_init(pgd, adr-PAGE_OFFSET, next-PAGE_OFFSET); 
@@ -254,20 +291,35 @@ void __init init_memory_mapping(void)
 	} 
 	asm volatile("movq %%cr4,%0" : "=r" (mmu_cr4_features));
 	__flush_tlb_all();
+	early_printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
+	       table_start<<PAGE_SHIFT, 
+	       table_end<<PAGE_SHIFT);
 }
 
 extern struct x8664_pda cpu_pda[NR_CPUS];
 
-void __init zap_low_mappings (void)
+static unsigned long low_pml4[NR_CPUS];
+
+void swap_low_mappings(void)
 {
 	int i;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_pda[i].level4_pgt) 
-			cpu_pda[i].level4_pgt[0] = 0; 
+	        unsigned long t;
+		if (!cpu_pda[i].level4_pgt) 
+			continue;
+		t = cpu_pda[i].level4_pgt[0];
+		cpu_pda[i].level4_pgt[0] = low_pml4[i];
+		low_pml4[i] = t;
 	}
 	flush_tlb_all();
 }
 
+void zap_low_mappings(void)
+{
+	swap_low_mappings();
+}
+
+#ifndef CONFIG_DISCONTIGMEM
 void __init paging_init(void)
 {
 	{
@@ -286,7 +338,7 @@ void __init paging_init(void)
 	}
 	return;
 }
-
+#endif
 
 static inline int page_is_ram (unsigned long pagenr)
 {
@@ -315,36 +367,45 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
-	if (!mem_map)
-		BUG();
-
+	/* How many end-of-memory variables you have, grandma! */
 	max_low_pfn = end_pfn;
 	max_pfn = end_pfn;
-	max_mapnr = num_physpages = end_pfn;
+	num_physpages = end_pfn;
 	high_memory = (void *) __va(end_pfn * PAGE_SIZE);
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);
 
+	reservedpages = 0;
+
 	/* this will put all low memory onto the freelists */
+#ifdef CONFIG_DISCONTIGMEM
+	totalram_pages += numa_free_all_bootmem();
+	tmp = 0;
+	/* should count reserved pages here for all nodes */ 
+#else
+	max_mapnr = end_pfn;
+	if (!mem_map) BUG();
+
 	totalram_pages += free_all_bootmem();
 
-	after_bootmem = 1;
-
-	reservedpages = 0;
 	for (tmp = 0; tmp < end_pfn; tmp++)
 		/*
 		 * Only count reserved RAM pages
 		 */
 		if (page_is_ram(tmp) && PageReserved(mem_map+tmp))
 			reservedpages++;
+#endif
+
+	after_bootmem = 1;
+
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
 	printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
-		max_mapnr << (PAGE_SHIFT-10),
+		end_pfn << (PAGE_SHIFT-10),
 		codesize >> 10,
 		reservedpages << (PAGE_SHIFT-10),
 		datasize >> 10,
@@ -392,3 +453,16 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
+
+void __init reserve_bootmem_generic(unsigned long phys, unsigned len) 
+{ 
+	/* Should check here against the e820 map to avoid double free */ 
+#ifdef CONFIG_DISCONTIGMEM
+	int nid = phys_to_nid(phys);
+	if (phys < HIGH_MEMORY && nid) 
+		panic("reserve of %lx at node %d", phys, nid);
+	reserve_bootmem_node(NODE_DATA(nid), phys, len);
+#else       		
+	reserve_bootmem(phys, len);    
+#endif
+}

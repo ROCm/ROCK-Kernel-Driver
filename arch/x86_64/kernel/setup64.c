@@ -1,7 +1,7 @@
 /* 
  * X86-64 specific CPU setup.
  * Copyright (C) 1995  Linus Torvalds
- * Copyright 2001, 2002 SuSE Labs / Andi Kleen.
+ * Copyright 2001, 2002, 2003 SuSE Labs / Andi Kleen.
  * See setup.c for older changelog.
  * $Id: setup64.c,v 1.12 2002/03/21 10:09:17 ak Exp $
  */ 
@@ -90,6 +90,17 @@ void pda_init(int cpu)
         pml4_t *level4;
 	struct x8664_pda *pda = &cpu_pda[cpu];
 
+	/* Setup up data that may be needed in __get_free_pages early */
+	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0)); 
+	wrmsrl(MSR_GS_BASE, cpu_pda + cpu);
+
+	pda->me = pda;
+	pda->cpunumber = cpu; 
+	pda->irqcount = -1;
+	pda->cpudata_offset = 0;
+	pda->kernelstack = 
+		(unsigned long)current_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
+
 	if (cpu == 0) {
 		/* others are initialized in smpboot.c */
 		pda->pcurrent = &init_task;
@@ -112,18 +123,8 @@ void pda_init(int cpu)
 	asm volatile("movq %0,%%cr3" :: "r" (__pa(level4))); 
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
-	pda->cpunumber = cpu; 
-	pda->irqcount = -1;
-	pda->kernelstack = 
-		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
-	pda->me = pda;
-	pda->cpudata_offset = 0;
-
 	pda->active_mm = &init_mm;
 	pda->mmu_state = 0;
-	
-	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0)); 
-	wrmsrl(MSR_GS_BASE, cpu_pda + cpu);
 } 
 
 #define EXCEPTION_STK_ORDER 0 /* >= N_EXCEPTION_STACKS*EXCEPTION_STKSZ */
@@ -150,10 +151,10 @@ void __init cpu_init (void)
 
 	/* CPU 0 is initialised in head64.c */
 	if (cpu != 0) {
+		pda_init(cpu);
 		estacks = (char *)__get_free_pages(GFP_ATOMIC, 0); 
 		if (!estacks)
 			panic("Can't allocate exception stacks for CPU %d\n",cpu);
-		pda_init(cpu);  
 	} else 
 		estacks = boot_exception_stacks; 
 

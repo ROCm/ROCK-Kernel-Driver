@@ -18,6 +18,7 @@
 // r5_hash
 //
 
+#include <linux/kernel.h>
 #include <asm/types.h>
 #include <asm/bug.h>
 

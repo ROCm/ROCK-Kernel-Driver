@@ -3,7 +3,7 @@
 
 extern int x86_summit;
 
-#define esr_disable (1)
+#define esr_disable (x86_summit ? 1 : 0)
 #define no_balance_irq (0)
 
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
@@ -15,14 +15,14 @@ extern int x86_summit;
 #define APIC_DFR_VALUE	(x86_summit ? APIC_DFR_CLUSTER : APIC_DFR_FLAT)
 #define TARGET_CPUS	(x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map)
 
-#define INT_DELIVERY_MODE dest_Fixed
+#define INT_DELIVERY_MODE (x86_summit ? dest_Fixed : dest_LowestPrio)
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
 #define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
-#define check_apicid_used(bitmap, apicid) (0)
+#define check_apicid_used(bitmap, apicid) (x86_summit ? 0 : (bitmap & (1 << apicid)))
 
 /* we don't use the phys_cpu_present_map to indicate apicid presence */
-#define check_apicid_present(bit) (1) 
+#define check_apicid_present(bit) (x86_summit ? 1 : (phys_cpu_present_map & (1 << bit))) 
 
 extern u8 bios_cpu_apicid[];
 
@@ -106,7 +106,10 @@ static inline void setup_portio_remap(void)
 
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
-	return (1);
+	if (x86_summit)
+		return (1);
+	else
+		return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
 
 #endif /* __ASM_MACH_APIC_H */

@@ -4708,8 +4708,8 @@ ahc_init(struct ahc_softc *ahc)
 
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_MISC) {
-		printf("%s: hardware scb %d bytes; kernel scb %d bytes; "
-		       "ahc_dma %d bytes\n",
+		printf("%s: hardware scb %Zu bytes; kernel scb %Zu bytes; "
+		       "ahc_dma %Zu bytes\n",
 			ahc_name(ahc),
 			sizeof(struct hardware_scb),
 			sizeof(struct scb),

@@ -15,7 +15,7 @@ extern int printk(const char * fmt, ...)
 
 typedef struct {
 	volatile unsigned int lock;
-#if CONFIG_DEBUG_SPINLOCK
+#ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
 } spinlock_t;
@@ -56,13 +56,56 @@ typedef struct {
 
 /*
  * This works. Despite all the confusion.
+ * (except on PPro SMP or if we are using OOSTORE)
+ * (PPro errata 66, 92)
  */
+ 
+#if !defined(CONFIG_X86_OOSTORE) && !defined(CONFIG_X86_PPRO_FENCE)
+
 #define spin_unlock_string \
-	"movb $1,%0"
+	"movb $1,%0" \
+		:"=m" (lock->lock) : : "memory"
+
+
+static inline void _raw_spin_unlock(spinlock_t *lock)
+{
+#ifdef CONFIG_DEBUG_SPINLOCK
+	if (lock->magic != SPINLOCK_MAGIC)
+		BUG();
+	if (!spin_is_locked(lock))
+		BUG();
+#endif
+	__asm__ __volatile__(
+		spin_unlock_string
+	);
+}
+
+#else
+
+#define spin_unlock_string \
+	"xchgb %b0, %1" \
+		:"=q" (oldval), "=m" (lock->lock) \
+		:"0" (oldval) : "memory"
+
+static inline void _raw_spin_unlock(spinlock_t *lock)
+{
+	char oldval = 1;
+#ifdef CONFIG_DEBUG_SPINLOCK
+	if (lock->magic != SPINLOCK_MAGIC)
+		BUG();
+	if (!spin_is_locked(lock))
+		BUG();
+#endif
+	__asm__ __volatile__(
+		spin_unlock_string
+	);
+}
+
+#endif
 
 static inline int _raw_spin_trylock(spinlock_t *lock)
 {
-	signed char oldval;
+	char oldval;
 	__asm__ __volatile__(
 		"xchgb %b0,%1"
 		:"=q" (oldval), "=m" (lock->lock)
@@ -85,18 +128,6 @@ printk("eip: %p\n", &&here);
 		:"=m" (lock->lock) : : "memory");
 }
 
-static inline void _raw_spin_unlock(spinlock_t *lock)
-{
-#ifdef CONFIG_DEBUG_SPINLOCK
-	if (lock->magic != SPINLOCK_MAGIC)
-		BUG();
-	if (!spin_is_locked(lock))
-		BUG();
-#endif
-	__asm__ __volatile__(
-		spin_unlock_string
-		:"=m" (lock->lock) : : "memory");
-}
 
 /*
  * Read-write spinlocks, allowing multiple readers
@@ -127,6 +158,8 @@ typedef struct {
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
+#define rwlock_is_locked(x) ((x)->lock != RW_LOCK_BIAS)
+
 /*
  * On x86, we implement read-write locks as a 32-bit counter
  * with the high bit (sign) being the "contended" bit.
@@ -136,9 +169,9 @@ typedef struct {
  * Changed to use the same technique as rw semaphores.  See
  * semaphore.h for details.  -ben
  */
-/* the spinlock helpers are in arch/x86_64/kernel/semaphore.S */
+/* the spinlock helpers are in arch/i386/kernel/semaphore.c */
 
-extern inline void _raw_read_lock(rwlock_t *rw)
+static inline void _raw_read_lock(rwlock_t *rw)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	if (rw->magic != RWLOCK_MAGIC)
@@ -167,7 +200,5 @@ static inline int _raw_write_trylock(rwlock_t *lock)
 	atomic_add(RW_LOCK_BIAS, count);
 	return 0;
 }
-
-#define rwlock_is_locked(x) ((x)->lock != RW_LOCK_BIAS)
 
 #endif /* __ASM_SPINLOCK_H */

@@ -162,6 +162,37 @@ back1:
 	return i;
 }
 
+struct page *
+follow_huge_addr(struct mm_struct *mm,
+	struct vm_area_struct *vma, unsigned long address, int write)
+{
+	return NULL;
+}
+
+struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
+{
+	return NULL;
+}
+
+int pmd_huge(pmd_t pmd)
+{
+	return !!(pmd_val(pmd) & _PAGE_PSE);
+}
+
+struct page *
+follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+		pmd_t *pmd, int write)
+{
+	struct page *page;
+
+	page = pte_page(*(pte_t *)pmd);
+	if (page) {
+		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
+		get_page(page);
+	}
+	return page;
+}
+
 void free_huge_page(struct page *page)
 {
 	BUG_ON(page_count(page));
@@ -193,8 +224,6 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
-	spin_lock(&htlbpage_lock);
-	spin_unlock(&htlbpage_lock);
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		page = pte_page(*pte);
@@ -216,7 +245,7 @@ void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigne
 int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 {
 	struct mm_struct *mm = current->mm;
-	struct inode = mapping->host;
+	struct inode *inode = mapping->host;
 	unsigned long addr;
 	int ret = 0;
 

@@ -1,5 +1,9 @@
 /*
  * arch/x86_64/kernel/bluesmoke.c - x86-64 Machine Check Exception Reporting
+ * 
+
+RED-PEN: need to add power management to restore after S3 wakeup. 
+
  */
 
 #include <linux/init.h>

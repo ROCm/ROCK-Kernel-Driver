@@ -39,15 +39,9 @@ static inline int need_signal_i387(struct task_struct *me)
 #define kernel_fpu_end() stts()
 
 #define unlazy_fpu(tsk) do { \
-	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) \
+	if ((tsk)->thread_info->flags & TIF_USEDFPU) \
 		save_init_fpu(tsk); \
 } while (0)
-
-#define unlazy_current_fpu() do { \
-	if (test_thread_flag(TIF_USEDFPU)) \
-		save_init_fpu(tsk); \
-} while (0)
-
 
 #define clear_fpu(tsk) do { \
 	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) {		\
@@ -134,7 +128,7 @@ static inline void save_init_fpu( struct task_struct *tsk )
 {
 	asm volatile( "fxsave %0 ; fnclex"
 		      : "=m" (tsk->thread.i387.fxsave));
-	clear_tsk_thread_flag(tsk, TIF_USEDFPU);
+	tsk->thread_info->flags &= ~TIF_USEDFPU;
 	stts();
 }
 

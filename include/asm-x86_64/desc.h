@@ -135,6 +135,14 @@ static inline void set_ldt_desc(unsigned cpu, void *addr, int size)
 			      DESC_LDT, size); 
 }
 
+static inline void set_seg_base(unsigned cpu, int entry, void *base)
+{ 
+	struct desc_struct *d = &cpu_gdt_table[cpu][entry];
+	d->base0 = PTR_LOW(base);
+	d->base1 = PTR_MIDDLE(base);
+	d->base2 = PTR_HIGH(base);
+} 
+
 #define LDT_entry_a(info) \
 	((((info)->base_addr & 0x0000ffff) << 16) | ((info)->limit & 0x0ffff))
 #define LDT_entry_b(info) \

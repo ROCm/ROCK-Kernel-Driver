@@ -38,6 +38,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/pci.h>
+#include <linux/acpi.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -52,6 +53,8 @@
 #include <asm/bootsetup.h>
 #include <asm/smp.h>
 #include <asm/proto.h>
+
+#define Dprintk(x...) printk(x)
 
 /*
  * Machine setup..
@@ -236,6 +239,8 @@ void __init setup_arch(char **cmdline_p)
 {
 	int i;
 
+	Dprintk("setup_arch\n");
+
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
@@ -263,34 +268,34 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_cmdline_early(cmdline_p);
 
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
-#define PFN_PHYS(x)	((x) << PAGE_SHIFT)
-
-#define MAXMEM		(120UL * 1024 * 1024 * 1024 * 1024)  /* 120TB */ 
-#define MAXMEM_PFN	PFN_DOWN(MAXMEM)
-#define MAX_NONPAE_PFN	(1 << 20)
-
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa_symbol(&_end));
-
-	e820_end_of_ram();
+	end_pfn = e820_end_of_ram();
 
 	init_memory_mapping(); 
 
+#ifdef CONFIG_DISCONTIGMEM
+	numa_initmem_init(0, end_pfn); 
+#else
 	contig_initmem_init(); 
+#endif
+
+	/* Reserve direct mapping */
+	reserve_bootmem_generic(table_start << PAGE_SHIFT, 
+				(table_end - table_start) << PAGE_SHIFT);
 
 	/* reserve kernel */
-	reserve_bootmem(HIGH_MEMORY, PFN_PHYS(start_pfn) - HIGH_MEMORY); 
+	unsigned long kernel_end;
+	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
+	reserve_bootmem_generic(HIGH_MEMORY, kernel_end - HIGH_MEMORY);
 
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,
 	 * enabling clean reboots, SMP operation, laptop functions.
 	 */
-	reserve_bootmem(0, PAGE_SIZE);
+	reserve_bootmem_generic(0, PAGE_SIZE);
 
 #ifdef CONFIG_SMP
 	/*
@@ -298,8 +303,12 @@ void __init setup_arch(char **cmdline_p)
 	 * FIXME: Don't need the extra page at 4K, but need to fix
 	 * trampoline before removing it. (see the GDT stuff)
 	 */
-	reserve_bootmem(PAGE_SIZE, PAGE_SIZE);
+	reserve_bootmem_generic(PAGE_SIZE, PAGE_SIZE);
+
+	/* Reserve SMP trampoline */
+	reserve_bootmem_generic(SMP_TRAMPOLINE_BASE, PAGE_SIZE);
 #endif
+
 #ifdef CONFIG_ACPI_SLEEP
        /*
         * Reserve low memory region for sleep support.
@@ -315,7 +324,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (LOADER_TYPE && INITRD_START) {
 		if (INITRD_START + INITRD_SIZE <= (end_pfn << PAGE_SHIFT)) {
-			reserve_bootmem(INITRD_START, INITRD_SIZE);
+			reserve_bootmem_generic(INITRD_START, INITRD_SIZE);
 			initrd_start =
 				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
 			initrd_end = initrd_start+INITRD_SIZE;
@@ -330,14 +339,6 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-	/*
-	 * NOTE: before this point _nobody_ is allowed to allocate
-	 * any memory using the bootmem allocator.
-	 */
-
-#ifdef CONFIG_SMP
-	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
-#endif
 	paging_init();
 #ifdef CONFIG_ACPI_BOOT
        /*
@@ -347,7 +348,7 @@ void __init setup_arch(char **cmdline_p)
         * of MADT).
         */
 	if (!acpi_disabled)
-       acpi_boot_init(*cmdline_p);
+		acpi_boot_init();
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*

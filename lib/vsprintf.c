@@ -306,7 +306,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 		/* get the conversion qualifier */
 		qualifier = -1;
-		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt =='Z') {
+		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' ||
+		    *fmt =='Z' || *fmt == 'z') {
 			qualifier = *fmt;
 			++fmt;
 			if (qualifier == 'l' && *fmt == 'l') {
@@ -381,7 +382,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 				if (qualifier == 'l') {
 					long * ip = va_arg(args, long *);
 					*ip = (str - buf);
-				} else if (qualifier == 'Z') {
+				} else if (qualifier == 'Z' || qualifier == 'z') {
 					size_t * ip = va_arg(args, size_t *);
 					*ip = (str - buf);
 				} else {
@@ -432,7 +433,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 			num = va_arg(args, unsigned long);
 			if (flags & SIGN)
 				num = (signed long) num;
-		} else if (qualifier == 'Z') {
+		} else if (qualifier == 'Z' || qualifier == 'z') {
 			num = va_arg(args, size_t);
 		} else if (qualifier == 'h') {
 			num = (unsigned short) va_arg(args, int);
@@ -565,7 +566,8 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 
 		/* get conversion qualifier */
 		qualifier = -1;
-		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' || *fmt == 'Z') {
+		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' ||
+		    *fmt == 'Z' || *fmt == 'z') {
 			qualifier = *fmt;
 			fmt++;
 		}
@@ -680,6 +682,7 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 			}
 			break;
 		case 'Z':
+		case 'z':
 		{
 			size_t *s = (size_t*) va_arg(args,size_t*);
 			*s = (size_t) simple_strtoul(str,&next,base);

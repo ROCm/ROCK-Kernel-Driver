@@ -1193,9 +1193,9 @@ static int port_detect \
    }
 #endif
 
-   spin_unlock(&driver_lock);
+   spin_unlock_irq(&driver_lock);
    sh[j] = scsi_register(tpnt, sizeof(struct hostdata));
-   spin_lock(&driver_lock);
+   spin_lock_irq(&driver_lock);
 
    if (sh[j] == NULL) {
       printk("%s: unable to register host, detaching.\n", name);
@@ -1450,9 +1450,8 @@ static void add_pci_ports(void) {
 
 static int eata2x_detect(Scsi_Host_Template *tpnt) {
    unsigned int j = 0, k;
-   unsigned long spin_flags;
 
-   spin_lock_irqsave(&driver_lock, spin_flags);
+   spin_lock_irq(&driver_lock);
 
    tpnt->proc_name = "eata2x";
 
@@ -1490,7 +1489,7 @@ static int eata2x_detect(Scsi_Host_Template *tpnt) {
       }
 
    num_boards = j;
-   spin_unlock_irqrestore(&driver_lock, spin_flags);
+   spin_unlock_irq(&driver_lock);
    return j;
 }
 

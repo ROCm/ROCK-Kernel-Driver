@@ -18,22 +18,22 @@ struct k_sigaction32 {
 };
 
 static inline void
-sigset_32to64(sigset_t *s64, sigset_t32 *s32)
+sigset_32to64(sigset_t *s64, compat_sigset_t *s32)
 {
 	s64->sig[0] = s32->sig[0] | ((unsigned long)s32->sig[1] << 32);
 }
 
 static inline void
-sigset_64to32(sigset_t32 *s32, sigset_t *s64)
+sigset_64to32(compat_sigset_t *s32, sigset_t *s64)
 {
 	s32->sig[0] = s64->sig[0] & 0xffffffffUL;
 	s32->sig[1] = (s64->sig[0] >> 32) & 0xffffffffUL;
 }
 
 static int
-put_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
+put_sigset32(compat_sigset_t *up, sigset_t *set, size_t sz)
 {
-	sigset_t32 s;
+	compat_sigset_t s;
 
 	if (sz != sizeof *set) panic("put_sigset32()");
 	sigset_64to32(&s, set);
@@ -42,9 +42,9 @@ put_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
 }
 
 static int
-get_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
+get_sigset32(compat_sigset_t *up, sigset_t *set, size_t sz)
 {
-	sigset_t32 s;
+	compat_sigset_t s;
 	int r;
 
 	if (sz != sizeof *set) panic("put_sigset32()");
@@ -56,7 +56,7 @@ get_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
 	return r;
 }
 
-int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset,
+int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset,
 				    unsigned int sigsetsize)
 {
 	extern long sys_rt_sigprocmask(int how,
@@ -78,7 +78,7 @@ int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset,
 }
 
 
-int sys32_rt_sigpending(sigset_t32 *uset, unsigned int sigsetsize)
+int sys32_rt_sigpending(compat_sigset_t *uset, unsigned int sigsetsize)
 {
 	int ret;
 	sigset_t set;

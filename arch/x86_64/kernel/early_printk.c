@@ -3,6 +3,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <asm/io.h>
+#include <asm/processor.h>
 
 /* Simple VGA output */
 
@@ -104,9 +105,9 @@ static __init void early_serial_init(char *opt)
 	s = strsep(&opt, ","); 
 	if (s != NULL) { 
 		unsigned port; 
-		if (!strncmp(s,"0x",2))
+		if (!strncmp(s,"0x",2)) {
 			early_serial_base = simple_strtoul(s, &e, 16);
-		else {	
+		} else {
 			static int bases[] = { 0x3f8, 0x2f8 };
 		if (!strncmp(s,"ttyS",4)) 
 			s+=4; 
