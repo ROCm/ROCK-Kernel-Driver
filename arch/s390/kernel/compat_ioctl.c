@@ -808,7 +808,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd,
 #define IOCTL_TABLE_START \
 	struct ioctl_trans ioctl_start[] = {
 #define IOCTL_TABLE_END \
-	}; struct ioctl_trans ioctl_end[0];
+	};
 
 IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
@@ -899,3 +899,5 @@ HANDLE_IOCTL(BLKSECTGET, w_long)
 HANDLE_IOCTL(BLKPG, blkpg_ioctl_trans)
 
 IOCTL_TABLE_END
+
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);

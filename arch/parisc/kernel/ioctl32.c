@@ -2458,7 +2458,7 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 #define COMPATIBLE_IOCTL(cmd) HANDLE_IOCTL(cmd, sys_ioctl) 
 
 #define IOCTL_TABLE_START  struct ioctl_trans ioctl_start[] = {
-#define IOCTL_TABLE_END    }; struct ioctl_trans ioctl_end[0];
+#define IOCTL_TABLE_END    };
 
 IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
@@ -2631,3 +2631,4 @@ HANDLE_IOCTL(DRM32_IOCTL_RES_CTX, drm32_res_ctx);
 #endif /* DRM */
 IOCTL_TABLE_END
 
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);
