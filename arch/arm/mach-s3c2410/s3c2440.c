@@ -12,6 +12,7 @@
  * Modifications:
  *	24-Aug-2004 BJD  Start of s3c2440 support
  *	12-Oct-2004 BJD	 Moved clock info out to clock.c
+ *	01-Nov-2004 BJD  Fixed clock build code
 */
 
 #include <linux/kernel.h>
@@ -29,6 +30,7 @@
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/hardware/clock.h>
 
 #include <asm/arch/regs-clock.h>
 #include <asm/arch/regs-serial.h>
@@ -193,11 +195,11 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	s3c2440_clk_cam.parent = clk_get(NULL, "hclk");
 	s3c2440_clk_ac97.parent = clk_get(NULL, "pclk");
 
-	s3c2410_register_clock(&clk_ac97);
-	s3c2410_register_clock(&clk_cam);
+	s3c2410_register_clock(&s3c2440_clk_ac97);
+	s3c2410_register_clock(&s3c2440_clk_cam);
 
-	clk_disable(&clk_ac97);
-	clk_disable(&clk_cam);
+	clk_disable(&s3c2440_clk_ac97);
+	clk_disable(&s3c2440_clk_cam);
 }
 
 

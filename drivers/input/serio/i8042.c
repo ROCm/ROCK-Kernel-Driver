@@ -813,6 +813,41 @@ void i8042_controller_cleanup(void)
 }
 
 
+static int blink_frequency = 500;
+module_param_named(panicblink, blink_frequency, int, 0600);
+
+/* Catch the case when the kbd interrupt is off */
+#define DELAY do { mdelay(1); if (++delay > 10) return delay; } while(0)
+
+/* Tell the user who may be running in X and not see the console that we have
+   panic'ed. This is to distingush panics from "real" lockups.  */
+static long i8042_panic_blink(long count)
+{
+	long delay = 0;
+	static long last_blink;
+	static char led;
+	/* Roughly 1/2s frequency. KDB uses about 1s. Make sure it is
+	   different. */
+	if (!blink_frequency)
+		return 0;
+	if (count - last_blink < blink_frequency)
+		return 0;
+	led ^= 0x01 | 0x04;
+	while (i8042_read_status() & I8042_STR_IBF)
+		DELAY;
+	i8042_write_data(0xed); /* set leds */
+	DELAY;
+	while (i8042_read_status() & I8042_STR_IBF)
+		DELAY;
+	DELAY;
+	i8042_write_data(led);
+	DELAY;
+	last_blink = count;
+	return delay;
+}
+
+#undef DELAY
+
 /*
  * Here we try to restore the original BIOS settings
  */
@@ -862,6 +897,8 @@ static int i8042_controller_resume(void)
  * Restart timer (for polling "stuck" data)
  */
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+
+	panic_blink = i8042_panic_blink;
 
 	return 0;
 }
@@ -1077,6 +1114,8 @@ void __exit i8042_exit(void)
 	driver_unregister(&i8042_driver);
 
 	i8042_platform_exit();
+
+	panic_blink = NULL;
 }
 
 module_init(i8042_init);

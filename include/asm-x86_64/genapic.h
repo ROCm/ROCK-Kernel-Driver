@@ -26,6 +26,7 @@ struct genapic {
 	void (*send_IPI_all)(int vector);
 	/* */
 	unsigned int (*cpu_mask_to_apicid)(cpumask_t cpumask);
+	unsigned int (*phys_pkg_id)(int index_msb);
 };
 
 

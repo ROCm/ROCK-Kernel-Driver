@@ -87,6 +87,5 @@ extern void superio_inform_irq(int irq);
 extern void superio_serial_init(void);		/* called by rs_init() */
 extern int superio_fixup_irq(struct pci_dev *pcidev); /* called by iosapic */
 extern void superio_fixup_pci(struct pci_dev *pdev);
-extern void superio_ide_init_iops (struct hwif_s *hwif);
 
 #endif /* _PARISC_SUPERIO_H */

@@ -291,14 +291,6 @@ ocotea_setup_arch(void)
 
 	ibm440gx_tah_enable();
 
-#if !defined(CONFIG_BDI_SWITCH)
-	/*
-	 * The Abatron BDI JTAG debugger does not tolerate others
-	 * mucking with the debug registers.
-	 */
-        mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
-#endif
-
 	/* Setup TODC access */
 	TODC_INIT(TODC_TYPE_DS1743,
 			0,

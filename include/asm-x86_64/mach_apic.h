@@ -24,5 +24,6 @@
 #define send_IPI_allbutself (genapic->send_IPI_allbutself)
 #define send_IPI_all (genapic->send_IPI_all)
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
+#define phys_pkg_id	(genapic->phys_pkg_id)
 
 #endif /* __ASM_MACH_APIC_H */

@@ -24,46 +24,8 @@
 #define	R_M32R_HI16_SLO		8
 #define	R_M32R_LO16		9
 #define	R_M32R_SDA16		10
-#ifdef OLD_TYPE
-#define	R_M32R_GOT24		11
-#define	R_M32R_26_PLTREL	12
-#define	R_M32R_GOT16_HI_ULO	13
-#define	R_M32R_GOT16_HI_SLO	14
-#define	R_M32R_GOT16_LO		15
-#define	R_M32R_GOTPC24		16
-#define	R_M32R_COPY		17
-#define	R_M32R_GLOB_DAT		18
-#define	R_M32R_JMP_SLOT		19
-#define	R_M32R_RELATIVE		20
-#define	R_M32R_GNU_VTINHERIT	21
-#define	R_M32R_GNU_VTENTRY	22
-
-#define R_M32R_16_RELA		R_M32R_16
-#define R_M32R_32_RELA		R_M32R_32
-#define R_M32R_24_RELA		R_M32R_24
-#define R_M32R_10_PCREL_RELA	R_M32R_10_PCREL
-#define R_M32R_18_PCREL_RELA	R_M32R_18_PCREL
-#define R_M32R_26_PCREL_RELA	R_M32R_26_PCREL
-#define R_M32R_HI16_ULO_RELA	R_M32R_HI16_ULO
-#define R_M32R_HI16_SLO_RELA	R_M32R_HI16_SLO
-#define R_M32R_LO16_RELA	R_M32R_LO16
-#define R_M32R_SDA16_RELA	R_M32R_SDA16
-#else /* not OLD_TYPE */
 #define	R_M32R_GNU_VTINHERIT	11
 #define	R_M32R_GNU_VTENTRY	12
-
-#define	R_M32R_GOT24_SAMPLE		11 /* comflict */
-#define	R_M32R_26_PLTREL_SAMPLE	12 /* comflict */
-#define	R_M32R_GOT16_HI_ULO_SAMPLE	13
-#define	R_M32R_GOT16_HI_SLO_SAMPLE	14
-#define	R_M32R_GOT16_LO_SAMPLE		15
-#define	R_M32R_GOTPC24_SAMPLE		16
-#define	R_M32R_COPY_SAMPLE		17
-#define	R_M32R_GLOB_DAT_SAMPLE		18
-#define	R_M32R_JMP_SLOT_SAMPLE		19
-#define	R_M32R_RELATIVE_SAMPLE		20
-#define	R_M32R_GNU_VTINHERIT_SAMPLE	21
-#define	R_M32R_GNU_VTENTRY_SAMPLE	22
 
 #define R_M32R_16_RELA		33
 #define R_M32R_32_RELA		34
@@ -92,7 +54,6 @@
 #define R_M32R_GOTPC_HI_ULO	59
 #define R_M32R_GOTPC_HI_SLO	60
 #define R_M32R_GOTPC_LO		61
-#endif /* not OLD_TYPE */
 
 #define R_M32R_NUM		256
 
@@ -154,7 +115,7 @@ typedef elf_fpreg_t elf_fpregset_t;
    now struct_user_regs, they are different) */
 
 #define ELF_CORE_COPY_REGS(pr_reg, regs)  \
-	memcpy((char *)&pr_reg, (char *)&regs, sizeof (struct pt_regs));
+	memcpy((char *)pr_reg, (char *)regs, sizeof (struct pt_regs));
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this CPU supports.  */

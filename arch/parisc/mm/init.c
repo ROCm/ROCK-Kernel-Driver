@@ -20,6 +20,7 @@
 #include <linux/initrd.h>
 #include <linux/swap.h>
 #include <linux/unistd.h>
+#include <linux/nodemask.h>	/* for node_online_map */
 
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
@@ -804,19 +805,21 @@ void __init paging_init(void)
 		   ZONE_DMA zone. */
 		zones_size[ZONE_DMA] = pmem_ranges[i].pages;
 
-		free_area_init_node(i, NODE_DATA(i), zones_size,
-				pmem_ranges[i].start_pfn, 0);
-
 #ifdef CONFIG_DISCONTIGMEM
+		/* Need to initialize the pfnnid_map before we can initialize
+		   the zone */
 		{
 		    int j;
-		    for (j = (node_start_pfn(i) >> PFNNID_SHIFT);
-			 j <= (node_end_pfn(i) >> PFNNID_SHIFT);
+		    for (j = (pmem_ranges[i].start_pfn >> PFNNID_SHIFT);
+			 j <= ((pmem_ranges[i].start_pfn + pmem_ranges[i].pages) >> PFNNID_SHIFT);
 			 j++) {
 			pfnnid_map[j] = i;
 		    }
 		}
 #endif
+
+		free_area_init_node(i, NODE_DATA(i), zones_size,
+				pmem_ranges[i].start_pfn, NULL);
 	}
 }
 

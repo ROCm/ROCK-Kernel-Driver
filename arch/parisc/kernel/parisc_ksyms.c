@@ -32,7 +32,6 @@
 #include <linux/string.h>
 EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL(memcmp);
-EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memscan);
 EXPORT_SYMBOL(memset);
@@ -65,12 +64,19 @@ EXPORT_SYMBOL(__cmpxchg_u64);
 #endif
 
 #include <asm/uaccess.h>
-EXPORT_SYMBOL(lcopy_to_user);
-EXPORT_SYMBOL(lcopy_from_user);
-EXPORT_SYMBOL(lcopy_in_user);
 EXPORT_SYMBOL(lstrncpy_from_user);
 EXPORT_SYMBOL(lclear_user);
 EXPORT_SYMBOL(lstrnlen_user);
+
+/* Global fixups */
+extern void fixup_get_user_skip_1(void);
+extern void fixup_get_user_skip_2(void);
+extern void fixup_put_user_skip_1(void);
+extern void fixup_put_user_skip_2(void);
+EXPORT_SYMBOL(fixup_get_user_skip_1);
+EXPORT_SYMBOL(fixup_get_user_skip_2);
+EXPORT_SYMBOL(fixup_put_user_skip_1);
+EXPORT_SYMBOL(fixup_put_user_skip_2);
 
 #ifndef __LP64__
 /* Needed so insmod can set dp value */

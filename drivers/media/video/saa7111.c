@@ -342,7 +342,7 @@ saa7111_command (struct i2c_client *client,
 
 		case VIDEO_MODE_SECAM:
 			saa7111_write(client, 0x08,
-				      (decoder->reg[0x0e] & 0x3f) | 0x00);
+				      (decoder->reg[0x08] & 0x3f) | 0x00);
 			saa7111_write(client, 0x0e,
 				      (decoder->reg[0x0e] & 0x8f) | 0x50);
 			break;

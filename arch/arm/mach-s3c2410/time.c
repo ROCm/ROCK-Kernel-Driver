@@ -125,20 +125,15 @@ static void s3c2410_timer_setup (void)
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
-	}
+	} else {
+		/* for the h1940 (and others), we use the pclk from the core
+		 * to generate the timer values. since values around 50 to
+		 * 70MHz are not values we can directly generate the timer
+		 * value from, we need to pre-scaleand divide before using it.
+		 */
 
-	/* for the h1940, we use the pclk from the core to generate
-	 * the timer values. since 67.5MHz is not a value we can directly
-	 * generate the timer value from, we need to pre-scale and
-	 * divied before using it.
-	 *
-	 * overall divsior to get 200Hz is 337500
-	 *   we can fit tcnt if we pre-scale by 6, producing a tick rate
-	 *   of 11.25MHz, and a tcnt of 56250.
-	 */
+		/* this is used as default if no other timer can be found */
 
-	if (machine_is_h1940() || machine_is_smdk2410() ||
-	    machine_is_rx3715()) {
 		timer_ticks_usec = s3c24xx_pclk / (1000*1000);
 		timer_ticks_usec /= 6;
 

@@ -201,7 +201,7 @@ config PPC4xx_EDMA
 
 config PPC_GEN550
 	bool
-	depends on 44x
+	depends on 4xx
 	default y
 
 config PM

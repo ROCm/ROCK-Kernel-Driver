@@ -4,8 +4,6 @@
 #ifndef _PPC64_SERIAL_H
 #define _PPC64_SERIAL_H
 
-#include <linux/config.h>
-
 /*
  * This assumes you have a 1.8432 MHz clock for your UART.
  *
@@ -21,10 +19,5 @@
 
 /* Default baud base if not found in device-tree */
 #define BASE_BAUD ( 1843200 / 16 )
-
-#define ARCH_HAS_GET_LEGACY_SERIAL_PORTS
-struct old_serial_port;
-extern struct old_serial_port *get_legacy_serial_ports(unsigned int *count);
-#define UART_NR	(8 + CONFIG_SERIAL_8250_NR_UARTS)
 
 #endif /* _PPC64_SERIAL_H */

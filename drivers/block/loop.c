@@ -47,7 +47,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
+#include <linux/moduleparam.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -1073,7 +1073,7 @@ static struct block_device_operations lo_fops = {
 /*
  * And now the modules code and kernel interface.
  */
-MODULE_PARM(max_loop, "i");
+module_param(max_loop, int, 0);
 MODULE_PARM_DESC(max_loop, "Maximum number of loop devices (1-256)");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_BLOCKDEV_MAJOR(LOOP_MAJOR);

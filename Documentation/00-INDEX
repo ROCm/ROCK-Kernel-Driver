@@ -82,8 +82,6 @@ device-mapper/
 	- directory with info on Device Mapper.
 devices.txt
 	- plain ASCII listing of all the nodes in /dev/ with major minor #'s.
-digiboard.txt
-	- info on the Digiboard PC/X{i,e,eve} multiport boards.
 digiepca.txt
 	- info on Digi Intl. {PC,PCI,EISA}Xx and Xem series cards.
 dnotify.txt

@@ -210,6 +210,8 @@ static inline void load_LDT(mm_context_t *pc)
 	put_cpu();
 }
 
+extern struct desc_ptr idt_descr;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

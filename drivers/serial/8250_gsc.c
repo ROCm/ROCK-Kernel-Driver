@@ -14,7 +14,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
-#include <linux/serial.h>
+#include <linux/serial_core.h>
 #include <linux/signal.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -22,36 +22,17 @@
 #include <asm/hardware.h>
 #include <asm/parisc-device.h>
 #include <asm/io.h>
-#include <asm/serial.h>
+#include <asm/serial.h> /* for LASI_BASE_BAUD */
 
-static void setup_parisc_serial(struct serial_struct *serial,
-		unsigned long address, int irq, int line)
-{
-	memset(serial, 0, sizeof(struct serial_struct));
-
-	/* autoconfig() sets state->type.  This sets info->type */
-	serial->type = PORT_16550A;
-
-	serial->line = line;
-	serial->iomap_base = address;
-	serial->iomem_base = ioremap(address, 0x8);
-
-	serial->irq = irq;
-	serial->io_type = SERIAL_IO_MEM;	/* define access method */
-	serial->flags = 0;
-	serial->xmit_fifo_size = 16;
-	serial->custom_divisor = 0;
-	serial->baud_base = LASI_BASE_BAUD;
-}
+#include "8250.h"
 
 static int __init 
 serial_init_chip(struct parisc_device *dev)
 {
 	static int serial_line_nr;
+	struct uart_port port;
 	unsigned long address;
 	int err;
-
-	struct serial_struct *serial;
 
 	if (!dev->irq) {
 		/* We find some unattached serial ports by walking native
@@ -66,21 +47,23 @@ serial_init_chip(struct parisc_device *dev)
 		return -ENODEV;
 	}
 
-	serial = kmalloc(sizeof(*serial), GFP_KERNEL);
-	if (!serial)
-		return -ENOMEM;
-
 	address = dev->hpa;
 	if (dev->id.sversion != 0x8d) {
 		address += 0x800;
 	}
 
-	setup_parisc_serial(serial, address, dev->irq, serial_line_nr++);
-	err = register_serial(serial);
+	memset(&port, 0, sizeof(struct uart_port));
+	port.mapbase = address;
+	port.irq = dev->irq;
+	port.iotype = UPIO_MEM;
+	port.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+	port.uartclk = LASI_BASE_BAUD * 16;
+	port.dev = &dev->dev;
+
+	err = serial8250_register_port(&port);
 	if (err < 0) {
-		printk(KERN_WARNING "register_serial returned error %d\n", err);
-		kfree(serial);
-		return -ENODEV;
+		printk(KERN_WARNING "serial8250_register_port returned error %d\n", err);
+		return err;
 	}
 
 	return 0;

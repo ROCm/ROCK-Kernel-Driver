@@ -36,6 +36,15 @@ static int __init panic_setup(char *str)
 }
 __setup("panic=", panic_setup);
 
+static long no_blink(long time)
+{
+	return 0;
+}
+
+/* Returns how long it waited in ms */
+long (*panic_blink)(long time) = no_blink;
+EXPORT_SYMBOL(panic_blink);
+
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -48,6 +57,7 @@ __setup("panic=", panic_setup);
  
 NORET_TYPE void panic(const char * fmt, ...)
 {
+	long i;
 	static char buf[1024];
 	va_list args;
 #if defined(CONFIG_ARCH_S390)
@@ -69,15 +79,16 @@ NORET_TYPE void panic(const char * fmt, ...)
 
 	if (panic_timeout > 0)
 	{
-		int i;
 		/*
 	 	 * Delay timeout seconds before rebooting the machine. 
 		 * We can't use the "normal" timers since we just panicked..
 	 	 */
 		printk(KERN_EMERG "Rebooting in %d seconds..",panic_timeout);
-		for (i = 0; i < panic_timeout; i++) {
+		for (i = 0; i < panic_timeout*1000; ) {
 			touch_nmi_watchdog();
-			mdelay(1000);
+			i += panic_blink(i);
+			mdelay(1);
+			i++;
 		}
 		/*
 		 *	Should we run the reboot notifier. For the moment Im
@@ -98,8 +109,11 @@ NORET_TYPE void panic(const char * fmt, ...)
         disabled_wait(caller);
 #endif
 	local_irq_enable();
-	for (;;)
-		;
+	for (i = 0;;) {
+		i += panic_blink(i);
+		mdelay(1);
+		i++;
+	}
 }
 
 EXPORT_SYMBOL(panic);
