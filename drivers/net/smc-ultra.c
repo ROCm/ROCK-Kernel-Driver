@@ -165,12 +165,11 @@ static void cleanup_card(struct net_device *dev)
 		pnp_device_detach(idev);
 #endif
 	release_region(dev->base_addr - ULTRA_NIC_OFFSET, ULTRA_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init ultra_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -178,8 +177,6 @@ struct net_device * __init ultra_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_ultra_probe(dev);
 	if (err)
@@ -266,13 +263,6 @@ static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 		dev->irq = irq;
 		eeprom_irq = 1;
 	}
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (", no memory for dev->priv.\n");
-                retval = -ENOMEM;
-		goto out;
-        }
 
 	/* The 8390 isn't at the base address, so fake the offset */
 	dev->base_addr = ioaddr+ULTRA_NIC_OFFSET;
@@ -565,10 +555,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "smc-ultra.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		if (do_ultra_probe(dev) == 0) {

@@ -27,6 +27,7 @@
  * **********************
  */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
@@ -46,18 +47,18 @@
 /* Module parameters */
 
 static int node;
-static char *device;		/* use eg. device="arc1" to change name */
+static char device[9];		/* use eg. device="arc1" to change name */
 static int timeout = 3;
 static int backplane;
 static int clockp;
 static int clockm;
 
-MODULE_PARM(node, "i");
-MODULE_PARM(device, "s");
-MODULE_PARM(timeout, "i");
-MODULE_PARM(backplane, "i");
-MODULE_PARM(clockp, "i");
-MODULE_PARM(clockm, "i");
+module_param(node, int, 0);
+module_param_string(device, device, sizeof(device), 0);
+module_param(timeout, int, 0);
+module_param(backplane, int, 0);
+module_param(clockp, int, 0);
+module_param(clockm, int, 0);
 MODULE_LICENSE("GPL");
 
 static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -68,15 +69,11 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 
 	if (pci_enable_device(pdev))
 		return -EIO;
-	dev = dev_alloc(device ? : "arc%d", &err);
+	dev = alloc_arcdev(device);
 	if (!dev)
-		return err;
-	lp = dev->priv = kmalloc(sizeof(struct arcnet_local), GFP_KERNEL);
-	if (!lp) {
-		err = -ENOMEM;
-		goto out_dev;
-	}
-	memset(lp, 0, sizeof(struct arcnet_local));
+		return -ENOMEM;
+	lp = dev->priv;
+
 	pci_set_drvdata(pdev, dev);
 
 	// SOHARD needs PCI base addr 4
@@ -87,6 +84,13 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	else {
 		BUGMSG(D_NORMAL, "Contemporary Controls\n");
 		ioaddr = pci_resource_start(pdev, 2);
+	}
+
+	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "com20020-pci")) {
+		BUGMSG(D_INIT, "IO region %xh-%xh already allocated.\n",
+		       ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
+		err = -EBUSY;
+		goto out_dev;
 	}
 
 	// Dummy access after Reset
@@ -105,12 +109,6 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 	lp->timeout = timeout;
 	lp->hw.owner = THIS_MODULE;
 
-	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "com20020-pci")) {
-		BUGMSG(D_INIT, "IO region %xh-%xh already allocated.\n",
-		       ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
-		err = -EBUSY;
-		goto out_priv;
-	}
 	if (ASTATUS() == 0xFF) {
 		BUGMSG(D_NORMAL, "IO address %Xh was reported by PCI BIOS, "
 		       "but seems empty!\n", ioaddr);
@@ -129,18 +127,18 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 
 out_port:
 	release_region(ioaddr, ARCNET_TOTAL_SIZE);
-out_priv:
-	kfree(dev->priv);
 out_dev:
-	kfree(dev);
+	free_netdev(dev);
 	return err;
 }
 
 static void __devexit com20020pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	com20020_remove(dev);
+	unregister_netdev(dev);
+	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
+	free_netdev(dev);
 }
 
 static struct pci_device_id com20020pci_id_table[] = {

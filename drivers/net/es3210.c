@@ -159,12 +159,11 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, ES_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init es_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -172,8 +171,6 @@ struct net_device * __init es_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_es_probe(dev);
 	if (err)
@@ -277,13 +274,6 @@ static int __init es_probe1(struct net_device *dev, int ioaddr)
 	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
 
 	printk("mem %#lx-%#lx\n", dev->mem_start, dev->mem_end-1);
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (" unable to allocate memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out1;
-	}
 
 #if ES_DEBUG & ES_D_PROBE
 	if (inb(ioaddr + ES_CFG5))
@@ -437,10 +427,9 @@ init_module(void)
 	for (this_dev = 0; this_dev < MAX_ES_CARDS; this_dev++) {
 		if (io[this_dev] == 0 && this_dev != 0)
 			break;
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_start = mem[this_dev];

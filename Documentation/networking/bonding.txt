@@ -21,7 +21,7 @@ userspace tools, please follow the links at the end of this file.
 
 Table of Contents
 =================
- 
+
 Installation
 Bond Configuration
 Module Parameters
@@ -66,7 +66,7 @@ of the -I option on the ifenslave compile line is to make sure it uses
 /usr/include/linux.
 
 To install ifenslave.c, do:
-    # gcc -Wall -Wstrict-prototypes -O -I/usr/src/linux/include ifenslave.c -o ifenslave 
+    # gcc -Wall -Wstrict-prototypes -O -I/usr/src/linux/include ifenslave.c -o ifenslave
     # cp ifenslave /sbin/ifenslave
 
 
@@ -74,10 +74,10 @@ Bond Configuration
 ==================
 
 You will need to add at least the following line to /etc/modules.conf
-so the bonding driver will automatically load when the bond0 interface is 
-configured. Refer to the modules.conf manual page for specific modules.conf 
-syntax details. The Module Parameters section of this document describes each 
-bonding driver parameter. 
+so the bonding driver will automatically load when the bond0 interface is
+configured. Refer to the modules.conf manual page for specific modules.conf
+syntax details. The Module Parameters section of this document describes each
+bonding driver parameter.
 
 	alias bond0 bonding
 
@@ -113,7 +113,7 @@ bonding interface (bond1), use MASTER=bond1 in the config file to make the
 network interface be a slave of bond1.
 
 Restart the networking subsystem or just bring up the bonding device if your
-administration tools allow it. Otherwise, reboot. On Red Hat distros you can 
+administration tools allow it. Otherwise, reboot. On Red Hat distros you can
 issue `ifup bond0' or `/etc/rc.d/init.d/network restart'.
 
 If the administration tools of your distribution do not support
@@ -128,30 +128,30 @@ manually configure the bonding device with the following commands:
 
 (use appropriate values for your network above)
 
-You can then create a script containing these commands and place it in the 
+You can then create a script containing these commands and place it in the
 appropriate rc directory.
 
 If you specifically need all network drivers loaded before the bonding driver,
-adding the following line to modules.conf will cause the network driver for 
+adding the following line to modules.conf will cause the network driver for
 eth0 and eth1 to be loaded before the bonding driver.
 
 probeall bond0 eth0 eth1 bonding
 
-Be careful not to reference bond0 itself at the end of the line, or modprobe 
+Be careful not to reference bond0 itself at the end of the line, or modprobe
 will die in an endless recursive loop.
 
-To have device characteristics (such as MTU size) propagate to slave devices, 
-set the bond characteristics before enslaving the device.  The characteristics 
+To have device characteristics (such as MTU size) propagate to slave devices,
+set the bond characteristics before enslaving the device.  The characteristics
 are propagated during the enslave process.
 
-If running SNMP agents, the bonding driver should be loaded before any network 
-drivers participating in a bond. This requirement is due to the the interface 
-index (ipAdEntIfIndex) being associated to the first interface found with a 
-given IP address. That is, there is only one ipAdEntIfIndex for each IP 
-address. For example, if eth0 and eth1 are slaves of bond0 and the driver for 
-eth0 is loaded before the bonding driver, the interface for the IP address 
-will be associated with the eth0 interface. This configuration is shown below, 
-the IP address 192.168.1.1 has an interface index of 2 which indexes to eth0 
+If running SNMP agents, the bonding driver should be loaded before any network
+drivers participating in a bond. This requirement is due to the the interface
+index (ipAdEntIfIndex) being associated to the first interface found with a
+given IP address. That is, there is only one ipAdEntIfIndex for each IP
+address. For example, if eth0 and eth1 are slaves of bond0 and the driver for
+eth0 is loaded before the bonding driver, the interface for the IP address
+will be associated with the eth0 interface. This configuration is shown below,
+the IP address 192.168.1.1 has an interface index of 2 which indexes to eth0
 in the ifDescr table (ifDescr.2).
 
      interfaces.ifTable.ifEntry.ifDescr.1 = lo
@@ -189,10 +189,10 @@ functions such as Interface_Scan_Next will report that association.
 Module Parameters
 =================
 
-Optional parameters for the bonding driver can be supplied as command line 
-arguments to the insmod command. Typically, these parameters are specified in 
-the file /etc/modules.conf (see the manual page for modules.conf). The 
-available bonding driver parameters are listed below. If a parameter is not 
+Optional parameters for the bonding driver can be supplied as command line
+arguments to the insmod command. Typically, these parameters are specified in
+the file /etc/modules.conf (see the manual page for modules.conf). The
+available bonding driver parameters are listed below. If a parameter is not
 specified the default value is used. When initially configuring a bond, it
 is recommended "tail -f /var/log/messages" be run in a separate window to
 watch for bonding driver error messages.
@@ -202,19 +202,19 @@ parameters be specified, otherwise serious network degradation will occur
 during link failures.
 
 arp_interval
- 
-        Specifies the ARP monitoring frequency in milli-seconds. 
-        If ARP monitoring is used in a load-balancing mode (mode 0 or 2), the 
-        switch should be configured in a mode that evenly distributes packets 
-        across all links - such as round-robin. If the switch is configured to 
-        distribute the packets in an XOR fashion, all replies from the ARP 
-        targets will be received on the same link which could cause the other 
+
+        Specifies the ARP monitoring frequency in milli-seconds.
+        If ARP monitoring is used in a load-balancing mode (mode 0 or 2), the
+        switch should be configured in a mode that evenly distributes packets
+        across all links - such as round-robin. If the switch is configured to
+        distribute the packets in an XOR fashion, all replies from the ARP
+        targets will be received on the same link which could cause the other
         team members to fail. ARP monitoring should not be used in conjunction
-        with miimon. A value of 0 disables ARP monitoring. The default value 
+        with miimon. A value of 0 disables ARP monitoring. The default value
         is 0.
- 
+
 arp_ip_target
- 
+
 	Specifies the ip addresses to use when arp_interval is > 0. These
 	are the targets of the ARP request sent to determine the health of
 	the link to the targets. Specify these values in ddd.ddd.ddd.ddd
@@ -223,8 +223,8 @@ arp_ip_target
 	maximum number of targets that can be specified is set at 16.
 
 downdelay
- 
-        Specifies the delay time in milli-seconds to disable a link after a 
+
+        Specifies the delay time in milli-seconds to disable a link after a
         link failure has been detected. This should be a multiple of miimon
         value, otherwise the value will be rounded. The default value is 0.
 
@@ -247,7 +247,7 @@ max_bonds
 	and bond2 will be created.  The default value is 1.
 
 miimon
- 
+
         Specifies the frequency in milli-seconds that MII link monitoring
         will occur. A value of zero disables MII link monitoring. A value
         of 100 is a good starting point. See High Availability section for
@@ -258,7 +258,7 @@ mode
 	Specifies one of the bonding policies. The default is
 	round-robin (balance-rr).  Possible values are (you can use
 	either the text or numeric option):
- 
+
 	balance-rr or 0
 
 		Round-robin policy: Transmit in a sequential order
@@ -273,7 +273,7 @@ mode
 		externally visible on only one port (network adapter)
 		to avoid confusing the switch.  This mode provides
 		fault tolerance.
- 
+
 	balance-xor or 2
 
 		XOR policy: Transmit based on [(source MAC address
@@ -293,7 +293,7 @@ mode
 		groups that share the same speed and duplex settings.
 		Transmits and receives on all slaves in the active
 		aggregator.
- 
+
 		Pre-requisites:
 
 		1. Ethtool support in the base drivers for retrieving the
@@ -317,7 +317,7 @@ mode
 		Ethtool support in the base drivers for retrieving the
 		speed of each slave.
 
-	balance-alb or 6 
+	balance-alb or 6
 
 		Adaptive load balancing: includes balance-tlb + receive
 		load balancing (rlb) for IPV4 traffic and does not require
@@ -327,7 +327,7 @@ mode
 		overwrites the src hw address with the unique hw address of
 		one of the slaves in the bond such that different clients
 		use different hw addresses for the server.
-		
+
 		Receive traffic from connections created by the server is
 		also balanced. When the server sends an ARP Request the
 		bonding driver copies and saves the client's IP information
@@ -363,24 +363,10 @@ mode
 		2. Base driver support for setting the hw address of a
 		device also when it is open. This is required so that there
 		will always be one slave in the team using the bond hw
-		address (the current_slave) while having a unique hw
-		address for each slave in the bond. If the current_slave
-		fails it's hw address is swapped with the new current_slave
+		address (the curr_active_slave) while having a unique hw
+		address for each slave in the bond. If the curr_active_slave
+		fails it's hw address is swapped with the new curr_active_slave
 		that was chosen.
-
-multicast
-
-        Option specifying the mode of operation for multicast support.
-        Possible values are:
-
-	disabled or 0
-		Disabled (no multicast support)
-
-        active or 1
-		Enabled on active slave only, useful in active-backup mode
-
-	all or 2
-		Enabled on all slaves, this is the default
 
 primary
 
@@ -397,11 +383,11 @@ primary
         primary is only valid in active-backup mode.
 
 updelay
- 
-        Specifies the delay time in milli-seconds to enable a link after a 
+
+        Specifies the delay time in milli-seconds to enable a link after a
         link up status has been detected. This should be a multiple of miimon
         value, otherwise the value will be rounded. The default value is 0.
- 
+
 use_carrier
 
         Specifies whether or not miimon should use MII or ETHTOOL
@@ -529,20 +515,20 @@ Verifying Bond Configuration
 ----------------------------
 The bonding driver information files reside in the /proc/net/bonding directory.
 
-Sample contents of /proc/net/bonding/bond0 after the driver is loaded with 
+Sample contents of /proc/net/bonding/bond0 after the driver is loaded with
 parameters of mode=0 and miimon=1000 is shown below.
- 
+
         Bonding Mode: load balancing (round-robin)
         Currently Active Slave: eth0
         MII Status: up
         MII Polling Interval (ms): 1000
         Up Delay (ms): 0
         Down Delay (ms): 0
- 
+
         Slave Interface: eth1
         MII Status: up
         Link Failure Count: 1
- 
+
         Slave Interface: eth0
         MII Status: up
         Link Failure Count: 1
@@ -550,34 +536,34 @@ parameters of mode=0 and miimon=1000 is shown below.
 2) Network verification
 -----------------------
 The network configuration can be verified using the ifconfig command. In
-the example below, the bond0 interface is the master (MASTER) while eth0 and 
-eth1 are slaves (SLAVE). Notice all slaves of bond0 have the same MAC address 
+the example below, the bond0 interface is the master (MASTER) while eth0 and
+eth1 are slaves (SLAVE). Notice all slaves of bond0 have the same MAC address
 (HWaddr) as bond0 for all modes except TLB and ALB that require a unique MAC
 address for each slave.
 
 [root]# /sbin/ifconfig
-bond0     Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4  
+bond0     Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4
           inet addr:XXX.XXX.XXX.YYY  Bcast:XXX.XXX.XXX.255  Mask:255.255.252.0
           UP BROADCAST RUNNING MASTER MULTICAST  MTU:1500  Metric:1
           RX packets:7224794 errors:0 dropped:0 overruns:0 frame:0
           TX packets:3286647 errors:1 dropped:0 overruns:1 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
 
-eth0      Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4  
+eth0      Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4
           inet addr:XXX.XXX.XXX.YYY  Bcast:XXX.XXX.XXX.255  Mask:255.255.252.0
           UP BROADCAST RUNNING SLAVE MULTICAST  MTU:1500  Metric:1
           RX packets:3573025 errors:0 dropped:0 overruns:0 frame:0
           TX packets:1643167 errors:1 dropped:0 overruns:1 carrier:0
-          collisions:0 txqueuelen:100 
-          Interrupt:10 Base address:0x1080 
+          collisions:0 txqueuelen:100
+          Interrupt:10 Base address:0x1080
 
-eth1      Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4  
+eth1      Link encap:Ethernet  HWaddr 00:C0:F0:1F:37:B4
           inet addr:XXX.XXX.XXX.YYY  Bcast:XXX.XXX.XXX.255  Mask:255.255.252.0
           UP BROADCAST RUNNING SLAVE MULTICAST  MTU:1500  Metric:1
           RX packets:3651769 errors:0 dropped:0 overruns:0 frame:0
           TX packets:1643480 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:100 
-          Interrupt:9 Base address:0x1400 
+          collisions:0 txqueuelen:100
+          Interrupt:9 Base address:0x1400
 
 
 Frequently Asked Questions
@@ -605,9 +591,9 @@ Frequently Asked Questions
 
 5.  What happens when a slave link dies?
 
-	If your ethernet cards support MII or ETHTOOL link status monitoring 
-        and the MII monitoring has been enabled in the driver (see description 
-        of module parameters), there will be no adverse consequences. This 
+	If your ethernet cards support MII or ETHTOOL link status monitoring
+        and the MII monitoring has been enabled in the driver (see description
+        of module parameters), there will be no adverse consequences. This
         release of the bonding driver knows how to get the MII information and
 	enables or disables its slaves according to their link status.
 	See section on High Availability for additional information.
@@ -622,8 +608,8 @@ Frequently Asked Questions
         slave.
 
 	If neither mii_monitor and arp_interval is configured, the bonding
-	driver will not handle this situation very well. The driver will 
-	continue to send packets but some packets will be lost. Retransmits 
+	driver will not handle this situation very well. The driver will
+	continue to send packets but some packets will be lost. Retransmits
 	will cause serious degradation of performance (in the case when one
 	of two slave links fails, 50% packets will be lost, which is a serious
 	problem for both TCP and UDP).
@@ -636,9 +622,9 @@ Frequently Asked Questions
 
 7.  Which switches/systems does it work with?
 
-	In round-robin and XOR mode, it works with systems that support 
+	In round-robin and XOR mode, it works with systems that support
 	trunking:
-	
+
 	* Many Cisco switches and routers (look for EtherChannel support).
 	* SunTrunking software.
 	* Alteon AceDirector switches / WebOS (use Trunks).
@@ -646,7 +632,7 @@ Frequently Asked Questions
 	  models (450) can define trunks between ports on different physical
 	  units.
 	* Linux bonding, of course !
-	
+
 	In 802.3ad mode, it works with with systems that support IEEE 802.3ad
 	Dynamic Link Aggregation:
 
@@ -667,21 +653,21 @@ Frequently Asked Questions
 	is then passed to all following slaves and remains persistent (even if
 	the the first slave is removed) until the bonding device is brought
 	down or reconfigured.
-	
+
 	If you wish to change the MAC address, you can set it with ifconfig:
 
 	  # ifconfig bond0 hw ether 00:11:22:33:44:55
 
 	The MAC address can be also changed by bringing down/up the device
 	and then changing its slaves (or their order):
-	
+
 	  # ifconfig bond0 down ; modprobe -r bonding
 	  # ifconfig bond0 .... up
 	  # ifenslave bond0 eth...
 
 	This method will automatically take the address from the next slave
 	that will be added.
-	
+
 	To restore your slaves' MAC addresses, you need to detach them
 	from the bond (`ifenslave -d bond0 eth0'), set them down
 	(`ifconfig eth0 down'), unload the drivers (`rmmod 3c59x', for
@@ -729,27 +715,27 @@ High Availability
 =================
 
 To implement high availability using the bonding driver, the driver needs to be
-compiled as a module, because currently it is the only way to pass parameters 
+compiled as a module, because currently it is the only way to pass parameters
 to the driver. This may change in the future.
 
-High availability is achieved by using MII or ETHTOOL status reporting. You 
-need to verify that all your interfaces support MII or ETHTOOL link status 
-reporting.  On Linux kernel 2.2.17, all the 100 Mbps capable drivers and 
-yellowfin gigabit driver support MII. To determine if ETHTOOL link reporting 
-is available for interface eth0, type "ethtool eth0" and the "Link detected:" 
-line should contain the correct link status. If your system has an interface 
-that does not support MII or ETHTOOL status reporting, a failure of its link 
-will not be detected! A message indicating MII and ETHTOOL is not supported by 
-a network driver is logged when the bonding driver is loaded with a non-zero 
+High availability is achieved by using MII or ETHTOOL status reporting. You
+need to verify that all your interfaces support MII or ETHTOOL link status
+reporting.  On Linux kernel 2.2.17, all the 100 Mbps capable drivers and
+yellowfin gigabit driver support MII. To determine if ETHTOOL link reporting
+is available for interface eth0, type "ethtool eth0" and the "Link detected:"
+line should contain the correct link status. If your system has an interface
+that does not support MII or ETHTOOL status reporting, a failure of its link
+will not be detected! A message indicating MII and ETHTOOL is not supported by
+a network driver is logged when the bonding driver is loaded with a non-zero
 miimon value.
 
 The bonding driver can regularly check all its slaves links using the ETHTOOL
-IOCTL (ETHTOOL_GLINK command) or by checking the MII status registers. The 
-check interval is specified by the module argument "miimon" (MII monitoring). 
-It takes an integer that represents the checking time in milliseconds. It 
-should not come to close to (1000/HZ) (10 milli-seconds on i386) because it 
-may then reduce the system interactivity. A value of 100 seems to be a good 
-starting point. It means that a dead link will be detected at most 100 
+IOCTL (ETHTOOL_GLINK command) or by checking the MII status registers. The
+check interval is specified by the module argument "miimon" (MII monitoring).
+It takes an integer that represents the checking time in milliseconds. It
+should not come to close to (1000/HZ) (10 milli-seconds on i386) because it
+may then reduce the system interactivity. A value of 100 seems to be a good
+starting point. It means that a dead link will be detected at most 100
 milli-seconds after it goes down.
 
 Example:
@@ -761,7 +747,7 @@ Or, put the following lines in /etc/modules.conf:
    alias bond0 bonding
    options bond0 miimon=100
 
-There are currently two policies for high availability. They are dependent on 
+There are currently two policies for high availability. They are dependent on
 whether:
 
    a) hosts are connected to a single host or switch that support trunking
@@ -811,7 +797,7 @@ Example 2 : host to switch at twice the speed
      # ifenslave bond0 eth0 eth1
 
 
-2) High Availability on two or more switches (or a single switch without 
+2) High Availability on two or more switches (or a single switch without
    trunking support)
 ---------------------------------------------------------------------------
 This mode is more problematic because it relies on the fact that there
@@ -870,10 +856,10 @@ by another external mechanism, it is good to have host1's active interface
 connected to one switch and host2's to the other. Such system will survive
 a failure of a single host, cable, or switch. The worst thing that may happen
 in the case of a switch failure is that half of the hosts will be temporarily
-unreachable until the other switch expires its tables. 
+unreachable until the other switch expires its tables.
 
 Example 2: Using multiple ethernet cards connected to a switch to configure
-           NIC failover (switch is not required to support trunking). 
+           NIC failover (switch is not required to support trunking).
 
 
           +----------+                          +----------+
@@ -957,7 +943,7 @@ The main limitations are :
     servers, but may be useful when the front switches send multicast
     information on their links (e.g. VRRP), or even health-check the servers.
     Use the arp_interval/arp_ip_target parameters to count incoming/outgoing
-    frames.  
+    frames.
 
 
 
@@ -973,13 +959,12 @@ Donald Becker's Ethernet Drivers and diag programs may be found at :
 You will also find a lot of information regarding Ethernet, NWay, MII, etc. at
 www.scyld.com.
 
-For new versions of the driver, patches for older kernels and the updated
-userspace tools, take a look at Willy Tarreau's site :
+Patches for 2.2 kernels are at Willy Tarreau's site :
  - http://wtarreau.free.fr/pub/bonding/
- - http://www-miaif.lip6.fr/willy/pub/bonding/
+ - http://www-miaif.lip6.fr/~tarreau/pub/bonding/
 
 To get latest informations about Linux Kernel development, please consult
 the Linux Kernel Mailing List Archives at :
-   http://boudicca.tux.org/hypermail/linux-kernel/latest/
+   http://www.ussg.iu.edu/hypermail/linux/kernel/
 
 -- END --

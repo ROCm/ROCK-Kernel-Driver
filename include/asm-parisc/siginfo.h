@@ -1,8 +1,6 @@
 #ifndef _PARISC_SIGINFO_H
 #define _PARISC_SIGINFO_H
 
-#define HAVE_ARCH_COPY_SIGINFO_TO_USER
-
 #include <asm-generic/siginfo.h>
 
 /*

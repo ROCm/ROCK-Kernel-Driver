@@ -25,6 +25,7 @@
  * **********************
  */
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
@@ -52,8 +53,7 @@
 
 
 /* Internal function declarations */
-static int com90xx_found(struct net_device *dev, int ioaddr, int airq,
-			 u_long shmem);
+static int com90xx_found(int ioaddr, int airq, u_long shmem);
 static void com90xx_command(struct net_device *dev, int command);
 static int com90xx_status(struct net_device *dev);
 static void com90xx_setmask(struct net_device *dev, int mask);
@@ -98,32 +98,43 @@ static int numcards;
 
 static int com90xx_skip_probe __initdata = 0;
 
-static int __init com90xx_probe(struct net_device *dev)
+/* Module parameters */
+
+static int io;			/* use the insmod io= irq= shmem= options */
+static int irq;
+static int shmem;
+static char device[9];		/* use eg. device=arc1 to change name */
+
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(shmem, int, 0);
+module_param_string(device, device, sizeof(device), 0);
+
+static void __init com90xx_probe(void)
 {
-	int count, status, ioaddr, numprint, airq, retval = -ENODEV,
-	 openparen = 0;
+	int count, status, ioaddr, numprint, airq, openparen = 0;
 	unsigned long airqmask;
 	int ports[(0x3f0 - 0x200) / 16 + 1] =
 	{0};
 	u_long shmems[(0xFF800 - 0xA0000) / 2048 + 1] =
 	{0};
 	int numports, numshmems, *port;
-	u_long *shmem;
+	u_long *p;
 
-	if (!dev && com90xx_skip_probe)
-		return -ENODEV;
+	if (!io && !irq && !shmem && !*device && com90xx_skip_probe)
+		return;
 
 	BUGLVL(D_NORMAL) printk(VERSION);
 
 	/* set up the arrays where we'll store the possible probe addresses */
 	numports = numshmems = 0;
-	if (dev && dev->base_addr)
-		ports[numports++] = dev->base_addr;
+	if (io)
+		ports[numports++] = io;
 	else
 		for (count = 0x200; count <= 0x3f0; count += 16)
 			ports[numports++] = count;
-	if (dev && dev->mem_start)
-		shmems[numshmems++] = dev->mem_start;
+	if (shmem)
+		shmems[numshmems++] = shmem;
 	else
 		for (count = 0xA0000; count <= 0xFF800; count += 2048)
 			shmems[numshmems++] = count;
@@ -143,22 +154,19 @@ static int __init com90xx_probe(struct net_device *dev)
 
 		ioaddr = *port;
 
-		if (check_region(*port, ARCNET_TOTAL_SIZE)) {
+		if (!request_region(*port, ARCNET_TOTAL_SIZE, "arcnet (90xx)")) {
 			BUGMSG2(D_INIT_REASONS, "(check_region)\n");
 			BUGMSG2(D_INIT_REASONS, "S1: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*port = ports[numports - 1];
-			numports--;
-			port--;
+			*port-- = ports[--numports];
 			continue;
 		}
 		if (ASTATUS() == 0xFF) {
 			BUGMSG2(D_INIT_REASONS, "(empty)\n");
 			BUGMSG2(D_INIT_REASONS, "S1: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*port = ports[numports - 1];
-			numports--;
-			port--;
+			release_region(*port, ARCNET_TOTAL_SIZE);
+			*port-- = ports[--numports];
 			continue;
 		}
 		inb(_RESET);	/* begin resetting card */
@@ -171,14 +179,14 @@ static int __init com90xx_probe(struct net_device *dev)
 
 	if (!numports) {
 		BUGMSG2(D_NORMAL, "S1: No ARCnet cards found.\n");
-		return -ENODEV;
+		return;
 	}
 	/* Stage 2: we have now reset any possible ARCnet cards, so we can't
 	 * do anything until they finish.  If D_INIT, print the list of
 	 * cards that are left.
 	 */
 	numprint = -1;
-	for (port = &ports[0]; port - ports < numports; port++) {
+	for (port = &ports[0]; port < ports + numports; port++) {
 		numprint++;
 		numprint %= 8;
 		if (!numprint) {
@@ -194,8 +202,8 @@ static int __init com90xx_probe(struct net_device *dev)
 	 * 0xD1 byte in the right place, or are read-only.
 	 */
 	numprint = -1;
-	for (shmem = &shmems[0]; shmem - shmems < numshmems; shmem++) {
-		u_long ptr = *shmem;
+	for (p = &shmems[0]; p < shmems + numshmems; p++) {
+		u_long ptr = *p;
 
 		numprint++;
 		numprint %= 8;
@@ -203,15 +211,13 @@ static int __init com90xx_probe(struct net_device *dev)
 			BUGMSG2(D_INIT, "\n");
 			BUGMSG2(D_INIT, "S3: ");
 		}
-		BUGMSG2(D_INIT, "%lXh ", *shmem);
+		BUGMSG2(D_INIT, "%lXh ", *p);
 
-		if (check_mem_region(*shmem, BUFFER_SIZE)) {
+		if (!request_mem_region(*p, BUFFER_SIZE, "arcnet (90xx)")) {
 			BUGMSG2(D_INIT_REASONS, "(check_mem_region)\n");
 			BUGMSG2(D_INIT_REASONS, "Stage 3: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*shmem = shmems[numshmems - 1];
-			numshmems--;
-			shmem--;
+			*p-- = shmems[--numshmems];
 			continue;
 		}
 		if (isa_readb(ptr) != TESTvalue) {
@@ -219,9 +225,8 @@ static int __init com90xx_probe(struct net_device *dev)
 				isa_readb(ptr), TESTvalue);
 			BUGMSG2(D_INIT_REASONS, "S3: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*shmem = shmems[numshmems - 1];
-			numshmems--;
-			shmem--;
+			release_mem_region(*p, BUFFER_SIZE);
+			*p-- = shmems[--numshmems];
 			continue;
 		}
 		/* By writing 0x42 to the TESTvalue location, we also make
@@ -233,9 +238,8 @@ static int __init com90xx_probe(struct net_device *dev)
 		if (isa_readb(ptr) != 0x42) {
 			BUGMSG2(D_INIT_REASONS, "(read only)\n");
 			BUGMSG2(D_INIT_REASONS, "S3: ");
-			*shmem = shmems[numshmems - 1];
-			numshmems--;
-			shmem--;
+			release_mem_region(*p, BUFFER_SIZE);
+			*p-- = shmems[--numshmems];
 			continue;
 		}
 		BUGMSG2(D_INIT_REASONS, "\n");
@@ -246,20 +250,22 @@ static int __init com90xx_probe(struct net_device *dev)
 
 	if (!numshmems) {
 		BUGMSG2(D_NORMAL, "S3: No ARCnet cards found.\n");
-		return -ENODEV;
+		for (port = &ports[0]; port < ports + numports; port++)
+			release_region(*port, ARCNET_TOTAL_SIZE);
+		return;
 	}
 	/* Stage 4: something of a dummy, to report the shmems that are
 	 * still possible after stage 3.
 	 */
 	numprint = -1;
-	for (shmem = &shmems[0]; shmem - shmems < numshmems; shmem++) {
+	for (p = &shmems[0]; p < shmems + numshmems; p++) {
 		numprint++;
 		numprint %= 8;
 		if (!numprint) {
 			BUGMSG2(D_INIT, "\n");
 			BUGMSG2(D_INIT, "S4: ");
 		}
-		BUGMSG2(D_INIT, "%lXh ", *shmem);
+		BUGMSG2(D_INIT, "%lXh ", *p);
 	}
 	BUGMSG2(D_INIT, "\n");
 
@@ -271,7 +277,8 @@ static int __init com90xx_probe(struct net_device *dev)
 	 * after the first one is found.
 	 */
 	numprint = -1;
-	for (port = &ports[0]; port - ports < numports; port++) {
+	for (port = &ports[0]; port < ports + numports; port++) {
+		int found = 0;
 		numprint++;
 		numprint %= 8;
 		if (!numprint) {
@@ -288,9 +295,8 @@ static int __init com90xx_probe(struct net_device *dev)
 			BUGMSG2(D_INIT_REASONS, "(status=%Xh)\n", status);
 			BUGMSG2(D_INIT_REASONS, "S5: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*port = ports[numports - 1];
-			numports--;
-			port--;
+			release_region(*port, ARCNET_TOTAL_SIZE);
+			*port-- = ports[--numports];
 			continue;
 		}
 		ACOMMAND(CFLAGScmd | RESETclear | CONFIGclear);
@@ -300,15 +306,14 @@ static int __init com90xx_probe(struct net_device *dev)
 				status);
 			BUGMSG2(D_INIT_REASONS, "S5: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
-			*port = ports[numports - 1];
-			numports--;
-			port--;
+			release_region(*port, ARCNET_TOTAL_SIZE);
+			*port-- = ports[--numports];
 			continue;
 		}
 		/* skip this completely if an IRQ was given, because maybe
 		 * we're on a machine that locks during autoirq!
 		 */
-		if (!dev || !dev->irq) {
+		if (!irq) {
 			/* if we do this, we're sure to get an IRQ since the
 			 * card has just reset and the NORXflag is on until
 			 * we tell it to start receiving.
@@ -323,13 +328,12 @@ static int __init com90xx_probe(struct net_device *dev)
 				BUGMSG2(D_INIT_REASONS, "(airq=%d)\n", airq);
 				BUGMSG2(D_INIT_REASONS, "S5: ");
 				BUGLVL(D_INIT_REASONS) numprint = 0;
-				*port = ports[numports - 1];
-				numports--;
-				port--;
+				release_region(*port, ARCNET_TOTAL_SIZE);
+				*port-- = ports[--numports];
 				continue;
 			}
 		} else {
-			airq = dev->irq;
+			airq = irq;
 		}
 
 		BUGMSG2(D_INIT, "(%d,", airq);
@@ -354,21 +358,20 @@ static int __init com90xx_probe(struct net_device *dev)
 		mdelay(RESETtime);
 #endif
 
-		for (shmem = &shmems[0]; shmem - shmems < numshmems; shmem++) {
-			u_long ptr = *shmem;
+		for (p = &shmems[0]; p < shmems + numshmems; p++) {
+			u_long ptr = *p;
 
 			if (isa_readb(ptr) == TESTvalue) {	/* found one */
-				BUGMSG2(D_INIT, "%lXh)\n", *shmem);
+				BUGMSG2(D_INIT, "%lXh)\n", *p);
 				openparen = 0;
 
 				/* register the card */
-				retval = com90xx_found(dev, *port, airq, *shmem);
+				if (com90xx_found(*port, airq, *p) == 0)
+					found = 1;
 				numprint = -1;
 
 				/* remove shmem from the list */
-				*shmem = shmems[numshmems - 1];
-				numshmems--;
-
+				*p = shmems[--numshmems];
 				break;	/* go to the next I/O port */
 			} else {
 				BUGMSG2(D_INIT_REASONS, "%Xh-", isa_readb(ptr));
@@ -380,44 +383,39 @@ static int __init com90xx_probe(struct net_device *dev)
 			BUGLVL(D_INIT_REASONS) printk("S5: ");
 			BUGLVL(D_INIT_REASONS) numprint = 0;
 		}
-		*port = ports[numports - 1];
-		numports--;
-		port--;
+		if (!found)
+			release_region(*port, ARCNET_TOTAL_SIZE);
+		*port-- = ports[--numports];
 	}
 
 	BUGLVL(D_INIT_REASONS) printk("\n");
 
 	/* Now put back TESTvalue on all leftover shmems. */
-	for (shmem = &shmems[0]; shmem - shmems < numshmems; shmem++)
-		isa_writeb(TESTvalue, *shmem);
-
-	if (retval && dev && !numcards)
-		BUGMSG2(D_NORMAL, "S5: No ARCnet cards found.\n");
-	return retval;
+	for (p = &shmems[0]; p < shmems + numshmems; p++) {
+		isa_writeb(TESTvalue, *p);
+		release_mem_region(*p, BUFFER_SIZE);
+	}
 }
 
 
 /* Set up the struct net_device associated with this card.  Called after
  * probing succeeds.
  */
-static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
-				u_long shmem)
+static int __init com90xx_found(int ioaddr, int airq, u_long shmem)
 {
-	struct net_device *dev = dev0;
+	struct net_device *dev = NULL;
 	struct arcnet_local *lp;
 	u_long first_mirror, last_mirror;
-	int mirror_size, err;
+	int mirror_size;
 
-	/* allocate struct net_device if we don't have one yet */
-	if (!dev && !(dev = dev_alloc("arc%d", &err))) {
+	/* allocate struct net_device */
+	dev = alloc_arcdev(device);
+	if (!dev) {
 		BUGMSG2(D_NORMAL, "com90xx: Can't allocate device!\n");
-		return err;
+		release_mem_region(shmem, BUFFER_SIZE);
+		return -ENOMEM;
 	}
-	lp = dev->priv = kmalloc(sizeof(struct arcnet_local), GFP_KERNEL);
-	if (!lp) {
-		BUGMSG(D_NORMAL, "Can't allocate device data!\n");
-		goto err_free_dev;
-	}
+	lp = dev->priv;
 	/* find the real shared memory start/end points, including mirrors */
 
 	/* guess the actual size of one "memory mirror" - the number of
@@ -442,8 +440,18 @@ static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
 	dev->mem_start = first_mirror;
 	dev->mem_end = last_mirror + MIRROR_SIZE - 1;
 
+	release_mem_region(shmem, BUFFER_SIZE);
+	if (!request_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1, "arcnet (90xx)"))
+		goto err_free_dev;
+
+	/* reserve the irq */
+	if (request_irq(airq, &arcnet_interrupt, 0, "arcnet (90xx)", dev)) {
+		BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", airq);
+		goto err_release_mem;
+	}
+	dev->irq = airq;
+
 	/* Initialize the rest of the device structure. */
-	memset(lp, 0, sizeof(struct arcnet_local));
 	lp->card_name = "COM90xx";
 	lp->hw.command = com90xx_command;
 	lp->hw.status = com90xx_status;
@@ -455,24 +463,12 @@ static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
 	lp->mem_start = ioremap(dev->mem_start, dev->mem_end - dev->mem_start + 1);
 	if (!lp->mem_start) {
 		BUGMSG(D_NORMAL, "Can't remap device memory!\n");
-		goto err_free_dev_priv;
+		goto err_free_irq;
 	}
-	/* Fill in the fields of the device structure with generic values. */
-	arcdev_setup(dev);
 
 	/* get and check the station ID from offset 1 in shmem */
 	dev->dev_addr[0] = readb(lp->mem_start + 1);
 
-	/* reserve the irq */
-	if (request_irq(airq, &arcnet_interrupt, 0, "arcnet (90xx)", dev)) {
-		BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", airq);
-		goto err_unmap;
-	}
-	dev->irq = airq;
-
-	/* reserve the I/O and memory regions - guaranteed to work by check_region */
-	request_region(ioaddr, ARCNET_TOTAL_SIZE, "arcnet (90xx)");
-	request_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1, "arcnet (90xx)");
 	dev->base_addr = ioaddr;
 
 	BUGMSG(D_NORMAL, "COM90xx station %02Xh found at %03lXh, IRQ %d, "
@@ -481,23 +477,20 @@ static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
 	       dev->base_addr, dev->irq, dev->mem_start,
 	 (dev->mem_end - dev->mem_start + 1) / mirror_size, mirror_size);
 
-	if (!dev0 && register_netdev(dev))
-		goto err_release;
+	if (register_netdev(dev))
+		goto err_unmap;
 
 	cards[numcards++] = dev;
 	return 0;
 
-      err_release:
-	free_irq(dev->irq, dev);
-	release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
-	release_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1);
-      err_unmap:
+err_unmap:
 	iounmap(lp->mem_start);
-      err_free_dev_priv:
-	kfree(dev->priv);
-      err_free_dev:
-	if (!dev0)
-		kfree(dev);
+err_free_irq:
+	free_irq(dev->irq, dev);
+err_release_mem:
+	release_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1);
+err_free_dev:
+	free_netdev(dev);
 	return -EIO;
 }
 
@@ -587,37 +580,13 @@ static void com90xx_copy_from_card(struct net_device *dev, int bufnum, int offse
 }
 
 
-/* Module parameters */
-
-static int io;			/* use the insmod io= irq= shmem= options */
-static int irq;
-static int shmem;
-static char *device;		/* use eg. device=arc1 to change name */
-
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(shmem, "i");
-MODULE_PARM(device, "s");
 MODULE_LICENSE("GPL");
 
 static int __init com90xx_init(void)
 {
-	struct net_device *dev;
-	int err;
-
-	if (io || irq || shmem || device) {
-		dev = dev_alloc(device ? : "arc%d", &err);
-		if (!dev)
-			return err;
-		dev->base_addr = io;
-		dev->irq = irq;
-		if (dev->irq == 2)
-			dev->irq = 9;
-		dev->mem_start = shmem;
-		com90xx_probe(dev);
-	} else
-		com90xx_probe(NULL);
-
+	if (irq == 2)
+		irq = 9;
+	com90xx_probe();
 	if (!numcards)
 		return -EIO;
 	return 0;
@@ -638,7 +607,6 @@ static void __exit com90xx_exit(void)
 		iounmap(lp->mem_start);
 		release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
 		release_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1);
-		kfree(dev->priv);
 		free_netdev(dev);
 	}
 }
@@ -669,9 +637,7 @@ static int __init com90xx_setup(char *s)
 	}
 
 	if (*s)
-		strncpy(device, s, 9);
-	else
-		strcpy(device, "arc%d");
+		snprintf(device, sizeof(device), "%s", s);
 
 	return 1;
 }

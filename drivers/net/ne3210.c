@@ -111,12 +111,6 @@ static int __init ne3210_eisa_probe (struct device *device)
 	device->driver_data = dev;
 	ioaddr = edev->base_addr;
 
-	if (ethdev_init (dev)) {
-		printk ("ne3210.c: unable to allocate memory for dev->priv!\n");
-		retval = -ENOMEM;
-		goto out;
-	}
-
 	if (!request_region(ioaddr, NE3210_IO_EXTENT, dev->name)) {
 		retval = -EBUSY;
 		goto out;
@@ -356,24 +350,6 @@ static struct eisa_driver ne3210_eisa_driver = {
 		.remove = __devexit_p (ne3210_eisa_remove),
 	},
 };
-
-#ifdef MODULE
-#if 0
-#define MAX_NE3210_CARDS	4	/* Max number of NE3210 cards per module */
-static struct net_device dev_ne3210[MAX_NE3210_CARDS];
-static int io[MAX_NE3210_CARDS];
-static int irq[MAX_NE3210_CARDS];
-static int mem[MAX_NE3210_CARDS];
-
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_NE3210_CARDS) "i");
-MODULE_PARM_DESC(io, "I/O base address(es)");
-MODULE_PARM_DESC(irq, "IRQ number(s)");
-MODULE_PARM_DESC(mem, "memory base address(es)");
-#endif
-#endif /* MODULE */
-
 
 MODULE_DESCRIPTION("NE3210 EISA Ethernet driver");
 MODULE_LICENSE("GPL");

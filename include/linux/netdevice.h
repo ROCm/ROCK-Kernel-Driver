@@ -375,6 +375,10 @@ struct net_device
 	atomic_t		refcnt;
 	/* delayed register/unregister */
 	struct list_head	todo_list;
+	/* device name hash chain */
+	struct hlist_node	name_hlist;
+	/* device index hash chain */
+	struct hlist_node	index_hlist;
 
 	/* register/unregister state machine */
 	enum { NETREG_UNINITIALIZED=0,
@@ -470,7 +474,14 @@ struct net_device
 	/* class/net/name entry */
 	struct class_device	class_dev;
 	struct net_device_stats* (*last_stats)(struct net_device *);
+	/* how much padding had been added by alloc_netdev() */
+	int padded;
 };
+
+static inline void *netdev_priv(struct net_device *dev)
+{
+	return (char *)dev + ((sizeof(struct net_device) + 31) & ~31);
+}
 
 #define SET_MODULE_OWNER(dev) do { } while (0)
 /* Set the sysfs physical device reference for the network logical device

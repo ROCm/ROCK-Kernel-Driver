@@ -372,7 +372,7 @@ static void netdev_release(struct class_device *cd)
 
 	BUG_ON(dev->reg_state != NETREG_RELEASED);
 
-	kfree(dev);
+	kfree((char *)dev - dev->padded);
 }
 
 static struct class net_class = {

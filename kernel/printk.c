@@ -784,12 +784,6 @@ void tty_write_message(struct tty_struct *tty, char *msg)
 	return;
 }
 
-/* minimum time in jiffies between messages */
-int printk_ratelimit_jiffies = 5*HZ;
-
-/* number of messages we send before ratelimiting */
-int printk_ratelimit_burst = 10;
-
 /*
  * printk rate limiting, lifted from the networking subsystem.
  *
@@ -797,7 +791,7 @@ int printk_ratelimit_burst = 10;
  * every printk_ratelimit_jiffies to make a denial-of-service
  * attack impossible.
  */
-int printk_ratelimit(void)
+int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst)
 {
 	static spinlock_t ratelimit_lock = SPIN_LOCK_UNLOCKED;
 	static unsigned long toks = 10*5*HZ;
@@ -809,12 +803,12 @@ int printk_ratelimit(void)
 	spin_lock_irqsave(&ratelimit_lock, flags);
 	toks += now - last_msg;
 	last_msg = now;
-	if (toks > (printk_ratelimit_burst * printk_ratelimit_jiffies))
-		toks = printk_ratelimit_burst * printk_ratelimit_jiffies;
-	if (toks >= printk_ratelimit_jiffies) {
+	if (toks > (ratelimit_burst * ratelimit_jiffies))
+		toks = ratelimit_burst * ratelimit_jiffies;
+	if (toks >= ratelimit_jiffies) {
 		int lost = missed;
 		missed = 0;
-		toks -= printk_ratelimit_jiffies;
+		toks -= ratelimit_jiffies;
 		spin_unlock_irqrestore(&ratelimit_lock, flags);
 		if (lost)
 			printk(KERN_WARNING "printk: %d messages suppressed.\n", lost);
@@ -823,5 +817,18 @@ int printk_ratelimit(void)
 	missed++;
 	spin_unlock_irqrestore(&ratelimit_lock, flags);
 	return 0;
+}
+EXPORT_SYMBOL(__printk_ratelimit);
+
+/* minimum time in jiffies between messages */
+int printk_ratelimit_jiffies = 5*HZ;
+
+/* number of messages we send before ratelimiting */
+int printk_ratelimit_burst = 10;
+
+int printk_ratelimit(void)
+{
+	return __printk_ratelimit(printk_ratelimit_jiffies,
+				printk_ratelimit_burst);
 }
 EXPORT_SYMBOL(printk_ratelimit);

@@ -29,7 +29,7 @@ typedef long			__kernel_time_t;
 typedef unsigned int		__kernel_size_t;
 typedef int			__kernel_ssize_t;
 typedef int			__kernel_ptrdiff_t;
-typedef int			__kernel_time_t;
+typedef long			__kernel_time_t;
 #endif
 typedef char *			__kernel_caddr_t;
 

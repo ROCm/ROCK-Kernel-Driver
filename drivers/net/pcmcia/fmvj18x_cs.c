@@ -332,11 +332,8 @@ static void fmvj18x_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	fmvj18x_release(link);
-	if (link->state & DEV_STALE_CONFIG)
-	    return;
-    }
 
     /* Break the link with Card Services */
     if (link->handle)
@@ -720,17 +717,6 @@ static void fmvj18x_release(dev_link_t *link)
 
     DEBUG(0, "fmvj18x_release(0x%p)\n", link);
 
-    /*
-       If the device is currently in use, we won't release until it
-       is actually closed.
-    */
-    if (link->open) {
-	DEBUG(1, "fmvj18x_cs: release postponed, '%s' "
-	      "still open\n", link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-
     /* Don't bother checking to see if these succeed or not */
     pcmcia_release_window(link->win);
     pcmcia_release_configuration(link->handle);
@@ -738,9 +724,6 @@ static void fmvj18x_release(dev_link_t *link)
     pcmcia_release_irq(link->handle, &link->irq);
     
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_CONFIG)
-	    fmvj18x_detach(link);
 }
 
 /*====================================================================*/
@@ -1248,8 +1231,6 @@ static int fjn_close(struct net_device *dev)
 	outb(INTR_OFF, ioaddr + LAN_CTRL);
 
     link->open--;
-    if (link->state & DEV_STALE_CONFIG)
-	    fmvj18x_release(link);
 
     return 0;
 } /* fjn_close */

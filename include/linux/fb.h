@@ -433,24 +433,25 @@ struct fb_ops {
 };
 
 struct fb_info {
-   int node;
-   int flags;
-   int open;                            /* Has this been open already ? */
+	int node;
+	int flags;
+	int open;			/* Has this been open already ? */
 #define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */
-   struct fb_var_screeninfo var;        /* Current var */
-   struct fb_fix_screeninfo fix;        /* Current fix */
-   struct fb_monspecs monspecs;         /* Current Monitor specs */
-   struct fb_cursor cursor;		/* Current cursor */	
-   struct work_struct queue;		/* Framebuffer event queue */
+	struct fb_var_screeninfo var;	/* Current var */
+	struct fb_fix_screeninfo fix;	/* Current fix */
+	struct fb_monspecs monspecs;	/* Current Monitor specs */
+	struct fb_cursor cursor;	/* Current cursor */	
+	struct work_struct queue;	/* Framebuffer event queue */
 	struct fb_pixmap pixmap;	/* Image Hardware Mapper */
-   struct fb_cmap cmap;                 /* Current cmap */
-   struct fb_ops *fbops;
-   char *screen_base;                   /* Virtual address */
-   struct vc_data *display_fg;		/* Console visible on this display */
-   int currcon;				/* Current VC. */	
-   void *pseudo_palette;                /* Fake palette of 16 colors */ 
-   /* From here on everything is device dependent */
-   void *par;	
+	struct fb_cmap cmap;		/* Current cmap */
+	struct fb_ops *fbops;
+	char *screen_base;		/* Virtual address */
+	struct vc_data *display_fg;	/* Console visible on this display */
+	int currcon;			/* Current VC. */
+	struct class_device class_dev;	/* Sysfs data */	
+	void *pseudo_palette;		/* Fake palette of 16 colors */ 
+	/* From here on everything is device dependent */
+	void *par;	
 };
 
 #ifdef MODULE
@@ -527,6 +528,13 @@ extern void move_buf_aligned(struct fb_info *info, u8 * dst, u8 * src,
 				u32 d_pitch, u32 s_pitch, u32 height);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
+
+/* drivers/video/fbsysfs.c */
+extern struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
+extern void framebuffer_release(struct fb_info *info);
+extern int fb_add_class_device(struct fb_info *info);
+
+extern struct class fb_class;
 
 /* drivers/video/fbmon.c */
 #define FB_MAXTIMINGS       0

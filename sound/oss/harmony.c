@@ -9,7 +9,7 @@
 	called 'Vivace'. Both Harmony and Vicace are supported by this driver.
 
 	Copyright 2000 (c) Linuxcare Canada, Alex deVries <alex@linuxcare.com>
-	Copyright 2000-2002 (c) Helge Deller <deller@gmx.de>
+	Copyright 2000-2003 (c) Helge Deller <deller@gmx.de>
 	Copyright 2001 (c) Matthieu Delahaye <delahaym@esiee.fr>
 	Copyright 2001 (c) Jean-Christophe Vaugeois <vaugeoij@esiee.fr>
 
@@ -157,19 +157,21 @@ struct harmony_hpa {
 };
 
 struct harmony_dev {
-	int irq;
 	struct harmony_hpa *hpa;
+	struct parisc_device *dev;
 	u32 current_gain;
+	u32 dac_rate;		/* 8000 ... 48000 (Hz) */
 	u8 data_format;		/* HARMONY_DF_xx_BIT_xxx */
 	u8 sample_rate;		/* HARMONY_SR_xx_KHZ */
 	u8 stereo_select;	/* HARMONY_SS_MONO or HARMONY_SS_STEREO */
-	int format_initialized;
-	u32 dac_rate;		/* 8000 ... 48000 (Hz) */
-	int suspended_playing;
-	int suspended_recording;
+	int format_initialized  :1;
+	int suspended_playing   :1;
+	int suspended_recording :1;
 	
-	int blocked_playing;
-	int blocked_recording;
+	int blocked_playing     :1;
+	int blocked_recording   :1;
+	int audio_open		:1;
+	int mixer_open		:1;
 	
 	wait_queue_head_t wq_play, wq_record;
 	int first_filled_play;	/* first buffer containing data (next to play) */
@@ -178,11 +180,7 @@ struct harmony_dev {
 	int first_filled_record;
 	int nb_filled_record;
 		
-	int audio_open, mixer_open;
 	int dsp_unit, mixer_unit;
-
-	struct pci_dev *fake_pci_dev; /* The fake pci_dev needed for 
-					pci_* functions under ccio. */
 };
 
 
@@ -196,8 +194,8 @@ static struct harmony_dev harmony;
 struct harmony_buffer {
 	unsigned char *addr;
 	dma_addr_t dma_handle;
-	int dma_consistent;	/* Zero if pci_alloc_consistent() fails */
-	int len;
+	int dma_coherent;	/* Zero if dma_alloc_coherent() fails */
+	unsigned int len;
 };
 
 /*
@@ -208,23 +206,23 @@ static struct harmony_buffer played_buf, recorded_buf, silent, graveyard;
 
 
 #define CHECK_WBACK_INV_OFFSET(b,offset,len) \
-        do { if (!b.dma_consistent) \
+        do { if (!b.dma_coherent) \
 		dma_cache_wback_inv((unsigned long)b.addr+offset,len); \
 	} while (0) 
 
 	
 static int __init harmony_alloc_buffer(struct harmony_buffer *b, 
-		int buffer_count)
+		unsigned int buffer_count)
 {
 	b->len = buffer_count * HARMONY_BUF_SIZE;
-	b->addr = pci_alloc_consistent(harmony.fake_pci_dev, 
-			  b->len, &b->dma_handle);
+	b->addr = dma_alloc_coherent(&harmony.dev->dev, 
+			  b->len, &b->dma_handle, GFP_KERNEL|GFP_DMA);
 	if (b->addr && b->dma_handle) {
-		b->dma_consistent = 1;
-		DPRINTK(KERN_INFO PFX "consistent memory: 0x%lx, played_buf: 0x%lx\n",
+		b->dma_coherent = 1;
+		DPRINTK(KERN_INFO PFX "coherent memory: 0x%lx, played_buf: 0x%lx\n",
 				(unsigned long)b->dma_handle, (unsigned long)b->addr);
 	} else {
-		b->dma_consistent = 0;
+		b->dma_coherent = 0;
 		/* kmalloc()ed memory will HPMC on ccio machines ! */
 		b->addr = kmalloc(b->len, GFP_KERNEL);
 		if (!b->addr) {
@@ -241,8 +239,8 @@ static void __exit harmony_free_buffer(struct harmony_buffer *b)
 	if (!b->addr)
 		return;
 
-	if (b->dma_consistent)
-		pci_free_consistent(harmony.fake_pci_dev,
+	if (b->dma_coherent)
+		dma_free_coherent(&harmony.dev->dev,
 				b->len, b->addr, b->dma_handle);
 	else
 		kfree(b->addr);
@@ -372,7 +370,7 @@ static int harmony_audio_open(struct inode *inode, struct file *file)
 	if (harmony.audio_open) 
 		return -EBUSY;
 	
-	harmony.audio_open++;
+	harmony.audio_open = 1;
 	harmony.suspended_playing = harmony.suspended_recording = 1;
 	harmony.blocked_playing   = harmony.blocked_recording   = 0;
 	harmony.first_filled_play = harmony.first_filled_record = 0;
@@ -402,7 +400,7 @@ static int harmony_audio_release(struct inode *inode, struct file *file)
 	if (!harmony.audio_open) 
 		return -EBUSY;
 	
-	harmony.audio_open--;
+	harmony.audio_open = 0;
 
 	return 0;
 }
@@ -835,15 +833,15 @@ static struct file_operations harmony_audio_fops = {
 static int harmony_audio_init(void)
 {
 	/* Request that IRQ */
-	if (request_irq(harmony.irq, harmony_interrupt, 0 ,"harmony", &harmony)) {
-		printk(KERN_ERR PFX "Error requesting irq %d.\n", harmony.irq);
+	if (request_irq(harmony.dev->irq, harmony_interrupt, 0 ,"harmony", &harmony)) {
+		printk(KERN_ERR PFX "Error requesting irq %d.\n", harmony.dev->irq);
 		return -EFAULT;
 	}
 
    	harmony.dsp_unit = register_sound_dsp(&harmony_audio_fops, -1);
 	if (harmony.dsp_unit < 0) {
 		printk(KERN_ERR PFX "Error registering dsp\n");
-		free_irq(harmony.irq, &harmony);
+		free_irq(harmony.dev->irq, &harmony);
 		return -EFAULT;
 	}
 	
@@ -1131,7 +1129,7 @@ static int harmony_mixer_open(struct inode *inode, struct file *file)
 {
 	if (harmony.mixer_open) 
 		return -EBUSY;
-	harmony.mixer_open++;
+	harmony.mixer_open = 1;
 	return 0;
 }
 
@@ -1139,7 +1137,7 @@ static int harmony_mixer_release(struct inode *inode, struct file *file)
 {
 	if (!harmony.mixer_open) 
 		return -EBUSY;
-	harmony.mixer_open--;
+	harmony.mixer_open = 0;
 	return 0;
 }
 
@@ -1189,8 +1187,8 @@ static int __init harmony_mixer_init(void)
  * This is the callback that's called by the inventory hardware code 
  * if it finds a match to the registered driver. 
  */
-static int __init
-harmony_driver_callback(struct parisc_device *dev)
+static int __devinit
+harmony_driver_probe(struct parisc_device *dev)
 {
 	u8	id;
 	u8	rev;
@@ -1203,11 +1201,12 @@ harmony_driver_callback(struct parisc_device *dev)
 		return -EBUSY;
 	}
 
+	harmony.dev = dev;
+
 	/* Set the HPA of harmony */
 	harmony.hpa = (struct harmony_hpa *)dev->hpa;
 
-	harmony.irq = dev->irq;
-	if (!harmony.irq) {
+	if (!harmony.dev->irq) {
 		printk(KERN_ERR PFX "no irq found\n");
 		return -ENODEV;
 	}
@@ -1223,7 +1222,7 @@ harmony_driver_callback(struct parisc_device *dev)
 
 	printk(KERN_INFO "Lasi Harmony Audio driver " HARMONY_VERSION ", "
 			"h/w id %i, rev. %i at 0x%lx, IRQ %i\n",
-			id, rev, dev->hpa, harmony.irq);
+			id, rev, dev->hpa, harmony.dev->irq);
 	
 	/* Make sure the control bit isn't set, although I don't think it 
 	   ever is. */
@@ -1233,9 +1232,6 @@ harmony_driver_callback(struct parisc_device *dev)
 		return -EBUSY;
 	}
 
-	/* a fake pci_dev is needed for pci_* functions under ccio */
-	harmony.fake_pci_dev = ccio_get_fake(dev);
-	
 	/* Initialize the memory buffers */
 	if (harmony_alloc_buffer(&played_buf, MAX_BUFS) || 
 	    harmony_alloc_buffer(&recorded_buf, MAX_BUFS) ||
@@ -1276,7 +1272,7 @@ MODULE_DEVICE_TABLE(parisc, harmony_tbl);
 static struct parisc_driver harmony_driver = {
 	.name		= "Lasi Harmony",
 	.id_table	= harmony_tbl,
-	.probe		= harmony_driver_callback,
+	.probe		= harmony_driver_probe,
 };
 
 static int __init init_harmony(void)
@@ -1286,7 +1282,7 @@ static int __init init_harmony(void)
 
 static void __exit cleanup_harmony(void)
 {
-	free_irq(harmony.irq, &harmony);
+	free_irq(harmony.dev->irq, &harmony);
 	unregister_sound_mixer(harmony.mixer_unit);
 	unregister_sound_dsp(harmony.dsp_unit);
 	harmony_free_buffer(&played_buf);

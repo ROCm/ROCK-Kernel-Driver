@@ -1,8 +1,11 @@
 /*
- * Linux/PA-RISC Project (http://www.parisc-linux.org/)
+ *    User Space Access Routines
  *
- * Assembly Language User Access Routines
- *  Copyright (C) 2000 Hewlett-Packard (John Marvin)
+ *    Copyright (C) 2000-2002 Hewlett-Packard (John Marvin)
+ *    Copyright (C) 2000 Richard Hirst <rhirst with parisc-linux.org>
+ *    Copyright (C) 2001 Matthieu Delahaye <delahaym at esiee.fr>
+ *    Copyright (C) 2003 Randolph Chung <tausq with parisc-linux.org>
+ *
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -16,7 +19,7 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
- *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*

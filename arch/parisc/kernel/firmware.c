@@ -1,10 +1,22 @@
-/* arch/parisc/kernel/pdc.c  - safe pdc access routines
+/*
+ * arch/parisc/kernel/firmware.c  - safe PDC access routines
+ *
+ *	PDC == Processor Dependent Code
+ *
+ * See http://www.parisc-linux.org/documentation/index.html
+ * for documentation describing the entry points and calling
+ * conventions defined below.
  *
  * Copyright 1999 SuSE GmbH Nuernberg (Philipp Rumpf, prumpf@tux.org)
- * portions Copyright 1999 The Puffin Group, (Alex deVries, David Kennedy)
+ * Copyright 1999 The Puffin Group, (Alex deVries, David Kennedy)
+ * Copyright 2003 Grant Grundler <grundler parisc-linux org>
  *
- * only these routines should be used out of the real kernel (i.e. everything
- * using virtual addresses) for obvious reasons */
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ */
 
 /*	I think it would be in everyone's best interest to follow this
  *	guidelines when writing PDC wrappers:
@@ -642,6 +654,49 @@ int pdc_pci_irt(unsigned long num_entries, unsigned long hpa, void *tbl)
 	return retval;
 }
 
+
+#if 0	/* UNTEST CODE - left here in case someone needs it */
+
+/** 
+ * pdc_pci_config_read - read PCI config space.
+ * @hpa		token from PDC to indicate which PCI device
+ * @pci_addr	configuration space address to read from
+ *
+ * Read PCI Configuration space *before* linux PCI subsystem is running.
+ */
+unsigned int pdc_pci_config_read(void *hpa, unsigned long cfg_addr)
+{
+	int retval;
+	spin_lock_irq(&pdc_lock);
+	pdc_result[0] = 0;
+	pdc_result[1] = 0;
+	retval = mem_pdc_call(PDC_PCI_INDEX, PDC_PCI_READ_CONFIG, 
+			      __pa(pdc_result), hpa, cfg_addr&~3UL, 4UL);
+	spin_unlock_irq(&pdc_lock);
+	return retval ? ~0 : (unsigned int) pdc_result[0];
+}
+
+
+/** 
+ * pdc_pci_config_write - read PCI config space.
+ * @hpa		token from PDC to indicate which PCI device
+ * @pci_addr	configuration space address to write
+ * @val		value we want in the 32-bit register
+ *
+ * Write PCI Configuration space *before* linux PCI subsystem is running.
+ */
+void pdc_pci_config_write(void *hpa, unsigned long cfg_addr, unsigned int val)
+{
+	int retval;
+	spin_lock_irq(&pdc_lock);
+	pdc_result[0] = 0;
+	retval = mem_pdc_call(PDC_PCI_INDEX, PDC_PCI_WRITE_CONFIG, 
+			      __pa(pdc_result), hpa,
+			      cfg_addr&~3UL, 4UL, (unsigned long) val);
+	spin_unlock_irq(&pdc_lock);
+	return retval;
+}
+#endif /* UNTESTED CODE */
 
 /**
  * pdc_tod_read - Read the Time-Of-Day clock.

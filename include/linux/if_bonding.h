@@ -1,7 +1,7 @@
 /*
  * Bond several ethernet interfaces into a Cisco, running 'Etherchannel'.
  *
- * 
+ *
  * Portions are (c) Copyright 1995 Simon "Guru Aleph-Null" Janes
  * NCM: Network and Communications Management, Inc.
  *
@@ -10,11 +10,11 @@
  *
  *	This software may be used and distributed according to the terms
  *	of the GNU Public License, incorporated herein by reference.
- * 
+ *
  * 2003/03/18 - Amir Noam <amir.noam at intel dot com>
  *	- Added support for getting slave's speed and duplex via ethtool.
  *	  Needed for 802.3ad and other future modes.
- * 
+ *
  * 2003/03/18 - Tsippy Mendelson <tsippy.mendelson at intel dot com> and
  *		Shmulik Hen <shmulik.hen at intel dot com>
  *	- Enable support of modes that need to use the unique mac address of
@@ -42,7 +42,7 @@
 #include <linux/if_ether.h>
 
 /* userland - kernel ABI version (2003/05/08) */
-#define BOND_ABI_VERSION 1
+#define BOND_ABI_VERSION 2
 
 /*
  * We can remove these ioctl definitions in 2.5.  People should use the
@@ -77,10 +77,6 @@
 
 #define BOND_DEFAULT_MAX_BONDS  1   /* Default maximum number of devices to support */
 
-#define BOND_MULTICAST_DISABLED 0
-#define BOND_MULTICAST_ACTIVE   1
-#define BOND_MULTICAST_ALL      2
-
 typedef struct ifbond {
 	__s32 bond_mode;
 	__s32 num_slaves;
@@ -90,9 +86,9 @@ typedef struct ifbond {
 typedef struct ifslave
 {
 	__s32 slave_id; /* Used as an IN param to the BOND_SLAVE_INFO_QUERY ioctl */
-	char slave_name[IFNAMSIZ];
-	char link;
-	char state;
+	__s8 slave_name[IFNAMSIZ];
+	__s8 link;
+	__s8 state;
 	__u32  link_failure_count;
 } ifslave;
 
@@ -115,3 +111,4 @@ struct ad_info {
  *  tab-width: 8
  * End:
  */
+

@@ -364,11 +364,11 @@ ccio_alloc_range(struct ioc *ioc, unsigned long pages_needed)
 		CCIO_FIND_FREE_MAPPING(ioc, res_idx, mask, 64);
 #endif
 	} else {
-		panic(__FILE__ ": %s() Too many pages to map. pages_needed: %ld\n", 
-		      __FUNCTION__, pages_needed);
+		panic("%s: %s() Too many pages to map. pages_needed: %ld\n",
+		       __FILE__,  __FUNCTION__, pages_needed);
 	}
 
-	panic(__FILE__ ": %s() I/O MMU is out of mapping resources.\n", 
+	panic("%s: %s() I/O MMU is out of mapping resources.\n", __FILE__,
 	      __FUNCTION__);
 	
 resource_found:
@@ -441,7 +441,7 @@ ccio_free_range(struct ioc *ioc, dma_addr_t iova, unsigned long pages_mapped)
 		CCIO_FREE_MAPPINGS(ioc, res_idx, mask, 64);
 #endif
 	} else {
-		panic(__FILE__ ":%s() Too many pages to unmap.\n", 
+		panic("%s:%s() Too many pages to unmap.\n", __FILE__,
 		      __FUNCTION__);
 	}
 }
@@ -1447,7 +1447,8 @@ ccio_ioc_init(struct ioc *ioc)
 	ioc->pdir_base = (u64 *)__get_free_pages(GFP_KERNEL, 
 						 get_order(ioc->pdir_size));
 	if(NULL == ioc->pdir_base) {
-		panic(__FILE__ ":%s() could not allocate I/O Page Table\n", __FUNCTION__);
+		panic("%s:%s() could not allocate I/O Page Table\n", __FILE__,
+		      __FUNCTION__);
 	}
 	memset(ioc->pdir_base, 0, ioc->pdir_size);
 
@@ -1461,7 +1462,8 @@ ccio_ioc_init(struct ioc *ioc)
 	ioc->res_map = (u8 *)__get_free_pages(GFP_KERNEL, 
 					      get_order(ioc->res_size));
 	if(NULL == ioc->res_map) {
-		panic(__FILE__ ":%s() could not allocate resource map\n", __FUNCTION__);
+		panic("%s:%s() could not allocate resource map\n", __FILE__,
+		      __FUNCTION__);
 	}
 	memset(ioc->res_map, 0, ioc->res_size);
 
@@ -1627,11 +1629,11 @@ int ccio_request_resource(const struct parisc_device *dev,
 
 	if (!ioc) {
 		parent = &iomem_resource;
-	} else if ((ioc->mmio_region->start <= dev->hpa) &&
-			(dev->hpa < ioc->mmio_region->end)) {
+	} else if ((ioc->mmio_region->start <= res->start) &&
+			(res->end <= ioc->mmio_region->end)) {
 		parent = ioc->mmio_region;
-	} else if (((ioc->mmio_region + 1)->start <= dev->hpa) &&
-			(dev->hpa < (ioc->mmio_region + 1)->end)) {
+	} else if (((ioc->mmio_region + 1)->start <= res->start) &&
+			(res->end <= (ioc->mmio_region + 1)->end)) {
 		parent = ioc->mmio_region + 1;
 	} else {
 		return -EBUSY;

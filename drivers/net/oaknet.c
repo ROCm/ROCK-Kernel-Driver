@@ -106,10 +106,9 @@ static int __init oaknet_init(void)
 	if (!ioaddr)
 		return -ENOMEM;
 
-	dev = alloc_etherdev(0);
+	dev = alloc_ei_netdev();
 	if (!dev)
 		goto out_unmap;
-	dev->priv = NULL;
 
 	ret = -EBUSY;
 	if (!request_region(OAKNET_IO_BASE, OAKNET_IO_SIZE, name))
@@ -152,14 +151,6 @@ static int __init oaknet_init(void)
 	dev->base_addr = ioaddr;
 	dev->irq = OAKNET_INT;
 
-	/* Allocate 8390-specific device-private area and fields. */
-
-	ret = -ENOMEM;
-	if (ethdev_init(dev)) {
-		printk(" unable to get memory for dev->priv.\n");
-		goto out_region;
-	}
-
 	/*
 	 * Disable all chip interrupts for now and ACK all pending
 	 * interrupts.
@@ -174,7 +165,7 @@ static int __init oaknet_init(void)
 	if (request_irq(dev->irq, ei_interrupt, 0, name, dev)) {
 		printk("%s: unable to request interrupt %d.\n",
 		       dev->name, dev->irq);
-		goto out_priv;
+		goto out_region;
 	}
 
 	/* Tell the world about what and where we've found. */
@@ -212,8 +203,6 @@ static int __init oaknet_init(void)
 
 out_irq;
 	free_irq(dev->irq, dev);
-out_priv:
-	kfree(dev->priv);
 out_region:
 	release_region(OAKNET_IO_BASE, OAKNET_IO_SIZE);
 out_dev:
@@ -660,20 +649,11 @@ oaknet_dma_error(struct net_device *dev, const char *name)
  */
 static void __exit oaknet_cleanup_module (void)
 {
-	if (oaknet_devs == NULL)
-		return;
-
-	if (oaknet_devs->priv != NULL) {
-		int ioaddr = oaknet_devs->base_addr;
-		void *priv = oaknet_devs->priv;
-		unregister_netdev(oaknet_dev);
-		free_irq(oaknet_devs->irq, oaknet_devs);
-		kfree(priv);
-		release_region(ioaddr, OAKNET_IO_SIZE);
-		iounmap(ioaddr);
-	}
-
 	/* Convert to loop once driver supports multiple devices. */
+	unregister_netdev(oaknet_dev);
+	free_irq(oaknet_devs->irq, oaknet_devs);
+	release_region(oaknet_devs->base_addr, OAKNET_IO_SIZE);
+	iounmap(ioaddr);
 	free_netdev(oaknet_devs);
 }
 

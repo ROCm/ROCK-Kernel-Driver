@@ -175,7 +175,7 @@ static int dino_current_bus = 0;
 static int dino_cfg_read(struct pci_bus *bus, unsigned int devfn, int where,
 		int size, u32 *val)
 {
-	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->dev));
+	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->bridge));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 v = DINO_CFG_TOK(local_bus, devfn, where & ~3);
 	unsigned long base_addr = d->hba.base_addr;
@@ -209,7 +209,7 @@ static int dino_cfg_read(struct pci_bus *bus, unsigned int devfn, int where,
 static int dino_cfg_write(struct pci_bus *bus, unsigned int devfn, int where,
 	int size, u32 val)
 {
-	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->dev));
+	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->bridge));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 v = DINO_CFG_TOK(local_bus, devfn, where & ~3);
 	unsigned long base_addr = d->hba.base_addr;
@@ -468,14 +468,14 @@ static void __init
 dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 {
 	int i;
-	struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->dev));
+	struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->bridge));
 	struct resource *res;
 	char name[128];
 	int size;
 
 	res = &dino_dev->hba.lmmio_space;
 	res->flags = IORESOURCE_MEM;
-	size = snprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->dev->bus_id);
+	size = snprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->bridge->bus_id);
 	res->name = kmalloc(size+1, GFP_KERNEL);
 	if(res->name)
 		strcpy((char *)res->name, name);
@@ -489,7 +489,7 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 		struct list_head *ln, *tmp_ln;
 
 		printk(KERN_ERR "Dino: cannot attach bus %s\n",
-		       bus->dev->bus_id);
+		       bus->bridge->bus_id);
 		/* kill the bus, we can't do anything with it */
 		list_for_each_safe(ln, tmp_ln, &bus->devices) {
 			struct pci_dev *dev = pci_dev_b(ln);
@@ -560,11 +560,11 @@ dino_fixup_bus(struct pci_bus *bus)
 {
 	struct list_head *ln;
         struct pci_dev *dev;
-        struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->dev));
+        struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->bridge));
 	int port_base = HBA_PORT_BASE(dino_dev->hba.hba_num);
 
 	DBG(KERN_WARNING "%s(0x%p) bus %d sysdata 0x%p\n",
-			__FUNCTION__, bus, bus->secondary, bus->dev->platform_data);
+			__FUNCTION__, bus, bus->secondary, bus->bridge->platform_data);
 
 	/* Firmware doesn't set up card-mode dino, so we have to */
 	if (is_card_dino(&dino_dev->hba.dev->id)) {
@@ -572,15 +572,23 @@ dino_fixup_bus(struct pci_bus *bus)
 	} else if(bus->parent == NULL) {
 		/* must have a dino above it, reparent the resources
 		 * into the dino window */
+		int i;
+		struct resource *res = &dino_dev->hba.lmmio_space;
+
 		bus->resource[0] = &(dino_dev->hba.io_space);
-		bus->resource[1] = &(dino_dev->hba.lmmio_space); 
+		for(i = 0; i < DINO_MAX_LMMIO_RESOURCES; i++) {
+			if(res[i].flags == 0)
+				break;
+			bus->resource[i+1] = &res[i];
+		}
+
 	} else if(bus->self) {
 		int i;
 
 		pci_read_bridge_bases(bus);
 
 
-		for(i = 0; i < PCI_NUM_RESOURCES; i++) {
+		for(i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
 			if((bus->self->resource[i].flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
 				continue;
 			
@@ -642,11 +650,10 @@ dino_fixup_bus(struct pci_bus *bus)
 		 * care about an expansion rom on parisc, since it
 		 * usually contains (x86) bios code) */
 		dev->resource[PCI_ROM_RESOURCE].flags = 0;
-		dev->resource[PCI_ROM_RESOURCE].start = 0;
-		dev->resource[PCI_ROM_RESOURCE].end = 0;
 				
 		if(dev->irq == 255) {
 
+#define DINO_FIX_UNASSIGNED_INTERRUPTS
 #ifdef DINO_FIX_UNASSIGNED_INTERRUPTS
 
 			/* This code tries to assign an unassigned
@@ -660,7 +667,7 @@ dino_fixup_bus(struct pci_bus *bus)
 			dino_cfg_read(dev->bus, dev->devfn, PCI_INTERRUPT_PIN, 1, &irq_pin);
 			dev->irq = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
 			dino_cfg_write(dev->bus, dev->devfn, PCI_INTERRUPT_LINE, 1, dev->irq);
-			dev->irq += dino_dev->dino_region->data.irqbase
+			dev->irq += dino_dev->dino_region->data.irqbase;
 			printk(KERN_WARNING "Device %s has undefined IRQ, setting to %d\n", dev->slot_name, irq_pin);
 #else
 			dev->irq = 65535;
@@ -741,9 +748,9 @@ dino_card_init(struct dino_device *dino_dev)
 static int __init
 dino_bridge_init(struct dino_device *dino_dev, const char *name)
 {
-	unsigned long io_addr, bpos;
-	int result;
-	struct resource *res;
+	unsigned long io_addr;
+	int result, i, count=0;
+	struct resource *res, *prevres = NULL;
 	/*
 	 * Decoding IO_ADDR_EN only works for Built-in Dino
 	 * since PDC has already initialized this.
@@ -755,21 +762,51 @@ dino_bridge_init(struct dino_device *dino_dev, const char *name)
 		return -ENODEV;
 	}
 
-	for (bpos = 0; (io_addr & (1 << bpos)) == 0; bpos++)
-		;
-
 	res = &dino_dev->hba.lmmio_space;
-	res->flags = IORESOURCE_MEM;
+	for (i = 0; i < 32; i++) {
+		unsigned long start, end;
 
-	res->start = (unsigned long)(signed int)(0xf0000000 | (bpos << 23));
-	res->end = res->start + 8 * 1024 * 1024 - 1;
+		if((io_addr & (1 << i)) == 0)
+			continue;
 
-	result = ccio_request_resource(dino_dev->hba.dev, res);
-	if (result < 0) {
-		printk(KERN_ERR "%s: failed to claim PCI Bus address space!\n", name);
-		return result;
+		start = (unsigned long)(signed int)(0xf0000000 | (i << 23));
+		end = start + 8 * 1024 * 1024 - 1;
+
+		DBG("DINO RANGE %d is at 0x%lx-0x%lx\n", count,
+		    start, end);
+
+		if(prevres && prevres->end + 1 == start) {
+			prevres->end = end;
+		} else {
+			if(count >= DINO_MAX_LMMIO_RESOURCES) {
+				printk(KERN_ERR "%s is out of resource windows for range %d (0x%lx-0x%lx)\n", name, count, start, end);
+				break;
+			}
+			prevres = res;
+			res->start = start;
+			res->end = end;
+			res->flags = IORESOURCE_MEM;
+			res->name = kmalloc(64, GFP_KERNEL);
+			if(res->name)
+				snprintf((char *)res->name, 64, "%s LMMIO %d",
+					 name, count);
+			res++;
+			count++;
+		}
 	}
 
+	res = &dino_dev->hba.lmmio_space;
+
+	for(i = 0; i < DINO_MAX_LMMIO_RESOURCES; i++) {
+		if(res[i].flags == 0)
+			break;
+
+		result = ccio_request_resource(dino_dev->hba.dev, &res[i]);
+		if (result < 0) {
+			printk(KERN_ERR "%s: failed to claim PCI Bus address space %d (0x%lx-0x%lx)!\n", name, i, res[i].start, res[i].end);
+			return result;
+		}
+	}
 	return 0;
 }
 
@@ -850,10 +887,8 @@ static int __init dino_common_init(struct parisc_device *dev,
 	res = &dino_dev->hba.io_space;
 	if (dev->id.hversion == 0x680 || is_card_dino(&dev->id)) {
 		res->name = "Dino I/O Port";
-	        dino_dev->hba.lmmio_space.name = "Dino LMMIO";
 	} else {
 		res->name = "Cujo I/O Port";
-	        dino_dev->hba.lmmio_space.name = "Cujo LMMIO";
 	}
 	res->start = HBA_PORT_BASE(dino_dev->hba.hba_num);
 	res->end = res->start + (HBA_PORT_SPACE_SIZE - 1);

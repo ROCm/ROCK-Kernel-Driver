@@ -588,18 +588,18 @@ sti_select_font(struct sti_cooked_rom *rom,
 static void __init 
 sti_dump_rom(struct sti_rom *rom)
 {
-        printk(KERN_INFO "STI id %04x-%04x, conforms to spec rev. %d.%02x\n",
+        printk(KERN_INFO "    id %04x-%04x, conforms to spec rev. %d.%02x\n",
 		rom->graphics_id[0], 
 		rom->graphics_id[1],
 		rom->revno[0] >> 4, 
 		rom->revno[0] & 0x0f);
-	DPRINTK((" supports %d monitors\n", rom->num_mons));
-	DPRINTK((" font start %08x\n", rom->font_start));
-	DPRINTK((" region list %08x\n", rom->region_list));
-	DPRINTK((" init_graph %08x\n", rom->init_graph));
-	DPRINTK((" bus support %02x\n", rom->bus_support));
-	DPRINTK((" ext bus support %02x\n", rom->ext_bus_support));
-	DPRINTK((" alternate code type %d\n", rom->alt_code_type));
+	DPRINTK(("      supports %d monitors\n", rom->num_mons));
+	DPRINTK(("      font start %08x\n", rom->font_start));
+	DPRINTK(("      region list %08x\n", rom->region_list));
+	DPRINTK(("      init_graph %08x\n", rom->init_graph));
+	DPRINTK(("      bus support %02x\n", rom->bus_support));
+	DPRINTK(("      ext bus support %02x\n", rom->ext_bus_support));
+	DPRINTK(("      alternate code type %d\n", rom->alt_code_type));
 }
 
 
@@ -869,14 +869,14 @@ test_rom:
 	ok = 0;
 	
 	if ((sig & 0xff) == 0x01) {
-		printk(KERN_INFO "STI byte mode ROM at %08lx, hpa at %08lx\n",
-		       address, hpa);
+		DPRINTK(("    byte mode ROM at %08lx, hpa at %08lx\n",
+		       address, hpa));
 		ok = sti_read_rom(0, sti, address);
 	}
 
 	if ((sig & 0xffff) == 0x0303) {
-		printk(KERN_INFO "STI word mode ROM at %08lx, hpa at %08lx\n",
-		       address, hpa);
+		DPRINTK(("    word mode ROM at %08lx, hpa at %08lx\n",
+		       address, hpa));
 		ok = sti_read_rom(1, sti, address);
 	}
 
@@ -903,7 +903,7 @@ test_rom:
 	sti_dump_globcfg(sti->glob_cfg, sti->sti_mem_request);
 	sti_dump_outptr(sti);
 	
-	printk(KERN_INFO "STI device: %s\n", sti->outptr.dev_name );
+	printk(KERN_INFO "    graphics card name: %s\n", sti->outptr.dev_name );
 
 	sti_roms[num_sti_roms] = sti;
 	num_sti_roms++;

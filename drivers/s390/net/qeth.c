@@ -9802,28 +9802,28 @@ static int
 qeth_get_internal_functions(void)
 {
 	struct net_device *dev;
-
-	dev = (struct net_device *) kmalloc(sizeof (struct net_device),
-					    GFP_KERNEL);
+#ifdef CONFIG_NET_ETHERNET
+	dev = alloc_etherdev(0);
 	if (!dev) {
 		PRINT_ERR("Not enough memory for internal functions.\n");
 		return -ENOMEM;
 	}
-#ifdef CONFIG_NET_ETHERNET
-	ether_setup(dev);
 	qeth_my_eth_header = dev->hard_header;
 	qeth_my_eth_rebuild_header = dev->rebuild_header;
 	qeth_my_eth_header_cache = dev->hard_header_cache;
 	qeth_my_eth_header_cache_update = dev->header_cache_update;
+	free_netdev(dev);
 #endif
 #ifdef CONFIG_TR
-	tr_setup(dev);
+	dev = alloc_trdev(0);
+	if (!dev) {
+		PRINT_ERR("Not enough memory for internal functions.\n");
+		return -ENOMEM;
+	}
 	qeth_my_tr_header = dev->hard_header;
 	qeth_my_tr_rebuild_header = dev->rebuild_header;
+	free_netdev(dev);
 #endif
-
-	kfree(dev);
-
 	return 0;
 }
 
