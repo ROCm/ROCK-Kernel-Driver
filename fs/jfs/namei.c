@@ -24,10 +24,12 @@
 #include "jfs_dmap.h"
 #include "jfs_unicode.h"
 #include "jfs_metapage.h"
+#include "jfs_xattr.h"
 #include "jfs_debug.h"
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
+extern struct inode_operations jfs_special_inode_operations;
 extern struct file_operations jfs_file_operations;
 extern struct address_space_operations jfs_aops;
 
@@ -913,6 +915,14 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 		i_fastsymlink = JFS_IP(ip)->i_inline;
 		memcpy(i_fastsymlink, name, ssize);
 		ip->i_size = ssize - 1;
+
+		/*
+		 * if symlink is > 128 bytes, we don't have the space to
+		 * store inline extended attributes
+		 */
+		if (ssize > sizeof (JFS_IP(ip)->i_inline))
+			JFS_IP(ip)->mode2 &= ~INLINEEA;
+
 		jFYI(1,
 		     ("jfs_symlink: fast symlink added  ssize:%d name:%s \n",
 		      ssize, name));
@@ -1328,6 +1338,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
 		goto out3;
 
+	ip->i_op = &jfs_special_inode_operations;
 	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);
@@ -1431,6 +1442,10 @@ struct inode_operations jfs_dir_inode_operations = {
 	.rmdir		= jfs_rmdir,
 	.mknod		= jfs_mknod,
 	.rename		= jfs_rename,
+	.setxattr	= jfs_setxattr,
+	.getxattr	= jfs_getxattr,
+	.listxattr	= jfs_listxattr,
+	.removexattr	= jfs_removexattr,
 };
 
 struct file_operations jfs_dir_operations = {
