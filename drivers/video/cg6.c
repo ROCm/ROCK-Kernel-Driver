@@ -480,15 +480,47 @@ cg6_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map cg6_mmap_map[] = {
-	{ CG6_FBC,		CG6_FBC_OFFSET,		PAGE_SIZE 		},
-	{ CG6_TEC,		CG6_TEC_OFFSET,		PAGE_SIZE 		},
-	{ CG6_BTREGS,		CG6_BROOKTREE_OFFSET,	PAGE_SIZE 		},
-	{ CG6_FHC,		CG6_FHC_OFFSET,		PAGE_SIZE 		},
-	{ CG6_THC,		CG6_THC_OFFSET,		PAGE_SIZE 		},
-	{ CG6_ROM,		CG6_ROM_OFFSET,		0x10000   		},
-	{ CG6_RAM,		CG6_RAM_OFFSET,		SBUS_MMAP_FBSIZE(1)  	},
-	{ CG6_DHC,		CG6_DHC_OFFSET,		0x40000   		},
-	{ 0,			0,			0	  		}
+	{
+		.voff	= CG6_FBC,
+		.poff	= CG6_FBC_OFFSET,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= CG6_TEC,
+		.poff	= CG6_TEC_OFFSET,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= CG6_BTREGS,
+		.poff	= CG6_BROOKTREE_OFFSET,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= CG6_FHC,
+		.poff	= CG6_FHC_OFFSET,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= CG6_THC,
+		.poff	= CG6_THC_OFFSET,
+		.size	= PAGE_SIZE
+	},
+	{
+		.voff	= CG6_ROM,
+		.poff	= CG6_ROM_OFFSET,
+		.size	= 0x10000
+	},
+	{
+		.voff	= CG6_RAM,
+		.poff	= CG6_RAM_OFFSET,
+		.size	= SBUS_MMAP_FBSIZE(1)
+	},
+	{
+		.voff	= CG6_DHC,
+		.poff	= CG6_DHC_OFFSET,
+		.size	= 0x40000
+	},
+	{ .size	= 0 }
 };
 
 static int cg6_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)
