@@ -2225,6 +2225,15 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	 */
 	tty_register_device(drv->tty_driver, port->line, port->dev);
 
+	/*
+	 * If this driver supports console, and it hasn't been
+	 * successfully registered yet, try to re-register it.
+	 * It may be that the port was not available.
+	 */
+	if (port->type != PORT_UNKNOWN &&
+	    port->cons && !(port->cons->flags & CON_ENABLED))
+		register_console(port->cons);
+
  out:
 	up(&port_sem);
 
