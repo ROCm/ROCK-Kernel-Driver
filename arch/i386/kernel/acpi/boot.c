@@ -420,6 +420,15 @@ acpi_boot_init (void)
 		return 1;
         }
 
+	/*
+ 	 * if "noapic" boot option, don't look for IO-APICs
+	 */
+	if (skip_ioapic_setup) {
+		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
+			"due to 'noapic' option.\n");
+		return 1;
+	}
+
 	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
 	if (!result) { 
 		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
