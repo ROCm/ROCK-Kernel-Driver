@@ -55,7 +55,7 @@ config I2C_AMD8111
 
 config I2C_I801
 	tristate "  Intel 801"
-	depends on I2C && I2C_PROC
+	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  801 family of mainboard I2C interfaces.  Specifically, the following
@@ -71,6 +71,29 @@ config I2C_I801
 	  say M here and read <file:Documentation/modules.txt>.
 
 	  The module will be called i2c-i801.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+config I2C_PIIX4
+	tristate "  Intel PIIX4"
+	depends on I2C && I2C_PROC && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the Intel
+	  PIIX4 family of mainboard I2C interfaces.  Specifically, the following
+	  versions of the chipset is supported:
+	    Intel PIIX4
+	    Intel 440MX
+	    Serverworks OSB4
+	    Serverworks CSB5
+	    SMSC Victory66
+
+	  This can also be built as a module which can be inserted and removed 
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-piix4.
 
 	  You will also need the latest user-space utilties: you can find them
 	  in the lm_sensors package, which you can download at 
