@@ -624,7 +624,7 @@ repeat:
 			}
 			goto end_waitsys;
 
-		case TASK_ZOMBIE:
+		case EXIT_ZOMBIE:
 			current->signal->cutime += p->utime + p->signal->cutime;
 			current->signal->cstime += p->stime + p->signal->cstime;
 			if (ru != NULL)
