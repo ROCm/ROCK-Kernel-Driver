@@ -33,17 +33,8 @@ void dma_free_coherent(struct device *dev, size_t size, void *vaddr, dma_addr_t 
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-static inline
-dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
-			  enum dma_data_direction direction)
-{
-	if (direction == DMA_NONE)
-                BUG();
-
-	frv_cache_wback_inv((unsigned long) ptr, (unsigned long) ptr + size);
-
-	return virt_to_bus(ptr);
-}
+extern dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
+				 enum dma_data_direction direction);
 
 /*
  * Unmap a single streaming mode DMA translation.  The dma_addr and size
@@ -76,21 +67,8 @@ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
  * Device ownership issues as mentioned above for pci_map_single are
  * the same here.
  */
-static inline
-int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-	       enum dma_data_direction direction)
-{
-	int i;
-
-	for (i=0; i<nents; i++)
-		frv_cache_wback_inv(sg_dma_address(&sg[i]),
-				    sg_dma_address(&sg[i]) + sg_dma_len(&sg[i]));
-
-	if (direction == DMA_NONE)
-                BUG();
-
-	return nents;
-}
+extern int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+		      enum dma_data_direction direction);
 
 /*
  * Unmap a set of streaming mode DMA translations.
@@ -104,13 +82,9 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 	BUG_ON(direction == DMA_NONE);
 }
 
-static inline
+extern
 dma_addr_t dma_map_page(struct device *dev, struct page *page, unsigned long offset,
-			size_t size, enum dma_data_direction direction)
-{
-	BUG_ON(direction == DMA_NONE);
-	return (dma_addr_t)(page_to_pfn(page)) * PAGE_SIZE + offset;
-}
+			size_t size, enum dma_data_direction direction);
 
 static inline
 void dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,

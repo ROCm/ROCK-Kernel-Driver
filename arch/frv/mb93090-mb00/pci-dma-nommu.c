@@ -1,7 +1,7 @@
-/* pci-dma.c: Dynamic DMA mapping support for the FRV CPUs that have MMUs
+/* pci-dma-nommu.c: Dynamic DMA mapping support for the FRV
  *
  * Copyright (C) 2004 Red Hat, Inc. All Rights Reserved.
- * Written by David Howells (dhowells@redhat.com)
+ * Written by David Woodhouse (dwmw2@redhat.com)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,23 +14,92 @@
 #include <linux/dma-mapping.h>
 #include <linux/list.h>
 #include <linux/pci.h>
-#include <linux/highmem.h>
 #include <asm/io.h>
+
+#if 1
+#define DMA_SRAM_START	dma_coherent_mem_start
+#define DMA_SRAM_END	dma_coherent_mem_end
+#else // Use video RAM on Matrox
+#define DMA_SRAM_START	0xe8900000
+#define DMA_SRAM_END	0xe8a00000
+#endif
+
+struct dma_alloc_record {
+	struct list_head	list;
+	unsigned long		ofs;
+	unsigned long		len;
+};
+
+static spinlock_t dma_alloc_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(dma_alloc_list);
 
 void *dma_alloc_coherent(struct device *hwdev, size_t size, dma_addr_t *dma_handle, int gfp)
 {
-	void *ret;
+	struct dma_alloc_record *new;
+	struct list_head *this = &dma_alloc_list;
+	unsigned long flags;
+	unsigned long start = DMA_SRAM_START;
+	unsigned long end;
 
-	ret = consistent_alloc(gfp, size, dma_handle);
-	if (ret)
-		memset(ret, 0, size);
+	if (!DMA_SRAM_START) {
+		printk("%s called without any DMA area reserved!\n", __func__);
+		return NULL;
+	}
 
-	return ret;
+	new = kmalloc(sizeof (*new), GFP_ATOMIC);
+	if (!new)
+		return NULL;
+
+	/* Round up to a reasonable alignment */
+	new->len = (size + 31) & ~31;
+
+	spin_lock_irqsave(&dma_alloc_lock, flags);
+
+	list_for_each (this, &dma_alloc_list) {
+		struct dma_alloc_record *this_r = list_entry(this, struct dma_alloc_record, list);
+		end = this_r->ofs;
+
+		if (end - start >= size)
+			goto gotone;
+
+		start = this_r->ofs + this_r->len;
+	}
+	/* Reached end of list. */
+	end = DMA_SRAM_END;
+	this = &dma_alloc_list;
+
+	if (end - start >= size) {
+	gotone:
+		new->ofs = start;
+		list_add_tail(&new->list, this);
+		spin_unlock_irqrestore(&dma_alloc_lock, flags);
+
+		*dma_handle = start;
+		return (void *)start;
+	}
+
+	kfree(new);
+	spin_unlock_irqrestore(&dma_alloc_lock, flags);
+	return NULL;
 }
 
 void dma_free_coherent(struct device *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
-	consistent_free(vaddr);
+	struct dma_alloc_record *rec;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dma_alloc_lock, flags);
+
+	list_for_each_entry(rec, &dma_alloc_list, list) {
+		if (rec->ofs == dma_handle) {
+			list_del(&rec->list);
+			kfree(rec);
+			spin_unlock_irqrestore(&dma_alloc_lock, flags);
+			return;
+		}
+	}
+	spin_unlock_irqrestore(&dma_alloc_lock, flags);
+	BUG();
 }
 
 /*
@@ -70,36 +139,14 @@ dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
 int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	       enum dma_data_direction direction)
 {
-	unsigned long dampr2;
-	void *vaddr;
 	int i;
+
+	for (i=0; i<nents; i++)
+		frv_cache_wback_inv(sg_dma_address(&sg[i]),
+				    sg_dma_address(&sg[i]) + sg_dma_len(&sg[i]));
 
 	if (direction == DMA_NONE)
                 BUG();
 
-	dampr2 = __get_DAMPR(2);
-
-	for (i = 0; i < nents; i++) {
-		vaddr = kmap_atomic(sg[i].page, __KM_CACHE);
-
-		frv_dcache_writeback((unsigned long) vaddr,
-				     (unsigned long) vaddr + PAGE_SIZE);
-
-	}
-
-	kunmap_atomic(vaddr, __KM_CACHE);
-	if (dampr2) {
-		__set_DAMPR(2, dampr2);
-		__set_IAMPR(2, dampr2);
-	}
-
 	return nents;
-}
-
-dma_addr_t dma_map_page(struct device *dev, struct page *page, unsigned long offset,
-			size_t size, enum dma_data_direction direction)
-{
-	BUG_ON(direction == DMA_NONE);
-	flush_dcache_page(page);
-	return (dma_addr_t) page_to_phys(page) + offset;
 }
