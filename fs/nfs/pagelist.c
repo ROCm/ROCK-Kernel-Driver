@@ -53,7 +53,7 @@ static int nfs_try_to_free_pages(struct nfs_server *);
 
 /**
  * nfs_create_request - Create an NFS read/write request.
- * @file: file that owns this request
+ * @cred: RPC credential to use
  * @inode: inode to which the request is attached
  * @page: page to write
  * @offset: starting offset within the page for the write
@@ -66,7 +66,7 @@ static int nfs_try_to_free_pages(struct nfs_server *);
  * User should ensure it is safe to sleep in this function.
  */
 struct nfs_page *
-nfs_create_request(struct file *file, struct inode *inode,
+nfs_create_request(struct rpc_cred *cred, struct inode *inode,
 		   struct page *page,
 		   unsigned int offset, unsigned int count)
 {
@@ -107,16 +107,37 @@ nfs_create_request(struct file *file, struct inode *inode,
 	req->wb_offset  = offset;
 	req->wb_bytes   = count;
 
-	/* If we have a struct file, use its cached credentials */
-	if (file) {
-		req->wb_file    = file;
-		get_file(file);
-		req->wb_cred	= nfs_file_cred(file);
-	}
+	if (cred)
+		req->wb_cred = get_rpccred(cred);
 	req->wb_inode   = inode;
 	req->wb_count   = 1;
 
 	return req;
+}
+
+/**
+ * nfs_clear_request - Free up all resources allocated to the request
+ * @req:
+ *
+ * Release all resources associated with a write request after it
+ * has completed.
+ */
+void nfs_clear_request(struct nfs_page *req)
+{
+	/* Release struct file or cached credential */
+	if (req->wb_file) {
+		fput(req->wb_file);
+		req->wb_file = NULL;
+	}
+	if (req->wb_cred) {
+		put_rpccred(req->wb_cred);
+		req->wb_cred = NULL;
+	}
+	if (req->wb_page) {
+		page_cache_release(req->wb_page);
+		req->wb_page = NULL;
+		atomic_dec(&NFS_REQUESTLIST(req->wb_inode)->nr_requests);
+	}
 }
 
 
@@ -124,17 +145,11 @@ nfs_create_request(struct file *file, struct inode *inode,
  * nfs_release_request - Release the count on an NFS read/write request
  * @req: request to release
  *
- * Release all resources associated with a write request after it
- * has been committed to stable storage
- *
  * Note: Should never be called with the spinlock held!
  */
 void
 nfs_release_request(struct nfs_page *req)
 {
-	struct inode		*inode = req->wb_inode;
-	struct nfs_reqlist	*cache = NFS_REQUESTLIST(inode);
-
 	spin_lock(&nfs_wreq_lock);
 	if (--req->wb_count) {
 		spin_unlock(&nfs_wreq_lock);
@@ -142,7 +157,6 @@ nfs_release_request(struct nfs_page *req)
 	}
 	__nfs_del_lru(req);
 	spin_unlock(&nfs_wreq_lock);
-	atomic_dec(&cache->nr_requests);
 
 #ifdef NFS_PARANOIA
 	if (!list_empty(&req->wb_list))
@@ -151,16 +165,12 @@ nfs_release_request(struct nfs_page *req)
 		BUG();
 	if (NFS_WBACK_BUSY(req))
 		BUG();
-	if (atomic_read(&cache->nr_requests) < 0)
+	if (atomic_read(&NFS_REQUESTLIST(req->wb_inode)->nr_requests) < 0)
 		BUG();
 #endif
 
 	/* Release struct file or cached credential */
-	if (req->wb_file)
-		fput(req->wb_file);
-	else if (req->wb_cred)
-		put_rpccred(req->wb_cred);
-	page_cache_release(req->wb_page);
+	nfs_clear_request(req);
 	nfs_page_free(req);
 }
 

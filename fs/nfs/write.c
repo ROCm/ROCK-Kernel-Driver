@@ -354,6 +354,7 @@ nfs_inode_remove_request(struct nfs_page *req)
 		iput(inode);
 	} else
 		spin_unlock(&nfs_wreq_lock);
+	nfs_clear_request(req);
 	nfs_release_request(req);
 }
 
@@ -684,9 +685,13 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		}
 		spin_unlock(&nfs_wreq_lock);
 
-		new = nfs_create_request(file, inode, page, offset, bytes);
+		new = nfs_create_request(nfs_file_cred(file), inode, page, offset, bytes);
 		if (IS_ERR(new))
 			return new;
+		if (file) {
+			new->wb_file = file;
+			get_file(file);
+		}
 		/* If the region is locked, adjust the timeout */
 		if (region_locked(inode, new))
 			new->wb_timeout = jiffies + NFS_WRITEBACK_LOCKDELAY;

@@ -250,7 +250,9 @@ extern struct address_space_operations nfs_file_aops;
 static __inline__ struct rpc_cred *
 nfs_file_cred(struct file *file)
 {
-	struct rpc_cred *cred = (struct rpc_cred *)(file->private_data);
+	struct rpc_cred *cred = NULL;
+	if (file)
+		cred = (struct rpc_cred *)file->private_data;
 #ifdef RPC_DEBUG
 	if (cred && cred->cr_magic != RPCAUTH_CRED_MAGIC)
 		BUG();

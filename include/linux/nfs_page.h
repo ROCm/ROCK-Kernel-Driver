@@ -41,9 +41,10 @@ struct nfs_page {
 
 #define NFS_WBACK_BUSY(req)	(test_bit(PG_BUSY,&(req)->wb_flags))
 
-extern	struct nfs_page *nfs_create_request(struct file *, struct inode *,
+extern	struct nfs_page *nfs_create_request(struct rpc_cred *, struct inode *,
 					    struct page *,
 					    unsigned int, unsigned int);
+extern	void nfs_clear_request(struct nfs_page *req);
 extern	void nfs_release_request(struct nfs_page *req);
 
 
