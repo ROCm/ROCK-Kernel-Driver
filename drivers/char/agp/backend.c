@@ -261,7 +261,7 @@ int agp_register_driver (struct pci_dev *dev)
 	return 0;
 }
 
-int __exit agp_unregister_driver(void)
+int agp_unregister_driver(void)
 {
 	agp_bridge.type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
@@ -269,6 +269,14 @@ int __exit agp_unregister_driver(void)
 	agp_backend_cleanup();
 	inter_module_unregister("drm_agp");
 	agp_count--;
+	return 0;
+}
+
+int __exit agp_exit(void)
+{
+	if (agp_count==0)
+		return -EBUSY;
+
 	return 0;
 }
 
@@ -291,6 +299,7 @@ int __init agp_init(void)
 
 #ifndef CONFIG_GART_IOMMU
 module_init(agp_init);
+module_exit(agp_exit);
 #endif
 
 EXPORT_SYMBOL(agp_backend_acquire);
