@@ -151,6 +151,9 @@ struct saa7134_format {
 #define SAA7134_BOARD_MANLI_MTV001     28
 #define SAA7134_BOARD_TG3000TV         29
 #define SAA7134_BOARD_ECS_TVP3XP       30
+#define SAA7134_BOARD_ECS_TVP3XP_4CB5  31
+#define SAA7134_BOARD_AVACSSMARTTV     32
+#define SAA7134_BOARD_AVERMEDIA_DVD_EZMAKER 33
 
 #define SAA7134_INPUT_MAX 8
 
@@ -212,10 +215,10 @@ struct saa7134_pgtable {
 
 /* tvaudio thread status */
 struct saa7134_thread {
-	struct task_struct         *task;
+	pid_t                      pid;
+	struct completion          exit;
 	wait_queue_head_t          wq;
-	struct semaphore           *notify;
-	unsigned int               exit;
+	unsigned int               shutdown;
 	unsigned int               scan1;
 	unsigned int               scan2;
 	unsigned int               mode;
@@ -319,6 +322,9 @@ struct saa7134_ir {
 	u32                        mask_keycode;
 	u32                        mask_keydown;
 	u32                        mask_keyup;
+        int                        polling;
+        u32                        last_gpio;
+        struct timer_list          timer;
 };
 
 /* global device status */
