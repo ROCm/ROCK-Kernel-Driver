@@ -185,7 +185,7 @@ find_safe_buffer(struct dmabounce_device_info *device_info, dma_addr_t safe_dma_
 static inline void
 free_safe_buffer(struct dmabounce_device_info *device_info, struct safe_buffer *buf)
 {
-	dev_dbg(dev_info->dev, "%s(buf=%p)\n", __func__, buf);
+	dev_dbg(device_info->dev, "%s(buf=%p)\n", __func__, buf);
 
 	list_del(&buf->node);
 
