@@ -78,6 +78,11 @@ struct cache_detail {
 	int			(*cache_parse)(struct cache_detail *,
 					       char *buf, int len);
 
+	int			(*cache_show)(struct seq_file *m,
+					      struct cache_detail *cd,
+					      struct cache_head *h,
+					      char *pbuf);
+
 	/* fields below this comment are for internal use
 	 * and should not be touched by cache owners
 	 */

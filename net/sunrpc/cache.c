@@ -22,6 +22,7 @@
 #include <linux/ctype.h>
 #include <asm/uaccess.h>
 #include <linux/poll.h>
+#include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/net.h>
 #include <asm/ioctls.h>
@@ -160,7 +161,8 @@ static spinlock_t cache_list_lock = SPIN_LOCK_UNLOCKED;
 static struct cache_detail *current_detail;
 static int current_index;
 
-struct file_operations cache_file_operations;
+static struct file_operations cache_file_operations;
+static struct file_operations content_file_operations;
 
 void cache_register(struct cache_detail *cd)
 {
@@ -169,13 +171,24 @@ void cache_register(struct cache_detail *cd)
 		struct proc_dir_entry *p;
 		cd->proc_ent->owner = THIS_MODULE;
 		
-		p = create_proc_entry("channel", S_IFREG|S_IRUSR|S_IWUSR,
-				      cd->proc_ent);
-		if (p) {
-			p->proc_fops = &cache_file_operations;
-			p->owner = THIS_MODULE;
-			p->data = cd;
+		if (cd->cache_request || cd->cache_parse) {
+			p = create_proc_entry("channel", S_IFREG|S_IRUSR|S_IWUSR,
+					      cd->proc_ent);
+			if (p) {
+				p->proc_fops = &cache_file_operations;
+				p->owner = THIS_MODULE;
+				p->data = cd;
+			}
 		}
+ 		if (cd->cache_show) {
+ 			p = create_proc_entry("content", S_IFREG|S_IRUSR|S_IWUSR,
+ 					      cd->proc_ent);
+ 			if (p) {
+ 				p->proc_fops = &content_file_operations;
+ 				p->owner = THIS_MODULE;
+ 				p->data = cd;
+ 			}
+ 		}
 	}
 	rwlock_init(&cd->hash_lock);
 	INIT_LIST_HEAD(&cd->queue);
@@ -710,7 +723,7 @@ cache_release(struct inode *inode, struct file *filp)
 
 
 
-struct file_operations cache_file_operations = {
+static struct file_operations cache_file_operations = {
 	.llseek		= no_llseek,
 	.read		= cache_read,
 	.write		= cache_write,
@@ -927,3 +940,146 @@ int qword_get(char **bpp, char *dest, int bufsize)
 	*dest = '\0';
 	return len;
 }
+
+
+/*
+ * support /proc/sunrpc/cache/$CACHENAME/content
+ * as a seqfile.
+ * We call ->cache_show passing NULL for the item to
+ * get a header, then pass each real item in the cache
+ */
+
+struct handle {
+	struct cache_detail *cd;
+	char 		    *pbuf;
+};
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	loff_t n = *pos;
+	unsigned hash, entry;
+	struct cache_head *ch;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
+	
+
+	read_lock(&cd->hash_lock);
+	if (!n--)
+		return (void *)1;
+	hash = n >> 32;
+	entry = n & ((1LL<<32) - 1);
+
+	for (ch=cd->hash_table[hash]; ch; ch=ch->next)
+		if (!entry--)
+			return ch;
+	n &= ~((1LL<<32) - 1);
+	do {
+		hash++;
+		n += 1LL<<32;
+	} while(hash < cd->hash_size && 
+		cd->hash_table[hash]==NULL);
+	if (hash >= cd->hash_size)
+		return NULL;
+	*pos = n+1;
+	return cd->hash_table[hash];
+}
+
+static void *c_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	struct cache_head *ch = p;
+	int hash = (*pos >> 32);
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
+
+	if (p == (void *)1)
+		hash = 0;
+	else if (ch->next == NULL) {
+		hash++;
+		*pos += 1LL<<32;
+	} else {
+		++*pos;
+		return ch->next;
+	}
+	*pos &= ~((1LL<<32) - 1);
+	while (hash < cd->hash_size &&
+	       cd->hash_table[hash] == NULL) {
+		hash++;
+		*pos += 1LL<<32;
+	}
+	if (hash >= cd->hash_size)
+		return NULL;
+	++*pos;
+	return cd->hash_table[hash];
+}
+
+static void c_stop(struct seq_file *m, void *p)
+{
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
+	read_unlock(&cd->hash_lock);
+}
+
+static int c_show(struct seq_file *m, void *p)
+{
+	struct cache_head *cp = p;
+	struct cache_detail *cd = ((struct handle*)m->private)->cd;
+	char *pbuf = ((struct handle*)m->private)->pbuf;
+
+	if (p == (void *)1)
+		return cd->cache_show(m, cd, NULL, pbuf);
+
+	cache_get(cp);
+	if (cache_check(cd, cp, NULL))
+		return 0;
+	cache_put(cp, cd);
+
+	return cd->cache_show(m, cd, cp, pbuf);
+}
+
+struct seq_operations cache_content_op = {
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= c_show,
+};
+
+static int content_open(struct inode *inode, struct file *file)
+{
+	int res;
+	char *namebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	struct handle *han;
+	struct cache_detail *cd = PDE(inode)->data;
+
+	if (namebuf == NULL)
+		return -ENOMEM;
+
+	han = kmalloc(sizeof(*han), GFP_KERNEL);
+	if (han == NULL) {
+		kfree(namebuf);
+		return -ENOMEM;
+	}
+	han->pbuf = namebuf;
+	han->cd = cd;
+
+	res = seq_open(file, &cache_content_op);
+	if (res) {
+		kfree(namebuf);
+		kfree(han);
+	} else
+		((struct seq_file *)file->private_data)->private = han;
+
+	return res;
+}
+static int content_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *m = (struct seq_file *)file->private_data;
+	struct handle *han = m->private;
+	kfree(han->pbuf);
+	kfree(han);
+	m->private = NULL;
+	return seq_release(inode, file);
+}
+
+static struct file_operations content_file_operations = {
+	.open		= content_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= content_release,
+};
