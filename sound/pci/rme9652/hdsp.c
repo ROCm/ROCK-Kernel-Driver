@@ -4445,7 +4445,7 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 		int i;
 		
 		if (hdsp->io_type == H9652) {
-			unsigned long rms_low, rms_high;
+			u32 rms_low, rms_high;
 			int doublespeed = 0;
 			if (hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DoubleSpeedStatus)
 				doublespeed = 1;
@@ -4620,7 +4620,7 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 	}
 	case SNDRV_HDSP_IOCTL_UPLOAD_FIRMWARE: {
 		hdsp_firmware_t __user *firmware;
-		unsigned long __user *firmware_data;
+		u32 __user *firmware_data;
 		int err;
 		
 		if (hdsp->io_type == H9652 || hdsp->io_type == H9632) return -EINVAL;
@@ -4638,7 +4638,7 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 			return -EIO;
 		}
 
-		if (copy_from_user(hdsp->firmware_cache, firmware_data, sizeof(unsigned long)*24413) != 0) {
+		if (copy_from_user(hdsp->firmware_cache, firmware_data, sizeof(hdsp->firmware_cache)) != 0) {
 			return -EFAULT;
 		}
 		
