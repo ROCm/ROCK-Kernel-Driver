@@ -1149,6 +1149,7 @@ static void sync_request_write(mddev_t *mddev, r10bio_t *r10_bio)
 		atomic_inc(&r10_bio->remaining);
 		md_sync_acct(conf->mirrors[d].rdev->bdev, tbio->bi_size >> 9);
 
+		tbio->bi_sector += conf->mirrors[d].rdev->data_offset;
 		generic_make_request(tbio);
 	}
 

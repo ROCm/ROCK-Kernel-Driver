@@ -60,7 +60,7 @@
  */
 #define MD_MAJOR_VERSION                0
 #define MD_MINOR_VERSION                90
-#define MD_PATCHLEVEL_VERSION           0
+#define MD_PATCHLEVEL_VERSION           1
 
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);

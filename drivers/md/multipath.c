@@ -190,6 +190,7 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	multipath = conf->multipaths + mp_bh->path;
 
 	mp_bh->bio = *bio;
+	mp_bh->bio.bi_sector += multipath->rdev->data_offset;
 	mp_bh->bio.bi_bdev = multipath->rdev->bdev;
 	mp_bh->bio.bi_rw |= (1 << BIO_RW_FAILFAST);
 	mp_bh->bio.bi_end_io = multipath_end_request;
@@ -410,6 +411,7 @@ static void multipathd (mddev_t *mddev)
 				bdevname(bio->bi_bdev,b),
 				(unsigned long long)bio->bi_sector);
 			*bio = *(mp_bh->master_bio);
+			bio->bi_sector += conf->multipaths[mp_bh->path].rdev->data_offset;
 			bio->bi_bdev = conf->multipaths[mp_bh->path].rdev->bdev;
 			bio->bi_rw |= (1 << BIO_RW_FAILFAST);
 			bio->bi_end_io = multipath_end_request;

@@ -748,7 +748,7 @@ static unsigned int calc_sb_1_csum(struct mdp_superblock_1 * sb)
 {
 	unsigned int disk_csum, csum;
 	unsigned long long newcsum;
-	int size = 256 + sb->max_dev*2;
+	int size = 256 + le32_to_cpu(sb->max_dev)*2;
 	unsigned int *isuper = (unsigned int*)sb;
 	int i;
 
@@ -763,7 +763,7 @@ static unsigned int calc_sb_1_csum(struct mdp_superblock_1 * sb)
 
 	csum = (newcsum & 0xffffffff) + (newcsum >> 32);
 	sb->sb_csum = disk_csum;
-	return csum;
+	return cpu_to_le32(csum);
 }
 
 static int super_1_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version)
@@ -785,7 +785,7 @@ static int super_1_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version)
 	case 0:
 		sb_offset = rdev->bdev->bd_inode->i_size >> 9;
 		sb_offset -= 8*2;
-		sb_offset &= ~(4*2);
+		sb_offset &= ~(4*2-1);
 		/* convert from sectors to K */
 		sb_offset /= 2;
 		break;
@@ -816,6 +816,11 @@ static int super_1_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version)
 	if (calc_sb_1_csum(sb) != sb->sb_csum) {
 		printk("md: invalid superblock checksum on %s\n",
 			bdevname(rdev->bdev,b));
+		return -EINVAL;
+	}
+	if (le64_to_cpu(sb->data_size) < 10) {
+		printk("md: data_size too small on %s\n",
+		       bdevname(rdev->bdev,b));
 		return -EINVAL;
 	}
 	rdev->preferred_minor = 0xffff;
@@ -862,7 +867,6 @@ static int super_1_validate(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	if (mddev->raid_disks == 0) {
 		mddev->major_version = 1;
-		mddev->minor_version = 0;
 		mddev->patch_version = 0;
 		mddev->persistent = 1;
 		mddev->chunk_size = le32_to_cpu(sb->chunksize) << 9;
@@ -871,7 +875,7 @@ static int super_1_validate(mddev_t *mddev, mdk_rdev_t *rdev)
 		mddev->level = le32_to_cpu(sb->level);
 		mddev->layout = le32_to_cpu(sb->layout);
 		mddev->raid_disks = le32_to_cpu(sb->raid_disks);
-		mddev->size = (u32)le64_to_cpu(sb->size);
+		mddev->size = le64_to_cpu(sb->size)/2;
 		mddev->events = le64_to_cpu(sb->events);
 		
 		mddev->recovery_cp = le64_to_cpu(sb->resync_offset);
@@ -939,7 +943,7 @@ static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 		if (rdev2->desc_nr > max_dev)
 			max_dev = rdev2->desc_nr;
 	
-	sb->max_dev = max_dev;
+	sb->max_dev = cpu_to_le32(max_dev);
 	for (i=0; i<max_dev;i++)
 		sb->dev_roles[max_dev] = cpu_to_le16(0xfffe);
 	
@@ -1434,17 +1438,6 @@ static int analyze_sbs(mddev_t * mddev)
 	}
 
 
-	/*
-	 * Check if we can support this RAID array
-	 */
-	if (mddev->major_version != MD_MAJOR_VERSION ||
-			mddev->minor_version > MD_MINOR_VERSION) {
-		printk(KERN_ALERT 
-			"md: %s: unsupported raid array version %d.%d.%d\n",
-			mdname(mddev), mddev->major_version,
-			mddev->minor_version, mddev->patch_version);
-		goto abort;
-	}
 
 	if ((mddev->recovery_cp != MaxSector) &&
 	    ((mddev->level == 1) ||
@@ -1454,8 +1447,6 @@ static int analyze_sbs(mddev_t * mddev)
 		       mdname(mddev));
 
 	return 0;
-abort:
-	return 1;
 }
 
 int mdp_major = 0;
@@ -1978,7 +1969,7 @@ static int get_array_info(mddev_t * mddev, void __user * arg)
 
 	info.major_version = mddev->major_version;
 	info.minor_version = mddev->minor_version;
-	info.patch_version = 1;
+	info.patch_version = MD_PATCHLEVEL_VERSION;
 	info.ctime         = mddev->ctime;
 	info.level         = mddev->level;
 	info.size          = mddev->size;
