@@ -19,20 +19,17 @@
 #include <linux/writeback.h>
 #include <asm/pgtable.h>
 
-static struct bio *
-get_swap_bio(int gfp_flags, struct page *page, bio_end_io_t end_io)
+static struct bio *get_swap_bio(int gfp_flags, pgoff_t index,
+				struct page *page, bio_end_io_t end_io)
 {
 	struct bio *bio;
 
 	bio = bio_alloc(gfp_flags, 1);
 	if (bio) {
 		struct swap_info_struct *sis;
-		swp_entry_t entry;
+		swp_entry_t entry = { .val = index, };
 
-		BUG_ON(!PageSwapCache(page));
-		entry.val = page->private;
 		sis = get_swap_info_struct(swp_type(entry));
-
 		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
 					(PAGE_SIZE >> 9);
 		bio->bi_bdev = sis->bdev;
@@ -94,7 +91,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		unlock_page(page);
 		goto out;
 	}
-	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
+	bio = get_swap_bio(GFP_NOIO, page->private, page, end_swap_bio_write);
 	if (bio == NULL) {
 		set_page_dirty(page);
 		unlock_page(page);
@@ -118,7 +115,7 @@ int swap_readpage(struct file *file, struct page *page)
 
 	BUG_ON(!PageLocked(page));
 	ClearPageUptodate(page);
-	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
+	bio = get_swap_bio(GFP_KERNEL, page->private, page, end_swap_bio_read);
 	if (bio == NULL) {
 		unlock_page(page);
 		ret = -ENOMEM;
@@ -131,36 +128,33 @@ out:
 }
 
 #if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_PM_DISK)
-
 /*
  * A scruffy utility function to read or write an arbitrary swap page
  * and wait on the I/O.  The caller must have a ref on the page.
+ *
+ * We use end_swap_bio_read() even for writes, because it happens to do what
+ * we want.
  */
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
-	int ret;
-	unsigned long save_private;
-	struct writeback_control swap_wbc = {
-		.sync_mode = WB_SYNC_ALL,
-	};
+	struct bio *bio;
+	int ret = 0;
 
 	lock_page(page);
-	SetPageSwapCache(page);
-	save_private = page->private;
-	page->private = entry.val;
 
-	if (rw == READ) {
-		ret = swap_readpage(NULL, page);
-		wait_on_page_locked(page);
-	} else {
-		ret = swap_writepage(page, &swap_wbc);
-		wait_on_page_writeback(page);
+	bio = get_swap_bio(GFP_KERNEL, entry.val, page, end_swap_bio_read);
+	if (bio == NULL) {
+		unlock_page(page);
+		ret = -ENOMEM;
+		goto out;
 	}
 
-	ClearPageSwapCache(page);
-	page->private = save_private;
-	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
+	submit_bio(rw | (1 << BIO_RW_SYNC), bio);
+	wait_on_page_locked(page);
+
+	if (!PageUptodate(page) || PageError(page))
 		ret = -EIO;
+out:
 	return ret;
 }
 #endif
