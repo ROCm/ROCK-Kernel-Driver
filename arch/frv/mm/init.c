@@ -134,11 +134,6 @@ void __init paging_init(void)
 	free_area_init(zones_size);
 
 #ifdef CONFIG_MMU
-	/* high memory (if present) starts after the last mapped page
-	 * - this is used by kmap()
-	 */
-	highmem_start_page = mem_map + num_mappedpages;
-
 	/* initialise init's MMU context */
 	init_new_context(&init_task, &init_mm);
 #endif

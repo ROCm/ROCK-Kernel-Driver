@@ -13,7 +13,7 @@
 void *kmap(struct page *page)
 {
 	might_sleep();
-	if (page < highmem_start_page)
+	if (!PageHighMem(page))
 		return page_address(page);
 	return kmap_high(page);
 }
@@ -22,7 +22,7 @@ void kunmap(struct page *page)
 {
 	if (in_interrupt())
 		BUG();
-	if (page < highmem_start_page)
+	if (!PageHighMem(page))
 		return;
 	kunmap_high(page);
 }
