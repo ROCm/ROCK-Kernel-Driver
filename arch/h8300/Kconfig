@@ -141,10 +141,7 @@ config KCORE_AOUT
 config KCORE_ELF
 	default y
 
-config BINFMT_FLAT
-	tristate "Kernel support for flat binaries"
-	help
-	  Support uClinux FLAT format binaries.
+source "fs/Kconfig.binfmt"
 
 endmenu
 

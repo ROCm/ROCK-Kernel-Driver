@@ -62,14 +62,7 @@ config MODE_SKAS
 config NET
 	bool "Networking support"
 
-config BINFMT_AOUT
-	tristate "Kernel support for a.out binaries"
-
-config BINFMT_ELF
-	tristate "Kernel support for ELF binaries"
-
-config BINFMT_MISC
-	tristate "Kernel support for MISC binaries"
+source "fs/Kconfig.binfmt"
 
 config HOSTFS
 	tristate "Host filesystem"
