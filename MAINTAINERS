@@ -1828,6 +1828,12 @@ M:	nico@cam.org
 L:	linux-arm-kernel@lists.arm.linux.org.uk
 S:	Maintained
 
+QLOGIC QLA2XXX FC-SCSI DRIVER
+P:	Andrew Vasquez
+M:	andrew.vasquez@qlogic.com
+L:	linux-scsi@vger.kernel.org
+S:	Supported
+
 QNX4 FILESYSTEM
 P:	Anders Larsen
 M:	al@alarsen.net
