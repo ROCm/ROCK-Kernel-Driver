@@ -82,6 +82,13 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 			sht->info ? sht->info(shost) : sht->name);
 
 	error = scsi_sysfs_add_host(shost, dev);
+
+	if (!shost->can_queue) {
+		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
+				sht->name);
+		error = -EINVAL;
+	}
+
 	if (!error) {
 		scsi_proc_host_add(shost);
 		scsi_scan_host(shost);
@@ -143,12 +150,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 				"this driver\n", sht->proc_name);
 		dump_stack();
         }
-
-	if (!sht->can_queue) {
-		printk(KERN_ERR "%s: can_queue = 0 no more supported\n",
-				sht->name);
-		return NULL;
-	}
 
 	/* if its not set in the template, use the default */
 	if (!sht->shost_attrs)
