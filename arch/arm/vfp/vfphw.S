@@ -62,14 +62,14 @@
 @ VFP hardware support entry point.
 @
 @  r0  = faulted instruction
-@  r5  = faulted PC+4
+@  r2  = faulted PC+4
 @  r9  = successful return
 @  r10 = vfp_state union
 @  lr  = failure return
 
 	.globl	vfp_support_entry
 vfp_support_entry:
-	DBGSTR3	"instr %08x pc %08x state %p", r0, r5, r10
+	DBGSTR3	"instr %08x pc %08x state %p", r0, r2, r10
 
 	VFPFMRX	r1, FPEXC		@ Is the VFP enabled?
 	DBGSTR1	"fpexc %08x", r1
@@ -80,14 +80,14 @@ vfp_support_entry:
 	ldr	r3, last_VFP_context_address
 	orr	r1, r1, #FPEXC_ENABLE	@ user FPEXC has the enable bit set
 	ldr	r4, [r3]		@ last_VFP_context pointer
-	bic	r2, r1, #FPEXC_EXCEPTION @ make sure exceptions are disabled
+	bic	r5, r1, #FPEXC_EXCEPTION @ make sure exceptions are disabled
 	cmp	r4, r10
 	beq	check_for_exception	@ we are returning to the same
 					@ process, so the registers are
 					@ still there.  In this case, we do
 					@ not want to drop a pending exception.
 
-	VFPFMXR	FPEXC, r2		@ enable VFP, disable any pending
+	VFPFMXR	FPEXC, r5		@ enable VFP, disable any pending
 					@ exceptions, so we can get at the
 					@ rest of it
 
@@ -96,14 +96,14 @@ vfp_support_entry:
 	DBGSTR1	"save old state %p", r4
 	cmp	r4, #0
 	beq	no_old_VFP_process
-	VFPFMRX	r2, FPSCR		@ current status
+	VFPFMRX	r5, FPSCR		@ current status
 	VFPFMRX	r6, FPINST		@ FPINST (always there, rev0 onwards)
 	tst	r1, #FPEXC_FPV2		@ is there an FPINST2 to read?
 	VFPFMRX	r8, FPINST2, NE		@ FPINST2 if needed - avoids reading
 					@ nonexistant reg on rev0
 	VFPFSTMIA r4 			@ save the working registers
 	add	r4, r4, #8*16+4
-	stmia	r4, {r1, r2, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
+	stmia	r4, {r1, r5, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
 					@ and point r4 at the word at the
 					@ start of the register dump
 
@@ -112,14 +112,14 @@ no_old_VFP_process:
 	str	r10, [r3]		@ update the last_VFP_context pointer
 					@ Load the saved state back into the VFP
 	add	r4, r10, #8*16+4
-	ldmia	r4, {r1, r2, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
+	ldmia	r4, {r1, r5, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
 	VFPFLDMIA r10	 		@ reload the working registers while
 					@ FPEXC is in a safe state
 	tst	r1, #FPEXC_FPV2		@ is there an FPINST2 to write?
 	VFPFMXR	FPINST2, r8, NE		@ FPINST2 if needed - avoids writing
 					@ nonexistant reg on rev0
 	VFPFMXR	FPINST, r6
-	VFPFMXR	FPSCR, r2		@ restore status
+	VFPFMXR	FPSCR, r5		@ restore status
 
 check_for_exception:
 	tst	r1, #FPEXC_EXCEPTION
@@ -128,16 +128,16 @@ check_for_exception:
 					@ out before setting an FPEXC that
 					@ stops us reading stuff
 	VFPFMXR	FPEXC, r1		@ restore FPEXC last
-	sub	r5, r5, #4
-	str	r5, [sp, #S_PC]		@ retry the instruction
+	sub	r2, r2, #4
+	str	r2, [sp, #S_PC]		@ retry the instruction
 	mov	pc, r9			@ we think we have handled things
 
 
 look_for_VFP_exceptions:
 	tst	r1, #FPEXC_EXCEPTION
 	bne	process_exception
-	VFPFMRX	r2, FPSCR
-	tst	r2, #FPSCR_IXE		@ IXE doesn't set FPEXC_EXCEPTION !
+	VFPFMRX	r5, FPSCR
+	tst	r5, #FPSCR_IXE		@ IXE doesn't set FPEXC_EXCEPTION !
 	bne	process_exception
 
 	@ Fall into hand on to next handler - appropriate coproc instr
@@ -148,8 +148,8 @@ look_for_VFP_exceptions:
 
 process_exception:
 	DBGSTR	"bounce"
-	sub	r5, r5, #4
-	str	r5, [sp, #S_PC]		@ retry the instruction on exit from
+	sub	r2, r2, #4
+	str	r2, [sp, #S_PC]		@ retry the instruction on exit from
 					@ the imprecise exception handling in
 					@ the support code
 	mov	r2, sp			@ nothing stacked - regdump is at TOS
