@@ -404,3 +404,7 @@ int sis_final_context(int context)
 	
 	return 1;
 }
+
+void DRM(driver_register_fns)(drm_device_t *dev)
+{
+}

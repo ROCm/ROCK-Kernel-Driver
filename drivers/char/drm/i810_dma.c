@@ -1388,3 +1388,27 @@ int i810_flip_bufs(struct inode *inode, struct file *filp,
 	i810_dma_dispatch_flip( dev );
    	return 0;
 }
+
+static void i810_driver_pretakedown(drm_device_t *dev)
+{
+	i810_dma_cleanup( dev );
+}
+
+static void i810_driver_release(drm_device_t *dev, struct file *filp)
+{
+	i810_reclaim_buffers(filp);
+}
+
+static int i810_driver_dma_quiescent(drm_device_t *dev)
+{
+	i810_dma_quiescent( dev );
+	return 0;
+}
+
+void i810_driver_register_fns(drm_device_t *dev)
+{
+	dev->fn_tbl.pretakedown = i810_driver_pretakedown;
+	dev->fn_tbl.release = i810_driver_release;
+	dev->fn_tbl.dma_quiescent = i810_driver_dma_quiescent;
+}
+

@@ -86,23 +86,7 @@
 #define __HAVE_DMA_WAITLIST		1
 #define __HAVE_DMA_FREELIST		1
 
-#define __HAVE_DMA_FLUSH		1
 #define __HAVE_DMA_SCHEDULE		1
-
-#define __HAVE_DMA_READY		1
-#define DRIVER_DMA_READY() do {						\
-	gamma_dma_ready(dev);						\
-} while (0)
-
-#define __HAVE_DMA_QUIESCENT		1
-#define DRIVER_DMA_QUIESCENT() do {					\
-	drm_gamma_private_t *dev_priv =					\
-		(drm_gamma_private_t *)dev->dev_private;		\
-	if (dev_priv->num_rast == 2)					\
-		gamma_dma_quiescent_dual(dev);				\
-	else gamma_dma_quiescent_single(dev);				\
-	return 0;							\
-} while (0)
 
 #define __HAVE_IRQ			1
 #define __HAVE_IRQ_BH			1

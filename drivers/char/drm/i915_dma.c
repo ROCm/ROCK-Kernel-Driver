@@ -712,3 +712,26 @@ int i915_setparam(DRM_IOCTL_ARGS)
 
 	return 0;
 }
+
+static void i915_driver_pretakedown(drm_device_t *dev)
+{
+	if ( dev->dev_private ) {
+		drm_i915_private_t *dev_priv = dev->dev_private;
+	        i915_mem_takedown( &(dev_priv->agp_heap) );
+ 	}
+	i915_dma_cleanup( dev );
+}
+
+static void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
+{
+	if ( dev->dev_private ) {
+		drm_i915_private_t *dev_priv = dev->dev_private;
+                i915_mem_release( dev, filp, dev_priv->agp_heap );
+	}
+}
+
+void i915_driver_register_fns(drm_device_t *dev)
+{
+	dev->fn_tbl.pretakedown = i915_driver_pretakedown;
+	dev->fn_tbl.prerelease = i915_driver_prerelease;
+}

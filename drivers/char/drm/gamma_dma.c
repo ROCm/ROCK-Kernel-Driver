@@ -904,3 +904,42 @@ void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
 	GAMMA_WRITE( GAMMA_COMMANDINTENABLE,	0x00000000 );
 	GAMMA_WRITE( GAMMA_GINTENABLE,		0x00000000 );
 }
+
+extern drm_ioctl_desc_t DRM(ioctls)[];
+
+static int gamma_driver_preinit(drm_device_t *dev)
+{
+	/* reset the finish ioctl */
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_FINISH)].func = DRM(finish);
+	return 0;
+}
+
+static void gamma_driver_pretakedown(drm_device_t *dev)
+{
+	gamma_do_cleanup_dma(dev);
+}
+
+static void gamma_driver_dma_ready(drm_device_t *dev)
+{
+	gamma_dma_ready(dev);
+}
+
+static int gamma_driver_dma_quiescent(drm_device_t *dev)
+{
+	drm_gamma_private_t *dev_priv =	(
+		drm_gamma_private_t *)dev->dev_private;
+	if (dev_priv->num_rast == 2)
+		gamma_dma_quiescent_dual(dev);
+	else gamma_dma_quiescent_single(dev);
+	return 0;
+}
+
+void gamma_driver_register_fns(drm_device_t *dev)
+{
+	dev->fn_tbl.preinit = gamma_driver_preinit;
+	dev->fn_tbl.pretakedown = gamma_driver_pretakedown;
+	dev->fn_tbl.dma_ready = gamma_driver_dma_ready;
+	dev->fn_tbl.dma_quiescent = gamma_driver_dma_quiescent;
+	dev->fn_tbl.dma_flush_block_and_flush = gamma_flush_block_and_flush;
+	dev->fn_tbl.dma_flush_unblock = gamma_flush_unblock;
+}

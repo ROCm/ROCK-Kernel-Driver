@@ -800,3 +800,20 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 
 	return ret;
 }
+
+static void mga_driver_pretakedown(drm_device_t *dev)
+{
+	mga_do_cleanup_dma( dev );
+}
+
+static int mga_driver_dma_quiescent(drm_device_t *dev)
+{
+	drm_mga_private_t *dev_priv = dev->dev_private;
+	return mga_do_wait_for_idle( dev_priv );
+}
+
+void mga_driver_register_fns(drm_device_t *dev)
+{
+	dev->fn_tbl.pretakedown = mga_driver_pretakedown;
+	dev->fn_tbl.dma_quiescent = mga_driver_dma_quiescent;
+}

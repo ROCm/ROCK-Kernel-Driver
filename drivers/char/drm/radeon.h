@@ -118,43 +118,6 @@
 #define DRIVER_FILE_FIELDS						\
 	int64_t radeon_fb_delta;					\
 
-#define DRIVER_OPEN_HELPER( filp_priv, dev )				\
-do {									\
-	drm_radeon_private_t *dev_priv = dev->dev_private;		\
-	if ( dev_priv )							\
-		filp_priv->radeon_fb_delta = dev_priv->fb_location;	\
-	else								\
-		filp_priv->radeon_fb_delta = 0;				\
-} while( 0 )
-
-/* When a client dies:
- *    - Check for and clean up flipped page state
- *    - Free any alloced GART memory.
- *
- * DRM infrastructure takes care of reclaiming dma buffers.
- */
-#define DRIVER_PRERELEASE() 						\
-do {									\
-	if ( dev->dev_private ) {					\
-		drm_radeon_private_t *dev_priv = dev->dev_private;	\
-		if ( dev_priv->page_flipping ) {			\
-			radeon_do_cleanup_pageflip( dev );		\
-		}							\
-		radeon_mem_release( filp, dev_priv->gart_heap );	\
-		radeon_mem_release( filp, dev_priv->fb_heap );		\
-	}								\
-} while (0)
-
-/* When the last client dies, shut down the CP and free dev->dev_priv.
- */
-/* #define __HAVE_RELEASE 1 */
-#define DRIVER_PRETAKEDOWN()			\
-do {						\
-    radeon_do_release( dev );			\
-} while (0)
-
-
-
 /* DMA customization:
  */
 #define __HAVE_DMA		1

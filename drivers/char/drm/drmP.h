@@ -610,6 +610,24 @@ typedef struct drm_vbl_sig {
 
 #endif
 
+/** 
+ * DRM device functions structure
+ */
+struct drm_device;
+
+struct drm_driver_fn {
+	int (*preinit)(struct drm_device *);
+	int (*postinit)(struct drm_device *);
+	void (*prerelease)(struct drm_device *, struct file *filp);
+	void (*pretakedown)(struct drm_device *);
+	int (*postcleanup)(struct drm_device *);
+	int (*presetup)(struct drm_device *);
+	int (*postsetup)(struct drm_device *);
+	void (*open_helper)(struct drm_device *, drm_file_t *);
+	void (*release)(struct drm_device *, struct file *filp);
+	void (*dma_ready)(struct drm_device *);
+	int (*dma_quiescent)(struct drm_device *);
+};
 /**
  * DRM device structure.
  */
@@ -738,8 +756,12 @@ typedef struct drm_device {
 	void		  *dev_private; /**< device private data */
 	drm_sigdata_t     sigdata; /**< For block_all_signals */
 	sigset_t          sigmask;
+
+	struct            drm_driver_fn fn_tbl;
+
 } drm_device_t;
 
+extern void DRM(driver_register_fns)(struct drm_device *dev);
 
 /******************************************************************/
 /** \name Internal function definitions */

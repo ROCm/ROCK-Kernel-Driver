@@ -83,29 +83,12 @@
 #define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
 #define __HAVE_COUNTER9         _DRM_STAT_DMA
 
-/* Driver customization:
- */
-#define __HAVE_RELEASE		1
-#define DRIVER_RELEASE() do {						\
-	i830_reclaim_buffers( filp );					\
-} while (0)
-
-#define DRIVER_PRETAKEDOWN() do {					\
-	i830_dma_cleanup( dev );					\
-} while (0)
-
 /* DMA customization:
  */
 #define __HAVE_DMA		1
 #define __HAVE_DMA_QUEUE	1
 #define __HAVE_DMA_WAITLIST	0
 #define __HAVE_DMA_RECLAIM	1
-
-#define __HAVE_DMA_QUIESCENT	1
-#define DRIVER_DMA_QUIESCENT() do {					\
-	i830_dma_quiescent( dev );					\
-} while (0)
-
 
 /* Driver will work either way: IRQ's save cpu time when waiting for
  * the card, but are subject to subtle interactions between bios,
