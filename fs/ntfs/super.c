@@ -925,8 +925,12 @@ unmap_err_out:
 	vol->mftbmp_rl.rl = rl;
 	vol->mftbmp_mapping.a_ops = &ntfs_mftbmp_aops;
 	
-	/* Not inode data, set to NULL. Our mft bitmap access kludge... */
-	vol->mftbmp_mapping.host = NULL;
+	/*
+	 * Not inode data, set to volume. Our mft bitmap access kludge...
+	 * We can only pray this is not going to cause problems... If it does
+	 * cause problems we will need a fake inode for this.
+	 */
+	vol->mftbmp_mapping.host = (struct inode*)vol;
 
 	// FIXME: If mounting read-only, it would be ok to ignore errors when
 	// loading the mftbmp but we then need to make sure nobody remounts the

@@ -1,14 +1,4 @@
 ToDo:
-	- Audit for allocated_size vs initialized_size vs data_size (i.e.
-	  i_size) in whole driver.
-	  Need to enforce limits and zeroes need to be written when overflow is
-	  detected. We CANNOT use block_read_full_page() at all anywhere! This
-	  is because initialized_size can lie within a block and ntfs_get_block
-	  has no way to tell block_read_full_page about it. So our readpage
-	  functions need to clone block_read_full_page and modify it to cope
-	  with the significance of the different attribute sizes.
-	  Still need to go through:
-		aops.c
 	- Find and fix bugs.
 	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
 	  there are dragons lurking in the details, e.g. read_inode() currently
@@ -24,13 +14,18 @@ ToDo:
 	  strictly a speed optimization. Obviously need to keep the ->run_list
 	  locked or RACE. load_attribute_list() already performs such an
 	  optimization so use the same optimization where desired.
-	- Optimize mft_readpage() to not do i/o on buffer heads beyond
-	  initialized_size, just zero the buffer heads instead. Question: How
-	  to setup the buffer heads so they point to the on disk location
-	  correctly (after all they are allocated) but are not read from disk?
+	- Optimize all our readpage functions to not do i/o on buffer heads
+	  beyond initialized_size, just zero the buffer heads instead.
+	  Question: How to setup the buffer heads so they point to the on disk
+	  location correctly (after all they are allocated) but are not read
+	  from disk?
 	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
+	- CLEANUP: Modularise and reuse code in aops.c. At the moment we have
+	  several copies of almost identicall functions and the functions are
+	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
+	  them cleaner and make code reuse easier.
 
 tng-0.0.9 - Work in progress
 
@@ -55,6 +50,14 @@ tng-0.0.9 - Work in progress
 	- Rename aops.c::end_buffer_read_index_async() to
 	  end_buffer_read_mst_async() and optimize the overflow checking and
 	  handling.
+	- Use the host of the mftbmp address space mapping to hold the ntfs
+	  volume. This is needed so the async i/o completion handler can
+	  retrieve a pointer to the volume. Hopefully this will not cause
+	  problems elsewhere in the kernel... Otherwise will need to use a
+	  fake inode.
+	- Complete implementation of proper handling of allocated_size vs
+	  initialized_size vs data_size (i.e. i_size) in whole driver.
+	  Basically aops.c is now completely rewritten.
 
 - Don't bother getting the run list in inode.c::ntfs_read_inode().
 
