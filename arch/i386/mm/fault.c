@@ -201,7 +201,7 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 	return 0;
 } 
 
-asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
+fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -213,7 +213,7 @@ asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
  *	bit 1 == 0 means read, 1 means write
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
-asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
+fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;

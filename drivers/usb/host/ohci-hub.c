@@ -43,6 +43,7 @@
 
 static void dl_done_list (struct ohci_hcd *, struct pt_regs *);
 static void finish_unlinks (struct ohci_hcd *, u16 , struct pt_regs *);
+static int ohci_restart (struct ohci_hcd *ohci);
 
 static int ohci_hub_suspend (struct usb_hcd *hcd)
 {
@@ -57,14 +58,14 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 
 	spin_lock_irq (&ohci->lock);
 
-	ohci->hc_control = ohci_readl (&ohci->regs->control);
+	ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
 	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
 	case OHCI_USB_RESUME:
 		ohci_dbg (ohci, "resume/suspend?\n");
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		ohci->hc_control |= OHCI_USB_RESET;
-		writel (ohci->hc_control, &ohci->regs->control);
-		(void) ohci_readl (&ohci->regs->control);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+		(void) ohci_readl (ohci, &ohci->regs->control);
 		/* FALL THROUGH */
 	case OHCI_USB_RESET:
 		status = -EBUSY;
@@ -82,9 +83,9 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 		int		limit;
 
 		ohci->hc_control &= ~OHCI_SCHED_ENABLES;
-		writel (ohci->hc_control, &ohci->regs->control);
-		ohci->hc_control = ohci_readl (&ohci->regs->control);
-		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+		ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
+		ohci_writel (ohci, OHCI_INTR_SF, &ohci->regs->intrstatus);
 
 		/* sched disables take effect on the next frame,
 		 * then the last WDH could take 6+ msec
@@ -94,15 +95,17 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 		while (limit > 0) {
 			udelay (250);
 			limit =- 250;
-			if (ohci_readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
+			if (ohci_readl (ohci, &ohci->regs->intrstatus)
+					& OHCI_INTR_SF)
 				break;
 		}
 		dl_done_list (ohci, NULL);
 		mdelay (7);
 	}
 	dl_done_list (ohci, NULL);
-	finish_unlinks (ohci, OHCI_FRAME_NO(ohci->hcca), NULL);
-	writel (ohci_readl (&ohci->regs->intrstatus), &ohci->regs->intrstatus);
+	finish_unlinks (ohci, ohci_frame_no(ohci), NULL);
+	ohci_writel (ohci, ohci_readl (ohci, &ohci->regs->intrstatus),
+			&ohci->regs->intrstatus);
 
 	/* maybe resume can wake root hub */
 	if (ohci->hcd.remote_wakeup)
@@ -113,8 +116,8 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	/* Suspend hub */
 	ohci->hc_control &= ~OHCI_CTRL_HCFS;
 	ohci->hc_control |= OHCI_USB_SUSPEND;
-	writel (ohci->hc_control, &ohci->regs->control);
-	(void) ohci_readl (&ohci->regs->control);
+	ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+	(void) ohci_readl (ohci, &ohci->regs->control);
 
 	/* no resumes until devices finish suspending */
 	ohci->next_statechange = jiffies + msecs_to_jiffies (5);
@@ -152,7 +155,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		return -EAGAIN;
 
 	spin_lock_irq (&ohci->lock);
-	ohci->hc_control = ohci_readl (&ohci->regs->control);
+	ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
 	if (ohci->hc_control & (OHCI_CTRL_IR | OHCI_SCHED_ENABLES)) {
 		/* this can happen after suspend-to-disk */
 		ohci_dbg (ohci, "BIOS/SMM active, control %03x\n",
@@ -162,8 +165,8 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	case OHCI_USB_SUSPEND:
 		ohci->hc_control &= ~(OHCI_CTRL_HCFS|OHCI_SCHED_ENABLES);
 		ohci->hc_control |= OHCI_USB_RESUME;
-		writel (ohci->hc_control, &ohci->regs->control);
-		(void) ohci_readl (&ohci->regs->control);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+		(void) ohci_readl (ohci, &ohci->regs->control);
 		ohci_dbg (ohci, "resume root hub\n");
 		break;
 	case OHCI_USB_RESUME:
@@ -190,19 +193,21 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	temp = roothub_a (ohci) & RH_A_NDP;
 	enables = 0;
 	while (temp--) {
-		u32 stat = ohci_readl (&ohci->regs->roothub.portstatus [temp]);
+		u32 stat = ohci_readl (ohci,
+				       &ohci->regs->roothub.portstatus [temp]);
 
 		/* force global, not selective, resume */
 		if (!(stat & RH_PS_PSS))
 			continue;
-		writel (RH_PS_POCI, &ohci->regs->roothub.portstatus [temp]);
+		ohci_writel (ohci, RH_PS_POCI,
+				&ohci->regs->roothub.portstatus [temp]);
 	}
 
 	/* Some controllers (lucent) need extra-long delays */
 	ohci->hcd.state = USB_STATE_RESUMING;
 	mdelay (20 /* usb 11.5.1.10 */ + 15);
 
-	temp = ohci_readl (&ohci->regs->control);
+	temp = ohci_readl (ohci, &ohci->regs->control);
 	temp &= OHCI_CTRL_HCFS;
 	if (temp != OHCI_USB_RESUME) {
 		ohci_err (ohci, "controller won't resume\n");
@@ -210,32 +215,33 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	}
 
 	/* disable old schedule state, reinit from scratch */
-	writel (0, &ohci->regs->ed_controlhead);
-	writel (0, &ohci->regs->ed_controlcurrent);
-	writel (0, &ohci->regs->ed_bulkhead);
-	writel (0, &ohci->regs->ed_bulkcurrent);
-	writel (0, &ohci->regs->ed_periodcurrent);
-	writel ((u32) ohci->hcca_dma, &ohci->regs->hcca);
+	ohci_writel (ohci, 0, &ohci->regs->ed_controlhead);
+	ohci_writel (ohci, 0, &ohci->regs->ed_controlcurrent);
+	ohci_writel (ohci, 0, &ohci->regs->ed_bulkhead);
+	ohci_writel (ohci, 0, &ohci->regs->ed_bulkcurrent);
+	ohci_writel (ohci, 0, &ohci->regs->ed_periodcurrent);
+	ohci_writel (ohci, (u32) ohci->hcca_dma, &ohci->regs->hcca);
 
 	periodic_reinit (ohci);
 
 	/* interrupts might have been disabled */
-	writel (OHCI_INTR_INIT, &ohci->regs->intrenable);
+	ohci_writel (ohci, OHCI_INTR_INIT, &ohci->regs->intrenable);
 	if (ohci->ed_rm_list)
-		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
-	writel (ohci_readl (&ohci->regs->intrstatus), &ohci->regs->intrstatus);
+		ohci_writel (ohci, OHCI_INTR_SF, &ohci->regs->intrenable);
+	ohci_writel (ohci, ohci_readl (ohci, &ohci->regs->intrstatus),
+			&ohci->regs->intrstatus);
 
 	/* Then re-enable operations */
-	writel (OHCI_USB_OPER, &ohci->regs->control);
-	(void) ohci_readl (&ohci->regs->control);
+	ohci_writel (ohci, OHCI_USB_OPER, &ohci->regs->control);
+	(void) ohci_readl (ohci, &ohci->regs->control);
 	msleep (3);
 
 	temp = OHCI_CONTROL_INIT | OHCI_USB_OPER;
 	if (ohci->hcd.can_wakeup)
 		temp |= OHCI_CTRL_RWC;
 	ohci->hc_control = temp;
-	writel (temp, &ohci->regs->control);
-	(void) ohci_readl (&ohci->regs->control);
+	ohci_writel (ohci, temp, &ohci->regs->control);
+	(void) ohci_readl (ohci, &ohci->regs->control);
 
 	/* TRSMRCY */
 	msleep (10);
@@ -250,13 +256,14 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	temp = 0;
 	if (!ohci->ed_rm_list) {
 		if (ohci->ed_controltail) {
-			writel (find_head (ohci->ed_controltail)->dma,
-				&ohci->regs->ed_controlhead);
+			ohci_writel (ohci,
+					find_head (ohci->ed_controltail)->dma,
+					&ohci->regs->ed_controlhead);
 			enables |= OHCI_CTRL_CLE;
 			temp |= OHCI_CLF;
 		}
 		if (ohci->ed_bulktail) {
-			writel (find_head (ohci->ed_bulktail)->dma,
+			ohci_writel (ohci, find_head (ohci->ed_bulktail)->dma,
 				&ohci->regs->ed_bulkhead);
 			enables |= OHCI_CTRL_BLE;
 			temp |= OHCI_BLF;
@@ -268,10 +275,10 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	if (enables) {
 		ohci_dbg (ohci, "restarting schedules ... %08x\n", enables);
 		ohci->hc_control |= enables;
-		writel (ohci->hc_control, &ohci->regs->control);
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
 		if (temp)
-			writel (temp, &ohci->regs->cmdstatus);
-		(void) ohci_readl (&ohci->regs->control);
+			ohci_writel (ohci, temp, &ohci->regs->cmdstatus);
+		(void) ohci_readl (ohci, &ohci->regs->control);
 	}
 
 	ohci->hcd.state = USB_STATE_RUNNING;
@@ -312,8 +319,8 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	if (ports > MAX_ROOT_PORTS) {
 		if (!HCD_IS_RUNNING(ohci->hcd.state))
 			return -ESHUTDOWN;
-		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n",
-			ports, ohci_readl (&ohci->regs->roothub.a) & RH_A_NDP);
+		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n", ports,
+			  ohci_readl (ohci, &ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */
 		return 0;
 	}
@@ -402,7 +409,7 @@ ohci_hub_descriptor (
 	    temp |= 0x0010;
 	else if (rh & RH_A_OCPM)	/* per-port overcurrent reporting? */
 	    temp |= 0x0008;
-	desc->wHubCharacteristics = cpu_to_le16 (temp);
+	desc->wHubCharacteristics = cpu_to_hc16 (ohci, temp);
 
 	/* two bitmaps:  ports removable, and usb 1.0 legacy PortPwrCtrlMask */
 	rh = roothub_b (ohci);
@@ -428,12 +435,12 @@ static int ohci_start_port_reset (struct usb_hcd *hcd, unsigned port)
 	port--;
 
 	/* start port reset before HNP protocol times out */
-	status = ohci_readl(&ohci->regs->roothub.portstatus [port]);
+	status = ohci_readl(ohci, &ohci->regs->roothub.portstatus [port]);
 	if (!(status & RH_PS_CCS))
 		return -ENODEV;
 
 	/* khubd will finish the reset later */
-	writel(RH_PS_PRS, &ohci->regs->roothub.portstatus [port]);
+	ohci_writel(ohci, RH_PS_PRS, &ohci->regs->roothub.portstatus [port]);
 	return 0;
 }
 
@@ -470,7 +477,7 @@ static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 {
 	u32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
 	u32	temp;
-	u16	now = readl(&ohci->regs->fmnumber);
+	u16	now = ohci_readl(ohci, &ohci->regs->fmnumber);
 	u16	reset_done = now + PORT_RESET_MSEC;
 
 	/* build a "continuous enough" reset signal, with up to
@@ -480,7 +487,7 @@ static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 	do {
 		/* spin until any current reset finishes */
 		for (;;) {
-			temp = ohci_readl (portstat);
+			temp = ohci_readl (ohci, portstat);
 			if (!(temp & RH_PS_PRS))
 				break;
 			udelay (500);
@@ -489,12 +496,12 @@ static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 		if (!(temp & RH_PS_CCS))
 			break;
 		if (temp & RH_PS_PRSC)
-			writel (RH_PS_PRSC, portstat);
+			ohci_writel (ohci, RH_PS_PRSC, portstat);
 
 		/* start the next reset, sleep till it's probably done */
-		writel (RH_PS_PRS, portstat);
+		ohci_writel (ohci, RH_PS_PRS, portstat);
 		msleep(PORT_RESET_HW_MSEC);
-		now = readl(&ohci->regs->fmnumber);
+		now = ohci_readl(ohci, &ohci->regs->fmnumber);
 	} while (tick_before(now, reset_done));
 	/* caller synchronizes using PRSC */
 }
@@ -516,7 +523,8 @@ static int ohci_hub_control (
 	case ClearHubFeature:
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
-			writel (RH_HS_OCIC, &ohci->regs->roothub.status);
+			ohci_writel (ohci, RH_HS_OCIC,
+					&ohci->regs->roothub.status);
 		case C_HUB_LOCAL_POWER:
 			break;
 		default:
@@ -559,8 +567,9 @@ static int ohci_hub_control (
 		default:
 			goto error;
 		}
-		writel (temp, &ohci->regs->roothub.portstatus [wIndex]);
-		// ohci_readl (&ohci->regs->roothub.portstatus [wIndex]);
+		ohci_writel (ohci, temp,
+				&ohci->regs->roothub.portstatus [wIndex]);
+		// ohci_readl (ohci, &ohci->regs->roothub.portstatus [wIndex]);
 		break;
 	case GetHubDescriptor:
 		ohci_hub_descriptor (ohci, (struct usb_hub_descriptor *) buf);
@@ -603,11 +612,11 @@ static int ohci_hub_control (
 				start_hnp(ohci);
 			else
 #endif
-			writel (RH_PS_PSS,
+			ohci_writel (ohci, RH_PS_PSS,
 				&ohci->regs->roothub.portstatus [wIndex]);
 			break;
 		case USB_PORT_FEAT_POWER:
-			writel (RH_PS_PPS,
+			ohci_writel (ohci, RH_PS_PPS,
 				&ohci->regs->roothub.portstatus [wIndex]);
 			break;
 		case USB_PORT_FEAT_RESET:

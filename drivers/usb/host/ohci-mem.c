@@ -40,11 +40,6 @@ static struct usb_hcd *ohci_hcd_alloc (void)
 	return NULL;
 }
 
-static void ohci_hcd_free (struct usb_hcd *hcd)
-{
-	kfree (hcd_to_ohci (hcd));
-}
-
 /*-------------------------------------------------------------------------*/
 
 static int ohci_mem_init (struct ohci_hcd *ohci)
@@ -104,7 +99,7 @@ td_alloc (struct ohci_hcd *hc, int mem_flags)
 	if (td) {
 		/* in case hc fetches it, make it look dead */
 		memset (td, 0, sizeof *td);
-		td->hwNextTD = cpu_to_le32 (dma);
+		td->hwNextTD = cpu_to_hc32 (hc, dma);
 		td->td_dma = dma;
 		/* hashed in td_fill */
 	}
@@ -120,7 +115,7 @@ td_free (struct ohci_hcd *hc, struct td *td)
 		prev = &(*prev)->td_hash;
 	if (*prev)
 		*prev = td->td_hash;
-	else if ((td->hwINFO & TD_DONE) != 0)
+	else if ((td->hwINFO & cpu_to_hc32(hc, TD_DONE)) != 0)
 		ohci_dbg (hc, "no hash for td %p\n", td);
 	dma_pool_free (hc->td_cache, td, td->td_dma);
 }

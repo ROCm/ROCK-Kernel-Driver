@@ -1431,6 +1431,7 @@ void hid_init_reports(struct hid_device *hid)
 
 #define USB_VENDOR_ID_CYPRESS		0x04b4
 #define USB_DEVICE_ID_CYPRESS_MOUSE	0x0001
+#define USB_DEVICE_ID_CYPRESS_HIDCOM	0x5500
 
 #define USB_VENDOR_ID_BERKSHIRE		0x0c98
 #define USB_DEVICE_ID_BERKSHIRE_PCWD	0x1140
@@ -1463,6 +1464,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_CODEMERCS_IOW24  0x1501
 #define USB_DEVICE_ID_CODEMERCS_IOW48  0x1502
 #define USB_DEVICE_ID_CODEMERCS_IOW28  0x1503
+
+#define USB_VENDOR_ID_DELORME		0x1163
+#define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
 
 static struct hid_blacklist {
 	__u16 idVendor;
@@ -1536,6 +1540,7 @@ static struct hid_blacklist {
 
 	{ USB_VENDOR_ID_A4TECH, USB_DEVICE_ID_A4TECH_WCP32PU, HID_QUIRK_2WHEEL_MOUSE_HACK_BACK },
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_MOUSE, HID_QUIRK_2WHEEL_MOUSE_HACK_EXTRA },
+	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_HIDCOM, HID_QUIRK_IGNORE },
 
 	{ USB_VENDOR_ID_ALPS, USB_DEVICE_ID_IBM_GAMEPAD, HID_QUIRK_BADPAD },
 	{ USB_VENDOR_ID_CHIC, USB_DEVICE_ID_CHIC_GAMEPAD, HID_QUIRK_BADPAD },
@@ -1550,6 +1555,8 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW24, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW48, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW28, HID_QUIRK_IGNORE },
+
+	{ USB_VENDOR_ID_DELORME, USB_DEVICE_ID_DELORME_EARTHMATE, HID_QUIRK_IGNORE },
 
 	{ 0, 0 }
 };
@@ -1695,8 +1702,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 
 	init_waitqueue_head(&hid->wait);
 	
-	hid->outlock = SPIN_LOCK_UNLOCKED;
-	hid->ctrllock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hid->outlock);
+	spin_lock_init(&hid->ctrllock);
 
 	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;

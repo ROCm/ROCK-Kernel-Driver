@@ -74,6 +74,11 @@
  * @interrupt_in_urb: pointer to the interrupt in struct urb for this port.
  * @interrupt_in_endpointAddress: endpoint address for the interrupt in pipe
  *	for this port.
+ * @interrupt_out_buffer: pointer to the interrupt out buffer for this port.
+ * @interrupt_out_size: the size of the interrupt_out_buffer, in bytes.
+ * @interrupt_out_urb: pointer to the interrupt out struct urb for this port.
+ * @interrupt_out_endpointAddress: endpoint address for the interrupt out pipe
+ * 	for this port.
  * @bulk_in_buffer: pointer to the bulk in buffer for this port.
  * @read_urb: pointer to the bulk in struct urb for this port.
  * @bulk_in_endpointAddress: endpoint address for the bulk in pipe for this
@@ -98,6 +103,11 @@ struct usb_serial_port {
 	unsigned char *		interrupt_in_buffer;
 	struct urb *		interrupt_in_urb;
 	__u8			interrupt_in_endpointAddress;
+
+	unsigned char *		interrupt_out_buffer;
+	int			interrupt_out_size;
+	struct urb *		interrupt_out_urb;
+	__u8			interrupt_out_endpointAddress;
 
 	unsigned char *		bulk_in_buffer;
 	int			bulk_in_size;
@@ -135,6 +145,7 @@ static inline void usb_set_serial_port_data (struct usb_serial_port *port, void 
  * @minor: the starting minor number for this device
  * @num_ports: the number of ports this device has
  * @num_interrupt_in: number of interrupt in endpoints we have
+ * @num_interrupt_out: number of interrupt out endpoints we have
  * @num_bulk_in: number of bulk in endpoints we have
  * @num_bulk_out: number of bulk out endpoints we have
  * @vendor: vendor id of this device
@@ -153,6 +164,7 @@ struct usb_serial {
 	unsigned char			num_ports;
 	unsigned char			num_port_pointers;
 	char				num_interrupt_in;
+	char				num_interrupt_out;
 	char				num_bulk_in;
 	char				num_bulk_out;
 	__u16				vendor;
@@ -188,6 +200,8 @@ static inline void usb_set_serial_data (struct usb_serial *serial, void *data)
  *	of the devices this structure can support.
  * @num_interrupt_in: the number of interrupt in endpoints this device will
  *	have.
+ * @num_interrupt_out: the number of interrupt out endpoints this device will
+ *	have.
  * @num_bulk_in: the number of bulk in endpoints this device will have.
  * @num_bulk_out: the number of bulk out endpoints this device will have.
  * @num_ports: the number of different ports this device will have.
@@ -220,6 +234,7 @@ struct usb_serial_device_type {
 	char	*short_name;
 	const struct usb_device_id *id_table;
 	char	num_interrupt_in;
+	char	num_interrupt_out;
 	char	num_bulk_in;
 	char	num_bulk_out;
 	char	num_ports;
@@ -251,6 +266,7 @@ struct usb_serial_device_type {
 	int  (*tiocmset)	(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 
 	void (*read_int_callback)(struct urb *urb, struct pt_regs *regs);
+	void (*write_int_callback)(struct urb *urb, struct pt_regs *regs);
 	void (*read_bulk_callback)(struct urb *urb, struct pt_regs *regs);
 	void (*write_bulk_callback)(struct urb *urb, struct pt_regs *regs);
 };
