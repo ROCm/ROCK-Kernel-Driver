@@ -126,6 +126,7 @@
 		* oom handling (Manfred Spraul)
 		* hands_off instead of playing with netif_device_{de,a}ttach
 		  (Manfred Spraul)
+		* be sure to write the MAC back to the chip (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -1094,6 +1095,14 @@ static int netdev_open(struct net_device *dev)
 	init_ring(dev);
 	spin_lock_irq(&np->lock);
 	init_registers(dev);
+	/* now set the MAC address according to dev->dev_addr */
+	for (i = 0; i < 3; i++) {
+		u16 mac = (dev->dev_addr[2*i+1]<<8) + dev->dev_addr[2*i];
+
+		writel(i*2, ioaddr + RxFilterAddr);
+		writew(mac, ioaddr + RxFilterData);
+	}
+	writel(np->cur_rx_mode, ioaddr + RxFilterAddr);
 	spin_unlock_irq(&np->lock);
 
 	netif_start_queue(dev);
