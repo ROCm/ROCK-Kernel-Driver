@@ -1808,7 +1808,7 @@ static void set_rx_mode(struct net_device *dev)
 	unsigned long flags;
 	spin_lock_irqsave(lp, flags);
 	__set_rx_mode(dev);
-	spin_unlock_irqrestore(&lp, flags);
+	spin_unlock_irqrestore(lp, flags);
 }
 
 
