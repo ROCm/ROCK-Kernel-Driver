@@ -315,16 +315,13 @@ struct i2c_address_data {
                                                  {NULL}}; \
   SENSORS_INSMOD
 
-typedef int i2c_found_addr_proc(struct i2c_adapter *adapter,
-				    int addr, int kind);
-
 /* Detect function. It iterates over all possible addresses itself. For
    SMBus addresses, it will only call found_proc if some client is connected
    to the SMBus (unless a 'force' matched); for ISA detections, this is not
    done. */
 extern int i2c_detect(struct i2c_adapter *adapter,
-			  struct i2c_address_data *address_data,
-			  i2c_found_addr_proc * found_proc);
+		      struct i2c_address_data *address_data,
+		      int (*found_proc) (struct i2c_adapter *, int, int));
 
 
 /* This macro is used to scale user-input to sensible values in almost all

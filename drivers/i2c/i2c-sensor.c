@@ -35,8 +35,8 @@
 
 /* Very inefficient for ISA detects, and won't work for 10-bit addresses! */
 int i2c_detect(struct i2c_adapter *adapter,
-		   struct i2c_address_data *address_data,
-		   i2c_found_addr_proc * found_proc)
+	       struct i2c_address_data *address_data,
+	       int (*found_proc) (struct i2c_adapter *, int, int))
 {
 	int addr, i, found, j, err;
 	struct i2c_force_data *this_force;
