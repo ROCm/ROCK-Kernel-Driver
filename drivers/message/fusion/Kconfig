@@ -29,7 +29,7 @@ config FUSION_MAX_SGE
 
 config FUSION_CTL
 	tristate "Fusion MPT misc device (ioctl) driver"
-	depends on MODULES && FUSION && m
+	depends on FUSION
 	---help---
 	  The Fusion MPT misc device driver provides specialized control
 	  of MPT adapters via system ioctl calls.  Use of ioctl calls to
