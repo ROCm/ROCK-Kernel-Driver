@@ -3,8 +3,6 @@
 
 #ifdef __KERNEL__
 
-#define struct_cpy(x,y) (*(x)=*(y))
-
 /* Written 2002 by Andi Kleen */ 
 
 /* Only used for special circumstances. Stolen from i386/string.h */ 

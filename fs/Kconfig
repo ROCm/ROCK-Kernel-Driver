@@ -552,7 +552,7 @@ endmenu
 menu "DOS/FAT/NT Filesystems"
 
 config FAT_FS
-	tristate "DOS FAT fs support"
+	tristate
 	select NLS
 	help
 	  If you want to use one of the FAT-based file systems (the MS-DOS,
@@ -595,7 +595,7 @@ config FAT_FS
 
 config MSDOS_FS
 	tristate "MSDOS fs support"
-	depends on FAT_FS
+	select FAT_FS
 	help
 	  This allows you to mount MSDOS partitions of your hard drive (unless
 	  they are compressed; to access compressed MSDOS partitions under
@@ -624,7 +624,7 @@ config MSDOS_FS
 
 config VFAT_FS
 	tristate "VFAT (Windows-95) fs support"
-	depends on FAT_FS
+	select FAT_FS
 	help
 	  This option provides support for normal Windows file systems with
 	  long filenames.  That includes non-compressed FAT-based file systems

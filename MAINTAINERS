@@ -1969,11 +1969,6 @@ M:	jbglaw@lug-owl.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
-STALLION TECHNOLOGIES MULTIPORT SERIAL BOARDS
-M:	support@stallion.oz.au
-W:	http://www.stallion.com
-S:	Supported
-
 STARFIRE/DURALAN NETWORK DRIVER
 P:	Ion Badulescu
 M:	ionut@cs.columbia.edu

@@ -4228,7 +4228,6 @@ int __init floppy_init(void)
 	int err, dr;
 
 	raw_cmd = NULL;
-	i = 0;
 
 	for (dr = 0; dr < N_DRIVE; dr++) {
 		disks[dr] = alloc_disk(1);

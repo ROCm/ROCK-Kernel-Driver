@@ -1,3 +1,5 @@
+#ifndef _LINUX_BLOCKGROUP_LOCK_H
+#define _LINUX_BLOCKGROUP_LOCK_H
 /*
  * Per-blockgroup locking for ext2 and ext3.
  *
@@ -55,4 +57,4 @@ static inline void bgl_lock_init(struct blockgroup_lock *bgl)
 #define sb_bgl_lock(sb, block_group) \
 	(&(sb)->s_blockgroup_lock.locks[(block_group) & (NR_BG_LOCKS-1)].lock)
 
-
+#endif

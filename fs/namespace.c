@@ -832,13 +832,11 @@ EXPORT_SYMBOL_GPL(do_add_mount);
 void mark_mounts_for_expiry(struct list_head *mounts)
 {
 	struct namespace *namespace;
-	struct list_head graveyard, *_p, *_n;
-	struct vfsmount *mnt;
+	struct vfsmount *mnt, *next;
+	LIST_HEAD(graveyard);
 
 	if (list_empty(mounts))
 		return;
-
-	INIT_LIST_HEAD(&graveyard);
 
 	spin_lock(&vfsmount_lock);
 
@@ -848,9 +846,7 @@ void mark_mounts_for_expiry(struct list_head *mounts)
 	 * - still marked for expiry (marked on the last call here; marks are
 	 *   cleared by mntput())
 	 */
-	list_for_each_safe(_p, _n, mounts) {
-		mnt = list_entry(_p, struct vfsmount, mnt_fslink);
-
+	list_for_each_entry_safe(mnt, next, mounts, mnt_fslink) {
 		if (!xchg(&mnt->mnt_expiry_mark, 1) ||
 		    atomic_read(&mnt->mnt_count) != 1)
 			continue;
@@ -913,8 +909,7 @@ void mark_mounts_for_expiry(struct list_head *mounts)
 			}
 
 			mntput(mnt);
-		}
-		else {
+		} else {
 			/* someone brought it back to life whilst we didn't
 			 * have any locks held so return it to the expiration
 			 * list */

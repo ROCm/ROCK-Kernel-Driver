@@ -250,7 +250,7 @@ static int afs_mntpt_follow_link(struct dentry *dentry, struct nameidata *nd)
 	if (IS_ERR(newmnt))
 		return PTR_ERR(newmnt);
 
-	struct_cpy(&newnd, nd);
+	newnd = *nd;
 	newnd.dentry = dentry;
 	err = do_add_mount(newmnt, &newnd, 0, &afs_vfsmounts);
 

@@ -3,7 +3,7 @@
 /*
  *	stallion.c  -- stallion multiport serial driver.
  *
- *	Copyright (C) 1996-1999  Stallion Technologies (support@stallion.oz.au).
+ *	Copyright (C) 1996-1999  Stallion Technologies
  *	Copyright (C) 1994-1996  Greg Ungerer.
  *
  *	This code is loosely based on the Linux serial driver, written by

@@ -1490,6 +1490,7 @@ no_dma:
 	uap->port.ops = &pmz_pops;
 	uap->port.type = PORT_PMAC_ZILOG;
 	uap->port.flags = 0;
+	spin_lock_init(&uap->port.lock);
 
 	/* Setup some valid baud rate information in the register
 	 * shadows so we don't write crap there before baud rate is
@@ -1985,8 +1986,6 @@ static int __init pmz_console_init(void)
 	/* Probe ports */
 	pmz_probe();
 
-#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
-#endif
 	/* TODO: Autoprobe console based on OF */
 	/* pmz_console.index = i; */
 	register_console(&pmz_console);

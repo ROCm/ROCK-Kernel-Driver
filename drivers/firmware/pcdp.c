@@ -193,7 +193,7 @@ hcdp_early_uart (void)
 	config_tables = __va(config_tables);
 
 	for (i = 0; i < systab->nr_tables; i++) {
-		if (efi_guidcmp(config_tables[i].guid, PCDP_TABLE_GUID) == 0) {
+		if (efi_guidcmp(config_tables[i].guid, HCDP_TABLE_GUID) == 0) {
 			pcdp = (struct pcdp *) config_tables[i].table;
 			break;
 		}
