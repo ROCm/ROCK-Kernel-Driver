@@ -51,7 +51,7 @@
 
 #include <asm/uaccess.h>
 
-struct ipv6_mib ipv6_statistics[NR_CPUS*2];
+DEFINE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);
 
 static struct packet_type ipv6_packet_type =
 {

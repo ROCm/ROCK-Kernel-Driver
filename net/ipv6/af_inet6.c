@@ -619,6 +619,81 @@ inet6_unregister_protosw(struct inet_protosw *p)
 	inet_unregister_protosw(p);
 }
 
+static int __init init_ipv6_mibs(void)
+{
+	int i;
+ 
+	ipv6_statistics[0] = kmalloc_percpu(sizeof (struct ipv6_mib),
+						GFP_KERNEL);
+	if (!ipv6_statistics[0])
+		goto err_ip_mib0;
+	ipv6_statistics[1] = kmalloc_percpu(sizeof (struct ipv6_mib),
+						GFP_KERNEL);
+	if (!ipv6_statistics[1])
+		goto err_ip_mib1;
+	
+	icmpv6_statistics[0] = kmalloc_percpu(sizeof (struct icmpv6_mib),
+						GFP_KERNEL);
+	if (!icmpv6_statistics[0])
+		goto err_icmp_mib0;
+	icmpv6_statistics[1] = kmalloc_percpu(sizeof (struct icmpv6_mib),
+						GFP_KERNEL);
+	if (!icmpv6_statistics[1])
+		goto err_icmp_mib1;
+	
+	udp_stats_in6[0] = kmalloc_percpu(sizeof (struct udp_mib),
+						GFP_KERNEL);
+	if (!udp_stats_in6[0])
+		goto err_udp_mib0;
+	udp_stats_in6[1] = kmalloc_percpu(sizeof (struct udp_mib),
+						GFP_KERNEL);
+	if (!udp_stats_in6[1])
+		goto err_udp_mib1;
+
+	/* Zero all percpu versions of the mibs */
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i)) {
+		memset(per_cpu_ptr(ipv6_statistics[0], i), 0,
+				sizeof (struct ipv6_mib));
+		memset(per_cpu_ptr(ipv6_statistics[1], i), 0,
+				sizeof (struct ipv6_mib));
+		memset(per_cpu_ptr(icmpv6_statistics[0], i), 0,
+				sizeof (struct icmpv6_mib));
+		memset(per_cpu_ptr(icmpv6_statistics[1], i), 0,
+				sizeof (struct icmpv6_mib));
+		memset(per_cpu_ptr(udp_stats_in6[0], i), 0,
+				sizeof (struct udp_mib));
+		memset(per_cpu_ptr(udp_stats_in6[1], i), 0,
+				sizeof (struct udp_mib));
+		}
+	}
+	return 0;
+
+err_udp_mib1:
+	kfree_percpu(udp_stats_in6[0]);
+err_udp_mib0:
+	kfree_percpu(icmpv6_statistics[1]);
+err_icmp_mib1:
+	kfree_percpu(icmpv6_statistics[0]);
+err_icmp_mib0:
+	kfree_percpu(ipv6_statistics[1]);
+err_ip_mib1:
+	kfree_percpu(ipv6_statistics[0]);
+err_ip_mib0:
+	return -ENOMEM;
+	
+}
+
+static void __exit cleanup_ipv6_mibs(void)
+{
+	kfree_percpu(ipv6_statistics[0]);
+	kfree_percpu(ipv6_statistics[1]);
+	kfree_percpu(icmpv6_statistics[0]);
+	kfree_percpu(icmpv6_statistics[1]);
+	kfree_percpu(udp_stats_in6[0]);
+	kfree_percpu(udp_stats_in6[1]);
+}
+	
 static int __init inet6_init(void)
 {
 	struct sk_buff *dummy_skb;
@@ -668,6 +743,11 @@ static int __init inet6_init(void)
 	 * be able to create sockets. (?? is this dangerous ??)
 	 */
 	(void) sock_register(&inet6_family_ops);
+
+	/* Initialise ipv6 mibs */
+	err = init_ipv6_mibs();
+	if (err)
+		goto init_mib_fail;
 	
 	/*
 	 *	ipngwg API draft makes clear that the correct semantics
@@ -735,6 +815,8 @@ icmp_fail:
 #if defined(MODULE) && defined(CONFIG_SYSCTL)
 	ipv6_sysctl_unregister();
 #endif
+	cleanup_ipv6_mibs();
+init_mib_fail:
 	return err;
 }
 module_init(inet6_init);
@@ -765,6 +847,7 @@ static void inet6_exit(void)
 #ifdef CONFIG_SYSCTL
 	ipv6_sysctl_unregister();	
 #endif
+	cleanup_ipv6_mibs();
 }
 module_exit(inet6_exit);
 #endif /* MODULE */
