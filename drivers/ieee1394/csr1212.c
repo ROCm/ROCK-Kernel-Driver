@@ -1348,6 +1348,12 @@ int csr1212_parse_keyval(struct csr1212_keyval *kv,
 	case CSR1212_KV_TYPE_DIRECTORY:
 		for (i = 0; i < kvi_len; i++) {
 			csr1212_quad_t ki = kvi->data[i];
+
+			/* Some devices put null entries in their unit
+			 * directories.  If we come across such and entry,
+			 * then skip it. */
+			if (ki == 0x0)
+				continue;
 			ret = csr1212_parse_dir_entry(kv, ki,
 						      (kv->offset +
 						       quads_to_bytes(i + 1)),
