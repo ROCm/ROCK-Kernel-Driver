@@ -391,6 +391,21 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 	if (!scsi_block_when_processing_errors(sdev))
 		return -ENODEV;
 
+	/* Check for deprecated ioctls ... all the ioctls which don't
+	 * follow the new unique numbering scheme are deprecated */
+	switch (cmd) {
+	case SCSI_IOCTL_SEND_COMMAND:
+	case SCSI_IOCTL_TEST_UNIT_READY:
+	case SCSI_IOCTL_BENCHMARK_COMMAND:
+	case SCSI_IOCTL_SYNC:
+	case SCSI_IOCTL_START_UNIT:
+	case SCSI_IOCTL_STOP_UNIT:
+		printk(KERN_WARNING "program %s is using a deprecated SCSI ioctl, please convert it to SG_IO\n", current->comm);
+		break;
+	default:
+		break;
+	}
+
 	switch (cmd) {
 	case SCSI_IOCTL_GET_IDLUN:
 		if (verify_area(VERIFY_WRITE, arg, sizeof(struct scsi_idlun)))
