@@ -453,8 +453,10 @@ struct i810_card {
 #define I810_IOREAD(size, type, card, off)				\
 ({									\
 	type val;							\
-	if (card->use_mmio) val=read##size(card->iobase_mmio+off);	\
-	else val=in##size(card->iobase+off);				\
+	if (card->use_mmio)						\
+		val=read##size(card->iobase_mmio+off);			\
+	else								\
+		val=in##size(card->iobase+off);				\
 	val;								\
 })
 
@@ -464,8 +466,10 @@ struct i810_card {
 
 #define I810_IOWRITE(size, val, card, off)				\
 ({									\
-	if (card->use_mmio) write##size(val, card->iobase_mmio+off);	\
-	else out##size(val, card->iobase+off);				\
+	if (card->use_mmio)						\
+		write##size(val, card->iobase_mmio+off);		\
+	else								\
+		out##size(val, card->iobase+off);			\
 })
 
 #define I810_IOWRITEL(val, card, off)	I810_IOWRITE(l, val, card, off)
@@ -2816,9 +2820,11 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 	 *	See if the primary codec comes ready. This must happen
 	 *	before we start doing DMA stuff
 	 */	
-	/* see i810_ac97_init for the next 7 lines (jsaw) */
-	if (card->use_mmio) readw(card->ac97base_mmio);
-	else inw(card->ac97base);
+	/* see i810_ac97_init for the next 10 lines (jsaw) */
+	if (card->use_mmio)
+		readw(card->ac97base_mmio);
+	else
+		inw(card->ac97base);
 	if (ich_use_mmio(card)) {
 		primary_codec_id = (int) readl(card->iobase_mmio + SDM) & 0x3;
 		printk(KERN_INFO "i810_audio: Primary codec has ID %d\n",
@@ -2836,8 +2842,10 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 		else 
 			printk("no response.\n");
 	}
-	if (card->use_mmio) readw(card->ac97base_mmio);
-	else inw(card->ac97base);
+	if (card->use_mmio)
+		readw(card->ac97base_mmio);
+	else
+		inw(card->ac97base);
 	return 1;
 }
 
@@ -2881,8 +2889,10 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 	for (num_ac97 = 0; num_ac97 < nr_ac97_max; num_ac97++) {
 		/* codec reset */
 		printk(KERN_INFO "i810_audio: Resetting connection %d\n", num_ac97);
-		if (card->use_mmio) readw(card->ac97base_mmio + 0x80*num_ac97);
-		else inw(card->ac97base + 0x80*num_ac97);
+		if (card->use_mmio)
+			readw(card->ac97base_mmio + 0x80*num_ac97);
+		else
+			inw(card->ac97base + 0x80*num_ac97);
 
 		/* If we have the SDATA_IN Map Register, as on ICH4, we
 		   do not loop thru all possible codec IDs but thru all 
@@ -3160,7 +3170,7 @@ static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device
 		}
 	}
 
-	if (!(card->use_mmio) && !(card->iobase)) {
+	if (!(card->use_mmio) && (!(card->iobase) || !(card->ac97base))) {
 		printk(KERN_ERR "i810_audio: No I/O resources available.\n");
 		goto out_mem;
 	}
