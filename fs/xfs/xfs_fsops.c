@@ -626,3 +626,28 @@ xfs_fs_thaw(
 	xfs_finish_freeze(mp);
 	return 0;
 }
+
+int
+xfs_fs_goingdown(
+	xfs_mount_t	*mp,
+	__uint32_t	inflags)
+{
+	switch (inflags)
+	{
+	case XFS_FSOP_GOING_FLAGS_DEFAULT:
+		xfs_fs_freeze(mp);
+		xfs_force_shutdown(mp, XFS_FORCE_UMOUNT);
+		xfs_fs_thaw(mp);
+		break;
+	case XFS_FSOP_GOING_FLAGS_LOGFLUSH:
+		xfs_force_shutdown(mp, XFS_FORCE_UMOUNT);
+		break;
+	case XFS_FSOP_GOING_FLAGS_NOLOGFLUSH:
+		xfs_force_shutdown(mp, XFS_FORCE_UMOUNT|XFS_LOG_IO_ERROR);
+		break;
+	default:
+		return XFS_ERROR(EINVAL);
+	}
+
+	return 0;
+}
