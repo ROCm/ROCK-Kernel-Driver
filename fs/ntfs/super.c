@@ -2574,7 +2574,7 @@ kmem_cache_t *ntfs_attr_ctx_cache;
 kmem_cache_t *ntfs_index_ctx_cache;
 
 /* A global default upcase table and a corresponding reference count. */
-wchar_t *default_upcase = NULL;
+ntfschar *default_upcase = NULL;
 unsigned long ntfs_nr_upcase_users = 0;
 
 /* Driver wide semaphore. */

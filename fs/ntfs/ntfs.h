@@ -156,7 +156,7 @@ extern int ntfs_read_compressed_block(struct page *page);
 
 /* From fs/ntfs/super.c */
 #define default_upcase_len 0x10000
-extern wchar_t *default_upcase;
+extern ntfschar *default_upcase;
 extern unsigned long ntfs_nr_upcase_users;
 extern struct semaphore ntfs_lock;
 

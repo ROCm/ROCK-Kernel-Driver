@@ -21,7 +21,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.19-WIP
+2.1.19 - Many cleanups, improvements, and a minor bug fix.
 
 	- Update ->setattr (fs/ntfs/inode.c::ntfs_setattr()) to refuse to
 	  change the uid, gid, and mode of an inode as we do not support NTFS
@@ -51,6 +51,9 @@ ToDo/Notes:
 	- Fix all the sparse bitwise warnings.  Had to change all the enums
 	  storing little endian values to #defines because we cannot set enums
 	  to be little endian so we had lots of bitwise warnings from sparse.
+	- Fix a bug found by the new sparse bitwise warnings where the default
+	  upcase table was defined as a pointer to wchar_t rather than ntfschar
+	  in fs/ntfs/ntfs.h and super.c.
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 
