@@ -651,9 +651,11 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 
 	/* An error occurred */
 	if (driver_byte(result) != 0 && 	/* An error occurred */
-	    SCpnt->sense_buffer[0] == 0xF0) {	/* Sense data is valid */
+	    (SCpnt->sense_buffer[0] & 0x7f) == 0x70) { /* Sense current */
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
+			if (!(SCpnt->sense_buffer[0] & 0x80))
+				break;
 			error_sector = (SCpnt->sense_buffer[3] << 24) |
 			(SCpnt->sense_buffer[4] << 16) |
 			(SCpnt->sense_buffer[5] << 8) |
@@ -696,7 +698,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 			 * hard error.
 			 */
 			print_sense("sd", SCpnt);
-			result = 0;
+			SCpnt->result = 0;
 			SCpnt->sense_buffer[0] = 0x0;
 			good_sectors = this_count;
 			break;

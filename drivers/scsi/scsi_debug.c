@@ -1722,10 +1722,7 @@ static int sdebug_driver_remove(struct device * dev)
 		return -ENODEV;
 	}
 
-        if (scsi_remove_host(sdbg_host->shost)) {
-                printk(KERN_ERR "%s: scsi_remove_host failed\n", __FUNCTION__);
-                return -EBUSY;
-        }
+        scsi_remove_host(sdbg_host->shost);
 
         list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
                 sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,

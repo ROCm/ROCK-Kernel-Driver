@@ -5361,7 +5361,6 @@ static Scsi_Host_Template driver_template = {
 	.eh_device_reset_handler =	megaraid_reset,
 	.eh_bus_reset_handler =		megaraid_reset,
 	.eh_host_reset_handler =	megaraid_reset,
-	.highmem_io =			1,
 };
 #include "scsi_module.c"
 

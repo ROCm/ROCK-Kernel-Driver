@@ -181,6 +181,7 @@ static void rw_intr(struct scsi_cmnd * SCpnt)
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
+	long error_sector;
 	struct scsi_cd *cd = scsi_cd(SCpnt->request->rq_disk);
 
 #ifdef DEBUG
@@ -194,33 +195,57 @@ static void rw_intr(struct scsi_cmnd * SCpnt)
 	 * memcpy's that could be avoided.
 	 */
 	if (driver_byte(result) != 0 &&		/* An error occurred */
-	    SCpnt->sense_buffer[0] == 0xF0 &&	/* Sense data is valid */
-	    (SCpnt->sense_buffer[2] == MEDIUM_ERROR ||
-	     SCpnt->sense_buffer[2] == VOLUME_OVERFLOW ||
-	     SCpnt->sense_buffer[2] == ILLEGAL_REQUEST)) {
-		long error_sector = (SCpnt->sense_buffer[3] << 24) |
-		(SCpnt->sense_buffer[4] << 16) |
-		(SCpnt->sense_buffer[5] << 8) |
-		SCpnt->sense_buffer[6];
-		if (SCpnt->request->bio != NULL)
-			block_sectors = bio_sectors(SCpnt->request->bio);
-		if (block_sectors < 4)
-			block_sectors = 4;
-		if (cd->device->sector_size == 2048)
-			error_sector <<= 2;
-		error_sector &= ~(block_sectors - 1);
-		good_sectors = error_sector - SCpnt->request->sector;
-		if (good_sectors < 0 || good_sectors >= this_count)
-			good_sectors = 0;
-		/*
-		 * The SCSI specification allows for the value returned by READ
-		 * CAPACITY to be up to 75 2K sectors past the last readable
-		 * block.  Therefore, if we hit a medium error within the last
-		 * 75 2K sectors, we decrease the saved size value.
-		 */
-		if (error_sector < get_capacity(cd->disk) &&
-		    cd->capacity - error_sector < 4 * 75)
-			set_capacity(cd->disk, error_sector);
+	    (SCpnt->sense_buffer[0] & 0x7f) == 0x70) { /* Sense current */
+		switch (SCpnt->sense_buffer[2]) {
+		case MEDIUM_ERROR:
+		case VOLUME_OVERFLOW:
+		case ILLEGAL_REQUEST:
+			if (!(SCpnt->sense_buffer[0] & 0x90))
+				break;
+			error_sector = (SCpnt->sense_buffer[3] << 24) |
+				(SCpnt->sense_buffer[4] << 16) |
+				(SCpnt->sense_buffer[5] << 8) |
+				SCpnt->sense_buffer[6];
+			if (SCpnt->request->bio != NULL)
+				block_sectors =
+					bio_sectors(SCpnt->request->bio);
+			if (block_sectors < 4)
+				block_sectors = 4;
+			if (cd->device->sector_size == 2048)
+				error_sector <<= 2;
+			error_sector &= ~(block_sectors - 1);
+			good_sectors = error_sector - SCpnt->request->sector;
+			if (good_sectors < 0 || good_sectors >= this_count)
+				good_sectors = 0;
+			/*
+			 * The SCSI specification allows for the value
+			 * returned by READ CAPACITY to be up to 75 2K
+			 * sectors past the last readable block.
+			 * Therefore, if we hit a medium error within the
+			 * last 75 2K sectors, we decrease the saved size
+			 * value.
+			 */
+			if (error_sector < get_capacity(cd->disk) &&
+			    cd->capacity - error_sector < 4 * 75)
+				set_capacity(cd->disk, error_sector);
+			break;
+
+		case RECOVERED_ERROR:
+
+			/*
+			 * An error occured, but it recovered.  Inform the
+			 * user, but make sure that it's not treated as a
+			 * hard error.
+			 */
+			print_sense("sr", SCpnt);
+			SCpnt->result = 0;
+			SCpnt->sense_buffer[0] = 0x0;
+			good_sectors = this_count;
+			break;
+
+		default:
+			break;
+		}
 	}
 
 	/*

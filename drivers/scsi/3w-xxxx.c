@@ -3451,7 +3451,6 @@ static Scsi_Host_Template driver_template = {
 	.cmd_per_lun		= TW_MAX_CMDS_PER_LUN,	
 	.use_clustering		= ENABLE_CLUSTERING,
 	.emulated		= 1,
-	.highmem_io		= 1,
 };
 #include "scsi_module.c"
 
