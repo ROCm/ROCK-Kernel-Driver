@@ -51,6 +51,8 @@
  *  Revision history
  *    02.08.2001  Initial release
  *    06.22.2001  Added I2S support
+ *    07.30.2003  Removed initialisation to zero for static variables
+ *		   (spdif[NR_DEVICE], i2s_fmt[NR_DEVICE], and devindex)
  */
 #include <linux/version.h>
 #include <linux/module.h>
@@ -1952,10 +1954,10 @@ static int proc_it8172_dump (char *buf, char **start, off_t fpos,
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int spdif[NR_DEVICE] = { 0, };
-static int i2s_fmt[NR_DEVICE] = { 0, };
+static int spdif[NR_DEVICE];
+static int i2s_fmt[NR_DEVICE];
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_PARM(spdif, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(spdif, "if 1 the S/PDIF digital output is enabled");
