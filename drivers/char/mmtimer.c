@@ -25,6 +25,8 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/mmtimer.h>
 #include <linux/miscdevice.h>
+#include <linux/posix-timers.h>
+
 #include <asm/uaccess.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/clksupport.h>
@@ -178,6 +180,45 @@ static struct miscdevice mmtimer_miscdev = {
 	&mmtimer_fops
 };
 
+static struct timespec sgi_clock_offset;
+static int sgi_clock_period;
+
+static int sgi_clock_get(struct timespec *tp) {
+	u64 nsec;
+
+	nsec = readq(RTC_COUNTER_ADDR) * sgi_clock_period
+			+ sgi_clock_offset.tv_nsec;
+	tp->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &tp->tv_nsec)
+			+ sgi_clock_offset.tv_sec;
+	return 0;
+};
+
+static int sgi_clock_set(struct timespec *tp) {
+
+	u64 nsec;
+	u64 rem;
+
+	nsec = readq(RTC_COUNTER_ADDR) * sgi_clock_period;
+
+	sgi_clock_offset.tv_sec = tp->tv_sec - div_long_long_rem(nsec, NSEC_PER_SEC, &rem);
+
+	if (rem <= tp->tv_nsec)
+		sgi_clock_offset.tv_nsec = tp->tv_sec - rem;
+	else {
+		sgi_clock_offset.tv_nsec = tp->tv_sec + NSEC_PER_SEC - rem;
+		sgi_clock_offset.tv_sec--;
+	}
+	return 0;
+}
+
+static struct k_clock sgi_clock = {
+	.res = 0,
+	.clock_set = sgi_clock_set,
+	.clock_get = sgi_clock_get,
+	.timer_create = do_posix_clock_notimer_create,
+	.nsleep = do_posix_clock_nonanosleep
+};
+
 /**
  * mmtimer_init - device initialization routine
  *
@@ -206,6 +247,9 @@ static int __init mmtimer_init(void)
 		       MMTIMER_NAME);
 		return -1;
 	}
+
+	sgi_clock_period = sgi_clock.res = NSEC_PER_SEC / sn_rtc_cycles_per_second;
+	register_posix_clock(CLOCK_SGI_CYCLE, &sgi_clock);
 
 	printk(KERN_INFO "%s: v%s, %ld MHz\n", MMTIMER_DESC, MMTIMER_VERSION,
 	       sn_rtc_cycles_per_second/(unsigned long)1E6);

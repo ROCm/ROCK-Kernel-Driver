@@ -162,6 +162,7 @@ struct	itimerval {
  */
 
 
+#define CLOCK_SGI_CYCLE 10
 #define MAX_CLOCKS 16
 #define CLOCKS_MASK  (CLOCK_REALTIME | CLOCK_MONOTONIC | \
                      CLOCK_REALTIME_HR | CLOCK_MONOTONIC_HR)
