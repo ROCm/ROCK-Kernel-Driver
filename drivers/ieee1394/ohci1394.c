@@ -995,8 +995,24 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 			return -EFAULT;
 		}
 
+		/* activate the legacy IR context */
+		if (ohci->ir_legacy_context.ohci == NULL) {
+			if (alloc_dma_rcv_ctx(ohci, &ohci->ir_legacy_context,
+					      DMA_CTX_ISO, 0, IR_NUM_DESC,
+					      IR_BUF_SIZE, IR_SPLIT_BUF_SIZE,
+					      OHCI1394_IsoRcvContextBase) < 0) {
+				PRINT(KERN_ERR, ohci->id, "%s: failed to allocate an IR context",
+				      __FUNCTION__);
+				return -ENOMEM;
+			}
+			ohci->ir_legacy_channels = 0;
+			initialize_dma_rcv_ctx(&ohci->ir_legacy_context, 1);
+
+			DBGMSG(ohci->id, "ISO receive legacy context activated");
+		}
+
 		mask = (u64)0x1<<arg;
-		
+
                 spin_lock_irqsave(&ohci->IR_channel_lock, flags);
 
 		if (ohci->ISO_channel_usage & mask) {
@@ -1005,23 +1021,6 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 			      __FUNCTION__, arg);
 			spin_unlock_irqrestore(&ohci->IR_channel_lock, flags);
 			return -EFAULT;
-		}
-
-		/* activate the legacy IR context */
-		if(ohci->ir_legacy_context.ohci == NULL) {
-			if(alloc_dma_rcv_ctx(ohci, &ohci->ir_legacy_context,
-					     DMA_CTX_ISO, 0, IR_NUM_DESC,
-					     IR_BUF_SIZE, IR_SPLIT_BUF_SIZE,
-					     OHCI1394_IsoRcvContextBase) < 0) {
-				PRINT(KERN_ERR, ohci->id,
-				      "%s: failed to allocate an IR context", 
-				      __FUNCTION__);
-				return -ENOMEM;
-			}
-			ohci->ir_legacy_channels = 0;
-			initialize_dma_rcv_ctx(&ohci->ir_legacy_context, 1);
-
-			DBGMSG(ohci->id, "ISO receive legacy context activated");
 		}
 
 		ohci->ISO_channel_usage |= mask;
@@ -2318,7 +2317,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 				 * or out manually into a port! The forced reset seems
 				 * to solve this problem. This mainly effects nForce2. */
 				if (loop_count > 10000) {
-					hpsb_reset_bus(host, 1);
+					ohci_devctl(host, RESET_BUS, LONG_RESET);
 					DBGMSG(ohci->id, "Detected bus-reset loop. Forced a bus reset!");
 					loop_count = 0;
 				}
