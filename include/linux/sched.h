@@ -152,7 +152,13 @@ typedef struct task_struct task_t;
 
 extern void sched_init(void);
 extern void init_idle(task_t *idle, int cpu);
+
 extern void show_state(void);
+extern void show_trace(unsigned long *stack);
+extern void show_stack(unsigned long *stack);
+extern void show_regs(struct pt_regs *);
+
+
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
@@ -166,7 +172,6 @@ extern unsigned long cache_decay_ticks;
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
 
-extern void flush_scheduled_tasks(void);
 extern int start_context_thread(void);
 extern int current_is_keventd(void);
 
@@ -220,15 +225,15 @@ struct signal_struct {
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
 
-        /* current thread group signal load-balancing target: */
-        task_t                  *curr_target;
+	/* current thread group signal load-balancing target: */
+	task_t			*curr_target;
 
+	/* shared signal handling: */
 	struct sigpending	shared_pending;
 
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
-
 	struct task_struct	*group_exit_task;
 };
 
@@ -374,7 +379,6 @@ struct task_struct {
 /* namespace */
 	struct namespace *namespace;
 /* signal handlers */
-	spinlock_t sigmask_lock;	/* Protects signal and blocked */
 	struct signal_struct *sig;
 
 	sigset_t blocked, real_blocked, shared_unblocked;
@@ -651,7 +655,6 @@ extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
-extern void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
@@ -714,6 +717,45 @@ do {									\
 	current->state = TASK_RUNNING;					\
 	remove_wait_queue(&wq, &__wait);				\
 } while (0)
+
+#define wait_event_interruptible(wq, condition)				\
+({									\
+	int __ret = 0;							\
+	if (!(condition))						\
+		__wait_event_interruptible(wq, condition, __ret);	\
+	__ret;								\
+})
+
+#define __wait_event_interruptible_timeout(wq, condition, ret)		\
+do {									\
+	wait_queue_t __wait;						\
+	init_waitqueue_entry(&__wait, current);				\
+									\
+	add_wait_queue(&wq, &__wait);					\
+	for (;;) {							\
+		set_current_state(TASK_INTERRUPTIBLE);			\
+		if (condition)						\
+			break;						\
+		if (!signal_pending(current)) {				\
+			ret = schedule_timeout(ret);			\
+			if (!ret)					\
+				break;					\
+			continue;					\
+		}							\
+		ret = -ERESTARTSYS;					\
+		break;							\
+	}								\
+	current->state = TASK_RUNNING;					\
+	remove_wait_queue(&wq, &__wait);				\
+} while (0)
+
+#define wait_event_interruptible_timeout(wq, condition, timeout)	\
+({									\
+	long __ret = timeout;						\
+	if (!(condition))						\
+		__wait_event_interruptible_timeout(wq, condition, __ret); \
+	__ret;								\
+})
 	
 /*
  * Must be called with the spinlock in the wait_queue_head_t held.
@@ -733,14 +775,6 @@ static inline void remove_wait_queue_locked(wait_queue_head_t *q,
 {
 	__remove_wait_queue(q,  wait);
 }
-
-#define wait_event_interruptible(wq, condition)				\
-({									\
-	int __ret = 0;							\
-	if (!(condition))						\
-		__wait_event_interruptible(wq, condition, __ret);	\
-	__ret;								\
-})
 
 #define remove_parent(p)	list_del_init(&(p)->sibling)
 #define add_parent(p, parent)	list_add_tail(&(p)->sibling,&(parent)->children)
@@ -949,7 +983,7 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
-   Athread cathreaders should have t->sigmask_lock.  */
+   callers must hold sig->siglock.  */
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);

@@ -187,7 +187,6 @@ static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 static struct i2ob_device i2ob_dev[MAX_I2OB<<4];
 static int i2ob_dev_count = 0;
 static struct gendisk i2o_disk[MAX_I2OB];
-static char i2o_names[MAX_I2OB * 8];
 
 /*
  * Mutex and spin lock for event handling synchronization
@@ -1254,7 +1253,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	}
 
 
-	strcpy(d->dev_name, i2o_disk[unit>>4].major_name);
+	strcpy(d->dev_name, i2o_disk[unit>>4].disk_name);
 
 	printk(KERN_INFO "%s: Max segments %d, queue depth %d, byte limit %d.\n",
 		 d->dev_name, i2ob_dev[unit].max_segments, i2ob_dev[unit].depth, limit);
@@ -1757,8 +1756,7 @@ int i2o_block_init(void)
 		disk->first_minor = i<<4;
 		disk->minor_shift = 4;
 		disk->fops = &i2ob_fops;
-		disk->major_name = i2o_names + i*8;
-		sprintf(disk->major_name, "i2o/hd%c", 'a' + i);
+		sprintf(disk->disk_name, "i2o/hd%c", 'a' + i);
 	}
 	
 	/*

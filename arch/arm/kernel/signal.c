@@ -373,7 +373,7 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 	regs->ARM_r0 = usig;
 	regs->ARM_sp = (unsigned long)frame;
 	regs->ARM_lr = retcode;
-	regs->ARM_pc = handler & (thumb ? ~1 : ~3);
+	regs->ARM_pc = handler;
 
 #ifdef CONFIG_CPU_32
 	regs->ARM_cpsr = cpsr;
@@ -503,7 +503,6 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
  */
 static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 {
-	struct k_sigaction *ka;
 	siginfo_t info;
 	int single_stepping;
 
@@ -519,11 +518,22 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	single_stepping = ptrace_cancel_bpt(current);
 
 	for (;;) {
-		unsigned long signr;
+		unsigned long signr = 0;
+		struct k_sigaction *ka;
+		sigset_t *mask = &current->blocked;
 
-		spin_lock_irq (&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq (&current->sigmask_lock);
+		local_irq_disable();
+		if (current->sig->shared_pending.head) {
+			spin_lock(&current->sig->siglock);
+			signr = dequeue_signal(&current->sig->shared_pending, mask, &info);
+			spin_unlock(&current->sig->siglock);
+		}
+		if (!signr) {
+			spin_lock(&current->sigmask_lock);
+			signr = dequeue_signal(&current->pending, mask, &info);
+			spin_unlock(&current->sigmask_lock);
+		}
+		local_irq_enable();
 
 		if (!signr)
 			break;
@@ -531,13 +541,14 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			/* Let the debugger run.  */
 			current->exit_code = signr;
-			current->state = TASK_STOPPED;
+			set_current_state(TASK_STOPPED);
 			notify_parent(current, SIGCHLD);
 			schedule();
 			single_stepping |= ptrace_cancel_bpt(current);
 
 			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code))
+			signr = current->exit_code;
+			if (signr == 0)
 				continue;
 			current->exit_code = 0;
 
@@ -589,7 +600,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 
 			case SIGSTOP: {
 				struct signal_struct *sig;
-				current->state = TASK_STOPPED;
+				set_current_state(TASK_STOPPED);
 				current->exit_code = signr;
 				sig = current->parent->sig;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))

@@ -126,9 +126,9 @@ int sa1100_request_dma (dma_device_t device, const char *device_id,
 	err = request_irq(IRQ_DMA0 + i, dma_irq_handler, SA_INTERRUPT,
 			  device_id, regs);
 	if (err) {
-		printk(KERN_ERR __FUNCTION__
-		       "unable to request IRQ %d for %s\n",
-		       IRQ_DMA0 + i, device_id);
+		printk(KERN_ERR
+		       "%s: unable to request IRQ %d for %s\n",
+		       __FUNCTION__, IRQ_DMA0 + i, device_id);
 		dma->device = 0;
 		return err;
 	}
@@ -164,12 +164,12 @@ void sa1100_free_dma(dma_regs_t *regs)
 		if (regs == (dma_regs_t *)&DDAR(i))
 			break;
 	if (i >= SA1100_DMA_CHANNELS) {
-		printk(KERN_ERR __FUNCTION__ ": bad DMA identifier\n");
+		printk(KERN_ERR "%s: bad DMA identifier\n", __FUNCTION__);
 		return;
 	}
 
 	if (!dma_chan[i].device) {
-		printk(KERN_ERR __FUNCTION__ "Trying to free free DMA\n");
+		printk(KERN_ERR "%s: Trying to free free DMA\n", __FUNCTION__);
 		return;
 	}
 
@@ -215,9 +215,13 @@ void sa1100_free_dma(dma_regs_t *regs)
 
 int sa1100_start_dma(dma_regs_t *regs, dma_addr_t dma_ptr, u_int size)
 {
-	long flags;
+	unsigned long flags;
 	u_long status;
 	int ret;
+
+	if (dma_ptr & 3)
+		printk(KERN_WARNING "DMA: unaligned start address (0x%08lx)\n",
+		       (unsigned long)dma_ptr);
 
 	if (size > MAX_DMA_SIZE)
 		return -EOVERFLOW;
@@ -324,7 +328,7 @@ void sa1100_reset_dma(dma_regs_t *regs)
 		if (regs == (dma_regs_t *)&DDAR(i))
 			break;
 	if (i >= SA1100_DMA_CHANNELS) {
-		printk(KERN_ERR __FUNCTION__ ": bad DMA identifier\n");
+		printk(KERN_ERR "%s: bad DMA identifier\n", __FUNCTION__);
 		return;
 	}
 

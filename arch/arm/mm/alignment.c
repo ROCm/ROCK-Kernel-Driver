@@ -611,4 +611,4 @@ static int __init alignment_init(void)
 	return 0;
 }
 
-__initcall(alignment_init);
+fs_initcall(alignment_init);

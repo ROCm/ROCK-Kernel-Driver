@@ -76,7 +76,7 @@ static struct gendisk z2ram_gendisk = {
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &z2_fops,
-	.major_name = "z2ram"
+	.disk_name = "z2ram"
 };
 
 static void

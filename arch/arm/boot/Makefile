@@ -10,6 +10,11 @@
 
 SYSTEM	=$(TOPDIR)/vmlinux
 
+# Note: the following conditions must always be true:
+#   ZRELADDR == virt_to_phys(TEXTADDR)
+#   PARAMS_PHYS must be with 4MB of ZRELADDR
+#   INITRD_PHYS must be in RAM
+
 ifeq ($(CONFIG_CPU_26),y)
 ZRELADDR	 = 0x02080000
 PARAMS_PHYS	 = 0x0207c000
@@ -129,14 +134,14 @@ zImage:	compressed/vmlinux
 bootpImage: bootp/bootp
 	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
-compressed/vmlinux: $(TOPDIR)/vmlinux
+compressed/vmlinux: $(TOPDIR)/vmlinux FORCE
 	@$(MAKE) -C compressed vmlinux
 
-bootp/bootp: zImage initrd
+bootp/bootp: zImage initrd FORCE
 	@$(MAKE) -C bootp bootp
 
 initrd:
-	@test "$(INITRD_PHYS)" != "" || (echo This architecture does not support INITRD; exit -1)
+	@test "$(INITRD_PHYS)" != "" || (echo This machine does not support INITRD; exit -1)
 	@test "$(INITRD)" != "" || (echo You must specify INITRD; exit -1)
 
 install: Image
@@ -149,3 +154,5 @@ clean:
 	$(RM) Image zImage bootpImage
 	@$(MAKE) -C compressed clean
 	@$(MAKE) -C bootp clean
+
+FORCE:

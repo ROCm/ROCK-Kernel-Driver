@@ -426,10 +426,7 @@ static void ir_write_bulk_callback (struct urb *urb)
 		urb->actual_length,
 		urb->transfer_buffer);
 
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-	
-	return;
+	schedule_task(&port->tqueue);
 }
 
 static void ir_read_bulk_callback (struct urb *urb)

@@ -64,17 +64,9 @@
 #define SA1111_SMCR	0x0004
 #define SA1111_SKID	0x0008
 
-#define _SBI_SKCR	_SA1111(SA1111_SKCR)
-#define _SBI_SMCR	_SA1111(SA1111_SMCR)
-#define _SBI_SKID	_SA1111(SA1111_SKID)
-
-#if LANGUAGE == C
-
 #define SBI_SKCR	__CCREG(SA1111_SKCR)
 #define SBI_SMCR	__CCREG(SA1111_SMCR)
 #define SBI_SKID	__CCREG(SA1111_SKID)
-
-#endif  /* LANGUAGE == C */
 
 #define SKCR_PLL_BYPASS	(1<<0)
 #define SKCR_RCLKEN	(1<<1)
@@ -135,21 +127,9 @@
 #define SA1111_SKPMC	0x020c
 #define SA1111_SKPTC	0x0210
 #define SA1111_SKPEN0	0x0214
-#define SA1111_SKPWN0	0x0218
+#define SA1111_SKPWM0	0x0218
 #define SA1111_SKPEN1	0x021c
 #define SA1111_SKPWM1	0x0220
-
-#define _SKPCR		_SA1111(SA1111_SKPCR)
-#define _SKCDR		_SA1111(SA1111_SKCDR)
-#define _SKAUD		_SA1111(SA1111_SKAUD)
-#define _SKPMC		_SA1111(SA1111_SKPMC)
-#define _SKPTC		_SA1111(SA1111_SKPTC)
-#define _SKPEN0		_SA1111(SA1111_SKPEN0)
-#define _SKPWM0		_SA1111(SA1111_SKPWM0)
-#define _SKPEN1		_SA1111(SA1111_SKPEN1)
-#define _SKPWM1		_SA1111(SA1111_SKPWM1)
-
-#if LANGUAGE == C
 
 #define SKPCR		__CCREG(SA1111_SKPCR)
 #define SKCDR		__CCREG(SA1111_SKCDR)
@@ -160,8 +140,6 @@
 #define SKPWM0		__CCREG(SA1111_SKPWM0)
 #define SKPEN1		__CCREG(SA1111_SKPEN1)
 #define SKPWM1		__CCREG(SA1111_SKPWM1)
-
-#endif  /* LANGUAGE == C */
 
 #define SKPCR_UCLKEN	(1<<0)
 #define SKPCR_ACCLKEN	(1<<1)
@@ -176,21 +154,14 @@
 /*
  * USB Host controller
  */
-#define _USB_OHCI_OP_BASE	_SA1111( 0x400 )
-#define _USB_STATUS		_SA1111( 0x518 )
-#define _USB_RESET		_SA1111( 0x51c )
-#define _USB_INTERRUPTEST	_SA1111( 0x520 )
+#define SA1111_USB		0x0400
 
-#define _USB_EXTENT		(_USB_INTERRUPTEST - _USB_OHCI_OP_BASE + 4)
-
-#if LANGUAGE == C
-
-#define USB_OHCI_OP_BASE	__CCREG(0x0400)
-#define USB_STATUS		__CCREG(0x0518)
-#define USB_RESET		__CCREG(0x051c)
-#define USB_INTERRUPTEST	__CCReG(0x0520)
-
-#endif  /* LANGUAGE == C */
+/*
+ * Offsets from SA1111_USB_BASE
+ */
+#define SA1111_USB_STATUS	0x0118
+#define SA1111_USB_RESET	0x011c
+#define SA1111_USB_IRQTEST	0x0120
 
 #define USB_RESET_FORCEIFRESET	(1 << 0)
 #define USB_RESET_FORCEHCRESET	(1 << 1)
@@ -451,82 +422,56 @@
  *    WAKE_POL0		Wake-up polarity selection 0
  *    WAKE_POL1		Wake-up polarity selection 1
  */
+#define SA1111_INTC		0x1600
 
-#define SA1111_INTTEST0		0x1600
-#define SA1111_INTTEST1		0x1604
-#define SA1111_INTEN0		0x1608
-#define SA1111_INTEN1		0x160c
-#define SA1111_INTPOL0		0x1610
-#define SA1111_INTPOL1		0x1614
-#define SA1111_INTTSTSEL	0x1618
-#define SA1111_INTSTATCLR0	0x161c
-#define SA1111_INTSTATCLR1	0x1620
-#define SA1111_INTSET0		0x1624
-#define SA1111_INTSET1		0x1628
-#define SA1111_WAKE_EN0		0x162c
-#define SA1111_WAKE_EN1		0x1630
-#define SA1111_WAKE_POL0	0x1634
-#define SA1111_WAKE_POL1	0x1638
+/*
+ * These are offsets from the above base.
+ */
+#define SA1111_INTTEST0		0x0000
+#define SA1111_INTTEST1		0x0004
+#define SA1111_INTEN0		0x0008
+#define SA1111_INTEN1		0x000c
+#define SA1111_INTPOL0		0x0010
+#define SA1111_INTPOL1		0x0014
+#define SA1111_INTTSTSEL	0x0018
+#define SA1111_INTSTATCLR0	0x001c
+#define SA1111_INTSTATCLR1	0x0020
+#define SA1111_INTSET0		0x0024
+#define SA1111_INTSET1		0x0028
+#define SA1111_WAKEEN0		0x002c
+#define SA1111_WAKEEN1		0x0030
+#define SA1111_WAKEPOL0		0x0034
+#define SA1111_WAKEPOL1		0x0038
 
-#define _INTTEST0	_SA1111(SA1111_INTTEST0)
-#define _INTTEST1	_SA1111(SA1111_INTTEST1)
-#define _INTEN0		_SA1111(SA1111_INTEN0)
-#define _INTEN1		_SA1111(SA1111_INTEN1)
-#define _INTPOL0	_SA1111(SA1111_INTPOL0)
-#define _INTPOL1	_SA1111(SA1111_INTPOL1)
-#define _INTTSTSEL	_SA1111(SA1111_INTTSTSEL)
-#define _INTSTATCLR0	_SA1111(SA1111_INTSTATCLR0)
-#define _INTSTATCLR1	_SA1111(SA1111_INTSTATCLR1)
-#define _INTSET0	_SA1111(SA1111_INTSET0)
-#define _INTSET1	_SA1111(SA1111_INTSET1)
-#define _WAKE_EN0	_SA1111(SA1111_WAKE_EN0)
-#define _WAKE_EN1	_SA1111(SA1111_WAKE_EN1)
-#define _WAKE_POL0	_SA1111(SA1111_WAKE_POL0)
-#define _WAKE_POL1	_SA1111(SA1111_WAKE_POL1)
-
-#if LANGUAGE == C
-
-#define INTTEST0	__CCREG(SA1111_INTTEST0)
-#define INTTEST1	__CCREG(SA1111_INTTEST1)
-#define INTEN0		__CCREG(SA1111_INTEN0)
-#define INTEN1		__CCREG(SA1111_INTEN1)
-#define INTPOL0		__CCREG(SA1111_INTPOL0)
-#define INTPOL1		__CCREG(SA1111_INTPOL1)
-#define INTTSTSEL	__CCREG(SA1111_INTTSTSEL)
-#define INTSTATCLR0	__CCREG(SA1111_INTSTATCLR0)
-#define INTSTATCLR1	__CCREG(SA1111_INTSTATCLR1)
-#define INTSET0		__CCREG(SA1111_INTSET0)
-#define INTSET1		__CCREG(SA1111_INTSET1)
-#define WAKE_EN0	__CCREG(SA1111_WAKE_EN0)
-#define WAKE_EN1	__CCREG(SA1111_WAKE_EN1)
-#define WAKE_POL0	__CCREG(SA1111_WAKE_POL0)
-#define WAKE_POL1	__CCREG(SA1111_WAKE_POL1)
-
-#endif  /* LANGUAGE == C */
+#define INTTEST0	__CCREG(SA1111_INTC + SA1111_INTTEST0)
+#define INTTEST1	__CCREG(SA1111_INTC + SA1111_INTTEST1)
+#define INTEN0		__CCREG(SA1111_INTC + SA1111_INTEN0)
+#define INTEN1		__CCREG(SA1111_INTC + SA1111_INTEN1)
+#define INTPOL0		__CCREG(SA1111_INTC + SA1111_INTPOL0)
+#define INTPOL1		__CCREG(SA1111_INTC + SA1111_INTPOL1)
+#define INTTSTSEL	__CCREG(SA1111_INTC + SA1111_INTTSTSEL)
+#define INTSTATCLR0	__CCREG(SA1111_INTC + SA1111_INTSTATCLR0)
+#define INTSTATCLR1	__CCREG(SA1111_INTC + SA1111_INTSTATCLR1)
+#define INTSET0		__CCREG(SA1111_INTC + SA1111_INTSET0)
+#define INTSET1		__CCREG(SA1111_INTC + SA1111_INTSET1)
+#define WAKE_EN0	__CCREG(SA1111_INTC + SA1111_WAKEEN0)
+#define WAKE_EN1	__CCREG(SA1111_INTC + SA1111_WAKEEN1)
+#define WAKE_POL0	__CCREG(SA1111_INTC + SA1111_WAKEPOL0)
+#define WAKE_POL1	__CCREG(SA1111_INTC + SA1111_WAKEPOL1)
 
 /*
  * PS/2 Trackpad and Mouse Interfaces
  *
- * Registers   (prefix kbd applies to trackpad interface, mse to mouse)
- *    KBDCR     Control Register
- *    KBDSTAT       Status Register
- *    KBDDATA       Transmit/Receive Data register
- *    KBDCLKDIV     Clock Division Register
- *    KBDPRECNT     Clock Precount Register
- *    KBDTEST1      Test register 1
- *    KBDTEST2      Test register 2
- *    KBDTEST3      Test register 3
- *    KBDTEST4      Test register 4
- *    MSECR
- *    MSESTAT
- *    MSEDATA
- *    MSECLKDIV
- *    MSEPRECNT
- *    MSETEST1
- *    MSETEST2
- *    MSETEST3
- *    MSETEST4
- *
+ * Registers
+ *    PS2CR		Control Register
+ *    PS2STAT		Status Register
+ *    PS2DATA		Transmit/Receive Data register
+ *    PS2CLKDIV		Clock Division Register
+ *    PS2PRECNT		Clock Precount Register
+ *    PS2TEST1		Test register 1
+ *    PS2TEST2		Test register 2
+ *    PS2TEST3		Test register 3
+ *    PS2TEST4		Test register 4
  */
 
 #define SA1111_KBD		0x0a00
@@ -564,17 +509,14 @@
  *    PCSSR	Sleep State Register
  */
 
-#define _PCCR		_SA1111( 0x1800 )
-#define _PCSSR		_SA1111( 0x1804 )
-#define _PCSR		_SA1111( 0x1808 )
+#define SA1111_PCMCIA	0x1600
 
-#if LANGUAGE == C
-
-#define PCCR		__CCREG(0x1800)
-#define PCSSR		__CCREG(0x1804)
-#define PCSR		__CCREG(0x1808)
-
-#endif  /* LANGUAGE == C */
+/*
+ * These are offsets from the above base.
+ */
+#define SA1111_PCCR	0x0000
+#define SA1111_PCSSR	0x0004
+#define SA1111_PCSR	0x0008
 
 #define PCSR_S0_READY	(1<<0)
 #define PCSR_S1_READY	(1<<1)
@@ -603,18 +545,61 @@
 #define PCSSR_S0_SLEEP	(1<<0)
 #define PCSSR_S1_SLEEP	(1<<1)
 
-struct sa1111_device {
+
+
+
+extern struct bus_type sa1111_bus_type;
+
+#define SA1111_DEVID_SBI	0
+#define SA1111_DEVID_SK		1
+#define SA1111_DEVID_USB	2
+#define SA1111_DEVID_SAC	3
+#define SA1111_DEVID_SSP	4
+#define SA1111_DEVID_PS2	5
+#define SA1111_DEVID_GPIO	6
+#define SA1111_DEVID_INT	7
+#define SA1111_DEVID_PCMCIA	8
+
+struct sa1111_dev {
 	struct device	dev;
-	struct resource	resource;
-	void		*base;
+	unsigned int	devid;
+	struct resource	res;
+	void		*mapbase;
+	unsigned int	skpcr_mask;
+	unsigned int	irq[6];
 };
 
-extern struct sa1111_device *sa1111;
+#define SA1111_DEV(_d)	container_of((_d), struct sa1111_dev, dev)
+
+struct sa1111_driver {
+	struct device_driver	drv;
+	unsigned int		devid;
+};
+
+#define SA1111_DRV(_d)	container_of((_d), struct sa1111_driver, drv)
+
+#define SA1111_DRIVER_NAME(_sadev) ((_sadev)->dev.driver->name)
+
+/*
+ * Probe for a SA1111 chip.
+ */
+extern int sa1111_init(unsigned long phys, unsigned int irq);
 
 /*
  * These frob the SKPCR register.
  */
-void sa1111_enable_device(unsigned int mask);
-void sa1111_disable_device(unsigned int mask);
+void sa1111_enable_device(struct sa1111_dev *);
+void sa1111_disable_device(struct sa1111_dev *);
+
+unsigned int sa1111_pll_clock(struct sa1111_dev *);
+
+#define SA1111_AUDIO_ACLINK	0
+#define SA1111_AUDIO_I2S	1
+
+void sa1111_select_audio_mode(struct sa1111_dev *sadev, int mode);
+int sa1111_set_audio_rate(struct sa1111_dev *sadev, int rate);
+int sa1111_get_audio_rate(struct sa1111_dev *sadev);
+
+int sa1111_check_dma_bug(dma_addr_t addr);
 
 #endif  /* _ASM_ARCH_SA1111 */

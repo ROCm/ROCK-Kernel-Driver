@@ -10,20 +10,49 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
-#include <asm/arch/assabet.h>
+#include <asm/mach-types.h>
+#include <asm/arch/neponset.h>
 #include <asm/hardware/sa1111.h>
 
 #include "sa1100_generic.h"
 #include "sa1111_generic.h"
 
+/*
+ * Neponset uses the Maxim MAX1600, with the following connections:
+ *
+ *   MAX1600      Neponset
+ *
+ *    A0VCC        SA-1111 GPIO A<1>
+ *    A1VCC        SA-1111 GPIO A<0>
+ *    A0VPP        CPLD NCR A0VPP
+ *    A1VPP        CPLD NCR A1VPP
+ *    B0VCC        SA-1111 GPIO A<2>
+ *    B1VCC        SA-1111 GPIO A<3>
+ *    B0VPP        ground (slot B is CF)
+ *    B1VPP        ground (slot B is CF)
+ *
+ *     VX          VCC (5V)
+ *     VY          VCC3_3 (3.3V)
+ *     12INA       12V
+ *     12INB       ground (slot B is CF)
+ *
+ * The MAX1600 CODE pin is tied to ground, placing the device in 
+ * "Standard Intel code" mode. Refer to the Maxim data sheet for
+ * the corresponding truth table.
+ */
+
 static int neponset_pcmcia_init(struct pcmcia_init *init)
 {
-	/* Set GPIO_A<3:0> to be outputs for PCMCIA/CF power controller: */
-	PA_DDR &= ~(GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3);
-
-	/* MAX1600 to standby mode: */
-	PA_DWR &= ~(GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3);
 	NCR_0 &= ~(NCR_A0VPP | NCR_A1VPP);
+
+	/*
+	 * Set GPIO_A<3:0> to be outputs for the MAX1600,
+	 * and switch to standby mode.
+	 */
+	PA_DDR = 0;
+	PA_SDR = 0;
+	PA_DWR = 0;
+	PA_SSR = 0;
 
 	return sa1111_pcmcia_init(init);
 }
@@ -34,29 +63,6 @@ neponset_pcmcia_configure_socket(const struct pcmcia_configure *conf)
 	unsigned int ncr_mask, pa_dwr_mask;
 	unsigned int ncr_set, pa_dwr_set;
 	int ret;
-
-	/* Neponset uses the Maxim MAX1600, with the following connections:
-
-	 *   MAX1600      Neponset
-	 *
-	 *    A0VCC        SA-1111 GPIO A<1>
-	 *    A1VCC        SA-1111 GPIO A<0>
-	 *    A0VPP        CPLD NCR A0VPP
-	 *    A1VPP        CPLD NCR A1VPP
-	 *    B0VCC        SA-1111 GPIO A<2>
-	 *    B1VCC        SA-1111 GPIO A<3>
-	 *    B0VPP        ground (slot B is CF)
-	 *    B1VPP        ground (slot B is CF)
-	 *
-	 *     VX          VCC (5V)
-	 *     VY          VCC3_3 (3.3V)
-	 *     12INA       12V
-	 *     12INB       ground (slot B is CF)
-	 *
-	 * The MAX1600 CODE pin is tied to ground, placing the device in 
-	 * "Standard Intel code" mode. Refer to the Maxim data sheet for
-	 * the corresponding truth table.
-	 */
 
 	switch (conf->sock) {
 	case 0:
@@ -135,13 +141,13 @@ int __init pcmcia_neponset_init(void)
 {
 	int ret = -ENODEV;
 
-	if (machine_is_assabet() && sa1111)
+	if (machine_is_assabet())
 		ret = sa1100_register_pcmcia(&neponset_pcmcia_ops);
 
 	return ret;
 }
 
-void __exit pcmcia_neponset_exit(void)
+void __devexit pcmcia_neponset_exit(void)
 {
 	sa1100_unregister_pcmcia(&neponset_pcmcia_ops);
 }

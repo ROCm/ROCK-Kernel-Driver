@@ -82,6 +82,19 @@ static void sg_proc_cleanup(void);
 
 #define SG_MAX_DEVS_MASK ((1U << KDEV_MINOR_BITS) - 1)
 
+/*
+ * Suppose you want to calculate the formula muldiv(x,m,d)=int(x * m / d)
+ * Then when using 32 bit integers x * m may overflow during the calculation.
+ * Replacing muldiv(x) by muldiv(x)=((x % d) * m) / d + int(x / d) * m
+ * calculates the same, but prevents the overflow when both m and d
+ * are "small" numbers (like HZ and USER_HZ).
+ * Of course an overflow is inavoidable if the result of muldiv doesn't fit
+ * in 32 bits.
+ */
+#define MULDIV(X,MUL,DIV) ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL))
+
+#define SG_DEFAULT_TIMEOUT MULDIV(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
+
 int sg_big_buff = SG_DEF_RESERVED_SIZE;
 /* N.B. This variable is readable and writeable via
    /proc/scsi/sg/def_reserved_size . Each time sg_open() is called a buffer
@@ -150,7 +163,8 @@ typedef struct sg_fd {		/* holds the state of a file descriptor */
 	struct sg_device *parentdp;	/* owning device */
 	wait_queue_head_t read_wait;	/* queue read until command done */
 	rwlock_t rq_list_lock;	/* protect access to list in req_arr */
-	int timeout;		/* defaults to SG_DEFAULT_TIMEOUT */
+	int timeout;		/* defaults to SG_DEFAULT_TIMEOUT      */
+	int timeout_user;	/* defaults to SG_DEFAULT_TIMEOUT_USER */
 	Sg_scatter_hold reserve;	/* buffer held for this file descriptor */
 	unsigned save_scat_len;	/* original length of trunc. scat. element */
 	Sg_request *headrp;	/* head of request slist, NULL->empty */
@@ -790,10 +804,15 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			return result;
 		if (val < 0)
 			return -EIO;
-		sfp->timeout = val;
+		if (val >= MULDIV (INT_MAX, USER_HZ, HZ))
+		    val = MULDIV (INT_MAX, USER_HZ, HZ);
+		sfp->timeout_user = val;
+		sfp->timeout = MULDIV (val, HZ, USER_HZ);
+
 		return 0;
 	case SG_GET_TIMEOUT:	/* N.B. User receives timeout as return value */
-		return sfp->timeout;	/* strange ..., for backward compatibility */
+				/* strange ..., for backward compatibility */
+		return sfp->timeout_user;
 	case SG_SET_FORCE_LOW_DMA:
 		result = get_user(val, (int *) arg);
 		if (result)
@@ -2432,6 +2451,7 @@ sg_add_sfp(Sg_device * sdp, int dev)
 	sfp->rq_list_lock = RW_LOCK_UNLOCKED;
 
 	sfp->timeout = SG_DEFAULT_TIMEOUT;
+	sfp->timeout_user = SG_DEFAULT_TIMEOUT_USER;
 	sfp->force_packid = SG_DEF_FORCE_PACK_ID;
 	sfp->low_dma = (SG_DEF_FORCE_LOW_DMA == 0) ?
 	    sdp->device->host->unchecked_isa_dma : 1;

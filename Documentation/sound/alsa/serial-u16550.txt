@@ -8,6 +8,7 @@ The snd_adaptor module parameter allows you to select either:
   1 - Midiator MS-124T support (1)
   2 - Midiator MS-124W S/A mode (2)
   3 - MS-124W M/B mode support (3)
+  4 - Generic device with multiple input support (4)
 
 For the Midiator MS-124W, you must set the physical M-S and A-B
 switches on the Midiator to match the driver mode you select.
@@ -82,3 +83,9 @@ compatible, nor are the other known models MS-101, MS-101B, MS-103, and MS-114.
 I do have documentation (tim.mann@compaq.com) that partially covers these models,
 but no units to experiment with.  The MS-124W support is tested with a real unit.
 The MS-124T support is untested, but should work.
+
+The Generic driver supports multiple input and output substreams over a single
+serial port.  Similar to Roland Soundcanvas mode, F5 NN is used to select the
+appropriate input or output stream (depending on the data direction).
+Additionally, the CTS signal is used to regulate the data flow.  The number of
+inputs is specified by the snd_ins parameter.

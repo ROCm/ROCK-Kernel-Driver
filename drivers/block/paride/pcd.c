@@ -301,7 +301,7 @@ static void pcd_init_units(void)
 		disk->major = major;
 		disk->first_minor = unit;
 		disk->minor_shift = 0;
-		disk->major_name = cd->name;
+		strcpy(disk->disk_name, cd->name);	/* umm... */
 		disk->fops = &pcd_bdops;
 	}
 }

@@ -43,6 +43,8 @@ struct address_space swapper_space = {
 	.a_ops			= &swap_aops,
 	.backing_dev_info	= &swap_backing_dev_info,
 	.i_shared_lock		= SPIN_LOCK_UNLOCKED,
+	.i_mmap			= LIST_HEAD_INIT(swapper_space.i_mmap),
+	.i_mmap_shared		= LIST_HEAD_INIT(swapper_space.i_mmap_shared),
 	.private_lock		= SPIN_LOCK_UNLOCKED,
 	.private_list		= LIST_HEAD_INIT(swapper_space.private_list),
 };

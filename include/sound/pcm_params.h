@@ -36,9 +36,13 @@ extern int _snd_pcm_hw_param_set(snd_pcm_hw_params_t *params,
 				 snd_pcm_hw_param_t var, unsigned int val, int dir);
 
 /* To share the same code we have  alsa-lib */
-#define snd_mask_bits(mask) (*(mask))
 #define INLINE static inline
 #define assert(a) (void)(a)
+
+#define SNDRV_MASK_BITS	64	/* we use so far 64bits only */
+#define SNDRV_MASK_SIZE	(SNDRV_MASK_BITS / 32)
+#define MASK_OFS(i)	((i) >> 5)
+#define MASK_BIT(i)	(1U << ((i) & 31))
 
 INLINE unsigned int ld2(u_int32_t v)
 {
@@ -72,91 +76,119 @@ INLINE size_t snd_mask_sizeof(void)
 
 INLINE void snd_mask_none(snd_mask_t *mask)
 {
-	snd_mask_bits(mask) = 0;
+	memset(mask, 0, sizeof(*mask));
 }
 
 INLINE void snd_mask_any(snd_mask_t *mask)
 {
-	snd_mask_bits(mask) = ~0U;
-}
-
-INLINE void snd_mask_load(snd_mask_t *mask, unsigned int msk)
-{
-	snd_mask_bits(mask) = msk;
+	memset(mask, 0xff, SNDRV_MASK_SIZE * sizeof(u_int32_t));
 }
 
 INLINE int snd_mask_empty(const snd_mask_t *mask)
 {
-	return snd_mask_bits(mask) == 0;
+	int i;
+	for (i = 0; i < SNDRV_MASK_SIZE; i++)
+		if (mask->bits[i])
+			return 0;
+	return 1;
 }
 
 INLINE unsigned int snd_mask_min(const snd_mask_t *mask)
 {
+	int i;
 	assert(!snd_mask_empty(mask));
-	return ffs(snd_mask_bits(mask)) - 1;
+	for (i = 0; i < SNDRV_MASK_SIZE; i++) {
+		if (mask->bits[i])
+			return ffs(mask->bits[i]) - 1 + (i << 5);
+	}
+	return 0;
 }
 
 INLINE unsigned int snd_mask_max(const snd_mask_t *mask)
 {
+	int i;
 	assert(!snd_mask_empty(mask));
-	return ld2(snd_mask_bits(mask));
+	for (i = SNDRV_MASK_SIZE - 1; i >= 0; i--) {
+		if (mask->bits[i])
+			return ld2(mask->bits[i]) + (i << 5);
+	}
+	return 0;
 }
 
 INLINE void snd_mask_set(snd_mask_t *mask, unsigned int val)
 {
-	assert(val <= SND_MASK_MAX);
-	snd_mask_bits(mask) |= (1U << val);
+	assert(val <= SNDRV_MASK_BITS);
+	mask->bits[MASK_OFS(val)] |= MASK_BIT(val);
 }
 
 INLINE void snd_mask_reset(snd_mask_t *mask, unsigned int val)
 {
-	assert(val <= SND_MASK_MAX);
-	snd_mask_bits(mask) &= ~(1U << val);
+	assert(val <= SNDRV_MASK_BITS);
+	mask->bits[MASK_OFS(val)] &= ~MASK_BIT(val);
 }
 
 INLINE void snd_mask_set_range(snd_mask_t *mask, unsigned int from, unsigned int to)
 {
-	assert(to <= SND_MASK_MAX && from <= to);
-	snd_mask_bits(mask) |= ((1U << (from - to + 1)) - 1) << from;
+	int i;
+	assert(to <= SNDRV_MASK_BITS && from <= to);
+	for (i = from; i <= to; i++)
+		mask->bits[MASK_OFS(i)] |= MASK_BIT(i);
 }
 
 INLINE void snd_mask_reset_range(snd_mask_t *mask, unsigned int from, unsigned int to)
 {
-	assert(to <= SND_MASK_MAX && from <= to);
-	snd_mask_bits(mask) &= ~(((1U << (from - to + 1)) - 1) << from);
+	int i;
+	assert(to <= SNDRV_MASK_BITS && from <= to);
+	for (i = from; i <= to; i++)
+		mask->bits[MASK_OFS(i)] &= ~MASK_BIT(i);
 }
 
 INLINE void snd_mask_leave(snd_mask_t *mask, unsigned int val)
 {
-	assert(val <= SND_MASK_MAX);
-	snd_mask_bits(mask) &= 1U << val;
+	unsigned int v;
+	assert(val <= SNDRV_MASK_BITS);
+	v = mask->bits[MASK_OFS(val)] & MASK_BIT(val);
+	snd_mask_none(mask);
+	mask->bits[MASK_OFS(val)] = v;
 }
 
 INLINE void snd_mask_intersect(snd_mask_t *mask, const snd_mask_t *v)
 {
-	snd_mask_bits(mask) &= snd_mask_bits(v);
+	int i;
+	for (i = 0; i < SNDRV_MASK_SIZE; i++)
+		mask->bits[i] &= v->bits[i];
 }
 
 INLINE int snd_mask_eq(const snd_mask_t *mask, const snd_mask_t *v)
 {
-	return snd_mask_bits(mask) == snd_mask_bits(v);
+	return ! memcmp(mask, v, SNDRV_MASK_SIZE * sizeof(u_int32_t));
 }
 
 INLINE void snd_mask_copy(snd_mask_t *mask, const snd_mask_t *v)
 {
-	snd_mask_bits(mask) = snd_mask_bits(v);
+	*mask = *v;
 }
 
 INLINE int snd_mask_test(const snd_mask_t *mask, unsigned int val)
 {
-	assert(val <= SND_MASK_MAX);
-	return snd_mask_bits(mask) & (1U << val);
+	assert(val <= SNDRV_MASK_BITS);
+	return mask->bits[MASK_OFS(val)] & MASK_BIT(val);
 }
 
 INLINE int snd_mask_single(const snd_mask_t *mask)
 {
+	int i, c = 0;
 	assert(!snd_mask_empty(mask));
-	return !(snd_mask_bits(mask) & (snd_mask_bits(mask) - 1));
+	for (i = 0; i < SNDRV_MASK_SIZE; i++) {
+		if (! mask->bits[i])
+			continue;
+		if (mask->bits[i] & (mask->bits[i] - 1))
+			return 0;
+		if (c)
+			return 0;
+		c++;
+	}
+	return 1;
 }
 
 INLINE int snd_mask_refine(snd_mask_t *mask, const snd_mask_t *v)
@@ -204,7 +236,7 @@ INLINE int snd_mask_refine_max(snd_mask_t *mask, unsigned int val)
 	assert(!snd_mask_empty(mask));
 	if (snd_mask_max(mask) <= val)
 		return 0;
-	snd_mask_reset_range(mask, val + 1, SND_MASK_MAX);
+	snd_mask_reset_range(mask, val + 1, SNDRV_MASK_BITS);
 	if (snd_mask_empty(mask))
 		return -EINVAL;
 	return 1;

@@ -304,7 +304,12 @@ struct sg_header
 
 
 /* Defaults, commented if they differ from original sg driver */
-#define SG_DEFAULT_TIMEOUT (60*HZ) /* HZ == 'jiffies in 1 second' */
+#ifdef __KERNEL__
+#define SG_DEFAULT_TIMEOUT_USER	(60*USER_HZ) /* HZ == 'jiffies in 1 second' */
+#else
+#define SG_DEFAULT_TIMEOUT	(60*HZ)	     /* HZ == 'jiffies in 1 second' */
+#endif
+
 #define SG_DEF_COMMAND_Q 0     /* command queuing is always on when
 				  the new interface is used */
 #define SG_DEF_UNDERRUN_FLAG 0

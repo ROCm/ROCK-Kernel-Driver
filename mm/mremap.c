@@ -53,6 +53,22 @@ end:
 	return pte;
 }
 
+#ifdef CONFIG_HIGHPTE	/* Save a few cycles on the sane machines */
+static inline int page_table_present(struct mm_struct *mm, unsigned long addr)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+
+	pgd = pgd_offset(mm, addr);
+	if (pgd_none(*pgd))
+		return 0;
+	pmd = pmd_offset(pgd, addr);
+	return pmd_present(*pmd);
+}
+#else
+#define page_table_present(mm, addr)	(1)
+#endif
+
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
 	pmd_t * pmd;
@@ -98,7 +114,18 @@ static int move_one_page(struct vm_area_struct *vma, unsigned long old_addr, uns
 	spin_lock(&mm->page_table_lock);
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
+		/*
+		 * Look to see whether alloc_one_pte_map needs to perform a
+		 * memory allocation.  If it does then we need to drop the
+		 * atomic kmap
+		 */
+		if (!page_table_present(mm, new_addr)) {
+			pte_unmap_nested(src);
+			src = NULL;
+		}
 		dst = alloc_one_pte_map(mm, new_addr);
+		if (src == NULL)
+			src = get_one_pte_map_nested(mm, old_addr);
 		error = copy_one_pte(mm, src, dst);
 		pte_unmap_nested(src);
 		pte_unmap(dst);
@@ -200,6 +227,7 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	if (!move_page_tables(vma, new_addr, addr, old_len)) {
 		if (allocated_vma) {
 			*new_vma = *vma;
+			INIT_LIST_HEAD(&new_vma->shared);
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
 			new_vma->vm_pgoff += (addr - vma->vm_start) >> PAGE_SHIFT;

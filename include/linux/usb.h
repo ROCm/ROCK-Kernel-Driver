@@ -84,6 +84,7 @@
 #include <linux/list.h>		/* for struct list_head */
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
+#include <linux/completion.h>	/* for struct completion */
 
 
 static __inline__ void wait_ms(unsigned int ms)
@@ -452,9 +453,9 @@ static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
  * User mode code can read these tables to choose which modules to load.
  * Declare the table as a MODULE_DEVICE_TABLE.
  *
- * The third probe() parameter will point to a matching entry from this
- * table.  (Null value reserved.)  Use the driver_data field for each
- * match to hold information tied to that match:  device quirks, etc.
+ * A probe() parameter will point to a matching entry from this table.
+ * Use the driver_info field for each match to hold information tied
+ * to that match:  device quirks, etc.
  *
  * Terminate the driver's table with an all-zeroes entry.
  * Use the flag values to control which fields are compared.
@@ -604,17 +605,14 @@ struct usb_device_id {
  * @name: The driver name should be unique among USB drivers,
  *	and should normally be the same as the module name.
  * @probe: Called to see if the driver is willing to manage a particular
- *	interface on a device.  The probe routine returns a handle that 
- *	will later be provided to disconnect(), or a null pointer to
- *	indicate that the driver will not handle the interface.
- *	The handle is normally a pointer to driver-specific data.
- *	If the probe() routine needs to access the interface
- *	structure itself, use usb_ifnum_to_if() to make sure it's using
- *	the right one.
+ *	interface on a device.  If it is, probe returns zero and uses
+ *	dev_set_drvdata() to associate driver-specific data with the
+ *	interface.  It may also use usb_set_interface() to specify the
+ *	appropriate altsetting.  If unwilling to manage the interface,
+ *	return a negative errno value.
  * @disconnect: Called when the interface is no longer accessible, usually
- *	because its device has been (or is being) disconnected.  The
- *	handle passed is what was returned by probe(), or was provided
- *	to usb_driver_claim_interface().
+ *	because its device has been (or is being) disconnected or the
+ *	driver module is being unloaded.
  * @ioctl: Used for drivers that want to talk to userspace through
  *	the "usbfs" filesystem.  This lets devices provide ways to
  *	expose information to user space regardless of where they
@@ -648,7 +646,7 @@ struct usb_driver {
 
 	void (*disconnect) (struct usb_interface *intf);
 
-	int (*ioctl) (struct usb_device *dev, unsigned int code, void *buf);
+	int (*ioctl) (struct usb_interface *intf, unsigned int code, void *buf);
 
 	const struct usb_device_id *id_table;
 
@@ -1073,6 +1071,57 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 #endif
 
 #define USB_CTRL_SET_TIMEOUT	3
+
+
+/**
+ * struct usb_sg_request - support for scatter/gather I/O
+ * @status: zero indicates success, else negative errno
+ * @bytes: counts bytes transferred.
+ *
+ * These requests are initialized using usb_sg_init(), and then are used
+ * as request handles passed to usb_sg_wait() or usb_sg_cancel().  Most
+ * members of the request object aren't for driver access.
+ *
+ * The status and bytecount values are valid only after usb_sg_wait()
+ * returns.  If the status is zero, then the bytecount matches the total
+ * from the request.
+ *
+ * After an error completion, drivers may need to clear a halt condition
+ * on the endpoint.
+ */
+struct usb_sg_request {
+	int			status;
+	size_t			bytes;
+
+	// members not documented above are private to usbcore,
+	// and are not provided for driver access!
+	spinlock_t		lock;
+
+	struct usb_device	*dev;
+	int			pipe;
+	struct scatterlist	*sg;
+	int			nents;
+
+	int			entries;
+	struct urb		**urbs;
+
+	int			count;
+	struct completion	complete;
+};
+
+int usb_sg_init (
+	struct usb_sg_request	*io,
+	struct usb_device	*dev,
+	unsigned		pipe, 
+	unsigned		period,
+	struct scatterlist	*sg,
+	int			nents,
+	size_t			length,
+	int			mem_flags
+);
+void usb_sg_cancel (struct usb_sg_request *io);
+void usb_sg_wait (struct usb_sg_request *io);
+
 
 /* -------------------------------------------------------------------------- */
 

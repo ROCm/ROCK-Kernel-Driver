@@ -331,6 +331,17 @@ static int ide_pci_enable(struct pci_dev *dev, ide_pci_device_t *d)
 		} else
 			printk(KERN_WARNING "%s: Not fully BIOS configured!\n", d->name);
 	}
+
+	/*
+	 * assume all devices can do 32-bit dma for now. we can add a
+	 * dma mask field to the ide_pci_device_t if we need it (or let
+	 * lower level driver set the dma mask)
+	 */
+	if (pci_set_dma_mask(dev, 0xffffffff)) {
+		printk(KERN_ERR "%s: can't set dma mask\n", d->name);
+		return -EBUSY;
+	}
+	 
 	/* FIXME: Temporary - until we put in the hotplug interface logic
 	   Check that the bits we want are not in use by someone else */
 	if (pci_request_region(dev, 4, "ide_tmp"))

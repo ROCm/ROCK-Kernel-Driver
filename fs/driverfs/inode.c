@@ -703,3 +703,4 @@ EXPORT_SYMBOL(driverfs_create_symlink);
 EXPORT_SYMBOL(driverfs_create_dir);
 EXPORT_SYMBOL(driverfs_remove_file);
 EXPORT_SYMBOL(driverfs_remove_dir);
+MODULE_LICENSE("GPL");

@@ -1129,7 +1129,7 @@ static void snd_es1968_playback_setup(es1968_t *chip, esschan_t *es,
 	/* clear WP interupts */
 	outw(1, chip->io_port + 0x04);
 	/* enable WP ints */
-	outw(inw(chip->io_port + 0x18) | 4, chip->io_port + 0x18);
+	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	freq = runtime->rate;
@@ -1260,7 +1260,7 @@ static void snd_es1968_capture_setup(es1968_t *chip, esschan_t *es,
 	/* clear WP interupts */
 	outw(1, chip->io_port + 0x04);
 	/* enable WP ints */
-	outw(inw(chip->io_port + 0x18) | 4, chip->io_port + 0x18);
+	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	freq = runtime->rate;
@@ -1446,8 +1446,10 @@ static esm_memory_t *snd_es1968_new_memory(es1968_t *chip, int size)
 __found:
 	if (buf->size > size) {
 		esm_memory_t *chunk = kmalloc(sizeof(*chunk), GFP_KERNEL);
-		if (chunk == NULL)
+		if (chunk == NULL) {
+			up(&chip->memory_mutex);
 			return NULL;
+		}
 		chunk->size = buf->size - size;
 		chunk->buf = buf->buf + size;
 		chunk->addr = buf->addr + size;
@@ -1821,7 +1823,7 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	apu_set_register(chip, apu, 11, 0x0000);
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	outw(1, chip->io_port + 0x04); /* clear WP interupts */
-	outw(inw(chip->io_port + 0x18) | 4, chip->io_port + 0x18); /* enable WP ints */
+	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ); /* enable WP ints */
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	snd_es1968_apu_set_freq(chip, apu, ((unsigned int)48000 << 16) / chip->clock); /* 48000 Hz */
@@ -2328,8 +2330,9 @@ static void snd_es1968_chip_init(es1968_t *chip)
 	outb(0, iobase + ASSP_CONTROL_C);	/* M: Disable ASSP, ASSP IRQ's and FM Port */
 
 	/* Enable IRQ's */
-	w = ESM_HIRQ_DSIE | ESM_HIRQ_MPU401;
+	w = ESM_HIRQ_DSIE | ESM_HIRQ_MPU401 | ESM_HIRQ_HW_VOLUME;
 	outw(w, iobase + ESM_PORT_HOST_IRQ);
+
 
 	/*
 	 * set up wavecache
@@ -2502,6 +2505,7 @@ static int snd_es1968_free(es1968_t *chip)
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
 	if (chip->res_io_port) {
+		snd_es1968_reset(chip);
 		release_resource(chip->res_io_port);
 		kfree_nocheck(chip->res_io_port);
 	}

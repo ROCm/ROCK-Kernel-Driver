@@ -151,7 +151,6 @@ static struct fd_data_type data_types[] = {
 
 /* current info on each unit */
 static struct amiga_floppy_struct unit[FD_MAX_UNITS];
-static char names[FD_MAX_UNITS][4];
 
 static struct timer_list flush_track_timer[FD_MAX_UNITS];
 static struct timer_list post_write_timer;
@@ -1747,8 +1746,7 @@ static int __init fd_probe_drives(void)
 			disk->first_minor = drive;
 			disk->minor_shift = 0;
 			disk->fops = &floppy_fops;
-			sprintf(names[drive], "fd%d", drive);
-			disk->major_name = names[drive];
+			sprintf(disk->disk_name, "fd%d", drive);
 			set_capacity(disk, 880*2);
 			add_disk(disk);
 		}

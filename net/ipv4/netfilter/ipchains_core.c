@@ -1252,7 +1252,7 @@ static struct ip_fwkernel *convert_ipfw(struct ip_fwuser *fwuser, int *errno)
 		return NULL;
 	}
 
-	fwkern = kmalloc(SIZEOF_STRUCT_IP_FW_KERNEL, GFP_KERNEL);
+	fwkern = kmalloc(SIZEOF_STRUCT_IP_FW_KERNEL, GFP_ATOMIC);
 	if (!fwkern) {
 		duprintf("convert_ipfw: kmalloc failed!\n");
 		*errno = ENOMEM;

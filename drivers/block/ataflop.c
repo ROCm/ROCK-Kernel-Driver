@@ -236,7 +236,6 @@ static struct atari_floppy_struct {
 				   disk change detection) */
 	int flags;		/* flags */
 	struct gendisk disk;
-	char name[4];
 } unit[FD_MAX_UNITS];
 
 #define	UD	unit[drive]
@@ -1976,8 +1975,7 @@ int __init atari_floppy_init (void)
 		unit[i].flags = 0;
 		unit[i].disk.major = MAJOR_NR;
 		unit[i].disk.first_minor = i;
-		sprintf(unit[i].name, "fd%d", i);
-		unit[i].disk.major_name = names[drive];
+		sprintf(unit[i].disk.disk_name, "fd%d", i);
 		unit[i].disk.fops = &floppy_fops;
 		set_capacity(&unit[i].disk, MAX_DISK_SIZE * 2);
 		add_disk(&unit[i].disk);

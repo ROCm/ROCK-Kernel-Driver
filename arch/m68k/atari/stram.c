@@ -1051,7 +1051,7 @@ static struct gendisk stram_disk = {
 	.first_minor = STRAM_MINOR,
 	.minor_shift = 0,
 	.fops = &stram_fops,
-	.major_name = "stram"
+	.disk_name = "stram"
 };
 
 int __init stram_device_init(void)

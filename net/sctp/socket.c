@@ -1,8 +1,8 @@
 /* Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
- * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001 Nokia, Inc.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 Intel Corp.
+ * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * 
  * This file is part of the SCTP kernel reference Implementation
@@ -82,8 +82,6 @@ static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
-static inline void sctp_sk_memcpy_msgname(struct sock *sk, char * msgname,
-					  int *addr_len, struct sk_buff *skb);
 static inline void sctp_sk_addr_set(struct sock *,
 				    const sockaddr_storage_t *newaddr,
 				    sockaddr_storage_t *saveaddr);
@@ -121,7 +119,7 @@ int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 
 	/* Disallow binding twice. */
 	if (!sctp_sk(sk)->ep->base.bind_addr.port)
-		retval = sctp_do_bind(sk, (sockaddr_storage_t *)uaddr, 
+		retval = sctp_do_bind(sk, (sockaddr_storage_t *)uaddr,
 				      addr_len);
 	else
 		retval = -EINVAL;
@@ -317,7 +315,7 @@ static int sctp_do_bind(struct sock *sk, sockaddr_storage_t *newaddr, int addr_l
 
 /* Unprotected by locks. Call only with socket lock sk->lock held! See
  * sctp_bindx() for a lock-protected call.
- */ 
+ */
 
 static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs, 
 			int addrcnt, int flags)
@@ -326,11 +324,11 @@ static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs,
 
 	SCTP_DEBUG_PRINTK("__sctp_bindx(sk: %p, addrs: %p, addrcnt: %d, "
 			  "flags: %s)\n", sk, addrs, addrcnt,
-			  (BINDX_ADD_ADDR == flags)?"ADD":
-			  ((BINDX_REM_ADDR == flags)?"REM":"BOGUS"));
+			  (BINDX_ADD_ADDR == flags) ? "ADD" :
+			  ((BINDX_REM_ADDR == flags) ? "REM" : "BOGUS"));
 
 	switch (flags) {
-       	case BINDX_ADD_ADDR:
+	case BINDX_ADD_ADDR:
 		retval = sctp_bindx_add(sk, addrs, addrcnt);
 		break;
 
@@ -411,7 +409,7 @@ err_bindx_add:
 				sctp_bindx_rem(sk, addrs, cnt);
 			return retval;
 		}
-        }
+	}
 
 	/* Notify the peer(s), assuming we have (an) association(s).
 	 * FIXME: for UDP, we have a 1-1-many mapping amongst sk, ep and asoc,
@@ -500,9 +498,8 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 		case AF_INET:
 			saveaddr = *((sockaddr_storage_t *)
 				     &addrs[cnt]);
-			saveaddr.v4.sin_port =
-				ntohs(saveaddr.v4.sin_port);
-			/* verify the port */
+			saveaddr.v4.sin_port = ntohs(saveaddr.v4.sin_port);
+			/* Verify the port.  */
 			if (saveaddr.v4.sin_port != bp->port) {
 				retval = -EINVAL;
 				goto err_bindx_rem;
@@ -606,7 +603,8 @@ err_bindx_rem:
  *
  * Returns 0 if ok, <0 errno code on error.
  */
-static int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr_storage *addrs,
+static int sctp_setsockopt_bindx(struct sock* sk,
+				 struct sockaddr_storage *addrs,
 				 int addrssize, int op)
 {
 	struct sockaddr_storage *kaddrs;
@@ -614,8 +612,7 @@ static int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr_storage *addrs
 	size_t addrcnt;
 
 	SCTP_DEBUG_PRINTK("sctp_do_setsocktopt_bindx: sk %p addrs %p"
-			  " addrssize %d opt %d\n", sk, addrs,
-			  addrssize, op);
+			  " addrssize %d opt %d\n", sk, addrs, addrssize, op);
 
 	/* Do we have an integer number of structs sockaddr_storage?  */
 	if (unlikely(addrssize <= 0 ||
@@ -781,7 +778,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 
 		memcpy(&to, msg->msg_name, msg->msg_namelen);
 		SCTP_DEBUG_PRINTK("Just memcpy'd. msg_name is "
-				  "0x%x:%u.\n", 
+				  "0x%x:%u.\n",
 				  to.v4.sin_addr.s_addr, to.v4.sin_port);
 
 		to.v4.sin_port = ntohs(to.v4.sin_port);
@@ -823,14 +820,14 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	} else {
 		/* For a peeled-off socket, ignore any associd specified by
 		 * the user with SNDRCVINFO.
-		 */ 
+		 */
 		if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sp->type) {
 			if (list_empty(&ep->asocs)) {
 				err = -EINVAL;
 				goto out_unlock;
 			}
 			asoc = list_entry(ep->asocs.next, sctp_association_t,
-				          asocs);
+					  asocs);
 		} else if (associd) {
 			asoc = sctp_id2assoc(sk, associd);
 		}
@@ -851,7 +848,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 			goto out_unlock;
 		}
 		if (sinfo_flags & MSG_ABORT) {
-			SCTP_DEBUG_PRINTK("Aborting association: %p\n",asoc);
+			SCTP_DEBUG_PRINTK("Aborting association: %p\n", asoc);
 			sctp_primitive_ABORT(asoc, NULL);
 			err = 0;
 			goto out_unlock;
@@ -866,8 +863,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 		 * either the default or the user specified stream counts.
 		 */
 		if (sinfo) {
-			if (!sinit ||
-			    (sinit && !sinit->sinit_num_ostreams)) {
+			if (!sinit || (sinit && !sinit->sinit_num_ostreams)) {
 				/* Check against the defaults. */
 				if (sinfo->sinfo_stream >=
 				    sp->initmsg.sinit_num_ostreams) {
@@ -988,7 +984,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 		/* If the user didn't specify SNDRCVINFO, make up one with
 		 * some defaults.
 		 */
-		default_sinfo.sinfo_stream  = asoc->defaults.stream;
+		default_sinfo.sinfo_stream = asoc->defaults.stream;
 		default_sinfo.sinfo_ppid = asoc->defaults.ppid;
 		sinfo = &default_sinfo;
 	}
@@ -1011,7 +1007,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	/* FIXME: This looks wrong so I'll comment out.
 	 * We should be able to use this same technique for
 	 * primary address override!  --jgrimm
-	 */ 
+	 */
 	/* If the user gave us an address, copy it in.  */
 	if (msg->msg_name) {
 		chunk->transport = sctp_assoc_lookup_paddr(asoc, &to);
@@ -1025,7 +1021,7 @@ static int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	/* Copy the message from the user.  */
 	err = sctp_user_addto_chunk(chunk, msg_len, msg->msg_iov);
 	if (err < 0)
-		goto out_free; 
+		goto out_free;
 
 	SCTP_DEBUG_PRINTK("Copied message to chunk: %p.\n", chunk);
 
@@ -1096,12 +1092,13 @@ do_interrupted:
  *  flags   - flags sent or received with the user message, see Section
  *            5 for complete description of the flags.
  */
-static struct sk_buff * sctp_skb_recv_datagram(struct sock *, int, int, int *);
+static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 
 static int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 			int noblock, int flags, int *addr_len)
 {
 	sctp_ulpevent_t *event = NULL;
+	sctp_opt_t *sp = sctp_sk(sk);
 	struct sk_buff *skb;
 	int copied;
 	int err = 0;
@@ -1147,19 +1144,16 @@ static int sctp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
 	sock_recv_timestamp(msg, sk, skb);
 	if (sctp_ulpevent_is_notification(event)) {
 		msg->msg_flags |= MSG_NOTIFICATION;
+		sp->pf->event_msgname(event, msg->msg_name, addr_len);
 	} else {
-		/* Copy the address.  */
-		if (addr_len && msg->msg_name)
-			sctp_sk_memcpy_msgname(sk, msg->msg_name,
-						addr_len, skb);
+		sp->pf->skb_msgname(skb, msg->msg_name, addr_len);
 	}
 
 	/* Check if we allow SCTP_SNDRCVINFO. */
-	if (sctp_sk(sk)->subscribe.sctp_data_io_event)
+	if (sp->subscribe.sctp_data_io_event)
 		sctp_ulpevent_read_sndrcvinfo(event, msg);
-
 #if 0
-	/* FIXME: we should be calling IP layer too.  */
+	/* FIXME: we should be calling IP/IPv6 layers.  */
 	if (sk->protinfo.af_inet.cmsg_flags)
 		ip_cmsg_recv(msg, skb);
 #endif
@@ -1176,7 +1170,8 @@ out:
 	return err;
 }
 
-static inline int sctp_setsockopt_disable_fragments(struct sock *sk, char *optval, int optlen)
+static inline int sctp_setsockopt_disable_fragments(struct sock *sk, 
+						    char *optval, int optlen)
 {
 	int val;
 
@@ -1191,7 +1186,8 @@ static inline int sctp_setsockopt_disable_fragments(struct sock *sk, char *optva
 	return 0;
 }
 
-static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval, int optlen)
+static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval, 
+					     int optlen)
 {
 	if (optlen != sizeof(struct sctp_event_subscribe))
 		return -EINVAL;
@@ -1200,7 +1196,8 @@ static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval, int 
 	return 0;
 }
 
-static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval, int optlen)
+static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval, 
+					    int optlen)
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 
@@ -1236,7 +1233,7 @@ static int sctp_setsockopt(struct sock *sk, int level, int optname,
 			   char *optval, int optlen)
 {
 	int retval = 0;
-	char * tmp;
+	char *tmp;
 	sctp_protocol_t *proto = sctp_get_protocol();
 	struct list_head *pos;
 	sctp_func_t *af;
@@ -1332,7 +1329,7 @@ static struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 {
 	int error = -EOPNOTSUPP;
 
-	*err = error; 
+	*err = error;
 	return NULL;
 }
 
@@ -1356,19 +1353,9 @@ static int sctp_init_sock(struct sock *sk)
 
 	proto = sctp_get_protocol();
 
-	/* Create a per socket endpoint structure.  Even if we
-	 * change the data structure relationships, this may still
-	 * be useful for storing pre-connect address information.
-	 */
-        ep = sctp_endpoint_new(proto, sk, GFP_KERNEL);
-	if (!ep)
-		return -ENOMEM;
-
 	sp = sctp_sk(sk);
 
 	/* Initialize the SCTP per socket area.  */
-
-	sp->ep = ep;
 	sp->type = SCTP_SOCKET_UDP;
 
 	/* FIXME:  The next draft (04) of the SCTP Sockets Extensions
@@ -1425,6 +1412,16 @@ static int sctp_init_sock(struct sock *sk)
 	 * for UDP-style sockets only.
 	 */
 	sp->autoclose         = 0;
+	sp->pf = sctp_get_pf_specific(sk->family);
+	/* Create a per socket endpoint structure.  Even if we
+	 * change the data structure relationships, this may still
+	 * be useful for storing pre-connect address information.
+	 */
+	ep = sctp_endpoint_new(proto, sk, GFP_KERNEL);
+	if (NULL == ep)
+		return -ENOMEM;
+
+	sp->ep = ep;
 
 	SCTP_DBG_OBJCNT_INC(sock);
 	return 0;
@@ -1836,8 +1833,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 		case PF_INET6:
 			SCTP_V6(tmpaddr.v6.sin6_family = AF_INET6;
 				tmpaddr.v6.sin6_port = snum;
-				tmpaddr.v6.sin6_addr =
-				inet6_sk(sk)->rcv_saddr;
+				tmpaddr.v6.sin6_addr = inet6_sk(sk)->rcv_saddr;
 			)
 			break;
 
@@ -1855,7 +1851,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 		 * that this port/socket (sk) combination are already
 		 * in an endpoint.
 		 */
-		for( ; sk2 != NULL; sk2 = sk2->bind_next) {
+		for ( ; sk2 != NULL; sk2 = sk2->bind_next) {
 			sctp_endpoint_t *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
@@ -1887,7 +1883,7 @@ static long sctp_get_port_local(struct sock *sk, unsigned short snum)
 	 * SO_REUSEADDR on this socket -sk-).
 	 */
 	if (pp->sk == NULL) {
-		pp->fastreuse = sk->reuse? 1 : 0;
+		pp->fastreuse = sk->reuse ? 1 : 0;
 	} else if (pp->fastreuse && sk->reuse == 0) {
 		pp->fastreuse = 0;
 	}
@@ -1974,7 +1970,7 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 	err = -EINVAL;
 	if (sock->state != SS_UNCONNECTED)
 		goto out;
-        switch (sock->type) {
+	switch (sock->type) {
 	case SOCK_SEQPACKET:
 		err = sctp_seqpacket_listen(sk, backlog);
 		break;
@@ -2073,7 +2069,7 @@ static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsi
 		pp->sk = NULL;
 		if ((pp->next = head->chain) != NULL)
 			pp->next->pprev = &pp->next;
-		head->chain= pp;
+		head->chain = pp;
 		pp->pprev = &head->chain;
 	}
 	SCTP_DEBUG_PRINTK("sctp_bucket_create() ends, pp=%p\n", pp);
@@ -2127,7 +2123,7 @@ static int sctp_autobind(struct sock *sk)
 	switch (sk->family) {
 	case PF_INET:
 		autoaddr.v4.sin_family = AF_INET;
-		autoaddr.v4.sin_addr.s_addr  = INADDR_ANY;
+		autoaddr.v4.sin_addr.s_addr = INADDR_ANY;
 		autoaddr.v4.sin_port = htons(inet_sk(sk)->num);
 		addr_len = sizeof(struct sockaddr_in);
 		break;
@@ -2202,7 +2198,7 @@ static int sctp_msghdr_parse(const struct msghdr *msg, sctp_cmsgs_t *cmsgs)
 			return -EINVAL;
 		}
 
-	        /* Should we parse this header or ignore?  */
+		/* Should we parse this header or ignore?  */
 		if (cmsg->cmsg_level != IPPROTO_SCTP)
 			continue;
 
@@ -2433,41 +2429,6 @@ no_packet:
 	return NULL;
 }
 
-/* Copy an approriately formatted address for msg_name.  */
-static inline void sctp_sk_memcpy_msgname(struct sock *sk, char * msgname,
-					  int *addr_len, struct sk_buff *skb)
-{
-	struct sockaddr_in *sin;
-	struct sockaddr_in6 *sin6 __attribute__ ((unused));
-	struct sctphdr *sh;
-
-	/* The sockets layer handles copying this out to user space.  */
-	switch (sk->family) {
-	case PF_INET:
-		sin = (struct sockaddr_in *)msgname;
-		if (addr_len)
-			*addr_len = sizeof(struct sockaddr_in);
-		sin->sin_family = AF_INET;
-		sh = (struct sctphdr *) skb->h.raw;
-		sin->sin_port = sh->source;
-		sin->sin_addr.s_addr = skb->nh.iph->saddr;
-		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
-		break;
-
-	case PF_INET6:
-		SCTP_V6(
-			/* FIXME: Need v6 code here.   We should convert
-			 * V4 addresses to PF_INET6 format.  See ipv6/udp.c
-			 * for an example. --jgrimm
-			 */
-		);
-		break;
-
-	default: /* Should not get here. */
-		break;
-	};
-}
-
 static inline int sctp_sendmsg_verify_name(struct sock *sk, struct msghdr *msg)
 {
 	sockaddr_storage_t *sa;
@@ -2590,7 +2551,7 @@ static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p, int msg
 
 		/* Let another process have a go.  Since we are going
 		 * to sleep anyway.
-	 	 */
+		 */
 		sctp_release_sock(sk);
 		current_timeo = schedule_timeout(current_timeo);
 		sctp_lock_sock(sk);

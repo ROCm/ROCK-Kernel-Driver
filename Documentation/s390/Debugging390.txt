@@ -238,7 +238,7 @@ they go to 64 Bit.
 
 On 390 our limitations & strengths make us slightly different.
 For backward compatibility ( because of the psw address hi bit which
-indicates whether we are in 31 or 24 bit mode ) we are only allowed 
+indicates whether we are in 31 or 64 bit mode ) we are only allowed 
 use 31 bits (2GB) of our 32 bit addresses. However, 
 we use entirely separate address  spaces for the user & kernel.
 

@@ -3,7 +3,8 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o
+export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o \
+                pcm_sgbuf.o
 
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
@@ -12,7 +13,7 @@ snd-objs     += sound_oss.o info_oss.o
 endif
 
 snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
-		pcm_memory.o
+		pcm_memory.o pcm_sgbuf.o
 
 snd-rawmidi-objs  := rawmidi.o
 snd-timer-objs    := timer.o
@@ -40,7 +41,7 @@ obj-$(CONFIG_SND_MPU401) += snd-rawmidi.o snd.o snd-timer.o
 obj-$(CONFIG_SND_ALS100) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_AZT2320) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_CMI8330) += snd-pcm.o snd-timer.o snd.o
-obj-$(CONFIG_SND_DT0197H) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
+obj-$(CONFIG_SND_DT019X) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ES18XX) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_OPL3SA2) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_SGALAXY) += snd-pcm.o snd-timer.o snd.o

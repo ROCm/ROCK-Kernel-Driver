@@ -84,7 +84,6 @@ static int floppy_count;
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 
 static struct gendisk disks[2];
-static char names[2][4];
 
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
 
@@ -197,8 +196,7 @@ int swimiop_init(void)
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
-		sprintf(names[i], "fd%d", i);
-		disk->major_name = names[i];
+		sprintf(disk->disk_name, "fd%d", i);
 		set_capacity(disk, 2880 * 2);
 		add_disk(disk);
 	}

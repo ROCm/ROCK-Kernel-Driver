@@ -94,7 +94,6 @@ static int kstack_depth_to_print = 24;
 
 #ifdef CONFIG_MODULES
 
-extern struct module *module_list;
 extern struct module kernel_module;
 
 static inline int kernel_text_address(unsigned long addr)
@@ -137,15 +136,16 @@ void show_trace(unsigned long * stack)
 	if (!stack)
 		stack = (unsigned long*)&stack;
 
-	printk("Call Trace: ");
+	printk("Call Trace:");
+#if CONFIG_KALLSYMS
+	printk("\n");
+#endif
 	i = 1;
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
 		addr = *stack++;
 		if (kernel_text_address(addr)) {
-			if (i && ((i % 6) == 0))
-				printk("\n   ");
-			printk("[<%08lx>] ", addr);
-			i++;
+			printk(" [<%08lx>]", addr);
+			print_symbol("%s\n", addr);
 		}
 	}
 	printk("\n");
@@ -206,8 +206,11 @@ void show_registers(struct pt_regs *regs)
 		esp = regs->esp;
 		ss = regs->xss & 0xffff;
 	}
+	print_modules();
 	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s\nEFLAGS: %08lx\n",
 		smp_processor_id(), 0xffff & regs->xcs, regs->eip, print_tainted(), regs->eflags);
+
+	print_symbol("EIP is at %s\n", regs->eip);
 	printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
 		regs->eax, regs->ebx, regs->ecx, regs->edx);
 	printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
@@ -225,7 +228,7 @@ void show_registers(struct pt_regs *regs)
 		printk("\nStack: ");
 		show_stack((unsigned long*)esp);
 
-		printk("\nCode: ");
+		printk("Code: ");
 		if(regs->eip < PAGE_OFFSET)
 			goto bad;
 
@@ -268,6 +271,7 @@ static void handle_BUG(struct pt_regs *regs)
 		(unsigned long)file < PAGE_OFFSET || __get_user(c, file))
 		file = "<bad filename>";
 
+	printk("------------[ cut here ]------------\n");
 	printk("kernel BUG at %s:%d!\n", file, line);
 
 no_bug:

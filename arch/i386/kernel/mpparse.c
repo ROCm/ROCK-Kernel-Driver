@@ -1019,10 +1019,39 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 /* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
 
+extern FADT_DESCRIPTOR acpi_fadt;
+
 void __init mp_config_ioapic_for_sci(int irq)
 {
 	int ioapic;
 	int ioapic_pin;
+	struct acpi_table_madt *madt;
+	struct acpi_table_int_src_ovr *entry = NULL;
+	void *madt_end;
+	acpi_status status;
+
+	/*
+	 * Ensure that if there is an interrupt source override entry
+	 * for the ACPI SCI, we leave it as is. Unfortunately this involves
+	 * walking the MADT again.
+	 */
+	status = acpi_get_firmware_table("APIC", 1, ACPI_LOGICAL_ADDRESSING,
+		(acpi_table_header **) &madt);
+	if (ACPI_SUCCESS(status)) {
+		madt_end = (unsigned long)madt + madt->header.length;
+
+		entry = (struct acpi_table_int_src_ovr *)
+                ((unsigned long) madt + sizeof(struct acpi_table_madt));
+
+		while ((void *) entry < madt_end) {
+                	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
+			    acpi_fadt.sci_int == entry->global_irq)
+                		return;
+
+                	entry = (struct acpi_table_int_src_ovr *)
+                	        ((unsigned long) entry + entry->header.length);
+        	}
+	}
 
 	ioapic = mp_find_ioapic(irq);
 

@@ -51,38 +51,34 @@ struct linux_ebus {
 	struct linux_prom_ebus_intmask	 ebus_intmask;
 };
 
-struct linux_ebus_dma {
-	unsigned int dcsr;
-	unsigned int dacr;
-	unsigned int dbcr;
+struct ebus_dma_info {
+	spinlock_t	lock;
+	unsigned long	regs;
+
+	unsigned int	flags;
+#define EBUS_DMA_FLAG_USE_EBDMA_HANDLER		0x00000001
+
+	/* These are only valid is EBUS_DMA_FLAG_USE_EBDMA_HANDLER is
+	 * set.
+	 */
+	void (*callback)(struct ebus_dma_info *p, int event, void *cookie);
+	void *client_cookie;
+	unsigned int	irq;
+#define EBUS_DMA_EVENT_ERROR	1
+#define EBUS_DMA_EVENT_DMA	2
+#define EBUS_DMA_EVENT_DEVICE	4
+
+	unsigned char	name[64];
 };
 
-#define EBUS_DCSR_INT_PEND	0x00000001
-#define EBUS_DCSR_ERR_PEND	0x00000002
-#define EBUS_DCSR_DRAIN		0x00000004
-#define EBUS_DCSR_INT_EN	0x00000010
-#define EBUS_DCSR_RESET		0x00000080
-#define EBUS_DCSR_WRITE		0x00000100
-#define EBUS_DCSR_EN_DMA	0x00000200
-#define EBUS_DCSR_CYC_PEND	0x00000400
-#define EBUS_DCSR_DIAG_RD_DONE	0x00000800
-#define EBUS_DCSR_DIAG_WR_DONE	0x00001000
-#define EBUS_DCSR_EN_CNT	0x00002000
-#define EBUS_DCSR_TC		0x00004000
-#define EBUS_DCSR_DIS_CSR_DRN	0x00010000
-#define EBUS_DCSR_BURST_SZ_MASK	0x000c0000
-#define EBUS_DCSR_BURST_SZ_1	0x00080000
-#define EBUS_DCSR_BURST_SZ_4	0x00000000
-#define EBUS_DCSR_BURST_SZ_8	0x00040000
-#define EBUS_DCSR_BURST_SZ_16	0x000c0000
-#define EBUS_DCSR_DIAG_EN	0x00100000
-#define EBUS_DCSR_DIS_ERR_PEND	0x00400000
-#define EBUS_DCSR_TCI_DIS	0x00800000
-#define EBUS_DCSR_EN_NEXT	0x01000000
-#define EBUS_DCSR_DMA_ON	0x02000000
-#define EBUS_DCSR_A_LOADED	0x04000000
-#define EBUS_DCSR_NA_LOADED	0x08000000
-#define EBUS_DCSR_DEV_ID_MASK	0xf0000000
+extern int ebus_dma_register(struct ebus_dma_info *p);
+extern int ebus_dma_irq_enable(struct ebus_dma_info *p, int on);
+extern void ebus_dma_unregister(struct ebus_dma_info *p);
+extern int ebus_dma_request(struct ebus_dma_info *p, dma_addr_t bus_addr,
+			    size_t len);
+extern void ebus_dma_prepare(struct ebus_dma_info *p, int write);
+extern unsigned int ebus_dma_residue(struct ebus_dma_info *p);
+extern void ebus_dma_enable(struct ebus_dma_info *p, int on);
 
 extern struct linux_ebus		*ebus_chain;
 

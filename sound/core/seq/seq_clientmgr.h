@@ -61,6 +61,7 @@ struct _snd_seq_client {
 	struct list_head ports_list_head;
 	rwlock_t ports_lock;
 	struct semaphore ports_mutex;
+	int convert32;		/* convert 32->64bit */
 
 	/* output pool */
 	pool_t *pool;		/* memory pool for this client */

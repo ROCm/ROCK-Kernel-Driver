@@ -4,6 +4,7 @@
  */
 
 #include "linux/config.h"
+#include "linux/kernel.h"
 #include "linux/sched.h"
 #include "linux/notifier.h"
 #include "linux/mm.h"
@@ -109,8 +110,6 @@ static int start_kernel_proc(void *unused)
 	return(0);
 }
 
-extern unsigned long high_physmem;
-
 #ifdef CONFIG_HOST_2G_2G
 #define TOP 0x80000000
 #else
@@ -160,7 +159,7 @@ void set_cmdline(char *cmd)
 
 	snprintf(ptr, (argv1_end - ptr) * sizeof(*ptr), " [%s]", cmd);
 	memset(argv1_begin + strlen(argv1_begin), '\0', 
-	       argv1_end - argv1_begin - strlen(argv1_begin));  
+	       argv1_end - argv1_begin - strlen(argv1_begin));
 }
 
 static char *usage_string = 
@@ -263,10 +262,12 @@ unsigned long brk_start;
 
 static struct vm_reserved kernel_vm_reserved;
 
+#define MIN_VMALLOC (32 * 1024 * 1024)
+
 int linux_main(int argc, char **argv)
 {
 	unsigned long avail;
-	unsigned long virtmem_size;
+	unsigned long virtmem_size, max_physmem;
 	unsigned int i, add, err;
 	void *sp;
 
@@ -278,7 +279,7 @@ int linux_main(int argc, char **argv)
 	}
 	if(have_root == 0) add_arg(saved_command_line, DEFAULT_COMMAND_LINE);
 
-	if(!jail)
+	if(!jail || debug)
 		remap_data(ROUND_DOWN(&_stext), ROUND_UP(&_etext), 1);
 	remap_data(ROUND_DOWN(&_sdata), ROUND_UP(&_edata), 1);
 	brk_start = (unsigned long) sbrk(0);
@@ -295,20 +296,20 @@ int linux_main(int argc, char **argv)
 	argv1_end = &argv[1][strlen(argv[1])];
   
 	set_usable_vm(uml_physmem, get_kmem_end());
+
+	highmem = 0;
+	max_physmem = get_kmem_end() - uml_physmem - MIN_VMALLOC;
+	if(physmem_size > max_physmem){
+		highmem = physmem_size - max_physmem;
+		physmem_size -= highmem;
+	}
+
 	high_physmem = uml_physmem + physmem_size;
 	high_memory = (void *) high_physmem;
-	setup_physmem(uml_physmem, uml_reserved, physmem_size);
-
-	/* Kernel vm starts after physical memory and is either the size
-	 * of physical memory or the remaining space left in the kernel
-	 * area of the address space, whichever is smaller.
-	 */
 
 	start_vm = VMALLOC_START;
-	if(start_vm >= get_kmem_end())
-		panic("Physical memory too large to allow any kernel "
-		      "virtual memory");
 
+	setup_physmem(uml_physmem, uml_reserved, physmem_size);
 	virtmem_size = physmem_size;
 	avail = get_kmem_end() - start_vm;
 	if(physmem_size > avail) virtmem_size = avail;

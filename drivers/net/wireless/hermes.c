@@ -45,7 +45,6 @@
 #include <linux/threads.h>
 #include <linux/smp.h>
 #include <asm/io.h>
-#include <linux/ptrace.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -53,7 +52,7 @@
 
 #include "hermes.h"
 
-static char version[] __initdata = "hermes.c: 5 Apr 2002 David Gibson <hermes@gibson.dropbear.id.au>";
+static char version[] __initdata = "hermes.c: 4 Jul 2002 David Gibson <hermes@gibson.dropbear.id.au>";
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 #ifdef MODULE_LICENSE
@@ -70,13 +69,13 @@ MODULE_LICENSE("Dual MPL/GPL");
  * Debugging helpers
  */
 
+#define IO_TYPE(hw)	((hw)->io_space ? "IO " : "MEM ")
+#define DMSG(stuff...) do {printk(KERN_DEBUG "hermes @ %s0x%x: " , IO_TYPE(hw), hw->iobase); \
+			printk(stuff);} while (0)
+
 #undef HERMES_DEBUG
 #ifdef HERMES_DEBUG
-
 #include <stdarg.h>
-
-#define DMSG(stuff...) do {printk(KERN_DEBUG "hermes @ 0x%x: " , hw->iobase); \
-			printk(stuff);} while (0)
 
 #define DEBUG(lvl, stuff...) if ( (lvl) <= HERMES_DEBUG) DMSG(stuff)
 
@@ -86,7 +85,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 #endif /* ! HERMES_DEBUG */
 
-#define IO_TYPE(hw)	((hw)->io_space ? "IO " : "MEM ")
 
 /*
  * Internal functions
@@ -111,7 +109,6 @@ static int hermes_issue_cmd(hermes_t *hw, u16 cmd, u16 param0)
 		udelay(1);
 		reg = hermes_read_regn(hw, CMD);
 	}
-	DEBUG(3, "hermes_issue_cmd: did %d retries.\n", CMD_BUSY_TIMEOUT-k);
 	if (reg & HERMES_CMD_BUSY) {
 		return -EBUSY;
 	}
@@ -143,7 +140,7 @@ void hermes_struct_init(hermes_t *hw, ulong address,
 #endif
 }
 
-int hermes_reset(hermes_t *hw)
+int hermes_init(hermes_t *hw)
 {
 	u16 status, reg;
 	int err = 0;
@@ -194,8 +191,6 @@ int hermes_reset(hermes_t *hw)
 		udelay(10);
 		reg = hermes_read_regn(hw, EVSTAT);
 	}
-
-	DEBUG(0, "Reset completed in %d iterations\n", CMD_INIT_TIMEOUT - k);
 
 	hermes_write_regn(hw, SWSUPPORT0, HERMES_MAGIC);
 
@@ -303,9 +298,6 @@ int hermes_allocate(hermes_t *hw, u16 size, u16 *fid)
 
 	err = hermes_docmd_wait(hw, HERMES_CMD_ALLOC, size, NULL);
 	if (err) {
-		printk(KERN_WARNING "hermes @ %s0x%lx: "
-		       "Frame allocation command failed (0x%X).\n",
-		       IO_TYPE(hw), hw->iobase, err);
 		return err;
 	}
 
@@ -393,12 +385,10 @@ static int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 	}
 
 	if (reg & HERMES_OFFSET_BUSY) {
-		DEBUG(1,"hermes_bap_seek: timeout\n");
 		return -ETIMEDOUT;
 	}
 
 	if (reg & HERMES_OFFSET_ERR) {
-		DEBUG(1,"hermes_bap_seek: BAP error\n");
 		return -EIO;
 	}
 
@@ -472,6 +462,7 @@ int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
 	int err = 0;
 	int dreg = bap ? HERMES_DATA1 : HERMES_DATA0;
 	u16 rlength, rtype;
+	int nwords;
 
 	if ( (bufsize < 0) || (bufsize % 2) )
 		return -EINVAL;
@@ -500,10 +491,9 @@ int hermes_read_ltv(hermes_t *hw, int bap, u16 rid, int bufsize,
 		       "(rid=0x%04x, len=0x%04x)\n",
 		       IO_TYPE(hw), hw->iobase,
 		       HERMES_RECLEN_TO_BYTES(rlength), bufsize, rid, rlength);
-	
-	/* FIXME: we should read the min of the requested length and
-           the actual record length */
-	hermes_read_words(hw, dreg, buf, bufsize / 2);
+
+	nwords = min_t(int, rlength - 1, bufsize / 2);
+	hermes_read_words(hw, dreg, buf, nwords);
 
  out:
 	return err;
@@ -516,9 +506,6 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 	int err = 0;
 	int count;
 	
-	DEBUG(3, "write_ltv(): bap=%d rid=0x%04x length=%d (value=0x%04x)\n",
-	      bap, rid, length, * ((u16 *)value));
-
 	err = hermes_bap_seek(hw, bap, rid, 0);
 	if (err)
 		goto out;
@@ -538,7 +525,7 @@ int hermes_write_ltv(hermes_t *hw, int bap, u16 rid,
 }
 
 EXPORT_SYMBOL(hermes_struct_init);
-EXPORT_SYMBOL(hermes_reset);
+EXPORT_SYMBOL(hermes_init);
 EXPORT_SYMBOL(hermes_docmd_wait);
 EXPORT_SYMBOL(hermes_allocate);
 

@@ -362,11 +362,7 @@ static void empeg_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-
-	return;
-
+	schedule_task(&port->tqueue);
 }
 
 

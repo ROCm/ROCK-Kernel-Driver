@@ -50,6 +50,7 @@ extern struct drive_info_struct drive_info;
 EXPORT_SYMBOL(drive_info);
 #endif
 
+extern unsigned long cpu_khz;
 extern unsigned long get_cmos_time(void);
 
 /* platform dependent support */
@@ -80,6 +81,7 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(get_cmos_time);
+EXPORT_SYMBOL(cpu_khz);
 EXPORT_SYMBOL(apm_info);
 
 #ifdef CONFIG_DEBUG_IOVIRT
@@ -134,6 +136,7 @@ EXPORT_SYMBOL(mmx_copy_page);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_data);
 EXPORT_SYMBOL(cpu_online_map);
+EXPORT_SYMBOL(cpu_callout_map);
 EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 

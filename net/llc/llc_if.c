@@ -30,17 +30,16 @@
 
 /**
  *	llc_sap_open - open interface to the upper layers.
- *	@nw_indicate: pointer to indicate function of upper layer.
- *	@nw_confirm: pointer to confirm function of upper layer.
  *	@lsap: SAP number.
- *	@sap: pointer to allocated SAP (output argument).
+ *	@func: rcv func for datalink protos
  *
  *	Interface function to upper layer. Each one who wants to get a SAP
  *	(for example NetBEUI) should call this function. Returns the opened
  *	SAP for success, NULL for failure.
  */
-struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
-			     llc_prim_call_t nw_confirm, u8 lsap)
+struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
+						  struct net_device *dev,
+						  struct packet_type *pt))
 {
 	/* verify this SAP is not already open; if so, return error */
 	struct llc_sap *sap;
@@ -57,9 +56,8 @@ struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 		goto err;
 	/* allocated a SAP; initialize it and clear out its memory pool */
 	sap->laddr.lsap = lsap;
-	sap->ind = nw_indicate;
-	sap->conf = nw_confirm;
-	sap->parent_station = llc_station_get();
+	sap->rcv_func	= func;
+	sap->station	= llc_station_get();
 	/* initialized SAP; add it to list of SAPs this station manages */
 	llc_sap_save(sap);
 out:
@@ -99,24 +97,16 @@ void llc_sap_close(struct llc_sap *sap)
 void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 			       u8 *dmac, u8 dsap)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	prim.data = &prim_data;
-	prim.sap  = sap;
-	prim.prim = LLC_DATAUNIT_PRIM;
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
 
-	prim_data.udata.skb        = skb;
-	prim_data.udata.saddr.lsap = sap->laddr.lsap;
-	prim_data.udata.daddr.lsap = dsap;
-	memcpy(prim_data.udata.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.udata.daddr.mac, dmac, IFHWADDRLEN);
-
-	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
-	ev->data.prim.prim = LLC_DATAUNIT_PRIM;
-	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = &prim;
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_DATAUNIT_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
 	llc_sap_state_process(sap, skb);
 }
 
@@ -130,27 +120,19 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
  *	This function is called when upper layer wants to send a TEST pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
-				 u8 *dmac, u8 dsap)
+void llc_build_and_send_test_pkt(struct llc_sap *sap, 
+				 struct sk_buff *skb, u8 *dmac, u8 dsap)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	prim.data = &prim_data;
-	prim.sap  = sap;
-	prim.prim = LLC_TEST_PRIM;
-
-	prim_data.test.skb        = skb;
-	prim_data.test.saddr.lsap = sap->laddr.lsap;
-	prim_data.test.daddr.lsap = dsap;
-	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.test.daddr.mac, dmac, IFHWADDRLEN);
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
 	
-	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
-	ev->data.prim.prim = LLC_TEST_PRIM;
-	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = &prim;
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_TEST_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
 	llc_sap_state_process(sap, skb);
 }
 
@@ -167,24 +149,16 @@ void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
 void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
 				u8 *dmac, u8 dsap)
 {
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	prim.data = &prim_data;
-	prim.sap  = sap;
-	prim.prim = LLC_XID_PRIM;
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
 
-	prim_data.xid.skb        = skb;
-	prim_data.xid.saddr.lsap = sap->laddr.lsap;
-	prim_data.xid.daddr.lsap = dsap;
-	memcpy(prim_data.xid.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.xid.daddr.mac, dmac, IFHWADDRLEN);
-
-	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
-	ev->data.prim.prim = LLC_XID_PRIM;
-	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = &prim;
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_XID_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
 	llc_sap_state_process(sap, skb);
 }
 
@@ -219,11 +193,10 @@ int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	}
 	ev = llc_conn_ev(skb);
-	ev->type	    = LLC_CONN_EV_TYPE_PRIM;
-	ev->data.prim.prim  = LLC_DATA_PRIM;
-	ev->data.prim.type  = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data  = NULL;
-	skb->dev	    = llc->dev;
+	ev->type      = LLC_CONN_EV_TYPE_PRIM;
+	ev->prim      = LLC_DATA_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	skb->dev      = llc->dev;
 	rc = llc_conn_state_process(sk, skb);
 out:
 	return rc;
@@ -268,10 +241,9 @@ int llc_establish_connection(struct sock *sk, u8 *lmac, u8 *dmac, u8 dsap)
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
-		ev->data.prim.prim = LLC_CONN_PRIM;
-		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-		ev->data.prim.data = NULL;
+		ev->type      = LLC_CONN_EV_TYPE_PRIM;
+		ev->prim      = LLC_CONN_PRIM;
+		ev->prim_type = LLC_PRIM_TYPE_REQ;
 		rc = llc_conn_state_process(sk, skb);
 	}
 out_put:
@@ -306,12 +278,11 @@ int llc_send_disc(struct sock *sk)
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto out;
-	sk->state	   = TCP_CLOSING;
-	ev		   = llc_conn_ev(skb);
-	ev->type	   = LLC_CONN_EV_TYPE_PRIM;
-	ev->data.prim.prim = LLC_DISC_PRIM;
-	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = NULL;
+	sk->state     = TCP_CLOSING;
+	ev	      = llc_conn_ev(skb);
+	ev->type      = LLC_CONN_EV_TYPE_PRIM;
+	ev->prim      = LLC_DISC_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
 	rc = llc_conn_state_process(sk, skb);
 out:
 	sock_put(sk);
@@ -327,8 +298,7 @@ out:
  *	it to connection component state machine. Returns 0 for success, 1
  *	otherwise.
  */
-int llc_build_and_send_reset_pkt(struct sock *sk,
-				 struct llc_prim_if_block *prim)
+int llc_build_and_send_reset_pkt(struct sock *sk)
 {
 	int rc = 1;
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
@@ -336,10 +306,9 @@ int llc_build_and_send_reset_pkt(struct sock *sk,
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-		ev->type = LLC_CONN_EV_TYPE_PRIM;
-		ev->data.prim.prim = LLC_RESET_PRIM;
-		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-		ev->data.prim.data = prim;
+		ev->type      = LLC_CONN_EV_TYPE_PRIM;
+		ev->prim      = LLC_RESET_PRIM;
+		ev->prim_type = LLC_PRIM_TYPE_REQ;
 		rc = llc_conn_state_process(sk, skb);
 	}
 	return rc;

@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -60,7 +61,7 @@ void x25_stop_heartbeat(struct sock *sk)
 
 void x25_start_t2timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -73,7 +74,7 @@ void x25_start_t2timer(struct sock *sk)
 
 void x25_start_t21timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -86,7 +87,7 @@ void x25_start_t21timer(struct sock *sk)
 
 void x25_start_t22timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -99,7 +100,7 @@ void x25_start_t22timer(struct sock *sk)
 
 void x25_start_t23timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	del_timer(&x25->timer);
 
@@ -117,7 +118,7 @@ void x25_stop_timer(struct sock *sk)
 
 unsigned long x25_display_timer(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	if (!timer_pending(&x25->timer))
 		return 0;
@@ -130,9 +131,8 @@ static void x25_heartbeat_expiry(unsigned long param)
 	struct sock *sk = (struct sock *)param;
 
         bh_lock_sock(sk);
-        if (sk->lock.users) { /* can currently only occur in state 3 */ 
+        if (sk->lock.users) /* can currently only occur in state 3 */ 
 		goto restart_heartbeat;
-	}
 
 	switch (x25_sk(sk)->state) {
 
@@ -152,9 +152,9 @@ static void x25_heartbeat_expiry(unsigned long param)
 			x25_check_rbuf(sk);
 			break;
 	}
- restart_heartbeat:
+restart_heartbeat:
 	x25_start_heartbeat(sk);
- unlock:
+unlock:
 	bh_unlock_sock(sk);
 }
 
@@ -164,7 +164,7 @@ static void x25_heartbeat_expiry(unsigned long param)
  */
 static inline void x25_do_timer_expiry(struct sock * sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	switch (x25->state) {
 
@@ -194,11 +194,9 @@ static void x25_timer_expiry(unsigned long param)
 
 	bh_lock_sock(sk);
 	if (sk->lock.users) { /* can currently only occur in state 3 */
-		if (x25_sk(sk)->state == X25_STATE_3) {
+		if (x25_sk(sk)->state == X25_STATE_3)
 			x25_start_t2timer(sk);
-		}
-	} else {
+	} else
 		x25_do_timer_expiry(sk);
-	}
 	bh_unlock_sock(sk);
 }

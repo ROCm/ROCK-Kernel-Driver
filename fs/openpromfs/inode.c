@@ -582,28 +582,28 @@ int property_release (struct inode *inode, struct file *filp)
 }
 
 static struct file_operations openpromfs_prop_ops = {
-	read:		property_read,
-	write:		property_write,
-	release:	property_release,
+	.read		= property_read,
+	.write		= property_write,
+	.release	= property_release,
 };
 
 static struct file_operations openpromfs_nodenum_ops = {
-	read:		nodenum_read,
+	.read		= nodenum_read,
 };
 
 static struct file_operations openprom_operations = {
-	read:		generic_read_dir,
-	readdir:	openpromfs_readdir,
+	.read		= generic_read_dir,
+	.readdir	= openpromfs_readdir,
 };
 
 static struct inode_operations openprom_alias_inode_operations = {
-	create:		openpromfs_create,
-	lookup:		openpromfs_lookup,
-	unlink:		openpromfs_unlink,
+	.create		= openpromfs_create,
+	.lookup		= openpromfs_lookup,
+	.unlink		= openpromfs_unlink,
 };
 
 static struct inode_operations openprom_inode_operations = {
-	lookup:		openpromfs_lookup,
+	.lookup		= openpromfs_lookup,
 };
 
 static int lookup_children(u16 n, const char * name, int len)
@@ -1026,8 +1026,8 @@ static void openprom_read_inode(struct inode * inode)
 }
 
 static struct super_operations openprom_sops = { 
-	read_inode:	openprom_read_inode,
-	statfs:		simple_statfs,
+	.read_inode	= openprom_read_inode,
+	.statfs		= simple_statfs,
 };
 
 static int openprom_fill_super(struct super_block *s, void *data, int silent)
@@ -1059,10 +1059,10 @@ static struct super_block *openprom_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type openprom_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"openpromfs",
-	get_sb:		openprom_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "openpromfs",
+	.get_sb		= openprom_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static int __init init_openprom_fs(void)

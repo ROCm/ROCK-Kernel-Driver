@@ -211,6 +211,8 @@ extern void get_page_state(struct page_state *ret);
 extern struct address_space swapper_space;
 #define PageSwapCache(page) ((page)->mapping == &swapper_space)
 
+struct page;	/* forward declaration */
+
 int test_clear_page_dirty(struct page *page);
 
 static inline void clear_page_dirty(struct page *page)

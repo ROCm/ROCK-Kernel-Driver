@@ -70,10 +70,10 @@ static int autofs_write(struct file *file, const void *addr, int bytes)
 	/* Keep the currently executing process from receiving a
 	   SIGPIPE unless it was already supposed to get one */
 	if (wr == -EPIPE && !sigpipe) {
-		spin_lock_irqsave(&current->sigmask_lock, flags);
+		spin_lock_irqsave(&current->sig->siglock, flags);
 		sigdelset(&current->pending.signal, SIGPIPE);
 		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sigmask_lock, flags);
+		spin_unlock_irqrestore(&current->sig->siglock, flags);
 	}
 
 	return (bytes > 0);
@@ -161,18 +161,18 @@ int autofs_wait(struct autofs_sb_info *sbi, struct qstr *name)
 		sigset_t oldset;
 		unsigned long irqflags;
 
-		spin_lock_irqsave(&current->sigmask_lock, irqflags);
+		spin_lock_irqsave(&current->sig->siglock, irqflags);
 		oldset = current->blocked;
 		siginitsetinv(&current->blocked, SHUTDOWN_SIGS & ~oldset.sig[0]);
 		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
+		spin_unlock_irqrestore(&current->sig->siglock, irqflags);
 
 		interruptible_sleep_on(&wq->queue);
 
-		spin_lock_irqsave(&current->sigmask_lock, irqflags);
+		spin_lock_irqsave(&current->sig->siglock, irqflags);
 		current->blocked = oldset;
 		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sigmask_lock, irqflags);
+		spin_unlock_irqrestore(&current->sig->siglock, irqflags);
 	} else {
 		DPRINTK(("autofs_wait: skipped sleeping\n"));
 	}

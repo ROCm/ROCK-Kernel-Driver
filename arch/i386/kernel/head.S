@@ -121,7 +121,7 @@ startup_32:
  */
 	xorl %eax,%eax
 	movl $__bss_start,%edi
-	movl $_end,%ecx
+	movl $__bss_stop,%ecx
 	subl %edi,%ecx
 	rep
 	stosb

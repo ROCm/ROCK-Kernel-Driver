@@ -9,36 +9,36 @@
  * This file includes part of the implementation of the add-IP extension,
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
- * 
+ *
  * These functions work with the state functions in sctp_sm_statefuns.c
  * to implement the state operations.  These functions implement the
  * steps which require modifying existing data structures.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    C. Robin              <chris@hundredacre.ac.uk>
@@ -73,7 +73,7 @@
  * support any address type.
  */
 static const sctp_supported_addrs_param_t sat_param = {
-	{           
+	{
 		SCTP_PARAM_SUPPORTED_ADDRESS_TYPES,
 		__constant_htons(SCTP_SAT_LEN),
 	},
@@ -204,7 +204,7 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	 * PLEASE DO NOT FIXME [This version does not support Host Name.]
 	 */
 
-	retval = sctp_make_chunk(asoc, SCTP_CID_INIT, 0, chunksize); 
+	retval = sctp_make_chunk(asoc, SCTP_CID_INIT, 0, chunksize);
 	if (!retval)
 		goto nodata;
 
@@ -1204,7 +1204,7 @@ sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *ep,
 
 	case 6:
 		asoc->c.peer_addr.v6.sin6_family     = AF_INET6;
-		asoc->c.peer_addr.v6.sin6_port 
+		asoc->c.peer_addr.v6.sin6_port
 			= ntohs(chunk->sctp_hdr->source);
 		asoc->c.peer_addr.v6.sin6_flowinfo = 0; /* BUG BUG BUG */
 		asoc->c.peer_addr.v6.sin6_addr = chunk->skb->nh.ipv6h->saddr;
@@ -1245,7 +1245,7 @@ sctp_cookie_param_t *sctp_pack_cookie(const sctp_endpoint_t *ep,
 	 * functions simpler to write.
 	 */
 	if (bodysize % SCTP_COOKIE_MULTIPLE)
-		bodysize += SCTP_COOKIE_MULTIPLE 
+		bodysize += SCTP_COOKIE_MULTIPLE
 			- (bodysize % SCTP_COOKIE_MULTIPLE);
 	*cookie_len = headersize + bodysize;
 
@@ -1418,6 +1418,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	__u8 *end;
 	sctp_transport_t *transport;
 	struct list_head *pos, *temp;
+	char *cookie;
 
 	/* We must include the address that the INIT packet came from.
 	 * This is the only address that matters for an INIT packet.
@@ -1437,7 +1438,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	for (param.v = peer_init->init_hdr.params;
 	     param.v < end;
 	     param.v += WORD_ROUND(ntohs(param.p->length))) {
-		if (!sctp_process_param(asoc, param, peer_addr, cid, 
+		if (!sctp_process_param(asoc, param, peer_addr, cid,
 					priority))
                         goto clean_up;
 	}
@@ -1461,7 +1462,7 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 	 */
 	if (asoc->c.sinit_num_ostreams  >
 	    ntohs(peer_init->init_hdr.num_inbound_streams)) {
-		asoc->c.sinit_num_ostreams = 
+		asoc->c.sinit_num_ostreams =
 			ntohs(peer_init->init_hdr.num_inbound_streams);
 	}
 
@@ -1470,6 +1471,15 @@ void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 
 	/* Peer Rwnd   : Current calculated value of the peer's rwnd.  */
 	asoc->peer.rwnd = asoc->peer.i.a_rwnd;
+
+	/* Copy cookie in case we need to resend COOKIE-ECHO. */
+	cookie = asoc->peer.cookie;
+	if (cookie) {
+		asoc->peer.cookie = kmalloc(asoc->peer.cookie_len, priority);
+		if (!asoc->peer.cookie)
+			goto clean_up;
+		memcpy(asoc->peer.cookie, cookie, asoc->peer.cookie_len);
+	}
 
 	/* RFC 2960 7.2.1 The initial value of ssthresh MAY be arbitrarily
 	 * high (for example, implementations MAY use the size of the receiver
@@ -1560,7 +1570,7 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 		break;
 
 	case SCTP_PARAM_HOST_NAME_ADDRESS:
-		SCTP_DEBUG_PRINTK("unimplmented SCTP_HOST_NAME_ADDRESS\n");
+		SCTP_DEBUG_PRINTK("unimplemented SCTP_HOST_NAME_ADDRESS\n");
 		break;
 
 	case SCTP_PARAM_SUPPORTED_ADDRESS_TYPES:
@@ -1595,13 +1605,12 @@ int sctp_process_param(sctp_association_t *asoc, sctpParam_t param,
 
 	case SCTP_PARAM_STATE_COOKIE:
 		asoc->peer.cookie_len =
-			ntohs(param.p->length) -
-			sizeof(sctp_paramhdr_t);
+			ntohs(param.p->length) - sizeof(sctp_paramhdr_t);
 		asoc->peer.cookie = param.cookie->body;
 		break;
 
 	case SCTP_PARAM_HEATBEAT_INFO:
-		SCTP_DEBUG_PRINTK("unimplmented "
+		SCTP_DEBUG_PRINTK("unimplemented "
 				  "SCTP_PARAM_HEATBEAT_INFO\n");
 		break;
 

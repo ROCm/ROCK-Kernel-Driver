@@ -1202,8 +1202,6 @@ int lmLogInit(struct jfs_log * log)
 	/*
 	 * validate log superblock
 	 */
-
-
 	if (!test_bit(log_INLINELOG, &log->flag))
 		log->l2bsize = 12;	/* XXX kludge alert XXX */
 	if ((rc = lbmRead(log, 1, &bpsuper)))
@@ -1552,7 +1550,12 @@ static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 				memcpy(logsuper->active[i].uuid, NULL_UUID, 16);
 				break;
 			}
-		assert(i < MAX_ACTIVE);
+		if (i == MAX_ACTIVE) {
+			jERROR(1,("Somebody stomped on the journal!\n"));
+			lbmFree(bpsuper);
+			return EIO;
+		}
+		
 	}
 
 	/*
@@ -2129,10 +2132,10 @@ int jfsIOWait(void *arg)
 
 	unlock_kernel();
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	complete(&jfsIOwait);
 

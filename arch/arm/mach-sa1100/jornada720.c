@@ -16,7 +16,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 
 #define JORTUCR_VAL	0x20000400
@@ -46,14 +45,10 @@ static int __init jornada720_init(void)
 	PPSR &= ~(PPC_LDD3 | PPC_LDD4);
 	PPDR |= PPC_LDD3 | PPC_LDD4;
 
-	/* initialize extra IRQs */
-	set_GPIO_IRQ_edge(GPIO_GPIO1, GPIO_RISING_EDGE);
-	sa1111_init_irq(IRQ_GPIO1);	/* chained on GPIO 1 */
-
-	return 0;
+	return sa1111_init(0x40000000, IRQ_GPIO1);
 }
 
-__initcall(jornada720_init);
+arch_initcall(jornada720_init);
 
 static struct map_desc jornada720_io_desc[] __initdata = {
  /* virtual     physical    length      type */

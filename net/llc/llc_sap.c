@@ -18,6 +18,7 @@
 #include <net/llc_s_ac.h>
 #include <net/llc_s_st.h>
 #include <net/sock.h>
+#include <linux/tcp.h>
 #include <net/llc_main.h>
 #include <net/llc_mac.h>
 #include <net/llc_pdu.h>
@@ -39,11 +40,15 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
  */
 void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
-	list_add_tail(&llc_sk(sk)->node, &sap->sk_list.list);
+	sk->next = sap->sk_list.list;
+	if (sk->next)
+		sap->sk_list.list->pprev = &sk->next;
+	sap->sk_list.list = sk;
+	sk->pprev = &sap->sk_list.list;
 	sock_hold(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**
@@ -55,29 +60,54 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
-	spin_lock_bh(&sap->sk_list.lock);
-	list_del(&llc_sk(sk)->node);
-	sock_put(sk);
-	spin_unlock_bh(&sap->sk_list.lock);
+	write_lock_bh(&sap->sk_list.lock);
+	if (sk->pprev) {
+		if (sk->next)
+			sk->next->pprev = sk->pprev;
+		*sk->pprev = sk->next;
+		sk->pprev  = NULL;
+		/*
+		 * This only makes sense if the socket was inserted on the
+		 * list, if sk->pprev is NULL it wasn't
+		 */
+		sock_put(sk);
+	}
+	write_unlock_bh(&sap->sk_list.lock);
 }
 
 /**
  *	llc_sap_state_process - sends event to SAP state machine
- *	@sap: pointer to SAP
+ *	@sap: sap to use
  *	@skb: pointer to occurred event
  *
  *	After executing actions of the event, upper layer will be indicated
- *	if needed(on receiving an UI frame).
+ *	if needed(on receiving an UI frame). sk can be null for the
+ *	datalink_proto case.
  */
 void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
+	/*
+	 * We have to hold the skb, because llc_sap_next_state
+	 * will kfree it in the sending path and we need to
+	 * look at the skb->cb, where we encode llc_sap_state_ev.
+	 */
+	skb_get(skb);
+	ev->ind_cfm_flag = 0;
 	llc_sap_next_state(sap, skb);
-	if (ev->ind_cfm_flag == LLC_IND)
-		sap->ind(ev->prim);
-	else if (ev->type == LLC_SAP_EV_TYPE_PDU)
-		kfree_skb(skb);
+	if (ev->ind_cfm_flag == LLC_IND) {
+		if (skb->sk->state == TCP_LISTEN)
+			kfree_skb(skb);
+		else {
+			llc_save_primitive(skb, ev->prim);
+
+			/* queue skb to the user. */
+			if (sock_queue_rcv_skb(skb->sk, skb))
+				kfree_skb(skb);
+		}
+	} 
+	kfree_skb(skb);
 }
 
 /**
@@ -89,54 +119,17 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_pdu_un *pdu;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-	union llc_u_prim_data *prim_data = prim->data;
-	u8 lfb;
 
-	llc_pdu_decode_sa(skb, prim_data->udata.saddr.mac);
-	llc_pdu_decode_da(skb, prim_data->udata.daddr.mac);
-	llc_pdu_decode_dsap(skb, &prim_data->udata.daddr.lsap);
-	llc_pdu_decode_ssap(skb, &prim_data->udata.saddr.lsap);
-	prim_data->udata.pri = 0;
-	prim_data->udata.skb = skb;
 	pdu = llc_pdu_un_hdr(skb);
 	switch (LLC_U_PDU_RSP(pdu)) {
-		case LLC_1_PDU_CMD_TEST:
-			prim->prim = LLC_TEST_PRIM;
-			break;
-		case LLC_1_PDU_CMD_XID:
-			prim->prim = LLC_XID_PRIM;
-			break;
-		case LLC_1_PDU_CMD_UI:
-			if (skb->protocol == ntohs(ETH_P_TR_802_2)) {
-				if (((struct trh_hdr *)skb->mac.raw)->rcf) {
-					lfb = ntohs(((struct trh_hdr *)
-						    skb->mac.raw)->rcf) &
-						    0x0070;
-					prim_data->udata.lfb = lfb >> 4;
-				} else {
-					lfb = 0xFF;
-					prim_data->udata.lfb = 0xFF;
-				}
-			}
-			prim->prim = LLC_DATAUNIT_PRIM;
-			break;
+	case LLC_1_PDU_CMD_TEST:
+		ev->prim = LLC_TEST_PRIM;	break;
+	case LLC_1_PDU_CMD_XID:
+		ev->prim = LLC_XID_PRIM;	break;
+	case LLC_1_PDU_CMD_UI:
+		ev->prim = LLC_DATAUNIT_PRIM;	break;
 	}
-	prim->data = prim_data;
-	prim->sap = sap;
 	ev->ind_cfm_flag = LLC_IND;
-	ev->prim = prim;
-}
-
-/**
- *	llc_sap_send_pdu - Sends a frame to MAC layer for transmition
- *	@sap: pointer to SAP
- *	@skb: pdu that must be sent
- */
-void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
-{
-	mac_send_pdu(skb);
-	kfree_skb(skb);
 }
 
 /**

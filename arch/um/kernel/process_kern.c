@@ -48,7 +48,7 @@ struct task_struct *get_task(int pid, int require)
 
         ret = NULL;
         read_lock(&tasklist_lock);
-        for_each_task(task){
+        for_each_process(task){
                 if(task->pid == pid){
                         ret = task;
                         break;
@@ -64,7 +64,7 @@ int is_valid_pid(int pid)
 	struct task_struct *task;
 
         read_lock(&tasklist_lock);
-        for_each_task(task){
+        for_each_process(task){
                 if(task->thread.extern_pid == pid){
 			read_unlock(&tasklist_lock);
 			return(1);
@@ -528,7 +528,7 @@ unsigned long um_virt_to_phys(void *t, unsigned long addr)
 
 char *current_cmd(void)
 {
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_HIGHMEM)
 	return("(Unknown)");
 #else
 	unsigned long addr = um_virt_to_phys(current, current->mm->arg_start);

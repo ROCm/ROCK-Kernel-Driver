@@ -255,23 +255,23 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		struct urb	*urb = qtd->urb;
 		u32		token = 0;
 
+		/* hc's on-chip qh overlay cache can overwrite our idea of
+		 * next qtd ptrs, if we appended a qtd while the queue was
+		 * advancing.  (because we don't use dummy qtds.)
+		 */
+		if (cpu_to_le32 (qtd->qtd_dma) == qh->hw_current
+				&& qtd->hw_next != qh->hw_qtd_next) {
+			qh->hw_alt_next = qtd->hw_alt_next;
+			qh->hw_qtd_next = qtd->hw_next;
+			COUNT (ehci->stats.qpatch);
+		}
+
 		/* clean up any state from previous QTD ...*/
 		if (last) {
 			if (likely (last->urb != urb)) {
 				ehci_urb_done (ehci, last->urb);
 				count++;
 			}
-
-			/* qh overlays can have HC's old cached copies of
-			 * next qtd ptrs, if an URB was queued afterwards.
-			 */
-			if (cpu_to_le32 (last->qtd_dma) == qh->hw_current
-					&& last->hw_next != qh->hw_qtd_next) {
-				qh->hw_alt_next = last->hw_alt_next;
-				qh->hw_qtd_next = last->hw_next;
-				COUNT (ehci->stats.qpatch);
-			}
-
 			ehci_qtd_free (ehci, last);
 			last = 0;
 		}
@@ -529,7 +529,8 @@ qh_urb_transaction (
 	}
 
 	/* by default, enable interrupt on urb completion */
-	if (likely (!(urb->transfer_flags & URB_NO_INTERRUPT)))
+// ... do it always, unless we switch over to dummy qtds
+//	if (likely (!(urb->transfer_flags & URB_NO_INTERRUPT)))
 		qtd->hw_token |= __constant_cpu_to_le32 (QTD_IOC);
 	return head;
 
@@ -785,7 +786,6 @@ static struct ehci_qh *qh_append_tds (
 		/* append to tds already queued to this qh? */
 		if (unlikely (!list_empty (&qh->qtd_list) && qtd)) {
 			struct ehci_qtd		*last_qtd;
-			int			short_rx = 0;
 			u32			hw_next;
 
 			/* update the last qtd's "next" pointer */
@@ -800,23 +800,16 @@ static struct ehci_qh *qh_append_tds (
 					&& (epnum & 0x10)) {
 				// only the last QTD for now
 				last_qtd->hw_alt_next = hw_next;
-				short_rx = 1;
 			}
 
-			/* Adjust any old copies in qh overlay too.
-			 * Interrupt code must cope with case of HC having it
-			 * cached, and clobbering these updates.
-			 * ... complicates getting rid of extra interrupts!
-			 * (Or:  use dummy td, so cache always stays valid.)
+			/* qh_completions() may need to patch the qh overlay if
+			 * the hc was advancing this queue while we appended.
+			 * we know it can: last_qtd->hw_token has IOC set.
+			 *
+			 * or:  use a dummy td (so the overlay gets the next td
+			 * only when we set its active bit); fewer irqs.
 			 */
-			if (qh->hw_current == cpu_to_le32 (last_qtd->qtd_dma)) {
-				wmb ();
-				qh->hw_qtd_next = hw_next;
-				if (short_rx)
-					qh->hw_alt_next = hw_next
-				    		| (qh->hw_alt_next & 0x1e);
-				vdbg ("queue to qh %p, patch", qh);
-			}
+			wmb ();
 
 		/* no URB queued */
 		} else {

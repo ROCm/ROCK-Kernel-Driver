@@ -42,6 +42,7 @@
 #include <linux/usb.h>
 
 #include "hcd.h"
+#include "usb.h"
 
 extern int  usb_hub_init(void);
 extern void usb_hub_cleanup(void);
@@ -123,6 +124,8 @@ int usb_device_remove(struct device *dev)
 	if (driver->owner) {
 		m = try_inc_mod_count(driver->owner);
 		if (m == 0) {
+			// FIXME this happens even when we just rmmod
+			// drivers that aren't in active use... 
 			err("Dieing driver still bound to device.\n");
 			return -EIO;
 		}
@@ -510,57 +513,41 @@ static int usb_device_match (struct device *dev, struct device_driver *drv)
  * cases, we know no other thread can recycle our address, since we must
  * already have been serialized enough to prevent that.
  */
-static void call_policy (char *verb, struct usb_device *dev)
+static int usb_hotplug (struct device *dev, char **envp, int num_envp,
+			char *buffer, int buffer_size)
 {
-	char *argv [3], **envp, *buf, *scratch;
-	int i = 0, value;
+	struct usb_interface *intf;
+	struct usb_device *usb_dev;
+	char *scratch;
+	int i = 0;
+	int length = 0;
 
-	if (!hotplug_path [0])
-		return;
-	if (in_interrupt ()) {
-		dbg ("In_interrupt");
-		return;
-	}
-	if (!current->fs->root) {
-		/* statically linked USB is initted rather early */
-		dbg ("call_policy %s, num %d -- no FS yet", verb, dev->devnum);
-		return;
-	}
-	if (dev->devnum < 0) {
+	dbg ("%s", __FUNCTION__);
+
+	if (!dev)
+		return -ENODEV;
+
+	if (dev->driver == &usb_generic_driver)
+		return 0;
+
+	intf = to_usb_interface(dev);
+	if (!intf)
+		return -ENODEV;
+
+	usb_dev = interface_to_usbdev (intf);
+	if (!usb_dev)
+		return -ENODEV;
+	
+	if (usb_dev->devnum < 0) {
 		dbg ("device already deleted ??");
-		return;
+		return -ENODEV;
 	}
-	if (!(envp = (char **) kmalloc (20 * sizeof (char *), GFP_KERNEL))) {
-		dbg ("enomem");
-		return;
-	}
-	if (!(buf = kmalloc (256, GFP_KERNEL))) {
-		kfree (envp);
-		dbg ("enomem2");
-		return;
+	if (!usb_dev->bus) {
+		dbg ("bus already removed?");
+		return -ENODEV;
 	}
 
-	/* only one standardized param to hotplug command: type */
-	argv [0] = hotplug_path;
-	argv [1] = "usb";
-	argv [2] = 0;
-
-	/* minimal command environment */
-	envp [i++] = "HOME=/";
-	envp [i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-
-#ifdef	DEBUG
-	/* hint that policy agent should enter no-stdout debug mode */
-	envp [i++] = "DEBUG=kernel";
-#endif
-	/* extensible set of named bus-specific parameters,
-	 * supporting multiple driver selection algorithms.
-	 */
-	scratch = buf;
-
-	/* action:  add, remove */
-	envp [i++] = scratch;
-	scratch += sprintf (scratch, "ACTION=%s", verb) + 1;
+	scratch = buffer;
 
 #ifdef	CONFIG_USB_DEVICEFS
 	/* If this is available, userspace programs can directly read
@@ -569,27 +556,48 @@ static void call_policy (char *verb, struct usb_device *dev)
 	 *
 	 * FIXME reduce hardwired intelligence here
 	 */
-	envp [i++] = "DEVFS=/proc/bus/usb";
 	envp [i++] = scratch;
-	scratch += sprintf (scratch, "DEVICE=/proc/bus/usb/%03d/%03d",
-		dev->bus->busnum, dev->devnum) + 1;
+	length += snprintf (scratch, buffer_size - length,
+			    "%s", "DEVFS=/proc/bus/usb");
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
+
+	envp [i++] = scratch;
+	length += snprintf (scratch, buffer_size - length,
+			    "DEVICE=/proc/bus/usb/%03d/%03d",
+			    usb_dev->bus->busnum, usb_dev->devnum);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
 #endif
 
 	/* per-device configuration hacks are common */
 	envp [i++] = scratch;
-	scratch += sprintf (scratch, "PRODUCT=%x/%x/%x",
-		dev->descriptor.idVendor,
-		dev->descriptor.idProduct,
-		dev->descriptor.bcdDevice) + 1;
+	length += snprintf (scratch, buffer_size - length, "PRODUCT=%x/%x/%x",
+			    usb_dev->descriptor.idVendor,
+			    usb_dev->descriptor.idProduct,
+			    usb_dev->descriptor.bcdDevice);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
 
 	/* class-based driver binding models */
 	envp [i++] = scratch;
-	scratch += sprintf (scratch, "TYPE=%d/%d/%d",
-			    dev->descriptor.bDeviceClass,
-			    dev->descriptor.bDeviceSubClass,
-			    dev->descriptor.bDeviceProtocol) + 1;
-	if (dev->descriptor.bDeviceClass == 0) {
-		int alt = dev->actconfig->interface [0].act_altsetting;
+	length += snprintf (scratch, buffer_size - length, "TYPE=%d/%d/%d",
+			    usb_dev->descriptor.bDeviceClass,
+			    usb_dev->descriptor.bDeviceSubClass,
+			    usb_dev->descriptor.bDeviceProtocol);
+	if ((buffer_size - length <= 0) || (i >= num_envp))
+		return -ENOMEM;
+	++length;
+	scratch += length;
+
+	if (usb_dev->descriptor.bDeviceClass == 0) {
+		int alt = intf->act_altsetting;
 
 		/* a simple/common case: one config, one interface, one driver
 		 * with current altsetting being a reasonable setting.
@@ -597,125 +605,31 @@ static void call_policy (char *verb, struct usb_device *dev)
 		 * device-specific binding policies.
 		 */
 		envp [i++] = scratch;
-		scratch += sprintf (scratch, "INTERFACE=%d/%d/%d",
-			dev->actconfig->interface [0].altsetting [alt].bInterfaceClass,
-			dev->actconfig->interface [0].altsetting [alt].bInterfaceSubClass,
-			dev->actconfig->interface [0].altsetting [alt].bInterfaceProtocol)
-			+ 1;
-		/* INTERFACE-0, INTERFACE-1, ... ? */
+		length += snprintf (scratch, buffer_size - length,
+				    "INTERFACE=%d/%d/%d",
+				    intf->altsetting[alt].bInterfaceClass,
+				    intf->altsetting[alt].bInterfaceSubClass,
+				    intf->altsetting[alt].bInterfaceProtocol);
+		if ((buffer_size - length <= 0) || (i >= num_envp))
+			return -ENOMEM;
+		++length;
+		scratch += length;
+
 	}
 	envp [i++] = 0;
-	/* assert: (scratch - buf) < sizeof buf */
 
-	/* NOTE: user mode daemons can call the agents too */
-
-	dbg ("kusbd: %s %s %d", argv [0], verb, dev->devnum);
-	value = call_usermodehelper (argv [0], argv, envp);
-	kfree (buf);
-	kfree (envp);
-	if (value != 0)
-		dbg ("kusbd policy returned 0x%x", value);
+	return 0;
 }
 
 #else
 
-static inline void
-call_policy (char *verb, struct usb_device *dev)
-{ } 
+static int usb_hotplug (struct device *dev, char **envp,
+			char *buffer, int buffer_size)
+{
+	return -ENODEV;
+}
 
 #endif	/* CONFIG_HOTPLUG */
-
-/* driverfs files */
-
-/* devices have one current configuration, with one
- * or more interfaces that are used concurrently 
- */
-static ssize_t
-show_config (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device	*udev;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
-}
-
-static DEVICE_ATTR(configuration,S_IRUGO,show_config,NULL);
-
-/* interfaces have one current setting; alternates
- * can have different endpoints and class info.
- */
-static ssize_t
-show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_interface	*interface;
-
-	if (off)
-		return 0;
-	interface = to_usb_interface (dev);
-	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
-}
-static DEVICE_ATTR(altsetting,S_IRUGO,show_altsetting,NULL);
-
-/* product driverfs file */
-static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
-
-/* manufacturer driverfs file */
-static ssize_t
-show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
-
-/* serial number driverfs file */
-static ssize_t
-show_serial (struct device *dev, char *buf, size_t count, loff_t off)
-{
-	struct usb_device *udev;
-	int len;
-
-	if (off)
-		return 0;
-	udev = to_usb_device (dev);
-
-	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
-	if (len < 0)
-		return 0;
-	buf[len] = '\n';
-	buf[len+1] = 0;
-	return len+1;
-}
-static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
 
 /**
  * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
@@ -893,9 +807,6 @@ void usb_disconnect(struct usb_device **pdev)
 		usbfs_remove_device(dev);
 		put_device(&dev->dev);
 	}
-
-	/* Let policy agent unload modules etc */
-	call_policy ("remove", dev);
 
 	/* Decrement the reference count, it'll auto free everything when */
 	/* it hits 0 which could very well be now */
@@ -1132,13 +1043,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		return err;
 
 	/* add the USB device specific driverfs files */
-	device_create_file (&dev->dev, &dev_attr_configuration);
-	if (dev->descriptor.iManufacturer)
-		device_create_file (&dev->dev, &dev_attr_manufacturer);
-	if (dev->descriptor.iProduct)
-		device_create_file (&dev->dev, &dev_attr_product);
-	if (dev->descriptor.iSerialNumber)
-		device_create_file (&dev->dev, &dev_attr_serial);
+	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
 	 * Remember, interfaces get bound to drivers, not devices. */
@@ -1168,14 +1073,11 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		}
 		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
 		device_register (&interface->dev);
-		device_create_file (&interface->dev, &dev_attr_altsetting);
+		usb_create_driverfs_intf_files (interface);
 	}
 
 	/* add a /proc/bus/usb entry */
 	usbfs_add_device(dev);
-
-	/* userspace may load modules and/or configure further */
-	call_policy ("add", dev);
 
 	return 0;
 }
@@ -1196,6 +1098,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
  * avoid behaviors like using "DMA bounce buffers", or tying down I/O mapping
  * hardware for long idle periods.  The implementation varies between
  * platforms, depending on details of how DMA will work to this device.
+ * Using these buffers also helps prevent cacheline sharing problems on
+ * architectures where CPU caches are not DMA-coherent.
  *
  * When the buffer is no longer used, free it with usb_buffer_free().
  */
@@ -1439,6 +1343,7 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 struct bus_type usb_bus_type = {
 	.name =		"usb",
 	.match =	usb_device_match,
+	.hotplug =	usb_hotplug,
 };
 
 /*

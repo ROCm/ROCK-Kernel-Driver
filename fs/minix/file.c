@@ -16,17 +16,17 @@
 int minix_sync_file(struct file *, struct dentry *, int);
 
 struct file_operations minix_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	mmap:		generic_file_mmap,
-	fsync:		minix_sync_file,
-	sendfile:	generic_file_sendfile,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.mmap		= generic_file_mmap,
+	.fsync		= minix_sync_file,
+	.sendfile	= generic_file_sendfile,
 };
 
 struct inode_operations minix_file_inode_operations = {
-	truncate:	minix_truncate,
-	getattr:	minix_getattr,
+	.truncate	= minix_truncate,
+	.getattr	= minix_getattr,
 };
 
 int minix_sync_file(struct file * file, struct dentry *dentry, int datasync)

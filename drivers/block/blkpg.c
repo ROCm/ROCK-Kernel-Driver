@@ -69,8 +69,7 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	struct gendisk *g;
 	long long ppstart, pplength;
 	long pstart, plength;
-	int i;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	int part, i;
 
 	/* convert bytes to sectors, check for fit in a hd_struct */
 	ppstart = (p->start >> 9);
@@ -82,7 +81,7 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -EINVAL;
 
 	/* find the drive major */
-	g = get_gendisk(dev);
+	g = get_gendisk(bdev->bd_dev, &part);
 	if (!g)
 		return -ENXIO;
 
@@ -91,6 +90,8 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 	/* drive and partition number OK? */
 	if (bdev != bdev->bd_contains)
 		return -EINVAL;
+	if (part)
+		BUG();
 	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
 		return -EINVAL;
 
@@ -123,17 +124,19 @@ int add_partition(struct block_device *bdev, struct blkpg_partition *p)
  */
 int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
 	struct block_device *bdevp;
+	int part;
 	int holder;
 
 	/* find the drive major */
-	g = get_gendisk(dev);
+	g = get_gendisk(bdev->bd_dev, &part);
 	if (!g)
 		return -ENXIO;
 	if (bdev != bdev->bd_contains)
 		return -EINVAL;
+	if (part)
+		BUG();
 	if (p->pno <= 0 || p->pno >= (1 << g->minor_shift))
   		return -EINVAL;
 
@@ -142,7 +145,7 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 		return -ENXIO;
 
 	/* partition in use? Incomplete check for now. */
-	bdevp = bdget(MKDEV(major(dev), minor(dev) + p->pno));
+	bdevp = bdget(MKDEV(g->major, g->first_minor + p->pno));
 	if (!bdevp)
 		return -ENOMEM;
 	if (bd_claim(bdevp, &holder) < 0) {

@@ -740,10 +740,8 @@ static int revalidate_allvol(kdev_t dev)
 
 	for(i=0; i< NWD; i++) {
 		struct gendisk *disk = &hba[ctlr]->gendisk[i];
-		if (disk->major_name) {
+		if (disk->part)
 			del_gendisk(disk);
-			disk->major_name = NULL;
-		}
 	}
 
         /*
@@ -768,7 +766,6 @@ static int revalidate_allvol(kdev_t dev)
 		if (!drv->nr_blocks)
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
-		disk->major_name = hba[ctlr]->names + 12 * i;
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -795,10 +792,8 @@ static int deregister_disk(int ctlr, int logvol)
 	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 	/* invalidate the devices and deregister the disk */ 
-	if (disk->major_name) {
+	if (disk->part)
 		del_gendisk(disk);
-		disk->major_name = NULL;
-	}
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun) {
 		/* if so, find the new hightest lun */
@@ -1237,7 +1232,6 @@ static int register_new_disk(int ctlr)
 	++hba[ctlr]->num_luns;
 	/* setup partitions per disk */
         disk = &hba[ctlr]->gendisk[logvol];
-	disk->major_name = hba[ctlr]->names + 12 * logvol;
 	set_capacity(disk, hba[ctlr]->drv[logvol].nr_blocks);
 	add_disk(disk);
 	
@@ -2433,15 +2427,13 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		drive_info_struct *drv = &(hba[i]->drv[j]);
 		struct gendisk *disk = hba[i]->gendisk + j;
 
-		sprintf(hba[i]->names + 12 * j, "cciss/c%dd%d", i, j);
+		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
 		disk->major = MAJOR_NR + i;
 		disk->first_minor = j << NWD_SHIFT;
-		disk->major_name = NULL;
 		disk->minor_shift = NWD_SHIFT;
 		if( !(drv->nr_blocks))
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->block_size;
-		disk->major_name = hba[i]->names + 12 * j;
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2491,10 +2483,8 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	/* remove it from the disk list */
 	for (j = 0; j < NWD; j++) {
 		struct gendisk *disk = &hba[i]->gendisk[j];
-		if (disk->major_name) {
+		if (disk->part)
 			del_gendisk(disk);
-			disk->major_name = NULL;
-		}
 	}
 
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct),

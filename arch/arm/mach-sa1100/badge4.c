@@ -32,7 +32,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 static int __init badge4_sa1111_init(void)
 {
@@ -45,7 +44,7 @@ static int __init badge4_sa1111_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	return sa1111_init(NULL, BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
+	return sa1111_init(BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
 }
 
 static int __init badge4_init(void)
@@ -57,8 +56,9 @@ static int __init badge4_init(void)
 
 	ret = badge4_sa1111_init();
 	if (ret < 0)
-		printk(KERN_ERR __FUNCTION__
-		       ": SA-1111 initialization failed (%d)\n", ret);
+		printk(KERN_ERR
+		       "%s: SA-1111 initialization failed (%d)\n",
+			__FUNCTION__, ret);
 
 	/* N.B, according to rmk this is the singular place that GPDR
            should be set */
@@ -109,7 +109,7 @@ static int __init badge4_init(void)
 	return 0;
 }
 
-__initcall(badge4_init);
+arch_initcall(badge4_init);
 
 
 static unsigned badge4_5V_bitmap = 0;
@@ -132,11 +132,11 @@ void badge4_set_5V(unsigned subsystem, int on)
 	/* detect on->off and off->on transitions */
 	if ((!old_5V_bitmap) && (badge4_5V_bitmap)) {
 		/* was off, now on */
-		printk(KERN_INFO __FUNCTION__ ": enabling 5V supply rail\n");
+		printk(KERN_INFO "%s: enabling 5V supply rail\n", __FUNCTION__);
 		GPSR = BADGE4_GPIO_PCMEN5V;
 	} else if ((old_5V_bitmap) && (!badge4_5V_bitmap)) {
 		/* was on, now off */
-		printk(KERN_INFO __FUNCTION__ ": disabling 5V supply rail\n");
+		printk(KERN_INFO "%s: disabling 5V supply rail\n", __FUNCTION__);
 		GPCR = BADGE4_GPIO_PCMEN5V;
 	}
 

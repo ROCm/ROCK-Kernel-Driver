@@ -138,8 +138,6 @@ struct isdn_ppp_compressor {
 
 extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *);
 extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *);
-extern int isdn_ppp_dial_slave(char *);
-extern int isdn_ppp_hangup_slave(char *);
 
 typedef struct {
   unsigned long seqerrs;
@@ -214,7 +212,7 @@ struct ippp_struct {
   unsigned int mpmru;
   unsigned int mpmtu;
   unsigned int maxcid;
-  struct isdn_net_local_s *lp;
+  struct isdn_net_dev_s *idev;
   int unit;
   int minor;
   unsigned int last_link_seqno;

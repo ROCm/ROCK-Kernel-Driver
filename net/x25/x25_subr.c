@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work.
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -15,7 +16,7 @@
  *	History
  *	X.25 001	Jonathan Naylor	  Started coding.
  *	X.25 002	Jonathan Naylor	  Centralised disconnection processing.
- *	mar/20/00	Daniela Squassoni Disabling/enabling of facilities 
+ *	mar/20/00	Daniela Squassoni Disabling/enabling of facilities
  *					  negotiation.
  *	jun/24/01	Arnaldo C. Melo	  use skb_queue_purge, cleanups
  */
@@ -46,7 +47,7 @@
  */
 void x25_clear_queues(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	skb_queue_purge(&sk->write_queue);
 	skb_queue_purge(&x25->ack_queue);
@@ -64,7 +65,7 @@ void x25_clear_queues(struct sock *sk)
 void x25_frames_acked(struct sock *sk, unsigned short nr)
 {
 	struct sk_buff *skb;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	int modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
 
 	/*
@@ -88,7 +89,7 @@ void x25_requeue_frames(struct sock *sk)
 	 * output queue.
 	 */
 	while ((skb = skb_dequeue(&x25_sk(sk)->ack_queue)) != NULL) {
-		if (skb_prev == NULL)
+		if (!skb_prev)
 			skb_queue_head(&sk->write_queue, skb);
 		else
 			skb_append(skb_prev, skb);
@@ -102,36 +103,35 @@ void x25_requeue_frames(struct sock *sk)
  */
 int x25_validate_nr(struct sock *sk, unsigned short nr)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	unsigned short vc = x25->va;
 	int modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
 
 	while (vc != x25->vs) {
-		if (nr == vc) return 1;
+		if (nr == vc)
+			return 1;
 		vc = (vc + 1) % modulus;
 	}
 
 	return nr == x25->vs ? 1 : 0;
 }
 
-/* 
+/*
  *  This routine is called when the packet layer internally generates a
  *  control frame.
  */
 void x25_write_internal(struct sock *sk, int frametype)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	unsigned char  facilities[X25_MAX_FAC_LEN];
 	unsigned char  addresses[1 + X25_ADDR_LEN];
 	unsigned char  lci1, lci2;
-	int len;
-
 	/*
 	 *	Default safe frame size.
 	 */
-	len = X25_MAX_L2_LEN + X25_EXT_MIN_LEN;
+	int len = X25_MAX_L2_LEN + X25_EXT_MIN_LEN;
 
 	/*
 	 *	Adjust frame size.
@@ -262,7 +262,7 @@ void x25_write_internal(struct sock *sk, int frametype)
 int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 	       int *d, int *m)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	unsigned char *frame = skb->data;
 
 	*ns = *nr = *q = *d = *m = 0;
@@ -329,7 +329,7 @@ int x25_decode(struct sock *sk, struct sk_buff *skb, int *ns, int *nr, int *q,
 void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
 		    unsigned char diagnostic)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	x25_clear_queues(sk);
 	x25_stop_timer(sk);
@@ -356,7 +356,7 @@ void x25_disconnect(struct sock *sk, int reason, unsigned char cause,
  */
 void x25_check_rbuf(struct sock *sk)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
 	    (x25->condition & X25_COND_OWN_RX_BUSY)) {

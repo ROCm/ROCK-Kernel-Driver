@@ -292,7 +292,7 @@ dasd_state_new_to_known(dasd_device_t *device)
 		return -ENODEV;
 	/* Set kdev and the device name. */
 	device->kdev = mk_kdev(gdp->major, gdp->first_minor);
-	strcpy(device->name, gdp->major_name);
+	strcpy(device->name, gdp->disk_name);
 
 	/* Find a discipline for the device. */
 	rc = dasd_find_disc(device);

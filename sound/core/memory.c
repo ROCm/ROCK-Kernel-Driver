@@ -29,6 +29,9 @@
 #include <linux/pci.h>
 #include <sound/core.h>
 #include <sound/info.h>
+#ifdef CONFIG_SBUS
+#include <asm/sbus.h>
+#endif
 
 /*
  *  memory allocation helpers and debug routines
@@ -405,6 +408,72 @@ void snd_free_pci_pages(struct pci_dev *pci,
 
 #endif /* CONFIG_PCI */
 
+#ifdef CONFIG_SBUS
+
+void *snd_malloc_sbus_pages(struct sbus_dev *sdev,
+			    unsigned long size,
+			    dma_addr_t *dma_addr)
+{
+	int pg;
+	void *res;
+
+	snd_assert(size > 0, return NULL);
+	snd_assert(dma_addr != NULL, return NULL);
+	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
+	res = sbus_alloc_consistent(sdev, PAGE_SIZE * (1 << pg), dma_addr);
+	if (res != NULL) {
+		struct page *page = virt_to_page(res);
+		struct page *last_page = page + (1 << pg);
+		while (page < last_page)
+			SetPageReserved(page++);
+#ifdef CONFIG_SND_DEBUG_MEMORY
+		snd_alloc_pages += 1 << pg;
+#endif
+	}
+	return res;
+}
+
+void *snd_malloc_sbus_pages_fallback(struct sbus_dev *sdev,
+				     unsigned long size,
+				     dma_addr_t *dma_addr,
+				     unsigned long *res_size)
+{
+	void *res;
+
+	snd_assert(res_size != NULL, return NULL);
+	do {
+		if ((res = snd_malloc_sbus_pages(sdev, size, dma_addr)) != NULL) {
+			*res_size = size;
+			return res;
+		}
+		size >>= 1;
+	} while (size >= PAGE_SIZE);
+	return NULL;
+}
+
+void snd_free_sbus_pages(struct sbus_dev *sdev,
+			 unsigned long size,
+			 void *ptr,
+			 dma_addr_t dma_addr)
+{
+	int pg;
+	struct page *page, *last_page;
+
+	if (ptr == NULL)
+		return;
+	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
+	page = virt_to_page(ptr);
+	last_page = page + (1 << pg);
+	while (page < last_page)
+		ClearPageReserved(page++);
+	sbus_free_consistent(sdev, PAGE_SIZE * (1 << pg), ptr, dma_addr);
+#ifdef CONFIG_SND_DEBUG_MEMORY
+	snd_alloc_pages -= 1 << pg;
+#endif
+}
+
+#endif /* CONFIG_SBUS */
+
 void *snd_kcalloc(size_t size, int flags)
 {
 	void *ptr;
@@ -439,7 +508,7 @@ int copy_to_user_fromio(void *dst, unsigned long src, size_t count)
 		size_t c = count;
 		if (c > sizeof(buf))
 			c = sizeof(buf);
-		memcpy_fromio(buf, src, c);
+		memcpy_fromio(buf, (void*)src, c);
 		if (copy_to_user(dst, buf, c))
 			return -EFAULT;
 		count -= c;
@@ -462,7 +531,7 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
 			c = sizeof(buf);
 		if (copy_from_user(buf, src, c))
 			return -EFAULT;
-		memcpy_toio(dst, buf, c);
+		memcpy_toio((void*)dst, buf, c);
 		count -= c;
 		dst += c;
 		src += c;
@@ -484,7 +553,7 @@ int copy_from_user_toio(unsigned long dst, const void *src, size_t count)
  */
 #ifdef __i386__
 #define get_phys_addr(x) virt_to_phys(x)
-#else /* ppc */
+#else /* ppc and x86-64 */
 #define get_phys_addr(x) virt_to_bus(x)
 #endif
 void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,

@@ -128,7 +128,7 @@ static char *open_min_error[] = {"No error", "Function Failure", "Signal Lost", 
 /* Module paramters */
 
 MODULE_AUTHOR("Mike Phillips <mikep@linuxtr.net>") ; 
-MODULE_DESCRIPTION("Olympic PCI/Cardbus Chipset Driver \n") ; 
+MODULE_DESCRIPTION("Olympic PCI/Cardbus Chipset Driver") ; 
 
 /* Ring Speed 0,4,16,100 
  * 0 = Autosense         

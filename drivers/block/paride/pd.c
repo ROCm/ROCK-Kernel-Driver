@@ -717,7 +717,7 @@ static int pd_detect(void)
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			disk->gd.major_name = disk->name;
+			strcpy(disk->gd.disk_name, disk->name);
 			disk->gd.minor_shift = PD_BITS;
 			disk->gd.fops = &pd_fops;
 			disk->gd.major = major;

@@ -108,7 +108,7 @@ struct usbdevfs_urb {
 	struct usbdevfs_iso_packet_desc iso_frame_desc[0];
 };
 
-/* ioctls for talking to drivers in the usbcore module: */
+/* ioctls for talking directly to drivers */
 struct usbdevfs_ioctl {
 	int	ifno;		/* interface 0..N ; negative numbers reserved */
 	int	ioctl_code;	/* MUST encode size + direction of data so the

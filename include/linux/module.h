@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/errno.h>
 
 #include <asm/atomic.h>
 
@@ -252,6 +253,7 @@ static const struct gtype##_id * __module_##gtype##_table \
  * software modules
  *
  *	"GPL"				[GNU Public License v2 or later]
+ *	"GPL v2"			[GNU Public License v2]
  *	"GPL and additional rights"	[GNU Public License v2 rights and more]
  *	"Dual BSD/GPL"			[GNU Public License v2 or BSD license choice]
  *	"Dual MPL/GPL"			[GNU Public License v2 or Mozilla license choice]
@@ -315,8 +317,6 @@ static const struct gtype##_id * __module_##gtype##_table \
 #define MOD_INC_USE_COUNT	do { } while (0)
 #define MOD_DEC_USE_COUNT	do { } while (0)
 #define MOD_IN_USE		1
-
-extern struct module *module_list;
 
 #endif /* !__GENKSYMS__ */
 
@@ -504,6 +504,30 @@ __asm__(".section __ksymtab,\"a\"\n.previous");
 #define SET_MODULE_OWNER(some_struct) do { (some_struct)->owner = THIS_MODULE; } while (0)
 #else
 #define SET_MODULE_OWNER(some_struct) do { } while (0)
+#endif
+
+extern void print_modules(void);
+
+#if defined(CONFIG_MODULES) || defined(CONFIG_KALLSYMS)
+
+extern struct module *module_list;
+
+/*
+ * print_symbols takes a format string containing one %s.
+ * If support for resolving symbols is compiled in, the %s will
+ * be replaced by the closest symbol to the address and the entire
+ * string is printk()ed. Otherwise, nothing is printed.
+ */
+extern void print_symbol(const char *fmt, unsigned long address);
+
+#else
+
+static inline int
+print_symbol(const char *fmt, unsigned long address)
+{
+	return -ESRCH;
+}
+
 #endif
 
 #endif /* _LINUX_MODULE_H */

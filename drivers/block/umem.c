@@ -162,7 +162,6 @@ static struct timer_list battery_timer;
 static int num_cards = 0;
 
 static struct gendisk mm_gendisk[MM_MAXCARDS];
-static char mm_names[MM_MAXCARDS * 6];
 
 static void check_batteries(struct cardinfo *card);
 
@@ -1192,11 +1191,10 @@ int __init mm_init(void)
 	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	for (i = 0; i < num_cards; i++) {
 		struct gendisk *disk = mm_gendisk + i;
-		sprintf(mm_names + i*6, "umem%c", 'a'+i);
+		sprintf(disk->disk_name, "umem%c", 'a'+i);
 		spin_lock_init(&cards[i].lock);
 		disk->major = major_nr;
 		disk->first_minor  = i << MM_SHIFT;
-		disk->major_name = mm_names + i*6;
 		disk->minor_shift = MM_SHIFT;
 		disk->fops = &mm_fops;
 		set_capacity(disk, cards[i].mm_size << 1);

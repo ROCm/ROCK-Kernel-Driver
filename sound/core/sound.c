@@ -429,6 +429,11 @@ EXPORT_SYMBOL(snd_malloc_pci_pages);
 EXPORT_SYMBOL(snd_malloc_pci_pages_fallback);
 EXPORT_SYMBOL(snd_free_pci_pages);
 #endif
+#ifdef CONFIG_SBUS
+EXPORT_SYMBOL(snd_malloc_sbus_pages);
+EXPORT_SYMBOL(snd_malloc_sbus_pages_fallback);
+EXPORT_SYMBOL(snd_free_sbus_pages);
+#endif
 EXPORT_SYMBOL(copy_to_user_fromio);
 EXPORT_SYMBOL(copy_from_user_toio);
   /* init.c */
@@ -501,6 +506,8 @@ EXPORT_SYMBOL(snd_printd);
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_wrapper_kmalloc);
 EXPORT_SYMBOL(snd_wrapper_kfree);
+EXPORT_SYMBOL(snd_wrapper_vmalloc);
+EXPORT_SYMBOL(snd_wrapper_vfree);
 #endif
 #ifdef HACK_PCI_ALLOC_CONSISTENT
 EXPORT_SYMBOL(snd_pci_hack_alloc_consistent);

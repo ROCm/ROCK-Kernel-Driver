@@ -1,8 +1,9 @@
 /*
  *	X.25 Packet Layer release 002
  *
- *	This is ALPHA test software. This code may break your machine, randomly fail to work with new 
- *	releases, misbehave and/or generally screw up. It might even work. 
+ *	This is ALPHA test software. This code may break your machine,
+ *	randomly fail to work with new releases, misbehave and/or generally
+ *	screw up. It might even work. 
  *
  *	This code REQUIRES 2.1.15 or higher
  *
@@ -47,7 +48,7 @@
 static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 {
 	struct sk_buff *skbo, *skbn = skb;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	if (more) {
 		x25->fraglen += skb->len;
@@ -86,7 +87,7 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 	skb_set_owner_r(skbn, sk);
 	skb_queue_tail(&sk->receive_queue, skbn);
 	if (!sk->dead)
-		sk->data_ready(sk,skbn->len);
+		sk->data_ready(sk, skbn->len);
 
 	return 0;
 }
@@ -98,11 +99,11 @@ static int x25_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
  */
 static int x25_state1_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	x25_address source_addr, dest_addr;
+	struct x25_address source_addr, dest_addr;
 
 	switch (frametype) {
 		case X25_CALL_ACCEPTED: {
-			x25_cb *x25 = x25_sk(sk);
+			struct x25_opt *x25 = x25_sk(sk);
 
 			x25_stop_timer(sk);
 			x25->condition = 0x00;
@@ -178,7 +179,7 @@ static int x25_state3_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 {
 	int queued = 0;
 	int modulus;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	
 	modulus = (x25->neighbour->extended) ? X25_EMODULUS : X25_SMODULUS;
 
@@ -307,7 +308,7 @@ static int x25_state4_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 		case X25_RESET_REQUEST:
 			x25_write_internal(sk, X25_RESET_CONFIRMATION);
 		case X25_RESET_CONFIRMATION: {
-			x25_cb *x25 = x25_sk(sk);
+			struct x25_opt *x25 = x25_sk(sk);
 
 			x25_stop_timer(sk);
 			x25->condition = 0x00;
@@ -334,7 +335,7 @@ static int x25_state4_machine(struct sock *sk, struct sk_buff *skb, int frametyp
 /* Higher level upcall for a LAPB frame */
 int x25_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 {
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	int queued = 0, frametype, ns, nr, q, d, m;
 
 	if (x25->state == X25_STATE_0)
@@ -364,10 +365,10 @@ int x25_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 
 int x25_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	int queued;
+	int queued = x25_process_rx_frame(sk, skb);
 
-	queued = x25_process_rx_frame(sk,skb);
-	if(!queued) kfree_skb(skb);
+	if (!queued)
+		kfree_skb(skb);
 
 	return 0;
 }

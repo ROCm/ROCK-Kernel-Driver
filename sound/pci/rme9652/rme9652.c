@@ -523,6 +523,7 @@ static int rme9652_set_rate(rme9652_t *rme9652, int rate)
 		rate = RME9652_DS | RME9652_freq;
 		break;
 	default:
+		spin_unlock_irq(&rme9652->lock);
 		return -EINVAL;
 	}
 

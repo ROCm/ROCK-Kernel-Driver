@@ -954,41 +954,35 @@ EXPORT_SYMBOL(init_irq);
  */
 static void init_gendisk (ide_hwif_t *hwif)
 {
-	struct gendisk *gd;
-	unsigned int unit, units, minors;
+	unsigned int unit, units;
 	extern devfs_handle_t ide_devfs_handle;
-	char *names;
+	struct gendisk *disks[MAX_DRIVES];
 
 	units = MAX_DRIVES;
 
-	minors    = units * (1<<PARTN_BITS);
-	gd        = kmalloc(MAX_DRIVES * sizeof(struct gendisk), GFP_KERNEL);
-	if (!gd)
-		goto err_kmalloc_gd;
-	memset(gd, 0, MAX_DRIVES * sizeof(struct gendisk));
-
-	names = kmalloc(4 * MAX_DRIVES, GFP_KERNEL);
-	if (!names)
-		goto err_kmalloc_gd_names;
-	memset(names, 0, 4 * MAX_DRIVES);
+	for (unit = 0; unit < MAX_DRIVES; unit++) {
+		disks[unit] = alloc_disk();
+		if (!disks[unit])
+			goto err_kmalloc_gd;
+	}
 
 	for (unit = 0; unit < units; ++unit) {
-		gd[unit].major  = hwif->major;
-		gd[unit].first_minor = unit << PARTN_BITS;
-		sprintf(names + 4*unit, "hd%c",'a'+hwif->index*MAX_DRIVES+unit);
-		gd[unit].major_name = names + 4*unit;
-		gd[unit].minor_shift = PARTN_BITS; 
-		gd[unit].fops = ide_fops;
+		struct gendisk *disk = disks[unit];
+		disk->major  = hwif->major;
+		disk->first_minor = unit << PARTN_BITS;
+		sprintf(disk->disk_name,"hd%c",'a'+hwif->index*MAX_DRIVES+unit);
+		disk->minor_shift = PARTN_BITS; 
+		disk->fops = ide_fops;
 
-		snprintf(gd[unit].disk_dev.bus_id,BUS_ID_SIZE,"%u.%u",
+		snprintf(disk->disk_dev.bus_id,BUS_ID_SIZE,"%u.%u",
 			 hwif->index,unit);
-		snprintf(gd[unit].disk_dev.name,DEVICE_NAME_SIZE,
+		snprintf(disk->disk_dev.name,DEVICE_NAME_SIZE,
 			 "%s","IDE Drive");
-		gd[unit].disk_dev.parent = &hwif->gendev;
-		gd[unit].disk_dev.bus = &ide_bus_type;
-		device_register(&gd[unit].disk_dev);
+		disk->disk_dev.parent = &hwif->gendev;
+		disk->disk_dev.bus = &ide_bus_type;
+		device_register(&disk->disk_dev);
 
-		hwif->drives[unit].disk = gd + unit;
+		hwif->drives[unit].disk = disk;
 	}
 
 	for (unit = 0; unit < units; ++unit) {
@@ -1003,10 +997,10 @@ static void init_gendisk (ide_hwif_t *hwif)
 	}
 	return;
 
-err_kmalloc_gd_names:
-	kfree(gd);
 err_kmalloc_gd:
 	printk(KERN_WARNING "(ide::init_gendisk) Out of memory\n");
+	while (unit--)
+		put_disk(disks[unit]);
 }
 
 EXPORT_SYMBOL(init_gendisk);

@@ -702,7 +702,7 @@ static void get_service(struct atm_dev *dev)
 			DPRINTK("Grr, servicing VCC %ld twice\n",vci);
 			continue;
 		}
-		ENI_VCC(vcc)->timestamp = xtime;
+		do_gettimeofday(&ENI_VCC(vcc)->timestamp);
 		ENI_VCC(vcc)->next = NULL;
 		if (vcc->qos.rxtp.traffic_class == ATM_CBR) {
 			if (eni_dev->fast)

@@ -30,7 +30,7 @@ Sg driver documentation
 =======================
 The most recent documentation of the sg driver is kept at the Linux
 Documentation Project's (LDP) site: 
-http://www.linuxdoc.org/HOWTO/SCSI-Generic-HOWTO
+http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO
 This describes the sg version 3 driver found in the lk 2.4 series.
 The LDP renders documents in single and multiple page HTML, postscript
 and pdf. This document can also be found at:
@@ -51,7 +51,7 @@ in /usr/include/scsi/sg.h . Driver debugging information and other notes
 can be found at the top of the /usr/src/linux/drivers/scsi/sg.c file.
 
 A more general description of the Linux SCSI subsystem of which sg is a 
-part can be found at http://www.linuxdoc.org/HOWTO/SCSI-2.4-HOWTO .
+part can be found at http://www.tldp.org/HOWTO/SCSI-2.4-HOWTO .
 
 
 Example code and utilities

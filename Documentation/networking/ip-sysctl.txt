@@ -89,7 +89,7 @@ tcp_keepalive_intvl - INTEGER
 
 tcp_retries1 - INTEGER
 	How many times to retry before deciding that something is wrong
-	and it is necessary to report this suspection to network layer.
+	and it is necessary to report this suspicion to network layer.
 	Minimal RFC value is 3, it is default, which corresponds
 	to ~3sec-8min depending on RTO.
 
@@ -200,7 +200,7 @@ tcp_sack - BOOLEAN
 	Enable select acknowledgments (SACKS).
 
 tcp_fack - BOOLEAN
-	Enable FACK congestion avoidance and fast restransmission.
+	Enable FACK congestion avoidance and fast retransmission.
 	The value is not used, if tcp_sack is not enabled.
 
 tcp_dsack - BOOLEAN
@@ -256,7 +256,7 @@ tcp_mem - vector of 3 INTEGERs: min, pressure, max
 
 	pressure: when amount of memory allocated by TCP exceeds this number
 	of pages, TCP moderates its memory consumption and enters memory
-	pressure mode, which is exited when memory consumtion falls
+	pressure mode, which is exited when memory consumption falls
 	under "low".
 
 	high: number of pages allowed for queueing by all TCP sockets.
@@ -278,7 +278,7 @@ tcp_adv_win_scale - INTEGER
 tcp_rfc1337 - BOOLEAN
 	If set, the TCP stack behaves conforming to RFC1337. If unset,
 	we are not conforming to RFC, but prevent TCP TIME_WAIT
-	asassination.	
+	assassination.   
 	Default: 0
 
 ip_local_port_range - 2 INTEGERS
@@ -295,7 +295,7 @@ ip_local_port_range - 2 INTEGERS
 	2000 connections per second to systems supporting timestamps.
 
 ip_nonlocal_bind - BOOLEAN
-	If set, allows processes to bind() to non-local IP adresses,
+	If set, allows processes to bind() to non-local IP addresses,
 	which can be quite useful - but may break some applications.
 	Default: 0
 

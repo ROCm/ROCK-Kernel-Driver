@@ -148,14 +148,14 @@ static struct block_device_operations ps2esdi_fops =
 static struct gendisk ps2esdi_gendisk[2] = {
 {
 	major:		MAJOR_NR,
-	major_name:	"eda",
+	disk_name:	"eda",
 	first_minor:	0,
 	minor_shift:	6,
 	fops:		&ps2esdi_fops,
 },{
 	major:		MAJOR_NR,
 	first_minor:	64,
-	major_name:	"edb",
+	disk_name:	"edb",
 	minor_shift:	6,
 	fops:		&ps2esdi_fops,
 }

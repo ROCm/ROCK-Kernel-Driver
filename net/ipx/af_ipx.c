@@ -2252,22 +2252,6 @@ drop:	kfree_skb(skb);
 out:	return ret;
 }
 
-static int ipx_8022_indicate(struct llc_prim_if_block *prim)
-{
-	int rc = 1;
-	static struct packet_type p8022_packet_type = {
-		.type = __constant_htons(ETH_P_802_2),
-	};
-
-	if (prim->prim == LLC_DATAUNIT_PRIM) {
-		struct sk_buff *skb = prim->data->udata.skb;
-
-		rc = ipx_rcv(skb, skb->dev, &p8022_packet_type);
-	}
-						
-	return rc;
-}
-
 static int ipx_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	struct scm_cookie *scm)
 {
@@ -2560,7 +2544,7 @@ static int __init ipx_init(void)
 	else
 		printk(ipx_8023_err_msg);
 
-	p8022_datalink = register_8022_client(ipx_8022_type, ipx_8022_indicate);
+	p8022_datalink = register_8022_client(ipx_8022_type, ipx_rcv);
 	if (!p8022_datalink)
 		printk(ipx_llc_err_msg);
 

@@ -21,7 +21,6 @@ struct llc_timer {
 };
 
 struct llc_opt {
-	struct list_head    node;		/* entry in sap->sk_list.list */
 	struct sock	    *sk;		/* sock that has this llc_opt */
 	struct sockaddr_llc addr;		/* address sock is bound to */
 	u8		    state;		/* state of connection */
@@ -66,17 +65,9 @@ struct llc_opt {
 	u32		    rx_pdu_hdr;	   /* used for saving header of last pdu
 					      received and caused sending FRMR.
 					      Used for resending FRMR */
-#ifdef DEBUG_LLC_CONN_ALLOC
-	char *f_alloc,	/* function that allocated this connection */
-	     *f_free;	/* function that freed this connection */
-	int l_alloc,	/* line that allocated this connection */
-	    l_free;	/* line that freed this connection */
-#endif
 };
 
 #define llc_sk(__sk) ((struct llc_opt *)(__sk)->protinfo)
-
-struct llc_conn_state_ev;
 
 extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);
@@ -100,6 +91,9 @@ extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *laddr);
 extern struct sock *llc_lookup_listener(struct llc_sap *sap,
 					struct llc_addr *laddr);
+extern struct sock *llc_lookup_dgram(struct llc_sap *sap,
+				     struct llc_addr *laddr);
+extern void llc_save_primitive(struct sk_buff* skb, u8 prim);
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
 #endif /* LLC_CONN_H */

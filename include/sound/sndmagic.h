@@ -61,6 +61,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_pcm_proc_private_t_magic		0xa15a0104
 #define snd_pcm_oss_file_t_magic		0xa15a0105
 #define snd_mixer_oss_t_magic			0xa15a0106
+#define snd_pcm_sgbuf_t_magic			0xa15a0107
 
 #define snd_info_private_data_t_magic		0xa15a0201
 #define snd_ctl_file_t_magic			0xa15a0301
@@ -78,6 +79,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define trident_t_magic				0xa15a1201
 #define es1938_t_magic				0xa15a1301
 #define cs46xx_t_magic				0xa15a1401
+#define cs46xx_pcm_t_magic			0xa15a1402
 #define ensoniq_t_magic				0xa15a1501
 #define sonicvibes_t_magic			0xa15a1601
 #define mpu401_t_magic				0xa15a1701

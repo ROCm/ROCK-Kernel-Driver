@@ -794,7 +794,7 @@ static void snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr
 				 u32 op, u32 r, u32 a, u32 x, u32 y)
 {
 	snd_assert(*ptr < 512, return);
-	set_bit(*ptr, &icode->code_valid);
+	set_bit(*ptr, icode->code_valid);
 	icode->code[*ptr    ][0] = ((x & 0x3ff) << 10) | (y & 0x3ff);
 	icode->code[(*ptr)++][1] = ((op & 0x0f) << 20) | ((r & 0x3ff) << 10) | (a & 0x3ff);
 }
@@ -806,7 +806,7 @@ static void snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned i
 					u32 op, u32 r, u32 a, u32 x, u32 y)
 {
 	snd_assert(*ptr < 512, return);
-	set_bit(*ptr, &icode->code_valid);
+	set_bit(*ptr, icode->code_valid);
 	icode->code[*ptr    ][0] = ((x & 0x7ff) << 12) | (y & 0x7ff);
 	icode->code[(*ptr)++][1] = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
 }
@@ -831,7 +831,7 @@ static void snd_emu10k1_gpr_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int gpr;
 
 	for (gpr = 0; gpr < 0x100; gpr++) {
-		if (!test_bit(gpr, &icode->gpr_valid))
+		if (!test_bit(gpr, icode->gpr_valid))
 			continue;
 		snd_emu10k1_ptr_write(emu, emu->gpr_base + gpr, 0, icode->gpr_map[gpr]);
 	}
@@ -842,7 +842,7 @@ static void snd_emu10k1_gpr_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int gpr;
 
 	for (gpr = 0; gpr < 0x100; gpr++) {
-		set_bit(gpr, &icode->gpr_valid);
+		set_bit(gpr, icode->gpr_valid);
 		icode->gpr_map[gpr] = snd_emu10k1_ptr_read(emu, emu->gpr_base + gpr, 0);
 	}
 }
@@ -852,7 +852,7 @@ static void snd_emu10k1_tram_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int tram;
 
 	for (tram = 0; tram < 0xa0; tram++) {
-		if (!test_bit(tram, &icode->tram_valid))
+		if (!test_bit(tram, icode->tram_valid))
 			continue;
 		snd_emu10k1_ptr_write(emu, TANKMEMDATAREGBASE + tram, 0, icode->tram_data_map[tram]);
 		snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + tram, 0, icode->tram_addr_map[tram]);
@@ -864,7 +864,7 @@ static void snd_emu10k1_tram_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int tram;
 
 	for (tram = 0; tram < 0xa0; tram++) {
-		set_bit(tram, &icode->tram_valid);
+		set_bit(tram, icode->tram_valid);
 		icode->tram_data_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMDATAREGBASE + tram, 0);
 		icode->tram_addr_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMADDRREGBASE + tram, 0);
 	}
@@ -875,7 +875,7 @@ static void snd_emu10k1_code_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	u32 pc;
 
 	for (pc = 0; pc < 512; pc++) {
-		if (!test_bit(pc, &icode->code_valid))
+		if (!test_bit(pc, icode->code_valid))
 			continue;
 		snd_emu10k1_efx_write(emu, pc * 2, icode->code[pc][0]);
 		snd_emu10k1_efx_write(emu, pc * 2 + 1, icode->code[pc][1]);
@@ -887,7 +887,7 @@ static void snd_emu10k1_code_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	u32 pc;
 
 	for (pc = 0; pc < 512; pc++) {
-		set_bit(pc, &icode->code_valid);
+		set_bit(pc, icode->code_valid);
 		icode->code[pc][0] = snd_emu10k1_efx_read(emu, pc * 2);
 		icode->code[pc][1] = snd_emu10k1_efx_read(emu, pc * 2 + 1);
 	}
@@ -1215,7 +1215,7 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	
 	/* clear free GPRs */
 	for (i = 0; i < 256; i++)
-		set_bit(i, &icode->gpr_valid);
+		set_bit(i, icode->gpr_valid);
 
 	strcpy(icode->name, "Audigy DSP code for ALSA");
 	ptr = 0;
@@ -1467,11 +1467,11 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	
 	/* clear free GPRs */
 	for (i = 0; i < 256; i++)
-		set_bit(i, &icode->gpr_valid);
+		set_bit(i, icode->gpr_valid);
 
 	/* clear TRAM data & address lines */
 	for (i = 0; i < 160; i++)
-		set_bit(i, &icode->tram_valid);
+		set_bit(i, icode->tram_valid);
 
 	strcpy(icode->name, "SB Live! FX8010 code for ALSA v1.2 by Jaroslav Kysela");
 	ptr = 0; i = 0;

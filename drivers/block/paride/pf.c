@@ -316,7 +316,7 @@ void pf_init_units(void)
 		snprintf(pf->name, PF_NAMELEN, "%s%d", name, unit);
 		disk->major = MAJOR_NR;
 		disk->first_minor = unit;
-		disk->major_name = pf->name;
+		strcpy(disk->disk_name, pf->name);
 		disk->minor_shift = 0;
 		disk->fops = &pf_fops;
 		if (!(*drives[unit])[D_PRT])

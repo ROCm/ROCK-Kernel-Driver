@@ -272,8 +272,7 @@ static void acm_write_bulk(struct urb *urb)
 	if (urb->status)
 		dbg("nonzero write bulk status received: %d", urb->status);
 
-	queue_task(&acm->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_task(&acm->tqueue);
 }
 
 static void acm_softint(void *private)

@@ -808,7 +808,7 @@ set_rx_mode(struct net_device *dev)
 	int ioaddr = dev->base_addr;
 	struct net_local *lp = (struct net_local *)dev->priv;
 	unsigned char mc_filter[8];		 /* Multicast hash filter */
-       unsigned long flags;
+	unsigned long flags;
 	int i;
 
 	if (dev->flags & IFF_PROMISC) {

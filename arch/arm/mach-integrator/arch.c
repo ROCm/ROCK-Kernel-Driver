@@ -29,37 +29,9 @@
 #include <asm/mach-types.h>
 
 #include <asm/mach/arch.h>
-#include <asm/mach/amba_kmi.h>
 
 extern void integrator_map_io(void);
 extern void integrator_init_irq(void);
-
-#ifdef CONFIG_KMI_KEYB
-static struct kmi_info integrator_keyboard __initdata = {
-	.base		= IO_ADDRESS(KMI0_BASE),
-	.irq		= IRQ_KMIINT0,
-	.divisor	= 24 / 8 - 1,
-	.type		= KMI_KEYBOARD,
-};
-
-static struct kmi_info integrator_mouse __initdata = {
-	.base		= IO_ADDRESS(KMI1_BASE),
-	.irq		= IRQ_KMIINT1,
-	.divisor	= 24 / 8 - 1,
-	.type		= KMI_MOUSE,
-};
-#endif
-
-static int __init integrator_init(void)
-{
-#ifdef CONFIG_KMI_KEYB
-	register_kmi(&integrator_keyboard);
-	register_kmi(&integrator_mouse);
-#endif
-	return 0;
-}
-
-__initcall(integrator_init);
 
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")

@@ -166,6 +166,9 @@ static int snd_sbdsp_probe(sb_t * chip)
 	case SB_HW_ALS4000:
 		str = "16 (ALS-4000)";
 		break;
+	case SB_HW_DT019X:
+		str = "(DT019X/ALS007)";
+		break;
 	default:
 		return -ENODEV;
 	}

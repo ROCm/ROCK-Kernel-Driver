@@ -56,7 +56,6 @@
 #include <linux/serial_core.h>
 
 #include "generic.h"
-#include "sa1111.h"
 #include <asm/hardware/sa1111.h>
 
 #define DEBUG 1
@@ -401,7 +400,7 @@ static int __init system3_init(void)
 	/*
 	 * Probe for a SA1111.
 	 */
-	ret = sa1111_init(NULL, PT_SA1111_BASE, IRQ_SYSTEM3_SA1111);
+	ret = sa1111_init(PT_SA1111_BASE, IRQ_SYSTEM3_SA1111);
 	if (ret < 0) {
 		printk( KERN_WARNING"PT Digital Board: no SA1111 found!\n" );
 		goto DONE;
@@ -429,7 +428,7 @@ DONE:
 /**********************************************************************
  *  kernel magic macros
  */
-__initcall(system3_init);
+arch_initcall(system3_init);
 
 MACHINE_START(PT_SYSTEM3, "PT System 3")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)

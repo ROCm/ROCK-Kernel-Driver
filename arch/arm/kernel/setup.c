@@ -77,6 +77,8 @@ struct cpu_user_fns cpu_user;
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
+unsigned long phys_initrd_start __initdata = 0;
+unsigned long phys_initrd_size __initdata = 0;
 
 static struct meminfo meminfo __initdata = { 0, };
 static struct proc_info_item proc_info;
@@ -326,6 +328,22 @@ parse_cmdline(struct meminfo *mi, char **cmdline_p, char *from)
 			mi->bank[mi->nr_banks].size  = size;
 			mi->bank[mi->nr_banks].node  = PHYS_TO_NID(start);
 			mi->nr_banks += 1;
+		} else if (c == ' ' && !memcmp(from, "initrd=", 7)) {
+			unsigned long start, size;
+
+			/*
+			 * Remove space character
+			 */
+			if (to != command_line)
+				to -= 1;
+
+			start = memparse(from + 7, &from);
+			if (*from == ',') {
+				size = memparse(from + 1, &from);
+
+				phys_initrd_start = start;
+				phys_initrd_size = size;
+			}
 		}
 		c = *from++;
 		if (!c)
@@ -350,19 +368,6 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 
 	if (rd_sz)
 		rd_size = rd_sz;
-#endif
-}
-
-/*
- * initial ram disk
- */
-static void __init setup_initrd(unsigned int start, unsigned int size)
-{
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (start == 0)
-		size = 0;
-	initrd_start = start;
-	initrd_end   = start + size;
 #endif
 }
 
@@ -499,7 +504,8 @@ __tagtable(ATAG_RAMDISK, parse_tag_ramdisk);
 
 static int __init parse_tag_initrd(const struct tag *tag)
 {
-	setup_initrd(tag->u.initrd.start, tag->u.initrd.size);
+	phys_initrd_start = __virt_to_phys(tag->u.initrd.start);
+	phys_initrd_size = tag->u.initrd.size;
 	return 0;
 }
 
@@ -507,13 +513,8 @@ __tagtable(ATAG_INITRD, parse_tag_initrd);
 
 static int __init parse_tag_initrd2(const struct tag *tag)
 {
-	unsigned long start = 0;
-
-	if (tag->u.initrd.size) {
-		start = (unsigned long)phys_to_virt(tag->u.initrd.start);
-
-		setup_initrd(start, tag->u.initrd.size);
-	}
+	phys_initrd_start = tag->u.initrd.start;
+	phys_initrd_size = tag->u.initrd.size;
 	return 0;
 }
 

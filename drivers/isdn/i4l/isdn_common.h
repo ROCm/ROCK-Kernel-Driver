@@ -12,6 +12,8 @@
  *
  */
 
+#include <linux/isdn.h>
+
 #undef  ISDN_DEBUG_MODEM_OPEN
 #undef  ISDN_DEBUG_MODEM_IOCTL
 #undef  ISDN_DEBUG_MODEM_WAITSENT
@@ -102,4 +104,4 @@ extern void  isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd);
 extern void  isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd);
 extern isdn_net_dev *isdn_slot_rx_netdev(int sl);
 extern isdn_net_dev *isdn_slot_st_netdev(int sl);
-
+extern int   isdn_hard_header_len(void);

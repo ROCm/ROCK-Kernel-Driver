@@ -106,8 +106,7 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
 	switch (data) {
 
 		case SUNKBD_RET_RESET:
-			queue_task(&sunkbd->tq, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_task(&sunkbd->tq);
 			sunkbd->reset = -1;
 			return;
 

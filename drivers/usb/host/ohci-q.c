@@ -854,6 +854,11 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	    	int		cc;
 
 		td = dma_to_td (ohci, td_dma);
+		if (!td) {
+			err ("%s bad entry %8x",
+				ohci->hcd.self.bus_name, td_dma);
+			break;
+		}
 
 		td->hwINFO |= cpu_to_le32 (TD_DONE);
 		cc = TD_CC_GET (le32_to_cpup (&td->hwINFO));

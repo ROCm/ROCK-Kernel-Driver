@@ -87,7 +87,7 @@ typedef struct lmc___ctl lmc_ctl_t;
 		lmc_delay(); \
 		LMC_CSR_WRITE((sc), csr_9, 0x30000); \
                 lmc_delay(); \
-		n--; }} while(0);
+		n--; }} while(0)
 
 struct lmc_regfile_t {
     lmc_csrptr_t csr_busmode;                  /* CSR0 */

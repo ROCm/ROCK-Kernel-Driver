@@ -284,6 +284,7 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	tpnt->use_clustering = DISABLE_CLUSTERING;
 	tpnt->proc_info = NCR_700_proc_directory_info;
 	tpnt->use_blk_tcq = 1;
+	tpnt->highmem_io = 1;
 	
 	if(tpnt->name == NULL)
 		tpnt->name = "53c700";

@@ -459,28 +459,32 @@ static void Q40Play(void)
 		  */
 	         return;
 	}
-	save_flags(flags); cli();
+	spin_lock_irqsave(&dmasound.lock, flags);
 	Q40PlayNextFrame(1);
-	restore_flags(flags);
+	spin_unlock_irqrestore_flags(&dmasound.lock, flags);
 }
 
 static void Q40StereoInterrupt(int irq, void *dummy, struct pt_regs *fp)
 {
+	spin_lock(&dmasound.lock);
         if (q40_sc>1){
             *DAC_LEFT=*q40_pp++;
 	    *DAC_RIGHT=*q40_pp++;
 	    q40_sc -=2;
 	    master_outb(1,SAMPLE_CLEAR_REG);
 	}else Q40Interrupt();
+	spin_unlock(&dmasound.lock);
 }
 static void Q40MonoInterrupt(int irq, void *dummy, struct pt_regs *fp)
 {
+	spin_lock(&dmasound.lock);
         if (q40_sc>0){
             *DAC_LEFT=*q40_pp;
 	    *DAC_RIGHT=*q40_pp++;
 	    q40_sc --;
 	    master_outb(1,SAMPLE_CLEAR_REG);
 	}else Q40Interrupt();
+	spin_unlock(&dmasound.lock);
 }
 static void Q40Interrupt(void)
 {

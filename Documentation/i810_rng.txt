@@ -72,6 +72,7 @@ Change history:
 
 	Version 0.9.8:
 	* Support other i8xx chipsets by adding 82801E detection
+	* 82801DB detection is the same as for 82801CA.
 
 	Version 0.9.7:
 	* Support other i8xx chipsets too (by adding 82801BA(M) and

@@ -284,24 +284,16 @@ storkInitTSandDtoA(void)
     storkClockShortToDtoA(0x0A00);	/* turn on the brightness */
 }
 
-/* see asm-arm/keyboard.h - there are a bunch of basically virtual functions required */
-/* we have to fill in for them or else we can't call handle_scancode when we see a button pressed */
-
-static int
-stork_kbd_translate(unsigned char scancode, unsigned char *keycode, char rawmode)
+static void stork_lcd_power(int on)
 {
-    if (keycode)
-	*keycode = scancode;
-
-    return 1;
+	if (on) {
+		storkSetLCDCPLD(0, 1);
+		storkSetLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
+	} else {
+		storkSetLCDCPLD(0, 0);
+		storkClearLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
+	}
 }
-
-static char
-stork_kbd_unexpected_up(unsigned char code)
-{
-    return 0;
-}
-
 
 struct map_desc stork_io_desc[] __initdata = {
  /* virtual     physical    length      type */
@@ -331,8 +323,7 @@ stork_map_io(void)
 
     storkInitTSandDtoA();
 
-    k_translate = stork_kbd_translate;
-    k_unexpected_up = stork_kbd_unexpected_up;
+    sa1100fb_lcd_power = stork_lcd_power;
 
     return 0;
 }

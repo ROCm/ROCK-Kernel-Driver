@@ -39,12 +39,12 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
 /* Offset table on connection states transition diagram */
 static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
 
-void llc_save_primitive(struct sock *sk, struct sk_buff* skb, u8 prim)
+void llc_save_primitive(struct sk_buff* skb, u8 prim)
 {
 	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
 
        /* save primitive for use by the user. */
-	addr->sllc_family = sk->family;
+	addr->sllc_family = skb->sk->family;
 	addr->sllc_arphrd = skb->dev->type;
 	addr->sllc_test   = prim == LLC_TEST_PRIM;
 	addr->sllc_xid    = prim == LLC_XID_PRIM;
@@ -67,110 +67,120 @@ void llc_save_primitive(struct sock *sk, struct sk_buff* skb, u8 prim)
  */
 int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 {
-	/* sending event to state machine */
-	int rc = llc_conn_service(sk, skb);
+	int rc;
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	u8 flag = ev->flag;
-	u8 status = ev->status;
-	struct llc_prim_if_block *ind_prim = ev->ind_prim;
-	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
-	/*
-	 * FIXME: this will vanish as soon I get rid of the last prim crap
-	 */
-	if (flag != LLC_DATA_PRIM + 1 && flag != LLC_CONN_PRIM + 1 &&
-	    flag != LLC_DISC_PRIM + 1)
-		llc_conn_free_ev(skb);
-	else if (ind_prim && cfm_prim)
-		skb_get(skb);
-	if (!flag)   /* indicate or confirm not required */
-		goto out;
-	rc = 0;
-	if (ind_prim) { /* indication required */
-		/*
-		 * FIXME: this will be saner as soon I get rid of the double
-		 *	  sock crap
-		 */
-		switch (flag) {
-		case LLC_DATA_PRIM + 1:
-			llc_save_primitive(sk, skb, LLC_DATA_PRIM);
-			if (sock_queue_rcv_skb(sk, skb)) {
-				/*
-				 * FIXME: have to sync the LLC state
-				 *        machine wrt mem usage with
-				 *        sk->{r,w}mem_alloc, will do
-				 *        this soon 8)
-				 */
-				printk(KERN_ERR
-				       "%s: sock_queue_rcv_skb failed!\n",
-				       __FUNCTION__);
-				kfree_skb(skb);
-			}
-			break;
-		case LLC_CONN_PRIM + 1: {
-			struct sock *parent = skb->sk;
-
-			skb->sk = sk;
-			skb_queue_tail(&parent->receive_queue, skb);
-			sk->state_change(parent);
-		}
-			break;
-		case LLC_DISC_PRIM + 1:
-			sock_hold(sk);
-			if (sk->type == SOCK_STREAM && sk->state == TCP_ESTABLISHED) {
-				sk->shutdown       = SHUTDOWN_MASK;
-				sk->socket->state  = SS_UNCONNECTED;
-				sk->state          = TCP_CLOSE;
-				if (!sk->dead) {
-					sk->state_change(sk);
-					sk->dead = 1;
-				}
-			}
-			kfree_skb(skb);
-			sock_put(sk);
-			break;
-		default:
-			llc->sap->ind(ind_prim);
-		}
+	ev->ind_prim = ev->cfm_prim = 0;
+	rc = llc_conn_service(sk, skb); /* sending event to state machine */
+	if (rc) {
+		printk(KERN_ERR "%s: llc_conn_service failed\n", __FUNCTION__);
+		goto out_kfree_skb;
 	}
-	if (!cfm_prim)  /* confirmation not required */
+
+	if (!ev->ind_prim && !ev->cfm_prim) {   /* indicate or confirm not required */
+		if (!skb->list)
+			goto out_kfree_skb;
 		goto out;
-	/* FIXME: see FIXMEs above */
-	switch (flag) {
-	case LLC_DATA_PRIM + 1:
+	}
+
+	if (ev->ind_prim && ev->cfm_prim)
+		skb_get(skb);
+
+	switch (ev->ind_prim) {
+	case LLC_DATA_PRIM:
+		llc_save_primitive(skb, LLC_DATA_PRIM);
+		if (sock_queue_rcv_skb(sk, skb)) {
+			/*
+			 * shouldn't happen
+			 */
+			printk(KERN_ERR "%s: sock_queue_rcv_skb failed!\n",
+			       __FUNCTION__);
+			kfree_skb(skb);
+		}
+		break;
+	case LLC_CONN_PRIM: {
+		struct sock *parent = skb->sk;
+
+		skb->sk = sk;
+		skb_queue_tail(&parent->receive_queue, skb);
+		sk->state_change(parent);
+	}
+		break;
+	case LLC_DISC_PRIM:
+		sock_hold(sk);
+		if (sk->type == SOCK_STREAM && sk->state == TCP_ESTABLISHED) {
+			sk->shutdown       = SHUTDOWN_MASK;
+			sk->socket->state  = SS_UNCONNECTED;
+			sk->state          = TCP_CLOSE;
+			if (!sk->dead) {
+				sk->state_change(sk);
+				sk->dead = 1;
+			}
+		}
+		kfree_skb(skb);
+		sock_put(sk);
+		break;
+	case LLC_RESET_PRIM:
+		/*
+		 * FIXME:
+		 * RESET is not being notified to upper layers for now
+		 */
+		printk(KERN_INFO "%s: received a reset ind!\n", __FUNCTION__);
+		kfree_skb(skb);
+		break;
+	default:
+		if (ev->ind_prim) {
+			printk(KERN_INFO "%s: received unknown %d prim!\n",
+				__FUNCTION__, ev->ind_prim);
+			kfree_skb(skb);
+		}
+		/* No indication */
+		break;
+	}
+
+	switch (ev->cfm_prim) {
+	case LLC_DATA_PRIM:
 		if (!llc_data_accept_state(llc->state))
-			/* In this state, we can send I pdu */
 			sk->write_space(sk);
 		else
 			rc = llc->failed_data_req = 1;
 		break;
-	case LLC_CONN_PRIM + 1:
-		if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
-			goto out_kfree_skb;
-		if (status) {
+	case LLC_CONN_PRIM:
+		if (sk->type == SOCK_STREAM && sk->state == TCP_SYN_SENT) {
+			if (ev->status) {
+				sk->socket->state = SS_UNCONNECTED;
+				sk->state         = TCP_CLOSE;
+			} else {
+				sk->socket->state = SS_CONNECTED;
+				sk->state         = TCP_ESTABLISHED;
+			}
+			sk->state_change(sk);
+		}
+		break;
+	case LLC_DISC_PRIM:
+		sock_hold(sk);
+		if (sk->type == SOCK_STREAM && sk->state == TCP_CLOSING) {
 			sk->socket->state = SS_UNCONNECTED;
 			sk->state         = TCP_CLOSE;
-		} else {
-			sk->socket->state = SS_CONNECTED;
-			sk->state         = TCP_ESTABLISHED;
+			sk->state_change(sk);
 		}
-		sk->state_change(sk);
-		break;
-	case LLC_DISC_PRIM + 1:
-		sock_hold(sk);
-		if (sk->type != SOCK_STREAM || sk->state != TCP_CLOSING) {
-			sock_put(sk);
-			goto out_kfree_skb;
-		}
-		sk->socket->state = SS_UNCONNECTED;
-		sk->state         = TCP_CLOSE;
-		sk->state_change(sk);
 		sock_put(sk);
 		break;
+	case LLC_RESET_PRIM:
+		/*
+		 * FIXME:
+		 * RESET is not being notified to upper layers for now
+		 */
+		printk(KERN_INFO "%s: received a reset conf!\n", __FUNCTION__);
+		break;
 	default:
-		llc->sap->conf(cfm_prim);
-		goto out;
+		if (ev->cfm_prim) {
+			printk(KERN_INFO "%s: received unknown %d prim!\n",
+					__FUNCTION__, ev->cfm_prim);
+			break;
+		}
+		goto out; /* No confirmation */
 	}
 out_kfree_skb:
 	kfree_skb(skb);
@@ -198,9 +208,7 @@ void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
-	/* FIXME: indicate that we should send this to the upper layer */
-	ev->flag     = LLC_DATA_PRIM + 1;
-	ev->ind_prim = (void *)1;
+	ev->ind_prim = LLC_DATA_PRIM;
 }
 
 /**
@@ -332,12 +340,15 @@ static void llc_conn_send_pdus(struct sock *sk)
 		struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 		if (!LLC_PDU_TYPE_IS_I(pdu) &&
-		    !(skb->dev->flags & IFF_LOOPBACK))
+		    !(skb->dev->flags & IFF_LOOPBACK)) {
+			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+
 			skb_queue_tail(&llc_sk(sk)->pdu_unack_q, skb);
-		mac_send_pdu(skb);
-		if (LLC_PDU_TYPE_IS_I(pdu) ||
-		    (skb->dev && skb->dev->flags & IFF_LOOPBACK))
-			kfree_skb(skb);
+			if (!skb2)
+				break;
+			skb = skb2;
+		}
+		dev_queue_xmit(skb);
 	}
 }
 
@@ -355,12 +366,14 @@ void llc_conn_free_ev(struct sk_buff *skb)
 		/* free the frame that is bound to this event */
 		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->flag || !ev->ind_prim)
+		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->ind_prim)
 			kfree_skb(skb);
 	} else if (ev->type == LLC_CONN_EV_TYPE_PRIM &&
-		   ev->data.prim.prim != LLC_DATA_PRIM)
+		   ev->prim != LLC_DATA_PRIM)
 		kfree_skb(skb);
-	else if (ev->type == LLC_CONN_EV_TYPE_P_TMR)
+	else if (ev->type == LLC_CONN_EV_TYPE_P_TMR ||
+		 ev->type == LLC_CONN_EV_TYPE_BUSY_TMR ||
+		 ev->type == LLC_CONN_EV_TYPE_REJ_TMR)
 		kfree_skb(skb);
 }
 
@@ -483,27 +496,21 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
 struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 				    struct llc_addr *laddr)
 {
-	struct sock *rc = NULL;
-	struct list_head *entry;
+	struct sock *rc;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each(entry, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
 
 		if (llc->laddr.lsap == laddr->lsap &&
 		    llc->daddr.lsap == daddr->lsap &&
 		    llc_mac_match(llc->laddr.mac, laddr->mac) &&
-		    llc_mac_match(llc->daddr.mac, daddr->mac)) {
-			rc = llc->sk;
+		    llc_mac_match(llc->daddr.mac, daddr->mac))
 			break;
-		}
 	}
 	if (rc)
 		sock_hold(rc);
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 
@@ -518,28 +525,49 @@ out:
  */
 struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 {
-	struct sock *rc = NULL;
-	struct list_head *entry;
+	struct sock *rc;
 
-	spin_lock_bh(&sap->sk_list.lock);
-	if (list_empty(&sap->sk_list.list))
-		goto out;
-	list_for_each(entry, &sap->sk_list.list) {
-		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
 
-		if (llc->sk->type != SOCK_STREAM || llc->sk->state != TCP_LISTEN ||
-		    llc->laddr.lsap != laddr->lsap ||
-		    !llc_mac_match(llc->laddr.mac, laddr->mac))
-			continue;
-		rc = llc->sk;
+		if (rc->type == SOCK_STREAM && rc->state == TCP_LISTEN &&
+		    llc->laddr.lsap == laddr->lsap &&
+		    llc_mac_match(llc->laddr.mac, laddr->mac))
+			break;
 	}
 	if (rc)
 		sock_hold(rc);
-out:
-	spin_unlock_bh(&sap->sk_list.lock);
+	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
 
+/**
+ *	llc_lookup_dgram - Finds dgram socket for the local sap/mac
+ *	@sap: SAP
+ *	@laddr: address of local LLC (MAC + SAP)
+ *
+ *	Search socket list of the SAP and finds connection using the local
+ *	mac, and local sap. Returns pointer for socket found, %NULL otherwise.
+ */
+struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
+{
+	struct sock *rc;
+
+	read_lock_bh(&sap->sk_list.lock);
+	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+		struct llc_opt *llc = llc_sk(rc);
+
+		if (rc->type == SOCK_DGRAM &&
+		    llc->laddr.lsap == laddr->lsap &&
+		    llc_mac_match(llc->laddr.mac, laddr->mac))
+			break;
+	}
+	if (rc)
+		sock_hold(rc);
+	read_unlock_bh(&sap->sk_list.lock);
+	return rc;
+}
 /**
  *	llc_data_accept_state - designates if in this state data can be sent.
  *	@state: state of connection.

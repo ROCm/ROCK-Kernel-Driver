@@ -151,9 +151,39 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 	return ret;
 }
 
+/**
+ * blk_queue_prep_rq - set a prepare_request function for queue
+ * @q:		queue
+ * @pfn:	prepare_request function
+ *
+ * It's possible for a queue to register a prepare_request callback which
+ * is invoked before the request is handed to the request_fn. The goal of
+ * the function is to prepare a request for I/O, it can be used to build a
+ * cdb from the request data for instance.
+ *
+ */
 void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn)
 {
 	q->prep_rq_fn = pfn;
+}
+
+/**
+ * blk_queue_merge_bvec - set a merge_bvec function for queue
+ * @q:		queue
+ * @mbfn:	merge_bvec_fn
+ *
+ * Usually queues have static limitations on the max sectors or segments that
+ * we can put in a request. Stacking drivers may have some settings that
+ * are dynamic, and thus we have to query the queue whether it is ok to
+ * add a new bio_vec to a bio at a given offset or not. If the block device
+ * has such limitations, it needs to register a merge_bvec_fn to control
+ * the size of bio's sent to it. Per default now merge_bvec_fn is defined for
+ * a queue, and only the fixed limits are honored.
+ *
+ */
+void blk_queue_merge_bvec(request_queue_t *q, merge_bvec_fn *mbfn)
+{
+	q->merge_bvec_fn = mbfn;
 }
 
 /**
@@ -1583,7 +1613,6 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	spin_lock_irq(q->queue_lock);
 again:
-	req = NULL;
 	insert_here = NULL;
 
 	if (blk_queue_empty(q)) {
@@ -1593,10 +1622,13 @@ again:
 	if (barrier)
 		goto get_rq;
 
-	el_ret = elv_merge(q, &req, bio);
+	el_ret = elv_merge(q, &insert_here, bio);
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
+			req = list_entry_rq(insert_here);
+
 			BUG_ON(!rq_mergeable(req));
+
 			if (!q->back_merge_fn(q, req, bio)) {
 				insert_here = &req->queuelist;
 				break;
@@ -1611,7 +1643,10 @@ again:
 			goto out;
 
 		case ELEVATOR_FRONT_MERGE:
+			req = list_entry_rq(insert_here);
+
 			BUG_ON(!rq_mergeable(req));
+
 			if (!q->front_merge_fn(q, req, bio)) {
 				insert_here = req->queuelist.prev;
 				break;
@@ -1638,13 +1673,6 @@ again:
 		 * elevator says don't/can't merge. get new request
 		 */
 		case ELEVATOR_NO_MERGE:
-			/*
-			 * use elevator hints as to where to insert the
-			 * request. if no hints, just add it to the back
-			 * of the queue
-			 */
-			if (req)
-				insert_here = &req->queuelist;
 			break;
 
 		default:
@@ -1798,7 +1826,11 @@ end_io:
 			break;
 		}
 
-		BUG_ON(bio_sectors(bio) > q->max_sectors);
+		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
+			printk("bio too big (%u > %u)\n", bio_sectors(bio),
+							q->max_sectors);
+			goto end_io;
+		}
 
 		/*
 		 * If this device has partitions, remap block n
@@ -1807,8 +1839,6 @@ end_io:
 		blk_partition_remap(bio);
 
 		ret = q->make_request_fn(q, bio);
-		blk_put_queue(q);
-
 	} while (ret);
 }
 
@@ -2059,6 +2089,7 @@ EXPORT_SYMBOL(blk_put_request);
 EXPORT_SYMBOL(blk_insert_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
+EXPORT_SYMBOL(blk_queue_merge_bvec);
 
 EXPORT_SYMBOL(blk_queue_find_tag);
 EXPORT_SYMBOL(blk_queue_init_tags);

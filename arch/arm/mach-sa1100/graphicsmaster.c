@@ -25,7 +25,6 @@
 #include <asm/mach/serial_sa1100.h>
 
 #include "generic.h"
-#include "sa1111.h"
 
 static int __init graphicsmaster_init(void)
 {
@@ -43,7 +42,7 @@ static int __init graphicsmaster_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_init(NULL, 0x18000000, ADS_EXT_IRQ(0));
+	ret = sa1111_init(0x18000000, ADS_EXT_IRQ(0));
 	if (ret < 0)
 		return ret;
 
@@ -59,7 +58,7 @@ static int __init graphicsmaster_init(void)
 	return 0;
 }
 
-__initcall(graphicsmaster_init);
+arch_initcall(graphicsmaster_init);
 
 /*
  * Handlers for GraphicsMaster's external IRQ logic

@@ -437,9 +437,7 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			/* Throw away data. No better idea what to do with it. */
 			priv->wrfilled=0;
 			priv->wrsent=0;
-			queue_task(&port->tqueue, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
-			return;
+			goto exit;
 		}
 
 		dbg("%s - priv->wrsent=%d", __FUNCTION__,priv->wrsent);
@@ -453,16 +451,10 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 			priv->wrfilled=0;
 			priv->wrsent=0;
 		}
-
-		queue_task(&port->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-		return;
 	}
 
-	queue_task(&port->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
-	
-	return;
+exit:
+	schedule_task(&port->tqueue);
 }
 
 static int __init cyberjack_init (void)

@@ -514,12 +514,12 @@ static struct dentry *export_decode_fh(struct super_block *sb, __u32 *fh, int fh
 }
 
 struct export_operations export_op_default = {
-	decode_fh:	export_decode_fh,
-	encode_fh:	export_encode_fh,
+	.decode_fh	= export_decode_fh,
+	.encode_fh	= export_encode_fh,
 
-	get_name:	get_name,
-	get_parent:	get_parent,
-	get_dentry:	get_object,
+	.get_name	= get_name,
+	.get_parent	= get_parent,
+	.get_dentry	= get_object,
 };
 
 EXPORT_SYMBOL(export_op_default);
