@@ -168,7 +168,7 @@ void validate_mem(struct pcmcia_socket *s);
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 		   char *name, struct pcmcia_socket *s);
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, struct pcmcia_socket *s);
+		    int low, char *name, struct pcmcia_socket *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);

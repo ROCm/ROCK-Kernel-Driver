@@ -816,7 +816,8 @@ static int pccardd(void *__skt)
 				if ((skt->state & SOCKET_PRESENT) &&
 				     !(status & SS_DETECT))
 					socket_shutdown(skt);
-				if (status & SS_DETECT)
+				if (!(skt->state & SOCKET_PRESENT) &&
+				    (status & SS_DETECT))
 					socket_insert(skt);
 			}
 			if (events & SS_BATDEAD)
@@ -2043,8 +2044,7 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 
     if (!(s->features & SS_CAP_STATIC_MAP) &&
 	find_mem_region(&win->base, win->size, align,
-			(req->Attributes & WIN_MAP_BELOW_1MB) ||
-			!(s->features & SS_CAP_PAGE_REGS),
+			(req->Attributes & WIN_MAP_BELOW_1MB),
 			(*handle)->dev_info, s))
 	return CS_IN_USE;
     (*handle)->state |= CLIENT_WIN_REQ(w);
