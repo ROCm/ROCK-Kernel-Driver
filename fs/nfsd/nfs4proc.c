@@ -113,16 +113,23 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 	return status;
 }
 
+/*
+ * nfs4_unlock_state() called in encode
+ */
 static inline int
 nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
 	int status;
-	dprintk("NFSD: nfsd4_open filename %.*s\n",
-		(int)open->op_fname.len, open->op_fname.data);
+	dprintk("NFSD: nfsd4_open filename %.*s op_stateowner %p\n",
+		(int)open->op_fname.len, open->op_fname.data,
+		open->op_stateowner);
 
 	/* This check required by spec. */
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
 		return nfserr_inval;
+
+	open->op_stateowner = NULL;
+	nfs4_lock_state();
 
 	/* check seqid for replay. set nfs4_owner */
 	status = nfsd4_process_open1(open);
@@ -761,7 +768,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_CLOSE:
 			op->status = nfsd4_close(rqstp, &current_fh, &op->u.close);
-			op->replay = &op->u.close.cl_stateowner->so_replay;
+			if (op->u.close.cl_stateowner)
+				op->replay =
+					&op->u.close.cl_stateowner->so_replay;
 			break;
 		case OP_COMMIT:
 			op->status = nfsd4_commit(rqstp, &current_fh, &op->u.commit);
@@ -780,14 +789,18 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_LOCK:
 			op->status = nfsd4_lock(rqstp, &current_fh, &op->u.lock);
-			op->replay = &op->u.lock.lk_stateowner->so_replay;
+			if (op->u.lock.lk_stateowner)
+				op->replay =
+					&op->u.lock.lk_stateowner->so_replay;
 			break;
 		case OP_LOCKT:
 			op->status = nfsd4_lockt(rqstp, &current_fh, &op->u.lockt);
 			break;
 		case OP_LOCKU:
 			op->status = nfsd4_locku(rqstp, &current_fh, &op->u.locku);
-			op->replay = &op->u.locku.lu_stateowner->so_replay;
+			if (op->u.locku.lu_stateowner)
+				op->replay =
+					&op->u.locku.lu_stateowner->so_replay;
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_lookup(rqstp, &current_fh, &op->u.lookup);
@@ -802,15 +815,21 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_OPEN:
 			op->status = nfsd4_open(rqstp, &current_fh, &op->u.open);
-			op->replay = &op->u.open.op_stateowner->so_replay;
+			if (op->u.open.op_stateowner)
+				op->replay =
+					&op->u.open.op_stateowner->so_replay;
 			break;
 		case OP_OPEN_CONFIRM:
 			op->status = nfsd4_open_confirm(rqstp, &current_fh, &op->u.open_confirm);
-			op->replay = &op->u.open_confirm.oc_stateowner->so_replay;
+			if (op->u.open_confirm.oc_stateowner)
+				op->replay =
+					&op->u.open_confirm.oc_stateowner->so_replay;
 			break;
 		case OP_OPEN_DOWNGRADE:
 			op->status = nfsd4_open_downgrade(rqstp, &current_fh, &op->u.open_downgrade);
-			op->replay = &op->u.open_downgrade.od_stateowner->so_replay;
+			if (op->u.open_downgrade.od_stateowner)
+				op->replay =
+					&op->u.open_downgrade.od_stateowner->so_replay;
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, &current_fh, &op->u.putfh);
