@@ -813,7 +813,7 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
 					high = read_24(drive);
 
 					sectors = ((__u64)high << 24) | low;
-					printk(", LBAsect=%lld, high=%d, low=%d", sectors, high, low);
+					printk(", LBAsect=%lld, high=%d, low=%d", (long long) sectors, high, low);
 				} else {
 					byte cur = IN_BYTE(IDE_SELECT_REG);
 					if (cur & 0x40) {	/* using LBA? */
