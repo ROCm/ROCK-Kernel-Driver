@@ -603,6 +603,7 @@ dev_link_t *btuart_attach(void)
 	link = &info->link;
 	link->priv = info;
 
+	init_timer(&link->release);
 	link->release.function = &btuart_release;
 	link->release.data = (u_long)link;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
