@@ -89,8 +89,8 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
 		if(ses->server)
-		buf += sprintf(buf, "\tLocal Users To Same Server: %d ",
-			atomic_read(&ses->server->socketUseCount));
+			buf += sprintf(buf, "\tLocal Users To Same Server: %d ",
+				atomic_read(&ses->server->socketUseCount));
 	}
 	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");

@@ -110,10 +110,14 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->netfid = netfid;
 			pCifsFile->pid = current->pid;
 			pCifsFile->pfile = file; /* needed for writepage */
+			write_lock(&file->f_owner.lock);
+			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
 			if(pCifsInode->openFileList.next)
 				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+			write_unlock(&GlobalSMBSeslock);
+			write_unlock(&file->f_owner.lock);
 			if(file->f_flags & O_CREAT) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
@@ -152,11 +156,13 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 {
 	int rc = 0;
 	struct cifsFileInfo *open_file = NULL;
-    struct file * file = NULL;
+	struct file * file = NULL;
 	struct list_head *tmp;
+	struct list_head *tmp1;
 
 /* list all files open on tree connection */
-	list_for_each(tmp, &pTcon->openFileList) {            
+	read_lock(&GlobalSMBSeslock);
+	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		if(open_file) {
 			if(open_file->search_resume_name) {
@@ -166,7 +172,9 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 			kfree(open_file);
 			if(file) {                
 				file->private_data = NULL;
+				read_unlock(&GlobalSMBSeslock);
 				rc = cifs_open(file->f_dentry->d_inode,file);
+				read_lock(&GlobalSMBSeslock);
 				if(rc) {
 					cFYI(1,("reconnecting file %s failed with %d",
 						file->f_dentry->d_name.name,rc));
@@ -177,6 +185,7 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 			} 
 		}
 	}
+	read_unlock(&GlobalSMBSeslock);
 	return rc;
 }
 
@@ -195,9 +204,11 @@ cifs_close(struct inode *inode, struct file *file)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
+		write_lock(&file->f_owner.lock);
 		if(pSMBFile->flist.next)
 			list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
+		write_unlock(&file->f_owner.lock);
 		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);
 		if(pSMBFile->search_resume_name)
 			kfree(pSMBFile->search_resume_name);
@@ -206,6 +217,8 @@ cifs_close(struct inode *inode, struct file *file)
 	} else
 		rc = -EBADF;
 
+	if((rc ==0) && CIFS_I(inode)->write_behind_rc)
+		rc = CIFS_I(inode)->write_behind_rc;
 	FreeXid(xid);
 	return rc;
 }
@@ -407,6 +420,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	struct cifsInodeInfo *cifsInode;
 	struct cifsFileInfo *open_file = NULL;
 	struct list_head *tmp;
+	struct list_head *tmp1;
 	int xid;
 
 	xid = GetXid();
@@ -445,14 +459,17 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		
 
 	cifsInode = CIFS_I(mapping->host);
-	list_for_each(tmp, &cifsInode->openFileList) {            
+	read_lock(&GlobalSMBSeslock);
+	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);           
 	/* We could check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
 			(open_file->pfile->f_flags & O_WRONLY))) {
+			read_unlock(&GlobalSMBSeslock);
 			bytes_written = cifs_write(open_file->pfile, write_data,
-					   to-from, &offset);
+					to-from, &offset);
+			read_lock(&GlobalSMBSeslock);
 		/* Does mm or vfs already set times? */
 			inode->i_atime = inode->i_mtime = CURRENT_TIME;
 			if ((bytes_written > 0) && (offset)) {
@@ -462,6 +479,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 			}
 		}
 	}
+	read_unlock(&GlobalSMBSeslock);
 	if(open_file == NULL) {
 		cFYI(1,("No writeable filehandles for inode"));
 		rc = -EIO;
@@ -548,7 +566,8 @@ cifs_fsync(struct file *file, struct dentry *dentry, int datasync)
 		dentry->d_name.name, datasync));
 	
 	rc = filemap_fdatawrite(inode->i_mapping);
-
+	if(rc == 0)
+		CIFS_I(inode)->write_behind_rc = 0;
 	FreeXid(xid);
 	return rc;
 }
@@ -600,6 +619,9 @@ int cifs_flush(struct file *file)
 	/* filemapfdatawrite appears easier for the time being */
 
 	rc = filemap_fdatawrite(inode->i_mapping);
+	if(rc == 0) /* reset wb rc if we were able to write out dirty pages */
+		CIFS_I(inode)->write_behind_rc = 0;
+		
 	cFYI(1,("Flush inode %p file %p rc %d",inode,file,rc));
 
 	return rc;
@@ -678,12 +700,16 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 	while (bytes_read > 0) {
 		if(list_empty(pages))
 			break;
+
+		spin_lock(&mapping->page_lock);
 		page = list_entry(pages->prev, struct page, list);
 
 		list_del(&page->list);
+		spin_unlock(&mapping->page_lock);
+
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
-            cFYI(1,("Add page cache failed"));
+			cFYI(1,("Add page cache failed"));
 			continue;
 		}
 
@@ -739,12 +765,14 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_init(&lru_pvec, 0);
 
 	for(i = 0;i<num_pages;) {
-
+		spin_lock(&mapping->page_lock);
 		if(list_empty(page_list)) {
 			break;
 		}
 		page = list_entry(page_list->prev, struct page, list);
 		offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
+	        spin_unlock(&mapping->page_lock);
+
 		/* for reads over a certain size could initiate async read ahead */
 
 		cFYI(0,("Read %d pages into cache at offset %ld ",
@@ -762,12 +790,15 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		if ((rc < 0) || (smb_read_data == NULL)) {
 			cFYI(1,("Read error in readpages: %d",rc));
 			/* clean up remaing pages off list */
+            
+			spin_lock(&mapping->page_lock);
 			while (!list_empty(page_list) && (i < num_pages)) {
 				page = list_entry(page_list->prev, struct page, list);
 				list_del(&page->list);
 			}
+			spin_unlock(&mapping->page_lock);
 			break;
-		} else if (bytes_read > 0){
+		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
 			cifs_copy_cache_pages(mapping, page_list, bytes_read,
 				smb_read_data + 4 /* RFC1000 hdr */ +
@@ -783,9 +814,9 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		}
 		if(smb_read_data) {
 			buf_release(smb_read_data);
-            smb_read_data = 0;
-        }
-        bytes_read = 0;
+			smb_read_data = 0;
+		}
+		bytes_read = 0;
 	}
 
 	pagevec_lru_add(&lru_pvec);

@@ -427,6 +427,7 @@ cifs_destroy_mids(void)
 static int cifs_oplock_thread(void * dummyarg)
 {
 	struct list_head * tmp;
+	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
 	struct file * pfile;
 	struct cifsTconInfo *pTcon;
@@ -442,9 +443,8 @@ static int cifs_oplock_thread(void * dummyarg)
 		/* BB add missing code */
 		cFYI(1,("oplock thread woken up - flush inode")); /* BB remove */
 		write_lock(&GlobalMid_Lock); 
-		list_for_each(tmp, &GlobalOplock_Q) {
-			oplock_item = list_entry(tmp, struct
-							       oplock_q_entry,
+		list_for_each_safe(tmp, tmp1, &GlobalOplock_Q) {
+			oplock_item = list_entry(tmp, struct oplock_q_entry,
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
@@ -453,6 +453,9 @@ static int cifs_oplock_thread(void * dummyarg)
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
 				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				if(rc)
+					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
+						= rc;
 				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
 				/* send oplock break */
 				write_lock(&GlobalMid_Lock);
