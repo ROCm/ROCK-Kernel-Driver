@@ -220,10 +220,9 @@ static inline void rfcomm_schedule(uint event)
 {
 	if (!rfcomm_thread)
 		return;
-
 	//set_bit(event, &rfcomm_event);
-	if (!test_and_set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event))
-		wake_up_process(rfcomm_thread);
+	set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
+	wake_up_process(rfcomm_thread);
 }
 
 extern struct semaphore rfcomm_sem;

@@ -1483,9 +1483,9 @@ static inline int rfcomm_process_tx(struct rfcomm_dlc *d)
 			d->rx_credits = d->credits;
 		}
 	} else {
-		/* CFC disabled. 
+		/* CFC disabled.
 		 * Give ourselves some credits */
-		d->tx_credits = RFCOMM_MAX_CREDITS;
+		d->tx_credits = 5;
 	}
 
 	if (test_bit(RFCOMM_TX_THROTTLED, &d->flags))
@@ -1651,7 +1651,7 @@ static void rfcomm_worker(void)
 	BT_DBG("");
 
 	while (!atomic_read(&terminate)) {
-		if (!test_and_clear_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event)) {
+		if (!test_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event)) {
 			/* No pending events. Let's sleep.
 			 * Incomming connections and data will wake us up. */
 			set_current_state(TASK_INTERRUPTIBLE);
@@ -1659,6 +1659,7 @@ static void rfcomm_worker(void)
 		}
 
 		/* Process stuff */
+		clear_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
 		rfcomm_process_sessions();
 	}
 	set_current_state(TASK_RUNNING);
