@@ -86,6 +86,25 @@ struct cache_detail {
 };
 
 
+/* this must be embedded in any request structure that
+ * identifies an object that will want a callback on
+ * a cache fill
+ */
+struct cache_req {
+	struct cache_deferred_req *(*defer)(struct cache_req *req);
+};
+/* this must be embedded in a deferred_request that is being
+ * delayed awaiting cache-fill
+ */
+struct cache_deferred_req {
+	struct list_head	hash;	/* on hash chain */
+	struct list_head	recent; /* on fifo */
+	struct cache_head	*item;  /* cache item we wait on */
+	time_t			recv_time;
+	void			(*revisit)(struct cache_deferred_req *req,
+					   int too_many);
+};
+
 /*
  * just like a template in C++, this macro does cache lookup
  * for us.
@@ -206,6 +225,9 @@ RTN *FNAME ARGS										\
 
 	     
 
+extern void cache_defer_req(struct cache_req *req, struct cache_head *item);
+extern void cache_revisit_request(struct cache_head *item);
+
 static inline struct cache_head  *cache_get(struct cache_head *h)
 {
 	atomic_inc(&h->refcnt);
@@ -230,7 +252,7 @@ extern void cache_init(struct cache_head *h);
 extern void cache_fresh(struct cache_detail *detail,
 			struct cache_head *head, time_t expiry);
 extern int cache_check(struct cache_detail *detail,
-		       struct cache_head *h);
+		       struct cache_head *h, struct cache_req *rqstp);
 extern int cache_clean(void);
 extern void cache_flush(void);
 extern void cache_purge(struct cache_detail *detail);

@@ -31,8 +31,12 @@ struct svc_sock {
 #define	SK_QUED		5			/* on serv->sk_sockets */
 #define	SK_DEAD		6			/* socket closed */
 #define	SK_CHNGBUF	7			/* need to change snd/rcv buffer sizes */
+#define	SK_DEFERRED	8			/* request on sk_deferred */
 
 	int			sk_reserved;	/* space on outq that is reserved */
+
+	struct list_head	sk_deferred;	/* deferred requests that need to
+						 * be revisted */
 
 	int			(*sk_recvfrom)(struct svc_rqst *rqstp);
 	int			(*sk_sendto)(struct svc_rqst *rqstp);

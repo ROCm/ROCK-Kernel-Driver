@@ -235,7 +235,7 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 	rqstp->rq_client = NULL;
 
 	if (ipm)
-		switch (cache_check(&ip_map_cache, &ipm->h)) {
+		switch (cache_check(&ip_map_cache, &ipm->h, &rqstp->rq_chandle)) {
 		case -EAGAIN:
 			rv = SVC_DROP;
 			break;
@@ -330,7 +330,7 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 	rqstp->rq_client = NULL;
 
 	if (ipm)
-		switch (cache_check(&ip_map_cache, &ipm->h)) {
+		switch (cache_check(&ip_map_cache, &ipm->h, &rqstp->rq_chandle)) {
 		case -EAGAIN:
 			rv = SVC_DROP;
 			break;

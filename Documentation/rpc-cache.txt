@@ -80,3 +80,13 @@ may contain valid content, or may not.
 This datum is typically passed to cache_check which determines the
 validity of the datum and may later initiate an upcall to fill
 in the data.
+
+cache_check can be passed a "struct cache_req *".  This structure is
+typically embedded in the actual request and can be used to create a
+deferred copy of the request (struct cache_deferred_req).  This is
+done when the found cache item is not uptodate, but the is reason to
+believe that userspace might provide information soon.  When the cache
+item does become valid, the deferred copy of the request will be
+revisited (->revisit).  It is expected that this method will
+reschedule the request for processing.
+

@@ -69,6 +69,9 @@ static void		svc_udp_data_ready(struct sock *, int);
 static int		svc_udp_recvfrom(struct svc_rqst *);
 static int		svc_udp_sendto(struct svc_rqst *);
 
+static struct svc_deferred_req *svc_deferred_dequeue(struct svc_sock *svsk);
+static int svc_deferred_recv(struct svc_rqst *rqstp);
+static struct cache_deferred_req *svc_defer(struct cache_req *req);
 
 /*
  * Queue up an idle server thread.  Must have serv->sv_lock held.
@@ -98,13 +101,18 @@ static inline void
 svc_release_skb(struct svc_rqst *rqstp)
 {
 	struct sk_buff *skb = rqstp->rq_skbuff;
+	struct svc_deferred_req *dr = rqstp->rq_deferred;
 
-	if (!skb)
-		return;
-	rqstp->rq_skbuff = NULL;
+	if (skb) {
+		rqstp->rq_skbuff = NULL;
 
-	dprintk("svc: service %p, releasing skb %p\n", rqstp, skb);
-	skb_free_datagram(rqstp->rq_sock->sk_sk, skb);
+		dprintk("svc: service %p, releasing skb %p\n", rqstp, skb);
+		skb_free_datagram(rqstp->rq_sock->sk_sk, skb);
+	}
+	if (dr) {
+		rqstp->rq_deferred = NULL;
+		kfree(dr);
+	}
 }
 
 /*
@@ -119,7 +127,7 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	struct svc_rqst	*rqstp;
 
 	if (!(svsk->sk_flags &
-	      ( (1<<SK_CONN)|(1<<SK_DATA)|(1<<SK_CLOSE)) ))
+	      ( (1<<SK_CONN)|(1<<SK_DATA)|(1<<SK_CLOSE)|(1<<SK_DEFERRED)) ))
 		return;
 
 	spin_lock_bh(&serv->sv_lock);
@@ -491,6 +499,9 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 				(serv->sv_nrthreads+3) * serv->sv_bufsz,
 				(serv->sv_nrthreads+3) * serv->sv_bufsz);
 
+	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk)))
+		return svc_deferred_recv(rqstp);
+
 	clear_bit(SK_DATA, &svsk->sk_flags);
 	while ((skb = skb_recv_datagram(svsk->sk_sk, 0, 1, &err)) == NULL) {
 		svc_sock_received(svsk);
@@ -781,6 +792,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		svsk, test_bit(SK_DATA, &svsk->sk_flags),
 		test_bit(SK_CONN, &svsk->sk_flags),
 		test_bit(SK_CLOSE, &svsk->sk_flags));
+
+	if ((rqstp->rq_deferred = svc_deferred_dequeue(svsk)))
+		return svc_deferred_recv(rqstp);
 
 	if (test_bit(SK_CLOSE, &svsk->sk_flags)) {
 		svc_delete_socket(svsk);
@@ -1093,6 +1107,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
 	rqstp->rq_userset = 0;
+	rqstp->rq_chandle.defer = svc_defer;
 
 	svc_getu32(&rqstp->rq_argbuf, rqstp->rq_xid);
 	svc_putu32(&rqstp->rq_resbuf, rqstp->rq_xid);
@@ -1168,6 +1183,7 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 	svsk->sk_owspace = inet->write_space;
 	svsk->sk_server = serv;
 	svsk->sk_lastrecv = CURRENT_TIME;
+	INIT_LIST_HEAD(&svsk->sk_deferred);
 
 	/* Initialize the socket */
 	if (sock->type == SOCK_DGRAM)
@@ -1308,3 +1324,97 @@ svc_makesock(struct svc_serv *serv, int protocol, unsigned short port)
 	return svc_create_socket(serv, protocol, &sin);
 }
 
+/*
+ * Handle defer and revisit of requests 
+ */
+
+static void svc_revisit(struct cache_deferred_req *dreq, int too_many)
+{
+	struct svc_deferred_req *dr = container_of(dreq, struct svc_deferred_req, handle);
+	struct svc_serv *serv = dr->serv;
+	struct svc_sock *svsk;
+
+	if (too_many) {
+		svc_sock_put(dr->svsk);
+		kfree(dr);
+		return;
+	}
+	dprintk("revisit queued\n");
+	svsk = dr->svsk;
+	dr->svsk = NULL;
+	spin_lock(&serv->sv_lock);
+	list_add(&dr->handle.recent, &svsk->sk_deferred);
+	spin_unlock(&serv->sv_lock);
+	set_bit(SK_DEFERRED, &svsk->sk_flags);
+	svc_sock_enqueue(svsk);
+	svc_sock_put(svsk);
+}
+
+static struct cache_deferred_req *
+svc_defer(struct cache_req *req)
+{
+	struct svc_rqst *rqstp = container_of(req, struct svc_rqst, rq_chandle);
+	int size = sizeof(struct svc_deferred_req) + (rqstp->rq_argbuf.buflen << 2);
+	struct svc_deferred_req *dr;
+
+	if (rqstp->rq_deferred) {
+		dr = rqstp->rq_deferred;
+		rqstp->rq_deferred = NULL;
+	} else {
+		/* FIXME maybe discard if size too large */
+		dr = kmalloc(size<<2, GFP_KERNEL);
+		if (dr == NULL)
+			return NULL;
+
+		dr->serv = rqstp->rq_server;
+		dr->prot = rqstp->rq_prot;
+		dr->addr = rqstp->rq_addr;
+		dr->argslen = rqstp->rq_argbuf.buflen;
+		memcpy(dr->args, rqstp->rq_argbuf.base, dr->argslen<<2);
+	}
+	spin_lock(&rqstp->rq_server->sv_lock);
+	rqstp->rq_sock->sk_inuse++;
+	dr->svsk = rqstp->rq_sock;
+	spin_unlock(&rqstp->rq_server->sv_lock);
+
+	dr->handle.revisit = svc_revisit;
+	return &dr->handle;
+}
+
+/*
+ * recv data from a defered request into an active one
+ */
+static int svc_deferred_recv(struct svc_rqst *rqstp)
+{
+	struct svc_deferred_req *dr = rqstp->rq_deferred;
+
+	rqstp->rq_argbuf.base = dr->args;
+	rqstp->rq_argbuf.buf  = dr->args;
+	rqstp->rq_argbuf.len  = dr->argslen;
+	rqstp->rq_argbuf.buflen = dr->argslen;
+	rqstp->rq_prot        = dr->prot;
+	rqstp->rq_addr        = dr->addr;
+	return dr->argslen<<2;
+}
+
+
+static struct svc_deferred_req *svc_deferred_dequeue(struct svc_sock *svsk)
+{
+	struct svc_deferred_req *dr = NULL;
+	struct svc_serv	*serv = svsk->sk_server;
+	
+	if (!test_bit(SK_DEFERRED, &svsk->sk_flags))
+		return NULL;
+	spin_lock(&serv->sv_lock);
+	clear_bit(SK_DEFERRED, &svsk->sk_flags);
+	if (!list_empty(&svsk->sk_deferred)) {
+		dr = list_entry(svsk->sk_deferred.next,
+				struct svc_deferred_req,
+				handle.recent);
+		list_del_init(&dr->handle.recent);
+		set_bit(SK_DEFERRED, &svsk->sk_flags);
+	}
+	spin_unlock(&serv->sv_lock);
+	svc_sock_received(svsk);
+	return dr;
+}

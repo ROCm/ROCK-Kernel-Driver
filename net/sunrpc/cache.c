@@ -46,7 +46,8 @@ void cache_init(struct cache_head *h)
  * -EAGAIN if upcall is pending,
  * -ENOENT if cache entry was negative
  */
-int cache_check(struct cache_detail *detail, struct cache_head *h)
+int cache_check(struct cache_detail *detail,
+		    struct cache_head *h, struct cache_req *rqstp)
 {
 	int rv;
 
@@ -64,6 +65,13 @@ int cache_check(struct cache_detail *detail, struct cache_head *h)
 	}
 
 	/* up-call processing goes here later */
+	/* if cache_pending, initiate upcall if none pending.
+	 * if upcall cannot be initiated, change to CACHE_NEGATIVE
+	 */
+	if (rv == CACHE_PENDING) rv = CACHE_NEGATIVE;
+
+	if (rv == CACHE_PENDING)
+		cache_defer_req(rqstp, h);
 
 	if (rv == -EAGAIN /* && cannot do upcall */)
 		rv = -ENOENT;
@@ -274,3 +282,111 @@ void cache_purge(struct cache_detail *detail)
 	cache_flush();
 }
 
+
+
+/*
+ * Deferral and Revisiting of Requests.
+ *
+ * If a cache lookup finds a pending entry, we
+ * need to defer the request and revisit it later.
+ * All deferred requests are stored in a hash table,
+ * indexed by "struct cache_head *".
+ * As it may be wasteful to store a whole request
+ * structure, we allow the request to provide a 
+ * deferred form, which must contain a
+ * 'struct cache_deferred_req'
+ * This cache_deferred_req contains a method to allow
+ * it to be revisited when cache info is available
+ */
+
+#define	DFR_HASHSIZE	(PAGE_SIZE/sizeof(struct list_head))
+#define	DFR_HASH(item)	((((long)item)>>4 ^ (((long)item)>>13)) % DFR_HASHSIZE)
+
+#define	DFR_MAX	300	/* ??? */
+
+spinlock_t cache_defer_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(cache_defer_list);
+static struct list_head cache_defer_hash[DFR_HASHSIZE];
+static int cache_defer_cnt;
+
+void cache_defer_req(struct cache_req *req, struct cache_head *item)
+{
+	struct cache_deferred_req *dreq;
+	int hash = DFR_HASH(item);
+
+	dreq = req->defer(req);
+	if (dreq == NULL)
+		return;
+
+	dreq->item = item;
+	dreq->recv_time = CURRENT_TIME;
+
+	spin_lock(&cache_defer_lock);
+
+	list_add(&dreq->recent, &cache_defer_list);
+
+	if (cache_defer_hash[hash].next == NULL)
+		INIT_LIST_HEAD(&cache_defer_hash[hash]);
+	list_add(&dreq->hash, &cache_defer_hash[hash]);
+
+	/* it is in, now maybe clean up */
+	dreq = NULL;
+	if (++cache_defer_cnt > DFR_MAX) {
+		/* too much in the cache, randomly drop
+		 * first or last
+		 */
+		if (net_random()&1) 
+			dreq = list_entry(cache_defer_list.next,
+					  struct cache_deferred_req,
+					  recent);
+		else
+			dreq = list_entry(cache_defer_list.prev,
+					  struct cache_deferred_req,
+					  recent);
+		list_del(&dreq->recent);
+		list_del(&dreq->hash);
+		cache_defer_cnt--;
+	}
+	spin_unlock(&cache_defer_lock);
+
+	if (dreq) {
+		/* there was one too many */
+		dreq->revisit(dreq, 1);
+	}
+	if (test_bit(CACHE_VALID, &item->flags)) {
+		/* must have just been validated... */
+		cache_revisit_request(item);
+	}
+}
+
+void cache_revisit_request(struct cache_head *item)
+{
+	struct cache_deferred_req *dreq;
+	struct list_head pending;
+
+	struct list_head *lp;
+	int hash = DFR_HASH(item);
+
+	INIT_LIST_HEAD(&pending);
+	spin_lock(&cache_defer_lock);
+	
+	lp = cache_defer_hash[hash].next;
+	if (lp) {
+		while (lp != &cache_defer_hash[hash]) {
+			dreq = list_entry(lp, struct cache_deferred_req, hash);
+			lp = lp->next;
+			if (dreq->item == item) {
+				list_del(&dreq->hash);
+				list_move(&dreq->recent, &pending);
+				cache_defer_cnt--;
+			}
+		}
+	}
+	spin_unlock(&cache_defer_lock);
+
+	while (!list_empty(&pending)) {
+		dreq = list_entry(pending.next, struct cache_deferred_req, recent);
+		list_del_init(&dreq->recent);
+		dreq->revisit(dreq, 0);
+	}
+}

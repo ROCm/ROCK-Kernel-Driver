@@ -101,6 +101,7 @@ struct svc_rqst {
 	struct auth_ops *	rq_authop;	/* authentication flavour */
 	struct svc_cred		rq_cred;	/* auth info */
 	struct sk_buff *	rq_skbuff;	/* fast recv inet buffer */
+	struct svc_deferred_req*rq_deferred;	/* deferred request we are replaying */
 	struct svc_buf		rq_defbuf;	/* default buffer */
 	struct svc_buf		rq_argbuf;	/* argument buffer */
 	struct svc_buf		rq_resbuf;	/* result buffer */
@@ -121,6 +122,9 @@ struct svc_rqst {
 						 * reserved for this request
 						 */
 
+	struct cache_req	rq_chandle;	/* handle passed to caches for 
+						 * request delaying 
+						 */
 	/* Catering to nfsd */
 	struct auth_domain *	rq_client;	/* RPC peer info */
 	struct svc_cacherep *	rq_cacherep;	/* cache info */
@@ -130,6 +134,16 @@ struct svc_rqst {
 						 */
 
 	wait_queue_head_t	rq_wait;	/* synchronization */
+};
+
+struct svc_deferred_req {
+	struct svc_serv		*serv;
+	u32			prot;	/* protocol (UDP or TCP) */
+	struct sockaddr_in	addr;
+	struct svc_sock		*svsk;	/* where reply must go */
+	struct cache_deferred_req handle;
+	int			argslen;
+	u32			args[0];
 };
 
 /*

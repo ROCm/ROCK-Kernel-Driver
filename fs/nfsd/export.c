@@ -180,7 +180,7 @@ static DefineSimpleCacheLookup(svc_export)
 
 
 struct svc_expkey *
-exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv)
+exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv, struct cache_req *reqp)
 {
 	struct svc_expkey key, *ek;
 	int err;
@@ -195,7 +195,7 @@ exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv)
 
 	ek = svc_expkey_lookup(&key, 0);
 	if (ek != NULL)
-		if ((err = cache_check(&svc_expkey_cache, &ek->h)))
+		if ((err = cache_check(&svc_expkey_cache, &ek->h, reqp)))
 			ek = ERR_PTR(err);
 	return ek;
 }
@@ -230,7 +230,7 @@ exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
 	u32 fsidv[2];
 	
 	mk_fsid_v0(fsidv, dev, ino);
-	return exp_find_key(clp, 0, fsidv);
+	return exp_find_key(clp, 0, fsidv, NULL);
 }
 
 /*
@@ -243,11 +243,12 @@ exp_get_fsid_key(svc_client *clp, int fsid)
 
 	mk_fsid_v1(fsidv, fsid);
 
-	return exp_find_key(clp, 1, fsidv);
+	return exp_find_key(clp, 1, fsidv, NULL);
 }
 
 svc_export *
-exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
+exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
+		struct cache_req *reqp)
 {
 	struct svc_export *exp, key;
 	
@@ -260,7 +261,7 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
 
 	exp = svc_export_lookup(&key, 0);
 	if (exp != NULL) 
-		if (cache_check(&svc_export_cache, &exp->h))
+		if (cache_check(&svc_export_cache, &exp->h, reqp))
 			exp = NULL;
 
 	return exp;
@@ -270,15 +271,16 @@ exp_get_by_name(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
  * Find the export entry for a given dentry.
  */
 struct svc_export *
-exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry)
+exp_parent(svc_client *clp, struct vfsmount *mnt, struct dentry *dentry,
+	   struct cache_req *reqp)
 {
 	svc_export *exp;
 
 	read_lock(&dparent_lock);
-	exp = exp_get_by_name(clp, mnt, dentry);
+	exp = exp_get_by_name(clp, mnt, dentry, reqp);
 	while (exp == NULL && dentry != dentry->d_parent) {
 		dentry = dentry->d_parent;
-		exp = exp_get_by_name(clp, mnt, dentry);
+		exp = exp_get_by_name(clp, mnt, dentry, reqp);
 	}
 	read_unlock(&dparent_lock);
 	return exp;
@@ -409,7 +411,7 @@ exp_export(struct nfsctl_export *nxp)
 	inode = nd.dentry->d_inode;
 	err = -EINVAL;
 
-	exp = exp_get_by_name(clp, nd.mnt, nd.dentry);
+	exp = exp_get_by_name(clp, nd.mnt, nd.dentry, NULL);
 
 	/* must make sure there wont be an ex_fsid clash */
 	if ((nxp->ex_flags & NFSEXP_FSID) &&
@@ -598,7 +600,7 @@ exp_rootfh(svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	dprintk("nfsd: exp_rootfh(%s [%p] %s:%s/%ld)\n",
 		 path, nd.dentry, clp->name,
 		 inode->i_sb->s_id, inode->i_ino);
-	exp = exp_parent(clp, nd.mnt, nd.dentry);
+	exp = exp_parent(clp, nd.mnt, nd.dentry, NULL);
 	if (!exp) {
 		dprintk("nfsd: exp_rootfh export not found.\n");
 		goto out;
@@ -763,7 +765,7 @@ static int e_show(struct seq_file *m, void *p)
 
 	clp = exp->ex_client;
 	cache_get(&exp->h);
-	if (cache_check(&svc_export_cache, &exp->h))
+	if (cache_check(&svc_export_cache, &exp->h, NULL))
 		return 0;
 	if (cache_put(&exp->h, &svc_export_cache)) BUG();
 	pbuf = m->private;
