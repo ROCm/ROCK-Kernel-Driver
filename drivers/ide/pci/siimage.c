@@ -21,7 +21,6 @@
  *	if neccessary
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -33,15 +32,6 @@
 #include <asm/io.h>
 
 #include "siimage.h"
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/proc_fs.h>
-
-static u8 siimage_proc = 0;
-#define SIIMAGE_MAX_DEVS		16
-static struct pci_dev *siimage_devs[SIIMAGE_MAX_DEVS];
-static int n_siimage_devs;
-#endif /* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 /**
  *	pdev_is_sata		-	check if device is SATA
@@ -120,67 +110,6 @@ static inline unsigned long siimage_seldev(ide_drive_t *drive, int r)
 	base |= drive->select.b.unit << drive->select.b.unit;
 	return base;
 }
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-/**
- *	print_siimage_get_info	-	print minimal proc information
- *	@buf: buffer to write into (kernel space)
- *	@dev: PCI device we are describing
- *	@index: Controller number
- *
- *	Print the basic information for the state of the CMD680/SI3112
- *	channel. We don't actually dump a lot of information out for
- *	this controller although we could expand it if we needed.
- */
- 
-static char *print_siimage_get_info (char *buf, struct pci_dev *dev, int index)
-{
-	char *p		= buf;
-	u8 mmio		= (pci_get_drvdata(dev) != NULL) ? 1 : 0;
-	unsigned long bmdma = pci_resource_start(dev, 4);
-	
-	if(mmio)
-		bmdma = pci_resource_start(dev, 5);
-
-	p += sprintf(p, "\nController: %d\n", index);
-	p += sprintf(p, "SiI%x Chipset.\n", dev->device);
-	if (mmio)
-		p += sprintf(p, "MMIO Base 0x%lx\n", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma+8);
-	return (char *)p;
-}
-
-/**
- *	siimage_get_info	-	proc callback
- *	@buffer: kernel buffer to complete
- *	@addr: written with base of data to return
- *	offset: seek offset
- *	count: bytes to fill in 
- *
- *	Called when the user reads data from the virtual file for this
- *	controller from /proc
- */
- 
-static int siimage_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int len;
-	u16 i;
-
-	p += sprintf(p, "\n");
-	for (i = 0; i < n_siimage_devs; i++) {
-		struct pci_dev *dev	= siimage_devs[i];
-		p = print_siimage_get_info(p, dev, i);
-	}
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-
-#endif	/* defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 /**
  *	siimage_ratemask	-	Compute available modes
@@ -779,15 +708,6 @@ static void proc_reports_siimage (struct pci_dev *dev, u8 clocking, const char *
 			case 0x00: printk("== 100\n"); break;
 		}
 	}
-
-#if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)
-	siimage_devs[n_siimage_devs++] = dev;
-
-	if (!siimage_proc) {
-		siimage_proc = 1;
-		ide_pci_create_host_proc("siimage", siimage_get_info);
-	}
-#endif /* DISPLAY_SIIMAGE_TIMINGS && CONFIG_PROC_FS */
 }
 
 /**

@@ -1,13 +1,10 @@
 #ifndef SIIMAGE_H
 #define SIIMAGE_H
 
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
-
-#define DISPLAY_SIIMAGE_TIMINGS
 
 #undef SIIMAGE_VIRTUAL_DMAPIO
 #undef SIIMAGE_BUFFERED_TASKFILE
