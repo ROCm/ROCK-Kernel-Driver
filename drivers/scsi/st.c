@@ -3408,11 +3408,17 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 	up(&STp->lock);
-	i = scsi_cmd_ioctl(STp->disk, cmd_in, arg);
-	if (i != -ENOTTY)
-		return i;
-	else
-		return scsi_ioctl(STp->device, cmd_in, (void *) arg);
+	switch (cmd_in) {
+		case SCSI_IOCTL_GET_IDLUN:
+		case SCSI_IOCTL_GET_BUS_NUMBER:
+			break;
+		default:
+			i = scsi_cmd_ioctl(STp->disk, cmd_in, arg);
+			if (i != -ENOTTY)
+				return i;
+			break;
+	}
+	return scsi_ioctl(STp->device, cmd_in, (void *) arg);
 
  out:
 	up(&STp->lock);
