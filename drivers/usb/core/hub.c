@@ -395,6 +395,33 @@ static void hub_power_on(struct usb_hub *hub)
 	msleep(hub->descriptor->bPwrOn2PwrGood * 2);
 }
 
+static void hub_quiesce(struct usb_hub *hub)
+{
+	/* stop khubd and related activity */
+	hub->quiescing = 1;
+	usb_kill_urb(hub->urb);
+	if (hub->has_indicators)
+		cancel_delayed_work(&hub->leds);
+	if (hub->has_indicators || hub->tt.hub)
+		flush_scheduled_work();
+}
+
+static void hub_activate(struct usb_hub *hub)
+{
+	int	status;
+
+	hub->quiescing = 0;
+	status = usb_submit_urb(hub->urb, GFP_NOIO);
+	if (status < 0)
+		dev_err(&hub->intf->dev, "activate --> %d\n", status);
+	if (hub->has_indicators && blinkenlights)
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
+
+	/* scan all ports ASAP */
+	hub->event_bits[0] = ~0;
+	kick_khubd(hub);
+}
+
 static int hub_hub_status(struct usb_hub *hub,
 		u16 *status, u16 *change)
 {
@@ -590,10 +617,7 @@ static int hub_configure(struct usb_hub *hub,
 		dev_dbg(hub_dev, "%sover-current condition exists\n",
 			(hubstatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
-	/* scan all ports ASAP on new hubs */
-	hub->change_bits[0] = ~0;
-
-	/* Start the interrupt endpoint */
+	/* set up the interrupt endpoint */
 	pipe = usb_rcvintpipe(hdev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(hdev, pipe, usb_pipeout(pipe));
 
@@ -611,24 +635,13 @@ static int hub_configure(struct usb_hub *hub,
 		hub, endpoint->bInterval);
 	hub->urb->transfer_dma = hub->buffer_dma;
 	hub->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
-	if (ret) {
-		message = "couldn't submit status urb";
-		goto fail;
-	}
 
-	/* Wake up khubd */
-	kick_khubd(hub);
-
-	/* maybe start cycling the hub leds */
-	if (hub->has_indicators && blinkenlights) {
-		set_port_led(hdev, 1, HUB_LED_GREEN);
+	/* maybe cycle the hub leds */
+	if (hub->has_indicators && blinkenlights)
 		hub->indicator [0] = INDICATOR_CYCLE;
-		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
-	}
 
 	hub_power_on(hub);
-
+	hub_activate(hub);
 	return 0;
 
 fail:
@@ -639,29 +652,6 @@ fail:
 }
 
 static unsigned highspeed_hubs;
-
-static void hub_quiesce(struct usb_hub *hub)
-{
-	/* stop khubd and related activity */
-	hub->quiescing = 1;
-	usb_kill_urb(hub->urb);
-	if (hub->has_indicators)
-		cancel_delayed_work(&hub->leds);
-	if (hub->has_indicators || hub->tt.hub)
-		flush_scheduled_work();
-}
-
-static void hub_reactivate(struct usb_hub *hub)
-{
-	int	status;
-
-	hub->quiescing = 0;
-	status = usb_submit_urb(hub->urb, GFP_NOIO);
-	if (status < 0)
-		dev_err(&hub->intf->dev, "reactivate --> %d\n", status);
-	if (hub->has_indicators && blinkenlights)
-		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
-}
 
 static void hub_disconnect(struct usb_interface *intf)
 {
@@ -822,7 +812,7 @@ static void hub_post_reset(struct usb_device *hdev)
 {
 	struct usb_hub *hub = usb_get_intfdata(hdev->actconfig->interface[0]);
 
-	hub_reactivate(hub);
+	hub_activate(hub);
 	hub_power_on(hub);
 }
 
@@ -1905,7 +1895,7 @@ static int hub_resume(struct usb_interface *intf)
 	}
 	intf->dev.power.power_state = PM_SUSPEND_ON;
 
-	hub_reactivate(hub);
+	hub_activate(hub);
 	return 0;
 }
 
