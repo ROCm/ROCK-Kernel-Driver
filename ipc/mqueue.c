@@ -251,6 +251,24 @@ static int mqueue_flush_file(struct file *filp)
 	return 0;
 }
 
+static unsigned int mqueue_poll_file(struct file *filp, struct poll_table_struct *poll_tab)
+{
+	struct mqueue_inode_info *info = MQUEUE_I(filp->f_dentry->d_inode);
+	int retval = 0;
+
+	poll_wait(filp, &info->wait_q, poll_tab);
+
+	spin_lock(&info->lock);
+	if (info->attr.mq_curmsgs)
+		retval = POLLIN | POLLRDNORM;
+
+	if (info->attr.mq_curmsgs < info->attr.mq_maxmsg)
+		retval |= POLLOUT | POLLWRNORM;
+	spin_unlock(&info->lock);
+
+	return retval;
+}
+
 /* Adds current to info->e_wait_q[sr] before element with smaller prio */
 static void wq_add(struct mqueue_inode_info *info, int sr,
 			struct ext_wait_queue *ewp)
@@ -376,11 +394,11 @@ static void __do_notify(struct mqueue_inode_info *info)
 				       &sig_i, info->notify_owner);
 		} else if (info->notify.sigev_notify == SIGEV_THREAD) {
 			info->notify_filp->private_data = (void*)NP_WOKENUP;
-			wake_up(&info->wait_q);
 		}
 		/* after notification unregisters process */
 		info->notify_owner = 0;
 	}
+	wake_up(&info->wait_q);
 }
 
 static long prepare_timeout(const struct timespec __user *u_arg)
@@ -712,9 +730,11 @@ static inline void pipelined_receive(struct mqueue_inode_info *info)
 {
 	struct ext_wait_queue *sender = wq_get_first_waiter(info, SEND);
 
-	if (!sender)
+	if (!sender) {
+		/* for poll */
+		wake_up_interruptible(&info->wait_q);
 		return;
-
+	}
 	msg_insert(sender->msg, info);
 	list_del(&sender->list);
 	sender->state = STATE_PENDING;
@@ -1039,6 +1059,7 @@ static struct inode_operations mqueue_dir_inode_operations = {
 
 static struct file_operations mqueue_file_operations = {
 	.flush = mqueue_flush_file,
+	.poll = mqueue_poll_file,
 };
 
 static struct file_operations mqueue_notify_fops = {
