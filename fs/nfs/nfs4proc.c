@@ -1013,6 +1013,7 @@ nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
 	       struct page *page, int *eofp)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_shareowner	*sp;
 	uint64_t offset = page_offset(page) + base;
 	struct nfs_readargs arg = {
 		.fh		= NFS_FH(inode),
@@ -1035,6 +1036,17 @@ nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
 	int status;
 
 	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
+	/*
+	* Try first to use O_RDONLY, then O_RDWR stateid.
+	*/
+	sp = nfs4_get_inode_share(inode, O_RDONLY);
+	if (!sp)
+		sp = nfs4_get_inode_share(inode, O_RDWR);
+	if (sp)
+		memcpy(arg.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	else
+		memcpy(arg.stateid, zero_stateid, sizeof(nfs4_stateid));
+
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
 	if (!status) {
@@ -1441,6 +1453,7 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
+	struct nfs4_shareowner	*sp;
 	int flags;
 
 	data->args.fh     = NFS_FH(inode);
@@ -1452,6 +1465,19 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	data->res.count   = count;
 	data->res.eof     = 0;
 	data->timestamp   = jiffies;
+
+	if(req->wb_file) {
+		unsigned int oflags = req->wb_file->f_flags;
+		sp = nfs4_get_inode_share(inode, oflags);
+	} else {
+		sp = nfs4_get_inode_share(inode, O_RDONLY);
+		if (!sp)
+			sp = nfs4_get_inode_share(inode, O_RDWR);
+	}
+	if (sp)
+		memcpy(data->args.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	else
+		memcpy(data->args.stateid, zero_stateid, sizeof(nfs4_stateid));
 
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);

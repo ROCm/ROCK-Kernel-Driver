@@ -654,10 +654,7 @@ encode_read(struct xdr_stream *xdr, struct nfs_readargs *args)
 
 	RESERVE_SPACE(32);
 	WRITE32(OP_READ);
-	WRITE32(0);   /* all-zero stateid! */
-	WRITE32(0);
-	WRITE32(0);
-	WRITE32(0);
+	WRITEMEM(args->stateid, sizeof(nfs4_stateid));
 	WRITE64(args->offset);
 	WRITE32(args->count);
 

@@ -157,6 +157,7 @@ struct nfs_closeres {
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
+	nfs4_stateid		stateid;
 	__u64			offset;
 	__u32			count;
 	unsigned int		pgbase;
