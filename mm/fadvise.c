@@ -38,6 +38,9 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 		goto out;
 	}
 
+	if (len == 0)		/* 0 == "all data following offset" */
+		len = -1;
+
 	bdi = mapping->backing_dev_info;
 
 	switch (advice) {
