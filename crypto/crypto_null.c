@@ -26,11 +26,13 @@
 #define NULL_BLOCK_SIZE		1
 #define NULL_DIGEST_SIZE	0
 
-static void null_compress(void)
-{ }
+static int null_compress(void *ctx, const u8 *src, unsigned int slen,
+                         u8 *dst, unsigned int *dlen)
+{ return 0; }
 
-static void null_decompress(void)
-{ }
+static int null_decompress(void *ctx, const u8 *src, unsigned int slen,
+                           u8 *dst, unsigned int *dlen)
+{ return 0; }
 
 static void null_init(void *ctx)
 { }

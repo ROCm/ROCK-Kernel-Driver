@@ -119,9 +119,7 @@
 #include <net/sock.h>
 #include <linux/ipsec.h>
 
-#ifdef CONFIG_FILTER
 #include <linux/filter.h>
-#endif
 
 #ifdef CONFIG_INET
 #include <net/tcp.h>
@@ -168,9 +166,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 		    char *optval, int optlen)
 {
 	struct sock *sk=sock->sk;
-#ifdef CONFIG_FILTER
 	struct sk_filter *filter;
-#endif
 	int val;
 	int valbool;
 	struct linger ling;
@@ -381,7 +377,6 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 #endif
 
 
-#ifdef CONFIG_FILTER
 		case SO_ATTACH_FILTER:
 			ret = -EINVAL;
 			if (optlen == sizeof(struct sock_fprog)) {
@@ -407,7 +402,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 			spin_unlock_bh(&sk->lock.slock);
 			ret = -ENONET;
 			break;
-#endif
+
 		/* We implement the SO_SNDLOWAT etc to
 		   not be settable (1003.1g 5.3) */
 		default:
@@ -614,20 +609,16 @@ struct sock *sk_alloc(int family, int priority, int zero_it, kmem_cache_t *slab)
 
 void sk_free(struct sock *sk)
 {
-#ifdef CONFIG_FILTER
 	struct sk_filter *filter;
-#endif
 
 	if (sk->destruct)
 		sk->destruct(sk);
 
-#ifdef CONFIG_FILTER
 	filter = sk->filter;
 	if (filter) {
 		sk_filter_release(sk, filter);
 		sk->filter = NULL;
 	}
-#endif
 
 	if (atomic_read(&sk->omem_alloc))
 		printk(KERN_DEBUG "sk_free: optmem leakage (%d bytes) detected.\n", atomic_read(&sk->omem_alloc));
