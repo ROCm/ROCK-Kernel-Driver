@@ -1,7 +1,7 @@
 /*
  * super.c - NTFS kernel super block handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2001,2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -323,6 +323,9 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 			return -EROFS;
 		}
 	}
+	// TODO:  For now we enforce no atime and dir atime updates as they are
+	// not implemented.
+	*flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
@@ -1338,6 +1341,40 @@ struct super_operations ntfs_sops = {
 	.show_options	= ntfs_show_options, /* Show mount options in proc. */
 };
 
+
+/**
+ * Declarations for NTFS specific export operations (fs/ntfs/namei.c).
+ */
+extern struct dentry *ntfs_get_parent(struct dentry *child_dent);
+extern struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh);
+
+/**
+ * Export operations allowing NFS exporting of mounted NTFS partitions.
+ *
+ * We use the default ->decode_fh() and ->encode_fh() for now.  Note that they
+ * use 32 bits to store the inode number which is an unsigned long so on 64-bit
+ * architectures is usually 64 bits so it would all fail horribly on huge
+ * volumes.  I guess we need to define our own encode and decode fh functions
+ * that store 64-bit inode numbers at some point but for now we will ignore the
+ * problem...
+ *
+ * We also use the default ->get_name() helper (used by ->decode_fh() via
+ * fs/exportfs/expfs.c::find_exported_dentry()) as that is completely fs
+ * independent.
+ *
+ * The default ->get_parent() just returns -EACCES so we have to provide our
+ * own and the default ->get_dentry() is incompatible with NTFS due to not
+ * allowing the inode number 0 which is used in NTFS for the system file $MFT
+ * and due to using iget() whereas NTFS needs ntfs_iget().
+ */
+static struct export_operations ntfs_export_ops = {
+	.get_parent	= ntfs_get_parent,	/* Find the parent of a given
+						   directory. */
+	.get_dentry	= ntfs_get_dentry,	/* Find a dentry for the inode
+						   given a file handle
+						   sub-fragment. */
+};
+
 /**
  * ntfs_fill_super - mount an ntfs files system
  * @sb:		super block of ntfs file system to mount
@@ -1366,6 +1403,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	ntfs_debug("Entering.");
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#else
+	// TODO:  For now we enforce no atime and dir atime updates as they are
+	// not implemented.
+	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */
 	sb->s_fs_info = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
@@ -1544,6 +1585,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			default_upcase = NULL;
 		}
 		up(&ntfs_lock);
+		sb->s_export_op = &ntfs_export_ops;
 		return 0;
 	}
 	ntfs_error(sb, "Failed to allocate root directory.");
@@ -1788,13 +1830,13 @@ static void __exit exit_ntfs_fs(void)
 		printk(KERN_CRIT "NTFS: This causes memory to leak! There is "
 				"probably a BUG in the driver! Please report "
 				"you saw this message to "
-				"linux-ntfs-dev@lists.sf.net\n");
+				"linux-ntfs-dev@lists.sourceforge.net\n");
 	/* Unregister the ntfs sysctls. */
 	ntfs_sysctl(0);
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2003 Anton Altaparmakov");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2004 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");

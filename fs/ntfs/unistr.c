@@ -1,7 +1,7 @@
 /*
  * unistr.c - NTFS Unicode string handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -305,8 +305,9 @@ conversion_err:
  * Convert the input little endian, 2-byte Unicode string @ins, of length
  * @ins_len into the string format dictated by the loaded NLS.
  *
- * If @outs is NULL, this function allocates the string and the caller is
- * responsible for calling kfree(@outs); when finished with it.
+ * If *@outs is NULL, this function allocates the string and the caller is
+ * responsible for calling kfree(*@outs); when finished with it. In this case
+ * @outs_len is ignored and can be 0.
  *
  * On success the function returns the number of bytes written to the output
  * string *@outs (>= 0), not counting the terminating NULL byte. If the output
