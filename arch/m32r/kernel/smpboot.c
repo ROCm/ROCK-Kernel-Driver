@@ -61,7 +61,7 @@
 #endif
 
 extern int cpu_idle(void);
-extern unsigned long cpu_initialized;
+extern cpumask_t cpu_initialized;
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 /* Data structures and variables                                             */
@@ -71,7 +71,7 @@ extern unsigned long cpu_initialized;
 static unsigned int bsp_phys_id = -1;
 
 /* Bitmask of physically existing CPUs */
-cpumask_t phys_cpu_present_map;
+physid_mask_t phys_cpu_present_map;
 
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;
@@ -142,7 +142,7 @@ static void unmap_cpu_to_physid(int, int);
 void __devinit smp_prepare_boot_cpu(void)
 {
 	bsp_phys_id = hard_smp_processor_id();
-	cpu_set(bsp_phys_id, phys_cpu_present_map);
+	physid_set(bsp_phys_id, phys_cpu_present_map);
 	cpu_set(0, cpu_online_map);	/* BSP's cpu_id == 0 */
 	cpu_set(0, cpu_callout_map);
 	cpu_set(0, cpu_callin_map);
@@ -184,7 +184,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		goto smp_done;
 	}
 	for (phys_id = 0 ; phys_id < nr_cpu ; phys_id++)
-		cpu_set(phys_id, phys_cpu_present_map);
+		physid_set(phys_id, phys_cpu_present_map);
 
 	show_mp_info(nr_cpu);
 
@@ -207,7 +207,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	/*
 	 * Now scan the CPU present map and fire up the other CPUs.
 	 */
-	Dprintk("CPU present map : %lx\n", phys_cpu_present_map);
+	Dprintk("CPU present map : %lx\n", physids_coerce(phys_cpu_present_map));
 
 	for (phys_id = 0 ; phys_id < NR_CPUS ; phys_id++) {
 		/*
@@ -216,7 +216,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (phys_id == bsp_phys_id)
 			continue;
 
-		if (!cpu_isset(phys_id, phys_cpu_present_map))
+		if (!physid_isset(phys_id, phys_cpu_present_map))
 			continue;
 
 		if ((max_cpus >= 0) && (max_cpus <= cpucount + 1))
@@ -228,7 +228,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		 * Make sure we unmap all failed CPUs
 		 */
 		if (physid_to_cpu(phys_id) == -1) {
-			cpu_clear(phys_id, phys_cpu_present_map);
+			physid_clear(phys_id, phys_cpu_present_map);
 			printk("phys CPU#%d not responding - " \
 				"cannot use it.\n", phys_id);
 		}
@@ -329,7 +329,7 @@ static void __init do_boot_cpu(int phys_id)
 	cpu_set(phys_id, cpu_bootout_map);
 
 	/* Send Startup IPI */
-	send_IPI_mask_phys((1 << phys_id), CPU_BOOT_IPI, 0);
+	send_IPI_mask_phys(cpumask_of_cpu(phys_id), CPU_BOOT_IPI, 0);
 
 	Dprintk("Waiting for send to finish...\n");
 	timeout = 0;
@@ -405,11 +405,11 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	unsigned long bogosum = 0;
 
 	for (timeout = 0; timeout < 5000; timeout++) {
-		if (cpu_callin_map == cpu_online_map)
+		if (cpus_equal(cpu_callin_map, cpu_online_map))
 			break;
 		udelay(1000);
 	}
-	if (cpu_callin_map != cpu_online_map)
+	if (!cpus_equal(cpu_callin_map, cpu_online_map))
 		BUG();
 
 	for (cpu_id = 0 ; cpu_id < num_online_cpus() ; cpu_id++)
@@ -420,9 +420,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 */
 	Dprintk("Before bogomips.\n");
 	if (cpucount) {
-		for (cpu_id = 0 ; cpu_id < NR_CPUS ; cpu_id++)
-			if (cpu_online_map & (1 << cpu_id))
-				bogosum += cpu_data[cpu_id].loops_per_jiffy;
+		for_each_cpu_mask(cpu_id, cpu_online_map)
+			bogosum += cpu_data[cpu_id].loops_per_jiffy;
 
 		printk(KERN_INFO "Total of %d processors activated " \
 			"(%lu.%02lu BogoMIPS).\n", cpucount + 1,

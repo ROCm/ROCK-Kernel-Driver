@@ -10,7 +10,6 @@ CONFIG_GENERIC_ISA_DMA=y
 #
 CONFIG_EXPERIMENTAL=y
 CONFIG_CLEAN_COMPILE=y
-CONFIG_STANDALONE=y
 CONFIG_BROKEN_ON_SMP=y
 
 #
@@ -20,6 +19,7 @@ CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
 CONFIG_BSD_PROCESS_ACCT=y
+# CONFIG_BSD_PROCESS_ACCT_V3 is not set
 CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
 CONFIG_LOG_BUF_SHIFT=14
@@ -81,6 +81,7 @@ CONFIG_RWSEM_GENERIC_SPINLOCK=y
 #
 # CONFIG_M32R_CFC is not set
 CONFIG_M32R_SMC91111=y
+CONFIG_M32700UT_DS1302=y
 
 #
 # Power management options (ACPI, APM)
@@ -117,6 +118,8 @@ CONFIG_BINFMT_ELF=y
 #
 # Generic Driver Options
 #
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_FW_LOADER is not set
 # CONFIG_DEBUG_DRIVER is not set
 
@@ -208,7 +211,6 @@ CONFIG_SCSI_MULTI_LUN=y
 #
 # IEEE 1394 (FireWire) support
 #
-# CONFIG_IEEE1394 is not set
 
 #
 # I2O device support
@@ -260,13 +262,13 @@ CONFIG_IP_PNP_DHCP=y
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
-# CONFIG_NET_FASTROUTE is not set
 # CONFIG_NET_HW_FLOWCONTROL is not set
 
 #
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -309,7 +311,7 @@ CONFIG_INPUT=y
 # CONFIG_GAMEPORT is not set
 CONFIG_SOUND_GAMEPORT=y
 CONFIG_SERIO=y
-CONFIG_SERIO_I8042=y
+# CONFIG_SERIO_I8042 is not set
 CONFIG_SERIO_SERPORT=y
 # CONFIG_SERIO_CT82C710 is not set
 
@@ -359,12 +361,10 @@ CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
 
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 
@@ -378,6 +378,11 @@ CONFIG_LEGACY_PTY_COUNT=256
 # I2C support
 #
 # CONFIG_I2C is not set
+
+#
+# Dallas's 1-wire bus
+#
+# CONFIG_W1 is not set
 
 #
 # Misc devices
@@ -443,6 +448,7 @@ CONFIG_ISO9660_FS=m
 CONFIG_JOLIET=y
 # CONFIG_ZISOFS is not set
 CONFIG_UDF_FS=m
+CONFIG_UDF_NLS=y
 
 #
 # DOS/FAT/NT Filesystems
@@ -450,6 +456,8 @@ CONFIG_UDF_FS=m
 CONFIG_FAT_FS=m
 CONFIG_MSDOS_FS=m
 CONFIG_VFAT_FS=m
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
 # CONFIG_NTFS_FS is not set
 
 #
@@ -537,6 +545,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # CONFIG_NLS_ISO8859_8 is not set
 # CONFIG_NLS_CODEPAGE_1250 is not set
 # CONFIG_NLS_CODEPAGE_1251 is not set
+# CONFIG_NLS_ASCII is not set
 # CONFIG_NLS_ISO8859_1 is not set
 # CONFIG_NLS_ISO8859_2 is not set
 # CONFIG_NLS_ISO8859_3 is not set
@@ -584,5 +593,6 @@ CONFIG_DEBUG_INFO=y
 #
 # Library routines
 #
+# CONFIG_CRC_CCITT is not set
 CONFIG_CRC32=y
 # CONFIG_LIBCRC32C is not set

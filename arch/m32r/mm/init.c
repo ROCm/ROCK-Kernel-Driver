@@ -47,7 +47,7 @@ void show_mem(void)
 
 	printk("Mem-info:\n");
 	show_free_areas();
-	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
+	printk("Free swap:       %6ldkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
 	for_each_pgdat(pgdat) {
 		for (i = 0; i < pgdat->node_spanned_pages; ++i) {
 			page = pgdat->node_mem_map + i;
@@ -115,9 +115,9 @@ unsigned long __init zone_sizes_init(void)
 		zones_size[ZONE_NORMAL] = low - max_dma;
 	}
 #else
-        zones_size[ZONE_DMA] = 0 >> PAGE_SHIFT;
-        zones_size[ZONE_NORMAL] = __MEMORY_SIZE >> PAGE_SHIFT;
-        start_pfn = __MEMORY_START >> PAGE_SHIFT;
+	zones_size[ZONE_DMA] = 0 >> PAGE_SHIFT;
+	zones_size[ZONE_NORMAL] = __MEMORY_SIZE >> PAGE_SHIFT;
+	start_pfn = __MEMORY_START >> PAGE_SHIFT;
 #endif /* CONFIG_MMU */
 
 	free_area_init_node(0, NODE_DATA(0), zones_size, start_pfn, 0);
@@ -170,7 +170,7 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int nid;
 #ifndef CONFIG_MMU
-        extern unsigned long memory_end;
+	extern unsigned long memory_end;
 #endif
 
 	num_physpages = 0;
@@ -186,7 +186,7 @@ void __init mem_init(void)
 #ifdef CONFIG_MMU
 	high_memory = (void *)__va(PFN_PHYS(MAX_LOW_PFN(0)));
 #else
-        high_memory = (void *)(memory_end & PAGE_MASK);
+	high_memory = (void *)(memory_end & PAGE_MASK);
 #endif /* CONFIG_MMU */
 
 	/* clear the zero-page */

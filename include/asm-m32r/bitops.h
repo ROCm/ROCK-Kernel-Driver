@@ -54,7 +54,7 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -108,7 +108,7 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -175,7 +175,7 @@ static __inline__ void change_bit(int nr, volatile void * addr)
 {
 	__u32  mask;
 	volatile __u32  *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -208,7 +208,7 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -263,7 +263,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -273,10 +273,10 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 	__asm__ __volatile__ (
 		DCACHE_CLEAR("%0", "r4", "%2")
 		LOAD"	%0, @%2;		\n\t"
-                "mv      r4, %0; \n\t"
-                "and     %0, %1; \n\t"
-                "not     %1, %1; \n\t"
-                "and     r4, %1; \n\t"
+		"mv      r4, %0; \n\t"
+		"and     %0, %1; \n\t"
+		"not     %1, %1; \n\t"
+		"and     r4, %1; \n\t"
 		STORE"	r4, @%2;		\n\t"
 		: "=&r" (oldbit), "+r" (mask)
 		: "r" (a)
@@ -335,7 +335,7 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-        unsigned long  flags;
+	unsigned long  flags;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -407,7 +407,7 @@ static __inline__ unsigned long ffz(unsigned long word)
  */
 
 #define find_first_zero_bit(addr, size) \
-        find_next_zero_bit((addr), (size), 0)
+	find_next_zero_bit((addr), (size), 0)
 
 /**
  * find_next_zero_bit - find the first zero bit in a memory region
@@ -502,7 +502,7 @@ static __inline__ int sched_find_first_bit(unsigned long *b)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(unsigned long *addr,
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);

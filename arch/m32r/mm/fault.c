@@ -31,7 +31,6 @@
 #include <asm/m32r.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
@@ -142,7 +141,27 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	if (in_atomic() || !mm)
 		goto bad_area_nosemaphore;
 
-	down_read(&mm->mmap_sem);
+	/* When running in the kernel we expect faults to occur only to
+	 * addresses in user space.  All other faults represent errors in the
+	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
+	 * erroneous fault occuring in a code path which already holds mmap_sem
+	 * we will deadlock attempting to validate the fault against the
+	 * address space.  Luckily the kernel only validly references user
+	 * space from well defined areas of code, which are listed in the
+	 * exceptions table.
+	 *
+	 * As the vast majority of faults will be valid we will only perform
+	 * the source reference check when there is a possibilty of a deadlock.
+	 * Attempt to lock the address space, if we cannot we then validate the
+	 * source.  If this is invalid we can skip the address space check,
+	 * thus avoiding the deadlock.
+	 */
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if ((error_code & 4) == 0 &&
+		    !search_exception_tables(regs->psw))
+			goto bad_area_nosemaphore;
+		down_read(&mm->mmap_sem);
+	}
 
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -227,7 +246,7 @@ bad_area_nosemaphore:
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
-		info.si_addr = (void *)address;
+		info.si_addr = (void __user *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
 		return;
 	}
@@ -293,7 +312,7 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
+	info.si_addr = (void __user *)address;
 	force_sig_info(SIGBUS, &info, tsk);
 	return;
 
@@ -364,24 +383,24 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long vaddr,
 
 #ifdef CONFIG_CHIP_OPSP
 	entry1 = (unsigned long *)ITLB_BASE;
-        for(i = 0 ; i < NR_TLB_ENTRIES; i++) {
-                if(*entry1++ == vaddr) {
-                        pte_data = pte_val(pte);
-                        set_tlb_data(entry1, pte_data);
-                        break;
-                }
-                entry1++;
-        }
-        entry2 = (unsigned long *)DTLB_BASE;
-        for(i = 0 ; i < NR_TLB_ENTRIES ; i++) {
-                if(*entry2++ == vaddr) {
-                        pte_data = pte_val(pte);
-                        set_tlb_data(entry2, pte_data);
-                        break;
-                }
-                entry2++;
-        }
-        local_irq_restore(flags);
+	for(i = 0 ; i < NR_TLB_ENTRIES; i++) {
+	        if(*entry1++ == vaddr) {
+	                pte_data = pte_val(pte);
+	                set_tlb_data(entry1, pte_data);
+	                break;
+	        }
+	        entry1++;
+	}
+	entry2 = (unsigned long *)DTLB_BASE;
+	for(i = 0 ; i < NR_TLB_ENTRIES ; i++) {
+	        if(*entry2++ == vaddr) {
+	                pte_data = pte_val(pte);
+	                set_tlb_data(entry2, pte_data);
+	                break;
+	        }
+	        entry2++;
+	}
+	local_irq_restore(flags);
 	return;
 #else
 	pte_data = pte_val(pte);

@@ -17,6 +17,8 @@
  *    Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
+#include <linux/in6.h>
+
 /*
  * computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)
@@ -195,7 +197,7 @@ static inline unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 		: "r" (saddr), "r" (daddr),
 		  "r" (htonl((__u32) (len))), "r" (htonl(proto)), "0" (sum)
 		: "cbit"
-        );
+	);
 
 	return csum_fold(sum);
 }

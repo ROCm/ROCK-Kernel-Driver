@@ -61,7 +61,7 @@ static unsigned long do_gettimeoffset(void)
 
 #if defined(CONFIG_CHIP_M32102) || defined(CONFIG_CHIP_XNUX2) \
 	|| defined(CONFIG_CHIP_VDEC2) || defined(CONFIG_CHIP_M32700) \
-        || defined(CONFIG_CHIP_OPSP)
+	|| defined(CONFIG_CHIP_OPSP)
 #ifndef CONFIG_SMP
 
 	unsigned long count;
@@ -156,12 +156,12 @@ int do_settimeofday(struct timespec *tv)
 		return -EINVAL;
 
 	write_seqlock_irq(&xtime_lock);
-        /*
-         * This is revolting. We need to set "xtime" correctly. However, the
-         * value in this location is the value at the most recent update of
-         * wall time.  Discover what correction gettimeofday() would have
-         * made, and then undo it!
-         */
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
+	 */
 	nsec -= do_gettimeoffset() * NSEC_PER_USEC;
 	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
@@ -171,11 +171,11 @@ int do_settimeofday(struct timespec *tv)
 	set_normalized_timespec(&xtime, sec, nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-        time_adjust = 0;		/* stop active adjtime() */
-        time_status |= STA_UNSYNC;
-        time_maxerror = NTP_PHASE_LIMIT;
-        time_esterror = NTP_PHASE_LIMIT;
-        write_sequnlock_irq(&xtime_lock);
+	time_adjust = 0;		/* stop active adjtime() */
+	time_status |= STA_UNSYNC;
+	time_maxerror = NTP_PHASE_LIMIT;
+	time_esterror = NTP_PHASE_LIMIT;
+	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
 
 	return 0;
@@ -248,8 +248,8 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-struct irqaction irq0 = { timer_interrupt, SA_INTERRUPT, 0, "MFT2", NULL,
-	NULL };
+struct irqaction irq0 = { timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE,
+			  "MFT2", NULL, NULL };
 
 void __init time_init(void)
 {
@@ -278,7 +278,7 @@ void __init time_init(void)
 
 #if defined(CONFIG_CHIP_M32102) || defined(CONFIG_CHIP_XNUX2) \
 	|| defined(CONFIG_CHIP_VDEC2) || defined(CONFIG_CHIP_M32700) \
-        || defined(CONFIG_CHIP_OPSP)
+	|| defined(CONFIG_CHIP_OPSP)
 
 	/* M32102 MFT setup */
 	setup_irq(M32R_IRQ_MFT2, &irq0);

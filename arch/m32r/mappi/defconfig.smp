@@ -10,7 +10,6 @@ CONFIG_GENERIC_ISA_DMA=y
 #
 CONFIG_EXPERIMENTAL=y
 # CONFIG_CLEAN_COMPILE is not set
-# CONFIG_STANDALONE is not set
 CONFIG_BROKEN=y
 CONFIG_BROKEN_ON_SMP=y
 
@@ -54,6 +53,7 @@ CONFIG_STOP_MACHINE=y
 CONFIG_PLAT_MAPPI=y
 # CONFIG_PLAT_USRV is not set
 # CONFIG_PLAT_M32700UT is not set
+# CONFIG_PLAT_OPSPUT is not set
 # CONFIG_PLAT_OAKS32R is not set
 # CONFIG_PLAT_MAPPI2 is not set
 CONFIG_CHIP_M32700=y
@@ -124,6 +124,8 @@ CONFIG_BINFMT_ELF=y
 #
 # Generic Driver Options
 #
+# CONFIG_STANDALONE is not set
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_FW_LOADER is not set
 
 #
@@ -134,6 +136,8 @@ CONFIG_MTD=y
 CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_CONCAT is not set
 CONFIG_MTD_REDBOOT_PARTS=y
+# CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED is not set
+# CONFIG_MTD_REDBOOT_PARTS_READONLY is not set
 # CONFIG_MTD_CMDLINE_PARTS is not set
 
 #
@@ -150,6 +154,16 @@ CONFIG_MTD_BLOCK=y
 #
 # CONFIG_MTD_CFI is not set
 # CONFIG_MTD_JEDECPROBE is not set
+CONFIG_MTD_MAP_BANK_WIDTH_1=y
+CONFIG_MTD_MAP_BANK_WIDTH_2=y
+CONFIG_MTD_MAP_BANK_WIDTH_4=y
+# CONFIG_MTD_MAP_BANK_WIDTH_8 is not set
+# CONFIG_MTD_MAP_BANK_WIDTH_16 is not set
+# CONFIG_MTD_MAP_BANK_WIDTH_32 is not set
+CONFIG_MTD_CFI_I1=y
+CONFIG_MTD_CFI_I2=y
+# CONFIG_MTD_CFI_I4 is not set
+# CONFIG_MTD_CFI_I8 is not set
 # CONFIG_MTD_RAM is not set
 # CONFIG_MTD_ROM is not set
 # CONFIG_MTD_ABSENT is not set
@@ -164,6 +178,7 @@ CONFIG_MTD_BLOCK=y
 # Self-contained MTD device drivers
 #
 # CONFIG_MTD_SLRAM is not set
+# CONFIG_MTD_PHRAM is not set
 # CONFIG_MTD_MTDRAM is not set
 # CONFIG_MTD_BLKMTD is not set
 
@@ -208,6 +223,7 @@ CONFIG_BLK_DEV_IDE=m
 #
 # Please see Documentation/ide.txt for help/info on IDE drives
 #
+# CONFIG_BLK_DEV_IDE_SATA is not set
 CONFIG_BLK_DEV_IDEDISK=m
 # CONFIG_IDEDISK_MULTI_MODE is not set
 CONFIG_BLK_DEV_IDECS=m
@@ -294,13 +310,13 @@ CONFIG_IP_PNP_DHCP=y
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
-# CONFIG_NET_FASTROUTE is not set
 # CONFIG_NET_HW_FLOWCONTROL is not set
 
 #
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -396,12 +412,10 @@ CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
 
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_FTAPE is not set
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 
@@ -415,6 +429,11 @@ CONFIG_LEGACY_PTY_COUNT=256
 # I2C support
 #
 # CONFIG_I2C is not set
+
+#
+# Dallas's 1-wire bus
+#
+# CONFIG_W1 is not set
 
 #
 # Misc devices
@@ -476,9 +495,11 @@ CONFIG_ISO9660_FS=y
 #
 # DOS/FAT/NT Filesystems
 #
-CONFIG_FAT_FS=y
+CONFIG_FAT_FS=m
 CONFIG_MSDOS_FS=m
 CONFIG_VFAT_FS=m
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
 # CONFIG_NTFS_FS is not set
 
 #
@@ -508,9 +529,14 @@ CONFIG_RAMFS=y
 # CONFIG_EFS_FS is not set
 CONFIG_JFFS_FS=y
 CONFIG_JFFS_FS_VERBOSE=0
+CONFIG_JFFS_PROC_FS=y
 CONFIG_JFFS2_FS=y
 CONFIG_JFFS2_FS_DEBUG=0
 # CONFIG_JFFS2_FS_NAND is not set
+# CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
+CONFIG_JFFS2_ZLIB=y
+CONFIG_JFFS2_RTIME=y
+# CONFIG_JFFS2_RUBIN is not set
 # CONFIG_CRAMFS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_HPFS_FS is not set
@@ -572,6 +598,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # CONFIG_NLS_ISO8859_8 is not set
 # CONFIG_NLS_CODEPAGE_1250 is not set
 # CONFIG_NLS_CODEPAGE_1251 is not set
+# CONFIG_NLS_ASCII is not set
 # CONFIG_NLS_ISO8859_1 is not set
 # CONFIG_NLS_ISO8859_2 is not set
 # CONFIG_NLS_ISO8859_3 is not set
@@ -612,6 +639,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 #
 # Library routines
 #
+# CONFIG_CRC_CCITT is not set
 CONFIG_CRC32=y
 # CONFIG_LIBCRC32C is not set
 CONFIG_ZLIB_INFLATE=y

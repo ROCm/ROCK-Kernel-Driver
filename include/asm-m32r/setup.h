@@ -18,7 +18,7 @@
 
 #define SCREEN_INFO		(*(struct screen_info *) (PARAM+0x200))
 
-#define COMMAND_LINE_SIZE	(256)
+#define COMMAND_LINE_SIZE	(512)
 
 #define RAMDISK_IMAGE_START_MASK	(0x07FF)
 #define RAMDISK_PROMPT_FLAG		(0x8000)

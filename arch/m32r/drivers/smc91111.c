@@ -72,7 +72,7 @@
 
 
 static const char version[] =
-	"SMSC LAN91C111 Driver (v2.0), (Linux Kernel 2.4 + Support for Odd Byte) 09/24/01 -      by Pramod Bhardwaj (pramod.bhardwaj@smsc.com)\n\n";
+	"SMSC LAN91C111 Driver (v2.0), (Linux Kernel 2.4 + Support for Odd Byte) 09/24/01 -      by Pramod Bhardwaj (pramod.bhardwaj@smsc.com)\n";
 
 #ifdef MODULE
 #include <linux/module.h>
@@ -241,7 +241,7 @@ struct smc_local {
 	unsigned short ChipRev;
 	/* <= Pramod, Odd Byte issue */
 
-        spinlock_t lock;
+	spinlock_t lock;
 
 #ifdef CONFIG_SYSCTL
 
@@ -398,12 +398,12 @@ static irqreturn_t smc_interrupt(int irq, void *, struct pt_regs *regs);
  . This is a separate procedure to handle the receipt of a packet, to
  . leave the interrupt code looking slightly cleaner
 */
-inline static void smc_rcv( struct net_device *dev );
+static inline void smc_rcv( struct net_device *dev );
 /*
  . This handles a TX interrupt, which is only called when an error
  . relating to a packet is sent.
 */
-inline static void smc_tx( struct net_device * dev );
+static inline void smc_tx( struct net_device * dev );
 
 /*
  . This handles interrupts generated from PHY register 18
@@ -815,11 +815,11 @@ static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * de
 		/* and when we set the interrupt bit */
 		status = inb( ioaddr + INT_REG );
 		if ( !(status & IM_ALLOC_INT) ) {
-      			PRINTK2("%s: memory allocation deferred. \n",
+			PRINTK2("%s: memory allocation deferred. \n",
 				dev->name);
 			/* it's deferred, but I'll handle it later */
 			spin_unlock_irqrestore(&lp->lock, flags);
-      			return 0;
+			return 0;
 		}
 
 		/* Looks like it did sneak in, so disable */
@@ -828,7 +828,7 @@ static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * de
 	}
 	/* or YES! I can send the packet now.. */
 #if THROTTLE_TX_PKTS
-                netif_stop_queue(dev);
+	netif_stop_queue(dev);
 #endif
 	smc_hardware_send_packet(dev);
 //	netif_wake_queue(dev);
@@ -1150,7 +1150,7 @@ static int __init smc_probe(struct net_device *dev, int ioaddr )
 	static unsigned version_printed = 0;
 	unsigned int	bank;
 
-        const char *version_string;
+	const char *version_string;
 
 	/*registers */
 	word	revision_register;
@@ -1329,12 +1329,12 @@ static int __init smc_probe(struct net_device *dev, int ioaddr )
 	memset(dev->priv, 0, sizeof(struct smc_local));
 
 	/* Grab the IRQ */
-    retval = request_irq(dev->irq, &smc_interrupt, 0, dev->name, dev);
-    if (retval) {
-       	  printk("%s: unable to get IRQ %d (irqval=%d).\n",
-		dev->name, dev->irq, retval);
-		  goto err_out;
-      	}
+	retval = request_irq(dev->irq, &smc_interrupt, 0, dev->name, dev);
+	if (retval) {
+		printk("%s: unable to get IRQ %d (irqval=%d).\n",
+		       dev->name, dev->irq, retval);
+		goto err_out;
+	}
 
 	dev->open		        = smc_open;
 	dev->stop		        = smc_close;
@@ -1352,7 +1352,7 @@ static int __init smc_probe(struct net_device *dev, int ioaddr )
 	lp->ChipID = (revision_register >> 4) & 0xF;
 	lp->ChipRev = revision_register & 0xF;
 
-        spin_lock_init(&lp->lock);
+	spin_lock_init(&lp->lock);
 
 	return 0;
 
@@ -1482,15 +1482,15 @@ static int smc_open(struct net_device *dev)
 static void smc_timeout (struct net_device *dev)
 {
 
-        struct smc_local *lp = (struct smc_local *)dev->priv;
-        unsigned long flags;
+	struct smc_local *lp = (struct smc_local *)dev->priv;
+	unsigned long flags;
 
-        /*
-         *      Best would be to use synchronize_irq(); spin_lock() here
-         *      lets make it work first..
-         */
+	/*
+	 *      Best would be to use synchronize_irq(); spin_lock() here
+	 *      lets make it work first..
+	 */
 
-        spin_lock_irqsave(&lp->lock, flags);
+	spin_lock_irqsave(&lp->lock, flags);
 
 	PRINTK3("%s:smc_send_packet\n", dev->name);
 
@@ -1598,7 +1598,7 @@ static irqreturn_t smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 			// Acknowledge the interrupt
 			outb(IM_TX_INT, ioaddr + INT_REG );
 #if THROTTLE_TX_PKTS
-                        netif_wake_queue(dev);
+			netif_wake_queue(dev);
 #endif
 		} else if (status & IM_TX_EMPTY_INT ) {
 			/* update stats */
@@ -1697,7 +1697,7 @@ static irqreturn_t smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
  . o otherwise, read in the packet
  --------------------------------------------------------------
 */
-static void smc_rcv(struct net_device *dev)
+static inline void smc_rcv(struct net_device *dev)
 {
 	struct smc_local *lp = (struct smc_local *)dev->priv;
 	int 	ioaddr = dev->base_addr;
@@ -1763,21 +1763,20 @@ static void smc_rcv(struct net_device *dev)
 		skb->dev = dev;
 
 		/* =>
-    ODD-BYTE ISSUE : The odd byte problem has been fixed in the LAN91C111 Rev B.
-		So we check if the Chip Revision, stored in smsc_local->ChipRev, is = 1.
-		If so then we increment the packet length only if RS_ODDFRAME is set.
-		If the Chip's revision is equal to 0, then we blindly increment the packet length
-		by 1, thus always assuming that the packet is odd length, leaving the higher layer
-		to decide the actual length.
-			-- Pramod
-		<= */
+		   ODD-BYTE ISSUE : The odd byte problem has been fixed in the LAN91C111 Rev B.
+		   So we check if the Chip Revision, stored in smsc_local->ChipRev, is = 1.
+		   If so then we increment the packet length only if RS_ODDFRAME is set.
+		   If the Chip's revision is equal to 0, then we blindly increment the packet length
+		   by 1, thus always assuming that the packet is odd length, leaving the higher layer
+		   to decide the actual length.
+		   -- Pramod
+		   <= */
 		if ((9 == lp->ChipID) && (1 == lp->ChipRev))
 		{
 			if (status & RS_ODDFRAME)
 				data = skb_put( skb, packet_length + 1 );
 			else
 				data = skb_put( skb, packet_length);
-
 		}
 		else
 		{
@@ -1850,7 +1849,7 @@ done:
  .	( resend?  Not really, since we don't want old packets around )
  .	Restore saved values
  ************************************************************************/
-static void smc_tx( struct net_device * dev )
+static inline void smc_tx( struct net_device * dev )
 {
 	int	ioaddr = dev->base_addr;
 	struct smc_local *lp = (struct smc_local *)dev->priv;
@@ -2156,7 +2155,7 @@ static const char smc_info_string[] =
  . Sysctl handler for all integer parameters
  .-------------------------------------------------------------*/
 static int smc_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
-				void *buffer, size_t *lenp)
+				void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct net_device *dev = (struct net_device*)ctl->extra1;
 	struct smc_local *lp = (struct smc_local *)ctl->extra2;
@@ -2385,7 +2384,7 @@ static int smc_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 	val = *valp;
 
 	// Perform the generic integer operation
-	if ((ret = proc_dointvec(ctl, write, filp, buffer, lenp)) != 0)
+	if ((ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos)) != 0)
 		return(ret);
 
 	// Write changes out to the registers
@@ -2673,7 +2672,7 @@ static int smc_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 
 	} // end if
 
-        return ret;
+	return ret;
 }
 
 /*------------------------------------------------------------
@@ -3817,78 +3816,77 @@ static void smc_phy_interrupt(struct net_device* dev)
 
 	PRINTK2("%s: smc_phy_interrupt\n", dev->name);
 
-  while (1)
-	{
-	// Read PHY Register 18, Status Output
-	phy18 = smc_read_phy_register(ioaddr, phyaddr, PHY_INT_REG);
+	while (1) {
+		// Read PHY Register 18, Status Output
+		phy18 = smc_read_phy_register(ioaddr, phyaddr, PHY_INT_REG);
 
-	// Exit if not more changes
-	if (phy18 == lp->lastPhy18)
-		break;
+		// Exit if not more changes
+		if (phy18 == lp->lastPhy18)
+			break;
 
 #if (SMC_DEBUG > 1 )
 
-	PRINTK2("%s:     phy18=0x%x\n", dev->name, phy18);
-	PRINTK2("%s: lastPhy18=0x%x\n", dev->name, lp->lastPhy18);
+		PRINTK2("%s:     phy18=0x%x\n", dev->name, phy18);
+		PRINTK2("%s: lastPhy18=0x%x\n", dev->name, lp->lastPhy18);
 
-	// Handle events
-	if ((phy18 & PHY_INT_LNKFAIL) != (lp->lastPhy18 & PHY_INT_LNKFAIL))
+		// Handle events
+		if ((phy18 & PHY_INT_LNKFAIL) != (lp->lastPhy18 & PHY_INT_LNKFAIL))
 		{
-		PRINTK2("%s: PHY Link Fail=%x\n", dev->name,
-			phy18 & PHY_INT_LNKFAIL);
+			PRINTK2("%s: PHY Link Fail=%x\n", dev->name,
+				phy18 & PHY_INT_LNKFAIL);
 		}
 
-	if ((phy18 & PHY_INT_LOSSSYNC) != (lp->lastPhy18 & PHY_INT_LOSSSYNC))
+		if ((phy18 & PHY_INT_LOSSSYNC) != (lp->lastPhy18 & PHY_INT_LOSSSYNC))
 		{
-		PRINTK2("%s: PHY LOSS SYNC=%x\n", dev->name,
-			phy18 & PHY_INT_LOSSSYNC);
+			PRINTK2("%s: PHY LOSS SYNC=%x\n", dev->name,
+				phy18 & PHY_INT_LOSSSYNC);
 		}
 
-	if ((phy18 & PHY_INT_CWRD) != (lp->lastPhy18 & PHY_INT_CWRD))
+		if ((phy18 & PHY_INT_CWRD) != (lp->lastPhy18 & PHY_INT_CWRD))
 		{
-		PRINTK2("%s: PHY INVALID 4B5B code=%x\n", dev->name,
-			phy18 & PHY_INT_CWRD);
+			PRINTK2("%s: PHY INVALID 4B5B code=%x\n", dev->name,
+				phy18 & PHY_INT_CWRD);
 		}
 
-	if ((phy18 & PHY_INT_SSD) != (lp->lastPhy18 & PHY_INT_SSD))
+		if ((phy18 & PHY_INT_SSD) != (lp->lastPhy18 & PHY_INT_SSD))
 		{
-		PRINTK2("%s: PHY No Start Of Stream=%x\n", dev->name,
-			phy18 & PHY_INT_SSD);
+			PRINTK2("%s: PHY No Start Of Stream=%x\n", dev->name,
+				phy18 & PHY_INT_SSD);
 		}
 
-	if ((phy18 & PHY_INT_ESD) != (lp->lastPhy18 & PHY_INT_ESD))
+		if ((phy18 & PHY_INT_ESD) != (lp->lastPhy18 & PHY_INT_ESD))
 		{
-		PRINTK2("%s: PHY No End Of Stream=%x\n", dev->name,
-			phy18 & PHY_INT_ESD);
+			PRINTK2("%s: PHY No End Of Stream=%x\n", dev->name,
+				phy18 & PHY_INT_ESD);
 		}
 
-	if ((phy18 & PHY_INT_RPOL) != (lp->lastPhy18 & PHY_INT_RPOL))
+		if ((phy18 & PHY_INT_RPOL) != (lp->lastPhy18 & PHY_INT_RPOL))
 		{
-		PRINTK2("%s: PHY Reverse Polarity Detected=%x\n", dev->name,
-			phy18 & PHY_INT_RPOL);
+			PRINTK2("%s: PHY Reverse Polarity Detected=%x\n", dev->name,
+				phy18 & PHY_INT_RPOL);
 		}
 
-	if ((phy18 & PHY_INT_JAB) != (lp->lastPhy18 & PHY_INT_JAB))
+		if ((phy18 & PHY_INT_JAB) != (lp->lastPhy18 & PHY_INT_JAB))
 		{
-		PRINTK2("%s: PHY Jabber Detected=%x\n", dev->name,
-			phy18 & PHY_INT_JAB);
+			PRINTK2("%s: PHY Jabber Detected=%x\n", dev->name,
+				phy18 & PHY_INT_JAB);
 		}
 
-	if ((phy18 & PHY_INT_SPDDET) != (lp->lastPhy18 & PHY_INT_SPDDET))
+		if ((phy18 & PHY_INT_SPDDET) != (lp->lastPhy18 & PHY_INT_SPDDET))
 		{
-		PRINTK2("%s: PHY Speed Detect=%x\n", dev->name,
-			phy18 & PHY_INT_SPDDET);
+			PRINTK2("%s: PHY Speed Detect=%x\n", dev->name,
+				phy18 & PHY_INT_SPDDET);
 		}
 
-	if ((phy18 & PHY_INT_DPLXDET) != (lp->lastPhy18 & PHY_INT_DPLXDET))
+		if ((phy18 & PHY_INT_DPLXDET) != (lp->lastPhy18 & PHY_INT_DPLXDET))
 		{
-		PRINTK2("%s: PHY Duplex Detect=%x\n", dev->name,
-			phy18 & PHY_INT_DPLXDET);
+			PRINTK2("%s: PHY Duplex Detect=%x\n", dev->name,
+				phy18 & PHY_INT_DPLXDET);
 		}
 #endif
 
-	// Update the last phy 18 variable
-	lp->lastPhy18 = phy18;
+		// Update the last phy 18 variable
+		lp->lastPhy18 = phy18;
 
 	} // end while
 }

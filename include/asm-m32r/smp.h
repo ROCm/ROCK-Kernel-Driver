@@ -13,7 +13,49 @@
 #include <linux/threads.h>
 #include <asm/m32r.h>
 
-extern cpumask_t phys_cpu_present_map;
+#define PHYSID_ARRAY_SIZE       1
+
+struct physid_mask
+{
+	unsigned long mask[PHYSID_ARRAY_SIZE];
+};
+
+typedef struct physid_mask physid_mask_t;
+
+#define physid_set(physid, map)                 set_bit(physid, (map).mask)
+#define physid_clear(physid, map)               clear_bit(physid, (map).mask)
+#define physid_isset(physid, map)               test_bit(physid, (map).mask)
+#define physid_test_and_set(physid, map)        test_and_set_bit(physid, (map).mask)
+
+#define physids_and(dst, src1, src2)            bitmap_and((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
+#define physids_or(dst, src1, src2)             bitmap_or((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
+#define physids_clear(map)                      bitmap_zero((map).mask, MAX_APICS)
+#define physids_complement(dst, src)            bitmap_complement((dst).mask,(src).mask, MAX_APICS)
+#define physids_empty(map)                      bitmap_empty((map).mask, MAX_APICS)
+#define physids_equal(map1, map2)               bitmap_equal((map1).mask, (map2).mask, MAX_APICS)
+#define physids_weight(map)                     bitmap_weight((map).mask, MAX_APICS)
+#define physids_shift_right(d, s, n)            bitmap_shift_right((d).mask, (s).mask, n, MAX_APICS)
+#define physids_shift_left(d, s, n)             bitmap_shift_left((d).mask, (s).mask, n, MAX_APICS)
+#define physids_coerce(map)                     ((map).mask[0])
+
+#define physids_promote(physids)					\
+	({								\
+		physid_mask_t __physid_mask = PHYSID_MASK_NONE;		\
+		__physid_mask.mask[0] = physids;			\
+		__physid_mask;						\
+	})
+
+#define physid_mask_of_physid(physid)					\
+	({								\
+		physid_mask_t __physid_mask = PHYSID_MASK_NONE;		\
+		physid_set(physid, __physid_mask);			\
+		__physid_mask;						\
+	})
+
+#define PHYSID_MASK_ALL         { {[0 ... PHYSID_ARRAY_SIZE-1] = ~0UL} }
+#define PHYSID_MASK_NONE        { {[0 ... PHYSID_ARRAY_SIZE-1] = 0UL} }
+
+extern physid_mask_t phys_cpu_present_map;
 
 /*
  * Some lowlevel functions might want to know about
@@ -51,7 +93,7 @@ static __inline__ unsigned int num_booting_cpus(void)
 
 extern void smp_send_timer(void);
 extern void calibrate_delay(void);
-extern unsigned long send_IPI_mask_phys(unsigned long, int, int);
+extern unsigned long send_IPI_mask_phys(cpumask_t, int, int);
 
 #endif	/* not __ASSEMBLY__ */
 
@@ -75,4 +117,3 @@ extern unsigned long send_IPI_mask_phys(unsigned long, int, int);
 #endif	/* CONFIG_SMP */
 
 #endif	/* _ASM_M32R_SMP_H */
-

@@ -53,7 +53,7 @@ static struct call_data_struct *call_data;
  * For flush_cache_all()
  */
 static spinlock_t flushcache_lock = SPIN_LOCK_UNLOCKED;
-static volatile unsigned long flushcache_cpumask;
+static volatile unsigned long flushcache_cpumask = 0;
 
 /*
  * For flush_tlb_others()
@@ -88,7 +88,7 @@ void smp_flush_tlb_mm(struct mm_struct *);
 void smp_flush_tlb_range(struct vm_area_struct *, unsigned long, \
 	unsigned long);
 void smp_flush_tlb_page(struct vm_area_struct *, unsigned long);
-static void flush_tlb_others(unsigned long, struct mm_struct *,
+static void flush_tlb_others(cpumask_t, struct mm_struct *,
 	struct vm_area_struct *, unsigned long);
 void smp_invalidate_interrupt(void);
 
@@ -130,7 +130,7 @@ unsigned long send_IPI_mask_phys(cpumask_t, int, int);
  *==========================================================================*/
 void smp_send_reschedule(int cpu_id)
 {
-	send_IPI_mask(1 << cpu_id, RESCHEDULE_IPI, 1);
+	send_IPI_mask(cpumask_of_cpu(cpu_id), RESCHEDULE_IPI, 1);
 }
 
 /*==========================================================================*
@@ -177,15 +177,18 @@ void smp_reschedule_interrupt(void)
 void smp_flush_cache_all(void)
 {
 	cpumask_t cpumask;
+	unsigned long *mask;
 
 	preempt_disable();
-	cpumask = 1UL << smp_processor_id();
-	cpumask = cpu_online_map & ~cpumask;
+	cpumask = cpu_online_map;
+	cpu_clear(smp_processor_id(), cpumask);
 	spin_lock(&flushcache_lock);
-	atomic_set_mask(cpumask, (atomic_t *)&flushcache_cpumask);
+	mask=cpus_addr(cpumask);
+	atomic_set_mask(*mask, (atomic_t *)&flushcache_cpumask);
 	send_IPI_mask(cpumask, INVALIDATE_CACHE_IPI, 0);
 	_flush_cache_copyback_all();
-	while (flushcache_cpumask);
+	while (flushcache_cpumask)
+		mb();
 	spin_unlock(&flushcache_lock);
 	preempt_enable();
 }
@@ -271,11 +274,14 @@ static void flush_tlb_all_ipi(void *info)
 void smp_flush_tlb_mm(struct mm_struct *mm)
 {
 	int cpu_id = smp_processor_id();
-	cpumask_t cpu_mask = mm->cpu_vm_mask & ~(1 << cpu_id);
+	cpumask_t cpu_mask;
 	unsigned long *mmc = &mm->context[cpu_id];
 	unsigned long flags;
 
 	preempt_disable();
+	cpu_mask = mm->cpu_vm_mask;
+	cpu_clear(cpu_id, cpu_mask);
+
 	if (*mmc != NO_CONTEXT) {
 		local_irq_save(flags);
 		*mmc = NO_CONTEXT;
@@ -285,7 +291,7 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 			cpu_clear(cpu_id, mm->cpu_vm_mask);
 		local_irq_restore(flags);
 	}
-	if (cpu_mask)
+	if (!cpus_empty(cpu_mask))
 		flush_tlb_others(cpu_mask, mm, NULL, FLUSH_ALL);
 
 	preempt_enable();
@@ -336,11 +342,14 @@ void smp_flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	int cpu_id = smp_processor_id();
-	cpumask_t cpu_mask = mm->cpu_vm_mask & ~(1 << cpu_id);
+	cpumask_t cpu_mask;
 	unsigned long *mmc = &mm->context[cpu_id];
 	unsigned long flags;
 
 	preempt_disable();
+	cpu_mask = mm->cpu_vm_mask;
+	cpu_clear(cpu_id, cpu_mask);
+
 #ifdef DEBUG_SMP
 	if (!mm)
 		BUG();
@@ -353,7 +362,7 @@ void smp_flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 		__flush_tlb_page(va);
 		local_irq_restore(flags);
 	}
-	if (cpu_mask)
+	if (!cpus_empty(cpu_mask))
 		flush_tlb_others(cpu_mask, mm, vma, va);
 
 	preempt_enable();
@@ -385,6 +394,8 @@ void smp_flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
 static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	struct vm_area_struct *vma, unsigned long va)
 {
+	cpumask_t tmp;
+	unsigned long *mask;
 #ifdef DEBUG_SMP
 	unsigned long flags;
 	__save_flags(flags);
@@ -399,14 +410,12 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 * - current CPU must not be in mask
 	 * - mask must exist :)
 	 */
-	if (!cpumask)
-		BUG();
-	if ((cpumask & cpu_online_map) != cpumask)
-		BUG();
-	if (cpumask & (1 << smp_processor_id()))
-		BUG();
-	if (!mm)
-		BUG();
+	BUG_ON(cpus_empty(cpumask));
+
+	cpus_and(tmp, cpumask, cpu_online_map);
+	BUG_ON(!cpus_equal(cpumask, tmp));
+	BUG_ON(cpu_isset(smp_processor_id(), cpumask));
+	BUG_ON(!mm);
 
 	/*
 	 * i'm not happy about this global shared spinlock in the
@@ -419,8 +428,8 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	flush_mm = mm;
 	flush_vma = vma;
 	flush_va = va;
-
-	atomic_set_mask(cpumask, (atomic_t *)&flush_cpumask);
+	mask=cpus_addr(cpumask);
+	atomic_set_mask(*mask, (atomic_t *)&flush_cpumask);
 
 	/*
 	 * We have to send the IPI only to
@@ -428,8 +437,9 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 */
 	send_IPI_mask(cpumask, INVALIDATE_TLB_IPI, 0);
 
-	while (flush_cpumask)
-		/* nothing. lockup detection does not belong here */;
+	while (!cpus_empty(flush_cpumask))
+		/* nothing. lockup detection does not belong here */
+		mb();
 
 	flush_mm = NULL;
 	flush_vma = NULL;
@@ -483,7 +493,7 @@ void smp_invalidate_interrupt(void)
 }
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
-/* Stop CPU reequest Routins                                                 */
+/* Stop CPU request Routins                                                 */
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 
 /*==========================================================================*
@@ -606,7 +616,8 @@ int smp_call_function(void (*func) (void *info), void *info, int nonatomic,
 
 	spin_lock(&call_lock);
 	call_data = &data;
-	wmb();
+	mb();
+
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_IPI, 0);
 
@@ -657,6 +668,7 @@ void smp_call_function_interrupt(void)
 	irq_enter();
 	(*func)(info);
 	irq_exit();
+
 	if (wait) {
 		mb();
 		atomic_inc(&call_data->finished);
@@ -797,7 +809,10 @@ void smp_local_timer_interrupt(struct pt_regs *regs)
  *==========================================================================*/
 void send_IPI_allbutself(int ipi_num, int try)
 {
-	cpumask_t cpumask = (cpu_online_map & ~(1 << smp_processor_id()));
+	cpumask_t cpumask;
+
+	cpumask = cpu_online_map;
+	cpu_clear(smp_processor_id(), cpumask);
 
 	send_IPI_mask(cpumask, ipi_num, try);
 }
@@ -824,21 +839,21 @@ void send_IPI_allbutself(int ipi_num, int try)
  *==========================================================================*/
 static void send_IPI_mask(cpumask_t cpumask, int ipi_num, int try)
 {
-	cpumask_t physid_mask;
+	cpumask_t physid_mask, tmp;
 	int cpu_id, phys_id;
 	int num_cpus = num_online_cpus();
 
 	if (num_cpus <= 1)	/* NO MP */
 		return;
 
-	if ((cpumask & cpu_online_map) != cpumask) /* include not online CPU */
-		BUG();
+	cpus_and(tmp, cpumask, cpu_online_map);
+	BUG_ON(!cpus_equal(cpumask, tmp));
 
-	physid_mask = 0;
-	for (cpu_id = 0 ; cpu_id < num_cpus ; cpu_id++)
-		if (cpumask & (1 << cpu_id))
-			if ((phys_id = cpu_to_physid(cpu_id)) != -1)
-				cpu_set(phys_id, physid_mask);
+	physid_mask = CPU_MASK_NONE;
+	for_each_cpu_mask(cpu_id, cpumask){
+		if ((phys_id = cpu_to_physid(cpu_id)) != -1)
+			cpu_set(phys_id, physid_mask);
+	}
 
 	send_IPI_mask_phys(physid_mask, ipi_num, try);
 }
@@ -870,14 +885,16 @@ unsigned long send_IPI_mask_phys(cpumask_t physid_mask, int ipi_num,
 	unsigned long flags = 0;
 	volatile unsigned long *ipicr_addr;
 	unsigned long ipicr_val;
-	cpumask_t my_physid_mask;
+	unsigned long my_physid_mask;
+	unsigned long mask = cpus_addr(physid_mask)[0];
 
-	if (physid_mask & ~phys_cpu_present_map)
+
+	if (mask & ~physids_coerce(phys_cpu_present_map))
 		BUG();
 	if (ipi_num >= NR_IPIS)
 		BUG();
 
-	physid_mask <<= IPI_SHIFT;
+	mask <<= IPI_SHIFT;
 	ipilock = &ipi_lock[ipi_num];
 	ipicr_addr = (volatile unsigned long *)(M32R_ICU_IPICR_ADDR
 		+ (ipi_num << 2));
@@ -927,7 +944,7 @@ unsigned long send_IPI_mask_phys(cpumask_t physid_mask, int ipi_num,
 		"st	r4, @%2			\n\t"
 		: "=&r"(ipicr_val)
 		: "r"(flags), "r"(&ipilock->lock), "r"(ipicr_addr),
-		  "r"(physid_mask), "r"(try), "r"(my_physid_mask)
+		  "r"(mask), "r"(try), "r"(my_physid_mask)
 		: "memory", "r4"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r5"

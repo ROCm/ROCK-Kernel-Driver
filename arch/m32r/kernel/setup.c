@@ -69,11 +69,21 @@ struct screen_info screen_info = {
 
 extern int root_mountflags;
 
-static char command_line[COMMAND_LINE_SIZE] = { 0 };
-char saved_command_line[COMMAND_LINE_SIZE];
+static char command_line[COMMAND_LINE_SIZE];
 
-static struct resource code_resource = { "Kernel code", 0x100000, 0 };
-static struct resource data_resource = { "Kernel data", 0, 0 };
+static struct resource data_resource = {
+	.name   = "Kernel data",
+	.start  = 0,
+	.end    = 0,
+	.flags  = IORESOURCE_BUSY | IORESOURCE_MEM
+};
+
+static struct resource code_resource = {
+	.name   = "Kernel code",
+	.start  = 0,
+	.end    = 0,
+	.flags  = IORESOURCE_BUSY | IORESOURCE_MEM
+};
 
 unsigned long memory_start;
 unsigned long memory_end;
@@ -243,9 +253,9 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-        conswitchp = &vga_con;
+	conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
-        conswitchp = &dummy_con;
+	conswitchp = &dummy_con;
 #endif
 #endif
 
@@ -282,7 +292,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	unsigned long cpu = c - cpu_data;
 
 #ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1 << cpu)))
+	if (!cpu_online(cpu))
 		return 0;
 #endif  /* CONFIG_SMP */
 
@@ -370,7 +380,7 @@ unsigned long cpu_initialized __initdata = 0;
  */
 #if defined(CONFIG_CHIP_VDEC2) || defined(CONFIG_CHIP_XNUX2)	\
 	|| defined(CONFIG_CHIP_M32700) || defined(CONFIG_CHIP_M32102) \
-        || defined(CONFIG_CHIP_OPSP)
+	|| defined(CONFIG_CHIP_OPSP)
 void __init cpu_init (void)
 {
 	int cpu_id = smp_processor_id();

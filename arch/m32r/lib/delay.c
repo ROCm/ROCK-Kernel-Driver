@@ -115,10 +115,12 @@ void __const_udelay(unsigned long xloops)
 	__delay(xloops * HZ);
 }
 
-/*
- * 4294 = 2^32 / 10^6
- */
 void __udelay(unsigned long usecs)
 {
-	__const_udelay(usecs * 4294UL);
+	__const_udelay(usecs * 0x000010c7);  /* 2**32 / 1000000 (rounded up) */
+}
+
+void __ndelay(unsigned long nsecs)
+{
+	__const_udelay(nsecs * 0x00005);  /* 2**32 / 1000000000 (rounded up) */
 }

@@ -302,10 +302,10 @@
 do { \
 	if ((unsigned long)(res) >= (unsigned long)(-125)) { \
 	/* Avoid using "res" which is declared to be in register r0; \
-           errno might expand to a function call and clobber it.  */ \
-                int __err = -(res); \
-                errno = __err; \
-                res = -1; \
+	   errno might expand to a function call and clobber it.  */ \
+		int __err = -(res); \
+		errno = __err; \
+		res = -1; \
 	} \
 	return (type) (res); \
 } while (0)
@@ -384,7 +384,7 @@ __syscall_return(type,__res); \
 }
 
 #define _syscall5(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4, \
-          type5,arg5) \
+	type5,arg5) \
 type name(type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 { \
 register long __scno __asm__ ("r7") = __NR_##name; \
@@ -446,15 +446,7 @@ __syscall_return(type,__res); \
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
-static __inline__ _syscall0(pid_t,setsid)
-static __inline__ _syscall3(int,write,int,fd,const char *,buf,off_t,count)
-static __inline__ _syscall3(int,read,int,fd,char *,buf,off_t,count)
-static __inline__ _syscall3(off_t,lseek,int,fd,off_t,offset,int,count)
-static __inline__ _syscall1(int,dup,int,fd)
 static __inline__ _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
-static __inline__ _syscall3(int,open,const char *,file,int,flag,int,mode)
-static __inline__ _syscall1(int,close,int,fd)
-static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
 
 asmlinkage int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount);
 asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,

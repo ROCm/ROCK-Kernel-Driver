@@ -185,7 +185,7 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 	printk("Call Trace: ");
 	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (kernel_text_address(addr)) {
+		if (__kernel_text_address(addr)) {
 			printk("[<%08lx>] ", addr);
 			print_symbol("%s\n", addr);
 		}
@@ -331,7 +331,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_signo = signr; \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
-	info.si_addr = (void *)siaddr; \
+	info.si_addr = (void __user *)siaddr; \
 	do_trap(trapnr, signr, str, regs, error_code, &info); \
 }
 
