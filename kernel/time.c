@@ -27,7 +27,6 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-
 #include <asm/uaccess.h>
 
 /* 
@@ -416,3 +415,17 @@ struct timespec current_kernel_time(void)
 
 	return now; 
 }
+
+#if (BITS_PER_LONG < 64)
+u64 get_jiffies_64(void)
+{
+	unsigned long seq;
+	u64 ret;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		ret = jiffies_64;
+	} while (read_seqretry(&xtime_lock, seq));
+	return ret;
+}
+#endif
