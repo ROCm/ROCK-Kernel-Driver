@@ -20,7 +20,7 @@
 #define LLC_DATA_PRIM		2
 #define LLC_DISC_PRIM		3
 #define LLC_RESET_PRIM		4
-#define LLC_FLOWCONTROL_PRIM	5
+#define LLC_FLOWCONTROL_PRIM	5 /* Not supported at this time */
 #define LLC_DISABLE_PRIM	6
 #define LLC_XID_PRIM		7
 #define LLC_TEST_PRIM		8
@@ -71,12 +71,6 @@ struct llc_prim_reset {
 	u8	     reason;		/* used only by indicate */
 };
 
-struct llc_prim_flow_ctrl {
-	struct sock *sk;
-	u16	     link;
-	u32	     amount;
-};
-
  /* Sending data in conection-less mode */
 struct llc_prim_unit_data {
 	struct llc_addr	saddr;
@@ -102,7 +96,6 @@ struct llc_prim_test {
 
 union llc_u_prim_data {
 	struct llc_prim_reset	  res;
-	struct llc_prim_flow_ctrl fc;
 	struct llc_prim_unit_data udata;	/* unit data */
 	struct llc_prim_xid	  xid;
 	struct llc_prim_test	  test;

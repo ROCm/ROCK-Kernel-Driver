@@ -1348,7 +1348,6 @@ static int llc_ui_indicate(struct llc_prim_if_block *prim)
 				"is gone for ->ind()...\n", __FUNCTION__);
 			break;
 		case LLC_RESET_PRIM:
-		case LLC_FLOWCONTROL_PRIM:
 		default:				break;
 	}
 	return 0;

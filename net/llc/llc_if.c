@@ -33,7 +33,6 @@ static int llc_unitdata_req_handler(struct llc_prim_if_block *prim);
 static int llc_test_req_handler(struct llc_prim_if_block *prim);
 static int llc_xid_req_handler(struct llc_prim_if_block *prim);
 static int llc_rst_req_handler(struct llc_prim_if_block *prim);
-static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim);
 
 /* table of request handler functions */
 static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
@@ -42,7 +41,7 @@ static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
 	[LLC_DATA_PRIM]		= NULL, /* replaced by llc_build_and_send_pkt */
 	[LLC_DISC_PRIM]		= NULL, /* replaced by llc_send_disc */
 	[LLC_RESET_PRIM]	= llc_rst_req_handler,
-	[LLC_FLOWCONTROL_PRIM]	= llc_flowcontrol_req_handler,
+	[LLC_FLOWCONTROL_PRIM]	= NULL, /* Not supported at this time */
 	[LLC_XID_PRIM]		= llc_xid_req_handler,
 	[LLC_TEST_PRIM]		= llc_test_req_handler,
 };
@@ -370,14 +369,6 @@ static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 		rc = llc_conn_state_process(sk, skb);
 	}
 	return rc;
-}
-
-/* We don't support flow control. The original code from procom has
- * some bits, but for now I'm cleaning this
- */
-static int llc_flowcontrol_req_handler(struct llc_prim_if_block *prim)
-{
-	return 1;
 }
 
 EXPORT_SYMBOL(llc_sap_open);
