@@ -17,9 +17,27 @@
 #define _LINUX_EXT3_FS_I
 
 #include <linux/rwsem.h>
+#include <linux/rbtree.h>
+#include <linux/seqlock.h>
+
+struct reserve_window {
+	__u32			_rsv_start;	/* First byte reserved */
+	__u32			_rsv_end;	/* Last byte reserved or 0 */
+};
+
+struct reserve_window_node {
+	struct rb_node	 	rsv_node;
+	atomic_t		rsv_goal_size;
+	atomic_t		rsv_alloc_hit;
+	seqlock_t		rsv_seqlock;
+	struct reserve_window	rsv_window;
+};
+
+#define rsv_start rsv_window._rsv_start
+#define rsv_end rsv_window._rsv_end
 
 /*
- * second extended file system inode data in memory
+ * third extended file system inode data in memory
  */
 struct ext3_inode_info {
 	__le32	i_data[15];	/* unconverted */
@@ -57,6 +75,9 @@ struct ext3_inode_info {
 	 * allocation when we detect linearly ascending requests.
 	 */
 	__u32	i_next_alloc_goal;
+	/* block reservation window */
+	struct reserve_window_node i_rsv_window;
+
 	__u32	i_dir_start_lookup;
 #ifdef CONFIG_EXT3_FS_XATTR
 	/*

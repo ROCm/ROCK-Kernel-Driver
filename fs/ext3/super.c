@@ -449,6 +449,7 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
+	ei->i_rsv_window.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
 	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
 }
@@ -490,10 +491,9 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ext3_inode_cache: not all structures were freed\n");
 }
 
-#ifdef CONFIG_EXT3_FS_POSIX_ACL
-
 static void ext3_clear_inode(struct inode *inode)
 {
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
        if (EXT3_I(inode)->i_acl &&
            EXT3_I(inode)->i_acl != EXT3_ACL_NOT_CACHED) {
                posix_acl_release(EXT3_I(inode)->i_acl);
@@ -504,11 +504,9 @@ static void ext3_clear_inode(struct inode *inode)
                posix_acl_release(EXT3_I(inode)->i_default_acl);
                EXT3_I(inode)->i_default_acl = EXT3_ACL_NOT_CACHED;
        }
-}
-
-#else
-# define ext3_clear_inode NULL
 #endif
+	ext3_discard_reservation(inode);
+}
 
 #ifdef CONFIG_QUOTA
 
@@ -558,7 +556,6 @@ static struct super_operations ext3_sops = {
 	.read_inode	= ext3_read_inode,
 	.write_inode	= ext3_write_inode,
 	.dirty_inode	= ext3_dirty_inode,
-	.put_inode	= ext3_put_inode,
 	.delete_inode	= ext3_delete_inode,
 	.put_super	= ext3_put_super,
 	.write_super	= ext3_write_super,
@@ -579,7 +576,8 @@ enum {
 	Opt_bsd_df, Opt_minix_df, Opt_grpid, Opt_nogrpid,
 	Opt_resgid, Opt_resuid, Opt_sb, Opt_err_cont, Opt_err_panic, Opt_err_ro,
 	Opt_nouid32, Opt_check, Opt_nocheck, Opt_debug, Opt_oldalloc, Opt_orlov,
-	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl, Opt_noload,
+	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl,
+	Opt_reservation, Opt_noreservation, Opt_noload,
 	Opt_commit, Opt_journal_update, Opt_journal_inum,
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
@@ -611,6 +609,8 @@ static match_table_t tokens = {
 	{Opt_nouser_xattr, "nouser_xattr"},
 	{Opt_acl, "acl"},
 	{Opt_noacl, "noacl"},
+	{Opt_reservation, "reservation"},
+	{Opt_noreservation, "noreservation"},
 	{Opt_noload, "noload"},
 	{Opt_commit, "commit=%u"},
 	{Opt_journal_update, "journal=update"},
@@ -765,6 +765,12 @@ static int parse_options (char * options, struct super_block *sb,
 			printk("EXT3 (no)acl options not supported\n");
 			break;
 #endif
+		case Opt_reservation:
+			set_opt(sbi->s_mount_opt, RESERVATION);
+			break;
+		case Opt_noreservation:
+			clear_opt(sbi->s_mount_opt, RESERVATION);
+			break;
 		case Opt_journal_update:
 			/* @@@ FIXME */
 			/* Eventually we will want to be able to create
@@ -1469,6 +1475,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_gdb_count = db_count;
 	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
 	spin_lock_init(&sbi->s_next_gen_lock);
+	/* per fileystem reservation list head & lock */
+	spin_lock_init(&sbi->s_rsv_window_lock);
+	sbi->s_rsv_window_root = RB_ROOT;
+	/* Add a single, static dummy reservation to the start of the
+	 * reservation window list --- it gives us a placeholder for
+	 * append-at-start-of-list which makes the allocation logic
+	 * _much_ simpler. */
+	sbi->s_rsv_window_head.rsv_start = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	sbi->s_rsv_window_head.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	atomic_set(&sbi->s_rsv_window_head.rsv_alloc_hit, 0);
+	atomic_set(&sbi->s_rsv_window_head.rsv_goal_size, 0);
+	rsv_window_add(sb, &sbi->s_rsv_window_head);
+
 	/*
 	 * set up enough so that it can read an inode
 	 */

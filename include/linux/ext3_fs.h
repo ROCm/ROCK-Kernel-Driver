@@ -33,6 +33,12 @@ struct statfs;
 #undef EXT3FS_DEBUG
 
 /*
+ * Define EXT3_RESERVATION to reserve data blocks for expanding files
+ */
+#define EXT3_DEFAULT_RESERVE_BLOCKS     8
+#define EXT3_MAX_RESERVE_BLOCKS         1024
+#define EXT3_RESERVE_WINDOW_NOT_ALLOCATED 0
+/*
  * Always enable hashed directories
  */
 #define CONFIG_EXT3_INDEX
@@ -202,6 +208,8 @@ struct ext3_group_desc
 #ifdef CONFIG_JBD_DEBUG
 #define EXT3_IOC_WAIT_FOR_READONLY	_IOR('f', 99, long)
 #endif
+#define EXT3_IOC_GETRSVSZ		_IOR('f', 5, long)
+#define EXT3_IOC_SETRSVSZ		_IOW('f', 6, long)
 
 /*
  * Structure of an inode on the disk
@@ -300,25 +308,26 @@ struct ext3_inode {
 /*
  * Mount flags
  */
-#define EXT3_MOUNT_CHECK		0x0001	/* Do mount-time checks */
-#define EXT3_MOUNT_OLDALLOC		0x0002  /* Don't use the new Orlov allocator */
-#define EXT3_MOUNT_GRPID		0x0004	/* Create files with directory's group */
-#define EXT3_MOUNT_DEBUG		0x0008	/* Some debugging messages */
-#define EXT3_MOUNT_ERRORS_CONT		0x0010	/* Continue on errors */
-#define EXT3_MOUNT_ERRORS_RO		0x0020	/* Remount fs ro on errors */
-#define EXT3_MOUNT_ERRORS_PANIC		0x0040	/* Panic on errors */
-#define EXT3_MOUNT_MINIX_DF		0x0080	/* Mimics the Minix statfs */
-#define EXT3_MOUNT_NOLOAD		0x0100	/* Don't use existing journal*/
-#define EXT3_MOUNT_ABORT		0x0200	/* Fatal error detected */
-#define EXT3_MOUNT_DATA_FLAGS		0x0C00	/* Mode for data writes: */
-  #define EXT3_MOUNT_JOURNAL_DATA	0x0400	/* Write data to journal */
-  #define EXT3_MOUNT_ORDERED_DATA	0x0800	/* Flush data before commit */
-  #define EXT3_MOUNT_WRITEBACK_DATA	0x0C00	/* No data ordering */
-#define EXT3_MOUNT_UPDATE_JOURNAL	0x1000	/* Update the journal format */
-#define EXT3_MOUNT_NO_UID32		0x2000  /* Disable 32-bit UIDs */
-#define EXT3_MOUNT_XATTR_USER		0x4000	/* Extended user attributes */
-#define EXT3_MOUNT_POSIX_ACL		0x8000	/* POSIX Access Control Lists */
-#define EXT3_MOUNT_BARRIER		0x10000 /* Use block barriers */
+#define EXT3_MOUNT_CHECK		0x00001	/* Do mount-time checks */
+#define EXT3_MOUNT_OLDALLOC		0x00002  /* Don't use the new Orlov allocator */
+#define EXT3_MOUNT_GRPID		0x00004	/* Create files with directory's group */
+#define EXT3_MOUNT_DEBUG		0x00008	/* Some debugging messages */
+#define EXT3_MOUNT_ERRORS_CONT		0x00010	/* Continue on errors */
+#define EXT3_MOUNT_ERRORS_RO		0x00020	/* Remount fs ro on errors */
+#define EXT3_MOUNT_ERRORS_PANIC		0x00040	/* Panic on errors */
+#define EXT3_MOUNT_MINIX_DF		0x00080	/* Mimics the Minix statfs */
+#define EXT3_MOUNT_NOLOAD		0x00100	/* Don't use existing journal*/
+#define EXT3_MOUNT_ABORT		0x00200	/* Fatal error detected */
+#define EXT3_MOUNT_DATA_FLAGS		0x00C00	/* Mode for data writes: */
+#define EXT3_MOUNT_JOURNAL_DATA		0x00400	/* Write data to journal */
+#define EXT3_MOUNT_ORDERED_DATA		0x00800	/* Flush data before commit */
+#define EXT3_MOUNT_WRITEBACK_DATA	0x00C00	/* No data ordering */
+#define EXT3_MOUNT_UPDATE_JOURNAL	0x01000	/* Update the journal format */
+#define EXT3_MOUNT_NO_UID32		0x02000  /* Disable 32-bit UIDs */
+#define EXT3_MOUNT_XATTR_USER		0x04000	/* Extended user attributes */
+#define EXT3_MOUNT_POSIX_ACL		0x08000	/* POSIX Access Control Lists */
+#define EXT3_MOUNT_RESERVATION		0x10000	/* Preallocation */
+#define EXT3_MOUNT_BARRIER		0x20000 /* Use block barriers */
 
 /* Compatibility, for having both ext2_fs.h and ext3_fs.h included at once */
 #ifndef _LINUX_EXT2_FS_H
@@ -684,6 +693,7 @@ extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
 						    struct buffer_head ** bh);
 extern int ext3_should_retry_alloc(struct super_block *sb, int *retries);
+extern void rsv_window_add(struct super_block *sb, struct reserve_window_node *rsv);
 
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,
@@ -722,7 +732,7 @@ extern int  ext3_setattr (struct dentry *, struct iattr *);
 extern void ext3_put_inode (struct inode *);
 extern void ext3_delete_inode (struct inode *);
 extern int  ext3_sync_inode (handle_t *, struct inode *);
-extern void ext3_discard_prealloc (struct inode *);
+extern void ext3_discard_reservation (struct inode *);
 extern void ext3_dirty_inode(struct inode *);
 extern int ext3_change_inode_journal_flag(struct inode *, int);
 extern void ext3_truncate (struct inode *);
