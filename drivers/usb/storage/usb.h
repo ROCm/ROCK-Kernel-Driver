@@ -92,6 +92,15 @@ struct us_unusual_dev {
 
 #define USB_STOR_STRING_LEN 32
 
+/*
+ * We provide a DMA-mapped I/O buffer for use with small USB transfers.
+ * It turns out that CB[I] needs a 12-byte buffer and Bulk-only needs a
+ * 31-byte buffer.  But Freecom needs a 64-byte buffer, so that's the
+ * size we'll allocate.
+ */
+
+#define US_IOBUF_SIZE		64	/* Size of the DMA-mapped I/O buffer */
+
 typedef int (*trans_cmnd)(Scsi_Cmnd*, struct us_data*);
 typedef int (*trans_reset)(struct us_data*);
 typedef void (*proto_cmnd)(Scsi_Cmnd*, struct us_data*);
@@ -106,6 +115,7 @@ struct us_data {
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 	struct usb_interface	*pusb_intf;	 /* this interface */
+	struct us_unusual_dev   *unusual_dev;	 /* device-filter entry     */
 	unsigned long		flags;		 /* from filter initially */
 	unsigned int		send_bulk_pipe;	 /* cached pipe values */
 	unsigned int		recv_bulk_pipe;
@@ -139,20 +149,19 @@ struct us_data {
 	int			pid;		 /* control thread	 */
 	int			sm_state;	 /* what we are doing	 */
 
-	/* interrupt communications data */
-	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
-
 	/* control and bulk communications data */
-	struct urb		*current_urb;	 /* non-int USB requests */
-	struct usb_ctrlrequest	*dr;		 /* control requests	 */
-	struct usb_sg_request	current_sg;	 /* scatter-gather USB   */
-
-	/* the semaphore for sleeping the control thread */
-	struct semaphore	sema;		 /* to sleep thread on   */
+	struct urb		*current_urb;	 /* USB requests	 */
+	struct usb_ctrlrequest	*cr;		 /* control requests	 */
+	struct usb_sg_request	current_sg;	 /* scatter-gather req.  */
+	unsigned char		*iobuf;		 /* I/O buffer		 */
+	dma_addr_t		cr_dma;		 /* buffer DMA addresses */
+	dma_addr_t		iobuf_dma;
 
 	/* mutual exclusion structures */
+	struct semaphore	sema;		 /* to sleep thread on   */
 	struct completion	notify;		 /* thread begin/end	    */
-	struct us_unusual_dev   *unusual_dev;	 /* If unusual device       */
+
+	/* subdriver information */
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
 };
