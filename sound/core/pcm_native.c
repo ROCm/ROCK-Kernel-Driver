@@ -483,7 +483,7 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -ENXIO);
-	snd_pcm_stream_unlock_irq(substream);
+	snd_pcm_stream_lock_irq(substream);
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
