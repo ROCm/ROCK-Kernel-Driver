@@ -91,32 +91,7 @@ struct snd_mem_list {
  *  Hacks
  */
 
-static void *snd_dma_alloc_coherent1(struct device *dev, size_t size,
-				     dma_addr_t *dma_handle, int flags)
-{
-	if (dev)
-		return dma_alloc_coherent(dev, size, dma_handle, flags);
-	else /* FIXME: dma_alloc_coherent does't always accept dev=NULL */
-		return pci_alloc_consistent(NULL, size, dma_handle);
-}
-
-static void snd_dma_free_coherent1(struct device *dev, size_t size, void *dma_addr,
-				   dma_addr_t dma_handle)
-{
-	if (dev)
-		return dma_free_coherent(dev, size, dma_addr, dma_handle);
-	else
-		return pci_free_consistent(NULL, size, dma_addr, dma_handle);
-}
-
-#undef dma_alloc_coherent
-#define dma_alloc_coherent snd_dma_alloc_coherent1
-#undef dma_free_coherent
-#define dma_free_coherent snd_dma_free_coherent1
-
-
 #if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
-
 /*
  * A hack to allocate large buffers via dma_alloc_coherent()
  *
