@@ -303,6 +303,24 @@ setup_memory(void *kernel_end)
 			max_low_pfn = end;
 	}
 
+	/*
+	 * Except for the NUMA systems (wildfire, marvel) all of the 
+	 * Alpha systems we run on support 32GB of memory or less.
+	 * Since the NUMA systems introduce large holes in memory addressing,
+	 * we can get into a situation where there is not enough contiguous
+	 * memory for the memory map. 
+	 *
+	 * Limit memory to the first 32GB to limit the NUMA systems to 
+	 * memory on their first node (wildfire) or 2 (marvel) to avoid 
+	 * not being able to produce the memory map. In order to access 
+	 * all of the memory on the NUMA systems, build with discontiguous
+	 * memory support.
+	 *
+	 * If the user specified a memory limit, let that memory limit stand.
+	 */
+	if (!mem_size_limit) 
+		mem_size_limit = (32ul * 1024 * 1024 * 1024) >> PAGE_SHIFT;
+
 	if (mem_size_limit && max_low_pfn >= mem_size_limit)
 	{
 		printk("setup: forcing memory size to %ldK (from %ldK).\n",
