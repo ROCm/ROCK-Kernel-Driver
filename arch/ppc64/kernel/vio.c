@@ -149,8 +149,9 @@ vio_bus_init(void)
 	 * Functionally takes the place of pci_scan_bus
 	 */
 	node_vroot = find_devices("vdevice");
-	if (!node_vroot) {
-		printk(KERN_WARNING "%s: no /vdevice node\n", __FUNCTION__);
+	if ((node_vroot == NULL) || (node_vroot->child == NULL)) {
+		printk(KERN_INFO "VIO: missing or empty /vdevice node; no virtual IO"
+			" devices present.\n");
 		return 0;
 	}
 
