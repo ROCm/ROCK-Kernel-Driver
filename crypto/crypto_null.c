@@ -94,6 +94,10 @@ static struct crypto_alg cipher_null = {
 	.cia_decrypt		=	null_decrypt } }
 };
 
+MODULE_ALIAS("compress_null");
+MODULE_ALIAS("digest_null");
+MODULE_ALIAS("cipher_null");
+
 static int __init init(void)
 {
 	int ret = 0;
