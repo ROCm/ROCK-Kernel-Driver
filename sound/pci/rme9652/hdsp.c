@@ -694,6 +694,13 @@ static int snd_hdsp_load_firmware_from_cache(hdsp_t *hdsp) {
 				return -EIO;
 			}
 		}
+
+		if ((1000 / HZ) < 3000) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout((3000 * HZ + 999) / 1000);
+		} else {
+			mdelay(3000);
+		}
 		
 		if (hdsp_fifo_wait (hdsp, 0, HDSP_LONG_WAIT)) {
 			snd_printk ("timeout at end of firmware loading\n");
@@ -708,12 +715,6 @@ static int snd_hdsp_load_firmware_from_cache(hdsp_t *hdsp) {
 		hdsp_write (hdsp, HDSP_control2Reg, hdsp->control2_register);
 		snd_printk ("finished firmware loading\n");
 		
-		if ((1000 / HZ) < 3000) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((3000 * HZ + 999) / 1000);
-		} else {
-			mdelay(3000);
-		}
 	}
 	if (hdsp->state & HDSP_InitializationComplete) {
 		snd_printk("firmware loaded from cache, restoring defaults\n");
@@ -1882,10 +1883,12 @@ static int snd_hdsp_put_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 
 static int snd_hdsp_info_spdif_sample_rate(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	static char *texts[] = {"32000", "44100", "48000", "64000", "88200", "96000", "None"};
+	static char *texts[] = {"32000", "44100", "48000", "64000", "88200", "96000", "None", "128000", "176400", "192000"};
+	hdsp_t *hdsp = _snd_kcontrol_chip(kcontrol);
+
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
-	uinfo->value.enumerated.items = 7 ;
+	uinfo->value.enumerated.items = (hdsp->io_type == H9632) ? 10 : 7;
 	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
 		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
 	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
@@ -1914,6 +1917,15 @@ static int snd_hdsp_get_spdif_sample_rate(snd_kcontrol_t * kcontrol, snd_ctl_ele
 		break;
 	case 96000:
 		ucontrol->value.enumerated.item[0] = 5;
+		break;
+	case 128000:
+		ucontrol->value.enumerated.item[0] = 7;
+		break;
+	case 176400:
+		ucontrol->value.enumerated.item[0] = 8;
+		break;
+	case 192000:
+		ucontrol->value.enumerated.item[0] = 9;
 		break;
 	default:
 		ucontrol->value.enumerated.item[0] = 6;		
@@ -3534,7 +3546,7 @@ snd_hdsp_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 			tmp = "-12 dB";
 			break;
 		}
-		snd_iprintf(buffer, "Phone Gain : %s\n", tmp);
+		snd_iprintf(buffer, "Phones Gain : %s\n", tmp);
 
 		snd_iprintf(buffer, "XLR Breakout Cable : %s\n", hdsp_xlr_breakout_cable(hdsp) ? "yes" : "no");	
 		
