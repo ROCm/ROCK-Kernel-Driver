@@ -1299,10 +1299,13 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			int cur = dirty_tx % NUM_TX_DESC;
 			struct sk_buff *skb = tp->Tx_skbuff[cur];
 
+			/* FIXME: is it really accurate for TxErr ? */
+			tp->stats.tx_bytes += skb->len >= ETH_ZLEN ?
+					      skb->len : ETH_ZLEN;
+			tp->stats.tx_packets++;
 			rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + cur,
 					     tp->TxDescArray + cur);
 			dev_kfree_skb_irq(skb);
-			tp->stats.tx_packets++;
 			dirty_tx++;
 			tx_left--;
 			entry++;
