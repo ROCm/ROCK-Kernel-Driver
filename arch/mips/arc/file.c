@@ -1,59 +1,75 @@
 /*
- * file.c: ARCS firmware interface to files.
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * ARC firmware interface.
  *
- * $Id: file.c,v 1.1 1998/10/18 13:32:08 tsbogend Exp $
+ * Copyright (C) 1994, 1995, 1996, 1999 Ralf Baechle
+ * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #include <linux/init.h>
+
+#include <asm/arc/types.h>
 #include <asm/sgialib.h>
 
-long __init prom_getvdirent(unsigned long fd, struct linux_vdirent *ent, unsigned long num, unsigned long *cnt)
+LONG __init
+ArcGetDirectoryEntry(ULONG FileID, struct linux_vdirent *Buffer,
+                     ULONG N, ULONG *Count)
 {
-	return romvec->get_vdirent(fd, ent, num, cnt);
+	return ARC_CALL4(get_vdirent, FileID, Buffer, N, Count);
 }
 
-long __init prom_open(char *name, enum linux_omode md, unsigned long *fd)
+LONG __init
+ArcOpen(CHAR *Path, enum linux_omode OpenMode, ULONG *FileID)
 {
-	return romvec->open(name, md, fd);
+	return ARC_CALL3(open, Path, OpenMode, FileID);
 }
 
-long __init prom_close(unsigned long fd)
+LONG __init
+ArcClose(ULONG FileID)
 {
-	return romvec->close(fd);
+	return ARC_CALL1(close, FileID);
 }
 
-long __init prom_read(unsigned long fd, void *buf, unsigned long num, unsigned long *cnt)
+LONG __init
+ArcRead(ULONG FileID, VOID *Buffer, ULONG N, ULONG *Count)
 {
-	return romvec->read(fd, buf, num, cnt);
+	return ARC_CALL4(read, FileID, Buffer, N, Count);
 }
 
-long __init prom_getrstatus(unsigned long fd)
+LONG __init
+ArcGetReadStatus(ULONG FileID)
 {
-	return romvec->get_rstatus(fd);
+	return ARC_CALL1(get_rstatus, FileID);
 }
 
-long __init prom_write(unsigned long fd, void *buf, unsigned long num, unsigned long *cnt)
+LONG __init
+ArcWrite(ULONG FileID, PVOID Buffer, ULONG N, PULONG Count)
 {
-	return romvec->write(fd, buf, num, cnt);
+	return ARC_CALL4(write, FileID, Buffer, N, Count);
 }
 
-long __init prom_seek(unsigned long fd, struct linux_bigint *off, enum linux_seekmode sm)
+LONG __init
+ArcSeek(ULONG FileID, struct linux_bigint *Position, enum linux_seekmode SeekMode)
 {
-	return romvec->seek(fd, off, sm);
+	return ARC_CALL3(seek, FileID, Position, SeekMode);
 }
 
-long __init prom_mount(char *name, enum linux_mountops op)
+LONG __init
+ArcMount(char *name, enum linux_mountops op)
 {
-	return romvec->mount(name, op);
+	return ARC_CALL2(mount, name, op);
 }
 
-long __init prom_getfinfo(unsigned long fd, struct linux_finfo *buf)
+LONG __init
+ArcGetFileInformation(ULONG FileID, struct linux_finfo *Information)
 {
-	return romvec->get_finfo(fd, buf);
+	return ARC_CALL2(get_finfo, FileID, Information);
 }
 
-long __init prom_setfinfo(unsigned long fd, unsigned long flags, unsigned long msk)
+LONG __init ArcSetFileInformation(ULONG FileID, ULONG AttributeFlags,
+                                  ULONG AttributeMask)
 {
-	return romvec->set_finfo(fd, flags, msk);
+	return ARC_CALL3(set_finfo, FileID, AttributeFlags, AttributeMask);
 }

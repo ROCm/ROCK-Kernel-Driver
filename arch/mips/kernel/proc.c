@@ -8,102 +8,136 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/seq_file.h>
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
 #include <asm/mipsregs.h>
 #include <asm/processor.h>
 #include <asm/watch.h>
 
-extern unsigned long unaligned_instructions;
 unsigned int vced_count, vcei_count;
-#ifndef CONFIG_CPU_HAS_LLSC
-unsigned long ll_ops, sc_ops;
-#endif
 
-/*
- * BUFFER is PAGE_SIZE bytes long.
- *
- * Currently /proc/cpuinfo is being abused to print data about the
- * number of date/instruction cacheflushes.
- */
-int get_cpuinfo(char *buffer)
+static const char *cpu_name[] = {
+	[CPU_UNKNOWN]	"unknown",
+	[CPU_R2000]	"R2000",
+	[CPU_R3000]	"R3000",
+	[CPU_R3000A]	"R3000A",
+	[CPU_R3041]	"R3041",
+	[CPU_R3051]	"R3051",
+	[CPU_R3052]	"R3052",
+	[CPU_R3081]	"R3081",
+	[CPU_R3081E]	"R3081E",
+	[CPU_R4000PC]	"R4000PC",
+	[CPU_R4000SC]	"R4000SC",
+	[CPU_R4000MC]	"R4000MC",
+        [CPU_R4200]	"R4200",
+	[CPU_R4400PC]	"R4400PC",
+	[CPU_R4400SC]	"R4400SC",
+	[CPU_R4400MC]	"R4400MC",
+	[CPU_R4600]	"R4600",
+	[CPU_R6000]	"R6000",
+        [CPU_R6000A]	"R6000A",
+	[CPU_R8000]	"R8000",
+	[CPU_R10000]	"R10000",
+	[CPU_R4300]	"R4300",
+	[CPU_R4650]	"R4650",
+	[CPU_R4700]	"R4700",
+	[CPU_R5000]	"R5000",
+        [CPU_R5000A]	"R5000A",
+	[CPU_R4640]	"R4640",
+	[CPU_NEVADA]	"Nevada",
+	[CPU_RM7000]	"RM7000",
+	[CPU_R5432]	"R5432",
+	[CPU_4KC]	"MIPS 4Kc",
+        [CPU_5KC]	"MIPS 5Kc",
+	[CPU_R4310]	"R4310",
+	[CPU_SB1]	"SiByte SB1",
+	[CPU_TX3912]	"TX3912",
+	[CPU_TX3922]	"TX3922",
+	[CPU_TX3927]	"TX3927",
+	[CPU_AU1000]	"Au1000",
+	[CPU_AU1500]	"Au1500",
+	[CPU_4KEC]	"MIPS 4KEc",
+	[CPU_4KSC]	"MIPS 4KSc",
+	[CPU_VR41XX]	"NEC Vr41xx",
+	[CPU_R5500]	"R5500",
+	[CPU_TX49XX]	"TX49xx",
+	[CPU_20KC]	"MIPS 20Kc",
+	[CPU_VR4111]	"NEC VR4111",
+	[CPU_VR4121]	"NEC VR4121",
+	[CPU_VR4122]	"NEC VR4122",
+	[CPU_VR4131]	"NEC VR4131",
+	[CPU_VR4181]	"NEC VR4181",
+	[CPU_VR4181A]	"NEC VR4181A",
+	[CPU_SR71000]	"Sandcraft SR71000"
+};
+
+
+static int show_cpuinfo(struct seq_file *m, void *v)
 {
+	unsigned int version = current_cpu_data.processor_id;
+	unsigned int fp_vers = current_cpu_data.fpu_id;
+	unsigned long n = (unsigned long) v - 1;
 	char fmt [64];
-	const char *cpu_name[] = CPU_NAMES;
-	const char *mach_group_names[] = GROUP_NAMES;
-	const char *mach_unknown_names[] = GROUP_UNKNOWN_NAMES;
-	const char *mach_jazz_names[] = GROUP_JAZZ_NAMES;
-	const char *mach_dec_names[] = GROUP_DEC_NAMES;
-	const char *mach_arc_names[] = GROUP_ARC_NAMES;
-	const char *mach_sni_rm_names[] = GROUP_SNI_RM_NAMES;
-	const char *mach_acn_names[] = GROUP_ACN_NAMES;
-	const char *mach_sgi_names[] = GROUP_SGI_NAMES;
-	const char *mach_cobalt_names[] = GROUP_COBALT_NAMES;
-	const char *mach_nec_ddb_names[] = GROUP_NEC_DDB_NAMES;
-	const char *mach_baget_names[] = GROUP_BAGET_NAMES;
-	const char *mach_cosine_names[] = GROUP_COSINE_NAMES;
-	const char *mach_galileo_names[] = GROUP_GALILEO_NAMES;
-	const char *mach_momenco_names[] = GROUP_MOMENCO_NAMES;
- 	const char *mach_ite_names[] = GROUP_ITE_NAMES;
-	const char *mach_philips_names[] = GROUP_PHILIPS_NAMES;
- 	const char *mach_globespan_names[] = GROUP_GLOBESPAN_NAMES;
-	const char *mach_sibyte_names[] = GROUP_SIBYTE_NAMES;
-	const char *mach_toshiba_names[] = GROUP_TOSHIBA_NAMES;
-	const char *mach_alchemy_names[] = GROUP_ALCHEMY_NAMES;
-	const char **mach_group_to_name[] = { mach_unknown_names,
-		mach_jazz_names, mach_dec_names, mach_arc_names,
-		mach_sni_rm_names, mach_acn_names, mach_sgi_names,
-		mach_cobalt_names, mach_nec_ddb_names, mach_baget_names,
-		mach_cosine_names, mach_galileo_names, mach_momenco_names, 
-		mach_ite_names, mach_philips_names, mach_globespan_names,
-		mach_sibyte_names, mach_toshiba_names, mach_alchemy_names};
-	unsigned int version = read_32bit_cp0_register(CP0_PRID);
-	int len;
 
-	len = sprintf(buffer, "cpu\t\t\t: MIPS\n");
-	len += sprintf(buffer + len, "cpu model\t\t: %s V%d.%d\n",
-	               cpu_name[mips_cpu.cputype <= CPU_LAST ?
-	                        mips_cpu.cputype : CPU_UNKNOWN],
-	               (version >> 4) & 0x0f, version & 0x0f);
-	len += sprintf(buffer + len, "system type\t\t: %s %s\n",
-		       mach_group_names[mips_machgroup],
-		       mach_group_to_name[mips_machgroup][mips_machtype]);
-	len += sprintf(buffer + len, "BogoMIPS\t\t: %lu.%02lu\n",
-		       loops_per_jiffy/(500000/HZ),
-		       (loops_per_jiffy/(5000/HZ)) % 100);
+#ifdef CONFIG_SMP
+	if (!CPUMASK_TSTB(cpu_online_map, n))
+		return 0;
+#endif
 
-#if defined (__MIPSEB__)
-	len += sprintf(buffer + len, "byteorder\t\t: big endian\n");
-#endif
-#if defined (__MIPSEL__)
-	len += sprintf(buffer + len, "byteorder\t\t: little endian\n");
-#endif
-	len += sprintf(buffer + len, "unaligned accesses\t: %lu\n",
-		       unaligned_instructions);
-	len += sprintf(buffer + len, "wait instruction\t: %s\n",
-	               cpu_wait ? "yes" : "no");
-	len += sprintf(buffer + len, "microsecond timers\t: %s\n",
-	               (mips_cpu.options & MIPS_CPU_COUNTER) ? "yes" : "no");
-	len += sprintf(buffer + len, "extra interrupt vector\t: %s\n",
-	               (mips_cpu.options & MIPS_CPU_DIVEC) ? "yes" : "no");
-	len += sprintf(buffer + len, "hardware watchpoint\t: %s\n",
-	               watch_available ? "yes" : "no");
+	/*
+	 * For the first processor also print the system type
+	 */
+	if (n == 0)
+		seq_printf(m, "system type\t\t: %s\n", get_system_type());
+
+	seq_printf(m, "processor\t\t: %ld\n", n);
+	sprintf(fmt, "cpu model\t\t: %%s V%%d.%%d%s\n",
+	        cpu_has_fpu ? "  FPU V%d.%d" : "");
+	seq_printf(m, fmt, cpu_name[current_cpu_data.cputype <= CPU_LAST ?
+	                            current_cpu_data.cputype : CPU_UNKNOWN],
+	                           (version >> 4) & 0x0f, version & 0x0f,
+	                           (fp_vers >> 4) & 0x0f, fp_vers & 0x0f);
+	seq_printf(m, "BogoMIPS\t\t: %lu.%02lu\n",
+	              loops_per_jiffy / (500000/HZ),
+	              (loops_per_jiffy / (5000/HZ)) % 100);
+	seq_printf(m, "wait instruction\t: %s\n", cpu_wait ? "yes" : "no");
+	seq_printf(m, "microsecond timers\t: %s\n",
+	              cpu_has_counter ? "yes" : "no");
+	seq_printf(m, "tlb_entries\t\t: %d\n", current_cpu_data.tlbsize);
+	seq_printf(m, "extra interrupt vector\t: %s\n",
+	              cpu_has_divec ? "yes" : "no");
+	seq_printf(m, "hardware watchpoint\t: %s\n",
+	              cpu_has_watch ? "yes" : "no");
 
 	sprintf(fmt, "VCE%%c exceptions\t\t: %s\n",
-	        (mips_cpu.options & MIPS_CPU_VCE) ? "%d" : "not available");
-	len += sprintf(buffer + len, fmt, 'D', vced_count);
-	len += sprintf(buffer + len, fmt, 'I', vcei_count);
+	        cpu_has_vce ? "%d" : "not available");
+	seq_printf(m, fmt, 'D', vced_count);
+	seq_printf(m, fmt, 'I', vcei_count);
 
-#ifndef CONFIG_CPU_HAS_LLSC
-	len += sprintf(buffer + len, "ll emulations\t\t: %lu\n",
-		       ll_ops);
-	len += sprintf(buffer + len, "sc emulations\t\t: %lu\n",
-		       sc_ops);
-#endif
-	return len;
+	return 0;
 }
 
-void init_irq_proc(void)
+static void *c_start(struct seq_file *m, loff_t *pos)
 {
-	/* Nothing, for now.  */
+	unsigned long i = *pos;
+
+	return i < NR_CPUS ? (void *) (i + 1) : NULL;
 }
+
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return c_start(m, pos);
+}
+
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	.start	= c_start,
+	.next	= c_next,
+	.stop	= c_stop,
+	.show	= show_cpuinfo,
+};

@@ -537,16 +537,20 @@ static int pl2303_tiocmget (struct usb_serial_port *port, struct file *file)
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned long flags;
 	unsigned int mcr;
+	unsigned int status;
 	unsigned int result;
 
 	dbg("%s (%d)", __FUNCTION__, port->number);
 
 	spin_lock_irqsave (&priv->lock, flags);
 	mcr = priv->line_control;
+	status = priv->line_status;
 	spin_unlock_irqrestore (&priv->lock, flags);
 
 	result = ((mcr & CONTROL_DTR)		? TIOCM_DTR : 0)
-		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0);
+		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0)
+		  | ((status & UART_CTS)	? TIOCM_CTS : 0)
+		  | ((status & UART_DSR)	? TIOCM_DSR : 0);
 
 	dbg("%s - result = %x", __FUNCTION__, result);
 

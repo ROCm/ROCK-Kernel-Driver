@@ -1,16 +1,40 @@
+/*
+ * kgdb io functions for DDB5477.  We use the second serial port (upper one).
+ *
+ * Copyright (C) 2001 MontaVista Software Inc.
+ * Author: jsun@mvista.com or jsun@junsun.net
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ *
+ */
 
-#include <linux/config.h>
+/* ======================= CONFIG ======================== */
 
-#if (defined(CONFIG_DDB5477) && defined(CONFIG_REMOTE_DEBUG))
+/* [jsun] we use the second serial port for kdb */
+#define         BASE                    0xbfa04240
+#define         MAX_BAUD                115200
 
-/* --- CONFIG --- */
+/* distance in bytes between two serial registers */
+#define         REG_OFFSET              8
 
-/* we need uint32 uint8 */
-/* #include "types.h" */
+/*
+ * 0 - kgdb does serial init
+ * 1 - kgdb skip serial init
+ */
+static int remoteDebugInitialized = 0;
+
+/*
+ * the default baud rate *if* kgdb does serial init
+ */
+#define		BAUD_DEFAULT		UART16550_BAUD_38400
+
+/* ======================= END OF CONFIG ======================== */
+
 typedef unsigned char uint8;
 typedef unsigned int uint32;
-
-/* --- END OF CONFIG --- */
 
 #define         UART16550_BAUD_2400             2400
 #define         UART16550_BAUD_4800             4800
@@ -34,21 +58,10 @@ typedef unsigned int uint32;
 #define         UART16550_STOP_1BIT             0x0
 #define         UART16550_STOP_2BIT             0x4
 
-/* ----------------------------------------------------- */
-
-/* === CONFIG === */
-
-/* [jsun] we use the second serial port for kdb */
-#define         BASE                    0xbfa04240
-#define         MAX_BAUD                115200
-#define		REG_OFFSET		8
-
-/* === END OF CONFIG === */
-
 /* register offset */
-#define         OFS_RCV_BUFFER          (0*REG_OFFSET)
-#define         OFS_TRANS_HOLD          (0*REG_OFFSET)
-#define         OFS_SEND_BUFFER         (0*REG_OFFSET)
+#define         OFS_RCV_BUFFER          0
+#define         OFS_TRANS_HOLD          0
+#define         OFS_SEND_BUFFER         0
 #define         OFS_INTR_ENABLE         (1*REG_OFFSET)
 #define         OFS_INTR_ID             (2*REG_OFFSET)
 #define         OFS_DATA_FORMAT         (3*REG_OFFSET)
@@ -70,73 +83,54 @@ typedef unsigned int uint32;
 
 void debugInit(uint32 baud, uint8 data, uint8 parity, uint8 stop)
 {
-	/* disable interrupts */
-	UART16550_WRITE(OFS_INTR_ENABLE, 0);
+        /* disable interrupts */
+        UART16550_WRITE(OFS_INTR_ENABLE, 0);
 
-	/* set up buad rate */
-	{
-		uint32 divisor;
+        /* set up buad rate */
+        {
+                uint32 divisor;
 
-		/* set DIAB bit */
-		UART16550_WRITE(OFS_LINE_CONTROL, 0x80);
+                /* set DIAB bit */
+                UART16550_WRITE(OFS_LINE_CONTROL, 0x80);
 
-		/* set divisor */
-		divisor = MAX_BAUD / baud;
-		UART16550_WRITE(OFS_DIVISOR_LSB, divisor & 0xff);
-		UART16550_WRITE(OFS_DIVISOR_MSB, (divisor & 0xff00) >> 8);
+                /* set divisor */
+                divisor = MAX_BAUD / baud;
+                UART16550_WRITE(OFS_DIVISOR_LSB, divisor & 0xff);
+                UART16550_WRITE(OFS_DIVISOR_MSB, (divisor & 0xff00) >> 8);
 
-		/* clear DIAB bit */
-		UART16550_WRITE(OFS_LINE_CONTROL, 0x0);
-	}
+                /* clear DIAB bit */
+                UART16550_WRITE(OFS_LINE_CONTROL, 0x0);
+        }
 
-	/* set data format */
-	UART16550_WRITE(OFS_DATA_FORMAT, data | parity | stop);
+        /* set data format */
+        UART16550_WRITE(OFS_DATA_FORMAT, data | parity | stop);
 }
 
-static int remoteDebugInitialized = 0;
-
-int debug_state = -1;
 
 uint8 getDebugChar(void)
 {
-	uint8 c;
-	if (!remoteDebugInitialized) {
-		remoteDebugInitialized = 1;
-		debugInit(UART16550_BAUD_38400,
-			  UART16550_DATA_8BIT,
-			  UART16550_PARITY_NONE, UART16550_STOP_1BIT);
-	}
+        if (!remoteDebugInitialized) {
+                remoteDebugInitialized = 1;
+                debugInit(BAUD_DEFAULT,
+                          UART16550_DATA_8BIT,
+                          UART16550_PARITY_NONE, UART16550_STOP_1BIT);
+        }
 
-	while ((UART16550_READ(OFS_LINE_STATUS) & 0x1) == 0);
-	c= UART16550_READ(OFS_RCV_BUFFER);
-/*
-	if (state != 1) {
-		state = 1;
-		debug_out("\ngetDebugChar: ", 15);
-	}
-	debug_out(&c, 1);
-*/
-	return c;
+        while ((UART16550_READ(OFS_LINE_STATUS) & 0x1) == 0);
+        return UART16550_READ(OFS_RCV_BUFFER);
 }
 
 
 int putDebugChar(uint8 byte)
 {
-	if (!remoteDebugInitialized) {
-		remoteDebugInitialized = 1;
-		debugInit(UART16550_BAUD_9600,
-			  UART16550_DATA_8BIT,
-			  UART16550_PARITY_NONE, UART16550_STOP_1BIT);
-	}
+        if (!remoteDebugInitialized) {
+                remoteDebugInitialized = 1;
+                debugInit(BAUD_DEFAULT,
+                          UART16550_DATA_8BIT,
+                          UART16550_PARITY_NONE, UART16550_STOP_1BIT);
+        }
 
-	while ((UART16550_READ(OFS_LINE_STATUS) & 0x20) == 0);
-	UART16550_WRITE(OFS_SEND_BUFFER, byte);
-	if (debug_state != 2) {
-		debug_state = 2;
-		// debug_out("\nputDebugChar: ", 15);
-	}
-	// debug_out(&byte, 1);
-	return 1;
+        while ((UART16550_READ(OFS_LINE_STATUS) & 0x20) == 0);
+        UART16550_WRITE(OFS_SEND_BUFFER, byte);
+        return 1;
 }
-
-#endif

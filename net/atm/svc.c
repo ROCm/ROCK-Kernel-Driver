@@ -88,18 +88,21 @@ static void svc_disconnect(struct atm_vcc *vcc)
 
 static int svc_release(struct socket *sock)
 {
+	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 
-	if (!sock->sk) return 0;
-	vcc = ATM_SD(sock);
-	DPRINTK("svc_release %p\n",vcc);
-	clear_bit(ATM_VF_READY,&vcc->flags);
-	atm_release_vcc_sk(sock->sk,0);
-	svc_disconnect(vcc);
-	    /* VCC pointer is used as a reference, so we must not free it
-	       (thereby subjecting it to re-use) before all pending connections
-	        are closed */
-	free_atm_vcc_sk(sock->sk);
+	if (sk)  {
+		vcc = ATM_SD(sock);
+		DPRINTK("svc_release %p\n", vcc);
+		clear_bit(ATM_VF_READY, &vcc->flags);
+		/* VCC pointer is used as a reference, so we must not free it
+		   (thereby subjecting it to re-use) before all pending connections
+	           are closed */
+		sock_hold(sk);
+		vcc_release(sock);
+		svc_disconnect(vcc);
+		sock_put(sk);
+	}
 	return 0;
 }
 
@@ -542,7 +545,7 @@ static int svc_create(struct socket *sock,int protocol)
 	int error;
 
 	sock->ops = &svc_proto_ops;
-	error = atm_create(sock,protocol,AF_ATMSVC);
+	error = vcc_create(sock, protocol, AF_ATMSVC);
 	if (error) return error;
 	ATM_SD(sock)->callback = svc_callback;
 	ATM_SD(sock)->local.sas_family = AF_ATMSVC;

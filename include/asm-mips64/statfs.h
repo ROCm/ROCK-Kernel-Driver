@@ -35,4 +35,20 @@ struct statfs {
 	long		f_spare[6];
 };
 
+struct statfs64 {			/* Same as struct statfs */
+	long		f_type;
+	long		f_bsize;
+	long		f_frsize;	/* Fragment size - unsupported */
+	long		f_blocks;
+	long		f_bfree;
+	long		f_files;
+	long		f_ffree;
+
+	/* Linux specials */
+	long	f_bavail;
+	__kernel_fsid_t	f_fsid;
+	long		f_namelen;
+	long		f_spare[6];
+};
+
 #endif /* _ASM_STATFS_H */

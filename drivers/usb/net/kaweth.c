@@ -56,6 +56,8 @@
 #include <linux/usb.h>
 #include <linux/types.h>
 #include <linux/ethtool.h>
+#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
@@ -215,8 +217,10 @@ struct kaweth_device
 	__u32 status;
 	int end;
 	int removed;
-	int suspend_lowmem;
+	int suspend_lowmem_rx;
+	int suspend_lowmem_ctrl;
 	int linkstate;
+	struct work_struct lowmem_work;
 
 	struct usb_device *dev;
 	struct net_device *net;
@@ -475,14 +479,29 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 /****************************************************************
 	int_callback
 *****************************************************************/
+
+static void kaweth_resubmit_int_urb(struct kaweth_device *kaweth, int mf)
+{
+	int status;
+
+	status = usb_submit_urb (kaweth->irq_urb, mf);
+	if (unlikely(status == -ENOMEM)) {
+		kaweth->suspend_lowmem_ctrl = 1;
+		schedule_delayed_work(&kaweth->lowmem_work, HZ/4);
+	} else {
+		kaweth->suspend_lowmem_ctrl = 0;
+	}
+
+	if (status)
+		err ("can't resubmit intr, %s-%s, status %d",
+				kaweth->dev->bus->bus_name,
+				kaweth->dev->devpath, status);
+}
+
 static void int_callback(struct urb *u, struct pt_regs *regs)
 {
 	struct kaweth_device *kaweth = u->context;
-	int act_state, status;
-
-	/* we abuse the interrupt urb for rebsubmitting under low memory saving a timer */
-	if (kaweth->suspend_lowmem)
-		kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
+	int act_state;
 
 	switch (u->status) {
 	case 0:			/* success */
@@ -506,12 +525,23 @@ static void int_callback(struct urb *u, struct pt_regs *regs)
 		kaweth->linkstate = act_state;
 	}
 resubmit:
-	status = usb_submit_urb (u, SLAB_ATOMIC);
-	if (status)
-		err ("can't resubmit intr, %s-%s, status %d",
-				kaweth->dev->bus->bus_name,
-				kaweth->dev->devpath, status);
+	kaweth_resubmit_int_urb(kaweth, GFP_ATOMIC);
 }
+
+static void kaweth_resubmit_tl(void *d)
+{
+	struct kaweth_device *kaweth = (struct kaweth_device *)d;
+
+	if (kaweth->status | KAWETH_STATUS_CLOSING)
+		return;
+
+	if (kaweth->suspend_lowmem_rx)
+		kaweth_resubmit_rx_urb(kaweth, GFP_NOIO);
+
+	if (kaweth->suspend_lowmem_ctrl)
+		kaweth_resubmit_int_urb(kaweth, GFP_NOIO);
+}
+
 
 /****************************************************************
  *     kaweth_resubmit_rx_urb
@@ -532,11 +562,13 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 	kaweth->rx_urb->transfer_dma = kaweth->rxbufferhandle;
 
 	if((result = usb_submit_urb(kaweth->rx_urb, mem_flags))) {
-		if (result == -ENOMEM)
-			kaweth->suspend_lowmem = 1;
+		if (result == -ENOMEM) {
+			kaweth->suspend_lowmem_rx = 1;
+			schedule_delayed_work(&kaweth->lowmem_work, HZ/4);
+		}
 		kaweth_err("resubmitting rx_urb %d failed", result);
 	} else {
-		kaweth->suspend_lowmem = 0;
+		kaweth->suspend_lowmem_rx = 0;
 	}
 
 	return result;
@@ -662,6 +694,13 @@ static int kaweth_close(struct net_device *net)
 
 	kaweth->status |= KAWETH_STATUS_CLOSING;
 
+	usb_unlink_urb(kaweth->irq_urb);
+	usb_unlink_urb(kaweth->rx_urb);
+
+	flush_scheduled_work();
+
+	/* a scheduled work may have resubmitted,
+	   we hit them again */
 	usb_unlink_urb(kaweth->irq_urb);
 	usb_unlink_urb(kaweth->rx_urb);
 
@@ -1075,9 +1114,14 @@ static int kaweth_probe(
 
 	memset(&kaweth->stats, 0, sizeof(kaweth->stats));
 
+	INIT_WORK(&kaweth->lowmem_work, kaweth_resubmit_tl, (void *)kaweth);
+
 	SET_MODULE_OWNER(netdev);
 
 	usb_set_intfdata(intf, kaweth);
+
+	if (dma_supported (&intf->dev, 0xffffffffffffffffULL))
+		kaweth->net->features |= NETIF_F_HIGHDMA;
 
 	if (register_netdev(netdev) != 0) {
 		kaweth_err("Error calling init_etherdev.");
@@ -1092,7 +1136,6 @@ static int kaweth_probe(
 
 err_intfdata:
 	usb_set_intfdata(intf, NULL);
-err_all:
 	usb_buffer_free(kaweth->dev, KAWETH_BUF_SIZE, (void *)kaweth->rx_buf, kaweth->rxbufferhandle);
 err_all_but_rxbuf:
 	usb_buffer_free(kaweth->dev, INTBUFFERSIZE, (void *)kaweth->intbuffer, kaweth->intbufferhandle);

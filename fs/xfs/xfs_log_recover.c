@@ -3413,6 +3413,45 @@ xlog_unpack_data(
 	xlog_unpack_data_checksum(rhead, dp, log);
 }
 
+STATIC int
+xlog_valid_rec_header(
+	xlog_t			*log,
+	xlog_rec_header_t	*rhead,
+	xfs_daddr_t		blkno)
+{
+	int			bblks;
+
+	if (unlikely(
+	    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
+			XLOG_HEADER_MAGIC_NUM))) {
+		XFS_ERROR_REPORT("xlog_valid_rec_header(1)",
+				XFS_ERRLEVEL_LOW, log->l_mp);
+		return XFS_ERROR(EFSCORRUPTED);
+	}
+	if (unlikely(
+	    (INT_ISZERO(rhead->h_version, ARCH_CONVERT) ||
+	    (INT_GET(rhead->h_version, ARCH_CONVERT) &
+			(~XLOG_VERSION_OKBITS)) != 0))) {
+		xlog_warn("XFS: %s: unrecognised log version (%d).",
+			__FUNCTION__, INT_GET(rhead->h_version, ARCH_CONVERT));
+		return XFS_ERROR(EIO);
+	}
+
+	/* LR body must have data or it wouldn't have been written */
+	bblks = INT_GET(rhead->h_len, ARCH_CONVERT);
+	if (unlikely( bblks <= 0 || bblks > INT_MAX )) {
+		XFS_ERROR_REPORT("xlog_valid_rec_header(2)",
+				XFS_ERRLEVEL_LOW, log->l_mp);
+		return XFS_ERROR(EFSCORRUPTED);
+	}
+	if (unlikely( blkno > log->l_logBBsize || blkno > INT_MAX )) {
+		XFS_ERROR_REPORT("xlog_valid_rec_header(3)",
+				XFS_ERRLEVEL_LOW, log->l_mp);
+		return XFS_ERROR(EFSCORRUPTED);
+	}
+	return 0;
+}
+
 /*
  * Read the log from tail to head and process the log records found.
  * Handle the two cases where the tail and head are in the same cycle
@@ -3437,6 +3476,8 @@ xlog_do_recovery_pass(
 	int			hblks, split_hblks, wrapped_hblks;
 	xlog_recover_t		*rhash[XLOG_RHASH_SIZE];
 
+	ASSERT(head_blk != tail_blk);
+
 	/*
 	 * Read the header of the tail block and get the iclog buffer size from
 	 * h_size.  Use this to tell how many sectors make up the log header.
@@ -3454,17 +3495,10 @@ xlog_do_recovery_pass(
 			goto bread_err1;
 		offset = xlog_align(log, tail_blk, 1, hbp);
 		rhead = (xlog_rec_header_t *)offset;
-		ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
-						XLOG_HEADER_MAGIC_NUM);
-		if ((INT_GET(rhead->h_version, ARCH_CONVERT) &
-				(~XLOG_VERSION_OKBITS)) != 0) {
-			xlog_warn(
-	"XFS: xlog_do_recovery_pass: unrecognised log version number.");
-			error = XFS_ERROR(EIO);
+		error = xlog_valid_rec_header(log, rhead, tail_blk);
+		if (error)
 			goto bread_err1;
-		}
 		h_size = INT_GET(rhead->h_size, ARCH_CONVERT);
-
 		if ((INT_GET(rhead->h_version, ARCH_CONVERT)
 				& XLOG_VERSION_2) &&
 		    (h_size > XLOG_HEADER_CYCLE_SIZE)) {
@@ -3498,47 +3532,21 @@ xlog_do_recovery_pass(
 				goto bread_err2;
 			offset = xlog_align(log, blk_no, hblks, hbp);
 			rhead = (xlog_rec_header_t *)offset;
-			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
-				XLOG_HEADER_MAGIC_NUM);
-			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
-				INT_MAX));
+			error = xlog_valid_rec_header(log, rhead, blk_no);
+			if (error)
+				goto bread_err2;
+
 			/* blocks in data section */
 			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-
-			if (unlikely(
-			    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
-					XLOG_HEADER_MAGIC_NUM) ||
-			    (BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) >
-					INT_MAX)) ||
-			    (bblks <= 0) ||
-			    (blk_no > log->l_logBBsize))) {
-				XFS_ERROR_REPORT("xlog_do_recovery_pass(1)",
-						XFS_ERRLEVEL_LOW, log->l_mp);
-				error = EFSCORRUPTED;
+			error = xlog_bread(log, blk_no + hblks, bblks, dbp);
+			if (error)
 				goto bread_err2;
-			}
-
-			if ((INT_GET(rhead->h_version, ARCH_CONVERT) &
-					(~XLOG_VERSION_OKBITS)) != 0) {
-				xlog_warn(
-		"XFS: xlog_do_recovery_pass: unrecognised log version number.");
-				error = XFS_ERROR(EIO);
-				goto bread_err2;
-			}
-			/* blocks in data section */
-			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-			if (bblks > 0) {
-				if ((error = xlog_bread(log, blk_no + hblks,
-							bblks, dbp)))
-					goto bread_err2;
-				offset = xlog_align(log, blk_no + hblks,
-							bblks, dbp);
-				xlog_unpack_data(rhead, offset, log);
-				if ((error = xlog_recover_process_data(log,
+			offset = xlog_align(log, blk_no + hblks, bblks, dbp);
+			xlog_unpack_data(rhead, offset, log);
+			if ((error = xlog_recover_process_data(log,
 						rhash, rhead, offset, pass)))
-					goto bread_err2;
-			}
-			blk_no += (bblks+hblks);
+				goto bread_err2;
+			blk_no += bblks + hblks;
 		}
 	} else {
 		/*
@@ -3551,17 +3559,17 @@ xlog_do_recovery_pass(
 			/*
 			 * Check for header wrapping around physical end-of-log
 			 */
+			offset = NULL;
+			split_hblks = 0;
 			wrapped_hblks = 0;
-			if (blk_no+hblks <= log->l_logBBsize) {
+			if (blk_no + hblks <= log->l_logBBsize) {
 				/* Read header in one read */
-				if ((error = xlog_bread(log, blk_no,
-							hblks, hbp)))
+				error = xlog_bread(log, blk_no, hblks, hbp);
+				if (error)
 					goto bread_err2;
 				offset = xlog_align(log, blk_no, hblks, hbp);
 			} else {
 				/* This LR is split across physical log end */
-				offset = NULL;
-				split_hblks = 0;
 				if (blk_no != log->l_logBBsize) {
 					/* some data before physical log end */
 					ASSERT(blk_no <= INT_MAX);
@@ -3590,8 +3598,8 @@ xlog_do_recovery_pass(
 						bufaddr + BBTOB(split_hblks),
 						BBTOB(hblks - split_hblks));
 				wrapped_hblks = hblks - split_hblks;
-				if ((error = xlog_bread(log, 0,
-							wrapped_hblks, hbp)))
+				error = xlog_bread(log, 0, wrapped_hblks, hbp);
+				if (error)
 					goto bread_err2;
 				XFS_BUF_SET_PTR(hbp, bufaddr, hblks);
 				if (!offset)
@@ -3599,33 +3607,18 @@ xlog_do_recovery_pass(
 							wrapped_hblks, hbp);
 			}
 			rhead = (xlog_rec_header_t *)offset;
-			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
-				XLOG_HEADER_MAGIC_NUM);
-			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
-				INT_MAX));
-			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-
-			/* LR body must have data or it wouldn't have been
-			 * written */
-			ASSERT(bblks > 0);
-			blk_no += hblks;	/* successfully read header */
-
-			if (unlikely(
-			    (INT_GET(rhead->h_magicno, ARCH_CONVERT) !=
-					XLOG_HEADER_MAGIC_NUM) ||
-			    (BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) >
-					INT_MAX)) ||
-			    (bblks <= 0))) {
-				XFS_ERROR_REPORT("xlog_do_recovery_pass(2)",
-					     XFS_ERRLEVEL_LOW, log->l_mp);
-				error = EFSCORRUPTED;
+			error = xlog_valid_rec_header(log, rhead,
+						split_hblks ? blk_no : 0);
+			if (error)
 				goto bread_err2;
-			}
+
+			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
+			blk_no += hblks;
 
 			/* Read in data for log record */
-			if (blk_no+bblks <= log->l_logBBsize) {
-				if ((error = xlog_bread(log, blk_no,
-							bblks, dbp)))
+			if (blk_no + bblks <= log->l_logBBsize) {
+				error = xlog_bread(log, blk_no, bblks, dbp);
+				if (error)
 					goto bread_err2;
 				offset = xlog_align(log, blk_no, bblks, dbp);
 			} else {
@@ -3674,7 +3667,7 @@ xlog_do_recovery_pass(
 			}
 			xlog_unpack_data(rhead, offset, log);
 			if ((error = xlog_recover_process_data(log, rhash,
-						  rhead, offset, pass)))
+							rhead, offset, pass)))
 				goto bread_err2;
 			blk_no += bblks;
 		}
@@ -3688,20 +3681,18 @@ xlog_do_recovery_pass(
 				goto bread_err2;
 			offset = xlog_align(log, blk_no, hblks, hbp);
 			rhead = (xlog_rec_header_t *)offset;
-			ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) ==
-				XLOG_HEADER_MAGIC_NUM);
-			ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <=
-				INT_MAX));
+			error = xlog_valid_rec_header(log, rhead, blk_no);
+			if (error)
+				goto bread_err2;
 			bblks = (int)BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
-			ASSERT(bblks > 0);
 			if ((error = xlog_bread(log, blk_no+hblks, bblks, dbp)))
 				goto bread_err2;
 			offset = xlog_align(log, blk_no+hblks, bblks, dbp);
 			xlog_unpack_data(rhead, offset, log);
 			if ((error = xlog_recover_process_data(log, rhash,
-							  rhead, offset, pass)))
+							rhead, offset, pass)))
 				goto bread_err2;
-			blk_no += (bblks+hblks);
+			blk_no += bblks + hblks;
 		}
 	}
 
@@ -3732,9 +3723,8 @@ xlog_do_log_recovery(
 	xfs_daddr_t	tail_blk)
 {
 	int		error;
-#ifdef DEBUG
-	int		i;
-#endif
+
+	ASSERT(head_blk != tail_blk);
 
 	/*
 	 * First do a pass to find all of the cancelled buf log items.
@@ -3758,11 +3748,15 @@ xlog_do_log_recovery(
 	 */
 	error = xlog_do_recovery_pass(log, head_blk, tail_blk,
 				      XLOG_RECOVER_PASS2);
-#ifdef	DEBUG
-	for (i = 0; i < XLOG_BC_TABLE_SIZE; i++) {
-		ASSERT(log->l_buf_cancel_table[i] == NULL);
+#ifdef DEBUG
+	{
+		int	i;
+
+		for (i = 0; i < XLOG_BC_TABLE_SIZE; i++)
+			ASSERT(log->l_buf_cancel_table[i] == NULL);
 	}
 #endif	/* DEBUG */
+
 	kmem_free(log->l_buf_cancel_table,
 		  XLOG_BC_TABLE_SIZE * sizeof(xfs_buf_cancel_t*));
 	log->l_buf_cancel_table = NULL;

@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/circ_buf.h>
 #include <linux/serial.h>
+#include <linux/sysrq.h>
 #include <linux/console.h>
 #include <linux/spinlock.h>
 #ifdef CONFIG_SERIO
@@ -41,6 +42,10 @@
 #include <asm/fhc.h>
 #endif
 #include <asm/sbus.h>
+
+#if defined(CONFIG_SERIAL_SUNZILOG_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
 
 #include <linux/serial_core.h>
 
@@ -1331,6 +1336,7 @@ static void sunzilog_serio_close(struct serio *serio)
 
 #endif /* CONFIG_SERIO */
 
+#ifdef CONFIG_SERIAL_SUNZILOG_CONSOLE
 static void
 sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 {
@@ -1400,6 +1406,7 @@ static struct console sunzilog_console = {
 	.index	=	-1,
 	.data   =	&sunzilog_reg,
 };
+#define SUNZILOG_CONSOLE	(&sunzilog_console)
 
 static int __init sunzilog_console_init(void)
 {
@@ -1422,6 +1429,10 @@ static int __init sunzilog_console_init(void)
 	register_console(&sunzilog_console);
 	return 0;
 }
+#else
+#define SUNZILOG_CONSOLE	(NULL)
+#define sunzilog_console_init() do { } while (0)
+#endif
 
 /*
  * We scan the PROM tree recursively. This is the most reliable way
@@ -1639,7 +1650,7 @@ static int __init sunzilog_ports_init(void)
 	 * in the system.
 	 */
 	sunzilog_reg.nr = NUM_CHANNELS;
-	sunzilog_reg.cons = &sunzilog_console;
+	sunzilog_reg.cons = SUNZILOG_CONSOLE;
 
 	sunzilog_reg.minor = sunserial_current_minor;
 	sunserial_current_minor += NUM_CHANNELS;

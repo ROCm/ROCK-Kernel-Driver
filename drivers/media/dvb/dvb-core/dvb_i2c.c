@@ -19,16 +19,15 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/module.h>
-#include <linux/version.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#endif
+#include <asm/semaphore.h>
 
 #include "dvb_i2c.h"
+#include "dvb_functions.h"
+
 
 struct dvb_i2c_device {
 	struct list_head list_head;
@@ -42,8 +41,7 @@ LIST_HEAD(dvb_i2c_devicelist);
 
 DECLARE_MUTEX(dvb_i2c_mutex);
 
-static
-int register_i2c_client (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
+static int register_i2c_client (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
 	struct dvb_i2c_device *client;
 
@@ -61,8 +59,7 @@ int register_i2c_client (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 }
 
 
-static
-void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
+static void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
 	if (dev->owner) {
 		if (!try_module_get(dev->owner))
@@ -78,8 +75,7 @@ void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 }
 
 
-static
-void detach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
+static void detach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
 	dev->detach (i2c);
 
@@ -88,8 +84,7 @@ void detach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 }
 
 
-static
-void unregister_i2c_client_from_bus (struct dvb_i2c_device *dev,
+static void unregister_i2c_client_from_bus (struct dvb_i2c_device *dev,
 				     struct dvb_i2c_bus *i2c)
 {
 	struct list_head *entry, *n;
@@ -107,8 +102,7 @@ void unregister_i2c_client_from_bus (struct dvb_i2c_device *dev,
 }
 
 
-static
-void unregister_i2c_client_from_all_busses (struct dvb_i2c_device *dev)
+static void unregister_i2c_client_from_all_busses (struct dvb_i2c_device *dev)
 {
 	struct list_head *entry, *n;
 
@@ -122,8 +116,7 @@ void unregister_i2c_client_from_all_busses (struct dvb_i2c_device *dev)
 }
 
 
-static
-void unregister_all_clients_from_bus (struct dvb_i2c_bus *i2c)
+static void unregister_all_clients_from_bus (struct dvb_i2c_bus *i2c)
 {
 	struct list_head *entry, *n;
 
@@ -137,8 +130,7 @@ void unregister_all_clients_from_bus (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void probe_device_on_all_busses (struct dvb_i2c_device *dev)
+static void probe_device_on_all_busses (struct dvb_i2c_device *dev)
 {
 	struct list_head *entry;
 
@@ -152,8 +144,7 @@ void probe_device_on_all_busses (struct dvb_i2c_device *dev)
 }
 
 
-static
-void probe_devices_on_bus (struct dvb_i2c_bus *i2c)
+static void probe_devices_on_bus (struct dvb_i2c_bus *i2c)
 {
 	struct list_head *entry;
 
@@ -167,8 +158,7 @@ void probe_devices_on_bus (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-struct dvb_i2c_bus* dvb_find_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
+static struct dvb_i2c_bus* dvb_find_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 		                                   const struct i2c_msg msgs[],
 						   int num),
 				      struct dvb_adapter *adapter,

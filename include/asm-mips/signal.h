@@ -1,5 +1,4 @@
-/* $Id: signal.h,v 1.6 1999/08/18 23:37:49 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -10,6 +9,7 @@
 #ifndef _ASM_SIGNAL_H
 #define _ASM_SIGNAL_H
 
+#include <linux/config.h>
 #include <linux/types.h>
 
 #define _NSIG		128
@@ -89,7 +89,7 @@ typedef unsigned long old_sigset_t;		/* at least 32 bits */
 
 #define SA_RESTORER	0x04000000
 
-/* 
+/*
  * sigaltstack controls
  */
 #define SS_ONSTACK     1
@@ -131,12 +131,13 @@ struct sigaction {
 	unsigned int	sa_flags;
 	__sighandler_t	sa_handler;
 	sigset_t	sa_mask;
-	void		(*sa_restorer)(void);
-	int		sa_resv[1];	/* reserved */
 };
 
 struct k_sigaction {
 	struct sigaction sa;
+#ifdef CONFIG_BINFMT_IRIX
+	void		(*sa_restorer)(void);
+#endif
 };
 
 /* IRIX compatible stack_t  */
@@ -168,9 +169,10 @@ typedef struct sigaltstack {
 #define BRK_NORLD	10	/* No rld found - not used by Linux/MIPS */
 #define _BRK_THREADBP	11	/* For threads, user bp (used by debuggers) */
 #define BRK_MULOVF	1023	/* Multiply overflow */
+#define BRK_BUG		512	/* Used by BUG() */
 
 #define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
-#endif /* defined (__KERNEL__) */
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_SIGNAL_H */

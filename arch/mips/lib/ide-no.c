@@ -1,5 +1,4 @@
-/* $Id: ide-no.c,v 1.2 1998/06/30 00:21:54 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -13,7 +12,6 @@
 #include <linux/kernel.h>
 #include <linux/ide.h>
 #include <asm/hdreg.h>
-#include <asm/ptrace.h>
 
 static int no_ide_default_irq(ide_ioreg_t base)
 {

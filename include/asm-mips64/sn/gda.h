@@ -9,7 +9,7 @@
  *
  * gda.h -- Contains the data structure for the global data area,
  * 	The GDA contains information communicated between the
- *	PROM, SYMMON, and the kernel. 
+ *	PROM, SYMMON, and the kernel.
  */
 #ifndef _ASM_SN_GDA_H
 #define _ASM_SN_GDA_H
@@ -23,9 +23,9 @@
  *
  * Version #	| Change
  * -------------+-------------------------------------------------------
- * 	1	| Initial SN0 version 
+ * 	1	| Initial SN0 version
  * 	2	| Prom sets g_partid field to the partition number. 0 IS
- *		| a valid partition #. 
+ *		| a valid partition #.
  */
 
 #define GDA_VERSION	2	/* Current GDA version # */
@@ -41,7 +41,7 @@
 #define G_PARTIDOFF	40
 #define G_TABLEOFF	128
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef struct gda {
 	u32	g_magic;	/* GDA magic number */
@@ -67,10 +67,10 @@ typedef struct gda {
 
 #define GDA ((gda_t*) GDA_ADDR(get_nasid()))
 
-#endif /* __LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 /*
  * Define:	PART_GDA_VERSION
- * Purpose:	Define the minimum version of the GDA required, lower 
+ * Purpose:	Define the minimum version of the GDA required, lower
  *		revisions assume GDA is NOT set up, and read partition
  *		information from the board info.
  */

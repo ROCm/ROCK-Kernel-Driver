@@ -91,7 +91,7 @@
  * widget target flush register are widget dependent thus will not be
  * defined here
  */
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef u32 widgetreg_t;
 
 /* widget configuration registers */
@@ -162,6 +162,6 @@ typedef struct xwidget_hwid_s {
 	((hwid2)->mfg_num == XWIDGET_MFG_NUM_NONE) || \
 	((hwid1)->mfg_num == (hwid2)->mfg_num)))
 
-#endif				/* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_XTALK_XWIDGET_H */

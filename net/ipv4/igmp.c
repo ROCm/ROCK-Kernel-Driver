@@ -2011,7 +2011,7 @@ int ip_mc_sf_allow(struct sock *sk, u32 loc_addr, u32 rmt_addr, int dif)
 			break;
 	}
 	if (!pmc)
-		return 0;
+		return 1;
 	psl = pmc->sflist;
 	if (!psl)
 		return pmc->sfmode == MCAST_EXCLUDE;
@@ -2020,11 +2020,11 @@ int ip_mc_sf_allow(struct sock *sk, u32 loc_addr, u32 rmt_addr, int dif)
 		if (psl->sl_addr[i] == rmt_addr)
 			break;
 	}
-	if (pmc->sfmode == MCAST_INCLUDE && i < psl->sl_count)
-		return 1;
-	if (pmc->sfmode == MCAST_EXCLUDE && i >= psl->sl_count)
-		return 1;
-	return 0;
+	if (pmc->sfmode == MCAST_INCLUDE && i >= psl->sl_count)
+		return 0;
+	if (pmc->sfmode == MCAST_EXCLUDE && i < psl->sl_count)
+		return 0;
+	return 1;
 }
 
 /*

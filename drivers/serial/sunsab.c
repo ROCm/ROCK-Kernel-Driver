@@ -28,6 +28,7 @@
 #include <linux/ioport.h>
 #include <linux/circ_buf.h>
 #include <linux/serial.h>
+#include <linux/sysrq.h>
 #include <linux/console.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
@@ -37,6 +38,10 @@
 #include <asm/irq.h>
 #include <asm/oplib.h>
 #include <asm/ebus.h>
+
+#if defined(CONFIG_SERIAL_SUNZILOG_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
 
 #include <linux/serial_core.h>
 
@@ -838,6 +843,8 @@ static struct uart_driver sunsab_reg = {
 static struct uart_sunsab_port *sunsab_ports;
 static int num_channels;
 
+#ifdef CONFIG_SERIAL_SUNSAB_CONSOLE
+
 static __inline__ void sunsab_console_putchar(struct uart_sunsab_port *up, char c)
 {
 	unsigned long flags;
@@ -929,6 +936,7 @@ static struct console sunsab_console = {
 	.index	=	-1,
 	.data	=	&sunsab_reg,
 };
+#define SUNSAB_CONSOLE	(&sunsab_console)
 
 static void __init sunsab_console_init(void)
 {
@@ -949,6 +957,10 @@ static void __init sunsab_console_init(void)
 	sunsab_console.index = i;
 	register_console(&sunsab_console);
 }
+#else
+#define SUNSAB_CONSOLE		(NULL)
+#define sunsab_console_init()	do { } while (0)
+#endif
 
 static void __init for_each_sab_edev(void (*callback)(struct linux_ebus_device *, void *), void *arg)
 {
@@ -1091,7 +1103,7 @@ static int __init sunsab_init(void)
 
 	sunsab_reg.minor = sunserial_current_minor;
 	sunsab_reg.nr = num_channels;
-	sunsab_reg.cons = &sunsab_console;
+	sunsab_reg.cons = SUNSAB_CONSOLE;
 
 	ret = uart_register_driver(&sunsab_reg);
 	if (ret < 0) {

@@ -32,17 +32,6 @@
 #include "ide_modes.h"
 #include "sc1200.h"
 
-#define DISPLAY_SC1200_TIMINGS
-
-#if defined(DISPLAY_SC1200_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static int sc1200_get_info(char *, char **, off_t, int);
-extern int (*sc1200_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
-static u8 sc1200_proc = 0;
-
 #define SC1200_REV_A	0x00
 #define SC1200_REV_B1	0x01
 #define SC1200_REV_B3	0x02
@@ -80,6 +69,17 @@ static unsigned short sc1200_get_pci_clock (void)
 	}
 	return pci_clock;
 }
+
+#define DISPLAY_SC1200_TIMINGS
+
+#if defined(DISPLAY_SC1200_TIMINGS) && defined(CONFIG_PROC_FS)
+#include <linux/stat.h>
+#include <linux/proc_fs.h>
+
+static int sc1200_get_info(char *, char **, off_t, int);
+extern int (*sc1200_display_info)(char *, char **, off_t, int); /* ide-proc.c */
+extern char *ide_media_verbose(ide_drive_t *);
+static u8 sc1200_proc = 0;
 
 static struct pci_dev *bmide_dev;
 

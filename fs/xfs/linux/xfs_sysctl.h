@@ -42,7 +42,6 @@
 #define XFS_PARAM	(sizeof(struct xfs_param) / sizeof(ulong))
 
 typedef struct xfs_param {
-	ulong	stats_clear;	/* Reset all XFS statistics to zero.     */
 	ulong	restrict_chown;	/* Root/non-root can give away files.    */
 	ulong	sgid_inherit;	/* Inherit ISGID bit if process' GID is  */
 				/*  not a member of the parent dir GID.  */
@@ -50,6 +49,7 @@ typedef struct xfs_param {
 	ulong	panic_mask;	/* bitmask to specify panics on errors.  */
 	ulong	error_level;	/* Degree of reporting for internal probs*/
 	ulong	sync_interval;	/* time between sync calls		 */
+	ulong	stats_clear;	/* Reset all XFS statistics to zero.     */
 } xfs_param_t;
 
 /*
@@ -68,13 +68,13 @@ typedef struct xfs_param {
  */
 
 enum {
-	XFS_STATS_CLEAR = 1,
-	XFS_RESTRICT_CHOWN = 2,
-	XFS_SGID_INHERIT = 3,
-	XFS_SYMLINK_MODE = 4,
-	XFS_PANIC_MASK = 5,
-	XFS_ERRLEVEL = 6,
-	XFS_SYNC_INTERVAL = 7,
+	XFS_RESTRICT_CHOWN = 1,
+	XFS_SGID_INHERIT = 2,
+	XFS_SYMLINK_MODE = 3,
+	XFS_PANIC_MASK = 4,
+	XFS_ERRLEVEL = 5,
+	XFS_SYNC_INTERVAL = 6,
+	XFS_STATS_CLEAR = 7,
 };
 
 extern xfs_param_t	xfs_params;

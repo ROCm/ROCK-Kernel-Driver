@@ -425,7 +425,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 	end = offset + (ntohs(skb->nh.ipv6h->payload_len) -
 			((u8 *) (fhdr + 1) - (u8 *) (skb->nh.ipv6h + 1)));
 
-	if ((unsigned int)end >= 65536) {
+	if ((unsigned int)end > IPV6_MAXPLEN) {
  		icmpv6_param_prob(skb,ICMPV6_HDR_FIELD, (u8*)&fhdr->frag_off - skb->nh.raw);
  		return;
 	}
@@ -597,7 +597,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 
 	/* Unfragmented part is taken from the first segment. */
 	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len - sizeof(struct frag_hdr);
-	if (payload_len > 65535)
+	if (payload_len > IPV6_MAXPLEN)
 		goto out_oversize;
 
 	/* Head of list must not be cloned. */

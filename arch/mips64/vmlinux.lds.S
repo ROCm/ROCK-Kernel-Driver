@@ -1,17 +1,37 @@
 #include <asm-generic/vmlinux.lds.h>
 
+#undef mips		/* CPP really sucks for this job  */
+#define mips mips
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
+jiffies = jiffies_64;
 SECTIONS
 {
+#ifdef CONFIG_BOOT_ELF64
   /* Read-only sections, merged into text segment: */
-  .init          : { *(.init)		} =0
-  .text      :
-  {
+  /* . = 0xc000000000000000; */
+
+  /* This is the value for an Origin kernel, taken from an IRIX kernel.  */
+  /* . = 0xc00000000001c000; */
+
+  /* Set the vaddr for the text segment to a value 
+        >= 0xa800 0000 0001 9000 if no symmon is going to configured
+        >= 0xa800 0000 0030 0000 otherwise  */
+
+  /* . = 0xa800000000300000; */
+  /* . = 0xa800000000300000; */
+  . = 0xffffffff80300000;
+#endif
+  . = LOADADDR;
+  /* read-only */
+  _text = .;			/* Text and read-only data */
+  .text : {
     *(.text)
-    /* .gnu.warning sections are handled specially by elf32.em.  */
+    *(.fixup)
     *(.gnu.warning)
   } =0
+
+  _etext = .;			/* End of text section */
 
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
@@ -23,39 +43,35 @@ SECTIONS
   __stop___dbe_table = .;
 
   RODATA
-	
-  _etext = .;
 
-  . = ALIGN(16384);
-  . = . + MAPPED_OFFSET; 	/* for CONFIG_MAPPED_KERNEL */
-  .data.init_task : { *(.data.init_task) }
+  . = ALIGN(64);
 
-  /* Startup code */
-  . = ALIGN(4096);
-  __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
-  . = ALIGN(16);
-  __setup_start = .;
-  .setup.init : { *(.setup.init) }
-  __setup_end = .;
-  __initcall_start = .;
-  .initcall.init : {
-	*(.initcall1.init) 
-	*(.initcall2.init) 
-	*(.initcall3.init) 
-	*(.initcall4.init) 
-	*(.initcall5.init) 
-	*(.initcall6.init) 
-	*(.initcall7.init)
+  /* writeable */
+  .data : {			/* Data */
+    *(.data)
+
+   /* Align the initial ramdisk image (INITRD) on page boundaries. */
+   . = ALIGN(4096);
+   __rd_start = .;
+   *(.initrd)
+   . = ALIGN(4096);
+   __rd_end = .;
+
+    CONSTRUCTORS
   }
-  __initcall_end = .;
-  __con_initcall_start = .;
-  .con_initcall.init : { *(.con_initcall.init) }
-  __con_initcall_end = .;
-  SECURITY_INIT
-  . = ALIGN(4096);	/* Align double page for init_task_union */
-  __init_end = .;
+  _gp = . + 0x8000;
+  .lit8 : { *(.lit8) }
+  .lit4 : { *(.lit4) }
+  /* We want the small data sections together, so single-instruction offsets
+     can access them all, and initialized data all before uninitialized, so
+     we can shorten the on-disk segment size.  */
+  .sdata     : { *(.sdata) }
+
+  . = ALIGN(4096);
+  __nosave_begin = .;
+  .data_nosave : { *(.data.nosave) }
+  . = ALIGN(4096);
+  __nosave_end = .;
 
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) }
@@ -63,59 +79,79 @@ SECTIONS
   . = ALIGN(32);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
-  .fini      : { *(.fini)    } =0
-  .reginfo : { *(.reginfo) }
-  /* Adjust the address for the data segment.  We want to adjust up to
-     the same address within the page on the next page up.  It would
-     be more correct to do this:
-       . = .;
-     The current expression does not correctly handle the case of a
-     text segment ending precisely at the end of a page; it causes the
-     data segment to skip a page.  The above expression does not have
-     this problem, but it will currently (2/95) cause BFD to allocate
-     a single segment, combining both text and data, for this case.
-     This will prevent the text segment from being shared among
-     multiple executions of the program; I think that is more
-     important than losing a page of the virtual address space (note
-     that no actual memory is lost; the page which is skipped can not
-     be referenced).  */
-  . = .;
-  .data    :
-  {
-    _fdata = . ;
-    *(.data)
-    CONSTRUCTORS
-  }
-  .data1   : { *(.data1) }
-  .lit8 : { *(.lit8) }
-  .lit4 : { *(.lit4) }
-  .ctors         : { *(.ctors)   }
-  .dtors         : { *(.dtors)   }
-  .got           : { *(.got.plt) *(.got) }
-  .dynamic       : { *(.dynamic) }
-  /* We want the small data sections together, so single-instruction offsets
-     can access them all, and initialized data all before uninitialized, so
-     we can shorten the on-disk segment size.  */
-  .sdata     : { *(.sdata) }
-  _edata  =  .;
+  _edata =  .;			/* End of data section */
 
-  .sbss      : { *(.sbss) *(.scommon) }
-  .bss       :
-  {
-   *(.dynbss)
-   *(.bss)
-   *(COMMON)
-  _end = . ;
+  . = ALIGN(16384);		/* init_task */
+  . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
+  .data.init_task : { *(.data.init_task) }
+
+  /* will be freed after init */
+  . = ALIGN(4096);		/* Init code and data */
+  __init_begin = .;
+  /* /DISCARD/ doesn't work for .reginfo */
+  .reginfo : { *(.reginfo) }
+  .init.text : {
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
   }
+  .init.data : { *(.init.data) }
+  . = ALIGN(16);
+  __setup_start = .;
+  .init.setup : { *(.init.setup) }
+  __setup_end = .;
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
+  __initcall_start = .;
+  .initcall.init : {
+	*(.initcall1.init)
+	*(.initcall2.init)
+	*(.initcall3.init)
+	*(.initcall4.init)
+	*(.initcall5.init)
+	*(.initcall6.init)
+	*(.initcall7.init)
+  }
+  __initcall_end = .;
+  __con_initcall_start = .;
+  .con_initcall.init : { *(.con_initcall.init) }
+  __con_initcall_end = .;
+  SECURITY_INIT
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
+  . = ALIGN(32);
+  __per_cpu_start = .;
+  .data.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
+  . = ALIGN(4096);
+  __init_end = .;
+  /* freed after init ends here */
+
+  __bss_start = .;		/* BSS */
+  .sbss      : {
+    *(.sbss)
+    *(.scommon)
+  }
+  .bss : {
+    *(.bss)
+    *(COMMON)
+  }
+  __bss_stop = .;
+
+  _end = . ;
 
   /* Sections to be discarded */
-  /DISCARD/ : 
-  {
-        *(.text.exit)
-        *(.data.exit)
+  /DISCARD/ : {
+        *(.exit.text)
+        *(.exit.data)
         *(.exitcall.exit)
   }
 
+  /* This is the MIPS specific mdebug section.  */
+  .mdebug : { *(.mdebug) }
   /* These are needed for ELF backends which have not yet been
      converted to the new style linker.  */
   .stab 0 : { *(.stab) }
@@ -133,4 +169,6 @@ SECTIONS
   /* These must appear regardless of  .  */
   .gptab.sdata : { *(.gptab.data) *(.gptab.sdata) }
   .gptab.sbss : { *(.gptab.bss) *(.gptab.sbss) }
+  .comment : { *(.comment) }
+  .note : { *(.note) }
 }

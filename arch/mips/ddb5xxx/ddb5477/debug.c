@@ -15,8 +15,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/interrupt.h>
-#include <linux/signal.h>		/* SA_INTERRUPT */
 
 #include <asm/mipsregs.h>
 #include <asm/ddb5xxx/ddb5xxx.h>
@@ -32,9 +30,9 @@ void jsun_show_regs(char *name, Register *regs)
 
 	printk("\nshow regs: %s\n", name);
 	for(i=0;regs[i].regname!= NULL; i++) {
-		printk("%-16s= %08x\t\t(@%08x)\n", 
-		       regs[i].regname, 
-		       *(unsigned *)(regs[i].regaddr), 
+		printk("%-16s= %08x\t\t(@%08x)\n",
+		       regs[i].regname,
+		       *(unsigned *)(regs[i].regaddr),
 		       regs[i].regaddr);
 	}
 }
@@ -58,15 +56,15 @@ static Register int_regs[] = {
 void vrc5477_show_int_regs()
 {
 	jsun_show_regs("interrupt registers", int_regs);
-	printk("CPU CAUSE = %08x\n", read_32bit_cp0_register(CP0_CAUSE));
-	printk("CPU STATUS = %08x\n", read_32bit_cp0_register(CP0_STATUS));
+	printk("CPU CAUSE = %08x\n", read_c0_cause());
+	printk("CPU STATUS = %08x\n", read_c0_status());
 }
 static Register pdar_regs[] = {
         {"DDB_SDRAM0", DDB_BASE + DDB_SDRAM0},
         {"DDB_SDRAM1", DDB_BASE + DDB_SDRAM1},
-        {"DDB_LDCS0", DDB_BASE + DDB_LDCS0},
-        {"DDB_LDCS1", DDB_BASE + DDB_LDCS1},
-        {"DDB_LDCS2", DDB_BASE + DDB_LDCS2},
+        {"DDB_LCS0", DDB_BASE + DDB_LCS0},
+        {"DDB_LCS1", DDB_BASE + DDB_LCS1},
+        {"DDB_LCS2", DDB_BASE + DDB_LCS2},
         {"DDB_INTCS", DDB_BASE + DDB_INTCS},
         {"DDB_BOOTCS", DDB_BASE + DDB_BOOTCS},
         {"DDB_PCIW0", DDB_BASE + DDB_PCIW0},

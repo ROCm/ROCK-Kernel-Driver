@@ -1,18 +1,17 @@
-/* $Id: balo_supp.S,v 1.1 1999/01/17 03:49:38 ralf Exp $
+/*
  * balo_supp.S: BAget Loader supplement
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
  */
-
 #include <asm/asm.h>
 #include <asm/regdef.h>
 #include <asm/stackframe.h>
 #include <asm/mipsregs.h>
 #include <asm/addrspace.h>
-	
+
 	.text
 	.set    mips1
-	
+
 	/* General exception vector. */
 NESTED(except_vec3_generic, 0, sp)
 	.set    noat
@@ -21,7 +20,7 @@ NESTED(except_vec3_generic, 0, sp)
 END(except_vec3_generic)
 
 NESTED(except_vec3_generic_code, 0, sp)
-	SAVE_ALL 
+	SAVE_ALL
 	mfc0	k1, CP0_CAUSE
 	la	k0, int_cause
 	sw      k1, (k0)
@@ -34,7 +33,7 @@ NESTED(except_vec3_generic_code, 0, sp)
         la      k0, badvaddr
         sw      k1, (k0)
 
-	la	k0, int_handler 
+	la	k0, int_handler
         .set    noreorder
 	jal	k0
         .set    reorder
@@ -48,7 +47,7 @@ NESTED(flush_cache_low, PT_SIZE, sp)
         .set    at
         .set    macro
         .set    noreorder
-        
+
         move    t1, a0  # ISIZE
         move    t2, a1  # DSIZE
 
@@ -89,7 +88,7 @@ NESTED(flush_cache_low, PT_SIZE, sp)
         sb      zero, -8(t0)
         bne     t0, t1, 1b
         sb      zero, -4(t0)
-        
+
         la      v0, 1f
         or      v0, KSEG1
         j       v0                              # Run uncached

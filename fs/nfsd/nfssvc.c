@@ -209,8 +209,8 @@ nfsd(struct svc_rqst *rqstp)
 		 * recvfrom routine.
 		 */
 		while ((err = svc_recv(serv, rqstp,
-				       5*60*HZ)) == -EAGAIN)
-			cache_clean();
+				       60*60*HZ)) == -EAGAIN)
+			;
 		if (err < 0)
 			break;
 		update_thread_usage(atomic_read(&nfsd_busy));

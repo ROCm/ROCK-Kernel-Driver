@@ -3,17 +3,21 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1998 Ralf Baechle
+ * Copyright (C) 1998, 2002 Ralf Baechle
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_CURRENT_H
 #define _ASM_CURRENT_H
 
-#ifdef _LANGUAGE_C
+#include <linux/thread_info.h>
 
-/* MIPS rules... */
-register struct task_struct *current asm("$28");
+struct task_struct;
 
-#endif /* _LANGUAGE_C */
+static inline struct task_struct * get_current(void)
+{
+	return current_thread_info()->task;
+}
+
+#define current		get_current()
 
 #endif /* _ASM_CURRENT_H */

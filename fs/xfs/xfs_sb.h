@@ -81,7 +81,7 @@ struct xfs_mount;
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
 #define XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2,na,sflag)	\
-	(((ia) || (dia) || (extflag) || (dirv2) || (na)) ? \
+	(((ia) || (dia) || (extflag) || (dirv2) || (na) || (sflag)) ? \
 		(XFS_SB_VERSION_4 | \
 		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
 		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0) | \

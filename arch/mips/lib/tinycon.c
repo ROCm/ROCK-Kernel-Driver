@@ -38,7 +38,7 @@ void init_console(void)
   cursor_y = 0;
 
   vram_addr = (unsigned short *)0xb00b8000;
-  
+
   console_needs_init = 0;
 }
 
@@ -87,7 +87,7 @@ scroll(void)
     *(caddr++) = *(caddr + size_x);
 
   /* blank last line */
-  
+
   caddr = vram_addr + (size_x * (size_y-1));
   for(i=0; i<size_x; i++)
     *(caddr++) = (*caddr & 0xff00) | (unsigned short) ' ';

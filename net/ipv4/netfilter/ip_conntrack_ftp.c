@@ -367,11 +367,11 @@ static int help(struct sk_buff *skb,
 		    { 0 } },
 		  { htonl((array[0] << 24) | (array[1] << 16)
 			  | (array[2] << 8) | array[3]),
-		    { htons(array[4] << 8 | array[5]) },
+		    { .tcp = { htons(array[4] << 8 | array[5]) } },
 		    IPPROTO_TCP }});
 	exp->mask = ((struct ip_conntrack_tuple)
 		{ { 0xFFFFFFFF, { 0 } },
-		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+		  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 
 	exp->expectfn = NULL;
 
@@ -406,7 +406,6 @@ static int __init init(void)
 		ports[0] = FTP_PORT;
 
 	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
-		memset(&ftp[i], 0, sizeof(struct ip_conntrack_helper));
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;

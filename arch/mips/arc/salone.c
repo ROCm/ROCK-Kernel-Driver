@@ -1,25 +1,24 @@
 /*
- * salone.c: Routines to load into memory and execute stand-along
- *           program images using ARCS PROM firmware.
+ * Routines to load into memory and execute stand-along program images using
+ * ARCS PROM firmware.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
- *
- * $Id: salone.c,v 1.1 1998/10/18 13:32:09 tsbogend Exp $
  */
 #include <linux/init.h>
 #include <asm/sgialib.h>
 
-long __init prom_load(char *name, unsigned long end, unsigned long *pc, unsigned long *eaddr)
+LONG __init ArcLoad(CHAR *Path, ULONG TopAddr, ULONG *ExecAddr, ULONG *LowAddr)
 {
-	return romvec->load(name, end, pc, eaddr);
+	return ARC_CALL4(load, Path, TopAddr, ExecAddr, LowAddr);
 }
 
-long __init prom_invoke(unsigned long pc, unsigned long sp, long argc, char **argv, char **envp)
+LONG __init ArcInvoke(ULONG ExecAddr, ULONG StackAddr, ULONG Argc, CHAR *Argv[],
+	CHAR *Envp[])
 {
-	return romvec->invoke(pc, sp, argc, argv, envp);
+	return ARC_CALL5(invoke, ExecAddr, StackAddr, Argc, Argv, Envp);
 }
 
-long __init prom_exec(char *name, long argc, char **argv, char **envp)
+LONG __init ArcExecute(CHAR *Path, LONG Argc, CHAR *Argv[], CHAR *Envp[])
 {
-	return romvec->exec(name, argc, argv, envp);
+	return ARC_CALL4(exec, Path, Argc, Argv, Envp);
 }

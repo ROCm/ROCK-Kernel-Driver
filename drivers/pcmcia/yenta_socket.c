@@ -807,22 +807,29 @@ struct cardbus_override_struct {
 	unsigned short device;
 	int (*override) (struct yenta_socket *socket);
 } cardbus_override[] = {
-	{ PD(TI,1130),	&ti113x_override },
 	{ PD(TI,1031),	&ti_override },
-	{ PD(TI,1131),	&ti113x_override },
-	{ PD(TI,1250),	&ti1250_override },
-	{ PD(TI,1220),	&ti_override },
-	{ PD(TI,1221),	&ti_override },
+
+	/* TBD: Check if these TI variants can use more
+	 * advanced overrides instead */
 	{ PD(TI,1210),	&ti_override },
-	{ PD(TI,1450),	&ti_override },
-	{ PD(TI,1225),	&ti_override },
-	{ PD(TI,1251A),	&ti_override },
 	{ PD(TI,1211),	&ti_override },
+	{ PD(TI,1251A),	&ti_override },
 	{ PD(TI,1251B),	&ti_override },
-	{ PD(TI,1410),	ti1250_override },
 	{ PD(TI,1420),	&ti_override },
+	{ PD(TI,1450),	&ti_override },
 	{ PD(TI,4410),	&ti_override },
 	{ PD(TI,4451),	&ti_override },
+
+	{ PD(TI,1130),	&ti113x_override },
+	{ PD(TI,1131),	&ti113x_override },
+
+	{ PD(TI,1220),	&ti12xx_override },
+	{ PD(TI,1221),	&ti12xx_override },
+	{ PD(TI,1225),	&ti12xx_override },
+	{ PD(TI,1520),  &ti12xx_override },
+
+	{ PD(TI,1250),	&ti1250_override },
+	{ PD(TI,1410),	&ti1250_override },
 
 	{ PD(RICOH,RL5C465), &ricoh_override },
 	{ PD(RICOH,RL5C466), &ricoh_override },

@@ -17,7 +17,7 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
-extern asmlinkage void syscall_trace(void);
+extern asmlinkage void do_syscall_trace(void);
 
 #undef DEBUG_SIG
 
@@ -117,7 +117,8 @@ static void setup_irix_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	regs->regs[5] = 0; /* XXX sigcode XXX */
 	regs->regs[6] = regs->regs[29] = sp;
 	regs->regs[7] = (unsigned long) ka->sa.sa_handler;
-	regs->regs[25] = regs->cp0_epc = (unsigned long) ka->sa.sa_restorer;
+	regs->regs[25] = regs->cp0_epc = (unsigned long) ka->sa_restorer;
+
 	return;
 
 segv_and_exit:
@@ -134,27 +135,11 @@ setup_irix_rt_frame(struct k_sigaction * ka, struct pt_regs *regs,
 	do_exit(SIGSEGV);
 }
 
-static inline void handle_signal(unsigned long sig, struct k_sigaction *ka,
-        siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
+static inline void handle_signal(unsigned long sig, siginfo_t *info,
+	sigset_t *oldset, struct pt_regs * regs)
 {
-	if (ka->sa.sa_flags & SA_SIGINFO)
-		setup_irix_rt_frame(ka, regs, sig, oldset, info);
-	else
-		setup_irix_frame(ka, regs, sig, oldset);
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
-	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
-		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
-	sigaddset(&current->blocked,sig);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
-	}
-}
-
-static inline void syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
-{
 	switch(regs->regs[0]) {
 	case ERESTARTNOHAND:
 		regs->regs[2] = EINTR;
@@ -170,111 +155,34 @@ static inline void syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
 	}
 
 	regs->regs[0] = 0;		/* Don't deal with this again.  */
+
+	if (ka->sa.sa_flags & SA_SIGINFO)
+		setup_irix_rt_frame(ka, regs, sig, oldset, info);
+	else
+		setup_irix_frame(ka, regs, sig, oldset);
+
+	if (ka->sa.sa_flags & SA_ONESHOT)
+		ka->sa.sa_handler = SIG_DFL;
+	if (!(ka->sa.sa_flags & SA_NODEFER)) {
+		spin_lock_irq(&current->sighand->siglock);
+		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
+		sigaddset(&current->blocked,sig);
+		recalc_sigpending();
+		spin_unlock_irq(&current->sighand->siglock);
+	}
 }
 
 asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 {
-	struct k_sigaction *ka;
 	siginfo_t info;
+	int signr;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
-	for (;;) {
-		unsigned long signr;
-
-		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(current, &current->blocked, &info);
-		spin_unlock_irq(&current->sigmask_lock);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Let the debugger run.  */
-			current->exit_code = signr;
-			current->state = TASK_STOPPED;
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code))
-				continue;
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
-		ka = &current->sig->action[signr-1];
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			/* Init gets no signals it doesn't want.  */
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP:
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGABRT: case SIGFPE: case SIGSEGV:
-				if (do_coredump(signr, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sigaddset(&current->pending.signal, signr);
-				recalc_sigpending();
-				current->flags |= PF_SIGNALED;
-				do_exit(exit_code);
-				/* NOTREACHED */
-			}
-		}
-
-		if (regs->regs[0])
-			syscall_restart(regs, ka);
-		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, ka, &info, oldset, regs);
+	signr = get_signal_to_deliver(&info, regs, NULL);
+	if (signr > 0) {
+		handle_signal(signr, &info, oldset, regs);
 		return 1;
 	}
 
@@ -343,19 +251,19 @@ irix_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&blocked, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = blocked;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/*
 	 * Don't let your children do this ...
 	 */
-	if (current->ptrace & PT_TRACESYS)
-		syscall_trace();
+	if (current_thread_info()->flags & TIF_SYSCALL_TRACE)
+		do_syscall_trace();
 	__asm__ __volatile__(
 		"move\t$29,%0\n\t"
-		"j\tret_from_sys_call"
+		"j\tsyscall_exit"
 		:/* no outputs */
 		:"r" (&regs));
 		/* Unreached */
@@ -380,7 +288,7 @@ static inline void dump_sigact_irix5(struct sigact_irix5 *p)
 }
 #endif
 
-asmlinkage int 
+asmlinkage int
 irix_sigaction(int sig, const struct sigaction *act,
 	      struct sigaction *oact, void *trampoline)
 {
@@ -408,7 +316,7 @@ irix_sigaction(int sig, const struct sigaction *act,
 		 * value for all invocations of sigaction.  Will have to
 		 * investigate.  POSIX POSIX, die die die...
 		 */
-		new_ka.sa.sa_restorer = trampoline;
+		new_ka.sa_restorer = trampoline;
 	}
 
 /* XXX Implement SIG_SETMASK32 for IRIX compatibility */
@@ -443,7 +351,7 @@ asmlinkage int irix_sigprocmask(int how, irix_sigset_t *new, irix_sigset_t *old)
 		__copy_from_user(&newbits, new, sizeof(unsigned long)*4);
 		sigdelsetmask(&newbits, ~_BLOCKABLE);
 
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sighand->siglock);
 		oldbits = current->blocked;
 
 		switch(how) {
@@ -466,7 +374,7 @@ asmlinkage int irix_sigprocmask(int how, irix_sigset_t *new, irix_sigset_t *old)
 			return -EINVAL;
 		}
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 	if(old) {
 		error = verify_area(VERIFY_WRITE, old, sizeof(*old));
@@ -487,11 +395,11 @@ asmlinkage int irix_sigsuspend(struct pt_regs *regs)
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->regs[2] = -EINTR;
 	while (1) {
@@ -640,7 +548,9 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 {
 	int flag, retval;
 	DECLARE_WAITQUEUE(wait, current);
+	struct task_struct *tsk;
 	struct task_struct *p;
+	struct list_head *_p;
 
 	if (!info) {
 		retval = -EINVAL;
@@ -667,7 +577,9 @@ repeat:
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
 	read_lock(&tasklist_lock);
-	for (p = current->p_cptr; p; p = p->p_osptr) {
+	tsk = current;
+	list_for_each(_p,&tsk->children) {
+		p = list_entry(_p,struct task_struct,sibling);
 		if ((type == P_PID) && p->pid != pid)
 			continue;
 		if ((type == P_PGID) && p->pgrp != pid)
@@ -676,50 +588,63 @@ repeat:
 			continue;
 		flag = 1;
 		switch (p->state) {
-			case TASK_STOPPED:
-				if (!p->exit_code)
-					continue;
-				if (!(options & (W_TRAPPED|W_STOPPED)) &&
-				    !(p->ptrace & PT_PTRACED))
-					continue;
-				if (ru != NULL)
-					getrusage(p, RUSAGE_BOTH, ru);
-				__put_user(SIGCHLD, &info->sig);
-				__put_user(0, &info->code);
-				__put_user(p->pid, &info->stuff.procinfo.pid);
-				__put_user((p->exit_code >> 8) & 0xff,
-				           &info->stuff.procinfo.procdata.child.status);
-				__put_user(p->times.tms_utime, &info->stuff.procinfo.procdata.child.utime);
-				__put_user(p->times.tms_stime, &info->stuff.procinfo.procdata.child.stime);
-				p->exit_code = 0;
-				retval = 0;
-				goto end_waitsys;
-			case TASK_ZOMBIE:
-				current->times.tms_cutime += p->times.tms_utime + p->times.tms_cutime;
-				current->times.tms_cstime += p->times.tms_stime + p->times.tms_cstime;
-				if (ru != NULL)
-					getrusage(p, RUSAGE_BOTH, ru);
-				__put_user(SIGCHLD, &info->sig);
-				__put_user(1, &info->code);      /* CLD_EXITED */
-				__put_user(p->pid, &info->stuff.procinfo.pid);
-				__put_user((p->exit_code >> 8) & 0xff,
-				           &info->stuff.procinfo.procdata.child.status);
-				__put_user(p->times.tms_utime,
-				           &info->stuff.procinfo.procdata.child.utime);
-				__put_user(p->times.tms_stime,
-				           &info->stuff.procinfo.procdata.child.stime);
-				retval = 0;
-				if (p->p_opptr != p->p_pptr) {
-					REMOVE_LINKS(p);
-					p->p_pptr = p->p_opptr;
-					SET_LINKS(p);
-					notify_parent(p, SIGCHLD);
-				} else
-					release_task(p);
-				goto end_waitsys;
-			default:
+		case TASK_STOPPED:
+			if (!p->exit_code)
 				continue;
+			if (!(options & (W_TRAPPED|W_STOPPED)) &&
+			    !(p->ptrace & PT_PTRACED))
+				continue;
+			read_unlock(&tasklist_lock);
+
+			/* move to end of parent's list to avoid starvation */
+			write_lock_irq(&tasklist_lock);
+			remove_parent(p);
+			add_parent(p, p->parent);
+			write_unlock_irq(&tasklist_lock);
+			retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
+			if (!retval && ru) {
+				retval |= __put_user(SIGCHLD, &info->sig);
+				retval |= __put_user(0, &info->code);
+				retval |= __put_user(p->pid, &info->stuff.procinfo.pid);
+				retval |= __put_user((p->exit_code >> 8) & 0xff,
+				           &info->stuff.procinfo.procdata.child.status);
+				retval |= __put_user(p->utime, &info->stuff.procinfo.procdata.child.utime);
+				retval |= __put_user(p->stime, &info->stuff.procinfo.procdata.child.stime);
+			}
+			if (!retval) {
+				p->exit_code = 0;
+			}
+			goto end_waitsys;
+
+		case TASK_ZOMBIE:
+			current->cutime += p->utime + p->cutime;
+			current->cstime += p->stime + p->cstime;
+			if (ru != NULL)
+				getrusage(p, RUSAGE_BOTH, ru);
+			__put_user(SIGCHLD, &info->sig);
+			__put_user(1, &info->code);      /* CLD_EXITED */
+			__put_user(p->pid, &info->stuff.procinfo.pid);
+			__put_user((p->exit_code >> 8) & 0xff,
+			           &info->stuff.procinfo.procdata.child.status);
+			__put_user(p->utime,
+			           &info->stuff.procinfo.procdata.child.utime);
+			__put_user(p->stime,
+			           &info->stuff.procinfo.procdata.child.stime);
+			retval = 0;
+			if (p->real_parent != p->parent) {
+				write_lock_irq(&tasklist_lock);
+				remove_parent(p);
+				p->parent = p->real_parent;
+				add_parent(p, p->parent);
+				do_notify_parent(p, SIGCHLD);
+				write_unlock_irq(&tasklist_lock);
+			} else
+				release_task(p);
+			goto end_waitsys;
+		default:
+			continue;
 		}
+		tsk = next_thread(tsk);
 	}
 	read_unlock(&tasklist_lock);
 	if (flag) {

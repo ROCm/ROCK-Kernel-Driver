@@ -243,9 +243,6 @@ static int __init init(void)
 
 	for (i = 0; (i < MAX_PORTS) && ports[i] != 0; i++) {
 		hlpr = &ip_nat_irc_helpers[i];
-		memset(hlpr, 0,
-		       sizeof(struct ip_nat_helper));
-
 		hlpr->tuple.dst.protonum = IPPROTO_TCP;
 		hlpr->tuple.src.u.tcp.port = htons(ports[i]);
 		hlpr->mask.src.u.tcp.port = 0xFFFF;

@@ -49,7 +49,7 @@
 #define MAX_PREMIUM_REGIONS     MAX_REGIONS
 
 /*
- * MAX_PARITIONS refers to the maximum number of logically defined 
+ * MAX_PARITIONS refers to the maximum number of logically defined
  * partitions the system can support.
  */
 #define MAX_PARTITIONS		MAX_REGIONS

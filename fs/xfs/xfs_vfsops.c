@@ -599,6 +599,8 @@ out:
 	return XFS_ERROR(error);
 }
 
+#define REMOUNT_READONLY_FLAGS	(SYNC_REMOUNT|SYNC_ATTR|SYNC_WAIT)
+
 STATIC int
 xfs_mntupdate(
 	bhv_desc_t			*bdp,
@@ -623,7 +625,7 @@ xfs_mntupdate(
 		xfs_finish_reclaim_all(mp, 0);
 
 		do {
-			VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
+			VFS_SYNC(vfsp, REMOUNT_READONLY_FLAGS, NULL, error);
 			pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT,
 								&pincount);
 		} while (pincount);
@@ -1483,7 +1485,7 @@ xfs_syncsub(
 	/*
 	 * Now check to see if the log needs a "dummy" transaction.
 	 */
-	if (xfs_log_need_covered(mp)) {
+	if (!(flags & SYNC_REMOUNT) && xfs_log_need_covered(mp)) {
 		xfs_trans_t *tp;
 		xfs_inode_t *ip;
 
@@ -1619,7 +1621,7 @@ xfs_parseargs(
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_LOGBUFS);
-				return -EINVAL;
+				return EINVAL;
 			}
 			args->logbufs = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
@@ -1628,7 +1630,7 @@ xfs_parseargs(
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_LOGBSIZE);
-				return -EINVAL;
+				return EINVAL;
 			}
 			last = strlen(value) - 1;
 			if (value[last] == 'K' || value[last] == 'k') {
@@ -1642,28 +1644,28 @@ xfs_parseargs(
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_LOGDEV);
-				return -EINVAL;
+				return EINVAL;
 			}
 			strncpy(args->logname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_MTPT);
-				return -EINVAL;
+				return EINVAL;
 			}
 			strncpy(args->mtpt, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_RTDEV);
-				return -EINVAL;
+				return EINVAL;
 			}
 			strncpy(args->rtname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_BIOSIZE); 
-				return -EINVAL;
+				return EINVAL;
 			}
 			iosize = simple_strtoul(value, &eov, 10);
 			args->flags |= XFSMNT_IOSIZE;
@@ -1679,7 +1681,7 @@ xfs_parseargs(
 #ifndef XFS_BIG_FILESYSTEMS
 			printk("XFS: %s option not allowed on this system\n",
 				MNTOPT_INO64);
-			return -EINVAL;
+			return EINVAL;
 #endif
 		} else if (!strcmp(this_char, MNTOPT_NOALIGN)) {
 			args->flags |= XFSMNT_NOALIGN;
@@ -1687,14 +1689,14 @@ xfs_parseargs(
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_SUNIT);
-				return -EINVAL;
+				return EINVAL;
 			}
 			dsunit = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
 					MNTOPT_SWIDTH);
-				return -EINVAL;
+				return EINVAL;
 			}
 			dswidth = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
@@ -1708,33 +1710,33 @@ printk("XFS: osyncisdsync is now the default, option is deprecated.\n");
 printk("XFS: irixsgid is now a sysctl(2) variable, option is deprecated.\n");
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
-			return -EINVAL;
+			return EINVAL;
 		}
 	}
 
 	if (args->flags & XFSMNT_NORECOVERY) {
 		if ((vfsp->vfs_flag & VFS_RDONLY) == 0) {
 			printk("XFS: no-recovery mounts must be read-only.\n");
-			return -EINVAL;
+			return EINVAL;
 		}
 	}
 
 	if ((args->flags & XFSMNT_NOALIGN) && (dsunit || dswidth)) {
 		printk(
 	"XFS: sunit and swidth options incompatible with the noalign option\n");
-		return -EINVAL;
+		return EINVAL;
 	}
 
 	if ((dsunit && !dswidth) || (!dsunit && dswidth)) {
 		printk("XFS: sunit and swidth must be specified together\n");
-		return -EINVAL;
+		return EINVAL;
 	}
 
 	if (dsunit && (dswidth % dsunit != 0)) {
 		printk(
 	"XFS: stripe width (%d) must be a multiple of the stripe unit (%d)\n",
 			dswidth, dsunit);
-		return -EINVAL;
+		return EINVAL;
 	}
 
 	if ((args->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {

@@ -22,10 +22,14 @@
 
 */    
 
-#include <linux/module.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
 #include "dvb_frontend.h"
+#include "dvb_functions.h"
 
 static int debug = 0;
 
@@ -33,27 +37,26 @@ static int debug = 0;
 
 
 struct dvb_frontend_info grundig_29504_401_info = {
-	name: "Grundig 29504-401",
-	type: FE_OFDM,
-/*	frequency_min: ???,*/
-/*	frequency_max: ???,*/
-	frequency_stepsize: 166666,
-/*      frequency_tolerance: ???,*/
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 0,
-	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
+	.name 			= "Grundig 29504-401",
+	.type 			= FE_OFDM,
+/*	.frequency_min 		= ???,*/
+/*	.frequency_max 		= ???,*/
+	.frequency_stepsize 	= 166666,
+/*      .frequency_tolerance 	= ???,*/
+/*      .symbol_rate_tolerance 	= ???,*/
+	.notifier_delay =  0,
+	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
 	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
 	      FE_CAN_MUTE_TS /*| FE_CAN_CLEAN_SETUP*/
 };
 
 
-static
-int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { addr: 0x55, flags: 0, buf: buf, len: 2 };
+	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error (reg == %02x) = %02x!\n",
@@ -63,14 +66,13 @@ int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static
-u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
-			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
+			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -81,11 +83,10 @@ u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
-	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error == %02x!\n", __FUNCTION__, ret);
@@ -97,29 +98,32 @@ int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
 /**
  *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 166666 Hz.
- *   frequency offset is 36000000 Hz.
+ *   frequency offset is 36125000 Hz.
  */
-static
-int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
 	u32 div;
 	u8 buf [4];
-	u8 cfg;
+	u8 cfg, cpump, band_select;
 
-	div = (36000000 + freq) / 166666;
+	div = (36125000 + freq) / 166666;
 	cfg = 0x88;
+
+	cpump = div < 175000000 ? 2 : div < 390000000 ? 1 :
+		div < 470000000 ? 2 : div < 750000000 ? 1 : 3;
+
+	band_select = div < 175000000 ? 0x0e : div < 470000000 ? 0x05 : 0x03;
 
 	buf [0] = (div >> 8) & 0x7f;
 	buf [1] = div & 0xff;
 	buf [2] = ((div >> 10) & 0x60) | cfg;
-	buf [3] = 0xc0;
+	buf [3] = cpump | band_select;
 
 	return tsa5060_write (i2c, buf);
 }
 
 
-static
-void apply_tps (struct dvb_i2c_bus *i2c)
+static void apply_tps (struct dvb_i2c_bus *i2c)
 {
 	l64781_writereg (i2c, 0x2a, 0x00);
 	l64781_writereg (i2c, 0x2a, 0x01);
@@ -133,8 +137,7 @@ void apply_tps (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void reset_afc (struct dvb_i2c_bus *i2c)
+static void reset_afc (struct dvb_i2c_bus *i2c)
 {
 	/* Set AFC stall for the AFC_INIT_FRQ setting, TIM_STALL for
 	   timing offset */
@@ -152,8 +155,7 @@ void reset_afc (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int apply_frontend_param (struct dvb_i2c_bus *i2c,
+static int apply_frontend_param (struct dvb_i2c_bus *i2c,
 			  struct dvb_frontend_parameters *param)
 {
 	/* The coderates for FEC_NONE, FEC_4_5 and FEC_FEC_6_7 are arbitrary */
@@ -265,19 +267,17 @@ int apply_frontend_param (struct dvb_i2c_bus *i2c,
 }
 
 
-static
-void reset_and_configure (struct dvb_i2c_bus *i2c)
+static void reset_and_configure (struct dvb_i2c_bus *i2c)
 {
 	u8 buf [] = { 0x06 };
-	struct i2c_msg msg = { addr: 0x00, flags: 0, buf: buf, len: 1 };
+	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
 
 	i2c->xfer (i2c, &msg, 1);
 }
 
 
 
-static
-int init (struct dvb_i2c_bus *i2c)
+static int init (struct dvb_i2c_bus *i2c)
 {
         reset_and_configure (i2c);
 
@@ -415,13 +415,12 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 } 
 
 
-static
-int l64781_attach (struct dvb_i2c_bus *i2c)
+static int l64781_attach (struct dvb_i2c_bus *i2c)
 {
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
-	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
-			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
+			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	if (i2c->xfer (i2c, msg, 2) == 2)   /*  probably an EEPROM... */
 		return -ENODEV;
@@ -440,23 +439,20 @@ int l64781_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void l64781_detach (struct dvb_i2c_bus *i2c)
+static void l64781_detach (struct dvb_i2c_bus *i2c)
 {
 	dvb_unregister_frontend (grundig_29504_401_ioctl, i2c);
 }
 
 
-static
-int __init init_grundig_29504_401 (void)
+static int __init init_grundig_29504_401 (void)
 {
 	return dvb_register_i2c_device (THIS_MODULE,
 					l64781_attach, l64781_detach);
 }
 
 
-static
-void __exit exit_grundig_29504_401 (void)
+static void __exit exit_grundig_29504_401 (void)
 {
 	dvb_unregister_i2c_device (l64781_attach);
 }

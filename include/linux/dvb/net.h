@@ -24,16 +24,12 @@
 #ifndef _DVBNET_H_
 #define _DVBNET_H_
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
-#include <stdint.h>
-#endif
+#include <asm/types.h>
 
 
 struct dvb_net_if {
-	uint16_t pid;
-	uint16_t if_num;
+	__u16 pid;
+	__u16 if_num;
 };
 
 

@@ -1,5 +1,4 @@
-/* $Id: floppy-no.c,v 1.1 1998/05/07 18:38:32 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.

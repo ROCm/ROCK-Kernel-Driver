@@ -3,7 +3,6 @@
  *
  * The IRIX kernel maps a page at PRDA_ADDRESS with the
  * contents of prda and fills it the bits on prda_sys.
- * $Id$
  */
 
 #ifndef __PRCTL_H__
@@ -13,14 +12,14 @@
 #define PRDA ((struct prda *) PRDA_ADDRESS)
 
 struct prda_sys {
-	pid_t t_pid; 
+	pid_t t_pid;
         u32   t_hint;
         u32   t_dlactseq;
         u32   t_fpflags;
         u32   t_prid;		/* processor type, $prid CP0 register */
         u32   t_dlendseq;
         u64   t_unused1[5];
-        pid_t t_rpid;   
+        pid_t t_rpid;
         s32   t_resched;
         u32   t_unused[8];
         u32   t_cpu;		/* current/last cpu */

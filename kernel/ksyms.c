@@ -523,6 +523,7 @@ EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
 EXPORT_SYMBOL(seq_escape);
 EXPORT_SYMBOL(seq_printf);
+EXPORT_SYMBOL(seq_path);
 EXPORT_SYMBOL(seq_open);
 EXPORT_SYMBOL(seq_release);
 EXPORT_SYMBOL(seq_read);

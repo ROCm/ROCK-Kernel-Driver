@@ -220,7 +220,7 @@
 #define __NR_SVR4_reserved62		(__NR_SVR4 + 199)
 #define __NR_SVR4_reserved63		(__NR_SVR4 + 200)
 #define __NR_SVR4_aread			(__NR_SVR4 + 201)
-#define __NR_SVR4_awrite		(__NR_SVR4 + 202)	
+#define __NR_SVR4_awrite		(__NR_SVR4 + 202)
 #define __NR_SVR4_listio		(__NR_SVR4 + 203)
 #define __NR_SVR4_mips_acancel		(__NR_SVR4 + 204)
 #define __NR_SVR4_astatus		(__NR_SVR4 + 205)

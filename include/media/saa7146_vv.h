@@ -9,6 +9,16 @@
 #define MAX_SAA7146_CAPTURE_BUFFERS	32	/* arbitrary */
 #define BUFFER_TIMEOUT     (HZ/2)  /* 0.5 seconds */
 
+#define WRITE_RPS0(x) do { \
+	static int count = 0;	\
+	dev->d_rps0.cpu_addr[ count++ ] = cpu_to_le32(x); \
+	} while (0);
+
+#define WRITE_RPS1(x) do { \
+	static int count = 0;	\
+	dev->d_rps1.cpu_addr[ count++ ] = cpu_to_le32(x); \
+	} while (0);
+
 struct	saa7146_video_dma {
 	u32 base_odd;
 	u32 base_even;
@@ -126,7 +136,7 @@ struct saa7146_vv
 	int 	current_hps_source;
 	int 	current_hps_sync;
 
-	u32	*clipping;	/* pointer to clipping memory */
+	struct saa7146_dma	d_clipping;	/* pointer to clipping memory */
 };
 
 #define SAA7146_EXCLUSIVE	0x1

@@ -1,47 +1,12 @@
 /*
- * Copyright (C) 1995  Waldorf Electronics
- * Copyright (C) 1997, 1999  Ralf Baechle
- */
-#include <asm/bootinfo.h>
-#include <asm/cpu.h>
-
-/*
  * This is included by init/main.c to check for architecture-dependent bugs.
  *
  * Needs:
  *	void check_bugs(void);
  */
+#ifndef __ASM_BUGS_H
+#define __ASM_BUGS_H
 
+extern void check_bugs(void);
 
-static inline void check_wait(void)
-{
-	printk("Checking for 'wait' instruction... ");
-	switch(mips_cpu.cputype) {
-	case CPU_R3081:
-	case CPU_R3081E:
-		cpu_wait = r3081_wait;
-		printk(" available.\n");
-		break;
-	case CPU_R4200: 
-	case CPU_R4300: 
-	case CPU_R4600: 
-	case CPU_R4640: 
-	case CPU_R4650: 
-	case CPU_R4700: 
-	case CPU_R5000: 
-	case CPU_NEVADA:
-	case CPU_RM7000:
-		cpu_wait = r4k_wait;
-		printk(" available.\n");
-		break;
-	default:
-		printk(" unavailable.\n");
-		break;
-	}
-}
-
-static void __init
-check_bugs(void)
-{
-	check_wait();
-}
+#endif /* __ASM_BUGS_H */

@@ -620,7 +620,6 @@ int
 xfs_mountfs(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp,
-	dev_t		dev,
 	int		mfsi_flags)
 {
 	xfs_buf_t	*bp;
@@ -633,11 +632,10 @@ xfs_mountfs(
 	__uint64_t	ret64;
 	__int64_t	update_flags;
 	uint		quotamount, quotaflags;
-	int		agno, noio;
+	int		agno;
 	int		uuid_mounted = 0;
 	int		error = 0;
 
-	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
 		if ((error = xfs_readsb(mp))) {
 			return (error);
@@ -826,22 +824,20 @@ xfs_mountfs(
 		error = XFS_ERROR(E2BIG);
 		goto error1;
 	}
-	if (!noio) {
-		error = xfs_read_buf(mp, mp->m_ddev_targp,
-				     d - XFS_FSS_TO_BB(mp, 1),
-				     XFS_FSS_TO_BB(mp, 1), 0, &bp);
-		if (!error) {
-			xfs_buf_relse(bp);
-		} else {
-			cmn_err(CE_WARN, "XFS: size check 2 failed");
-			if (error == ENOSPC) {
-				error = XFS_ERROR(E2BIG);
-			}
-			goto error1;
+	error = xfs_read_buf(mp, mp->m_ddev_targp,
+			     d - XFS_FSS_TO_BB(mp, 1),
+			     XFS_FSS_TO_BB(mp, 1), 0, &bp);
+	if (!error) {
+		xfs_buf_relse(bp);
+	} else {
+		cmn_err(CE_WARN, "XFS: size check 2 failed");
+		if (error == ENOSPC) {
+			error = XFS_ERROR(E2BIG);
 		}
+		goto error1;
 	}
 
-	if (!noio && ((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
+	if (((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
 	    mp->m_logdev_targp != mp->m_ddev_targp) {
 		d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
@@ -918,10 +914,6 @@ xfs_mountfs(
 	 * Initialize the precomputed transaction reservations values.
 	 */
 	xfs_trans_init(mp);
-	if (noio) {
-		ASSERT((mfsi_flags & XFS_MFSI_CLIENT) == 0);
-		return 0;
-	}
 
 	/*
 	 * Allocate and initialize the inode hash table for this

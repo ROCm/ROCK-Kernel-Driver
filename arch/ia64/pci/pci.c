@@ -53,21 +53,21 @@ struct pci_fixup pcibios_fixups[1];
  * synchronization mechanism here.
  */
 
-#define PCI_SAL_ADDRESS(seg, bus, dev, fn, reg) \
+#define PCI_SAL_ADDRESS(seg, bus, devfn, reg) \
 	((u64)(seg << 24) | (u64)(bus << 16) | \
-	 (u64)(dev << 11) | (u64)(fn << 8) | (u64)(reg))
+	 (u64)(devfn << 8) | (u64)(reg))
 
 
 static int
-pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+pci_sal_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	int result = 0;
 	u64 data = 0;
 
-	if (!value || (seg > 255) || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (seg > 255) || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
-	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(seg, bus, dev, fn, reg), len, &data);
+	result = ia64_sal_pci_config_read(PCI_SAL_ADDRESS(seg, bus, devfn, reg), len, &data);
 
 	*value = (u32) data;
 
@@ -75,12 +75,12 @@ pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 }
 
 static int
-pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+pci_sal_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
-	if ((seg > 255) || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if ((seg > 255) || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
-	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, dev, fn, reg), len, value);
+	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, devfn, reg), len, value);
 }
 
 struct pci_raw_ops pci_sal_ops = {
@@ -95,14 +95,14 @@ static int
 pci_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
 	return raw_pci_ops->read(pci_domain_nr(bus), bus->number,
-			PCI_SLOT(devfn), PCI_FUNC(devfn), where, size, value);
+			devfn, where, size, value);
 }
 
 static int
 pci_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
 	return raw_pci_ops->write(pci_domain_nr(bus), bus->number,
-			PCI_SLOT(devfn), PCI_FUNC(devfn), where, size, value);
+			devfn, where, size, value);
 }
 
 static struct pci_ops pci_root_ops = {
@@ -363,8 +363,6 @@ pcibios_fixup_bus (struct pci_bus *b)
 
 	return;
 }
-
-#warning pcibios_update_resource() is now a generic implementation - please check
 
 void __devinit
 pcibios_update_irq (struct pci_dev *dev, int irq)

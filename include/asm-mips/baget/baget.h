@@ -1,4 +1,4 @@
-/* $Id$
+/*
  * baget.h: Definitions specific to Baget/MIPS machines.
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
@@ -9,13 +9,13 @@
 #include "vic.h"
 #include "vac.h"
 
-#define VIC_BASE         0xBFFC0000 
+#define VIC_BASE         0xBFFC0000
 #define VAC_BASE         0xBFFD0000
 
 
 /* Baget interrupt registers and their sizes */
 
-struct  baget_int_reg { 
+struct  baget_int_reg {
 	unsigned long address;
 	int size;  /* in bytes */
 };
@@ -43,8 +43,8 @@ struct  baget_int_reg {
 #define BAGET_IRQ_MASK(x)       ((NR_IRQS-1) & (x))
 
 #define BAGET_FPU_IRQ           0x26
-#define BAGET_VIC_TIMER_IRQ     0x32 
-#define BAGET_VAC_TIMER_IRQ     0x36 
+#define BAGET_VIC_TIMER_IRQ     0x32
+#define BAGET_VAC_TIMER_IRQ     0x36
 #define BAGET_BSM_IRQ           0x3C
 
 #define BAGET_LANCE_MEM_BASE    0xfcf10000

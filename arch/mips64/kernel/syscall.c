@@ -32,8 +32,6 @@
 #include <asm/sysmips.h>
 #include <asm/uaccess.h>
 
-u64 jiffies_64;
-
 extern asmlinkage void syscall_trace(void);
 
 asmlinkage int sys_pipe(abi64_no_regargs, struct pt_regs regs)
@@ -52,12 +50,71 @@ out:
 	return res;
 }
 
+unsigned long shm_align_mask = PAGE_SIZE - 1;	/* Sane caches */
+
+#define COLOUR_ALIGN(addr,pgoff)				\
+	((((addr) + shm_align_mask) & ~shm_align_mask) +	\
+	 (((pgoff) << PAGE_SHIFT) & shm_align_mask))
+
+unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
+	unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	struct vm_area_struct * vmm;
+	int do_color_align;
+
+	if (flags & MAP_FIXED) {
+		/*
+		 * We do not accept a shared mapping if it would violate
+		 * cache aliasing constraints.
+		 */
+		if ((flags & MAP_SHARED) && (addr & shm_align_mask))
+			return -EINVAL;
+		return addr;
+	}
+
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+	do_color_align = 0;
+	if (filp || (flags & MAP_SHARED))
+		do_color_align = 1;
+	if (addr) {
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
+		else
+			addr = PAGE_ALIGN(addr);
+		vmm = find_vma(current->mm, addr);
+		if (TASK_SIZE - len >= addr &&
+		    (!vmm || addr + len <= vmm->vm_start))
+			return addr;
+	}
+	addr = TASK_UNMAPPED_BASE;
+	if (do_color_align)
+		addr = COLOUR_ALIGN(addr, pgoff);
+	else
+		addr = PAGE_ALIGN(addr);
+
+	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
+		/* At this point:  (!vmm || addr < vmm->vm_end). */
+		if (TASK_SIZE - len < addr)
+			return -ENOMEM;
+		if (!vmm || addr + len <= vmm->vm_start)
+			return addr;
+		addr = vmm->vm_end;
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
+	}
+}
+
 asmlinkage unsigned long
 sys_mmap(unsigned long addr, size_t len, unsigned long prot,
          unsigned long flags, unsigned long fd, off_t offset)
 {
 	struct file * file = NULL;
-	unsigned long error = -EFAULT;
+	unsigned long error;
+
+	error = -EINVAL;
+	if (offset & ~PAGE_MASK)
+		goto out;
 
 	if (!(flags & MAP_ANONYMOUS)) {
 		error = -EBADF;
@@ -72,33 +129,32 @@ sys_mmap(unsigned long addr, size_t len, unsigned long prot,
 	up_write(&current->mm->mmap_sem);
         if (file)
                 fput(file);
-out:
 
+out:
 	return error;
 }
 
 asmlinkage int sys_fork(abi64_no_regargs, struct pt_regs regs)
 {
-	struct task_struct *p;
-
 	save_static(&regs);
-	p = do_fork(SIGCHLD, regs.regs[29], &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs.regs[29], &regs, 0, NULL, NULL);
 }
 
 asmlinkage int sys_clone(abi64_no_regargs, struct pt_regs regs)
 {
 	unsigned long clone_flags;
 	unsigned long newsp;
-	struct task_struct *p;
+	int *parent_tidptr, *child_tidptr;
 
 	save_static(&regs);
 	clone_flags = regs.regs[4];
 	newsp = regs.regs[5];
 	if (!newsp)
 		newsp = regs.regs[29];
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	parent_tidptr = (int *) regs.regs[6];
+	child_tidptr = (int *) regs.regs[7];
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+	               parent_tidptr, child_tidptr);
 }
 
 /*
@@ -131,12 +187,10 @@ asmlinkage int sys_syscall(abi64_no_regargs, struct pt_regs regs)
 	return -ENOSYS;
 }
 
-asmlinkage int
-_sys_sysmips(int cmd, long arg1, int arg2, int arg3)
+asmlinkage int sys_sysmips(int cmd, long arg1, int arg2, int arg3)
 {
-	int	*p;
+	int	tmp, len;
 	char	*name;
-	int	tmp, len, errno;
 
 	switch(cmd) {
 	case SETNAME: {
@@ -150,11 +204,12 @@ _sys_sysmips(int cmd, long arg1, int arg2, int arg3)
 		len = strncpy_from_user(nodename, name, __NEW_UTS_LEN);
 		if (len < 0)
 			return -EFAULT;
-		nodename[__NEW_UTS_LEN] = '\0';
 
 		down_write(&uts_sem);
+		strncpy(system_utsname.nodename, nodename, len);
+		nodename[__NEW_UTS_LEN] = '\0';
 		strlcpy(system_utsname.nodename, nodename,
-			sizeof(system_utsname.nodename));
+		        sizeof(system_utsname.nodename));
 		up_write(&uts_sem);
 		return 0;
 	}
@@ -169,7 +224,7 @@ _sys_sysmips(int cmd, long arg1, int arg2, int arg3)
 		return 0;
 
 	case FLUSH_CACHE:
-		_flush_cache_l2();
+		__flush_cache_all();
 		return 0;
 
 	case MIPS_RDNVRAM:
@@ -207,7 +262,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	}
 
 	case MSGSND:
-		return sys_msgsnd (first, (struct msgbuf *) ptr, 
+		return sys_msgsnd (first, (struct msgbuf *) ptr,
 				   second, third);
 	case MSGRCV:
 		switch (version) {
@@ -215,9 +270,9 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 			struct ipc_kludge tmp;
 			if (!ptr)
 				return -EINVAL;
-			
+
 			if (copy_from_user(&tmp,
-					   (struct ipc_kludge *) ptr, 
+					   (struct ipc_kludge *) ptr,
 					   sizeof (tmp)))
 				return -EFAULT;
 			return sys_msgrcv (first, tmp.msgp, second,
@@ -247,7 +302,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 				return -EINVAL;
 			return sys_shmat (first, (char *) ptr, second, (ulong *) third);
 		}
-	case SHMDT: 
+	case SHMDT:
 		return sys_shmdt ((char *)ptr);
 	case SHMGET:
 		return sys_shmget (first, second, third);
@@ -255,15 +310,14 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		return sys_shmctl (first, second,
 				   (struct shmid_ds *) ptr);
 	default:
-		return -EINVAL;
+		return -ENOSYS;
 	}
 }
 
 /*
  * No implemented yet ...
  */
-asmlinkage int
-sys_cachectl(char *addr, int nbytes, int op)
+asmlinkage int sys_cachectl(char *addr, int nbytes, int op)
 {
 	return -ENOSYS;
 }

@@ -400,7 +400,7 @@ int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data);
 int pnp_register_dma_resource(struct pnp_option *option, struct pnp_dma *data);
 int pnp_register_port_resource(struct pnp_option *option, struct pnp_port *data);
 int pnp_register_mem_resource(struct pnp_option *option, struct pnp_mem *data);
-void pnp_init_resources(struct pnp_resource_table *table);
+void pnp_init_resource_table(struct pnp_resource_table *table);
 int pnp_assign_resources(struct pnp_dev *dev, int depnum);
 int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table *res, int mode);
 int pnp_auto_config_dev(struct pnp_dev *dev);
@@ -448,7 +448,7 @@ static inline int pnp_register_irq_resource(struct pnp_option *option, struct pn
 static inline int pnp_register_dma_resource(struct pnp_option *option, struct pnp_dma *data) { return -ENODEV; }
 static inline int pnp_register_port_resource(struct pnp_option *option, struct pnp_port *data) { return -ENODEV; }
 static inline int pnp_register_mem_resource(struct pnp_option *option, struct pnp_mem *data) { return -ENODEV; }
-static inline void pnp_init_resources(struct pnp_resource_table *table) { }
+static inline void pnp_init_resource_table(struct pnp_resource_table *table) { }
 static inline int pnp_assign_resources(struct pnp_dev *dev, int depnum) { return -ENODEV; }
 static inline int pnp_manual_config_dev(struct pnp_dev *dev, struct pnp_resource_table *res, int mode) { return -ENODEV; }
 static inline int pnp_auto_config_dev(struct pnp_dev *dev) { return -ENODEV; }

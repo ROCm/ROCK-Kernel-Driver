@@ -20,10 +20,6 @@
 
 #include <media/saa7146.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 /* global variables */
 struct list_head saa7146_devices;
 struct semaphore saa7146_devices_lock;
@@ -53,8 +49,7 @@ static void dump_registers(struct saa7146_dev* dev)
  ****************************************************************************/
 
 /* this is videobuf_vmalloc_to_sg() from video-buf.c */
-static
-struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
+static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 {
 	struct scatterlist *sglist;
 	struct page *pg;
@@ -207,7 +202,6 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	saa7146_write(dev, ISR, isr);
-//	DEB_INT(("0x%08x\n",isr));
 
 	if( 0 != (dev->ext)) {
 		if( 0 != (dev->ext->irq_mask & isr )) {
@@ -260,8 +254,7 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 /*********************************************************************************/
 /* configuration-functions                                                       */
 
-static
-int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
+static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
 {
 	unsigned long adr = 0, len = 0;
 	struct saa7146_dev* dev = kmalloc (sizeof(struct saa7146_dev),GFP_KERNEL);
@@ -340,33 +333,33 @@ int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
 	}
 
 	/* get memory for various stuff */
-	dev->rps0 = (u32*)kmalloc(SAA7146_RPS_MEM, GFP_KERNEL);
-	if( NULL == dev->rps0 ) {
+	dev->d_rps0.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_RPS_MEM, &dev->d_rps0.dma_handle);	
+	if( NULL == dev->d_rps0.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_1;
 	}
-	memset(dev->rps0, 0x0, SAA7146_RPS_MEM);
+	memset(dev->d_rps0.cpu_addr, 0x0, SAA7146_RPS_MEM);
 
-	dev->rps1 = (u32*)kmalloc(SAA7146_RPS_MEM, GFP_KERNEL);
-	if( NULL == dev->rps1 ) {
+	dev->d_rps1.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_RPS_MEM, &dev->d_rps1.dma_handle);	
+	if( NULL == dev->d_rps1.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_2;
 	}
-	memset(dev->rps1, 0x0, SAA7146_RPS_MEM);
+	memset(dev->d_rps1.cpu_addr, 0x0, SAA7146_RPS_MEM);
 
-	dev->i2c_mem = (u32*)kmalloc(SAA7146_I2C_MEM, GFP_KERNEL);
-	if( NULL == dev->i2c_mem ) {
+	dev->d_i2c.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_RPS_MEM, &dev->d_i2c.dma_handle);	
+	if( NULL == dev->d_i2c.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_3;
 	}
-	memset(dev->i2c_mem, 0x00, SAA7146_I2C_MEM);
+	memset(dev->d_i2c.cpu_addr, 0x0, SAA7146_RPS_MEM);
 
 	/* the rest + print status message */
 
 	/* create a nice device name */
 	sprintf(&dev->name[0], "saa7146 (%d)",saa7146_num);
 
-	INFO(("found saa7146 @ mem 0x%08x (revision %d, irq %d) (0x%04x,0x%04x).\n", (unsigned int)dev->mem, dev->revision,dev->pci->irq,dev->pci->subsystem_vendor,dev->pci->subsystem_device));
+	INFO(("found saa7146 @ mem %p (revision %d, irq %d) (0x%04x,0x%04x).\n", dev->mem, dev->revision,dev->pci->irq,dev->pci->subsystem_vendor,dev->pci->subsystem_device));
 	dev->ext = ext;
 
 	pci_set_drvdata(pci,dev);
@@ -406,11 +399,11 @@ int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
 attach_error:
 probe_error:
 	pci_set_drvdata(pci,NULL);
-	kfree( dev->i2c_mem );
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_i2c.cpu_addr, dev->d_i2c.dma_handle);
 kmalloc_error_3:
-	kfree( dev->rps1 );
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_rps1.cpu_addr, dev->d_rps1.dma_handle);
 kmalloc_error_2:
-	kfree( dev->rps0 );
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_rps0.cpu_addr, dev->d_rps0.dma_handle);
 kmalloc_error_1:
 	free_irq(dev->pci->irq, (void *)dev);
 irq_error:
@@ -423,8 +416,7 @@ out:
 	return err;
 }
 
-static
-void saa7146_remove_one(struct pci_dev *pdev)
+static void saa7146_remove_one(struct pci_dev *pdev)
 {
 	struct saa7146_dev* dev = (struct saa7146_dev*) pci_get_drvdata(pdev);
 	DEB_EE(("dev:%p\n",dev));
@@ -440,9 +432,9 @@ void saa7146_remove_one(struct pci_dev *pdev)
 	free_irq(dev->pci->irq, (void *)dev);
 
 	/* free kernel memory */
-	kfree(dev->rps0 );
-	kfree(dev->rps1 );
-	kfree(dev->i2c_mem);
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_i2c.cpu_addr, dev->d_i2c.dma_handle);
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_rps1.cpu_addr, dev->d_rps1.dma_handle);
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, dev->d_rps0.cpu_addr, dev->d_rps0.dma_handle);
 
 	iounmap(dev->mem);
 	release_mem_region(pci_resource_start(dev->pci,0), pci_resource_len(dev->pci,0));
@@ -483,8 +475,7 @@ int saa7146_unregister_extension(struct saa7146_extension* ext)
 	return 0;
 }
 
-static
-int __init saa7146_init_module(void)
+static int __init saa7146_init_module(void)
 {
 	if( 0 == initialized ) {
 		INIT_LIST_HEAD(&saa7146_devices);
@@ -494,8 +485,7 @@ int __init saa7146_init_module(void)
 	return 0;
 }
 
-static
-void __exit saa7146_cleanup_module(void)
+static void __exit saa7146_cleanup_module(void)
 {
 }
 

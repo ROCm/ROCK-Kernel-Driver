@@ -6,6 +6,7 @@
  * Copyright (C) 1995, 1996, 1997, 1999, 2001 by Ralf Baechle
  * Copyright (C) 1999 by Silicon Graphics, Inc.
  * Copyright (C) 2001 MIPS Technologies, Inc.
+ * Copyright (C) 2002  Maciej W. Rozycki
  *
  * Some useful macros for MIPS assembler code
  *
@@ -87,7 +88,7 @@ symbol		=	value
 #define	PANIC(msg)                                      \
 		.set	push;				\
 		.set	reorder;                        \
-		la	a0,8f;                          \
+		PTR_LA	a0,8f;                          \
 		jal	panic;                          \
 9:		b	9b;                             \
 		.set	pop;				\
@@ -99,26 +100,26 @@ symbol		=	value
 #define PRINT(string)                                   \
 		.set	push;				\
 		.set	reorder;                        \
-		la	a0,8f;                          \
+		PTR_LA	a0,8f;                          \
 		jal	printk;                         \
 		.set	pop;				\
 		TEXT(string)
 
 #define	TEXT(msg)                                       \
-		.data;                                  \
+		.pushsection .data;			\
 8:		.asciiz	msg;                            \
-		.previous;
+		.popsection;
 
 /*
  * Build text tables
  */
 #define TTABLE(string)                                  \
-		.text;                                  \
+		.pushsection .text;			\
 		.word	1f;                             \
-		.previous;                              \
-		.data;                                  \
-1:		.asciz	string;                         \
-		.previous
+		.popsection				\
+		.pushsection .data;			\
+1:		.asciiz	string;                         \
+		.popsection
 
 /*
  * MIPS IV pref instruction.
@@ -127,21 +128,25 @@ symbol		=	value
  * MIPS IV implementations are free to treat this as a nop.  The R5000
  * is one of them.  So we should have an option not to use this instruction.
  */
-#if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS64)
+#ifdef CONFIG_CPU_HAS_PREFETCH
+
 #define PREF(hint,addr)                                 \
 		pref	hint,addr
+
 #define PREFX(hint,addr)                                \
 		prefx	hint,addr
-#else
-#define PREF
-#define PREFX
-#endif
+
+#else /* !CONFIG_CPU_HAS_PREFETCH */
+
+#define PREF(hint,addr)
+#define PREFX(hint,addr)
+
+#endif /* !CONFIG_CPU_HAS_PREFETCH */
 
 /*
  * MIPS ISA IV/V movn/movz instructions and equivalents for older CPUs.
  */
-#if _MIPS_ISA == _MIPS_ISA_MIPS1
+#if (_MIPS_ISA == _MIPS_ISA_MIPS1)
 #define MOVN(rd,rs,rt)                                  \
 		.set	push;				\
 		.set	reorder;			\
@@ -153,7 +158,7 @@ symbol		=	value
 		.set	push;				\
 		.set	reorder;			\
 		bnez	rt,9f;                          \
-		move	rd,rt;                          \
+		move	rd,rs;                          \
 		.set	pop;				\
 9:
 #endif /* _MIPS_ISA == _MIPS_ISA_MIPS1 */
@@ -162,24 +167,24 @@ symbol		=	value
 		.set	push;				\
 		.set	noreorder;			\
 		bnezl	rt,9f;                          \
-		move	rd,rs;                          \
+		 move	rd,rs;                          \
 		.set	pop;				\
 9:
 #define MOVZ(rd,rs,rt)                                  \
 		.set	push;				\
 		.set	noreorder;			\
 		beqzl	rt,9f;                          \
-		movz	rd,rs;                          \
+		 move	rd,rs;                          \
 		.set	pop;				\
 9:
 #endif /* (_MIPS_ISA == _MIPS_ISA_MIPS2) || (_MIPS_ISA == _MIPS_ISA_MIPS3) */
 #if (_MIPS_ISA == _MIPS_ISA_MIPS4 ) || (_MIPS_ISA == _MIPS_ISA_MIPS5) || \
-    (_MIPS_ISA == _MIPS_ISA_MIPS64)
+    (_MIPS_ISA == _MIPS_ISA_MIPS32) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
 #define MOVN(rd,rs,rt)                                  \
 		movn	rd,rs,rt
 #define MOVZ(rd,rs,rt)                                  \
 		movz	rd,rs,rt
-#endif /* MIPS IV, MIPS V or MIPS64 */
+#endif /* MIPS IV, MIPS V, MIPS32 or MIPS64 */
 
 /*
  * Stack alignment
@@ -196,6 +201,10 @@ symbol		=	value
 #endif
 
 /*
+ * Macros to handle different pointer/register sizes for 32/64-bit code
+ */
+
+/*
  * Size of a register
  */
 #ifdef __mips64
@@ -210,47 +219,54 @@ symbol		=	value
  */
 #if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
     (_MIPS_ISA == _MIPS_ISA_MIPS32)
-#define REG_S sw
-#define REG_L lw
-#define PTR_SUBU dsubu
-#define PTR_ADDU daddu
+#define REG_S		sw
+#define REG_L		lw
+#define REG_SUBU	subu
+#define REG_ADDU	addu
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
     (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
-#define REG_S sd
-#define REG_L ld
-/* We still live in a 32 bit address space ...  */
-#define PTR_SUBU dsubu
-#define PTR_ADDU daddu
+#define REG_S		sd
+#define REG_L		ld
+#define REG_SUBU	dsubu
+#define REG_ADDU	daddu
 #endif
 
 /*
  * How to add/sub/load/store/shift C int variables.
  */
 #if (_MIPS_SZINT == 32)
-#define INT_ADD	add
-#define INT_ADDI	addi
+#define INT_ADD		add
 #define INT_ADDU	addu
+#define INT_ADDI	addi
 #define INT_ADDIU	addiu
-#define INT_SUB		add
-#define INT_SUBI	subi
+#define INT_SUB		sub
 #define INT_SUBU	subu
-#define INT_SUBIU	subu
 #define INT_L		lw
 #define INT_S		sw
+#define INT_SLL		sll
+#define INT_SLLV	sllv
+#define INT_SRL		srl
+#define INT_SRLV	srlv
+#define INT_SRA		sra
+#define INT_SRAV	srav
 #endif
 
 #if (_MIPS_SZINT == 64)
-#define INT_ADD	dadd
-#define INT_ADDI	daddi
+#define INT_ADD		dadd
 #define INT_ADDU	daddu
+#define INT_ADDI	daddi
 #define INT_ADDIU	daddiu
-#define INT_SUB		dadd
-#define INT_SUBI	dsubi
+#define INT_SUB		dsub
 #define INT_SUBU	dsubu
-#define INT_SUBIU	dsubu
 #define INT_L		ld
 #define INT_S		sd
+#define INT_SLL		dsll
+#define INT_SLLV	dsllv
+#define INT_SRL		dsrl
+#define INT_SRLV	dsrlv
+#define INT_SRA		dsra
+#define INT_SRAV	dsrav
 #endif
 
 /*
@@ -258,13 +274,11 @@ symbol		=	value
  */
 #if (_MIPS_SZLONG == 32)
 #define LONG_ADD	add
-#define LONG_ADDI	addi
 #define LONG_ADDU	addu
+#define LONG_ADDI	addi
 #define LONG_ADDIU	addiu
-#define LONG_SUB	add
-#define LONG_SUBI	subi
+#define LONG_SUB	sub
 #define LONG_SUBU	subu
-#define LONG_SUBIU	subu
 #define LONG_L		lw
 #define LONG_S		sw
 #define LONG_SLL	sll
@@ -277,13 +291,11 @@ symbol		=	value
 
 #if (_MIPS_SZLONG == 64)
 #define LONG_ADD	dadd
-#define LONG_ADDI	daddi
 #define LONG_ADDU	daddu
+#define LONG_ADDI	daddi
 #define LONG_ADDIU	daddiu
-#define LONG_SUB	dadd
-#define LONG_SUBI	dsubi
+#define LONG_SUB	dsub
 #define LONG_SUBU	dsubu
-#define LONG_SUBIU	dsubu
 #define LONG_L		ld
 #define LONG_S		sd
 #define LONG_SLL	dsll
@@ -298,16 +310,15 @@ symbol		=	value
  * How to add/sub/load/store/shift pointers.
  */
 #if (_MIPS_SZPTR == 32)
-#define PTR_ADD	add
-#define PTR_ADDI	addi
+#define PTR_ADD		add
 #define PTR_ADDU	addu
+#define PTR_ADDI	addi
 #define PTR_ADDIU	addiu
-#define PTR_SUB		add
-#define PTR_SUBI	subi
+#define PTR_SUB		sub
 #define PTR_SUBU	subu
-#define PTR_SUBIU	subu
 #define PTR_L		lw
 #define PTR_S		sw
+#define PTR_LA		la
 #define PTR_SLL		sll
 #define PTR_SLLV	sllv
 #define PTR_SRL		srl
@@ -323,16 +334,15 @@ symbol		=	value
 #endif
 
 #if (_MIPS_SZPTR == 64)
-#define PTR_ADD	dadd
-#define PTR_ADDI	daddi
+#define PTR_ADD		dadd
 #define PTR_ADDU	daddu
+#define PTR_ADDI	daddi
 #define PTR_ADDIU	daddiu
-#define PTR_SUB		dadd
-#define PTR_SUBI	dsubi
+#define PTR_SUB		dsub
 #define PTR_SUBU	dsubu
-#define PTR_SUBIU	dsubu
 #define PTR_L		ld
 #define PTR_S		sd
+#define PTR_LA		dla
 #define PTR_SLL		dsll
 #define PTR_SLLV	dsllv
 #define PTR_SRL		dsrl
@@ -352,13 +362,15 @@ symbol		=	value
  */
 #if (_MIPS_ISA == _MIPS_ISA_MIPS1) || (_MIPS_ISA == _MIPS_ISA_MIPS2) || \
     (_MIPS_ISA == _MIPS_ISA_MIPS32)
-#define MFC0	mfc0
-#define MTC0	mtc0
+#define MFC0		mfc0
+#define MTC0		mtc0
 #endif
 #if (_MIPS_ISA == _MIPS_ISA_MIPS3) || (_MIPS_ISA == _MIPS_ISA_MIPS4) || \
     (_MIPS_ISA == _MIPS_ISA_MIPS5) || (_MIPS_ISA == _MIPS_ISA_MIPS64)
-#define MFC0	dmfc0
-#define MTC0	dmtc0
+#define MFC0		dmfc0
+#define MTC0		dmtc0
 #endif
+
+#define SSNOP		sll zero,zero,1
 
 #endif /* __ASM_ASM_H */

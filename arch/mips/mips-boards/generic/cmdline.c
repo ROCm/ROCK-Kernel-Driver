@@ -17,16 +17,21 @@
  *
  * Kernel command line creation using the prom monitor (YAMON) argc/argv.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/string.h>
 
 #include <asm/bootinfo.h>
 
 extern int prom_argc;
-extern char **prom_argv;
+extern int *_prom_argv;
 
-char arcs_cmdline[COMMAND_LINE_SIZE];
+/*
+ * YAMON (32-bit PROM) pass arguments and environment as 32-bit pointer.
+ * This macro take care of sign extension.
+ */
+#define prom_argv(index) ((char *)(((int *)(int)_prom_argv)[(index)]))
+
+char arcs_cmdline[CL_SIZE];
 
 char * __init prom_getcmdline(void)
 {
@@ -43,8 +48,8 @@ void  __init prom_init_cmdline(void)
 
 	cp = &(arcs_cmdline[0]);
 	while(actr < prom_argc) {
-	        strcpy(cp, prom_argv[actr]);
-		cp += strlen(prom_argv[actr]);
+	        strcpy(cp, prom_argv(actr));
+		cp += strlen(prom_argv(actr));
 		*cp++ = ' ';
 		actr++;
 	}

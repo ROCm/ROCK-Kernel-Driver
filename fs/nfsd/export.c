@@ -156,7 +156,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (len == 0) {
 		struct svc_expkey *ek;
 		set_bit(CACHE_NEGATIVE, &key.h.flags);
-		ek = svc_expkey_lookup(&key, 2);
+		ek = svc_expkey_lookup(&key, 1);
 		if (ek)
 			expkey_put(&ek->h, &svc_expkey_cache);
 	} else {
@@ -176,7 +176,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 		key.ek_export = exp;
 		dprintk("And found export\n");
 		
-		ek = svc_expkey_lookup(&key, 2);
+		ek = svc_expkey_lookup(&key, 1);
 		if (ek)
 			expkey_put(&ek->h, &svc_expkey_cache);
 		exp_put(exp);
@@ -184,7 +184,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	out_nd:
 		path_release(&nd);
 	}
-
+	cache_flush();
  out:
 	if (dom)
 		auth_domain_put(dom);
@@ -193,6 +193,31 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 	return err;
 }
 
+static int expkey_show(struct seq_file *m,
+		       struct cache_detail *cd,
+		       struct cache_head *h,
+		       char *pbuf)
+{
+	struct svc_expkey *ek ;
+
+	if (h ==NULL) {
+		seq_puts(m, "#domain fsidtype fsid [path]\n");
+		return 0;
+	}
+	ek = container_of(h, struct svc_expkey, h);
+	seq_printf(m, "%s %d 0x%08x", ek->ek_client->name,
+		   ek->ek_fsidtype, ek->ek_fsid[0]);
+	if (ek->ek_fsid == 0)
+		seq_printf(m, "%08x", ek->ek_fsid[0]);
+	if (test_bit(CACHE_VALID, &h->flags) && 
+	    !test_bit(CACHE_NEGATIVE, &h->flags)) {
+		seq_printf(m, " ");
+		seq_path(m, ek->ek_export->ex_mnt, ek->ek_export->ex_dentry, "\\ \t\n");
+	}
+	seq_printf(m, "\n");
+	return 0;
+}
+	
 struct cache_detail svc_expkey_cache = {
 	.hash_size	= EXPKEY_HASHMAX,
 	.hash_table	= expkey_table,
@@ -200,6 +225,7 @@ struct cache_detail svc_expkey_cache = {
 	.cache_put	= expkey_put,
 	.cache_request	= expkey_request,
 	.cache_parse	= expkey_parse,
+	.cache_show	= expkey_show,
 };
 
 static inline int svc_expkey_match (struct svc_expkey *a, struct svc_expkey *b)
@@ -231,7 +257,7 @@ static inline void svc_expkey_update(struct svc_expkey *new, struct svc_expkey *
 	new->ek_export = item->ek_export;
 }
 
-static DefineSimpleCacheLookup(svc_expkey)
+static DefineSimpleCacheLookup(svc_expkey,0) /* no inplace updates */
 
 #define	EXPORT_HASHBITS		8
 #define	EXPORT_HASHMAX		(1<< EXPORT_HASHBITS)
@@ -396,7 +422,7 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 	if (expp)
 		exp_put(expp);
 	err = 0;
-
+	cache_flush();
  out:
 	if (nd.dentry)
 		path_release(&nd);
@@ -407,6 +433,31 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 	return err;
 }
 
+static void exp_flags(struct seq_file *m, int flag, int fsid, uid_t anonu, uid_t anong);
+
+static int svc_export_show(struct seq_file *m,
+		       struct cache_detail *cd,
+		       struct cache_head *h,
+		       char *pbuf)
+{
+	struct svc_export *exp ;
+
+	if (h ==NULL) {
+		seq_puts(m, "#path domain(flags)\n");
+		return 0;
+	}
+	exp = container_of(h, struct svc_export, h);
+	seq_path(m, exp->ex_mnt, exp->ex_dentry, " \t\n\\");
+	seq_putc(m, '\t');
+	seq_escape(m, exp->ex_client->name, " \t\n\\");
+	seq_putc(m, '(');
+	if (test_bit(CACHE_VALID, &h->flags) && 
+	    !test_bit(CACHE_NEGATIVE, &h->flags))
+		exp_flags(m, exp->ex_flags, exp->ex_fsid, 
+			  exp->ex_anon_uid, exp->ex_anon_gid);
+	seq_puts(m, ")\n");
+	return 0;
+}
 struct cache_detail svc_export_cache = {
 	.hash_size	= EXPORT_HASHMAX,
 	.hash_table	= export_table,
@@ -414,6 +465,7 @@ struct cache_detail svc_export_cache = {
 	.cache_put	= svc_export_put,
 	.cache_request	= svc_export_request,
 	.cache_parse	= svc_export_parse,
+	.cache_show	= svc_export_show,
 };
 
 static inline int svc_export_match(struct svc_export *a, struct svc_export *b)
@@ -438,7 +490,7 @@ static inline void svc_export_update(struct svc_export *new, struct svc_export *
 	new->ex_fsid = item->ex_fsid;
 }
 
-static DefineSimpleCacheLookup(svc_export)
+static DefineSimpleCacheLookup(svc_export,1) /* allow inplace updates */
 
 
 struct svc_expkey *

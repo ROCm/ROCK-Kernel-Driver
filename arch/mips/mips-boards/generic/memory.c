@@ -2,8 +2,6 @@
  * Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 1999,2000 MIPS Technologies, Inc.  All rights reserved.
  *
- * ########################################################################
- *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
  *  published by the Free Software Foundation.
@@ -17,11 +15,8 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- * ########################################################################
- *
- * PROM library functions for acquiring/using memory descriptors given to 
+ * PROM library functions for acquiring/using memory descriptors given to
  * us from the YAMON.
- * 
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -83,11 +78,11 @@ struct prom_pmemblock * __init prom_getmdesc(void)
 	mdesc[1].size = 0x000ef000;
 
 #if (CONFIG_MIPS_MALTA)
-	/* 
+	/*
 	 * The area 0x000f0000-0x000fffff is allocated for BIOS memory by the
-	 * south bridge and PCI access always forwarded to the ISA Bus and 
+	 * south bridge and PCI access always forwarded to the ISA Bus and
 	 * BIOSCS# is always generated.
-	 * This mean that this area can't be used as DMA memory for PCI 
+	 * This mean that this area can't be used as DMA memory for PCI
 	 * devices.
 	 */
 	mdesc[2].type = yamon_dontuse;
@@ -148,7 +143,7 @@ void __init prom_meminit(void)
 		size = p->size;
 
 		add_memory_region(base, size, type);
-                p++; 
+                p++;
 	}
 }
 
@@ -168,7 +163,7 @@ prom_free_prom_memory (void)
 			      + boot_mem_map.map[i].size) {
 			ClearPageReserved(virt_to_page(__va(addr)));
 			set_page_count(virt_to_page(__va(addr)), 1);
-			free_page(__va(addr));
+			free_page((unsigned long)__va(addr));
 			addr += PAGE_SIZE;
 			freed += PAGE_SIZE;
 		}

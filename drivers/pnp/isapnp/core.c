@@ -458,7 +458,7 @@ static struct pnp_dev * __init isapnp_parse_device(struct pnp_card *card, int si
 	dev->capabilities |= PNP_READ;
 	dev->capabilities |= PNP_WRITE;
 	dev->capabilities |= PNP_DISABLE;
-	pnp_init_resources(&dev->res);
+	pnp_init_resource_table(&dev->res);
 	return dev;
 }
 
@@ -1020,7 +1020,7 @@ static int isapnp_read_resources(struct pnp_dev *dev, struct pnp_resource_table 
 static int isapnp_get_resources(struct pnp_dev *dev, struct pnp_resource_table * res)
 {
 	int ret;
-	pnp_init_resources(res);
+	pnp_init_resource_table(res);
 	isapnp_cfg_begin(dev->card->number, dev->number);
 	ret = isapnp_read_resources(dev, res);
 	isapnp_cfg_end();

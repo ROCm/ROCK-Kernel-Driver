@@ -31,7 +31,7 @@ typedef struct {
  * We make no fairness assumptions.  They have a cost.
  */
 
-static inline void spin_lock(spinlock_t *lock)
+static inline void _raw_spin_lock(spinlock_t *lock)
 {
 	unsigned int tmp;
 
@@ -44,37 +44,37 @@ static inline void spin_lock(spinlock_t *lock)
 	"beqz\t%1, 1b\n\t"
 	" sync\n\t"
 	".set\treorder"
-	: "=o" (lock->lock), "=&r" (tmp)
-	: "o" (lock->lock)
+	: "=m" (lock->lock), "=&r" (tmp)
+	: "m" (lock->lock)
 	: "memory");
 }
 
-static inline void spin_unlock(spinlock_t *lock)
+static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 	__asm__ __volatile__(
 	".set\tnoreorder\t\t\t# spin_unlock\n\t"
 	"sync\n\t"
 	"sw\t$0, %0\n\t"
-	".set\treorder"	
-	: "=o" (lock->lock)
-	: "o" (lock->lock)
+	".set\treorder"
+	: "=m" (lock->lock)
+	: "m" (lock->lock)
 	: "memory");
 }
 
-static inline unsigned int spin_trylock(spinlock_t *lock)
+static inline unsigned int _raw_spin_trylock(spinlock_t *lock)
 {
 	unsigned int temp, res;
 
 	__asm__ __volatile__(
 	".set\tnoreorder\t\t\t# spin_trylock\n\t"
-	"1:\tll\t%0, %1\n\t"
-	"or\t%2, %0, %3\n\t"
+	"1:\tll\t%0, %3\n\t"
+	"ori\t%2, %0, 1\n\t"
 	"sc\t%2, %1\n\t"
 	"beqz\t%2, 1b\n\t"
-	" and\t%2, %0, %3\n\t"
+	" andi\t%2, %0, 1\n\t"
 	".set\treorder"
 	: "=&r" (temp), "=m" (lock->lock), "=&r" (res)
-	: "r" (1), "m" (lock->lock)
+	: "m" (lock->lock)
 	: "memory");
 
 	return res == 0;
@@ -95,7 +95,11 @@ typedef struct {
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 
-static inline void read_lock(rwlock_t *rw)
+#define rwlock_init(x)  do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+
+#define rwlock_is_locked(x) ((x)->lock)
+
+static inline void _raw_read_lock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -107,16 +111,16 @@ static inline void read_lock(rwlock_t *rw)
 	"sc\t%1, %0\n\t"
 	"beqz\t%1, 1b\n\t"
 	" sync\n\t"
-	".set\treorder"	
-	: "=o" (rw->lock), "=&r" (tmp)
-	: "o" (rw->lock)
+	".set\treorder"
+	: "=m" (rw->lock), "=&r" (tmp)
+	: "m" (rw->lock)
 	: "memory");
 }
 
 /* Note the use of sub, not subu which will make the kernel die with an
    overflow exception if we ever try to unlock an rwlock that is already
    unlocked or is being held by a writer.  */
-static inline void read_unlock(rwlock_t *rw)
+static inline void _raw_read_unlock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -126,14 +130,14 @@ static inline void read_unlock(rwlock_t *rw)
 	"sub\t%1, 1\n\t"
 	"sc\t%1, %0\n\t"
 	"beqz\t%1, 1b\n\t"
-	"sync\n\t"
-	".set\treorder"	
-	: "=o" (rw->lock), "=&r" (tmp)
-	: "o" (rw->lock)
+	" sync\n\t"
+	".set\treorder"
+	: "=m" (rw->lock), "=&r" (tmp)
+	: "m" (rw->lock)
 	: "memory");
 }
 
-static inline void write_lock(rwlock_t *rw)
+static inline void _raw_write_lock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -145,21 +149,21 @@ static inline void write_lock(rwlock_t *rw)
 	"sc\t%1, %0\n\t"
 	"beqz\t%1, 1b\n\t"
 	" sync\n\t"
-	".set\treorder"	
-	: "=o" (rw->lock), "=&r" (tmp)
-	: "o" (rw->lock)
+	".set\treorder"
+	: "=m" (rw->lock), "=&r" (tmp)
+	: "m" (rw->lock)
 	: "memory");
 }
 
-static inline void write_unlock(rwlock_t *rw)
+static inline void _raw_write_unlock(rwlock_t *rw)
 {
 	__asm__ __volatile__(
 	".set\tnoreorder\t\t\t# write_unlock\n\t"
 	"sync\n\t"
 	"sw\t$0, %0\n\t"
-	".set\treorder"	
-	: "=o" (rw->lock)
-	: "o" (rw->lock)
+	".set\treorder"
+	: "=m" (rw->lock)
+	: "m" (rw->lock)
 	: "memory");
 }
 

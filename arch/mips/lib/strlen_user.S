@@ -1,5 +1,4 @@
-/* $Id: strlen_user.S,v 1.3 1999/08/21 22:19:11 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -24,22 +23,18 @@
  * Return 0 for error
  */
 LEAF(__strlen_user_asm)
-	lw	v0, THREAD_CURDS($28)	# pointer ok?
+	lw	v0, TI_ADDR_LIMIT($28)	# pointer ok?
 	and	v0, a0
 	bltz	v0, fault
 
-EXPORT(__strlen_user_nocheck_asm)
+FEXPORT(__strlen_user_nocheck_asm)
 	move	v0, a0
 1:	EX(lb, t0, (v0), fault)
 	addiu	v0, 1
 	bnez	t0, 1b
 	subu	v0, a0
 	jr	ra
-	END(__strlen_user_nocheck_asm)
-
-	.section __ex_table,"a"
-	PTR	1b, fault
-	.previous
+	END(__strlen_user_asm)
 
 fault:	move	v0, zero
 	jr	ra

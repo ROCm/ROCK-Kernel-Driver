@@ -21,26 +21,19 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/version.h>
-#include <linux/module.h>
 #include <linux/types.h>
+#include <linux/errno.h>
+#include <linux/string.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/errno.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <linux/kmod.h>
 #include <linux/slab.h>
+#include <linux/version.h>
+#include <asm/semaphore.h>
 
 #include "dvbdev.h"
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#endif
+#include "dvb_functions.h"
 
 static int dvbdev_debug = 0;
 #define dprintk if (dvbdev_debug) printk
@@ -58,8 +51,7 @@ static char *dnames[] = {
 #define DVB_MAX_IDS              4
 #define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
 
-static
-struct dvb_device* dvbdev_find_device (int minor)
+static struct dvb_device* dvbdev_find_device (int minor)
 {
 	struct list_head *entry;
 
@@ -79,8 +71,7 @@ struct dvb_device* dvbdev_find_device (int minor)
 }
 
 
-static
-int dvb_device_open(struct inode *inode, struct file *file)
+static int dvb_device_open(struct inode *inode, struct file *file)
 {
 	struct dvb_device *dvbdev;
 	
@@ -164,8 +155,7 @@ int dvb_generic_ioctl(struct inode *inode, struct file *file,
 }
 
 
-static
-int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
+static int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
 {
 	u32 id = 0;
 
@@ -188,8 +178,8 @@ skip:
 int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev, 
 			const struct dvb_device *template, void *priv, int type)
 {
-	u32 id;
 	struct dvb_device *dvbdev;
+	int id;
 
 	if (down_interruptible (&dvbdev_register_lock))
 		return -ERESTARTSYS;
@@ -241,8 +231,7 @@ void dvb_unregister_device(struct dvb_device *dvbdev)
 }
 
 
-static
-int dvbdev_get_free_adapter_num (void)
+static int dvbdev_get_free_adapter_num (void)
 {
 	int num = 0;
 
@@ -284,10 +273,6 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name)
 	memset (adap, 0, sizeof(struct dvb_adapter));
 	INIT_LIST_HEAD (&adap->device_list);
 
- 	/* fixme: is this correct? */
-	/* No */
-	try_module_get(THIS_MODULE);
-
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
 	devfs_mk_dir("dvb/adapter%d", num);
@@ -310,15 +295,11 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 	list_del (&adap->list_head);
 	up (&dvbdev_register_lock);
 	kfree (adap);
-	/* fixme: is this correct? */
-	/* No. */
-	module_put(THIS_MODULE);
 	return 0;
 }
 
 
-static
-int __init init_dvbdev(void)
+static int __init init_dvbdev(void)
 {
 	devfs_mk_dir("dvb");
 
@@ -331,8 +312,7 @@ int __init init_dvbdev(void)
 }
 
 
-static 
-void __exit exit_dvbdev(void)
+static void __exit exit_dvbdev(void)
 {
 	unregister_chrdev(DVB_MAJOR, "DVB");
         devfs_remove("dvb");

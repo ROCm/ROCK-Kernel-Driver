@@ -483,8 +483,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 
 		if (unlikely(
 		    ((char *)sfe < (char *)sf) ||
-		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
-		    (sfe->namelen >= MAXNAMELEN))) {
+		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)))) {
 			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
 			XFS_CORRUPTION_ERROR("xfs_dir_shortform_getdents",
 					     XFS_ERRLEVEL_LOW, mp, sfe);
@@ -2001,8 +2000,7 @@ xfs_dir_leaf_getdents_int(
 
 		if (unlikely(
 		    ((char *)namest < (char *)leaf) ||
-		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)) ||
-		    (entry->namelen >= MAXNAMELEN))) {
+		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)))) {
 			XFS_CORRUPTION_ERROR("xfs_dir_leaf_getdents_int(1)",
 					     XFS_ERRLEVEL_LOW, mp, leaf);
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
@@ -2065,8 +2063,7 @@ xfs_dir_leaf_getdents_int(
 
 		if (unlikely(
 		    ((char *)namest < (char *)leaf) ||
-		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)) ||
-		    (entry->namelen >= MAXNAMELEN))) {
+		    ((char *)namest >= (char *)leaf + XFS_LBSIZE(mp)))) {
 			XFS_CORRUPTION_ERROR("xfs_dir_leaf_getdents_int(2)",
 					     XFS_ERRLEVEL_LOW, mp, leaf);
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);

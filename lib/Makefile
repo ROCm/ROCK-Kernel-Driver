@@ -24,6 +24,7 @@ include drivers/net/Makefile.lib
 include drivers/usb/Makefile.lib
 include fs/Makefile.lib
 include net/bluetooth/bnep/Makefile.lib
+include drivers/media/dvb/dvb-core/Makefile.lib
 
 host-progs	:= gen_crc32table
 clean-files	:= crc32table.h

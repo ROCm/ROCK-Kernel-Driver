@@ -6,7 +6,7 @@
  * This is the user-visible SGI GFX interface.
  *
  * This must be used verbatim into the GNU libc.  It does not include
- * any kernel-only bits on it.  
+ * any kernel-only bits on it.
  *
  * miguel@nuclecu.unam.mx
  */

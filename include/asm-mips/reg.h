@@ -59,7 +59,7 @@
 #define EF_CP0_EPC		40
 #define EF_CP0_BADVADDR		41
 #define EF_CP0_STATUS		42
-#define EF_CP0_CAUSE		44
+#define EF_CP0_CAUSE		43
 
 #define EF_SIZE			180	/* size in bytes */
 

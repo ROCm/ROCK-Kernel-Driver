@@ -77,8 +77,7 @@ xfs_ioinit(
 	struct xfs_mount_args	*mntargs,
 	int			flags)
 {
-	return xfs_mountfs(vfsp, XFS_VFSTOM(vfsp),
-			   vfsp->vfs_super->s_bdev->bd_dev, flags);
+	return xfs_mountfs(vfsp, XFS_VFSTOM(vfsp), flags);
 }
 
 xfs_ioops_t	xfs_iocore_xfs = {

@@ -763,6 +763,11 @@ do_bindings(struct ip_conntrack *ct,
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	int proto = (*pskb)->nh.iph->protocol;
 
+	/* Skip everything and don't call helpers if there are no
+	 * manips for this connection */
+	if (info->num_manips == 0)
+		return NF_ACCEPT;
+
 	/* Need nat lock to protect against modification, but neither
 	   conntrack (referenced) and helper (deleted with
 	   synchronize_bh()) can vanish. */
@@ -791,6 +796,7 @@ do_bindings(struct ip_conntrack *ct,
 		struct ip_conntrack_expect *exp = NULL;
 		struct list_head *cur_item;
 		int ret = NF_ACCEPT;
+		int helper_called = 0;
 
 		DEBUGP("do_bindings: helper existing for (%p)\n", ct);
 
@@ -809,19 +815,21 @@ do_bindings(struct ip_conntrack *ct,
 				continue;
 
 			if (exp_for_packet(exp, *pskb)) {
-				/* FIXME: May be true multiple times in the case of UDP!! */
-				DEBUGP("calling nat helper (exp=%p) for packet\n",
-					exp);
+				/* FIXME: May be true multiple times in the
+				 * case of UDP!! */
+				DEBUGP("calling nat helper (exp=%p) for packet\n", exp);
 				ret = helper->help(ct, exp, info, ctinfo, 
 						   hooknum, pskb);
 				if (ret != NF_ACCEPT) {
 					READ_UNLOCK(&ip_conntrack_lock);
 					return ret;
 				}
+				helper_called = 1;
 			}
 		}
-		/* Helper might want to manip the packet even when there is no expectation */
-		if (!exp && helper->flags & IP_NAT_HELPER_F_ALWAYS) {
+		/* Helper might want to manip the packet even when there is no
+		 * matching expectation for this packet */
+		if (!helper_called && helper->flags & IP_NAT_HELPER_F_ALWAYS) {
 			DEBUGP("calling nat helper for packet without expectation\n");
 			ret = helper->help(ct, NULL, info, ctinfo, 
 					   hooknum, pskb);
