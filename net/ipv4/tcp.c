@@ -333,7 +333,7 @@ int tcp_mem_schedule(struct sock *sk, int size, int kind)
 suppress_allocation:
 
 	if (!kind) {
-		tcp_moderate_sndbuf(sk);
+		sk_stream_moderate_sndbuf(sk);
 
 		/* Fail only if socket is _under_ its sndbuf.
 		 * In this case we cannot block, so that we have to fail.

@@ -1893,14 +1893,6 @@ static inline void tcp_enter_memory_pressure(void)
 	}
 }
 
-static inline void tcp_moderate_sndbuf(struct sock *sk)
-{
-	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK)) {
-		sk->sk_sndbuf = min(sk->sk_sndbuf, sk->sk_wmem_queued / 2);
-		sk->sk_sndbuf = max(sk->sk_sndbuf, SOCK_MIN_SNDBUF);
-	}
-}
-
 static inline struct sk_buff *tcp_alloc_pskb(struct sock *sk, int size, int mem, int gfp)
 {
 	struct sk_buff *skb = alloc_skb(size+MAX_TCP_HEADER, gfp);
@@ -1915,7 +1907,7 @@ static inline struct sk_buff *tcp_alloc_pskb(struct sock *sk, int size, int mem,
 		__kfree_skb(skb);
 	} else {
 		tcp_enter_memory_pressure();
-		tcp_moderate_sndbuf(sk);
+		sk_stream_moderate_sndbuf(sk);
 	}
 	return NULL;
 }
@@ -1934,7 +1926,7 @@ static inline struct page * tcp_alloc_page(struct sock *sk)
 			return page;
 	}
 	tcp_enter_memory_pressure();
-	tcp_moderate_sndbuf(sk);
+	sk_stream_moderate_sndbuf(sk);
 	return NULL;
 }
 

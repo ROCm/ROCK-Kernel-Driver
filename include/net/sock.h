@@ -1095,6 +1095,14 @@ static inline void sk_wake_async(struct sock *sk, int how, int band)
 #define SOCK_MIN_SNDBUF 2048
 #define SOCK_MIN_RCVBUF 256
 
+static inline void sk_stream_moderate_sndbuf(struct sock *sk)
+{
+	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK)) {
+		sk->sk_sndbuf = min(sk->sk_sndbuf, sk->sk_wmem_queued / 2);
+		sk->sk_sndbuf = max(sk->sk_sndbuf, SOCK_MIN_SNDBUF);
+	}
+}
+
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO
  */
