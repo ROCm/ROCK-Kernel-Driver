@@ -22,13 +22,6 @@
 #define SID_MASK        0xfffffffff
 #define GET_ESID(x)     (((x) >> SID_SHIFT) & SID_MASK)
 
-/* Define an illegal instr to trap on the bug.
- * We don't use 0 because that marks the end of a function
- * in the ELF ABI.  That's "Boo Boo" in case you wonder...
- */
-#define BUG_OPCODE .long 0x00b00b00  /* For asm */
-#define BUG_ILLEGAL_INSTR "0x00b00b00" /* For BUG macro */
-
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 #include <asm/naca.h>
