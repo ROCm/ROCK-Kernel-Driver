@@ -535,7 +535,7 @@ done:
 	return err;
 }
 
-int l2cap_sock_listen(struct socket *sock, int backlog)
+static int l2cap_sock_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -563,7 +563,7 @@ done:
 	return err;
 }
 
-int l2cap_sock_accept(struct socket *sock, struct socket *newsock, int flags)
+static int l2cap_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct sock *sk = sock->sk, *nsk;
@@ -1051,7 +1051,7 @@ static void l2cap_chan_ready(struct sock *sk)
 }
 
 /* Copy frame to all raw sockets on that connection */
-void l2cap_raw_recv(struct l2cap_conn *conn, struct sk_buff *skb)
+static void l2cap_raw_recv(struct l2cap_conn *conn, struct sk_buff *skb)
 {
 	struct l2cap_chan_list *l = &conn->chan_list;
 	struct sk_buff *nskb;
@@ -2153,7 +2153,7 @@ static struct hci_proto l2cap_hci_proto = {
 	.recv_acldata =	l2cap_recv_acldata
 };
 
-int __init l2cap_init(void)
+static int __init l2cap_init(void)
 {
 	int err;
 
@@ -2175,7 +2175,7 @@ int __init l2cap_init(void)
 	return 0;
 }
 
-void __exit l2cap_cleanup(void)
+static void __exit l2cap_exit(void)
 {
 	l2cap_proc_cleanup();
 
@@ -2197,9 +2197,10 @@ void l2cap_load(void)
 EXPORT_SYMBOL(l2cap_load);
 
 module_init(l2cap_init);
-module_exit(l2cap_cleanup);
+module_exit(l2cap_exit);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth L2CAP ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("bt-proto-0");

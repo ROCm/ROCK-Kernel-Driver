@@ -482,7 +482,7 @@ int cmtp_get_conninfo(struct cmtp_conninfo *ci)
 }
 
 
-int __init init_cmtp(void)
+static int __init cmtp_init(void)
 {
 	l2cap_load();
 
@@ -493,15 +493,16 @@ int __init init_cmtp(void)
 	return 0;
 }
 
-void __exit exit_cmtp(void)
+static void __exit cmtp_exit(void)
 {
 	cmtp_cleanup_sockets();
 }
 
-module_init(init_cmtp);
-module_exit(exit_cmtp);
+module_init(cmtp_init);
+module_exit(cmtp_exit);
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth CMTP ver " VERSION);
+MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("bt-proto-5");
