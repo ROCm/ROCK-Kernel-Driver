@@ -23,4 +23,4 @@ fi
 dep_tristate '  Aiptek 6000U/8000U tablet support' CONFIG_USB_AIPTEK $CONFIG_USB $CONFIG_INPUT
 dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
 dep_tristate '  Griffin PowerMate and Contour Jog support' CONFIG_USB_POWERMATE $CONFIG_USB $CONFIG_INPUT
-
+dep_tristate '  X-Box gamepad support' CONFIG_USB_XPAD $CONFIG_USB $CONFIG_INPUT
