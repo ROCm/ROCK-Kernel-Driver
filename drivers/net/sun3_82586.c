@@ -327,7 +327,7 @@ out2:
 out1:
 	free_netdev(dev);
 out:
-	iounmap(ioaddr);
+	iounmap((void *)ioaddr);
 	return ERR_PTR(err);
 }
 
@@ -1163,8 +1163,8 @@ void cleanup_module(void)
 	unsigned long ioaddr = dev_sun3_82586->base_addr;
 	unregister_netdev(dev_sun3_82586);
 	release_region(ioaddr, SUN3_82586_TOTAL_SIZE);
-	iounmap(ioaddr);
-	free_netdev(dev);
+	iounmap((void *)ioaddr);
+	free_netdev(dev_sun3_82586);
 }
 #endif /* MODULE */
 
