@@ -1235,10 +1235,10 @@ static struct {
 } isapnp_ad1816_list[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7150), 
-		0 },
+		NULL },
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('A','D','S'), ISAPNP_FUNCTION(0x7180),
-		0 },
+		NULL },
 	{0}
 };
 

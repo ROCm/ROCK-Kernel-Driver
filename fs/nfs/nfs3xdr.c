@@ -484,7 +484,7 @@ static int
 nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
-	struct iovec *iov = rcvbuf->head;
+	struct kvec *iov = rcvbuf->head;
 	struct page **page;
 	int hdrlen, recvd;
 	int status, nr;
@@ -721,7 +721,7 @@ static int
 nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
-	struct iovec *iov = rcvbuf->head;
+	struct kvec *iov = rcvbuf->head;
 	unsigned int hdrlen;
 	u32	*strlen, len;
 	char	*string;
@@ -761,7 +761,7 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 static int
 nfs3_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 {
-	struct iovec *iov = req->rq_rcv_buf.head;
+	struct kvec *iov = req->rq_rcv_buf.head;
 	int	status, count, ocount, recvd, hdrlen;
 
 	status = ntohl(*p++);

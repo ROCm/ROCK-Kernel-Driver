@@ -39,26 +39,24 @@
 #include <linux/init.h>
 #include <net/sctp/sctp.h>
 
-static char *sctp_snmp_list[] = {
-#define SCTP_SNMP_ENTRY(x) #x 
-	SCTP_SNMP_ENTRY(SctpCurrEstab),
-	SCTP_SNMP_ENTRY(SctpActiveEstabs),
-	SCTP_SNMP_ENTRY(SctpPassiveEstabs),
-	SCTP_SNMP_ENTRY(SctpAborteds),
-	SCTP_SNMP_ENTRY(SctpShutdowns),
-	SCTP_SNMP_ENTRY(SctpOutOfBlues),
-	SCTP_SNMP_ENTRY(SctpChecksumErrors),
-	SCTP_SNMP_ENTRY(SctpOutCtrlChunks),
-	SCTP_SNMP_ENTRY(SctpOutOrderChunks),
-	SCTP_SNMP_ENTRY(SctpOutUnorderChunks),
-	SCTP_SNMP_ENTRY(SctpInCtrlChunks),
-	SCTP_SNMP_ENTRY(SctpInOrderChunks),
-	SCTP_SNMP_ENTRY(SctpInUnorderChunks),
-	SCTP_SNMP_ENTRY(SctpFragUsrMsgs),
-	SCTP_SNMP_ENTRY(SctpReasmUsrMsgs),
-	SCTP_SNMP_ENTRY(SctpOutSCTPPacks),
-	SCTP_SNMP_ENTRY(SctpInSCTPPacks),
-#undef SCTP_SNMP_ENTRY
+struct snmp_mib sctp_snmp_list[] = {
+	SNMP_MIB_ITEM("SctpCurrEstab", SCTP_MIB_CURRESTAB),
+	SNMP_MIB_ITEM("SctpActiveEstabs", SCTP_MIB_ACTIVEESTABS),
+	SNMP_MIB_ITEM("SctpPassiveEstabs", SCTP_MIB_PASSIVEESTABS),
+	SNMP_MIB_ITEM("SctpAborteds", SCTP_MIB_ABORTEDS),
+	SNMP_MIB_ITEM("SctpShutdowns", SCTP_MIB_SHUTDOWNS),
+	SNMP_MIB_ITEM("SctpOutOfBlues", SCTP_MIB_OUTOFBLUES),
+	SNMP_MIB_ITEM("SctpChecksumErrors", SCTP_MIB_CHECKSUMERRORS),
+	SNMP_MIB_ITEM("SctpOutCtrlChunks", SCTP_MIB_OUTCTRLCHUNKS),
+	SNMP_MIB_ITEM("SctpOutOrderChunks", SCTP_MIB_OUTORDERCHUNKS),
+	SNMP_MIB_ITEM("SctpOutUnorderChunks", SCTP_MIB_OUTUNORDERCHUNKS),
+	SNMP_MIB_ITEM("SctpInCtrlChunks", SCTP_MIB_INCTRLCHUNKS),
+	SNMP_MIB_ITEM("SctpInOrderChunks", SCTP_MIB_INORDERCHUNKS),
+	SNMP_MIB_ITEM("SctpInUnorderChunks", SCTP_MIB_INUNORDERCHUNKS),
+	SNMP_MIB_ITEM("SctpFragUsrMsgs", SCTP_MIB_FRAGUSRMSGS),
+	SNMP_MIB_ITEM("SctpReasmUsrMsgs", SCTP_MIB_REASMUSRMSGS),
+	SNMP_MIB_ITEM("SctpOutSCTPPacks", SCTP_MIB_OUTSCTPPACKS),
+	SNMP_MIB_ITEM("SctpInSCTPPacks", SCTP_MIB_INSCTPPACKS),
 };
 
 /* Return the current value of a particular entry in the mib by adding its
@@ -88,9 +86,10 @@ static int sctp_snmp_seq_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	for (i = 0; i < sizeof(sctp_snmp_list) / sizeof(char *); i++)
-		seq_printf(seq, "%-32s\t%ld\n", sctp_snmp_list[i],
-			   fold_field((void **)sctp_statistics, i));
+	for (i = 0; sctp_snmp_list[i].name != NULL; i++)
+		seq_printf(seq, "%-32s\t%ld\n", sctp_snmp_list[i].name,
+			   fold_field((void **)sctp_statistics, 
+				      sctp_snmp_list[i].entry));
 
 	return 0;
 }

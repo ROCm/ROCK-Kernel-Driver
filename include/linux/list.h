@@ -626,7 +626,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 	     pos = pos->next)
 
 #define hlist_for_each_safe(pos, n, head) \
-	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
+	for (pos = (head)->first; n = pos ? pos->next : NULL, pos; \
 	     pos = n)
 
 /**

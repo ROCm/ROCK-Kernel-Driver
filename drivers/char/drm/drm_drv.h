@@ -243,7 +243,7 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_FREE)]       = { DRM(sg_free),     1, 1 },
 #endif
 
-#if __HAVE_VBL_IRQ
+#ifdef __HAVE_VBL_IRQ
 	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank), 0, 0 },
 #endif
 
@@ -741,12 +741,11 @@ module_exit( drm_cleanup );
 int DRM(version)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
+	drm_version_t __user *argp = (void __user *)arg;
 	drm_version_t version;
 	int len;
 
-	if ( copy_from_user( &version,
-			     (drm_version_t *)arg,
-			     sizeof(version) ) )
+	if ( copy_from_user( &version, argp, sizeof(version) ) )
 		return -EFAULT;
 
 #define DRM_COPY( name, value )						\
@@ -766,9 +765,7 @@ int DRM(version)( struct inode *inode, struct file *filp,
 	DRM_COPY( version.date, DRIVER_DATE );
 	DRM_COPY( version.desc, DRIVER_DESC );
 
-	if ( copy_to_user( (drm_version_t *)arg,
-			   &version,
-			   sizeof(version) ) )
+	if ( copy_to_user( argp, &version, sizeof(version) ) )
 		return -EFAULT;
 	return 0;
 }
@@ -1048,7 +1045,7 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 
 	++priv->lock_count;
 
-        if ( copy_from_user( &lock, (drm_lock_t *)arg, sizeof(lock) ) )
+        if ( copy_from_user( &lock, (drm_lock_t __user *)arg, sizeof(lock) ) )
 		return -EFAULT;
 
         if ( lock.context == DRM_KERNEL_CONTEXT ) {
@@ -1161,7 +1158,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_lock_t lock;
 
-	if ( copy_from_user( &lock, (drm_lock_t *)arg, sizeof(lock) ) )
+	if ( copy_from_user( &lock, (drm_lock_t __user *)arg, sizeof(lock) ) )
 		return -EFAULT;
 
 	if ( lock.context == DRM_KERNEL_CONTEXT ) {
@@ -1181,7 +1178,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	 * agent to request it then we should just be able to
 	 * take it immediately and not eat the ioctl.
 	 */
-	dev->lock.filp = 0;
+	dev->lock.filp = NULL;
 	{
 		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
 		unsigned int old, new, prev, ctx;

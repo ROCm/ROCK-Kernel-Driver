@@ -72,7 +72,7 @@ fixup_one_level_bus_range(struct device_node *node, int higher)
 		int len;
 
 		/* For PCI<->PCI bridges or CardBus bridges, we go down */
-		class_code = (unsigned int *) get_property(node, "class-code", 0);
+		class_code = (unsigned int *) get_property(node, "class-code", NULL);
 		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
 			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
 			continue;
@@ -509,7 +509,7 @@ fixup_nec_usb2(void)
 			continue;
 		if (0x0035 != *prop)
 			continue;
-		prop = (u32 *)get_property(nec, "reg", 0);
+		prop = (u32 *)get_property(nec, "reg", NULL);
 		if (prop == NULL)
 			continue;
 		devfn = (prop[0] >> 8) & 0xff;

@@ -154,6 +154,13 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 {
 }
 
+#define PCI_DMA_ERROR_CODE      (~(dma_addr_t)0x0)
+
+static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
+{
+        return (dma_addr == PCI_DMA_ERROR_CODE);
+}
+
 #endif /* __KERNEL__ */
 
 /* generic pci stuff */

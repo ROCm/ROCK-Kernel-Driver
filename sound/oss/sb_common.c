@@ -1206,7 +1206,7 @@ int probe_sbmpu(struct address_info *hw_config, struct module *owner)
 	if (last_devc == NULL)
 		return 0;
 
-	last_devc = 0;
+	last_devc = NULL;
 
 	if (hw_config->io_base <= 0)
 	{

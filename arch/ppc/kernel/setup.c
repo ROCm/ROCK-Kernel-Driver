@@ -622,7 +622,7 @@ int __init ppc_setup_l2cr(char *str)
 }
 __setup("l2cr=", ppc_setup_l2cr);
 
-#ifdef CONFIG_NVRAM
+#ifdef CONFIG_GENERIC_NVRAM
 
 /* Generic nvram hooks used by drivers/char/gen_nvram.c */
 unsigned char nvram_read_byte(int addr)
@@ -693,7 +693,7 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XMON
 	xmon_map_scc();
 	if (strstr(cmd_line, "xmon"))
-		xmon(0);
+		xmon(NULL);
 #endif /* CONFIG_XMON */
 	if ( ppc_md.progress ) ppc_md.progress("setup_arch: enter", 0x3eab);
 

@@ -13,10 +13,10 @@ struct mcontext {
 
 struct ucontext {
 	unsigned long	 uc_flags;
-	struct ucontext *uc_link;
+	struct ucontext __user *uc_link;
 	stack_t		 uc_stack;
 	int		 uc_pad[7];
-	struct mcontext	*uc_regs;	/* points to uc_mcontext field */
+	struct mcontext	__user *uc_regs;/* points to uc_mcontext field */
 	sigset_t	 uc_sigmask;
 	/* glibc has 1024-bit signal masks, ours are 64-bit */
 	int		 uc_maskext[30];

@@ -865,7 +865,7 @@ prep_init_IRQ(void)
 		irq_desc[i].handler = &i8259_pic;
 	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory
 	 * controller, we poll (as they have a different int-ack address). */
-	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &pci_viddid);
+	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &pci_viddid);
 	pci_did = (pci_viddid & 0xffff0000) >> 16;
 	if (((pci_viddid & 0xffff) == PCI_VENDOR_ID_MOTOROLA)
 			&& ((pci_did == PCI_DEVICE_ID_MOTOROLA_RAVEN)

@@ -469,7 +469,7 @@ static int __init gen_rtc_proc_init(void)
 {
 	struct proc_dir_entry *r;
 
-	r = create_proc_read_entry("driver/rtc", 0, 0, gen_rtc_read_proc, NULL);
+	r = create_proc_read_entry("driver/rtc", 0, NULL, gen_rtc_read_proc, NULL);
 	if (!r)
 		return -ENOMEM;
 	return 0;

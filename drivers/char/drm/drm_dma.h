@@ -214,7 +214,7 @@ int DRM(control)( struct inode *inode, struct file *filp,
 {
 	drm_control_t ctl;
 
-	if ( copy_from_user( &ctl, (drm_control_t *)arg, sizeof(ctl) ) )
+	if ( copy_from_user( &ctl, (drm_control_t __user *)arg, sizeof(ctl) ) )
 		return -EFAULT;
 
 	switch ( ctl.func ) {

@@ -1,6 +1,6 @@
 /*
  * lec.c: Lan Emulation driver 
- * Marko Kiiskila carnil@cs.tut.fi
+ * Marko Kiiskila mkiiskila@yahoo.com
  *
  */
 

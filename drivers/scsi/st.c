@@ -3974,7 +3974,7 @@ static int st_remove(struct device *dev)
 	for (i = 0; i < st_dev_max; i++) {
 		tpnt = scsi_tapes[i];
 		if (tpnt != NULL && tpnt->device == SDp) {
-			scsi_tapes[i] = 0;
+			scsi_tapes[i] = NULL;
 			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
 			devfs_unregister_tape(tpnt->disk->number);

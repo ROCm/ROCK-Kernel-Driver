@@ -380,7 +380,7 @@ struct vio_dev * __devinit vio_register_device_node(struct device_node *of_node)
 	viodev->dev.platform_data = of_node_get(of_node);
 
 	viodev->irq = NO_IRQ;
-	irq_p = (unsigned int *)get_property(of_node, "interrupts", 0);
+	irq_p = (unsigned int *)get_property(of_node, "interrupts", NULL);
 	if (irq_p) {
 		int virq = virt_irq_create_mapping(*irq_p);
 		if (virq == NO_IRQ) {

@@ -417,7 +417,7 @@ out_sleep:
 
 static ssize_t
 gss_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
-		char *dst, size_t buflen)
+		char __user *dst, size_t buflen)
 {
 	char *data = (char *)msg->data + msg->copied;
 	ssize_t mlen = msg->len;
@@ -439,7 +439,7 @@ gss_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
 #define MSG_BUF_MAXSIZE 1024
 
 static ssize_t
-gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
+gss_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 {
 	struct xdr_netobj obj = {
 		.len	= mlen,
@@ -697,7 +697,7 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 	struct rpc_rqst *req = task->tk_rqstp;
 	u32             maj_stat = 0;
 	struct xdr_netobj mic;
-	struct iovec	iov;
+	struct kvec	iov;
 	struct xdr_buf	verf_buf;
 	u32		service;
 
@@ -774,7 +774,7 @@ gss_validate(struct rpc_task *task, u32 *p)
 						gc_base);
 	struct gss_cl_ctx *ctx = gss_cred_get_ctx(cred);
 	u32		seq, qop_state;
-	struct iovec	iov;
+	struct kvec	iov;
 	struct xdr_buf	verf_buf;
 	struct xdr_netobj mic;
 	u32		flav,len;
@@ -830,7 +830,7 @@ gss_wrap_req_integ(struct gss_cl_ctx *ctx,
 	u32             *integ_len = NULL;
 	struct xdr_netobj mic;
 	u32		offset, *q;
-	struct iovec	*iov;
+	struct kvec	*iov;
 	u32             maj_stat = 0;
 	int		status = -EIO;
 

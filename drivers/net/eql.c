@@ -389,7 +389,7 @@ static inline int eql_is_full(slave_queue_t *queue)
 static int __eql_insert_slave(slave_queue_t *queue, slave_t *slave)
 {
 	if (!eql_is_full(queue)) {
-		slave_t *duplicate_slave = 0;
+		slave_t *duplicate_slave = NULL;
 
 		duplicate_slave = __eql_find_slave_dev(queue, slave->dev);
 		if (duplicate_slave != 0)

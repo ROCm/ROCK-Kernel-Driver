@@ -1432,7 +1432,7 @@ isdn_ciscohdlck_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	unsigned long expires = 0;
 	int tmp = 0;
 	int period = lp->cisco_keepalive_period;
-	char debserint = lp->cisco_debserint;
+	s8 debserint = lp->cisco_debserint;
 	int rc = 0;
 
 	if (lp->p_encap != ISDN_NET_ENCAP_CISCOHDLCK)

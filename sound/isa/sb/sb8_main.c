@@ -452,11 +452,11 @@ int snd_sb8_open(snd_pcm_substream_t *substream)
 		runtime->hw.rate_max = 44100;
 		runtime->hw.channels_max = 2;
 		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				    snd_sb8_hw_constraint_rate_channels, 0,
+				    snd_sb8_hw_constraint_rate_channels, NULL,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
 				    SNDRV_PCM_HW_PARAM_RATE, -1);
 		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				     snd_sb8_hw_constraint_channels_rate, 0,
+				     snd_sb8_hw_constraint_channels_rate, NULL,
 				     SNDRV_PCM_HW_PARAM_RATE, -1);
 		break;
 	case SB_HW_201:

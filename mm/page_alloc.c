@@ -1402,7 +1402,7 @@ void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
 		INIT_LIST_HEAD(&page->lru);
 #ifdef WANT_PAGE_VIRTUAL
 		/* The shift won't overflow because ZONE_NORMAL is below 4G. */
-		if (!is_highmem(zone))
+		if (!is_highmem_idx(zone))
 			set_page_address(page, __va(start_pfn << PAGE_SHIFT));
 #endif
 		start_pfn++;

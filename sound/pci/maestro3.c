@@ -968,7 +968,7 @@ static struct m3_quirk m3_quirk_list[] = {
 		.amp_gpio = 0x03,
 	},
 	/* END */
-	{ 0 }
+	{ NULL }
 };
 
 

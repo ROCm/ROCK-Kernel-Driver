@@ -87,7 +87,8 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 /*
  * This is updated when the user sets irq affinity via /proc
  */
-cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
+cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
+static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
 
 #ifdef CONFIG_IA64_GENERIC
 irq_desc_t * __ia64_irq_desc (unsigned int irq)
@@ -973,6 +974,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	int prelen;
 	irq_desc_t *desc = irq_descp(irq);
 	unsigned long flags;
+	int redir = 0;
 
 	if (!desc->handler->set_affinity)
 		return -EIO;
@@ -995,7 +997,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	prelen = 0;
 	if (tolower(*rbuf) == 'r') {
 		prelen = strspn(rbuf, "Rr ");
-		irq |= IA64_IRQ_REDIRECTED;
+		redir++;
 	}
 
 	err = cpumask_parse(buffer+prelen, count-prelen, new_value);
@@ -1013,6 +1015,10 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	spin_lock_irqsave(&desc->lock, flags);
 	pending_irq_cpumask[irq] = new_value;
+	if (redir)
+		set_bit(irq, pending_irq_redir);
+	else
+		clear_bit(irq, pending_irq_redir);
 	spin_unlock_irqrestore(&desc->lock, flags);
 
 	return full_count;
@@ -1023,11 +1029,13 @@ void move_irq(int irq)
 	/* note - we hold desc->lock */
 	cpumask_t tmp;
 	irq_desc_t *desc = irq_descp(irq);
+	int redir = test_bit(irq, pending_irq_redir);
 
 	if (!cpus_empty(pending_irq_cpumask[irq])) {
 		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
 		if (unlikely(!cpus_empty(tmp))) {
-			desc->handler->set_affinity(irq, pending_irq_cpumask[irq]);
+			desc->handler->set_affinity(irq | (redir ? IA64_IRQ_REDIRECTED : 0),
+						    pending_irq_cpumask[irq]);
 		}
 		cpus_clear(pending_irq_cpumask[irq]);
 	}

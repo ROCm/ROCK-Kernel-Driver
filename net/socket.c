@@ -559,6 +559,23 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	return ret;
 }
 
+int kernel_sendmsg(struct socket *sock, struct msghdr *msg,
+		   struct kvec *vec, size_t num, size_t size)
+{
+	mm_segment_t oldfs = get_fs();
+	int result;
+
+	set_fs(KERNEL_DS);
+	/*
+	 * the following is safe, since for compiler definitions of kvec and
+	 * iovec are identical, yielding the same in-core layout and alignment
+	 */
+	msg->msg_iov = (struct iovec *)vec,
+	msg->msg_iovlen = num;
+	result = sock_sendmsg(sock, msg, size);
+	set_fs(oldfs);
+	return result;
+}
 
 static inline int __sock_recvmsg(struct kiocb *iocb, struct socket *sock, 
 				 struct msghdr *msg, size_t size, int flags)
@@ -592,6 +609,25 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
 	return ret;
+}
+
+int kernel_recvmsg(struct socket *sock, struct msghdr *msg, 
+		   struct kvec *vec, size_t num,
+		   size_t size, int flags)
+{
+	mm_segment_t oldfs = get_fs();
+	int result;
+
+	set_fs(KERNEL_DS);
+	/*
+	 * the following is safe, since for compiler definitions of kvec and
+	 * iovec are identical, yielding the same in-core layout and alignment
+	 */
+	msg->msg_iov = (struct iovec *)vec,
+	msg->msg_iovlen = num;
+	result = sock_recvmsg(sock, msg, size, flags);
+	set_fs(oldfs);
+	return result;
 }
 
 static void sock_aio_dtor(struct kiocb *iocb)
@@ -2069,3 +2105,5 @@ EXPORT_SYMBOL(sock_sendmsg);
 EXPORT_SYMBOL(sock_unregister);
 EXPORT_SYMBOL(sock_wake_async);
 EXPORT_SYMBOL(sockfd_lookup);
+EXPORT_SYMBOL(kernel_sendmsg);
+EXPORT_SYMBOL(kernel_recvmsg);

@@ -133,10 +133,10 @@ typedef unsigned long interpret_func(struct device_node *, unsigned long,
 /* prom structure */
 struct prom_t prom;
 
-char *prom_display_paths[FB_MAX] __initdata = { 0, };
+char *prom_display_paths[FB_MAX] __initdata = { NULL, };
 phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays = 0;
-char *of_stdout_device = 0;
+char *of_stdout_device = NULL;
 
 static int iommu_force_on;
 int ppc64_iommu_off;
@@ -148,13 +148,13 @@ extern struct lmb lmb;
 #define MAX_PHB (32 * 6)  /* 32 drawers * 6 PHBs/drawer */
 struct of_tce_table of_tce_table[MAX_PHB + 1];
 
-char *bootpath = 0;
-char *bootdevice = 0;
+char *bootpath = NULL;
+char *bootdevice = NULL;
 
 int boot_cpuid = 0;
 #define MAX_CPU_THREADS 2
 
-struct device_node *allnodes = 0;
+struct device_node *allnodes = NULL;
 /* use when traversing tree through the allnext, child, sibling,
  * or parent members of struct device_node.
  */
@@ -1582,8 +1582,8 @@ copy_device_tree(unsigned long mem_start)
 		prom_panic("couldn't get device tree root\n");
 	}
 	allnextp = &RELOC(allnodes);
-	inspect_node(root, 0, &mem_start, &mem_end, &allnextp);
-	*allnextp = 0;
+	inspect_node(root, NULL, &mem_start, &mem_end, &allnextp);
+	*allnextp = NULL;
 	return mem_start;
 }
 
@@ -2241,8 +2241,8 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	struct device_node *child;
 	int *ip;
 
-	np->name = get_property(np, "name", 0);
-	np->type = get_property(np, "device_type", 0);
+	np->name = get_property(np, "name", NULL);
+	np->type = get_property(np, "device_type", NULL);
 
 	if (!np->name)
 		np->name = "<NULL>";
@@ -2256,10 +2256,10 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	mem_start = finish_node_interrupts(np, mem_start, measure_only);
 
 	/* Look for #address-cells and #size-cells properties. */
-	ip = (int *) get_property(np, "#address-cells", 0);
+	ip = (int *) get_property(np, "#address-cells", NULL);
 	if (ip != NULL)
 		naddrc = *ip;
-	ip = (int *) get_property(np, "#size-cells", 0);
+	ip = (int *) get_property(np, "#size-cells", NULL);
 	if (ip != NULL)
 		nsizec = *ip;
 
@@ -2267,7 +2267,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	 * expect for the name -- Cort
 	 */
 	if (!strcmp(np->name, "display"))
-		np->name = get_property(np, "compatible", 0);
+		np->name = get_property(np, "compatible", NULL);
 
 	if (!strcmp(np->name, "device-tree") || np->parent == NULL)
 		ifunc = interpret_root_props;
@@ -2324,7 +2324,7 @@ prom_n_addr_cells(struct device_node* np)
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = (int *) get_property(np, "#address-cells", 0);
+		ip = (int *) get_property(np, "#address-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
@@ -2339,7 +2339,7 @@ prom_n_size_cells(struct device_node* np)
 	do {
 		if (np->parent)
 			np = np->parent;
-		ip = (int *) get_property(np, "#size-cells", 0);
+		ip = (int *) get_property(np, "#size-cells", NULL);
 		if (ip != NULL)
 			return *ip;
 	} while (np->parent);
@@ -2384,7 +2384,7 @@ find_devices(const char *name)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -2403,7 +2403,7 @@ find_type_devices(const char *type)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -2420,7 +2420,7 @@ find_all_nodes(void)
 		*prevp = np;
 		prevp = &np->next;
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -2485,7 +2485,7 @@ find_compatible_devices(const char *type, const char *compat)
 			prevp = &np->next;
 		}
 	}
-	*prevp = 0;
+	*prevp = NULL;
 	return head;
 }
 
@@ -2905,8 +2905,8 @@ static int of_finish_dynamic_node(struct device_node *node)
 	int err = 0;
 	phandle *ibm_phandle;
  
-	node->name = get_property(node, "name", 0);
-	node->type = get_property(node, "device_type", 0);
+	node->name = get_property(node, "name", NULL);
+	node->type = get_property(node, "device_type", NULL);
 
 	if (!parent) {
 		err = -ENODEV;
@@ -2952,7 +2952,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 	}
 
 	/* now do the work of finish_node_interrupts */
-	if (get_property(node, "interrupts", 0)) {
+	if (get_property(node, "interrupts", NULL)) {
 		err = of_finish_dynamic_node_interrupts(node);
 		if (err) goto out;
 	}
@@ -2964,7 +2964,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 
        node->phb = parent->phb;
 
-       regs = (u32 *)get_property(node, "reg", 0);
+       regs = (u32 *)get_property(node, "reg", NULL);
        if (regs) {
                node->busno = (regs[0] >> 16) & 0xff;
                node->devfn = (regs[0] >> 8) & 0xff;
@@ -3097,7 +3097,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 				*lenp = pp->length;
 			return pp->value;
 		}
-	return 0;
+	return NULL;
 }
 
 /*

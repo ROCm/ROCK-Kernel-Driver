@@ -53,16 +53,17 @@ int DRM(getunique)(struct inode *inode, struct file *filp,
 {
 	drm_file_t	 *priv	 = filp->private_data;
 	drm_device_t	 *dev	 = priv->dev;
+	drm_unique_t	 __user *argp = (void __user *)arg;
 	drm_unique_t	 u;
 
-	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u)))
+	if (copy_from_user(&u, argp, sizeof(u)))
 		return -EFAULT;
 	if (u.unique_len >= dev->unique_len) {
 		if (copy_to_user(u.unique, dev->unique, dev->unique_len))
 			return -EFAULT;
 	}
 	u.unique_len = dev->unique_len;
-	if (copy_to_user((drm_unique_t *)arg, &u, sizeof(u)))
+	if (copy_to_user(argp, &u, sizeof(u)))
 		return -EFAULT;
 	return 0;
 }
@@ -91,7 +92,8 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 
 	if (dev->unique_len || dev->unique) return -EBUSY;
 
-	if (copy_from_user(&u, (drm_unique_t *)arg, sizeof(u))) return -EFAULT;
+	if (copy_from_user(&u, (drm_unique_t __user *)arg, sizeof(u)))
+		return -EFAULT;
 
 	if (!u.unique_len || u.unique_len > 1024) return -EINVAL;
 
@@ -171,13 +173,14 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 {
 	drm_file_t   *priv = filp->private_data;
 	drm_device_t *dev  = priv->dev;
+	drm_map_t    __user *argp = (void __user *)arg;
 	drm_map_t    map;
 	drm_map_list_t *r_list = NULL;
 	struct list_head *list;
 	int          idx;
 	int	     i;
 
-	if (copy_from_user(&map, (drm_map_t *)arg, sizeof(map)))
+	if (copy_from_user(&map, argp, sizeof(map)))
 		return -EFAULT;
 	idx = map.offset;
 
@@ -208,7 +211,7 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	map.mtrr   = r_list->map->mtrr;
 	up(&dev->struct_sem);
 
-	if (copy_to_user((drm_map_t *)arg, &map, sizeof(map))) return -EFAULT;
+	if (copy_to_user(argp, &map, sizeof(map))) return -EFAULT;
 	return 0;
 }
 
@@ -230,12 +233,13 @@ int DRM(getclient)( struct inode *inode, struct file *filp,
 {
 	drm_file_t   *priv = filp->private_data;
 	drm_device_t *dev  = priv->dev;
+	drm_client_t __user *argp = (void __user *)arg;
 	drm_client_t client;
 	drm_file_t   *pt;
 	int          idx;
 	int          i;
 
-	if (copy_from_user(&client, (drm_client_t *)arg, sizeof(client)))
+	if (copy_from_user(&client, argp, sizeof(client)))
 		return -EFAULT;
 	idx = client.idx;
 	down(&dev->struct_sem);
@@ -253,7 +257,7 @@ int DRM(getclient)( struct inode *inode, struct file *filp,
 	client.iocs  = pt->ioctl_count;
 	up(&dev->struct_sem);
 
-	if (copy_to_user((drm_client_t *)arg, &client, sizeof(client)))
+	if (copy_to_user((drm_client_t __user *)arg, &client, sizeof(client)))
 		return -EFAULT;
 	return 0;
 }
@@ -294,7 +298,7 @@ int DRM(getstats)( struct inode *inode, struct file *filp,
 
 	up(&dev->struct_sem);
 
-	if (copy_to_user((drm_stats_t *)arg, &stats, sizeof(stats)))
+	if (copy_to_user((drm_stats_t __user *)arg, &stats, sizeof(stats)))
 		return -EFAULT;
 	return 0;
 }
@@ -308,15 +312,16 @@ int DRM(setversion)(DRM_IOCTL_ARGS)
 	drm_set_version_t sv;
 	drm_set_version_t retv;
 	int if_version;
+	drm_set_version_t __user *argp = (void __user *)data;
 
-	DRM_COPY_FROM_USER_IOCTL(sv, (drm_set_version_t *)data, sizeof(sv));
+	DRM_COPY_FROM_USER_IOCTL(sv, argp, sizeof(sv));
 
 	retv.drm_di_major = DRM_IF_MAJOR;
 	retv.drm_di_minor = DRM_IF_MINOR;
 	retv.drm_dd_major = DRIVER_MAJOR;
 	retv.drm_dd_minor = DRIVER_MINOR;
 
-	DRM_COPY_TO_USER_IOCTL((drm_set_version_t *)data, retv, sizeof(sv));
+	DRM_COPY_TO_USER_IOCTL(argp, retv, sizeof(sv));
 
 	if (sv.drm_di_major != -1) {
 		if (sv.drm_di_major != DRM_IF_MAJOR ||

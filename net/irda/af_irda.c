@@ -1266,7 +1266,7 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
+	IRDA_DEBUG(4, "%s(), len=%zd\n", __FUNCTION__, len);
 
 	/* Note : socket.c set MSG_EOR on SEQPACKET sockets */
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
@@ -1295,7 +1295,7 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	/* Check that we don't send out to big frames */
 	if (len > self->max_data_size) {
-		IRDA_DEBUG(2, "%s(), Chopping frame from %d to %d bytes!\n",
+		IRDA_DEBUG(2, "%s(), Chopping frame from %zd to %d bytes!\n",
 			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}
@@ -1355,7 +1355,7 @@ static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
 	copied     = skb->len;
 
 	if (copied > size) {
-		IRDA_DEBUG(2, "%s(), Received truncated frame (%d < %d)!\n",
+		IRDA_DEBUG(2, "%s(), Received truncated frame (%zd < %zd)!\n",
 			   __FUNCTION__, copied, size);
 		copied = size;
 		msg->msg_flags |= MSG_TRUNC;
@@ -1519,7 +1519,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
+	IRDA_DEBUG(4, "%s(), len=%zd\n", __FUNCTION__, len);
 
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
@@ -1541,7 +1541,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 	 */
 	if (len > self->max_data_size) {
 		IRDA_DEBUG(0, "%s(), Warning to much data! "
-			   "Chopping frame from %d to %d bytes!\n",
+			   "Chopping frame from %zd to %d bytes!\n",
 			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}
@@ -1591,7 +1591,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 	unsigned char *asmptr;
 	int err;
 
-	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
+	IRDA_DEBUG(4, "%s(), len=%zd\n", __FUNCTION__, len);
 
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
@@ -1637,7 +1637,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 	 */
 	if (len > self->max_data_size) {
 		IRDA_DEBUG(0, "%s(), Warning to much data! "
-			   "Chopping frame from %d to %d bytes!\n",
+			   "Chopping frame from %zd to %d bytes!\n",
 			   __FUNCTION__, len, self->max_data_size);
 		len = self->max_data_size;
 	}

@@ -76,7 +76,7 @@ int hvc_count(int *start_termno)
 	 * we should _always_ be able to find one. */
 	vty = of_find_node_by_name(NULL, "vty");
 	if (vty && device_is_compatible(vty, "hvterm1")) {
-		u32 *termno = (u32 *)get_property(vty, "reg", 0);
+		u32 *termno = (u32 *)get_property(vty, "reg", NULL);
 
 		if (termno && start_termno)
 			*start_termno = *termno;

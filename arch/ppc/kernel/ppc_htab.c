@@ -448,15 +448,15 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	}
 
 	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
+		if(put_user('\n', (char __user *) buffer))
 			return -EFAULT;
 		left--, buffer++;
 	}
 	if (write) {
-		p = (char *) buffer;
+		char __user *s = (char __user *) buffer;
 		while (left) {
 			char c;
-			if(get_user(c, p++))
+			if(get_user(c, s++))
 				return -EFAULT;
 			if (!isspace(c))
 				break;

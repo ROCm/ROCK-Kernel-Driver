@@ -938,7 +938,7 @@ fb_load_cursor_image(struct fb_info *info)
 }
 
 int
-fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
+fb_cursor(struct fb_info *info, struct fb_cursor __user *sprite)
 {
 	struct fb_cursor cursor;
 	int err;
@@ -973,8 +973,8 @@ fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
 			return -ENOMEM;
 		}
 		
-		if (copy_from_user(data, sprite->image.data, size) ||
-		    copy_from_user(mask, sprite->mask, size)) {
+		if (copy_from_user(data, cursor.image.data, size) ||
+		    copy_from_user(mask, cursor.mask, size)) {
 			kfree(data);
 			kfree(mask);
 			return -EFAULT;
@@ -1078,16 +1078,17 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct fb_con2fbmap con2fb;
 #endif
 	struct fb_cmap cmap;
+	void __user *argp = (void __user *)arg;
 	int i;
 	
 	if (!fb)
 		return -ENODEV;
 	switch (cmd) {
 	case FBIOGET_VSCREENINFO:
-		return copy_to_user((void *) arg, &info->var,
+		return copy_to_user(argp, &info->var,
 				    sizeof(var)) ? -EFAULT : 0;
 	case FBIOPUT_VSCREENINFO:
-		if (copy_from_user(&var, (void *) arg, sizeof(var)))
+		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
 		info->flags |= FBINFO_MISC_MODECHANGEUSER;
@@ -1095,47 +1096,47 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
 		release_console_sem();
 		if (i) return i;
-		if (copy_to_user((void *) arg, &var, sizeof(var)))
+		if (copy_to_user(argp, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
 	case FBIOGET_FSCREENINFO:
-		return copy_to_user((void *) arg, &info->fix,
+		return copy_to_user(argp, &info->fix,
 				    sizeof(fix)) ? -EFAULT : 0;
 	case FBIOPUTCMAP:
-		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
+		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
 		return (fb_set_cmap(&cmap, 0, info));
 	case FBIOGETCMAP:
-		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
+		if (copy_from_user(&cmap, argp, sizeof(cmap)))
 			return -EFAULT;
 		return (fb_copy_cmap(&info->cmap, &cmap, 2));
 	case FBIOPAN_DISPLAY:
-		if (copy_from_user(&var, (void *) arg, sizeof(var)))
+		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
 		i = fb_pan_display(info, &var);
 		release_console_sem();
 		if (i)
 			return i;
-		if (copy_to_user((void *) arg, &var, sizeof(var)))
+		if (copy_to_user(argp, &var, sizeof(var)))
 			return -EFAULT;
 		return 0;
 	case FBIO_CURSOR:
 		acquire_console_sem();
-		i = fb_cursor(info, (struct fb_cursor *) arg);
+		i = fb_cursor(info, argp);
 		release_console_sem();
 		return i;
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	case FBIOGET_CON2FBMAP:
-		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
+		if (copy_from_user(&con2fb, argp, sizeof(con2fb)))
 			return -EFAULT;
 		if (con2fb.console < 1 || con2fb.console > MAX_NR_CONSOLES)
 		    return -EINVAL;
 		con2fb.framebuffer = con2fb_map[con2fb.console-1];
-		return copy_to_user((void *)arg, &con2fb,
+		return copy_to_user(argp, &con2fb,
 				    sizeof(con2fb)) ? -EFAULT : 0;
 	case FBIOPUT_CON2FBMAP:
-		if (copy_from_user(&con2fb, (void *)arg, sizeof(con2fb)))
+		if (copy_from_user(&con2fb, argp, sizeof(con2fb)))
 			return - EFAULT;
 		if (con2fb.console < 0 || con2fb.console > MAX_NR_CONSOLES)
 		    return -EINVAL;

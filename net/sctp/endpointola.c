@@ -369,7 +369,7 @@ static void sctp_endpoint_bh_rcv(struct sctp_endpoint *ep)
 		if (asoc && sctp_chunk_is_data(chunk))
 			asoc->peer.last_data_from = chunk->transport;
 		else
-			SCTP_INC_STATS(SctpInCtrlChunks);
+			SCTP_INC_STATS(SCTP_MIB_INCTRLCHUNKS);
 
 		if (chunk->transport)
 			chunk->transport->last_time_heard = jiffies;

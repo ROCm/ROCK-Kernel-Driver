@@ -1253,8 +1253,8 @@ int usb_resume_device(struct usb_device *udev)
 	return 0;
 }
 
-#define	hub_suspend		0
-#define	hub_resume		0
+#define	hub_suspend		NULL
+#define	hub_resume		NULL
 #define	remote_wakeup(x)	0
 
 #endif	/* CONFIG_USB_SUSPEND */

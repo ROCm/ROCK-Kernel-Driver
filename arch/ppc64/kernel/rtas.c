@@ -31,7 +31,7 @@
 #include <asm/delay.h>
 #include <asm/uaccess.h>
 
-struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
+struct flash_block_list_header rtas_firmware_flash_list = {0, NULL};
 
 struct rtas_t rtas = { 
 	.lock = SPIN_LOCK_UNLOCKED
@@ -329,7 +329,7 @@ rtas_flash_firmware(void)
 		if (f->next)
 			f->next = (struct flash_block_list *)virt_to_abs(f->next);
 		else
-			f->next = 0LL;
+			f->next = NULL;
 		/* make num_blocks into the version/length field */
 		f->num_blocks = (FLASH_BLOCK_LIST_VERSION << 56) | ((f->num_blocks+1)*16);
 	}

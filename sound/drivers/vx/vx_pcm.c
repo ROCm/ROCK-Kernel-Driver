@@ -465,7 +465,7 @@ static int vx_alloc_pipe(vx_core_t *chip, int capture,
 	struct vx_rmh rmh;
 	int data_mode;
 
-	*pipep = 0;
+	*pipep = NULL;
 	vx_init_rmh(&rmh, CMD_RES_PIPE);
 	vx_set_pipe_cmd_params(&rmh, capture, audioid, num_audio);
 #if 0	// NYI
@@ -581,7 +581,7 @@ static int vx_pcm_playback_open(snd_pcm_substream_t *subs)
 {
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	vx_core_t *chip = snd_pcm_substream_chip(subs);
-	vx_pipe_t *pipe = 0;
+	vx_pipe_t *pipe = NULL;
 	unsigned int audio;
 	int err;
 
@@ -632,7 +632,7 @@ static int vx_pcm_playback_close(snd_pcm_substream_t *subs)
 	pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return -EINVAL);
 
 	if (--pipe->references == 0) {
-		chip->playback_pipes[pipe->number] = 0;
+		chip->playback_pipes[pipe->number] = NULL;
 		vx_free_pipe(chip, pipe);
 	}
 
@@ -1038,7 +1038,7 @@ static int vx_pcm_capture_close(snd_pcm_substream_t *subs)
 	if (! subs->runtime->private_data)
 		return -EINVAL;
 	pipe = snd_magic_cast(vx_pipe_t, subs->runtime->private_data, return -EINVAL);
-	chip->capture_pipes[pipe->number] = 0;
+	chip->capture_pipes[pipe->number] = NULL;
 
 	pipe_out_monitoring = pipe->monitoring_pipe;
 
@@ -1049,8 +1049,8 @@ static int vx_pcm_capture_close(snd_pcm_substream_t *subs)
 	if (pipe_out_monitoring) {
 		if (--pipe_out_monitoring->references == 0) {
 			vx_free_pipe(chip, pipe_out_monitoring);
-			chip->playback_pipes[pipe->number] = 0;
-			pipe->monitoring_pipe = 0;
+			chip->playback_pipes[pipe->number] = NULL;
+			pipe->monitoring_pipe = NULL;
 		}
 	}
 	
@@ -1269,11 +1269,11 @@ static void snd_vx_pcm_free(snd_pcm_t *pcm)
 	chip->pcm[pcm->device] = NULL;
 	if (chip->playback_pipes) {
 		kfree(chip->playback_pipes);
-		chip->playback_pipes = 0;
+		chip->playback_pipes = NULL;
 	}
 	if (chip->capture_pipes) {
 		kfree(chip->capture_pipes);
-		chip->capture_pipes = 0;
+		chip->capture_pipes = NULL;
 	}
 }
 

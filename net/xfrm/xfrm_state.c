@@ -65,7 +65,6 @@ static void xfrm_state_gc_destroy(struct xfrm_state *x)
 		xfrm_put_type(x->type);
 	}
 	kfree(x);
-	wake_up(&km_waitq);
 }
 
 static void xfrm_state_gc_task(void *data)
@@ -82,6 +81,7 @@ static void xfrm_state_gc_task(void *data)
 		x = list_entry(entry, struct xfrm_state, bydst);
 		xfrm_state_gc_destroy(x);
 	}
+	wake_up(&km_waitq);
 }
 
 static inline unsigned long make_jiffies(long secs)

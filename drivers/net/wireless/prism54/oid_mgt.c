@@ -408,7 +408,7 @@ int
 mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 {
 	int ret = 0;
-	struct islpci_mgmtframe *response;
+	struct islpci_mgmtframe *response = NULL;
 	int response_op = PIMFOR_OP_ERROR;
 	int dlen;
 	void *cache, *_data = data;
@@ -613,14 +613,16 @@ static enum oid_num_t commit_part2[] = {
 	DOT11_OID_DEFKEYID,
 	DOT11_OID_DOT1XENABLE,
 	OID_INL_DOT11D_CONFORMANCE,
+	/* Do not initialize this - fw < 1.0.4.3 rejects it
 	OID_INL_OUTPUTPOWER,
+	*/
 };
 
 /* update the MAC addr. */
 static int
 mgt_update_addr(islpci_private *priv)
 {
-	struct islpci_mgmtframe *res;
+	struct islpci_mgmtframe *res = NULL;
 	int ret;
 
 	ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,

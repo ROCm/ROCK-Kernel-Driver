@@ -715,7 +715,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
-			debugger(0);
+			debugger(NULL);
 			goto out;
 		}
 	}
@@ -730,7 +730,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 				       smp_processor_id(),
 				       atomic_read(&data.finished),
 				       atomic_read(&data.started));
-				debugger(0);
+				debugger(NULL);
 				goto out;
 			}
 		}

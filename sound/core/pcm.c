@@ -202,37 +202,37 @@ char *snd_pcm_tstamp_mode_names[] = {
 
 const char *snd_pcm_stream_name(snd_pcm_stream_t stream)
 {
-	snd_assert(stream <= SNDRV_PCM_STREAM_LAST, return 0);
+	snd_assert(stream <= SNDRV_PCM_STREAM_LAST, return NULL);
 	return snd_pcm_stream_names[stream];
 }
 
 const char *snd_pcm_access_name(snd_pcm_access_t access)
 {
-	snd_assert(access <= SNDRV_PCM_ACCESS_LAST, return 0);
+	snd_assert(access <= SNDRV_PCM_ACCESS_LAST, return NULL);
 	return snd_pcm_access_names[access];
 }
 
 const char *snd_pcm_format_name(snd_pcm_format_t format)
 {
-	snd_assert(format <= SNDRV_PCM_FORMAT_LAST, return 0);
+	snd_assert(format <= SNDRV_PCM_FORMAT_LAST, return NULL);
 	return snd_pcm_format_names[format];
 }
 
 const char *snd_pcm_subformat_name(snd_pcm_subformat_t subformat)
 {
-	snd_assert(subformat <= SNDRV_PCM_SUBFORMAT_LAST, return 0);
+	snd_assert(subformat <= SNDRV_PCM_SUBFORMAT_LAST, return NULL);
 	return snd_pcm_subformat_names[subformat];
 }
 
 const char *snd_pcm_tstamp_mode_name(snd_pcm_tstamp_t mode)
 {
-	snd_assert(mode <= SNDRV_PCM_TSTAMP_LAST, return 0);
+	snd_assert(mode <= SNDRV_PCM_TSTAMP_LAST, return NULL);
 	return snd_pcm_tstamp_mode_names[mode];
 }
 
 const char *snd_pcm_state_name(snd_pcm_state_t state)
 {
-	snd_assert(state <= SNDRV_PCM_STATE_LAST, return 0);
+	snd_assert(state <= SNDRV_PCM_STATE_LAST, return NULL);
 	return snd_pcm_state_names[state];
 }
 

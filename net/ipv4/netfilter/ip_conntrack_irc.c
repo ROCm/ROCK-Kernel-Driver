@@ -44,14 +44,12 @@ static char irc_buffer[65536];
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
-#ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 MODULE_PARM(max_dcc_channels, "i");
 MODULE_PARM_DESC(max_dcc_channels, "max number of expected DCC channels per IRC session");
 MODULE_PARM(dcc_timeout, "i");
 MODULE_PARM_DESC(dcc_timeout, "timeout on for unestablished DCC channels");
-#endif
 
 static char *dccprotos[] = { "SEND ", "CHAT ", "MOVE ", "TSEND ", "SCHAT " };
 #define MINMATCHLEN	5

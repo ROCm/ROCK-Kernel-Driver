@@ -444,7 +444,7 @@ void __init pmac_pic_init(void)
 					nmi_irq = pswitch->intrs[0].line;
 					openpic_init_nmi_irq(nmi_irq);
 					request_irq(nmi_irq, xmon_irq, 0,
-						    "NMI - XMON", 0);
+						    "NMI - XMON", NULL);
 				}
 			}
 #endif	/* CONFIG_XMON */
@@ -542,7 +542,7 @@ void __init pmac_pic_init(void)
 		for ( i = max_real_irqs ; i < max_irqs ; i++ )
 			irq_desc[i].handler = &gatwick_pic;
 		request_irq( irq_cascade, gatwick_action, SA_INTERRUPT,
-			     "cascade", 0 );
+			     "cascade", NULL );
 	}
 	printk("System has %d possible interrupts\n", max_irqs);
 	if (max_irqs != max_real_irqs)
@@ -550,7 +550,7 @@ void __init pmac_pic_init(void)
 			max_real_irqs);
 
 #ifdef CONFIG_XMON
-	request_irq(20, xmon_irq, 0, "NMI - XMON", 0);
+	request_irq(20, xmon_irq, 0, "NMI - XMON", NULL);
 #endif	/* CONFIG_XMON */
 }
 

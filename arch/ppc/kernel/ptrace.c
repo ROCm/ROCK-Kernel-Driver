@@ -77,7 +77,7 @@ static inline int put_reg(struct task_struct *task, int regno,
 /*
  * Get contents of AltiVec register state in task TASK
  */
-static inline int get_vrregs(unsigned long *data, struct task_struct *task)
+static inline int get_vrregs(unsigned long __user *data, struct task_struct *task)
 {
 	int i, j;
 
@@ -105,7 +105,7 @@ static inline int get_vrregs(unsigned long *data, struct task_struct *task)
 /*
  * Write contents of AltiVec register state into task TASK.
  */
-static inline int set_vrregs(struct task_struct *task, unsigned long *data)
+static inline int set_vrregs(struct task_struct *task, unsigned long __user *data)
 {
 	int i, j;
 
@@ -286,7 +286,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if (copied != sizeof(tmp))
 			break;
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -312,7 +312,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 			preempt_enable();
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp,(unsigned long __user *) data);
 		break;
 	}
 
@@ -410,7 +410,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (child->thread.regs->msr & MSR_VEC)
 			giveup_altivec(child);
 		preempt_enable();
-		ret = get_vrregs((unsigned long *)data, child);
+		ret = get_vrregs((unsigned long __user *)data, child);
 		break;
 
 	case PTRACE_SETVRREGS:
@@ -421,7 +421,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (child->thread.regs->msr & MSR_VEC)
 			giveup_altivec(child);
 		preempt_enable();
-		ret = set_vrregs(child, (unsigned long *)data);
+		ret = set_vrregs(child, (unsigned long __user *)data);
 		break;
 #endif
 #ifdef CONFIG_SPE
@@ -429,7 +429,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		/* Get the child spe register state. */
 		if (child->thread.regs->msr & MSR_SPE)
 			giveup_spe(child);
-		ret = get_evrregs((unsigned long *)data, child);
+		ret = get_evrregs((unsigned long __user *)data, child);
 		break;
 
 	case PTRACE_SETEVRREGS:
@@ -438,7 +438,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		 * of register state from memory */
 		if (child->thread.regs->msr & MSR_SPE)
 			giveup_spe(child);
-		ret = set_evrregs(child, (unsigned long *)data);
+		ret = set_evrregs(child, (unsigned long __user *)data);
 		break;
 #endif
 

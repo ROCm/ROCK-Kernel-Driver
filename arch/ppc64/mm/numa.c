@@ -356,6 +356,7 @@ void __init do_init_bootmem(void)
 
 	min_low_pfn = 0;
 	max_low_pfn = lmb_end_of_DRAM() >> PAGE_SHIFT;
+	max_pfn = max_low_pfn;
 
 	if (parse_numa_properties())
 		setup_nonnuma();

@@ -672,7 +672,7 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 			else
 				printk("pcm_oss: read: recovering from SUSPEND\n");
 #endif
-			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, NULL);
 			if (ret < 0)
 				break;
 		} else if (runtime->status->state == SNDRV_PCM_STATE_SETUP) {
@@ -693,7 +693,7 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 		}
 		if (ret == -EPIPE) {
 			if (runtime->status->state == SNDRV_PCM_STATE_DRAINING) {
-				ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+				ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, NULL);
 				if (ret < 0)
 					break;
 			}
@@ -754,7 +754,7 @@ snd_pcm_sframes_t snd_pcm_oss_readv3(snd_pcm_substream_t *substream, void **bufs
 			else
 				printk("pcm_oss: readv: recovering from SUSPEND\n");
 #endif
-			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
+			ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, NULL);
 			if (ret < 0)
 				break;
 		} else if (runtime->status->state == SNDRV_PCM_STATE_SETUP) {

@@ -30,7 +30,7 @@ struct nfsd_readargs {
 	struct svc_fh		fh;
 	__u32			offset;
 	__u32			count;
-	struct iovec		vec[RPCSVC_MAXPAGES];
+	struct kvec		vec[RPCSVC_MAXPAGES];
 	int			vlen;
 };
 
@@ -38,7 +38,7 @@ struct nfsd_writeargs {
 	svc_fh			fh;
 	__u32			offset;
 	int			len;
-	struct iovec		vec[RPCSVC_MAXPAGES];
+	struct kvec		vec[RPCSVC_MAXPAGES];
 	int			vlen;
 };
 

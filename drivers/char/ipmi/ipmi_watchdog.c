@@ -229,7 +229,7 @@ static int i_ipmi_set_timeout(struct ipmi_smi_msg  *smi_msg,
 			      struct ipmi_recv_msg *recv_msg,
 			      int                  *send_heartbeat_now)
 {
-	struct ipmi_msg                   msg;
+	struct kernel_ipmi_msg            msg;
 	unsigned char                     data[6];
 	int                               rv;
 	struct ipmi_system_interface_addr addr;
@@ -406,7 +406,7 @@ static struct ipmi_recv_msg panic_halt_heartbeat_recv_msg =
  
 static int ipmi_heartbeat(void)
 {
-	struct ipmi_msg                   msg;
+	struct kernel_ipmi_msg            msg;
 	int                               rv;
 	struct ipmi_system_interface_addr addr;
 
@@ -478,7 +478,7 @@ static int ipmi_heartbeat(void)
 
 static void panic_halt_ipmi_heartbeat(void)
 {
-	struct ipmi_msg                   msg;
+	struct kernel_ipmi_msg             msg;
 	struct ipmi_system_interface_addr addr;
 
 

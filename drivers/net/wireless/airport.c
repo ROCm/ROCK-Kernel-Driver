@@ -139,7 +139,7 @@ airport_detach(struct macio_dev *mdev)
 
 	if (card->vaddr)
 		iounmap(card->vaddr);
-	card->vaddr = 0;
+	card->vaddr = NULL;
 
 	macio_release_resource(mdev, 0);
 

@@ -2365,7 +2365,8 @@ static int ymfpci_memalloc(ymfpci_t *codec)
 	codec->dma_area_ba = pba;
 	codec->dma_area_size = size + 0xff;
 
-	if ((off = ((uint) ptr) & 0xff) != 0) {
+	off = (unsigned long)ptr & 0xff;
+	if (off) {
 		ptr += 0x100 - off;
 		pba += 0x100 - off;
 	}

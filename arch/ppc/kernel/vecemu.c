@@ -262,7 +262,7 @@ int emulate_altivec(struct pt_regs *regs)
 	unsigned int va, vb, vc, vd;
 	vector128 *vrs;
 
-	if (get_user(instr, (unsigned int *) regs->nip))
+	if (get_user(instr, (unsigned int __user *) regs->nip))
 		return -EFAULT;
 	if ((instr >> 26) != 4)
 		return -EINVAL;		/* not an altivec instruction */

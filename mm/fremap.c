@@ -61,12 +61,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pmd_t *pmd;
 	pte_t pte_val;
 
-	/*
-	 * We use page_add_file_rmap below: if install_page is
-	 * ever extended to anonymous pages, this will warn us.
-	 */
-	BUG_ON(!page_mapping(page));
-
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
 
@@ -76,6 +70,14 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	pte = pte_alloc_map(mm, pmd, addr);
 	if (!pte)
+		goto err_unlock;
+
+	/*
+	 * This page may have been truncated. Tell the
+	 * caller about it.
+	 */
+	err = -EAGAIN;
+	if (!page_mapping(page))
 		goto err_unlock;
 
 	zap_pte(mm, vma, addr, pte);
