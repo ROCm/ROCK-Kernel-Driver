@@ -58,7 +58,7 @@
  * Remaining dev_t-handling stuff
  */
 #define SD_MAJORS	8
-#define SD_MAJOR(i)	((i) ? SCSI_DISK1_MAJOR+(i) : SCSI_DISK0_MAJOR)
+#define SD_MAJOR(i)	((i) ? SCSI_DISK1_MAJOR-1+(i) : SCSI_DISK0_MAJOR)
 
 /*
  * Time out in seconds for disks and Magneto-opticals (which are slower).
