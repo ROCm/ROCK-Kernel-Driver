@@ -4047,22 +4047,13 @@ static int __init cpia_init(void)
 	proc_cpia_create();
 #endif
 
-#ifdef CONFIG_KMOD
-#ifdef CONFIG_VIDEO_CPIA_PP_MODULE
-	request_module("cpia_pp");
-#endif
-
-#ifdef CONFIG_VIDEO_CPIA_USB_MODULE
-	request_module("cpia_usb");
-#endif
-#endif	/* CONFIG_KMOD */
-
 #ifdef CONFIG_VIDEO_CPIA_PP
 	cpia_pp_init();
 #endif
 #ifdef CONFIG_VIDEO_CPIA_USB
 	cpia_usb_init();
 #endif
+
 	return 0;
 }
 

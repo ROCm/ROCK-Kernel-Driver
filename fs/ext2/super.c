@@ -181,10 +181,9 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ext2_inode_cache: not all structures were freed\n");
 }
 
-#ifdef CONFIG_EXT2_FS_POSIX_ACL
-
 static void ext2_clear_inode(struct inode *inode)
 {
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
 	struct ext2_inode_info *ei = EXT2_I(inode);
 
 	if (ei->i_acl && ei->i_acl != EXT2_ACL_NOT_CACHED) {
@@ -195,18 +194,17 @@ static void ext2_clear_inode(struct inode *inode)
 		posix_acl_release(ei->i_default_acl);
 		ei->i_default_acl = EXT2_ACL_NOT_CACHED;
 	}
+#endif
+	if (!is_bad_inode(inode))
+		ext2_discard_prealloc(inode);
 }
 
-#else
-# define ext2_clear_inode NULL
-#endif
 
 static struct super_operations ext2_sops = {
 	.alloc_inode	= ext2_alloc_inode,
 	.destroy_inode	= ext2_destroy_inode,
 	.read_inode	= ext2_read_inode,
 	.write_inode	= ext2_write_inode,
-	.put_inode	= ext2_put_inode,
 	.delete_inode	= ext2_delete_inode,
 	.put_super	= ext2_put_super,
 	.write_super	= ext2_write_super,

@@ -2393,27 +2393,27 @@ module_exit(apm_exit);
 MODULE_AUTHOR("Stephen Rothwell");
 MODULE_DESCRIPTION("Advanced Power Management");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
+module_param(debug, bool, 0644);
 MODULE_PARM_DESC(debug, "Enable debug mode");
-MODULE_PARM(power_off, "i");
+module_param(power_off, bool, 0444);
 MODULE_PARM_DESC(power_off, "Enable power off");
-MODULE_PARM(bounce_interval, "i");
+module_param(bounce_interval, int, 0444);
 MODULE_PARM_DESC(bounce_interval,
 		"Set the number of ticks to ignore suspend bounces");
-MODULE_PARM(allow_ints, "i");
+module_param(allow_ints, bool, 0444);
 MODULE_PARM_DESC(allow_ints, "Allow interrupts during BIOS calls");
-MODULE_PARM(broken_psr, "i");
+module_param(broken_psr, bool, 0444);
 MODULE_PARM_DESC(broken_psr, "BIOS has a broken GetPowerStatus call");
-MODULE_PARM(realmode_power_off, "i");
+module_param(realmode_power_off, bool, 0444);
 MODULE_PARM_DESC(realmode_power_off,
 		"Switch to real mode before powering off");
-MODULE_PARM(idle_threshold, "i");
+module_param(idle_threshold, int, 0444);
 MODULE_PARM_DESC(idle_threshold,
 	"System idle percentage above which to make APM BIOS idle calls");
-MODULE_PARM(idle_period, "i");
+module_param(idle_period, int, 0444);
 MODULE_PARM_DESC(idle_period,
 	"Period (in sec/100) over which to caculate the idle percentage");
-MODULE_PARM(smp, "i");
+module_param(smp, bool, 0444);
 MODULE_PARM_DESC(smp,
 	"Set this to enable APM use on an SMP platform. Use with caution on older systems");
 MODULE_ALIAS_MISCDEV(APM_MINOR_DEV);

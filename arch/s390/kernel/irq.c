@@ -86,7 +86,7 @@ asmlinkage void do_softirq(void)
 				     "   la    15,0(%1)\n"
 				     : : "a" (new), "a" (old),
 				         "a" (__do_softirq)
-				     : "0", "1", "2", "3", "4", "5",
+				     : "0", "1", "2", "3", "4", "5", "14",
 				       "cc", "memory" );
 		} else
 			/* We are already on the async stack. */

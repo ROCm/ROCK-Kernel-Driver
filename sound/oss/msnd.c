@@ -33,6 +33,8 @@
 #include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/spinlock.h>

@@ -23,6 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/wait.h>
 #include <linux/suspend.h>
+
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -51,16 +52,21 @@ static int limit_adjust = 0;
 static int fan_speed = -1;
 
 MODULE_AUTHOR("Colin Leroy <colin@colino.net>");
-MODULE_DESCRIPTION("Driver for ADT746x thermostat in iBook G4 and Powerbook G4 Alu");
+MODULE_DESCRIPTION("Driver for ADT746x thermostat in iBook G4 and "
+		   "Powerbook G4 Alu");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(limit_adjust,"i");
-MODULE_PARM_DESC(limit_adjust,"Adjust maximum temperatures (50 cpu, 70 gpu) by N degrees.");
+MODULE_PARM_DESC(limit_adjust,"Adjust maximum temperatures (50 cpu, 70 gpu) "
+		 "by N degrees.");
+
 MODULE_PARM(fan_speed,"i");
-MODULE_PARM_DESC(fan_speed,"Specify fan speed (0-255) when lim < temp < lim+8 (default 128)");
+MODULE_PARM_DESC(fan_speed,"Specify fan speed (0-255) when lim < temp < lim+8 "
+		 "(default 128)");
 
 struct thermostat {
 	struct i2c_client	clt;
+	u8			temps[3];
 	u8			cached_temp[3];
 	u8			initial_limits[3];
 	u8			limits[3];
@@ -74,7 +80,9 @@ static struct of_device * of_dev;
 static struct thermostat* thermostat;
 static struct task_struct *thread_therm = NULL;
 
-static int attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno);
+static int attach_one_thermostat(struct i2c_adapter *adapter, int addr,
+				 int busno);
+
 static void write_both_fan_speed(struct thermostat *th, int speed);
 static void write_fan_speed(struct thermostat *th, int speed, int fan);
 
@@ -140,10 +148,11 @@ detach_thermostat(struct i2c_adapter *adapter)
 		kthread_stop(thread_therm);
 	}
 		
-	printk(KERN_INFO "adt746x: Putting max temperatures back from %d, %d, %d,"
-		" to %d, %d, %d\n",
+	printk(KERN_INFO "adt746x: Putting max temperatures back from "
+			 "%d, %d, %d to %d, %d, %d\n",
 		th->limits[0], th->limits[1], th->limits[2],
-		th->initial_limits[0], th->initial_limits[1], th->initial_limits[2]);
+		th->initial_limits[0], th->initial_limits[1],
+		th->initial_limits[2]);
 	
 	for (i = 0; i < 3; i++)
 		write_reg(th, LIMIT_REG[i], th->initial_limits[i]);
@@ -202,11 +211,11 @@ static void write_fan_speed(struct thermostat *th, int speed, int fan)
 	
 	if (th->last_speed[fan] != speed) {
 		if (speed == -1)
-			printk(KERN_INFO "adt746x: Setting speed to: automatic for %s fan.\n",
-				fan?"GPU":"CPU");
+			printk(KERN_INFO "adt746x: Setting speed to automatic "
+				"for %s fan.\n", fan?"GPU":"CPU");
 		else
-			printk(KERN_INFO "adt746x: Setting speed to: %d for %s fan.\n",
-				speed, fan?"GPU":"CPU");
+			printk(KERN_INFO "adt746x: Setting speed to %d "
+				"for %s fan.\n", speed, fan?"GPU":"CPU");
 	} else
 		return;
 	
@@ -217,8 +226,11 @@ static void write_fan_speed(struct thermostat *th, int speed, int fan)
 	} else {
 		/* back to automatic */
 		if(therm_type == ADT7460) {
-			manual = read_reg(th, MANUAL_MODE[fan]) & (~MANUAL_MASK);
-			write_reg(th, MANUAL_MODE[fan], manual|REM_CONTROL[fan]);
+			manual = read_reg(th,
+				MANUAL_MODE[fan]) & (~MANUAL_MASK);
+
+			write_reg(th,
+				MANUAL_MODE[fan], manual|REM_CONTROL[fan]);
 		} else {
 			manual = read_reg(th, MANUAL_MODE[fan]);
 			write_reg(th, MANUAL_MODE[fan], manual&(~AUTO_MASK));
@@ -228,99 +240,114 @@ static void write_fan_speed(struct thermostat *th, int speed, int fan)
 	th->last_speed[fan] = speed;			
 }
 
+static void read_sensors(struct thermostat *th)
+{
+	int i = 0;
+
+	for (i = 0; i < 3; i++)
+		th->temps[i]  = read_reg(th, TEMP_REG[i]);
+}
+
+#ifdef DEBUG
+static void display_stats(struct thermostat *th)
+{
+	if (th->temps[0] != th->cached_temp[0]
+	||  th->temps[1] != th->cached_temp[1]
+	||  th->temps[2] != th->cached_temp[2]) {
+		printk(KERN_INFO "adt746x: Temperature infos:"
+				 " thermostats: %d,%d,%d;"
+				 " limits: %d,%d,%d;"
+				 " fan speed: %d RPM\n",
+				 th->temps[0], th->temps[1], th->temps[2],
+				 th->limits[0],  th->limits[1],  th->limits[2],
+				 read_fan_speed(th, FAN_SPEED[0]));
+	}
+	th->cached_temp[0] = th->temps[0];
+	th->cached_temp[1] = th->temps[1];
+	th->cached_temp[2] = th->temps[2];
+}
+#endif
+
+static void update_fans_speed (struct thermostat *th)
+{
+	int lastvar = 0; /* last variation, for iBook */
+	int i = 0;
+
+	/* we don't care about local sensor, so we start at sensor 1 */
+	for (i = 1; i < 3; i++) {
+		int started = 0;
+		int fan_number = (therm_type == ADT7460 && i == 2);
+		int var = th->temps[i] - th->limits[i];
+		if (var > 8) {
+			if (th->overriding[fan_number] == 0)
+				printk(KERN_INFO "adt746x: Limit exceeded by "
+					"%d, overriding specified fan speed "
+					"for %s.\n", var,
+					fan_number?"GPU":"CPU");
+
+			th->overriding[fan_number] = 1;
+			write_fan_speed(th, 255, fan_number);
+			started = 1;
+		} else if ((!th->overriding[fan_number] || var < 6) && var > 0) {
+			if (th->overriding[fan_number] == 1)
+				printk(KERN_INFO "adt746x: Limit exceeded by "
+					"%d, setting speed to specified "
+					"for %s.\n", var,
+					fan_number?"GPU":"CPU");
+
+			th->overriding[fan_number] = 0;
+			write_fan_speed(th, fan_speed, fan_number);
+			started = 1;
+		} else if (var < -1) {
+			/* don't stop iBook fan if GPU is cold and CPU is not
+			 * so cold (lastvar >= -1) */
+			if (therm_type == ADT7460 || lastvar < -1 || i == 1) {
+				if (th->last_speed[fan_number] != 0)
+					printk(KERN_INFO "adt746x: Stopping %s "
+						"fan.\n",
+						fan_number?"GPU":"CPU");
+				write_fan_speed(th, 0, fan_number);
+			}
+		}
+
+		lastvar = var;
+
+		if (started && therm_type == ADT7467)
+			return; /* we don't want to re-stop the fan
+				* if CPU is heating and GPU is not */
+	}
+}
+
 static int monitor_task(void *arg)
 {
 	struct thermostat* th = arg;
-	u8 temps[3];
-	u8 lims[3];
-	int i;
-#ifdef DEBUG
-	int mfan_speed;
-#endif
+
 	while(!kthread_should_stop()) {
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
 
 		msleep_interruptible(2000);
 
-		/* Check status */
-		/* local   : chip */
-		/* remote 1: CPU ?*/
-		/* remote 2: GPU ?*/
 #ifndef DEBUG
-		if (fan_speed != -1) {
-#endif
-			for (i = 0; i < 3; i++) {
-				temps[i]  = read_reg(th, TEMP_REG[i]);
-				lims[i]   = th->limits[i];
-			}
-#ifndef DEBUG
-		}
+		if (fan_speed != -1)
+			read_sensors(th);
+#else
+		read_sensors(th);
 #endif		
-		if (fan_speed != -1) {
-			int lastvar = 0;		/* for iBook */
-			for (i = 1; i < 3; i++) {	/* we don't care about local sensor */
-				int started = 0;
-				int fan_number = (therm_type == ADT7460 && i == 2);
-				int var = temps[i] - lims[i];
-				if (var > 8) {
-					if (th->overriding[fan_number] == 0)
-						printk(KERN_INFO "adt746x: Limit exceeded by %d, overriding specified fan speed for %s.\n",
-							var, fan_number?"GPU":"CPU");
-					th->overriding[fan_number] = 1;
-					write_fan_speed(th, 255, fan_number);
-					started = 1;
-				} else if ((!th->overriding[fan_number] || var < 6) && var > 0) {
-					if (th->overriding[fan_number] == 1)
-						printk(KERN_INFO "adt746x: Limit exceeded by %d, setting speed to specified for %s.\n",
-							var, fan_number?"GPU":"CPU");					
-					th->overriding[fan_number] = 0;
-					write_fan_speed(th, fan_speed, fan_number);
-					started = 1;
-				} else if (var < -1) {
-					/* don't stop iBook fan if GPU is cold and CPU is not
-					 * so cold (lastvar >= -1) */
-					if (therm_type == ADT7460 || lastvar < -1 || i == 1) {
-						if (th->last_speed[fan_number] != 0)
-							printk(KERN_INFO "adt746x: Stopping %s fan.\n",
-								fan_number?"GPU":"CPU");
-						write_fan_speed(th, 0, fan_number);
-					}
-				}
-				
-				lastvar = var;
-				
-				if (started && therm_type == ADT7467)
-					break; /* we don't want to re-stop the fan
-						* if CPU is heating and GPU is not */
-			}
-		}
+
+		if (fan_speed != -1)
+			update_fans_speed(th);
+
 #ifdef DEBUG
-		mfan_speed = read_fan_speed(th, FAN_SPEED[0]);
-		/* only one fan in the iBook G4 */
-				
-		if (temps[0] != th->cached_temp[0]
-		||  temps[1] != th->cached_temp[1]
-		||  temps[2] != th->cached_temp[2]) {
-			printk(KERN_INFO "adt746x: Temperature infos:"
-					 " thermostats: %d,%d,%d;"
-					 " limits: %d,%d,%d;"
-					 " fan speed: %d RPM\n",
-				temps[0], temps[1], temps[2],
-				lims[0],  lims[1],  lims[2],
-				mfan_speed);
-		}
-		th->cached_temp[0] = temps[0];
-		th->cached_temp[1] = temps[1];
-		th->cached_temp[2] = temps[2];
-#endif		
+		display_stats(th);
+#endif
+
 	}
 
 	return 0;
 }
 
-static void
-set_limit(struct thermostat *th, int i)
+static void set_limit(struct thermostat *th, int i)
 {
 		/* Set CPU limit higher to avoid powerdowns */ 
 		th->limits[i] = default_limits_chip[i] + limit_adjust;
@@ -329,9 +356,9 @@ set_limit(struct thermostat *th, int i)
 		/* set our limits to normal */
 		th->limits[i] = default_limits_local[i] + limit_adjust;
 }
-	
-static int
-attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
+
+static int attach_one_thermostat(struct i2c_adapter *adapter, int addr,
+				 int busno)
 {
 	struct thermostat* th;
 	int rc;
@@ -339,9 +366,13 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 
 	if (thermostat)
 		return 0;
-	th = (struct thermostat *)kmalloc(sizeof(struct thermostat), GFP_KERNEL);
+
+	th = (struct thermostat *)
+		kmalloc(sizeof(struct thermostat), GFP_KERNEL);
+
 	if (!th)
 		return -ENOMEM;
+
 	memset(th, 0, sizeof(*th));
 	th->clt.addr = addr;
 	th->clt.adapter = adapter;
@@ -351,13 +382,14 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 
 	rc = read_reg(th, 0);
 	if (rc < 0) {
-		printk(KERN_ERR "adt746x: Thermostat failed to read config from bus %d !\n",
-			busno);
+		printk(KERN_ERR "adt746x: Thermostat failed to read config "
+				"from bus %d !\n",
+				busno);
 		kfree(th);
 		return -ENODEV;
 	}
+
 	/* force manual control to start the fan quieter */
-	
 	if (fan_speed == -1)
 		fan_speed=128;
 	
@@ -374,14 +406,16 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 	}
 	
 	printk(KERN_INFO "adt746x: Lowering max temperatures from %d, %d, %d"
-		" to %d, %d, %d\n",
-		th->initial_limits[0], th->initial_limits[1], th->initial_limits[2], 
-		th->limits[0], th->limits[1], th->limits[2]);
+			 " to %d, %d, %d\n",
+			 th->initial_limits[0], th->initial_limits[1],
+			 th->initial_limits[2], th->limits[0], th->limits[1],
+			 th->limits[2]);
 
 	thermostat = th;
 
 	if (i2c_attach_client(&th->clt)) {
-		printk(KERN_INFO "adt746x: Thermostat failed to attach client !\n");
+		printk(KERN_INFO "adt746x: Thermostat failed to attach "
+				 "client !\n");
 		thermostat = NULL;
 		kfree(th);
 		return -ENODEV;
@@ -392,8 +426,10 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 	th->last_speed[1] = -2;
 	
 	if (fan_speed != -1) {
+		/* manual mode, stop fans */
 		write_both_fan_speed(th, 0);
 	} else {
+		/* automatic mode */
 		write_both_fan_speed(th, -1);
 	}
 	
@@ -510,8 +546,9 @@ thermostat_init(void)
 	therm_bus = ((*prop) >> 8) & 0x0f;
 	therm_address = ((*prop) & 0xff) >> 1;
 
-	printk(KERN_INFO "adt746x: Thermostat bus: %d, address: 0x%02x, limit_adjust: %d, fan_speed: %d\n",
-		therm_bus, therm_address, limit_adjust, fan_speed);
+	printk(KERN_INFO "adt746x: Thermostat bus: %d, address: 0x%02x, "
+			 "limit_adjust: %d, fan_speed: %d\n",
+			 therm_bus, therm_address, limit_adjust, fan_speed);
 
 	of_dev = of_platform_device_create(np, "temperatures");
 	
@@ -548,8 +585,11 @@ thermostat_exit(void)
 		device_remove_file(&of_dev->dev, &dev_attr_limit_adjust);
 		device_remove_file(&of_dev->dev, &dev_attr_specified_fan_speed);
 		device_remove_file(&of_dev->dev, &dev_attr_cpu_fan_speed);
+
 		if(therm_type == ADT7460)
-			device_remove_file(&of_dev->dev, &dev_attr_gpu_fan_speed);
+			device_remove_file(&of_dev->dev,
+					   &dev_attr_gpu_fan_speed);
+
 		of_device_unregister(of_dev);
 	}
 	i2c_del_driver(&thermostat_driver);

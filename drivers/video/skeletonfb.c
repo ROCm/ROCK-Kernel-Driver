@@ -477,6 +477,28 @@ int xxxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
  *		Used internally by the driver.	 
  *      @hot:	The hot spot. 
  *	@image:	The actual data for the cursor image.
+ *
+ *      NOTES ON FLAGS (cursor->set):
+ *
+ *      FB_CUR_SETIMAGE - the cursor image has changed (cursor->image.data)
+ *      FB_CUR_SETPOS   - the cursor position has changed (cursor->image.dx|dy)
+ *      FB_CUR_SETHOT   - the cursor hot spot has changed (cursor->hot.dx|dy)
+ *      FB_CUR_SETCMAP  - the cursor colors has changed (cursor->fg_color|bg_color)
+ *      FB_CUR_SETSHAPE - the cursor bitmask has changed (cursor->mask)
+ *      FB_CUR_SETSIZE  - the cursor size has changed (cursor->width|height)
+ *      FB_CUR_SETALL   - everything has changed
+ *
+ *      NOTES ON ROPs (cursor->rop, Raster Operation)
+ *
+ *      ROP_XOR         - cursor->image.data XOR cursor->mask
+ *      ROP_COPY        - curosr->image.data AND cursor->mask
+ *
+ *      OTHER NOTES:
+ *
+ *      - fbcon only supports a 2-color cursor (cursor->image.depth = 1)
+ *      - The fb_cursor structure, @cursor, _will_ always contain valid
+ *        fields, whether any particular bitfields in cursor->set is set
+ *        or not.
  */
 }
 
@@ -529,6 +551,17 @@ int __init xxxfb_init(void)
 {
     int cmap_len, retval;	
    
+    /*
+     *  For kernel boot options (in 'video=xxxfb:<options>' format)
+     */
+#ifndef MODULE
+    char *option = NULL;
+
+    if (fb_get_options("xxxfb", &option))
+	    return -ENODEV;
+    xxxfb_setup(option);
+#endif
+
     /* 
      * Here we set the screen_base to the vitrual memory address
      * for the framebuffer. Usually we obtain the resource address
@@ -582,17 +615,6 @@ int __init xxxfb_init(void)
 
 static void __exit xxxfb_cleanup(void)
 {
-    /*
-     *  For kernel boot options (in 'video=xxxfb:<options>' format)
-     */
-#ifndef MODULE
-    char *option = NULL;
-
-    if (fb_get_options("xxxfb", &option))
-	    return -ENODEV;
-    xxxfb_setup(option);
-#endif
-
     /*
      *  If your driver supports multiple boards, you should unregister and
      *  clean up all instances.

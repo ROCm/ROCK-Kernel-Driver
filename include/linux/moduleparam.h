@@ -152,4 +152,15 @@ int param_array(const char *name,
 		void *elem, int elemsize,
 		int (*set)(const char *, struct kernel_param *kp),
 		int *num);
+
+/* for exporting parameters in /sys/parameters */
+
+struct module;
+
+extern int module_param_sysfs_setup(struct module *mod,
+				    struct kernel_param *kparam,
+				    unsigned int num_params);
+
+extern void module_param_sysfs_remove(struct module *mod);
+
 #endif /* _LINUX_MODULE_PARAMS_H */

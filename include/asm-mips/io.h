@@ -290,6 +290,10 @@ static inline void iounmap(void *addr)
 #define __raw_writeb(b,addr)	((*(volatile unsigned char *)(addr)) = (b))
 #define __raw_writew(w,addr)	((*(volatile unsigned short *)(addr)) = (w))
 #define __raw_writel(l,addr)	((*(volatile unsigned int *)(addr)) = (l))
+
+/* Depends on MIPS III instruction set */
+#define mmiowb() asm volatile ("sync" ::: "memory")
+
 #ifdef CONFIG_MIPS32
 #define ____raw_writeq(val,addr)						\
 ({									\

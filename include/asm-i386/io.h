@@ -178,6 +178,8 @@ static inline void writel(unsigned int b, volatile void __iomem *addr)
 #define __raw_writew writew
 #define __raw_writel writel
 
+#define mmiowb()
+
 static inline void memset_io(volatile void __iomem *addr, unsigned char val, int count)
 {
 	memset((void __force *) addr, val, count);

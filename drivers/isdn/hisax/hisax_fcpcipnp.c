@@ -996,7 +996,7 @@ static struct pci_driver fcpci_driver = {
 
 static int __init hisax_fcpcipnp_init(void)
 {
-	int retval, pci_nr_found;
+	int retval;
 
 	printk(KERN_INFO "hisax_fcpcipnp: Fritz!Card PCI/PCIv2/PnP ISDN driver v0.0.1\n");
 

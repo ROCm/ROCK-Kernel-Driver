@@ -140,6 +140,53 @@ dcssblk_get_device_by_name(char *name)
 }
 
 /*
+ * print appropriate error message for segment_load()/segment_info()
+ * return code
+ */
+static void
+dcssblk_segment_warn(int rc, char* seg_name)
+{
+	switch (rc) {
+	case -ENOENT:
+		PRINT_WARN("cannot load/query segment %s, does not exist\n",
+			   seg_name);
+		break;
+	case -ENOSYS:
+		PRINT_WARN("cannot load/query segment %s, not running on VM\n",
+			   seg_name);
+		break;
+	case -EIO:
+		PRINT_WARN("cannot load/query segment %s, hardware error\n",
+			   seg_name);
+		break;
+	case -ENOTSUPP:
+		PRINT_WARN("cannot load/query segment %s, is a multi-part "
+			   "segment\n", seg_name);
+		break;
+	case -ENOSPC:
+		PRINT_WARN("cannot load/query segment %s, overlaps with "
+			   "storage\n", seg_name);
+		break;
+	case -EBUSY:
+		PRINT_WARN("cannot load/query segment %s, overlaps with "
+			   "already loaded dcss\n", seg_name);
+		break;
+	case -EPERM:
+		PRINT_WARN("cannot load/query segment %s, already loaded in "
+			   "incompatible mode\n", seg_name);
+		break;
+	case -ENOMEM:
+		PRINT_WARN("cannot load/query segment %s, out of memory\n",
+			   seg_name);
+		break;
+	default:
+		PRINT_WARN("cannot load/query segment %s, return value %i\n",
+			   seg_name, rc);
+		break;
+	}
+}
+
+/*
  * device attribute for switching shared/nonshared (exclusive)
  * operation (show + store)
  */
@@ -185,61 +232,38 @@ dcssblk_shared_store(struct device *dev, const char *inbuf, size_t count)
 	if (inbuf[0] == '1') {
 		// reload segment in shared mode
 		segment_unload(dev_info->segment_name);
-		rc = segment_load(dev_info->segment_name, SEGMENT_SHARED_RO,
+		rc = segment_load(dev_info->segment_name, SEGMENT_SHARED,
 					&dev_info->start, &dev_info->end);
 		if (rc < 0) {
-			PRINT_ERR("Segment %s not reloaded, rc=%d\n",
-					dev_info->segment_name, rc);
+			dcssblk_segment_warn(rc, dev_info->segment_name);
 			goto removeseg;
 		}
 		dev_info->is_shared = 1;
-		PRINT_INFO("Segment %s reloaded, shared mode.\n",
-			   dev_info->segment_name);
+		if (rc == SEG_TYPE_SR || rc == SEG_TYPE_ER || rc == SEG_TYPE_SC)
+			set_disk_ro(dev_info->gd, 1);
 	} else if (inbuf[0] == '0') {
 		// reload segment in exclusive mode
+		if (dev_info->segment_type == SEG_TYPE_SC) {
+			PRINT_ERR("Segment type SC (%s) cannot be loaded in "
+				  "non-shared mode\n", dev_info->segment_name);
+			up_write(&dcssblk_devices_sem);
+			return -EINVAL;
+		}
 		segment_unload(dev_info->segment_name);
-		rc = segment_load(dev_info->segment_name, SEGMENT_EXCLUSIVE_RW,
+		rc = segment_load(dev_info->segment_name, SEGMENT_EXCLUSIVE,
 					&dev_info->start, &dev_info->end);
 		if (rc < 0) {
-			PRINT_ERR("Segment %s not reloaded, rc=%d\n",
-					dev_info->segment_name, rc);
+			dcssblk_segment_warn(rc, dev_info->segment_name);
 			goto removeseg;
 		}
 		dev_info->is_shared = 0;
-		PRINT_INFO("Segment %s reloaded, exclusive (read-write) mode.\n",
-			   dev_info->segment_name);
+		set_disk_ro(dev_info->gd, 0);
 	} else {
 		up_write(&dcssblk_devices_sem);
 		PRINT_WARN("Invalid value, must be 0 or 1\n");
 		return -EINVAL;
 	}
-	dev_info->segment_type = rc;
 	rc = count;
-
-	switch (dev_info->segment_type) {
-		case SEGMENT_SHARED_RO:
-		case SEGMENT_EXCLUSIVE_RO:
-			set_disk_ro(dev_info->gd, 1);
-			break;
-		case SEGMENT_SHARED_RW:
-		case SEGMENT_EXCLUSIVE_RW:
-			set_disk_ro(dev_info->gd, 0);
-			break;
-	}
-	if ((inbuf[0] == '1') &&
-	   ((dev_info->segment_type == SEGMENT_EXCLUSIVE_RO) ||
-	    (dev_info->segment_type == SEGMENT_EXCLUSIVE_RW))) {
-		PRINT_WARN("Could not get shared copy of segment %s\n",
-				dev_info->segment_name);
-		rc = -EPERM;
-	}
-	if ((inbuf[0] == '0') &&
-	   ((dev_info->segment_type == SEGMENT_SHARED_RO) ||
-	    (dev_info->segment_type == SEGMENT_SHARED_RW))) {
-		PRINT_WARN("Could not get exclusive copy of segment %s\n",
-				dev_info->segment_name);
-		rc = -EPERM;
-	}
 	up_write(&dcssblk_devices_sem);
 	goto out;
 
@@ -292,7 +316,7 @@ dcssblk_save_store(struct device *dev, const char *inbuf, size_t count)
 			// device is idle => we save immediately
 			PRINT_INFO("Saving segment %s\n",
 				   dev_info->segment_name);
-			segment_replace(dev_info->segment_name);
+			segment_save(dev_info->segment_name);
 		}  else {
 			// device is busy => we save it when it becomes
 			// idle in dcssblk_release
@@ -390,18 +414,17 @@ dcssblk_add_store(struct device *dev, const char *buf, size_t count)
 	/*
 	 * load the segment
 	 */
-	rc = segment_load(local_buf, SEGMENT_SHARED_RO,
+	rc = segment_load(local_buf, SEGMENT_SHARED,
 				&dev_info->start, &dev_info->end);
 	if (rc < 0) {
-		PRINT_ERR("Segment %s not loaded, rc=%d\n", local_buf, rc);
+		dcssblk_segment_warn(rc, dev_info->segment_name);
 		goto dealloc_gendisk;
 	}
 	seg_byte_size = (dev_info->end - dev_info->start + 1);
 	set_capacity(dev_info->gd, seg_byte_size >> 9); // size in sectors
-	PRINT_INFO("Loaded segment %s from %p to %p, size = %lu Byte, "
-		   "capacity = %lu sectors (512 Byte)\n", local_buf,
-		   	(void *) dev_info->start, (void *) dev_info->end,
-			seg_byte_size, seg_byte_size >> 9);
+	PRINT_INFO("Loaded segment %s, size = %lu Byte, "
+		   "capacity = %lu (512 Byte) sectors\n", local_buf,
+		   seg_byte_size, seg_byte_size >> 9);
 
 	dev_info->segment_type = rc;
 	dev_info->save_pending = 0;
@@ -451,12 +474,12 @@ dcssblk_add_store(struct device *dev, const char *buf, size_t count)
 	blk_queue_hardsect_size(dev_info->dcssblk_queue, 4096);
 
 	switch (dev_info->segment_type) {
-		case SEGMENT_SHARED_RO:
-		case SEGMENT_EXCLUSIVE_RO:
+		case SEG_TYPE_SR:
+		case SEG_TYPE_ER:
+		case SEG_TYPE_SC:
 			set_disk_ro(dev_info->gd,1);
 			break;
-		case SEGMENT_SHARED_RW:
-		case SEGMENT_EXCLUSIVE_RW:
+		default:
 			set_disk_ro(dev_info->gd,0);
 			break;
 	}
@@ -589,7 +612,7 @@ dcssblk_release(struct inode *inode, struct file *filp)
 	    && (dev_info->save_pending)) {
 		PRINT_INFO("Segment %s became idle and is being saved now\n",
 			    dev_info->segment_name);
-		segment_replace(dev_info->segment_name);
+		segment_save(dev_info->segment_name);
 		dev_info->save_pending = 0;
 	}
 	up_write(&dcssblk_devices_sem);

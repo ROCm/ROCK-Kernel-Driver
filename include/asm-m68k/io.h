@@ -306,6 +306,7 @@ static inline void isa_delay(void)
 #endif
 #endif /* CONFIG_PCI */
 
+#define mmiowb()
 
 static inline void *ioremap(unsigned long physaddr, unsigned long size)
 {

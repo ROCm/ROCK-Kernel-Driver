@@ -391,13 +391,9 @@ int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files
 		return -ENOMEM;
 	}
 	for (i = 0; !files->name || files->name[0]; i++, files++) {
-		struct qstr name;
 		if (!files->name)
 			continue;
-		name.name = files->name;
-		name.len = strlen(name.name);
-		name.hash = full_name_hash(name.name, name.len);
-		dentry = d_alloc(root, &name);
+		dentry = d_alloc_name(root, files->name);
 		if (!dentry)
 			goto out;
 		inode = new_inode(s);
@@ -530,6 +526,7 @@ EXPORT_SYMBOL(simple_commit_write);
 EXPORT_SYMBOL(simple_dir_inode_operations);
 EXPORT_SYMBOL(simple_dir_operations);
 EXPORT_SYMBOL(simple_empty);
+EXPORT_SYMBOL(d_alloc_name);
 EXPORT_SYMBOL(simple_fill_super);
 EXPORT_SYMBOL(simple_getattr);
 EXPORT_SYMBOL(simple_link);

@@ -41,7 +41,7 @@ struct pci_controller {
 	int first_busno;
 	int last_busno;
 
-	void *io_base_virt;
+	void __iomem *io_base_virt;
 	unsigned long io_base_phys;
 
 	/* Some machines have a non 1:1 mapping of
@@ -51,8 +51,8 @@ struct pci_controller {
 	unsigned long pci_io_size;
 
 	struct pci_ops *ops;
-	volatile unsigned int *cfg_addr;
-	volatile unsigned char *cfg_data;
+	volatile unsigned int __iomem *cfg_addr;
+	volatile unsigned char __iomem *cfg_data;
 
 	/* Currently, we limit ourselves to 1 IO range and 3 mem
 	 * ranges since the common pci_bus structure can't handle more
@@ -100,6 +100,23 @@ extern int pcibios_remove_root_bus(struct pci_controller *phb);
 #define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
 
 extern void phbs_remap_io(void);
+
+static inline struct pci_controller *pci_bus_to_host(struct pci_bus *bus)
+{
+	struct device_node *busdn;
+
+	busdn = bus->sysdata;
+	if (busdn == 0) {
+		struct pci_bus *b;
+		for (b = bus->parent; b && bus->sysdata == 0; b = b->parent)
+			;
+		busdn = b->sysdata;
+	}
+	if (busdn == NULL)
+		return NULL;
+	return busdn->phb;
+}
+
 
 #endif
 #endif /* __KERNEL__ */

@@ -15,7 +15,7 @@
 #include <asm/system.h>
 
 static spinlock_t cpcmd_lock = SPIN_LOCK_UNLOCKED;
-static char cpcmd_buf[128];
+static char cpcmd_buf[240];
 
 void cpcmd(char *cmd, char *response, int rlen)
 {
@@ -24,22 +24,23 @@ void cpcmd(char *cmd, char *response, int rlen)
         int cmdlen;
 
 	spin_lock_irqsave(&cpcmd_lock, flags);
-        cmdlen = strlen(cmd);
-        strcpy(cpcmd_buf, cmd);
-        ASCEBC(cpcmd_buf, cmdlen);
+	cmdlen = strlen(cmd);
+	BUG_ON(cmdlen>240);
+	strcpy(cpcmd_buf, cmd);
+	ASCEBC(cpcmd_buf, cmdlen);
 
-        if (response != NULL && rlen > 0) {
+	if (response != NULL && rlen > 0) {
 #ifndef CONFIG_ARCH_S390X
                 asm volatile ("LRA   2,0(%0)\n\t"
                               "LR    4,%1\n\t"
                               "O     4,%4\n\t"
                               "LRA   3,0(%2)\n\t"
                               "LR    5,%3\n\t"
-                              ".long 0x83240008 # Diagnose 83\n\t"
+                              ".long 0x83240008 # Diagnose X'08'\n\t"
                               : /* no output */
                               : "a" (cpcmd_buf), "d" (cmdlen),
                                 "a" (response), "d" (rlen), "m" (mask)
-                              : "2", "3", "4", "5" );
+                              : "cc", "2", "3", "4", "5" );
 #else /* CONFIG_ARCH_S390X */
                 asm volatile ("   lrag  2,0(%0)\n"
                               "   lgr   4,%1\n"
@@ -47,19 +48,19 @@ void cpcmd(char *cmd, char *response, int rlen)
                               "   lrag  3,0(%2)\n"
                               "   lgr   5,%3\n"
                               "   sam31\n"
-                              "   .long 0x83240008 # Diagnose 83\n"
+                              "   .long 0x83240008 # Diagnose X'08'\n"
                               "   sam64"
                               : /* no output */
                               : "a" (cpcmd_buf), "d" (cmdlen),
                                 "a" (response), "d" (rlen), "m" (mask)
-                              : "2", "3", "4", "5" );
+                              : "cc", "2", "3", "4", "5" );
 #endif /* CONFIG_ARCH_S390X */
                 EBCASC(response, rlen);
         } else {
 #ifndef CONFIG_ARCH_S390X
                 asm volatile ("LRA   2,0(%0)\n\t"
                               "LR    3,%1\n\t"
-                              ".long 0x83230008 # Diagnose 83\n\t"
+                              ".long 0x83230008 # Diagnose X'08'\n\t"
                               : /* no output */
                               : "a" (cpcmd_buf), "d" (cmdlen)
                               : "2", "3"  );
@@ -67,7 +68,7 @@ void cpcmd(char *cmd, char *response, int rlen)
                 asm volatile ("   lrag  2,0(%0)\n"
                               "   lgr   3,%1\n"
                               "   sam31\n"
-                              "   .long 0x83230008 # Diagnose 83\n"
+                              "   .long 0x83230008 # Diagnose X'08'\n"
                               "   sam64"
                               : /* no output */
                               : "a" (cpcmd_buf), "d" (cmdlen)

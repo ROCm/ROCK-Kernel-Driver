@@ -384,32 +384,10 @@ exit:
 		unlock_timer(timr, flags);
 }
 
-/*
- * Notify the task and set up the timer for the next expiration (if
- * applicable).  This function requires that the k_itimer structure
- * it_lock is taken.  This code will requeue the timer only if we get
- * either an error return or a flag (ret > 0) from send_seg_info
- * indicating that the signal was either not queued or was queued
- * without an info block.  In this case, we will not get a call back to
- * do_schedule_next_timer() so we do it here.  This should be rare...
-
- * An interesting problem can occur if, while a signal, and thus a call
- * back is pending, the timer is rearmed, i.e. stopped and restarted.
- * We then need to sort out the call back and do the right thing.  What
- * we do is to put a counter in the info block and match it with the
- * timers copy on the call back.  If they don't match, we just ignore
- * the call back.  The counter is local to the timer and we use odd to
- * indicate a call back is pending.  Note that we do allow the timer to 
- * be deleted while a signal is pending.  The standard says we can
- * allow that signal to be delivered, and we do. 
- */
-
-static void timer_notify_task(struct k_itimer *timr)
+int posix_timer_event(struct k_itimer *timr,int si_private)
 {
-	int ret;
-
 	memset(&timr->sigq->info, 0, sizeof(siginfo_t));
-
+	timr->sigq->info.si_sys_private = si_private;
 	/*
 	 * Send signal to the process that owns this timer.
 
@@ -424,12 +402,6 @@ static void timer_notify_task(struct k_itimer *timr)
 	timr->sigq->info.si_code = SI_TIMER;
 	timr->sigq->info.si_tid = timr->it_id;
 	timr->sigq->info.si_value = timr->it_sigev_value;
-	if (timr->it_incr)
-		timr->sigq->info.si_sys_private = ++timr->it_requeue_pending;
-	else {
-		remove_from_abslist(timr);
-	}
-
 	if (timr->it_sigev_notify & SIGEV_THREAD_ID) {
 		if (unlikely(timr->it_process->flags & PF_EXITING)) {
 			timr->it_sigev_notify = SIGEV_SIGNAL;
@@ -437,28 +409,20 @@ static void timer_notify_task(struct k_itimer *timr)
 			timr->it_process = timr->it_process->group_leader;
 			goto group;
 		}
-		ret = send_sigqueue(timr->it_sigev_signo, timr->sigq,
+		return send_sigqueue(timr->it_sigev_signo, timr->sigq,
 			timr->it_process);
 	}
 	else {
 	group:
-		ret = send_group_sigqueue(timr->it_sigev_signo, timr->sigq,
+		return send_group_sigqueue(timr->it_sigev_signo, timr->sigq,
 			timr->it_process);
-	}
-	if (ret) {
-		/*
-		 * signal was not sent because of sig_ignor
-		 * we will not get a call back to restart it AND
-		 * it should be restarted.
-		 */
-		schedule_next_timer(timr);
 	}
 }
 
 /*
  * This function gets called when a POSIX.1b interval timer expires.  It
  * is used as a callback from the kernel internal timer.  The
- * run_timer_list code ALWAYS calls with interrutps on.
+ * run_timer_list code ALWAYS calls with interrupts on.
 
  * This code is for CLOCK_REALTIME* and CLOCK_MONOTONIC* timers.
  */
@@ -501,8 +465,23 @@ static void posix_timer_fn(unsigned long __data)
 		spin_unlock(&abs_list.lock);
 
 	}
-	if (do_notify)
-		timer_notify_task(timr);
+	if (do_notify)  {
+		int si_private=0;
+
+		if (timr->it_incr)
+			si_private = ++timr->it_requeue_pending;
+		else {
+			remove_from_abslist(timr);
+		}
+
+		if (posix_timer_event(timr, si_private))
+			/*
+			 * signal was not sent because of sig_ignor
+			 * we will not get a call back to restart it AND
+			 * it should be restarted.
+			 */
+			schedule_next_timer(timr);
+	}
 	unlock_timer(timr, flags); /* hold thru abs lock to keep irq off */
 }
 
@@ -585,10 +564,6 @@ sys_timer_create(clockid_t which_clock,
 				!posix_clocks[which_clock].res)
 		return -EINVAL;
 
-	if (posix_clocks[which_clock].timer_create)
-		return posix_clocks[which_clock].timer_create(which_clock,
-				timer_event_spec, created_timer_id);
-
 	new_timer = alloc_posix_timer();
 	if (unlikely(!new_timer))
 		return -EAGAIN;
@@ -620,11 +595,17 @@ sys_timer_create(clockid_t which_clock,
 	new_timer->it_clock = which_clock;
 	new_timer->it_incr = 0;
 	new_timer->it_overrun = -1;
-	init_timer(&new_timer->it_timer);
-	new_timer->it_timer.expires = 0;
-	new_timer->it_timer.data = (unsigned long) new_timer;
-	new_timer->it_timer.function = posix_timer_fn;
-	set_timer_inactive(new_timer);
+	if (posix_clocks[which_clock].timer_create) {
+		error =  posix_clocks[which_clock].timer_create(new_timer);
+		if (error)
+			goto out;
+	} else {
+		init_timer(&new_timer->it_timer);
+		new_timer->it_timer.expires = 0;
+		new_timer->it_timer.data = (unsigned long) new_timer;
+		new_timer->it_timer.function = posix_timer_fn;
+		set_timer_inactive(new_timer);
+	}
 
 	/*
 	 * return the timer_id now.  The next step is hard to
@@ -1239,9 +1220,7 @@ int do_posix_clock_nosettime(struct timespec *tp)
 	return -EINVAL;
 }
 
-int do_posix_clock_notimer_create(int which_clock,
-		struct sigevent __user *timer_event_spec,
-		timer_t __user *created_timer_id) {
+int do_posix_clock_notimer_create(struct k_itimer *timer) {
 	return -EINVAL;
 }
 

@@ -18,7 +18,6 @@ extern void pmac_calibrate_decr(void);
 extern void pmac_pcibios_fixup(void);
 extern void pmac_pci_init(void);
 extern void pmac_setup_pci_dma(void);
-extern void fixup_k2_sata(struct pci_dev* dev);
 extern void pmac_check_ht_link(void);
 
 extern void pmac_setup_smp(void);

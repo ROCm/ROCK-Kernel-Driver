@@ -877,7 +877,6 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		green = CNVT_TOHW(green, info->var.green.length);
 		blue = CNVT_TOHW(blue, info->var.blue.length);
 		transp = CNVT_TOHW(transp, info->var.transp.length);
-		set_color(par, regno, red, green, blue);
 		break;
 	case FB_VISUAL_DIRECTCOLOR:
 		/* example here assumes 8 bit DAC. Might be different 
@@ -904,12 +903,8 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 		switch (info->var.bits_per_pixel) {
 		case 8:
-			/* Yes some hand held devices have this. */ 
-           		((u8*)(info->pseudo_palette))[regno] = v;
 			break;	
    		case 16:
-           		((u16*)(info->pseudo_palette))[regno] = v;
-			break;
 		case 24:
 		case 32:	
            		((u32*)(info->pseudo_palette))[regno] = v;
@@ -917,7 +912,9 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		}
 		return 0;
 	}
-	/* ... */
+	else if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+		set_color(par, regno, red, green, blue);
+
 	return 0;
 }
 
@@ -973,24 +970,26 @@ static int pm2fb_blank(int blank_mode, struct fb_info *info)
 
 	DPRINTK("blank_mode %d\n", blank_mode);
 
-	/* Turn everything on, then disable as requested. */
-	video |= (PM2F_VIDEO_ENABLE | PM2F_HSYNC_MASK | PM2F_VSYNC_MASK);
-
 	switch (blank_mode) {
-	case 0: 	/* Screen: On; HSync: On, VSync: On */
+	case 0:
+		/* Screen: On */
+		video |= PM2F_VIDEO_ENABLE;
 		break;
-	case 1: 	/* Screen: Off; HSync: On, VSync: On */
+	case VESA_NO_BLANKING + 1:
+		/* Screen: Off */
 		video &= ~PM2F_VIDEO_ENABLE;
 		break;
-	case 2: /* Screen: Off; HSync: On, VSync: Off */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_VSYNC_MASK | PM2F_BLANK_LOW );
+	case VESA_VSYNC_SUSPEND + 1:
+		/* VSync: Off */
+		video &= ~(PM2F_VSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case 3: /* Screen: Off; HSync: Off, VSync: On */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_HSYNC_MASK | PM2F_BLANK_LOW );
+	case VESA_HSYNC_SUSPEND + 1:
+		/* HSync: Off */
+		video &= ~(PM2F_HSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case 4: /* Screen: Off; HSync: Off, VSync: Off */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_VSYNC_MASK | PM2F_HSYNC_MASK|
-			   PM2F_BLANK_LOW);
+	case VESA_POWERDOWN + 1:
+		/* HSync: Off, VSync: Off */
+		video &= ~(PM2F_VSYNC_MASK | PM2F_HSYNC_MASK| PM2F_BLANK_LOW);
 		break;
 	}
 	set_video(par, video);

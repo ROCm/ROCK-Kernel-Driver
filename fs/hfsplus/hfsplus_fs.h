@@ -155,6 +155,7 @@ struct hfsplus_sb_info {
 struct hfsplus_inode_info {
 	struct semaphore extents_lock;
 	u32 clump_blocks, alloc_blocks;
+	sector_t fs_blocks;
 	/* Allocation extents from catalog record or volume header */
 	hfsplus_extent_rec first_extents;
 	u32 first_blocks;
@@ -340,6 +341,11 @@ void hfsplus_delete_inode(struct inode *);
 /* ioctl.c */
 int hfsplus_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		  unsigned long arg);
+int hfsplus_setxattr(struct dentry *dentry, const char *name,
+		     const void *value, size_t size, int flags);
+ssize_t hfsplus_getxattr(struct dentry *dentry, const char *name,
+			 void *value, size_t size);
+ssize_t hfsplus_listxattr(struct dentry *dentry, char *buffer, size_t size);
 
 /* options.c */
 int parse_options(char *, struct hfsplus_sb_info *);

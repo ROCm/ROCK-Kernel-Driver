@@ -63,7 +63,7 @@
 		debug_event(iucv_dbf_##name,level,(void*)(addr),len); \
 	} while (0)
 
-extern DEFINE_PER_CPU(char[256], iucv_dbf_txt_buf);
+DECLARE_PER_CPU(char[256], iucv_dbf_txt_buf);
 
 #define IUCV_DBF_TEXT_(name,level,text...)				\
 	do {								\

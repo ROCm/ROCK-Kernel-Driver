@@ -200,38 +200,33 @@ __init ourmouse_init(void)
   </para>
   <para>
     Next, in order to be able to use and test our code we need to add some 
-    module code to support it. This too is fairly simple:
+    startup and shutdown code to support it. This too is fairly simple:
   </para>
   <programlisting>
-#ifdef MODULE
-
-int init_module(void)
+static int init(void)
 {
         if(ourmouse_init()&lt;0)
                 return -ENODEV:
         return 0;
 }
 
-void cleanup_module(void)
+static void cleanup(void)
 {
         misc_deregister(&amp;our_mouse);
         free_region(OURMOUSE_BASE, 3);
 }
-
-
-#endif
+module_init(init);
+module_exit(cleanup);
   </programlisting>
 
   <para>
-    The module code provides the normal two functions. The 
-    <function>init_module</function> function is called when the module is 
-    loaded. In our case it simply calls the initialising function we wrote 
+    The <function>module_init</function> macro sets the function to call when the module is inserted (or at boot if the module were built into the kernel).  In our case it is <function>init</function>, which simply calls the initialising function we wrote
     and returns an error if this fails. This ensures the module will only 
     be loaded if it was successfully set up.
   </para>
   <para>
-    The <function>cleanup_module</function> function is called when the 
-    module is unloaded. We give the miscellaneous device entry back, and 
+    The <function>module_exit</function> macro sets the function to call when the
+    module is unloaded: if this is not set, the module cannot be unloaded. We give the miscellaneous device entry back, and
     then free our I/O resources. If we didn't free the I/O resources then 
     the next time the module loaded it would think someone else had its I/O 
     space.

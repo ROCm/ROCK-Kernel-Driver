@@ -24,16 +24,40 @@ static spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 /*
  * Acquire/release the underlying lock from the scheduler.
  *
- * The scheduler release and re-acquire currently always happen
- * with preemption disabled. Which is likely a bug in the acquire
- * case...
+ * This is called with preemption disabled, and should
+ * return an error value if it cannot get the lock and
+ * TIF_NEED_RESCHED gets set.
  *
- * Regardless, we try to be polite about preemption. If SMP is
- * not on (ie UP preemption), this all goes away because the
+ * If it successfully gets the lock, it should increment
+ * the preemption count like any spinlock does.
+ *
+ * (This works on UP too - _raw_spin_trylock will never
+ * return false in that case)
+ */
+int __lockfunc get_kernel_lock(void)
+{
+	while (!_raw_spin_trylock(&kernel_flag)) {
+		if (test_thread_flag(TIF_NEED_RESCHED))
+			return -EAGAIN;
+		cpu_relax();
+	}
+	preempt_disable();
+	return 0;
+}
+
+void __lockfunc put_kernel_lock(void)
+{
+	_raw_spin_unlock(&kernel_flag);
+	preempt_enable_no_resched();
+}
+
+/*
+ * These are the BKL spinlocks - we try to be polite about preemption. 
+ * If SMP is not on (ie UP preemption), this all goes away because the
  * _raw_spin_trylock() will always succeed.
  */
 #ifdef CONFIG_PREEMPT
-inline void __lockfunc get_kernel_lock(void)
+static inline void __lock_kernel(void)
 {
 	preempt_disable();
 	if (unlikely(!_raw_spin_trylock(&kernel_flag))) {
@@ -65,13 +89,13 @@ inline void __lockfunc get_kernel_lock(void)
 /*
  * Non-preemption case - just get the spinlock
  */
-inline void __lockfunc get_kernel_lock(void)
+static inline void __lock_kernel(void)
 {
 	_raw_spin_lock(&kernel_flag);
 }
 #endif
 
-inline void __lockfunc put_kernel_lock(void)
+static inline void __unlock_kernel(void)
 {
 	_raw_spin_unlock(&kernel_flag);
 	preempt_enable();
@@ -87,7 +111,7 @@ void __lockfunc lock_kernel(void)
 {
 	int depth = current->lock_depth+1;
 	if (likely(!depth))
-		get_kernel_lock();
+		__lock_kernel();
 	current->lock_depth = depth;
 }
 
@@ -95,7 +119,7 @@ void __lockfunc unlock_kernel(void)
 {
 	BUG_ON(current->lock_depth < 0);
 	if (likely(--current->lock_depth < 0))
-		put_kernel_lock();
+		__unlock_kernel();
 }
 
 EXPORT_SYMBOL(lock_kernel);

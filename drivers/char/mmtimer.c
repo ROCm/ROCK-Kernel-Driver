@@ -103,13 +103,13 @@ static int mmtimer_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case MMTIMER_GETRES: /* resolution of the clock in 10^-15 s */
-		if(copy_to_user((unsigned long *)arg, &mmtimer_femtoperiod,
-				sizeof(unsigned long)))
+		if(copy_to_user((unsigned long __user *)arg,
+				&mmtimer_femtoperiod, sizeof(unsigned long)))
 			return -EFAULT;
 		break;
 
 	case MMTIMER_GETFREQ: /* frequency in Hz */
-		if(copy_to_user((unsigned long *)arg,
+		if(copy_to_user((unsigned long __user *)arg,
 				&sn_rtc_cycles_per_second,
 				sizeof(unsigned long)))
 			return -EFAULT;
@@ -125,8 +125,8 @@ static int mmtimer_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	case MMTIMER_GETCOUNTER:
-		if(copy_to_user((unsigned long *)arg, RTC_COUNTER_ADDR,
-				sizeof(unsigned long)))
+		if(copy_to_user((unsigned long __user *)arg,
+				RTC_COUNTER_ADDR, sizeof(unsigned long)))
 			return -EFAULT;
 		break;
 	default:

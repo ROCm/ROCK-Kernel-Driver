@@ -263,7 +263,8 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 		 */
 		;
 	} else {
-		area = im_get_area(ea, size, IM_REGION_UNUSED|IM_REGION_SUBSET);
+		area = im_get_area(ea, size,
+			IM_REGION_UNUSED|IM_REGION_SUBSET|IM_REGION_EXISTS);
 		if (area == NULL) {
 			/* Expected when PHB-dlpar is in play */
 			return 1;

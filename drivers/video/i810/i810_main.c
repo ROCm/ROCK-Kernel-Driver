@@ -1416,62 +1416,50 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 	i810_enable_cursor(mmio, OFF);
 
-	if (cursor->set & FB_CUR_SETHOT)
-		info->cursor.hot = cursor->hot;
-	
 	if (cursor->set & FB_CUR_SETPOS) {
 		u32 tmp;
 
-		info->cursor.image.dx = cursor->image.dx;
-		info->cursor.image.dy = cursor->image.dy;
-		tmp = (info->cursor.image.dx - info->var.xoffset) & 0xffff;
-		tmp |= (info->cursor.image.dy - info->var.yoffset) << 16;
+		tmp = (cursor->image.dx - info->var.xoffset) & 0xffff;
+		tmp |= (cursor->image.dy - info->var.yoffset) << 16;
 		i810_writel(CURPOS, mmio, tmp);
 	}
 
-	if (cursor->set & FB_CUR_SETSIZE) {
+	if (cursor->set & FB_CUR_SETSIZE)
 		i810_reset_cursor_image(par);
-		info->cursor.image.height = cursor->image.height;
-		info->cursor.image.width = cursor->image.width;
-	}
 
-	if (cursor->set & FB_CUR_SETCMAP) {
+	if (cursor->set & FB_CUR_SETCMAP)
 		i810_load_cursor_colors(cursor->image.fg_color,
 					cursor->image.bg_color,
 					info);
-		info->cursor.image.fg_color = cursor->image.fg_color;
-		info->cursor.image.bg_color = cursor->image.bg_color;
 
-	}
-
-	if (cursor->set & (FB_CUR_SETSHAPE)) {
-		int size = ((info->cursor.image.width + 7) >> 3) * 
-			info->cursor.image.height;
+	if (cursor->set & (FB_CUR_SETSHAPE | FB_CUR_SETIMAGE)) {
+		int size = ((cursor->image.width + 7) >> 3) *
+			cursor->image.height;
 		int i;
 		u8 *data = kmalloc(64 * 8, GFP_KERNEL);
 
 		if (data == NULL)
 			return -ENOMEM;
-		info->cursor.image.data = cursor->image.data;
 
-		switch (info->cursor.rop) {
+		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				data[i] = info->cursor.image.data[i] ^ info->cursor.mask[i];
+				data[i] = cursor->image.data[i] ^ cursor->mask[i];
 			break;
 		case ROP_COPY:
 		default:
 			for (i = 0; i < size; i++)
-				data[i] = info->cursor.image.data[i] & info->cursor.mask[i];
+				data[i] = cursor->image.data[i] & cursor->mask[i];
 			break;
 		}
-		i810_load_cursor_image(info->cursor.image.width, 
-				       info->cursor.image.height, data,
+
+		i810_load_cursor_image(cursor->image.width,
+				       cursor->image.height, data,
 				       par);
 		kfree(data);
 	}
 
-	if (info->cursor.enable)
+	if (cursor->enable)
 		i810_enable_cursor(mmio, ON);
 
 	return 0;
@@ -1523,8 +1511,8 @@ static int i810fb_suspend(struct pci_dev *dev, u32 state)
 	info->fbops->fb_blank(blank, info);
 
 	if (!prev_state) { 
-		par->drm_agp->unbind_memory(par->i810_gtt.i810_fb_memory);
-		par->drm_agp->unbind_memory(par->i810_gtt.i810_cursor_memory);
+		agp_unbind_memory(par->i810_gtt.i810_fb_memory);
+		agp_unbind_memory(par->i810_gtt.i810_cursor_memory);
 		pci_disable_device(dev);
 	}
 	pci_save_state(dev);
@@ -1544,10 +1532,10 @@ static int i810fb_resume(struct pci_dev *dev)
 	pci_restore_state(dev);
 	pci_set_power_state(dev, 0);
 	pci_enable_device(dev);
-	par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
-				  par->fb.offset);
-	par->drm_agp->bind_memory(par->i810_gtt.i810_cursor_memory, 
-				  par->cursor_heap.offset);
+	agp_bind_memory(par->i810_gtt.i810_fb_memory,
+			par->fb.offset);
+	agp_bind_memory(par->i810_gtt.i810_cursor_memory,
+			par->cursor_heap.offset);
 
 	info->fbops->fb_blank(VESA_NO_BLANKING, info);
 
@@ -1599,39 +1587,36 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
 	i810_fix_offsets(par);
 	size = par->fb.size + par->iring.size;
 
-	par->drm_agp = (drm_agp_t *) inter_module_get("drm_agp");
-	if (!par->drm_agp) {
-		printk("i810fb: cannot acquire agp\n");
+	if (agp_backend_acquire()) {
+		printk("i810fb_alloc_fbmem: cannot acquire agpgart\n");
 		return -ENODEV;
 	}
-	par->drm_agp->acquire(); 
-
 	if (!(par->i810_gtt.i810_fb_memory = 
-	      par->drm_agp->allocate_memory(size >> 12, AGP_NORMAL_MEMORY))) {
+	      agp_allocate_memory(size >> 12, AGP_NORMAL_MEMORY))) {
 		printk("i810fb_alloc_fbmem: can't allocate framebuffer "
 		       "memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -ENOMEM;
 	}
-	if (par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
-				      par->fb.offset)) {
+	if (agp_bind_memory(par->i810_gtt.i810_fb_memory,
+			    par->fb.offset)) {
 		printk("i810fb_alloc_fbmem: can't bind framebuffer memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -EBUSY;
 	}	
 	
 	if (!(par->i810_gtt.i810_cursor_memory = 
-	      par->drm_agp->allocate_memory(par->cursor_heap.size >> 12, 
-					    AGP_PHYSICAL_MEMORY))) {
+	      agp_allocate_memory(par->cursor_heap.size >> 12,
+				  AGP_PHYSICAL_MEMORY))) {
 		printk("i810fb_alloc_cursormem:  can't allocate" 
 		       "cursor memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -ENOMEM;
 	}
-	if (par->drm_agp->bind_memory(par->i810_gtt.i810_cursor_memory, 
+	if (agp_bind_memory(par->i810_gtt.i810_cursor_memory,
 			    par->cursor_heap.offset)) {
 		printk("i810fb_alloc_cursormem: cannot bind cursor memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -EBUSY;
 	}	
 
@@ -1639,7 +1624,7 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
 
 	i810_fix_pointers(par);
 
-	par->drm_agp->release();
+	agp_backend_release();
 
 	return 0;
 }
@@ -1874,12 +1859,12 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 	par = (struct i810fb_par *) info->par;
 	par->dev = dev;
 
-	if (!(info->pixmap.addr = kmalloc(64*1024, GFP_KERNEL))) {
+	if (!(info->pixmap.addr = kmalloc(8*1024, GFP_KERNEL))) {
 		i810fb_release_resource(info, par);
 		return -ENOMEM;
 	}
-	memset(info->pixmap.addr, 0, 64*1024);
-	info->pixmap.size = 64*1024;
+	memset(info->pixmap.addr, 0, 8*1024);
+	info->pixmap.size = 8*1024;
 	info->pixmap.buf_align = 8;
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
 
@@ -1945,19 +1930,13 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 static void i810fb_release_resource(struct fb_info *info, 
 				    struct i810fb_par *par)
 {
+	struct gtt_data *gtt = &par->i810_gtt;
 	unset_mtrr(par);
-	if (par->drm_agp) {
-		drm_agp_t *agp = par->drm_agp;
-		struct gtt_data *gtt = &par->i810_gtt;
 
-		if (par->i810_gtt.i810_cursor_memory)
-			agp->free_memory(gtt->i810_cursor_memory);
-		if (par->i810_gtt.i810_fb_memory)
-			agp->free_memory(gtt->i810_fb_memory);
-
-		inter_module_put("drm_agp");
-		par->drm_agp = NULL;
-	}
+	if (par->i810_gtt.i810_cursor_memory)
+		agp_free_memory(gtt->i810_cursor_memory);
+	if (par->i810_gtt.i810_fb_memory)
+		agp_free_memory(gtt->i810_fb_memory);
 
 	if (par->mmio_start_virtual)
 		iounmap(par->mmio_start_virtual);
