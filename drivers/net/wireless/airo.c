@@ -2389,7 +2389,7 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 
 #ifdef MICSUPPORT
-		if ((cap_rid.len==sizeof(cap_rid)) && (cap_rid.extSoftCap&1)) {
+		if ((cap_rid.len>=sizeof(cap_rid)) && (cap_rid.extSoftCap&1)) {
 			ai->config.opmode |= MODE_MIC;
 			ai->flags |= FLAG_MIC_CAPABLE;
 			micsetup(ai);
