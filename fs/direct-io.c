@@ -106,7 +106,8 @@ struct dio {
 	int page_errors;		/* errno from get_user_pages() */
 
 	/* BIO completion state */
-	atomic_t bio_count;		/* nr bios in flight */
+	atomic_t bio_count;		/* nr bios to be completed */
+	atomic_t bios_in_flight;	/* nr bios in flight */
 	spinlock_t bio_list_lock;	/* protects bio_list */
 	struct bio *bio_list;		/* singly linked via bi_private */
 	struct task_struct *waiter;	/* waiting task (NULL if none) */
@@ -239,7 +240,8 @@ static int dio_bio_end_io(struct bio *bio, unsigned int bytes_done, int error)
 	spin_lock_irqsave(&dio->bio_list_lock, flags);
 	bio->bi_private = dio->bio_list;
 	dio->bio_list = bio;
-	if (dio->waiter)
+	atomic_dec(&dio->bios_in_flight);
+	if (dio->waiter && atomic_read(&dio->bios_in_flight) == 0)
 		wake_up_process(dio->waiter);
 	spin_unlock_irqrestore(&dio->bio_list_lock, flags);
 	return 0;
@@ -277,6 +279,7 @@ static void dio_bio_submit(struct dio *dio)
 
 	bio->bi_private = dio;
 	atomic_inc(&dio->bio_count);
+	atomic_inc(&dio->bios_in_flight);
 	if (dio->is_async && dio->rw == READ)
 		bio_set_pages_dirty(bio);
 	submit_bio(dio->rw, bio);
@@ -857,6 +860,7 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	 * still submitting BIOs.
 	 */
 	atomic_set(&dio->bio_count, 1);
+	atomic_set(&dio->bios_in_flight, 0);
 	spin_lock_init(&dio->bio_list_lock);
 	dio->bio_list = NULL;
 	dio->waiter = NULL;
