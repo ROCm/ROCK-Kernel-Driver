@@ -200,13 +200,13 @@ static int vlsi_proc_ndev(struct net_device *ndev, char *buf, int len)
 
 	out += sprintf(out, "\nhw-state:\n");
 	pci_read_config_byte(idev->pdev, VLSI_PCI_IRMISC, &byte);
-	out += sprintf(out, "IRMISC:%s%s%s UART%s",
+	out += sprintf(out, "IRMISC:%s%s%s uart%s",
 		(byte&IRMISC_IRRAIL) ? " irrail" : "",
 		(byte&IRMISC_IRPD) ? " irpd" : "",
 		(byte&IRMISC_UARTTST) ? " uarttest" : "",
-		(byte&IRMISC_UARTEN) ? "" : " disabled\n");
+		(byte&IRMISC_UARTEN) ? "@" : " disabled\n");
 	if (byte&IRMISC_UARTEN) {
-		out += sprintf(out, "@0x%s\n",
+		out += sprintf(out, "0x%s\n",
 			(byte&2) ? ((byte&1) ? "3e8" : "2e8")
 				 : ((byte&1) ? "3f8" : "2f8"));
 	}
@@ -360,7 +360,7 @@ static int vlsi_proc_print(struct net_device *ndev, char *buf, int len)
 	char *out = buf;
 
 	if (!ndev || !ndev->priv) {
-		printk(KERN_ERR "%s: invalid ptr!\n", __FUNCTION__);
+		ERROR("%s: invalid ptr!\n", __FUNCTION__);
 		return 0;
 	}
 
@@ -556,7 +556,7 @@ static struct vlsi_ring *vlsi_alloc_ring(struct pci_dev *pdev, struct ring_descr
 		}
 		busaddr = pci_map_single(pdev, rd->buf, len, dir);
 		if (!busaddr) {
-			printk(KERN_ERR "%s: failed to create PCI-MAP for %p",
+			ERROR("%s: failed to create PCI-MAP for %p",
 				__FUNCTION__, rd->buf);
 			BUG();
 		}
@@ -599,8 +599,7 @@ static int vlsi_create_hwif(vlsi_irda_dev_t *idev)
 
 	ringarea = pci_alloc_consistent(idev->pdev, HW_RING_AREA_SIZE, &idev->busaddr);
 	if (!ringarea) {
-		printk(KERN_ERR "%s: insufficient memory for descriptor rings\n",
-			__FUNCTION__);
+		ERROR("%s: insufficient memory for descriptor rings\n", __FUNCTION__);
 		goto out;
 	}
 	memset(ringarea, 0, HW_RING_AREA_SIZE);
@@ -674,12 +673,11 @@ static int vlsi_process_rx(struct vlsi_ring *r, struct ring_descr *rd)
 		crclen = (idev->mode==IFF_FIR) ? sizeof(u32) : sizeof(u16);
 		len -= crclen;		/* remove trailing CRC */
 		if (len <= 0) {
-			printk(KERN_ERR "%s: strange frame (len=%d)\n",
-				__FUNCTION__, len);
+			WARNING("%s: strange frame (len=%d)\n", __FUNCTION__, len);
 			ret |= VLSI_RX_DROP;
 		}
 		else if (!rd->skb) {
-			printk(KERN_ERR "%s: rx packet dropped\n", __FUNCTION__);
+			WARNING("%s: rx packet dropped\n", __FUNCTION__);
 			ret |= VLSI_RX_DROP;
 		}
 		else {
@@ -766,7 +764,7 @@ static void vlsi_rx_interrupt(struct net_device *ndev)
 
 	if (ring_first(r) == NULL) {
 		/* we are in big trouble, if this should ever happen */
-		printk(KERN_ERR "%s: rx ring exhausted!\n", __FUNCTION__);
+		ERROR("%s: rx ring exhausted!\n", __FUNCTION__);
 		vlsi_ring_debug(r);
 	}
 	else
@@ -787,7 +785,7 @@ static void vlsi_unarm_rx(vlsi_irda_dev_t *idev)
 		if (rd_is_active(rd)) {
 			rd_set_status(rd, 0);
 			if (rd_get_count(rd)) {
-				printk(KERN_INFO "%s - dropping rx packet\n", __FUNCTION__);
+				IRDA_DEBUG(0, "%s - dropping rx packet\n", __FUNCTION__);
 				ret = -VLSI_RX_DROP;
 			}
 			rd_set_count(rd, 0);
@@ -867,9 +865,7 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 
 	baudrate = idev->new_baud;
 	iobase = ndev->base_addr;
-#if 0
-	printk(KERN_DEBUG "%s: %d -> %d\n", __FUNCTION__, idev->baud, idev->new_baud);
-#endif
+	IRDA_DEBUG(2, "%s: %d -> %d\n", __FUNCTION__, idev->baud, idev->new_baud);
 	if (baudrate == 4000000) {
 		mode = IFF_FIR;
 		config = IRCFG_FIR;
@@ -885,7 +881,7 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 		config = IRCFG_SIR | IRCFG_SIRFILT  | IRCFG_RXANY;
 		switch(baudrate) {
 			default:
-				printk(KERN_ERR "%s: undefined baudrate %d - fallback to 9600!\n",
+				WARNING("%s: undefined baudrate %d - fallback to 9600!\n",
 					__FUNCTION__, baudrate);
 				baudrate = 9600;
 				/* fallthru */
@@ -910,7 +906,7 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 		if (fifocnt == 0)
 			break;
 		if (!idle_retry)
-			printk(KERN_WARNING "%s: waiting for rx fifo to become empty(%d)\n",
+			IRDA_DEBUG(0, "%s: waiting for rx fifo to become empty(%d)\n",
 				__FUNCTION__, fifocnt);
 		if (dolock) {
 			spin_unlock_irqrestore(&idev->lock, flags);
@@ -921,7 +917,7 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 			udelay(100);
 	}
 	if (fifocnt != 0)
-		printk(KERN_ERR "%s: rx fifo not empty(%d)\n", __FUNCTION__, fifocnt);
+		IRDA_DEBUG(0, "%s: rx fifo not empty(%d)\n", __FUNCTION__, fifocnt);
 
 	outw(0, iobase+VLSI_PIO_IRENABLE);
 	wmb();
@@ -949,13 +945,13 @@ static int vlsi_set_baud(struct net_device *ndev, int dolock)
 		config ^= IRENABLE_SIR_ON;
 
 	if (config != (IRENABLE_IREN|IRENABLE_ENRXST)) {
-		printk(KERN_ERR "%s: failed to set %s mode!\n", __FUNCTION__,
+		WARNING("%s: failed to set %s mode!\n", __FUNCTION__,
 			(mode==IFF_SIR)?"SIR":((mode==IFF_MIR)?"MIR":"FIR"));
 		ret = -1;
 	}
 	else {
 		if (inw(iobase+VLSI_PIO_PHYCTL) != nphyctl) {
-			printk(KERN_ERR "%s: failed to apply baudrate %d\n",
+			WARNING("%s: failed to apply baudrate %d\n",
 				__FUNCTION__, baudrate);
 			ret = -1;
 		}
@@ -1043,7 +1039,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		status = 0;
 
 	if (skb->len == 0) {
-		printk(KERN_ERR "%s: dropping len=0 packet\n", __FUNCTION__);
+		WARNING("%s: dropping len=0 packet\n", __FUNCTION__);
 		goto drop;
 	}
 
@@ -1091,7 +1087,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		 */
 
 		if (len >= r->len-5)
-			 printk(KERN_WARNING "%s: possible buffer overflow with SIR wrapping!\n",
+			 WARNING("%s: possible buffer overflow with SIR wrapping!\n",
 			 	__FUNCTION__);
 	}
 	else {
@@ -1099,7 +1095,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		status |= RD_TX_PULSE;		/* send 2 us highspeed indication pulse */
 		len = skb->len;
 		if (len > r->len) {
-			printk(KERN_ERR "%s: no space - skb too big (%d)\n",
+			WARNING("%s: no space - skb too big (%d)\n",
 				__FUNCTION__, skb->len);
 			goto drop;
 		}
@@ -1160,9 +1156,9 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		int fifocnt;
 
 		fifocnt = inw(ndev->base_addr+VLSI_PIO_RCVBCNT) & RCVBCNT_MASK;
-		if (fifocnt != 0)
-			printk(KERN_WARNING "%s: rx fifo not empty(%d)\n",
-				__FUNCTION__, fifocnt);
+		if (fifocnt != 0) {
+			IRDA_DEBUG(0, "%s: rx fifo not empty(%d)\n", __FUNCTION__, fifocnt);
+		}
 
 		config = inw(iobase+VLSI_PIO_IRCFG);
 		rmb();
@@ -1174,7 +1170,7 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	if (ring_put(r) == NULL) {
 		netif_stop_queue(ndev);
-		printk(KERN_DEBUG "%s: tx ring full - queue stopped\n", __FUNCTION__);
+		IRDA_DEBUG(3, "%s: tx ring full - queue stopped\n", __FUNCTION__);
 	}
 	spin_unlock_irqrestore(&idev->lock, flags);
 
@@ -1230,9 +1226,10 @@ static void vlsi_tx_interrupt(struct net_device *ndev)
 		int fifocnt;
 
 		fifocnt = inw(iobase+VLSI_PIO_RCVBCNT) & RCVBCNT_MASK;
-		if (fifocnt != 0)
-			printk(KERN_WARNING "%s: rx fifo not empty(%d)\n",
+		if (fifocnt != 0) {
+			IRDA_DEBUG(0, "%s: rx fifo not empty(%d)\n",
 				__FUNCTION__, fifocnt);
+		}
 		outw(config | IRCFG_ENTX, iobase+VLSI_PIO_IRCFG);
 	}
 
@@ -1240,7 +1237,7 @@ static void vlsi_tx_interrupt(struct net_device *ndev)
 
 	if (netif_queue_stopped(ndev)  &&  !idev->new_baud) {
 		netif_wake_queue(ndev);
-		printk(KERN_DEBUG "%s: queue awoken\n", __FUNCTION__);
+		IRDA_DEBUG(3, "%s: queue awoken\n", __FUNCTION__);
 	}
 }
 
@@ -1263,7 +1260,7 @@ static void vlsi_unarm_tx(vlsi_irda_dev_t *idev)
 				dev_kfree_skb_any(rd->skb);
 				rd->skb = NULL;
 			}
-			printk(KERN_INFO "%s - dropping tx packet\n", __FUNCTION__);
+			IRDA_DEBUG(0, "%s - dropping tx packet\n", __FUNCTION__);
 			ret = -VLSI_TX_DROP;
 		}
 		else
@@ -1312,8 +1309,7 @@ static int vlsi_start_clock(struct pci_dev *pdev)
 		}
 		if (count < 3) {
 			if (clksrc == 1) { /* explicitly asked for PLL hence bail out */
-				printk(KERN_ERR "%s: no PLL or failed to lock!\n",
-					__FUNCTION__);
+				ERROR("%s: no PLL or failed to lock!\n", __FUNCTION__);
 				clkctl = CLKCTL_CLKSTP;
 				pci_write_config_byte(pdev, VLSI_PCI_CLKCTL, clkctl);
 				return -1;
@@ -1321,7 +1317,7 @@ static int vlsi_start_clock(struct pci_dev *pdev)
 			else			/* was: clksrc=0(auto) */
 				clksrc = 3;	/* fallback to 40MHz XCLK (OB800) */
 
-			printk(KERN_INFO "%s: PLL not locked, fallback to clksrc=%d\n",
+			IRDA_DEBUG(0, "%s: PLL not locked, fallback to clksrc=%d\n",
 				__FUNCTION__, clksrc);
 		}
 		else
@@ -1569,8 +1565,7 @@ static int vlsi_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 			irq->ifr_receiving = (fifocnt!=0) ? 1 : 0;
 			break;
 		default:
-			printk(KERN_ERR "%s: notsupp - cmd=%04x\n",
-				__FUNCTION__, cmd);
+			WARNING("%s: notsupp - cmd=%04x\n", __FUNCTION__, cmd);
 			ret = -EOPNOTSUPP;
 	}	
 	
@@ -1613,14 +1608,14 @@ static irqreturn_t vlsi_interrupt(int irq, void *dev_instance,
 			break;		/* done if only activity remaining */
 	
 		if (irintr & ~(IRINTR_RPKTINT|IRINTR_TPKTINT|IRINTR_ACTIVITY)) {
-			printk(KERN_DEBUG "%s: IRINTR = %02x\n",
+			IRDA_DEBUG(1, "%s: IRINTR = %02x\n",
 				__FUNCTION__, (unsigned)irintr);
 			vlsi_reg_debug(iobase,__FUNCTION__);
 		}			
 	} while (--boguscount > 0);
 
 	if (boguscount <= 0)
-		printk(KERN_WARNING "%s: too much work in interrupt!\n", __FUNCTION__);
+		MESSAGE("%s: too much work in interrupt!\n", __FUNCTION__);
 	return IRQ_RETVAL(handled);
 }
 
@@ -1633,7 +1628,7 @@ static int vlsi_open(struct net_device *ndev)
 	char	hwname[32];
 
 	if (pci_request_regions(idev->pdev, drivername)) {
-		printk(KERN_ERR "%s: io resource busy\n", __FUNCTION__);
+		WARNING("%s: io resource busy\n", __FUNCTION__);
 		goto errout;
 	}
 	ndev->base_addr = pci_resource_start(idev->pdev,0);
@@ -1647,8 +1642,7 @@ static int vlsi_open(struct net_device *ndev)
 
 	if (request_irq(ndev->irq, vlsi_interrupt, SA_SHIRQ,
 			drivername, ndev)) {
-		printk(KERN_ERR "%s: couldn't get IRQ: %d\n",
-			__FUNCTION__, ndev->irq);
+		WARNING("%s: couldn't get IRQ: %d\n", __FUNCTION__, ndev->irq);
 		goto errout_io;
 	}
 
@@ -1669,7 +1663,7 @@ static int vlsi_open(struct net_device *ndev)
 
 	netif_start_queue(ndev);
 
-	printk(KERN_INFO "%s: device %s operational\n", __FUNCTION__, ndev->name);
+	MESSAGE("%s: device %s operational\n", __FUNCTION__, ndev->name);
 
 	return 0;
 
@@ -1703,7 +1697,7 @@ static int vlsi_close(struct net_device *ndev)
 
 	pci_release_regions(idev->pdev);
 
-	printk(KERN_INFO "%s: device %s stopped\n", __FUNCTION__, ndev->name);
+	MESSAGE("%s: device %s stopped\n", __FUNCTION__, ndev->name);
 
 	return 0;
 }
@@ -1724,8 +1718,7 @@ static int vlsi_irda_init(struct net_device *ndev)
 
 	if (pci_set_dma_mask(pdev,DMA_MASK_USED_BY_HW)
 	    || pci_set_dma_mask(pdev,DMA_MASK_MSTRPAGE)) {
-		printk(KERN_ERR "%s: aborting due to PCI BM-DMA address limitations\n",
-			__FUNCTION__);
+		ERROR("%s: aborting due to PCI BM-DMA address limitations\n", __FUNCTION__);
 		return -1;
 	}
 
@@ -1779,7 +1772,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if ( !pci_resource_start(pdev,0)
 	     || !(pci_resource_flags(pdev,0) & IORESOURCE_IO) ) {
-		printk(KERN_ERR "%s: bar 0 invalid", __FUNCTION__);
+		ERROR("%s: bar 0 invalid", __FUNCTION__);
 		goto out_disable;
 	}
 
@@ -1787,8 +1780,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	ndev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
 	if (ndev==NULL) {
-		printk(KERN_ERR "%s: Unable to allocate device memory.\n",
-			__FUNCTION__);
+		ERROR("%s: Unable to allocate device memory.\n", __FUNCTION__);
 		goto out_disable;
 	}
 
@@ -1804,37 +1796,33 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ndev->init = vlsi_irda_init;
 	strcpy(ndev->name,"irda%d");
 	if (register_netdev(ndev)) {
-		printk(KERN_ERR "%s: register_netdev failed\n",
-			__FUNCTION__);
+		ERROR("%s: register_netdev failed\n", __FUNCTION__);
 		goto out_freedev;
 	}
 
+	idev->proc_entry = NULL;
 	if (vlsi_proc_root != NULL) {
 		struct proc_dir_entry *ent;
 
 		ent = create_proc_entry(ndev->name, S_IFREG|S_IRUGO, vlsi_proc_root);
 		if (!ent) {
-			printk(KERN_ERR "%s: failed to create proc entry\n", __FUNCTION__);
-			goto out_unregister;
+			WARNING("%s: failed to create proc entry\n", __FUNCTION__);
+			idev->proc_entry = NULL;
 		}
-		ent->data = ndev;
-		ent->proc_fops = VLSI_PROC_FOPS;
-		ent->size = 0;
-		idev->proc_entry = ent;
-	} else
-		idev->proc_entry = NULL;
-
-	printk(KERN_INFO "%s: registered device %s\n", drivername, ndev->name);
+		else {
+			ent->data = ndev;
+			ent->proc_fops = VLSI_PROC_FOPS;
+			ent->size = 0;
+			idev->proc_entry = ent;
+		}
+	}
+	MESSAGE("%s: registered device %s\n", drivername, ndev->name);
 
 	pci_set_drvdata(pdev, ndev);
 	up(&idev->sem);
 
 	return 0;
 
-out_unregister:
-	up(&idev->sem);
-	unregister_netdev(ndev);
-	goto out_disable;
 out_freedev:
 	up(&idev->sem);
 	kfree(ndev);
@@ -1851,7 +1839,7 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
 	vlsi_irda_dev_t *idev;
 
 	if (!ndev) {
-		printk(KERN_CRIT "%s: lost netdevice?\n", drivername);
+		ERROR("%s: lost netdevice?\n", drivername);
 		return;
 	}
 
@@ -1968,7 +1956,7 @@ static int vlsi_irda_resume(struct pci_dev *pdev)
 		 * now we explicitly set pdev->current_state = 0 after enabling the
 		 * device and independently resume_ok should catch any garbage config.
 		 */
-		printk(KERN_ERR "%s - hm, nothing to resume?\n", __FUNCTION__);
+		WARNING("%s - hm, nothing to resume?\n", __FUNCTION__);
 		up(&idev->sem);
 		return 0;
 	}
@@ -2006,7 +1994,7 @@ static int __init vlsi_mod_init(void)
 	int	i, ret;
 
 	if (clksrc < 0  ||  clksrc > 3) {
-		printk(KERN_ERR "%s: invalid clksrc=%d\n", drivername, clksrc);
+		ERROR("%s: invalid clksrc=%d\n", drivername, clksrc);
 		return -1;
 	}
 
@@ -2019,9 +2007,8 @@ static int __init vlsi_mod_init(void)
 			case 64:
 				break;
 			default:
-				printk(KERN_WARNING "%s: invalid %s ringsize %d",
+				WARNING("%s: invalid %s ringsize %d, using default=8",
 					drivername, (i)?"rx":"tx", ringsize[i]);
-				printk(", using default=8\n");
 				ringsize[i] = 8;
 				break;
 		}
