@@ -25,6 +25,7 @@
  *  -- prune comments, they are too volumnous
  *  -- Exterminate P3 printks
  *  -- Resove XXX's
+ *  -- Redo "benh's retries", perhaps have spin-up code to handle them. V:D=?
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -157,7 +158,8 @@ struct ub_scsi_cmd {
 	struct ub_scsi_cmd *next;
 
 	int error;			/* Return code - valid upon done */
-	int act_len;			/* Return size */
+	unsigned int act_len;		/* Return size */
+	unsigned char key, asc, ascq;	/* May be valid if error==-EIO */
 
 	int stat_count;			/* Retries getting status. */
 
@@ -673,9 +675,12 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 
 	/*
 	 * build the command
+	 *
+	 * The call to blk_queue_hardsect_size() guarantees that request
+	 * is aligned, but it is given in terms of 512 byte units, always.
 	 */
-	block = rq->sector;
-	nblks = rq->nr_sectors;
+	block = rq->sector >> sc->capacity.bshift;
+	nblks = rq->nr_sectors >> sc->capacity.bshift;
 
 	memset(cmd, 0, sizeof(struct ub_scsi_cmd));
 	cmd->cdb[0] = (ub_dir == UB_DIR_READ)? READ_10: WRITE_10;
@@ -690,7 +695,7 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 	cmd->dir = ub_dir;
 	cmd->state = UB_CMDST_INIT;
 	cmd->data = rq->buffer;
-	cmd->len = nblks * 512;
+	cmd->len = rq->nr_sectors * 512;
 	cmd->done = ub_rw_cmd_done;
 	cmd->back = rq;
 
@@ -837,6 +842,7 @@ static void ub_urb_complete(struct urb *urb, struct pt_regs *pt)
 {
 	struct ub_dev *sc = urb->context;
 
+	del_timer(&sc->work_timer);
 	ub_complete(&sc->work_done);
 	tasklet_schedule(&sc->tasklet);
 }
@@ -1141,16 +1147,8 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		(*cmd->done)(sc, cmd);
 
 	} else if (cmd->state == UB_CMDST_SENSE) {
-		/* 
-		 * We do not look at sense, because even if there was no sense,
-		 * we get into UB_CMDST_SENSE from a STALL or CSW FAIL only.
-		 * We request sense because we want to clear CHECK CONDITION
-		 * on devices with delusions of SCSI, and not because we
-		 * are curious in any way about the sense itself.
-		 */
-		/* if ((cmd->top_sense[2] & 0x0F) == NO_SENSE) { foo } */
-
 		ub_state_done(sc, cmd, -EIO);
+
 	} else {
 		printk(KERN_WARNING "%s: "
 		    "wrong command state %d on device %u\n",
@@ -1309,6 +1307,10 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 	 */
 	ub_cmdtr_sense(sc, scmd, sense);
 
+	/*
+	 * Find the command which triggered the unit attention or a check,
+	 * save the sense into it, and advance its state machine.
+	 */
 	if ((cmd = ub_cmdq_peek(sc)) == NULL) {
 		printk(KERN_WARNING "%s: sense done while idle\n", sc->name);
 		return;
@@ -1325,6 +1327,10 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 		    sc->name, cmd->state, sc->dev->devnum);
 		return;
 	}
+
+	cmd->key = sense[2] & 0x0F;
+	cmd->asc = sense[12];
+	cmd->ascq = sense[13];
 
 	ub_scsi_urb_compl(sc, cmd);
 }
@@ -1519,7 +1525,7 @@ static int ub_bd_revalidate(struct gendisk *disk)
 	    sc->name, sc->dev->devnum, sc->capacity.nsec, sc->capacity.bsize);
 
 	/* XXX Support sector size switching like in sr.c */
-	// blk_queue_hardsect_size(q, sc->capacity.bsize);
+	blk_queue_hardsect_size(disk->queue, sc->capacity.bsize);
 	set_capacity(disk, sc->capacity.nsec);
 	// set_disk_ro(sdkp->disk, sc->readonly);
 
@@ -1620,6 +1626,9 @@ static int ub_sync_tur(struct ub_dev *sc)
 	wait_for_completion(&compl);
 
 	rc = cmd->error;
+
+	if (rc == -EIO && cmd->key != 0)	/* Retries for benh's key */
+		rc = cmd->key;
 
 err_submit:
 	kfree(cmd);
@@ -1836,6 +1845,7 @@ static int ub_probe(struct usb_interface *intf,
 	request_queue_t *q;
 	struct gendisk *disk;
 	int rc;
+	int i;
 
 	rc = -ENOMEM;
 	if ((sc = kmalloc(sizeof(struct ub_dev), GFP_KERNEL)) == NULL)
@@ -1902,7 +1912,11 @@ static int ub_probe(struct usb_interface *intf,
 	 * has to succeed, so we clear checks with an additional one here.
 	 * In any case it's not our business how revaliadation is implemented.
 	 */
-	ub_sync_tur(sc);
+	for (i = 0; i < 3; i++) {	/* Retries for benh's key */
+		if ((rc = ub_sync_tur(sc)) <= 0) break;
+		if (rc != 0x6) break;
+		msleep(10);
+	}
 
 	sc->removable = 1;		/* XXX Query this from the device */
 
@@ -1938,7 +1952,7 @@ static int ub_probe(struct usb_interface *intf,
 	blk_queue_max_phys_segments(q, UB_MAX_REQ_SG);
 	// blk_queue_segment_boundary(q, CARM_SG_BOUNDARY);
 	blk_queue_max_sectors(q, UB_MAX_SECTORS);
-	// blk_queue_hardsect_size(q, xxxxx);
+	blk_queue_hardsect_size(q, sc->capacity.bsize);
 
 	/*
 	 * This is a serious infraction, caused by a deficiency in the
@@ -2045,6 +2059,13 @@ static void ub_disconnect(struct usb_interface *intf)
 		    "URB is active after disconnect\n", sc->name);
 	}
 	spin_unlock_irqrestore(&sc->lock, flags);
+
+	/*
+	 * There is virtually no chance that other CPU runs times so long
+	 * after ub_urb_complete should have called del_timer, but only if HCD
+	 * didn't forget to deliver a callback on unlink.
+	 */
+	del_timer_sync(&sc->work_timer);
 
 	/*
 	 * At this point there must be no commands coming from anyone
