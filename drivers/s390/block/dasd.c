@@ -290,11 +290,9 @@ dasd_state_new_to_known(dasd_device_t *device)
 	gdp = dasd_gendisk_from_devindex(devmap->devindex);
 	if (gdp == NULL)
 		return -ENODEV;
-	minor = devmap->devindex % DASD_PER_MAJOR;
-
 	/* Set kdev and the device name. */
-	device->kdev = mk_kdev(gdp->major, minor << DASD_PARTN_BITS);
-	dasd_device_name(device->name, minor, 0, gdp);
+	device->kdev = mk_kdev(gdp->major, gdp->first_minor);
+	strcpy(device->name, gdp->major_name);
 
 	/* Find a discipline for the device. */
 	rc = dasd_find_disc(device);
@@ -304,7 +302,7 @@ dasd_state_new_to_known(dasd_device_t *device)
 	/* Add a proc directory and the dasd device entry to devfs. */
 	sprintf(buffer, "%04x", device->devinfo.devno);
 	dir = devfs_mk_dir(dasd_devfs_handle, buffer, device);
-	gdp->de_arr[minor(device->kdev) >> DASD_PARTN_BITS] = dir;
+	gdp->de_arr[0] = dir;
 	if (devmap->features & DASD_FEATURE_READONLY)
 		devfs_perm = S_IFBLK | S_IRUSR;
 	else
@@ -324,19 +322,13 @@ dasd_state_new_to_known(dasd_device_t *device)
 static inline void
 dasd_state_known_to_new(dasd_device_t * device)
 {
-	struct gendisk *gdp;
-	dasd_devmap_t *devmap;
-	int minor;
-
-	devmap = dasd_devmap_from_devno(device->devinfo.devno);
-	gdp = dasd_gendisk_from_devindex(devmap->devindex);
+	dasd_devmap_t *devmap = dasd_devmap_from_devno(device->devinfo.devno);
+	struct gendisk *gdp = dasd_gendisk_from_devindex(devmap->devindex);
 	if (gdp == NULL)
 		return;
-	minor = devmap->devindex % DASD_PER_MAJOR;
-
 	/* Remove device entry and devfs directory. */
 	devfs_unregister(device->devfs_entry);
-	devfs_unregister(gdp->de_arr[minor]);
+	devfs_unregister(gdp->de_arr[0]);
 
 	/* Forget the discipline information. */
 	device->discipline = NULL;

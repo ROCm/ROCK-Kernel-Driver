@@ -79,22 +79,7 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 #endif
 	NULL
 };
-
-/*
- *	This is ucking fugly but its probably the best thing for 2.4.x
- *	Take it as a clear reminder that: 1) we should put the device name
- *	generation in the object kdev_t points to in 2.5.
- *	and 2) ioctls better work on half-opened devices.
- */
  
-#ifdef CONFIG_ARCH_S390
-int (*genhd_dasd_name)(char*,int,int,struct gendisk*) = NULL;
-int (*genhd_dasd_ioctl)(struct inode *inp, struct file *filp,
-			unsigned int no, unsigned long data);
-EXPORT_SYMBOL(genhd_dasd_name);
-EXPORT_SYMBOL(genhd_dasd_ioctl);
-#endif
-
 /*
  * disk_name() is used by partition check code and the md driver.
  * It formats the devicename of the indicated disk into
@@ -119,11 +104,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			return buf + pos;
 	}
 
-#ifdef CONFIG_ARCH_S390
-	if (genhd_dasd_name
-	    && genhd_dasd_name (buf, unit, part, hd) == 0)
-		return buf;
-#endif
 	/*
 	 * Yes, I know, ... in cases is gccism and not a pretty one.  
 	 * However, the first variant will eventually consume _all_ cases
@@ -138,7 +118,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			maj = s;
 			break;
 		case I2O_MAJOR:
-		case DASD_MAJOR:
 			sprintf(s, "%s%c", hd->major_name, unit + 'a');
 			maj = s;
 	}

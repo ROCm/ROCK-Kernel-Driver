@@ -32,7 +32,12 @@ static struct list_head dasd_major_info = LIST_HEAD_INIT(dasd_major_info);
 
 struct major_info {
 	struct list_head list;
-	struct gendisk gendisk;	/* actually contains the major number */
+	int major;
+	struct gendisk disks[DASD_PER_MAJOR];
+	devfs_handle_t de_arr[DASD_PER_MAJOR];
+	char flags[DASD_PER_MAJOR];
+	char names[DASD_PER_MAJOR * 8];
+	struct hd_struct part[1<<MINORBITS];
 };
 
 /*
@@ -64,24 +69,17 @@ static int
 dasd_register_major(int major)
 {
 	struct major_info *mi;
-	struct hd_struct *gd_part;
-	devfs_handle_t *gd_de_arr;
-	char *gd_flags;
 	int new_major, rc;
+	struct list_head *l;
+	int index;
+	int i;
 
 	rc = 0;
 	/* Allocate major info structure. */
 	mi = kmalloc(sizeof(struct major_info), GFP_KERNEL);
 
-	/* Allocate gendisk arrays. */
-	gd_de_arr = kmalloc(DASD_PER_MAJOR * sizeof(devfs_handle_t),
-			    GFP_KERNEL);
-	gd_flags = kmalloc(DASD_PER_MAJOR * sizeof(char), GFP_KERNEL);
-	gd_part = kmalloc(sizeof (struct hd_struct) << MINORBITS, GFP_ATOMIC);
-
 	/* Check if one of the allocations failed. */
-	if (mi == NULL || gd_de_arr == NULL || gd_flags == NULL ||
-	    gd_part == NULL) {
+	if (mi == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"Cannot get memory to allocate another "
 			"major number");
@@ -99,41 +97,48 @@ dasd_register_major(int major)
 	}
 	if (major != 0)
 		new_major = major;
-
+	
 	/* Initialize major info structure. */
 	memset(mi, 0, sizeof(struct major_info));
-	mi->gendisk.major = new_major;
-	mi->gendisk.major_name = "dasd";
-	mi->gendisk.minor_shift = DASD_PARTN_BITS;
-	mi->gendisk.nr_real = DASD_PER_MAJOR;
-	mi->gendisk.fops = &dasd_device_operations;
-	mi->gendisk.de_arr = gd_de_arr;
-	mi->gendisk.flags = gd_flags;
-	mi->gendisk.part = gd_part;
-
-	/* Initialize the gendisk arrays. */
-	memset(gd_de_arr, 0, DASD_PER_MAJOR * sizeof(devfs_handle_t));
-	memset(gd_flags, 0, DASD_PER_MAJOR * sizeof (char));
-	memset(gd_part, 0, sizeof (struct hd_struct) << MINORBITS);
+	mi->major = new_major;
+	for (i = 0; i < DASD_PER_MAJOR; i++) {
+		struct gendisk *disk = mi->disks + i;
+		disk->major = new_major;
+		disk->first_minor = i << DASD_PARTN_BITS;
+		disk->minor_shift = DASD_PARTN_BITS;
+		disk->nr_real = 1;
+		disk->fops = &dasd_device_operations;
+		disk->de_arr = mi->de_arr + i;
+		disk->flags = mi->flags + i;
+		disk->part = mi->part + (i << DASD_PARTN_BITS);
+	}
 
 	/* Setup block device pointers for the new major. */
 	blk_dev[new_major].queue = dasd_get_queue;
 
-	/* Insert the new major info structure into dasd_major_info list. */
 	spin_lock(&dasd_major_lock);
+	index = 0;
+	list_for_each(l, &dasd_major_info)
+		index += DASD_PER_MAJOR;
+	for (i = 0; i < DASD_PER_MAJOR; i++, index++) {
+		char *name = mi->names + i * 8;
+		mi->disks[i].major_name = name;
+		sprintf(name, "dasd");
+		name += 4;
+		if (index > 701)
+			*name++ = 'a' + (((index - 702) / 676) % 26);
+		if (index > 25)
+			*name++ = 'a' + (((index - 26) / 26) % 26);
+		sprintf(name, "%c", 'a' + (index % 26));
+	}
 	list_add_tail(&mi->list, &dasd_major_info);
 	spin_unlock(&dasd_major_lock);
 
-	/* Make the gendisk known. */
-	add_gendisk(&mi->gendisk);
 	return 0;
 
 	/* Something failed. Do the cleanup and return rc. */
 out_error:
 	/* We rely on kfree to do the != NULL check. */
-	kfree(gd_part);
-	kfree(gd_flags);
-	kfree(gd_de_arr);
 	kfree(mi);
 	return rc;
 }
@@ -146,16 +151,13 @@ dasd_unregister_major(struct major_info * mi)
 	if (mi == NULL)
 		return;
 
-	/* Remove gendisk information. */
-	del_gendisk(&mi->gendisk);
-
 	/* Delete the major info from dasd_major_info. */
 	spin_lock(&dasd_major_lock);
 	list_del(&mi->list);
 	spin_unlock(&dasd_major_lock);
 
 	/* Clear block device pointers. */
-	major = mi->gendisk.major;
+	major = mi->major;
 	blk_dev[major].queue = NULL;
 	blk_clear(major);
 
@@ -166,9 +168,6 @@ dasd_unregister_major(struct major_info * mi)
 			major, rc);
 
 	/* Free memory. */
-	kfree(mi->gendisk.part);
-	kfree(mi->gendisk.flags);
-	kfree(mi->gendisk.de_arr);
 	kfree(mi);
 }
 
@@ -189,19 +188,19 @@ dasd_gendisk_new_major(void)
 /*
  * Return pointer to gendisk structure by kdev.
  */
-struct gendisk *
-dasd_gendisk_from_major(int major)
+static struct gendisk *dasd_gendisk_by_dev(kdev_t dev)
 {
 	struct list_head *l;
 	struct major_info *mi;
 	struct gendisk *gdp;
+	int major = major(dev);
 
 	spin_lock(&dasd_major_lock);
 	gdp = NULL;
 	list_for_each(l, &dasd_major_info) {
 		mi = list_entry(l, struct major_info, list);
-		if (mi->gendisk.major == major) {
-			gdp = &mi->gendisk;
+		if (mi->major == major) {
+			gdp = &mi->disks[minor(dev) >> DASD_PARTN_BITS];
 			break;
 		}
 	}
@@ -224,7 +223,7 @@ dasd_gendisk_from_devindex(int devindex)
 	list_for_each(l, &dasd_major_info) {
 		mi = list_entry(l, struct major_info, list);
 		if (devindex < DASD_PER_MAJOR) {
-			gdp = &mi->gendisk;
+			gdp = &mi->disks[devindex];
 			break;
 		}
 		devindex -= DASD_PER_MAJOR;
@@ -247,7 +246,7 @@ int dasd_gendisk_major_index(int major)
 	devindex = 0;
 	list_for_each(l, &dasd_major_info) {
 		mi = list_entry(l, struct major_info, list);
-		if (mi->gendisk.major == major) {
+		if (mi->major == major) {
 			rc = devindex;
 			break;
 		}
@@ -257,62 +256,19 @@ int dasd_gendisk_major_index(int major)
 	return rc;
 }
 
-
-/*
- * This one is needed for naming 18000+ possible dasd devices.
- *   dasda - dasdz : 26 devices
- *   dasdaa - dasdzz : 676 devices, added up = 702
- *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
- * This function is called from the partition detection code (see disk_name)
- * via the genhd_dasd_name hook. As mentioned in partition/check.c this
- * is ugly...
- */
-int
-dasd_device_name(char *str, int index, int partition, struct gendisk *hd)
-{
-	struct list_head *l;
-	int len, found;
-
-	/* Check if this is on of our gendisk structures. */
-	found = 0;
-	spin_lock(&dasd_major_lock);
-	list_for_each(l, &dasd_major_info) {
-		struct major_info *mi;
-		mi = list_entry(l, struct major_info, list);
-		if (&mi->gendisk == hd) {
-			found = 1;
-			break;
-		}
-		index += DASD_PER_MAJOR;
-	}
-	spin_unlock(&dasd_major_lock);
-	if (!found)
-		/* Not one of our structures. Can't be a dasd. */
-		return -EINVAL;
-	len = sprintf(str, "dasd");
-	if (index > 25) {
-		if (index > 701)
-			len += sprintf(str + len, "%c",
-				       'a' + (((index - 702) / 676) % 26));
-		len += sprintf(str + len, "%c",
-			       'a' + (((index - 26) / 26) % 26));
-	}
-	len += sprintf(str + len, "%c", 'a' + (index % 26));
-
-	if (partition > DASD_PARTN_MASK)
-		return -EINVAL;
-	if (partition)
-		len += sprintf(str + len, "%d", partition);
-	return 0;
-}
-
 /*
  * Register disk to genhd. This will trigger a partition detection.
  */
 void
 dasd_setup_partitions(dasd_device_t * device)
 {
-	grok_partitions(device->kdev, device->blocks << device->s2b_shift);
+	struct gendisk *disk = dasd_gendisk_by_dev(device->kdev);
+	if (disk == NULL)
+		return;
+	add_gendisk(disk);
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops,
+			device->blocks << device->s2b_shift);
 }
 
 /*
@@ -322,11 +278,10 @@ dasd_setup_partitions(dasd_device_t * device)
 void
 dasd_destroy_partitions(dasd_device_t * device)
 {
-	struct gendisk *gdp;
+	struct gendisk *disk = dasd_gendisk_by_dev(device->kdev);
 	int minor, i;
 
-	gdp = dasd_gendisk_from_major(major(device->kdev));
-	if (gdp == NULL)
+	if (disk == NULL)
 		return;
 
 	wipe_partitions(device->kdev);
@@ -336,12 +291,9 @@ dasd_destroy_partitions(dasd_device_t * device)
 	 * but the 1 as third parameter makes it do an unregister...
 	 * FIXME: there must be a better way to get rid of the devfs entries
 	 */
-	devfs_register_partitions(gdp, minor(device->kdev), 1);
+	devfs_register_partitions(disk, minor(device->kdev), 1);
+	del_gendisk(disk);
 }
-
-extern int (*genhd_dasd_name)(char *, int, int, struct gendisk *);
-extern int (*genhd_dasd_ioctl) (struct inode *inp, struct file *filp,
-                                unsigned int no, unsigned long data);
 
 int
 dasd_gendisk_init(void)
@@ -350,25 +302,17 @@ dasd_gendisk_init(void)
 
 	/* Register to static dasd major 94 */
 	rc = dasd_register_major(DASD_MAJOR);
-	if (rc != 0) {
+	if (rc != 0)
 		MESSAGE(KERN_WARNING,
 			"Couldn't register successfully to "
 			"major no %d", DASD_MAJOR);
-		return rc;
-	}
-	genhd_dasd_name = dasd_device_name;
-        genhd_dasd_ioctl = dasd_ioctl;
-	return 0;
-
+	return rc;
 }
 
 void
 dasd_gendisk_exit(void)
 {
 	struct list_head *l, *n;
-
-	genhd_dasd_ioctl = NULL;
-	genhd_dasd_name = NULL;
 	spin_lock(&dasd_major_lock);
 	list_for_each_safe(l, n, &dasd_major_info)
 		dasd_unregister_major(list_entry(l, struct major_info, list));
