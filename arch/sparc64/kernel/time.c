@@ -910,10 +910,10 @@ try_isa_clock:
 }
 
 /* This is gets the master TICK_INT timer going. */
-static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struct pt_regs *))
+static unsigned long sparc64_init_timers(void)
 {
-	unsigned long pstate, clock;
-	int node, err;
+	unsigned long clock;
+	int node;
 #ifdef CONFIG_SMP
 	extern void smp_tick_init(void);
 #endif
@@ -946,6 +946,14 @@ static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struc
 	smp_tick_init();
 #endif
 
+	return clock;
+}
+
+static void sparc64_start_timers(irqreturn_t (*cfunc)(int, void *, struct pt_regs *))
+{
+	unsigned long pstate;
+	int err;
+
 	/* Register IRQ handler. */
 	err = request_irq(build_irq(0, 0, 0UL, 0UL), cfunc, SA_STATIC_ALLOC,
 			  "timer", NULL);
@@ -971,8 +979,6 @@ static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struc
 			     : "r" (pstate));
 
 	local_irq_enable();
-
-	return clock;
 }
 
 struct freq_table {
@@ -1036,10 +1042,15 @@ static struct time_interpolator sparc64_cpu_interpolator = {
 #define SPARC64_NSEC_PER_CYC_SHIFT	30UL
 void __init time_init(void)
 {
-	unsigned long clock = sparc64_init_timers(timer_interrupt);
+	unsigned long clock = sparc64_init_timers();
 
 	sparc64_cpu_interpolator.frequency = clock;
 	register_time_interpolator(&sparc64_cpu_interpolator);
+
+	/* Now that the interpolator is registered, it is
+	 * safe to start the timer ticking.
+	 */
+	sparc64_start_timers(timer_interrupt);
 
 	timer_ticks_per_nsec_quotient =
 		(((NSEC_PER_SEC << SPARC64_NSEC_PER_CYC_SHIFT) +
