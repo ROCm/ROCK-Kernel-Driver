@@ -2210,9 +2210,9 @@ module_exit(rivafb_exit);
 
 module_param(noaccel, bool, 0);
 MODULE_PARM_DESC(noaccel, "bool: disable acceleration");
-module_param(flatpanel, int, -1);
+module_param(flatpanel, int, 0);
 MODULE_PARM_DESC(flatpanel, "Enables experimental flat panel support for some chipsets. (0 or 1=enabled) (default=0)");
-module_param(forceCRTC, int, -1);
+module_param(forceCRTC, int, 0);
 MODULE_PARM_DESC(forceCRTC, "Forces usage of a particular CRTC in case autodetection fails. (0 or 1) (default=autodetect)");
 #ifdef CONFIG_MTRR
 module_param(nomtrr, bool, 0);
