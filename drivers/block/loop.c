@@ -1238,8 +1238,8 @@ void loop_exit(void)
 	int i;
 
 	for (i = 0; i < max_loop; i++) {
-		blk_put_queue(loop_dev[i].lo_queue);
 		del_gendisk(disks[i]);
+		blk_put_queue(loop_dev[i].lo_queue);
 		put_disk(disks[i]);
 	}
 	devfs_remove("loop");
