@@ -18,15 +18,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/system.h>
 #include <asm/leds.h>
 #include <asm/mach-types.h>
 
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/arch/map.h>
 #include <asm/arch/regs-timer.h>
-
-extern unsigned long (*gettimeoffset)(void);
+#include <asm/mach/time.h>
 
 static unsigned long timer_startval;
 static unsigned long timer_ticks_usec;
@@ -79,15 +84,19 @@ s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+static struct irqaction s3c2410_timer_irq = {
+	.name		= "S32410 Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= s3c2410_timer_interrupt
+};
+
 /*
  * Set up timer interrupt, and return the current time in seconds.
- */
-
-/* currently we only use timer4, as it is the only timer which has no
+ *
+ * Currently we only use timer4, as it is the only timer which has no
  * other function that can be exploited externally
-*/
-
-void __init time_init (void)
+ */
+void __init s3c2410_init_time (void)
 {
 	unsigned long tcon;
 	unsigned long tcnt;
@@ -95,7 +104,6 @@ void __init time_init (void)
 	unsigned long tcfg0;
 
 	gettimeoffset = s3c2410_gettimeoffset;
-	timer_irq.handler = s3c2410_timer_interrupt;
 
 	tcnt = 0xffff;  /* default value for tcnt */
 
@@ -161,7 +169,7 @@ void __init time_init (void)
 	__raw_writel(tcnt, S3C2410_TCNTB(4));
 	__raw_writel(tcnt, S3C2410_TCMPB(4));
 
-	setup_irq(IRQ_TIMER4, &timer_irq);
+	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
 
 	/* start the timer running */
 	tcon |= S3C2410_TCON_T4START;

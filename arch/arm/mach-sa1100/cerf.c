@@ -92,4 +92,5 @@ MACHINE_START(CERF, "Intrinsyc CerfBoard/CerfCube")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(cerf_map_io)
 	INITIRQ(cerf_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

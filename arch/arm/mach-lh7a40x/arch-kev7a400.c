@@ -25,6 +25,7 @@
 
       /* This function calls the board specific IRQ initialization function. */
 extern void lh7a400_init_irq (void);
+extern void lh7a40x_init_time (void);
 
 static struct map_desc kev7a400_io_desc[] __initdata = {
 	{ IO_VIRT,    IO_PHYS,    IO_SIZE,    MT_DEVICE },
@@ -108,4 +109,5 @@ MACHINE_START (KEV7A400, "Sharp KEV7a400")
 	BOOT_PARAMS (0xc0000100)
 	MAPIO (kev7a400_map_io)
 	INITIRQ (lh7a400_init_irq)
+	INITTIME (lh7a40x_init_time)
 MACHINE_END

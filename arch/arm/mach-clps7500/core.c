@@ -10,12 +10,13 @@
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <linux/timer.h>
+#include <linux/sched.h>
 #include <linux/init.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 
 #include <asm/hardware.h>
 #include <asm/hardware/iomd.h>
@@ -265,10 +266,48 @@ static void __init clps7500_map_io(void)
 	iotable_init(cl7500_io_desc, ARRAY_SIZE(cl7500_io_desc));
 }
 
+extern void ioctime_init(void);
+
+static irqreturn_t
+clps7500_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	do_timer(regs);
+	do_set_rtc();
+	do_profile(regs);
+
+	{
+		/* Twinkle the lights. */
+		static int count, state = 0xff00;
+		if (count-- == 0) {
+			state ^= 0x100;
+			count = 25;
+			*((volatile unsigned int *)LED_ADDRESS) = state;
+		}
+	}
+	return IRQ_HANDLED;
+}
+
+static struct irqaction clps7500_timer_irq = {
+	.name		= "CLPS7500 Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= clps7500_timer_interrupt
+};
+
+/*
+ * Set up timer interrupt.
+ */
+void __init clps7500_init_time(void)
+{
+	ioctime_init();
+
+	setup_irq(IRQ_TIMER, &clps7500_timer_irq);
+}
+
 MACHINE_START(CLPS7500, "CL-PS7500")
 	MAINTAINER("Philip Blundell")
 	BOOT_MEM(0x10000000, 0x03000000, 0xe0000000)
 	MAPIO(clps7500_map_io)
 	INITIRQ(clps7500_init_irq)
+	INITTIME(clps7500_init_time)
 MACHINE_END
 

@@ -357,11 +357,17 @@ static void __init intcp_init(void)
 	}
 }
 
+static void __init intcp_init_time(void)
+{
+	integrator_time_init(1000000 / HZ, TIMER_CTRL_IE);
+}
+
 MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
 	BOOT_MEM(0x00000000, 0x16000000, 0xf1600000)
 	BOOT_PARAMS(0x00000100)
 	MAPIO(intcp_map_io)
 	INITIRQ(intcp_init_irq)
+	INITTIME(intcp_init_time)
 	INIT_MACHINE(intcp_init)
 MACHINE_END

@@ -14,6 +14,8 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/interrupt.h>
 
 #include <asm/elf.h>
 #include <asm/io.h>
@@ -25,6 +27,7 @@
 
 #include <asm/mach/map.h>
 #include <asm/mach/arch.h>
+#include <asm/mach/time.h>
 
 extern void rpc_init_irq(void);
 
@@ -82,6 +85,33 @@ void __init rpc_map_io(void)
 	elf_hwcap &= ~HWCAP_HALF;
 }
 
+static irqreturn_t
+rpc_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	do_timer(regs);
+	do_set_rtc();
+	do_profile(regs);
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction rpc_timer_irq = {
+	.name		= "RiscPC Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= rpc_timer_interrupt
+};
+
+/*
+ * Set up timer interrupt.
+ */
+void __init rpc_init_time(void)
+{
+	extern void ioctime_init(void);
+	ioctime_init();
+
+	setup_irq(IRQ_TIMER, &rpc_timer_irq);
+}
+
 MACHINE_START(RISCPC, "Acorn-RiscPC")
 	MAINTAINER("Russell King")
 	BOOT_MEM(0x10000000, 0x03000000, 0xe0000000)
@@ -90,4 +120,5 @@ MACHINE_START(RISCPC, "Acorn-RiscPC")
 	DISABLE_PARPORT(1)
 	MAPIO(rpc_map_io)
 	INITIRQ(rpc_init_irq)
+	INITTIME(rpc_init_time)
 MACHINE_END

@@ -36,6 +36,7 @@
 
 extern void clps711x_init_irq(void);
 extern void clps711x_map_io(void);
+extern void clps711x_init_time(void);
 
 /*
  * Map the P720T system PLD.  It occupies two address spaces:
@@ -86,6 +87,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
 	FIXUP(fixup_p720t)
 	MAPIO(p720t_map_io)
 	INITIRQ(clps711x_init_irq)
+	INITTIME(clps711x_init_time)
 MACHINE_END
 
 static int p720t_hw_init(void)

@@ -1,7 +1,7 @@
 /*
- * linux/include/asm-arm/arch-omap/time.h
+ * arch/arm/mach-omap/time.c
  *
- * 32kHz timer definition
+ * OMAP Timer Tick 
  *
  * Copyright (C) 2000 RidgeRun, Inc.
  * Author: Greg Lonnon <glonnon@ridgerun.com>
@@ -26,8 +26,6 @@
  * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#if !defined(__ASM_ARCH_OMAP_TIME_H)
-#define __ASM_ARCH_OMAP_TIME_H
 
 #include <linux/config.h>
 #include <linux/delay.h>
@@ -37,6 +35,7 @@
 #include <asm/leds.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 #include <asm/arch/clocks.h>
 
 #ifndef __instrument
@@ -162,14 +161,14 @@ unsigned long __noinstrument machinecycles_to_usecs(unsigned long mputicks)
  */
 static unsigned long systimer_mark;
 
-static unsigned long omap1510_gettimeoffset(void)
+static unsigned long omap_gettimeoffset(void)
 {
 	/* Return elapsed usecs since last system timer ISR */
 	return machinecycles_to_usecs(do_getmachinecycles() - systimer_mark);
 }
 
 static irqreturn_t
-omap1510_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long now, ilatency;
 
@@ -191,22 +190,25 @@ omap1510_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-void __init time_init(void)
+static struct irqaction omap_timer_irq = {
+	.name		= "OMAP Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= omap_timer_interrupt
+};
+
+void __init omap_init_time(void)
 {
 	/* Since we don't call request_irq, we must init the structure */
-	gettimeoffset = omap1510_gettimeoffset;
+	gettimeoffset = omap_gettimeoffset;
 
-	timer_irq.handler = omap1510_timer_interrupt;
-	timer_irq.flags = SA_INTERRUPT;
 #ifdef OMAP1510_USE_32KHZ_TIMER
 	timer32k_write(TIMER32k_CR, 0x0);
 	timer32k_write(TIMER32k_TVR,TIMER32k_PERIOD);
-	setup_irq(INT_OS_32kHz_TIMER, &timer_irq);
+	setup_irq(INT_OS_32kHz_TIMER, &omap_timer_irq);
 	start_timer32k();
 #else
-	setup_irq(INT_TIMER2, &timer_irq);
+	setup_irq(INT_TIMER2, &omap_timer_irq);
 	start_mputimer2(MPUTICKS_PER_SEC / 100 - 1);
 #endif
 }
 
-#endif

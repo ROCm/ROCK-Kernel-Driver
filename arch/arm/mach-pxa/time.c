@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-pxa/time.h
+ * arch/arm/mach-pxa/time.c
  *
  * Author:	Nicolas Pitre
  * Created:	Jun 15, 2001
@@ -9,6 +9,24 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/time.h>
+#include <linux/signal.h>
+#include <linux/errno.h>
+#include <linux/sched.h>
+
+#include <asm/system.h>
+#include <asm/hardware.h>
+#include <asm/io.h>
+#include <asm/leds.h>
+#include <asm/irq.h>
+#include <asm/mach/irq.h>
+#include <asm/mach/time.h>
 
 
 static inline unsigned long pxa_get_rtc_time(void)
@@ -84,7 +102,13 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-void __init time_init(void)
+static struct irqaction pxa_timer_irq = {
+	.name		= "PXA Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= pxa_timer_interrupt
+};
+
+void __init pxa_init_time(void)
 {
 	struct timespec tv;
 
@@ -95,10 +119,9 @@ void __init time_init(void)
 	tv.tv_sec = pxa_get_rtc_time();
 	do_settimeofday(&tv);
 
-	timer_irq.handler = pxa_timer_interrupt;
 	OSMR0 = 0;		/* set initial match at 0 */
 	OSSR = 0xf;		/* clear status on all timers */
-	setup_irq(IRQ_OST0, &timer_irq);
+	setup_irq(IRQ_OST0, &pxa_timer_irq);
 	OIER |= OIER_E0;	/* enable match on timer 0 to cause interrupts */
 	OSCR = 0;		/* initialize free-running timer, force first match */
 }

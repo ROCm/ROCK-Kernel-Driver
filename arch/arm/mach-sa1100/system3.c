@@ -470,4 +470,5 @@ MACHINE_START(PT_SYSTEM3, "PT System 3")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(system3_map_io)
 	INITIRQ(sa1100_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END
