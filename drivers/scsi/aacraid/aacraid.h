@@ -406,12 +406,10 @@ struct aac_init
 enum aac_log_level {
 	LOG_INIT			= 10,
 	LOG_INFORMATIONAL		= 20,
-	LOG_WARNING			= 30,
 	LOG_LOW_ERROR			= 40,
 	LOG_MEDIUM_ERROR		= 50,
 	LOG_HIGH_ERROR			= 60,
 	LOG_PANIC			= 70,
-	LOG_DEBUG			= 80,
 	LOG_WINDBG_PRINT		= 90
 };
 
