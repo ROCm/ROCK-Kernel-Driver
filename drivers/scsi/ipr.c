@@ -3179,6 +3179,7 @@ static irqreturn_t ipr_handle_other_interrupt(struct ipr_ioa_cfg *ioa_cfg,
 		writel(IPR_PCII_IOA_TRANS_TO_OPER, ioa_cfg->regs.clr_interrupt_reg);
 		int_reg = readl(ioa_cfg->regs.sense_interrupt_reg);
 
+		list_del(&ioa_cfg->reset_cmd->queue);
 		del_timer(&ioa_cfg->reset_cmd->timer);
 		ipr_reset_ioa_job(ioa_cfg->reset_cmd);
 	} else {
@@ -4806,6 +4807,7 @@ static int ipr_reset_enable_ioa(struct ipr_cmnd *ipr_cmd)
 	ipr_cmd->timer.expires = jiffies + IPR_OPERATIONAL_TIMEOUT;
 	ipr_cmd->timer.function = (void (*)(unsigned long))ipr_timeout;
 	add_timer(&ipr_cmd->timer);
+	list_add_tail(&ipr_cmd->queue, &ioa_cfg->pending_q);
 
 	LEAVE;
 	return IPR_RC_JOB_RETURN;
