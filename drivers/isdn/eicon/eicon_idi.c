@@ -2972,7 +2972,7 @@ idi_send_data(eicon_card *card, eicon_chan *chan, int ack, struct sk_buff *skb, 
 			spin_unlock_irqrestore(&eicon_lock, flags);
         	        eicon_log(card, 1, "idi_err: Ch%d: alloc_skb failed in send_data()\n", chan->No);
 			if (xmit_skb) 
-				dev_kfree_skb(skb);
+				dev_kfree_skb(xmit_skb);
 			if (skb2) 
 				dev_kfree_skb(skb2);
                 	return -ENOMEM;

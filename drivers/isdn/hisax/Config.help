@@ -251,6 +251,10 @@ CONFIG_HISAX_SEDLBAUER_CS
   This enables the PCMCIA client driver for the Sedlbauer Speed Star
   and Speed Star II cards.
 
+CONFIG_HISAX_AVM_A1_CS
+  This enables the PCMCIA client driver for the AVM A1 / Fritz!Card
+  PCMCIA cards.
+
 CONFIG_HISAX_ST5481
   This enables the driver for ST5481 based USB ISDN adapters,
   e.g. the BeWan Gazel 128 USB

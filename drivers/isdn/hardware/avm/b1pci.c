@@ -211,7 +211,7 @@ static int b1pciv4_probe(struct capicardparams *p, struct pci_dev *pdev)
 		goto err_free_dma;
 	}
 
-	card->mbase = ioremap_nocache(card->membase, 64);
+	card->mbase = ioremap(card->membase, 64);
 	if (!card->mbase) {
 		printk(KERN_NOTICE "b1pci: can't remap memory at 0x%lx\n",
 		       card->membase);
