@@ -486,6 +486,7 @@ END(ia64_trace_syscall)
 
 GLOBAL_ENTRY(ia64_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
@@ -493,6 +494,7 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
 .ret8:
+#endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 	ld4 r2=[r2]

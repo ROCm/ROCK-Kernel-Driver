@@ -91,6 +91,11 @@ SECTIONS
   .opd : AT(ADDR(.opd) - PAGE_OFFSET)
 	{ *(.opd) }
 
+  /* Per-cpu data: */
+  __per_cpu_start = .;
+  .data.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
+
   /* Initialization code and data: */
 
   . = ALIGN(PAGE_SIZE);
