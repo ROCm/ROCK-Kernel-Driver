@@ -104,9 +104,6 @@ static struct resource sa1111_resources[] = {
 static struct platform_device sa1111_device = {
 	.name		= "sa1111",
 	.id		= 0,
-	.dev		= {
-		.name	= "Intel Corporation SA1111",
-	},
 	.num_resources	= ARRAY_SIZE(sa1111_resources),
 	.resource	= sa1111_resources,
 };

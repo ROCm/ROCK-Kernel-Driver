@@ -9,7 +9,7 @@ int __init platform_add_device(struct platform_device *dev)
 	for (i = 0; i < dev->num_resources; i++) {
 		struct resource *r = &dev->resource[i];
 
-		r->name = dev->dev.name;
+		r->name = dev->dev.bus_id;
 
 		if (r->flags & IORESOURCE_MEM &&
 		    request_resource(&iomem_resource, r)) {

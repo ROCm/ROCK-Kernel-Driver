@@ -54,7 +54,6 @@ static struct platform_device sa1111_device = {
 	.name		= "sa1111",
 	.id		= 0,
 	.dev		= {
-		.name	= "Intel Corporation SA1111",
 		.dma_mask = &sa1111_dmamask;
 	},
 	.num_resources	= ARRAY_SIZE(sa1111_resources),

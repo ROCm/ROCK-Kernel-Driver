@@ -180,7 +180,7 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
 
 	dev->dev.release = amba_device_release;
 	dev->dev.bus = &amba_bustype;
-	dev->res.name = dev->dev.name;
+	dev->res.name = dev->dev.bus_id;
 
 	ret = request_resource(parent, &dev->res);
 	if (ret == 0) {
@@ -199,14 +199,6 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
 
 		if (cid == 0xb105f00d)
 			dev->periphid = pid;
-
-		if (dev->periphid)
-			snprintf(dev->dev.name, sizeof(dev->dev.name),
-				 "AMBA PL%03X",
-				 dev->periphid & 0xfff);
-		else
-			strlcpy(dev->dev.name, "AMBA unknown",
-				sizeof(dev->dev.name));
 
 		ret = device_register(&dev->dev);
 		if (ret == 0) {

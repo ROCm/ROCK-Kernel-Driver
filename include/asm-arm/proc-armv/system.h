@@ -41,6 +41,14 @@
 #define CR_I	(1 << 12)	/* Icache enable			*/
 #define CR_V	(1 << 13)	/* Vectors relocated to 0xffff0000	*/
 #define CR_RR	(1 << 14)	/* Round Robin cache replacement	*/
+#define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
+#define CR_DT	(1 << 16)
+#define CR_IT	(1 << 18)
+#define CR_ST	(1 << 19)
+#define CR_FI	(1 << 21)
+#define CR_U	(1 << 22)	/* Unaligned access operation		*/
+#define CR_XP	(1 << 23)	/* Extended page tables			*/
+#define CR_VE	(1 << 24)	/* Vectored interrupts			*/
 
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */

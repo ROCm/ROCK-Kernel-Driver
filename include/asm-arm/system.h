@@ -41,6 +41,7 @@ extern asmlinkage void __backtrace(void);
 #define CPU_ARCH_ARMv5		4
 #define CPU_ARCH_ARMv5T		5
 #define CPU_ARCH_ARMv5TE	6
+#define CPU_ARCH_ARMv6		7
 
 extern int cpu_architecture(void);
 
