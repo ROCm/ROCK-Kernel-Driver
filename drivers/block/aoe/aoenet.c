@@ -164,7 +164,7 @@ aoenet_init(void)
 	return 0;
 }
 
-void __exit
+void
 aoenet_exit(void)
 {
 	dev_remove_pack(&aoe_pt);

@@ -266,7 +266,7 @@ aoechr_init(void)
 	return 0;
 }
 
-void __exit
+void
 aoechr_exit(void)
 {
 	int i;

@@ -151,7 +151,7 @@ aoedev_freedev(struct aoedev *d)
 	kfree(d);
 }
 
-void __exit
+void
 aoedev_exit(void)
 {
 	struct aoedev *d;
