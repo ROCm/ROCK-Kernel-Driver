@@ -815,7 +815,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	
 		if (!idev) {
 			/* XXX: count this drop? */
-			return 0;
+			return;
 		}
 	
 		if (addr_type == IPV6_ADDR_ANY) {
@@ -825,7 +825,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 			ndisc_send_na(dev, NULL, &maddr, &msg->target,
 				      idev->cnf.forwarding, 0, 0, 1);
 			in6_dev_put(idev);
-			return 0;
+			return;
 		}
 
 		if (addr_type & IPV6_ADDR_UNICAST) {
