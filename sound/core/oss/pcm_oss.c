@@ -125,8 +125,8 @@ static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
 	if (runtime->period_size == runtime->oss.period_bytes)
 		return frames;
 	if (runtime->period_size < runtime->oss.period_bytes)
-		return frames * (runtime->oss.period_bytes / runtime->period_size);
-	return frames / (runtime->period_size / runtime->oss.period_bytes);
+		return (frames * runtime->period_size) / runtime->oss.period_bytes;
+	return (frames * runtime->oss.period_bytes) / runtime->period_size;
 }
 
 static int snd_pcm_oss_format_from(int format)
@@ -451,7 +451,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	sw_params->tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
 	sw_params->period_step = 1;
 	sw_params->sleep_min = 0;
-	sw_params->avail_min = runtime->period_size;
+	sw_params->avail_min = 1;
 	sw_params->xfer_align = 1;
 	if (atomic_read(&runtime->mmap_count) ||
 	    (substream->oss.setup && substream->oss.setup->nosilence)) {
@@ -470,7 +470,6 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		snd_printd("SW_PARAMS failed: %i\n", err);
 		goto failure;
 	}
-	runtime->control->avail_min = runtime->period_size;
 
 	runtime->oss.periods = params_periods(sparams);
 	oss_period_size = snd_pcm_plug_client_size(substream, params_period_size(sparams));
@@ -883,7 +882,7 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size
 				if (tmp <= 0)
 					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
-				runtime->oss.buffer_used = runtime->oss.period_bytes;
+				runtime->oss.buffer_used = tmp;
 			}
 			tmp = bytes;
 			if ((size_t) tmp > runtime->oss.buffer_used)
@@ -1425,6 +1424,7 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	snd_pcm_substream_t *substream;
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t delay;
+	int fixup;
 	struct count_info info;
 	int err;
 
@@ -1447,9 +1447,13 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 		if (err == -EPIPE || err == -ESTRPIPE) {
 			err = 0;
 			delay = 0;
+			fixup = 0;
+		} else {
+			fixup = runtime->oss.buffer_used;
 		}
 	} else {
 		err = snd_pcm_oss_capture_position_fixup(substream, &delay);
+		fixup = -runtime->oss.buffer_used;
 	}
 	if (err < 0)
 		return err;
@@ -1469,7 +1473,8 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			snd_pcm_oss_simulate_fill(substream);
 	} else {
-		info.blocks = delay / runtime->period_size;
+		delay = snd_pcm_oss_bytes(substream, delay) + fixup;
+		info.blocks = delay / runtime->oss.period_bytes;
 	}
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
@@ -1481,6 +1486,7 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	snd_pcm_substream_t *substream;
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t avail;
+	int fixup;
 	struct audio_buf_info info;
 	int err;
 
@@ -1500,7 +1506,7 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	if (runtime->oss.prepare) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			info.bytes = runtime->oss.period_bytes * runtime->periods;
-			info.fragments = runtime->periods;
+			info.fragments = runtime->oss.periods;
 		} else {
 			info.bytes = 0;
 			info.fragments = 0;
@@ -1511,16 +1517,19 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 			if (err == -EPIPE || err == -ESTRPIPE) {
 				avail = runtime->buffer_size;
 				err = 0;
+				fixup = 0;
 			} else {
 				avail = runtime->buffer_size - avail;
+				fixup = -runtime->oss.buffer_used;
 			}
 		} else {
 			err = snd_pcm_oss_capture_position_fixup(substream, &avail);
+			fixup = runtime->oss.buffer_used;
 		}
 		if (err < 0)
 			return err;
-		info.bytes = snd_pcm_oss_bytes(substream, avail);
-		info.fragments = avail / runtime->period_size;
+		info.bytes = snd_pcm_oss_bytes(substream, avail) + fixup;
+		info.fragments = info.bytes / runtime->oss.period_bytes;
 	}
 
 #ifdef OSS_DEBUG
