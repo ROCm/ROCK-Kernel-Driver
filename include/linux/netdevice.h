@@ -37,9 +37,6 @@
 
 #ifdef __KERNEL__
 #include <linux/config.h>
-#ifdef CONFIG_NET_PROFILE
-#include <net/profile.h>
-#endif
 
 struct divert_blk;
 struct vlan_group;

@@ -99,7 +99,6 @@
 #include <linux/divert.h>
 #include <net/dst.h>
 #include <net/pkt_sched.h>
-#include <net/profile.h>
 #include <net/checksum.h>
 #include <linux/highmem.h>
 #include <linux/init.h>
@@ -127,9 +126,6 @@ extern int plip_init(void);
  * via a timer instead of as each packet is received.
  */
 #undef OFFLINE_SAMPLE
-
-NET_PROFILE_DEFINE(dev_queue_xmit)
-NET_PROFILE_DEFINE(softnet_process)
 
 /*
  *	The list of packet types we will receive (as opposed to discard)
@@ -3014,12 +3010,6 @@ static int __init net_dev_init(void)
 		queue->backlog_dev.poll = process_backlog;
 		atomic_set(&queue->backlog_dev.refcnt, 1);
 	}
-
-#ifdef CONFIG_NET_PROFILE
-	net_profile_init();
-	NET_PROFILE_REGISTER(dev_queue_xmit);
-	NET_PROFILE_REGISTER(softnet_process);
-#endif
 
 #ifdef OFFLINE_SAMPLE
 	samp_timer.expires = jiffies + (10 * HZ);
