@@ -21,6 +21,7 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <asm/semaphore.h>
 #include <sound/core.h>
 #include <sound/util_mem.h>
 
