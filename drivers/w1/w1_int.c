@@ -181,8 +181,15 @@ void __w1_remove_master_device(struct w1_master *dev)
 			 "%s: Failed to send signal to w1 kernel thread %d.\n",
 			 __func__, dev->kpid);
 
-	while (atomic_read(&dev->refcnt))
-		schedule_timeout(10);
+	while (atomic_read(&dev->refcnt)) {
+		printk(KERN_INFO "Waiting for %s to become free: refcnt=%d.\n",
+				dev->name, atomic_read(&dev->refcnt));
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ);
+
+		if (signal_pending(current))
+			flush_signals(current);
+	}
 
 	msg.id.mst.id = dev->id;
 	msg.id.mst.pid = dev->kpid;

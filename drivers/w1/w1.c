@@ -449,8 +449,15 @@ static void w1_slave_detach(struct w1_slave *sl)
 	
 	dev_info(&sl->dev, "%s: detaching %s.\n", __func__, sl->name);
 
-	while (atomic_read(&sl->refcnt))
-		schedule_timeout(10);
+	while (atomic_read(&sl->refcnt)) {
+		printk(KERN_INFO "Waiting for %s to become free: refcnt=%d.\n",
+				sl->name, atomic_read(&sl->refcnt));
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ);
+
+		if (signal_pending(current))
+			flush_signals(current);
+	}
 
 	sysfs_remove_bin_file (&sl->dev.kobj, &sl->attr_bin);
 	device_remove_file(&sl->dev, &sl->attr_name);
@@ -507,8 +514,8 @@ static void w1_search(struct w1_master *dev)
 			 * All who don't sleep must send ID bit and COMPLEMENT ID bit.
 			 * They actually are ANDed between all senders.
 			 */
-			id_bit = w1_read_bit(dev);
-			comp_bit = w1_read_bit(dev);
+			id_bit = w1_touch_bit(dev, 1);
+			comp_bit = w1_touch_bit(dev, 1);
 
 			if (id_bit && comp_bit)
 				break;
@@ -539,7 +546,10 @@ static void w1_search(struct w1_master *dev)
 			 * and make all who don't have "search_bit" in "i"'th position
 			 * in it's registration number sleep.
 			 */
-			w1_write_bit(dev, search_bit);
+			if (dev->bus_master->touch_bit)
+				w1_touch_bit(dev, search_bit);
+			else
+				w1_write_bit(dev, search_bit);
 
 		}
 #endif
