@@ -366,7 +366,6 @@ acpi_processor_set_power_policy (
 	 * -----
 	 */
 	pr->power.state = ACPI_STATE_C1;
-	pr->power.default_state = ACPI_STATE_C1;
 
 	/*
 	 * C1/C2
@@ -637,11 +636,9 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 		goto end;
 
 	seq_printf(seq, "active state:            %d\n"
-			"default state:           %d\n"
 			"max_cstate:              %d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state,
-			pr->power.default_state,
 			max_cstate,
 			pr->power.bm_activity);
 
