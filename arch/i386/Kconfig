@@ -99,6 +99,15 @@ config X86_GENERICARCH
           This option compiles in the Summit, bigsmp, default subarchitectures.
 	  It is intended for a generic binary kernel.
 
+config X86_ES7000
+	bool "Support for Unisys ES7000 IA32 series"
+	depends on SMP
+	help
+	  Support for Unisys ES7000 systems.  Say 'Y' here if this kernel is
+	  supposed to run on an IA32-based Unisys ES7000 system. 
+	  Only choose this option if you have such a system, otherwise you 
+	  should say N here.
+
 endchoice
 
 config ACPI_SRAT
@@ -110,6 +119,11 @@ config X86_CYCLONE_TIMER
        bool 
        default y
        depends on X86_SUMMIT || X86_GENERICARCH
+
+config ES7000_CLUSTERED_APIC
+	bool
+	default y
+	depends on SMP && X86_ES7000 && MPENTIUMIII
 
 choice
 	prompt "Processor family"

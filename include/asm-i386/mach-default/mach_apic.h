@@ -118,4 +118,8 @@ static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 	return cpumask;
 }
 
+static inline void enable_apic_mode(void)
+{
+}
+
 #endif /* __ASM_MACH_APIC_H */
