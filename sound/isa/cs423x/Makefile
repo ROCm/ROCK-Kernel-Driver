@@ -5,9 +5,6 @@
 
 O_TARGET     := _cs423x.o
 
-list-multi   := snd-cs4231-lib.o snd-cs4236-lib.o \
-		snd-cs4231.o snd-cs4232.o snd-cs4236.o
-
 export-objs  := cs4231_lib.o cs4236_lib.o
 
 snd-cs4231-lib-objs := cs4231_lib.o
@@ -29,18 +26,3 @@ obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-cs4231-lib.o
 
 include $(TOPDIR)/Rules.make
-
-snd-cs4231-lib.o: $(snd-cs4231-lib-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4231-lib-objs)
-
-snd-cs4236-lib.o: $(snd-cs4236-lib-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4236-lib-objs)
-
-snd-cs4231.o: $(snd-cs4231-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4231-objs)
-
-snd-cs4232.o: $(snd-cs4232-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4232-objs)
-
-snd-cs4236.o: $(snd-cs4236-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4236-objs)

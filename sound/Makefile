@@ -49,13 +49,7 @@ ifeq ($(CONFIG_SND),y)
   obj-y += last.o
 endif
 
-list-multi      := soundcore.o
-
 soundcore-objs  := sound_core.o sound_firmware.o
 
 
 include $(TOPDIR)/Rules.make
-
-
-soundcore.o: $(soundcore-objs)
-	$(LD) -r -o $@ $(soundcore-objs)

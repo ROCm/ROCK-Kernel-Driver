@@ -8,11 +8,6 @@ O_TARGET     := pci.o
 subdir-y     := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
 subdir-m     := $(subdir-y)
 
-list-multi   := snd-als4000.o snd-cmipci.o snd-cs4281.o snd-ens1370.o \
-		snd-ens1371.o snd-es1938.o snd-es1968.o snd-fm801.o \
-		snd-ice1712.o snd-intel8x0.o snd-maestro3.o snd-rme96.o \
-		snd-sonicvibes.o snd-via686.o snd-via8233.o
-
 snd-als4000-objs := als4000.o
 snd-cmipci-objs := cmipci.o
 snd-cs4281-objs := cs4281.o
@@ -47,48 +42,3 @@ obj-$(CONFIG_SND_VIA686) += snd-via686.o
 obj-$(CONFIG_SND_VIA8233) += snd-via8233.o
 
 include $(TOPDIR)/Rules.make
-
-snd-als4000.o: $(snd-als4000-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-als4000-objs)
-
-snd-cmipci.o: $(snd-cmipci-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cmipci-objs)
-
-snd-cs4281.o: $(snd-cs4281-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-cs4281-objs)
-
-snd-ens1370.o: $(snd-ens1370-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ens1370-objs)
-
-snd-ens1371.o: $(snd-ens1371-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ens1371-objs)
-
-snd-es1938.o: $(snd-es1938-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-es1938-objs)
-
-snd-es1968.o: $(snd-es1968-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-es1968-objs)
-
-snd-fm801.o: $(snd-fm801-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-fm801-objs)
-
-snd-ice1712.o: $(snd-ice1712-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-ice1712-objs)
-
-snd-intel8x0.o: $(snd-intel8x0-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-intel8x0-objs)
-
-snd-maestro3.o: $(snd-maestro3-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-maestro3-objs)
-
-snd-rme96.o: $(snd-rme96-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-rme96-objs)
-
-snd-sonicvibes.o: $(snd-sonicvibes-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sonicvibes-objs)
-
-snd-via686.o: $(snd-via686-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-via686-objs)
-
-snd-via8233.o: $(snd-via8233-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-via8233-objs)

@@ -5,8 +5,6 @@
 
 O_TARGET     := _opti9xx.o
 
-list-multi   := snd-opti92x-ad1848.o snd-opti92x-cs4231.o snd-opti93x.o
-
 snd-opti92x-ad1848-objs := opti92x-ad1848.o
 snd-opti92x-cs4231-objs := opti92x-cs4231.o
 snd-opti93x-objs := opti93x.o
@@ -17,12 +15,3 @@ obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opti92x-cs4231.o
 obj-$(CONFIG_SND_OPTI93X) += snd-opti93x.o
 
 include $(TOPDIR)/Rules.make
-
-snd-opti92x-ad1848.o: $(snd-opti92x-ad1848-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-opti92x-ad1848-objs)
-
-snd-opti92x-cs4231.o: $(snd-opti92x-cs4231-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-opti92x-cs4231-objs)
-
-snd-opti93x.o: $(snd-opti93x-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-opti93x-objs)

@@ -5,28 +5,29 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-SUB_DIRS     := 
-
 O_TARGET := wan.o
 
-export-objs =	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o
-list-multi =	wanpipe.o cyclomx.o
+export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o
 
-wanpipe-objs = sdlamain.o sdla_ft1.o $(wanpipe-y)
+wanpipe-y			:= sdlamain.o sdla_ft1.o
 wanpipe-$(CONFIG_WANPIPE_X25)	+= sdla_x25.o
 wanpipe-$(CONFIG_WANPIPE_FR)	+= sdla_fr.o
 wanpipe-$(CONFIG_WANPIPE_CHDLC)	+= sdla_chdlc.o
 wanpipe-$(CONFIG_WANPIPE_PPP)	+= sdla_ppp.o
 wanpipe-$(CONFIG_WANPIPE_MULTPPP) += wanpipe_multppp.o
+wanpipe-objs			:= $(wanpipe-y)
 
-cyclomx-objs = cycx_main.o $(cyclomx-y)  
+cyclomx-y                       := cycx_main.o
 cyclomx-$(CONFIG_CYCLOMX_X25)	+= cycx_x25.o
+cyclomx-objs			:= $(cyclomx-y)  
 
+hdlc-y				:= hdlc_generic.o
 hdlc-$(CONFIG_HDLC_RAW)		+= hdlc_raw.o
 hdlc-$(CONFIG_HDLC_CISCO)	+= hdlc_cisco.o
 hdlc-$(CONFIG_HDLC_FR)		+= hdlc_fr.o
 hdlc-$(CONFIG_HDLC_PPP)		+= hdlc_ppp.o
 hdlc-$(CONFIG_HDLC_X25)		+= hdlc_x25.o
+hdlc-objs			:= $(hdlc-y)
 
 obj-$(CONFIG_HOSTESS_SV11)	+= z85230.o	syncppp.o	hostess_sv11.o
 obj-$(CONFIG_SEALEVEL_4021)	+= z85230.o	syncppp.o	sealevel.o
@@ -69,13 +70,3 @@ obj-$(CONFIG_N2)		+= n2.o
 obj-$(CONFIG_C101)		+= c101.o
 
 include $(TOPDIR)/Rules.make
-
-hdlc.o: hdlc_generic.o $(hdlc-y)
-	$(LD) -r -o $@ hdlc_generic.o $(hdlc-y)
-
-wanpipe.o: $(wanpipe-objs)
-	$(LD) -r -o $@ $(wanpipe-objs)
-
-cyclomx.o: $(cyclomx-objs)
-	$(LD) -r -o $@ $(cyclomx-objs)
-
