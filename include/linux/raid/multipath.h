@@ -20,7 +20,6 @@ struct multipath_info {
 struct multipath_private_data {
 	mddev_t			*mddev;
 	struct multipath_info	multipaths[MD_SB_DISKS];
-	int			nr_disks;
 	int			raid_disks;
 	int			working_disks;
 	mdk_thread_t		*thread;

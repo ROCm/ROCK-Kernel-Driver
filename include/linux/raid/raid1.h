@@ -27,7 +27,6 @@ typedef struct r1bio_s r1bio_t;
 struct r1_private_data_s {
 	mddev_t			*mddev;
 	mirror_info_t		mirrors[MD_SB_DISKS];
-	int			nr_disks;
 	int			raid_disks;
 	int			working_disks;
 	int			last_used;

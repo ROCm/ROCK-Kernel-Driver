@@ -274,8 +274,8 @@ static void print_multipath_conf (multipath_conf_t *conf)
 		printk("(conf==NULL)\n");
 		return;
 	}
-	printk(" --- wd:%d rd:%d nd:%d\n", conf->working_disks,
-			 conf->raid_disks, conf->nr_disks);
+	printk(" --- wd:%d rd:%d\n", conf->working_disks,
+			 conf->raid_disks);
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->multipaths + i;
@@ -303,7 +303,6 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 		p->bdev = rdev->bdev;
 		p->operational = 1;
 		p->used_slot = 1;
-		conf->nr_disks++;
 		conf->working_disks++;
 		err = 0;
 	}
@@ -332,7 +331,6 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 		}
 		p->bdev = NULL;
 		p->used_slot = 0;
-		conf->nr_disks--;
 		err = 0;
 	}
 	if (err)
@@ -500,7 +498,6 @@ static int multipath_run (mddev_t *mddev)
 	}
 
 	conf->raid_disks = sb->raid_disks = num_rdevs;
-	conf->nr_disks = num_rdevs;
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;

@@ -625,8 +625,8 @@ static void print_conf(conf_t *conf)
 		printk("(!conf)\n");
 		return;
 	}
-	printk(" --- wd:%d rd:%d nd:%d\n", conf->working_disks,
-			conf->raid_disks, conf->nr_disks);
+	printk(" --- wd:%d rd:%d\n", conf->working_disks,
+			conf->raid_disks);
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->mirrors + i;
@@ -803,7 +803,6 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 		p->spare = 1;
 		p->used_slot = 1;
 		p->head_position = 0;
-		conf->nr_disks++;
 		err = 0;
 	}
 	if (err)
@@ -829,7 +828,6 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 		}
 		p->bdev = NULL;
 		p->used_slot = 0;
-		conf->nr_disks--;
 		err = 0;
 	}
 	if (err)
@@ -1279,7 +1277,6 @@ static int run(mddev_t *mddev)
 		}
 	}
 	conf->raid_disks = sb->raid_disks;
-	conf->nr_disks = sb->nr_disks;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
 
