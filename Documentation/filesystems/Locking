@@ -179,11 +179,12 @@ existing instances of this method ->sync_page() itself doesn't look
 well-defined...
 
 	->writeback_mapping() is used for periodic writeback and for
-systemcall-initiated sync operations. The address_space should start
-I/O against at least *nr_to_write pages.  *nr_to_write must be decremented
-for each page which is written.  *nr_to_write must not go negative (this
-will be relaxed later).  If nr_to_write is NULL, all dirty pages must
-be written.
+systemcall-initiated sync operations.  The address_space should start
+I/O against at least *nr_to_write pages.  *nr_to_write must be
+decremented for each page which is written.  The address_space
+implementation may write more (or less) pages than *nr_to_write asks
+for, but it should try to be reasonably close.  If nr_to_write is NULL,
+all dirty pages must be written.
 
 	->vm_writeback() is called from the VM.  The address_space should
 start I/O against at least *nr_to_write pages, including the passed page. As

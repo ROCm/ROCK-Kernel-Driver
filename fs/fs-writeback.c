@@ -257,7 +257,7 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 		if (current_is_pdflush())
 			writeback_release(bdi);
 
-		if (nr_to_write && *nr_to_write == 0)
+		if (nr_to_write && *nr_to_write <= 0)
 			break;
 	}
 out:
@@ -301,7 +301,7 @@ void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 					older_than_this);
 			spin_lock(&sb_lock);
 		}
-		if (nr_to_write && *nr_to_write == 0)
+		if (nr_to_write && *nr_to_write <= 0)
 			break;
 	}
 	spin_unlock(&sb_lock);
