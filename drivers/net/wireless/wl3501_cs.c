@@ -1724,6 +1724,65 @@ static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_set_scan(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	/*
+	 * FIXME: trigger scanning, for now we just get the results of the
+	 * normal scanning already done
+	 */
+	return 0;
+}
+
+static int wl3501_get_scan(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = dev->priv;
+	int i;
+	char *current_ev = extra;
+	struct iw_event iwe;
+
+	for (i = 0; i < this->bss_cnt; ++i) {
+		iwe.cmd			= SIOCGIWAP;
+		iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
+		memcpy(iwe.u.ap_addr.sa_data, this->bss_set[i].bssid, ETH_ALEN);
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_ADDR_LEN);
+		iwe.cmd		  = SIOCGIWESSID;
+		iwe.u.data.flags  = 1;
+		iwe.u.data.length = this->bss_set[i].ssid.el.len;
+		current_ev = iwe_stream_add_point(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe,
+						  this->bss_set[i].ssid.essid);
+		iwe.cmd	   = SIOCGIWMODE;
+		iwe.u.mode = this->bss_set[i].bss_type;
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_UINT_LEN);
+		iwe.cmd = SIOCGIWFREQ;
+		iwe.u.freq.m = this->bss_set[i].ds_pset.chan;
+		iwe.u.freq.e = 0;
+		current_ev = iwe_stream_add_event(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, IW_EV_FREQ_LEN);
+		iwe.cmd = SIOCGIWENCODE;
+		if (this->bss_set[i].cap_info & WL3501_MGMT_CAPABILITY_PRIVACY)
+			iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
+		else
+			iwe.u.data.flags = IW_ENCODE_DISABLED;
+		iwe.u.data.length = 0;
+		current_ev = iwe_stream_add_point(current_ev,
+						  extra + IW_SCAN_MAX_DATA,
+						  &iwe, NULL);
+	}
+	/* Length of data */
+	wrqu->data.length = (current_ev - extra);
+	wrqu->data.flags = 0; /* FIXME: set properly these flags */
+	return 0;
+}
+
 static int wl3501_set_essid(struct net_device *dev,
 			    struct iw_request_info *info,
 			    union iwreq_data *wrqu, char *extra)
@@ -1940,6 +1999,8 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWTHRSPY	- SIOCIWFIRST] = iw_handler_get_thrspy,
 	[SIOCSIWAP	- SIOCIWFIRST] = wl3501_set_wap,
 	[SIOCGIWAP	- SIOCIWFIRST] = wl3501_get_wap,
+	[SIOCSIWSCAN	- SIOCIWFIRST] = wl3501_set_scan,
+	[SIOCGIWSCAN	- SIOCIWFIRST] = wl3501_get_scan,
 	[SIOCSIWESSID	- SIOCIWFIRST] = wl3501_set_essid,
 	[SIOCGIWESSID	- SIOCIWFIRST] = wl3501_get_essid,
 	[SIOCSIWNICKN	- SIOCIWFIRST] = wl3501_set_nick,
