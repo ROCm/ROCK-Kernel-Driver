@@ -979,9 +979,10 @@ CONFIG_H8
 CONFIG_NVRAM
   If you say Y here and create a character special file /dev/nvram
   with major number 10 and minor number 144 using mknod ("man mknod"),
-  you get read and write access to the 50 bytes of non-volatile memory
-  in the real time clock (RTC), which is contained in every PC and
-  most Ataris.
+  you get read and write access to the extra bytes of non-volatile
+  memory in the real time clock (RTC), which is contained in every PC
+  and most Ataris.  The actual number of bytes varies, depending on the
+  nvram in the system, but is usually 114 (128-14 for the RTC).
 
   This memory is conventionally called "CMOS RAM" on PCs and "NVRAM"
   on Ataris. /dev/nvram may be used to view settings there, or to
