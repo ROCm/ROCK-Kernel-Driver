@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mm.c
- * Version	: v2.20.2.2 (Nov 04 2004)
+ * Version	: v2.20.2.3 (Dec 09 2004)
  *
  * Common management module
  */
@@ -614,23 +614,27 @@ mraid_mm_dealloc_kioc(mraid_mmadp_t *adp, uioc_t *kioc)
 	mm_dmapool_t	*pool;
 	unsigned long	flags;
 
-	pool = &adp->dma_pool_list[kioc->pool_index];
+	if (kioc->pool_index != -1) {
+		pool = &adp->dma_pool_list[kioc->pool_index];
 
-	/* This routine may be called in non-isr context also */
-	spin_lock_irqsave(&pool->lock, flags);
+		/* This routine may be called in non-isr context also */
+		spin_lock_irqsave(&pool->lock, flags);
 
-	/*
-	 * While attaching the dma buffer, if we didn't get the required
-	 * buffer from the pool, we would have allocated it at the run time
-	 * and set the free_buf flag. We must free that buffer. Otherwise,
-	 * just mark that the buffer is not in use
-	 */
-	if (kioc->free_buf == 1)
-		pci_pool_free(pool->handle, kioc->buf_vaddr, kioc->buf_paddr);
-	else
-		pool->in_use = 0;
+		/*
+		 * While attaching the dma buffer, if we didn't get the 
+		 * required buffer from the pool, we would have allocated 
+		 * it at the run time and set the free_buf flag. We must 
+		 * free that buffer. Otherwise, just mark that the buffer is 
+		 * not in use
+		 */
+		if (kioc->free_buf == 1)
+			pci_pool_free(pool->handle, kioc->buf_vaddr, 
+							kioc->buf_paddr);
+		else
+			pool->in_use = 0;
 
-	spin_unlock_irqrestore(&pool->lock, flags);
+		spin_unlock_irqrestore(&pool->lock, flags);
+	}
 
 	/* Return the kioc to the free pool */
 	spin_lock_irqsave(&adp->kioc_pool_lock, flags);
