@@ -45,9 +45,7 @@ extern int (*debugger_dabr_match)(struct pt_regs *);
 int debugger_kernel_faults = 1;
 #endif
 
-extern void die_if_kernel(char *, struct pt_regs *, long);
-void bad_page_fault(struct pt_regs *, unsigned long);
-void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
+void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /*
  * For 600- and 800-family processors, the error_code parameter is DSISR
@@ -86,7 +84,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 #endif /* CONFIG_XMON || CONFIG_KGDB */
 
 	if (in_interrupt() || mm == NULL) {
-		bad_page_fault(regs, address);
+		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}
 	down_read(&mm->mmap_sem);
@@ -143,7 +141,7 @@ good_area:
 
 bad_area:
 	up_read(&mm->mmap_sem);
-	
+
 	/* User mode accesses cause a SIGSEGV */
 	if (user_mode(regs)) {
 		info.si_signo = SIGSEGV;
@@ -159,7 +157,7 @@ bad_area:
 		return;
 	}
 
-	bad_page_fault(regs, address);
+	bad_page_fault(regs, address, SIGSEGV);
 	return;
 
 /*
@@ -176,7 +174,7 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	bad_page_fault(regs, address);
+	bad_page_fault(regs, address, SIGKILL);
 	return;
 
 do_sigbus:
@@ -187,7 +185,7 @@ do_sigbus:
 	info.si_addr = (void *)address;
 	force_sig_info (SIGBUS, &info, current);
 	if (!user_mode(regs))
-		bad_page_fault(regs, address);
+		bad_page_fault(regs, address, SIGBUS);
 }
 
 /*
@@ -196,8 +194,10 @@ do_sigbus:
  * in traps.c.
  */
 void
-bad_page_fault(struct pt_regs *regs, unsigned long address)
+bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
+	extern void die(const char *, struct pt_regs *, long);
+
 	unsigned long fixup;
 
 	/* Are we prepared to handle this fault?  */
@@ -207,13 +207,10 @@ bad_page_fault(struct pt_regs *regs, unsigned long address)
 	}
 
 	/* kernel has accessed a bad area */
-	show_regs(regs);
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_kernel_faults)
 		debugger(regs);
 #endif
-	print_backtrace( (unsigned long *)regs->gpr[1] );
-	panic("kernel access of bad area pc %lx lr %lx address %lX tsk %s/%d",
-	      regs->nip,regs->link,address,current->comm,current->pid);
+	die("Kernel access of bad area", regs, sig);
 }
 
