@@ -69,12 +69,12 @@ static int video_nr             =       -1;
 
 	
 
-extern __inline__ void mvv_write(u8 index, u8 value)
+static inline void mvv_write(u8 index, u8 value)
 {
 	outw(index|(value<<8), io_port);
 }
 
-extern __inline__ u8 mvv_read(u8 index)
+static inline u8 mvv_read(u8 index)
 {
 	outb(index, io_port);
 	return inb(data_port);

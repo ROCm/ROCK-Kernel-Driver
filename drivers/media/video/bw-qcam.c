@@ -89,27 +89,27 @@ MODULE_PARM(yieldlines,"i");
 MODULE_PARM(video_nr,"i");
 #endif
 
-extern __inline__ int read_lpstatus(struct qcam_device *q)
+static inline int read_lpstatus(struct qcam_device *q)
 {
 	return parport_read_status(q->pport);
 }
 
-extern __inline__ int read_lpcontrol(struct qcam_device *q)
+static inline int read_lpcontrol(struct qcam_device *q)
 {
 	return parport_read_control(q->pport);
 }
 
-extern __inline__ int read_lpdata(struct qcam_device *q)
+static inline int read_lpdata(struct qcam_device *q)
 {
 	return parport_read_data(q->pport);
 }
 
-extern __inline__ void write_lpdata(struct qcam_device *q, int d)
+static inline void write_lpdata(struct qcam_device *q, int d)
 {
 	parport_write_data(q->pport, d);
 }
 
-extern __inline__ void write_lpcontrol(struct qcam_device *q, int d)
+static inline void write_lpcontrol(struct qcam_device *q, int d)
 {
 	parport_write_control(q->pport, d);
 }
@@ -506,7 +506,7 @@ void qc_set(struct qcam_device *q)
    the supplied buffer.  It returns the number of bytes read,
    or -1 on error. */
 
-extern __inline__ int qc_readbytes(struct qcam_device *q, char buffer[])
+static inline int qc_readbytes(struct qcam_device *q, char buffer[])
 {
 	int ret=1;
 	unsigned int hi, lo;
