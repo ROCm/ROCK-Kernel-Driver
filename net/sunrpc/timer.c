@@ -11,15 +11,15 @@
 #define RPC_RTO_MIN (2)
 
 void
-rpc_init_rtt(struct rpc_rtt *rt, long timeo)
+rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo)
 {
-	long t = (timeo - RPC_RTO_INIT) << 3;
-	int i;
+	unsigned long init = 0;
+	unsigned i;
 	rt->timeo = timeo;
-	if (t < 0)
-		t = 0;
+	if (timeo > RPC_RTO_INIT)
+		init = (timeo - RPC_RTO_INIT) << 3;
 	for (i = 0; i < 5; i++) {
-		rt->srtt[i] = t;
+		rt->srtt[i] = init;
 		rt->sdrtt[i] = RPC_RTO_INIT;
 	}
 	atomic_set(&rt->ntimeouts, 0);
@@ -28,11 +28,14 @@ rpc_init_rtt(struct rpc_rtt *rt, long timeo)
 void
 rpc_update_rtt(struct rpc_rtt *rt, int timer, long m)
 {
-	long *srtt, *sdrtt;
+	unsigned long *srtt, *sdrtt;
 
 	if (timer-- == 0)
 		return;
 
+	/* jiffies wrapped; ignore this one */
+	if (m < 0)
+		return;
 	if (m == 0)
 		m = 1;
 	srtt = &rt->srtt[timer];
@@ -61,10 +64,10 @@ rpc_update_rtt(struct rpc_rtt *rt, int timer, long m)
  * other                   - timeo
  */
 
-long
+unsigned long
 rpc_calc_rto(struct rpc_rtt *rt, int timer)
 {
-	long res;
+	unsigned long res;
 	if (timer-- == 0)
 		return rt->timeo;
 	res = (rt->srtt[timer] >> 3) + rt->sdrtt[timer];

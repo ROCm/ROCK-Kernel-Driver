@@ -12,16 +12,16 @@
 #include <asm/atomic.h>
 
 struct rpc_rtt {
-	long timeo;		/* default timeout value */
-	long srtt[5];		/* smoothed round trip time << 3 */
-	long sdrtt[5];		/* soothed medium deviation of RTT */
+	unsigned long timeo;	/* default timeout value */
+	unsigned long srtt[5];	/* smoothed round trip time << 3 */
+	unsigned long sdrtt[5];	/* smoothed medium deviation of RTT */
 	atomic_t  ntimeouts;	/* Global count of the number of timeouts */
 };
 
 
-extern void rpc_init_rtt(struct rpc_rtt *rt, long timeo);
+extern void rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo);
 extern void rpc_update_rtt(struct rpc_rtt *rt, int timer, long m);
-extern long rpc_calc_rto(struct rpc_rtt *rt, int timer);
+extern unsigned long rpc_calc_rto(struct rpc_rtt *rt, int timer);
 
 static inline void rpc_inc_timeo(struct rpc_rtt *rt)
 {
