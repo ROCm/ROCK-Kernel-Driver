@@ -308,6 +308,8 @@ repeat:
 		goto repeat;
 	}
 	list_del(&timer->entry);
+	/* Need to make sure that anybody who sees a NULL base also sees the list ops */
+	smp_wmb();
 	timer->base = NULL;
 	spin_unlock_irqrestore(&base->lock, flags);
 
