@@ -9,7 +9,7 @@ realize that this article describes the _in kernel_ interfaces, not the
 kernel to userspace interfaces.  The kernel to userspace interface is
 the one that application programs use, the syscall interface.  That
 interface is _very_ stable over time, and will not break.  I have old
-programs that were built on a pre 0.9something kernel that still works
+programs that were built on a pre 0.9something kernel that still work
 just fine on the latest 2.6 kernel release.  This interface is the one
 that users and application programmers can count on being stable.
 
@@ -167,7 +167,7 @@ up by the person who did the kernel change in the first place.  This
 ensures that your driver is always buildable, and works over time, with
 very little effort on your part.
 
-The very good side affects of having your driver in the main kernel tree
+The very good side effects of having your driver in the main kernel tree
 are:
   - The quality of the driver will rise as the maintenance costs (to the
     original developer) will decrease.
