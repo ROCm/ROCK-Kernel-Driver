@@ -182,7 +182,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.27-pre2"
+#define E100_VERSION  "2.0.27-pre3"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -482,7 +482,7 @@ inline unsigned char
 e100_wait_exec_simple(struct e100_private *bdp, u8 scb_cmd_low)
 {
 	if (!e100_wait_scb(bdp)) {
-		printk(KERN_ERR "%s e100_wait_exec_simple: Wait failed\n",
+		printk(KERN_DEBUG "%s e100_wait_exec_simple: Wait failed\n",
 		       bdp->device->name);
 		return false;
 	}
@@ -2373,11 +2373,13 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 	case START_WAIT:
 		// The last command was a non_tx CU command
 		if (!e100_wait_cus_idle(bdp))
-			printk("%s cu_start: timeout waiting for cu\n",
+			printk(KERN_DEBUG
+			       "%s cu_start: timeout waiting for cu\n",
 			       bdp->device->name);
 		if (!e100_wait_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					  SCB_CUC_START)) {
-			printk("%s cu_start: timeout waiting for scb\n",
+			printk(KERN_DEBUG
+			       "%s cu_start: timeout waiting for scb\n",
 			       bdp->device->name);
 			e100_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					SCB_CUC_START);
@@ -2538,7 +2540,8 @@ e100_start_ru(struct e100_private *bdp)
 	spin_lock(&bdp->bd_lock);
 
 	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START)) {
-		printk("%s start_ru: wait_scb failed\n", bdp->device->name);
+		printk(KERN_DEBUG
+		       "%s start_ru: wait_scb failed\n", bdp->device->name);
 		e100_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START);
 	}
 	if (bdp->next_cu_cmd == RESUME_NO_WAIT) {
