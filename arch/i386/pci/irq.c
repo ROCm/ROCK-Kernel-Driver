@@ -817,7 +817,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 			
 		/* With IDE legacy devices the IRQ lookup failure is not a problem.. */
 		if (dev->class >> 8 == PCI_CLASS_STORAGE_IDE && !(dev->class & 0x5))
-			return;
+			return 0;
 			
 		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
 		       'A' + pin - 1, dev->slot_name, msg);
