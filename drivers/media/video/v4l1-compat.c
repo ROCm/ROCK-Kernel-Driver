@@ -503,10 +503,11 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		int *on = arg;
 
 		if (0 == *on) {
+			enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 			/* dirty hack time.  But v4l1 has no STREAMOFF
 			 * equivalent in the API, and this one at
 			 * least comes close ... */
-			drv(inode, file, VIDIOC_STREAMOFF, NULL);
+			drv(inode, file, VIDIOC_STREAMOFF, &type);
 		}
 		err = drv(inode, file, VIDIOC_OVERLAY, arg);
 		if (err < 0)
@@ -857,6 +858,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	case VIDIOCMCAPTURE: /*  capture a frame  */
 	{
 		struct video_mmap	*mm = arg;
+		enum v4l2_buf_type	type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
 		fmt2 = kmalloc(sizeof(*fmt2),GFP_KERNEL);
 		memset(&buf2,0,sizeof(buf2));
@@ -897,7 +899,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			dprintk("VIDIOCMCAPTURE / VIDIOC_QBUF: %d\n",err);
 			break;
 		}
-		err = drv(inode, file, VIDIOC_STREAMON, NULL);
+		err = drv(inode, file, VIDIOC_STREAMON, &type);
 		if (err < 0)
 			dprintk("VIDIOCMCAPTURE / VIDIOC_STREAMON: %d\n",err);
 		break;
