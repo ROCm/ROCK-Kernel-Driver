@@ -11,7 +11,6 @@
 #define __ASM_PARAM_H
 
 #include <asm/arch/param.h>	/* for HZ */
-#include <asm/proc/page.h>	/* for EXEC_PAGE_SIZE */
 
 #ifndef __KERNEL_HZ
 #define __KERNEL_HZ	100
@@ -24,6 +23,8 @@
 #else
 # define HZ		100
 #endif
+
+#define EXEC_PAGESIZE	4096
 
 #ifndef NGROUPS
 #define NGROUPS         32

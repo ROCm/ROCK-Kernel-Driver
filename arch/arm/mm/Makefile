@@ -4,20 +4,12 @@
 
 # Object file lists.
 
-obj-y		:= init.o extable.o fault-common.o
-obj-m		:=
-obj-n		:=
-obj-		:=
-ifeq ($(CONFIG_CPU_32),y)
-obj-y		+= consistent.o fault-armv.o ioremap.o mm-armv.o
+obj-y		:= consistent.o extable.o fault-armv.o fault-common.o \
+		   init.o ioremap.o mm-armv.o
 obj-$(CONFIG_MODULES) += proc-syms.o
-endif
 
 obj-$(CONFIG_ALIGNMENT_TRAP) += alignment.o
 obj-$(CONFIG_DISCONTIGMEM) += discontig.o
-
-# Select the processor-specific files
-p-$(CONFIG_CPU_26)	+= proc-arm2_3.o
 
 # ARMv3
 p-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o  tlb-v3.o    cache-v3.o    copypage-v3.o

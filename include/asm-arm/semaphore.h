@@ -10,7 +10,7 @@
 #include <linux/rwsem.h>
 
 #include <asm/atomic.h>
-#include <asm/proc/locks.h>
+#include <asm/locks.h>
 
 struct semaphore {
 	atomic_t count;

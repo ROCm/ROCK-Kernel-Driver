@@ -15,6 +15,7 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
+#include <asm/ptrace.h>
 
 ENTRY(cpu_arm6_dcache_clean_area)
 ENTRY(cpu_arm7_dcache_clean_area)
