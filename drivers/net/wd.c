@@ -97,7 +97,7 @@ int __init wd_probe(struct net_device *dev)
 			return -EBUSY;
 		i = wd_probe1(dev, base_addr);
 		if (i != 0)  
-			release_resource(r);
+			release_region(base_addr, WD_IO_EXTENT);
 		else
 			r->name = dev->name;
 		return i;
@@ -114,7 +114,7 @@ int __init wd_probe(struct net_device *dev)
 			r->name = dev->name;
 			return 0;
 		}
-		release_resource(r);
+		release_region(ioaddr, WD_IO_EXTENT);
 	}
 
 	return -ENODEV;
