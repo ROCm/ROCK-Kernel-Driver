@@ -3231,13 +3231,13 @@ void __devinit init_idle(task_t *idle, int cpu)
 }
 
 /*
- * In a system that switches off the HZ timer idle_cpu_mask
+ * In a system that switches off the HZ timer nohz_cpu_mask
  * indicates which cpus entered this state. This is used
  * in the rcu update to wait only for active cpus. For system
- * which do not switch off the HZ timer idle_cpu_mask should
+ * which do not switch off the HZ timer nohz_cpu_mask should
  * always be CPU_MASK_NONE.
  */
-cpumask_t idle_cpu_mask = CPU_MASK_NONE;
+cpumask_t nohz_cpu_mask = CPU_MASK_NONE;
 
 #ifdef CONFIG_SMP
 /*

@@ -433,7 +433,6 @@ CONFIG_SUNRPC=y
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
-# CONFIG_INTERMEZZO_FS is not set
 # CONFIG_AFS_FS is not set
 
 #
@@ -505,9 +504,11 @@ CONFIG_CRYPTO=y
 # CONFIG_CRYPTO_ARC4 is not set
 # CONFIG_CRYPTO_DEFLATE is not set
 # CONFIG_CRYPTO_MICHAEL_MIC is not set
+# CONFIG_CRYPTO_CRC32C is not set
 # CONFIG_CRYPTO_TEST is not set
 
 #
 # Library routines
 #
 # CONFIG_CRC32 is not set
+# CONFIG_LIBCRC32C is not set

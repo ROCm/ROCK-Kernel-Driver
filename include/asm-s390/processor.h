@@ -63,15 +63,18 @@ extern struct task_struct *last_task_used_math;
 
 # define TASK_SIZE		(0x80000000UL)
 # define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
 
-# define TASK_SIZE		(0x40000000000UL)
-# define TASK31_SIZE		(0x80000000UL)
-# define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
-					(TASK31_SIZE / 2) : (TASK_SIZE / 2))
+# define TASK_SIZE		(test_thread_flag(TIF_31BIT) ? \
+					(0x80000000UL) : (0x40000000000UL))
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	(0x40000000000UL)
 
 #endif /* __s390x__ */
+
+#define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
 
 typedef struct {
         __u32 ar4;

@@ -784,10 +784,6 @@ typedef pte_t *pte_addr_t;
  */
 #define pgtable_cache_init()	do { } while (0)
 
-#ifdef __s390x__
-# define HAVE_ARCH_UNMAPPED_AREA
-#endif /* __s390x__ */
-
 #define __HAVE_ARCH_PTEP_ESTABLISH
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH

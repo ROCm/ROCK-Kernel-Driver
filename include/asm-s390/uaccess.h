@@ -119,7 +119,7 @@ struct exception_table_entry
  * These are the main single-value transfer routines.  They automatically
  * use the right size if we just have the right pointer type.
  */
-#if __GNUC__ > 2
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ > 2)
 #define __put_user_asm(x, ptr, err) \
 ({								\
 	err = 0;						\
@@ -174,7 +174,7 @@ struct exception_table_entry
 
 extern int __put_user_bad(void);
 
-#if __GNUC__ > 2
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ > 2)
 #define __get_user_asm(x, ptr, err) \
 ({								\
 	err = 0;						\

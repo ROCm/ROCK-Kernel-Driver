@@ -471,9 +471,10 @@ pgm_per:
 pgm_per_std:
 	SAVE_ALL __LC_PGM_OLD_PSW,__LC_SAVE_AREA,1
 	GET_THREAD_INFO
-	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
-	mvc	__THREAD_per+__PER_address(4,%r9),__LC_PER_ADDRESS
-	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
+	l	%r1,__TI_task(%r9)
+	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(4,%r1),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
 	la	%r4,0x7f
 	l	%r3,__LC_PGM_ILC	 # load program interruption code
         nr      %r4,%r3                  # clear per-event-bit and ilc
@@ -495,11 +496,12 @@ pgm_per_only:
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
 	lh	%r7,0x8a	  # get svc number from lowcore
-        stosm   24(%r15),0x03     # reenable interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
-	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
-	mvc	__THREAD_per+__PER_address(4,%r9),__LC_PER_ADDRESS
-	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
+	l	%r1,__TI_task(%r9)
+	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(4,%r1),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
+        stosm   24(%r15),0x03     # reenable interrupts
         sla     %r7,2             # *4 and test for svc 0
 	bnz	BASED(pgm_svcstd) # svc number > 0 ?
 	# svc 0: system call number in %r1
