@@ -76,4 +76,6 @@ extern unsigned int scsi_logging_level;
 #define SCSI_LOG_IOCTL(LEVEL,CMD)  \
         SCSI_CHECK_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL,CMD);
 
+extern unsigned int scsi_logging_level;
+
 #endif /* _SCSI_LOGGING_H */
