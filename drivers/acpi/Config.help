@@ -1,21 +1,76 @@
-CONFIG_ACPI_DEBUG
-  The ACPI driver can optionally report errors with a great deal
-  of verbosity. Saying Y enables these statements. This will increase
-  your kernel size by around 50K.
+CONFIG_ACPI
+  Advanced Configuration and Power Interface (ACPI) support for 
+  Linux requires an ACPI compliant platform (hardware/firmware),
+  and assumes the presence of OS-directed configuration and power
+  management (OSPM) software.  This option will enlarge your 
+  kernel by about 70K.
 
-CONFIG_ACPI_BUSMGR
-  The ACPI Bus Manager enumerates devices in the ACPI namespace, and
-  handles PnP messages.  All ACPI devices use its services, so using
-  them requires saying Y here.
+  Linux ACPI provides a robust functional replacement for several 
+  legacy configuration and power management intefaces, including 
+  the Plug-and-Play BIOS specification (PnP BIOS), the 
+  MultiProcessor Specification (MPS), and the Advanced Power 
+  Management (APM) specification.  If both ACPI and APM support 
+  are configured, whichever is loaded first shall be used.
+  
+  The ACPI SourceForge project contains the latest source code, 
+  documentation, tools, mailing list subscription, and other 
+  information.  This project is available at:
+    <http://sourceforge.net/projects/acpi>
 
-CONFIG_ACPI_SYS
-  This driver will enable your system to shut down using ACPI, and
-  dump your ACPI DSDT table using /proc/acpi/dsdt.
+  Linux support for ACPI is based on Intel Corporation's ACPI
+  Component Architecture (ACPI CA).  For more information see:
+    <http://developer.intel.com/technology/iapc/acpi>
 
-CONFIG_ACPI_CPU
-  This driver installs ACPI as the idle handler for Linux, and uses
-  ACPI C2 and C3 processor states to save power, on systems that
-  support it.
+  ACPI is an open industry specification co-developed by Compaq, 
+  Intel, Microsoft, Phoenix, and Toshiba.  The specification is 
+  available at:
+    <http://www.acpi.info>
+
+CONFIG_ACPI_BOOT
+  This option enables the use of ACPI tables for obtaining various
+  boot-time configuration information such as system processors, 
+  memory, and interrupt routing.  
+  
+  ACPI tables supercede legacy BIOS interfaces.  For example, the 
+  Multiple APIC Description Table (MADT) defined by the ACPI 
+  Specification is a replacement for the MP Configuration Table 
+  defined by the MultiProcessor Specification (MPS).
+  
+  You can disable this feature on IA32 systems by adding "acpi_boot=off" 
+  to your kernel command line. (Try "man bootparam" or see the 
+  documentation of your boot loader about how to pass options to the 
+  kernel at boot time.)
+
+  IA64 systems do not support legacy BIOS interfaces and thus rely
+  on ACPI tables to boot the system.  No kernel command line options
+  are supported.
+  
+CONFIG_ACPI_INTERPRETER
+  The ACPI Interpreter (a.k.a. ACPI Core Subsystem) provides the 
+  fundamental services required to parse the ACPI namespace, evaluate
+  control methods, and manage ACPI hardware and events.  This 
+  subsystem exposes kernel interfaces allowing higher level software
+  to manipulate ACPI defined hardware and software interfaces.
+
+  Add "acpi=off" to the kernel command line to disable this feature.
+  (Try "man bootparam" or see the documentation of your boot loader 
+  about how to pass options to the kernel at boot time.)
+
+  Note that this option will enlarge your kernel by about 100K.
+
+CONFIG_ACPI_BUS
+  The ACPI Bus driver enumerates and manages devices in the ACPI 
+  namespace in a manner similar to other bus drivers (e.g. PCI).
+  All ACPI device drivers rely on its services. 
+
+CONFIG_ACPI_AC
+  This driver adds support for the AC Adapter object, which indicates
+  whether a system is on AC, or not.  Typically, only laptops have
+  this object, since desktops are always on AC.
+
+CONFIG_ACPI_BATTERY
+  This driver adds support for battery information through
+  /proc/acpi/battery. If you have a laptop with a battery, say Y.
 
 CONFIG_ACPI_BUTTON
   This driver registers for events based on buttons, such as the
@@ -24,21 +79,44 @@ CONFIG_ACPI_BUTTON
   down the system.  Until then, you can cat it, and see output when
   a button is pressed.
 
-CONFIG_ACPI_AC
-  This driver adds support for the AC Adapter object, which indicates
-  whether a system is on AC, or not.  Typically, only laptops have
-  this object, since desktops are always on AC.
+CONFIG_ACPI_DEBUG
+  The ACPI driver can optionally report errors with a great deal
+  of verbosity. Saying Y enables these statements. This will increase
+  your kernel size by around 50K.
 
 CONFIG_ACPI_EC
   This driver is required on some systems for the proper operation of
   the battery and thermal drivers.  If you are compiling for a laptop,
   say Y.
 
-CONFIG_ACPI_CMBATT
-  This driver adds support for battery information through
-  /proc/acpi/battery. If you have a laptop with a battery, say Y.
+CONFIG_ACPI_PCI
+  This option enables ACPI-based enumeration and configuration of PCI 
+  root bridge devices, including PCI interrupt routing (_PRT) support.  
+  This is required on platforms that no longer support legacy tables 
+  (e.g. MPS/PIR) or have erroneous table entries.
+
+CONFIG_ACPI_PROCESSOR
+  This driver installs ACPI as the idle handler for Linux, and uses
+  ACPI C2 and C3 processor states to save power, on systems that
+  support it.
 
 CONFIG_ACPI_THERMAL
-  This driver handles overheating conditions on laptops. It is HIGHLY
-  recommended, as your laptop CPU may be damaged without it.
+  This driver adds support for ACPI thermal zones.  Most mobile and
+  some desktop systems support ACPI thermal zones.  It is HIGHLY
+  recommended that this option be enabled, as your processor(s)
+  may be damaged without it.
 
+CONFIG_ACPI_FAN
+  This driver adds support for ACPI fan devices, allowing user-mode 
+  applications to perform basic fan control (on, off, status).
+
+CONFIG_ACPI_SYSTEM
+  This driver will enable your system to shut down using ACPI, and
+  dump your ACPI DSDT table using /proc/acpi/dsdt.
+
+CONFIG_ACPI_SLEEP
+  Enables low-level sleep support, allowing the platform to enter
+  and exit the S1-S4 states.  Note that although the platform may
+  support this capability, full sleep support will not be viable
+  until drivers properly save/restore hardware context.  (In other
+  words, use at your own risk!)

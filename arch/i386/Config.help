@@ -649,33 +649,32 @@ CONFIG_PM
   sending the processor to sleep and saving power.
 
 CONFIG_ACPI
-  ACPI/OSPM support for Linux is currently under development. As such,
-  this support is preliminary and EXPERIMENTAL.  Configuring ACPI
-  support enables kernel interfaces that allow higher level software
-  (OSPM) to manipulate ACPI defined hardware and software interfaces,
-  including the evaluation of ACPI control methods.  If unsure, choose
-  N here.  Note, this option will enlarge your kernel by about 120K.
+  Advanced Configuration and Power Interface (ACPI) support for 
+  Linux requires an ACPI compliant platform (hardware/firmware),
+  and assumes the presence of OS-directed configuration and power
+  management (OSPM) software.  This option will enlarge your 
+  kernel by about 70K.
 
-  This support requires an ACPI compliant platform (hardware/firmware).
-  If both ACPI and Advanced Power Management (APM) support are
-  configured, whichever is loaded first shall be used.
+  Linux ACPI provides a robust functional replacement for several 
+  legacy configuration and power management intefaces, including 
+  the Plug-and-Play BIOS specification (PnP BIOS), the 
+  MultiProcessor Specification (MPS), and the Advanced Power 
+  Management (APM) specification.  If both ACPI and APM support 
+  are configured, whichever is loaded first shall be used.
+  
+  The ACPI SourceForge project contains the latest source code, 
+  documentation, tools, mailing list subscription, and other 
+  information.  This project is available at:
+    <http://sourceforge.net/projects/acpi>
 
-  This code DOES NOT currently provide a complete OSPM implementation
-  -- it has not yet reached APM's level of functionality.  When fully
-  implemented, Linux ACPI/OSPM will provide a more robust functional
-  replacement for legacy configuration and power management
-  interfaces, including the Plug-and-Play BIOS specification (PnP
-  BIOS), the Multi-Processor Specification (MPS), and the Advanced
-  Power Management specification (APM).
+  Linux support for ACPI is based on Intel Corporation's ACPI
+  Component Architecture (ACPI CA).  For more information see:
+    <http://developer.intel.com/technology/iapc/acpi>
 
-  Linux support for ACPI/OSPM is based on Intel Corporation's ACPI
-  Component Architecture (ACPI CA). The latest ACPI CA source code,
-  documentation, debug builds, and implementation status information
-  can be downloaded from:
-  <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
-
-  The ACPI Sourceforge project may also be of interest:
-  <http://sf.net/projects/acpi/>
+  ACPI is an open industry specification co-developed by Compaq, 
+  Intel, Microsoft, Phoenix, and Toshiba.  The specification is 
+  available at:
+    <http://www.acpi.info>
 
 CONFIG_APM
   APM is a BIOS specification for saving power using several different
