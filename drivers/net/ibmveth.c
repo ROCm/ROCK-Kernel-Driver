@@ -214,11 +214,12 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		free_index = pool->consumer_index++ % pool->size;
 		index = pool->free_map[free_index];
 	
-		ibmveth_assert(index != 0xffff);
+		ibmveth_assert(index != IBM_VETH_INVALID_MAP);
 		ibmveth_assert(pool->skbuff[index] == NULL);
 
 		dma_addr = vio_map_single(adapter->vdev, skb->data, pool->buff_size, DMA_FROM_DEVICE);
 
+		pool->free_map[free_index] = IBM_VETH_INVALID_MAP;
 		pool->dma_addr[index] = dma_addr;
 		pool->skbuff[index] = skb;
 
@@ -233,6 +234,7 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 		lpar_rc = h_add_logical_lan_buffer(adapter->vdev->unit_address, desc.desc);
 		    
 		if(lpar_rc != H_Success) {
+			pool->free_map[free_index] = IBM_VETH_INVALID_MAP;
 			pool->skbuff[index] = NULL;
 			pool->consumer_index--;
 			vio_unmap_single(adapter->vdev, pool->dma_addr[index], pool->buff_size, DMA_FROM_DEVICE);
@@ -240,7 +242,6 @@ static void ibmveth_replenish_buffer_pool(struct ibmveth_adapter *adapter, struc
 			adapter->replenish_add_buff_failure++;
 			break;
 		} else {
-			pool->free_map[free_index] = 0xffff;
 			buffers_added++;
 			adapter->replenish_add_buff_success++;
 		}

@@ -77,6 +77,8 @@
 #define IbmVethPool1DftCnt  256
 #define IbmVethPool2DftCnt  256
 
+#define IBM_VETH_INVALID_MAP ((u16)0xffff)
+
 struct ibmveth_buff_pool {
     u32 size;
     u32 index;
