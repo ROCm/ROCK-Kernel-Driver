@@ -2216,7 +2216,7 @@ static void epcapoll(unsigned long ignored)
 
 	/* -------------------------------------------------------------------
 		This routine is called upon every timer interrupt.  Even though
-		the Digi series cards are capable of generating interupts this 
+		the Digi series cards are capable of generating interrupts this 
 		method of non-looping polling is more efficient.  This routine
 		checks for card generated events (Such as receive data, are transmit
 		buffer empty) and acts on those events.

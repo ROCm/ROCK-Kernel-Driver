@@ -1,4 +1,4 @@
-/* $Id: ioport.c,v 1.42 2000/12/05 00:56:36 anton Exp $
+/* $Id: ioport.c,v 1.44 2001/02/13 04:07:38 davem Exp $
  * ioport.c:  Simple io mapping allocator.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -225,7 +225,7 @@ _sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz)
 	 * XXX Playing with implementation details here.
 	 * On sparc64 Ebus has resources with precise boundaries.
 	 * We share drivers with sparc64. Too clever drivers use
-	 * start of a resource instead of a base adress.
+	 * start of a resource instead of a base address.
 	 *
 	 * XXX-2 This may be not valid anymore, clean when
 	 * interface to sbus_ioremap() is resolved.

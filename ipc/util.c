@@ -185,7 +185,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* p;
 	int lid = id % SEQ_MULTIPLIER;
-	if(lid > ids->size)
+	if(lid >= ids->size)
 		BUG();
 	p = ids->entries[lid].p;
 	ids->entries[lid].p = NULL;

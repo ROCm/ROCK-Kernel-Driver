@@ -19,6 +19,9 @@ if [ "$CONFIG_PCMCIA" != "n" ]; then
    fi
    bool '  i82365 compatible bridge support' CONFIG_I82365
    bool '  Databook TCIC host bridge support' CONFIG_TCIC
+   if [ "$CONFIG_HD64465" = "y" ]; then
+      dep_tristate '  HD64465 host bridge support' CONFIG_HD64465_PCMCIA $CONFIG_PCMCIA
+   fi
 fi
 
 endmenu

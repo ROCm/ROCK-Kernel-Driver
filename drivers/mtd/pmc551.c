@@ -483,7 +483,7 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
         pci_write_config_word( dev, PMC551_SDRAM_CMD, 0x00bf );
 
         /*
-         * Wait untill command has gone through
+         * Wait until command has gone through
          * FIXME: register spinning issue
          */
         do {	pci_read_config_word( dev, PMC551_SDRAM_CMD, &cmd );
@@ -709,7 +709,7 @@ int __init init_pmc551(void)
                        PCI_Device->irq);
 
                 /*
-                 * The PMC551 device acts VERY wierd if you don't init it
+                 * The PMC551 device acts VERY weird if you don't init it
                  * first.  i.e. it will not correctly report devsel.  If for
                  * some reason the sdram is in a wrote-protected state the
                  * device will DEVSEL when it is written to causing problems

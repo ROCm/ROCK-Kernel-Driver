@@ -13,6 +13,7 @@ if [ "$CONFIG_TR" != "n" ]; then
    dep_tristate '  Generic TMS380 Token Ring ISA/PCI adapter support' CONFIG_TMS380TR $CONFIG_TR
    if [ "$CONFIG_TMS380TR" != "n" ]; then
       dep_tristate '    Generic TMS380 PCI support' CONFIG_TMSPCI $CONFIG_TMS380TR
+      dep_tristate '    Generic TMS380 ISA support' CONFIG_TMSISA $CONFIG_TMS380TR
       dep_tristate '    Madge Smart 16/4 PCI Mk2 support' CONFIG_ABYSS $CONFIG_TMS380TR
       if [ "$CONFIG_MCA" = "y" ]; then 
          dep_tristate '    Madge Smart 16/4 Ringnode MicroChannel' CONFIG_MADGEMC $CONFIG_TMS380TR

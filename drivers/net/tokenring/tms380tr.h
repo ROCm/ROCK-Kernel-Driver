@@ -15,7 +15,9 @@
 int tms380tr_open(struct net_device *dev);
 int tms380tr_close(struct net_device *dev);
 void tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-int tmsdev_init(struct net_device *dev);
+int tmsdev_init(struct net_device *dev, unsigned long dmalimit,
+		struct pci_dev *pdev);
+void tmsdev_term(struct net_device *dev);
 void tms380tr_wait(unsigned long time);
 
 #define TMS380TR_MAX_ADAPTERS 7
@@ -360,19 +362,19 @@ typedef struct {
 					 */
 
 	/* Interrupt vectors the adapter places on attached system bus. */
-	unsigned char CMD_Status_IV;	/* Interrupt vector: command status. */
-	unsigned char TX_IV;		/* Interrupt vector: transmit. */
-	unsigned char RX_IV;		/* Interrupt vector: receive. */
-	unsigned char Ring_Status_IV;	/* Interrupt vector: ring status. */
-	unsigned char SCB_Clear_IV;	/* Interrupt vector: SCB clear. */
-	unsigned char Adapter_CHK_IV;	/* Interrupt vector: adapter check. */
+	u_int8_t  CMD_Status_IV;    /* Interrupt vector: command status. */
+	u_int8_t  TX_IV;	    /* Interrupt vector: transmit. */
+	u_int8_t  RX_IV;	    /* Interrupt vector: receive. */
+	u_int8_t  Ring_Status_IV;   /* Interrupt vector: ring status. */
+	u_int8_t  SCB_Clear_IV;	    /* Interrupt vector: SCB clear. */
+	u_int8_t  Adapter_CHK_IV;   /* Interrupt vector: adapter check. */
 
-	unsigned short RX_Burst_Size;	/* Max. number of transfer cycles. */
-	unsigned short TX_Burst_Size;	/* During DMA burst; even value! */
-	unsigned short DMA_Abort_Thrhld;/* Number of DMA retries. */
+	u_int16_t RX_Burst_Size;    /* Max. number of transfer cycles. */
+	u_int16_t TX_Burst_Size;    /* During DMA burst; even value! */
+	u_int16_t DMA_Abort_Thrhld; /* Number of DMA retries. */
 
-	unsigned long SCB_Addr;	/* SCB address: even, word aligned, high-low */
-	unsigned long SSB_Addr;	/* SSB address: even, word aligned, high-low */
+	u_int32_t SCB_Addr;   /* SCB address: even, word aligned, high-low */
+	u_int32_t SSB_Addr;   /* SSB address: even, word aligned, high-low */
 } IPB, *IPB_Ptr;
 #pragma pack()
 
@@ -463,35 +465,35 @@ typedef struct {
 
 #pragma pack(1)
 typedef struct {
-	unsigned short OPENOptions;
-	unsigned char NodeAddr[6];	/* Adapter node address; use ROM 
-					 * address
-					 */
-	unsigned long GroupAddr;	/* Multicast: high order
-					 * bytes = 0xC000
-					 */
-	unsigned long FunctAddr;	/* High order bytes = 0xC000 */
-	unsigned short RxListSize;	/* RPL size: 0 (=26), 14, 20 or
-					 * 26 bytes read by the adapter.
-					 * (Depending on the number of 
-					 * fragments/list)
-					 */
-	unsigned short TxListSize;	/* TPL size */
-	unsigned short BufSize;		/* Is automatically rounded up to the
-					 * nearest nK boundary.
-					 */
-	unsigned short FullDuplex;
-	unsigned short Reserved;
-	unsigned char TXBufMin;		/* Number of adapter buffers reserved
-					 * for transmission a minimum of 2
-					 * buffers must be allocated.
-					 */
-	unsigned char TXBufMax;		/* Maximum number of adapter buffers
-					 * for transmit; a minimum of 2 buffers
-					 * must be available for receive.
-					 * Default: 6
-					 */
-	unsigned short ProdIDAddr[2];	/* Pointer to product ID. */
+	u_int16_t OPENOptions;
+	u_int8_t  NodeAddr[6];	/* Adapter node address; use ROM 
+				 * address
+				 */
+	u_int32_t GroupAddr;	/* Multicast: high order
+				 * bytes = 0xC000
+				 */
+	u_int32_t FunctAddr;	/* High order bytes = 0xC000 */
+	u_int16_t RxListSize;	/* RPL size: 0 (=26), 14, 20 or
+				 * 26 bytes read by the adapter.
+				 * (Depending on the number of 
+				 * fragments/list)
+				 */
+	u_int16_t TxListSize;	/* TPL size */
+	u_int16_t BufSize;	/* Is automatically rounded up to the
+				 * nearest nK boundary.
+				 */
+	u_int16_t FullDuplex;
+	u_int16_t Reserved;
+	u_int8_t  TXBufMin;	/* Number of adapter buffers reserved
+				 * for transmission a minimum of 2
+				 * buffers must be allocated.
+				 */
+	u_int8_t  TXBufMax;	/* Maximum number of adapter buffers
+				 * for transmit; a minimum of 2 buffers
+				 * must be available for receive.
+				 * Default: 6
+				 */
+	u_int16_t ProdIDAddr[2];/* Pointer to product ID. */
 } OPB, *OPB_Ptr;
 #pragma pack()
 
@@ -502,8 +504,8 @@ typedef struct {
  */
 #pragma pack(1)
 typedef struct {
-	unsigned short CMD;	/* Command code */
-	unsigned short Parm[2];	/* Pointer to Command Parameter Block */
+	u_int16_t CMD;		/* Command code */
+	u_int16_t Parm[2];	/* Pointer to Command Parameter Block */
 } SCB;	/* System Command Block (32 bit physical address; big endian)*/
 #pragma pack()
 
@@ -515,8 +517,8 @@ typedef struct {
  */
 #pragma pack(1)
 typedef struct {
-	unsigned short STS;	/* Status code */
-	unsigned short Parm[3];	/* Parameter or pointer to Status Parameter
+	u_int16_t STS;		/* Status code */
+	u_int16_t Parm[3];	/* Parameter or pointer to Status Parameter
 				 * Block.
 				 */
 } SSB;	/* System Status Block (big endian - physical address)  */
@@ -539,33 +541,33 @@ typedef struct {
 
 #pragma pack(1)
 typedef struct {
-	unsigned char Line_Error;	/* Line error: code violation in
+	u_int8_t  Line_Error;		/* Line error: code violation in
 					 * frame or in a token, or FCS error.
 					 */
-	unsigned char Internal_Error;	/* IBM specific. (Reserved_1) */
-	unsigned char Burst_Error;
-	unsigned char ARI_FCI_Error;	/* ARI/FCI bit zero in AMP or
+	u_int8_t  Internal_Error;	/* IBM specific. (Reserved_1) */
+	u_int8_t  Burst_Error;
+	u_int8_t  ARI_FCI_Error;	/* ARI/FCI bit zero in AMP or
 					 * SMP MAC frame.
 					 */
-	unsigned char AbortDelimeters;	/* IBM specific. (Reserved_2) */
-	unsigned char Reserved_3;
-	unsigned char Lost_Frame_Error;	/* Receive of end of transmitted
+	u_int8_t  AbortDelimeters;	/* IBM specific. (Reserved_2) */
+	u_int8_t  Reserved_3;
+	u_int8_t  Lost_Frame_Error;	/* Receive of end of transmitted
 					 * frame failed.
 					 */
-	unsigned char Rx_Congest_Error;	/* Adapter in repeat mode has not
+	u_int8_t  Rx_Congest_Error;	/* Adapter in repeat mode has not
 					 * enough buffer space to copy incoming
 					 * frame.
 					 */
-	unsigned char Frame_Copied_Error;/* ARI bit not zero in frame
+	u_int8_t  Frame_Copied_Error;	/* ARI bit not zero in frame
 					 * addressed to adapter.
 					 */
-	unsigned char Frequency_Error;	/* IBM specific. (Reserved_4) */
-	unsigned char Token_Error;	/* (active only in monitor station) */
-	unsigned char Reserved_5;
-	unsigned char DMA_Bus_Error;	/* DMA bus errors not exceeding the
+	u_int8_t  Frequency_Error;	/* IBM specific. (Reserved_4) */
+	u_int8_t  Token_Error;		/* (active only in monitor station) */
+	u_int8_t  Reserved_5;
+	u_int8_t  DMA_Bus_Error;	/* DMA bus errors not exceeding the
 					 * abort thresholds.
 					 */
-	unsigned char DMA_Parity_Error;	/* DMA parity errors not exceeding
+	u_int8_t  DMA_Parity_Error;	/* DMA parity errors not exceeding
 					 * the abort thresholds.
 					 */
 } ERRORTAB;	/* Adapter error counters */
@@ -575,16 +577,16 @@ typedef struct {
 /*--------------------- Send and Receive definitions -------------------*/
 #pragma pack(1)
 typedef struct {
-	unsigned short DataCount;	/* Value 0, even and odd values are
-					 * permitted; value is unaltered most
-					 * significant bit set: following
-					 * fragments last fragment: most
-					 * significant bit is not evaluated.
-					 * (???)
-					 */
-	unsigned long DataAddr;		/* Pointer to frame data fragment;
-					 * even or odd.
-					 */
+	u_int16_t DataCount;	/* Value 0, even and odd values are
+				 * permitted; value is unaltered most
+				 * significant bit set: following
+				 * fragments last fragment: most
+				 * significant bit is not evaluated.
+				 * (???)
+				 */
+	u_int32_t DataAddr;	/* Pointer to frame data fragment;
+				 * even or odd.
+				 */
 } Fragment;
 #pragma pack()
 
@@ -675,17 +677,17 @@ typedef struct {
 typedef struct s_TPL TPL;
 
 struct s_TPL {	/* Transmit Parameter List (align on even word boundaries) */
-	unsigned long NextTPLAddr;	/* Pointer to next TPL in chain; if
+	u_int32_t NextTPLAddr;		/* Pointer to next TPL in chain; if
 					 * pointer is odd: this is the last
 					 * TPL. Pointing to itself can cause
 					 * problems!
 					 */
-	volatile unsigned short Status;	/* Initialized by the adapter:
+	volatile u_int16_t Status;	/* Initialized by the adapter:
 					 * CSTAT_REQUEST important: update least
 					 * significant bit first! Set by the
 					 * adapter: CSTAT_COMPLETE status.
 					 */
-	unsigned short FrameSize;	/* Number of bytes to be transmitted
+	u_int16_t FrameSize;		/* Number of bytes to be transmitted
 					 * as a frame including AC/FC,
 					 * Destination, Source, Routing field
 					 * not including CRC, FS, End Delimiter
@@ -714,6 +716,7 @@ struct s_TPL {	/* Transmit Parameter List (align on even word boundaries) */
 	struct sk_buff *Skb;
 	unsigned char TPLIndex;
 	volatile unsigned char BusyFlag;/* Flag: TPL busy? */
+	dma_addr_t DMABuff;		/* DMA IO bus address from pci_map */
 };
 
 /* ---------------------Receive Functions-------------------------------*
@@ -1015,18 +1018,18 @@ enum SKB_STAT {
 #pragma pack(1)
 typedef struct s_RPL RPL;
 struct s_RPL {	/* Receive Parameter List */
-	unsigned long NextRPLAddr;	/* Pointer to next RPL in chain
+	u_int32_t NextRPLAddr;		/* Pointer to next RPL in chain
 					 * (normalized = physical 32 bit
 					 * address) if pointer is odd: this
 					 * is last RPL. Pointing to itself can
 					 * cause problems!
 					 */
-	volatile unsigned short Status;	/* Set by creation of Receive Parameter
+	volatile u_int16_t Status;	/* Set by creation of Receive Parameter
 					 * List RECEIVE_CSTAT_COMPLETE set by
 					 * adapter in lists that start or end
 					 * a frame.
 					 */
-	volatile unsigned short FrameSize; /* Number of bytes received as a
+	volatile u_int16_t FrameSize;	 /* Number of bytes received as a
 					 * frame including AC/FC, Destination,
 					 * Source, Routing field not including 
 					 * CRC, FS (Frame Status), End Delimiter
@@ -1054,6 +1057,7 @@ struct s_RPL {	/* Receive Parameter List */
 	struct sk_buff *Skb;
 	SKB_STAT SkbStat;
 	int RPLIndex;
+	dma_addr_t DMABuff;		/* DMA IO bus address from pci_map */
 };
 
 /* Information that need to be kept for each board. */
@@ -1084,6 +1088,7 @@ typedef struct net_local {
 	RPL *RplTail;
 	unsigned char LocalRxBuffers[RPL_NUM][DEFAULT_PACKET_SIZE];
 
+	struct pci_dev *pdev;
 	int DataRate;
 	unsigned char ScbInUse;
 	unsigned short CMDqueue;
@@ -1111,6 +1116,9 @@ typedef struct net_local {
 	struct tr_statistics MacStat;	/* MAC statistics structure */
 
 	unsigned long dmalimit; /* the max DMA address (ie, ISA) */
+	dma_addr_t    dmabuffer; /* the DMA bus address corresponding to
+				    priv. Might be different from virt_to_bus()
+				    for architectures with IO MMU (Alpha) */
 
 	struct timer_list timer;
 

@@ -32,6 +32,9 @@ ifeq ($(CONFIG_PCMCIA),y)
   ifeq ($(CONFIG_TCIC),y)
     obj-y += tcic.o
   endif
+  ifeq ($(CONFIG_HD64465_PCMCIA),y)
+    obj-y += hd64465_ss.o
+  endif
 else
   ifeq ($(CONFIG_PCMCIA),m)
     obj-m   := pcmcia_core.o ds.o
@@ -40,6 +43,9 @@ else
     endif
     ifeq ($(CONFIG_TCIC),y)
       obj-m += tcic.o
+    endif
+    ifeq ($(CONFIG_HD64465_PCMCIA),m)
+      obj-m += hd64465_ss.o
     endif
      ifeq ($(CONFIG_CARDBUS),y)
 	obj-m += yenta_socket.o cb_enabler.o

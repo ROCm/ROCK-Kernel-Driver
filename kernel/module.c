@@ -23,6 +23,7 @@
  * Fix sys_init_module race, Andrew Morton <andrewm@uow.edu.au> Oct 2000
  *     http://www.uwsg.iu.edu/hypermail/linux/kernel/0008.3/0379.html
  * Replace xxx_module_symbol with inter_module_xxx.  Keith Owens <kaos@ocs.com.au> Oct 2000
+ * Add a module list lock for kernel fault race fixing. Alan Cox <alan@redhat.com>
  *
  * This source is covered by the GNU GPL, the same as all kernel sources.
  */
@@ -64,6 +65,17 @@ struct module *module_list = &kernel_module;
 static struct list_head ime_list = LIST_HEAD_INIT(ime_list);
 static spinlock_t ime_lock = SPIN_LOCK_UNLOCKED;
 static int kmalloc_failed;
+
+/*
+ *	This lock prevents modifications that might race the kernel fault
+ *	fixups. It does not prevent reader walks that the modules code
+ *	does. The kernel lock does that.
+ *
+ *	Since vmalloc fault fixups occur in any context this lock is taken
+ *	irqsave at all times.
+ */
+ 
+spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * inter_module_register - register a new set of inter module data.
@@ -283,6 +295,7 @@ sys_create_module(const char *name_user, size_t size)
 	char *name;
 	long namelen, error;
 	struct module *mod;
+	unsigned long flags;
 
 	if (!capable(CAP_SYS_MODULE))
 		return -EPERM;
@@ -306,14 +319,16 @@ sys_create_module(const char *name_user, size_t size)
 
 	memset(mod, 0, sizeof(*mod));
 	mod->size_of_struct = sizeof(*mod);
-	mod->next = module_list;
 	mod->name = (char *)(mod + 1);
 	mod->size = size;
 	memcpy((char*)(mod+1), name, namelen+1);
 
 	put_mod_name(name);
 
+	spin_lock_irqsave(&modlist_lock, flags);
+	mod->next = module_list;
 	module_list = mod;	/* link it in */
+	spin_unlock_irqrestore(&modlist_lock, flags);
 
 	error = (long) mod;
 	goto err0;
@@ -628,6 +643,7 @@ sys_delete_module(const char *name_user)
 	/* Do automatic reaping */
 restart:
 	something_changed = 0;
+	
 	for (mod = module_list; mod != &kernel_module; mod = next) {
 		next = mod->next;
 		spin_lock(&unload_lock);
@@ -651,10 +667,13 @@ restart:
 			spin_unlock(&unload_lock);
 		}
 	}
+	
 	if (something_changed)
 		goto restart;
+		
 	for (mod = module_list; mod != &kernel_module; mod = mod->next)
 		mod->flags &= ~MOD_JUST_FREED;
+	
 	error = 0;
 out:
 	unlock_kernel();
@@ -1018,6 +1037,7 @@ free_module(struct module *mod, int tag_freed)
 {
 	struct module_ref *dep;
 	unsigned i;
+	unsigned long flags;
 
 	/* Let the module clean up.  */
 
@@ -1041,6 +1061,7 @@ free_module(struct module *mod, int tag_freed)
 
 	/* And from the main module list.  */
 
+	spin_lock_irqsave(&modlist_lock, flags);
 	if (mod == module_list) {
 		module_list = mod->next;
 	} else {
@@ -1049,6 +1070,7 @@ free_module(struct module *mod, int tag_freed)
 			continue;
 		p->next = mod->next;
 	}
+	spin_unlock_irqrestore(&modlist_lock, flags);
 
 	/* And free the memory.  */
 

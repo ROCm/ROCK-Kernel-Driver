@@ -894,7 +894,7 @@ static int __init init_opl3sa2(void)
 	/* Sanitize isapnp and multiple settings */
 	isapnp = isapnp != 0 ? 1 : 0;
 	multiple = multiple != 0 ? 1 : 0;
-
+	
 	max = (multiple && isapnp) ? OPL3SA2_CARDS_MAX : 1;
 	for(card = 0; card < max; card++, opl3sa2_cards_num++) {
 #if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
@@ -912,7 +912,9 @@ static int __init init_opl3sa2(void)
 			break;
 		}
 #endif
-		if(!isapnp) {
+		/* If a user wants an I/O then assume they meant it */
+		
+		if(!isapnp && io == -1 ) {
 			if(io == -1 || irq == -1 || dma == -1 ||
 			   dma2 == -1 || mss_io == -1) {
 				printk(KERN_ERR

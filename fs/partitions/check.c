@@ -76,7 +76,7 @@ static int (*check_part[])(struct gendisk *hd, kdev_t dev, unsigned long first_s
 };
 
 /*
- * disk_name() is used by genhd.c and blkpg.c.
+ * disk_name() is used by partition check code and the md driver.
  * It formats the devicename of the indicated disk into
  * the supplied buffer (of size at least 32), and returns
  * a pointer to that same buffer (for convenience).

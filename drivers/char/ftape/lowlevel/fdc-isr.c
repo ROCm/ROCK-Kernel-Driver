@@ -237,7 +237,7 @@ static void print_progress(buffer_struct *buff, error_cause cause)
 
 	switch (cause) {
 	case no_error: 
-		TRACE(ft_t_flow,"%d Sector(s) transfered", buff->sector_count);
+		TRACE(ft_t_flow,"%d Sector(s) transferred", buff->sector_count);
 		break;
 	case no_data_error:
 		TRACE(ft_t_flow, "Sector %d not found",

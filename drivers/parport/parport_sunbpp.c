@@ -1,4 +1,4 @@
-/* $Id: parport_sunbpp.c,v 1.10 2000/03/27 01:47:56 anton Exp $
+/* $Id: parport_sunbpp.c,v 1.11 2001/02/13 01:16:58 davem Exp $
  * Parallel-port routines for Sun architecture
  * 
  * Author: Derrick J. Brashear <shadow@dementia.org>

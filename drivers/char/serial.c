@@ -28,7 +28,7 @@
  *        Stanislav V. Voronyi <stas@uanet.kharkov.ua>
  *
  *  3/98: Change the IRQ detection, use of probe_irq_o*(),
- *	  supress TIOCSERGWILD and TIOCSERSWILD
+ *	  suppress TIOCSERGWILD and TIOCSERSWILD
  *	  Etienne Lorrain <etienne.lorrain@ibm.net>
  *
  *  4/98: Added changes to support the ARM architecture proposed by
@@ -165,9 +165,6 @@ static char *serial_revdate = "2000-08-09";
  * End of serial driver configuration section.
  */
 
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
 #include <linux/module.h>
 
 #include <linux/types.h>

@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.107 2001/01/06 00:46:44 davem Exp $
+# $Id: config.in,v 1.108 2001/02/18 09:02:59 davem Exp $
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
@@ -183,8 +183,8 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    mainmenu_option next_comment
    comment 'SCSI low-level drivers'
 
-   tristate 'Sparc ESP Scsi Driver' CONFIG_SCSI_SUNESP $CONFIG_SCSI
-   tristate 'PTI Qlogic,ISP Driver' CONFIG_SCSI_QLOGICPTI $CONFIG_SCSI
+   dep_tristate 'Sparc ESP Scsi Driver' CONFIG_SCSI_SUNESP $CONFIG_SCSI
+   dep_tristate 'PTI Qlogic,ISP Driver' CONFIG_SCSI_QLOGICPTI $CONFIG_SCSI
    endmenu
 fi
 endmenu

@@ -13,13 +13,7 @@
  *  The following modules are currently available for card support:
  *	- tmspci (Generic PCI card support)
  *	- abyss (Madge PCI support)
- *  
- *  The following cards are currently lacking support, even
- *  though they were supported in previous versions, because
- *  their code did not get migrated into a seperate module:
- *	- SysKonnect TR4/16(+) ISA	(SK-4190)
- *  They are no longer supported by this driver, at least until
- *  a module gets written for them.
+ *      - tmsisa (SysKonnect TR4/16 ISA)
  *
  *  Sources:
  *  	- The hardware related parts of this driver are take from
@@ -38,6 +32,7 @@
  *    CG	Christoph Goos		cgoos@syskonnect.de
  *    AF	Adam Fritzler		mid@auk.cx
  *    MLP       Mike Phillips           phillim@amtrak.com
+ *    JF	Jochen Friedrich	jochen@scram.de
  *     
  *  Modification History:
  *	29-Aug-97	CG	Created
@@ -57,10 +52,15 @@
  *	30-Dec-99	AF	Turned tms380tr into a library ala 8390.
  *				Madge support is provided in the abyss module
  *				Generic PCI support is in the tmspci module.
- *
+ *	30-Nov-00	JF	Updated PCI code to support IO MMU via
+ *				pci_map_static(). Alpha uses this MMU for ISA
+ *				as well.
+ *      14-Jan-01	JF	Fix DMA on ifdown/ifup sequences. Some 
+ *      			cleanup.
+ *      			
  *  To do:
  *    1. Multi/Broadcast packet handling (this may have fixed itself)
- *    2. Write a sktrisa module that includes the old ISA support
+ *    2. Write a sktrisa module that includes the old ISA support (done)
  *    3. Allow modules to load their own microcode
  *    4. Speed up the BUD process -- freezing the kernel for 3+sec is
  *         quite unacceptable.
@@ -68,7 +68,7 @@
  */
 
 #ifdef MODULE
-static const char *version = "tms380tr.c: v1.07 21/01/2000 by Christoph Goos, Adam Fritzler\n";
+static const char *version = "tms380tr.c: v1.08 14/01/2001 by Christoph Goos, Adam Fritzler\n";
 #endif
 
 #ifdef MODULE
@@ -125,9 +125,6 @@ static int      tms380tr_bringup_diags(struct net_device *dev);
 static void	tms380tr_cancel_tx_queue(struct net_local* tp);
 static int 	tms380tr_chipset_init(struct net_device *dev);
 static void 	tms380tr_chk_irq(struct net_device *dev);
-#if 0
-static unsigned char tms380tr_chk_frame(struct net_device *dev, unsigned char *Addr);
-#endif
 static void 	tms380tr_chk_outstanding_cmds(struct net_device *dev);
 static void 	tms380tr_chk_src_addr(unsigned char *frame, unsigned char *hw_addr);
 static unsigned char tms380tr_chk_ssb(struct net_local *tp, unsigned short IrqType);
@@ -191,7 +188,7 @@ static void 	tms380tr_write_tpl_status(TPL *tpl, unsigned int Status);
 
 
 
-#if TMS380TR_DEBUG > 0
+#if 0 /* TMS380TR_DEBUG > 0 */
 static int madgemc_sifprobe(struct net_device *dev)
 {
         unsigned char old, chk1, chk2;
@@ -259,6 +256,16 @@ int tms380tr_open(struct net_device *dev)
 	int err;
 	
 	/* Reset the hardware here. Don't forget to set the station address. */
+
+	if(dev->dma > 0) 
+	{
+		unsigned long flags=claim_dma_lock();
+		disable_dma(dev->dma);
+		set_dma_mode(dev->dma, DMA_MODE_CASCADE);
+		enable_dma(dev->dma);
+		release_dma_lock(flags);
+	}
+	
 	err = tms380tr_chipset_init(dev);
   	if(err)
 	{
@@ -275,6 +282,7 @@ int tms380tr_open(struct net_device *dev)
 
 	printk(KERN_INFO "%s: Adapter RAM size: %dK\n", 
 	       dev->name, tms380tr_read_ptr(dev));
+
 	tms380tr_enable_interrupts(dev);
 	tms380tr_open_adapter(dev);
 
@@ -334,18 +342,26 @@ static int tms380tr_chipset_init(struct net_device *dev)
 	tms380tr_init_opb(dev);
 	tms380tr_init_net_local(dev);
 
+	if(tms380tr_debug > 3)
+		printk(KERN_INFO "%s: Resetting adapter...\n", dev->name);
 	err = tms380tr_reset_adapter(dev);
 	if(err < 0)
 		return (-1);
 
+	if(tms380tr_debug > 3)
+		printk(KERN_INFO "%s: Bringup diags...\n", dev->name);
 	err = tms380tr_bringup_diags(dev);
 	if(err < 0)
 		return (-1);
 
+	if(tms380tr_debug > 3)
+		printk(KERN_INFO "%s: Init adapter...\n", dev->name);
 	err = tms380tr_init_adapter(dev);
 	if(err < 0)
 		return (-1);
 
+	if(tms380tr_debug > 3)
+		printk(KERN_INFO "%s: Done!\n", dev->name);
 	return (0);
 }
 
@@ -356,6 +372,7 @@ static void tms380tr_init_net_local(struct net_device *dev)
 {
 	struct net_local *tp = (struct net_local *)dev->priv;
 	int i;
+	dma_addr_t dmabuf;
 
 	tp->scb.CMD	= 0;
 	tp->scb.Parm[0] = 0;
@@ -381,11 +398,11 @@ static void tms380tr_init_net_local(struct net_device *dev)
 
 	skb_queue_head_init(&tp->SendSkbQueue);
 	tp->QueueSkb = MAX_TX_QUEUE;
-	
+
 	/* Create circular chain of transmit lists */
 	for (i = 0; i < TPL_NUM; i++)
 	{
-		tp->Tpl[i].NextTPLAddr = htonl((unsigned long) virt_to_bus(&tp->Tpl[(i+1) % TPL_NUM]));
+		tp->Tpl[i].NextTPLAddr = htonl(((char *)(&tp->Tpl[(i+1) % TPL_NUM]) - (char *)tp) + tp->dmabuffer); /* DMA buffer may be MMU driven */
 		tp->Tpl[i].Status	= 0;
 		tp->Tpl[i].FrameSize	= 0;
 		tp->Tpl[i].FragList[0].DataCount	= 0;
@@ -393,6 +410,7 @@ static void tms380tr_init_net_local(struct net_device *dev)
 		tp->Tpl[i].NextTPLPtr	= &tp->Tpl[(i+1) % TPL_NUM];
 		tp->Tpl[i].MData	= NULL;
 		tp->Tpl[i].TPLIndex	= i;
+		tp->Tpl[i].DMABuff	= 0;
 		tp->Tpl[i].BusyFlag	= 0;
 	}
 
@@ -401,19 +419,20 @@ static void tms380tr_init_net_local(struct net_device *dev)
 	/* Create circular chain of receive lists */
 	for (i = 0; i < RPL_NUM; i++)
 	{
-		tp->Rpl[i].NextRPLAddr = htonl((unsigned long) virt_to_bus(&tp->Rpl[(i+1) % RPL_NUM]));
+		tp->Rpl[i].NextRPLAddr = htonl(((char *)(&tp->Rpl[(i+1) % RPL_NUM]) - (char *)tp) + tp->dmabuffer); /* DMA buffer may be MMU driven */
 		tp->Rpl[i].Status = (RX_VALID | RX_START_FRAME | RX_END_FRAME | RX_FRAME_IRQ);
 		tp->Rpl[i].FrameSize = 0;
 		tp->Rpl[i].FragList[0].DataCount = cpu_to_be16((unsigned short)tp->MaxPacketSize);
 
 		/* Alloc skb and point adapter to data area */
 		tp->Rpl[i].Skb = dev_alloc_skb(tp->MaxPacketSize);
+			tp->Rpl[i].DMABuff = 0;
 
 		/* skb == NULL ? then use local buffer */
 		if(tp->Rpl[i].Skb == NULL)
 		{
 			tp->Rpl[i].SkbStat = SKB_UNAVAILABLE;
-			tp->Rpl[i].FragList[0].DataAddr = htonl(virt_to_bus(tp->LocalRxBuffers[i]));
+			tp->Rpl[i].FragList[0].DataAddr = htonl(((char *)tp->LocalRxBuffers[i] - (char *)tp) + tp->dmabuffer);
 			tp->Rpl[i].MData = tp->LocalRxBuffers[i];
 		}
 		else	/* SKB != NULL */
@@ -422,17 +441,19 @@ static void tms380tr_init_net_local(struct net_device *dev)
 			skb_put(tp->Rpl[i].Skb, tp->MaxPacketSize);
 
 			/* data unreachable for DMA ? then use local buffer */
-			if(tp->dmalimit && virt_to_bus(tp->Rpl[i].Skb->data) + tp->MaxPacketSize > tp->dmalimit)
+			dmabuf = pci_map_single(tp->pdev, tp->Rpl[i].Skb->data, tp->MaxPacketSize, PCI_DMA_FROMDEVICE);
+			if(tp->dmalimit && (dmabuf + tp->MaxPacketSize > tp->dmalimit))
 			{
 				tp->Rpl[i].SkbStat = SKB_DATA_COPY;
-				tp->Rpl[i].FragList[0].DataAddr = htonl(virt_to_bus(tp->LocalRxBuffers[i]));
+				tp->Rpl[i].FragList[0].DataAddr = htonl(((char *)tp->LocalRxBuffers[i] - (char *)tp) + tp->dmabuffer);
 				tp->Rpl[i].MData = tp->LocalRxBuffers[i];
 			}
 			else	/* DMA directly in skb->data */
 			{
 				tp->Rpl[i].SkbStat = SKB_DMA_DIRECT;
-				tp->Rpl[i].FragList[0].DataAddr = htonl(virt_to_bus(tp->Rpl[i].Skb->data));
+				tp->Rpl[i].FragList[0].DataAddr = htonl(dmabuf);
 				tp->Rpl[i].MData = tp->Rpl[i].Skb->data;
+				tp->Rpl[i].DMABuff = dmabuf;
 			}
 		}
 
@@ -506,7 +527,7 @@ static void tms380tr_init_opb(struct net_device *dev)
 	tp->ocpl.TXBufMin	 = TX_BUF_MIN;
 	tp->ocpl.TXBufMax	 = TX_BUF_MAX;
 
-	Addr = htonl(virt_to_bus(tp->ProductID));
+	Addr = htonl(((char *)tp->ProductID - (char *)tp) + tp->dmabuffer);
 
 	tp->ocpl.ProdIDAddr[0]	 = LOWORD(Addr);
 	tp->ocpl.ProdIDAddr[1]	 = HIWORD(Addr);
@@ -610,10 +631,11 @@ static void tms380tr_hardware_send_packet(struct net_device *dev, struct net_loc
 {
 	TPL *tpl;
 	short length;
-	unsigned char *buf, *newbuf;
+	unsigned char *buf;
 	struct sk_buff *skb;
 	int i;
-    
+	dma_addr_t dmabuf, newbuf;
+   
 	for(;;)
 	{
 		/* Try to get a free TPL from the chain.
@@ -634,26 +656,30 @@ static void tms380tr_hardware_send_packet(struct net_device *dev, struct net_loc
 			return;
 
 		tp->QueueSkb++;
+		dmabuf = 0;
+
 		/* Is buffer reachable for Busmaster-DMA? */
-		if(tp->dmalimit && virt_to_bus((void*)(((long) skb->data) + skb->len)) > tp->dmalimit)
+
+		length	= skb->len;
+		dmabuf = pci_map_single(tp->pdev, skb->data, length, PCI_DMA_TODEVICE);
+		if(tp->dmalimit && (dmabuf + length > tp->dmalimit))
 		{
 			/* Copy frame to local buffer */
+			pci_unmap_single(tp->pdev, dmabuf, length, PCI_DMA_TODEVICE);
+			dmabuf  = 0;
 			i 	= tp->TplFree->TPLIndex;
-			length 	= skb->len;
 			buf 	= tp->LocalTxBuffers[i];
 			memcpy(buf, skb->data, length);
-			newbuf 	= buf;
+			newbuf 	= ((char *)buf - (char *)tp) + tp->dmabuffer;
 		}
 		else
 		{
 			/* Send direct from skb->data */
-			length = skb->len;
-			newbuf = skb->data;
+			newbuf	= dmabuf;
+			buf	= skb->data;
 		}
-
 		/* Source address in packet? */
-		tms380tr_chk_src_addr(newbuf, dev->dev_addr);
-
+		tms380tr_chk_src_addr(buf, dev->dev_addr);
 		tp->LastSendTime	= jiffies;
 		tpl 			= tp->TplFree;	/* Get the "free" TPL */
 		tpl->BusyFlag 		= 1;		/* Mark TPL as busy */
@@ -661,12 +687,13 @@ static void tms380tr_hardware_send_packet(struct net_device *dev, struct net_loc
     
 		/* Save the skb for delayed return of skb to system */
 		tpl->Skb = skb;
+		tpl->DMABuff = dmabuf;
 		tpl->FragList[0].DataCount = cpu_to_be16((unsigned short)length);
-		tpl->FragList[0].DataAddr  = htonl(virt_to_bus(newbuf));
+		tpl->FragList[0].DataAddr  = htonl(newbuf);
 
 		/* Write the data length in the transmit list. */
 		tpl->FrameSize 	= cpu_to_be16((unsigned short)length);
-		tpl->MData 	= newbuf;
+		tpl->MData 	= buf;
 
 		/* Transmit the frame and set the status values. */
 		tms380tr_write_tpl_status(tpl, TX_VALID | TX_START_FRAME
@@ -1155,9 +1182,10 @@ int tms380tr_close(struct net_device *dev)
 	}
 	
 	SIFWRITEW(0xFF00, SIFCMD);
+#if 0
 	if(dev->dma > 0) /* what the? */
 		SIFWRITEB(0xff, POSREG);
-
+#endif
 	tms380tr_cancel_tx_queue(tp);
 
 	return (0);
@@ -1331,6 +1359,7 @@ static int tms380tr_reset_adapter(struct net_device *dev)
 		}
 	} while(count == 0);
 
+	printk(KERN_INFO "%s: Adapter Download Failed\n", dev->name);
 	return (-1);
 }
 
@@ -1381,6 +1410,7 @@ static int tms380tr_bringup_diags(struct net_device *dev)
 
 	Status = SIFREADW(SIFSTS);
 	
+	printk(KERN_INFO "%s: Hardware error\n", dev->name);
 	/* Hardware error occurred! */
 	Status &= 0x001f;
 	if (Status & 0x0010)
@@ -1412,9 +1442,16 @@ static int tms380tr_init_adapter(struct net_device *dev)
 	int i, loop_cnt, retry_cnt;
 
 	/* Normalize: byte order low/high, word order high/low! (only IPB!) */
-	tp->ipb.SCB_Addr = SWAPW(virt_to_bus(&tp->scb));
-	tp->ipb.SSB_Addr = SWAPW(virt_to_bus(&tp->ssb));
+	tp->ipb.SCB_Addr = SWAPW(((char *)&tp->scb - (char *)tp) + tp->dmabuffer);
+	tp->ipb.SSB_Addr = SWAPW(((char *)&tp->ssb - (char *)tp) + tp->dmabuffer);
 
+	if(tms380tr_debug > 3)
+	{
+		printk(KERN_INFO "%s: buffer (real): %lx\n", dev->name, (long) &tp->scb);
+		printk(KERN_INFO "%s: buffer (virt): %lx\n", dev->name, (long) ((char *)&tp->scb - (char *)tp) + tp->dmabuffer);
+		printk(KERN_INFO "%s: buffer (DMA) : %lx\n", dev->name, (long) tp->dmabuffer);
+		printk(KERN_INFO "%s: buffer (tp)  : %lx\n", dev->name, (long) tp);
+	}
 	/* Maximum: three initialization retries */
 	retry_cnt = INIT_MAX_RETRIES;
 
@@ -1454,8 +1491,11 @@ static int tms380tr_init_adapter(struct net_device *dev)
 			i = 0;
 			do {	/* Test if contents of SCB is valid */
 				if(SCB_Test[i] != *(cb_ptr + i))
+				{
+					printk(KERN_INFO "%s: DMA failed\n", dev->name);
 					/* DMA data error: wrong data in SCB */
 					return (-1);
+				}
 				i++;
 			} while(i < 6);
 
@@ -1477,6 +1517,7 @@ static int tms380tr_init_adapter(struct net_device *dev)
 				Status = SIFREADW(SIFSTS);
 				Status &= STS_ERROR_MASK;
 				/* ShowInitialisationErrorCode(Status); */
+				printk(KERN_INFO "%s: Status error: %d\n", dev->name, Status);
 				return (-1); /* Unrecoverable error */
 			}
 			else
@@ -1491,6 +1532,7 @@ static int tms380tr_init_adapter(struct net_device *dev)
 		}
 	} while(retry_cnt > 0);
 
+	printk(KERN_INFO "%s: Retry exceeded\n", dev->name);
 	return (-1);
 }
 
@@ -1520,7 +1562,7 @@ static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
 			/* Execute OPEN command	*/
 			tp->CMDqueue ^= OC_OPEN;
 
-			Addr = htonl(virt_to_bus(&tp->ocpl));
+			Addr = htonl(((char *)&tp->ocpl - (char *)tp) + tp->dmabuffer);
 			tp->scb.Parm[0] = LOWORD(Addr);
 			tp->scb.Parm[1] = HIWORD(Addr);
 			tp->scb.CMD = OPEN;
@@ -1554,7 +1596,7 @@ static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
 			if(tp->CMDqueue & OC_RECEIVE)
 			{
 				tp->CMDqueue ^= OC_RECEIVE;
-				Addr = htonl(virt_to_bus(tp->RplHead));
+				Addr = htonl(((char *)tp->RplHead - (char *)tp) + tp->dmabuffer);
 				tp->scb.Parm[0] = LOWORD(Addr);
 				tp->scb.Parm[1] = HIWORD(Addr);
 				tp->scb.CMD = RECEIVE;
@@ -1595,7 +1637,7 @@ static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
 
 						tp->CMDqueue ^= OC_TRANSMIT;
 						tms380tr_cancel_tx_queue(tp);
-						Addr = htonl(virt_to_bus(tp->TplBusy));
+						Addr = htonl(((char *)tp->TplBusy - (char *)tp) + tp->dmabuffer);
 						tp->scb.Parm[0] = LOWORD(Addr);
 						tp->scb.Parm[1] = HIWORD(Addr);
 						tp->scb.CMD = TRANSMIT;
@@ -1634,7 +1676,7 @@ static void tms380tr_chk_outstanding_cmds(struct net_device *dev)
 									if(tp->CMDqueue & OC_READ_ERROR_LOG)
 									{
 										tp->CMDqueue ^= OC_READ_ERROR_LOG;
-										Addr = htonl(virt_to_bus(&tp->errorlogtable));
+										Addr = htonl(((char *)&tp->errorlogtable - (char *)tp) + tp->dmabuffer);
 										tp->scb.Parm[0] = LOWORD(Addr);
 										tp->scb.Parm[1] = HIWORD(Addr);
 										tp->scb.CMD = READ_ERROR_LOG;
@@ -1976,8 +2018,9 @@ static void tms380tr_cancel_tx_queue(struct net_local* tp)
 		tpl->BusyFlag = 0;		/* "free" TPL */
 
 		printk(KERN_INFO "Cancel tx (%08lXh).\n", (unsigned long)tpl);
-
-		dev_kfree_skb(tpl->Skb);
+		if (tpl->DMABuff)
+			pci_unmap_single(tp->pdev, tpl->DMABuff, tpl->Skb->len, PCI_DMA_TODEVICE);
+		dev_kfree_skb_any(tpl->Skb);
 	}
 
 	for(;;)
@@ -1986,7 +2029,7 @@ static void tms380tr_cancel_tx_queue(struct net_local* tp)
 		if(skb == NULL)
 			break;
 		tp->QueueSkb++;
-		dev_kfree_skb(skb);
+		dev_kfree_skb_any(skb);
 	}
 
 	return;
@@ -2053,7 +2096,9 @@ static void tms380tr_tx_status_irq(struct net_device *dev)
 		}
 
 		tp->MacStat.tx_packets++;
-		dev_kfree_skb(tpl->Skb);
+		if (tpl->DMABuff)
+			pci_unmap_single(tp->pdev, tpl->DMABuff, tpl->Skb->len, PCI_DMA_TODEVICE);
+		dev_kfree_skb_irq(tpl->Skb);
 		tpl->BusyFlag = 0;	/* "free" TPL */
 	}
 
@@ -2075,6 +2120,7 @@ static void tms380tr_rcv_status_irq(struct net_device *dev)
 	unsigned int Length, Length2;
 	RPL *rpl;
 	RPL *SaveHead;
+	dma_addr_t dmabuf;
 
 	/* NOTE: At this point the SSB from RECEIVE STATUS is no longer
 	 * available, because the CLEAR SSB command has already been issued.
@@ -2118,81 +2164,68 @@ static void tms380tr_rcv_status_irq(struct net_device *dev)
 				tp->RplHead = SaveHead;
 				break;	/* Return to tms380tr_interrupt */
 			}
-#if 0  		/* This might happen for multicast or broadcast packets.
-		   The upper layers are expected to handle this, not here */
-
-			/* Drop frames sent by myself */
-			if(tms380tr_chk_frame(dev, rpl->MData))
+			tms380tr_update_rcv_stats(tp,ReceiveDataPtr,Length);
+			  
+			if(tms380tr_debug > 3)
+				printk("%s: Packet Length %04X (%d)\n",
+					dev->name, Length, Length);
+			  
+			/* Indicate the received frame to system the
+			 * adapter does the Source-Routing padding for 
+			 * us. See: OpenOptions in tms380tr_init_opb()
+			 */
+			skb = rpl->Skb;
+			if(rpl->SkbStat == SKB_UNAVAILABLE)
 			{
-				printk(KERN_INFO "%s: Received my own frame\n",
-					dev->name);
-				if(rpl->Skb != NULL)
-					dev_kfree_skb(rpl->Skb);
+				/* Try again to allocate skb */
+				skb = dev_alloc_skb(tp->MaxPacketSize);
+				if(skb == NULL)
+				{
+					/* Update Stats ?? */
+				}
+				else
+				{
+					skb->dev	= dev;
+					skb_put(skb, tp->MaxPacketSize);
+					rpl->SkbStat 	= SKB_DATA_COPY;
+					ReceiveDataPtr 	= rpl->MData;
+				}
 			}
-			else
-#endif
+
+			if(rpl->SkbStat == SKB_DATA_COPY
+				|| rpl->SkbStat == SKB_DMA_DIRECT)
 			{
-			  tms380tr_update_rcv_stats(tp,ReceiveDataPtr,Length);
-			  
-			  if(tms380tr_debug > 3)
-			    printk("%s: Packet Length %04X (%d)\n",
-				   dev->name, Length, Length);
-			  
-				/* Indicate the received frame to system the
-				 * adapter does the Source-Routing padding for 
-				 * us. See: OpenOptions in tms380tr_init_opb()
-				 */
-				skb = rpl->Skb;
-				if(rpl->SkbStat == SKB_UNAVAILABLE)
-				{
-					/* Try again to allocate skb */
-					skb = dev_alloc_skb(tp->MaxPacketSize);
-					if(skb == NULL)
-					{
-						/* Update Stats ?? */
-					}
-					else
-					{
-						skb->dev	= dev;
-						skb_put(skb, tp->MaxPacketSize);
-						rpl->SkbStat 	= SKB_DATA_COPY;
-						ReceiveDataPtr 	= rpl->MData;
-					}
-				}
+				if(rpl->SkbStat == SKB_DATA_COPY)
+					memmove(skb->data, ReceiveDataPtr, Length);
 
-				if(rpl->SkbStat == SKB_DATA_COPY
-					|| rpl->SkbStat == SKB_DMA_DIRECT)
-				{
-					if(rpl->SkbStat == SKB_DATA_COPY)
-						memmove(skb->data, ReceiveDataPtr, Length);
-
-					/* Deliver frame to system */
-					rpl->Skb = NULL;
-					skb_trim(skb,Length);
-					skb->protocol = tr_type_trans(skb,dev);
-					netif_rx(skb);
-				}
+				/* Deliver frame to system */
+				rpl->Skb = NULL;
+				skb_trim(skb,Length);
+				skb->protocol = tr_type_trans(skb,dev);
+				netif_rx(skb);
 			}
 		}
 		else	/* Invalid frame */
 		{
 			if(rpl->Skb != NULL)
-				dev_kfree_skb(rpl->Skb);
+				dev_kfree_skb_irq(rpl->Skb);
 
 			/* Skip list. */
 			if(rpl->Status & RX_START_FRAME)
 				/* Frame start bit is set -> overflow. */
 				tp->MacStat.rx_errors++;
 		}
+		if (rpl->DMABuff)
+			pci_unmap_single(tp->pdev, rpl->DMABuff, tp->MaxPacketSize, PCI_DMA_TODEVICE);
+		rpl->DMABuff = 0;
 
 		/* Allocate new skb for rpl */
 		rpl->Skb = dev_alloc_skb(tp->MaxPacketSize);
-
 		/* skb == NULL ? then use local buffer */
 		if(rpl->Skb == NULL)
 		{
 			rpl->SkbStat = SKB_UNAVAILABLE;
-			rpl->FragList[0].DataAddr = htonl(virt_to_bus(tp->LocalRxBuffers[rpl->RPLIndex]));
+			rpl->FragList[0].DataAddr = htonl(((char *)tp->LocalRxBuffers[rpl->RPLIndex] - (char *)tp) + tp->dmabuffer);
 			rpl->MData = tp->LocalRxBuffers[rpl->RPLIndex];
 		}
 		else	/* skb != NULL */
@@ -2201,18 +2234,20 @@ static void tms380tr_rcv_status_irq(struct net_device *dev)
 			skb_put(rpl->Skb, tp->MaxPacketSize);
 
 			/* Data unreachable for DMA ? then use local buffer */
-			if(tp->dmalimit && virt_to_bus(rpl->Skb->data) + tp->MaxPacketSize > tp->dmalimit)
+			dmabuf = pci_map_single(tp->pdev, rpl->Skb->data, tp->MaxPacketSize, PCI_DMA_FROMDEVICE);
+			if(tp->dmalimit && (dmabuf + tp->MaxPacketSize > tp->dmalimit))
 			{
 				rpl->SkbStat = SKB_DATA_COPY;
-				rpl->FragList[0].DataAddr = htonl(virt_to_bus(tp->LocalRxBuffers[rpl->RPLIndex]));
+				rpl->FragList[0].DataAddr = htonl(((char *)tp->LocalRxBuffers[rpl->RPLIndex] - (char *)tp) + tp->dmabuffer);
 				rpl->MData = tp->LocalRxBuffers[rpl->RPLIndex];
 			}
 			else
 			{
 				/* DMA directly in skb->data */
 				rpl->SkbStat = SKB_DMA_DIRECT;
-				rpl->FragList[0].DataAddr = htonl(virt_to_bus(rpl->Skb->data));
+				rpl->FragList[0].DataAddr = htonl(dmabuf);
 				rpl->MData = rpl->Skb->data;
+				rpl->DMABuff = dmabuf;
 			}
 		}
 
@@ -2267,29 +2302,6 @@ static void tms380tr_update_rcv_stats(struct net_local *tp, unsigned char DataPt
 	return;
 }
 
-#if 0
-/*
- * Check if it is a frame of myself. Compare source address with my current
- * address in reverse direction, and mask out the TR_RII.
- */
-static unsigned char tms380tr_chk_frame(struct net_device *dev, unsigned char *Addr)
-{
-	int i;
-
-	for(i = 5; i > 0; i--)
-	{
-		if(Addr[8 + i] != dev->dev_addr[i])
-			return (0);
-	}
-
-	/* Mask out RIF bit. */
-	if((Addr[8] & ~TR_RII) != (unsigned char)(dev->dev_addr[0]))
-		return (0);
-
-	return (1);  /* It is my frame. */
-}
-#endif
-
 static int tms380tr_set_mac_address(struct net_device *dev, void *addr)
 {
 	struct net_local *tp = (struct net_local *)dev->priv;
@@ -2322,18 +2334,46 @@ static void tms380tr_dump(unsigned char *Data, int length)
 }
 #endif
 
-int tmsdev_init(struct net_device *dev)
+void tmsdev_term(struct net_device *dev)
+{
+	struct net_local *tp;
+
+	tp = (struct net_local *) dev->priv;
+	pci_unmap_single(tp->pdev, tp->dmabuffer, sizeof(struct net_local),
+		PCI_DMA_BIDIRECTIONAL);
+	kfree(dev->priv);
+}
+
+int tmsdev_init(struct net_device *dev, unsigned long dmalimit, 
+		struct pci_dev *pdev)
 {
 	if (dev->priv == NULL)
 	{
 		struct net_local *tms_local;
+		dma_addr_t buffer;
 		
 		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL | GFP_DMA);
 		if (dev->priv == NULL)
+		{
+                        printk("%s: Out of memory for DMA\n",
+                                dev->name);
 			return -ENOMEM;
+		}
 		memset(dev->priv, 0, sizeof(struct net_local));
 		tms_local = (struct net_local *)dev->priv;
 		init_waitqueue_head(&tms_local->wait_for_tok_int);
+		tms_local->dmalimit = dmalimit;
+		tms_local->pdev = pdev;
+                buffer = pci_map_single(pdev, (void *)tms_local,
+                        sizeof(struct net_local), PCI_DMA_BIDIRECTIONAL);
+                if (buffer + sizeof(struct net_local) > dmalimit)
+                {
+			printk("%s: Memory not accessible for DMA\n",
+				dev->name);
+			tmsdev_term(dev);
+			return -ENOMEM;
+		}
+		tms_local->dmabuffer = buffer;
 	}
 	
 	/* These can be overridden by the card driver if needed */
@@ -2357,6 +2397,7 @@ EXPORT_SYMBOL(tms380tr_open);
 EXPORT_SYMBOL(tms380tr_close);
 EXPORT_SYMBOL(tms380tr_interrupt);
 EXPORT_SYMBOL(tmsdev_init);
+EXPORT_SYMBOL(tmsdev_term);
 EXPORT_SYMBOL(tms380tr_wait);
 
 struct module *TMS380_module = NULL;

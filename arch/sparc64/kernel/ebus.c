@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.53 2000/11/08 05:08:23 davem Exp $
+/* $Id: ebus.c,v 1.54 2001/02/13 01:16:44 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)

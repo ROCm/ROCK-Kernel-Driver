@@ -54,7 +54,7 @@ extern inline struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* out;
 	int lid = id % SEQ_MULTIPLIER;
-	if(lid > ids->size)
+	if(lid >= ids->size)
 		return NULL;
 
 	out = ids->entries[lid].p;
@@ -69,7 +69,7 @@ extern inline struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* out;
 	int lid = id % SEQ_MULTIPLIER;
-	if(lid > ids->size)
+	if(lid >= ids->size)
 		return NULL;
 
 	spin_lock(&ids->ary);

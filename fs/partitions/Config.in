@@ -21,6 +21,7 @@ if [ "$CONFIG_PARTITION_ADVANCED" = "y" ]; then
    bool '  PC BIOS (MSDOS partition tables) support' CONFIG_MSDOS_PARTITION
    if [ "$CONFIG_MSDOS_PARTITION" = "y" ]; then
       bool '    BSD disklabel (FreeBSD partition tables) support' CONFIG_BSD_DISKLABEL
+      bool '    Minix subpartition support' CONFIG_MINIX_SUBPARTITION
       bool '    Solaris (x86) partition table support' CONFIG_SOLARIS_X86_PARTITION
       bool '    Unixware slices support' CONFIG_UNIXWARE_DISKLABEL
    fi

@@ -29,12 +29,6 @@ int
 ip2_loadmain(int *, int  *, unsigned char *, int ); // ref into ip2main.c
 
 #ifdef MODULE
-#if defined(CONFIG_MODVERSIONS) && !defined(MODVERSIONS)
-#	define MODVERSIONS
-#endif
-#ifdef MODVERSIONS
-#	include <linux/modversions.h>
-#endif
 
 static int io[IP2_MAX_BOARDS]= { 0,};
 static int irq[IP2_MAX_BOARDS] = { 0,}; 

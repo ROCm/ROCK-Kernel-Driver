@@ -142,14 +142,14 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 		printk(":%2.2x", dev->dev_addr[i]);
 	printk("\n");
 		
-	ret = tmsdev_init(dev);
+	ret = tmsdev_init(dev,0, pdev);
+	/* XXX: should be the max PCI32 DMA max */
 	if (ret) {
 		printk("%s: unable to get memory for dev->priv.\n", dev->name);
 		goto err_out_irq;
 	}
 
 	tp = dev->priv;
-	tp->dmalimit = 0; /* XXX: should be the max PCI32 DMA max */
 	tp->setnselout = tms_pci_setnselout_pins;
 		
 	tp->sifreadb = tms_pci_sifreadb;
@@ -172,7 +172,7 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 	return 0;
 
 err_out_tmsdev:
-	kfree(dev->priv);
+	tmsdev_term(dev);
 err_out_irq:
 	free_irq(pdev->irq, dev);
 err_out_region:
@@ -228,7 +228,7 @@ static void __exit tms_pci_detach (struct pci_dev *pdev)
 	unregister_netdev(dev);
 	release_region(dev->base_addr, TMS_PCI_IO_EXTENT);
 	free_irq(dev->irq, dev);
-	kfree(dev->priv);
+	tmsdev_term(dev);
 	kfree(dev);
 	pci_set_drvdata(pdev, NULL);
 }

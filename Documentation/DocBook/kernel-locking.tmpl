@@ -720,7 +720,8 @@
       halves without a lock.  Depending on their exact timing, they
       would either see the new element in the list with a valid 
       <structfield>next</structfield> pointer, or it would not be in the 
-      list yet.
+      list yet.  A lock is still required against other CPUs inserting
+      or deleting from the list, of course.
     </para>
 
     <para>

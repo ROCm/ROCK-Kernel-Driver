@@ -1,6 +1,9 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      30 Jan 2001 Rev. 6.04 for linux 2.4.1
+ *        + Call pci_resource_start after pci_enable_device.
+ *
  *      25 Jan 2001 Rev. 6.03 for linux 2.4.0
  *        + "check_region" call replaced by "request_region".
  *
@@ -838,9 +841,9 @@ static inline void tune_pci_port(unsigned long port_base) {
 
       if (!(dev = pci_find_class(PCI_CLASS_STORAGE_SCSI << 8, dev))) break;
 
-      addr = pci_resource_start (dev, 0);
-
       if (pci_enable_device (dev)) continue;
+
+      addr = pci_resource_start (dev, 0);
 
 #if defined(DEBUG_PCI_DETECT)
       printk("%s: tune_pci_port, bus %d, devfn 0x%x, addr 0x%x.\n",

@@ -200,8 +200,8 @@ static inline void set_page_dirty(struct page * page)
 					smp_mb__before_clear_bit(); \
 					if (!test_and_clear_bit(PG_locked, &(page)->flags)) BUG(); \
 					smp_mb__after_clear_bit(); \
-					if (waitqueue_active(&page->wait)) \
-						wake_up(&page->wait); \
+					if (waitqueue_active(&(page)->wait)) \
+						wake_up(&(page)->wait); \
 				} while (0)
 #define PageError(page)		test_bit(PG_error, &(page)->flags)
 #define SetPageError(page)	set_bit(PG_error, &(page)->flags)

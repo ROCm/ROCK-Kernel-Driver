@@ -48,7 +48,6 @@
 #include <linux/netdevice.h>
 #include <linux/string.h>
 #include <linux/skbuff.h>
-#include <linux/slab.h>
 #include <linux/cache.h>
 #include <linux/init.h>
 

@@ -23,9 +23,6 @@
 #include <linux/proc_fs.h>
 #include <linux/mm.h>
 #include <linux/module.h>
-#if defined(MODVERSIONS)
-#include <linux/modversions.h>
-#endif
 
 #include <asm/pal.h>
 #include <asm/sal.h>

@@ -2,7 +2,7 @@
 
   Linux Driver for Mylex DAC960/AcceleRAID/eXtremeRAID PCI RAID Controllers
 
-  Copyright 1998-2000 by Leonard N. Zubkoff <lnz@dandelion.com>
+  Copyright 1998-2001 by Leonard N. Zubkoff <lnz@dandelion.com>
 
   This program is free software; you may redistribute and/or modify it under
   the terms of the GNU General Public License Version 2 as published by the
@@ -19,8 +19,8 @@
 */
 
 
-#define DAC960_DriverVersion			"2.4.9"
-#define DAC960_DriverDate			"7 September 2000"
+#define DAC960_DriverVersion			"2.4.10"
+#define DAC960_DriverDate			"1 February 2001"
 
 
 #include <linux/version.h>
@@ -51,7 +51,7 @@
 */
 
 static int
-  DAC960_ControllerCount;
+  DAC960_ControllerCount =			0;
 
 
 /*
@@ -60,7 +60,7 @@ static int
 */
 
 static int
-  DAC960_ActiveControllerCount;
+  DAC960_ActiveControllerCount =		0;
 
 
 /*
@@ -69,7 +69,7 @@ static int
 */
 
 static DAC960_Controller_T
-  *DAC960_Controllers[DAC960_MaxControllers];
+  *DAC960_Controllers[DAC960_MaxControllers] =	{ NULL };
 
 
 /*
@@ -110,7 +110,7 @@ static void DAC960_AnnounceDriver(DAC960_Controller_T *Controller)
   DAC960_Announce("***** DAC960 RAID Driver Version "
 		  DAC960_DriverVersion " of "
 		  DAC960_DriverDate " *****\n", Controller);
-  DAC960_Announce("Copyright 1998-2000 by Leonard N. Zubkoff "
+  DAC960_Announce("Copyright 1998-2001 by Leonard N. Zubkoff "
 		  "<lnz@dandelion.com>\n", Controller);
 }
 
@@ -511,7 +511,7 @@ static boolean DAC960_V1_ExecuteType3(DAC960_Controller_T *Controller,
   DAC960_V1_ClearCommand(Command);
   Command->CommandType = DAC960_ImmediateCommand;
   CommandMailbox->Type3.CommandOpcode = CommandOpcode;
-  CommandMailbox->Type3.BusAddress = Virtual_to_Bus(DataPointer);
+  CommandMailbox->Type3.BusAddress = Virtual_to_Bus32(DataPointer);
   DAC960_ExecuteCommand(Command);
   CommandStatus = Command->V1.CommandStatus;
   DAC960_DeallocateCommand(Command);
@@ -539,7 +539,7 @@ static boolean DAC960_V1_ExecuteType3D(DAC960_Controller_T *Controller,
   CommandMailbox->Type3D.CommandOpcode = CommandOpcode;
   CommandMailbox->Type3D.Channel = Channel;
   CommandMailbox->Type3D.TargetID = TargetID;
-  CommandMailbox->Type3D.BusAddress = Virtual_to_Bus(DataPointer);
+  CommandMailbox->Type3D.BusAddress = Virtual_to_Bus32(DataPointer);
   DAC960_ExecuteCommand(Command);
   CommandStatus = Command->V1.CommandStatus;
   DAC960_DeallocateCommand(Command);
@@ -573,7 +573,7 @@ static boolean DAC960_V2_GeneralInfo(DAC960_Controller_T *Controller,
   CommandMailbox->Common.DataTransferMemoryAddress
 			.ScatterGatherSegments[0]
 			.SegmentDataPointer =
-    Virtual_to_Bus(DataPointer);
+    Virtual_to_Bus64(DataPointer);
   CommandMailbox->Common.DataTransferMemoryAddress
 			.ScatterGatherSegments[0]
 			.SegmentByteCount =
@@ -612,7 +612,7 @@ static boolean DAC960_V2_ControllerInfo(DAC960_Controller_T *Controller,
   CommandMailbox->ControllerInfo.DataTransferMemoryAddress
 				.ScatterGatherSegments[0]
 				.SegmentDataPointer =
-    Virtual_to_Bus(DataPointer);
+    Virtual_to_Bus64(DataPointer);
   CommandMailbox->ControllerInfo.DataTransferMemoryAddress
 				.ScatterGatherSegments[0]
 				.SegmentByteCount =
@@ -655,7 +655,7 @@ static boolean DAC960_V2_LogicalDeviceInfo(DAC960_Controller_T *Controller,
   CommandMailbox->LogicalDeviceInfo.DataTransferMemoryAddress
 				   .ScatterGatherSegments[0]
 				   .SegmentDataPointer =
-    Virtual_to_Bus(DataPointer);
+    Virtual_to_Bus64(DataPointer);
   CommandMailbox->LogicalDeviceInfo.DataTransferMemoryAddress
 				   .ScatterGatherSegments[0]
 				   .SegmentByteCount =
@@ -700,7 +700,7 @@ static boolean DAC960_V2_PhysicalDeviceInfo(DAC960_Controller_T *Controller,
   CommandMailbox->PhysicalDeviceInfo.DataTransferMemoryAddress
 				    .ScatterGatherSegments[0]
 				    .SegmentDataPointer =
-    Virtual_to_Bus(DataPointer);
+    Virtual_to_Bus64(DataPointer);
   CommandMailbox->PhysicalDeviceInfo.DataTransferMemoryAddress
 				    .ScatterGatherSegments[0]
 				    .SegmentByteCount =
@@ -816,9 +816,9 @@ static boolean DAC960_V1_EnableMemoryMailboxInterface(DAC960_Controller_T
   CommandMailbox.TypeX.CommandIdentifier = 0;
   CommandMailbox.TypeX.CommandOpcode2 = 0x14;
   CommandMailbox.TypeX.CommandMailboxesBusAddress =
-    Virtual_to_Bus(Controller->V1.FirstCommandMailbox);
+    Virtual_to_Bus32(Controller->V1.FirstCommandMailbox);
   CommandMailbox.TypeX.StatusMailboxesBusAddress =
-    Virtual_to_Bus(Controller->V1.FirstStatusMailbox);
+    Virtual_to_Bus32(Controller->V1.FirstStatusMailbox);
   for (i = 0; i < 2; i++)
     switch (Controller->HardwareType)
       {
@@ -940,11 +940,11 @@ static boolean DAC960_V2_EnableMemoryMailboxInterface(DAC960_Controller_T
   CommandMailbox.SetMemoryMailbox.IOCTL_Opcode = DAC960_V2_SetMemoryMailbox;
   CommandMailbox.SetMemoryMailbox.HealthStatusBufferSizeKB = 1;
   CommandMailbox.SetMemoryMailbox.HealthStatusBufferBusAddress =
-    Virtual_to_Bus(Controller->V2.HealthStatusBuffer);
+    Virtual_to_Bus64(Controller->V2.HealthStatusBuffer);
   CommandMailbox.SetMemoryMailbox.FirstCommandMailboxBusAddress =
-    Virtual_to_Bus(Controller->V2.FirstCommandMailbox);
+    Virtual_to_Bus64(Controller->V2.FirstCommandMailbox);
   CommandMailbox.SetMemoryMailbox.FirstStatusMailboxBusAddress =
-    Virtual_to_Bus(Controller->V2.FirstStatusMailbox);
+    Virtual_to_Bus64(Controller->V2.FirstStatusMailbox);
   switch (Controller->HardwareType)
     {
     case DAC960_BA_Controller:
@@ -1334,7 +1334,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  Command->CommandType = DAC960_ImmediateCommand;
 	  Command->Semaphore = Semaphore;
 	  Command->V1.CommandMailbox.Type3.CommandOpcode = DAC960_V1_DCDB;
-	  Command->V1.CommandMailbox.Type3.BusAddress = Virtual_to_Bus(DCDB);
+	  Command->V1.CommandMailbox.Type3.BusAddress = Virtual_to_Bus32(DCDB);
 	  DCDB->Channel = Channel;
 	  DCDB->TargetID = TargetID;
 	  DCDB->Direction = DAC960_V1_DCDB_DataTransferDeviceToSystem;
@@ -1343,7 +1343,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DCDB->NoAutomaticRequestSense = false;
 	  DCDB->DisconnectPermitted = true;
 	  DCDB->TransferLength = sizeof(DAC960_SCSI_Inquiry_T);
-	  DCDB->BusAddress = Virtual_to_Bus(InquiryStandardData);
+	  DCDB->BusAddress = Virtual_to_Bus32(InquiryStandardData);
 	  DCDB->CDBLength = 6;
 	  DCDB->TransferLengthHigh4 = 0;
 	  DCDB->SenseLength = sizeof(DCDB->SenseData);
@@ -1370,7 +1370,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  Command->Semaphore = Semaphore;
 	  DCDB = &DCDBs[Channel];
 	  DCDB->TransferLength = sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T);
-	  DCDB->BusAddress = Virtual_to_Bus(InquiryUnitSerialNumber);
+	  DCDB->BusAddress = Virtual_to_Bus32(InquiryUnitSerialNumber);
 	  DCDB->SenseLength = sizeof(DCDB->SenseData);
 	  DCDB->CDB[0] = 0x12; /* INQUIRY */
 	  DCDB->CDB[1] = 1; /* EVPD = 1 */
@@ -1461,7 +1461,7 @@ static boolean DAC960_V2_ReadDeviceConfiguration(DAC960_Controller_T
       CommandMailbox->SCSI_10.DataTransferMemoryAddress
 			     .ScatterGatherSegments[0]
 			     .SegmentDataPointer =
-	Virtual_to_Bus(InquiryUnitSerialNumber);
+	Virtual_to_Bus64(InquiryUnitSerialNumber);
       CommandMailbox->SCSI_10.DataTransferMemoryAddress
 			     .ScatterGatherSegments[0]
 			     .SegmentByteCount =
@@ -1864,7 +1864,7 @@ static int DAC960_MergeRequestsFunction(RequestQueue_T *RequestQueue,
   int TotalSegments = Request->nr_segments + NextRequest->nr_segments;
   if (Request->bhtail->b_data + Request->bhtail->b_size
       == NextRequest->bh->b_data)
-      TotalSegments--;
+    TotalSegments--;
   if (TotalSegments > MaxSegments ||
       TotalSegments > Controller->DriverScatterGatherLimit)
     return false;
@@ -2602,7 +2602,8 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
       CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
       CommandMailbox->Type5.LD.LogicalDriveNumber = Command->LogicalDriveNumber;
       CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
-      CommandMailbox->Type5.BusAddress = Virtual_to_Bus(Command->RequestBuffer);
+      CommandMailbox->Type5.BusAddress =
+	Virtual_to_Bus32(Command->RequestBuffer);
     }
   else
     {
@@ -2620,7 +2621,7 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
       CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
       CommandMailbox->Type5.LD.LogicalDriveNumber = Command->LogicalDriveNumber;
       CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
-      CommandMailbox->Type5.BusAddress = Virtual_to_Bus(ScatterGatherList);
+      CommandMailbox->Type5.BusAddress = Virtual_to_Bus32(ScatterGatherList);
       CommandMailbox->Type5.ScatterGatherCount = Command->SegmentCount;
       while (BufferHeader != NULL)
 	{
@@ -2633,7 +2634,7 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
-		Virtual_to_Bus(BufferHeader->b_data);
+		Virtual_to_Bus32(BufferHeader->b_data);
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
 		BufferHeader->b_size;
 	      LastDataEndPointer = BufferHeader->b_data + BufferHeader->b_size;
@@ -2665,7 +2666,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
   CommandMailbox->SCSI_10.DataTransferSize =
     Command->BlockCount << DAC960_BlockSizeBits;
   CommandMailbox->SCSI_10.RequestSenseBusAddress =
-    Virtual_to_Bus(&Command->V2.RequestSense);
+    Virtual_to_Bus64(&Command->V2.RequestSense);
   CommandMailbox->SCSI_10.PhysicalDevice =
     Controller->V2.LogicalDriveToVirtualDevice[Command->LogicalDriveNumber];
   CommandMailbox->SCSI_10.RequestSenseSize =
@@ -2684,7 +2685,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
       CommandMailbox->SCSI_10.DataTransferMemoryAddress
 			     .ScatterGatherSegments[0]
 			     .SegmentDataPointer =
-	Virtual_to_Bus(Command->RequestBuffer);
+	Virtual_to_Bus64(Command->RequestBuffer);
       CommandMailbox->SCSI_10.DataTransferMemoryAddress
 			     .ScatterGatherSegments[0]
 			     .SegmentByteCount =
@@ -2706,7 +2707,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 	    Command->SegmentCount;
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 			 .ExtendedScatterGather.ScatterGatherList0Address =
-	    Virtual_to_Bus(ScatterGatherList);
+	    Virtual_to_Bus64(ScatterGatherList);
 	}
       else
 	ScatterGatherList =
@@ -2723,7 +2724,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
-		Virtual_to_Bus(BufferHeader->b_data);
+		Virtual_to_Bus64(BufferHeader->b_data);
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
 		BufferHeader->b_size;
 	      LastDataEndPointer = BufferHeader->b_data + BufferHeader->b_size;
@@ -2950,7 +2951,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->BlockCount = BufferHeader->b_size >> DAC960_BlockSizeBits;
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.BusAddress =
-	    Virtual_to_Bus(BufferHeader->b_data);
+	    Virtual_to_Bus32(BufferHeader->b_data);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3006,7 +3007,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
 	  CommandMailbox->Type5.BusAddress =
-	    Virtual_to_Bus(NextBufferHeader->b_data);
+	    Virtual_to_Bus32(NextBufferHeader->b_data);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3019,11 +3020,13 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	{
 	  if (CommandOpcode == DAC960_V1_Enquiry)
 	    memcpy(&Controller->V1.NewEnquiry,
-		   Bus_to_Virtual(Command->V1.CommandMailbox.Type3.BusAddress),
+		   Bus32_to_Virtual(Command->V1.CommandMailbox
+					       .Type3.BusAddress),
 		   sizeof(DAC960_V1_Enquiry_T));
 	  else if (CommandOpcode == DAC960_V1_GetRebuildProgress)
 	    memcpy(&Controller->V1.RebuildProgress,
-		   Bus_to_Virtual(Command->V1.CommandMailbox.Type3.BusAddress),
+		   Bus32_to_Virtual(Command->V1.CommandMailbox
+					       .Type3.BusAddress),
 		   sizeof(DAC960_V1_RebuildProgress_T));
 	}
       if (CommandOpcode == DAC960_V1_Enquiry &&
@@ -3037,18 +3040,25 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	    NewEnquiry->CriticalLogicalDriveCount;
 	  if (NewEnquiry->NumberOfLogicalDrives > Controller->LogicalDriveCount)
 	    {
-	      int LogicalDriveNumber = Controller->LogicalDriveCount;
-	      while (LogicalDriveNumber < NewEnquiry->NumberOfLogicalDrives)
-		{
-		  DAC960_Critical("Logical Drive %d (/dev/rd/c%dd%d) "
-				  "Now Exists\n", Controller,
-				  LogicalDriveNumber,
-				  Controller->ControllerNumber,
-				  LogicalDriveNumber);
-		  LogicalDriveNumber++;
-		}
-	      Controller->LogicalDriveCount = LogicalDriveNumber;
+	      int LogicalDriveNumber = Controller->LogicalDriveCount - 1;
+	      while (++LogicalDriveNumber < NewEnquiry->NumberOfLogicalDrives)
+		DAC960_Critical("Logical Drive %d (/dev/rd/c%dd%d) "
+				"Now Exists\n", Controller,
+				LogicalDriveNumber,
+				Controller->ControllerNumber,
+				LogicalDriveNumber);
 	    }
+	  if (NewEnquiry->NumberOfLogicalDrives < Controller->LogicalDriveCount)
+	    {
+	      int LogicalDriveNumber = NewEnquiry->NumberOfLogicalDrives - 1;
+	      while (++LogicalDriveNumber < Controller->LogicalDriveCount)
+		DAC960_Critical("Logical Drive %d (/dev/rd/c%dd%d) "
+				"No Longer Exists\n", Controller,
+				LogicalDriveNumber,
+				Controller->ControllerNumber,
+				LogicalDriveNumber);
+	    }
+	  Controller->LogicalDriveCount = NewEnquiry->NumberOfLogicalDrives;
 	  if (NewEnquiry->StatusFlags.DeferredWriteError !=
 	      OldEnquiry->StatusFlags.DeferredWriteError)
 	    DAC960_Critical("Deferred Write Error Flag is now %s\n", Controller,
@@ -3073,8 +3083,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 		NewEnquiry->EventLogSequenceNumber;
 	      Controller->V1.NeedErrorTableInformation = true;
 	      Controller->V1.NeedDeviceStateInformation = true;
-	      Controller->V1.DeviceStateChannel = 0;
-	      Controller->V1.DeviceStateTargetID = -1;
+	      Controller->V1.StartDeviceStateScan = true;
 	      Controller->SecondaryMonitoringTime = jiffies;
 	    }
 	  if (NewEnquiry->RebuildFlag == DAC960_V1_StandbyRebuildInProgress ||
@@ -3133,7 +3142,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Controller->V1.RebuildFlagPending)
 	    {
 	      DAC960_V1_Enquiry_T *Enquiry = (DAC960_V1_Enquiry_T *)
-		Bus_to_Virtual(Command->V1.CommandMailbox.Type3.BusAddress);
+		Bus32_to_Virtual(Command->V1.CommandMailbox.Type3.BusAddress);
 	      Enquiry->RebuildFlag = Controller->V1.PendingRebuildFlag;
 	      Controller->V1.RebuildFlagPending = false;
 	    }
@@ -3279,6 +3288,9 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	    {
 	      Controller->V1.NeedDeviceInquiryInformation = true;
 	      Controller->V1.NeedDeviceSerialNumberInformation = true;
+	      Controller->V1.DeviceResetCount
+			     [Controller->V1.DeviceStateChannel]
+			     [Controller->V1.DeviceStateTargetID] = 0;
 	    }
 	  memcpy(OldDeviceState, NewDeviceState,
 		 sizeof(DAC960_V1_DeviceState_T));
@@ -3418,7 +3430,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3E.SequenceNumber =
 	    Controller->V1.OldEventLogSequenceNumber;
 	  Command->V1.CommandMailbox.Type3E.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.EventLogEntry);
+	    Virtual_to_Bus32(&Controller->V1.EventLogEntry);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3428,7 +3440,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3.CommandOpcode =
 	    DAC960_V1_GetErrorTable;
 	  Command->V1.CommandMailbox.Type3.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.NewErrorTable);
+	    Virtual_to_Bus32(&Controller->V1.NewErrorTable);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3439,7 +3451,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3.CommandOpcode =
 	    DAC960_V1_GetRebuildProgress;
 	  Command->V1.CommandMailbox.Type3.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.RebuildProgress);
+	    Virtual_to_Bus32(&Controller->V1.RebuildProgress);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3455,7 +3467,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      InquiryStandardData->PeripheralDeviceType = 0x1F;
 	      Command->V1.CommandMailbox.Type3.CommandOpcode = DAC960_V1_DCDB;
 	      Command->V1.CommandMailbox.Type3.BusAddress =
-		Virtual_to_Bus(DCDB);
+		Virtual_to_Bus32(DCDB);
 	      DCDB->Channel = Controller->V1.DeviceStateChannel;
 	      DCDB->TargetID = Controller->V1.DeviceStateTargetID;
 	      DCDB->Direction = DAC960_V1_DCDB_DataTransferDeviceToSystem;
@@ -3464,7 +3476,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DCDB->NoAutomaticRequestSense = false;
 	      DCDB->DisconnectPermitted = true;
 	      DCDB->TransferLength = sizeof(DAC960_SCSI_Inquiry_T);
-	      DCDB->BusAddress = Virtual_to_Bus(InquiryStandardData);
+	      DCDB->BusAddress = Virtual_to_Bus32(InquiryStandardData);
 	      DCDB->CDBLength = 6;
 	      DCDB->TransferLengthHigh4 = 0;
 	      DCDB->SenseLength = sizeof(DCDB->SenseData);
@@ -3488,7 +3500,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      InquiryUnitSerialNumber->PeripheralDeviceType = 0x1F;
 	      Command->V1.CommandMailbox.Type3.CommandOpcode = DAC960_V1_DCDB;
 	      Command->V1.CommandMailbox.Type3.BusAddress =
-		Virtual_to_Bus(DCDB);
+		Virtual_to_Bus32(DCDB);
 	      DCDB->Channel = Controller->V1.DeviceStateChannel;
 	      DCDB->TargetID = Controller->V1.DeviceStateTargetID;
 	      DCDB->Direction = DAC960_V1_DCDB_DataTransferDeviceToSystem;
@@ -3498,7 +3510,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DCDB->DisconnectPermitted = true;
 	      DCDB->TransferLength =
 		sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T);
-	      DCDB->BusAddress = Virtual_to_Bus(InquiryUnitSerialNumber);
+	      DCDB->BusAddress = Virtual_to_Bus32(InquiryUnitSerialNumber);
 	      DCDB->CDBLength = 6;
 	      DCDB->TransferLengthHigh4 = 0;
 	      DCDB->SenseLength = sizeof(DCDB->SenseData);
@@ -3512,35 +3524,31 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Controller->V1.NeedDeviceSerialNumberInformation = false;
 	      return;
 	    }
-	  if (++Controller->V1.DeviceStateTargetID == Controller->Targets)
+	  if (Controller->V1.StartDeviceStateScan)
+	    {
+	      Controller->V1.DeviceStateChannel = 0;
+	      Controller->V1.DeviceStateTargetID = 0;
+	      Controller->V1.StartDeviceStateScan = false;
+	    }
+	  else if (++Controller->V1.DeviceStateTargetID == Controller->Targets)
 	    {
 	      Controller->V1.DeviceStateChannel++;
 	      Controller->V1.DeviceStateTargetID = 0;
 	    }
-	  while (Controller->V1.DeviceStateChannel < Controller->Channels)
+	  if (Controller->V1.DeviceStateChannel < Controller->Channels)
 	    {
-	      DAC960_V1_DeviceState_T *OldDeviceState =
-		&Controller->V1.DeviceState[Controller->V1.DeviceStateChannel]
-					   [Controller->V1.DeviceStateTargetID];
-	      if (OldDeviceState->Present &&
-		  OldDeviceState->DeviceType == DAC960_V1_DiskType)
-		{
-		  Command->V1.CommandMailbox.Type3D.CommandOpcode =
-		    DAC960_V1_GetDeviceState;
-		  Command->V1.CommandMailbox.Type3D.Channel =
-		    Controller->V1.DeviceStateChannel;
-		  Command->V1.CommandMailbox.Type3D.TargetID =
-		    Controller->V1.DeviceStateTargetID;
-		  Command->V1.CommandMailbox.Type3D.BusAddress =
-		    Virtual_to_Bus(&Controller->V1.NewDeviceState);
-		  DAC960_QueueCommand(Command);
-		  return;
-		}
-	      if (++Controller->V1.DeviceStateTargetID == Controller->Targets)
-		{
-		  Controller->V1.DeviceStateChannel++;
-		  Controller->V1.DeviceStateTargetID = 0;
-		}
+	      Controller->V1.NewDeviceState.DeviceState =
+		DAC960_V1_Device_Dead;
+	      Command->V1.CommandMailbox.Type3D.CommandOpcode =
+		DAC960_V1_GetDeviceState;
+	      Command->V1.CommandMailbox.Type3D.Channel =
+		Controller->V1.DeviceStateChannel;
+	      Command->V1.CommandMailbox.Type3D.TargetID =
+		Controller->V1.DeviceStateTargetID;
+	      Command->V1.CommandMailbox.Type3D.BusAddress =
+		Virtual_to_Bus32(&Controller->V1.NewDeviceState);
+	      DAC960_QueueCommand(Command);
+	      return;
 	    }
 	  Controller->V1.NeedDeviceStateInformation = false;
 	}
@@ -3550,7 +3558,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3.CommandOpcode =
 	    DAC960_V1_GetLogicalDriveInformation;
 	  Command->V1.CommandMailbox.Type3.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.NewLogicalDriveInformation);
+	    Virtual_to_Bus32(&Controller->V1.NewLogicalDriveInformation);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3560,7 +3568,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3.CommandOpcode =
 	    DAC960_V1_GetRebuildProgress;
 	  Command->V1.CommandMailbox.Type3.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.RebuildProgress);
+	    Virtual_to_Bus32(&Controller->V1.RebuildProgress);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3570,7 +3578,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Command->V1.CommandMailbox.Type3.CommandOpcode =
 	    DAC960_V1_RebuildStat;
 	  Command->V1.CommandMailbox.Type3.BusAddress =
-	    Virtual_to_Bus(&Controller->V1.RebuildProgress);
+	    Virtual_to_Bus32(&Controller->V1.RebuildProgress);
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3948,7 +3956,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	    Command->BlockCount << DAC960_BlockSizeBits;
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0].SegmentDataPointer =
-	    Virtual_to_Bus(BufferHeader->b_data);
+	    Virtual_to_Bus64(BufferHeader->b_data);
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0].SegmentByteCount =
 	    CommandMailbox->SCSI_10.DataTransferSize;
@@ -4009,7 +4017,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0]
 				 .SegmentDataPointer =
-	    Virtual_to_Bus(NextBufferHeader->b_data);
+	    Virtual_to_Bus64(NextBufferHeader->b_data);
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0]
 				 .SegmentByteCount =
@@ -4035,12 +4043,9 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Controller->LogicalDriveCount =
 	    NewControllerInfo->LogicalDevicesPresent;
 	  Controller->V2.NeedLogicalDeviceInformation = true;
-	  Controller->V2.NewLogicalDeviceInformation.LogicalDeviceNumber = 0;
 	  Controller->V2.NeedPhysicalDeviceInformation = true;
-	  Controller->V2.PhysicalDeviceIndex = 0;
-	  Controller->V2.NewPhysicalDeviceInformation.Channel = 0;
-	  Controller->V2.NewPhysicalDeviceInformation.TargetID = 0;
-	  Controller->V2.NewPhysicalDeviceInformation.LogicalUnit = 0;
+	  Controller->V2.StartLogicalDeviceInformationScan = true;
+	  Controller->V2.StartPhysicalDeviceInformationScan = true;
 	  Controller->MonitoringAlertMode =
 	    (NewControllerInfo->LogicalDevicesCritical > 0 ||
 	     NewControllerInfo->LogicalDevicesOffline > 0 ||
@@ -4063,7 +4068,49 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  unsigned int PhysicalDeviceIndex = Controller->V2.PhysicalDeviceIndex;
 	  DAC960_V2_PhysicalDeviceInfo_T *PhysicalDeviceInfo =
 	    Controller->V2.PhysicalDeviceInformation[PhysicalDeviceIndex];
-	  DAC960_SCSI_Inquiry_UnitSerialNumber_T *InquiryUnitSerialNumber;
+	  DAC960_SCSI_Inquiry_UnitSerialNumber_T *InquiryUnitSerialNumber =
+	    Controller->V2.InquiryUnitSerialNumber[PhysicalDeviceIndex];
+	  unsigned int DeviceIndex;
+	  while (PhysicalDeviceInfo != NULL &&
+		 (NewPhysicalDeviceInfo->Channel >
+		  PhysicalDeviceInfo->Channel ||
+		  (NewPhysicalDeviceInfo->Channel ==
+		   PhysicalDeviceInfo->Channel &&
+		   (NewPhysicalDeviceInfo->TargetID >
+		    PhysicalDeviceInfo->TargetID ||
+		   (NewPhysicalDeviceInfo->TargetID ==
+		    PhysicalDeviceInfo->TargetID &&
+		    NewPhysicalDeviceInfo->LogicalUnit >
+		    PhysicalDeviceInfo->LogicalUnit)))))
+	    {
+	      DAC960_Critical("Physical Device %d:%d No Longer Exists\n",
+			      Controller,
+			      PhysicalDeviceInfo->Channel,
+			      PhysicalDeviceInfo->TargetID);
+	      Controller->V2.PhysicalDeviceInformation
+			     [PhysicalDeviceIndex] = NULL;
+	      Controller->V2.InquiryUnitSerialNumber
+			     [PhysicalDeviceIndex] = NULL;
+	      kfree(PhysicalDeviceInfo);
+	      kfree(InquiryUnitSerialNumber);
+	      for (DeviceIndex = PhysicalDeviceIndex;
+		   DeviceIndex < DAC960_V2_MaxPhysicalDevices - 1;
+		   DeviceIndex++)
+		{
+		  Controller->V2.PhysicalDeviceInformation[DeviceIndex] =
+		    Controller->V2.PhysicalDeviceInformation[DeviceIndex+1];
+		  Controller->V2.InquiryUnitSerialNumber[DeviceIndex] =
+		    Controller->V2.InquiryUnitSerialNumber[DeviceIndex+1];
+		}
+	      Controller->V2.PhysicalDeviceInformation
+			     [DAC960_V2_MaxPhysicalDevices-1] = NULL;
+	      Controller->V2.InquiryUnitSerialNumber
+			     [DAC960_V2_MaxPhysicalDevices-1] = NULL;
+	      PhysicalDeviceInfo =
+		Controller->V2.PhysicalDeviceInformation[PhysicalDeviceIndex];
+	      InquiryUnitSerialNumber =
+		Controller->V2.InquiryUnitSerialNumber[PhysicalDeviceIndex];
+	    }
 	  if (PhysicalDeviceInfo == NULL ||
 	      (NewPhysicalDeviceInfo->Channel !=
 	       PhysicalDeviceInfo->Channel) ||
@@ -4072,14 +4119,14 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      (NewPhysicalDeviceInfo->LogicalUnit !=
 	       PhysicalDeviceInfo->LogicalUnit))
 	    {
-	      unsigned int DeviceIndex;
 	      PhysicalDeviceInfo = (DAC960_V2_PhysicalDeviceInfo_T *)
 		kmalloc(sizeof(DAC960_V2_PhysicalDeviceInfo_T), GFP_ATOMIC);
 	      InquiryUnitSerialNumber =
 		(DAC960_SCSI_Inquiry_UnitSerialNumber_T *)
 		  kmalloc(sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T),
 			  GFP_ATOMIC);
-	      if (InquiryUnitSerialNumber == NULL)
+	      if (InquiryUnitSerialNumber == NULL &&
+		  PhysicalDeviceInfo != NULL)
 		{
 		  kfree(PhysicalDeviceInfo);
 		  PhysicalDeviceInfo = NULL;
@@ -4092,21 +4139,6 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 			       ? "" : " - Allocation Failed"));
 	      if (PhysicalDeviceInfo != NULL)
 		{
-		  for (DeviceIndex = PhysicalDeviceIndex;
-		       DeviceIndex < DAC960_V2_MaxPhysicalDevices - 1;
-		       DeviceIndex++)
-		    {
-		      Controller->V2.PhysicalDeviceInformation[DeviceIndex+1] =
-			Controller->V2.PhysicalDeviceInformation[DeviceIndex];
-		      Controller->V2.InquiryUnitSerialNumber[DeviceIndex+1] =
-			Controller->V2.InquiryUnitSerialNumber[DeviceIndex];
-		      Controller->V2.PhysicalDeviceInformation
-				     [PhysicalDeviceIndex] =
-			PhysicalDeviceInfo;
-		      Controller->V2.InquiryUnitSerialNumber
-				     [PhysicalDeviceIndex] =
-			InquiryUnitSerialNumber;
-		    }
 		  memset(PhysicalDeviceInfo, 0,
 			 sizeof(DAC960_V2_PhysicalDeviceInfo_T));
 		  PhysicalDeviceInfo->PhysicalDeviceState =
@@ -4114,6 +4146,21 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 		  memset(InquiryUnitSerialNumber, 0,
 			 sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T));
 		  InquiryUnitSerialNumber->PeripheralDeviceType = 0x1F;
+		  for (DeviceIndex = DAC960_V2_MaxPhysicalDevices - 1;
+		       DeviceIndex > PhysicalDeviceIndex;
+		       DeviceIndex--)
+		    {
+		      Controller->V2.PhysicalDeviceInformation[DeviceIndex] =
+			Controller->V2.PhysicalDeviceInformation[DeviceIndex-1];
+		      Controller->V2.InquiryUnitSerialNumber[DeviceIndex] =
+			Controller->V2.InquiryUnitSerialNumber[DeviceIndex-1];
+		    }
+		  Controller->V2.PhysicalDeviceInformation
+				 [PhysicalDeviceIndex] =
+		    PhysicalDeviceInfo;
+		  Controller->V2.InquiryUnitSerialNumber
+				 [PhysicalDeviceIndex] =
+		    InquiryUnitSerialNumber;
 		  Controller->V2.NeedDeviceSerialNumberInformation = true;
 		}
 	    }
@@ -4176,8 +4223,10 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 				  NewPhysicalDeviceInfo
 				  ->PredictedFailuresDetected);
 		}
-	      if (PhysicalDeviceInfo->PhysicalDeviceState
-		  == DAC960_V2_Device_Dead &&
+	      if ((PhysicalDeviceInfo->PhysicalDeviceState
+		   == DAC960_V2_Device_Dead ||
+		   PhysicalDeviceInfo->PhysicalDeviceState
+		   == DAC960_V2_Device_InvalidState) &&
 		  NewPhysicalDeviceInfo->PhysicalDeviceState
 		  != DAC960_V2_Device_Dead)
 		Controller->V2.NeedDeviceSerialNumberInformation = true;
@@ -4188,7 +4237,28 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  Controller->V2.PhysicalDeviceIndex++;
 	}
       else if (CommandOpcode == DAC960_V2_GetPhysicalDeviceInfoValid)
-	Controller->V2.NeedPhysicalDeviceInformation = false;
+	{
+	  unsigned int DeviceIndex;
+	  for (DeviceIndex = Controller->V2.PhysicalDeviceIndex;
+	       DeviceIndex < DAC960_V2_MaxPhysicalDevices;
+	       DeviceIndex++)
+	    {
+	      DAC960_V2_PhysicalDeviceInfo_T *PhysicalDeviceInfo =
+		Controller->V2.PhysicalDeviceInformation[DeviceIndex];
+	      DAC960_SCSI_Inquiry_UnitSerialNumber_T *InquiryUnitSerialNumber =
+		Controller->V2.InquiryUnitSerialNumber[DeviceIndex];
+	      if (PhysicalDeviceInfo == NULL) break;
+	      DAC960_Critical("Physical Device %d:%d No Longer Exists\n",
+			      Controller,
+			      PhysicalDeviceInfo->Channel,
+			      PhysicalDeviceInfo->TargetID);
+	      Controller->V2.PhysicalDeviceInformation[DeviceIndex] = NULL;
+	      Controller->V2.InquiryUnitSerialNumber[DeviceIndex] = NULL;
+	      kfree(PhysicalDeviceInfo);
+	      kfree(InquiryUnitSerialNumber);
+	    }
+	  Controller->V2.NeedPhysicalDeviceInformation = false;
+	}
       else if (CommandOpcode == DAC960_V2_GetLogicalDeviceInfoValid &&
 	       CommandStatus == DAC960_V2_NormalCompletion)
 	{
@@ -4295,13 +4365,50 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 					 NewLogicalDeviceInfo
 					 ->PatrolOperationBlockNumber,
 					 LogicalDeviceSize);
+	      if (LogicalDeviceInfo->BackgroundInitializationInProgress &&
+		  !NewLogicalDeviceInfo->BackgroundInitializationInProgress)
+		DAC960_Progress("Logical Drive %d (/dev/rd/c%dd%d) "
+				"Background Initialization %s\n",
+				Controller,
+				LogicalDeviceNumber,
+				Controller->ControllerNumber,
+				LogicalDeviceNumber,
+				(NewLogicalDeviceInfo->LogicalDeviceControl
+						      .LogicalDeviceInitialized
+				 ? "Completed" : "Failed"));
 	      memcpy(LogicalDeviceInfo, NewLogicalDeviceInfo,
 		     sizeof(DAC960_V2_LogicalDeviceInfo_T));
 	    }
+	  Controller->V2.LogicalDriveFoundDuringScan
+			 [LogicalDeviceNumber] = true;
 	  NewLogicalDeviceInfo->LogicalDeviceNumber++;
 	}
       else if (CommandOpcode == DAC960_V2_GetLogicalDeviceInfoValid)
-	Controller->V2.NeedLogicalDeviceInformation = false;
+	{
+	  int LogicalDriveNumber;
+	  for (LogicalDriveNumber = 0;
+	       LogicalDriveNumber < DAC960_MaxLogicalDrives;
+	       LogicalDriveNumber++)
+	    {
+	      DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
+		Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
+	      if (LogicalDeviceInfo == NULL ||
+		  Controller->V2.LogicalDriveFoundDuringScan
+				 [LogicalDriveNumber])
+		continue;
+	      DAC960_Critical("Logical Drive %d (/dev/rd/c%dd%d) "
+			      "No Longer Exists\n", Controller,
+			      LogicalDriveNumber,
+			      Controller->ControllerNumber,
+			      LogicalDriveNumber);
+	      Controller->V2.LogicalDeviceInformation
+			     [LogicalDriveNumber] = NULL;
+	      kfree(LogicalDeviceInfo);
+	      Controller->LogicalDriveInitiallyAccessible
+			  [LogicalDriveNumber] = false;
+	    }
+	  Controller->V2.NeedLogicalDeviceInformation = false;
+	}
       if (Controller->V2.HealthStatusBuffer->NextEventSequenceNumber
 	  - Controller->V2.NextEventSequenceNumber > 0)
 	{
@@ -4317,7 +4424,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  CommandMailbox->GetEvent.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentDataPointer =
-	    Virtual_to_Bus(&Controller->V2.Event);
+	    Virtual_to_Bus64(&Controller->V2.Event);
 	  CommandMailbox->GetEvent.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentByteCount =
@@ -4354,7 +4461,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				     .ScatterGatherSegments[0]
 				     .SegmentDataPointer =
-		Virtual_to_Bus(InquiryUnitSerialNumber);
+		Virtual_to_Bus64(InquiryUnitSerialNumber);
 	      CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				     .ScatterGatherSegments[0]
 				     .SegmentByteCount =
@@ -4362,6 +4469,14 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DAC960_QueueCommand(Command);
 	      Controller->V2.NeedDeviceSerialNumberInformation = false;
 	      return;
+	    }
+	  if (Controller->V2.StartPhysicalDeviceInformationScan)
+	    {
+	      Controller->V2.PhysicalDeviceIndex = 0;
+	      Controller->V2.NewPhysicalDeviceInformation.Channel = 0;
+	      Controller->V2.NewPhysicalDeviceInformation.TargetID = 0;
+	      Controller->V2.NewPhysicalDeviceInformation.LogicalUnit = 0;
+	      Controller->V2.StartPhysicalDeviceInformationScan = false;
 	    }
 	  CommandMailbox->PhysicalDeviceInfo.CommandOpcode = DAC960_V2_IOCTL;
 	  CommandMailbox->PhysicalDeviceInfo.DataTransferSize =
@@ -4377,7 +4492,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  CommandMailbox->PhysicalDeviceInfo.DataTransferMemoryAddress
 					    .ScatterGatherSegments[0]
 					    .SegmentDataPointer =
-	    Virtual_to_Bus(&Controller->V2.NewPhysicalDeviceInformation);
+	    Virtual_to_Bus64(&Controller->V2.NewPhysicalDeviceInformation);
 	  CommandMailbox->PhysicalDeviceInfo.DataTransferMemoryAddress
 					    .ScatterGatherSegments[0]
 					    .SegmentByteCount =
@@ -4387,6 +4502,18 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	}
       if (Controller->V2.NeedLogicalDeviceInformation)
 	{
+	  if (Controller->V2.StartLogicalDeviceInformationScan)
+	    {
+	      int LogicalDriveNumber;
+	      for (LogicalDriveNumber = 0;
+		   LogicalDriveNumber < DAC960_MaxLogicalDrives;
+		   LogicalDriveNumber++)
+		Controller->V2.LogicalDriveFoundDuringScan
+			       [LogicalDriveNumber] = false;
+	      Controller->V2.NewLogicalDeviceInformation
+			    .LogicalDeviceNumber = 0;
+	      Controller->V2.StartLogicalDeviceInformationScan = false;
+	    }
 	  CommandMailbox->LogicalDeviceInfo.CommandOpcode = DAC960_V2_IOCTL;
 	  CommandMailbox->LogicalDeviceInfo.DataTransferSize =
 	    sizeof(DAC960_V2_LogicalDeviceInfo_T);
@@ -4397,7 +4524,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  CommandMailbox->LogicalDeviceInfo.DataTransferMemoryAddress
 					   .ScatterGatherSegments[0]
 					   .SegmentDataPointer =
-	    Virtual_to_Bus(&Controller->V2.NewLogicalDeviceInformation);
+	    Virtual_to_Bus64(&Controller->V2.NewLogicalDeviceInformation);
 	  CommandMailbox->LogicalDeviceInfo.DataTransferMemoryAddress
 					   .ScatterGatherSegments[0]
 					   .SegmentByteCount =
@@ -4695,7 +4822,8 @@ static void DAC960_V1_QueueMonitoringCommand(DAC960_Command_T *Command)
   DAC960_V1_ClearCommand(Command);
   Command->CommandType = DAC960_MonitoringCommand;
   CommandMailbox->Type3.CommandOpcode = DAC960_V1_Enquiry;
-  CommandMailbox->Type3.BusAddress = Virtual_to_Bus(&Controller->V1.NewEnquiry);
+  CommandMailbox->Type3.BusAddress =
+    Virtual_to_Bus32(&Controller->V1.NewEnquiry);
   DAC960_QueueCommand(Command);
 }
 
@@ -4723,7 +4851,7 @@ static void DAC960_V2_QueueMonitoringCommand(DAC960_Command_T *Command)
   CommandMailbox->ControllerInfo.DataTransferMemoryAddress
 				.ScatterGatherSegments[0]
 				.SegmentDataPointer =
-    Virtual_to_Bus(&Controller->V2.NewControllerInformation);
+    Virtual_to_Bus64(&Controller->V2.NewControllerInformation);
   CommandMailbox->ControllerInfo.DataTransferMemoryAddress
 				.ScatterGatherSegments[0]
 				.SegmentByteCount =
@@ -4766,6 +4894,28 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 	&Controller->V2.ControllerInformation;
       unsigned int StatusChangeCounter =
 	Controller->V2.HealthStatusBuffer->StatusChangeCounter;
+      boolean ForceMonitoringCommand = false;
+      if (jiffies - Controller->SecondaryMonitoringTime
+	  > DAC960_SecondaryMonitoringInterval)
+	{
+	  int LogicalDriveNumber;
+	  for (LogicalDriveNumber = 0;
+	       LogicalDriveNumber < DAC960_MaxLogicalDrives;
+	       LogicalDriveNumber++)
+	    {
+	      DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
+		Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
+	      if (LogicalDeviceInfo == NULL) continue;
+	      if (!LogicalDeviceInfo->LogicalDeviceControl
+				     .LogicalDeviceInitialized &&
+		  Controller->LogicalDriveUsageCount[LogicalDriveNumber] > 0)
+		{
+		  ForceMonitoringCommand = true;
+		  break;
+		}
+	    }
+	  Controller->SecondaryMonitoringTime = jiffies;
+	}
       if (StatusChangeCounter == Controller->V2.StatusChangeCounter &&
 	  Controller->V2.HealthStatusBuffer->NextEventSequenceNumber
 	  == Controller->V2.NextEventSequenceNumber &&
@@ -4776,7 +4926,8 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 	   ControllerInfo->RebuildsActive +
 	   ControllerInfo->OnlineExpansionsActive == 0 ||
 	   jiffies - Controller->PrimaryMonitoringTime
-	   < DAC960_MonitoringTimerInterval))
+	   < DAC960_MonitoringTimerInterval) &&
+	  !ForceMonitoringCommand)
 	{
 	  Controller->MonitoringTimer.expires =
 	    jiffies + DAC960_HealthStatusMonitoringInterval;
@@ -4895,8 +5046,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
   DiskGeometry_T Geometry, *UserGeometry;
   DAC960_Controller_T *Controller;
   int PartitionNumber;
-  if (File == NULL) return -EINVAL;
-  if (File->f_flags & O_NONBLOCK)
+  if (File != NULL && (File->f_flags & O_NONBLOCK))
     return DAC960_UserIOCTL(Inode, File, Request, Argument);
   if (ControllerNumber < 0 || ControllerNumber > DAC960_ControllerCount - 1)
     return -ENXIO;
@@ -5136,10 +5286,17 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	if (CommandOpcode == DAC960_V1_DCDB)
 	  {
 	    DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
-	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
-						     [DCDB.TargetID] ||
-		   (Command = DAC960_AllocateCommand(Controller)) == NULL)
+	    while ((Command = DAC960_AllocateCommand(Controller)) == NULL)
 	      DAC960_WaitForCommand(Controller);
+	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
+						     [DCDB.TargetID])
+	      {
+		spin_unlock_irq(&io_request_lock);
+		__wait_event(Controller->CommandWaitQueue,
+			     !Controller->V1.DirectCommandActive
+					     [DCDB.Channel][DCDB.TargetID]);
+		spin_lock_irq(&io_request_lock);
+	      }
 	    Controller->V1.DirectCommandActive[DCDB.Channel]
 					      [DCDB.TargetID] = true;
 	    DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
@@ -5148,8 +5305,8 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	    memcpy(&Command->V1.CommandMailbox, &UserCommand.CommandMailbox,
 		   sizeof(DAC960_V1_CommandMailbox_T));
 	    Command->V1.CommandMailbox.Type3.BusAddress =
-	      Virtual_to_Bus(&DCDB);
-	    DCDB.BusAddress = Virtual_to_Bus(DataTransferBuffer);
+	      Virtual_to_Bus32(&DCDB);
+	    DCDB.BusAddress = Virtual_to_Bus32(DataTransferBuffer);
 	  }
 	else
 	  {
@@ -5163,7 +5320,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 		   sizeof(DAC960_V1_CommandMailbox_T));
 	    if (DataTransferBuffer != NULL)
 	      Command->V1.CommandMailbox.Type3.BusAddress =
-		Virtual_to_Bus(DataTransferBuffer);
+		Virtual_to_Bus32(DataTransferBuffer);
 	  }
 	DAC960_ExecuteCommand(Command);
 	CommandStatus = Command->V1.CommandStatus;
@@ -5276,7 +5433,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	    CommandMailbox->Common.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentDataPointer =
-	      Virtual_to_Bus(DataTransferBuffer);
+	      Virtual_to_Bus64(DataTransferBuffer);
 	    CommandMailbox->Common.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentByteCount =
@@ -5288,7 +5445,7 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 				  .NoAutoRequestSense = false;
 	    CommandMailbox->Common.RequestSenseSize = RequestSenseLength;
 	    CommandMailbox->Common.RequestSenseBusAddress =
-	      Virtual_to_Bus(RequestSenseBuffer);
+	      Virtual_to_Bus64(RequestSenseBuffer);
 	  }
 	DAC960_ExecuteCommand(Command);
 	CommandStatus = Command->V2.CommandStatus;
@@ -5468,9 +5625,9 @@ int DAC960_KernelIOCTL(unsigned int Request, void *Argument)
 	    memcpy(&Command->V1.CommandMailbox, &KernelCommand->CommandMailbox,
 		   sizeof(DAC960_V1_CommandMailbox_T));
 	    Command->V1.CommandMailbox.Type3.BusAddress =
-	      Virtual_to_Bus(DCDB);
+	      Virtual_to_Bus32(DCDB);
 	    Command->V1.KernelCommand = KernelCommand;
-	    DCDB->BusAddress = Virtual_to_Bus(DataTransferBuffer);
+	    DCDB->BusAddress = Virtual_to_Bus32(DataTransferBuffer);
 	    DAC960_QueueCommand(Command);
 	    DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
 	  }
@@ -5489,7 +5646,7 @@ int DAC960_KernelIOCTL(unsigned int Request, void *Argument)
 		   sizeof(DAC960_V1_CommandMailbox_T));
 	    if (DataTransferBuffer != NULL)
 	      Command->V1.CommandMailbox.Type3.BusAddress =
-		Virtual_to_Bus(DataTransferBuffer);
+		Virtual_to_Bus32(DataTransferBuffer);
 	    Command->V1.KernelCommand = KernelCommand;
 	    DAC960_QueueCommand(Command);
 	    DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
@@ -5566,7 +5723,7 @@ int DAC960_KernelIOCTL(unsigned int Request, void *Argument)
 	    CommandMailbox->Common.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentDataPointer =
-	      Virtual_to_Bus(DataTransferBuffer);
+	      Virtual_to_Bus64(DataTransferBuffer);
 	    CommandMailbox->Common.DataTransferMemoryAddress
 				  .ScatterGatherSegments[0]
 				  .SegmentByteCount =
@@ -5577,7 +5734,7 @@ int DAC960_KernelIOCTL(unsigned int Request, void *Argument)
 	    CommandMailbox->Common.CommandControlBits
 				  .NoAutoRequestSense = false;
 	    CommandMailbox->Common.RequestSenseBusAddress =
-	      Virtual_to_Bus(RequestSenseBuffer);
+	      Virtual_to_Bus64(RequestSenseBuffer);
 	  }
 	Command->V2.KernelCommand = KernelCommand;
 	DAC960_QueueCommand(Command);
@@ -5669,7 +5826,7 @@ static void DAC960_Message(DAC960_MessageLevel_T MessageLevel,
 	    }
 	  if (MessageLevel == DAC960_AnnounceLevel)
 	    {
-	      static int AnnouncementLines;
+	      static int AnnouncementLines = 0;
 	      if (++AnnouncementLines <= 2)
 		printk("%sDAC960: %s", DAC960_MessageLevelMap[MessageLevel],
 		       Buffer);
@@ -6015,7 +6172,7 @@ static boolean DAC960_V1_ExecuteUserCommand(DAC960_Controller_T *Controller,
       CommandMailbox->Type3R.CommandOpcode = DAC960_V1_RebuildControl;
       CommandMailbox->Type3R.RebuildRateConstant = 0xFF;
       CommandMailbox->Type3R.BusAddress =
-	Virtual_to_Bus(&OldRebuildRateConstant);
+	Virtual_to_Bus32(&OldRebuildRateConstant);
       DAC960_ExecuteCommand(Command);
       switch (Command->V1.CommandStatus)
 	{
@@ -6071,7 +6228,7 @@ static boolean DAC960_V2_TranslatePhysicalDevice(DAC960_Command_T *Command,
   CommandMailbox->Common.DataTransferMemoryAddress
 			.ScatterGatherSegments[0]
 			.SegmentDataPointer =
-    Virtual_to_Bus(&PhysicalToLogicalDevice);
+    Virtual_to_Bus64(&PhysicalToLogicalDevice);
   CommandMailbox->Common.DataTransferMemoryAddress
 			.ScatterGatherSegments[0]
 			.SegmentByteCount =

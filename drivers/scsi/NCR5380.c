@@ -2264,8 +2264,8 @@ static int NCR5380_transfer_dma(struct Scsi_Host *instance,
 		return -1;
 	}
 #if defined(REAL_DMA) || defined(REAL_DMA_POLL)
-#ifdef READ_OVERRUNS if (p & SR_IO) { c -= 2;
-}
+#ifdef READ_OVERRUNS 
+	if (p & SR_IO) { c -= 2; }
 #endif
 #if (NDEBUG & NDEBUG_DMA)
 printk("scsi%d : initializing DMA channel %d for %s, %d bytes %s %0x\n",

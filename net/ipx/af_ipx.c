@@ -1194,6 +1194,7 @@ static ipx_interface *ipxitf_auto_create(struct net_device *dev,
 		atomic_set(&intrfc->refcnt, 1);
 		MOD_INC_USE_COUNT;
 		ipxitf_insert(intrfc);
+		dev_hold(dev);
 	}
 
 	return intrfc;
@@ -1835,6 +1836,10 @@ static int ipx_getsockopt(struct socket *sock, int level, int optname,
 		return -EFAULT;
 
 	len = min(len, sizeof(int));
+	
+	if(len < 0)
+		return -EINVAL;
+		
 	if (put_user(len, optlen))
 		return -EFAULT;
 

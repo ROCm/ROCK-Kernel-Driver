@@ -161,15 +161,15 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    mainmenu_option next_comment
    comment 'SCSI low-level drivers'
 
-   tristate 'Sparc ESP Scsi Driver' CONFIG_SCSI_SUNESP $CONFIG_SCSI
-   tristate 'PTI Qlogic, ISP Driver' CONFIG_SCSI_QLOGICPTI $CONFIG_SCSI
+   dep_tristate 'Sparc ESP Scsi Driver' CONFIG_SCSI_SUNESP $CONFIG_SCSI
+   dep_tristate 'PTI Qlogic, ISP Driver' CONFIG_SCSI_QLOGICPTI $CONFIG_SCSI
 
    if [ "$CONFIG_PCI" != "n" ]; then
       dep_tristate 'Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX $CONFIG_SCSI
       if [ "$CONFIG_SCSI_AIC7XXX" != "n" ]; then
 	 bool '  Enable tagged command queueing (TCQ) by default' CONFIG_AIC7XXX_TAGGED_QUEUEING
 	 int  '  Maximum number of TCQ commands per device' CONFIG_AIC7XXX_CMDS_PER_DEVICE 8
-  	 bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_PROC_STATS N
+  	 bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_PROC_STATS
 	 int  '  Delay in seconds after SCSI bus reset' CONFIG_AIC7XXX_RESET_DELAY 5
       fi
       dep_tristate 'NCR53C8XX SCSI support' CONFIG_SCSI_NCR53C8XX $CONFIG_SCSI
@@ -196,6 +196,8 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    endmenu
 fi
 endmenu
+
+source drivers/message/fusion/Config.in
 
 source drivers/fc4/Config.in
 

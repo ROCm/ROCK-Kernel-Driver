@@ -5,7 +5,7 @@
  *
  *  Copyright (C) 1994,1995 Troy De Jongh
  *  This software may be used and distributed according to the terms 
- *  of the GNU Public License.
+ *  of the GNU General Public License.
  *
  *  This driver is for the DigiBoard PC/Xe and PC/Xi line of products.
  *

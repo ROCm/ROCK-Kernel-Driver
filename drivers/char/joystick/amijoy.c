@@ -113,7 +113,7 @@ static int __init amijoy_init(void)
 	for (i = 0; i < 2; i++)
 		if (amijoy[i]) {
 			if (!request_mem_region(CUSTOM_PHYSADDR+10+i*2, 2,
-						amijoy [Denise]")) {
+						"amijoy [Denise]")) {
 				if (i == 1 && amijoy[0]) {
 					input_unregister_device(amijoy_dev);
 					release_mem_region(CUSTOM_PHYSADDR+10, 2);

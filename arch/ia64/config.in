@@ -70,7 +70,7 @@ if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
 	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
 	  bool '    Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
 	fi
-	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN1_SIM n
+	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN1_SIM
 	define_bool CONFIG_DEVFS_DEBUG y
 	define_bool CONFIG_DEVFS_FS y
 	define_bool CONFIG_IA64_BRL_EMU y
@@ -79,8 +79,8 @@ if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
 	define_bool CONFIG_SGI_IOC3_ETH y
 	define_bool CONFIG_PERCPU_IRQ y
 	define_int  CONFIG_CACHE_LINE_SHIFT 7
-	bool '  Enable DISCONTIGMEM support' CONFIG_DISCONTIGMEM y
-	bool '	Enable NUMA support' CONFIG_NUMA y
+	bool '  Enable DISCONTIGMEM support' CONFIG_DISCONTIGMEM
+	bool '	Enable NUMA support' CONFIG_NUMA
 fi
 
 define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.

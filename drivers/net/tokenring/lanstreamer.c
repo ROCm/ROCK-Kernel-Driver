@@ -237,6 +237,7 @@ static int __init streamer_scan(struct net_device *dev)
 				printk(KERN_ERR "lanstreamer: out of memory.\n");
 				break;
 			}
+			SET_MODULE_OWNER(dev);
 #endif
 			dev->priv = (void *) streamer_priv;
 #if STREAMER_DEBUG
@@ -736,7 +737,6 @@ static int streamer_open(struct net_device *dev)
 #endif
 
 	netif_start_queue(dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -907,7 +907,7 @@ static void streamer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				streamer_priv->streamer_stats.tx_bytes += streamer_priv->tx_ring_skb[streamer_priv->tx_ring_last_status]->len;
 				streamer_priv->streamer_stats.tx_packets++;
 				dev_kfree_skb_irq(streamer_priv->tx_ring_skb[streamer_priv->tx_ring_last_status]);
-				streamer_priv-> streamer_tx_ring[streamer_priv->tx_ring_last_status].buffer = 0xdeadbeef;
+				streamer_priv->streamer_tx_ring[streamer_priv->tx_ring_last_status].buffer = 0xdeadbeef;
 				streamer_priv->streamer_tx_ring[streamer_priv->tx_ring_last_status].status = 0;
 				streamer_priv->streamer_tx_ring[streamer_priv->tx_ring_last_status].bufcnt_framelen = 0;
 				streamer_priv->streamer_tx_ring[streamer_priv->tx_ring_last_status].buflen = 0;
@@ -1071,8 +1071,6 @@ static int streamer_close(struct net_device *dev)
 	printk("\n");
 #endif
 	free_irq(dev->irq, dev);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1384,8 +1382,11 @@ static void streamer_arb_cmd(struct net_device *dev)
 			       status, len);
 		}
 #endif
-		mac_frame = dev_alloc_skb(frame_len);
-
+		if (!(mac_frame = dev_alloc_skb(frame_len))) {
+			printk(KERN_WARNING "%s: Memory squeeze, dropping frame.\n",
+			       dev->name);
+			goto drop_frame;
+		}
 		/* Walk the buffer chain, creating the frame */
 
 		do {
@@ -1432,7 +1433,7 @@ static void streamer_arb_cmd(struct net_device *dev)
 		netif_rx(mac_frame);
 
 		/* Now tell the card we have dealt with the received frame */
-
+drop_frame:
 		/* Set LISR Bit 1 */
 		writel(LISR_ARB_FREE, streamer_priv->streamer_mmio + LISR_SUM);
 
@@ -1759,6 +1760,7 @@ int init_module(void)
 	{
 		dev_streamer[i] = NULL;
 		dev_streamer[i] = init_trdev(dev_streamer[i], 0);
+		SET_MODULE_OWNER(dev_streamer[i]);
 		if (dev_streamer[i] == NULL)
 			return -ENOMEM;
 

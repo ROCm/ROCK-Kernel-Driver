@@ -714,5 +714,9 @@ static void __exit unload_aci(void)
 		release_region(aci_port, 3);
 }
 
+EXPORT_SYMBOL(aci_write_cmd);
+EXPORT_SYMBOL(aci_indexed_cmd);
+EXPORT_SYMBOL(aci_write_cmd_d);
+
 module_init(attach_aci);
 module_exit(unload_aci);

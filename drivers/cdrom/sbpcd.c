@@ -323,7 +323,7 @@
  *		Andrew J. Kroll <ag784@freenet.buffalo.edu> Wed Jul 26 04:24:10 EDT 2000
  *
  *  4.64 Fix module parameters - were being completely ignored.
- *	 Can also specify max_drives as 3rd setup int to get rid of
+ *	 Can also specify max_drives=N as a setup int to get rid of
  *	 "ghost" drives on crap hardware (aren't they all?)   Paul Gortmaker
  *
  *  TODO
@@ -338,6 +338,15 @@
  *     thread which brought additional hints and bug fixes.
  *
  */
+
+/*
+ * Trying to merge requests breaks this driver horribly (as in it goes
+ * boom and apparently has done so since 2.3.41).  As it is a legacy 
+ * driver for a horribly slow double speed CD on a hideous interface 
+ * designed for polled operation, I won't loose any sleep in simply 
+ * disallowing merging.				Paul G.  02/2001
+ */
+#define DONT_MERGE_REQUESTS
 
 #ifndef SBPCD_ISSUE
 #define SBPCD_ISSUE 1
@@ -476,7 +485,8 @@ static int sbpcd[] =
 #else
 static int sbpcd[] = {CDROM_PORT, SBPRO}; /* probe with user's setup only */
 #endif
-MODULE_PARM(sbpcd, "3i");
+MODULE_PARM(sbpcd, "2i");
+MODULE_PARM(max_drives, "i");
 
 #define NUM_PROBE  (sizeof(sbpcd) / sizeof(int))
 
@@ -5566,7 +5576,6 @@ int sbpcd_setup(char *s)
 #else
 	sbpcd_ioaddr = sbpcd[0];
 	sbpro_type = sbpcd[1];
-	max_drives = sbpcd[2];
 #endif
 	
 	CDo_command=sbpcd_ioaddr;
@@ -5661,6 +5670,21 @@ static int __init config_spea(void)
 	msg(DBG_SEQ,"found SoundScape interface at %04X.\n", sbpcd_ioaddr);
 	return (0);
 }
+
+#ifdef DONT_MERGE_REQUESTS
+static int dont_merge_requests_fn(request_queue_t *q, struct request *req,
+                                struct request *next, int max_segments)
+{
+	return 0;
+}
+
+static int dont_bh_merge_fn(request_queue_t *q, struct request *req,
+                            struct buffer_head *bh, int max_segments)
+{
+	return 0;
+}
+#endif
+
 /*==========================================================================*/
 /*
  *  Test for presence of drive and initialize it.
@@ -5828,6 +5852,11 @@ int __init SBPCD_INIT(void)
 #endif MODULE
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+#ifdef DONT_MERGE_REQUESTS
+	(BLK_DEFAULT_QUEUE(MAJOR_NR))->back_merge_fn = dont_bh_merge_fn;
+	(BLK_DEFAULT_QUEUE(MAJOR_NR))->front_merge_fn = dont_bh_merge_fn;
+	(BLK_DEFAULT_QUEUE(MAJOR_NR))->merge_requests_fn = dont_merge_requests_fn;
+#endif
 	blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0);
 	read_ahead[MAJOR_NR] = buffers * (CD_FRAMESIZE / 512);
 	

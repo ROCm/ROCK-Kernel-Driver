@@ -19,7 +19,6 @@
 #include <linux/blkdev.h>
 #include <linux/file.h>
 #include <linux/swapctl.h>
-#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 

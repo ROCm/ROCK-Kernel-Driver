@@ -11,6 +11,8 @@
  * for more info.
  */
 
+#include <linux/spinlock.h>
+
 #include "sound_config.h"
 
 #include "sb.h"
@@ -36,15 +38,14 @@ static int sb_midi_open(int dev, int mode,
 	if (devc == NULL)
 		return -ENXIO;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (devc->opened)
 	{
-		restore_flags(flags);
+		spin_unlock_irqrestore(&devc->lock, flags);
 		return -EBUSY;
 	}
 	devc->opened = 1;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	devc->irq_mode = IMODE_MIDI;
 	devc->midi_broken = 0;
@@ -74,13 +75,12 @@ static void sb_midi_close(int dev)
 	if (devc == NULL)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	sb_dsp_reset(devc);
 	devc->intr_active = 0;
 	devc->input_opened = 0;
 	devc->opened = 0;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 static int sb_midi_out(int dev, unsigned char midi_byte)
@@ -131,14 +131,13 @@ void sb_midi_interrupt(sb_devc * devc)
 	if (devc == NULL)
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	data = inb(DSP_READ);
 	if (devc->input_opened)
 		devc->midi_input_intr(devc->my_mididev, data);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 #define MIDI_SYNTH_NAME	"Sound Blaster Midi"

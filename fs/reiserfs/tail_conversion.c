@@ -92,7 +92,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
     /* Move bytes from the direct items to the new unformatted node
        and delete them. */
     while (1)  {
-	int item_len, first_direct;
+	int tail_size;
 
 	/* end_key.k_offset is set so, that we will always have found
            last item of the file */
@@ -103,13 +103,11 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 #ifdef CONFIG_REISERFS_CHECK
 	if (!is_direct_le_ih (p_le_ih))
 	    reiserfs_panic (sb, "vs-14055: direct2indirect: "
-			    "direct item expected, found %h", p_le_ih);
+			    "direct item expected(%k), found %h", 
+				&end_key, p_le_ih);
 #endif
-	if ((le_ih_k_offset (p_le_ih) & (n_blk_size - 1)) == 1)
-	    first_direct = 1;
-	else
-	    first_direct = 0;
-	item_len = le16_to_cpu (p_le_ih->ih_item_len);
+	tail_size = (le_ih_k_offset (p_le_ih) & (n_blk_size - 1))
+	    + ih_item_len(p_le_ih) - 1;
 
 	/* we only send the unbh pointer if the buffer is not up to date.
 	** this avoids overwriting good data from writepage() with old data
@@ -123,7 +121,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	n_retval = reiserfs_delete_item (th, path, &end_key, inode, 
 	                                 up_to_date_bh) ;
 
-	if (first_direct && item_len == n_retval)
+	if (tail_size == n_retval)
 	    // done: file does not have direct items anymore
 	    break;
 

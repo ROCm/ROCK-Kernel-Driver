@@ -6,7 +6,7 @@
 
     Copyright (C) 1996,97,98 Ralph  Metzler (rjkm@thp.uni-koeln.de)
                            & Marcus Metzler (mocm@thp.uni-koeln.de)
-    (c) 1999,2000 Gerd Knorr <kraxel@goldbach.in-berlin.de>
+    (c) 1999-2001 Gerd Knorr <kraxel@goldbach.in-berlin.de>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ static void gvbctv3pci_audio(struct bttv *btv, struct video_audio *v, int set);
 
 /* config variables */
 static int triton1=0;
+int no_overlay=-1;
 static unsigned int card[4]  = { -1, -1, -1, -1 };
 static unsigned int pll[4]   = { -1, -1, -1, -1 };
 static unsigned int tuner[4] = { -1, -1, -1, -1 };
@@ -67,6 +68,7 @@ static unsigned int audiomux[5] = { -1, -1, -1, -1, -1 };
 
 /* insmod options */
 MODULE_PARM(triton1,"i");
+MODULE_PARM(no_overlay,"i");
 MODULE_PARM(card,"1-4i");
 MODULE_PARM_DESC(card,"specify TV/grabber card model, see CARDLIST file for a list");
 MODULE_PARM(pll,"1-4i");
@@ -115,10 +117,11 @@ static struct CARD {
 	{ 0x00031002, BTTV_HAUPPAUGE878,  "ATI TV Wonder/VE" },
 	{ 0x00031461, BTTV_AVPHONE98,     "AVerMedia TVPhone98" },
 	{ 0x00041461, BTTV_AVERMEDIA98,   "AVerMedia TVCapture 98" },
+	{ 0x010114c7, 16 /* FIXME */,     "Modular Technology PCTV" },
 	{ 0x10b42636, BTTV_HAUPPAUGE878,  "STB ???" },
 	{ 0x1118153b, BTTV_TERRATVALUE,   "Terratec TV Value" },
 	{ 0x1123153b, BTTV_TERRATVRADIO,  "Terratec TV/Radio+" },
-	{ 0x1200bd11, BTTV_PINNACLERAVE,  "Pinnacle PCTV Rave" },
+	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV" },
 	{ 0x13eb0070, BTTV_HAUPPAUGE878,  "Hauppauge WinTV" },
 	{ 0x18501851, BTTV_CHRONOS_VS2,   "Chronos Video Shuttle II" },
 	{ 0x18521852, BTTV_TYPHOON_TVIEW, "Typhoon TView TV/FM Tuner" },
@@ -131,6 +134,7 @@ static struct CARD {
 	{ 0x300214ff, BTTV_PHOEBE_TVMAS,  "Phoebe TV Master" },
 	{ 0x39000070, BTTV_HAUPPAUGE878,  "Hauppauge WinTV-D" },
 	{ 0x400a15b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV" },
+	{ 0x400d15b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV / Radio" },
 	{ 0x401015b0, BTTV_ZOLTRIX_GENIE, "Zoltrix Genie TV / Radio" },
  	{ 0x402010fc, BTTV_GVBCTV3PCI,    "I-O Data Co. GV-BCV3/PCI" },
 	{ 0xff000070, BTTV_HAUPPAUGE878,  "Osprey-100" },
@@ -219,12 +223,16 @@ struct tvcard bttv_tvcards[] = {
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		3,
+	/* old 
 	gpiomask:	15,
-	muxsel:		{ 2, 3, 1, 1},
 	audiomux:	{12, 4,11,11, 0},
+	*/
+	muxsel:		{ 2, 3, 1, 1},
+	gpiomask:	0x0f,
+	audiomux:	{ 0x04, 0x04, 0x08, 0x04, 0},
 	needs_tvaudio:	1,
-	pll:		PLL_28,
 	tuner_type:	-1,
+	audio_hook:	avermedia_tvphone_audio,
 },{
 	name:		"MATRIX-Vision MV-Delta",
 	video_inputs:	5,
@@ -278,9 +286,9 @@ struct tvcard bttv_tvcards[] = {
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
-	gpiomask:	65551,
+	gpiomask:	0x3000f,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{1,65537, 0, 0,10},
+	audiomux:	{ 1,0x10001, 0, 0,10},
 	needs_tvaudio:	1,
 	tuner_type:	-1,
 },{
@@ -421,8 +429,8 @@ struct tvcard bttv_tvcards[] = {
 	muxsel:		{ 2, 3 },
 	audiomux:	{ 0, 0, 0, 0, 0 },
 	no_msp34xx:	1,
-	needs_tvaudio:	1,
-	tuner_type:	-1,
+	pll:            PLL_28,
+	tuner_type:     TUNER_ALPS_TSBB5_PAL_I,
 },{
 
 /* ---- card 0x18 ---------------------------------- */
@@ -480,16 +488,17 @@ struct tvcard bttv_tvcards[] = {
 	svhs:		2,
 	gpiomask:	0x70000,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 0x20000, 0x30000, 0x00000, 0x10000, 0x40000},
+	audiomux:	{ 0x20000, 0x30000, 0x10000, 0x00000, 0x40000},
 	needs_tvaudio:	1,
 	tuner_type:	-1,
 	audio_hook:	terratv_audio,
 },{
+	/* Jannik Fritsch <jannik@techfak.uni-bielefeld.de> */
 	name:		"Imagenation PXC200",
 	video_inputs:	5,
 	audio_inputs:	1,
 	tuner:		-1,
-	svhs:		4,
+	svhs:		1, /* was: 4 */
 	gpiomask:	0,
 	muxsel:		{ 2, 3, 1, 0, 0},
 	audiomux:	{ 0 },
@@ -539,7 +548,8 @@ struct tvcard bttv_tvcards[] = {
 	muxsel:		{ 2, 3, 1, 1},
 	audiomux:	{ 0x500, 0, 0x300, 0x900, 0x900},
 	needs_tvaudio:	1,
-	tuner_type:	-1,
+	pll:		PLL_28,
+	tuner_type:	TUNER_PHILIPS_PAL,
 },{
 	name:		"Leadtek WinFast 2000",
 	video_inputs:	3,
@@ -603,7 +613,7 @@ struct tvcard bttv_tvcards[] = {
 	pll:		PLL_28,
 	tuner_type:	-1,
 },{
-	name:		"Pinnacle PCTV Rave",
+	name:		"Pinnacle PCTV Studio/Rave",
 	video_inputs:	3,
 	audio_inputs:	1,
 	tuner:		0,
@@ -636,11 +646,10 @@ struct tvcard bttv_tvcards[] = {
 	svhs:		2,
 	gpiomask:	12,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 13, 14, 11, 7, 0, 0},
+	audiomux:	{ 13, 4, 11, 7, 0, 0},
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	5,
-	audio_hook:	avermedia_tvphone_audio,
 },{
 	name:		"ProVideo PV951", /* pic16c54 */
 	video_inputs:	3,
@@ -691,17 +700,17 @@ struct tvcard bttv_tvcards[] = {
 	pll:		PLL_28,
 	tuner_type:	-1,
 },{
-	name:		"Zoltrix Genie TV",
+	name:		"Zoltrix Genie TV/FM",
 	video_inputs:	3,
 	audio_inputs:	1,
 	tuner:		0,
 	svhs:		2,
 	gpiomask:	0xbcf03f,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 0xbc803f, 0, 0xbcb03f, 0, 0xbcb03f},
+	audiomux:	{ 0xbc803f, 0xbc903f, 0xbcb03f, 0, 0xbcb03f},
 	no_msp34xx:	1,
 	pll:		PLL_28,
-	tuner_type:	5,
+	tuner_type:	21,
 },{
 	name:		"Terratec TV/Radio+",
 	video_inputs:	3,
@@ -767,29 +776,105 @@ struct tvcard bttv_tvcards[] = {
 },{
 
 /* ---- card 0x34 ---------------------------------- */
-	name:           "Pinnacle Studio PCTV Pro", /* David Härdeman <david@2gen.com> */
+	/* David Härdeman <david@2gen.com> */
+	name:           "Pinnacle PCTV Studio Pro",
 	video_inputs:   3,
 	audio_inputs:   1,
 	tuner:          0,
 	svhs:           2,
 	gpiomask:       0x03000F,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 1, 65537, 0, 0, 10},
+	audiomux:	{ 1, 0x10001, 0, 0, 10},
 	needs_tvaudio:  1,
 	pll:            PLL_28,
 	tuner_type:     -1,
 },{
-	name:		"Typhoon TView RDS", /* Claas Langbehn <claas@bigfoot.com> */
+	/* Claas Langbehn <claas@bigfoot.com>,
+	   Sven Grothklags <sven@upb.de> */
+	name:		"Typhoon TView RDS / FM Stereo",
 	video_inputs:	3,
 	audio_inputs:	3,
 	tuner:		0,
 	svhs:		2,
-	gpiomask:	0xffff,
+	gpiomask:	0x1c,
 	muxsel:		{ 2, 3, 1, 1},
-	audiomux:	{ 0xb002, 0, 0x12, 0x12, 0x3007 },
+	audiomux:	{ 0, 0, 0x10, 8, 4 },
 	needs_tvaudio:	1,
 	pll:		PLL_28,
 	tuner_type:	TUNER_PHILIPS_PAL_I,
+},{
+	/* Tim Röstermundt <rosterm@uni-muenster.de>
+	   in de.comp.os.unix.linux.hardware:
+		options bttv card=0 pll=1 radio=1 gpiomask=0x18e0
+		audiomux=0x44c71f,0x44d71f,0,0x44d71f,0x44dfff
+		options tuner type=5 */
+	name:		"Livetec 9415 TV",
+	video_inputs:	4,
+	audio_inputs:	1,
+	tuner:		0,
+	svhs:		2,
+	gpiomask:	0x18e0,
+	muxsel:		{ 2, 3, 1, 1},
+	audiomux:	{ 0x0000,0x0800,0x1000,0x1000,0x18e0 },
+	pll:		PLL_28,
+	tuner_type:	TUNER_PHILIPS_PAL,
+},{
+	/* Miguel Angel Alvarez <maacruz@navegalia.com> */
+	name:           "BESTBUY Easy TV",
+	video_inputs:	4,
+	audio_inputs:   1,
+	tuner:          0,
+	svhs:           2,
+	gpiomask:       0xF,
+	muxsel:         { 2, 3, 1, 0},
+	audiomux:       { 2, 0, 0, 0, 10},
+	needs_tvaudio:  0,
+	pll:		PLL_28,
+	tuner_type:	TUNER_TEMIC_PAL_I,
+},{
+
+/* ---- card 0x38 ---------------------------------- */
+	/* Gordon Heydon <gjheydon@bigfoot.com */
+	name:           "FlyVideo '98/FM",
+	video_inputs:   3,
+	audio_inputs:   3,
+	tuner:          0,
+	svhs:           2,
+	gpiomask:       0x1800,
+	muxsel:         { 2, 3, 1, 1},
+	audiomux:       { 0, 0x800, 0, 0, 0x1800, 0 },
+	needs_tvaudio:  1,
+	pll:            PLL_28,
+	tuner_type:     -1,
+},{
+	/* This is the ultimate cheapo capture card 
+	 * just a BT848A on a small PCB!
+	 * Steve Hosgood <steve@equiinet.com> */
+	name:           "GrandTec 'Grand Video Capture'",
+	video_inputs:   2,
+	audio_inputs:   0,
+	tuner:          -1,
+	svhs:           1,
+	gpiomask:       0,
+	muxsel:         { 3, 1 },
+	audiomux:       { 0 },
+	needs_tvaudio:  0,
+	no_msp34xx:     1,
+	pll:            PLL_35,
+	tuner_type:     -1,
+},{
+        /* Daniel Herrington <daniel.herrington@home.com> */
+        name:           "Phoebe TV Master Only (No FM)",
+        video_inputs:   3,
+        audio_inputs:   1,
+        tuner:          0,
+        svhs:           2,
+        gpiomask:       0x0e00,
+        muxsel:         { 2, 3, 1, 1},
+        audiomux:       { 0x400, 0x400, 0x400, 0x400, 0x800, 0x400 },
+        needs_tvaudio:  1,
+        pll:            PLL_NONE,
+        tuner_type:     TUNER_TEMIC_4036FY5_NTSC,
 }};
 
 const int bttv_num_tvcards = (sizeof(bttv_tvcards)/sizeof(struct tvcard));
@@ -876,31 +961,75 @@ void __devinit bttv_idcard(struct bttv *btv)
 /*
  * (most) board specific initialisations goes here
  */
+
+int miro_tunermap[] = { 0,6,2,3,   4,5,6,0,  3,0,4,5,  5,2,16,1,
+			14,2,17,1, 4,1,4,3,  1,2,16,1, 4,4,4,4 };
+int miro_fmtuner[]  = { 0,0,0,0,   0,0,0,0,  0,0,0,0,  0,0,0,1,
+			1,1,1,1,   1,1,1,0,  0,0,0,0,  0,0,0,0 };
+
 void __devinit bttv_init_card(struct bttv *btv)
 {
-	int eeprom = 0;
-
-        if (btv->type == BTTV_MIRO || btv->type == BTTV_MIROPRO) {
-                /* auto detect tuner for MIRO cards */
-                btv->tuner_type=((btread(BT848_GPIO_DATA)>>10)-1)&7;
+	/* miro/pinnacle */
+        if (btv->type == BTTV_MIRO      ||
+	    btv->type == BTTV_MIROPRO   ||
+	    btv->type == BTTV_PINNACLE  ||
+	    btv->type == BTTV_PINNACLEPRO) {
+		int id,msp;
+		id  = ((btread(BT848_GPIO_DATA)>>10) & 31) -1;
+		msp = bttv_I2CRead(btv, I2C_MSP3400, "MSP34xx");
+		btv->tuner_type = miro_tunermap[id];
+		if (0 == (btread(BT848_GPIO_DATA) & 0x20)) {
+			btv->has_radio = 1;
+			if (!miro_fmtuner[id]) {
+				btv->has_matchbox = 1;
+				btv->mbox_we    = (1<<6);
+				btv->mbox_most  = (1<<7);
+				btv->mbox_clk   = (1<<8);
+				btv->mbox_data  = (1<<9);
+				btv->mbox_mask  = (1<<6)|(1<<7)|(1<<8)|(1<<9);
+			}
+		} else {
+			btv->has_radio = 0;
+		}
+		if (-1 != msp) {
+			if (btv->type == BTTV_MIRO)
+				btv->type = BTTV_MIROPRO;
+			if (btv->type == BTTV_PINNACLE)
+				btv->type = BTTV_PINNACLEPRO;
+		}
+		if (bttv_verbose)
+			printk("bttv%d: miro: id=%d tuner=%d radio=%s stereo=%s\n",
+			       btv->nr, id+1, btv->tuner_type,
+			       !btv->has_radio ? "no" :
+				   (btv->has_matchbox ? "matchbox" : "fmtuner"),
+			       (-1 == msp) ? "no" : "yes");
 #if 0
-		if (btv->type == BTTV_MIROPRO) {
+		if (btv->has_matchbox) {
 			if (bttv_verbose)
 				printk(KERN_INFO "Initializing TEA5757...\n");
 			init_tea5757(btv);
 		}
 #endif
-        }
+	}
+
         if (btv->type == BTTV_HAUPPAUGE || btv->type == BTTV_HAUPPAUGE878) {
 		/* pick up some config infos from the eeprom */
-		if (0xa0 != eeprom) {
-			eeprom = 0xa0;
-			bttv_readee(btv,eeprom_data,0xa0);
-		}
+		bttv_readee(btv,eeprom_data,0xa0);
                 hauppauge_eeprom(btv);
         }
+
  	if (btv->type == BTTV_PXC200)
 		init_PXC200(btv);
+
+	if (btv->type == BTTV_VHX) {
+		btv->has_radio    = 1;
+		btv->has_matchbox = 1;
+		btv->mbox_we      = 0x20;
+		btv->mbox_most    = 0;
+		btv->mbox_clk     = 0x08;
+		btv->mbox_data    = 0x10;
+		btv->mbox_mask    = 0x38;
+	}
 
 	/* pll configuration */
         if (!(btv->id==848 && btv->revision==0x11)) {
@@ -985,59 +1114,80 @@ hauppauge_tuner[] __devinitdata =
         { TUNER_ABSENT,        "" },
         { TUNER_ABSENT,        "External" },
         { TUNER_ABSENT,        "Unspecified" },
-        { TUNER_ABSENT,        "Philips FI1216" },
+        { TUNER_PHILIPS_PAL,   "Philips FI1216" },
         { TUNER_PHILIPS_SECAM, "Philips FI1216MF" },
         { TUNER_PHILIPS_NTSC,  "Philips FI1236" },
-        { TUNER_ABSENT,        "Philips FI1246" },
-        { TUNER_ABSENT,        "Philips FI1256" },
+        { TUNER_PHILIPS_PAL_I, "Philips FI1246" },
+        { TUNER_PHILIPS_PAL_DK,"Philips FI1256" },
         { TUNER_PHILIPS_PAL,   "Philips FI1216 MK2" },
         { TUNER_PHILIPS_SECAM, "Philips FI1216MF MK2" },
         { TUNER_PHILIPS_NTSC,  "Philips FI1236 MK2" },
         { TUNER_PHILIPS_PAL_I, "Philips FI1246 MK2" },
-        { TUNER_ABSENT,        "Philips FI1256 MK2" },
-        { TUNER_ABSENT,        "Temic 4032FY5" },
+        { TUNER_PHILIPS_PAL_DK,"Philips FI1256 MK2" },
+        { TUNER_TEMIC_NTSC,    "Temic 4032FY5" },
         { TUNER_TEMIC_PAL,     "Temic 4002FH5" },
         { TUNER_TEMIC_PAL_I,   "Temic 4062FY5" },
-        { TUNER_ABSENT,        "Philips FR1216 MK2" },
+        { TUNER_PHILIPS_PAL,   "Philips FR1216 MK2" },
         { TUNER_PHILIPS_SECAM, "Philips FR1216MF MK2" },
         { TUNER_PHILIPS_NTSC,  "Philips FR1236 MK2" },
         { TUNER_PHILIPS_PAL_I, "Philips FR1246 MK2" },
-        { TUNER_ABSENT,        "Philips FR1256 MK2" },
+        { TUNER_PHILIPS_PAL_DK,"Philips FR1256 MK2" },
         { TUNER_PHILIPS_PAL,   "Philips FM1216" },
-        { TUNER_ABSENT,        "Philips FM1216MF" },
+        { TUNER_PHILIPS_SECAM, "Philips FM1216MF" },
         { TUNER_PHILIPS_NTSC,  "Philips FM1236" },
         { TUNER_PHILIPS_PAL_I, "Philips FM1246" },
-        { TUNER_ABSENT,        "Philips FM1256" },
-        { TUNER_TEMIC_4036FY5_NTSC,  "Temic 4036FY5" },
+        { TUNER_PHILIPS_PAL_DK,"Philips FM1256" },
+        { TUNER_TEMIC_4036FY5_NTSC, "Temic 4036FY5" },
         { TUNER_ABSENT,        "Samsung TCPN9082D" },
         { TUNER_ABSENT,        "Samsung TCPM9092P" },
-        { TUNER_TEMIC_PAL,     "Temic 4006FH5" },
+        { TUNER_TEMIC_4006FH5_PAL, "Temic 4006FH5" },
         { TUNER_ABSENT,        "Samsung TCPN9085D" },
         { TUNER_ABSENT,        "Samsung TCPB9085P" },
         { TUNER_ABSENT,        "Samsung TCPL9091P" },
-        { TUNER_ABSENT,        "Temic 4039FR5" },
-        { TUNER_ABSENT,        "Philips FQ1216 ME" },
-        { TUNER_TEMIC_PAL_I,   "Temic 4066FY5" },
+        { TUNER_TEMIC_4039FR5_NTSC, "Temic 4039FR5" },
+        { TUNER_PHILIPS_FQ1216ME,   "Philips FQ1216 ME" },
+        { TUNER_TEMIC_4066FY5_PAL_I, "Temic 4066FY5" },
         { TUNER_ABSENT,        "Philips TD1536" },
         { TUNER_ABSENT,        "Philips TD1536D" },
         { TUNER_ABSENT,        "Philips FMR1236" },
         { TUNER_ABSENT,        "Philips FI1256MP" },
         { TUNER_ABSENT,        "Samsung TCPQ9091P" },
-        { TUNER_ABSENT,        "Temic 4006FN5" },
-        { TUNER_ABSENT,        "Temic 4009FR5" },
-        { TUNER_ABSENT,        "Temic 4046FM5" },
+        { TUNER_TEMIC_4006FN5_MULTI_PAL, "Temic 4006FN5" },
+        { TUNER_TEMIC_4009FR5_PAL, "Temic 4009FR5" },
+        { TUNER_TEMIC_4046FM5,     "Temic 4046FM5" },
+	{ TUNER_ABSENT,        "Temic 4009FN5" },
+	{ TUNER_ABSENT,        "Philips TD1536D_FH_44"},
+	{ TUNER_ABSENT,	       "LG TP18NSR01F"},
+	{ TUNER_ABSENT,        "LG TP18PSB01D"},
+	{ TUNER_ABSENT,        "LG TP18PSB11D"},	
+	{ TUNER_ABSENT,        "LG TAPC_l001D"},
+	{ TUNER_ABSENT,        "LG TAPC_l701D"}
 };
 
 static void __devinit hauppauge_eeprom(struct bttv *btv)
 {
-        if (eeprom_data[9] < sizeof(hauppauge_tuner)/sizeof(struct HAUPPAUGE_TUNER)) 
-        {
-                btv->tuner_type = hauppauge_tuner[eeprom_data[9]].id;
-		if (bttv_verbose)
-			printk("bttv%d: Hauppauge eeprom: model=%d, tuner=%s (%d)\n",btv->nr,
-			       eeprom_data[12] << 8 | eeprom_data[11],
-			       hauppauge_tuner[eeprom_data[9]].name,btv->tuner_type);
-        }
+	int blk2,tuner,radio,model;
+
+	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0)
+		printk("bttv%d: Hauppauge eeprom: invalid\n",btv->nr);
+
+	/* Block 2 starts after len+3 bytes header */
+	blk2 = eeprom_data[1] + 3;
+
+	/* decode + use some config infos */
+	model = eeprom_data[12] << 8 | eeprom_data[11];
+	tuner = eeprom_data[9];
+	radio = eeprom_data[blk2-1] & 0x01;
+	
+        if (tuner < sizeof(hauppauge_tuner)/sizeof(struct HAUPPAUGE_TUNER))
+                btv->tuner_type = hauppauge_tuner[tuner].id;
+	if (radio)
+		btv->has_radio = 1;
+	
+	if (bttv_verbose)
+		printk("bttv%d: Hauppauge eeprom: model=%d, tuner=%s (%d), radio=%s\n",
+		       btv->nr, model, hauppauge_tuner[tuner].name,
+		       btv->tuner_type, radio ? "yes" : "no");
 }
 
 void __devinit bttv_hauppauge_boot_msp34xx(struct bttv *btv)
@@ -1117,15 +1267,17 @@ static void __devinit init_PXC200(struct bttv *btv)
  * Brutally hacked by Dan Sheridan <dan.sheridan@contact.org.uk> djs52 8/3/00
  */
 
+#if 0
 /* bus bits on the GPIO port */
 #define TEA_WE			6
 #define TEA_DATA		9
 #define TEA_CLK			8
 #define TEA_MOST		7
+#endif
 
-#define BUS_LOW(bit) 	btand(~(1<<TEA_##bit), BT848_GPIO_DATA)
-#define BUS_HIGH(bit)	btor((1<<TEA_##bit), BT848_GPIO_DATA)
-#define BUS_IN(bit)	((btread(BT848_GPIO_DATA) >> TEA_##bit) & 1)
+#define BUS_LOW(bit) 	btand(~(bit), BT848_GPIO_DATA)
+#define BUS_HIGH(bit)	btor((bit), BT848_GPIO_DATA)
+#define BUS_IN(bit)	(btread(BT848_GPIO_DATA) & (bit))
 
 /* TEA5757 register bits */
 #define TEA_FREQ		0:14
@@ -1155,93 +1307,83 @@ static void __devinit init_PXC200(struct bttv *btv)
 #define TEA_STATUS_SEARCHING	1
 
 /* Low-level stuff */
-static int tea_read(struct bttv *btv)
+static int tea5757_read(struct bttv *btv)
 {
 	int value = 0;
 	long timeout;
 	int i;
 	
 	/* better safe than sorry */
-	btaor((1<<TEA_CLK) | (1<<TEA_WE), ~((1<<TEA_CLK) | (1<<TEA_DATA) | (1<<TEA_WE) | (1<<TEA_MOST)), BT848_GPIO_OUT_EN);
+	btaor((btv->mbox_clk | btv->mbox_we),
+	      ~btv->mbox_mask, BT848_GPIO_OUT_EN);
 	if (bttv_gpio)
-		bttv_gpio_tracking(btv,"miro tea read");
+		bttv_gpio_tracking(btv,"tea5757 read");
 	
-	BUS_LOW(WE);
-	BUS_LOW(CLK);
+	BUS_LOW(btv->mbox_we);
+	BUS_LOW(btv->mbox_clk);
 	
 	udelay(10);
 	for(timeout = jiffies + 10 * HZ;
-	    BUS_IN(DATA) == 1 && time_before(jiffies, timeout);
+	    BUS_IN(btv->mbox_data) && time_before(jiffies, timeout);
 	    schedule());	/* 10 s */
-	if (BUS_IN(DATA) == 1) {
-		printk("tea5757: read timeout\n");
+	if (BUS_IN(btv->mbox_data)) {
+		printk("bttv%d: tea5757: read timeout\n",btv->nr);
 		return -1;
 	}
 	for(timeout = jiffies + HZ/5;
-	    BUS_IN(MOST) == 1 && time_before(jiffies, timeout);
+	    BUS_IN(btv->mbox_data) == 1 && time_before(jiffies, timeout);
 	    schedule());	/* 0.2 s */
-	if (bttv_debug) printk("tea5757:");
+	dprintk("bttv%d: tea5757:",btv->nr);
 	for(i = 0; i < 24; i++)
 	{
-		udelay(10);
-		BUS_HIGH(CLK);
-		udelay(10);
-		if (bttv_debug) printk("%c", (BUS_IN(MOST) == 0)?'T':'-');
-		BUS_LOW(CLK);
-		value <<= 1;					
-		value |= (BUS_IN(DATA) == 0)?0:1;	/* MSB first */
-		if (bttv_debug) printk("%c", (BUS_IN(MOST) == 0)?'S':'M');
+		udelay(5);
+		BUS_HIGH(btv->mbox_clk);
+		udelay(5);
+		dprintk("%c",(BUS_IN(btv->mbox_most) == 0)?'T':'-');
+		BUS_LOW(btv->mbox_clk);
+		value <<= 1;
+		value |= (BUS_IN(btv->mbox_data) == 0)?0:1;  /* MSB first */
+		dprintk("%c", (BUS_IN(btv->mbox_most) == 0)?'S':'M');
 	}
-	if (bttv_debug) printk("\ntea5757: read 0x%X\n", value);
+	dprintk("\nbttv%d: tea5757: read 0x%X\n", btv->nr, value);
 	return value;
 }
 
-static int tea_write(struct bttv *btv, int value)
+static int tea5757_write(struct bttv *btv, int value)
 {
 	int i;
 	int reg = value;
 	
-	btaor((1<<TEA_CLK) | (1<<TEA_WE) | (1<<TEA_DATA), ~((1<<TEA_CLK) | (1<<TEA_DATA) | (1<<TEA_WE) | (1<<TEA_MOST)), BT848_GPIO_OUT_EN);
+	btaor(btv->mbox_clk | btv->mbox_we | btv->mbox_data,
+	      ~btv->mbox_mask, BT848_GPIO_OUT_EN);
 	if (bttv_gpio)
-		bttv_gpio_tracking(btv,"miro tea write");
-	if (bttv_debug)
-		printk("tea5757: write 0x%X\n", value);
-	BUS_LOW(CLK);
-	BUS_HIGH(WE);
+		bttv_gpio_tracking(btv,"tea5757 write");
+	dprintk("bttv%d: tea5757: write 0x%X\n", btv->nr, value);
+	BUS_LOW(btv->mbox_clk);
+	BUS_HIGH(btv->mbox_we);
 	for(i = 0; i < 25; i++)
 	{
 		if (reg & 0x1000000)
-			BUS_HIGH(DATA);
+			BUS_HIGH(btv->mbox_data);
 		else
-			BUS_LOW(DATA);
+			BUS_LOW(btv->mbox_data);
 		reg <<= 1;
-		BUS_HIGH(CLK);
+		BUS_HIGH(btv->mbox_clk);
 		udelay(10);
-		BUS_LOW(CLK);
+		BUS_LOW(btv->mbox_clk);
 		udelay(10);
 	}
-	BUS_LOW(WE);	/* unmute !!! */
+	BUS_LOW(btv->mbox_we);  /* unmute !!! */
 	return 0;
 }
 
 void tea5757_set_freq(struct bttv *btv, unsigned short freq)
 {
-	tea_write(btv, 5 * freq + 0x358); /* add 10.7MHz (see docs) */
-	if (bttv_debug) tea_read(btv);
+	tea5757_write(btv, 5 * freq + 0x358); /* add 10.7MHz (see docs) */
+	if (bttv_debug)
+		tea5757_read(btv);
 }
 
-#if 0
-void init_tea5757(struct bttv *btv)
-{
-	BUS_LOW(CLK);
-	BUS_LOW(WE); /* just to be on the safe side... */
-
-	/* software CLK (unused) */
-	btaor(0, BT848_GPIO_DMA_CTL_GPCLKMODE, BT848_GPIO_DMA_CTL);
-	/* normal mode for GPIO */
-	btaor(0, BT848_GPIO_DMA_CTL_GPIOMODE, BT848_GPIO_DMA_CTL);
-}
-#endif
 
 /* ----------------------------------------------------------------------- */
 /* winview                                                                 */
@@ -1297,7 +1439,7 @@ gvbctv3pci_audio(struct bttv *btv, struct video_audio *v, int set)
 	unsigned int con = 0;
 
 	if (set) {
-		btor(0x100, BT848_GPIO_OUT_EN);
+		btor(0x300, BT848_GPIO_OUT_EN);
 		if (v->mode & VIDEO_SOUND_LANG1)
 			con = 0x000;
 		if (v->mode & VIDEO_SOUND_LANG2)
@@ -1322,21 +1464,22 @@ gvbctv3pci_audio(struct bttv *btv, struct video_audio *v, int set)
  *  P.S.: At least mask in line above is wrong - GPIO pins 3,2 select
  *  input/output sound connection, so both must be set for output mode.
  *
+ * Looks like it's needed only for the "tvphone", the "tvphone 98"
+ * handles this with a tda9840
+ *
  */
 static void
 avermedia_tvphone_audio(struct bttv *btv, struct video_audio *v, int set)
 {
-#if 0 /* needs more testing -- might be we need two versions for PAL/NTSC */
 	int val = 0;
 
 	if (set) {
 		if (v->mode & VIDEO_SOUND_LANG1)   /* SAP */
-			val = 0xce;
+			val = 0x02;
 		if (v->mode & VIDEO_SOUND_STEREO)
-			val = 0xcd;
+			val = 0x01;
 		if (val) {
-			btaor(val, 0xff, BT848_GPIO_OUT_EN);
-			btaor(val, 0xff, BT848_GPIO_DATA);
+			btaor(val, ~0x03, BT848_GPIO_DATA);
 			if (bttv_gpio)
 				bttv_gpio_tracking(btv,"avermedia");
 		}
@@ -1345,7 +1488,6 @@ avermedia_tvphone_audio(struct bttv *btv, struct video_audio *v, int set)
 			VIDEO_SOUND_LANG1;
 		return;
 	}
-#endif
 }
 
 static void
@@ -1372,27 +1514,31 @@ terratv_audio(struct bttv *btv, struct video_audio *v, int set)
 /* ----------------------------------------------------------------------- */
 /* motherboard chipset specific stuff                                      */
 
-static struct {
-	char            *name;
-	unsigned short  vendor;
-	unsigned short  device;
-} needs_etbf[] __devinitdata = {
-	{ "Intel 82437FX [Triton PIIX]",
-	  PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437  },
-	{ "VIA VT82C597 [Apollo VP3]",
-	  PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C597_0 },
-	{ NULL, 0, 0 }
-};
-
 void __devinit bttv_check_chipset(void)
 {
-	int i;
+	int pcipci_fail = 0;
 	struct pci_dev *dev = NULL;
 
-	if(pci_pci_problems & PCIPCI_FAIL)
-		printk(KERN_WARNING "BT848 and your chipset may not work together.\n");
+	/* for 2.4.x we'll use the pci quirks (drivers/pci/quirks.c) */
+	if (pci_pci_problems & PCIPCI_FAIL)
+		pcipci_fail = 1;
 
-        while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL,
+	if (pci_pci_problems & (PCIPCI_TRITON|PCIPCI_NATOMA|PCIPCI_VIAETBF))
+		triton1 = 1;
+
+	/* print warnings about quirks found */
+	if (triton1)
+		printk(KERN_INFO "bttv: Host bridge needs ETBF enabled.\n");
+
+	if (pcipci_fail) {
+		printk(KERN_WARNING "bttv: BT848 and your chipset may not work together.\n");
+		if (-1 == no_overlay) {
+			printk(KERN_WARNING "bttv: going to disable overlay.\n");
+			no_overlay = 1;
+		}
+	}
+
+	while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL,
 				      PCI_DEVICE_ID_INTEL_82441, dev))) {
                 unsigned char b;
                 pci_read_config_byte(dev, 0x53, &b);
@@ -1401,11 +1547,6 @@ void __devinit bttv_check_chipset(void)
 			       "bufcon=0x%02x\n",b);
 	}
 
-	if(pci_pci_problems & (PCIPCI_TRITON|PCIPCI_VIAETBF))
-	{
-		printk(KERN_INFO "bttv: Host bridge needs ETBF enabled.\n");
-		triton1=1;
-	}
 }
 
 int __devinit bttv_handle_chipset(struct bttv *btv)
@@ -1435,24 +1576,6 @@ int __devinit bttv_handle_chipset(struct bttv *btv)
 	return 0;
 }
 
-
-#ifndef MODULE
-
-static int __init bttv_card_setup(char *str)
-{
-	int i,number,res = 2;
-
-	for (i = 0; res == 2 && i < BTTV_MAX; i++) {
-		res = get_option(&str,&number);
-		if (res)
-			card[i] = number;
-	}
-	return 1;
-}
-
-__setup("bttv_card=", bttv_card_setup);
-
-#endif /* not MODULE */
 
 /*
  * Local variables:

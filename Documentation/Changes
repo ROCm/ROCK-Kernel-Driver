@@ -31,7 +31,7 @@ al español de este documento en varios formatos.
 Eine deutsche Version dieser Datei finden Sie unter
 <http://www.stefan-winter.de/Changes-2.4.0.txt>.
 
-Last updated: December 11, 2000
+Last updated: January 11, 2001
 
 Chris Ricker (kaboom@gatech.edu or chris.ricker@genetics.utah.edu).
 
@@ -53,7 +53,8 @@ o  Gnu make               3.77                    # make --version
 o  binutils               2.9.1.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
-o  e2fsprogs              1.19                    # tune2fs --version
+o  e2fsprogs              1.19                    # tune2fs
+o  reiserfsprogs          3.x.0b                  # reiserfsck 2>&1|grep reiserfsprogs
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
@@ -99,11 +100,11 @@ assembling the 16-bit boot code, removing the need for as86 to compile
 your kernel.  This change does, however, mean that you need a recent
 release of binutils.
 
-If you can, upgrade to the latest 2.9.5 binutils release.  Older
+If you can, upgrade to the latest 2.9.5 or 2.10 binutils release.  Older
 releases such as 2.8, 2.8.xx, and the FSF's 2.9.1 should be avoided if
 at all possible.  The later releases of 2.9.1.0.x (anything where x >= 22)
-can and do compile the kernel properly, but there are many benefits
-to upgrading to 2.9.5 if you're up to it.
+can and do compile the kernel properly, but there are many benefits in
+upgrading to 2.9.5 or 2.10 if you're up to it.
 
 System utils
 ============
@@ -113,20 +114,6 @@ Architectural changes
 
 DevFS is now in the kernel.  See Documentation/filesystems/devfs/* in
 the kernel source tree for all the gory details.
-
-System V shared memory is now implemented via a virtual filesystem.
-You do not have to mount it to use it. SYSV shared memory limits are
-set via /proc/sys/kernel/shm{max,all,mni}.  You should mount the
-filesystem under /dev/shm to be able to use POSIX shared
-memory. Adding the following line to /etc/fstab should take care of
-things:
-
-none		/dev/shm	shm		defaults	0 0
-
-Remember to create the directory that you intend to mount shm on if
-necessary (The entry is automagically created if you use devfs). You
-can set limits for the number of blocks and inodes used by the
-filesystem with the mount options nr_blocks and nr_inodes.
 
 The Logical Volume Manager (LVM) is now in the kernel.  If you want to
 use this, you'll need to install the necessary LVM toolset.
@@ -178,6 +165,14 @@ E2fsprogs
 The latest version of e2fsprogs fixes several bugs in fsck and
 debugfs.  Obviously, it's a good idea to upgrade.
 
+Reiserfsprogs
+-------------
+
+The reiserfsprogs package should be used for reiserfs-3.6.x
+(Linux kernels 2.4.x). It is a combined package and contains working
+versions of mkreiserfs, resize_reiserfs, debugreiserfs and
+reiserfsck. These utils work on both i386 and alpha platforms.
+
 Pcmcia-cs
 ---------
 
@@ -205,6 +200,14 @@ the following line:
 alias char-major-10-184 microcode
 
 to your /etc/modules.conf file.
+
+Powertweak
+----------
+
+If you are running v0.1.17 or earlier, you should upgrade to
+version v0.99.0 or higher. Running old versions may cause problems
+with programs using shared memory.
+
 
 Networking
 ==========
@@ -262,10 +265,19 @@ Compilers
 *********
 
 egcs 1.1.2 (gcc 2.91.66)
----------
-o  <ftp://ftp.valinux.com/pub/support/hjl/gcc/egcs-1.1.2/egcs-1.1.2-glibc.x86.tar.bz2>
-o  <ftp://ftp.valinux.com/pub/support/hjl/gcc/egcs-1.1.2/egcs-1.1.2-libc5.x86.tar.bz2>
-o  <ftp://ftp.valinux.com/pub/support/hjl/gcc/egcs-1.1.2/egcs-1.1.2-alpha.tar.bz2>
+------------------------
+o  <ftp://sourceware.cygnus.com/pub/gcc/releases/egcs-1.1.2/egcs-1.1.2.tar.bz2>
+
+gcc 2.95.2
+----------
+o  <ftp://ftp.gnu.org/pub/gnu/gcc/gcc-2.95.2.tar.gz>
+
+Gnu Make
+********
+
+Make 3.77
+--------
+o  <ftp://ftp.gnu.org/gnu/make/make-3.77.tar.gz>
 
 Binutils
 ********
@@ -274,20 +286,20 @@ Binutils
 ------------
 o  <ftp://ftp.valinux.com/pub/support/hjl/binutils/2.9.1/binutils-2.9.1.0.25.tar.gz>
 
-2.10 series
-------------
-o  <ftp://ftp.valinux.com/pub/support/hjl/binutils/binutils-2.10.0.24.tar.bz2>
+2.9.5 and 2.10 series
+---------------------
+o  <ftp://ftp.valinux.com/pub/support/hjl/binutils/>
 
 System utilities
 ****************
 
 Util-linux
 ----------
-o  <ftp://ftp.win.tue.nl/pub/linux-local/utils/util-linux/util-linux-2.10o.tar.gz>
+o  <ftp://ftp.kernel.org/pub/linux/utils/util-linux/util-linux-2.10o.tar.gz>
 
 Ksymoops
 --------
-o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/ksymoops/v2.4>
+o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/ksymoops/v2.4/>
 
 Modutils
 --------
@@ -295,12 +307,16 @@ o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/modutils/v2.4/>
 
 Mkinitrd
 --------
-o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/mkinitrd-2.5-1.src.rpm>
+o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/mkinitrd-2.9-1.src.rpm>
 
 E2fsprogs
 ---------
 o  <ftp://download.sourceforge.net/pub/sourceforge/e2fsprogs/e2fsprogs-1.19.tar.gz>
 o  <ftp://download.sourceforge.net/pub/sourceforge/e2fsprogs/e2fsprogs-1.19.src.rpm>
+
+Reiserfsprogs
+-------------
+o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfs_utils-3.6.25-fsck-3.x.0b.tar.gz>
 
 LVM toolset
 -----------
@@ -322,6 +338,10 @@ Intel P6 microcode
 ------------------
 o  <http://www.urbanmyth.org/microcode/>
 
+Powertweak
+----------
+o  <http://powertweak.sourceforge.net>
+
 Network
 *******
 
@@ -331,7 +351,7 @@ o  <ftp://linuxcare.com.au/pub/ppp/ppp-2.4.0.tar.gz>
 
 Isdn4k-utils
 ------------
-o  <ftp://ftp.isdn4linux.de/pub/isdn4linux/utils/testing/isdn4k-utils.v3.1beta7.tar.gz>
+o  <ftp://ftp.isdn4linux.de/pub/isdn4linux/utils/isdn4k-utils.v3.1pre1.tar.gz>
 
 Netfilter
 ---------

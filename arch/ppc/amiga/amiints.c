@@ -119,7 +119,7 @@ void amiga_init_IRQ(void)
 	custom.intreq = 0x7fff;
 
 #ifdef CONFIG_APUS
-	/* Clear any inter-CPU interupt requests. Circumvents bug in
+	/* Clear any inter-CPU interrupt requests. Circumvents bug in
            Blizzard IPL emulation HW (or so it appears). */
 	APUS_WRITE(APUS_INT_LVL, INTLVL_SETRESET | INTLVL_MASK);
 

@@ -1360,7 +1360,7 @@ static void ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
       printk("nicstar%d: Raw cell received and no support yet...\n",
              card->index);
 #endif /* RCQ_SUPPORT */
-      /* NOTE: the following procedure may keep a raw cell pending untill the
+      /* NOTE: the following procedure may keep a raw cell pending until the
                next interrupt. As this preliminary support is only meant to
                avoid buffer leakage, this is not an issue. */
       while (readl(card->membase + RAWCT) != card->rawch)

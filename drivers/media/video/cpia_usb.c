@@ -558,6 +558,7 @@ static void cpia_disconnect(struct usb_device *dev, void *ptr);
 
 static struct usb_device_id cpia_id_table [] = {
 	{ USB_DEVICE(0x0553, 0x0002) },
+	{ USB_DEVICE(0x0813, 0x0001) },
 	{ }					/* Terminating entry */
 };
 

@@ -349,7 +349,7 @@ int __init madgemc_probe(void)
 			printk(":%2.2x", dev->dev_addr[i]);
 		printk("\n");
 
-		if (tmsdev_init(dev)) {
+		if (tmsdev_init(dev, ISA_MAX_ADDRESS, NULL)) {
 			printk("%s: unable to get memory for dev->priv.\n", 
 			       dev->name);
 			return -1;
@@ -362,7 +362,6 @@ int __init madgemc_probe(void)
 		 * they know what they're talking about.  Cut off DMA
 		 * at 16mb.
 		 */
-		tp->dmalimit = ISA_MAX_ADDRESS; /* XXX: ?? */
 		tp->setnselout = madgemc_setnselout_pins;
 		tp->sifwriteb = madgemc_sifwriteb;
 		tp->sifreadb = madgemc_sifreadb;
@@ -383,7 +382,7 @@ int __init madgemc_probe(void)
 			printk("madgemc: register_trdev() returned non-zero.\n");
 			
 			kfree(card);
-			kfree(dev->priv);
+			tmsdev_term(dev);
 			kfree(dev);
 			return -1;
 		}
@@ -783,7 +782,7 @@ void cleanup_module(void)
 		unregister_trdev(dev);
 		release_region(dev->base_addr-MADGEMC_SIF_OFFSET, MADGEMC_IO_EXTENT);
 		free_irq(dev->irq, dev);
-		kfree(dev->priv);
+		tmsdev_term(dev);
 		kfree(dev);
 		this_card = madgemc_card_list;
 		madgemc_card_list = this_card->next;

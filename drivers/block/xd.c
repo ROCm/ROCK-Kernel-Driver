@@ -28,6 +28,9 @@
  *   Recovered DMA access. Abridged messages. Added support for DTC5051CX,
  *   WD1002-27X & XEBEC controllers. Driver uses now some jumper settings.
  *   Extended ioctl() support.
+ *
+ * Bugfix: 15/02/01, Paul G. - inform queue layer of tiny xd_maxsect.
+ *
  */
 
 #include <linux/module.h>
@@ -59,7 +62,7 @@
 #define XD_INIT_DISK_DELAY	(30*HZ/1000)  /* 30 ms delay during disk initialization */
 
 /* Above may need to be increased if a problem with the 2nd drive detection
-   (ST11M controller) or resetting a controler (WD) appears */
+   (ST11M controller) or resetting a controller (WD) appears */
 
 XD_INFO xd_info[XD_MAXDRIVES];
 
@@ -118,6 +121,7 @@ static unsigned int xd_bases[] __initdata =
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
 static int xd_sizes[XD_MAXDRIVES << 6], xd_access[XD_MAXDRIVES];
 static int xd_blocksizes[XD_MAXDRIVES << 6];
+static int xd_maxsect[XD_MAXDRIVES << 6];
 
 extern struct block_device_operations xd_fops;
 
@@ -241,6 +245,10 @@ static void __init xd_geninit (void)
 		else
 			printk("xd: unable to get IRQ%d\n",xd_irq);
 	}
+
+	/* xd_maxsectors depends on controller - so set after detection */
+	for(i=0; i<(XD_MAXDRIVES << 6); i++) xd_maxsect[i] = xd_maxsectors;
+	max_sectors[MAJOR_NR] = xd_maxsect;
 
 	for (i = 0; i < xd_drives; i++) {
 		xd_valid[i] = 1;
@@ -877,7 +885,7 @@ static void __init xd_wd_init_drive (u_char drive)
 				xd_setparam(CMD_WDSETPARAM,drive,xd_info[drive].heads,xd_info[drive].cylinders,
 					((u_short *) (buf))[0xD8],((u_short *) (buf))[0xDA],buf[0x1B4]);
 		}
-	/* 1002 based RLL controler requests converted addressing, but reports physical 
+	/* 1002 based RLL controller requests converted addressing, but reports physical 
 	   (physical 26 sec., logical 17 sec.) 
 	   1004 based ???? */
 		if (rll & wd_1002) {
@@ -1058,7 +1066,7 @@ static void __init xd_override_init_drive (u_char drive)
 	xd_info[drive].control = 0;
 }
 
-/* xd_setup: initialise controler from command line parameters */
+/* xd_setup: initialise controller from command line parameters */
 void __init do_xd_setup (int *integers)
 {
 	switch (integers[0]) {

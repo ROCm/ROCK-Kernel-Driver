@@ -73,7 +73,7 @@ typedef struct {
 } phy_info_t;
 
 /* The number of Tx and Rx buffers.  These are allocated from the page
- * pool.  The code may assume these are power of two, so it it best
+ * pool.  The code may assume these are power of two, so it is best
  * to keep them that size.
  * We don't need to allocate pages for the transmitter.  We just use
  * the skbuffer directly.
@@ -953,7 +953,7 @@ static phy_info_t phy_info_lxt970 = {
 /* 
  * I had some nice ideas of running the MDIO faster...
  * The 971 should support 8MHz and I tried it, but things acted really
- * wierd, so 2.5 MHz ought to be enough for anyone...
+ * weird, so 2.5 MHz ought to be enough for anyone...
  */
 
 static void mii_parse_lxt971_sr2(uint mii_reg, struct net_device *dev)

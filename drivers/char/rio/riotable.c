@@ -696,7 +696,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
 
 	    /*
 	    ** Now we have a host we need to allocate an ID
-	    ** if the the entry does not already have one.
+	    ** if the entry does not already have one.
 	    */
 	    if (MapP->ID == (ushort)-1)
 	    {

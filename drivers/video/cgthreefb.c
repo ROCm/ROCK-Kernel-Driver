@@ -1,4 +1,4 @@
-/* $Id: cgthreefb.c,v 1.9 2000/03/19 04:20:44 anton Exp $
+/* $Id: cgthreefb.c,v 1.10 2001/02/13 01:17:14 davem Exp $
  * cgthreefb.c: CGthree frame buffer driver
  *
  * Copyright (C) 1996,1998 Jakub Jelinek (jj@ultra.linux.cz)

@@ -137,6 +137,39 @@ you will automatically load _both_ the msdos and umsdos modules,
 since umsdos runs piggyback on msdos.
 
 
+Using modinfo:
+--------------
+
+Sometimes you need to know what parameters are accepted by a
+module or you've found a bug and want to contact the maintainer.
+Then modinfo comes in very handy.
+
+Every module (normally) contains the author/maintainer,
+a description and a list of parameters.
+
+For example "modinfo -a eepro100" will return:
+
+	Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>
+
+and "modinfo -d eepro100" will return a description:
+
+	Intel i82557/i82558 PCI EtherExpressPro driver
+
+and more important "modinfo -p eepro100" will return this list:
+
+	debug int
+	options int array (min = 1, max = 8)
+	full_duplex int array (min = 1, max = 8)
+	congenb int
+	txfifo int
+	rxfifo int
+	txdmacount int
+	rxdmacount int
+	rx_copybreak int
+	max_interrupt_work int
+	multicast_filter_limit int
+
+
 The "ultimate" utility:
 -----------------------
 

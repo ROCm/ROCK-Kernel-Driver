@@ -19,8 +19,6 @@
 
 #include "smb_debug.h"
 
-#define SMBFS_MAX_AGE 5*HZ
-
 static int smb_readdir(struct file *, void *, filldir_t);
 static int smb_dir_open(struct inode *, struct file *);
 
@@ -52,27 +50,39 @@ struct inode_operations smb_dir_inode_operations =
 	setattr:	smb_notify_change,
 };
 
+/*
+ * Read a directory, using filldir to fill the dirent memory.
+ * smb_proc_readdir does the actual reading from the smb server.
+ *
+ * The cache code is almost directly taken from ncpfs
+ */
 static int 
 smb_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct dentry *dentry = filp->f_dentry;
 	struct inode *dir = dentry->d_inode;
-	struct cache_head *cachep;
+	struct smb_sb_info *server = server_from_dentry(dentry);
+	union  smb_dir_cache *cache = NULL;
+	struct smb_cache_control ctl;
+	struct page *page = NULL;
 	int result;
+
+	ctl.page  = NULL;
+	ctl.cache = NULL;
 
 	VERBOSE("reading %s/%s, f_pos=%d\n",
 		DENTRY_PATH(dentry),  (int) filp->f_pos);
 
 	result = 0;
-	switch ((unsigned int) filp->f_pos)
-	{
+	switch ((unsigned int) filp->f_pos) {
 	case 0:
 		if (filldir(dirent, ".", 1, 0, dir->i_ino, DT_DIR) < 0)
 			goto out;
 		filp->f_pos = 1;
+		/* fallthrough */
 	case 1:
 		if (filldir(dirent, "..", 2, 1,
-				dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
+			    dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
 			goto out;
 		filp->f_pos = 2;
 	}
@@ -83,61 +93,119 @@ smb_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	result = smb_revalidate_inode(dentry);
 	if (result)
 		goto out;
-	/*
-	 * Get the cache pointer ...
-	 */
-	result = -EIO;
-	cachep = smb_get_dircache(dentry);
-	if (!cachep)
-		goto out;
 
-	/*
-	 * Make sure the cache is up-to-date.
-	 *
-	 * To detect changes on the server we refill on each "new" access.
-	 *
-	 * Directory mtime would be nice to use for finding changes,
-	 * unfortunately some servers (NT4) doesn't update on local changes.
-	 */
-	if (!cachep->valid || filp->f_pos == 2)
-	{
-		result = smb_refill_dircache(cachep, dentry);
-		if (result)
-			goto out_free;
+
+	page = grab_cache_page(&dir->i_data, 0);
+	if (!page)
+		goto read_really;
+
+	ctl.cache = cache = kmap(page);
+	ctl.head  = cache->head;
+
+	if (!Page_Uptodate(page) || !ctl.head.eof) {
+		VERBOSE("%s/%s, page uptodate=%d, eof=%d\n",
+			 DENTRY_PATH(dentry), Page_Uptodate(page),ctl.head.eof);
+		goto init_cache;
 	}
 
-	result = 0;
+	if (filp->f_pos == 2) {
+		if (jiffies - ctl.head.time >= SMB_MAX_AGE(server))
+			goto init_cache;
 
-	while (1)
-	{
-		struct cache_dirent this_dirent, *entry = &this_dirent;
-
-		if (!smb_find_in_cache(cachep, filp->f_pos, entry))
-			break;
 		/*
-		 * Check whether to look up the inode number.
+		 * N.B. ncpfs checks mtime of dentry too here, we don't.
+		 *   1. common smb servers do not update mtime on dir changes
+		 *   2. it requires an extra smb request
+		 *      (revalidate has the same timeout as ctl.head.time)
+		 *
+		 * Instead smbfs invalidates its own cache on local changes
+		 * and remote changes are not seen until timeout.
 		 */
-		if (!entry->ino) {
-			struct qstr qname;
-			/* N.B. Make cache_dirent name a qstr! */
-			qname.name = entry->name;
-			qname.len  = entry->len;
-			entry->ino = find_inode_number(dentry, &qname);
-			if (!entry->ino)
-				entry->ino = iunique(dentry->d_sb, 2);
-		}
-
-		if (filldir(dirent, entry->name, entry->len, 
-				    filp->f_pos, entry->ino, DT_UNKNOWN) < 0)
-			break;
-		filp->f_pos += 1;
 	}
 
-	/*
-	 * Release the dircache.
-	 */
-out_free:
-	smb_free_dircache(cachep);
+	if (filp->f_pos > ctl.head.end)
+		goto finished;
+
+	ctl.fpos = filp->f_pos + (SMB_DIRCACHE_START - 2);
+	ctl.ofs  = ctl.fpos / SMB_DIRCACHE_SIZE;
+	ctl.idx  = ctl.fpos % SMB_DIRCACHE_SIZE;
+
+	for (;;) {
+		if (ctl.ofs != 0) {
+			ctl.page = find_lock_page(&dir->i_data, ctl.ofs);
+			if (!ctl.page)
+				goto invalid_cache;
+			ctl.cache = kmap(ctl.page);
+			if (!Page_Uptodate(ctl.page))
+				goto invalid_cache;
+		}
+		while (ctl.idx < SMB_DIRCACHE_SIZE) {
+			struct dentry *dent;
+			int res;
+
+			dent = smb_dget_fpos(ctl.cache->dentry[ctl.idx],
+					     dentry, filp->f_pos);
+			if (!dent)
+				goto invalid_cache;
+
+			res = filldir(dirent, dent->d_name.name,
+				      dent->d_name.len, filp->f_pos,
+				      dent->d_inode->i_ino, DT_UNKNOWN);
+			dput(dent);
+			if (res)
+				goto finished;
+			filp->f_pos += 1;
+			ctl.idx += 1;
+			if (filp->f_pos > ctl.head.end)
+				goto finished;
+		}
+		if (ctl.page) {
+			kunmap(ctl.page);
+			SetPageUptodate(ctl.page);
+			UnlockPage(ctl.page);
+			page_cache_release(ctl.page);
+			ctl.page = NULL;
+		}
+		ctl.idx  = 0;
+		ctl.ofs += 1;
+	}
+invalid_cache:
+	if (ctl.page) {
+		kunmap(ctl.page);
+		UnlockPage(ctl.page);
+		page_cache_release(ctl.page);
+		ctl.page = NULL;
+	}
+	ctl.cache = cache;
+init_cache:
+	smb_invalidate_dircache_entries(dentry);
+	ctl.head.time = jiffies;
+	ctl.head.eof = 0;
+	ctl.fpos = 2;
+	ctl.ofs = 0;
+	ctl.idx = SMB_DIRCACHE_START;
+	ctl.filled = 0;
+	ctl.valid  = 1;
+read_really:
+	result = smb_proc_readdir(filp, dirent, filldir, &ctl);
+	if (ctl.idx == -1)
+		goto invalid_cache;	/* retry */
+	ctl.head.end = ctl.fpos - 1;
+	ctl.head.eof = ctl.valid;
+finished:
+	if (page) {
+		cache->head = ctl.head;
+		kunmap(page);
+		SetPageUptodate(page);
+		UnlockPage(page);
+		page_cache_release(page);
+	}
+	if (ctl.page) {
+		kunmap(ctl.page);
+		SetPageUptodate(ctl.page);
+		UnlockPage(ctl.page);
+		page_cache_release(ctl.page);
+	}
 out:
 	return result;
 }
@@ -204,16 +272,17 @@ static struct dentry_operations smbfs_dentry_operations_case =
 static int
 smb_lookup_validate(struct dentry * dentry, int flags)
 {
+	struct smb_sb_info *server = server_from_dentry(dentry);
 	struct inode * inode = dentry->d_inode;
 	unsigned long age = jiffies - dentry->d_time;
 	int valid;
 
 	/*
 	 * The default validation is based on dentry age:
-	 * we believe in dentries for 5 seconds.  (But each
+	 * we believe in dentries for a few seconds.  (But each
 	 * successful server lookup renews the timestamp.)
 	 */
-	valid = (age <= SMBFS_MAX_AGE);
+	valid = (age <= SMB_MAX_AGE(server));
 #ifdef SMBFS_DEBUG_VERBOSE
 	if (!valid)
 		VERBOSE("%s/%s not valid, age=%lu\n", 
@@ -284,6 +353,22 @@ smb_delete_dentry(struct dentry * dentry)
 	}
 	return 0;
 }
+
+/*
+ * Initialize a new dentry
+ */
+void
+smb_new_dentry(struct dentry *dentry)
+{
+	struct smb_sb_info *server = server_from_dentry(dentry);
+
+	if (server->mnt->flags & SMB_MOUNT_CASE)
+		dentry->d_op = &smbfs_dentry_operations_case;
+	else
+		dentry->d_op = &smbfs_dentry_operations;
+	dentry->d_time = jiffies;
+}
+
 
 /*
  * Whenever a lookup succeeds, we know the parent directories
@@ -441,6 +526,7 @@ smb_rmdir(struct inode *dir, struct dentry *dentry)
 	if (!d_unhashed(dentry))
 		goto out;
 
+	smb_invalid_dir_cache(dir);
 	error = smb_proc_rmdir(dentry);
 
 out:
@@ -457,6 +543,7 @@ smb_unlink(struct inode *dir, struct dentry *dentry)
 	 */
 	smb_close(dentry->d_inode);
 
+	smb_invalid_dir_cache(dir);
 	error = smb_proc_unlink(dentry);
 	if (!error)
 		smb_renew_times(dentry);

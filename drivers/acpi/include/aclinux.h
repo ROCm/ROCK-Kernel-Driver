@@ -28,7 +28,6 @@
 
 #define ACPI_OS_NAME                "Linux"
 
-#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>

@@ -62,21 +62,21 @@ int osf_partition(struct gendisk *hd, kdev_t dev, unsigned long first_sector,
 	}
 	label = (struct disklabel *) (bh->b_data+64);
 	partition = label->d_partitions;
-	if (label->d_magic != DISKLABELMAGIC) {
+	if (le32_to_cpu(label->d_magic) != DISKLABELMAGIC) {
 		brelse(bh);
 		return 0;
 	}
-	if (label->d_magic2 != DISKLABELMAGIC) {
+	if (le32_to_cpu(label->d_magic2) != DISKLABELMAGIC) {
 		brelse(bh);
 		return 0;
 	}
-	for (i = 0 ; i < label->d_npartitions; i++, partition++) {
+	for (i = 0 ; i < le16_to_cpu(label->d_npartitions); i++, partition++) {
 		if ((current_minor & mask) == 0)
 		        break;
-		if (partition->p_size)
+		if (le32_to_cpu(partition->p_size))
 			add_gd_partition(hd, current_minor,
-				first_sector+partition->p_offset,
-				partition->p_size);
+				first_sector+le32_to_cpu(partition->p_offset),
+				le32_to_cpu(partition->p_size));
 		current_minor++;
 	}
 	printk("\n");

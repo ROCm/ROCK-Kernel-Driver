@@ -319,7 +319,7 @@ Description (Verbose) : Made the following modifications:
 
                         1.  Removed code from pc_close which closes the 
                             drivers line discipline and restores its original
-                            line discipline.  This is currently unecessary,
+                            line discipline.  This is currently unnecessary,
                             though future fast cook enhancements may require
                             this.
 

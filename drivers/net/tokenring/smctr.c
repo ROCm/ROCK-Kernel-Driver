@@ -1348,7 +1348,7 @@ static unsigned int smctr_get_num_rx_bdbs(struct net_device *dev)
          * Make sure the mem_used offset at this point is the
          * same as in allocate_shared memory or the following
          * boundry adjustment will be incorrect (i.e. not allocating
-         * the non-mac recieve buffers above cannot change the 256
+         * the non-mac receive buffers above cannot change the 256
          * byte offset).
          *
          * Since this cannot be guaranteed, adding the full 256 bytes

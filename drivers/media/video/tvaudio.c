@@ -112,13 +112,14 @@ struct CHIPSTATE {
 	audiocmd   shadow;
 
 	/* current settings */
-	__u16 left,right,treble,bass;
+	__u16 left,right,treble,bass,mode;
 
 	/* thread */
 	struct task_struct  *thread;
 	struct semaphore    *notify;
 	wait_queue_head_t    wq;
-	int                  wake,done;
+	struct timer_list    wt;
+	int                  done;
 };
 
 
@@ -245,6 +246,12 @@ static int chip_cmd(struct CHIPSTATE *chip, char *name, audiocmd *cmd)
  *   if available, ...
  */
 
+static void chip_thread_wake(unsigned long data)
+{
+        struct CHIPSTATE *chip = (struct CHIPSTATE*)data;
+	wake_up_interruptible(&chip->wq);
+}
+
 static int chip_thread(void *data)
 {
         struct CHIPSTATE *chip = data;
@@ -266,35 +273,42 @@ static int chip_thread(void *data)
 		up(chip->notify);
 
 	for (;;) {
-		if (chip->done)
+		interruptible_sleep_on(&chip->wq);
+		dprintk("%s: thread wakeup\n", chip->c.name);
+		if (chip->done || signal_pending(current))
 			break;
-		if (!chip->wake) {
-			interruptible_sleep_on(&chip->wq);
-			dprintk("%s: thread wakeup\n", chip->c.name);
-			if (chip->done || signal_pending(current))
-				break;
-		}
-		chip->wake = 0;
-
-		/* wait some time -- let the audio hardware
-		   figure the current mode */
-		current->state   = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ);
-		if (signal_pending(current))
-			break;
-		if (chip->wake)
+		
+		if (0 != chip->mode)
+			/* don't do anything if mode != auto */
 			continue;
-
+		
+		/* have a look what's going on */
 		dprintk("%s: thread checkmode\n", chip->c.name);
 		desc->checkmode(chip);
+		
+		/* schedule next check */
+		mod_timer(&chip->wt, jiffies+2*HZ);
 	}
 
 	chip->thread = NULL;
 	dprintk("%s: thread exiting\n", chip->c.name);
 	if(chip->notify != NULL)
-		up_and_exit(chip->notify,0);
+		up(chip->notify);
 
 	return 0;
+}
+
+void generic_checkmode(struct CHIPSTATE *chip)
+{
+	struct CHIPDESC  *desc = chiplist + chip->type;
+	int mode = desc->getmode(chip);
+
+	if (mode & VIDEO_SOUND_STEREO)
+		desc->setmode(chip,VIDEO_SOUND_STEREO);
+	else if (mode & VIDEO_SOUND_LANG1)
+		desc->setmode(chip,VIDEO_SOUND_LANG1);
+	else
+		desc->setmode(chip,VIDEO_SOUND_MONO);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -313,10 +327,24 @@ static int chip_thread(void *data)
 #define TDA9840_DUALBA     0x16
 #define TDA9840_EXTERNAL   0x7a
 
+#define TDA9840_DS_DUAL    0x20 /* Dual sound identified          */
+#define TDA9840_ST_STEREO  0x40 /* Stereo sound identified        */
+#define TDA9840_PONRES     0x80 /* Power-on reset detected if = 1 */
+
 int  tda9840_getmode(struct CHIPSTATE *chip)
 {
-	return VIDEO_SOUND_MONO | VIDEO_SOUND_STEREO |
-		VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
+	int val, mode;
+	
+	val = chip_read(chip);
+	mode = VIDEO_SOUND_MONO;
+	if (val & TDA9840_DS_DUAL)
+		mode |= VIDEO_SOUND_LANG1 | VIDEO_SOUND_LANG2;
+	if (val & TDA9840_ST_STEREO)
+		mode |= VIDEO_SOUND_STEREO;
+	
+	dprintk ("tda9840_getmode(): raw chip read: %d, return: %d\n",
+		 val, mode);
+	return mode;
 }
 
 void tda9840_setmode(struct CHIPSTATE *chip, int mode)
@@ -617,6 +645,12 @@ void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 {
 	int sw_data  = chip->shadow.bytes[TDA9873_SW+1] & 0xe3;
 	/*	int adj_data = chip->shadow.bytes[TDA9873_AD+1] ; */
+
+	if (sw_data & 3) {
+		dprintk("tda9873_setmode(): external input\n");
+		return;
+	}
+	
 	dprintk("tda9873_setmode(): chip->shadow.bytes[%d] = %d\n", TDA9873_SW+1, chip->shadow.bytes[TDA9873_SW+1]);
 	dprintk("tda9873_setmode(): sw_data  = %d\n", sw_data);
 
@@ -636,16 +670,6 @@ void tda9873_setmode(struct CHIPSTATE *chip, int mode)
 	}
 	dprintk("tda9873_setmode(): req. mode %d; chip_write: %d\n", mode, sw_data);
 	chip_write(chip,TDA9873_SW,sw_data);
-}
-
-void tda9873_checkmode(struct CHIPSTATE *chip)
-{
-	int mode = tda9873_getmode(chip);
-
-	if (mode & VIDEO_SOUND_STEREO)
-		tda9873_setmode(chip,VIDEO_SOUND_STEREO);
-	if (mode & VIDEO_SOUND_LANG1)
-		tda9873_setmode(chip,VIDEO_SOUND_LANG1);
 }
 
 int tda9873_checkit(struct CHIPSTATE *chip)
@@ -751,6 +775,7 @@ static struct CHIPDESC chiplist[] = {
 
 		getmode:    tda9840_getmode,
 		setmode:    tda9840_setmode,
+		checkmode:  generic_checkmode,
 
 		init:       { 2, { TDA9840_SW, 0x2a } }
 	},
@@ -762,12 +787,17 @@ static struct CHIPDESC chiplist[] = {
 		addr_lo:    I2C_TDA985x_L >> 1,
 		addr_hi:    I2C_TDA985x_H >> 1,
 		registers:  3,
+		flags:      CHIP_HAS_INPUTSEL,
 
 		getmode:    tda9873_getmode,
 		setmode:    tda9873_setmode,
-		checkmode:  tda9873_checkmode,
+		checkmode:  generic_checkmode,
 
-		init:       { 4, { TDA9873_SW, 0xa0, 0x06, 0x03 } }
+		init:       { 4, { TDA9873_SW, 0xa4, 0x06, 0x03 } },
+		inputreg:   TDA9873_SW,
+		inputmute:  0xc0,
+		inputmap:   {0xa4, 0xa2, 0xa4, 0xa4, 0xc0}
+		
 	},
 	{
 		name:       "tda9850",
@@ -873,7 +903,10 @@ static struct CHIPDESC chiplist[] = {
 
 		inputreg:   PIC16C54_REG_MISC,
 		inputmap:   {PIC16C54_MISC_SND_NOTMUTE|PIC16C54_MISC_SWITCH_TUNER,
-			     PIC16C54_MISC_SND_NOTMUTE|PIC16C54_MISC_SWITCH_LINE},
+			     PIC16C54_MISC_SND_NOTMUTE|PIC16C54_MISC_SWITCH_LINE,
+			     PIC16C54_MISC_SND_NOTMUTE|PIC16C54_MISC_SWITCH_LINE,
+			     PIC16C54_MISC_SND_MUTE,PIC16C54_MISC_SND_MUTE,
+			     PIC16C54_MISC_SND_NOTMUTE},
 		inputmute:  PIC16C54_MISC_SND_MUTE,
 	},
 	{ name: NULL } /* EOF */
@@ -947,11 +980,12 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 		/* start async thread */
 		DECLARE_MUTEX_LOCKED(sem);
 		chip->notify = &sem;
+		chip->wt.function = chip_thread_wake;
+		chip->wt.data     = (unsigned long)chip;
 		init_waitqueue_head(&chip->wq);
 		kernel_thread(chip_thread,(void *)chip,0);
 		down(&sem);
 		chip->notify = NULL;
-		chip->wake++;
 		wake_up_interruptible(&chip->wq);
 	}
 	return 0;
@@ -1048,17 +1082,19 @@ static int chip_command(struct i2c_client *client,
 			chip_write(chip,desc->bassreg,desc->bassfunc(chip->bass));
 			chip_write(chip,desc->treblereg,desc->treblefunc(chip->treble));
 		}
-		if (desc->setmode && va->mode)
+		if (desc->setmode && va->mode) {
+			chip->mode = va->mode;
 			desc->setmode(chip,va->mode);
+		}
 		break;
 	}
 	case VIDIOCSFREQ:
 	{
+		chip->mode = 0; /* automatic */
 		if (desc->checkmode) {
 			desc->setmode(chip,VIDEO_SOUND_MONO);
-			chip->wake++;
-			wake_up_interruptible(&chip->wq);
-			/* the thread will call checkmode() a second later */
+			mod_timer(&chip->wt, jiffies+2*HZ);
+			/* the thread will call checkmode() later */
 		}
 	}
 	}

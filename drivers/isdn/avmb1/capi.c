@@ -252,7 +252,6 @@
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
 #include "capifs.h"
 #endif
-#include <linux/slab.h>
 
 static char *revision = "$Revision: 1.44.6.3 $";
 

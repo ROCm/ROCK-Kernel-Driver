@@ -10793,11 +10793,10 @@ CONFIG_REISERFS_FS
   Balanced trees are more efficient than traditional
   filesystem architectural foundations.
 
-  You can use reiserfs in all cases where you use the ext2fs file
-  system, and you will gain in speed and disk space.  It has fewer
-  worst case performance situations than other file systems
-  because balanced trees are hardier creatures than other algorithms
-  are (if that is not technical enough, read www.namesys.com....:-) )
+  In general, ReiserFS is as fast as ext2, but is very efficient
+  with large directories and small files.  Additional patches are
+  needed for NFS and quotas, please see www.reiserfs.org for
+  links.
 
   It is more easily extended to have features currently found in
   database and keyword search systems than block allocation based
@@ -10805,7 +10804,7 @@ CONFIG_REISERFS_FS
   support plugins consistent with our motto ``It takes more than a
   license to make source code open.''
 
-  Read www.namesys.com to learn more about reiserfs.
+  Read www.reiserfs.org to learn more about reiserfs.
 
   Sponsored by Threshold Networks, Emusic.com, and Bigstorage.com.
 

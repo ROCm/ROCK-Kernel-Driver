@@ -315,7 +315,7 @@ int vfc_i2c_sendbuf(struct vfc_dev *dev, unsigned char addr,
 		switch(ret) {
 		case XMIT_LAST_BYTE:
 			VFC_I2C_DEBUG_PRINTK(("vfc%d: "
-					      "Reciever ended transmission with "
+					      "Receiver ended transmission with "
 					      " %d bytes remaining\n",
 					      dev->instance, count));
 			ret = 0;

@@ -56,7 +56,7 @@
 #define CD186x_EOIR      0x7f    /* End of Interrupt Register               */
 #define CD186x_MRAR      0x75    /* Modem Request Acknowlege register       */
 #define CD186x_TRAR      0x76    /* Transmit Request Acknowlege register    */
-#define CD186x_RRAR      0x77    /* Recieve Request Acknowlege register     */
+#define CD186x_RRAR      0x77    /* Receive Request Acknowlege register     */
 #define CD186x_SRCR      0x66    /* Service Request Configuration register  */
 
 /* Channel Registers */

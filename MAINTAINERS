@@ -858,6 +858,8 @@ M:	pavel@atrey.karlin.mff.cuni.cz
 S:	Maintained
 
 NETWORK DEVICE DRIVERS
+P:	Andrew Morton
+M:	andrewm@uow.edu.au
 P:	Jeff Garzik
 M:	jgarzik@mandrakesoft.com
 L:	linux-net@vger.kernel.org

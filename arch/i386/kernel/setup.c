@@ -1104,6 +1104,9 @@ static inline void do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
 /*
  * Cx86_dir0_msb is a HACK needed by check_cx686_cpuid/slop in bugs.h in
  * order to identify the Cyrix CPU model after we're out of setup.c
+ *
+ * Actually since bugs.h doesnt even reference this perhaps someone should
+ * fix the documentation ???
  */
 unsigned char Cx86_dir0_msb __initdata = 0;
 
@@ -1129,6 +1132,8 @@ static char cyrix_model_mult2[] __initdata = "12233445";
  * Reset the slow-loop (SLOP) bit on the 686(L) which is set by some old
  * BIOSes for compatability with DOS games.  This makes the udelay loop
  * work correctly, and improves performance.
+ *
+ * FIXME: our newer udelay uses the tsc. We dont need to frob with SLOP
  */
 
 extern void calibrate_delay(void) __init;
@@ -1401,6 +1406,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 					wrmsr (0x1107, lo, hi);
 
 					set_bit(X86_FEATURE_CX8, &c->x86_capability);
+					set_bit(X86_FEATURE_3DNOW, &c->x86_capability);
 
 					get_model_name(c);
 					display_cacheinfo(c);
@@ -1565,12 +1571,10 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 				case 4:
 					if ( c->x86 > 6 && dl ) {
 						/* P4 family */
-						if ( dl ) {
-							/* L3 cache */
-							cs = 128 << (dl-1);
-							l3 += cs;
-							break;
-						}
+						/* L3 cache */
+						cs = 128 << (dl-1);
+						l3 += cs;
+						break;
 					}
 					/* else same as 8 - fall through */
 				case 8:
@@ -1870,8 +1874,34 @@ static int __init id_and_try_enable_cpuid(struct cpuinfo_x86 *c)
 
 	/* Detect Cyrix with disabled CPUID */
 	if ( c->x86 == 4 && test_cyrix_52div() ) {
+		unsigned char dir0, dir1;
+		
 		strcpy(c->x86_vendor_id, "CyrixInstead");
 	        c->x86_vendor = X86_VENDOR_CYRIX;
+	        
+	        /* Actually enable cpuid on the older cyrix */
+	    
+	    	/* Retrieve CPU revisions */
+	    	
+		do_cyrix_devid(&dir0, &dir1);
+
+		dir0>>=4;		
+		
+		/* Check it is an affected model */
+		
+   	        if (dir0 == 5 || dir0 == 3)
+   	        {
+			unsigned char ccr3, ccr4;
+
+			printk(KERN_INFO "Enabling CPUID on Cyrix processor.\n");
+			cli();
+			ccr3 = getCx86(CX86_CCR3);
+			setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10); /* enable MAPEN  */
+			ccr4 = getCx86(CX86_CCR4);
+			setCx86(CX86_CCR4, ccr4 | 0x80);          /* enable cpuid  */
+			setCx86(CX86_CCR3, ccr3);                 /* disable MAPEN */
+			sti();
+		}
 	} else
 
 	/* Detect NexGen with old hypercode */
@@ -1914,7 +1944,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		      (int *)&c->x86_vendor_id[4]);
 		
 		get_cpu_vendor(c);
-
 		/* Initialize the standard set of capabilities */
 		/* Note that the vendor-specific code below might override */
 

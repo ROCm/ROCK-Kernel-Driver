@@ -117,7 +117,7 @@ yes		yes	yes		maybe
 
 --------------------------- address_space_operations --------------------------
 prototypes:
-	int (*writepage)(struct file *, struct page *);
+	int (*writepage)(struct page *);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
@@ -126,8 +126,8 @@ prototypes:
 locking rules:
 	All may block
 		BKL	PageLocked(page)
-writepage:	no	yes
-readpage:	no	yes
+writepage:	no	yes, unlocks
+readpage:	no	yes, unlocks
 sync_page:	no	maybe
 prepare_write:	no	yes
 commit_write:	no	yes
@@ -135,6 +135,7 @@ bmap:		yes
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
 may be called from the request handler (/dev/loop).
+	->readpage() and ->writepage() unlock the page.
 	->sync_page() locking rules are not well-defined - usually it is called
 with lock on page, but that is not guaranteed. Considering the currently
 existing instances of this method ->sync_page() itself doesn't look
@@ -285,26 +286,13 @@ transfer:	no
 prototypes:
 	void (*open)(struct vm_area_struct*);
 	void (*close)(struct vm_area_struct*);
-	void (*unmap)(struct vm_area_struct*, unsigned long, size_t);
-	void (*protect)(struct vm_area_struct*, unsigned long, size_t, unsigned);
-	int (*sync)(struct vm_area_struct*, unsigned long, size_t, unsigned);
 	struct page *(*nopage)(struct vm_area_struct*, unsigned long, int);
-	struct page *(*wppage)(struct vm_area_struct*, unsigned long, struct page*);
-	int (*swapout)(struct page *, struct file *);
 
 locking rules:
 		BKL	mmap_sem
 open:		no	yes
 close:		no	yes
-sync:		no	yes
-unmap:		no	yes
 nopage:		no	yes
-swapout:	yes	yes
-wpppage:				(see below)
-protect:				(see below)
-
-->wppage() and ->protect() have no instances and nothing calls them; looks like
-they must die...
 
 ================================================================================
 			Dubious stuff

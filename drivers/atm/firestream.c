@@ -1441,7 +1441,7 @@ static inline int nr_buffers_in_freepool (struct fs_dev *dev, struct freepool *f
 
 
 /* Check if this gets going again if a pool ever runs out.  -- Yes, it
-   does. I've seen "recieve abort: no buffers" and things started
+   does. I've seen "receive abort: no buffers" and things started
    working again after that...  -- REW */
 
 static void top_off_fp (struct fs_dev *dev, struct freepool *fp, int gfp_flags)

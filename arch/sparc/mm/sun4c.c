@@ -353,7 +353,7 @@ void __init sun4c_probe_vac(void)
 			break;
 
 		default:
-			prom_printf("Cannot initialize VAC - wierd sun4 model idprom->id_machtype = %d", idprom->id_machtype);
+			prom_printf("Cannot initialize VAC - weird sun4 model idprom->id_machtype = %d", idprom->id_machtype);
 			prom_halt();
 		};
 	} else {

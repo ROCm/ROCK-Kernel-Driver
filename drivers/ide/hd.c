@@ -22,6 +22,9 @@
  *  This is now a lightweight ST-506 driver. (Paul Gortmaker)
  *
  *  Modified 1995 Russell King for ARM processor.
+ *
+ *  Bugfix: max_sectors must be <= 255 or the wheels tend to come
+ *  off in a hurry once you queue things up - Paul G. 02/2001
  */
   
 /* Uncomment the following if you want verbose error reports. */
@@ -104,6 +107,7 @@ static struct hd_struct hd[MAX_HD<<6];
 static int hd_sizes[MAX_HD<<6];
 static int hd_blocksizes[MAX_HD<<6];
 static int hd_hardsectsizes[MAX_HD<<6];
+static int hd_maxsect[MAX_HD<<6];
 
 static struct timer_list device_timer;
 
@@ -730,9 +734,11 @@ static void __init hd_geninit(void)
 	for(drive=0; drive < (MAX_HD << 6); drive++) {
 		hd_blocksizes[drive] = 1024;
 		hd_hardsectsizes[drive] = 512;
+		hd_maxsect[drive]=255;
 	}
 	blksize_size[MAJOR_NR] = hd_blocksizes;
 	hardsect_size[MAJOR_NR] = hd_hardsectsizes;
+	max_sectors[MAJOR_NR] = hd_maxsect;
 
 #ifdef __i386__
 	if (!NR_HD) {

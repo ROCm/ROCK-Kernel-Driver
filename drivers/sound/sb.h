@@ -137,6 +137,8 @@ typedef struct sb_devc {
 	   void (*midi_input_intr) (int dev, unsigned char data);
 	   void *midi_irq_cookie;		/* IRQ cookie for the midi */
 
+	   spinlock_t lock;
+
 	   struct sb_module_options sbmo;	/* Module options */
 
 	} sb_devc;

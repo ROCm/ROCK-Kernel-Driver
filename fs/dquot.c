@@ -52,7 +52,6 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
-#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 

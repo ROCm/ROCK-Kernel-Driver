@@ -47,10 +47,6 @@
 
  */
 
-#ifdef MODVERSIONS
-#include <linux/modversions.h>
-#endif
-
 #include <linux/module.h>
 #include <linux/version.h>
 

@@ -21,12 +21,16 @@
  *
  * 2000/09/18 - got rid of attach_uart401
  * Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *
+ * 2001/01/26 - replaced CLI/STI with spinlocks
+ * Chris Rankin <rankinc@zipworld.com.au>
  */
 
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 
 #include "sound_config.h"
 #include "sound_firmware.h"
@@ -62,6 +66,7 @@ void *smw_free = NULL;
 
 static int jazz16_base = 0;		/* Not detected */
 static unsigned char jazz16_bits = 0;	/* I/O relocation bits */
+static spinlock_t jazz16_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Logitech Soundman Wave specific initialization code
@@ -251,8 +256,7 @@ static void dsp_get_vers(sb_devc * devc)
 	unsigned long   flags;
 
 	DDB(printk("Entered dsp_get_vers()\n"));
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	devc->major = devc->minor = 0;
 	sb_dsp_command(devc, 0xe1);	/* Get version */
 
@@ -269,8 +273,8 @@ static void dsp_get_vers(sb_devc * devc)
 			}
 		}
 	}
+	spin_unlock_irqrestore(&devc->lock, flags);
 	DDB(printk("DSP version %d.%02d\n", devc->major, devc->minor));
-	restore_flags(flags);
 }
 
 static int sb16_set_dma_hw(sb_devc * devc)
@@ -368,12 +372,11 @@ static void relocate_Jazz16(sb_devc * devc, struct address_info *hw_config)
 	/*
 	 *	Magic wake up sequence by writing to 0x201 (aka Joystick port)
 	 */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jazz16_lock, flags);
 	outb((0xAF), 0x201);
 	outb((0x50), 0x201);
 	outb((bits), 0x201);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jazz16_lock, flags);
 }
 
 static int init_Jazz16(sb_devc * devc, struct address_info *hw_config)
@@ -523,6 +526,7 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 		return 0;
 	}
 
+	devc->lock = SPIN_LOCK_UNLOCKED;
 	devc->type = hw_config->card_subtype;
 
 	devc->base = hw_config->io_base;
@@ -552,7 +556,9 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 	
 	if (devc->sbmo.acer)
 	{
-		cli();
+		unsigned long flags;
+
+		spin_lock_irqsave(&devc->lock, flags);
 		inb(devc->base + 0x09);
 		inb(devc->base + 0x09);
 		inb(devc->base + 0x09);
@@ -564,7 +570,7 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 		inb(devc->base + 0x0b);
 		inb(devc->base + 0x09);
 		inb(devc->base + 0x00);
-		sti();
+		spin_unlock_irqrestore(&devc->lock, flags);
 	}
 	/*
 	 * Detect the device
@@ -631,7 +637,7 @@ int sb_dsp_detect(struct address_info *hw_config, int pci, int pciio, struct sb_
 		printk(KERN_ERR "sb: Can't allocate memory for device information\n");
 		return 0;
 	}
-	memcpy((char *) detected_devc, (char *) devc, sizeof(sb_devc));
+	memcpy(detected_devc, devc, sizeof(sb_devc));
 	MDB(printk(KERN_INFO "SB %d.%02d detected OK (%x)\n", devc->major, devc->minor, hw_config->io_base));
 	return 1;
 }
@@ -937,15 +943,14 @@ void sb_setmixer(sb_devc * devc, unsigned int port, unsigned int value)
 
 	if (devc->model == MDL_ESS) return ess_setmixer (devc, port, value);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	outb(((unsigned char) (port & 0xff)), MIXER_ADDR);
 	udelay(20);
 	outb(((unsigned char) (value & 0xff)), MIXER_DATA);
 	udelay(20);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 unsigned int sb_getmixer(sb_devc * devc, unsigned int port)
@@ -955,15 +960,14 @@ unsigned int sb_getmixer(sb_devc * devc, unsigned int port)
 
 	if (devc->model == MDL_ESS) return ess_getmixer (devc, port);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	outb(((unsigned char) (port & 0xff)), MIXER_ADDR);
 	udelay(20);
 	val = inb(MIXER_DATA);
 	udelay(20);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	return val;
 }
@@ -986,14 +990,13 @@ static void smw_putmem(sb_devc * devc, int base, int addr, unsigned char val)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jazz16_lock, flags);  /* NOT the SB card? */
 
 	outb((addr & 0xff), base + 1);	/* Low address bits */
 	outb((addr >> 8), base + 2);	/* High address bits */
 	outb((val), base);	/* Data */
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jazz16_lock, flags);
 }
 
 static unsigned char smw_getmem(sb_devc * devc, int base, int addr)
@@ -1001,14 +1004,13 @@ static unsigned char smw_getmem(sb_devc * devc, int base, int addr)
 	unsigned long flags;
 	unsigned char val;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jazz16_lock, flags);  /* NOT the SB card? */
 
 	outb((addr & 0xff), base + 1);	/* Low address bits */
 	outb((addr >> 8), base + 2);	/* High address bits */
 	val = inb(base);	/* Data */
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jazz16_lock, flags);
 	return val;
 }
 
@@ -1168,12 +1170,11 @@ static int init_Jazz16_midi(sb_devc * devc, struct address_info *hw_config)
 	/*
 	 *	Magic wake up sequence by writing to 0x201 (aka Joystick port)
 	 */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&jazz16_lock, flags);
 	outb(0xAF, 0x201);
 	outb(0x50, 0x201);
 	outb(bits, 0x201);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&jazz16_lock, flags);
 
 	hw_config->name = "Jazz16";
 	smw_midi_init(devc, hw_config);

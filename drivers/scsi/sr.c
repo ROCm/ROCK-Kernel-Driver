@@ -88,7 +88,6 @@ Scsi_CD *scsi_CDs;
 static int *sr_sizes;
 
 static int *sr_blocksizes;
-static int *sr_hardsizes;
 
 static int sr_open(struct cdrom_device_info *, int);
 void get_sectorsize(int);
@@ -349,7 +348,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	devm = MINOR(SCpnt->request.rq_dev);
 	dev = DEVICE_NR(SCpnt->request.rq_dev);
 
-	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
+	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d\n", devm));
 
 	if (dev >= sr_template.nr_dev ||
 	    !scsi_CDs[dev].device ||
@@ -783,21 +782,16 @@ static int sr_init()
 	if (!sr_blocksizes)
 		goto cleanup_sizes;
 
-	sr_hardsizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
-	if (!sr_hardsizes)
-		goto cleanup_blocksizes;
 	/*
 	 * These are good guesses for the time being.
+	 * Don't set sr_hardsizes here! That will prevent reading anything smaller.
 	 */
 	for (i = 0; i < sr_template.dev_max; i++) {
 		sr_blocksizes[i] = 2048;
-		sr_hardsizes[i] = 2048;
         }
 	blksize_size[MAJOR_NR] = sr_blocksizes;
-        hardsect_size[MAJOR_NR] = sr_hardsizes;
 	return 0;
-cleanup_blocksizes:
-	kfree(sr_blocksizes);
+
 cleanup_sizes:
 	kfree(sr_sizes);
 cleanup_cds:
@@ -921,11 +915,8 @@ static void __exit exit_sr(void)
 
 		kfree(sr_blocksizes);
 		sr_blocksizes = NULL;
-		kfree(sr_hardsizes);
-		sr_hardsizes = NULL;
 	}
 	blksize_size[MAJOR_NR] = NULL;
-        hardsect_size[MAJOR_NR] = NULL;
 	blk_size[MAJOR_NR] = NULL;
 	read_ahead[MAJOR_NR] = 0;
 

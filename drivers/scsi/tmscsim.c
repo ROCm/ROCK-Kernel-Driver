@@ -3054,7 +3054,4 @@ int DC390_release (struct Scsi_Host *host)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,99)
 static Scsi_Host_Template driver_template = DC390_T;
 #include "scsi_module.c"
-#elif defined(MODULE)
-Scsi_Host_Template driver_template = DC390_T;
-#include "scsi_module.c"
 #endif

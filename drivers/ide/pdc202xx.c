@@ -747,14 +747,11 @@ void pdc202xx_reset (ide_drive_t *drive)
 {
 	unsigned long high_16	= pci_resource_start(HWIF(drive)->pci_dev, 4);
 	byte udma_speed_flag	= inb(high_16 + 0x001f);
-	int i			= 0;
 
 	OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
-	ide_delay_50ms();
-	ide_delay_50ms();
+	mdelay(100);
 	OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
-	for (i = 0; i < 40; i++)
-		ide_delay_50ms();
+	mdelay(2000);		/* 2 seconds ?! */
 }
 
 unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
@@ -767,7 +764,6 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 	if ((dev->device == PCI_DEVICE_ID_PROMISE_20262) ||
 	    (dev->device == PCI_DEVICE_ID_PROMISE_20265) ||
 	    (dev->device == PCI_DEVICE_ID_PROMISE_20267)) {
-		int i = 0;
 		/*
 		 * software reset -  this is required because the bios
 		 * will set UDMA timing on if the hdd supports it. The
@@ -779,11 +775,9 @@ unsigned int __init pci_init_pdc202xx (struct pci_dev *dev, const char *name)
 		 */
 
 		OUT_BYTE(udma_speed_flag | 0x10, high_16 + 0x001f);
-		ide_delay_50ms();
-		ide_delay_50ms();
+		mdelay(100);
 		OUT_BYTE(udma_speed_flag & ~0x10, high_16 + 0x001f);
-		for (i=0; i<40; i++)
-			ide_delay_50ms();
+		mdelay(2000);	/* 2 seconds ?! */
 	}
 
 	if (dev->resource[PCI_ROM_RESOURCE].start) {

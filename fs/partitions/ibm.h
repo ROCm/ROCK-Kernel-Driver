@@ -1,1 +1,1 @@
-void ibm_partition (struct gendisk *hd, kdev_t dev);
+int ibm_partition(struct gendisk *, kdev_t, unsigned long, int);

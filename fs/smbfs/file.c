@@ -38,7 +38,7 @@ smb_fsync(struct file *file, struct dentry * dentry, int datasync)
 static int
 smb_readpage_sync(struct dentry *dentry, struct page *page)
 {
-	char *buffer = page_address(page);
+	char *buffer = kmap(page);
 	unsigned long offset = page->index << PAGE_CACHE_SHIFT;
 	int rsize = smb_get_rsize(server_from_dentry(dentry));
 	int count = PAGE_SIZE;
@@ -76,6 +76,7 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 	result = 0;
 
 io_error:
+	kunmap(page);
 	UnlockPage(page);
 	return result;
 }
@@ -88,8 +89,6 @@ smb_readpage(struct file *file, struct page *page)
 {
 	int		error;
 	struct dentry  *dentry = file->f_dentry;
-
-	DEBUG1("readpage %p\n", page_address(page));
 
 	get_page(page);
 	error = smb_readpage_sync(dentry, page);
@@ -105,7 +104,7 @@ static int
 smb_writepage_sync(struct inode *inode, struct page *page,
 		   unsigned long offset, unsigned int count)
 {
-	u8 *buffer = page_address(page) + offset;
+	char *buffer = kmap(page) + offset;
 	int wsize = smb_get_wsize(server_from_inode(inode));
 	int result, written = 0;
 
@@ -139,8 +138,10 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 		inode->i_mtime = inode->i_atime = CURRENT_TIME;
 		if (offset > inode->i_size)
 			inode->i_size = offset;
-		inode->u.smbfs_i.cache_valid |= SMB_F_LOCALWRITE;
+		inode->u.smbfs_i.flags |= SMB_F_LOCALWRITE;
 	} while (count);
+
+	kunmap(page);
 	return written ? written : result;
 }
 

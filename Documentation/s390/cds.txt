@@ -539,7 +539,7 @@ flag    : defines the action to e parformed for I/O processing
 
 Possible flag values are :
 
-DOIO_EARLY_NOTIFICATION  - allow for early interupt notification
+DOIO_EARLY_NOTIFICATION  - allow for early interrupt notification
 DOIO_VALID_LPM           - LPM input parameter is valid (see usage
                            notes below for details)
 DOIO_WAIT_FOR_INTERRUPT  - wait synchronously for final status
@@ -549,7 +549,7 @@ The cpa parameter points to the first format 1 CCW of a channel program :
 
 typedef struct {
    char            cmd_code; /* command code */
-   char            flags;    /* flags, like IDA adressing, etc. */
+   char            flags;    /* flags, like IDA addressing, etc. */
    unsigned short  count;    /* byte count */
    void           *cda;      /* data address */
 } ccw1_t __attribute__ ((aligned(8)));

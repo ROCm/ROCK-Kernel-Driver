@@ -14,21 +14,21 @@ endmenu
 mainmenu_option next_comment
 comment 'General setup'
 
-bool 'Networking support' CONFIG_NET y
-bool 'System V IPC' CONFIG_SYSVIPC y
+bool 'Networking support' CONFIG_NET
+bool 'System V IPC' CONFIG_SYSVIPC
 
-tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF y
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
   tristate 'Kernel support for JAVA binaries' CONFIG_BINFMT_JAVA
 fi
 
-bool 'Use kernel gdb debugger' CONFIG_KGDB n
+bool 'Use kernel gdb debugger' CONFIG_KGDB
 
-bool 'Enable Etrax100 watchdog' CONFIG_ETRAX_WATCHDOG y
+bool 'Enable Etrax100 watchdog' CONFIG_ETRAX_WATCHDOG
 
-bool 'Use serial console (on the debug port)' CONFIG_USE_SERIAL_CONSOLE y
+bool 'Use serial console (on the debug port)' CONFIG_USE_SERIAL_CONSOLE
 
-bool 'Use in-kernel ifconfig/route setup' CONFIG_KERNEL_IFCONFIG n
+bool 'Use in-kernel ifconfig/route setup' CONFIG_KERNEL_IFCONFIG
 
 endmenu
 

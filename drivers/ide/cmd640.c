@@ -67,7 +67,7 @@
  *
  *  Version 0.09	Try to be smarter about 2nd port enabling.
  *  Version 0.10	Be nice and don't reset 2nd port.
- *  Version 0.11	Try to handle more wierd situations.
+ *  Version 0.11	Try to handle more weird situations.
  *
  *  Version 0.12	Lots of bug fixes from Laszlo Peter
  *			irq unmasking disabled for reliability.

@@ -44,7 +44,7 @@ struct RioHostInfo {
 	long	location;	/* RIO Card Base I/O address */
 	long	vector;		/* RIO Card IRQ vector */
 	int	bus;		/* ISA/EISA/MCA/PCI */
-	int	mode;		/* pointer to host mode - INTERUPT / POLLED */
+	int	mode;		/* pointer to host mode - INTERRUPT / POLLED */
 	struct old_sgttyb
 		* Sg;		/* pointer to default term characteristics */
 };

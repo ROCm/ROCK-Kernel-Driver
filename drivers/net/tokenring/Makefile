@@ -19,6 +19,7 @@ obj-$(CONFIG_TMS380TR) 	+= tms380tr.o
 obj-$(CONFIG_ABYSS) 	+= abyss.o
 obj-$(CONFIG_MADGEMC) 	+= madgemc.o
 obj-$(CONFIG_TMSPCI) 	+= tmspci.o
+obj-$(CONFIG_TMSISA) 	+= tmsisa.o
 obj-$(CONFIG_SMCTR) 	+= smctr.o
 
 O_TARGET := tr.o

@@ -90,6 +90,7 @@ struct msp3400c {
 	int nicam_on;
 	int acb;
 	int main, second;	/* sound carrier */
+	int scart;              /* input is scart */
 
 	int muted;
 	int left, right;	/* volume */
@@ -733,6 +734,8 @@ static int msp3400c_thread(void *data)
 
 		if (VIDEO_MODE_RADIO == msp->norm)
 			continue;  /* nothing to do */
+		if (msp->scart)
+			continue;  /* nothing to do */
 	
 		msp->active = 1;
 
@@ -749,6 +752,10 @@ static int msp3400c_thread(void *data)
 			goto done;
 		
 	restart:
+		if (msp->scart)
+			continue;
+		if (VIDEO_MODE_RADIO == msp->norm)
+			continue;
 		msp->restart = 0;
 		msp3400c_setvolume(client, msp->muted, 0, 0);
 		msp3400c_setmode(client, MSP_MODE_AM_DETECT /* +1 */ );
@@ -912,7 +919,7 @@ done:
 	msp->thread = NULL;
 
 	if(msp->notify != NULL)
-		up_and_exit(msp->notify, 0);
+		up(msp->notify);
 	return 0;
 }
 
@@ -982,6 +989,9 @@ static int msp3410d_thread(void *data)
 		if (msp->rmmod || signal_pending(current))
 			goto done;
 
+		if (msp->scart)
+			continue;
+		
 		msp->active = 1;
 
 		if (msp->watch_stereo) {
@@ -997,17 +1007,14 @@ static int msp3410d_thread(void *data)
 			goto done;
 
 	restart:
+		if (msp->scart)
+			continue;
 		msp->restart = 0;
 		del_timer(&msp->wake_stereo);
 		msp->watch_stereo = 0;
 
 		/* put into sane state (and mute) */
 		msp3400c_reset(client);
-
-		/* set various prescales */
-		msp3400c_write(client, I2C_MSP3400C_DFP, 0x0d, 0x1900); /* scart */
-		msp3400c_write(client, I2C_MSP3400C_DFP, 0x0e, 0x2403); /* FM */
-		msp3400c_write(client, I2C_MSP3400C_DFP, 0x10, 0x5a00); /* nicam */
 
 		/* start autodetect */
 		switch (msp->norm) {
@@ -1080,6 +1087,11 @@ static int msp3410d_thread(void *data)
 			val = 0x0009;
 			msp3400c_write(client, I2C_MSP3400C_DEM, 0x20, val);
 		}
+
+		/* set various prescales */
+		msp3400c_write(client, I2C_MSP3400C_DFP, 0x0d, 0x1900); /* scart */
+		msp3400c_write(client, I2C_MSP3400C_DFP, 0x0e, 0x2403); /* FM */
+		msp3400c_write(client, I2C_MSP3400C_DFP, 0x10, 0x5a00); /* nicam */
 
 		/* set stereo */
 		switch (val) {
@@ -1320,19 +1332,25 @@ static int msp_command(struct i2c_client *client,unsigned int cmd, void *arg)
 
 	case AUDC_SET_INPUT:
 #if 1
+		dprintk(KERN_DEBUG "msp34xx: AUDC_SET_INPUT(%d)\n",*sarg);
 		/* hauppauge 44xxx scart switching */
+		msp->scart = 0;
 		switch (*sarg) {
 		case AUDIO_RADIO:
 			msp3400c_set_scart(client,SCART_IN2,0);
 			break;
 		case AUDIO_EXTERN:
+			msp->scart   = 1;
 			msp3400c_set_scart(client,SCART_IN1,0);
+			msp3400c_write(client,I2C_MSP3400C_DFP,0x0008,0x0220);
 			break;
 		default:
 			if (*sarg & AUDIO_MUTE)
 				msp3400c_set_scart(client,SCART_MUTE,0);
 			break;
 		}
+		if (msp->active)
+			msp->restart = 1;
 #endif
 		break;
 
@@ -1344,8 +1362,6 @@ static int msp_command(struct i2c_client *client,unsigned int cmd, void *arg)
 		if (msp->simple) {
 			/* the thread will do for us */
 			msp3400c_setvolume(client,msp->muted,0,0);
-			if (msp->active)
-				msp->restart = 1;
 			wake_up_interruptible(&msp->wq);
 		} else {
 			/* set msp3400 to FM radio mode */
@@ -1353,6 +1369,8 @@ static int msp_command(struct i2c_client *client,unsigned int cmd, void *arg)
 			msp3400c_setcarrier(client, MSP_CARRIER(10.7),MSP_CARRIER(10.7));
 			msp3400c_setvolume(client,msp->muted,msp->left,msp->right);			
 		}
+		if (msp->active)
+			msp->restart = 1;
 		break;
 
 	/* --- v4l ioctls --- */

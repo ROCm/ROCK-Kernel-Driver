@@ -31,7 +31,7 @@ Count (8 bits): A data byte containing the length of a block operation.
 SMBus Write Quick
 =================
 
-This sends a single byte to the device, at the place of the Rd/Wr bit.
+This sends a single bit to the device, at the place of the Rd/Wr bit.
 There is no equivalent Read Quick command.
 
 A Addr Rd/Wr [A] P

@@ -230,7 +230,7 @@ static inline void receive_chars (struct dz_serial *info_in)
 
     ch = UCHAR(status);                /* grab the char */
 
-#ifdef 0
+#if 0
     if (info->is_console) {
       if (ch == 0) return;            /* it's a break ... */
 

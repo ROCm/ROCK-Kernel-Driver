@@ -2,7 +2,7 @@
 
   Linux Driver for Mylex DAC960/AcceleRAID/eXtremeRAID PCI RAID Controllers
 
-  Copyright 1998-2000 by Leonard N. Zubkoff <lnz@dandelion.com>
+  Copyright 1998-2001 by Leonard N. Zubkoff <lnz@dandelion.com>
 
   This program is free software; you may redistribute and/or modify it under
   the terms of the GNU General Public License Version 2 as published by the
@@ -259,6 +259,7 @@ typedef enum
   DAC960_V1_ClearBadDataTable =			0x26,
   DAC960_V1_GetErrorTable =			0x17,
   DAC960_V1_AddCapacityAsync =			0x2A,
+  DAC960_V1_BackgroundInitializationControl =	0x2B,
   /* Configuration Related Commands */
   DAC960_V1_ReadConfig2 =			0x3D,
   DAC960_V1_WriteConfig2 =			0x3C,
@@ -450,14 +451,16 @@ typedef struct DAC960_V1_Enquiry2
   unsigned int NonVolatileMemorySize;			/* Bytes 36-39 */
   struct {
     enum {
-      DAC960_V1_DRAM =				0x0,
-      DAC960_V1_EDO =				0x1,
-      DAC960_V1_SDRAM =				0x2
+      DAC960_V1_RamType_DRAM =			0x0,
+      DAC960_V1_RamType_EDO =			0x1,
+      DAC960_V1_RamType_SDRAM =			0x2,
+      DAC960_V1_RamType_Last =			0x7
     } __attribute__ ((packed)) RamType:3;		/* Byte 40 Bits 0-2 */
     enum {
-      DAC960_V1_None =				0x0,
-      DAC960_V1_Parity =			0x1,
-      DAC960_V1_ECC =				0x2
+      DAC960_V1_ErrorCorrection_None =		0x0,
+      DAC960_V1_ErrorCorrection_Parity =	0x1,
+      DAC960_V1_ErrorCorrection_ECC =		0x2,
+      DAC960_V1_ErrorCorrection_Last =		0x7
     } __attribute__ ((packed)) ErrorCorrection:3;	/* Byte 40 Bits 3-5 */
     boolean FastPageMode:1;				/* Byte 40 Bit 6 */
     boolean LowPowerMemory:1;				/* Byte 40 Bit 7 */
@@ -523,7 +526,9 @@ typedef struct DAC960_V1_Enquiry2
   struct {
     boolean Clustering:1;				/* Byte 116 Bit 0 */
     boolean MylexOnlineRAIDExpansion:1;			/* Byte 116 Bit 1 */
-    unsigned int :30;					/* Bytes 116-119 */
+    boolean ReadAhead:1;				/* Byte 116 Bit 2 */
+    boolean BackgroundInitialization:1;			/* Byte 116 Bit 3 */
+    unsigned int :28;					/* Bytes 116-119 */
   } FirmwareFeatures;
   unsigned int :32;					/* Bytes 120-123 */
   unsigned int :32;					/* Bytes 124-127 */
@@ -993,7 +998,8 @@ typedef struct DAC960_V2_MemoryType
     DAC960_V2_MemoryType_DRAM =			0x01,
     DAC960_V2_MemoryType_EDRAM =		0x02,
     DAC960_V2_MemoryType_EDO =			0x03,
-    DAC960_V2_MemoryType_SDRAM =		0x04
+    DAC960_V2_MemoryType_SDRAM =		0x04,
+    DAC960_V2_MemoryType_Last =			0x1F
   } __attribute__ ((packed)) MemoryType:5;		/* Byte 0 Bits 0-4 */
   boolean :1;						/* Byte 0 Bit 5 */
   boolean MemoryParity:1;				/* Byte 0 Bit 6 */
@@ -1269,13 +1275,15 @@ typedef struct DAC960_V2_LogicalDeviceInfo
       DAC960_V2_ReadCacheDisabled =		0x0,
       DAC960_V2_ReadCacheEnabled =		0x1,
       DAC960_V2_ReadAheadEnabled =		0x2,
-      DAC960_V2_IntelligentReadAheadEnabled =	0x3
+      DAC960_V2_IntelligentReadAheadEnabled =	0x3,
+      DAC960_V2_ReadCache_Last =		0x7
     } __attribute__ ((packed)) ReadCache:3;		/* Byte 8 Bits 0-2 */
     enum {
       DAC960_V2_WriteCacheDisabled =		0x0,
       DAC960_V2_LogicalDeviceReadOnly =		0x1,
       DAC960_V2_WriteCacheEnabled =		0x2,
-      DAC960_V2_IntelligentWriteCacheEnabled =	0x3
+      DAC960_V2_IntelligentWriteCacheEnabled =	0x3,
+      DAC960_V2_WriteCache_Last =		0x7
     } __attribute__ ((packed)) WriteCache:3;		/* Byte 8 Bits 3-5 */
     boolean :1;						/* Byte 8 Bit 6 */
     boolean LogicalDeviceInitialized:1;			/* Byte 8 Bit 7 */
@@ -2336,6 +2344,7 @@ typedef struct DAC960_Controller
       boolean NeedDeviceSerialNumberInformation;
       boolean NeedRebuildProgress;
       boolean NeedConsistencyCheckProgress;
+      boolean StartDeviceStateScan;
       boolean RebuildProgressFirst;
       boolean RebuildFlagPending;
       boolean RebuildStatusPending;
@@ -2375,6 +2384,8 @@ typedef struct DAC960_Controller
       boolean NeedLogicalDeviceInformation;
       boolean NeedPhysicalDeviceInformation;
       boolean NeedDeviceSerialNumberInformation;
+      boolean StartLogicalDeviceInformationScan;
+      boolean StartPhysicalDeviceInformationScan;
       DAC960_V2_CommandMailbox_T *FirstCommandMailbox;
       DAC960_V2_CommandMailbox_T *LastCommandMailbox;
       DAC960_V2_CommandMailbox_T *NextCommandMailbox;
@@ -2397,6 +2408,7 @@ typedef struct DAC960_Controller
       DAC960_V2_PhysicalDevice_T
 	LogicalDriveToVirtualDevice[DAC960_MaxLogicalDrives];
       DAC960_V2_Event_T Event;
+      boolean LogicalDriveFoundDuringScan[DAC960_MaxLogicalDrives];
     } V2;
   } FW;
   DiskPartition_T DiskPartitions[DAC960_MinorCount];
@@ -2503,22 +2515,35 @@ void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
 
 
 /*
-  Virtual_to_Bus maps from Kernel Virtual Addresses to PCI Bus Addresses.
+  Virtual_to_Bus32 maps from Kernel Virtual Addresses to 32 Bit PCI Bus
+  Addresses.
 */
 
-static inline DAC960_BusAddress32_T Virtual_to_Bus(void *VirtualAddress)
+static inline DAC960_BusAddress32_T Virtual_to_Bus32(void *VirtualAddress)
 {
   return (DAC960_BusAddress32_T) virt_to_bus(VirtualAddress);
 }
 
 
 /*
-  Bus_to_Virtual maps from PCI Bus Addresses to Kernel Virtual Addresses.
+  Bus32_to_Virtual maps from 32 Bit PCI Bus Addresses to Kernel Virtual
+  Addresses.
 */
 
-static inline void *Bus_to_Virtual(DAC960_BusAddress32_T BusAddress)
+static inline void *Bus32_to_Virtual(DAC960_BusAddress32_T BusAddress)
 {
   return (void *) bus_to_virt(BusAddress);
+}
+
+
+/*
+  Virtual_to_Bus64 maps from Kernel Virtual Addresses to 64 Bit PCI Bus
+  Addresses.
+*/
+
+static inline DAC960_BusAddress64_T Virtual_to_Bus64(void *VirtualAddress)
+{
+  return (DAC960_BusAddress64_T) virt_to_bus(VirtualAddress);
 }
 
 
@@ -2789,8 +2814,13 @@ static inline
 void DAC960_BA_WriteHardwareMailbox(void *ControllerBaseAddress,
 				    DAC960_V2_CommandMailbox_T *CommandMailbox)
 {
-  writel(Virtual_to_Bus(CommandMailbox),
+#ifdef __ia64__
+  writeq(Virtual_to_Bus64(CommandMailbox),
 	 ControllerBaseAddress + DAC960_BA_CommandMailboxBusAddressOffset);
+#else
+  writel(Virtual_to_Bus32(CommandMailbox),
+	 ControllerBaseAddress + DAC960_BA_CommandMailboxBusAddressOffset);
+#endif
 }
 
 static inline DAC960_V2_CommandIdentifier_T
@@ -3090,8 +3120,13 @@ static inline
 void DAC960_LP_WriteHardwareMailbox(void *ControllerBaseAddress,
 				    DAC960_V2_CommandMailbox_T *CommandMailbox)
 {
-  writel(Virtual_to_Bus(CommandMailbox),
+#ifdef __ia64__
+  writeq(Virtual_to_Bus64(CommandMailbox),
 	 ControllerBaseAddress + DAC960_LP_CommandMailboxBusAddressOffset);
+#else
+  writel(Virtual_to_Bus32(CommandMailbox),
+	 ControllerBaseAddress + DAC960_LP_CommandMailboxBusAddressOffset);
+#endif
 }
 
 static inline DAC960_V2_CommandIdentifier_T

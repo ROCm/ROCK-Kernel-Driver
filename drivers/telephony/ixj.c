@@ -68,7 +68,7 @@ static char ixj_c_revision[] = "$Revision: 3.31 $";
 #include <asm/segment.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_PCMCIA
+#if defined(CONFIG_PCMCIA) || defined(CONFIG_PCMCIA_MODULE)
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
@@ -186,7 +186,7 @@ DSPbase +
 8-9		Hardware Status Register			Read Only
 A-B		Hardware Control Register			Read Write
 C-D Host Transmit (Write) Data Buffer Access Port (buffer input)Write Only
-E-F Host Recieve (Read) Data Buffer Access Port (buffer input)	Read Only
+E-F Host Receive (Read) Data Buffer Access Port (buffer input)	Read Only
 ************************************************************************/
 
 extern __inline__ void ixj_read_HSR(IXJ *j)
@@ -5823,7 +5823,7 @@ static int ixj_read_proc_fsk(char *page, char **start, off_t off,
 MODULE_DESCRIPTION("Internet Phone/Internet LineJack module - www.quicknet.net");
 MODULE_AUTHOR("Ed Okerson <eokerson@quicknet.net>");
 
-#ifdef CONFIG_PCMCIA
+#if defined(CONFIG_PCMCIA) || defined(CONFIG_PCMCIA_MODULE)
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
@@ -5999,6 +5999,7 @@ void ixj_get_serial(dev_link_t * link, IXJ * j)
 
 void ixj_config(dev_link_t * link)
 {
+	IXJ *j;
 	client_handle_t handle;
 	ixj_info_t *info;
 	tuple_t tuple;

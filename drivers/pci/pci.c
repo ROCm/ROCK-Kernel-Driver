@@ -20,7 +20,6 @@
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
 #include <linux/pm.h>
-#include <linux/slab.h>
 #include <linux/kmod.h>		/* for hotplug_path */
 
 #include <asm/page.h>

@@ -130,6 +130,7 @@
 #include <linux/malloc.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/init.h>

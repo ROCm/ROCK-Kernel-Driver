@@ -34,6 +34,7 @@ static int debug =  0; /* insmod parameter */
 static int type  = -1; /* insmod parameter */
 
 static int addr  =  0;
+static char *pal =  "b";
 static int this_adap;
 
 #define dprintk     if (debug) printk
@@ -41,6 +42,7 @@ static int this_adap;
 MODULE_PARM(debug,"i");
 MODULE_PARM(type,"i");
 MODULE_PARM(addr,"i");
+MODULE_PARM(pal,"s");
 
 struct tuner
 {
@@ -55,6 +57,44 @@ struct tuner
 static struct i2c_driver driver;
 static struct i2c_client client_template;
 
+/* tv standard selection for Temic 4046 FM5
+   this value takes the low bits of control byte 2
+   from datasheet Rev.01, Feb.00 
+     standard     BG      I       L       L2      D
+     picture IF   38.9    38.9    38.9    33.95   38.9
+     sound 1      33.4    32.9    32.4    40.45   32.4
+     sound 2      33.16   
+     NICAM        33.05   32.348  33.05           33.05
+ */
+#define TEMIC_SET_PAL_I         0x05
+#define TEMIC_SET_PAL_DK        0x09
+#define TEMIC_SET_PAL_L         0x0a // SECAM ?
+#define TEMIC_SET_PAL_L2        0x0b // change IF !
+#define TEMIC_SET_PAL_BG        0x0c
+
+/* tv tuner system standard selection for Philips FQ1216ME
+   this value takes the low bits of control byte 2
+   from datasheet "1999 Nov 16" (supersedes "1999 Mar 23")
+     standard 		BG	DK	I	L	L`
+     picture carrier	38.90	38.90	38.90	38.90	33.95
+     colour		34.47	34.47	34.47	34.47	38.38
+     sound 1		33.40	32.40	32.90	32.40	40.45
+     sound 2		33.16	-	-	-	-
+     NICAM		33.05	33.05	32.35	33.05	39.80
+ */
+#define PHILIPS_SET_PAL_I	0x01 /* Bit 2 always zero !*/
+#define PHILIPS_SET_PAL_BGDK	0x09
+#define PHILIPS_SET_PAL_L2	0x0a
+#define PHILIPS_SET_PAL_L	0x0b	
+
+/* system switching for Philips FI1216MF MK2
+   from datasheet "1996 Jul 09",
+ */
+#define PHILIPS_MF_SET_BG	0x01 /* Bit 2 must be zero, Bit 3 is system output */
+#define PHILIPS_MF_SET_PAL_L	0x03
+#define PHILIPS_MF_SET_PAL_L2	0x02
+
+
 /* ---------------------------------------------------------------------- */
 
 struct tunertype 
@@ -63,18 +103,13 @@ struct tunertype
 	unsigned char Vendor;
 	unsigned char Type;
   
-	unsigned short thresh1; /* frequency Range for UHF,VHF-L, VHF_H */   
-	unsigned short thresh2;  
+	unsigned short thresh1;  /*  band switch VHF_LO <=> VHF_HI  */
+	unsigned short thresh2;  /*  band switch VHF_HI <=> UHF     */
 	unsigned char VHF_L;
 	unsigned char VHF_H;
 	unsigned char UHF;
 	unsigned char config; 
-	unsigned short IFPCoff;
-	unsigned char mode; /* mode change value (tested PHILIPS_SECAM only) */
-			/* 0x01 -> ??? no change ??? */
-			/* 0x02 -> PAL BDGHI / SECAM L */
-			/* 0x04 -> ??? PAL others / SECAM others ??? */
-	int capability;
+	unsigned short IFPCoff; /* 622.4=16*38.90 MHz PAL, 732=16*45.75 NTSC */
 };
 
 /*
@@ -83,23 +118,25 @@ struct tunertype
  *	"no float in kernel" rule.
  */
 static struct tunertype tuners[] = {
-        { "Temic PAL", TEMIC, PAL,
+        { "Temic PAL (4002 FH5)", TEMIC, PAL,
 	  16*140.25,16*463.25,0x02,0x04,0x01,0x8e,623},
 	{ "Philips PAL_I", Philips, PAL_I,
 	  16*140.25,16*463.25,0xa0,0x90,0x30,0x8e,623},
 	{ "Philips NTSC", Philips, NTSC,
 	  16*157.25,16*451.25,0xA0,0x90,0x30,0x8e,732},
 	{ "Philips SECAM", Philips, SECAM,
-	  16*168.25,16*447.25,0xA7,0x97,0x37,0x8e,623,0x02},
+	  16*168.25,16*447.25,0xA7,0x97,0x37,0x8e,623},
+
 	{ "NoTuner", NoTuner, NOTUNER,
-	  0,0,0x00,0x00,0x00,0x00,0x00,000},
+	  0,0,0x00,0x00,0x00,0x00,0x00},
 	{ "Philips PAL", Philips, PAL,
 	  16*168.25,16*447.25,0xA0,0x90,0x30,0x8e,623},
-	{ "Temic NTSC", TEMIC, NTSC,
+	{ "Temic NTSC (4032 FY5)", TEMIC, NTSC,
 	  16*157.25,16*463.25,0x02,0x04,0x01,0x8e,732},
-	{ "Temic PAL_I", TEMIC, PAL_I,
+	{ "Temic PAL_I (4062 FY5)", TEMIC, PAL_I,
 	  16*170.00,16*450.00,0x02,0x04,0x01,0x8e,623},
- 	{ "Temic 4036 FY5 NTSC", TEMIC, NTSC,
+
+ 	{ "Temic NTSC (4036 FY5)", TEMIC, NTSC,
 	  16*157.25,16*463.25,0xa0,0x90,0x30,0x8e,732},
         { "Alps HSBH1", TEMIC, NTSC,
 	  16*137.25,16*385.25,0x01,0x02,0x08,0x8e,732},
@@ -107,14 +144,36 @@ static struct tunertype tuners[] = {
 	  16*137.25,16*385.25,0x01,0x02,0x08,0x8e,732},
         { "Alps TSBB5", Alps, PAL_I, /* tested (UK UHF) with Modtec MM205 */
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,632},
+
         { "Alps TSBE5", Alps, PAL, /* untested - data sheet guess. Only IF differs. */
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,622},
         { "Alps TSBC5", Alps, PAL, /* untested - data sheet guess. Only IF differs. */
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,608},
-	{ "Temic 4006FH5", TEMIC, PAL_I,
+	{ "Temic PAL_I (4006FH5)", TEMIC, PAL_I,
 	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623}, 
   	{ "Alps TSCH6",Alps,NTSC,
   	  16*137.25,16*385.25,0x14,0x12,0x11,0x8e,732},
+
+  	{ "Temic PAL_DK (4016 FY5)",TEMIC,PAL,
+  	  16*136.25,16*456.25,0xa0,0x90,0x30,0x8e,623},
+  	{ "Philips NTSC_M (MK2)",Philips,NTSC,
+  	  16*160.00,16*454.00,0xa0,0x90,0x30,0x8e,732},
+        { "Temic PAL_I (4066 FY5)", TEMIC, PAL_I,
+          16*169.00, 16*454.00, 0xa0,0x90,0x30,0x8e,623},
+        { "Temic PAL* auto (4006 FN5)", TEMIC, PAL,
+          16*169.00, 16*454.00, 0xa0,0x90,0x30,0x8e,623},
+
+        { "Temic PAL (4009 FR5)", TEMIC, PAL,
+          16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623},
+        { "Temic NTSC (4039 FR5)", TEMIC, NTSC,
+          16*158.00, 16*453.00, 0xa0,0x90,0x30,0x8e,732},
+        { "Temic PAL/SECAM multi (4046 FM5)", TEMIC, PAL,
+          16*169.00, 16*454.00, 0xa0,0x90,0x30,0x8e,623},
+        { "Philips PAL_DK", Philips, PAL,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+
+	{ "Philips PAL/SECAM multi (FQ1216ME)", Philips, PAL,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623}
 };
 #define TUNERS (sizeof(tuners)/sizeof(struct tunertype))
 
@@ -165,6 +224,7 @@ static int tuner_mode (struct i2c_client *c)
 }
 #endif
 
+// Set tuner frequency,  freq in Units of 62.5kHz = 1/16MHz
 static void set_tv_freq(struct i2c_client *c, int freq)
 {
 	u8 config;
@@ -173,6 +233,15 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 	struct tuner *t = c->data;
         unsigned char buffer[4];
 	int rc;
+
+	if (freq < 45*16 || freq > 890*16) {
+		/* FIXME: better do that chip-specific, but
+		   right now we don't have that in the config
+		   struct and this way is still better than no
+		   check at all */
+		printk("tuner: TV freq out of range\n");
+		return;
+	}
 
 	if (t->type == -1) {
 		printk("tuner: tuner type not set\n");
@@ -187,32 +256,81 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 	else
 		config = tun->UHF;
 
-#if 1   // Fix colorstandard mode change
-	if (t->type == TUNER_PHILIPS_SECAM && t->mode)
-		config |= tun->mode;
-	else
-		config &= ~tun->mode;
-#else
-		config &= ~tun->mode;
-#endif
+
+	/* tv norm specific stuff for multi-norm tuners */
+	switch (t->type) {
+	case TUNER_PHILIPS_SECAM:
+		/* 0x01 -> ??? no change ??? */
+		/* 0x02 -> PAL BDGHI / SECAM L */
+		/* 0x04 -> ??? PAL others / SECAM others ??? */
+		config &= ~0x02;
+		if (t->mode)
+			config |= 0x02;
+		break;
+
+	case TUNER_TEMIC_4046FM5:
+		config &= ~0x0f;
+		switch (pal[0]) {
+		case 'i':
+		case 'I':
+			config |= TEMIC_SET_PAL_I;
+			break;
+		case 'd':
+		case 'D':
+			config |= TEMIC_SET_PAL_DK;
+			break;
+		case 'l':
+		case 'L':
+			config |= TEMIC_SET_PAL_L;
+			break;
+		case 'b':
+		case 'B':
+		case 'g':
+		case 'G':
+		default:
+			config |= TEMIC_SET_PAL_BG;
+			break;
+		break;
+		}
+	case TUNER_PHILIPS_FQ1216ME:
+		config &= ~0x0f;
+		switch (pal[0]) {
+		case 'i':
+		case 'I':
+			config |= PHILIPS_SET_PAL_I;
+			break;
+		case 'l':
+		case 'L':
+			config |= PHILIPS_SET_PAL_L;
+			break;
+		case 'd':
+		case 'D':
+		case 'b':
+		case 'B':
+		case 'g':
+		case 'G':
+			config |= PHILIPS_SET_PAL_BGDK;
+			break;
+		break;
+		}
+	}
+
+	
+	/*
+	 * Philips FI1216MK2 remark from specification :
+	 * for channel selection involving band switching, and to ensure
+	 * smooth tuning to the desired channel without causing
+	 * unnecessary charge pump action, it is recommended to consider
+	 * the difference between wanted channel frequency and the
+	 * current channel frequency.  Unnecessary charge pump action
+	 * will result in very low tuning voltage which may drive the
+	 * oscillator to extreme conditions.
+	 *
+	 * Progfou: specification says to send config data before
+	 * frequency in case (wanted frequency < current frequency).
+	 */
 
 	div=freq + tun->IFPCoff;
-
-    /*
-     * Philips FI1216MK2 remark from specification :
-     * for channel selection involving band switching, and to ensure
-     * smooth tuning to the desired channel without causing
-     * unnecessary charge pump action, it is recommended to consider
-     * the difference between wanted channel frequency and the
-     * current channel frequency.  Unnecessary charge pump action
-     * will result in very low tuning voltage which may drive the
-     * oscillator to extreme conditions.
-     */
-    /*
-     * Progfou: specification says to send config data before
-     * frequency in case (wanted frequency < current frequency).
-     */
-
 	if (t->type == TUNER_PHILIPS_SECAM && freq < t->freq) {
 		buffer[0] = tun->config;
 		buffer[1] = config;
@@ -239,6 +357,10 @@ static void set_radio_freq(struct i2c_client *c, int freq)
         unsigned char buffer[4];
 	int rc;
 
+	if (freq < 76*16 || freq > 108*16) {
+		printk("tuner: radio freq out of range\n");
+		return;
+	}
 	if (t->type == -1) {
 		printk("tuner: tuner type not set\n");
 		return;
@@ -378,16 +500,16 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	{
 		unsigned long *v = arg;
 
-		t->freq = *v;
 		if (t->radio) {
 			dprintk("tuner: radio freq set to %d.%02d\n",
 				(*iarg)/16,(*iarg)%16*100/16);
-			set_radio_freq(client,t->freq);
+			set_radio_freq(client,*v);
 		} else {
 			dprintk("tuner: tv freq set to %d.%02d\n",
 				(*iarg)/16,(*iarg)%16*100/16);
-			set_tv_freq(client,t->freq);
+			set_tv_freq(client,*v);
 		}
+		t->freq = *v;
 		return 0;
 	}
 	case VIDIOCGTUNER:

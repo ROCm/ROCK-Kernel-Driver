@@ -95,15 +95,8 @@
  */
 #endif				/* #ifdef __KERNEL__ */
 
-#ifndef __KERNEL__
-#define __KERNEL__
 #include <linux/kdev_t.h>
 #include <linux/list.h>
-#undef __KERNEL__
-#else
-#include <linux/kdev_t.h>
-#include <linux/list.h>
-#endif				/* #ifndef __KERNEL__ */
 
 #include <asm/types.h>
 #include <linux/major.h>

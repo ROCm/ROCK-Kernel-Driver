@@ -43,7 +43,6 @@
 static void smb_delete_inode(struct inode *);
 static void smb_put_super(struct super_block *);
 static int  smb_statfs(struct super_block *, struct statfs *);
-static void smb_set_inode_attr(struct inode *, struct smb_fattr *);
 
 static struct super_operations smb_sops =
 {
@@ -110,7 +109,7 @@ smb_get_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 		fattr->attr |= aRONLY;
 }
 
-static void
+void
 smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 {
 	inode->i_mode	= fattr->f_mode;
@@ -125,8 +124,7 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 	 * Don't change the size and mtime/atime fields
 	 * if we're writing to the file.
 	 */
-	if (!(inode->u.smbfs_i.cache_valid & SMB_F_LOCALWRITE))
-	{
+	if (!(inode->u.smbfs_i.flags & SMB_F_LOCALWRITE)) {
 		inode->i_size  = fattr->f_size;
 		inode->i_mtime = fattr->f_mtime;
 		inode->i_atime = fattr->f_atime;
@@ -211,6 +209,7 @@ smb_refresh_inode(struct dentry *dentry)
 int
 smb_revalidate_inode(struct dentry *dentry)
 {
+	struct smb_sb_info *s = server_from_dentry(dentry);
 	struct inode *inode = dentry->d_inode;
 	time_t last_time;
 	int error = 0;
@@ -221,8 +220,7 @@ smb_revalidate_inode(struct dentry *dentry)
 	 * the inode will be up-to-date.
 	 */
 	lock_kernel();
-	if (S_ISREG(inode->i_mode) && smb_is_open(inode))
-	{
+	if (S_ISREG(inode->i_mode) && smb_is_open(inode)) {
 		if (inode->u.smbfs_i.access != SMB_O_RDONLY)
 			goto out;
 	}
@@ -230,10 +228,9 @@ smb_revalidate_inode(struct dentry *dentry)
 	/*
 	 * Check whether we've recently refreshed the inode.
 	 */
-	if (time_before(jiffies, inode->u.smbfs_i.oldmtime + HZ/10))
-	{
-		VERBOSE("up-to-date, jiffies=%lu, oldtime=%lu\n",
-			jiffies, inode->u.smbfs_i.oldmtime);
+	if (time_before(jiffies, inode->u.smbfs_i.oldmtime + SMB_MAX_AGE(s))) {
+		VERBOSE("up-to-date, ino=%ld, jiffies=%lu, oldtime=%lu\n",
+			inode->i_ino, jiffies, inode->u.smbfs_i.oldmtime);
 		goto out;
 	}
 
@@ -243,16 +240,13 @@ smb_revalidate_inode(struct dentry *dentry)
 	 */
 	last_time = inode->i_mtime;
 	error = smb_refresh_inode(dentry);
-	if (error || inode->i_mtime != last_time)
-	{
+	if (error || inode->i_mtime != last_time) {
 		VERBOSE("%s/%s changed, old=%ld, new=%ld\n",
 			DENTRY_PATH(dentry),
 			(long) last_time, (long) inode->i_mtime);
 
 		if (!S_ISDIR(inode->i_mode))
 			invalidate_inode_pages(inode);
-		else
-			smb_invalid_dir_cache(inode);
 	}
 out:
 	unlock_kernel();
@@ -287,6 +281,7 @@ struct option opts[] = {
 	{ "dir_mode",	1, 0, 'd' },
 	{ "iocharset",	1, 0, 'i' },
 	{ "codepage",	1, 0, 'c' },
+	{ "ttl",	1, 0, 't' },
 	{ NULL,		0, 0, 0}
 };
 
@@ -338,6 +333,9 @@ parse_options(struct smb_mount_data_kernel *mnt, char *options)
 		case 'c':
 			strncpy(mnt->codepage.remote_name, optarg,
 				SMB_NLS_MAXNAMELEN);
+			break;
+		case 't':
+			mnt->ttl = value;
 			break;
 		default:
 			printk ("smbfs: Unrecognized mount option %s\n",
@@ -437,6 +435,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	strncpy(mnt->codepage.remote_name, SMB_NLS_REMOTE,
 		SMB_NLS_MAXNAMELEN);
 
+	mnt->ttl = 1000;
 	if (ver == SMB_MOUNT_OLDVERSION) {
 		mnt->version = oldmnt->version;
 
@@ -483,6 +482,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root)
 		goto out_no_root;
+	smb_new_dentry(sb->s_root);
 
 	return sb;
 

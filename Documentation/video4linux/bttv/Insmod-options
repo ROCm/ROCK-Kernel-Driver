@@ -30,6 +30,12 @@ bttv.o
 				default is 2.
 		gbufsize=	size of capture buffers. default and
 				maximum value is 0x208000 (~2MB)
+		no_overlay=0	Enable overlay on broken hardware.  There
+				are some chipsets (SIS for example) which
+				are known to have problems with the PCI DMA
+				push used by bttv.  bttv will disable overlay
+				by default on this hardware to avoid crashes.
+				With this insmod option you can override this.
 
 		bttv_gpio=0/1
 		gpiomask=
@@ -48,6 +54,8 @@ tuner.o
 		debug=1		print some debug info to the syslog
 		type=n		type of the tuner chip. n as follows:
 				see CARDLIST for a complete list.
+		pal=[bdgil]	select PAL variant (used for some tuners
+				only, important for the audio carrier).
 
 tvmixer.o
 	registers a mixer device for the TV card's volume/bass/treble

@@ -23,7 +23,7 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
 fi
 dep_tristate '  CPiA Video For Linux' CONFIG_VIDEO_CPIA $CONFIG_VIDEO_DEV
 if [ "$CONFIG_VIDEO_CPIA" != "n" ]; then
-  if [ "CONFIG_PARPORT_1284" != "n" ]; then
+  if [ "$CONFIG_PARPORT_1284" != "n" ]; then
     dep_tristate '    CPiA Parallel Port Lowlevel Support' CONFIG_VIDEO_CPIA_PP $CONFIG_VIDEO_CPIA $CONFIG_PARPORT
   fi
   if [ "$CONFIG_USB" != "n" ]; then

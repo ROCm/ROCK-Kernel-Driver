@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.92 2001/01/25 17:15:59 davem Exp $
+/* $Id: sbus.c,v 1.94 2001/02/13 07:34:40 davem Exp $
  * sbus.c:  SBus support routines.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -67,29 +67,12 @@ static void __init fill_sbus_device(int prom_node, struct sbus_dev *sdev)
 	sdev->ranges_applied = 0;
 
 	base = (unsigned long) sdev->reg_addrs[0].phys_addr;
-	if (base >= SUN_SBUS_BVADDR ||
-	    (sparc_cpu_model != sun4c && sparc_cpu_model != sun4)) {
-		/* OK, we can compute the slot number in a
-		 * straightforward manner.
-		 */
-		if (sparc_cpu_model == sun4u ||
-		    sparc_cpu_model == sun4d)
-			sdev->slot = sdev->reg_addrs[0].which_io;
-		else
-			sdev->slot = sbus_dev_slot(base);
-	} else {
-		int rnum;
 
-		/* Fixups are needed to compute the slot number. */
+	/* Compute the slot number. */
+	if (base >= SUN_SBUS_BVADDR && sparc_cpu_model == sun4m) {
+		sdev->slot = sbus_dev_slot(base);
+	} else {
 		sdev->slot = sdev->reg_addrs[0].which_io;
-		sdev->reg_addrs[0].phys_addr =
-			sbus_devaddr(sdev->slot, base);
-		for (rnum = 1; rnum < sdev->num_registers; rnum++) {
-			base = (unsigned long)
-				sdev->reg_addrs[rnum].phys_addr;
-			sdev->reg_addrs[rnum].phys_addr =
-				sbus_devaddr(sdev->slot, base);
-		}
 	}
 
 no_regs:

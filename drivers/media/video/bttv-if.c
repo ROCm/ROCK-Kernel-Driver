@@ -36,6 +36,9 @@
 #include "bttvp.h"
 #include "tuner.h"
 
+static struct i2c_algo_bit_data bttv_i2c_algo_template;
+static struct i2c_adapter bttv_i2c_adap_template;
+static struct i2c_client bttv_i2c_client_template;
 
 EXPORT_SYMBOL(bttv_get_cardinfo);
 EXPORT_SYMBOL(bttv_get_id);
@@ -240,17 +243,17 @@ void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg)
 	}
 }
 
-struct i2c_algo_bit_data bttv_i2c_algo_template = {
+static struct i2c_algo_bit_data bttv_i2c_algo_template = {
 	setsda:  bttv_bit_setsda,
 	setscl:  bttv_bit_setscl,
 	getsda:  bttv_bit_getsda,
 	getscl:  bttv_bit_getscl,
-	udelay:  40,
+	udelay:  16,
 	mdelay:  10,
 	timeout: 200,
 };
 
-struct i2c_adapter bttv_i2c_adap_template = {
+static struct i2c_adapter bttv_i2c_adap_template = {
 	name:              "bt848",
 	id:                I2C_HW_B_BT848,
 	inc_use:           bttv_inc_use,
@@ -259,7 +262,7 @@ struct i2c_adapter bttv_i2c_adap_template = {
 	client_unregister: detach_inform,
 };
 
-struct i2c_client bttv_i2c_client_template = {
+static struct i2c_client bttv_i2c_client_template = {
         name: "bttv internal use only",
         id:   -1,
 };
@@ -323,6 +326,30 @@ void __devinit bttv_readee(struct bttv *btv, unsigned char *eedata, int addr)
 			break;
 		}
 	}
+}
+
+/* init + register i2c algo-bit adapter */
+int __devinit init_bttv_i2c(struct bttv *btv)
+{
+	memcpy(&btv->i2c_adap, &bttv_i2c_adap_template,
+	       sizeof(struct i2c_adapter));
+	memcpy(&btv->i2c_algo, &bttv_i2c_algo_template,
+	       sizeof(struct i2c_algo_bit_data));
+	memcpy(&btv->i2c_client, &bttv_i2c_client_template,
+	       sizeof(struct i2c_client));
+
+	sprintf(btv->i2c_adap.name+strlen(btv->i2c_adap.name),
+		" #%d", btv->nr);
+        btv->i2c_algo.data = btv;
+        btv->i2c_adap.data = btv;
+        btv->i2c_adap.algo_data = &btv->i2c_algo;
+        btv->i2c_client.adapter = &btv->i2c_adap;
+
+	bttv_bit_setscl(btv,1);
+	bttv_bit_setsda(btv,1);
+
+	btv->i2c_rc = i2c_bit_add_bus(&btv->i2c_adap);
+	return btv->i2c_rc;
 }
 
 /*

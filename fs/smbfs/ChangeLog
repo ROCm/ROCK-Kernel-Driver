@@ -1,5 +1,14 @@
 ChangeLog for smbfs.
 
+2001-02-10 Urban Widmark <urban@teststation.com>
+
+	* dir.c: replace non-bigmem safe cache with cache code from ncpfs
+	  and fix some other bigmem bugs in smbfs.
+	* inode.c: root dentry not properly initialized
+	* proc.c, sock.c: adjust max parameters & max data to follow max_xmit
+	  lots of servers were having find_next trouble with this.
+	* proc.c: use documented write method of truncating (NetApp fix)
+
 2000-08-14 Urban Widmark <urban@svenskatest.se>
 
 	* dir.c: support case sensitive shares
@@ -31,7 +40,7 @@ ChangeLog for smbfs.
 
 	* *.c: replace ugly #ifdef's with less ugly debug macros.
 
-2000-01-?? cpg@aladdin.de
+2000-01-03 Christian Groessler <cpg@aladdin.de>
 
 	* proc.c: added posix semantics for unlink
 

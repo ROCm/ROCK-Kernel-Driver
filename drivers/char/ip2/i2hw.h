@@ -143,7 +143,7 @@ registers, use byte operations only.
 //
 #define FIFO_DATA 0
 
-// Another way of passing information between the the board and the host is
+// Another way of passing information between the board and the host is
 // through "mailboxes". Unlike a FIFO, a mailbox holds only a single byte of
 // data.  Writing data to the mailbox causes a status bit to be set, and
 // potentially interrupting the intended receiver. The sender has some way to

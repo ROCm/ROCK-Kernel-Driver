@@ -1719,21 +1719,15 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_SETFRAGMENT:
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
-	/* P3: these frags are for Doom. Amasingly, it sets [2,2**11]. */
-	/* P3 */ // printk("ymfpci: ioctl SNDCTL_DSP_SETFRAGMENT 0x%x\n", val);
-
 		dmabuf = &state->wpcm.dmabuf;
 		dmabuf->ossfragshift = val & 0xffff;
 		dmabuf->ossmaxfrags = (val >> 16) & 0xffff;
-		switch (dmabuf->ossmaxfrags) {
-		case 1:
-			dmabuf->ossfragshift = 12;
-			return 0;
-		default:
-			/* Fragments must be 2K long */
-			dmabuf->ossfragshift = 11;
-			dmabuf->ossmaxfrags = 2;
-		}
+		if (dmabuf->ossfragshift < 4)
+			dmabuf->ossfragshift = 4;
+		if (dmabuf->ossfragshift > 15)
+			dmabuf->ossfragshift = 15;
+		if (dmabuf->ossmaxfrags < 4)
+			dmabuf->ossmaxfrags = 4;
 		return 0;
 
 	case SNDCTL_DSP_GETOSPACE:

@@ -137,7 +137,8 @@ static int __init abyss_attach(struct pci_dev *pdev, const struct pci_device_id 
 	 */
 	dev->base_addr += 0x10;
 		
-	ret = tmsdev_init(dev);
+	ret = tmsdev_init(dev,0,pdev);
+	/* XXX: should be the max PCI32 DMA max */
 	if (ret) {
 		printk("%s: unable to get memory for dev->priv.\n", 
 		       dev->name);
@@ -153,7 +154,6 @@ static int __init abyss_attach(struct pci_dev *pdev, const struct pci_device_id 
 	printk("\n");
 
 	tp = dev->priv;
-	tp->dmalimit = 0; /* XXX: should be the max PCI32 DMA max */
 	tp->setnselout = abyss_setnselout_pins;
 	tp->sifreadb = abyss_sifreadb;
 	tp->sifreadw = abyss_sifreadw;
@@ -173,7 +173,7 @@ static int __init abyss_attach(struct pci_dev *pdev, const struct pci_device_id 
 	return 0;
 
 err_out_tmsdev:
-	kfree(dev->priv);
+	tmsdev_term(dev);
 err_out_irq:
 	free_irq(pdev->irq, dev);
 err_out_region:
@@ -441,7 +441,7 @@ static void __exit abyss_detach (struct pci_dev *pdev)
 	unregister_netdev(dev);
 	release_region(dev->base_addr-0x10, ABYSS_IO_EXTENT);
 	free_irq(dev->irq, dev);
-	kfree(dev->priv);
+	tmsdev_term(dev);
 	kfree(dev);
 	pci_set_drvdata(pdev, NULL);
 }

@@ -1113,6 +1113,8 @@ dasd_end_request (struct request *req, int uptodate)
 {
 	struct buffer_head *bh;
 	while ((bh = req->bh) != NULL) {
+                int nsect = bh->b_size >> 9;
+                blk_finished_io (nsect);
 		req->bh = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		bh->b_end_io (bh, uptodate);

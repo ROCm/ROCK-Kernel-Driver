@@ -253,29 +253,6 @@ static int fbuffer_alloc(struct bttv *btv)
 	return 0;
 }
 
-
-/* init + register i2c algo-bit adapter */
-static int __devinit init_bttv_i2c(struct bttv *btv)
-{
-	memcpy(&btv->i2c_adap, &bttv_i2c_adap_template, sizeof(struct i2c_adapter));
-	memcpy(&btv->i2c_algo, &bttv_i2c_algo_template, sizeof(struct i2c_algo_bit_data));
-	memcpy(&btv->i2c_client, &bttv_i2c_client_template, sizeof(struct i2c_client));
-
-	sprintf(btv->i2c_adap.name+strlen(btv->i2c_adap.name),
-		" #%d", btv->nr);
-        btv->i2c_algo.data = btv;
-        btv->i2c_adap.data = btv;
-        btv->i2c_adap.algo_data = &btv->i2c_algo;
-        btv->i2c_client.adapter = &btv->i2c_adap;
-
-	bttv_bit_setscl(btv,1);
-	bttv_bit_setsda(btv,1);
-
-	btv->i2c_rc = i2c_bit_add_bus(&btv->i2c_adap);
-	return btv->i2c_rc;
-}
-
-
 /* ----------------------------------------------------------------------- */
 
 void bttv_gpio_tracking(struct bttv *btv, char *comment)
@@ -1589,8 +1566,10 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		struct video_tuner v;
 		if(copy_from_user(&v,arg,sizeof(v))!=0)
 			return -EFAULT;
+#if 0 /* tuner.signal might be of intrest for non-tuner sources too ... */
 		if(v.tuner||btv->channel)	/* Only tuner 0 */
 			return -EINVAL;
+#endif
 		strcpy(v.name, "Television");
 		v.rangelow=0;
 		v.rangehigh=0xFFFFFFFF;
@@ -1753,6 +1732,8 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			return -EINVAL;
 		if (btv->win.width==0 || btv->win.height==0)
 			return -EINVAL;
+		if (1 == no_overlay)
+			return -EIO;
 		spin_lock_irqsave(&btv->s_lock, irq_flags);
 		if (v == 1 && btv->win.vidadr != 0)
 			btv->scr_on = 1;
@@ -1796,14 +1777,18 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		btv->win.depth=v.depth;
 		btv->win.bpl=v.bytesperline;
 
+#if 0 /* was broken for ages and nobody noticed.  Looks like we don't need
+	 it any more as everybody explicitly sets the palette using VIDIOCSPICT
+	 these days */
 		/* set sefault color format */
-		switch (btv->win.bpp) {
+		switch (v.depth) {
 		case  8: btv->picture.palette = VIDEO_PALETTE_HI240;  break;
 		case 15: btv->picture.palette = VIDEO_PALETTE_RGB555; break;
 		case 16: btv->picture.palette = VIDEO_PALETTE_RGB565; break;
 		case 24: btv->picture.palette = VIDEO_PALETTE_RGB24;  break;
 		case 32: btv->picture.palette = VIDEO_PALETTE_RGB32;  break;
 		}
+#endif
 	
 		if (bttv_debug)
 			printk("Display at %p is %d by %d, bytedepth %d, bpl %d\n",
@@ -1833,8 +1818,8 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 			return -EFAULT;
 		btv->win.freq=v;
 		bttv_call_i2c_clients(btv,cmd,&v);
-#if 0
-		if (btv->type == BTTV_MIROPRO && btv->radio)
+#if 1
+		if (btv->radio && btv->has_matchbox)
 			tea5757_set_freq(btv,v);
 #endif
 		return 0;
@@ -1882,7 +1867,7 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		
 		/* card specific hooks */
 		if (bttv_tvcards[btv->type].audio_hook)
-			bttv_tvcards[btv->type].audio_hook(btv,&v,0);
+			bttv_tvcards[btv->type].audio_hook(btv,&v,1);
 
 		btv->audio_dev=v;
 		up(&btv->lock);
@@ -2184,7 +2169,7 @@ static void vbi_close(struct video_device *dev)
 
 static int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 {
-	struct bttv *btv=(struct bttv *)dev;
+	struct bttv *btv=(struct bttv *)(dev-2);
 
 	switch (cmd) {	
 	case VIDIOCGCAP:
@@ -2206,7 +2191,7 @@ static int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	case VIDIOCGFREQ:
 	case VIDIOCSFREQ:
 	case BTTV_VERSION:
-		return bttv_ioctl(dev,cmd,arg);
+		return bttv_ioctl(dev-2,cmd,arg);
 	case BTTV_VBISIZE:
 		/* make alevt happy :-) */
 		return VBIBUF_SIZE;
@@ -2462,7 +2447,7 @@ static int __devinit init_video_dev(struct bttv *btv)
 	        video_unregister_device(&btv->video_dev);
 		return -1;
 	}
-	if (radio[btv->nr])
+	if (btv->has_radio)
 	{
 		if(video_register_device(&btv->radio_dev, VFL_TYPE_RADIO)<0) 
                 {
@@ -2523,6 +2508,7 @@ static int __devinit init_bt848(struct bttv *btv)
 
 	btv->errors=0;
 	btv->needs_restart=0;
+	btv->has_radio=radio[btv->nr];
 
 	if (!(btv->risc_scr_odd=(unsigned int *) kmalloc(RISCMEM_LEN/2, GFP_KERNEL)))
 		return -1;
@@ -2854,11 +2840,11 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
         if (btv->bt848_mem)
                 iounmap(btv->bt848_mem);
 
-        if(btv->video_dev.minor!=-1)
+        if (btv->video_dev.minor!=-1)
                 video_unregister_device(&btv->video_dev);
-        if(btv->vbi_dev.minor!=-1)
+        if (btv->vbi_dev.minor!=-1)
                 video_unregister_device(&btv->vbi_dev);
-        if (radio[btv->nr] && btv->radio_dev.minor != -1)
+        if (btv->radio_dev.minor != -1)
                 video_unregister_device(&btv->radio_dev);
 
         release_mem_region(pci_resource_start(btv->dev,0),

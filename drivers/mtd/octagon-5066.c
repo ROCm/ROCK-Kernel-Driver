@@ -1,4 +1,4 @@
-// $Id: octagon-5066.c,v 1.12 2000/11/27 08:50:22 dwmw2 Exp $
+// $Id: octagon-5066.c,v 1.12.2.1 2001/02/15 10:12:48 dwmw2 Exp $
 /* ######################################################################
 
    Octagon 5066 MTD Driver. 
@@ -273,7 +273,7 @@ int __init init_oct5066(void)
 		}
 	}
 	
-	if (!oct5066_mtd[1] && !oct5066_mtd[2]) {
+	if (!oct5066_mtd[0] && !oct5066_mtd[1]) {
 		cleanup_oct5066();
 		return -ENXIO;
 	}	  

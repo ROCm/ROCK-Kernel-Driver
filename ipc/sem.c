@@ -467,7 +467,7 @@ int semctl_nolock(int semid, int semnum, int cmd, int version, union semun arg)
 		struct semid64_ds tbuf;
 		int id;
 
-		if(semid > sem_ids.size)
+		if(semid >= sem_ids.size)
 			return -EINVAL;
 
 		memset(&tbuf,0,sizeof(tbuf));
@@ -922,7 +922,7 @@ asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
 
 		tmp = sem_lock(semid);
 		if(tmp==NULL) {
-			if(queue.status != -EIDRM)
+			if(queue.prev != NULL)
 				BUG();
 			current->semsleeping = NULL;
 			error = -EIDRM;

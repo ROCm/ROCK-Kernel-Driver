@@ -186,6 +186,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 
 #include "sound_config.h"
 #include "sb_mixer.h"
@@ -524,10 +525,9 @@ static void ess_audio_halt_xfer(int dev)
 	unsigned long flags;
 	sb_devc *devc = audio_devs[dev]->devc;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	sb_dsp_reset(devc);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	/*
 	 * Audio 2 may still be operational! Creates awful sounds!
@@ -969,8 +969,7 @@ static unsigned int ess_identify (sb_devc * devc)
 	unsigned int val;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	outb(((unsigned char) (0x40 & 0xff)), MIXER_ADDR);
 
 	udelay(20);
@@ -978,7 +977,7 @@ static unsigned int ess_identify (sb_devc * devc)
 	udelay(20);
 	val |= inb(MIXER_DATA);
 	udelay(20);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	return val;
 }
@@ -1565,8 +1564,7 @@ void ess_setmixer (sb_devc * devc, unsigned int port, unsigned int value)
 printk(KERN_INFO "FKS: write mixer %x: %x\n", port, value);
 #endif
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (port >= 0xa0) {
 		ess_write (devc, port, value);
 	} else {
@@ -1576,7 +1574,7 @@ printk(KERN_INFO "FKS: write mixer %x: %x\n", port, value);
 		outb(((unsigned char) (value & 0xff)), MIXER_DATA);
 		udelay(20);
 	};
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 unsigned int ess_getmixer (sb_devc * devc, unsigned int port)
@@ -1584,8 +1582,7 @@ unsigned int ess_getmixer (sb_devc * devc, unsigned int port)
 	unsigned int val;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	if (port >= 0xa0) {
 		val = ess_read (devc, port);
@@ -1596,7 +1593,7 @@ unsigned int ess_getmixer (sb_devc * devc, unsigned int port)
 		val = inb(MIXER_DATA);
 		udelay(20);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	return val;
 }

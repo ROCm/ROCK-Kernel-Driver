@@ -19,7 +19,10 @@
  * Daniel J. Rodriksson: Changes to make sb16 work full duplex.
  *                       Maybe other 16 bit cards in this code could behave
  *                       the same.
+ * Chris Rankin:         Use spinlocks instead of CLI/STI
  */
+
+#include <linux/spinlock.h>
 
 #include "sound_config.h"
 
@@ -43,23 +46,22 @@ int sb_audio_open(int dev, int mode)
 		if (mode == OPEN_READ)
 			return -EPERM;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (devc->opened)
 	{
-		  restore_flags(flags);
+		  spin_unlock_irqrestore(&devc->lock, flags);
 		  return -EBUSY;
 	}
 	if (devc->dma16 != -1 && devc->dma16 != devc->dma8 && !devc->duplex)
 	{
 		if (sound_open_dma(devc->dma16, "Sound Blaster 16 bit"))
 		{
-			restore_flags(flags);
+		  	spin_unlock_irqrestore(&devc->lock, flags);
 			return -EBUSY;
 		}
 	}
 	devc->opened = mode;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	devc->irq_mode = IMODE_NONE;
 	devc->irq_mode_16 = IMODE_NONE;
@@ -182,8 +184,7 @@ static void sb1_audio_output_block(int dev, unsigned long buf, int nr_bytes, int
 
 	devc->irq_mode = IMODE_OUTPUT;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x14))		/* 8 bit DAC using DMA */
 	{
 		sb_dsp_command(devc, (unsigned char) (count & 0xff));
@@ -191,7 +192,7 @@ static void sb1_audio_output_block(int dev, unsigned long buf, int nr_bytes, int
 	}
 	else
 		printk(KERN_WARNING "Sound Blaster:  unable to start DAC.\n");
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->intr_active = 1;
 }
 
@@ -213,8 +214,7 @@ static void sb1_audio_start_input(int dev, unsigned long buf, int nr_bytes, int 
 
 	devc->irq_mode = IMODE_INPUT;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x24))		/* 8 bit ADC using DMA */
 	{
 		sb_dsp_command(devc, (unsigned char) (count & 0xff));
@@ -222,7 +222,7 @@ static void sb1_audio_start_input(int dev, unsigned long buf, int nr_bytes, int 
 	}
 	else
 		printk(KERN_ERR "Sound Blaster:  unable to start ADC.\n");
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	devc->intr_active = 1;
 }
@@ -258,12 +258,11 @@ static int sb1_audio_prepare_for_input(int dev, int bsize, int bcount)
 	sb_devc *devc = audio_devs[dev]->devc;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x40))
 		sb_dsp_command(devc, devc->tconst);
 	sb_dsp_command(devc, DSP_CMD_SPKOFF);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	devc->trigger_bits = 0;
 	return 0;
@@ -274,12 +273,11 @@ static int sb1_audio_prepare_for_output(int dev, int bsize, int bcount)
 	sb_devc *devc = audio_devs[dev]->devc;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x40))
 		sb_dsp_command(devc, devc->tconst);
 	sb_dsp_command(devc, DSP_CMD_SPKON);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->trigger_bits = 0;
 	return 0;
 }
@@ -327,10 +325,9 @@ static void sb1_audio_halt_xfer(int dev)
 	unsigned long flags;
 	sb_devc *devc = audio_devs[dev]->devc;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	sb_dsp_reset(devc);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 /*
@@ -353,8 +350,7 @@ static void sb20_audio_output_block(int dev, unsigned long buf, int nr_bytes,
 
 	devc->irq_mode = IMODE_OUTPUT;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x48))		/* DSP Block size */
 	{
 		sb_dsp_command(devc, (unsigned char) (count & 0xff));
@@ -370,7 +366,7 @@ static void sb20_audio_output_block(int dev, unsigned long buf, int nr_bytes,
 	}
 	else
 		printk(KERN_ERR "Sound Blaster: unable to start DAC.\n");
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->intr_active = 1;
 }
 
@@ -393,8 +389,7 @@ static void sb20_audio_start_input(int dev, unsigned long buf, int nr_bytes, int
 
 	devc->irq_mode = IMODE_INPUT;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x48))		/* DSP Block size */
 	{
 		sb_dsp_command(devc, (unsigned char) (count & 0xff));
@@ -410,7 +405,7 @@ static void sb20_audio_start_input(int dev, unsigned long buf, int nr_bytes, int
 	}
 	else
 		printk(KERN_ERR "Sound Blaster:  unable to start ADC.\n");
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->intr_active = 1;
 }
 
@@ -484,8 +479,7 @@ static int sbpro_audio_prepare_for_input(int dev, int bsize, int bcount)
 		if (devc->bits == AFMT_S16_LE)
 			bits = 0x04;	/* 16 bit mode */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x40))
 		sb_dsp_command(devc, devc->tconst);
 	sb_dsp_command(devc, DSP_CMD_SPKOFF);
@@ -493,7 +487,7 @@ static int sbpro_audio_prepare_for_input(int dev, int bsize, int bcount)
 		sb_dsp_command(devc, 0xa0 | bits);	/* Mono input */
 	else
 		sb_dsp_command(devc, 0xa8 | bits);	/* Stereo input */
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	devc->trigger_bits = 0;
 	return 0;
@@ -511,8 +505,7 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 	if (devc->model == MDL_SBPRO)
 		sb_mixer_set_stereo(devc, devc->channels == 2);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 	if (sb_dsp_command(devc, 0x40))
 		sb_dsp_command(devc, devc->tconst);
 	sb_dsp_command(devc, DSP_CMD_SPKON);
@@ -536,7 +529,7 @@ static int sbpro_audio_prepare_for_output(int dev, int bsize, int bcount)
 			tmp |= 0x02;
 		sb_setmixer(devc, 0x0e, tmp);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 	devc->trigger_bits = 0;
 	return 0;
 }
@@ -706,21 +699,19 @@ static void sb16_audio_output_block(int dev, unsigned long buf, int count,
 	}
 
 	/* save value */
-	save_flags (flags);
-	cli ();
+	spin_lock_irqsave(&devc->lock, flags);
 	bits = devc->bits;
 	if (devc->fullduplex)
 		devc->bits = (devc->bits == AFMT_S16_LE) ?
 			AFMT_U8 : AFMT_S16_LE;
-	restore_flags (flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 
 	cnt = count;
 	if (devc->bits == AFMT_S16_LE)
 		cnt >>= 1;
 	cnt--;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	/* DMAbuf_start_dma (dev, buf, count, DMA_MODE_WRITE); */
 
@@ -736,7 +727,7 @@ static void sb16_audio_output_block(int dev, unsigned long buf, int count,
 
 	/* restore real value after all programming */
 	devc->bits = bits;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 
@@ -768,8 +759,7 @@ static void sb16_audio_start_input(int dev, unsigned long buf, int count, int in
 		cnt >>= 1;
 	cnt--;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&devc->lock, flags);
 
 	/* DMAbuf_start_dma (dev, buf, count, DMA_MODE_READ); */
 
@@ -783,7 +773,7 @@ static void sb16_audio_start_input(int dev, unsigned long buf, int count, int in
 	sb_dsp_command(devc, (unsigned char) (cnt & 0xff));
 	sb_dsp_command(devc, (unsigned char) (cnt >> 8));
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&devc->lock, flags);
 }
 
 static void sb16_audio_trigger(int dev, int bits)

@@ -19,7 +19,6 @@
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/cache.h>

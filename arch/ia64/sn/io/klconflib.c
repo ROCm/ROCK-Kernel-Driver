@@ -511,7 +511,7 @@ find_gfxpipe(int pipenum)
 				moduleid_t kgm, pkgm;
 				int	kgs, pkgs;
 
-#if defined(DEBUG) && (defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1 || defined(CONFIG_IA64_GENERIC))) && defined(BRINGUP)
+#if defined(DEBUG) && (defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)) && defined(BRINGUP)
 				printf("find_gfxpipe(): PIPE: %s mod %M slot %d\n",lb?lb->brd_name:"!LBRD",
 					lb->brd_module,lb->brd_slot);
 #endif

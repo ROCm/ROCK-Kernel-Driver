@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.2 2001/01/12 02:43:30 davem Exp $
+/* $Id: pci_schizo.c,v 1.3 2001/02/13 01:16:44 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)

@@ -3753,7 +3753,7 @@ pcibr_attach(devfs_handle_t xconn_vhdl)
 	 * completion interrupts will reach a CPU
 	 * after all DMA data has reached memory.
 	 * (Of course, there may be a few special
-	 * drivers/controlers that explicitly manage
+	 * drivers/controllers that explicitly manage
 	 * this ordering problem.)
 	 */
 

@@ -139,7 +139,7 @@ klgraph_hack_init(void)
 	uint64_t	*tmp;
 	volatile u32	*tmp32;
 
-#ifdef 0
+#if 0
 	/* Preset some values */
 	/* Write IOERR clear to clear the CRAZY bit in the status */
 	tmp = (uint64_t *)0xc0000a0001c001f8; *tmp = (uint64_t)0xffffffff;

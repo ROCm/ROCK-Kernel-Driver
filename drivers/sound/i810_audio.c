@@ -879,7 +879,9 @@ static void i810_update_ptr(struct i810_state *state)
 					dmabuf->endcleared = 1;
 				}
 			}			
-			wake_up(&dmabuf->wait);
+			if (dmabuf->count < (signed)dmabuf->dmasize/2) {
+				wake_up(&dmabuf->wait);
+			}
 		}
 	}
 	/* error handling and process wake up for DAC */
@@ -896,10 +898,12 @@ static void i810_update_ptr(struct i810_state *state)
 				   it here, just stop the machine and let the process force hwptr
 				   and swptr to sync */
 				__stop_dac(state);
-				printk("DMA overrun on send\n");
+				printk(KERN_WARNING "i810_audio: DMA overrun on send\n");
 				dmabuf->error++;
 			}
-			wake_up(&dmabuf->wait);
+			if (dmabuf->count < (signed)dmabuf->dmasize/2) {
+				wake_up(&dmabuf->wait);
+			}
 		}
 	}
 }
@@ -1047,7 +1051,7 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
 				       dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
 				       dmabuf->hwptr, dmabuf->swptr);
 #endif
-				/* a buffer overrun, we delay the recovery untill next time the
+				/* a buffer overrun, we delay the recovery until next time the
 				   while loop begin and we REALLY have space to record */
 			}
 			if (signal_pending(current)) {
@@ -1144,7 +1148,7 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
 				       dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
 				       dmabuf->hwptr, dmabuf->swptr);
 #endif
-				/* a buffer underrun, we delay the recovery untill next time the
+				/* a buffer underrun, we delay the recovery until next time the
 				   while loop begin and we REALLY have data to play */
 			}
 			if (signal_pending(current)) {
@@ -1823,7 +1827,7 @@ static int __init i810_ac97_init(struct i810_card *card)
 }
 
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
-   untill "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
+   until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
    
 static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {

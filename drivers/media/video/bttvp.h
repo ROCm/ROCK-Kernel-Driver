@@ -25,7 +25,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,7,50)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,7,57)
 
 
 #include <linux/types.h>
@@ -43,10 +43,14 @@
 /* bttv-driver.c                                              */
 
 /* insmod options / kernel args */
+extern int no_overlay;
 extern unsigned int bttv_verbose;
 extern unsigned int bttv_debug;
 extern unsigned int bttv_gpio;
 extern void bttv_gpio_tracking(struct bttv *btv, char *comment);
+extern int init_bttv_i2c(struct bttv *btv);
+
+#define dprintk		if (bttv_debug) printk
 
 /* Anybody who uses more than four? */
 #define BTTV_MAX 4
@@ -143,6 +147,16 @@ struct bttv {
 	int audio;           /* audio mode */
 	int audio_chip;      /* set to one of the chips supported by bttv.c */
 	int radio;
+	int has_radio;
+
+	/* miro/pinnacle + Aimslab VHX
+	   philips matchbox (tea5757 radio tuner) support */
+	int has_matchbox;
+	int mbox_we;
+	int mbox_data;
+	int mbox_clk;
+	int mbox_most;
+	int mbox_mask;
 
 	u32 *risc_jmp;
 	u32 *vbi_odd;

@@ -50,6 +50,9 @@ struct smb_mount_data_kernel {
 
 	u32 flags;
 
+        /* maximum age in jiffies (inode, dentry and dircache) */
+	int ttl;
+
 	struct smb_nls_codepage codepage;
 };
 

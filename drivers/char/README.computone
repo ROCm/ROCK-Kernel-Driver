@@ -92,7 +92,7 @@ Previously, the driver sources were packaged with a set of patch files
 to update the character drivers' makefile and configuration file, and other 
 kernel source files. A build script (ip2build) was included which applies 
 the patches if needed, and build any utilities needed.
-What you recieve may be a single patch file in conventional kernel
+What you receive may be a single patch file in conventional kernel
 patch format build script. That form can also be applied by
 running patch -p1 < ThePatchFile.  Otherwise the drivers source may be
 a tar file, then untar and run ip2build if a new installation.

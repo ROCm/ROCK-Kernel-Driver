@@ -457,7 +457,7 @@ pmac_pic_init(void)
 /*
  * These procedures are used in implementing sleep on the powerbooks.
  * sleep_save_intrs() saves the states of all interrupt enables
- * and disables all interupts except for the nominated one.
+ * and disables all interrupts except for the nominated one.
  * sleep_restore_intrs() restores the states of all interrupt enables.
  */
 unsigned int sleep_save_mask[2];
