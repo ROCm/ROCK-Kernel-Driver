@@ -156,23 +156,6 @@ struct device_node *allnodes = 0;
  */
 static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
 
-static unsigned long call_prom(const char *service, int nargs, int nret, ...);
-static void prom_panic(const char *reason);
-static unsigned long check_display(unsigned long);
-static int prom_next_node(phandle *);
-static struct bi_record * prom_bi_rec_verify(struct bi_record *);
-static unsigned long prom_bi_rec_reserve(unsigned long);
-static struct device_node *find_phandle(phandle);
-static void of_node_cleanup(struct device_node *);
-static struct device_node *derive_parent(const char *);
-static void add_node_proc_entries(struct device_node *);
-static void remove_node_proc_entries(struct device_node *);
-static int of_finish_dynamic_node(struct device_node *);
-
-#ifdef DEBUG_PROM
-void prom_dump_lmb(void);
-#endif
-
 extern unsigned long reloc_offset(void);
 
 extern void enter_prom(struct prom_args *args);
@@ -1927,6 +1910,20 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 }
 
 /*
+ * Find the device_node with a given phandle.
+ */
+static struct device_node * __devinit
+find_phandle(phandle ph)
+{
+	struct device_node *np;
+
+	for (np = allnodes; np != 0; np = np->allnext)
+		if (np->linux_phandle == ph)
+			return np;
+	return NULL;
+}
+
+/*
  * Find the interrupt parent of a node.
  */
 static struct device_node * __devinit
@@ -2755,6 +2752,29 @@ struct device_node *of_node_get(struct device_node *node)
 EXPORT_SYMBOL(of_node_get);
 
 /**
+ *	of_node_cleanup - release a dynamically allocated node
+ *	@arg:  Node to be released
+ */
+static void of_node_cleanup(struct device_node *node)
+{
+	struct property *prop = node->properties;
+
+	if (!OF_IS_DYNAMIC(node))
+		return;
+	while (prop) {
+		struct property *next = prop->next;
+		kfree(prop->name);
+		kfree(prop->value);
+		kfree(prop);
+		prop = next;
+	}
+	kfree(node->intrs);
+	kfree(node->addrs);
+	kfree(node->full_name);
+	kfree(node);
+}
+
+/**
  *	of_node_put - Decrement refcount of a node
  *	@node:	Node to dec refcount, NULL is supported to
  *		simplify writing of callers
@@ -2777,29 +2797,6 @@ void of_node_put(struct device_node *node)
 		atomic_dec(&node->_users);
 }
 EXPORT_SYMBOL(of_node_put);
-
-/**
- *	of_node_cleanup - release a dynamically allocated node
- *	@arg:  Node to be released
- */
-static void of_node_cleanup(struct device_node *node)
-{
-	struct property *prop = node->properties;
-
-	if (!OF_IS_DYNAMIC(node))
-		return;
-	while (prop) {
-		struct property *next = prop->next;
-		kfree(prop->name);
-		kfree(prop->value);
-		kfree(prop);
-		prop = next;
-	}
-	kfree(node->intrs);
-	kfree(node->addrs);
-	kfree(node->full_name);
-	kfree(node);
-}
 
 /**
  *	derive_parent - basically like dirname(1)
@@ -2834,104 +2831,6 @@ static struct device_node *derive_parent(const char *path)
 /*
  * Routines for "runtime" addition and removal of device tree nodes.
  */
-
-/*
- * Given a path and a property list, construct an OF device node, add
- * it to the device tree and global list, and place it in
- * /proc/device-tree.  This function may sleep.
- */
-int of_add_node(const char *path, struct property *proplist)
-{
-	struct device_node *np;
-	int err = 0;
-
-	np = kmalloc(sizeof(struct device_node), GFP_KERNEL);
-	if (!np)
-		return -ENOMEM;
-
-	memset(np, 0, sizeof(*np));
-
-	np->full_name = kmalloc(strlen(path) + 1, GFP_KERNEL);
-	if (!np->full_name) {
-		kfree(np);
-		return -ENOMEM;
-	}
-	strcpy(np->full_name, path);
-
-	np->properties = proplist;
-	OF_MARK_DYNAMIC(np);
-	of_node_get(np);
-	np->parent = derive_parent(path);
-	if (!np->parent) {
-		kfree(np);
-		return -EINVAL; /* could also be ENOMEM, though */
-	}
-
-	if (0 != (err = of_finish_dynamic_node(np))) {
-		kfree(np);
-		return err;
-	}
-
-	write_lock(&devtree_lock);
-	np->sibling = np->parent->child;
-	np->allnext = allnodes;
-	np->parent->child = np;
-	allnodes = np;
-	write_unlock(&devtree_lock);
-
-	add_node_proc_entries(np);
-
-	of_node_put(np->parent);
-	of_node_put(np);
-	return 0;
-}
-
-/*
- * Remove an OF device node from the system.
- * Caller should have already "gotten" np.
- */
-int of_remove_node(struct device_node *np)
-{
-	struct device_node *parent, *child;
-
-	parent = of_get_parent(np);
-	if (!parent)
-		return -EINVAL;
-
-	if ((child = of_get_next_child(np, NULL))) {
-		of_node_put(child);
-		return -EBUSY;
-	}
-
-	write_lock(&devtree_lock);
-	OF_MARK_STALE(np);
-	remove_node_proc_entries(np);
-	if (allnodes == np)
-		allnodes = np->allnext;
-	else {
-		struct device_node *prev;
-		for (prev = allnodes;
-		     prev->allnext != np;
-		     prev = prev->allnext)
-			;
-		prev->allnext = np->allnext;
-	}
-
-	if (parent->child == np)
-		parent->child = np->sibling;
-	else {
-		struct device_node *prevsib;
-		for (prevsib = np->parent->child;
-		     prevsib->sibling != np;
-		     prevsib = prevsib->sibling)
-			;
-		prevsib->sibling = np->sibling;
-	}
-	write_unlock(&devtree_lock);
-	of_node_put(parent);
-	return 0;
-}
-
 #ifdef CONFIG_PROC_DEVICETREE
 /*
  * Add a node to /proc/device-tree.
@@ -3123,17 +3022,100 @@ out:
 }
 
 /*
- * Find the device_node with a given phandle.
+ * Given a path and a property list, construct an OF device node, add
+ * it to the device tree and global list, and place it in
+ * /proc/device-tree.  This function may sleep.
  */
-static struct device_node * __devinit
-find_phandle(phandle ph)
+int of_add_node(const char *path, struct property *proplist)
 {
 	struct device_node *np;
+	int err = 0;
 
-	for (np = allnodes; np != 0; np = np->allnext)
-		if (np->linux_phandle == ph)
-			return np;
-	return NULL;
+	np = kmalloc(sizeof(struct device_node), GFP_KERNEL);
+	if (!np)
+		return -ENOMEM;
+
+	memset(np, 0, sizeof(*np));
+
+	np->full_name = kmalloc(strlen(path) + 1, GFP_KERNEL);
+	if (!np->full_name) {
+		kfree(np);
+		return -ENOMEM;
+	}
+	strcpy(np->full_name, path);
+
+	np->properties = proplist;
+	OF_MARK_DYNAMIC(np);
+	of_node_get(np);
+	np->parent = derive_parent(path);
+	if (!np->parent) {
+		kfree(np);
+		return -EINVAL; /* could also be ENOMEM, though */
+	}
+
+	if (0 != (err = of_finish_dynamic_node(np))) {
+		kfree(np);
+		return err;
+	}
+
+	write_lock(&devtree_lock);
+	np->sibling = np->parent->child;
+	np->allnext = allnodes;
+	np->parent->child = np;
+	allnodes = np;
+	write_unlock(&devtree_lock);
+
+	add_node_proc_entries(np);
+
+	of_node_put(np->parent);
+	of_node_put(np);
+	return 0;
+}
+
+/*
+ * Remove an OF device node from the system.
+ * Caller should have already "gotten" np.
+ */
+int of_remove_node(struct device_node *np)
+{
+	struct device_node *parent, *child;
+
+	parent = of_get_parent(np);
+	if (!parent)
+		return -EINVAL;
+
+	if ((child = of_get_next_child(np, NULL))) {
+		of_node_put(child);
+		return -EBUSY;
+	}
+
+	write_lock(&devtree_lock);
+	OF_MARK_STALE(np);
+	remove_node_proc_entries(np);
+	if (allnodes == np)
+		allnodes = np->allnext;
+	else {
+		struct device_node *prev;
+		for (prev = allnodes;
+		     prev->allnext != np;
+		     prev = prev->allnext)
+			;
+		prev->allnext = np->allnext;
+	}
+
+	if (parent->child == np)
+		parent->child = np->sibling;
+	else {
+		struct device_node *prevsib;
+		for (prevsib = np->parent->child;
+		     prevsib->sibling != np;
+		     prevsib = prevsib->sibling)
+			;
+		prevsib->sibling = np->sibling;
+	}
+	write_unlock(&devtree_lock);
+	of_node_put(parent);
+	return 0;
 }
 
 /*
