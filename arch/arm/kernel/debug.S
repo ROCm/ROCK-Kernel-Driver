@@ -464,6 +464,36 @@
                 .macro  busyuart,rd,rx
                 .endm
 
+#elif defined(CONFIG_ARCH_IXP2000)
+
+		.macro  addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx, #0xc0000000	@ Physical base
+		movne	\rx, #0xfe000000	@ virtual base
+		orrne	\rx, \rx, #0x00f00000
+		orr	\rx, \rx, #0x00030000
+#ifdef	__ARMEB__
+		orr	\rx, \rx, #0x00000003
+#endif
+		.endm 
+		
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx]
+		.endm
+
+		.macro	busyuart,rd,rx
+1002:		ldrb	\rd, [\rx, #0x14]
+		tst	\rd, #0x20       
+		beq	1002b
+		.endm
+
+		.macro	waituart,rd,rx
+		nop
+		nop
+		nop
+		.endm
+
 #elif defined(CONFIG_ARCH_OMAP)
 
 		.macro	addruart,rx
