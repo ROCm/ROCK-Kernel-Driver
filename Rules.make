@@ -415,7 +415,7 @@ if_changed_dep = $(if $(strip $? \
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep $(subst /,_,$@) $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
+	$(TOPDIR)/scripts/fixdep .$(subst /,_,$@).d $@ $(TOPDIR) '$(cmd_$(1))' > .$(subst /,_,$@).tmp; \
 	rm -f .$(subst /,_,$@).d; \
 	mv -f .$(subst /,_,$@).tmp .$(subst /,_,$@).cmd )
 
