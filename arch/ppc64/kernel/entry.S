@@ -289,6 +289,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
 
+#ifdef CONFIG_SMP
+	/* We need a sync somewhere here to make sure that if the
+	 * previous task gets rescheduled on another CPU, it sees all
+	 * stores it has performed on this one.
+	 */
+	sync
+#endif /* CONFIG_SMP */
+
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */
 
