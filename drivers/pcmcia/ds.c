@@ -51,6 +51,8 @@
 #include <linux/list.h>
 #include <linux/workqueue.h>
 
+#include <asm/atomic.h>
+
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
@@ -95,10 +97,12 @@ typedef struct user_info_t {
     int			event_head, event_tail;
     event_t		event[MAX_EVENTS];
     struct user_info_t	*next;
+    struct pcmcia_bus_socket *socket;
 } user_info_t;
 
 /* Socket state information */
 struct pcmcia_bus_socket {
+	atomic_t		refcount;
 	client_handle_t		handle;
 	int			state;
 	user_info_t		*user;
@@ -106,13 +110,13 @@ struct pcmcia_bus_socket {
 	wait_queue_head_t	queue, request;
 	struct work_struct	removal;
 	socket_bind_t		*bind;
-	struct device		*socket_dev;
 	struct pcmcia_socket	*parent;
 };
 
 #define SOCKET_PRESENT		0x01
 #define SOCKET_BUSY		0x02
 #define SOCKET_REMOVAL_PENDING	0x10
+#define SOCKET_DEAD		0x80
 
 /*====================================================================*/
 
@@ -136,6 +140,24 @@ EXPORT_SYMBOL(cs_error);
 
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info);
 static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr);
+
+static void pcmcia_put_bus_socket(struct pcmcia_bus_socket *s)
+{
+	if (atomic_dec_and_test(&s->refcount))
+		kfree(s);
+}
+
+static struct pcmcia_bus_socket *pcmcia_get_bus_socket(int nr)
+{
+	struct pcmcia_bus_socket *s;
+
+	s = get_socket_info_by_nr(nr);
+	if (s) {
+		WARN_ON(atomic_read(&s->refcount) == 0);
+		atomic_inc(&s->refcount);
+	}
+	return s;
+}
 
 /**
  * pcmcia_register_driver - register a PCMCIA driver with the bus core
@@ -230,13 +252,10 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     if (s->state & SOCKET_BUSY)
 	s->req_pending = 1;
     handle_event(s, event);
-    if (s->req_pending > 0) {
-	interruptible_sleep_on(&s->request);
-	if (signal_pending(current))
-	    return CS_IN_USE;
-	else
-	    return s->req_result;
-    }
+    if (wait_event_interruptible(s->request, s->req_pending <= 0))
+        return CS_IN_USE;
+    if (s->state & SOCKET_BUSY)
+        return s->req_result;
     return CS_SUCCESS;
 }
 
@@ -501,7 +520,7 @@ static int ds_open(struct inode *inode, struct file *file)
 
     DEBUG(0, "ds_open(socket %d)\n", i);
 
-    s = get_socket_info_by_nr(i);
+    s = pcmcia_get_bus_socket(i);
     if (!s)
 	    return -ENODEV;
 
@@ -517,6 +536,7 @@ static int ds_open(struct inode *inode, struct file *file)
     user->event_tail = user->event_head = 0;
     user->next = s->user;
     user->user_magic = USER_MAGIC;
+    user->socket = s;
     s->user = user;
     file->private_data = user;
     
@@ -529,23 +549,23 @@ static int ds_open(struct inode *inode, struct file *file)
 
 static int ds_release(struct inode *inode, struct file *file)
 {
-    socket_t i = iminor(inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user, **link;
 
-    DEBUG(0, "ds_release(socket %d)\n", i);
-
-    s = get_socket_info_by_nr(i);
-    if (!s)
-	    return 0;
+    DEBUG(0, "ds_release(socket %d)\n", iminor(inode));
 
     user = file->private_data;
     if (CHECK_USER(user))
 	goto out;
 
+    s = user->socket;
+
     /* Unlink user data structure */
-    if ((file->f_flags & O_ACCMODE) != O_RDONLY)
+    if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 	s->state &= ~SOCKET_BUSY;
+	s->req_pending = 0;
+	wake_up_interruptible(&s->request);
+    }
     file->private_data = NULL;
     for (link = &s->user; *link; link = &(*link)->next)
 	if (*link == user) break;
@@ -554,6 +574,7 @@ static int ds_release(struct inode *inode, struct file *file)
     *link = user->next;
     user->user_magic = 0;
     kfree(user);
+    pcmcia_put_bus_socket(s);
 out:
     return 0;
 } /* ds_release */
@@ -563,30 +584,28 @@ out:
 static ssize_t ds_read(struct file *file, char *buf,
 		       size_t count, loff_t *ppos)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
+    int ret;
 
-    DEBUG(2, "ds_read(socket %d)\n", i);
+    DEBUG(2, "ds_read(socket %d)\n", iminor(inode));
     
     if (count < 4)
 	return -EINVAL;
-
-    s = get_socket_info_by_nr(i);
-    if (!s)
-	    return -ENODEV;
 
     user = file->private_data;
     if (CHECK_USER(user))
 	return -EIO;
     
-    if (queue_empty(user)) {
-	interruptible_sleep_on(&s->queue);
-	if (signal_pending(current))
-	    return -EINTR;
-    }
+    s = user->socket;
+    if (s->state & SOCKET_DEAD)
+        return -EIO;
 
-    return put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
+    ret = wait_event_interruptible(s->queue, !queue_empty(user));
+    if (ret == 0)
+	ret = put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
+
+    return ret;
 } /* ds_read */
 
 /*====================================================================*/
@@ -594,24 +613,23 @@ static ssize_t ds_read(struct file *file, char *buf,
 static ssize_t ds_write(struct file *file, const char *buf,
 			size_t count, loff_t *ppos)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_write(socket %d)\n", i);
+    DEBUG(2, "ds_write(socket %d)\n", iminor(inode));
     
     if (count != 4)
 	return -EINVAL;
     if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 	return -EBADF;
 
-    s = get_socket_info_by_nr(i);
-    if (!s)
-	    return -ENODEV;
-
     user = file->private_data;
     if (CHECK_USER(user))
 	return -EIO;
+
+    s = user->socket;
+    if (s->state & SOCKET_DEAD)
+        return -EIO;
 
     if (s->req_pending) {
 	s->req_pending--;
@@ -629,19 +647,19 @@ static ssize_t ds_write(struct file *file, const char *buf,
 /* No kernel lock - fine */
 static u_int ds_poll(struct file *file, poll_table *wait)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_poll(socket %d)\n", i);
+    DEBUG(2, "ds_poll(socket %d)\n", iminor(inode));
     
-    s = get_socket_info_by_nr(i);
-    if (!s)
-	    return POLLERR;
-
     user = file->private_data;
     if (CHECK_USER(user))
 	return POLLERR;
+    s = user->socket;
+    /*
+     * We don't check for a dead socket here since that
+     * will send cardmgr into an endless spin.
+     */
     poll_wait(file, &s->queue, wait);
     if (!queue_empty(user))
 	return POLLIN | POLLRDNORM;
@@ -653,17 +671,21 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
-    socket_t i = iminor(inode);
     struct pcmcia_bus_socket *s;
     u_int size;
     int ret, err;
     ds_ioctl_arg_t buf;
+    user_info_t *user;
 
-    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", i, cmd, arg);
+    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
     
-    s = get_socket_info_by_nr(i);
-    if (!s)
-	    return -ENODEV;
+    user = file->private_data;
+    if (CHECK_USER(user))
+	return -EIO;
+
+    s = user->socket;
+    if (s->state & SOCKET_DEAD)
+        return -EIO;
     
     size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
     if (size > sizeof(ds_ioctl_arg_t)) return -EINVAL;
@@ -833,6 +855,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	if(!s)
 		return -ENOMEM;
 	memset(s, 0, sizeof(struct pcmcia_bus_socket));
+	atomic_set(&s->refcount, 1);
     
 	/*
 	 * Ugly. But we want to wait for the socket threads to have started up.
@@ -845,7 +868,6 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	init_waitqueue_head(&s->request);
 
 	/* initialize data */
-	s->socket_dev = socket->dev.dev;
 	INIT_WORK(&s->removal, handle_removal, s);
 	s->parent = socket;
 
@@ -894,7 +916,8 @@ static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 
 	pcmcia_deregister_client(socket->pcmcia->handle);
 
-	kfree(socket->pcmcia);
+	socket->pcmcia->state |= SOCKET_DEAD;
+	pcmcia_put_bus_socket(socket->pcmcia);
 	socket->pcmcia = NULL;
 
 	return;
