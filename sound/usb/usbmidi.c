@@ -1145,6 +1145,44 @@ static int snd_usbmidi_create_rawmidi(snd_usb_midi_t* umidi,
 }
 
 /*
+ * Temporarily stop input. 
+ */
+void snd_usbmidi_input_stop(struct list_head* p)
+{
+	snd_usb_midi_t* umidi;
+	int i;
+
+	umidi = list_entry(p, snd_usb_midi_t, list);
+	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
+		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
+		if (ep->in)
+			usb_unlink_urb(ep->in->urb);
+	}
+}
+
+static void snd_usbmidi_input_start_ep(snd_usb_midi_in_endpoint_t* ep)
+{
+	if (ep) {
+		struct urb* urb = ep->urb; 
+		urb->dev = ep->umidi->chip->dev;
+		snd_usbmidi_submit_urb(urb, GFP_KERNEL);
+	}
+}
+
+/*
+ * Resume input after a call to snd_usbmidi_input_stop().
+ */
+void snd_usbmidi_input_start(struct list_head* p)
+{
+	snd_usb_midi_t* umidi;
+	int i;
+
+	umidi = list_entry(p, snd_usb_midi_t, list);
+	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
+		snd_usbmidi_input_start_ep(umidi->endpoints[i].in);
+}
+
+/*
  * Creates and registers everything needed for a MIDI streaming interface.
  */
 int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
@@ -1219,8 +1257,6 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 	list_add(&umidi->list, &umidi->chip->midi_list);
 
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
-		if (umidi->endpoints[i].in)
-			snd_usbmidi_submit_urb(umidi->endpoints[i].in->urb,
-					       GFP_KERNEL);
+		snd_usbmidi_input_start_ep(umidi->endpoints[i].in);
 	return 0;
 }
