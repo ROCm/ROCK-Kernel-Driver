@@ -1038,25 +1038,6 @@ s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command,
 }
 
 /* Returns the number of read bytes */
-s32 i2c_smbus_block_process_call(struct i2c_client *client, u8 command, u8 length, u8 *values)
-{
-	union i2c_smbus_data data;
-	int i;
-	if (length > I2C_SMBUS_BLOCK_MAX - 1)
-		return -1;
-	data.block[0] = length;
-	for (i = 1; i <= length; i++)
-		data.block[i] = values[i-1];
-	if(i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                  I2C_SMBUS_WRITE, command,
-	                  I2C_SMBUS_BLOCK_PROC_CALL, &data))
-		return -1;
-	for (i = 1; i <= data.block[0]; i++)
-		values[i-1] = data.block[i];
-	return data.block[0];
-}
-
-/* Returns the number of read bytes */
 s32 i2c_smbus_read_i2c_block_data(struct i2c_client *client, u8 command, u8 *values)
 {
 	union i2c_smbus_data data;
