@@ -493,9 +493,13 @@ static void fn_lastcons(struct vc_data *vc, struct pt_regs *regs)
 
 static void fn_dec_console(struct vc_data *vc, struct pt_regs *regs)
 {
-	int i;
- 
-	for (i = fg_console-1; i != fg_console; i--) {
+	int i, cur = fg_console;
+
+	/* Currently switching?  Queue this next switch relative to that. */
+	if (want_console != -1)
+		cur = want_console;
+
+	for (i = cur-1; i != cur; i--) {
 		if (i == -1)
 			i = MAX_NR_CONSOLES-1;
 		if (vc_cons_allocated(i))
@@ -506,9 +510,13 @@ static void fn_dec_console(struct vc_data *vc, struct pt_regs *regs)
 
 static void fn_inc_console(struct vc_data *vc, struct pt_regs *regs)
 {
-	int i;
+	int i, cur = fg_console;
 
-	for (i = fg_console+1; i != fg_console; i++) {
+	/* Currently switching?  Queue this next switch relative to that. */
+	if (want_console != -1)
+		cur = want_console;
+
+	for (i = cur+1; i != cur; i++) {
 		if (i == MAX_NR_CONSOLES)
 			i = 0;
 		if (vc_cons_allocated(i))
@@ -933,7 +941,7 @@ void kbd_refresh_leds(struct input_handle *handle)
 	tasklet_enable(&keyboard_tasklet);
 }
 
-#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC)
+#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC) || defined(CONFIG_SH_MPC1211)
 
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
@@ -941,14 +949,14 @@ static unsigned short x86_keycodes[256] =
 	 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
 	 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
 	 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-	 80, 81, 82, 83, 84, 93, 86, 87, 88, 94, 95, 85,259,375,260, 90,
-	284,285,309,311,312, 91,327,328,329,331,333,335,336,337,338,339,
-	367,288,302,304,350, 89,334,326,116,377,109,111,126,347,348,349,
-	360,261,262,263,298,376,100,101,321,316,373,286,289,102,351,355,
+	 80, 81, 82, 83, 84,118, 86, 87, 88,115,120,119,121,112,123, 92,
+	284,285,309,298,312, 91,327,328,329,331,333,335,336,337,338,339,
+	367,288,302,304,350, 89,334,326,267,126,268,269,125,347,348,349,
+	360,261,262,263,268,376,100,101,321,316,373,286,289,102,351,355,
 	103,104,105,275,287,279,306,106,274,107,294,364,358,363,362,361,
 	291,108,381,281,290,272,292,305,280, 99,112,257,258,359,113,114,
-	264,117,271,374,379,115,125,273,121,123, 92,265,266,267,268,269,
-	120,119,118,277,278,282,283,295,296,297,299,300,301,293,303,307,
+	264,117,271,374,379,265,266, 93, 94, 95, 85,259,375,260, 90,116,
+	377,109,111,277,278,282,283,295,296,297,299,300,301,293,303,307,
 	308,310,313,314,315,317,318,319,320,357,322,323,324,325,276,330,
 	332,340,365,342,343,344,345,346,356,270,341,368,369,370,371,372 };
 
@@ -978,10 +986,10 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode,
 			put_queue(vc, 0x1d | up_flag);
 			put_queue(vc, 0x45 | up_flag);
 			return 0;
-		case KEY_LANG1:
+		case KEY_HANGUEL:
 			if (!up_flag) put_queue(vc, 0xf1);
 			return 0;
-		case KEY_LANG2:
+		case KEY_HANJA:
 			if (!up_flag) put_queue(vc, 0xf2);
 			return 0;
 	} 

@@ -47,6 +47,8 @@
 
 #define SO_ACCEPTCONN          30
 
+#define SO_PEERSEC             31
+
 #if defined(__KERNEL__)
 /* Socket types. */
 #define SOCK_STREAM     1               /* stream (connection) socket   */

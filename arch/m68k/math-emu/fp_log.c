@@ -19,7 +19,7 @@
 
 static const struct fp_ext fp_one =
 {
-	0, 0, 0x3fff, { 0 }
+	.exp = 0x3fff,
 };
 
 extern struct fp_ext *fp_fadd(struct fp_ext *dest, const struct fp_ext *src);

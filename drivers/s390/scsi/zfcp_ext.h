@@ -30,9 +30,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.33 $"
-
-#ifdef __KERNEL__
+#define ZFCP_EXT_REVISION "$Revision: 1.38 $"
 
 #include "zfcp_def.h"
 
@@ -44,7 +42,9 @@ extern void zfcp_sysfs_driver_remove_files(struct device_driver *);
 extern int  zfcp_sysfs_adapter_create_files(struct device *);
 extern void zfcp_sysfs_adapter_remove_files(struct device *);
 extern int  zfcp_sysfs_port_create_files(struct device *, u32);
+extern void zfcp_sysfs_port_remove_files(struct device *, u32);
 extern int  zfcp_sysfs_unit_create_files(struct device *);
+extern void zfcp_sysfs_unit_remove_files(struct device *);
 extern void zfcp_sysfs_port_release(struct device *);
 extern int  zfcp_sysfs_port_shutdown(struct zfcp_port *);
 extern void zfcp_sysfs_unit_release(struct device *);
@@ -112,9 +112,6 @@ extern void zfcp_fsf_els_processing(struct zfcp_fsf_req *);
 extern int  zfcp_adapter_scsi_register(struct zfcp_adapter *);
 extern void zfcp_adapter_scsi_unregister(struct zfcp_adapter *);
 extern void zfcp_scsi_block_requests(struct Scsi_Host *);
-extern void zfcp_scsi_insert_into_fake_queue(struct zfcp_adapter *,
-					     Scsi_Cmnd *);
-extern void zfcp_scsi_process_and_clear_fake_queue(unsigned long);
 extern int  zfcp_create_sbals_from_sg(struct zfcp_fsf_req *,
 				     Scsi_Cmnd *, char, int, int);
 extern void zfcp_set_fcp_dl(struct fcp_cmnd_iu *, fcp_dl_t);
@@ -159,5 +156,4 @@ extern void zfcp_in_els_dbf_event(struct zfcp_adapter *, const char *,
 #ifdef ZFCP_STAT_REQSIZES
 extern int  zfcp_statistics_inc(struct list_head *, u32);
 #endif
-#endif	/* __KERNEL__ */
 #endif	/* ZFCP_EXT_H */

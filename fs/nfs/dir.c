@@ -1281,13 +1281,8 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	int mode = inode->i_mode;
 	int res;
 
-	/* Are we checking permissions on anything other than lookup? */
-	if (!(mask & MAY_EXEC)) {
-		/* We only need to check permissions on file open() and access() */
-		if (!nd || !(nd->flags & (LOOKUP_OPEN|LOOKUP_ACCESS)))
-			return 0;
-	}
-
+	if (mask == 0)
+		return 0;
 	if (mask & MAY_WRITE) {
 		/*
 		 *
@@ -1305,6 +1300,12 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 		 */
 		if (IS_IMMUTABLE(inode))
 			return -EACCES;
+	}
+	/* Are we checking permissions on anything other than lookup/execute? */
+	if ((mask & MAY_EXEC) == 0) {
+		/* We only need to check permissions on file open() and access() */
+		if (!nd || !(nd->flags & (LOOKUP_OPEN|LOOKUP_ACCESS)))
+			return 0;
 	}
 
 	lock_kernel();

@@ -239,8 +239,6 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
  * ide_multwrite() transfers a block of up to mcount sectors of data
  * to a drive as part of a disk multiple-sector write operation.
  *
- * Returns 0 on success.
- *
  * Note that we may be called from two contexts - __ide_do_rw_disk() context
  * and IRQ context. The IRQ can happen any time after we've output the
  * full "mcount" number of sectors, so we must make sure we update the
@@ -251,7 +249,7 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
  * is shorter or smaller than the BH segment then we should be OKAY.
  * This is only valid if we can rewind the rq->current_nr_sectors counter.
  */
-int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
+static void ide_multwrite(ide_drive_t *drive, unsigned int mcount)
 {
  	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
  	struct request *rq	= &hwgroup->wrq;
@@ -279,7 +277,7 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 			 * all bvecs in this one.
 			 */
 			if (++bio->bi_idx >= bio->bi_vcnt) {
-				bio->bi_idx = 0;
+				bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 				bio = bio->bi_next;
 			}
 
@@ -288,7 +286,8 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 				mcount = 0;
 			} else {
 				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				rq->nr_cbio_segments = bio_segments(bio);
+				rq->current_nr_sectors = bio_cur_sectors(bio);
 				rq->hard_cur_sectors = rq->current_nr_sectors;
 			}
 		}
@@ -300,8 +299,6 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 		taskfile_output_data(drive, buffer, nsect<<7);
 		ide_unmap_buffer(rq, buffer, &flags);
 	} while (mcount);
-
-        return 0;
 }
 
 /*
@@ -312,6 +309,7 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct request *rq	= &hwgroup->wrq;
+	struct bio *bio		= rq->bio;
 	u8 stat;
 
 	stat = hwif->INB(IDE_STATUS_REG);
@@ -322,8 +320,7 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 			 *	of the request
 			 */
 			if (rq->nr_sectors) {
-				if (ide_multwrite(drive, drive->mult_count))
-					return ide_stopped;
+				ide_multwrite(drive, drive->mult_count);
 				ide_set_handler(drive, &multwrite_intr, WAIT_CMD, NULL);
 				return ide_started;
 			}
@@ -333,14 +330,17 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 			 *	we can end the original request.
 			 */
 			if (!rq->nr_sectors) {	/* all done? */
+				bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 				rq = hwgroup->rq;
 				ide_end_request(drive, 1, rq->nr_sectors);
 				return ide_stopped;
 			}
 		}
+		bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 		/* the original code did this here (?) */
 		return ide_stopped;
 	}
+	bio->bi_idx = bio->bi_vcnt - rq->nr_cbio_segments;
 	return DRIVER(drive)->error(drive, "multwrite_intr", stat);
 }
 
@@ -506,27 +506,10 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 			local_irq_disable();
 		if (drive->mult_count) {
 			ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	/*
-	 * Ugh.. this part looks ugly because we MUST set up
-	 * the interrupt handler before outputting the first block
-	 * of data to be written.  If we hit an error (corrupted buffer list)
-	 * in ide_multwrite(), then we need to remove the handler/timer
-	 * before returning.  Fortunately, this NEVER happens (right?).
-	 *
-	 * Except when you get an error it seems...
-	 *
-	 * MAJOR DATA INTEGRITY BUG !!! only if we error 
-	 */
+
 			hwgroup->wrq = *rq; /* scratchpad */
 			ide_set_handler(drive, &multwrite_intr, WAIT_CMD, NULL);
-			if (ide_multwrite(drive, drive->mult_count)) {
-				unsigned long flags;
-				spin_lock_irqsave(&ide_lock, flags);
-				hwgroup->handler = NULL;
-				del_timer(&hwgroup->timer);
-				spin_unlock_irqrestore(&ide_lock, flags);
-				return ide_stopped;
-			}
+			ide_multwrite(drive, drive->mult_count);
 		} else {
 			unsigned long flags;
 			char *to = ide_map_buffer(rq, &flags);

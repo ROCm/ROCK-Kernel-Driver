@@ -336,7 +336,7 @@ static void presto_apply_write_policy(struct file *file,
                                 unlock_kernel();
                                 return; 
                         }
-                        error = presto_journal_close(&rec, fset, file,
+                        error = presto_journal_close(&rec, fset, fdata,
                                                      file->f_dentry,
                                                      &fdata->fd_version,
                                                      &new_file_ver);

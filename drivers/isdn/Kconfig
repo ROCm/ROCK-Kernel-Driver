@@ -16,7 +16,7 @@ config ISDN_BOOL
 	  conversations while downloading stuff.  It only works if your
 	  computer is equipped with an ISDN card and both you and your service
 	  provider purchased an ISDN line from the phone company.  For
-	  details, read <http://alumni.caltech.edu/~dank/isdn/> on the WWW.
+	  details, read <http://www.alumni.caltech.edu/~dank/isdn/> on the WWW.
 
 	  Select this option if you want your kernel to support ISDN.
 

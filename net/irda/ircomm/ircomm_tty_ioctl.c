@@ -190,17 +190,20 @@ void ircomm_tty_set_termios(struct tty_struct *tty,
 }
 
 /*
- * Function ircomm_tty_get_modem_info (self, value)
+ * Function ircomm_tty_tiocmget (tty, file)
  *
  *    
  *
  */
-static int ircomm_tty_get_modem_info(struct ircomm_tty_cb *self, 
-				     unsigned int *value)
+int ircomm_tty_tiocmget(struct tty_struct *tty, struct file *file)
 {
+	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
 	unsigned int result;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
+
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	result =  ((self->settings.dte & IRCOMM_RTS) ? TIOCM_RTS : 0)
 		| ((self->settings.dte & IRCOMM_DTR) ? TIOCM_DTR : 0)
@@ -208,63 +211,41 @@ static int ircomm_tty_get_modem_info(struct ircomm_tty_cb *self,
 		| ((self->settings.dce & IRCOMM_RI)  ? TIOCM_RNG : 0)
 		| ((self->settings.dce & IRCOMM_DSR) ? TIOCM_DSR : 0)
 		| ((self->settings.dce & IRCOMM_CTS) ? TIOCM_CTS : 0);
-
-	return put_user(result, value);
+	return result;
 }
 
 /*
- * Function set_modem_info (driver, cmd, value)
+ * Function ircomm_tty_tiocmset (tty, file, set, clear)
  *
  *    
  *
  */
-static int ircomm_tty_set_modem_info(struct ircomm_tty_cb *self, 
-				     unsigned int cmd, unsigned int *value)
+int ircomm_tty_tiocmset(struct tty_struct *tty, struct file *file,
+			unsigned int set, unsigned int clear)
 { 
-	unsigned int arg;
-	__u8 old_rts, old_dtr;
+	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
+
+	if (tty->flags & (1 << TTY_IO_ERROR))
+		return -EIO;
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	if (get_user(arg, value))
-		return -EFAULT;
+	if (set & TIOCM_RTS)
+		self->settings.dte |= IRCOMM_RTS;
+	if (set & TIOCM_DTR)
+		self->settings.dte |= IRCOMM_DTR;
 
-	old_rts = self->settings.dte & IRCOMM_RTS;
-	old_dtr = self->settings.dte & IRCOMM_DTR;
+	if (clear & TIOCM_RTS)
+		self->settings.dte &= ~IRCOMM_RTS;
+	if (clear & TIOCM_DTR)
+		self->settings.dte &= ~IRCOMM_DTR;
 
-	switch (cmd) {
-	case TIOCMBIS: 
-		if (arg & TIOCM_RTS) 
-			self->settings.dte |= IRCOMM_RTS;
-		if (arg & TIOCM_DTR)
-			self->settings.dte |= IRCOMM_DTR;
-		break;
-		
-	case TIOCMBIC:
-		if (arg & TIOCM_RTS)
-			self->settings.dte &= ~IRCOMM_RTS;
-		if (arg & TIOCM_DTR)
- 			self->settings.dte &= ~IRCOMM_DTR;
- 		break;
-		
-	case TIOCMSET:
- 		self->settings.dte = 
-			((self->settings.dte & ~(IRCOMM_RTS | IRCOMM_DTR))
-			 | ((arg & TIOCM_RTS) ? IRCOMM_RTS : 0)
-			 | ((arg & TIOCM_DTR) ? IRCOMM_DTR : 0));
-		break;
-		
-	default:
-		return -EINVAL;
-	}
-	
-	if ((self->settings.dte & IRCOMM_RTS) != old_rts)
+	if ((set|clear) & TIOCM_RTS)
 		self->settings.dte |= IRCOMM_DELTA_RTS;
-
-	if ((self->settings.dte & IRCOMM_DTR) != old_dtr)
+	if ((set|clear) & TIOCM_DTR)
 		self->settings.dte |= IRCOMM_DELTA_DTR;
 
 	ircomm_param_request(self, IRCOMM_DTE, TRUE);
@@ -406,14 +387,6 @@ int ircomm_tty_ioctl(struct tty_struct *tty, struct file *file,
 	}
 
 	switch (cmd) {
-	case TIOCMGET:
-		ret = ircomm_tty_get_modem_info(self, (unsigned int *) arg);
-		break;
-	case TIOCMBIS:
-	case TIOCMBIC:
-	case TIOCMSET:
-		ret = ircomm_tty_set_modem_info(self, cmd, (unsigned int *) arg);
-		break;
 	case TIOCGSERIAL:
 		ret = ircomm_tty_get_serial_info(self, (struct serial_struct *) arg);
 		break;

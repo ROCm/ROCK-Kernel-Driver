@@ -281,6 +281,9 @@ extern unsigned long __strnlen_user (const char *, long);
 	__su_ret;						\
 })
 
+#define ARCH_HAS_SORT_EXTABLE
+#define ARCH_HAS_SEARCH_EXTABLE
+
 struct exception_table_entry {
 	int addr;	/* gp-relative address of insn this fixup is for */
 	int cont;	/* gp-relative continuation address; if bit 2 is set, r9 is set to 0 */

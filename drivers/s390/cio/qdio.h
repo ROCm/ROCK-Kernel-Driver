@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.20 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.22 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -56,14 +56,14 @@
 #define QDIO_STATS_CLASSES 2
 #define QDIO_STATS_COUNT_NEEDED 2*/
 
-#define QDIO_NO_USE_COUNT_TIMEOUT 1000 /* wait for 1 sec on each q before
-					  exiting without having use_count
-					  of the queue to 0 */
+#define QDIO_NO_USE_COUNT_TIMEOUT (1*HZ) /* wait for 1 sec on each q before
+					    exiting without having use_count
+					    of the queue to 0 */
 
-#define QDIO_ESTABLISH_TIMEOUT 1000
-#define QDIO_ACTIVATE_TIMEOUT 5
-#define QDIO_CLEANUP_CLEAR_TIMEOUT 20000
-#define QDIO_CLEANUP_HALT_TIMEOUT 10000
+#define QDIO_ESTABLISH_TIMEOUT (1*HZ)
+#define QDIO_ACTIVATE_TIMEOUT ((5*HZ)>>10)
+#define QDIO_CLEANUP_CLEAR_TIMEOUT (20*HZ)
+#define QDIO_CLEANUP_HALT_TIMEOUT (10*HZ)
 
 enum qdio_irq_states {
 	QDIO_IRQ_STATE_INACTIVE,

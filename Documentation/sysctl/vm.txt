@@ -53,7 +53,7 @@ and don't use much of it.
 The default value is 0.
 
 See Documentation/vm/overcommit-accounting and
-mm/mmap.c::vm_enough_memory() for more information.
+security/commoncap.c::cap_vm_enough_memory() for more information.
 
 ==============================================================
 

@@ -14,7 +14,9 @@ struct mod_arch_specific {
 #define Elf_Ehdr		Elf32_Ehdr
 
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
-# ifdef CONFIG_CPU_SH3
+# ifdef CONFIG_CPU_SH2
+#  define MODULE_PROC_FAMILY "SH2LE "
+# elif defined  CONFIG_CPU_SH3
 #  define MODULE_PROC_FAMILY "SH3LE "
 # elif defined  CONFIG_CPU_SH4
 #  define MODULE_PROC_FAMILY "SH4LE "
@@ -22,7 +24,9 @@ struct mod_arch_specific {
 #  error unknown processor family
 # endif
 #else
-# ifdef CONFIG_CPU_SH3
+# ifdef CONFIG_CPU_SH2
+#  define MODULE_PROC_FAMILY "SH2BE "
+# elif defined  CONFIG_CPU_SH3
 #  define MODULE_PROC_FAMILY "SH3BE "
 # elif defined  CONFIG_CPU_SH4
 #  define MODULE_PROC_FAMILY "SH4BE "

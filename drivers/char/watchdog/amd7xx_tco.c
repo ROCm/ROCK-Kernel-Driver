@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
@@ -45,7 +46,7 @@
 #define TCO_TIMEOUT_MASK	0x3f
 #define TCO_STATUS1_REG 0x44
 #define TCO_STATUS2_REG	0x46
-#define NDTO_STS2	(1 << 1)	/* we're interested in the second timeout */ 
+#define NDTO_STS2	(1 << 1)	/* we're interested in the second timeout */
 #define BOOT_STS	(1 << 2)	/* will be set if NDTO_STS2 was set before reboot */
 #define TCO_CTRL1_REG	0x48
 #define TCO_HALT	(1 << 11)
@@ -57,10 +58,19 @@ static u32 pmbase;		/* PMxx I/O base */
 static struct pci_dev *dev;
 static struct semaphore open_sem;
 static spinlock_t amdtco_lock;	/* only for device access */
-static int expect_close = 0;
+static char expect_close;
 
-MODULE_PARM(timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "range is 0-38 seconds, default is 38");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+module_param(nowayout, int, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 static inline u8 seconds_to_ticks(int seconds)
 {
@@ -124,7 +134,7 @@ static inline void amdtco_global_enable(void)
 static inline void amdtco_enable(void)
 {
 	u16 reg;
-	
+
 	spin_lock(&amdtco_lock);
 	reg = inw(pmbase+TCO_CTRL1_REG);
 	reg &= ~TCO_HALT;
@@ -152,13 +162,13 @@ static int amdtco_fop_open(struct inode *inode, struct file *file)
 		timeout = MAX_TIMEOUT;
 
 	amdtco_disable();
-	amdtco_settimeout(timeout);	
+	amdtco_settimeout(timeout);
 	amdtco_global_enable();
 	amdtco_enable();
 	amdtco_ping();
 	printk(KERN_INFO PFX "Watchdog enabled, timeout = %ds of %ds\n",
 		amdtco_gettimeout(), timeout);
-	
+
 	return 0;
 }
 
@@ -170,12 +180,12 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 	static struct watchdog_info ident = {
 		.options	= WDIOF_SETTIMEOUT | WDIOF_CARDRESET,
-		.identity	= "AMD 766/768"
+		.identity	= "AMD 766/768",
 	};
 
 	switch (cmd) {
 		default:
-			return -ENOTTY;	
+			return -ENOIOCTLCMD;
 
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof ident))
@@ -184,7 +194,7 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 		case WDIOC_GETSTATUS:
 			return put_user(amdtco_status(), (int *)arg);
-	
+
 		case WDIOC_KEEPALIVE:
 			amdtco_ping();
 			return 0;
@@ -192,10 +202,10 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 		case WDIOC_SETTIMEOUT:
 			if (get_user(new_timeout, (int *)arg))
 				return -EFAULT;
-			
+
 			if (new_timeout < 0)
 				return -EINVAL;
-		
+
 			if (new_timeout > MAX_TIMEOUT)
 				new_timeout = MAX_TIMEOUT;
 
@@ -205,17 +215,17 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 		case WDIOC_GETTIMEOUT:
 			return put_user(amdtco_gettimeout(), (int *)arg);
-		
+
 		case WDIOC_SETOPTIONS:
 			if (copy_from_user(&tmp, (int *)arg, sizeof tmp))
-                                return -EFAULT;
+				return -EFAULT;
 
 			if (tmp & WDIOS_DISABLECARD)
 				amdtco_disable();
 
 			if (tmp & WDIOS_ENABLECARD)
 				amdtco_enable();
-			
+
 			return 0;
 	}
 }
@@ -223,14 +233,15 @@ static int amdtco_fop_ioctl(struct inode *inode, struct file *file, unsigned int
 
 static int amdtco_fop_release(struct inode *inode, struct file *file)
 {
-	if (expect_close) {
-		amdtco_disable();	
+	if (expect_close == 42) {
+		amdtco_disable();
 		printk(KERN_INFO PFX "Watchdog disabled\n");
 	} else {
 		amdtco_ping();
 		printk(KERN_CRIT PFX "Unexpected close!, timeout in %d seconds\n", timeout);
-	}	
-	
+	}
+
+	expect_close = 0;
 	up(&open_sem);
 	return 0;
 }
@@ -240,21 +251,21 @@ static ssize_t amdtco_fop_write(struct file *file, const char *data, size_t len,
 {
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
-	
-	if (len) {
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		size_t i;
-		char c;
-		expect_close = 0;
-		
-		for (i = 0; i != len; i++) {
-			if (get_user(c, data + i))
-				return -EFAULT;
 
-			if (c == 'V')
-				expect_close = 1;
+	if (len) {
+		if (!nowayout) {
+			size_t i;
+			char c;
+			expect_close = 0;
+
+			for (i = 0; i != len; i++) {
+				if (get_user(c, data + i))
+					return -EFAULT;
+
+				if (c == 'V')
+					expect_close = 42;
+			}
 		}
-#endif
 		amdtco_ping();
 	}
 
@@ -273,7 +284,7 @@ static int amdtco_notify_sys(struct notifier_block *this, unsigned long code, vo
 
 static struct notifier_block amdtco_notifier =
 {
-	.notifier_call = amdtco_notify_sys
+	.notifier_call = amdtco_notify_sys,
 };
 
 static struct file_operations amdtco_fops =
@@ -282,20 +293,20 @@ static struct file_operations amdtco_fops =
 	.write		= amdtco_fop_write,
 	.ioctl		= amdtco_fop_ioctl,
 	.open		= amdtco_fop_open,
-	.release	= amdtco_fop_release
+	.release	= amdtco_fop_release,
 };
 
 static struct miscdevice amdtco_miscdev =
 {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &amdtco_fops
+	.fops	= &amdtco_fops,
 };
 
 static struct pci_device_id amdtco_pci_tbl[] = {
 	/* AMD 766 PCI_IDs here */
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7443, PCI_ANY_ID, PCI_ANY_ID, },
-	{ 0, }
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE (pci, amdtco_pci_tbl);
@@ -316,7 +327,7 @@ static int __init amdtco_init(void)
 	return -ENODEV;
 
 found_one:
-	
+
 	if ((ret = register_reboot_notifier(&amdtco_notifier))) {
 		printk(KERN_ERR PFX "Unable to register reboot notifier err = %d\n", ret);
 		goto out_clean;

@@ -9,6 +9,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 #include <asm/machvec.h>
 #include <asm/delay.h>

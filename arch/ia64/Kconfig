@@ -405,7 +405,8 @@ config EFI_VARS
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
 config NR_CPUS
-	int "Maximum number of CPUs"
+	int "Maximum number of CPUs (2-512)"
+	range 2 512
 	depends on SMP
 	default "64"
 	help

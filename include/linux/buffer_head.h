@@ -125,8 +125,7 @@ BUFFER_FNS(Write_EIO,write_io_error)
 /* If we *know* page->private refers to buffer_heads */
 #define page_buffers(page)					\
 	({							\
-		if (!PagePrivate(page))				\
-			BUG();					\
+		BUG_ON(!PagePrivate(page));		\
 		((struct buffer_head *)(page)->private);	\
 	})
 #define page_has_buffers(page)	PagePrivate(page)
@@ -210,7 +209,7 @@ int nobh_truncate_page(struct address_space *, loff_t);
 #define OSYNC_METADATA	(1<<0)
 #define OSYNC_DATA	(1<<1)
 #define OSYNC_INODE	(1<<2)
-int generic_osync_inode(struct inode *, int);
+int generic_osync_inode(struct inode *, struct address_space *, int);
 
 
 /*

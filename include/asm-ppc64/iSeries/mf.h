@@ -23,61 +23,50 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-
 #ifndef MF_H_INCLUDED
 #define MF_H_INCLUDED
+
+#include <linux/proc_fs.h>
 
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 
 struct rtc_time;
 
-typedef void (*MFCompleteHandler)( void * clientToken, int returnCode );
+typedef void (*MFCompleteHandler)(void *clientToken, int returnCode);
 
-extern void mf_allocateLpEvents( HvLpIndex targetLp,
-				 HvLpEvent_Type type,
-				 unsigned size,
-				 unsigned amount,
-				 MFCompleteHandler hdlr,
-				 void * userToken );
+extern void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+		unsigned size, unsigned amount, MFCompleteHandler hdlr,
+		void *userToken);
+extern void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+		unsigned count, MFCompleteHandler hdlr, void *userToken);
 
-extern void mf_deallocateLpEvents( HvLpIndex targetLp,
-				   HvLpEvent_Type type,
-				   unsigned count,
-				   MFCompleteHandler hdlr,
-				   void * userToken );
+extern void mf_powerOff(void);
+extern void mf_reboot(void);
 
-extern void mf_powerOff( void );
+extern void mf_displaySrc(u32 word);
+extern void mf_displayProgress(u16 value);
+extern void mf_clearSrc(void);
 
-extern void mf_reboot( void );
-
-extern void mf_displaySrc( u32 word );
-extern void mf_displayProgress( u16 value );
-
-extern void mf_clearSrc( void );
-
-extern void mf_init( void );
+extern void mf_init(void);
 
 extern void mf_setSide(char side);
-
 extern char mf_getSide(void);
 
 extern void mf_setCmdLine(const char *cmdline, int size, u64 side);
-
 extern int  mf_getCmdLine(char *cmdline, int *size, u64 side);
 
 extern void mf_getSrcHistory(char *buffer, int size);
 
-extern int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side);
-
+extern int mf_setVmlinuxChunk(const char *buffer, int size, int offset,
+		u64 side);
 extern int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side);
 
 extern int mf_setRtcTime(unsigned long time);
-
 extern int mf_getRtcTime(unsigned long *time);
-
 extern int mf_getRtc( struct rtc_time * tm );
-
 extern int mf_setRtc( struct rtc_time * tm );
+
+extern void mf_proc_init(struct proc_dir_entry *iSeries_proc);
 
 #endif /* MF_H_INCLUDED */

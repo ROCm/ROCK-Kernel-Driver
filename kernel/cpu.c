@@ -14,7 +14,7 @@
 /* This protects CPUs going up and down... */
 DECLARE_MUTEX(cpucontrol);
 
-static struct notifier_block *cpu_chain = NULL;
+static struct notifier_block *cpu_chain;
 
 /* Need to know about CPUs going up/down? */
 int register_cpu_notifier(struct notifier_block *nb)

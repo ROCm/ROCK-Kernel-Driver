@@ -271,11 +271,11 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 };
 
 /* key2index calculation, -1 on invalid index */
-static __inline__ int sysrq_key_table_key2index(int key) {
+static int sysrq_key_table_key2index(int key) {
 	int retval;
-	if ((key >= '0') & (key <= '9')) {
+	if ((key >= '0') && (key <= '9')) {
 		retval = key - '0';
-	} else if ((key >= 'a') & (key <= 'z')) {
+	} else if ((key >= 'a') && (key <= 'z')) {
 		retval = key + 10 - 'a';
 	} else {
 		retval = -1;

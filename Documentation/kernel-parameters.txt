@@ -37,7 +37,7 @@ restrictions referred to are that the relevant option is valid if:
 	MCA	MCA bus support is enabled.
 	MDA	MDA console support is enabled.
 	MOUSE	Appropriate mouse support is enabled.
-	MTD	MTD support is nebaled.
+	MTD	MTD support is enabled.
 	NET	Appropriate network support is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
@@ -57,6 +57,7 @@ restrictions referred to are that the relevant option is valid if:
 	SMP	The kernel is an SMP kernel.
 	SPARC	Sparc architecture is enabled.
 	SWSUSP	Software suspension is enabled.
+	TS	Appropriate touchscreen support is enabled.
 	USB	USB support is enabled.
 	V4L	Video For Linux support is enabled.
 	VGA	The VGA console has been enabled.
@@ -84,6 +85,9 @@ running once the system is up.
 	53c7xx=		[HW,SCSI] Amiga SCSI controllers
 			See header of drivers/scsi/53c7xx.c.
 			See also Documentation/scsi/ncr53c7xx.txt.
+
+	98busmouse.irq=	[HW,MOUSE] PC-9801 Bus Mouse Driver
+			Format: <irq>, default is 13
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
 			Format: { force | off | ht }
@@ -170,10 +174,11 @@ running once the system is up.
 
 	atascsi=	[HW,SCSI] Atari SCSI
 
-	atkbd_set=	[HW] Select keyboard code set
+	atkbd.set=	[HW] Select keyboard code set
 			Format: <int>
-
-	atkbd_reset	[HW] Reset keyboard during initialization
+	atkbd.softrepeat=
+			[HW] Use software keyboard repeat
+	atkbd.reset=	[HW] Reset keyboard during initialization
 
 	autotest	[IA64]
 
@@ -389,13 +394,15 @@ running once the system is up.
 
 	noirqbalance	[IA-32,SMP,KNL] Disable kernel irq balancing
 
-	i8042_direct	[HW] Keyboard has been put into non-translated mode 
-			by BIOS
-	i8042_dumbkbd	[HW] Don't attempt to blink the leds
-	i8042_noaux	[HW] Don't check for auxiliary (== mouse) port
-	i8042_nomux
-	i8042_reset	[HW] Reset the controller during init and cleanup
-	i8042_unlock	[HW] Unlock (ignore) the keylock
+	i8042.direct	[HW] Put keyboard port into non-translated mode
+	i8042.dumbkbd	[HW] Pretend that controlled can only read data from
+			     keyboard and can not control its state
+			     (Don't attempt to blink the leds)
+	i8042.noaux	[HW] Don't check for auxiliary (== mouse) port
+	i8042.nomux	[HW] Don't check presence of an active multiplexing
+			     controller
+	i8042.reset	[HW] Reset the controller during init and cleanup
+	i8042.unlock	[HW] Unlock (ignore) the keylock
 
 	i810=		[HW,DRM]
 
@@ -431,7 +438,7 @@ running once the system is up.
 
 	initrd=		[BOOT] Specify the location of the initial ramdisk
 
-	inport_irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
+	inport.irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
 			Format: <irq>
 
 	inttest=	[IA64]
@@ -479,7 +486,7 @@ running once the system is up.
 
 	lockd.tcpport=	[NFS]
 
-	logibm_irq=	[HW,MOUSE] Logitech Bus Mouse Driver
+	logibm.irq=	[HW,MOUSE] Logitech Bus Mouse Driver
 			Format: <irq>
 
 	log_buf_len=n	Sets the size of the printk ring buffer, in bytes.
@@ -578,6 +585,11 @@ running once the system is up.
 			See Documentation/video4linux/meye.txt.
 
 	mga=		[HW,DRM]
+
+	mousedev.xres	[MOUSE] Horizontal screen resolution, used for devices
+			reporting absolute coordinates, such as tablets
+	mousedev.yres	[MOUSE] Vertical screen resolution, used for devices
+			reporting absolute coordinates, such as tablets
 
 	mpu401=		[HW,OSS]
 			Format: <io>,<irq>
@@ -812,12 +824,18 @@ running once the system is up.
 			before loading.
 			See Documentation/ramdisk.txt.
 
-	psmouse_proto=  [HW,MOUSE] Highest PS2 mouse protocol extension to
+	psmouse.proto=  [HW,MOUSE] Highest PS2 mouse protocol extension to
 			probe for (bare|imps|exps).
-
-	psmouse_resetafter=
+	psmouse.rate=	[HW,MOUSE] Set desired mouse report rate, in reports
+			per second.
+	psmouse.resetafter=
 			[HW,MOUSE] Try to reset Synaptics Touchpad after so many
 			bad packets (0 = never).
+	psmouse.resolution=
+			[HW,MOUSE] Set desired mouse resolution, in dpi.
+	psmouse.smartscroll=
+			[HW,MOUSE] Controls Logitech smartscroll autorepeat,
+			0 = disabled, 1 = enabled (default).
 
 	pss=		[HW,OSS] Personal Sound System (ECHO ESC614)
 			Format: <io>,<mss_io>,<mss_irq>,<mss_dma>,<mpu_io>,<mpu_irq>
@@ -1135,6 +1153,9 @@ running once the system is up.
 	trix=		[HW,OSS] MediaTrix AudioTrix Pro
 			Format: <io>,<irq>,<dma>,<dma2>,<sb_io>,<sb_irq>,<sb_dma>,<mpu_io>,<mpu_irq>
  
+	tsdev.xres	[TS] Horizontal screen resolution.
+	tsdev.yres	[TS] Vertical screen resolution.
+
 	u14-34f=	[HW,SCSI] UltraStor 14F/34F SCSI host adapter
 			See header of drivers/scsi/u14-34f.c.
 

@@ -525,8 +525,12 @@ static void uhci_append_queued_urb(struct uhci_hcd *uhci, struct urb *eurb, stru
 
 	lltd = list_entry(lurbp->td_list.prev, struct uhci_td, list);
 
-	usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe),
-		uhci_fixup_toggle(urb, uhci_toggle(td_token(lltd)) ^ 1));
+	/* Control transfers always start with toggle 0 */
+	if (!usb_pipecontrol(urb->pipe))
+		usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe),
+				usb_pipeout(urb->pipe),
+				uhci_fixup_toggle(urb,
+					uhci_toggle(td_token(lltd)) ^ 1));
 
 	/* All qh's in the queue need to link to the next queue */
 	urbp->qh->link = eurbp->qh->link;
@@ -560,38 +564,43 @@ static void uhci_delete_queued_urb(struct uhci_hcd *uhci, struct urb *urb)
 
 	nurbp = list_entry(urbp->queue_list.next, struct urb_priv, queue_list);
 
-	/* Fix up the toggle for the next URB's */
-	if (!urbp->queued)
-		/* We just set the toggle in uhci_unlink_generic */
-		toggle = usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
-	else {
-		/* If we're in the middle of the queue, grab the toggle */
-		/*  from the TD previous to us */
-		purbp = list_entry(urbp->queue_list.prev, struct urb_priv,
-				queue_list);
+	/*
+	 * Fix up the toggle for the following URBs in the queue.
+	 * Only needed for bulk and interrupt: control and isochronous
+	 * endpoints don't propagate toggles between messages.
+	 */
+	if (usb_pipebulk(urb->pipe) || usb_pipeint(urb->pipe)) {
+		if (!urbp->queued)
+			/* We just set the toggle in uhci_unlink_generic */
+			toggle = usb_gettoggle(urb->dev,
+					usb_pipeendpoint(urb->pipe),
+					usb_pipeout(urb->pipe));
+		else {
+			/* If we're in the middle of the queue, grab the */
+			/* toggle from the TD previous to us */
+			purbp = list_entry(urbp->queue_list.prev,
+					struct urb_priv, queue_list);
+			pltd = list_entry(purbp->td_list.prev,
+					struct uhci_td, list);
+			toggle = uhci_toggle(td_token(pltd)) ^ 1;
+		}
 
-		pltd = list_entry(purbp->td_list.prev, struct uhci_td, list);
+		head = &urbp->queue_list;
+		tmp = head->next;
+		while (head != tmp) {
+			struct urb_priv *turbp;
 
-		toggle = uhci_toggle(td_token(pltd)) ^ 1;
+			turbp = list_entry(tmp, struct urb_priv, queue_list);
+			tmp = tmp->next;
+
+			if (!turbp->queued)
+				break;
+			toggle = uhci_fixup_toggle(turbp->urb, toggle);
+		}
+
+		usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe),
+				usb_pipeout(urb->pipe), toggle);
 	}
-
-	head = &urbp->queue_list;
-	tmp = head->next;
-	while (head != tmp) {
-		struct urb_priv *turbp;
-
-		turbp = list_entry(tmp, struct urb_priv, queue_list);
-
-		tmp = tmp->next;
-
-		if (!turbp->queued)
-			break;
-
-		toggle = uhci_fixup_toggle(turbp->urb, toggle);
-	}
-
-	usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe),
-		usb_pipeout(urb->pipe), toggle);
 
 	if (!urbp->queued) {
 		struct uhci_qh *pqh;

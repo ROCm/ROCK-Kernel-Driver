@@ -33,7 +33,7 @@
 extern unsigned char boot_cpu_id;
 
 extern cpumask_t phys_cpu_present_map;
-#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
+#define cpu_possible_map phys_cpu_present_map
 
 #define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 

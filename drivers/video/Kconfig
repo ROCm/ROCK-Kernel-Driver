@@ -109,29 +109,6 @@ config FB_SA1100
 	  If you plan to use the LCD display with your SA-1100 system, say
 	  Y here.
 
-choice
-	prompt "CerfBoard LCD Display Size"
-	depends on FB_SA1100 && SA1100_CERF
-	default CERF_LCD_57_A
-
-config CERF_LCD_38_A
-	bool "3.8_Color"
-
-config CERF_LCD_38_B
-	bool "3.8_Mono"
-
-config CERF_LCD_57_A
-	bool "5.7"
-
-config CERF_LCD_72_A
-	bool "7.2"
-
-endchoice
-
-config SA1100_CERF_LCD_BACKLIGHT
-	bool "Cerfboard Backlight (CerfPDA)"
-	depends on FB_SA1100 && SA1100_CERF_CPLD
-
 config FB_CYBER2000
 	tristate "CyberPro 2000/2010/5000 support"
 	depends on FB && PCI
@@ -406,14 +383,6 @@ config FB_PVR2
 	  (<file:drivers/video/pvr2fb.c>). Please see the file
 	  <file:Documentation/fb/pvr2fb.txt>.
 
-config FB_PVR2_DEBUG
-	bool "Debug pvr2fb"
-	depends on FB_PVR2=y
-	help
-	  Say Y here if you wish for the pvr2fb driver to print out debugging
-	  messages. Most people will want to say N here. If unsure, you will
-	  also want to say N.
-
 config FB_E1355
 	bool "Epson 1355 framebuffer support"
 	depends on FB && SUPERH
@@ -579,7 +548,8 @@ config FB_MATROX_G100
 
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
-	depends on FB_MATROX && I2C_ALGOBIT
+	depends on FB_MATROX && I2C
+	select I2C_ALGOBIT
 	---help---
 	  This drivers creates I2C buses which are needed for accessing the
 	  DDC (I2C) bus present on all Matroxes, an I2C bus which
@@ -733,6 +703,16 @@ config FB_NEOMAGIC
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called neofb.
+
+config FB_KYRO
+	tristate "IMG Kyro support"
+	depends on FB && PCI
+	help
+	  Say Y here if you have a STG4000 / Kyro / PowerVR 3 based
+	  graphics board.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called kyrofb.
 
 config FB_3DFX
 	tristate "3Dfx Banshee/Voodoo3 display support"

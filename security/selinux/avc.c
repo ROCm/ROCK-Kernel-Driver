@@ -22,8 +22,6 @@
 #include <linux/un.h>
 #include <net/af_unix.h>
 #include <linux/ip.h>
-#include <linux/udp.h>
-#include <linux/tcp.h>
 #include "avc.h"
 #include "avc_ss.h"
 #include "class_to_string.h"
@@ -575,17 +573,26 @@ void avc_audit(u32 ssid, u32 tsid,
 			break;
 		case AVC_AUDIT_DATA_FS:
 			if (a->u.fs.dentry) {
+				struct dentry *dentry = a->u.fs.dentry;
 				if (a->u.fs.mnt) {
-					p = d_path(a->u.fs.dentry,
+					p = d_path(dentry,
 						   a->u.fs.mnt,
 						   avc_audit_buffer,
 						   PAGE_SIZE);
 					if (p)
 						printk(" path=%s", p);
+				} else {
+					printk(" name=%s", dentry->d_name.name);
 				}
-				inode = a->u.fs.dentry->d_inode;
+				inode = dentry->d_inode;
 			} else if (a->u.fs.inode) {
+				struct dentry *dentry;
 				inode = a->u.fs.inode;
+				dentry = d_find_alias(inode);
+				if (dentry) {
+					printk(" name=%s", dentry->d_name.name);
+					dput(dentry);
+				}
 			}
 			if (inode)
 				printk(" dev=%s ino=%ld",
@@ -631,41 +638,12 @@ void avc_audit(u32 ssid, u32 tsid,
 					break;
 				}
 			}
-			if (a->u.net.daddr) {
-				printk(" daddr=%d.%d.%d.%d",
-				       NIPQUAD(a->u.net.daddr));
-				if (a->u.net.port)
-					printk(" dest=%d", a->u.net.port);
-			} else if (a->u.net.port)
-				printk(" port=%d", a->u.net.port);
-			if (a->u.net.skb) {
-				struct sk_buff *skb = a->u.net.skb;
+			
+			avc_print_ipv4_addr(a->u.net.saddr, a->u.net.sport,
+			                    "saddr", "src");
+			avc_print_ipv4_addr(a->u.net.daddr, a->u.net.dport,
+			                    "daddr", "dest");
 
-				if ((skb->protocol == htons(ETH_P_IP)) &&
-				     skb->nh.iph) {
-					u16 source = 0, dest = 0;
-					u8  protocol = skb->nh.iph->protocol;
-
-
-					if (protocol == IPPROTO_TCP &&
-					    skb->h.th) {
-						source = skb->h.th->source;
-						dest = skb->h.th->dest;
-					}
-					if (protocol == IPPROTO_UDP &&
-					    skb->h.uh) {
-						source = skb->h.uh->source;
-						dest = skb->h.uh->dest;
-					}
-
-					avc_print_ipv4_addr(skb->nh.iph->saddr,
-					                    source,
-					                    "saddr", "source");
-					avc_print_ipv4_addr(skb->nh.iph->daddr,
-					                    dest,
-					                    "daddr", "dest");
-				}
-			}
 			if (a->u.net.netif)
 				printk(" netif=%s", a->u.net.netif);
 			break;

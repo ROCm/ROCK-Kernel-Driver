@@ -37,6 +37,7 @@
 #include <linux/hugetlb.h>
 #include <linux/security.h>
 #include <linux/initrd.h>
+#include <linux/times.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_ROOT_NFS
@@ -60,6 +61,8 @@ extern int cad_pid;
 extern int pid_max;
 extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
+extern int printk_ratelimit_jiffies;
+extern int printk_ratelimit_burst;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -579,6 +582,24 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= KERN_PRINTK_RATELIMIT,
+		.procname	= "printk_ratelimit",
+		.data		= &printk_ratelimit_jiffies,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies,
+		.strategy	= &sysctl_jiffies,
+	},
+	{
+		.ctl_name	= KERN_PRINTK_RATELIMIT_BURST,
+		.procname	= "printk_ratelimit_burst",
+		.data		= &printk_ratelimit_burst,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_jiffies,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -1050,8 +1071,8 @@ int do_sysctl_strategy (ctl_table *table,
  * cover common cases -
  *
  * proc_dostring(), proc_dointvec(), proc_dointvec_jiffies(),
- * proc_dointvec_minmax(), proc_doulongvec_ms_jiffies_minmax(),
- * proc_doulongvec_minmax()
+ * proc_dointvec_userhz_jiffies(), proc_dointvec_minmax(), 
+ * proc_doulongvec_ms_jiffies_minmax(), proc_doulongvec_minmax()
  *
  * It is the handler's job to read the input buffer from user memory
  * and process it. The handler should return 0 on success.
@@ -1322,19 +1343,36 @@ static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
 	return r;
 }
 
-#define OP_SET	0
-#define OP_AND	1
-#define OP_OR	2
-#define OP_MAX	3
-#define OP_MIN	4
+static int do_proc_dointvec_conv(int *negp, unsigned long *lvalp,
+				 int *valp,
+				 int write, void *data)
+{
+	if (write) {
+		*valp = *negp ? -*lvalp : *lvalp;
+	} else {
+		int val = *valp;
+		if (val < 0) {
+			*negp = -1;
+			*lvalp = (unsigned long)-val;
+		} else {
+			*negp = 0;
+			*lvalp = (unsigned long)val;
+		}
+	}
+	return 0;
+}
 
 static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer, size_t *lenp, int conv, int op)
+		  void __user *buffer, size_t *lenp, 
+		  int (*conv)(int *negp, unsigned long *lvalp, int *valp,
+			      int write, void *data),
+		  void *data)
 {
+#define TMPBUFLEN 20
 	int *i, vleft, first=1, neg, val;
+	unsigned long lval;
 	size_t left, len;
 	
-	#define TMPBUFLEN 20
 	char buf[TMPBUFLEN], *p;
 	
 	if (!table->data || !table->maxlen || !*lenp ||
@@ -1344,9 +1382,12 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 	}
 	
 	i = (int *) table->data;
-	vleft = table->maxlen / sizeof(int);
+	vleft = table->maxlen / sizeof(*i);
 	left = *lenp;
-	
+
+	if (!conv)
+		conv = do_proc_dointvec_conv;
+
 	for (; left && vleft--; i++, first=0) {
 		if (write) {
 			while (left) {
@@ -1362,8 +1403,8 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 				break;
 			neg = 0;
 			len = left;
-			if (len > TMPBUFLEN-1)
-				len = TMPBUFLEN-1;
+			if (len > sizeof(buf) - 1)
+				len = sizeof(buf) - 1;
 			if(copy_from_user(buf, buffer, len))
 				return -EFAULT;
 			buf[len] = 0;
@@ -1374,7 +1415,9 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 			}
 			if (*p < '0' || *p > '9')
 				break;
-			val = simple_strtoul(p, &p, 0) * conv;
+
+			lval = simple_strtoul(p, &p, 0);
+
 			len = p-buf;
 			if ((len < left) && *p && !isspace(*p))
 				break;
@@ -1382,22 +1425,18 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 				val = -val;
 			buffer += len;
 			left -= len;
-			switch(op) {
-			case OP_SET:	*i = val; break;
-			case OP_AND:	*i &= val; break;
-			case OP_OR:	*i |= val; break;
-			case OP_MAX:	if(*i < val)
-						*i = val;
-					break;
-			case OP_MIN:	if(*i > val)
-						*i = val;
-					break;
-			}
+
+			if (conv(&neg, &lval, i, 1, data))
+				break;
 		} else {
 			p = buf;
 			if (!first)
 				*p++ = '\t';
-			sprintf(p, "%d", (*i) / conv);
+	
+			if (conv(&neg, &lval, i, 0, data))
+				break;
+
+			sprintf(p, "%s%lu", neg ? "-" : "", lval);
 			len = strlen(buf);
 			if (len > left)
 				len = left;
@@ -1429,6 +1468,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 	*lenp -= left;
 	filp->f_pos += *lenp;
 	return 0;
+#undef TMPBUFLEN
 }
 
 /**
@@ -1447,7 +1487,45 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 int proc_dointvec(ctl_table *table, int write, struct file *filp,
 		     void __user *buffer, size_t *lenp)
 {
-    return do_proc_dointvec(table,write,filp,buffer,lenp,1,OP_SET);
+    return do_proc_dointvec(table,write,filp,buffer,lenp,
+		    	    NULL,NULL);
+}
+
+#define OP_SET	0
+#define OP_AND	1
+#define OP_OR	2
+#define OP_MAX	3
+#define OP_MIN	4
+
+static int do_proc_dointvec_bset_conv(int *negp, unsigned long *lvalp,
+				      int *valp,
+				      int write, void *data)
+{
+	int op = *(int *)data;
+	if (write) {
+		int val = *negp ? -*lvalp : *lvalp;
+		switch(op) {
+		case OP_SET:	*valp = val; break;
+		case OP_AND:	*valp &= val; break;
+		case OP_OR:	*valp |= val; break;
+		case OP_MAX:	if(*valp < val)
+					*valp = val;
+				break;
+		case OP_MIN:	if(*valp > val)
+				*valp = val;
+				break;
+		}
+	} else {
+		int val = *valp;
+		if (val < 0) {
+			*negp = -1;
+			*lvalp = (unsigned long)-val;
+		} else {
+			*negp = 0;
+			*lvalp = (unsigned long)val;
+		}
+	}
+	return 0;
 }
 
 /*
@@ -1457,11 +1535,44 @@ int proc_dointvec(ctl_table *table, int write, struct file *filp,
 int proc_dointvec_bset(ctl_table *table, int write, struct file *filp,
 			void __user *buffer, size_t *lenp)
 {
+	int op;
+
 	if (!capable(CAP_SYS_MODULE)) {
 		return -EPERM;
 	}
-	return do_proc_dointvec(table,write,filp,buffer,lenp,1,
-				(current->pid == 1) ? OP_SET : OP_AND);
+
+	op = (current->pid == 1) ? OP_SET : OP_AND;
+	return do_proc_dointvec(table,write,filp,buffer,lenp,
+				do_proc_dointvec_bset_conv,&op);
+}
+
+struct do_proc_dointvec_minmax_conv_param {
+	int *min;
+	int *max;
+};
+
+static int do_proc_dointvec_minmax_conv(int *negp, unsigned long *lvalp, 
+					int *valp, 
+					int write, void *data)
+{
+	struct do_proc_dointvec_minmax_conv_param *param = data;
+	if (write) {
+		int val = *negp ? -*lvalp : *lvalp;
+		if ((param->min && *param->min > val) ||
+		    (param->max && *param->max < val))
+			return -EINVAL;
+		*valp = val;
+	} else {
+		int val = *valp;
+		if (val < 0) {
+			*negp = -1;
+			*lvalp = (unsigned long)-val;
+		} else {
+			*negp = 0;
+			*lvalp = (unsigned long)val;
+		}
+	}
+	return 0;
 }
 
 /**
@@ -1483,98 +1594,12 @@ int proc_dointvec_bset(ctl_table *table, int write, struct file *filp,
 int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 		  void __user *buffer, size_t *lenp)
 {
-	int *i, *min, *max, vleft, first=1, neg, val;
-	size_t len, left;
-	#define TMPBUFLEN 20
-	char buf[TMPBUFLEN], *p;
-	
-	if (!table->data || !table->maxlen || !*lenp ||
-	    (filp->f_pos && !write)) {
-		*lenp = 0;
-		return 0;
-	}
-	
-	i = (int *) table->data;
-	min = (int *) table->extra1;
-	max = (int *) table->extra2;
-	vleft = table->maxlen / sizeof(int);
-	left = *lenp;
-	
-	for (; left && vleft--; i++, min++, max++, first=0) {
-		if (write) {
-			while (left) {
-				char c;
-				if(get_user(c, (char *) buffer))
-					return -EFAULT;
-				if (!isspace(c))
-					break;
-				left--;
-				buffer++;
-			}
-			if (!left)
-				break;
-			neg = 0;
-			len = left;
-			if (len > TMPBUFLEN-1)
-				len = TMPBUFLEN-1;
-			if(copy_from_user(buf, buffer, len))
-				return -EFAULT;
-			buf[len] = 0;
-			p = buf;
-			if (*p == '-' && left > 1) {
-				neg = 1;
-				left--, p++;
-			}
-			if (*p < '0' || *p > '9')
-				break;
-			val = simple_strtoul(p, &p, 0);
-			len = p-buf;
-			if ((len < left) && *p && !isspace(*p))
-				break;
-			if (neg)
-				val = -val;
-			buffer += len;
-			left -= len;
-
-			if ((min && val < *min) || (max && val > *max))
-				continue;
-			*i = val;
-		} else {
-			p = buf;
-			if (!first)
-				*p++ = '\t';
-			sprintf(p, "%d", *i);
-			len = strlen(buf);
-			if (len > left)
-				len = left;
-			if(copy_to_user(buffer, buf, len))
-				return -EFAULT;
-			left -= len;
-			buffer += len;
-		}
-	}
-
-	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
-			return -EFAULT;
-		left--, buffer++;
-	}
-	if (write) {
-		p = (char *) buffer;
-		while (left) {
-			char c;
-			if(get_user(c, p++))
-				return -EFAULT;
-			if (!isspace(c))
-				break;
-			left--;
-		}
-	}
-	if (write && first)
-		return -EINVAL;
-	*lenp -= left;
-	filp->f_pos += *lenp;
-	return 0;
+	struct do_proc_dointvec_minmax_conv_param param = {
+		.min = (int *) table->extra1,
+		.max = (int *) table->extra2,
+	};
+	return do_proc_dointvec(table, write, filp, buffer, lenp,
+				do_proc_dointvec_minmax_conv, &param);
 }
 
 static int do_proc_doulongvec_minmax(ctl_table *table, int write,
@@ -1729,6 +1754,48 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 }
 
 
+static int do_proc_dointvec_jiffies_conv(int *negp, unsigned long *lvalp,
+					 int *valp,
+					 int write, void *data)
+{
+	if (write) {
+		*valp = *negp ? -(*lvalp*HZ) : (*lvalp*HZ);
+	} else {
+		int val = *valp;
+		unsigned long lval;
+		if (val < 0) {
+			*negp = -1;
+			lval = (unsigned long)-val;
+		} else {
+			*negp = 0;
+			lval = (unsigned long)val;
+		}
+		*lvalp = lval / HZ;
+	}
+	return 0;
+}
+
+static int do_proc_dointvec_userhz_jiffies_conv(int *negp, unsigned long *lvalp,
+						int *valp,
+						int write, void *data)
+{
+	if (write) {
+		*valp = clock_t_to_jiffies(*negp ? -*lvalp : *lvalp);
+	} else {
+		int val = *valp;
+		unsigned long lval;
+		if (val < 0) {
+			*negp = -1;
+			lval = (unsigned long)-val;
+		} else {
+			*negp = 0;
+			lval = (unsigned long)val;
+		}
+		*lvalp = jiffies_to_clock_t(lval);
+	}
+	return 0;
+}
+
 /**
  * proc_dointvec_jiffies - read a vector of integers as seconds
  * @table: the sysctl table
@@ -1747,7 +1814,30 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 int proc_dointvec_jiffies(ctl_table *table, int write, struct file *filp,
 			  void __user *buffer, size_t *lenp)
 {
-    return do_proc_dointvec(table,write,filp,buffer,lenp,HZ,OP_SET);
+    return do_proc_dointvec(table,write,filp,buffer,lenp,
+		    	    do_proc_dointvec_jiffies_conv,NULL);
+}
+
+/**
+ * proc_dointvec_userhz_jiffies - read a vector of integers as 1/USER_HZ seconds
+ * @table: the sysctl table
+ * @write: %TRUE if this is a write to the sysctl file
+ * @filp: the file structure
+ * @buffer: the user buffer
+ * @lenp: the size of the user buffer
+ *
+ * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
+ * values from/to the user buffer, treated as an ASCII string. 
+ * The values read are assumed to be in 1/USER_HZ seconds, and 
+ * are converted into jiffies.
+ *
+ * Returns 0 on success.
+ */
+int proc_dointvec_userhz_jiffies(ctl_table *table, int write, struct file *filp,
+				 void __user *buffer, size_t *lenp)
+{
+    return do_proc_dointvec(table,write,filp,buffer,lenp,
+		    	    do_proc_dointvec_userhz_jiffies_conv,NULL);
 }
 
 #else /* CONFIG_PROC_FS */
@@ -1783,6 +1873,12 @@ int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 }
 
 int proc_dointvec_jiffies(ctl_table *table, int write, struct file *filp,
+		    void *buffer, size_t *lenp)
+{
+	return -ENOSYS;
+}
+
+int proc_dointvec_userhz_jiffies(ctl_table *table, int write, struct file *filp,
 		    void *buffer, size_t *lenp)
 {
 	return -ENOSYS;
@@ -1975,6 +2071,12 @@ int proc_dointvec_jiffies(ctl_table *table, int write, struct file *filp,
 	return -ENOSYS;
 }
 
+int proc_dointvec_userhz_jiffies(ctl_table *table, int write, struct file *filp,
+			  void *buffer, size_t *lenp)
+{
+	return -ENOSYS;
+}
+
 int proc_doulongvec_minmax(ctl_table *table, int write, struct file *filp,
 		    void __user *buffer, size_t *lenp)
 {
@@ -2007,6 +2109,7 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 EXPORT_SYMBOL(proc_dointvec);
 EXPORT_SYMBOL(proc_dointvec_jiffies);
 EXPORT_SYMBOL(proc_dointvec_minmax);
+EXPORT_SYMBOL(proc_dointvec_userhz_jiffies);
 EXPORT_SYMBOL(proc_dostring);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);

@@ -33,6 +33,8 @@
 #include <linux/serio.h>
 
 MODULE_AUTHOR("Justin Cormack <j.cormack@doc.ic.ac.uk>");
+MODULE_DESCRIPTION("Newton keyboard driver");
+MODULE_LICENSE("GPL");
 
 #define NKBD_KEY	0x7f
 #define NKBD_PRESS	0x80

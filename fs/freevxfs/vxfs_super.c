@@ -53,6 +53,8 @@ MODULE_AUTHOR("Christoph Hellwig");
 MODULE_DESCRIPTION("Veritas Filesystem (VxFS) driver");
 MODULE_LICENSE("Dual BSD/GPL");
 
+MODULE_ALIAS("vxfs"); /* makes mount -t vxfs autoload the module */
+
 
 static void		vxfs_put_super(struct super_block *);
 static int		vxfs_statfs(struct super_block *, struct kstatfs *);

@@ -12,48 +12,55 @@ static struct saa7146_format formats[] = {
 		.pixelformat	= V4L2_PIX_FMT_RGB332,
 		.trans 		= RGB08_COMPOSED,
 		.depth		= 8,
+		.flags		= 0,
 	}, {
-		.name 		= "RGB-16 (5/B-6/G-5/R)", 	/* really? */
+		.name 		= "RGB-16 (5/B-6/G-5/R)",
 		.pixelformat	= V4L2_PIX_FMT_RGB565,
 		.trans 		= RGB16_COMPOSED,
 		.depth		= 16,
+		.flags		= 0,
 	}, {
 		.name 		= "RGB-24 (B-G-R)",
 		.pixelformat	= V4L2_PIX_FMT_BGR24,
 		.trans 		= RGB24_COMPOSED,
 		.depth		= 24,
+		.flags		= 0,
 	}, {
 		.name 		= "RGB-32 (B-G-R)",
 		.pixelformat	= V4L2_PIX_FMT_BGR32,
 		.trans 		= RGB32_COMPOSED,
 		.depth		= 32,
+		.flags		= 0,
 	}, {
 		.name 		= "Greyscale-8",
 		.pixelformat	= V4L2_PIX_FMT_GREY,
 		.trans 		= Y8,
 		.depth		= 8,
+		.flags		= 0,
 	}, {
 		.name 		= "YUV 4:2:2 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YUV422P,
 		.trans 		= YUV422_DECOMPOSED,
 		.depth		= 16,
-		.swap		= 1,
+		.flags		= FORMAT_BYTE_SWAP|FORMAT_IS_PLANAR,
 	}, {
 		.name 		= "YVU 4:2:0 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YVU420,
 		.trans 		= YUV420_DECOMPOSED,
 		.depth		= 12,
-		.swap		= 1,
+		.flags		= FORMAT_BYTE_SWAP|FORMAT_IS_PLANAR,
 	}, {
 		.name 		= "YUV 4:2:0 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YUV420,
 		.trans 		= YUV420_DECOMPOSED,
 		.depth		= 12,
+		.flags		= FORMAT_IS_PLANAR,
 	}, {
 		.name 		= "YUV 4:2:2 (U-Y-V-Y)",
 		.pixelformat	= V4L2_PIX_FMT_UYVY,
 		.trans 		= YUV422_COMPOSED,
 		.depth		= 16,
+		.flags		= 0,
 	}
 };
 
@@ -243,13 +250,13 @@ int saa7146_start_preview(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
-	int err = 0;
+	int ret = 0, err = 0;
 
 	DEB_EE(("dev:%p, fh:%p\n",dev,fh));
 
 	/* check if we have overlay informations */
 	if( NULL == fh->ov.fh ) {
-		DEB_D(("not overlay data available. try S_FMT first.\n"));
+		DEB_D(("no overlay data available. try S_FMT first.\n"));
 		return -EAGAIN;
 	}
 
@@ -280,7 +287,11 @@ int saa7146_start_preview(struct saa7146_fh *fh)
 		fh->ov.win.w.left,fh->ov.win.w.top,
 		vv->ov_fmt->name,v4l2_field_names[fh->ov.win.field]));
 	
-	saa7146_set_overlay(dev, fh, 1);
+	if (0 != (ret = saa7146_enable_overlay(fh))) {
+		vv->ov_data = NULL;
+		DEB_D(("enabling overlay failed: %d\n",ret));
+		return ret;
+	}
 
 	return 0;
 }
@@ -290,7 +301,7 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 
-	DEB_EE(("saa7146.o: saa7146_stop_preview()\n"));
+	DEB_EE(("dev:%p, fh:%p\n",dev,fh));
 
 	/* check if overlay is running */
 	if( 0 == vv->ov_data ) {
@@ -300,11 +311,11 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 
 	if( fh != vv->ov_data->fh ) {
 		DEB_D(("overlay is active, but for another open.\n"));
-		return -EBUSY;
+		return 0;
 	}
 
-	saa7146_set_overlay(dev, fh, 0);
 	vv->ov_data = NULL;
+	saa7146_disable_overlay(fh);
 	
 	return 0;
 }
@@ -675,21 +686,37 @@ static int video_begin(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
+	struct saa7146_format *fmt = NULL;
 	unsigned long flags;
+	unsigned int resource;
+	int ret = 0;
 
 	DEB_EE(("dev:%p, fh:%p\n",dev,fh));
 
 	if( fh == vv->streaming ) {
 		DEB_S(("already capturing.\n"));
-		return 0;
+		return -EBUSY;
 	}
 	if( vv->streaming != 0 ) {
 		DEB_S(("already capturing, but in another open.\n"));
 		return -EBUSY;
 	}
 
-	/* fixme: check for planar formats here, if we will interfere with
-	   vbi capture for example */	
+	fmt = format_by_fourcc(dev,fh->video_fmt.pixelformat);
+	/* we need to have a valid format set here */
+	BUG_ON(NULL == fmt);
+
+	if (0 != (fmt->flags & FORMAT_IS_PLANAR)) {
+		resource = RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP|RESOURCE_DMA3_BRS;
+	} else {
+		resource = RESOURCE_DMA1_HPS;
+	}
+
+	ret = saa7146_res_get(fh, resource);
+	if (0 == ret) {
+		DEB_S(("cannot get capture resource %d\n",resource));
+		return -EBUSY;
+	}
 
 	spin_lock_irqsave(&dev->slock,flags);
 
@@ -708,14 +735,29 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
+	struct saa7146_format *fmt = NULL;
 	unsigned long flags;
-	
+	unsigned int resource;
+	u32 dmas = 0;
 	DEB_EE(("dev:%p, fh:%p\n",dev,fh));
 
 	if( vv->streaming != fh ) {
 		DEB_S(("not capturing.\n"));
 		return -EINVAL;
 	}
+
+	fmt = format_by_fourcc(dev,fh->video_fmt.pixelformat);
+	/* we need to have a valid format set here */
+	BUG_ON(NULL == fmt);
+
+	if (0 != (fmt->flags & FORMAT_IS_PLANAR)) {
+		resource = RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP|RESOURCE_DMA3_BRS;
+		dmas = MASK_22 | MASK_21 | MASK_20;
+	} else {
+		resource = RESOURCE_DMA1_HPS;
+		dmas = MASK_20;
+	}
+	saa7146_res_free(fh, resource);
 
 	spin_lock_irqsave(&dev->slock,flags);
 
@@ -725,14 +767,8 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	/* disable rps0 irqs */
 	IER_DISABLE(dev, MASK_27);
 
-	// fixme: only used formats here!
-	/* fixme: look at planar formats here, especially at the
-	   shutdown of planar formats! */
-
 	/* shut down all used video dma transfers */
-	/* fixme: what about the budget-dvb cards? they use
-	   video-dma3, but video_end should not get called anyway ...*/
-	saa7146_write(dev, MC1, 0x00700000);
+	saa7146_write(dev, MC1, dmas);
 
 	vv->streaming = NULL;
 
@@ -849,8 +885,12 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EINVAL;
 		}
 		
-		down(&dev->lock);
+		/* planar formats are not allowed for overlay video, clipping and video dma would clash */
+		if (0 != (fmt->flags & FORMAT_IS_PLANAR)) {
+			DEB_S(("planar pixelformat '%4.4s' not allowed for overlay\n",(char *)&fmt->pixelformat));
+		}
 
+		down(&dev->lock);
 		if( vv->ov_data != NULL ) {
 			ov_fh = vv->ov_data->fh;
 			saa7146_stop_preview(ov_fh);
@@ -1002,7 +1042,9 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EBUSY;
 		}
 
+		DEB_D(("before getting lock...\n"));
 		down(&dev->lock);
+		DEB_D(("got lock\n"));
 
 		if( vv->ov_data != NULL ) {
 			ov_fh = vv->ov_data->fh;
@@ -1047,22 +1089,33 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if( 0 != on ) {
 			if( vv->ov_data != NULL ) {
 				if( fh != vv->ov_data->fh) {
+					DEB_D(("overlay already active in another open\n"));
 					return -EAGAIN;
 				}
 			}
+
+			if (0 == saa7146_res_get(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP)) {
+				DEB_D(("cannot get overlay resources\n"));
+				return -EBUSY;
+			}
+
 			spin_lock_irqsave(&dev->slock,flags);
 			err = saa7146_start_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
-		} else {
+			return err;
+		}
+
 			if( vv->ov_data != NULL ) {
 				if( fh != vv->ov_data->fh) {
+				DEB_D(("overlay is active, but in another open\n"));
 					return -EAGAIN;
 				}
 			}
 			spin_lock_irqsave(&dev->slock,flags);
 			err = saa7146_stop_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
-		}
+		/* free resources */
+		saa7146_res_free(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 		return err;
 	}
 	case VIDIOC_REQBUFS: {
@@ -1093,7 +1146,13 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		int *type = arg;
 		DEB_D(("VIDIOC_STREAMON, type:%d\n",*type));
 
-		if( 0 != (err = video_begin(fh))) {
+		if( fh == vv->streaming ) {
+			DEB_D(("already capturing.\n"));
+			return 0;
+		}
+
+		err = video_begin(fh);
+		if( 0 != err) {
 				return err;
 			}
 		err = videobuf_streamon(file,q);
@@ -1103,6 +1162,12 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		int *type = arg;
 
 		DEB_D(("VIDIOC_STREAMOFF, type:%d\n",*type));
+
+		if( fh != vv->streaming ) {
+			DEB_D(("this open is not capturing.\n"));
+			return -EINVAL;
+		}
+
 		err = videobuf_streamoff(file,q);
 		video_end(fh, file);
 		return err;
@@ -1309,7 +1374,7 @@ static void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 }
 
 
-static void video_open(struct saa7146_dev *dev, struct file *file)
+static int video_open(struct saa7146_dev *dev, struct file *file)
 {
 	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	struct saa7146_format *sfmt;
@@ -1329,6 +1394,8 @@ static void video_open(struct saa7146_dev *dev, struct file *file)
 			    sizeof(struct saa7146_buf));
 
 	init_MUTEX(&fh->video_q.lock);
+
+	return 0;
 }
 
 
@@ -1381,20 +1448,35 @@ static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *p
 
 	DEB_EE(("called.\n"));
 
+	/* fixme: should we allow read() captures while streaming capture? */
+	if( 0 != vv->streaming ) {
+		DEB_S(("already capturing.\n"));
+		return -EBUSY;
+	}
+
+	/* stop any active overlay */
 	if( vv->ov_data != NULL ) {
 		ov_fh = vv->ov_data->fh;
 		saa7146_stop_preview(ov_fh);
+		saa7146_res_free(ov_fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 		restart_overlay = 1;
 	}
 
-	if( 0 != video_begin(fh)) {
-		return -EAGAIN;
+	ret = video_begin(fh);
+	if( 0 != ret) {
+		goto out;
 	}
+
 	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos);
 	video_end(fh, file);
 
+out:
 	/* restart overlay if it was active before */
 	if( 0 != restart_overlay ) {
+		if (0 == saa7146_res_get(ov_fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP)) {
+			DEB_D(("cannot get overlay resources again!\n"));
+			BUG();
+		}
 		saa7146_start_preview(ov_fh);
 	}
 	

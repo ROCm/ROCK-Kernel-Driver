@@ -61,7 +61,7 @@ struct paca_struct {
 	struct ItLpRegSave *xLpRegSavePtr; /* Pointer to LpRegSave for PLIC	0x08 */
 	u64 xCurrent;  		        /* Pointer to current			0x10 */
 	u16 xPacaIndex;			/* Logical processor number		0x18 */
-	u16 active;			/* Is this cpu active?			0x1a */
+        u16 xHwProcNum;                 /* Physical processor number            0x1A */
 	u32 default_decr;		/* Default decrementer value		0x1c */	
 	u64 unused1;
 	u64 xKsave;			/* Saved Kernel stack addr or zero	0x28 */
@@ -94,7 +94,9 @@ struct paca_struct {
 	u32 *prof_buffer;		/* iSeries profiling buffer		0x38 */
 	u32 *prof_stext;		/* iSeries start of kernel text		0x40 */
 	u32 prof_len;			/* iSeries length of profile buffer -1	0x48 */
-	u8  rsvd2[128-76];		/*					0x4C */
+	u8  yielded;                    /* 0 = this processor is running        0x4c */
+	                                /* 1 = this processor is yielded             */
+	u8  rsvd2[128-77];		/*					0x49 */
 
 /*=====================================================================================
  * CACHE_LINE_3 0x0100 - 0x017F
@@ -117,7 +119,7 @@ struct paca_struct {
 	struct ItLpRegSave xRegSav;	/* Register save for proc */
 
 /*=====================================================================================
- * CACHE_LINE_17-18 0x0800 - 0x0EFF Reserved
+ * CACHE_LINE_17-18 0x0800 - 0x08FF Reserved
  *=====================================================================================
  */
 	struct rtas_args xRtas;		/* Per processor RTAS struct */
@@ -126,10 +128,12 @@ struct paca_struct {
 	u8 rsvd5[256-16-sizeof(struct rtas_args)];
 
 /*=====================================================================================
- * CACHE_LINE_19-30 0x0800 - 0x0EFF Reserved
+ * CACHE_LINE_19-30 0x0900 - 0x0EFF Reserved
  *=====================================================================================
  */
-	u8 rsvd6[0x600];
+	u64 slb_shadow[0x20];
+	u64 dispatch_log;
+	u8  rsvd6[0x500 - 0x8];
 
 /*=====================================================================================
  * CACHE_LINE_31 0x0F00 - 0x0F7F Exception stack

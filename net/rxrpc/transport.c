@@ -130,7 +130,19 @@ int rxrpc_create_transport(unsigned short port,
 	return 0;
 
  error:
-	rxrpc_put_transport(trans);
+	/* finish cleaning up the transport (not really needed here, but...) */
+	if (trans->socket)
+		trans->socket->ops->shutdown(trans->socket, 2);
+
+	/* close the socket */
+	if (trans->socket) {
+		trans->socket->sk->sk_user_data = NULL;
+		sock_release(trans->socket);
+		trans->socket = NULL;
+	}
+
+	kfree(trans);
+
 
 	_leave(" = %d", ret);
 	return ret;

@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.47 2003/09/09 06:52:29 schindler Exp $
+/* $Id: capifunc.c,v 1.48 2004/01/11 19:20:54 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -776,7 +776,7 @@ static void diva_register_appl(struct capi_ctr *ctrl, __u16 appl,
 	}
 
 	if (application[appl - 1].Id == appl) {
-		DBG_ERR(("CAPI_REGISTER - appl already registered"))
+		DBG_LOG(("CAPI_REGISTER - appl already registered"))
 		return;	/* appl already registered */
 	}
 

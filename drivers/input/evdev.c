@@ -92,6 +92,7 @@ static int evdev_flush(struct file * file)
 static void evdev_free(struct evdev *evdev)
 {
 	devfs_remove("input/event%d", evdev->minor);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + evdev->minor));
 	evdev_table[evdev->minor] = NULL;
 	kfree(evdev);
 }
@@ -426,6 +427,9 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/event%d", minor);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
+				dev->dev, "event%d", minor);
 
 	return &evdev->handle;
 }

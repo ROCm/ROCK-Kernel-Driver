@@ -1231,7 +1231,9 @@ mptscsih_initChainBuffers (MPT_SCSI_HOST *hd, int init)
 	} else {
 		mem = (u8 *) hd->ReqToChain;
 	}
-	memset(mem, 0xFF, sz);
+/*	memset(mem, 0xFF, sz); */
+	for(ii=0;ii<hd->ioc->req_depth;ii++)
+		hd->ReqToChain[ii] = MPT_HOST_NO_CHAIN;
 
 
 	/* ChainToChain size must equal the total number

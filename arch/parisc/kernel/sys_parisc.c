@@ -93,17 +93,13 @@ static unsigned long get_shared_area(struct address_space *mapping,
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags)
 {
-	struct inode *inode;
-
 	if (len > TASK_SIZE)
 		return -ENOMEM;
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	inode = filp ? filp->f_dentry->d_inode : NULL;
-
-	if (inode && (flags & MAP_SHARED)) {
-		addr = get_shared_area(inode->i_mapping, addr, len, pgoff);
+	if (filp && (flags & MAP_SHARED)) {
+		addr = get_shared_area(filp->f_mapping, addr, len, pgoff);
 	} else {
 		addr = get_unshared_area(addr, len);
 	}

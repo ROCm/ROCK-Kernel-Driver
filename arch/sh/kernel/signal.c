@@ -1,4 +1,4 @@
-/* $Id: signal.c,v 1.15 2003/05/06 23:28:47 lethal Exp $
+/* $Id: signal.c,v 1.19 2003/10/13 07:21:19 lethal Exp $
  *
  *  linux/arch/sh/kernel/signal.c
  *
@@ -93,8 +93,8 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize,
 }
 
 asmlinkage int 
-sys_sigaction(int sig, const struct old_sigaction *act,
-	      struct old_sigaction *oact)
+sys_sigaction(int sig, const struct old_sigaction __user *act,
+	      struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -125,7 +125,7 @@ sys_sigaction(int sig, const struct old_sigaction *act,
 }
 
 asmlinkage int
-sys_sigaltstack(const stack_t *uss, stack_t *uoss,
+sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss,
 		unsigned long r6, unsigned long r7,
 		struct pt_regs regs)
 {
@@ -137,24 +137,26 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss,
  * Do a signal return; undo the signal stack.
  */
 
+#define MOVW(n)	 (0x9300|((n)-2))	/* Move mem word at PC+n to R3 */
+#define TRAP16	 0xc310			/* Syscall w/no args (NR in R3) */
+#define OR_R0_R0 0x200b			/* or r0,r0 (insert to avoid hardware bug) */
+
 struct sigframe
 {
 	struct sigcontext sc;
 	unsigned long extramask[_NSIG_WORDS-1];
-	char retcode[4];
+	u16 retcode[8];
 };
 
 struct rt_sigframe
 {
-	struct siginfo *pinfo;
-	void *puc;
 	struct siginfo info;
 	struct ucontext uc;
-	char retcode[4];
+	u16 retcode[8];
 };
 
 #ifdef CONFIG_CPU_SH4
-static inline int restore_sigcontext_fpu(struct sigcontext *sc)
+static inline int restore_sigcontext_fpu(struct sigcontext __user *sc)
 {
 	struct task_struct *tsk = current;
 
@@ -166,7 +168,7 @@ static inline int restore_sigcontext_fpu(struct sigcontext *sc)
 				sizeof(long)*(16*2+2));
 }
 
-static inline int save_sigcontext_fpu(struct sigcontext *sc)
+static inline int save_sigcontext_fpu(struct sigcontext __user *sc)
 {
 	struct task_struct *tsk = current;
 
@@ -192,7 +194,7 @@ static inline int save_sigcontext_fpu(struct sigcontext *sc)
 #endif /* CONFIG_CPU_SH4 */
 
 static int
-restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, int *r0_p)
+restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *r0_p)
 {
 	unsigned int err = 0;
 
@@ -233,7 +235,7 @@ asmlinkage int sys_sigreturn(unsigned long r4, unsigned long r5,
 			     unsigned long r6, unsigned long r7,
 			     struct pt_regs regs)
 {
-	struct sigframe *frame = (struct sigframe *)regs.regs[15];
+	struct sigframe __user *frame = (struct sigframe __user *)regs.regs[15];
 	sigset_t set;
 	int r0;
 
@@ -266,7 +268,7 @@ asmlinkage int sys_rt_sigreturn(unsigned long r4, unsigned long r5,
 				unsigned long r6, unsigned long r7,
 				struct pt_regs regs)
 {
-	struct rt_sigframe *frame = (struct rt_sigframe *)regs.regs[15];
+	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)regs.regs[15];
 	sigset_t set;
 	stack_t st;
 	int r0;
@@ -304,7 +306,7 @@ badframe:
  */
 
 static int
-setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
+setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 		 unsigned long mask)
 {
 	int err = 0;
@@ -336,19 +338,19 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 /*
  * Determine which stack to use..
  */
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 {
 	if ((ka->sa.sa_flags & SA_ONSTACK) != 0 && ! on_sig_stack(sp))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	return (void *)((sp - frame_size) & -8ul);
+	return (void __user *)((sp - frame_size) & -8ul);
 }
 
 static void setup_frame(int sig, struct k_sigaction *ka,
 			sigset_t *set, struct pt_regs *regs)
 {
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 	int err = 0;
 	int signal;
 
@@ -375,15 +377,16 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (ka->sa.sa_flags & SA_RESTORER) {
 		regs->pr = (unsigned long) ka->sa.sa_restorer;
 	} else {
-		/* This is : mov  #__NR_sigreturn,r3 ; trapa #0x10 */
-#ifdef __LITTLE_ENDIAN__
-		unsigned long code = 0xc310e300 | (__NR_sigreturn);
-#else
-		unsigned long code = 0xe300c310 | (__NR_sigreturn << 16);
-#endif
-
+		/* Generate return code (system call to sigreturn) */
+		err |= __put_user(MOVW(7), &frame->retcode[0]);
+		err |= __put_user(TRAP16, &frame->retcode[1]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[2]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[3]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[4]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[5]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[6]);
+		err |= __put_user((__NR_sigreturn), &frame->retcode[7]);
 		regs->pr = (unsigned long) frame->retcode;
-		err |= __put_user(code, (long *)(frame->retcode+0));
 	}
 
 	if (err)
@@ -392,6 +395,8 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	/* Set up registers for signal handler */
 	regs->regs[15] = (unsigned long) frame;
 	regs->regs[4] = signal; /* Arg for signal handler */
+	regs->regs[5] = 0;
+	regs->regs[6] = (unsigned long) &frame->sc;
 	regs->pc = (unsigned long) ka->sa.sa_handler;
 
 	set_fs(USER_DS);
@@ -402,6 +407,8 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 #endif
 
 	flush_cache_sigtramp(regs->pr);
+	if ((-regs->pr & (L1_CACHE_BYTES-1)) < sizeof(frame->retcode))
+		flush_cache_sigtramp(regs->pr + L1_CACHE_BYTES);
 	return;
 
 give_sigsegv:
@@ -413,7 +420,7 @@ give_sigsegv:
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs *regs)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	int err = 0;
 	int signal;
 
@@ -428,8 +435,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		? current_thread_info()->exec_domain->signal_invmap[sig]
 		: sig;
 
-	err |= __put_user(&frame->info, &frame->pinfo);
-	err |= __put_user(&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user(&frame->info, info);
 
 	/* Create the ucontext.  */
@@ -449,15 +454,16 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (ka->sa.sa_flags & SA_RESTORER) {
 		regs->pr = (unsigned long) ka->sa.sa_restorer;
 	} else {
-		/* This is : mov  #__NR_rt_sigreturn,r3 ; trapa #0x10 */
-#ifdef __LITTLE_ENDIAN__
-		unsigned long code = 0xc310e300 | (__NR_rt_sigreturn);
-#else
-		unsigned long code = 0xe300c310 | (__NR_rt_sigreturn << 16);
-#endif
-
+		/* Generate return code (system call to rt_sigreturn) */
+		err |= __put_user(MOVW(7), &frame->retcode[0]);
+		err |= __put_user(TRAP16, &frame->retcode[1]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[2]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[3]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[4]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[5]);
+		err |= __put_user(OR_R0_R0, &frame->retcode[6]);
+		err |= __put_user((__NR_rt_sigreturn), &frame->retcode[7]);
 		regs->pr = (unsigned long) frame->retcode;
-		err |= __put_user(code, (long *)(frame->retcode+0));
 	}
 
 	if (err)
@@ -466,6 +472,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up registers for signal handler */
 	regs->regs[15] = (unsigned long) frame;
 	regs->regs[4] = signal; /* Arg for signal handler */
+	regs->regs[5] = (unsigned long) &frame->info;
+	regs->regs[6] = (unsigned long) &frame->uc;
 	regs->pc = (unsigned long) ka->sa.sa_handler;
 
 	set_fs(USER_DS);
@@ -476,6 +484,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 #endif
 
 	flush_cache_sigtramp(regs->pr);
+	if ((-regs->pr & (L1_CACHE_BYTES-1)) < sizeof(frame->retcode))
+		flush_cache_sigtramp(regs->pr + L1_CACHE_BYTES);
 	return;
 
 give_sigsegv:

@@ -55,6 +55,7 @@ There may be more modes.
     aty128fb	- ATI Rage128 / Pro frame buffer
     atyfb	- ATI Mach64 frame buffer
     tdfx	- 3D Fx frame buffer
+    tridentfb	- Trident (Cyber)blade chipset frame buffer
 
 BTW, only a few drivers use this at the moment. Others are to follow
 (feel free to send patches).

@@ -130,7 +130,7 @@ send_QIC_CPI(__u32 cpuset, __u8 cpi)
 {
 	int cpu;
 
-	for_each_cpu(cpu, cpu_online_map) {
+	for_each_online_cpu(cpu) {
 		if(cpuset & (1<<cpu)) {
 #ifdef VOYAGER_DEBUG
 			if(!cpu_isset(cpu, cpu_online_map))
@@ -1465,7 +1465,7 @@ send_CPI(__u32 cpuset, __u8 cpi)
 	cpuset &= 0xff;		/* only first 8 CPUs vaild for VIC CPI */
 	if(cpuset == 0)
 		return;
-	for_each_cpu(cpu, cpu_online_map) {
+	for_each_online_cpu(cpu) {
 		if(cpuset & (1<<cpu))
 			set_bit(cpi, &vic_cpi_mailbox[cpu]);
 	}
@@ -1579,7 +1579,7 @@ enable_vic_irq(unsigned int irq)
 	VDEBUG(("VOYAGER: enable_vic_irq(%d) CPU%d affinity 0x%lx\n",
 		irq, cpu, cpu_irq_affinity[cpu]));
 	spin_lock_irqsave(&vic_irq_lock, flags);
-	for_each_cpu(real_cpu, cpu_online_map) {
+	for_each_online_cpu(real_cpu) {
 		if(!(voyager_extended_vic_processors & (1<<real_cpu)))
 			continue;
 		if(!(cpu_irq_affinity[real_cpu] & mask)) {
@@ -1720,7 +1720,7 @@ after_handle_vic_irq(unsigned int irq)
 			int i;
 			__u8 cpu = smp_processor_id();
 			__u8 real_cpu;
-			int mask;
+			int mask; /* Um... initialize me??? --RR */
 
 			printk("VOYAGER SMP: CPU%d lost interrupt %d\n",
 			       cpu, irq);
@@ -1809,7 +1809,7 @@ set_vic_irq_affinity(unsigned int irq, cpumask_t mask)
 		 * bus) */
 		return;
 
-	for_each_cpu(cpu, cpu_online_map) {
+	for_each_online_cpu(cpu) {
 		unsigned long cpu_mask = 1 << cpu;
 		
 		if(cpu_mask & real_mask) {
@@ -1875,7 +1875,7 @@ voyager_smp_dump()
 	int old_cpu = smp_processor_id(), cpu;
 
 	/* dump the interrupt masks of each processor */
-	for_each_cpu(cpu, cpu_online_map) {
+	for_each_online_cpu(cpu) {
 		__u16 imr, isr, irr;
 		unsigned long flags;
 

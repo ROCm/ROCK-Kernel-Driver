@@ -15,7 +15,7 @@ SYSCALL(sys_read,sys_read,sys32_read_wrapper)
 SYSCALL(sys_write,sys_write,sys32_write_wrapper)
 SYSCALL(sys_open,sys_open,sys32_open_wrapper)			/* 5 */
 SYSCALL(sys_close,sys_close,sys32_close_wrapper)
-SYSCALL(sys_restart_syscall,sys_restart_syscall,sys_ni_syscall)
+SYSCALL(sys_restart_syscall,sys_restart_syscall,sys_restart_syscall)
 SYSCALL(sys_creat,sys_creat,sys32_creat_wrapper)
 SYSCALL(sys_link,sys_link,sys32_link_wrapper)
 SYSCALL(sys_unlink,sys_unlink,sys32_unlink_wrapper)		/* 10 */
@@ -261,14 +261,15 @@ SYSCALL(sys_epoll_create,sys_epoll_create,sys_epoll_create_wrapper)
 SYSCALL(sys_epoll_ctl,sys_epoll_ctl,sys_epoll_ctl_wrapper)	/* 250 */
 SYSCALL(sys_epoll_wait,sys_epoll_wait,sys_epoll_wait_wrapper)
 SYSCALL(sys_set_tid_address,sys_set_tid_address,sys32_set_tid_address_wrapper)
-SYSCALL(sys_fadvise64,sys_fadvise64,sys_ni_syscall)
-SYSCALL(sys_timer_create,sys_timer_create,sys_ni_syscall)
-SYSCALL(sys_timer_settime,sys_timer_settime,sys_ni_syscall)	/* 255 */
-SYSCALL(sys_timer_gettime,sys_timer_gettime,sys_ni_syscall)
-SYSCALL(sys_timer_getoverrun,sys_timer_getoverrun,sys_ni_syscall)
-SYSCALL(sys_timer_delete,sys_timer_delete,sys_ni_syscall)
-SYSCALL(sys_clock_settime,sys_clock_settime,sys_ni_syscall)
-SYSCALL(sys_clock_gettime,sys_clock_gettime,sys_ni_syscall)	/* 260 */
-SYSCALL(sys_clock_getres,sys_clock_getres,sys_ni_syscall)
-SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys_ni_syscall)
+SYSCALL(s390_fadvise64,sys_fadvise64_64,sys32_fadvise64_wrapper)
+SYSCALL(sys_timer_create,sys_timer_create,sys32_timer_create_wrapper)
+SYSCALL(sys_timer_settime,sys_timer_settime,sys32_timer_settime_wrapper)	/* 255 */
+SYSCALL(sys_timer_gettime,sys_timer_gettime,sys32_timer_gettime_wrapper)
+SYSCALL(sys_timer_getoverrun,sys_timer_getoverrun,sys32_timer_getoverrun_wrapper)
+SYSCALL(sys_timer_delete,sys_timer_delete,sys32_timer_delete_wrapper)
+SYSCALL(sys_clock_settime,sys_clock_settime,sys32_clock_settime_wrapper)
+SYSCALL(sys_clock_gettime,sys_clock_gettime,sys32_clock_gettime_wrapper)	/* 260 */
+SYSCALL(sys_clock_getres,sys_clock_getres,sys32_clock_getres_wrapper)
+SYSCALL(sys_clock_nanosleep,sys_clock_nanosleep,sys32_clock_nanosleep_wrapper)
 NI_SYSCALL							/* reserved for vserver */
+SYSCALL(s390_fadvise64_64,sys_ni_syscall,sys32_fadvise64_64_wrapper)

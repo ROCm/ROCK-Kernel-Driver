@@ -483,9 +483,9 @@ static inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 }
 #endif /* CONFIG_MMU */
 
-#define rq_for_each_bio(bio, rq)	\
+#define rq_for_each_bio(_bio, rq)	\
 	if ((rq->bio))			\
-		for (bio = (rq)->bio; bio; bio = bio->bi_next)
+		for (_bio = (rq)->bio; _bio; _bio = bio->bi_next)
 
 struct sec_size {
 	unsigned block_size;
@@ -541,7 +541,7 @@ static inline void blkdev_dequeue_request(struct request *req)
 
 	list_del_init(&req->queuelist);
 
-	if (req->q)
+	if (req->rl)
 		elv_remove_request(req->q, req);
 }
 

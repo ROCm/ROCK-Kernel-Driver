@@ -35,14 +35,6 @@ struct afs_mount_params {
 	struct afs_volume	*volume;
 };
 
-static inline char *strdup(const char *s)
-{
-	char *ns = kmalloc(strlen(s) + 1, GFP_KERNEL);
-	if (ns)
-		strcpy(ns, s);
-	return ns;
-}
-
 static void afs_i_init_once(void *foo, kmem_cache_t *cachep,
 			    unsigned long flags);
 
@@ -94,7 +86,7 @@ int __init afs_fs_init(void)
 
 	ret = -ENOMEM;
 	afs_inode_cachep = kmem_cache_create("afs_inode_cache",
-					     sizeof(afs_vnode_t),
+					     sizeof(struct afs_vnode),
 					     0,
 					     SLAB_HWCACHE_ALIGN,
 					     afs_i_init_once,
@@ -164,8 +156,8 @@ static int want_no_value(char *const *_value, const char *option)
 /*****************************************************************************/
 /*
  * parse the mount options
- * - this function has been shamelessly adapted from the ext3 fs which shamelessly adapted it from
- *   the msdos fs
+ * - this function has been shamelessly adapted from the ext3 fs which
+ *   shamelessly adapted it from the msdos fs
  */
 static int afs_super_parse_options(struct afs_mount_params *params,
 				   char *options,
@@ -243,9 +235,9 @@ static int afs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct afs_mount_params *params = data;
 	struct afs_super_info *as = NULL;
+	struct afs_fid fid;
 	struct dentry *root = NULL;
 	struct inode *inode = NULL;
-	afs_fid_t fid;
 	int ret;
 
 	kenter("");
@@ -395,7 +387,7 @@ static void afs_put_super(struct super_block *sb)
 static void afs_i_init_once(void *_vnode, kmem_cache_t *cachep,
 			    unsigned long flags)
 {
-	afs_vnode_t *vnode = (afs_vnode_t *) _vnode;
+	struct afs_vnode *vnode = (struct afs_vnode *) _vnode;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
@@ -417,9 +409,9 @@ static void afs_i_init_once(void *_vnode, kmem_cache_t *cachep,
  */
 static struct inode *afs_alloc_inode(struct super_block *sb)
 {
-	afs_vnode_t *vnode;
+	struct afs_vnode *vnode;
 
-	vnode = (afs_vnode_t *)
+	vnode = (struct afs_vnode *)
 		kmem_cache_alloc(afs_inode_cachep, SLAB_KERNEL);
 	if (!vnode)
 		return NULL;

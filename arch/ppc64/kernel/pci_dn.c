@@ -46,6 +46,7 @@
 static void * __init
 update_dn_pci_info(struct device_node *dn, void *data)
 {
+#ifdef CONFIG_PPC_PSERIES
 	struct pci_controller *phb = (struct pci_controller *)data;
 	u32 *regs;
 	char *device_type = get_property(dn, "device_type", 0);
@@ -64,6 +65,7 @@ update_dn_pci_info(struct device_node *dn, void *data)
 			dn->devfn = (regs[0] >> 8) & 0xff;
 		}
 	}
+#endif
 	return NULL;
 }
 
@@ -97,6 +99,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre, travers
 		return ret;
 	for (dn = start->child; dn; dn = nextdn) {
 		nextdn = NULL;
+#ifdef CONFIG_PPC_PSERIES
 		if (get_property(dn, "class-code", 0)) {
 			if (pre && (ret = pre(dn, data)) != NULL)
 				return ret;
@@ -112,6 +115,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre, travers
 					post(dn, data);
 			}
 		}
+#endif
 		if (!nextdn) {
 			/* Walk up to next valid sibling. */
 			do {

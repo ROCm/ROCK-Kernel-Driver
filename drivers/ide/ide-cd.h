@@ -35,6 +35,12 @@
 #define NO_DOOR_LOCKING 0
 #endif
 
+/*
+ * typical timeout for packet command
+ */
+#define ATAPI_WAIT_PC		(60 * HZ)
+#define ATAPI_WAIT_WRITE_BUSY	(10 * HZ)
+
 /************************************************************************/
 
 #define SECTOR_BITS 		9
@@ -75,6 +81,9 @@ struct ide_cd_config_flags {
 	__u8 dvd		: 1; /* Drive is a DVD-ROM */
 	__u8 dvd_r		: 1; /* Drive can write DVD-R */
 	__u8 dvd_ram		: 1; /* Drive can write DVD-RAM */
+	__u8 mrw		: 1; /* drive can read mrw */
+	__u8 mrw_w		: 1; /* drive can write mrw */
+	__u8 ram		: 1; /* generic WRITE (dvd-ram/mrw) */
 	__u8 test_write		: 1; /* Drive can fake writes */
 	__u8 supp_disc_present	: 1; /* Changer can report exact contents
 					of slots. */
@@ -482,6 +491,8 @@ struct cdrom_info {
 
         /* Per-device info needed by cdrom.c generic driver. */
         struct cdrom_device_info devinfo;
+
+	unsigned long write_timeout;
 };
 
 /****************************************************************************

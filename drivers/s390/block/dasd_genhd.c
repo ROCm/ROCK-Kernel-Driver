@@ -9,7 +9,7 @@
  *
  * gendisk related functions for the dasd driver.
  *
- * $Revision: 1.41 $
+ * $Revision: 1.42 $
  */
 
 #include <linux/config.h>
@@ -31,7 +31,6 @@ int
 dasd_gendisk_alloc(struct dasd_device *device)
 {
 	struct gendisk *gdp;
-	int len;
 
 	/* Make sure the minor for this device exists. */
 	if (device->devindex >= DASD_PER_MAJOR)
@@ -47,22 +46,8 @@ dasd_gendisk_alloc(struct dasd_device *device)
 	gdp->fops = &dasd_device_operations;
 	gdp->driverfs_dev = &device->cdev->dev;
 
-	/*
-	 * Set device name.
-	 *   dasda - dasdz : 26 devices
-	 *   dasdaa - dasdzz : 676 devices, added up = 702
-	 *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
-	 */
-	len = sprintf(gdp->disk_name, "dasd");
-	if (device->devindex > 25) {
-		if (device->devindex > 701)
-			len += sprintf(gdp->disk_name + len, "%c",
-				       'a'+(((device->devindex-702)/676)%26));
-		len += sprintf(gdp->disk_name + len, "%c",
-			       'a'+(((device->devindex-26)/26)%26));
-	}
-	len += sprintf(gdp->disk_name + len, "%c", 'a'+(device->devindex%26));
-
+	/* Set device name */
+ 	sprintf(gdp->disk_name, "dasd_%s_", device->cdev->dev.bus_id);
  	sprintf(gdp->devfs_name, "dasd/%s", device->cdev->dev.bus_id);
 
 	if (device->ro_flag)

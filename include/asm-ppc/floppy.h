@@ -12,7 +12,7 @@
 #define __ASM_PPC_FLOPPY_H
 
 #define fd_inb(port)			inb_p(port)
-#define fd_outb(port,value)		outb_p(port,value)
+#define fd_outb(value,port)		outb_p(value,port)
 
 #define fd_enable_dma()         enable_dma(FLOPPY_DMA)
 #define fd_disable_dma()        disable_dma(FLOPPY_DMA)

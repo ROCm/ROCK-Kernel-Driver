@@ -143,8 +143,9 @@ static int joydev_fasync(int fd, struct file *file, int on)
 
 static void joydev_free(struct joydev *joydev)
 {
-	devfs_remove("js%d", joydev->minor);
+	devfs_remove("input/js%d", joydev->minor);
 	joydev_table[joydev->minor] = NULL;
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + joydev->minor));
 	kfree(joydev);
 }
 
@@ -290,7 +291,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
 	struct input_dev *dev = joydev->handle.dev;
-	int i;
+	int i, j;
 
 	if (!joydev->exist) return -ENODEV;
 
@@ -324,8 +325,14 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		case JSIOCGBUTTONS:
 			return put_user(joydev->nkey, (__u8 *) arg);
 		case JSIOCSCORR:
-			return copy_from_user(joydev->corr, (struct js_corr *) arg,
-						sizeof(struct js_corr) * joydev->nabs) ? -EFAULT : 0;
+			if (copy_from_user(joydev->corr, (struct js_corr *)arg,
+				      sizeof(struct js_corr) * joydev->nabs))
+			    return -EFAULT;
+			for (i = 0; i < joydev->nabs; i++) {
+				j = joydev->abspam[i];
+			        joydev->abs[i] = joydev_correct(dev->abs[j], joydev->corr + i);
+			}
+			return 0;
 		case JSIOCGCORR:
 			return copy_to_user((struct js_corr *) arg, joydev->corr,
 						sizeof(struct js_corr) * joydev->nabs) ? -EFAULT : 0;
@@ -426,6 +433,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 		j = joydev->abspam[i];
 		if (dev->absmax[j] == dev->absmin[j]) {
 			joydev->corr[i].type = JS_CORR_NONE;
+			joydev->abs[i] = dev->abs[j];
 			continue;
 		}
 		joydev->corr[i].type = JS_CORR_BROKEN;
@@ -443,7 +451,10 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	joydev_table[minor] = joydev;
 	
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
-			S_IFCHR|S_IRUGO|S_IWUSR, "js%d", minor);
+			S_IFCHR|S_IRUGO|S_IWUSR, "input/js%d", minor);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
+				dev->dev, "js%d", minor);
 
 	return &joydev->handle;
 }

@@ -36,166 +36,125 @@
 #include <asm/nvram.h>
 #include <asm/time.h>
 #include <asm/iSeries/ItSpCommArea.h>
-#include <asm/iSeries/mf_proc.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/pci.h>
 #include <linux/bcd.h>
 
-extern struct pci_dev * iSeries_vio_dev;
+extern struct pci_dev *iSeries_vio_dev;
 
 /*
  * This is the structure layout for the Machine Facilites LPAR event
  * flows.
  */
-struct VspCmdData;
-struct CeMsgData;
-union SafeCast
-{
-	u64 ptrAsU64;
+union safe_cast {
+	u64 ptr_as_u64;
 	void *ptr;
 };
 
-
-typedef void (*CeMsgCompleteHandler)( void *token, struct CeMsgData *vspCmdRsp );
-
-struct CeMsgCompleteData
-{
-	CeMsgCompleteHandler xHdlr;
-	void *xToken;
+struct VspCmdData {
+	union safe_cast token;
+	u16 cmd;
+	HvLpIndex lp_index;
+	u8 result_code;
+	u32 reserved;
+	union {
+		u64 state;	/* GetStateOut */
+		u64 ipl_type;	/* GetIplTypeOut, Function02SelectIplTypeIn */
+		u64 ipl_mode;	/* GetIplModeOut, Function02SelectIplModeIn */
+		u64 page[4];	/* GetSrcHistoryIn */
+		u64 flag;	/* GetAutoIplWhenPrimaryIplsOut,
+				   SetAutoIplWhenPrimaryIplsIn,
+				   WhiteButtonPowerOffIn,
+				   Function08FastPowerOffIn,
+				   IsSpcnRackPowerIncompleteOut */
+		struct {
+			u64 token;
+			u64 address_type;
+			u64 side;
+			u32 length;
+			u32 offset;
+		} kern;		/* SetKernelImageIn, GetKernelImageIn,
+				   SetKernelCmdLineIn, GetKernelCmdLineIn */
+		u32 length_out;	/* GetKernelImageOut, GetKernelCmdLineOut */
+		u8 reserved[80];
+	} sub_data;
 };
 
-struct VspRspData
-{
-	struct semaphore *xSemaphore;
-	struct VspCmdData *xResponse;
+struct VspRspData {
+	struct semaphore *sem;
+	struct VspCmdData *response;
 };
 
-struct IoMFLpEvent
-{
-	struct HvLpEvent xHvLpEvent;
-
-	u16 xSubtypeRc;
-	u16 xRsvd1;
-	u32 xRsvd2;
-
-	union
-	{
-
-		struct AllocData
-		{
-			u16 xSize;
-			u16 xType;
-			u32 xCount;
-			u16 xRsvd3;
-			u8 xRsvd4;
-			HvLpIndex xTargetLp;
-		} xAllocData;
-
-		struct CeMsgData
-		{
-			u8 xCEMsg[12];
-			char xReserved[4];
-			struct CeMsgCompleteData *xToken;
-		} xCEMsgData;
-
-		struct VspCmdData
-		{
-			union SafeCast xTokenUnion;
-			u16 xCmd;
-			HvLpIndex xLpIndex;
-			u8 xRc;
-			u32 xReserved1;
-
-			union VspCmdSubData
-			{
-				struct
-				{
-					u64 xState;
-				} xGetStateOut;
-
-				struct
-				{
-					u64 xIplType;
-				} xGetIplTypeOut, xFunction02SelectIplTypeIn;
-
-				struct
-				{
-					u64 xIplMode;
-				} xGetIplModeOut, xFunction02SelectIplModeIn;
-
-				struct
-				{
-					u64 xPage[4];
-				} xGetSrcHistoryIn;
-
-				struct
-				{
-					u64 xFlag;
-				} xGetAutoIplWhenPrimaryIplsOut,
-					xSetAutoIplWhenPrimaryIplsIn,
-					xWhiteButtonPowerOffIn,
-					xFunction08FastPowerOffIn,
-					xIsSpcnRackPowerIncompleteOut;
-
-				struct
-				{
-					u64 xToken;
-					u64 xAddressType;
-					u64 xSide;
-					u32 xTransferLength;
-					u32 xOffset;
-				} xSetKernelImageIn,
-					xGetKernelImageIn,
-					xSetKernelCmdLineIn,
-					xGetKernelCmdLineIn;
-
-				struct
-				{
-					u32 xTransferLength;
-				} xGetKernelImageOut,xGetKernelCmdLineOut;
-
-
-				u8 xReserved2[80];
-
-			} xSubData;
-		} xVspCmd;
-	} xUnion;
+struct AllocData {
+	u16 size;
+	u16 type;
+	u32 count;
+	u16 reserved1;
+	u8 reserved2;
+	HvLpIndex target_lp;
 };
 
+struct CeMsgData;
+
+typedef void (*CeMsgCompleteHandler)(void *token, struct CeMsgData *vspCmdRsp);
+
+struct CeMsgCompleteData {
+	CeMsgCompleteHandler handler;
+	void *token;
+};
+
+struct CeMsgData {
+	u8 ce_msg[12];
+	char reserved[4];
+	struct CeMsgCompleteData *completion;
+};
+
+struct IoMFLpEvent {
+	struct HvLpEvent hp_lp_event;
+	u16 subtype_result_code;
+	u16 reserved1;
+	u32 reserved2;
+	union {
+		struct AllocData alloc;
+		struct CeMsgData ce_msg;
+		struct VspCmdData vsp_cmd;
+	} data;
+};
+
+#define subtype_data(a, b, c, d)	\
+		(((a) << 24) + ((b) << 16) + ((c) << 8) + (d))
 
 /*
  * All outgoing event traffic is kept on a FIFO queue.  The first
  * pointer points to the one that is outstanding, and all new
  * requests get stuck on the end.  Also, we keep a certain number of
- * preallocated stack elements so that we can operate very early in
+ * preallocated pending events so that we can operate very early in
  * the boot up sequence (before kmalloc is ready).
  */
-struct StackElement
-{
-	struct StackElement * next;
+struct pending_event {
+	struct pending_event *next;
 	struct IoMFLpEvent event;
 	MFCompleteHandler hdlr;
-	char dmaData[72];
-	unsigned dmaDataLength;
-	unsigned remoteAddress;
+	char dma_data[72];
+	unsigned dma_data_length;
+	unsigned remote_address;
 };
-static spinlock_t spinlock;
-static struct StackElement * head = NULL;
-static struct StackElement * tail = NULL;
-static struct StackElement * avail = NULL;
-static struct StackElement prealloc[16];
+static spinlock_t pending_event_spinlock;
+static struct pending_event *pending_event_head;
+static struct pending_event *pending_event_tail;
+static struct pending_event *pending_event_avail;
+static struct pending_event pending_event_prealloc[16];
 
 /*
- * Put a stack element onto the available queue, so it can get reused.
- * Attention! You must have the spinlock before calling!
+ * Put a pending event onto the available queue, so it can get reused.
+ * Attention! You must have the pending_event_spinlock before calling!
  */
-void free( struct StackElement * element )
+static void free_pending_event(struct pending_event *ev)
 {
-	if ( element != NULL )
-	{
-		element->next = avail;
-		avail = element;
+	if (ev != NULL) {
+		ev->next = pending_event_avail;
+		pending_event_avail = ev;
 	}
 }
 
@@ -203,68 +162,68 @@ void free( struct StackElement * element )
  * Enqueue the outbound event onto the stack.  If the queue was
  * empty to begin with, we must also issue it via the Hypervisor
  * interface.  There is a section of code below that will touch
- * the first stack pointer without the protection of the spinlock.
+ * the first stack pointer without the protection of the pending_event_spinlock.
  * This is OK, because we know that nobody else will be modifying
  * the first pointer when we do this.
  */
-static int signalEvent( struct StackElement * newElement )
+static int signal_event(struct pending_event *ev)
 {
 	int rc = 0;
 	unsigned long flags;
 	int go = 1;
-	struct StackElement * element;
+	struct pending_event *ev1;
 	HvLpEvent_Rc hvRc;
 
 	/* enqueue the event */
-	if ( newElement != NULL )
-	{
-		spin_lock_irqsave( &spinlock, flags );
-		if ( head == NULL )
-			head = newElement;
+	if (ev != NULL) {
+		ev->next = NULL;
+		spin_lock_irqsave(&pending_event_spinlock, flags);
+		if (pending_event_head == NULL)
+			pending_event_head = ev;
 		else {
 			go = 0;
-			tail->next = newElement;
+			pending_event_tail->next = ev;
 		}
-		newElement->next = NULL;
-		tail = newElement;
-		spin_unlock_irqrestore( &spinlock, flags );
+		pending_event_tail = ev;
+		spin_unlock_irqrestore(&pending_event_spinlock, flags);
 	}
 
 	/* send the event */
-	while ( go )
-	{
+	while (go) {
 		go = 0;
 
 		/* any DMA data to send beforehand? */
-		if ( head->dmaDataLength > 0 )
-			HvCallEvent_dmaToSp( head->dmaData, head->remoteAddress, head->dmaDataLength, HvLpDma_Direction_LocalToRemote );
+		if (pending_event_head->dma_data_length > 0)
+			HvCallEvent_dmaToSp(pending_event_head->dma_data,
+					pending_event_head->remote_address,
+					pending_event_head->dma_data_length,
+					HvLpDma_Direction_LocalToRemote);
 
-		hvRc = HvCallEvent_signalLpEvent(&head->event.xHvLpEvent);
-		if ( hvRc != HvLpEvent_Rc_Good )
-		{
-			printk( KERN_ERR "mf.c: HvCallEvent_signalLpEvent() failed with %d\n", (int)hvRc );
+		hvRc = HvCallEvent_signalLpEvent(
+				&pending_event_head->event.hp_lp_event);
+		if (hvRc != HvLpEvent_Rc_Good) {
+			printk(KERN_ERR "mf.c: HvCallEvent_signalLpEvent() failed with %d\n",
+					(int)hvRc);
 
-			spin_lock_irqsave( &spinlock, flags );
-			element = head;
-			head = head->next;
-			if ( head != NULL )
+			spin_lock_irqsave(&pending_event_spinlock, flags);
+			ev1 = pending_event_head;
+			pending_event_head = pending_event_head->next;
+			if (pending_event_head != NULL)
 				go = 1;
-			spin_unlock_irqrestore( &spinlock, flags );
+			spin_unlock_irqrestore(&pending_event_spinlock, flags);
 
-			if ( element == newElement )
+			if (ev1 == ev)
 				rc = -EIO;
-			else {
-				if ( element->hdlr != NULL )
-				{
-					union SafeCast mySafeCast;
-					mySafeCast.ptrAsU64 = element->event.xHvLpEvent.xCorrelationToken;
-					(*element->hdlr)( mySafeCast.ptr, -EIO );
-				}
+			else if (ev1->hdlr != NULL) {
+				union safe_cast mySafeCast;
+
+				mySafeCast.ptr_as_u64 = ev1->event.hp_lp_event.xCorrelationToken;
+				(*ev1->hdlr)(mySafeCast.ptr, -EIO);
 			}
 
-			spin_lock_irqsave( &spinlock, flags );
-			free( element );
-			spin_unlock_irqrestore( &spinlock, flags );
+			spin_lock_irqsave(&pending_event_spinlock, flags);
+			free_pending_event(ev1);
+			spin_unlock_irqrestore(&pending_event_spinlock, flags);
 		}
 	}
 
@@ -272,80 +231,74 @@ static int signalEvent( struct StackElement * newElement )
 }
 
 /*
- * Allocate a new StackElement structure, and initialize it.
+ * Allocate a new pending_event structure, and initialize it.
  */
-static struct StackElement * newStackElement( void )
+static struct pending_event *new_pending_event(void)
 {
-	struct StackElement * newElement = NULL;
+	struct pending_event *ev = NULL;
 	HvLpIndex primaryLp = HvLpConfig_getPrimaryLpIndex();
 	unsigned long flags;
+	struct HvLpEvent *hev;
 
-	if ( newElement == NULL )
-	{
-		spin_lock_irqsave( &spinlock, flags );
-		if ( avail != NULL )
-		{
-			newElement = avail;
-			avail = avail->next;
-		}
-		spin_unlock_irqrestore( &spinlock, flags );
+	spin_lock_irqsave(&pending_event_spinlock, flags);
+	if (pending_event_avail != NULL) {
+		ev = pending_event_avail;
+		pending_event_avail = pending_event_avail->next;
 	}
-
-	if ( newElement == NULL )
-		newElement = kmalloc(sizeof(struct StackElement),GFP_ATOMIC);
-
-	if ( newElement == NULL )
-	{
-		printk( KERN_ERR "mf.c: unable to kmalloc %ld bytes\n", sizeof(struct StackElement) );
+	spin_unlock_irqrestore(&pending_event_spinlock, flags);
+	if (ev == NULL)
+		ev = kmalloc(sizeof(struct pending_event),GFP_ATOMIC);
+	if (ev == NULL) {
+		printk(KERN_ERR "mf.c: unable to kmalloc %ld bytes\n",
+				sizeof(struct pending_event));
 		return NULL;
 	}
+	memset(ev, 0, sizeof(struct pending_event));
+	hev = &ev->event.hp_lp_event;
+	hev->xFlags.xValid = 1;
+	hev->xFlags.xAckType = HvLpEvent_AckType_ImmediateAck;
+	hev->xFlags.xAckInd = HvLpEvent_AckInd_DoAck;
+	hev->xFlags.xFunction = HvLpEvent_Function_Int;
+	hev->xType = HvLpEvent_Type_MachineFac;
+	hev->xSourceLp = HvLpConfig_getLpIndex();
+	hev->xTargetLp = primaryLp;
+	hev->xSizeMinus1 = sizeof(ev->event)-1;
+	hev->xRc = HvLpEvent_Rc_Good;
+	hev->xSourceInstanceId = HvCallEvent_getSourceLpInstanceId(primaryLp,
+			HvLpEvent_Type_MachineFac);
+	hev->xTargetInstanceId = HvCallEvent_getTargetLpInstanceId(primaryLp,
+			HvLpEvent_Type_MachineFac);
 
-	memset( newElement, 0, sizeof(struct StackElement) );
-	newElement->event.xHvLpEvent.xFlags.xValid = 1;
-	newElement->event.xHvLpEvent.xFlags.xAckType = HvLpEvent_AckType_ImmediateAck;
-	newElement->event.xHvLpEvent.xFlags.xAckInd = HvLpEvent_AckInd_DoAck;
-	newElement->event.xHvLpEvent.xFlags.xFunction = HvLpEvent_Function_Int;
-	newElement->event.xHvLpEvent.xType = HvLpEvent_Type_MachineFac;
-	newElement->event.xHvLpEvent.xSourceLp = HvLpConfig_getLpIndex();
-	newElement->event.xHvLpEvent.xTargetLp = primaryLp;
-	newElement->event.xHvLpEvent.xSizeMinus1 = sizeof(newElement->event)-1;
-	newElement->event.xHvLpEvent.xRc = HvLpEvent_Rc_Good;
-	newElement->event.xHvLpEvent.xSourceInstanceId = HvCallEvent_getSourceLpInstanceId(primaryLp,HvLpEvent_Type_MachineFac);
-	newElement->event.xHvLpEvent.xTargetInstanceId = HvCallEvent_getTargetLpInstanceId(primaryLp,HvLpEvent_Type_MachineFac);
-
-	return newElement;
+	return ev;
 }
 
-static int signalVspInstruction( struct VspCmdData *vspCmd )
+static int signal_vsp_instruction(struct VspCmdData *vspCmd)
 {
-	struct StackElement * newElement = newStackElement();
-	int rc = 0;
+	struct pending_event *ev = new_pending_event();
+	int rc;
 	struct VspRspData response;
 	DECLARE_MUTEX_LOCKED(Semaphore);
-	response.xSemaphore = &Semaphore;
-	response.xResponse = vspCmd;
 
-	if ( newElement == NULL )
-		rc = -ENOMEM;
-	else {
-		newElement->event.xHvLpEvent.xSubtype = 6;
-		newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('V'<<8)+('I'<<0);
-		newElement->event.xUnion.xVspCmd.xTokenUnion.ptr = &response;
-		newElement->event.xUnion.xVspCmd.xCmd = vspCmd->xCmd;
-		newElement->event.xUnion.xVspCmd.xLpIndex = HvLpConfig_getLpIndex();
-		newElement->event.xUnion.xVspCmd.xRc = 0xFF;
-		newElement->event.xUnion.xVspCmd.xReserved1 = 0;
-		memcpy(&(newElement->event.xUnion.xVspCmd.xSubData),&(vspCmd->xSubData), sizeof(vspCmd->xSubData));
-		mb();
+	if (ev == NULL)
+		return -ENOMEM;
 
-		rc = signalEvent(newElement);
-	}
+	response.sem = &Semaphore;
+	response.response = vspCmd;
+	ev->event.hp_lp_event.xSubtype = 6;
+	ev->event.hp_lp_event.x.xSubtypeData =
+		subtype_data('M', 'F',  'V',  'I');
+	ev->event.data.vsp_cmd.token.ptr = &response;
+	ev->event.data.vsp_cmd.cmd = vspCmd->cmd;
+	ev->event.data.vsp_cmd.lp_index = HvLpConfig_getLpIndex();
+	ev->event.data.vsp_cmd.result_code = 0xFF;
+	ev->event.data.vsp_cmd.reserved = 0;
+	memcpy(&(ev->event.data.vsp_cmd.sub_data),
+			&(vspCmd->sub_data), sizeof(vspCmd->sub_data));
+	mb();
 
+	rc = signal_event(ev);
 	if (rc == 0)
-	{
 		down(&Semaphore);
-	}
-
 	return rc;
 }
 
@@ -353,46 +306,42 @@ static int signalVspInstruction( struct VspCmdData *vspCmd )
 /*
  * Send a 12-byte CE message to the primary partition VSP object
  */
-static int signalCEMsg( char * ceMsg, void * token )
+static int signal_ce_msg(char *ce_msg, struct CeMsgCompleteData *completion)
 {
-	struct StackElement * newElement = newStackElement();
-	int rc = 0;
+	struct pending_event *ev = new_pending_event();
 
-	if ( newElement == NULL )
-		rc = -ENOMEM;
-	else {
-		newElement->event.xHvLpEvent.xSubtype = 0;
-		newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('C'<<8)+('E'<<0);
-		memcpy( newElement->event.xUnion.xCEMsgData.xCEMsg, ceMsg, 12 );
-		newElement->event.xUnion.xCEMsgData.xToken = token;
-		rc = signalEvent(newElement);
-	}
+	if (ev == NULL)
+		return -ENOMEM;
 
-	return rc;
+	ev->event.hp_lp_event.xSubtype = 0;
+	ev->event.hp_lp_event.x.xSubtypeData =
+		subtype_data('M',  'F',  'C',  'E');
+	memcpy(ev->event.data.ce_msg.ce_msg, ce_msg, 12);
+	ev->event.data.ce_msg.completion = completion;
+	return signal_event(ev);
 }
 
 /*
  * Send a 12-byte CE message and DMA data to the primary partition VSP object
  */
-static int dmaAndSignalCEMsg( char * ceMsg, void * token, void * dmaData, unsigned dmaDataLength, unsigned remoteAddress )
+static int dma_and_signal_ce_msg(char *ce_msg,
+		struct CeMsgCompleteData *completion, void *dma_data,
+		unsigned dma_data_length, unsigned remote_address)
 {
-	struct StackElement * newElement = newStackElement();
-	int rc = 0;
+	struct pending_event *ev = new_pending_event();
 
-	if ( newElement == NULL )
-		rc = -ENOMEM;
-	else {
-		newElement->event.xHvLpEvent.xSubtype = 0;
-		newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('C'<<8)+('E'<<0);
-		memcpy( newElement->event.xUnion.xCEMsgData.xCEMsg, ceMsg, 12 );
-		newElement->event.xUnion.xCEMsgData.xToken = token;
-		memcpy( newElement->dmaData, dmaData, dmaDataLength );
-		newElement->dmaDataLength = dmaDataLength;
-		newElement->remoteAddress = remoteAddress;
-		rc = signalEvent(newElement);
-	}
+	if (ev == NULL)
+		return -ENOMEM;
 
-	return rc;
+	ev->event.hp_lp_event.xSubtype = 0;
+	ev->event.hp_lp_event.x.xSubtypeData =
+		subtype_data('M', 'F', 'C', 'E');
+	memcpy(ev->event.data.ce_msg.ce_msg, ce_msg, 12);
+	ev->event.data.ce_msg.completion = completion;
+	memcpy(ev->dma_data, dma_data, dma_data_length);
+	ev->dma_data_length = dma_data_length;
+	ev->remote_address = remote_address;
+	return signal_event(ev);
 }
 
 /*
@@ -401,18 +350,17 @@ static int dmaAndSignalCEMsg( char * ceMsg, void * token, void * dmaData, unsign
  * this fails (why?), we'll simply force it off in a not-so-nice
  * manner.
  */
-static int shutdown( void )
+static int shutdown(void)
 {
-	int rc = kill_proc(1,SIGINT,1);
+	int rc = kill_proc(1, SIGINT, 1);
 
-	if ( rc )
-	{
-		printk( KERN_ALERT "mf.c: SIGINT to init failed (%d), hard shutdown commencing\n", rc );
+	if (rc) {
+		printk(KERN_ALERT "mf.c: SIGINT to init failed (%d), "
+				"hard shutdown commencing\n", rc);
 		mf_powerOff();
-	}
-	else
-		printk( KERN_INFO "mf.c: init has been successfully notified to proceed with shutdown\n" );
-
+	} else
+		printk(KERN_INFO "mf.c: init has been successfully notified "
+				"to proceed with shutdown\n");
 	return rc;
 }
 
@@ -420,67 +368,64 @@ static int shutdown( void )
  * The primary partition VSP object is sending us a new
  * event flow.  Handle it...
  */
-static void intReceived( struct IoMFLpEvent * event )
+static void intReceived(struct IoMFLpEvent *event)
 {
 	int freeIt = 0;
-	struct StackElement * two = NULL;
-	/* ack the interrupt */
-	event->xHvLpEvent.xRc = HvLpEvent_Rc_Good;
-	HvCallEvent_ackLpEvent( &event->xHvLpEvent );
+	struct pending_event *two = NULL;
 
-    /* process interrupt */
-	switch( event->xHvLpEvent.xSubtype )
-	{
+	/* ack the interrupt */
+	event->hp_lp_event.xRc = HvLpEvent_Rc_Good;
+	HvCallEvent_ackLpEvent(&event->hp_lp_event);
+
+	/* process interrupt */
+	switch (event->hp_lp_event.xSubtype) {
 	case 0:	/* CE message */
-		switch( event->xUnion.xCEMsgData.xCEMsg[3] )
-		{
+		switch (event->data.ce_msg.ce_msg[3]) {
 		case 0x5B:	/* power control notification */
-			if ( (event->xUnion.xCEMsgData.xCEMsg[5]&0x20) != 0 )
-			{
-				printk( KERN_INFO "mf.c: Commencing partition shutdown\n" );
-				if ( shutdown() == 0 )
-					signalCEMsg( "\x00\x00\x00\xDB\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
+			if ((event->data.ce_msg.ce_msg[5] & 0x20) != 0) {
+				printk(KERN_INFO "mf.c: Commencing partition shutdown\n");
+				if (shutdown() == 0)
+					signal_ce_msg("\x00\x00\x00\xDB\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 			}
 			break;
 		case 0xC0:	/* get time */
-			{
-				if ( (head != NULL) && ( head->event.xUnion.xCEMsgData.xCEMsg[3] == 0x40 ) )
-				{
-					freeIt = 1;
-					if ( head->event.xUnion.xCEMsgData.xToken != 0 )
-					{
-						CeMsgCompleteHandler xHdlr = head->event.xUnion.xCEMsgData.xToken->xHdlr;
-						void * token = head->event.xUnion.xCEMsgData.xToken->xToken;
+			if ((pending_event_head == NULL) ||
+			    (pending_event_head->event.data.ce_msg.ce_msg[3]
+			     != 0x40))
+				break;
+			freeIt = 1;
+			if (pending_event_head->event.data.ce_msg.completion != 0) {
+				CeMsgCompleteHandler handler = pending_event_head->event.data.ce_msg.completion->handler;
+				void *token = pending_event_head->event.data.ce_msg.completion->token;
 
-						if (xHdlr != NULL)
-							(*xHdlr)( token, &(event->xUnion.xCEMsgData) );
-					}
-				}
+				if (handler != NULL)
+					(*handler)(token, &(event->data.ce_msg));
 			}
 			break;
 		}
 
 		/* remove from queue */
-		if ( freeIt == 1 )
-		{
+		if (freeIt == 1) {
 			unsigned long flags;
-			spin_lock_irqsave( &spinlock, flags );
-			if ( head != NULL )
-			{
-				struct StackElement *oldHead = head;
-				head = head->next;
-				two = head;
-				free( oldHead );
+
+			spin_lock_irqsave(&pending_event_spinlock, flags);
+			if (pending_event_head != NULL) {
+				struct pending_event *oldHead =
+					pending_event_head;
+
+				pending_event_head = pending_event_head->next;
+				two = pending_event_head;
+				free_pending_event(oldHead);
 			}
-			spin_unlock_irqrestore( &spinlock, flags );
+			spin_unlock_irqrestore(&pending_event_spinlock, flags);
 		}
 
 		/* send next waiting event */
-		if ( two != NULL )
-			signalEvent( NULL );
+		if (two != NULL)
+			signal_event(NULL);
 		break;
 	case 1:	/* IT sys shutdown */
-		printk( KERN_INFO "mf.c: Commencing system shutdown\n" );
+		printk(KERN_INFO "mf.c: Commencing system shutdown\n");
 		shutdown();
 		break;
 	}
@@ -491,81 +436,74 @@ static void intReceived( struct IoMFLpEvent * event )
  * of a flow we sent to them.  If there are other flows queued
  * up, we must send another one now...
  */
-static void ackReceived( struct IoMFLpEvent * event )
+static void ackReceived(struct IoMFLpEvent *event)
 {
 	unsigned long flags;
-	struct StackElement * two = NULL;
+	struct pending_event * two = NULL;
 	unsigned long freeIt = 0;
 
-    /* handle current event */
-	if ( head != NULL )
-	{
-		switch( event->xHvLpEvent.xSubtype )
-		{
+	/* handle current event */
+	if (pending_event_head != NULL) {
+		switch (event->hp_lp_event.xSubtype) {
 		case 0:     /* CE msg */
-			if ( event->xUnion.xCEMsgData.xCEMsg[3] == 0x40 )
-			{
-				if ( event->xUnion.xCEMsgData.xCEMsg[2] != 0 )
-				{
+			if (event->data.ce_msg.ce_msg[3] == 0x40) {
+				if (event->data.ce_msg.ce_msg[2] != 0) {
 					freeIt = 1;
-					if ( head->event.xUnion.xCEMsgData.xToken != 0 )
-					{
-						CeMsgCompleteHandler xHdlr = head->event.xUnion.xCEMsgData.xToken->xHdlr;
-						void * token = head->event.xUnion.xCEMsgData.xToken->xToken;
+					if (pending_event_head->event.data.ce_msg.completion
+							!= 0) {
+						CeMsgCompleteHandler handler = pending_event_head->event.data.ce_msg.completion->handler;
+						void *token = pending_event_head->event.data.ce_msg.completion->token;
 
-						if (xHdlr != NULL)
-							(*xHdlr)( token, &(event->xUnion.xCEMsgData) );
+						if (handler != NULL)
+							(*handler)(token, &(event->data.ce_msg));
 					}
 				}
-			} else {
+			} else
 				freeIt = 1;
-			}
 			break;
 		case 4:	/* allocate */
 		case 5:	/* deallocate */
-			if ( head->hdlr != NULL )
-			{
-				union SafeCast mySafeCast;
-				mySafeCast.ptrAsU64 = event->xHvLpEvent.xCorrelationToken;
-				(*head->hdlr)( mySafeCast.ptr, event->xUnion.xAllocData.xCount );
+			if (pending_event_head->hdlr != NULL) {
+				union safe_cast mySafeCast;
+
+				mySafeCast.ptr_as_u64 = event->hp_lp_event.xCorrelationToken;
+				(*pending_event_head->hdlr)(mySafeCast.ptr, event->data.alloc.count);
 			}
 			freeIt = 1;
 			break;
 		case 6:
 			{
-				struct VspRspData *rsp = (struct VspRspData *)event->xUnion.xVspCmd.xTokenUnion.ptr;
+				struct VspRspData *rsp = (struct VspRspData *)event->data.vsp_cmd.token.ptr;
 
-				if (rsp != NULL)
-				{
-					if (rsp->xResponse != NULL)
-						memcpy(rsp->xResponse, &(event->xUnion.xVspCmd), sizeof(event->xUnion.xVspCmd));
-					if (rsp->xSemaphore != NULL)
-						up(rsp->xSemaphore);
-				} else {
-					printk( KERN_ERR "mf.c: no rsp\n");
-				}
+				if (rsp != NULL) {
+					if (rsp->response != NULL)
+						memcpy(rsp->response, &(event->data.vsp_cmd), sizeof(event->data.vsp_cmd));
+					if (rsp->sem != NULL)
+						up(rsp->sem);
+				} else
+					printk(KERN_ERR "mf.c: no rsp\n");
 				freeIt = 1;
 			}
 			break;
 		}
 	}
 	else
-		printk( KERN_ERR "mf.c: stack empty for receiving ack\n" );
+		printk(KERN_ERR "mf.c: stack empty for receiving ack\n");
 
-    /* remove from queue */
-	spin_lock_irqsave( &spinlock, flags );
-	if (( head != NULL ) && ( freeIt == 1 ))
-	{
-		struct StackElement *oldHead = head;
-		head = head->next;
-		two = head;
-		free( oldHead );
+	/* remove from queue */
+	spin_lock_irqsave(&pending_event_spinlock, flags);
+	if ((pending_event_head != NULL) && (freeIt == 1)) {
+		struct pending_event *oldHead = pending_event_head;
+
+		pending_event_head = pending_event_head->next;
+		two = pending_event_head;
+		free_pending_event(oldHead);
 	} 
-	spin_unlock_irqrestore( &spinlock, flags );
+	spin_unlock_irqrestore(&pending_event_spinlock, flags);
 
-    /* send next waiting event */
-	if ( two != NULL )
-		signalEvent( NULL );
+	/* send next waiting event */
+	if (two != NULL)
+		signal_event(NULL);
 }
 
 /*
@@ -574,101 +512,94 @@ static void ackReceived( struct IoMFLpEvent * event )
  * parse it enough to know if it is an interrupt or an
  * acknowledge.
  */
-static void hvHandler( struct HvLpEvent * event, struct pt_regs * regs )
+static void hvHandler(struct HvLpEvent *event, struct pt_regs *regs)
 {
-	if ( (event != NULL) && (event->xType == HvLpEvent_Type_MachineFac) )
-	{
-		switch( event->xFlags.xFunction )
-		{
+	if ((event != NULL) && (event->xType == HvLpEvent_Type_MachineFac)) {
+		switch(event->xFlags.xFunction) {
 		case HvLpEvent_Function_Ack:
-			ackReceived( (struct IoMFLpEvent *)event );
+			ackReceived((struct IoMFLpEvent *)event);
 			break;
 		case HvLpEvent_Function_Int:
-			intReceived( (struct IoMFLpEvent *)event );
+			intReceived((struct IoMFLpEvent *)event);
 			break;
 		default:
-			printk( KERN_ERR "mf.c: non ack/int event received\n" );
+			printk(KERN_ERR "mf.c: non ack/int event received\n");
 			break;
 		}
-	}
-	else
-		printk( KERN_ERR "mf.c: alien event received\n" );
+	} else
+		printk(KERN_ERR "mf.c: alien event received\n");
 }
 
 /*
  * Global kernel interface to allocate and seed events into the
  * Hypervisor.
  */
-void mf_allocateLpEvents( HvLpIndex targetLp,
-			  HvLpEvent_Type type,
-			  unsigned size,
-			  unsigned count,
-			  MFCompleteHandler hdlr,
-			  void * userToken )
+void mf_allocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+		unsigned size, unsigned count, MFCompleteHandler hdlr,
+		void *userToken)
 {
-	struct StackElement * newElement = newStackElement();
-	int rc = 0;
+	struct pending_event *ev = new_pending_event();
+	int rc;
 
-	if ( newElement == NULL )
+	if (ev == NULL) {
 		rc = -ENOMEM;
-	else {
-		union SafeCast mine;
-		mine.ptr = userToken;
-		newElement->event.xHvLpEvent.xSubtype = 4;
-		newElement->event.xHvLpEvent.xCorrelationToken = mine.ptrAsU64;
-		newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('M'<<8)+('A'<<0);
-		newElement->event.xUnion.xAllocData.xTargetLp = targetLp;
-		newElement->event.xUnion.xAllocData.xType = type;
-		newElement->event.xUnion.xAllocData.xSize = size;
-		newElement->event.xUnion.xAllocData.xCount = count;
-		newElement->hdlr = hdlr;
-		rc = signalEvent(newElement);
-	}
+	} else {
+		union safe_cast mine;
 
-	if ( (rc != 0) && (hdlr != NULL) )
-		(*hdlr)( userToken, rc );
+		mine.ptr = userToken;
+		ev->event.hp_lp_event.xSubtype = 4;
+		ev->event.hp_lp_event.xCorrelationToken = mine.ptr_as_u64;
+		ev->event.hp_lp_event.x.xSubtypeData =
+			subtype_data('M', 'F', 'M', 'A');
+		ev->event.data.alloc.target_lp = targetLp;
+		ev->event.data.alloc.type = type;
+		ev->event.data.alloc.size = size;
+		ev->event.data.alloc.count = count;
+		ev->hdlr = hdlr;
+		rc = signal_event(ev);
+	}
+	if ((rc != 0) && (hdlr != NULL))
+		(*hdlr)(userToken, rc);
 }
 
 /*
  * Global kernel interface to unseed and deallocate events already in
  * Hypervisor.
  */
-void mf_deallocateLpEvents( HvLpIndex targetLp,
-			    HvLpEvent_Type type,
-			    unsigned count,
-			    MFCompleteHandler hdlr,
-			    void * userToken )
+void mf_deallocateLpEvents(HvLpIndex targetLp, HvLpEvent_Type type,
+		unsigned count, MFCompleteHandler hdlr, void *userToken)
 {
-	struct StackElement * newElement = newStackElement();
-	int rc = 0;
+	struct pending_event *ev = new_pending_event();
+	int rc;
 
-	if ( newElement == NULL )
+	if (ev == NULL)
 		rc = -ENOMEM;
 	else {
-		union SafeCast mine;
-		mine.ptr = userToken;
-		newElement->event.xHvLpEvent.xSubtype = 5;
-		newElement->event.xHvLpEvent.xCorrelationToken = mine.ptrAsU64;
-		newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('M'<<8)+('D'<<0);
-		newElement->event.xUnion.xAllocData.xTargetLp = targetLp;
-		newElement->event.xUnion.xAllocData.xType = type;
-		newElement->event.xUnion.xAllocData.xCount = count;
-		newElement->hdlr = hdlr;
-		rc = signalEvent(newElement);
-	}
+		union safe_cast mine;
 
-	if ( (rc != 0) && (hdlr != NULL) )
-		(*hdlr)( userToken, rc );
+		mine.ptr = userToken;
+		ev->event.hp_lp_event.xSubtype = 5;
+		ev->event.hp_lp_event.xCorrelationToken = mine.ptr_as_u64;
+		ev->event.hp_lp_event.x.xSubtypeData =
+			subtype_data('M', 'F', 'M', 'D');
+		ev->event.data.alloc.target_lp = targetLp;
+		ev->event.data.alloc.type = type;
+		ev->event.data.alloc.count = count;
+		ev->hdlr = hdlr;
+		rc = signal_event(ev);
+	}
+	if ((rc != 0) && (hdlr != NULL))
+		(*hdlr)(userToken, rc);
 }
 
 /*
  * Global kernel interface to tell the VSP object in the primary
  * partition to power this partition off.
  */
-void mf_powerOff( void )
+void mf_powerOff(void)
 {
-	printk( KERN_INFO "mf.c: Down it goes...\n" );
-	signalCEMsg( "\x00\x00\x00\x4D\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
+	printk(KERN_INFO "mf.c: Down it goes...\n");
+	signal_ce_msg("\x00\x00\x00\x4D\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 	for (;;);
 }
 
@@ -676,111 +607,104 @@ void mf_powerOff( void )
  * Global kernel interface to tell the VSP object in the primary
  * partition to reboot this partition.
  */
-void mf_reboot( void )
+void mf_reboot(void)
 {
-	printk( KERN_INFO "mf.c: Preparing to bounce...\n" );
-	signalCEMsg( "\x00\x00\x00\x4E\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
+	printk(KERN_INFO "mf.c: Preparing to bounce...\n");
+	signal_ce_msg("\x00\x00\x00\x4E\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 	for (;;);
 }
 
 /*
  * Display a single word SRC onto the VSP control panel.
  */
-void mf_displaySrc( u32 word )
+void mf_displaySrc(u32 word)
 {
 	u8 ce[12];
 
-	memcpy( ce, "\x00\x00\x00\x4A\x00\x00\x00\x01\x00\x00\x00\x00", 12 );
-	ce[8] = word>>24;
-	ce[9] = word>>16;
-	ce[10] = word>>8;
+	memcpy(ce, "\x00\x00\x00\x4A\x00\x00\x00\x01\x00\x00\x00\x00", 12);
+	ce[8] = word >> 24;
+	ce[9] = word >> 16;
+	ce[10] = word >> 8;
 	ce[11] = word;
-	signalCEMsg( ce, NULL );
+	signal_ce_msg(ce, NULL);
 }
 
 /*
  * Display a single word SRC of the form "PROGXXXX" on the VSP control panel.
  */
-void mf_displayProgress( u16 value )
+void mf_displayProgress(u16 value)
 {
 	u8 ce[12];
 	u8 src[72];
 
-	memcpy( ce, "\x00\x00\x04\x4A\x00\x00\x00\x48\x00\x00\x00\x00", 12 );
-	memcpy( src,
-		"\x01\x00\x00\x01"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"\x00\x00\x00\x00"
-		"PROGxxxx"
-		"                        ",
-		72 );
-	src[6] = value>>8;
-	src[7] = value&255;
-	src[44] = "0123456789ABCDEF"[(value>>12)&15];
-	src[45] = "0123456789ABCDEF"[(value>>8)&15];
-	src[46] = "0123456789ABCDEF"[(value>>4)&15];
-	src[47] = "0123456789ABCDEF"[value&15];
-	dmaAndSignalCEMsg( ce, NULL, src, sizeof(src), 9*64*1024 );
+	memcpy(ce, "\x00\x00\x04\x4A\x00\x00\x00\x48\x00\x00\x00\x00", 12);
+	memcpy(src, "\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		"\x00\x00\x00\x00PROGxxxx                        ",
+		72);
+	src[6] = value >> 8;
+	src[7] = value & 255;
+	src[44] = "0123456789ABCDEF"[(value >> 12) & 15];
+	src[45] = "0123456789ABCDEF"[(value >> 8) & 15];
+	src[46] = "0123456789ABCDEF"[(value >> 4) & 15];
+	src[47] = "0123456789ABCDEF"[value & 15];
+	dma_and_signal_ce_msg(ce, NULL, src, sizeof(src), 9 * 64 * 1024);
 }
 
 /*
  * Clear the VSP control panel.  Used to "erase" an SRC that was
  * previously displayed.
  */
-void mf_clearSrc( void )
+void mf_clearSrc(void)
 {
-	signalCEMsg( "\x00\x00\x00\x4B\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
+	signal_ce_msg("\x00\x00\x00\x4B\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 }
 
 /*
  * Initialization code here.
  */
-void mf_init( void )
+void mf_init(void)
 {
 	int i;
 
-    /* initialize */
-	spin_lock_init( &spinlock );
-	for ( i = 0; i < sizeof(prealloc)/sizeof(*prealloc); ++i )
-		free( &prealloc[i] );
-	HvLpEvent_registerHandler( HvLpEvent_Type_MachineFac, &hvHandler );
+	/* initialize */
+	spin_lock_init(&pending_event_spinlock);
+	for (i = 0;
+	     i < sizeof(pending_event_prealloc) / sizeof(*pending_event_prealloc);
+	     ++i)
+		free_pending_event(&pending_event_prealloc[i]);
+	HvLpEvent_registerHandler(HvLpEvent_Type_MachineFac, &hvHandler);
 
 	/* virtual continue ack */
-	signalCEMsg( "\x00\x00\x00\x57\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
+	signal_ce_msg("\x00\x00\x00\x57\x00\x00\x00\x00\x00\x00\x00\x00", NULL);
 
 	/* initialization complete */
-	printk( KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n" );
+	printk(KERN_NOTICE "mf.c: iSeries Linux LPAR Machine Facilities initialized\n");
 
 	iSeries_proc_callback(&mf_proc_init);
 }
 
 void mf_setSide(char side)
 {
-	int rc = 0;
-	u64 newSide = 0;
+	u64 newSide;
 	struct VspCmdData myVspCmd;
 
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
-	if (side == 'A')
-		newSide = 0;
-	else if (side == 'B')
-		newSide = 1;
-	else if (side == 'C')
-		newSide = 2; 
-	else
-		newSide = 3;
+	switch (side) {
+	case 'A':	newSide = 0;
+			break;
+	case 'B':	newSide = 1;
+			break;
+	case 'C':	newSide = 2; 
+			break;
+	default:	newSide = 3;
+			break;
+	}
+	myVspCmd.sub_data.ipl_type = newSide;
+	myVspCmd.cmd = 10;
 
-	myVspCmd.xSubData.xFunction02SelectIplTypeIn.xIplType = newSide;
-	myVspCmd.xCmd = 10;
-
-	rc = signalVspInstruction(&myVspCmd);
+	(void)signal_vsp_instruction(&myVspCmd);
 }
 
 char mf_getSide(void)
@@ -790,91 +714,82 @@ char mf_getSide(void)
 	struct VspCmdData myVspCmd;
 
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
-	myVspCmd.xCmd = 2;
-	myVspCmd.xSubData.xFunction02SelectIplTypeIn.xIplType = 0;
+	myVspCmd.cmd = 2;
+	myVspCmd.sub_data.ipl_type = 0;
 	mb();
-	rc = signalVspInstruction(&myVspCmd);
+	rc = signal_vsp_instruction(&myVspCmd);
 
 	if (rc != 0)
-	{
 		return returnValue;
-	} else {
-		if (myVspCmd.xRc == 0)
-		{
-			if (myVspCmd.xSubData.xGetIplTypeOut.xIplType == 0)
-				returnValue = 'A';
-			else if (myVspCmd.xSubData.xGetIplTypeOut.xIplType == 1)
-				returnValue = 'B';
-			else if (myVspCmd.xSubData.xGetIplTypeOut.xIplType == 2)
-				returnValue = 'C';
-			else
-				returnValue = 'D';
+
+	if (myVspCmd.result_code == 0) {
+		switch (myVspCmd.sub_data.ipl_type) {
+		case 0:	returnValue = 'A';
+			break;
+		case 1:	returnValue = 'B';
+			break;
+		case 2:	returnValue = 'C';
+			break;
+		default:	returnValue = 'D';
+			break;
 		}
 	}
-
 	return returnValue;
 }
 
 void mf_getSrcHistory(char *buffer, int size)
 {
-    /*    struct IplTypeReturnStuff returnStuff;
-     struct StackElement * newElement = newStackElement();
-     int rc = 0;
-     char *pages[4];
+#if 0
+	struct IplTypeReturnStuff returnStuff;
+	struct pending_event *ev = new_pending_event();
+	int rc = 0;
+	char *pages[4];
 
-     pages[0] = kmalloc(4096, GFP_ATOMIC);
-     pages[1] = kmalloc(4096, GFP_ATOMIC);
-     pages[2] = kmalloc(4096, GFP_ATOMIC);
-     pages[3] = kmalloc(4096, GFP_ATOMIC);
-     if (( newElement == NULL ) || (pages[0] == NULL) || (pages[1] == NULL) || (pages[2] == NULL) || (pages[3] == NULL))
-     rc = -ENOMEM;
-     else
-     {
-     returnStuff.xType = 0;
-     returnStuff.xRc = 0;
-     returnStuff.xDone = 0;
-     newElement->event.xHvLpEvent.xSubtype = 6;
-     newElement->event.xHvLpEvent.x.xSubtypeData = ('M'<<24)+('F'<<16)+('V'<<8)+('I'<<0);
-     newElement->event.xUnion.xVspCmd.xEvent = &returnStuff;
-     newElement->event.xUnion.xVspCmd.xCmd = 4;
-     newElement->event.xUnion.xVspCmd.xLpIndex = HvLpConfig_getLpIndex();
-     newElement->event.xUnion.xVspCmd.xRc = 0xFF;
-     newElement->event.xUnion.xVspCmd.xReserved1 = 0;
-     newElement->event.xUnion.xVspCmd.xSubData.xGetSrcHistoryIn.xPage[0] = (0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[0]));
-     newElement->event.xUnion.xVspCmd.xSubData.xGetSrcHistoryIn.xPage[1] = (0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[1]));
-     newElement->event.xUnion.xVspCmd.xSubData.xGetSrcHistoryIn.xPage[2] = (0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[2]));
-     newElement->event.xUnion.xVspCmd.xSubData.xGetSrcHistoryIn.xPage[3] = (0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[3]));
-     mb();
-     rc = signalEvent(newElement);
-     }
+	pages[0] = kmalloc(4096, GFP_ATOMIC);
+	pages[1] = kmalloc(4096, GFP_ATOMIC);
+	pages[2] = kmalloc(4096, GFP_ATOMIC);
+	pages[3] = kmalloc(4096, GFP_ATOMIC);
+	if ((ev == NULL) || (pages[0] == NULL) || (pages[1] == NULL)
+			 || (pages[2] == NULL) || (pages[3] == NULL))
+		return -ENOMEM;
 
-     if (rc != 0)
-     {
-     return;
-     }
-     else
-     {
-     while (returnStuff.xDone != 1)
-     {
-     udelay(10);
-     }
+	returnStuff.xType = 0;
+	returnStuff.xRc = 0;
+	returnStuff.xDone = 0;
+	ev->event.hp_lp_event.xSubtype = 6;
+	ev->event.hp_lp_event.x.xSubtypeData =
+		subtype_data('M', 'F', 'V', 'I');
+	ev->event.data.vsp_cmd.xEvent = &returnStuff;
+	ev->event.data.vsp_cmd.cmd = 4;
+	ev->event.data.vsp_cmd.lp_index = HvLpConfig_getLpIndex();
+	ev->event.data.vsp_cmd.result_code = 0xFF;
+	ev->event.data.vsp_cmd.reserved = 0;
+	ev->event.data.vsp_cmd.sub_data.page[0] =
+		(0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[0]));
+	ev->event.data.vsp_cmd.sub_data.page[1] =
+		(0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[1]));
+	ev->event.data.vsp_cmd.sub_data.page[2] =
+		(0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[2]));
+	ev->event.data.vsp_cmd.sub_data.page[3] =
+		(0x8000000000000000ULL | virt_to_absolute((unsigned long)pages[3]));
+	mb();
+	if (signal_event(ev) != 0)
+		return;
 
-     if (returnStuff.xRc == 0)
-     {
-     memcpy(buffer, pages[0], size);
-     }
-     }
-
-     kfree(pages[0]);
-     kfree(pages[1]);
-     kfree(pages[2]);
-     kfree(pages[3]);*/
+ 	while (returnStuff.xDone != 1)
+ 		udelay(10);
+ 	if (returnStuff.xRc == 0)
+ 		memcpy(buffer, pages[0], size);
+	kfree(pages[0]);
+	kfree(pages[1]);
+	kfree(pages[2]);
+	kfree(pages[3]);
+#endif
 }
 
 void mf_setCmdLine(const char *cmdline, int size, u64 side)
 {
 	struct VspCmdData myVspCmd;
-	int rc = 0;
 	dma_addr_t dma_addr = 0;
 	char *page = pci_alloc_consistent(iSeries_vio_dev, size, &dma_addr);
 
@@ -886,13 +801,13 @@ void mf_setCmdLine(const char *cmdline, int size, u64 side)
 	copy_from_user(page, cmdline, size);
 
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
-	myVspCmd.xCmd = 31;
-	myVspCmd.xSubData.xSetKernelCmdLineIn.xToken = dma_addr;
-	myVspCmd.xSubData.xSetKernelCmdLineIn.xAddressType = HvLpDma_AddressType_TceIndex;
-	myVspCmd.xSubData.xSetKernelCmdLineIn.xSide = side;
-	myVspCmd.xSubData.xSetKernelCmdLineIn.xTransferLength = size;
+	myVspCmd.cmd = 31;
+	myVspCmd.sub_data.kern.token = dma_addr;
+	myVspCmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	myVspCmd.sub_data.kern.side = side;
+	myVspCmd.sub_data.kern.length = size;
 	mb();
-	rc = signalVspInstruction(&myVspCmd);
+	(void)signal_vsp_instruction(&myVspCmd);
 
 	pci_free_consistent(iSeries_vio_dev, size, page, dma_addr);
 }
@@ -900,31 +815,29 @@ void mf_setCmdLine(const char *cmdline, int size, u64 side)
 int mf_getCmdLine(char *cmdline, int *size, u64 side)
 {
 	struct VspCmdData myVspCmd;
-	int rc = 0;
+	int rc;
 	int len = *size;
-	dma_addr_t dma_addr = pci_map_single(iSeries_vio_dev, cmdline, *size, PCI_DMA_FROMDEVICE);
+	dma_addr_t dma_addr;
 
-	memset(cmdline, 0, *size);
+	dma_addr = pci_map_single(iSeries_vio_dev, cmdline, len,
+			PCI_DMA_FROMDEVICE);
+	memset(cmdline, 0, len);
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
-	myVspCmd.xCmd = 33;
-	myVspCmd.xSubData.xGetKernelCmdLineIn.xToken = dma_addr;
-	myVspCmd.xSubData.xGetKernelCmdLineIn.xAddressType = HvLpDma_AddressType_TceIndex;
-	myVspCmd.xSubData.xGetKernelCmdLineIn.xSide = side;
-	myVspCmd.xSubData.xGetKernelCmdLineIn.xTransferLength = *size;
+	myVspCmd.cmd = 33;
+	myVspCmd.sub_data.kern.token = dma_addr;
+	myVspCmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	myVspCmd.sub_data.kern.side = side;
+	myVspCmd.sub_data.kern.length = len;
 	mb();
-	rc = signalVspInstruction(&myVspCmd);
+	rc = signal_vsp_instruction(&myVspCmd);
 
-	if ( ! rc ) {
-
-		if (myVspCmd.xRc == 0)
-		{
-			len = myVspCmd.xSubData.xGetKernelCmdLineOut.xTransferLength;
-		}
-		/* else
-			{
+	if (rc == 0) {
+		if (myVspCmd.result_code == 0)
+			len = myVspCmd.sub_data.length_out;
+#if 0
+		else
 			memcpy(cmdline, "Bad cmdline", 11);
-			}
-		*/
+#endif
 	}
 
 	pci_unmap_single(iSeries_vio_dev, dma_addr, *size, PCI_DMA_FROMDEVICE);
@@ -936,10 +849,8 @@ int mf_getCmdLine(char *cmdline, int *size, u64 side)
 int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 {
 	struct VspCmdData myVspCmd;
-	int rc = 0;
-
+	int rc;
 	dma_addr_t dma_addr = 0;
-
 	char *page = pci_alloc_consistent(iSeries_vio_dev, size, &dma_addr);
 
 	if (page == NULL) {
@@ -950,23 +861,19 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 	copy_from_user(page, buffer, size);
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
 
-	myVspCmd.xCmd = 30;
-	myVspCmd.xSubData.xGetKernelImageIn.xToken = dma_addr;
-	myVspCmd.xSubData.xGetKernelImageIn.xAddressType = HvLpDma_AddressType_TceIndex;
-	myVspCmd.xSubData.xGetKernelImageIn.xSide = side;
-	myVspCmd.xSubData.xGetKernelImageIn.xOffset = offset;
-	myVspCmd.xSubData.xGetKernelImageIn.xTransferLength = size;
+	myVspCmd.cmd = 30;
+	myVspCmd.sub_data.kern.token = dma_addr;
+	myVspCmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	myVspCmd.sub_data.kern.side = side;
+	myVspCmd.sub_data.kern.offset = offset;
+	myVspCmd.sub_data.kern.length = size;
 	mb();
-	rc = signalVspInstruction(&myVspCmd);
-
-	if (rc == 0)
-	{
-		if (myVspCmd.xRc == 0)
-		{
+	rc = signal_vsp_instruction(&myVspCmd);
+	if (rc == 0) {
+		if (myVspCmd.result_code == 0)
 			rc = 0;
-		} else {
+		else
 			rc = -ENOMEM;
-		}
 	}
 
 	pci_free_consistent(iSeries_vio_dev, size, page, dma_addr);
@@ -977,31 +884,27 @@ int mf_setVmlinuxChunk(const char *buffer, int size, int offset, u64 side)
 int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
 {
 	struct VspCmdData myVspCmd;
-	int rc = 0;
+	int rc;
 	int len = *size;
+	dma_addr_t dma_addr;
 
-	dma_addr_t dma_addr = pci_map_single(iSeries_vio_dev, buffer, *size, PCI_DMA_FROMDEVICE);
-
+	dma_addr = pci_map_single(iSeries_vio_dev, buffer, len,
+			PCI_DMA_FROMDEVICE);
 	memset(buffer, 0, len);
-
 	memset(&myVspCmd, 0, sizeof(myVspCmd));
-	myVspCmd.xCmd = 32;
-	myVspCmd.xSubData.xGetKernelImageIn.xToken = dma_addr;
-	myVspCmd.xSubData.xGetKernelImageIn.xAddressType = HvLpDma_AddressType_TceIndex;
-	myVspCmd.xSubData.xGetKernelImageIn.xSide = side;
-	myVspCmd.xSubData.xGetKernelImageIn.xOffset = offset;
-	myVspCmd.xSubData.xGetKernelImageIn.xTransferLength = len;
+	myVspCmd.cmd = 32;
+	myVspCmd.sub_data.kern.token = dma_addr;
+	myVspCmd.sub_data.kern.address_type = HvLpDma_AddressType_TceIndex;
+	myVspCmd.sub_data.kern.side = side;
+	myVspCmd.sub_data.kern.offset = offset;
+	myVspCmd.sub_data.kern.length = len;
 	mb();
-	rc = signalVspInstruction(&myVspCmd);
-
-	if (rc == 0)
-	{
-		if (myVspCmd.xRc == 0)
-		{
-			*size = myVspCmd.xSubData.xGetKernelImageOut.xTransferLength;
-		} else {
+	rc = signal_vsp_instruction(&myVspCmd);
+	if (rc == 0) {
+		if (myVspCmd.result_code == 0)
+			*size = myVspCmd.sub_data.length_out;
+		else
 			rc = -ENOMEM;
-		}
 	}
 
 	pci_unmap_single(iSeries_vio_dev, dma_addr, len, PCI_DMA_FROMDEVICE);
@@ -1015,12 +918,11 @@ int mf_setRtcTime(unsigned long time)
 
 	to_tm(time, &tm);
 
-	return mf_setRtc( &tm );
+	return mf_setRtc(&tm);
 }
 
-struct RtcTimeData
-{
-	struct semaphore *xSemaphore;
+struct RtcTimeData {
+	struct semaphore *sem;
 	struct CeMsgData xCeMsg;
 	int xRc;
 };
@@ -1030,26 +932,23 @@ void getRtcTimeComplete(void * token, struct CeMsgData *ceMsg)
 	struct RtcTimeData *rtc = (struct RtcTimeData *)token;
 
 	memcpy(&(rtc->xCeMsg), ceMsg, sizeof(rtc->xCeMsg));
-
 	rtc->xRc = 0;
-	up(rtc->xSemaphore);
+	up(rtc->sem);
 }
 
 static unsigned long lastsec = 1;
 
 int mf_getRtcTime(unsigned long *time)
 {
-/*    unsigned long usec, tsec; */
-	
 	u32 dataWord1 = *((u32 *)(&xSpCommArea.xBcdTimeAtIplStart));
 	u32 dataWord2 = *(((u32 *)&(xSpCommArea.xBcdTimeAtIplStart)) + 1);
 	int year = 1970;
-	int year1 = ( dataWord1 >> 24 ) & 0x000000FF;
-	int year2 = ( dataWord1 >> 16 ) & 0x000000FF;
-	int sec = ( dataWord1 >> 8 ) & 0x000000FF;
+	int year1 = (dataWord1 >> 24) & 0x000000FF;
+	int year2 = (dataWord1 >> 16) & 0x000000FF;
+	int sec = (dataWord1 >> 8) & 0x000000FF;
 	int min = dataWord1 & 0x000000FF;
-	int hour = ( dataWord2 >> 24 ) & 0x000000FF;
-	int day = ( dataWord2 >> 8 ) & 0x000000FF;
+	int hour = (dataWord2 >> 24) & 0x000000FF;
+	int day = (dataWord2 >> 8) & 0x000000FF;
 	int mon = dataWord2 & 0x000000FF;
 
 	BCD_TO_BIN(sec);
@@ -1062,49 +961,41 @@ int mf_getRtcTime(unsigned long *time)
 	year = year1 * 100 + year2;
 
 	*time = mktime(year, mon, day, hour, min, sec);
-
-	*time += ( jiffies / HZ );
+	*time += (jiffies / HZ);
     
-	/* Now THIS is a nasty hack!
+	/*
+	 * Now THIS is a nasty hack!
 	 * It ensures that the first two calls to mf_getRtcTime get different
 	 * answers.  That way the loop in init_time (time.c) will not think
 	 * the clock is stuck.
 	 */
-	if ( lastsec ) {
+	if (lastsec) {
 		*time -= lastsec;
 		--lastsec;
 	}
-    
 	return 0;
-
 }
 
-int mf_getRtc( struct rtc_time * tm )
+int mf_getRtc(struct rtc_time *tm)
 {
-
 	struct CeMsgCompleteData ceComplete;
 	struct RtcTimeData rtcData;
-	int rc = 0;
+	int rc;
 	DECLARE_MUTEX_LOCKED(Semaphore);
 
 	memset(&ceComplete, 0, sizeof(ceComplete));
 	memset(&rtcData, 0, sizeof(rtcData));
-
-	rtcData.xSemaphore = &Semaphore;
-
-	ceComplete.xHdlr = &getRtcTimeComplete;
-	ceComplete.xToken = (void *)&rtcData;
-
-	rc = signalCEMsg( "\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00", &ceComplete );
-
-	if ( rc == 0 )
-	{
+	rtcData.sem = &Semaphore;
+	ceComplete.handler = &getRtcTimeComplete;
+	ceComplete.token = (void *)&rtcData;
+	rc = signal_ce_msg("\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00",
+			&ceComplete);
+	if (rc == 0) {
 		down(&Semaphore);
 
-		if ( rtcData.xRc == 0)
-		{
-			if ( ( rtcData.xCeMsg.xCEMsg[2] == 0xa9 ) ||
-			     ( rtcData.xCeMsg.xCEMsg[2] == 0xaf ) ) {
+		if (rtcData.xRc == 0) {
+			if ((rtcData.xCeMsg.ce_msg[2] == 0xa9) ||
+			    (rtcData.xCeMsg.ce_msg[2] == 0xaf)) {
 				/* TOD clock is not set */
 				tm->tm_sec = 1;
 				tm->tm_min = 1;
@@ -1112,16 +1003,16 @@ int mf_getRtc( struct rtc_time * tm )
 				tm->tm_mday = 10;
 				tm->tm_mon = 8;
 				tm->tm_year = 71;
-				mf_setRtc( tm );
+				mf_setRtc(tm);
 			}
 			{
-				u32 dataWord1 = *((u32 *)(rtcData.xCeMsg.xCEMsg+4));
-				u32 dataWord2 = *((u32 *)(rtcData.xCeMsg.xCEMsg+8));
-				u8 year = (dataWord1 >> 16 ) & 0x000000FF;
-				u8 sec = ( dataWord1 >> 8 ) & 0x000000FF;
+				u32 dataWord1 = *((u32 *)(rtcData.xCeMsg.ce_msg+4));
+				u32 dataWord2 = *((u32 *)(rtcData.xCeMsg.ce_msg+8));
+				u8 year = (dataWord1 >> 16) & 0x000000FF;
+				u8 sec = (dataWord1 >> 8) & 0x000000FF;
 				u8 min = dataWord1 & 0x000000FF;
-				u8 hour = ( dataWord2 >> 24 ) & 0x000000FF;
-				u8 day = ( dataWord2 >> 8 ) & 0x000000FF;
+				u8 hour = (dataWord2 >> 24) & 0x000000FF;
+				u8 day = (dataWord2 >> 8) & 0x000000FF;
 				u8 mon = dataWord2 & 0x000000FF;
 
 				BCD_TO_BIN(sec);
@@ -1131,7 +1022,7 @@ int mf_getRtc( struct rtc_time * tm )
 				BCD_TO_BIN(mon);
 				BCD_TO_BIN(year);
 
-				if ( year <= 69 )
+				if (year <= 69)
 					year += 100;
 	    
 				tm->tm_sec = sec;
@@ -1154,17 +1045,14 @@ int mf_getRtc( struct rtc_time * tm )
 		tm->tm_wday = 0;
 		tm->tm_yday = 0;
 		tm->tm_isdst = 0;
-
 	}
 
 	return rc;
-
 }
 
 int mf_setRtc(struct rtc_time * tm)
 {
 	char ceTime[12] = "\x00\x00\x00\x41\x00\x00\x00\x00\x00\x00\x00\x00";
-	int rc = 0;
 	u8 day, mon, hour, min, sec, y1, y2;
 	unsigned year;
     
@@ -1194,10 +1082,5 @@ int mf_setRtc(struct rtc_time * tm)
 	ceTime[10] = day;
 	ceTime[11] = mon;
    
-	rc = signalCEMsg( ceTime, NULL );
-
-	return rc;
+	return signal_ce_msg(ceTime, NULL);
 }
-
-
-

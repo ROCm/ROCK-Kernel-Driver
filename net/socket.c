@@ -394,6 +394,7 @@ int sock_map_fd(struct socket *sock)
 		file->f_dentry->d_op = &sockfs_dentry_operations;
 		d_add(file->f_dentry, SOCK_INODE(sock));
 		file->f_vfsmnt = mntget(sock_mnt);
+		file->f_mapping = file->f_dentry->d_inode->i_mapping;
 
 		sock->file = file;
 		file->f_op = SOCK_INODE(sock)->i_fop = &socket_file_ops;

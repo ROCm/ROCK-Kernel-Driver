@@ -6,37 +6,12 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/config.h>
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/pci_ids.h>
-#include <linux/sched.h>
-#include <linux/ioport.h>
-#include <asm/sn/types.h>
+#include <linux/vmalloc.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/io.h>
-#include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
-#include <asm/param.h>
-#include <asm/sn/pio.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/sn_private.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/hcl_util.h>
-#include <asm/sn/intr.h>
-#include <asm/sn/xtalk/xtalkaddrs.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/nodepda.h>
-#include <asm/sn/pci/pciio.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
-#include <asm/sn/simulator.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/arch.h>
+#include <asm/sn/simulator.h>
 
 extern int bridge_rev_b_data_check_disable;
 
@@ -53,29 +28,32 @@ vertex_hdl_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
 void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
+extern int cbrick_type_get_nasid(nasid_t);
 
+#define IS_OPUS(nasid) (cbrick_type_get_nasid(nasid) == MODULE_OPUSBRICK)
+#define IS_ALTIX(nasid) (cbrick_type_get_nasid(nasid) == MODULE_CBRICK)
 
 /*
- * For the given device, initialize whether it is a PIC device.
+ * Init the provider asic for a given device
  */
+
 static void
-set_isPIC(struct sn_device_sysdata *device_sysdata)
+set_pci_provider(struct sn_device_sysdata *device_sysdata)
 {
 	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
-	pcibr_soft_t pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
 
-	device_sysdata->isPIC = IS_PIC_SOFT(pcibr_soft);;
+	device_sysdata->pci_provider = pciio_info_pops_get(pciio_info);
 }
 
 /*
  * pci_bus_cvlink_init() - To be called once during initialization before 
  *	SGI IO Infrastructure init is called.
  */
-void
+int
 pci_bus_cvlink_init(void)
 {
 
-	extern void ioconfig_bus_init(void);
+	extern int ioconfig_bus_init(void);
 
 	memset(busnum_to_pcibr_vhdl, 0x0, sizeof(vertex_hdl_t) * MAX_PCI_XWIDGET);
 	memset(busnum_to_nid, 0x0, sizeof(nasid_t) * MAX_PCI_XWIDGET);
@@ -84,7 +62,7 @@ pci_bus_cvlink_init(void)
 
 	num_bridges = 0;
 
-	ioconfig_bus_init();
+	return ioconfig_bus_init();
 }
 
 /*
@@ -170,62 +148,15 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	return(device_vertex);
 }
 
-/*
- * For the given device, initialize the addresses for both the Device(x) Flush 
- * Write Buffer register and the Xbow Flush Register for the port the PCI bus 
- * is connected.
- */
-static void
-set_flush_addresses(struct pci_dev *device_dev, 
-	struct sn_device_sysdata *device_sysdata)
-{
-	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
-	pciio_slot_t pciio_slot = pciio_info_slot_get(pciio_info);
-	pcibr_soft_t pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    	bridge_t               *bridge = pcibr_soft->bs_base;
-	nasid_t			nasid;
-
-	/*
-	 * Get the nasid from the bridge.
-	 */
-	nasid = NASID_GET(device_sysdata->dma_buf_sync);
-	if (IS_PIC_DEVICE(device_dev)) {
-		device_sysdata->dma_buf_sync = (volatile unsigned int *)
-			&bridge->b_wr_req_buf[pciio_slot].reg;
-		device_sysdata->xbow_buf_sync = (volatile unsigned int *)
-			XBOW_PRIO_LINKREGS_PTR(NODE_SWIN_BASE(nasid, 0),
-			pcibr_soft->bs_xid);
-	} else {
-		/*
-		 * Accessing Xbridge and Xbow register when SHUB swapoper is on!.
-		 */
-		device_sysdata->dma_buf_sync = (volatile unsigned int *)
-			((uint64_t)&(bridge->b_wr_req_buf[pciio_slot].reg)^4);
-		device_sysdata->xbow_buf_sync = (volatile unsigned int *)
-			((uint64_t)(XBOW_PRIO_LINKREGS_PTR(
-			NODE_SWIN_BASE(nasid, 0), pcibr_soft->bs_xid)) ^ 4);
-	}
-
-#ifdef DEBUG
-	printk("set_flush_addresses: dma_buf_sync %p xbow_buf_sync %p\n", 
-		device_sysdata->dma_buf_sync, device_sysdata->xbow_buf_sync);
-
-printk("set_flush_addresses: dma_buf_sync\n");
-	while((volatile unsigned int )*device_sysdata->dma_buf_sync);
-printk("set_flush_addresses: xbow_buf_sync\n");
-	while((volatile unsigned int )*device_sysdata->xbow_buf_sync);
-#endif
-
-}
-
 struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
 
-// Initialize the data structures for flushing write buffers after a PIO read.
-// The theory is: 
-// Take an unused int. pin and associate it with a pin that is in use.
-// After a PIO read, force an interrupt on the unused pin, forcing a write buffer flush
-// on the in use pin.  This will prevent the race condition between PIO read responses and 
-// DMA writes.
+/* Initialize the data structures for flushing write buffers after a PIO read.
+ * The theory is: 
+ * Take an unused int. pin and associate it with a pin that is in use.
+ * After a PIO read, force an interrupt on the unused pin, forcing a write buffer flush
+ * on the in use pin.  This will prevent the race condition between PIO read responses and 
+ * DMA writes.
+ */
 void
 sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot) {
 	nasid_t nasid; 
@@ -247,101 +178,59 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (flush_nasid_list[nasid].widget_p == NULL) {
 		flush_nasid_list[nasid].widget_p = (struct sn_flush_device_list **)kmalloc((HUB_WIDGET_ID_MAX+1) *
 			sizeof(struct sn_flush_device_list *), GFP_KERNEL);
+		if (flush_nasid_list[nasid].widget_p <= 0) {
+			printk("sn_dma_flush_init: Cannot allocate memory for nasid list\n");
+			return;
+		}
 		memset(flush_nasid_list[nasid].widget_p, 0, (HUB_WIDGET_ID_MAX+1) * sizeof(struct sn_flush_device_list *));
 	}
 	if (bwin > 0) {
-		bwin--;
-		switch (bwin) {
-			case 0:
-				flush_nasid_list[nasid].iio_itte1 = HUB_L(IIO_ITTE_GET(nasid, 0));
-				wid_num = ((flush_nasid_list[nasid].iio_itte1) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte1 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 1:
-				flush_nasid_list[nasid].iio_itte2 = HUB_L(IIO_ITTE_GET(nasid, 1));
-				wid_num = ((flush_nasid_list[nasid].iio_itte2) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte2 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 2:
-				flush_nasid_list[nasid].iio_itte3 = HUB_L(IIO_ITTE_GET(nasid, 2));
-				wid_num = ((flush_nasid_list[nasid].iio_itte3) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte3 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 3:
-				flush_nasid_list[nasid].iio_itte4 = HUB_L(IIO_ITTE_GET(nasid, 3));
-				wid_num = ((flush_nasid_list[nasid].iio_itte4) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte4 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 4:
-				flush_nasid_list[nasid].iio_itte5 = HUB_L(IIO_ITTE_GET(nasid, 4));
-				wid_num = ((flush_nasid_list[nasid].iio_itte5) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte5 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 5:
-				flush_nasid_list[nasid].iio_itte6 = HUB_L(IIO_ITTE_GET(nasid, 5));
-				wid_num = ((flush_nasid_list[nasid].iio_itte6) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte6 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 6:
-				flush_nasid_list[nasid].iio_itte7 = HUB_L(IIO_ITTE_GET(nasid, 6));
-				wid_num = ((flush_nasid_list[nasid].iio_itte7) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte7 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
+		int itte_index = bwin - 1;
+		unsigned long itte;
+
+		itte = HUB_L(IIO_ITTE_GET(nasid, itte_index));
+		flush_nasid_list[nasid].iio_itte[bwin] = itte;
+		wid_num = (itte >> IIO_ITTE_WIDGET_SHIFT) & 
+			  IIO_ITTE_WIDGET_MASK;
+		bus = itte & IIO_ITTE_OFFSET_MASK;
+		if (bus == 0x4 || bus == 0x8) {
+			bus = 0;
+		} else {
+			bus = 1;
 		}
 	}
 
-	// if it's IO9, bus 1, we don't care about slots 1, 3, and 4.  This is
-	// because these are the IOC4 slots and we don't flush them.
+	/* if it's IO9, bus 1, we don't care about slots 1 and 4.  This is
+	 * because these are the IOC4 slots and we don't flush them.
+	 */
 	if (isIO9(nasid) && bus == 0 && (slot == 1 || slot == 4)) {
 		return;
 	}
 	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) {
 		flush_nasid_list[nasid].widget_p[wid_num] = (struct sn_flush_device_list *)kmalloc(
 			DEV_PER_WIDGET * sizeof (struct sn_flush_device_list), GFP_KERNEL);
+		if (flush_nasid_list[nasid].widget_p[wid_num] <= 0) {
+			printk("sn_dma_flush_init: Cannot allocate memory for nasid sub-list\n");
+			return;
+		}
 		memset(flush_nasid_list[nasid].widget_p[wid_num], 0, 
 			DEV_PER_WIDGET * sizeof (struct sn_flush_device_list));
 		p = &flush_nasid_list[nasid].widget_p[wid_num][0];
 		for (i=0; i<DEV_PER_WIDGET;i++) {
 			p->bus = -1;
 			p->pin = -1;
+			p->slot = -1;
 			p++;
 		}
 	}
 
 	p = &flush_nasid_list[nasid].widget_p[wid_num][0];
 	for (i=0;i<DEV_PER_WIDGET; i++) {
-		if (p->pin == pin && p->bus == bus) break;
+		if (p->pin == pin && p->bus == bus && p->slot == slot) break;
 		if (p->pin < 0) {
 			p->pin = pin;
 			p->bus = bus;
+			p->slot = slot;
 			break;
 		}
 		p++;
@@ -356,25 +245,28 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	}
 	b = (bridge_t *)(NODE_SWIN_BASE(nasid, wid_num) | (bus << 23) );
 
-	// If it's IO9, then slot 2 maps to slot 7 and slot 6 maps to slot 8.
-	// To see this is non-trivial.  By drawing pictures and reading manuals and talking
-	// to HW guys, we can see that on IO9 bus 1, slots 7 and 8 are always unused.
-	// Further, since we short-circuit slots  1, 3, and 4 above, we only have to worry
-	// about the case when there is a card in slot 2.  A multifunction card will appear
-	// to be in slot 6 (from an interrupt point of view) also.  That's the  most we'll
-	// have to worry about.  A four function card will overload the interrupt lines in
-	// slot 2 and 6.  
-	// We also need to special case the 12160 device in slot 3.  Fortunately, we have
-	// a spare intr. line for pin 4, so we'll use that for the 12160.
-	// All other buses have slot 3 and 4 and slots 7 and 8 unused.  Since we can only
-	// see slots 1 and 2 and slots 5 and 6 coming through here for those buses (this
-	// is true only on Pxbricks with 2 physical slots per bus), we just need to add
-	// 2 to the slot number to find an unused slot.
-	// We have convinced ourselves that we will never see a case where two different cards
-	// in two different slots will ever share an interrupt line, so there is no need to
-	// special case this.
+	/* If it's IO9, then slot 2 maps to slot 7 and slot 6 maps to slot 8.
+	 * To see this is non-trivial.  By drawing pictures and reading manuals and talking
+	 * to HW guys, we can see that on IO9 bus 1, slots 7 and 8 are always unused.
+	 * Further, since we short-circuit slots  1, 3, and 4 above, we only have to worry
+	 * about the case when there is a card in slot 2.  A multifunction card will appear
+	 * to be in slot 6 (from an interrupt point of view) also.  That's the  most we'll
+	 * have to worry about.  A four function card will overload the interrupt lines in
+	 * slot 2 and 6.  
+	 * We also need to special case the 12160 device in slot 3.  Fortunately, we have
+	 * a spare intr. line for pin 4, so we'll use that for the 12160.
+	 * All other buses have slot 3 and 4 and slots 7 and 8 unused.  Since we can only
+	 * see slots 1 and 2 and slots 5 and 6 coming through here for those buses (this
+	 * is true only on Pxbricks with 2 physical slots per bus), we just need to add
+	 * 2 to the slot number to find an unused slot.
+	 * We have convinced ourselves that we will never see a case where two different cards
+	 * in two different slots will ever share an interrupt line, so there is no need to
+	 * special case this.
+	 */
 
-	if (isIO9(nasid) && wid_num == 0xc && bus == 0) {
+	if (isIO9(nasid) && ( (IS_ALTIX(nasid) && wid_num == 0xc)
+				|| (IS_OPUS(nasid) && wid_num == 0xf) )
+				&& bus == 0) {
 		if (slot == 2) {
 			p->force_int_addr = (unsigned long)&b->b_force_always[6].intr;
 			dev_sel = b->b_int_device;
@@ -427,7 +319,7 @@ sn_pci_fixup(int arg)
 	struct sn_widget_sysdata *widget_sysdata;
 	struct sn_device_sysdata *device_sysdata;
 	pcibr_intr_t intr_handle;
-	int cpuid;
+	pciio_provider_t *pci_provider;
 	vertex_hdl_t device_vertex;
 	pciio_intr_line_t lines;
 	extern int numnodes;
@@ -437,11 +329,10 @@ sn_pci_fixup(int arg)
 #ifdef CONFIG_PROC_FS
 		extern void register_sn_procfs(void);
 #endif
-		extern void irix_io_init(void);
+		extern void sgi_master_io_infr_init(void);
 		extern void sn_init_cpei_timer(void);
 		
-		init_hcl();
-		irix_io_init();
+		sgi_master_io_infr_init();
 		
 		for (cnode = 0; cnode < numnodes; cnode++) {
 			extern void intr_init_vecblk(cnodeid_t);
@@ -474,8 +365,13 @@ sn_pci_fixup(int arg)
  	 * set the root start and end so that drivers calling check_region()
 	 * won't see a conflict
 	 */
-	ioport_resource.start  = 0xc000000000000000;
-	ioport_resource.end =    0xcfffffffffffffff;
+
+#ifdef CONFIG_IA64_SGI_SN_SIM
+	if (! IS_RUNNING_ON_SIMULATOR()) {
+		ioport_resource.start  = 0xc000000000000000;
+		ioport_resource.end =    0xcfffffffffffffff;
+	}
+#endif
 
 	/*
 	 * Set the root start and end for Mem Resource.
@@ -490,6 +386,7 @@ sn_pci_fixup(int arg)
 		unsigned int irq;
 		int idx;
 		u16 cmd;
+		vertex_hdl_t vhdl;
 		unsigned long size;
 		extern int bit_pos_to_irq(int);
 
@@ -497,18 +394,16 @@ sn_pci_fixup(int arg)
 
 		device_sysdata = kmalloc(sizeof(struct sn_device_sysdata),
 					 GFP_KERNEL);
+		if (device_sysdata <= 0) {
+			printk("sn_pci_fixup: Cannot allocate memory for device sysdata\n");
+			return;
+		}
+
 		device_sysdata->vhdl = devfn_to_vertex(device_dev->bus->number, device_dev->devfn);
 		device_sysdata->isa64 = 0;
-		device_vertex = device_sysdata->vhdl;
-
 		device_dev->sysdata = (void *) device_sysdata;
-		set_isPIC(device_sysdata);
+		set_pci_provider(device_sysdata);
 
-		/*
-		 * Set the xbridge Device(X) Write Buffer Flush and Xbow Flush 
-		 * register addresses.
-		 */
-		set_flush_addresses(device_dev, device_sysdata);
 		pci_read_config_word(device_dev, PCI_COMMAND, &cmd);
 
 		/*
@@ -517,22 +412,62 @@ sn_pci_fixup(int arg)
 		 * read from the card and it was set in the card by our
 		 * Infrastructure ..
 		 */
+		vhdl = device_sysdata->vhdl;
+		/* Allocate the IORESOURCE_IO space first */
 		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
-			size = 0;
-			size = device_dev->resource[idx].end -
-				device_dev->resource[idx].start;
-			if (size) {
-				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(device_vertex, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, (IS_PIC_DEVICE(device_dev)) ? 0 : PCIIO_BYTE_STREAM);
-				device_dev->resource[idx].start |= __IA64_UNCACHED_OFFSET;
-			}
-			else
-				continue;
+			unsigned long start, end, addr;
 
-			device_dev->resource[idx].end = 
-				device_dev->resource[idx].start + size;
+			if (!(device_dev->resource[idx].flags & IORESOURCE_IO))
+				continue; 
+			
+			start = device_dev->resource[idx].start;
+			end = device_dev->resource[idx].end;
+			size = end - start;
+			if (!size)
+				continue; 
+			
+			addr = (unsigned long)pciio_pio_addr(vhdl, 0, 
+					PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
+			if (!addr) {
+				device_dev->resource[idx].start = 0;
+				device_dev->resource[idx].end = 0;
+				printk("sn_pci_fixup(): pio map failure for "
+				    "%s bar%d\n", device_dev->slot_name, idx);
+			} else {
+				addr |= __IA64_UNCACHED_OFFSET;
+				device_dev->resource[idx].start = addr;
+				device_dev->resource[idx].end = addr + size;
+			}	
 
-			if (device_dev->resource[idx].flags & IORESOURCE_IO)
-				cmd |= PCI_COMMAND_IO;
+			if (device_dev->resource[idx].flags & IORESOURCE_IO) 
+				cmd |= PCI_COMMAND_IO; 
+		} 
+
+		/* Allocate the IORESOURCE_MEM space next */
+		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+			unsigned long start, end, addr;
+
+			if ((device_dev->resource[idx].flags & IORESOURCE_IO))
+				continue; 
+
+			start = device_dev->resource[idx].start;
+			end = device_dev->resource[idx].end;
+			size = end - start;
+			if (!size)
+				continue; 
+
+			addr = (unsigned long)pciio_pio_addr(vhdl, 0, 
+					PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
+			if (!addr) {
+				device_dev->resource[idx].start = 0;
+				device_dev->resource[idx].end = 0;
+				printk("sn_pci_fixup(): pio map failure for "
+				    "%s bar%d\n", device_dev->slot_name, idx);
+			} else {
+				addr |= __IA64_UNCACHED_OFFSET;
+				device_dev->resource[idx].start = addr;
+				device_dev->resource[idx].end = addr + size;
+			}	
 
 			if (device_dev->resource[idx].flags & IORESOURCE_MEM)
 				cmd |= PCI_COMMAND_MEMORY;
@@ -544,17 +479,19 @@ sn_pci_fixup(int arg)
 		cmd |= PCI_COMMAND_MASTER; /* If the device doesn't support */
 					   /* bit gets dropped .. no harm */
 		pci_write_config_word(device_dev, PCI_COMMAND, cmd);
-		
+
 		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN,
 				     (unsigned char *)&lines);
-	 
+		device_sysdata = (struct sn_device_sysdata *)device_dev->sysdata;
+		device_vertex = device_sysdata->vhdl;
+		pci_provider = device_sysdata->pci_provider;
+ 
 		irqpdaindr->curr = device_dev;
-		intr_handle = pcibr_intr_alloc(device_vertex, NULL, lines, device_vertex);
+		intr_handle = (pci_provider->intr_alloc)(device_vertex, NULL, lines, device_vertex);
 
 		irq = intr_handle->bi_irq;
 		irqpdaindr->device_dev[irq] = device_dev;
-		cpuid = intr_handle->bi_cpu;
-		pcibr_intr_connect(intr_handle, (intr_func_t)0, (intr_arg_t)0);
+		(pci_provider->intr_connect)(intr_handle, (intr_func_t)0, (intr_arg_t)0);
 		device_dev->irq = irq;
 		register_pcibr_intr(irq, intr_handle);
 
@@ -825,10 +762,8 @@ pci_bus_to_hcl_cvlink(void)
 				
 	devfs_hdl = hwgraph_path_to_vertex("hw/module");
 	for (i = 0; i < nummodules ; i++) {
-	    for ( j = 0; j < 3; j++ ) {
+	    for ( j = 0; j < 2; j++ ) {
 		if ( j == 0 )
-			brick_name = EDGE_LBL_PBRICK;
-		else if ( j == 1 )
 			brick_name = EDGE_LBL_PXBRICK;
 		else
 			brick_name = EDGE_LBL_IXBRICK;
@@ -867,8 +802,8 @@ sn_pci_init (void)
 	int i = 0;
 	struct pci_controller *controller;
 
-	if (!ia64_platform_is("sn2"))
-	    return 0;
+	if (!ia64_platform_is("sn2") || IS_RUNNING_ON_SIMULATOR())
+		return 0;
 
 	/*
 	 * set pci_raw_ops, etc.

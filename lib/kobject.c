@@ -198,9 +198,24 @@ exit:
 	kfree(envp);
 	return;
 }
+
+void kobject_hotplug(const char *action, struct kobject *kobj)
+{
+	struct kobject * top_kobj = kobj;
+
+	/* If this kobj does not belong to a kset,
+	   try to find a parent that does. */
+	if (!top_kobj->kset && top_kobj->parent) {
+		do {
+			top_kobj = top_kobj->parent;
+		} while (!top_kobj->kset && top_kobj->parent);
+	}
+
+	if (top_kobj->kset && top_kobj->kset->hotplug_ops)
+		kset_hotplug(action, top_kobj->kset, kobj);
+}
 #else
-static void kset_hotplug(const char *action, struct kset *kset,
-			 struct kobject *kobj)
+void kobject_hotplug(const char *action, struct kobject *kobj)
 {
 	return;
 }
@@ -248,7 +263,6 @@ int kobject_add(struct kobject * kobj)
 {
 	int error = 0;
 	struct kobject * parent;
-	struct kobject * top_kobj;
 
 	if (!(kobj = kobject_get(kobj)))
 		return -ENOENT;
@@ -277,18 +291,9 @@ int kobject_add(struct kobject * kobj)
 		if (parent)
 			kobject_put(parent);
 	} else {
-		/* If this kobj does not belong to a kset,
-		   try to find a parent that does. */
-		top_kobj = kobj;
-		if (!top_kobj->kset && top_kobj->parent) {
-			do {
-				top_kobj = top_kobj->parent;
-			} while (!top_kobj->kset && top_kobj->parent);
-		}
-	
-		if (top_kobj->kset && top_kobj->kset->hotplug_ops)
-			kset_hotplug("add", top_kobj->kset, kobj);
+		kobject_hotplug("add", kobj);
 	}
+
 	return error;
 }
 
@@ -396,20 +401,7 @@ void kobject_rename(struct kobject * kobj, char *new_name)
 
 void kobject_del(struct kobject * kobj)
 {
-	struct kobject * top_kobj;
-
-	/* If this kobj does not belong to a kset,
-	   try to find a parent that does. */
-	top_kobj = kobj;
-	if (!top_kobj->kset && top_kobj->parent) {
-		do {
-			top_kobj = top_kobj->parent;
-		} while (!top_kobj->kset && top_kobj->parent);
-	}
-
-	if (top_kobj->kset && top_kobj->kset->hotplug_ops)
-		kset_hotplug("remove", top_kobj->kset, kobj);
-
+	kobject_hotplug("remove", kobj);
 	sysfs_remove_dir(kobj);
 	unlink(kobj);
 }
@@ -555,7 +547,7 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	down_read(&kset->subsys->rwsem);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
-		if (!strcmp(kobject_name(k),name)) {
+		if (kobject_name(k) && (!strcmp(kobject_name(k),name))) {
 			ret = k;
 			break;
 		}
@@ -638,6 +630,7 @@ EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
+EXPORT_SYMBOL(kobject_hotplug);
 
 EXPORT_SYMBOL(kset_register);
 EXPORT_SYMBOL(kset_unregister);

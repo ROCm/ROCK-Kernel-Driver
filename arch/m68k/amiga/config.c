@@ -121,14 +121,22 @@ static struct console amiga_console_driver = {
 static struct {
     struct resource _ciab, _ciaa, _custom, _kickstart;
 } mb_resources = {
-    ._ciab =		{ "CIA B", 0x00bfd000, 0x00bfdfff },
-    ._ciaa =		{ "CIA A", 0x00bfe000, 0x00bfefff },
-    ._custom =		{ "Custom I/O", 0x00dff000, 0x00dfffff },
-    ._kickstart =	{ "Kickstart ROM", 0x00f80000, 0x00ffffff }
+    ._ciab = {
+	.name = "CIA B", .start = 0x00bfd000, .end = 0x00bfdfff
+    },
+    ._ciaa = {
+	.name = "CIA A", .start = 0x00bfe000, .end = 0x00bfefff
+    },
+    ._custom = {
+	.name = "Custom I/O", .start = 0x00dff000, .end = 0x00dfffff
+    },
+    ._kickstart = {
+	.name = "Kickstart ROM", .start = 0x00f80000, .end = 0x00ffffff
+    }
 };
 
 static struct resource rtc_resource = {
-    NULL, 0x00dc0000, 0x00dcffff
+    .start = 0x00dc0000, .end = 0x00dcffff
 };
 
 static struct resource ram_resource[NUM_MEMINFO];
@@ -495,7 +503,7 @@ static void __init amiga_sched_init(irqreturn_t (*timer_routine)(int, void *,
 							  struct pt_regs *))
 {
 	static struct resource sched_res = {
-	    "timer", 0x00bfd400, 0x00bfd5ff,
+	    .name = "timer", .start = 0x00bfd400, .end = 0x00bfd5ff,
 	};
 	jiffy_ticks = (amiga_eclock+HZ/2)/HZ;
 
@@ -798,12 +806,12 @@ static void amiga_mem_console_write(struct console *co, const char *s,
 
 static void amiga_savekmsg_init(void)
 {
-    static struct resource debug_res = { "Debug" };
+    static struct resource debug_res = { .name = "Debug" };
 
     savekmsg = amiga_chip_alloc_res(SAVEKMSG_MAXMEM, &debug_res);
     savekmsg->magic1 = SAVEKMSG_MAGIC1;
     savekmsg->magic2 = SAVEKMSG_MAGIC2;
-    savekmsg->magicptr = virt_to_phys(savekmsg);
+    savekmsg->magicptr = ZTWO_PADDR(savekmsg);
     savekmsg->size = 0;
 }
 

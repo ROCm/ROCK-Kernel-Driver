@@ -8,6 +8,8 @@
 //	drive the hypervisor from SLIC.
 //
 //============================================================================
+#ifndef _HVCALLXM_H
+#define _HVCALLXM_H
 
 //-------------------------------------------------------------------
 // Forward declarations 
@@ -16,24 +18,12 @@
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#ifndef  _HVCALLSC_H
-#include "HvCallSc.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
-
-//-------------------------------------------------------------------
-// Other Includes
-//-------------------------------------------------------------------
-
 
 //-----------------------------------------------------------------------------
 // Constants
 //-----------------------------------------------------------------------------
-#ifndef _HVCALLXM_H
-#define _HVCALLXM_H
 
 #define HvCallXmGetTceTableParms	HvCallXm +  0
 #define HvCallXmTestBus			HvCallXm +  1
@@ -102,5 +92,4 @@ static inline u64	HvCallXm_loadTod(void)
 }
 //=====================================================================================
 
-#endif // _HVCALLXM_H
-
+#endif /* _HVCALLXM_H */

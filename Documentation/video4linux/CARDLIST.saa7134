@@ -1,0 +1,23 @@
+  0 -> UNKNOWN/GENERIC                         
+  1 -> Proteus Pro [philips reference design]   [1131:2001,1131:2001]
+  2 -> LifeView FlyVIDEO3000                    [5168:0138]
+  3 -> LifeView FlyVIDEO2000                    [5168:0138]
+  4 -> EMPRESS                                  [1131:6752]
+  5 -> SKNet Monster TV                         [1131:4e85]
+  6 -> Tevion MD 9717                          
+  7 -> KNC One TV-Station RDS / Typhoon TV+Radio 90031 [1131:fe01]
+  8 -> Terratec Cinergy 400 TV                  [153B:1142]
+  9 -> Medion 5044                             
+ 10 -> Kworld/KuroutoShikou SAA7130-TVPCI      
+ 11 -> Terratec Cinergy 600 TV                  [153B:1143]
+ 12 -> Medion 7134                              [16be:0003]
+ 13 -> ELSA EX-VISION 300TV                     [1048:226b]
+ 14 -> ELSA EX-VISION 500TV                     [1048:226b]
+ 15 -> ASUS TV-FM 7134                          [PCI_VENDOR_ID_ASUSTEK:4842,PCI_VENDOR_ID_ASUSTEK:4830]
+ 16 -> AOPEN VA1000 POWER                       [1131:7133]
+ 17 -> 10MOONS PCI TV CAPTURE CARD              [1131:2001]
+ 18 -> BMK MPEX No Tuner                       
+ 19 -> Compro VideoMate TV                      [185b:c100]
+ 20 -> Matrox CronosPlus                        [PCI_VENDOR_ID_MATROX:48d0]
+ 21 -> Medion 2819                              [1461:a70b]
+ 22 -> BMK MPEX Tuner                          

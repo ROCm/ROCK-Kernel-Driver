@@ -120,7 +120,7 @@ xfs_max_file_offset(
 	 */
 
 #if BITS_PER_LONG == 32
-# if defined(HAVE_SECTOR_T)
+# if defined(CONFIG_LBD)
 	ASSERT(sizeof(sector_t) == 8);
 	pagefactor = PAGE_CACHE_SIZE;
 	bitshift = BITS_PER_LONG;
@@ -239,6 +239,23 @@ xfs_initialize_vnode(
 		xfs_set_inodeops(inode);
 		unlock_new_inode(inode);
 	}
+}
+
+void
+xfs_flush_inode(
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
+
+	filemap_fdatawrite(inode->i_mapping);
+}
+
+void
+xfs_flush_device(
+	xfs_inode_t	*ip)
+{
+	sync_blockdev(XFS_ITOV(ip)->v_vfsp->vfs_super->s_bdev);
+	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
 }
 
 int
@@ -860,14 +877,15 @@ init_xfs_fs( void )
 {
 	int			error;
 	struct sysinfo		si;
-	static char		message[] __initdata =
-		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with "
-		XFS_BUILD_OPTIONS " enabled\n";
+	static char		message[] __initdata = KERN_INFO \
+		XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled\n";
 
 	printk(message);
 
 	si_meminfo(&si);
 	xfs_physmem = si.totalram;
+
+	ktrace_init(64);
 
 	error = init_inodecache();
 	if (error < 0)
@@ -907,12 +925,12 @@ exit_xfs_fs( void )
 	vfs_exitdmapi();
 	pagebuf_terminate();
 	destroy_inodecache();
+	ktrace_uninit();
 }
 
 module_init(init_xfs_fs);
 module_exit(exit_xfs_fs);
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
-MODULE_DESCRIPTION(
-	"SGI XFS " XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled");
+MODULE_DESCRIPTION(XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled");
 MODULE_LICENSE("GPL");

@@ -90,8 +90,6 @@ void ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #include <platforms/4xx/ocotea.h>
 #endif
 
-#endif /* CONFIG_40x */
-
 #ifndef __ASSEMBLY__
 /*
  * The "residual" board information structure the boot loader passes
@@ -99,6 +97,7 @@ void ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
  */
 extern bd_t __res;
 #endif
+#endif /* CONFIG_40x */
 
 #endif /* __ASM_IBM4XX_H__ */
 #endif /* __KERNEL__ */

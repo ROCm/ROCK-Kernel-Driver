@@ -14,13 +14,10 @@
  *   Theodore Ts'o <tytso@mit.edu>
  */
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/init.h>
-#include <linux/unistd.h>
 #include <linux/signal.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
@@ -171,7 +168,6 @@ static int worker_thread(void *__startup)
 	struct k_sigaction sa;
 
 	daemonize("%s/%d", startup->name, cpu);
-	allow_signal(SIGCHLD);
 	current->flags |= PF_IOTHREAD;
 	cwq->thread = current;
 
@@ -180,7 +176,7 @@ static int worker_thread(void *__startup)
 
 	complete(&startup->done);
 
-	/* Install a handler so SIGCLD is delivered */
+	/* SIG_IGN makes children autoreap: see do_notify_parent(). */
 	sa.sa.sa_handler = SIG_IGN;
 	sa.sa.sa_flags = 0;
 	siginitset(&sa.sa.sa_mask, sigmask(SIGCHLD));
@@ -200,14 +196,6 @@ static int worker_thread(void *__startup)
 
 		if (!list_empty(&cwq->worklist))
 			run_workqueue(cwq);
-
-		if (signal_pending(current)) {
-			while (waitpid(-1, NULL, __WALL|WNOHANG) > 0)
-				/* SIGCHLD - auto-reaping */ ;
-
-			/* zap all other signals */
-			flush_signals(current);
-		}
 	}
 	remove_wait_queue(&cwq->more_work, &wait);
 	complete(&cwq->exit);
@@ -366,9 +354,7 @@ int current_is_keventd(void)
 
 	BUG_ON(!keventd_wq);
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
+	for_each_cpu(cpu) {
 		cwq = keventd_wq->cpu_wq + cpu;
 		if (current == cwq->thread)
 			return 1;

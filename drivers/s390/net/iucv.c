@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.15 2003/10/01 09:25:15 mschwide Exp $
+ * $Id: iucv.c,v 1.19 2003/12/18 15:28:49 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.15 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.19 $
  *
  */
 
@@ -44,12 +44,14 @@
 #include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+#include <linux/err.h>
 #include <linux/device.h>
 #include <asm/atomic.h>
 #include "iucv.h"
 #include <asm/io.h>
 #include <asm/s390_ext.h>
 #include <asm/ebcdic.h>
+#include <asm/ccwdev.h> //for root device stuff
 
 #define DEBUG
 
@@ -79,20 +81,12 @@ iucv_bus_match (struct device *dev, struct device_driver *drv)
 	return 0;
 }
 
-static void
-iucv_root_release (struct device *dev)
-{
-}
-
 struct bus_type iucv_bus = {
 	.name = "iucv",
 	.match = iucv_bus_match,
 };	
 
-struct device iucv_root = {
-	.bus_id = "iucv",
-	.release = iucv_root_release,
-};
+struct device *iucv_root;
 
 /* General IUCV interrupt structure */
 typedef struct {
@@ -355,7 +349,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.15 $";
+	char vbuf[] = "$Revision: 1.19 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -378,6 +372,11 @@ iucv_init(void)
 {
 	int ret;
 
+	if (!MACHINE_IS_VM) {
+		printk(KERN_ERR "IUCV: IUCV connection needs VM as base\n");
+		return -EPROTONOSUPPORT;
+	}
+
 	if (iucv_external_int_buffer)
 		return 0;
 
@@ -387,11 +386,11 @@ iucv_init(void)
 		return ret;
 	}
 
-	ret = device_register(&iucv_root);
-	if (ret != 0) {
+	iucv_root = s390_root_dev_register("iucv");
+	if (IS_ERR(iucv_root)) {
 		printk(KERN_ERR "IUCV: failed to register iucv root.\n");
 		bus_unregister(&iucv_bus);
-		return ret;
+		return PTR_ERR(iucv_root);
 	}
 
 	/* Note: GFP_DMA used used to get memory below 2G */
@@ -401,6 +400,7 @@ iucv_init(void)
 		printk(KERN_WARNING
 		       "%s: Could not allocate external interrupt buffer\n",
 		       __FUNCTION__);
+		s390_root_dev_unregister(iucv_root);
 		return -ENOMEM;
 	}
 	memset(iucv_external_int_buffer, 0, sizeof(iucv_GeneralInterrupt));
@@ -413,6 +413,7 @@ iucv_init(void)
 		       __FUNCTION__);
 		kfree(iucv_external_int_buffer);
 		iucv_external_int_buffer = NULL;
+		s390_root_dev_unregister(iucv_root);
 		return -ENOMEM;
 	}
 	memset(iucv_param_pool, 0, sizeof(iucv_param) * PARAM_POOL_SIZE);
@@ -439,7 +440,7 @@ iucv_exit(void)
 		kfree(iucv_external_int_buffer);
 	if (iucv_param_pool)
 		kfree(iucv_param_pool);
-	device_unregister(&iucv_root);
+	s390_root_dev_unregister(iucv_root);
 	bus_unregister(&iucv_bus);
 	printk(KERN_INFO "IUCV lowlevel driver unloaded\n");
 }
@@ -772,7 +773,7 @@ iucv_register_program (__u8 pgmname[16],
 	}
 
 	/* Allocate handler entry */
-	new_handler = (handler *)kmalloc(sizeof(handler), GFP_KERNEL);
+	new_handler = (handler *)kmalloc(sizeof(handler), GFP_ATOMIC);
 	if (new_handler == NULL) {
 		printk(KERN_WARNING "%s: storage allocation for new handler "
 		       "failed.\n", __FUNCTION__);
@@ -787,7 +788,7 @@ iucv_register_program (__u8 pgmname[16],
 
 		max_connections = iucv_query_maxconn();
 		iucv_pathid_table = kmalloc(max_connections * sizeof(handler *),
-				       GFP_KERNEL);
+				       GFP_ATOMIC);
 		if (iucv_pathid_table == NULL) {
 			printk(KERN_WARNING "%s: iucv_pathid_table storage "
 			       "allocation failed\n", __FUNCTION__);

@@ -89,10 +89,11 @@ struct ccw_driver {
 	struct module *owner;		/* for automatic MOD_INC_USE_COUNT   */
 	struct ccw_device_id *ids;	/* probe driver with these devs      */
 	int (*probe) (struct ccw_device *); /* ask driver to probe dev 	     */
-	int (*remove) (struct ccw_device *);
+	void (*remove) (struct ccw_device *);
 					/* device is no longer available     */
 	int (*set_online) (struct ccw_device *);
 	int (*set_offline) (struct ccw_device *);
+	int (*notify) (struct ccw_device *, int);
 	struct device_driver driver;	/* higher level structure, don't init
 					   this from your driver	     */
 	char *name;
@@ -149,8 +150,8 @@ extern int ccw_device_clear(struct ccw_device *, unsigned long);
 extern int read_dev_chars(struct ccw_device *cdev, void **buffer, int length);
 extern int read_conf_data(struct ccw_device *cdev, void **buffer, int *length);
 
-extern void ccw_device_set_online(struct ccw_device *cdev);
-extern void ccw_device_set_offline(struct ccw_device *cdev);
+extern int ccw_device_set_online(struct ccw_device *cdev);
+extern int ccw_device_set_offline(struct ccw_device *cdev);
 
 
 extern struct ciw *ccw_device_get_ciw(struct ccw_device *, __u32 cmd);
@@ -166,5 +167,8 @@ extern struct ccw_device *ccw_device_probe_console(void);
 // FIXME: these have to go
 extern int _ccw_device_get_device_number(struct ccw_device *);
 extern int _ccw_device_get_subchannel_number(struct ccw_device *);
+
+extern struct device *s390_root_dev_register(const char *);
+extern void s390_root_dev_unregister(struct device *);
 
 #endif /* _S390_CCWDEV_H_ */

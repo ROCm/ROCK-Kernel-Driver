@@ -435,8 +435,10 @@ static unsigned int br_nf_forward_arp(unsigned int hook, struct sk_buff **pskb,
 	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
 	struct net_device **d = (struct net_device **)(skb->cb);
 
+#ifdef CONFIG_SYSCTL
 	if (!brnf_call_arptables)
 		return NF_ACCEPT;
+#endif
 
 	if (skb->protocol != __constant_htons(ETH_P_ARP)) {
 		if (!IS_VLAN_ARP)

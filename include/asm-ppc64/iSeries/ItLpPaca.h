@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _ITLPPACA_H
+#define _ITLPPACA_H
 
 //=============================================================================
 //                                   
@@ -24,13 +26,7 @@
 //    
 //
 //----------------------------------------------------------------------------
-#ifndef  _PPC_TYPES_H
 #include <asm/types.h>
-#endif
-
-#ifndef _ITLPPACA_H
-#define _ITLPPACA_H
-
 
 struct ItLpPaca
 {
@@ -110,7 +106,10 @@ struct ItLpPaca
 	u64     xPDCSavedSPRG1;         // Saved SPRG1 for PMC int      x68-x6F
 	u64     xPDCSavedSRR0;          // Saved SRR0 for PMC int       x70-x77
 	volatile u32 xVirtualDecr;	// Virtual DECR for shared procsx78-x7B
-	u32	    xRsvd2_2;		// Reserved			x7C-x7F
+	u16     xSLBCount;              // # of SLBs to maintain        x7C-x7D
+	u8      xIdle;                  // Indicate OS is idle          x7E
+	u8      xRsvd2_2;               // Reserved                     x7F
+
 
 //=============================================================================
 // CACHE_LINE_3 0x0100 - 0x007F: This line is shared with other processors
@@ -131,4 +130,5 @@ struct ItLpPaca
 
 
 };
-#endif // _ITLPPACA_H
+
+#endif /* _ITLPPACA_H */

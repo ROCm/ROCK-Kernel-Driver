@@ -6,7 +6,7 @@ ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
 
-obj-y				:= fault.o init.o mem_pieces.o extable.o \
+obj-y				:= fault.o init.o mem_pieces.o \
 					mmu_context.o pgtable.o
 
 obj-$(CONFIG_PPC_STD_MMU)	+= hashtable.o ppc_mmu.o tlb.o

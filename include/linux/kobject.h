@@ -56,6 +56,7 @@ extern void kobject_unregister(struct kobject *);
 extern struct kobject * kobject_get(struct kobject *);
 extern void kobject_put(struct kobject *);
 
+extern void kobject_hotplug(const char *action, struct kobject *);
 
 struct kobj_type {
 	void (*release)(struct kobject *);

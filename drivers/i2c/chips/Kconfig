@@ -3,6 +3,7 @@
 #
 
 menu "I2C Hardware Sensors Chip support"
+	depends on I2C
 
 config I2C_SENSOR
 	tristate
@@ -20,6 +21,17 @@ config SENSORS_ADM1021
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1021.
+
+config SENSORS_ASB100
+	tristate "Asus ASB100 Bach"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the ASB100 Bach sensor
+	  chip found on some Asus mainboards.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called asb100.
 
 config SENSORS_EEPROM
 	tristate "EEPROM (DIMM) reader"
@@ -90,10 +102,22 @@ config SENSORS_LM85
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm85.
 
+config SENSORS_LM90
+	tristate "National Semiconductor LM90 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM90
+	  and Analog Devices ADM1032 sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm90.
+
 config SENSORS_VIA686A
 	tristate "VIA686A"
 	depends on I2C && EXPERIMENTAL
 	select I2C_SENSOR
+	select I2C_ISA
 	help
 	  If you say yes here you get support for the integrated sensors in
 	  Via 686A/B South Bridges.
@@ -112,5 +136,17 @@ config SENSORS_W83781D
 	  
 	  This driver can also be built as a module.  If so, the module
 	  will be called w83781d.
+
+config SENSORS_W83L785TS
+	tristate "Winbond W83L785TS-S"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the Winbond W83L785TS-S
+	  sensor chip, which is used on the Asus A7N8X, among other
+	  motherboards.
+	  
+	  This driver can also be built as a module.  If so, the module
+	  will be called w83l785ts.
 
 endmenu

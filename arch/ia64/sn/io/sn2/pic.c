@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,26 +6,15 @@
  * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <asm/sn/sgi.h>
+#include <linux/interrupt.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
+#include <asm/sn/hcl_util.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
+#include <asm/sn/pci/pic.h>
 #include <asm/sn/sn_private.h>
 
 
@@ -38,34 +26,9 @@ extern void pcibr_driver_unreg_callback(vertex_hdl_t, int, int, int);
 
 
 /*
- * copy inventory_t from conn_v to peer_conn_v
- */
-int
-pic_bus1_inventory_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v)
-{
-	inventory_t *pinv, *peer_pinv;
-
-	if (hwgraph_info_get_LBL(conn_v, INFO_LBL_INVENT,
-				(arbitrary_info_t *)&pinv) == GRAPH_SUCCESS)
- {
-		NEW(peer_pinv);
-		memcpy(peer_pinv, pinv, sizeof(inventory_t));
-		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_INVENT,
-			    (arbitrary_info_t)peer_pinv) != GRAPH_SUCCESS) {
-			DEL(peer_pinv);
-			return 0;
-		}
-		return 1;
-	}
-
-	printk("pic_bus1_inventory_dup: cannot get INFO_LBL_INVENT from 0x%lx\n ", (uint64_t)conn_v);
-	return 0;
-}
-
-/*
  * copy xwidget_info_t from conn_v to peer_conn_v
  */
-int
+static int
 pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 							cnodeid_t xbow_peer)
 {
@@ -83,21 +46,27 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 
 	if (hwgraph_info_get_LBL(conn_v, INFO_LBL_XWIDGET,
 			(arbitrary_info_t *)&widget_info) == GRAPH_SUCCESS) {
-		NEW(peer_widget_info);
-		peer_widget_info->w_vertex = peer_conn_v;
-		peer_widget_info->w_id = widget_info->w_id;
-		peer_widget_info->w_master = peer_hubv;
-		peer_widget_info->w_masterid = peer_hub_info->h_widgetid;
+		peer_widget_info = kmalloc(sizeof (*(peer_widget_info)), GFP_KERNEL);
+		if ( !peer_widget_info ) {
+			return 0;
+		}
+		memset(peer_widget_info, 0, sizeof (*(peer_widget_info)));
+
+		peer_widget_info->w_fingerprint = widget_info_fingerprint;
+    		peer_widget_info->w_vertex = peer_conn_v;
+    		peer_widget_info->w_id = widget_info->w_id;
+    		peer_widget_info->w_master = peer_hubv;
+    		peer_widget_info->w_masterid = peer_hub_info->h_widgetid;
 		/* structure copy */
-		peer_widget_info->w_hwid = widget_info->w_hwid;
-		peer_widget_info->w_efunc = 0;
-		peer_widget_info->w_einfo = 0;
+    		peer_widget_info->w_hwid = widget_info->w_hwid;
+    		peer_widget_info->w_efunc = 0;
+    		peer_widget_info->w_einfo = 0;
 		peer_widget_info->w_name = kmalloc(strlen(peer_path) + 1, GFP_KERNEL);
 		strcpy(peer_widget_info->w_name, peer_path);
 
 		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_XWIDGET,
 			(arbitrary_info_t)peer_widget_info) != GRAPH_SUCCESS) {
-				DEL(peer_widget_info);
+				kfree(peer_widget_info);
 				return 0;
 		}
 
@@ -119,7 +88,7 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
  * If not successful, return zero and both buses will attach to the
  * vertex passed into pic_attach().
  */
-vertex_hdl_t
+static vertex_hdl_t
 pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 {
 	cnodeid_t cnode = NASID_TO_COMPACT_NODEID(nasid);
@@ -172,11 +141,6 @@ pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 			     * vertex but that should be safe and we don't
 			     * really expect the additions to fail anyway.
 			     */
-#if 0
-			    if (!pic_bus1_inventory_dup(conn_v, peer_conn_v))
-					return 0;
-			    pic_bus1_device_desc_dup(conn_v, peer_conn_v);
-#endif
 			    if (!pic_bus1_widget_info_dup(conn_v, peer_conn_v, xbow_peer))
 					return 0;
 
@@ -196,6 +160,8 @@ pic_attach(vertex_hdl_t conn_v)
 	vertex_hdl_t	pcibr_vhdl0, pcibr_vhdl1 = (vertex_hdl_t)0;
 	pcibr_soft_t	bus0_soft, bus1_soft = (pcibr_soft_t)0;
 	vertex_hdl_t  conn_v0, conn_v1, peer_conn_v;
+	int		bricktype;
+	int		iobrick_type_get_nasid(nasid_t nasid);
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v, "pic_attach()\n"));
 
@@ -204,13 +170,14 @@ pic_attach(vertex_hdl_t conn_v)
 	bridge1 = (bridge_t *)((char *)bridge0 + PIC_BUS1_OFFSET);
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: bridge0=0x%x, bridge1=0x%x\n", 
+		    "pic_attach: bridge0=0x%lx, bridge1=0x%lx\n", 
 		    bridge0, bridge1));
 
 	conn_v0 = conn_v1 = conn_v;
 
 	/* If dual-ported then split the two PIC buses across both Cbricks */
-	if ((peer_conn_v = (pic_bus1_redist(NASID_GET(bridge0), conn_v))))
+	peer_conn_v = pic_bus1_redist(NASID_GET(bridge0), conn_v);
+	if (peer_conn_v)
 		conn_v1 = peer_conn_v;
 
 	/*
@@ -224,14 +191,21 @@ pic_attach(vertex_hdl_t conn_v)
 	 * Opening this vertex will provide access to
 	 * the Bridge registers themselves.
 	 */
-	/* FIXME: what should the hwgraph path look like ? */
-	rc = hwgraph_path_add(conn_v0, EDGE_LBL_PCIX_0, &pcibr_vhdl0);
-	ASSERT(rc == GRAPH_SUCCESS);
-	rc = hwgraph_path_add(conn_v1, EDGE_LBL_PCIX_1, &pcibr_vhdl1);
-	ASSERT(rc == GRAPH_SUCCESS);
+	bricktype = iobrick_type_get_nasid(NASID_GET(bridge0));
+	if ( bricktype == MODULE_CGBRICK ) {
+		rc = hwgraph_path_add(conn_v0, EDGE_LBL_AGP_0, &pcibr_vhdl0);
+		ASSERT(rc == GRAPH_SUCCESS);
+		rc = hwgraph_path_add(conn_v1, EDGE_LBL_AGP_1, &pcibr_vhdl1);
+		ASSERT(rc == GRAPH_SUCCESS);
+	} else {
+		rc = hwgraph_path_add(conn_v0, EDGE_LBL_PCIX_0, &pcibr_vhdl0);
+		ASSERT(rc == GRAPH_SUCCESS);
+		rc = hwgraph_path_add(conn_v1, EDGE_LBL_PCIX_1, &pcibr_vhdl1);
+		ASSERT(rc == GRAPH_SUCCESS);
+	}
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: pcibr_vhdl0=%v, pcibr_vhdl1=%v\n",
+		    "pic_attach: pcibr_vhdl0=0x%lx, pcibr_vhdl1=0x%lx\n",
 		    pcibr_vhdl0, pcibr_vhdl1));
 
 	/* register pci provider array */
@@ -249,7 +223,7 @@ pic_attach(vertex_hdl_t conn_v)
         bus1_soft->bs_peers_soft = bus0_soft;
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
-		    "pic_attach: bus0_soft=0x%x, bus1_soft=0x%x\n",
+		    "pic_attach: bus0_soft=0x%lx, bus1_soft=0x%lx\n",
 		    bus0_soft, bus1_soft));
 
 	return 0;
@@ -294,10 +268,8 @@ pciio_provider_t        pci_pic_provider =
     (pciio_priority_set_f *) pcibr_priority_set,
     (pciio_config_get_f *) pcibr_config_get,
     (pciio_config_set_f *) pcibr_config_set,
-    (pciio_error_devenable_f *) 0,
     (pciio_error_extract_f *) 0,
     (pciio_driver_reg_callback_f *) pcibr_driver_reg_callback,
     (pciio_driver_unreg_callback_f *) pcibr_driver_unreg_callback,
     (pciio_device_unregister_f 	*) pcibr_device_unregister,
-    (pciio_dma_enabled_f		*) pcibr_dma_enabled,
 };

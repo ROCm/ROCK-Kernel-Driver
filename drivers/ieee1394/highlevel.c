@@ -251,12 +251,12 @@ void hpsb_register_highlevel(struct hpsb_highlevel *hl)
         list_add_tail(&hl->hl_list, &hl_drivers);
 	up_write(&hl_drivers_sem);
 
-	if (hl->add_host)
-		nodemgr_for_each_host(hl, highlevel_for_each_host_reg);
-
 	write_lock(&hl_irqs_lock);
 	list_add_tail(&hl->irq_list, &hl_irqs);
 	write_unlock(&hl_irqs_lock);
+
+	if (hl->add_host)
+		nodemgr_for_each_host(hl, highlevel_for_each_host_reg);
 
         return;
 }
@@ -402,10 +402,27 @@ void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
         }
 }
 
+static void init_hpsb_highlevel(struct hpsb_host *host)
+{
+	INIT_LIST_HEAD(&dummy_zero_addr.as_list);
+	INIT_LIST_HEAD(&dummy_zero_addr.addr_list);
+	INIT_LIST_HEAD(&dummy_max_addr.as_list);
+	INIT_LIST_HEAD(&dummy_max_addr.addr_list);
+
+	dummy_zero_addr.op = dummy_max_addr.op = &dummy_ops;
+
+	dummy_zero_addr.start = dummy_zero_addr.end = 0;
+	dummy_max_addr.start = dummy_max_addr.end = ((u64) 1) << 48;
+
+	list_add_tail(&dummy_zero_addr.as_list, &host->addr_space);
+	list_add_tail(&dummy_max_addr.as_list, &host->addr_space);
+}
 
 void highlevel_add_host(struct hpsb_host *host)
 {
         struct hpsb_highlevel *hl;
+
+	init_hpsb_highlevel(host);
 
 	down_read(&hl_drivers_sem);
         list_for_each_entry(hl, &hl_drivers, hl_list) {
@@ -448,7 +465,7 @@ void highlevel_host_reset(struct hpsb_host *host)
         struct hpsb_highlevel *hl;
 
 	read_lock(&hl_irqs_lock);
-	list_for_each_entry(hl, &hl_irqs, hl_list) {
+	list_for_each_entry(hl, &hl_irqs, irq_list) {
                 if (hl->host_reset)
                         hl->host_reset(host);
         }
@@ -641,20 +658,4 @@ int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
         read_unlock(&addr_space_lock);
 
         return rcode;
-}
-
-void init_hpsb_highlevel(struct hpsb_host *host)
-{
-        INIT_LIST_HEAD(&dummy_zero_addr.as_list);
-        INIT_LIST_HEAD(&dummy_zero_addr.addr_list);
-        INIT_LIST_HEAD(&dummy_max_addr.as_list);
-        INIT_LIST_HEAD(&dummy_max_addr.addr_list);
-
-        dummy_zero_addr.op = dummy_max_addr.op = &dummy_ops;
-
-        dummy_zero_addr.start = dummy_zero_addr.end = 0;
-        dummy_max_addr.start = dummy_max_addr.end = ((u64) 1) << 48;
-
-        list_add_tail(&dummy_zero_addr.as_list, &host->addr_space);
-        list_add_tail(&dummy_max_addr.as_list, &host->addr_space);
 }

@@ -1,5 +1,5 @@
 /*
- * linux/arch/sh/stboards/mach.c
+ * linux/arch/sh/boards/harp/mach.c
  *
  * Copyright (C) 2000 Stuart Menefy (stuart.menefy@st.com)
  *
@@ -14,7 +14,7 @@
 #include <asm/machvec.h>
 #include <asm/rtc.h>
 #include <asm/machvec_init.h>
-#include <asm/hd64465.h/io.h>
+#include <asm/hd64465/io.h>
 #include <asm/hd64465/hd64465.h>
 
 void setup_harp(void);
@@ -49,16 +49,6 @@ struct sh_machine_vector mv_harp __initmv = {
 	.mv_outsw		= hd64465_outsw,
 	.mv_outsl		= hd64465_outsl,
 
-	.mv_readb		= generic_readb,
-	.mv_readw		= generic_readw,
-	.mv_readl		= generic_readl,
-	.mv_writeb		= generic_writeb,
-	.mv_writew		= generic_writew,
-	.mv_writel		= generic_writel,
-
-        .mv_ioremap             = generic_ioremap,
-        .mv_iounmap             = generic_iounmap,
- 
         .mv_isa_port2addr       = hd64465_isa_port2addr,
 
 #ifdef CONFIG_PCI

@@ -5,6 +5,7 @@
  *    Copyright (C) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *    Author(s): Martin Schwidefsky (schwidefsky@de.ibm.com),
  *               Gerhard Tonn (ton@de.ibm.com)   
+ *               Thomas Spatzier (tspat@de.ibm.com)
  *
  *  Conversion between 31bit and 64bit native syscalls.
  *
@@ -934,18 +935,31 @@ static long do_readv_writev32(int type, struct file *file,
 	tot_len = 0;
 	i = count;
 	ivp = iov;
+	retval = -EINVAL;
 	while(i > 0) {
-		u32 len;
+		compat_ssize_t tmp = tot_len;
+		compat_ssize_t len;
 		u32 buf;
 
-		__get_user(len, &vector->iov_len);
-		__get_user(buf, &vector->iov_base);
+		if (__get_user(len, &vector->iov_len) ||
+		    __get_user(buf, &vector->iov_base)) {
+			retval = -EFAULT;
+			goto out;
+		}
+		if (len < 0)	/* size_t not fitting an ssize_t32 .. */
+			goto out;
 		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the compat_ssize_t */
+			goto out;
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t) len;
 		vector++;
 		ivp++;
 		i--;
+	}
+	if (tot_len == 0) {
+		retval = 0;
+		goto out;
 	}
 
 	inode = file->f_dentry->d_inode;
@@ -1497,50 +1511,6 @@ type_out:
 	free_page(type_page);
 
 out:
-	return err;
-}
-
-struct rusage32 {
-        struct compat_timeval ru_utime;
-        struct compat_timeval ru_stime;
-        s32    ru_maxrss;
-        s32    ru_ixrss;
-        s32    ru_idrss;
-        s32    ru_isrss;
-        s32    ru_minflt;
-        s32    ru_majflt;
-        s32    ru_nswap;
-        s32    ru_inblock;
-        s32    ru_oublock;
-        s32    ru_msgsnd; 
-        s32    ru_msgrcv; 
-        s32    ru_nsignals;
-        s32    ru_nvcsw;
-        s32    ru_nivcsw;
-};
-
-static int put_rusage (struct rusage32 *ru, struct rusage *r)
-{
-	int err;
-	
-	err = put_user (r->ru_utime.tv_sec, &ru->ru_utime.tv_sec);
-	err |= __put_user (r->ru_utime.tv_usec, &ru->ru_utime.tv_usec);
-	err |= __put_user (r->ru_stime.tv_sec, &ru->ru_stime.tv_sec);
-	err |= __put_user (r->ru_stime.tv_usec, &ru->ru_stime.tv_usec);
-	err |= __put_user (r->ru_maxrss, &ru->ru_maxrss);
-	err |= __put_user (r->ru_ixrss, &ru->ru_ixrss);
-	err |= __put_user (r->ru_idrss, &ru->ru_idrss);
-	err |= __put_user (r->ru_isrss, &ru->ru_isrss);
-	err |= __put_user (r->ru_minflt, &ru->ru_minflt);
-	err |= __put_user (r->ru_majflt, &ru->ru_majflt);
-	err |= __put_user (r->ru_nswap, &ru->ru_nswap);
-	err |= __put_user (r->ru_inblock, &ru->ru_inblock);
-	err |= __put_user (r->ru_oublock, &ru->ru_oublock);
-	err |= __put_user (r->ru_msgsnd, &ru->ru_msgsnd);
-	err |= __put_user (r->ru_msgrcv, &ru->ru_msgrcv);
-	err |= __put_user (r->ru_nsignals, &ru->ru_nsignals);
-	err |= __put_user (r->ru_nvcsw, &ru->ru_nvcsw);
-	err |= __put_user (r->ru_nivcsw, &ru->ru_nivcsw);
 	return err;
 }
 
@@ -2706,56 +2676,6 @@ out:
 	return error;
 }
 
-extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
-					    unsigned long *user_mask_ptr);
-
-asmlinkage int sys32_sched_setaffinity(compat_pid_t pid, unsigned int len,
-				       u32 *user_mask_ptr)
-{
-	unsigned long kernel_mask;
-	mm_segment_t old_fs;
-	int ret;
-
-	if (get_user(kernel_mask, user_mask_ptr))
-		return -EFAULT;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_sched_setaffinity(pid,
-				    /* XXX Nice api... */
-				    sizeof(kernel_mask),
-				    &kernel_mask);
-	set_fs(old_fs);
-
-	return ret;
-}
-
-extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
-					    unsigned long *user_mask_ptr);
-
-asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
-				       u32 *user_mask_ptr)
-{
-	unsigned long kernel_mask;
-	mm_segment_t old_fs;
-	int ret;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_sched_getaffinity(pid,
-				    /* XXX Nice api... */
-				    sizeof(kernel_mask),
-				    &kernel_mask);
-	set_fs(old_fs);
-
-	if (ret == 0) {
-		if (put_user(kernel_mask, user_mask_ptr))
-			ret = -EFAULT;
-	}
-
-	return ret;
-}
-
 asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count);
 
 asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
@@ -2792,4 +2712,43 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 		       parent_tidptr, child_tidptr);
 }
 
+/*
+ * Wrapper function for sys_timer_create.
+ */
+extern asmlinkage long
+sys_timer_create(clockid_t, struct sigevent *, timer_t *);
 
+asmlinkage long
+sys32_timer_create(clockid_t which_clock, struct sigevent32 *se32,
+		timer_t *timer_id)
+{
+	struct sigevent se;
+	timer_t ktimer_id;
+	mm_segment_t old_fs;
+	long ret;
+
+	if (se32 == NULL)
+		return sys_timer_create(which_clock, NULL, timer_id);
+
+	/* XXX: converting se32 to se is filthy because of the
+	 * two union members. For now it is ok, because the pointers
+	 * are not touched in kernel.
+	 */
+	memset(&se, 0, sizeof(se));
+	if (get_user(se.sigev_value.sival_int,  &se32->sigev_value.sival_int) ||
+	    get_user(se.sigev_signo, &se32->sigev_signo) ||
+	    get_user(se.sigev_notify, &se32->sigev_notify) ||
+	    copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
+	    sizeof(se._sigev_un._pad)))
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_timer_create(which_clock, &se, &ktimer_id);
+	set_fs(old_fs);
+
+	if (!ret)
+		ret = put_user (ktimer_id, timer_id);
+
+	return ret;
+}

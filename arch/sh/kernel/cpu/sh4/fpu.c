@@ -1,4 +1,4 @@
-/* $Id: fpu.c,v 1.2 2003/05/04 19:29:54 lethal Exp $
+/* $Id: fpu.c,v 1.3 2003/09/23 23:15:44 lethal Exp $
  *
  * linux/arch/sh/kernel/fpu.c
  *
@@ -17,6 +17,14 @@
 #include <linux/signal.h>
 #include <asm/processor.h>
 #include <asm/io.h>
+
+/* The PR (precision) bit in the FP Status Register must be clear when
+ * an frchg instruction is executed, otherwise the instruction is undefined.
+ * Executing frchg with PR set causes a trap on some SH4 implementations.
+ */
+
+#define FPSCR_RCHG 0x00000000
+
 
 /*
  * Save FPU registers onto task structure.
@@ -61,9 +69,11 @@ save_fpu(struct task_struct *tsk)
 		     "fmov.s	fr3, @-%0\n\t"
 		     "fmov.s	fr2, @-%0\n\t"
 		     "fmov.s	fr1, @-%0\n\t"
-		     "fmov.s	fr0, @-%0"
+		     "fmov.s	fr0, @-%0\n\t"
+		     "lds	%2, fpscr\n\t"
 		     : /* no output */
 		     : "r" ((char *)(&tsk->thread.fpu.hard.status)),
+		       "r" (FPSCR_RCHG),
 		       "r" (FPSCR_INIT)
 		     : "memory");
 
@@ -112,7 +122,7 @@ restore_fpu(struct task_struct *tsk)
 		     "lds.l	@%0+, fpscr\n\t"
 		     "lds.l	@%0+, fpul\n\t"
 		     : /* no output */
-		     : "r" (&tsk->thread.fpu), "r" (FPSCR_INIT)
+		     : "r" (&tsk->thread.fpu), "r" (FPSCR_RCHG)
 		     : "memory");
 }
 
@@ -160,9 +170,10 @@ fpu_init(void)
 		     "fsts	fpul, fr13\n\t"
 		     "fsts	fpul, fr14\n\t"
 		     "fsts	fpul, fr15\n\t"
-		     "frchg"
+		     "frchg\n\t"
+		     "lds	%2, fpscr\n\t"
 		     : /* no output */
-		     : "r" (0), "r" (FPSCR_INIT));
+		     : "r" (0), "r" (FPSCR_RCHG), "r" (FPSCR_INIT));
 }
 
 /**

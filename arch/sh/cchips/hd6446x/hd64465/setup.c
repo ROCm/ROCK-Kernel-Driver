@@ -1,5 +1,5 @@
 /*
- * $Id: setup.c,v 1.1.2.3 2002/11/04 20:33:57 lethal Exp $
+ * $Id: setup.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
  *
  * Setup and IRQ handling code for the HD64465 companion chip.
  * by Greg Banks <gbanks@pocketpenguins.com>
@@ -24,21 +24,13 @@
 
 #include <asm/hd64465/hd64465.h>
 
-#undef HD64465_DEBUG
-
-#ifdef HD64465_DEBUG
-#define DPRINTK(args...)	printk(args)
-#else
-#define DPRINTK(args...)
-#endif
-
 static void disable_hd64465_irq(unsigned int irq)
 {
 	unsigned long flags;
 	unsigned short nimr;
 	unsigned short mask = 1 << (irq - HD64465_IRQ_BASE);
 
-    	DPRINTK("disable_hd64465_irq(%d): mask=%x\n", irq, mask);
+    	pr_debug("disable_hd64465_irq(%d): mask=%x\n", irq, mask);
 	local_irq_save(flags);
 	nimr = inw(HD64465_REG_NIMR);
 	nimr |= mask;
@@ -53,7 +45,7 @@ static void enable_hd64465_irq(unsigned int irq)
 	unsigned short nimr;
 	unsigned short mask = 1 << (irq - HD64465_IRQ_BASE);
 
-    	DPRINTK("enable_hd64465_irq(%d): mask=%x\n", irq, mask);
+    	pr_debug("enable_hd64465_irq(%d): mask=%x\n", irq, mask);
 	local_irq_save(flags);
 	nimr = inw(HD64465_REG_NIMR);
 	nimr &= ~mask;
@@ -95,15 +87,17 @@ static struct hw_interrupt_type hd64465_irq_type = {
 	.enable		= enable_hd64465_irq,
 	.disable	= disable_hd64465_irq,
 	.ack		= mask_and_ack_hd64465,
-	.end		= end_hd64465_irq
+	.end		= end_hd64465_irq,
 };
 
 
-static void hd64465_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t hd64465_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk(KERN_INFO
 	       "HD64465: spurious interrupt, nirr: 0x%x nimr: 0x%x\n",
 	       inw(HD64465_REG_NIRR), inw(HD64465_REG_NIMR));
+
+	return IRQ_NONE;
 }
 
 
@@ -145,7 +139,7 @@ int hd64465_irq_demux(int irq)
 		unsigned short nirr = inw(HD64465_REG_NIRR);
 		unsigned short nimr = inw(HD64465_REG_NIMR);
 
-    	    	DPRINTK("hd64465_irq_demux, nirr=%04x, nimr=%04x\n", nirr, nimr);
+    	    	pr_debug("hd64465_irq_demux, nirr=%04x, nimr=%04x\n", nirr, nimr);
 		nirr &= ~nimr;
 		for (bit = 1, i = 0 ; i < HD64465_IRQ_NUM ; bit <<= 1, i++)
 		    if (nirr & bit)

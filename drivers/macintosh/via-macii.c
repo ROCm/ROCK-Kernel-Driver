@@ -22,13 +22,13 @@
 #include <linux/sched.h>
 #include <linux/adb.h>
 #include <linux/interrupt.h>
+#include <linux/init.h>
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/machw.h>
 #include <asm/mac_via.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/init.h>
 
 static volatile unsigned char *via;
 

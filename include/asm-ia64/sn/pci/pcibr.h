@@ -1,13 +1,12 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIBR_H
-#define _ASM_SN_PCI_PCIBR_H
+#ifndef _ASM_IA64_SN_PCI_PCIBR_H
+#define _ASM_IA64_SN_PCI_PCIBR_H
 
 #if defined(__KERNEL__)
 
@@ -212,9 +211,6 @@ extern void		pcibr_config_set(vertex_hdl_t conn,
 					 unsigned size,
 					 uint64_t value);
 
-extern int		pcibr_error_devenable(vertex_hdl_t pconn_vhdl,
-					      int error_code);
-
 extern int		pcibr_wrb_flush(vertex_hdl_t pconn_vhdl);
 extern int		pcibr_rrb_check(vertex_hdl_t pconn_vhdl,
 					int *count_vchan0,
@@ -238,7 +234,7 @@ void			pcibr_set_rrb_callback(vertex_hdl_t xconn_vhdl,
 					       rrb_alloc_funct_f *func);
 
 extern int		pcibr_device_unregister(vertex_hdl_t);
-extern int		pcibr_dma_enabled(vertex_hdl_t);
+
 /*
  * Bridge-specific flags that can be set via pcibr_device_flags_set
  * and cleared via pcibr_device_flags_clear.  Other flags are
@@ -422,7 +418,7 @@ struct pcibr_slot_info_resp_s {
     int                     resp_bss_ninfo;
     char                    resp_bss_devio_bssd_space[16];
     iopaddr_t               resp_bss_devio_bssd_base; 
-    bridgereg_t             resp_bss_device;
+    uint64_t		    resp_bss_device;
     int                     resp_bss_pmu_uctr;
     int                     resp_bss_d32_uctr;
     int                     resp_bss_d64_uctr;
@@ -430,7 +426,7 @@ struct pcibr_slot_info_resp_s {
     unsigned                resp_bss_d64_flags;
     iopaddr_t               resp_bss_d32_base;
     unsigned                resp_bss_d32_flags;
-    atomic_t                resp_bss_ext_ates_active;
+    atomic_t		    resp_bss_ext_ates_active;
     volatile unsigned      *resp_bss_cmd_pointer;
     unsigned                resp_bss_cmd_shadow;
     int                     resp_bs_rrb_valid;
@@ -438,10 +434,10 @@ struct pcibr_slot_info_resp_s {
     int                     resp_bs_rrb_valid_v2;
     int                     resp_bs_rrb_valid_v3;
     int                     resp_bs_rrb_res;
-    bridgereg_t             resp_b_resp;
-    bridgereg_t             resp_b_int_device;
-    bridgereg_t             resp_b_int_enable;
-    bridgereg_t             resp_b_int_host;
+    uint64_t		    resp_b_resp;
+    uint64_t		    resp_b_int_device;
+    uint64_t		    resp_b_int_enable;
+    uint64_t		    resp_b_int_host;
     picreg_t		    resp_p_int_enable;
     picreg_t		    resp_p_int_host;
     struct pcibr_slot_func_info_resp_s {
@@ -508,4 +504,4 @@ struct pcibr_slot_info_resp_s {
 /* ERANGE                        34    */
 /* EUNATCH                       42    */
 
-#endif				/* _ASM_SN_PCI_PCIBR_H */
+#endif				/* _ASM_IA64_SN_PCI_PCIBR_H */

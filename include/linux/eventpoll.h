@@ -22,6 +22,9 @@
 #define EPOLL_CTL_DEL 2
 #define EPOLL_CTL_MOD 3
 
+/* Set the One Shot behaviour for the target file descriptor */
+#define EPOLLONESHOT (1 << 30)
+
 /* Set the Edge Triggered behaviour for the target file descriptor */
 #define EPOLLET (1 << 31)
 

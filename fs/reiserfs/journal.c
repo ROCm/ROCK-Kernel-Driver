@@ -193,6 +193,9 @@ static int set_bit_in_list_bitmap(struct super_block *p_s_sb, int block,
 static void cleanup_bitmap_list(struct super_block *p_s_sb,
                                 struct reiserfs_list_bitmap *jb) {
   int i;
+  if (jb->bitmaps == NULL)
+    return;
+
   for (i = 0 ; i < SB_BMAP_NR(p_s_sb) ; i++) {
     if (jb->bitmaps[i]) {
       free_bitmap_node(p_s_sb, jb->bitmaps[i]) ;
@@ -1937,18 +1940,13 @@ static int journal_init_dev( struct super_block *super,
 
 	journal -> j_dev_file = filp_open( jdev_name, 0, 0 );
 	if( !IS_ERR( journal -> j_dev_file ) ) {
-		struct inode *jdev_inode;
-
-		jdev_inode = journal -> j_dev_file -> f_dentry -> d_inode;
-		journal -> j_dev_bd = jdev_inode -> i_bdev;
+		struct inode *jdev_inode = journal->j_dev_file->f_mapping->host;
 		if( !S_ISBLK( jdev_inode -> i_mode ) ) {
 			printk( "journal_init_dev: '%s' is not a block device\n", jdev_name );
 			result = -ENOTBLK;
-		} else if( jdev_inode -> i_bdev == NULL ) {
-			printk( "journal_init_dev: bdev uninitialized for '%s'\n", jdev_name );
-			result = -ENOMEM;
 		} else  {
 			/* ok */
+			journal->j_dev_bd = I_BDEV(jdev_inode);
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
 		}
 	} else {

@@ -63,10 +63,11 @@ struct avc_audit_data {
 		} fs;
 		struct {
 			char *netif;
-			struct sk_buff *skb;
 			struct sock *sk;
-			u16 port;
+			u16 dport;
+			u16 sport;
 			u32 daddr;
+			u32 saddr;
 		} net;
 		int cap;
 		int ipc_id;

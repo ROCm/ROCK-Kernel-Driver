@@ -9,6 +9,14 @@
 #define H_PTEG_Full	-6	/* PTEG is full */
 #define H_Not_Found	-7	/* PTE was not found" */
 #define H_Reserved_DABR	-8	/* DABR address is reserved by the hypervisor on this processor" */
+#define H_NoMem                 -9
+#define H_Authority            -10
+#define H_Permission           -11
+#define H_Dropped              -12
+#define H_SourceParm           -13
+#define H_DestParm             -14
+#define H_RemoteParm           -15
+#define H_Resource             -16
 
 /* Flags */
 #define H_LARGE_PAGE		(1UL<<(63-16))
@@ -58,6 +66,21 @@
 #define H_IPOLL			0x70
 #define H_XIRR			0x74
 #define H_PERFMON		0x7c
+#define H_MIGRATE_DMA		0x78
+#define H_REGISTER_VPA		0xDC
+#define H_CEDE		        0xE0
+#define H_CONFER		0xE4
+#define H_PROD		        0xE8
+#define H_GET_PPP		0xEC
+#define H_SET_PPP		0xF0
+#define H_SET_PURR		0xF4
+#define H_PIC		        0xF8
+#define H_REG_CRQ		0xFC
+#define H_FREE_CRQ		0x100
+#define H_VIO_SIGNAL		0x104
+#define H_SEND_CRQ		0x108
+#define H_COPY_RDMA             0x110
+#define H_POLL_PENDING	        0x1D8
 
 /* plpar_hcall() -- Generic call interface using above opcodes
  *
@@ -80,3 +103,38 @@ long plpar_hcall(unsigned long opcode,
  * other than status.  Slightly more efficient.
  */
 long plpar_hcall_norets(unsigned long opcode, ...);
+
+/* 
+ * Special hcall interface for ibmveth support.
+ * Takes 8 input parms. Returns a rc and stores the
+ * R4 return value in *out1.
+ */
+long plpar_hcall_8arg_2ret(unsigned long opcode,
+			   unsigned long arg1,
+		  	   unsigned long arg2,
+			   unsigned long arg3,
+			   unsigned long arg4,
+			   unsigned long arg5,
+			   unsigned long arg6,
+			   unsigned long arg7,
+			   unsigned long arg8,
+			   unsigned long *out1);
+
+
+ 
+ 
+/* plpar_hcall_4out()
+ *
+ * same as plpar_hcall except with 4 output arguments.  
+ * 
+ */
+long plpar_hcall_4out(unsigned long opcode,
+		      unsigned long arg1,
+		      unsigned long arg2,
+		      unsigned long arg3,
+		      unsigned long arg4,
+		      unsigned long *out1,
+		      unsigned long *out2,
+		      unsigned long *out3,
+		      unsigned long *out4);
+

@@ -7,6 +7,4 @@
 #
 # Makefile for the sn2 io routines.
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
-
 obj-y				+= ioconfig_bus.o

@@ -603,7 +603,7 @@ int presto_journal_rename(struct rec_info *rec, struct presto_file_set *fset,
 int presto_journal_open(struct rec_info *, struct presto_file_set *,
                         struct dentry *, struct presto_version *old_ver);
 int presto_journal_close(struct rec_info *rec, struct presto_file_set *,
-                         struct file *, struct dentry *,
+                         struct presto_file_data *, struct dentry *,
                          struct presto_version *old_file_ver,
                          struct presto_version *new_file_ver);
 int presto_write_lml_close(struct rec_info *rec,

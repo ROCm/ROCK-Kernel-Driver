@@ -50,7 +50,7 @@ EXPORT_SYMBOL(nr_swap_pages);
  * Used by page_zone() to look up the address of the struct zone whose
  * id is encoded in the upper bits of page->flags
  */
-struct zone *zone_table[MAX_NR_ZONES*MAX_NUMNODES];
+struct zone *zone_table[1 << (ZONES_SHIFT + NODES_SHIFT)];
 EXPORT_SYMBOL(zone_table);
 
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
@@ -539,7 +539,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 {
 	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
-	struct zone **zones, *classzone;
+	struct zone **zones;
 	struct page *page;
 	struct reclaim_state reclaim_state;
 	struct task_struct *p = current;
@@ -554,8 +554,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		cold = 1;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
-	classzone = zones[0]; 
-	if (classzone == NULL)    /* no zones in the zonelist */
+	if (zones[0] == NULL)     /* no zones in the zonelist */
 		return NULL;
 
 	/* Go through the zonelist once, looking for a zone with enough free */
@@ -630,7 +629,7 @@ rebalance:
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
 
-	try_to_free_pages(classzone, gfp_mask, order);
+	try_to_free_pages(zones, gfp_mask, order);
 
 	p->reclaim_state = NULL;
 	p->flags &= ~PF_MEMALLOC;
@@ -670,10 +669,11 @@ rebalance:
 	}
 
 nopage:
-	if (!(gfp_mask & __GFP_NOWARN)) {
-		printk("%s: page allocation failure."
+	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
+		printk(KERN_WARNING "%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
 			p->comm, order, gfp_mask);
+		dump_stack();
 	}
 	return NULL;
 got_pg:
@@ -869,14 +869,14 @@ void __get_page_state(struct page_state *ret, int nr)
 	while (cpu < NR_CPUS) {
 		unsigned long *in, *out, off;
 
-		if (!cpu_online(cpu)) {
+		if (!cpu_possible(cpu)) {
 			cpu++;
 			continue;
 		}
 
 		in = (unsigned long *)&per_cpu(page_states, cpu);
 		cpu++;
-		if (cpu < NR_CPUS && cpu_online(cpu))
+		if (cpu < NR_CPUS && cpu_possible(cpu))
 			prefetch(&per_cpu(page_states, cpu));
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)
@@ -1212,7 +1212,7 @@ void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
 	struct page *page;
 
 	for (page = start; page < (start + size); page++) {
-		set_page_zone(page, nid * MAX_NR_ZONES + zone);
+		set_page_zone(page, NODEZONE(nid, zone));
 		set_page_count(page, 0);
 		SetPageReserved(page);
 		INIT_LIST_HEAD(&page->list);
@@ -1253,7 +1253,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		unsigned long size, realsize;
 		unsigned long batch;
 
-		zone_table[nid * MAX_NR_ZONES + j] = zone;
+		zone_table[NODEZONE(nid, j)] = zone;
 		realsize = size = zones_size[j];
 		if (zholes_size)
 			realsize -= zholes_size[j];
@@ -1265,6 +1265,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 		spin_lock_init(&zone->lru_lock);
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
+
+		zone->temp_priority = zone->prev_priority = DEF_PRIORITY;
 
 		/*
 		 * The per-cpu-pages pools are set to around 1000th of the

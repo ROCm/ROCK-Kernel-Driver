@@ -39,6 +39,9 @@ static struct security_operations capability_ops = {
 	.bprm_set_security =		cap_bprm_set_security,
 	.bprm_secureexec =		cap_bprm_secureexec,
 
+	.inode_setxattr =		cap_inode_setxattr,
+	.inode_removexattr =		cap_inode_removexattr,
+
 	.task_post_setuid =		cap_task_post_setuid,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
 

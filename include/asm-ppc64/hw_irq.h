@@ -21,18 +21,15 @@ extern void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq);
 
 #ifdef CONFIG_PPC_ISERIES
 
-extern void __no_use_sti(void);
-extern void __no_use_cli(void);
-extern void __no_use_restore_flags(unsigned long);
-extern unsigned long __no_use_save_flags(void);
-extern void __no_use_set_lost(unsigned long);
-extern void __no_lpq_restore_flags(unsigned long);
+extern unsigned long local_get_flags(void);
+extern unsigned long local_irq_disable(void);
+extern void local_irq_restore(unsigned long);
 
-#define local_irq_disable()			__no_use_cli()
-#define local_irq_enable()			__no_use_sti()
-#define local_save_flags(flags)	((flags) = __no_use_save_flags())
-#define local_irq_restore(flags)	__no_use_restore_flags((unsigned long)flags)
-#define local_irq_save(flags)	({local_save_flags(flags);local_irq_disable();})
+#define local_irq_enable()	local_irq_restore(1)
+#define local_save_flags(flags)	((flags) = local_get_flags())
+#define local_irq_save(flags)	((flags) = local_irq_disable())
+
+#define irqs_disabled()		(local_get_flags() == 0)
 
 #else
 
@@ -68,6 +65,13 @@ static inline void __do_save_and_cli(unsigned long *flags)
 }
 
 #define local_irq_save(flags)          __do_save_and_cli(&flags)
+
+#define irqs_disabled()				\
+({						\
+	unsigned long flags;			\
+	local_save_flags(flags);		\
+	!(flags & MSR_EE);			\
+})
 
 #endif /* CONFIG_PPC_ISERIES */
 

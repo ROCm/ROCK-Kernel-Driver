@@ -23,7 +23,8 @@
 #define TRANSLUCENT       5UL
 #define HSM               6UL
 #define MULTIPATH         7UL
-#define MAX_PERSONALITY   8UL
+#define RAID6		  8UL
+#define MAX_PERSONALITY   9UL
 
 #define	LEVEL_MULTIPATH		(-4)
 #define	LEVEL_LINEAR		(-1)
@@ -41,6 +42,7 @@ static inline int pers_to_level (int pers)
 		case RAID0:		return 0;
 		case RAID1:		return 1;
 		case RAID5:		return 5;
+		case RAID6:		return 6;
 	}
 	BUG();
 	return MD_RESERVED;
@@ -57,6 +59,7 @@ static inline int level_to_pers (int level)
 		case 1: return RAID1;
 		case 4:
 		case 5: return RAID5;
+		case 6: return RAID6;
 	}
 	return MD_RESERVED;
 }
@@ -187,6 +190,8 @@ struct mddev_s
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
+
+	struct gendisk			*gendisk;
 
 	/* Superblock information */
 	int				major_version,

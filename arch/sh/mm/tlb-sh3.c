@@ -61,6 +61,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 void __flush_tlb_page(unsigned long asid, unsigned long page)
 {
 	unsigned long addr, data;
+	int i, ways = MMU_NTLB_WAYS;
 
 	/*
 	 * NOTE: PTEH.ASID should be set to this MM
@@ -68,8 +69,15 @@ void __flush_tlb_page(unsigned long asid, unsigned long page)
 	 *
 	 * It would be simple if we didn't need to set PTEH.ASID...
 	 */
-	addr = MMU_TLB_ADDRESS_ARRAY |(page & 0x1F000)| MMU_PAGE_ASSOC_BIT;
+	addr = MMU_TLB_ADDRESS_ARRAY | (page & 0x1F000);
 	data = (page & 0xfffe0000) | asid; /* VALID bit is off */
-	ctrl_outl(data, addr);
+	
+	if (test_bit(CPU_HAS_MMU_PAGE_ASSOC, &(cpu_data->flags))) {
+		addr |= MMU_PAGE_ASSOC_BIT;
+		ways = 1;	/* we already know the way .. */
+	}
+
+	for (i = 0; i < ways; i++)
+		ctrl_outl(data, addr + (i << 8));
 }
 

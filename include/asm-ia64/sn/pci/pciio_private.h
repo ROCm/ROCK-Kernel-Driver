@@ -1,13 +1,12 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIIO_PRIVATE_H
-#define _ASM_SN_PCI_PCIIO_PRIVATE_H
+#ifndef _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H
+#define _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H
 
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pci_defs.h>
@@ -16,8 +15,6 @@
  * pciio_private.h -- private definitions for pciio
  * PCI drivers should NOT include this file.
  */
-
-#ident "sys/PCI/pciio_private: $Revision: 1.13 $"
 
 /*
  * All PCI providers set up PIO using this information.
@@ -62,6 +59,20 @@ struct pciio_intr_s {
 #define PCIIO_INTR_NOTHREAD	2	/* interrupt handler wants to be called at interrupt level */
 
 /*
+ * Generic PCI bus information
+ */
+struct pciio_businfo_s {
+    int                 bi_multi_master;/* Bus provider supports multiple */
+                                        /* dma masters behind a single slot. */
+                                        /* Needed to work around a thrashing */
+                                        /* issue in SGI Bridge ASIC and */
+                                        /* its derivatives. */
+    pciio_asic_type_t   bi_asic_type;   /* PCI ASIC type */
+    pciio_bus_type_t    bi_bus_type;    /* PCI bus type */
+    pciio_bus_speed_t   bi_bus_speed;   /* PCI bus speed */
+}; 
+
+/*
  * Some PCI provider implementations keep track of PCI window Base Address
  * Register (BAR) address range assignment via the rmalloc()/rmfree() arena
  * management routines.  These implementations use the following data
@@ -101,6 +112,7 @@ struct pciio_win_alloc_s {
 struct pciio_info_s {
     char                   *c_fingerprint;
     vertex_hdl_t            c_vertex;	/* back pointer to vertex */
+    vertex_hdl_t	    c_hostvertex;/* top most device in tree */
     pciio_bus_t             c_bus;	/* which bus the card is in */
     pciio_slot_t            c_slot;	/* which slot the card is in */
     pciio_function_t        c_func;	/* which func (on multi-func cards) */
@@ -114,6 +126,8 @@ struct pciio_info_s {
 
     struct pciio_win_info_s {           /* state of BASE regs */
         pciio_space_t           w_space;
+        char                    w_code;		/* low 4 bits of MEM BAR */
+						/* low 2 bits of IO BAR */
         iopaddr_t               w_base;
         size_t                  w_size;
         int                     w_devio_index;   /* DevIO[] register used to
@@ -124,7 +138,8 @@ struct pciio_info_s {
 #define c_rbase		c_rwindow.w_base		/* EXPANSION ROM base addr */
 #define c_rsize		c_rwindow.w_size		/* EXPANSION ROM size (bytes) */
     pciio_piospace_t	    c_piospace;	/* additional I/O spaces allocated */
+    int			    c_type1;	/* use type1 addressing */
 };
 
 extern char             pciio_info_fingerprint[];
-#endif				/* _ASM_SN_PCI_PCIIO_PRIVATE_H */
+#endif				/* _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H */

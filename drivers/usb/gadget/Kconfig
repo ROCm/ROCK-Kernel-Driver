@@ -177,6 +177,27 @@ config USB_GADGETFS_PXA2XX
 	depends on USB_GADGETFS && USB_PXA2XX
 	default y
 
+config USB_G_SERIAL
+	tristate "serial Gadget"
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
+
+config USB_G_SERIAL_NET2280
+	bool
+	# for now, treat the "dummy" hcd as if it were a net2280
+	depends on USB_G_SERIAL && (USB_NET2280 || USB_DUMMY_HCD)
+	default y
+
+config USB_G_SERIAL_PXA2XX
+	bool
+	depends on USB_G_SERIAL && USB_PXA2XX
+	default y
+
+config USB_G_SERIAL_SA1100
+	bool
+	depends on USB_G_SERIAL && USB_SA1100
+	default y
+
+
 endchoice
 
 # endmenuconfig

@@ -889,11 +889,9 @@ int dquot_alloc_space(struct inode *inode, qsize_t number, int warn)
 		warntype[cnt] = NOWARN;
 
 	down_read(&sb_dqopt(inode->i_sb)->dqptr_sem);
-	if (IS_NOQUOTA(inode)) {
-		up_read(&sb_dqopt(inode->i_sb)->dqptr_sem);
-		return QUOTA_OK;
-	}
 	spin_lock(&dq_data_lock);
+	if (IS_NOQUOTA(inode))
+		goto add_bytes;
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		if (inode->i_dquot[cnt] == NODQUOT)
 			continue;
@@ -905,6 +903,7 @@ int dquot_alloc_space(struct inode *inode, qsize_t number, int warn)
 			continue;
 		dquot_incr_space(inode->i_dquot[cnt], number);
 	}
+add_bytes:
 	inode_add_bytes(inode, number);
 	ret = QUOTA_OK;
 warn_put_all:
@@ -958,16 +957,15 @@ void dquot_free_space(struct inode *inode, qsize_t number)
 	unsigned int cnt;
 
 	down_read(&sb_dqopt(inode->i_sb)->dqptr_sem);
-	if (IS_NOQUOTA(inode)) {
-		up_read(&sb_dqopt(inode->i_sb)->dqptr_sem);
-		return;
-	}
 	spin_lock(&dq_data_lock);
+	if (IS_NOQUOTA(inode))
+		goto sub_bytes;
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		if (inode->i_dquot[cnt] == NODQUOT)
 			continue;
 		dquot_decr_space(inode->i_dquot[cnt], number);
 	}
+sub_bytes:
 	inode_sub_bytes(inode, number);
 	spin_unlock(&dq_data_lock);
 	up_read(&sb_dqopt(inode->i_sb)->dqptr_sem);
@@ -1015,8 +1013,10 @@ int dquot_transfer(struct inode *inode, struct iattr *iattr)
 		warntype[cnt] = NOWARN;
 	}
 	down_write(&sb_dqopt(inode->i_sb)->dqptr_sem);
-	if (IS_NOQUOTA(inode))	/* File without quota accounting? */
-		goto warn_put_all;
+	if (IS_NOQUOTA(inode)) {	/* File without quota accounting? */
+		up_write(&sb_dqopt(inode->i_sb)->dqptr_sem);
+		return QUOTA_OK;
+	}
 	/* First build the transfer_to list - here we can block on reading of dquots... */
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		switch (cnt) {

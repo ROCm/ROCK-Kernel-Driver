@@ -88,7 +88,7 @@
 #define cycles()	((u32)get_cycles())
 
 
-#define VERSION "pktgen version 1.3"
+#define VERSION "pktgen version 1.31"
 static char version[] __initdata = 
   "pktgen.c: v1.3: Packet Generator for packet performance testing.\n";
 
@@ -720,8 +720,18 @@ static void inject(struct pktgen_info* info)
 
 	{
 		char *p = info->result;
-		__u64 pps = (__u32)(info->sofar * 1000) / ((__u32)(total) / 1000);
-		__u64 bps = pps * 8 * (info->pkt_size + 4); /* take 32bit ethernet CRC into account */
+		__u64 bps, pps = 0;
+
+		if (total > 1000)
+			pps = (__u32)(info->sofar * 1000) / ((__u32)(total) / 1000);
+		else if(total > 100)
+			pps = (__u32)(info->sofar * 10000) / ((__u32)(total) / 100);
+		else if(total > 10)
+			pps = (__u32)(info->sofar * 100000) / ((__u32)(total) / 10);
+		else if(total > 1)
+			pps = (__u32)(info->sofar * 1000000) / (__u32)total;
+
+		bps = pps * 8 * (info->pkt_size + 4); /* take 32bit ethernet CRC into account */
 		p += sprintf(p, "OK: %llu(c%llu+d%llu) usec, %llu (%dbyte,%dfrags) %llupps %lluMb/sec (%llubps)  errors: %llu",
 			     (unsigned long long) total,
 			     (unsigned long long) (total - idle),

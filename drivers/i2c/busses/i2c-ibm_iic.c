@@ -27,6 +27,12 @@
  * option) any later version.
  *
  */
+
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
@@ -601,7 +607,7 @@ static int __devinit iic_probe(struct ocp_device *ocp){
 	
 	/* Register it with i2c layer */
 	adap = &dev->adap;
-	strcpy(adap->dev.name, "IBM IIC");
+	strcpy(adap->name, "IBM IIC");
 	i2c_set_adapdata(adap, dev);
 	adap->id = I2C_HW_OCP | iic_algo.id;
 	adap->algo = &iic_algo;

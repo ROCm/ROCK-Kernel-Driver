@@ -61,7 +61,7 @@ static void bri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 /*
  * check for trapped MIPS 3xxx CPU, dump only exception frame
  */
- if ( READ_WORD(&Xlog[0x80 / sizeof(Xlog[0])]) == 0x99999999 )
+ if ( READ_DWORD(&Xlog[0x80 / sizeof(Xlog[0])]) == 0x99999999 )
  {
   dump_trap_frame (IoAdapter, &((byte *)Xlog)[0x90]) ;
   IoAdapter->trapped = 1 ;

@@ -21,8 +21,9 @@
 #include <linux/sysrq.h>
 #include <linux/circ_buf.h>
 #include <linux/serial_reg.h>
+#include <asm/uaccess.h>
 #include <asm/sn/sn_sal.h>
-#include <asm/sn/pci/pciio.h>		/* this is needed for get_console_nasid */
+#include <asm/sn/pci/pciio.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/sn2/sn_private.h>
 
@@ -771,7 +772,7 @@ sn_sal_read_proc(char *page, char **start, off_t off, int count,
 	off_t	begin = 0;
 
 	len += sprintf(page, "sn_serial: nasid:%d irq:%d tx:%d rx:%d\n",
-		       get_console_nasid(), sn_sal_irq,
+		       ia64_sn_get_console_nasid(), sn_sal_irq,
 		       sn_total_tx_count, sn_total_rx_count);
 	*eof = 1;
 
@@ -813,12 +814,17 @@ sn_sal_switch_to_asynch(void)
 {
 	unsigned long flags;
 
-	sn_debug_printf("sn_serial: about to switch to asynchronous console\n");
-
 	/* without early_printk, we may be invoked late enough to race
 	 * with other cpus doing console IO at this point, however
 	 * console interrupts will never be enabled */
 	spin_lock_irqsave(&sn_sal_lock, flags);
+
+	if (sn_sal_is_asynch) {
+		spin_unlock_irqrestore(&sn_sal_lock, flags);
+		return;
+	}
+
+	sn_debug_printf("sn_serial: switch to asynchronous console\n");
 
 	/* early_printk invocation may have done this for us */
 	if (!sn_func) {
@@ -901,8 +907,7 @@ sn_sal_module_init(void)
 	/* when this driver is compiled in, the console initialization
 	 * will have already switched us into asynchronous operation
 	 * before we get here through the module initcalls */
-	if (!sn_sal_is_asynch)
-		sn_sal_switch_to_asynch();
+	sn_sal_switch_to_asynch();
 
 	/* at this point (module_init) we can try to turn on interrupts */
 	if (!IS_RUNNING_ON_SIMULATOR())

@@ -164,7 +164,8 @@ static void qtd_copy_status (
 
 		/* if async CSPLIT failed, try cleaning out the TT buffer */
 		} else if (urb->dev->tt && !usb_pipeint (urb->pipe)
-				&& QTD_CERR(token) == 0) {
+				&& ((token & QTD_STS_MMF) != 0
+					|| QTD_CERR(token) == 0)) {
 #ifdef DEBUG
 			struct usb_device *tt = urb->dev->tt->hub;
 			dev_dbg (&tt->dev,
@@ -211,6 +212,16 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 		break;
 	}
 	spin_unlock (&urb->lock);
+
+#ifdef EHCI_URB_TRACE
+	ehci_dbg (ehci,
+		"%s %s urb %p ep%d%s status %d len %d/%d\n",
+		__FUNCTION__, urb->dev->devpath, urb,
+		usb_pipeendpoint (urb->pipe),
+		usb_pipein (urb->pipe) ? "in" : "out",
+		urb->status,
+		urb->actual_length, urb->transfer_buffer_length);
+#endif
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
@@ -640,6 +651,9 @@ qh_make (
 
 			qh->period = urb->interval;
 		}
+
+		/* support for tt scheduling */
+		qh->dev = usb_get_dev (urb->dev);
 	}
 
 	/* using TT? */
@@ -699,8 +713,6 @@ done:
 	usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe), !is_input, 1);
 	return qh;
 }
-#undef hb_mult
-#undef hb_packet
 
 /*-------------------------------------------------------------------------*/
 
@@ -887,10 +899,14 @@ submit_async (
 	if (usb_pipein (urb->pipe) && !usb_pipecontrol (urb->pipe))
 		epnum |= 0x10;
 
-	ehci_vdbg (ehci, "submit_async urb %p len %d ep%d%s qtd %p [qh %p]\n",
-		urb, urb->transfer_buffer_length,
-		epnum & 0x0f, (epnum & 0x10) ? "in" : "out",
+#ifdef EHCI_URB_TRACE
+	ehci_dbg (ehci,
+		"%s %s urb %p ep%d%s len %d, qtd %p [qh %p]\n",
+		__FUNCTION__, urb->dev->devpath, urb,
+		epnum & 0x0f, usb_pipein (urb->pipe) ? "in" : "out",
+		urb->transfer_buffer_length,
 		qtd, dev ? dev->ep [epnum] : (void *)~0);
+#endif
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &dev->ep [epnum]);

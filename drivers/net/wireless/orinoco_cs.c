@@ -131,7 +131,7 @@ orinoco_cs_hard_reset(struct orinoco_private *priv)
 	/* We need atomic ops here, because we're not holding the lock */
 	set_bit(0, &card->hard_reset_in_progress);
 
-	err = CardServices(ResetCard, link->handle, NULL);
+	err = pcmcia_reset_card(link->handle, NULL);
 	if (err)
 		return err;
 
@@ -150,7 +150,7 @@ static void
 orinoco_cs_error(client_handle_t handle, int func, int ret)
 {
 	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
+	pcmcia_report_error(handle, &err);
 }
 
 /*
@@ -214,7 +214,7 @@ orinoco_cs_attach(void)
 	client_reg.Version = 0x0210; /* FIXME: what does this mean? */
 	client_reg.event_callback_args.client_data = link;
 
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
 		orinoco_cs_error(link->handle, RegisterClient, ret);
 		orinoco_cs_detach(link);
@@ -250,7 +250,7 @@ orinoco_cs_detach(dev_link_t * link)
 
 	/* Break the link with Card Services */
 	if (link->handle)
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 
 	/* Unlink device structure, and free it */
 	*linkp = link->next;
@@ -269,11 +269,8 @@ orinoco_cs_detach(dev_link_t * link)
  * device available to the system.
  */
 
-#define CS_CHECK(fn, args...) \
-	while ((last_ret=CardServices(last_fn=(fn),args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-	if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void
 orinoco_cs_config(dev_link_t *link)
@@ -290,7 +287,7 @@ orinoco_cs_config(dev_link_t *link)
 	tuple_t tuple;
 	cisparse_t parse;
 
-	CS_CHECK(ValidateCIS, handle, &info);
+	CS_CHECK(ValidateCIS, pcmcia_validate_cis(handle, &info));
 
 	/*
 	 * This reads the card's CONFIG tuple to find its
@@ -301,9 +298,9 @@ orinoco_cs_config(dev_link_t *link)
 	tuple.TupleData = buf;
 	tuple.TupleDataMax = sizeof(buf);
 	tuple.TupleOffset = 0;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.Present = parse.config.rmask[0];
 
@@ -311,7 +308,7 @@ orinoco_cs_config(dev_link_t *link)
 	link->state |= DEV_CONFIG;
 
 	/* Look up the current Vcc */
-	CS_CHECK(GetConfigurationInfo, handle, &conf);
+	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;
 
 	/*
@@ -329,13 +326,14 @@ orinoco_cs_config(dev_link_t *link)
 	 * implementation-defined details.
 	 */
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	while (1) {
 		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
 		cistpl_cftable_entry_t dflt = { .index = 0 };
 
-		CFG_CHECK(GetTupleData, handle, &tuple);
-		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
+		if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+				pcmcia_parse_tuple(handle, &tuple, &parse) != 0)
+			goto next_entry;
 
 		if (cfg->flags & CISTPL_CFTABLE_DEFAULT)
 			dflt = *cfg;
@@ -400,7 +398,8 @@ orinoco_cs_config(dev_link_t *link)
 			}
 
 			/* This reserves IO space but doesn't actually enable it */
-			CFG_CHECK(RequestIO, link->handle, &link->io);
+			if (pcmcia_request_io(link->handle, &link->io) != 0)
+				goto next_entry;
 		}
 
 
@@ -410,8 +409,8 @@ orinoco_cs_config(dev_link_t *link)
 		
 	next_entry:
 		if (link->io.NumPorts1)
-			CardServices(ReleaseIO, link->handle, &link->io);
-		last_ret = CardServices(GetNextTuple, handle, &tuple);
+			pcmcia_release_io(link->handle, &link->io);
+		last_ret = pcmcia_get_next_tuple(handle, &tuple);
 		if (last_ret  == CS_NO_MORE_ITEMS) {
 			printk(KERN_ERR "GetNextTuple().  No matching CIS configuration, "
 			       "maybe you need the ignore_cis_vcc=1 parameter.\n");
@@ -438,7 +437,7 @@ orinoco_cs_config(dev_link_t *link)
   		link->irq.Handler = orinoco_interrupt; 
   		link->irq.Instance = dev; 
 		
-		CS_CHECK(RequestIRQ, link->handle, &link->irq);
+		CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
 	}
 
 	/* We initialize the hermes structure before completing PCMCIA
@@ -452,7 +451,7 @@ orinoco_cs_config(dev_link_t *link)
 	 * the I/O windows and the interrupt mapping, and putting the
 	 * card and host interface into "Memory and IO" mode.
 	 */
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
 	/* Ok, we have the configuration, prepare to register the netdev */
 	dev->base_addr = link->io.BasePort1;
@@ -521,11 +520,11 @@ orinoco_cs_release(dev_link_t *link)
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* Don't bother checking to see if these succeed or not */
-	CardServices(ReleaseConfiguration, link->handle);
+	pcmcia_release_configuration(link->handle);
 	if (link->io.NumPorts1)
-		CardServices(ReleaseIO, link->handle, &link->io);
+		pcmcia_release_io(link->handle, &link->io);
 	if (link->irq.AssignedIRQ)
-		CardServices(ReleaseIRQ, link->handle, &link->irq);
+		pcmcia_release_irq(link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
 }				/* orinoco_cs_release */
 
@@ -587,7 +586,7 @@ orinoco_cs_event(event_t event, int priority,
 				spin_unlock_irqrestore(&priv->lock, flags);
 			}
 
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		}
 		break;
 
@@ -598,8 +597,7 @@ orinoco_cs_event(event_t event, int priority,
 		if (link->state & DEV_CONFIG) {
 			/* FIXME: should we double check that this is
 			 * the same card as we had before */
-			CardServices(RequestConfiguration, link->handle,
-				     &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 
 			if (! test_bit(0, &card->hard_reset_in_progress)) {
 				err = orinoco_reinit_firmware(dev);

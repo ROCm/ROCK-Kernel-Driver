@@ -140,6 +140,30 @@ static int video_open(struct inode *inode, struct file *file)
 /*
  * helper function -- handles userspace copying for ioctl arguments
  */
+
+static unsigned int
+video_fix_command(unsigned int cmd)
+{
+	switch (cmd) {
+	case VIDIOC_OVERLAY_OLD:
+		cmd = VIDIOC_OVERLAY;
+		break;
+	case VIDIOC_S_PARM_OLD:
+		cmd = VIDIOC_S_PARM;
+		break;
+	case VIDIOC_S_CTRL_OLD:
+		cmd = VIDIOC_S_CTRL;
+		break;
+	case VIDIOC_G_AUDIO_OLD:
+		cmd = VIDIOC_G_AUDIO;
+		break;
+	case VIDIOC_G_AUDOUT_OLD:
+		cmd = VIDIOC_G_AUDOUT;
+		break;
+	}
+	return cmd;
+}
+
 int
 video_usercopy(struct inode *inode, struct file *file,
 	       unsigned int cmd, unsigned long arg,
@@ -151,12 +175,14 @@ video_usercopy(struct inode *inode, struct file *file,
 	void	*parg = NULL;
 	int	err  = -EINVAL;
 
+	cmd = video_fix_command(cmd);
+
 	/*  Copy arguments into temp kernel buffer  */
 	switch (_IOC_DIR(cmd)) {
 	case _IOC_NONE:
 		parg = (void *)arg;
 		break;
-	case _IOC_READ: /* some v4l ioctls are marked wrong ... */
+	case _IOC_READ:
 	case _IOC_WRITE:
 	case (_IOC_WRITE | _IOC_READ):
 		if (_IOC_SIZE(cmd) <= sizeof(sbuf)) {
@@ -170,8 +196,9 @@ video_usercopy(struct inode *inode, struct file *file,
 		}
 		
 		err = -EFAULT;
-		if (copy_from_user(parg, (void *)arg, _IOC_SIZE(cmd)))
-			goto out;
+		if (_IOC_DIR(cmd) & _IOC_WRITE)
+			if (copy_from_user(parg, (void *)arg, _IOC_SIZE(cmd)))
+				goto out;
 		break;
 	}
 

@@ -10,7 +10,7 @@
 #ifndef __ASM_CPU_SH4_CACHE_H
 #define __ASM_CPU_SH4_CACHE_H
 
-#define        L1_CACHE_BYTES  32
+#define L1_CACHE_SHIFT	5
 
 #define CCR		0xff00001c	/* Address of Cache Control Register */
 #define CCR_CACHE_OCE	0x0001	/* Operand Cache Enable */

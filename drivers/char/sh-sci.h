@@ -1,4 +1,4 @@
-/* $Id: sh-sci.h,v 1.8 2000/03/08 15:19:39 gniibe Exp $
+/* $Id: sh-sci.h,v 1.6 2003/10/13 01:11:11 lethal Exp $
  *
  *  linux/drivers/char/sh-sci.h
  *
@@ -6,6 +6,7 @@
  *  Copyright (C) 1999, 2000  Niibe Yutaka
  *  Copyright (C) 2000  Greg Banks
  *  Modified to support multiple serial ports. Stuart Menefy (May 2000).
+ *  Modified to support SH7760 SCIF. Paul Mundt (Oct 2003).
  *
  */
 #include <linux/config.h>
@@ -26,6 +27,9 @@
 #define SH3_IRDA_IRQS { 52,  53,  55,  54 }
 #define SH4_SCIF_IRQS { 40,  41,  43,  42 }
 #define STB1_SCIF1_IRQS {23, 24,  26,  25 }
+#define SH7760_SCIF0_IRQS { 52, 53, 55, 54 }
+#define SH7760_SCIF1_IRQS { 72, 73, 75, 74 }
+#define SH7760_SCIF2_IRQS { 76, 77, 79, 78 }
 
 #if defined(CONFIG_CPU_SUBTYPE_SH7708)
 # define SCI_NPORTS 1
@@ -59,6 +63,19 @@
 	0x30 /* TIE=0,RIE=0,TE=1,RE=1 */ : \
 	0x38 /* TIE=0,RIE=0,TE=1,RE=1,REIE=1 */ )
 # define SCI_AND_SCIF
+#elif defined(CONFIG_CPU_SUBTYPE_SH7760)
+# define SCI_NPORTS 3
+# define SCI_INIT { \
+  { {}, PORT_SCIF, 0xfe600000, SH7760_SCIF0_IRQS, sci_init_pins_scif }, \
+  { {}, PORT_SCIF, 0xfe610000, SH7760_SCIF1_IRQS, sci_init_pins_scif }, \
+  { {}, PORT_SCIF, 0xfe620000, SH7760_SCIF2_IRQS, sci_init_pins_scif }  \
+}
+# define SCSPTR0 0xfe600024 /* 16 bit SCIF */
+# define SCSPTR1 0xfe610024 /* 16 bit SCIF */
+# define SCSPTR2 0xfe620024 /* 16 bit SCIF */
+# define SCIF_ORDER 0x0001  /* overrun error bit */
+# define SCSCR_INIT(port)          0x38 /* TIE=0,RIE=0,TE=1,RE=1,REIE=1 */
+# define SCIF_ONLY
 #elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 # define SCI_NPORTS 2
 # define SCI_INIT { \
@@ -161,29 +178,6 @@
 /* Generic serial flags */
 #define SCI_RX_THROTTLE		0x0000001
 
-/* generic serial tty */
-#define O_OTHER(tty)    \
-      ((O_OLCUC(tty))  ||\
-      (O_ONLCR(tty))   ||\
-      (O_OCRNL(tty))   ||\
-      (O_ONOCR(tty))   ||\
-      (O_ONLRET(tty))  ||\
-      (O_OFILL(tty))   ||\
-      (O_OFDEL(tty))   ||\
-      (O_NLDLY(tty))   ||\
-      (O_CRDLY(tty))   ||\
-      (O_TABDLY(tty))  ||\
-      (O_BSDLY(tty))   ||\
-      (O_VTDLY(tty))   ||\
-      (O_FFDLY(tty)))
-
-#define I_OTHER(tty)    \
-      ((I_INLCR(tty))  ||\
-      (I_IGNCR(tty))   ||\
-      (I_ICRNL(tty))   ||\
-      (I_IUCLC(tty))   ||\
-      (L_ISIG(tty)))
-
 #define SCI_MAGIC 0xbabeface
 
 /*
@@ -202,6 +196,7 @@ struct sci_port {
 	struct async_icount icount;
 	struct work_struct tqueue;
 	unsigned long event;
+	int break_flag;
 };
 
 #define SCI_IN(size, offset)					\
@@ -247,7 +242,7 @@ struct sci_port {
     SCI_OUT(scif_size, scif_offset, value);				\
   }
 
-#ifdef __sh3__
+#ifdef CONFIG_CPU_SH3
 #define SCIx_FNS(name, sh3_sci_offset, sh3_sci_size, sh4_sci_offset, sh4_sci_size, \
 		 sh3_scif_offset, sh3_scif_size, sh4_scif_offset, sh4_scif_size) \
   CPU_SCIx_FNS(name, sh3_sci_offset, sh3_sci_size, sh3_scif_offset, sh3_scif_size)
@@ -307,6 +302,16 @@ static inline int sci_rxd_in(struct sci_port *port)
 #endif
 	return 1;
 }
+#elif defined(CONFIG_CPU_SUBTYPE_SH7760)
+static inline int sci_rxd_in(struct sci_port *port)
+{
+	if (port->base == 0xfe600000)
+		return ctrl_inw(SCSPTR0) & 0x0001 ? 1 : 0; /* SCIF */
+	if (port->base == 0xfe610000)
+		return ctrl_inw(SCSPTR1) & 0x0001 ? 1 : 0; /* SCIF */
+	if (port->base == 0xfe620000)
+		return ctrl_inw(SCSPTR2) & 0x0001 ? 1 : 0; /* SCIF */
+}
 #elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 static inline int sci_rxd_in(struct sci_port *port)
 {
@@ -360,4 +365,5 @@ static inline int sci_rxd_in(struct sci_port *port)
 #define BPS_38400      SCBRR_VALUE(38400)
 #define BPS_57600      SCBRR_VALUE(57600)
 #define BPS_115200     SCBRR_VALUE(115200)
+#define BPS_230400     SCBRR_VALUE(230400)
 

@@ -85,8 +85,7 @@ extern int rxrpc_create_transport(unsigned short port,
 
 static inline void rxrpc_get_transport(struct rxrpc_transport *trans)
 {
-	if (atomic_read(&trans->usage) <= 0)
-		BUG();
+	BUG_ON(atomic_read(&trans->usage) <= 0);
 	atomic_inc(&trans->usage);
 	//printk("rxrpc_get_transport(%p{u=%d})\n",
 	//       trans, atomic_read(&trans->usage));

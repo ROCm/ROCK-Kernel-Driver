@@ -379,7 +379,7 @@ static dev_link_t *smc91c92_attach(void)
     client_reg.event_handler = &smc91c92_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	smc91c92_detach(link);
@@ -418,7 +418,7 @@ static void smc91c92_detach(dev_link_t *link)
     }
 
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
@@ -453,19 +453,27 @@ static int cvt_ascii_address(struct net_device *dev, char *s)
 
 /*====================================================================*/
 
-static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple,
-		     cisparse_t *parse)
+static int first_tuple(client_handle_t handle, tuple_t *tuple,
+		cisparse_t *parse)
 {
-    int i;
-    i = CardServices(fn, handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    i = CardServices(GetTupleData, handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    return CardServices(ParseTuple, handle, tuple, parse);
+	int i;
+
+	if ((i = pcmcia_get_first_tuple(handle, tuple)) != CS_SUCCESS ||
+			(i = pcmcia_get_tuple_data(handle, tuple)) != CS_SUCCESS)
+		return i;
+	return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
+static int next_tuple(client_handle_t handle, tuple_t *tuple,
+		cisparse_t *parse)
+{
+	int i;
+
+	if ((i = pcmcia_get_next_tuple(handle, tuple)) != CS_SUCCESS ||
+			(i = pcmcia_get_tuple_data(handle, tuple)) != CS_SUCCESS)
+		return i;
+	return pcmcia_parse_tuple(handle, tuple, parse);
+}
 
 /*======================================================================
 
@@ -534,7 +542,7 @@ static int mhz_mfc_config(dev_link_t *link)
 	for (k = 0; k < 0x400; k += 0x10) {
 	    if (k & 0x80) continue;
 	    link->io.BasePort1 = k ^ 0x300;
-	    i = CardServices(RequestIO, link->handle, &link->io);
+	    i = pcmcia_request_io(link->handle, &link->io);
 	    if (i == CS_SUCCESS) break;
 	}
 	if (i == CS_SUCCESS) break;
@@ -548,15 +556,14 @@ static int mhz_mfc_config(dev_link_t *link)
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
     req.Base = req.Size = 0;
     req.AccessSpeed = 0;
-    link->win = (window_handle_t)link->handle;
-    i = CardServices(RequestWindow, &link->win, &req);
+    i = pcmcia_request_window(&link->handle, &req, &link->win);
     if (i != CS_SUCCESS)
 	return i;
     smc->base = ioremap(req.Base, req.Size);
     mem.CardOffset = mem.Page = 0;
     if (smc->manfid == MANFID_MOTOROLA)
 	mem.CardOffset = link->conf.ConfigBase;
-    i = CardServices(MapMemPage, link->win, &mem);
+    i = pcmcia_map_mem_page(link->win, &mem);
 
     if ((i == CS_SUCCESS)
 	&& (smc->manfid == MANFID_MEGAHERTZ)
@@ -594,9 +601,9 @@ static int mhz_setup(dev_link_t *link)
 
     /* Another possibility: for the EM3288, in a special tuple */
     tuple.DesiredTuple = 0x81;
-    if (CardServices(GetFirstTuple, handle, &tuple) != CS_SUCCESS)
+    if (pcmcia_get_first_tuple(handle, &tuple) != CS_SUCCESS)
 	return -1;
-    if (CardServices(GetTupleData, handle, &tuple) != CS_SUCCESS)
+    if (pcmcia_get_tuple_data(handle, &tuple) != CS_SUCCESS)
 	return -1;
     buf[12] = '\0';
     if (cvt_ascii_address(dev, buf) == 0)
@@ -690,7 +697,7 @@ static int smc_config(dev_link_t *link)
 	    link->conf.ConfigIndex = cf->index;
 	    link->io.BasePort1 = cf->io.win[0].base;
 	    link->io.IOAddrLines = cf->io.flags & CISTPL_IO_LINES_MASK;
-	    i = CardServices(RequestIO, link->handle, &link->io);
+	    i = pcmcia_request_io(link->handle, &link->io);
 	    if (i == CS_SUCCESS) break;
 	}
 	i = next_tuple(link->handle, &tuple, &parse);
@@ -763,14 +770,14 @@ static int osi_config(dev_link_t *link)
 
     for (i = j = 0; j < 4; j++) {
 	link->io.BasePort2 = com[j];
-	i = CardServices(RequestIO, link->handle, &link->io);
+	i = pcmcia_request_io(link->handle, &link->io);
 	if (i == CS_SUCCESS) break;
     }
     if (i != CS_SUCCESS) {
 	/* Fallback: turn off hard decode */
 	link->conf.ConfigIndex = 0x03;
 	link->io.NumPorts2 = 0;
-	i = CardServices(RequestIO, link->handle, &link->io);
+	i = pcmcia_request_io(link->handle, &link->io);
     }
     dev->base_addr = link->io.BasePort1 + 0x10;
     return i;
@@ -791,12 +798,12 @@ static int osi_setup(dev_link_t *link, u_short manfid, u_short cardid)
 
     /* Read the station address from tuple 0x90, subtuple 0x04 */
     tuple.DesiredTuple = 0x90;
-    i = CardServices(GetFirstTuple, handle, &tuple);
+    i = pcmcia_get_first_tuple(handle, &tuple);
     while (i == CS_SUCCESS) {
-	i = CardServices(GetTupleData, handle, &tuple);
+	i = pcmcia_get_tuple_data(handle, &tuple);
 	if ((i != CS_SUCCESS) || (buf[0] == 0x04))
 	    break;
-	i = CardServices(GetNextTuple, handle, &tuple);
+	i = pcmcia_get_next_tuple(handle, &tuple);
     }
     if (i != CS_SUCCESS)
 	return -1;
@@ -869,9 +876,9 @@ static int check_sig(dev_link_t *link)
 	printk(KERN_INFO "smc91c92_cs: using 8-bit IO window.\n");
 	args.client_data = link;
 	smc91c92_event(CS_EVENT_RESET_PHYSICAL, 0, &args);
-	CardServices(ReleaseIO, link->handle, &link->io);
+	pcmcia_release_io(link->handle, &link->io);
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
-	CardServices(RequestIO, link->handle, &link->io);
+	pcmcia_request_io(link->handle, &link->io);
 	smc91c92_event(CS_EVENT_CARD_RESET, 0, &args);
 	return check_sig(link);
     }
@@ -936,9 +943,9 @@ static void smc91c92_config(dev_link_t *link)
     }
     CS_EXIT_TEST(i, RequestIO, config_failed);
 
-    i = CardServices(RequestIRQ, link->handle, &link->irq);
+    i = pcmcia_request_irq(link->handle, &link->irq);
     CS_EXIT_TEST(i, RequestIRQ, config_failed);
-    i = CardServices(RequestConfiguration, link->handle, &link->conf);
+    i = pcmcia_request_configuration(link->handle, &link->conf);
     CS_EXIT_TEST(i, RequestConfiguration, config_failed);
 
     if (smc->manfid == MANFID_MOTOROLA)
@@ -1070,14 +1077,14 @@ static void smc91c92_release(dev_link_t *link)
 	return;
     }
 
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
     if (link->win) {
 	struct net_device *dev = link->priv;
 	struct smc_private *smc = dev->priv;
 	iounmap(smc->base);
-	CardServices(ReleaseWindow, link->win);
+	pcmcia_release_window(link->win);
     }
 
     link->state &= ~DEV_CONFIG;
@@ -1124,7 +1131,7 @@ static int smc91c92_event(event_t event, int priority,
 	if (link->state & DEV_CONFIG) {
 	    if (link->open)
 		netif_device_detach(dev);
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	}
 	break;
     case CS_EVENT_PM_RESUME:
@@ -1135,7 +1142,7 @@ static int smc91c92_event(event_t event, int priority,
 	    if ((smc->manfid == MANFID_MEGAHERTZ) &&
 		(smc->cardid == PRODID_MEGAHERTZ_EM3288))
 		mhz_3288_power(link);
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    if (smc->manfid == MANFID_MOTOROLA)
 		mot_config(link);
 	    if ((smc->manfid == MANFID_OSITECH) &&

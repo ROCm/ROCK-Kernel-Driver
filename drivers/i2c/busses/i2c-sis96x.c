@@ -32,7 +32,10 @@
     We assume there can only be one SiS96x with one SMBus interface.
 */
 
-/* #define DEBUG */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/module.h>
 #include <linux/pci.h>

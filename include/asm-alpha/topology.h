@@ -16,8 +16,7 @@ static inline int cpu_to_node(int cpu)
 	node = alpha_mv.cpuid_to_nid(cpu);
 
 #ifdef DEBUG_NUMA
-	if (node < 0)
-		BUG();
+	BUG_ON(node < 0);
 #endif
 
 	return node;

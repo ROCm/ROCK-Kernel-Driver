@@ -48,11 +48,13 @@
 /* #define MONITOR_TCE 1 */ /* Turn on to sanity check TCE generation. */
 
 
+#ifdef CONFIG_PPC_PSERIES
 /* Initialize so this guy does not end up in the BSS section.
  * Only used to pass OF initialization data set in prom.c into the main 
  * kernel code -- data ultimately copied into tceTables[].
  */
 extern struct _of_tce_table of_tce_table[];
+#endif
 
 extern struct pci_controller* hose_head;
 extern struct pci_controller** hose_tail;
@@ -553,7 +555,7 @@ inline dma_addr_t get_tces( struct TceTable *tbl, unsigned order, void *page, un
 }
 
 #ifdef CONFIG_PPC_ISERIES
-static void tce_free_one_iSeries( struct TceTable *tbl, long tcenum )
+void tce_free_one_iSeries( struct TceTable *tbl, long tcenum )
 {
 	u64 set_tce_rc;
 	union Tce tce;
@@ -701,6 +703,7 @@ void create_tce_tables_for_buses(struct list_head *bus_list)
 	}
 }
 
+#ifdef CONFIG_PPC_PSERIES
 void create_tce_tables_for_busesLP(struct list_head *bus_list)
 {
 	struct list_head *ln;
@@ -722,15 +725,19 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 		create_tce_tables_for_busesLP(&bus->children);
 	}
 }
+#endif
 
 void create_tce_tables(void) {
 	struct pci_dev *dev = NULL;
 	struct device_node *dn, *mydn;
 
+#ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 		create_tce_tables_for_busesLP(&pci_root_buses);
 	}
-	else {
+	else
+#endif
+	{
 		create_tce_tables_for_buses(&pci_root_buses);
 	}
 	/* Now copy the tce_table ptr from the bus devices down to every
@@ -884,6 +891,7 @@ static void getTceTableParmsiSeries(struct iSeries_Device_Node* DevNode,
 static void getTceTableParmsPSeries(struct pci_controller *phb,
 				    struct device_node *dn,
 				    struct TceTable *newTceTable ) {
+#ifdef CONFIG_PPC_PSERIES
 	phandle node;
 	unsigned long i;
 
@@ -953,6 +961,7 @@ static void getTceTableParmsPSeries(struct pci_controller *phb,
 		}
 		i++;
 	}
+#endif
 }
 
 /*
@@ -970,6 +979,7 @@ static void getTceTableParmsPSeries(struct pci_controller *phb,
 static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
 				    struct device_node *dn,
 				    struct TceTable *newTceTable ) {
+#ifdef CONFIG_PPC_PSERIES
 	u32 *dma_window = (u32 *)get_property(dn, "ibm,dma-window", 0);
 	if (!dma_window) {
 		panic("PCI_DMA: getTceTableParmsPSeriesLP: device %s has no ibm,dma-window property!\n", dn->full_name);
@@ -985,6 +995,7 @@ static void getTceTableParmsPSeriesLP(struct pci_controller *phb,
 	PPCDBG(PPCDBG_TCEINIT, "\tnewTceTable->index       = 0x%lx\n", newTceTable->index);
 	PPCDBG(PPCDBG_TCEINIT, "\tnewTceTable->startOffset = 0x%lx\n", newTceTable->startOffset);
 	PPCDBG(PPCDBG_TCEINIT, "\tnewTceTable->size        = 0x%lx\n", newTceTable->size);
+#endif
 }
 
 /* Allocates a contiguous real buffer and creates TCEs over it.

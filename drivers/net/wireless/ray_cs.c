@@ -420,7 +420,7 @@ static dev_link_t *ray_attach(void)
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
 
-    DEBUG(2,"ray_cs ray_attach calling CardServices(RegisterClient...)\n");
+    DEBUG(2,"ray_cs ray_attach calling pcmcia_register_client(...)\n");
 
     init_timer(&local->timer);
 
@@ -490,8 +490,8 @@ static void ray_detach(dev_link_t *link)
     is received, to configure the PCMCIA socket, and to make the
     ethernet device available to the system.
 =============================================================================*/
-#define CS_CHECK(fn, args...) \
-while ((last_ret=fn(args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 #define MAX_TUPLE_SIZE 128
 static void ray_config(dev_link_t *link)
 {
@@ -510,23 +510,23 @@ static void ray_config(dev_link_t *link)
 
     /* This reads the card's CONFIG tuple to find its configuration regs */
     tuple.DesiredTuple = CISTPL_CONFIG;
-    CS_CHECK(pcmcia_get_first_tuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
     tuple.TupleData = buf;
     tuple.TupleDataMax = MAX_TUPLE_SIZE;
     tuple.TupleOffset = 0;
-    CS_CHECK(pcmcia_get_tuple_data, handle, &tuple);
-    CS_CHECK(pcmcia_parse_tuple, handle, &tuple, &parse);
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     link->conf.ConfigBase = parse.config.base;
     link->conf.Present = parse.config.rmask[0];
 
     /* Determine card type and firmware version */
     buf[0] = buf[MAX_TUPLE_SIZE - 1] = 0;
     tuple.DesiredTuple = CISTPL_VERS_1;
-    CS_CHECK(pcmcia_get_first_tuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
     tuple.TupleData = buf;
     tuple.TupleDataMax = MAX_TUPLE_SIZE;
     tuple.TupleOffset = 2;
-    CS_CHECK(pcmcia_get_tuple_data, handle, &tuple);
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
 
     for (i=0; i<tuple.TupleDataLen - 4; i++) 
         if (buf[i] == 0) buf[i] = ' ';
@@ -538,22 +538,22 @@ static void ray_config(dev_link_t *link)
     /* Now allocate an interrupt line.  Note that this does not
        actually assign a handler to the interrupt.
     */
-    CS_CHECK(pcmcia_request_irq, link->handle, &link->irq);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
     dev->irq = link->irq.AssignedIRQ;
     
     /* This actually configures the PCMCIA socket -- setting up
        the I/O windows and the interrupt mapping.
     */
-    CS_CHECK(pcmcia_request_configuration, link->handle, &link->conf);
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
 /*** Set up 32k window for shared memory (transmit and control) ************/
     req.Attributes = WIN_DATA_WIDTH_8 | WIN_MEMORY_TYPE_CM | WIN_ENABLE | WIN_USE_WAIT;
     req.Base = 0;
     req.Size = 0x8000;
     req.AccessSpeed = ray_mem_speed;
-    CS_CHECK(pcmcia_request_window, &link->handle, &req, &link->win);
+    CS_CHECK(RequestWindow, pcmcia_request_window(&link->handle, &req, &link->win));
     mem.CardOffset = 0x0000; mem.Page = 0;
-    CS_CHECK(pcmcia_map_mem_page, link->win, &mem);
+    CS_CHECK(MapMemPage, pcmcia_map_mem_page(link->win, &mem));
     local->sram = (UCHAR *)(ioremap(req.Base,req.Size));
 
 /*** Set up 16k window for shared memory (receive buffer) ***************/
@@ -561,9 +561,9 @@ static void ray_config(dev_link_t *link)
     req.Base = 0;
     req.Size = 0x4000;
     req.AccessSpeed = ray_mem_speed;
-    CS_CHECK(pcmcia_request_window, &link->handle, &req, &local->rmem_handle);
+    CS_CHECK(RequestWindow, pcmcia_request_window(&link->handle, &req, &local->rmem_handle));
     mem.CardOffset = 0x8000; mem.Page = 0;
-    CS_CHECK(pcmcia_map_mem_page, local->rmem_handle, &mem);
+    CS_CHECK(MapMemPage, pcmcia_map_mem_page(local->rmem_handle, &mem));
     local->rmem = (UCHAR *)(ioremap(req.Base,req.Size));
 
 /*** Set up window for attribute memory ***********************************/
@@ -571,9 +571,9 @@ static void ray_config(dev_link_t *link)
     req.Base = 0;
     req.Size = 0x1000;
     req.AccessSpeed = ray_mem_speed;
-    CS_CHECK(pcmcia_request_window, &link->handle, &req, &local->amem_handle);
+    CS_CHECK(RequestWindow, pcmcia_request_window(&link->handle, &req, &local->amem_handle));
     mem.CardOffset = 0x0000; mem.Page = 0;
-    CS_CHECK(pcmcia_map_mem_page, local->amem_handle, &mem);
+    CS_CHECK(MapMemPage, pcmcia_map_mem_page(local->amem_handle, &mem));
     local->amem = (UCHAR *)(ioremap(req.Base,req.Size));
 
     DEBUG(3,"ray_config sram=%p\n",local->sram);

@@ -25,8 +25,16 @@ typedef struct {
 	unsigned int __softirq_pending;
 } irq_cpustat_t;
 
-#define softirq_pending(cpu) (lowcore_ptr[(cpu)]->softirq_pending)
 #define local_softirq_pending() (S390_lowcore.softirq_pending)
+
+/* this is always called with cpu == smp_processor_id() at the moment */
+static inline __u32
+softirq_pending(unsigned int cpu)
+{
+	if (cpu == smp_processor_id())
+		return local_softirq_pending();
+	return lowcore_ptr[cpu]->softirq_pending;
+}
 
 #define __ARCH_IRQ_STAT
 
@@ -42,12 +50,12 @@ typedef struct {
  *
  * PREEMPT_MASK: 0x000000ff
  * SOFTIRQ_MASK: 0x0000ff00
- * HARDIRQ_MASK: 0x00010000
+ * HARDIRQ_MASK: 0x00ff0000
  */
 
 #define PREEMPT_BITS	8
 #define SOFTIRQ_BITS	8
-#define HARDIRQ_BITS	1
+#define HARDIRQ_BITS	8
 
 #define PREEMPT_SHIFT	0
 #define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
@@ -81,7 +89,6 @@ typedef struct {
 
 #define irq_enter()							\
 do {									\
-	BUG_ON( hardirq_count() );					\
 	(preempt_count() += HARDIRQ_OFFSET);				\
 } while(0)
 	

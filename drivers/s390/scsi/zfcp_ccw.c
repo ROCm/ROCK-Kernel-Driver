@@ -25,7 +25,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.33 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.36 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -37,7 +37,7 @@
 #define ZFCP_LOG_AREA_PREFIX            ZFCP_LOG_AREA_PREFIX_CONFIG
 
 static int zfcp_ccw_probe(struct ccw_device *);
-static int zfcp_ccw_remove(struct ccw_device *);
+static void zfcp_ccw_remove(struct ccw_device *);
 static int zfcp_ccw_set_online(struct ccw_device *);
 static int zfcp_ccw_set_offline(struct ccw_device *);
 
@@ -90,16 +90,17 @@ zfcp_ccw_probe(struct ccw_device *ccw_device)
  *
  * This function gets called by the common i/o layer and removes an adapter
  * from the system. Task of this function is to get rid of all units and
- * ports that belong to this adapter. And addition all resources of this
+ * ports that belong to this adapter. And in addition all resources of this
  * adapter will be freed too.
  */
-static int
+static void
 zfcp_ccw_remove(struct ccw_device *ccw_device)
 {
 	struct zfcp_adapter *adapter;
 	struct zfcp_port *port, *p;
 	struct zfcp_unit *unit, *u;
 
+	ccw_device_set_offline(ccw_device);
 	down(&zfcp_data.config_sema);
 	adapter = dev_get_drvdata(&ccw_device->dev);
 
@@ -119,16 +120,18 @@ zfcp_ccw_remove(struct ccw_device *ccw_device)
 	list_for_each_entry_safe(port, p, &adapter->port_remove_lh, list) {
 		list_for_each_entry_safe(unit, u, &port->unit_remove_lh, list) {
 			zfcp_unit_wait(unit);
+			zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
 			device_unregister(&unit->sysfs_device);
 		}
 		zfcp_port_wait(port);
+		zfcp_sysfs_port_remove_files(&port->sysfs_device,
+					     atomic_read(&port->status));
 		device_unregister(&port->sysfs_device);
 	}
 	zfcp_adapter_wait(adapter);
 	zfcp_adapter_dequeue(adapter);
 
 	up(&zfcp_data.config_sema);
-	return 0;
 }
 
 /**
@@ -155,6 +158,7 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	zfcp_erp_modify_adapter_status(adapter, ZFCP_STATUS_COMMON_RUNNING,
 				       ZFCP_SET);
 	zfcp_erp_adapter_reopen(adapter, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_wait(adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval;

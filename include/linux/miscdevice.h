@@ -36,12 +36,15 @@
 
 #define TUN_MINOR	     200
 
+struct device;
+
 struct miscdevice 
 {
 	int minor;
 	const char *name;
 	struct file_operations *fops;
 	struct list_head list;
+	struct device *dev;
 	char devfs_name[64];
 };
 

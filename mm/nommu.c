@@ -25,12 +25,12 @@
 #include <asm/tlbflush.h>
 
 void *high_memory;
-struct page *mem_map = NULL;
+struct page *mem_map;
 unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
-int sysctl_overcommit_memory = 0; /* default is heuristic overcommit */
+int sysctl_overcommit_memory; /* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
 
 /*
@@ -547,6 +547,11 @@ struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
 }
 
 struct page * follow_page(struct mm_struct *mm, unsigned long addr, int write)
+{
+	return NULL;
+}
+
+struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr)
 {
 	return NULL;
 }

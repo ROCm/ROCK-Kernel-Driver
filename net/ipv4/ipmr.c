@@ -205,6 +205,9 @@ static struct net_device *ipmr_reg_vif(void)
 	dev = alloc_netdev(sizeof(struct net_device_stats), "pimreg",
 			   reg_vif_setup);
 
+	if (dev == NULL)
+		return NULL;
+
 	if (register_netdevice(dev)) {
 		kfree(dev);
 		return NULL;

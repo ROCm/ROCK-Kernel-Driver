@@ -72,25 +72,25 @@ struct afs_vldbentry {
 };
 
 /* probe a volume location server to see if it is still alive */
-extern int afs_rxvl_probe(afs_server_t *server, int alloc_flags);
+extern int afs_rxvl_probe(struct afs_server *server, int alloc_flags);
 
 /* look up a volume location database entry by name */
-extern int afs_rxvl_get_entry_by_name(afs_server_t *server,
+extern int afs_rxvl_get_entry_by_name(struct afs_server *server,
 				      const char *volname,
 				      unsigned volnamesz,
 				      struct afs_cache_vlocation *entry);
 
 /* look up a volume location database entry by ID */
-extern int afs_rxvl_get_entry_by_id(afs_server_t *server,
+extern int afs_rxvl_get_entry_by_id(struct afs_server *server,
 				    afs_volid_t	volid,
 				    afs_voltype_t voltype,
 				    struct afs_cache_vlocation *entry);
 
-extern int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
+extern int afs_rxvl_get_entry_by_id_async(struct afs_async_op *op,
 					  afs_volid_t volid,
 					  afs_voltype_t voltype);
 
-extern int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
+extern int afs_rxvl_get_entry_by_id_async2(struct afs_async_op *op,
 					   struct afs_cache_vlocation *entry);
 
 #endif /* _LINUX_AFS_VLCLIENT_H */

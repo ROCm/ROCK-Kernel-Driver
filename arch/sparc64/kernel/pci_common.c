@@ -303,14 +303,23 @@ __init get_device_resource(struct linux_prom_pci_registers *ap,
 {
 	struct resource *res;
 	int breg = (ap->phys_hi & 0xff);
-	int space = (ap->phys_hi >> 24) & 3;
 
 	switch (breg) {
 	case  PCI_ROM_ADDRESS:
+		/* Unfortunately I have seen several cases where
+		 * buggy FCODE uses a space value of '1' (I/O space)
+		 * in the register property for the ROM address
+		 * so disable this sanity check for now.
+		 */
+#if 0
+	{
+		int space = (ap->phys_hi >> 24) & 3;
+
 		/* It had better be MEM space. */
 		if (space != 2)
 			bad_assignment(pdev, ap, NULL, 0);
-
+	}
+#endif
 		res = &pdev->resource[PCI_ROM_RESOURCE];
 		break;
 

@@ -82,7 +82,7 @@ struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
 	int minors;
-	char disk_name[16];		/* name of major driver */
+	char disk_name[32];		/* name of major driver */
 	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
 	struct request_queue *queue;

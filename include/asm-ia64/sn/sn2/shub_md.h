@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,8 +7,8 @@
  */
 
 
-#ifndef _SHUB_MD_H
-#define _SHUB_MD_H
+#ifndef _ASM_IA64_SN_SN2_SHUB_MD_H
+#define _ASM_IA64_SN_SN2_SHUB_MD_H
 
 /* SN2 supports a mostly-flat address space with 4 CPU-visible, evenly spaced, 
    contiguous regions, or "software banks".  On SN2, software bank n begins at 
@@ -273,4 +272,4 @@
 #define MD_BIST_MISCOMPARE(_n) (REMOTE_HUB_L(_n, SH_MMRBIST_ERR) &	\
 		SH_MMRBIST_ERR_DETECTED_MASK)
 
-#endif	/* _SHUB_MD_H */
+#endif	/* _ASM_IA64_SN_SN2_SHUB_MD_H */

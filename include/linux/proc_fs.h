@@ -131,7 +131,9 @@ extern void proc_tty_unregister_driver(struct tty_driver *driver);
 /*
  * proc_devtree.c
  */
+struct device_node;
 extern void proc_device_tree_init(void);
+extern void proc_device_tree_add_node(struct device_node *, struct proc_dir_entry *);
 
 /*
  * proc_rtas.c

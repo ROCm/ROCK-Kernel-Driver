@@ -295,6 +295,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"USR2080",		0	},
 	/* U.S. Robotics 56K FAX INT */
 	{	"USR3031",		0	},
+	/* U.S. Robotics 56K FAX INT */
+	{	"USR3050",		0	},
 	/* U.S. Robotics 56K Voice INT PnP */
 	{	"USR3070",		0	},
 	/* U.S. Robotics 56K Voice EXT PnP */

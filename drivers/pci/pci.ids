@@ -3539,6 +3539,7 @@
 11aa  Actel
 11ab  Galileo Technology Ltd.
 	0146  GT-64010/64010A System Controller
+	4146  GT-64111 System Controller
 	4320  Gigabit Ethernet Adapter
 		11ab 9521  Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter
 	4611  GT-64115 System Controller
@@ -3725,6 +3726,7 @@
 11d9  TEC Corporation
 11da  Novell
 11db  Sega Enterprises Ltd
+	1234  Broadband Adapter
 11dc  Questra Corporation
 11dd  Crosfield Electronics Limited
 11de  Zoran Corporation

@@ -654,6 +654,17 @@ static struct init_tags {
 	{ 0, ATAG_NONE }
 };
 
+static void (*init_machine)(void) __initdata;
+
+static int __init customize_machine(void)
+{
+	/* customizes platform devices, or adds new ones */
+	if (init_machine)
+		init_machine();
+	return 0;
+}
+arch_initcall(customize_machine);
+
 void __init setup_arch(char **cmdline_p)
 {
 	struct tag *tags = (struct tag *)&init_tags;
@@ -704,6 +715,7 @@ void __init setup_arch(char **cmdline_p)
 	 * Set up various architecture-specific pointers
 	 */
 	init_arch_irq = mdesc->init_irq;
+	init_machine = mdesc->init_machine;
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)

@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.11 2003/05/27 16:21:23 lethal Exp $
+/* $Id: init.c,v 1.18 2003/10/31 09:26:59 kkojima Exp $
  *
  *  linux/arch/sh/mm/init.c
  *
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/highmem.h>
 #include <linux/bootmem.h>
+#include <linux/pagemap.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -54,6 +55,9 @@ unsigned long mmu_context_cache = NO_CONTEXT;
 pg_data_t discontig_page_data[MAX_NUMNODES];
 bootmem_data_t discontig_node_bdata[MAX_NUMNODES];
 #endif
+
+void (*copy_page)(void *from, void *to);
+void (*clear_page)(void *to);
 
 void show_mem(void)
 {
@@ -112,13 +116,13 @@ void __init paging_init(void)
 	{
 		unsigned long max_dma, low, start_pfn;
 		pgd_t *pg_dir;
-	int i;
+		int i;
 
-	/* We don't need kernel mapping as hardware support that. */
-	pg_dir = swapper_pg_dir;
+		/* We don't need kernel mapping as hardware support that. */
+		pg_dir = swapper_pg_dir;
 
 		for (i = 0; i < PTRS_PER_PGD; i++)
-		pgd_val(pg_dir[i]) = 0;
+			pgd_val(pg_dir[i]) = 0;
 
 		/* Turn on the MMU */
 		enable_mmu();
@@ -130,11 +134,13 @@ void __init paging_init(void)
 
 		if (low < max_dma) {
 			zones_size[ZONE_DMA] = low - start_pfn;
+			zones_size[ZONE_NORMAL] = 0;
 		} else {
 			zones_size[ZONE_DMA] = max_dma - start_pfn;
 			zones_size[ZONE_NORMAL] = low - max_dma;
 		}
 	}
+
 #elif defined(CONFIG_CPU_SH3) || defined(CONFIG_CPU_SH4)
 	/*
 	 * If we don't have CONFIG_MMU set and the processor in question
@@ -149,17 +155,17 @@ void __init paging_init(void)
 	disable_mmu();
 #endif
 
-		free_area_init_node(0, NODE_DATA(0), 0, zones_size, __MEMORY_START >> PAGE_SHIFT, 0);
+	free_area_init_node(0, NODE_DATA(0), 0, zones_size, __MEMORY_START >> PAGE_SHIFT, 0);
 	/* XXX: MRB-remove - this doesn't seem sane, should this be done somewhere else ?*/
-		mem_map = NODE_DATA(0)->node_mem_map;
+	mem_map = NODE_DATA(0)->node_mem_map;
 
 #ifdef CONFIG_DISCONTIGMEM
 	/*
 	 * And for discontig, do some more fixups on the zone sizes..
 	 */
-		zones_size[ZONE_DMA] = __MEMORY_SIZE_2ND >> PAGE_SHIFT;
-		zones_size[ZONE_NORMAL] = 0;
-		free_area_init_node(1, NODE_DATA(1), 0, zones_size, __MEMORY_START_2ND >> PAGE_SHIFT, 0);
+	zones_size[ZONE_DMA] = __MEMORY_SIZE_2ND >> PAGE_SHIFT;
+	zones_size[ZONE_NORMAL] = 0;
+	free_area_init_node(1, NODE_DATA(1), 0, zones_size, __MEMORY_START_2ND >> PAGE_SHIFT, 0);
 #endif
 }
 
@@ -183,6 +189,13 @@ void __init mem_init(void)
 	memset(empty_zero_page, 0, PAGE_SIZE);
 	__flush_wback_region(empty_zero_page, PAGE_SIZE);
 
+	/* 
+	 * Setup wrappers for copy/clear_page(), these will get overridden
+	 * later in the boot process if a better method is available.
+	 */
+	copy_page = copy_page_slow;
+	clear_page = clear_page_slow;
+
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem_node(NODE_DATA(0));
 #ifdef CONFIG_DISCONTIGMEM
@@ -195,6 +208,7 @@ void __init mem_init(void)
 		 */
 		if (PageReserved(mem_map+tmp))
 			reservedpages++;
+
 	codesize =  (unsigned long) &_etext - (unsigned long) &_text;
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
@@ -237,76 +251,4 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif
-
-/*
- * Generic first-level cache init
- */
-void __init sh_cache_init(void)
-{
-	extern int detect_cpu_and_cache_system(void);
-	unsigned long ccr, flags = 0;
-
-	detect_cpu_and_cache_system();
-
-	if (cpu_data->type == CPU_SH_NONE)
-		panic("Unknown CPU");
-
-	jump_to_P2();
-	ccr = ctrl_inl(CCR);
-
-	/*
-	 * If the cache is already enabled .. flush it.
-	 */
-	if (ccr & CCR_CACHE_ENABLE) {
-		unsigned long entries, i, j;
-
-		entries = cpu_data->dcache.sets;
-
-		/*
-		 * If the OC is already in RAM mode, we only have
-		 * half of the entries to flush..
-		 */
-		if (ccr & CCR_CACHE_ORA)
-			entries >>= 1;
-
-		for (i = 0; i < entries; i++) {
-			for (j = 0; j < cpu_data->dcache.ways; j++) {
-				unsigned long data, addr;
-
-				addr = CACHE_OC_ADDRESS_ARRAY |
-					(j << cpu_data->dcache.way_shift) |
-					(i << cpu_data->dcache.entry_shift);
-
-				data = ctrl_inl(addr);
-
-				if ((data & (SH_CACHE_UPDATED | SH_CACHE_VALID))
-					== (SH_CACHE_UPDATED | SH_CACHE_VALID))
-					ctrl_outl(data & ~SH_CACHE_UPDATED, addr);
-		}
-		}
-	}
-
-	/* 
-	 * Default CCR values .. enable the caches
-	 * and flush them immediately..
-	 */
-	flags |= CCR_CACHE_ENABLE | CCR_CACHE_INVALIDATE | (ccr & CCR_CACHE_EMODE);
-
-#ifdef CONFIG_SH_WRITETHROUGH
-	/* Turn on Write-through caching */
-	flags |= CCR_CACHE_WT;
-#else
-	/* .. or default to Write-back */
-	flags |= CCR_CACHE_CB;
-#endif
-
-#ifdef CONFIG_SH_OCRAM
-	/* Turn on OCRAM -- halve the OC */
-	flags |= CCR_CACHE_ORA;
-	cpu_data->dcache.sets >>= 1;
-#endif
-
-	ctrl_outl(flags, CCR);
-	back_to_P1();
-}
 

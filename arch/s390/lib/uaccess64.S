@@ -73,6 +73,41 @@ __copy_to_user_asm:
 
         .align 4
         .text
+        .globl __copy_in_user_asm
+__copy_in_user_asm:
+	stmg	%r6,%r15,48(%r15)
+	lgr	%r5,%r3
+	lgr	%r7,%r5
+	lgr	%r6,%r2
+	cpya	6,4          # ar6 = ar4
+	sacf	512
+0:	mvcle	%r4,%r6,0
+	jo	0b
+1:	sacf	0
+	lgr	%r2,%r7
+	lmg	%r6,%r15,48(%r15)
+	br	%r14
+2:	lghi	%r1,-4096
+	lgr	%r5,%r4
+	slgr	%r5,%r1      # %r5 = %r4 + 4096
+	ngr	%r5,%r1      # %r5 = (%r4 + 4096) & -4096
+	slgr	%r5,%r4      # %r5 = #bytes to next user page boundary
+	clgr	%r7,%r5      # copy crosses next page boundary ?
+	jnh	1b           # no, the current page fauled
+	# The page after the current user page might have faulted.
+	# We cant't find out which page because the program check handler
+	# might have callled schedule, destroying all lowcore information.
+	# We retry with the shortened length.
+3:	mvcle	%r4,%r6,0
+	jo	3b
+	j	1b
+        .section __ex_table,"a"
+	.quad	0b,2b
+	.quad	3b,1b
+        .previous
+
+        .align 4
+        .text
         .globl __clear_user_asm
 __clear_user_asm:
 	lgr	%r4,%r2

@@ -182,7 +182,7 @@ ENTRY(inthandler)
 	movew   %sp@(LFORMATVEC),%d0	/* put exception # in d0 */
 	andl	#0x03fc,%d0		/* mask out vector only */
 
-	leal	kstat__per_cpu+STAT_IRQ,%a0
+	leal	per_cpu__kstat+STAT_IRQ,%a0
 	addql	#1,%a0@(%d0)
 
 	lsrl	#2,%d0			/* calculate real vector # */
@@ -213,7 +213,7 @@ ENTRY(fasthandler)
 	movew   %sp@(LFORMATVEC),%d0
 	andl	#0x03fc,%d0		/* mask out vector only */
 
-	leal	kstat__per_cpu+STAT_IRQ,%a0
+	leal	per_cpu__kstat+STAT_IRQ,%a0
 	addql	#1,%a0@(%d0)
 
 	movel	%sp,%sp@-		/* push regs arg onto stack */

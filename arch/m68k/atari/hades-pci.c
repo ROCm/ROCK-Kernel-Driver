@@ -40,13 +40,20 @@ static const char pci_mem_name[] = "PCI memory space";
 static const char pci_io_name[] = "PCI I/O space";
 static const char pci_config_name[] = "PCI config space";
 
-static struct resource config_space = { pci_config_name, HADES_CONFIG_BASE,
-										HADES_CONFIG_BASE + HADES_CONFIG_SIZE - 1 };
-static struct resource io_space = { pci_io_name, HADES_IO_BASE, HADES_IO_BASE +
-								    HADES_IO_SIZE - 1 };
+static struct resource config_space = {
+    .name = pci_config_name,
+    .start = HADES_CONFIG_BASE,
+    .end = HADES_CONFIG_BASE + HADES_CONFIG_SIZE - 1
+};
+static struct resource io_space = {
+    .name = pci_io_name,
+    .start = HADES_IO_BASE,
+    .end = HADES_IO_BASE + HADES_IO_SIZE - 1
+};
 
-static const unsigned long pci_conf_base_phys[] = { 0xA0080000, 0xA0040000,
-												    0xA0020000, 0xA0010000 };
+static const unsigned long pci_conf_base_phys[] = {
+    0xA0080000, 0xA0040000, 0xA0020000, 0xA0010000
+};
 static unsigned long pci_conf_base_virt[N_SLOTS];
 static unsigned long pci_io_base_virt;
 

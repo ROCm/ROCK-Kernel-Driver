@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,27 +7,12 @@
  */
 
 #include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <linux/byteorder/swab.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_private.h>
 
 extern pcibr_info_t      pcibr_info_get(vertex_hdl_t);
 
@@ -38,22 +22,11 @@ void              pcibr_config_set(vertex_hdl_t, unsigned, unsigned, uint64_t);
 void       	  do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
 
 /*
- * on sn-ia we need to twiddle the the addresses going out
- * the pci bus because we use the unswizzled synergy space
- * (the alternative is to use the swizzled synergy space
- * and byte swap the data)
+ * fancy snia bit twiddling....
  */
-#define CB(b,r) (((volatile uint8_t *) b)[((r)^4)])
-#define CS(b,r) (((volatile uint16_t *) b)[((r^4)/2)])
-#define CW(b,r) (((volatile uint32_t *) b)[((r^4)/4)])
-
 #define	CBP(b,r) (((volatile uint8_t *) b)[(r)])
 #define	CSP(b,r) (((volatile uint16_t *) b)[((r)/2)])
 #define	CWP(b,r) (((volatile uint32_t *) b)[(r)/4])
-
-#define SCB(b,r) (((volatile uint8_t *) b)[((r)^3)])
-#define SCS(b,r) (((volatile uint16_t *) b)[((r^2)/2)])
-#define SCW(b,r) (((volatile uint32_t *) b)[((r)/4)])
 
 /*
  * Return a config space address for given slot / func / offset.  Note the

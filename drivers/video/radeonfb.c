@@ -114,6 +114,7 @@ enum radeon_chips {
 	RADEON_Ie,
 	RADEON_If,
 	RADEON_Ig,
+	RADEON_Yd,
 	RADEON_Ld,
 	RADEON_Le,
 	RADEON_Lf,
@@ -207,6 +208,7 @@ static struct pci_device_id radeonfb_pci_table[] = {
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ie, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ie},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_If, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_If},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ig, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ig},
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Yd, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Yd},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Ld, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Ld},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Le, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Le},
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_Lf, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RADEON_Lf},
@@ -679,7 +681,7 @@ static __inline__ int _max(int val1, int val2)
  */
         
 static char *mode_option __initdata;
-static char noaccel = 1;
+static char noaccel = 0;
 static char mirror = 0;
 static int panel_yres __initdata = 0;
 static char force_dfp __initdata = 0;
@@ -1099,7 +1101,7 @@ static int radeon_get_dfpinfo_BIOS(struct radeonfb_info *rinfo)
 	printk("radeonfb: detected DFP panel size from BIOS: %dx%d\n",
 		rinfo->panel_xres, rinfo->panel_yres);
 
-	for(i=0; i<20; i++) {
+	for(i=0; i<32; i++) {
 		tmp0 = rinfo->bios_seg + readw(tmp+64+i*2);
 		if (tmp0 == 0)
 			break;
@@ -1240,9 +1242,6 @@ static void radeon_engine_init (struct radeonfb_info *rinfo)
 
 	radeon_fifo_wait (1);
 	OUTREG(RB2D_DSTCACHE_MODE, 0);
-
-	/* XXX */
-	rinfo->pitch = ((rinfo->xres_virtual * (rinfo->bpp / 8) + 0x3f)) >> 6;
 
 	radeon_fifo_wait (1);
 	temp = INREG(DEFAULT_PITCH_OFFSET);
@@ -1782,6 +1781,7 @@ static int radeonfb_set_par (struct fb_info *info)
 	int hsync_start, hsync_fudge, bytpp, hsync_wid, vsync_wid;
 	int primary_mon = PRIMARY_MONITOR(rinfo);
 	int depth = var_to_depth(mode);
+        int accel = (mode->accel_flags & FB_ACCELF_TEXT) != 0;
 
 	rinfo->xres = mode->xres;
 	rinfo->yres = mode->yres;
@@ -1878,7 +1878,15 @@ static int radeonfb_set_par (struct fb_info *info)
 	newmode.crtc_v_sync_strt_wid = (((vSyncStart - 1) & 0xfff) |
 					 (vsync_wid << 16) | (v_sync_pol  << 23));
 
-	newmode.crtc_pitch = (mode->xres_virtual >> 3);
+	if (accel) {
+		/* We first calculate the engine pitch */
+		rinfo->pitch = ((mode->xres_virtual * ((mode->bits_per_pixel + 1) / 8) + 0x3f)
+ 				& ~(0x3f)) >> 6;
+
+		/* Then, re-multiply it to get the CRTC pitch */
+		newmode.crtc_pitch = (rinfo->pitch << 3) / ((mode->bits_per_pixel + 1) / 8);
+	} else
+		newmode.crtc_pitch = (mode->xres_virtual >> 3);
 	newmode.crtc_pitch |= (newmode.crtc_pitch << 16);
 
 #if defined(__BIG_ENDIAN)
@@ -2085,18 +2093,21 @@ static int radeonfb_set_par (struct fb_info *info)
 	if (!rinfo->asleep) {
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
-		if (!noaccel)
+		if (noaccel)
 			radeon_engine_init (rinfo);
 	
 	}
 	/* Update fix */
-        info->fix.line_length = rinfo->pitch*64;
+	if (accel)
+        	info->fix.line_length = rinfo->pitch*64;
+        else
+		info->fix.line_length = mode->xres_virtual * ((mode->bits_per_pixel + 1) / 8);
         info->fix.visual = rinfo->depth == 8 ? FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 
 #ifdef CONFIG_BOOTX_TEXT
 	/* Update debug text engine */
 	btext_update_display(rinfo->fb_base_phys, mode->xres, mode->yres,
-			     rinfo->depth, rinfo->pitch*64);
+			     rinfo->depth, info->fix.line_length);
 #endif
 
 	return 0;
@@ -3021,11 +3032,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	 * so we can restore this upon __exit
 	 */
 	radeon_save_state (rinfo, &rinfo->init_state);
-
-	if (!noaccel) {
-		/* initialize the engine */
-		radeon_engine_init (rinfo);
-	}
 
 	/* set all the vital stuff */
 	radeon_set_fbinfo (rinfo);

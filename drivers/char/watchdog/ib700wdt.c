@@ -1,5 +1,5 @@
 /*
- *	IB700 Single Board Computer WDT driver for Linux 2.4.x
+ *	IB700 Single Board Computer WDT driver
  *
  *	(c) Copyright 2001 Charles Howes <chowes@vsol.net>
  *
@@ -28,7 +28,7 @@
  *      14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
  *           Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
  *           Added timeout module option to override default
- * 
+ *
  */
 
 #include <linux/config.h>
@@ -48,9 +48,9 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-static int ibwdt_is_open;
+static unsigned long ibwdt_is_open;
 static spinlock_t ibwdt_lock;
-static int expect_close = 0;
+static char expect_close;
 
 #define PFX "ib700wdt: "
 
@@ -157,7 +157,7 @@ ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
-					expect_close = 1;
+					expect_close = 42;
 			}
 		}
 		ibwdt_ping();
@@ -174,7 +174,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "IB700 WDT"
+		.identity = "IB700 WDT",
 	};
 
 	switch (cmd) {
@@ -184,9 +184,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  break;
 
 	case WDIOC_GETSTATUS:
-	  if (copy_to_user((int *)arg, &ibwdt_is_open,  sizeof(int)))
-	    return -EFAULT;
-	  break;
+	  return put_user(0, (int *) arg);
 
 	case WDIOC_KEEPALIVE:
 	  ibwdt_ping();
@@ -209,7 +207,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  break;
 
 	default:
-	  return -ENOTTY;
+	  return -ENOIOCTLCMD;
 	}
 	return 0;
 }
@@ -217,38 +215,32 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
-	if (iminor(inode) == WATCHDOG_MINOR) {
-		spin_lock(&ibwdt_lock);
-		if (ibwdt_is_open) {
-			spin_unlock(&ibwdt_lock);
-			return -EBUSY;
-		}
-		if (nowayout)
-			__module_get(THIS_MODULE);
-
-		/* Activate */
-		ibwdt_is_open = 1;
-		ibwdt_ping();
+	spin_lock(&ibwdt_lock);
+	if (test_and_set_bit(0, &ibwdt_is_open)) {
 		spin_unlock(&ibwdt_lock);
-		return 0;
-	} else {	
-		return -ENODEV;
+		return -EBUSY;
 	}
+	if (nowayout)
+		__module_get(THIS_MODULE);
+
+	/* Activate */
+	ibwdt_ping();
+	spin_unlock(&ibwdt_lock);
+	return 0;
 }
 
 static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
-	if (iminor(inode) == WATCHDOG_MINOR) {
-		spin_lock(&ibwdt_lock);
-		if (expect_close)
-			outb_p(wd_times[wd_margin], WDT_STOP);
-		else
-			printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
+	spin_lock(&ibwdt_lock);
+	if (expect_close == 42)
+		outb_p(wd_times[wd_margin], WDT_STOP);
+	else
+		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
-		ibwdt_is_open = 0;
-		spin_unlock(&ibwdt_lock);
-	}
+	clear_bit(0, &ibwdt_is_open);
+	expect_close = 0;
+	spin_unlock(&ibwdt_lock);
 	return 0;
 }
 
@@ -282,7 +274,7 @@ static struct file_operations ibwdt_fops = {
 static struct miscdevice ibwdt_miscdev = {
 	.minor = WATCHDOG_MINOR,
 	.name = "watchdog",
-	.fops = &ibwdt_fops
+	.fops = &ibwdt_fops,
 };
 
 /*
@@ -293,7 +285,7 @@ static struct miscdevice ibwdt_miscdev = {
 static struct notifier_block ibwdt_notifier = {
 	.notifier_call = ibwdt_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static int __init ibwdt_init(void)

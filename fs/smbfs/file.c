@@ -64,11 +64,8 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 		DENTRY_PATH(dentry), count, offset, rsize);
 
 	result = smb_open(dentry, SMB_O_RDONLY);
-	if (result < 0) {
-		PARANOIA("%s/%s open failed, error=%d\n",
-			 DENTRY_PATH(dentry), result);
+	if (result < 0)
 		goto io_error;
-	}
 
 	do {
 		if (count < rsize)

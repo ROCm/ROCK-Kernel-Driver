@@ -22,6 +22,7 @@
 #include "cio_debug.h"
 #include "css.h"
 #include "device.h"
+#include "ioasm.h"
 
 /*
  * diag210 is used under VM to get information about a virtual device
@@ -195,15 +196,11 @@ __ccw_device_sense_id_start(struct ccw_device *cdev)
 	ret = -ENODEV;
 	while (cdev->private->imask != 0) {
 		if ((sch->lpm & cdev->private->imask) != 0 &&
-		    cdev->private->iretry-- > 0) {
-			/* 0x00E2C9C4 == ebcdic "SID" */
+		    cdev->private->iretry > 0) {
+			cdev->private->iretry--;
 			ret = cio_start (sch, cdev->private->iccws,
-					 0x00E2C9C4, cdev->private->imask);
+					 cdev->private->imask);
 			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
-			if (ret == -EBUSY) {
-				udelay(100);
-				continue;
-			}
 			if (ret != -EACCES)
 				return ret;
 		}
@@ -223,7 +220,7 @@ ccw_device_sense_id_start(struct ccw_device *cdev)
 	cdev->private->imask = 0x80;
 	cdev->private->iretry = 5;
 	ret = __ccw_device_sense_id_start(cdev);
-	if (ret)
+	if (ret && ret != -EBUSY)
 		ccw_device_sense_id_done(cdev, ret);
 }
 
@@ -255,16 +252,16 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 		 * if the device doesn't support the SenseID
 		 *  command further retries wouldn't help ...
 		 */
-		CIO_MSG_EVENT(2, "SenseID : device %04X on Subchannel %04X "
+		CIO_MSG_EVENT(2, "SenseID : device %s on Subchannel %s "
 			      "reports cmd reject or intervention required\n",
-			      sch->schib.pmcw.dev, sch->irq);
+			      cdev->dev.bus_id, sch->dev.bus_id);
 		return -EOPNOTSUPP;
 	}
 	if (irb->esw.esw0.erw.cons) {
-		CIO_MSG_EVENT(2, "SenseID : UC on dev %04X, "
+		CIO_MSG_EVENT(2, "SenseID : UC on dev %s, "
 			      "lpum %02X, cnt %02d, sns :"
 			      " %02X%02X%02X%02X %02X%02X%02X%02X ...\n",
-			      sch->schib.pmcw.dev,
+			      cdev->dev.bus_id,
 			      irb->esw.esw0.sublog.lpum,
 			      irb->esw.esw0.erw.scnt,
 			      irb->ecw[0], irb->ecw[1],
@@ -274,15 +271,15 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 		return -EAGAIN;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "SenseID : path %02X for device %04X on "
-			      "subchannel %04X is 'not operational'\n",
-			      sch->orb.lpm, sch->schib.pmcw.dev, sch->irq);
+		CIO_MSG_EVENT(2, "SenseID : path %02X for device %s on "
+			      "subchannel %s is 'not operational'\n",
+			      sch->orb.lpm, cdev->dev.bus_id, sch->dev.bus_id);
 		return -EACCES;
 	}
 	/* Hmm, whatever happened, try again. */
-	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %04X on "
-		      "subchannel %04X returns status %02X%02X\n",
-		      sch->schib.pmcw.dev, sch->irq,
+	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %s on "
+		      "subchannel %s returns status %02X%02X\n",
+		      cdev->dev.bus_id, sch->dev.bus_id,
 		      irb->scsw.dstat, irb->scsw.cstat);
 	return -EAGAIN;
 }
@@ -299,11 +296,17 @@ ccw_device_sense_id_irq(struct ccw_device *cdev, enum dev_event dev_event)
 
 	sch = to_subchannel(cdev->dev.parent);
 	irb = (struct irb *) __LC_IRB;
-	/* Ignore unsolicited interrupts. */
+	/*
+	 * Unsolicited interrupts may pertain to an earlier status pending or
+	 * busy condition on the subchannel. Retry sense id.
+	 */
 	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
+		ret = __ccw_device_sense_id_start(cdev);
+		if (ret && ret != -EBUSY)
+			ccw_device_sense_id_done(cdev, ret);
 		return;
-
+	}
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
 		return;
 	ret = ccw_device_check_sense_id(cdev);

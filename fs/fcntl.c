@@ -229,8 +229,8 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 		   arg |= O_NONBLOCK;
 
 	if (arg & O_DIRECT) {
-		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
-			!inode->i_mapping->a_ops->direct_IO)
+		if (!filp->f_mapping || !filp->f_mapping->a_ops ||
+			!filp->f_mapping->a_ops->direct_IO)
 				return -EINVAL;
 	}
 
@@ -609,9 +609,15 @@ EXPORT_SYMBOL(__kill_fasync);
 
 void kill_fasync(struct fasync_struct **fp, int sig, int band)
 {
-	read_lock(&fasync_lock);
-	__kill_fasync(*fp, sig, band);
-	read_unlock(&fasync_lock);
+	/* First a quick test without locking: usually
+	 * the list is empty.
+	 */
+	if (*fp) {
+		read_lock(&fasync_lock);
+		/* reread *fp after obtaining the lock */
+		__kill_fasync(*fp, sig, band);
+		read_unlock(&fasync_lock);
+	}
 }
 
 EXPORT_SYMBOL(kill_fasync);

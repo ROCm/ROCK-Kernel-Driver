@@ -29,22 +29,28 @@ MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
 
 static unsigned int i8042_noaux;
-module_param(i8042_noaux, bool, 0);
+module_param_named(noaux, i8042_noaux, bool, 0);
+MODULE_PARM_DESC(noaux, "Do not probe or use AUX (mouse) port.");
 
 static unsigned int i8042_nomux;
-module_param(i8042_nomux, bool, 0);
+module_param_named(nomux, i8042_nomux, bool, 0);
+MODULE_PARM_DESC(nomux, "Do not check whether an active multiplexing conrtoller is present.");
 
 static unsigned int i8042_unlock;
-module_param(i8042_unlock, bool, 0);
+module_param_named(unlock, i8042_unlock, bool, 0);
+MODULE_PARM_DESC(unlock, "Ignore keyboard lock.");
 
 static unsigned int i8042_reset;
-module_param(i8042_reset, bool, 0);
+module_param_named(reset, i8042_reset, bool, 0);
+MODULE_PARM_DESC(reset, "Reset controller during init and cleanup.");
 
 static unsigned int i8042_direct;
-module_param(i8042_direct, bool, 0);
+module_param_named(direct, i8042_direct, bool, 0);
+MODULE_PARM_DESC(direct, "Put keyboard port into non-translated mode.");
 
 static unsigned int i8042_dumbkbd;
-module_param(i8042_dumbkbd, bool, 0);
+module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
+MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
 #undef DEBUG
 #include "i8042.h"
@@ -371,65 +377,60 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	unsigned char str, data;
 	unsigned int dfl;
-	struct {
-		int data;
-		int str;
-	} buffer[I8042_BUFFER_SIZE];
-	int i, j = 0;
 
 	spin_lock_irqsave(&i8042_lock, flags);
-
-	while (j < I8042_BUFFER_SIZE && 
-	    (buffer[j].str = i8042_read_status()) & I8042_STR_OBF)
-		buffer[j++].data = i8042_read_data();
-
+	str = i8042_read_status();
+	data = i8042_read_data();
 	spin_unlock_irqrestore(&i8042_lock, flags);
 
-	for (i = 0; i < j; i++) {
+	if (~str & I8042_STR_OBF) {
+		if (irq) dbg("Interrupt %d, without any data", irq);
+		return IRQ_RETVAL(0);
+	}
 
-		str = buffer[i].str;
-		data = buffer[i].data;
+	dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
+	      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
-		dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
-		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
+	if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
 
-		if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
+		if (str & I8042_STR_MUXERR) {
+			switch (data) {
+				case 0xfd:
+				case 0xfe: dfl = SERIO_TIMEOUT; break;
+				case 0xff: dfl = SERIO_PARITY; break;
+			}
+			data = 0xfe;
+		} else dfl = 0;
 
-			if (str & I8042_STR_MUXERR) {
-				switch (data) {
-					case 0xfd:
-					case 0xfe: dfl = SERIO_TIMEOUT; break;
-					case 0xff: dfl = SERIO_PARITY; break;
-				}
-				data = 0xfe;
-			} else dfl = 0;
-
-			dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
-				data, (str >> 6), irq, 
-				dfl & SERIO_PARITY ? ", bad parity" : "",
-				dfl & SERIO_TIMEOUT ? ", timeout" : "");
-
-			serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl, regs);
-			continue;
-		}
-
-		dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
-			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+		dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
+			data, (str >> 6), irq, 
 			dfl & SERIO_PARITY ? ", bad parity" : "",
 			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-		if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
-			serio_interrupt(&i8042_aux_port, data, dfl, regs);
-			continue;
-		}
-
-		if (!i8042_kbd_values.exists)
-			continue;
-
-		serio_interrupt(&i8042_kbd_port, data, dfl, regs);
+		serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl, regs);
+		
+		goto irq_ret;
 	}
 
-	return IRQ_RETVAL(j);
+	dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
+		data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+		dfl & SERIO_PARITY ? ", bad parity" : "",
+		dfl & SERIO_TIMEOUT ? ", timeout" : "");
+
+	if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
+		serio_interrupt(&i8042_aux_port, data, dfl, regs);
+		goto irq_ret;
+	}
+
+	if (!i8042_kbd_values.exists)
+		goto irq_ret;
+
+	serio_interrupt(&i8042_kbd_port, data, dfl, regs);
+
+irq_ret:
+
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+	return IRQ_RETVAL(1);
 }
 
 /*
@@ -513,16 +514,7 @@ static int i8042_enable_mux_ports(struct i8042_values *values)
 
 static int __init i8042_check_mux(struct i8042_values *values)
 {
-	static int i8042_check_mux_cookie;
 	unsigned char mux_version;
-
-/*
- * Check if AUX irq is available.
- */
-	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
-				"i8042", &i8042_check_mux_cookie))
-                return -1;
-	free_irq(values->irq, &i8042_check_mux_cookie);
 
 	if (i8042_enable_mux_mode(values, &mux_version))
 		return -1;
@@ -592,8 +584,10 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	
 	if (i8042_command(&param, I8042_CMD_AUX_DISABLE))
 		return -1;
-	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS))
-		return -1;	
+	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS)) {
+		printk(KERN_WARNING "Failed to disable AUX port, but continuing anyway... Is this a SiS?\n");
+		printk(KERN_WARNING "If AUX port is really absent please use the 'i8042.noaux' option.\n");
+	}
 
 	if (i8042_command(&param, I8042_CMD_AUX_ENABLE))
 		return -1;
@@ -627,6 +621,7 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
 		printk(KERN_WARNING "i8042.c: Can't write CTR while registering.\n");
+		values->exists = 0;
 		return -1; 
 	}
 
@@ -645,7 +640,6 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 static void i8042_timer_func(unsigned long data)
 {
 	i8042_interrupt(0, NULL, NULL);
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 }
 
 
@@ -658,8 +652,6 @@ static void i8042_timer_func(unsigned long data)
 static int i8042_controller_init(void)
 {
 
-	if (i8042_noaux)
-		i8042_nomux = 1;
 /*
  * Test the i8042. We need to know if it thinks it's working correctly
  * before doing anything else.
@@ -746,6 +738,29 @@ static int i8042_controller_init(void)
 
 
 /*
+ * Reset the controller.
+ */
+void i8042_controller_reset(void)
+{
+	if (i8042_reset) {
+		unsigned char param;
+
+		if (i8042_command(&param, I8042_CMD_CTL_TEST))
+			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
+	}
+
+/*
+ * Restore the original control register setting.
+ */
+
+	i8042_ctr = i8042_initial_ctr;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
+		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
+}
+
+
+/*
  * Here we try to reset everything back to a state in which the BIOS will be
  * able to talk to the hardware when rebooting.
  */
@@ -770,26 +785,20 @@ void i8042_controller_cleanup(void)
 		if (i8042_mux_values[i].exists)
 			serio_cleanup(i8042_mux_port + i);
 
-/*
- * Reset the controller.
- */
+	i8042_controller_reset();
+}
 
-	if (i8042_reset) {
-		unsigned char param;
-
-		if (i8042_command(&param, I8042_CMD_CTL_TEST))
-			printk(KERN_ERR "i8042.c: i8042 controller reset timeout.\n");
-	}
 
 /*
- * Restore the original control register setting.
+ * Here we try to restore the original BIOS settings
  */
 
-	i8042_ctr = i8042_initial_ctr;
+static int i8042_controller_suspend(void)
+{
+	del_timer_sync(&i8042_timer);
+	i8042_controller_reset();
 
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR))
-		printk(KERN_WARNING "i8042.c: Can't restore CTR.\n");
-
+	return 0;
 }
 
 
@@ -809,7 +818,7 @@ static int i8042_controller_resume(void)
 	if (i8042_mux_present)
 		if (i8042_enable_mux_mode(&i8042_aux_values, NULL) ||
 		    i8042_enable_mux_ports(&i8042_aux_values)) {
-			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't wotk.\n");
+			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't work.\n");
 		}
 
 /*
@@ -825,6 +834,10 @@ static int i8042_controller_resume(void)
 	for (i = 0; i < 4; i++)
 		if (i8042_mux_values[i].exists && i8042_activate_port(i8042_mux_port + i) == 0)
 			serio_reconnect(i8042_mux_port + i);
+/*
+ * Restart timer (for polling "stuck" data)
+ */
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
 	return 0;
 }
@@ -851,16 +864,22 @@ static struct notifier_block i8042_notifier=
 };
 
 /*
- * Resume handler for the new PM scheme (driver model)
+ * Suspend/resume handlers for the new PM scheme (driver model)
  */
+static int i8042_suspend(struct sys_device *dev, u32 state)
+{
+	return i8042_controller_suspend();
+}
+
 static int i8042_resume(struct sys_device *dev)
 {
 	return i8042_controller_resume();
 }
 
 static struct sysdev_class kbc_sysclass = {
-       set_kset_name("i8042"),
-       .resume = i8042_resume,
+	set_kset_name("i8042"),
+	.suspend = i8042_suspend,
+	.resume = i8042_resume,
 };
 
 static struct sys_device device_i8042 = {
@@ -869,12 +888,17 @@ static struct sys_device device_i8042 = {
 };
 
 /*
- * Resume handler for the old PM scheme (APM)
+ * Suspend/resume handler for the old PM scheme (APM)
  */
 static int i8042_pm_callback(struct pm_dev *dev, pm_request_t request, void *dummy)
 {
-	if (request == PM_RESUME)
-		return i8042_controller_resume();
+	switch (request) {
+		case PM_SUSPEND:
+			return i8042_controller_suspend();
+
+		case PM_RESUME:
+			return i8042_controller_resume();
+	}
 
 	return 0;
 }
@@ -899,6 +923,9 @@ int __init i8042_init(void)
 
 	dbg_init();
 
+	init_timer(&i8042_timer);
+	i8042_timer.function = i8042_timer_func;
+
 	if (i8042_platform_init())
 		return -EBUSY;
 
@@ -911,20 +938,18 @@ int __init i8042_init(void)
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
 
-	for (i = 0; i < 4; i++)
-		i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
-
-	if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
-		for (i = 0; i < 4; i++)
-			i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
-	else 
-		if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values))
+	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
+		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
+			for (i = 0; i < 4; i++) {
+				i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
+				i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
+			}
+		else
 			i8042_port_register(&i8042_aux_values, &i8042_aux_port);
+	}
 
 	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 
-	init_timer(&i8042_timer);
-	i8042_timer.function = i8042_timer_func;
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
         if (sysdev_class_register(&kbc_sysclass) == 0) {
@@ -955,7 +980,7 @@ void __exit i8042_exit(void)
 		sysdev_class_unregister(&kbc_sysclass);
 	}
 
-	del_timer(&i8042_timer);
+	del_timer_sync(&i8042_timer);
 
 	i8042_controller_cleanup();
 	

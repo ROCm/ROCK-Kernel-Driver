@@ -25,7 +25,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.26 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.32 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -110,11 +110,9 @@ zfcp_sysfs_unit_add_store(struct device *dev, const char *buf, size_t count)
 
 	retval = 0;
 
-	zfcp_port_get(port);
-
-	/* try to open unit only if adapter is online */
-	if (port->adapter->ccw_device->online == 1)
-		zfcp_erp_unit_reopen(unit, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_unit_reopen(unit, 0);
+	zfcp_erp_wait(unit->port->adapter);
+	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
 	zfcp_unit_put(unit);
  out:
 	up(&zfcp_data.config_sema);
@@ -170,6 +168,7 @@ zfcp_sysfs_unit_remove_store(struct device *dev, const char *buf, size_t count)
 	zfcp_erp_unit_shutdown(unit, 0);
 	zfcp_erp_wait(unit->port->adapter);
 	zfcp_unit_put(unit);
+	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
 	device_unregister(&unit->sysfs_device);
  out:
 	up(&zfcp_data.config_sema);
@@ -217,6 +216,7 @@ zfcp_sysfs_port_failed_store(struct device *dev, const char *buf, size_t count)
 	}
 	zfcp_erp_modify_port_status(port, ZFCP_STATUS_COMMON_RUNNING, ZFCP_SET);
 	zfcp_erp_port_reopen(port, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_wait(port->adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval ? retval : count;
@@ -293,7 +293,7 @@ static struct attribute_group zfcp_port_no_ns_attr_group = {
 };
 
 /**
- * zfcp_sysfs_create_port_files - create sysfs port files
+ * zfcp_sysfs_port_create_files - create sysfs port files
  * @dev: pointer to belonging device
  *
  * Create all attributes of the sysfs representation of a port.
@@ -313,6 +313,20 @@ zfcp_sysfs_port_create_files(struct device *dev, u32 flags)
 		sysfs_remove_group(&dev->kobj, &zfcp_port_common_attr_group);
 
 	return retval;
+}
+
+/**
+ * zfcp_sysfs_port_remove_files - remove sysfs port files
+ * @dev: pointer to belonging device
+ *
+ * Remove all attributes of the sysfs representation of a port.
+ */
+void
+zfcp_sysfs_port_remove_files(struct device *dev, u32 flags)
+{
+	sysfs_remove_group(&dev->kobj, &zfcp_port_common_attr_group);
+	if (!(flags & ZFCP_STATUS_PORT_NAMESERVER))
+		sysfs_remove_group(&dev->kobj, &zfcp_port_no_ns_attr_group);
 }
 
 #undef ZFCP_LOG_AREA

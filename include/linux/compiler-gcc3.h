@@ -20,3 +20,4 @@
 #endif
 
 #define __attribute_pure__	__attribute__((pure))
+#define __attribute_const__	__attribute__((__const__))

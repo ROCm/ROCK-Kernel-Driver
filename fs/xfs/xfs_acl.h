@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2001-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -102,6 +102,8 @@ extern struct kmem_zone *xfs_acl_zone;
 #define xfs_acl_vset(v,p,sz,t)	(-EOPNOTSUPP)
 #define xfs_acl_vget(v,p,sz,t)	(-EOPNOTSUPP)
 #define xfs_acl_vremove(v,t)	(-EOPNOTSUPP)
+#define xfs_acl_vhasacl_access(v)	(0)
+#define xfs_acl_vhasacl_default(v)	(0)
 #define _ACL_DECL(a)		((void)0)
 #define _ACL_ALLOC(a)		(1)	/* successfully allocate nothing */
 #define _ACL_FREE(a)		((void)0)

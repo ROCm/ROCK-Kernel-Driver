@@ -19,7 +19,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_sal.h>
@@ -34,6 +33,7 @@
  */
 static vertex_hdl_t ioconfig_bus_handle;
 static unsigned long ioconfig_bus_debug;
+static struct ioconfig_parm parm;
 
 #ifdef IOCONFIG_BUS_DEBUG
 #define DBG(x...)	printk(x)
@@ -41,8 +41,6 @@ static unsigned long ioconfig_bus_debug;
 #define DBG(x...)
 #endif
 
-static u64 ioconfig_file;
-static u64 ioconfig_file_size;
 static u64 ioconfig_activated;
 static char ioconfig_kernopts[128];
 
@@ -50,8 +48,6 @@ static char ioconfig_kernopts[128];
  * For debugging purpose .. hardcode a table ..
  */
 struct  ascii_moduleid *ioconfig_bus_table;
-u64 ioconfig_bus_table_size;
-
 
 static int free_entry;
 static int new_entry;
@@ -68,6 +64,8 @@ ioconfig_get_busnum(char *io_moduleid, int *bus_num)
 
 	*bus_num = -1;
 	temp = ioconfig_bus_table;
+	if (!ioconfig_bus_table)
+		return;
 	for (index = 0; index < free_entry; temp++, index++) {
 		if ( (io_moduleid[0] == temp->io_moduleid[0]) &&
 		     (io_moduleid[1] == temp->io_moduleid[1]) &&
@@ -101,6 +99,10 @@ dump_ioconfig_table(void)
 	struct ascii_moduleid *temp;
 
 	temp = ioconfig_bus_table;
+	if (!temp) {
+		DBG("ioconfig_bus_table tabel empty\n");
+		return;
+	}
 	while (index < free_entry) {
 		DBG("ASSCI Module ID %s\n", temp->io_moduleid);
 		temp++;
@@ -145,7 +147,7 @@ int nextline(char *buffer, char **next, char *line)
  *	memory by ioconfig command in EFI and builds the
  *	persistent pci bus naming table.
  */
-void
+int
 build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 {
 	/*
@@ -160,8 +162,17 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	struct ascii_moduleid *moduleid;
 
 	line = kmalloc(256, GFP_KERNEL);
-	memset(line, 0,256);
 	name = kmalloc(125, GFP_KERNEL);
+	if (!line || !name) {
+		if (line)
+			kfree(line);
+		if (name)
+			kfree(name);
+		printk("build_moduleid_table(): Unabled to allocate memmory");
+		return -ENOMEM;
+	}
+
+	memset(line, 0,256);
 	memset(name, 0, 125);
 	moduleid = table;
 	curr = file_contents;
@@ -210,46 +221,21 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	kfree(line);
 	kfree(name);
 
-	return;
+	return 0;
 }
 
-void
+int
 ioconfig_bus_init(void)
 {
 
-	struct ia64_sal_retval ret_stuff;
-	u64	*temp;
-	int	cnode;
-
 	DBG("ioconfig_bus_init called.\n");
 
-        for (cnode = 0; cnode < numnodes; cnode++) {
-		nasid_t nasid;
-		/*
-	 	 * Make SAL call to get the address of the bus configuration table.
-	 	 */
-		ret_stuff.status = (uint64_t)0;
-		ret_stuff.v0 = (uint64_t)0;
-		ret_stuff.v1 = (uint64_t)0;
-		ret_stuff.v2 = (uint64_t)0;
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		SAL_CALL(ret_stuff, SN_SAL_BUS_CONFIG, 0, nasid, 0, 0, 0, 0, 0);
-		temp = (u64 *)TO_NODE_CAC(nasid, ret_stuff.v0);
-		ioconfig_file = *temp;
-		DBG("ioconfig_bus_init: Nasid %d ret_stuff.v0 0x%lx\n", nasid,
-			ret_stuff.v0);
-		if (ioconfig_file) {
-			ioconfig_file_size = ret_stuff.v1;
-			ioconfig_file = (ioconfig_file | CACHEABLE_MEM_SPACE);
-			ioconfig_activated = 1;
-			break;
-		}
+	ioconfig_bus_table = kmalloc( 512, GFP_KERNEL );
+	if (!ioconfig_bus_table) {
+		printk("ioconfig_bus_init : cannot allocate memory\n");
+		return -1;
 	}
 
-	DBG("ioconfig_bus_init: ret_stuff.v0 %p ioconfig_file %p %d\n",
-		ret_stuff.v0, (void *)ioconfig_file, (int)ioconfig_file_size);
-
-	ioconfig_bus_table = kmalloc( 512, GFP_KERNEL );
 	memset(ioconfig_bus_table, 0, 512);
 
 	/*
@@ -260,27 +246,17 @@ ioconfig_bus_init(void)
 		 * ioconfig="..." kernel options given.
 		 */
 		DBG("ioconfig_bus_init: Kernel Options given.\n");
-		(void) build_moduleid_table((char *)ioconfig_kernopts, ioconfig_bus_table);
+		if ( build_moduleid_table((char *)ioconfig_kernopts, ioconfig_bus_table) < 0 )
+			return -1;
 		(void) dump_ioconfig_table();
-		return;
 	}
-
-	if (ioconfig_activated) {
-		DBG("ioconfig_bus_init: ioconfig file given.\n");
-		(void) build_moduleid_table((char *)ioconfig_file, ioconfig_bus_table);
-		(void) dump_ioconfig_table();
-	} else {
-		DBG("ioconfig_bus_init: ioconfig command not executed in prom\n");
-	}
-
+	return 0;
 }
 
 void
 ioconfig_bus_new_entries(void)
 {
-
-	
-	int index = 0;
+	int index;
 	struct ascii_moduleid *temp;
 
 	if ((ioconfig_activated) && (free_entry > new_entry)) {
@@ -290,6 +266,10 @@ ioconfig_bus_new_entries(void)
 		return;
 
 	index = new_entry;
+	if (!ioconfig_bus_table) {
+		printk("ioconfig_bus_table table is empty\n");
+		return;
+	}
 	temp = &ioconfig_bus_table[index];
         while (index < free_entry) {
                 printk("%s\n", (char *)temp);
@@ -302,17 +282,21 @@ ioconfig_bus_new_entries(void)
 static int ioconfig_bus_ioctl(struct inode * inode, struct file * file,
         unsigned int cmd, unsigned long arg)
 {
-
-	struct ioconfig_parm parm;
-
 	/*
 	 * Copy in the parameters.
 	 */
-	copy_from_user(&parm, (char *)arg, sizeof(struct ioconfig_parm));
+	if (copy_from_user(&parm, (char *)arg, sizeof(struct ioconfig_parm)))
+		return -EFAULT;
 	parm.number = free_entry - new_entry;
 	parm.ioconfig_activated = ioconfig_activated;
-	copy_to_user((char *)arg, &parm, sizeof(struct ioconfig_parm));
-	copy_to_user((char *)parm.buffer, &ioconfig_bus_table[new_entry], sizeof(struct  ascii_moduleid) * (free_entry - new_entry));
+	if (copy_to_user((char *)arg, &parm, sizeof(struct ioconfig_parm)))
+		return -EFAULT;
+
+	if (!ioconfig_bus_table)
+		return -EFAULT;
+
+	if (copy_to_user((char *)parm.buffer, &ioconfig_bus_table[new_entry], sizeof(struct  ascii_moduleid) * (free_entry - new_entry)))
+		return -EFAULT;
 
 	return 0;
 }
@@ -344,9 +328,9 @@ static int ioconfig_bus_close(struct inode * inode, struct file * filp)
 }
 
 struct file_operations ioconfig_bus_fops = {
-	.ioctl = ioconfig_bus_ioctl,
-	.open = ioconfig_bus_open,		/* open */
-	.release = ioconfig_bus_close	/* release */
+	.ioctl	= ioconfig_bus_ioctl,
+	.open	= ioconfig_bus_open,	/* open */
+	.release=ioconfig_bus_close	/* release */
 };
 
 
@@ -357,7 +341,6 @@ struct file_operations ioconfig_bus_fops = {
  */
 int init_ioconfig_bus(void)
 {
-	ioconfig_bus_handle = NULL;
 	ioconfig_bus_handle = hwgraph_register(hwgraph_root, ".ioconfig_bus",
 		        0, 0,
 			0, 0,
@@ -368,8 +351,7 @@ int init_ioconfig_bus(void)
 		panic("Unable to create SGI PERSISTENT BUS NUMBERING Driver.\n");
 	}
 
-	return(0);
-
+	return 0;
 }
 
 static int __init ioconfig_bus_setup (char *str)

@@ -26,30 +26,26 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
 MODULE_LICENSE("GPL");
 
-static int psmouse_noext;
-module_param(psmouse_noext, int, 0);
-MODULE_PARM_DESC(psmouse_noext, "[DEPRECATED] Disable any protocol extensions. Useful for KVM switches.");
-
 static char *psmouse_proto;
 static unsigned int psmouse_max_proto = -1U;
-module_param(psmouse_proto, charp, 0);
-MODULE_PARM_DESC(psmouse_proto, "Highest protocol extension to probe (bare, imps, exps). Useful for KVM switches.");
+module_param_named(proto, psmouse_proto, charp, 0);
+MODULE_PARM_DESC(proto, "Highest protocol extension to probe (bare, imps, exps). Useful for KVM switches.");
 
 int psmouse_resolution = 200;
-module_param(psmouse_resolution, uint, 0);
-MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
+module_param_named(resolution, psmouse_resolution, uint, 0);
+MODULE_PARM_DESC(resolution, "Resolution, in dpi.");
 
 unsigned int psmouse_rate = 100;
-module_param(psmouse_rate, uint, 0);
-MODULE_PARM_DESC(psmouse_rate, "Report rate, in reports per second.");
+module_param_named(rate, psmouse_rate, uint, 0);
+MODULE_PARM_DESC(rate, "Report rate, in reports per second.");
 
 int psmouse_smartscroll = 1;
-module_param(psmouse_smartscroll, bool, 0);
-MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
+module_param_named(smartscroll, psmouse_smartscroll, bool, 0);
+MODULE_PARM_DESC(smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
 
 unsigned int psmouse_resetafter;
-module_param(psmouse_resetafter, uint, 0);
-MODULE_PARM_DESC(psmouse_resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
+module_param_named(resetafter, psmouse_resetafter, uint, 0);
+MODULE_PARM_DESC(resetafter, "Reset Synaptics Touchpad after so many bad packets (0 = never).");
 
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
@@ -124,6 +120,19 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 
 	if (psmouse->state == PSMOUSE_IGNORE)
 		goto out;
+
+	if (flags & (SERIO_PARITY|SERIO_TIMEOUT)) {
+		if (psmouse->state == PSMOUSE_ACTIVATED)
+			printk(KERN_WARNING "psmouse.c: bad data from KBC -%s%s\n",
+				flags & SERIO_TIMEOUT ? " timeout" : "",
+				flags & SERIO_PARITY ? " bad parity" : "");
+		if (psmouse->acking) {
+			psmouse->ack = -1;
+			psmouse->acking = 0;
+		}
+		psmouse->pktcnt = 0;
+		goto out;
+	}
 
 	if (psmouse->acking) {
 		switch (data) {
@@ -235,6 +244,11 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	if (command == PSMOUSE_CMD_RESET_BAT)
                 timeout = 4000000; /* 4 sec */
 
+	/* initialize cmdbuf with preset values from param */
+	if (receive)
+	   for (i = 0; i < receive; i++)
+		psmouse->cmdbuf[(receive - 1) - i] = param[i];
+
 	if (command & 0xff)
 		if (psmouse_sendbyte(psmouse, command & 0xff))
 			return (psmouse->cmdcnt = 0) - 1;
@@ -245,8 +259,9 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 
 	while (psmouse->cmdcnt && timeout--) {
 	
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT)
-			timeout = 100000;
+		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
+				timeout > 100000) /* do not run in a endless loop */
+			timeout = 100000; /* 1 sec */
 
 		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_GETID &&
 		    psmouse->cmdbuf[1] != 0xab && psmouse->cmdbuf[1] != 0xac) {
@@ -414,7 +429,7 @@ static int psmouse_probe(struct psmouse *psmouse)
  * in case of an IntelliMouse in 4-byte mode or 0x04 for IM Explorer.
  */
 
-	param[0] = param[1] = 0xa5;
+	param[0] = 0xa5;
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETID))
 		return -1;
@@ -578,12 +593,14 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	serio->private = psmouse;
 	if (serio_open(serio, dev)) {
 		kfree(psmouse);
+		serio->private = NULL;
 		return;
 	}
 
 	if (psmouse_probe(psmouse) <= 0) {
 		serio_close(serio);
 		kfree(psmouse);
+		serio->private = NULL;
 		return;
 	}
 	
@@ -665,12 +682,6 @@ static struct serio_dev psmouse_dev = {
 
 static inline void psmouse_parse_proto(void)
 {
-	if (psmouse_noext) {
-		printk(KERN_WARNING "psmouse: 'psmouse_noext' option is deprecated, please use 'psmouse_proto'\n");
-		psmouse_max_proto = PSMOUSE_PS2;
-	}
-
-	/* even is psmouse_noext is present psmouse_proto overrides it */
 	if (psmouse_proto) {
 		if (!strcmp(psmouse_proto, "bare"))
 			psmouse_max_proto = PSMOUSE_PS2;

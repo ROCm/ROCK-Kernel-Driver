@@ -485,7 +485,8 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 					      { .daddr = dst,
 						.saddr = tiph->saddr,
 						.tos = RT_TOS(tos) } },
-				    .oif = tunnel->parms.link };
+				    .oif = tunnel->parms.link,
+				    .proto = IPPROTO_IPV6 };
 		if (ip_route_output_key(&rt, &fl)) {
 			tunnel->stat.tx_carrier_errors++;
 			goto tx_error_icmp;
@@ -757,7 +758,8 @@ static int ipip6_tunnel_init(struct net_device *dev)
 					      { .daddr = iph->daddr,
 						.saddr = iph->saddr,
 						.tos = RT_TOS(iph->tos) } },
-				    .oif = tunnel->parms.link };
+				    .oif = tunnel->parms.link,
+				    .proto = IPPROTO_IPV6 };
 		struct rtable *rt;
 		if (!ip_route_output_key(&rt, &fl)) {
 			tdev = rt->u.dst.dev;

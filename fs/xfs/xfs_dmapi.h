@@ -175,14 +175,6 @@ typedef enum {
 			DM_FLAGS_NDELAY : 0)
 #define AT_DELAY_FLAG(f) ((f&ATTR_NONBLOCK) ? DM_FLAGS_NDELAY : 0)
 
-/*
- *	Macros to turn caller specified delay/block flags into
- *	dm_send_xxxx_event flag DM_FLAGS_NDELAY.
- */
-
-#define FILP_DELAY_FLAG(filp) ((filp->f_flags&(O_NDELAY|O_NONBLOCK)) ? \
-			DM_FLAGS_NDELAY : 0)
-
 
 extern struct bhv_vfsops xfs_dmops;
 

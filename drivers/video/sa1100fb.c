@@ -326,54 +326,6 @@ static struct sa1100fb_mach_info brutus_info __initdata = {
 };
 #endif
 
-#ifdef CONFIG_SA1100_CERF
-static struct sa1100fb_mach_info cerf_info __initdata = {
-#if defined(CONFIG_CERF_LCD_72_A)
-	.pixclock	= 171521, 	.bpp		= 8,
-	.xres		= 640,		.yres		= 480,
-	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			  LCCR3_PixClkDiv(38),
-#elif defined(CONFIG_CERF_LCD_57_A)
-	.pixclock	= 171521, 	.bpp		= 8,
-	.xres		= 320,		.yres		= 240,
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			  LCCR3_PixClkDiv(38),
-#elif defined(CONFIG_CERF_LCD_38_A)
-	.pixclock	= 171521, 	.bpp		= 8,
-	.xres		= 240,		.yres		= 320,
-	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
-			  LCCR3_PixClkDiv(38),
-#elif defined(CONFIG_CERF_LCD_38_B)
-	.pixclock	= 171521,	.bpp		= 4,
-	.xres		= 320,		.yres		= 240,
-	.lccr0		= LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
-	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
-			  LCCR3_PixClkDiv(38),
-#else
-#error "Must have a CerfBoard LCD form factor selected"
-#endif
-
-	.hsync_len	= 5,		.vsync_len	= 1,
-	.left_margin	= 61,		.upper_margin	= 3,
-	.right_margin	= 9,		.lower_margin	= 0,
-
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-};
-
-#if 0
-static struct sa1100fb_rgb cerf_rgb_16 = {
-	.red	= { .offset = 8,	.length = 4, },
-	.green	= { .offset = 4,	.length = 4, },
-	.blue	= { .offset = 0,	.length = 4, },
-	.transp	= { .offset = 0,	.length = 0, },
-};
-#endif
-#endif
-
 #ifdef CONFIG_SA1100_FREEBIRD
 #warning Please check this carefully
 static struct sa1100fb_mach_info freebird_info __initdata = {
@@ -681,11 +633,6 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #ifdef CONFIG_SA1100_BRUTUS
 	if (machine_is_brutus()) {
 		inf = &brutus_info;
-	}
-#endif
-#ifdef CONFIG_SA1100_CERF
-	if (machine_is_cerf()) {
-		inf = &cerf_info;
 	}
 #endif
 #ifdef CONFIG_SA1100_FREEBIRD
@@ -1293,10 +1240,6 @@ static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 			mask |= GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12;
 
 	}
-
-	/* GPIO15 is used as a bypass for 3.8" displays */
-	if (machine_is_cerf())
-		mask |= GPIO_GPIO15;
 
 	if (mask) {
 		GPDR |= mask;
