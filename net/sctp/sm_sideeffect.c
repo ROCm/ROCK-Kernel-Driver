@@ -86,6 +86,8 @@ static int sctp_cmd_process_sack(sctp_cmd_seq_t *, sctp_association_t *,
 				 sctp_sackhdr_t *);
 static void sctp_cmd_setup_t2(sctp_cmd_seq_t *, sctp_association_t *,
 			      sctp_chunk_t *);
+static void sctp_cmd_new_state(sctp_cmd_seq_t *, sctp_association_t *,
+			       sctp_state_t);
 
 /* These three macros allow us to pull the debugging code out of the
  * main flow of sctp_do_sm() to keep attention focused on the real
@@ -305,8 +307,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_NEW_STATE:
 			/* Enter a new state.  */
-			asoc->state = command->obj.state;
-			asoc->state_timestamp = jiffies;
+			sctp_cmd_new_state(commands, asoc, command->obj.state);
 			break;
 
 		case SCTP_CMD_REPORT_TSN:
@@ -1232,4 +1233,19 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 	asoc->shutdown_last_sent_to = t;
 	asoc->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] = t->rto;
 	chunk->transport = t;
+}
+
+/* Helper function to change the state of an association. */
+static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
+			       sctp_state_t state)
+{
+	asoc->state = state;
+	asoc->state_timestamp = jiffies;
+
+	/* Wake up any process waiting for the association to
+	 * get established.
+	 */
+	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
+	    (waitqueue_active(&asoc->wait)))
+		wake_up_interruptible(&asoc->wait);
 }
