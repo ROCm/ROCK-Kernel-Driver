@@ -50,6 +50,7 @@
    History
    -------
    2.26.02.000 - Driver cleanup for kernel submission.
+   2.26.02.001 - Replace schedule_timeout() calls with msleep().
 */
 
 #include <linux/module.h>
@@ -72,7 +73,7 @@
 #include "3w-9xxx.h"
 
 /* Globals */
-static const char *twa_driver_version="2.26.02.000";
+static const char *twa_driver_version="2.26.02.001";
 static TW_Device_Extension *twa_device_extension_list[TW_MAX_SLOT];
 static unsigned int twa_device_extension_count;
 static int twa_major = -1;
@@ -1445,7 +1446,7 @@ static int twa_poll_status(TW_Device_Extension *tw_dev, u32 flag, int seconds)
 		if (time_after(jiffies, before + HZ * seconds))
 			goto out;
 
-		schedule_timeout(1);
+		msleep(50);
 	}
 	retval = 0;
 out:
@@ -1473,7 +1474,7 @@ static int twa_poll_status_gone(TW_Device_Extension *tw_dev, u32 flag, int secon
 		if (time_after(jiffies, before + HZ * seconds))
 			goto out;
 
-		schedule_timeout(1);
+		msleep(50);
 	}
 	retval = 0;
 out:
