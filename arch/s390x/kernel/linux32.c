@@ -1623,7 +1623,7 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
 
 extern asmlinkage int sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset);
 
-asmlinkage int sys32_sigprocmask(int how, old_sigset_t32 *set, old_sigset_t32 *oset)
+asmlinkage int sys32_sigprocmask(int how, compat_old_sigset_t *set, compat_old_sigset_t *oset)
 {
 	old_sigset_t s;
 	int ret;
@@ -1640,15 +1640,15 @@ asmlinkage int sys32_sigprocmask(int how, old_sigset_t32 *set, old_sigset_t32 *o
 
 extern asmlinkage int sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize);
 
-asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset_t32 s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
 	if (set) {
-		if (copy_from_user (&s32, set, sizeof(sigset_t32)))
+		if (copy_from_user (&s32, set, sizeof(compat_sigset_t)))
 			return -EFAULT;
 		switch (_NSIG_WORDS) {
 		case 4: s.sig[3] = s32.sig[6] | (((long)s32.sig[7]) << 32);
@@ -1668,7 +1668,7 @@ asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, 
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (oset, &s32, sizeof(sigset_t32)))
+		if (copy_to_user (oset, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return 0;
@@ -1676,7 +1676,7 @@ asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, 
 
 extern asmlinkage int sys_sigpending(old_sigset_t *set);
 
-asmlinkage int sys32_sigpending(old_sigset_t32 *set)
+asmlinkage int sys32_sigpending(compat_old_sigset_t *set)
 {
 	old_sigset_t s;
 	int ret;
@@ -1691,10 +1691,10 @@ asmlinkage int sys32_sigpending(old_sigset_t32 *set)
 
 extern asmlinkage int sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
-asmlinkage int sys32_rt_sigpending(sigset_t32 *set, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset_t32 s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 		
@@ -1708,7 +1708,7 @@ asmlinkage int sys32_rt_sigpending(sigset_t32 *set, compat_size_t sigsetsize)
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (set, &s32, sizeof(sigset_t32)))
+		if (copy_to_user (set, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return ret;
@@ -1718,12 +1718,12 @@ extern int
 copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from);
 
 asmlinkage int
-sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
+sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		      struct compat_timespec *uts, compat_size_t sigsetsize)
 {
 	int ret, sig;
 	sigset_t these;
-	sigset_t32 these32;
+	compat_sigset_t these32;
 	struct timespec ts;
 	siginfo_t info;
 	long timeout = 0;
@@ -1732,7 +1732,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 	if (sigsetsize != sizeof(sigset_t))
 		return -EINVAL;
 
-	if (copy_from_user (&these32, uthese, sizeof(sigset_t32)))
+	if (copy_from_user (&these32, uthese, sizeof(compat_sigset_t)))
 		return -EFAULT;
 
 	switch (_NSIG_WORDS) {

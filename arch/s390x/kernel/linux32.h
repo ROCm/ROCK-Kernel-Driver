@@ -25,20 +25,13 @@ struct ipc_kludge_32 {
 #define F_SETLK64       13
 #define F_SETLKW64      14    
 
-typedef __u32 old_sigset_t32;       /* at least 32 bits */ 
-
 struct old_sigaction32 {
        __u32			sa_handler;	/* Really a pointer, but need to deal with 32 bits */
-       old_sigset_t32		sa_mask;	/* A 32 bit mask */
+       compat_old_sigset_t	sa_mask;	/* A 32 bit mask */
        __u32			sa_flags;
        __u32			sa_restorer;	/* Another 32 bit pointer */
 };
  
-#define _SIGCONTEXT_NSIG_WORDS32    2 
-typedef struct {
-        __u32   sig[_SIGCONTEXT_NSIG_WORDS32];
-} sigset_t32;  
-
 typedef union sigval32 {
         int     sival_int;
         __u32   sival_ptr;
@@ -174,7 +167,7 @@ typedef struct
 
 struct sigcontext32
 {
-	__u32	oldmask[_SIGCONTEXT_NSIG_WORDS32];
+	__u32	oldmask[_COMPAT_NSIG_WORDS];
 	__u32	sregs;				/* pointer */
 };
 
@@ -183,7 +176,7 @@ struct sigaction32 {
 	__u32		sa_handler;		/* pointer */
 	__u32		sa_flags;
         __u32		sa_restorer;		/* pointer */
-	sigset_t32	sa_mask;        /* mask last for extensibility */
+	compat_sigset_t	sa_mask;        /* mask last for extensibility */
 };
 
 typedef struct {
@@ -198,7 +191,7 @@ struct ucontext32 {
 	__u32			uc_link;	/* pointer */	
 	stack_t32		uc_stack;
 	_sigregs32		uc_mcontext;
-	sigset_t32		uc_sigmask;	/* mask last for extensibility */
+	compat_sigset_t		uc_sigmask;	/* mask last for extensibility */
 };
 
 #endif /* _ASM_S390X_S390_H */
