@@ -2,6 +2,7 @@
  * probe.c - PCI detection and setup code
  */
 
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
@@ -336,6 +337,22 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 	return child;
 }
 
+static void pci_enable_crs(struct pci_dev *dev)
+{
+	u16 cap, rpctl;
+	int rpcap = pci_find_capability(dev, PCI_CAP_ID_EXP);
+	if (!rpcap)
+		return;
+
+	pci_read_config_word(dev, rpcap + PCI_CAP_FLAGS, &cap);
+	if (((cap & PCI_EXP_FLAGS_TYPE) >> 4) != PCI_EXP_TYPE_ROOT_PORT)
+		return;
+
+	pci_read_config_word(dev, rpcap + PCI_EXP_RTCTL, &rpctl);
+	rpctl |= PCI_EXP_RTCTL_CRSSVE;
+	pci_write_config_word(dev, rpcap + PCI_EXP_RTCTL, rpctl);
+}
+
 unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus);
 
 /*
@@ -365,6 +382,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 	pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &bctl);
 	pci_write_config_word(dev, PCI_BRIDGE_CONTROL,
 			      bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
+
+	pci_enable_crs(dev);
 
 	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
 		unsigned int cmax, busnr;
@@ -614,9 +633,7 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	struct pci_dev *dev;
 	u32 l;
 	u8 hdr_type;
-
-	if (pci_bus_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type))
-		return NULL;
+	int delay = 1;
 
 	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
 		return NULL;
@@ -624,6 +641,25 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	/* some broken boards return 0 or ~0 if a slot is empty: */
 	if (l == 0xffffffff || l == 0x00000000 ||
 	    l == 0x0000ffff || l == 0xffff0000)
+		return NULL;
+
+	/* Configuration request Retry Status */
+	while (l == 0xffff0001) {
+		msleep(delay);
+		delay *= 2;
+		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
+			return NULL;
+		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+		if (delay > 60 * 1000) {
+			printk(KERN_WARNING "Device %04x:%02x:%02x.%d not "
+					"responding\n", pci_domain_nr(bus),
+					bus->number, PCI_SLOT(devfn),
+					PCI_FUNC(devfn));
+			return NULL;
+		}
+	}
+
+	if (pci_bus_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type))
 		return NULL;
 
 	dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
