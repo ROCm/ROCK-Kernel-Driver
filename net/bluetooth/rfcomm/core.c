@@ -798,6 +798,33 @@ static int rfcomm_send_rpn(struct rfcomm_session *s, int cr, u8 dlci,
 	return rfcomm_send_frame(s, buf, ptr - buf);
 }
 
+static int rfcomm_send_rls(struct rfcomm_session *s, int cr, u8 dlci, u8 status)
+{
+	struct rfcomm_hdr *hdr;
+	struct rfcomm_mcc *mcc;
+	struct rfcomm_rls *rls;
+	u8 buf[16], *ptr = buf;
+
+	BT_DBG("%p cr %d status 0x%x", s, cr, status);
+
+	hdr = (void *) ptr; ptr += sizeof(*hdr);
+	hdr->addr = __addr(s->initiator, 0);
+	hdr->ctrl = __ctrl(RFCOMM_UIH, 0);
+	hdr->len  = __len8(sizeof(*mcc) + sizeof(*rls));
+
+	mcc = (void *) ptr; ptr += sizeof(*mcc);
+	mcc->type = __mcc_type(cr, RFCOMM_RLS);
+	mcc->len  = __len8(sizeof(*rls));
+
+	rls = (void *) ptr; ptr += sizeof(*rls);
+	rls->dlci   = __addr(1, dlci);
+	rls->status = status;
+
+	*ptr = __fcs(buf); ptr++;
+
+	return rfcomm_send_frame(s, buf, ptr - buf);
+}
+
 static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig)
 {
 	struct rfcomm_hdr *hdr;
@@ -1229,6 +1256,26 @@ rpn_out:
 	return 0;
 }
 
+static int rfcomm_recv_rls(struct rfcomm_session *s, int cr, struct sk_buff *skb)
+{
+	struct rfcomm_rls *rls = (void *) skb->data;
+	u8 dlci = __get_dlci(rls->dlci);
+
+	BT_DBG("dlci %d cr %d status 0x%x", dlci, cr, rls->status);
+	
+	if (!cr)
+		return 0;
+
+	/* FIXME: We should probably do something with this
+	   information here. But for now it's sufficient just
+	   to reply -- Bluetooth 1.1 says it's mandatory to 
+	   recognise and respond to RLS */
+
+	rfcomm_send_rls(s, 0, dlci, rls->status);
+
+	return 0;
+}
+
 static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 {
 	struct rfcomm_msc *msc = (void *) skb->data;
@@ -1277,6 +1324,10 @@ static int rfcomm_recv_mcc(struct rfcomm_session *s, struct sk_buff *skb)
 
 	case RFCOMM_RPN:
 		rfcomm_recv_rpn(s, cr, len, skb);
+		break;
+
+	case RFCOMM_RLS:
+		rfcomm_recv_rls(s, cr, skb);
 		break;
 
 	case RFCOMM_MSC:
