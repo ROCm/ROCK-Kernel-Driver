@@ -336,6 +336,9 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	return -ENODEV;
 }
 
+static struct agp_driver ali_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_ali_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -351,7 +354,8 @@ static int __init agp_ali_probe (struct pci_dev *dev, const struct pci_device_id
 		agp_bridge.capndx = cap_ptr;
 		/* Fill in the mode register */
 		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
-		agp_register_driver(dev);
+		ali_agp_driver.dev = dev;
+		agp_register_driver(&ali_agp_driver);
 		return 0;
 	}
 	return -ENODEV;	
@@ -390,7 +394,7 @@ static int __init agp_ali_init(void)
 
 static void __exit agp_ali_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&ali_agp_driver);
 	pci_unregister_driver(&agp_ali_pci_driver);
 }
 
