@@ -643,24 +643,23 @@ void shrink_dcache_anon(struct hlist_head *head)
 }
 
 /*
- * This is called from kswapd when we think we need some more memory.
+ * Scan `nr' dentries and return the number which remain.
+ *
+ * We need to avoid reentering the filesystem if the caller is performing a
+ * GFP_NOFS allocation attempt.  One example deadlock is:
+ *
+ * ext2_new_block->getblk->GFP->shrink_dcache_memory->prune_dcache->
+ * prune_one_dentry->dput->dentry_iput->iput->inode->i_sb->s_op->put_inode->
+ * ext2_discard_prealloc->ext2_free_blocks->lock_super->DEADLOCK.
+ *
+ * In this case we return -1 to tell the caller that we baled.
  */
 static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 {
 	if (nr) {
-		/*
-		 * Nasty deadlock avoidance.
-		 *
-	 	 * ext2_new_block->getblk->GFP->shrink_dcache_memory->
-		 * prune_dcache->prune_one_dentry->dput->dentry_iput->iput->
-		 * inode->i_sb->s_op->put_inode->ext2_discard_prealloc->
-		 * ext2_free_blocks->lock_super->DEADLOCK.
-	 	 *
-	 	 * We should make sure we don't hold the superblock lock over
-	 	 * block allocations, but for now:
-		 */
-		if (gfp_mask & __GFP_FS)
-			prune_dcache(nr);
+		if (!(gfp_mask & __GFP_FS))
+			return -1;
+		prune_dcache(nr);
 	}
 	return dentry_stat.nr_unused;
 }
