@@ -199,10 +199,10 @@ SOCKCALL_WRAP(name, setsockopt, (struct socket *sock, int level, int optname, \
 			 char *optval, int optlen), (sock, level, optname, optval, optlen)) \
 SOCKCALL_WRAP(name, getsockopt, (struct socket *sock, int level, int optname, \
 			 char *optval, int *optlen), (sock, level, optname, optval, optlen)) \
-SOCKCALL_WRAP(name, sendmsg, (struct socket *sock, struct msghdr *m, int len, struct scm_cookie *scm), \
-	      (sock, m, len, scm)) \
-SOCKCALL_WRAP(name, recvmsg, (struct socket *sock, struct msghdr *m, int len, int flags, struct scm_cookie *scm), \
-	      (sock, m, len, flags, scm)) \
+SOCKCALL_WRAP(name, sendmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, int len, struct scm_cookie *scm), \
+	      (iocb, sock, m, len, scm)) \
+SOCKCALL_WRAP(name, recvmsg, (struct kiocb *iocb, struct socket *sock, struct msghdr *m, int len, int flags, struct scm_cookie *scm), \
+	      (iocb, sock, m, len, flags, scm)) \
 SOCKCALL_WRAP(name, mmap, (struct file *file, struct socket *sock, struct vm_area_struct *vma), \
 	      (file, sock, vma)) \
 	      \
