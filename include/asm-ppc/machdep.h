@@ -37,6 +37,9 @@ struct machdep_calls {
 	void		(*power_off)(void);
 	void		(*halt)(void);
 
+	void		(*idle)(void);
+	void		(*power_save)(void);
+
 	long		(*time_init)(void); /* Optional, may be NULL */
 	int		(*set_rtc_time)(unsigned long nowtime);
 	unsigned long	(*get_rtc_time)(void);

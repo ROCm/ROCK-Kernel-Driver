@@ -42,7 +42,7 @@
 #define __ASM_IBMNP405H_H__
 
 #include <linux/config.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 /* ibm405.h at bottom of this file */
 
@@ -166,7 +166,7 @@
 #define DCRN_UIC1_VCR	(DCRN_UIC1_BASE + 0x8)
 #endif
 
-#include <platforms/ibm405.h>
+#include <asm/ibm405.h>
 
 #endif				/* __ASM_IBMNP405H_H__ */
 #endif				/* __KERNEL__ */

@@ -54,6 +54,8 @@ extern void xmon_map_scc(void);
 extern void kgdb_map_scc(void);
 #endif
 
+extern void ppc6xx_idle(void);
+
 extern boot_infos_t *boot_infos;
 char saved_command_line[256];
 unsigned char aux_device_present;
@@ -527,6 +529,10 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_CMDLINE
 	strcpy(cmd_line, CONFIG_CMDLINE);
 #endif /* CONFIG_CMDLINE */
+
+#if defined(CONFIG_6xx) || defined(CONFIG_ALL_PPC)
+	ppc_md.power_save = ppc6xx_idle;
+#endif
 
 	platform_init(r3, r4, r5, r6, r7);
 

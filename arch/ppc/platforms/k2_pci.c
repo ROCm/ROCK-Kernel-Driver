@@ -24,7 +24,8 @@
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
 
-#include "cpc710.h"
+#include <syslib/cpc710.h>
+
 #include "k2.h"
 
 #undef DEBUG

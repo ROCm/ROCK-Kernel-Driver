@@ -23,7 +23,8 @@
 #include <asm/pci-bridge.h>
 #include <asm/uaccess.h>
 
-#include "cpc700.h"
+#include <syslib/cpc700.h>
+
 #include "pal4.h"
 
 /* not much to this.... */

@@ -39,7 +39,7 @@
 #include <linux/threads.h>
 #include <linux/param.h>
 #include <linux/string.h>
-#include <platforms/ibmnp405l.h>
+#include <platforms/4xx/ibmnp405l.h>
 
 const struct NS16550* COM_PORTS[] =
 {
