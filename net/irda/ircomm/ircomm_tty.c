@@ -490,7 +490,8 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	if (line < 0x10) {
 		self->service_type = IRCOMM_3_WIRE | IRCOMM_9_WIRE;
 		self->settings.service_type = IRCOMM_9_WIRE; /* 9 wire as default */
-		self->settings.dce = IRCOMM_CTS | IRCOMM_CD; /* Default line settings */
+		/* Jan Kiszka -> add DSR/RI -> Conform to IrCOMM spec */
+		self->settings.dce = IRCOMM_CTS | IRCOMM_CD | IRCOMM_DSR | IRCOMM_RI; /* Default line settings */
 		IRDA_DEBUG(2, "%s(), IrCOMM device\n", __FUNCTION__ );
 	} else {
 		IRDA_DEBUG(2, "%s(), IrLPT device\n", __FUNCTION__ );

@@ -26,28 +26,18 @@ struct ia32_flock64 {
 #include <asm/sigcontext32.h>
 
 /* signal.h */
-#define _IA32_NSIG	       64
-#define _IA32_NSIG_BPW	       32
-#define _IA32_NSIG_WORDS	       (_IA32_NSIG / _IA32_NSIG_BPW)
-
-typedef struct {
-       unsigned int sig[_IA32_NSIG_WORDS];
-} sigset32_t;
-
 struct sigaction32 {
        unsigned int  sa_handler;	/* Really a pointer, but need to deal 
 					     with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
-       sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_sigset_t sa_mask;		/* A 32 bit mask */
 };
-
-typedef unsigned int old_sigset32_t;	/* at least 32 bits */
 
 struct old_sigaction32 {
        unsigned int  sa_handler;	/* Really a pointer, but need to deal 
 					     with 32 bits */
-       old_sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_old_sigset_t sa_mask;		/* A 32 bit mask */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
 };
@@ -63,7 +53,7 @@ struct ucontext_ia32 {
 	unsigned int 	  uc_link;
 	stack_ia32_t	  uc_stack;
 	struct sigcontext_ia32 uc_mcontext;
-	sigset32_t	  uc_sigmask;	/* mask last for extensibility */
+	compat_sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
 /* This matches struct stat64 in glibc2.2, hence the absolutely

@@ -113,13 +113,7 @@ static int irda_thread(void *startup)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
-	daemonize();
-	strcpy(current->comm, "kIrDAd");
-
-	spin_lock_irq(&current->sig->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	daemonize("kIrDAd");
 
 	set_fs(KERNEL_DS);
 

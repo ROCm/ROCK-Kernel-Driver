@@ -2,10 +2,10 @@
  *  linux/include/linux/cpufreq.h
  *
  *  Copyright (C) 2001 Russell King
- *            (C) 2002 Dominik Brodowski <linux@brodo.de>
+ *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *            
  *
- * $Id: cpufreq.h,v 1.29 2002/11/11 15:35:47 db Exp $
+ * $Id: cpufreq.h,v 1.36 2003/01/20 17:31:48 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -18,6 +18,9 @@
 #include <linux/notifier.h>
 #include <linux/threads.h>
 #include <linux/device.h>
+
+
+#define CPUFREQ_NAME_LEN 16
 
 
 /*********************************************************************
@@ -37,13 +40,16 @@ int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list);
 
 #define CPUFREQ_POLICY_POWERSAVE        (1)
 #define CPUFREQ_POLICY_PERFORMANCE      (2)
+#define CPUFREQ_POLICY_GOVERNOR         (3)
 
 /* Frequency values here are CPU kHz so that hardware which doesn't run 
  * with some frequencies can complain without having to guess what per 
  * cent / per mille means. 
- * Maximum transition latency is in nanoseconds - if it's unknown,
+ * Maximum transition latency is in microseconds - if it's unknown,
  * CPUFREQ_ETERNAL shall be used.
  */
+
+struct cpufreq_governor;
 
 #define CPUFREQ_ETERNAL (-1)
 struct cpufreq_cpuinfo {
@@ -57,6 +63,7 @@ struct cpufreq_policy {
 	unsigned int            min;    /* in kHz */
 	unsigned int            max;    /* in kHz */
         unsigned int            policy; /* see above */
+	struct cpufreq_governor *governor; /* see below */
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
 	struct intf_data        intf;   /* interface data */
 };
@@ -104,25 +111,62 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
 	return carry + val;
 };
 
+/*********************************************************************
+ *                          CPUFREQ GOVERNORS                        *
+ *********************************************************************/
+
+#define CPUFREQ_GOV_START  1
+#define CPUFREQ_GOV_STOP   2
+#define CPUFREQ_GOV_LIMITS 3
+
+struct cpufreq_governor {
+	char			name[CPUFREQ_NAME_LEN];
+	int	(*governor)	(struct cpufreq_policy *policy,
+				 unsigned int event);
+	struct list_head	governor_list;
+	struct module           *owner;
+};
+
+/* pass a target to the cpufreq driver 
+ * _l : (cpufreq_driver_sem is not held)
+ */
+inline int cpufreq_driver_target(struct cpufreq_policy *policy,
+				 unsigned int target_freq,
+				 unsigned int relation);
+
+inline int cpufreq_driver_target_l(struct cpufreq_policy *policy,
+				   unsigned int target_freq,
+				   unsigned int relation);
+
+/* pass an event to the cpufreq governor */
+int cpufreq_governor_l(unsigned int cpu, unsigned int event);
+
+int cpufreq_register_governor(struct cpufreq_governor *governor);
+void cpufreq_unregister_governor(struct cpufreq_governor *governor);
 
 /*********************************************************************
  *                      CPUFREQ DRIVER INTERFACE                     *
  *********************************************************************/
 
-#define CPUFREQ_NAME_LEN 16
+#define CPUFREQ_RELATION_L 0  /* lowest frequency at or above target */
+#define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
 struct cpufreq_driver {
 	/* needed by all drivers */
-	int     (*verify)       (struct cpufreq_policy *policy);
-	int     (*setpolicy)    (struct cpufreq_policy *policy);
-	struct cpufreq_policy   *policy;
-	char           		name[CPUFREQ_NAME_LEN];
+	int	(*verify)	(struct cpufreq_policy *policy);
+	struct cpufreq_policy	*policy;
+	char			name[CPUFREQ_NAME_LEN];
+	/* define one out of two */
+	int	(*setpolicy)	(struct cpufreq_policy *policy);
+	int	(*target)	(struct cpufreq_policy *policy,
+				 unsigned int target_freq,
+				 unsigned int relation);
 	/* optional, for the moment */
-	int     (*init)        (struct cpufreq_policy *policy);
-	int     (*exit)        (struct cpufreq_policy *policy);
+	int	(*init)		(struct cpufreq_policy *policy);
+	int	(*exit)		(struct cpufreq_policy *policy);
 	/* 2.4. compatible API */
 #ifdef CONFIG_CPU_FREQ_24_API
-	unsigned int            cpu_cur_freq[NR_CPUS];
+	unsigned int		cpu_cur_freq[NR_CPUS];
 #endif
 };
 
@@ -161,6 +205,8 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 int cpufreq_restore(void);
 #endif
 
+/* the proc_intf.c needs this */
+int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
 #ifdef CONFIG_CPU_FREQ_24_API
 /*********************************************************************
@@ -253,6 +299,7 @@ enum {
 
 #endif /* CONFIG_CPU_FREQ_24_API */
 
+
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
  *********************************************************************/
@@ -266,6 +313,7 @@ struct cpufreq_frequency_table {
 				    * order */
 };
 
+#if defined(CONFIG_CPU_FREQ_TABLE) || defined(CONFIG_CPU_FREQ_TABLE_MODULE)
 int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 				    struct cpufreq_frequency_table *table);
 
@@ -275,5 +323,13 @@ int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
 int cpufreq_frequency_table_setpolicy(struct cpufreq_policy *policy,
 				      struct cpufreq_frequency_table *table,
 				      unsigned int *index);
+
+int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
+				   struct cpufreq_frequency_table *table,
+				   unsigned int target_freq,
+				   unsigned int relation,
+				   unsigned int *index);
+
+#endif /* CONFIG_CPU_FREQ_TABLE */
 
 #endif /* _LINUX_CPUFREQ_H */

@@ -78,7 +78,7 @@ krb5_encrypt(
 	sg[0].offset = ((long)out & ~PAGE_MASK);
 	sg[0].length = length;
 
-	ret = crypto_cipher_encrypt(tfm, sg, 1);
+	ret = crypto_cipher_encrypt(tfm, sg, sg, length);
 
 out:
 	dprintk("gss_k5encrypt returns %d\n",ret);
@@ -117,7 +117,7 @@ krb5_decrypt(
 	sg[0].offset = ((long)out  & ~PAGE_MASK);
 	sg[0].length = length;
 
-	ret = crypto_cipher_decrypt(tfm, sg, 1);
+	ret = crypto_cipher_decrypt(tfm, sg, sg, length);
 
 out:
 	dprintk("gss_k5decrypt returns %d\n",ret);

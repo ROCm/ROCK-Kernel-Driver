@@ -55,7 +55,7 @@ sys_call_table32:
 	.word sys_quotactl, sys_set_tid_address, sys32_mount, sys_ustat, sys_setxattr
 /*170*/	.word sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys32_getdents
 	.word sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
-/*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, sys32_sigpending, sys_ni_syscall
+/*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, compat_sys_sigpending, sys_ni_syscall
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
 /*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_epoll_create, sys_epoll_ctl
 	.word sys_epoll_wait, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
@@ -63,11 +63,8 @@ sys_call_table32:
 	.word sys32_readahead, sys32_socketcall, sys_syslog, sys32_lookup_dcookie, sys_nis_syscall
 /*210*/	.word sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys32_sysinfo
 	.word sys32_ipc, sys32_sigreturn, sys_clone, sys_nis_syscall, sys32_adjtimex
-/*220*/	.word sys32_sigprocmask, sys_ni_syscall, sys32_delete_module, sys_ni_syscall, sys_getpgid
+/*220*/	.word compat_sys_sigprocmask, sys_ni_syscall, sys32_delete_module, sys_ni_syscall, sys_getpgid
 	.word sys32_bdflush, sys32_sysfs, sys_nis_syscall, sys32_setfsuid16, sys32_setfsgid16
-
-	/* 234 and 235 were for the hugetlb syscalls.  They can be reused */
-
 /*230*/	.word sys32_select, sys_time, sys_nis_syscall, sys_stime, sys_ni_syscall
 	.word sys_ni_syscall, sys_llseek, sys_mlock, sys_munlock, sys_mlockall
 /*240*/	.word sys_munlockall, sys_sched_setparam, sys_sched_getparam, sys_sched_setscheduler, sys_sched_getscheduler
@@ -206,7 +203,7 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_getdents, sys_setsid
 	.word sys_fchdir, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys
-	.word sunos_nosys, sys32_sigpending, sunos_nosys
+	.word sunos_nosys, compat_sys_sigpending, sunos_nosys
 	.word sys_setpgid, sunos_pathconf, sunos_fpathconf
 	.word sunos_sysconf, sunos_uname, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys

@@ -2542,33 +2542,81 @@ static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 
 /* Place files in /proc/sys/dev/cdrom */
 ctl_table cdrom_table[] = {
-	{DEV_CDROM_INFO, "info", &cdrom_sysctl_settings.info, 
-		CDROM_STR_SIZE, 0444, NULL, &cdrom_sysctl_info},
-	{DEV_CDROM_AUTOCLOSE, "autoclose", &cdrom_sysctl_settings.autoclose,
-		sizeof(int), 0644, NULL, &cdrom_sysctl_handler },
-	{DEV_CDROM_AUTOEJECT, "autoeject", &cdrom_sysctl_settings.autoeject,
-		sizeof(int), 0644, NULL, &cdrom_sysctl_handler },
-	{DEV_CDROM_DEBUG, "debug", &cdrom_sysctl_settings.debug,
-		sizeof(int), 0644, NULL, &cdrom_sysctl_handler },
-	{DEV_CDROM_LOCK, "lock", &cdrom_sysctl_settings.lock,
-		sizeof(int), 0644, NULL, &cdrom_sysctl_handler },
-	{DEV_CDROM_CHECK_MEDIA, "check_media", &cdrom_sysctl_settings.check,
-		sizeof(int), 0644, NULL, &cdrom_sysctl_handler },
-	{0}
-	};
+	{
+		.ctl_name	= DEV_CDROM_INFO,
+		.procname	= "info",
+		.data		= &cdrom_sysctl_settings.info, 
+		.maxlen		= CDROM_STR_SIZE,
+		.mode		= 0444,
+		.proc_handler	= &cdrom_sysctl_info,
+	},
+	{
+		.ctl_name	= DEV_CDROM_AUTOCLOSE,
+		.procname	= "autoclose",
+		.data		= &cdrom_sysctl_settings.autoclose,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &cdrom_sysctl_handler,
+	},
+	{
+		.ctl_name	= DEV_CDROM_AUTOEJECT,
+		.procname	= "autoeject",
+		.data		= &cdrom_sysctl_settings.autoeject,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &cdrom_sysctl_handler,
+	},
+	{
+		.ctl_name	= DEV_CDROM_DEBUG,
+		.procname	= "debug",
+		.data		= &cdrom_sysctl_settings.debug,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &cdrom_sysctl_handler,
+	},
+	{
+		.ctl_name	= DEV_CDROM_LOCK,
+		.procname	= "lock",
+		.data		= &cdrom_sysctl_settings.lock,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &cdrom_sysctl_handler,
+	},
+	{
+		.ctl_name	= DEV_CDROM_CHECK_MEDIA,
+		.procname	= "check_media",
+		.data		= &cdrom_sysctl_settings.check,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &cdrom_sysctl_handler
+	},
+	{ .ctl_name = 0 }
+};
 
 ctl_table cdrom_cdrom_table[] = {
-	{DEV_CDROM, "cdrom", NULL, 0, 0555, cdrom_table},
-	{0}
-	};
+	{
+		.ctl_name	= DEV_CDROM,
+		.procname	= "cdrom",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= cdrom_table,
+	},
+	{ .ctl_name = 0 }
+};
 
 /* Make sure that /proc/sys/dev is there */
 ctl_table cdrom_root_table[] = {
 #ifdef CONFIG_PROC_FS
-	{CTL_DEV, "dev", NULL, 0, 0555, cdrom_cdrom_table},
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= cdrom_cdrom_table,
+	},
 #endif /* CONFIG_PROC_FS */
-	{0}
-	};
+	{ .ctl_name = 0 }
+};
 static struct ctl_table_header *cdrom_sysctl_header;
 
 static void cdrom_sysctl_register(void)

@@ -195,23 +195,23 @@ static int hostmixer_release(struct inode *inode, struct file *file)
 /* kernel module operations */
 
 static struct file_operations hostaudio_fops = {
-        owner:          THIS_MODULE,
-        llseek:         no_llseek,
-        read:           hostaudio_read,
-        write:          hostaudio_write,
-        poll:           hostaudio_poll,
-        ioctl:          hostaudio_ioctl,
-        mmap:           NULL,
-        open:           hostaudio_open,
-        release:        hostaudio_release,
+        .owner          = THIS_MODULE,
+        .llseek         = no_llseek,
+        .read           = hostaudio_read,
+        .write          = hostaudio_write,
+        .poll           = hostaudio_poll,
+        .ioctl          = hostaudio_ioctl,
+        .mmap           = NULL,
+        .open           = hostaudio_open,
+        .release        = hostaudio_release,
 };
 
 static struct file_operations hostmixer_fops = {
-        owner:          THIS_MODULE,
-        llseek:         no_llseek,
-        ioctl:          hostmixer_ioctl_mixdev,
-        open:           hostmixer_open_mixdev,
-        release:        hostmixer_release,
+        .owner          = THIS_MODULE,
+        .llseek         = no_llseek,
+        .ioctl          = hostmixer_ioctl_mixdev,
+        .open           = hostmixer_open_mixdev,
+        .release        = hostmixer_release,
 };
 
 struct {

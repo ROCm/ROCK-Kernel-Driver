@@ -30,7 +30,7 @@ static int errno;
  *
  * The max1617 is capable of being programmed with power-off
  * temperature values, one low limit and one high limit.  These
- * can be controlled independantly for the cpu or ambient temperature.
+ * can be controlled independently for the cpu or ambient temperature.
  * If a limit is violated, the power is simply shut off.  The frequency
  * with which the max1617 does temperature sampling can be controlled
  * as well.
@@ -457,8 +457,8 @@ static struct task_struct *kenvctrld_task;
 
 static int kenvctrld(void *__unused)
 {
-	daemonize();
-	strcpy(current->comm, "kenvctrld");
+	daemonize("kenvctrld");
+	allow_signal(SIGKILL);
 	kenvctrld_task = current;
 
 	printk(KERN_INFO "bbc_envctrl: kenvctrld starting...\n");

@@ -25,6 +25,7 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
+#include <linux/compat.h>
 #include <asm/ucontext.h>
 #include <asm/rt_sigframe.h>
 #include <asm/uaccess.h>
@@ -97,13 +98,13 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 	sigset_t saveset, newset;
 #ifdef __LP64__
 	/* XXX FIXME -- assumes 32-bit user app! */
-	sigset_t32 newset32;
+	compat_sigset_t newset32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t32))
+	if (sigsetsize != sizeof(compat_sigset_t))
 		return -EINVAL;
 
-	if (copy_from_user(&newset32, (sigset_t32 *)unewset, sizeof(newset32)))
+	if (copy_from_user(&newset32, (compat_sigset_t *)unewset, sizeof(newset32)))
 		return -EFAULT;
 
 	newset.sig[0] = newset32.sig[0] | ((unsigned long)newset32.sig[1] << 32);
@@ -118,11 +119,11 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 #endif
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->gr[28] = -EINTR;
 	while (1) {
@@ -177,10 +178,10 @@ sys_rt_sigreturn(struct pt_regs *regs, int in_syscall)
 		goto give_sigsegv;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* Good thing we saved the old gr[30], eh? */
 	if (restore_sigcontext(&frame->uc.uc_mcontext, regs))
@@ -407,11 +408,11 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 	return 1;
 }

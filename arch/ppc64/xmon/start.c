@@ -17,7 +17,6 @@
 #include <asm/udbg.h>
 
 extern void xmon_printf(const char *fmt, ...);
-static int xmon_expect(const char *str, unsigned int timeout);
 
 #define TB_SPEED	25000000
 
@@ -120,32 +119,6 @@ xmon_readchar(void)
 static char line[256];
 static char *lineptr;
 static int lineleft;
-
-int xmon_expect(const char *str, unsigned int timeout)
-{
-	int c;
-	unsigned int t0;
-
-	timeout *= TB_SPEED;
-	t0 = readtb();
-	do {
-		lineptr = line;
-		for (;;) {
-			c = xmon_read_poll();
-			if (c == -1) {
-				if (readtb() - t0 > timeout)
-					return 0;
-				continue;
-			}
-			if (c == '\n')
-				break;
-			if (c != '\r' && lineptr < &line[sizeof(line) - 1])
-				*lineptr++ = c;
-		}
-		*lineptr = 0;
-	} while (strstr(line, str) == NULL);
-	return 1;
-}
 
 int
 xmon_getchar(void)

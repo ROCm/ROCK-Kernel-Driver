@@ -289,8 +289,7 @@ _STATIC(do_efault)
 	li	r3,-EFAULT
 	blr
 
-	.data
-	.align	8
+	.balign	8
 _GLOBAL(socketcall_table_begin)
 	.llong		.do_sys_socket
 	.llong		.do_sys_bind

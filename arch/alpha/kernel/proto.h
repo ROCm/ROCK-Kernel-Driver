@@ -53,7 +53,6 @@ extern int marvel_pa_to_nid(unsigned long);
 extern int marvel_cpuid_to_nid(int);
 extern unsigned long marvel_node_mem_start(int);
 extern unsigned long marvel_node_mem_size(int);
-extern int marvel_srmcons_allowed(void);
 extern struct _alpha_agp_info *marvel_agp_info(void);
 struct io7 *marvel_find_io7(int pe);
 struct io7 *marvel_next_io7(struct io7 *prev);
@@ -109,9 +108,15 @@ extern unsigned long wildfire_node_mem_size(int);
 /* setup.c */
 extern unsigned long srm_hae;
 extern int boot_cpuid;
-extern int srmcons_output;
+
+/* srmcons.c */
+#if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_SRM)
 extern void register_srm_console(void);
 extern void unregister_srm_console(void);
+#else
+#define register_srm_console()
+#define unregister_srm_console()
+#endif
 
 /* smp.c */
 extern void setup_smp(void);

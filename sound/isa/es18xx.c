@@ -460,6 +460,11 @@ static int snd_es18xx_playback_hw_params(snd_pcm_substream_t * substream,
 	return 0;
 }
 
+static int snd_es18xx_pcm_hw_free(snd_pcm_substream_t * substream)
+{
+	return snd_pcm_lib_free_pages(substream);
+}
+
 static int snd_es18xx_playback1_prepare(es18xx_t *chip,
 					snd_pcm_substream_t *substream)
 {
@@ -796,12 +801,12 @@ static snd_pcm_uframes_t snd_es18xx_playback_pointer(snd_pcm_substream_t * subst
 	if (substream->number == 0 && (chip->caps & ES18XX_PCM2)) {
 		if (!(chip->active & DAC2))
 			return 0;
-		pos = chip->dma2_size - snd_dma_residue(chip->dma2);
+		pos = snd_dma_pointer(chip->dma2, chip->dma2_size);
 		return pos >> chip->dma2_shift;
 	} else {
 		if (!(chip->active & DAC1))
 			return 0;
-		pos = chip->dma1_size - snd_dma_residue(chip->dma1);
+		pos = snd_dma_pointer(chip->dma1, chip->dma1_size);
 		return pos >> chip->dma1_shift;
 	}
 }
@@ -813,7 +818,7 @@ static snd_pcm_uframes_t snd_es18xx_capture_pointer(snd_pcm_substream_t * substr
 
         if (!(chip->active & ADC1))
                 return 0;
-	pos = chip->dma1_size - snd_dma_residue(chip->dma1);
+	pos = snd_dma_pointer(chip->dma1, chip->dma1_size);
 	return pos >> chip->dma1_shift;
 }
 
@@ -1540,6 +1545,7 @@ static snd_pcm_ops_t snd_es18xx_playback_ops = {
 	.close =	snd_es18xx_playback_close,
 	.ioctl =	snd_pcm_lib_ioctl,
 	.hw_params =	snd_es18xx_playback_hw_params,
+	.hw_free =	snd_es18xx_pcm_hw_free,
 	.prepare =	snd_es18xx_playback_prepare,
 	.trigger =	snd_es18xx_playback_trigger,
 	.pointer =	snd_es18xx_playback_pointer,
@@ -1550,6 +1556,7 @@ static snd_pcm_ops_t snd_es18xx_capture_ops = {
 	.close =	snd_es18xx_capture_close,
 	.ioctl =	snd_pcm_lib_ioctl,
 	.hw_params =	snd_es18xx_capture_hw_params,
+	.hw_free =	snd_es18xx_pcm_hw_free,
 	.prepare =	snd_es18xx_capture_prepare,
 	.trigger =	snd_es18xx_capture_trigger,
 	.pointer =	snd_es18xx_capture_pointer,
@@ -1606,9 +1613,8 @@ static void snd_es18xx_suspend(es18xx_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -1619,24 +1625,19 @@ static void snd_es18xx_suspend(es18xx_t *chip)
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_SUS);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void snd_es18xx_resume(es18xx_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* restore PM register, we won't wake till (not 0x07) i/o activity though */
 	snd_es18xx_write(chip, ES18XX_PM, chip->pm_reg ^= ES18XX_PM_FM);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 /* callback for control API */
@@ -1785,14 +1786,14 @@ static int __init snd_es18xx_new_device(snd_card_t * card,
 static int __init snd_es18xx_mixer(es18xx_t *chip)
 {
 	snd_card_t *card;
-	int err, idx;
+	int err;
+	unsigned int idx;
 
 	card = chip->card;
 
 	strcpy(card->mixername, chip->pcm->name);
 
-	for (idx = 0; idx < sizeof(snd_es18xx_base_controls) / 
-		     sizeof(snd_es18xx_base_controls[0]); idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_base_controls); idx++) {
 		snd_kcontrol_t *kctl;
 		kctl = snd_ctl_new1(&snd_es18xx_base_controls[idx], chip);
 		if (chip->caps & ES18XX_HWV) {
@@ -1811,14 +1812,12 @@ static int __init snd_es18xx_mixer(es18xx_t *chip)
 			return err;
 	}
 	if (chip->caps & ES18XX_PCM2) {
-		for (idx = 0; idx < sizeof(snd_es18xx_pcm2_controls) / 
-			     sizeof(snd_es18xx_pcm2_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_pcm2_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es18xx_pcm2_controls[idx], chip))) < 0)
 				return err;
 		} 
 	} else {
-		for (idx = 0; idx < sizeof(snd_es18xx_pcm1_controls) / 
-			     sizeof(snd_es18xx_pcm1_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_pcm1_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es18xx_pcm1_controls[idx], chip))) < 0)
 				return err;
 		}
@@ -1829,8 +1828,7 @@ static int __init snd_es18xx_mixer(es18xx_t *chip)
 			return err;
 	}
 	if (chip->caps & ES18XX_RECMIX) {
-		for (idx = 0; idx < sizeof(snd_es18xx_recmix_controls) / 
-			     sizeof(snd_es18xx_recmix_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_recmix_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es18xx_recmix_controls[idx], chip))) < 0)
 				return err;
 		}
@@ -1847,15 +1845,13 @@ static int __init snd_es18xx_mixer(es18xx_t *chip)
 		break;
 	}
 	if (chip->caps & ES18XX_SPATIALIZER) {
-		for (idx = 0; idx < sizeof(snd_es18xx_spatializer_controls) / 
-			     sizeof(snd_es18xx_spatializer_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_spatializer_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es18xx_spatializer_controls[idx], chip))) < 0)
 				return err;
 		}
 	}
 	if (chip->caps & ES18XX_HWV) {
-		for (idx = 0; idx < sizeof(snd_es18xx_hw_volume_controls) / 
-			     sizeof(snd_es18xx_hw_volume_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_es18xx_hw_volume_controls); idx++) {
 			snd_kcontrol_t *kctl;
 			kctl = snd_ctl_new1(&snd_es18xx_hw_volume_controls[idx], chip);
 			if (idx == 0)

@@ -25,6 +25,7 @@ struct timezone {
 #ifdef __KERNEL__
 
 #include <linux/spinlock.h>
+#include <linux/seqlock.h>
 
 /*
  * Change timeval to jiffies, trying to avoid the
@@ -39,6 +40,19 @@ struct timezone {
  * be positive.
  */
 #define MAX_JIFFY_OFFSET ((~0UL >> 1)-1)
+
+/* Parameters used to convert the timespec values */
+#ifndef USEC_PER_SEC
+#define USEC_PER_SEC (1000000L)
+#endif
+
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC (1000000000L)
+#endif
+
+#ifndef NSEC_PER_USEC
+#define NSEC_PER_USEC (1000L)
+#endif
 
 static __inline__ unsigned long
 timespec_to_jiffies(struct timespec *value)
@@ -120,7 +134,7 @@ mktime (unsigned int year, unsigned int mon,
 }
 
 extern struct timespec xtime;
-extern rwlock_t xtime_lock;
+extern seqlock_t xtime_lock;
 
 static inline unsigned long get_seconds(void)
 { 
@@ -138,6 +152,8 @@ struct timespec current_kernel_time(void);
 #ifdef __KERNEL__
 extern void do_gettimeofday(struct timeval *tv);
 extern void do_settimeofday(struct timeval *tv);
+extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
+extern void clock_was_set(void); // call when ever the clock is set
 extern long do_nanosleep(struct timespec *t);
 extern long do_utimes(char * filename, struct timeval * times);
 #endif
@@ -165,5 +181,25 @@ struct	itimerval {
 	struct	timeval it_interval;	/* timer interval */
 	struct	timeval it_value;	/* current value */
 };
+
+
+/*
+ * The IDs of the various system clocks (for POSIX.1b interval timers).
+ */
+#define CLOCK_REALTIME		  0
+#define CLOCK_MONOTONIC	  1
+#define CLOCK_PROCESS_CPUTIME_ID 2
+#define CLOCK_THREAD_CPUTIME_ID	 3
+#define CLOCK_REALTIME_HR	 4
+#define CLOCK_MONOTONIC_HR	  5
+
+#define MAX_CLOCKS 6
+
+/*
+ * The various flags for setting POSIX.1b interval timers.
+ */
+
+#define TIMER_ABSTIME 0x01
+
 
 #endif

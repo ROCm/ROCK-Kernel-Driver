@@ -624,7 +624,7 @@ static int snd_ymfpci_playback_prepare(snd_pcm_substream_t * substream)
 	// ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
-	int nvoice;
+	unsigned int nvoice;
 
 	ypcm->period_size = runtime->period_size;
 	ypcm->buffer_size = runtime->buffer_size;
@@ -926,7 +926,7 @@ static int snd_ymfpci_playback_spdif_open(snd_pcm_substream_t * substream)
 			  snd_ymfpci_readw(chip, YDSXGR_SPDIFOUTCTRL) | 2);
 	ymfpci_open_extension(chip);
 	chip->spdif_pcm_bits = chip->spdif_bits;
-	snd_ymfpci_writel(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_pcm_bits);
+	snd_ymfpci_writew(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_pcm_bits);
 	chip->spdif_opened++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
@@ -1170,6 +1170,7 @@ static void snd_ymfpci_pcm_spdif_free(snd_pcm_t *pcm)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
 	chip->pcm_spdif = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
@@ -1190,6 +1191,9 @@ int __devinit snd_ymfpci_pcm_spdif(ymfpci_t *chip, int device, snd_pcm_t ** rpcm
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - IEC958");
 	chip->pcm_spdif = pcm;
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1210,6 +1214,7 @@ static void snd_ymfpci_pcm_4ch_free(snd_pcm_t *pcm)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
 	chip->pcm_4ch = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
@@ -1230,6 +1235,9 @@ int __devinit snd_ymfpci_pcm_4ch(ymfpci_t *chip, int device, snd_pcm_t ** rpcm)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "YMFPCI - Rear PCM");
 	chip->pcm_4ch = pcm;
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 256*1024);
+
 	if (rpcm)
 		*rpcm = pcm;
 	return 0;
@@ -1306,8 +1314,8 @@ static int snd_ymfpci_spdif_mask_get(snd_kcontrol_t * kcontrol,
 static snd_kcontrol_new_t snd_ymfpci_spdif_mask __devinitdata =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,CON_MASK),
 	.info =		snd_ymfpci_spdif_mask_info,
 	.get =		snd_ymfpci_spdif_mask_get,
 };
@@ -1354,8 +1362,8 @@ static int snd_ymfpci_spdif_stream_put(snd_kcontrol_t * kcontrol,
 static snd_kcontrol_new_t snd_ymfpci_spdif_stream __devinitdata =
 {
 	.access =	SNDRV_CTL_ELEM_ACCESS_READWRITE | SNDRV_CTL_ELEM_ACCESS_INACTIVE,
-	.iface =		SNDRV_CTL_ELEM_IFACE_PCM,
-	.name =           SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =         SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
 	.info =		snd_ymfpci_spdif_stream_info,
 	.get =		snd_ymfpci_spdif_stream_get,
 	.put =		snd_ymfpci_spdif_stream_put
@@ -1654,7 +1662,8 @@ int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
 	ac97_t ac97;
 	snd_kcontrol_t *kctl;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.write = snd_ymfpci_codec_write;
@@ -1766,16 +1775,16 @@ static int snd_ymfpci_joystick_addr_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_
 static int snd_ymfpci_joystick_addr_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	ucontrol->value.integer.value[0] = chip->joystick_port;
+	ucontrol->value.enumerated.item[0] = chip->joystick_port;
 	return 0;
 }
 
 static int snd_ymfpci_joystick_addr_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
-	if (ucontrol->value.integer.value[0] != chip->joystick_port) {
-		snd_assert(ucontrol->value.integer.value[0] >= 0 && ucontrol->value.integer.value[0] < 4, return -EINVAL);
-		chip->joystick_port = ucontrol->value.integer.value[0];
+	if (ucontrol->value.enumerated.item[0] != chip->joystick_port) {
+		snd_assert(ucontrol->value.enumerated.item[0] >= 0 && ucontrol->value.enumerated.item[0] < 4, return -EINVAL);
+		chip->joystick_port = ucontrol->value.enumerated.item[0];
 		setup_joystick_base(chip);
 		return 1;
 	}
@@ -1827,26 +1836,8 @@ static int __devinit snd_ymfpci_proc_init(snd_card_t * card, ymfpci_t *chip)
 {
 	snd_info_entry_t *entry;
 	
-	entry = snd_info_create_card_entry(card, "ymfpci", card->proc_root);
-	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = chip;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 4096;
-		entry->c.text.read = snd_ymfpci_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_unregister(entry);
-			entry = NULL;
-		}
-	}
-	chip->proc_entry = entry;
-	return 0;
-}
-
-static int snd_ymfpci_proc_done(ymfpci_t *chip)
-{
-	if (chip->proc_entry)
-		snd_info_unregister((snd_info_entry_t *) chip->proc_entry);
+	if (! snd_card_proc_new(card, "ymfpci", &entry))
+		snd_info_set_text_ops(entry, chip, snd_ymfpci_proc_read);
 	return 0;
 }
 
@@ -2037,7 +2028,6 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 	u16 ctrl;
 
 	snd_assert(chip != NULL, return -EINVAL);
-	snd_ymfpci_proc_done(chip);
 
 	if (chip->res_reg_area) {	/* don't touch busy hardware */
 		snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
@@ -2125,11 +2115,10 @@ static int saved_regs_index[] = {
 void snd_ymfpci_suspend(ymfpci_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
+	unsigned int i;
 	
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 	snd_pcm_suspend_all(chip->pcm);
 	snd_pcm_suspend_all(chip->pcm2);
 	snd_pcm_suspend_all(chip->pcm_spdif);
@@ -2140,19 +2129,15 @@ void snd_ymfpci_suspend(ymfpci_t *chip)
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
 	snd_ymfpci_disable_dsp(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 void snd_ymfpci_resume(ymfpci_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
-
-	snd_power_lock(card);
+	unsigned int i;
 
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	pci_enable_device(chip->pci);
 	pci_set_master(chip->pci);
@@ -2174,8 +2159,6 @@ void snd_ymfpci_resume(ymfpci_t *chip)
 		spin_unlock(&chip->reg_lock);
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static int snd_ymfpci_set_power_state(snd_card_t *card, unsigned int power_state)

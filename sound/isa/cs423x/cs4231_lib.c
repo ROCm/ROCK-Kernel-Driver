@@ -158,7 +158,7 @@ static __CS4231_INLINE__ u8 cs4231_inb(cs4231_t *chip, u8 offset)
 	} else {
 #endif
 #ifdef SBUS_SUPPORT
-		return sbus_writeb(chip->port + (offset << 2));
+		return sbus_readb(chip->port + (offset << 2));
 #endif
 #ifdef EBUS_SUPPORT
 	}
@@ -338,13 +338,13 @@ void snd_cs4231_mce_up(cs4231_t *chip)
 	unsigned long flags;
 	int timeout;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	for (timeout = 250; timeout > 0 && (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT); timeout--)
 		udelay(100);
 #ifdef CONFIG_SND_DEBUG
 	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("mce_up - auto calibration time out (0)\n");
 #endif
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->mce_bit |= CS4231_MCE;
 	timeout = cs4231_inb(chip, CS4231P(REGSEL));
 	if (timeout == 0x80)
@@ -360,7 +360,6 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 	int timeout;
 	signed long time;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_cs4231_busy_wait(chip);
 #if 0
 	printk("(1) timeout = %i\n", timeout);
@@ -369,14 +368,15 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 	if (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT)
 		snd_printk("mce_down [0x%lx] - auto calibration time out (0)\n", (long)CS4231P(REGSEL));
 #endif
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->mce_bit &= ~CS4231_MCE;
 	timeout = cs4231_inb(chip, CS4231P(REGSEL));
 	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | (timeout & 0x1f));
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	if (timeout == 0x80)
 		snd_printk("mce_down [0x%lx]: serious init problem - codec still busy\n", chip->port);
 	if ((timeout & CS4231_MCE) == 0 ||
 	    !(chip->hardware & (CS4231_HW_CS4231_MASK | CS4231_HW_CS4232_MASK))) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
 		return;
 	}
 	snd_cs4231_busy_wait(chip);
@@ -387,38 +387,40 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 		udelay(10);
 	if ((snd_cs4231_in(chip, CS4231_TEST_INIT) & CS4231_CALIB_IN_PROGRESS) == 0) {
 		snd_printd("cs4231_mce_down - auto calibration time out (1)\n");
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
 		return;
 	}
 #if 0
 	printk("(2) timeout = %i, jiffies = %li\n", timeout, jiffies);
 #endif
-	time = HZ / 4;
+	timeout = HZ / 4 / 2;
+	time = 2;
 	while (snd_cs4231_in(chip, CS4231_TEST_INIT) & CS4231_CALIB_IN_PROGRESS) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
-		if (time <= 0) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		time = schedule_timeout(time);
+		if (time > 0)
+			continue;
+		time = 2;
+		if (--timeout < 0) {
 			snd_printk("mce_down - auto calibration time out (2)\n");
 			return;
 		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		time = schedule_timeout(time);
-		spin_lock_irqsave(&chip->reg_lock, flags);
 	}
 #if 0
 	printk("(3) jiffies = %li\n", jiffies);
 #endif
-	time = HZ / 10;
+	timeout = HZ / 10 / 2;
+	time = 2;
 	while (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
-		if (time <= 0) {
-			snd_printk("mce_down - auto calibration time out (3)\n");
-			return;
-		}
 		set_current_state(TASK_INTERRUPTIBLE);		
 		time = schedule_timeout(time);
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		if (time > 0)
+			continue;
+		time = 2;
+		if (--timeout < 0) {
+			snd_printk(KERN_ERR "mce_down - auto calibration time out (3)\n");
+			return;
+		}
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 #if 0
 	printk("(4) jiffies = %li\n", jiffies);
 	snd_printk("mce_down - exit = 0x%x\n", cs4231_inb(chip, CS4231P(REGSEL)));
@@ -581,6 +583,7 @@ static void snd_cs4231_playback_format(cs4231_t *chip,
 			snd_cs4231_out(chip, CS4231_ALT_FEATURE_1, chip->image[CS4231_ALT_FEATURE_1] | 0x10);
 			snd_cs4231_out(chip, CS4231_PLAYBK_FORMAT, chip->image[CS4231_PLAYBK_FORMAT] = pdfr);
 			snd_cs4231_out(chip, CS4231_ALT_FEATURE_1, chip->image[CS4231_ALT_FEATURE_1] &= ~0x10);
+			udelay(100); /* Fixes audible clicks at least on GUS MAX */
 			full_calib = 0;
 		}
 		spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -1005,7 +1008,7 @@ static snd_pcm_uframes_t snd_cs4231_playback_pointer(snd_pcm_substream_t * subst
 
 	if (!(chip->image[CS4231_IFACE_CTRL] & CS4231_PLAYBACK_ENABLE))
 		return 0;
-	ptr = chip->p_dma_size - snd_dma_residue(chip->dma1);
+	ptr = snd_dma_pointer(chip->dma1, chip->p_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1016,7 +1019,7 @@ static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substr
 	
 	if (!(chip->image[CS4231_IFACE_CTRL] & CS4231_RECORD_ENABLE))
 		return 0;
-	ptr = chip->c_dma_size - snd_dma_residue(chip->dma2);
+	ptr = snd_dma_pointer(chip->dma2, chip->c_dma_size);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 #endif /* LEGACY_SUPPORT */
@@ -1375,20 +1378,19 @@ static void snd_cs4231_resume(cs4231_t *chip)
 	   This is the first half of copy of snd_cs4231_mce_down(), but doesn't
 	   include rescheduling.  -- iwai
 	   */
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_cs4231_busy_wait(chip);
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->mce_bit &= ~CS4231_MCE;
 	timeout = cs4231_inb(chip, CS4231P(REGSEL));
 	cs4231_outb(chip, CS4231P(REGSEL), chip->mce_bit | (timeout & 0x1f));
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	if (timeout == 0x80)
 		snd_printk("down [0x%lx]: serious init problem - codec still busy\n", chip->port);
 	if ((timeout & CS4231_MCE) == 0 ||
 	    !(chip->hardware & (CS4231_HW_CS4231_MASK | CS4231_HW_CS4232_MASK))) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
 		return;
 	}
 	snd_cs4231_busy_wait(chip);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 #endif
 }
 
@@ -1462,6 +1464,7 @@ const char *snd_cs4231_chip_id(cs4231_t *chip)
 	case CS4231_HW_CS4232:	return "CS4232";
 	case CS4231_HW_CS4232A:	return "CS4232A";
 	case CS4231_HW_CS4235:	return "CS4235";
+	case CS4231_HW_CS4236:  return "CS4236";
 	case CS4231_HW_CS4236B: return "CS4236B";
 	case CS4231_HW_CS4237B: return "CS4237B";
 	case CS4231_HW_CS4238B: return "CS4238B";
@@ -1910,7 +1913,8 @@ CS4231_SINGLE("Loopback Capture Volume", 0, CS4231_LOOPBACK, 2, 63, 1)
 int snd_cs4231_mixer(cs4231_t *chip)
 {
 	snd_card_t *card;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	snd_assert(chip != NULL && chip->pcm != NULL, return -EINVAL);
 

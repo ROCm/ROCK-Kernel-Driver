@@ -223,7 +223,7 @@
 
 #define NR_HW_CH		32
 
-/* maxinum nuber of AC97 codecs connected, AC97 2.0 defined 4, but 7018 and 4D-NX only
+/* maximum number of AC97 codecs connected, AC97 2.0 defined 4, but 7018 and 4D-NX only
    have 2 SDATA_IN lines (currently) */
 #define NR_AC97		2	
 
@@ -1227,7 +1227,7 @@ static int alloc_dmabuf(struct dmabuf* dmabuf, struct pci_dev* pci_dev, int orde
 }
 
 /* allocate the main DMA buffer, playback and recording buffer should be */ 
-/* allocated seperately */
+/* allocated separately */
 static int alloc_main_dmabuf(struct trident_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;

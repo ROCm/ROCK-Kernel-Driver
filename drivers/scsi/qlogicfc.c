@@ -397,7 +397,7 @@ struct Status_Entry {
 #define MBOX_PORT_LOGOUT                0x0071
 
 /*
- *	Firmware if needed (note this is a hack, it belongs in a seperate
+ *	Firmware if needed (note this is a hack, it belongs in a separate
  *	module.
  */
  
@@ -731,7 +731,7 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 			        printk("qlogicfc%d : could not register host.\n", hosts);
 				continue;
 			}
- 			scsi_set_pci_device(host, pdev);
+ 			scsi_set_device(host, &pdev->dev);
 			host->max_id = QLOGICFC_MAX_ID + 1;
 			host->max_lun = QLOGICFC_MAX_LUN;
 			hostdata = (struct isp2x00_hostdata *) host->hostdata;
@@ -1148,7 +1148,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 
 	ENTER("isp2x00_queuecommand");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 	Cmnd->scsi_done = done;
 
@@ -1233,10 +1233,10 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 
 	cmd->hdr.entry_type = ENTRY_COMMAND;
 	cmd->hdr.entry_cnt = 1;
-	cmd->target_lun = Cmnd->lun;
-	cmd->expanded_lun = cpu_to_le16(Cmnd->lun);
+	cmd->target_lun = Cmnd->device->lun;
+	cmd->expanded_lun = cpu_to_le16(Cmnd->device->lun);
 #if ISP2x00_PORTDB
-	cmd->target_id = hostdata->port_db[Cmnd->target].loop_id;
+	cmd->target_id = hostdata->port_db[Cmnd->device->id].loop_id;
 #else
 	cmd->target_id = Cmnd->target;
 #endif
@@ -1312,9 +1312,9 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 		cmd->control_flags = cpu_to_le16(CFLAG_READ);
 
 	if (Cmnd->device->tagged_supported) {
-		if ((jiffies - hostdata->tag_ages[Cmnd->target]) > (2 * SCSI_TIMEOUT)) {
+		if ((jiffies - hostdata->tag_ages[Cmnd->device->id]) > (2 * SCSI_TIMEOUT)) {
 			cmd->control_flags |= cpu_to_le16(CFLAG_ORDERED_TAG);
-			hostdata->tag_ages[Cmnd->target] = jiffies;
+			hostdata->tag_ages[Cmnd->device->id] = jiffies;
 		} else
 			switch (Cmnd->tag) {
 			case HEAD_OF_QUEUE_TAG:
@@ -1383,8 +1383,8 @@ static void redo_port_db(unsigned long arg)
 		}
 		
 	        for (i = 0; i < QLOGICFC_REQ_QUEUE_LEN; i++){ 
-		        if (hostdata->handle_ptrs[i] && (hostdata->port_db[hostdata->handle_ptrs[i]->target].loop_id > QLOGICFC_MAX_LOOP_ID || hostdata->adapter_state & AS_REDO_LOOP_PORTDB)){
-                                if (hostdata->port_db[hostdata->handle_ptrs[i]->target].loop_id != hostdata->port_db[0].loop_id){
+		        if (hostdata->handle_ptrs[i] && (hostdata->port_db[hostdata->handle_ptrs[i]->device->id].loop_id > QLOGICFC_MAX_LOOP_ID || hostdata->adapter_state & AS_REDO_LOOP_PORTDB)){
+                                if (hostdata->port_db[hostdata->handle_ptrs[i]->device->id].loop_id != hostdata->port_db[0].loop_id){
 					Scsi_Cmnd *Cmnd = hostdata->handle_ptrs[i];
 
 					 if (Cmnd->use_sg)
@@ -1581,7 +1581,7 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 				 * the device may well be back in a couple of
 				 * seconds.
 				 */
-				if ((hostdata->adapter_state == AS_LOOP_DOWN || sts->completion_status == cpu_to_le16(CS_PORT_UNAVAILABLE) || sts->completion_status == cpu_to_le16(CS_PORT_LOGGED_OUT) || sts->completion_status == cpu_to_le16(CS_PORT_CONFIG_CHANGED)) && hostdata->port_db[Cmnd->target].wwn){
+				if ((hostdata->adapter_state == AS_LOOP_DOWN || sts->completion_status == cpu_to_le16(CS_PORT_UNAVAILABLE) || sts->completion_status == cpu_to_le16(CS_PORT_LOGGED_OUT) || sts->completion_status == cpu_to_le16(CS_PORT_CONFIG_CHANGED)) && hostdata->port_db[Cmnd->device->id].wwn){
 					outw(out_ptr, host->io_port + MBOX5);
 					continue;
 				}
@@ -1709,7 +1709,7 @@ int isp2x00_abort(Scsi_Cmnd * Cmnd)
 
 	ENTER("isp2x00_abort");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 
 	for (i = 0; i < QLOGICFC_REQ_QUEUE_LEN; i++)
@@ -1724,7 +1724,7 @@ int isp2x00_abort(Scsi_Cmnd * Cmnd)
 
 	param[0] = MBOX_ABORT_IOCB;
 #if ISP2x00_PORTDB
-	param[1] = (((u_short) hostdata->port_db[Cmnd->target].loop_id) << 8) | Cmnd->lun;
+	param[1] = (((u_short) hostdata->port_db[Cmnd->device->id].loop_id) << 8) | Cmnd->device->lun;
 #else
 	param[1] = (((u_short) Cmnd->target) << 8) | Cmnd->lun;
 #endif
@@ -1766,7 +1766,7 @@ int isp2x00_reset(Scsi_Cmnd * Cmnd, unsigned int reset_flags)
 
 	ENTER("isp2x00_reset");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 	param[0] = MBOX_BUS_RESET;
 	param[1] = 3;

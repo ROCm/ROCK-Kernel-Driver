@@ -15,7 +15,7 @@ config MKISS
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called mkiss.o.
+	  will be called mkiss.
 
 config 6PACK
 	tristate "Serial port 6PACK driver"
@@ -35,7 +35,7 @@ config 6PACK
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called 6pack.o.
+	  will be called 6pack.
 
 config BPQETHER
 	tristate "BPQ Ethernet driver"
@@ -64,7 +64,7 @@ config DMASCC
 
 	  This driver can operate multiple boards simultaneously. If you
 	  compile it as a module (by saying M instead of Y), it will be called
-	  dmascc.o. If you don't pass any parameter to the driver, all
+	  dmascc. If you don't pass any parameter to the driver, all
 	  possible I/O addresses are probed. This could irritate other devices
 	  that are currently not in use. You may specify the list of addresses
 	  to be probed by "dmascc=addr1,addr2,..." (when compiled into the
@@ -94,7 +94,7 @@ config SCC
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called scc.o.
+	  will be called scc.
 
 config SCC_DELAY
 	bool "additional delay for PA0HZP OptoSCC compatible boards"
@@ -132,7 +132,7 @@ config BAYCOM_SER_FDX
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_ser_fdx.o.
+	  recommended.  The module will be called baycom_ser_fdx.
 
 config BAYCOM_SER_HDX
 	tristate "BAYCOM ser12 halfduplex driver for AX.25"
@@ -151,7 +151,7 @@ config BAYCOM_SER_HDX
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_ser_hdx.o.
+	  recommended.  The module will be called baycom_ser_hdx.
 
 config BAYCOM_PAR
 	tristate "BAYCOM picpar and par96 driver for AX.25"
@@ -167,7 +167,7 @@ config BAYCOM_PAR
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_par.o.
+	  recommended.  The module will be called baycom_par.
 
 config BAYCOM_EPP
 	tristate "BAYCOM epp driver for AX.25"
@@ -183,7 +183,7 @@ config BAYCOM_EPP
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called baycom_par.o.
+	  recommended.  The module will be called baycom_par.
 
 config YAM
 	tristate "YAM driver for AX.25"

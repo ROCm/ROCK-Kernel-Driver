@@ -17,6 +17,7 @@
 #include <asm/msr.h>
 #include <asm/current.h>
 #include <asm/system.h>
+#include <asm/mmsegment.h>
 
 #define TF_MASK		0x00000100
 #define IF_MASK		0x00000200
@@ -110,64 +111,6 @@ extern void dodgy_tsc(void);
 #define X86_EFLAGS_ID	0x00200000 /* CPUID detection flag */
 
 /*
- *	Generic CPUID function
- * 	FIXME: This really belongs to msr.h
- */
-extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
-{
-	__asm__("cpuid"
-		: "=a" (*eax),
-		  "=b" (*ebx),
-		  "=c" (*ecx),
-		  "=d" (*edx)
-		: "0" (op));
-}
-
-/*
- * CPUID functions returning a single datum
- */
-extern inline unsigned int cpuid_eax(unsigned int op)
-{
-	unsigned int eax;
-
-	__asm__("cpuid"
-		: "=a" (eax)
-		: "0" (op)
-		: "bx", "cx", "dx");
-	return eax;
-}
-extern inline unsigned int cpuid_ebx(unsigned int op)
-{
-	unsigned int eax, ebx;
-
-	__asm__("cpuid"
-		: "=a" (eax), "=b" (ebx)
-		: "0" (op)
-		: "cx", "dx" );
-	return ebx;
-}
-extern inline unsigned int cpuid_ecx(unsigned int op)
-{
-	unsigned int eax, ecx;
-
-	__asm__("cpuid"
-		: "=a" (eax), "=c" (ecx)
-		: "0" (op)
-		: "bx", "dx" );
-	return ecx;
-}
-extern inline unsigned int cpuid_edx(unsigned int op)
-{
-	unsigned int eax, edx;
-
-	__asm__("cpuid"
-		: "=a" (eax), "=d" (edx)
-		: "0" (op)
-		: "bx", "cx");
-	return edx;
-}
-
-/*
  * Intel CPU features in CR4
  */
 #define X86_CR4_VME		0x0001	/* enable vm86 extensions */
@@ -209,36 +152,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 		: : "irg" (~mask)
 		:"ax");
 }
-
-#if 0
-/*
- *      Cyrix CPU configuration register indexes
- */
-#define CX86_CCR0 0xc0
-#define CX86_CCR1 0xc1
-#define CX86_CCR2 0xc2
-#define CX86_CCR3 0xc3
-#define CX86_CCR4 0xe8
-#define CX86_CCR5 0xe9
-#define CX86_CCR6 0xea
-#define CX86_CCR7 0xeb
-#define CX86_DIR0 0xfe
-#define CX86_DIR1 0xff
-#define CX86_ARR_BASE 0xc4
-#define CX86_RCR_BASE 0xdc
-
-/*
- *      Cyrix CPU indexed register access macros
- */
-
-#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
-
-#define setCx86(reg, data) do { \
-	outb((reg), 0x22); \
-	outb((data), 0x23); \
-} while (0)
-
-#endif
 
 /*
  * Bus types
@@ -286,10 +199,6 @@ union i387_union {
 	struct i387_fxsave_struct	fxsave;
 };
 
-typedef struct {
-	unsigned long seg;
-} mm_segment_t;
-
 struct tss_struct {
 	u32 reserved1;
 	u64 rsp0;	
@@ -302,7 +211,7 @@ struct tss_struct {
 	u16 reserved5;
 	u16 io_map_base;
 	u32 io_bitmap[IO_BITMAP_SIZE];
-} __attribute__((packed));
+} __attribute__((packed)) ____cacheline_aligned;
 
 struct thread_struct {
 	unsigned long	rsp0;
@@ -336,6 +245,7 @@ struct thread_struct {
 #define NMI_STACK 3 
 #define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
 #define EXCEPTION_STKSZ 1024
+#define EXCEPTION_STK_ORDER 0
 
 #define start_thread(regs,new_rip,new_rsp) do { \
 	asm volatile("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));	 \
@@ -378,6 +288,13 @@ extern inline void rep_nop(void)
 	__asm__ __volatile__("rep;nop": : :"memory");
 }
 
+/* Stop speculative execution */
+extern inline void sync_core(void)
+{ 
+	int tmp;
+	asm volatile("cpuid" : "=a" (tmp) : "0" (1) : "ebx","ecx","edx","memory");
+} 
+
 #define cpu_has_fpu 1
 
 #define ARCH_HAS_PREFETCH
@@ -388,7 +305,6 @@ extern inline void rep_nop(void)
 #define prefetchw(x) __builtin_prefetch((x),1)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()
-
 
 /*
  *      NSC/Cyrix CPU configuration register indexes
@@ -416,5 +332,12 @@ extern inline void rep_nop(void)
 	outb((reg), 0x22); \
 	outb((data), 0x23); \
 } while (0)
+
+#define stack_current() \
+({								\
+	struct thread_info *ti;					\
+	asm("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));	\
+	ti->task;					\
+})
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

@@ -333,7 +333,7 @@ repeat:
 					  hpteflags, 0, large);
 
 		/* Primary is full, try the secondary */
-		if (slot == -1) {
+		if (unlikely(slot == -1)) {
 			pte_val(new_pte) |= 1 << 15;
 			hpte_group = ((~hash & htab_data.htab_hash_mask) *
 				      HPTES_PER_GROUP) & ~0x7UL; 
@@ -393,6 +393,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		mm = &init_mm;
 		vsid = get_kernel_vsid(ea);
 		break;
+#if 0
 	case EEH_REGION_ID:
 		/*
 		 * Should only be hit if there is an access to MMIO space
@@ -404,6 +405,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		 * Should never get here - entire 0xC0... region is bolted.
 		 * Send the problem up to do_page_fault 
 		 */
+#endif
 	default:
 		/* Not a valid range
 		 * Send the problem up to do_page_fault 

@@ -1361,19 +1361,37 @@ static struct nf_sockopt_ops so_getorigdst
 static struct ctl_table_header *ip_conntrack_sysctl_header;
 
 static ctl_table ip_conntrack_table[] = {
-	{ NET_IP_CONNTRACK_MAX, NET_IP_CONNTRACK_MAX_NAME, &ip_conntrack_max,
-	  sizeof(ip_conntrack_max), 0644,  NULL, proc_dointvec },
- 	{ 0 }
+	{
+		.ctl_name	= NET_IP_CONNTRACK_MAX,
+		.procname	= NET_IP_CONNTRACK_MAX_NAME,
+		.data		= &ip_conntrack_max,
+		.maxlen		= sizeof(ip_conntrack_max),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+ 	{ .ctl_name = 0 }
 };
 
 static ctl_table ip_conntrack_dir_table[] = {
-	{NET_IPV4, "ipv4", NULL, 0, 0555, ip_conntrack_table, 0, 0, 0, 0, 0},
-	{ 0 }
+	{
+		.ctl_name	= NET_IPV4,
+		.procname	= "ipv4",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= ip_conntrack_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table ip_conntrack_root_table[] = {
-	{CTL_NET, "net", NULL, 0, 0555, ip_conntrack_dir_table, 0, 0, 0, 0, 0},
-	{ 0 }
+	{
+		.ctl_name	= CTL_NET,
+		.procname	= "net",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= ip_conntrack_dir_table
+	},
+	{ .ctl_name = 0 }
 };
 #endif /*CONFIG_SYSCTL*/
 

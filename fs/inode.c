@@ -16,6 +16,7 @@
 #include <linux/backing-dev.h>
 #include <linux/wait.h>
 #include <linux/hash.h>
+#include <linux/swap.h>
 #include <linux/security.h>
 
 /*
@@ -176,6 +177,7 @@ void inode_init_once(struct inode *inode)
 	spin_lock_init(&inode->i_data.private_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
+	spin_lock_init(&inode->i_lock);
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
@@ -391,6 +393,7 @@ static void prune_icache(int nr_to_scan)
 	LIST_HEAD(freeable);
 	int nr_pruned = 0;
 	int nr_scanned;
+	unsigned long reap = 0;
 
 	spin_lock(&inode_lock);
 	for (nr_scanned = 0; nr_scanned < nr_to_scan; nr_scanned++) {
@@ -409,7 +412,7 @@ static void prune_icache(int nr_to_scan)
 			__iget(inode);
 			spin_unlock(&inode_lock);
 			if (remove_inode_buffers(inode))
-				invalidate_inode_pages(&inode->i_data);
+				reap += invalidate_inode_pages(&inode->i_data);
 			iput(inode);
 			spin_lock(&inode_lock);
 
@@ -427,6 +430,10 @@ static void prune_icache(int nr_to_scan)
 	inodes_stat.nr_unused -= nr_pruned;
 	spin_unlock(&inode_lock);
 	dispose_list(&freeable);
+	if (current_is_kswapd)
+		mod_page_state(kswapd_inodesteal, reap);
+	else
+		mod_page_state(pginodesteal, reap);
 }
 
 /*

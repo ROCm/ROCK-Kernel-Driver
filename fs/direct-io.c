@@ -57,7 +57,7 @@ struct dio {
 	struct inode *inode;
 	int rw;
 	unsigned blkbits;		/* doesn't change */
-	unsigned blkfactor;		/* When we're using an aligment which
+	unsigned blkfactor;		/* When we're using an alignment which
 					   is finer than the filesystem's soft
 					   blocksize, this specifies how much
 					   finer.  blkfactor=2 means 1/4-block
@@ -754,7 +754,15 @@ static int do_direct_IO(struct dio *dio)
 do_holes:
 			/* Handle holes */
 			if (!buffer_mapped(map_bh)) {
-				char *kaddr = kmap_atomic(page, KM_USER0);
+				char *kaddr;
+
+				if (dio->block_in_file >=
+						dio->inode->i_size>>blkbits) {
+					/* We hit eof */
+					page_cache_release(page);
+					goto out;
+				}
+				kaddr = kmap_atomic(page, KM_USER0);
 				memset(kaddr + (block_in_page << blkbits),
 						0, 1 << blkbits);
 				flush_dcache_page(page);
@@ -892,15 +900,14 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	
 		ret = do_direct_IO(dio);
 
-		if (ret) {
-			dio_cleanup(dio);
-			break;
-		}
-
 		dio->result += iov[seg].iov_len -
 			((dio->final_block_in_request - dio->block_in_file) <<
 					blkbits);
 
+		if (ret) {
+			dio_cleanup(dio);
+			break;
+		}
 	} /* end iovec loop */
 
 	/*
@@ -928,20 +935,24 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			ret = dio->result;	/* Bytes written */
 		finished_one_bio(dio);		/* This can free the dio */
 		blk_run_queues();
-		goto out;
+	} else {
+		finished_one_bio(dio);
+		ret2 = dio_await_completion(dio);
+		if (ret == 0)
+			ret = ret2;
+		if (ret == 0)
+			ret = dio->page_errors;
+		if (ret == 0 && dio->result) {
+			ret = dio->result;
+			/*
+			 * Adjust the return value if the read crossed a
+			 * non-block-aligned EOF.
+			 */
+			if (rw == READ && (offset + ret > inode->i_size))
+				ret = inode->i_size - offset;
+		}
+		kfree(dio);
 	}
-
-	finished_one_bio(dio);
-	ret2 = dio_await_completion(dio);
-	if (ret == 0)
-		ret = ret2;
-	if (ret == 0)
-		ret = dio->page_errors;
-
-	if (dio->result)
-		ret = dio->result;
-	kfree(dio);
-out:
 	return ret;
 }
 

@@ -225,10 +225,10 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 #define CFG_CHECK(fn, args...) \
 if (CardServices(fn, args) != 0) goto next_entry
 
-static int idecs_register(int io, int ctl, int irq)
+static int idecs_register(unsigned long io, unsigned long ctl, unsigned long irq)
 {
     hw_regs_t hw;
-    ide_init_hwif_ports(&hw, (ide_ioreg_t)io, (ide_ioreg_t)ctl, NULL);
+    ide_init_hwif_ports(&hw, io, ctl, NULL);
     hw.irq = irq;
     hw.chipset = ide_pci;
     return ide_register_hw(&hw, NULL);
@@ -244,7 +244,8 @@ void ide_config(dev_link_t *link)
     config_info_t conf;
     cistpl_cftable_entry_t *cfg = &parse.cftable_entry;
     cistpl_cftable_entry_t dflt = { 0 };
-    int i, pass, last_ret, last_fn, hd, io_base, ctl_base, is_kme = 0;
+    int i, pass, last_ret, last_fn, hd, is_kme = 0;
+    unsigned long io_base, ctl_base;
 
     DEBUG(0, "ide_config(0x%p)\n", link);
     
@@ -367,7 +368,7 @@ void ide_config(dev_link_t *link)
     }
     
     if (hd < 0) {
-	printk(KERN_NOTICE "ide-cs: ide_register() at 0x%3x & 0x%3x"
+	printk(KERN_NOTICE "ide-cs: ide_register() at 0x%3lx & 0x%3lx"
 	       ", irq %u failed\n", io_base, ctl_base,
 	       link->irq.AssignedIRQ);
 	goto failed;

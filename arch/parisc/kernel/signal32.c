@@ -17,76 +17,23 @@ struct k_sigaction32 {
 	struct sigaction32 sa;
 };
 
-typedef unsigned int old_sigset_t32;
-
-static int
-put_old_sigset32(old_sigset_t32 *up, old_sigset_t *set)
-{
-	old_sigset_t32 set32 = *set;
-	return put_user(set32, up);
-}
-
-static int
-get_old_segset32(old_sigset_t32 *up, old_sigset_t *set)
-{
-	old_sigset_t32 set32;
-	int r;
-
-	if ((r = get_user(set32, up)) == 0)
-		*set = set32;
-
-	return r;
-}
-
-long
-sys32_sigpending(old_sigset_t32 *set)
-{
-	extern long sys_sigpending(old_sigset_t *set);
-	old_sigset_t pending;
-	int ret;
-
-	KERNEL_SYSCALL(ret, sys_sigpending, &pending);
-
-	/* can't put_user an old_sigset_t -- it is too big */
-	if (put_old_sigset32(set, &pending))
-		return -EFAULT;
-
-	return ret;
-}
-
-int sys32_sigprocmask(int how, old_sigset_t32 *set, 
-				 old_sigset_t32 *oset)
-{
-	extern int sys_sigprocmask(int how, old_sigset_t *set, 
-				 old_sigset_t *oset);
-	old_sigset_t s;
-	int ret;
-
-	if (set && get_old_segset32 (set, &s))
-		return -EFAULT;
-	KERNEL_SYSCALL(ret, sys_sigprocmask, how, set ? &s : NULL, oset ? &s : NULL);
-	if (!ret && oset && put_old_sigset32(oset, &s))
-		return -EFAULT;
-	return ret;
-}
-
 static inline void
-sigset_32to64(sigset_t *s64, sigset_t32 *s32)
+sigset_32to64(sigset_t *s64, compat_sigset_t *s32)
 {
 	s64->sig[0] = s32->sig[0] | ((unsigned long)s32->sig[1] << 32);
 }
 
 static inline void
-sigset_64to32(sigset_t32 *s32, sigset_t *s64)
+sigset_64to32(compat_sigset_t *s32, sigset_t *s64)
 {
 	s32->sig[0] = s64->sig[0] & 0xffffffffUL;
 	s32->sig[1] = (s64->sig[0] >> 32) & 0xffffffffUL;
 }
 
 static int
-put_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
+put_sigset32(compat_sigset_t *up, sigset_t *set, size_t sz)
 {
-	sigset_t32 s;
+	compat_sigset_t s;
 
 	if (sz != sizeof *set) panic("put_sigset32()");
 	sigset_64to32(&s, set);
@@ -95,9 +42,9 @@ put_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
 }
 
 static int
-get_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
+get_sigset32(compat_sigset_t *up, sigset_t *set, size_t sz)
 {
-	sigset_t32 s;
+	compat_sigset_t s;
 	int r;
 
 	if (sz != sizeof *set) panic("put_sigset32()");
@@ -109,7 +56,7 @@ get_sigset32(sigset_t32 *up, sigset_t *set, size_t sz)
 	return r;
 }
 
-int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset,
+int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset,
 				    unsigned int sigsetsize)
 {
 	extern long sys_rt_sigprocmask(int how,
@@ -131,7 +78,7 @@ int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset,
 }
 
 
-int sys32_rt_sigpending(sigset_t32 *uset, unsigned int sigsetsize)
+int sys32_rt_sigpending(compat_sigset_t *uset, unsigned int sigsetsize)
 {
 	int ret;
 	sigset_t set;

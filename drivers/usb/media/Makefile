@@ -2,8 +2,6 @@
 # Makefile for USB Media drivers
 #
 
-export-objs	:= ov511.o pwc-uncompress.o usbvideo.o
-
 pwc-objs	:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
 
 obj-$(CONFIG_USB_DABUSB)	+= dabusb.o

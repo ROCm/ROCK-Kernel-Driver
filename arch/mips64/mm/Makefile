@@ -2,8 +2,6 @@
 # Makefile for the Linux/MIPS-specific parts of the memory manager.
 #
 
-export-objs			+= umap.o
-
 obj-y				:= extable.o init.o fault.o loadmmu.o
 
 obj-$(CONFIG_CPU_R4300)		+= r4xx0.o

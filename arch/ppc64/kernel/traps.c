@@ -81,8 +81,10 @@ static void
 _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
+#ifdef CONFIG_DEBUG_KERNEL
 		if (debugger)
 			debugger(regs);
+#endif
 		die("Exception in kernel mode\n", regs, signr);
 	}
 
@@ -133,8 +135,10 @@ SystemResetException(struct pt_regs *regs)
 		FWNMI_release_errinfo();
 	}
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger)
 		debugger(regs);
+#endif
 
 #ifdef PANIC_ON_ERROR
 	panic("System Reset");
@@ -147,60 +151,87 @@ SystemResetException(struct pt_regs *regs)
 	/* What should we do here? We could issue a shutdown or hard reset. */
 }
 
-static int power4_handle_mce(struct pt_regs *regs)
-{
-	return 0;
-}
-
-void
-MachineCheckException(struct pt_regs *regs)
+/* 
+ * See if we can recover from a machine check exception.
+ * This is only called on power4 (or above) and only via
+ * the Firmware Non-Maskable Interrupts (fwnmi) handler
+ * which provides the error analysis for us.
+ *
+ * Return 1 if corrected (or delivered a signal).
+ * Return 0 if there is nothing we can do.
+ */
+static int recover_mce(struct pt_regs *regs, struct rtas_error_log err)
 {
 	siginfo_t info;
 
+	if (err.disposition == DISP_FULLY_RECOVERED) {
+		/* Platform corrected itself */
+		return 1;
+	} else if ((regs->msr & MSR_RI) &&
+		   user_mode(regs) &&
+		   err.severity == SEVERITY_ERROR_SYNC &&
+		   err.disposition == DISP_NOT_RECOVERED &&
+		   err.target == TARGET_MEMORY &&
+		   err.type == TYPE_ECC_UNCORR &&
+		   !(current->pid == 0 || current->pid == 1)) {
+		/* Kill off a user process with an ECC error */
+		info.si_signo = SIGBUS;
+		info.si_errno = 0;
+		/* XXX something better for ECC error? */
+		info.si_code = BUS_ADRERR;
+		info.si_addr = (void *)regs->nip;
+		printk(KERN_ERR "MCE: uncorrectable ecc error for pid %d\n",
+		       current->pid);
+		_exception(SIGBUS, &info, regs);
+		return 1;
+	}
+	return 0;
+}
+
+/*
+ * Handle a machine check.
+ *
+ * Note that on Power 4 and beyond Firmware Non-Maskable Interrupts (fwnmi)
+ * should be present.  If so the handler which called us tells us if the
+ * error was recovered (never true if RI=0).
+ *
+ * On hardware prior to Power 4 these exceptions were asynchronous which
+ * means we can't tell exactly where it occurred and so we can't recover.
+ *
+ * Note that the debugger should test RI=0 and warn the user that system
+ * state has been corrupted.
+ */
+void
+MachineCheckException(struct pt_regs *regs)
+{
+	struct rtas_error_log err, *errp;
+
 	if (fwnmi_active) {
-		struct rtas_error_log *errhdr = FWNMI_get_errinfo(regs);
-		if (errhdr) {
-			/* ToDo: attempt to recover from some errors here */
-		}
-		FWNMI_release_errinfo();
-	}
-
-	if (!user_mode(regs)) {
-		/* Attempt to recover if the interrupt is recoverable */
-		if (regs->msr & MSR_RI) {
-			if ((__is_processor(PV_POWER4) ||
-			     __is_processor(PV_POWER4p)) &&
-			     power4_handle_mce(regs))
-				return;
-		}
-
-		if (debugger_fault_handler) {
-			debugger_fault_handler(regs);
+		errp = FWNMI_get_errinfo(regs);
+		if (errp)
+			err = *errp;
+		FWNMI_release_errinfo();	/* frees errp */
+		if (errp && recover_mce(regs, err))
 			return;
-		}
-		if (debugger)
-			debugger(regs);
-
-		console_verbose();
-		spin_lock_irq(&die_lock);
-		bust_spinlocks(1);
-		printk("Machine check in kernel mode.\n");
-		printk("Caused by (from SRR1=%lx): ", regs->msr);
-		show_regs(regs);
-		bust_spinlocks(0);
-		spin_unlock_irq(&die_lock);
-		panic("Unrecoverable Machine Check");
 	}
 
-	/*
-	 * XXX we should check RI bit on exception exit and kill the
-	 * task if it was cleared
-	 */
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)regs->nip;
-	_exception(SIGSEGV, &info, regs);
+#ifdef CONFIG_DEBUG_KERNEL
+	if (debugger_fault_handler) {
+		debugger_fault_handler(regs);
+		return;
+	}
+	if (debugger)
+		debugger(regs);
+#endif
+	console_verbose();
+	spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
+	printk("Machine check in kernel mode.\n");
+	printk("Caused by (from SRR1=%lx): ", regs->msr);
+	show_regs(regs);
+	bust_spinlocks(0);
+	spin_unlock_irq(&die_lock);
+	panic("Unrecoverable Machine Check");
 }
 
 void
@@ -223,9 +254,10 @@ InstructionBreakpointException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_iabr_match && debugger_iabr_match(regs))
 		return;
-
+#endif
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
@@ -292,9 +324,10 @@ ProgramCheckException(struct pt_regs *regs)
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
+#ifdef CONFIG_DEBUG_KERNEL
 		if (debugger_bpt && debugger_bpt(regs))
 			return;
-
+#endif
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
@@ -318,9 +351,10 @@ SingleStepException(struct pt_regs *regs)
 
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_sstep && debugger_sstep(regs))
 		return;
-
+#endif
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_TRACE;

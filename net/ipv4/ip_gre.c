@@ -454,7 +454,7 @@ out:
 			/* Impossible event. */
 			return;
 		case ICMP_FRAG_NEEDED:
-			/* And it is the only really necesary thing :-) */
+			/* And it is the only really necessary thing :-) */
 			rel_info = ntohs(skb->h.icmph->un.frag.mtu);
 			if (rel_info < grehlen+68)
 				return;

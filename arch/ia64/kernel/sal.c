@@ -1,7 +1,7 @@
 /*
  * System Abstraction Layer (SAL) interface routines.
  *
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
@@ -96,17 +96,17 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 	int i;
 
 	if (!systab) {
-		printk("Hmm, no SAL System Table.\n");
+		printk(KERN_WARNING "Hmm, no SAL System Table.\n");
 		return;
 	}
 
 	if (strncmp(systab->signature, "SST_", 4) != 0)
-		printk("bad signature in system table!");
+		printk(KERN_ERR "bad signature in system table!");
 
 	/*
 	 * revisions are coded in BCD, so %x does the job for us
 	 */
-	printk("SAL v%x.%02x: oem=%.32s, product=%.32s\n",
+	printk(KERN_INFO "SAL v%x.%02x: oem=%.32s, product=%.32s\n",
 	       systab->sal_rev_major, systab->sal_rev_minor,
 	       systab->oem_id, systab->product_id);
 
@@ -121,7 +121,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		switch (*p) {
 		      case SAL_DESC_ENTRY_POINT:
 			ep = (struct ia64_sal_desc_entry_point *) p;
-			printk("SAL: entry: pal_proc=0x%lx, sal_proc=0x%lx\n",
+			printk(KERN_INFO "SAL: entry: pal_proc=0x%lx, sal_proc=0x%lx\n",
 			       ep->pal_proc, ep->sal_proc);
 			ia64_pal_handler_init(__va(ep->pal_proc));
 			ia64_sal_handler_init(__va(ep->sal_proc), __va(ep->gp));
@@ -139,12 +139,12 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 			      switch (ap->mechanism) {
 				    case IA64_SAL_AP_EXTERNAL_INT:
 				      ap_wakeup_vector = ap->vector;
-				      printk("SAL: AP wakeup using external interrupt "
+				      printk(KERN_INFO "SAL: AP wakeup using external interrupt "
 					     "vector 0x%lx\n", ap_wakeup_vector);
 				      break;
 
 				    default:
-				      printk("SAL: AP wakeup mechanism unsupported!\n");
+				      printk(KERN_ERR "SAL: AP wakeup mechanism unsupported!\n");
 				      break;
 			      }
 			      break;
@@ -154,7 +154,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		      {
 			      struct ia64_sal_desc_platform_feature *pf = (void *) p;
 			      sal_platform_features = pf->feature_mask;
-			      printk("SAL: Platform features ");
+			      printk(KERN_INFO "SAL: Platform features ");
 
 			      if (pf->feature_mask & IA64_SAL_PLATFORM_FEATURE_BUS_LOCK)
 				      printk("BusLock ");

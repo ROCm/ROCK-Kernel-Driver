@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/serverworks.c		Version 0.7	10 Sept 2002
+ * linux/drivers/ide/pci/serverworks.c		Version 0.7	10 Sept 2002
  *
  * Copyright (C) 1998-2000 Michel Aubry
  * Copyright (C) 1998-2000 Andrzej Krzysztofowicz
@@ -20,6 +20,9 @@
  *         *** to detect 80-conductor cable presence. ***
  *
  *   CSB6: `Champion South Bridge' IDE Interface (optional: third channel)
+ *
+ * Documentation:
+ *	Available under NDA only. Errata info very hard to get.
  *
  */
 

@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -35,9 +36,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Cirrus Logic CS4281");
@@ -501,13 +499,9 @@ struct snd_cs4281 {
 	unsigned int spurious_dhtc_irq;
 	unsigned int spurious_dtc_irq;
 
-	void *proc_entry_BA0;
-	void *proc_entry_BA1;
-
 	spinlock_t reg_lock;
 	unsigned int midcr;
 	unsigned int uartm;
-	snd_info_entry_t *proc_entry;
 
 	struct snd_cs4281_gameport *gameport;
 
@@ -1253,55 +1247,19 @@ static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(chip->card, "cs4281", chip->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = chip;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_cs4281_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	chip->proc_entry = entry;
-	if ((entry = snd_info_create_card_entry(chip->card, "cs4281_BA0", chip->card->proc_root)) != NULL) {
+	if (! snd_card_proc_new(chip->card, "cs4281", &entry))
+		snd_info_set_text_ops(entry, chip, snd_cs4281_proc_read);
+	if (! snd_card_proc_new(chip->card, "cs4281_BA0", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = chip;
 		entry->c.ops = &snd_cs4281_proc_ops_BA0;
 		entry->size = CS4281_BA0_SIZE;
-		if (snd_info_register(entry) < 0) {
-			snd_info_unregister(entry);
-			entry = NULL;
-		}
 	}
-	chip->proc_entry_BA0 = entry;
-	if ((entry = snd_info_create_card_entry(chip->card, "cs4281_BA1", chip->card->proc_root)) != NULL) {
+	if (! snd_card_proc_new(chip->card, "cs4281_BA1", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
 		entry->private_data = chip;
 		entry->c.ops = &snd_cs4281_proc_ops_BA1;
 		entry->size = CS4281_BA1_SIZE;
-		if (snd_info_register(entry) < 0) {
-			snd_info_unregister(entry);
-			entry = NULL;
-		}
-	}
-	chip->proc_entry_BA1 = entry;
-}
-
-static void snd_cs4281_proc_done(cs4281_t * chip)
-{
-	if (chip->proc_entry_BA1) {
-		snd_info_unregister(chip->proc_entry_BA1);
-		chip->proc_entry_BA1 = NULL;
-	}
-	if (chip->proc_entry_BA0) {
-		snd_info_unregister(chip->proc_entry_BA0);
-		chip->proc_entry_BA0 = NULL;
-	}
-	if (chip->proc_entry) {
-		snd_info_unregister(chip->proc_entry);
-		chip->proc_entry = NULL;
 	}
 }
 
@@ -1309,7 +1267,7 @@ static void snd_cs4281_proc_done(cs4281_t * chip)
  * joystick support
  */
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 
 typedef struct snd_cs4281_gameport {
 	struct gameport info;
@@ -1399,7 +1357,9 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 	gameport_register_port(&gp->info);
 }
 
-#endif /* !LINUX_2_2 */
+#else
+#define snd_cs4281_gameport(chip) /*NOP*/
+#endif /* CONFIG_GAMEPORT || CONFIG_GAMEPORT_MODULE */
 
 
 /*
@@ -1408,13 +1368,12 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 
 static int snd_cs4281_free(cs4281_t *chip)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (chip->gameport) {
 		gameport_unregister_port(&chip->gameport->info);
 		kfree(chip->gameport);
 	}
 #endif
-	snd_cs4281_proc_done(chip);
 	if (chip->irq >= 0)
 		synchronize_irq(chip->irq);
 
@@ -2041,9 +2000,7 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifndef LINUX_2_2
 	snd_cs4281_gameport(chip);
-#endif
 	strcpy(card->driver, "CS4281");
 	strcpy(card->shortname, "Cirrus Logic CS4281");
 	sprintf(card->longname, "%s at 0x%lx, irq %d",
@@ -2097,11 +2054,10 @@ static void cs4281_suspend(cs4281_t *chip)
 {
 	snd_card_t *card = chip->card;
 	u32 ulCLK;
-	int i;
+	unsigned int i;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -2134,19 +2090,16 @@ static void cs4281_suspend(cs4281_t *chip)
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
- __skip:
-      	snd_power_unlock(card);
 }
 
 static void cs4281_resume(cs4281_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
+	unsigned int i;
 	u32 ulCLK;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	pci_enable_device(chip->pci);
 
@@ -2171,8 +2124,6 @@ static void cs4281_resume(cs4281_t *chip)
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND

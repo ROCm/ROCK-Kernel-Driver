@@ -47,8 +47,8 @@ sctp_cmd_seq_t *sctp_new_cmd_seq(int priority)
 {
 	sctp_cmd_seq_t *retval = t_new(sctp_cmd_seq_t, priority);
 
-	/* XXX Check for NULL? -DaveM */
-	sctp_init_cmd_seq(retval);
+	if (retval)
+		sctp_init_cmd_seq(retval);
 
 	return retval;
 }

@@ -689,7 +689,7 @@ void pci_unmap_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 	free_dma_mapping (mapping);
 }
 
-/* Make physical memory consistant for a single streaming mode DMA
+/* Make physical memory consistent for a single streaming mode DMA
    translation after a transfer.
 
    If you perform a pci_map_single() but wish to interrogate the
@@ -731,7 +731,7 @@ pci_unmap_sg (struct pci_dev *pdev, struct scatterlist *sg, int sg_len,int dir)
 	BUG ();
 }
 
-/* Make physical memory consistant for a set of streaming mode DMA
+/* Make physical memory consistent for a set of streaming mode DMA
    translations after a transfer.  The same as pci_dma_sync_single but
    for a scatter-gather list, same rules and usage.  */
 

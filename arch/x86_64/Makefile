@@ -48,7 +48,7 @@ CFLAGS += -fno-reorder-blocks
 CFLAGS += -finline-limit=2000
 #CFLAGS += -g
 
-HEAD := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
+head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 
 libs-y 					+= arch/x86_64/lib/
 core-y					+= arch/x86_64/kernel/ arch/x86_64/mm/
@@ -58,7 +58,8 @@ drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/
 
 boot := arch/x86_64/boot
 
-.PHONY: bzImage bzlilo bzdisk install archmrproper
+.PHONY: bzImage bzlilo install archmrproper \
+	fdimage fdimage144 fdimage288 archclean
 
 #Default target when executing "make"
 all: bzImage
@@ -74,7 +75,7 @@ bzlilo: vmlinux
 bzdisk: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) zdisk
 
-install: vmlinux
+install fdimage fdimage144 fdimage288: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
 
 archclean:
@@ -102,4 +103,7 @@ define archhelp
   echo  '                  (distribution) /sbin/installkernel or'
   echo  '        	  install to $$(INSTALL_PATH) and run lilo'
 endef
+
+CLEAN_FILES += arch/$(ARCH)/boot/fdimage arch/$(ARCH)/boot/mtools.conf
+
 

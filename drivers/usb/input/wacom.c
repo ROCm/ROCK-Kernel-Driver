@@ -102,6 +102,17 @@ struct wacom {
 	char phys[32];
 };
 
+#define USB_REQ_SET_REPORT	0x09
+static int usb_set_report(struct usb_interface *intf, unsigned char type,
+				unsigned char id, void *buf, int size)
+{
+        return usb_control_msg(interface_to_usbdev(intf),
+		usb_sndctrlpipe(interface_to_usbdev(intf), 0),
+                USB_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+                (type << 8) + id, intf->altsetting[0].desc.bInterfaceNumber,
+		buf, size, HZ);
+}
+
 static void wacom_pl_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct wacom *wacom = urb->context;
@@ -129,6 +140,8 @@ static void wacom_pl_irq(struct urb *urb, struct pt_regs *regs)
 		dbg("received unknown report #%d", data[0]);
 
 	prox = data[1] & 0x40;
+
+	input_regs(dev, regs);
 	
 	input_report_key(dev, BTN_TOOL_PEN, prox);
 	
@@ -179,6 +192,7 @@ static void wacom_penpartner_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
+	input_regs(dev, regs);
 	input_report_key(dev, BTN_TOOL_PEN, 1);
 	input_report_abs(dev, ABS_X, data[2] << 8 | data[1]);
 	input_report_abs(dev, ABS_Y, data[4] << 8 | data[3]);
@@ -222,6 +236,8 @@ static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 
 	x = data[2] | ((__u32)data[3] << 8);
 	y = data[4] | ((__u32)data[5] << 8);
+
+	input_regs(dev, regs);
 
 	switch ((data[1] >> 5) & 3) {
 
@@ -293,6 +309,8 @@ static void wacom_intuos_irq(struct urb *urb, struct pt_regs *regs)
 
 	if (data[0] != 2)
 		dbg("received unknown report #%d", data[0]);
+
+	input_regs(dev, regs);
 
 	/* tool number */
 	idx = data[1] & 0x01;
@@ -481,6 +499,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_endpoint_descriptor *endpoint;
+	char rep_data[2] = {0x02, 0x02};
 	struct wacom *wacom;
 	char path[64];
 
@@ -575,11 +594,9 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	input_register_device(&wacom->dev);
 
-#if 0	/* Missing usb_set_report() */
 	usb_set_report(intf, 3, 2, rep_data, 2);
 	usb_set_report(intf, 3, 5, rep_data, 0);
 	usb_set_report(intf, 3, 6, rep_data, 0);
-#endif
 
 	printk(KERN_INFO "input: %s on %s\n", wacom->features->name, path);
 

@@ -725,17 +725,17 @@ static inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
-#define cpu_has_largepage()	(__is_processor(PV_POWER4) || \
-				 __is_processor(PV_POWER4p))
+#define cpu_has_largepage()	(processor_type() == PV_POWER4 || \
+				 processor_type() == PV_POWER4p)
 
-#define cpu_has_slb()		(__is_processor(PV_POWER4) || \
-				 __is_processor(PV_POWER4p))
+#define cpu_has_slb()		(processor_type() == PV_POWER4 || \
+				 processor_type() == PV_POWER4p)
 
-#define cpu_has_tlbiel()	(__is_processor(PV_POWER4) || \
-				 __is_processor(PV_POWER4p))
+#define cpu_has_tlbiel()	(processor_type() == PV_POWER4 || \
+				 processor_type() == PV_POWER4p)
 
-#define cpu_has_noexecute()	(__is_processor(PV_POWER4) || \
-				 __is_processor(PV_POWER4p))
+#define cpu_has_noexecute()	(processor_type() == PV_POWER4 || \
+				 processor_type() == PV_POWER4p)
 
 #endif /* ASSEMBLY */
 

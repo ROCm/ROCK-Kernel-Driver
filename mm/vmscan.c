@@ -757,7 +757,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  */
 static int
 shrink_caches(struct zone *classzone, int priority, int *total_scanned,
-		int gfp_mask, const int nr_pages, struct page_state *ps)
+		int gfp_mask, int nr_pages, struct page_state *ps)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
@@ -835,7 +835,7 @@ try_to_free_pages(struct zone *classzone,
 		wakeup_bdflush(total_scanned);
 
 		/* Take a nap, wait for some writeback to complete */
-		blk_congestion_wait(WRITE, HZ/4);
+		blk_congestion_wait(WRITE, HZ/10);
 		shrink_slab(total_scanned, gfp_mask);
 	}
 	if (gfp_mask & __GFP_FS)
@@ -894,9 +894,9 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				max_scan = to_reclaim * 2;
 			if (max_scan < SWAP_CLUSTER_MAX)
 				max_scan = SWAP_CLUSTER_MAX;
-			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
+			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &nr_mapped, ps, priority);
-			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
+			shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)
@@ -904,7 +904,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		}
 		if (all_zones_ok)
 			break;
-		blk_congestion_wait(WRITE, HZ/4);
+		blk_congestion_wait(WRITE, HZ/10);
 	}
 	return nr_pages - to_free;
 }
@@ -928,10 +928,8 @@ int kswapd(void *p)
 	struct task_struct *tsk = current;
 	DEFINE_WAIT(wait);
 
-	daemonize();
-	set_cpus_allowed(tsk, __node_to_cpu_mask(pgdat->node_id));
-	sprintf(tsk->comm, "kswapd%d", pgdat->node_id);
-	sigfillset(&tsk->blocked);
+	daemonize("kswapd%d", pgdat->node_id);
+	set_cpus_allowed(tsk, node_to_cpumask(pgdat->node_id));
 	
 	/*
 	 * Tell the memory management that we're a "memory allocator",
@@ -957,7 +955,6 @@ int kswapd(void *p)
 		finish_wait(&pgdat->kswapd_wait, &wait);
 		get_page_state(&ps);
 		balance_pgdat(pgdat, 0, &ps);
-		blk_run_queues();
 	}
 }
 

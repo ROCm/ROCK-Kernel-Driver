@@ -60,10 +60,12 @@ struct sermouse {
  * second, which is as good as a PS/2 or USB mouse.
  */
 
-static void sermouse_process_msc(struct sermouse *sermouse, signed char data)
+static void sermouse_process_msc(struct sermouse *sermouse, signed char data, struct pt_regs *regs)
 {
 	struct input_dev *dev = &sermouse->dev;
 	signed char *buf = sermouse->buf;
+
+	input_regs(dev, regs);
 
 	switch (sermouse->count) {
 
@@ -101,12 +103,14 @@ static void sermouse_process_msc(struct sermouse *sermouse, signed char data)
  * standard 3-byte packets and 1200 bps.
  */
 
-static void sermouse_process_ms(struct sermouse *sermouse, signed char data)
+static void sermouse_process_ms(struct sermouse *sermouse, signed char data, struct pt_regs *regs)
 {
 	struct input_dev *dev = &sermouse->dev;
 	signed char *buf = sermouse->buf;
 
 	if (data & 0x40) sermouse->count = 0;
+
+	input_regs(dev, regs);
 
 	switch (sermouse->count) {
 
@@ -200,7 +204,7 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data)
  * packets or passing them to the command routine as command output.
  */
 
-static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
+static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct sermouse *sermouse = serio->private;
 
@@ -208,9 +212,9 @@ static void sermouse_interrupt(struct serio *serio, unsigned char data, unsigned
 	sermouse->last = jiffies;
 
 	if (sermouse->type > SERIO_SUN)
-		sermouse_process_ms(sermouse, data);
+		sermouse_process_ms(sermouse, data, regs);
 	else
-		sermouse_process_msc(sermouse, data);
+		sermouse_process_msc(sermouse, data, regs);
 }
 
 /*

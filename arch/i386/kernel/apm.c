@@ -215,6 +215,7 @@
 #include <linux/miscdevice.h>
 #include <linux/apm_bios.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/kernel.h>
@@ -225,9 +226,6 @@
 #include <asm/uaccess.h>
 #include <asm/desc.h>
 
-#include <linux/sysrq.h>
-
-extern rwlock_t xtime_lock;
 extern spinlock_t i8253_lock;
 extern unsigned long get_cmos_time(void);
 extern void machine_real_restart(unsigned char *, int);
@@ -972,30 +970,6 @@ static void apm_power_off(void)
 		(void) set_system_power_state(APM_STATE_OFF);
 }
 
-/**
- * handle_poweroff	-	sysrq callback for power down
- * @key: key pressed (unused)
- * @pt_regs: register state (unused)
- * @kbd: keyboard state (unused)
- * @tty: tty involved (unused)
- *
- * When the user hits Sys-Rq o to power down the machine this is the
- * callback we use.
- */
-
-static void handle_poweroff (int key, struct pt_regs *pt_regs,
-			     struct tty_struct *tty)
-{
-        apm_power_off();
-}
-
-static struct sysrq_key_op	sysrq_poweroff_op = {
-	.handler        = handle_poweroff,
-	.help_msg       = "Off",
-	.action_msg     = "Power Off\n"
-};
-
-
 #ifdef CONFIG_APM_DO_ENABLE
 
 /**
@@ -1264,7 +1238,7 @@ static int suspend(int vetoable)
 		printk(KERN_CRIT "apm: suspend was vetoed, but suspending anyway.\n");
 	}
 	/* serialize with the timer interrupt */
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 
 	/* protect against access to timer chip registers */
 	spin_lock(&i8253_lock);
@@ -1276,7 +1250,7 @@ static int suspend(int vetoable)
 	ignore_normal_resume = 1;
 
 	spin_unlock(&i8253_lock);
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	if (err == APM_NO_ERROR)
 		err = APM_SUCCESS;
@@ -1301,10 +1275,10 @@ static void standby(void)
 	int	err;
 
 	/* serialize with the timer interrupt */
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/* If needed, notify drivers here */
 	get_time_diff();
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	err = set_system_power_state(APM_STATE_STANDBY);
 	if ((err != APM_SUCCESS) && (err != APM_NO_ERROR))
@@ -1393,9 +1367,9 @@ static void check_events(void)
 			ignore_bounce = 1;
 			if ((event != APM_NORMAL_RESUME)
 			    || (ignore_normal_resume == 0)) {
-				write_lock_irq(&xtime_lock);
+				write_seqlock_irq(&xtime_lock);
 				set_time();
-				write_unlock_irq(&xtime_lock);
+				write_sequnlock_irq(&xtime_lock);
 				pm_send_all(PM_RESUME, (void *)0);
 				queue_event(event, NULL);
 			}
@@ -1410,9 +1384,9 @@ static void check_events(void)
 			break;
 
 		case APM_UPDATE_TIME:
-			write_lock_irq(&xtime_lock);
+			write_seqlock_irq(&xtime_lock);
 			set_time();
-			write_unlock_irq(&xtime_lock);
+			write_sequnlock_irq(&xtime_lock);
 			break;
 
 		case APM_CRITICAL_SUSPEND:
@@ -1742,11 +1716,9 @@ static int apm(void *unused)
 
 	kapmd_running = 1;
 
-	daemonize();
+	daemonize("kapmd");
 
-	strcpy(current->comm, "kapmd");
 	current->flags |= PF_IOTHREAD;
-	sigfillset(&current->blocked);
 
 #ifdef CONFIG_SMP
 	/* 2002/08/01 - WT
@@ -1850,7 +1822,6 @@ static int apm(void *unused)
 	/* Install our power off handler.. */
 	if (power_off)
 		pm_power_off = apm_power_off;
-	register_sysrq_key('o', &sysrq_poweroff_op);
 
 	if (num_online_cpus() == 1 || smp) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
@@ -2098,7 +2069,6 @@ static void __exit apm_exit(void)
 	}
 	misc_deregister(&apm_device);
 	remove_proc_entry("apm", NULL);
-	unregister_sysrq_key('o',&sysrq_poweroff_op);
 	if (power_off)
 		pm_power_off = NULL;
 	exit_kapmd = 1;

@@ -252,37 +252,46 @@ int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int
 
 static int ptrace_setoptions(struct task_struct *child, long data)
 {
+	child->ptrace &= ~PT_TRACE_MASK;
+
 	if (data & PTRACE_O_TRACESYSGOOD)
 		child->ptrace |= PT_TRACESYSGOOD;
-	else
-		child->ptrace &= ~PT_TRACESYSGOOD;
 
 	if (data & PTRACE_O_TRACEFORK)
 		child->ptrace |= PT_TRACE_FORK;
-	else
-		child->ptrace &= ~PT_TRACE_FORK;
 
 	if (data & PTRACE_O_TRACEVFORK)
 		child->ptrace |= PT_TRACE_VFORK;
-	else
-		child->ptrace &= ~PT_TRACE_VFORK;
 
 	if (data & PTRACE_O_TRACECLONE)
 		child->ptrace |= PT_TRACE_CLONE;
-	else
-		child->ptrace &= ~PT_TRACE_CLONE;
 
 	if (data & PTRACE_O_TRACEEXEC)
 		child->ptrace |= PT_TRACE_EXEC;
-	else
-		child->ptrace &= ~PT_TRACE_EXEC;
 
-	if ((data & (PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK
-		    | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE
-		    | PTRACE_O_TRACEEXEC))
-	    != data)
+	if (data & PTRACE_O_TRACEVFORKDONE)
+		child->ptrace |= PT_TRACE_VFORK_DONE;
+
+	if (data & PTRACE_O_TRACEEXIT)
+		child->ptrace |= PT_TRACE_EXIT;
+
+	return (data & ~PTRACE_O_MASK) ? -EINVAL : 0;
+}
+
+static int ptrace_getsiginfo(struct task_struct *child, long data)
+{
+	if (child->last_siginfo == NULL)
 		return -EINVAL;
+	return copy_siginfo_to_user ((siginfo_t *) data, child->last_siginfo);
+}
 
+static int ptrace_setsiginfo(struct task_struct *child, long data)
+{
+	if (child->last_siginfo == NULL)
+		return -EINVAL;
+	if (copy_from_user (child->last_siginfo, (siginfo_t *) data,
+			    sizeof (siginfo_t)) != 0)
+		return -EFAULT;
 	return 0;
 }
 
@@ -301,6 +310,12 @@ int ptrace_request(struct task_struct *child, long request,
 	case PTRACE_GETEVENTMSG:
 		ret = put_user(child->ptrace_message, (unsigned long *) data);
 		break;
+	case PTRACE_GETSIGINFO:
+		ret = ptrace_getsiginfo(child, data);
+		break;
+	case PTRACE_SETSIGINFO:
+		ret = ptrace_setsiginfo(child, data);
+		break;
 	default:
 		break;
 	}
@@ -317,4 +332,9 @@ void ptrace_notify(int exit_code)
 	set_current_state(TASK_STOPPED);
 	notify_parent(current, SIGCHLD);
 	schedule();
+
+	/*
+	 * Signals sent while we were stopped might set TIF_SIGPENDING.
+	 */
+	recalc_sigpending();
 }

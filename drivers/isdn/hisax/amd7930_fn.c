@@ -176,7 +176,7 @@ Amd7930_new_ph(struct IsdnCardState *cs)
 
         cs->dc.amd7930.old_state = cs->dc.amd7930.ph_state;
 
-        /* abort transmit if nessesary */
+        /* abort transmit if necessary */
         if ((message & 0xf0) && (cs->tx_skb)) {
                 wByteAMD(cs, 0x21, 0xC2);
                 wByteAMD(cs, 0x21, 0x02);

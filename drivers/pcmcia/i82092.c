@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
@@ -46,6 +47,9 @@ static struct pci_driver i82092aa_pci_drv = {
 	.id_table       = i82092aa_pci_ids,
 	.probe          = i82092aa_pci_probe,
 	.remove         = __devexit_p(i82092aa_pci_remove),
+	.driver		= {
+		.devclass = &pcmcia_socket_class,
+	},
 };
 
 
@@ -93,6 +97,7 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 {
 	unsigned char configbyte;
 	int i, ret;
+	struct pcmcia_socket_class_data *cls_d;
 	
 	enter("i82092aa_pci_probe");
 	
@@ -150,11 +155,17 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 		printk(KERN_ERR "i82092aa: Failed to register IRQ %d, aborting\n", dev->irq);
 		goto err_out_free_res;
 	}
-		 
-	if ((ret = register_ss_entry(socket_count, &i82092aa_operations) != 0)) {
-		printk(KERN_ERR "i82092aa: register_ss_entry() failed\n");
+
+	
+	cls_d = kmalloc(sizeof(*cls_d), GFP_KERNEL);
+	if (!cls_d) {
+		printk(KERN_ERR "i82092aa: kmalloc failed\n");
 		goto err_out_free_irq;
 	}
+	memset(cls_d, 0, sizeof(*cls_d));
+	cls_d->nsock = socket_count;
+	cls_d->ops = &i82092aa_operations;
+	dev->dev.class_data = cls_d;
 
 	leave("i82092aa_pci_probe");
 	return 0;
@@ -173,6 +184,8 @@ static void __devexit i82092aa_pci_remove(struct pci_dev *dev)
 	enter("i82092aa_pci_remove");
 	
 	free_irq(dev->irq, i82092aa_interrupt);
+	if (dev->dev.class_data)
+		kfree(dev->dev.class_data);
 
 	leave("i82092aa_pci_remove");
 }
@@ -384,7 +397,7 @@ static int card_present(int socketno)
 	unsigned int val;
 	enter("card_present");
 	
-	if ((socketno<0) || (socketno > MAX_SOCKETS))
+	if ((socketno<0) || (socketno >= MAX_SOCKETS))
 		return 0;
 	if (sockets[socketno].io_base == 0)
 		return 0;
@@ -903,7 +916,6 @@ static void i82092aa_module_exit(void)
 {
 	enter("i82092aa_module_exit");
 	pci_unregister_driver(&i82092aa_pci_drv);
-	unregister_ss_entry(&i82092aa_operations);
 	if (sockets[0].io_base>0)
 			 release_region(sockets[0].io_base, 2);
 	leave("i82092aa_module_exit");

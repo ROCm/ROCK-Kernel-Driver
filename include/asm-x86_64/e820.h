@@ -47,7 +47,7 @@ extern void add_memory_region(unsigned long start, unsigned long size,
 			      int type);
 extern void setup_memory_region(void);
 extern void contig_e820_setup(void); 
-extern void e820_end_of_ram(void);
+extern unsigned long e820_end_of_ram(void);
 extern void e820_reserve_resources(void);
 extern void e820_print_map(char *who);
 extern int e820_mapped(unsigned long start, unsigned long end, int type);

@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
 #include <linux/kallsyms.h>
+#include <linux/ptrace.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -514,6 +515,10 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
+	/* It's safe to allow irq's after DR6 has been saved */
+	if (regs->eflags & X86_EFLAGS_IF)
+		local_irq_enable();
+
 	/* Mask out spurious debug traps due to lazy DR7 setting */
 	if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
 		if (!tsk->thread.debugreg[7])
@@ -831,7 +836,7 @@ void __init trap_init(void)
 #endif
 
 	set_trap_gate(0,&divide_error);
-	set_trap_gate(1,&debug);
+	set_intr_gate(1,&debug);
 	set_intr_gate(2,&nmi);
 	set_system_gate(3,&int3);	/* int3-5 can be called from all */
 	set_system_gate(4,&overflow);

@@ -84,7 +84,7 @@ CFLAGS += -DUTS_SYSNAME=\"uClinux\"
 
 LDFLAGS_BLOB	:= --format binary --oformat elf32-m68k
 
-HEAD := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
+head-y := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
 CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h.tmp \
 	       include/asm-$(ARCH)/asm-offsets.h \
@@ -97,8 +97,6 @@ core-y	+= arch/m68knommu/kernel/ \
 libs-y	+= arch/m68knommu/lib/
 
 prepare: include/asm-$(ARCH)/asm-offsets.h
-
-archmrproper:
 
 archclean:
 	$(call descend arch/$(ARCH)/boot, subdirclean)

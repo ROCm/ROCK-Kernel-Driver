@@ -773,13 +773,13 @@ static __inline__ int search(__s32 *array, __s32 value, unsigned n)
 	return -1;
 }
 
-static void hid_process_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value)
+static void hid_process_event(struct hid_device *hid, struct hid_field *field, struct hid_usage *usage, __s32 value, struct pt_regs *regs)
 {
 	hid_dump_input(usage, value);
 	if (hid->claimed & HID_CLAIMED_INPUT)
-		hidinput_hid_event(hid, field, usage, value);
+		hidinput_hid_event(hid, field, usage, value, regs);
 	if (hid->claimed & HID_CLAIMED_HIDDEV)
-		hiddev_hid_event(hid, field, usage, value);
+		hiddev_hid_event(hid, field, usage, value, regs);
 }
 
 /*
@@ -788,7 +788,7 @@ static void hid_process_event(struct hid_device *hid, struct hid_field *field, s
  * reporting to the layer).
  */
 
-static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u8 *data)
+static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u8 *data, struct pt_regs *regs)
 {
 	unsigned n;
 	unsigned count = field->report_count;
@@ -818,25 +818,25 @@ static void hid_input_field(struct hid_device *hid, struct hid_field *field, __u
 			} else {
 				if (value[n] == field->value[n]) continue;
 			}	
-			hid_process_event(hid, field, &field->usage[n], value[n]);
+			hid_process_event(hid, field, &field->usage[n], value[n], regs);
 			continue;
 		}
 
 		if (field->value[n] >= min && field->value[n] <= max
 			&& field->usage[field->value[n] - min].hid
 			&& search(value, field->value[n], count))
-				hid_process_event(hid, field, &field->usage[field->value[n] - min], 0);
+				hid_process_event(hid, field, &field->usage[field->value[n] - min], 0, regs);
 
 		if (value[n] >= min && value[n] <= max
 			&& field->usage[value[n] - min].hid
 			&& search(field->value, value[n], count))
-				hid_process_event(hid, field, &field->usage[value[n] - min], 1);
+				hid_process_event(hid, field, &field->usage[value[n] - min], 1, regs);
 	}
 
 	memcpy(field->value, value, count * sizeof(__s32));
 }
 
-static int hid_input_report(int type, struct urb *urb)
+static int hid_input_report(int type, struct urb *urb, struct pt_regs *regs)
 {
 	struct hid_device *hid = urb->context;
 	struct hid_report_enum *report_enum = hid->report_enum + type;
@@ -886,7 +886,7 @@ static int hid_input_report(int type, struct urb *urb)
 		hiddev_report_event(hid, report);
 
 	for (n = 0; n < report->maxfield; n++)
-		hid_input_field(hid, report->field[n], data);
+		hid_input_field(hid, report->field[n], data, regs);
 
 	if (hid->claimed & HID_CLAIMED_INPUT)
 		hidinput_report_event(hid, report);
@@ -905,7 +905,7 @@ static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 
 	switch (urb->status) {
 	case 0:			/* success */
-		hid_input_report(HID_INPUT_REPORT, urb);
+		hid_input_report(HID_INPUT_REPORT, urb, regs);
 		break;
 	case -ECONNRESET:	/* unlink */
 	case -ENOENT:
@@ -1130,7 +1130,7 @@ static void hid_ctrl(struct urb *urb, struct pt_regs *regs)
 	spin_lock_irqsave(&hid->ctrllock, flags);
 
 	if (hid->ctrl[hid->ctrltail].dir == USB_DIR_IN) 
-		hid_input_report(hid->ctrl[hid->ctrltail].report->type, urb);
+		hid_input_report(hid->ctrl[hid->ctrltail].report->type, urb, regs);
 
 	hid->ctrltail = (hid->ctrltail + 1) & (HID_CONTROL_FIFO_SIZE - 1);
 
@@ -1324,6 +1324,12 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_MGE_UPS          0xffff
 #define USB_DEVICE_ID_MGE_UPS1         0x0001
 
+#define USB_VENDOR_ID_ONTRAK		0x0a07
+#define USB_DEVICE_ID_ONTRAK_ADU100	0x0064
+
+#define USB_VENDOR_ID_TANGTOP          0x0d3d
+#define USB_DEVICE_ID_TANGTOP_USBPS2   0x0001
+
 struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
@@ -1359,6 +1365,13 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS1, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 100, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 200, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 300, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 400, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 500, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_TANGTOP, USB_DEVICE_ID_TANGTOP_USBPS2, HID_QUIRK_NOGET },
 	{ 0, 0 }
 };
 
@@ -1524,6 +1537,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	kfree(buf);
 
 	hid->urbctrl = usb_alloc_urb(0, GFP_KERNEL);
+	if (!hid->urbctrl)
+		goto fail;
 	usb_fill_control_urb(hid->urbctrl, dev, 0, (void *) hid->cr,
 			     hid->ctrlbuf, 1, hid_ctrl, hid);
 	hid->urbctrl->setup_dma = hid->cr_dma;

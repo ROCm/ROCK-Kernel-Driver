@@ -288,20 +288,19 @@ sba_dump_pdir_entry(struct ioc *ioc, char *msg, uint pide)
 	unsigned long *rptr = (unsigned long *) &(ioc->res_map[(pide >>3) & ~(sizeof(unsigned long) - 1)]);
 	uint rcnt;
 
-	/* printk(KERN_DEBUG "SBA: %s rp %p bit %d rval 0x%lx\n", */
-	printk("SBA: %s rp %p bit %d rval 0x%lx\n",
+	printk(KERN_DEBUG "SBA: %s rp %p bit %d rval 0x%lx\n",
 		 msg, rptr, pide & (BITS_PER_LONG - 1), *rptr);
 
 	rcnt = 0;
 	while (rcnt < BITS_PER_LONG) {
-		printk("%s %2d %p %016Lx\n",
-			(rcnt == (pide & (BITS_PER_LONG - 1)))
-				? "    -->" : "       ",
-			rcnt, ptr, *ptr );
+		printk(KERN_DEBUG "%s %2d %p %016Lx\n",
+		       (rcnt == (pide & (BITS_PER_LONG - 1)))
+		       ? "    -->" : "       ",
+		       rcnt, ptr, *ptr );
 		rcnt++;
 		ptr++;
 	}
-	printk("%s", msg);
+	printk(KERN_DEBUG "%s", msg);
 }
 
 
@@ -363,11 +362,9 @@ static void
 sba_dump_sg(struct ioc *ioc, struct scatterlist *startsg, int nents)
 {
 	while (nents-- > 0) {
-		printk(" %d : DMA %08lx/%05x CPU %p\n",
-				nents,
-				(unsigned long) sba_sg_iova(startsg),
-				sba_sg_iova_len(startsg),
-				sba_sg_address(startsg));
+		printk(KERN_DEBUG " %d : DMA %08lx/%05x CPU %p\n", nents,
+		       (unsigned long) sba_sg_iova(startsg), sba_sg_iova_len(startsg),
+		       sba_sg_address(startsg));
 		startsg++;
 	}
 }
@@ -1451,9 +1448,10 @@ sba_common_init(struct sba_device *sba_dev)
 			    sba_dev->ioc[i].res_map;
 		} else {
 			u64 reserved_iov;
-			
+
 			/* Yet another 1.x hack */
-			printk("zx1 1.x: Starting resource hint offset into IOV space to avoid initial zero value IOVA\n");
+			printk(KERN_DEBUG "zx1 1.x: Starting resource hint offset into "
+			       "IOV space to avoid initial zero value IOVA\n");
 			sba_dev->ioc[i].res_hint = (unsigned long *)
 			    &(sba_dev->ioc[i].res_map[L1_CACHE_BYTES]);
 
@@ -1632,7 +1630,7 @@ void __init sba_init(void)
 	       device->slot_name, hpa);
 
 	if ((hw_rev & 0xFF) < 0x20) {
-		printk("%s: SBA rev less than 2.0 not supported", DRIVER_NAME);
+		printk(KERN_INFO "%s: SBA rev less than 2.0 not supported", DRIVER_NAME);
 		return;
 	}
 

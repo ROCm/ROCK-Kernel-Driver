@@ -364,62 +364,6 @@ static void print_inquiry(unsigned char *inq_result)
 		printk("\n");
 }
 
-u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
-{
-	if (shost->highmem_io) {
-		struct device *host_dev = scsi_get_device(shost);
-
-		if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
-			return *host_dev->dma_mask;
-
-		/*
-		 * Platforms with virtual-DMA translation
- 		 * hardware have no practical limit.
-		 */
-		return BLK_BOUNCE_ANY;
-	} else if (shost->unchecked_isa_dma)
-		return BLK_BOUNCE_ISA;
-
-	return BLK_BOUNCE_HIGH;
-}
-
-static request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost)
-{
-	request_queue_t *q;
-
-	q = kmalloc(sizeof(*q), GFP_ATOMIC);
-	if (!q)
-		return NULL;
-	memset(q, 0, sizeof(*q));
-
-	if (!shost->max_sectors) {
-		/*
-		 * Driver imposes no hard sector transfer limit.
-		 * start at machine infinity initially.
-		 */
-		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
-	}
-
-	blk_init_queue(q, scsi_request_fn, shost->host_lock);
-	blk_queue_prep_rq(q, scsi_prep_fn);
-
-	blk_queue_max_hw_segments(q, shost->sg_tablesize);
-	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
-	blk_queue_max_sectors(q, shost->max_sectors);
-	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
-
-	if (!shost->use_clustering)
-		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
-
-	return q;
-}
-
-static void scsi_free_queue(request_queue_t *q)
-{
-	blk_cleanup_queue(q);
-	kfree(q);
-}
-
 /**
  * scsi_alloc_sdev - allocate and setup a Scsi_Device
  *
@@ -449,6 +393,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		sdev->online = TRUE;
 		INIT_LIST_HEAD(&sdev->siblings);
 		INIT_LIST_HEAD(&sdev->same_target_siblings);
+		INIT_LIST_HEAD(&sdev->cmd_list);
+		spin_lock_init(&sdev->list_lock);
 		/*
 		 * Some low level driver could use device->type
 		 */
@@ -471,10 +417,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 
 		sdev->request_queue->queuedata = sdev;
 		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-		scsi_build_commandblocks(sdev);
-		if (sdev->current_queue_depth == 0) {
-			goto out_bail;
-		}
 		init_waitqueue_head(&sdev->scpnt_wait);
 
 		if (shost->hostt->slave_alloc)
@@ -515,7 +457,6 @@ out_bail:
 	} else if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
 
-	scsi_release_commandblocks(sdev);
 	kfree(sdev);
 	return NULL;
 }
@@ -535,7 +476,6 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 
 	if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
-	scsi_release_commandblocks(sdev);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry)

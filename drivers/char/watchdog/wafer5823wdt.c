@@ -198,17 +198,17 @@ static int wafwdt_notify_sys(struct notifier_block *this, unsigned long code, vo
  */
 
 static struct file_operations wafwdt_fops = {
-	owner:THIS_MODULE,
-	write:wafwdt_write,
-	ioctl:wafwdt_ioctl,
-	open:wafwdt_open,
-	release:wafwdt_close,
+	.owner		= THIS_MODULE,
+	.write		= wafwdt_write,
+	.ioctl		= wafwdt_ioctl,
+	.open		= wafwdt_open,
+	.release	= wafwdt_close,
 };
 
 static struct miscdevice wafwdt_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&wafwdt_fops
+	.minor	= WATCHDOG_MINOR,
+	.name	= "watchdog",
+	.fops	= &wafwdt_fops
 };
 
 /*
@@ -217,9 +217,9 @@ static struct miscdevice wafwdt_miscdev = {
  */
 
 static struct notifier_block wafwdt_notifier = {
-	wafwdt_notify_sys,
-	NULL,
-	0
+	.notifier_call = wafwdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static int __init wafwdt_init(void)

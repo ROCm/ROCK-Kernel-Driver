@@ -32,7 +32,7 @@ int com20020_found(struct net_device *dev, int shared);
 void com20020_remove(struct net_device *dev);
 
 /* The number of low I/O ports used by the card. */
-#define ARCNET_TOTAL_SIZE 9
+#define ARCNET_TOTAL_SIZE 8
 
 /* various register addresses */
 #define _INTMASK  (ioaddr+0)	/* writable */
@@ -59,6 +59,8 @@ void com20020_remove(struct net_device *dev);
 
 /* in SETUP register */
 #define PROMISCset	0x10	/* enable RCV_ALL */
+#define P1MODE		0x80    /* enable P1-MODE for Backplane */
+#define SLOWARB		0x01    /* enable Slow Arbitration for >=5Mbps */
 
 /* COM2002x */
 #define SUB_TENTATIVE	0	/* tentative node ID */

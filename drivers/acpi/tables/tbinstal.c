@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "actables.h"
+#include <acpi/acpi.h>
+#include <acpi/actables.h>
 
 
 #define _COMPONENT          ACPI_TABLES
@@ -61,7 +61,7 @@ acpi_tb_match_signature (
 	 * Search for a signature match among the known table types
 	 */
 	for (i = 0; i < NUM_ACPI_TABLES; i++) {
-		if ((acpi_gbl_acpi_table_data[i].flags & ACPI_TABLE_TYPE_MASK) != search_type) {
+		if (!(acpi_gbl_acpi_table_data[i].flags & search_type)) {
 			continue;
 		}
 
@@ -74,7 +74,7 @@ acpi_tb_match_signature (
 			}
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-				"Table [%4.4s] matched and is a required ACPI table\n",
+				"Table [%4.4s] is an ACPI table consumed by the core subsystem\n",
 				(char *) acpi_gbl_acpi_table_data[i].signature));
 
 			return_ACPI_STATUS (AE_OK);
@@ -82,7 +82,7 @@ acpi_tb_match_signature (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"Table [%4.4s] is not a required ACPI table - ignored\n",
+		"Table [%4.4s] is not an ACPI table consumed by the core subsystem - ignored\n",
 		(char *) signature));
 
 	return_ACPI_STATUS (AE_TABLE_NOT_SUPPORTED);
@@ -125,7 +125,7 @@ acpi_tb_install_table (
 
 	status = acpi_tb_init_table_descriptor (table_info->type, table_info);
 	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR (("Could not install ACPI table [%s], %s\n",
+		ACPI_REPORT_ERROR (("Could not install ACPI table [%4.4s], %s\n",
 			table_info->pointer->signature, acpi_format_exception (status)));
 	}
 

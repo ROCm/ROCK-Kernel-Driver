@@ -65,23 +65,10 @@ static LIST_HEAD (opt_vg_head);
 static LIST_HEAD (opt_lo_head);
 static void *io_mem;
 
-char *chassis_str, *rxe_str, *str;
-
 /* Local functions */
 static int ebda_rsrc_controller (void);
 static int ebda_rsrc_rsrc (void);
 static int ebda_rio_table (void);
-
-static struct slot *alloc_ibm_slot (void)
-{
-	struct slot *slot;
-
-	slot = kmalloc (sizeof (struct slot), GFP_KERNEL);
-	if (!slot)
-		return NULL;
-	memset (slot, 0, sizeof (*slot));
-	return slot;
-}
 
 static struct ebda_hpc_list * __init alloc_ebda_hpc_list (void)
 {
@@ -591,32 +578,6 @@ static int combine_wpg_for_expansion (void)
 	return 0;	
 }
 	
-static char *convert_2digits_to_char (int var)
-{
-	int bit;	
-	char *str1;
-
-	str = (char *) kmalloc (3, GFP_KERNEL);
-	memset (str, 0, 3);
-	str1 = (char *) kmalloc (2, GFP_KERNEL);
-	memset (str, 0, 3);
-	bit = (int)(var / 10);
-	switch (bit) {
-	case 0:
-		//one digit number
-		*str = (char)(var + 48);
-		return str;
-	default: 	
-		//2 digits number
-		*str1 = (char)(bit + 48);
-		strncpy (str, str1, 1);
-		memset (str1, 0, 3);
-		*str1 = (char)((var % 10) + 48);
-		strcat (str, str1);
-		return str;
-	}	
-	return NULL;	
-}
 
 /* Since we don't know the max slot number per each chassis, hence go
  * through the list of all chassis to find out the range
@@ -701,7 +662,7 @@ static char *create_file_name (struct slot * slot_cur)
 {
 	struct opt_rio *opt_vg_ptr = NULL;
 	struct opt_rio_lo *opt_lo_ptr = NULL;
-	char *ptr_chassis_num, *ptr_rxe_num, *ptr_slot_num;
+	static char str[30];
 	int which = 0; /* rxe = 1, chassis = 0 */
 	u8 number = 1; /* either chassis or rxe # */
 	u8 first_slot = 1;
@@ -715,19 +676,7 @@ static char *create_file_name (struct slot * slot_cur)
 	
 	slot_num = slot_cur->number;
 
-	chassis_str = (char *) kmalloc (30, GFP_KERNEL);
-	memset (chassis_str, 0, 30);
-	rxe_str = (char *) kmalloc (30, GFP_KERNEL);
-	memset (rxe_str, 0, 30);
-	ptr_chassis_num = (char *) kmalloc (3, GFP_KERNEL);
-	memset (ptr_chassis_num, 0, 3);
-	ptr_rxe_num = (char *) kmalloc (3, GFP_KERNEL);
-	memset (ptr_rxe_num, 0, 3);
-	ptr_slot_num = (char *) kmalloc (3, GFP_KERNEL);
-	memset (ptr_slot_num, 0, 3);
-	
-	strcpy (chassis_str, "chassis");
-	strcpy (rxe_str, "rxe");
+	memset (str, 0, sizeof(str));
 	
 	if (rio_table_ptr) {
 		if (rio_table_ptr->ver_num == 3) {
@@ -772,31 +721,10 @@ static char *create_file_name (struct slot * slot_cur)
 		}
 	}
 
-	switch (which) {
-	case 0:
-		/* Chassis */
-		*ptr_chassis_num = (char)(number + 48);
-		strcat (chassis_str, ptr_chassis_num);
-		kfree (ptr_chassis_num);
-		strcat (chassis_str, "slot");
-		ptr_slot_num = convert_2digits_to_char (slot_num - first_slot + 1);
-		strcat (chassis_str, ptr_slot_num);
-		kfree (ptr_slot_num);
-		return chassis_str;
-		break;
-	case 1:
-		/* RXE */
-		*ptr_rxe_num = (char)(number + 48);
-		strcat (rxe_str, ptr_rxe_num);
-		kfree (ptr_rxe_num);
-		strcat (rxe_str, "slot");
-		ptr_slot_num = convert_2digits_to_char (slot_num - first_slot + 1);
-		strcat (rxe_str, ptr_slot_num);
-		kfree (ptr_slot_num);
-		return rxe_str;
-		break;
-	}	
-	return NULL;
+	sprintf(str, "%s%dslot%d",
+		which == 0 ? "chassis" : "rxe",
+		number, slot_num - first_slot + 1);
+	return str;
 }
 
 static struct pci_driver ibmphp_driver;
@@ -818,8 +746,7 @@ static int __init ebda_rsrc_controller (void)
 	struct ebda_hpc_slot *slot_ptr;
 	struct bus_info *bus_info_ptr1, *bus_info_ptr2;
 	int rc;
-	int retval;
-	struct slot *slot_cur;
+	struct slot *tmp_slot;
 	struct list_head *list;
 
 	addr = hpc_list_ptr->phys_addr;
@@ -844,8 +771,8 @@ static int __init ebda_rsrc_controller (void)
 		/* init hpc structure */
 		hpc_ptr = alloc_ebda_hpc (slot_num, bus_num);
 		if (!hpc_ptr ) {
-			iounmap (io_mem);
-			return -ENOMEM;
+			rc = -ENOMEM;
+			goto error_no_hpc;
 		}
 		hpc_ptr->ctlr_id = ctlr_id;
 		hpc_ptr->ctlr_relative_id = ctlr;
@@ -871,8 +798,8 @@ static int __init ebda_rsrc_controller (void)
 			if (!bus_info_ptr2) {
 				bus_info_ptr1 = (struct bus_info *) kmalloc (sizeof (struct bus_info), GFP_KERNEL);
 				if (!bus_info_ptr1) {
-					iounmap (io_mem);
-					return -ENOMEM;
+					rc = -ENOMEM;
+					goto error_no_hp_slot;
 				}
 				memset (bus_info_ptr1, 0, sizeof (struct bus_info));
 				bus_info_ptr1->slot_min = slot_ptr->slot_num;
@@ -932,16 +859,20 @@ static int __init ebda_rsrc_controller (void)
 				hpc_ptr->u.pci_ctlr.dev_fun = readb (io_mem + addr + 1);
 				hpc_ptr->irq = readb (io_mem + addr + 2);
 				addr += 3;
-				debug ("ctrl bus = %x, ctlr devfun = %x, irq = %x\n", hpc_ptr->u.pci_ctlr.bus, hpc_ptr->u.pci_ctlr.dev_fun, hpc_ptr->irq);
+				debug ("ctrl bus = %x, ctlr devfun = %x, irq = %x\n", 
+					hpc_ptr->u.pci_ctlr.bus,
+					hpc_ptr->u.pci_ctlr.dev_fun, hpc_ptr->irq);
 				break;
 
 			case 0:
 				hpc_ptr->u.isa_ctlr.io_start = readw (io_mem + addr);
 				hpc_ptr->u.isa_ctlr.io_end = readw (io_mem + addr + 2);
-				retval = check_region (hpc_ptr->u.isa_ctlr.io_start, (hpc_ptr->u.isa_ctlr.io_end - hpc_ptr->u.isa_ctlr.io_start + 1));
-				if (retval)
-					return -ENODEV;
-				request_region (hpc_ptr->u.isa_ctlr.io_start, (hpc_ptr->u.isa_ctlr.io_end - hpc_ptr->u.isa_ctlr.io_start + 1), "ibmphp");
+				if (!request_region (hpc_ptr->u.isa_ctlr.io_start,
+						     (hpc_ptr->u.isa_ctlr.io_end - hpc_ptr->u.isa_ctlr.io_start + 1),
+						     "ibmphp")) {
+					rc = -ENODEV;
+					goto error_no_hp_slot;
+				}
 				hpc_ptr->irq = readb (io_mem + addr + 4);
 				addr += 5;
 				break;
@@ -954,8 +885,8 @@ static int __init ebda_rsrc_controller (void)
 				addr += 6;
 				break;
 			default:
-				iounmap (io_mem);
-				return -ENODEV;
+				rc = -ENODEV;
+				goto error_no_hp_slot;
 		}
 
 		//reorganize chassis' linked list
@@ -971,79 +902,71 @@ static int __init ebda_rsrc_controller (void)
 
 			hp_slot_ptr = (struct hotplug_slot *) kmalloc (sizeof (struct hotplug_slot), GFP_KERNEL);
 			if (!hp_slot_ptr) {
-				iounmap (io_mem);
-				return -ENOMEM;
+				rc = -ENOMEM;
+				goto error_no_hp_slot;
 			}
 			memset (hp_slot_ptr, 0, sizeof (struct hotplug_slot));
 
 			hp_slot_ptr->info = (struct hotplug_slot_info *) kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
 			if (!hp_slot_ptr->info) {
-				iounmap (io_mem);
-				kfree (hp_slot_ptr);
-				return -ENOMEM;
+				rc = -ENOMEM;
+				goto error_no_hp_info;
 			}
 			memset (hp_slot_ptr->info, 0, sizeof (struct hotplug_slot_info));
 
 			hp_slot_ptr->name = (char *) kmalloc (30, GFP_KERNEL);
 			if (!hp_slot_ptr->name) {
-				iounmap (io_mem);
-				kfree (hp_slot_ptr->info);
-				kfree (hp_slot_ptr);
-				return -ENOMEM;
+				rc = -ENOMEM;
+				goto error_no_hp_name;
 			}
 
-			hp_slot_ptr->private = alloc_ibm_slot ();
-			if (!hp_slot_ptr->private) {
-				iounmap (io_mem);
-				kfree (hp_slot_ptr->name);
-				kfree (hp_slot_ptr->info);
-				kfree (hp_slot_ptr);
-				return -ENOMEM;
+			tmp_slot = kmalloc (sizeof (struct slot), GFP_KERNEL);
+			if (!tmp_slot) {
+				rc = -ENOMEM;
+				goto error_no_slot;
 			}
+			memset (tmp_slot, 0, sizeof (*tmp_slot));
 
-			((struct slot *)hp_slot_ptr->private)->flag = TRUE;
+			tmp_slot->flag = TRUE;
 
-			((struct slot *) hp_slot_ptr->private)->capabilities = hpc_ptr->slots[index].slot_cap;
+			tmp_slot->capabilities = hpc_ptr->slots[index].slot_cap;
 			if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_133_MAX) == EBDA_SLOT_133_MAX)
-				((struct slot *) hp_slot_ptr->private)->supported_speed =  3;
+				tmp_slot->supported_speed =  3;
 			else if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_100_MAX) == EBDA_SLOT_100_MAX)
-				((struct slot *) hp_slot_ptr->private)->supported_speed =  2;
+				tmp_slot->supported_speed =  2;
 			else if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_66_MAX) == EBDA_SLOT_66_MAX)
-				((struct slot *) hp_slot_ptr->private)->supported_speed =  1;
+				tmp_slot->supported_speed =  1;
 				
 			if ((hpc_ptr->slots[index].slot_cap & EBDA_SLOT_PCIX_CAP) == EBDA_SLOT_PCIX_CAP)
-				((struct slot *) hp_slot_ptr->private)->supported_bus_mode = 1;
+				tmp_slot->supported_bus_mode = 1;
 			else
-				((struct slot *) hp_slot_ptr->private)->supported_bus_mode = 0;
+				tmp_slot->supported_bus_mode = 0;
 
 
-			((struct slot *) hp_slot_ptr->private)->bus = hpc_ptr->slots[index].slot_bus_num;
+			tmp_slot->bus = hpc_ptr->slots[index].slot_bus_num;
 
 			bus_info_ptr1 = ibmphp_find_same_bus_num (hpc_ptr->slots[index].slot_bus_num);
 			if (!bus_info_ptr1) {
-				iounmap (io_mem);
-				return -ENODEV;
+				rc = -ENODEV;
+				goto error;
 			}
-			((struct slot *) hp_slot_ptr->private)->bus_on = bus_info_ptr1;
+			tmp_slot->bus_on = bus_info_ptr1;
 			bus_info_ptr1 = NULL;
-			((struct slot *) hp_slot_ptr->private)->ctrl = hpc_ptr;
+			tmp_slot->ctrl = hpc_ptr;
 
+			tmp_slot->ctlr_index = hpc_ptr->slots[index].ctl_index;
+			tmp_slot->number = hpc_ptr->slots[index].slot_num;
+			tmp_slot->hotplug_slot = hp_slot_ptr;
 
-			((struct slot *) hp_slot_ptr->private)->ctlr_index = hpc_ptr->slots[index].ctl_index;
-			((struct slot *) hp_slot_ptr->private)->number = hpc_ptr->slots[index].slot_num;
-			
-			((struct slot *) hp_slot_ptr->private)->hotplug_slot = hp_slot_ptr;
+			hp_slot_ptr->private = tmp_slot;
+
 			rc = ibmphp_hpc_fillhpslotinfo (hp_slot_ptr);
-			if (rc) {
-				iounmap (io_mem);
-				return rc;
-			}
+			if (rc)
+				goto error;
 
 			rc = ibmphp_init_devno ((struct slot **) &hp_slot_ptr->private);
-			if (rc) {
-				iounmap (io_mem);
-				return rc;
-			}
+			if (rc)
+				goto error;
 			hp_slot_ptr->ops = &ibmphp_hotplug_slot_ops;
 
 			// end of registering ibm slot with hotplug core
@@ -1057,19 +980,29 @@ static int __init ebda_rsrc_controller (void)
 	}			/* each hpc  */
 
 	list_for_each (list, &ibmphp_slot_head) {
-		slot_cur = list_entry (list, struct slot, ibm_slot_list);
+		tmp_slot = list_entry (list, struct slot, ibm_slot_list);
 
-		snprintf (slot_cur->hotplug_slot->name, 30, "%s", create_file_name (slot_cur));
-		if (chassis_str) 
-			kfree (chassis_str);
-		if (rxe_str)
-			kfree (rxe_str);
-		pci_hp_register (slot_cur->hotplug_slot);
+		snprintf (tmp_slot->hotplug_slot->name, 30, "%s", create_file_name (tmp_slot));
+		pci_hp_register (tmp_slot->hotplug_slot);
 	}
 
 	print_ebda_hpc ();
 	print_ibm_slot ();
 	return 0;
+
+error:
+	kfree (hp_slot_ptr->private);
+error_no_slot:
+	kfree (hp_slot_ptr->name);
+error_no_hp_name:
+	kfree (hp_slot_ptr->info);
+error_no_hp_info:
+	kfree (hp_slot_ptr);
+error_no_hp_slot:
+	free_ebda_hpc (hpc_ptr);
+error_no_hpc:
+	iounmap (io_mem);
+	return rc;
 }
 
 /* 

@@ -213,6 +213,8 @@ Module parameters
 
     mpu_port	- 0x300 (default),0x310,0x320,0x330, -1 (diable)
     fm_port     - 0x388 (default), -1 (disable)
+    soft_ac3    - Sofware-conversion of raw SPDIF packets (model 033 only)
+                  (default = 1)
 
     Module supports autoprobe and multiple chips (max 8).
     
@@ -748,7 +750,8 @@ Module parameters
   Module snd-rme32
   ----------------
 
-    Module for RME Digi32, Digi32/8 and Digi32 PRO soundcards.
+    Module for RME Digi32, Digi32 Pro and Digi32/8 (Sek'd Prodif32, 
+    Prodif96 and Prodif Gold) soundcards.
 
     Module supports up to 8 cards.
 

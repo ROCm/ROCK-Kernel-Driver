@@ -9,6 +9,7 @@
  */
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
@@ -23,8 +24,6 @@
 #include <asm/system.h>
 
 #include <asm/hardware/sa1111.h>
-
-extern struct pt_regs *kbd_pt_regs;
 
 struct ps2if {
 	struct serio		io;
@@ -47,8 +46,6 @@ static void ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 	struct ps2if *ps2if = dev_id;
 	unsigned int scancode, flag, status;
 
-	kbd_pt_regs = regs;
-
 	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
 	while (status & PS2STAT_RXF) {
 		if (status & PS2STAT_STP)
@@ -62,7 +59,7 @@ static void ps2_rxint(int irq, void *dev_id, struct pt_regs *regs)
 		if (hweight8(scancode) & 1)
 			flag ^= SERIO_PARITY;
 
-		serio_interrupt(&ps2if->io, scancode, flag);
+		serio_interrupt(&ps2if->io, scancode, flag, regs);
 
                	status = sa1111_readl(ps2if->base + SA1111_PS2STAT);
         }
@@ -343,6 +340,7 @@ static struct sa1111_driver ps2_driver = {
 	.drv = {
 		.name		= "sa1111-ps2",
 		.bus		= &sa1111_bus_type,
+		.devclass	= &input_devclass,
 		.probe		= ps2_probe,
 		.remove		= ps2_remove,
 		.suspend	= ps2_suspend,

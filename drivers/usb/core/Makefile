@@ -2,8 +2,6 @@
 # Makefile for USB Core files and filesystem
 #
 
-export-objs	:= usb.o hcd.o hcd-pci.o urb.o message.o file.o buffer.o
-
 usbcore-objs	:= usb.o usb-debug.o hub.o hcd.o urb.o message.o \
 			config.o file.o buffer.o driverfs.o
 

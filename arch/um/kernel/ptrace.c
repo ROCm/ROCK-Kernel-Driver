@@ -9,7 +9,9 @@
 #include "linux/smp_lock.h"
 #include "linux/security.h"
 #include "linux/ptrace.h"
+#ifdef CONFIG_PROC_MM
 #include "linux/proc_mm.h"
+#endif
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"
 #include "kern_util.h"

@@ -19,11 +19,6 @@ config X86_64
 config X86
 	bool
 	default y
-	help
-	  This is Linux's home port.  Linux was originally native to the Intel
-	  386, and runs on all the later x86 processors including the Intel
-	  486, 586, Pentiums, and various instruction-set-compatible chips by
-	  AMD, Cyrix, and others.
 
 config MMU
 	bool
@@ -35,19 +30,9 @@ config SWAP
 
 config ISA
 	bool
-	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
 
 config SBUS
 	bool
-
-config UID16
-	bool
-	default y
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -86,14 +71,14 @@ choice
 	default MK8
 
 config MK8
-	bool "AMD-Hammer"
+	bool "AMD-Opteron/Athlon64"
 	help
-	  Support for AMD Clawhammer/Sledgehammer CPUs. Only choice for x86-64
-	  currently so you should choose this if you want a x86-64 kernel. In fact
-	  you will have no other choice than to choose this.
+	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs. 
 
 config GENERIC_CPU
 	bool "Generic-x86-64"
+	help
+	  Generic x86-64 CPU.
 
 endchoice
 
@@ -196,25 +181,12 @@ config SMP
 	  singleprocessor machines. On a singleprocessor machine, the kernel
 	  will run faster if you say N here.
 
-	  Note that if you say Y here and choose architecture "586" or
-	  "Pentium" under "Processor family", the kernel will not work on 486
-	  architectures. Similarly, multiprocessor kernels for the "PPro"
-	  architecture may not work on all Pentium based boards.
-
-	  People using multiprocessor machines who say Y here should also say
-	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
-	  Management" code will be disabled if you say Y here.
-
-	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-	  <http://www.tldp.org/docs.html#howto>.
-
 	  If you don't know what to do here, say N.
 
+# broken currently
 config PREEMPT
+	depends on NOT_WORKING
 	bool "Preemptible Kernel"
-	depends on !SMP
 	---help---
 	  This option reduces the latency of the kernel when reacting to
 	  real-time or interactive events by allowing a low priority process to
@@ -228,6 +200,28 @@ config PREEMPT
 
 	  Say Y here if you are feeling brave and building a kernel for a 
 	  desktop, embedded or real-time system.  Say N if you are unsure. 
+
+# someone write a better help text please.
+config K8_NUMA
+       bool "K8 NUMA support"
+       depends on SMP
+       help
+	  Enable NUMA (Non Unified Memory Architecture) support for
+	  AMD Opteron Multiprocessor systems. The kernel will try to allocate
+	  memory used by a CPU on the local memory controller of the CPU
+	  and in the future do more optimizations. This may improve performance 
+	  or it may not. Code is still experimental.
+	  Say N if unsure.
+
+config DISCONTIGMEM
+       bool
+       depends on K8_NUMA
+       default y
+
+config NUMA
+       bool
+       depends on K8_NUMA
+       default y
 
 config HAVE_DEC_LOCK
 	bool
@@ -245,15 +239,17 @@ config NR_CPUS
 	  kernel will support.  The maximum supported value is 32 and the
 	  minimum value which makes sense is 2.
 
-	  This is purely to save memory - each supported CPU adds
-	  approximately eight kilobytes to the kernel image.
+	  This is purely to save memory - each supported CPU requires
+	  memory in the static kernel configuration.
 
 config GART_IOMMU
 	bool "IOMMU support"
 	help
 	  Support the K8 IOMMU. Needed to run systems with more than 4GB of memory
-	  properly with 32-bit devices. You should probably turn this on.
-	  The iommu can be turned off at runtime with the iommu=off parameter.
+	  properly with 32-bit PCI devices that do not support DAC (Double Address
+	  Cycle). The IOMMU can be turned off at runtime with the iommu=off parameter.
+	  Normally the kernel will take the right choice by itself.
+	  If unsure say Y 
 
 config DUMMY_IOMMU
 	bool
@@ -291,7 +287,8 @@ config PM
 
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
-	  sending the processor to sleep and saving power.
+	  sending the processor to limited sleep and saving power. However
+	  using ACPI will likely save more power.
 
 config SOFTWARE_SUSPEND
 	bool "Software Suspend (EXPERIMENTAL)"
@@ -331,16 +328,6 @@ menu "Bus options (PCI etc.)"
 
 config PCI
 	bool "PCI support"
-	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
-
-	  The PCI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
 
 # x86-64 doesn't support PCI BIOS access from long mode so always go direct. 
 config PCI_DIRECT
@@ -381,54 +368,10 @@ config KCORE_ELF
 	bool
 	depends on PROC_FS
 	default y
-	---help---
-	  If you enabled support for /proc file system then the file
-	  /proc/kcore will contain the kernel core image. This can be used
-	  in gdb:
 
-	  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
-
-	  You have two choices here: ELF and A.OUT. Selecting ELF will make
-	  /proc/kcore appear in ELF core format as defined by the Executable
-	  and Linkable Format specification. Selecting A.OUT will choose the
-	  old "a.out" format which may be necessary for some old versions
-	  of binutils or on some architectures.
-
-	  This is especially useful if you have compiled the kernel with the
-	  "-g" option to preserve debugging information. It is mainly used
-	  for examining kernel data structures on the live kernel so if you
-	  don't understand what this means or are not a kernel hacker, just
-	  leave it at its default value ELF.
-
-#tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 config BINFMT_ELF
-	tristate "Kernel support for ELF binaries"
-	---help---
-	  ELF (Executable and Linkable Format) is a format for libraries and
-	  executables used across different architectures and operating
-	  systems. Saying Y here will enable your kernel to run ELF binaries
-	  and enlarge it by about 13 KB. ELF support under Linux has now all
-	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
-	  because it is portable (this does *not* mean that you will be able
-	  to run executables from different architectures or operating systems
-	  however) and makes building run-time libraries very easy. Many new
-	  executables are distributed solely in ELF format. You definitely
-	  want to say Y here.
-
-	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  If you find that after upgrading from Linux kernel 1.2 and saying Y
-	  here, you still can't run any ELF binaries (they just crash), then
-	  you'll have to install the newest ELF runtime libraries, including
-	  ld.so (check the file <file:Documentation/Changes> for location and
-	  latest version).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
-	  some crucial programs on your system might be in ELF format.
+	bool
+	default y
 
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
@@ -436,12 +379,9 @@ config BINFMT_MISC
 	  If you say Y here, it will be possible to plug wrapper-driven binary
 	  formats into the kernel. You will like this especially when you use
 	  programs that need an interpreter to run like Java, Python or
-	  Emacs-Lisp. It's also useful if you often run DOS executables under
-	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>). Once you have
-	  registered such a binary class with the kernel, you can start one of
-	  those programs simply by typing in its name at a shell prompt; Linux
-	  will automatically feed it to the correct interpreter.
+	  Emacs-Lisp. Once you have registered such a binary class with the kernel, 
+	  you can start one of those programs simply by typing in its name at a shell 
+	  prompt; Linux will automatically feed it to the correct interpreter.
 
 	  You can do other nice things, too. Read the file
 	  <file:Documentation/binfmt_misc.txt> to learn how to use this
@@ -452,7 +392,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 config IA32_EMULATION
@@ -463,6 +403,12 @@ config IA32_EMULATION
 	  left.
 
 config COMPAT
+	bool
+	depends on IA32_EMULATION
+	default y
+
+
+config UID16
 	bool
 	depends on IA32_EMULATION
 	default y
@@ -518,7 +464,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -545,7 +491,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -615,7 +561,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/oss/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.
@@ -672,9 +618,11 @@ config DEBUG_SPINLOCK
 	  best used in conjunction with the NMI watchdog so that spinlock
 	  deadlocks are also debuggable.
 
+# !SMP for now because the context switch early causes GPF in segment reloading
+# and the GS base checking does the wrong thing then, causing a hang.
 config CHECKING
 	bool "Additional run-time checks"
-	depends on DEBUG_KERNEL
+	depends on DEBUG_KERNEL && !SMP
 	help
 	  Enables some internal consistency checks for kernel debugging.
 	  You should normally say N.
@@ -683,7 +631,8 @@ config INIT_DEBUG
 	bool "Debug __init statements"
 	depends on DEBUG_KERNEL
 	help
-	  Fill __init and __initdata at the end of boot. This is only for debugging.
+	  Fill __init and __initdata at the end of boot. This helps debugging
+	  illegal uses of __init and __initdata after initialization.	  
 
 config KALLSYMS
 	bool "Load all symbols for debugging/kksymoops"
@@ -696,11 +645,11 @@ config FRAME_POINTER
        bool "Compile the kernel with frame pointers"
        depends on DEBUG_KERNEL	
        help
-         If you say Y here the resulting kernel image will be slightly larger
-         and slower, but it will give very useful debugging information.
-         If you don't debug the kernel, you can say N, but we may not be able
-         to solve problems without frame pointers.
-	 Note this is normally not needed on x86-64.
+	 Compile the kernel with frame pointers. This may help for some 
+	 debugging with external debuggers. Note the standard oops backtracer 
+	 doesn't make use of it and the x86-64 kernel doesn't ensure an consistent
+	 frame pointer through inline assembly (semaphores etc.)
+	 Normally you should say N.
 
 endmenu
 

@@ -686,7 +686,6 @@ static int validate (struct slot *slot_cur, int opn)
 int ibmphp_update_slot_info (struct slot *slot_cur)
 {
 	struct hotplug_slot_info *info;
-	char buffer[30];
 	int rc;
 	u8 bus_speed;
 	u8 mode;
@@ -697,7 +696,6 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 		return -ENOMEM;
 	}
         
-	strncpy (buffer, slot_cur->hotplug_slot->name, 30);
 	info->power_status = SLOT_PWRGD (slot_cur->status);
 	info->attention_status = SLOT_ATTN (slot_cur->status, slot_cur->ext_status);
 	info->latch_status = SLOT_LATCH (slot_cur->status);
@@ -735,7 +733,7 @@ int ibmphp_update_slot_info (struct slot *slot_cur)
 	info->max_bus_speed = slot_cur->hotplug_slot->info->max_bus_speed;
 	// To do: bus_names 
 	
-	rc = pci_hp_change_slot_info (buffer, info);
+	rc = pci_hp_change_slot_info (slot_cur->hotplug_slot, info);
 	kfree (info);
 	return rc;
 }
@@ -1057,6 +1055,8 @@ static int ibm_configure_device (struct pci_func *func)
 
 	if (func->dev == NULL) {
 		dev0.bus = ibmphp_find_bus (func->busno);
+		if (!dev0.bus)
+			return 0;
 		dev0.devfn = ((func->device << 3) + (func->function & 0x7));
 		dev0.sysdata = dev0.bus->sysdata;
 
@@ -1097,6 +1097,8 @@ static int is_bus_empty (struct slot * slot_cur)
 			continue;
 		}
 		tmp_slot = ibmphp_get_slot_from_physical_num (i);
+		if (!tmp_slot)
+			return 0;
 		rc = slot_update (&tmp_slot);
 		if (rc)
 			return 0;
@@ -1219,6 +1221,8 @@ static int check_limitations (struct slot *slot_cur)
 
 	for (i = slot_cur->bus_on->slot_min; i <= slot_cur->bus_on->slot_max; i++) {
 		tmp_slot = ibmphp_get_slot_from_physical_num (i);
+		if (!tmp_slot)
+			return -ENODEV;
 		if ((SLOT_PWRGD (tmp_slot->status)) && !(SLOT_CONNECT (tmp_slot->status))) 
 			count++;
 	}

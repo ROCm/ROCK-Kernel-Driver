@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -53,6 +53,9 @@
 #include <linux/socket.h>
 #include <linux/ip.h>
 #include <linux/time.h> /* For struct timeval */
+#include <net/ip.h>
+#include <net/icmp.h>
+#include <net/snmp.h>
 #include <net/sock.h>
 #include <net/xfrm.h>
 #include <net/sctp/sctp.h>
@@ -63,7 +66,7 @@ static int sctp_rcv_ootb(struct sk_buff *);
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *laddr,
 				      const union sctp_addr *paddr,
-				      sctp_transport_t **transportp);
+				      struct sctp_transport **transportp);
 sctp_endpoint_t *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr);
 
 
@@ -72,10 +75,19 @@ static inline int sctp_rcv_checksum(struct sk_buff *skb)
 {
 	struct sctphdr *sh;
 	__u32 cmp, val;
+	struct sk_buff *list = skb_shinfo(skb)->frag_list;
 
 	sh = (struct sctphdr *) skb->h.raw;
 	cmp = ntohl(sh->checksum);
-	val = count_crc((__u8 *)sh, skb->len);
+
+	val = sctp_start_cksum((__u8 *)sh, skb_headlen(skb));
+
+	for (; list; list = list->next)
+		val = sctp_update_cksum((__u8 *)list->data, skb_headlen(list),
+					val);
+
+	val = sctp_end_cksum(val);
+
 	if (val != cmp) {
 		/* CRC failure, dump it. */
 		return -1;
@@ -92,7 +104,7 @@ int sctp_rcv(struct sk_buff *skb)
 	sctp_association_t *asoc;
 	sctp_endpoint_t *ep = NULL;
 	sctp_endpoint_common_t *rcvr;
-	sctp_transport_t *transport = NULL;
+	struct sctp_transport *transport = NULL;
 	sctp_chunk_t *chunk;
 	struct sctphdr *sh;
 	union sctp_addr src;
@@ -158,6 +170,10 @@ int sctp_rcv(struct sk_buff *skb)
 
 	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_release;
+
+	ret = sk_filter(sk, skb, 1);
+	if (ret)
+                goto discard_release;
 
 	/* Create an SCTP packet structure. */
 	chunk = sctp_chunkify(skb, asoc, sk);
@@ -244,6 +260,27 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
         return 0;
 }
 
+/* Handle icmp frag needed error. */
+static inline void sctp_icmp_frag_needed(struct sock *sk,
+					 sctp_association_t *asoc,
+					 struct sctp_transport *transport,
+					 __u32 pmtu)
+{
+	if (unlikely(pmtu < SCTP_DEFAULT_MINSEGMENT)) {
+		printk(KERN_WARNING "%s: Reported pmtu %d too low, "
+		       "using default minimum of %d\n", __FUNCTION__, pmtu,
+		       SCTP_DEFAULT_MINSEGMENT);
+		pmtu = SCTP_DEFAULT_MINSEGMENT;
+	}
+
+	if (!sock_owned_by_user(sk) && transport && (transport->pmtu != pmtu)) {
+		transport->pmtu = pmtu;
+		sctp_assoc_sync_pmtu(asoc);
+		sctp_retransmit(&asoc->outqueue, transport,
+				SCTP_RETRANSMIT_PMTU_DISCOVERY );
+	}
+}
+
 /*
  * This routine is called by the ICMP module when it gets some
  * sort of error condition.  If err < 0 then the socket should
@@ -259,9 +296,109 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
  * is probably better.
  *
  */
-void sctp_v4_err(struct sk_buff *skb, u32 info)
+void sctp_v4_err(struct sk_buff *skb, __u32 info)
 {
-	/* This should probably involve a call to SCTPhandleICMP().  */
+	struct iphdr *iph = (struct iphdr *)skb->data;
+	struct sctphdr *sh = (struct sctphdr *)(skb->data + (iph->ihl <<2));
+	int type = skb->h.icmph->type;
+	int code = skb->h.icmph->code;
+	union sctp_addr saddr, daddr;
+	struct inet_opt *inet;
+	struct sock *sk = NULL;
+	sctp_endpoint_t *ep = NULL;
+	sctp_association_t *asoc = NULL;
+	struct sctp_transport *transport;
+	int err;
+
+	if (skb->len < ((iph->ihl << 2) + 8)) {
+		ICMP_INC_STATS_BH(IcmpInErrors);
+		return;
+	}
+
+	saddr.v4.sin_family = AF_INET;
+	saddr.v4.sin_port = ntohs(sh->source);
+	memcpy(&saddr.v4.sin_addr.s_addr, &iph->saddr, sizeof(struct in_addr));	
+	daddr.v4.sin_family = AF_INET;
+	daddr.v4.sin_port = ntohs(sh->dest);
+	memcpy(&daddr.v4.sin_addr.s_addr, &iph->daddr, sizeof(struct in_addr));	
+
+	/* Look for an association that matches the incoming ICMP error 
+	 * packet.
+	 */
+	asoc = __sctp_lookup_association(&saddr, &daddr, &transport);
+	if (!asoc) {
+		/* If there is no matching association, see if it matches any
+		 * endpoint. This may happen for an ICMP error generated in 
+		 * response to an INIT_ACK. 
+		 */ 
+		ep = __sctp_rcv_lookup_endpoint(&daddr);
+		if (!ep) {
+			ICMP_INC_STATS_BH(IcmpInErrors);
+			return;
+		}
+	}
+
+	if (asoc) {
+		if (ntohl(sh->vtag) != asoc->c.peer_vtag) {
+			ICMP_INC_STATS_BH(IcmpInErrors);
+			goto out;
+		}
+		sk = asoc->base.sk;
+	} else
+		sk = ep->base.sk;
+
+	sctp_bh_lock_sock(sk);
+	/* If too many ICMPs get dropped on busy
+	 * servers this needs to be solved differently.
+	 */
+	if (sock_owned_by_user(sk))
+		NET_INC_STATS_BH(LockDroppedIcmps);
+
+	switch (type) {
+	case ICMP_PARAMETERPROB:
+		err = EPROTO;
+		break;
+	case ICMP_DEST_UNREACH:
+		if (code > NR_ICMP_UNREACH)
+			goto out_unlock;
+
+		/* PMTU discovery (RFC1191) */
+		if (ICMP_FRAG_NEEDED == code) {
+			sctp_icmp_frag_needed(sk, asoc, transport, info);
+			goto out_unlock;
+		}
+
+		err = icmp_err_convert[code].errno;
+		break;
+	case ICMP_TIME_EXCEEDED:
+		/* Ignore any time exceeded errors due to fragment reassembly
+		 * timeouts.
+		 */
+		if (ICMP_EXC_FRAGTIME == code)
+			goto out_unlock;
+
+		err = EHOSTUNREACH;
+		break;
+	default:
+		goto out_unlock;
+	}
+
+	inet = inet_sk(sk);
+	if (!sock_owned_by_user(sk) && inet->recverr) {
+		sk->err = err;
+		sk->error_report(sk);
+	} else {  /* Only an error on timeout */
+		sk->err_soft = err;
+	}
+
+out_unlock:
+	sctp_bh_unlock_sock(sk);
+out:
+	sock_put(sk);
+	if (asoc)
+		sctp_association_put(asoc);
+	if (ep)	
+		sctp_endpoint_put(ep);
 }
 
 /*
@@ -299,17 +436,17 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 		 * chunk, the receiver should silently discard the packet
 		 * and take no further action.
 		 */
-		if (ch->type == SCTP_CID_SHUTDOWN_COMPLETE)
+		if (SCTP_CID_SHUTDOWN_COMPLETE == ch->type)
 			goto discard;
 
 		/* RFC 8.4, 7) If the packet contains a "Stale cookie" ERROR
 		 * or a COOKIE ACK the SCTP Packet should be silently
 		 * discarded.
 		 */
-		if (ch->type == SCTP_CID_COOKIE_ACK)
+		if (SCTP_CID_COOKIE_ACK == ch->type)
 			goto discard;
 
-		if (ch->type == SCTP_CID_ERROR) {
+		if (SCTP_CID_ERROR == ch->type) {
 			err = (sctp_errhdr_t *)(ch + sizeof(sctp_chunkhdr_t));
 			if (SCTP_ERROR_STALE_COOKIE == err->cause)
 				goto discard;
@@ -481,12 +618,12 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 /* Look up an association. */
 sctp_association_t *__sctp_lookup_association(const union sctp_addr *laddr,
 					      const union sctp_addr *paddr,
-					      sctp_transport_t **transportp)
+					      struct sctp_transport **transportp)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	int hash;
 
 	/* Optimize here for direct hit, only listening connections can
@@ -517,7 +654,7 @@ hit:
 /* Look up an association. BH-safe. */
 sctp_association_t *sctp_lookup_association(const union sctp_addr *laddr,
 					    const union sctp_addr *paddr,
-					    sctp_transport_t **transportp)
+					    struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 
@@ -533,7 +670,7 @@ int sctp_has_association(const union sctp_addr *laddr,
 			 const union sctp_addr *paddr)
 {
 	sctp_association_t *asoc;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 
 	if ((asoc = sctp_lookup_association(laddr, paddr, &transport))) {
 		sock_put(asoc->base.sk);
@@ -563,7 +700,7 @@ int sctp_has_association(const union sctp_addr *laddr,
  *
  */
 static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
-	const union sctp_addr *laddr, sctp_transport_t **transportp)
+	const union sctp_addr *laddr, struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 	union sctp_addr addr;
@@ -623,7 +760,7 @@ static sctp_association_t *__sctp_rcv_init_lookup(struct sk_buff *skb,
 sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *paddr,
 				      const union sctp_addr *laddr,
-				      sctp_transport_t **transportp)
+				      struct sctp_transport **transportp)
 {
 	sctp_association_t *asoc;
 

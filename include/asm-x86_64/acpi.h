@@ -48,8 +48,8 @@
 
 #define ACPI_ASM_MACROS
 #define BREAKPOINT3
-#define ACPI_DISABLE_IRQS() __cli()
-#define ACPI_ENABLE_IRQS()  __sti()
+#define ACPI_DISABLE_IRQS() local_irq_disable()
+#define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE()	wbinvd()
 
 /*
@@ -141,6 +141,10 @@ extern void acpi_reserve_bootmem(void);
 #define boot_cpu_physical_apicid boot_cpu_id
 
 extern int acpi_disabled;
+
+#define dmi_broken (0)
+#define BROKEN_ACPI_Sx		0x0001
+#define BROKEN_INIT_AFTER_S1	0x0002
 
 #endif /*__KERNEL__*/
 

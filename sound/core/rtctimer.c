@@ -37,9 +37,6 @@
 #include <linux/mc146818rtc.h>
 #endif
 
-/* use tasklet for interrupt handling */
-#define USE_TASKLET
-
 #define RTC_FREQ	1024		/* default frequency */
 #define NANO_SEC	1000000000L	/* 10^9 in sec */
 
@@ -69,10 +66,6 @@ static snd_timer_t *rtctimer;
 static atomic_t rtc_inc = ATOMIC_INIT(0);
 static rtc_task_t rtc_task;
 
-/* tasklet */
-#ifdef USE_TASKLET
-static struct tasklet_struct rtc_tq;
-#endif
 
 static int
 rtctimer_open(snd_timer_t *t)
@@ -83,7 +76,6 @@ rtctimer_open(snd_timer_t *t)
 	if (err < 0)
 		return err;
 	t->private_data = &rtc_task;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -95,7 +87,6 @@ rtctimer_close(snd_timer_t *t)
 		rtc_unregister(rtc);
 		t->private_data = NULL;
 	}
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -124,31 +115,13 @@ rtctimer_stop(snd_timer_t *timer)
  */
 static void rtctimer_interrupt(void *private_data)
 {
-	atomic_inc(&rtc_inc);
-#ifdef USE_TASKLET
-	tasklet_hi_schedule(&rtc_tq);
-#else
-	{
-		int ticks = atomic_read(&rtc_inc);
-		snd_timer_interrupt((snd_timer_t*)private_data, ticks);
-		atomic_sub(ticks, &rtc_inc);
-	}
-#endif /* USE_TASKLET */
-}
-
-#ifdef USE_TASKLET
-static void rtctimer_interrupt2(unsigned long private_data)
-{
-	snd_timer_t *timer = (snd_timer_t *)private_data;
 	int ticks;
 
-	snd_assert(timer != NULL, return);
-	do {
-		ticks = atomic_read(&rtc_inc);
-		snd_timer_interrupt(timer, ticks);
-	} while (!atomic_sub_and_test(ticks, &rtc_inc));
+	atomic_inc(&rtc_inc);
+	ticks = atomic_read(&rtc_inc);
+	snd_timer_interrupt((snd_timer_t*)private_data, ticks);
+	atomic_sub(ticks, &rtc_inc);
 }
-#endif /* USE_TASKLET */
 
 
 /*
@@ -174,10 +147,6 @@ static int __init rtctimer_init(void)
 	err = snd_timer_global_new("rtc", SNDRV_TIMER_GLOBAL_RTC, &timer);
 	if (err < 0)
 		return err;
-
-#ifdef USE_TASKLET
-	tasklet_init(&rtc_tq, rtctimer_interrupt2, (unsigned long)timer);
-#endif /* USE_TASKLET */
 
 	strcpy(timer->name, "RTC timer");
 	timer->hw = rtc_hw;

@@ -3,22 +3,6 @@
 # 30 Jan 1998, Michael Elizabeth Chastain, <mailto:mec@shout.net>
 # Rewritten to use lists instead of if-statements.
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs	:= cdrom.o
-
-
-
-# Object file lists.
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
-
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_BLK_DEV_IDECD)	+=              cdrom.o

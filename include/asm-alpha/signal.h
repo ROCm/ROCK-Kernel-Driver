@@ -93,7 +93,7 @@ typedef unsigned long sigset_t;
 #define SA_NOCLDSTOP	0x00000004
 #define SA_NODEFER	0x00000008
 #define SA_RESETHAND	0x00000010
-#define SA_NOCLDWAIT	0x00000020 /* not supported yet */
+#define SA_NOCLDWAIT	0x00000020
 #define SA_SIGINFO	0x00000040
 
 #define SA_ONESHOT	SA_RESETHAND
@@ -186,6 +186,7 @@ struct sigstack {
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
 
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 #define HAVE_ARCH_SYS_PAUSE
 
 #endif

@@ -746,7 +746,7 @@ static int sprint_command(char *buffer, int len, unsigned char *command)
 static int sprint_Scsi_Cmnd(char *buffer, int len, Scsi_Cmnd * cmd)
 {
 	int start = len;
-	PRINTP("host number %d destination target %d, lun %d\n" ANDP cmd->host->host_no ANDP cmd->target ANDP cmd->lun);
+	PRINTP("host number %d destination target %d, lun %d\n" ANDP cmd->device->host->host_no ANDP cmd->device->id ANDP cmd->device->lun);
 	PRINTP("        command = ");
 	len += sprint_command(buffer, len, cmd->cmnd);
 	return len - start;

@@ -69,6 +69,7 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 	oldseg = get_fs();\
 	set_fs(KERNEL_DS);\
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);\
+	set_fs(oldseg);\
 	if (err < 0) \
 		return err;\
 	if (native_ctl & (_IOC_READ << _IOC_DIRSHIFT)) {\
@@ -101,6 +102,7 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 	oldseg = get_fs();\
 	set_fs(KERNEL_DS);\
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)data);\
+	set_fs(oldseg);\
 	if (err < 0) \
 		goto __end;\
 	err = 0;\
@@ -122,12 +124,15 @@ static int snd_ioctl32_##name(unsigned int fd, unsigned int cmd, unsigned long a
 	return _snd_ioctl32_##type(fd, cmd, arg, file, native_ctl);\
 }
 
+#define MAP_COMPAT(ctl) { ctl, snd_ioctl32_compat }
 
 struct ioctl32_mapper {
 	unsigned int cmd;
 	int (*handler)(unsigned int, unsigned int, unsigned long, struct file * filp);
 	int registered;
 };
+
+int snd_ioctl32_compat(unsigned int, unsigned int, unsigned long, struct file *);
 
 int snd_ioctl32_register(struct ioctl32_mapper *mappers);
 void snd_ioctl32_unregister(struct ioctl32_mapper *mappers);

@@ -4811,7 +4811,7 @@ pcibr_dmamap_alloc(devfs_handle_t pconn_vhdl,
 
 	    /* Device is capable of A64 operations,
 	     * and the attributes of the DMA are
-	     * consistant with any previous DMA
+	     * consistent with any previous DMA
 	     * mappings using shared resources.
 	     */
 
@@ -4853,7 +4853,7 @@ pcibr_dmamap_alloc(devfs_handle_t pconn_vhdl,
 	if (!pcibr_try_set_device(pcibr_soft, slot, flags, BRIDGE_DEV_D32_BITS)) {
 	    /* User desires DIRECT A32 operations,
 	     * and the attributes of the DMA are
-	     * consistant with any previous DMA
+	     * consistent with any previous DMA
 	     * mappings using shared resources.
 	     * Mapping calls may fail if target
 	     * is outside the direct32 range.

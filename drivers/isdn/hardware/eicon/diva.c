@@ -563,10 +563,11 @@ static void diva_init_request_array(void)
 	Requests[31] = DivaIdiRequest31;
 }
 
+/* card:  1-based card number */
 void diva_xdi_display_adapter_features(int card)
 {
 	dword features;
-	if (!card || ((card - 1) > MAX_ADAPTER) || !IoAdapters[card - 1]) {
+	if (!card || ((card - 1) >= MAX_ADAPTER) || !IoAdapters[card - 1]) {
 		return;
 	}
 	card--;

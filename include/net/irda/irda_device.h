@@ -173,12 +173,33 @@ typedef struct {
 
 	__u8 *head;	      /* start of buffer */
 	__u8 *data;	      /* start of data in buffer */
-	__u8 *tail;           /* end of data in buffer */
 
-	int len;	      /* length of data */
-	int truesize;	      /* total size of buffer */
+	int len;	      /* current length of data */
+	int truesize;	      /* total allocated size of buffer */
 	__u16 fcs;
+
+	struct sk_buff *skb;	/* ZeroCopy Rx in async_unwrap_char() */
 } iobuff_t;
+
+/* Maximum SIR frame (skb) that we expect to receive *unwrapped*.
+ * Max LAP MTU (I field) is 2048 bytes max (IrLAP 1.1, chapt 6.6.5, p40).
+ * Max LAP header is 2 bytes (for now).
+ * Max CRC is 2 bytes at SIR, 4 bytes at FIR. 
+ * Need 1 byte for skb_reserve() to align IP header for IrLAN.
+ * Add a few extra bytes just to be safe (buffer is power of two anyway)
+ * Jean II */
+#define IRDA_SKB_MAX_MTU	2064
+/* Maximum SIR frame that we expect to send, wrapped (i.e. with XBOFS
+ * and escaped characters on top of above). */
+#define IRDA_SIR_MAX_FRAME	4269
+
+/* The SIR unwrapper async_unwrap_char() will use a Rx-copy-break mechanism
+ * when using the optional ZeroCopy Rx, where only small frames are memcpy
+ * to a smaller skb to save memory. This is the thresold under which copy
+ * will happen (and over which it won't happen).
+ * Some FIR drivers may use this #define as well...
+ * This is the same value as various Ethernet drivers. - Jean II */
+#define IRDA_RX_COPY_THRESHOLD  256
 
 /* Function prototypes */
 int  irda_device_init(void);

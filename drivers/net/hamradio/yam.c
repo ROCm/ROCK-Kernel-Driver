@@ -34,7 +34,7 @@
  *   0.5 F6FBB 01.08.98  Shared IRQs, /proc/net and network statistics
  *   0.6 F6FBB 25.08.98  Added 1200Bds format
  *   0.7 F6FBB 12.09.98  Added to the kernel configuration
- *   0.8 F6FBB 14.10.98  Fixed slottime/persistance timing bug
+ *   0.8 F6FBB 14.10.98  Fixed slottime/persistence timing bug
  *       OK1ZIA 2.09.01  Fixed "kfree_skb on hard IRQ" 
  *                       using dev_kfree_skb_any(). (important in 2.4 kernel)
  *   
@@ -350,7 +350,7 @@ static int fpga_write(int iobase, unsigned char wrd)
 		wrd <<= 1;
 		outb(0xfc, THR(iobase));
 		while ((inb(LSR(iobase)) & LSR_TSRE) == 0)
-			if (jiffies > timeout)
+			if (time_after(jiffies, timeout))
 				return -1;
 	}
 

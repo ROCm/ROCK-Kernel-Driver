@@ -116,6 +116,49 @@ mpage_alloc(struct block_device *bdev,
 	return bio;
 }
 
+/*
+ * support function for mpage_readpages.  The fs supplied get_block might
+ * return an up to date buffer.  This is used to map that buffer into
+ * the page, which allows readpage to avoid triggering a duplicate call
+ * to get_block.
+ *
+ * The idea is to avoid adding buffers to pages that don't already have
+ * them.  So when the buffer is up to date and the page size == block size,
+ * this marks the page up to date instead of adding new buffers.
+ */
+static void 
+map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block) 
+{
+	struct inode *inode = page->mapping->host;
+	struct buffer_head *page_bh, *head;
+	int block = 0;
+
+	if (!page_has_buffers(page)) {
+		/*
+		 * don't make any buffers if there is only one buffer on
+		 * the page and the page just needs to be set up to date
+		 */
+		if (inode->i_blkbits == PAGE_CACHE_SHIFT && 
+		    buffer_uptodate(bh)) {
+			SetPageUptodate(page);    
+			return;
+		}
+		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
+	}
+	head = page_buffers(page);
+	page_bh = head;
+	do {
+		if (block == page_block) {
+			page_bh->b_state = bh->b_state;
+			page_bh->b_bdev = bh->b_bdev;
+			page_bh->b_blocknr = bh->b_blocknr;
+			break;
+		}
+		page_bh = page_bh->b_this_page;
+		block++;
+	} while (page_bh != head);
+}
+
 /**
  * mpage_readpages - populate an address space with some pages, and
  *                       start reads against them.
@@ -186,6 +229,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	block_in_file = page->index << (PAGE_CACHE_SHIFT - blkbits);
 	last_block = (inode->i_size + blocksize - 1) >> blkbits;
 
+	bh.b_page = page;
 	for (page_block = 0; page_block < blocks_per_page;
 				page_block++, block_in_file++) {
 		bh.b_state = 0;
@@ -199,6 +243,17 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 			if (first_hole == blocks_per_page)
 				first_hole = page_block;
 			continue;
+		}
+
+		/* some filesystems will copy data into the page during
+		 * the get_block call, in which case we don't want to
+		 * read it again.  map_buffer_to_page copies the data
+		 * we just collected from get_block into the page's buffers
+		 * so readpage doesn't have to repeat the get_block call
+		 */
+		if (buffer_uptodate(&bh)) {
+			map_buffer_to_page(page, &bh, page_block);
+			goto confused;
 		}
 	
 		if (first_hole != blocks_per_page)
@@ -256,7 +311,10 @@ out:
 confused:
 	if (bio)
 		bio = mpage_bio_submit(READ, bio);
-	block_read_full_page(page, get_block);
+	if (!PageUptodate(page))
+	        block_read_full_page(page, get_block);
+	else
+		unlock_page(page);
 	goto out;
 }
 
@@ -344,6 +402,7 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	sector_t boundary_block = 0;
 	struct block_device *boundary_bdev = NULL;
 	int length;
+	struct buffer_head map_bh;
 
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
@@ -401,8 +460,8 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	BUG_ON(!PageUptodate(page));
 	block_in_file = page->index << (PAGE_CACHE_SHIFT - blkbits);
 	last_block = (inode->i_size - 1) >> blkbits;
+	map_bh.b_page = page;
 	for (page_block = 0; page_block < blocks_per_page; ) {
-		struct buffer_head map_bh;
 
 		map_bh.b_state = 0;
 		if (get_block(inode, block_in_file, &map_bh, 1))
@@ -559,7 +618,6 @@ mpage_writepages(struct address_space *mapping,
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
-		blk_run_queues();
 		wbc->encountered_congestion = 1;
 		return 0;
 	}
@@ -614,7 +672,6 @@ mpage_writepages(struct address_space *mapping,
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
 			if (wbc->nonblocking && bdi_write_congested(bdi)) {
-				blk_run_queues();
 				wbc->encountered_congestion = 1;
 				done = 1;
 			}

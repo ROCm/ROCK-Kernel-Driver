@@ -18,7 +18,7 @@ config AZTCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aztcd.o.  If you want to compile it as a
+	  The module will be called aztcd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config GSCD
@@ -36,7 +36,7 @@ config GSCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called gscd.o.  If you want to compile it as a
+	  The module will be called gscd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config SBPCD
@@ -76,7 +76,7 @@ config SBPCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sbpcd.o.  If you want to compile it as a
+	  The module will be called sbpcd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config MCD
@@ -101,7 +101,7 @@ config MCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mcd.o. If you want to compile it as a
+	  The module will be called mcd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config MCD_IRQ
@@ -142,7 +142,7 @@ config MCDX
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mcdx.o. If you want to compile it as a
+	  The module will be called mcdx. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config OPTCD
@@ -161,7 +161,7 @@ config OPTCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called optcd.o. If you want to compile it as a
+	  The module will be called optcd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config CM206
@@ -178,7 +178,7 @@ config CM206
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cm206.o. If you want to compile it as a
+	  The module will be called cm206. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config SJCD
@@ -192,7 +192,7 @@ config SJCD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sjcd.o. If you want to compile it as a
+	  The module will be called sjcd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ISP16_CDI
@@ -207,7 +207,7 @@ config ISP16_CDI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called isp16.o. If you want to compile it as a
+	  The module will be called isp16. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config CDU31A
@@ -229,7 +229,7 @@ config CDU31A
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cdu31a.o.  If you want to compile it as a
+	  The module will be called cdu31a.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config CDU535
@@ -245,6 +245,6 @@ config CDU535
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sonycd535.o. If you want to compile it as
+	  The module will be called sonycd535. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 

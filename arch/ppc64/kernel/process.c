@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/init_task.h>
 #include <linux/prctl.h>
+#include <linux/ptrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -163,6 +164,11 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
+	struct thread_info *t = current_thread_info();
+
+	if (t->flags & _TIF_ABI_PENDING)
+		t->flags ^= (_TIF_ABI_PENDING | _TIF_32BIT);
+
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 }

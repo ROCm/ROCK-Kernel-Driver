@@ -1046,7 +1046,7 @@ static void aurora_change_speed(struct Aurora_board *bp, struct Aurora_port *por
 			    &bp->r[chip]->r[CD180_MSVR]);
 	}
 	
-	/* Now we must calculate some speed dependant things. */
+	/* Now we must calculate some speed dependent things. */
 	
 	/* Set baud rate for port. */
 	tmp = (((bp->oscfreq + baud/2) / baud +

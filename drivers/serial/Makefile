@@ -4,8 +4,6 @@
 #  $Id: Makefile,v 1.8 2002/07/21 21:32:30 rmk Exp $
 #
 
-export-objs	:= core.o 8250.o 8250_pci.o suncore.o
-
 serial-8250-y :=
 serial-8250-$(CONFIG_GSC) += 8250_gsc.o
 serial-8250-$(CONFIG_PCI) += 8250_pci.o

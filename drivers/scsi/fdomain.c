@@ -960,7 +960,7 @@ static int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    	return 0;
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
-   scsi_set_pci_device(shpnt, pdev);
+   scsi_set_device(shpnt, &pdev->dev);
    shpnt->n_io_port = 0x10;
    print_banner( shpnt );
 
@@ -1252,9 +1252,9 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	 printk( " AFAIL " );
 #endif
-         spin_lock_irqsave(current_SC->host->host_lock, flags);
+         spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	 my_done( DID_BUS_BUSY << 16 );
-         spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+         spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 	 return;
       }
       current_SC->SCp.phase = in_selection;
@@ -1262,7 +1262,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       outb( 0x40 | FIFO_COUNT, Interrupt_Cntl_port );
 
       outb( 0x82, SCSI_Cntl_port ); /* Bus Enable + Select */
-      outb( adapter_mask | (1 << current_SC->target), SCSI_Data_NoACK_port );
+      outb( adapter_mask | (1 << current_SC->device->id), SCSI_Data_NoACK_port );
       
       /* Stop arbitration and enable parity */
       outb( 0x10 | PARITY_MASK, TMC_Cntl_port );
@@ -1274,13 +1274,13 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
       status = inb( SCSI_Status_port );
       if (!(status & 0x01)) {
 	 /* Try again, for slow devices */
-	 if (fdomain_select( current_SC->target )) {
+	 if (fdomain_select( current_SC->device->id )) {
 #if EVERY_ACCESS
 	    printk( " SFAIL " );
 #endif
-            spin_lock_irqsave(current_SC->host->host_lock, flags);
+            spin_lock_irqsave(current_SC->device->host->host_lock, flags);
 	    my_done( DID_NO_CONNECT << 16 );
-            spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+            spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 	    return;
 	 } else {
 #if EVERY_ACCESS
@@ -1337,7 +1337,7 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 	     && current_SC->SCp.Status != 2
 	     && current_SC->SCp.Status != 8) {
 	    printk( "scsi: <fdomain> target = %d, command = %x, status = %x\n",
-		    current_SC->target,
+		    current_SC->device->id,
 		    current_SC->cmnd[0],
 		    current_SC->SCp.Status );
 	 }
@@ -1476,10 +1476,10 @@ static void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
       printk( "BEFORE MY_DONE. . ." );
 #endif
-      spin_lock_irqsave(current_SC->host->host_lock, flags);
+      spin_lock_irqsave(current_SC->device->host->host_lock, flags);
       my_done( (current_SC->SCp.Status & 0xff)
 	       | ((current_SC->SCp.Message & 0xff) << 8) | (DID_OK << 16) );
-      spin_unlock_irqrestore(current_SC->host->host_lock, flags);
+      spin_unlock_irqrestore(current_SC->device->host->host_lock, flags);
 #if EVERY_ACCESS
       printk( "RETURNING.\n" );
 #endif
@@ -1580,13 +1580,13 @@ static void print_info(Scsi_Cmnd *SCpnt)
    unsigned int irr;
    unsigned int isr;
 
-   if (!SCpnt || !SCpnt->host) {
+   if (!SCpnt || !SCpnt->device || !SCpnt->device->host) {
       printk(KERN_WARNING "scsi: <fdomain> Cannot provide detailed information\n");
       return;
    }
    
-   printk(KERN_INFO "%s\n", fdomain_16x0_info( SCpnt->host ) );
-   print_banner(SCpnt->host);
+   printk(KERN_INFO "%s\n", fdomain_16x0_info( SCpnt->device->host ) );
+   print_banner(SCpnt->device->host);
    switch (SCpnt->SCp.phase) {
    case in_arbitration: printk("arbitration"); break;
    case in_selection:   printk("selection");   break;
@@ -1596,7 +1596,7 @@ static void print_info(Scsi_Cmnd *SCpnt)
 
    printk( " (%d), target = %d cmnd = 0x%02x pieces = %d size = %u\n",
 	   SCpnt->SCp.phase,
-	   SCpnt->target,
+	   SCpnt->device->id,
 	   *(unsigned char *)SCpnt->cmnd,
 	   SCpnt->use_sg,
 	   SCpnt->request_bufflen );

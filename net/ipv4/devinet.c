@@ -823,6 +823,34 @@ int unregister_inetaddr_notifier(struct notifier_block *nb)
 	return notifier_chain_unregister(&inetaddr_chain, nb);
 }
 
+/* Rename ifa_labels for a device name change. Make some effort to preserve existing
+ * alias numbering and to create unique labels if possible.
+*/
+static void inetdev_changename(struct net_device *dev, struct in_device *in_dev)
+{ 
+	struct in_ifaddr *ifa;
+	int named = 0;
+
+	for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next) { 
+		char old[IFNAMSIZ], *dot; 
+
+		memcpy(old, ifa->ifa_label, IFNAMSIZ);
+		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ); 
+		if (named++ == 0)
+			continue;
+		dot = strchr(ifa->ifa_label, ':');
+		if (dot == NULL) { 
+			sprintf(old, ":%d", named); 
+			dot = old;
+		}
+		if (strlen(dot) + strlen(dev->name) < IFNAMSIZ) { 
+			strcat(ifa->ifa_label, dot); 
+		} else { 
+			strcpy(ifa->ifa_label + (IFNAMSIZ - strlen(dot) - 1), dot); 
+		} 
+	}	
+} 
+
 /* Called only under RTNL semaphore */
 
 static int inetdev_event(struct notifier_block *this, unsigned long event,
@@ -873,14 +901,10 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 		inetdev_destroy(in_dev);
 		break;
 	case NETDEV_CHANGENAME:
-		if (in_dev->ifa_list) {
-			struct in_ifaddr *ifa;
-			for (ifa = in_dev->ifa_list; ifa; ifa = ifa->ifa_next)
-				memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
-			/* Do not notify about label change, this event is
-			   not interesting to applications using netlink.
-			 */
-		}
+		/* Do not notify about label change, this event is
+		 * not interesting to applications using netlink.
+		 */
+		inetdev_changename(dev, in_dev);
 		break;
 	}
 out:

@@ -168,13 +168,16 @@ nfsd(struct svc_rqst *rqstp)
 	struct svc_serv	*serv = rqstp->rq_server;
 	int		err;
 	struct nfsd_list me;
+	sigset_t shutdown_mask, allowed_mask;
 
 	/* Lock module and set up kernel thread */
 	MOD_INC_USE_COUNT;
 	lock_kernel();
-	daemonize();
-	sprintf(current->comm, "nfsd");
+	daemonize("nfsd");
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
+
+	siginitsetinv(&shutdown_mask, SHUTDOWN_SIGS);
+	siginitsetinv(&allowed_mask, ALLOWED_SIGS);
 
 	nfsdstats.th_cnt++;
 
@@ -189,10 +192,7 @@ nfsd(struct svc_rqst *rqstp)
 	 */
 	for (;;) {
 		/* Block all but the shutdown signals */
-		spin_lock_irq(&current->sig->siglock);
-		siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		sigprocmask(SIG_SETMASK, &shutdown_mask, NULL);
 
 		/*
 		 * Find a socket with data available and call its
@@ -210,10 +210,7 @@ nfsd(struct svc_rqst *rqstp)
 		exp_readlock();
 
 		/* Process request with signals blocked.  */
-		spin_lock_irq(&current->sig->siglock);
-		siginitsetinv(&current->blocked, ALLOWED_SIGS);
-		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		sigprocmask(SIG_SETMASK, &allowed_mask, NULL);
 
 		svc_process(serv, rqstp);
 
@@ -267,6 +264,7 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	struct svc_procedure	*proc;
 	kxdrproc_t		xdr;
 	u32			nfserr;
+	u32			*nfserrp;
 
 	dprintk("nfsd_dispatch: vers %d proc %d\n",
 				rqstp->rq_vers, rqstp->rq_proc);
@@ -293,6 +291,13 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 		return 1;
 	}
 
+	/* need to grab the location to store the status, as
+	 * nfsv4 does some encoding while processing 
+	 */
+	nfserrp = rqstp->rq_res.head[0].iov_base
+		+ rqstp->rq_res.head[0].iov_len;
+	rqstp->rq_res.head[0].iov_len += sizeof(u32);
+
 	/* Now call the procedure handler, and encode NFS status. */
 	nfserr = proc->pc_func(rqstp, rqstp->rq_argp, rqstp->rq_resp);
 	if (nfserr == nfserr_dropit) {
@@ -300,16 +305,16 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 		nfsd_cache_update(rqstp, RC_NOCACHE, NULL);
 		return 0;
 	}
-		
+
 	if (rqstp->rq_proc != 0)
-		svc_putu32(&rqstp->rq_res.head[0], nfserr);
+		*nfserrp++ = nfserr;
 
 	/* Encode result.
 	 * For NFSv2, additional info is never returned in case of an error.
 	 */
 	if (!(nfserr && rqstp->rq_vers == 2)) {
 		xdr = proc->pc_encode;
-		if (xdr && !xdr(rqstp, (u32*)(rqstp->rq_res.head[0].iov_base+rqstp->rq_res.head[0].iov_len),
+		if (xdr && !xdr(rqstp, nfserrp,
 				rqstp->rq_resp)) {
 			/* Failed to encode result. Release cache entry */
 			dprintk("nfsd: failed to encode result!\n");

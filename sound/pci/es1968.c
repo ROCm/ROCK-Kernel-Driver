@@ -1414,7 +1414,7 @@ static snd_pcm_hardware_t snd_es1968_capture = {
    * DMA memory management *
    *************************/
 
-/* Because the Maestro can only take adresses relative to the PCM base adress
+/* Because the Maestro can only take addresses relative to the PCM base adress
    register :( */
 
 static int calc_available_memory_size(es1968_t *chip)
@@ -2420,15 +2420,12 @@ static void es1968_suspend(es1968_t *chip)
 	if (! chip->do_pm)
 		return;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 	snd_es1968_bob_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void es1968_resume(es1968_t *chip)
@@ -2438,9 +2435,8 @@ static void es1968_resume(es1968_t *chip)
 	if (! chip->do_pm)
 		return;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* restore all our config */
 	pci_enable_device(chip->pci);
@@ -2459,8 +2455,6 @@ static void es1968_resume(es1968_t *chip)
 	if (atomic_read(&chip->bobclient))
 		snd_es1968_bob_start(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND
@@ -2674,7 +2668,7 @@ static int snd_es1968_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	val = oval & ~0x04;
 	if (ucontrol->value.integer.value[0])
 		val |= 0x04;
-	if (val != oval); {
+	if (val != oval) {
 		pci_write_config_word(chip->pci, ESM_LEGACY_AUDIO_CONTROL, val);
 		return 1;
 	}
@@ -2701,7 +2695,8 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 	static int dev;
 	snd_card_t *card;
 	es1968_t *chip;
-	int i, err;
+	unsigned int i;
+	int err;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;

@@ -37,17 +37,18 @@
 #include "uml-config.h"
 #include "choose-mode.h"
 #include "mode.h"
-#ifdef CONFIG_MODE_SKAS
-#include "skas_ptrace.h"
+#ifdef UML_CONFIG_MODE_SKAS
 #include "skas.h"
+#include "skas_ptrace.h"
 #endif
 
 void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 {
-	int flags = 0;
+	int flags = 0, pages;
 
 	if(sig_stack != NULL){
-		set_sigstack(sig_stack, 2 * page_size());
+		pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER) - 2;
+		set_sigstack(sig_stack, pages * page_size());
 		flags = SA_ONSTACK;
 	}
 	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
@@ -251,32 +252,32 @@ void forward_pending_sigio(int target)
 
 int can_do_skas(void)
 {
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 	struct ptrace_faultinfo fi;
 	void *stack;
 	int pid, n, ret = 1;
 
-	printk("Checking for the skas3 patch in the host...");
+	printf("Checking for the skas3 patch in the host...");
 	pid = start_ptraced_child(&stack);
 
 	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
 	if(n < 0){
 		if(errno == EIO)
-			printk("not found\n");
-		else printk("No (unexpected errno - %d)\n", errno);
+			printf("not found\n");
+		else printf("No (unexpected errno - %d)\n", errno);
 		ret = 0;
 	}
-	else printk("found\n");
+	else printf("found\n");
 
 	init_registers(pid);
 	stop_ptraced_child(pid, stack, 1);
 
-	printk("Checking for /proc/mm...");
+	printf("Checking for /proc/mm...");
 	if(access("/proc/mm", W_OK)){
-		printk("not found\n");
+		printf("not found\n");
 		ret = 0;
 	}
-	else printk("found\n");
+	else printf("found\n");
 
 	return(ret);
 #else

@@ -34,15 +34,14 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/gameport.h>
 
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/trident.h>
 #include <sound/asoundef.h>
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
+#include <sound/pcm_sgbuf.h>
 
 #include <asm/io.h>
 
@@ -760,14 +759,14 @@ int snd_trident_allocate_pcm_mem(snd_pcm_substream_t * substream,
 
 	if ((err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params))) < 0)
 		return err;
-	if (err > 0 && trident->tlb.entries) {
-		if (voice->memblk)
-			snd_trident_free_pages(trident, voice->memblk);
-		spin_lock_irq(&trident->reg_lock);
-		voice->memblk = snd_trident_alloc_pages(trident, runtime->dma_area, runtime->dma_addr, runtime->dma_bytes);
-		spin_unlock_irq(&trident->reg_lock);
-		if (voice->memblk == NULL)
-			return -ENOMEM;
+	if (trident->tlb.entries) {
+		if (err > 0) { /* change */
+			if (voice->memblk)
+				snd_trident_free_pages(trident, voice->memblk);
+			voice->memblk = snd_trident_alloc_pages(trident, substream);
+			if (voice->memblk == NULL)
+				return -ENOMEM;
+		}
 	}
 	return 0;
 }
@@ -794,7 +793,7 @@ int snd_trident_allocate_evoice(snd_pcm_substream_t * substream,
 
 	/* voice management */
 
-	if (params_buffer_size(hw_params) / 2 != params_buffer_size(hw_params)) {
+	if (params_buffer_size(hw_params) / 2 != params_period_size(hw_params)) {
 		if (evoice == NULL) {
 			evoice = snd_trident_alloc_voice(trident, SNDRV_TRIDENT_VOICE_TYPE_PCM, 0, 0);
 			if (evoice == NULL)
@@ -853,9 +852,11 @@ static int snd_trident_hw_free(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	snd_trident_voice_t *evoice = voice ? voice->extra : NULL;
 
-	if (trident->tlb.entries && voice && voice->memblk) {
-		snd_trident_free_pages(trident, voice->memblk);
-		voice->memblk = NULL;
+	if (trident->tlb.entries) {
+		if (voice && voice->memblk) {
+			snd_trident_free_pages(trident, voice->memblk);
+			voice->memblk = NULL;
+		}
 	}
 	snd_pcm_lib_free_pages(substream);
 	if (evoice != NULL) {
@@ -992,10 +993,12 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	outb(0x54, TRID_REG(trident, LEGACY_DMAR11));
 
 	// Set channel buffer Address
-	voice->LBA = runtime->dma_addr;
-	outl(voice->LBA, TRID_REG(trident, LEGACY_DMAR0));
+	/* FIXME: LEGACY_DMAR0 correctly set? */
 	if (voice->memblk)
 		voice->LBA = voice->memblk->offset;
+	else
+		voice->LBA = runtime->dma_addr;
+	outl(voice->LBA, TRID_REG(trident, LEGACY_DMAR0));
 
 	// set ESO
 	ESO_bytes = snd_pcm_lib_buffer_bytes(substream) - 1;
@@ -1345,6 +1348,7 @@ static int snd_trident_spdif_prepare(snd_pcm_substream_t * substream)
 		voice->spurious_threshold = snd_trident_spurious_threshold(runtime->rate, runtime->period_size);
 
 		/* set Loop Back Address */
+		/* FIXME: LBAO?? */
 		LBAO = runtime->dma_addr;
 		if (voice->memblk)
 			voice->LBA = voice->memblk->offset;
@@ -1573,10 +1577,10 @@ static snd_pcm_uframes_t snd_trident_playback_pointer(snd_pcm_substream_t * subs
 		cso = (unsigned int) inl(TRID_REG(trident, CH_NX_DELTA_CSO)) & 0x00ffffff;
 	}
 
-	if (++cso > runtime->buffer_size)
-		cso = runtime->buffer_size;
-
 	spin_unlock(&trident->reg_lock);
+
+	if (++cso >= runtime->buffer_size)
+		cso = 0;
 
 	return cso;
 }
@@ -1605,7 +1609,8 @@ static snd_pcm_uframes_t snd_trident_capture_pointer(snd_pcm_substream_t * subst
 	result = inw(TRID_REG(trident, T4D_SBBL_SBCL));
 	if (runtime->channels > 1)
 		result >>= 1;
-	result = runtime->buffer_size - result;
+	if (result > 0)
+		result = runtime->buffer_size - result;
 
 	// printk("capture result = 0x%x, cso = 0x%x\n", result, cso);
 
@@ -1759,15 +1764,12 @@ static snd_pcm_hardware_t snd_trident_spdif_7018 =
 
 static void snd_trident_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
-	unsigned long flags;
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	trident_t *trident;
 
 	if (voice) {
 		trident = voice->trident;
-		spin_lock_irqsave(&trident->reg_lock, flags);
 		snd_trident_free_voice(trident, voice);
-		spin_unlock_irqrestore(&trident->reg_lock, flags);
 	}
 }
 
@@ -1777,13 +1779,9 @@ static int snd_trident_playback_open(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_trident_voice_t *voice;
 
-	spin_lock_irq(&trident->reg_lock);
 	voice = snd_trident_alloc_voice(trident, SNDRV_TRIDENT_VOICE_TYPE_PCM, 0, 0);
-	if (voice == NULL) {
-		spin_unlock_irq(&trident->reg_lock);
+	if (voice == NULL)
 		return -EAGAIN;
-	}
-	spin_unlock_irq(&trident->reg_lock);
 	snd_trident_pcm_mixer_build(trident, voice, substream);
 	voice->substream = substream;
 	runtime->private_data = voice;
@@ -1830,12 +1828,9 @@ static int snd_trident_spdif_open(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
-	spin_lock_irq(&trident->reg_lock);
 	voice = snd_trident_alloc_voice(trident, SNDRV_TRIDENT_VOICE_TYPE_PCM, 0, 0);
-	if (voice == NULL) {
-		spin_unlock_irq(&trident->reg_lock);
+	if (voice == NULL)
 		return -EAGAIN;
-	}
 	voice->spdif = 1;
 	voice->substream = substream;
 	trident->spdif_pcm_bits = trident->spdif_bits;
@@ -1911,14 +1906,10 @@ static int snd_trident_capture_open(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	spin_lock_irq(&trident->reg_lock);
 	voice = snd_trident_alloc_voice(trident, SNDRV_TRIDENT_VOICE_TYPE_PCM, 0, 0);
-	if (voice == NULL) {
-		spin_unlock_irq(&trident->reg_lock);
+	if (voice == NULL)
 		return -EAGAIN;
-	}
 	voice->capture = 1;
-	spin_unlock_irq(&trident->reg_lock);
 	voice->substream = substream;
 	runtime->private_data = voice;
 	runtime->private_free = snd_trident_pcm_free_substream;
@@ -1959,23 +1950,11 @@ static int snd_trident_foldback_open(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
-	spin_lock_irq(&trident->reg_lock);
 	voice = snd_trident_alloc_voice(trident, SNDRV_TRIDENT_VOICE_TYPE_PCM, 0, 0);
-	if (voice == NULL) {
-		spin_unlock_irq(&trident->reg_lock);
+	if (voice == NULL)
 		return -EAGAIN;
-	}
-	if (trident->tlb.entries) {
-		voice->memblk = snd_trident_alloc_pages(trident, runtime->dma_area, runtime->dma_addr, runtime->dma_bytes);
-		if (voice->memblk == NULL) {
-			snd_trident_free_voice(trident, voice);
-			spin_unlock_irq(&trident->reg_lock);
-			return -ENOMEM;
-		}
-	}
-	voice->substream = substream;
 	voice->foldback_chan = substream->number;
-	spin_unlock_irq(&trident->reg_lock);
+	voice->substream = substream;
 	runtime->private_data = voice;
 	runtime->private_free = snd_trident_pcm_free_substream;
 	runtime->hw = snd_trident_foldback;
@@ -2021,6 +2000,18 @@ static snd_pcm_ops_t snd_trident_playback_ops = {
 	.pointer =	snd_trident_playback_pointer,
 };
 
+static snd_pcm_ops_t snd_trident_nx_playback_ops = {
+	.open =		snd_trident_playback_open,
+	.close =	snd_trident_playback_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_hw_params,
+	.hw_free =	snd_trident_hw_free,
+	.prepare =	snd_trident_playback_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_playback_pointer,
+	.page =		snd_pcm_sgbuf_ops_page,
+};
+
 static snd_pcm_ops_t snd_trident_capture_ops = {
 	.open =		snd_trident_capture_open,
 	.close =	snd_trident_capture_close,
@@ -2030,6 +2021,18 @@ static snd_pcm_ops_t snd_trident_capture_ops = {
 	.prepare =	snd_trident_capture_prepare,
 	.trigger =	snd_trident_trigger,
 	.pointer =	snd_trident_capture_pointer,
+};
+
+static snd_pcm_ops_t snd_trident_nx_capture_ops = {
+	.open =		snd_trident_capture_open,
+	.close =	snd_trident_capture_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_capture_hw_params,
+	.hw_free =	snd_trident_hw_free,
+	.prepare =	snd_trident_capture_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_capture_pointer,
+	.page =		snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_trident_si7018_capture_ops = {
@@ -2054,6 +2057,18 @@ static snd_pcm_ops_t snd_trident_foldback_ops = {
 	.pointer =	snd_trident_playback_pointer,
 };
 
+static snd_pcm_ops_t snd_trident_nx_foldback_ops = {
+	.open =		snd_trident_foldback_open,
+	.close =	snd_trident_foldback_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_hw_params,
+	.hw_free =	snd_trident_hw_free,
+	.prepare =	snd_trident_foldback_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_playback_pointer,
+	.page =		snd_pcm_sgbuf_ops_page,
+};
+
 static snd_pcm_ops_t snd_trident_spdif_ops = {
 	.open =		snd_trident_spdif_open,
 	.close =	snd_trident_spdif_close,
@@ -2063,6 +2078,18 @@ static snd_pcm_ops_t snd_trident_spdif_ops = {
 	.prepare =	snd_trident_spdif_prepare,
 	.trigger =	snd_trident_trigger,
 	.pointer =	snd_trident_spdif_pointer,
+};
+
+static snd_pcm_ops_t snd_trident_nx_spdif_ops = {
+	.open =		snd_trident_spdif_open,
+	.close =	snd_trident_spdif_close,
+	.ioctl =	snd_trident_ioctl,
+	.hw_params =	snd_trident_spdif_hw_params,
+	.hw_free =	snd_trident_hw_free,
+	.prepare =	snd_trident_spdif_prepare,
+	.trigger =	snd_trident_trigger,
+	.pointer =	snd_trident_spdif_pointer,
+	.page =		snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_trident_spdif_7018_ops = {
@@ -2131,18 +2158,26 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 	pcm->private_data = trident;
 	pcm->private_free = snd_trident_pcm_free;
 
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_playback_ops);
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
+	if (trident->tlb.entries) {
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_nx_playback_ops);
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_nx_capture_ops);
+	} else {
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_playback_ops);
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE,
 				trident->device != TRIDENT_DEVICE_ID_SI7018 ?
-					&snd_trident_capture_ops :
-					&snd_trident_si7018_capture_ops);
+				&snd_trident_capture_ops :
+				&snd_trident_si7018_capture_ops);
+	}
 
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "Trident 4DWave");
 	trident->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, pcm, 64*1024, 256*1024);
+	if (trident->tlb.entries)
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
+	else
+		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -2176,7 +2211,10 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 
 	foldback->private_data = trident;
 	foldback->private_free = snd_trident_foldback_pcm_free;
-	snd_pcm_set_ops(foldback, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_foldback_ops);
+	if (trident->tlb.entries)
+		snd_pcm_set_ops(foldback, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_nx_foldback_ops);
+	else
+		snd_pcm_set_ops(foldback, SNDRV_PCM_STREAM_CAPTURE, &snd_trident_foldback_ops);
 	foldback->info_flags = 0;
 	strcpy(foldback->name, "Trident 4DWave");
 	substream = foldback->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
@@ -2191,7 +2229,10 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 	}
 	trident->foldback = foldback;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, foldback, 64*1024, 128*1024);
+	if (trident->tlb.entries)
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, foldback, 0, 128*1024);
+	else
+		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, foldback, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = foldback;
@@ -2221,7 +2262,9 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 
 	spdif->private_data = trident;
 	spdif->private_free = snd_trident_spdif_pcm_free;
-	if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
+	if (trident->tlb.entries) {
+		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_nx_spdif_ops);
+	} else if (trident->device != TRIDENT_DEVICE_ID_SI7018) {
 		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_spdif_ops);
 	} else {
 		snd_pcm_set_ops(spdif, SNDRV_PCM_STREAM_PLAYBACK, &snd_trident_spdif_7018_ops);
@@ -2230,7 +2273,10 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 	strcpy(spdif->name, "Trident 4DWave IEC958");
 	trident->spdif = spdif;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
+	if (trident->tlb.entries)
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
+	else
+		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = spdif;
@@ -2888,7 +2934,7 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 
 static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device)
 {
-	ac97_t _ac97, *ac97;
+	ac97_t _ac97;
 	snd_card_t * card = trident->card;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_value_t uctl;
@@ -2902,7 +2948,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	_ac97.private_data = trident;
 	trident->ac97_detect = 1;
       __again:
-	if ((err = snd_ac97_mixer(trident->card, &_ac97, &ac97)) < 0) {
+	if ((err = snd_ac97_mixer(trident->card, &_ac97, &trident->ac97)) < 0) {
 		if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
 			if ((err = snd_trident_sis_reset(trident)) < 0)
 				return err;
@@ -2987,7 +3033,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 /*
  * gameport interface
  */
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 
 typedef struct snd_trident_gameport {
 	struct gameport info;
@@ -3076,7 +3122,22 @@ void __devinit snd_trident_gameport(trident_t *chip)
 void __devinit snd_trident_gameport(trident_t *chip)
 {
 }
+#endif /* CONFIG_GAMEPORT */
+
+/*
+ * delay for 1 tick
+ */
+inline static void do_delay(trident_t *chip)
+{
+#ifdef CONFIG_PM
+	if (chip->in_suspend) {
+		mdelay((1000 + HZ - 1) / HZ);
+		return;
+	}
 #endif
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(1);
+}
 
 /*
  *  SiS reset routine
@@ -3088,7 +3149,7 @@ static int snd_trident_sis_reset(trident_t *trident)
 	unsigned int i;
 	int r;
 
-	r = 2;	/* count of retries */
+	r = trident->in_suspend ? 0 : 2;	/* count of retries */
       __si7018_retry:
 	pci_write_config_byte(trident->pci, 0x46, 0x04);	/* SOFTWARE RESET */
 	udelay(100);
@@ -3109,15 +3170,13 @@ static int snd_trident_sis_reset(trident_t *trident)
 	do {
 		if ((inl(TRID_REG(trident, SI_SERIAL_INTF_CTRL)) & SI_AC97_PRIMARY_READY) != 0)
 			goto __si7018_ok;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		do_delay(trident);
 	} while (time_after_eq(end_time, jiffies));
 	snd_printk("AC'97 codec ready error [0x%x]\n", inl(TRID_REG(trident, SI_SERIAL_INTF_CTRL)));
 	if (r-- > 0) {
 		end_time = jiffies + HZ;
 		do {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
+			do_delay(trident);
 		} while (time_after_eq(end_time, jiffies));
 		goto __si7018_retry;
 	}
@@ -3175,36 +3234,195 @@ static void snd_trident_proc_read(snd_info_entry_t *entry,
 static void __devinit snd_trident_proc_init(trident_t * trident)
 {
 	snd_info_entry_t *entry;
-	char *s = "trident";
+	const char *s = "trident";
 	
 	if (trident->device == TRIDENT_DEVICE_ID_SI7018)
 		s = "sis7018";
-	if ((entry = snd_info_create_card_entry(trident->card, s, trident->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = trident;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_trident_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	trident->proc_entry = entry;
-}
-
-static void snd_trident_proc_done(trident_t * trident)
-{
-	if (trident->proc_entry) {
-		snd_info_unregister(trident->proc_entry);
-		trident->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(trident->card, s, &entry))
+		snd_info_set_text_ops(entry, trident, snd_trident_proc_read);
 }
 
 static int snd_trident_dev_free(snd_device_t *device)
 {
 	trident_t *trident = snd_magic_cast(trident_t, device->device_data, return -ENXIO);
 	return snd_trident_free(trident);
+}
+
+/*---------------------------------------------------------------------------
+   snd_trident_tlb_alloc
+  
+   Description: Allocate and set up the TLB page table on 4D NX.
+		Each entry has 4 bytes (physical PCI address).
+                
+   Paramters:   trident - pointer to target device class for 4DWave.
+
+   Returns:     0 or negative error code
+  
+  ---------------------------------------------------------------------------*/
+
+static int __devinit snd_trident_tlb_alloc(trident_t *trident)
+{
+	int i;
+
+	/* TLB array must be aligned to 16kB !!! so we allocate
+	   32kB region and correct offset when necessary */
+
+	trident->tlb.buffer = snd_malloc_pci_pages(trident->pci, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer_dmaaddr);
+	if (trident->tlb.buffer == NULL) {
+		snd_printk(KERN_ERR "trident: unable to allocate TLB buffer\n");
+		return -ENOMEM;
+	}
+	trident->tlb.entries = (unsigned int*)(((unsigned long)trident->tlb.buffer + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1));
+	trident->tlb.entries_dmaaddr = (trident->tlb.buffer_dmaaddr + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1);
+	/* allocate shadow TLB page table (virtual addresses) */
+	trident->tlb.shadow_entries = (unsigned long *)vmalloc(SNDRV_TRIDENT_MAX_PAGES*sizeof(unsigned long));
+	if (trident->tlb.shadow_entries == NULL) {
+		snd_printk(KERN_ERR "trident: unable to allocate shadow TLB entries\n");
+		return -ENOMEM;
+	}
+	/* allocate and setup silent page and initialise TLB entries */
+	trident->tlb.silent_page = snd_malloc_pci_pages(trident->pci, SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page_dmaaddr);
+	if (trident->tlb.silent_page == 0UL) {
+		snd_printk(KERN_ERR "trident: unable to allocate silent page\n");
+		return -ENOMEM;
+	}
+	memset(trident->tlb.silent_page, 0, SNDRV_TRIDENT_PAGE_SIZE);
+	for (i = 0; i < SNDRV_TRIDENT_MAX_PAGES; i++) {
+		trident->tlb.entries[i] = cpu_to_le32(trident->tlb.silent_page_dmaaddr & ~(SNDRV_TRIDENT_PAGE_SIZE-1));
+		trident->tlb.shadow_entries[i] = (unsigned long)trident->tlb.silent_page;
+	}
+
+	/* use emu memory block manager code to manage tlb page allocation */
+	trident->tlb.memhdr = snd_util_memhdr_new(SNDRV_TRIDENT_PAGE_SIZE * SNDRV_TRIDENT_MAX_PAGES);
+	if (trident->tlb.memhdr == NULL)
+		return -ENOMEM;
+
+	trident->tlb.memhdr->block_extra_size = sizeof(snd_trident_memblk_arg_t);
+	return 0;
+}
+
+/*
+ * initialize 4D DX chip
+ */
+
+static void snd_trident_stop_all_voices(trident_t *trident)
+{
+	outl(0xffffffff, TRID_REG(trident, T4D_STOP_A));
+	outl(0xffffffff, TRID_REG(trident, T4D_STOP_B));
+	outl(0, TRID_REG(trident, T4D_AINTEN_A));
+	outl(0, TRID_REG(trident, T4D_AINTEN_B));
+}
+
+static int snd_trident_4d_dx_init(trident_t *trident)
+{
+	struct pci_dev *pci = trident->pci;
+	signed long end_time;
+
+	/* reset the legacy configuration and whole audio/wavetable block */
+	pci_write_config_dword(pci, 0x40, 0);	/* DDMA */
+	pci_write_config_byte(pci, 0x44, 0);	/* ports */
+	pci_write_config_byte(pci, 0x45, 0);	/* Legacy DMA */
+	pci_write_config_byte(pci, 0x46, 4); /* reset */
+	udelay(100);
+	pci_write_config_byte(pci, 0x46, 0); /* release reset */
+	udelay(100);
+	
+	/* warm reset of the AC'97 codec */
+	outl(0x00000001, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
+	udelay(100);
+	outl(0x00000000, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
+	/* DAC on, disable SB IRQ and try to force ADC valid signal */
+	trident->ac97_ctrl = 0x0000004a;
+	outl(trident->ac97_ctrl, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
+	/* wait, until the codec is ready */
+	end_time = (jiffies + (HZ * 3) / 4) + 1;
+	do {
+		if ((inl(TRID_REG(trident, DX_ACR2_AC97_COM_STAT)) & 0x0010) != 0)
+			goto __dx_ok;
+		do_delay(trident);
+	} while (time_after_eq(end_time, jiffies));
+	snd_printk(KERN_ERR "AC'97 codec ready error\n");
+	return -EIO;
+
+ __dx_ok:
+	snd_trident_stop_all_voices(trident);
+
+	return 0;
+}
+
+/*
+ * initialize 4D NX chip
+ */
+static int snd_trident_4d_nx_init(trident_t *trident)
+{
+	struct pci_dev *pci = trident->pci;
+	signed long end_time;
+
+	/* reset the legacy configuration and whole audio/wavetable block */
+	pci_write_config_dword(pci, 0x40, 0);	/* DDMA */
+	pci_write_config_byte(pci, 0x44, 0);	/* ports */
+	pci_write_config_byte(pci, 0x45, 0);	/* Legacy DMA */
+
+	pci_write_config_byte(pci, 0x46, 1); /* reset */
+	udelay(100);
+	pci_write_config_byte(pci, 0x46, 0); /* release reset */
+	udelay(100);
+
+	/* warm reset of the AC'97 codec */
+	outl(0x00000001, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
+	udelay(100);
+	outl(0x00000000, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
+	/* wait, until the codec is ready */
+	end_time = (jiffies + (HZ * 3) / 4) + 1;
+	do {
+		if ((inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT)) & 0x0008) != 0)
+			goto __nx_ok;
+		do_delay(trident);
+	} while (time_after_eq(end_time, jiffies));
+	snd_printk(KERN_ERR "AC'97 codec ready error [0x%x]\n", inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT)));
+	return -EIO;
+
+ __nx_ok:
+	/* DAC on */
+	trident->ac97_ctrl = 0x00000002;
+	outl(trident->ac97_ctrl, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
+	/* disable SB IRQ */
+	outl(NX_SB_IRQ_DISABLE, TRID_REG(trident, T4D_MISCINT));
+
+	snd_trident_stop_all_voices(trident);
+
+	if (trident->tlb.entries != NULL) {
+		unsigned int i;
+		/* enable virtual addressing via TLB */
+		i = trident->tlb.entries_dmaaddr;
+		i |= 0x00000001;
+		outl(i, TRID_REG(trident, NX_TLBC));
+	} else {
+		outl(0, TRID_REG(trident, NX_TLBC));
+	}
+	/* initialize S/PDIF */
+	outl(trident->spdif_bits, TRID_REG(trident, NX_SPCSTATUS));
+	outb(trident->spdif_ctrl, TRID_REG(trident, NX_SPCTRL_SPCSO + 3));
+
+	return 0;
+}
+
+/*
+ * initialize sis7018 chip
+ */
+static int snd_trident_sis_init(trident_t *trident)
+{
+	int err;
+
+	if ((err = snd_trident_sis_reset(trident)) < 0)
+		return err;
+
+	snd_trident_stop_all_voices(trident);
+
+	/* initialize S/PDIF */
+	outl(trident->spdif_bits, TRID_REG(trident, SI_SPDIF_CS));
+
+	return 0;
 }
 
 /*---------------------------------------------------------------------------
@@ -3231,9 +3449,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 		       trident_t ** rtrident)
 {
 	trident_t *trident;
-	unsigned int i;
-	int err;
-	signed long end_time;
+	int i, err;
 	snd_trident_voice_t *voice;
 	snd_trident_pcm_mixer_t *tmix;
 	static snd_device_ops_t ops = {
@@ -3292,151 +3508,39 @@ int __devinit snd_trident_create(snd_card_t * card,
 	trident->tlb.entries = NULL;
 	trident->tlb.buffer = NULL;
 	if (trident->device == TRIDENT_DEVICE_ID_NX) {
-		/* allocate and setup TLB page table */
-		/* each entry has 4 bytes (physical PCI address) */
-		/* TLB array must be aligned to 16kB !!! so we allocate
-		   32kB region and correct offset when necessary */
-		trident->tlb.buffer = snd_malloc_pci_pages(trident->pci, 2 * SNDRV_TRIDENT_MAX_PAGES * 4, &trident->tlb.buffer_dmaaddr);
-		if (trident->tlb.buffer == NULL) {
-			snd_trident_free(trident);
-			snd_printk("unable to allocate TLB buffer\n");
-			return -ENOMEM;
-		}
-		trident->tlb.entries = (unsigned int*)(((unsigned long)trident->tlb.buffer + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1));
-		trident->tlb.entries_dmaaddr = (trident->tlb.buffer_dmaaddr + SNDRV_TRIDENT_MAX_PAGES * 4 - 1) & ~(SNDRV_TRIDENT_MAX_PAGES * 4 - 1);
-		/* allocate shadow TLB page table (virtual addresses) */
-		trident->tlb.shadow_entries = (unsigned long *)vmalloc(SNDRV_TRIDENT_MAX_PAGES*sizeof(unsigned long));
-		if (trident->tlb.shadow_entries == NULL) {
-			snd_trident_free(trident);
-			snd_printk("unable to allocate shadow TLB entries\n");
-			return -ENOMEM;
-		}
-		/* allocate and setup silent page and initialise TLB entries */
-		trident->tlb.silent_page = snd_malloc_pci_pages(trident->pci, SNDRV_TRIDENT_PAGE_SIZE, &trident->tlb.silent_page_dmaaddr);
-		if (trident->tlb.silent_page == 0UL) {
-			snd_trident_free(trident);
-			snd_printk("unable to allocate silent page\n");
-			return -ENOMEM;
-		}
-		memset(trident->tlb.silent_page, 0, SNDRV_TRIDENT_PAGE_SIZE);
-		for (i = 0; i < SNDRV_TRIDENT_MAX_PAGES; i++) {
-			trident->tlb.entries[i] = cpu_to_le32(trident->tlb.silent_page_dmaaddr & ~(SNDRV_TRIDENT_PAGE_SIZE-1));
-			trident->tlb.shadow_entries[i] = (unsigned long)trident->tlb.silent_page;
-		}
-
-		/* use emu memory block manager code to manage tlb page allocation */
-		trident->tlb.memhdr = snd_util_memhdr_new(SNDRV_TRIDENT_PAGE_SIZE * SNDRV_TRIDENT_MAX_PAGES);
-		if (trident->tlb.memhdr == NULL) {
-			snd_trident_free(trident);
-			return -ENOMEM;
-		}
-		trident->tlb.memhdr->block_extra_size = sizeof(snd_trident_memblk_arg_t);
-	}
-
-	/* reset the legacy configuration and whole audio/wavetable block */
-	if (trident->device == TRIDENT_DEVICE_ID_DX ||
-	    trident->device == TRIDENT_DEVICE_ID_NX) {
-		pci_write_config_dword(pci, 0x40, 0);	/* DDMA */
-		pci_write_config_byte(pci, 0x44, 0);	/* ports */
-		pci_write_config_byte(pci, 0x45, 0);	/* Legacy DMA */
-		if (trident->device == TRIDENT_DEVICE_ID_DX) {
-			pci_write_config_byte(pci, 0x46, 4); /* reset */
-			udelay(100);
-			pci_write_config_byte(pci, 0x46, 0); /* release reset */
-			udelay(100);
-		} else /* NX */ {
-			pci_write_config_byte(pci, 0x46, 1); /* reset */
-			udelay(100);
-			pci_write_config_byte(pci, 0x46, 0); /* release reset */
-			udelay(100);
-		}
-	}
-	
-	/* initialize chip */
-
-	switch (trident->device) {
-	case TRIDENT_DEVICE_ID_DX:
-		/* warm reset of the AC'97 codec */
-		outl(0x00000001, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
-		udelay(100);
-		outl(0x00000000, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
-		/* DAC on, disable SB IRQ and try to force ADC valid signal */
-		trident->ac97_ctrl = 0x0000004a;
-		outl(trident->ac97_ctrl, TRID_REG(trident, DX_ACR2_AC97_COM_STAT));
-		/* wait, until the codec is ready */
-		end_time = (jiffies + (HZ * 3) / 4) + 1;
-		do {
-			if ((inl(TRID_REG(trident, DX_ACR2_AC97_COM_STAT)) & 0x0010) != 0)
-				goto __dx_ok;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
-		} while (end_time - (signed long)jiffies >= 0);
-		snd_printk("AC'97 codec ready error\n");
-		snd_trident_free(trident);
-		return -EIO;
-	      __dx_ok:
-		break;
-	case TRIDENT_DEVICE_ID_NX:
-		/* warm reset of the AC'97 codec */
-		outl(0x00000001, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
-		udelay(100);
-		outl(0x00000000, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
-		/* wait, until the codec is ready */
-		end_time = (jiffies + (HZ * 3) / 4) + 1;
-		do {
-			if ((inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT)) & 0x0008) != 0)
-				goto __nx_ok;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(1);
-		} while (end_time - (signed long)jiffies >= 0);
-		snd_printk("AC'97 codec ready error [0x%x]\n", inl(TRID_REG(trident, NX_ACR0_AC97_COM_STAT)));
-		snd_trident_free(trident);
-		return -EIO;
-	      __nx_ok:
-		/* DAC on */
-		trident->ac97_ctrl = 0x00000002;
-		outl(trident->ac97_ctrl, TRID_REG(trident, NX_ACR0_AC97_COM_STAT));
-		/* disable SB IRQ */
-		outl(NX_SB_IRQ_DISABLE, TRID_REG(trident, T4D_MISCINT));
-		break;
-	case TRIDENT_DEVICE_ID_SI7018:
-		if ((err = snd_trident_sis_reset(trident)) < 0) {
+		if ((err = snd_trident_tlb_alloc(trident)) < 0) {
 			snd_trident_free(trident);
 			return err;
 		}
 	}
 
-	outl(0xffffffff, TRID_REG(trident, T4D_STOP_A));
-	outl(0xffffffff, TRID_REG(trident, T4D_STOP_B));
-	outl(0, TRID_REG(trident, T4D_AINTEN_A));
-	outl(0, TRID_REG(trident, T4D_AINTEN_B));
+	trident->spdif_bits = trident->spdif_pcm_bits = SNDRV_PCM_DEFAULT_CON_SPDIF;
+
+	/* initialize chip */
+	switch (trident->device) {
+	case TRIDENT_DEVICE_ID_DX:
+		err = snd_trident_4d_dx_init(trident);
+		break;
+	case TRIDENT_DEVICE_ID_NX:
+		err = snd_trident_4d_nx_init(trident);
+		break;
+	case TRIDENT_DEVICE_ID_SI7018:
+		err = snd_trident_sis_init(trident);
+		break;
+	default:
+		snd_BUG();
+		break;
+	}
+	if (err < 0) {
+		snd_trident_free(trident);
+		return err;
+	}
 
 	if ((err = snd_trident_mixer(trident, pcm_spdif_device)) < 0) {
 		snd_trident_free(trident);
 		return err;
 	}
 	
-	if (trident->device == TRIDENT_DEVICE_ID_NX) {
-		if (trident->tlb.entries != NULL) {
-			/* enable virtual addressing via TLB */
-			i = trident->tlb.entries_dmaaddr;
-			i |= 0x00000001;
-			outl(i, TRID_REG(trident, NX_TLBC));
-		} else {
-			outl(0, TRID_REG(trident, NX_TLBC));
-		}
-		/* initialize S/PDIF */
-		trident->spdif_bits = trident->spdif_pcm_bits = SNDRV_PCM_DEFAULT_CON_SPDIF;
-		outl(trident->spdif_bits, TRID_REG(trident, NX_SPCSTATUS));
-		outb(trident->spdif_ctrl, TRID_REG(trident, NX_SPCTRL_SPCSO + 3));
-	}
-
-	if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
-		/* initialize S/PDIF */
-		trident->spdif_bits = trident->spdif_pcm_bits = SNDRV_PCM_DEFAULT_CON_SPDIF;
-		outl(trident->spdif_bits, TRID_REG(trident, SI_SPDIF_CS));
-	}
-
 	/* initialise synth voices */
 	for (i = 0; i < 64; i++) {
 		voice = &trident->synth.voices[i];
@@ -3482,7 +3586,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 int snd_trident_free(trident_t *trident)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (trident->gameport) {
 		gameport_unregister_port(&trident->gameport->info);
 		kfree(trident->gameport);
@@ -3495,7 +3599,6 @@ int snd_trident_free(trident_t *trident)
 	else if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
 		outl(0, TRID_REG(trident, SI_SERIAL_INTF_CTRL));
 	}
-	snd_trident_proc_done(trident);
 	if (trident->tlb.buffer) {
 		outl(0, TRID_REG(trident, NX_TLBC));
 		if (trident->tlb.memhdr)
@@ -3568,10 +3671,10 @@ static void snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			delta = (int)stimer - (int)voice->stimer;
 			if (delta < 0)
 				delta = -delta;
-			if (delta < voice->spurious_threshold) {
+			if ((unsigned int)delta < voice->spurious_threshold) {
 				/* do some statistics here */
 				trident->spurious_irq_count++;
-				if (trident->spurious_irq_max_delta < delta)
+				if (trident->spurious_irq_max_delta < (unsigned int)delta)
 					trident->spurious_irq_max_delta = delta;
 				continue;
 			}
@@ -3656,6 +3759,7 @@ snd_trident_voice_t *snd_trident_alloc_voice(trident_t * trident, int type, int 
 		pvoice->capture = 0;
 		pvoice->spdif = 0;
 		pvoice->memblk = NULL;
+		pvoice->substream = NULL;
 		spin_unlock_irqrestore(&trident->voice_alloc, flags);
 		return pvoice;
 	}
@@ -3734,9 +3838,9 @@ void snd_trident_suspend(trident_t *trident)
 {
 	snd_card_t *card = trident->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
+	trident->in_suspend = 1;
 	snd_pcm_suspend_all(trident->pcm);
 	if (trident->foldback)
 		snd_pcm_suspend_all(trident->foldback);
@@ -3750,27 +3854,40 @@ void snd_trident_suspend(trident_t *trident)
 		break;
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 void snd_trident_resume(trident_t *trident)
 {
 	snd_card_t *card = trident->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
+
+	pci_enable_device(trident->pci);
+	pci_set_dma_mask(trident->pci, 0x3fffffff); /* to be sure */
+	pci_set_master(trident->pci); /* to be sure */
+
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:
+		snd_trident_4d_dx_init(trident);
+		break;
 	case TRIDENT_DEVICE_ID_NX:
-		break;			/* TODO */
+		snd_trident_4d_nx_init(trident);
+		break;
 	case TRIDENT_DEVICE_ID_SI7018:
+		snd_trident_sis_init(trident);
 		break;
 	}
+
+	snd_ac97_resume(trident->ac97);
+
+	/* restore some registers */
+	outl(trident->musicvol_wavevol, TRID_REG(trident, T4D_MUSICVOL_WAVEVOL));
+
+	snd_trident_enable_eso(trident);
+
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-	snd_power_unlock(card);
+	trident->in_suspend = 0;
 }
 
 static int snd_trident_set_power_state(snd_card_t *card, unsigned int power_state)

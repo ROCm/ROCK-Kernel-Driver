@@ -405,7 +405,7 @@ snd_nm256_load_coefficient(nm256_t *chip, int stream, int number)
 
 
 /* The actual rates supported by the card. */
-static int samplerates[8] = {
+static unsigned int samplerates[8] = {
 	8000, 11025, 16000, 22050, 24000, 32000, 44100, 48000,
 };
 #define NUM_SAMPLERATES (sizeof(samplerates) / sizeof(samplerates[0]))
@@ -419,9 +419,9 @@ static snd_pcm_hw_constraint_list_t constraints_rates = {
  * return the index of the target rate
  */
 static int
-snd_nm256_fixed_rate(int rate)
+snd_nm256_fixed_rate(unsigned int rate)
 {
-	int i;
+	unsigned int i;
 	for (i = 0; i < NUM_SAMPLERATES; i++) {
 		if (rate == samplerates[i])
 			return i;
@@ -1199,7 +1199,7 @@ snd_nm256_mixer(nm256_t *chip)
 		AC97_PC_BEEP, AC97_PHONE, AC97_MIC, AC97_LINE,
 		AC97_VIDEO, AC97_AUX, AC97_PCM, AC97_REC_SEL,
 		AC97_REC_GAIN, AC97_GENERAL_PURPOSE, AC97_3D_CONTROL,
-		AC97_EXTENDED_ID, AC97_EXTENDED_STATUS,
+		AC97_EXTENDED_ID,
 		AC97_VENDOR_ID1, AC97_VENDOR_ID2,
 		-1
 	};
@@ -1270,24 +1270,20 @@ static void nm256_suspend(nm256_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 	chip->coeffs_current = 0;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void nm256_resume(nm256_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* Perform a full reset on the hardware */
 	pci_enable_device(chip->pci);
@@ -1297,8 +1293,6 @@ static void nm256_resume(nm256_t *chip)
 	snd_ac97_resume(chip->ac97);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND
@@ -1539,7 +1533,7 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 	if ((err = snd_nm256_pcm(chip, 0)) < 0)
 		goto __error;
 	
-	if ((err = snd_nm256_mixer(chip) < 0))
+	if ((err = snd_nm256_mixer(chip)) < 0)
 		goto __error;
 
 	// pci_set_master(pci); /* needed? */

@@ -2,9 +2,6 @@
 # Makefile for the Linux PCMCIA network device drivers.
 #
 
-# Things that need to export symbols
-export-objs	:= ray_cs.o
-
 # 16-bit client drivers
 obj-$(CONFIG_PCMCIA_3C589)	+= 3c589_cs.o
 obj-$(CONFIG_PCMCIA_3C574)	+= 3c574_cs.o

@@ -22,6 +22,7 @@
 #include <asm/machdep.h>
 #include <asm/io.h>
 
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/profile.h>
 
@@ -129,25 +130,27 @@ void time_init(void)
 	mach_sched_init(timer_interrupt);
 }
 
-extern rwlock_t xtime_lock;
-
 /*
  * This version of gettimeofday has near microsecond resolution.
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	extern unsigned long wall_jiffies;
 	unsigned long flags;
+	extern unsigned long wall_jiffies;
+	unsigned long seq;
 	unsigned long usec, sec, lost;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = mach_gettimeoffset();
-	lost = jiffies - wall_jiffies;
-	if (lost)
-		usec += lost * (1000000/HZ);
-	sec = xtime.tv_sec;
-	usec += xtime.tv_nsec/1000;
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+
+		usec = mach_gettimeoffset();
+		lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000/HZ);
+		sec = xtime.tv_sec;
+		usec += xtime.tv_nsec/1000;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -162,7 +165,7 @@ void do_settimeofday(struct timeval *tv)
 {
 	extern unsigned long wall_jiffies;
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/* This is revolting. We need to set the xtime.tv_nsec
 	 * correctly. However, the value in this location is
 	 * is value at the last tick.
@@ -183,5 +186,5 @@ void do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }

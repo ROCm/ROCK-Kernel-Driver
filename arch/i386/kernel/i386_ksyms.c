@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/tty.h>
 #include <linux/highmem.h>
+#include <linux/time.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>

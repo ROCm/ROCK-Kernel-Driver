@@ -128,6 +128,14 @@ config RTAS_FLASH
 	tristate "Firmware flash interface"
 	depends on !PPC_ISERIES
 
+config SCANLOG
+	tristate "Scanlog dump interface"
+	depends on !PPC_ISERIES
+
+config PPC_RTAS
+	bool "Proc interface to RTAS"
+	depends on !PPC_ISERIES
+
 endmenu
 
 
@@ -183,9 +191,6 @@ config BINFMT_ELF
 	  executables used across different architectures and operating
 	  systems.
 
-config BINFMT_ELF32
-	tristate "Kernel support for 32-bit ELF binaries"
-
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
 	---help---
@@ -208,7 +213,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 source "drivers/pci/Kconfig"
@@ -307,7 +312,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -334,7 +339,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -400,7 +405,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.

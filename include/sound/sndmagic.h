@@ -27,14 +27,49 @@
 
 void *_snd_magic_kcalloc(unsigned long magic, size_t size, int flags);
 void *_snd_magic_kmalloc(unsigned long magic, size_t size, int flags);
-void snd_magic_kfree(void *ptr);
 
-#define snd_magic_kcalloc(type, extra, flags) (type *) _snd_magic_kcalloc(type##_magic, sizeof(type) + extra, flags)
-#define snd_magic_kmalloc(type, extra, flags) (type *) _snd_magic_kmalloc(type##_magic, sizeof(type) + extra, flags)
+/**
+ * snd_magic_kmalloc - allocate a record with a magic-prefix
+ * @type: the type to allocate a record (like xxx_t)
+ * @extra: the extra size to allocate in bytes
+ * @flags: the allocation condition (GFP_XXX)
+ *
+ * Allocates a record of the given type with the extra space and
+ * returns its pointer.  The allocated record has a secret magic-key
+ * to be checked via snd_magic_cast() for safe casts.
+ *
+ * The allocated pointer must be released via snd_magic_kfree().
+ *
+ * The "struct xxx" style cannot be used as the type argument
+ * because the magic-key constant is generated from the type-name
+ * string.
+ */
+#define snd_magic_kmalloc(type, extra, flags) \
+	(type *) _snd_magic_kmalloc(type##_magic, sizeof(type) + extra, flags)
+/**
+ * snd_magic_kcalloc - allocate a record with a magic-prefix and initialize
+ * @type: the type to allocate a record (like xxx_t)
+ * @extra: the extra size to allocate in bytes
+ * @flags: the allocation condition (GFP_XXX)
+ *
+ * Works like snd_magic_kmalloc() but this clears the area with zero
+ * automatically.
+ */
+#define snd_magic_kcalloc(type, extra, flags) \
+	(type *) _snd_magic_kcalloc(type##_magic, sizeof(type) + extra, flags)
+
+/**
+ * snd_magic_kfree - release the allocated area
+ * @ptr: the pointer allocated via snd_magic_kmalloc() or snd_magic_kcalloc()
+ *
+ * Releases the memory area allocated via snd_magic_kmalloc() or
+ * snd_magic_kcalloc() function.
+ */
+void snd_magic_kfree(void *ptr);
 
 static inline unsigned long _snd_magic_value(void *obj)
 {
-	return obj == NULL ? -1 : *(((unsigned long *)obj) - 1);
+	return obj == NULL ? (unsigned long)-1 : *(((unsigned long *)obj) - 1);
 }
 
 static inline int _snd_magic_bad(void *obj, unsigned long magic)
@@ -44,7 +79,19 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 
 #define snd_magic_cast1(t, expr, cmd) snd_magic_cast(t, expr, cmd)
 
-#define snd_magic_cast(type, ptr, action...) (type *) ({\
+/**
+ * snd_magic_cast - check and cast the magic-allocated pointer
+ * @type: the type of record to cast
+ * @ptr: the magic-allocated pointer
+ * @action...: the action to do if failed
+ *
+ * This macro provides a safe cast for the given type, which was
+ * allocated via snd_magic_kmalloc() or snd_magic_kcallc().
+ * If the pointer is invalid, i.e. the cast-type doesn't match,
+ * the action arguments are called with a debug message.
+ */
+#define snd_magic_cast(type, ptr, action...) \
+	(type *) ({\
 	void *__ptr = ptr;\
 	unsigned long __magic = _snd_magic_value(__ptr);\
 	if (__magic != type##_magic) {\
@@ -64,6 +111,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_pcm_sgbuf_t_magic			0xa15a0107
 
 #define snd_info_private_data_t_magic		0xa15a0201
+#define snd_info_entry_t_magic			0xa15a0202
 #define snd_ctl_file_t_magic			0xa15a0301
 #define snd_kcontrol_t_magic			0xa15a0302
 #define snd_rawmidi_t_magic			0xa15a0401

@@ -30,7 +30,7 @@ config PCMCIA_3C589
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c589_cs.o.  If you want to compile it as
+	  The module will be called 3c589_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>. If
 	  unsure, say N.
 
@@ -43,7 +43,7 @@ config PCMCIA_3C574
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c574_cs.o.  If you want to compile it as
+	  The module will be called 3c574_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -56,7 +56,7 @@ config PCMCIA_FMVJ18X
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called fmvj18x_cs.o.  If you want to compile it
+	  The module will be called fmvj18x_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
@@ -69,7 +69,7 @@ config PCMCIA_PCNET
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcnet_cs.o.  If you want to compile it as
+	  The module will be called pcnet_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>. If
 	  unsure, say N.
 
@@ -82,7 +82,7 @@ config PCMCIA_NMCLAN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nmclan_cs.o.  If you want to compile it as
+	  The module will be called nmclan_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -95,7 +95,7 @@ config PCMCIA_SMC91C92
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc91c92_cs.o.  If you want to compile it
+	  The module will be called smc91c92_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
@@ -108,7 +108,7 @@ config PCMCIA_XIRC2PS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xirc2ps_cs.o.  If you want to compile it
+	  The module will be called xirc2ps_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
@@ -123,7 +123,7 @@ config PCMCIA_AXNET
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called axnet_cs.o.  If you want to compile it as
+	  The module will be called axnet_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -136,7 +136,7 @@ config ARCNET_COM20020_CS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com20020_cs.o.  If you want to compile it
+	  The module will be called com20020_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
@@ -150,7 +150,7 @@ config PCMCIA_IBMTR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmtr_cs.o.  If you want to compile it as
+	  The module will be called ibmtr_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config NET_PCMCIA_RADIO
@@ -177,7 +177,7 @@ config PCMCIA_RAYCS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ray_cs.o.  If you want to compile it as a
+	  The module will be called ray_cs.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -191,7 +191,7 @@ config AIRONET4500_CS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aironet4500_cs.o. If you want to
+	  The module will be called aironet4500_cs. If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 

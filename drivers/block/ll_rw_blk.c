@@ -27,6 +27,9 @@
 #include <linux/completion.h>
 #include <linux/slab.h>
 
+static void blk_unplug_work(void *data);
+static void blk_unplug_timeout(unsigned long data);
+
 /*
  * For the allocated request tables
  */
@@ -237,6 +240,17 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
 
+	q->unplug_thresh = 4;		/* hmm */
+	q->unplug_delay = (3 * HZ) / 1000;	/* 3 milliseconds */
+	if (q->unplug_delay == 0)
+		q->unplug_delay = 1;
+
+	init_timer(&q->unplug_timer);
+	INIT_WORK(&q->unplug_work, blk_unplug_work, q);
+
+	q->unplug_timer.function = blk_unplug_timeout;
+	q->unplug_timer.data = (unsigned long)q;
+
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
 	 */
@@ -274,7 +288,7 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 		init_emergency_isa_pool();
 		q->bounce_gfp = GFP_NOIO | GFP_DMA;
 	} else
-		q->bounce_gfp = GFP_NOHIGHIO;
+		q->bounce_gfp = GFP_NOIO;
 
 	/*
 	 * keep this for debugging for now...
@@ -667,7 +681,7 @@ static char *rq_flags[] = {
 	"REQ_SENSE",
 	"REQ_FAILED",
 	"REQ_QUIET",
-	"REQ_SPECIAL"
+	"REQ_SPECIAL",
 	"REQ_DRIVE_CMD",
 	"REQ_DRIVE_TASK",
 	"REQ_DRIVE_TASKFILE",
@@ -960,6 +974,7 @@ void blk_plug_device(request_queue_t *q)
 	if (!blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
+		mod_timer(&q->unplug_timer, jiffies + q->unplug_delay);
 		spin_unlock(&blk_plug_lock);
 	}
 }
@@ -974,6 +989,7 @@ int blk_remove_plug(request_queue_t *q)
 	if (blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_del_init(&q->plug_list);
+		del_timer(&q->unplug_timer);
 		spin_unlock(&blk_plug_lock);
 		return 1;
 	}
@@ -991,6 +1007,8 @@ static inline void __generic_unplug_device(request_queue_t *q)
 
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
+
+	del_timer(&q->unplug_timer);
 
 	/*
 	 * was plugged, fire request_fn if queue has stuff to do
@@ -1018,6 +1036,18 @@ void generic_unplug_device(void *data)
 	spin_lock_irq(q->queue_lock);
 	__generic_unplug_device(q);
 	spin_unlock_irq(q->queue_lock);
+}
+
+static void blk_unplug_work(void *data)
+{
+	generic_unplug_device(data);
+}
+
+static void blk_unplug_timeout(unsigned long data)
+{
+	request_queue_t *q = (request_queue_t *)data;
+
+	schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1163,6 +1193,9 @@ void blk_cleanup_queue(request_queue_t * q)
 
 	count -= __blk_cleanup_queue(&q->rq[READ]);
 	count -= __blk_cleanup_queue(&q->rq[WRITE]);
+
+	del_timer_sync(&q->unplug_timer);
+	flush_scheduled_work();
 
 	if (count)
 		printk("blk_cleanup_queue: leaked requests (%d)\n", count);
@@ -1325,11 +1358,19 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 
 	generic_unplug_device(q);
 	do {
+		int block = 0;
+
 		prepare_to_wait_exclusive(&rl->wait, &wait,
 					TASK_UNINTERRUPTIBLE);
+		spin_lock_irq(q->queue_lock);
 		if (!rl->count)
+			block = 1;
+		spin_unlock_irq(q->queue_lock);
+
+		if (block)
 			io_schedule();
 		finish_wait(&rl->wait, &wait);
+
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
@@ -1563,13 +1604,9 @@ void blk_congestion_wait(int rw, long timeout)
 	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
-	if (!atomic_read(&cs->nr_active_queues))
-		return;
-
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&cs->nr_active_queues))
-		io_schedule_timeout(timeout);
+	io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
 
@@ -1811,7 +1848,15 @@ get_rq:
 out:
 	if (freereq)
 		__blk_put_request(q, freereq);
+
+	if (blk_queue_plugged(q)) {
+		int nr_queued = (queue_nr_requests - q->rq[0].count) +
+				(queue_nr_requests - q->rq[1].count);
+		if (nr_queued == q->unplug_thresh)
+			__generic_unplug_device(q);
+	}
 	spin_unlock_irq(q->queue_lock);
+
 	return 0;
 
 end_io:

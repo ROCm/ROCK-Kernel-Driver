@@ -285,7 +285,7 @@ undo_log:
 		} else {
 			log_flags = 0;
 		}
-		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+		xfs_log_done(tp->t_mountp, tp->t_ticket, NULL, log_flags);
 		tp->t_ticket = NULL;
 		tp->t_log_res = 0;
 		tp->t_flags &= ~XFS_TRANS_PERM_LOG_RES;
@@ -669,6 +669,7 @@ xfs_trans_commit(
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
 #endif
+	void			*commit_iclog;
 	int			shutdown;
 
 	commit_lsn = -1;
@@ -706,7 +707,8 @@ shut_us_down:
 			xfs_trans_unreserve_and_mod_dquots(tp);
 		}
 		if (tp->t_ticket) {
-			commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+			commit_lsn = xfs_log_done(mp, tp->t_ticket,
+							NULL, log_flags);
 			if (commit_lsn == -1 && !shutdown)
 				shutdown = XFS_ERROR(EIO);
 		}
@@ -773,7 +775,7 @@ shut_us_down:
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
 		commit_lsn = xfs_log_done(mp, tp->t_ticket,
-					  log_flags);
+					  &commit_iclog, log_flags);
 	} else {
 		commit_lsn = 0;
 		tp->t_lsn = trans_lsn++;
@@ -785,7 +787,7 @@ shut_us_down:
 	 * any time.  However, all the items associated with the transaction
 	 * are still locked and pinned in memory.
 	 */
-	commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+	commit_lsn = xfs_log_done(mp, tp->t_ticket, &commit_iclog, log_flags);
 #endif
 
 	tp->t_commit_lsn = commit_lsn;
@@ -845,21 +847,28 @@ shut_us_down:
 	if (xlog_debug) {
 		tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
-		xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
+		error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
 	} else {
 		xfs_trans_committed(tp, 0);
 	}
 #else
 	tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 	tp->t_logcb.cb_arg = tp;
-	xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
+
+	/* We need to pass the iclog buffer which was used for the
+	 * transaction commit record into this function, attach
+	 * the callback to it, and then release it. This will guarantee
+	 * that we do callbacks on the transaction in the correct order.
+	 */
+	error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
 #endif
 	/*
 	 * If the transaction needs to be synchronous, then force the
 	 * log out now and wait for it.
 	 */
 	if (sync) {
-		error = xfs_log_force(mp, commit_lsn,
+		if (!error)
+			error = xfs_log_force(mp, commit_lsn,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 		XFS_STATS_INC(xfsstats.xs_trans_sync);
 	} else {
@@ -1070,7 +1079,7 @@ xfs_trans_cancel(
 		} else {
 			log_flags = 0;
 		}
-		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+		xfs_log_done(tp->t_mountp, tp->t_ticket, NULL, log_flags);
 	}
 	xfs_trans_free_items(tp, flags);
 	xfs_trans_free_busy(tp);
@@ -1262,8 +1271,11 @@ xfs_trans_chunk_committed(
 
 		/*
 		 * Now that we've repositioned the item in the AIL,
-		 * unpin it so it can be flushed.
+		 * unpin it so it can be flushed. Pass information
+		 * about buffer stale state down from the log item
+		 * flags, if anyone else stales the buffer we do not
+		 * want to pay any attention to it.
 		 */
-		IOP_UNPIN(lip);
+		IOP_UNPIN(lip, lidp->lid_flags & XFS_LID_BUF_STALE);
 	}
 }

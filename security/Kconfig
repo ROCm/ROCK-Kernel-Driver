@@ -15,6 +15,15 @@ config SECURITY
 
 	  If you are unsure how to answer this question, answer N.
 
+config SECURITY_NETWORK
+	bool "Socket and Networking Security Hooks"
+	depends on SECURITY
+	help
+	  This enables the socket and networking security hooks.
+	  If enabled, a security module can use these hooks to
+	  implement socket and networking access controls.
+	  If you are unsure how to answer this question, answer N.
+
 config SECURITY_CAPABILITIES
 	tristate "Default Linux Capabilities"
 	depends on SECURITY!=n

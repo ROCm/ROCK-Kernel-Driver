@@ -10,8 +10,6 @@
 #		Christoph Hellwig <hch@infradead.org>
 #
 
-export-objs	= hdlcdrv.o
-
 obj-$(CONFIG_DMASCC)		+= dmascc.o
 obj-$(CONFIG_SCC)		+= scc.o
 obj-$(CONFIG_MKISS)		+= mkiss.o

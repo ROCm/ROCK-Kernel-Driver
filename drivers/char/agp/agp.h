@@ -30,7 +30,7 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
-extern struct agp_bridge_data agp_bridge;
+extern struct agp_bridge_data *agp_bridge;
 
 #define PFX "agpgart: "
 
@@ -47,7 +47,7 @@ static void __attribute__((unused)) global_cache_flush(void)
 	flush_agp_cache();
 }
 #else
-static void global_cache_flush(void)
+static inline void global_cache_flush(void)
 {
 	flush_agp_cache();
 }
@@ -128,6 +128,7 @@ struct agp_bridge_data {
 	int num_aperture_sizes;
 	int capndx;
 	int cant_use_aperture;
+	struct vm_operations_struct *vm_ops;
 
 	/* Links to driver specific functions */
 
@@ -165,20 +166,20 @@ struct agp_bridge_data {
 #define MB(x)	(KB (KB (x)))
 #define GB(x)	(MB (KB (x)))
 
-#define CACHE_FLUSH	agp_bridge.cache_flush
+#define CACHE_FLUSH	agp_bridge->cache_flush
 #define A_SIZE_8(x)	((struct aper_size_info_8 *) x)
 #define A_SIZE_16(x)	((struct aper_size_info_16 *) x)
 #define A_SIZE_32(x)	((struct aper_size_info_32 *) x)
 #define A_SIZE_LVL2(x)	((struct aper_size_info_lvl2 *) x)
 #define A_SIZE_FIX(x)	((struct aper_size_info_fixed *) x)
-#define A_IDX8()	(A_SIZE_8(agp_bridge.aperture_sizes) + i)
-#define A_IDX16()	(A_SIZE_16(agp_bridge.aperture_sizes) + i)
-#define A_IDX32()	(A_SIZE_32(agp_bridge.aperture_sizes) + i)
-#define A_IDXLVL2()	(A_SIZE_LVL2(agp_bridge.aperture_sizes) + i)
-#define A_IDXFIX()	(A_SIZE_FIX(agp_bridge.aperture_sizes) + i)
+#define A_IDX8()	(A_SIZE_8(agp_bridge->aperture_sizes) + i)
+#define A_IDX16()	(A_SIZE_16(agp_bridge->aperture_sizes) + i)
+#define A_IDX32()	(A_SIZE_32(agp_bridge->aperture_sizes) + i)
+#define A_IDXLVL2()	(A_SIZE_LVL2(agp_bridge->aperture_sizes) + i)
+#define A_IDXFIX()	(A_SIZE_FIX(agp_bridge->aperture_sizes) + i)
 #define MAXKEY		(4096 * 32)
 
-#define PGE_EMPTY(p)	(!(p) || (p) == (unsigned long) agp_bridge.scratch_page)
+#define PGE_EMPTY(p)	(!(p) || (p) == (unsigned long) agp_bridge->scratch_page)
 
 /* intel register */
 #define INTEL_APBASE	0x10
@@ -366,7 +367,7 @@ struct agp_driver {
 
 /* Generic routines. */
 void agp_generic_agp_enable(u32 mode);
-int agp_generic_agp_3_0_enable(u32 mode);
+void agp_generic_agp_3_0_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
 int agp_generic_free_gatt_table(void);
 agp_memory *agp_create_memory(int scratch_pages);

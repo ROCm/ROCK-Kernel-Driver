@@ -2101,7 +2101,7 @@ void vt_console_print(struct console *co, const char * b, unsigned count)
 	if (kmsg_redirect && vc_cons_allocated(kmsg_redirect - 1))
 		currcons = kmsg_redirect - 1;
 
-	/* read `x' only after setting currecons properly (otherwise
+	/* read `x' only after setting currcons properly (otherwise
 	   the `x' macro will read the x of the foreground console). */
 	myx = x;
 
@@ -2198,8 +2198,8 @@ struct console vt_console_driver = {
  *
  * There are some functions which don't need it.
  *
- * There are some functions which can sleep for arbitrary periods (paste_selection)
- * but we don't need the lock there anyway.
+ * There are some functions which can sleep for arbitrary periods
+ * (paste_selection) but we don't need the lock there anyway.
  *
  * set_selection has locking, and definitely needs it
  */

@@ -2,8 +2,6 @@
 # S/390 network devices
 #
 
-export-objs := iucv.o fsm.o cu3088.o
-
 ctc-objs := ctcmain.o ctctty.o
 
 obj-$(CONFIG_IUCV) += iucv.o fsm.o

@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/siimage.c		Version 1.01	Sept 11, 2002
+ * linux/drivers/ide/pci/siimage.c		Version 1.02	Jan 30, 2003
  *
  * Copyright (C) 2001-2002	Andre Hedrick <andre@linux-ide.org>
  */
@@ -31,15 +31,15 @@ static char * print_siimage_get_info (char *buf, struct pci_dev *dev, int index)
 {
 	char *p		= buf;
 	u8 mmio		= (pci_get_drvdata(dev) != NULL) ? 1 : 0;
-	u32 bmdma	= (mmio) ? ((u32) pci_get_drvdata(dev)) :
+	unsigned long bmdma	= (mmio) ? ((unsigned long) pci_get_drvdata(dev)) :
 				    (pci_resource_start(dev, 4));
 
 	p += sprintf(p, "\nController: %d\n", index);
 	p += sprintf(p, "SiI%x Chipset.\n", dev->device);
 	if (mmio)
-		p += sprintf(p, "MMIO Base 0x%08x\n", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%08x\n", (mmio)?"MMIO":"BM", bmdma);
-	p += sprintf(p, "%s-DMA Base 0x%08x\n", (mmio)?"MMIO":"BM", bmdma+8);
+		p += sprintf(p, "MMIO Base 0x%lx\n", bmdma);
+	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma);
+	p += sprintf(p, "%s-DMA Base 0x%lx\n", (mmio)?"MMIO":"BM", bmdma+8);
 
 	p += sprintf(p, "--------------- Primary Channel "
 			"---------------- Secondary Channel "
@@ -248,9 +248,9 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed	= ide_dma_speed(drive, siimage_ratemask(drive));
 
-	config_chipset_for_pio(drive, (!(speed)));
+	config_chipset_for_pio(drive, !speed);
 
-	if ((!(speed)))
+	if (!speed)
 		return 0;
 
 	if (ide_set_xfer_rate(drive, speed))
@@ -267,7 +267,7 @@ static int siimage_config_drive_for_dma (ide_drive_t *drive)
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct hd_driveid *id	= drive->id;
 
-	if ((id != NULL) && ((id->capability & 1) != 0) && drive->autodma) {
+	if (id != NULL && (id->capability & 1) != 0 && drive->autodma) {
 		if (!(hwif->atapi_dma))
 			goto fast_ata_pio;
 		/* Consult the list of known "bad" drives */
@@ -317,10 +317,9 @@ static int siimage_io_ide_dma_test_irq (ide_drive_t *drive)
 		return 1;
 
 	/* return 1 if Device INTR asserted */
-	if ((pci_read_config_byte(hwif->pci_dev, SELREG(1), &dma_altstat)),
-	    ((dma_altstat & 8) == 8))
+	pci_read_config_byte(hwif->pci_dev, SELREG(1), &dma_altstat);
+	if (dma_altstat & 8)
 		return 0;	//return 1;
-
 	return 0;
 }
 
@@ -355,7 +354,7 @@ static int siimage_mmio_ide_dma_test_irq (ide_drive_t *drive)
 			hwif->OUTL(sata_error, SATA_ERROR_REG);
 			watchdog = (sata_error & 0x00680000) ? 1 : 0;
 #if 1
-			printk("%s: sata_error = 0x%08x, "
+			printk(KERN_WARNING "%s: sata_error = 0x%08x, "
 				"watchdog = %d, %s\n",
 				drive->name, sata_error, watchdog,
 				__FUNCTION__);
@@ -426,7 +425,7 @@ static int siimage_reset_poll (ide_drive_t *drive)
 		ide_hwif_t *hwif	= HWIF(drive);
 
 		if ((hwif->INL(SATA_STATUS_REG) & 0x03) != 0x03) {
-			printk("%s: reset phy dead, status=0x%08x\n",
+			printk(KERN_WARNING "%s: reset phy dead, status=0x%08x\n",
 				hwif->name, hwif->INL(SATA_STATUS_REG));
 			HWGROUP(drive)->poll_timeout = 0;
 #if 0
@@ -475,10 +474,10 @@ static void siimage_reset (ide_drive_t *drive)
 
 	if (SATA_STATUS_REG) {
 		u32 sata_stat = hwif->INL(SATA_STATUS_REG);
-		printk("%s: reset phy, status=0x%08x, %s\n",
+		printk(KERN_WARNING "%s: reset phy, status=0x%08x, %s\n",
 			hwif->name, sata_stat, __FUNCTION__);
 		if (!(sata_stat)) {
-			printk("%s: reset phy dead, status=0x%08x\n",
+			printk(KERN_WARNING "%s: reset phy dead, status=0x%08x\n",
 				hwif->name, sata_stat);
 			drive->failures++;
 		}
@@ -491,7 +490,7 @@ static void proc_reports_siimage (struct pci_dev *dev, u8 clocking, const char *
 	if (dev->device == PCI_DEVICE_ID_SII_3112)
 		goto sata_skip;
 
-	printk("%s: BASE CLOCK ", name);
+	printk(KERN_INFO "%s: BASE CLOCK ", name);
 	clocking &= ~0x0C;
 	switch(clocking) {
 		case 0x03: printk("DISABLED !\n"); break;
@@ -514,13 +513,12 @@ sata_skip:
 #endif /* DISPLAY_SIIMAGE_TIMINGS && CONFIG_PROC_FS */
 }
 
-#ifdef CONFIG_TRY_MMIO_SIIMAGE
 static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
 {
-	u32 bar5	= pci_resource_start(dev, 5);
-	u32 end5	= pci_resource_end(dev, 5);
+	unsigned long bar5	= pci_resource_start(dev, 5);
+	unsigned long end5	= pci_resource_end(dev, 5);
 	u8 tmpbyte	= 0;
-	u32 addr;
+	unsigned long addr;
 	void *ioaddr;
 
 	ioaddr = ioremap_nocache(bar5, (end5 - bar5));
@@ -529,82 +527,77 @@ static unsigned int setup_mmio_siimage (struct pci_dev *dev, const char *name)
 		return 0;
 
 	pci_set_master(dev);
-	addr = (u32) ioaddr;
-	pci_set_drvdata(dev, (void *) addr);
+	pci_set_drvdata(dev, ioaddr);
+	addr = (unsigned long) ioaddr;
 
 	if (dev->device == PCI_DEVICE_ID_SII_3112) {
-		sii_outl(0, DEVADDR(0x148));
-		sii_outl(0, DEVADDR(0x1C8));
+		writel(0, DEVADDR(0x148));
+		writel(0, DEVADDR(0x1C8));
 	}
 
-	sii_outb(0, DEVADDR(0xB4));
-	sii_outb(0, DEVADDR(0xF4));
-	tmpbyte = sii_inb(DEVADDR(0x4A));
+	writeb(0, DEVADDR(0xB4));
+	writeb(0, DEVADDR(0xF4));
+	tmpbyte = readb(DEVADDR(0x4A));
 
 	switch(tmpbyte) {
 		case 0x01:
-			sii_outb(tmpbyte|0x10, DEVADDR(0x4A));
-			tmpbyte = sii_inb(DEVADDR(0x4A));
+			writeb(tmpbyte|0x10, DEVADDR(0x4A));
+			tmpbyte = readb(DEVADDR(0x4A));
 		case 0x31:
 			/* if clocking is disabled */
 			/* 133 clock attempt to force it on */
-			sii_outb(tmpbyte & ~0x20, DEVADDR(0x4A));
-			tmpbyte = sii_inb(DEVADDR(0x4A));
+			writeb(tmpbyte & ~0x20, DEVADDR(0x4A));
+			tmpbyte = readb(DEVADDR(0x4A));
 		case 0x11:
 		case 0x21:
 			break;
 		default:
 			tmpbyte &= ~0x30;
 			tmpbyte |= 0x20;
-			sii_outb(tmpbyte, DEVADDR(0x4A));
+			writeb(tmpbyte, DEVADDR(0x4A));
 			break;
 	}
 	
-	sii_outb(0x72, DEVADDR(0xA1));
-	sii_outw(0x328A, DEVADDR(0xA2));
-	sii_outl(0x62DD62DD, DEVADDR(0xA4));
-	sii_outl(0x43924392, DEVADDR(0xA8));
-	sii_outl(0x40094009, DEVADDR(0xAC));
-	sii_outb(0x72, DEVADDR(0xE1));
-	sii_outw(0x328A, DEVADDR(0xE2));
-	sii_outl(0x62DD62DD, DEVADDR(0xE4));
-	sii_outl(0x43924392, DEVADDR(0xE8));
-	sii_outl(0x40094009, DEVADDR(0xEC));
+	writeb(0x72, DEVADDR(0xA1));
+	writew(0x328A, DEVADDR(0xA2));
+	writel(0x62DD62DD, DEVADDR(0xA4));
+	writel(0x43924392, DEVADDR(0xA8));
+	writel(0x40094009, DEVADDR(0xAC));
+	writeb(0x72, DEVADDR(0xE1));
+	writew(0x328A, DEVADDR(0xE2));
+	writel(0x62DD62DD, DEVADDR(0xE4));
+	writel(0x43924392, DEVADDR(0xE8));
+	writel(0x40094009, DEVADDR(0xEC));
 
 	if (dev->device == PCI_DEVICE_ID_SII_3112) {
-		sii_outl(0xFFFF0000, DEVADDR(0x108));
-		sii_outl(0xFFFF0000, DEVADDR(0x188));
-		sii_outl(0x00680000, DEVADDR(0x148));
-		sii_outl(0x00680000, DEVADDR(0x1C8));
+		writel(0xFFFF0000, DEVADDR(0x108));
+		writel(0xFFFF0000, DEVADDR(0x188));
+		writel(0x00680000, DEVADDR(0x148));
+		writel(0x00680000, DEVADDR(0x1C8));
 	}
 
-	tmpbyte = sii_inb(DEVADDR(0x4A));
+	tmpbyte = readb(DEVADDR(0x4A));
 
 	proc_reports_siimage(dev, (tmpbyte>>=4), name);
 	return 1;
 }
-#endif /* CONFIG_TRY_MMIO_SIIMAGE */
 
 static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char *name)
 {
 	u32 class_rev	= 0;
 	u8 tmpbyte	= 0;
-#ifdef CONFIG_TRY_MMIO_SIIMAGE
 	u8 BA5_EN	= 0;
-#endif /* CONFIG_TRY_MMIO_SIIMAGE */
 
         pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
         class_rev &= 0xff;
 	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, (class_rev) ? 1 : 255);	
 
-#ifdef CONFIG_TRY_MMIO_SIIMAGE
 	pci_read_config_byte(dev, 0x8A, &BA5_EN);
 	if ((BA5_EN & 0x01) || (pci_resource_start(dev, 5))) {
 		if (setup_mmio_siimage(dev, name)) {
 			return 0;
 		}
 	}
-#endif /* CONFIG_TRY_MMIO_SIIMAGE */
 
 	pci_write_config_byte(dev, 0x80, 0x00);
 	pci_write_config_byte(dev, 0x84, 0x00);
@@ -653,22 +646,12 @@ static unsigned int __init init_chipset_siimage (struct pci_dev *dev, const char
 static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
-	u32 addr		= (u32) pci_get_drvdata(hwif->pci_dev);
+	unsigned long addr	= (unsigned long) pci_get_drvdata(hwif->pci_dev);
 	u8 ch			= hwif->channel;
 //	u16 i			= 0;
 	hw_regs_t hw;
 
-	hwif->OUTB  = sii_outb;
-	hwif->OUTW  = sii_outw;
-	hwif->OUTL  = sii_outl;
-	hwif->OUTSW = sii_outsw;
-	hwif->OUTSL = sii_outsl;
-	hwif->INB   = sii_inb;
-	hwif->INW   = sii_inw;
-	hwif->INL   = sii_inl;
-	hwif->INSW  = sii_insw;
-	hwif->INSL  = sii_insl;
-
+	default_hwif_mmiops(hwif);
 	memset(&hw, 0, sizeof(hw_regs_t));
 
 #if 1
@@ -706,7 +689,7 @@ static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
 #endif
 
 #if 0
-	printk("%s: ", hwif->name);
+	printk(KERN_DEBUG "%s: ", hwif->name);
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
 		printk("0x%08x ", DEVADDR((ch) ? 0xC0 : 0x80)|(i));
 	printk("0x%08x ", DEVADDR((ch) ? 0xCA : 0x8A)|(i));
@@ -726,7 +709,6 @@ static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
 	hw.priv				= (void *) addr;
 //	hw.priv				= pci_get_drvdata(hwif->pci_dev);
 	hw.irq				= hwif->pci_dev->irq;
-//	hw.iops				= siimage_iops;
 
 	memcpy(&hwif->hw, &hw, sizeof(hw));
 	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->hw.io_ports));
@@ -777,9 +759,6 @@ static unsigned int __init ata66_siimage (ide_hwif_t *hwif)
 		pci_read_config_byte(hwif->pci_dev, SELREG(0), &ata66);
 		return (ata66 & 0x01) ? 1 : 0;
 	}
-#ifndef CONFIG_TRY_MMIO_SIIMAGE
-	if (hwif->mmio) BUG();
-#endif /* CONFIG_TRY_MMIO_SIIMAGE */
 
 	return (hwif->INB(SELADDR(0)) & 0x01) ? 1 : 0;
 }

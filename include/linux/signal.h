@@ -151,8 +151,6 @@ static inline void sigfillset(sigset_t *set)
 	}
 }
 
-extern char * render_sigset_t(sigset_t *set, char *buffer);
-
 /* Some extensions for manipulating the low 32 signals in particular.  */
 
 static inline void sigaddsetmask(sigset_t *set, unsigned long mask)
@@ -204,12 +202,13 @@ static inline void init_sigpending(struct sigpending *sig)
 }
 
 extern long do_sigpending(void *, unsigned long);
+extern int sigprocmask(int, sigset_t *, sigset_t *);
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 struct pt_regs;
-extern int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs);
+extern int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie);
 #endif
-
+#define FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_SIGNAL_H */

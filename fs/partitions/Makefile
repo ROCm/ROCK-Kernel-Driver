@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-export-objs := msdos.o
-
 obj-y := check.o
 
 obj-$(CONFIG_ACORN_PARTITION) += acorn.o

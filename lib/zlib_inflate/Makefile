@@ -13,8 +13,6 @@
 # uncompression can be done without blocking on allocation).
 #
 
-export-objs := inflate_syms.o
-
 obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate.o
 
 zlib_inflate-objs := infblock.o infcodes.o inffast.o inflate.o \

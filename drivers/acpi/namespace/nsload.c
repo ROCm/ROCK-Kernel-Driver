@@ -23,9 +23,9 @@
  */
 
 
-#include "acpi.h"
-#include "acnamesp.h"
-#include "acdispat.h"
+#include <acpi/acpi.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acdispat.h>
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -75,9 +75,11 @@ acpi_ns_load_table (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "AML block at %p\n", table_desc->aml_start));
 
+	/* Ignore table if there is no AML contained within */
+
 	if (!table_desc->aml_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Zero-length AML block\n"));
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
+		ACPI_REPORT_WARNING (("Zero-length AML block in table [%4.4s]\n", table_desc->pointer->signature));
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*

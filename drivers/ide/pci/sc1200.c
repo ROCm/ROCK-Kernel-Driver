@@ -1,11 +1,14 @@
 /*
- * linux/drivers/ide/sc1200.c		Version 0.9	24-Oct-2002
+ * linux/drivers/ide/pci/sc1200.c		Version 0.91	28-Jan-2003
  *
  * Copyright (C) 2000-2002		Mark Lord <mlord@pobox.com>
  * May be copied or modified under the terms of the GNU General Public License
  *
  * Development of this chipset driver was funded
  * by the nice folks at National Semiconductor.
+ *
+ * Documentation:
+ *	Available from National Semiconductor
  */
 
 #include <linux/config.h>

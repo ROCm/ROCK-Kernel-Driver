@@ -1273,25 +1273,41 @@ do_xprt_reserve(struct rpc_task *task)
 }
 
 /*
+ * Allocate a 'unique' XID
+ */
+static u32
+xprt_alloc_xid(void)
+{
+	static spinlock_t xid_lock = SPIN_LOCK_UNLOCKED;
+	static int need_init = 1;
+	static u32 xid;
+	u32 ret;
+
+	spin_lock(&xid_lock);
+	if (unlikely(need_init)) {
+		xid = get_seconds() << 12;
+		need_init = 0;
+	}
+	ret = xid++;
+	spin_unlock(&xid_lock);
+	return ret;
+}
+
+/*
  * Initialize RPC request
  */
 static void
 xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 {
 	struct rpc_rqst	*req = task->tk_rqstp;
-	static u32	xid = 0;
 
-	if (!xid)
-		xid = get_seconds() << 12;
-
-	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid, req, xid);
 	req->rq_timeout = xprt->timeout;
 	req->rq_task	= task;
 	req->rq_xprt    = xprt;
-	req->rq_xid     = xid++;
-	if (!xid)
-		xid++;
+	req->rq_xid     = xprt_alloc_xid();
 	INIT_LIST_HEAD(&req->rq_list);
+	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid,
+			req, req->rq_xid);
 }
 
 /*

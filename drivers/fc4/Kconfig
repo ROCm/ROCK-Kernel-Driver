@@ -33,7 +33,7 @@ config FC4_SOC
 	  that if you have older firmware in the card, you'll need the
 	  microcode from the Solaris driver to make it work.
 
-	  This support is also available as a module called soc.o ( = code
+	  This support is also available as a module called soc ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -48,7 +48,7 @@ config FC4_SOCAL
 	  Interface Board). You'll probably need the microcode from the
 	  Solaris driver to make it work.
 
-	  This support is also available as a module called socal.o ( = code
+	  This support is also available as a module called socal ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -62,7 +62,7 @@ config SCSI_PLUTO
 	help
 	  If you never bought a disk array made by Sun, go with N.
 
-	  This support is also available as a module called pluto.o ( = code
+	  This support is also available as a module called pluto ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -76,7 +76,7 @@ config SCSI_FCAL
 	  common is either A5000 array or internal disks in E[3-6]000
 	  machines.
 
-	  This support is also available as a module called fcal.o ( = code
+	  This support is also available as a module called fcal ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>. If unsure, say N.

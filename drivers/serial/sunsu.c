@@ -527,7 +527,7 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 			}
 			kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
-			serio_interrupt(&up->serio, ch, 0);
+			serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 		} else if (up->su_type == SU_PORT_MS) {
 			int ret = suncore_mouse_baud_detection(ch, is_break);
@@ -541,7 +541,7 @@ static void receive_kbd_ms_chars(struct uart_sunsu_port *up, struct pt_regs *reg
 
 			case 0:
 #ifdef CONFIG_SERIO
-				serio_interrupt(&up->serio, ch, 0);
+				serio_interrupt(&up->serio, ch, 0, regs);
 #endif
 				break;
 			};

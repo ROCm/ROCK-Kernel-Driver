@@ -135,6 +135,7 @@ typedef struct mtpav_port {
 	u8 number;
 	u8 hwport;
 	u8 mode;
+	u8 running_status;
 	snd_rawmidi_substream_t *input;
 	snd_rawmidi_substream_t *output;
 } mtpav_port_t;
@@ -301,6 +302,11 @@ static void snd_mtpav_output_port_write(mtpav_port_t *port,
 {
 	u8 outbyte;
 
+	// Get the outbyte first, so we can emulate running status if
+	// necessary
+	if (snd_rawmidi_transmit(substream, &outbyte, 1) != 1)
+		return;
+
 	// send port change command if necessary
 
 	if (port->hwport != mtp_card->outmidihwport) {
@@ -310,12 +316,18 @@ static void snd_mtpav_output_port_write(mtpav_port_t *port,
 		snd_mtpav_send_byte(mtp_card, port->hwport);
 		//snd_printk("new outport: 0x%x\n", (unsigned int) port->hwport);
 
+		if (!(outbyte & 0x80) && port->running_status)
+			snd_mtpav_send_byte(mtp_card, port->running_status);
 	}
 
 	// send data
 
-	while (snd_rawmidi_transmit(substream, &outbyte, 1) == 1)
+	do {
+		if (outbyte & 0x80)
+			port->running_status = outbyte;
+		
 		snd_mtpav_send_byte(mtp_card, outbyte);
+	} while (snd_rawmidi_transmit(substream, &outbyte, 1) == 1);
 }
 
 static void snd_mtpav_output_write(snd_rawmidi_substream_t * substream)
@@ -503,7 +515,7 @@ static void snd_mtpav_inmidi_process(mtpav_t *mcrd, u8 inbyte)
 {
 	mtpav_port_t *portp;
 
-	if (mcrd->inmidiport > mcrd->num_ports * 2 + MTPAV_PIDX_BROADCAST)
+	if ((int)mcrd->inmidiport > mcrd->num_ports * 2 + MTPAV_PIDX_BROADCAST)
 		return;
 
 	portp = &mcrd->ports[mcrd->inmidiport];
@@ -682,7 +694,7 @@ static int snd_mtpav_get_RAWMIDI(mtpav_t * mcard)
 
 static mtpav_t *new_mtpav(void)
 {
-	mtpav_t *ncrd = (mtpav_t *) snd_kcalloc(sizeof(mtpav_t), GFP_KERNEL);
+	mtpav_t *ncrd = (mtpav_t *) snd_magic_kcalloc(mtpav_t, 0, GFP_KERNEL);
 	if (ncrd != NULL) {
 		spin_lock_init(&ncrd->spinlock);
 
@@ -715,8 +727,7 @@ static void free_mtpav(mtpav_t * crd)
 		release_resource(crd->res_port);
 		kfree_nocheck(crd->res_port);
 	}
-	if (crd != NULL)
-		kfree(crd);
+	snd_magic_kfree(crd);
 }
 
 /*

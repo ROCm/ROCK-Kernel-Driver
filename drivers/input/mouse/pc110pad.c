@@ -73,6 +73,7 @@ static void pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 
 	if (pc110pad_count < 3) return;
 	
+	input_regs(&pc110pad_dev, regs);
 	input_report_key(&pc110pad_dev, BTN_TOUCH,
 		pc110pad_data[0] & 0x01);
 	input_report_abs(&pc110pad_dev, ABS_X,

@@ -39,32 +39,6 @@ unsigned long set_task_sizes_tt(int arg, unsigned long *host_size_out,
 	return(START);
 }
 
-struct page *arch_validate_tt(struct page *page, int mask, int order)
-{
-        unsigned long addr, zero = 0;
-        int i;
-
- again:
-        if(page == NULL) return(page);
-        if(PageHighMem(page)) return(page);
-
-        addr = (unsigned long) page_address(page);
-        for(i = 0; i < (1 << order); i++){
-                current->thread.fault_addr = (void *) addr;
-                if(__do_copy_to_user((void *) addr, &zero, 
-                                     sizeof(zero),
-                                     &current->thread.fault_addr,
-                                     &current->thread.fault_catcher)){
-                        if(!(mask & __GFP_WAIT)) return(NULL);
-                        else break;
-                }
-                addr += PAGE_SIZE;
-        }
-        if(i == (1 << order)) return(page);
-        page = alloc_pages(mask, order);
-        goto again;
-}
-
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

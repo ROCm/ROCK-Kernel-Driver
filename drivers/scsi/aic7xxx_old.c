@@ -1040,11 +1040,11 @@ static struct aic7xxx_syncrate {
                         (((scb->hscb)->target_channel_lun >> 4) & 0xf), \
                         ((scb->hscb)->target_channel_lun & 0x07)
 
-#define CTL_OF_CMD(cmd) ((cmd->channel) & 0x01),  \
-                        ((cmd->target) & 0x0f), \
-                        ((cmd->lun) & 0x07)
+#define CTL_OF_CMD(cmd) ((cmd->device->channel) & 0x01),  \
+                        ((cmd->device->id) & 0x0f), \
+                        ((cmd->device->lun) & 0x07)
 
-#define TARGET_INDEX(cmd)  ((cmd)->target | ((cmd)->channel << 3))
+#define TARGET_INDEX(cmd)  ((cmd)->device->id | ((cmd)->device->channel << 3))
 
 /*
  * A nice little define to make doing our printks a little easier
@@ -2557,7 +2557,7 @@ aic7xxx_allocate_scb(struct aic7xxx_host *p)
      * than the right hand side.  If the number of SG array elements
      * is changed, this function may not be near so efficient any more.
      *
-     * Since the DMA'able buffers are now allocated in a seperate
+     * Since the DMA'able buffers are now allocated in a separate
      * chunk this algorithm has been modified to match.  The '12'
      * and '6' factors in scb_size are for the DMA'able command byte
      * and sensebuffers respectively.  -DaveM
@@ -4068,7 +4068,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
              * normal.
              */
 	    scsi_adjust_queue_depth(scb->cmd->device, MSG_SIMPLE_TAG,
-			    scb->cmd->device->new_queue_depth);
+			    scb->cmd->device->queue_depth);
             scb->tag_action = MSG_SIMPLE_Q_TAG;
             scb->hscb->control &= ~SCB_TAG_TYPE;
             scb->hscb->control |= MSG_SIMPLE_Q_TAG;
@@ -4284,7 +4284,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
                 memcpy(scb->sense_cmd, &generic_sense[0],
                        sizeof(generic_sense));
 
-                scb->sense_cmd[1] = (cmd->lun << 5);
+                scb->sense_cmd[1] = (cmd->device->lun << 5);
                 scb->sense_cmd[4] = sizeof(cmd->sense_buffer);
 
                 scb->sg_list[0].length = 
@@ -4935,9 +4935,9 @@ aic7xxx_parse_msg(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
   struct aic7xxx_syncrate *syncrate;
   struct aic_dev_data *aic_dev;
 
-  target = scb->cmd->target;
-  channel = scb->cmd->channel;
-  lun = scb->cmd->lun;
+  target = scb->cmd->device->id;
+  channel = scb->cmd->device->channel;
+  lun = scb->cmd->device->lun;
   reply = reject = done = FALSE;
   tindex = TARGET_INDEX(scb->cmd);
   aic_dev = AIC_DEV(scb->cmd);
@@ -6026,11 +6026,11 @@ aic7xxx_handle_scsiint(struct aic7xxx_host *p, unsigned char intstat)
        */
       aic_dev = AIC_DEV(scb->cmd);
       aic_dev->needppr = aic_dev->needppr_copy = 0;
-      aic7xxx_set_width(p, scb->cmd->target, scb->cmd->channel, scb->cmd->lun,
+      aic7xxx_set_width(p, scb->cmd->device->id, scb->cmd->device->channel, scb->cmd->device->lun,
                         MSG_EXT_WDTR_BUS_8_BIT,
                         (AHC_TRANS_ACTIVE|AHC_TRANS_CUR|AHC_TRANS_QUITE),
 			aic_dev);
-      aic7xxx_set_syncrate(p, NULL, scb->cmd->target, scb->cmd->channel, 0, 0,
+      aic7xxx_set_syncrate(p, NULL, scb->cmd->device->id, scb->cmd->device->channel, 0, 0,
                            0, AHC_TRANS_ACTIVE|AHC_TRANS_CUR|AHC_TRANS_QUITE,
 			   aic_dev);
       aic_dev->goal.options = 0;
@@ -6307,8 +6307,8 @@ aic7xxx_handle_command_completion_intr(struct aic7xxx_host *p)
         unpause_sequencer(p, FALSE);
         continue;
       }
-      aic7xxx_reset_device(p, scb->cmd->target, scb->cmd->channel,
-        scb->cmd->lun, scb->hscb->tag);
+      aic7xxx_reset_device(p, scb->cmd->device->id, scb->cmd->device->channel,
+        scb->cmd->device->lun, scb->hscb->tag);
       scb->flags &= ~(SCB_QUEUED_FOR_DONE | SCB_RESET | SCB_ABORT |
         SCB_QUEUED_ABORT);
       unpause_sequencer(p, FALSE);
@@ -8450,7 +8450,7 @@ aic7xxx_alloc(Scsi_Host_Template *sht, struct aic7xxx_host *temp)
     }
     p->host_no = host->host_no;
   }
-  scsi_set_pci_device(host, p->pdev);
+  scsi_set_device(host, &p->pdev->dev);
   return (p);
 }
 
@@ -10201,8 +10201,8 @@ aic7xxx_buildscb(struct aic7xxx_host *p, Scsi_Cmnd *cmd,
     }
     scb->flags |= SCB_DTR_SCB;
   }
-  hscb->target_channel_lun = ((cmd->target << 4) & 0xF0) |
-        ((cmd->channel & 0x01) << 3) | (cmd->lun & 0x07);
+  hscb->target_channel_lun = ((cmd->device->id << 4) & 0xF0) |
+        ((cmd->device->channel & 0x01) << 3) | (cmd->device->lun & 0x07);
 
   /*
    * The interpretation of request_buffer and request_bufflen
@@ -10298,7 +10298,7 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
   struct aic7xxx_scb *scb;
   struct aic_dev_data *aic_dev;
 
-  p = (struct aic7xxx_host *) cmd->host->hostdata;
+  p = (struct aic7xxx_host *) cmd->device->host->hostdata;
 
   aic_dev = cmd->device->hostdata;  
 #ifdef AIC7XXX_VERBOSE_DEBUGGING
@@ -10379,7 +10379,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
     printk(KERN_ERR "aic7xxx_bus_device_reset: called with NULL cmd!\n");
     return FAILED;
   }
-  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  p = (struct aic7xxx_host *)cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
     scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
@@ -10441,7 +10441,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
          aic_inb(p, STCNT));
   }
 
-  channel = cmd->channel;
+  channel = cmd->device->channel;
 
     /*
      * Send a Device Reset Message:
@@ -10508,7 +10508,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
    * Check to see if the command is on the qinfifo.  If it is, then we will
    * not need to queue the command again since the card should start it soon
    */
-  if (aic7xxx_search_qinfifo(p, cmd->channel, cmd->target, cmd->lun, hscb->tag,
+  if (aic7xxx_search_qinfifo(p, cmd->device->channel, cmd->device->id, cmd->device->lun, hscb->tag,
 			  0, TRUE, NULL) == 0)
   {
     disconnected = TRUE;
@@ -10604,7 +10604,7 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
     printk(KERN_ERR "aic7xxx_abort: called with NULL cmd!\n");
     return FAILED;
   }
-  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  p = (struct aic7xxx_host *)cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
     scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
@@ -10664,8 +10664,8 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
 /*
  *  We just checked the waiting_q, now for the QINFIFO
  */
-  if ( ((found = aic7xxx_search_qinfifo(p, cmd->target, cmd->channel,
-                     cmd->lun, scb->hscb->tag, SCB_ABORT | SCB_QUEUED_FOR_DONE,
+  if ( ((found = aic7xxx_search_qinfifo(p, cmd->device->id, cmd->device->channel,
+                     cmd->device->lun, scb->hscb->tag, SCB_ABORT | SCB_QUEUED_FOR_DONE,
                      FALSE, NULL)) != 0) &&
                     (aic7xxx_verbose & VERBOSE_ABORT_PROCESS))
   {
@@ -10825,7 +10825,7 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
   struct aic7xxx_host *p;
   struct aic_dev_data *aic_dev;
 
-  p = (struct aic7xxx_host *) cmd->host->hostdata;
+  p = (struct aic7xxx_host *) cmd->device->host->hostdata;
   aic_dev = AIC_DEV(cmd);
   if(aic7xxx_position(cmd) < p->scb_data->numscbs)
   {
@@ -10872,10 +10872,10 @@ aic7xxx_reset(Scsi_Cmnd *cmd)
  *  By this point, we want to already know what we are going to do and
  *  only have the following code implement our course of action.
  */
-  aic7xxx_reset_channel(p, cmd->channel, TRUE);
+  aic7xxx_reset_channel(p, cmd->device->channel, TRUE);
   if (p->features & AHC_TWIN)
   {
-    aic7xxx_reset_channel(p, cmd->channel ^ 0x01, TRUE);
+    aic7xxx_reset_channel(p, cmd->device->channel ^ 0x01, TRUE);
     restart_sequencer(p);
   }
   aic_outb(p,  aic_inb(p, SIMODE1) & ~(ENREQINIT|ENBUSFREE), SIMODE1);

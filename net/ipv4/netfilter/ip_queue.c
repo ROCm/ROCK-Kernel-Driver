@@ -26,6 +26,7 @@
 #include <linux/brlock.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/security.h>
 #include <net/sock.h>
 #include <net/route.h>
 
@@ -496,7 +497,7 @@ ipq_rcv_skb(struct sk_buff *skb)
 	if (type <= IPQM_BASE)
 		return;
 		
-	if(!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
+	if (security_netlink_recv(skb))
 		RCV_SKB_FAIL(-EPERM);
 	
 	write_lock_bh(&queue_lock);
@@ -585,19 +586,37 @@ static int sysctl_maxlen = IPQ_QMAX_DEFAULT;
 static struct ctl_table_header *ipq_sysctl_header;
 
 static ctl_table ipq_table[] = {
-	{ NET_IPQ_QMAX, NET_IPQ_QMAX_NAME, &sysctl_maxlen,
-	  sizeof(sysctl_maxlen), 0644,  NULL, proc_dointvec },
- 	{ 0 }
+	{
+		.ctl_name	= NET_IPQ_QMAX,
+		.procname	= NET_IPQ_QMAX_NAME,
+		.data		= &sysctl_maxlen,
+		.maxlen		= sizeof(sysctl_maxlen),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+ 	{ .ctl_name = 0 }
 };
 
 static ctl_table ipq_dir_table[] = {
-	{NET_IPV4, "ipv4", NULL, 0, 0555, ipq_table, 0, 0, 0, 0, 0},
-	{ 0 }
+	{
+		.ctl_name	= NET_IPV4,
+		.procname	= "ipv4",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= ipq_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table ipq_root_table[] = {
-	{CTL_NET, "net", NULL, 0, 0555, ipq_dir_table, 0, 0, 0, 0, 0},
-	{ 0 }
+	{
+		.ctl_name	= CTL_NET,
+		.procname	= "net",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= ipq_dir_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static int

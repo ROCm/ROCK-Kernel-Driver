@@ -172,17 +172,13 @@ static int worker_thread(void *__startup)
 	DECLARE_WAITQUEUE(wait, current);
 	struct k_sigaction sa;
 
-	daemonize();
-	sprintf(current->comm, "%s/%d", startup->name, cpu);
+	daemonize("%s/%d", startup->name, cpu);
+	allow_signal(SIGCHLD);
 	current->flags |= PF_IOTHREAD;
 	cwq->thread = current;
 
+	set_user_nice(current, -10);
 	set_cpus_allowed(current, 1UL << cpu);
-
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked, sigmask(SIGCHLD));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
 
 	complete(&startup->done);
 
@@ -212,10 +208,7 @@ static int worker_thread(void *__startup)
 				/* SIGCHLD - auto-reaping */ ;
 
 			/* zap all other signals */
-			spin_lock_irq(&current->sig->siglock);
 			flush_signals(current);
-			recalc_sigpending();
-			spin_unlock_irq(&current->sig->siglock);
 		}
 	}
 	remove_wait_queue(&cwq->more_work, &wait);

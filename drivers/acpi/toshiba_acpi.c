@@ -44,7 +44,7 @@
 #include <linux/seq_file.h>
 #include <linux/version.h>
 
-#include <acconfig.h>
+#include <acpi/acconfig.h>
 #define OLD_ACPI_INTERFACE (ACPI_CA_VERSION < 0x20020000)
 
 #if OLD_ACPI_INTERFACE
@@ -52,7 +52,7 @@
 extern struct proc_dir_entry* bm_proc_root;
 #define acpi_root_dir bm_proc_root
 #else
-#include "acpi_drivers.h"
+#include <acpi/acpi_drivers.h>
 #endif
 
 MODULE_AUTHOR("John Belmonte");
@@ -309,8 +309,8 @@ static int toshiba_lcd_open_fs(struct inode *inode, struct file *file)
 }
 
 static int
-proc_write_lcd(struct file* file, const char* buffer, unsigned long count,
-	void* data)
+proc_write_lcd(struct file* file, const char* buffer, size_t count,
+	loff_t* data)
 {
 	int value;
 	/*int byte_count;*/
@@ -358,8 +358,8 @@ static int toshiba_video_open_fs(struct inode *inode, struct file *file)
 }
 
 static int
-proc_write_video(struct file* file, const char* buffer, unsigned long count,
-	void* data)
+proc_write_video(struct file* file, const char* buffer, size_t count,
+	loff_t* data)
 {
 	int value;
 	const char* buffer_end = buffer + count;
@@ -423,8 +423,8 @@ static int toshiba_fan_open_fs(struct inode *inode, struct file *file)
 }
 
 static int
-proc_write_fan(struct file* file, const char* buffer, unsigned long count,
-	void* data)
+proc_write_fan(struct file* file, const char* buffer, size_t count,
+	loff_t* data)
 {
 	int value;
 	u32 hci_result;
@@ -476,8 +476,8 @@ static int toshiba_keys_open_fs(struct inode *inode, struct file *file)
 }
 
 static int
-proc_write_keys(struct file* file, const char* buffer, unsigned long count,
-	void* data)
+proc_write_keys(struct file* file, const char* buffer, size_t count,
+	loff_t* data)
 {
 	int value;
 
@@ -518,28 +518,28 @@ add_device(void)
 		toshiba_proc_dir);
 	if (proc) {
 		proc->proc_fops = &toshiba_lcd_fops;
-		proc->write_proc = proc_write_lcd;
+		proc->proc_fops->write = proc_write_lcd;
 	}
 
 	proc = create_proc_entry(PROC_VIDEO, S_IFREG | S_IRUGO | S_IWUSR,
 		toshiba_proc_dir);
 	if (proc) {
 		proc->proc_fops = &toshiba_video_fops;
-		proc->write_proc = proc_write_video;
+		proc->proc_fops->write = proc_write_video;
 	}
 
 	proc = create_proc_entry(PROC_FAN, S_IFREG | S_IRUGO | S_IWUSR,
 		toshiba_proc_dir);
 	if (proc) {
 		proc->proc_fops = &toshiba_fan_fops;
-		proc->write_proc = proc_write_fan;
+		proc->proc_fops->write = proc_write_fan;
 	}
 
 	proc = create_proc_entry(PROC_KEYS, S_IFREG | S_IRUGO | S_IWUSR,
 		toshiba_proc_dir);
 	if (proc) {
 		proc->proc_fops = &toshiba_keys_fops;
-		proc->write_proc = proc_write_keys;
+		proc->proc_fops->write = proc_write_keys;
 	}
 
 	proc = create_proc_entry(PROC_VERSION, S_IFREG | S_IRUGO | S_IWUSR,

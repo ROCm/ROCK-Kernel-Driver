@@ -2,12 +2,6 @@
 # Makefile for the Linux network (ethercard) device drivers.
 #
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
-			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
-			net_init.o mii.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_ISDN_PPP),y)
@@ -39,6 +33,7 @@ obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
 obj-$(CONFIG_DGRS) += dgrs.o
 obj-$(CONFIG_RCPCI) += rcpci.o
 obj-$(CONFIG_VORTEX) += 3c59x.o
+obj-$(CONFIG_TYPHOON) += typhoon.o
 obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
 obj-$(CONFIG_PCNET32) += pcnet32.o mii.o
 obj-$(CONFIG_EEPRO100) += eepro100.o mii.o
@@ -63,6 +58,7 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o mii.o
 # end link order section
 #
 
+obj-$(CONFIG_MII) += mii.o
 obj-$(CONFIG_AIRONET4500) 	+= aironet4500_core.o
 obj-$(CONFIG_AIRONET4500_CS) 	+= aironet4500_core.o
 obj-$(CONFIG_AIRONET4500_NONCS)  += aironet4500_card.o
@@ -199,3 +195,6 @@ obj-$(CONFIG_NET_WIRELESS) += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
+
+
+include $(TOPDIR)/drivers/usb/net/Makefile.mii

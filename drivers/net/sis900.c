@@ -591,7 +591,7 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 			yield();
 
 			poll_bit ^= (mdio_read(net_dev, sis_priv->cur_phy, MII_STATUS) & poll_bit);
-			if (jiffies >= timeout) {
+			if (time_after_eq(jiffies, timeout)) {
 				printk(KERN_WARNING "%s: reset phy and link down now\n", net_dev->name);
 				return -ETIME;
 			}
@@ -750,7 +750,7 @@ static u16 __devinit read_eeprom(long ioaddr, int location)
 
 /* Read and write the MII management registers using software-generated
    serial MDIO protocol. Note that the command bits and data bits are
-   send out seperately */
+   send out separately */
 #define mdio_delay()    inl(mdio_addr)
 
 static void mdio_idle(long mdio_addr)

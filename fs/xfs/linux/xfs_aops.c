@@ -50,7 +50,7 @@ map_blocks(
 
 	if (((flags & (PBF_DIRECT|PBF_SYNC)) == PBF_DIRECT) &&
 	    (offset >= inode->i_size))
-		count = max(count, XFS_WRITE_IO_LOG);
+		count = max_t(ssize_t, count, XFS_WRITE_IO_LOG);
 retry:
 	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
 	if (flags & PBF_WRITE) {

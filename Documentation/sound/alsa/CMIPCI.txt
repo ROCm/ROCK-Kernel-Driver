@@ -20,7 +20,7 @@ There are slight difference between two DACs.
 
 - The first DAC supports U8 and S16LE formats, while the second DAC
   supports only S16LE.
-- The second DAC supports only two channel stereo.
+- The seconde DAC supports only two channel stereo.
 
 Please note that the CM8x38 DAC doesn't support continuous playback
 rate but only fixed rates: 5512, 8000, 11025, 16000, 22050, 32000,
@@ -65,15 +65,20 @@ When the multi-channel is supported, the driver name has a suffix
 "-MC" such like "CMI8738-MC6".  You can check this name from
 /proc/asound/cards.
 
-When the 4/6-ch output is enabled, the front DAC accepts up to 6 (or
-4) channels.  This is different from the dual DACs described in the
-previous section.  While the dual DAC supports two different rates or
+When the 4/6-ch output is enabled, the second DAC accepts up to 6 (or
+4) channels.  While the dual DAC supports two different rates or
 formats, the 4/6-ch playback supports only the same condition for all
-channels.
+channels.  Since the multi-channel playback mode uses both DACs, you
+cannot operate with full-duplex.
 
-For using 4/6 channel playback, you need to specify the PCM channels
-as you like and set the format S16LE.  For example, for playback with
-4 channels,
+The 4.0 and 5.1 modes are defined as the pcm "surround40" and "surround51"
+in alsa-lib.  For example, you can play a WAV file with 6 channels like
+
+	% aplay -Dsurround51 sixchannels.wav
+
+For programmin the 4/6 channel playback, you need to specify the PCM
+channels as you like and set the format S16LE.  For example, for playback
+with 4 channels,
 
 	snd_pcm_hw_params_set_access(pcm, hw, SND_PCM_ACCESS_RW_INTERLEAVED);
 	    // or mmap if you like
@@ -82,9 +87,15 @@ as you like and set the format S16LE.  For example, for playback with
 
 and use the interleaved 4 channel data.
 
-There is a control switch, "Line-In As Bass".  As you can imagine from
-its name, the line-in jack is used for the bass (5th and 6th channels)
-output.
+There are some control switchs affecting to the speaker connections:
+
+"Line-In As Rear"	- As mentioned above, the line-in jack is used
+	for the rear (3th and 4th channels) output.
+"Line-In As Bass"	- The line-in jack is used for the bass (5th
+	and 6th channels) output.
+"Mic As Center/LFE"	- The mic jack is used for the bass output.
+	If this switch is on, you cannot use a microphone as a capture
+	source, of course.
 
 
 Digital I/O
@@ -134,8 +145,7 @@ Additionally there are relevant control switches:
 	(see the next section).
 
 "IEC958 In Select"  - Select SPDIF input, the internal CD-in (false)
-	and the external input (true).  This switch appears only on
-	the chip models 039 or later.
+	and the external input (true).
 
 "IEC958 Loop"       - SPDIF input data is loop back into SPDIF
 	output (aka bypass)
@@ -169,6 +179,11 @@ turned off so that non-audio data is heard from the analog line-out.
 Similarly the following switches are off: "IEC958 Mix Analog" and
 "IEC958 Loop".  The switches are resumed after closing the SPDIF PCM
 device automatically to the previous state.
+
+On the model 033, AC3 is implemented by the software conversion in
+the driver.  This prevents the mmap support.  If you need mmap
+support, pass the "soft_ac3=0" module option.  This doesn't matter
+on the newer models.
 
 
 ANALOG MIXER INTERFACE

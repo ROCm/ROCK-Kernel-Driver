@@ -55,7 +55,10 @@ asm volatile(op "q %0,%%gs:%c1"::"r" (val),"i"(pda_offset(field)):"memory"); bre
        } \
        } while (0)
 
-
+/* 
+ * AK: PDA read accesses should be neither volatile nor have an memory clobber.
+ * Unfortunately removing them causes all hell to break lose currently.
+ */
 #define pda_from_op(op,field) ({ \
        typedef typeof_field(struct x8664_pda, field) T__; T__ ret__; \
        switch (sizeof_field(struct x8664_pda, field)) { 		\

@@ -410,10 +410,6 @@ int snd_gf1_stop(snd_gus_card_t * gus)
 	snd_gf1_stop_voices(gus, 0, 31);		/* stop all voices */
 	snd_gf1_i_write8(gus, SNDRV_GF1_GB_RESET, 1);	/* disable IRQ & DAC */
 	snd_gf1_timers_done(gus);
-#ifdef CONFIG_SND_DEBUG
-	snd_gus_irq_profile_done(gus);
-#endif
-	snd_gf1_mem_proc_done(gus);
 	snd_gf1_mem_done(gus);
 #if 0
 	snd_gf1_lfo_done(gus);

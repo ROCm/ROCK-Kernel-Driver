@@ -846,6 +846,7 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	}
 
 	/* Set up the controller registers. */
+	/* FIXME: for Virtual DMA we must check harder */
 	HWIF(drive)->OUTB(info->dma, IDE_FEATURE_REG);
 	HWIF(drive)->OUTB(0, IDE_IREASON_REG);
 	HWIF(drive)->OUTB(0, IDE_SECTOR_REG);
@@ -854,13 +855,10 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
 	HWIF(drive)->OUTB(xferlen >> 8  , IDE_BCOUNTH_REG);
 	if (IDE_CONTROL_REG)
 		HWIF(drive)->OUTB(drive->ctl, IDE_CONTROL_REG);
-
+ 
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
-		if (HWGROUP(drive)->handler != NULL)
-			BUG();
-		ide_set_handler (drive, handler, WAIT_CMD, cdrom_timer_expiry);
 		/* packet command */
-		HWIF(drive)->OUTB(WIN_PACKETCMD, IDE_COMMAND_REG);
+		ide_execute_command(drive, WIN_PACKETCMD, handler, WAIT_CMD, cdrom_timer_expiry);
 		return ide_started;
 	} else {
 		/* packet command */
@@ -1276,9 +1274,7 @@ static ide_startstop_t cdrom_seek_intr (ide_drive_t *drive)
 			 * this condition is far too common, to bother
 			 * users about it
 			 */
-#if 0
-			printk("%s: disabled DSC seek overlap\n", drive->name);
-#endif
+			/* printk("%s: disabled DSC seek overlap\n", drive->name);*/ 
 			drive->dsc_overlap = 0;
 		}
 	}
@@ -2965,8 +2961,10 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	printk(", %dkB Cache", be16_to_cpu(cap.buffer_size));
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) HWIF(drive)->ide_dma_verbose(drive);
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 
 	return nslots;
@@ -3261,11 +3259,7 @@ static ide_driver_t ide_cdrom_driver = {
 	.version		= IDECD_VERSION,
 	.media			= ide_cdrom,
 	.busy			= 0,
-#ifdef CONFIG_IDEDMA_ONLYDISK
-	.supports_dma		= 0,
-#else
 	.supports_dma		= 1,
-#endif
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,

@@ -236,7 +236,7 @@ static __u32 trampoline_base;
 /* The per cpu profile stuff - used in smp_local_timer_interrupt */
 static unsigned int prof_multiplier[NR_CPUS] __cacheline_aligned = { 1, };
 static unsigned int prof_old_multiplier[NR_CPUS] __cacheline_aligned = { 1, };
-static unsigned int prof_counter[NR_CPUS] __cacheline_aligned = { 1, };
+static DEFINE_PER_CPU(unsigned int, prof_counter) =  1;
 
 /* the map used to check if a CPU has booted */
 static __u32 cpu_booted_map;
@@ -393,9 +393,6 @@ find_smp_config(void)
 
 	/* initialize the CPU structures (moved from smp_boot_cpus) */
 	for(i=0; i<NR_CPUS; i++) {
-		prof_counter[i] = 1;
-		prof_old_multiplier[i] = 1;
-		prof_multiplier[i] = 1;
 		cpu_irq_affinity[i] = ~0;
 	}
 	cpu_online_map = (1<<boot_cpu_id);
@@ -1312,7 +1309,7 @@ smp_local_timer_interrupt(struct pt_regs * regs)
 
 	x86_do_profile(regs);
 
-	if (--prof_counter[cpu] <= 0) {
+	if (--per_cpu(prof_counter, cpu) <= 0) {
 		/*
 		 * The multiplier may have changed since the last time we got
 		 * to this point as a result of the user writing to
@@ -1321,10 +1318,10 @@ smp_local_timer_interrupt(struct pt_regs * regs)
 		 *
 		 * Interrupts are already masked off at this point.
 		 */
-		prof_counter[cpu] = prof_multiplier[cpu];
-		if (prof_counter[cpu] != prof_old_multiplier[cpu]) {
+		per_cpu(prof_counter,cpu) = prof_multiplier[cpu];
+		if (per_cpu(prof_counter, cpu) != prof_old_multiplier[cpu]) {
 			/* FIXME: need to update the vic timer tick here */
-			prof_old_multiplier[cpu] = prof_counter[cpu];
+			prof_old_multiplier[cpu] = per_cpu(prof_counter, cpu);
 		}
 
 		update_process_times(user_mode(regs));

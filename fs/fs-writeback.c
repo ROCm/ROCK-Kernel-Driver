@@ -61,12 +61,19 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			sb->s_op->dirty_inode(inode);
 	}
 
+	/*
+	 * make sure that changes are seen by all cpus before we test i_state
+	 * -- mikulas
+	 */
+	smp_mb();
+
 	/* avoid the locking if we can */
 	if ((inode->i_state & flags) == flags)
 		return;
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
+		const int was_dirty = inode->i_state & I_DIRTY;
 		struct address_space *mapping = inode->i_mapping;
 
 		inode->i_state |= flags;
@@ -90,7 +97,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * If the inode was already on s_dirty or s_io, don't
 		 * reposition it (that would break s_dirty time-ordering).
 		 */
-		if (!mapping->dirtied_when) {
+		if (!was_dirty) {
 			mapping->dirtied_when = jiffies|1; /* 0 is special */
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
@@ -122,12 +129,12 @@ static void write_inode(struct inode *inode, int sync)
  * Called under inode_lock.
  */
 static void
-__sync_single_inode(struct inode *inode, int wait,
-			struct writeback_control *wbc)
+__sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	unsigned dirty;
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
+	int wait = wbc->sync_mode == WB_SYNC_ALL;
 
 	BUG_ON(inode->i_state & I_LOCK);
 
@@ -135,6 +142,12 @@ __sync_single_inode(struct inode *inode, int wait,
 	dirty = inode->i_state & I_DIRTY;
 	inode->i_state |= I_LOCK;
 	inode->i_state &= ~I_DIRTY;
+
+	/*
+	 * smp_rmb(); note: if you remove write_lock below, you must add this.
+	 * mark_inode_dirty doesn't take spinlock, make sure that inode is not
+	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
+	 */
 
 	write_lock(&mapping->page_lock);
 	if (wait || !wbc->for_kupdate || list_empty(&mapping->io_pages))
@@ -181,14 +194,17 @@ __sync_single_inode(struct inode *inode, int wait,
  * Write out an inode's dirty pages.  Called under inode_lock.
  */
 static void
-__writeback_single_inode(struct inode *inode, int sync,
+__writeback_single_inode(struct inode *inode,
 			struct writeback_control *wbc)
 {
-	if (current_is_pdflush() && (inode->i_state & I_LOCK)) {
+	if ((wbc->sync_mode != WB_SYNC_ALL) && (inode->i_state & I_LOCK)) {
 		list_move(&inode->i_list, &inode->i_sb->s_dirty);
 		return;
 	}
 
+	/*
+	 * It's a data-integrity sync.  We must wait.
+	 */
 	while (inode->i_state & I_LOCK) {
 		__iget(inode);
 		spin_unlock(&inode_lock);
@@ -196,7 +212,7 @@ __writeback_single_inode(struct inode *inode, int sync,
 		iput(inode);
 		spin_lock(&inode_lock);
 	}
-	__sync_single_inode(inode, sync, wbc);
+	__sync_single_inode(inode, wbc);
 }
 
 /*
@@ -242,7 +258,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 						struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
-		int really_sync;
 
 		if (bdi->memory_backed)
 			break;
@@ -275,12 +290,11 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		if (current_is_pdflush() && !writeback_acquire(bdi))
 			break;
 
-		really_sync = (wbc->sync_mode == WB_SYNC_ALL);
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
-		__writeback_single_inode(inode, really_sync, wbc);
+		__writeback_single_inode(inode, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
-			mapping->dirtied_when = jiffies;
+			mapping->dirtied_when = jiffies|1;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		if (current_is_pdflush())
@@ -332,7 +346,6 @@ writeback_inodes(struct writeback_control *wbc)
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
-	blk_run_queues();
 }
 
 /*
@@ -451,10 +464,11 @@ void write_inode_now(struct inode *inode, int sync)
 {
 	struct writeback_control wbc = {
 		.nr_to_write = LONG_MAX,
+		.sync_mode = WB_SYNC_ALL,
 	};
 
 	spin_lock(&inode_lock);
-	__writeback_single_inode(inode, sync, &wbc);
+	__writeback_single_inode(inode, &wbc);
 	spin_unlock(&inode_lock);
 	if (sync)
 		wait_on_inode(inode);

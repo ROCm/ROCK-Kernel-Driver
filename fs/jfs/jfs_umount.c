@@ -58,7 +58,7 @@ int jfs_umount(struct super_block *sb)
 	struct jfs_log *log;
 	int rc = 0;
 
-	jFYI(1, ("\n	UnMount JFS: sb:0x%p\n", sb));
+	jfs_info("UnMount JFS: sb:0x%p", sb);
 
 	/*
 	 *      update superblock and close log 
@@ -69,12 +69,11 @@ int jfs_umount(struct super_block *sb)
 		/*
 		 * Wait for outstanding transactions to be written to log: 
 		 */
-		jfs_flush_journal(log, 1);
+		jfs_flush_journal(log, 2);
 
 	/*
 	 * close fileset inode allocation map (aka fileset inode)
 	 */
-	jEVENT(0, ("jfs_umount: close ipimap:0x%p\n", ipimap));
 	diUnmount(ipimap, 0);
 
 	diFreeSpecial(ipimap);
@@ -85,7 +84,6 @@ int jfs_umount(struct super_block *sb)
 	 */
 	ipaimap2 = sbi->ipaimap2;
 	if (ipaimap2) {
-		jEVENT(0, ("jfs_umount: close ipaimap2:0x%p\n", ipaimap2));
 		diUnmount(ipaimap2, 0);
 		diFreeSpecial(ipaimap2);
 		sbi->ipaimap2 = NULL;
@@ -95,7 +93,6 @@ int jfs_umount(struct super_block *sb)
 	 * close aggregate inode allocation map
 	 */
 	ipaimap = sbi->ipaimap;
-	jEVENT(0, ("jfs_umount: close ipaimap:0x%p\n", ipaimap));
 	diUnmount(ipaimap, 0);
 	diFreeSpecial(ipaimap);
 	sbi->ipaimap = NULL;
@@ -103,7 +100,6 @@ int jfs_umount(struct super_block *sb)
 	/*
 	 * close aggregate block allocation map
 	 */
-	jEVENT(0, ("jfs_umount: close ipbmap:%p\n", ipbmap));
 	dbUnmount(ipbmap, 0);
 
 	diFreeSpecial(ipbmap);
@@ -134,7 +130,7 @@ int jfs_umount(struct super_block *sb)
 		 */
 		rc = lmLogClose(sb, log);
 	}
-	jFYI(0, ("	UnMount JFS Complete: %d\n", rc));
+	jfs_info("UnMount JFS Complete: rc = %d", rc);
 	return rc;
 }
 
@@ -153,7 +149,7 @@ int jfs_umount_rw(struct super_block *sb)
 	 *
 	 * remove file system from log active file system list.
 	 */
-	jfs_flush_journal(log, 1);
+	jfs_flush_journal(log, 2);
 
 	/*
 	 * Make sure all metadata makes it to disk

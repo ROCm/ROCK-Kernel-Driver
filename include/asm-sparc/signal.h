@@ -140,7 +140,7 @@ struct sigstack {
 #define SA_INTERRUPT	0x10
 #define SA_NOMASK	0x20
 #define SA_SHIRQ	0x40
-#define SA_NOCLDWAIT	0x100	/* not supported yet */
+#define SA_NOCLDWAIT	0x100
 #define SA_SIGINFO	0x200
 
 #define SIG_BLOCK          0x01	/* for blocking signals */
@@ -216,7 +216,32 @@ typedef struct sigaltstack {
 	size_t		ss_size;
 } stack_t;
 
-#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+struct sparc_deliver_cookie {
+	int restart_syscall;
+	unsigned long orig_i0;
+};
+
+#define ptrace_signal_deliver(REGS, COOKIE) \
+do {	struct sparc_deliver_cookie *cp = (COOKIE); \
+	if (cp->restart_syscall && \
+	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND || \
+	     regs->u_regs[UREG_I0] == ERESTARTSYS || \
+	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) { \
+		/* replay the system call when we are done */ \
+		regs->u_regs[UREG_I0] = cp->orig_i0; \
+		regs->pc -= 4; \
+		regs->npc -= 4; \
+		cp->restart_syscall = 0; \
+	} \
+	if (cp->restart_syscall && \
+	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) { \
+		regs->u_regs[UREG_G1] = __NR_restart_syscall; \
+		regs->pc -= 4; \
+		regs->npc -= 4; \
+		cp->restart_syscall = 0; \
+	} \
+} while (0)
+
 
 #endif /* !(__ASSEMBLY__) */
 

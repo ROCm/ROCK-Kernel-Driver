@@ -24,7 +24,7 @@ struct cpu_task {
 extern struct cpu_task cpu_tasks[];
 
 struct signal_info {
-	void (*handler)(int, struct uml_pt_regs *);
+	void (*handler)(int, union uml_pt_regs *);
 	int is_irq;
 };
 
@@ -61,7 +61,6 @@ extern int start_fork_tramp(void *arg, unsigned long temp_stack,
 			    int clone_flags, int (*tramp)(void *));
 extern int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags);
 extern int linux_main(int argc, char **argv);
-extern void remap_data(void *segment_start, void *segment_end, int w);
 extern void set_cmdline(char *cmd);
 extern void input_cb(void (*proc)(void *), void *arg, int arg_len);
 extern int get_pty(void);
@@ -87,7 +86,7 @@ extern void check_sigio(void);
 extern int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr);
 extern void write_sigio_workaround(void);
 extern void arch_check_bugs(void);
-extern int arch_handle_signal(int sig, struct uml_pt_regs *regs);
+extern int arch_handle_signal(int sig, union uml_pt_regs *regs);
 extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);

@@ -685,7 +685,7 @@ int isp1020_detect(Scsi_Host_Template *tmpt)
 		memset(hostdata, 0, sizeof(struct isp1020_hostdata));
 
 		hostdata->pci_dev = pdev;
-		scsi_set_pci_device(host, pdev);
+		scsi_set_device(host, &pdev->dev);
 
 		if (isp1020_init(host))
 			goto fail_and_unregister;
@@ -802,7 +802,7 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 
 	ENTER("isp1020_queuecommand");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 	Cmnd->scsi_done = done;
 
@@ -853,8 +853,8 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 	cmd->hdr.entry_type = ENTRY_COMMAND;
 	cmd->hdr.entry_cnt = 1;
 
-	cmd->target_lun = Cmnd->lun;
-	cmd->target_id = Cmnd->target;
+	cmd->target_lun = Cmnd->device->lun;
+	cmd->target_id = Cmnd->device->id;
 	cmd->cdb_length = cpu_to_le16(Cmnd->cmd_len);
 	cmd->control_flags = cpu_to_le16(CFLAG_READ | CFLAG_WRITE);
 	cmd->time_out = cpu_to_le16(30);
@@ -1175,7 +1175,7 @@ int isp1020_abort(Scsi_Cmnd *Cmnd)
 
 	ENTER("isp1020_abort");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 
 	for (i = 0; i < QLOGICISP_REQ_QUEUE_LEN + 1; i++)
@@ -1186,7 +1186,7 @@ int isp1020_abort(Scsi_Cmnd *Cmnd)
 	isp1020_disable_irqs(host);
 
 	param[0] = MBOX_ABORT;
-	param[1] = (((u_short) Cmnd->target) << 8) | Cmnd->lun;
+	param[1] = (((u_short) Cmnd->device->id) << 8) | Cmnd->device->lun;
 	param[2] = cmd_cookie >> 16;
 	param[3] = cmd_cookie & 0xffff;
 
@@ -1214,7 +1214,7 @@ int isp1020_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 
 	ENTER("isp1020_reset");
 
-	host = Cmnd->host;
+	host = Cmnd->device->host;
 	hostdata = (struct isp1020_hostdata *) host->hostdata;
 
 	param[0] = MBOX_BUS_RESET;

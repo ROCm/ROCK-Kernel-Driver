@@ -29,7 +29,7 @@ static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
  * Equal to 2^32 * (1 / (clocks per usec) ).
  * Initialized in time_init.
  */
-unsigned long fast_gettimeoffset_quotient;
+static unsigned long fast_gettimeoffset_quotient;
 
 static unsigned long get_offset_tsc(void)
 {
@@ -130,7 +130,7 @@ static void delay_tsc(unsigned long loops)
 #define CALIBRATE_LATCH	(5 * LATCH)
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
-static unsigned long __init calibrate_tsc(void)
+unsigned long __init calibrate_tsc(void)
 {
        /* Set the Gate high, disable speaker */
 	outb((inb(0x61) & ~0x02) | 0x01, 0x61);

@@ -34,14 +34,9 @@ obj-m		:= $(filter-out %/, $(obj-m))
 
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
 
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
 # if $(foo-objs) exists, foo.o is a composite object 
-multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
-multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
+multi-used-y := $(sort $(foreach m,$(obj-y), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
+multi-used-m := $(sort $(foreach m,$(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
 multi-used   := $(multi-used-y) $(multi-used-m)
 single-used-m := $(sort $(filter-out $(multi-used-m),$(obj-m)))
 
@@ -58,9 +53,6 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 # Replace multi-part objects by their individual parts, look at local dir only
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m)))
-
-# Only build module versions for files which are selected to be built
-export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
 # C code
 # Executables compiled from a single .c file
@@ -96,7 +88,6 @@ EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
 build-targets	:= $(addprefix $(obj)/,$(build-targets))
 obj-y		:= $(addprefix $(obj)/,$(obj-y))
 obj-m		:= $(addprefix $(obj)/,$(obj-m))
-export-objs	:= $(addprefix $(obj)/,$(export-objs))
 subdir-obj-y	:= $(addprefix $(obj)/,$(subdir-obj-y))
 real-objs-y	:= $(addprefix $(obj)/,$(real-objs-y))
 real-objs-m	:= $(addprefix $(obj)/,$(real-objs-m))
@@ -130,13 +121,14 @@ basename_flags = -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
 modname_flags  = $(if $(filter 1,$(words $(modname))),-DKBUILD_MODNAME=$(subst $(comma),_,$(subst -,_,$(modname))))
 c_flags        = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	         $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
-	         $(basename_flags) $(modname_flags) $(export_flags) 
+	         $(basename_flags) $(modname_flags)
 a_flags        = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS)\
 		 $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 hostc_flags    = -Wp,-MD,$(depfile) $(HOSTCFLAGS) $(HOST_EXTRACFLAGS)\
 		 $(HOSTCFLAGS_$(*F).o)
 hostcxx_flags  = -Wp,-MD,$(depfile) $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS)\
 		 $(HOSTCXXFLAGS_$(*F).o)
+ld_flags       = $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 # Finds the multi-part object the current object will be linked into
 modname-multi = $(sort $(foreach m,$(multi-used),\
@@ -173,7 +165,7 @@ cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$(@F)) \
 # ---------------------------------------------------------------------------
 
 quiet_cmd_objcopy = OBJCOPY $@
-cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $(OBJCOPYFLAGS_$(@F)) $< $@
 
 # Gzip
 # ---------------------------------------------------------------------------
@@ -186,14 +178,16 @@ cmd_gzip = gzip -f -9 < $< > $@
 # ===========================================================================
 
 # function to only execute the passed command if necessary
+# >'< substitution is for echo to work, >$< substitution to preserve $ when reloading .cmd file
+# note: when using inline perl scripts [perl -e '...$$t=1;...'] in $(cmd_xxx) double $$ your perl vars
 
 if_changed = $(if $(strip $? \
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))';) \
 	$(cmd_$(1)); \
-	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd)
+	echo 'cmd_$@ := $(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).cmd)
 
 
 # execute the command and also postprocess generated .d dependencies
@@ -203,9 +197,9 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))';) \
 	$(cmd_$(1)); \
-	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
@@ -217,7 +211,6 @@ if_changed_rule = $(if $(strip $? \
 		               $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			       $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 			@set -e; \
-			mkdir -p $(dir $@); \
 			$(rule_$(1)))
 
 # If quiet is set, only print short version of command

@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 59
+SUBLEVEL = 62
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -36,7 +36,8 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
 ARCH := $(SUBARCH)
 
-KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
+# Remove hyphens since they have special meaning in RPM filenames
+KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
 UTS_MACHINE := $(ARCH)
 
@@ -53,6 +54,8 @@ HOSTCXXFLAGS	= -O2
 CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
+#	Note that 'modules' will be added as a prerequisite as well, 
+#	in the CONFIG_MODULES part below
 
 all:	vmlinux
 
@@ -183,6 +186,8 @@ export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+export MODVERDIR := .tmp_versions
+
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
@@ -190,7 +195,7 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean \
-		    help tags TAGS sgmldocs psdocs pdfdocs htmldocs \
+		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
 RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
@@ -256,12 +261,20 @@ ifdef include_config
 
 -include .config.cmd
 
-ifdef CONFIG_MODULES
-export EXPORT_FLAGS := -DEXPORT_SYMTAB
-endif
-
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
+endif
+
+#	When we're building modules with modversions, we need to consider
+#	the built-in objects during the descend as well, in order to
+#	make sure the checksums are uptodate before we record them.
+
+ifdef CONFIG_MODVERSIONS
+ifeq ($(KBUILD_MODULES),1)
+ifneq ($(KBUILD_BUILTIN),1)
+  KBUILD_BUILTIN := 1
+endif
+endif
 endif
 
 #
@@ -289,12 +302,12 @@ export MODLIB
 #       normal descending-into-subdirs phase, since at that time
 #       we cannot yet know if we will need to relink vmlinux.
 #	So we descend into init/ inside the rule for vmlinux again.
-
-vmlinux-objs := $(HEAD) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
+head-y += $(HEAD)
+vmlinux-objs := $(head-y) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
 quiet_cmd_vmlinux__ = LD      $@
 define cmd_vmlinux__
-	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(init-y) \
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(head-y) $(init-y) \
 	--start-group \
 	$(core-y) \
 	$(libs-y) \
@@ -343,7 +356,7 @@ LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 #	It's a three stage process:
 #	o .tmp_vmlinux1 has all symbols and sections, but __kallsyms is
 #	  empty
-#	  Running kallsyms on that gives as .tmp_kallsyms1.o with
+#	  Running kallsyms on that gives us .tmp_kallsyms1.o with
 #	  the right size
 #	o .tmp_vmlinux2 now has a __kallsyms section of the right size,
 #	  but due to the added section, some addresses have shifted
@@ -384,7 +397,7 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): .hdepend prepare
+$(SUBDIRS): prepare
 	$(Q)$(MAKE) $(build)=$@
 
 #	Things we need done before we descend to build or make
@@ -392,18 +405,16 @@ $(SUBDIRS): .hdepend prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
-	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
-
-#	We need to build init/vermagic.o before descending since all modules
-#	(*.ko) need it already
-
-ifdef CONFIG_MODULES
-
-prepare: init/vermagic.o
-
-init/vermagic.o: include/linux/version.h
-
+ifdef KBUILD_MODULES
+ifeq ($(origin SUBDIRS),file)
+	$(Q)rm -rf $(MODVERDIR)
+else
+	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
+	@echo '***          inconsistencies'
 endif
+	$(Q)mkdir -p $(MODVERDIR)
+endif
+	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
@@ -424,6 +435,8 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
+%/:      scripts prepare FORCE
+	$(Q)$(MAKE) $(build)=$(@D)
 %.ko: scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.lst: %.c scripts FORCE
@@ -475,80 +488,32 @@ include/linux/version.h: Makefile
 	) > $@.tmp
 	@$(update-if-changed)
 
-# Generate module versions
 # ---------------------------------------------------------------------------
 
-# 	The targets are still named depend / dep for traditional
-#	reasons, but the only thing we do here is generating
-#	the module version checksums.
-
-.PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
-
-depend dep: .hdepend
-
-#	.hdepend is our (misnomed) marker for whether we've
-#	generated module versions
-
-make-versions := $(strip $(if $(filter dep depend,$(MAKECMDGOALS)),1) \
-			 $(if $(wildcard .hdepend),,1))
-
-.hdepend: prepare FORCE
-ifneq ($(make-versions),)
-	@$(MAKE) include/linux/modversions.h
-	@touch $@
-endif
-
-ifdef CONFIG_MODVERSIONS
-
-# 	Update modversions.h, but only if it would change.
-
-.PHONY: __rm_tmp_export-objs
-__rm_tmp_export-objs: 
-	@rm -rf .tmp_export-objs
-
-include/linux/modversions.h: $(patsubst %,_modver_%,$(SUBDIRS))
-	@echo -n '  Generating $@'
-	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
-	   echo "#define _LINUX_MODVERSIONS_H"; \
-	   echo "#include <linux/modsetver.h>"; \
-	   cd .tmp_export-objs >/dev/null; \
-	   for f in `find modules -name \*.ver -print | sort`; do \
-	     echo "#include <linux/$${f}>"; \
-	   done; \
-	   echo "#endif"; \
-	) > $@.tmp; \
-	$(update-if-changed)
-
-.PHONY: $(patsubst %, _modver_%, $(SUBDIRS))
-$(patsubst %, _modver_%, $(SUBDIRS)): __rm_tmp_export-objs
-	$(Q)$(MAKE) -f scripts/Makefile.modver obj=$(patsubst _modver_%,%,$@)
-
-else # !CONFIG_MODVERSIONS
-
-.PHONY: include/linux/modversions.h
-
-include/linux/modversions.h:
-
-endif # CONFIG_MODVERSIONS
+.PHONY: depend dep
+depend dep:
+	@echo '*** Warning: make $@ is unnecessary now.'
 
 # ---------------------------------------------------------------------------
 # Modules
 
 ifdef CONFIG_MODULES
 
+# 	By default, build modules as well
+
+all: modules
+
 #	Build modules
 
-ifdef CONFIG_MODVERSIONS
-MODFLAGS += -include include/linux/modversions.h
-endif
-
 .PHONY: modules
-modules: $(SUBDIRS)
+modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
+	@echo '  Building modules, stage 2.';
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
 #	Install modules
 
 .PHONY: modules_install
-modules_install: _modinst_ $(patsubst %, _modinst_%, $(SUBDIRS)) _modinst_post
+modules_install: _modinst_ _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
@@ -556,6 +521,7 @@ _modinst_:
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
 	@ln -s $(TOPDIR) $(MODLIB)/build
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
 # dependency on System.map since that would run the dependency tree on
@@ -568,12 +534,9 @@ else
 depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
 endif
 .PHONY: _modinst_post
-_modinst_post:
+_modinst_post: _modinst_
 	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
 
-.PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
-$(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 else # CONFIG_MODULES
 
 # Modules not configured
@@ -624,7 +587,7 @@ spec:
 
 rpm:	clean spec
 	find . $(RCS_FIND_IGNORE) \
-		\( -size 0 -o -name .depend -o -name .hdepend \) \
+		\( -size 0 -o -name .depend -o -name .hdepend\) \
 		-type f -print | xargs rm -f
 	set -e; \
 	cd $(TOPDIR)/.. ; \
@@ -705,7 +668,7 @@ defconfig: scripts/kconfig/conf
 # make clean     Delete all automatically generated files, including
 #                tools and firmware.
 # make mrproper  Delete the current configuration, and related files
-#                Any core files spread around is deleted as well
+#                Any core files spread around are deleted as well
 # make distclean Remove editor backup files, patch leftover files and the like
 
 # Files removed with 'make clean'
@@ -718,30 +681,31 @@ MRPROPER_FILES += \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
-	tags TAGS kernel.spec \
+	tags TAGS cscope kernel.spec \
 	.tmp*
 
 # Directories removed with 'make mrproper'
 MRPROPER_DIRS += \
+	$(MODVERDIR) \
 	.tmp_export-objs \
 	include/config \
 	include/linux/modules
 
 # clean - Delete all intermediate files
 #
-clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
-
-$(addprefix _clean_,$(clean-dirs)):
+clean-dirs += $(addprefix _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
+.PHONY: $(clean-dirs) clean archclean mrproper archmrproper distclean
+$(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
-clean: archclean $(addprefix _clean_,$(clean-dirs))
+clean: archclean $(clean-dirs)
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
-		-o -name '.*.d' -o -name '.*.tmp' \) -type f \
-		-print | xargs rm -f
+		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+		-type f -print | xargs rm -f
 
 # mrproper - delete configuration + modules + core files
 #
@@ -775,6 +739,9 @@ define all-sources
 	       -name '*.[chS]' -print )
 endef
 
+quiet_cmd_cscope = MAKE   $@
+cmd_cscope = $(all-sources) | cscope -k -b -i -
+
 quiet_cmd_TAGS = MAKE   $@
 cmd_TAGS = $(all-sources) | etags -
 
@@ -786,6 +753,9 @@ define cmd_tags
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	$(all-sources) | xargs ctags $$CTAGSF -a
 endef
+
+cscope: FORCE
+	$(call cmd,cscope)
 
 TAGS: FORCE
 	$(call cmd,TAGS)
@@ -893,9 +863,9 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
-	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))';) \
 	$(cmd_$(1)); \
-	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(subst $$,$$$$,$(subst ','\'',$(cmd_$(1))))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
@@ -922,19 +892,19 @@ define update-if-changed
 	fi
 endef
 
-# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=dir
 # Usage:
 # $(Q)$(MAKE) $(build)=dir
 build := -f scripts/Makefile.build obj
 
-# Shorthand for $(Q)$(MAKE) scripts/Makefile.clean obj=dir
+# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=dir
 # Usage:
 # $(Q)$(MAKE) $(clean)=dir
 clean := -f scripts/Makefile.clean obj
 
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target>
-# Usage is deprecated, because make do not see this as an invocation of make.
+# Usage is deprecated, because make does not see this as an invocation of make.
 descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:

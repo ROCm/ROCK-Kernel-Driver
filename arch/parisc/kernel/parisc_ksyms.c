@@ -31,10 +31,6 @@ EXPORT_SYMBOL(hppa_dma_ops);
 EXPORT_SYMBOL(get_pci_node_path);
 #endif
 
-#ifdef CONFIG_IOMMU_CCIO
-EXPORT_SYMBOL(ccio_get_fake);
-#endif
-
 #include <linux/sched.h>
 #include <asm/irq.h>
 EXPORT_SYMBOL(enable_irq);

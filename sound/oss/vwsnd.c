@@ -3260,7 +3260,7 @@ static int __init probe_vwsnd(struct address_info *hw_config)
 	li_writel(&lith, LI_HOST_CONTROLLER, LI_HC_LINK_ENABLE);
 	do {
 		w = li_readl(&lith, LI_HOST_CONTROLLER);
-	} while (w == LI_HC_LINK_ENABLE && jiffies < later);
+	} while (w == LI_HC_LINK_ENABLE && time_before(jiffies, later));
 	
 	li_destroy(&lith);
 

@@ -85,6 +85,62 @@ static void bad_page(const char *function, struct page *page)
 	page->mapping = NULL;
 }
 
+#ifndef CONFIG_HUGETLB_PAGE
+#define prep_compound_page(page, order) do { } while (0)
+#define destroy_compound_page(page, order) do { } while (0)
+#else
+/*
+ * Higher-order pages are called "compound pages".  They are structured thusly:
+ *
+ * The first PAGE_SIZE page is called the "head page".
+ *
+ * The remaining PAGE_SIZE pages are called "tail pages".
+ *
+ * All pages have PG_compound set.  All pages have their lru.next pointing at
+ * the head page (even the head page has this).
+ *
+ * The head page's lru.prev, if non-zero, holds the address of the compound
+ * page's put_page() function.
+ *
+ * The order of the allocation is stored in the first tail page's lru.prev.
+ * This is only for debug at present.  This usage means that zero-order pages
+ * may not be compound.
+ */
+static void prep_compound_page(struct page *page, int order)
+{
+	int i;
+	int nr_pages = 1 << order;
+
+	page->lru.prev = NULL;
+	page[1].lru.prev = (void *)order;
+	for (i = 0; i < nr_pages; i++) {
+		struct page *p = page + i;
+
+		SetPageCompound(p);
+		p->lru.next = (void *)page;
+	}
+}
+
+static void destroy_compound_page(struct page *page, int order)
+{
+	int i;
+	int nr_pages = 1 << order;
+
+	if (page[1].lru.prev != (void *)order)
+		bad_page(__FUNCTION__, page);
+
+	for (i = 0; i < nr_pages; i++) {
+		struct page *p = page + i;
+
+		if (!PageCompound(p))
+			bad_page(__FUNCTION__, page);
+		if (p->lru.next != (void *)page)
+			bad_page(__FUNCTION__, page);
+		ClearPageCompound(p);
+	}
+}
+#endif		/* CONFIG_HUGETLB_PAGE */
+
 /*
  * Freeing function for a buddy system allocator.
  *
@@ -114,6 +170,8 @@ static inline void __free_pages_bulk (struct page *page, struct page *base,
 {
 	unsigned long page_idx, index;
 
+	if (order)
+		destroy_compound_page(page, order);
 	page_idx = page - base;
 	if (page_idx & ~mask)
 		BUG();
@@ -409,6 +467,12 @@ void free_cold_page(struct page *page)
 	free_hot_cold_page(page, 1);
 }
 
+/*
+ * Really, prep_compound_page() should be called from __rmqueue_bulk().  But
+ * we cheat by calling it from here, in the order > 0 path.  Saves a branch
+ * or two.
+ */
+
 static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 {
 	unsigned long flags;
@@ -435,6 +499,8 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 		spin_lock_irqsave(&zone->lock, flags);
 		page = __rmqueue(zone, order);
 		spin_unlock_irqrestore(&zone->lock, flags);
+		if (order && page)
+			prep_compound_page(page, order);
 	}
 
 	if (page != NULL) {
@@ -1269,7 +1335,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
-	memblk_set_online(__node_to_memblk(nid));
+	memblk_set_online(node_to_memblk(nid));
 
 	calculate_zone_bitmap(pgdat, zones_size);
 }
@@ -1379,15 +1445,20 @@ static char *vmstat_text[] = {
 	"pswpin",
 	"pswpout",
 	"pgalloc",
+
 	"pgfree",
 	"pgactivate",
 	"pgdeactivate",
 	"pgfault",
 	"pgmajfault",
+
 	"pgscan",
 	"pgrefill",
 	"pgsteal",
+	"pginodesteal",
 	"kswapd_steal",
+
+	"kswapd_inodesteal",
 	"pageoutrun",
 	"allocstall",
 	"pgrotated",

@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
+#include <linux/time.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 
@@ -44,7 +45,6 @@ unsigned long uart_baud_base;
 
 static unsigned long r4k_offset; /* Amount to increment compare reg each time */
 static unsigned long r4k_cur;    /* What counter should be at next timer irq */
-extern rwlock_t xtime_lock;
 
 #define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
 
@@ -150,10 +150,10 @@ void __init time_init(void)
 	set_cp0_status(ALLINTS);
 
 	/* Read time from the RTC chipset. */
-	write_lock_irqsave (&xtime_lock, flags);
+	write_seqlock_irqsave (&xtime_lock, flags);
 	xtime.tv_sec = get_mips_time();
 	xtime.tv_usec = 0;
-	write_unlock_irqrestore(&xtime_lock, flags);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 }
 
 /* This is for machines which generate the exact clock. */
@@ -229,20 +229,24 @@ static unsigned long do_fast_gettimeoffset(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned int flags;
+	unsigned long flags;
+	unsigned long seq;
 
-	read_lock_irqsave (&xtime_lock, flags);
-	*tv = xtime;
-	tv->tv_usec += do_fast_gettimeoffset();
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 
-	/*
-	 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-	 * is nonzero if the timer bottom half hasnt executed yet.
-	 */
-	if (jiffies - wall_jiffies)
-		tv->tv_usec += USECS_PER_JIFFY;
+		*tv = xtime;
+		tv->tv_usec += do_fast_gettimeoffset();
 
-	read_unlock_irqrestore (&xtime_lock, flags);
+		/*
+		 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
+		 * is nonzero if the timer bottom half hasnt executed yet.
+		 */
+		if (jiffies - wall_jiffies)
+			tv->tv_usec += USECS_PER_JIFFY;
+
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
 
 	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
@@ -252,7 +256,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
+	write_seqlock_irq (&xtime_lock);
 
 	/* This is revolting. We need to set the xtime.tv_usec correctly.
 	 * However, the value in this location is is value at the last tick.
@@ -272,7 +276,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq (&xtime_lock);
+	write_sequnlock_irq (&xtime_lock);
 }
 
 /*

@@ -673,7 +673,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		if(!bh) {
 			printk("EXT2-fs: Couldn't read superblock on "
 			       "2nd try.\n");
-			goto failed_mount;
+			goto failed_sbi;
 		}
 		es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 		sbi->s_es = es;
@@ -842,8 +842,7 @@ static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 {
 	es->s_wtime = cpu_to_le32(get_seconds());
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
-	ll_rw_block(WRITE, 1, &EXT2_SB(sb)->s_sbh);
-	wait_on_buffer(EXT2_SB(sb)->s_sbh);
+	sync_dirty_buffer(EXT2_SB(sb)->s_sbh);
 	sb->s_dirt = 0;
 }
 

@@ -86,7 +86,7 @@ typedef unsigned long sigset_t;
  */
 
 #define SA_NOCLDSTOP	0x00000001
-#define SA_NOCLDWAIT	0x00000002 /* not supported yet */
+#define SA_NOCLDWAIT	0x00000002
 #define SA_SIGINFO	0x00000004
 #define SA_ONSTACK	0x08000000
 #define SA_RESTART	0x10000000
@@ -181,6 +181,7 @@ typedef struct sigaltstack {
 /* here we could define asm-optimized sigaddset, sigdelset etc. operations. 
  * if we don't, generic ones are used from linux/signal.h
  */
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
 #endif /* __KERNEL__ */
 

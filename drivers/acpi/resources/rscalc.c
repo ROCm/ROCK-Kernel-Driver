@@ -23,10 +23,10 @@
  */
 
 
-#include "acpi.h"
-#include "acresrc.h"
-#include "amlcode.h"
-#include "acnamesp.h"
+#include <acpi/acpi.h>
+#include <acpi/acresrc.h>
+#include <acpi/amlcode.h>
+#include <acpi/acnamesp.h>
 
 #define _COMPONENT          ACPI_RESOURCES
 	 ACPI_MODULE_NAME    ("rscalc")
@@ -793,7 +793,7 @@ acpi_rs_get_pci_routing_table_length (
 				 * The length String.Length field does not include the
 				 * terminating NULL, add 1
 				 */
-				temp_size_needed += ((*sub_object_list)->string.length + 1);
+				temp_size_needed += ((acpi_size) (*sub_object_list)->string.length + 1);
 			}
 			else {
 				temp_size_needed += acpi_ns_get_pathname_length (

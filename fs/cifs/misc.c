@@ -81,7 +81,7 @@ void
 sesInfoFree(struct cifsSesInfo *buf_to_free)
 {
 	if (buf_to_free == NULL) {
-		cFYI(1, ("\nNull buffer passed to sesInfoFree"));
+		cFYI(1, ("Null buffer passed to sesInfoFree"));
 		return;
 	}
 
@@ -122,7 +122,7 @@ void
 tconInfoFree(struct cifsTconInfo *buf_to_free)
 {
 	if (buf_to_free == NULL) {
-		cFYI(1, ("\nNull buffer passed to tconInfoFree"));
+		cFYI(1, ("Null buffer passed to tconInfoFree"));
 		return;
 	}
 	write_lock(&GlobalSMBSeslock);
@@ -169,7 +169,7 @@ buf_release(void *buf_to_free)
 {
 
 	if (buf_to_free == NULL) {
-		cFYI(1, ("\nNull buffer passed to buf_release"));
+		cFYI(1, ("Null buffer passed to buf_release"));
 		return;
 	}
 	kmem_cache_free(cifs_req_cachep, buf_to_free);
@@ -225,8 +225,10 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 		}
 		if (treeCon->Flags & SMB_SHARE_IS_IN_DFS)
 			buffer->Flags2 |= SMBFLG2_DFS;
-		if(treeCon->ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-			buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+		if(treeCon->ses->server)
+			if(treeCon->ses->server->secMode & 
+			  (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+				buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 	}
 
 /*  endian conversion of flags is now done just before sending */
@@ -248,17 +250,17 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 			if(smb->Command == SMB_COM_LOCKING_ANDX)
 				return 0;
 			else
-				cERROR(1, ("\n Rcvd Request not response "));         
+				cERROR(1, ("Rcvd Request not response "));         
 		}
 	} else { /* bad signature or mid */
 		if (*(unsigned int *) smb->Protocol != cpu_to_le32(0x424d53ff))
 			cERROR(1,
-			       ("\nBad protocol string signature header %x ",
+			       ("Bad protocol string signature header %x ",
 				*(unsigned int *) smb->Protocol));
 		if (mid != smb->Mid)
-			cERROR(1, ("\n Mids do not match \n"));
+			cERROR(1, ("Mids do not match"));
 	}
-	cERROR(1, ("\nCIFS: bad smb detected. The Mid=%d\n", smb->Mid));
+	cERROR(1, ("bad smb detected. The Mid=%d", smb->Mid));
 	return 1;
 }
 
@@ -266,13 +268,13 @@ int
 checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 {
 	cFYI(0,
-	     ("\nEntering checkSMB with Length: %x, smb_buf_length: %x ",
+	     ("Entering checkSMB with Length: %x, smb_buf_length: %x ",
 	      length, ntohl(smb->smb_buf_length)));
 	if ((length < 2 + sizeof (struct smb_hdr))
 	    || (4 + ntohl(smb->smb_buf_length) >
 		CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE)) {
 		if (length < 2 + sizeof (struct smb_hdr)) {
-			cERROR(1, ("\n Length less than 2 + sizeof smb_hdr "));
+			cERROR(1, ("Length less than 2 + sizeof smb_hdr "));
 			if ((length >= sizeof (struct smb_hdr) - 1)
 			    && (smb->Status.CifsError != 0))
 				return 0;	/* some error cases do not return wct and bcc */
@@ -281,9 +283,9 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 		if (4 + ntohl(smb->smb_buf_length) >
 		    CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE)
 			cERROR(1,
-			       ("\n smb_buf_length greater than CIFS_MAX_MSGSIZE ... "));
+			       ("smb_buf_length greater than CIFS_MAX_MSGSIZE ... "));
 		cERROR(1,
-		       ("CIFS: bad smb detected. Illegal length. The mid=%d\n",
+		       ("bad smb detected. Illegal length. The mid=%d",
 			smb->Mid));
 		return 1;
 	}
@@ -295,51 +297,62 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 	    || (4 + ntohl(smb->smb_buf_length) != length)) {
 		return 0;
 	} else {
-		cERROR(1, ("\nCIFS: smbCalcSize %x ", smbCalcSize(smb)));
+		cERROR(1, ("smbCalcSize %x ", smbCalcSize(smb)));
 		cERROR(1,
-		       ("CIFS: bad smb size detected. The Mid=%d\n", smb->Mid));
+		       ("bad smb size detected. The Mid=%d", smb->Mid));
 		return 1;
 	}
 }
 int
 is_valid_oplock_break(struct smb_hdr *buf)
 {    
-       struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
-       struct list_head *tmp;
-       struct cifsTconInfo *tcon;
+	struct smb_com_lock_req * pSMB = (struct smb_com_lock_req *)buf;
+	struct list_head *tmp;
+	struct list_head *tmp1;
+	struct cifsTconInfo *tcon;
+	struct cifsFileInfo *netfile;
 
-       /* could add check for smb response flag 0x80 */
-       cFYI(1,("\nChecking for oplock break"));    
-       if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
-               return FALSE;
-       if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
-               return FALSE; /* server sends us "request" here */
-       if(pSMB->hdr.WordCount != 8)
-               return FALSE;
+	/* could add check for smb response flag 0x80 */
+	cFYI(1,("Checking for oplock break"));    
+	if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
+		return FALSE;
+	if(pSMB->hdr.Flags & SMBFLG_RESPONSE)
+		return FALSE; /* server sends us "request" here */
+	if(pSMB->hdr.WordCount != 8)
+		return FALSE;
 
-       cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
-       if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
-               return FALSE;    
+	cFYI(1,(" oplock type 0x%d level 0x%d",pSMB->LockType,pSMB->OplockLevel));
+	if(!(pSMB->LockType & LOCKING_ANDX_OPLOCK_RELEASE))
+		return FALSE;    
 
-       /* look up tcon based on tid & uid */
-       read_lock(&GlobalSMBSeslock);
-       list_for_each(tmp, &GlobalTreeConnectionList) {
-               tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
-               if (tcon->tid == buf->Tid)
-                       if(tcon->ses->Suid == buf->Uid) {
-                       /* BB Add following logic: 
-                         2) look up inode from tcon->openFileList->file->f_dentry->d_inode
-                         3) flush dirty pages and cached byte range locks and mark inode
-                         4) depending on break type change to r/o caching or no caching
-                         5) send oplock break response to server */
-                               read_unlock(&GlobalSMBSeslock);
-                               cFYI(1,("\nFound matching connection, process oplock break"));
-                               return TRUE;
-                       }
-       }
-       read_unlock(&GlobalSMBSeslock);
-       cFYI(1,("\nProcessing oplock break for non-existent connection"));
-       return TRUE;
+	/* look up tcon based on tid & uid */
+	read_lock(&GlobalSMBSeslock);
+	list_for_each(tmp, &GlobalTreeConnectionList) {
+		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+		if (tcon->tid == buf->Tid) {
+			list_for_each(tmp1,&tcon->openFileList){
+				netfile = list_entry(tmp1,struct cifsFileInfo,tlist);
+				if(pSMB->Fid == netfile->netfid) {
+			/* BB Add following logic: 
+			  2) look up inode from tcon->openFileList->file->f_dentry->d_inode
+			  3) flush dirty pages and cached byte range locks and mark inode
+			  4) depending on break type change to r/o caching or no caching
+                  cifsinode->clientCanCacheAll = 0
+              5)  inode->i_data.a_ops = &cifs_addr_ops_writethrough;
+			  6) send oplock break response to server */
+					read_unlock(&GlobalSMBSeslock);
+					cFYI(1,("Matching file id, processing oplock break"));
+					return TRUE;
+				}
+			}
+			read_unlock(&GlobalSMBSeslock);
+			cFYI(1,("No matching file for oplock break on connection"));
+			return TRUE;
+		}
+	}
+	read_unlock(&GlobalSMBSeslock);
+	cFYI(1,("Can not process oplock break for non-existent connection"));
+	return TRUE;
 }
 
 void
@@ -355,7 +368,7 @@ dump_smb(struct smb_hdr *smb_buf, int smb_buf_length)
 	buffer = (unsigned char *) smb_buf;
 	for (i = 0, j = 0; i < smb_buf_length; i++, j++) {
 		if (i % 8 == 0) {	/* we have reached the beginning of line  */
-			printk("\n| ");
+			printk(KERN_DEBUG "| ");
 			j = 0;
 		}
 		printk("%0#4x ", buffer[i]);
@@ -367,7 +380,7 @@ dump_smb(struct smb_hdr *smb_buf, int smb_buf_length)
 
 		if (i % 8 == 7) {	/* we have reached end of line, time to print ascii */
 			debug_line[16] = 0;
-			printk(" | %s", debug_line);
+			printk(" | %s\n", debug_line);
 		}
 	}
 	for (; j < 8; j++) {
@@ -375,6 +388,6 @@ dump_smb(struct smb_hdr *smb_buf, int smb_buf_length)
 		debug_line[2 * j] = ' ';
 		debug_line[1 + (2 * j)] = ' ';
 	}
-	printk(" | %s\n", debug_line);
+	printk( " | %s\n", debug_line);
 	return;
 }

@@ -2,8 +2,6 @@
 # Makefile for Linux kernel Rx RPC
 #
 
-export-objs := rxrpc_syms.o
-
 rxrpc-objs := \
 	call.o \
 	connection.o \

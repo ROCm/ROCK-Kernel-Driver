@@ -251,6 +251,46 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 	return 0;
 }
 
+static int choose_rate(snd_pcm_substream_t *substream,
+		       snd_pcm_hw_params_t *params, unsigned int best_rate)
+{
+	snd_interval_t *it;
+	snd_pcm_hw_params_t *save;
+	unsigned int rate, prev;
+
+	save = kmalloc(sizeof(*save), GFP_KERNEL);
+	if (save == NULL)
+		return -ENOMEM;
+	*save = *params;
+	it = hw_param_interval(save, SNDRV_PCM_HW_PARAM_RATE);
+
+	/* try multiples of the best rate */
+	rate = best_rate;
+	for (;;) {
+		if (it->max < rate || (it->max == rate && it->openmax))
+			break;
+		if (it->min < rate || (it->min == rate && !it->openmin)) {
+			int ret;
+			ret = snd_pcm_hw_param_set(substream, params,
+						   SNDRV_PCM_HW_PARAM_RATE,
+						   rate, 0);
+			if (ret == (int)rate) {
+				kfree(save);
+				return rate;
+			}
+			*params = *save;
+		}
+		prev = rate;
+		rate += best_rate;
+		if (rate <= prev)
+			break;
+	}
+
+	/* not found, use the nearest rate */
+	kfree(save);
+	return snd_pcm_hw_param_near(substream, params, SNDRV_PCM_HW_PARAM_RATE, best_rate, 0);
+}
+
 static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -287,7 +327,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		snd_printd("No usable accesses\n");
 		return -EINVAL;
 	}
-	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_RATE, runtime->oss.rate, 0);
+	choose_rate(substream, &sparams, runtime->oss.rate);
 	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_CHANNELS, runtime->oss.channels, 0);
 
 	format = snd_pcm_oss_format_from(runtime->oss.format);
@@ -679,7 +719,7 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *bu
 				tmp = runtime->oss.period_bytes - runtime->oss.buffer_used;
 			if (tmp > 0) {
 				if (copy_from_user(runtime->oss.buffer + runtime->oss.buffer_used, buf, tmp))
-					return xfer > 0 ? xfer : -EFAULT;
+					return xfer > 0 ? (snd_pcm_sframes_t)xfer : -EFAULT;
 			}
 			runtime->oss.buffer_used += tmp;
 			buf += tmp;
@@ -688,14 +728,14 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *bu
 			if (runtime->oss.buffer_used == runtime->oss.period_bytes) {
 				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
 				if (tmp <= 0)
-					return xfer > 0 ? xfer : tmp;
+					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
 				runtime->oss.buffer_used = 0;
 			}
 		} else {
 			tmp = snd_pcm_oss_write2(substream, (char *)buf, runtime->oss.period_bytes, 0);
 			if (tmp <= 0)
-				return xfer > 0 ? xfer : tmp;
+				return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 			runtime->oss.bytes += tmp;
 			buf += tmp;
 			bytes -= tmp;
@@ -751,7 +791,7 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size
 			if (runtime->oss.buffer_used == 0) {
 				tmp = snd_pcm_oss_read2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
 				if (tmp <= 0)
-					return xfer > 0 ? xfer : tmp;
+					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
 				runtime->oss.buffer_used = runtime->oss.period_bytes;
 			}
@@ -759,7 +799,7 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size
 			if ((size_t) tmp > runtime->oss.buffer_used)
 				tmp = runtime->oss.buffer_used;
 			if (copy_to_user(buf, runtime->oss.buffer + (runtime->oss.period_bytes - runtime->oss.buffer_used), tmp))
-				return xfer > 0 ? xfer : -EFAULT;
+				return xfer > 0 ? (snd_pcm_sframes_t)xfer : -EFAULT;
 			buf += tmp;
 			bytes -= tmp;
 			xfer += tmp;
@@ -767,7 +807,7 @@ static ssize_t snd_pcm_oss_read1(snd_pcm_substream_t *substream, char *buf, size
 		} else {
 			tmp = snd_pcm_oss_read2(substream, (char *)buf, runtime->oss.period_bytes, 0);
 			if (tmp <= 0)
-				return xfer > 0 ? xfer : tmp;
+				return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 			runtime->oss.bytes += tmp;
 			buf += tmp;
 			bytes -= tmp;
@@ -890,7 +930,7 @@ static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file)
 	return substream->runtime->oss.rate;
 }
 
-static int snd_pcm_oss_set_channels(snd_pcm_oss_file_t *pcm_oss_file, int channels)
+static int snd_pcm_oss_set_channels(snd_pcm_oss_file_t *pcm_oss_file, unsigned int channels)
 {
 	int idx;
 	if (channels < 1)
@@ -1540,9 +1580,6 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	device = SNDRV_MINOR_OSS_DEVICE(minor) == SNDRV_MINOR_OSS_PCM1 ?
 		adsp_map[cardnum] : dsp_map[cardnum];
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	pcm = snd_pcm_devices[(cardnum * SNDRV_PCM_DEVICES) + device];
 	if (pcm == NULL) {
 		err = -ENODEV;
@@ -1611,13 +1648,10 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	return err;
 
       __error:
-      	module_put(pcm->card->module);
+     	module_put(pcm->card->module);
       __error2:
       	snd_card_file_remove(pcm->card, file);
       __error1:
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return err;
 }
 
@@ -1640,9 +1674,6 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	wake_up(&pcm->open_wait);
 	module_put(pcm->card->module);
 	snd_card_file_remove(pcm->card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -2123,7 +2154,7 @@ static void register_oss_dsp(snd_pcm_t *pcm, int index)
 static int snd_pcm_oss_register_minor(snd_pcm_t * pcm)
 {
 	pcm->oss.reg = 0;
-	if (dsp_map[pcm->card->number] == pcm->device) {
+	if (dsp_map[pcm->card->number] == (int)pcm->device) {
 		char name[128];
 		int duplex;
 		register_oss_dsp(pcm, 0);
@@ -2139,7 +2170,7 @@ static int snd_pcm_oss_register_minor(snd_pcm_t * pcm)
 		pcm->oss.reg++;
 		pcm->oss.reg_mask |= 1;
 	}
-	if (adsp_map[pcm->card->number] == pcm->device) {
+	if (adsp_map[pcm->card->number] == (int)pcm->device) {
 		register_oss_dsp(pcm, 1);
 		pcm->oss.reg++;
 		pcm->oss.reg_mask |= 2;
@@ -2172,7 +2203,7 @@ static int snd_pcm_oss_unregister_minor(snd_pcm_t * pcm)
 {
 	snd_pcm_oss_disconnect_minor(pcm);
 	if (pcm->oss.reg) {
-		if (dsp_map[pcm->card->number] == pcm->device) {
+		if (dsp_map[pcm->card->number] == (int)pcm->device) {
 #ifdef SNDRV_OSS_INFO_DEV_AUDIO
 			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_AUDIO, pcm->card->number);
 #endif

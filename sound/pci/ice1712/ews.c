@@ -851,7 +851,8 @@ static snd_kcontrol_new_t snd_ice1712_6fire_controls[] __devinitdata = {
 
 static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 {
-	int err, idx;
+	unsigned int idx;
+	int err;
 	snd_kcontrol_t *kctl;
 	
 	/* all terratec cards have spdif */
@@ -873,7 +874,7 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 	/* card specific controls */
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWX2496:
-		for (idx = 0; idx < sizeof(snd_ice1712_ewx2496_controls)/sizeof(snd_ice1712_ewx2496_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_ice1712_ewx2496_controls); idx++) {
 			err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_ewx2496_controls[idx], ice));
 			if (err < 0)
 				return err;
@@ -892,14 +893,14 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 			return err;
 		break;
 	case ICE1712_SUBDEVICE_EWS88D:
-		for (idx = 0; idx < sizeof(snd_ice1712_ews88d_controls)/sizeof(snd_ice1712_ews88d_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_ice1712_ews88d_controls); idx++) {
 			err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_ews88d_controls[idx], ice));
 			if (err < 0)
 				return err;
 		}
 		break;
 	case ICE1712_SUBDEVICE_DMX6FIRE:
-		for (idx = 0; idx < sizeof(snd_ice1712_6fire_controls)/sizeof(snd_ice1712_6fire_controls[0]); idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_ice1712_6fire_controls); idx++) {
 			err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_6fire_controls[idx], ice));
 			if (err < 0)
 				return err;

@@ -63,8 +63,6 @@ extern void show_registers(struct pt_regs *regs);
    CRU_ESCR0 (with any non-null event selector) through a complemented
    max threshold. [IA32-Vol3, Section 14.9.9] */
 #define MSR_P4_IQ_COUNTER0	0x30C
-#define MSR_P4_IQ_CCCR0		0x36C
-#define MSR_P4_CRU_ESCR0	0x3B8
 #define P4_NMI_CRU_ESCR0	(P4_ESCR_EVENT_SELECT(0x3F)|P4_ESCR_OS|P4_ESCR_USR)
 #define P4_NMI_IQ_CCCR0	\
 	(P4_CCCR_OVF_PMI|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT|	\

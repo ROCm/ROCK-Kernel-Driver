@@ -2,9 +2,8 @@
 #define _LINUX_SYS_H
 
 /*
- * system call entry points ... but not all are defined
+ * This file is no longer used or needed
  */
-#define NR_syscalls 260
 
 /*
  * These are system calls that will be removed at some time

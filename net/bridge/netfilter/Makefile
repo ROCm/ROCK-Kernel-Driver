@@ -2,8 +2,6 @@
 # Makefile for the netfilter modules for Link Layer filtering on a bridge.
 #
 
-export-objs := ebtables.o
-
 obj-$(CONFIG_BRIDGE_NF_EBTABLES) += ebtables.o
 obj-$(CONFIG_BRIDGE_EBT_T_FILTER) += ebtable_filter.o
 obj-$(CONFIG_BRIDGE_EBT_T_NAT) += ebtable_nat.o

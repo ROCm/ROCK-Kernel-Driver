@@ -71,6 +71,17 @@ void snd_ioctl32_unregister(struct ioctl32_mapper *mappers)
 
 
 /*
+ * compatible wrapper
+ */
+int snd_ioctl32_compat(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *filp)
+{
+	if (! filp->f_op || ! filp->f_op->ioctl)
+		return -ENOTTY;
+	return filp->f_op->ioctl(filp->f_dentry->d_inode, filp, cmd, arg);
+}
+
+
+/*
  * Controls
  */
 
@@ -250,9 +261,9 @@ static int get_ctl_type(struct file *file, snd_ctl_elem_id_t *id)
 	ctl = snd_magic_cast(snd_ctl_file_t, file->private_data, return -ENXIO);
 
 	kctl = snd_ctl_find_id(ctl->card, id);
-	if (! kctl)
+	if (! kctl) {
 		return -ENXIO;
-
+	}
 	info.id = *id;
 	err = kctl->info(kctl, &info);
 	if (err >= 0)
@@ -381,22 +392,22 @@ enum {
 
 static struct ioctl32_mapper control_mappers[] = {
 	/* controls (without rawmidi, hwdep, timer releated ones) */
-	{ SNDRV_CTL_IOCTL_PVERSION, NULL },
-	{ SNDRV_CTL_IOCTL_CARD_INFO , NULL },
+	MAP_COMPAT(SNDRV_CTL_IOCTL_PVERSION),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_CARD_INFO),
 	{ SNDRV_CTL_IOCTL_ELEM_LIST32, AP(ctl_elem_list) },
 	{ SNDRV_CTL_IOCTL_ELEM_INFO32, AP(ctl_elem_info) },
 	{ SNDRV_CTL_IOCTL_ELEM_READ32, AP(ctl_elem_read) },
 	{ SNDRV_CTL_IOCTL_ELEM_WRITE32, AP(ctl_elem_write) },
-	{ SNDRV_CTL_IOCTL_ELEM_LOCK, NULL },
-	{ SNDRV_CTL_IOCTL_ELEM_UNLOCK, NULL },
-	{ SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS, NULL },
-	{ SNDRV_CTL_IOCTL_HWDEP_INFO, NULL },
-	{ SNDRV_CTL_IOCTL_HWDEP_NEXT_DEVICE, NULL },
-	{ SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE, NULL },
-	{ SNDRV_CTL_IOCTL_PCM_INFO, NULL },
-	{ SNDRV_CTL_IOCTL_PCM_PREFER_SUBDEVICE, NULL },
-	{ SNDRV_CTL_IOCTL_POWER, NULL },
-	{ SNDRV_CTL_IOCTL_POWER_STATE, NULL },
+	MAP_COMPAT(SNDRV_CTL_IOCTL_ELEM_LOCK),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_ELEM_UNLOCK),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_SUBSCRIBE_EVENTS),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_HWDEP_INFO),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_HWDEP_NEXT_DEVICE),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_PCM_NEXT_DEVICE),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_PCM_INFO),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_PCM_PREFER_SUBDEVICE),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_POWER),
+	MAP_COMPAT(SNDRV_CTL_IOCTL_POWER_STATE),
 	{ 0 }
 };
 

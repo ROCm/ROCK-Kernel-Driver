@@ -1689,7 +1689,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 	switch (cmd) {
 	case SXIO_SET_BOARD:
 		sx_dprintk (SX_DEBUG_FIRMWARE, "set board to %ld\n", arg);
-		if (arg > SX_NBOARDS) return -EIO;
+		if (arg >= SX_NBOARDS) return -EIO;
 		sx_dprintk (SX_DEBUG_FIRMWARE, "not out of range\n");
 		if (!(boards[arg].flags	& SX_BOARD_PRESENT)) return -EIO;
 		sx_dprintk (SX_DEBUG_FIRMWARE, ".. and present!\n");
@@ -2214,6 +2214,23 @@ static int probe_si (struct sx_board *board)
 				return 0;
 			}
 		}
+	}
+
+	/* Now we're pretty much convinced that there is an SI board here, 
+	   but to prevent trouble, we'd better double check that we don't
+	   have an SI1 board when we're probing for an SI2 board.... */
+
+	write_sx_byte (board, SI2_ISA_ID_BASE,0x10); 
+	if ( IS_SI1_BOARD(board)) {
+		/* This should be an SI1 board, which has this
+		   location writable... */
+		if (read_sx_byte (board, SI2_ISA_ID_BASE) != 0x10)
+			return 0; 
+	} else {
+		/* This should be an SI2 board, which has the bottom
+		   3 bits non-writable... */
+		if (read_sx_byte (board, SI2_ISA_ID_BASE) == 0x10)
+			return 0; 
 	}
 
 	/* Now we're pretty much convinced that there is an SI board here, 

@@ -233,10 +233,8 @@ do_more:
 	}
 
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 
 	group_release_blocks(desc, bh2, group_freed);
 	freed += group_freed;
@@ -334,22 +332,23 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 	if (!prealloc_count || *prealloc_count)
 		prealloc_goal = 0;
 
-	*err = -EDQUOT;
-	if (DQUOT_ALLOC_BLOCK(inode, 1))
+	if (DQUOT_ALLOC_BLOCK(inode, 1)) {
+		*err = -EDQUOT;
 		goto out;
+	}
 
 	while (prealloc_goal && DQUOT_PREALLOC_BLOCK(inode, prealloc_goal))
 		prealloc_goal--;
 
 	dq_alloc = prealloc_goal + 1;
 
-	*err = -ENOSPC;
-
 	lock_super (sb);
 
 	es_alloc = reserve_blocks(sb, dq_alloc);
-	if (!es_alloc)
+	if (!es_alloc) {
+		*err = -ENOSPC;
 		goto out_unlock;
+	}
 
 	ext2_debug ("goal=%lu.\n", goal);
 
@@ -396,8 +395,10 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 			goto io_error;
 		group_alloc = group_reserve_blocks(desc, gdp_bh, es_alloc);
 	}
-	if (bit >= sbi->s_groups_count)
+	if (bit >= sbi->s_groups_count) {
+		*err = -ENOSPC;
 		goto out_release;
+	}
 	brelse(bitmap_bh);
 	bitmap_bh = read_block_bitmap(sb, group_no);
 	if (!bitmap_bh)
@@ -409,7 +410,7 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 			"Free blocks count corrupted for block group %d",
 				group_no);
 		group_alloc = 0;
-		goto out_release;
+		goto io_error;
 	}
 
 got_block:
@@ -432,7 +433,7 @@ got_block:
 			    "block(%d) >= blocks count(%d) - "
 			    "block_group = %d, es == %p ", ret_block,
 			le32_to_cpu(es->s_blocks_count), group_no, es);
-		goto out_release;
+		goto io_error;
 	}
 	block = target_block;
 
@@ -463,17 +464,15 @@ got_block:
 	write_unlock(&EXT2_I(inode)->i_meta_lock);
 
 	mark_buffer_dirty(bitmap_bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block(WRITE, 1, &bitmap_bh);
-		wait_on_buffer(bitmap_bh);
-	}
+	if (sb->s_flags & MS_SYNCHRONOUS)
+		sync_dirty_buffer(bitmap_bh);
 
 	ext2_debug ("allocating block %d. ", block);
 
+	*err = 0;
 out_release:
 	group_release_blocks(desc, gdp_bh, group_alloc);
 	release_blocks(sb, es_alloc);
-	*err = 0;
 out_unlock:
 	unlock_super (sb);
 	DQUOT_FREE_BLOCK(inode, dq_alloc);

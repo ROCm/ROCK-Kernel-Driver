@@ -57,7 +57,7 @@ voyager_thread_start(void)
 }
 
 static int
-execute_helper(void *string)
+execute(const char *string)
 {
 	int ret;
 
@@ -74,20 +74,11 @@ execute_helper(void *string)
 		NULL,
 	};
 
-	if((ret = exec_usermodehelper(argv[0], argv, envp)) < 0) {
-		printk(KERN_ERR "Voyager failed to execute \"%s\"\n",
-		       (char *)string);
+	if ((ret = call_usermodehelper(argv[0], argv, envp, 1)) != 0) {
+		printk(KERN_ERR "Voyager failed to run \"%s\": %i\n",
+		       string, ret);
 	}
 	return ret;
-}
-
-static void
-execute(char *string)
-{
-	if(kernel_thread(execute_helper, (void *)string, CLONE_VFORK | SIGCHLD) < 0) {
-		printk(KERN_ERR "Voyager failed to fork before exec of \"%s\"\n",
-		       string);
-	}
 }
 
 static void
@@ -137,13 +128,12 @@ thread(void *unused)
 	kvoyagerd_running = 1;
 
 	reparent_to_init();
-	daemonize();
+	daemonize(THREAD_NAME);
 
 	set_timeout = 0;
 
 	init_timer(&wakeup_timer);
 
-	strcpy(current->comm, THREAD_NAME);
 	sigfillset(&current->blocked);
 	current->tty = NULL;	/* get rid of controlling tty */
 

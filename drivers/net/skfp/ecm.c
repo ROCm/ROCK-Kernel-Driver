@@ -17,23 +17,23 @@
 /*
 	SMT ECM
 	Entity Coordination Management
-	Hardware independant state machine
+	Hardware independent state machine
 */
 
 /*
- * Hardware independant state machine implemantation
+ * Hardware independent state machine implemantation
  * The following external SMT functions are referenced :
  *
  * 		queue_event()
  * 		smt_timer_start()
  * 		smt_timer_stop()
  *
- * 	The following external HW dependant functions are referenced :
+ * 	The following external HW dependent functions are referenced :
  * 		sm_pm_bypass_req()
  * 		sm_pm_ls_latch()
  * 		sm_pm_get_ls()
  * 
- * 	The following HW dependant events are required :
+ * 	The following HW dependent events are required :
  *		NONE
  *
  */

@@ -177,7 +177,7 @@ struct sg_item {
 struct i810_channel 
 {
 	/* these sg guys should probably be allocated
-	   seperately as nocache. Must be 8 byte aligned */
+	   separately as nocache. Must be 8 byte aligned */
 	struct sg_item sg[SG_LEN];	/* 32*8 */
 	u32 offset;			/* 4 */
 	u32 port;			/* 4 */
@@ -186,7 +186,7 @@ struct i810_channel
 };
 
 /*
- * we have 3 seperate dma engines.  pcm in, pcm out, and mic.
+ * we have 3 separate dma engines.  pcm in, pcm out, and mic.
  * each dma engine has controlling registers.  These goofy
  * names are from the datasheet, but make it easy to write
  * code while leafing through it.
@@ -900,7 +900,7 @@ static void start_dac(struct i810_state *state)
 #define DMABUF_DEFAULTORDER (16-PAGE_SHIFT)
 #define DMABUF_MINORDER 1
 
-/* allocate DMA buffer, playback and recording buffer should be allocated seperately */
+/* allocate DMA buffer, playback and recording buffer should be allocated separately */
 static int alloc_dmabuf(struct i810_state *state)
 {
 	struct dmabuf *dmabuf = &state->dmabuf;

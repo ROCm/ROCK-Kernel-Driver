@@ -31,6 +31,7 @@
 #define _LINUX_SS_H
 
 #include <pcmcia/cs_types.h>
+#include <linux/device.h>
 
 /* Definitions for card status flags for GetStatus */
 #define SS_WRPROT	0x0001
@@ -142,7 +143,16 @@ struct pccard_operations {
 /*
  *  Calls to set up low-level "Socket Services" drivers
  */
-extern int register_ss_entry(int nsock, struct pccard_operations *ops);
-extern void unregister_ss_entry(struct pccard_operations *ops);
+
+#define MAX_SOCKETS_PER_DEV 8
+
+struct pcmcia_socket_class_data {
+	unsigned int nsock;			/* number of sockets */
+	struct pccard_operations *ops;		/* see above */
+	void *s_info[MAX_SOCKETS_PER_DEV];	/* socket_info_t */
+	unsigned int use_bus_pm;
+};
+
+extern struct device_class pcmcia_socket_class;
 
 #endif /* _LINUX_SS_H */

@@ -1156,7 +1156,7 @@ static int InitFailover (PADAPTER2220I padapter, POUR_DEVICE pdev)
 static void TimerExpiry (unsigned long data)
 	{
 	PADAPTER2220I	padapter = (PADAPTER2220I)data;
-	struct Scsi_Host *host = padapter->SCpnt->host;
+	struct Scsi_Host *host = padapter->SCpnt->device->host;
 	POUR_DEVICE		pdev = padapter->pdev;
 	UCHAR			status = IDE_STATUS_BUSY;
 	UCHAR			temp, temp1;
@@ -1334,7 +1334,7 @@ static LONG SetReconstruct (POUR_DEVICE pdev, int index)
 static void ReconTimerExpiry (unsigned long data)
 	{
 	PADAPTER2220I	padapter = (PADAPTER2220I)data;
-	struct Scsi_Host *host = padapter->SCpnt->host;
+	struct Scsi_Host *host = padapter->SCpnt->device->host;
 	POUR_DEVICE		pdev;
 	ULONG			testsize = 0;
 	PIDENTIFY_DATA	pid;
@@ -2041,8 +2041,8 @@ out:;
 int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	{
 	UCHAR		   *cdb = (UCHAR *)SCpnt->cmnd;					// Pointer to SCSI CDB
-	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	PADAPTER2220I	padapter = HOSTDATA(SCpnt->device->host);			// Pointer to adapter control structure
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 	UCHAR			rc;											// command return code
 	int				z; 
 	PDEVICE_RAID1	pdr;
@@ -2073,9 +2073,9 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		{
 		UCHAR			zlo, zhi;
 
-		DEB (printk ("\nPCI2242I: ID %d, LUN %d opcode %X ", SCpnt->target, SCpnt->lun, *cdb));
+		DEB (printk ("\nPCI2242I: ID %d, LUN %d opcode %X ", SCpnt->device->id, SCpnt->device->lun, *cdb));
 		padapter->pdev = pdev;
-		if ( !pdev->byte6 || SCpnt->lun )
+		if ( !pdev->byte6 || SCpnt->device->lun )
 			{
 			OpDone (padapter, DID_BAD_TARGET << 16);
 			return 0;
@@ -2138,7 +2138,7 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		padapter->reconTimer.data = 0;
 		}
 		
-	if ( (SCpnt->target >= padapter->numberOfDrives) || SCpnt->lun )
+	if ( (SCpnt->device->id >= padapter->numberOfDrives) || SCpnt->device->lun )
 		{
 		OpDone (padapter, DID_BAD_TARGET << 16);
 		return 0;
@@ -2549,7 +2549,7 @@ int Pci2220i_Detect (Scsi_Host_Template *tpnt)
 		if ( GetRegs (pshost, FALSE, pcidev) )
 			goto unregister;
 
-		scsi_set_pci_device(pshost, pcidev);
+		scsi_set_device(pshost, &pcidev->dev);
 		pshost->max_id = padapter->numberOfDrives;
 		for ( z = 0;  z < padapter->numberOfDrives;  z++ )
 			{
@@ -2791,8 +2791,8 @@ unregister1:;
  ****************************************************************/
 int Pci2220i_Abort (Scsi_Cmnd *SCpnt)
 	{
-	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	PADAPTER2220I	padapter = HOSTDATA(SCpnt->device->host);			// Pointer to adapter control structure
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 
 	if ( !padapter->SCpnt )
 		return SCSI_ABORT_NOT_RUNNING;
@@ -2823,8 +2823,8 @@ int Pci2220i_Abort (Scsi_Cmnd *SCpnt)
  ****************************************************************/
 int Pci2220i_Reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	{
-	PADAPTER2220I	padapter = HOSTDATA(SCpnt->host);			// Pointer to adapter control structure
-	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->target];// Pointer to device information
+	PADAPTER2220I	padapter = HOSTDATA(SCpnt->device->host);			// Pointer to adapter control structure
+	POUR_DEVICE		pdev	 = &padapter->device[SCpnt->device->id];// Pointer to device information
 
 	if ( padapter->atapi )
 		{

@@ -662,7 +662,7 @@ snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len)
 		snd_printk(KERN_WARNING "illegal chorus mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
-	if (len < sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
+	if (len < (long)sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
 		return -EFAULT;
 	chorus_parm[mode] = rec;
 	chorus_defined[mode] = 1;
@@ -790,7 +790,7 @@ snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len)
 		snd_printk(KERN_WARNING "illegal reverb mode %d for uploading\n", mode);
 		return -EINVAL;
 	}
-	if (len < sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
+	if (len < (long)sizeof(rec) || copy_from_user(&rec, buf, sizeof(rec)))
 		return -EFAULT;
 	reverb_parm[mode] = rec;
 	reverb_defined[mode] = 1;

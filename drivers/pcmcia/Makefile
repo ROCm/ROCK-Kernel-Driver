@@ -2,8 +2,6 @@
 # Makefile for the kernel pcmcia subsystem (c/o David Hinds)
 #
 
-export-objs := ds.o cs.o yenta.o sa1100_generic.o
-
 obj-$(CONFIG_PCMCIA)			+= pcmcia_core.o ds.o
 ifeq ($(CONFIG_CARDBUS),y)
   obj-$(CONFIG_PCMCIA) 			+= yenta_socket.o

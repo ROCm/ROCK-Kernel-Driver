@@ -4211,7 +4211,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	unsigned short flags;
 	int            i, b_size, new_session = FALSE, retval = 0;
 	unsigned char  cmd[MAX_COMMAND_SIZE];
-	Scsi_Request * SRpnt;
+	Scsi_Request * SRpnt = NULL;
 	OS_Scsi_Tape * STp;
 	ST_mode      * STm;
 	ST_partstat  * STps;

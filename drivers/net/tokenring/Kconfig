@@ -32,7 +32,7 @@ config IBMTR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmtr.o. If you want to compile it as a
+	  The module will be called ibmtr. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config IBMOL
@@ -48,7 +48,7 @@ config IBMOL
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called olympic.o. If you want to compile it
+	  The module will be called olympic. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  Also read <file:Documentation/networking/olympic.txt> or check the
@@ -66,7 +66,7 @@ config IBMLS
 
 	  This driver is also available as a modules ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The modules will be called lanstreamer.o. If you want to compile it
+	  The modules will be called lanstreamer. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config 3C359
@@ -82,7 +82,7 @@ config 3C359
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will will be called 3c359.o. If you want to compile it
+	  The module will will be called 3c359. If you want to compile it
 	  as a module, say M here and read Documentation/modules.txt.
 
 	  Also read the file <file:Documentation/networking/3c359.txt> or check the 
@@ -111,7 +111,7 @@ config TMS380TR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tms380tr.o. If you want to compile it
+	  The module will be called tms380tr. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config TMSPCI
@@ -128,21 +128,36 @@ config TMSPCI
 
 	  This driver is available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tmspci.o. If you want to compile it
+	  The module will be called tmspci. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
-config TMSISA
-	tristate "Generic TMS380 ISA support"
+config SKISA
+	tristate "SysKonnect TR4/16 ISA support"
 	depends on TR && TMS380TR!=n && ISA
 	help
-	  This tms380 module supports generic TMS380-based ISA cards.
+	  This tms380 module supports SysKonnect TR4/16 ISA cards.
 
 	  These cards are known to work:
 	  - SysKonnect TR4/16 ISA (SK-4190)
 
 	  This driver is available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tmsisa.o. If you want to compile it
+	  The module will be called skisa. If you want to compile it
+	  as a module, say M here and read <file:Documentation/modules.txt>.
+
+config PROTEON
+	tristate "Proteon ISA support"
+	depends on TR && TMS380TR!=n && ISA
+	help
+	  This tms380 module supports Proteon ISA cards.
+
+	  These cards are known to work:
+	  - Proteon 1392
+	  - Proteon 1392 plus
+
+	  This driver is available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called proteon. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config ABYSS
@@ -154,7 +169,7 @@ config ABYSS
 
 	  This driver is available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called abyss.o. If you want to compile it
+	  The module will be called abyss. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config MADGEMC
@@ -166,7 +181,7 @@ config MADGEMC
 
 	  This driver is available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called madgemc.o. If you want to compile it
+	  The module will be called madgemc. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config SMCTR
@@ -184,7 +199,7 @@ config SMCTR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smctr.o. If you want to compile it
+	  The module will be called smctr. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 endmenu

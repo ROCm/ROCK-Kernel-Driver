@@ -339,10 +339,6 @@ static int snd_seq_open(struct inode *inode, struct file *file)
 	/* make others aware this new client */
 	snd_seq_system_client_ev_client_start(c);
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
-
 	return 0;
 }
 
@@ -358,9 +354,6 @@ static int snd_seq_release(struct inode *inode, struct file *file)
 		kfree(client);
 	}
 
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -1013,7 +1006,7 @@ static ssize_t snd_seq_write(struct file *file, const char *buf, size_t count, l
 
 		if (snd_seq_ev_is_variable(&event)) {
 			int extlen = event.data.ext.len & ~SNDRV_SEQ_EXT_MASK;
-			if (extlen + len > count) {
+			if ((size_t)(extlen + len) > count) {
 				/* back out, will get an error this time or next */
 				err = -EINVAL;
 				break;

@@ -151,7 +151,7 @@ config CPU_FREQ
 	  If in doubt, say N.
 
 config CPU_FREQ_PROC_INTF
-	bool "/proc/cpufreq interface (DEPRECATED)"
+	tristate "/proc/cpufreq interface (DEPRECATED)"
 	depends on CPU_FREQ && PROC_FS
 	help
 	  This enables the /proc/cpufreq interface for controlling
@@ -162,9 +162,14 @@ config CPU_FREQ_PROC_INTF
 	  
 	  If in doubt, say N.
 
+config CPU_FREQ_TABLE
+       tristate
+       default y
+
+
 config US3_FREQ
 	tristate "UltraSPARC-III CPU Frequency driver"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
 
@@ -232,7 +237,7 @@ config ISAPNP
 	  Say Y here if you would like support for ISA Plug and Play devices.
 	  Some information is in <file:Documentation/isapnp.txt>.
 
-	  This support is also available as a module called isapnp.o ( =
+	  This support is also available as a module called isapnp ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -279,8 +284,8 @@ config PCMCIA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core.o
-	  and ds.o.  If you want to compile it as a module, say M here and
+	  When compiled this way, there will be modules called pcmcia_core
+	  and ds.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.
 
 config SBUS
@@ -338,7 +343,7 @@ config RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc.o. If you want to compile it as a module,
+	  The module is called rtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 source "drivers/pci/Kconfig"
@@ -354,7 +359,7 @@ config SUN_OPENPROMFS
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called openpromfs.o.  If unsure, say M.
+	  The module will be called openpromfs.  If unsure, say M.
 
 config KCORE_ELF
 	bool
@@ -431,7 +436,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -456,7 +461,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 config SUNOS_EMUL
@@ -477,7 +482,7 @@ config SOLARIS_EMUL
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called solaris.o. If you want to compile it as a
+	  The module will be called solaris. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 source "drivers/parport/Kconfig"
@@ -498,7 +503,7 @@ config PRINTER
 	  driver as a module however ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt> and
-	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
@@ -518,7 +523,7 @@ config ENVCTRL
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called envctrl.o. If you want to compile it as a
+	  The module will be called envctrl. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config DISPLAY7SEG
@@ -530,7 +535,7 @@ config DISPLAY7SEG
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called display7seg.o. If you want to compile it
+	  The module will be called display7seg. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you do not have a CompactPCI model CP1400 or CP1500, or
@@ -546,7 +551,7 @@ config WATCHDOG_CP1XXX
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpwatchdog.o. If you want to compile it
+	  The module will be called cpwatchdog. If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you do not have a CompactPCI model CP1400 or CP1500, or
@@ -586,7 +591,7 @@ config BLK_DEV_FD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called floppy.o. If you want to compile it as a
+	  The module will be called floppy. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config BLK_DEV_LOOP
@@ -636,7 +641,7 @@ config BLK_DEV_LOOP
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called loop.o.
+	  will be called loop.
 
 	  Most users will answer N here.
 
@@ -665,7 +670,7 @@ config BLK_DEV_NBD
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called nbd.o.
+	  will be called nbd.
 
 	  If unsure, say N.
 
@@ -687,7 +692,7 @@ config BLK_DEV_RAM
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M and read <file:Documentation/modules.txt>. The module will be
-	  called rd.o.
+	  called rd.
 
 	  Most normal users won't need the RAM disk functionality, and can
 	  thus say N here.
@@ -755,7 +760,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -782,7 +787,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -803,7 +808,7 @@ config BLK_DEV_SD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sd_mod.o.  If you want to compile it as a
+	  The module will be called sd_mod.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  Do not compile this driver as a
 	  module if your root file system (the one containing the directory /)
@@ -839,7 +844,7 @@ config CHR_DEV_ST
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called st.o. If you want to compile it as a
+	  The module will be called st. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.
 
@@ -864,7 +869,7 @@ config CHR_DEV_OSST
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called osst.o. If you want to compile it as a
+	  The module will be called osst. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.
 
@@ -879,7 +884,7 @@ config BLK_DEV_SR
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sr_mod.o. If you want to compile it as a
+	  The module will be called sr_mod. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.
 
@@ -932,7 +937,7 @@ config CHR_DEV_SG
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.o.
+	  <file:Documentation/scsi/scsi.txt>. The module will be called sg.
 	  If unsure, say N.
 
 comment "Some SCSI devices (e.g. CD jukebox) support multiple LUNs"
@@ -994,7 +999,7 @@ config SCSI_SUNESP
 	  This is the driver for the Sun ESP SCSI host adapter. The ESP
 	  chipset is present in most SPARC SBUS-based computers.
 
-	  This support is also available as a module called esp.o ( = code
+	  This support is also available as a module called esp ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -1008,7 +1013,7 @@ config SCSI_QLOGICPTI
 	  PTI,ptisp or QLGC,isp. Note that PCI QLogic SCSI controllers are
 	  driven by a different driver.
 
-	  This support is also available as a module called qlogicpti.o ( =
+	  This support is also available as a module called qlogicpti ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -1060,7 +1065,7 @@ config SCSI_AIC7XXX_OLD
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called aic7xxx_old.o.
+	  will be called aic7xxx_old.
 
 config AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
 	bool "Enable Tagged Command Queueing (TCQ) by default"
@@ -1404,7 +1409,7 @@ config SCSI_QLOGIC_ISP
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called qlogicisp.o.  If you want to compile it as
+	  The module will be called qlogicisp.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config SCSI_QLOGIC_FC
@@ -1415,7 +1420,7 @@ config SCSI_QLOGIC_FC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called qlogicfc.o.  If you want to compile it as
+	  The module will be called qlogicfc.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config SCSI_QLOGIC_FC_FIRMWARE
@@ -1502,7 +1507,7 @@ config VIDEO_DEV
 	  device or user software interacting with such a driver, please read
 	  the file <file:Documentation/video4linux/API.html>.
 
-	  This driver is also available as a module called videodev.o ( = code
+	  This driver is also available as a module called videodev ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -1518,7 +1523,7 @@ config VIDEO_BT848
 	  If you say Y or M here, you need to say Y or M to "I2C support" and
 	  "I2C bit-banging interfaces" in the character device section.
 
-	  This driver is available as a module called bttv.o ( = code
+	  This driver is available as a module called bttv ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -1552,14 +1557,14 @@ config DRM_TDFX
 	depends on DRM
 	help
 	  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
-	  graphics card.  If M is selected, the module will be called tdfx.o.
+	  graphics card.  If M is selected, the module will be called tdfx.
 
 config DRM_R128
 	tristate "ATI Rage 128"
 	depends on DRM
 	help
 	  Choose this option if you have an ATI Rage 128 graphics card.  If M
-	  is selected, the module will be called r128.o.  AGP support for
+	  is selected, the module will be called r128.  AGP support for
 	  this card is strongly suggested (unless you have a PCI version).
 
 endmenu
@@ -1594,7 +1599,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.
@@ -1623,7 +1628,7 @@ config SOFT_WATCHDOG
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.o.
+	  softdog.
 
 endmenu
 

@@ -257,7 +257,7 @@ static inline struct zone *next_zone(struct zone *zone)
 
 #include <asm/topology.h>
 /* Returns the number of the current Node. */
-#define numa_node_id()		(__cpu_to_node(smp_processor_id()))
+#define numa_node_id()		(cpu_to_node(smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
 extern struct pglist_data contig_page_data;

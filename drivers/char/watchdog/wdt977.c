@@ -58,7 +58,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 
 
 /* This is kicking the watchdog by simply re-writing the timeout to reg. 0xF2 */
-int kick_wdog(void)
+static int kick_wdog(void)
 {
 	/*
 	 *	Refresh the timer.
@@ -216,21 +216,20 @@ static int wdt977_release(struct inode *inode, struct file *file)
 
 static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
+	/* Can't seek (pwrite) on this device  */
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if(count)
-	{
+	if (count) {
 		if (!nowayout) {
 			size_t i;
 
 			/* In case it was set long ago */
 			expect_close = 0;
 
-			for (i = 0; i != len; i++) {
+			for (i = 0; i != count; i++) {
 				char c;
-				if (get_user(c, data + i))
+				if (get_user(c, buf + i))
 					return -EFAULT;
 				if (c == 'V')
 					expect_close = 1;
@@ -238,9 +237,8 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 		}
 
 		kick_wdog();
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 /*
@@ -254,14 +252,15 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
  *      according to their available features.
  */
 
+static struct watchdog_info ident = {
+	.options	= WDIOF_SETTIMEOUT,
+	.identity	= "Winbond 83977"
+};
+
 static int wdt977_ioctl(struct inode *inode, struct file *file,
          unsigned int cmd, unsigned long arg)
 {
-static struct watchdog_info ident = {
-	identity	: "Winbond 83977"
-};
-
-int temp;
+	int temp;
 
 	switch(cmd)
 	{
@@ -337,9 +336,9 @@ static struct file_operations wdt977_fops=
 
 static struct miscdevice wdt977_miscdev=
 {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&wdt977_fops
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &wdt977_fops
 };
 
 static int __init nwwatchdog_init(void)
@@ -360,4 +359,5 @@ static void __exit nwwatchdog_exit(void)
 module_init(nwwatchdog_init);
 module_exit(nwwatchdog_exit);
 
+MODULE_DESCRIPTION("W83977AF Watchdog driver");
 MODULE_LICENSE("GPL");

@@ -203,6 +203,20 @@ static int ohci_urb_enqueue (
 		return -ENOMEM;
 	memset (urb_priv, 0, sizeof (urb_priv_t) + size * sizeof (struct td *));
 	
+	/* fill the private part of the URB */
+	urb_priv->length = size;
+	urb_priv->ed = ed;	
+
+	/* allocate the TDs (deferring hash chain updates) */
+	for (i = 0; i < size; i++) {
+		urb_priv->td [i] = td_alloc (ohci, mem_flags);
+		if (!urb_priv->td [i]) {
+			urb_priv->length = i;
+			urb_free_priv (ohci, urb_priv);
+			return -ENOMEM;
+		}
+	}	
+
 	spin_lock_irqsave (&ohci->lock, flags);
 
 	/* don't submit to a dead HC */
@@ -210,20 +224,6 @@ static int ohci_urb_enqueue (
 		retval = -ENODEV;
 		goto fail;
 	}
-
-	/* fill the private part of the URB */
-	urb_priv->length = size;
-	urb_priv->ed = ed;	
-
-	/* allocate the TDs (updating hash chains) */
-	for (i = 0; i < size; i++) {
-		urb_priv->td [i] = td_alloc (ohci, SLAB_ATOMIC);
-		if (!urb_priv->td [i]) {
-			urb_priv->length = i;
-			retval = -ENOMEM;
-			goto fail;
-		}
-	}	
 
 	/* schedule the ed if needed */
 	if (ed->state == ED_IDLE) {

@@ -90,7 +90,7 @@ endif
 # BWX is most important, but we don't really want any emulation ever.
 CFLAGS += $(cflags-y) -Wa,-mev6
 
-HEAD := arch/alpha/kernel/head.o
+head-y := arch/alpha/kernel/head.o
 
 core-y				+= arch/alpha/kernel/ arch/alpha/mm/
 core-$(CONFIG_MATHEMU)		+= arch/alpha/math-emu/
@@ -125,8 +125,6 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(boot)
-
-archmrproper:
 
 CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h.tmp \
 	       include/asm-$(ARCH)/asm_offsets.h

@@ -366,12 +366,15 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		   also reload when it has changed. 
 		   when prev process used 64bit base always reload
 		   to avoid an information leak. */
-		if (unlikely((fsindex | next->fsindex) || prev->fs))
+		if (unlikely(fsindex | next->fsindex | prev->fs)) {
 			loadsegment(fs, next->fsindex);
-		/* check if the user changed the selector
-		   if yes clear 64bit base. */
-		if (unlikely(fsindex != prev->fsindex))
+			/* check if the user used a selector != 0
+	                 * if yes clear 64bit base, since overloaded base
+                         * is always mapped to the Null selector
+                         */
+			if (fsindex)
 			prev->fs = 0;				
+		}
 		/* when next process has a 64bit base use it */
 		if (next->fs) 
 			wrmsrl(MSR_FS_BASE, next->fs); 
@@ -380,10 +383,11 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	{ 
 		unsigned gsindex;
 		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
-		if (unlikely((gsindex | next->gsindex) || prev->gs))
+		if (unlikely(gsindex | next->gsindex | prev->gs)) {
 			load_gs_index(next->gsindex);
-		if (unlikely(gsindex != prev->gsindex)) 
+			if (gsindex)
 			prev->gs = 0;				
+		}
 		if (next->gs)
 			wrmsrl(MSR_KERNEL_GS_BASE, next->gs); 
 		prev->gsindex = gsindex;
@@ -537,29 +541,23 @@ int sys_arch_prctl(int code, unsigned long addr)
 
 	switch (code) { 
 	case ARCH_SET_GS:
-#if 1
-		/* For now. We still have one unsolved bug in long gs base context
-		   switch handling. */
-		return -EINVAL; 
-#else
 		if (addr >= TASK_SIZE) 
 			return -EPERM; 
 		get_cpu();
-		load_gs_index(__USER_LONGBASE);
-		current->thread.gsindex = __USER_LONGBASE;
+		load_gs_index(0);
+		current->thread.gsindex = 0;
 		current->thread.gs = addr;
 		ret = checking_wrmsrl(MSR_KERNEL_GS_BASE, addr); 
 		put_cpu();
 		break;
-#endif
 	case ARCH_SET_FS:
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
 		if (addr >= TASK_SIZE)
 			return -EPERM; 
 		get_cpu();
-		asm volatile("movl %0,%%fs" :: "r" (__USER_LONGBASE));
-		current->thread.fsindex = __USER_LONGBASE;
+		asm volatile("movl %0,%%fs" :: "r" (0));
+		current->thread.fsindex = 0;
 		current->thread.fs = addr;
 		ret = checking_wrmsrl(MSR_FS_BASE, addr); 
 		put_cpu();

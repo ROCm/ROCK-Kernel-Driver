@@ -3057,7 +3057,7 @@ eicon_idi_manage(eicon_card *card, eicon_manifbuf *mb)
 		}
 
 	        timeout = jiffies + 50;
-        	while (timeout > jiffies) {
+        	while (time_before(jiffies, timeout)) {
 	                if (chan->e.B2Id) break;
         	        SLEEP(10);
 	        }
@@ -3119,7 +3119,7 @@ eicon_idi_manage(eicon_card *card, eicon_manifbuf *mb)
         eicon_tx_request(card);
 
         timeout = jiffies + 50;
-        while (timeout > jiffies) {
+        while (time_before(jiffies, timeout)) {
                 if (chan->fsm_state) break;
                 SLEEP(10);
         }

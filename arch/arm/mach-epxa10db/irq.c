@@ -19,6 +19,9 @@
  */
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/stddef.h>
+#include <linux/timer.h>
+#include <linux/list.h>
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/irq.h>

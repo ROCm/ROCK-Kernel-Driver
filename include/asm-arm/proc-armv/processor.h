@@ -23,7 +23,7 @@
 #define KERNEL_STACK_SIZE	PAGE_SIZE
 
 #define INIT_EXTRA_THREAD_INFO						\
-	cpu_domain:	  domain_val(DOMAIN_USER, DOMAIN_CLIENT) |	\
+	.cpu_domain	= domain_val(DOMAIN_USER, DOMAIN_MANAGER) |	\
 			  domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) |	\
 			  domain_val(DOMAIN_IO, DOMAIN_CLIENT)
 
@@ -45,7 +45,7 @@
 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
 })
 
-#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1019])
-#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1017])
+#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1019])
+#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1017])
 
 #endif

@@ -29,6 +29,7 @@
 #define	LEVEL_LINEAR		(-1)
 
 #define MaxSector (~(sector_t)0)
+#define MD_THREAD_NAME_MAX 14
 
 static inline int pers_to_level (int pers)
 {
@@ -229,7 +230,10 @@ struct mddev_s
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
 	sector_t			recovery_cp;
-
+	int				safemode;	/* if set, update "clean" superblock
+							 * when no writes pending.
+							 */ 
+	atomic_t			writes_pending; 
 	request_queue_t			queue;	/* for plugging ... */
 
 	struct list_head		all_mddevs;

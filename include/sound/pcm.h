@@ -50,7 +50,7 @@ typedef struct sndrv_pcm_mmap_status snd_pcm_mmap_status_t;
 typedef struct sndrv_pcm_mmap_control snd_pcm_mmap_control_t;
 typedef struct sndrv_mask snd_mask_t;
 
-#define _snd_pcm_substream_chip(substream) ((substream)->pcm->private_data)
+#define _snd_pcm_substream_chip(substream) ((substream)->private_data)
 #define snd_pcm_substream_chip(substream) snd_magic_cast1(chip_t, _snd_pcm_substream_chip(substream), return -ENXIO)
 #define _snd_pcm_chip(pcm) ((pcm)->private_data)
 #define snd_pcm_chip(pcm) snd_magic_cast1(chip_t, _snd_pcm_chip(pcm), return -ENXIO)
@@ -120,10 +120,12 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_TRIGGER_SUSPEND	5
 #define SNDRV_PCM_TRIGGER_RESUME	6
 
-#define SNDRV_PCM_DMA_TYPE_CONTINUOUS	0	/* continuous no-DMA memory */
-#define SNDRV_PCM_DMA_TYPE_ISA		1	/* ISA continuous */
-#define SNDRV_PCM_DMA_TYPE_PCI		2	/* PCI continuous */
-#define SNDRV_PCM_DMA_TYPE_SBUS		3	/* SBUS continuous */
+#define SNDRV_PCM_DMA_TYPE_UNKNOWN	0	/* not defined */
+#define SNDRV_PCM_DMA_TYPE_CONTINUOUS	1	/* continuous no-DMA memory */
+#define SNDRV_PCM_DMA_TYPE_ISA		2	/* ISA continuous */
+#define SNDRV_PCM_DMA_TYPE_PCI		3	/* PCI continuous */
+#define SNDRV_PCM_DMA_TYPE_SBUS		4	/* SBUS continuous */
+#define SNDRV_PCM_DMA_TYPE_PCI_SG	5	/* PCI SG-buffer */
 
 /* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
@@ -279,6 +281,13 @@ typedef struct {
 	unsigned int mask;
 } snd_pcm_hw_constraint_list_t;
 
+struct snd_pcm_dma_buffer {
+	unsigned char *area;
+	dma_addr_t addr;
+	unsigned long bytes;
+	void *private_data; /* for allocator */
+};
+
 struct _snd_pcm_runtime {
 	/* -- Status -- */
 	snd_pcm_substream_t *trigger_master;
@@ -353,6 +362,7 @@ struct _snd_pcm_runtime {
 	unsigned char *dma_area;	/* DMA area */
 	dma_addr_t dma_addr;		/* physical bus address (not accessible from main CPU) */
 	unsigned long dma_bytes;	/* size of DMA area */
+	void *dma_private;		/* private DMA data for the memory allocator */
 
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	/* -- OSS things -- */
@@ -363,14 +373,13 @@ struct _snd_pcm_runtime {
 struct _snd_pcm_substream {
 	snd_pcm_t *pcm;
 	snd_pcm_str_t *pstr;
+	void *private_data;		/* copied from pcm->private_data */
 	int number;
 	char name[32];			/* substream name */
 	int stream;			/* stream (direction) */
 	size_t buffer_bytes_max;	/* limit ring buffer size */
 	int dma_type;			
-	void *dma_area;
-	dma_addr_t dma_addr;
-	size_t dma_bytes;
+	struct snd_pcm_dma_buffer dma_buffer;
 	size_t dma_max;
 	void *dma_private;
 	/* -- hardware operations -- */
@@ -741,6 +750,10 @@ int snd_pcm_hw_param_near(snd_pcm_substream_t *substream,
 			  snd_pcm_hw_params_t *params,
 			  snd_pcm_hw_param_t var, 
 			  unsigned int val, int *dir);
+int snd_pcm_hw_param_set(snd_pcm_substream_t *pcm,
+			 snd_pcm_hw_params_t *params,
+			 snd_pcm_hw_param_t var,
+			 unsigned int val, int dir);
 int snd_pcm_hw_params_choose(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
 
 int snd_pcm_hw_refine(snd_pcm_substream_t *substream, snd_pcm_hw_params_t *params);
@@ -808,7 +821,7 @@ int snd_pcm_playback_xrun_check(snd_pcm_substream_t *substream);
 int snd_pcm_capture_xrun_check(snd_pcm_substream_t *substream);
 int snd_pcm_playback_xrun_asap(snd_pcm_substream_t *substream);
 int snd_pcm_capture_xrun_asap(snd_pcm_substream_t *substream);
-void snd_pcm_playback_silence(snd_pcm_substream_t *substream);
+void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t new_hw_ptr);
 int snd_pcm_playback_ready(snd_pcm_substream_t *substream);
 int snd_pcm_capture_ready(snd_pcm_substream_t *substream);
 long snd_pcm_playback_ready_jiffies(snd_pcm_substream_t *substream);

@@ -69,7 +69,6 @@ u64 jiffies_64;
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;
-extern rwlock_t xtime_lock;
 extern int piranha_simulator;
 #ifdef CONFIG_PPC_ISERIES
 unsigned long iSeries_recal_titan = 0;
@@ -268,7 +267,6 @@ int timer_interrupt(struct pt_regs * regs)
 	unsigned long cur_tb;
 	struct paca_struct *lpaca = get_paca();
 	unsigned long cpu = lpaca->xPacaIndex;
-	struct ItLpQueue * lpq;
 
 	irq_enter();
 
@@ -284,12 +282,12 @@ int timer_interrupt(struct pt_regs * regs)
 		smp_local_timer_interrupt(regs);
 #endif
 		if (cpu == boot_cpuid) {
-			write_lock(&xtime_lock);
+			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
 			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
-			write_unlock(&xtime_lock);
+			write_sequnlock(&xtime_lock);
 			if ( adjusting_time && (time_adjust == 0) )
 				ppc_adjtimex();
 		}
@@ -302,9 +300,11 @@ int timer_interrupt(struct pt_regs * regs)
 	set_dec(next_dec);
 
 #ifdef CONFIG_PPC_ISERIES
-	lpq = lpaca->lpQueuePtr;
-	if (lpq && ItLpQueue_isLpIntPending(lpq))
-		lpEvent_count += ItLpQueue_process(lpq, regs); 
+	{
+		struct ItLpQueue *lpq = lpaca->lpQueuePtr;
+		if (lpq && ItLpQueue_isLpIntPending(lpq))
+			lpEvent_count += ItLpQueue_process(lpq, regs);
+	}
 #endif
 
 	irq_exit();
@@ -348,7 +348,7 @@ void do_settimeofday(struct timeval *tv)
 	long int tb_delta, new_usec, new_sec;
 	unsigned long new_xsec;
 
-	write_lock_irqsave(&xtime_lock, flags);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	/* Updating the RTC is not the job of this code. If the time is
 	 * stepped under NTP, the RTC will be update after STA_UNSYNC
 	 * is cleared. Tool like clock/hwclock either copy the RTC
@@ -399,7 +399,7 @@ void do_settimeofday(struct timeval *tv)
 		do_gtod.tb_orig_stamp = tb_last_stamp;
 	}
 
-	write_unlock_irqrestore(&xtime_lock, flags);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 }
 
 /*
@@ -465,7 +465,7 @@ void __init time_init(void)
 #endif
 		ppc_md.get_boot_time(&tm);
 
-	write_lock_irqsave(&xtime_lock, flags);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	xtime.tv_sec = mktime(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			      tm.tm_hour, tm.tm_min, tm.tm_sec);
 	tb_last_stamp = get_tb();
@@ -484,7 +484,7 @@ void __init time_init(void)
 
 	xtime.tv_nsec = 0;
 	last_rtc_update = xtime.tv_sec;
-	write_unlock_irqrestore(&xtime_lock, flags);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 
 	/* Not exact, but the timer interrupt takes care of this */
 	set_dec(tb_ticks_per_jiffy);
@@ -587,7 +587,7 @@ void ppc_adjtimex(void)
 	new_tb_to_xs = divres.result_low;
 	new_xsec = mulhdu( tb_ticks, new_tb_to_xs );
 
-	write_lock_irqsave( &xtime_lock, flags );
+	write_seqlock_irqsave( &xtime_lock, flags );
 	old_xsec = mulhdu( tb_ticks, do_gtod.varp->tb_to_xs );
 	new_stamp_xsec = do_gtod.varp->stamp_xsec + old_xsec - new_xsec;
 
@@ -609,7 +609,7 @@ void ppc_adjtimex(void)
 	do_gtod.varp = temp_varp;
 	do_gtod.var_idx = temp_idx;
 
-	write_unlock_irqrestore( &xtime_lock, flags );
+	write_sequnlock_irqrestore( &xtime_lock, flags );
 
 }
 

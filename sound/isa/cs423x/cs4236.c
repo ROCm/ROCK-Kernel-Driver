@@ -188,6 +188,8 @@ static struct isapnp_card_id snd_card_pnpids[] __devinitdata = {
 	ISAPNP_CS4232('C','S','C',0x1a32,0x0000,0x0010,0x0003),
 	/* HP Omnibook 5500 onboard */
 	ISAPNP_CS4232('C','S','C',0x4232,0x0000,0x0002,0x0003),
+	/* Unnamed CS4236 card (Made in Taiwan) */
+	ISAPNP_CS4232('C','S','C',0x4236,0x0000,0x0010,0x0003),
 	/* Turtle Beach TBS-2000 (CS4232) */
 	ISAPNP_CS4232('C','S','C',0x7532,0x0000,0x0010,0xb006),
 	/* Turtle Beach Tropez Plus (CS4232) */
@@ -328,7 +330,7 @@ static int __init snd_card_cs4236_isapnp(int dev, struct snd_card_cs4236 *acard)
 	sb_port[dev] = pdev->resource[2].start;
 	irq[dev] = pdev->irq_resource[0].start;
 	dma1[dev] = pdev->dma_resource[0].start;
-	dma2[dev] = pdev->dma_resource[1].start == 4 ? -1 : pdev->dma_resource[1].start;
+	dma2[dev] = pdev->dma_resource[1].start == 4 ? -1 : (int)pdev->dma_resource[1].start;
 	snd_printdd("isapnp WSS: wss port=0x%lx, fm port=0x%lx, sb port=0x%lx\n",
 			port[dev], fm_port[dev], sb_port[dev]);
 	snd_printdd("isapnp WSS: irq=%i, dma1=%i, dma2=%i\n",

@@ -22,7 +22,6 @@
  *
  */
 
-#include "control.h"
 #include "pcm.h"
 
 /* IO ports */
@@ -162,28 +161,44 @@ int snd_ad1848_create(snd_card_t * card,
 		      ad1848_t ** chip);
 
 int snd_ad1848_pcm(ad1848_t * chip, int device, snd_pcm_t **rpcm);
+const snd_pcm_ops_t *snd_ad1848_get_pcm_ops(int direction);
 int snd_ad1848_mixer(ad1848_t * chip);
 void snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-#define AD1848_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
-  .info = snd_ad1848_info_single, \
-  .get = snd_ad1848_get_single, .put = snd_ad1848_put_single, \
-  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
+/* exported mixer stuffs */
+enum { AD1848_MIX_SINGLE, AD1848_MIX_DOUBLE, AD1848_MIX_CAPTURE };
 
-int snd_ad1848_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
-int snd_ad1848_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
-int snd_ad1848_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
+#define AD1848_MIXVAL_SINGLE(reg, shift, mask, invert) \
+	((reg) | ((shift) << 8) | ((mask) << 16) | ((invert) << 24))
+#define AD1848_MIXVAL_DOUBLE(left_reg, right_reg, shift_left, shift_right, mask, invert) \
+	((left_reg) | ((right_reg) << 8) | ((shift_left) << 16) | ((shift_right) << 19) | ((mask) << 24) | ((invert) << 22))
+
+int snd_ad1848_add_ctl(ad1848_t *chip, const char *name, int index, int type, unsigned long value);
+
+/* for ease of use */
+struct ad1848_mix_elem {
+	const char *name;
+	int index;
+	int type;
+	unsigned long private_value;
+};
+
+#define AD1848_SINGLE(xname, xindex, reg, shift, mask, invert) \
+{ .name = xname, \
+  .index = xindex, \
+  .type = AD1848_MIX_SINGLE, \
+  .private_value = AD1848_MIXVAL_SINGLE(reg, shift, mask, invert) }
 
 #define AD1848_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
-  .info = snd_ad1848_info_double, \
-  .get = snd_ad1848_get_double, .put = snd_ad1848_put_double, \
-  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .name = xname, \
+  .index = xindex, \
+  .type = AD1848_MIX_DOUBLE, \
+  .private_value = AD1848_MIXVAL_DOUBLE(left_reg, right_reg, shift_left, shift_right, mask, invert) }
 
-int snd_ad1848_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
-int snd_ad1848_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
-int snd_ad1848_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
+static inline int snd_ad1848_add_ctl_elem(ad1848_t *chip, const struct ad1848_mix_elem *c)
+{
+	return snd_ad1848_add_ctl(chip, c->name, c->index, c->type, c->private_value);
+}
 
 #ifdef CONFIG_SND_DEBUG
 void snd_ad1848_debug(ad1848_t *chip);

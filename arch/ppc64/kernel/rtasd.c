@@ -49,6 +49,8 @@ static unsigned int rtas_error_log_max;
 #define SURVEILLANCE_TIMEOUT	1
 #define SURVEILLANCE_SCANRATE	1
 
+struct proc_dir_entry *proc_rtas;
+
 /*
  * Since we use 32 bit RTAS, the physical address of this must be below
  * 4G or else bad things happen. Allocate this in the kernel data and
@@ -145,8 +147,8 @@ static int enable_surveillance(void)
 {
 	int error;
 
-	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL, SURVEILLANCE_TOKEN,
-			0, SURVEILLANCE_TIMEOUT);
+	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
+			  SURVEILLANCE_TOKEN, 0, SURVEILLANCE_TIMEOUT);
 
 	if (error) {
 		printk(KERN_ERR "rtasd: could not enable surveillance\n");
@@ -209,9 +211,7 @@ static int rtasd(void *unused)
 
 	DEBUG("will sleep for %d jiffies\n", (HZ*60/rtas_event_scan_rate) / 2);
 
-	daemonize();
-	sigfillset(&current->blocked);
-	sprintf(current->comm, "rtasd");
+	daemonize("rtasd");
 
 #if 0
 	/* Rusty unreal time task */
@@ -243,11 +243,13 @@ repeat:
 
 		} while(error == 0);
 
-		/* Check all cpus for pending events before sleeping*/
-		if (!first_pass) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
-		}
+		/*
+		 * Check all cpus for pending events quickly, sleeping for
+		 * at least one second since some machines have problems
+		 * if we call event-scan too quickly
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(first_pass ? HZ : (HZ*60/rtas_event_scan_rate) / 2);
 	}
 
 	if (first_pass && surveillance_requested) {
@@ -255,10 +257,9 @@ repeat:
 		if (enable_surveillance())
 			goto error_vfree;
 		DEBUG("surveillance enabled\n");
-	} else {
-		first_pass = 0;
 	}
 
+	first_pass = 0;
 	goto repeat;
 
 error_vfree:
@@ -270,13 +271,16 @@ error:
 
 static int __init rtas_init(void)
 {
-	struct proc_dir_entry *rtas_dir, *entry;
+	struct proc_dir_entry *entry;
 
-	rtas_dir = proc_mkdir("rtas", 0);
-	if (!rtas_dir) {
-		printk(KERN_ERR "Failed to create rtas proc directory\n");
+	if (proc_rtas == NULL) {
+		proc_rtas = proc_mkdir("rtas", 0);
+	}
+
+	if (proc_rtas == NULL) {
+		printk(KERN_ERR "Failed to create /proc/rtas in rtas_init\n");
 	} else {
-		entry = create_proc_entry("error_log", S_IRUSR, rtas_dir);
+		entry = create_proc_entry("error_log", S_IRUSR, proc_rtas);
 		if (entry)
 			entry->proc_fops = &proc_rtas_log_operations;
 		else

@@ -56,7 +56,7 @@ config AUTOFS_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called autofs.o.
+	  will be called autofs.
 
 	  If you are not a part of a fairly large, distributed network, you
 	  probably do not need an automounter, and can say N here.
@@ -76,7 +76,7 @@ config AUTOFS4_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called autofs4.o.  You will need to add "alias autofs
+	  will be called autofs4.  You will need to add "alias autofs
 	  autofs4" to your modules configuration file.
 
 	  If you are not a part of a fairly large, distributed network or
@@ -150,7 +150,7 @@ config ADFS_FS
 	  /dev/[hs]d?1) on each of your drives. Please read the file
 	  <file:Documentation/filesystems/adfs.txt> for further details.
 
-	  This code is also available as a module called adfs.o ( = code which
+	  This code is also available as a module called adfs ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want). If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
@@ -186,7 +186,7 @@ config AFFS_FS
 
 	  This file system is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called affs.o.  If you want to compile it as a module,
+	  The module is called affs.  If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.  If unsure,
 	  say N.
 
@@ -201,7 +201,7 @@ config HFS_FS
 
 	  This file system support is also available as a module ( = code
 	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called hfs.o.  If you want to
+	  whenever you want). The module is called hfs.  If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -224,7 +224,7 @@ config BEFS_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read Documentation/modules.txt. The module will be
-	  called befs.o.
+	  called befs.
 
 config BEFS_DEBUG
 	bool "Debug BeFS"
@@ -252,7 +252,7 @@ config BFS_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called bfs.o.  Note that the file system of your root
+	  will be called bfs.  Note that the file system of your root
 	  partition (the one containing the directory /) cannot be compiled as
 	  a module.
 
@@ -285,7 +285,7 @@ config EXT3_FS
 	  If you want to compile this file system as a module ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called ext3.o.  Be aware however that the file system
+	  module will be called ext3.  Be aware however that the file system
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this may be dangerous.
 
@@ -332,7 +332,7 @@ config JBD
 	  If you want to compile this device as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called jbd.o.  If you are compiling ext3 into the kernel,
+	  will be called jbd.  If you are compiling ext3 into the kernel,
 	  you cannot compile this code as a module.
 
 config JBD_DEBUG
@@ -388,7 +388,7 @@ config FAT_FS
 	  If you want to compile this as a module however ( = code which can
 	  be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called fat.o.  Note that if you compile the FAT
+	  module will be called fat.  Note that if you compile the FAT
 	  support as a module, you cannot compile any of the FAT-based file
 	  systems into the kernel -- they will have to be modules as well.
 	  The file system of your root partition (the one containing the
@@ -425,7 +425,7 @@ config MSDOS_FS
 	  which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called msdos.o.
+	  The module will be called msdos.
 
 #dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
 # UMSDOS is temprory broken
@@ -454,7 +454,7 @@ config UMSDOS_FS
 	  above.  If you want to compile this as a module ( = code which can
 	  be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called umsdos.o.  Note that the file system of your
+	  module will be called umsdos.  Note that the file system of your
 	  root partition (the one containing the directory /) cannot be a
 	  module, so saying M could be dangerous.  If unsure, say N.
 
@@ -480,7 +480,7 @@ config VFAT_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called vfat.o.
+	  will be called vfat.
 
 config EFS_FS
 	tristate "EFS file system support (read only) (EXPERIMENTAL)"
@@ -497,7 +497,7 @@ config EFS_FS
 	  If you want to compile the EFS file system support as a module ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called efs.o.
+	  <file:Documentation/modules.txt>. The module will be called efs.
 
 config JFFS_FS
 	tristate "Journalling Flash File System (JFFS) support"
@@ -583,7 +583,7 @@ config CRAMFS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called cramfs.o.  Note that the root file system (the one
+	  will be called cramfs.  Note that the root file system (the one
 	  containing the directory /) cannot be compiled as a module.
 
 	  If unsure, say N.
@@ -614,7 +614,7 @@ config RAMFS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ramfs.o.
+	  will be called ramfs.
 
 config HUGETLBFS
 	bool "HugeTLB file system support"
@@ -636,7 +636,7 @@ config ISO9660_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called isofs.o.
+	  will be called isofs.
 
 config JOLIET
 	bool "Microsoft Joliet CDROM extensions"
@@ -711,7 +711,7 @@ config MINIX_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called minix.o.  Note that the file system of your root
+	  will be called minix.  Note that the file system of your root
 	  partition (the one containing the directory /) cannot be compiled as
 	  a module.
 
@@ -730,7 +730,7 @@ config VXFS_FS
 
 	  This file system is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called freevxfs.o.  If you want to compile it as a
+	  The module is called freevxfs.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -743,7 +743,7 @@ config NTFS_FS
 
 	  This file system is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ntfs.o. If you want to compile it as a
+	  The module will be called ntfs. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you are not using Windows NT/2000/XP in addition to Linux on your
@@ -796,7 +796,7 @@ config HPFS_FS
 
 	  This file system is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called hpfs.o.  If you want to compile it as a module,
+	  The module is called hpfs.  If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.  If unsure,
 	  say N.
 
@@ -907,7 +907,7 @@ config QNX4FS_FS
 
 	  This file system support is also available as a module ( = code
 	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called qnx4.o. If you want to
+	  whenever you want). The module is called qnx4. If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -933,7 +933,7 @@ config ROMFS_FS
 
 	  This file system support is also available as a module ( = code
 	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called romfs.o.  If you want to
+	  whenever you want). The module is called romfs.  If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  Note that the file system of your
 	  root partition (the one containing the directory /) cannot be a
@@ -984,7 +984,7 @@ config EXT2_FS
 	  If you want to compile this file system as a module ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called ext2.o.  Be aware however that the file system
+	  module will be called ext2.  Be aware however that the file system
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this could be dangerous.  Most
 	  everyone wants to say Y here.
@@ -1045,7 +1045,7 @@ config SYSV_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called sysv.o.
+	  will be called sysv.
 
 	  If you haven't heard about all of this before, it's safe to say N.
 
@@ -1059,7 +1059,7 @@ config UDF_FS
 
 	  This file system support is also available as a module ( = code
 	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called udf.o. If you want to
+	  whenever you want). The module is called udf. If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -1092,7 +1092,7 @@ config UFS_FS
 	  If you want to compile the UFS file system support as a module ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called ufs.o.
+	  <file:Documentation/modules.txt>. The module will be called ufs.
 
 	  If you haven't heard about all of this before, it's safe to say N.
 
@@ -1120,7 +1120,7 @@ config XFS_FS
 	  If you want to compile this file system as a module ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>. The
-	  module will be called xfs.o.  Be aware, however, that if the file
+	  module will be called xfs.  Be aware, however, that if the file
 	  system of your root partition is compiled as a module, you'll need
 	  to use an initial ramdisk (initrd) to boot.
 
@@ -1196,7 +1196,7 @@ config CODA_FS
 	  If you want to compile the coda client support as a module ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called coda.o.
+	  <file:Documentation/modules.txt>.  The module will be called coda.
 
 config INTERMEZZO_FS
 	tristate "InterMezzo file system support (replicating fs) (EXPERIMENTAL)"
@@ -1235,7 +1235,7 @@ config NFS_FS
 
 	  This file system is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called nfs.o. If you want to compile it as a module,
+	  The module is called nfs. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 	  If you are configuring a diskless machine which will mount its root
@@ -1307,7 +1307,7 @@ config NFSD
 
 	  The NFS server is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called nfsd.o.  If you want to compile it as a module,
+	  The module is called nfsd.  If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.  If unsure,
 	  say N.
 
@@ -1425,7 +1425,7 @@ config SMB_FS
 	  If you want to compile the SMB support as a module ( = code which
 	  can be inserted in and removed from the running kernel whenever you
 	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called smbfs.o.  Most people say N, however.
+	  module will be called smbfs.  Most people say N, however.
 
 config SMB_NLS_DEFAULT
 	bool "Use a default NLS"
@@ -1477,7 +1477,7 @@ config NCP_FS
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ncpfs.o.  Say N unless you are connected to a Novell
+	  will be called ncpfs.  Say N unless you are connected to a Novell
 	  network.
 
 source "fs/ncpfs/Kconfig"

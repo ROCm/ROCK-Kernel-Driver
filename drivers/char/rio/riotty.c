@@ -1287,7 +1287,7 @@ register caddr_t arg;
 }
 
 /*
-	ttyseth -- set hardware dependant tty settings
+	ttyseth -- set hardware dependent tty settings
 */
 void
 ttyseth(PortP, s, sg)
@@ -1342,7 +1342,7 @@ struct old_sgttyb *sg;
 }
 
 /*
-	ttyseth_pv -- set hardware dependant tty settings using either the
+	ttyseth_pv -- set hardware dependent tty settings using either the
 			POSIX termios structure or the System V termio structure.
 				sysv = 0 => (POSIX):	 struct termios *sg
 				sysv != 0 => (System V): struct termio *sg

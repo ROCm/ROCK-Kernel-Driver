@@ -137,7 +137,8 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction * action;
 
 	seq_printf(p, "           ");
-	for_each_cpu(j) 
+	for (j=0; j<NR_CPUS; j++)
+		if (cpu_online(j))
 		seq_printf(p, "CPU%d       ",j);
 	seq_putc(p, '\n');
 
@@ -149,7 +150,8 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for_each_cpu(j) 
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
 			seq_printf(p, "%10u ",
 				kstat_cpu(j).irqs[i]);
 #endif
@@ -161,12 +163,14 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	}
 	seq_printf(p, "NMI: ");
-	for_each_cpu(j)
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
 		seq_printf(p, "%10u ", cpu_pda[j].__nmi_count);
 	seq_putc(p, '\n');
 #if CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");
-	for_each_cpu(j)
+	for (j = 0; j < NR_CPUS; j++)
+		if (cpu_online(j))
 		seq_printf(p, "%10u ", cpu_pda[j].apic_timer_irqs);
 	seq_putc(p, '\n');
 #endif

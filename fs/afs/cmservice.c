@@ -120,17 +120,9 @@ static int kafscmd(void *arg)
 	int die;
 
 	printk("kAFS: Started kafscmd %d\n",current->pid);
-	strcpy(current->comm,"kafscmd");
-
-	daemonize();
+	daemonize("kafscmd");
 
 	complete(&kafscmd_alive);
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
 
 	/* loop around looking for things to attend to */
 	do {

@@ -433,12 +433,11 @@ extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
 extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
-extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
-extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
-extern int scsi_prep_fn(struct request_queue *q, struct request *req);
-extern void scsi_request_fn(request_queue_t * q);
+extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
+extern request_queue_t *scsi_alloc_queue(struct Scsi_Host *shost);
+extern void scsi_free_queue(request_queue_t *q);
 extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
 
@@ -446,8 +445,10 @@ extern void scsi_exit_queue(void);
  * Prototypes for functions in scsi.c
  */
 extern int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt);
-extern void scsi_release_commandblocks(Scsi_Device * SDpnt);
-extern void scsi_build_commandblocks(Scsi_Device * SDpnt);
+extern int scsi_setup_command_freelist(struct Scsi_Host *shost);
+extern void scsi_destroy_command_freelist(struct Scsi_Host *shost);
+extern struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int flags);
+extern void scsi_put_command(struct scsi_cmnd *cmd);
 extern void scsi_adjust_queue_depth(Scsi_Device *, int, int);
 extern int scsi_track_queue_full(Scsi_Device *, int);
 extern int scsi_slave_attach(struct scsi_device *);
@@ -457,14 +458,6 @@ extern void scsi_device_put(struct scsi_device *);
 extern void scsi_done(Scsi_Cmnd * SCpnt);
 extern void scsi_finish_command(Scsi_Cmnd *);
 extern int scsi_retry_command(Scsi_Cmnd *);
-extern Scsi_Cmnd *scsi_allocate_device(Scsi_Device *, int);
-extern void __scsi_release_command(Scsi_Cmnd *);
-extern void scsi_release_command(Scsi_Cmnd *);
-extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
-			void *buffer, unsigned bufflen,
-			void (*done) (struct scsi_cmnd *),
-			int timeout, int retries);
-extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 extern int scsi_attach_device(struct scsi_device *);
 extern void scsi_detach_device(struct scsi_device *);
 extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
@@ -576,14 +569,11 @@ struct scsi_device {
 					   device is busy */
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
-        atomic_t                device_active; /* commands checked out for device */
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
-	struct list_head free_cmnds;    /* list of available Scsi_Cmnd structs */
-	struct list_head busy_cmnds;    /* list of Scsi_Cmnd structs in use */
-	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
+	spinlock_t list_lock;
+	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
         Scsi_Cmnd *current_cmnd;	/* currently active command */
-	unsigned short current_queue_depth;/* How deep of a queue we have */
-	unsigned short new_queue_depth; /* How deep of a queue we want */
+	unsigned short queue_depth;	/* How deep of a queue we want */
 	unsigned short last_queue_full_depth; /* These two are used by */
 	unsigned short last_queue_full_count; /* scsi_track_queue_full() */
 	unsigned long last_queue_full_time;/* don't let QUEUE_FULLs on the same
@@ -728,14 +718,13 @@ struct scsi_request {
 struct scsi_cmnd {
 	int     sc_magic;
 
-	struct Scsi_Host *host;
+	struct scsi_device *device;
 	unsigned short state;
 	unsigned short owner;
-	Scsi_Device *device;
 	Scsi_Request *sc_request;
-	struct scsi_cmnd *next;
 	struct scsi_cmnd *reset_chain;
-	struct list_head list_entry; /* Used to place us on the cmd lists */
+
+	struct list_head list;  /* scsi_cmnd participates in queue lists */
 
 	int eh_state;		/* Used for state tracking in error handlr */
 	int eh_eflags;		/* Used by error handlr */
@@ -770,10 +759,6 @@ struct scsi_cmnd {
 	unsigned volatile char internal_timeout;
 	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
 					   to be processed. */
-
-	unsigned int target;
-	unsigned int lun;
-	unsigned int channel;
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;
 	unsigned char sc_data_direction;
@@ -990,4 +975,4 @@ extern void scsi_device_unregister(struct scsi_device *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
 
-#endif
+#endif /* _SCSI_H */

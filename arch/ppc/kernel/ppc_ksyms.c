@@ -14,6 +14,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
+#include <linux/pm.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -68,8 +69,6 @@ long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
 int abs(int);
-
-extern unsigned char __res[];
 
 extern unsigned long mm_ptov (unsigned long paddr);
 
@@ -180,6 +179,7 @@ EXPORT_SYMBOL(pci_bus_to_phys);
 EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);
+EXPORT_SYMBOL(flush_dcache_all);
 #endif
 
 EXPORT_SYMBOL(open);
@@ -269,6 +269,8 @@ EXPORT_SYMBOL(pmac_xpram_write);
 #endif /* CONFIG_NVRAM */
 EXPORT_SYMBOL(to_tm);
 
+EXPORT_SYMBOL(pm_power_off);
+
 EXPORT_SYMBOL_NOVERS(__ashrdi3);
 EXPORT_SYMBOL_NOVERS(__ashldi3);
 EXPORT_SYMBOL_NOVERS(__lshrdi3);
@@ -329,10 +331,12 @@ EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
 #ifdef  CONFIG_8xx
-EXPORT_SYMBOL(__res);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
+#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
+EXPORT_SYMBOL(__res);
+#endif
 #if defined(CONFIG_8xx) || defined(CONFIG_8260)
 EXPORT_SYMBOL(request_8xxirq);
 #endif

@@ -59,9 +59,6 @@ static snd_midi_op_t emux_ops = {
 				 SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE)
 
 /*
- */
-
-/*
  * Initialise the EMUX Synth by creating a client and registering
  * a series of ports.
  * Each of the ports will contain the 16 midi channels.  Applications
@@ -179,7 +176,7 @@ snd_emux_create_port(snd_emux_t *emu, char *name,
 	}
 
 	p->chset.port = snd_seq_event_port_attach(emu->client, callback,
-						  cap, type, name);
+						  cap, type, max_channels, name);
 
 	return p;
 }
@@ -292,11 +289,11 @@ snd_emux_inc_count(snd_emux_t *emu)
 void
 snd_emux_dec_count(snd_emux_t *emu)
 {
-	module_put(emu->ops.owner);
+	module_put(emu->card->module);
 	emu->used--;
 	if (emu->used <= 0)
 		snd_emux_terminate_all(emu);
-	module_put(emu->card->module);
+	module_put(emu->ops.owner);
 }
 
 

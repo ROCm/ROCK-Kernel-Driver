@@ -287,7 +287,7 @@ void umount_tree(struct vfsmount *mnt)
 static int do_umount(struct vfsmount *mnt, int flags)
 {
 	struct super_block * sb = mnt->mnt_sb;
-	int retval = 0;
+	int retval;
 
 	retval = security_sb_umount(mnt, flags);
 	if (retval)
@@ -892,12 +892,10 @@ void set_fs_root(struct fs_struct *fs, struct vfsmount *mnt,
 	struct dentry *old_root;
 	struct vfsmount *old_rootmnt;
 	write_lock(&fs->lock);
-	spin_lock(&dcache_lock);
 	old_root = fs->root;
 	old_rootmnt = fs->rootmnt;
 	fs->rootmnt = mntget(mnt);
 	fs->root = dget(dentry);
-	spin_unlock(&dcache_lock);
 	write_unlock(&fs->lock);
 	if (old_root) {
 		dput(old_root);
@@ -916,12 +914,10 @@ void set_fs_pwd(struct fs_struct *fs, struct vfsmount *mnt,
 	struct vfsmount *old_pwdmnt;
 
 	write_lock(&fs->lock);
-	spin_lock(&dcache_lock);
 	old_pwd = fs->pwd;
 	old_pwdmnt = fs->pwdmnt;
 	fs->pwdmnt = mntget(mnt);
 	fs->pwd = dget(dentry);
-	spin_unlock(&dcache_lock);
 	write_unlock(&fs->lock);
 
 	if (old_pwd) {

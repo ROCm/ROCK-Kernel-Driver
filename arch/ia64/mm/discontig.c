@@ -215,7 +215,7 @@ discontig_mem_init(void)
 	int	node;
 
 	if (numnodes == 0) {
-		printk("node info missing!\n");
+		printk(KERN_ERR "node info missing!\n");
 		numnodes = 1;
 	}
 

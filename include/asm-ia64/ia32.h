@@ -12,17 +12,6 @@
  * 32 bit structures for IA32 support.
  */
 
-/* 32bit compatibility types */
-typedef unsigned short	__kernel_ipc_pid_t32;
-typedef unsigned int	__kernel_uid32_t32;
-typedef unsigned int	__kernel_gid32_t32;
-typedef unsigned short	__kernel_umode_t32;
-typedef short		__kernel_nlink_t32;
-typedef int		__kernel_daddr_t32;
-typedef unsigned int	__kernel_caddr_t32;
-typedef long		__kernel_loff_t32;
-typedef __kernel_fsid_t	__kernel_fsid_t32;
-
 #define IA32_PAGE_SHIFT		12	/* 4KB pages */
 #define IA32_PAGE_SIZE		(1UL << IA32_PAGE_SHIFT)
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
@@ -143,10 +132,6 @@ struct ia32_user_fxsr_struct {
 };
 
 /* signal.h */
-#define _IA32_NSIG	       64
-#define _IA32_NSIG_BPW	       32
-#define _IA32_NSIG_WORDS	       (_IA32_NSIG / _IA32_NSIG_BPW)
-
 #define IA32_SET_SA_HANDLER(ka,handler,restorer)				\
 				((ka)->sa.sa_handler = (__sighandler_t)		\
 					(((unsigned long)(restorer) << 32)	\
@@ -154,23 +139,17 @@ struct ia32_user_fxsr_struct {
 #define IA32_SA_HANDLER(ka)	((unsigned long) (ka)->sa.sa_handler & 0xffffffff)
 #define IA32_SA_RESTORER(ka)	((unsigned long) (ka)->sa.sa_handler >> 32)
 
-typedef struct {
-       unsigned int sig[_IA32_NSIG_WORDS];
-} sigset32_t;
-
 struct sigaction32 {
        unsigned int sa_handler;		/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
-       sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_sigset_t sa_mask;		/* A 32 bit mask */
 };
-
-typedef unsigned int old_sigset32_t;	/* at least 32 bits */
 
 struct old_sigaction32 {
        unsigned int  sa_handler;	/* Really a pointer, but need to deal
 					     with 32 bits */
-       old_sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_old_sigset_t sa_mask;		/* A 32 bit mask */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
 };
@@ -212,19 +191,6 @@ struct stat64 {
 	unsigned int	st_ctime_nsec;
 	unsigned int	st_ino_lo;
 	unsigned int	st_ino_hi;
-};
-
-struct statfs32 {
-       int f_type;
-       int f_bsize;
-       int f_blocks;
-       int f_bfree;
-       int f_bavail;
-       int f_files;
-       int f_ffree;
-       __kernel_fsid_t32 f_fsid;
-       int f_namelen;  /* SunOS ignores this field. */
-       int f_spare[6];
 };
 
 typedef union sigval32 {

@@ -73,6 +73,13 @@ static devfs_handle_t devfs_handle = NULL;
 
 #ifdef CONFIG_KMOD
 
+/**
+ * snd_request_card - try to load the card module
+ * @card: the card number
+ *
+ * Tries to load the module "snd-card-X" for the given card number
+ * via KMOD.  Returns immediately if already loaded.
+ */
 void snd_request_card(int card)
 {
 	char str[32];
@@ -83,7 +90,7 @@ void snd_request_card(int card)
 	read_unlock(&snd_card_rwlock);
 	if (locked)
 		return;
-	if (card < 0 || card >= snd_ecards_limit)
+	if (card < 0 || card >= cards_limit)
 		return;
 	sprintf(str, "snd-card-%i", card);
 	request_module(str);
@@ -188,6 +195,19 @@ static int snd_kernel_minor(int type, snd_card_t * card, int dev)
 	return minor;
 }
 
+/**
+ * snd_register_device - Register the ALSA device file for the card
+ * @type: the device type, SNDRV_DEVICE_TYPE_XXX
+ * @card: the card instance
+ * @dev: the device index
+ * @reg: the snd_minor_t record
+ * @name: the device file name
+ *
+ * Registers an ALSA device file for the given card.
+ * The operators have to be set in reg parameter.
+ *
+ * Retrurns zero if successful, or a negative error code on failure.
+ */
 int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg, const char *name)
 {
 	int minor = snd_kernel_minor(type, card, dev);
@@ -215,6 +235,17 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 	return 0;
 }
 
+/**
+ * snd_unregister_device - unregister the device on the given card
+ * @type: the device type, SNDRV_DEVICE_TYPE_XXX
+ * @card: the card instance
+ * @dev: the device index
+ *
+ * Unregisters the device file already registered via
+ * snd_register_device().
+ *
+ * Returns zero if sucecessful, or a negative error code on failure
+ */
 int snd_unregister_device(int type, snd_card_t * card, int dev)
 {
 	int minor = snd_kernel_minor(type, card, dev);
@@ -411,6 +442,7 @@ EXPORT_SYMBOL(snd_malloc_isa_pages_fallback);
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(snd_malloc_pci_pages);
 EXPORT_SYMBOL(snd_malloc_pci_pages_fallback);
+EXPORT_SYMBOL(snd_malloc_pci_page);
 EXPORT_SYMBOL(snd_free_pci_pages);
 #endif
 #ifdef CONFIG_SBUS
@@ -446,7 +478,7 @@ EXPORT_SYMBOL(snd_device_free_all);
 #ifdef CONFIG_ISA
 EXPORT_SYMBOL(snd_dma_program);
 EXPORT_SYMBOL(snd_dma_disable);
-EXPORT_SYMBOL(snd_dma_residue);
+EXPORT_SYMBOL(snd_dma_pointer);
 #endif
   /* info.c */
 #ifdef CONFIG_PROC_FS
@@ -463,6 +495,7 @@ EXPORT_SYMBOL(snd_info_create_device);
 EXPORT_SYMBOL(snd_info_free_device);
 EXPORT_SYMBOL(snd_info_register);
 EXPORT_SYMBOL(snd_info_unregister);
+EXPORT_SYMBOL(snd_card_proc_new);
 #endif
   /* info_oss.c */
 #if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)

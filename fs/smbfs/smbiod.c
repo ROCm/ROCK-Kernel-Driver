@@ -283,14 +283,9 @@ out:
 static int smbiod(void *unused)
 {
 	MOD_INC_USE_COUNT;
-	daemonize();
+	daemonize("smbiod");
 
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
-
-	strcpy(current->comm, "smbiod");
+	allow_signal(SIGKILL);
 
 	VERBOSE("SMB Kernel thread starting (%d) ...\n", current->pid);
 

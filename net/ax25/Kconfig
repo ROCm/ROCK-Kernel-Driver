@@ -50,7 +50,7 @@ config AX25
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ax25.o. If you want to compile it as a
+	  The module will be called ax25. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config AX25_DAMA_SLAVE
@@ -83,7 +83,7 @@ config NETROM
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called netrom.o. If you want to compile it as a
+	  The module will be called netrom. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ROSE
@@ -104,7 +104,7 @@ config ROSE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rose.o. If you want to compile it as a
+	  The module will be called rose. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 

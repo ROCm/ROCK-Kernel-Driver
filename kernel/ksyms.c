@@ -55,6 +55,7 @@
 #include <linux/dnotify.h>
 #include <linux/mount.h>
 #include <linux/ptrace.h>
+#include <linux/time.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -67,13 +68,6 @@
 extern struct timezone sys_tz;
 
 extern int panic_timeout;
-
-#ifdef CONFIG_MODVERSIONS
-const struct module_symbol __export_Using_Versions
-__attribute__((section("__ksymtab"))) = {
-	1 /* Version version */, "Using_Versions"
-};
-#endif
 
 /* process memory management */
 EXPORT_SYMBOL(do_mmap_pgoff);
@@ -214,6 +208,7 @@ EXPORT_SYMBOL(close_bdev_excl);
 EXPORT_SYMBOL(__brelse);
 EXPORT_SYMBOL(__bforget);
 EXPORT_SYMBOL(ll_rw_block);
+EXPORT_SYMBOL(sync_dirty_buffer);
 EXPORT_SYMBOL(submit_bh);
 EXPORT_SYMBOL(unlock_buffer);
 EXPORT_SYMBOL(__wait_on_buffer);
@@ -272,6 +267,10 @@ EXPORT_SYMBOL(vfs_fstat);
 EXPORT_SYMBOL(vfs_stat);
 EXPORT_SYMBOL(vfs_lstat);
 EXPORT_SYMBOL(vfs_getattr);
+EXPORT_SYMBOL(inode_add_bytes);
+EXPORT_SYMBOL(inode_sub_bytes);
+EXPORT_SYMBOL(inode_get_bytes);
+EXPORT_SYMBOL(inode_set_bytes);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
@@ -488,8 +487,12 @@ EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(jiffies);
 EXPORT_SYMBOL(jiffies_64);
 EXPORT_SYMBOL(xtime);
+EXPORT_SYMBOL(xtime_lock);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
+#if (BITS_PER_LONG < 64)
+EXPORT_SYMBOL(get_jiffies_64);
+#endif
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 EXPORT_SYMBOL(__might_sleep);
 #endif

@@ -60,7 +60,7 @@ fill_fixup:
 	sll		%g2, 3, %g2			! NORMAL-->OTHER
 
 	wrpr		%g0, 0x0, %canrestore		! Standard etrap stuff.
-	wrpr		%g2, 0x0, %wstate		! This must be consistant.
+	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
 	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
 	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.
@@ -181,7 +181,7 @@ fill_fixup_mna:
 	sll		%g2, 3, %g2			! NORMAL-->OTHER
 	wrpr		%g0, 0x0, %canrestore		! Standard etrap stuff.
 
-	wrpr		%g2, 0x0, %wstate		! This must be consistant.
+	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
 	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
 	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.
@@ -287,7 +287,7 @@ fill_fixup_dax:
 	sll		%g2, 3, %g2			! NORMAL-->OTHER
 	wrpr		%g0, 0x0, %canrestore		! Standard etrap stuff.
 
-	wrpr		%g2, 0x0, %wstate		! This must be consistant.
+	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
 	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
 	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.

@@ -60,7 +60,7 @@ static void reset_all_channels(snd_midi_channel_set_t *chset);
 
 
 /*
- * Process an event in a driver independant way.  This means dealing
+ * Process an event in a driver independent way.  This means dealing
  * with RPN, NRPN, SysEx etc that are defined for common midi applications
  * such as GM, GS and XG.
  * There modes that this module will run in are:
@@ -258,7 +258,7 @@ note_off(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan, int note, int 
 }
 
 /*
- * Do all driver independant operations for this controler and pass
+ * Do all driver independent operations for this controler and pass
  * events that need to take place immediately to the driver.
  */
 static void
@@ -506,7 +506,7 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 	len--;
 
 	/* GM on */
-	if (len >= sizeof(gm_on_macro) &&
+	if (len >= (int)sizeof(gm_on_macro) &&
 	    memcmp(buf, gm_on_macro, sizeof(gm_on_macro)) == 0) {
 		if (chset->midi_mode != SNDRV_MIDI_MODE_GS &&
 		    chset->midi_mode != SNDRV_MIDI_MODE_XG) {
@@ -568,7 +568,7 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 	}
 
 	/* XG on */
-	else if (len >= sizeof(xg_on_macro) &&
+	else if (len >= (int)sizeof(xg_on_macro) &&
 		 memcmp(buf, xg_on_macro, sizeof(xg_on_macro)) == 0) {
 		int i;
 		chset->midi_mode = SNDRV_MIDI_MODE_XG;

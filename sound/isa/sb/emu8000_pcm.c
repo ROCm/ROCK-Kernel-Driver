@@ -215,7 +215,7 @@ static void emu8k_pcm_timer_func(unsigned long data)
 	add_timer(&rec->timer);
 
 	/* update period */
-	if (rec->period_pos >= rec->period_size) {
+	if (rec->period_pos >= (int)rec->period_size) {
 		rec->period_pos %= rec->period_size;
 		spin_unlock(&rec->timer_lock);
 		snd_pcm_period_elapsed(rec->substream);
@@ -592,7 +592,7 @@ static int emu8k_pcm_hw_params(snd_pcm_substream_t *subs,
 		return -ENOMEM;
 	rec->offset = EMU8000_DRAM_OFFSET + (rec->block->offset >> 1); /* in word */
 	/* at least dma_bytes must be set for non-interleaved mode */
-	subs->dma_bytes = params_buffer_bytes(hw_params);
+	subs->dma_buffer.bytes = params_buffer_bytes(hw_params);
 
 	return 0;
 }

@@ -27,7 +27,6 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-
 #include <asm/uaccess.h>
 
 /* 
@@ -36,9 +35,6 @@
  */
 struct timezone sys_tz;
 
-/* The xtime_lock is not only serializing the xtime read/writes but it's also
-   serializing all accesses to the global NTP variables now. */
-extern rwlock_t xtime_lock;
 extern unsigned long last_time_offset;
 
 #if !defined(__alpha__) && !defined(__ia64__)
@@ -80,7 +76,7 @@ asmlinkage long sys_stime(int * tptr)
 		return -EPERM;
 	if (get_user(value, tptr))
 		return -EFAULT;
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = value;
 	xtime.tv_nsec = 0;
 	last_time_offset = 0;
@@ -88,7 +84,7 @@ asmlinkage long sys_stime(int * tptr)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
 
@@ -96,13 +92,13 @@ asmlinkage long sys_stime(int * tptr)
 
 asmlinkage long sys_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
-	if (tv) {
+	if (likely(tv != NULL)) {
 		struct timeval ktv;
 		do_gettimeofday(&ktv);
 		if (copy_to_user(tv, &ktv, sizeof(ktv)))
 			return -EFAULT;
 	}
-	if (tz) {
+	if (unlikely(tz != NULL)) {
 		if (copy_to_user(tz, &sys_tz, sizeof(sys_tz)))
 			return -EFAULT;
 	}
@@ -127,10 +123,10 @@ asmlinkage long sys_gettimeofday(struct timeval *tv, struct timezone *tz)
  */
 inline static void warp_clock(void)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec += sys_tz.tz_minuteswest * 60;
 	last_time_offset = 0;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /*
@@ -235,7 +231,7 @@ int do_adjtimex(struct timex *txc)
 		    txc->tick > 1100000/USER_HZ)
 			return -EINVAL;
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	result = time_state;	/* mostly `TIME_OK' */
 
 	/* Save for later - semantics of adjtime is to return old value */
@@ -386,7 +382,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->errcnt	   = pps_errcnt;
 	txc->stbcnt	   = pps_stbcnt;
 	last_time_offset = 0;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 	do_gettimeofday(&txc->time);
 	return(result);
 }
@@ -409,9 +405,27 @@ asmlinkage long sys_adjtimex(struct timex *txc_p)
 struct timespec current_kernel_time(void)
 {
         struct timespec now;
-        unsigned long flags;
-        read_lock_irqsave(&xtime_lock,flags);
-	now = xtime;
-        read_unlock_irqrestore(&xtime_lock,flags);
+        unsigned long seq;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		
+		now = xtime;
+	} while (read_seqretry(&xtime_lock, seq));
+
 	return now; 
 }
+
+#if (BITS_PER_LONG < 64)
+u64 get_jiffies_64(void)
+{
+	unsigned long seq;
+	u64 ret;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		ret = jiffies_64;
+	} while (read_seqretry(&xtime_lock, seq));
+	return ret;
+}
+#endif

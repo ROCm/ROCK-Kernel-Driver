@@ -58,9 +58,9 @@ static int __init pnpide_generic_init(struct pnp_dev *dev, int enable)
 	if (!(pnp_port_valid(dev, 0) && pnp_port_valid(dev, 1) && pnp_irq_valid(dev, 0)))
 		return 1;
 
-	ide_setup_ports(&hw, (ide_ioreg_t) pnp_port_start(dev, 0),
+	ide_setup_ports(&hw, (unsigned long) pnp_port_start(dev, 0),
 			generic_ide_offsets,
-			(ide_ioreg_t) pnp_port_start(dev, 1),
+			(unsigned long) pnp_port_start(dev, 1),
 			0, NULL,
 //			generic_pnp_ide_iops,
 			pnp_irq(dev, 0));

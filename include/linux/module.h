@@ -33,10 +33,17 @@
 #endif
 
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
+
 struct kernel_symbol
 {
 	unsigned long value;
 	const char *name;
+};
+
+struct modversion_info
+{
+	unsigned long crc;
+	char name[MODULE_NAME_LEN];
 };
 
 /* These are either module local, or the kernel's dummy ones. */
@@ -50,13 +57,14 @@ search_extable(const struct exception_table_entry *first,
 	       unsigned long value);
 
 #ifdef MODULE
+#define ___module_cat(a,b) a ## b
+#define __module_cat(a,b) ___module_cat(a,b)
+/* For userspace: you can also call me... */
+#define MODULE_ALIAS(alias)					\
+	static const char __module_cat(__alias_,__LINE__)[]	\
+		__attribute__((section(".modinfo"),unused)) = "alias=" alias
 
-/* For replacement modutils, use an alias not a pointer. */
 #define MODULE_GENERIC_TABLE(gtype,name)			\
-static const unsigned long __module_##gtype##_size		\
-  __attribute__ ((unused)) = sizeof(struct gtype##_id);		\
-static const struct gtype##_id * __module_##gtype##_table	\
-  __attribute__ ((unused)) = name;				\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
@@ -92,10 +100,11 @@ extern const struct gtype##_id __mod_##gtype##_table		\
  */
 #define MODULE_LICENSE(license)					\
 	static const char __module_license[]			\
-		__attribute__((section(".init.license"))) = license
+		__attribute__((section(".init.license"), unused)) = license
 
 #else  /* !MODULE */
 
+#define MODULE_ALIAS(alias)
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
 #define MOD_INC_USE_COUNT	do { } while (0)
@@ -119,6 +128,7 @@ struct kernel_symbol_group
 
 	unsigned int num_syms;
 	const struct kernel_symbol *syms;
+	const unsigned long *crcs;
 };
 
 /* Given an address, look for it in the exception tables */
@@ -134,29 +144,52 @@ struct exception_table
 
 
 #ifdef CONFIG_MODULES
+
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
+#ifdef __GENKSYMS__
+
+/* genksyms doesn't handle GPL-only symbols yet */
+#define EXPORT_SYMBOL_GPL EXPORT_SYMBOL
+	
+#else
+
+#ifdef CONFIG_MODVERSIONS
+/* Mark the CRC weak since genksyms apparently decides not to
+ * generate a checksums for some symbols */
+#define __CRC_SYMBOL(sym, sec)					\
+	extern void *__crc_##sym __attribute__((weak));		\
+	static const unsigned long __kcrctab_##sym		\
+	__attribute__((section("__kcrctab" sec), unused))	\
+	= (unsigned long) &__crc_##sym;
+#else
+#define __CRC_SYMBOL(sym, sec)
+#endif
+
 /* For every exported symbol, place a struct in the __ksymtab section */
-#define EXPORT_SYMBOL(sym)					\
+#define __EXPORT_SYMBOL(sym, sec)				\
+	__CRC_SYMBOL(sym, sec)					\
 	static const char __kstrtab_##sym[]			\
 	__attribute__((section("__ksymtab_strings")))		\
 	= MODULE_SYMBOL_PREFIX #sym;                    	\
 	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab")))			\
+	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL(sym)					\
+	__EXPORT_SYMBOL(sym, "")
 
 #define EXPORT_SYMBOL_GPL(sym)					\
-	static const char __kstrtab_##sym[]			\
-	__attribute__((section("__ksymtab_strings")))		\
-	= MODULE_SYMBOL_PREFIX #sym;                    	\
-	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__gpl_ksymtab")))		\
-	= { (unsigned long)&sym, __kstrtab_##sym }
+	__EXPORT_SYMBOL(sym, "_gpl")
+
+#endif
+
+/* We don't mangle the actual symbol anymore, so no need for
+ * special casing EXPORT_SYMBOL_NOVERS */
+#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
 
 struct module_ref
 {
@@ -344,7 +377,7 @@ static inline int module_text_address(unsigned long addr)
 }
 
 /* Get/put a kernel symbol (calls should be symmetric) */
-#define symbol_get(x) (&(x))
+#define symbol_get(x) ({ extern typeof(x) x __attribute__((weak)); &(x); })
 #define symbol_put(x) do { } while(0)
 #define symbol_put_addr(x) do { } while(0)
 

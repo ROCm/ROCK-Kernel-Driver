@@ -18,6 +18,7 @@
 #include <linux/smp_lock.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+#include <linux/ptrace.h>
 
 int cap_capable (struct task_struct *tsk, int cap)
 {
@@ -120,28 +121,26 @@ void cap_bprm_compute_creds (struct linux_binprm *bprm)
 {
 	/* Derived from fs/exec.c:compute_creds. */
 	kernel_cap_t new_permitted, working;
-	int do_unlock = 0;
 
 	new_permitted = cap_intersect (bprm->cap_permitted, cap_bset);
 	working = cap_intersect (bprm->cap_inheritable,
 				 current->cap_inheritable);
 	new_permitted = cap_combine (new_permitted, working);
 
+	task_lock(current);
 	if (!cap_issubset (new_permitted, current->cap_permitted)) {
 		current->mm->dumpable = 0;
 
-		lock_kernel ();
 		if (must_not_trace_exec (current)
 		    || atomic_read (&current->fs->count) > 1
 		    || atomic_read (&current->files->count) > 1
-		    || atomic_read (&current->sig->count) > 1) {
+		    || atomic_read (&current->sighand->count) > 1) {
 			if (!capable (CAP_SETPCAP)) {
 				new_permitted = cap_intersect (new_permitted,
 							       current->
 							       cap_permitted);
 			}
 		}
-		do_unlock = 1;
 	}
 
 	/* For init, we want to retain the capabilities set
@@ -154,9 +153,7 @@ void cap_bprm_compute_creds (struct linux_binprm *bprm)
 	}
 
 	/* AUD: Audit candidate if current->cap_effective is set */
-
-	if (do_unlock)
-		unlock_kernel ();
+	task_unlock(current);
 
 	current->keep_capabilities = 0;
 }
@@ -286,6 +283,8 @@ static struct security_operations capability_ops = {
 	.capset_check =			cap_capset_check,
 	.capset_set =			cap_capset_set,
 	.capable =			cap_capable,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
 
 	.bprm_compute_creds =		cap_bprm_compute_creds,
 	.bprm_set_security =		cap_bprm_set_security,

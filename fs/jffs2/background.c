@@ -82,12 +82,10 @@ static int jffs2_garbage_collect_thread(void *_c)
 {
 	struct jffs2_sb_info *c = _c;
 
-	daemonize();
+	daemonize("jffs2_gcd_mtd%d", c->mtd->index);
 
 	c->gc_task = current;
 	up(&c->gc_thread_start);
-
-	sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
 
 	set_user_nice(current, 10);
 
@@ -116,7 +114,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			unsigned long signr;
 
 			spin_lock_irq(&current_sig_lock);
-			signr = dequeue_signal(&current->blocked, &info);
+			signr = dequeue_signal(current, &current->blocked, &info);
 			spin_unlock_irq(&current_sig_lock);
 
 			switch(signr) {

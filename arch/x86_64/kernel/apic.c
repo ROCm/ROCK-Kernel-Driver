@@ -895,7 +895,7 @@ int setup_profiling_timer(unsigned int multiplier)
  * value into /proc/profile.
  */
 
-inline void smp_local_timer_interrupt(struct pt_regs *regs)
+void smp_local_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
@@ -1026,7 +1026,7 @@ asmlinkage void smp_error_interrupt(void)
 	irq_exit();
 }
 
-int disable_apic __initdata; 
+int disable_apic; 
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
@@ -1038,8 +1038,10 @@ int __init APIC_init_uniprocessor (void)
 		printk(KERN_INFO "Apic disabled\n");
 		return -1; 
 	}
-	if (!smp_found_config && !cpu_has_apic)
+	if (!smp_found_config && !cpu_has_apic) { 
+		disable_apic = 1;
 		return -1;
+	} 
 
 	/*
 	 * Complain if the BIOS pretends there is one.
@@ -1047,6 +1049,7 @@ int __init APIC_init_uniprocessor (void)
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_id])) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_id);
+		disable_apic = 1;
 		return -1;
 	}
 

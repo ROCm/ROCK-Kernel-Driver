@@ -11,8 +11,6 @@ struct nameidata {
 	struct qstr	last;
 	unsigned int	flags;
 	int		last_type;
-	struct dentry	*old_dentry;
-	struct vfsmount	*old_mnt;
 };
 
 /*

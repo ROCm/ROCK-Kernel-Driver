@@ -25,7 +25,7 @@
  * mb() prevents loads and stores being reordered across this point.
  * rmb() prevents loads being reordered across this point.
  * wmb() prevents stores being reordered across this point.
- * read_barrier_depends() prevents data-dependant loads being reordered
+ * read_barrier_depends() prevents data-dependent loads being reordered
  *	across this point (nop on PPC).
  *
  * We can use the eieio instruction for wmb, but since it doesn't
@@ -105,11 +105,18 @@ extern void dump_regs(struct pt_regs *);
 	!(flags & MSR_EE);			\
 })
 
-static __inline__ int __is_processor(unsigned long pv)
+static inline int __is_processor(unsigned long pv)
 {
-      unsigned long pvr;
-      asm volatile("mfspr %0, 0x11F" : "=r" (pvr)); 
-      return(PVR_VER(pvr) == pv);
+	unsigned long pvr;
+	asm("mfspr %0, 0x11F" : "=r" (pvr)); 
+	return(PVR_VER(pvr) == pv);
+}
+
+static inline int processor_type(void)
+{
+	unsigned long pvr;
+	asm ("mfspr %0, 0x11F" : "=r" (pvr)); 
+	return(PVR_VER(pvr));
 }
 
 /*
@@ -189,7 +196,7 @@ __xchg(volatile void *ptr, unsigned long x, int size)
 static __inline__ unsigned long
 __cmpxchg_u32(volatile int *p, int old, int new)
 {
-	int prev;
+	unsigned int prev;
 
 	__asm__ __volatile__ (
 	EIEIO_ON_SMP
@@ -211,7 +218,7 @@ __cmpxchg_u32(volatile int *p, int old, int new)
 static __inline__ unsigned long
 __cmpxchg_u64(volatile long *p, unsigned long old, unsigned long new)
 {
-	int prev;
+	unsigned long prev;
 
 	__asm__ __volatile__ (
 	EIEIO_ON_SMP

@@ -64,6 +64,8 @@ static void amijoy_interrupt(int irq, void *dummy, struct pt_regs *fp)
 				case 1: data = ~custom.joy1dat; button = (~ciaa.pra >> 7) & 1; break;
 			}
 
+			input_regs(amijoy_dev + i, fp);
+
 			input_report_key(amijoy_dev + i, BTN_TRIGGER, button);
 
 			input_report_abs(amijoy_dev + i, ABS_X, ((data >> 1) & 1) - ((data >> 9) & 1));

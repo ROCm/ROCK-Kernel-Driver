@@ -502,7 +502,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 if !IA64_HP_SIM
@@ -611,7 +611,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -640,7 +640,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -767,6 +767,9 @@ source "arch/ia64/hp/sim/Kconfig"
 
 
 menu "Kernel hacking"
+
+config FSYS
+	bool "Light-weight system-call support (via epc)"
 
 choice
 	prompt "Physical memory granularity"

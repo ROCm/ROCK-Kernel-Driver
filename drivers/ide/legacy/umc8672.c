@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/umc8672.c		Version 0.05	Jul 31, 1996
+ *  linux/drivers/ide/legacy/umc8672.c		Version 0.05	Jul 31, 1996
  *
  *  Copyright (C) 1995-1996  Linus Torvalds & author (see below)
  */

@@ -4,10 +4,12 @@
 #ifdef	__KERNEL__
 #include <linux/config.h>
 
+#define BITS_TO_LONGS(bits) \
+	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
 #define DECLARE_BITMAP(name,bits) \
-	unsigned long name[((bits)+BITS_PER_LONG-1)/BITS_PER_LONG]
+	unsigned long name[BITS_TO_LONGS(bits)]
 #define CLEAR_BITMAP(name,bits) \
-	memset(name, 0, ((bits)+BITS_PER_LONG-1)/8)
+	memset(name, 0, BITS_TO_LONGS(bits)*sizeof(unsigned long))
 #endif
 
 #include <linux/posix_types.h>
@@ -25,6 +27,8 @@ typedef __kernel_pid_t		pid_t;
 typedef __kernel_daddr_t	daddr_t;
 typedef __kernel_key_t		key_t;
 typedef __kernel_suseconds_t	suseconds_t;
+typedef __kernel_timer_t	timer_t;
+typedef __kernel_clockid_t	clockid_t;
 
 #ifdef __KERNEL__
 typedef __kernel_uid32_t	uid_t;

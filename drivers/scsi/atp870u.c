@@ -492,17 +492,17 @@ static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))
 	struct Scsi_Host *host;
 	struct atp_unit *dev;
 
-	if (req_p->channel != 0) {
+	if (req_p->device->channel != 0) {
 		req_p->result = 0x00040000;
 		done(req_p);
 		return 0;
 	};
 
-	host = req_p->host;
+	host = req_p->device->host;
 	dev = (struct atp_unit *)&host->hostdata;
 	
 	m = 1;
-	m = m << req_p->target;
+	m = m << req_p->device->id;
 
 	/*
 	 *      Fake a timeout for missing targets
@@ -600,9 +600,9 @@ static void send_s870(struct Scsi_Host *host)
 		dev->quhdu = 0;
 	}
 	workrequ = dev->querequ[dev->quhdu];
-	if (dev->id[workrequ->target].curr_req == 0) {
-		dev->id[workrequ->target].curr_req = workrequ;
-		dev->last_cmd = workrequ->target;
+	if (dev->id[workrequ->device->id].curr_req == 0) {
+		dev->id[workrequ->device->id].curr_req = workrequ;
+		dev->last_cmd = workrequ->device->id;
 		goto cmd_subp;
 	}
 	dev->quhdu = j;
@@ -638,7 +638,7 @@ oktosend:
 
 	tmport = workportu + 0x1b;
 	j = 0;
-	target_id = workrequ->target;
+	target_id = workrequ->device->id;
 
 	/*
 	 *      Wide ?
@@ -665,7 +665,7 @@ oktosend:
 		outb(dev->ata_cdbu[i], tmport++);
 	}
 	tmport = workportu + 0x0f;
-	outb(workrequ->lun, tmport);
+	outb(workrequ->device->lun, tmport);
 	tmport += 0x02;
 	/*
 	 *      Write the target
@@ -2606,7 +2606,7 @@ int atp870u_abort(Scsi_Cmnd * SCpnt)
 	unsigned char j, k;
 	Scsi_Cmnd *workrequ;
 	unsigned int tmport;
-	struct atp_unit *dev = (struct atp_unit *)&SCpnt->host->hostdata;
+	struct atp_unit *dev = (struct atp_unit *)&SCpnt->device->host->hostdata;
 
 	printk(KERN_DEBUG "working=%x last_cmd=%x ", dev->working, dev->last_cmd);
 	printk(" quhdu=%x quendu=%x ", dev->quhdu, dev->quendu);

@@ -668,7 +668,7 @@ static int ac97_read_mixer(struct ess_card *card, int mixer)
 		if (mixer == SOUND_MIXER_IGAIN) {
 			right = (right * 100) / mh->scale;
 			left = (left * 100) / mh->scale;
-		else {
+		} else {
 			right = 100 - ((right * 100) / mh->scale);
 			left = 100 - ((left * 100) / mh->scale);
 		}
@@ -793,7 +793,7 @@ static unsigned int ac97_oss_rm[] = {
 	
 /* read or write the recmask 
 	the ac97 can really have left and right recording
-	inputs independantly set, but OSS doesn't seem to 
+	inputs independently set, but OSS doesn't seem to 
 	want us to express that to the user. 
 	the caller guarantees that we have a supported bit set,
 	and they must be holding the card's spinlock */

@@ -300,6 +300,8 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 
 	pgd = pgd_offset(tsk->mm, address);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain)
+		goto out_sig;
 	spin_lock(&tsk->mm->page_table_lock);
 	pmd = pmd_alloc(tsk->mm, pgd, address);
 	if (!pmd)
@@ -325,6 +327,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	return;
 out:
 	spin_unlock(&tsk->mm->page_table_lock);
+out_sig:
 	__free_page(page);
 	force_sig(SIGKILL, tsk);
 	pte_chain_free(pte_chain);
@@ -556,35 +559,71 @@ static inline void put_proc_dentry(struct dentry *dentry)
  * disturbing other processes.  (Other processes might share the signal
  * table via the CLONE_SIGHAND option to clone().)
  */
-static inline int de_thread(struct signal_struct *oldsig)
+static inline int de_thread(struct task_struct *tsk)
 {
-	struct signal_struct *newsig;
+	struct signal_struct *newsig, *oldsig = tsk->signal;
+	struct sighand_struct *newsighand, *oldsighand = tsk->sighand;
+	spinlock_t *lock = &oldsighand->siglock;
 	int count;
 
-	if (atomic_read(&current->sig->count) <= 1)
+	/*
+	 * If we don't share sighandlers, then we aren't sharing anything
+	 * and we can just re-use it all.
+	 */
+	if (atomic_read(&oldsighand->count) <= 1)
 		return 0;
 
-	newsig = kmem_cache_alloc(sigact_cachep, GFP_KERNEL);
-	if (!newsig)
+	newsighand = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);
+	if (!newsighand)
 		return -ENOMEM;
 
-	if (thread_group_empty(current))
-		goto out;
+	spin_lock_init(&newsighand->siglock);
+	atomic_set(&newsighand->count, 1);
+	memcpy(newsighand->action, oldsighand->action, sizeof(newsighand->action));
+
 	/*
-	 * Kill all other threads in the thread group:
+	 * See if we need to allocate a new signal structure
 	 */
-	spin_lock_irq(&oldsig->siglock);
+	newsig = NULL;
+	if (atomic_read(&oldsig->count) > 1) {
+		newsig = kmem_cache_alloc(signal_cachep, GFP_KERNEL);
+		if (!newsig) {
+			kmem_cache_free(sighand_cachep, newsighand);
+			return -ENOMEM;
+		}
+		atomic_set(&newsig->count, 1);
+		newsig->group_exit = 0;
+		newsig->group_exit_code = 0;
+		newsig->group_exit_task = NULL;
+		newsig->group_stop_count = 0;
+		newsig->curr_target = NULL;
+		init_sigpending(&newsig->shared_pending);
+	}
+
+	if (thread_group_empty(current))
+		goto no_thread_group;
+
+	/*
+	 * Kill all other threads in the thread group.
+	 * We must hold tasklist_lock to call zap_other_threads.
+	 */
+	read_lock(&tasklist_lock);
+	spin_lock_irq(lock);
 	if (oldsig->group_exit) {
 		/*
 		 * Another group action in progress, just
 		 * return so that the signal is processed.
 		 */
-		spin_unlock_irq(&oldsig->siglock);
-		kmem_cache_free(sigact_cachep, newsig);
+		spin_unlock_irq(lock);
+		read_unlock(&tasklist_lock);
+		kmem_cache_free(sighand_cachep, newsighand);
+		if (newsig)
+			kmem_cache_free(signal_cachep, newsig);
 		return -EAGAIN;
 	}
 	oldsig->group_exit = 1;
-	__broadcast_thread_group(current, SIGKILL);
+	zap_other_threads(current);
+	read_unlock(&tasklist_lock);
 
 	/*
 	 * Account for the thread group leader hanging around:
@@ -595,13 +634,13 @@ static inline int de_thread(struct signal_struct *oldsig)
 	while (atomic_read(&oldsig->count) > count) {
 		oldsig->group_exit_task = current;
 		current->state = TASK_UNINTERRUPTIBLE;
-		spin_unlock_irq(&oldsig->siglock);
+		spin_unlock_irq(lock);
 		schedule();
-		spin_lock_irq(&oldsig->siglock);
+		spin_lock_irq(lock);
 		if (oldsig->group_exit_task)
 			BUG();
 	}
-	spin_unlock_irq(&oldsig->siglock);
+	spin_unlock_irq(lock);
 
 	/*
 	 * At this point all other threads have exited, all we have to
@@ -656,7 +695,8 @@ static inline int de_thread(struct signal_struct *oldsig)
 			current->ptrace = ptrace;
 			__ptrace_link(current, parent);
 		}
-		
+
+		list_del(&current->tasks);
 		list_add_tail(&current->tasks, &init_task.tasks);
 		current->exit_signal = SIGCHLD;
 		state = leader->state;
@@ -671,31 +711,29 @@ static inline int de_thread(struct signal_struct *oldsig)
 		release_task(leader);
         }
 
-out:
-	spin_lock_init(&newsig->siglock);
-	atomic_set(&newsig->count, 1);
-	newsig->group_exit = 0;
-	newsig->group_exit_code = 0;
-	newsig->group_exit_task = NULL;
-	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
-	init_sigpending(&newsig->shared_pending);
+no_thread_group:
 
 	write_lock_irq(&tasklist_lock);
-	spin_lock(&oldsig->siglock);
-	spin_lock(&newsig->siglock);
+	spin_lock(&oldsighand->siglock);
+	spin_lock(&newsighand->siglock);
 
 	if (current == oldsig->curr_target)
 		oldsig->curr_target = next_thread(current);
-	current->sig = newsig;
+	if (newsig)
+		current->signal = newsig;
+	current->sighand = newsighand;
 	init_sigpending(&current->pending);
 	recalc_sigpending();
 
-	spin_unlock(&newsig->siglock);
-	spin_unlock(&oldsig->siglock);
+	spin_unlock(&newsighand->siglock);
+	spin_unlock(&oldsighand->siglock);
 	write_unlock_irq(&tasklist_lock);
 
-	if (atomic_dec_and_test(&oldsig->count))
-		kmem_cache_free(sigact_cachep, oldsig);
+	if (newsig && atomic_dec_and_test(&oldsig->count))
+		kmem_cache_free(signal_cachep, oldsig);
+
+	if (atomic_dec_and_test(&oldsighand->count))
+		kmem_cache_free(sighand_cachep, oldsighand);
 
 	if (!thread_group_empty(current))
 		BUG();
@@ -741,21 +779,20 @@ int flush_old_exec(struct linux_binprm * bprm)
 {
 	char * name;
 	int i, ch, retval;
-	struct signal_struct * oldsig = current->sig;
 
 	/* 
 	 * Release all of the old mmap stuff
 	 */
 	retval = exec_mmap(bprm->mm);
 	if (retval)
-		goto mmap_failed;
+		goto out;
 	/*
 	 * Make sure we have a private signal table and that
 	 * we are unassociated from the previous thread group.
 	 */
-	retval = de_thread(oldsig);
+	retval = de_thread(current);
 	if (retval)
-		goto flush_failed;
+		goto out;
 
 	/* This is the point of no return */
 
@@ -786,17 +823,11 @@ int flush_old_exec(struct linux_binprm * bprm)
 			
 	flush_signal_handlers(current);
 	flush_old_files(current->files);
+	exit_itimers(current);
 
 	return 0;
 
-mmap_failed:
-flush_failed:
-	spin_lock_irq(&current->sig->siglock);
-	if (current->sig != oldsig) {
-		kmem_cache_free(sigact_cachep, current->sig);
-		current->sig = oldsig;
-	}
-	spin_unlock_irq(&current->sig->siglock);
+out:
 	return retval;
 }
 
@@ -873,29 +904,25 @@ int prepare_binprm(struct linux_binprm *bprm)
 
 void compute_creds(struct linux_binprm *bprm) 
 {
-	int do_unlock = 0;
-
+	task_lock(current);
 	if (bprm->e_uid != current->uid || bprm->e_gid != current->gid) {
                 current->mm->dumpable = 0;
 		
-		lock_kernel();
 		if (must_not_trace_exec(current)
 		    || atomic_read(&current->fs->count) > 1
 		    || atomic_read(&current->files->count) > 1
-		    || atomic_read(&current->sig->count) > 1) {
+		    || atomic_read(&current->sighand->count) > 1) {
 			if(!capable(CAP_SETUID)) {
 				bprm->e_uid = current->uid;
 				bprm->e_gid = current->gid;
 			}
 		}
-		do_unlock = 1;
 	}
 
         current->suid = current->euid = current->fsuid = bprm->e_uid;
         current->sgid = current->egid = current->fsgid = bprm->e_gid;
 
-	if(do_unlock)
-		unlock_kernel();
+	task_unlock(current);
 
 	security_bprm_compute_creds(bprm);
 }
@@ -1166,7 +1193,7 @@ void format_corename(char *corename, const char *pattern, long signr)
 			case 'p':
 				pid_in_pattern = 1;
 				rc = snprintf(out_ptr, out_end - out_ptr,
-					      "%d", current->pid);
+					      "%d", current->tgid);
 				if (rc > out_end - out_ptr)
 					goto out;
 				out_ptr += rc;
@@ -1238,7 +1265,7 @@ void format_corename(char *corename, const char *pattern, long signr)
 	if (!pid_in_pattern
             && (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)) {
 		rc = snprintf(out_ptr, out_end - out_ptr,
-			      ".%d", current->pid);
+			      ".%d", current->tgid);
 		if (rc > out_end - out_ptr)
 			goto out;
 		out_ptr += rc;
@@ -1301,8 +1328,8 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	}
 	mm->dumpable = 0;
 	init_completion(&mm->core_done);
-	current->sig->group_exit = 1;
-	current->sig->group_exit_code = exit_code;
+	current->signal->group_exit = 1;
+	current->signal->group_exit_code = exit_code;
 	coredump_wait(mm);
 
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
@@ -1329,7 +1356,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 
 	retval = binfmt->core_dump(signr, regs, file);
 
-	current->sig->group_exit_code |= 0x80;
+	current->signal->group_exit_code |= 0x80;
 close_fail:
 	filp_close(file, NULL);
 fail_unlock:

@@ -340,7 +340,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		case JSIOCSBTNMAP:
 			if (copy_from_user(joydev->keypam, (__u16 *) arg, sizeof(__u16) * (KEY_MAX - BTN_MISC)))
 				return -EFAULT;
-			for (i = 0; i < joydev->nkey; i++); {
+			for (i = 0; i < joydev->nkey; i++) {
 				if (joydev->keypam[i] > KEY_MAX || joydev->keypam[i] < BTN_MISC) return -EINVAL;
 				joydev->keymap[joydev->keypam[i] - BTN_MISC] = i;
 			}
@@ -377,7 +377,8 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	struct joydev *joydev;
 	int i, j, t, minor;
 
-        if (test_bit(BTN_TOUCH, dev->keybit))
+	/* Avoid tablets */
+        if (test_bit(EV_KEY, dev->evbit) && test_bit(BTN_TOUCH, dev->keybit))
 		return NULL;
 
 	for (minor = 0; minor < JOYDEV_MINORS && joydev_table[minor]; minor++);
@@ -463,18 +464,18 @@ static void joydev_disconnect(struct input_handle *handle)
 
 static struct input_device_id joydev_ids[] = {
 	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT(EV_ABS) },
 		.absbit = { BIT(ABS_X) },
 	},
 	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT(EV_ABS) },
 		.absbit = { BIT(ABS_WHEEL) },
 	},
 	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT(EV_ABS) },
 		.absbit = { BIT(ABS_THROTTLE) },
 	},
 	{ }, 	/* Terminating entry */

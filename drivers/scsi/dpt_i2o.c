@@ -391,7 +391,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 		return 0;
 	}
 
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
 	if (!pHba) {
 		return FAILED;
 	}
@@ -424,7 +424,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 		 * to the device structure.  This should be a TEST_UNIT_READY
 		 * command from scan_scsis_single.
 		 */
-		if ((pDev = adpt_find_device(pHba, (u32)cmd->channel, (u32)cmd->target, (u32)cmd-> lun)) == NULL) {
+		if ((pDev = adpt_find_device(pHba, (u32)cmd->device->channel, (u32)cmd->device->id, (u32)cmd->device->lun)) == NULL) {
 			// TODO: if any luns are at this bus, scsi id then fake a TEST_UNIT_READY and INQUIRY response 
 			// with type 7F (for all luns less than the max for this bus,id) so the lun scan will continue.
 			cmd->result = (DID_NO_CONNECT << 16);
@@ -647,7 +647,7 @@ static int adpt_abort(Scsi_Cmnd * cmd)
 	if(cmd->serial_number == 0){
 		return FAILED;
 	}
-	pHba = (adpt_hba*) cmd->host->hostdata[0];
+	pHba = (adpt_hba*) cmd->device->host->hostdata[0];
 	printk(KERN_INFO"%s: Trying to Abort cmd=%ld\n",pHba->name, cmd->serial_number);
 	if ((dptdevice = (void*) (cmd->device->hostdata)) == NULL) {
 		printk(KERN_ERR "%s: Unable to abort: No device in cmnd\n",pHba->name);
@@ -685,7 +685,7 @@ static int adpt_device_reset(Scsi_Cmnd* cmd)
 	int old_state;
 	struct adpt_device* d = (void*) cmd->device->hostdata;
 
-	pHba = (void*) cmd->host->hostdata[0];
+	pHba = (void*) cmd->device->host->hostdata[0];
 	printk(KERN_INFO"%s: Trying to reset device\n",pHba->name);
 	if (!d) {
 		printk(KERN_INFO"%s: Reset Device: Device Not found\n",pHba->name);
@@ -722,11 +722,11 @@ static int adpt_bus_reset(Scsi_Cmnd* cmd)
 	adpt_hba* pHba;
 	u32 msg[4];
 
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
 	memset(msg, 0, sizeof(msg));
-	printk(KERN_WARNING"%s: Bus reset: SCSI Bus %d: tid: %d\n",pHba->name, cmd->channel,pHba->channel[cmd->channel].tid );
+	printk(KERN_WARNING"%s: Bus reset: SCSI Bus %d: tid: %d\n",pHba->name, cmd->device->channel,pHba->channel[cmd->device->channel].tid );
 	msg[0] = FOUR_WORD_MSG_SIZE|SGL_OFFSET_0;
-	msg[1] = (I2O_HBA_BUS_RESET<<24|HOST_TID<<12|pHba->channel[cmd->channel].tid);
+	msg[1] = (I2O_HBA_BUS_RESET<<24|HOST_TID<<12|pHba->channel[cmd->device->channel].tid);
 	msg[2] = 0;
 	msg[3] = 0;
 	if(adpt_i2o_post_wait(pHba, (void*)msg,sizeof(msg), FOREVER) ){
@@ -743,8 +743,8 @@ static int adpt_reset(Scsi_Cmnd* cmd)
 {
 	adpt_hba* pHba;
 	int rcode;
-	pHba = (adpt_hba*)cmd->host->hostdata[0];
-	printk(KERN_WARNING"%s: Hba Reset: scsi id %d: tid: %d\n",pHba->name,cmd->channel,pHba->channel[cmd->channel].tid );
+	pHba = (adpt_hba*)cmd->device->host->hostdata[0];
+	printk(KERN_WARNING"%s: Hba Reset: scsi id %d: tid: %d\n",pHba->name,cmd->device->channel,pHba->channel[cmd->device->channel].tid );
 	rcode =  adpt_hba_reset(pHba);
 	if(rcode == 0){
 		printk(KERN_WARNING"%s: HBA reset complete\n",pHba->name);
@@ -1402,7 +1402,7 @@ static int adpt_i2o_parse_lct(adpt_hba* pHba)
 				printk(KERN_WARNING"%s: Channel number %d out of range \n", pHba->name, bus_no);
 				continue;
 			}
-			if(scsi_id > MAX_ID){
+			if (scsi_id >= MAX_ID){
 				printk(KERN_WARNING"%s: SCSI ID %d out of range \n", pHba->name, bus_no);
 				continue;
 			}
@@ -1476,7 +1476,7 @@ static int adpt_i2o_parse_lct(adpt_hba* pHba)
 				if(bus_no >= MAX_CHANNEL) {	// Something wrong skip it
 					continue;
 				}
-				if(scsi_id > MAX_ID){
+				if (scsi_id >= MAX_ID) {
 					continue;
 				}
 				if( pHba->channel[bus_no].device[scsi_id] == NULL){
@@ -2216,7 +2216,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 	// calculate resid for sg 
 	cmd->resid = cmd->request_bufflen - readl(reply+5);
 
-	pHba = (adpt_hba*) cmd->host->hostdata[0];
+	pHba = (adpt_hba*) cmd->device->host->hostdata[0];
 
 	cmd->sense_buffer[0] = '\0';  // initialize sense valid flag to false
 
@@ -2240,7 +2240,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 		case I2O_SCSI_DSC_NO_ADAPTER:
 		case I2O_SCSI_DSC_RESOURCE_UNAVAILABLE:
 			printk(KERN_WARNING"%s: SCSI Timeout-Device (%d,%d,%d) hba status=0x%x, dev status=0x%x, cmd=0x%x\n",
-				pHba->name, (u32)cmd->channel, (u32)cmd->target, (u32)cmd->lun, hba_status, dev_status, cmd->cmnd[0]);
+				pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, (u32)cmd->device->lun, hba_status, dev_status, cmd->cmnd[0]);
 			cmd->result = (DID_TIME_OUT << 16);
 			break;
 		case I2O_SCSI_DSC_ADAPTER_BUSY:
@@ -2280,7 +2280,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 		case I2O_SCSI_DSC_REQUEST_INVALID:
 		default:
 			printk(KERN_WARNING"%s: SCSI error %0x-Device(%d,%d,%d) hba_status=0x%x, dev_status=0x%x, cmd=0x%x\n",
-				pHba->name, detailed_status & I2O_SCSI_DSC_MASK, (u32)cmd->channel, (u32)cmd->target, (u32)cmd-> lun,
+				pHba->name, detailed_status & I2O_SCSI_DSC_MASK, (u32)cmd->device->channel, (u32)cmd->device->id, (u32)cmd->device->lun,
 			       hba_status, dev_status, cmd->cmnd[0]);
 			cmd->result = (DID_ERROR << 16);
 			break;
@@ -2298,7 +2298,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 				/* This is to handle an array failed */
 				cmd->result = (DID_TIME_OUT << 16);
 				printk(KERN_WARNING"%s: SCSI Data Protect-Device (%d,%d,%d) hba_status=0x%x, dev_status=0x%x, cmd=0x%x\n",
-					pHba->name, (u32)cmd->channel, (u32)cmd->target, (u32)cmd->lun, 
+					pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, (u32)cmd->device->lun, 
 					hba_status, dev_status, cmd->cmnd[0]);
 
 			}
@@ -2310,7 +2310,7 @@ static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd)
 		 */
 		cmd->result = (DID_TIME_OUT << 16);
 		printk(KERN_WARNING"%s: I2O MSG_FAIL - Device (%d,%d,%d) tid=%d, cmd=0x%x\n",
-			pHba->name, (u32)cmd->channel, (u32)cmd->target, (u32)cmd-> lun,
+			pHba->name, (u32)cmd->device->channel, (u32)cmd->device->id, (u32)cmd->device->lun,
 			((struct adpt_device*)(cmd->device->hostdata))->tid, cmd->cmnd[0]);
 	}
 
@@ -2510,13 +2510,16 @@ static void adpt_fail_posted_scbs(adpt_hba* pHba)
 	Scsi_Device* 	d = NULL;
 
 	list_for_each_entry(d, &pHba->host->my_devices, siblings) {
-		for(cmd = d->device_queue; cmd ; cmd = cmd->next){
+		unsigned long flags;
+		spin_lock_irqsave(&d->list_lock, flags);
+		list_for_each_entry(cmd, &d->cmd_list, list) {
 			if(cmd->serial_number == 0){
 				continue;
 			}
 			cmd->result = (DID_OK << 16) | (QUEUE_FULL <<1);
 			cmd->scsi_done(cmd);
 		}
+		spin_unlock_irqrestore(&d->list_lock, flags);
 	}
 }
 

@@ -94,17 +94,10 @@ static int kafsasyncd(void *arg)
 	kafsasyncd_task = current;
 
 	printk("kAFS: Started kafsasyncd %d\n",current->pid);
-	strcpy(current->comm,"kafsasyncd");
 
-	daemonize();
+	daemonize("kafsasyncd");
 
 	complete(&kafsasyncd_alive);
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
 
 	/* loop around looking for things to attend to */
 	do {

@@ -157,9 +157,6 @@ struct e1000_desc_ring {
 struct e1000_adapter {
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
-#ifdef CONFIG_PROC_FS
-	struct list_head proc_list_head;
-#endif
 	struct vlan_group *vlgrp;
 	char *id_string;
 	uint32_t bd_number;

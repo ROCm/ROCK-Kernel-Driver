@@ -689,7 +689,7 @@ syscall_exit_rfi:
 	 * (we don't store them in the sigcontext), so set them
 	 * to "proper" values now (otherwise we'll wind up restoring
 	 * whatever was last stored in the task structure, which might
-	 * be inconsistant if an interrupt occured while on the gateway
+	 * be inconsistent if an interrupt occured while on the gateway
 	 * page) Note that we may be "trashing" values the user put in
 	 * them, but we don't support the the user changing them.
 	 */

@@ -90,7 +90,7 @@ typedef unsigned long sigset_t;
  * Unix names RESETHAND and NODEFER respectively.
  */
 #define SA_NOCLDSTOP	0x00000001
-#define SA_NOCLDWAIT	0x00000002 /* not supported yet */
+#define SA_NOCLDWAIT	0x00000002
 #define SA_SIGINFO	0x00000004
 #define SA_THIRTYTWO	0x02000000
 #define SA_RESTORER	0x04000000
@@ -184,9 +184,7 @@ typedef struct sigaltstack {
 
 #ifdef __KERNEL__
 #include <asm/sigcontext.h>
-
-#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
-
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 #endif
 
 #endif

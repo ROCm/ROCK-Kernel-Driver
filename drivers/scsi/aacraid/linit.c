@@ -217,7 +217,7 @@ static int aac_detect(Scsi_Host_Template *template)
 			host_ptr->irq = dev->irq;		/* Adapter IRQ number */
 			/* host_ptr->base = ( char * )(dev->resource[0].start & ~0xff); */
 			host_ptr->base = dev->resource[0].start;
-			scsi_set_pci_device(host_ptr, dev);
+			scsi_set_device(host_ptr, &dev->dev);
 			dprintk((KERN_DEBUG "Device base address = 0x%lx [0x%lx].\n", host_ptr->base, dev->resource[0].start));
 			dprintk((KERN_DEBUG "Device irq = 0x%x.\n", dev->irq));
 			/*
@@ -536,7 +536,7 @@ static int aac_slave_configure(Scsi_Device * dev )
 
 	dprintk((KERN_DEBUG "(scsi%d:%d:%d:%d) Tagged Queue depth %2d, "
 				"%s\n", dev->host->host_no, dev->channel,
-				dev->id, dev->lun, dev->new_queue_depth,
+				dev->id, dev->lun, dev->queue_depth,
 				dev->online ? "OnLine" : "OffLine"));
 	return 0;
 }

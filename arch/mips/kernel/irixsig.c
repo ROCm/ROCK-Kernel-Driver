@@ -12,6 +12,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
+#include <linux/ptrace.h>
 
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
@@ -183,7 +184,7 @@ asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 		unsigned long signr;
 
 		spin_lock_irq(&current->sigmask_lock);
-		signr = dequeue_signal(&current->blocked, &info);
+		signr = dequeue_signal(current, &current->blocked, &info);
 		spin_unlock_irq(&current->sigmask_lock);
 
 		if (!signr)

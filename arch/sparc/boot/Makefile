@@ -17,7 +17,7 @@ quiet_cmd_piggy		= PIGGY $@
 quiet_cmd_btfix		= BTFIX $@
       cmd_btfix		= $(OBJDUMP) -x vmlinux | $(obj)/btfixupprep > $@
 
-BTOBJS := $(HEAD) $(INIT_Y)
+BTOBJS := $(HEAD_Y) $(INIT_Y)
 BTLIBS := $(CORE_Y) $(LIBS_Y) $(DRIVERS_Y) $(NET_Y)
 LDFLAGS_image := -T arch/sparc/vmlinux.lds.s $(BTOBJS) --start-group $(BTLIBS) --end-group
 

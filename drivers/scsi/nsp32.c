@@ -458,7 +458,7 @@ static void nsp32_build_identify(nsp32_hw_data *data, Scsi_Cmnd *SCpnt)
 		/* XXX: Auto DiscPriv detection is progressing... */
 		0x40 |		/* DiscPriv */
 #endif
-		SCpnt->lun;	/* LUNTRN */
+		SCpnt->device->lun;	/* LUNTRN */
 
 	data->msgoutlen = pos;
 }
@@ -532,9 +532,9 @@ static void nsp32_start_timer(Scsi_Cmnd *SCpnt, int time)
  */
 static int nsp32hw_start_selection(Scsi_Cmnd *SCpnt, nsp32_hw_data *data)
 {
-	unsigned int   host_id = SCpnt->host->this_id;
-	unsigned int   base    = SCpnt->host->io_port;
-	unsigned char  target  = SCpnt->target;
+	unsigned int   host_id = SCpnt->device->host->this_id;
+	unsigned int   base    = SCpnt->device->host->io_port;
+	unsigned char  target  = SCpnt->device->id;
 	unsigned char  *param  = data->autoparam;
 	unsigned char  phase, arbit;
 	int	       i, time;
@@ -744,7 +744,7 @@ static int nsp32_selection_autoscsi(Scsi_Cmnd *SCpnt, nsp32_hw_data *data)
 	 * set SCSIOUT LATCH(initiator)/TARGET(target) (ORed) ID
 	 */
 	nsp32_write1(base, SCSI_OUT_LATCH_TARGET_ID,
-		((1 << NSP32_HOST_SCSIID) | (1 << SCpnt->target)));
+		((1 << NSP32_HOST_SCSIID) | (1 << SCpnt->device->id)));
 
 	/*
 	 * set SCSI MSGOUT REG
@@ -1021,7 +1021,7 @@ static int nsp32hw_setup_sg_table(Scsi_Cmnd *SCpnt, nsp32_hw_data *data)
 
 static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	struct nsp32_target *target;
 	struct nsp32_lunt *curlunt;
 	int ret;
@@ -1029,7 +1029,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND,
 		  "enter. target: 0x%x LUN: 0x%x cmnd: 0x%x cmndlen: 0x%x "
 		  "use_sg: 0x%x reqbuf: 0x%lx reqlen: 0x%x",
-		  SCpnt->target, SCpnt->lun, SCpnt->cmnd[0], SCpnt->cmd_len,
+		  SCpnt->device->id, SCpnt->device->lun, SCpnt->cmnd[0], SCpnt->cmd_len,
 		  SCpnt->use_sg, SCpnt->request_buffer, SCpnt->request_bufflen);
 
 	if (data->CurrentSC != NULL ) {
@@ -1042,14 +1042,14 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	}
 
 	/* check target ID is not same as this initiator ID */
-	if (SCpnt->target == NSP32_HOST_SCSIID) {
+	if (SCpnt->device->id == NSP32_HOST_SCSIID) {
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
 		return 1;
 	}
 
 	/* check target LUN is allowable value */
-	if (SCpnt->lun >= MAX_LUN) {
+	if (SCpnt->device->lun >= MAX_LUN) {
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
 		return 1;
@@ -1071,13 +1071,13 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/* initialize data */
 	data->msgoutlen		= 0;
 	data->msginlen		= 0;
-	curlunt			= data->lunt[SCpnt->target][SCpnt->lun];
+	curlunt			= data->lunt[SCpnt->device->id][SCpnt->device->lun];
 	curlunt->SCpnt		= SCpnt;
 	curlunt->save_datp	= 0;
 	curlunt->msgin03	= FALSE;
 	data->curlunt		= curlunt;
-	data->pid		= SCpnt->target;
-	data->plun		= SCpnt->lun;
+	data->pid		= SCpnt->device->id;
+	data->plun		= SCpnt->device->lun;
 
 	ret = nsp32hw_setup_sg_table(SCpnt, data);
 	if (ret == FALSE) {
@@ -1093,7 +1093,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	 * (target don't have SDTR_DONE and SDTR_INITIATOR), sync
 	 * message SDTR is needed to do synchronous transfer.
 	 */
-	target = &data->target[SCpnt->target];
+	target = &data->target[SCpnt->device->id];
 	data->curtarget = target;
 
 	if (!(target->sync_flag & (SDTR_DONE | SDTR_INITIATOR | SDTR_TARGET))) {
@@ -1139,7 +1139,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
 	nsp32_dbg(NSP32_DEBUG_TARGETFLAG,
 		  "target: %d sync_flag: 0x%x syncreg: 0x%x ackwidth: 0x%x",
-		  SCpnt->target, target->sync_flag, target->syncreg,
+		  SCpnt->device->id, target->sync_flag, target->syncreg,
 		  target->ackwidth);
 
 	/* Selection */
@@ -1661,7 +1661,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	host->unique_id	  = data->BaseAddress;
 	host->n_io_port	  = data->NumAddress;
 	host->base        = data->MmioAddress;
-	scsi_set_pci_device(host, data->Pci);
+	scsi_set_device(host, &data->Pci->dev);
 
 	data->Host        = host;
 	spin_lock_init(&(data->Lock));
@@ -1920,7 +1920,7 @@ static int nsp32_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 
 static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base = data->BaseAddress;
 
 	nsp32_msg(KERN_WARNING, "abort");
@@ -1942,7 +1942,7 @@ static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 
 static int nsp32_eh_bus_reset(Scsi_Cmnd *SCpnt)
 {
-	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->host->hostdata;
+	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base = data->BaseAddress;
 
 	nsp32_msg(KERN_INFO, "Bus Reset");	
@@ -1997,7 +1997,7 @@ static void nsp32_do_bus_reset(nsp32_hw_data *data)
 
 static int nsp32_eh_host_reset(Scsi_Cmnd *SCpnt)
 {
-	struct Scsi_Host *host = SCpnt->host;
+	struct Scsi_Host *host = SCpnt->device->host;
 	nsp32_hw_data *data = (nsp32_hw_data *)host->hostdata;
 	unsigned int base = data->BaseAddress;
 

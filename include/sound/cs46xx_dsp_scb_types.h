@@ -248,12 +248,12 @@ typedef struct _mix2_ostream_spb_t
 	   insure that the fractional error is always
 	   positive)
 	*/
-	long outTripletsPerFrame;
+	u32 outTripletsPerFrame;
 
 	/* 16b.16b integer.frac accumulated number of
 	   output triplets since the start of group 
 	*/
-	long accumOutTriplets;  
+	u32 accumOutTriplets;  
 } mix2_ostream_spb_t;
 
 /* SCB for Timing master algorithm */
@@ -569,10 +569,10 @@ typedef struct _vari_decimate_scb_t {
 	u32  vdec_input_buf_strm_config;
 	/* inputBufStrmConfig: rsConfig for the input buffer to the decimator
 	   (buffer size = 64 dwords) */
-	long  vdec_coef_increment;
+	u32  vdec_coef_increment;
 	/* coefIncrement = - 128.0 / decimationFactor (as a 32Q15 number) */
 
-	long  vdec_accumphi;
+	u32  vdec_accumphi;
 	/* accumPhi: accumulated fractional phase increment (6.26) */
 
 	u16 vdec_exp_vol_change_rate;

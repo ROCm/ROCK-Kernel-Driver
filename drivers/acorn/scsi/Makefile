@@ -2,7 +2,6 @@
 # Makefile for drivers/acorn/scsi
 #
 
-export-objs		:= fas216.o queue.o msgqueue.o
 acornscsi_mod-objs	:= acornscsi.o acornscsi-io.o
 
 obj-$(CONFIG_SCSI_ACORNSCSI_3)	+= acornscsi_mod.o queue.o msgqueue.o

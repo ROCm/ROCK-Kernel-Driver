@@ -2,8 +2,6 @@
 # Makefile for most of the non-PCI devices in PA-RISC machines
 #
 
-export-objs			:= gsc.o superio.o
-
 obj-y :=
 obj-m :=
 obj-n :=

@@ -5,6 +5,7 @@
 
 #include "linux/sched.h"
 #include "linux/slab.h"
+#include "linux/ptrace.h"
 #include "kern_util.h"
 #include "time_user.h"
 #include "signal_user.h"
@@ -68,8 +69,7 @@ void new_thread_handler(int sig)
 	n = run_kernel_thread(fn, arg, &current->thread.exec_buf);
 	if(n == 1)
 		userspace(&current->thread.regs.regs);
-	else if(n == 2)
-		do_exit(0);
+	else do_exit(0);
 }
 
 void new_thread_proc(void *stack, void (*handler)(int sig))
@@ -109,21 +109,21 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
   	void (*handler)(int);
 
 	if(current->thread.forking){
-	  	memcpy(&p->thread.regs.regs.mode.skas, 
-		       &current->thread.regs.regs.mode.skas, 
-		       sizeof(p->thread.regs.regs.mode.skas));
-		REGS_SET_SYSCALL_RETURN(p->thread.regs.regs.mode.skas.regs, 0);
-		if(sp != 0) REGS_SP(p->thread.regs.regs.mode.skas.regs) = sp;
+	  	memcpy(&p->thread.regs.regs.skas, 
+		       &current->thread.regs.regs.skas, 
+		       sizeof(p->thread.regs.regs.skas));
+		REGS_SET_SYSCALL_RETURN(p->thread.regs.regs.skas.regs, 0);
+		if(sp != 0) REGS_SP(p->thread.regs.regs.skas.regs) = sp;
 
 		handler = fork_handler;
 	}
 	else {
-	  	memcpy(p->thread.regs.regs.mode.skas.regs, exec_regs, 
-		       sizeof(p->thread.regs.regs.mode.skas.regs));
-		memcpy(p->thread.regs.regs.mode.skas.fp, exec_fp_regs, 
-		       sizeof(p->thread.regs.regs.mode.skas.fp));
-	  	memcpy(p->thread.regs.regs.mode.skas.xfp, exec_fpx_regs, 
-		       sizeof(p->thread.regs.regs.mode.skas.xfp));
+	  	memcpy(p->thread.regs.regs.skas.regs, exec_regs, 
+		       sizeof(p->thread.regs.regs.skas.regs));
+		memcpy(p->thread.regs.regs.skas.fp, exec_fp_regs, 
+		       sizeof(p->thread.regs.regs.skas.fp));
+	  	memcpy(p->thread.regs.regs.skas.xfp, exec_fpx_regs, 
+		       sizeof(p->thread.regs.regs.skas.xfp));
                 p->thread.request.u.thread = current->thread.request.u.thread;
 		handler = new_thread_handler;
 	}

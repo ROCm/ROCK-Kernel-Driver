@@ -68,16 +68,16 @@ extern inline void pcibios_penalize_isa_irq(int irq)
    decisions.  */
 #define PCI_DMA_BUS_IS_PHYS  0
 
-/* Allocate and map kernel buffer using consistant mode DMA for PCI
+/* Allocate and map kernel buffer using consistent mode DMA for PCI
    device.  Returns non-NULL cpu-view pointer to the buffer if
    successful and sets *DMA_ADDRP to the pci side dma address as well,
    else DMA_ADDRP is undefined.  */
 
 extern void *pci_alloc_consistent(struct pci_dev *, size_t, dma_addr_t *);
 
-/* Free and unmap a consistant DMA buffer.  CPU_ADDR and DMA_ADDR must
-   be values that were returned from pci_alloc_consistant.  SIZE must
-   be the same as what as passed into pci_alloc_consistant.
+/* Free and unmap a consistent DMA buffer.  CPU_ADDR and DMA_ADDR must
+   be values that were returned from pci_alloc_consistent.  SIZE must
+   be the same as what as passed into pci_alloc_consistent.
    References to the memory and mappings assosciated with CPU_ADDR or
    DMA_ADDR past this call are illegal.  */
 
@@ -139,7 +139,7 @@ extern int pci_map_sg(struct pci_dev *, struct scatterlist *, int, int);
 
 extern void pci_unmap_sg(struct pci_dev *, struct scatterlist *, int, int);
 
-/* Make physical memory consistant for a single streaming mode DMA
+/* Make physical memory consistent for a single streaming mode DMA
    translation after a transfer.
 
    If you perform a pci_map_single() but wish to interrogate the
@@ -155,7 +155,7 @@ pci_dma_sync_single(struct pci_dev *dev, dma_addr_t dma_addr, long size,
 	/* Nothing to do.  */
 }
 
-/* Make physical memory consistant for a set of streaming mode DMA
+/* Make physical memory consistent for a set of streaming mode DMA
    translations after a transfer.  The same as pci_dma_sync_single but
    for a scatter-gather list, same rules and usage.  */
 

@@ -68,7 +68,7 @@ config IPDDP
 	  If you say M here, the AppleTalk-IP support will be compiled as a
 	  module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want, read
-	  <file:Documentation/modules.txt>).  The module is called ipddp.o.
+	  <file:Documentation/modules.txt>).  The module is called ipddp.
 	  In this case, you will be able to use both encapsulation and
 	  decapsulation simultaneously, by loading two copies of the module
 	  and specifying different values for the module option ipddp_mode.

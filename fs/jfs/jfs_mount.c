@@ -87,8 +87,6 @@ int jfs_mount(struct super_block *sb)
 	struct inode *ipimap = NULL;
 	struct inode *ipbmap = NULL;
 
-	jFYI(1, ("\nMount JFS\n"));
-
 	/*
 	 * read/validate superblock 
 	 * (initialize mount inode from the superblock)
@@ -99,21 +97,19 @@ int jfs_mount(struct super_block *sb)
 
 	ipaimap = diReadSpecial(sb, AGGREGATE_I, 0);
 	if (ipaimap == NULL) {
-		jERROR(1, ("jfs_mount: Faild to read AGGREGATE_I\n"));
+		jfs_err("jfs_mount: Faild to read AGGREGATE_I");
 		rc = EIO;
 		goto errout20;
 	}
 	sbi->ipaimap = ipaimap;
 
-	jFYI(1, ("jfs_mount: ipaimap:0x%p\n", ipaimap));
+	jfs_info("jfs_mount: ipaimap:0x%p", ipaimap);
 
 	/*
 	 * initialize aggregate inode allocation map
 	 */
 	if ((rc = diMount(ipaimap))) {
-		jERROR(1,
-		       ("jfs_mount: diMount(ipaimap) failed w/rc = %d\n",
-			rc));
+		jfs_err("jfs_mount: diMount(ipaimap) failed w/rc = %d", rc);
 		goto errout21;
 	}
 
@@ -126,7 +122,7 @@ int jfs_mount(struct super_block *sb)
 		goto errout22;
 	}
 
-	jFYI(1, ("jfs_mount: ipbmap:0x%p\n", ipbmap));
+	jfs_info("jfs_mount: ipbmap:0x%p", ipbmap);
 
 	sbi->ipbmap = ipbmap;
 
@@ -134,7 +130,7 @@ int jfs_mount(struct super_block *sb)
 	 * initialize aggregate block allocation map
 	 */
 	if ((rc = dbMount(ipbmap))) {
-		jERROR(1, ("jfs_mount: dbMount failed w/rc = %d\n", rc));
+		jfs_err("jfs_mount: dbMount failed w/rc = %d", rc);
 		goto errout22;
 	}
 
@@ -152,22 +148,20 @@ int jfs_mount(struct super_block *sb)
 	if ((sbi->mntflag & JFS_BAD_SAIT) == 0) {
 		ipaimap2 = diReadSpecial(sb, AGGREGATE_I, 1);
 		if (ipaimap2 == 0) {
-			jERROR(1,
-			       ("jfs_mount: Faild to read AGGREGATE_I\n"));
+			jfs_err("jfs_mount: Faild to read AGGREGATE_I");
 			rc = EIO;
 			goto errout35;
 		}
 		sbi->ipaimap2 = ipaimap2;
 
-		jFYI(1, ("jfs_mount: ipaimap2:0x%p\n", ipaimap2));
+		jfs_info("jfs_mount: ipaimap2:0x%p", ipaimap2);
 
 		/*
 		 * initialize secondary aggregate inode allocation map
 		 */
 		if ((rc = diMount(ipaimap2))) {
-			jERROR(1,
-			       ("jfs_mount: diMount(ipaimap2) failed, rc = %d\n",
-				rc));
+			jfs_err("jfs_mount: diMount(ipaimap2) failed, rc = %d",
+				rc);
 			goto errout35;
 		}
 	} else
@@ -182,23 +176,22 @@ int jfs_mount(struct super_block *sb)
 	 */
 	ipimap = diReadSpecial(sb, FILESYSTEM_I, 0);
 	if (ipimap == NULL) {
-		jERROR(1, ("jfs_mount: Failed to read FILESYSTEM_I\n"));
+		jfs_err("jfs_mount: Failed to read FILESYSTEM_I");
 		/* open fileset secondary inode allocation map */
 		rc = EIO;
 		goto errout40;
 	}
-	jFYI(1, ("jfs_mount: ipimap:0x%p\n", ipimap));
+	jfs_info("jfs_mount: ipimap:0x%p", ipimap);
 
 	/* map further access of per fileset inodes by the fileset inode */
 	sbi->ipimap = ipimap;
 
 	/* initialize fileset inode allocation map */
 	if ((rc = diMount(ipimap))) {
-		jERROR(1, ("jfs_mount: diMount failed w/rc = %d\n", rc));
+		jfs_err("jfs_mount: diMount failed w/rc = %d", rc);
 		goto errout41;
 	}
 
-	jFYI(1, ("Mount JFS Complete.\n"));
 	goto out;
 
 	/*
@@ -234,9 +227,9 @@ int jfs_mount(struct super_block *sb)
 
       out:
 
-	if (rc) {
-		jERROR(1, ("Mount JFS Failure: %d\n", rc));
-	}
+	if (rc)
+		jfs_err("Mount JFS Failure: %d", rc);
+
 	return rc;
 }
 
@@ -265,13 +258,13 @@ int jfs_mount_rw(struct super_block *sb, int remount)
 		truncate_inode_pages(sbi->ipbmap->i_mapping, 0);
 		diUnmount(sbi->ipimap, 1);
 		if ((rc = diMount(sbi->ipimap))) {
-			jERROR(1,("jfs_mount_rw: diMount failed!\n"));
+			jfs_err("jfs_mount_rw: diMount failed!");
 			return rc;
 		}
 
 		dbUnmount(sbi->ipbmap, 1);
 		if ((rc = dbMount(sbi->ipbmap))) {
-			jERROR(1,("jfs_mount_rw: dbMount failed!\n"));
+			jfs_err("jfs_mount_rw: dbMount failed!");
 			return rc;
 		}
 	}
@@ -288,8 +281,7 @@ int jfs_mount_rw(struct super_block *sb, int remount)
 	 * update file system superblock;
 	 */
 	if ((rc = updateSuper(sb, FM_MOUNT))) {
-		jERROR(1,
-		       ("jfs_mount: updateSuper failed w/rc = %d\n", rc));
+		jfs_err("jfs_mount: updateSuper failed w/rc = %d", rc);
 		lmLogClose(sb, log);
 		JFS_SBI(sb)->log = 0;
 		return rc;
@@ -343,15 +335,15 @@ static int chkSuper(struct super_block *sb)
 	bsize = le32_to_cpu(j_sb->s_bsize);
 #ifdef _JFS_4K
 	if (bsize != PSIZE) {
-		jERROR(1, ("Currently only 4K block size supported!\n"));
+		jfs_err("Currently only 4K block size supported!");
 		rc = EINVAL;
 		goto out;
 	}
 #endif				/* _JFS_4K */
 
-	jFYI(1, ("superblock: flag:0x%08x state:0x%08x size:0x%Lx\n",
+	jfs_info("superblock: flag:0x%08x state:0x%08x size:0x%Lx",
 		 le32_to_cpu(j_sb->s_flag), le32_to_cpu(j_sb->s_state),
-		 (unsigned long long) le64_to_cpu(j_sb->s_size)));
+		 (unsigned long long) le64_to_cpu(j_sb->s_size));
 
 	/* validate the descriptors for Secondary AIM and AIT */
 	if ((j_sb->s_flag & cpu_to_le32(JFS_BAD_SAIT)) !=
@@ -375,15 +367,11 @@ static int chkSuper(struct super_block *sb)
 	if ((j_sb->s_flag & cpu_to_le32(JFS_GROUPCOMMIT)) !=
 	    cpu_to_le32(JFS_GROUPCOMMIT))
 		j_sb->s_flag |= cpu_to_le32(JFS_GROUPCOMMIT);
-	jFYI(0, ("superblock: flag:0x%08x state:0x%08x size:0x%Lx\n",
-		 le32_to_cpu(j_sb->s_flag), le32_to_cpu(j_sb->s_state),
-		 (unsigned long long) le64_to_cpu(j_sb->s_size)));
 
 	/* validate fs state */
 	if (j_sb->s_state != cpu_to_le32(FM_CLEAN) &&
 	    !(sb->s_flags & MS_RDONLY)) {
-		jERROR(1,
-		       ("jfs_mount: Mount Failure: File System Dirty.\n"));
+		jfs_err("jfs_mount: Mount Failure: File System Dirty.");
 		rc = EINVAL;
 		goto out;
 	}
@@ -461,8 +449,7 @@ int updateSuper(struct super_block *sb, uint state)
 	}
 
 	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
-	wait_on_buffer(bh);
+	sync_dirty_buffer(bh);
 	brelse(bh);
 
 	return 0;

@@ -12,8 +12,6 @@ endif
 # Extra CFLAGS so we don't have to do relative includes
 CFLAGS_pmac_setup.o	+= -I$(TOPDIR)/arch/$(ARCH)/mm
 
-export-objs			:= prep_setup.o
-
 obj-$(CONFIG_APUS)		+= apus_setup.o
 ifeq ($(CONFIG_APUS),y)
 obj-$(CONFIG_PCI)		+= apus_pci.o

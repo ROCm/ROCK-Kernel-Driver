@@ -64,6 +64,8 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	rpcmouse_lastx = x;
 	rpcmouse_lasty = y;
 
+	input_regs(dev, regs);
+
 	input_report_rel(dev, REL_X, dx);
 	input_report_rel(dev, REL_Y, -dy);
 
@@ -88,7 +90,7 @@ static int __init rpcmouse_init(void)
 
 	input_register_device(&rpcmouse_dev);
 
-	printk(KERN_INFO "input: Acorn RiscPC mouse irq %d", IRQ_VSYNCPULSE);
+	printk(KERN_INFO "input: Acorn RiscPC mouse\n");
 
 	return 0;
 }

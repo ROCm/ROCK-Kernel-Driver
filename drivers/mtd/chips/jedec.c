@@ -608,7 +608,7 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
 
    /* Poll the flash for erasure completion, specs say this can take as long
       as 480 seconds to do all the sectors (for a 2 meg flash). 
-      Erasure time is dependant on chip age, temp and wear.. */
+      Erasure time is dependent on chip age, temp and wear.. */
    
    /* This being a generic routine assumes a 32 bit bus. It does read32s
       and bundles interleved chips into the same grouping. This will work 
@@ -754,7 +754,7 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
 		       size_t *retlen, const u_char *buf)
 {
    /* Does IO to the currently selected chip. It takes the bank addressing
-      base (which is divisable by the chip size) adds the necesary lower bits
+      base (which is divisible by the chip size) adds the necessary lower bits
       of addrshift (interleve index) and then adds the control register index. */
    #define flread(x) map->read8(map,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
    #define flwrite(v,x) map->write8(map,v,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))

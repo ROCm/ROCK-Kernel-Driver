@@ -162,7 +162,7 @@ static void _dsp_unlink_scb (cs46xx_t *chip,dsp_scb_descriptor_t * scb)
 
 static void _dsp_clear_sample_buffer (cs46xx_t *chip, u32 sample_buffer_addr, int dword_count) 
 {
-	u32 dst = chip->region.idx[2].remap_addr + sample_buffer_addr;
+	unsigned long dst = chip->region.idx[2].remap_addr + sample_buffer_addr;
 	int i;
   
 	for (i = 0; i < dword_count ; ++i ) {
@@ -1543,7 +1543,7 @@ int cs46xx_dsp_enable_spdif_out (cs46xx_t *chip)
 	/* dont touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		/* when cs46xx_iec958_post_close(...) is called it
-		   will call this function if necesary depending on
+		   will call this function if necessary depending on
 		   this bit */
 		ins->spdif_status_out |= DSP_SPDIF_STATUS_OUTPUT_ENABLED;
 

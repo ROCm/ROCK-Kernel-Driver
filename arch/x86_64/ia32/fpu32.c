@@ -146,6 +146,7 @@ int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 *buf, int fs
 			return -1;
 	} 
 	tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
+	current->used_math = 1;
 	return convert_fxsr_from_user(&tsk->thread.i387.fxsave, buf);
 }  
 

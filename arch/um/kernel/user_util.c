@@ -29,6 +29,7 @@
 #include "mem_user.h"
 #include "init.h"
 #include "helper.h"
+#include "uml-config.h"
 
 #define COMMAND_LINE_SIZE _POSIX_ARG_MAX
 
@@ -44,31 +45,6 @@ void add_arg(char *cmd_line, char *arg)
 	}
 	if(strlen(cmd_line) > 0) strcat(cmd_line, " ");
 	strcat(cmd_line, arg);
-}
-
-void remap_data(void *segment_start, void *segment_end, int w)
-{
-	void *addr;
-	unsigned long size;
-	int data, prot;
-
-	if(w) prot = PROT_WRITE;
-	else prot = 0;
-	prot |= PROT_READ | PROT_EXEC;
-	size = (unsigned long) segment_end - 
-		(unsigned long) segment_start;
-	data = create_mem_file(size);
-	if((addr = mmap(NULL, size, PROT_WRITE | PROT_READ, 
-			MAP_SHARED, data, 0)) < 0){
-		perror("mapping new data segment");
-		exit(1);
-	}
-	memcpy(addr, segment_start, size);
-	if(switcheroo(data, prot, addr, segment_start, 
-		      size) < 0){
-		printf("switcheroo failed\n");
-		exit(1);
-	}
 }
 
 void stop(void)
@@ -88,12 +64,15 @@ void task_protections(unsigned long address)
 {
 	unsigned long guard = address + page_size();
 	unsigned long stack = guard + page_size();
-	int prot = 0;
+	int prot = 0, pages;
 
+#ifdef notdef
 	if(mprotect((void *) stack, page_size(), prot) < 0)
 		panic("protecting guard page failed, errno = %d", errno);
+#endif
+	pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER) - 2;
 	prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-	if(mprotect((void *) stack, 2 * page_size(), prot) < 0)
+	if(mprotect((void *) stack, pages * page_size(), prot) < 0)
 		panic("protecting stack failed, errno = %d", errno);
 }
 

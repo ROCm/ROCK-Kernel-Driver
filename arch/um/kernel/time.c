@@ -86,20 +86,23 @@ struct timeval local_offset = { 0, 0 };
 
 void do_gettimeofday(struct timeval *tv)
 {
-	time_lock();
+	unsigned long flags;
+
+	flags = time_lock();
 	gettimeofday(tv, NULL);
 	timeradd(tv, &local_offset, tv);
-	time_unlock();
+	time_unlock(flags);
 }
 
 void do_settimeofday(struct timeval *tv)
 {
 	struct timeval now;
+	unsigned long flags;
 
-	time_lock();
+	flags = time_lock();
 	gettimeofday(&now, NULL);
 	timersub(tv, &now, &local_offset);
-	time_unlock();
+	time_unlock(flags);
 }
 
 void idle_sleep(int secs)
@@ -108,7 +111,7 @@ void idle_sleep(int secs)
 
 	ts.tv_sec = secs;
 	ts.tv_nsec = 0;
-	nanosleep(&ts, &ts);
+	nanosleep(&ts, NULL);
 }
 
 /*

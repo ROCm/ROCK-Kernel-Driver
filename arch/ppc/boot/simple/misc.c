@@ -11,7 +11,7 @@
  * Derived from arch/ppc/boot/prep/misc.c
  *
  * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
- * the terms of the GNU General Public License version 2.1.  This program
+ * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
  */
@@ -82,7 +82,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 #if defined(CONFIG_LOPEC) || defined(CONFIG_PAL4)
 	/*
-	 * Call get_mem_size(), which is memory controller dependant,
+	 * Call get_mem_size(), which is memory controller dependent,
 	 * and we must have the correct file linked in here.
 	 */
 	TotalMemory = get_mem_size();

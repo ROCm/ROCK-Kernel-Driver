@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/slc90e66.c	Version 0.11	September 11, 2002
+ *  linux/drivers/ide/pci/slc90e66.c	Version 0.11	September 11, 2002
  *
  *  Copyright (C) 2000-2002 Andre Hedrick <andre@linux-ide.org>
  *

@@ -55,7 +55,6 @@ long sys_mmap(unsigned long addr, unsigned long len, unsigned long prot, unsigne
 		if (!file)
 			goto out;
 	}
-
 	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, off >> PAGE_SHIFT);
 	up_write(&current->mm->mmap_sem);

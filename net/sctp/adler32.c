@@ -1,6 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
+ * Copyright (c) 2003 International Business Machines, Corp.
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
@@ -36,6 +37,7 @@
  *    Randall Stewart <rstewar1@email.mot.com>
  *    Ken Morneau     <kmorneau@cisco.com>
  *    Qiaobing Xie    <qxie1@email.mot.com>
+ *    Sridhar Samudrala <sri@us.ibm.com>
  * 
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -122,7 +124,7 @@ unsigned long update_adler32(unsigned long adler,
 	return (s2 << 16) + s1;
 }
 
-__u32 count_crc(__u8 *ptr, __u16 count)
+__u32 sctp_start_cksum(__u8 *ptr, __u16 count)
 {
 	/*
 	 * Update a running Adler-32 checksum with the bytes
@@ -145,4 +147,16 @@ __u32 count_crc(__u8 *ptr, __u16 count)
 	adler = update_adler32(adler, ptr, count);
 
         return adler;
+}
+
+__u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 adler)
+{
+	adler = update_adler32(adler, ptr, count);
+
+	return adler;
+}
+
+__u32 sctp_end_cksum(__u32 adler)
+{
+	return adler;
 }

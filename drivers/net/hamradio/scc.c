@@ -1703,7 +1703,7 @@ static int scc_net_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/*
 	 * Start transmission if the trx state is idle or
-	 * t_idle hasn't expired yet. Use dwait/persistance/slottime
+	 * t_idle hasn't expired yet. Use dwait/persistence/slottime
 	 * algorithm for normal halfduplex operation.
 	 */
 
@@ -1763,7 +1763,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 			if (hwcfg.irq == 2) hwcfg.irq = 9;
 
-			if (hwcfg.irq <0 || hwcfg.irq > NR_IRQS)
+			if (hwcfg.irq < 0 || hwcfg.irq >= NR_IRQS)
 				return -EINVAL;
 				
 			if (!Ivec[hwcfg.irq].used && hwcfg.irq)

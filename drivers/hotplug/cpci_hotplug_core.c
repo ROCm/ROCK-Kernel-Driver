@@ -130,7 +130,7 @@ update_latch_status(struct hotplug_slot *hotplug_slot, u8 value)
 		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.latch_status = value;
-	return pci_hp_change_slot_info(hotplug_slot->name, &info);
+	return pci_hp_change_slot_info(hotplug_slot, &info);
 }
 
 static int
@@ -142,7 +142,7 @@ update_adapter_status(struct hotplug_slot *hotplug_slot, u8 value)
 		return -EINVAL;
 	memcpy(&info, hotplug_slot->info, sizeof(struct hotplug_slot_info));
 	info.adapter_status = value;
-	return pci_hp_change_slot_info(hotplug_slot->name, &info);
+	return pci_hp_change_slot_info(hotplug_slot, &info);
 }
 
 static int
@@ -622,8 +622,7 @@ event_thread(void *data)
 	struct list_head *tmp;
 
 	lock_kernel();
-	daemonize();
-	strcpy(current->comm, "cpci_hp_eventd");
+	daemonize("cpci_hp_eventd");
 	unlock_kernel();
 
 	dbg("%s - event thread started", __FUNCTION__);
@@ -682,8 +681,7 @@ poll_thread(void *data)
 	struct list_head *tmp;
 
 	lock_kernel();
-	daemonize();
-	strcpy(current->comm, "cpci_hp_polld");
+	daemonize("cpci_hp_polld");
 	unlock_kernel();
 
 	while(1) {

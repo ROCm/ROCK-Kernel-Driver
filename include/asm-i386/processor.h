@@ -483,7 +483,7 @@ extern inline void prefetch(const void *x)
 	__asm__ __volatile__ ("prefetchnta (%0)" : : "r"(x));
 }
 
-#elif CONFIG_X86_USE_3DNOW
+#elif defined CONFIG_X86_USE_3DNOW
 
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW

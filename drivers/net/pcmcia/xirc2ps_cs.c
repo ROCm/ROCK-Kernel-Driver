@@ -447,7 +447,7 @@ busy_loop(u_long len)
 	u_long flags;
 	save_flags(flags);
 	sti();
-	while (timeout >= jiffies)
+	while (time_before_eq(jiffies, timeout))
 	    ;
 	restore_flags(flags);
     } else {
@@ -632,6 +632,7 @@ xirc2ps_attach(void)
     link = &local->link; dev = &local->dev;
     link->priv = dev->priv = local;
 
+    init_timer(&link->release);
     link->release.function = &xirc2ps_release;
     link->release.data = (u_long) link;
 

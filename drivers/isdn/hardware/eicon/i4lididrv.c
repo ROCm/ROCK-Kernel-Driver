@@ -326,10 +326,7 @@ divad_thread(void * data)
     if(!(atomic_read(&thread_running)))
       break;
     if(signal_pending(current)) {
-         /* we may want to do something on signals here */
-         spin_lock_irq(&current->sigmask_lock);
          flush_signals(current);
-         spin_unlock_irq(&current->sigmask_lock);
     } else {
          run_task_queue(&tq_divad);
     }

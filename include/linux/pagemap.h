@@ -8,6 +8,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/highmem.h>
+#include <asm/uaccess.h>
 
 /*
  * The page cache can done in larger chunks than
@@ -122,4 +123,49 @@ static inline void wait_on_page_writeback(struct page *page)
 }
 
 extern void end_page_writeback(struct page *page);
+
+/*
+ * Fault a userspace page into pagetables.  Return non-zero on a fault.
+ *
+ * FIXME: this assumes that two userspace pages are always sufficient.  That's
+ * not true if PAGE_CACHE_SIZE > PAGE_SIZE.
+ */
+static inline int fault_in_pages_writeable(char *uaddr, int size)
+{
+	int ret;
+
+	/*
+	 * Writing zeroes into userspace here is OK, because we know that if
+	 * the zero gets there, we'll be overwriting it.
+	 */
+	ret = __put_user(0, uaddr);
+	if (ret == 0) {
+		char *end = uaddr + size - 1;
+
+		/*
+		 * If the page was already mapped, this will get a cache miss
+		 * for sure, so try to avoid doing it.
+		 */
+		if (((unsigned long)uaddr & PAGE_MASK) !=
+				((unsigned long)end & PAGE_MASK))
+		 	ret = __put_user(0, end);
+	}
+	return ret;
+}
+
+static inline void fault_in_pages_readable(const char *uaddr, int size)
+{
+	volatile char c;
+	int ret;
+
+	ret = __get_user(c, (char *)uaddr);
+	if (ret == 0) {
+		const char *end = uaddr + size - 1;
+
+		if (((unsigned long)uaddr & PAGE_MASK) !=
+				((unsigned long)end & PAGE_MASK))
+		 	__get_user(c, (char *)end);
+	}
+}
+
 #endif /* _LINUX_PAGEMAP_H */

@@ -39,7 +39,8 @@ cifs_dump_mem(char *label, void *data, int length)
 	char *charptr = data;
 	char buf[10], line[80];
 
-	printk("%s: dump of %d bytes of data at 0x%p\n\n", label, length, data);
+	printk(KERN_DEBUG "%s: dump of %d bytes of data at 0x%p\n\n", 
+		label, length, data);
 	for (i = 0; i < length; i += 16) {
 		line[0] = 0;
 		for (j = 0; (j < 4) && (i + j * 4 < length); j++) {
@@ -52,7 +53,7 @@ cifs_dump_mem(char *label, void *data, int length)
 			buf[1] = isprint(charptr[i + j]) ? charptr[i + j] : '.';
 			strcat(line, buf);
 		}
-		printk("%s\n", line);
+		printk(KERN_DEBUG "%s\n", line);
 	}
 }
 
@@ -68,7 +69,6 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	int length = 0;
 	char *buf_start = buf;
 
-	printk("\n\nEntering cifs_debug_data_read:  buf=0x%p, beginBuffer=0x%p, offset=%ld, count=%d, eof=%d, data=0x%p\n", buf, *beginBuffer, offset, count, *eof, data);	/* BB remove */
 	length =
 	    sprintf(buf,
 		    "Display Internal CIFS Data Structures for Debugging\n"
@@ -85,17 +85,17 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s HowManyMounts: %d ServerOS: %s  ServerNOS: %s\n\tCapabilities: 0x%x",
+			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  ServerNOS: %s\n\tCapabilities: 0x%x",
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
 		if(ses->server)
-		buf += sprintf(buf, "\tLocal Users To Same Server: %d ",atomic_read(&ses->server->socketUseCount));
+		buf += sprintf(buf, "\tLocal Users To Same Server: %d ",
+			atomic_read(&ses->server->socketUseCount));
 	}
 	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");
 	buf++;
-	printk("\nTotal Buffer so far: %s\n", buf_start);
 
 	length = sprintf(buf, "\nShares: \n");
 	buf += length;
@@ -107,7 +107,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) %s UseCount: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentLengthMax: %d",
+			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentMax: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,

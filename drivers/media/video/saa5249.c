@@ -254,21 +254,19 @@ static int saa5249_command(struct i2c_client *device,
 
 static struct i2c_driver i2c_driver_videotext = 
 {
-	IF_NAME,		/* name */
-	I2C_DRIVERID_SAA5249, /* in i2c.h */
-	I2C_DF_NOTIFY,
-	saa5249_probe,
-	saa5249_detach,
-	saa5249_command
+	.owner 		= THIS_MODULE,
+	.name 		= IF_NAME,		/* name */
+	.id 		= I2C_DRIVERID_SAA5249, /* in i2c.h */
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = saa5249_probe,
+	.detach_client  = saa5249_detach,
+	.command 	= saa5249_command
 };
 
 static struct i2c_client client_template = {
-	"(unset)",
-	-1,
-	0,
-	0,
-	NULL,
-	&i2c_driver_videotext
+	.name 		= "(unset)",
+	.id 		= -1,
+	.driver 	= &i2c_driver_videotext
 };
 
 /*
@@ -280,17 +278,17 @@ static void jdelay(unsigned long delay)
 {
 	sigset_t oldblocked = current->blocked;
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(delay);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = oldblocked;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 }
 
 

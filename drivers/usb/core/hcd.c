@@ -310,9 +310,9 @@ static int rh_string (
 	} else
 	    return 0;
 
-	data [0] = 2 + ascii2utf (buf, data + 2, len - 2);
+	data [0] = 2 * (strlen (buf) + 1);
 	data [1] = 3;	/* type == string */
-	return data [0];
+	return 2 + ascii2utf (buf, data + 2, len - 2);
 }
 
 
@@ -1029,8 +1029,11 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 		return status;
 	}
 
-	/* lower level hcd code should use *_dma exclusively */
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
+	/* lower level hcd code should use *_dma exclusively,
+	 * unless it uses pio or talks to another transport.
+	 */
+	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
+			&& hcd->controller->dma_mask) {
 		if (usb_pipecontrol (urb->pipe))
 			urb->setup_dma = dma_map_single (
 					hcd->controller,

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#108 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#112 $
  *
  * $FreeBSD$
  */
@@ -1844,8 +1844,9 @@ ahc_update_neg_request(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		 * occurs the need to renegotiate is
 		 * recorded persistently.
 		 */
+		if ((ahc->features & AHC_WIDE) != 0)
+			tinfo->curr.width = AHC_WIDTH_UNKNOWN;
 		tinfo->curr.period = AHC_PERIOD_UNKNOWN;
-		tinfo->curr.width = AHC_WIDTH_UNKNOWN;
 		tinfo->curr.offset = AHC_OFFSET_UNKNOWN;
 	}
 	if (tinfo->curr.period != tinfo->goal.period
@@ -3443,7 +3444,7 @@ ahc_handle_msg_reject(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		 * but rejected our response, we already cleared the
 		 * sync rate before sending our WDTR.
 		 */
-		if (tinfo->goal.offset) {
+		if (tinfo->goal.offset != tinfo->curr.offset) {
 
 			/* Start the sync negotiation */
 			ahc->msgout_index = 0;
@@ -4045,6 +4046,14 @@ ahc_reset(struct ahc_softc *ahc)
 	 * to disturb the integrity of the bus.
 	 */
 	ahc_pause(ahc);
+	if ((ahc_inb(ahc, HCNTRL) & CHIPRST) != 0) {
+		/*
+		 * The chip has not been initialized since
+		 * PCI/EISA/VLB bus reset.  Don't trust
+		 * "left over BIOS data".
+		 */
+		ahc->flags |= AHC_NO_BIOS_INIT;
+	}
 	sxfrctl1_b = 0;
 	if ((ahc->chip & AHC_CHIPID_MASK) == AHC_AIC7770) {
 		u_int sblkctl;
@@ -4539,8 +4548,9 @@ ahc_init(struct ahc_softc *ahc)
 	size_t	 driver_data_size;
 	uint32_t physaddr;
 
-#ifdef AHC_DEBUG_SEQUENCER
-	ahc->flags |= AHC_SEQUENCER_DEBUG;
+#ifdef AHC_DEBUG
+	if ((ahc_debug & AHC_DEBUG_SEQUENCER) != 0)
+		ahc->flags |= AHC_SEQUENCER_DEBUG;
 #endif
 
 #ifdef AHC_PRINT_SRAM
@@ -4698,8 +4708,8 @@ ahc_init(struct ahc_softc *ahc)
 
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_MISC) {
-		printf("%s: hardware scb %d bytes; kernel scb %d bytes; "
-		       "ahc_dma %d bytes\n",
+		printf("%s: hardware scb %Zu bytes; kernel scb %Zu bytes; "
+		       "ahc_dma %Zu bytes\n",
 			ahc_name(ahc),
 			sizeof(struct hardware_scb),
 			sizeof(struct scb),
@@ -4875,7 +4885,7 @@ ahc_init(struct ahc_softc *ahc)
 			tinfo->curr.protocol_version = 2;
 			tinfo->curr.transport_version = 2;
 		}
-		tstate->ultraenb = ultraenb;
+		tstate->ultraenb = 0;
 	}
 	ahc->user_discenable = discenable;
 	ahc->user_tagenable = tagenable;
@@ -6483,8 +6493,11 @@ ahc_loadseq(struct ahc_softc *ahc)
 	ahc_outb(ahc, SEQCTL, PERRORDIS|FAILDIS|FASTMODE);
 	ahc_restart(ahc);
 
-	if (bootverbose)
+	if (bootverbose) {
 		printf(" %d instructions downloaded\n", downloaded);
+		printf("%s: Features 0x%x, Bugs 0x%x, Flags 0x%x\n",
+		       ahc_name(ahc), ahc->features, ahc->bugs, ahc->flags);
+	}
 }
 
 static int
@@ -6702,6 +6715,7 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	struct	scb *scb;
 	struct	scb_tailq *untagged_q;
 	u_int	cur_col;
+	int	paused;
 	int	target;
 	int	maxtarget;
 	int	i;
@@ -6712,12 +6726,21 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	uint8_t scb_index;
 	uint8_t saved_scbptr;
 
-	saved_scbptr = ahc_inb(ahc, SCBPTR);
+	if (ahc_is_paused(ahc)) {
+		paused = 1;
+	} else {
+		paused = 0;
+		ahc_pause(ahc);
+	}
 
+	saved_scbptr = ahc_inb(ahc, SCBPTR);
 	last_phase = ahc_inb(ahc, LASTPHASE);
-	printf("%s: Dumping Card State %s, at SEQADDR 0x%x\n",
+	printf(">>>>>>>>>>>>>>>>>> Dump Card State Begins <<<<<<<<<<<<<<<<<\n"
+	       "%s: Dumping Card State %s, at SEQADDR 0x%x\n",
 	       ahc_name(ahc), ahc_lookup_phase_entry(last_phase)->phasemsg,
 	       ahc_inb(ahc, SEQADDR0) | (ahc_inb(ahc, SEQADDR1) << 8));
+	if (paused)
+		printf("Card was paused\n");
 	printf("ACCUM = 0x%x, SINDEX = 0x%x, DINDEX = 0x%x, ARG_2 = 0x%x\n",
 	       ahc_inb(ahc, ACCUM), ahc_inb(ahc, SINDEX), ahc_inb(ahc, DINDEX),
 	       ahc_inb(ahc, ARG_2));
@@ -6725,13 +6748,14 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	       ahc_inb(ahc, SCBPTR));
 	cur_col = 0;
 	if ((ahc->features & AHC_DT) != 0)
-		ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
+		ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
+	ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
 	ahc_error_print(ahc_inb(ahc, ERROR), &cur_col, 50);
-	ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
 	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &cur_col, 50);
 	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &cur_col, 50);
 	ahc_scsiseq_print(ahc_inb(ahc, SCSISEQ), &cur_col, 50);
 	ahc_sblkctl_print(ahc_inb(ahc, SBLKCTL), &cur_col, 50);
+	ahc_scsirate_print(ahc_inb(ahc, SCSIRATE), &cur_col, 50);
 	ahc_seqctl_print(ahc_inb(ahc, SEQCTL), &cur_col, 50);
 	ahc_seq_flags_print(ahc_inb(ahc, SEQ_FLAGS), &cur_col, 50);
 	ahc_sstat0_print(ahc_inb(ahc, SSTAT0), &cur_col, 50);
@@ -6862,7 +6886,10 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	}
 
 	ahc_platform_dump_card_state(ahc);
+	printf("\n<<<<<<<<<<<<<<<<< Dump Card State Ends >>>>>>>>>>>>>>>>>>\n");
 	ahc_outb(ahc, SCBPTR, saved_scbptr);
+	if (paused == 0)
+		ahc_unpause(ahc);
 }
 
 /************************* Target Mode ****************************************/

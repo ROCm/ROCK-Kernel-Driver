@@ -160,10 +160,10 @@ static int (*mangle[])(struct sk_buff **, u_int32_t, u_int16_t,
 		     unsigned int,
 		     struct ip_conntrack *,
 		     enum ip_conntrack_info)
-= { [IP_CT_FTP_PORT] mangle_rfc959_packet,
-    [IP_CT_FTP_PASV] mangle_rfc959_packet,
-    [IP_CT_FTP_EPRT] mangle_eprt_packet,
-    [IP_CT_FTP_EPSV] mangle_epsv_packet
+= { [IP_CT_FTP_PORT] = mangle_rfc959_packet,
+    [IP_CT_FTP_PASV] = mangle_rfc959_packet,
+    [IP_CT_FTP_EPRT] = mangle_eprt_packet,
+    [IP_CT_FTP_EPSV] = mangle_epsv_packet
 };
 
 static int ftp_data_fixup(const struct ip_ct_ftp_expect *ct_ftp_info,

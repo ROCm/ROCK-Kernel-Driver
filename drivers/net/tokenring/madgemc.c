@@ -163,7 +163,7 @@ int __init madgemc_probe(void)
 
 	if (!MCA_bus)
 		return -1;	
-       
+ 
 	while (slot != MCA_NOTFOUND) {
 		/*
 		 * Currently we only support the MC16/32 (MCA ID 002d)
@@ -180,8 +180,11 @@ int __init madgemc_probe(void)
 
 		if ((dev = init_trdev(NULL, 0))==NULL) {
 			printk("madgemc: unable to allocate dev space\n");
+			if (madgemc_card_list)
+				return 0;
 			return -1;
 		}
+		SET_MODULE_OWNER(dev);
 		dev->dma = 0;
 
 		/*
@@ -193,6 +196,9 @@ int __init madgemc_probe(void)
 		card = kmalloc(sizeof(struct madgemc_card), GFP_KERNEL);
 		if (card==NULL) {
 			printk("madgemc: unable to allocate card struct\n");
+			kfree(dev); /* release_trdev? */
+			if (madgemc_card_list)
+				return 0;
 			return -1;
 		}
 		card->dev = dev;
@@ -223,14 +229,14 @@ int __init madgemc_probe(void)
 
 		if (dev->irq == 0) {
 			printk("%s: invalid IRQ\n", dev->name);
-			goto getout;
+			goto getout1;
 		}
 
 		if (!request_region(dev->base_addr, MADGEMC_IO_EXTENT, 
 				   "madgemc")) {
 			printk(KERN_INFO "madgemc: unable to setup Smart MC in slot %d because of I/O base conflict at 0x%04lx\n", slot, dev->base_addr);
 			dev->base_addr += MADGEMC_SIF_OFFSET;
-			goto getout;
+			goto getout1;
 		}
 		dev->base_addr += MADGEMC_SIF_OFFSET;
 		
@@ -348,6 +354,14 @@ int __init madgemc_probe(void)
 		if (tmsdev_init(dev, ISA_MAX_ADDRESS, NULL)) {
 			printk("%s: unable to get memory for dev->priv.\n", 
 			       dev->name);
+			release_region(dev->base_addr-MADGEMC_SIF_OFFSET, 
+			       MADGEMC_IO_EXTENT); 
+			
+			kfree(card);
+			tmsdev_term(dev);
+			kfree(dev);
+			if (madgemc_card_list)
+				return 0;
 			return -1;
 		}
 		tp = (struct net_local *)dev->priv;
@@ -376,10 +390,14 @@ int __init madgemc_probe(void)
 			madgemc_card_list = card;
 		} else {
 			printk("madgemc: register_trdev() returned non-zero.\n");
+			release_region(dev->base_addr-MADGEMC_SIF_OFFSET, 
+			       MADGEMC_IO_EXTENT); 
 			
 			kfree(card);
 			tmsdev_term(dev);
 			kfree(dev);
+			if (madgemc_card_list)
+				return 0;
 			return -1;
 		}
 
@@ -389,6 +407,7 @@ int __init madgemc_probe(void)
 	getout:
 		release_region(dev->base_addr-MADGEMC_SIF_OFFSET, 
 			       MADGEMC_IO_EXTENT); 
+	getout1:
 		kfree(card);
 		kfree(dev); /* release_trdev? */
 		slot++;
@@ -514,7 +533,7 @@ unsigned short madgemc_setnselout_pins(struct net_device *dev)
  *
  * Register selection is normally done via three contiguous
  * bits.  However, some boards (such as the MC16/32) use only
- * two bits, plus a seperate bit in the glue chip.  This
+ * two bits, plus a separate bit in the glue chip.  This
  * sets the SRSX bit (the top bit).  See page 4-17 in the
  * Yellow Book for which registers are affected.
  *
@@ -629,7 +648,7 @@ void madgemc_chipset_close(struct net_device *dev)
 /*
  * Read the card type (MC16 or MC32) from the card.
  *
- * The configuration registers are stored in two seperate
+ * The configuration registers are stored in two separate
  * pages.  Pages are flipped by clearing bit 3 of CONTROL_REG0 (PAGE)
  * for page zero, or setting bit 3 for page one.
  *
@@ -696,7 +715,6 @@ static int madgemc_open(struct net_device *dev)
 	 */
 	madgemc_chipset_init(dev);
 	tms380tr_open(dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -704,7 +722,6 @@ static int madgemc_close(struct net_device *dev)
 {
 	tms380tr_close(dev);
 	madgemc_chipset_close(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

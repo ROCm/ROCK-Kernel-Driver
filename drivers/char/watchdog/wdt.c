@@ -465,17 +465,17 @@ static struct file_operations wdt_fops = {
 
 static struct miscdevice wdt_miscdev=
 {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&wdt_fops
+	.minor	= WATCHDOG_MINOR,
+	.name	= "watchdog",
+	.fops	= &wdt_fops
 };
 
 #ifdef CONFIG_WDT_501
 static struct miscdevice temp_miscdev=
 {
-	TEMP_MINOR,
-	"temperature",
-	&wdt_fops
+	.minor	= TEMP_MINOR,
+	.name	= "temperature",
+	.fops	= &wdt_fops
 };
 #endif
 
@@ -486,9 +486,9 @@ static struct miscdevice temp_miscdev=
  
 static struct notifier_block wdt_notifier=
 {
-	wdt_notify_sys,
-	NULL,
-	0
+	.notifier_call = wdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 /**

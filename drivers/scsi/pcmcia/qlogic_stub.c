@@ -126,6 +126,7 @@ static dev_link_t *qlogic_attach(void)
 	memset(info, 0, sizeof(*info));
 	link = &info->link;
 	link->priv = info;
+	init_timer(&link->release);
 	link->release.function = &qlogic_release;
 	link->release.data = (u_long) link;
 
@@ -329,7 +330,7 @@ static void qlogic_release(u_long arg)
 
 	DEBUG(0, "qlogic_release(0x%p)\n", link);
 
-#warning This doesn't protect you.  You need some real fix for your races.
+#warning This does not protect you.  You need some real fix for your races.
 #if 0
 	if (GET_USE_COUNT(&__this_module) != 0) {
 		DEBUG(0, "qlogic_cs: release postponed, device still open\n");

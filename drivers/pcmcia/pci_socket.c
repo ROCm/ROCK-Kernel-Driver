@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
+#include <linux/device.h>
 
 #include <pcmcia/ss.h>
 
@@ -30,9 +31,6 @@
 #include "pci_socket.h"
 
 
-extern struct socket_info_t *pcmcia_register_socket (int slot,
-		struct pccard_operations *vtable, int use_bus_pm);
-extern void pcmcia_unregister_socket (struct socket_info_t *socket);
 extern void pcmcia_suspend_socket (struct socket_info_t *socket);
 extern void pcmcia_resume_socket (struct socket_info_t *socket);
 
@@ -189,11 +187,21 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	return err;
 }
 
-void cardbus_register(pci_socket_t *socket)
+int cardbus_register(struct pci_dev *p_dev)
 {
-	int nr = socket - pci_socket_array;
+	pci_socket_t *socket = pci_get_drvdata(p_dev);
+	struct pcmcia_socket_class_data *cls_d;
 
-	socket->pcmcia_socket = pcmcia_register_socket(nr, &pci_socket_operations, 1);
+	if (!socket)
+		return -EINVAL;
+
+	cls_d = &socket->cls_d;
+	cls_d->nsock = 1; /* yenta is 1, no other low-level driver uses
+			     this yet */
+	cls_d->ops = &pci_socket_operations;
+	cls_d->use_bus_pm = 1;
+	p_dev->dev.class_data = cls_d;
+	return 0;
 }
 
 static int __devinit
@@ -213,7 +221,7 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 {
 	pci_socket_t *socket = pci_get_drvdata(dev);
 
-	pcmcia_unregister_socket (socket->pcmcia_socket);
+	/* note: we are already unregistered from the cs core */
 	if (socket->op && socket->op->close)
 		socket->op->close(socket);
 	pci_set_drvdata(dev, NULL);
@@ -253,11 +261,14 @@ static struct pci_driver pci_cardbus_driver = {
 	.remove		= __devexit_p(cardbus_remove),
 	.suspend	= cardbus_suspend,
 	.resume		= cardbus_resume,
+	.driver		= {
+		.devclass = &pcmcia_socket_class,
+	},
 };
 
 static int __init pci_socket_init(void)
 {
-	return pci_module_init (&pci_cardbus_driver);
+	return pci_register_driver (&pci_cardbus_driver);
 }
 
 static void __exit pci_socket_exit (void)

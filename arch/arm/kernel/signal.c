@@ -59,11 +59,11 @@ asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t m
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	regs->ARM_r0 = -EINTR;
 
 	while (1) {
@@ -87,11 +87,11 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	regs->ARM_r0 = -EINTR;
 
 	while (1) {
@@ -207,17 +207,19 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext(regs, &frame->sc))
 		goto badframe;
 
 	/* Send SIGTRAP if we're single-stepping */
-	if (ptrace_cancel_bpt(current))
+	if (current->ptrace & PT_SINGLESTEP) {
+		ptrace_cancel_bpt(current);
 		send_sig(SIGTRAP, current, 1);
+	}
 
 	return regs->ARM_r0;
 
@@ -247,17 +249,19 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
 	/* Send SIGTRAP if we're single-stepping */
-	if (ptrace_cancel_bpt(current))
+	if (current->ptrace & PT_SINGLESTEP) {
+		ptrace_cancel_bpt(current);
 		send_sig(SIGTRAP, current, 1);
+	}
 
 	return regs->ARM_r0;
 
@@ -441,17 +445,46 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	return err;
 }
 
+static inline void restart_syscall(struct pt_regs *regs)
+{
+	regs->ARM_r0 = regs->ARM_ORIG_r0;
+	regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
+}
+
 /*
  * OK, we're invoking a handler
  */	
 static void
-handle_signal(unsigned long sig, struct k_sigaction *ka,
-	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
+handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
+	      struct pt_regs * regs, int syscall)
 {
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = current;
+	struct k_sigaction *ka = &tsk->sighand->action[sig-1];
 	int usig = sig;
 	int ret;
+
+	/*
+	 * If we were from a system call, check for system call restarting...
+	 */
+	if (syscall) {
+		switch (regs->ARM_r0) {
+		case -ERESTART_RESTARTBLOCK:
+			current_thread_info()->restart_block.fn =
+				do_no_restart_syscall;
+		case -ERESTARTNOHAND:
+			regs->ARM_r0 = -EINTR;
+			break;
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
+				regs->ARM_r0 = -EINTR;
+				break;
+			}
+			/* fallthrough */
+		case -ERESTARTNOINTR:
+			restart_syscall(regs);
+		}
+	}
 
 	/*
 	 * translate the signal
@@ -477,12 +510,12 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 			ka->sa.sa_handler = SIG_DFL;
 
 		if (!(ka->sa.sa_flags & SA_NODEFER)) {
-			spin_lock_irq(&tsk->sig->siglock);
+			spin_lock_irq(&tsk->sighand->siglock);
 			sigorsets(&tsk->blocked, &tsk->blocked,
 				  &ka->sa.sa_mask);
 			sigaddset(&tsk->blocked, sig);
 			recalc_sigpending();
-			spin_unlock_irq(&tsk->sig->siglock);
+			spin_unlock_irq(&tsk->sighand->siglock);
 		}
 		return;
 	}
@@ -504,7 +537,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 {
 	siginfo_t info;
-	int single_stepping;
+	int signr;
 
 	/*
 	 * We want the common case to go fast, which
@@ -515,130 +548,14 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	if (!user_mode(regs))
 		return 0;
 
-	single_stepping = ptrace_cancel_bpt(current);
+	if (current->ptrace & PT_SINGLESTEP)
+		ptrace_cancel_bpt(current);
 
-	for (;;) {
-		unsigned long signr = 0;
-		struct k_sigaction *ka;
-
-		spin_lock_irq(&current->sig->siglock);
-		signr = dequeue_signal(&current->blocked, &info);
-		spin_unlock_irq(&current->sig->siglock);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Let the debugger run.  */
-			current->exit_code = signr;
-			set_current_state(TASK_STOPPED);
-			notify_parent(current, SIGCHLD);
-			schedule();
-			single_stepping |= ptrace_cancel_bpt(current);
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			signr = current->exit_code;
-			if (signr == 0)
-				continue;
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good? */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
-		ka = &current->sig->action[signr-1];
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			/* Init gets no signals it doesn't want.  */
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP: {
-				struct signal_struct *sig;
-				set_current_state(TASK_STOPPED);
-				current->exit_code = signr;
-				sig = current->parent->sig;
-				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				single_stepping |= ptrace_cancel_bpt(current);
-				continue;
-			}
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGABRT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, exit_code, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sig_exit(signr, exit_code, &info);
-				/* NOTREACHED */
-			}
-		}
-
-		/* Are we from a system call? */
-		if (syscall) {
-			/* If so, check system call restarting.. */
-			switch (regs->ARM_r0) {
-			case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn =
-					do_no_restart_syscall;
-			case -ERESTARTNOHAND:
-				regs->ARM_r0 = -EINTR;
-				break;
-
-			case -ERESTARTSYS:
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->ARM_r0 = -EINTR;
-					break;
-				}
-				/* fallthrough */
-			case -ERESTARTNOINTR:
-				regs->ARM_r0 = regs->ARM_ORIG_r0;
-				regs->ARM_pc -= 4;
-			}
-		}
-		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, ka, &info, oldset, regs);
-		if (single_stepping)
-		    	ptrace_set_bpt(current);
+	signr = get_signal_to_deliver(&info, regs, NULL);
+	if (signr > 0) {
+		handle_signal(signr, &info, oldset, regs, syscall);
+		if (current->ptrace & PT_SINGLESTEP)
+			ptrace_set_bpt(current);
 		return 1;
 	}
 
@@ -668,11 +585,10 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 		if (regs->ARM_r0 == -ERESTARTNOHAND ||
 		    regs->ARM_r0 == -ERESTARTSYS ||
 		    regs->ARM_r0 == -ERESTARTNOINTR) {
-			regs->ARM_r0 = regs->ARM_ORIG_r0;
-			regs->ARM_pc -= 4;
+			restart_syscall(regs);
 		}
 	}
-	if (single_stepping)
+	if (current->ptrace & PT_SINGLESTEP)
 		ptrace_set_bpt(current);
 	return 0;
 }

@@ -22,18 +22,18 @@
 /* FAS register definitions */
 
 /* transfer count low */
-#define REG_CTCL(x)		((x)->scsi.io_port)
-#define REG_STCL(x)		((x)->scsi.io_port)
+#define REG_CTCL		(0)
+#define REG_STCL		(0)
 
 /* transfer count medium */
-#define REG_CTCM(x)		((x)->scsi.io_port + (1 << (x)->scsi.io_shift))
-#define REG_STCM(x)		((x)->scsi.io_port + (1 << (x)->scsi.io_shift))
+#define REG_CTCM		(1)
+#define REG_STCM		(1)
 
 /* fifo data */
-#define REG_FF(x)		((x)->scsi.io_port + (2 << (x)->scsi.io_shift))
+#define REG_FF			(2)
 
 /* command */
-#define REG_CMD(x)		((x)->scsi.io_port + (3 << (x)->scsi.io_shift))
+#define REG_CMD			(3)
 #define CMD_NOP			0x00
 #define CMD_FLUSHFIFO		0x01
 #define CMD_RESETCHIP		0x02
@@ -57,7 +57,7 @@
 #define CMD_WITHDMA		0x80
 
 /* status register (read) */
-#define REG_STAT(x)		((x)->scsi.io_port + (4 << (x)->scsi.io_shift))
+#define REG_STAT		(4)
 #define STAT_IO			(1 << 0)			/* IO phase		*/
 #define STAT_CD			(1 << 1)			/* CD phase		*/
 #define STAT_MSG		(1 << 2)			/* MSG phase		*/
@@ -76,11 +76,11 @@
 #define STAT_MESGIN		(STAT_MSG|STAT_CD|STAT_IO)	/* Message In		*/
 
 /* bus ID for select / reselect */
-#define REG_SDID(x)		((x)->scsi.io_port + (4 << (x)->scsi.io_shift))
+#define REG_SDID		(4)
 #define BUSID(target)		((target) & 7)
 
 /* Interrupt status register (read) */
-#define REG_INST(x)		((x)->scsi.io_port + (5 << (x)->scsi.io_shift))
+#define REG_INST		(5)
 #define INST_SELWOATN		(1 << 0)			/* Select w/o ATN	*/
 #define INST_SELATN		(1 << 1)			/* Select w/ATN		*/
 #define INST_RESELECTED		(1 << 2)			/* Reselected		*/
@@ -91,10 +91,10 @@
 #define INST_BUSRESET		(1 << 7)			/* SCSI Bus reset	*/
 
 /* Timeout register (write) */
-#define REG_STIM(x)		((x)->scsi.io_port + (5 << (x)->scsi.io_shift))
+#define REG_STIM		(5)
 
 /* Sequence step register (read) */
-#define REG_IS(x)		((x)->scsi.io_port + (6 << (x)->scsi.io_shift))
+#define REG_IS			(6)
 #define IS_BITS			0x07
 #define IS_SELARB		0x00				/* Select & Arb ok	*/
 #define IS_MSGBYTESENT		0x01				/* One byte message sent*/
@@ -104,18 +104,18 @@
 #define IS_SOF			0x08				/* Sync off flag	*/
 
 /* Transfer period step (write) */
-#define REG_STP(x)		((x)->scsi.io_port + (6 << (x)->scsi.io_shift))
+#define REG_STP			(6)
 
 /* Synchronous Offset (write) */
-#define REG_SOF(x)		((x)->scsi.io_port + (7 << (x)->scsi.io_shift))
+#define REG_SOF			(7)
 
 /* Fifo state register (read) */
-#define REG_CFIS(x)		((x)->scsi.io_port + (7 << (x)->scsi.io_shift))
+#define REG_CFIS		(7)
 #define CFIS_CF			0x1f				/* Num bytes in FIFO	*/
 #define CFIS_IS			0xe0				/* Step			*/
 
 /* config register 1 */
-#define REG_CNTL1(x)		((x)->scsi.io_port + (8 << (x)->scsi.io_shift))
+#define REG_CNTL1		(8)
 #define CNTL1_CID		(7 << 0)			/* Chip ID			*/
 #define CNTL1_STE		(1 << 3)			/* Self test enable		*/
 #define CNTL1_PERE		(1 << 4)			/* Parity enable reporting en.	*/
@@ -124,7 +124,7 @@
 #define CNTL1_ETM		(1 << 7)			/* Extended Timing Mode		*/
 
 /* Clock conversion factor (read) */
-#define REG_CLKF(x)		((x)->scsi.io_port + (9 << (x)->scsi.io_shift))
+#define REG_CLKF		(9)
 #define CLKF_F37MHZ		0x00				/* 35.01 - 40 MHz		*/
 #define CLKF_F10MHZ		0x02				/* 10 MHz			*/
 #define CLKF_F12MHZ		0x03				/* 10.01 - 15 MHz		*/
@@ -134,13 +134,13 @@
 #define CLKF_F32MHZ		0x07				/* 30.01 - 35 MHz		*/
 
 /* Chip test register (write) */
-#define REG0_FTM(x)		((x)->scsi.io_port + (10 << (x)->scsi.io_shift))
+#define REG_FTM			(10)
 #define TEST_FTM		0x01				/* Force target mode		*/
 #define TEST_FIM		0x02				/* Force initiator mode		*/
 #define TEST_FHI		0x04				/* Force high impedance mode	*/
 
 /* Configuration register 2 (read/write) */
-#define REG_CNTL2(x)		((x)->scsi.io_port + (11 << (x)->scsi.io_shift))
+#define REG_CNTL2		(11)
 #define CNTL2_PGDP		(1 << 0)			/* Pass Th/Generate Data Parity	*/
 #define CNTL2_PGRP		(1 << 1)			/* Pass Th/Generate Reg Parity	*/
 #define CNTL2_ACDPE		(1 << 2)			/* Abort on Cmd/Data Parity Err	*/
@@ -151,7 +151,7 @@
 #define CNTL2_DAE		(1 << 7)			/* Data Alignment Enable	*/
 
 /* Configuration register 3 (read/write) */
-#define REG_CNTL3(x)		((x)->scsi.io_port + (12 << (x)->scsi.io_shift))
+#define REG_CNTL3		(12)
 #define CNTL3_BS8		(1 << 0)			/* Burst size 8			*/
 #define CNTL3_MDM		(1 << 1)			/* Modify DMA mode		*/
 #define CNTL3_LBTM		(1 << 2)			/* Last Byte Transfer mode	*/
@@ -162,14 +162,14 @@
 #define CNTL3_ADIDCHK		(1 << 7)			/* Additional ID check		*/
 
 /* High transfer count (read/write) */
-#define REG_CTCH(x)		((x)->scsi.io_port + (14 << (x)->scsi.io_shift))
-#define REG_STCH(x)		((x)->scsi.io_port + (14 << (x)->scsi.io_shift))
+#define REG_CTCH		(14)
+#define REG_STCH		(14)
 
-/* ID reigster (read only) */
-#define REG1_ID(x)		((x)->scsi.io_port + (14 << (x)->scsi.io_shift))
+/* ID register (read only) */
+#define REG_ID			(14)
 
 /* Data alignment */
-#define REG0_DAL(x)		((x)->scsi.io_port + (15 << (x)->scsi.io_shift))
+#define REG_DAL			(15)
 
 typedef enum {
 	PHASE_IDLE,					/* we're not planning on doing anything	*/
@@ -212,6 +212,9 @@ typedef enum {
 #define MAGIC	0x441296bdUL
 #define NR_MSGS	8
 
+#define FASCAP_DMA		(1 << 0)
+#define FASCAP_PSEUDODMA	(1 << 1)
+
 typedef struct {
 	unsigned long		magic_start;
 	spinlock_t		host_lock;
@@ -233,12 +236,13 @@ typedef struct {
 
 	/* driver information */
 	struct {
+		phase_t		phase;			/* current phase			*/
+		void		*io_base;		/* iomem base of FAS216			*/
 		unsigned int	io_port;		/* base address of FAS216		*/
 		unsigned int	io_shift;		/* shift to adjust reg offsets by	*/
-		unsigned int	irq;			/* interrupt				*/
 		unsigned char	cfg[4];			/* configuration registers		*/
 		const char	*type;			/* chip type				*/
-		phase_t		phase;			/* current phase			*/
+		unsigned int	irq;			/* interrupt				*/
 
 		struct {
 			unsigned char	target;		/* reconnected target			*/
@@ -253,7 +257,6 @@ typedef struct {
 		unsigned int	async_stp;		/* Async transfer STP value		*/
 		unsigned char	msgin_fifo;		/* bytes in fifo at time of message in	*/
 		unsigned char	message[256];		/* last message received from device	*/
-		unsigned int	msglen;			/* length of last message received	*/
 
 		unsigned char	disconnectable:1;	/* this command can be disconnected	*/
 		unsigned char	aborting:1;		/* aborting command			*/
@@ -281,6 +284,7 @@ typedef struct {
 		unsigned char	wide_max_size;		/* Maximum wide transfer size		*/
 		unsigned char	cntl3;			/* Control Reg 3			*/
 		unsigned int	asyncperiod;		/* Async transfer period (ns)		*/
+		unsigned int	capabilities;		/* driver capabilities			*/
 		unsigned int	disconnect_ok:1;	/* Disconnects allowed?			*/
 	} ifcfg;
 
@@ -319,26 +323,18 @@ typedef struct {
 } FAS216_Info;
 
 /* Function: int fas216_init (struct Scsi_Host *instance)
- * Purpose : initialise FAS/NCR/AMD SCSI ic.
+ * Purpose : initialise FAS/NCR/AMD SCSI structures.
  * Params  : instance - a driver-specific filled-out structure
  * Returns : 0 on success
  */
 extern int fas216_init (struct Scsi_Host *instance);
 
-/* Function: int fas216_abort (Scsi_Cmnd *SCpnt)
- * Purpose : abort a command if something horrible happens.
- * Params  : SCpnt - Command that is believed to be causing a problem.
- * Returns : one of SCSI_ABORT_ macros.
+/* Function: int fas216_add (struct Scsi_Host *instance, struct device *dev)
+ * Purpose : initialise FAS/NCR/AMD SCSI ic.
+ * Params  : instance - a driver-specific filled-out structure
+ * Returns : 0 on success
  */
-extern int fas216_abort (Scsi_Cmnd *);
-
-/* Function: int fas216_reset (Scsi_Cmnd *SCpnt, unsigned int reset_flags)
- * Purpose : resets the adapter if something horrible happens.
- * Params  : SCpnt - Command that is believed to be causing a problem.
- *	     reset_flags - flags indicating reset type that is believed to be required.
- * Returns : one of SCSI_RESET_ macros, or'd with the SCSI_RESET_*_RESET macros.
- */
-extern int fas216_reset (Scsi_Cmnd *, unsigned int);
+extern int fas216_add (struct Scsi_Host *instance, struct device *dev);
 
 /* Function: int fas216_queue_command (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
  * Purpose : queue a command for adapter to process.
@@ -355,20 +351,21 @@ extern int fas216_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
  */
 extern int fas216_command (Scsi_Cmnd *);
 
-/* Function: void fas216_intr (struct Scsi_Host *instance)
+/* Function: void fas216_intr (FAS216_Info *info)
  * Purpose : handle interrupts from the interface to progress a command
- * Params  : instance - interface to service
+ * Params  : info - interface to service
  */
-extern void fas216_intr (struct Scsi_Host *instance);
+extern void fas216_intr (FAS216_Info *info);
 
-/* Function: int fas216_release (struct Scsi_Host *instance)
+extern void fas216_remove (struct Scsi_Host *instance);
+
+/* Function: void fas216_release (struct Scsi_Host *instance)
  * Purpose : release all resources and put everything to bed for FAS/NCR/AMD SCSI ic.
  * Params  : instance - a driver-specific filled-out structure
  * Returns : 0 on success
  */
-extern int fas216_release (struct Scsi_Host *instance);
+extern void fas216_release (struct Scsi_Host *instance);
 
-extern int fas216_info(FAS216_Info *info, char *buffer);
 extern int fas216_print_host(FAS216_Info *info, char *buffer);
 extern int fas216_print_stats(FAS216_Info *info, char *buffer);
 extern int fas216_print_device(FAS216_Info *info, Scsi_Device *scd, char *buffer);

@@ -94,32 +94,22 @@ typedef struct siginfo32 {
 	} _sifields;
 } siginfo_t32;
 
-#define __old_sigset_t32	old_sigset_t32
 #define __old_sigaction32	old_sigaction32
 
-typedef unsigned int __old_sigset_t32;
 struct __old_sigaction32 {
 	unsigned		sa_handler;
-	__old_sigset_t32  	sa_mask;
+	compat_old_sigset_t  	sa_mask;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
 };
 
 
 
-#define _PPC32_NSIG	       64
-#define _PPC32_NSIG_BPW	       32
-#define _PPC32_NSIG_WORDS	       (_PPC32_NSIG / _PPC32_NSIG_BPW)
-
-typedef struct {
-       unsigned int sig[_PPC32_NSIG_WORDS];
-} sigset32_t;
-
 struct sigaction32 {
        unsigned int  sa_handler;	/* Really a pointer, but need to deal with 32 bits */
        unsigned int sa_flags;
        unsigned int sa_restorer;	/* Another 32 bit pointer */
-       sigset32_t sa_mask;		/* A 32 bit mask */
+       compat_sigset_t sa_mask;		/* A 32 bit mask */
 };
 
 typedef struct sigaltstack_32 {

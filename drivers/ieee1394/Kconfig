@@ -18,7 +18,7 @@ config IEEE1394
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ieee1394.o.
+	  will be called ieee1394.
 
 comment "Subsystem Options"
 	depends on IEEE1394
@@ -67,7 +67,7 @@ config IEEE1394_PCILYNX
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called pcilynx.o.
+	  will be called pcilynx.
 
 # Non-maintained pcilynx options
 # if [ "$CONFIG_IEEE1394_PCILYNX" != "n" ]; then
@@ -87,7 +87,7 @@ config IEEE1394_OHCI1394
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ohci1394.o.
+	  will be called ohci1394.
 
 comment "Protocol Drivers"
 	depends on IEEE1394
@@ -131,7 +131,7 @@ config IEEE1394_DV1394
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called dv1394.o.
+	  will be called dv1394.
 
 config IEEE1394_RAWIO
 	tristate "Raw IEEE1394 I/O support"
@@ -145,7 +145,7 @@ config IEEE1394_RAWIO
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called raw1394.o.
+	  will be called raw1394.
 
 config IEEE1394_CMP
 	tristate "IEC61883-1 Plug support"
@@ -157,7 +157,7 @@ config IEEE1394_CMP
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called amdtp.o.
+	  will be called amdtp.
 
 config IEEE1394_AMDTP
 	tristate "IEC61883-6 (Audio transmission) support"
@@ -172,6 +172,6 @@ config IEEE1394_AMDTP
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called amdtp.o.
+	  will be called amdtp.
 
 endmenu

@@ -42,15 +42,8 @@ static int rxrpc_krxiod(void *arg)
 	DECLARE_WAITQUEUE(krxiod,current);
 
 	printk("Started krxiod %d\n",current->pid);
-	strcpy(current->comm,"krxiod");
 
-	daemonize();
-
-	/* only certain signals are of interest */
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked,0);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	daemonize("krxiod");
 
 	/* loop around waiting for work to do */
 	do {

@@ -99,6 +99,8 @@ static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 		goto resubmit;
 	}
 
+	input_regs(&kbd->dev, regs);
+
 	for (i = 0; i < 8; i++)
 		input_report_key(&kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
 

@@ -1328,7 +1328,7 @@ static struct play_vals {
 static void
 snd_m3_playback_setup(m3_t *chip, m3_dma_t *s, snd_pcm_substream_t *subs)
 {
-	int i;
+	unsigned int i;
 
 	/*
 	 * some per client initializers
@@ -1355,7 +1355,7 @@ snd_m3_playback_setup(m3_t *chip, m3_dma_t *s, snd_pcm_substream_t *subs)
 	/*
 	 * set an armload of static initializers
 	 */
-	for (i = 0 ; i < (sizeof(pv) / sizeof(pv[0])) ; i++) 
+	for (i = 0; i < ARRAY_SIZE(pv); i++) 
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_DATA,
 				  s->inst.data + pv[i].addr, pv[i].val);
 }
@@ -1394,7 +1394,7 @@ static struct rec_vals {
 static void
 snd_m3_capture_setup(m3_t *chip, m3_dma_t *s, snd_pcm_substream_t *subs)
 {
-	int i;
+	unsigned int i;
 
 	/*
 	 * some per client initializers
@@ -1413,7 +1413,7 @@ snd_m3_capture_setup(m3_t *chip, m3_dma_t *s, snd_pcm_substream_t *subs)
 	/*
 	 * set an armload of static initializers
 	 */
-	for (i = 0 ; i < (sizeof(rv) / sizeof(rv[0])) ; i++) 
+	for (i = 0; i < ARRAY_SIZE(rv); i++) 
 		snd_m3_assp_write(chip, MEMTYPE_INTERNAL_DATA,
 				  s->inst.data + rv[i].addr, rv[i].val);
 }
@@ -2121,7 +2121,7 @@ static u16 minisrc_lpf[MINISRC_LPF_LEN] = {
 
 static void snd_m3_assp_init(m3_t *chip)
 {
-	int i;
+	unsigned int i;
 
 	/* zero kernel data */
 	for (i = 0; i < (REV_B_DATA_MEMORY_UNIT_LENGTH * NUM_UNITS_KERNEL_DATA) / 2; i++)
@@ -2377,9 +2377,8 @@ static void m3_suspend(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	snd_pcm_suspend_all(chip->pcm);
 
@@ -2400,8 +2399,6 @@ static void m3_suspend(m3_t *chip)
 	snd_m3_outw(chip, 0xffff, 0x54);
 	snd_m3_outw(chip, 0xffff, 0x56);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void m3_resume(m3_t *chip)
@@ -2409,9 +2406,8 @@ static void m3_resume(m3_t *chip)
 	snd_card_t *card = chip->card;
 	int i, index;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	/* first lets just bring everything back. .*/
 	snd_m3_outw(chip, 0, 0x54);
@@ -2442,8 +2438,6 @@ static void m3_resume(m3_t *chip)
 	snd_m3_amp_enable(chip, 1);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 #ifndef PCI_OLD_SUSPEND
@@ -2548,13 +2542,9 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 	chip->pci = pci;
 	chip->irq = -1;
 
-#ifndef LINUX_2_2
-	subsystem_vendor = pci->subsystem_vendor;
-	subsystem_device = pci->subsystem_device;
-#else
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
 	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
-#endif
+
 	for (quirk = m3_quirk_list; quirk->vendor; quirk++) {
 		if (subsystem_vendor == quirk->vendor &&
 		    subsystem_device == quirk->device) {

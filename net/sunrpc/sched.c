@@ -962,14 +962,8 @@ rpciod(void *ptr)
 	rpciod_pid = current->pid;
 	up(&rpciod_running);
 
-	daemonize();
-
-	spin_lock_irq(&current->sig->siglock);
-	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
-
-	strcpy(current->comm, "rpciod");
+	daemonize("rpciod");
+	allow_signal(SIGKILL);
 
 	dprintk("RPC: rpciod starting (pid %d)\n", rpciod_pid);
 	while (rpciod_users) {
@@ -1022,9 +1016,9 @@ rpciod_killall(void)
 		}
 	}
 
-	spin_lock_irqsave(&current->sig->siglock, flags);
+	spin_lock_irqsave(&current->sighand->siglock, flags);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, flags);
+	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 }
 
 /*
@@ -1100,9 +1094,9 @@ rpciod_down(void)
 		}
 		interruptible_sleep_on(&rpciod_killer);
 	}
-	spin_lock_irqsave(&current->sig->siglock, flags);
+	spin_lock_irqsave(&current->sighand->siglock, flags);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, flags);
+	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 out:
 	up(&rpciod_sema);
 	MOD_DEC_USE_COUNT;

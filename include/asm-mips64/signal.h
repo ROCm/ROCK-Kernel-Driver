@@ -80,7 +80,7 @@ typedef unsigned int old_sigset_t32;
 #define SA_RESTART	0x10000000
 #define SA_SIGINFO	0x00000008
 #define SA_NODEFER	0x40000000
-#define SA_NOCLDWAIT	0x00010000	/* Not supported yet */
+#define SA_NOCLDWAIT	0x00010000
 #define SA_NOCLDSTOP	0x00000001
 
 #define SA_NOMASK	SA_NODEFER
@@ -168,6 +168,9 @@ typedef struct sigaltstack {
 #define BRK_NORLD	10	/* No rld found - not used by Linux/MIPS */
 #define _BRK_THREADBP	11	/* For threads, user bp (used by debuggers) */
 #define BRK_MULOVF	1023	/* Multiply overflow */
+
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
+
 #endif /* defined (__KERNEL__) || defined (__USE_MISC) */
 
 #endif /* !defined (_ASM_SIGNAL_H) */

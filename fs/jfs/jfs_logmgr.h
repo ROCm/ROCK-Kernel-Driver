@@ -403,6 +403,7 @@ struct jfs_log {
 		struct tblock *head;
 		struct tblock *tail;
 	} cqueue;
+	struct tblock *flush_tblk; /* tblk we're waiting on for flush */
 	int gcrtc;		/* 4: GC_READY transaction count */
 	struct tblock *gclrt;	/* 4: latest GC_READY transaction */
 	spinlock_t gclock;	/* 4: group commit lock */

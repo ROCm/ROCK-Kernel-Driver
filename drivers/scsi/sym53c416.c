@@ -1,4 +1,4 @@
-/* 
+/*
  *  sym53c416.c
  *  Low-level SCSI driver for sym53c416 chip.
  *  Copyright (C) 1998 Lieven Willems (lw_linux@hotmail.com)
@@ -272,7 +272,7 @@ static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, u
 		{
 			i = jiffies + timeout;
 			spin_unlock_irqrestore(&sym53c416_lock, flags);
-			while(jiffies < i && (inb(base + PIO_INT_REG) & EMPTY) && timeout)
+			while(time_before(jiffies, i) && (inb(base + PIO_INT_REG) & EMPTY) && timeout)
 				if(inb(base + PIO_INT_REG) & SCI)
 					timeout = 0;
 			spin_lock_irqsave(&sym53c416_lock, flags);
@@ -316,7 +316,7 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 		{
 			i = jiffies + timeout;
 			spin_unlock_irqrestore(&sym53c416_lock, flags);
-			while(jiffies < i && (inb(base + PIO_INT_REG) & FULL) && timeout)
+			while(time_before(jiffies, i) && (inb(base + PIO_INT_REG) & FULL) && timeout)
 				;
 			spin_lock_irqsave(&sym53c416_lock, flags);
 			if(inb(base + PIO_INT_REG) & FULL)
@@ -552,7 +552,7 @@ static int sym53c416_probeirq(int base, int scsi_id)
 	outb(0x00, base + DEST_BUS_ID);
 	/* Wait for interrupt to occur */
 	i = jiffies + 20;
-	while(i > jiffies && !(inb(base + STATUS_REG) & SCI))
+	while(time_before(jiffies, i) && !(inb(base + STATUS_REG) & SCI))
 		barrier();
 	if(time_before_eq(i, jiffies))	/* timed out */
 		return 0;
@@ -763,7 +763,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int i;
 
 	/* Store base register as we can have more than one controller in the system */
-	base = SCpnt->host->io_port;
+	base = SCpnt->device->host->io_port;
 	current_command = SCpnt;                  /* set current command                */
 	current_command->scsi_done = done;        /* set ptr to done function           */
 	current_command->SCp.phase = command_ph;  /* currect phase is the command phase */
@@ -771,7 +771,7 @@ int sym53c416_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	current_command->SCp.Message = 0;
 
 	spin_lock_irqsave(&sym53c416_lock, flags);
-	outb(SCpnt->target, base + DEST_BUS_ID); /* Set scsi id target        */
+	outb(SCpnt->device->id, base + DEST_BUS_ID); /* Set scsi id target        */
 	outb(FLUSH_FIFO, base + COMMAND_REG);    /* Flush SCSI and PIO FIFO's */
 	/* Write SCSI command into the SCSI fifo */
 	for(i = 0; i < SCpnt->cmd_len; i++)
@@ -819,7 +819,7 @@ static int sym53c416_host_reset(Scsi_Cmnd *SCpnt)
 	int i;
 
 	/* printk("sym53c416_reset\n"); */
-	base = SCpnt->host->io_port;
+	base = SCpnt->device->host->io_port;
 	/* search scsi_id - fixme, we shouldnt need to iterate for this! */
 	for(i = 0; i < host_index && scsi_id != -1; i++)
 		if(hosts[i].base == base)

@@ -31,7 +31,7 @@ config WAVELAN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wavelan.o.  If you want to compile it as a
+	  The module will be called wavelan.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -50,7 +50,7 @@ config AIRO
 	  and Cisco proprietary API, so both the Linux Wireless Tools and the
 	  Cisco Linux utilities can be used to configure the card.
 
-	  The driver can be compiled as a module and will be named "airo.o".
+	  The driver can be compiled as a module and will be named "airo".
 
 config HERMES
 	tristate "Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)"
@@ -121,7 +121,7 @@ config PCMCIA_NETWAVE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called netwave_cs.o.  If you want to compile it
+	  The module will be called netwave_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 
@@ -135,7 +135,7 @@ config PCMCIA_WAVELAN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wavelan_cs.o.  If you want to compile it
+	  The module will be called wavelan_cs.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 

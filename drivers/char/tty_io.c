@@ -442,6 +442,13 @@ void do_tty_hangup(void *data)
 	file_list_lock();
 	for (l = tty->tty_files.next; l != &tty->tty_files; l = l->next) {
 		struct file * filp = list_entry(l, struct file, f_list);
+		/*
+		 * If this file descriptor has been closed, ignore it; it
+		 * will be going away shortly. (We don't test filp->f_count
+		 * for zero since that could open another race.) --rmk
+		 */
+		if (filp->private_data == NULL)
+			continue;
 		if (IS_CONSOLE_DEV(filp->f_dentry->d_inode->i_rdev) ||
 		    IS_SYSCONS_DEV(filp->f_dentry->d_inode->i_rdev)) {
 			cons_filp = filp;
@@ -571,7 +578,7 @@ EXPORT_SYMBOL(tty_hung_up_p);
  */
 void disassociate_ctty(int on_exit)
 {
-	struct tty_struct *tty = current->tty;
+	struct tty_struct *tty;
 	struct task_struct *p;
 	struct list_head *l;
 	struct pid *pid;
@@ -579,6 +586,7 @@ void disassociate_ctty(int on_exit)
 
 	lock_kernel();
 
+	tty = current->tty;
 	if (tty) {
 		tty_pgrp = tty->pgrp;
 		if (on_exit && tty->driver.type != TTY_DRIVER_TYPE_PTY)
@@ -2035,7 +2043,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 /*
  * The default put_char routine if the driver did not define one.
  */
-void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
+static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	tty->driver.write(tty, 0, &ch, 1);
 }

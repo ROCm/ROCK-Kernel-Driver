@@ -214,7 +214,7 @@
  *	Brian Warner has a place to put his code.
  *	Made the ezusb specific functions generic enough that different
  *	devices can use them (whiteheat and keyspan_pda both need them).
- *	Split out a whole bunch of structure and other stuff to a seperate
+ *	Split out a whole bunch of structure and other stuff to a separate
  *	usb-serial.h file.
  *	Made the Visor connection messages a little more understandable, now
  *	that Miles Lott (milos@insync.net) has gotten the Generic channel to

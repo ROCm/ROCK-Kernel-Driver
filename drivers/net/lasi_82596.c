@@ -91,6 +91,7 @@
 #include <asm/irq.h>
 #include <asm/pdc.h>
 #include <asm/cache.h>
+#include <asm/parisc-device.h>
 
 static char version[] __devinitdata =
 	"82596.c $Revision: 1.29 $\n";
@@ -121,13 +122,13 @@ static char version[] __devinitdata =
 
 
 #define  CHECK_WBACK(addr,len) \
-	do { if (!dma_consistent) dma_cache_wback((unsigned long)addr,len); } while (0)
+	do { dma_cache_sync((void *)addr, len, DMA_TO_DEVICE); } while (0)
 
 #define  CHECK_INV(addr,len) \
-	do { if (!dma_consistent) dma_cache_inv((unsigned long)addr,len); } while(0)
+	do { dma_cache_sync((void *)addr,len, DMA_FROM_DEVICE); } while(0)
 
 #define  CHECK_WBACK_INV(addr,len) \
-	do { if (!dma_consistent) dma_cache_wback_inv((unsigned long)addr,len); } while (0)
+	do { dma_cache_sync((void *)addr,len, DMA_BIDIRECTIONAL); } while (0)
 
 
 #define PA_I82596_RESET		0	/* Offsets relative to LASI-LAN-Addr.*/
@@ -383,6 +384,7 @@ struct i596_private {
 	int options;
 	spinlock_t lock;
 	dma_addr_t dma_addr;
+	struct device *dev;
 };
 
 static char init_setup[] =
@@ -401,10 +403,6 @@ static char init_setup[] =
 	0xff,
 	0x00,
 	0x7f /*  *multi IA */ };
-
-static struct pci_dev *fake_pci_dev; /* The fake pci_dev needed for 
-					pci_* functions under ccio. */
-static int dma_consistent = 1;	/* Zero if pci_alloc_consistent() fails */
 
 static int i596_open(struct net_device *dev);
 static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev);
@@ -558,8 +556,8 @@ static inline void init_rx_bufs(struct net_device *dev)
 		if (skb == NULL)
 			panic("82596: alloc_skb() failed");
 		skb_reserve(skb, 2);
-		dma_addr = pci_map_single(fake_pci_dev, skb->tail,PKT_BUF_SZ,
-					PCI_DMA_FROMDEVICE);
+		dma_addr = dma_map_single(lp->dev, skb->tail,PKT_BUF_SZ,
+					  DMA_FROM_DEVICE);
 		skb->dev = dev;
 		rbd->v_next = rbd+1;
 		rbd->b_next = WSWAPrbd(virt_to_dma(lp,rbd+1));
@@ -605,9 +603,9 @@ static inline void remove_rx_bufs(struct net_device *dev)
 	for (i = 0, rbd = lp->rbds; i < rx_ring_size; i++, rbd++) {
 		if (rbd->skb == NULL)
 			break;
-		pci_unmap_single(fake_pci_dev,
+		dma_unmap_single(lp->dev,
 				 (dma_addr_t)WSWAPchar(rbd->b_data), 
-				 PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+				 PKT_BUF_SZ, DMA_FROM_DEVICE);
 		dev_kfree_skb(rbd->skb);
 	}
 }
@@ -774,7 +772,7 @@ static inline int i596_rx(struct net_device *dev)
 				struct sk_buff *newskb;
 				dma_addr_t dma_addr;
 
-				pci_unmap_single(fake_pci_dev,(dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+				dma_unmap_single(lp->dev,(dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, DMA_FROM_DEVICE);
 				/* Get fresh skbuff to replace filled one. */
 				newskb = dev_alloc_skb(PKT_BUF_SZ + 4);
 				if (newskb == NULL) {
@@ -788,7 +786,7 @@ static inline int i596_rx(struct net_device *dev)
 				rx_in_place = 1;
 				rbd->skb = newskb;
 				newskb->dev = dev;
-				dma_addr = pci_map_single(fake_pci_dev, newskb->tail, PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+				dma_addr = dma_map_single(lp->dev, newskb->tail, PKT_BUF_SZ, DMA_FROM_DEVICE);
 				rbd->v_data = newskb->tail;
 				rbd->b_data = WSWAPchar(dma_addr);
 				CHECK_WBACK_INV(rbd, sizeof(struct i596_rbd));
@@ -805,7 +803,7 @@ memory_squeeze:
 				skb->dev = dev;
 				if (!rx_in_place) {
 					/* 16 byte align the data fields */
-					pci_dma_sync_single(fake_pci_dev, (dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+					dma_sync_single(lp->dev, (dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, DMA_FROM_DEVICE);
 					skb_reserve(skb, 2);
 					memcpy(skb_put(skb,pkt_len), rbd->v_data, pkt_len);
 				}
@@ -886,7 +884,7 @@ static inline void i596_cleanup_cmd(struct net_device *dev, struct i596_private 
 			{
 				struct tx_cmd *tx_cmd = (struct tx_cmd *) ptr;
 				struct sk_buff *skb = tx_cmd->skb;
-				pci_unmap_single(fake_pci_dev, tx_cmd->dma_addr, skb->len, PCI_DMA_TODEVICE);
+				dma_unmap_single(lp->dev, tx_cmd->dma_addr, skb->len, DMA_TO_DEVICE);
 
 				dev_kfree_skb(skb);
 
@@ -1118,8 +1116,8 @@ static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tbd->pad = 0;
 		tbd->size = EOF | length;
 
-		tx_cmd->dma_addr = pci_map_single(fake_pci_dev, skb->data, skb->len, 
-				PCI_DMA_TODEVICE);
+		tx_cmd->dma_addr = dma_map_single(lp->dev, skb->data, skb->len,
+				DMA_TO_DEVICE);
 		tbd->data = WSWAPchar(tx_cmd->dma_addr);
 
 		DEB(DEB_TXADDR,print_eth(skb->data, "tx-queued"));
@@ -1156,6 +1154,8 @@ static int __devinit i82596_probe(struct net_device *dev)
 {
 	int i;
 	struct i596_private *lp;
+	/* we're going to overwrite dev->priv, so pull the device out */
+	struct device *gen_dev = dev->priv;
 	char eth_addr[6];
 	dma_addr_t dma_addr;
 
@@ -1198,17 +1198,11 @@ static int __devinit i82596_probe(struct net_device *dev)
 		printk("82596.c: MAC of HP700 LAN read from EEPROM\n");
 	}
 
-	dev->mem_start = (unsigned long) pci_alloc_consistent(fake_pci_dev, 
-		sizeof(struct i596_private), &dma_addr);
+	dev->mem_start = (unsigned long) dma_alloc_noncoherent(gen_dev, 
+		sizeof(struct i596_private), &dma_addr, GFP_KERNEL);
 	if (!dev->mem_start) {
-		printk("%s: Couldn't get consistent shared memory\n", dev->name);
-		dma_consistent = 0;
-		dev->mem_start = (int)__get_free_pages(GFP_ATOMIC, 0);
-		if (!dev->mem_start) {
-			printk("%s: Couldn't get shared memory\n", dev->name);
-			return -ENOMEM;
-		}
-		dma_addr = virt_to_bus(dev->mem_start);
+		printk("%s: Couldn't get shared memory\n", dev->name);
+		return -ENOMEM;
 	}
 
 	ether_setup(dev);
@@ -1243,6 +1237,7 @@ static int __devinit i82596_probe(struct net_device *dev)
 	lp->scb.rfd = I596_NULL;
 	lp->lock = SPIN_LOCK_UNLOCKED;
 	lp->dma_addr = dma_addr;
+	lp->dev = gen_dev;
 
 	CHECK_WBACK_INV(dev->mem_start, sizeof(struct i596_private));
 
@@ -1320,7 +1315,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					if ((ptr->status) & 0x1000)
 						lp->stats.tx_aborted_errors++;
 				}
-				pci_unmap_single(fake_pci_dev, tx_cmd->dma_addr, skb->len, PCI_DMA_TODEVICE);
+				dma_unmap_single(lp->dev, tx_cmd->dma_addr, skb->len, DMA_TO_DEVICE);
 				dev_kfree_skb_irq(skb);
 
 				tx_cmd->cmd.command = 0; /* Mark free */
@@ -1530,8 +1525,6 @@ lan_init_chip(struct parisc_device *dev)
 		return -ENODEV;
 	}
 	
-	fake_pci_dev = ccio_get_fake(dev);
-
 	if (!dev->irq) {
 		printk(KERN_ERR __FILE__ ": IRQ not found for i82596 at 0x%lx\n", dev->hpa);
 		return -ENODEV;
@@ -1546,6 +1539,7 @@ lan_init_chip(struct parisc_device *dev)
 	netdevice->base_addr = dev->hpa;
 	netdevice->irq = dev->irq;
 	netdevice->init = i82596_probe;
+	netdevice->priv = &dev->dev;
 
 	retval = register_netdev(netdevice);
 	if (retval) {
@@ -1601,13 +1595,8 @@ static void __exit lasi_82596_exit(void)
 		unregister_netdev(netdevice);
 
 		lp = (struct i596_private *) netdevice->priv;
-		if (dma_consistent)
-			pci_free_consistent(fake_pci_dev, 
-					    sizeof(struct i596_private), 
-				(void *)netdevice->mem_start, lp->dma_addr);
-		else
-			free_page(netdevice->mem_start);
-
+		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
+				       (void *)netdevice->mem_start, lp->dma_addr);
 		netdevice->priv = NULL;
 	}
 

@@ -974,8 +974,8 @@ sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size,
  *
  * See Documentation/DMA-mapping.txt
  */
-static void *
-sba_alloc_consistent(struct device *hwdev, size_t size, dma_addr_t *dma_handle)
+static void *sba_alloc_consistent(struct device *hwdev, size_t size,
+					dma_addr_t *dma_handle, int gfp)
 {
 	void *ret;
 
@@ -985,7 +985,7 @@ sba_alloc_consistent(struct device *hwdev, size_t size, dma_addr_t *dma_handle)
 		return 0;
 	}
 
-        ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
+        ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret) {
 		memset(ret, 0, size);
@@ -1132,7 +1132,7 @@ sba_fill_pdir(
  * in the DMA stream. Allocates PDIR entries but does not fill them.
  * Returns the number of DMA chunks.
  *
- * Doing the fill seperate from the coalescing/allocation keeps the
+ * Doing the fill separate from the coalescing/allocation keeps the
  * code simpler. Future enhancement could make one pass through
  * the sglist do both.
  */

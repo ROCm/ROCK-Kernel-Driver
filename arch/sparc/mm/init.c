@@ -525,7 +525,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
-void flush_page_to_ram(struct page *page)
+void sparc_flush_page_to_ram(struct page *page)
 {
 	unsigned long vaddr = (unsigned long)page_address(page);
 

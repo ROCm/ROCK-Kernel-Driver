@@ -75,6 +75,11 @@ config ACPI_SLEEP
 	  This option is not recommended for anyone except those doing driver
 	  power management development.
 
+config ACPI_SLEEP_PROC_FS
+	bool
+	depends on ACPI_SLEEP && PROC_FS
+	default y
+
 config ACPI_AC
 	tristate "AC Adapter"
 	depends on X86 && ACPI && !ACPI_HT_ONLY
@@ -115,14 +120,6 @@ config ACPI_PROCESSOR
 	  This driver installs ACPI as the idle handler for Linux, and uses
 	  ACPI C2 and C3 processor states to save power, on systems that
 	  support it.
-
-config ACPI_PROCESSOR_PERF
-	bool "Processor Performance States"
-	depends on X86 && ACPI && !ACPI_HT_ONLY && ACPI_PROCESSOR && CPU_FREQ
-	help
-	  This driver adds support for CPU frequency scaling, if this is supported
-	  by the hardware and the BIOS. If you are compiling for a mobile system,
-	  say Y.
 
 config ACPI_THERMAL
 	tristate "Thermal Zone"

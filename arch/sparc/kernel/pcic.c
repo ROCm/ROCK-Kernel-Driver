@@ -25,6 +25,7 @@
 
 #include <linux/ctype.h>
 #include <linux/pci.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/interrupt.h>
 
@@ -33,8 +34,6 @@
 #include <asm/pcic.h>
 #include <asm/timer.h>
 #include <asm/uaccess.h>
-
-extern rwlock_t xtime_lock;
 
 #ifndef CONFIG_PCI
 
@@ -739,10 +738,10 @@ static void pcic_clear_clock_irq(void)
 
 static void pcic_timer_handler (int irq, void *h, struct pt_regs *regs)
 {
-	write_lock(&xtime_lock);	/* Dummy, to show that we remember */
+	write_seqlock(&xtime_lock);	/* Dummy, to show that we remember */
 	pcic_clear_clock_irq();
 	do_timer(regs);
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 #define USECS_PER_JIFFY  10000  /* We have 100HZ "standard" timer for sparc */
@@ -795,18 +794,20 @@ extern unsigned long wall_jiffies;
 static void pci_do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned long usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = do_gettimeoffset();
-	{
-		unsigned long lost = jiffies - wall_jiffies;
-		if (lost)
-			usec += lost * (1000000 / HZ);
-	}
-	sec = xtime.tv_sec;
-	usec += (xtime.tv_nsec / 1000);
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		usec = do_gettimeoffset();
+		{
+			unsigned long lost = jiffies - wall_jiffies;
+			if (lost)
+				usec += lost * (1000000 / HZ);
+		}
+		sec = xtime.tv_sec;
+		usec += (xtime.tv_nsec / 1000);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;

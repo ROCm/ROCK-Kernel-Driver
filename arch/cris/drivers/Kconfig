@@ -366,7 +366,7 @@ config PARPORT
 	  ( = code which can be inserted in and removed from the running
 	  kernel whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  parport.o.  If you have more than one parallel port and want to
+	  parport.  If you have more than one parallel port and want to
 	  specify which port and IRQ to be used by this driver at module load
 	  time, take a look at <file:Documentation/parport.txt>.
 
@@ -400,7 +400,7 @@ config PRINTER
 	  driver as a module however ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt> and
-	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
@@ -463,7 +463,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -494,7 +494,7 @@ config BLK_DEV_IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/ide.txt>. The module will be called ide-mod.o.
+	  <file:Documentation/ide.txt>. The module will be called ide-mod.
 	  Do not compile this driver as a module if your root file system (the
 	  one containing the directory /) is located on an IDE device.
 
@@ -516,7 +516,7 @@ config BLK_DEV_IDEDISK
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-disk.o.  Do not compile this driver as a module
+	  will be called ide-disk.  Do not compile this driver as a module
 	  if your root file system (the one containing the directory /) is
 	  located on the IDE disk. If unsure, say Y.
 
@@ -544,7 +544,7 @@ config BLK_DEV_IDECD
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ide-cd.o.
+	  will be called ide-cd.
 
 config BLK_DEV_IDEDMA
 	bool
@@ -859,7 +859,7 @@ config USB
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbcore.o.  If you want to compile it as a
+	  The module will be called usbcore.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ETRAX_USB_HOST_PORT1

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/buddha.c -- Amiga Buddha, Catweasel and X-Surf IDE Driver
+ *  linux/drivers/ide/legacy/buddha.c -- Amiga Buddha, Catweasel and X-Surf IDE Driver
  *
  *	Copyright (C) 1997, 2001 by Geert Uytterhoeven and others
  *
@@ -197,16 +197,16 @@ fail_base2:
 		
 		for(i=0;i<buddha_num_hwifs;i++) {
 			if(type != BOARD_XSURF) {
-				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+buddha_bases[i]),
+				ide_setup_ports(&hw, (buddha_board+buddha_bases[i]),
 						buddha_offsets, 0,
-						(ide_ioreg_t)(buddha_board+buddha_irqports[i]),
+						(buddha_board+buddha_irqports[i]),
 						buddha_ack_intr,
 //						budda_iops,
 						IRQ_AMIGA_PORTS);
 			} else {
-				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+xsurf_bases[i]),
+				ide_setup_ports(&hw, (buddha_board+xsurf_bases[i]),
 						xsurf_offsets, 0,
-						(ide_ioreg_t)(buddha_board+xsurf_irqports[i]),
+						(buddha_board+xsurf_irqports[i]),
 						xsurf_ack_intr,
 //						xsurf_iops,
 						IRQ_AMIGA_PORTS);

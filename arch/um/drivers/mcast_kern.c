@@ -36,11 +36,11 @@ void mcast_init(struct net_device *dev, void *data)
 	pri = dev->priv;
 	dpri = (struct mcast_data *) pri->user;
 	*dpri = ((struct mcast_data)
-		{ addr :	init->addr,
-		  port :	init->port,
-		  ttl :		init->ttl,
-		  mcast_addr :	NULL,
-		  dev :		dev });
+		{ .addr 	= init->addr,
+		  .port 	= init->port,
+		  .ttl 		= init->ttl,
+		  .mcast_addr 	= NULL,
+		  .dev 		= dev });
 	printk("mcast backend ");
 	printk("multicast adddress: %s:%u, TTL:%u ",
 	       dpri->addr, dpri->port, dpri->ttl);
@@ -64,10 +64,10 @@ static int mcast_write(int fd, struct sk_buff **skb,
 }
 
 static struct net_kern_info mcast_kern_info = {
-	init:			mcast_init,
-	protocol:		eth_protocol,
-	read:			mcast_read,
-	write:			mcast_write,
+	.init			= mcast_init,
+	.protocol		= eth_protocol,
+	.read			= mcast_read,
+	.write			= mcast_write,
 };
 
 int mcast_setup(char *str, char **mac_out, void *data)
@@ -78,9 +78,9 @@ int mcast_setup(char *str, char **mac_out, void *data)
 	int n;
 
 	*init = ((struct mcast_init)
-		{ addr :	"239.192.168.1",
-		  port :	1102,
-		  ttl :		1 });
+		{ .addr 	= "239.192.168.1",
+		  .port 	= 1102,
+		  .ttl 		= 1 });
 
 	remain = split_if_spec(str, mac_out, &init->addr, &port_str, &ttl_str,
 			       NULL);
@@ -116,13 +116,13 @@ int mcast_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport mcast_transport = {
-	list :		LIST_HEAD_INIT(mcast_transport.list),
-	name :		"mcast",
-	setup : 	mcast_setup,
-	user :		&mcast_user_info,
-	kern :		&mcast_kern_info,
-	private_size :	sizeof(struct mcast_data),
-	setup_size :	sizeof(struct mcast_init),
+	.list 		= LIST_HEAD_INIT(mcast_transport.list),
+	.name 		= "mcast",
+	.setup  	= mcast_setup,
+	.user 		= &mcast_user_info,
+	.kern 		= &mcast_kern_info,
+	.private_size 	= sizeof(struct mcast_data),
+	.setup_size 	= sizeof(struct mcast_init),
 };
 
 static int register_mcast(void)

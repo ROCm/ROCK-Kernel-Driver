@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/adma100.c -- basic support for Pacific Digital ADMA-100 boards
+ *  linux/drivers/ide/pci/adma100.c -- basic support for Pacific Digital ADMA-100 boards
  *
  *     Created 09 Apr 2002 by Mark Lord
  *

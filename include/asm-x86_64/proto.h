@@ -1,6 +1,8 @@
 #ifndef _ASM_X8664_PROTO_H
 #define _ASM_X8664_PROTO_H 1
 
+#include <asm/ldt.h>
+
 /* misc architecture specific prototypes */
 
 struct cpuinfo_x86; 
@@ -23,6 +25,8 @@ extern void iommu_hole_init(void);
 
 extern void do_softirq_thunk(void);
 
+extern int numa_setup(char *opt);
+
 extern int setup_early_printk(char *); 
 extern void early_printk(const char *fmt, ...) __attribute__((format(printf,1,2)));
 
@@ -34,18 +38,27 @@ extern unsigned long numa_free_all_bootmem(void);
 extern void reserve_bootmem_generic(unsigned long phys, unsigned len);
 extern void free_bootmem_generic(unsigned long phys, unsigned len);
 
-extern unsigned long start_pfn, end_pfn, end_pfn_map; 
+extern unsigned long end_pfn_map; 
 
 extern void show_stack(unsigned long * rsp);
 
 extern void exception_table_check(void);
 
-extern int acpi_boot_init(char *);
+extern void acpi_reserve_bootmem(void);
+
+extern void swap_low_mappings(void);
 
 extern int map_syscall32(struct mm_struct *mm, unsigned long address);
 extern char *syscall32_page;
 
+void setup_node_bootmem(int nodeid, unsigned long start, unsigned long end);
+
+extern unsigned long max_mapnr;
+extern unsigned long end_pfn; 
+extern unsigned long table_start, table_end;
+
 struct thread_struct;
+struct user_desc;
 
 int do_set_thread_area(struct thread_struct *t, struct user_desc *u_info);
 int do_get_thread_area(struct thread_struct *t, struct user_desc *u_info);

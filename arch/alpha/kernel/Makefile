@@ -6,8 +6,6 @@ EXTRA_TARGETS	:= head.o
 
 EXTRA_AFLAGS	:= $(CFLAGS)
 
-export-objs := alpha_ksyms.o core_marvel.o core_titan.o
-
 obj-y    := entry.o traps.o process.o init_task.o osf_sys.o irq.o \
 	    irq_alpha.o signal.o setup.o ptrace.o time.o semaphore.o \
 	    alpha_ksyms.o systbls.o err_common.o
@@ -35,7 +33,12 @@ obj-y    += err_titan.o err_marvel.o
 
 obj-y	 += es1888.o smc37c669.o smc37c93x.o ns87312.o gct.o
 
+obj-y    += srmcons.o
+
 else
+
+# Misc support
+obj-$(CONFIG_ALPHA_SRM)		+= srmcons.o
 
 # Core logic support
 obj-$(CONFIG_ALPHA_APECS)	+= core_apecs.o

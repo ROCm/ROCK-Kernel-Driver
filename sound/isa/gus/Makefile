@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := gus_main.o gus_volume.o
-
 snd-gus-lib-objs := gus_main.o \
 		    gus_io.o gus_irq.o gus_timer.o \
 		    gus_mem.o gus_mem_proc.o gus_dram.o gus_dma.o gus_volume.o \
@@ -19,18 +17,24 @@ snd-gusmax-objs := gusmax.o
 snd-interwave-objs := interwave.o
 snd-interwave-stb-objs := interwave-stb.o
 
+#
+# this function returns:
+#   "m" - CONFIG_SND_SEQUENCER is m
+#   <empty string> - CONFIG_SND_SEQUENCER is undefined
+#   otherwise parameter #1 value
+#
+sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
+
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_GUSCLASSIC) += snd-gusclassic.o snd-gus-lib.o
+obj-$(call sequencer,$(CONFIG_SND_GUSCLASSIC)) += snd-gus-synth.o
 obj-$(CONFIG_SND_GUSMAX) += snd-gusmax.o snd-gus-lib.o
+obj-$(call sequencer,$(CONFIG_SND_GUSMAX)) += snd-gus-synth.o
 obj-$(CONFIG_SND_GUSEXTREME) += snd-gusextreme.o snd-gus-lib.o
+obj-$(call sequencer,$(CONFIG_SND_GUSEXTREME)) += snd-gus-synth.o
 obj-$(CONFIG_SND_INTERWAVE) += snd-interwave.o snd-gus-lib.o
+obj-$(call sequencer,$(CONFIG_SND_INTERWAVE)) += snd-gus-synth.o
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-interwave-stb.o snd-gus-lib.o
-ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
-  obj-$(CONFIG_SND_GUSCLASSIC) += snd-gus-synth.o
-  obj-$(CONFIG_SND_GUSMAX) += snd-gus-synth.o
-  obj-$(CONFIG_SND_GUSEXTREME) += snd-gus-synth.o
-  obj-$(CONFIG_SND_INTERWAVE) += snd-gus-synth.o
-  obj-$(CONFIG_SND_INTERWAVE_STB) += snd-gus-synth.o
-endif
+obj-$(call sequencer,$(CONFIG_SND_INTERWAVE_STB)) += snd-gus-synth.o
 
 obj-m := $(sort $(obj-m))

@@ -2,8 +2,6 @@
 # Makefile for the kernel Parallel port device drivers.
 #
 
-export-objs	:= init.o parport_pc.o
-
 parport-objs	:= share.o ieee1284.o ieee1284_ops.o init.o procfs.o
 
 ifeq ($(CONFIG_PARPORT_1284),y)

@@ -7,7 +7,11 @@
 	
 OUTPUT_ARCH(arm)
 ENTRY(stext)
+#ifndef __ARMEB__
 jiffies = jiffies_64;
+#else
+jiffies = jiffies_64 + 4;
+#endif
 SECTIONS
 {
 	. = TEXTADDR;

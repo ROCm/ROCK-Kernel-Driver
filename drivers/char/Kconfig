@@ -91,7 +91,7 @@ config COMPUTONE
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. You will get
-	  two modules called ip2.o and ip2main.o.
+	  two modules called ip2 and ip2main.
 
 config ROCKETPORT
 	tristate "Comtrol Rocketport support"
@@ -104,7 +104,7 @@ config ROCKETPORT
 
 	  If you want to compile this driver as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  rocket.o.
+	  rocket.
 
 config CYCLADES
 	tristate "Cyclades async mux support"
@@ -122,7 +122,7 @@ config CYCLADES
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called cyclades.o.
+	  will be called cyclades.
 
 	  If you haven't heard about it, it's safe to say N.
 
@@ -155,7 +155,7 @@ config DIGIEPCA
 	  one of the two drivers.
 
 	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called epca.o.
+	  <file:Documentation/modules.txt>. The module will be called epca.
 
 config DIGI
 	tristate "Digiboard PC/Xx Support"
@@ -168,7 +168,7 @@ config DIGI
 	  Y here and read the file <file:Documentation/digiboard.txt>.
 
 	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called pcxx.o.
+	  <file:Documentation/modules.txt>. The module will be called pcxx.
 
 config ESPSERIAL
 	tristate "Hayes ESP serial port support"
@@ -181,7 +181,7 @@ config ESPSERIAL
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>.  The module will be
-	  called esp.o.  If unsure, say N.
+	  called esp.  If unsure, say N.
 
 config MOXA_INTELLIO
 	tristate "Moxa Intellio support"
@@ -191,7 +191,7 @@ config MOXA_INTELLIO
 
 	  This driver can also be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called moxa.o. If you want to do that, say M
+	  The module will be called moxa. If you want to do that, say M
 	  here.
 
 config MOXA_SMARTIO
@@ -202,7 +202,7 @@ config MOXA_SMARTIO
 
 	  This driver can also be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mxser.o. If you want to do that, say M
+	  The module will be called mxser. If you want to do that, say M
 	  here.
 
 config ISI
@@ -214,7 +214,7 @@ config ISI
 	  built as a module ( = code which can be inserted in and removed from
 	  the running kernel whenever you want).  Please read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  isicom.o.
+	  isicom.
 
 config SYNCLINK
 	tristate "Microgate SyncLink card support"
@@ -226,7 +226,7 @@ config SYNCLINK
 
 	  This driver can only be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called synclink.o.  If you want to do that, say M
+	  The module will be called synclink.  If you want to do that, say M
 	  here.
 
 config SYNCLINKMP
@@ -240,7 +240,7 @@ config SYNCLINKMP
 
 	  This driver may be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called synclinkmp.o.  If you want to do that, say M
+	  The module will be called synclinkmp.  If you want to do that, say M
 	  here.
 
 config N_HDLC
@@ -252,7 +252,7 @@ config N_HDLC
 
 	  This driver can only be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called n_hdlc.o. If you want to do that, say M
+	  The module will be called n_hdlc. If you want to do that, say M
 	  here.
 
 config RISCOM8
@@ -266,7 +266,7 @@ config RISCOM8
 	  say Y here and read the file <file:Documentation/riscom8.txt>.
 
 	  Also it's possible to say M here and compile this driver as kernel
-	  loadable module; the module will be called riscom8.o.
+	  loadable module; the module will be called riscom8.
 
 config SPECIALIX
 	tristate "Specialix IO8+ card support"
@@ -280,7 +280,7 @@ config SPECIALIX
 	  If you have a card like that, say Y here and read the file
 	  <file:Documentation/specialix.txt>. Also it's possible to say M here
 	  and compile this driver as kernel loadable module which will be
-	  called specialix.o.
+	  called specialix.
 
 config SPECIALIX_RTSCTS
 	bool "Specialix DTR/RTS pin is RTS"
@@ -301,7 +301,7 @@ config SX
 
 	  This driver can only be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sx.o. If you want to do that, say M here.
+	  The module will be called sx. If you want to do that, say M here.
 
 config RIO
 	tristate "Specialix RIO system support"
@@ -343,7 +343,7 @@ config STALLION
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called stallion.o.
+	  will be called stallion.
 
 config ISTALLION
 	tristate "Stallion EC8/64, ONboard, Brumby support"
@@ -356,7 +356,7 @@ config ISTALLION
 	  To compile it as a module ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt>. The module will be called
-	  istallion.o.
+	  istallion.
 
 config SERIAL_TX3912
 	bool "TMPTX3912/PR31700 serial port support"
@@ -430,9 +430,9 @@ config A2232
 	  for which 8 pin to DB25 adapters were supplied. The card also had
 	  jumpers internally to toggle various pinning configurations.
 
-	  This driver can be built as a module; but then "generic_serial.o"
+	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232.o". If you want to do this, answer M here and read
+	  "ser_a2232". If you want to do this, answer M here and read
 	  "<file:Documentation/modules.txt>".
 
 source "drivers/serial/Kconfig"
@@ -495,7 +495,7 @@ config PRINTER
 	  driver as a module however ( = code which can be inserted in and
 	  removed from the running kernel whenever you want), say M here and
 	  read <file:Documentation/modules.txt> and
-	  <file:Documentation/parport.txt>.  The module will be called lp.o.
+	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
 	  use with the "lp" kernel command line option.  (Try "man bootparam"
@@ -539,7 +539,7 @@ config PPDEV
 	  This support is also available as a module.  If you want to compile
 	  it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  ppdev.o.
+	  ppdev.
 
 	  If unsure, say N.
 
@@ -558,7 +558,7 @@ config TIPAR
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tipar.o. If you want to compile it as a
+	  The module will be called tipar. If you want to compile it as a
 	  module, say M here and read Documentation/modules.txt.
 
 	  If you don't know what a parallel link cable is or what a Texas
@@ -598,7 +598,7 @@ config BUSMOUSE
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called busmouse.o. If you want to compile it as a
+	  The module will be called busmouse. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 endmenu
@@ -610,7 +610,7 @@ config QIC02_TAPE
 	  to compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  tpqic02.o.
+	  tpqic02.
 
 config QIC02_DYNCONF
 	bool "Do you want runtime configuration for QIC-02"
@@ -649,7 +649,7 @@ config DS1620
 	  found in the NetWinder. This driver allows the user to control the
 	  temperature set points and to read the current temperature.
 
-	  It is also possible to say M here to build it as a module (ds1620.o)
+	  It is also possible to say M here to build it as a module (ds1620)
 	  It is recommended to be used on a NetWinder, but it is not a
 	  necessity.
 
@@ -675,7 +675,7 @@ config NWBUTTON
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  nwbutton.o.
+	  nwbutton.
 
 	  Most people will answer Y to this question and "Reboot Using Button"
 	  below to be able to initiate a system shutdown from the button.
@@ -704,7 +704,7 @@ config NWFLASH
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nwflash.o. If you want to compile it as a
+	  The module will be called nwflash. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you're not sure, say N.
@@ -723,7 +723,7 @@ config INTEL_RNG
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  i810_rng.o.
+	  i810_rng.
 
 	  If unsure, say N.
 
@@ -741,7 +741,7 @@ config AMD_RNG
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  amd768_rng.o.
+	  amd768_rng.
 
 	  If unsure, say N.
 
@@ -769,7 +769,7 @@ config NVRAM
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nvram.o. If you want to compile it as a
+	  The module will be called nvram. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config RTC
@@ -797,7 +797,7 @@ config RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc.o. If you want to compile it as a module,
+	  The module is called rtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>.
 
 config GEN_RTC
@@ -817,7 +817,7 @@ config GEN_RTC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called genrtc.o. If you want to compile it as a module,
+	  The module is called genrtc. If you want to compile it as a module,
 	  say M here and read <file:Documentation/modules.txt>. To load the
 	  module automatically add 'alias char-major-10-135 genrtc' to your
 	  /etc/modules.conf
@@ -851,7 +851,7 @@ config DTLK
 	  called the `internal DoubleTalk'.  If you want to compile this as a
 	  module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called dtlk.o.
+	  <file:Documentation/modules.txt>. The module will be called dtlk.
 
 config R3964
 	tristate "Siemens R3964 line discipline"
@@ -863,7 +863,7 @@ config R3964
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  n_r3964.o.
+	  n_r3964.
 
 	  If unsure, say N.
 
@@ -879,7 +879,7 @@ config APPLICOM
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  applicom.o.
+	  applicom.
 
 	  If unsure, say N.
 
@@ -896,7 +896,7 @@ config SONYPI
 	  If you want to compile the driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called sonypi.o.
+	  will be called sonypi.
 
 
 menu "Ftape, the floppy tape device driver"
@@ -927,7 +927,7 @@ config FTAPE
 	  module ( = code which can be inserted in and removed from the
 	  running kernel whenever you want). If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>. The
-	  module will be called ftape.o.
+	  module will be called ftape.
 
 	  Note that the Ftape-HOWTO is out of date (sorry) and documents the
 	  older version 2.08 of this software but still contains useful
@@ -973,7 +973,7 @@ config MWAVE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mwave.o. If you want to compile it as
+	  The module will be called mwave. If you want to compile it as
 	  a module, say M here and read Documentation/modules.txt.
 
 config SCx200_GPIO
@@ -983,7 +983,7 @@ config SCx200_GPIO
 	  Give userspace access to the GPIO pins on the National
 	  Semiconductor SCx200 processors.
 
-	  If compiled as a module, it will be called scx200_gpio.o.
+	  If compiled as a module, it will be called scx200_gpio.
 
 config RAW_DRIVER
 	tristate "RAW driver (/dev/raw/rawN)"
@@ -991,6 +991,13 @@ config RAW_DRIVER
 	  The raw driver permits block devices to be bound to /dev/raw/rawN. 
 	  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
 	  See the raw(8) manpage for more details.
+
+config HANGCHECK_TIMER
+	tristate "Hangcheck timer"
+	help
+	  The hangcheck-timer module detects when the system has gone
+	  out to lunch past a certain margin.  It can reboot the system
+	  or merely print a warning.
 
 endmenu
 

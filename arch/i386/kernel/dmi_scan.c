@@ -450,17 +450,6 @@ static __init int broken_pirq(struct dmi_blacklist *d)
 }
 
 /*
- * ASUS K7V-RM has broken ACPI table defining sleep modes
- */
-
-static __init int broken_acpi_Sx(struct dmi_blacklist *d)
-{
-	printk(KERN_WARNING "Detected ASUS mainboard with broken ACPI sleep table\n");
-	dmi_broken |= BROKEN_ACPI_Sx;
-	return 0;
-}
-
-/*
  * Toshiba keyboard likes to repeat keys when they are not repeated.
  */
 
@@ -744,12 +733,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ broken_pirq, "Dell PowerEdge 8450", {		/* Bad $PIR */
 			MATCH(DMI_PRODUCT_NAME, "Dell PowerEdge 8450"),
 			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-			
-	{ broken_acpi_Sx, "ASUS K7V-RM", {		/* Bad ACPI Sx table */
-			MATCH(DMI_BIOS_VERSION,"ASUS K7V-RM ACPI BIOS Revision 1003A"),
-			MATCH(DMI_BOARD_NAME, "<K7V-RM>"),
-			NO_MATCH, NO_MATCH
 			} },
 			
 	{ broken_toshiba_keyboard, "Toshiba Satellite 4030cdt", { /* Keyboard generates spurious repeats */

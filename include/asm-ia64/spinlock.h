@@ -74,6 +74,27 @@ typedef struct {
 #define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
 #define spin_lock_init(x)			((x)->lock = 0)
 
+#define DEBUG_SPIN_LOCK	0
+
+#if DEBUG_SPIN_LOCK
+
+#include <ia64intrin.h>
+
+#define _raw_spin_lock(x)								\
+do {											\
+	unsigned long _timeout = 1000000000;						\
+	volatile unsigned int _old = 0, _new = 1, *_ptr = &((x)->lock);			\
+	do {										\
+		if (_timeout-- == 0) {							\
+			extern void dump_stack (void);					\
+			printk("kernel DEADLOCK at %s:%d?\n", __FILE__, __LINE__);	\
+			dump_stack();							\
+		}									\
+	} while (__sync_val_compare_and_swap(_ptr, _old, _new) != _old);		\
+} while (0)
+
+#else
+
 /*
  * Streamlined test_and_set_bit(0, (x)).  We use test-and-test-and-set
  * rather than a simple xchg to avoid writing the cache-line when
@@ -94,6 +115,8 @@ typedef struct {
 	"(p7) br.cond.spnt.few 1b\n"				\
 	";;\n"							\
 	:: "r"(&(x)->lock) : "ar.ccv", "p7", "r2", "r29", "memory")
+
+#endif /* !DEBUG_SPIN_LOCK */
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define _raw_spin_unlock(x)	do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)

@@ -31,6 +31,7 @@
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
+#include <asm/bug.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
@@ -789,7 +790,6 @@ SystemCall_common:
 	beq+	HardwareInterrupt_entry
 1:
 #endif
-	std	r3,ORIG_GPR3(r1)
 #ifdef DO_SOFT_DISABLE
 	ld	r20,SOFTE(r1)
 #else
@@ -1141,9 +1141,9 @@ _GLOBAL(save_remaining_regs)
 	 * If from user state, update THREAD.regs
 	 */
 	beq	2f			/* Modify THREAD.regs if from user */
-	addi	r24,r1,STACK_FRAME_OVERHEAD
+	addi	r23,r1,STACK_FRAME_OVERHEAD
 	ld	r22, PACACURRENT(r13)
-	std	r24,THREAD+PT_REGS(r22)
+	std	r23,THREAD+PT_REGS(r22)
 2:
 	SET_REG_TO_CONST(r22, MSR_KERNEL)
 

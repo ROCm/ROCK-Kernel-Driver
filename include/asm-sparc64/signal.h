@@ -88,27 +88,21 @@
 #define _NSIG_BPW     	64
 #define _NSIG_WORDS   	(__NEW_NSIG / _NSIG_BPW)
 
-#define _NSIG_BPW32   	32
-#define _NSIG_WORDS32 	(__NEW_NSIG / _NSIG_BPW32)
-
 #define SIGRTMIN       32
 #define SIGRTMAX       (__NEW_NSIG - 1)
 
 #if defined(__KERNEL__) || defined(__WANT_POSIX1B_SIGNALS__)
 #define _NSIG			__NEW_NSIG
 #define __new_sigset_t		sigset_t
-#define __new_sigset_t32	sigset_t32
 #define __new_sigaction		sigaction
 #define __new_sigaction32	sigaction32
 #define __old_sigset_t		old_sigset_t
-#define __old_sigset_t32	old_sigset_t32
 #define __old_sigaction		old_sigaction
 #define __old_sigaction32	old_sigaction32
 #else
 #define _NSIG			__OLD_NSIG
 #define NSIG			_NSIG
 #define __old_sigset_t		sigset_t
-#define __old_sigset_t32	sigset_t32
 #define __old_sigaction		sigaction
 #define __old_sigaction32	sigaction32
 #endif
@@ -116,15 +110,10 @@
 #ifndef __ASSEMBLY__
 
 typedef unsigned long __old_sigset_t;            /* at least 32 bits */
-typedef unsigned int __old_sigset_t32;
 
 typedef struct {
        unsigned long sig[_NSIG_WORDS];
 } __new_sigset_t;
-
-typedef struct {
-       unsigned int sig[_NSIG_WORDS32];
-} __new_sigset_t32;
 
 /* A SunOS sigstack */
 struct sigstack {
@@ -156,7 +145,7 @@ struct sigstack {
 #define SA_INTERRUPT	0x10
 #define SA_NOMASK	0x20
 #define SA_SHIRQ	0x40
-#define SA_NOCLDWAIT    0x100 /* not supported yet */
+#define SA_NOCLDWAIT    0x100
 #define SA_SIGINFO      0x200
 
 
@@ -213,14 +202,14 @@ struct __new_sigaction {
 	__new_sigset_t		sa_mask;
 };
 
+#ifdef __KERNEL__
 struct __new_sigaction32 {
 	unsigned		sa_handler;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
-	__new_sigset_t32 	sa_mask;
+	compat_sigset_t 	sa_mask;
 };
 
-#ifdef __KERNEL__
 struct k_sigaction {
 	struct __new_sigaction 	sa;
 	void			*ka_restorer;
@@ -234,12 +223,14 @@ struct __old_sigaction {
 	void 			(*sa_restorer)(void);     /* not used by Linux/SPARC yet */
 };
 
+#ifdef __KERNEL__
 struct __old_sigaction32 {
 	unsigned		sa_handler;
-	__old_sigset_t32  	sa_mask;
+	compat_old_sigset_t  	sa_mask;
 	unsigned int    	sa_flags;
 	unsigned		sa_restorer;     /* not used by Linux/SPARC yet */
 };
+#endif
 
 typedef struct sigaltstack {
 	void			*ss_sp;
@@ -254,7 +245,32 @@ typedef struct sigaltstack32 {
 	compat_size_t		ss_size;
 } stack_t32;
 
-#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+struct signal_deliver_cookie {
+	int restart_syscall;
+	unsigned long orig_i0;
+};
+
+#define ptrace_signal_deliver(REGS, COOKIE) \
+do {	struct signal_deliver_cookie *cp = (COOKIE); \
+	if (cp->restart_syscall && \
+	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND || \
+	     regs->u_regs[UREG_I0] == ERESTARTSYS || \
+	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) { \
+		/* replay the system call when we are done */ \
+		regs->u_regs[UREG_I0] = cp->orig_i0; \
+		regs->tpc -= 4; \
+		regs->tnpc -= 4; \
+		cp->restart_syscall = 0; \
+	} \
+	if (cp->restart_syscall && \
+	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) { \
+		regs->u_regs[UREG_G1] = __NR_restart_syscall; \
+		regs->tpc -= 4; \
+		regs->tnpc -= 4; \
+		cp->restart_syscall = 0; \
+	} \
+} while (0)
+
 #define HAVE_ARCH_SYS_PAUSE
 
 #endif

@@ -41,11 +41,11 @@ void ssl_announce(char *dev_name, int dev)
 }
 
 static struct chan_opts opts = {
-	announce: 	ssl_announce,
-	xterm_title:	"Serial Line #%d",
-	raw:		1,
-	tramp_stack :	0,
-	in_kernel :	1,
+	.announce 	= ssl_announce,
+	.xterm_title	= "Serial Line #%d",
+	.raw		= 1,
+	.tramp_stack 	= 0,
+	.in_kernel 	= 1,
 };
 
 static int ssl_config(char *str);
@@ -53,23 +53,23 @@ static int ssl_get_config(char *dev, char *str, int size, char **error_out);
 static int ssl_remove(char *str);
 
 static struct line_driver driver = {
-	name :			"UML serial line",
-	devfs_name :		"tts/%d",
-	major :			TTYAUX_MAJOR,
-	minor_start :		64,
-	type :		 	TTY_DRIVER_TYPE_SERIAL,
-	subtype :	 	0,
-	read_irq :		SSL_IRQ,
-	read_irq_name :		"ssl",
-	write_irq :		SSL_WRITE_IRQ,
-	write_irq_name :	"ssl-write",
-	symlink_from :		"serial",
-	symlink_to :		"tts",
-	mc : {
-		name : 		"ssl",
-		config :	ssl_config,
-		get_config :	ssl_get_config,
-		remove :	ssl_remove,
+	.name 			= "UML serial line",
+	.devfs_name 		= "tts/%d",
+	.major 			= TTYAUX_MAJOR,
+	.minor_start 		= 64,
+	.type 		 	= TTY_DRIVER_TYPE_SERIAL,
+	.subtype 	 	= 0,
+	.read_irq 		= SSL_IRQ,
+	.read_irq_name 		= "ssl",
+	.write_irq 		= SSL_WRITE_IRQ,
+	.write_irq_name 	= "ssl-write",
+	.symlink_from 		= "serial",
+	.symlink_to 		= "tts",
+	.mc  = {
+		.name  		= "ssl",
+		.config 	= ssl_config,
+		.get_config 	= ssl_get_config,
+		.remove 	= ssl_remove,
 	},
 };
 
@@ -191,21 +191,21 @@ void ssl_hangup(struct tty_struct *tty)
 }
 
 static struct tty_driver ssl_driver = {
-	refcount :		&ssl_refcount,
-	open :	 		ssl_open,
-	close :	 		ssl_close,
-	write :	 		ssl_write,
-	put_char :		ssl_put_char,
-	flush_chars :		ssl_flush_chars,
-	chars_in_buffer :	ssl_chars_in_buffer,
-	flush_buffer :		ssl_flush_buffer,
-	ioctl :	 		ssl_ioctl,
-	throttle :		ssl_throttle,
-	unthrottle :		ssl_unthrottle,
-	set_termios :		ssl_set_termios,
-	stop :	 		ssl_stop,
-	start :	 		ssl_start,
-	hangup :	 	ssl_hangup
+	.refcount 		= &ssl_refcount,
+	.open 	 		= ssl_open,
+	.close 	 		= ssl_close,
+	.write 	 		= ssl_write,
+	.put_char 		= ssl_put_char,
+	.flush_chars 		= ssl_flush_chars,
+	.chars_in_buffer 	= ssl_chars_in_buffer,
+	.flush_buffer 		= ssl_flush_buffer,
+	.ioctl 	 		= ssl_ioctl,
+	.throttle 		= ssl_throttle,
+	.unthrottle 		= ssl_unthrottle,
+	.set_termios 		= ssl_set_termios,
+	.stop 	 		= ssl_stop,
+	.start 	 		= ssl_start,
+	.hangup 	 	= ssl_hangup
 };
 
 /* Changed by ssl_init and referenced by ssl_exit, which are both serialized

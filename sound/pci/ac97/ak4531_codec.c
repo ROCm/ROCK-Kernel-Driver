@@ -33,7 +33,6 @@ MODULE_LICENSE("GPL");
 #define chip_t ak4531_t
 
 static void snd_ak4531_proc_init(snd_card_t * card, ak4531_t * ak4531);
-static void snd_ak4531_proc_done(ak4531_t * ak4531);
 
 /*
  *
@@ -314,7 +313,6 @@ AK4531_SINGLE("Mic Boost (+30dB)", 0, AK4531_MIC_GAIN, 0, 1, 0)
 static int snd_ak4531_free(ak4531_t *ak4531)
 {
 	if (ak4531) {
-		snd_ak4531_proc_done(ak4531);
 		if (ak4531->private_free)
 			ak4531->private_free(ak4531);
 		snd_magic_kfree(ak4531);
@@ -359,7 +357,8 @@ static u8 snd_ak4531_initial_map[0x19 + 1] = {
 
 int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 {
-	int idx, err;
+	unsigned int idx;
+	int err;
 	ak4531_t * ak4531;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ak4531_dev_free,
@@ -425,26 +424,8 @@ static void snd_ak4531_proc_init(snd_card_t * card, ak4531_t * ak4531)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(card, "ak4531", card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = ak4531;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_ak4531_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	ak4531->proc_entry = entry;
-}
-
-static void snd_ak4531_proc_done(ak4531_t * ak4531)
-{
-	if (ak4531->proc_entry) {
-		snd_info_unregister(ak4531->proc_entry);
-		ak4531->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(card, "ak4531", &entry))
+		snd_info_set_text_ops(entry, ak4531, snd_ak4531_proc_read);
 }
 
 EXPORT_SYMBOL(snd_ak4531_mixer);

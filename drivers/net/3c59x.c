@@ -181,7 +181,7 @@
     - See http://www.zip.com.au/~akpm/linux/#3c59x-2.3 for more details.
     - Also see Documentation/networking/vortex.txt
 
-   LK1.1.19 10Nov09 Marc Zyngier <maz@wild-wind.fr.eu.org>
+   LK1.1.19 10Nov02 Marc Zyngier <maz@wild-wind.fr.eu.org>
     - EISA sysfs integration.
 */
 
@@ -817,7 +817,11 @@ struct vortex_private {
 	u32 power_state[16];
 };
 
+#ifdef CONFIG_PCI
 #define DEVICE_PCI(dev) (((dev)->bus == &pci_bus_type) ? to_pci_dev((dev)) : NULL)
+#else
+#define DEVICE_PCI(dev) NULL
+#endif
 
 #define VORTEX_PCI(vp) (((vp)->gendev) ? DEVICE_PCI((vp)->gendev) : NULL)
 
@@ -1003,6 +1007,7 @@ static int vortex_eisa_remove (struct device *device)
 /* returns count found (>= 0), or negative on error */
 static int __init vortex_eisa_init (void)
 {
+	int eisa_found = 0;
 	int orig_cards_found = vortex_cards_found;
 
 	/* Now check all slots of the EISA bus. */
@@ -1010,8 +1015,14 @@ static int __init vortex_eisa_init (void)
 		return 0;
 
 #ifdef CONFIG_EISA
-	if (eisa_driver_register (&vortex_eisa_driver) < 0) {
-		eisa_driver_unregister (&vortex_eisa_driver);
+	if (eisa_driver_register (&vortex_eisa_driver) >= 0) {
+			/* Because of the way EISA bus is probed, we cannot assume
+			 * any device have been found when we exit from
+			 * eisa_driver_register (the bus root driver may not be
+			 * initialized yet). So we blindly assume something was
+			 * found, and let the sysfs magic happend... */
+			
+			eisa_found = 1;
 	}
 #endif
 	
@@ -1021,7 +1032,7 @@ static int __init vortex_eisa_init (void)
 					  compaq_device_id, vortex_cards_found++);
 	}
 
-	return vortex_cards_found - orig_cards_found;
+	return vortex_cards_found - orig_cards_found + eisa_found;
 }
 
 /* returns count (>= 0), or negative on error */
@@ -1768,10 +1779,12 @@ vortex_timer(unsigned long data)
 			if (vortex_debug > 1)
 				printk(KERN_DEBUG "%s: Media %s has link beat, %x.\n",
 					   dev->name, media_tbl[dev->if_port].name, media_status);
-		} else if (vortex_debug > 1) {
+		} else {
 			netif_carrier_off(dev);
-			printk(KERN_DEBUG "%s: Media %s has no link beat, %x.\n",
-				   dev->name, media_tbl[dev->if_port].name, media_status);
+			if (vortex_debug > 1) {
+				printk(KERN_DEBUG "%s: Media %s has no link beat, %x.\n",
+					   dev->name, media_tbl[dev->if_port].name, media_status);
+			}
 		}
 		break;
 	case XCVR_MII: case XCVR_NWAY:

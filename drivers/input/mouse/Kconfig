@@ -25,7 +25,7 @@ config MOUSE_PS2
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called psmouse.o. If you want to compile it as a
+	  The module will be called psmouse. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config MOUSE_SERIAL
@@ -40,7 +40,7 @@ config MOUSE_SERIAL
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sermouse.o. If you want to compile it as a
+	  The module will be called sermouse. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config MOUSE_INPORT
@@ -52,7 +52,7 @@ config MOUSE_INPORT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called inport.o. If you want to compile it as a
+	  The module will be called inport. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
 config MOUSE_ATIXL
@@ -70,7 +70,7 @@ config MOUSE_LOGIBM
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called logibm.o. If you want to compile it as a
+	  The module will be called logibm. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
 config MOUSE_PC110PAD
@@ -82,7 +82,7 @@ config MOUSE_PC110PAD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pc110pad.o. If you want to compile it as a
+	  The module will be called pc110pad. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
 config MOUSE_MAPLE
@@ -94,7 +94,7 @@ config MOUSE_MAPLE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maplemouse.o. If you want to compile it as a
+	  The module will be called maplemouse. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
 config MOUSE_AMIGA
@@ -106,7 +106,7 @@ config MOUSE_AMIGA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called amimouse.o. If you want to compile it as a
+	  The module will be called amimouse. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 
 config MOUSE_RISCPC
@@ -118,6 +118,6 @@ config MOUSE_RISCPC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rpcmouse.o. If you want to compile it as a
+	  The module will be called rpcmouse. If you want to compile it as a
 	  module, say M here and read <file.:Documentation/modules.txt>.
 

@@ -25,7 +25,7 @@ config KEYBOARD_ATKBD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called atkbd.o. If you want to compile it as a
+	  The module will be called atkbd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config KEYBOARD_SUNKBD
@@ -38,7 +38,7 @@ config KEYBOARD_SUNKBD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sunkbd.o. If you want to compile it as a
+	  The module will be called sunkbd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config KEYBOARD_XTKBD
@@ -52,7 +52,7 @@ config KEYBOARD_XTKBD
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xtkbd.o. If you want to compile it as a
+	  The module will be called xtkbd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config KEYBOARD_NEWTON
@@ -63,7 +63,7 @@ config KEYBOARD_NEWTON
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maple_keyb.o. If you want to compile it as a
+	  The module will be called maple_keyb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config KEYBOARD_MAPLE
@@ -75,7 +75,7 @@ config KEYBOARD_MAPLE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maple_keyb.o. If you want to compile it as a
+	  The module will be called maple_keyb. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config KEYBOARD_AMIGA
@@ -87,6 +87,6 @@ config KEYBOARD_AMIGA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called amikbd.o. If you want to compile it as a
+	  The module will be called amikbd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 

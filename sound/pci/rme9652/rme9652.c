@@ -263,7 +263,6 @@ typedef struct snd_rme9652 {
 	snd_card_t *card;
 	snd_pcm_t *pcm;
 	struct pci_dev *pci;
-	snd_info_entry_t *proc_entry;
 	snd_kcontrol_t *spdif_ctl;
 
 } rme9652_t;
@@ -375,7 +374,7 @@ static inline void rme9652_compute_period_size(rme9652_t *rme9652)
 static snd_pcm_uframes_t rme9652_hw_pointer(rme9652_t *rme9652)
 {
 	int status;
-	int offset, frag;
+	unsigned int offset, frag;
 	snd_pcm_uframes_t period_size = rme9652->period_bytes / 4;
 	snd_pcm_sframes_t delta;
 
@@ -390,7 +389,7 @@ static snd_pcm_uframes_t rme9652_hw_pointer(rme9652_t *rme9652)
 
 	delta = rme9652->prev_hw_offset - offset;
 	delta &= 0xffff;
-	if (delta <= rme9652->max_jitter * 4)
+	if (delta <= (snd_pcm_sframes_t)rme9652->max_jitter * 4)
 		offset = rme9652->prev_hw_offset;
 	else
 		rme9652->prev_hw_offset = offset;
@@ -1103,7 +1102,7 @@ static int snd_rme9652_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
 	spin_lock_irqsave(&rme9652->lock, flags);
-	change = val != rme9652_spdif_out(rme9652);
+	change = (int)val != rme9652_spdif_out(rme9652);
 	rme9652_set_spdif_output(rme9652, val);
 	spin_unlock_irqrestore(&rme9652->lock, flags);
 	return change;
@@ -1190,7 +1189,7 @@ static int snd_rme9652_put_sync_mode(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 	
 	val = ucontrol->value.enumerated.item[0] % 3;
 	spin_lock_irqsave(&rme9652->lock, flags);
-	change = val != rme9652_sync_mode(rme9652);
+	change = (int)val != rme9652_sync_mode(rme9652);
 	rme9652_set_sync_mode(rme9652, val);
 	spin_unlock_irqrestore(&rme9652->lock, flags);
 	return change;
@@ -1287,7 +1286,7 @@ static int snd_rme9652_put_sync_pref(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 	max = rme9652->ss_channels == RME9652_NCHANNELS ? 4 : 3;
 	val = ucontrol->value.enumerated.item[0] % max;
 	spin_lock_irqsave(&rme9652->lock, flags);
-	change = val != rme9652_sync_pref(rme9652);
+	change = (int)val != rme9652_sync_pref(rme9652);
 	rme9652_set_sync_pref(rme9652, val);
 	spin_unlock_irqrestore(&rme9652->lock, flags);
 	return change;
@@ -1601,7 +1600,8 @@ RME9652_ADAT1_IN("ADAT1 Input Source", 0);
 
 int snd_rme9652_create_controls(snd_card_t *card, rme9652_t *rme9652)
 {
-	int idx, err;
+	unsigned int idx;
+	int err;
 	snd_kcontrol_t *kctl;
 
 	for (idx = 0; idx < RME9652_CONTROLS; idx++) {
@@ -1803,27 +1803,8 @@ static void __devinit snd_rme9652_proc_init(rme9652_t *rme9652)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(rme9652->card, "rme9652", rme9652->card->proc_root)) !=
-	    NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = rme9652;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_rme9652_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	rme9652->proc_entry = entry;
-}
-
-static void snd_rme9652_proc_done(rme9652_t *rme9652)
-{
-	if (rme9652->proc_entry) {
-		snd_info_unregister(rme9652->proc_entry);
-		rme9652->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(rme9652->card, "rme9652", &entry))
+		snd_info_set_text_ops(entry, rme9652, snd_rme9652_proc_read);
 }
 
 static void snd_rme9652_free_buffers(rme9652_t *rme9652)
@@ -1855,7 +1836,6 @@ static int snd_rme9652_free(rme9652_t *rme9652)
 {
 	if (rme9652->irq >= 0)
 		rme9652_stop(rme9652);
-	snd_rme9652_proc_done(rme9652);
 	snd_rme9652_free_buffers(rme9652);
 
 	if (rme9652->iobase)
@@ -2116,7 +2096,7 @@ static int snd_rme9652_hw_params(snd_pcm_substream_t *substream,
 		   that matter are the same.
 		 */
 
-		if (params_rate(params) !=
+		if ((int)params_rate(params) !=
 		    rme9652_adat_sample_rate(rme9652)) {
 			spin_unlock_irq(&rme9652->lock);
 			_snd_pcm_hw_param_setempty(params, SNDRV_PCM_HW_PARAM_RATE);
@@ -2288,9 +2268,9 @@ static snd_pcm_hardware_t snd_rme9652_playback_subinfo =
 	.rate_max =		96000,
 	.channels_min =		10,
 	.channels_max =		26,
-	.buffer_bytes_max =	1024*1024,
-	.period_bytes_min =	1,
-	.period_bytes_max =	1024*1024,
+	.buffer_bytes_max =	RME9652_CHANNEL_BUFFER_BYTES * 26,
+	.period_bytes_min =	(64 * 4) * 10,
+	.period_bytes_max =	(8192 * 4) * 26,
 	.periods_min =		2,
 	.periods_max =		2,
 	.fifo_size =		0,
@@ -2311,9 +2291,9 @@ static snd_pcm_hardware_t snd_rme9652_capture_subinfo =
 	.rate_max =		96000,
 	.channels_min =		10,
 	.channels_max =		26,
-	.buffer_bytes_max =	1024*1024,
-	.period_bytes_min =	1,
-	.period_bytes_max =	1024*1024,
+	.buffer_bytes_max =	RME9652_CHANNEL_BUFFER_BYTES *26,
+	.period_bytes_min =	(64 * 4) * 10,
+	.period_bytes_max =	(8192 * 4) * 26,
 	.periods_min =		2,
 	.periods_max =		2,
 	.fifo_size =		0,

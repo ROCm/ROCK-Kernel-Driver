@@ -104,11 +104,11 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 	sigset_t saveset;
 
 	set &= _BLOCKABLE;
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, set);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = regs->npc;
 	regs->npc += 4;
@@ -161,11 +161,11 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
 	}
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	oldset = current->blocked;
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = regs->npc;
 	regs->npc += 4;
@@ -267,10 +267,10 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 		goto segv_and_exit;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	return;
 
 segv_and_exit:
@@ -314,10 +314,10 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 		goto segv_and_exit;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = pc;
 	regs->npc = npc;
@@ -384,10 +384,10 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 	do_sigaltstack(&st, NULL, (unsigned long)sf);
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
 	send_sig(SIGSEGV, current, 1);
@@ -967,10 +967,10 @@ asmlinkage int svr4_setcontext (svr4_ucontext_t *c, struct pt_regs *regs)
 		set.sig[3] = setv.sigbits[3];
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	regs->pc = pc;
 	regs->npc = npc | 1;
 	err |= __get_user(regs->y, &((*gr) [SVR4_Y]));
@@ -1007,11 +1007,11 @@ handle_signal(unsigned long signr, struct k_sigaction *ka,
 	if(ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
 	if(!(ka->sa.sa_flags & SA_NOMASK)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked, signr);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
 
@@ -1045,8 +1045,9 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 			 unsigned long orig_i0, int restart_syscall)
 {
-	struct k_sigaction *ka;
 	siginfo_t info;
+	struct sparc_deliver_cookie cookie;
+	int signr;
 
 	/*
 	 * XXX Disable svr4 signal handling until solaris emulation works.
@@ -1059,142 +1060,32 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 	int svr4_signal = current->personality == PER_SVR4;
 #endif
 
+	cookie.restart_syscall = restart_syscall;
+	cookie.orig_i0 = orig_i0;
+
 	if (!oldset)
 		oldset = &current->blocked;
 
-	for (;;) {
-		sigset_t *mask = &current->blocked;
-		unsigned long signr = 0;
-
-		spin_lock_irq(&current->sig->siglock);
-		signr = dequeue_signal(mask, &info);
-		spin_unlock_irq(&current->sig->siglock);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			/* Do the syscall restart before we let the debugger
-			 * look at the child registers.
-			 */
-			if (restart_syscall &&
-			    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
-			     regs->u_regs[UREG_I0] == ERESTARTSYS ||
-			     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
-				/* replay the system call when we are done */
-				regs->u_regs[UREG_I0] = orig_i0;
-				regs->pc -= 4;
-				regs->npc -= 4;
-				restart_syscall = 0;
-			}
-			if (restart_syscall &&
-			    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
-				regs->u_regs[UREG_G1] = __NR_restart_syscall;
-				regs->pc -= 4;
-				regs->npc -= 4;
-				restart_syscall = 0;
-			}
-			current->exit_code = signr;
-			set_current_state(TASK_STOPPED);
-
-			/* This happens to be SMP safe so no need to
-			 * grab master kernel lock even in this case.
-			 */
-			notify_parent(current, SIGCHLD);
-			schedule();
-			if (!(signr = current->exit_code))
-				continue;
-			current->exit_code = 0;
-			if (signr == SIGSTOP)
-				continue;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
-		ka = &current->sig->action[signr-1];
-
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-
-			/* sys_wait4() grabs the master kernel lock, so
-			 * we need not do so, that sucker should be
-			 * threaded and would not be that difficult to
-			 * do anyways.
-			 */
-			while(sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				;
-			continue;
-		}
-		if (ka->sa.sa_handler == SIG_DFL) {
-			unsigned long exit_code = signr;
-
-			if (current->pid == 1)
-				continue;
-			switch (signr) {
-			case SIGCONT: case SIGCHLD: case SIGWINCH: case SIGURG:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				/* The operations performed by
-				 * is_orphaned_pgrp() are protected by
-				 * the tasklist_lock.
-				 */
-				if (is_orphaned_pgrp(current->pgrp))
-					continue;
-
-			case SIGSTOP: {
-				struct signal_struct *sig;
-				set_current_state(TASK_STOPPED);
-				current->exit_code = signr;
-				sig = current->parent->sig;
-				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
-				      SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-			}
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGABRT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, exit_code, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				sig_exit(signr, exit_code, &info);
-				/* NOT REACHED */
-			}
-		}
-		if (restart_syscall)
-			syscall_restart(orig_i0, regs, &ka->sa);
+	signr = get_signal_to_deliver(&info, regs, &cookie);
+	if (signr > 0) {
+		struct k_sigaction *ka;
+		
+		ka = &current->sighand->action[signr-1];
+		if (cookie.restart_syscall)
+			syscall_restart(cookie.orig_i0, regs, &ka->sa);
 		handle_signal(signr, ka, &info, oldset, regs, svr4_signal);
 		return 1;
 	}
-	if (restart_syscall &&
+	if (cookie.restart_syscall &&
 	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
 	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
 	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = orig_i0;
+		regs->u_regs[UREG_I0] = cookie.orig_i0;
 		regs->pc -= 4;
 		regs->npc -= 4;
 	}
-	if (restart_syscall &&
+	if (cookie.restart_syscall &&
 	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
 		regs->u_regs[UREG_G1] = __NR_restart_syscall;
 		regs->pc -= 4;

@@ -17,6 +17,8 @@
 #ifndef LINUX_PCI_H
 #define LINUX_PCI_H
 
+#include <linux/mod_devicetable.h>
+
 /*
  * Under PCI, each device has 256 bytes of configuration address space,
  * of which the first 64 bytes are standardized as follows:
@@ -359,8 +361,6 @@ enum pci_mmap_state {
 #define DEVICE_COUNT_DMA	2
 #define DEVICE_COUNT_RESOURCE	12
 
-#define PCI_ANY_ID (~0)
-
 /*
  * The pci_dev structure is used to describe PCI devices.
  */
@@ -489,13 +489,6 @@ struct pbus_set_ranges_data
 	unsigned long io_start, io_end;
 	unsigned long mem_start, mem_end;
 	unsigned long prefetch_start, prefetch_end;
-};
-
-struct pci_device_id {
-	unsigned int vendor, device;		/* Vendor and device ID or PCI_ANY_ID */
-	unsigned int subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
-	unsigned int class, class_mask;		/* (class,subclass,prog-if) triplet */
-	unsigned long driver_data;		/* Data private to the driver */
 };
 
 struct pci_driver {
@@ -670,6 +663,37 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
 extern struct pci_dev *isa_bridge;
 #endif
+
+/* Some worker functions that PCI Hotplug drivers find useful */
+struct pci_dev_wrapped {
+	struct pci_dev	*dev;
+	void		*data;
+};
+
+struct pci_bus_wrapped {
+	struct pci_bus	*bus;
+	void		*data;
+};
+
+struct pci_visit {
+	int (* pre_visit_pci_bus)	(struct pci_bus_wrapped *,
+					 struct pci_dev_wrapped *);
+	int (* post_visit_pci_bus)	(struct pci_bus_wrapped *,
+					 struct pci_dev_wrapped *);
+
+	int (* pre_visit_pci_dev)	(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+	int (* visit_pci_dev)		(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+	int (* post_visit_pci_dev)	(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+};
+
+extern int pci_visit_dev(struct pci_visit *fn,
+			 struct pci_dev_wrapped *wrapped_dev,
+			 struct pci_bus_wrapped *wrapped_parent);
+extern int pci_is_dev_in_use(struct pci_dev *dev);
+extern int pci_remove_device_safe(struct pci_dev *dev);
 
 #endif /* CONFIG_PCI */
 

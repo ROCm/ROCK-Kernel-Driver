@@ -181,7 +181,7 @@ static void storkClockTS(void)
 {
     storkSetLatchB(STORK_TOUCH_SCREEN_DCLK);
     udelay(10);			 /* hmm wait 200ns (min) - ok this ought to be udelay(1) but that doesn't get */
-				 /* consistant values so I'm using 10 (urgh) */
+				 /* consistent values so I'm using 10 (urgh) */
     storkClearLatchB(STORK_TOUCH_SCREEN_DCLK);
     udelay(10);
 }

@@ -10,8 +10,6 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:= oldlatches.o
-
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
 EXTRA_TARGETS 		:= head.o

@@ -150,6 +150,9 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define ES_REG_STATUS	0x04	/* R/O: Interrupt/Chip select status register */
 #define   ES_INTR               (1<<31)		/* Interrupt is pending */
 #define   ES_1371_ST_AC97_RST	(1<<29)		/* CT5880 AC'97 Reset bit */
+#define   ES_1373_REAR_BIT27	(1<<27)		/* rear bits: 000 - front, 010 - mirror, 101 - separate */
+#define   ES_1373_REAR_BIT26	(1<<26)
+#define   ES_1373_REAR_BIT24	(1<<24)
 #define   ES_1373_GPIO_INT_EN(o)(((o)&0x0f)<<20)/* GPIO [3:0] pins - interrupt enable */
 #define   ES_1373_SPDIF_EN	(1<<18)		/* SPDIF enable */
 #define   ES_1373_SPDIF_TEST	(1<<17)		/* SPDIF test */
@@ -398,15 +401,15 @@ struct _snd_ensoniq {
 	unsigned int spdif_default;
 	unsigned int spdif_stream;
 
-	snd_info_entry_t *proc_entry;
-
 #ifdef CHIP1370
 	unsigned char *bugbuf;
 	dma_addr_t bugbuf_addr;
 #endif
 
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	struct gameport gameport;
 	struct semaphore joy_sem;	// gameport configuration semaphore
+#endif
 };
 
 static void snd_audiopci_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -1197,7 +1200,11 @@ static int __devinit snd_ensoniq_pcm(ensoniq_t * ensoniq, int device, snd_pcm_t 
 	if (err < 0)
 		return err;
 
+#ifdef CHIP1370
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_ensoniq_playback2_ops);
+#else
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_ensoniq_playback1_ops);
+#endif
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_ensoniq_capture_ops);
 
 	pcm->private_data = ensoniq;
@@ -1239,8 +1246,11 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
 	if (err < 0)
 		return err;
 
+#ifdef CHIP1370
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_ensoniq_playback1_ops);
-
+#else
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_ensoniq_playback2_ops);
+#endif
 	pcm->private_data = ensoniq;
 	pcm->private_free = snd_ensoniq_pcm_free2;
 	pcm->info_flags = 0;
@@ -1262,9 +1272,10 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
  *  Mixer section
  */
 
+/*
+ * ENS1371 mixer (including SPDIF interface)
+ */
 #ifdef CHIP1371
-
-
 static int snd_ens1373_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
@@ -1421,6 +1432,53 @@ static int snd_es1371_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static snd_kcontrol_new_t snd_es1371_mixer_spdif __devinitdata =
 ES1371_SPDIF("IEC958 Playback Switch");
 
+static int snd_es1373_rear_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+        uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+        uinfo->count = 1;
+        uinfo->value.integer.min = 0;
+        uinfo->value.integer.max = 1;
+        return 0;
+}
+
+static int snd_es1373_rear_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	int val = 0;
+	
+	spin_lock_irq(&ensoniq->reg_lock);
+	if ((ensoniq->cssr & (ES_1373_REAR_BIT27|ES_1373_REAR_BIT26|ES_1373_REAR_BIT24)) == ES_1373_REAR_BIT26)
+	    	val = 1;
+	ucontrol->value.integer.value[0] = val;
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return 0;
+}
+
+static int snd_es1373_rear_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	unsigned int nval1;
+	int change;
+	
+	nval1 = ucontrol->value.integer.value[0] ? ES_1373_REAR_BIT26 : (ES_1373_REAR_BIT27|ES_1373_REAR_BIT24);
+	spin_lock_irq(&ensoniq->reg_lock);
+	change = (ensoniq->cssr & (ES_1373_REAR_BIT27|ES_1373_REAR_BIT26|ES_1373_REAR_BIT24)) != nval1;
+	ensoniq->cssr &= ~(ES_1373_REAR_BIT27|ES_1373_REAR_BIT26|ES_1373_REAR_BIT24);
+	ensoniq->cssr |= nval1;
+	outl(ensoniq->cssr, ES_REG(ensoniq, STATUS));
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return change;
+}
+
+static snd_kcontrol_new_t snd_ens1373_rear __devinitdata =
+{
+	.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name =		"AC97 2ch->4ch Copy Switch",
+	.info =		snd_es1373_rear_info,
+	.get =		snd_es1373_rear_get,
+	.put =		snd_es1373_rear_put,
+};
+
 static void snd_ensoniq_mixer_free_ac97(ac97_t *ac97)
 {
 	ensoniq_t *ensoniq = snd_magic_cast(ensoniq_t, ac97->private_data, return);
@@ -1431,7 +1489,7 @@ static struct {
 	unsigned short vid;		/* vendor ID */
 	unsigned short did;		/* device ID */
 	unsigned char rev;		/* revision */
-} __devinitdata es1371_spdif_present[] = {
+} es1371_spdif_present[] __devinitdata = {
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_C },
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_D },
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_E },
@@ -1483,11 +1541,19 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 			snd_ctl_add(card, kctl);
 			break;
 		}
+	if (ensoniq->u.es1371.ac97->ext_id & AC97_EI_SDAC) {
+		/* mirror rear to front speakers */
+		ensoniq->cssr &= ~(ES_1373_REAR_BIT27|ES_1373_REAR_BIT24);
+		ensoniq->cssr |= ES_1373_REAR_BIT26;
+		snd_ctl_add(card, snd_ctl_new1(&snd_ens1373_rear, ensoniq));
+	}
 	return 0;
 }
 
 #endif /* CHIP1371 */
 
+/* generic control callbacks for ens1370 and for joystick */
+#if defined(CHIP1370) || defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 #define ENSONIQ_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
   .get = snd_ensoniq_control_get, .put = snd_ensoniq_control_put, \
@@ -1515,7 +1581,6 @@ static int snd_ensoniq_control_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 }
 
 #ifdef CHIP1370
-
 static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
@@ -1533,13 +1598,20 @@ static int snd_ensoniq_control_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
 	return change;
 }
+#endif /* CHIP1370 */
+#endif /* CHIP1370 || GAMEPORT */
 
-#define ES1370_CONTROLS 2
+/*
+ * ENS1370 mixer
+ */
 
+#ifdef CHIP1370
 static snd_kcontrol_new_t snd_es1370_controls[2] __devinitdata = {
 ENSONIQ_CONTROL("PCM 0 Output also on Line-In Jack", ES_1370_XCTL0),
 ENSONIQ_CONTROL("Mic +5V bias", ES_1370_XCTL1)
 };
+
+#define ES1370_CONTROLS ARRAY_SIZE(snd_es1370_controls)
 
 static void snd_ensoniq_mixer_free_ak4531(ak4531_t *ak4531)
 {
@@ -1551,7 +1623,8 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 {
 	snd_card_t *card = ensoniq->card;
 	ak4531_t ak4531;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	/* try reset AK4531 */
 	outw(ES_1370_CODEC_WRITE(AK4531_RESET, 0x02), ES_REG(ensoniq, 1370_CODEC));
@@ -1576,6 +1649,7 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
  *  General Switches...
  */
 
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 /* MQ: gameport driver connectivity */
 #define ENSONIQ_JOY_CONTROL(xname, mask) \
 { .iface = SNDRV_CTL_ELEM_IFACE_CARD, .name = xname, .info = snd_ensoniq_control_info, \
@@ -1584,13 +1658,13 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_joy_enable(ensoniq_t *ensoniq)
 {
-	static int last_jiffies = 0;
+	static unsigned long last_jiffies = 0;
 	unsigned long flags;
 
 	if (!request_region(ensoniq->gameport.io, 8, "ens137x: gameport")) {
 #define ES___GAMEPORT_LOG_DELAY (30*HZ)
 		// avoid log pollution: limit to 2 infos per minute
-		if (jiffies > last_jiffies + ES___GAMEPORT_LOG_DELAY) {
+		if (time_after(jiffies, last_jiffies + ES___GAMEPORT_LOG_DELAY)) {
 			last_jiffies = jiffies;
 			snd_printk("gameport io port 0x%03x in use", ensoniq->gameport.io);
 		}
@@ -1693,6 +1767,7 @@ static snd_kcontrol_new_t snd_es1371_joystick_addr __devinitdata =
 ES1371_JOYSTICK_ADDR("Joystick Address");
 
 #endif /* CHIP1371 */
+#endif /* CONFIG_GAMEPORT */
 
 /*
 
@@ -1721,26 +1796,8 @@ static void __devinit snd_ensoniq_proc_init(ensoniq_t * ensoniq)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(ensoniq->card, "audiopci", ensoniq->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = ensoniq;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_ensoniq_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	ensoniq->proc_entry = entry;
-}
-
-static void snd_ensoniq_proc_done(ensoniq_t * ensoniq)
-{
-	if (ensoniq->proc_entry) {
-		snd_info_unregister(ensoniq->proc_entry);
-		ensoniq->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(ensoniq->card, "audiopci", &entry))
+		snd_info_set_text_ops(entry, ensoniq, snd_ensoniq_proc_read);
 }
 
 /*
@@ -1749,9 +1806,10 @@ static void snd_ensoniq_proc_done(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_free(ensoniq_t *ensoniq)
 {
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (ensoniq->ctrl & ES_JYSTK_EN)
 		snd_ensoniq_joy_disable(ensoniq);
-	snd_ensoniq_proc_done(ensoniq);
+#endif
 	if (ensoniq->irq < 0)
 		goto __hw_end;
 #ifdef CHIP1370
@@ -1831,7 +1889,6 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	if (ensoniq == NULL)
 		return -ENOMEM;
 	spin_lock_init(&ensoniq->reg_lock);
-	init_MUTEX(&ensoniq->joy_sem);
 	ensoniq->card = card;
 	ensoniq->pci = pci;
 	ensoniq->irq = -1;
@@ -1946,11 +2003,14 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	outb(ensoniq->uartc = 0x00, ES_REG(ensoniq, UART_CONTROL));
 	outb(0x00, ES_REG(ensoniq, UART_RES));
 	outl(ensoniq->cssr, ES_REG(ensoniq, STATUS));
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+	init_MUTEX(&ensoniq->joy_sem);
 #ifdef CHIP1371
 	snd_ctl_add(card, snd_ctl_new1(&snd_es1371_joystick_addr, ensoniq));
 #endif
 	snd_ctl_add(card, snd_ctl_new1(&snd_ensoniq_control_joystick, ensoniq));
 	ensoniq->gameport.io = 0x200;	// FIXME: is ES1371 configured like this above ?
+#endif
 	synchronize_irq(ensoniq->irq);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ensoniq, &ops)) < 0) {

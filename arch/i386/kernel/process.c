@@ -36,6 +36,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -86,7 +87,7 @@ void enable_hlt(void)
  */
 void default_idle(void)
 {
-	if (current_cpu_data.hlt_works_ok && !hlt_counter) {
+	if (!hlt_counter && current_cpu_data.hlt_works_ok) {
 		local_irq_disable();
 		if (!need_resched())
 			safe_halt();

@@ -65,14 +65,11 @@ static int powerd(void *__unused)
 	static char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 	char *argv[] = { "/sbin/shutdown", "-h", "now", NULL };
 
-	daemonize();
-	sprintf(current->comm, "powerd");
+	daemonize("powerd");
 
 again:
 	while (button_pressed == 0) {
-		spin_lock_irq(&current->sig->siglock);
 		flush_signals(current);
-		spin_unlock_irq(&current->sig->siglock);
 		interruptible_sleep_on(&powerd_wait);
 	}
 

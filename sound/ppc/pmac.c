@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include <sound/pcm_params.h>
@@ -695,6 +696,7 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 }
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 
 /*
  * beep stuff
@@ -930,6 +932,8 @@ int __init snd_pmac_attach_beep(pmac_t *chip)
 
 	return 0;
 }
+
+#endif /* beep stuff */
 
 static void snd_pmac_dbdma_reset(pmac_t *chip)
 {
@@ -1460,9 +1464,8 @@ static void snd_pmac_suspend(pmac_t *chip)
 	unsigned long flags;
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		goto __skip;
+		return;
 
 	if (chip->suspend)
 		chip->suspend(chip);
@@ -1476,17 +1479,14 @@ static void snd_pmac_suspend(pmac_t *chip)
 	disable_irq(chip->rx_irq);
 	snd_pmac_sound_feature(chip, 0);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 static void snd_pmac_resume(pmac_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
-		goto __skip;
+		return;
 
 	snd_pmac_sound_feature(chip, 1);
 	if (chip->resume)
@@ -1505,8 +1505,6 @@ static void snd_pmac_resume(pmac_t *chip)
 	enable_irq(chip->rx_irq);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
-      __skip:
-      	snd_power_unlock(card);
 }
 
 /* the chip is stored statically by snd_pmac_register_sleep_notifier

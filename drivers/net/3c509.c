@@ -103,6 +103,10 @@ static int el3_debug = EL3_DEBUG;
 static int el3_debug = 2;
 #endif
 
+/* Used to do a global count of all the cards in the system.  Must be
+ * a global variable so that the mca/eisa probe routines can increment
+ * it */
+static int el3_cards = 0;
 
 /* To minimize the size of the driver source I only define operating
    constants if they are used several times.  You'll need the manual
@@ -167,16 +171,15 @@ struct el3_private {
 	/* skb send-queue */
 	int head, size;
 	struct sk_buff *queue[SKB_QUEUE_SIZE];
-	char mca_slot;
 #ifdef CONFIG_PM
 	struct pm_dev *pmdev;
 #endif
-#ifdef __ISAPNP__
-	struct pnp_dev *pnpdev;
-#endif
-#ifdef CONFIG_EISA
-	struct eisa_device *edev;
-#endif
+	enum {
+		EL3_MCA,
+		EL3_PNP,
+		EL3_EISA,
+	} type;						/* type of device */
+	struct device *dev;
 };
 static int id_port __initdata = 0x110;	/* Start with 0x110 to avoid new sound cards.*/
 static struct net_device *el3_root_dev;
@@ -200,6 +203,8 @@ static int el3_suspend(struct pm_dev *pdev);
 static int el3_resume(struct pm_dev *pdev);
 static int el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data);
 #endif
+/* generic device remove for all device types */
+static int el3_device_remove (struct device *device);
 
 #ifdef CONFIG_EISA
 struct eisa_device_id el3_eisa_ids[] = {
@@ -209,31 +214,46 @@ struct eisa_device_id el3_eisa_ids[] = {
 };
 
 static int el3_eisa_probe (struct device *device);
-static int el3_eisa_remove (struct device *device);
 
 struct eisa_driver el3_eisa_driver = {
 		.id_table = el3_eisa_ids,
 		.driver   = {
 				.name    = "3c509",
 				.probe   = el3_eisa_probe,
-				.remove  = __devexit_p (el3_eisa_remove)
+				.remove  = __devexit_p (el3_device_remove)
 		}
 };
 #endif
 
 #ifdef CONFIG_MCA
-struct el3_mca_adapters_struct {
-	char* name;
-	int id;
+static int el3_mca_probe(struct device *dev);
+
+static short el3_mca_adapter_ids[] __initdata = {
+		0x627c,
+		0x627d,
+		0x62db,
+		0x62f6,
+		0x62f7,
+		0x0000
 };
 
-static struct el3_mca_adapters_struct el3_mca_adapters[] __initdata = {
-	{ "3Com 3c529 EtherLink III (10base2)", 0x627c },
-	{ "3Com 3c529 EtherLink III (10baseT)", 0x627d },
-	{ "3Com 3c529 EtherLink III (test mode)", 0x62db },
-	{ "3Com 3c529 EtherLink III (TP or coax)", 0x62f6 },
-	{ "3Com 3c529 EtherLink III (TP)", 0x62f7 },
-	{ NULL, 0 },
+static char *el3_mca_adapter_names[] __initdata = {
+		"3Com 3c529 EtherLink III (10base2)",
+		"3Com 3c529 EtherLink III (10baseT)",
+		"3Com 3c529 EtherLink III (test mode)",
+		"3Com 3c529 EtherLink III (TP or coax)",
+		"3Com 3c529 EtherLink III (TP)",
+		NULL
+};
+
+static struct mca_driver el3_mca_driver = {
+		.id_table = el3_mca_adapter_ids,
+		.driver = {
+				.name = "3c529",
+				.bus = &mca_bus_type,
+				.probe = el3_mca_probe,
+				.remove = __devexit_p(el3_device_remove),
+		},
 };
 #endif /* CONFIG_MCA */
 
@@ -264,12 +284,12 @@ static struct isapnp_device_id el3_isapnp_adapters[] __initdata = {
 };
 
 static u16 el3_isapnp_phys_addr[8][3];
-#endif /* __ISAPNP__ */
 static int nopnp;
+#endif /* __ISAPNP__ */
 
 /* With the driver model introduction for EISA devices, both init
  * and cleanup have been split :
- * - EISA devices probe/remove starts in el3_eisa_probe/el3_eisa_remove
+ * - EISA devices probe/remove starts in el3_eisa_probe/el3_device_remove
  * - MCA/ISA still use el3_probe
  *
  * Both call el3_common_init/el3_common_remove. */
@@ -278,10 +298,9 @@ static int __init el3_common_init (struct net_device *dev)
 {
 	struct el3_private *lp = dev->priv;
 	short i;
-  
-#ifdef CONFIG_EISA
-	if (!lp->edev)				/* EISA devices are not chained */
-#endif
+
+	el3_cards++;
+	if (!lp->dev)				/* probed devices are not chained */
 	{
 			lp->next_dev = el3_root_dev;
 			el3_root_dev = dev;
@@ -319,16 +338,6 @@ static int __init el3_common_init (struct net_device *dev)
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->do_ioctl = netdev_ioctl;
 
-#ifdef CONFIG_PM
-	/* register power management */
-	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
-	if (lp->pmdev) {
-		struct pm_dev *p;
-		p = lp->pmdev;
-		p->data = (struct net_device *)dev;
-	}
-#endif
-
 	return 0;
 }
 
@@ -337,17 +346,13 @@ static void el3_common_remove (struct net_device *dev)
 		struct el3_private *lp = dev->priv;
 
 		(void) lp;				/* Keep gcc quiet... */
-#ifdef CONFIG_MCA		
-		if(lp->mca_slot!=-1)
-			mca_mark_as_unused(lp->mca_slot);
-#endif
 #ifdef CONFIG_PM
 		if (lp->pmdev)
 			pm_unregister(lp->pmdev);
 #endif
 #ifdef __ISAPNP__
-		if (lp->pnpdev)
-			pnp_device_detach(lp->pnpdev);
+		if (lp->type == EL3_PNP)
+			pnp_device_detach(to_pnp_dev(lp->dev));
 #endif
 
 		unregister_netdev (dev);
@@ -363,75 +368,10 @@ static int __init el3_probe(int card_idx)
 	int ioaddr, irq, if_port;
 	u16 phys_addr[3];
 	static int current_tag;
-	int mca_slot = -1;
 #ifdef __ISAPNP__
 	static int pnp_cards;
 	struct pnp_dev *idev = NULL;
 #endif /* __ISAPNP__ */
-
-#ifdef CONFIG_MCA
-	/* Based on Erik Nygren's (nygren@mit.edu) 3c529 patch, heavily
-	 * modified by Chris Beauregard (cpbeaure@csclub.uwaterloo.ca)
-	 * to support standard MCA probing.
-	 *
-	 * redone for multi-card detection by ZP Gu (zpg@castle.net)
-	 * now works as a module
-	 */
-
-	if( MCA_bus ) {
-		int slot, j;
-		u_char pos4, pos5;
-
-		for( j = 0; el3_mca_adapters[j].name != NULL; j ++ ) {
-			slot = 0;
-			while( slot != MCA_NOTFOUND ) {
-				slot = mca_find_unused_adapter(
-					el3_mca_adapters[j].id, slot );
-				if( slot == MCA_NOTFOUND ) break;
-
-				/* if we get this far, an adapter has been
-				 * detected and is enabled
-				 */
-
-				pos4 = mca_read_stored_pos( slot, 4 );
-				pos5 = mca_read_stored_pos( slot, 5 );
-
-				ioaddr = ((short)((pos4&0xfc)|0x02)) << 8;
-				irq = pos5 & 0x0f;
-
-				/* probing for a card at a particular IO/IRQ */
-				if(dev && ((dev->irq >= 1 && dev->irq != irq) ||
-			   	(dev->base_addr >= 1 && dev->base_addr != ioaddr))) {
-					slot++;         /* probing next slot */
-					continue;
-				}
-
-				printk("3c509: found %s at slot %d\n",
-					el3_mca_adapters[j].name, slot + 1 );
-
-				/* claim the slot */
-				mca_set_adapter_name(slot, el3_mca_adapters[j].name);
-				mca_set_adapter_procfn(slot, NULL, NULL);
-				mca_mark_as_used(slot);
-
-				if_port = pos4 & 0x03;
-				if (el3_debug > 2) {
-					printk("3c529: irq %d  ioaddr 0x%x  ifport %d\n", irq, ioaddr, if_port);
-				}
-				EL3WINDOW(0);
-				for (i = 0; i < 3; i++) {
-					phys_addr[i] = htons(read_eeprom(ioaddr, i));
-				}
-				
-				mca_slot = slot;
-
-				goto found;
-			}
-		}
-		/* if we get here, we didn't find an MCA adapter */
-		return -ENODEV;
-	}
-#endif /* CONFIG_MCA */
 
 #ifdef __ISAPNP__
 	if (nopnp == 1)
@@ -467,6 +407,13 @@ static int __init el3_probe(int card_idx)
 					phys_addr[j] =
 						htons(read_eeprom(ioaddr, j));
 			if_port = read_eeprom(ioaddr, 8) >> 14;
+			if (!(dev = init_etherdev(NULL, sizeof(struct el3_private)))) {
+					release_region(ioaddr, EL3_IO_EXTENT);
+					pnp_device_detach(idev);
+					return -ENOMEM;
+			}
+
+			SET_MODULE_OWNER(dev);
 			pnp_cards++;
 			goto found;
 		}
@@ -547,24 +494,29 @@ no_pnp:
 	}
 	irq = id_read_eeprom(9) >> 12;
 
-#if 0							/* Huh ?
-								   Can someone explain what is this for ? */
-	if (dev) {					/* Set passed-in IRQ or I/O Addr. */
-		if (dev->irq > 1  &&  dev->irq < 16)
+	if (!(dev = init_etherdev(NULL, sizeof(struct el3_private))))
+			return -ENOMEM;
+
+	SET_MODULE_OWNER(dev);
+	
+	/* Set passed-in IRQ or I/O Addr. */
+	if (dev->irq > 1  &&  dev->irq < 16)
 			irq = dev->irq;
 
-		if (dev->base_addr) {
+	if (dev->base_addr) {
 			if (dev->mem_end == 0x3c509 			/* Magic key */
 				&& dev->base_addr >= 0x200  &&  dev->base_addr <= 0x3e0)
-				ioaddr = dev->base_addr & 0x3f0;
-			else if (dev->base_addr != ioaddr)
-				return -ENODEV;
-		}
+					ioaddr = dev->base_addr & 0x3f0;
+			else if (dev->base_addr != ioaddr) {
+					unregister_netdev (dev);
+					return -ENODEV;
+			}
 	}
-#endif
 
-	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509"))
-		return -EBUSY;
+	if (!request_region(ioaddr, EL3_IO_EXTENT, "3c509")) {
+			unregister_netdev (dev);
+			return -EBUSY;
+	}
 
 	/* Set the adaptor tag so that the next card can be found. */
 	outb(0xd0 + ++current_tag, id_port);
@@ -574,19 +526,17 @@ no_pnp:
 
 	EL3WINDOW(0);
 	if (inw(ioaddr) != 0x6d50) {
+		unregister_netdev (dev);
 		release_region(ioaddr, EL3_IO_EXTENT);
 		return -ENODEV;
 	}
 
 	/* Free the interrupt so that some other card can use it. */
 	outw(0x0f00, ioaddr + WN0_IRQ);
- found:
-	dev = init_etherdev(NULL, sizeof(struct el3_private));
-	if (dev == NULL) {
-	    release_region(ioaddr, EL3_IO_EXTENT);
-		return -ENOMEM;
-	}
-	SET_MODULE_OWNER(dev);
+
+#ifdef __ISAPNP__	
+ found:							/* PNP jumps here... */
+#endif /* __ISAPNP__ */
 
 	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
 	dev->base_addr = ioaddr;
@@ -594,12 +544,89 @@ no_pnp:
 	dev->if_port = if_port;
 	lp = dev->priv;
 #ifdef __ISAPNP__
-	lp->pnpdev = idev;
+	lp->dev = &idev->dev;
 #endif
-	lp->mca_slot = mca_slot;
+
+#ifdef CONFIG_PM
+	/* register power management */
+	lp->pmdev = pm_register(PM_ISA_DEV, card_idx, el3_pm_callback);
+	if (lp->pmdev) {
+		struct pm_dev *p;
+		p = lp->pmdev;
+		p->data = (struct net_device *)dev;
+	}
+#endif
 
 	return el3_common_init (dev);
 }
+
+#ifdef CONFIG_MCA
+static int __init el3_mca_probe(struct device *device) {
+		/* Based on Erik Nygren's (nygren@mit.edu) 3c529 patch,
+		 * heavily modified by Chris Beauregard
+		 * (cpbeaure@csclub.uwaterloo.ca) to support standard MCA
+		 * probing.
+		 *
+		 * redone for multi-card detection by ZP Gu (zpg@castle.net)
+		 * now works as a module */
+
+		struct el3_private *lp;
+		short i;
+		int ioaddr, irq, if_port;
+		u16 phys_addr[3];
+		struct net_device *dev = NULL;
+		u_char pos4, pos5;
+		struct mca_device *mdev = to_mca_device(device);
+		int slot = mdev->slot;
+
+		pos4 = mca_device_read_stored_pos(mdev, 4);
+		pos5 = mca_device_read_stored_pos(mdev, 5);
+
+		ioaddr = ((short)((pos4&0xfc)|0x02)) << 8;
+		irq = pos5 & 0x0f;
+
+
+		printk("3c529: found %s at slot %d\n",
+			   el3_mca_adapter_names[mdev->index], slot + 1);
+
+		/* claim the slot */
+		strncpy(device->name, el3_mca_adapter_names[mdev->index],
+				sizeof(device->name));
+		mca_device_set_claim(mdev, 1);
+
+		if_port = pos4 & 0x03;
+
+		irq = mca_device_transform_irq(mdev, irq);
+		ioaddr = mca_device_transform_ioport(mdev, ioaddr); 
+		if (el3_debug > 2) {
+				printk("3c529: irq %d  ioaddr 0x%x  ifport %d\n", irq, ioaddr, if_port);
+		}
+		EL3WINDOW(0);
+		for (i = 0; i < 3; i++) {
+				phys_addr[i] = htons(read_eeprom(ioaddr, i));
+		}
+
+		dev = init_etherdev(NULL, sizeof(struct el3_private));
+		if (dev == NULL) {
+				release_region(ioaddr, EL3_IO_EXTENT);
+				return -ENOMEM;
+		}
+
+		SET_MODULE_OWNER(dev);
+
+		memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
+		dev->base_addr = ioaddr;
+		dev->irq = irq;
+		dev->if_port = if_port;
+		lp = dev->priv;
+		lp->dev = device;
+		lp->type = EL3_MCA;
+		device->driver_data = dev;
+
+		return el3_common_init (dev);
+}
+		
+#endif /* CONFIG_MCA */
 
 #ifdef CONFIG_EISA
 static int __init el3_eisa_probe (struct device *device)
@@ -642,20 +669,23 @@ static int __init el3_eisa_probe (struct device *device)
 	dev->irq = irq;
 	dev->if_port = if_port;
 	lp = dev->priv;
-	lp->mca_slot = -1;
-	lp->edev = edev;
+	lp->dev = device;
+	lp->type = EL3_EISA;
 	eisa_set_drvdata (edev, dev);
 
 	return el3_common_init (dev);
 }
+#endif
 
-static int __devexit el3_eisa_remove (struct device *device)
+#if defined(CONFIG_EISA) || defined(CONFIG_MCA)
+/* This remove works for all device types.
+ *
+ * The net dev must be stored in the driver_data field */
+static int __devexit el3_device_remove (struct device *device)
 {
-		struct eisa_device *edev;
 		struct net_device *dev;
 
-		edev = to_eisa_device (device);
-		dev  = eisa_get_drvdata (edev);
+		dev  = device->driver_data;
 
 		el3_common_remove (dev);
 		return 0;
@@ -1080,7 +1110,7 @@ el3_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	/* Switching back to window 0 disables the IRQ. */
 	EL3WINDOW(0);
-	if (!lp->edev) {
+	if (lp->type != EL3_EISA) {
 	    /* But we explicitly zero the IRQ line select anyway. Don't do
 	     * it on EISA cards, it prevents the module from getting an
 	     * IRQ after unload+reload... */
@@ -1530,7 +1560,7 @@ MODULE_LICENSE("GPL");
 
 static int __init el3_init_module(void)
 {
-	int el3_cards = 0;
+	el3_cards = 0;
 
 	if (debug >= 0)
 		el3_debug = debug;
@@ -1548,8 +1578,9 @@ static int __init el3_init_module(void)
 	if (eisa_driver_register (&el3_eisa_driver) < 0) {
 			eisa_driver_unregister (&el3_eisa_driver);
 	}
-	else
-			el3_cards++;				/* Found an eisa card */
+#endif
+#ifdef CONFIG_MCA
+	mca_register_driver(&el3_mca_driver);
 #endif
 	return el3_cards ? 0 : -ENODEV;
 }
@@ -1568,6 +1599,9 @@ static void __exit el3_cleanup_module(void)
 
 #ifdef CONFIG_EISA
 	eisa_driver_unregister (&el3_eisa_driver);
+#endif
+#ifdef CONFIG_MCA
+	mca_unregister_driver(&el3_mca_driver);
 #endif
 }
 

@@ -1,6 +1,8 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
+#include <linux/config.h>
+
 /*
  * This file contains the definitions for the x86 IO instructions
  * inb/inw/inl/outb/outw/outl and the "string versions" of the same
@@ -135,7 +137,12 @@ extern inline void * phys_to_virt(unsigned long address)
 /*
  * Change "struct page" to physical address.
  */
+#ifdef CONFIG_DISCONTIGMEM
+#include <asm/mmzone.h>
+#define page_to_phys(page)    ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
+#else
 #define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+#endif
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 

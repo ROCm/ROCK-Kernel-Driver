@@ -6098,7 +6098,7 @@ void usc_reset( struct mgsl_struct *info )
 	/*
 	 * Program the Bus Configuration Register (BCR)
 	 *
-	 * <15>		0	Don't use seperate address
+	 * <15>		0	Don't use separate address
 	 * <14..6>	0	reserved
 	 * <5..4>	00	IAckmode = Default, don't care
 	 * <3>		1	Bus Request Totem Pole output

@@ -3196,8 +3196,8 @@ static void PRINT_LUN(ncb_p np, int target, int lun)
 
 static void PRINT_ADDR(Scsi_Cmnd *cmd)
 {
-	struct host_data *host_data = (struct host_data *) cmd->host->hostdata;
-	PRINT_LUN(host_data->ncb, cmd->target, cmd->lun);
+	struct host_data *host_data = (struct host_data *) cmd->device->host->hostdata;
+	PRINT_LUN(host_data->ncb, cmd->device->id, cmd->device->lun);
 }
 
 /*==========================================================
@@ -4345,8 +4345,8 @@ static int ncr_prepare_nego(ncb_p np, ccb_p cp, u_char *msgptr)
 static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 {
 /*	Scsi_Device        *device    = cmd->device; */
-	tcb_p tp                      = &np->target[cmd->target];
-	lcb_p lp		      = tp->lp[cmd->lun];
+	tcb_p tp                      = &np->target[cmd->device->id];
+	lcb_p lp		      = tp->lp[cmd->device->lun];
 	ccb_p cp;
 
 	int	segments;
@@ -4361,9 +4361,9 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	**
 	**---------------------------------------------
 	*/
-	if ((cmd->target == np->myaddr	  ) ||
-		(cmd->target >= MAX_TARGET) ||
-		(cmd->lun    >= MAX_LUN   )) {
+	if ((cmd->device->id == np->myaddr	  ) ||
+		(cmd->device->id >= MAX_TARGET) ||
+		(cmd->device->lun    >= MAX_LUN   )) {
 		return(DID_BAD_TARGET);
         }
 
@@ -4403,7 +4403,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 			np->settle_time = tlimit;
 	}
 
-        if (np->settle_time || !(cp=ncr_get_ccb (np, cmd->target, cmd->lun))) {
+        if (np->settle_time || !(cp=ncr_get_ccb (np, cmd->device->id, cmd->device->lun))) {
 		insert_into_waiting_list(np, cmd);
 		return(DID_OK);
 	}
@@ -4418,7 +4418,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 #if 0	/* This stuff was only useful for linux-1.2.13 */
 	if (lp && !lp->numtags && cmd->device && cmd->device->tagged_queue) {
 		lp->numtags = tp->usrtags;
-		ncr_setup_tags (np, cmd->target, cmd->lun);
+		ncr_setup_tags (np, cmd->device->id, cmd->device->lun);
 	}
 #endif
 
@@ -4429,7 +4429,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	**----------------------------------------------------
 	*/
 
-	idmsg = M_IDENTIFY | cmd->lun;
+	idmsg = M_IDENTIFY | cmd->device->lun;
 
 	if (cp ->tag != NO_TAG ||
 		(cp != np->ccb && np->disc && !(tp->usrflag & UF_NODISC)))
@@ -4662,7 +4662,7 @@ static int ncr_queue_command (ncb_p np, Scsi_Cmnd *cmd)
 	/*
 	**	select
 	*/
-	cp->phys.select.sel_id		= cmd->target;
+	cp->phys.select.sel_id		= cmd->device->id;
 	cp->phys.select.sel_scntl3	= tp->wval;
 	cp->phys.select.sel_sxfer	= tp->sval;
 	/*
@@ -5199,8 +5199,8 @@ void ncr_complete (ncb_p np, ccb_p cp)
 
 	cmd = cp->cmd;
 	cp->cmd = NULL;
-	tp = &np->target[cmd->target];
-	lp = tp->lp[cmd->lun];
+	tp = &np->target[cmd->device->id];
+	lp = tp->lp[cmd->device->lun];
 
 	/*
 	**	We donnot queue more than 1 ccb per target 
@@ -5296,7 +5296,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		**	Allocate the lcb if not yet.
 		*/
 		if (!lp)
-			ncr_alloc_lcb (np, cmd->target, cmd->lun);
+			ncr_alloc_lcb (np, cmd->device->id, cmd->device->lun);
 
 		/*
 		**	On standard INQUIRY response (EVPD and CmDt 
@@ -5306,7 +5306,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		if (cmd->cmnd[0] == 0x12 && !(cmd->cmnd[1] & 0x3) &&
 		    cmd->cmnd[4] >= 7 && !cmd->use_sg) {
 			sync_scsi_data(np, cmd);	/* SYNC the data */
-			ncr_setup_lcb (np, cmd->target, cmd->lun,
+			ncr_setup_lcb (np, cmd->device->id, cmd->device->lun,
 				       (char *) cmd->request_buffer);
 		}
 
@@ -5322,7 +5322,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 			if (lp->num_good >= 1000) {
 				lp->num_good = 0;
 				++lp->numtags;
-				ncr_setup_tags (np, cmd->target, cmd->lun);
+				ncr_setup_tags (np, cmd->device->id, cmd->device->lun);
 			}
 		}
 	} else if ((cp->host_status == HS_COMPLETE)
@@ -5902,7 +5902,7 @@ static void ncr_set_sync_wide_status (ncb_p np, u_char target)
 	*/
 	for (cp = np->ccb; cp; cp = cp->link_ccb) {
 		if (!cp->cmd) continue;
-		if (cp->cmd->target != target) continue;
+		if (cp->cmd->device->id != target) continue;
 #if 0
 		cp->sync_status = tp->sval;
 		cp->wide_status = tp->wval;
@@ -5932,7 +5932,7 @@ static void ncr_setsync (ncb_p np, ccb_p cp, u_char scntl3, u_char sxfer)
 	cmd = cp->cmd;
 	if (!cmd) return;
 
-	assert (target == (cmd->target & 0xf));
+	assert (target == (cmd->device->id & 0xf));
 
 	tp = &np->target[target];
 
@@ -6017,7 +6017,7 @@ static void ncr_setwide (ncb_p np, ccb_p cp, u_char wide, u_char ack)
 	cmd = cp->cmd;
 	if (!cmd) return;
 
-	assert (target == (cmd->target & 0xf));
+	assert (target == (cmd->device->id & 0xf));
 
 	tp = &np->target[target];
 	tp->widedone  =  wide+1;
@@ -7057,8 +7057,8 @@ reset_all:
 static void ncr_sir_to_redo(ncb_p np, int num, ccb_p cp)
 {
 	Scsi_Cmnd *cmd	= cp->cmd;
-	tcb_p tp	= &np->target[cmd->target];
-	lcb_p lp	= tp->lp[cmd->lun];
+	tcb_p tp	= &np->target[cmd->device->id];
+	lcb_p lp	= tp->lp[cmd->device->lun];
 	XPT_QUEHEAD	*qp;
 	ccb_p		cp2;
 	int		disc_cnt = 0;
@@ -7104,7 +7104,7 @@ static void ncr_sir_to_redo(ncb_p np, int num, ccb_p cp)
 		if (disc_cnt < lp->numtags) {
 			lp->numtags	= disc_cnt > 2 ? disc_cnt : 2;
 			lp->num_good	= 0;
-			ncr_setup_tags (np, cmd->target, cmd->lun);
+			ncr_setup_tags (np, cmd->device->id, cmd->device->lun);
 		}
 		/*
 		**	Requeue the command to the start queue.
@@ -7136,7 +7136,7 @@ static void ncr_sir_to_redo(ncb_p np, int num, ccb_p cp)
 		**
 		**	identify message
 		*/
-		cp->scsi_smsg2[0]	= M_IDENTIFY | cmd->lun;
+		cp->scsi_smsg2[0]	= M_IDENTIFY | cmd->device->lun;
 		cp->phys.smsg.addr	= cpu_to_scr(CCB_PHYS (cp, scsi_smsg2));
 		cp->phys.smsg.size	= cpu_to_scr(1);
 
@@ -7150,7 +7150,7 @@ static void ncr_sir_to_redo(ncb_p np, int num, ccb_p cp)
 		**	patch requested size into sense command
 		*/
 		cp->sensecmd[0]		= 0x03;
-		cp->sensecmd[1]		= cmd->lun << 5;
+		cp->sensecmd[1]		= cmd->device->lun << 5;
 		cp->sensecmd[4]		= sizeof(cp->sense_buf);
 
 		/*
@@ -8731,7 +8731,7 @@ int ncr53c8xx_slave_configure(Scsi_Device *device)
 
 int ncr53c8xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 {
-     ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+     ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
      unsigned long flags;
      int sts;
 
@@ -8798,9 +8798,9 @@ static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
      if (DEBUG_FLAGS & DEBUG_TINY) printk ("]\n");
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(done_list->host, flags);
+          NCR_LOCK_SCSI_DONE(done_list->device->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
 }
 
@@ -8821,9 +8821,9 @@ static void ncr53c8xx_timeout(unsigned long npref)
      NCR_UNLOCK_NCB(np, flags);
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(done_list->host, flags);
+          NCR_LOCK_SCSI_DONE(done_list->device->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
 }
 
@@ -8837,7 +8837,7 @@ int ncr53c8xx_reset(Scsi_Cmnd *cmd, unsigned int reset_flags)
 int ncr53c8xx_reset(Scsi_Cmnd *cmd)
 #endif
 {
-	ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+	ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
 	int sts;
 	unsigned long flags;
 	Scsi_Cmnd *done_list;
@@ -8899,7 +8899,7 @@ out:
 
 int ncr53c8xx_abort(Scsi_Cmnd *cmd)
 {
-	ncb_p np = ((struct host_data *) cmd->host->hostdata)->ncb;
+	ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
 	int sts;
 	unsigned long flags;
 	Scsi_Cmnd *done_list;

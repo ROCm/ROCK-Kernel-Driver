@@ -24,7 +24,8 @@ struct eisa_device_id {
 };
 
 /* There is not much we can say about an EISA device, apart from
- * signature, slot number, and base address */
+ * signature, slot number, and base address. */
+
 struct eisa_device {
 	struct eisa_device_id id;
 	int                   slot;
@@ -56,5 +57,19 @@ static inline void eisa_set_drvdata (struct eisa_device *edev, void *data)
 {
         edev->dev.driver_data = data;
 }
+
+/* The EISA root device. There's rumours about machines with multiple
+ * busses (PA-RISC ?), so we try to handle that. */
+
+struct eisa_root_device {
+	struct list_head node;
+	struct device   *dev;	 /* Pointer to bridge device */
+	struct resource *res;
+	unsigned long    bus_base_addr;
+	int		 slots;  /* Max slot number */
+	int              bus_nr; /* Set by eisa_root_register */
+};
+
+int eisa_root_register (struct eisa_root_device *root);
 
 #endif

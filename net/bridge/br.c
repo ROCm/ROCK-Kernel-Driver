@@ -33,12 +33,12 @@ int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
 
 void br_dec_use_count()
 {
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 }
 
 void br_inc_use_count()
 {
-	MOD_INC_USE_COUNT;
+	try_module_get(THIS_MODULE);
 }
 
 static int __init br_init(void)

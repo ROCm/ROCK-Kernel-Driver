@@ -58,6 +58,7 @@
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -1725,15 +1726,15 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 			return -EINVAL;
 	}
 
-	spin_lock_irq(&current->sig->siglock);
-	sig = dequeue_signal(&these, &info);
+	spin_lock_irq(&current->sighand->siglock);
+	sig = dequeue_signal(current, &these, &info);
 	if (!sig) {
 		/* None ready -- temporarily unblock those we're interested
 		   in so that we'll be awakened when they arrive.  */
 		current->real_blocked = current->blocked;
 		sigandsets(&current->blocked, &current->blocked, &these);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 
 		timeout = MAX_SCHEDULE_TIMEOUT;
 		if (uts)
@@ -1743,13 +1744,13 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		current->state = TASK_INTERRUPTIBLE;
 		timeout = schedule_timeout(timeout);
 
-		spin_lock_irq(&current->sig->siglock);
-		sig = dequeue_signal(&these, &info);
+		spin_lock_irq(&current->sighand->siglock);
+		sig = dequeue_signal(current, &these, &info);
 		current->blocked = current->real_blocked;
 		siginitset(&current->real_blocked, 0);
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (sig) {
 		ret = sig;
@@ -4045,28 +4046,6 @@ asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
 		if (put_user(kernel_mask, user_mask_ptr))
 			ret = -EFAULT;
 	}
-
-	return ret;
-}
-
-asmlinkage int 
-sys_futex(void *uaddr, int op, int val, struct timespec *utime);
-
-asmlinkage int
-sys32_futex(void *uaddr, int op, int val, 
-		 struct compat_timespec *timeout32)
-{
-	struct timespec tmp;
-	mm_segment_t old_fs;
-	int ret;
-
-	if (timeout32 && get_compat_timespec(&tmp, timeout32))
-		return -EINVAL;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_futex(uaddr, op, val, timeout32 ? &tmp : NULL);
-	set_fs(old_fs);
 
 	return ret;
 }

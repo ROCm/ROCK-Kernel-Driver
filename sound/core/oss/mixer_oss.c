@@ -56,14 +56,8 @@ static int snd_mixer_oss_open(struct inode *inode, struct file *file)
 	fmixer->card = card;
 	fmixer->mixer = card->mixer_oss;
 	file->private_data = fmixer;
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	if (!try_module_get(card->module)) {
 		kfree(fmixer);
-#ifdef LINUX_2_2
-		MOD_DEC_USE_COUNT;
-#endif
 		snd_card_file_remove(card, file);
 		return -EFAULT;
 	}
@@ -77,9 +71,6 @@ static int snd_mixer_oss_release(struct inode *inode, struct file *file)
 	if (file->private_data) {
 		fmixer = (snd_mixer_oss_file_t *) file->private_data;
 		module_put(fmixer->card->module);
-#ifdef LINUX_2_2
-		MOD_DEC_USE_COUNT;
-#endif
 		snd_card_file_remove(fmixer->card, file);
 		kfree(fmixer);
 	}
@@ -473,7 +464,7 @@ static int snd_mixer_oss_recsrce_get(snd_card_t *card, int slot)
 struct slot {
 	unsigned int signature;
 	unsigned int present;
-	int channels;
+	unsigned int channels;
 	snd_kcontrol_t *kcontrol[SNDRV_MIXER_OSS_ITEM_COUNT];
 	unsigned int capture_item;
 	struct snd_mixer_oss_assign_table *assigned;
@@ -741,7 +732,7 @@ static int snd_mixer_oss_put_recsrc1_route(snd_mixer_oss_file_t *fmixer,
 	return 0;
 }
 
-static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, int *active_index)
+static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, unsigned int *active_index)
 {
 	snd_card_t *card = fmixer->card;
 	snd_mixer_oss_t *mixer = fmixer->mixer;
@@ -787,7 +778,7 @@ static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, int *active_i
       	return err;
 }
 
-static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, int active_index)
+static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, unsigned int active_index)
 {
 	snd_card_t *card = fmixer->card;
 	snd_mixer_oss_t *mixer = fmixer->mixer;
@@ -796,7 +787,8 @@ static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, int active_in
 	struct slot *slot = NULL;
 	snd_ctl_elem_info_t *uinfo;
 	snd_ctl_elem_value_t *uctl;
-	int err, idx;
+	int err;
+	unsigned int idx;
 
 	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_KERNEL);
 	uctl = snd_kcalloc(sizeof(*uctl), GFP_KERNEL);
@@ -1164,7 +1156,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 	static struct snd_mixer_oss_assign_table fm_table = {
 		SOUND_MIXER_SYNTH,	"FM",			0
 	};
-	int idx;
+	unsigned int idx;
 	
 	for (idx = 0; idx < sizeof(table) / sizeof(struct snd_mixer_oss_assign_table); idx++)
 		snd_mixer_oss_build_input(mixer, &table[idx], 0);

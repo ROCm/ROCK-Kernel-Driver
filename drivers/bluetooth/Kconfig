@@ -11,7 +11,7 @@ config BT_HCIUSB
 	  USB interface.
 
 	  Say Y here to compile support for Bluetooth USB devices into the
-	  kernel or say M to compile it as module (hci_usb.o).
+	  kernel or say M to compile it as module (hci_usb).
 
 config BT_USB_ZERO_PACKET
 	bool "USB zero packet support"
@@ -34,7 +34,7 @@ config BT_HCIUART
 	  adapter and BrainBoxes Bluetooth PC Card.
 
 	  Say Y here to compile support for Bluetooth UART devices into the
-	  kernel or say M to compile it as module (hci_uart.o).
+	  kernel or say M to compile it as module (hci_uart).
 
 config BT_HCIUART_H4
 	bool "UART (H4) protocol support"
@@ -68,7 +68,7 @@ config BT_HCIDTL1
 	  Socket Bluetooth CF Card
 
 	  Say Y here to compile support for HCI DTL1 devices into the
-	  kernel or say M to compile it as module (dtl1_cs.o).
+	  kernel or say M to compile it as module (dtl1_cs).
 
 config BT_HCIBT3C
 	tristate "HCI BT3C (PC Card) driver"
@@ -84,7 +84,7 @@ config BT_HCIBT3C
 	  the BlueFW package. For more information, see <http://bluez.sf.net>.
 
 	  Say Y here to compile support for HCI BT3C devices into the
-	  kernel or say M to compile it as module (bt3c_cs.o).
+	  kernel or say M to compile it as module (bt3c_cs).
 
 config BT_HCIBLUECARD
 	tristate "HCI BlueCard (PC Card) driver"
@@ -97,7 +97,7 @@ config BT_HCIBLUECARD
 	  Anycom Bluetooth CF Card
 
 	  Say Y here to compile support for HCI BlueCard devices into the
-	  kernel or say M to compile it as module (bluecard_cs.o).
+	  kernel or say M to compile it as module (bluecard_cs).
 
 config BT_HCIVHCI
 	tristate "HCI VHCI (Virtual HCI device) driver"
@@ -107,7 +107,7 @@ config BT_HCIVHCI
 	  This driver is required if you want to use HCI Emulation software.
 
 	  Say Y here to compile support for virtual HCI devices into the
-	  kernel or say M to compile it as module (hci_vhci.o).
+	  kernel or say M to compile it as module (hci_vhci).
 
 endmenu
 

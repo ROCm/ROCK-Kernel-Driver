@@ -65,7 +65,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
-extern void signal_wake_up(struct task_struct *t);
 extern int sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
@@ -219,9 +218,9 @@ int freeze_processes(void)
 			/* FIXME: smp problem here: we may not access other process' flags
 			   without locking */
 			p->flags |= PF_FREEZE;
-			spin_lock_irqsave(&p->sig->siglock, flags);
-			signal_wake_up(p);
-			spin_unlock_irqrestore(&p->sig->siglock, flags);
+			spin_lock_irqsave(&p->sighand->siglock, flags);
+			signal_wake_up(p, 0);
+			spin_unlock_irqrestore(&p->sighand->siglock, flags);
 			todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
@@ -1085,12 +1084,12 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, 
 	else if (!memcmp("S2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else {
+		if (noresume)
+			return -EINVAL;
 		panic("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
 			name_resume, cur->swh.magic.magic);
-		/* We want to panic even with noresume -- we certainly don't want to add
-		   out signature into your ext2 filesystem ;-) */
 	}
-	if(noresume) {
+	if (noresume) {
 		/* We don't do a sanity check here: we want to restore the swap
 		   whatever version of kernel made the suspend image;
 		   We need to write swap, but swap is *not* enabled so
@@ -1208,11 +1207,11 @@ void software_resume(void)
 	/* We enable the possibility of machine suspend */
 	software_suspend_enabled = 1;
 #endif
-	if(!resume_status)
+	if (!resume_status)
 		return;
 
 	printk( "%s", name_resume );
-	if(resume_status == NORESUME) {
+	if (resume_status == NORESUME) {
 		if(resume_file[0])
 			read_suspend_image(resume_file, 1);
 		printk( "disabled\n" );
@@ -1241,7 +1240,7 @@ read_failure:
 
 static int __init resume_setup(char *str)
 {
-	if(resume_status)
+	if (resume_status == NORESUME)
 		return 1;
 
 	strncpy( resume_file, str, 255 );
@@ -1250,16 +1249,13 @@ static int __init resume_setup(char *str)
 	return 1;
 }
 
-static int __init software_noresume(char *str)
+static int __init noresume_setup(char *str)
 {
-	if(!resume_status)
-		printk(KERN_WARNING "noresume option lacks a resume= option\n");
 	resume_status = NORESUME;
-	
 	return 1;
 }
 
-__setup("noresume", software_noresume);
+__setup("noresume", noresume_setup);
 __setup("resume=", resume_setup);
 
 EXPORT_SYMBOL(software_suspend);

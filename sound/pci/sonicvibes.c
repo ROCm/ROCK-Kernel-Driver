@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -37,9 +38,6 @@
 #include <sound/opl3.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
-#ifndef LINUX_2_2
-#include <linux/gameport.h>
-#endif
 
 #include <asm/io.h>
 
@@ -249,7 +247,6 @@ struct _snd_sonicvibes {
 	snd_hwdep_t *fmsynth;	/* S3FM */
 
 	spinlock_t reg_lock;
-	snd_info_entry_t *proc_entry;
 
 	unsigned int p_dma_size;
 	unsigned int c_dma_size;
@@ -257,7 +254,7 @@ struct _snd_sonicvibes {
 	snd_kcontrol_t *master_mute;
 	snd_kcontrol_t *master_volume;
 
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	struct gameport gameport;
 #endif
 };
@@ -1122,7 +1119,8 @@ static int __devinit snd_sonicvibes_mixer(sonicvibes_t * sonic)
 {
 	snd_card_t *card;
 	snd_kcontrol_t *kctl;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	snd_assert(sonic != NULL && sonic->card != NULL, return -EINVAL);
 	card = sonic->card;
@@ -1177,26 +1175,8 @@ static void __devinit snd_sonicvibes_proc_init(sonicvibes_t * sonic)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(sonic->card, "sonicvibes", sonic->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = sonic;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_sonicvibes_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	sonic->proc_entry = entry;
-}
-
-static void snd_sonicvibes_proc_done(sonicvibes_t * sonic)
-{
-	if (sonic->proc_entry) {
-		snd_info_unregister(sonic->proc_entry);
-		sonic->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(sonic->card, "sonicvibes", &entry))
+		snd_info_set_text_ops(entry, sonic, snd_sonicvibes_proc_read);
 }
 
 /*
@@ -1208,11 +1188,10 @@ SONICVIBES_SINGLE("Joystick Speed", 0, SV_IREG_GAME_PORT, 1, 15, 0);
 
 static int snd_sonicvibes_free(sonicvibes_t *sonic)
 {
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (sonic->gameport.io)
 		gameport_unregister_port(&sonic->gameport);
 #endif
-	snd_sonicvibes_proc_done(sonic);
 	pci_write_config_dword(sonic->pci, 0x40, sonic->dmaa_port);
 	pci_write_config_dword(sonic->pci, 0x48, sonic->dmac_port);
 	if (sonic->res_sb_port) {
@@ -1440,7 +1419,8 @@ static int __devinit snd_sonicvibes_midi(sonicvibes_t * sonic, snd_rawmidi_t * r
 	mpu401_t * mpu = snd_magic_cast(mpu401_t, rmidi->private_data, return -ENXIO);
 	snd_card_t *card = sonic->card;
 	snd_rawmidi_str_t *dir;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	mpu->private_data = sonic;
 	mpu->open_input = snd_sonicvibes_midi_input_open;
@@ -1512,7 +1492,7 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifndef LINUX_2_2
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	sonic->gameport.io = sonic->game_port;
 	gameport_register_port(&sonic->gameport);
 #endif

@@ -273,7 +273,7 @@ ia32_sys_call_table:
 	.quad sys_setreuid16	/* 70 */
 	.quad sys_setregid16
 	.quad stub32_sigsuspend
-	.quad sys32_sigpending
+	.quad compat_sys_sigpending
 	.quad sys_sethostname
 	.quad sys32_setrlimit	/* 75 */
 	.quad sys32_old_getrlimit	/* old_getrlimit */
@@ -326,7 +326,7 @@ ia32_sys_call_table:
 	.quad sys32_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
-	.quad sys32_sigprocmask
+	.quad compat_sys_sigprocmask
 	.quad sys32_module_warning	/* create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
@@ -440,7 +440,7 @@ ia32_sys_call_table:
 	.quad sys_fremovexattr
 	.quad sys_tkill		/* 238 */ 
 	.quad sys_sendfile64 
-	.quad sys32_futex		/* 240 */
+	.quad compat_sys_futex		/* 240 */
         .quad sys32_sched_setaffinity
         .quad sys32_sched_getaffinity
 	.quad sys_set_thread_area
@@ -450,7 +450,7 @@ ia32_sys_call_table:
 	.quad sys32_io_getevents
 	.quad sys32_io_submit
 	.quad sys_io_cancel
-	.quad sys_ni_syscall /* 250 alloc_huge_pages */
+	.quad sys_fadvise64
 	.quad sys_ni_syscall /* free_huge_pages */
 	.quad sys_exit_group /* exit_group */
 	.quad sys_lookup_dcookie

@@ -602,7 +602,7 @@ static int pnp_dock_event(int dock, struct pnp_docking_station_info *info)
 		info->location_id, info->serial, info->capabilities);
 	envp[i] = 0;
 	
-	value = call_usermodehelper (argv [0], argv, envp);
+	value = call_usermodehelper (argv [0], argv, envp, 0);
 	kfree (buf);
 	kfree (envp);
 	return 0;
@@ -615,8 +615,8 @@ static int pnp_dock_thread(void * unused)
 {
 	static struct pnp_docking_station_info now;
 	int docked = -1, d = 0;
-	daemonize();
-	strcpy(current->comm, "kpnpbiosd");
+	daemonize("kpnpbiosd");
+	allow_signal(SIGKILL);
 	while(!unloading && !signal_pending(current))
 	{
 		int status;

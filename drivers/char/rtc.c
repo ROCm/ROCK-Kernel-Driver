@@ -171,7 +171,7 @@ static const unsigned char days_in_mo[] =
  *	A very tiny interrupt handler. It runs with SA_INTERRUPT set,
  *	but there is possibility of conflicting with the set_rtc_mmss()
  *	call (the rtc irq and the timer irq can easily run at the same
- *	time in two different CPUs). So we need to serializes
+ *	time in two different CPUs). So we need to serialize
  *	accesses to the chip with the rtc_lock spinlock that each
  *	architecture should implement in the timer code.
  *	(See ./arch/XXXX/kernel/time.c for the set_rtc_mmss() function.)
@@ -211,19 +211,37 @@ static void rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * sysctl-tuning infrastructure.
  */
 static ctl_table rtc_table[] = {
-    { 1, "max-user-freq", &rtc_max_user_freq, sizeof(int), 0644, NULL,
-      &proc_dointvec, NULL, },
-    { 0, }
+	{
+		.ctl_name	= 1,
+		.procname	= "max-user-freq",
+		.data		= &rtc_max_user_freq,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table rtc_root[] = {
-    { 1, "rtc", NULL, 0, 0555, rtc_table, },
-    { 0, }
+	{
+		.ctl_name	= 1,
+		.procname	= "rtc",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= rtc_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table dev_root[] = {
-    { CTL_DEV, "dev", NULL, 0, 0555, rtc_root, },
-    { 0, }
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= rtc_root,
+	},
+	{ .ctl_name = 0 }
 };
 
 static struct ctl_table_header *sysctl_header;
@@ -401,22 +419,18 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		min = alm_tm.tm_min;
 		sec = alm_tm.tm_sec;
 
-		if (hrs >= 24)
-			hrs = 0xff;
-
-		if (min >= 60)
-			min = 0xff;
-
-		if (sec >= 60)
-			sec = 0xff;
-
 		spin_lock_irq(&rtc_lock);
 		if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) ||
 		    RTC_ALWAYS_BCD)
 		{
-			BIN_TO_BCD(sec);
-			BIN_TO_BCD(min);
-			BIN_TO_BCD(hrs);
+			if (sec < 60) BIN_TO_BCD(sec);
+			else sec = 0xff;
+
+			if (min < 60) BIN_TO_BCD(min);
+			else min = 0xff;
+
+			if (hrs < 24) BIN_TO_BCD(hrs);
+			else hrs = 0xff;
 		}
 		CMOS_WRITE(hrs, RTC_HOURS_ALARM);
 		CMOS_WRITE(min, RTC_MINUTES_ALARM);
@@ -486,7 +500,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 			yrs = 73;
 		}
 #endif
-		/* These limits and adjustments are independant of
+		/* These limits and adjustments are independent of
 		 * whether the chip is in binary mode or not.
 		 */
 		if (yrs > 169) {

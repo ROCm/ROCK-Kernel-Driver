@@ -25,7 +25,7 @@
   * made the souce code not only hard to read but version problems hard
   * to track down.  If I'm overiding a function/etc with something in
   * this file it will be prefixed by "LMC_" which will mean look
-  * here for the version dependant change that's been done.
+  * here for the version dependent change that's been done.
   *
   */
 

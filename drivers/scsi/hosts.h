@@ -27,7 +27,9 @@
 #include <linux/config.h>
 #include <linux/proc_fs.h>
 #include <linux/types.h>
-#include <linux/pci.h>
+
+struct scsi_host_cmd_pool;
+
 
 /* It is senseless to set SG_ALL any higher than this - the performance
  *  does not get any better, and it wastes memory
@@ -375,6 +377,10 @@ struct Scsi_Host
     struct list_head      sh_list;
     struct list_head	  my_devices;
 
+    struct scsi_host_cmd_pool *cmd_pool;
+    spinlock_t            free_list_lock;
+    struct list_head      free_list;   /* backup store of cmd structs */
+
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
 
@@ -389,7 +395,6 @@ struct Scsi_Host
     unsigned int            eh_kill:1; /* set when killing the eh thread */
     wait_queue_head_t       host_wait;
     Scsi_Host_Template    * hostt;
-    atomic_t                host_active; /* commands checked out */
     volatile unsigned short host_busy;   /* commands actually active on low-level */
     volatile unsigned short host_failed; /* commands that failed. */
     
@@ -528,13 +533,6 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
         return shost->host_gendev;
 }
 
-static inline void scsi_set_pci_device(struct Scsi_Host *shost,
-                                       struct pci_dev *pdev)
-{
-        scsi_set_device(shost, &pdev->dev);
-}
-
-
 /*
  * Prototypes for functions/data in scsi_scan.c
  */
@@ -605,8 +603,8 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
 	list_for_each_entry (sdev, &shost->my_devices, siblings)
                 if (sdev->channel == channel && sdev->id == pun
                    && sdev->lun ==lun)
-                        break;
-        return sdev;
+                        return sdev;
+        return NULL;
 }
 
 /*

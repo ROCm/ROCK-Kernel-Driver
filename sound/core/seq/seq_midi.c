@@ -280,7 +280,8 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 	seq_midisynth_t *msynth, *ms;
 	snd_seq_port_info_t port;
 	snd_rawmidi_info_t info;
-	int newclient = 0, p, ports;
+	int newclient = 0;
+	unsigned int p, ports;
 	snd_seq_client_callback_t callbacks;
 	snd_seq_port_callback_t pcallbacks;
 	snd_seq_client_info_t inf;

@@ -60,13 +60,6 @@ unsigned char snd_sbmixer_read(sb_t *chip, unsigned char reg)
  * Single channel mixer element
  */
 
-#define SB_SINGLE(xname, reg, shift, mask) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
-  .name = xname, \
-  .info = snd_sbmixer_info_single, \
-  .get = snd_sbmixer_get_single, put: snd_sbmixer_put_single, \
-  .private_value = reg | (shift << 16) | (mask << 24) }
-
 static int snd_sbmixer_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	int mask = (kcontrol->private_value >> 24) & 0xff;
@@ -118,13 +111,6 @@ static int snd_sbmixer_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 /*
  * Double channel mixer element
  */
-
-#define SB_DOUBLE(xname, left_reg, right_reg, left_shift, right_shift, mask) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
-  .name = xname, \
-  .info = snd_sbmixer_info_double, \
-  .get = snd_sbmixer_get_double, put: snd_sbmixer_put_double, \
-  .private_value = left_reg | (right_reg << 8) | (left_shift << 16) | (right_shift << 19) | (mask << 24) }
 
 static int snd_sbmixer_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
@@ -362,13 +348,6 @@ static int snd_sb8mixer_put_mux(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
  * SB16 input switch
  */
 
-#define SB16_INPUT_SW(xname, reg1, reg2, left_shift, right_shift) \
-{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, \
-  .name = xname, \
-  .info = snd_sb16mixer_info_input_sw, \
-  .get = snd_sb16mixer_get_input_sw, put: snd_sb16mixer_put_input_sw, \
-  .private_value = reg1 | (reg2 << 8) | (left_shift << 16) | (right_shift << 24) }
-
 static int snd_sb16mixer_info_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
@@ -428,61 +407,114 @@ static int snd_sb16mixer_put_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	return change;
 }
 
-#define SB20_CONTROLS (sizeof(snd_sb20_controls)/sizeof(snd_kcontrol_new_t *))
 
-static snd_kcontrol_new_t snd_sb20_ctl_master_play_vol =
+/*
+ */
+/*
+ */
+int snd_sbmixer_add_ctl(sb_t *chip, const char *name, int index, int type, unsigned long value)
+{
+	static snd_kcontrol_new_t newctls[] = {
+		[SB_MIX_SINGLE] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_sbmixer_info_single,
+			.get = snd_sbmixer_get_single,
+			.put = snd_sbmixer_put_single,
+		},
+		[SB_MIX_DOUBLE] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_sbmixer_info_double,
+			.get = snd_sbmixer_get_double,
+			.put = snd_sbmixer_put_double,
+		},
+		[SB_MIX_INPUT_SW] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_sb16mixer_info_input_sw,
+			.get = snd_sb16mixer_get_input_sw,
+			.put = snd_sb16mixer_put_input_sw,
+		},
+		[SB_MIX_CAPTURE_PRO] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_sb8mixer_info_mux,
+			.get = snd_sb8mixer_get_mux,
+			.put = snd_sb8mixer_put_mux,
+		},
+		[SB_MIX_CAPTURE_DT019X] = {
+			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+			.info = snd_dt019x_input_sw_info,
+			.get = snd_dt019x_input_sw_get,
+			.put = snd_dt019x_input_sw_put,
+		},
+	};
+	snd_kcontrol_t *ctl;
+	int err;
+
+	ctl = snd_ctl_new1(&newctls[type], chip);
+	if (! ctl)
+		return -ENOMEM;
+	strncpy(ctl->id.name, name, sizeof(ctl->id.name)-1);
+	ctl->id.index = index;
+	ctl->private_value = value;
+	if ((err = snd_ctl_add(chip->card, ctl)) < 0) {
+		snd_ctl_free_one(ctl);
+		return err;
+	}
+	return 0;
+}
+
+/*
+ * SB 2.0 specific mixer elements
+ */
+
+static struct sbmix_elem snd_sb20_ctl_master_play_vol =
 	SB_SINGLE("Master Playback Volume", SB_DSP20_MASTER_DEV, 1, 7);
-static snd_kcontrol_new_t snd_sb20_ctl_pcm_play_vol =
+static struct sbmix_elem snd_sb20_ctl_pcm_play_vol =
 	SB_SINGLE("PCM Playback Volume", SB_DSP20_PCM_DEV, 1, 3);
-static snd_kcontrol_new_t snd_sb20_ctl_synth_play_vol =
+static struct sbmix_elem snd_sb20_ctl_synth_play_vol =
 	SB_SINGLE("Synth Playback Volume", SB_DSP20_FM_DEV, 1, 7);
-static snd_kcontrol_new_t snd_sb20_ctl_cd_play_vol =
+static struct sbmix_elem snd_sb20_ctl_cd_play_vol =
 	SB_SINGLE("CD Playback Volume", SB_DSP20_CD_DEV, 1, 7);
 
-static snd_kcontrol_new_t *snd_sb20_controls[] = {
+static struct sbmix_elem *snd_sb20_controls[] = {
 	&snd_sb20_ctl_master_play_vol,
 	&snd_sb20_ctl_pcm_play_vol,
 	&snd_sb20_ctl_synth_play_vol,
 	&snd_sb20_ctl_cd_play_vol
 };
 
-#define SB20_INIT_VALUES (sizeof(snd_sb20_init_values)/sizeof(unsigned char)/2)
-
 static unsigned char snd_sb20_init_values[][2] = {
 	{ SB_DSP20_MASTER_DEV, 0 },
 	{ SB_DSP20_FM_DEV, 0 },
 };
 
-#define SBPRO_CONTROLS (sizeof(snd_sbpro_controls)/sizeof(snd_kcontrol_new_t *))
-
-static snd_kcontrol_new_t snd_sbpro_ctl_master_play_vol =
+/*
+ * SB Pro specific mixer elements
+ */
+static struct sbmix_elem snd_sbpro_ctl_master_play_vol =
 	SB_DOUBLE("Master Playback Volume", SB_DSP_MASTER_DEV, SB_DSP_MASTER_DEV, 5, 1, 7);
-static snd_kcontrol_new_t snd_sbpro_ctl_pcm_play_vol =
+static struct sbmix_elem snd_sbpro_ctl_pcm_play_vol =
 	SB_DOUBLE("PCM Playback Volume", SB_DSP_PCM_DEV, SB_DSP_PCM_DEV, 5, 1, 7);
-static snd_kcontrol_new_t snd_sbpro_ctl_pcm_play_filter =
+static struct sbmix_elem snd_sbpro_ctl_pcm_play_filter =
 	SB_SINGLE("PCM Playback Filter", SB_DSP_PLAYBACK_FILT, 5, 1);
-static snd_kcontrol_new_t snd_sbpro_ctl_synth_play_vol =
+static struct sbmix_elem snd_sbpro_ctl_synth_play_vol =
 	SB_DOUBLE("Synth Playback Volume", SB_DSP_FM_DEV, SB_DSP_FM_DEV, 5, 1, 7);
-static snd_kcontrol_new_t snd_sbpro_ctl_cd_play_vol =
+static struct sbmix_elem snd_sbpro_ctl_cd_play_vol =
 	SB_DOUBLE("CD Playback Volume", SB_DSP_CD_DEV, SB_DSP_CD_DEV, 5, 1, 7);
-static snd_kcontrol_new_t snd_sbpro_ctl_line_play_vol =
+static struct sbmix_elem snd_sbpro_ctl_line_play_vol =
 	SB_DOUBLE("Line Playback Volume", SB_DSP_LINE_DEV, SB_DSP_LINE_DEV, 5, 1, 7);
-static snd_kcontrol_new_t snd_sbpro_ctl_mic_play_vol =
+static struct sbmix_elem snd_sbpro_ctl_mic_play_vol =
 	SB_SINGLE("Mic Playback Volume", SB_DSP_MIC_DEV, 1, 3);
-static snd_kcontrol_new_t snd_sbpro_ctl_capture_source =
+static struct sbmix_elem snd_sbpro_ctl_capture_source =
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Capture Source",
-		.info = snd_sb8mixer_info_mux,
-		.get = snd_sb8mixer_get_mux,
-		.put = snd_sb8mixer_put_mux,
+		.type = SB_MIX_CAPTURE_PRO
 	};
-static snd_kcontrol_new_t snd_sbpro_ctl_capture_filter =
+static struct sbmix_elem snd_sbpro_ctl_capture_filter =
 	SB_SINGLE("Capture Filter", SB_DSP_CAPTURE_FILT, 5, 1);
-static snd_kcontrol_new_t snd_sbpro_ctl_capture_low_filter =
+static struct sbmix_elem snd_sbpro_ctl_capture_low_filter =
 	SB_SINGLE("Capture Low-Pass Filter", SB_DSP_CAPTURE_FILT, 3, 1);
 
-static snd_kcontrol_new_t *snd_sbpro_controls[] = {
+static struct sbmix_elem *snd_sbpro_controls[] = {
 	&snd_sbpro_ctl_master_play_vol,
 	&snd_sbpro_ctl_pcm_play_vol,
 	&snd_sbpro_ctl_pcm_play_filter,
@@ -495,58 +527,57 @@ static snd_kcontrol_new_t *snd_sbpro_controls[] = {
 	&snd_sbpro_ctl_capture_low_filter
 };
 
-#define SBPRO_INIT_VALUES (sizeof(snd_sbpro_init_values)/sizeof(unsigned char)/2)
-
 static unsigned char snd_sbpro_init_values[][2] = {
 	{ SB_DSP_MASTER_DEV, 0 },
 	{ SB_DSP_PCM_DEV, 0 },
 	{ SB_DSP_FM_DEV, 0 },
 };
 
-#define SB16_CONTROLS (sizeof(snd_sb16_controls)/sizeof(snd_kcontrol_new_t *))
-
-static snd_kcontrol_new_t snd_sb16_ctl_master_play_vol =
+/*
+ * SB16 specific mixer elements
+ */
+static struct sbmix_elem snd_sb16_ctl_master_play_vol =
 	SB_DOUBLE("Master Playback Volume", SB_DSP4_MASTER_DEV, (SB_DSP4_MASTER_DEV + 1), 3, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_3d_enhance_switch =
+static struct sbmix_elem snd_sb16_ctl_3d_enhance_switch =
 	SB_SINGLE("3D Enhancement Switch", SB_DSP4_3DSE, 0, 1);
-static snd_kcontrol_new_t snd_sb16_ctl_tone_bass =
+static struct sbmix_elem snd_sb16_ctl_tone_bass =
 	SB_DOUBLE("Tone Control - Bass", SB_DSP4_BASS_DEV, (SB_DSP4_BASS_DEV + 1), 4, 4, 15);
-static snd_kcontrol_new_t snd_sb16_ctl_tone_treble =
+static struct sbmix_elem snd_sb16_ctl_tone_treble =
 	SB_DOUBLE("Tone Control - Treble", SB_DSP4_TREBLE_DEV, (SB_DSP4_TREBLE_DEV + 1), 4, 4, 15);
-static snd_kcontrol_new_t snd_sb16_ctl_pcm_play_vol =
+static struct sbmix_elem snd_sb16_ctl_pcm_play_vol =
 	SB_DOUBLE("PCM Playback Volume", SB_DSP4_PCM_DEV, (SB_DSP4_PCM_DEV + 1), 3, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_synth_capture_route =
+static struct sbmix_elem snd_sb16_ctl_synth_capture_route =
 	SB16_INPUT_SW("Synth Capture Route", SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, 6, 5);
-static snd_kcontrol_new_t snd_sb16_ctl_synth_play_vol =
+static struct sbmix_elem snd_sb16_ctl_synth_play_vol =
 	SB_DOUBLE("Synth Playback Volume", SB_DSP4_SYNTH_DEV, (SB_DSP4_SYNTH_DEV + 1), 3, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_cd_capture_route =
+static struct sbmix_elem snd_sb16_ctl_cd_capture_route =
 	SB16_INPUT_SW("CD Capture Route", SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, 2, 1);
-static snd_kcontrol_new_t snd_sb16_ctl_cd_play_switch =
+static struct sbmix_elem snd_sb16_ctl_cd_play_switch =
 	SB_DOUBLE("CD Playback Switch", SB_DSP4_OUTPUT_SW, SB_DSP4_OUTPUT_SW, 2, 1, 1);
-static snd_kcontrol_new_t snd_sb16_ctl_cd_play_vol =
+static struct sbmix_elem snd_sb16_ctl_cd_play_vol =
 	SB_DOUBLE("CD Playback Volume", SB_DSP4_CD_DEV, (SB_DSP4_CD_DEV + 1), 3, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_line_capture_route =
+static struct sbmix_elem snd_sb16_ctl_line_capture_route =
 	SB16_INPUT_SW("Line Capture Route", SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, 4, 3);
-static snd_kcontrol_new_t snd_sb16_ctl_line_play_switch =
+static struct sbmix_elem snd_sb16_ctl_line_play_switch =
 	SB_DOUBLE("Line Playback Switch", SB_DSP4_OUTPUT_SW, SB_DSP4_OUTPUT_SW, 4, 3, 1);
-static snd_kcontrol_new_t snd_sb16_ctl_line_play_vol =
+static struct sbmix_elem snd_sb16_ctl_line_play_vol =
 	SB_DOUBLE("Line Playback Volume", SB_DSP4_LINE_DEV, (SB_DSP4_LINE_DEV + 1), 3, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_mic_capture_route =
+static struct sbmix_elem snd_sb16_ctl_mic_capture_route =
 	SB16_INPUT_SW("Mic Capture Route", SB_DSP4_INPUT_LEFT, SB_DSP4_INPUT_RIGHT, 0, 0);
-static snd_kcontrol_new_t snd_sb16_ctl_mic_play_switch =
+static struct sbmix_elem snd_sb16_ctl_mic_play_switch =
 	SB_SINGLE("Mic Playback Switch", SB_DSP4_OUTPUT_SW, 0, 1);
-static snd_kcontrol_new_t snd_sb16_ctl_mic_play_vol =
+static struct sbmix_elem snd_sb16_ctl_mic_play_vol =
 	SB_SINGLE("Mic Playback Volume", SB_DSP4_MIC_DEV, 3, 31);
-static snd_kcontrol_new_t snd_sb16_ctl_pc_speaker_vol =
+static struct sbmix_elem snd_sb16_ctl_pc_speaker_vol =
 	SB_SINGLE("PC Speaker Volume", SB_DSP4_SPEAKER_DEV, 6, 3);
-static snd_kcontrol_new_t snd_sb16_ctl_capture_vol =
+static struct sbmix_elem snd_sb16_ctl_capture_vol =
 	SB_DOUBLE("Capture Volume", SB_DSP4_IGAIN_DEV, (SB_DSP4_IGAIN_DEV + 1), 6, 6, 3);
-static snd_kcontrol_new_t snd_sb16_ctl_play_vol =
+static struct sbmix_elem snd_sb16_ctl_play_vol =
 	SB_DOUBLE("Playback Volume", SB_DSP4_OGAIN_DEV, (SB_DSP4_OGAIN_DEV + 1), 6, 6, 3);
-static snd_kcontrol_new_t snd_sb16_ctl_auto_mic_gain =
+static struct sbmix_elem snd_sb16_ctl_auto_mic_gain =
 	SB_SINGLE("Mic Auto Gain", SB_DSP4_MIC_AGC, 0, 1);
 
-static snd_kcontrol_new_t *snd_sb16_controls[] = {
+static struct sbmix_elem *snd_sb16_controls[] = {
 	&snd_sb16_ctl_master_play_vol,
 	&snd_sb16_ctl_3d_enhance_switch,
 	&snd_sb16_ctl_tone_bass,
@@ -569,8 +600,6 @@ static snd_kcontrol_new_t *snd_sb16_controls[] = {
 	&snd_sb16_ctl_auto_mic_gain
 };
 
-#define SB16_INIT_VALUES (sizeof(snd_sb16_init_values)/sizeof(unsigned char)/2)
-
 static unsigned char snd_sb16_init_values[][2] = {
 	{ SB_DSP4_MASTER_DEV + 0, 0 },
 	{ SB_DSP4_MASTER_DEV + 1, 0 },
@@ -584,37 +613,34 @@ static unsigned char snd_sb16_init_values[][2] = {
 	{ SB_DSP4_SPEAKER_DEV, 0 },
 };
 
-#define DT019X_CONTROLS (sizeof(snd_dt019x_controls)/sizeof(snd_kcontrol_new_t *))
-
-
-static snd_kcontrol_new_t snd_dt019x_ctl_master_play_vol =
+/*
+ * DT019x specific mixer elements
+ */
+static struct sbmix_elem snd_dt019x_ctl_master_play_vol =
 	SB_DOUBLE("Master Playback Volume", SB_DT019X_MASTER_DEV, SB_DT019X_MASTER_DEV, 4,0, 15);
-static snd_kcontrol_new_t snd_dt019x_ctl_pcm_play_vol =
+static struct sbmix_elem snd_dt019x_ctl_pcm_play_vol =
 	SB_DOUBLE("PCM Playback Volume", SB_DT019X_PCM_DEV, SB_DT019X_PCM_DEV, 4,0, 15);
-static snd_kcontrol_new_t snd_dt019x_ctl_synth_play_vol =
+static struct sbmix_elem snd_dt019x_ctl_synth_play_vol =
 	SB_DOUBLE("Synth Playback Volume", SB_DT019X_SYNTH_DEV, SB_DT019X_SYNTH_DEV, 4,0, 15);
-static snd_kcontrol_new_t snd_dt019x_ctl_cd_play_vol =
+static struct sbmix_elem snd_dt019x_ctl_cd_play_vol =
 	SB_DOUBLE("CD Playback Volume", SB_DT019X_CD_DEV, SB_DT019X_CD_DEV, 4,0, 15);
-static snd_kcontrol_new_t snd_dt019x_ctl_mic_play_vol =
+static struct sbmix_elem snd_dt019x_ctl_mic_play_vol =
 	SB_SINGLE("Mic Playback Volume", SB_DT019X_MIC_DEV, 4, 7);
-static snd_kcontrol_new_t snd_dt019x_ctl_pc_speaker_vol =
+static struct sbmix_elem snd_dt019x_ctl_pc_speaker_vol =
 	SB_SINGLE("PC Speaker Volume", SB_DT019X_SPKR_DEV, 0,  7);
-static snd_kcontrol_new_t snd_dt019x_ctl_line_play_vol =
+static struct sbmix_elem snd_dt019x_ctl_line_play_vol =
 	SB_DOUBLE("Line Playback Volume", SB_DT019X_LINE_DEV, SB_DT019X_LINE_DEV, 4,0, 15);
-static snd_kcontrol_new_t snd_dt019x_ctl_pcm_play_switch =
+static struct sbmix_elem snd_dt019x_ctl_pcm_play_switch =
 	SB_DOUBLE("PCM Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 2,1, 1);
-static snd_kcontrol_new_t snd_dt019x_ctl_synth_play_switch =
+static struct sbmix_elem snd_dt019x_ctl_synth_play_switch =
 	SB_DOUBLE("Synth Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 4,3, 1);
-static snd_kcontrol_new_t snd_dt019x_ctl_capture_source =
+static struct sbmix_elem snd_dt019x_ctl_capture_source =
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Capture Source",
-		.info = snd_dt019x_input_sw_info,
-		.get = snd_dt019x_input_sw_get,
-		.put = snd_dt019x_input_sw_put,
+		.type = SB_MIX_CAPTURE_DT019X
 	};
 
-static snd_kcontrol_new_t *snd_dt019x_controls[] = {
+static struct sbmix_elem *snd_dt019x_controls[] = {
 	&snd_dt019x_ctl_master_play_vol,
 	&snd_dt019x_ctl_pcm_play_vol,
 	&snd_dt019x_ctl_synth_play_vol,
@@ -630,8 +656,6 @@ static snd_kcontrol_new_t *snd_dt019x_controls[] = {
 	&snd_dt019x_ctl_capture_source
 };
 
-#define DT019X_INIT_VALUES (sizeof(snd_dt019x_init_values)/sizeof(unsigned char)/2)
-
 static unsigned char snd_dt019x_init_values[][2] = {
         { SB_DT019X_MASTER_DEV, 0 },
         { SB_DT019X_PCM_DEV, 0 },
@@ -644,35 +668,36 @@ static unsigned char snd_dt019x_init_values[][2] = {
         { SB_DT019X_CAPTURE_SW, 0x06 },
 };
 
+/*
+ * ALS4000 specific mixer elements
+ */
 /* FIXME: SB_ALS4000_MONO_IO_CTRL needs output select ctrl ! */
-static snd_kcontrol_new_t snd_als4000_ctl_mono_output_switch =
+static struct sbmix_elem snd_als4000_ctl_mono_output_switch =
 	SB_SINGLE("Mono Output Switch", SB_ALS4000_MONO_IO_CTRL, 5, 1);
 /* FIXME: mono input switch also available on DT019X ? */
-static snd_kcontrol_new_t snd_als4000_ctl_mono_input_switch =
+static struct sbmix_elem snd_als4000_ctl_mono_input_switch =
 	SB_SINGLE("Mono Input Switch", SB_DT019X_OUTPUT_SW2, 0, 1);
-static snd_kcontrol_new_t snd_als4000_ctl_mic_20db_boost =
+static struct sbmix_elem snd_als4000_ctl_mic_20db_boost =
 	SB_SINGLE("Mic Boost (+20dB)", SB_ALS4000_MIC_IN_GAIN, 0, 0x03);
-static snd_kcontrol_new_t snd_als4000_ctl_mixer_out_to_in =
+static struct sbmix_elem snd_als4000_ctl_mixer_out_to_in =
 	SB_SINGLE("Mixer Out To In", SB_ALS4000_MIC_IN_GAIN, 7, 0x01);
 /* FIXME: 3D needs much more sophisticated controls, many more features ! */
-static snd_kcontrol_new_t snd_als4000_ctl_3d_output_switch =
+static struct sbmix_elem snd_als4000_ctl_3d_output_switch =
 	SB_SINGLE("3D Output Switch", SB_ALS4000_3D_SND_FX, 6, 0x01);
-static snd_kcontrol_new_t snd_als4000_ctl_3d_output_ratio =
+static struct sbmix_elem snd_als4000_ctl_3d_output_ratio =
 	SB_SINGLE("3D Output Ratio", SB_ALS4000_3D_SND_FX, 0, 0x07);
-static snd_kcontrol_new_t snd_als4000_ctl_3d_poweroff_switch =
+static struct sbmix_elem snd_als4000_ctl_3d_poweroff_switch =
 	SB_SINGLE("3D PowerOff Switch", SB_ALS4000_3D_TIME_DELAY, 4, 0x01);
-static snd_kcontrol_new_t snd_als4000_ctl_3d_delay =
+static struct sbmix_elem snd_als4000_ctl_3d_delay =
 	SB_SINGLE("3D Delay", SB_ALS4000_3D_TIME_DELAY, 0, 0x0f);
 #if NOT_AVAILABLE
-static snd_kcontrol_new_t snd_als4000_ctl_fmdac =
+static struct sbmix_elem snd_als4000_ctl_fmdac =
 	SB_SINGLE("FMDAC Switch (Option ?)", SB_ALS4000_FMDAC, 0, 0x01);
-static snd_kcontrol_new_t snd_als4000_ctl_qsound =
+static struct sbmix_elem snd_als4000_ctl_qsound =
 	SB_SINGLE("QSound Mode", SB_ALS4000_QSOUND, 1, 0x1f);
 #endif
 
-#define ALS4000_CONTROLS (sizeof(snd_als4000_controls)/sizeof(snd_kcontrol_new_t *))
-
-static snd_kcontrol_new_t *snd_als4000_controls[] = {
+static struct sbmix_elem *snd_als4000_controls[] = {
 	&snd_sb16_ctl_master_play_vol,
 	&snd_dt019x_ctl_pcm_play_switch,
 	&snd_sb16_ctl_pcm_play_vol,
@@ -706,8 +731,6 @@ static snd_kcontrol_new_t *snd_als4000_controls[] = {
 #endif
 };
 
-#define ALS4000_INIT_VALUES (sizeof(snd_als4000_init_values)/sizeof(unsigned char)/2)
-
 static unsigned char snd_als4000_init_values[][2] = {
 	{ SB_DSP4_MASTER_DEV + 0, 0 },
 	{ SB_DSP4_MASTER_DEV + 1, 0 },
@@ -723,8 +746,11 @@ static unsigned char snd_als4000_init_values[][2] = {
 	{ SB_ALS4000_MIC_IN_GAIN, 0 },
 };
 
+
+/*
+ */
 static int snd_sbmixer_init(sb_t *chip,
-			    snd_kcontrol_new_t **controls,
+			    struct sbmix_elem **controls,
 			    int controls_count,
 			    unsigned char map[][2],
 			    int map_count,
@@ -747,7 +773,7 @@ static int snd_sbmixer_init(sb_t *chip,
 	}
 
 	for (idx = 0; idx < controls_count; idx++) {
-		if ((err = snd_ctl_add(card, snd_ctl_new1(controls[idx], chip))) < 0)
+		if ((err = snd_sbmixer_add_ctl_elem(chip, controls[idx])) < 0)
 			return err;
 	}
 	snd_component_add(card, name);
@@ -770,37 +796,47 @@ int snd_sbmixer_new(sb_t *chip)
 	case SB_HW_20:
 	case SB_HW_201:
 		if ((err = snd_sbmixer_init(chip,
-					    snd_sb20_controls, SB20_CONTROLS,
-					    snd_sb20_init_values, SB20_INIT_VALUES,
+					    snd_sb20_controls,
+					    ARRAY_SIZE(snd_sb20_controls),
+					    snd_sb20_init_values,
+					    ARRAY_SIZE(snd_sb20_init_values),
 					    "CTL1335")) < 0)
 			return err;
 		break;
 	case SB_HW_PRO:
 		if ((err = snd_sbmixer_init(chip,
-					    snd_sbpro_controls, SBPRO_CONTROLS,
-					    snd_sbpro_init_values, SBPRO_INIT_VALUES,
+					    snd_sbpro_controls,
+					    ARRAY_SIZE(snd_sbpro_controls),
+					    snd_sbpro_init_values,
+					    ARRAY_SIZE(snd_sbpro_init_values),
 					    "CTL1345")) < 0)
 			return err;
 		break;
 	case SB_HW_16:
 	case SB_HW_ALS100:
 		if ((err = snd_sbmixer_init(chip,
-					    snd_sb16_controls, SB16_CONTROLS,
-					    snd_sb16_init_values, SB16_INIT_VALUES,
+					    snd_sb16_controls,
+					    ARRAY_SIZE(snd_sb16_controls),
+					    snd_sb16_init_values,
+					    ARRAY_SIZE(snd_sb16_init_values),
 					    "CTL1745")) < 0)
 			return err;
 		break;
 	case SB_HW_ALS4000:
 		if ((err = snd_sbmixer_init(chip,
-					    snd_als4000_controls, ALS4000_CONTROLS,
-					    snd_als4000_init_values, ALS4000_INIT_VALUES,
+					    snd_als4000_controls,
+					    ARRAY_SIZE(snd_als4000_controls),
+					    snd_als4000_init_values,
+					    ARRAY_SIZE(snd_als4000_init_values),
 					    "ALS4000")) < 0)
 			return err;
 		break;
 	case SB_HW_DT019X:
 		if ((err = snd_sbmixer_init(chip,
-					    snd_dt019x_controls, DT019X_CONTROLS,
-					    snd_dt019x_init_values, DT019X_INIT_VALUES,
+					    snd_dt019x_controls,
+					    ARRAY_SIZE(snd_dt019x_controls),
+					    snd_dt019x_init_values,
+					    ARRAY_SIZE(snd_dt019x_init_values),
 					    "DT019X")) < 0)
 		break;
 	default:

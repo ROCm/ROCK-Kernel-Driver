@@ -248,6 +248,8 @@ EXPORT_SYMBOL(inet_unregister_protosw);
 EXPORT_SYMBOL(ip_route_output_key);
 EXPORT_SYMBOL(ip_route_input);
 EXPORT_SYMBOL(icmp_send);
+EXPORT_SYMBOL(icmp_statistics);
+EXPORT_SYMBOL(icmp_err_convert);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(arp_send);
@@ -322,6 +324,11 @@ EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
 EXPORT_SYMBOL(xfrm_policy_byid);
 EXPORT_SYMBOL(xfrm_policy_list);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+EXPORT_SYMBOL(xfrm6_state_lookup);
+EXPORT_SYMBOL(xfrm6_find_acq);
+EXPORT_SYMBOL(xfrm6_alloc_spi);
+#endif
 
 EXPORT_SYMBOL_GPL(xfrm_probe_algs);
 EXPORT_SYMBOL_GPL(xfrm_count_auth_supported);
@@ -427,6 +434,7 @@ EXPORT_SYMBOL(sysctl_tcp_wmem);
 EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 EXPORT_SYMBOL(tcp_sendpage);
+EXPORT_SYMBOL(sysctl_tcp_low_latency);
 
 EXPORT_SYMBOL(tcp_write_xmit);
 

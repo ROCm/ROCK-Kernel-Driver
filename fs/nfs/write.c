@@ -829,7 +829,6 @@ nfs_writeback_done(struct rpc_task *task)
 	struct nfs_write_data	*data = (struct nfs_write_data *) task->tk_calldata;
 	struct nfs_writeargs	*argp = &data->args;
 	struct nfs_writeres	*resp = &data->res;
-	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	struct page		*page;
 
@@ -863,7 +862,7 @@ nfs_writeback_done(struct rpc_task *task)
 		if (time_before(complain, jiffies)) {
 			dprintk("NFS: faulty NFS server %s:"
 				" (committed = %d) != (stable = %d)\n",
-				NFS_SERVER(inode)->hostname,
+				NFS_SERVER(data->inode)->hostname,
 				data->verf.committed, argp->stable);
 			complain = jiffies + 300 * HZ;
 		}

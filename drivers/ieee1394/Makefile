@@ -2,8 +2,6 @@
 # Makefile for the Linux IEEE 1394 implementation
 #
 
-export-objs := ieee1394_core.o ohci1394.o cmp.o
-
 ieee1394-objs := ieee1394_core.o ieee1394_transactions.o hosts.o \
 		 highlevel.o csr.o nodemgr.o oui.o dma.o iso.o
 
@@ -20,6 +18,8 @@ obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
 clean-files := oui.c
 
+ieee1394.o: $(ieee1394-objs)
+	$(LD) $(LDFLAGS) -r -o $@ $(ieee1394-objs)
 
 ifeq ($(obj),)
 obj = .

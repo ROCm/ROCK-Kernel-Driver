@@ -116,7 +116,7 @@
 
 #ifdef DEBUG_TARGET
 #define DBG(cmd,xxx...) \
-  if (cmd->target == DEBUG_TARGET) { \
+  if (cmd->device->id == DEBUG_TARGET) { \
     xxx; \
   }
 #else
@@ -575,7 +575,7 @@ static
 char acornscsi_target(AS_Host *host)
 {
 	if (host->SCpnt)
-		return '0' + host->SCpnt->target;
+		return '0' + host->SCpnt->device->id;
 	return 'H';
 }
 
@@ -742,7 +742,7 @@ intr_ret_t acornscsi_kick(AS_Host *host)
      * In this case, we don't want to write to the registers
      */
     if (!(sbic_arm_read(host->scsi.io_port, ASR) & (ASR_INT|ASR_BSY|ASR_CIP))) {
-	sbic_arm_write(host->scsi.io_port, DESTID, SCpnt->target);
+	sbic_arm_write(host->scsi.io_port, DESTID, SCpnt->device->id);
 	sbic_arm_write(host->scsi.io_port, CMND, CMND_SELWITHATN);
     }
 
@@ -759,7 +759,7 @@ intr_ret_t acornscsi_kick(AS_Host *host)
 
 #if (DEBUG & (DEBUG_ABORT|DEBUG_CONNECT))
     DBG(SCpnt,printk("scsi%d.%c: starting cmd %02X\n",
-	    host->host->host_no, '0' + SCpnt->target,
+	    host->host->host_no, '0' + SCpnt->device->id,
 	    SCpnt->cmnd[0]));
 #endif
 
@@ -775,7 +775,7 @@ intr_ret_t acornscsi_kick(AS_Host *host)
 	    SCpnt->tag = SCpnt->device->current_tag;
 	} else
 #endif
-	    set_bit(SCpnt->target * 8 + SCpnt->lun, host->busyluns);
+	    set_bit(SCpnt->device->id * 8 + SCpnt->device->lun, host->busyluns);
 
 	host->stats.removes += 1;
 
@@ -868,7 +868,7 @@ void acornscsi_done(AS_Host *host, Scsi_Cmnd **SCpntp, unsigned int result)
 				host->host->host_no, SCpnt->result);
 			print_command(SCpnt->cmnd);
 			acornscsi_dumpdma(host, "done");
-		 	acornscsi_dumplog(host, SCpnt->target);
+		 	acornscsi_dumplog(host, SCpnt->device->id);
 			SCpnt->result &= 0xffff;
 			SCpnt->result |= DID_ERROR << 16;
 		    }
@@ -878,7 +878,7 @@ void acornscsi_done(AS_Host *host, Scsi_Cmnd **SCpntp, unsigned int result)
 	if (!SCpnt->scsi_done)
 	    panic("scsi%d.H: null scsi_done function in acornscsi_done", host->host->host_no);
 
-	clear_bit(SCpnt->target * 8 + SCpnt->lun, host->busyluns);
+	clear_bit(SCpnt->device->id * 8 + SCpnt->device->lun, host->busyluns);
 
 	SCpnt->scsi_done(SCpnt);
     } else
@@ -1035,7 +1035,7 @@ void acornscsi_dma_setup(AS_Host *host, dmadir_t direction)
 
     if (direction == DMA_OUT) {
 #if (DEBUG & DEBUG_NO_WRITE)
-	if (NO_WRITE & (1 << host->SCpnt->target)) {
+	if (NO_WRITE & (1 << host->SCpnt->device->id)) {
 	    printk(KERN_CRIT "scsi%d.%c: I can't handle DMA_OUT!\n",
 		    host->host->host_no, acornscsi_target(host));
 	    return;
@@ -1511,7 +1511,7 @@ void acornscsi_message(AS_Host *host)
 	if (host->scsi.phase != PHASE_STATUSIN) {
 	    printk(KERN_ERR "scsi%d.%c: command complete following non-status in phase?\n",
 		    host->host->host_no, acornscsi_target(host));
-	    acornscsi_dumplog(host, host->SCpnt->target);
+	    acornscsi_dumplog(host, host->SCpnt->device->id);
 	}
 	host->scsi.phase = PHASE_DONE;
 	host->scsi.SCp.Message = message[0];
@@ -1567,8 +1567,8 @@ void acornscsi_message(AS_Host *host)
 	 * transfer.  Re-initiate sync transfer negociation now, and if
 	 * we got a REJECT in response to SDTR, then it'll be set to DONE.
 	 */
-	if (host->device[host->SCpnt->target].sync_state == SYNC_SENT_REQUEST)
-	    host->device[host->SCpnt->target].sync_state = SYNC_NEGOCIATE;
+	if (host->device[host->SCpnt->device->id].sync_state == SYNC_SENT_REQUEST)
+	    host->device[host->SCpnt->device->id].sync_state = SYNC_NEGOCIATE;
 #endif
 
 	/*
@@ -1591,7 +1591,7 @@ void acornscsi_message(AS_Host *host)
 	    printk(KERN_NOTICE "scsi%d.%c: disabling tagged queueing\n",
 		    host->host->host_no, acornscsi_target(host));
 	    host->SCpnt->device->tagged_queue = 0;
-	    set_bit(host->SCpnt->target * 8 + host->SCpnt->lun, host->busyluns);
+	    set_bit(host->SCpnt->device->id * 8 + host->SCpnt->device->lun, host->busyluns);
 	    break;
 #endif
 	case EXTENDED_MESSAGE | (EXTENDED_SDTR << 8):
@@ -1600,9 +1600,9 @@ void acornscsi_message(AS_Host *host)
 	     */
 	    printk(KERN_NOTICE "scsi%d.%c: Using asynchronous transfer\n",
 		    host->host->host_no, acornscsi_target(host));
-	    host->device[host->SCpnt->target].sync_xfer = SYNCHTRANSFER_2DBA;
-	    host->device[host->SCpnt->target].sync_state = SYNC_ASYNCHRONOUS;
-	    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->target].sync_xfer);
+	    host->device[host->SCpnt->device->id].sync_xfer = SYNCHTRANSFER_2DBA;
+	    host->device[host->SCpnt->device->id].sync_state = SYNC_ASYNCHRONOUS;
+	    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->device->id].sync_xfer);
 	    break;
 
 	default:
@@ -1625,18 +1625,18 @@ void acornscsi_message(AS_Host *host)
 	switch (message[2]) {
 #ifdef CONFIG_SCSI_ACORNSCSI_SYNC
 	case EXTENDED_SDTR:
-	    if (host->device[host->SCpnt->target].sync_state == SYNC_SENT_REQUEST) {
+	    if (host->device[host->SCpnt->device->id].sync_state == SYNC_SENT_REQUEST) {
 		/*
 		 * We requested synchronous transfers.  This isn't quite right...
 		 * We can only say if this succeeded if we proceed on to execute the
 		 * command from this message.  If we get a MESSAGE PARITY ERROR,
 		 * and the target retries fail, then we fallback to asynchronous mode
 		 */
-		host->device[host->SCpnt->target].sync_state = SYNC_COMPLETED;
+		host->device[host->SCpnt->device->id].sync_state = SYNC_COMPLETED;
 		printk(KERN_NOTICE "scsi%d.%c: Using synchronous transfer, offset %d, %d ns\n",
 			host->host->host_no, acornscsi_target(host),
 			message[4], message[3] * 4);
-		host->device[host->SCpnt->target].sync_xfer =
+		host->device[host->SCpnt->device->id].sync_xfer =
 			calc_sync_xfer(message[3] * 4, message[4]);
 	    } else {
 		unsigned char period, length;
@@ -1649,10 +1649,10 @@ void acornscsi_message(AS_Host *host)
 		length = min_t(unsigned int, message[4], sdtr_size);
 		msgqueue_addmsg(&host->scsi.msgs, 5, EXTENDED_MESSAGE, 3,
 				 EXTENDED_SDTR, period, length);
-		host->device[host->SCpnt->target].sync_xfer =
+		host->device[host->SCpnt->device->id].sync_xfer =
 			calc_sync_xfer(period * 4, length);
 	    }
-	    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->target].sync_xfer);
+	    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->device->id].sync_xfer);
 	    break;
 #else
 	    /* We do not accept synchronous transfers.  Respond with a
@@ -1738,8 +1738,8 @@ void acornscsi_buildmessages(AS_Host *host)
 #endif
 
     msgqueue_addmsg(&host->scsi.msgs, 1,
-		     IDENTIFY(host->device[host->SCpnt->target].disconnect_ok,
-			     host->SCpnt->lun));
+		     IDENTIFY(host->device[host->SCpnt->device->id].disconnect_ok,
+			     host->SCpnt->device->lun));
 
 #if 0
     /* does the device need the current command aborted */
@@ -1764,8 +1764,8 @@ void acornscsi_buildmessages(AS_Host *host)
 #endif
 
 #ifdef CONFIG_SCSI_ACORNSCSI_SYNC
-    if (host->device[host->SCpnt->target].sync_state == SYNC_NEGOCIATE) {
-	host->device[host->SCpnt->target].sync_state = SYNC_SENT_REQUEST;
+    if (host->device[host->SCpnt->device->id].sync_state == SYNC_NEGOCIATE) {
+	host->device[host->SCpnt->device->id].sync_state = SYNC_SENT_REQUEST;
 	msgqueue_addmsg(&host->scsi.msgs, 5,
 			 EXTENDED_MESSAGE, 3, EXTENDED_SDTR,
 			 sdtr_period / 4, sdtr_size);
@@ -1792,7 +1792,7 @@ int acornscsi_starttransfer(AS_Host *host)
 
     residual = host->SCpnt->request_bufflen - host->scsi.SCp.scsi_xferred;
 
-    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->target].sync_xfer);
+    sbic_arm_write(host->scsi.io_port, SYNCHTRANSFER, host->device[host->SCpnt->device->id].sync_xfer);
     sbic_arm_writenext(host->scsi.io_port, residual >> 16);
     sbic_arm_writenext(host->scsi.io_port, residual >> 8);
     sbic_arm_writenext(host->scsi.io_port, residual);
@@ -1828,7 +1828,7 @@ int acornscsi_reconnect(AS_Host *host)
     if (host->SCpnt && !host->scsi.disconnectable) {
 	printk(KERN_ERR "scsi%d.%d: reconnected while command in "
 		"progress to target %d?\n",
-		host->host->host_no, target, host->SCpnt->target);
+		host->host->host_no, target, host->SCpnt->device->id);
 	host->SCpnt = NULL;
     }
 
@@ -1839,7 +1839,7 @@ int acornscsi_reconnect(AS_Host *host)
     host->scsi.reconnected.tag = 0;
 
     if (host->scsi.disconnectable && host->SCpnt &&
-	host->SCpnt->target == target && host->SCpnt->lun == lun)
+	host->SCpnt->device->id == target && host->SCpnt->device->lun == lun)
 	ok = 1;
 
     if (!ok && queue_probetgtlun(&host->queues.disconnected, target, lun))
@@ -1876,9 +1876,9 @@ int acornscsi_reconnect_finish(AS_Host *host)
 {
     if (host->scsi.disconnectable && host->SCpnt) {
 	host->scsi.disconnectable = 0;
-	if (host->SCpnt->target == host->scsi.reconnected.target &&
-	    host->SCpnt->lun	== host->scsi.reconnected.lun &&
-	    host->SCpnt->tag	== host->scsi.reconnected.tag) {
+	if (host->SCpnt->device->id  == host->scsi.reconnected.target &&
+	    host->SCpnt->device->lun == host->scsi.reconnected.lun &&
+	    host->SCpnt->tag         == host->scsi.reconnected.tag) {
 #if (DEBUG & (DEBUG_QUEUES|DEBUG_DISCON))
 	    DBG(host->SCpnt, printk("scsi%d.%c: reconnected",
 		    host->host->host_no, acornscsi_target(host)));
@@ -1992,7 +1992,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
     ADD_STATUS(8, ssr, host->scsi.phase, in_irq);
 
     if (host->SCpnt && !host->scsi.disconnectable)
-	ADD_STATUS(host->SCpnt->target, ssr, host->scsi.phase, in_irq);
+	ADD_STATUS(host->SCpnt->device->id, ssr, host->scsi.phase, in_irq);
 
     switch (ssr) {
     case 0x00:				/* reset state - not advanced			*/
@@ -2030,7 +2030,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 		break;
 	    ssr = sbic_arm_read(host->scsi.io_port, SSR);
 	    ADD_STATUS(8, ssr, host->scsi.phase, 1);
-	    ADD_STATUS(host->SCpnt->target, ssr, host->scsi.phase, 1);
+	    ADD_STATUS(host->SCpnt->device->id, ssr, host->scsi.phase, 1);
 	    goto connected;
 	    
 	case 0x42:			/* select timed out				*/
@@ -2049,7 +2049,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_CONNECTING, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	    acornscsi_abortcmd(host, host->SCpnt->tag);
 	}
 	return INTR_PROCESSING;
@@ -2085,7 +2085,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_CONNECTED, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	    acornscsi_abortcmd(host, host->SCpnt->tag);
 	}
 	return INTR_PROCESSING;
@@ -2123,7 +2123,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_MSGOUT, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2168,7 +2168,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_COMMAND, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2181,7 +2181,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	} else {
 	    printk(KERN_ERR "scsi%d.%c: PHASE_DISCONNECT, SSR %02X instead of disconnect?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_NEXT_COMMAND;
 
@@ -2191,7 +2191,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	else {
 	    printk(KERN_ERR "scsi%d.%c: PHASE_IDLE, SSR %02X while idle?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2206,7 +2206,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	 */
 	if (ssr != 0x8f && !acornscsi_reconnect_finish(host))
 	    return INTR_IDLE;
-	ADD_STATUS(host->SCpnt->target, ssr, host->scsi.phase, in_irq);
+	ADD_STATUS(host->SCpnt->device->id, ssr, host->scsi.phase, in_irq);
 	switch (ssr) {
 	case 0x88:			/* data out phase				*/
 					/* -> PHASE_DATAOUT				*/
@@ -2251,7 +2251,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_RECONNECTED, SSR %02X after reconnect?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2300,7 +2300,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_DATAIN, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2352,7 +2352,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_DATAOUT, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2373,7 +2373,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_STATUSIN, SSR %02X instead of MESSAGE_IN?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2396,14 +2396,14 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	case 0x85:
 	    printk("scsi%d.%c: strange message in disconnection\n",
 		host->host->host_no, acornscsi_target(host));
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	    acornscsi_done(host, &host->SCpnt, DID_ERROR);
 	    break;
 
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_MSGIN, SSR %02X after message in?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2421,7 +2421,7 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_DONE, SSR %02X instead of disconnect?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
@@ -2447,14 +2447,14 @@ intr_ret_t acornscsi_sbicintr(AS_Host *host, int in_irq)
 	default:
 	    printk(KERN_ERR "scsi%d.%c: PHASE_ABORTED, SSR %02X?\n",
 		    host->host->host_no, acornscsi_target(host), ssr);
-	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	    acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
 	}
 	return INTR_PROCESSING;
 
     default:
 	printk(KERN_ERR "scsi%d.%c: unknown driver phase %d\n",
 		host->host->host_no, acornscsi_target(host), ssr);
-	acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->target : 8);
+	acornscsi_dumplog(host, host->SCpnt ? host->SCpnt->device->id : 8);
     }
     return INTR_PROCESSING;
 }
@@ -2531,9 +2531,9 @@ int acornscsi_queuecmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
     }
 
 #if (DEBUG & DEBUG_NO_WRITE)
-    if (acornscsi_cmdtype(SCpnt->cmnd[0]) == CMD_WRITE && (NO_WRITE & (1 << SCpnt->target))) {
+    if (acornscsi_cmdtype(SCpnt->cmnd[0]) == CMD_WRITE && (NO_WRITE & (1 << SCpnt->device->id))) {
 	printk(KERN_CRIT "scsi%d.%c: WRITE attempted with NO_WRITE flag set\n",
-	    SCpnt->host->host_no, '0' + SCpnt->target);
+	    SCpnt->host->host_no, '0' + SCpnt->device->id);
 	SCpnt->result = DID_NO_CONNECT << 16;
 	done(SCpnt);
 	return 0;
@@ -2708,7 +2708,7 @@ int acornscsi_abort(Scsi_Cmnd *SCpnt)
 
 		printk(KERN_WARNING "acornscsi_abort: ");
 		print_sbic_status(asr, ssr, host->scsi.phase);
-		acornscsi_dumplog(host, SCpnt->target);
+		acornscsi_dumplog(host, SCpnt->device->id);
 	}
 #endif
 
@@ -2724,7 +2724,7 @@ int acornscsi_abort(Scsi_Cmnd *SCpnt)
 //#if (DEBUG & DEBUG_ABORT)
 		printk("clear ");
 //#endif
-		clear_bit(SCpnt->target * 8 + SCpnt->lun, host->busyluns);
+		clear_bit(SCpnt->device->id * 8 + SCpnt->device->lun, host->busyluns);
 
 	/*
 	 * We found the command, and cleared it out.  Either
@@ -2758,7 +2758,7 @@ int acornscsi_abort(Scsi_Cmnd *SCpnt)
 	 */
 	default:
 	case res_not_running:
-		acornscsi_dumplog(host, SCpnt->target);
+		acornscsi_dumplog(host, SCpnt->device->id);
 #if (DEBUG & DEBUG_ABORT)
 		result = SCSI_ABORT_SNOOZE;
 #else
@@ -2796,7 +2796,7 @@ int acornscsi_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 
 	printk(KERN_WARNING "acornscsi_reset: ");
 	print_sbic_status(asr, ssr, host->scsi.phase);
-	acornscsi_dumplog(host, SCpnt->target);
+	acornscsi_dumplog(host, SCpnt->device->id);
     }
 #endif
 
@@ -3110,7 +3110,8 @@ static struct ecard_driver acornscsi_driver = {
 	.remove		= __devexit_p(acornscsi_remove),
 	.id_table	= acornscsi_cids,
 	.drv = {
-		.name	= "acornscsi",
+		.devclass	= &shost_devclass,
+		.name		= "acornscsi",
 	},
 };
 

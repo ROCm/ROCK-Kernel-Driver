@@ -406,7 +406,6 @@ kbd_error:
 
 static void a5kkbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
-	kbd_pt_regs = regs;
 	if (handle_rawcode(ioc_readb(IOC_KARTRX)))
 		tasklet_schedule(&keyboard_tasklet);
 }

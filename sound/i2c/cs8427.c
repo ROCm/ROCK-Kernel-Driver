@@ -396,7 +396,8 @@ int snd_cs8427_iec958_build(snd_i2c_device_t *cs8427,
 {
 	cs8427_t *chip = snd_magic_cast(cs8427_t, cs8427->private_data, return -ENXIO);
 	snd_kcontrol_t *kctl;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	snd_assert(play_substream && cap_substream, return -EINVAL);
 	for (idx = 0; idx < CONTROLS; idx++) {

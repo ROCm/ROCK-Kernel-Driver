@@ -505,8 +505,7 @@ hotfix_primary_boot_sector:
 			memcpy(bh_primary->b_data, bh_backup->b_data,
 					sb->s_blocksize);
 			mark_buffer_dirty(bh_primary);
-			ll_rw_block(WRITE, 1, &bh_primary);
-			wait_on_buffer(bh_primary);
+			sync_dirty_buffer(bh_primary);
 			if (buffer_uptodate(bh_primary)) {
 				brelse(bh_backup);
 				return bh_primary;

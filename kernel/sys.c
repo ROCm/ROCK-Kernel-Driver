@@ -561,19 +561,12 @@ asmlinkage long sys_setgid(gid_t gid)
   
 static int set_user(uid_t new_ruid, int dumpclear)
 {
-	struct user_struct *new_user, *old_user;
+	struct user_struct *new_user;
 
-	/* What if a process setreuid()'s and this brings the
-	 * new uid over his NPROC rlimit?  We can check this now
-	 * cheaply with the new uid cache, so if it matters
-	 * we should be checking for it.  -DaveM
-	 */
 	new_user = alloc_uid(new_ruid);
 	if (!new_user)
 		return -EAGAIN;
-	old_user = current->user;
-	atomic_dec(&old_user->processes);
-	atomic_inc(&new_user->processes);
+	switch_uid(new_user);
 
 	if(dumpclear)
 	{
@@ -581,8 +574,6 @@ static int set_user(uid_t new_ruid, int dumpclear)
 		wmb();
 	}
 	current->uid = new_ruid;
-	current->user = new_user;
-	free_uid(old_user);
 	return 0;
 }
 
@@ -916,6 +907,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	p = find_task_by_pid(pid);
 	if (!p)
 		goto out;
+
 	err = -EINVAL;
 	if (!thread_group_leader(p))
 		goto out;
@@ -927,11 +919,16 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 		err = -EACCES;
 		if (p->did_exec)
 			goto out;
-	} else if (p != current)
-		goto out;
+	} else {
+		err = -ESRCH;
+		if (p != current)
+			goto out;
+	}
+
 	err = -EPERM;
 	if (p->leader)
 		goto out;
+
 	if (pgid != pid) {
 		struct task_struct *p;
 		struct pid *pid;
@@ -1021,16 +1018,7 @@ asmlinkage long sys_setsid(void)
 		goto out;
 
 	current->leader = 1;
-	if (current->session != current->pid) {
-		detach_pid(current, PIDTYPE_SID);
-		current->session = current->pid;
-		attach_pid(current, PIDTYPE_SID, current->pid);
-	}
-	if (current->pgrp != current->pid) {
-		detach_pid(current, PIDTYPE_PGID);
-		current->pgrp = current->pid;
-		attach_pid(current, PIDTYPE_PGID, current->pid);
-	}
+	__set_special_pids(current->pid, current->pid);
 	current->tty = NULL;
 	current->tty_old_pgrp = 0;
 	err = current->pgrp;
@@ -1317,7 +1305,7 @@ asmlinkage long sys_umask(int mask)
 asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			  unsigned long arg4, unsigned long arg5)
 {
-	int error = 0;
+	int error;
 	int sig;
 
 	error = security_task_prctl(option, arg2, arg3, arg4, arg5);

@@ -9,6 +9,7 @@
  *  Copyright (c) 1996  Ingo Molnar
  *  Copyright (c) 1998  Andrea Arcangeli
  *  Copyright (c) 2002  Vojtech Pavlik
+ *  Copyright (c) 2003  Andi Kleen
  *
  */
 
@@ -18,17 +19,26 @@
 #include <linux/init.h>
 #include <linux/mc146818rtc.h>
 #include <linux/irq.h>
+#include <linux/time.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/bcd.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
+#ifdef CONFIG_X86_LOCAL_APIC
+#include <asm/apic.h>
+#endif
 
 u64 jiffies_64; 
 
-extern rwlock_t xtime_lock;
+extern int using_apic_timer;
+
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+
+extern int using_apic_timer;
+extern void smp_local_timer_interrupt(struct pt_regs * regs);
+
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
@@ -52,12 +62,10 @@ struct timezone __sys_tz __section_sys_tz;
  * together by xtime_lock.
          */
 
-static spinlock_t time_offset_lock = SPIN_LOCK_UNLOCKED;
-static unsigned long timeoffset = 0;
-
 inline unsigned int do_gettimeoffset(void)
 {
 	unsigned long t;
+	sync_core();
 	rdtscll(t);	
 	return (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset;
 }
@@ -70,21 +78,19 @@ inline unsigned int do_gettimeoffset(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags, t;
+	unsigned long seq, t;
  	unsigned int sec, usec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	spin_lock(&time_offset_lock);
+	do {
+		seq = read_seqbegin(&xtime_lock);
 
-	sec = xtime.tv_sec;
-	usec = xtime.tv_nsec / 1000;
+		sec = xtime.tv_sec;
+		usec = xtime.tv_nsec / 1000;
 
-	t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
-	if (t > timeoffset) timeoffset = t;
-	usec += timeoffset;
+		t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
+		usec += t;
 
-	spin_unlock(&time_offset_lock);
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqretry(&xtime_lock, seq));
 
 	tv->tv_sec = sec + usec / 1000000;
 	tv->tv_usec = usec % 1000000;
@@ -98,8 +104,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
-	vxtime_lock();
+	write_seqlock_irq(&xtime_lock);
 
 	tv->tv_usec -= do_gettimeoffset() +
 		(jiffies - wall_jiffies) * tick_usec;
@@ -111,14 +116,13 @@ void do_settimeofday(struct timeval *tv)
 
 	xtime.tv_sec = tv->tv_sec;
 	xtime.tv_nsec = (tv->tv_usec * 1000);
-	vxtime_unlock();
 
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /*
@@ -201,12 +205,12 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * variables, because both do_timer() and us change them -arca+vojtech
 	 */
 
-	write_lock(&xtime_lock);
-	vxtime_lock();
+	write_seqlock(&xtime_lock);
 
 	{
 		unsigned long t;
 
+		sync_core();
 		rdtscll(t);
 		hpet.offset = (t  - hpet.last_tsc) * (1000000L / HZ) / hpet.ticks + hpet.offset - 1000000L / HZ;
 		if (hpet.offset >= 1000000L / HZ)
@@ -249,8 +253,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		rtc_update = xtime.tv_sec + 660;
 	}
  
-	vxtime_unlock();
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 unsigned long get_cmos_time(void)
@@ -342,8 +345,9 @@ static unsigned int __init pit_calibrate_tsc(void)
 	outb((1193182 / (1000 / 50)) & 0xff, 0x42);
 	outb((1193182 / (1000 / 50)) >> 8, 0x42);
 	rdtscll(start);
-      	
+	sync_core();
 	while ((inb(0x61) & 0x20) == 0);
+	sync_core();
 	rdtscll(end);
 
 
@@ -376,12 +380,12 @@ void __init time_init(void)
 
 	pit_init();
 	printk(KERN_INFO "time.c: Using 1.1931816 MHz PIT timer.\n");
-	setup_irq(0, &irq0);
 	cpu_khz = pit_calibrate_tsc();
 	printk(KERN_INFO "time.c: Detected %d.%03d MHz processor.\n",
 		cpu_khz / 1000, cpu_khz % 1000);
 	hpet.ticks = cpu_khz * (1000 / HZ);
 	rdtscll(hpet.last_tsc);
+	setup_irq(0, &irq0);
 }
 
 __setup("report_lost_ticks", time_setup);

@@ -30,6 +30,7 @@
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/ad1848.h>
+#include <sound/control.h>
 #define SNDRV_LEGACY_FIND_FREE_IRQ
 #define SNDRV_LEGACY_FIND_FREE_DMA
 #define SNDRV_GET_ID
@@ -176,9 +177,7 @@ static int __init snd_sgalaxy_detect(int dev, int irq, int dma)
 	return snd_sgalaxy_setup_wss(wssport[dev], irq, dma);
 }
 
-#define SGALAXY_CONTROLS 2
-
-static snd_kcontrol_new_t snd_sgalaxy_controls[2] = {
+static struct ad1848_mix_elem snd_sgalaxy_controls[] = {
 AD1848_DOUBLE("Aux Playback Switch", 0, SGALAXY_AUXC_LEFT, SGALAXY_AUXC_RIGHT, 7, 7, 1, 1),
 AD1848_DOUBLE("Aux Playback Volume", 0, SGALAXY_AUXC_LEFT, SGALAXY_AUXC_RIGHT, 0, 0, 31, 0)
 };
@@ -187,7 +186,8 @@ static int __init snd_sgalaxy_mixer(ad1848_t *chip)
 {
 	snd_card_t *card = chip->card;
 	snd_ctl_elem_id_t id1, id2;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	memset(&id1, 0, sizeof(id1));
 	memset(&id2, 0, sizeof(id2));
@@ -211,8 +211,8 @@ static int __init snd_sgalaxy_mixer(ad1848_t *chip)
 	if ((err = snd_ctl_rename_id(card, &id1, &id2)) < 0)
 		return err;
 	/* build AUX2 input */
-	for (idx = 0; idx < SGALAXY_CONTROLS; idx++) {
-		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_sgalaxy_controls[idx], chip))) < 0)
+	for (idx = 0; idx < ARRAY_SIZE(snd_sgalaxy_controls); idx++) {
+		if ((err = snd_ad1848_add_ctl_elem(chip, &snd_sgalaxy_controls[idx])) < 0)
 			return err;
 	}
 	return 0;

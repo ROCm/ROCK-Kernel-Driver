@@ -110,7 +110,7 @@ config QDIO
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called qdio.o. If you want to compile it as a
+	  The module will be called qdio. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 	  If unsure, say Y.
@@ -210,7 +210,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -235,7 +235,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 config PROCESS_DEBUG

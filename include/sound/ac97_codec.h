@@ -196,6 +196,8 @@
 #define AC97_CXR_SPDIF_AC3	0x2
 
 /* specific - ALC */
+#define AC97_ALC650_SURR_DAC_VOL	0x64
+#define AC97_ALC650_LFE_DAC_VOL		0x66
 #define AC97_ALC650_MULTICH	0x6a
 #define AC97_ALC650_CLOCK	0x7a
 
@@ -235,8 +237,6 @@ struct _snd_ac97 {
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
 	void (*init) (ac97_t *ac97);
-	snd_info_entry_t *proc_entry;
-	snd_info_entry_t *proc_regs_entry;
 	void *private_data;
 	void (*private_free) (ac97_t *ac97);
 	/* --- */
@@ -290,5 +290,15 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
 void snd_ac97_suspend(ac97_t *ac97);
 void snd_ac97_resume(ac97_t *ac97);
 #endif
+
+enum { AC97_TUNE_HP_ONLY, AC97_TUNE_SWAP_HP };
+
+struct ac97_quirk {
+	unsigned short vendor;
+	unsigned short device;
+	int type;
+};
+
+int snd_ac97_tune_hardware(ac97_t *ac97, struct pci_dev *pci, struct ac97_quirk *quirk);
 
 #endif /* __SOUND_AC97_CODEC_H */

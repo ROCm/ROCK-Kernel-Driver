@@ -31,8 +31,8 @@ typedef int (*snd_mixer_oss_get_volume_t)(snd_mixer_oss_file_t *fmixer, snd_mixe
 typedef int (*snd_mixer_oss_put_volume_t)(snd_mixer_oss_file_t *fmixer, snd_mixer_oss_slot_t *chn, int left, int right);
 typedef int (*snd_mixer_oss_get_recsrc_t)(snd_mixer_oss_file_t *fmixer, snd_mixer_oss_slot_t *chn, int *active);
 typedef int (*snd_mixer_oss_put_recsrc_t)(snd_mixer_oss_file_t *fmixer, snd_mixer_oss_slot_t *chn, int active);
-typedef int (*snd_mixer_oss_get_recsrce_t)(snd_mixer_oss_file_t *fmixer, int *active_index);
-typedef int (*snd_mixer_oss_put_recsrce_t)(snd_mixer_oss_file_t *fmixer, int active_index);
+typedef int (*snd_mixer_oss_get_recsrce_t)(snd_mixer_oss_file_t *fmixer, unsigned int *active_index);
+typedef int (*snd_mixer_oss_put_recsrce_t)(snd_mixer_oss_file_t *fmixer, unsigned int active_index);
 
 #define SNDRV_OSS_MAX_MIXERS	32
 

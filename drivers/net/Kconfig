@@ -1,3 +1,4 @@
+
 #
 # Network device configuration
 #
@@ -55,7 +56,7 @@ config DUMMY
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called dummy.o.  If you want to use more than one dummy
+	  will be called dummy.  If you want to use more than one dummy
 	  device at a time, you need to compile this driver as a module.
 	  Instead of 'dummy', the devices will then be called 'dummy0',
 	  'dummy1' etc.
@@ -80,7 +81,7 @@ config BONDING
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called bonding.o.
+	  will be called bonding.
 
 config EQUALIZER
 	tristate "EQL (serial line load balancing) support"
@@ -101,7 +102,7 @@ config EQUALIZER
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called eql.o.  If you want to compile it as a
+	  The module will be called eql.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -125,7 +126,7 @@ config TUN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tun.o.  If you want to compile it as a
+	  The module will be called tun.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you don't know what to use this for, you don't need it.
@@ -150,7 +151,7 @@ config ETHERTAP
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ethertap.o. If you want to compile it as a
+	  The module will be called ethertap. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 	  If you don't know what to use this for, you don't need it.
@@ -167,7 +168,7 @@ config NET_SB1000
 	  provided by your regular phone modem.
 
 	  At present this driver only compiles as a module, so say M here if
-	  you have this card. The module will be called sb1000.o. Then read
+	  you have this card. The module will be called sb1000. Then read
 	  <file:Documentation/networking/README.sb1000> for information on how
 	  to use this module, as it needs special ppp scripts for establishing
 	  a connection. Further documentation and the necessary scripts can be
@@ -212,6 +213,14 @@ config NET_ETHERNET
 	  kernel: saying N will just cause the configurator to skip all
 	  the questions about Ethernet network cards. If unsure, say N.
 
+config MII
+	tristate "Generic Media Independent Interface device support"
+	depends on NET_ETHERNET
+	help
+	  Most ethernet controllers have MII transceiver either as an external
+	  or internal device.  It is safe to say Y or M here even if your
+	  ethernet card lack MII.
+
 config ARM_AM79C961A
 	bool "ARM EBSA110 AM79C961A support"
 	depends on NET_ETHERNET && ARM && ARCH_EBSA110
@@ -229,7 +238,7 @@ config MACE
 	  motherboard will usually use a MACE (Medium Access Control for
 	  Ethernet) interface. Say Y to include support for the MACE chip.
 
-	  This driver is also available as a module called mace.o ( = code
+	  This driver is also available as a module called mace ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -252,7 +261,7 @@ config BMAC
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
 	  computers.
 
-	  This driver is also available as a module called bmac.o ( = code
+	  This driver is also available as a module called bmac ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -263,7 +272,7 @@ config OAKNET
 	help
 	  Say Y if your machine has this type of Ethernet network card.
 
-	  This driver is also available as a module called oaknet.o ( = code
+	  This driver is also available as a module called oaknet ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -277,7 +286,7 @@ config ARIADNE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module is called ariadne.o. If you want to compile it as
+	  want). The module is called ariadne. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config ARIADNE2
@@ -290,7 +299,7 @@ config ARIADNE2
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ariadne2.o. If you want to compile it as
+	  The module will be called ariadne2. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config NE2K_ZORRO
@@ -306,7 +315,7 @@ config A2065
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module is called a2065.o. If you want to compile it as a
+	  want). The module is called a2065. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config HYDRA
@@ -317,7 +326,7 @@ config HYDRA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module is called hydra.o. If you want to compile it as a
+	  want). The module is called hydra. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config APNE
@@ -329,7 +338,7 @@ config APNE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
-	  want). The module is called apne.o. If you want to compile it as a
+	  want). The module is called apne. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config APOLLO_ELPLUS
@@ -363,7 +372,7 @@ config MAC89x0
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  This module will
-	  be called mac89x0.o.
+	  be called mac89x0.
 
 config MACSONIC
 	tristate "Macintosh SONIC based ethernet (onboard, NuBus, LC, CS)"
@@ -379,7 +388,7 @@ config MACSONIC
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  This module will
-	  be called macsonic.o.
+	  be called macsonic.
 
 config MACMACE
 	bool "Macintosh (AV) onboard MACE ethernet (EXPERIMENTAL)"
@@ -529,7 +538,7 @@ config SUNLANCE
 	  cards are based on the AMD Lance chipset, which is better known
 	  via the NE2100 cards.
 
-	  This support is also available as a module called sunlance.o ( =
+	  This support is also available as a module called sunlance ( =
 	  code which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -543,7 +552,7 @@ config HAPPYMEAL
 	  both PCI and Sbus devices. This driver also supports the "qfe" quad
 	  100baseT device available in both PCI and Sbus configurations.
 
-	  This support is also available as a module called sunhme.o ( = code
+	  This support is also available as a module called sunhme ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -555,7 +564,7 @@ config SUNBMAC
 	  This driver supports the "be" interface available as an Sbus option.
 	  This is Sun's older 100baseT Ethernet device.
 
-	  This support is also available as a module called sunbmac.o ( = code
+	  This support is also available as a module called sunbmac ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -568,7 +577,7 @@ config SUNQE
 	  an Sbus option. Note that this is not the same as Quad FastEthernet
 	  "qfe" which is supported by the Happy Meal driver instead.
 
-	  This support is also available as a module called sunqe.o ( = code
+	  This support is also available as a module called sunqe ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -606,7 +615,7 @@ config EL1
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c501.o.  If you want to compile it as a
+	  The module will be called 3c501.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -620,7 +629,7 @@ config EL2
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c503.o.  If you want to compile it as a
+	  The module will be called 3c503.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -637,7 +646,7 @@ config ELPLUS
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called 3c505.o.
+	  called 3c505.
 
 config EL16
 	tristate "3c507 \"EtherLink 16\" support (EXPERIMENTAL)"
@@ -649,7 +658,7 @@ config EL16
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c507.o.  If you want to compile it as a
+	  The module will be called 3c507.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -669,7 +678,7 @@ config EL3
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called 3c509.o.
+	  called 3c509.
 
 config 3C515
 	tristate "3c515 ISA \"Fast EtherLink\""
@@ -683,7 +692,7 @@ config 3C515
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called 3c515.o.
+	  called 3c515.
 
 config ELMC
 	tristate "3c523 \"EtherLink/MC\" support"
@@ -695,7 +704,7 @@ config ELMC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c523.o.  If you want to compile it as a
+	  The module will be called 3c523.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -709,7 +718,7 @@ config ELMC_II
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c527.o.  If you want to compile it as a
+	  The module will be called 3c527.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -737,6 +746,26 @@ config VORTEX
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.
 
+config TYPHOON
+	tristate "3cr990 series \"Typhoon\" support"
+	depends on NET_VENDOR_3COM && PCI
+	---help---
+	  This option enables driver support for the 3cr990 series of cards:
+
+	  3C990-TX, 3CR990-TX-95, 3CR990-TX-97, 3CR990-FX-95, 3CR990-FX-97,
+	  3CR990SVR, 3CR990SVR95, 3CR990SVR97, 3CR990-FX-95 Server,
+	  3CR990-FX-97 Server, 3C990B-TX-M, 3C990BSVR
+
+	  If you have a network (Ethernet) card of this type, say Y and read
+	  the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called typhoon.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
 config LANCE
 	tristate "AMD LANCE and PCnet (AT1500 and NE2100) support"
 	depends on NET_ETHERNET && ISA
@@ -749,7 +778,7 @@ config LANCE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called lance.o.
+	  recommended.  The module will be called lance.
 
 config NET_VENDOR_SMC
 	bool "Western Digital/SMC cards"
@@ -774,7 +803,7 @@ config WD80x3
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called wd.o.  If you want to compile it as a
+	  The module will be called wd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -788,7 +817,7 @@ config ULTRAMCA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc-mca.o.  If you want to compile it as a
+	  The module will be called smc-mca.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -809,7 +838,7 @@ config ULTRA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc-ultra.o.  If you want to compile it as
+	  The module will be called smc-ultra.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
 
@@ -823,7 +852,7 @@ config ULTRA32
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc-ultra32.o.  If you want to compile it
+	  The module will be called smc-ultra32.  If you want to compile it
 	  as a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
 
@@ -840,7 +869,7 @@ config SMC9194
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc9194.o.  If you want to compile it as a
+	  The module will be called smc9194.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -868,7 +897,7 @@ config NI5010
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ni5010.o.  If you want to compile it as a
+	  The module will be called ni5010.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -882,7 +911,7 @@ config NI52
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ni52.o.  If you want to compile it as a
+	  The module will be called ni52.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -896,7 +925,7 @@ config NI65
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ni65.o.  If you want to compile it as a
+	  The module will be called ni65.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -915,7 +944,7 @@ config AT1700
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called at1700.o.
+	  called at1700.
 
 config DEPCA
 	tristate "DEPCA, DE10x, DE200, DE201, DE202, DE422 support"
@@ -931,7 +960,7 @@ config DEPCA
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
 	  called
-	  depca.o.
+	  depca.
 
 config HP100
 	tristate "HP 10/100VG PCLAN (ISA, EISA, PCI) support"
@@ -945,7 +974,7 @@ config HP100
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called hp100.o.
+	  called hp100.
 
 config NET_ISA
 	bool "Other ISA cards"
@@ -974,7 +1003,7 @@ config E2100
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called e2100.o.  If you want to compile it as a
+	  The module will be called e2100.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -992,7 +1021,7 @@ config EWRK3
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called ewrk3.o.
+	  called ewrk3.
 
 config EEXPRESS
 	tristate "EtherExpress 16 support"
@@ -1009,7 +1038,7 @@ config EEXPRESS
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called eexpress.o.
+	  called eexpress.
 
 config EEXPRESS_PRO
 	tristate "EtherExpressPro support/EtherExpress 10 (i82595) support"
@@ -1023,7 +1052,7 @@ config EEXPRESS_PRO
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called eepro.o.  If you want to compile it as a
+	  The module will be called eepro.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1040,7 +1069,7 @@ config FMV18X
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called fmv18x.o.  If you want to compile it as a
+	  The module will be called fmv18x.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1054,7 +1083,7 @@ config HPLAN_PLUS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called hp-plus.o.  If you want to compile it as a
+	  The module will be called hp-plus.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1068,7 +1097,7 @@ config HPLAN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called hp.o.  If you want to compile it as a
+	  The module will be called hp.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1090,7 +1119,7 @@ config ETH16I
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called eth16i.o.  If you want to compile it as a
+	  The module will be called eth16i.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1111,7 +1140,7 @@ config NE2000
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ne.o.  If you want to compile it as a
+	  The module will be called ne.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1137,7 +1166,7 @@ config SEEQ8005
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called ewrk3.o.
+	  called ewrk3.
 
 config SK_G16
 	tristate "SK_G16 support (OBSOLETE)"
@@ -1160,7 +1189,7 @@ config SKMC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called sk_mca.o.  If you want to compile it as a
+	  The module is called sk_mca.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1174,7 +1203,7 @@ config NE2_MCA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ne2.o.  If you want to compile it as a
+	  The module will be called ne2.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1218,7 +1247,7 @@ config PCNET32
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcnet32.o.  If you want to compile it as a
+	  The module will be called pcnet32.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1232,7 +1261,7 @@ config AMD8111_ETH
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called amd8111e.o.  If you want to compile it as a
+	  The module will be called amd8111e.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1248,7 +1277,19 @@ config ADAPTEC_STARFIRE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called starfire.o.
+	  recommended.  The module will be called starfire.
+
+config ADAPTEC_STARFIRE_NAPI
+	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
+	depends on ADAPTEC_STARFIRE && EXPERIMENTAL
+	help
+	  NAPI is a new driver API designed to reduce CPU and interrupt load
+	  when the driver is receiving lots of packets from the card. It is
+	  still somewhat experimental and thus not yet enabled by default.
+
+	  If your estimated Rx load is 10kpps or more, or if the card will be
+	  deployed on potentially unfriendly networks (e.g. in a firewall),
+	  then say Y here.
 
 config AC3200
 	tristate "Ansel Communications EISA 3200 support (EXPERIMENTAL)"
@@ -1260,7 +1301,7 @@ config AC3200
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ac3200.o.  If you want to compile it as a
+	  The module will be called ac3200.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1276,7 +1317,7 @@ config APRICOT
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called apricot.o.
+	  called apricot.
 
 config B44
 	tristate "Broadcom 4400 ethernet support (EXPERIMENTAL)"
@@ -1290,7 +1331,7 @@ config B44
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called b44.o.
+	  called b44.
 
 config CS89x0
 	tristate "CS89x0 support"
@@ -1306,7 +1347,7 @@ config CS89x0
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called cs89x.o.
+	  called cs89x.
 
 config DGRS
 	tristate "Digi Intl. RightSwitch SE-X support"
@@ -1321,7 +1362,7 @@ config DGRS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dgrs.o.  If you want to compile it as a
+	  The module will be called dgrs.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1335,9 +1376,20 @@ config EEPRO100
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called eepro100.o.  If you want to compile it as
+	  The module will be called eepro100.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
+
+
+config EEPRO100_PIO
+	bool "Use PIO instead of MMIO" if !X86_VISWS
+	depends on EEPRO100
+	default y if X86_VISWS
+	help
+	  This instructs the driver to use programmed I/O ports (PIO) instead
+	  of PCI shared memory (MMIO).  This can possibly solve some problems
+	  in case your mainboard has memory consistency issues.  If unsure,
+	  say N.
 
 config E100
 	tristate "EtherExpressPro/100 support (e100, Alternate Intel driver)"
@@ -1412,7 +1464,7 @@ config E100
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called e100.o.  If you want to compile it as a
+	  The module will be called e100.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1426,7 +1478,7 @@ config LNE390
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called lne390.o.  If you want to compile it as a
+	  The module will be called lne390.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1465,7 +1517,7 @@ config NE2K_PCI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ne2k-pci.o.  If you want to compile it as
+	  The module will be called ne2k-pci.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
 
@@ -1480,7 +1532,7 @@ config NE3210
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ne3210.o.  If you want to compile it as a
+	  The module will be called ne3210.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1494,7 +1546,7 @@ config ES3210
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called es3210.o.  If you want to compile it as a
+	  The module will be called es3210.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1510,7 +1562,7 @@ config 8139CP
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read Documentation/modules.txt. This is recommended.
-	  The module will be called 8139cp.o.
+	  The module will be called 8139cp.
 
 config 8139TOO
 	tristate "RealTek RTL-8139 PCI Fast Ethernet Adapter support"
@@ -1525,7 +1577,7 @@ config 8139TOO
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called 8139too.o.
+	  recommended.  The module will be called 8139too.
 
 config 8139TOO_PIO
 	bool "Use PIO instead of MMIO"
@@ -1584,7 +1636,7 @@ config SIS900
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called sis900.o.
+	  recommended.  The module will be called sis900.
 
 config EPIC100
 	tristate "SMC EtherPower II"
@@ -1628,7 +1680,7 @@ config TLAN
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tlan.o.  If you want to compile it as a
+	  The module will be called tlan.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1643,7 +1695,7 @@ config VIA_RHINE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called via-rhine.o.  If you want to compile it as
+	  The module will be called via-rhine.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> as
 	  well as <file:Documentation/networking/net-modules.txt>.
 
@@ -1706,7 +1758,7 @@ config ATP
 	  If you want to compile this driver as a module however ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called atp.o.
+	  <file:Documentation/modules.txt>.  The module will be called atp.
 
 config DE600
 	tristate "D-Link DE600 pocket adapter support"
@@ -1724,7 +1776,7 @@ config DE600
 	  which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called de600.o.
+	  The module will be called de600.
 
 config DE620
 	tristate "D-Link DE620 pocket adapter support"
@@ -1742,7 +1794,7 @@ config DE620
 	  which can be inserted in and removed from the running kernel
 	  whenever you want), say M here and read
 	  <file:Documentation/modules.txt>.
-	  The module will be called de620.o.
+	  The module will be called de620.
 
 config SGISEEQ
 	bool "SGI Seeq ethernet controller support"
@@ -1804,7 +1856,7 @@ config ACENIC
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called acenic.o.
+	  recommended.  The module will be called acenic.
 
 config ACENIC_OMIT_TIGON_I
 	bool "Omit support for old Tigon I based AceNICs"
@@ -1831,7 +1883,7 @@ config DL2K
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called dl2k.o.
+	  recommended.  The module will be called dl2k.
 
 config E1000
 	tristate "Intel(R) PRO/1000 Gigabit Ethernet support"
@@ -1873,7 +1925,7 @@ config E1000
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called e1000.o.  If you want to compile it as a
+	  The module will be called e1000.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
@@ -1890,7 +1942,7 @@ config MYRI_SBUS
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called myri_sbus.o.
+	  recommended.  The module will be called myri_sbus.
 
 config NS83820
 	tristate "National Semiconduct DP83820 support"
@@ -1914,7 +1966,7 @@ config HAMACHI
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called hamachi.o.
+	  called hamachi.
 
 config YELLOWFIN
 	tristate "Packet Engines Yellowfin Gigabit-NIC support (EXPERIMENTAL)"
@@ -1929,7 +1981,7 @@ config YELLOWFIN
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called yellowfin.o.
+	  recommended.  The module will be called yellowfin.
 
 config R8169
 	tristate "Realtek 8169 gigabit ethernet support"
@@ -1940,7 +1992,7 @@ config R8169
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called r8169.o.
+	  recommended.  The module will be called r8169.
 
 config SK98LIN
 	tristate "SysKonnect SK-98xx support"
@@ -1968,7 +2020,7 @@ config SK98LIN
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called sk98lin.o.
+	  recommended.  The module will be called sk98lin.
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"
@@ -1979,7 +2031,7 @@ config TIGON3
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called tg3.o.
+	  recommended.  The module will be called tg3.
 
 endmenu
 
@@ -2036,7 +2088,7 @@ config SKFP
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called skfp.o.
+	  recommended.  The module will be called skfp.
 
 config HIPPI
 	bool "HIPPI driver support (EXPERIMENTAL)"
@@ -2059,7 +2111,7 @@ config ROADRUNNER
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rrunner.o. If you want to compile it as a
+	  The module will be called rrunner. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 
@@ -2108,7 +2160,7 @@ config PLIP
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called plip.o.  If unsure, say Y or M, in case you buy a laptop
+	  called plip.  If unsure, say Y or M, in case you buy a laptop
 	  later.
 
 config PPP
@@ -2140,7 +2192,7 @@ config PPP
 	  inserted in and removed from the running kernel whenever you want).
 	  If you said Y to "Version information on all symbols" above, then
 	  you cannot compile the PPP driver into the kernel; you can then only
-	  compile it as a module.  The module will be called ppp_generic.o.
+	  compile it as a module.  The module will be called ppp_generic.
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.
@@ -2231,7 +2283,7 @@ config PPP_BSDCOMP
 	  and is patent-free.
 
 	  Note that the BSD compression code will always be compiled as a
-	  module; it is called bsd_comp.o and will show up in the directory
+	  module; it is called bsd_comp and will show up in the directory
 	  modules once you have said "make modules". If unsure, say N.
 
 config PPPOE
@@ -2287,7 +2339,7 @@ config SLIP
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>. The module will be
-	  called slip.o.
+	  called slip.
 
 config SLIP_COMPRESSED
 	bool "CSLIP compressed headers"
@@ -2374,7 +2426,7 @@ config STRIP
 	  You can also compile this as a module ( = code which can be inserted
 	  in and removed from the running kernel whenever you want), say M
 	  here and read <file:Documentation/modules.txt>.  The module will be
-	  called strip.o.
+	  called strip.
 
 config ARLAN
 	tristate "Aironet Arlan 655 & IC2200 DS support"
@@ -2404,7 +2456,7 @@ config AIRONET4500
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aironet4500_core.o. If you want to
+	  The module will be called aironet4500_core. If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.
@@ -2434,7 +2486,7 @@ config AIRONET4500_NONCS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aironet4500_card.o.  If you want to
+	  The module will be called aironet4500_card.  If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -2481,7 +2533,7 @@ config AIRONET4500_PROC
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aironet4500_proc.o. If you want to
+	  The module will be called aironet4500_proc. If you want to
 	  compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
 
@@ -2517,7 +2569,7 @@ config IPHASE5526
 
 	  The driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called iph5526.o. For general information about
+	  The module will be called iph5526. For general information about
 	  modules read <file:Documentation/modules.txt>.
 
 config RCPCI
@@ -2527,7 +2579,7 @@ config RCPCI
 	  This is a driver for hardware which provides a Virtual Private
 	  Network (VPN). Say Y if you have it.
 
-	  This code is also available as a module called rcpci.o ( = code
+	  This code is also available as a module called rcpci ( = code
 	  which can be inserted in and removed from the running kernel
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
@@ -2552,7 +2604,7 @@ config SHAPER
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called shaper.o.  If you want to compile it as a
+	  The module will be called shaper.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  If
 	  unsure, say N.
 

@@ -57,8 +57,8 @@ struct rtc_pll_info {
 	int pll_value;      /* get/set correction value */
 	int pll_max;        /* max +ve (faster) adjustment value */
 	int pll_min;        /* max -ve (slower) adjustment value */
-	int pll_posmult;    /* factor for +ve corection */
-	int pll_negmult;    /* factor for -ve corection */
+	int pll_posmult;    /* factor for +ve correction */
+	int pll_negmult;    /* factor for -ve correction */
 	long pll_clock;     /* base PLL frequency */
 };
 

@@ -1169,7 +1169,7 @@ static devfs_handle_t _devfs_make_parent_for_leaf (struct devfs_entry *dir,
     *leaf_pos = (name[namelen] == '/') ? (namelen + 1) : 0;
     for (; namelen > 0; name += next_pos, namelen -= next_pos)
     {
-	struct devfs_entry *de, *old;
+	struct devfs_entry *de, *old = NULL;
 
 	if ( ( de = _devfs_descend (dir, name, namelen, &next_pos) ) == NULL )
 	{

@@ -629,11 +629,9 @@ static int i2ob_evt(void *dummy)
 		u8 data[16];
 		} *evt_local;
 
-	lock_kernel();
-	daemonize();
-	unlock_kernel();
+	daemonize("i2oblock");
+	allow_signal(SIGKILL);
 
-	strcpy(current->comm, "i2oblock");
 	evt_running = 1;
 
 	while(1)

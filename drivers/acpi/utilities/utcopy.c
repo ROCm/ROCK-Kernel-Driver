@@ -23,8 +23,8 @@
  */
 
 
-#include "acpi.h"
-#include "amlcode.h"
+#include <acpi/acpi.h>
+#include <acpi/amlcode.h>
 
 
 #define _COMPONENT          ACPI_UTILITIES
@@ -652,13 +652,13 @@ acpi_ut_copy_simple_object (
 		 */
 		if ((source_desc->string.length) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
-			dest_desc->string.pointer = ACPI_MEM_ALLOCATE (source_desc->string.length + 1);
+			dest_desc->string.pointer = ACPI_MEM_ALLOCATE ((acpi_size) source_desc->string.length + 1);
 			if (!dest_desc->string.pointer) {
 				return (AE_NO_MEMORY);
 			}
 
 			ACPI_MEMCPY (dest_desc->string.pointer, source_desc->string.pointer,
-					  source_desc->string.length + 1);
+					  (acpi_size) source_desc->string.length + 1);
 		}
 		break;
 
