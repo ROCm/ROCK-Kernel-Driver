@@ -329,7 +329,7 @@ u32 agp_collect_device_status(u32 mode, u32 command)
 		 * Ok, here we have a AGP device. Disable impossible 
 		 * settings, and adjust the readqueue to the minimum.
 		 */
-		pci_read_config_dword(device, agp + 4, &scratch);
+		pci_read_config_dword(device, agp + PCI_AGP_STATUS, &scratch);
 
 		/* adjust RQ depth */
 		command = ((command & ~0xff000000) |
@@ -393,7 +393,7 @@ void agp_device_command(u32 command, int agp_v3)
 
 		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
 				agp_v3 ? 3 : 2, device->slot_name, mode);
-		pci_write_config_dword(device, agp + 8, command);
+		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
 }
 
@@ -401,13 +401,15 @@ void agp_generic_agp_enable(u32 mode)
 {
 	u32 command;
 
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 4, &command);
+	pci_read_config_dword(agp_bridge.dev,
+			      agp_bridge.capndx + PCI_AGP_STATUS,
+			      &command);
 
 	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
 	pci_write_config_dword(agp_bridge.dev,
-			       agp_bridge.capndx + 8,
+			       agp_bridge.capndx + PCI_AGP_COMMAND,
 			       command);
 
 	agp_device_command(command, 0);

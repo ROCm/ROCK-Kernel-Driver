@@ -368,12 +368,12 @@ static void agp_x86_64_agp_enable(u32 mode)
 	}
 
 
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &command);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &command);
 
 	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
-	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+8, command);
+	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_COMMAND, command);
 
 	agp_device_command(command, 1);
 }
@@ -421,7 +421,7 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	agp_bridge.capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 	amd_8151_setup(dev);
 	agp_register_driver(dev);
 	return 0;

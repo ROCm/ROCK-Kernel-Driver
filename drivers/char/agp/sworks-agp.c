@@ -272,7 +272,7 @@ static int serverworks_configure(void)
 
 	/* Fill in the mode register */
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge.capndx+4, &agp_bridge.mode);
+			      agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 
 	pci_read_config_byte(agp_bridge.dev, SVWRKS_CACHING, &enable_reg);
 	enable_reg &= ~0x3;
@@ -416,7 +416,7 @@ static void serverworks_agp_enable(u32 mode)
 	u32 command;
 
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge.capndx + 4,
+			      agp_bridge.capndx + PCI_AGP_STATUS,
 			      &command);
 
 	command = agp_collect_device_status(mode, command);
@@ -427,7 +427,7 @@ static void serverworks_agp_enable(u32 mode)
 	command |= 0x100;
 
 	pci_write_config_dword(serverworks_private.svrwrks_dev,
-			       agp_bridge.capndx + 8,
+			       agp_bridge.capndx + PCI_AGP_COMMAND,
 			       command);
 
 	agp_device_command(command, 0);
