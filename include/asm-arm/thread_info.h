@@ -51,8 +51,9 @@ struct thread_info {
 	__u32			cpu;		/* cpu */
 	__u32			cpu_domain;	/* cpu domain */
 	struct cpu_context_save	cpu_context;	/* cpu context */
-	struct restart_block    restart_block;
+	__u8			used_cp[16];	/* thread used copro */
 	union fp_state		fpstate;
+	struct restart_block    restart_block;
 };
 
 #define INIT_THREAD_INFO(tsk)						\
@@ -107,7 +108,8 @@ extern void free_thread_info(struct thread_info *);
 #define TI_CPU		20
 #define TI_CPU_DOMAIN	24
 #define TI_CPU_SAVE	28
-#define TI_FPSTATE	76
+#define TI_USED_MATH	76
+#define TI_FPSTATE	(TI_USED_MATH+16)
 
 #endif
 

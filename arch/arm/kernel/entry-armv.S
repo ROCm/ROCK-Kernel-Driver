@@ -963,23 +963,46 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
  * co-processor instructions.  However, we have to watch out
  * for the ARM6/ARM7 SWI bug.
  *
- * Emulators may wish to make use of the instruction value we
- * prepared for them in r0.
+ * Emulators may wish to make use of the following registers:
+ *  r0  - instruction opcode.
+ *  r10 - this threads thread_info structure.
  */
 call_fpe:	enable_irq r10				@ Enable interrupts
 		tst	r0, #0x08000000			@ only CDP/CPRT/LDC/STC have bit 27
 #if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
-		and	r10, r0, #0x0f000000		@ mask out op-code bits
-		teqne	r10, #0x0f000000		@ SWI (ARM6/7 bug)?
+		and	r8, r0, #0x0f000000		@ mask out op-code bits
+		teqne	r8, #0x0f000000			@ SWI (ARM6/7 bug)?
 #endif
 		moveq	pc, lr
-do_fpe:		get_thread_info r10			@ get current thread
-		ldr	r4, [r10, #TI_TASK]		@ get current task
-		mov	r8, #1
-		strb	r8, [r4, #TSK_USED_MATH]	@ set current->used_math
-		ldr	r4, .LCfp
+		get_thread_info r10			@ get current thread
+		and	r8, r0, #0x00000f00		@ mask out CP number
+		mov	r7, #1
+		add	r6, r10, #TI_USED_CP
+		strb	r7, [r6, r8, lsr #8]		@ set appropriate used_cp[]
+		add	pc, pc, r8, lsr #6
+		mov	r0, r0
+
+		mov	pc, lr				@ CP#0
+		b	do_fpe				@ CP#1 (FPE)
+		b	do_fpe				@ CP#2 (FPE)
+		mov	pc, lr				@ CP#3
+		mov	pc, lr				@ CP#4
+		mov	pc, lr				@ CP#5
+		mov	pc, lr				@ CP#6
+		mov	pc, lr				@ CP#7
+		mov	pc, lr				@ CP#8
+		mov	pc, lr				@ CP#9
+		mov	pc, lr				@ CP#10 (VFP)
+		mov	pc, lr				@ CP#11 (VFP)
+		mov	pc, lr				@ CP#12
+		mov	pc, lr				@ CP#13
+		mov	pc, lr				@ CP#14 (Debug)
+		mov	pc, lr				@ CP#15 (Control)
+
+do_fpe:		ldr	r4, .LCfp
 		add	r10, r10, #TI_FPSTATE		@ r10 = workspace
 		ldr	pc, [r4]			@ Call FP module USR entry point
+
 /*
  * The FP module is called with these registers set:
  *  r0  = instruction
@@ -988,6 +1011,11 @@ do_fpe:		get_thread_info r10			@ get current thread
  *  r10 = FP workspace
  *  lr  = unrecognised FP instruction return address
  */
+
+		.data
+ENTRY(fp_enter)
+		.word	fpe_not_present
+		.text
 
 fpundefinstr:	mov	r0, sp
 		adrsvc	al, lr, ret_from_exception
@@ -1016,10 +1044,6 @@ ENTRY(ret_from_exception)
 		mov	why, #0
 		b	ret_to_user
 
-		.data
-ENTRY(fp_enter)
-		.word	fpe_not_present
-		.text
 /*
  * Register switch for ARMv3 and ARMv4 processors
  * r0 = previous thread_info, r1 = next thread_info
