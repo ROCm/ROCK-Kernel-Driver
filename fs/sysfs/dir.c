@@ -19,7 +19,7 @@ static void sysfs_d_iput(struct dentry * dentry, struct inode * inode)
 	if (sd) {
 		BUG_ON(sd->s_dentry != dentry);
 		sd->s_dentry = NULL;
-		release_sysfs_dirent(sd);
+		sysfs_put(sd);
 	}
 	iput(inode);
 }
@@ -61,7 +61,7 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 	sd->s_mode = mode;
 	sd->s_type = type;
 	sd->s_dentry = dentry;
-	dentry->d_fsdata = sd;
+	dentry->d_fsdata = sysfs_get(sd);
 	dentry->d_op = &sysfs_dentry_ops;
 
 	return 0;
@@ -146,6 +146,7 @@ static void remove_dir(struct dentry * d)
 	d_delete(d);
 	sd = d->d_fsdata;
  	list_del_init(&sd->s_sibling);
+	sysfs_put(sd);
 	if (d->d_inode)
 		simple_rmdir(parent->d_inode,d);
 
@@ -173,49 +174,22 @@ void sysfs_remove_subdir(struct dentry * d)
 
 void sysfs_remove_dir(struct kobject * kobj)
 {
-	struct list_head * node;
 	struct dentry * dentry = dget(kobj->dentry);
+	struct sysfs_dirent * parent_sd = dentry->d_fsdata;
+	struct sysfs_dirent * sd, * tmp;
 
 	if (!dentry)
 		return;
 
 	pr_debug("sysfs %s: removing dir\n",dentry->d_name.name);
 	down(&dentry->d_inode->i_sem);
-
-	spin_lock(&dcache_lock);
-restart:
-	node = dentry->d_subdirs.next;
-	while (node != &dentry->d_subdirs) {
-		struct dentry * d = list_entry(node,struct dentry,d_child);
-
-		node = node->next;
-		pr_debug(" o %s (%d): ",d->d_name.name,atomic_read(&d->d_count));
-		if (!d_unhashed(d) && (d->d_inode)) {
-			struct sysfs_dirent * sd = d->d_fsdata;
-			d = dget_locked(d);
-			pr_debug("removing");
-
-			/**
-			 * Unlink and unhash.
-			 */
-			__d_drop(d);
-			spin_unlock(&dcache_lock);
-			/* release the target kobject in case of 
-			 * a symlink
-			 */
-			if (S_ISLNK(d->d_inode->i_mode))
-				kobject_put(sd->s_element);
-			
-			list_del_init(&sd->s_sibling);
-			simple_unlink(dentry->d_inode,d);
-			dput(d);
-			pr_debug(" done\n");
-			spin_lock(&dcache_lock);
-			/* re-acquired dcache_lock, need to restart */
-			goto restart;
-		}
+	list_for_each_entry_safe(sd, tmp, &parent_sd->s_children, s_sibling) {
+		if (!sd->s_element)
+			continue;
+		list_del_init(&sd->s_sibling);
+		sysfs_drop_dentry(sd, dentry);
+		sysfs_put(sd);
 	}
-	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
 
 	remove_dir(dentry);

@@ -14,6 +14,9 @@ extern void sysfs_hash_and_remove(struct dentry * dir, const char * name);
 extern int sysfs_create_subdir(struct kobject *, const char *, struct dentry **);
 extern void sysfs_remove_subdir(struct dentry *);
 
+extern const unsigned char * sysfs_get_name(struct sysfs_dirent *sd);
+extern void sysfs_drop_dentry(struct sysfs_dirent *sd, struct dentry *parent);
+
 extern int sysfs_follow_link(struct dentry *, struct nameidata *);
 extern void sysfs_put_link(struct dentry *, struct nameidata *);
 extern struct rw_semaphore sysfs_rename_sem;
@@ -68,5 +71,20 @@ static inline void release_sysfs_dirent(struct sysfs_dirent * sd)
 		kfree(sl);
 	}
 	kfree(sd);
+}
+
+static inline struct sysfs_dirent * sysfs_get(struct sysfs_dirent * sd)
+{
+	if (sd) {
+		WARN_ON(!atomic_read(&sd->s_count));
+		atomic_inc(&sd->s_count);
+	}
+	return sd;
+}
+
+static inline void sysfs_put(struct sysfs_dirent * sd)
+{
+	if (atomic_dec_and_test(&sd->s_count))
+		release_sysfs_dirent(sd);
 }
 
