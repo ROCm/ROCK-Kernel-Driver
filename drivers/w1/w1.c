@@ -383,6 +383,7 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	struct w1_slave *sl;
 	struct w1_family *f;
 	int err;
+	struct w1_netlink_msg msg;
 
 	sl = kmalloc(sizeof(struct w1_slave), GFP_KERNEL);
 	if (!sl) {
@@ -427,11 +428,17 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 
 	dev->slave_count++;
 
+	msg.id.id = *rn;
+	msg.type = W1_SLAVE_ADD;
+	w1_netlink_send(dev, &msg);
+
 	return 0;
 }
 
 static void w1_slave_detach(struct w1_slave *sl)
 {
+	struct w1_netlink_msg msg;
+	
 	dev_info(&sl->dev, "%s: detaching %s.\n", __func__, sl->name);
 
 	while (atomic_read(&sl->refcnt))
@@ -441,6 +448,10 @@ static void w1_slave_detach(struct w1_slave *sl)
 	device_remove_file(&sl->dev, &w1_slave_attribute);
 	device_unregister(&sl->dev);
 	w1_family_put(sl->family);
+
+	msg.id.id = sl->reg_num;
+	msg.type = W1_SLAVE_REMOVE;
+	w1_netlink_send(sl->master, &msg);
 }
 
 static void w1_search(struct w1_master *dev)
@@ -452,11 +463,8 @@ static void w1_search(struct w1_master *dev)
 	struct list_head *ent;
 	struct w1_slave *sl;
 	int family_found = 0;
-	struct w1_netlink_msg msg;
 
 	dev->attempts++;
-
-	memset(&msg, 0, sizeof(msg));
 
 	search_bit = id_bit = comp_bit = 0;
 	rn = tmp = last = 0;
@@ -483,8 +491,6 @@ static void w1_search(struct w1_master *dev)
 		}
 
 #if 1
-		memset(&msg, 0, sizeof(msg));
-
 		w1_write_8(dev, W1_SEARCH);
 		for (i = 0; i < 64; ++i) {
 			/*
@@ -528,9 +534,6 @@ static void w1_search(struct w1_master *dev)
 
 		}
 #endif
-		msg.id.w1_id = rn;
-		msg.val = w1_calc_crc8((u8 *) & rn, 7);
-		w1_netlink_send(dev, &msg);
 
 		if (desc_bit == last_zero)
 			last_device = 1;
@@ -558,7 +561,7 @@ static void w1_search(struct w1_master *dev)
 		}
 
 		if (slave_count == dev->slave_count &&
-		    msg.val && (*((__u8 *) & msg.val) == msg.id.id.crc)) {
+		    ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
 			w1_attach_slave_device(dev, (struct w1_reg_num *) &rn);
 		}
 	}
