@@ -18,6 +18,7 @@
 #define __ASMARM_TLB_H
 
 #include <asm/tlbflush.h>
+#include <asm/cacheflush.h>
 
 /*
  * TLB handling.  This allows us to remove pages from the page
@@ -26,6 +27,7 @@
 struct mmu_gather {
 	struct mm_struct	*mm;
 	unsigned int		freed;
+	unsigned int		fullmm;
 
 	unsigned int		flushes;
 	unsigned int		avoided_flushes;
@@ -41,6 +43,7 @@ tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
 
 	tlb->mm = mm;
 	tlb->freed = 0;
+	tlb->fullmm = full_mm_flush;
 
 	return tlb;
 }
@@ -68,7 +71,13 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 }
 
 #define tlb_remove_tlb_entry(tlb,ptep,address)	do { } while (0)
-#define tlb_start_vma(tlb,vma)			do { } while (0)
+
+#define tlb_start_vma(tlb,vma)						\
+	do {								\
+		if (!tlb->fullmm)					\
+			flush_cache_range(vma, vma->vm_start, vma->vm_end); \
+	} while (0)
+
 #define tlb_end_vma(tlb,vma)			do { } while (0)
 
 #define tlb_remove_page(tlb,page)	free_page_and_swap_cache(page)

@@ -29,7 +29,6 @@
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 static struct vfsmount *rpc_mount;
-static spinlock_t rpc_mount_lock = SPIN_LOCK_UNLOCKED;
 static int rpc_mount_count;
 
 static struct file_system_type rpc_pipe_fs_type;
@@ -379,46 +378,13 @@ static struct rpc_filelist authfiles[] = {
 static int
 rpc_get_mount(void)
 {
-	struct vfsmount * mnt = NULL;
-
-	spin_lock(&rpc_mount_lock);
-	if (rpc_mount)
-		goto out_get;
-	spin_unlock(&rpc_mount_lock);
-	mnt = kern_mount(&rpc_pipe_fs_type);
-	if (IS_ERR(mnt))
-		return -ENODEV;
-	spin_lock(&rpc_mount_lock);
-	if (!rpc_mount) {
-		rpc_mount = mnt;
-		mnt = NULL;
-		goto out_dontget;
-	}
-out_get:
-	mntget(rpc_mount);
-out_dontget:
-	++rpc_mount_count;
-	spin_unlock(&rpc_mount_lock);
-	if (mnt)
-		mntput(mnt);
-	return 0;
+	return simple_pin_fs("rpc_pipefs", &rpc_mount, &rpc_mount_count);
 }
 
 static void
 rpc_put_mount(void)
 {
-	struct vfsmount *mnt;
-
-	spin_lock(&rpc_mount_lock);
-	mnt = rpc_mount;
-	--rpc_mount_count;
-	if (rpc_mount_count == 0)
-		rpc_mount = NULL;
-	else
-		mnt = NULL;
-	spin_unlock(&rpc_mount_lock);
-	if (mnt)
-		mntput(mnt);
+	simple_release_fs(&rpc_mount, &rpc_mount_count);
 }
 
 static int

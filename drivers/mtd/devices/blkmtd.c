@@ -1049,17 +1049,10 @@ extern dev_t name_to_dev_t(char *line) __init;
 /* Startup */
 static int __init init_blkmtd(void)
 {
-#ifdef MODULE
-  struct file *file = NULL;
-  struct inode *inode;
-#endif
-
-  int maj, min;
   int i, blocksize, blocksize_bits;
   loff_t size;
   int readonly = 0;
   int erase_size = CONFIG_MTD_BLKDEV_ERASESIZE;
-  dev_t rdev;
   struct block_device *bdev;
   int err;
   int mode;
@@ -1092,48 +1085,24 @@ static int __init init_blkmtd(void)
   mode = (readonly) ? O_RDONLY : O_RDWR;
 
 #ifdef MODULE
-
-  file = filp_open(device, mode, 0);
-  if(IS_ERR(file)) {
-    printk("blkmtd: error, can't open device %s\n", device);
-    DEBUG(2, "blkmtd: filp_open returned %ld\n", PTR_ERR(file));
-    return 1;
-  }
-  
-  /* determine is this is a block device and if so get its major and minor
-     numbers */
-  inode = file->f_dentry->d_inode;
-  if(!S_ISBLK(inode->i_mode)) {
-    printk("blkmtd: %s not a block device\n", device);
-    filp_close(file, NULL);
-    return 1;
-  }
-  rdev = inode->i_bdev->bd_dev;
-  filp_close(file, NULL);
+  bdev = open_bdev_excl(device, mode, BDEV_RAW, NULL);
 #else
-  rdev = name_to_dev_t(device);
+  bdev = open_by_devnum(name_to_dev_t(device), FMODE_READ, BDEV_RAW);
 #endif
 
-  maj = MAJOR(rdev);
-  min = MINOR(rdev);
-  DEBUG(1, "blkmtd: found a block device major = %d, minor = %d\n", maj, min);
-
-  if(!rdev) {
-    printk("blkmtd: bad block device: `%s'\n", device);
+  if (IS_ERR(bdev)){
+    printk("blkmtd: error, can't open device %s\n", device);
+    DEBUG(2, "blkmtd: opening bdev returned %ld\n", PTR_ERR(bdev));
     return 1;
   }
-
-  if(maj == MTD_BLOCK_MAJOR) {
-    printk("blkmtd: attempting to use an MTD device as a block device\n");
-    return 1;
-  }
-  /* get the block device */
-  bdev = bdget(rdev);
-  err = blkdev_get(bdev, mode, 0, BDEV_RAW);
-  if (err)
-    return 1;
 
   DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev, b));
+
+  if(MAJOR(bdev->bd_dev) == MTD_BLOCK_MAJOR) {
+    printk("blkmtd: attempting to use an MTD device as a block device\n");
+    blkdev_put(bdev, BDEV_RAW);
+    return 1;
+  }
   blocksize = BLOCK_SIZE;
 
   blocksize = bs ? bs : block_size(bdev);

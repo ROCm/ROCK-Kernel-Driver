@@ -55,6 +55,10 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#ifdef __arm__
+#include <asm/mach-types.h>
+#endif
+
 #include "cyber2000fb.h"
 
 struct cfb_info {

@@ -384,20 +384,16 @@ void ext3_update_dynamic_rev(struct super_block *sb)
 static struct block_device *ext3_blkdev_get(dev_t dev)
 {
 	struct block_device *bdev;
-	int err = -ENODEV;
 	char b[BDEVNAME_SIZE];
 
-	bdev = bdget(dev);
-	if (bdev == NULL)
-		goto fail;
-	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	if (err < 0)
+	bdev = open_by_devnum(dev, FMODE_READ|FMODE_WRITE, BDEV_FS);
+	if (IS_ERR(bdev))
 		goto fail;
 	return bdev;
 
 fail:
-	printk(KERN_ERR "EXT3: failed to open journal device %s: %d\n",
-			__bdevname(dev, b), err);
+	printk(KERN_ERR "EXT3: failed to open journal device %s: %ld\n",
+			__bdevname(dev, b), PTR_ERR(bdev));
 	return NULL;
 }
 

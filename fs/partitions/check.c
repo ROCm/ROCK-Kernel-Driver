@@ -311,7 +311,7 @@ void register_disk(struct gendisk *disk)
 	if (!get_capacity(disk))
 		return;
 
-	bdev = bdget(MKDEV(disk->major, disk->first_minor));
+	bdev = bdget_disk(disk, 0);
 	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
 		return;
 	state = check_partition(disk, bdev);
@@ -336,13 +336,12 @@ void register_disk(struct gendisk *disk)
 
 int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct parsed_partitions *state;
 	int p, res;
 
 	if (bdev->bd_part_count)
 		return -EBUSY;
-	res = invalidate_device(dev, 1);
+	res = invalidate_partition(disk, 0);
 	if (res)
 		return res;
 	bdev->bd_invalidated = 0;
@@ -391,18 +390,14 @@ fail:
 
 void del_gendisk(struct gendisk *disk)
 {
-	int max_p = disk->minors;
-	kdev_t devp;
 	int p;
 
 	/* invalidate stuff */
-	for (p = max_p - 1; p > 0; p--) {
-		devp = mk_kdev(disk->major,disk->first_minor + p);
-		invalidate_device(devp, 1);
+	for (p = disk->minors - 1; p > 0; p--) {
+		invalidate_partition(disk, p);
 		delete_partition(disk, p);
 	}
-	devp = mk_kdev(disk->major,disk->first_minor);
-	invalidate_device(devp, 1);
+	invalidate_partition(disk, 0);
 	disk->capacity = 0;
 	disk->flags &= ~GENHD_FL_UP;
 	unlink_gendisk(disk);

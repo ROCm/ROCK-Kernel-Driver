@@ -345,26 +345,21 @@ static struct dm_dev *find_device(struct list_head *l, dev_t dev)
 static int open_dev(struct dm_dev *d, dev_t dev)
 {
 	static char *_claim_ptr = "I belong to device-mapper";
+	struct block_device *bdev;
 
 	int r;
 
 	if (d->bdev)
 		BUG();
 
-	d->bdev = bdget(dev);
-	if (!d->bdev)
-		return -ENOMEM;
-
-	r = blkdev_get(d->bdev, d->mode, 0, BDEV_RAW);
+	bdev = open_by_devnum(dev, d->mode, BDEV_RAW);
+	if (IS_ERR(bdev))
+		return PTR_ERR(bdev);
+	r = bd_claim(bdev, _claim_ptr);
 	if (r)
-		return r;
-
-	r = bd_claim(d->bdev, _claim_ptr);
-	if (r) {
-		blkdev_put(d->bdev, BDEV_RAW);
-		d->bdev = NULL;
-	}
-
+		blkdev_put(bdev, BDEV_RAW);
+	else
+		d->bdev = bdev;
 	return r;
 }
 

@@ -45,7 +45,6 @@ static struct file_operations default_file_operations;
 static struct inode_operations usbfs_dir_inode_operations;
 static struct vfsmount *usbdevfs_mount;
 static struct vfsmount *usbfs_mount;
-static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int usbdevfs_mount_count;	/* = 0 */
 static int usbfs_mount_count;	/* = 0 */
 
@@ -514,69 +513,20 @@ static struct file_system_type usb_fs_type = {
 };
 
 /* --------------------------------------------------------------------- */
-static int get_mount (struct file_system_type *fs_type, struct vfsmount **mount, int *mount_count)
-{
-	struct vfsmount *mnt;
-
-	spin_lock (&mount_lock);
-	if (*mount) {
-		mntget(*mount);
-		++(*mount_count);
-		spin_unlock (&mount_lock);
-		goto go_ahead;
-	}
-
-	spin_unlock (&mount_lock);
-	mnt = kern_mount (fs_type);
-	if (IS_ERR(mnt)) {
-		err ("could not mount the fs...erroring out!\n");
-		return -ENODEV;
-	}
-	spin_lock (&mount_lock);
-	if (!*mount) {
-		*mount = mnt;
-		++(*mount_count);
-		spin_unlock (&mount_lock);
-		goto go_ahead;
-	}
-	mntget(*mount);
-	++(*mount_count);
-	spin_unlock (&mount_lock);
-	mntput(mnt);
-
-go_ahead:
-	dbg("mount_count = %d", *mount_count);
-	return 0;
-}
-
-static void put_mount (struct vfsmount **mount, int *mount_count)
-{
-	struct vfsmount *mnt;
-
-	spin_lock (&mount_lock);
-	mnt = *mount;
-	--(*mount_count);
-	if (!(*mount_count))
-		*mount = NULL;
-
-	spin_unlock (&mount_lock);
-	mntput(mnt);
-	dbg("mount_count = %d", *mount_count);
-}
 
 static int create_special_files (void)
 {
 	struct dentry *parent;
-	int retval = 0;
+	int retval;
 
 	/* create the devices special file */
-	retval = get_mount (&usbdevice_fs_type, &usbdevfs_mount, &usbdevfs_mount_count);
+	retval = simple_pin_fs("usbdevfs", &usbdevfs_mount, &usbdevfs_mount_count);
 	if (retval) {
 		err ("Unable to get usbdevfs mount");
 		goto exit;
 	}
 
-	retval = get_mount (&usb_fs_type, &usbfs_mount, &usbfs_mount_count);
+	retval = simple_pin_fs("usbfs", &usbfs_mount, &usbfs_mount_count);
 	if (retval) {
 		err ("Unable to get usbfs mount");
 		goto error_clean_usbdevfs_mount;
@@ -611,10 +561,10 @@ error_remove_file:
 	devices_usbfs_dentry = NULL;
 
 error_clean_mounts:
-	put_mount (&usbfs_mount, &usbfs_mount_count);
+	simple_release_fs(&usbfs_mount, &usbfs_mount_count);
 
 error_clean_usbdevfs_mount:
-	put_mount (&usbdevfs_mount, &usbdevfs_mount_count);
+	simple_release_fs(&usbdevfs_mount, &usbdevfs_mount_count);
 
 exit:
 	return retval;
@@ -628,8 +578,8 @@ static void remove_special_files (void)
 		fs_remove_file (devices_usbfs_dentry);
 	devices_usbdevfs_dentry = NULL;
 	devices_usbfs_dentry = NULL;
-	put_mount (&usbdevfs_mount, &usbdevfs_mount_count);
-	put_mount (&usbfs_mount, &usbfs_mount_count);
+	simple_release_fs(&usbdevfs_mount, &usbdevfs_mount_count);
+	simple_release_fs(&usbfs_mount, &usbfs_mount_count);
 }
 
 void usbfs_update_special (void)

@@ -14,6 +14,7 @@
 
 struct cpu_tlb_fns;
 struct cpu_user_fns;
+struct cpu_cache_fns;
 struct processor;
 
 /*
@@ -37,13 +38,14 @@ struct proc_info_list {
 	struct processor	*proc;
 	struct cpu_tlb_fns	*tlb;
 	struct cpu_user_fns	*user;
+	struct cpu_cache_fns	*cache;
 };
 
 extern unsigned int elf_hwcap;
 
 #endif	/* __ASSEMBLY__ */
 
-#define PROC_INFO_SZ	44
+#define PROC_INFO_SZ	48
 
 #define HWCAP_SWP	1
 #define HWCAP_HALF	2

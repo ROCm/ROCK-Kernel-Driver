@@ -202,4 +202,17 @@ struct meminfo {
 
 extern struct meminfo meminfo;
 
+/*
+ * Early command line parameters.
+ */
+struct early_params {
+	const char *arg;
+	void (*fn)(char **p);
+};
+
+#define __early_param(name,fn)				\
+static struct early_params __early_##fn			\
+__attribute__((section("__early_param"), unused)) =	\
+	{ name, fn }
+
 #endif
