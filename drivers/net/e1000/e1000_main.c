@@ -592,7 +592,6 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->adaptive_ifs = TRUE;
 
 	atomic_set(&adapter->irq_sem, 1);
-	spin_lock_init(&adapter->tx_lock);
 	spin_lock_init(&adapter->stats_lock);
 }
 
@@ -717,7 +716,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 	uint32_t tdlen = adapter->tx_ring.count * sizeof(struct e1000_tx_desc);
 	uint32_t tctl, tipg;
 
-	E1000_WRITE_REG(&adapter->hw, TDBAL, (tdba & 0x00000000FFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, TDBAL, (tdba & 0x00000000ffffffffULL));
 	E1000_WRITE_REG(&adapter->hw, TDBAH, (tdba >> 32));
 
 	E1000_WRITE_REG(&adapter->hw, TDLEN, tdlen);
@@ -754,7 +753,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	tctl = E1000_READ_REG(&adapter->hw, TCTL);
 
-	tctl &= ~E1000_TCTL_CT;	
+	tctl &= ~E1000_TCTL_CT;
 	tctl |= E1000_TCTL_EN | E1000_TCTL_PSP |
 	       (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
 
@@ -877,7 +876,7 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* set the Receive Delay Timer Register */
 
-	if(adapter->hw.mac_type == e1000_82540) {
+	if(adapter->hw.mac_type >= e1000_82540) {
 		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_int_delay);
 		E1000_WRITE_REG(&adapter->hw, RDTR, 64);
 
@@ -893,7 +892,7 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 
 	/* Setup the Base and Length of the Rx Descriptor Ring */
 
-	E1000_WRITE_REG(&adapter->hw, RDBAL, (rdba & 0x00000000FFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, RDBAL, (rdba & 0x00000000ffffffffULL));
 	E1000_WRITE_REG(&adapter->hw, RDBAH, (rdba >> 32));
 
 	E1000_WRITE_REG(&adapter->hw, RDLEN, rdlen);
@@ -1214,6 +1213,8 @@ e1000_watchdog(unsigned long data)
 {
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
 	struct net_device *netdev = adapter->netdev;
+	struct e1000_desc_ring *txdr = &adapter->tx_ring;
+	int i;
 
 	e1000_check_for_link(&adapter->hw);
 
@@ -1230,7 +1231,6 @@ e1000_watchdog(unsigned long data)
 			       "Full Duplex" : "Half Duplex");
 
 			netif_carrier_on(netdev);
-			adapter->trans_finish = jiffies;
 			netif_wake_queue(netdev);
 			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
 		}
@@ -1249,6 +1249,13 @@ e1000_watchdog(unsigned long data)
 
 	e1000_update_stats(adapter);
 	e1000_update_adaptive(&adapter->hw);
+
+	/* Early detection of hung controller */
+	i = txdr->next_to_clean;
+	if(txdr->buffer_info[i].dma &&
+	   time_after(jiffies, txdr->buffer_info[i].time_stamp + HZ) &&
+	   !(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_TXOFF))
+		netif_stop_queue(netdev);
 
 	/* Reset the timer */
 	mod_timer(&adapter->watchdog_timer, jiffies + 2 * HZ);
@@ -1312,6 +1319,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 				skb->data + offset,
 				size,
 				PCI_DMA_TODEVICE);
+		tx_ring->buffer_info[i].time_stamp = jiffies;
 
 		len -= size;
 		offset += size;
@@ -1390,19 +1398,10 @@ static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
-	unsigned long flags;
 	int tx_flags = 0, count;
 
 	int f;
 
-
-	if(time_after(netdev->trans_start, adapter->trans_finish + HZ) &&
-	   !(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_TXOFF)) {
-
-		adapter->trans_finish = jiffies;
-		netif_stop_queue(netdev);
-		return 1;
-	}
 
 	count = TXD_USE_COUNT(skb->len - skb->data_len,
 	                      adapter->max_data_per_txd);
@@ -1412,14 +1411,10 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(skb->ip_summed == CHECKSUM_HW)
 		count++;
 
-	spin_lock_irqsave(&adapter->tx_lock, flags);
-	e1000_clean_tx_irq(adapter);
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
 		netif_stop_queue(netdev);
-		spin_unlock_irqrestore(&adapter->tx_lock, flags);
 		return 1;
 	}
-	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 
 	if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
@@ -1430,7 +1425,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
 	}
 #endif
-	
+
 	count = e1000_tx_map(adapter, skb);
 
 	e1000_tx_queue(adapter, count, tx_flags);
@@ -1703,12 +1698,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		}
 
 		e1000_clean_rx_irq(adapter);
-
-		if((icr & E1000_ICR_TXDW) && spin_trylock(&adapter->tx_lock)) {
-			e1000_clean_tx_irq(adapter);
-			spin_unlock(&adapter->tx_lock);
-		}
-
+		e1000_clean_tx_irq(adapter);
 		i--;
 
 	}
@@ -1755,8 +1745,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 		i = (i + 1) % tx_ring->count;
 		tx_desc = E1000_TX_DESC(*tx_ring, i);
-
-		adapter->trans_finish = jiffies;
 	}
 
 	tx_ring->next_to_clean = i;

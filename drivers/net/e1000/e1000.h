@@ -155,6 +155,7 @@ struct e1000_buffer {
 	struct sk_buff *skb;
 	uint64_t dma;
 	unsigned long length;
+	unsigned long time_stamp;
 };
 
 struct e1000_desc_ring {
@@ -210,8 +211,6 @@ struct e1000_adapter {
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
-	unsigned long trans_finish;
-	spinlock_t tx_lock;
 	uint32_t txd_cmd;
 	int max_data_per_txd;
 
