@@ -17,12 +17,52 @@ out-of-the-box support for installation on remote machines.
 
 Compiling modules outside the official kernel
 ---------------------------------------------
-Often modules are developed outside the official kernel.
-To keep up with changes in the build system the most portable way
-to compile a module outside the kernel is to use the following command-line:
+
+Often modules are developed outside the official kernel.  To keep up
+with changes in the build system the most portable way to compile a
+module outside the kernel is to use the kernel build system,
+kbuild. Use the following command-line:
 
 make -C path/to/kernel/src SUBDIRS=$PWD modules
 
 This requires that a makefile exits made in accordance to
-Documentation/kbuild/makefiles.txt.
+Documentation/kbuild/makefiles.txt. Read that file for more details on
+the build system.
 
+The following is a short summary of how to write your Makefile to get
+you up and running fast. Assuming your module will be called
+yourmodule.ko, your code should be in yourmodule.c and your Makefile
+should include
+
+obj-m := yourmodule.o
+
+If the code for your module is in multiple files that need to be
+linked, you need to tell the build system which files to compile. In
+the case of multiple files, none of these files can be named
+yourmodule.c because doing so would cause a problem with the linking
+step. Assuming your code exists in file1.c, file2.c, and file3.c and
+you want to build yourmodule.ko from them, your Makefile should
+include
+
+obj-m := yourmodule.o
+yourmodule-objs := file1.o file2.o file3.o
+
+Now for a final example to put it all together. Assuming the
+KERNEL_SOURCE environment variable is set to the directory where you
+compiled the kernel, a simple Makefile that builds yourmodule.ko as
+described above would look like
+
+# Tells the build system to build yourmodule.ko.
+obj-m := yourmodule.o
+
+# Tells the build system to build these object files and link them as
+# yourmodule.o, before building yourmodule.ko. This line can be left
+# out if all the code for your module is in one file, yourmodule.c. If
+# you are using multiple files, none of these files can be named
+# yourmodule.c.
+yourmodule-objs := file1.o file2.o file3.o
+
+# Invokes the kernel build system to come back to the current
+# directory and build yourmodule.ko.
+default:
+	make -C ${KERNEL_SOURCE} SUBDIRS=`pwd` modules
