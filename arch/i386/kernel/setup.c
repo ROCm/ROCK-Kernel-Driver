@@ -562,6 +562,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			acpi_disabled = 0;
 		}
 
+		/* acpi=strict disables out-of-spec workarounds */
+		else if (!memcmp(from, "acpi=strict", 11)) {
+			acpi_strict = 1;
+		}
+
 		/* Limit ACPI just to boot-time to enable HT */
 		else if (!memcmp(from, "acpi=ht", 7)) {
 			acpi_ht = 1;

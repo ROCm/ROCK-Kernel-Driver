@@ -86,6 +86,8 @@ ia64_acpi_release_global_lock (unsigned int *lock)
 #define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq)				\
 	((Acq) = ia64_acpi_release_global_lock((unsigned int *) GLptr))
 
+#define acpi_strict 1	/* no ACPI spec workarounds on IA64 */
+
 const char *acpi_get_sysname (void);
 int acpi_request_vector (u32 int_type);
 int acpi_register_irq (u32 gsi, u32 polarity, u32 trigger);

@@ -86,10 +86,13 @@ running once the system is up.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
-			Format: { force | off | ht }
+			Format: { force | off | ht | strict }
 			force -- enables ACPI for systems with default off
 			off -- disabled ACPI for systems with default on
 			ht -- run only enough ACPI to enable Hyper Threading
+			strict --  Be less tolerant of platforms that are not
+				strictly ACPI specification compliant.
+
 			See also Documentation/pm.txt.
  
 	acpi_pic_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
