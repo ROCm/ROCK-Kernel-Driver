@@ -28,10 +28,10 @@
  * Ugh, we don't have PCI space, so map readb() and friends to use Zorro space
  * for MMIO accesses. This should make clgenfb work again on Amiga
  */
-#define inb(port)	0
-#define inw(port)	0
-#define outb(port, val)	do { } while (0)
-#define outw(port, val)	do { } while (0)
+#define inb_p(port)	0
+#define inw_p(port)	0
+#define outb_p(port, val)	do { } while (0)
+#define outw(port, val)		do { } while (0)
 #define readb		z_readb
 #define writeb		z_writeb
 #define writew		z_writew
@@ -217,18 +217,18 @@ extern int restore_vga(struct vgastate *state);
  
 static inline unsigned char vga_io_r (unsigned short port)
 {
-	return inb (port);
+	return inb_p(port);
 }
 
 static inline void vga_io_w (unsigned short port, unsigned char val)
 {
-	outb (val, port);
+	outb_p(val, port);
 }
 
 static inline void vga_io_w_fast (unsigned short port, unsigned char reg,
 				  unsigned char val)
 {
-	outw (VGA_OUT16VAL (val, reg), port);
+	outw(VGA_OUT16VAL (val, reg), port);
 }
 
 static inline unsigned char vga_mm_r (caddr_t regbase, unsigned short port)
@@ -378,8 +378,6 @@ static inline void vga_mm_wseq (caddr_t regbase, unsigned char reg, unsigned cha
         vga_mm_w (regbase, VGA_SEQ_D, val);
 #endif /* VGA_OUTW_WRITE */
 }
-
-
 
 /*
  * VGA graphics controller register read/write

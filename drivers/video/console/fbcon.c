@@ -1874,17 +1874,26 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	struct display *p = &fb_display[vc->vc_num];
 	struct fb_info *info = p->fb_info;
 	struct fb_var_screeninfo var = info->var;
-	int err;
+	int err; int x_diff, y_diff;
+	int fw = vc->vc_font.width;
+	int fh = vc->vc_font.height;
 
-	var.xres = width * vc->vc_font.width;
-	var.yres = height * vc->vc_font.height;
-	var.activate = FB_ACTIVATE_NOW;
-
-	err = fb_set_var(&var, info);
-	if (err || var.xres != info->var.xres ||
-		 var.yres != info->var.yres) 
-		return -EINVAL;
-	p->vrows = info->var.yres_virtual/vc->vc_font.height;
+	var.xres = width * fw;
+	var.yres = height * fh;
+	x_diff = info->var.xres - var.xres;
+	y_diff = info->var.yres - var.yres;
+	if (x_diff < 0 || x_diff > fw ||
+	   (y_diff < 0 || y_diff > fh)) {
+		var.activate = FB_ACTIVATE_TEST;
+		err = fb_set_var(&var, info);
+		if (err || width != var.xres/fw ||
+		    height != var.yres/fh)
+			return -EINVAL;
+		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
+		var.activate = FB_ACTIVATE_NOW;
+		fb_set_var(&var, info);
+		p->vrows = info->var.yres_virtual/fh;
+	}
 	return 0;
 }
 

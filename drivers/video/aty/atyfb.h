@@ -8,8 +8,6 @@
      */
 
 struct crtc {
-	u32 vxres;
-	u32 vyres;
 	u32 h_tot_disp;
 	u32 h_sync_strt_wid;
 	u32 v_tot_disp;
@@ -18,6 +16,11 @@ struct crtc {
 	u32 gen_cntl;
 	u32 dp_pix_width;	/* acceleration */
 	u32 dp_chain_mask;	/* acceleration */
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	u32 monitors_enabled; /* LCD monitor support */
+	u16 h_stretching;     /* LCD monitor support */
+	u16 v_stretching;     /* LCD monitor support */
+#endif
 };
 
 struct pll_514 {
@@ -33,6 +36,7 @@ struct pll_18818 {
 };
 
 struct pll_ct {
+	u8 xclk_post_div_real;
 	u8 pll_ref_div;
 	u8 pll_gen_cntl;
 	u8 mclk_fb_div;
@@ -75,15 +79,43 @@ struct atyfb_par {
 	u32 ref_clk_per;
 	u32 pll_per;
 	u32 mclk_per;
+	u32 xclk_per;
 	u8 bus_type;
 	u8 ram_type;
 	u8 mem_refresh_rate;
 	u8 blitter_may_be_busy;
+	unsigned char clock;
 	u32 accel_flags;
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
 	u8 mmaped;
 	int open;
+#endif
+#ifdef CONFIG_FB_ATY_CT
+	u8 fifo_size;
+	u8 dsp_loop_latency;
+	u8 page_size;
+#endif
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	unsigned long bios_base_phys;
+	unsigned long bios_base;
+	unsigned long lcd_table;
+	u16 lcd_width;
+	u16 lcd_height;
+	u32 lcd_pixclock;
+	u16 lcd_htotal;
+	u16 lcd_hdisp;
+	u16 lcd_hsync_start;
+	u16 lcd_hsync_delay;
+	u16 lcd_hsync_width;
+	u16 lcd_vtotal;
+	u16 lcd_vdisp;
+	u16 lcd_vsync_start;
+	u16 lcd_vsync_width;
+	u16 lcd_right;
+	u16 lcd_lower;
+	u16 lcd_hblank_width;
+	u16 lcd_vblank_width;
 #endif
 #ifdef CONFIG_PMAC_PBOOK
 	struct fb_info *next;
@@ -91,7 +123,7 @@ struct atyfb_par {
 	unsigned long save_pll[64];
 #endif
 };
-    
+
     /*
      *  ATI Mach64 features
      */
@@ -211,11 +243,12 @@ extern const struct aty_dac_ops aty_dac_ct;	/* Integrated */
 
 struct aty_pll_ops {
 	int (*var_to_pll) (const struct fb_info * info, u32 vclk_per,
-			   u8 bpp, union aty_pll * pll);
+			   u32 bpp, u32 width, union aty_pll * pll);
 	 u32(*pll_to_var) (const struct fb_info * info,
 			   const union aty_pll * pll);
 	void (*set_pll) (const struct fb_info * info,
 			 const union aty_pll * pll);
+	void (*init_pll)(struct fb_info * info);
 };
 
 extern const struct aty_pll_ops aty_pll_ati18818_1;	/* ATI 18818 */
@@ -226,12 +259,10 @@ extern const struct aty_pll_ops aty_pll_ibm514;	/* IBM RGB514 */
 extern const struct aty_pll_ops aty_pll_unsupported;	/* unsupported */
 extern const struct aty_pll_ops aty_pll_ct;	/* Integrated */
 
-
 extern void aty_set_pll_ct(const struct fb_info *info,
 			   const union aty_pll *pll);
 extern void aty_calc_pll_ct(const struct fb_info *info,
 			    struct pll_ct *pll);
-
 
     /*
      *  Hardware cursor support

@@ -704,6 +704,13 @@ config FB_ATY_CT
 	  framebuffer device.  The ATI product support page for these boards
 	  is at <http://support.ati.com/products/pc/mach64/>.
 
+config FB_ATY_GENERIC_LCD
+	bool "generic LCD support (EXPERIMENTAL)"
+	depends on FB_ATY_CT
+	help
+	  say Y here to support ATI Rage 3D MOBILITY M1 or others flawours
+	  of Mach64 on Notebooks
+
 config FB_ATY_GX
 	bool "Mach64 GX support" if PCI
 	depends on FB_ATY
