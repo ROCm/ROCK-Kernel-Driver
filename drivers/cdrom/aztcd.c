@@ -1907,16 +1907,14 @@ static int __init aztcd_init(void)
 			goto err_out;
 		}
 	}
-	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
-		       S_IFBLK | S_IRUGO | S_IWUGO, &azt_fops, NULL);
 	azt_disk = alloc_disk(1);
 	if (!azt_disk)
-		goto err_out2;
+		goto err_out;
 	if (register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
 		printk(KERN_WARNING "aztcd: Unable to get major %d for Aztech"
 		       " CD-ROM\n", MAJOR_NR);
 		ret = -EIO;
-		goto err_out3;
+		goto err_out2;
 	}
 	blk_init_queue(&azt_queue, do_aztcd_request, &aztSpin);
 	blk_queue_hardsect_size(&azt_queue, 2048);
@@ -1926,15 +1924,16 @@ static int __init aztcd_init(void)
 	sprintf(azt_disk->disk_name, "aztcd");
 	azt_disk->queue = &azt_queue;
 	add_disk(azt_disk);
+	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT,
+		       azt_disk->major, azt_disk->first_minor,
+		       S_IFBLK | S_IRUGO | S_IWUGO, azt_disk->fops, NULL);
 
 	azt_invalidate_buffers();
 	aztPresent = 1;
 	aztCloseDoor();
 	return (0);
-err_out3:
-	put_disk(azt_disk);
 err_out2:
-	devfs_remove("aztcd");
+	put_disk(azt_disk);
 err_out:
 	if ((azt_port == 0x1f0) || (azt_port == 0x170)) {
 		SWITCH_IDE_MASTER;
