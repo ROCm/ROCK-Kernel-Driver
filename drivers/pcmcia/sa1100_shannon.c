@@ -74,19 +74,19 @@ shannon_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
 {
 	switch (state->Vcc) {
 	case 0:	/* power off */
-		printk(KERN_WARNING __FUNCTION__"(): CS asked for 0V, still applying 3.3V..\n");
+		printk(KERN_WARNING "%s(): CS asked for 0V, still applying 3.3V..\n", __FUNCTION__);
 		break;
 	case 50:
-		printk(KERN_WARNING __FUNCTION__"(): CS asked for 5V, applying 3.3V..\n");
+		printk(KERN_WARNING "%s(): CS asked for 5V, applying 3.3V..\n", __FUNCTION__);
 	case 33:
 		break;
 	default:
-		printk(KERN_ERR __FUNCTION__"(): unrecognized Vcc %u\n",
-		       state->Vcc);
+		printk(KERN_ERR "%s(): unrecognized Vcc %u\n",
+		       __FUNCTION__, state->Vcc);
 		return -1;
 	}
 
-	printk(KERN_WARNING __FUNCTION__"(): Warning, Can't perform reset\n");
+	printk(KERN_WARNING "%s(): Warning, Can't perform reset\n", __FUNCTION__);
 	
 	/* Silently ignore Vpp, output enable, speaker enable. */
 

@@ -70,8 +70,8 @@ typedef enum {
 #define TRACE(l, m, i...)						\
 {									\
 	if ((ft_trace_t)(l) == FT_TRACE_TOP_LEVEL) {			\
-		printk(KERN_INFO"ftape"__FILE__"("__FUNCTION__"):\n"	\
-		       KERN_INFO m".\n" ,##i);				\
+		printk(KERN_INFO"ftape%s(%s):\n"	                \
+		       KERN_INFO m".\n" ,__FILE__, __FUNCTION__ , ##i);	\
 	}								\
 }
 #define SET_TRACE_LEVEL(l)      if ((l) == (l)) do {} while(0)

@@ -224,7 +224,7 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
 	 * Fill in logic to get the current power status of the specific
@@ -242,7 +242,7 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
 	 * Fill in logic to get the current attention status of the specific
@@ -260,7 +260,7 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
 	 * Fill in logic to get the current latch status of the specific
@@ -278,7 +278,7 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	if (slot == NULL)
 		return -ENODEV;
 	
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
 	 * Fill in logic to get the current adapter status of the specific
@@ -296,7 +296,7 @@ static void release_slots(struct hotplug_slot *hotplug_slot)
 	if (slot == NULL)
 		return -ENODEV;
 
-	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 	kfree(slot->hotplug_slot->info);
 	kfree(slot->hotplug_slot->name);
 	kfree(slot->hotplug_slot);
