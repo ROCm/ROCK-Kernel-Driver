@@ -235,8 +235,6 @@ static inline struct kcore_list * kclist_del(void *addr)
 	return NULL;
 }
 
-static inline void kclist_add(struct kcore_list *new, void *addr, size_t size) {};
-static inline struct kcore_list * kclist_del(void *addr) {return NULL};
 #endif /* CONFIG_PROC_FS */
 
 struct proc_inode {
