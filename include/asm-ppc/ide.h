@@ -103,30 +103,10 @@ static __inline__ void ide_init_default_hwifs(void)
 #endif
 }
 
-#if !defined(ide_request_irq)
-#define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
-#endif
-
-#if !defined(ide_free_irq)
-#define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))
-#endif
-#define ide_check_region(from,extent)		check_region((from), (extent))
-#define ide_request_region(from,extent,name)	request_region((from), (extent), (name))
-#define ide_release_region(from,extent)		release_region((from), (extent))
-
-extern void ide_fix_driveid(struct hd_driveid *id);
-
-/*
- * The following are not needed for the non-m68k ports
- * unless direct IDE on 8xx
- */
 #if (defined CONFIG_APUS || defined CONFIG_BLK_DEV_MPC8xx_IDE )
+#define IDE_ARCH_ACK_INTR  1
 #define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
-#else
-#define ide_ack_intr(hwif)		(1)
 #endif
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
 #endif /* __KERNEL__ */
 
