@@ -21,28 +21,6 @@
 #include <asm/io.h>
 #endif
 
-/* ??? This does not belong here.  */
-/*
- * Every architecture must define this function. It's the fastest
- * way of searching a 140-bit bitmap where the first 100 bits are
- * unlikely to be set. It's guaranteed that at least one of the 140
- * bits is cleared.
- */
-
-static inline int
-sched_find_first_bit(unsigned long *b)
-{
-	unsigned long b0 = b[0], b1 = b[1], b2 = b[2];
-	unsigned long offset = 128;
-
-	if (unlikely(b0 | b1)) {
-		b2 = (b0 ? b0 : b1);
-		offset = (b0 ? 0 : 64);
-	}
-
-	return __ffs(b2) + offset;
-}
-
 
 extern inline unsigned long
 __reload_thread(struct pcb_struct *pcb)
