@@ -169,7 +169,7 @@ static inline void internal_add_timer(struct timer_list *timer)
 }
 
 /* Initialize both explicitly - let's try to have them in the same cache line */
-spinlock_t timerlist_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t timerlist_lock ____cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_SMP
 volatile struct timer_list * volatile running_timer;
@@ -327,7 +327,7 @@ repeat:
 	spin_unlock_irq(&timerlist_lock);
 }
 
-spinlock_t tqueue_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t tqueue_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 void tqueue_bh(void)
 {
@@ -633,7 +633,7 @@ unsigned long wall_jiffies;
  * This read-write spinlock protects us from races in SMP while
  * playing with xtime and avenrun.
  */
-rwlock_t xtime_lock = RW_LOCK_UNLOCKED;
+rwlock_t xtime_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
 unsigned long last_time_offset;
 
 static inline void update_times(void)
