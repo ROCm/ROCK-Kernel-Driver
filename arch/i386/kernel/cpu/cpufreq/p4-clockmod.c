@@ -110,7 +110,7 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
 {
 	unsigned int    newstate = DC_RESV;
 	struct cpufreq_freqs freqs;
-	cpumask_t cpus_allowed, affected_cpu_map;
+	cpumask_t cpus_allowed;
 	int i;
 
 	if (cpufreq_frequency_table_target(policy, &p4clockmod_table[0], target_freq, relation, &newstate))
@@ -122,18 +122,8 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
 	if (freqs.new == freqs.old)
 		return 0;
 
-	/* switch to physical CPU where state is to be changed*/
-	cpus_allowed = current->cpus_allowed;
-
-	/* only run on CPU to be set, or on its sibling */
-#ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[policy->cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(policy->cpu);
-#endif
-
 	/* notifiers */
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	}
@@ -141,7 +131,9 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
 	/* run on each logical CPU, see section 13.15.3 of IA32 Intel Architecture Software
 	 * Developer's Manual, Volume 3 
 	 */
-	for_each_cpu_mask(i, affected_cpu_map) {
+	cpus_allowed = current->cpus_allowed;
+
+	for_each_cpu_mask(i, policy->cpus) {
 		cpumask_t this_cpu = cpumask_of_cpu(i);
 
 		set_cpus_allowed(current, this_cpu);
@@ -152,7 +144,7 @@ static int cpufreq_p4_target(struct cpufreq_policy *policy,
 	set_cpus_allowed(current, cpus_allowed);
 
 	/* notifiers */
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
@@ -219,6 +211,10 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 	int cpuid = 0;
 	unsigned int i;
 
+#ifdef CONFIG_SMP
+	policy->cpus = cpu_sibling_map[policy->cpu];
+#endif
+
 	/* Errata workaround */
 	cpuid = (c->x86 << 8) | (c->x86_model << 4) | c->x86_mask;
 	switch (cpuid) {
@@ -260,14 +256,13 @@ static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
 
 static unsigned int cpufreq_p4_get(unsigned int cpu)
 {
-	cpumask_t cpus_allowed, affected_cpu_map;
+	cpumask_t cpus_allowed;
 	u32 l, h;
 
 	cpus_allowed = current->cpus_allowed;
-        affected_cpu_map = cpumask_of_cpu(cpu);
 
-	set_cpus_allowed(current, affected_cpu_map);
-        BUG_ON(!cpu_isset(smp_processor_id(), affected_cpu_map));
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	BUG_ON(smp_processor_id() != cpu);
 
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
 
@@ -335,4 +330,3 @@ MODULE_LICENSE ("GPL");
 
 late_initcall(cpufreq_p4_init);
 module_exit(cpufreq_p4_exit);
-

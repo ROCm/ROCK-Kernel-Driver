@@ -468,6 +468,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	memset(policy, 0, sizeof(struct cpufreq_policy));
 
 	policy->cpu = cpu;
+	policy->cpus = cpumask_of_cpu(cpu);
+
 	init_MUTEX_LOCKED(&policy->lock);
 	init_completion(&policy->kobj_unregister);
 	INIT_WORK(&policy->update, handle_update, (void *)(long)cpu);

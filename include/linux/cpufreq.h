@@ -22,6 +22,7 @@
 #include <linux/sysfs.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
+#include <linux/cpumask.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -69,7 +70,8 @@ struct cpufreq_real_policy {
 };
 
 struct cpufreq_policy {
-	unsigned int		cpu;    /* cpu nr */
+	cpumask_t		cpus;	/* affected CPUs */
+	unsigned int		cpu;    /* cpu nr of registered CPU */
 	struct cpufreq_cpuinfo	cpuinfo;/* see above */
 
 	unsigned int		min;    /* in kHz */

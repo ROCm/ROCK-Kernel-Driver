@@ -569,7 +569,7 @@ static int centrino_target (struct cpufreq_policy *policy,
 	 * Make sure we are running on the CPU that wants to change frequency
 	 */
 	saved_mask = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(policy->cpu));
+	set_cpus_allowed(current, policy->cpus);
 	if (smp_processor_id() != policy->cpu) {
 		return(-EAGAIN);
 	}

@@ -223,22 +223,21 @@ static unsigned int speedstep_detect_chipset (void)
 	return 0;
 }
 
-static unsigned int speedstep_get(unsigned int cpu)
+static unsigned int _speedstep_get(cpumask_t cpus)
 {
 	unsigned int speed;
-	cpumask_t cpus_allowed,affected_cpu_map;
+	cpumask_t cpus_allowed;
 
-	/* only run on CPU to be set, or on its sibling */
 	cpus_allowed = current->cpus_allowed;
-#ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(cpu);
-#endif
-	set_cpus_allowed(current, affected_cpu_map);
-	speed=speedstep_get_processor_frequency(speedstep_processor);
+	set_cpus_allowed(current, cpus);
+	speed = speedstep_get_processor_frequency(speedstep_processor);
 	set_cpus_allowed(current, cpus_allowed);
 	return speed;
+}
+
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	return _speedstep_get(cpumask_of_cpu(cpu));
 }
 
 /**
@@ -255,13 +254,13 @@ static int speedstep_target (struct cpufreq_policy *policy,
 {
 	unsigned int newstate = 0;
 	struct cpufreq_freqs freqs;
-	cpumask_t cpus_allowed, affected_cpu_map;
+	cpumask_t cpus_allowed;
 	int i;
 
 	if (cpufreq_frequency_table_target(policy, &speedstep_freqs[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
-	freqs.old = speedstep_get(policy->cpu);
+	freqs.old = _speedstep_get(policy->cpus);
 	freqs.new = speedstep_freqs[newstate].frequency;
 	freqs.cpu = policy->cpu;
 
@@ -271,27 +270,20 @@ static int speedstep_target (struct cpufreq_policy *policy,
 
 	cpus_allowed = current->cpus_allowed;
 
-	/* only run on CPU to be set, or on its sibling */
-#ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[policy->cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(policy->cpu);
-#endif
-
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	}
 
 	/* switch to physical CPU where state is to be changed */
-	set_cpus_allowed(current, affected_cpu_map);
+	set_cpus_allowed(current, policy->cpus);
 
 	speedstep_set_state(newstate);
 
 	/* allow to be run on all CPUs */
 	set_cpus_allowed(current, cpus_allowed);
 
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
@@ -317,7 +309,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 {
 	int result = 0;
 	unsigned int speed;
-	cpumask_t cpus_allowed,affected_cpu_map;
+	cpumask_t cpus_allowed;
 
 
 	/* capability check */
@@ -327,11 +319,9 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	/* only run on CPU to be set, or on its sibling */
 	cpus_allowed = current->cpus_allowed;
 #ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[policy->cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(policy->cpu);
+	policy->cpus = cpu_sibling_map[policy->cpu];
 #endif
-	set_cpus_allowed(current, affected_cpu_map);
+	set_cpus_allowed(current, policy->cpus);
 
 	/* detect low and high frequency */
 	result = speedstep_get_freqs(speedstep_processor,
@@ -343,7 +333,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return result;
 
 	/* get current speed setting */
-	speed = speedstep_get(policy->cpu);
+	speed = _speedstep_get(policy->cpus);
 	if (!speed)
 		return -EIO;
 
