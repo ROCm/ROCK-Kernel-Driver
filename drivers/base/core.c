@@ -26,7 +26,7 @@ spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 static int probe(struct device * dev, struct device_driver * drv)
 {
 	dev->driver = drv;
-	return drv->probe ? drv->probe(dev) : 0;
+	return drv->probe ? drv->probe(dev) : -ENODEV;
 }
 
 static void attach(struct device * dev)
@@ -54,7 +54,7 @@ static void attach(struct device * dev)
  */
 static int found_match(struct device * dev, struct device_driver * drv)
 {
-	int error = 0;
+	int error;
 
 	if (!(error = probe(dev,get_driver(drv)))) {
 		pr_debug("bound device '%s' to driver '%s'\n",
@@ -64,7 +64,8 @@ static int found_match(struct device * dev, struct device_driver * drv)
 		put_driver(drv);
 		dev->driver = NULL;
 	}
-	return error;
+	/* return boolean:  did driver bind? */
+	return error == 0;
 }
 
 /**
@@ -84,6 +85,7 @@ static int do_device_attach(struct device_driver * drv, void * data)
 
 	if (drv->bus->match && drv->bus->match(dev,drv))
 		error = found_match(dev,drv);
+	/* stop bus_for_each_drv() once a driver binds to the device */
 	return error;
 }
 
@@ -113,13 +115,13 @@ static void device_detach(struct device * dev)
 static int do_driver_attach(struct device * dev, void * data)
 {
 	struct device_driver * drv = (struct device_driver *)data;
-	int error = 0;
 
 	if (!dev->driver) {
 		if (dev->bus->match && dev->bus->match(dev,drv))
-			error = found_match(dev,drv);
+			found_match(dev,drv);
 	}
-	return error;
+	/* continue bus_for_each_dev(), to attach to other devices */
+	return 0;
 }
 
 int driver_attach(struct device_driver * drv)
