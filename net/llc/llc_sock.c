@@ -51,11 +51,7 @@ static u16 llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 static u16 llc_ui_sap_link_no_max[256];
 static struct sockaddr_llc llc_ui_addrnull;
 static struct proto_ops llc_ui_ops;
-static struct sock *llc_ui_sockets;
-static rwlock_t llc_ui_sockets_lock = RW_LOCK_UNLOCKED;
 
-static int llc_ui_indicate(struct llc_prim_if_block *prim);
-static int llc_ui_confirm(struct llc_prim_if_block *prim);
 static int llc_ui_wait_for_conn(struct sock *sk, int timeout);
 static int llc_ui_wait_for_disc(struct sock *sk, int timeout);
 static int llc_ui_wait_for_data(struct sock *sk, int timeout);
@@ -145,103 +141,6 @@ static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb, int noblock)
 	return rc;
 }
 
-/**
- *	__llc_ui_find_sk_by_addr - return socket matching local mac + sap.
- *	@addr: Local address to match.
- *
- *	Search the local socket list and return the socket which has a matching
- *	local (mac + sap) address (allows null mac). This search will work on
- *	unconnected and connected sockets, though find_by_link_no is recommend
- *	for connected sockets.
- *	Returns sock upon match, %NULL otherwise.
- */
-static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
-					     struct llc_addr *daddr,
-					     struct net_device *dev)
-{
-	struct sock *sk;
-
-	for (sk = llc_ui_sockets; sk; sk = sk->next) {
-		struct llc_opt *llc = llc_sk(sk);
-
-		if (llc->addr.sllc_ssap != laddr->lsap)
-			continue;
-		if (llc_mac_null(llc->addr.sllc_smac)) {
-			if (!llc_mac_null(llc->addr.sllc_mmac) &&
-			    !llc_mac_match(llc->addr.sllc_mmac,
-				    	   laddr->mac))
-				continue;
-			break;
-		}
-		if (dev && !llc_mac_null(llc->addr.sllc_mmac) &&
-		    llc_mac_match(llc->addr.sllc_mmac, laddr->mac) &&
-		    llc_mac_match(llc->addr.sllc_smac, dev->dev_addr))
-			break;
-		if (dev->flags & IFF_LOOPBACK)
-			break;
-		if (!llc_mac_match(llc->addr.sllc_smac, laddr->mac))
-			continue;
-		if (llc_mac_null(llc->addr.sllc_dmac))
-			break;
-	}
-	return sk;
-}
-
-static struct sock *llc_ui_find_sk_by_addr(struct llc_addr *addr,
-					   struct llc_addr *daddr,
-					   struct net_device *dev)
-{
-	struct sock *sk;
-
-	read_lock(&llc_ui_sockets_lock);
-	sk = __llc_ui_find_sk_by_addr(addr, daddr, dev);
-	if (sk)
-		sock_hold(sk);
-	read_unlock(&llc_ui_sockets_lock);
-	return sk;
-}
-
-/**
- *	llc_ui_insert_socket - insert socket into list
- *	@sk: Socket to insert.
- *
- *	Insert a socket into the local llc socket list.
- */
-static __inline__ void llc_ui_insert_socket(struct sock *sk)
-{
-	write_lock_bh(&llc_ui_sockets_lock);
-	sk->next = llc_ui_sockets;
-	if (sk->next)
-		llc_ui_sockets->pprev = &sk->next;
-	llc_ui_sockets = sk;
-	sk->pprev = &llc_ui_sockets;
-	sock_hold(sk);
-	write_unlock_bh(&llc_ui_sockets_lock);
-}
-
-/**
- *	llc_ui_remove_socket - remove socket from list
- *	@sk: Socket to remove.
- *
- *	Remove a socket from the local llc socket list.
- */
-static __inline__ void llc_ui_remove_socket(struct sock *sk)
-{
-	write_lock_bh(&llc_ui_sockets_lock);
-	if (sk->pprev) {
-		if (sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev = NULL;
-		/*
-		 * This only makes sense if the socket was inserted on the
-		 * list, if sk->pprev is NULL it wasn't
-		 */
-		sock_put(sk);
-	}
-	write_unlock_bh(&llc_ui_sockets_lock);
-}
-
 static void llc_ui_sk_init(struct socket *sock, struct sock *sk)
 {
 	sk->type   = sock->type;
@@ -296,10 +195,8 @@ static int llc_ui_release(struct socket *sock)
 		llc->laddr.lsap, llc->daddr.lsap);
 	if (!llc_send_disc(sk))
 		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
-	if (!sk->zapped) {
+	if (!sk->zapped)
 		llc_sap_unassign_sock(llc->sap, sk);
-		llc_ui_remove_socket(sk);
-	}
 	release_sock(sk);
 	if (llc->sap && list_empty(&llc->sap->sk_list.list))
 		llc_sap_close(llc->sap);
@@ -384,8 +281,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	}
 	sap = llc_sap_find(addr->sllc_ssap);
 	if (!sap) {
-		sap = llc_sap_open(llc_ui_indicate, llc_ui_confirm,
-				   addr->sllc_ssap);
+		sap = llc_sap_open(addr->sllc_ssap, NULL);
 		rc = -EBUSY; /* some other network layer is using the sap */
 		if (!sap)
 			goto out;
@@ -420,7 +316,6 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	llc->daddr.lsap = addr->sllc_dsap;
 	memcpy(llc->daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));
-	llc_ui_insert_socket(sk);
 	/* assign new connection to it's SAP */
 	llc_sap_assign_sock(sap, sk);
 	rc = sk->zapped = 0;
@@ -769,7 +664,6 @@ static int llc_ui_accept(struct socket *sock, struct socket *newsock, int flags)
 	/* put original socket back into a clean listen state. */
 	sk->state = TCP_LISTEN;
 	sk->ack_backlog--;
-	llc_ui_insert_socket(newsk);
 	skb->sk = NULL;
 	dprintk("%s: ok success on %02X, client on %02X\n", __FUNCTION__,
 		llc_sk(sk)->addr.sllc_ssap, newllc->addr.sllc_dsap);
@@ -1124,178 +1018,6 @@ static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
 out:
 	release_sock(sk);
 	return rc;
-}
-
-/**
- *	llc_ui_ind_test - handle TEST indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle TEST indication.
- */
-static void llc_ui_ind_test(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_test *prim_data = &prim->data->test;
-	struct sk_buff *skb = prim_data->skb;
-	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
-	struct sock *sk = llc_ui_find_sk_by_addr(&prim_data->daddr,
-						 &prim_data->saddr, skb->dev);
-	if (!sk)
-		goto out;
-	if (sk->state == TCP_LISTEN)
-		goto out_put;
-	/* save primitive for use by the user. */
-	addr->sllc_family = AF_LLC;
-	addr->sllc_arphrd = skb->dev->type;
-	addr->sllc_test   = 1;
-	addr->sllc_xid    = 0;
-	addr->sllc_ua     = 0;
-	addr->sllc_dsap = prim_data->daddr.lsap;
-	memcpy(addr->sllc_dmac, prim_data->daddr.mac, IFHWADDRLEN);
-	addr->sllc_ssap = prim_data->saddr.lsap;
-	memcpy(addr->sllc_smac, prim_data->saddr.mac, IFHWADDRLEN);
-	/* queue skb to the user. */
-	if (sock_queue_rcv_skb(sk, skb))
-		kfree_skb(skb);
-out_put:
-	sock_put(sk);
-out:;
-}
-
-/**
- *	llc_ui_ind_xid - handle XID indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle XID indication.
- */
-static void llc_ui_ind_xid(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_xid *prim_data = &prim->data->xid;
-	struct sk_buff *skb = prim_data->skb;
-	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
-	struct sock *sk = llc_ui_find_sk_by_addr(&prim_data->daddr,
-						 &prim_data->saddr, skb->dev);
-	if (!sk)
-		goto out;
-	if (sk->state == TCP_LISTEN)
-		goto out_put;
-	/* save primitive for use by the user. */
-	addr->sllc_family = AF_LLC;
-	addr->sllc_arphrd = 0;
-	addr->sllc_test   = 0;
-	addr->sllc_xid    = 1;
-	addr->sllc_ua     = 0;
-	addr->sllc_dsap = prim_data->daddr.lsap;
-	memcpy(addr->sllc_dmac, prim_data->daddr.mac, IFHWADDRLEN);
-	addr->sllc_ssap = prim_data->saddr.lsap;
-	memcpy(addr->sllc_smac, prim_data->saddr.mac, IFHWADDRLEN);
-	/* queue skb to the user. */
-	if (sock_queue_rcv_skb(sk, skb))
-		kfree_skb(skb);
-out_put:
-	sock_put(sk);
-out:;
-}
-
-/**
- *	llc_ui_ind_dataunit - handle DATAUNIT indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle DATAUNIT indication.
- */
-static void llc_ui_ind_dataunit(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_unit_data *prim_data = &prim->data->udata;
-	struct sk_buff *skb = prim_data->skb;
-	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
-	struct sock *sk = llc_ui_find_sk_by_addr(&prim_data->daddr,
-						 &prim_data->saddr, skb->dev);
-	if (!sk)
-		goto out;
-	if (sk->state == TCP_LISTEN)
-		goto out_put;
-	/* save primitive for use by the user. */
-	addr->sllc_family = AF_LLC;
-	addr->sllc_arphrd = skb->dev->type;
-	addr->sllc_test   = 0;
-	addr->sllc_xid    = 0;
-	addr->sllc_ua     = 1;
-	addr->sllc_dsap = prim_data->daddr.lsap;
-	memcpy(addr->sllc_dmac, prim_data->daddr.mac, IFHWADDRLEN);
-	addr->sllc_ssap = prim_data->saddr.lsap;
-	memcpy(addr->sllc_smac, prim_data->saddr.mac, IFHWADDRLEN);
-	/* queue skb to the user. */
-	if (sock_queue_rcv_skb(sk, skb))
-		kfree_skb(skb);
-out_put:
-	sock_put(sk);
-out:;
-}
-
-/**
- *	llc_ui_indicate - LLC user interface hook into the LLC layer.
- *	@prim: Primitive block provided by the llc layer.
- *
- *	LLC user interface hook into the LLC layer, every llc_ui sap references
- *	this function as its indicate handler.
- *	Always returns 0 to indicate reception of primitive.
- */
-static int llc_ui_indicate(struct llc_prim_if_block *prim)
-{
-	switch (prim->prim) {
-		case LLC_TEST_PRIM:
-			llc_ui_ind_test(prim);		break;
-		case LLC_XID_PRIM:
-			llc_ui_ind_xid(prim);		break;
-		case LLC_DATAUNIT_PRIM:
-			llc_ui_ind_dataunit(prim);	break;
-		case LLC_CONN_PRIM:
-			dprintk("%s: shouldn't happen, LLC_CONN_PRIM "
-				"is gone for ->ind()...\n", __FUNCTION__);
-			break;
-		case LLC_DATA_PRIM:
-			dprintk("%s: shouldn't happen, LLC_DATA_PRIM "
-				"is gone for ->ind()...\n", __FUNCTION__);
-			break;
-		case LLC_DISC_PRIM:
-			dprintk("%s: shouldn't happen, LLC_DISC_PRIM "
-				"is gone for ->ind()...\n", __FUNCTION__);
-			break;
-		case LLC_RESET_PRIM:
-		default:				break;
-	}
-	return 0;
-}
-
-/**
- *	llc_ui_confirm - LLC user interface hook into the LLC layer
- *	@prim: Primitive block provided by the llc layer.
- *
- *	LLC user interface hook into the LLC layer, every llc_ui sap references
- *	this function as its confirm handler.
- *	Always returns 0 to indicate reception of primitive.
- */
-static int llc_ui_confirm(struct llc_prim_if_block *prim)
-{
-	switch (prim->prim) {
-		case LLC_CONN_PRIM:
-			dprintk("%s: shouldn't happen, LLC_CONN_PRIM "
-				"is gone for ->conf()...\n", __FUNCTION__);
-			break;
-		case LLC_DATA_PRIM:
-			dprintk("%s: shouldn't happen, LLC_DATA_PRIM "
-				"is gone for ->conf()...\n", __FUNCTION__);
-			break;
-		case LLC_DISC_PRIM:
-			dprintk("%s: shouldn't happen, LLC_DISC_PRIM "
-				"is gone for ->conf()...\n", __FUNCTION__);
-			break;
-		case LLC_RESET_PRIM:			break;
-		default:
-			printk(KERN_ERR "%s: prim not supported%d\n", __FUNCTION__,
-			       prim->prim);
-			break;
-	}
-	return 0;
 }
 
 #ifdef CONFIG_PROC_FS

@@ -64,4 +64,5 @@ extern void llc_station_state_process(struct llc_station *station,
 extern void llc_station_send_pdu(struct llc_station *station,
 				 struct sk_buff *skb);
 extern struct sk_buff *llc_alloc_frame(void);
+extern struct packet_type llc_packet_type;
 #endif /* LLC_MAIN_H */

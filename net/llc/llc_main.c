@@ -73,8 +73,6 @@ struct llc_sap *llc_sap_alloc(void)
 		spin_lock_init(&sap->sk_list.lock);
 		INIT_LIST_HEAD(&sap->sk_list.list);
 		skb_queue_head_init(&sap->mac_pdu_q);
-		sap->llc_ind_prim.data = &sap->llc_ind_data_prim;
-		sap->llc_cfm_prim.data = &sap->llc_cfm_data_prim;
 	}
 	return sap;
 }
@@ -621,7 +619,7 @@ unlock:
 	return len;
 }
 
-static struct packet_type llc_packet_type = {
+struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
 	.func = llc_rcv,
 	.data = (void *)1,

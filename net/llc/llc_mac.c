@@ -37,7 +37,8 @@ u8 llc_mac_null_var[IFHWADDRLEN];
 
 static void fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb,
+			struct packet_type *pt);
 
 /**
  *	mac_send_pdu - Sends PDU to specific device.
@@ -82,7 +83,7 @@ out:
  *	data now), it queues this frame in the connection's backlog.
  */
 int llc_rcv(struct sk_buff *skb, struct net_device *dev,
-		 struct packet_type *pt)
+	    struct packet_type *pt)
 {
 	struct llc_sap *sap;
 	struct llc_pdu_sn *pdu;
@@ -113,8 +114,16 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	}
 	llc_decode_pdu_type(skb, &dest);
 	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		dprintk("%s: calling llc_sap_rcv!\n", __FUNCTION__);
-		llc_sap_rcv(sap, skb);
+		struct llc_addr laddr;
+		struct sock *sk;
+
+		llc_pdu_decode_da(skb, laddr.mac);
+		llc_pdu_decode_dsap(skb, &laddr.lsap);
+
+		skb->sk = sk = llc_lookup_dgram(sap, &laddr);
+		llc_sap_rcv(sap, skb, pt);
+		if (sk)
+			sock_put(sk);
 	} else if (dest == LLC_DEST_CONN) {
 		struct llc_addr saddr, daddr;
 		struct sock *sk;
@@ -245,16 +254,18 @@ int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
  *	llc_sap_rcv - sends received pdus to the sap state machine
  *	@sap: current sap component structure.
  *	@skb: received frame.
+ *	@pt: packet type
  *
  *	Sends received pdus to the sap state machine.
  */
-static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb,
+			struct packet_type *pt)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
 	ev->type   = LLC_SAP_EV_TYPE_PDU;
 	ev->reason = 0;
-	llc_sap_state_process(sap, skb);
+	llc_sap_state_process(sap, skb, pt);
 }
 
 /**

@@ -100,6 +100,9 @@ extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *laddr);
 extern struct sock *llc_lookup_listener(struct llc_sap *sap,
 					struct llc_addr *laddr);
+extern struct sock *llc_lookup_dgram(struct llc_sap *sap,
+				     struct llc_addr *laddr);
+extern void llc_save_primitive(struct sk_buff* skb, u8 prim);
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
 #endif /* LLC_CONN_H */

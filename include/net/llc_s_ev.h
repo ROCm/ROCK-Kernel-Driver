@@ -60,6 +60,7 @@ union llc_sap_ev_if {
 struct llc_prim_if_block;
 
 struct llc_sap_state_ev {
+	u8			  primitive;
 	u8			  type;
 	u8			  reason;
 	u8			  ind_cfm_flag;

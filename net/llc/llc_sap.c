@@ -18,6 +18,7 @@
 #include <net/llc_s_ac.h>
 #include <net/llc_s_st.h>
 #include <net/sock.h>
+#include <linux/tcp.h>
 #include <net/llc_main.h>
 #include <net/llc_mac.h>
 #include <net/llc_pdu.h>
@@ -63,21 +64,45 @@ void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 
 /**
  *	llc_sap_state_process - sends event to SAP state machine
- *	@sap: pointer to SAP
+ *	@sap: sap to use
  *	@skb: pointer to occurred event
+ *	@pt: packet type, for datalink protos
  *
  *	After executing actions of the event, upper layer will be indicated
- *	if needed(on receiving an UI frame).
+ *	if needed(on receiving an UI frame). sk can be null for the
+ *	datalink_proto case.
  */
-void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
+void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb,
+			   struct packet_type *pt)
 {
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
 	llc_sap_next_state(sap, skb);
-	if (ev->ind_cfm_flag == LLC_IND)
-		sap->ind(ev->prim);
-	else if (ev->type == LLC_SAP_EV_TYPE_PDU)
+	if (ev->ind_cfm_flag == LLC_IND) {
+		if (sap->rcv_func) {
+			/* FIXME:
+			 * Ugly hack, still trying to figure it
+			 * out if this is a bug in IPX or here
+			 * in LLC Land... But hey, it even works,
+			 * no leaks 8)
+			 */
+			if (skb->list)
+				skb_get(skb);
+			sap->rcv_func(skb, skb->dev, pt);
+		} else {
+			if (skb->sk->state == TCP_LISTEN)
+				goto drop;
+
+			llc_save_primitive(skb, ev->primitive);
+
+			/* queue skb to the user. */
+			if (sock_queue_rcv_skb(skb->sk, skb))
+				kfree_skb(skb);
+		}
+	} else if (ev->type == LLC_SAP_EV_TYPE_PDU) {
+drop:
 		kfree_skb(skb);
+	}
 }
 
 /**
@@ -89,43 +114,18 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_pdu_un *pdu;
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-	union llc_u_prim_data *prim_data = prim->data;
-	u8 lfb;
 
-	llc_pdu_decode_sa(skb, prim_data->udata.saddr.mac);
-	llc_pdu_decode_da(skb, prim_data->udata.daddr.mac);
-	llc_pdu_decode_dsap(skb, &prim_data->udata.daddr.lsap);
-	llc_pdu_decode_ssap(skb, &prim_data->udata.saddr.lsap);
-	prim_data->udata.pri = 0;
-	prim_data->udata.skb = skb;
 	pdu = llc_pdu_un_hdr(skb);
 	switch (LLC_U_PDU_RSP(pdu)) {
-		case LLC_1_PDU_CMD_TEST:
-			prim->prim = LLC_TEST_PRIM;
-			break;
-		case LLC_1_PDU_CMD_XID:
-			prim->prim = LLC_XID_PRIM;
-			break;
-		case LLC_1_PDU_CMD_UI:
-			if (skb->protocol == ntohs(ETH_P_TR_802_2)) {
-				if (((struct trh_hdr *)skb->mac.raw)->rcf) {
-					lfb = ntohs(((struct trh_hdr *)
-						    skb->mac.raw)->rcf) &
-						    0x0070;
-					prim_data->udata.lfb = lfb >> 4;
-				} else {
-					lfb = 0xFF;
-					prim_data->udata.lfb = 0xFF;
-				}
-			}
-			prim->prim = LLC_DATAUNIT_PRIM;
-			break;
+	case LLC_1_PDU_CMD_TEST:
+		ev->primitive = LLC_TEST_PRIM;	   break;
+	case LLC_1_PDU_CMD_XID:
+		ev->primitive = LLC_XID_PRIM;	   break;
+	case LLC_1_PDU_CMD_UI:
+		ev->primitive = LLC_DATAUNIT_PRIM; break;
 	}
-	prim->data = prim_data;
-	prim->sap = sap;
 	ev->ind_cfm_flag = LLC_IND;
-	ev->prim = prim;
+	ev->prim	 = NULL;
 }
 
 /**

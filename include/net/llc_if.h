@@ -17,17 +17,17 @@
 #include <linux/if_arp.h>
 #include <linux/llc.h>
 
-#define LLC_DATAUNIT_PRIM	0
-#define LLC_CONN_PRIM		1
-#define LLC_DATA_PRIM		2
-#define LLC_DISC_PRIM		3
-#define LLC_RESET_PRIM		4
-#define LLC_FLOWCONTROL_PRIM	5 /* Not supported at this time */
-#define LLC_DISABLE_PRIM	6
-#define LLC_XID_PRIM		7
-#define LLC_TEST_PRIM		8
-#define LLC_SAP_ACTIVATION      9
-#define LLC_SAP_DEACTIVATION   10
+#define LLC_DATAUNIT_PRIM	1
+#define LLC_CONN_PRIM		2
+#define LLC_DATA_PRIM		3
+#define LLC_DISC_PRIM		4
+#define LLC_RESET_PRIM		5
+#define LLC_FLOWCONTROL_PRIM	6 /* Not supported at this time */
+#define LLC_DISABLE_PRIM	7
+#define LLC_XID_PRIM		8
+#define LLC_TEST_PRIM		9
+#define LLC_SAP_ACTIVATION     10
+#define LLC_SAP_DEACTIVATION   11
 
 #define LLC_NBR_PRIMITIVES     11
 
@@ -110,23 +110,21 @@ struct llc_prim_if_block {
 	u8		       prim;
 	union llc_u_prim_data *data;
 };
-typedef int (*llc_prim_call_t)(struct llc_prim_if_block *prim_if);
 
-extern struct llc_sap *llc_sap_open(llc_prim_call_t network_indicate,
-				    llc_prim_call_t network_confirm, u8 lsap);
+extern struct llc_sap *llc_sap_open(u8 lsap,
+				    int (*func)(struct sk_buff *skb,
+						struct net_device *dev,
+						struct packet_type *pt));
 extern void llc_sap_close(struct llc_sap *sap);
 
 extern int llc_establish_connection(struct sock *sk, u8 *lmac,
 				    u8 *dmac, u8 dsap);
 extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
-extern void llc_build_and_send_ui_pkt(struct llc_sap *sap,
-				      struct sk_buff *skb,
+extern void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 				      u8 *dmac, u8 dsap);
-extern void llc_build_and_send_xid_pkt(struct llc_sap *sap,
-				       struct sk_buff *skb,
+extern void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
 				       u8 *dmac, u8 dsap);
-extern void llc_build_and_send_test_pkt(struct llc_sap *sap,
-					struct sk_buff *skb,
+extern void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
 					u8 *dmac, u8 dsap);
 extern int llc_send_disc(struct sock *sk);
 #endif /* LLC_IF_H */

@@ -138,9 +138,8 @@ struct llc_conn_state_ev {
 	u8			  type;
 	u8			  reason;
 	u8			  status;
-	u8			  flag;
-	struct llc_prim_if_block *ind_prim;
-	struct llc_prim_if_block *cfm_prim;
+	u8			  ind_prim;
+	u8			  cfm_prim;
 	union llc_conn_ev_if	  data;
 };
 

@@ -30,17 +30,16 @@
 
 /**
  *	llc_sap_open - open interface to the upper layers.
- *	@nw_indicate: pointer to indicate function of upper layer.
- *	@nw_confirm: pointer to confirm function of upper layer.
  *	@lsap: SAP number.
- *	@sap: pointer to allocated SAP (output argument).
+ *	@func: rcv func for datalink protos
  *
  *	Interface function to upper layer. Each one who wants to get a SAP
  *	(for example NetBEUI) should call this function. Returns the opened
  *	SAP for success, NULL for failure.
  */
-struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
-			     llc_prim_call_t nw_confirm, u8 lsap)
+struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
+						  struct net_device *dev,
+						  struct packet_type *pt))
 {
 	/* verify this SAP is not already open; if so, return error */
 	struct llc_sap *sap;
@@ -57,8 +56,7 @@ struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 		goto err;
 	/* allocated a SAP; initialize it and clear out its memory pool */
 	sap->laddr.lsap = lsap;
-	sap->ind = nw_indicate;
-	sap->conf = nw_confirm;
+	sap->rcv_func = func;
 	sap->parent_station = llc_station_get();
 	/* initialized SAP; add it to list of SAPs this station manages */
 	llc_sap_save(sap);
@@ -117,7 +115,7 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 	ev->data.prim.prim = LLC_DATAUNIT_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = &prim;
-	llc_sap_state_process(sap, skb);
+	llc_sap_state_process(sap, skb, &llc_packet_type);
 }
 
 /**
@@ -130,8 +128,8 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
  *	This function is called when upper layer wants to send a TEST pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
-				 u8 *dmac, u8 dsap)
+void llc_build_and_send_test_pkt(struct llc_sap *sap, 
+				 struct sk_buff *skb, u8 *dmac, u8 dsap)
 {
 	union llc_u_prim_data prim_data;
 	struct llc_prim_if_block prim;
@@ -151,7 +149,7 @@ void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
 	ev->data.prim.prim = LLC_TEST_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = &prim;
-	llc_sap_state_process(sap, skb);
+	llc_sap_state_process(sap, skb, &llc_packet_type);
 }
 
 /**
@@ -185,7 +183,7 @@ void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
 	ev->data.prim.prim = LLC_XID_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = &prim;
-	llc_sap_state_process(sap, skb);
+	llc_sap_state_process(sap, skb, &llc_packet_type);
 }
 
 /**
