@@ -29,9 +29,7 @@
 #include "smberr.h"
 #include "nterr.h"
 
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 extern mempool_t *cifs_sm_req_poolp;
-#endif /* CIFS_EXPERIMENTAL */
 extern mempool_t *cifs_req_poolp;
 extern struct task_struct * oplockThread;
 
@@ -163,10 +161,9 @@ cifs_buf_get(void)
 	    (struct smb_hdr *) mempool_alloc(cifs_req_poolp, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
-	/* clear through bcc + 1, making an even 0x40 bytes */
-
+	/* for most paths, more is cleared in header_assemble */
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 3);
 		atomic_inc(&bufAllocCount);
 	}
 
@@ -187,7 +184,6 @@ cifs_buf_release(void *buf_to_free)
 	return;
 }
 
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 struct smb_hdr *
 cifs_small_buf_get(void)
 {
@@ -199,14 +195,11 @@ cifs_small_buf_get(void)
    defaults to this and can not be bigger */
 	ret_buf =
 	    (struct smb_hdr *) mempool_alloc(cifs_sm_req_poolp, SLAB_KERNEL | SLAB_NOFS);
-
-	/* clear the first few header bytes */
-	/* clear through bcc + 1, making an even 0x40 bytes */
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
+	/* No need to clear memory here, cleared in header assemble */
+	/*	memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);*/
 		atomic_inc(&smBufAllocCount);
 	}
-
 	return ret_buf;
 }
 
@@ -223,22 +216,17 @@ cifs_small_buf_release(void *buf_to_free)
 	atomic_dec(&smBufAllocCount);
 	return;
 }
-#endif /* CIFS_EXPERIMENTAL */
 
 void
 header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 		const struct cifsTconInfo *treeCon, int word_count
-		/* length of fixed section (word count) in two byte units  */
-    )
+		/* length of fixed section (word count) in two byte units  */)
 {
-	int i;
 	struct list_head* temp_item;
 	struct cifsSesInfo * ses;
 	char *temp = (char *) buffer;
 
-	for (i = 0; i < MAX_CIFS_HDR_SIZE; i++) {
-		temp[i] = 0;	/* BB is this needed ?? */
-	}
+	memset(temp,0,MAX_CIFS_HDR_SIZE);
 
 	buffer->smb_buf_length =
 	    (2 * word_count) + sizeof (struct smb_hdr) -

@@ -413,9 +413,7 @@ GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
 
 /* Various Debug counters to remove someday (BB) */
 GLOBAL_EXTERN atomic_t bufAllocCount;
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 GLOBAL_EXTERN atomic_t smBufAllocCount;      
-#endif /* CIFS_EXPERIMENTAL */
 GLOBAL_EXTERN atomic_t midCount;
 
 /* Misc globals */

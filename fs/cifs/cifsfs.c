@@ -207,10 +207,8 @@ static kmem_cache_t *cifs_inode_cachep;
 static kmem_cache_t *cifs_req_cachep;
 static kmem_cache_t *cifs_mid_cachep;
 kmem_cache_t *cifs_oplock_cachep;
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 static kmem_cache_t *cifs_sm_req_cachep;
 mempool_t *cifs_sm_req_poolp;
-#endif /* CIFS_EXPERIMENTAL */
 mempool_t *cifs_req_poolp;
 mempool_t *cifs_mid_poolp;
 
@@ -634,23 +632,23 @@ cifs_init_request_bufs(void)
 		kmem_cache_destroy(cifs_req_cachep);
 		return -ENOMEM;
 	}
-#ifdef CONFIG_CIFS_EXPERIMENTAL
-	/* 120 bytes is enough for most SMB responses and handle
-	based requests (but not write response, nor is it
-	sufficient for path based requests).  112 bytes is 75 more than
-	sizeof(struct smb_hdr) but still (with slab hdr) just smaller than
-	128 byte cutoff which should make it easy to alloc off the slab 
-	compared to 17K (5page) alloc of large cifs buffers and not 
-	so large as to force a single page alloc for each slab entry */
+	/* 256 (MAX_CIFS_HDR_SIZE bytes is enough for most SMB responses and
+	almost all handle based requests (but not write response, nor is it
+	sufficient for path based requests).  A smaller size would have
+	been more efficient (compacting multiple slab items on one 4k page) 
+	for the case in which debug was on, but this larger size allows
+	more SMBs to use small buffer alloc and is still much more
+	efficient to alloc 1 per page off the slab compared to 17K (5page) 
+	alloc of large cifs buffers even when page debugging is on */
 	cifs_sm_req_cachep = kmem_cache_create("cifs_small_rq",
-			112, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+			MAX_CIFS_HDR_SIZE, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_sm_req_cachep == NULL) {
 		mempool_destroy(cifs_req_poolp);
 		kmem_cache_destroy(cifs_req_cachep);
 		return -ENOMEM;              
 	}
 
-	cifs_sm_req_poolp = mempool_create(64,
+	cifs_sm_req_poolp = mempool_create(30,
 				mempool_alloc_slab,
 				mempool_free_slab,
 				cifs_sm_req_cachep);
@@ -661,7 +659,6 @@ cifs_init_request_bufs(void)
 		kmem_cache_destroy(cifs_sm_req_cachep);
 		return -ENOMEM;
 	}
-#endif /* CIFS_EXPERIMENTAL */
 
 	return 0;
 }
@@ -673,12 +670,10 @@ cifs_destroy_request_bufs(void)
 	if (kmem_cache_destroy(cifs_req_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_request_cache: error not all structures were freed\n");
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 	mempool_destroy(cifs_sm_req_poolp);
 	if (kmem_cache_destroy(cifs_sm_req_cachep))
 		printk(KERN_WARNING
 		      "cifs_destroy_request_cache: cifs_small_rq free error\n");
-#endif /* CIFS_EXPERIMENTAL */
 }
 
 static int

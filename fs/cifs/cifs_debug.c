@@ -202,13 +202,11 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 			bufAllocCount.counter);
 	length += item_length;
 	buf += item_length;
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 	item_length = 
 		sprintf(buf,"SMB Small Req/Resp Buffer: %d\n",
 			smBufAllocCount.counter);
 	length += item_length;
 	buf += item_length;
-#endif /* CIFS_EXPERIMENTAL */
 	item_length = 
 		sprintf(buf,"Operations (MIDs): %d\n",
 			midCount.counter);

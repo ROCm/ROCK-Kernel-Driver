@@ -78,7 +78,6 @@ static void mark_open_files_invalid(struct cifsTconInfo * pTcon)
 	/* BB Add call to invalidate_inodes(sb) for all superblocks mounted to this tcon */
 }
 
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 static int
 small_smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	 void **request_buf /* returned */)
@@ -169,7 +168,6 @@ small_smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 #endif /* CONFIG_CIFS_STATS */
 	return rc;
 }  
-#endif /* CIFS_EXPERIMENTAL */
 
 static int
 smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
@@ -414,7 +412,7 @@ int
 CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 {
 	struct smb_hdr *smb_buffer;
-	struct smb_hdr *smb_buffer_response;
+	struct smb_hdr *smb_buffer_response; /* BB removeme BB */
 	int rc = 0;
 	int length;
 
@@ -448,20 +446,20 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 		up(&tcon->tconSem);
 		return -EIO;
 	}
-
-	rc = smb_init(SMB_COM_TREE_DISCONNECT, 0, tcon,
-		      (void **) &smb_buffer, (void **) &smb_buffer_response);
+	rc = small_smb_init(SMB_COM_TREE_DISCONNECT, 0, tcon, (void **)&smb_buffer);
 	if (rc) {
 		up(&tcon->tconSem);
 		return rc;
-	}
+	} else {
+		smb_buffer_response = smb_buffer; /* BB removeme BB */
+    }
 	rc = SendReceive(xid, tcon->ses, smb_buffer, smb_buffer_response,
 			 &length, 0);
 	if (rc)
 		cFYI(1, (" Tree disconnect failed %d", rc));
 
 	if (smb_buffer)
-		cifs_buf_release(smb_buffer);
+		cifs_small_buf_release(smb_buffer);
 	up(&tcon->tconSem);
 
 	/* No need to return error on this operation if tid invalidated and 
@@ -491,9 +489,8 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		up(&ses->sesSem);
 		return -EBUSY;
 	}
-
-	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
-		 (void **) &pSMB, (void **) &smb_buffer_response);
+	rc = small_smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL, (void **)&pSMB);
+	smb_buffer_response = (struct smb_hdr *)pSMB; /* BB removeme BB */
 	
 	if(ses->server) {
 		if(ses->server->secMode & 
@@ -521,7 +518,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		}
 	}
 	if (pSMB)
-		cifs_buf_release(pSMB);
+		cifs_small_buf_release(pSMB);
 	up(&ses->sesSem);
 
 	/* if session dead then we do not need to do ulogoff,
@@ -915,6 +912,66 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	return rc;
 }
 
+#ifdef CONFIG_CIFS_EXPERIMENTAL
+int CIFSSMBWrite2(const int xid, struct cifsTconInfo *tcon,
+	     const int netfid, const unsigned int count,
+	     const __u64 offset, unsigned int *nbytes, const char __user *buf,
+	     const int long_op)
+{
+	int rc = -EACCES;
+	WRITE_REQ *pSMB = NULL;
+	WRITE_RSP *pSMBr = NULL;
+	/*int bytes_returned;*/
+	unsigned bytes_sent;
+	__u16 byte_count;
+
+	rc = small_smb_init(SMB_COM_WRITE_ANDX, 14, tcon, (void **) &pSMB);
+	pSMBr = (WRITE_RSP *)pSMB; /* BB removeme BB */
+    
+    if (rc)
+		return rc;
+	/* tcon and ses pointer are checked in smb_init */
+	if (tcon->ses->server == NULL)
+		return -ECONNABORTED;
+
+	pSMB->AndXCommand = 0xFF; /* none */
+	pSMB->Fid = netfid;
+	pSMB->OffsetLow = cpu_to_le32(offset & 0xFFFFFFFF);
+	pSMB->OffsetHigh = cpu_to_le32(offset >> 32);
+	pSMB->Reserved = 0xFFFFFFFF;
+	pSMB->WriteMode = 0;
+	pSMB->Remaining = 0;
+	bytes_sent = (tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & ~0xFF;
+	if (bytes_sent > count)
+		bytes_sent = count;
+	pSMB->DataLengthHigh = 0;
+	pSMB->DataOffset =
+	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
+
+	byte_count = bytes_sent + 1 /* pad */ ;
+	pSMB->DataLengthLow = cpu_to_le16(bytes_sent);
+	pSMB->DataLengthHigh = 0;
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
+
+/*	rc = SendReceive2(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, buf, buflen, &bytes_returned, long_op); */  /* BB fixme BB */
+	if (rc) {
+		cFYI(1, ("Send error in write2 (large write) = %d", rc));
+		*nbytes = 0;
+	} else
+		*nbytes = le16_to_cpu(pSMBr->Count);
+
+	if (pSMB)
+		cifs_small_buf_release(pSMB);
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
+
+	return rc;
+}
+#endif /* CIFS_EXPERIMENTAL */
+
 int
 CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	    const __u16 smb_file_id, const __u64 len,
@@ -989,13 +1046,8 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 	cFYI(1, ("In CIFSSMBClose"));
 
 /* do not retry on dead session on close */
-#ifdef CONFIG_CIFS_EXPERIMENTAL
 	rc = small_smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB);
 	pSMBr = (CLOSE_RSP *)pSMB; /* BB removeme BB */
-#else 
-	rc = smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB,
-		      (void **) &pSMBr);
-#endif /* CIFS_EXPERIMENTAL */
 	if(rc == -EAGAIN)
 		return 0;
 	if (rc)
@@ -1013,13 +1065,8 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 		}
 	}
 
-#ifdef CONFIG_CIFS_EXPERIMENTAL 
 	if (pSMB)
 		cifs_small_buf_release(pSMB);
-#else
-	if (pSMB)
-		cifs_buf_release(pSMB);
-#endif /* CIFS_EXPERIMENTAL */
 
 	/* Since session is dead, file will be closed on server already */
 	if(rc == -EAGAIN)
@@ -2712,12 +2759,12 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 {
 	int rc = 0;
 	FINDCLOSE_REQ *pSMB = NULL;
-	CLOSE_RSP *pSMBr = NULL;
+	CLOSE_RSP *pSMBr = NULL; /* BB removeme BB */
 	int bytes_returned;
 
 	cFYI(1, ("In CIFSSMBFindClose"));
-	rc = smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **) &pSMB,
-		      (void **) &pSMBr);
+	rc = small_smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **)&pSMB);
+	pSMBr = (CLOSE_RSP *)pSMB;  /* BB removeme BB */
 	/* no sense returning error if session restarted
 		file handle has been closed */
 	if(rc == -EAGAIN)
@@ -2733,7 +2780,7 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 		cERROR(1, ("Send error in FindClose = %d", rc));
 	}
 	if (pSMB)
-		cifs_buf_release(pSMB);
+		cifs_small_buf_release(pSMB);
 
 	/* Since session is dead, search handle closed on server already */
 	if (rc == -EAGAIN)
