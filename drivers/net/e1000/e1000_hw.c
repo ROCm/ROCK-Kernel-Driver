@@ -48,8 +48,62 @@ static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data, uint16_t
 static uint16_t e1000_shift_in_ee_bits(struct e1000_hw *hw);
 static void e1000_setup_eeprom(struct e1000_hw *hw);
 static void e1000_standby_eeprom(struct e1000_hw *hw);
+static void e1000_clock_eeprom(struct e1000_hw *hw);
+static void e1000_cleanup_eeprom(struct e1000_hw *hw);
 static int32_t e1000_id_led_init(struct e1000_hw * hw);
 
+/******************************************************************************
+ * Set the mac type member in the hw struct.
+ * 
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+int32_t
+e1000_set_mac_type(struct e1000_hw *hw)
+{
+    DEBUGFUNC("e1000_set_mac_type");
+
+    switch (hw->device_id) {
+    case E1000_DEV_ID_82542:
+        switch (hw->revision_id) {
+        case E1000_82542_2_0_REV_ID:
+            hw->mac_type = e1000_82542_rev2_0;
+            break;
+        case E1000_82542_2_1_REV_ID:
+            hw->mac_type = e1000_82542_rev2_1;
+            break;
+        default:
+            /* Invalid 82542 revision ID */
+            return -E1000_ERR_MAC_TYPE;
+        }
+        break;
+    case E1000_DEV_ID_82543GC_FIBER:
+    case E1000_DEV_ID_82543GC_COPPER:
+        hw->mac_type = e1000_82543;
+        break;
+    case E1000_DEV_ID_82544EI_COPPER:
+    case E1000_DEV_ID_82544EI_FIBER:
+    case E1000_DEV_ID_82544GC_COPPER:
+    case E1000_DEV_ID_82544GC_LOM:
+        hw->mac_type = e1000_82544;
+        break;
+    case E1000_DEV_ID_82540EM:
+    case E1000_DEV_ID_82540EM_LOM:
+        hw->mac_type = e1000_82540;
+        break;
+    case E1000_DEV_ID_82545EM_COPPER:
+    case E1000_DEV_ID_82545EM_FIBER:
+        hw->mac_type = e1000_82545;
+        break;
+    case E1000_DEV_ID_82546EB_COPPER:
+    case E1000_DEV_ID_82546EB_FIBER:
+        hw->mac_type = e1000_82546;
+        break;
+    default:
+        /* Should never have loaded on this device */
+        return -E1000_ERR_MAC_TYPE;
+    }
+    return E1000_SUCCESS;
+}
 /******************************************************************************
  * Reset the transmit and receive units; mask and clear all interrupts.
  *
@@ -164,8 +218,8 @@ e1000_init_hw(struct e1000_hw *hw)
     /* Initialize Identification LED */
     ret_val = e1000_id_led_init(hw);
     if(ret_val < 0) {
-	DEBUGOUT("Error Initializing Identification LED\n");
-	return ret_val;
+        DEBUGOUT("Error Initializing Identification LED\n");
+        return ret_val;
     }
     
     /* Set the Media Type and exit with error if it is not valid. */
@@ -239,6 +293,8 @@ e1000_init_hw(struct e1000_hw *hw)
             PCIX_COMMAND_MMRBC_SHIFT;
         stat_mmrbc = (pcix_stat_hi_word & PCIX_STATUS_HI_MMRBC_MASK) >>
             PCIX_STATUS_HI_MMRBC_SHIFT;
+        if(stat_mmrbc == PCIX_STATUS_HI_MMRBC_4K)
+            stat_mmrbc = PCIX_STATUS_HI_MMRBC_2K;
         if(cmd_mmrbc > stat_mmrbc) {
             pcix_cmd_word &= ~PCIX_COMMAND_MMRBC_MASK;
             pcix_cmd_word |= stat_mmrbc << PCIX_COMMAND_MMRBC_SHIFT;
@@ -248,6 +304,13 @@ e1000_init_hw(struct e1000_hw *hw)
 
     /* Call a subroutine to configure the link and setup flow control. */
     ret_val = e1000_setup_link(hw);
+
+    /* Set the transmit descriptor write-back policy */
+    if(hw->mac_type > e1000_82544) {
+        ctrl = E1000_READ_REG(hw, TXDCTL);
+        ctrl = (ctrl & ~E1000_TXDCTL_WTHRESH) | E1000_TXDCTL_FULL_TX_DESC_WB;
+        E1000_WRITE_REG(hw, TXDCTL, ctrl);
+    }
 
     /* Clear all of the statistics registers (clear on read).  It is
      * important that we do this after we have tried to establish link
@@ -374,7 +437,6 @@ e1000_setup_link(struct e1000_hw *hw)
  * Sets up link for a fiber based adapter
  *
  * hw - Struct containing variables accessed by shared code
- * ctrl - Current value of the device control register
  *
  * Manipulates Physical Coding Sublayer functions in order to configure
  * link. Assumes the hardware has been previously reset and the transmitter
@@ -505,7 +567,6 @@ e1000_setup_fiber_link(struct e1000_hw *hw)
 * Detects which PHY is present and the speed and duplex
 *
 * hw - Struct containing variables accessed by shared code
-* ctrl - current value of the device control register
 ******************************************************************************/
 static int32_t 
 e1000_setup_copper_link(struct e1000_hw *hw)
@@ -2986,12 +3047,12 @@ e1000_id_led_init(struct e1000_hw * hw)
     const uint32_t ledctl_off = E1000_LEDCTL_MODE_LED_OFF;
     uint16_t eeprom_data, i, temp;
     const uint16_t led_mask = 0x0F;
-	
+        
     DEBUGFUNC("e1000_id_led_init");
     
     if(hw->mac_type < e1000_82540) {
-	/* Nothing to do */
-	return 0;
+        /* Nothing to do */
+        return 0;
     }
     
     ledctl = E1000_READ_REG(hw, LEDCTL);
@@ -3008,39 +3069,39 @@ e1000_id_led_init(struct e1000_hw * hw)
     for(i = 0; i < 4; i++) {
         temp = (eeprom_data >> (i << 2)) & led_mask;
         switch(temp) {
-	case ID_LED_ON1_DEF2:
-	case ID_LED_ON1_ON2:
-	case ID_LED_ON1_OFF2:
+        case ID_LED_ON1_DEF2:
+        case ID_LED_ON1_ON2:
+        case ID_LED_ON1_OFF2:
             hw->ledctl_mode1 &= ~(ledctl_mask << (i << 3));
             hw->ledctl_mode1 |= ledctl_on << (i << 3);
             break;
-	case ID_LED_OFF1_DEF2:
-	case ID_LED_OFF1_ON2:
-	case ID_LED_OFF1_OFF2:
+        case ID_LED_OFF1_DEF2:
+        case ID_LED_OFF1_ON2:
+        case ID_LED_OFF1_OFF2:
             hw->ledctl_mode1 &= ~(ledctl_mask << (i << 3));
             hw->ledctl_mode1 |= ledctl_off << (i << 3);
             break;
-	default:
-	    /* Do nothing */
-	    break;
-	}
-	switch(temp) {
-	case ID_LED_DEF1_ON2:
-	case ID_LED_ON1_ON2:
-	case ID_LED_OFF1_ON2:
+        default:
+            /* Do nothing */
+            break;
+        }
+        switch(temp) {
+        case ID_LED_DEF1_ON2:
+        case ID_LED_ON1_ON2:
+        case ID_LED_OFF1_ON2:
             hw->ledctl_mode2 &= ~(ledctl_mask << (i << 3));
             hw->ledctl_mode2 |= ledctl_on << (i << 3);
             break;
-	case ID_LED_DEF1_OFF2:
-	case ID_LED_ON1_OFF2:
-	case ID_LED_OFF1_OFF2:
+        case ID_LED_DEF1_OFF2:
+        case ID_LED_ON1_OFF2:
+        case ID_LED_OFF1_OFF2:
             hw->ledctl_mode2 &= ~(ledctl_mask << (i << 3));
             hw->ledctl_mode2 |= ledctl_off << (i << 3);
             break;
-	default:
-	    /* Do nothing */
-	    break;
-	}
+        default:
+            /* Do nothing */
+            break;
+        }
     }
     return 0;
 }

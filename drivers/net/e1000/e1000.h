@@ -85,11 +85,7 @@ struct e1000_adapter;
 
 #define E1000_ERR(args...) printk(KERN_ERR "e1000: " args)
 
-#ifdef CONFIG_PPC
-#define E1000_MAX_INTR 1
-#else
 #define E1000_MAX_INTR 10
-#endif
 
 /* Supported Rx Buffer Sizes */
 #define E1000_RXBUFFER_2048  2048

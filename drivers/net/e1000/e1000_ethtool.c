@@ -37,6 +37,7 @@ extern char e1000_driver_version[];
 
 extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
+extern void e1000_reset(struct e1000_adapter *adapter);
 
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
@@ -144,8 +145,11 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 
 	/* reset the link */
 
-	e1000_down(adapter);
-	e1000_up(adapter);
+	if(netif_running(adapter->netdev)) {
+		e1000_down(adapter);
+		e1000_up(adapter);
+	} else
+		e1000_reset(adapter);
 
 	return 0;
 }
@@ -166,7 +170,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 {
 	strncpy(drvinfo->driver,  e1000_driver_name, 32);
 	strncpy(drvinfo->version, e1000_driver_version, 32);
-	strncpy(drvinfo->fw_version, "", 32);
+	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
@@ -206,7 +210,8 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	struct e1000_hw *hw = &adapter->hw;
 	int i, max_len, first_word, last_word;
 
-	if(eeprom->len == 0) return;
+	if(eeprom->len == 0) 
+		return -EINVAL;
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
@@ -469,8 +474,10 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	case ETHTOOL_NWAY_RST: {
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		e1000_down(adapter);
-		e1000_up(adapter);
+		if(netif_running(netdev)) {
+			e1000_down(adapter);
+			e1000_up(adapter);
+		}
 		return 0;
 	}
 	case ETHTOOL_PHYS_ID: {

@@ -31,6 +31,20 @@
 
 /* Change Log
  *
+ * 4.3.15      8/9/02
+ *   o Converted from Dual BSD/GPL license to GPL license.
+ *   o Clean up: use pci_[clear|set]_mwi rather than direct calls to
+ *     pci_write_config_word.
+ *   o Bug fix: added read-behind-write calls to post writes before delays.
+ *   o Bug fix: removed mdelay busy-waits in interrupt context.
+ *   o Clean up: direct clear of descriptor bits rather than using memset.
+ *   o Bug fix: added wmb() for ia-64 between descritor writes and advancing
+ *     descriptor tail.
+ *   o Feature: added locking mechanism for asf functionality.
+ *   o Feature: exposed two Tx and one Rx interrupt delay knobs for finer
+ *     control over interurpt rate tuning.
+ *   o Misc ethtool bug fixes.
+ *         
  * 4.3.2       7/5/02
  *   o Bug fix: perform controller reset using I/O rather than mmio because
  *     some chipsets try to perform a 64-bit write, but the controller ignores
@@ -51,10 +65,10 @@
  *
  * 4.2.17      5/30/02
  */
-
+ 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.3.2-k1";
+char e1000_driver_version[] = "4.3.15-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -545,43 +559,8 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* identify the MAC */
 
-	switch (hw->device_id) {
-	case E1000_DEV_ID_82542:
-		switch (hw->revision_id) {
-		case E1000_82542_2_0_REV_ID:
-			hw->mac_type = e1000_82542_rev2_0;
-			break;
-		case E1000_82542_2_1_REV_ID:
-			hw->mac_type = e1000_82542_rev2_1;
-			break;
-		default:
-			hw->mac_type = e1000_82542_rev2_0;
-			E1000_ERR("Could not identify 82542 revision\n");
-		}
-		break;
-	case E1000_DEV_ID_82543GC_FIBER:
-	case E1000_DEV_ID_82543GC_COPPER:
-		hw->mac_type = e1000_82543;
-		break;
-	case E1000_DEV_ID_82544EI_COPPER:
-	case E1000_DEV_ID_82544EI_FIBER:
-	case E1000_DEV_ID_82544GC_COPPER:
-	case E1000_DEV_ID_82544GC_LOM:
-		hw->mac_type = e1000_82544;
-		break;
-	case E1000_DEV_ID_82540EM:
-		hw->mac_type = e1000_82540;
-		break;
-	case E1000_DEV_ID_82545EM_COPPER:
-	case E1000_DEV_ID_82545EM_FIBER:
-		hw->mac_type = e1000_82545;
-		break;
-	case E1000_DEV_ID_82546EB_COPPER:
-	case E1000_DEV_ID_82546EB_FIBER:
-		hw->mac_type = e1000_82546;
-		break;
-	default:
-		E1000_ERR("Should never have loaded on this device\n");
+	if (e1000_set_mac_type(hw)) {
+		E1000_ERR("Unknown MAC Type\n");
 		BUG();
 	}
 
@@ -1415,9 +1394,14 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 
 	tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP);
 
+	/* Force memory writes to complete before letting h/w
+	 * know there are new descriptors to fetch.  (Only
+	 * applicable for weak-ordered memory model archs,
+	 * such as IA-64). */
+	wmb();
+
 	tx_ring->next_to_use = i;
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
-	E1000_WRITE_FLUSH(&adapter->hw);
 }
 
 #define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
@@ -1937,8 +1921,15 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 
 		rx_desc->buffer_addr = cpu_to_le64(rx_ring->buffer_info[i].dma);
 
-		if(!(i % E1000_RX_BUFFER_WRITE))
+		if(!(i % E1000_RX_BUFFER_WRITE)) {
+			/* Force memory writes to complete before letting h/w
+			 * know there are new descriptors to fetch.  (Only
+			 * applicable for weak-ordered memory model archs,
+			 * such as IA-64). */
+			wmb();
+
 			E1000_WRITE_REG(&adapter->hw, RDT, i);
+		}
 
 		i = (i + 1) % rx_ring->count;
 	}

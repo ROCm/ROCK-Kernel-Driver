@@ -42,7 +42,8 @@ struct e1000_hw_stats;
 /* Enumerated types specific to the e1000 hardware */
 /* Media Access Controlers */
 typedef enum {
-    e1000_82542_rev2_0 = 0,
+    e1000_undefined = 0,
+    e1000_82542_rev2_0,
     e1000_82542_rev2_1,
     e1000_82543,
     e1000_82544,
@@ -159,16 +160,18 @@ struct e1000_phy_stats {
 
 
 /* Error Codes */
-#define E1000_SUCCESS    0
-#define E1000_ERR_EEPROM 1
-#define E1000_ERR_PHY    2
-#define E1000_ERR_CONFIG 3
-#define E1000_ERR_PARAM  4
+#define E1000_SUCCESS      0
+#define E1000_ERR_EEPROM   1
+#define E1000_ERR_PHY      2
+#define E1000_ERR_CONFIG   3
+#define E1000_ERR_PARAM    4
+#define E1000_ERR_MAC_TYPE 5
 
 /* Function prototypes */
 /* Initialization */
 void e1000_reset_hw(struct e1000_hw *hw);
 int32_t e1000_init_hw(struct e1000_hw *hw);
+int32_t e1000_set_mac_type(struct e1000_hw *hw);
 
 /* Link Configuration */
 int32_t e1000_setup_link(struct e1000_hw *hw);
@@ -1185,6 +1188,7 @@ struct e1000_hw {
 #define E1000_TXDCTL_WTHRESH 0x00FF0000 /* TXDCTL Writeback Threshold */
 #define E1000_TXDCTL_GRAN    0x01000000 /* TXDCTL Granularity */
 #define E1000_TXDCTL_LWTHRESH 0xFE000000 /* TXDCTL Low Threshold */
+#define E1000_TXDCTL_FULL_TX_DESC_WB 0x01010000 /* GRAN=1, WTHRESH=1 */
 
 /* Transmit Configuration Word */
 #define E1000_TXCW_FD         0x00000020        /* TXCW full duplex */
@@ -1424,6 +1428,8 @@ struct e1000_hw {
 #define PCIX_COMMAND_MMRBC_SHIFT     0x2
 #define PCIX_STATUS_HI_MMRBC_MASK    0x0060
 #define PCIX_STATUS_HI_MMRBC_SHIFT   0x5
+#define PCIX_STATUS_HI_MMRBC_4K      0x3
+#define PCIX_STATUS_HI_MMRBC_2K      0x2
 
 
 /* The number of bits that we need to shift right to move the "pause"

@@ -96,6 +96,6 @@ typedef enum {
         readl((a)->hw_addr + E1000_##reg + ((offset) << 2)) : \
         readl((a)->hw_addr + E1000_82542_##reg + ((offset) << 2)))
 
-#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS);
+#define E1000_WRITE_FLUSH(a) ((void)E1000_READ_REG(a, STATUS))
 
 #endif /* _E1000_OSDEP_H_ */
