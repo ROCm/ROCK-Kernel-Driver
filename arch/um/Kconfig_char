@@ -158,11 +158,6 @@ config LEGACY_PTY_COUNT
 	  When not in use, each legacy PTY occupies 12 bytes on 32-bit
 	  architectures and 24 bytes on 64-bit architectures.
 
-#config UNIX98_PTY_COUNT
-#	int "Maximum number of Unix98 PTYs in use (0-2048)"
-#	depends on UNIX98_PTYS
-#	default "256"
-
 config WATCHDOG
 	bool "Watchdog Timer Support"
 
