@@ -2046,7 +2046,8 @@ awe_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			awe_info.nr_voices = awe_max_voices;
 		else
 			awe_info.nr_voices = AWE_MAX_CHANNELS;
-		memcpy((char*)arg, &awe_info, sizeof(awe_info));
+		if (copy_to_user((char*)arg, &awe_info, sizeof(awe_info)))
+			return -EFAULT;
 		return 0;
 		break;
 
@@ -2063,10 +2064,12 @@ awe_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 	case SNDCTL_SYNTH_MEMAVL:
 		return memsize - awe_free_mem_ptr() * 2;
+		break;
 
 	default:
 		printk(KERN_WARNING "AWE32: unsupported ioctl %d\n", cmd);
 		return -EINVAL;
+		break;
 	}
 }
 
@@ -4314,7 +4317,8 @@ awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	if (((cmd >> 8) & 0xff) != 'M')
 		return -EINVAL;
 
-	level = *(int*)arg;
+	if (get_user(level, (int *)arg))
+		return -EFAULT;
 	level = ((level & 0xff) + (level >> 8)) / 2;
 	DEBUG(0,printk("AWEMix: cmd=%x val=%d\n", cmd & 0xff, level));
 
@@ -4370,7 +4374,9 @@ awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		level = 0;
 		break;
 	}
-	return *(int*)arg = level;
+	if (put_user(level, (int *)arg))
+		return -EFAULT;
+	return level;
 }
 #endif /* CONFIG_AWE32_MIXER */
 
