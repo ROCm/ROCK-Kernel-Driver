@@ -316,7 +316,7 @@ static const u32 bf_sbox[256 * 4] = {
  * The blowfish encipher, processes 64-bit blocks.
  * NOTE: This function MUSTN'T respect endianess 
  */
-static inline void encrypt_block(struct bf_ctx *bctx, u32 *dst, u32 *src)
+static void encrypt_block(struct bf_ctx *bctx, u32 *dst, u32 *src)
 {
 	const u32 *P = bctx->p;
 	const u32 *S = bctx->s;
