@@ -201,20 +201,6 @@ static struct sock *llc_ui_find_sk_by_addr(struct llc_addr *addr,
 	return sk;
 }
 
-static struct sock *llc_ui_bh_find_sk_by_addr(struct llc_addr *addr,
-					      struct llc_addr *daddr,
-					      struct net_device *dev)
-{
-	struct sock *sk;
-
-	read_lock_bh(&llc_ui_sockets_lock);
-	sk = __llc_ui_find_sk_by_addr(addr, daddr, dev);
-	if (sk)
-		sock_hold(sk);
-	read_unlock_bh(&llc_ui_sockets_lock);
-	return sk;
-}
-
 /**
  *	llc_ui_insert_socket - insert socket into list
  *	@sk: Socket to insert.
@@ -422,7 +408,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 			memcpy(laddr.mac, addr->sllc_smac, IFHWADDRLEN);
 		laddr.lsap = addr->sllc_ssap;
 		rc = -EADDRINUSE; /* mac + sap clash. */
-		ask = llc_ui_bh_find_sk_by_addr(&laddr, &daddr, dev);
+		ask = llc_lookup_established(sap, &daddr, &laddr);
 		if (ask) {
 			sock_put(ask);
 			goto out;
