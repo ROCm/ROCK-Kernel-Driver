@@ -633,7 +633,7 @@ struct ace_skb
 struct ace_private
 {
 	struct ace_info		*info;
-	struct ace_regs		*regs;		/* register base */
+	struct ace_regs	__iomem	*regs;		/* register base */
 	struct ace_skb		*skb;
 	dma_addr_t		info_dma;	/* 32/64 bit */
 
@@ -718,7 +718,7 @@ static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
 }
 
 
-static inline void ace_set_txprd(struct ace_regs *regs,
+static inline void ace_set_txprd(struct ace_regs __iomem *regs,
 				 struct ace_private *ap, u32 value)
 {
 #ifdef INDEX_DEBUG
@@ -740,7 +740,7 @@ static inline void ace_set_txprd(struct ace_regs *regs,
 static inline void ace_mask_irq(struct net_device *dev)
 {
 	struct ace_private *ap = netdev_priv(dev);
-	struct ace_regs *regs = ap->regs;
+	struct ace_regs __iomem *regs = ap->regs;
 
 	if (ACE_IS_TIGON_I(ap))
 		writel(1, &regs->MaskInt);
@@ -754,7 +754,7 @@ static inline void ace_mask_irq(struct net_device *dev)
 static inline void ace_unmask_irq(struct net_device *dev)
 {
 	struct ace_private *ap = netdev_priv(dev);
-	struct ace_regs *regs = ap->regs;
+	struct ace_regs __iomem *regs = ap->regs;
  
 	if (ACE_IS_TIGON_I(ap))
 		writel(0, &regs->MaskInt);
