@@ -36,8 +36,6 @@ struct scatterlist* videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages);
  */
 struct scatterlist* videobuf_pages_to_sg(struct page **pages, int nr_pages,
 					 int offset);
-int videobuf_lock(struct page **pages, int nr_pages);
-int videobuf_unlock(struct page **pages, int nr_pages);
 
 /* --------------------------------------------------------------------- */
 

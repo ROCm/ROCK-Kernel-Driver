@@ -5,10 +5,10 @@
  * The functions expect the hardware being able to scatter gatter
  * (i.e. the buffers are not linear in physical memory, but fragmented
  * into PAGE_SIZE chunks).  They also assume the driver does not need
- * to touch the video data (thus it is probably not useful for USB as
- * data often must be uncompressed by the drivers).
+ * to touch the video data (thus it is probably not useful for USB 1.1
+ * as data often must be uncompressed by the drivers).
  * 
- * (c) 2001,02 Gerd Knorr <kraxel@bytesex.org>
+ * (c) 2001-2004 Gerd Knorr <kraxel@bytesex.org> [SUSE Labs]
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -536,6 +536,11 @@ videobuf_reqbufs(struct file *file, struct videobuf_queue *q,
 	    req->memory != V4L2_MEMORY_OVERLAY)
 		return -EINVAL;
 
+	if (q->streaming)
+		return -EBUSY;
+	if (!list_empty(&q->stream))
+		return -EBUSY;
+
 	down(&q->lock);
 	count = req->count;
 	if (count > VIDEO_MAX_FRAME)
@@ -614,6 +619,8 @@ videobuf_qbuf(struct file *file, struct videobuf_queue *q,
 	case V4L2_MEMORY_USERPTR:
 		if (b->length < buf->bsize)
 			goto done;
+		if (STATE_NEEDS_INIT != buf->state && buf->baddr != b->m.userptr)
+			q->ops->buf_release(file,buf);
 		buf->baddr = b->m.userptr;
 		break;
 	case V4L2_MEMORY_OVERLAY:
@@ -1118,7 +1125,7 @@ int videobuf_mmap_setup(struct file *file, struct videobuf_queue *q,
 		case V4L2_MEMORY_OVERLAY:
 			/* nothing */
 			break;
-		};
+		}
 	}
 	dprintk(1,"mmap setup: %d buffers, %d bytes each\n",
 		bcount,bsize);
