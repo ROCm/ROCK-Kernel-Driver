@@ -308,13 +308,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
-		read_lock(&swapper_space.page_lock);
+		write_lock(&swapper_space.page_lock);
 		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		read_unlock(&swapper_space.page_lock);
+		write_unlock(&swapper_space.page_lock);
 	}
 	swap_info_put(p);
 
