@@ -964,6 +964,16 @@ config SCSI_SYM53C8XX_2
 	  Please read <file:drivers/scsi/sym53c8xx_2/Documentation.txt> for more
 	  information.
 
+config SCSI_ZALON
+	tristate "Zalon SCSI support"
+	depends on GSC && SCSI
+	help
+	  The Zalon is a GSC/HSC bus interface chip that sits between the
+	  PA-RISC processor and the NCR 53c720 SCSI controller on C100,
+	  C110, J200, J210 and some D, K & R-class machines.  It's also
+	  used on the add-in Bluefish, Barracuda & Shrike SCSI cards.
+	  Say Y here if you have one of these machines or cards.
+
 config SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 	int "DMA addressing mode"
 	depends on SCSI_SYM53C8XX_2
@@ -1068,7 +1078,7 @@ config SCSI_SYM53C8XX
 
 config SCSI_NCR53C8XX_DEFAULT_TAGS
 	int "default tagged command queue depth"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX)
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
 	default "8"
 	---help---
 	  "Tagged command queuing" is a feature of SCSI-2 which improves
@@ -1094,7 +1104,7 @@ config SCSI_NCR53C8XX_DEFAULT_TAGS
 
 config SCSI_NCR53C8XX_MAX_TAGS
 	int "maximum number of queued commands"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX)
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
 	default "32"
 	---help---
 	  This option allows you to specify the maximum number of commands
@@ -1111,7 +1121,7 @@ config SCSI_NCR53C8XX_MAX_TAGS
 
 config SCSI_NCR53C8XX_SYNC
 	int "synchronous transfers frequency in MHz"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX)
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
 	default "20"
 	---help---
 	  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
@@ -1145,7 +1155,7 @@ config SCSI_NCR53C8XX_SYNC
 
 config SCSI_NCR53C8XX_PROFILE
 	bool "enable profiling"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX)
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON)
 	help
 	  This option allows you to enable profiling information gathering.
 	  These statistics are not very accurate due to the low frequency
@@ -1156,7 +1166,7 @@ config SCSI_NCR53C8XX_PROFILE
 
 config SCSI_NCR53C8XX_IOMAPPED
 	bool "use normal IO"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX)
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX) && !SCSI_ZALON
 	help
 	  If you say Y here, the driver will use normal IO, as opposed to
 	  memory mapped IO. Memory mapped IO has less latency than normal IO
@@ -1181,7 +1191,7 @@ config SCSI_NCR53C8XX_PQS_PDS
 
 config SCSI_NCR53C8XX_NO_DISCONNECT
 	bool "not allow targets to disconnect"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
 	help
 	  This option is only provided for safety if you suspect some SCSI
 	  device of yours to not support properly the target-disconnect
@@ -1191,7 +1201,7 @@ config SCSI_NCR53C8XX_NO_DISCONNECT
 
 config SCSI_NCR53C8XX_SYMBIOS_COMPAT
 	bool "assume boards are SYMBIOS compatible (EXPERIMENTAL)"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX) && EXPERIMENTAL
+	depends on PCI && SCSI_SYM53C8XX_2!=y && (SCSI_NCR53C8XX || SCSI_SYM53C8XX || SCSI_ZALON) && EXPERIMENTAL
 	---help---
 	  This option allows you to enable some features depending on GPIO
 	  wiring. These General Purpose Input/Output pins can be used for

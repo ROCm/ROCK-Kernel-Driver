@@ -350,27 +350,8 @@
    #define IPS_SCSI_MP3_AllocateSurface 0x08
 
    /*
-    * Configuration Structure Flags
-    */
-   #define IPS_CFG_USEROPT_UPDATECOUNT(cfg)   (((cfg)->UserOpt & 0xffff000) >> 16)
-   #define IPS_CFG_USEROPT_CONCURSTART(cfg)   (((cfg)->UserOpt & 0xf000) >> 12)
-   #define IPS_CFG_USEROPT_STARTUPDELAY(cfg)  (((cfg)->UserOpt & 0xf00) >> 8)
-   #define IPS_CFG_USEROPT_REARRANGE(cfg)     ((cfg)->UserOpt & 0x80)
-   #define IPS_CFG_USEROPT_CDBOOT(cfg)        ((cfg)->UserOpt & 0x40)
-   #define IPS_CFG_USEROPT_CLUSTER(cfg)       ((cfg)->UserOpt & 0x20)
-
-   /*
-    * Host adapter Flags (bit numbers)
-    */
-   #define IPS_IN_INTR                  0
-   #define IPS_IN_ABORT                 1
-   #define IPS_IN_RESET                 2
-
-   /*
     * SCB Flags
     */
-   #define IPS_SCB_ACTIVE               0x00001
-   #define IPS_SCB_WAITING              0x00002
    #define IPS_SCB_MAP_SG               0x00008
    #define IPS_SCB_MAP_SINGLE           0X00010
 
@@ -381,7 +362,6 @@
    #define IPS_COPPIOCCMD              (('C'<<8) | 66)
    #define IPS_NUMCTRLS                (('C'<<8) | 68)
    #define IPS_CTRLINFO                (('C'<<8) | 69)
-   #define IPS_FLASHBIOS               (('C'<<8) | 70)
 
    /* flashing defines */
    #define IPS_FW_IMAGE                0x00
@@ -406,36 +386,7 @@
    /*
     * Scsi_Host Template
     */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
-#define IPS {	\
-	.module				= NULL,		\
-	.proc_info			= NULL,		\
-	.proc_dir			= NULL,		\
-	.name				= NULL,		\
-	.detect				= ips_detect,	\
-	.release			= ips_release,	\
-	.info				= ips_info,	\
-	.command			= NULL,		\
-	.queuecommand			= ips_queue,	\
-	.eh_strategy_handler		= NULL,		\
-	.eh_abort_handler		= ips_eh_abort,	\
-	.eh_device_reset_handler	= NULL,		\
-	.eh_bus_reset_handler		= NULL,		\
-	.eh_host_reset_handler		= ips_eh_reset,	\
-	.abort				= NULL,		\
-	.reset				= NULL,		\
-	.slave_attach			= NULL,		\
-	.bios_param			= ips_biosparam,\
-	.can_queue			= 0,		\
-	.this_id			= -1,		\
-	.sg_tablesize			= IPS_MAX_SG,	\
-	.cmd_per_lun			= 3,		\
-	.present			= 0,		\
-	.unchecked_isa_dma		= 0,		\
-	.use_clustering			= ENABLE_CLUSTERING,	\
-	.use_new_eh_code		= 1 \
-}
-#elif LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
+#if LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
 #define IPS{	\
 	.module				= NULL,		\
 	.proc_info			= NULL,		\
@@ -1004,19 +955,6 @@ typedef struct {
    int  *option_flag;
    int   option_value;
 } IPS_OPTION;
-
-typedef struct {
-   void             *userbuffer;
-   uint32_t          usersize;
-   void             *kernbuffer;
-   uint32_t          kernsize;
-   void             *ha;
-   void             *SC;
-   void             *pt;
-   struct semaphore *sem;
-   uint32_t          offset;
-   uint32_t          retcode;
-} IPS_FLASH_DATA;
 
 /*
  * Status Info

@@ -2,13 +2,13 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
-#include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include "scsi.h"
 #include "hosts.h"
