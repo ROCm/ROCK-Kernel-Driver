@@ -11,13 +11,16 @@
 struct ia64_machine_vector ia64_mv;
 
 /*
- * Most platforms use this routine for mapping page frame addresses
- * into a memory map index.
+ * Most platforms use this routine for mapping page frame addresses into a memory map
+ * index.
+ *
+ * Note: we can't use __pa() because map_nr_dense(X) MUST map to something >= max_mapnr if
+ * X is outside the identity mapped kernel space.
  */
 unsigned long
 map_nr_dense (unsigned long addr)
 {
-	return MAP_NR_DENSE(addr);
+	return (addr - PAGE_OFFSET) >> PAGE_SHIFT;
 }
 
 static struct ia64_machine_vector *
