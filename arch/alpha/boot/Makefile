@@ -9,7 +9,7 @@
 #
 
 host-progs	:= tools/mkbb tools/objstrip
-EXTRA_TARGETS	:= vmlinux.gz vmlinux \
+targets		:= vmlinux.gz vmlinux \
 		   vmlinux.nh tools/lxboot tools/bootlx tools/bootph \
 		   bootloader bootpheader 
 OBJSTRIP	:= $(obj)/tools/objstrip

@@ -1011,6 +1011,23 @@ Egdp:
 	return ERR_PTR(-EIO);
 }
 
+void ext2_set_inode_flags(struct inode *inode)
+{
+	unsigned int flags = EXT2_I(inode)->i_flags;
+
+	inode->i_flags &= ~(S_SYNC|S_APPEND|S_IMMUTABLE|S_NOATIME|S_DIRSYNC);
+	if (flags & EXT2_SYNC_FL)
+		inode->i_flags |= S_SYNC;
+	if (flags & EXT2_APPEND_FL)
+		inode->i_flags |= S_APPEND;
+	if (flags & EXT2_IMMUTABLE_FL)
+		inode->i_flags |= S_IMMUTABLE;
+	if (flags & EXT2_NOATIME_FL)
+		inode->i_flags |= S_NOATIME;
+	if (flags & EXT2_DIRSYNC_FL)
+		inode->i_flags |= S_DIRSYNC;
+}
+
 void ext2_read_inode (struct inode * inode)
 {
 	struct ext2_inode_info *ei = EXT2_I(inode);
@@ -1108,14 +1125,7 @@ void ext2_read_inode (struct inode * inode)
 				   le32_to_cpu(raw_inode->i_block[0]));
 	}
 	brelse (bh);
-	if (ei->i_flags & EXT2_SYNC_FL)
-		inode->i_flags |= S_SYNC;
-	if (ei->i_flags & EXT2_APPEND_FL)
-		inode->i_flags |= S_APPEND;
-	if (ei->i_flags & EXT2_IMMUTABLE_FL)
-		inode->i_flags |= S_IMMUTABLE;
-	if (ei->i_flags & EXT2_NOATIME_FL)
-		inode->i_flags |= S_NOATIME;
+	ext2_set_inode_flags(inode);
 	return;
 	
 bad_inode:

@@ -209,8 +209,8 @@ struct hid_item {
 #define HID_QUIRK_BADPAD        0x20
 
 /*
- * This is the global enviroment of the parser. This information is
- * persistent for main-items. The global enviroment can be saved and
+ * This is the global environment of the parser. This information is
+ * persistent for main-items. The global environment can be saved and
  * restored with PUSH/POP statements.
  */
 
@@ -228,7 +228,7 @@ struct hid_global {
 };
 
 /*
- * This is the local enviroment. It is resistent up the next main-item.
+ * This is the local environment. It is persistent up the next main-item.
  */
 
 #define HID_MAX_DESCRIPTOR_SIZE		4096

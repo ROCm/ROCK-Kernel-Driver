@@ -3,7 +3,7 @@
 # Licensed under the GPL
 #
 
-EXTRA_TARGETS := unmap_fin.o
+extra-y := unmap_fin.o
 
 obj-y = exec_kern.o exec_user.o gdb.o ksyms.o mem.o mem_user.o process_kern.o \
 	syscall_kern.o syscall_user.o time.o tlb.o tracer.o trap_user.o \

@@ -2,7 +2,7 @@
 # Makefile for the Linux/SuperH kernel.
 #
 
-EXTRA_TARGETS	:= head.o init_task.o
+extra-y	:= head.o init_task.o
 
 obj-y	:= process.o signal.o entry.o traps.o irq.o irq_ipr.o \
 	ptrace.o setup.o time.o sys_sh.o semaphore.o \

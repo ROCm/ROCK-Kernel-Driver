@@ -1460,6 +1460,45 @@ do_signal_stop(int signr)
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
+/*
+ * Do appropriate magic when group_stop_count > 0.
+ * We return nonzero if we stopped, after releasing the siglock.
+ * We return zero if we still hold the siglock and should look
+ * for another signal without checking group_stop_count again.
+ */
+static inline int handle_group_stop(void)
+{
+	int stop_count;
+
+	if (current->signal->group_exit_task == current) {
+		/*
+		 * Group stop is so we can do a core dump,
+		 * We are the initiating thread, so get on with it.
+		 */
+		current->signal->group_exit_task = NULL;
+		return 0;
+	}
+
+	if (current->signal->group_exit)
+		/*
+		 * Group stop is so another thread can do a core dump,
+		 * or else we are racing against a death signal.
+		 * Just punt the stop so we can get the next signal.
+		 */
+		return 0;
+
+	/*
+	 * There is a group stop in progress.  We stop
+	 * without any associated signal being in our queue.
+	 */
+	stop_count = --current->signal->group_stop_count;
+	current->exit_code = current->signal->group_exit_code;
+	set_current_state(TASK_STOPPED);
+	spin_unlock_irq(&current->sighand->siglock);
+	finish_stop(stop_count);
+	return 1;
+}
+
 int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
 {
 	sigset_t *mask = &current->blocked;
@@ -1469,28 +1508,9 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
 		struct k_sigaction *ka;
 
 		spin_lock_irq(&current->sighand->siglock);
-		if (unlikely(current->signal->group_stop_count > 0)) {
-			int stop_count;
-			if (current->signal->group_exit_task == current) {
-				/*
-				 * Group stop is so we can do a core dump.
-				 */
-				current->signal->group_exit_task = NULL;
-				goto dequeue;
-			}
-			/*
-			 * There is a group stop in progress.  We stop
-			 * without any associated signal being in our queue.
-			 */
-			stop_count = --current->signal->group_stop_count;
-			signr = current->signal->group_exit_code;
-			current->exit_code = signr;
-			set_current_state(TASK_STOPPED);
-			spin_unlock_irq(&current->sighand->siglock);
-			finish_stop(stop_count);
+		if (unlikely(current->signal->group_stop_count > 0) &&
+		    handle_group_stop())
 			continue;
-		}
-	dequeue:
 		signr = dequeue_signal(current, mask, info);
 		spin_unlock_irq(&current->sighand->siglock);
 

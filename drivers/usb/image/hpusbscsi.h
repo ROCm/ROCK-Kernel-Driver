@@ -85,7 +85,7 @@ static Scsi_Host_Template hpusbscsi_scsi_host_template = {
 
 /* defines for internal driver state */
 #define HP_STATE_FREE                 0  /*ready for next request */
-#define HP_STATE_BEGINNING      1  /*command being transfered */
+#define HP_STATE_BEGINNING      1  /*command being transferred */
 #define HP_STATE_WORKING         2  /* data transfer stage */
 #define HP_STATE_ERROR             3  /* error has been reported */
 #define HP_STATE_WAIT                 4  /* waiting for status transfer */

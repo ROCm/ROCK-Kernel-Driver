@@ -385,83 +385,92 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	struct scsi_device *sdev, *device;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
-	if (sdev != NULL) {
-		memset(sdev, 0, sizeof(Scsi_Device));
-		sdev->vendor = scsi_null_device_strs;
-		sdev->model = scsi_null_device_strs;
-		sdev->rev = scsi_null_device_strs;
-		sdev->host = shost;
-		sdev->id = id;
-		sdev->lun = lun;
-		sdev->channel = channel;
-		sdev->online = TRUE;
-		INIT_LIST_HEAD(&sdev->siblings);
-		INIT_LIST_HEAD(&sdev->same_target_siblings);
-		INIT_LIST_HEAD(&sdev->cmd_list);
-		spin_lock_init(&sdev->list_lock);
-		/*
-		 * Some low level driver could use device->type
-		 */
-		sdev->type = -1;
-		/*
-		 * Assume that the device will have handshaking problems,
-		 * and then fix this field later if it turns out it
-		 * doesn't
-		 */
-		sdev->borken = 1;
+	if (!sdev)
+		goto out;
 
-		if (!q || *q == NULL) {
-			sdev->request_queue = scsi_alloc_queue(shost);
-			if (!sdev->request_queue)
-				goto out_bail;
-		} else {
-			sdev->request_queue = *q;
-			*q = NULL;
-		}
+	memset(sdev, 0, sizeof(*sdev));
+	sdev->vendor = scsi_null_device_strs;
+	sdev->model = scsi_null_device_strs;
+	sdev->rev = scsi_null_device_strs;
+	sdev->host = shost;
+	sdev->id = id;
+	sdev->lun = lun;
+	sdev->channel = channel;
+	sdev->online = TRUE;
+	INIT_LIST_HEAD(&sdev->siblings);
+	INIT_LIST_HEAD(&sdev->same_target_siblings);
+	INIT_LIST_HEAD(&sdev->cmd_list);
+	spin_lock_init(&sdev->list_lock);
 
-		sdev->request_queue->queuedata = sdev;
-		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-		init_waitqueue_head(&sdev->scpnt_wait);
+	/*
+	 * Some low level driver could use device->type
+	 */
+	sdev->type = -1;
 
-		if (shost->hostt->slave_alloc)
-			if (shost->hostt->slave_alloc(sdev)) {
-				goto out_bail;
-			}
-		/*
-		 * If there are any same target siblings, add this to the
-		 * sibling list
-		 */
-		list_for_each_entry(device, &shost->my_devices, siblings) {
-			if(device->id == sdev->id &&
-			   device->channel == sdev->channel) {
-				list_add_tail(&sdev->same_target_siblings,
-					      &device->same_target_siblings);
-				sdev->scsi_level = device->scsi_level;
-				break;
-			}
-		}
-		/*
-		 * If there wasn't another lun already configured at this
-		 * target, then default this device to SCSI_2 until we
-		 * know better
-		 */
-		if(!sdev->scsi_level)
-			sdev->scsi_level = SCSI_2;
-		/*
-		 * Add it to the end of the shost->my_devices list.
-		 */
-		list_add_tail(&sdev->siblings, &shost->my_devices);
-		return (sdev);
+	/*
+	 * Assume that the device will have handshaking problems,
+	 * and then fix this field later if it turns out it
+	 * doesn't
+	 */
+	sdev->borken = 1;
+
+	if (!q || *q == NULL) {
+		sdev->request_queue = scsi_alloc_queue(shost);
+		if (!sdev->request_queue)
+			goto out_free_dev;
+	} else {
+		sdev->request_queue = *q;
+		*q = NULL;
 	}
-out_bail:
-	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+
+	sdev->request_queue->queuedata = sdev;
+	scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
+	init_waitqueue_head(&sdev->scpnt_wait);
+
+	if (shost->hostt->slave_alloc) {
+		if (shost->hostt->slave_alloc(sdev))
+			goto out_free_queue;
+	}
+
+	/*
+	 * If there are any same target siblings, add this to the
+	 * sibling list
+	 */
+	list_for_each_entry(device, &shost->my_devices, siblings) {
+		if (device->id == sdev->id &&
+		    device->channel == sdev->channel) {
+			list_add_tail(&sdev->same_target_siblings,
+				      &device->same_target_siblings);
+			sdev->scsi_level = device->scsi_level;
+			break;
+		}
+	}
+
+	/*
+	 * If there wasn't another lun already configured at this
+	 * target, then default this device to SCSI_2 until we
+	 * know better
+	 */
+	if (!sdev->scsi_level)
+		sdev->scsi_level = SCSI_2;
+
+	/*
+	 * Add it to the end of the shost->my_devices list.
+	 */
+	list_add_tail(&sdev->siblings, &shost->my_devices);
+	return sdev;
+
+out_free_queue:
 	if (q && sdev->request_queue) {
 		*q = sdev->request_queue;
 		sdev->request_queue = NULL;
 	} else if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
 
+out_free_dev:
 	kfree(sdev);
+out:
+	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	return NULL;
 }
 

@@ -48,9 +48,6 @@ arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
-	@echo -n '  Generating $@'
-	@$(generate-asm-offsets.h) < $< > $@.tmp
-	@$(update-if-changed)
+	$(call filechk,gen-asm-offsets)
 
-CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
-	       include/asm-$(ARCH)/offsets.h
+CLEAN_FILES += include/asm-$(ARCH)/offsets.h

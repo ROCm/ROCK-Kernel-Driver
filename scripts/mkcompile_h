@@ -10,7 +10,7 @@ CC=$4
 # do "compiled by root"
 
 if [ -r $TARGET -a ! -O include/linux/autoconf.h ]; then
-  echo ' (not modified)'
+  echo "  SKIPPED $TARGET"
   exit 0
 fi
 
@@ -70,10 +70,9 @@ if [ -r $TARGET ] && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' $TARGET > .tmpver.1 && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' .tmpcompile > .tmpver.2 && \
       cmp -s .tmpver.1 .tmpver.2; then
-   echo ' (unchanged)'
    rm -f .tmpcompile
 else
-   echo ' (updated)'
+   echo "  UPD     $TARGET"
    mv -f .tmpcompile $TARGET
 fi
-#rm -f .tmpver.1 .tmpver.2
+rm -f .tmpver.1 .tmpver.2

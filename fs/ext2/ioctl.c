@@ -58,22 +58,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		flags |= oldflags & ~EXT2_FL_USER_MODIFIABLE;
 		ei->i_flags = flags;
 
-		if (flags & EXT2_SYNC_FL)
-			inode->i_flags |= S_SYNC;
-		else
-			inode->i_flags &= ~S_SYNC;
-		if (flags & EXT2_APPEND_FL)
-			inode->i_flags |= S_APPEND;
-		else
-			inode->i_flags &= ~S_APPEND;
-		if (flags & EXT2_IMMUTABLE_FL)
-			inode->i_flags |= S_IMMUTABLE;
-		else
-			inode->i_flags &= ~S_IMMUTABLE;
-		if (flags & EXT2_NOATIME_FL)
-			inode->i_flags |= S_NOATIME;
-		else
-			inode->i_flags &= ~S_NOATIME;
+		ext2_set_inode_flags(inode);
 		inode->i_ctime = CURRENT_TIME;
 		mark_inode_dirty(inode);
 		return 0;

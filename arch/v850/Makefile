@@ -55,14 +55,10 @@ prepare: include/asm-$(ARCH)/asm-consts.h
 # Generate constants from C code for use by asm files
 arch/$(ARCH)/kernel/asm-consts.s: include/asm include/linux/version.h \
 				   include/config/MARKER
-include/asm-$(ARCH)/asm-consts.h.tmp: arch/$(ARCH)/kernel/asm-consts.s
-	@$(generate-asm-offsets.h) < $< > $@
-include/asm-$(ARCH)/asm-consts.h: include/asm-$(ARCH)/asm-consts.h.tmp
-	@echo -n '  Generating $@'
-	@$(update-if-changed)
 
+include/asm-$(ARCH)/asm-consts.h: arch/$(ARCH)/kernel/asm-consts.s
+	$(call filechk,gen-asm-offsets)
 
-CLEAN_FILES += include/asm-$(ARCH)/asm-consts.h.tmp \
-	       include/asm-$(ARCH)/asm-consts.h \
+CLEAN_FILES += include/asm-$(ARCH)/asm-consts.h \
 	       arch/$(ARCH)/kernel/asm-consts.s \
 	       root_fs_image.o

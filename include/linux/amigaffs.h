@@ -73,7 +73,7 @@ static inline void
 affs_brelse(struct buffer_head *bh)
 {
 	if (bh)
-		pr_debug("affs_brelse: %ld\n", bh->b_blocknr);
+		pr_debug("affs_brelse: %lld\n", (long long) bh->b_blocknr);
 	brelse(bh);
 }
 

@@ -6,12 +6,9 @@
 
 obj-y			:= arch.o dma.o fault.o irq.o mm.o oldlatches.o \
 			   small_page.o
-obj-m			:=
-obj-n			:=
-obj-			:=
 
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
-EXTRA_TARGETS 		:= head.o
+extra-y 		:= head.o
 
 AFLAGS_head.o		:= -DTEXTADDR=$(TEXTADDR)

@@ -136,7 +136,7 @@ static inline void uhci_add_complete(struct uhci_hcd *uhci, struct urb *urb)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uhci->complete_list_lock, flags);
-	list_add(&urbp->complete_list, &uhci->complete_list);
+	list_add_tail(&urbp->complete_list, &uhci->complete_list);
 	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
 }
 

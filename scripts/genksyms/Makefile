@@ -1,6 +1,6 @@
 
 host-progs	:= genksyms
-build-targets	:= $(host-progs)
+always		:= $(host-progs)
 
 genksyms-objs	:= genksyms.o parse.o lex.o
 

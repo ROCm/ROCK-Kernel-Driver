@@ -369,7 +369,7 @@ static struct notifier_block ratelimit_nb = {
  * dirty memory thresholds: allowing too much dirty highmem pins an excessive
  * number of buffer_heads.
  */
-static int __init page_writeback_init(void)
+void __init page_writeback_init(void)
 {
 	long buffer_pages = nr_free_buffer_pages();
 	long correction;
@@ -392,9 +392,7 @@ static int __init page_writeback_init(void)
 	add_timer(&wb_timer);
 	set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
-	return 0;
 }
-module_init(page_writeback_init);
 
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {

@@ -741,8 +741,7 @@ struct scsi_cmnd {
 	 * abort, etc are in process. 
 	 */
 	unsigned volatile char internal_timeout;
-	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
-					   to be processed. */
+
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;
 	unsigned char sc_data_direction;

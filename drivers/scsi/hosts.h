@@ -549,6 +549,7 @@ struct Scsi_Device_Template
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
                                            Selects command for blkdevs */
+    void (*rescan)(Scsi_Device *);
     struct device_driver scsi_driverfs_driver;
 };
 

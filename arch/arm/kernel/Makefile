@@ -11,9 +11,6 @@ AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)
 obj-y		:= arch.o compat.o dma.o $(ENTRY_OBJ) entry-common.o irq.o   \
 		   process.o ptrace.o semaphore.o setup.o signal.o sys_arm.o \
 		   time.o traps.o
-obj-m		:=
-obj-n		:=
-obj-		:=
 
 obj-$(CONFIG_APM)		+= apm.o
 obj-$(CONFIG_PM)		+= pm.o
@@ -35,7 +32,7 @@ head-y			:= head.o
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 endif
 
-EXTRA_TARGETS := $(head-y) init_task.o
+extra-y := $(head-y) init_task.o
 
 # Spell out some dependencies that `make dep' doesn't spot
 $(obj)/entry-armv.o: 	$(obj)/entry-header.S include/asm-arm/constants.h
