@@ -411,7 +411,7 @@ xfs_itobp(
 				mp->m_dev, (unsigned long long)imap.im_blkno, i,
 				INT_GET(dip->di_core.di_magic, ARCH_CONVERT));
 #endif
-			XFS_CORRUPTION_ERROR("xfs_itobp", XFS_ERRLEVEL_LOW,
+			XFS_CORRUPTION_ERROR("xfs_itobp", XFS_ERRLEVEL_HIGH,
 					     mp, dip);
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EFSCORRUPTED);
