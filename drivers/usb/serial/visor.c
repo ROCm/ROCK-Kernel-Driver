@@ -518,6 +518,7 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 		dev_err(&port->dev, "%s - usb_submit_urb(write bulk) failed with status = %d\n",
 			__FUNCTION__, status);
 		count = status;
+		kfree (buffer);
 	} else {
 		bytes_out += count;
 	}
