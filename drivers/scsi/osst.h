@@ -70,7 +70,7 @@ typedef struct {
 #define BLOCK_SIZE_PAGE_LENGTH     4
 
 #define BUFFER_FILLING_PAGE        0x33
-#define BUFFER_FILLING_PAGE_LENGTH 
+#define BUFFER_FILLING_PAGE_LENGTH 4
 
 #define VENDOR_IDENT_PAGE          0x36
 #define VENDOR_IDENT_PAGE_LENGTH   8
@@ -577,6 +577,7 @@ struct osst_tape {
   int min_block;
   int max_block;
   int recover_count;            /* from tape opening */
+  int abort_count;
   int write_count;
   int read_count;
   int recover_erreg;            /* from last status call */
