@@ -646,9 +646,6 @@ isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg)
 	dbg_net_dial("%s: dialstate=%d pr=%#x\n", idev->name, 
 		     idev->dialstate, pr);
 
-	if (pr == ISDN_STAT_DHUP)
-		return 1; // FIXME
-
 	switch (idev->dialstate) {
 	case ST_ACTIVE:
 		return isdn_net_event_active(idev, pr, arg);
@@ -695,96 +692,49 @@ isdn_net_hangup(isdn_net_dev *idev)
 	isdn_net_unbind_channel(idev);
 }
 
-typedef struct {
-	unsigned short source;
-	unsigned short dest;
-} ip_ports;
 
 static void
 isdn_net_log_skb(struct sk_buff *skb, isdn_net_dev *idev)
 {
-	isdn_net_local *mlp = idev->mlp;
-
-	u_char *p = skb->nh.raw; /* hopefully, this was set correctly */
+	unsigned char *p = skb->nh.raw; /* hopefully, this was set correctly */
 	unsigned short proto = ntohs(skb->protocol);
 	int data_ofs;
-	ip_ports *ipp;
+	struct ip_ports {
+		unsigned short source;
+		unsigned short dest;
+	} *ipp;
 	char addinfo[100];
 
-	addinfo[0] = '\0';
-	/* This check stolen from 2.1.72 dev_queue_xmit_nit() */
-	if (skb->nh.raw < skb->data || skb->nh.raw >= skb->tail) {
-		/* fall back to old isdn_net_log_packet method() */
-		char * buf = skb->data;
-
-		printk(KERN_DEBUG "isdn_net: protocol %04x is buggy, dev %s\n", skb->protocol, idev->name);
-		p = buf;
-		proto = ETH_P_IP;
-		switch (mlp->p_encap) {
-			case ISDN_NET_ENCAP_IPTYP:
-				proto = ntohs(*(unsigned short *) &buf[0]);
-				p = &buf[2];
-				break;
-			case ISDN_NET_ENCAP_ETHER:
-				proto = ntohs(*(unsigned short *) &buf[12]);
-				p = &buf[14];
-				break;
-			case ISDN_NET_ENCAP_CISCOHDLC:
-				proto = ntohs(*(unsigned short *) &buf[2]);
-				p = &buf[4];
-				break;
-			case ISDN_NET_ENCAP_SYNCPPP:
-				proto = ntohs(skb->protocol);
-				p = &buf[IPPP_MAX_HEADER];
-				break;
-		}
-	}
 	data_ofs = ((p[0] & 15) * 4);
 	switch (proto) {
-		case ETH_P_IP:
-			switch (p[9]) {
-				case 1:
-					strcpy(addinfo, " ICMP");
-					break;
-				case 2:
-					strcpy(addinfo, " IGMP");
-					break;
-				case 4:
-					strcpy(addinfo, " IPIP");
-					break;
-				case 6:
-					ipp = (ip_ports *) (&p[data_ofs]);
-					sprintf(addinfo, " TCP, port: %d -> %d", ntohs(ipp->source),
-						ntohs(ipp->dest));
-					break;
-				case 8:
-					strcpy(addinfo, " EGP");
-					break;
-				case 12:
-					strcpy(addinfo, " PUP");
-					break;
-				case 17:
-					ipp = (ip_ports *) (&p[data_ofs]);
-					sprintf(addinfo, " UDP, port: %d -> %d", ntohs(ipp->source),
-						ntohs(ipp->dest));
-					break;
-				case 22:
-					strcpy(addinfo, " IDP");
-					break;
-			}
-			printk(KERN_INFO
-				"OPEN: %d.%d.%d.%d -> %d.%d.%d.%d%s\n",
-
-			       p[12], p[13], p[14], p[15],
-			       p[16], p[17], p[18], p[19],
-			       addinfo);
+	case ETH_P_IP:
+		switch (p[9]) {
+		case IPPROTO_ICMP:
+			strcpy(addinfo, "ICMP");
 			break;
-		case ETH_P_ARP:
-			printk(KERN_INFO
-				"OPEN: ARP %d.%d.%d.%d -> *.*.*.* ?%d.%d.%d.%d\n",
-			       p[14], p[15], p[16], p[17],
-			       p[24], p[25], p[26], p[27]);
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+			ipp = (struct ip_ports *) (&p[data_ofs]);
+			sprintf(addinfo, "%s, port: %d -> %d",
+				p[9] == IPPROTO_TCP ? "TCP" : "UDP",
+				ntohs(ipp->source), ntohs(ipp->dest));
 			break;
+		default:
+			sprintf(addinfo, "type %d", p[9]);
+		}
+		printk(KERN_INFO
+		       "OPEN: %u.%u.%u.%u -> %u.%u.%u.%u %s\n",
+		       
+		       NIPQUAD(*(u32 *)(p + 12)), NIPQUAD(*(u32 *)(p + 16)),
+		       addinfo);
+		break;
+	case ETH_P_ARP:
+		printk(KERN_INFO
+		       "OPEN: ARP %d.%d.%d.%d -> *.*.*.* ?%d.%d.%d.%d\n",
+		       NIPQUAD(*(u32 *)(p + 14)), NIPQUAD(*(u32 *)(p + 24)));
+		break;
+	default:
+		printk(KERN_INFO "OPEN: unknown proto %#x\n", proto);
 	}
 }
 
