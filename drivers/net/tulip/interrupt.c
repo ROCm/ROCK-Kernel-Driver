@@ -114,9 +114,8 @@ int tulip_poll(struct net_device *dev, int *budget)
 	int rx_work_limit = *budget;
 	int received = 0;
 
-	if(!netif_running(dev)) goto done;
-
-	if(!netif_running(dev)) goto done;
+	if (!netif_running(dev))
+		goto done;
 
 	if (rx_work_limit > dev->quota)
 		rx_work_limit = dev->quota;
@@ -254,7 +253,7 @@ int tulip_poll(struct net_device *dev, int *budget)
                 * finally: amount of IO did not increase at all. */
        } while ((inl(dev->base_addr + CSR5) & RxIntr));
  
- done:
+done:
  
  #ifdef CONFIG_TULIP_NAPI_HW_MITIGATION
   
