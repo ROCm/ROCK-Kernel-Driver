@@ -32,6 +32,7 @@
 
 #include "libata.h"
 
+typedef unsigned int (*ata_xlat_func_t)(struct ata_queued_cmd *qc, u8 *scsicmd);
 static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *));
@@ -335,7 +336,8 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 
 static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
-			      void (*done)(struct scsi_cmnd *))
+			      void (*done)(struct scsi_cmnd *),
+			      ata_xlat_func_t xlat_func)
 {
 	struct ata_queued_cmd *qc;
 	u8 *scsicmd = cmd->cmnd;
@@ -352,9 +354,11 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 	if (!qc)
 		return;
 
-	qc->flags |= ATA_QCFLAG_SG;	/* data is present; dma-map it */
+	if (cmd->sc_data_direction == SCSI_DATA_READ ||
+	    cmd->sc_data_direction == SCSI_DATA_WRITE)
+		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
 
-	if (ata_scsi_rw_xlat(qc, scsicmd))
+	if (xlat_func(qc, scsicmd))
 		goto err_out;
 
 	/* select device, send command to hardware */
@@ -1014,17 +1018,17 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 }
 
 /**
- *	ata_scsi_xlat_possible - check if SCSI to ATA translation is possible
+ *	ata_get_xlat_func - check if SCSI to ATA translation is possible
  *	@cmd: SCSI command opcode to consider
  *
  *	Look up the SCSI command given, and determine whether the
  *	SCSI command is to be translated or simulated.
  *
  *	RETURNS:
- *	Non-zero if possible, zero if not.
+ *	Pointer to translation function if possible, %NULL if not.
  */
 
-static inline int ata_scsi_xlat_possible(u8 cmd)
+static inline ata_xlat_func_t ata_get_xlat_func(u8 cmd)
 {
 	switch (cmd) {
 	case READ_6:
@@ -1034,10 +1038,10 @@ static inline int ata_scsi_xlat_possible(u8 cmd)
 	case WRITE_6:
 	case WRITE_10:
 	case WRITE_16:
-		return 1;
+		return ata_scsi_rw_xlat;
 	}
 
-	return 0;
+	return NULL;
 }
 
 /**
@@ -1099,8 +1103,10 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	}
 
 	if (dev->class == ATA_DEV_ATA) {
-		if (ata_scsi_xlat_possible(cmd->cmnd[0]))
-			ata_scsi_translate(ap, dev, cmd, done);
+		ata_xlat_func_t xlat_func = ata_get_xlat_func(cmd->cmnd[0]);
+
+		if (xlat_func)
+			ata_scsi_translate(ap, dev, cmd, done, xlat_func);
 		else
 			ata_scsi_simulate(ap, dev, cmd, done);
 	} else
