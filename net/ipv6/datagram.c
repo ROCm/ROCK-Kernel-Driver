@@ -295,7 +295,7 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 
 			addr_type = ipv6_addr_type(&src_info->ipi6_addr);
 
-			if (ipv6_addr_type == IPV6_ADDR_ANY)
+			if (addr_type == IPV6_ADDR_ANY)
 				break;
 			
 			if (addr_type & IPV6_ADDR_LINKLOCAL) {
