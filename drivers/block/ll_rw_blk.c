@@ -300,6 +300,27 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 }
 
 /**
+ * blk_queue_find_tag - find a request by its tag and queue
+ *
+ * @q:	 The request queue for the device
+ * @tag: The tag of the request
+ *
+ * Notes:
+ *    Should be used when a device returns a tag and you want to match
+ *    it with a request.
+ *
+ *    no locks need be held.
+ **/
+struct request *blk_queue_find_tag(request_queue_t *q, int tag)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+
+	if(unlikely(bqt == NULL || bqt->max_depth < tag))
+		return NULL;
+
+	return bqt->tag_index[tag];
+}
+/**
  * blk_queue_free_tags - release tag maintenance info
  * @q:  the request queue for the device
  *
@@ -432,10 +453,12 @@ void blk_queue_end_tag(request_queue_t *q, struct request *rq)
  *  Description:
  *    This can either be used as a stand-alone helper, or possibly be
  *    assigned as the queue &prep_rq_fn (in which case &struct request
- *    automagically gets a tag assigned). Note that this function assumes
- *    that only REQ_CMD requests can be queued! The request will also be
- *    removed from the request queue, so it's the drivers responsibility to
- *    readd it if it should need to be restarted for some reason.
+ *    automagically gets a tag assigned). Note that this function
+ *    assumes that any type of request can be queued! if this is not
+ *    true for your device, you must check the request type before
+ *    calling this function.  The request will also be removed from
+ *    the request queue, so it's the drivers responsibility to readd
+ *    it if it should need to be restarted for some reason.
  *
  *  Notes:
  *   queue lock must be held.
@@ -446,8 +469,12 @@ int blk_queue_start_tag(request_queue_t *q, struct request *rq)
 	unsigned long *map = bqt->tag_map;
 	int tag = 0;
 
-	if (unlikely(!(rq->flags & REQ_CMD)))
-		return 1;
+	if (unlikely((rq->flags & REQ_QUEUED))) {
+		printk(KERN_ERR 
+		       "request %p for device [02%x:02%x] already tagged %d",
+		       rq, major(rq->rq_dev), minor(rq->rq_dev), rq->tag);
+		BUG();
+	}
 
 	for (map = bqt->tag_map; *map == -1UL; map++) {
 		tag += BLK_TAGS_PER_LONG;
@@ -2033,6 +2060,7 @@ EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
+EXPORT_SYMBOL(blk_queue_find_tag);
 EXPORT_SYMBOL(blk_queue_init_tags);
 EXPORT_SYMBOL(blk_queue_free_tags);
 EXPORT_SYMBOL(blk_queue_start_tag);
