@@ -102,7 +102,6 @@ static int isapnp_detected;
 /* some prototypes */
 
 static int isapnp_config_prepare(struct pnp_dev *dev);
-extern struct pnp_protocol isapnp_card_protocol;
 extern struct pnp_protocol isapnp_protocol;
 
 static inline void write_data(unsigned char x)
@@ -1125,7 +1124,7 @@ int __init isapnp_init(void)
 	isapnp_build_device_list();
 	cards = 0;
 
-	protocol_for_each_card(&isapnp_card_protocol,card) {
+	protocol_for_each_card(&isapnp_protocol,card) {
 		cards++;
 		if (isapnp_verbose) {
 			printk(KERN_INFO "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");

@@ -284,7 +284,7 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 }
 
 static ssize_t
-pnp_set_current_resources(struct device * dmdev, const char * buf)
+pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char	command[20];
@@ -326,7 +326,7 @@ pnp_set_current_resources(struct device * dmdev, const char * buf)
 		goto done;
 	}
  done:
-	return error < 0 ? error : strlen(buf);
+	return error < 0 ? error : count;
 }
 
 static DEVICE_ATTR(resources,S_IRUGO | S_IWUSR,

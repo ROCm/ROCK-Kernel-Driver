@@ -158,12 +158,12 @@ static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
 	show_function(field, format_string)				\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf)			\
+store_##field (struct device *dev, const char *buf, size_t count)	\
 {									\
 	struct scsi_device *sdev;					\
 	sdev = to_scsi_device(dev);					\
 	snscanf (buf, 20, format_string, &sdev->field);			\
-	return strlen(buf);						\
+	return count;							\
 }									\
 static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
 
@@ -175,7 +175,7 @@ static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
 	show_function(field, "%d\n")					\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf)			\
+store_##field (struct device *dev, const char *buf, size_t count)	\
 {									\
 	int ret;							\
 	struct scsi_device *sdev;					\
@@ -183,7 +183,7 @@ store_##field (struct device *dev, const char *buf)			\
 	if (ret >= 0)	{						\
 		sdev = to_scsi_device(dev);				\
 		sdev->field = ret;					\
-		ret = strlen(buf);					\
+		ret = count;						\
 	}								\
 	return ret;							\
 }									\

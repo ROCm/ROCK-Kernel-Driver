@@ -157,7 +157,7 @@ module_exit(cleanup_ccw_bus_type);
  * TODO: Split chpids and pimpampom up? Where is "in use" in the tree?
  */
 static ssize_t
-chpids_show (struct device * dev, char * buf, size_t count, loff_t off)
+chpids_show (struct device * dev, char * buf)
 {
 	struct subchannel *sch = to_subchannel(dev);
 	struct ssd_info *ssd = &sch->ssd_info;
@@ -168,48 +168,48 @@ chpids_show (struct device * dev, char * buf, size_t count, loff_t off)
 		ret += sprintf (buf+ret, "%02x ", ssd->chpid[chp]);
 
 	ret += sprintf (buf+ret, "\n");
-	return off ? 0 : min((ssize_t)count, ret);
+	return min((ssize_t)PAGE_SIZE, ret);
 }
 
 static ssize_t
-pimpampom_show (struct device * dev, char * buf, size_t count, loff_t off)
+pimpampom_show (struct device * dev, char * buf)
 {
 	struct subchannel *sch = to_subchannel(dev);
 	struct pmcw *pmcw = &sch->schib.pmcw;
 
-	return off ? 0 : snprintf (buf, count, "%02x %02x %02x\n",
-				   pmcw->pim, pmcw->pam, pmcw->pom);
+	return sprintf (buf, "%02x %02x %02x\n",
+			pmcw->pim, pmcw->pam, pmcw->pom);
 }
 
 static ssize_t
-devtype_show (struct device *dev, char *buf, size_t count, loff_t off)
+devtype_show (struct device *dev, char *buf)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 	struct ccw_device_id *id = &(cdev->id);
 
 	if (id->dev_type != 0)
-		return off ? 0 : snprintf(buf, count, "%04x/%02x\n",
-					  id->dev_type, id->dev_model);
+		return sprintf(buf, "%04x/%02x\n",
+				id->dev_type, id->dev_model);
 	else
-		return off ? 0 : snprintf(buf, count, "n/a\n");
+		return sprintf(buf, "n/a\n");
 }
 
 static ssize_t
-cutype_show (struct device *dev, char *buf, size_t count, loff_t off)
+cutype_show (struct device *dev, char *buf)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 	struct ccw_device_id *id = &(cdev->id);
 
-	return off ? 0 : snprintf(buf, count, "%04x/%02x\n",
-				  id->cu_type, id->cu_model);
+	return sprintf(buf, "%04x/%02x\n",
+		       id->cu_type, id->cu_model);
 }
 
 static ssize_t
-online_show (struct device *dev, char *buf, size_t count, loff_t off)
+online_show (struct device *dev, char *buf)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 
-	return off ? 0 : snprintf(buf, count, cdev->online ? "yes\n" : "no\n");
+	return sprintf(buf, cdev->online ? "yes\n" : "no\n");
 }
 
 void
@@ -256,13 +256,10 @@ ccw_device_set_online(struct ccw_device *cdev)
 }
 
 static ssize_t
-online_store (struct device *dev, const char *buf, size_t count, loff_t off)
+online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 	unsigned int value;
-
-	if (off)
-		return 0;
 
 	if (!cdev->drv)
 		return count;

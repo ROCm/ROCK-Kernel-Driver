@@ -98,11 +98,6 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 		}
 
 		sym = ((Elf32_Sym *)symsec->sh_addr) + offset;
-		if (!sym->st_value) {
-			printk(KERN_WARNING "%s: unknown symbol %s\n",
-				module->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
 
 		if (rel->r_offset < 0 || rel->r_offset > dstsec->sh_size - sizeof(u32)) {
 			printk(KERN_ERR "%s: out of bounds relocation, "

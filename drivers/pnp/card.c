@@ -22,9 +22,9 @@
 
 LIST_HEAD(pnp_cards);
 
-static const struct pnp_card_id * match_card(struct pnpc_driver *drv, struct pnp_card *card)
+static const struct pnp_card_device_id * match_card(struct pnpc_driver *drv, struct pnp_card *card)
 {
-	const struct pnp_card_id *drv_id = drv->id_table;
+	const struct pnp_card_device_id *drv_id = drv->id_table;
 	while (*drv_id->id){
 		if (compare_pnp_id(card->id,drv_id->id))
 			return drv_id;
@@ -216,18 +216,15 @@ done:
 	return NULL;
 
 found:
-	spin_lock(&pnp_lock);
-	if(dev->status != PNP_READY){
-		spin_unlock(&pnp_lock);
+	if (pnp_device_attach(dev) < 0)
 		return NULL;
-	}
-	dev->status = PNP_ATTACHED;
-	spin_unlock(&pnp_lock);
 	cdrv = to_pnpc_driver(card->dev.driver);
 	if (dev->active == 0) {
 		if (!(cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE)) {
-			if(pnp_activate_dev(dev,NULL)<0)
+			if(pnp_activate_dev(dev,NULL)<0) {
+				pnp_device_detach(dev);
 				return NULL;
+			}
 		}
 	} else {
 		if ((cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE))
@@ -250,10 +247,8 @@ void pnp_release_card_device(struct pnp_dev *dev)
 {
 	spin_lock(&pnp_lock);
 	list_del(&dev->rdev_list);
-	if (dev->status == PNP_ATTACHED)
-		dev->status = PNP_READY;
 	spin_unlock(&pnp_lock);
-	pnp_disable_dev(dev);
+	pnp_device_detach(dev);
 }
 
 static void pnpc_recover_devices(struct pnp_card *card)
@@ -291,7 +286,7 @@ static int pnpc_card_probe(struct device *dev)
 	int error = 0;
 	struct pnpc_driver *drv = to_pnpc_driver(dev->driver);
 	struct pnp_card *card = to_pnp_card(dev);
-	const struct pnp_card_id *card_id = NULL;
+	const struct pnp_card_device_id *card_id = NULL;
 
 	pnp_dbg("pnp: match found with the PnP card '%s' and the driver '%s'", dev->bus_id,drv->name);
 

@@ -26,14 +26,15 @@ devclass_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 }
 
 static ssize_t
-devclass_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
+devclass_attr_store(struct kobject * kobj, struct attribute * attr, 
+		    const char * buf, size_t count)
 {
 	struct devclass_attribute * class_attr = to_class_attr(attr);
 	struct device_class * dc = to_class(kobj);
 	ssize_t ret = 0;
 
 	if (class_attr->store)
-		ret = class_attr->store(dc,buf);
+		ret = class_attr->store(dc,buf,count);
 	return ret;
 }
 

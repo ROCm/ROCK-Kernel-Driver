@@ -184,19 +184,12 @@ int apply_relocate_add (Elf32_Shdr *sechdrs, const char *strtab,
 		uint32_t *loc
 			= ((void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			   + rela[i].r_offset);
-		/* This is the symbol it is referring to */
+		/* This is the symbol it is referring to.  Note that all
+		   undefined symbols have been resolved.  */
 		Elf32_Sym *sym
 			= ((Elf32_Sym *)sechdrs[symindex].sh_addr
 			   + ELF32_R_SYM (rela[i].r_info));
-		uint32_t val = sym->st_value;
-
-		if (! val) {
-			printk (KERN_WARNING "%s: Unknown symbol %s\n",
-				mod->name, strtab + sym->st_name);
-			return -ENOENT;
-		}
-
-		val += rela[i].r_addend;
+		uint32_t val = sym->st_value + rela[i].r_addend;
 
 		switch (ELF32_R_TYPE (rela[i].r_info)) {
 		case R_V850_32:
