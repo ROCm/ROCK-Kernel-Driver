@@ -63,7 +63,7 @@ struct rtc_pll_info {
 };
 
 /*
- * ioctl calls that are permitted to the /dev/rtc interface, if 
+ * ioctl calls that are permitted to the /dev/rtc interface, if
  * any of the RTC drivers are enabled.
  */
 
@@ -87,6 +87,7 @@ struct rtc_pll_info {
 
 #define RTC_WKALM_SET	_IOW('p', 0x0f, struct rtc_wkalrm)/* Set wakeup alarm*/
 #define RTC_WKALM_RD	_IOR('p', 0x10, struct rtc_wkalrm)/* Get wakeup alarm*/
+
 #define RTC_PLL_GET	_IOR('p', 0x11, struct rtc_pll_info)  /* Get PLL correction */
 #define RTC_PLL_SET	_IOW('p', 0x12, struct rtc_pll_info)  /* Set PLL correction */
 
