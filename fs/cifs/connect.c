@@ -445,6 +445,10 @@ parse_mount_options(char *options, char *devname, struct smb_vol *vol)
 			printk(KERN_WARNING "CIFS: Unknown mount option %s\n",data);
 	}
 	if (vol->UNC == NULL) {
+		if(devname == NULL) {
+			printk(KERN_WARNING "CIFS: Missing UNC name for mount target\n");
+			return 1;
+		}
 		if (strnlen(devname, 300) < 300) {
 			vol->UNC = devname;
 			if (strncmp(vol->UNC, "//", 2) == 0) {
@@ -2288,11 +2292,6 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 	if (ses) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ / 2);
-		/* if ((ses->server) && (ses->server->ssocket)) {
-               cFYI(1,("Releasing socket "));        
-               sock_release(ses->server->ssocket); 
-               kfree(ses->server); 
-          } */ 
 	}
 	if (ses)
 		sesInfoFree(ses);

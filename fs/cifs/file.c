@@ -1091,18 +1091,29 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		file->f_pos++;
 		/* fallthrough */
 	case 2:
-		/* Should we first check if file->private_data is null? */
-		rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
+		/* do not reallocate search handle if rewind */
+		if(file->private_data == NULL) {
+			rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
 				   &findParms, cifs_sb->local_nls,
 				   &Unicode, &UnixSearch);
-		cFYI(1,
-		     ("Count: %d  End: %d ", findParms.SearchCount,
-		      findParms.EndofSearch));
+			cFYI(1,
+			     ("Count: %d  End: %d ", findParms.SearchCount,
+			      findParms.EndofSearch));
+		} else {
+			cFYI(1,("Search rewinding on %s",full_path));
+			goto readdir_rewind;
+		}
 
 		if (rc == 0) {
 			searchHandle = findParms.SearchHandle;
-			file->private_data =
-			    kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
+			if(file->private_data == NULL)
+				file->private_data =
+				    kmalloc(sizeof(struct cifsFileInfo),
+					 GFP_KERNEL);
+			else {
+				/* BB close search handle */
+				cFYI(1,("Search rewinding on %s",full_path));
+			}
 			if (file->private_data) {
 				memset(file->private_data, 0,
 				       sizeof (struct cifsFileInfo));
@@ -1186,7 +1197,9 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			rc = 0;	/* unless parent directory disappeared - do not return error here (eg Access Denied or no more files) */
 		}
 		break;
+readdir_rewind:
 	default:
+		/* BB rewrite eventually to better handle rewind */
 		if (file->private_data == NULL) {
 			rc = -EBADF;
 			cFYI(1,
