@@ -191,7 +191,7 @@
 #define LANAI_EEPROM_SIZE	(128)
 
 typedef int vci_t;
-typedef void *bus_addr_t;
+typedef void __iomem *bus_addr_t;
 
 /* DMA buffer in host memory for TX, RX, or service list. */
 struct lanai_buffer {
