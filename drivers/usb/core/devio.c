@@ -361,14 +361,14 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 	if (intf >= 8*sizeof(ps->ifclaimed))
 		return -EINVAL;
 	err = -EINVAL;
-	lock_kernel();
 	dev = ps->dev;
+	down(&dev->serialize);
 	if (dev && test_and_clear_bit(intf, &ps->ifclaimed)) {
 		iface = &dev->actconfig->interface[intf];
 		usb_driver_release_interface(&usbdevfs_driver, iface);
 		err = 0;
 	}
-	unlock_kernel();
+	up(&dev->serialize);
 	return err;
 }
 
@@ -722,14 +722,11 @@ static int proc_resetdevice(struct dev_state *ps)
 		if (test_bit(i, &ps->ifclaimed))
 			continue;
 
-		if (intf->driver) {
-			const struct usb_device_id *id;
-			down(&intf->driver->serialize);
-			intf->driver->disconnect(ps->dev, intf->private_data);
-			id = usb_match_id(ps->dev,intf,intf->driver->id_table);
-			intf->driver->probe(ps->dev, i, id);
-			up(&intf->driver->serialize);
+		lock_kernel();
+		if (intf->driver && ps->dev) {
+			usb_bind_driver(intf->driver,ps->dev, i);
 		}
+		unlock_kernel();
 	}
 
 	return 0;
@@ -1092,16 +1089,17 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 
        /* disconnect kernel driver from interface, leaving it unbound.  */
        case USBDEVFS_DISCONNECT:
+       	/* this function is voodoo. without locking it is a maybe thing */
+		lock_kernel();
                driver = ifp->driver;
                if (driver) {
-                       down (&driver->serialize);
                        dbg ("disconnect '%s' from dev %d interface %d",
                                driver->name, ps->dev->devnum, ctrl.ifno);
-                       driver->disconnect (ps->dev, ifp->private_data);
+		       usb_unbind_driver(ps->dev, ifp);
                        usb_driver_release_interface (driver, ifp);
-                       up (&driver->serialize);
                } else
 			retval = -EINVAL;
+		unlock_kernel();
                break;
 
        /* let kernel drivers try to (re)bind to the interface */
@@ -1111,18 +1109,28 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 
        /* talk directly to the interface's driver */
        default:
+		lock_kernel(); /* against module unload */
                driver = ifp->driver;
-               if (driver == 0 || driver->ioctl == 0)
-                       retval = -ENOSYS;
-		else {
-			if (ifp->driver->owner)
+               if (driver == 0 || driver->ioctl == 0) {
+			unlock_kernel();
+			retval = -ENOSYS;
+		} else {
+			if (ifp->driver->owner) {
 				__MOD_INC_USE_COUNT(ifp->driver->owner);
+				unlock_kernel();
+			}
 			/* ifno might usefully be passed ... */
                        retval = driver->ioctl (ps->dev, ctrl.ioctl_code, buf);
 			/* size = min_t(int, size, retval)? */
-			if (ifp->driver->owner)
+			if (ifp->driver->owner) {
 				__MOD_DEC_USE_COUNT(ifp->driver->owner);
+			} else {
+				unlock_kernel();
+			}
 		}
+		
+		if (retval == -ENOIOCTLCMD)
+			retval = -ENOTTY;
 	}
 
 	/* cleanup and return */
@@ -1139,7 +1147,7 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct dev_state *ps = (struct dev_state *)file->private_data;
-	int ret = -ENOIOCTLCMD;
+	int ret = -ENOTTY;
 
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EPERM;

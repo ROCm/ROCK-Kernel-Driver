@@ -1046,8 +1046,6 @@ static void usb_hub_events(void)
 
 static int usb_hub_thread(void *__hub)
 {
-	lock_kernel();
-
 	/*
 	 * This thread doesn't need any user-level access,
 	 * so get rid of all our resources
@@ -1067,8 +1065,6 @@ static int usb_hub_thread(void *__hub)
 	} while (!signal_pending(current));
 
 	dbg("usb_hub_thread exiting");
-
-	unlock_kernel();
 	complete_and_exit(&khubd_exited, 0);
 }
 

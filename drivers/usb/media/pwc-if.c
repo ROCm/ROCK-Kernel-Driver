@@ -1756,40 +1756,40 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 	pdev = (struct pwc_device *)ptr;
 	if (pdev == NULL) {
 		Err("pwc_disconnect() Called without private pointer.\n");
-		return;
+		goto out_err;
 	}
 	if (pdev->udev == NULL) {
 		Err("pwc_disconnect() already called for %p\n", pdev);
-		return;
+		goto out_err;
 	}
 	if (pdev->udev != udev) {
 		Err("pwc_disconnect() Woops: pointer mismatch udev/pdev.\n");
-		return;
+		goto out_err;
 	}
 #ifdef PWC_MAGIC	
 	if (pdev->magic != PWC_MAGIC) {
 		Err("pwc_disconnect() Magic number failed. Consult your scrolls and try again.\n");
-		return;
+		goto out_err;
 	}
-#endif	
-	
+#endif
+
 	pdev->unplugged = 1;
 	if (pdev->vdev != NULL) {
-		video_unregister_device(pdev->vdev); 
+		video_unregister_device(pdev->vdev);
 		if (pdev->vopen) {
 			Info("Disconnected while device/video is open!\n");
-			
+
 			/* Wake up any processes that might be waiting for
 			   a frame, let them return an error condition
 			 */
 			wake_up(&pdev->frameq);
-			
+
 			/* Wait until we get a 'go' from _close(). This used
 			   to have a gigantic race condition, since we kfree()
-			   stuff here, but we have to wait until close() 
-			   is finished. 
+			   stuff here, but we have to wait until close()
+			   is finished.
 			 */
-			   
+
 			Trace(TRACE_PROBE, "Sleeping on remove_ok.\n");
 			add_wait_queue(&pdev->remove_ok, &wait);
 			set_current_state(TASK_UNINTERRUPTIBLE);
@@ -1815,6 +1815,7 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr)
 			device_hint[hint].pdev = NULL;
 
 	pdev->udev = NULL;
+out_err:
 	unlock_kernel();
 	kfree(pdev);
 }

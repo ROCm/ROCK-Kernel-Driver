@@ -655,7 +655,10 @@ static ssize_t usblp_write(struct file *file, const char *buffer, size_t count, 
 							  (count - writecount) : USBLP_BUF_SIZE;
 
 		if (copy_from_user(usblp->writeurb->transfer_buffer, buffer + writecount,
-				usblp->writeurb->transfer_buffer_length)) return -EFAULT;
+				usblp->writeurb->transfer_buffer_length)) {
+			up(&usblp->sem);
+			return writecount ? writecount : -EFAULT;
+		}
 
 		usblp->writeurb->dev = usblp->dev;
 		usblp->wcomplete = 0;

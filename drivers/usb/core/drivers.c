@@ -66,6 +66,7 @@ static ssize_t usb_driver_read(struct file *file, char *buf, size_t nbytes, loff
 	start = page;
 	end = page + (PAGE_SIZE - 100);
 	pos = *ppos;
+	lock_kernel(); /* else drivers might be unloaded */
 	for (; tmp != &usb_driver_list; tmp = tmp->next) {
 		struct usb_driver *driver = list_entry(tmp, struct usb_driver, driver_list);
 		int minor = driver->fops ? driver->minor : -1;
@@ -80,6 +81,7 @@ static ssize_t usb_driver_read(struct file *file, char *buf, size_t nbytes, loff
 			break;
 		}
 	}
+	unlock_kernel();
 	if (start == page)
 		start += sprintf(start, "(none)\n");
 	len = start - page;

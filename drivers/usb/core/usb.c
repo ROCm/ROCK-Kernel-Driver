@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
+#include <linux/smp_lock.h>
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
@@ -117,6 +118,108 @@ void usb_scan_devices(void)
 	up (&usb_bus_list_lock);
 }
 
+/**
+ *	usb_unbind_driver - disconnects a driver from a device
+ *	@device: usb device to be disconnected
+ *	@intf: interface of the device to be disconnected
+ *	Context: BKL held
+ *
+ *	Handles module usage count correctly
+ */
+
+void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf)
+{
+	struct usb_driver *driver;
+	void *priv;
+	int m;
+	
+
+	driver = intf->driver;
+	priv = intf->private_data;
+	
+	if (!driver)
+		return;
+
+	/* as soon as we increase the module use count we drop the BKL
+	   before that we must not sleep */
+	if (driver->owner) {
+		m = try_inc_mod_count(driver->owner);
+		if (m == 0) {
+			err("Dieing driver still bound to device.\n");
+			return;
+		}
+		unlock_kernel();
+	}
+	down(&driver->serialize); 	/* if we sleep here on an umanaged driver
+					   the holder of the lock guards against
+					   module unload */
+
+	driver->disconnect(device, priv);
+
+	up(&driver->serialize);
+	if (driver->owner) {
+		lock_kernel();
+		__MOD_DEC_USE_COUNT(driver->owner);
+	}
+}
+
+/**
+ *	usb_bind_driver - connect a driver to a device's interface
+ *	@driver: device driver to be bound to a devices interface
+ *	@dev: device to be bound
+ *	@ifnum: index number of the interface to be used
+ *
+ *	Does a save binding of a driver to a device's interface
+ *	Returns a pointer to the drivers private description of the binding
+ */
+
+void *usb_bind_driver(struct usb_driver *driver, struct usb_device *dev, unsigned int ifnum)
+{
+	int i,m;
+	void *private = NULL;
+	const struct usb_device_id *id;
+	struct usb_interface *interface;
+
+	if (driver->owner) {
+		m = try_inc_mod_count(driver->owner);
+		if (m == 0)
+			return NULL; /* this horse is dead - don't ride*/
+		unlock_kernel();
+	}
+
+	interface = &dev->actconfig->interface[ifnum];
+
+	id = driver->id_table;
+	/* new style driver? */
+	if (id) {
+		for (i = 0; i < interface->num_altsetting; i++) {
+		  	interface->act_altsetting = i;
+			id = usb_match_id(dev, interface, id);
+			if (id) {
+				down(&driver->serialize);
+				private = driver->probe(dev,ifnum,id);
+				up(&driver->serialize);
+				if (private != NULL)
+					break;
+			}
+		}
+
+		/* if driver not bound, leave defaults unchanged */
+		if (private == NULL)
+			interface->act_altsetting = 0;
+	} else { /* "old style" driver */
+		down(&driver->serialize);
+		private = driver->probe(dev, ifnum, NULL);
+		up(&driver->serialize);
+	}
+	if (driver->owner) {
+		lock_kernel();
+		__MOD_DEC_USE_COUNT(driver->owner);
+	}
+
+	return private;
+}
+
 /*
  * This function is part of a depth-first search down the device tree,
  * removing any instances of a device driver.
@@ -136,18 +239,12 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 
 	if (!dev->actconfig)
 		return;
-			
+
 	for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
 		struct usb_interface *interface = &dev->actconfig->interface[i];
-		
+
 		if (interface->driver == driver) {
-			if (driver->owner)
-				__MOD_INC_USE_COUNT(driver->owner);
-			down(&driver->serialize);
-			driver->disconnect(dev, interface->private_data);
-			up(&driver->serialize);
-			if (driver->owner)
-				__MOD_DEC_USE_COUNT(driver->owner);
+			usb_unbind_driver(dev, interface);
 			/* if driver->disconnect didn't release the interface */
 			if (interface->driver)
 				usb_driver_release_interface(driver, interface);
@@ -163,7 +260,7 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 /**
  * usb_deregister - unregister a USB driver
  * @driver: USB operations of the driver to unregister
- * Context: !in_interrupt ()
+ * Context: !in_interrupt (), must be called with BKL held
  *
  * Unlinks the specified driver from the internal USB driver list.
  * 
@@ -528,9 +625,7 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 	struct list_head *tmp;
 	struct usb_interface *interface;
 	void *private;
-	const struct usb_device_id *id;
 	struct usb_driver *driver;
-	int i;
 	
 	if ((!dev) || (ifnum >= dev->actconfig->bNumInterfaces)) {
 		err("bad find_interface_driver params");
@@ -545,37 +640,12 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		goto out_err;
 
 	private = NULL;
+	lock_kernel();
 	for (tmp = usb_driver_list.next; tmp != &usb_driver_list;) {
 		driver = list_entry(tmp, struct usb_driver, driver_list);
 		tmp = tmp->next;
 
-		if (driver->owner)
-			__MOD_INC_USE_COUNT(driver->owner);
-		id = driver->id_table;
-		/* new style driver? */
-		if (id) {
-			for (i = 0; i < interface->num_altsetting; i++) {
-			  	interface->act_altsetting = i;
-				id = usb_match_id(dev, interface, id);
-				if (id) {
-					down(&driver->serialize);
-					private = driver->probe(dev,ifnum,id);
-					up(&driver->serialize);
-					if (private != NULL)
-						break;
-				}
-			}
-
-			/* if driver not bound, leave defaults unchanged */
-			if (private == NULL)
-				interface->act_altsetting = 0;
-		} else { /* "old style" driver */
-			down(&driver->serialize);
-			private = driver->probe(dev, ifnum, NULL);
-			up(&driver->serialize);
-		}
-		if (driver->owner)
-			__MOD_DEC_USE_COUNT(driver->owner);
+		private = usb_bind_driver(driver, dev, ifnum);
 
 		/* probe() may have changed the config on us */
 		interface = dev->actconfig->interface + ifnum;
@@ -583,9 +653,11 @@ static int usb_find_interface_driver(struct usb_device *dev, unsigned ifnum)
 		if (private) {
 			usb_driver_claim_interface(driver, interface, private);
 			up(&dev->serialize);
+			unlock_kernel();
 			return 0;
 		}
 	}
+	unlock_kernel();
 
 out_err:
 	up(&dev->serialize);
@@ -1121,27 +1193,22 @@ void usb_disconnect(struct usb_device **pdev)
 
 	info("USB disconnect on device %d", dev->devnum);
 
+	lock_kernel();
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
 			struct usb_driver *driver = interface->driver;
 			if (driver) {
-				if (driver->owner)
-					__MOD_INC_USE_COUNT(driver->owner);
-				down(&driver->serialize);
-				driver->disconnect(dev, interface->private_data);
-				up(&driver->serialize);
+				usb_unbind_driver(dev, interface);
 				/* if driver->disconnect didn't release the interface */
 				if (interface->driver)
 					usb_driver_release_interface(driver, interface);
-				/* we don't need the driver any longer */
-				if (driver->owner)
-					__MOD_DEC_USE_COUNT(driver->owner);
 			}
 			/* remove our device node for this interface */
 			put_device(&interface->dev);
 		}
 	}
+	unlock_kernel();
 
 	/* Free up all the children.. */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
@@ -1475,6 +1542,8 @@ EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_connect);
 EXPORT_SYMBOL(usb_disconnect);
+EXPORT_SYMBOL(usb_bind_driver);
+EXPORT_SYMBOL(usb_unbind_driver);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 

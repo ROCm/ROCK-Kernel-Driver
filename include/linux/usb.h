@@ -431,6 +431,10 @@ extern void usb_free_dev(struct usb_device *);
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
 
+/* for probe/disconnect with correct module usage counting */
+void *usb_bind_driver(struct usb_driver *driver, struct usb_device *dev, unsigned int ifnum);
+void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf);
+
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
 
