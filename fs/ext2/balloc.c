@@ -198,16 +198,11 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	unsigned long bit;
 	unsigned long i;
 	unsigned long overflow;
-	struct super_block * sb;
+	struct super_block * sb = inode->i_sb;
 	struct ext2_group_desc * gdp;
 	struct ext2_super_block * es;
 	unsigned freed = 0, group_freed;
 
-	sb = inode->i_sb;
-	if (!sb) {
-		printk ("ext2_free_blocks: nonexistent device");
-		return;
-	}
 	lock_super (sb);
 	es = sb->u.ext2_sb.s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) || 
