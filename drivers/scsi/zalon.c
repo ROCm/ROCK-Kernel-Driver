@@ -108,7 +108,7 @@ zalon_probe(struct parisc_device *dev)
 	unsigned long io_port = zalon + GSC_SCSI_ZALON_OFFSET;
 	static int unit = 0;
 	struct Scsi_Host *host;
-	ncr_device device;
+	struct ncr_device device;
 
 	__raw_writel(CMD_RESET, zalon + IO_MODULE_IO_COMMAND);
 	while (!(__raw_readl(zalon + IO_MODULE_IO_STATUS) & IOSTATUS_RY))
@@ -133,7 +133,7 @@ zalon_probe(struct parisc_device *dev)
 	if (zalon_vers == 0)
 		printk(KERN_WARNING "%s: Zalon 1.1 or earlier\n", __FUNCTION__);
 
-	memset(&device, 0, sizeof(ncr_device));
+	memset(&device, 0, sizeof(struct ncr_device));
 
 	/* The following three are needed before any other access. */
 	writeb(0x20, io_port + 0x38); /* DCNTL_REG,  EA  */

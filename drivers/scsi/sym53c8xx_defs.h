@@ -951,7 +951,7 @@ struct Symbios_nvram {
 /* Controller set up 20 bytes */
 	u_char	v_major;	/* 0x00 */
 	u_char	v_minor;	/* 0x30 */
-	u_int32	boot_crc;
+	u32	boot_crc;
 	u_short	flags;
 #define SYMBIOS_SCAM_ENABLE	(1)
 #define SYMBIOS_PARITY_ENABLE	(1<<1)
@@ -1187,7 +1187,7 @@ struct ncr_reg {
 	#define   WRIE    0x01  /* mod: write and invalidate enable */
 				/* bits 4-7 rsvd for C1010          */
 
-/*1c*/  u_int32    nc_temp;	/* ### Temporary stack              */
+/*1c*/  u32    nc_temp;	/* ### Temporary stack              */
 
 /*20*/	u_char	  nc_dfifo;
 /*21*/  u_char    nc_ctest4;
@@ -1200,10 +1200,10 @@ struct ncr_reg {
 				/* bits 0-1, 3-7 rsvd for C1010          */
 /*23*/  u_char    nc_ctest6;
 
-/*24*/  u_int32    nc_dbc;	/* ### Byte count and command       */
-/*28*/  u_int32    nc_dnad;	/* ### Next command register        */
-/*2c*/  u_int32    nc_dsp;	/* --> Script Pointer               */
-/*30*/  u_int32    nc_dsps;	/* --> Script pointer save/opcode#2 */
+/*24*/  u32    nc_dbc;	/* ### Byte count and command       */
+/*28*/  u32    nc_dnad;	/* ### Next command register        */
+/*2c*/  u32    nc_dsp;	/* --> Script Pointer               */
+/*30*/  u32    nc_dsps;	/* --> Script pointer save/opcode#2 */
 
 /*34*/  u_char     nc_scratcha;  /* Temporary register a            */
 /*35*/  u_char     nc_scratcha1;
@@ -1232,7 +1232,7 @@ struct ncr_reg {
  	#define	  NOCOM   0x01	/* cmd: protect sfbr while reselect */
 				/* bits 0-1 rsvd for C1010          */
 
-/*3c*/  u_int32    nc_adder;
+/*3c*/  u32    nc_adder;
 
 /*40*/  u_short   nc_sien;	/* -->: interrupt enable            */
 /*42*/  u_short   nc_sist;	/* <--: interrupt status            */
@@ -1311,13 +1311,13 @@ struct ncr_reg {
 /*5f*/  u_char    nc_scr3;	/*                                  */
 
 /*60*/  u_char    nc_scrx[64];	/* Working register C-R             */
-/*a0*/	u_int32   nc_mmrs;	/* Memory Move Read Selector        */
-/*a4*/	u_int32   nc_mmws;	/* Memory Move Write Selector       */
-/*a8*/	u_int32   nc_sfs;	/* Script Fetch Selector            */
-/*ac*/	u_int32   nc_drs;	/* DSA Relative Selector            */
-/*b0*/	u_int32   nc_sbms;	/* Static Block Move Selector       */
-/*b4*/	u_int32   nc_dbms;	/* Dynamic Block Move Selector      */
-/*b8*/	u_int32   nc_dnad64;	/* DMA Next Address 64              */
+/*a0*/	u32   nc_mmrs;	/* Memory Move Read Selector        */
+/*a4*/	u32   nc_mmws;	/* Memory Move Write Selector       */
+/*a8*/	u32   nc_sfs;	/* Script Fetch Selector            */
+/*ac*/	u32   nc_drs;	/* DSA Relative Selector            */
+/*b0*/	u32   nc_sbms;	/* Static Block Move Selector       */
+/*b4*/	u32   nc_dbms;	/* Dynamic Block Move Selector      */
+/*b8*/	u32   nc_dnad64;	/* DMA Next Address 64              */
 /*bc*/	u_short   nc_scntl4;    /* C1010 only                       */
 	#define   U3EN   0x80	/* Enable Ultra 3                   */
 	#define   AIPEN	 0x40   /* Allow check upper byte lanes     */
@@ -1329,8 +1329,8 @@ struct ncr_reg {
 /*be*/  u_char   nc_aipcntl0;	/* Epat Control 1 C1010 only        */
 /*bf*/  u_char   nc_aipcntl1;	/* AIP Control C1010_66 Only        */
 
-/*c0*/	u_int32   nc_pmjad1;	/* Phase Mismatch Jump Address 1    */
-/*c4*/	u_int32   nc_pmjad2;	/* Phase Mismatch Jump Address 2    */
+/*c0*/	u32   nc_pmjad1;	/* Phase Mismatch Jump Address 1    */
+/*c4*/	u32   nc_pmjad2;	/* Phase Mismatch Jump Address 2    */
 /*c8*/	u_char    nc_rbc;	/* Remaining Byte Count             */
 /*c9*/	u_char    nc_rbc1;	/*                                  */
 /*ca*/	u_char    nc_rbc2;	/*                                  */
@@ -1340,22 +1340,22 @@ struct ncr_reg {
 /*cd*/	u_char    nc_ua1;	/*                                  */
 /*ce*/	u_char    nc_ua2;	/*                                  */
 /*cf*/	u_char    nc_ua3;	/*                                  */
-/*d0*/	u_int32   nc_esa;	/* Entry Storage Address            */
+/*d0*/	u32   nc_esa;	/* Entry Storage Address            */
 /*d4*/	u_char    nc_ia;	/* Instruction Address              */
 /*d5*/	u_char    nc_ia1;
 /*d6*/	u_char    nc_ia2;
 /*d7*/	u_char    nc_ia3;
-/*d8*/	u_int32   nc_sbc;	/* SCSI Byte Count (3 bytes only)   */
-/*dc*/	u_int32   nc_csbc;	/* Cumulative SCSI Byte Count       */
+/*d8*/	u32   nc_sbc;	/* SCSI Byte Count (3 bytes only)   */
+/*dc*/	u32   nc_csbc;	/* Cumulative SCSI Byte Count       */
 
                                 /* Following for C1010 only         */
 /*e0*/ u_short    nc_crcpad;    /* CRC Value                        */
 /*e2*/ u_char     nc_crccntl0;  /* CRC control register             */
 	#define   SNDCRC  0x10	/* Send CRC Request                 */
 /*e3*/ u_char     nc_crccntl1;  /* CRC control register             */
-/*e4*/ u_int32    nc_crcdata;   /* CRC data register                */ 
-/*e8*/ u_int32	  nc_e8_;	/* rsvd 			    */
-/*ec*/ u_int32	  nc_ec_;	/* rsvd 			    */
+/*e4*/ u32    nc_crcdata;   /* CRC data register                */ 
+/*e8*/ u32	  nc_e8_;	/* rsvd 			    */
+/*ec*/ u32	  nc_ec_;	/* rsvd 			    */
 /*f0*/ u_short    nc_dfbc;      /* DMA FIFO byte count              */ 
 
 };
@@ -1370,7 +1370,7 @@ struct ncr_reg {
 #define REGJ(p,r) (offsetof(struct ncr_reg, p ## r))
 #define REG(r) REGJ (nc_, r)
 
-typedef u_int32 ncrcmd;
+typedef u32 ncrcmd;
 
 /*-----------------------------------------------------------
 **
@@ -1422,8 +1422,8 @@ typedef u_int32 ncrcmd;
 #define SCR_CHMOV_TBL     (0x10000000)
 
 struct scr_tblmove {
-        u_int32  size;
-        u_int32  addr;
+        u32  size;
+        u32  addr;
 };
 
 /*-----------------------------------------------------------
@@ -1464,7 +1464,7 @@ struct scr_tblsel {
 #endif
 
 #define SCR_JMP_REL     0x04000000
-#define SCR_ID(id)	(((u_int32)(id)) << 16)
+#define SCR_ID(id)	(((u32)(id)) << 16)
 
 /*-----------------------------------------------------------
 **
