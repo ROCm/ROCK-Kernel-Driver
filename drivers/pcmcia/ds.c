@@ -928,7 +928,7 @@ static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
 	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
 		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
 		if (bus_sock->socket_dev == class_dev->dev) {
-			bus_sock->parent.pcmcia = NULL;
+			bus_sock->parent->pcmcia = NULL;
 			pcmcia_deregister_client(bus_sock->handle);
 			list_del(&bus_sock->socket_list);
 			kfree(bus_sock);

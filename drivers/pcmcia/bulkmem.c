@@ -538,7 +538,7 @@ int pcmcia_open_memory(client_handle_t *handle, open_mem_t *open, memory_handle_
     
     if ((handle == NULL) || CHECK_HANDLE(*handle))
 	return CS_BAD_HANDLE;
-    s = SOCKET(*handle);
+    s = pcmcia_get_socket_by_nr((*handle)->Socket);
     if (open->Attributes & MEMORY_TYPE_AM)
 	region = s->a_region;
     else

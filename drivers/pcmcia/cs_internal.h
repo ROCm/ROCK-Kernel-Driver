@@ -118,7 +118,7 @@ typedef struct pcmcia_socket socket_info_t;
 #define CHECK_SOCKET(s) \
     (((s) >= sockets) || (socket_table[s]->ss_entry == NULL))
 
-#define SOCKET(h) (socket_table[(h)->Socket])
+#define SOCKET(h) (pcmcia_get_socket_by_nr(h->Socket))
 #define CONFIG(h) (&SOCKET(h)->config[(h)->Function])
 
 #define CHECK_REGION(r) \
@@ -181,9 +181,8 @@ int proc_read_io(char *buf, char **start, off_t pos,
 int proc_read_mem(char *buf, char **start, off_t pos,
 		  int count, int *eof, void *data);
 
-#define MAX_SOCK 8
-extern socket_t sockets;
-extern socket_info_t *socket_table[MAX_SOCK];
+extern struct rw_semaphore pcmcia_socket_list_rwsem;
+extern struct list_head pcmcia_socket_list;
 
 #ifdef CONFIG_PROC_FS
 extern struct proc_dir_entry *proc_pccard;

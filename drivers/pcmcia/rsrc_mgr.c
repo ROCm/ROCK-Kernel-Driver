@@ -726,7 +726,7 @@ void undo_irq(u_int Attributes, int irq)
 static int adjust_memory(adjust_t *adj)
 {
     u_long base, num;
-    int i, ret;
+    int ret;
 
     base = adj->resource.memory.Base;
     num = adj->resource.memory.Size;
@@ -743,9 +743,11 @@ static int adjust_memory(adjust_t *adj)
     case REMOVE_MANAGED_RESOURCE:
 	ret = sub_interval(&mem_db, base, num);
 	if (ret == CS_SUCCESS) {
-	    for (i = 0; i < sockets; i++) {
-		release_cis_mem(socket_table[i]);
-	    }
+		struct pcmcia_socket *socket;
+		down_read(&pcmcia_socket_list_rwsem);
+		list_for_each_entry(socket, &pcmcia_socket_list, socket_list)
+			release_cis_mem(socket);
+		up_read(&pcmcia_socket_list_rwsem);
 	}
 	break;
     default:
