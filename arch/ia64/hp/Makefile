@@ -1,23 +1,15 @@
-#
-# ia64/platform/hp/Makefile
-#
-# Copyright (C) 2002 Hewlett-Packard Co.
-#	David Mosberger-Tang <davidm@hpl.hp.com>
-# Copyright (C) 1999 Silicon Graphics, Inc.
-# Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
-#
+# arch/ia64/hp/Makefile
+# Copyright (c) 2002 Matthew Wilcox for Hewlett Packard
 
-all: hp.a
+ALL_SUB_DIRS := sim zx1 common
 
-O_TARGET := hp.a
+O_TARGET := hp.o
 
-obj-y := hpsim_console.o hpsim_irq.o hpsim_setup.o
-obj-$(CONFIG_IA64_GENERIC) += hpsim_machvec.o
+subdir-$(CONFIG_IA64_GENERIC) += $(ALL_SUB_DIRS)
+subdir-$(CONFIG_IA64_HP_SIM) += sim
+subdir-$(CONFIG_IA64_HP_ZX1) += zx1 common
 
-obj-$(CONFIG_HP_SIMETH)	+= simeth.o
-obj-$(CONFIG_HP_SIMSERIAL) += simserial.o
-obj-$(CONFIG_HP_SIMSCSI) += simscsi.o
-
-clean::
+SUB_DIRS := $(subdir-y)
+obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))
 
 include $(TOPDIR)/Rules.make

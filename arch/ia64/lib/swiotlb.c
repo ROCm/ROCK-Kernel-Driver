@@ -10,6 +10,7 @@
  *			unnecessary i-cache flushing.
  */
 
+#include <linux/cache.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -23,9 +24,6 @@
 
 #include <linux/init.h>
 #include <linux/bootmem.h>
-
-#define ALIGN(val, align) ((unsigned long)	\
-	(((unsigned long) (val) + ((align) - 1)) & ~((align) - 1)))
 
 #define OFFSET(val,align) ((unsigned long)	\
 	                   ( (val) & ( (align) - 1)))

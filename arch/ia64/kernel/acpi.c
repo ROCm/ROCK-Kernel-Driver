@@ -80,6 +80,8 @@ acpi_get_sysname (void)
 #endif
 }
 
+#ifdef CONFIG_ACPI_BOOT
+
 #define ACPI_MAX_PLATFORM_IRQS	256
 
 /* Array to record platform interrupt vectors for generic interrupt routing. */
@@ -592,3 +594,5 @@ acpi_get_interrupt_model (int *type)
 
         return 0;
 }
+
+#endif /* CONFIG_ACPI_BOOT */
