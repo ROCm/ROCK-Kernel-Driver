@@ -2000,6 +2000,9 @@ static void addrconf_dev_config(struct net_device *dev)
 
 	ASSERT_RTNL();
 
+	if (!dev->generate_eui64) 
+		dev->generate_eui64 = ipv6_generate_eui64;
+
 	if ((dev->type != ARPHRD_ETHER) && 
 	    (dev->type != ARPHRD_FDDI) &&
 	    (dev->type != ARPHRD_IEEE802_TR) &&
@@ -2008,9 +2011,6 @@ static void addrconf_dev_config(struct net_device *dev)
 		/* Alas, we support only Ethernet autoconfiguration. */
 		return;
 	}
-
-	if (!dev->generate_eui64) 
-		dev->generate_eui64 = ipv6_generate_eui64;
 
 	idev = addrconf_add_dev(dev);
 	if (idev == NULL)
