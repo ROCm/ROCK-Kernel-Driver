@@ -295,7 +295,7 @@ static unsigned short find_eisa_board(int);
 /* Static Data */
 /***************/
 
-static struct tty_driver ip2_tty_driver;
+static struct tty_driver *ip2_tty_driver;
 
 /* Here, then is a table of board pointers which the interrupt routine should
  * scan through to determine who it must service.
@@ -348,7 +348,7 @@ static int tracewrap;
 
 #if defined(MODULE) && defined(IP2DEBUG_OPEN)
 #define DBG_CNT(s) printk(KERN_DEBUG "(%s): [%x] refc=%d, ttyc=%d, modc=%x -> %s\n", \
-		    tty->name,(pCh->flags),ip2_tty_driver.refcount, \
+		    tty->name,(pCh->flags),ip2_tty_driver->refcount, \
 		    tty->count,/*GET_USE_COUNT(module)*/0,s)
 #else
 #define DBG_CNT(s)
@@ -502,9 +502,10 @@ cleanup_module(void)
 		}
 	}
 	devfs_remove("ip2");
-	if ( ( err = tty_unregister_driver ( &ip2_tty_driver ) ) ) {
+	if ( ( err = tty_unregister_driver ( ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister tty driver (%d)\n", err);
 	}
+	put_tty_driver(ip2_tty_driver);
 	if ( ( err = unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister IPL driver (%d)\n", err);
 	}
@@ -530,6 +531,26 @@ cleanup_module(void)
 #endif
 }
 #endif /* MODULE */
+
+static struct tty_operations ip2_ops = {
+	.open            = ip2_open,
+	.close           = ip2_close,
+	.write           = ip2_write,
+	.put_char        = ip2_putchar,
+	.flush_chars     = ip2_flush_chars,
+	.write_room      = ip2_write_room,
+	.chars_in_buffer = ip2_chars_in_buf,
+	.flush_buffer    = ip2_flush_buffer,
+	.ioctl           = ip2_ioctl,
+	.throttle        = ip2_throttle,
+	.unthrottle      = ip2_unthrottle,
+	.set_termios     = ip2_set_termios,
+	.set_ldisc       = ip2_set_line_discipline,
+	.stop            = ip2_stop,
+	.start           = ip2_start,
+	.hangup          = ip2_hangup,
+	.read_proc       = ip2_read_proc,
+};
 
 /******************************************************************************/
 /* Function:   ip2_loadmain()                                                 */
@@ -604,6 +625,10 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		return 0;
 	}
 	loaded++;
+
+	ip2_tty_driver = alloc_tty_driver(IP2_MAX_PORTS);
+	if (!ip2_tty_driver)
+		return -ENOMEM;
 
 	/* Initialise the iiEllis subsystem. */
 	iiEllisInit();
@@ -759,50 +784,26 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 2, 0 );
 
-	/* Zero out the normal tty device structure. */
-	memset ( &ip2_tty_driver, 0, sizeof ip2_tty_driver );
-
-	/* Initialise the relevant fields. */
-	ip2_tty_driver.magic                = TTY_DRIVER_MAGIC;
-	ip2_tty_driver.owner		    = THIS_MODULE;
-	ip2_tty_driver.name                 = "ttyF";
-	ip2_tty_driver.devfs_name	    = "tts/F";
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
-	ip2_tty_driver.driver_name          = pcDriver_name;
-	ip2_tty_driver.read_proc          	= ip2_read_proc;
-#endif
-	ip2_tty_driver.major                = IP2_TTY_MAJOR;
-	ip2_tty_driver.minor_start          = 0;
-	ip2_tty_driver.num                  = IP2_MAX_PORTS;
-	ip2_tty_driver.type                 = TTY_DRIVER_TYPE_SERIAL;
-	ip2_tty_driver.subtype              = SERIAL_TYPE_NORMAL;
-	ip2_tty_driver.init_termios         = tty_std_termios;
-	ip2_tty_driver.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
-	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-
-	/* Setup the pointers to the implemented functions. */
-	ip2_tty_driver.open            = ip2_open;
-	ip2_tty_driver.close           = ip2_close;
-	ip2_tty_driver.write           = ip2_write;
-	ip2_tty_driver.put_char        = ip2_putchar;
-	ip2_tty_driver.flush_chars     = ip2_flush_chars;
-	ip2_tty_driver.write_room      = ip2_write_room;
-	ip2_tty_driver.chars_in_buffer = ip2_chars_in_buf;
-	ip2_tty_driver.flush_buffer    = ip2_flush_buffer;
-	ip2_tty_driver.ioctl           = ip2_ioctl;
-	ip2_tty_driver.throttle        = ip2_throttle;
-	ip2_tty_driver.unthrottle      = ip2_unthrottle;
-	ip2_tty_driver.set_termios     = ip2_set_termios;
-	ip2_tty_driver.set_ldisc       = ip2_set_line_discipline;
-	ip2_tty_driver.stop            = ip2_stop;
-	ip2_tty_driver.start           = ip2_start;
-	ip2_tty_driver.hangup          = ip2_hangup;
+	ip2_tty_driver->owner		    = THIS_MODULE;
+	ip2_tty_driver->name                 = "ttyF";
+	ip2_tty_driver->devfs_name	    = "tts/F";
+	ip2_tty_driver->driver_name          = pcDriver_name;
+	ip2_tty_driver->major                = IP2_TTY_MAJOR;
+	ip2_tty_driver->minor_start          = 0;
+	ip2_tty_driver->type                 = TTY_DRIVER_TYPE_SERIAL;
+	ip2_tty_driver->subtype              = SERIAL_TYPE_NORMAL;
+	ip2_tty_driver->init_termios         = tty_std_termios;
+	ip2_tty_driver->init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
+	ip2_tty_driver->flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(ip2_tty_driver, &ip2_ops);
 
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 3, 0 );
 
 	/* Register the tty devices. */
-	if ( ( err = tty_register_driver ( &ip2_tty_driver ) ) ) {
+	if ( ( err = tty_register_driver ( ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to register tty driver (%d)\n", err);
+		put_tty_driver(ip2_tty_driver);
+		return -EINVAL;
 	} else
 	/* Register the IPL driver. */
 	if ( ( err = register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl ) ) ) {
@@ -838,7 +839,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 			        {
 				    if ( pB->i2eChannelMap[box] & (1 << j) )
 				    {
-				        tty_register_device(&ip2_tty_driver,
+				        tty_register_device(ip2_tty_driver,
 					    j + ABS_BIGGEST_BOX *
 						    (box+i*ABS_MAX_BOXES), NULL);
 			    	    }
@@ -3016,7 +3017,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 	case 13:
 		switch ( cmd ) {
 		case 64:	/* Driver - ip2stat */
-			PUT_USER(rc, ip2_tty_driver.refcount, pIndex++ );
+			PUT_USER(rc, ip2_tty_driver->refcount, pIndex++ );
 			PUT_USER(rc, irq_counter, pIndex++  );
 			PUT_USER(rc, bh_counter, pIndex++  );
 			break;
