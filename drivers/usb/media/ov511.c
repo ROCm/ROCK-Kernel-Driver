@@ -6474,7 +6474,7 @@ usb_ov511_init(void)
 		return -1;
 
 #if defined (__i386__)
-	if (test_bit(X86_FEATURE_MMX, &boot_cpu_data.x86_capability))
+	if (test_bit(X86_FEATURE_MMX, boot_cpu_data.x86_capability))
 		ov51x_mmx_available = 1;
 #endif
 
