@@ -159,14 +159,25 @@ export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
-# Build vmlinux / boot target
+# boot target
 # ---------------------------------------------------------------------------
 
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
-vmlinux: include/linux/version.h $(CONFIGURATION) linuxsubdirs
-	$(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
+# Build vmlinux
+# ---------------------------------------------------------------------------
+
+#	This is a bit tricky: If we need to relink vmlinux, we want
+#	the version number incremented, which means recompile init/version.o
+#	and relink init/init.o. However, we cannot do this during the
+#       normal descending-into-subdirs phase, since at that time
+#       we cannot yet know if we will need to relink vmlinux.
+#	So we descend into init/ inside the rule for vmlinux again.
+
+vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
+
+cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
 		$(LIBS) \
@@ -174,10 +185,33 @@ vmlinux: include/linux/version.h $(CONFIGURATION) linuxsubdirs
 		$(NETWORKS) \
 		--end-group \
 		-o vmlinux
+
+#	set -e makes the rule exit immediately on error
+
+define rule_link_vmlinux
+	set -e
+	echo Generating build number
+	. scripts/mkversion > .tmpversion
+	mv -f .tmpversion .version
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C init
+	echo $(cmd_link_vmlinux)
+	$(cmd_link_vmlinux)
+	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+endef
+
+vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
+	$(call if_changed_rule,link_vmlinux)
+
+#	The actual objects are generated when descending, make sure
+#	no implicit rule kicks in
+
+$(sort $(vmlinux-objs)): linuxsubdirs
+	@
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
+.PHONY: linuxsubdirs
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
 $(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
@@ -214,8 +248,6 @@ symlinks:
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
-	. scripts/mkversion > .tmpversion
-	@mv -f .tmpversion .version
 
 # Generate some files
 
@@ -470,3 +502,12 @@ backup: mrproper
 
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
+
+# FIXME Should go into a make.lib or something 
+# ---------------------------------------------------------------------------
+
+if_changed_rule = $(if $(strip $? \
+		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\
+			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
+	               @$(rule_$(1)))
+
