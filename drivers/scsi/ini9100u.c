@@ -328,7 +328,6 @@ int tul_NewReturnNumberOfAdapters(void)
 
 int i91u_detect(Scsi_Host_Template * tpnt)
 {
-	SCB *pSCB;
 	HCS *pHCB;
 	struct Scsi_Host *hreg;
 	unsigned long i;	/* 01/14/98                     */
@@ -370,7 +369,7 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 
 	for (; tul_num_scb >= MAX_TARGETS + 3; tul_num_scb--) {
 		i = tul_num_ch * tul_num_scb * sizeof(SCB);
-		if ((tul_scb = (SCB *) kmalloc(i, GFP_ATOMIC)) != NULL)
+		if ((tul_scb = (SCB *) kmalloc(i, GFP_ATOMIC | GFP_DMA)) != NULL)
 			break;
 	}
 	if (tul_scb == NULL) {
@@ -378,11 +377,6 @@ int i91u_detect(Scsi_Host_Template * tpnt)
 		return (0);
 	}
 	memset((unsigned char *) tul_scb, 0, i);
-
-	pSCB = tul_scb;
-	for (i = 0; i < tul_num_ch * tul_num_scb; i++, pSCB++) {
-		pSCB->SCB_SGPAddr = (u32)&pSCB->SCB_SGList[0];
-	}
 
 	for (i = 0, pHCB = &tul_hcs[0];		/* Get pointer for control block */
 	     i < tul_num_ch;
@@ -503,19 +497,23 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	} else {
 		pSCB->SCB_TagMsg = 0;	/* No tag support               */
 	}
-
+	/* todo handle map_sg error */
 	if (SCpnt->use_sg) {
-		pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
+		dma_addr = dma_map_single(&pHCB->pci_dev->dev, &pSCB->SCB_SGList[0],
+					  sizeof(struct SG_Struc) * TOTAL_SG_ENTRY,
+					  DMA_BIDIRECTIONAL);
+		pSCB->SCB_BufPtr = dma_addr;
+		SCpnt->SCp.dma_handle = dma_addr;
 
+		pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
 		pSCB->SCB_SGLen = dma_map_sg(&pHCB->pci_dev->dev, pSrbSG,
 					     SCpnt->use_sg, SCpnt->sc_data_direction);
 
-		pSCB->SCB_BufPtr = pSCB->SCB_SGPAddr;
 		pSCB->SCB_Flags |= SCF_SG;	/* Turn on SG list flag       */
 		for (i = 0, TotalLen = 0, pSG = &pSCB->SCB_SGList[0];	/* 1.01g */
 		     i < pSCB->SCB_SGLen; i++, pSG++, pSrbSG++) {
-			pSG->SG_Ptr = cpu_to_le32((u32)sg_dma_address(pSrbSG));
-			TotalLen += pSG->SG_Len = cpu_to_le32((u32)sg_dma_len(pSrbSG));
+			pSG->SG_Ptr = (u32)sg_dma_address(pSrbSG);
+			TotalLen += pSG->SG_Len = (u32)sg_dma_len(pSrbSG);
 		}
 
 		pSCB->SCB_BufLen = (SCpnt->request_bufflen > TotalLen) ?
@@ -525,8 +523,8 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 					  SCpnt->request_bufflen,
 					  SCpnt->sc_data_direction);
 		SCpnt->SCp.dma_handle = dma_addr;
-		pSCB->SCB_BufPtr = cpu_to_le32((u32)dma_addr);
-		pSCB->SCB_BufLen = cpu_to_le32((u32)SCpnt->request_bufflen);
+		pSCB->SCB_BufPtr = (u32)dma_addr;
+		pSCB->SCB_BufLen = (u32)SCpnt->request_bufflen;
 		pSCB->SCB_SGLen = 0;
 	} else {
 		pSCB->SCB_BufLen = 0;
@@ -640,13 +638,17 @@ static void i91u_unmap_cmnd(struct pci_dev *pci_dev, struct scsi_cmnd *cmnd)
 
 	/* request buffer */
 	if (cmnd->use_sg) {
+		dma_unmap_single(&pci_dev->dev, cmnd->SCp.dma_handle,
+				 sizeof(struct SG_Struc) * TOTAL_SG_ENTRY,
+				 DMA_BIDIRECTIONAL);
+
 		dma_unmap_sg(&pci_dev->dev, cmnd->request_buffer,
 			     cmnd->use_sg,
-			     scsi_to_pci_dma_dir(cmnd->sc_data_direction));
+			     cmnd->sc_data_direction);
 	} else if (cmnd->request_bufflen) {
 		dma_unmap_single(&pci_dev->dev, cmnd->SCp.dma_handle,
 				 cmnd->request_bufflen,
-				 scsi_to_pci_dma_dir(cmnd->sc_data_direction));
+				 cmnd->sc_data_direction);
 	}
 }
 
