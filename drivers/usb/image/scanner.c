@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.5.52)
+ * Driver for USB Scanners (linux-2.5.54)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
@@ -330,6 +330,9 @@
  *    - Fix compilation error when debugging is enabled.
  *    - Add locking to ioctl_scanner(). Thanks to Oliver Neukum
  *      <oliver@neukum.name>.
+ *
+ * 0.4.10  01/07/2003
+ *    - Added vendor/product ids for Visioneer scanners.
  *
  * TODO
  *    - Remove the 2/3 endpoint limitation

@@ -122,6 +122,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0458, 0x2016) }, /* ColorPage-HR6X */
 	/* Hewlett Packard */
 	{ USB_DEVICE(0x03f0, 0x0505) }, /* ScanJet 2100C */
+	{ USB_DEVICE(0x03f0, 0x0605) },	/* 2200C */
 	{ USB_DEVICE(0x03f0, 0x0901) }, /* 2300C */
 	{ USB_DEVICE(0x03f0, 0x0205) },	/* 3300C */
 	{ USB_DEVICE(0x03f0, 0x0405) }, /* 3400C */
@@ -134,7 +135,6 @@ static struct usb_device_id scanner_device_ids [] = {
 	//	{ USB_DEVICE(0x03f0, 0x0701) },	/* 5300C - NOT SUPPORTED - see http://www.neatech.nl/oss/HP5300C/ */
 	{ USB_DEVICE(0x03f0, 0x0201) },	/* 6200C */
 	{ USB_DEVICE(0x03f0, 0x0601) },	/* 6300C */
-	{ USB_DEVICE(0x03f0, 0x605) },	/* 2200C */
 	/* iVina */
 	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
 	/* Lexmark */
@@ -242,6 +242,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */
 	{ USB_DEVICE(0x04a7, 0x0321) },	/* OneTouch 8100 EPP/USB */
 	{ USB_DEVICE(0x04a7, 0x0331) }, /* OneTouch 8600 EPP/USB */
+	{ USB_DEVICE(0x0461, 0x0345) }, /* 6200 (actually Primax?) */
+	{ USB_DEVICE(0x0461, 0x0371) }, /* Onetouch 8920 USB (actually Primax?) */
 	{ }				/* Terminating entry */
 };
 
