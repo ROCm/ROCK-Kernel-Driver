@@ -645,7 +645,6 @@ capi_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct capidev *cdev = (struct capidev *)file->private_data;
 	struct sk_buff *skb;
-	int retval;
 	size_t copied;
 
 	if (ppos != &file->f_pos)
@@ -689,7 +688,6 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct capidev *cdev = (struct capidev *)file->private_data;
 	struct sk_buff *skb;
-	int retval;
 	u16 mlen;
 
         if (ppos != &file->f_pos)

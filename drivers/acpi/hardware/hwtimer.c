@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 20 $
+ *              $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
  */
 
 #include "acpi.h"
-#include "achware.h"
 
 #define _COMPONENT          ACPI_HARDWARE
 	 ACPI_MODULE_NAME    ("hwtimer")
@@ -81,6 +80,9 @@ acpi_status
 acpi_get_timer (
 	u32                     *ticks)
 {
+	acpi_status             status;
+
+
 	ACPI_FUNCTION_TRACE ("Acpi_get_timer");
 
 
@@ -88,9 +90,9 @@ acpi_get_timer (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	*ticks = acpi_hw_low_level_read (32, &acpi_gbl_FADT->Xpm_tmr_blk, 0);
+	status = acpi_hw_low_level_read (32, ticks, &acpi_gbl_FADT->Xpm_tmr_blk, 0);
 
-	return_ACPI_STATUS (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 68 $
+ *              $Revision: 73 $
  *
  *****************************************************************************/
 
@@ -25,9 +25,7 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
-#include "actables.h"
 #include "amlcode.h"
 
 
@@ -97,6 +95,10 @@ acpi_ut_create_internal_object_dbg (
 
 		object->common.next_object = second_object;
 		break;
+
+	default:
+		/* All others have no secondary object */
+		break;
 	}
 
 	/* Save the object type in the object descriptor */
@@ -142,7 +144,7 @@ acpi_ut_valid_internal_object (
 	/* Check the descriptor type field */
 
 	switch (ACPI_GET_DESCRIPTOR_TYPE (object)) {
-	case ACPI_DESC_TYPE_INTERNAL:
+	case ACPI_DESC_TYPE_OPERAND:
 
 		/* The object appears to be a valid acpi_operand_object  */
 
@@ -210,10 +212,10 @@ acpi_ut_allocate_object_desc_dbg (
 
 	/* Mark the descriptor type */
 
-	ACPI_SET_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_INTERNAL);
+	ACPI_SET_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_OPERAND);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "%p Size %X\n",
-			object, sizeof (acpi_operand_object)));
+			object, (u32) sizeof (acpi_operand_object)));
 
 	return_PTR (object);
 }
@@ -240,7 +242,7 @@ acpi_ut_delete_object_desc (
 
 	/* Object must be an acpi_operand_object  */
 
-	if (ACPI_GET_DESCRIPTOR_TYPE (object) != ACPI_DESC_TYPE_INTERNAL) {
+	if (ACPI_GET_DESCRIPTOR_TYPE (object) != ACPI_DESC_TYPE_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Obj %p is not an ACPI object\n", object));
 		return_VOID;
@@ -337,13 +339,13 @@ acpi_ut_get_simple_object_size (
 
 	case ACPI_TYPE_STRING:
 
-		length += internal_object->string.length + 1;
+		length += (ACPI_SIZE) internal_object->string.length + 1;
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		length += internal_object->buffer.length;
+		length += (ACPI_SIZE) internal_object->buffer.length;
 		break;
 
 
@@ -461,6 +463,13 @@ acpi_ut_get_element_length (
 		info->num_packages++;
 		state->pkg.this_target_obj = NULL;
 		break;
+
+
+	default:
+
+		/* No other types allowed */
+
+		return (AE_BAD_PARAMETER);
 	}
 
 	return (status);
@@ -512,7 +521,7 @@ acpi_ut_get_package_object_size (
 	 * Round up to the next machine word.
 	 */
 	info.length += ACPI_ROUND_UP_TO_NATIVE_WORD (sizeof (acpi_object)) *
-			  info.num_packages;
+			  (ACPI_SIZE) info.num_packages;
 
 	/* Return the total package length */
 
@@ -546,7 +555,7 @@ acpi_ut_get_object_size(
 	ACPI_FUNCTION_ENTRY ();
 
 
-	if ((ACPI_GET_DESCRIPTOR_TYPE (internal_object) == ACPI_DESC_TYPE_INTERNAL) &&
+	if ((ACPI_GET_DESCRIPTOR_TYPE (internal_object) == ACPI_DESC_TYPE_OPERAND) &&
 		(internal_object->common.type == ACPI_TYPE_PACKAGE)) {
 		status = acpi_ut_get_package_object_size (internal_object, obj_length);
 	}

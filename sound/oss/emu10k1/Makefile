@@ -2,8 +2,6 @@
 #
 # 12 Apr 2000 Rui Sousa
 
-O_TARGET := _emu10k1.o
-
 obj-$(CONFIG_SOUND_EMU10K1) += emu10k1.o
 
 emu10k1-objs := audio.o cardmi.o cardmo.o cardwi.o cardwo.o ecard.o \

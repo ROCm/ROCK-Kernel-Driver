@@ -56,15 +56,6 @@ static int __init xp860_init(void)
 
 __initcall(xp860_init);
 
-
-static void __init
-fixup_xp860(struct machine_desc *desc, struct tag *tags,
-	    char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-}
-
 static struct map_desc xp860_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x10000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SCSI */
@@ -84,7 +75,6 @@ static void __init xp860_map_io(void)
 
 MACHINE_START(XP860, "XP860")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_xp860)
 	MAPIO(xp860_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

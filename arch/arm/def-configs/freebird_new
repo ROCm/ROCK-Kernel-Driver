@@ -131,7 +131,7 @@ CONFIG_BINFMT_ELF=y
 CONFIG_PM=y
 CONFIG_APM=y
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="noinitrd console=ttySA0 init=/linuxrc root=1f04 mem=32m"
+CONFIG_CMDLINE="noinitrd console=ttySA0 init=/linuxrc root=/dev/mtdblock4 mem=32m"
 # CONFIG_PFS168_CMDLINE is not set
 # CONFIG_LEDS is not set
 CONFIG_ALIGNMENT_TRAP=y

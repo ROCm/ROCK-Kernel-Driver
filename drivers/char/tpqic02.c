@@ -2977,4 +2977,3 @@ int init_module(void)
 #endif
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 36 $
+ *              $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@ acpi_tb_get_table_count (
 	ACPI_FUNCTION_ENTRY ();
 
 
-#ifndef _IA64
+#if ACPI_MACHINE_WIDTH != 64
 
 	if (RSDP->revision < 2) {
 		pointer_size = sizeof (u32);
@@ -93,7 +93,7 @@ acpi_tb_convert_to_xsdt (
 	acpi_table_desc         *table_info,
 	u32                     *number_of_tables)
 {
-	u32                     table_size;
+	ACPI_SIZE               table_size;
 	u32                     i;
 	xsdt_descriptor         *new_table;
 
@@ -107,7 +107,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Compute size of the converted XSDT */
 
-	table_size = (*number_of_tables * sizeof (u64)) + sizeof (acpi_table_header);
+	table_size = ((ACPI_SIZE) *number_of_tables * sizeof (u64)) + sizeof (acpi_table_header);
 
 	/* Allocate an XSDT */
 
@@ -119,7 +119,7 @@ acpi_tb_convert_to_xsdt (
 	/* Copy the header and set the length */
 
 	ACPI_MEMCPY (new_table, table_info->pointer, sizeof (acpi_table_header));
-	new_table->header.length = table_size;
+	new_table->header.length = (u32) table_size;
 
 	/* Copy the table pointers */
 
@@ -151,6 +151,165 @@ acpi_tb_convert_to_xsdt (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_tb_convert_fadt1
+ *
+ * PARAMETERS:  Local_fadt      - Pointer to new FADT
+ *              Original_fadt   - Pointer to old FADT
+ *
+ * RETURN:      Populates Local_fadt
+ *
+ * DESCRIPTION: Convert an ACPI 1.0 FADT to common internal format
+ *
+ ******************************************************************************/
+
+static void
+acpi_tb_convert_fadt1 (
+	fadt_descriptor_rev2   *local_fadt,
+	fadt_descriptor_rev1   *original_fadt)
+{
+
+
+	/* ACPI 1.0 FACS */
+	/* The BIOS stored FADT should agree with Revision 1.0 */
+
+	/*
+	 * Copy the table header and the common part of the tables.
+	 *
+	 * The 2.0 table is an extension of the 1.0 table, so the entire 1.0
+	 * table can be copied first, then expand some fields to 64 bits.
+	 */
+	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (fadt_descriptor_rev1));
+
+	/* Convert table pointers to 64-bit fields */
+
+	ACPI_STORE_ADDRESS (local_fadt->Xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
+	ACPI_STORE_ADDRESS (local_fadt->Xdsdt, local_fadt->V1_dsdt);
+
+	/*
+	 * System Interrupt Model isn't used in ACPI 2.0 (Local_fadt->Reserved1 = 0;)
+	 */
+
+	/*
+	 * This field is set by the OEM to convey the preferred power management
+	 * profile to OSPM. It doesn't have any 1.0 equivalence.  Since we don't
+	 * know what kind of 32-bit system this is, we will use "unspecified".
+	 */
+	local_fadt->prefer_PM_profile = PM_UNSPECIFIED;
+
+	/*
+	 * Processor Performance State Control. This is the value OSPM writes to
+	 * the SMI_CMD register to assume processor performance state control
+	 * responsibility. There isn't any equivalence in 1.0, leave it zeroed.
+	 */
+	local_fadt->pstate_cnt = 0;
+
+	/*
+	 * Support for the _CST object and C States change notification.
+	 * This data item hasn't any 1.0 equivalence so leave it zero.
+	 */
+	local_fadt->cst_cnt = 0;
+
+	/*
+	 * Since there isn't any equivalence in 1.0 and since it highly likely
+	 * that a 1.0 system has legacy support.
+	 */
+	local_fadt->iapc_boot_arch = BAF_LEGACY_DEVICES;
+
+	/*
+	 * Convert the V1.0 block addresses to V2.0 GAS structures
+	 */
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_evt_blk, local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm2_cnt_blk, local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm_tmr_blk, local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe0_blk,  local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe1_blk,  local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
+
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_tb_convert_fadt2
+ *
+ * PARAMETERS:  Local_fadt      - Pointer to new FADT
+ *              Original_fadt   - Pointer to old FADT
+ *
+ * RETURN:      Populates Local_fadt
+ *
+ * DESCRIPTION: Convert an ACPI 2.0 FADT to common internal format.
+ *              Handles optional "X" fields.
+ *
+ ******************************************************************************/
+
+static void
+acpi_tb_convert_fadt2 (
+	fadt_descriptor_rev2   *local_fadt,
+	fadt_descriptor_rev2   *original_fadt)
+{
+
+	/* We have an ACPI 2.0 FADT but we must copy it to our local buffer */
+
+	ACPI_MEMCPY (local_fadt, original_fadt, sizeof (fadt_descriptor_rev2));
+
+	/*
+	 * "X" fields are optional extensions to the original V1.0 fields, so
+	 * we must selectively expand V1.0 fields if the corresponding X field
+	 * is zero.
+	 */
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xfirmware_ctrl))) {
+		ACPI_STORE_ADDRESS (local_fadt->Xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xdsdt))) {
+		ACPI_STORE_ADDRESS (local_fadt->Xdsdt, local_fadt->V1_dsdt);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1a_evt_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_evt_blk,
+			local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1b_evt_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_evt_blk,
+			local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1a_cnt_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_cnt_blk,
+			local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1b_cnt_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_cnt_blk,
+			local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm2_cnt_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm2_cnt_blk,
+			local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm_tmr_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm_tmr_blk,
+			local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xgpe0_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe0_blk,
+			local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
+	}
+
+	if (!(ACPI_GET_ADDRESS (local_fadt->Xgpe1_blk.address))) {
+		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe1_blk,
+			local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
+	}
+}
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_tb_convert_table_fadt
  *
  * PARAMETERS:  None
@@ -170,8 +329,7 @@ acpi_tb_convert_to_xsdt (
 acpi_status
 acpi_tb_convert_table_fadt (void)
 {
-	fadt_descriptor_rev1   *FADT1;
-	fadt_descriptor_rev2   *FADT2;
+	fadt_descriptor_rev2   *local_fadt;
 	acpi_table_desc        *table_desc;
 
 
@@ -182,97 +340,45 @@ acpi_tb_convert_table_fadt (void)
 	 * Acpi_gbl_FADT is valid
 	 * Allocate and zero the 2.0 FADT buffer
 	 */
-	FADT2 = ACPI_MEM_CALLOCATE (sizeof (fadt_descriptor_rev2));
-	if (FADT2 == NULL) {
+	local_fadt = ACPI_MEM_CALLOCATE (sizeof (fadt_descriptor_rev2));
+	if (local_fadt == NULL) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
 	/*
-	 * The ACPI FADT revision number is FADT2_REVISION_ID=3
-	 * So, if the current table revision is less than 3 it is type 1.0
+	 * FADT length and version validation.  The table must be at least as
+	 * long as the version 1.0 FADT
 	 */
-	if (acpi_gbl_FADT->header.revision >= FADT2_REVISION_ID) {
-		/* We have an ACPI 2.0 FADT but we must copy it to our local buffer */
+	if (acpi_gbl_FADT->header.length < sizeof (fadt_descriptor_rev1)) {
+		ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", acpi_gbl_FADT->header.length));
+		return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
+	}
 
-		*FADT2 = *((fadt_descriptor_rev2*) acpi_gbl_FADT);
+	if (acpi_gbl_FADT->header.revision >= FADT2_REVISION_ID) {
+		if (acpi_gbl_FADT->header.length < sizeof (fadt_descriptor_rev2)) {
+			/* Length is too short to be a V2.0 table */
+
+			ACPI_REPORT_WARNING (("Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table\n",
+					 acpi_gbl_FADT->header.length, acpi_gbl_FADT->header.revision));
+
+			acpi_tb_convert_fadt1 (local_fadt, (void *) acpi_gbl_FADT);
+		}
+		else {
+			/* Valid V2.0 table */
+
+			acpi_tb_convert_fadt2 (local_fadt, acpi_gbl_FADT);
+		}
 	}
 	else {
-		/* ACPI 1.0 FACS */
+		/* Valid V1.0 table */
 
-		/* The BIOS stored FADT should agree with Revision 1.0 */
-
-		FADT1 = (fadt_descriptor_rev1*) acpi_gbl_FADT;
-
-		/*
-		 * Copy the table header and the common part of the tables.
-		 *
-		 * The 2.0 table is an extension of the 1.0 table, so the entire 1.0
-		 * table can be copied first, then expand some fields to 64 bits.
-		 */
-		ACPI_MEMCPY (FADT2, FADT1, sizeof (fadt_descriptor_rev1));
-
-		/* Convert table pointers to 64-bit fields */
-
-		ACPI_STORE_ADDRESS (FADT2->Xfirmware_ctrl, FADT1->firmware_ctrl);
-		ACPI_STORE_ADDRESS (FADT2->Xdsdt, FADT1->dsdt);
-
-		/*
-		 * System Interrupt Model isn't used in ACPI 2.0 (FADT2->Reserved1 = 0;)
-		 */
-
-		/*
-		 * This field is set by the OEM to convey the preferred power management
-		 * profile to OSPM. It doesn't have any 1.0 equivalence.  Since we don't
-		 * know what kind of 32-bit system this is, we will use "unspecified".
-		 */
-		FADT2->prefer_PM_profile = PM_UNSPECIFIED;
-
-		/*
-		 * Processor Performance State Control. This is the value OSPM writes to
-		 * the SMI_CMD register to assume processor performance state control
-		 * responsibility. There isn't any equivalence in 1.0, leave it zeroed.
-		 */
-		FADT2->pstate_cnt = 0;
-
-		/*
-		 * Support for the _CST object and C States change notification.
-		 * This data item hasn't any 1.0 equivalence so leave it zero.
-		 */
-		FADT2->cst_cnt = 0;
-
-		/*
-		 * Since there isn't any equivalence in 1.0 and since it highly likely
-		 * that a 1.0 system has legacy support.
-		 */
-		FADT2->iapc_boot_arch = BAF_LEGACY_DEVICES;
-
-		/*
-		 * Convert the V1.0 block addresses to V2.0 GAS structures
-		 * in this order:
-		 *
-		 * PM 1_a Events
-		 * PM 1_b Events
-		 * PM 1_a Control
-		 * PM 1_b Control
-		 * PM 2 Control
-		 * PM Timer Control
-		 * GPE Block 0
-		 * GPE Block 1
-		 */
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm1a_evt_blk, FADT1->pm1_evt_len, FADT1->pm1a_evt_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm1b_evt_blk, FADT1->pm1_evt_len, FADT1->pm1b_evt_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm1a_cnt_blk, FADT1->pm1_cnt_len, FADT1->pm1a_cnt_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm1b_cnt_blk, FADT1->pm1_cnt_len, FADT1->pm1b_cnt_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm2_cnt_blk, FADT1->pm2_cnt_len, FADT1->pm2_cnt_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xpm_tmr_blk, FADT1->pm_tm_len,  FADT1->pm_tmr_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xgpe0_blk,   FADT1->gpe0_blk_len, FADT1->gpe0_blk);
-		ASL_BUILD_GAS_FROM_V1_ENTRY (FADT2->Xgpe1_blk,   FADT1->gpe1_blk_len, FADT1->gpe1_blk);
+		acpi_tb_convert_fadt1 (local_fadt, (void *) acpi_gbl_FADT);
 	}
 
 	/*
-	 * Global FADT pointer will point to the common V2.0 FADT
+	 * Global FADT pointer will point to the new common V2.0 FADT
 	 */
-	acpi_gbl_FADT = FADT2;
+	acpi_gbl_FADT = local_fadt;
 	acpi_gbl_FADT->header.length = sizeof (FADT_DESCRIPTOR);
 
 	/* Free the original table */
@@ -282,10 +388,10 @@ acpi_tb_convert_table_fadt (void)
 
 	/* Install the new table */
 
-	table_desc->pointer = (acpi_table_header *) acpi_gbl_FADT;
+	table_desc->pointer     = (acpi_table_header *) acpi_gbl_FADT;
 	table_desc->base_pointer = acpi_gbl_FADT;
-	table_desc->allocation = ACPI_MEM_ALLOCATED;
-	table_desc->length = sizeof (fadt_descriptor_rev2);
+	table_desc->allocation  = ACPI_MEM_ALLOCATED;
+	table_desc->length      = sizeof (fadt_descriptor_rev2);
 
 	/* Dump the entire FADT */
 
@@ -315,35 +421,42 @@ acpi_status
 acpi_tb_build_common_facs (
 	acpi_table_desc         *table_info)
 {
-	facs_descriptor_rev1    *FACS1;
-	facs_descriptor_rev2    *FACS2;
-
 
 	ACPI_FUNCTION_TRACE ("Tb_build_common_facs");
 
 
+	/* Absolute minimum length is 24, but the ACPI spec says 64 */
+
+	if (acpi_gbl_FACS->length < 24) {
+		ACPI_REPORT_ERROR (("Invalid FACS table length: 0x%X\n", acpi_gbl_FACS->length));
+		return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
+	}
+
+	if (acpi_gbl_FACS->length < 64) {
+		ACPI_REPORT_WARNING (("FACS is shorter than the ACPI specification allows: 0x%X, using anyway\n",
+			acpi_gbl_FACS->length));
+	}
+
 	/* Copy fields to the new FACS */
 
-	if (acpi_gbl_RSDP->revision < 2) {
-		/* ACPI 1.0 FACS */
+	acpi_gbl_common_fACS.global_lock = &(acpi_gbl_FACS->global_lock);
 
-		FACS1 = (facs_descriptor_rev1 *) acpi_gbl_FACS;
+	if ((acpi_gbl_RSDP->revision < 2) ||
+		(acpi_gbl_FACS->length < 32) ||
+		(!(ACPI_GET_ADDRESS (acpi_gbl_FACS->Xfirmware_waking_vector)))) {
+		/* ACPI 1.0 FACS or short table or optional X_ field is zero */
 
-		acpi_gbl_common_fACS.global_lock = &(FACS1->global_lock);
-		acpi_gbl_common_fACS.firmware_waking_vector = (u64 *) &FACS1->firmware_waking_vector;
+		acpi_gbl_common_fACS.firmware_waking_vector = ACPI_CAST_PTR (u64, &(acpi_gbl_FACS->firmware_waking_vector));
 		acpi_gbl_common_fACS.vector_width = 32;
 	}
 	else {
-		/* ACPI 2.0 FACS */
+		/* ACPI 2.0 FACS with valid X_ field */
 
-		FACS2 = (facs_descriptor_rev2 *) acpi_gbl_FACS;
-
-		acpi_gbl_common_fACS.global_lock = &(FACS2->global_lock);
-		acpi_gbl_common_fACS.firmware_waking_vector = &FACS2->Xfirmware_waking_vector;
+		acpi_gbl_common_fACS.firmware_waking_vector = &acpi_gbl_FACS->Xfirmware_waking_vector;
 		acpi_gbl_common_fACS.vector_width = 64;
 	}
 
-	return_ACPI_STATUS  (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

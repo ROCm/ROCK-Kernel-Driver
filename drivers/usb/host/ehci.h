@@ -288,14 +288,11 @@ struct ehci_qh {
 
 	atomic_t		refcount;
 	unsigned short		usecs;		/* intr bandwidth */
+	unsigned short		c_usecs;	/* ... split completion bw */
 	short			qh_state;
 #define	QH_STATE_LINKED		1		/* HC sees this */
 #define	QH_STATE_UNLINK		2		/* HC may still see this */
 #define	QH_STATE_IDLE		3		/* HC doesn't see this */
-
-#ifdef EHCI_SOFT_RETRIES
-	int			retries;
-#endif
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/
@@ -360,6 +357,9 @@ struct ehci_sitd {
 	union ehci_shadow	sitd_next;	/* ptr to periodic q entry */
 	struct urb		*urb;
 	dma_addr_t		buf_dma;	/* buffer address */
+
+	unsigned short		usecs;		/* start bandwidth */
+	unsigned short		c_usecs;	/* completion bandwidth */
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/

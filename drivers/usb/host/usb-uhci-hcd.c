@@ -13,7 +13,7 @@
     HW-initalization based on material of
     Randy Dunlap + Johannes Erdfelt + Gregory P. Smith + Linus Torvalds 
 
-    $Id: usb-uhci-hcd.c,v 1.1 2002/05/14 20:36:57 acher Exp $
+    $Id: usb-uhci-hcd.c,v 1.3 2002/05/25 16:42:41 acher Exp $
  */
 
 #include <linux/config.h>
@@ -37,7 +37,6 @@
 #include <asm/byteorder.h>
 #include <linux/usb.h>
 
-#define CONFIG_USB_DEBUG
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
 #else
@@ -47,34 +46,34 @@
 #include "../core/hcd.h"
 #include "usb-uhci-hcd.h"
 
-#define DRIVER_VERSION "$Revision: 1.1 $"
+#define DRIVER_VERSION "$Revision: 1.3 $"
 #define DRIVER_AUTHOR "Georg Acher, Deti Fliegl, Thomas Sailer"
 #define DRIVER_DESC "USB 1.1 Universal Host Controller Interface driver (HCD)"
-/*--------------------------------------------------------------------------*/
-// Values you may tweak
 
-/* CONFIG_USB_UHCI_HIGH_BANDWITH turns on Full Speed Bandwidth
- * Reclamation: feature that puts loop on descriptor loop when
+/*--------------------------------------------------------------------------*/
+/* Values you may tweak with module parameters
+ *  
+ * high_bw: 1=on (default), 0=off
+ * Turns on Full Speed Bandwidth Reclamation: 
+ * Feature that puts a loop on the descriptor chain when
  * there's some transfer going on. With FSBR, USB performance
  * is optimal, but PCI can be slowed down up-to 5 times, slowing down
  * system performance (eg. framebuffer devices).
- */
-#define CONFIG_USB_UHCI_HIGH_BANDWIDTH 
-
-/* *_DEPTH_FIRST puts descriptor in depth-first mode. This has
- * somehow similar effect to FSBR (higher speed), but does not
+ *
+ * bulk_depth/ctrl_depth: 0=off (default), 1:on
+ * Puts descriptors for bulk/control transfers in depth-first mode. 
+ * This has somehow similar effect to FSBR (higher speed), but does not
  * slow PCI down. OTOH USB performace is slightly slower than
  * in FSBR case and single device could hog whole USB, starving
- * other devices.
- */
-#define USE_CTRL_DEPTH_FIRST 0  // 0: Breadth first, 1: Depth first
-#define USE_BULK_DEPTH_FIRST 0  // 0: Breadth first, 1: Depth first
-
-/* Turning off both CONFIG_USB_UHCI_HIGH_BANDWITH and *_DEPTH_FIRST
+ * other devices. Some devices (e.g. STV680-based cameras) NEED this depth 
+ * first search to work properly.
+ *
+ * Turning off both high_bw and bulk_depth/ctrl_depth
  * will lead to <64KB/sec performance over USB for bulk transfers targeting
  * one device's endpoint. You probably do not want to do that.
  */
 
+// Other constants, there's usually no need to change them.
 // stop bandwidth reclamation after (roughly) 50ms
 #define IDLE_TIMEOUT  (HZ/20)
 
@@ -99,6 +98,14 @@
 /*--------------------------------------------------------------------------*/
 //                   NO serviceable parts below!
 /*--------------------------------------------------------------------------*/
+
+/* Can be set by module parameters */
+static int high_bw = 1;
+static int ctrl_depth = 0;  /* 0: Breadth first, 1: Depth first */
+static int bulk_depth = 0;  /* 0: Breadth first, 1: Depth first */
+
+// How much URBs with ->next are walked
+#define MAX_NEXT_COUNT 2048
 
 static struct uhci *devs = NULL;
 
@@ -155,7 +162,6 @@ static int uhci_urb_enqueue (struct usb_hcd *hcd, struct urb *urb, int mem_flags
 
 	spin_lock_irqsave (&uhci->urb_list_lock, flags);
 
-
 	queued_urb = search_dev_ep (uhci, urb); // returns already queued urb for that pipe
 
 	if (queued_urb) {
@@ -165,7 +171,7 @@ static int uhci_urb_enqueue (struct usb_hcd *hcd, struct urb *urb, int mem_flags
 		    ((type == PIPE_BULK) &&
 		     (!(urb->transfer_flags & USB_QUEUE_BULK) || !(queued_urb->transfer_flags & USB_QUEUE_BULK)))) {
 			spin_unlock_irqrestore (&uhci->urb_list_lock, flags);
-			err("ENXIO (%s)  %08x, flags %x, urb %p, burb %p, propably device driver bug...", 
+			err("ENXIO (%s)  %08x, flags %x, urb %p, burb %p, probably device driver bug...", 
 			    PIPESTRING(type),
 			    urb->pipe,urb->transfer_flags,urb,queued_urb);
 			return -ENXIO;	// urb already queued
@@ -196,7 +202,7 @@ static int uhci_urb_enqueue (struct usb_hcd *hcd, struct urb *urb, int mem_flags
 							       PCI_DMA_TODEVICE);
 
 	// for bulk queuing it is essential that interrupts are disabled until submission
-	// all other type enable interrupts again
+	// all other types enable interrupts again
 	switch (type) {
 	case PIPE_BULK:
 		if (queued_urb) {
@@ -293,7 +299,7 @@ static int uhci_get_frame (struct usb_hcd *hcd)
 /*--------------------------------------------------------------------------*/
 static int hc_reset (struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 
 	uhci->apm_state = 0;
 	uhci->running = 0;
@@ -306,7 +312,7 @@ static int hc_reset (struct uhci_hcd *uhci)
 /*--------------------------------------------------------------------------*/
 static int hc_irq_run(struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 	/* Turn on all interrupts */
 	outw (USBINTR_TIMEOUT | USBINTR_RESUME | USBINTR_IOC | USBINTR_SP, io_addr + USBINTR);
 
@@ -324,7 +330,7 @@ static int hc_irq_run(struct uhci_hcd *uhci)
 /*--------------------------------------------------------------------------*/
 static int hc_start (struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 	int timeout = 10;
 	struct usb_device	*udev;
 	init_dbg("hc_start uhci %p",uhci);
@@ -351,7 +357,6 @@ static int hc_start (struct uhci_hcd *uhci)
 	uhci->hcd.state = USB_STATE_READY;
 	if (!udev) {
 	    uhci->running = 0;
-// FIXME cleanup
 	    return -ENOMEM;
 	}
 
@@ -360,7 +365,6 @@ static int hc_start (struct uhci_hcd *uhci)
 	if (usb_register_root_hub (udev, &uhci->hcd.pdev->dev) != 0) {
 		usb_free_dev (udev); 
 		uhci->running = 0;
-// FIXME cleanup
 		return -ENODEV;
 	}
 	
@@ -374,7 +378,7 @@ static int __devinit uhci_start (struct usb_hcd *hcd)
 {
 	struct uhci_hcd	*uhci = hcd_to_uhci (hcd);
 	int ret;
-	int io_addr=(int)hcd->regs, io_size=0x20; // FIXME
+	unsigned long io_addr=(unsigned long)hcd->regs, io_size=0x20;
 	
 	init_dbg("uhci_start hcd %p uhci %p, pdev %p",hcd,uhci,hcd->pdev);
 	/* disable legacy emulation, Linux takes over... */
@@ -448,7 +452,7 @@ static void uhci_stop (struct usb_hcd *hcd)
 static void uhci_irq (struct usb_hcd *hcd)
 {	
 	struct uhci_hcd	*uhci = hcd_to_uhci (hcd);
-	unsigned int io_addr = (int)hcd->regs;
+	unsigned long io_addr = (unsigned long)hcd->regs;
 	unsigned short status;
 	struct list_head *p, *p2;
 	int restarts, work_done;
@@ -586,10 +590,15 @@ static const struct hc_driver uhci_driver = {
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_INFO);
 MODULE_LICENSE ("GPL");
+MODULE_PARM (high_bw, "i");
+MODULE_PARM_DESC (high_bw, "high_hw: Enable high bandwidth mode, 1=on (default), 0=off"); 
+MODULE_PARM (bulk_depth, "i");
+MODULE_PARM_DESC (bulk_depth, "bulk_depth: Depth first processing for bulk transfers, 0=off (default), 1=on");
+MODULE_PARM (ctrl_depth, "i");
+MODULE_PARM_DESC (ctrl_depth, "ctrl_depth: Depth first processing for control transfers, 0=off (default), 1=on");
 
 static const struct pci_device_id __devinitdata pci_ids [] = { {
 
@@ -628,6 +637,10 @@ static int __init uhci_hcd_init (void)
 	init_dbg (DRIVER_INFO);
 	init_dbg ("block sizes: hq %d td %d",
 		sizeof (struct qh), sizeof (struct td));
+	info("High bandwidth mode %s.%s%s",
+	     high_bw?"enabled":"disabled",
+	     ctrl_depth?"CTRL depth first enabled":"",
+	     bulk_depth?"BULK depth first enabled":"");
 	return pci_module_init (&uhci_pci_driver);
 }
 

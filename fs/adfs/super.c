@@ -17,6 +17,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/buffer_head.h>
 
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
@@ -476,8 +477,6 @@ static void __exit exit_adfs_fs(void)
 	unregister_filesystem(&adfs_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_adfs_fs)
 module_exit(exit_adfs_fs)

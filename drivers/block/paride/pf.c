@@ -881,10 +881,9 @@ static void pf_next_buf( int unit )
 	
 /* paranoia */
 
-	if (QUEUE_EMPTY ||
+	if (blk_queue_empty(QUEUE) ||
 	    (rq_data_dir(CURRENT) != pf_cmd) ||
 	    (DEVICE_NR(CURRENT->rq_dev) != pf_unit) ||
-	    (CURRENT->rq_status == RQ_INACTIVE) ||
 	    (CURRENT->sector != pf_block)) 
 		printk("%s: OUCH: request list changed unexpectedly\n",
 			PF.name);

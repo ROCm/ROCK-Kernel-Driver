@@ -26,6 +26,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <linux/module.h>

@@ -1389,6 +1389,12 @@ sba_dma_address (struct scatterlist *sg)
 	return ((unsigned long)sba_sg_iova(sg));
 }
 
+int
+sba_dma_supported (struct pci_dev *dev, u64 mask)
+{
+	return 1;
+}
+
 /**************************************************************
 *
 *   Initialization and claim
@@ -1858,5 +1864,6 @@ EXPORT_SYMBOL(sba_unmap_single);
 EXPORT_SYMBOL(sba_map_sg);
 EXPORT_SYMBOL(sba_unmap_sg);
 EXPORT_SYMBOL(sba_dma_address);
+EXPORT_SYMBOL(sba_dma_supported);
 EXPORT_SYMBOL(sba_alloc_consistent);
 EXPORT_SYMBOL(sba_free_consistent);

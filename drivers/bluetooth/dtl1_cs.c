@@ -935,5 +935,3 @@ void __exit exit_dtl1_cs(void) {
 
 module_init(init_dtl1_cs);
 module_exit(exit_dtl1_cs);
-
-EXPORT_NO_SYMBOLS;

@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/hardware/sa1111.h>

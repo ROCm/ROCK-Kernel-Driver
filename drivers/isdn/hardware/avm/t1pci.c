@@ -26,8 +26,6 @@
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.1.4.1.2.1 $";
-
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG
 
@@ -45,9 +43,9 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static int t1pci_add_card(struct capi_driver *driver,
-                          struct capicardparams *p,
-	                  struct pci_dev *pdev)
+static char *t1pci_procinfo(struct capi_ctr *ctrl);
+
+static int t1pci_add_card(struct capicardparams *p, struct pci_dev *pdev)
 {
 	avmcard *card;
 	avmctrl_info *cinfo;
@@ -55,14 +53,14 @@ static int t1pci_add_card(struct capi_driver *driver,
 
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "t1pci: no memory.\n");
 		retval = -ENOMEM;
 		goto err;
 	}
 
-        card->dma = avmcard_dma_alloc(driver->name, pdev, 2048+128, 2048+128);
+        card->dma = avmcard_dma_alloc("t1pci", pdev, 2048+128, 2048+128);
 	if (!card->dma) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "t1pci: no memory.\n");
 		retval = -ENOMEM;
 		goto err_free;
 	}
@@ -75,17 +73,16 @@ static int t1pci_add_card(struct capi_driver *driver,
 	card->cardtype = avm_t1pci;
 
 	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
-		printk(KERN_WARNING
-		       "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		printk(KERN_WARNING "t1pci: ports 0x%03x-0x%03x in use.\n",
+		       card->port, card->port + AVMB1_PORTLEN);
 		retval = -EBUSY;
 		goto err_free_dma;
 	}
 
 	card->mbase = ioremap_nocache(card->membase, 64);
 	if (!card->mbase) {
-		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
-					driver->name, card->membase);
+		printk(KERN_NOTICE "t1pci: can't remap memory at 0x%lx\n",
+		       card->membase);
 		retval = -EIO;
 		goto err_release_region;
 	}
@@ -95,11 +92,11 @@ static int t1pci_add_card(struct capi_driver *driver,
 	retval = t1pci_detect(card);
 	if (retval != 0) {
 		if (retval < 6)
-			printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-					driver->name, card->port, retval);
+			printk(KERN_NOTICE "t1pci: NO card at 0x%x (%d)\n",
+			       card->port, retval);
 		else
-			printk(KERN_NOTICE "%s: card at 0x%x, but cabel not connected or T1 has no power (%d)\n",
-					driver->name, card->port, retval);
+			printk(KERN_NOTICE "t1pci: card at 0x%x, but cable not connected or T1 has no power (%d)\n",
+			       card->port, retval);
 		retval = -EIO;
 		goto err_unmap;
 	}
@@ -107,23 +104,33 @@ static int t1pci_add_card(struct capi_driver *driver,
 
 	retval = request_irq(card->irq, b1dma_interrupt, SA_SHIRQ, card->name, card);
 	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
+		printk(KERN_ERR "t1pci: unable to get IRQ %d.\n", card->irq);
 		retval = -EBUSY;
 		goto err_unmap;
 	}
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
-		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
+	cinfo->capi_ctrl.driver_name   = "t1pci";
+	cinfo->capi_ctrl.driverdata    = cinfo;
+	cinfo->capi_ctrl.register_appl = b1dma_register_appl;
+	cinfo->capi_ctrl.release_appl  = b1dma_release_appl;
+	cinfo->capi_ctrl.send_message  = b1dma_send_message;
+	cinfo->capi_ctrl.load_firmware = b1dma_load_firmware;
+	cinfo->capi_ctrl.reset_ctr     = b1dma_reset_ctr;
+	cinfo->capi_ctrl.procinfo      = t1pci_procinfo;
+	cinfo->capi_ctrl.ctr_read_proc = b1dmactl_read_proc;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
+		printk(KERN_ERR "t1pci: attach controller failed.\n");
 		retval = -EBUSY;
 		goto err_free_irq;
 	}
-	card->cardnr = cinfo->capi_ctrl->cnr;
+	card->cardnr = cinfo->capi_ctrl.cnr;
 
-	printk(KERN_INFO
-		"%s: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
-		driver->name, card->port, card->irq, card->membase);
+	printk(KERN_INFO "t1pci: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
+	       card->port, card->irq, card->membase);
 
 	pci_set_drvdata(pdev, card);
 	return 0;
@@ -151,7 +158,7 @@ static void t1pci_remove(struct pci_dev *pdev)
 
  	b1dma_reset(card);
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
@@ -179,33 +186,14 @@ static char *t1pci_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver t1pci_driver = {
-	owner: THIS_MODULE,
-	name: "t1pci",
-	revision: "0.0",
-	load_firmware: b1dma_load_firmware,
-	reset_ctr: b1dma_reset_ctr,
-	register_appl: b1dma_register_appl,
-	release_appl: b1dma_release_appl,
-	send_message: b1dma_send_message,
-	
-	procinfo: t1pci_procinfo,
-	ctr_read_proc: b1dmactl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
-};
-
-/* ------------------------------------------------------------- */
-
 static int __devinit t1pci_probe(struct pci_dev *dev,
 				 const struct pci_device_id *ent)
 {
-	struct capi_driver *driver = &t1pci_driver;
 	struct capicardparams param;
 	int retval;
 
 	if (pci_enable_device(dev) < 0) {
-		printk(KERN_ERR	"%s: failed to enable AVM-T1-PCI\n",
-		       driver->name);
+		printk(KERN_ERR	"t1pci: failed to enable AVM-T1-PCI\n");
 		return -ENODEV;
 	}
 	pci_set_master(dev);
@@ -214,15 +202,13 @@ static int __devinit t1pci_probe(struct pci_dev *dev,
 	param.irq = dev->irq;
 	param.membase = pci_resource_start(dev, 0);
 
-	printk(KERN_INFO
-	       "%s: PCI BIOS reports AVM-T1-PCI at i/o %#x, irq %d, mem %#x\n",
-	       driver->name, param.port, param.irq, param.membase);
+	printk(KERN_INFO "t1pci: PCI BIOS reports AVM-T1-PCI at i/o %#x, irq %d, mem %#x\n",
+	       param.port, param.irq, param.membase);
 
-	retval = t1pci_add_card(driver, &param, dev);
+	retval = t1pci_add_card(&param, dev);
 	if (retval != 0) {
-		printk(KERN_ERR
-		       "%s: no AVM-T1-PCI at i/o %#x, irq %d detected, mem %#x\n",
-		       driver->name, param.port, param.irq, param.membase);
+		printk(KERN_ERR "t1pci: no AVM-T1-PCI at i/o %#x, irq %d detected, mem %#x\n",
+		       param.port, param.irq, param.membase);
 		return -ENODEV;
 	}
 	return 0;
@@ -237,30 +223,12 @@ static struct pci_driver t1pci_pci_driver = {
 
 static int __init t1pci_init(void)
 {
-	int retval;
-
-	b1_set_revision(&t1pci_driver, revision);
-        attach_capi_driver(&t1pci_driver);
-
-	retval = pci_register_driver(&t1pci_pci_driver);
-	if (retval < 0)
-		goto err;
-
-	printk(KERN_INFO "%s: %d T1-PCI card(s) detected\n",
-	       t1pci_driver.name, retval);
-	retval = 0;
-	goto out;
-
- err:
-	detach_capi_driver(&t1pci_driver);
- out:
-	return retval;
+	return pci_module_init(&t1pci_pci_driver);
 }
 
 static void __exit t1pci_exit(void)
 {
 	pci_unregister_driver(&t1pci_pci_driver);
-	detach_capi_driver(&t1pci_driver);
 }
 
 module_init(t1pci_init);

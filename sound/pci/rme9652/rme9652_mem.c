@@ -111,8 +111,8 @@ static void *rme9652_malloc_pages(struct pci_dev *pci,
 		*dmaaddr = virt_to_bus(res);
 #endif
 	if (res != NULL) {
-		mem_map_t *page = virt_to_page(res);
-		mem_map_t *last_page = page + (size + PAGE_SIZE - 1) / PAGE_SIZE;
+		struct page *page = virt_to_page(res);
+		struct page *last_page = page + (size + PAGE_SIZE - 1) / PAGE_SIZE;
 		while (page < last_page)
 			set_bit(PG_reserved, &(page++)->flags);
 	}
@@ -122,7 +122,7 @@ static void *rme9652_malloc_pages(struct pci_dev *pci,
 static void rme9652_free_pages(struct pci_dev *pci, unsigned long size,
 			       void *ptr, dma_addr_t dmaaddr)
 {
-	mem_map_t *page, *last_page;
+	struct page *page, *last_page;
 
 	if (ptr == NULL)
 		return;

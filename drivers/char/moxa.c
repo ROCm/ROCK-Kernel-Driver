@@ -210,8 +210,6 @@ MODULE_PARM(ttymajor, "i");
 MODULE_PARM(calloutmajor, "i");
 MODULE_PARM(verbose, "i");
 
-EXPORT_NO_SYMBOLS;
-
 #endif				//MODULE
 
 static struct tty_driver moxaDriver;

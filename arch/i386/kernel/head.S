@@ -182,26 +182,19 @@ checkCPUtype:
 	pushfl			# push EFLAGS
 	popl %eax		# get EFLAGS
 	movl %eax,%ecx		# save original EFLAGS
-	xorl $0x40000,%eax	# flip AC bit in EFLAGS
+	xorl $0x240000,%eax	# flip AC and ID bits in EFLAGS
 	pushl %eax		# copy to EFLAGS
 	popfl			# set EFLAGS
 	pushfl			# get new EFLAGS
 	popl %eax		# put it in eax
 	xorl %ecx,%eax		# change in flags
-	andl $0x40000,%eax	# check if AC bit changed
+	pushl %ecx		# restore original EFLAGS
+	popfl
+	testl $0x40000,%eax	# check if AC bit changed
 	je is386
 
 	movb $4,X86		# at least 486
-	movl %ecx,%eax
-	xorl $0x200000,%eax	# check ID flag
-	pushl %eax
-	popfl			# if we are on a straight 486DX, SX, or
-	pushfl			# 487SX we can't change it
-	popl %eax
-	xorl %ecx,%eax
-	pushl %ecx		# restore original EFLAGS
-	popfl
-	andl $0x200000,%eax
+	testl $0x200000,%eax	# check if ID bit changed
 	je is486
 
 	/* get vendor info */
@@ -227,18 +220,15 @@ checkCPUtype:
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
-is486:
-	movl %cr0,%eax		# 486 or better
-	andl $0x80000011,%eax	# Save PG,PE,ET
-	orl $0x50022,%eax	# set AM, WP, NE and MP
+is486:	movl $0x50022,%ecx	# set AM, WP, NE and MP
 	jmp 2f
 
-is386:	pushl %ecx		# restore original EFLAGS
-	popfl
-	movl %cr0,%eax		# 386
+is386:	movl $2,%ecx		# set MP
+2:	movl %cr0,%eax
 	andl $0x80000011,%eax	# Save PG,PE,ET
-	orl $2,%eax		# set MP
-2:	movl %eax,%cr0
+	orl %ecx,%eax
+	movl %eax,%cr0
+
 	call check_x87
 	incb ready
 	lgdt gdt_descr

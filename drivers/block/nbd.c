@@ -323,7 +323,7 @@ static void do_nbd_request(request_queue_t * q)
 	int dev = 0;
 	struct nbd_device *lo;
 
-	while (!QUEUE_EMPTY) {
+	while (!blk_queue_empty(QUEUE)) {
 		req = CURRENT;
 #ifdef PARANOIA
 		if (!req)

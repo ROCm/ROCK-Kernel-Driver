@@ -196,7 +196,6 @@ static struct pci_driver e1000_driver = {
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("Dual BSD/GPL");
-EXPORT_NO_SYMBOLS;
 
 /**
  * e1000_init_module - Driver Registration Routine

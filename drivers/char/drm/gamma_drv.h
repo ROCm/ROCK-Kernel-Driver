@@ -32,8 +32,9 @@
 #ifndef _GAMMA_DRV_H_
 #define _GAMMA_DRV_H_
 
-
 typedef struct drm_gamma_private {
+	drm_gamma_sarea_t *sarea_priv;
+	drm_map_t *sarea;
 	drm_map_t *buffers;
 	drm_map_t *mmio0;
 	drm_map_t *mmio1;
@@ -51,6 +52,11 @@ do {									\
 	}								\
 } while (0)
 
+				/* gamma_dma.c */
+extern int gamma_dma_init( struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg );
+extern int gamma_dma_copy( struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg );
 
 extern void gamma_dma_ready(drm_device_t *dev);
 extern void gamma_dma_quiescent_single(drm_device_t *dev);
@@ -63,6 +69,7 @@ extern int  gamma_dma(struct inode *inode, struct file *filp,
 extern int  gamma_find_devices(void);
 extern int  gamma_found(void);
 
+#define GLINT_DRI_BUF_COUNT 256
 
 #define GAMMA_OFF(reg)						   \
 	((reg < 0x1000)						   \
@@ -78,7 +85,6 @@ extern int  gamma_found(void);
 			   ((reg < 0x10000)  ? dev_priv->mmio1->handle :     \
 			    ((reg < 0x11000) ? dev_priv->mmio2->handle :     \
 					       dev_priv->mmio3->handle))))
-	
 #define GAMMA_ADDR(reg)	 (GAMMA_BASE(reg) + GAMMA_OFF(reg))
 #define GAMMA_DEREF(reg) *(__volatile__ int *)GAMMA_ADDR(reg)
 #define GAMMA_READ(reg)	 GAMMA_DEREF(reg)
@@ -91,9 +97,11 @@ extern int  gamma_found(void);
 #define GAMMA_FILTERMODE       0x8c00
 #define GAMMA_GCOMMANDINTFLAGS 0x0c50
 #define GAMMA_GCOMMANDMODE     0x0c40
+#define		GAMMA_QUEUED_DMA_MODE		1<<1
 #define GAMMA_GCOMMANDSTATUS   0x0c60
 #define GAMMA_GDELAYTIMER      0x0c38
 #define GAMMA_GDMACONTROL      0x0060
+#define 	GAMMA_USE_AGP			1<<1
 #define GAMMA_GINTENABLE       0x0808
 #define GAMMA_GINTFLAGS	       0x0810
 #define GAMMA_INFIFOSPACE      0x0018
@@ -101,5 +109,12 @@ extern int  gamma_found(void);
 #define GAMMA_OUTPUTFIFO       0x2000
 #define GAMMA_SYNC	       0x8c40
 #define GAMMA_SYNC_TAG	       0x0188
+#define GAMMA_PAGETABLEADDR    0x0C00
+#define GAMMA_PAGETABLELENGTH  0x0C08
+
+#define GAMMA_PASSTHROUGH	0x1FE
+#define GAMMA_DMAADDRTAG	0x530
+#define GAMMA_DMACOUNTTAG	0x531
+#define GAMMA_COMMANDINTTAG	0x532
 
 #endif

@@ -83,7 +83,6 @@
 #include "cs4281pm.h"
 
 struct cs4281_state;
-EXPORT_NO_SYMBOLS;
 
 static void stop_dac(struct cs4281_state *s);
 static void stop_adc(struct cs4281_state *s);

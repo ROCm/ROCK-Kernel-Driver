@@ -138,7 +138,6 @@ Things to implement
 Not so important ideas for implementing
 
 - If a real time process is running then don't suspend the machine.
-- Is there any sense in compressing the outwritten pages?
 - Support for power.conf file as in Solaris, autoshutdown, special
   devicetypes support, maybe in sysctl.
 - Introduce timeout for SMP locking. But first locking ought to work :O

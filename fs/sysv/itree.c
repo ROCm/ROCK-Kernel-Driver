@@ -5,6 +5,7 @@
  *  AV, Sep--Dec 2000
  */
 
+#include <linux/buffer_head.h>
 #include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */

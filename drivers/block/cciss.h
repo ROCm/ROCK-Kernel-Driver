@@ -76,7 +76,7 @@ struct ctlr_info
 	dma_addr_t		cmd_pool_dhandle; 
 	ErrorInfo_struct 	*errinfo_pool;
 	dma_addr_t		errinfo_pool_dhandle; 
-        __u32   		*cmd_pool_bits;
+        unsigned long  		*cmd_pool_bits;
 	int			nr_allocs;
 	int			nr_frees; 
 

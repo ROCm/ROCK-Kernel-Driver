@@ -221,8 +221,6 @@ MODULE_PARM(ttymajor, "i");
 MODULE_PARM(calloutmajor, "i");
 MODULE_PARM(verbose, "i");
 
-EXPORT_NO_SYMBOLS;
-
 struct mxser_hwconf {
 	int board_type;
 	int ports;

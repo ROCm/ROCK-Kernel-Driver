@@ -574,6 +574,11 @@ M:	matthew@wil.cx
 L:	linux-fsdevel@vger.kernel.org
 S:	Maintained
 
+FILESYSTEMS (VFS and infrastructure)
+P:	Alexander Viro
+M:	viro@math.psu.edu
+S:	Maintained
+
 FPU EMULATOR
 P:	Bill Metzenthen
 M:	billm@suburbia.net
@@ -1447,11 +1452,11 @@ L:	linux-raid@vger.kernel.org
 S:	Maintained
 
 SOFTWARE SUSPEND:
-P:	Gabor Kuti
-M:	seasons@falcon.sch.bme.hu
-M:	seasons@makosteszta.sote.hu
+P:	Pavel Machek
+M:	pavel@suse.cz
+M:	pavel@ucw.cz
 L:	http://lister.fornax.hu/mailman/listinfo/swsusp
-W:	http://falcon.sch.bme.hu/~seasons/linux
+W:	http://swsusp.sf.net/
 S:	Maintained
 
 SONIC NETWORK DRIVER

@@ -32,8 +32,6 @@
 
 #define chip_t cs4231_t
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Generic CS4231");
 MODULE_LICENSE("GPL");

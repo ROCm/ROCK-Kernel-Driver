@@ -100,7 +100,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_PM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="keepinitrd"
+CONFIG_CMDLINE="keepinitrd mem=16M root=/dev/ram ramdisk=8192 initrd=0xd0000000,4M"
 # CONFIG_LEDS is not set
 # CONFIG_ALIGNMENT_TRAP is not set
 

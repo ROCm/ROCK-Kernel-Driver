@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 29 $
+ *              $Revision: 30 $
  *
  ******************************************************************************/
 
@@ -317,7 +317,7 @@ acpi_rs_set_srs_method_data (
 	/*
 	 * Set up the parameter object
 	 */
-	params[0]->buffer.length  = buffer.length;
+	params[0]->buffer.length  = (u32) buffer.length;
 	params[0]->buffer.pointer = buffer.pointer;
 	params[1] = NULL;
 

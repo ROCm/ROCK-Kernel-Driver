@@ -65,7 +65,6 @@
 MODULE_AUTHOR("Jan-Benedict Glaw <jbglaw@lug-owl.de>");
 MODULE_DESCRIPTION("Accessing Alpha SRM environment through procfs interface");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 typedef struct _srm_env {
 	char			*name;

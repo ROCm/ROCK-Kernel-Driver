@@ -26,6 +26,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
@@ -576,8 +577,6 @@ static void __exit exit_affs_fs(void)
 	unregister_filesystem(&affs_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_DESCRIPTION("Amiga filesystem support for Linux");
 MODULE_LICENSE("GPL");

@@ -161,53 +161,6 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
 }
 
 /*
- * The following routines are mainly used by the ATAPI drivers.
- *
- * These routines will round up any request for an odd number of bytes,
- * so if an odd bytecount is specified, be sure that there's at least one
- * extra byte allocated for the buffer.
- */
-void atapi_read(struct ata_device *drive, void *buffer, unsigned int bytecount)
-{
-	if (drive->channel->atapi_read) {
-		drive->channel->atapi_read(drive, buffer, bytecount);
-		return;
-	}
-
-	++bytecount;
-#if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
-	if (MACH_IS_ATARI || MACH_IS_Q40) {
-		/* Atari has a byte-swapped IDE interface */
-		insw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
-		return;
-	}
-#endif
-	ata_read(drive, buffer, bytecount / 4);
-	if ((bytecount & 0x03) >= 2)
-		insw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
-}
-
-void atapi_write(struct ata_device *drive, void *buffer, unsigned int bytecount)
-{
-	if (drive->channel->atapi_write) {
-		drive->channel->atapi_write(drive, buffer, bytecount);
-		return;
-	}
-
-	++bytecount;
-#if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
-	if (MACH_IS_ATARI || MACH_IS_Q40) {
-		/* Atari has a byte-swapped IDE interface */
-		outsw_swapw(IDE_DATA_REG, buffer, bytecount / 2);
-		return;
-	}
-#endif
-	ata_write(drive, buffer, bytecount / 4);
-	if ((bytecount & 0x03) >= 2)
-		outsw(IDE_DATA_REG, ((byte *)buffer) + (bytecount & ~0x03), 1);
-}
-
-/*
  * Needed for PCI irq sharing
  */
 int drive_is_ready(struct ata_device *drive)
@@ -400,13 +353,20 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 
 	OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
 	if (args->handler != NULL) {
+
+		/* This is apparently supposed to reset the wait timeout for
+		 * the interrupt to accur.
+		 */
+
 		ide_set_handler(drive, args->handler, WAIT_CMD, NULL);
 		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+
 		/*
 		 * Warning check for race between handler and prehandler for
 		 * writing first block of data.  however since we are well
 		 * inside the boundaries of the seek, we should be okay.
 		 */
+
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
@@ -626,7 +586,8 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 	return ide_started;
 }
 
-/* Called by ioctl to feature out type of command being called */
+/* Called to figure out the type of command being called.
+ */
 void ide_cmd_type_parser(struct ata_taskfile *args)
 {
 	struct hd_drive_task_hdr *taskfile = &args->taskfile;
@@ -1016,7 +977,6 @@ int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 		/* FIXME: what about the setup for the drive?! */
 		if (drive->channel->speedproc)
 			drive->channel->speedproc(drive, pio);
-		ide_driveid_update(drive);
 	}
 
 abort:
@@ -1032,8 +992,6 @@ abort:
 EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
-EXPORT_SYMBOL(atapi_read);
-EXPORT_SYMBOL(atapi_write);
 EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(task_no_data_intr);

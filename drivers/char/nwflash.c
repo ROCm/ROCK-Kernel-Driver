@@ -702,8 +702,6 @@ static void __exit nwflash_exit(void)
 	iounmap((void *)FLASH_BASE);
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(flashdebug, "i");

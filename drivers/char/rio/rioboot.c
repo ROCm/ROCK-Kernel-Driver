@@ -129,7 +129,7 @@ struct DownLoad *	rbp;
 		p->RIOError.Error = HOST_FILE_TOO_LARGE;
 		/* restore(oldspl); */
 		func_exit ();
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	if ( p->RIOBooting ) {
@@ -137,7 +137,7 @@ struct DownLoad *	rbp;
 		p->RIOError.Error = BOOT_IN_PROGRESS;
 		/* restore(oldspl); */
 		func_exit ();
-		return EBUSY;
+		return -EBUSY;
 	}
 
 	/*
@@ -165,7 +165,7 @@ struct DownLoad *	rbp;
 		p->RIOError.Error = COPYIN_FAILED;
 		/* restore(oldspl); */
 		func_exit ();
-		return EFAULT;
+		return -EFAULT;
 	}
 
 	/*
@@ -295,7 +295,7 @@ register struct DownLoad *rbp;
 			rio_dprintk (RIO_DEBUG_BOOT, "Bin too large\n");
 			p->RIOError.Error = HOST_FILE_TOO_LARGE;
 			func_exit ();
-			return EFBIG;
+			return -EFBIG;
 		}
 		/*
 		** Ensure that the host really is stopped.
@@ -322,7 +322,7 @@ register struct DownLoad *rbp;
 				rio_dprintk (RIO_DEBUG_BOOT, "No system memory available\n");
 				p->RIOError.Error = NOT_ENOUGH_CORE_FOR_PCI_COPY;
 				func_exit ();
-				return ENOMEM;
+				return -ENOMEM;
 			}
 			bzero(DownCode, rbp->Count);
 
@@ -330,7 +330,7 @@ register struct DownLoad *rbp;
 				rio_dprintk (RIO_DEBUG_BOOT, "Bad copyin of host data\n");
 				p->RIOError.Error = COPYIN_FAILED;
 				func_exit ();
-				return EFAULT;
+				return -EFAULT;
 			}
 
 			HostP->Copy( DownCode, StartP, rbp->Count );
@@ -341,7 +341,7 @@ register struct DownLoad *rbp;
 			rio_dprintk (RIO_DEBUG_BOOT, "Bad copyin of host data\n");
 			p->RIOError.Error = COPYIN_FAILED;
 			func_exit ();
-			return EFAULT;
+			return -EFAULT;
 		}
 
 		rio_dprintk (RIO_DEBUG_BOOT, "Copy completed\n");

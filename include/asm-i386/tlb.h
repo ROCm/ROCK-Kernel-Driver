@@ -5,8 +5,8 @@
  * x86 doesn't need any special per-pte or
  * per-vma handling..
  */
-#define tlb_start_vma(tlb, vma, start, end) do { } while (0)
-#define tlb_end_vma(tlb, vma, start, end) do { } while (0)
+#define tlb_start_vma(tlb, vma) do { } while (0)
+#define tlb_end_vma(tlb, vma) do { } while (0)
 #define tlb_remove_tlb_entry(tlb, pte, address) do { } while (0)
 
 /*

@@ -66,10 +66,10 @@ struct irq_routing_table {
 
 extern unsigned int pcibios_irq_mask;
 
-extern int pci_use_acpi_routing;
+extern int pcibios_scanned;
 extern spinlock_t pci_config_lock;
 
 void pcibios_fixup_irqs(void);
-void pcibios_enable_irq(struct pci_dev *dev);
+int pirq_enable_irq(struct pci_dev *dev);
 
-extern int (*pci_lookup_irq)(struct pci_dev * dev, int assign);
+extern int (*pcibios_enable_irq)(struct pci_dev *dev);

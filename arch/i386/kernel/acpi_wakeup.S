@@ -17,11 +17,6 @@ wakeup_code:
 	cli
 	cld
 	  
-# setup video mode
-#	movw	$0x4117, %bx		# 0x4000 for linear framebuffer
-#	movw	$0x4f02, %ax
-#	int	$0x10
-
 	# setup data segment
 	movw	%cs, %ax
 
@@ -184,7 +179,7 @@ wakeup_pmode_return:
 	rep	lodsb
 	movw	$0x0e00 + 'O', %ds:(0xb8018)
 
-	movl	%cs:saved_magic2, %eax
+	movl	%cs:saved_magic, %eax
 	cmpl	$0x12345678, %eax
 	jne	bogus_magic
 
@@ -248,7 +243,7 @@ ENTRY(acpi_copy_wakeup_routine)
 	movl	saved_videomode, %edx
 	movl	%edx, video_mode - wakeup_start (%eax)
 	movl	$0x12345678, real_magic - wakeup_start (%eax)
-	movl	$0x12345678, saved_magic2
+	movl	$0x12345678, saved_magic
 
 	# restore the regs we used
 	popl	%edi
@@ -266,8 +261,6 @@ ENTRY(saved_eip)	.long	0
 ENTRY(saved_esp)	.long	0
 
 ENTRY(saved_magic)	.long	0
-ENTRY(saved_magic2)	.long	0	
-ENTRY(saved_videomode)	.long	0
 
 ALIGN
 # saved registers

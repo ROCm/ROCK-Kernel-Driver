@@ -19,6 +19,7 @@
 #include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/blkpg.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 
@@ -55,14 +56,13 @@ static void kill_bdev(struct block_device *bdev)
 int set_blocksize(struct block_device *bdev, int size)
 {
 	int oldsize;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
 		return -EINVAL;
 
 	/* Size cannot be smaller than the size supported by the device */
-	if (size < get_hardsect_size(dev))
+	if (size < bdev_hardsect_size(bdev))
 		return -EINVAL;
 
 	oldsize = bdev->bd_block_size;
@@ -322,6 +322,7 @@ struct block_device *bdget(dev_t dev)
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
+			new_bdev->bd_queue = NULL;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
 			inode->i_mode = S_IFBLK;
@@ -606,7 +607,21 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			goto out2;
 	}
 	bdev->bd_inode->i_size = blkdev_size(dev);
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(bdev));
+	if (!bdev->bd_openers) {
+		struct blk_dev_struct *p = blk_dev + major(dev);
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+		if (p->queue)
+			bdev->bd_queue =  p->queue(dev);
+		else
+			bdev->bd_queue = &p->request_queue;
+	}
 	bdev->bd_openers++;
 	unlock_kernel();
 	up(&bdev->bd_sem);
@@ -615,6 +630,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 out2:
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
@@ -689,6 +705,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
@@ -731,7 +748,7 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
-	writeback_mapping: generic_writeback_mapping,
+	writepages: generic_writepages,
 	vm_writeback: generic_vm_writeback,
 	direct_IO: blkdev_direct_IO,
 };

@@ -35,7 +35,6 @@
 
 #define chip_t cs4231_t
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Paul Barton-Davis <pbd@op.net>");
 MODULE_DESCRIPTION("Turtle Beach Wavefront");
 MODULE_LICENSE("GPL");

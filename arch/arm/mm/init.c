@@ -30,6 +30,7 @@
 #include <asm/dma.h>
 #include <asm/hardware.h>
 #include <asm/setup.h>
+#include <asm/tlb.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -47,6 +48,8 @@
 #endif
 
 #define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
+
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
@@ -243,6 +246,7 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 	 * also get rid of some of the stuff above as well.
 	 */
 	max_low_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
+	max_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
 	mi->end = memend_pfn << PAGE_SHIFT;
 
 	return bootmem_pages;

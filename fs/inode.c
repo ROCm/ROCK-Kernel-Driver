@@ -14,6 +14,16 @@
 #include <linux/writeback.h>
 #include <linux/module.h>
 #include <linux/backing-dev.h>
+/*
+ * This is needed for the following functions:
+ *  - inode_has_buffers
+ *  - invalidate_inode_buffers
+ *  - fsync_bdev
+ *  - invalidate_bdev
+ *
+ * FIXME: remove all knowledge of the buffer layer from this file
+ */
+#include <linux/buffer_head.h>
 
 /*
  * New inode.c implementation.
@@ -971,6 +981,15 @@ void update_atime (struct inode *inode)
 	do_atime_update(inode);
 }   /*  End Function update_atime  */
 
+int inode_needs_sync(struct inode *inode)
+{
+	if (IS_SYNC(inode))
+		return 1;
+	if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode))
+		return 1;
+	return 0;
+}
+EXPORT_SYMBOL(inode_needs_sync);
 
 /*
  *	Quota functions that want to walk the inode lists..

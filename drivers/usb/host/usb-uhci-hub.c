@@ -13,7 +13,7 @@
     HW-initalization based on material of
     Randy Dunlap + Johannes Erdfelt + Gregory P. Smith + Linus Torvalds 
 
-    $Id: usb-uhci-hub.c,v 1.1 2002/05/14 20:36:57 acher Exp $
+    $Id: usb-uhci-hub.c,v 1.2 2002/05/21 21:40:16 acher Exp $
 */
 
 #define CLR_RH_PORTSTAT(x) \
@@ -34,7 +34,7 @@ static int oldval=-1;
 static int uhci_hub_status_data (struct usb_hcd *hcd, char *buf)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci (hcd);
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 	int i, len=0, data = 0, portstate;
 	int changed=0;
 
@@ -99,7 +99,7 @@ static int uhci_hub_control (
 	int status = 0;
 	int stat = 0;
 	int cstatus;
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 	int		ports = uhci->maxports;
 
 	switch (typeReq) {	

@@ -25,6 +25,7 @@
 #include <linux/highuid.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/buffer_head.h>
 #include <asm/byteorder.h>
 #include "sysv.h"
 

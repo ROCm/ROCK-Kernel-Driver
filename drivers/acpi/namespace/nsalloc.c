@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 72 $
+ *              $Revision: 74 $
  *
  ******************************************************************************/
 
@@ -26,7 +26,6 @@
 
 #include "acpi.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
@@ -207,7 +206,7 @@ acpi_ns_install_node (
 		 * real definition is found later.
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] is a forward reference\n",
-			(char *) &node->name));
+			node->name.ascii));
 	}
 
 	/*
@@ -232,7 +231,7 @@ acpi_ns_install_node (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s added to %p at %p\n",
-		(char *) &node->name, parent_node, node));
+		node->name.ascii, parent_node, node));
 
 	/*
 	 * Increment the reference count(s) of all parents up to
@@ -339,7 +338,7 @@ acpi_ns_delete_children (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ns_delete_namespace_subtree (
 	acpi_namespace_node     *parent_node)
 {
@@ -351,7 +350,7 @@ acpi_ns_delete_namespace_subtree (
 
 
 	if (!parent_node) {
-		return_ACPI_STATUS (AE_OK);
+		return_VOID;
 	}
 
 	/*
@@ -403,7 +402,7 @@ acpi_ns_delete_namespace_subtree (
 		}
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 
@@ -475,7 +474,7 @@ acpi_ns_remove_reference (
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ns_delete_namespace_by_owner (
 	u16                     owner_id)
 {
@@ -553,7 +552,7 @@ acpi_ns_delete_namespace_by_owner (
 		}
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 

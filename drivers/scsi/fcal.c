@@ -300,4 +300,3 @@ static Scsi_Host_Template driver_template = FCAL;
 
 #include "scsi_module.c"
 
-EXPORT_NO_SYMBOLS;

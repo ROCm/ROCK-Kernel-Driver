@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 17 $
+ *              $Revision: 20 $
  *
  ******************************************************************************/
 
@@ -60,7 +60,7 @@ acpi_rs_io_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_io);
@@ -119,7 +119,7 @@ acpi_rs_io_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -158,7 +158,7 @@ acpi_rs_fixed_io_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_io);
@@ -193,7 +193,7 @@ acpi_rs_fixed_io_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -377,7 +377,7 @@ acpi_rs_dma_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u8                      temp8 = 0;
 	u8                      index;
 	u8                      i;
@@ -407,13 +407,18 @@ acpi_rs_dma_resource (
 			i++;
 		}
 	}
+	if (i == 0) {
+		/* Zero channels is invalid! */
+
+		return_ACPI_STATUS (AE_BAD_DATA);
+	}
 	output_struct->data.dma.number_of_channels = i;
 
 
 	/*
 	 * Calculate the structure size based upon the number of interrupts
 	 */
-	struct_size += (output_struct->data.dma.number_of_channels - 1) * 4;
+	struct_size += ((ACPI_SIZE) output_struct->data.dma.number_of_channels - 1) * 4;
 
 	/*
 	 * Point to Byte 2
@@ -443,7 +448,7 @@ acpi_rs_dma_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pstree - Parser op tree manipulation/traversal/search
- *              $Revision: 37 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -59,7 +59,7 @@ acpi_ps_get_arg (
 
 	/* Get the info structure for this opcode */
 
-	op_info = acpi_ps_get_opcode_info (op->opcode);
+	op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Invalid opcode or ASCII character */
 
@@ -76,10 +76,10 @@ acpi_ps_get_arg (
 
 	/* Get the requested argument object */
 
-	arg = op->value.arg;
+	arg = op->common.value.arg;
 	while (arg && argn) {
 		argn--;
-		arg = arg->next;
+		arg = arg->common.next;
 	}
 
 	return (arg);
@@ -117,11 +117,12 @@ acpi_ps_append_arg (
 
 	/* Get the info structure for this opcode */
 
-	op_info = acpi_ps_get_opcode_info (op->opcode);
+	op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Invalid opcode */
 
-		ACPI_REPORT_ERROR (("Ps_append_arg: Invalid AML Opcode: 0x%2.2X\n", op->opcode));
+		ACPI_REPORT_ERROR (("Ps_append_arg: Invalid AML Opcode: 0x%2.2X\n",
+			op->common.aml_opcode));
 		return;
 	}
 
@@ -136,28 +137,28 @@ acpi_ps_append_arg (
 
 	/* Append the argument to the linked argument list */
 
-	if (op->value.arg) {
+	if (op->common.value.arg) {
 		/* Append to existing argument list */
 
-		prev_arg = op->value.arg;
-		while (prev_arg->next) {
-			prev_arg = prev_arg->next;
+		prev_arg = op->common.value.arg;
+		while (prev_arg->common.next) {
+			prev_arg = prev_arg->common.next;
 		}
-		prev_arg->next = arg;
+		prev_arg->common.next = arg;
 	}
 
 	else {
 		/* No argument list, this will be the first argument */
 
-		op->value.arg = arg;
+		op->common.value.arg = arg;
 	}
 
 
 	/* Set the parent in this arg and any args linked after it */
 
 	while (arg) {
-		arg->parent = op;
-		arg = arg->next;
+		arg->common.parent = op;
+		arg = arg->common.next;
 	}
 }
 
@@ -184,7 +185,7 @@ acpi_ps_get_child (
 	ACPI_FUNCTION_ENTRY ();
 
 
-	switch (op->opcode) {
+	switch (op->common.aml_opcode) {
 	case AML_SCOPE_OP:
 	case AML_ELSE_OP:
 	case AML_DEVICE_OP:
@@ -219,6 +220,10 @@ acpi_ps_get_child (
 		child = acpi_ps_get_arg (op, 3);
 		break;
 
+
+	default:
+		/* All others have no children */
+		break;
 	}
 
 	return (child);
@@ -265,19 +270,19 @@ acpi_ps_get_depth_next (
 
 	/* look for a sibling */
 
-	next = op->next;
+	next = op->common.next;
 	if (next) {
 		return (next);
 	}
 
 	/* look for a sibling of parent */
 
-	parent = op->parent;
+	parent = op->common.parent;
 
 	while (parent) {
 		arg = acpi_ps_get_arg (parent, 0);
 		while (arg && (arg != origin) && (arg != op)) {
-			arg = arg->next;
+			arg = arg->common.next;
 		}
 
 		if (arg == origin) {
@@ -286,13 +291,14 @@ acpi_ps_get_depth_next (
 			return (NULL);
 		}
 
-		if (parent->next) {
+		if (parent->common.next) {
 			/* found sibling of parent */
-			return (parent->next);
+
+			return (parent->common.next);
 		}
 
 		op = parent;
-		parent = parent->parent;
+		parent = parent->common.parent;
 	}
 
 	return (next);

@@ -35,6 +35,4 @@ clean:
 mrproper:
 	rm -f vmlinux.ecoff addinitrd elf2ecoff
 
-dummy:
-
 include $(TOPDIR)/Rules.make

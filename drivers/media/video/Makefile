@@ -2,15 +2,6 @@
 # Makefile for the kernel character device drivers.
 #
 
-# Object file lists.
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
-O_TARGET := video.o
-
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 

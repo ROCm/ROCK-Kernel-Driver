@@ -4,6 +4,9 @@
  * for more details.
  *
  * Copyright (C) 2000,2002 Silicon Graphics, Inc. All rights reserved.
+ *
+ * Routines for PCI DMA mapping.  See Documentation/DMA-mapping.txt for
+ * a description of how these routines should be used.
  */
 
 #include <linux/types.h>
@@ -12,6 +15,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/module.h>
 
 #include <asm/delay.h>
 #include <asm/io.h>
@@ -46,7 +50,7 @@ get_free_pciio_dmamap(devfs_handle_t pci_bus)
 	/*
 	 * Darn, we need to get the maps allocated for this bus.
 	 */
-	for (i=0; i<MAX_PCI_XWIDGET; i++) {
+	for (i = 0; i < MAX_PCI_XWIDGET; i++) {
 		if (busnum_to_pcibr_vhdl[i] == pci_bus) {
 			sn1_dma_map = busnum_to_atedmamaps[i];
 		}
@@ -314,22 +318,18 @@ sn1_pci_map_sg (struct pci_dev *hwdev,
 		}
 
 		/*
-		 * It is a 32bit card and we cannot do Direct mapping.
-		 * Let's 32Bit Page map the request.
+		 * It is a 32 bit card and we cannot do direct mapping,
+		 * so we use an ATE.
 		 */
-		dma_map = NULL;
-#ifdef CONFIG_IA64_SGI_SN1
-		dma_map = pciio_dmamap_alloc(vhdl, NULL, sg->length, 
-				PCIIO_BYTE_STREAM | PCIIO_DMA_DATA);
-#else
-		dma_map = pciio_dmamap_alloc(vhdl, NULL, sg->length, PCIIO_DMA_DATA);
-#endif
+		dma_map = 0;
+		dma_map = pciio_dmamap_alloc(vhdl, NULL, sg->length,
+					     DMA_DATA_FLAGS);
 		if (!dma_map) {
-			printk("pci_map_sg: Unable to allocate anymore 32Bits Page Map entries.\n");
+			printk(KERN_ERR "sn_pci_map_sg: Unable to allocate "
+			       "anymore 32 bit page map entries.\n");
 			BUG();
 		}
-		dma_addr = (dma_addr_t)pciio_dmamap_addr(dma_map, temp_ptr, sg->length);
-		/* printk("pci_map_sg: dma_map 0x%p Phys Addr 0x%p dma_addr 0x%p\n", dma_map, temp_ptr, dma_addr); */
+		dma_addr = pciio_dmamap_addr(dma_map, phys_addr, sg->length);
 		sg->address = (char *)dma_addr;
 		sg->page = (char *)dma_map;
 		
@@ -372,7 +372,17 @@ sn1_pci_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int
 
 }
 
-/*
+/**
+ * sn_pci_map_single - map a single region for DMA
+ * @hwdev: device to map for
+ * @ptr: kernel virtual address of the region to map
+ * @size: size of the region
+ * @direction: DMA direction
+ *
+ * Map the region pointed to by @ptr for DMA and return the
+ * DMA address.   Also known as platform_pci_map_single() by
+ * the IA64 machvec code.
+ *
  * We map this to the one step pciio_dmamap_trans interface rather than
  * the two step pciio_dmamap_alloc/pciio_dmamap_addr because we have
  * no way of saving the dmamap handle from the alloc to later free

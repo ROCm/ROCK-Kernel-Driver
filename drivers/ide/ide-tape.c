@@ -1,9 +1,5 @@
 /*
- * linux/drivers/ide/ide-tape.c		Version 1.17a	Jan, 2001
- *
  * Copyright (C) 1995 - 1999 Gadi Oxman <gadio@netvision.net.il>
- *
- * $Header$
  *
  * This driver was constructed as a student project in the software laboratory
  * of the faculty of electrical engineering in the Technion - Israel's
@@ -2793,14 +2789,14 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 	struct bio *prev_bio, *bio;
 	int pages = tape->pages_per_stage;
 	char *b_data = NULL;
-	struct bio_vec *bv; 
+	struct bio_vec *bv;
 
 	if ((stage = (idetape_stage_t *) kmalloc (sizeof (idetape_stage_t),GFP_KERNEL)) == NULL)
 		return NULL;
 	stage->next = NULL;
 
 	bio = stage->bio = bio_alloc(GFP_KERNEL,1);
-	bv = bio_iovec(bio);	
+	bv = bio_iovec(bio);
 	bv->bv_len = 0;
 	if (bio == NULL)
 		goto abort;
@@ -2810,9 +2806,14 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 	if (clear)
 		memset(bio_data(bio), 0, PAGE_SIZE);
 	bio->bi_size = PAGE_SIZE;
-	if(bv->bv_len == full) bv->bv_len = bio->bi_size;
-	set_bit (BH_Lock, &bio->bi_flags);
+	if(bv->bv_len == full)
+	    bv->bv_len = bio->bi_size;
+#if 0
 
+	/* FIXME: What what this supposed to achieve? */
+
+	set_bit (BH_Lock, &bio->bi_flags);
+#endif
 	while (--pages) {
 		if ((bio->bi_io_vec[pages].bv_page = alloc_page(GFP_KERNEL)) == NULL)
 			goto abort;
@@ -2841,7 +2842,11 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 		//bio->bi_io_vec[0].bv_offset = b_data;
 		bio->bi_size = PAGE_SIZE;
 		atomic_set(&bio->bi_cnt, full ? bio->bi_size : 0);
+#if 0
+		/* FIXME: What what this supposed to achieve? */
+
 		set_bit (BH_Lock, &bio->bi_flags);
+#endif
 		prev_bio->bi_next = bio;
 	}
 	bio->bi_size -= tape->excess_bh_size;
@@ -5849,7 +5854,7 @@ static void idetape_get_mode_sense_results(struct ata_device *drive)
 	printk (KERN_INFO "ide-tape: Medium Type - %d\n",header->medium_type);
 	printk (KERN_INFO "ide-tape: Device Specific Parameter - %d\n",header->dsp);
 	printk (KERN_INFO "ide-tape: Block Descriptor Length - %d\n",header->bdl);
-	
+
 	printk (KERN_INFO "ide-tape: Capabilities and Mechanical Status Page:\n");
 	printk (KERN_INFO "ide-tape: Page code - %d\n",capabilities->page_code);
 	printk (KERN_INFO "ide-tape: Page length - %d\n",capabilities->page_length);
@@ -5955,7 +5960,7 @@ static void idetape_setup(struct ata_device *drive, idetape_tape_t *tape, int mi
 		set_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags);
 
 	tape->min_pipeline = tape->max_pipeline = tape->max_stages = 10;
-	
+
 	idetape_get_inquiry_results(drive);
 	idetape_get_mode_sense_results(drive);
 	idetape_get_blocksize_from_block_descriptor(drive);
@@ -6054,11 +6059,11 @@ static void idetape_revalidate(struct ata_device *_dummy)
 	 */
 }
 
-/*
- *	IDE subdriver functions, registered with ide.c
- */
+static void idetape_attach(struct ata_device *);
+
 static struct ata_operations idetape_driver = {
 	owner:			THIS_MODULE,
+	attach:			idetape_attach,
 	cleanup:		idetape_cleanup,
 	standby:		NULL,
 	do_request:		idetape_do_request,
@@ -6069,6 +6074,8 @@ static struct ata_operations idetape_driver = {
 	check_media_change:	NULL,
 	revalidate:		idetape_revalidate,
 };
+
+
 
 /*
  *	Our character device supporting functions, passed to register_chrdev.
@@ -6082,104 +6089,93 @@ static struct file_operations idetape_fops = {
 	release:	idetape_chrdev_release,
 };
 
+static void idetape_attach(struct ata_device *drive)
+{
+	idetape_tape_t *tape;
+	int minor, supported = 0;
+	char *req;
+	struct ata_channel *channel;
+	int unit;
+
+	if (drive->type != ATA_TAPE)
+		return;
+
+	req = drive->driver_req;
+	if (req[0] != '\0' && strcmp(req, "ide-tape"))
+		return;
+
+	if (!idetape_chrdev_present)
+		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++ )
+			idetape_chrdevs[minor].drive = NULL;
+
+	if (!idetape_chrdev_present &&
+	    devfs_register_chrdev (IDETAPE_MAJOR, "ht", &idetape_fops)) {
+		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
+		return;
+	}
+
+	if (!idetape_identify_device (drive, drive->id)) {
+		printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
+		return;
+	}
+	if (drive->scsi) {
+		if (strstr(drive->id->model, "OnStream DI-")) {
+			printk(KERN_INFO "ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
+		} else {
+			printk(KERN_INFO "ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
+			return;
+		}
+	}
+	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
+	if (!tape) {
+		printk (KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
+		return;
+	}
+	if (ide_register_subdriver (drive, &idetape_driver)) {
+		printk (KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (tape);
+		return;
+	}
+	for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++);
+	idetape_setup (drive, tape, minor);
+	idetape_chrdevs[minor].drive = drive;
+	tape->de_r =
+		devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
+				drive->channel->major, minor,
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				&idetape_fops, NULL);
+	tape->de_n =
+		devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
+				drive->channel->major, minor + 128,
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				&idetape_fops, NULL);
+	devfs_register_tape (tape->de_r);
+	supported++;
+
+	if (!idetape_chrdev_present && !supported) {
+		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
+	} else
+		idetape_chrdev_present = 1;
+
+	/* Feel free to use partitions even on tapes... */
+
+	channel = drive->channel;
+	unit = drive - channel->drives;
+
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+}
+
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
 MODULE_LICENSE("GPL");
 
 static void __exit idetape_exit(void)
 {
-	struct ata_device *drive;
-	int minor;
-
-	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++) {
-		drive = idetape_chrdevs[minor].drive;
-		if (drive != NULL && idetape_cleanup (drive))
-		printk (KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
-	}
+	unregister_ata_driver(&idetape_driver);
 }
 
-/*
- *	idetape_init will register the driver for each tape.
- */
-int idetape_init(void)
+int __init idetape_init(void)
 {
-	struct ata_device *drive;
-	idetape_tape_t *tape;
-	int minor, failed = 0, supported = 0;
-/* DRIVER(drive)->busy++; */
-	MOD_INC_USE_COUNT;
-#if ONSTREAM_DEBUG
-        printk(KERN_INFO "ide-tape: MOD_INC_USE_COUNT in idetape_init\n");
-#endif
-	if (!idetape_chrdev_present)
-		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++ )
-			idetape_chrdevs[minor].drive = NULL;
-
-	if ((drive = ide_scan_devices(ATA_TAPE, "ide-tape", NULL, failed++)) == NULL) {
-		revalidate_drives();
-		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return 0;
-	}
-	if (!idetape_chrdev_present &&
-	    devfs_register_chrdev (IDETAPE_MAJOR, "ht", &idetape_fops)) {
-		printk (KERN_ERR "ide-tape: Failed to register character device interface\n");
-		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return -EBUSY;
-	}
-	do {
-		if (!idetape_identify_device (drive, drive->id)) {
-			printk (KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
-			continue;
-		}
-		if (drive->scsi) {
-			if (strstr(drive->id->model, "OnStream DI-")) {
-				printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
-			} else {
-				printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-				continue;
-			}
-		}
-		tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
-		if (tape == NULL) {
-			printk (KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idetape_driver)) {
-			printk (KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (tape);
-			continue;
-		}
-		for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++);
-		idetape_setup (drive, tape, minor);
-		idetape_chrdevs[minor].drive = drive;
-		tape->de_r =
-		    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
-				    drive->channel->major, minor,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		tape->de_n =
-		    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
-				    drive->channel->major, minor + 128,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		devfs_register_tape (tape->de_r);
-		supported++; failed--;
-	} while ((drive = ide_scan_devices(ATA_TAPE, "ide-tape", NULL, failed++)) != NULL);
-	if (!idetape_chrdev_present && !supported) {
-		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
-	} else
-		idetape_chrdev_present = 1;
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-	return 0;
+	return ata_driver_module(&idetape_driver);
 }
 
 module_init(idetape_init);

@@ -362,8 +362,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20f or 0x30f)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit cleanup_rtrack_module(void)
 {
 	video_unregister_device(&rtrack_radio);

@@ -207,20 +207,16 @@ ia64_phys_addr_valid (unsigned long addr)
 #define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
 
 /*
- * Conversion functions: convert a page and protection to a page entry,
- * and a page entry and page directory to the page they refer to.
+ * Conversion functions: convert page frame number (pfn) and a protection value to a page
+ * table entry (pte).
  */
-#define mk_pte(page,pgprot)						\
-({									\
-	pte_t __pte;							\
-									\
-	pte_val(__pte) = (page_to_phys(page)) | pgprot_val(pgprot);	\
-	__pte;								\
-})
+#define pfn_pte(pfn, pgprot) \
+({ pte_t __pte; pte_val(__pte) = ((pfn) << PAGE_SHIFT) | pgprot_val(pgprot); __pte; })
 
-/* This takes a physical page address that is used by the remapping functions */
-#define mk_pte_phys(physpage, pgprot) \
-({ pte_t __pte; pte_val(__pte) = physpage + pgprot_val(pgprot); __pte; })
+/* Extract pfn from pte.  */
+#define pte_pfn(_pte)		((pte_val(_pte) & _PFN_MASK) >> PAGE_SHIFT)
+
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
 #define pte_modify(_pte, newprot) \
 	(__pte((pte_val(_pte) & _PAGE_CHG_MASK) | pgprot_val(newprot)))

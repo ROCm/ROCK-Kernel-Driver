@@ -166,7 +166,7 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset,
 
 static void ida_geninit(int ctlr)
 {
-	int i,j;
+	int i;
 	drv_info_t *drv;
 
 	for(i=0; i<NWD; i++) {
@@ -296,7 +296,6 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 #ifdef MODULE
 
 MODULE_PARM(eisa, "1-8i");
-EXPORT_NO_SYMBOLS;
 
 /* This is a bit of a hack... */
 int __init init_module(void)
@@ -410,8 +409,7 @@ int __init cpqarray_init(void)
 		hba[i]->cmd_pool = (cmdlist_t *)pci_alloc_consistent(
 				hba[i]->pci_dev, NR_CMDS * sizeof(cmdlist_t), 
 				&(hba[i]->cmd_pool_dhandle));
-		hba[i]->cmd_pool_bits = (__u32*)kmalloc(
-				((NR_CMDS+31)/32)*sizeof(__u32), GFP_KERNEL);
+		hba[i]->cmd_pool_bits = kmalloc(((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long), GFP_KERNEL);
 		
 	if(hba[i]->cmd_pool_bits == NULL || hba[i]->cmd_pool == NULL)
 		{
@@ -442,7 +440,7 @@ int __init cpqarray_init(void)
 	
 		}
 		memset(hba[i]->cmd_pool, 0, NR_CMDS * sizeof(cmdlist_t));
-		memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+31)/32)*sizeof(__u32));
+		memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long));
 		printk(KERN_INFO "cpqarray: Finding drives on %s", 
 			hba[i]->devname);
 		getgeometry(i);
@@ -917,6 +915,7 @@ DBGPX(	printk("Submitting %d sectors in %d segments\n", creq->nr_sectors, seg); 
 	goto queue_next;
 
 startio:
+	blk_stop_queue(q);
 	start_io(h);
 }
 
@@ -1067,8 +1066,8 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	do_ida_request(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 	spin_unlock_irqrestore(IDA_LOCK(h->ctlr), flags);
+	blk_start_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 }
 
 /*
@@ -1334,7 +1333,7 @@ static cmdlist_t * cmd_alloc(ctlr_info_t *h, int get_from_pool)
 			i = find_first_zero_bit(h->cmd_pool_bits, NR_CMDS);
 			if (i == NR_CMDS)
 				return NULL;
-		} while(test_and_set_bit(i%32, h->cmd_pool_bits+(i/32)) != 0);
+		} while(test_and_set_bit(i&(BITS_PER_LONG-1), h->cmd_pool_bits+(i/BITS_PER_LONG)) != 0);
 		c = h->cmd_pool + i;
 		cmd_dhandle = h->cmd_pool_dhandle + i*sizeof(cmdlist_t);
 		h->nr_allocs++;
@@ -1354,7 +1353,7 @@ static void cmd_free(ctlr_info_t *h, cmdlist_t *c, int got_from_pool)
 			c->busaddr);
 	} else {
 		i = c - h->cmd_pool;
-		clear_bit(i%32, h->cmd_pool_bits+(i/32));
+		clear_bit(i&(BITS_PER_LONG-1), h->cmd_pool_bits+(i/BITS_PER_LONG));
 		h->nr_frees++;
 	}
 }

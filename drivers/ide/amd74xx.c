@@ -226,9 +226,9 @@ static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
  * by upper layers.
  */
 
-static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
+static int amd_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int T, UT;
 
@@ -251,8 +251,6 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 
 	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
-	if (!drive->init_speed)	
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return 0;
@@ -263,7 +261,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	if (!((amd_enabled >> drive->channel->unit) & 1))
 		return;
@@ -443,7 +441,8 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_channel: amd74xx_init_channel,
 		init_dma: amd74xx_init_dma,
 		enablebits: {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		bootable: ON_BOARD
+		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX
 	},
 	{
 		vendor:	PCI_VENDOR_ID_AMD,

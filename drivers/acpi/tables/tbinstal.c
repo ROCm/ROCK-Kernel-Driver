@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 57 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -84,8 +84,7 @@ acpi_tb_match_signature (
  *
  * FUNCTION:    Acpi_tb_install_table
  *
- * PARAMETERS:  Table_ptr           - Input buffer pointer, optional
- *              Table_info          - Return value from Acpi_tb_get_table
+ * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table
  *
  * RETURN:      Status
  *
@@ -97,7 +96,6 @@ acpi_tb_match_signature (
 
 acpi_status
 acpi_tb_install_table (
-	acpi_table_header       *table_ptr,
 	acpi_table_desc         *table_info)
 {
 	acpi_status             status;
@@ -109,7 +107,7 @@ acpi_tb_install_table (
 	 * Check the table signature and make sure it is recognized
 	 * Also checks the header checksum
 	 */
-	status = acpi_tb_recognize_table (table_ptr, table_info);
+	status = acpi_tb_recognize_table (table_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -137,8 +135,7 @@ acpi_tb_install_table (
  *
  * FUNCTION:    Acpi_tb_recognize_table
  *
- * PARAMETERS:  Table_ptr           - Input buffer pointer, optional
- *              Table_info          - Return value from Acpi_tb_get_table
+ * PARAMETERS:  Table_info          - Return value from Acpi_tb_get_table
  *
  * RETURN:      Status
  *
@@ -156,7 +153,6 @@ acpi_tb_install_table (
 
 acpi_status
 acpi_tb_recognize_table (
-	acpi_table_header       *table_ptr,
 	acpi_table_desc         *table_info)
 {
 	acpi_table_header       *table_header;
@@ -193,7 +189,7 @@ acpi_tb_recognize_table (
 
 	/* Return the table type and length via the info struct */
 
-	table_info->length  = table_header->length;
+	table_info->length = (ACPI_SIZE) table_header->length;
 
 	/*
 	 * Validate checksum for _most_ tables,
@@ -201,12 +197,14 @@ acpi_tb_recognize_table (
 	 */
 	if (table_info->type != ACPI_TABLE_FACS) {
 		status = acpi_tb_verify_table_checksum (table_header);
-		if (ACPI_FAILURE (status) &&
-			(!ACPI_CHECKSUM_ABORT)) {
+
+#if (!ACPI_CHECKSUM_ABORT)
+		if (ACPI_FAILURE (status)) {
 			/* Ignore the error if configuration says so */
 
 			status = AE_OK;
 		}
+#endif
 	}
 
 	return_ACPI_STATUS (status);
@@ -497,6 +495,9 @@ acpi_tb_delete_single_table (
 
 			acpi_os_unmap_memory (table_desc->base_pointer, table_desc->length);
 			break;
+
+		default:
+			break;
 		}
 	}
 }
@@ -508,7 +509,7 @@ acpi_tb_delete_single_table (
  *
  * PARAMETERS:  Table_info          - A table info struct
  *
- * RETURN:      None.
+ * RETURN:      Pointer to the next table in the list (of same type)
  *
  * DESCRIPTION: Free the memory associated with an internal ACPI table that
  *              is either installed or has never been installed.
@@ -523,7 +524,7 @@ acpi_tb_uninstall_table (
 	acpi_table_desc         *next_desc;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Tb_delete_single_table", table_desc);
+	ACPI_FUNCTION_TRACE_PTR ("Acpi_tb_uninstall_table", table_desc);
 
 
 	if (!table_desc) {

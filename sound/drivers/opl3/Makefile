@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _opl3.o
-
 export-objs  := opl3_lib.o
 
 snd-opl3-lib-objs := opl3_lib.o opl3_synth.o
@@ -64,7 +62,5 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SONICVIBES) += snd-opl3-synth.o
   obj-$(CONFIG_SND_YMFPCI) += snd-opl3-synth.o
 endif
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

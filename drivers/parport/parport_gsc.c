@@ -550,7 +550,5 @@ static void __exit parport_gsc_exit_module(void)
 	}
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(parport_gsc_init_module);
 module_exit(parport_gsc_exit_module);

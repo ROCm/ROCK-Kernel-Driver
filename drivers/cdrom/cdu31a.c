@@ -1563,11 +1563,6 @@ static void do_cdu31a_request(request_queue_t * q)
 		interruptible_sleep_on(&sony_wait);
 		if (signal_pending(current)) {
 			restore_flags(flags);
-			if (!QUEUE_EMPTY
-			    && CURRENT->rq_status != RQ_INACTIVE) {
-				end_request(0);
-			}
-			restore_flags(flags);
 #if DEBUG
 			printk("Leaving do_cdu31a_request at %d\n",
 			       __LINE__);
@@ -3502,4 +3497,3 @@ module_init(cdu31a_init);
 module_exit(cdu31a_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

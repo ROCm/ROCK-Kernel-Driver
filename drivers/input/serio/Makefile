@@ -2,10 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= seriodrv.o
-
 # Objects that export symbols.
 
 export-objs	:= serio.o

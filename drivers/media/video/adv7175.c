@@ -457,8 +457,6 @@ static struct i2c_driver i2c_driver_adv7176 = {
 	adv7175_command
 };
 
-EXPORT_NO_SYMBOLS;
-
 static int adv7175_init(void)
 {
 	int res_adv7175 = 0, res_adv7176 = 0;

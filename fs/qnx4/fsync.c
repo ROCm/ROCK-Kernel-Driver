@@ -16,6 +16,7 @@
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include <linux/fs.h>
 #include <linux/qnx4_fs.h>

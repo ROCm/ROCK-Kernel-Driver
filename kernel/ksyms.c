@@ -48,6 +48,7 @@
 #include <linux/seq_file.h>
 #include <linux/binfmts.h>
 #include <linux/namei.h>
+#include <linux/buffer_head.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -336,7 +337,6 @@ EXPORT_SYMBOL(ioctl_by_bdev);
 EXPORT_SYMBOL(grok_partitions);
 EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
-EXPORT_SYMBOL(tq_disk);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(wipe_partitions);
 

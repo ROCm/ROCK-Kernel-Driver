@@ -43,7 +43,7 @@ int via_calibrate_decr(void);
  */
 static __inline__ unsigned int get_dec(void)
 {
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 	return (mfspr(SPRN_PIT));
 #else
 	return (mfspr(SPRN_DEC));
@@ -52,7 +52,7 @@ static __inline__ unsigned int get_dec(void)
 
 static __inline__ void set_dec(unsigned int val)
 {
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 	return;		/* Have to let it auto-reload */
 #elif defined(CONFIG_8xx_CPU6)
 	set_dec_cpu6(val);

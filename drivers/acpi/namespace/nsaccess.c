@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 153 $
+ *              $Revision: 155 $
  *
  ******************************************************************************/
 
@@ -26,7 +26,6 @@
 
 #include "acpi.h"
 #include "amlcode.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 #include "acdispat.h"
 
@@ -180,7 +179,7 @@ acpi_ns_root_initialize (void)
 
 			/* Store pointer to value descriptor in the Node */
 
-			acpi_ns_attach_object (new_node, obj_desc, obj_desc->common.type);
+			status = acpi_ns_attach_object (new_node, obj_desc, obj_desc->common.type);
 
 			/* Remove local reference to the object */
 
@@ -298,9 +297,10 @@ acpi_ns_lookup (
 
 		num_segments = 0;
 		this_node    = acpi_gbl_root_node;
+		pathname     = "";
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-			"Null Pathname (Zero segments), Flags=%x\n", flags));
+			"Null Pathname (Zero segments), Flags=%X\n", flags));
 	}
 	else {
 		/*
@@ -316,7 +316,7 @@ acpi_ns_lookup (
 		 * Parent Prefixes (in which case the name's scope is relative
 		 * to the current scope).
 		 */
-		if (*pathname == AML_ROOT_PREFIX) {
+		if (*pathname == (u8) AML_ROOT_PREFIX) {
 			/* Pathname is fully qualified, start from the root */
 
 			this_node = acpi_gbl_root_node;
@@ -340,7 +340,7 @@ acpi_ns_lookup (
 			 * the parent node for each prefix instance.
 			 */
 			this_node = prefix_node;
-			while (*pathname == AML_PARENT_PREFIX) {
+			while (*pathname == (u8) AML_PARENT_PREFIX) {
 				/*
 				 * Point past this prefix to the name segment
 				 * part or the next Parent Prefix
@@ -382,7 +382,7 @@ acpi_ns_lookup (
 			num_segments = 0;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Prefix-only Pathname (Zero name segments), Flags=%x\n", flags));
+				"Prefix-only Pathname (Zero name segments), Flags=%X\n", flags));
 			break;
 
 		case AML_DUAL_NAME_PREFIX:

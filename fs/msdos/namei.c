@@ -9,6 +9,7 @@
 #include <linux/module.h>
 
 #include <linux/time.h>
+#include <linux/buffer_head.h>
 #include <linux/msdos_fs.h>
 #include <linux/smp_lock.h>
 
@@ -221,22 +222,17 @@ struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry)
 	if (res)
 		goto out;
 add:
-	if (inode) {
-		dentry = d_splice_alias(inode, dentry);
-		dentry->d_op = &msdos_dentry_operations;
-	} else {
-		d_add(dentry, inode);
-		dentry = NULL;
-	}
 	res = 0;
+	dentry = d_splice_alias(inode, dentry);
+	if (dentry)
+		dentry->d_op = &msdos_dentry_operations;
 out:
 	if (bh)
 		fat_brelse(sb, bh);
 	unlock_kernel();
-	if (res)
-		return ERR_PTR(res);
-	else
+	if (!res)
 		return dentry;
+	return ERR_PTR(res);
 }
 
 /***** Creates a directory entry (name is already formatted). */

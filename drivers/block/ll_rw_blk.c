@@ -25,6 +25,7 @@
 #include <linux/bootmem.h>
 #include <linux/completion.h>
 #include <linux/compiler.h>
+#include <linux/buffer_head.h>
 #include <scsi/scsi.h>
 #include <linux/backing-dev.h>
 
@@ -48,11 +49,8 @@ extern int mac_floppy_init(void);
  */
 static kmem_cache_t *request_cachep;
 
-/*
- * The "disk" task queue is used to start the actual requests
- * after a plug
- */
-DECLARE_TASK_QUEUE(tq_disk);
+static struct list_head blk_plug_list;
+static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /* blk_dev_struct is:
  *	request_queue
@@ -79,8 +77,8 @@ unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
 
 /**
- * blk_get_queue: - return the queue that matches the given device
- * @dev:    device
+ * bdev_get_queue: - return the queue that matches the given device
+ * @bdev:    device
  *
  * Description:
  *     Given a specific device, return the queue that will hold I/O
@@ -89,14 +87,9 @@ int blk_nohighio = 0;
  *     stored in the same location.
  *
  **/
-inline request_queue_t *blk_get_queue(kdev_t dev)
+inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
-	struct blk_dev_struct *bdev = blk_dev + major(dev);
-
-	if (bdev->queue)
-		return bdev->queue(dev);
-	else
-		return &blk_dev[major(dev)].request_queue;
+	return bdev->bd_queue;
 }
 
 /**
@@ -111,7 +104,7 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
 	struct backing_dev_info *ret = NULL;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	request_queue_t *q = bdev_get_queue(bdev);
 
 	if (q)
 		ret = &q->backing_dev_info;
@@ -795,8 +788,11 @@ void blk_plug_device(request_queue_t *q)
 	if (!elv_queue_empty(q))
 		return;
 
-	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
-		queue_task(&q->plug_tq, &tq_disk);
+	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
+		spin_lock(&blk_plug_lock);
+		list_add_tail(&q->plug_list, &blk_plug_list);
+		spin_unlock(&blk_plug_lock);
+	}
 }
 
 /*
@@ -807,7 +803,10 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	/*
 	 * not plugged
 	 */
-	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+	if (!__test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+		return;
+
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
 
 	/*
@@ -819,24 +818,92 @@ static inline void __generic_unplug_device(request_queue_t *q)
 
 /**
  * generic_unplug_device - fire a request queue
- * @q:    The &request_queue_t in question
+ * @data:    The &request_queue_t in question
  *
  * Description:
  *   Linux uses plugging to build bigger requests queues before letting
  *   the device have at them. If a queue is plugged, the I/O scheduler
  *   is still adding and merging requests on the queue. Once the queue
  *   gets unplugged (either by manually calling this function, or by
- *   running the tq_disk task queue), the request_fn defined for the
+ *   calling blk_run_queues()), the request_fn defined for the
  *   queue is invoked and transfers started.
  **/
 void generic_unplug_device(void *data)
 {
-	request_queue_t *q = (request_queue_t *) data;
+	request_queue_t *q = data;
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	__generic_unplug_device(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
+}
+
+/*
+ * clear stop flag and run queue
+ */
+void blk_start_queue(request_queue_t *q)
+{
+	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
+		unsigned long flags;
+
+		spin_lock_irqsave(q->queue_lock, flags);
+		if (!elv_queue_empty(q))
+			q->request_fn(q);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+	}
+}
+
+/*
+ * set stop bit, queue won't be run until blk_start_queue() is called
+ */
+void blk_stop_queue(request_queue_t *q)
+{
+	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
+}
+
+/*
+ * the equivalent of the previous tq_disk run
+ */
+void blk_run_queues(void)
+{
+	struct list_head *n, *tmp, local_plug_list;
+	unsigned long flags;
+
+	INIT_LIST_HEAD(&local_plug_list);
+
+	/*
+	 * this will happen fairly often
+	 */
+	spin_lock_irqsave(&blk_plug_lock, flags);
+	if (list_empty(&blk_plug_list)) {
+		spin_unlock_irqrestore(&blk_plug_lock, flags);
+		return;
+	}
+
+	list_splice(&blk_plug_list, &local_plug_list);
+	INIT_LIST_HEAD(&blk_plug_list);
+	spin_unlock_irqrestore(&blk_plug_lock, flags);
+
+	/*
+	 * local_plug_list is now a private copy we can traverse lockless
+	 */
+	list_for_each_safe(n, tmp, &local_plug_list) {
+		request_queue_t *q = list_entry(n, request_queue_t, plug_list);
+
+		if (!test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
+			list_del(&q->plug_list);
+			generic_unplug_device(q);
+		}
+	}
+
+	/*
+	 * add any remaining queue back to plug list
+	 */
+	if (!list_empty(&local_plug_list)) {
+		spin_lock_irqsave(&blk_plug_lock, flags);
+		list_splice(&local_plug_list, &blk_plug_list);
+		spin_unlock_irqrestore(&blk_plug_lock, flags);
+	}
 }
 
 static int __blk_cleanup_queue(struct request_list *list)
@@ -978,9 +1045,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->front_merge_fn      	= ll_front_merge_fn;
 	q->merge_requests_fn	= ll_merge_requests_fn;
 	q->prep_rq_fn		= NULL;
-	q->plug_tq.sync		= 0;
-	q->plug_tq.routine	= &generic_unplug_device;
-	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
 
@@ -991,6 +1055,9 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
+
+	INIT_LIST_HEAD(&q->plug_list);
+
 	return 0;
 }
 
@@ -1481,7 +1548,7 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
-		q = blk_get_queue(to_kdev_t(bio->bi_bdev->bd_dev));
+		q = bdev_get_queue(bio->bi_bdev);
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
@@ -1871,6 +1938,8 @@ int __init blk_dev_init(void)
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
 
+	INIT_LIST_HEAD(&blk_plug_list);
+
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
 	hd_init();
 #endif
@@ -1884,7 +1953,7 @@ int __init blk_dev_init(void)
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(blk_init_queue);
-EXPORT_SYMBOL(blk_get_queue);
+EXPORT_SYMBOL(bdev_get_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);
@@ -1893,6 +1962,7 @@ EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
 EXPORT_SYMBOL(blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
+EXPORT_SYMBOL(blk_max_pfn);
 EXPORT_SYMBOL(blk_queue_max_sectors);
 EXPORT_SYMBOL(blk_queue_max_phys_segments);
 EXPORT_SYMBOL(blk_queue_max_hw_segments);
@@ -1906,6 +1976,8 @@ EXPORT_SYMBOL(submit_bio);
 EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
+EXPORT_SYMBOL(blk_get_request);
+EXPORT_SYMBOL(blk_put_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
@@ -1914,3 +1986,7 @@ EXPORT_SYMBOL(blk_queue_free_tags);
 EXPORT_SYMBOL(blk_queue_start_tag);
 EXPORT_SYMBOL(blk_queue_end_tag);
 EXPORT_SYMBOL(blk_queue_invalidate_tags);
+
+EXPORT_SYMBOL(blk_start_queue);
+EXPORT_SYMBOL(blk_stop_queue);
+EXPORT_SYMBOL(blk_run_queues);

@@ -9,7 +9,7 @@
  *	   trini@mvista.com
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -188,10 +188,11 @@ start_ldr:
 	bl	decompress_kernel
 
 	/*
-	 * Make sure the kernel knows we don't have things set  in
+	 * Make sure the kernel knows we don't have things set in
 	 * registers.  -- Tom
 	 */
 	li	r4,0
+	li	r5,0
 	li	r6,0
 
 	/*

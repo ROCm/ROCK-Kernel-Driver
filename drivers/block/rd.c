@@ -48,6 +48,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <asm/uaccess.h>
 
 /*
@@ -378,6 +379,7 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit]->bd_openers++;
 		rd_bdev[unit]->bd_block_size = rd_blocksize;
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
+		rd_bdev[unit]->bd_queue = &blk_dev[MAJOR_NR].request_queue;
 	}
 
 	return 0;

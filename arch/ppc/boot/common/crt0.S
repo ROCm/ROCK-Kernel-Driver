@@ -69,7 +69,7 @@ __start:
 	bdnz	1b			# If we are not done yet, keep clearing
 2:
 
-#ifdef CONFIG_4xx
+#ifdef CONFIG_40x
 	## Set up the stack
 
 	lis	r9,_start@h		# r9 = &_start (text section entry)

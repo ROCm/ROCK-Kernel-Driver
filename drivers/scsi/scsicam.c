@@ -16,6 +16,7 @@
 #include <linux/genhd.h>
 #include <linux/kernel.h>
 #include <linux/blk.h>
+#include <linux/buffer_head.h>
 #include <asm/unaligned.h>
 #include "scsi.h"
 #include "hosts.h"

@@ -11,6 +11,7 @@
 #define _AVMCARD_H_
 
 #include <linux/spinlock.h>
+#include <linux/list.h>
 
 #define	AVMB1_PORTLEN		0x1f
 #define AVM_MAXVERSION		8
@@ -67,7 +68,7 @@ typedef	struct avmctrl_info {
 	char infobuf[128];	/* for function procinfo */
 	
 	struct avmcard  *card;
-	struct capi_ctr *capi_ctrl;
+	struct capi_ctr  capi_ctrl;
 	
 	struct list_head ncci_head;
 } avmctrl_info;
@@ -93,7 +94,9 @@ typedef struct avmcard {
 
 	struct avmctrl_info *ctrlinfo;
 
+	int nr_controllers;
 	int nlogcontr;
+	struct list_head list;
 } avmcard;
 
 extern int b1_irq_table[16];
@@ -537,7 +540,6 @@ static inline void b1_setinterrupt(unsigned int base, unsigned irq,
 }
 
 /* b1.c */
-void b1_set_revision(struct capi_driver *driver, char *rev);
 avmcard *b1_alloc_card(int nr_controllers);
 void b1_free_card(avmcard *card);
 int b1_detect(unsigned int base, enum avmcardtype cardtype);

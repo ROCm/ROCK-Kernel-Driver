@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
+#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>

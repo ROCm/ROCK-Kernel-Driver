@@ -368,5 +368,4 @@ module_init(isp16_init);
 #endif
 module_exit(isp16_exit);
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");

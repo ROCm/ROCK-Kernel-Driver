@@ -5,7 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET	:= storage.o
 EXTRA_CFLAGS	:= -I../../scsi/
 
 obj-$(CONFIG_USB_STORAGE)	+= usb-storage.o

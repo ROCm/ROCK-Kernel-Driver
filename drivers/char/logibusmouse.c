@@ -163,4 +163,3 @@ module_init(logi_busmouse_init);
 module_exit(logi_busmouse_cleanup);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

@@ -637,13 +637,14 @@ bad_ctc:
 	return 0;
 }
 
-static struct device device_i8253;
+static struct device device_i8253 = {
+	name:	       	"i8253",
+	bus_id:		"0040",
+};
 
-static void time_init_driverfs(void)
+static int time_init_driverfs(void)
 {
-	strcpy(device_i8253.name, "i8253");
-	strcpy(device_i8253.bus_id, "0040");
-	register_sys_device(&device_i8253);
+	return register_sys_device(&device_i8253);
 }
 
 __initcall(time_init_driverfs);

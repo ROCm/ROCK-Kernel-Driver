@@ -7,9 +7,9 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999 Hewlett-Packard Co.
- * Copyright (C) 1999 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999, 2002 Hewlett-Packard Co.
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  */
 #include <linux/init.h>
 #include <linux/string.h>
@@ -258,8 +258,9 @@ extern void efi_map_pal_code (void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timeval *tv);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
-extern u64  efi_get_iobase (void);
-extern u32  efi_mem_type (u64 phys_addr);
+extern u64 efi_get_iobase (void);
+extern u32 efi_mem_type (unsigned long phys_addr);
+extern u64 efi_mem_attributes (unsigned long phys_addr);
 
 /*
  * Variable Attributes

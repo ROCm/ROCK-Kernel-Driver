@@ -958,7 +958,6 @@ void cleanup_module(void)
 		i2o_remove_handler(&cfg_handler);
 }
  
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Configuration");
 MODULE_LICENSE("GPL");

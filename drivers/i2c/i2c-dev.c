@@ -537,8 +537,6 @@ int i2cdev_cleanup(void)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
-
 #ifdef MODULE
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");

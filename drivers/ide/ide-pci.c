@@ -27,10 +27,6 @@
 
 #include "pcihost.h"
 
-/* Missing PCI device IDs: */
-#define PCI_VENDOR_ID_HINT 0x3388
-#define PCI_DEVICE_ID_HINT 0x8013
-
 /*
  * This is the list of registered PCI chipset driver data structures.
  */
@@ -66,85 +62,68 @@ void ata_register_chipset(struct ata_pci_device *d)
 }
 
 /*
- * This allows off board ide-pci cards the enable a BIOS, verify interrupt
- * settings of split-mirror pci-config space, place chipset into init-mode,
- * and/or preserve an interrupt if the card is not native ide support.
- */
-static unsigned int __init trust_pci_irq(struct ata_pci_device *d, struct pci_dev *dev)
-{
-	if (d->flags & ATA_F_IRQ)
-		return dev->irq;
-
-	return 0;
-}
-
-/*
  * Match a PCI IDE port against an entry in ide_hwifs[],
  * based on io_base port if possible.
  */
 static struct ata_channel __init *lookup_channel(unsigned long io_base, int bootable, const char *name)
 {
 	int h;
-	struct ata_channel *hwif;
+	struct ata_channel *ch;
 
 	/*
-	 * Look for a hwif with matching io_base specified using
-	 * parameters to ide_setup().
+	 * Look for a channel with matching io_base default value.  If chipset is
+	 * "ide_unknown", then claim that channel slot.  Otherwise, some other
+	 * chipset has already claimed it..  :(
 	 */
 	for (h = 0; h < MAX_HWIFS; ++h) {
-		hwif = &ide_hwifs[h];
-		if (hwif->io_ports[IDE_DATA_OFFSET] == io_base) {
-			if (hwif->chipset == ide_generic)
-				return hwif; /* a perfect match */
-		}
-	}
-	/*
-	 * Look for a hwif with matching io_base default value.
-	 * If chipset is "ide_unknown", then claim that hwif slot.
-	 * Otherwise, some other chipset has already claimed it..  :(
-	 */
-	for (h = 0; h < MAX_HWIFS; ++h) {
-		hwif = &ide_hwifs[h];
-		if (hwif->io_ports[IDE_DATA_OFFSET] == io_base) {
-			if (hwif->chipset == ide_unknown)
-				return hwif; /* match */
-			printk("%s: port 0x%04lx already claimed by %s\n", name, io_base, hwif->name);
+		ch = &ide_hwifs[h];
+		if (ch->io_ports[IDE_DATA_OFFSET] == io_base) {
+			if (ch->chipset == ide_generic)
+				return ch; /* a perfect match */
+			if (ch->chipset == ide_unknown)
+				return ch; /* match */
+			printk(KERN_INFO "%s: port 0x%04lx already claimed by %s\n",
+					name, io_base, ch->name);
 			return NULL;	/* already claimed */
 		}
 	}
+
 	/*
-	 * Okay, there is no hwif matching our io_base,
-	 * so we'll just claim an unassigned slot.
-	 * Give preference to claiming other slots before claiming ide0/ide1,
-	 * just in case there's another interface yet-to-be-scanned
-	 * which uses ports 1f0/170 (the ide0/ide1 defaults).
+	 * Okay, there is no ch matching our io_base, so we'll just claim an
+	 * unassigned slot.
 	 *
-	 * Unless there is a bootable card that does not use the standard
-	 * ports 1f0/170 (the ide0/ide1 defaults). The (bootable) flag.
+	 * Give preference to claiming other slots before claiming ide0/ide1,
+	 * just in case there's another interface yet-to-be-scanned which uses
+	 * ports 1f0/170 (the ide0/ide1 defaults).
+	 *
+	 * Unless there is a bootable card that does not use the standard ports
+	 * 1f0/170 (the ide0/ide1 defaults). The (bootable) flag.
 	 */
+
 	if (bootable == ON_BOARD) {
 		for (h = 0; h < MAX_HWIFS; ++h) {
-			hwif = &ide_hwifs[h];
-			if (hwif->chipset == ide_unknown)
-				return hwif;	/* pick an unused entry */
+			ch = &ide_hwifs[h];
+			if (ch->chipset == ide_unknown)
+				return ch;	/* pick an unused entry */
 		}
 	} else {
 		for (h = 2; h < MAX_HWIFS; ++h) {
-			hwif = ide_hwifs + h;
-			if (hwif->chipset == ide_unknown)
-				return hwif;	/* pick an unused entry */
+			ch = &ide_hwifs[h];
+			if (ch->chipset == ide_unknown)
+				return ch;	/* pick an unused entry */
 		}
 	}
 	for (h = 0; h < 2; ++h) {
-		hwif = ide_hwifs + h;
-		if (hwif->chipset == ide_unknown)
-			return hwif;	/* pick an unused entry */
+		ch = &ide_hwifs[h];
+		if (ch->chipset == ide_unknown)
+			return ch;	/* pick an unused entry */
 	}
-	printk("%s: too many IDE interfaces, no room in table\n", name);
+	printk(KERN_INFO "%s: too many ATA interfaces.\n", name);
+
 	return NULL;
 }
 
-static int __init setup_pci_baseregs (struct pci_dev *dev, const char *name)
+static int __init setup_pci_baseregs(struct pci_dev *dev, const char *name)
 {
 	u8 reg;
 	u8 progif = 0;
@@ -179,109 +158,6 @@ static int __init setup_pci_baseregs (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-
-/*
- * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
- */
-static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, const char *name)
-{
-	unsigned long	dma_base = 0;
-	struct pci_dev	*dev = hwif->pci_dev;
-
-	dma_base = pci_resource_start(dev, 4);
-	if (!dma_base)
-		return 0;
-
-	/* PDC20246, PDC20262, HPT343, & HPT366 */
-	if (extra) {
-		request_region(dma_base + 16, extra, name);
-		hwif->dma_extra = extra;
-	}
-
-	/* If we are on the second channel, the dma base address will be one
-	 * entry away from the primary interface.
-	 */
-	if (hwif->unit == ATA_SECONDARY)
-		dma_base += 8;
-
-	if ((dev->vendor == PCI_VENDOR_ID_AL && dev->device == PCI_DEVICE_ID_AL_M5219) ||
-			(dev->vendor == PCI_VENDOR_ID_AMD && dev->device == PCI_DEVICE_ID_AMD_VIPER_7409) ||
-			(dev->vendor == PCI_VENDOR_ID_CMD && dev->device == PCI_DEVICE_ID_CMD_643)) {
-		outb(inb(dma_base + 2) & 0x60, dma_base+2);
-		if (inb(dma_base + 2) & 0x80)
-			printk(KERN_INFO "%s: simplex device: DMA forced\n", name);
-	} else {
-
-		/* If the device claims "simplex" DMA, this means only one of
-		 * the two interfaces can be trusted with DMA at any point in
-		 * time.  So we should enable DMA only on one of the two
-		 * interfaces.
-		 */
-
-		if ((inb(dma_base + 2) & 0x80)) {
-			if ((!hwif->drives[0].present && !hwif->drives[1].present) ||
-				hwif->unit == ATA_SECONDARY) {
-				printk("%s: simplex device:  DMA disabled\n", name);
-				dma_base = 0;
-			}
-		}
-	}
-
-	return dma_base;
-}
-
-/*
- * Setup DMA transfers on a channel.
- */
-static void __init setup_channel_dma(struct ata_channel *ch,
-		struct pci_dev *dev,
-		struct ata_pci_device *d,
-		int port,
-		u8 class_rev,
-		int pciirq,
-		int autodma,
-		unsigned short *pcicmd)
-{
-	unsigned long dma_base;
-
-	if (d->flags & ATA_F_NOADMA)
-		autodma = 0;
-
-	if (autodma)
-		ch->autodma = 1;
-
-	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
-		return;
-
-	dma_base = get_dma_base(ch, ((port == ATA_PRIMARY) && d->extra) ? d->extra : 0, dev->name);
-	if (!dma_base) {
-		printk("%s: %s Bus-Master DMA was disabled by BIOS\n",
-				ch->name, dev->name);
-
-		return;
-	}
-	if (!(*pcicmd & PCI_COMMAND_MASTER)) {
-
-		/*
-		 * Set up BM-DMA capability (PnP BIOS should have done this already)
-		 */
-		if (!(d->vendor == PCI_VENDOR_ID_CYRIX && d->device == PCI_DEVICE_ID_CYRIX_5530_IDE))
-			ch->autodma = 0;	/* default DMA off if we had to configure it here */
-		pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
-		if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
-			printk("%s: %s error updating PCICMD\n",
-					ch->name, dev->name);
-			dma_base = 0;
-		}
-	}
-	if (d->init_dma)
-		d->init_dma(ch, dma_base);
-	else
-		ata_init_dma(ch, dma_base);
-}
-#endif
-
 /*
  * Setup a particular port on an ATA host controller.
  *
@@ -296,6 +172,7 @@ static int __init setup_host_channel(struct pci_dev *dev,
 		unsigned short *pcicmd)
 {
 	unsigned long base = 0;
+	unsigned long dma_base;
 	unsigned long ctl = 0;
 	ide_pci_enablebit_t *e = &(d->enablebits[port]);
 	struct ata_channel *ch;
@@ -354,7 +231,7 @@ controller_ok:
 		base = port ? 0x170 : 0x1f0;
 
 	if ((ch = lookup_channel(base, d->bootable, dev->name)) == NULL)
-		return -ENOMEM;	/* no room in ide_hwifs[] */
+		return -ENOMEM;	/* no room */
 
 	if (ch->io_ports[IDE_DATA_OFFSET] != base) {
 		ide_init_hwif_ports(&ch->hw, base, (ctl | 2), NULL);
@@ -390,7 +267,79 @@ controller_ok:
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	setup_channel_dma(ch, dev, d, port, class_rev, pciirq, autodma, pcicmd);
+	/*
+	 * Setup DMA transfers on the channel.
+	 */
+	if (d->flags & ATA_F_NOADMA)
+		autodma = 0;
+
+	if (autodma)
+		ch->autodma = 1;
+
+	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
+		goto no_dma;
+	/*
+	 * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
+	 */
+	dma_base = pci_resource_start(dev, 4);
+	if (dma_base) {
+		/* PDC20246, PDC20262, HPT343, & HPT366 */
+		if ((ch->unit == ATA_PRIMARY) && d->extra) {
+			request_region(dma_base + 16, d->extra, dev->name);
+			ch->dma_extra = d->extra;
+		}
+
+		/* If we are on the second channel, the dma base address will
+		 * be one entry away from the primary interface.
+		 */
+		if (ch->unit == ATA_SECONDARY)
+			dma_base += 8;
+
+		if (d->flags & ATA_F_SIMPLEX) {
+			outb(inb(dma_base + 2) & 0x60, dma_base + 2);
+			if (inb(dma_base + 2) & 0x80)
+				printk(KERN_INFO "%s: simplex device: DMA forced\n", dev->name);
+		} else {
+			/* If the device claims "simplex" DMA, this means only
+			 * one of the two interfaces can be trusted with DMA at
+			 * any point in time.  So we should enable DMA only on
+			 * one of the two interfaces.
+			 */
+			if ((inb(dma_base + 2) & 0x80)) {
+				if ((!ch->drives[0].present && !ch->drives[1].present) ||
+						ch->unit == ATA_SECONDARY) {
+					printk(KERN_INFO "%s: simplex device:  DMA disabled\n", dev->name);
+					dma_base = 0;
+				}
+			}
+		}
+	} else {
+		printk(KERN_INFO "%s: %s Bus-Master DMA was disabled by BIOS\n",
+				ch->name, dev->name);
+
+		goto no_dma;
+	}
+	if (!(*pcicmd & PCI_COMMAND_MASTER)) {
+		/*
+		 * Set up BM-DMA capability (PnP BIOS should have done this
+		 * already).  Default to DMA off on the drive, if we had to
+		 * configure it here.  This should most propably be enabled no
+		 * all chipsets which can be expected to be used on systems
+		 * without a BIOS equivalent.
+		 */
+		if (!(d->flags | ATA_F_FDMA))
+			ch->autodma = 0;
+		pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
+		if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
+			printk("%s: %s error updating PCICMD\n",
+					ch->name, dev->name);
+			dma_base = 0;
+		}
+	}
+	if (d->init_dma)
+		d->init_dma(ch, dma_base);
+	else
+		ata_init_dma(ch, dma_base);
 #endif
 
 no_dma:
@@ -431,7 +380,7 @@ static void __init setup_pci_device(struct pci_dev *dev, struct ata_pci_device *
 
 check_if_enabled:
 	if (pci_read_config_word(dev, PCI_COMMAND, &pcicmd)) {
-		printk("%s: error accessing PCI regs\n", dev->name);
+		printk(KERN_ERR "%s: error accessing PCI regs\n", dev->name);
 		return;
 	}
 	if (!(pcicmd & PCI_COMMAND_IO)) {	/* is device disabled? */
@@ -498,8 +447,12 @@ check_if_enabled:
 		 */
 		if (d->init_chipset)
 			pciirq = d->init_chipset(dev);
-		else
-			pciirq = trust_pci_irq(d, dev);
+		else {
+			if (d->flags & ATA_F_IRQ)
+				pciirq = dev->irq;
+			else
+				pciirq =  0;
+		}
 	} else if (tried_config) {
 		printk(KERN_INFO "ATA: will probe IRQs later\n");
 		pciirq = 0;
@@ -523,6 +476,10 @@ check_if_enabled:
 	setup_host_channel(dev, d, ATA_SECONDARY, class_rev, pciirq, autodma, &pcicmd);
 }
 
+/*
+ * Fix crossover IRQ line setups between primary and secondary channel.  Quite
+ * a common bug apparently.
+ */
 static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_pci_device *d)
 {
 	struct pci_dev *dev2 = NULL;
@@ -553,14 +510,14 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_
 			}
 		}
 	}
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-			dev->name, dev->slot_name, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-			dev2->name, dev2->slot_name, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -583,8 +540,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-		dev->name, dev->slot_name, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+		dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2) {
 		return;
@@ -600,8 +557,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-		dev2->name, dev2->slot_name, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+		dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 
 }
@@ -622,7 +579,8 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	switch(class_rev) {
 		case 5:
 		case 4:
-		case 3:	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
+		case 3:	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+					dev->name, dev->slot_name);
 			setup_pci_device(dev, d);
 			return;
 		default:	break;
@@ -643,12 +601,14 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 			break;
 		}
 	}
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev2->name, dev2->slot_name);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -683,7 +643,7 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		 * beeing grabbed by generic drivers.
 		 */
 		if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
-			printk(KERN_INFO "ATA: unknown interface: %s, on PCI slot %s\n",
+			printk(KERN_INFO "ATA: unknown interface: %s, PCI slot %s\n",
 					dev->name, dev->slot_name);
 		}
 		return;
@@ -707,8 +667,8 @@ static void __init scan_pcidev(struct pci_dev *dev)
 	} else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
 		pdc20270_device_order_fixup(dev, d);
 	else {
-		printk(KERN_INFO "ATA: %s (%04x:%04x) on PCI slot %s\n",
-				dev->name, vendor, device, dev->slot_name);
+		printk(KERN_INFO "ATA: %s, PCI slot %s\n",
+				dev->name, dev->slot_name);
 		setup_pci_device(dev, d);
 	}
 }
@@ -752,7 +712,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 	},
 	{
 		vendor: PCI_VENDOR_ID_HINT,
-		device: PCI_DEVICE_ID_HINT,
+		device: PCI_DEVICE_ID_HINT_VXPROII_IDE,
 		bootable: ON_BOARD
 	},
 	{

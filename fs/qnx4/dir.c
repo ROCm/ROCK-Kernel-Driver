@@ -18,6 +18,7 @@
 #include <linux/qnx4_fs.h>
 #include <linux/stat.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 
 static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)

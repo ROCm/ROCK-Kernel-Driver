@@ -47,6 +47,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
+#include <linux/errno.h>
 #include "usb.h"
 #include "scsiglue.h"
 #include "transport.h"
@@ -102,9 +104,6 @@ static int my_host_number;
  */
 
 #define US_ACT_COMMAND		1
-#define US_ACT_DEVICE_RESET	2
-#define US_ACT_BUS_RESET	3
-#define US_ACT_HOST_RESET	4
 #define US_ACT_EXIT		5
 
 /* The list of structures and the protective lock for them */
@@ -342,10 +341,12 @@ static int usb_stor_control_thread(void * __us)
 	for(;;) {
 		struct Scsi_Host *host;
 		US_DEBUGP("*** thread sleeping.\n");
+		atomic_set(&us->sm_state, US_STATE_IDLE);
 		if(down_interruptible(&us->sema))
 			break;
 			
 		US_DEBUGP("*** thread awakened.\n");
+		atomic_set(&us->sm_state, US_STATE_RUNNING);
 
 		/* lock access to the queue element */
 		spin_lock_irq(&us->queue_exclusion);
@@ -359,145 +360,131 @@ static int usb_stor_control_thread(void * __us)
 		/* release the queue lock as fast as possible */
 		spin_unlock_irq(&us->queue_exclusion);
 
-		switch (action) {
-		case US_ACT_COMMAND:
-			/* reject the command if the direction indicator 
-			 * is UNKNOWN
-			 */
-			if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
-				US_DEBUGP("UNKNOWN data direction\n");
-				us->srb->result = DID_ERROR << 16;
-				scsi_lock(host);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				scsi_unlock(host);
-				break;
-			}
-
-			/* reject if target != 0 or if LUN is higher than
-			 * the maximum known LUN
-			 */
-			if (us->srb->target && 
-					!(us->flags & US_FL_SCM_MULT_TARG)) {
-				US_DEBUGP("Bad target number (%d/%d)\n",
-					  us->srb->target, us->srb->lun);
-				us->srb->result = DID_BAD_TARGET << 16;
-
-				scsi_lock(host);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				scsi_unlock(host);
-				break;
-			}
-
-			if (us->srb->lun > us->max_lun) {
-				US_DEBUGP("Bad LUN (%d/%d)\n",
-					  us->srb->target, us->srb->lun);
-				us->srb->result = DID_BAD_TARGET << 16;
-
-				scsi_lock(host);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				scsi_unlock(host);
-				break;
-			}
-
-			/* handle those devices which can't do a START_STOP */
-			if ((us->srb->cmnd[0] == START_STOP) &&
-			    (us->flags & US_FL_START_STOP)) {
-				US_DEBUGP("Skipping START_STOP command\n");
-				us->srb->result = GOOD << 1;
-
-				scsi_lock(host);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				scsi_unlock(host);
-				break;
-			}
-
-			/* lock the device pointers */
-			down(&(us->dev_semaphore));
-
-			/* our device has gone - pretend not ready */
-			if (atomic_read(&us->sm_state) == US_STATE_DETACHED) {
-				US_DEBUGP("Request is for removed device\n");
-				/* For REQUEST_SENSE, it's the data.  But
-				 * for anything else, it should look like
-				 * we auto-sensed for it.
-				 */
-				if (us->srb->cmnd[0] == REQUEST_SENSE) {
-					memcpy(us->srb->request_buffer, 
-					       usb_stor_sense_notready, 
-					       sizeof(usb_stor_sense_notready));
-					us->srb->result = GOOD << 1;
-				} else if(us->srb->cmnd[0] == INQUIRY) {
-					unsigned char data_ptr[36] = {
-					    0x20, 0x80, 0x02, 0x02,
-					    0x1F, 0x00, 0x00, 0x00};
-					US_DEBUGP("Faking INQUIRY command for disconnected device\n");
-					fill_inquiry_response(us, data_ptr, 36);
-					us->srb->result = GOOD << 1;
-				} else {
-					memcpy(us->srb->sense_buffer, 
-					       usb_stor_sense_notready, 
-					       sizeof(usb_stor_sense_notready));
-					us->srb->result = CHECK_CONDITION << 1;
-				}
-			} else { /* atomic_read(&us->sm_state) == STATE_DETACHED */
-
-				/* Handle those devices which need us to fake 
-				 * their inquiry data */
-				if ((us->srb->cmnd[0] == INQUIRY) &&
-				    (us->flags & US_FL_FIX_INQUIRY)) {
-					unsigned char data_ptr[36] = {
-					    0x00, 0x80, 0x02, 0x02,
-					    0x1F, 0x00, 0x00, 0x00};
-
-					US_DEBUGP("Faking INQUIRY command\n");
-					fill_inquiry_response(us, data_ptr, 36);
-					us->srb->result = GOOD << 1;
-				} else {
-					/* we've got a command, let's do it! */
-					US_DEBUG(usb_stor_show_command(us->srb));
-					atomic_set(&us->sm_state, US_STATE_RUNNING);
-					us->proto_handler(us->srb, us);
-					atomic_set(&us->sm_state, US_STATE_IDLE);
-				}
-			}
-
-			/* unlock the device pointers */
-			up(&(us->dev_semaphore));
-
-			/* indicate that the command is done */
-			if (us->srb->result != DID_ABORT << 16) {
-				US_DEBUGP("scsi cmd done, result=0x%x\n", 
-					   us->srb->result);
-				scsi_lock(host);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				scsi_unlock(host);
-			} else {
-				US_DEBUGP("scsi command aborted\n");
-				us->srb = NULL;
-				complete(&(us->notify));
-			}
-			break;
-
-		case US_ACT_DEVICE_RESET:
-			break;
-
-		case US_ACT_BUS_RESET:
-			break;
-
-		case US_ACT_HOST_RESET:
-			break;
-
-		} /* end switch on action */
-
 		/* exit if we get a signal to exit */
 		if (action == US_ACT_EXIT) {
 			US_DEBUGP("-- US_ACT_EXIT command received\n");
 			break;
+		}
+
+		BUG_ON(action != US_ACT_COMMAND);
+
+		/* reject the command if the direction indicator 
+		 * is UNKNOWN
+		 */
+		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+			US_DEBUGP("UNKNOWN data direction\n");
+			us->srb->result = DID_ERROR << 16;
+			scsi_lock(host);
+			us->srb->scsi_done(us->srb);
+			us->srb = NULL;
+			scsi_unlock(host);
+			continue;
+		}
+
+		/* reject if target != 0 or if LUN is higher than
+		 * the maximum known LUN
+		 */
+		if (us->srb->target && 
+				!(us->flags & US_FL_SCM_MULT_TARG)) {
+			US_DEBUGP("Bad target number (%d/%d)\n",
+				  us->srb->target, us->srb->lun);
+			us->srb->result = DID_BAD_TARGET << 16;
+
+			scsi_lock(host);
+			us->srb->scsi_done(us->srb);
+			us->srb = NULL;
+			scsi_unlock(host);
+			continue;
+		}
+
+		if (us->srb->lun > us->max_lun) {
+			US_DEBUGP("Bad LUN (%d/%d)\n",
+				  us->srb->target, us->srb->lun);
+			us->srb->result = DID_BAD_TARGET << 16;
+
+			scsi_lock(host);
+			us->srb->scsi_done(us->srb);
+			us->srb = NULL;
+			scsi_unlock(host);
+			continue;
+		}
+
+		/* handle those devices which can't do a START_STOP */
+		if ((us->srb->cmnd[0] == START_STOP) &&
+		    (us->flags & US_FL_START_STOP)) {
+			US_DEBUGP("Skipping START_STOP command\n");
+			us->srb->result = GOOD << 1;
+
+			scsi_lock(host);
+			us->srb->scsi_done(us->srb);
+			us->srb = NULL;
+			scsi_unlock(host);
+			continue;
+		}
+
+		/* lock the device pointers */
+		down(&(us->dev_semaphore));
+
+		/* our device has gone - pretend not ready */
+		if (atomic_read(&us->device_state) == US_STATE_DETACHED) {
+			US_DEBUGP("Request is for removed device\n");
+			/* For REQUEST_SENSE, it's the data.  But
+			 * for anything else, it should look like
+			 * we auto-sensed for it.
+			 */
+			if (us->srb->cmnd[0] == REQUEST_SENSE) {
+				memcpy(us->srb->request_buffer, 
+				       usb_stor_sense_notready, 
+				       sizeof(usb_stor_sense_notready));
+				us->srb->result = GOOD << 1;
+			} else if(us->srb->cmnd[0] == INQUIRY) {
+				unsigned char data_ptr[36] = {
+				    0x20, 0x80, 0x02, 0x02,
+				    0x1F, 0x00, 0x00, 0x00};
+				US_DEBUGP("Faking INQUIRY command for disconnected device\n");
+				fill_inquiry_response(us, data_ptr, 36);
+				us->srb->result = GOOD << 1;
+			} else {
+				memcpy(us->srb->sense_buffer, 
+				       usb_stor_sense_notready, 
+				       sizeof(usb_stor_sense_notready));
+				us->srb->result = CHECK_CONDITION << 1;
+			}
+		} else { /* atomic_read(&us->device_state) == STATE_DETACHED */
+
+			/* Handle those devices which need us to fake 
+			 * their inquiry data */
+			if ((us->srb->cmnd[0] == INQUIRY) &&
+			    (us->flags & US_FL_FIX_INQUIRY)) {
+				unsigned char data_ptr[36] = {
+				    0x00, 0x80, 0x02, 0x02,
+				    0x1F, 0x00, 0x00, 0x00};
+
+				US_DEBUGP("Faking INQUIRY command\n");
+				fill_inquiry_response(us, data_ptr, 36);
+				us->srb->result = GOOD << 1;
+			} else {
+				/* we've got a command, let's do it! */
+				US_DEBUG(usb_stor_show_command(us->srb));
+				us->proto_handler(us->srb, us);
+			}
+		}
+
+		/* unlock the device pointers */
+		up(&(us->dev_semaphore));
+
+		/* indicate that the command is done */
+		if (us->srb->result != DID_ABORT << 16) {
+			US_DEBUGP("scsi cmd done, result=0x%x\n", 
+				   us->srb->result);
+			scsi_lock(host);
+			us->srb->scsi_done(us->srb);
+			us->srb = NULL;
+			scsi_unlock(host);
+		} else {
+			US_DEBUGP("scsi command aborted\n");
+			us->srb = NULL;
+			complete(&(us->notify));
 		}
 	} /* for (;;) */
 
@@ -723,7 +710,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
-		atomic_set(&ss->sm_state, US_STATE_IDLE);
+		atomic_set(&ss->device_state, US_STATE_ATTACHED);
 
 		/* copy over the endpoint data */
 		if (ep_in)
@@ -1014,6 +1001,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* start up our control thread */
 		atomic_set(&ss->sm_state, US_STATE_IDLE);
+		atomic_set(&ss->device_state, US_STATE_ATTACHED);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {

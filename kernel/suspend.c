@@ -1,5 +1,5 @@
 /*
- * linux/kernel/swsusp.c
+ * linux/kernel/suspend.c
  *
  * This file is to realize architecture-independent
  * machine suspend feature using pretty near only high-level routines
@@ -11,7 +11,7 @@
  * 
  * Pavel Machek <pavel@ucw.cz>:
  * Modifications, defectiveness pointing, being with me at the very beginning,
- * suspend to swap space, stop all tasks.
+ * suspend to swap space, stop all tasks. Port to 2.4.18-ac and 2.5.17.
  *
  * Steve Doddi <dirk@loth.demon.co.uk>: 
  * Support the possibility of hardware state restoring.
@@ -34,15 +34,6 @@
  * For TODOs,FIXMEs also look in Documentation/swsusp.txt
  */
 
-/*
- * TODO:
- *
- * - we should launch a kernel_thread to process suspend request, cleaning up
- * bdflush from this task. (check apm.c for something similar).
- */
-
-/* FIXME: try to poison to memory */
-
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/swapctl.h>
@@ -51,7 +42,6 @@
 #include <linux/file.h>
 #include <linux/utsname.h>
 #include <linux/version.h>
-#include <linux/compile.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
@@ -68,6 +58,7 @@
 #include <linux/swap.h>
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -81,7 +72,7 @@ unsigned char software_suspend_enabled = 0;
    we probably do not take enough locks for switching consoles, etc,
    so bad things might happen.
 */
-#ifndef CONFIG_VT
+#if !defined(CONFIG_VT) || !defined(CONFIG_VT_CONSOLE)
 #undef SUSPEND_CONSOLE
 #endif
 
@@ -122,7 +113,7 @@ static int pm_suspend_state = 0;
    Warning: this is evil. There are actually two pagedirs at time of
    resume. One is "pagedir_save", which is empty frame allocated at
    time of suspend, that must be freed. Second is "pagedir_nosave", 
-   allocated at time of resume, that travells through memory not to
+   allocated at time of resume, that travels through memory not to
    collide with anything.
  */
 static suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
@@ -143,8 +134,6 @@ union diskpage {
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
  * without paging. Might this be more?
- *
- * [If this is not enough, might it corrupt our data silently?]
  */
 #define PAGES_FOR_IO	512
 
@@ -157,7 +146,7 @@ static const char *name_resume = "Resume Machine: ";
 #define	DEBUG_DEFAULT	1
 #undef	DEBUG_PROCESS
 #undef	DEBUG_SLOW
-#define TEST_SWSUSP 0		/* Set to 1 to reboot instead of halt machine after suspension */
+#define TEST_SWSUSP 1		/* Set to 1 to reboot instead of halt machine after suspension */
 
 #ifdef DEBUG_DEFAULT
 #define PRINTD(func, f, a...)	\
@@ -310,7 +299,6 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 
 static void do_suspend_sync(void)
 {
-//	sync_dev(0); FIXME
 	while (1) {
 		run_task_queue(&tq_disk);
 		if (!TQ_ACTIVE(tq_disk))
@@ -409,14 +397,11 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
 	swap_list_lock();
 	for(i = 0; i< MAX_SWAPFILES; i++)
 		if(swapfile_used[i] == SWAPFILE_IGNORED) {
-//			PRINTS( "device %s locked\n", swap_info[i].swap_file->d_name.name );
 			swap_info[i].flags ^= 0xFF; /* we make the device unusable. A new call to
 						       lock_swapdevices can unlock the devices. */
 		}
 	swap_list_unlock();
 }
-
-kdev_t suspend_device;
 
 static int write_suspend_image(void)
 {
@@ -425,6 +410,7 @@ static int write_suspend_image(void)
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
 	union diskpage *cur,  *buffer = (union diskpage *)get_free_page(GFP_ATOMIC);
 	unsigned long address;
+	kdev_t suspend_device;
 
 	PRINTS( "Writing data to swap (%d pages): ", nr_copy_pages );
 	for (i=0; i<nr_copy_pages; i++) {
@@ -640,60 +626,11 @@ static int prepare_suspend_processes(void)
 	MDELAY(1000);
 	if (freeze_processes()) {
 		PRINTS( "Not all processes stopped!\n" );
-//		panic("Some processes survived?\n");
 		thaw_processes();
 		return 1;
 	}
 	do_suspend_sync();
 	return 0;
-}
-
-/*
- *	Free as much memory as possible
- */
-
-static void **eaten_memory;
-
-static void eat_memory(void)
-{
-	int i = 0;
-	void **c= eaten_memory, *m;
-
-	printk("Eating pages ");
-	while ((m = (void *) get_free_page(GFP_HIGHUSER))) {
-		memset(m, 0, PAGE_SIZE);
-		eaten_memory = m;
-		if (!(i%100))
-			printk( ".(%d)", i ); 
-		*eaten_memory = c;
-		c = eaten_memory;
-		i++; 
-#if 1
-	/* 40000 == 160MB */
-	/* 10000 for 64MB */
-	/* 2500 for  16MB */
-		if (i > 40000)
-			break;
-#endif
-	}
-	printk("(%dK)\n", i*4);
-}
-
-static void free_memory(void)
-{
-	int i = 0;
-	void **c = eaten_memory, *f;
-	
-	printk( "Freeing pages " );
-	while (c) {
-		if (!(i%5000))
-		printk( "." ); 
-		f = *c;
-		c = *c;
-		if (f) { free_page( (long) f ); i++; }
-	}
-	printk( "(%dK)\n", i*4 );
-	eaten_memory = NULL;
 }
 
 /*
@@ -703,16 +640,10 @@ static void free_memory(void)
  */
 static void free_some_memory(void)
 {
-#if 1
 	PRINTS("Freeing memory: ");
 	while (try_to_free_pages(&contig_page_data.node_zones[ZONE_HIGHMEM], GFP_KSWAPD, 0))
 		printk(".");
 	printk("\n");
-#else
-	printk("Using memeat\n");
-	eat_memory();
-	free_memory();
-#endif
 }
 
 /* Make disk drivers accept operations, again */
@@ -809,7 +740,6 @@ static int suspend_save_image(void)
 	 *
 	 * Following line enforces not writing to disk until we choose.
 	 */
-	suspend_device = NODEV;					/* We do not want any writes, thanx */
 	drivers_unsuspend();
 	spin_unlock_irq(&suspend_pagedir_lock);
 	PRINTS( "critical section/: done (%d pages copied)\n", nr_copy_pages );
@@ -839,16 +769,16 @@ void suspend_power_down(void)
 		machine_restart(NULL);
 	else
 #endif
+	{
+		device_shutdown();
 		machine_power_off();
+	}
 
 	printk(KERN_EMERG "%sProbably not capable for powerdown. System halted.\n", name_suspend);
 	machine_halt();
 	while (1);
 	/* NOTREACHED */
 }
-
-/* forward decl */
-void do_software_suspend(void);
 
 /*
  * Magic happens here
@@ -886,7 +816,6 @@ static void do_magic_resume_2(void)
 #ifdef SUSPEND_CONSOLE
 	update_screen(fg_console);	/* Hmm, is this the problem? */
 #endif
-	suspend_tq.routine = (void *)do_software_suspend;
 }
 
 static void do_magic_suspend_1(void)
@@ -899,13 +828,9 @@ static void do_magic_suspend_1(void)
 static void do_magic_suspend_2(void)
 {
 	read_swapfiles();
-	if (!suspend_save_image()) {
-#if 1
-		suspend_power_down ();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
-#endif
-	}
+	if (!suspend_save_image())
+		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
 
-	suspend_device = NODEV;
 	printk(KERN_WARNING "%sSuspend failed, trying to recover...\n", name_suspend);
 	MDELAY(1000); /* So user can wait and report us messages if armageddon comes :-) */
 
@@ -919,7 +844,6 @@ static void do_magic_suspend_2(void)
 	drivers_resume(RESUME_PHASE1);
 	spin_unlock_irq(&suspend_pagedir_lock);
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	suspend_tq.routine = (void *)do_software_suspend;
 	printk(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
 }
 
@@ -927,44 +851,38 @@ static void do_magic_suspend_2(void)
 #include <asm/suspend.h>
 
 /*
- * This function is triggered using process bdflush. We try to swap out as
- * much as we can then make a copy of the occupied pages in memory so we can
- * make a copy of kernel state atomically, the I/O needed by saving won't
- * bother us anymore.
+ * We try to swap out as much as we can then make a copy of the
+ * occupied pages in memory so we can make a copy of kernel state
+ * atomically, the I/O needed by saving won't bother us anymore. 
  */
 void do_software_suspend(void)
 {
 	arch_prepare_suspend();
-	if (!prepare_suspend_console()) {
-		if (!prepare_suspend_processes()) {
-			free_some_memory();
-
-			/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
-			 *
-			 * We sync here -- so you have consistent filesystem state when things go wrong.
-			 * -- so that noone writes to disk after we do atomic copy of data.
-			 */
-			PRINTS( "Syncing disks before copy\n" );
-			do_suspend_sync();
-			drivers_suspend();
-			if(drivers_suspend()==0)
-				do_magic(0);			/* This function returns after machine woken up from resume */
-			PRINTR("Restarting processes...\n");
-			thaw_processes();
-		}
+	if (prepare_suspend_console())
+		printk( "Can't allocate a console... proceeding\n");
+	if (!prepare_suspend_processes()) {
+		free_some_memory();
+		
+		/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
+		 *
+		 * We sync here -- so you have consistent filesystem state when things go wrong.
+		 * -- so that noone writes to disk after we do atomic copy of data.
+		 */
+		PRINTS("Syncing disks before copy\n");
+		do_suspend_sync();
+		if(drivers_suspend()==0)
+			do_magic(0);			/* This function returns after machine woken up from resume */
+		PRINTR("Restarting processes...\n");
+		thaw_processes();
 	}
 	software_suspend_enabled = 1;
 	MDELAY(1000);
 	restore_console ();
 }
 
-struct tq_struct suspend_tq =
-	{ routine: (void *)(void *)do_software_suspend, 
-	  data: 0 };
-
 /*
- * This is the trigger function, we must queue ourself since we
- * can be called from interrupt && bdflush context is needed
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
  */
 void software_suspend(void)
 {
@@ -972,8 +890,8 @@ void software_suspend(void)
 		return;
 
 	software_suspend_enabled = 0;
-	queue_task(&suspend_tq, &tq_bdflush);
-	wakeup_bdflush();
+	BUG_ON(in_interrupt());
+	do_software_suspend();
 }
 
 /* More restore stuff */
@@ -991,8 +909,7 @@ static void copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
 	}
 }
 
-#define does_collide(addr)	\
-		does_collide_order(pagedir_nosave, addr, 0)
+#define does_collide(addr) does_collide_order(pagedir_nosave, addr, 0)
 
 /*
  * Returns true if given address/order collides with any orig_address 
@@ -1015,7 +932,6 @@ static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-
 static int check_pagedir(void)
 {
 	int i;
@@ -1036,14 +952,13 @@ static int check_pagedir(void)
 
 static int relocate_pagedir(void)
 {
-	/* This is deep magic
-	   We have to avoid recursion (not to overflow kernel stack), and that's why
-	   code looks pretty cryptic
-	*/
+	/*
+	 * We have to avoid recursion (not to overflow kernel stack),
+	 * and that's why code looks pretty cryptic 
+	 */
 	suspend_pagedir_t *new_pagedir, *old_pagedir = pagedir_nosave;
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
-
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
 		printk("not neccessary\n");
@@ -1195,6 +1110,7 @@ static int resume_try_to_read(const char * specialfile, int noresume)
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
 	error = -ENOMEM;
+	free_page((unsigned long) cur);
 	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
 	if(!pagedir_nosave)
 		goto resume_read_error;

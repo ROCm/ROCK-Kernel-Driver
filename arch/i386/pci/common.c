@@ -28,6 +28,12 @@ int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 
 int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value) = NULL;
 
 /*
+ * legacy, numa, and acpi all want to call pcibios_scan_root
+ * from their initcalls. This flag prevents that.
+ */
+int pcibios_scanned;
+
+/*
  * This interrupt-safe spinlock protects all accesses to PCI
  * configuration space.
  */
@@ -201,6 +207,6 @@ int pcibios_enable_device(struct pci_dev *dev)
 
 	if ((err = pcibios_enable_resources(dev)) < 0)
 		return err;
-	pcibios_enable_irq(dev);
-	return 0;
+
+	return pcibios_enable_irq(dev);
 }

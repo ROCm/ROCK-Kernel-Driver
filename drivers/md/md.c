@@ -491,7 +491,7 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	bio.bi_private = &event;
 	bio.bi_end_io = bi_complete;
 	submit_bio(rw, &bio);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	wait_for_completion(&event);
 
 	return test_bit(BIO_UPTODATE, &bio.bi_flags);
@@ -2285,7 +2285,7 @@ static int hot_generate_error(mddev_t * mddev, kdev_t dev)
 	if (!disk_active(disk))
 		return -ENODEV;
 
-	q = blk_get_queue(rdev->dev);
+	q = bdev_get_queue(rdev->bdev);
 	if (!q) {
 		MD_BUG();
 		return -ENODEV;
@@ -2955,7 +2955,7 @@ int md_thread(void * arg)
 		run = thread->run;
 		if (run) {
 			run(thread->data);
-			run_task_queue(&tq_disk);
+			blk_run_queues();
 		}
 		if (signal_pending(current))
 			flush_curr_signals();
@@ -3411,7 +3411,7 @@ recheck:
 
 		last_check = j;
 
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 
 	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {

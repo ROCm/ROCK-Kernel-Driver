@@ -1,9 +1,6 @@
-# File: drivers/sk98lin/Makefile
 #
 # Makefile for the SysKonnect SK-98xx device driver.
 #
-
-O_TARGET := built-in.o
 
 obj-$(CONFIG_SK98LIN) += sk98lin.o
 

@@ -822,8 +822,6 @@ static int __init act2000_init(void)
 		act2000_addcard(act_bus, act_port, act_irq, act_id);
         if (!cards)
                 printk(KERN_INFO "act2000: No cards defined yet\n");
-        /* No symbols to export, hide all symbols */
-        EXPORT_NO_SYMBOLS;
         return 0;
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 129 $
+ *              $Revision: 135 $
  *
  *****************************************************************************/
 
@@ -25,9 +25,7 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
-#include "actables.h"
 #include "acparser.h"
 
 
@@ -202,11 +200,11 @@ acpi_ns_dump_one_object (
 		}
 		else {
 			if (acpi_ns_exist_downstream_sibling (this_node + 1)) {
-				downstream_sibling_mask |= (1 << (level - 1));
+				downstream_sibling_mask |= ((u32) 1 << (level - 1));
 				acpi_os_printf ("+");
 			}
 			else {
-				downstream_sibling_mask &= ACPI_UINT32_MAX ^ (1 << (level - 1));
+				downstream_sibling_mask &= ACPI_UINT32_MAX ^ ((u32) 1 << (level - 1));
 				acpi_os_printf ("+");
 			}
 
@@ -229,14 +227,14 @@ acpi_ns_dump_one_object (
 	}
 
 	if (!acpi_ut_valid_acpi_name (this_node->name.integer)) {
-		ACPI_REPORT_WARNING (("Invalid ACPI Name %08X\n", this_node->name));
+		ACPI_REPORT_WARNING (("Invalid ACPI Name %08X\n", this_node->name.integer));
 	}
 
 	/*
 	 * Now we can print out the pertinent information
 	 */
 	acpi_os_printf (" %4.4s %-12s %p",
-			(char *) &this_node->name, acpi_ut_get_type_name (type), this_node);
+			this_node->name.ascii, acpi_ut_get_type_name (type), this_node);
 
 	dbg_level = acpi_dbg_level;
 	acpi_dbg_level = 0;
@@ -256,7 +254,7 @@ acpi_ns_dump_one_object (
 		switch (type) {
 		case ACPI_TYPE_PROCESSOR:
 
-			acpi_os_printf (" ID %d Addr %.4X Len %.4X\n",
+			acpi_os_printf (" ID %hd Addr %.4X Len %.4X\n",
 					 obj_desc->processor.proc_id,
 					 obj_desc->processor.address,
 					 obj_desc->processor.length);
@@ -271,7 +269,7 @@ acpi_ns_dump_one_object (
 
 		case ACPI_TYPE_METHOD:
 
-			acpi_os_printf (" Args %d Len %.4X Aml %p \n",
+			acpi_os_printf (" Args %hd Len %.4X Aml %p \n",
 					 obj_desc->method.param_count,
 					 obj_desc->method.aml_length,
 					 obj_desc->method.aml_start);
@@ -309,7 +307,7 @@ acpi_ns_dump_one_object (
 				if (obj_desc->buffer.length > 0) {
 					acpi_os_printf (" =");
 					for (i = 0; (i < obj_desc->buffer.length && i < 12); i++) {
-						acpi_os_printf (" %.2X", obj_desc->buffer.pointer[i]);
+						acpi_os_printf (" %.2hX", obj_desc->buffer.pointer[i]);
 					}
 				}
 				acpi_os_printf ("\n");
@@ -361,7 +359,7 @@ acpi_ns_dump_one_object (
 			if (obj_desc->buffer_field.buffer_obj &&
 				obj_desc->buffer_field.buffer_obj->buffer.node) {
 				acpi_os_printf (" Buf [%4.4s]",
-						(char *) &obj_desc->buffer_field.buffer_obj->buffer.node->name);
+						obj_desc->buffer_field.buffer_obj->buffer.node->name.ascii);
 			}
 			break;
 
@@ -369,23 +367,23 @@ acpi_ns_dump_one_object (
 		case INTERNAL_TYPE_REGION_FIELD:
 
 			acpi_os_printf (" Rgn [%4.4s]",
-					(char *) &obj_desc->common_field.region_obj->region.node->name);
+					obj_desc->common_field.region_obj->region.node->name.ascii);
 			break;
 
 
 		case INTERNAL_TYPE_BANK_FIELD:
 
 			acpi_os_printf (" Rgn [%4.4s] Bnk [%4.4s]",
-					(char *) &obj_desc->common_field.region_obj->region.node->name,
-					(char *) &obj_desc->bank_field.bank_obj->common_field.node->name);
+					obj_desc->common_field.region_obj->region.node->name.ascii,
+					obj_desc->bank_field.bank_obj->common_field.node->name.ascii);
 			break;
 
 
 		case INTERNAL_TYPE_INDEX_FIELD:
 
 			acpi_os_printf (" Idx [%4.4s] Dat [%4.4s]",
-					(char *) &obj_desc->index_field.index_obj->common_field.node->name,
-					(char *) &obj_desc->index_field.data_obj->common_field.node->name);
+					obj_desc->index_field.index_obj->common_field.node->name.ascii,
+					obj_desc->index_field.data_obj->common_field.node->name.ascii);
 			break;
 
 
@@ -402,14 +400,16 @@ acpi_ns_dump_one_object (
 		case INTERNAL_TYPE_REGION_FIELD:
 		case INTERNAL_TYPE_BANK_FIELD:
 		case INTERNAL_TYPE_INDEX_FIELD:
-			acpi_os_printf (" Off %.2X Len %.2X Acc %.2d\n",
+			acpi_os_printf (" Off %.2X Len %.2X Acc %.2hd\n",
 					(obj_desc->common_field.base_byte_offset * 8)
 						+ obj_desc->common_field.start_field_bit_offset,
 					obj_desc->common_field.bit_length,
 					obj_desc->common_field.access_byte_width);
 			break;
-		}
 
+		default:
+			break;
+		}
 		break;
 
 
@@ -498,7 +498,7 @@ acpi_ns_dump_one_object (
 			break;
 
 
-		case ACPI_DESC_TYPE_INTERNAL:
+		case ACPI_DESC_TYPE_OPERAND:
 
 			obj_type = obj_desc->common.type;
 
@@ -507,8 +507,8 @@ acpi_ns_dump_one_object (
 				bytes_to_dump = 32;
 			}
 			else {
-				acpi_os_printf ("(Ptr to ACPI Object type %2.2X [%s])\n",
-						   obj_type, acpi_ut_get_type_name (obj_type));
+				acpi_os_printf ("(Ptr to ACPI Object type %s, %X)\n",
+						   acpi_ut_get_type_name (obj_type), obj_type);
 				bytes_to_dump = sizeof (acpi_operand_object);
 			}
 			break;
@@ -525,7 +525,7 @@ acpi_ns_dump_one_object (
 
 		/* If value is NOT an internal object, we are done */
 
-		if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_INTERNAL) {
+		if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
 			goto cleanup;
 		}
 
@@ -534,11 +534,11 @@ acpi_ns_dump_one_object (
 		 */
 		switch (obj_type) {
 		case ACPI_TYPE_STRING:
-			obj_desc = (acpi_operand_object *) obj_desc->string.pointer;
+			obj_desc = (void *) obj_desc->string.pointer;
 			break;
 
 		case ACPI_TYPE_BUFFER:
-			obj_desc = (acpi_operand_object *) obj_desc->buffer.pointer;
+			obj_desc = (void *) obj_desc->buffer.pointer;
 			break;
 
 		case ACPI_TYPE_BUFFER_FIELD:
@@ -546,26 +546,26 @@ acpi_ns_dump_one_object (
 			break;
 
 		case ACPI_TYPE_PACKAGE:
-			obj_desc = (acpi_operand_object *) obj_desc->package.elements;
+			obj_desc = (void *) obj_desc->package.elements;
 			break;
 
 		case ACPI_TYPE_METHOD:
-			obj_desc = (acpi_operand_object *) obj_desc->method.aml_start;
+			obj_desc = (void *) obj_desc->method.aml_start;
 			break;
 
 		case INTERNAL_TYPE_REGION_FIELD:
-			obj_desc = (acpi_operand_object *) obj_desc->field.region_obj;
+			obj_desc = (void *) obj_desc->field.region_obj;
 			break;
 
 		case INTERNAL_TYPE_BANK_FIELD:
-			obj_desc = (acpi_operand_object *) obj_desc->bank_field.region_obj;
+			obj_desc = (void *) obj_desc->bank_field.region_obj;
 			break;
 
 		case INTERNAL_TYPE_INDEX_FIELD:
-			obj_desc = (acpi_operand_object *) obj_desc->index_field.index_obj;
+			obj_desc = (void *) obj_desc->index_field.index_obj;
 			break;
 
-	   default:
+		default:
 			goto cleanup;
 		}
 
@@ -613,8 +613,9 @@ acpi_ns_dump_objects (
 	info.display_type = display_type;
 
 
-	acpi_ns_walk_namespace (type, start_handle, max_depth, ACPI_NS_WALK_NO_UNLOCK, acpi_ns_dump_one_object,
-			   (void *) &info, NULL);
+	(void) acpi_ns_walk_namespace (type, start_handle, max_depth,
+			 ACPI_NS_WALK_NO_UNLOCK, acpi_ns_dump_one_object,
+			 (void *) &info, NULL);
 }
 
 
@@ -655,7 +656,7 @@ acpi_ns_dump_one_device (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " "));
 		}
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %x\n",
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
 				  info.hardware_id,
 				  ACPI_HIDWORD (info.address), ACPI_LODWORD (info.address),
 				  info.current_status));
@@ -679,6 +680,7 @@ void
 acpi_ns_dump_root_devices (void)
 {
 	acpi_handle             sys_bus_handle;
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_NAME ("Ns_dump_root_devices");
@@ -690,11 +692,16 @@ acpi_ns_dump_root_devices (void)
 		return;
 	}
 
-	acpi_get_handle (0, ACPI_NS_SYSTEM_BUS, &sys_bus_handle);
+	status = acpi_get_handle (0, ACPI_NS_SYSTEM_BUS, &sys_bus_handle);
+	if (ACPI_FAILURE (status)) {
+		return;
+	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Display of all devices in the namespace:\n"));
-	acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, sys_bus_handle, ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
-			   acpi_ns_dump_one_device, NULL, NULL);
+
+	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, sys_bus_handle,
+			 ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
+			 acpi_ns_dump_one_device, NULL, NULL);
 }
 
 #endif
@@ -772,7 +779,7 @@ acpi_ns_dump_entry (
 	info.owner_id = ACPI_UINT32_MAX;
 	info.display_type = ACPI_DISPLAY_SUMMARY;
 
-	acpi_ns_dump_one_object (handle, 1, &info, NULL);
+	(void) acpi_ns_dump_one_object (handle, 1, &info, NULL);
 }
 
 #endif

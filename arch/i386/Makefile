@@ -103,17 +103,9 @@ SUBDIRS	+= arch/i386/pci
 DRIVERS	+= arch/i386/pci/pci.o
 endif
 
-arch/i386/kernel: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/i386/kernel
-
-arch/i386/mm: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/i386/mm
-
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/i386/vmlinux.lds
-
-FORCE: ;
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper archdep

@@ -466,7 +466,7 @@ static void do_ps2esdi_request(request_queue_t * q)
 #if 0
 	printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld, buffer: %p\n",
 	       DEVICE_NAME,
-	       CURRENT_DEV, minor(CURRENT->rq_dev),
+	       DEVICE_NR(CURRENT->rq_dev), minor(CURRENT->rq_dev),
 	       CURRENT->cmd, CURRENT->sector,
 	       CURRENT->current_nr_sectors, CURRENT->buffer);
 #endif
@@ -482,14 +482,14 @@ static void do_ps2esdi_request(request_queue_t * q)
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
 		end_request(FAIL);
 	}			/* check for above 16Mb dmas */
-	else if ((CURRENT_DEV < ps2esdi_drives) &&
+	else if ((DEVICE_NR(CURRENT->rq_dev) < ps2esdi_drives) &&
 	    (CURRENT->sector + CURRENT->current_nr_sectors <=
 	     ps2esdi[minor(CURRENT->rq_dev)].nr_sects) &&
 	    	CURRENT->flags & REQ_CMD) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
 		       DEVICE_NAME,
-		       CURRENT_DEV, minor(CURRENT->rq_dev),
+		       DEVICE_NR(CURRENT->rq_dev), minor(CURRENT->rq_dev),
 		       CURRENT->cmd, CURRENT->sector,
 		       CURRENT->current_nr_sectors);
 #endif
@@ -499,10 +499,10 @@ static void do_ps2esdi_request(request_queue_t * q)
 
 		switch (rq_data_dir(CURRENT)) {
 		case READ:
-			ps2esdi_readwrite(READ, CURRENT_DEV, block, count);
+			ps2esdi_readwrite(READ, DEVICE_NR(CURRENT->rq_dev), block, count);
 			break;
 		case WRITE:
-			ps2esdi_readwrite(WRITE, CURRENT_DEV, block, count);
+			ps2esdi_readwrite(WRITE, DEVICE_NR(CURRENT->rq_dev), block, count);
 			break;
 		default:
 			printk("%s: Unknown command\n", DEVICE_NAME);

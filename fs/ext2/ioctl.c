@@ -36,6 +36,9 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		if (get_user(flags, (int *) arg))
 			return -EFAULT;
 
+		if (!S_ISDIR(inode->i_mode))
+			flags &= ~EXT2_DIRSYNC_FL;
+
 		oldflags = ei->i_flags;
 
 		/*

@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/random.h>
+#include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
@@ -909,8 +910,6 @@ static void __exit exit_ext2_fs(void)
 	unregister_filesystem(&ext2_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_ext2_fs)
 module_exit(exit_ext2_fs)

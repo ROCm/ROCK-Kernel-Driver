@@ -23,7 +23,9 @@
  */
 
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/module.h>
+#include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -743,12 +745,18 @@ EXPORT_SYMBOL (usb_register_root_hub);
 
 /*-------------------------------------------------------------------------*/
 
-/*
- * usb_calc_bus_time:
+/**
+ * usb_calc_bus_time: approximate periodic transaction time in nanoseconds
+ * @speed: from dev->speed; USB_SPEED_{LOW,FULL,HIGH}
+ * @is_input: true iff the transaction sends data to the host
+ * @is_isoc: true for isochronous transactions, false for interrupt ones
+ * @bytecount: how many bytes in the transaction.
+ *
  * Returns approximate bus time in nanoseconds for a periodic transaction.
- * See USB 2.0 spec section 5.11.3
+ * See USB 2.0 spec section 5.11.3; only periodic transfers need to be
+ * scheduled in software, this function is only used for such scheduling.
  */
-static long usb_calc_bus_time (int speed, int is_input, int isoc, int bytecount)
+long usb_calc_bus_time (int speed, int is_input, int isoc, int bytecount)
 {
 	unsigned long	tmp;
 
@@ -770,14 +778,18 @@ static long usb_calc_bus_time (int speed, int is_input, int isoc, int bytecount)
 			return (9107L + BW_HOST_DELAY + tmp);
 		}
 	case USB_SPEED_HIGH:	/* ISOC or INTR */
-		// FIXME merge from EHCI code; caller will need to handle
-		// each part of a split separately.
-		return 0;
+		// FIXME adjust for input vs output
+		if (isoc)
+			tmp = HS_USECS (bytecount);
+		else
+			tmp = HS_USECS_ISO (bytecount);
+		return tmp;
 	default:
 		dbg ("bogus device speed!");
 		return -1;
 	}
 }
+EXPORT_SYMBOL (usb_calc_bus_time);
 
 /*
  * usb_check_bandwidth():

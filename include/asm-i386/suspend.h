@@ -1,13 +1,8 @@
-#ifndef __ASM_I386_SUSPEND_H
-#define __ASM_I386_SUSPEND_H
-#endif
-
 /*
  * Copyright 2001-2002 Pavel Machek <pavel@suse.cz>
  * Based on code
  * Copyright 2001 Patrick Mochel <mochel@osdl.org>
  */
-#if defined(SUSPEND_C) || defined(ACPI_C)
 #include <asm/desc.h>
 #include <asm/i387.h>
 
@@ -209,14 +204,11 @@ static inline void restore_processor_context (void)
 
 	/*
 	 * now restore the descriptor tables to their proper values
+	 * ltr is done i fix_processor_context().
 	 */
 	asm volatile ("lgdt (%0)" :: "m" (saved_context.gdt_limit));
 	asm volatile ("lidt (%0)" :: "m" (saved_context.idt_limit));
 	asm volatile ("lldt (%0)" :: "m" (saved_context.ldt));
-
-#if 0
-	asm volatile ("ltr (%0)"  :: "m" (saved_context.tr));
-#endif
 
 	fix_processor_context();
 
@@ -228,9 +220,7 @@ static inline void restore_processor_context (void)
 	do_fpu_end();
 }
 
-#endif
 #ifdef SUSPEND_C
-#if 1
 /* Local variables for do_magic */
 static int loop __nosavedata = 0;
 static int loop2 __nosavedata = 0;
@@ -269,36 +259,38 @@ static void do_magic(int resume)
 /*
  * Final function for resuming: after copying the pages to their original
  * position, it restores the register state.
+ *
+ * What about page tables? Writing data pages may toggle
+ * accessed/dirty bits in our page tables. That should be no problems
+ * with 4MB page tables. That's why we require have_pse.  
+ *
+ * This loops destroys stack from under itself, so it better should
+ * not use any stack space, itself. When this function is entered at
+ * resume time, we move stack to _old_ place.  This is means that this
+ * function must use no stack and no local variables in registers,
+ * until calling restore_processor_context();
+ *
+ * Critical section here: noone should touch saved memory after
+ * do_magic_resume_1; copying works, because nr_copy_pages,
+ * pagedir_nosave, loop and loop2 are nosavedata.
  */
-
 	do_magic_resume_1();
 
-	/* Critical section here: noone should touch memory from now */
-	/* This works, because nr_copy_pages, pagedir_nosave, loop and loop2 are nosavedata */
 	for (loop=0; loop < nr_copy_pages; loop++) {
-		/* You may not call something (like copy_page) here:
-		   We may absolutely not use stack at this point */
+		/* You may not call something (like copy_page) here: see above */
 		for (loop2=0; loop2 < PAGE_SIZE; loop2++) {
 			*(((char *)((pagedir_nosave+loop)->orig_address))+loop2) =
 				*(((char *)((pagedir_nosave+loop)->address))+loop2);
 			__flush_tlb();
 		}
 	}
-/* FIXME: What about page tables? Writing data pages may toggle
-   accessed/dirty bits in our page tables. That should be no problems
-   with 4MB page tables. That's why we require have_pse. */
 
-/* Danger: previous loop probably destroyed our current stack. Better hope it did not use
-   any stack space, itself.
-
-   When this function is entered at resume time, we move stack to _old_ place.
-   This is means that this function must use no stack and no local variables in registers.
-*/
 	restore_processor_context();
-/* Ahah, we now run with our old stack, and with registers copied from suspend time */
+
+/* Ahah, we now run with our old stack, and with registers copied from
+   suspend time */
 
 	do_magic_resume_2();
 }
-#endif
 #endif 
 

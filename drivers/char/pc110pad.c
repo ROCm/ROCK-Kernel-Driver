@@ -849,4 +849,3 @@ MODULE_AUTHOR("Alan Cox, Robin O'Leary");
 MODULE_DESCRIPTION("Driver for the touchpad on the IBM PC110 palmtop");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;

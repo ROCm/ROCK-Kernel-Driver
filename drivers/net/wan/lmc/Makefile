@@ -1,10 +1,7 @@
-# File: drivers/lmc/Makefile
 #
 # Makefile for the Lan Media 21140 based WAN cards
 # Specifically the 1000,1200,5200,5245
 #
-
-O_TARGET := built-in.o
 
 obj-$(CONFIG_LANMEDIA) += lmc.o
 

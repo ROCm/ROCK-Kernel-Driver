@@ -71,18 +71,20 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Definitions for accessing IDE controller registers
  */
-#define IDE_NR_PORTS		(10)
 
-#define IDE_DATA_OFFSET		(0)
-#define IDE_ERROR_OFFSET	(1)
-#define IDE_NSECTOR_OFFSET	(2)
-#define IDE_SECTOR_OFFSET	(3)
-#define IDE_LCYL_OFFSET		(4)
-#define IDE_HCYL_OFFSET		(5)
-#define IDE_SELECT_OFFSET	(6)
-#define IDE_STATUS_OFFSET	(7)
-#define IDE_CONTROL_OFFSET	(8)
-#define IDE_IRQ_OFFSET		(9)
+enum {
+	IDE_DATA_OFFSET	    = 0,
+	IDE_ERROR_OFFSET    = 1,
+	IDE_NSECTOR_OFFSET  = 2,
+	IDE_SECTOR_OFFSET   = 3,
+	IDE_LCYL_OFFSET	    = 4,
+	IDE_HCYL_OFFSET	    = 5,
+	IDE_SELECT_OFFSET   = 6,
+	IDE_STATUS_OFFSET   = 7,
+	IDE_CONTROL_OFFSET  = 8,
+	IDE_IRQ_OFFSET	    = 9,
+	IDE_NR_PORTS	    = 10
+};
 
 #define IDE_FEATURE_OFFSET	IDE_ERROR_OFFSET
 #define IDE_COMMAND_OFFSET	IDE_STATUS_OFFSET
@@ -317,7 +319,6 @@ typedef union {
 /*
  * ATA/ATAPI device structure :
  */
-typedef
 struct ata_device {
 	struct ata_channel *	channel;
 	char			name[6];	/* device name */
@@ -392,7 +393,6 @@ struct ata_device {
 	int		crc_count;	/* crc counter to reduce drive speed */
 	byte		quirk_list;	/* drive is considered quirky if set for a specific host */
 	byte		suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
-	byte		init_speed;	/* transfer rate set at boot */
 	byte		current_speed;	/* current transfer rate set */
 	byte		dn;		/* now wide spread use */
 	byte		wcache;		/* status of write cache */
@@ -409,7 +409,7 @@ struct ata_device {
 	unsigned long	immed_comp;
 	int		max_last_depth;
 	int		max_depth;
-} ide_drive_t;
+};
 
 /*
  * Status returned by various functions.
@@ -550,7 +550,7 @@ struct ata_channel {
 /*
  * Register new hardware with ide
  */
-extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
+extern int ide_register_hw(hw_regs_t *hw);
 extern void ide_unregister(struct ata_channel *hwif);
 
 struct ata_taskfile;
@@ -590,6 +590,7 @@ static inline int ata_can_queue(struct ata_device *drive)
 
 struct ata_operations {
 	struct module *owner;
+	void (*attach) (struct ata_device *);
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
 	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
@@ -602,6 +603,9 @@ struct ata_operations {
 	void (*revalidate)(struct ata_device *);
 
 	sector_t (*capacity)(struct ata_device *);
+
+	/* linked list of rgistered device type drivers */
+	struct ata_operations *next;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -618,11 +622,20 @@ do {	\
 
 extern sector_t ata_capacity(struct ata_device *drive);
 
-/* FIXME: Actually implement and use them as soon as possible!  to make the
- * ide_scan_devices() go away! */
-
-extern int unregister_ata_driver(unsigned int type, struct ata_operations *driver);
-extern int register_ata_driver(unsigned int type, struct ata_operations *driver);
+extern void unregister_ata_driver(struct ata_operations *driver);
+extern int register_ata_driver(struct ata_operations *driver);
+static inline int ata_driver_module(struct ata_operations *driver)
+{
+#ifdef MODULE
+	if (register_ata_driver(driver) <= 0) {
+		unregister_ata_driver(driver);
+		return -ENODEV;
+	}
+#else
+	register_ata_driver(driver);
+#endif
+	return 0;
+}
 
 #define ata_ops(drive)		((drive)->driver)
 
@@ -730,9 +743,6 @@ struct ata_taskfile {
 extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
-extern void atapi_read(struct ata_device *, void *, unsigned int);
-extern void atapi_write(struct ata_device *, void *, unsigned int);
-
 extern ide_startstop_t ata_taskfile(struct ata_device *,
 	struct ata_taskfile *, struct request *);
 
@@ -750,10 +760,7 @@ extern void ide_cmd_type_parser(struct ata_taskfile *args);
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
-void ide_delay_50ms(void);
-
 extern void ide_fix_driveid(struct hd_driveid *id);
-extern int ide_driveid_update(struct ata_device *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
 
@@ -797,9 +804,10 @@ extern int idefloppy_init (void);
 extern int idescsi_init (void);
 #endif
 
-extern struct ata_device *ide_scan_devices(byte, const char *, struct ata_operations *, int);
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
+extern int ata_revalidate(kdev_t i_rdev);
+extern void ide_driver_module(void);
 
 #ifdef CONFIG_PCI
 # define ON_BOARD		0
@@ -883,13 +891,15 @@ extern void ide_release_dma(struct ata_channel *);
 extern int ata_start_dma(struct ata_device *, struct request *rq);
 
 extern void ata_init_dma(struct ata_channel *,	unsigned long) __init;
+
 #endif
+
+extern void ata_fix_driveid(struct hd_driveid *);
 
 extern spinlock_t ide_lock;
 
-#define DRIVE_LOCK(drive)		((drive)->queue.queue_lock)
+#define DRIVE_LOCK(drive)	((drive)->queue.queue_lock)
 
 extern int drive_is_ready(struct ata_device *drive);
-extern void revalidate_drives(void);
 
 #endif

@@ -84,10 +84,10 @@ ide_init_default_hwifs(void)
 	   doesn't match the silkscreen however. */
 	ide_init_hwif_ports(&hw, PCMCIA_IO_0_BASE + 0x40, PCMCIA_IO_0_BASE + 0x78, NULL);
 	hw.irq = EMPEG_IRQ_IDE2;
-	ide_register_hw(&hw, NULL);
+	ide_register_hw(&hw);
 	ide_init_hwif_ports(&hw, PCMCIA_IO_0_BASE + 0x00, PCMCIA_IO_0_BASE + 0x38, NULL);
 	hw.irq = ,EMPEG_IRQ_IDE1;
-	ide_register_hw(&hw, NULL);
+	ide_register_hw(&hw);
 #endif
     }
 
@@ -104,7 +104,7 @@ ide_init_default_hwifs(void)
 
 	ide_init_hwif_ports(&hw, PCMCIA_IO_0_BASE + 0x1f0, PCMCIA_IO_0_BASE + 0x3f6, NULL);
 	hw.irq = IRQ_GPIO7;
-	ide_register_hw(&hw, NULL);
+	ide_register_hw(&hw);
 #endif
     }
     else if (machine_is_lart()) {
@@ -114,14 +114,14 @@ ide_init_default_hwifs(void)
         /* Enable GPIO as interrupt line */
         GPDR &= ~LART_GPIO_IDE;
 	set_irq_type(LART_IRQ_IDE, IRQT_RISING);
-        
+
         /* set PCMCIA interface timing */
         MECR = 0x00060006;
 
         /* init the interface */
 	ide_init_hwif_ports(&hw, PCMCIA_IO_0_BASE + 0x0000, PCMCIA_IO_0_BASE + 0x1000, NULL);
         hw.irq = LART_IRQ_IDE;
-        ide_register_hw(&hw, NULL);
+        ide_register_hw(&hw);
 #endif
     }
 }

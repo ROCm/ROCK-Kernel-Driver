@@ -110,7 +110,7 @@ static int pci_pm_save_state(u32 state)
 	return error;
 }
 
-int pci_pm_suspend(u32 state)
+static int pci_pm_suspend(u32 state)
 {
 	struct list_head *list;
 	struct pci_bus *bus;
@@ -123,7 +123,7 @@ int pci_pm_suspend(u32 state)
 	return 0;
 }
 
-int pci_pm_resume(void)
+static int pci_pm_resume(void)
 {
 	struct list_head *list;
 	struct pci_bus *bus;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 155 $
+ *              $Revision: 161 $
  *
  *****************************************************************************/
 
@@ -26,11 +26,7 @@
 #define DEFINE_ACPI_GLOBALS
 
 #include "acpi.h"
-#include "acevents.h"
 #include "acnamesp.h"
-#include "acinterp.h"
-#include "amlcode.h"
-
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utglobal")
@@ -180,15 +176,15 @@ const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
  */
 
 const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
-{ {"_GPE",    INTERNAL_TYPE_DEF_ANY},
-	{"_PR_",    INTERNAL_TYPE_DEF_ANY},
-	{"_SB_",    ACPI_TYPE_DEVICE},
-	{"_SI_",    INTERNAL_TYPE_DEF_ANY},
-	{"_TZ_",    INTERNAL_TYPE_DEF_ANY},
+{ {"_GPE",    INTERNAL_TYPE_DEF_ANY,      NULL},
+	{"_PR_",    INTERNAL_TYPE_DEF_ANY,      NULL},
+	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
+	{"_SI_",    INTERNAL_TYPE_DEF_ANY,      NULL},
+	{"_TZ_",    INTERNAL_TYPE_DEF_ANY,      NULL},
 	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
-	{NULL,      ACPI_TYPE_ANY}              /* Table terminator */
+	{NULL,      ACPI_TYPE_ANY,              NULL}              /* Table terminator */
 };
 
 
@@ -243,9 +239,9 @@ const u8                        acpi_gbl_ns_properties[] =
 
 /* Hex to ASCII conversion table */
 
-const NATIVE_CHAR           acpi_gbl_hex_to_ascii[] =
+static const NATIVE_CHAR    acpi_gbl_hex_to_ascii[] =
 			  {'0','1','2','3','4','5','6','7',
-			  '8','9','A','B','C','D','E','F'};
+					 '8','9','A','B','C','D','E','F'};
 
 /*****************************************************************************
  *
@@ -261,7 +257,7 @@ const NATIVE_CHAR           acpi_gbl_hex_to_ascii[] =
  *
  ****************************************************************************/
 
-u8
+char
 acpi_ut_hex_to_ascii_char (
 	acpi_integer            integer,
 	u32                     position)
@@ -361,7 +357,7 @@ acpi_fixed_event_info       acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS] =
 
 /* Region type decoding */
 
-const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
+static const NATIVE_CHAR *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS] =
 {
 	"System_memory",
 	"System_iO",
@@ -407,7 +403,7 @@ acpi_ut_get_region_name (
 
 /* Event type decoding */
 
-const NATIVE_CHAR *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
+static const NATIVE_CHAR *acpi_gbl_event_types[ACPI_NUM_FIXED_EVENTS] =
 {
 	"PM_Timer",
 	"Global_lock",
@@ -431,7 +427,7 @@ acpi_ut_get_event_name (
 }
 
 
-#ifdef ACPI_DEBUG
+#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
 
 /*
  * Strings and procedures used for debug only
@@ -545,16 +541,21 @@ acpi_ut_get_type_name (
 }
 
 
+/* Various strings for future use */
+
+#if 0
+#include "amlcode.h"
+
 /* Data used in keeping track of fields */
 
-const NATIVE_CHAR *acpi_gbl_FEnames[NUM_FIELD_NAMES] =
+static const NATIVE_CHAR *acpi_gbl_FEnames[NUM_FIELD_NAMES] =
 {
 	"skip",
 	"?access?"
 };              /* FE = Field Element */
 
 
-const NATIVE_CHAR *acpi_gbl_match_ops[NUM_MATCH_OPS] =
+static const NATIVE_CHAR *acpi_gbl_match_ops[NUM_MATCH_OPS] =
 {
 	"Error",
 	"MTR",
@@ -568,7 +569,7 @@ const NATIVE_CHAR *acpi_gbl_match_ops[NUM_MATCH_OPS] =
 
 /* Access type decoding */
 
-const NATIVE_CHAR *acpi_gbl_access_types[NUM_ACCESS_TYPES] =
+static const NATIVE_CHAR *acpi_gbl_access_types[NUM_ACCESS_TYPES] =
 {
 	"Any_acc",
 	"Byte_acc",
@@ -581,12 +582,13 @@ const NATIVE_CHAR *acpi_gbl_access_types[NUM_ACCESS_TYPES] =
 
 /* Update rule decoding */
 
-const NATIVE_CHAR *acpi_gbl_update_rules[NUM_UPDATE_RULES] =
+static const NATIVE_CHAR *acpi_gbl_update_rules[NUM_UPDATE_RULES] =
 {
 	"Preserve",
 	"Write_as_ones",
 	"Write_as_zeros"
 };
+#endif /* Future use */
 
 #endif
 
@@ -670,6 +672,9 @@ acpi_ut_allocate_owner_id (
 			acpi_gbl_next_method_owner_id = ACPI_FIRST_METHOD_ID;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	(void) acpi_ut_release_mutex (ACPI_MTX_CACHES);
@@ -702,15 +707,15 @@ acpi_ut_init_globals (
 	ACPI_MEMSET (acpi_gbl_memory_lists, 0, sizeof (ACPI_MEMORY_LIST) * ACPI_NUM_MEM_LISTS);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].link_offset      = (u16) ACPI_PTR_DIFF (&(((acpi_generic_state *) NULL)->common.next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->next), NULL);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) ACPI_PTR_DIFF (&(((acpi_parse2_object *) NULL)->next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].link_offset     = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].link_offset = (u16) ACPI_PTR_DIFF (&(((acpi_parse_object *) NULL)->common.next), NULL);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].link_offset    = (u16) ACPI_PTR_DIFF (&(((acpi_operand_object *) NULL)->cache.next), NULL);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].link_offset       = (u16) ACPI_PTR_DIFF (&(((acpi_walk_state *) NULL)->next), NULL);
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_NSNODE].object_size     = sizeof (acpi_namespace_node);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_STATE].object_size      = sizeof (acpi_generic_state);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (acpi_parse_object);
-	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (acpi_parse2_object);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE].object_size     = sizeof (ACPI_PARSE_OBJ_COMMON);
+	acpi_gbl_memory_lists[ACPI_MEM_LIST_PSNODE_EXT].object_size = sizeof (ACPI_PARSE_OBJ_NAMED);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_OPERAND].object_size    = sizeof (acpi_operand_object);
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_WALK].object_size       = sizeof (acpi_walk_state);
 
@@ -753,6 +758,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_sys_notify.handler         = NULL;
 	acpi_gbl_drv_notify.handler         = NULL;
+	acpi_gbl_init_handler               = NULL;
 
 	/* Global "typed" ACPI table pointers */
 
@@ -802,7 +808,7 @@ acpi_ut_init_globals (
 
 
 #ifdef ACPI_DEBUG
-	acpi_gbl_lowest_stack_pointer       = ACPI_UINT32_MAX;
+	acpi_gbl_lowest_stack_pointer       = ACPI_SIZE_MAX;
 #endif
 
 	return_VOID;

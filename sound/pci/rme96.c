@@ -37,9 +37,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-/* note, two last pcis should be equal, it is not a bug */
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Anders Torger <torger@ludd.luth.se>");
 MODULE_DESCRIPTION("RME Digi96, Digi96/8, Digi96/8 PRO, Digi96/8 PST, "
 		   "Digi96/8 PAD");

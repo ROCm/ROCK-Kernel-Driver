@@ -149,8 +149,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"MemShared:    %8lu kB\n"
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
-		"Active:       %8u kB\n"
-		"Inactive:     %8u kB\n"
+		"Active:       %8lu kB\n"
+		"Inactive:     %8lu kB\n"
 		"HighTotal:    %8lu kB\n"
 		"HighFree:     %8lu kB\n"
 		"LowTotal:     %8lu kB\n"
@@ -164,8 +164,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.sharedram),
 		K(ps.nr_pagecache-swapper_space.nrpages),
 		K(swapper_space.nrpages),
-		K(nr_active_pages),
-		K(nr_inactive_pages),
+		K(ps.nr_active),
+		K(ps.nr_inactive),
 		K(i.totalhigh),
 		K(i.freehigh),
 		K(i.totalram-i.totalhigh),

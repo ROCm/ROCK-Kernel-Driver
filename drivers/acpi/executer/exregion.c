@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exregion - ACPI default Op_region (address space) handlers
- *              $Revision: 74 $
+ *              $Revision: 79 $
  *
  *****************************************************************************/
 
@@ -27,10 +27,6 @@
 
 #include "acpi.h"
 #include "acinterp.h"
-#include "amlcode.h"
-#include "acnamesp.h"
-#include "achware.h"
-#include "acevents.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -68,8 +64,10 @@ acpi_ex_system_memory_space_handler (
 	void                    *logical_addr_ptr = NULL;
 	acpi_mem_space_context  *mem_info = region_context;
 	u32                     length;
-	u32                     window_size;
-
+	ACPI_SIZE               window_size;
+#ifndef _HW_ALIGNMENT_SUPPORT
+	u32                     remainder;
+#endif
 
 	ACPI_FUNCTION_TRACE ("Ex_system_memory_space_handler");
 
@@ -99,6 +97,18 @@ acpi_ex_system_memory_space_handler (
 		return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 	}
 
+
+#ifndef _HW_ALIGNMENT_SUPPORT
+	/*
+	 * Hardware does not support non-aligned data transfers, we must verify
+	 * the request.
+	 */
+	(void) acpi_ut_short_divide ((acpi_integer *) &address, length, NULL, &remainder);
+	if (remainder != 0) {
+		return_ACPI_STATUS (AE_AML_ALIGNMENT);
+	}
+#endif
+
 	/*
 	 * Does the request fit into the cached memory mapping?
 	 * Is 1) Address below the current mapping? OR
@@ -122,7 +132,7 @@ acpi_ex_system_memory_space_handler (
 		 * Don't attempt to map memory beyond the end of the region, and
 		 * constrain the maximum mapping size to something reasonable.
 		 */
-		window_size = (u32) ((mem_info->address + mem_info->length) - address);
+		window_size = (ACPI_SIZE) ((mem_info->address + mem_info->length) - address);
 		if (window_size > SYSMEM_REGION_WINDOW_SIZE) {
 			window_size = SYSMEM_REGION_WINDOW_SIZE;
 		}
@@ -132,6 +142,8 @@ acpi_ex_system_memory_space_handler (
 		status = acpi_os_map_memory (address, window_size,
 				  (void **) &mem_info->mapped_logical_address);
 		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %8.8X%8.8X, size %X\n",
+				ACPI_HIDWORD (address), ACPI_LODWORD (address), (u32) window_size));
 			mem_info->mapped_length = 0;
 			return_ACPI_STATUS (status);
 		}
@@ -153,27 +165,38 @@ acpi_ex_system_memory_space_handler (
 		"System_memory %d (%d width) Address=%8.8X%8.8X\n", function, bit_width,
 		ACPI_HIDWORD (address), ACPI_LODWORD (address)));
 
-   /* Perform the memory read or write */
-
+   /*
+	* Perform the memory read or write
+	*
+	* Note: For machines that do not support non-aligned transfers, the target
+	* address was checked for alignment above.  We do not attempt to break the
+	* transfer up into smaller (byte-size) chunks because the AML specifically
+	* asked for a transfer width that the hardware may require.
+	*/
 	switch (function) {
 	case ACPI_READ:
 
 		*value = 0;
 		switch (bit_width) {
 		case 8:
-			*value = (u32)* (u8 *) logical_addr_ptr;
+			*value = (acpi_integer) *((u8 *) logical_addr_ptr);
 			break;
 
 		case 16:
-			ACPI_MOVE_UNALIGNED16_TO_16 (value, logical_addr_ptr);
+			*value = (acpi_integer) *((u16 *) logical_addr_ptr);
 			break;
 
 		case 32:
-			ACPI_MOVE_UNALIGNED32_TO_32 (value, logical_addr_ptr);
+			*value = (acpi_integer) *((u32 *) logical_addr_ptr);
 			break;
 
+#if ACPI_MACHINE_WIDTH != 16
 		case 64:
-			ACPI_MOVE_UNALIGNED64_TO_64 (value, logical_addr_ptr);
+			*value = (acpi_integer) *((u64 *) logical_addr_ptr);
+			break;
+#endif
+		default:
+			/* Bit_width was already validated */
 			break;
 		}
 		break;
@@ -186,15 +209,21 @@ acpi_ex_system_memory_space_handler (
 			break;
 
 		case 16:
-			ACPI_MOVE_UNALIGNED16_TO_16 (logical_addr_ptr, value);
+			*(u16 *) logical_addr_ptr = (u16) *value;
 			break;
 
 		case 32:
-			ACPI_MOVE_UNALIGNED32_TO_32 (logical_addr_ptr, value);
+			*(u32 *) logical_addr_ptr = (u32) *value;
 			break;
 
+#if ACPI_MACHINE_WIDTH != 16
 		case 64:
-			ACPI_MOVE_UNALIGNED64_TO_64 (logical_addr_ptr, value);
+			*(u64 *) logical_addr_ptr = (u64) *value;
+			break;
+#endif
+
+		default:
+			/* Bit_width was already validated */
 			break;
 		}
 		break;
@@ -316,7 +345,7 @@ acpi_ex_pci_config_space_handler (
 	 *
 	 */
 	pci_id      = (acpi_pci_id *) region_context;
-	pci_register = (u16) (ACPI_SIZE) address;
+	pci_register = (u16) (u32) address;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"Pci_config %d (%d) Seg(%04x) Bus(%04x) Dev(%04x) Func(%04x) Reg(%04x)\n",
@@ -469,6 +498,7 @@ acpi_ex_data_table_space_handler (
 		break;
 
 	case ACPI_WRITE:
+	default:
 
 		return_ACPI_STATUS (AE_SUPPORT);
 	}

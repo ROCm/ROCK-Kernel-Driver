@@ -24,6 +24,7 @@
 #include <linux/highuid.h>
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 
@@ -589,8 +590,6 @@ static void __exit exit_qnx4_fs(void)
 	unregister_filesystem(&qnx4_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_qnx4_fs)
 module_exit(exit_qnx4_fs)

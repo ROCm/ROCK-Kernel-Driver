@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 67 $
+ *              $Revision: 75 $
  *
  ******************************************************************************/
 
@@ -25,16 +25,82 @@
 
 
 #include "acpi.h"
-#include "acevents.h"
-#include "achware.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 #include "amlcode.h"
-#include "acdebug.h"
 
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utmisc")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_dword_byte_swap
+ *
+ * PARAMETERS:  Value           - Value to be converted
+ *
+ * DESCRIPTION: Convert a 32-bit value to big-endian (swap the bytes)
+ *
+ ******************************************************************************/
+
+u32
+acpi_ut_dword_byte_swap (
+	u32                     value)
+{
+	union {
+		u32                 value;
+		u8                  bytes[4];
+	} out;
+
+	union {
+		u32                 value;
+		u8                  bytes[4];
+	} in;
+
+
+	ACPI_FUNCTION_ENTRY ();
+
+
+	in.value = value;
+
+	out.bytes[0] = in.bytes[3];
+	out.bytes[1] = in.bytes[2];
+	out.bytes[2] = in.bytes[1];
+	out.bytes[3] = in.bytes[0];
+
+	return (out.value);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_set_integer_width
+ *
+ * PARAMETERS:  Revision            From DSDT header
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Set the global integer bit width based upon the revision
+ *              of the DSDT.  For Revision 1 and 0, Integers are 32 bits.
+ *              For Revision 2 and above, Integers are 64 bits.  Yes, this
+ *              makes a difference.
+ *
+ ******************************************************************************/
+
+void
+acpi_ut_set_integer_width (
+	u8                      revision)
+{
+
+	if (revision <= 1) {
+		acpi_gbl_integer_bit_width = 32;
+		acpi_gbl_integer_byte_width = 4;
+	}
+	else {
+		acpi_gbl_integer_bit_width = 64;
+		acpi_gbl_integer_byte_width = 8;
+	}
+}
 
 
 #ifdef ACPI_DEBUG
@@ -145,6 +211,152 @@ acpi_ut_valid_acpi_character (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_ut_strtoul64
+ *
+ * PARAMETERS:  String          - Null terminated string
+ *              Terminater      - Where a pointer to the terminating byte is returned
+ *              Base            - Radix of the string
+ *
+ * RETURN:      Converted value
+ *
+ * DESCRIPTION: Convert a string into an unsigned value.
+ *
+ ******************************************************************************/
+#define NEGATIVE    1
+#define POSITIVE    0
+
+acpi_status
+acpi_ut_strtoul64 (
+	NATIVE_CHAR             *string,
+	u32                     base,
+	acpi_integer            *ret_integer)
+{
+	u32                     index;
+	acpi_integer            return_value = 0;
+	acpi_status             status = AE_OK;
+	acpi_integer            dividend;
+	acpi_integer            quotient;
+
+
+	*ret_integer = 0;
+
+	switch (base) {
+	case 0:
+	case 8:
+	case 10:
+	case 16:
+		break;
+
+	default:
+		/*
+		 * The specified Base parameter is not in the domain of
+		 * this function:
+		 */
+		return (AE_BAD_PARAMETER);
+	}
+
+	/*
+	 * skip over any white space in the buffer:
+	 */
+	while (ACPI_IS_SPACE (*string) || *string == '\t') {
+		++string;
+	}
+
+	/*
+	 * If the input parameter Base is zero, then we need to
+	 * determine if it is octal, decimal, or hexadecimal:
+	 */
+	if (base == 0) {
+		if (*string == '0') {
+			if (ACPI_TOLOWER (*(++string)) == 'x') {
+				base = 16;
+				++string;
+			}
+			else {
+				base = 8;
+			}
+		}
+		else {
+			base = 10;
+		}
+	}
+
+	/*
+	 * For octal and hexadecimal bases, skip over the leading
+	 * 0 or 0x, if they are present.
+	 */
+	if (base == 8 && *string == '0') {
+		string++;
+	}
+
+	if (base == 16 &&
+		*string == '0' &&
+		ACPI_TOLOWER (*(++string)) == 'x') {
+		string++;
+	}
+
+	/* Main loop: convert the string to an unsigned long */
+
+	while (*string) {
+		if (ACPI_IS_DIGIT (*string)) {
+			index = ((u8) *string) - '0';
+		}
+		else {
+			index = (u8) ACPI_TOUPPER (*string);
+			if (ACPI_IS_UPPER ((char) index)) {
+				index = index - 'A' + 10;
+			}
+			else {
+				goto error_exit;
+			}
+		}
+
+		if (index >= base) {
+			goto error_exit;
+		}
+
+		/* Check to see if value is out of range: */
+
+		dividend = ACPI_INTEGER_MAX - (acpi_integer) index;
+		(void) acpi_ut_short_divide (&dividend, base, &quotient, NULL);
+		if (return_value > quotient) {
+			goto error_exit;
+		}
+
+		return_value *= base;
+		return_value += index;
+		++string;
+	}
+
+	*ret_integer = return_value;
+	return (status);
+
+
+error_exit:
+	switch (base) {
+	case 8:
+		status = AE_BAD_OCTAL_CONSTANT;
+		break;
+
+	case 10:
+		status = AE_BAD_DECIMAL_CONSTANT;
+		break;
+
+	case 16:
+		status = AE_BAD_HEX_CONSTANT;
+		break;
+
+	default:
+		/* Base validated above */
+		break;
+	}
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_ut_strupr
  *
  * PARAMETERS:  Src_string      - The source string to convert to
@@ -239,7 +451,7 @@ acpi_ut_mutex_terminate (
 	 * Delete each predefined mutex object
 	 */
 	for (i = 0; i < NUM_MTX; i++) {
-		acpi_ut_delete_mutex (i);
+		(void) acpi_ut_delete_mutex (i);
 	}
 
 	return_VOID;
@@ -933,6 +1145,10 @@ acpi_ut_resolve_reference (
 				source_object->common.type = ACPI_TYPE_INTEGER;
 				source_object->integer.value = ACPI_INTEGER_MAX;
 				break;
+
+			default:
+				/* Other types not supported */
+				return (AE_SUPPORT);
 			}
 		}
 		break;
@@ -945,6 +1161,9 @@ acpi_ut_resolve_reference (
 		info->num_packages++;
 		state->pkg.this_target_obj = NULL;
 		break;
+
+	default:
+		return (AE_BAD_PARAMETER);
 	}
 
 	return (AE_OK);
@@ -1040,7 +1259,7 @@ acpi_ut_walk_package_tree (
 		 *    case below.
 		 */
 		if ((!this_source_obj) ||
-			(ACPI_GET_DESCRIPTOR_TYPE (this_source_obj) != ACPI_DESC_TYPE_INTERNAL) ||
+			(ACPI_GET_DESCRIPTOR_TYPE (this_source_obj) != ACPI_DESC_TYPE_OPERAND) ||
 			(this_source_obj->common.type != ACPI_TYPE_PACKAGE)) {
 			status = walk_callback (ACPI_COPY_TYPE_SIMPLE, this_source_obj,
 					 state, context);

@@ -76,7 +76,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_PM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="keepinitrd"
+CONFIG_CMDLINE="mem=4M@0xc0000000 mem=4M@0xc8000000 mem=4M@0xd0000000 mem=4M@0xd8000000 keepinitrd root=/dev/ram ramdisk=8192 initrd=0xd8000000,3M"
 CONFIG_LEDS=y
 CONFIG_LEDS_TIMER=y
 CONFIG_LEDS_CPU=y

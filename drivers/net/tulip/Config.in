@@ -3,7 +3,7 @@
 #
 
 mainmenu_option next_comment
-comment '"Tulip" family network device support'
+comment 'Tulip family network device support'
 
 bool '"Tulip" family network device support' CONFIG_NET_TULIP
 if [ "$CONFIG_NET_TULIP" = "y" ]; then

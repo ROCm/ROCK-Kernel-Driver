@@ -948,7 +948,6 @@ MODULE_DESCRIPTION("PowerMac MACE driver.");
 MODULE_PARM(port_aaui, "i");
 MODULE_PARM_DESC(port_aaui, "MACE uses AAUI port (0-1)");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 static void __exit mace_cleanup (void)
 {

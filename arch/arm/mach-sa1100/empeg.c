@@ -15,20 +15,6 @@
 
 #include "generic.h"
 
-
-static void __init
-fixup_empeg(struct machine_desc *desc, struct tag *tags,
-	    char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 4*1024*1024 );
-	SET_BANK( 1, 0xc8000000, 4*1024*1024 );
-	mi->nr_banks = 2;
-
-	ROOT_DEV = mk_kdev( 3, 1 );  /* /dev/hda1 */
-	setup_ramdisk( 1, 0, 0, 4096 );
-	setup_initrd( 0xd0000000+((1024-320)*1024), (320*1024) );
-}
-
 static struct map_desc empeg_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { EMPEG_FLASHBASE, 0x00000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash */
@@ -48,7 +34,6 @@ static void __init empeg_map_io(void)
 
 MACHINE_START(EMPEG, "empeg MP3 Car Audio Player")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_empeg)
 	MAPIO(empeg_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

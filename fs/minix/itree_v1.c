@@ -1,3 +1,4 @@
+#include <linux/buffer_head.h>
 #include "minix.h"
 
 enum {DEPTH = 3, DIRECT = 7};	/* Only double indirect */

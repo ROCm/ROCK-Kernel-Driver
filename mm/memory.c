@@ -69,7 +69,7 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
 	copy_user_highpage(to, from, address);
 }
 
-mem_map_t * mem_map;
+struct page *mem_map;
 
 /*
  * Note: this doesn't free the actual pages themselves. That
@@ -387,19 +387,18 @@ static void zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address,
 
 void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned long address, unsigned long end)
 {
-	unsigned long start = address;
 	pgd_t * dir;
 
 	if (address >= end)
 		BUG();
 	dir = pgd_offset(vma->vm_mm, address);
-	tlb_start_vma(tlb, vma, start, end);
+	tlb_start_vma(tlb, vma);
 	do {
 		zap_pmd_range(tlb, dir, address, end - address);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	tlb_end_vma(tlb, vma, start, end);
+	tlb_end_vma(tlb, vma);
 }
 
 /*

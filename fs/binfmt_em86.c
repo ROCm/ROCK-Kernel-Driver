@@ -16,7 +16,9 @@
 #include <linux/binfmts.h>
 #include <linux/elf.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/errno.h>
 
 
 #define EM86_INTERP	"/usr/bin/em86"

@@ -143,8 +143,17 @@ static inline struct jfs_inode_info *JFS_IP(struct inode *inode)
 {
 	return list_entry(inode, struct jfs_inode_info, vfs_inode);
 }
-#define JFS_SBI(sb)	((struct jfs_sb_info *)(sb)->u.generic_sbp)
 
-#define isReadOnly(ip)	((JFS_SBI((ip)->i_sb)->log) ? 0 : 1)
+static inline struct jfs_sb_info *JFS_SBI(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
+static inline int isReadOnly(struct inode *inode)
+{
+	if (JFS_SBI(inode->i_sb)->log)
+		return 0;
+	return 1;
+}
 
 #endif /* _H_JFS_INCORE */

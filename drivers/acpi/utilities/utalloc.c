@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utalloc - local cache and memory allocation routines
- *              $Revision: 121 $
+ *              $Revision: 127 $
  *
  *****************************************************************************/
 
@@ -25,10 +25,6 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "acinterp.h"
-#include "acnamesp.h"
-#include "acglobal.h"
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utalloc")
@@ -77,11 +73,11 @@ acpi_ut_release_to_cache (
 		/* Mark the object as cached */
 
 		ACPI_MEMSET (object, 0xCA, cache_info->object_size);
-		ACPI_SET_DESCRIPTOR_TYPE (object, ACPI_CACHED_OBJECT);
+		ACPI_SET_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_CACHED);
 
 		/* Put the object at the head of the cache list */
 
-		* (char **) (((char *) object) + cache_info->link_offset) = cache_info->list_head;
+		* (ACPI_CAST_INDIRECT_PTR (char, &(((char *) object)[cache_info->link_offset]))) = cache_info->list_head;
 		cache_info->list_head = object;
 		cache_info->cache_depth++;
 
@@ -128,7 +124,7 @@ acpi_ut_acquire_from_cache (
 		/* There is an object available, use it */
 
 		object = cache_info->list_head;
-		cache_info->list_head = * (char **) (((char *) object) + cache_info->link_offset);
+		cache_info->list_head = *(ACPI_CAST_INDIRECT_PTR (char, &(((char *) object)[cache_info->link_offset])));
 
 		ACPI_MEM_TRACKING (cache_info->cache_hits++);
 		cache_info->cache_depth--;
@@ -191,7 +187,7 @@ acpi_ut_delete_generic_cache (
 	while (cache_info->list_head) {
 		/* Delete one cached state object */
 
-		next = * (char **) (((char *) cache_info->list_head) + cache_info->link_offset);
+		next = *(ACPI_CAST_INDIRECT_PTR (char, &(((char *) cache_info->list_head)[cache_info->link_offset])));
 		ACPI_MEM_FREE (cache_info->list_head);
 
 		cache_info->list_head = next;
@@ -362,7 +358,7 @@ acpi_ut_allocate (
 		/* Report allocation error */
 
 		_ACPI_REPORT_ERROR (module, line, component,
-				("Ut_allocate: Could not allocate size %X\n", size));
+				("Ut_allocate: Could not allocate size %X\n", (u32) size));
 
 		return_PTR (NULL);
 	}
@@ -412,7 +408,7 @@ acpi_ut_callocate (
 		/* Report allocation error */
 
 		_ACPI_REPORT_ERROR (module, line, component,
-				("Ut_callocate: Could not allocate size %X\n", size));
+				("Ut_callocate: Could not allocate size %X\n", (u32) size));
 		return_PTR (NULL);
 	}
 
@@ -514,7 +510,7 @@ acpi_ut_callocate_and_track (
 		/* Report allocation error */
 
 		_ACPI_REPORT_ERROR (module, line, component,
-				("Ut_callocate: Could not allocate size %X\n", size));
+				("Ut_callocate: Could not allocate size %X\n", (u32) size));
 		return (NULL);
 	}
 
@@ -555,6 +551,7 @@ acpi_ut_free_and_track (
 	u32                     line)
 {
 	acpi_debug_mem_block    *debug_block;
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ut_free", allocation);
@@ -567,14 +564,19 @@ acpi_ut_free_and_track (
 		return_VOID;
 	}
 
-	debug_block = (acpi_debug_mem_block *)
-			  (((char *) allocation) - sizeof (acpi_debug_mem_header));
+	debug_block = ACPI_CAST_PTR (acpi_debug_mem_block,
+			  (((char *) allocation) - sizeof (acpi_debug_mem_header)));
 
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_GLOBAL].total_freed++;
 	acpi_gbl_memory_lists[ACPI_MEM_LIST_GLOBAL].current_total_size -= debug_block->size;
 
-	acpi_ut_remove_allocation (ACPI_MEM_LIST_GLOBAL, debug_block,
-			component, module, line);
+	status = acpi_ut_remove_allocation (ACPI_MEM_LIST_GLOBAL, debug_block,
+			  component, module, line);
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not free memory, %s\n",
+			acpi_format_exception (status)));
+	}
+
 	acpi_os_free (debug_block);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "%p freed\n", allocation));
@@ -864,6 +866,7 @@ acpi_ut_dump_allocations (
 	NATIVE_CHAR             *module)
 {
 	acpi_debug_mem_block    *element;
+	ACPI_DESCRIPTOR         *descriptor;
 	u32                     num_outstanding = 0;
 
 
@@ -883,28 +886,29 @@ acpi_ut_dump_allocations (
 			((module == NULL) || (0 == ACPI_STRCMP (module, element->module)))) {
 			/* Ignore allocated objects that are in a cache */
 
-			if (((acpi_operand_object  *)(&element->user_space))->common.type != ACPI_CACHED_OBJECT) {
+			descriptor = ACPI_CAST_PTR (ACPI_DESCRIPTOR, &element->user_space);
+			if (descriptor->descriptor_id != ACPI_DESC_TYPE_CACHED) {
 				acpi_os_printf ("%p Len %04X %9.9s-%d ",
-						 &element->user_space, element->size, element->module,
+						 descriptor, element->size, element->module,
 						 element->line);
 
 				/* Most of the elements will be internal objects. */
 
-				switch (ACPI_GET_DESCRIPTOR_TYPE (&element->user_space)) {
-				case ACPI_DESC_TYPE_INTERNAL:
-					acpi_os_printf ("Obj_type %12.12s R%d",
-							acpi_ut_get_type_name (((acpi_operand_object *)(&element->user_space))->common.type),
-							((acpi_operand_object *)(&element->user_space))->common.reference_count);
+				switch (ACPI_GET_DESCRIPTOR_TYPE (descriptor)) {
+				case ACPI_DESC_TYPE_OPERAND:
+					acpi_os_printf ("Obj_type %12.12s R%hd",
+							acpi_ut_get_type_name (descriptor->object.common.type),
+							descriptor->object.common.reference_count);
 					break;
 
 				case ACPI_DESC_TYPE_PARSER:
-					acpi_os_printf ("Parse_obj Opcode %04X",
-							((acpi_parse_object *)(&element->user_space))->opcode);
+					acpi_os_printf ("Parse_obj Aml_opcode %04hX",
+							descriptor->op.asl.aml_opcode);
 					break;
 
 				case ACPI_DESC_TYPE_NAMED:
 					acpi_os_printf ("Node %4.4s",
-							(char *) &((acpi_namespace_node *)(&element->user_space))->name);
+							descriptor->node.name.ascii);
 					break;
 
 				case ACPI_DESC_TYPE_STATE:
@@ -946,6 +950,10 @@ acpi_ut_dump_allocations (
 				case ACPI_DESC_TYPE_STATE_THREAD:
 					acpi_os_printf ("THREAD State_obj");
 					break;
+
+				default:
+					/* All types should appear above */
+					break;
 				}
 
 				acpi_os_printf ( "\n");
@@ -961,7 +969,7 @@ acpi_ut_dump_allocations (
 
 	if (!num_outstanding) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_OK,
-				"No outstanding allocations.\n"));
+			"No outstanding allocations.\n"));
 	}
 	else {
 		ACPI_DEBUG_PRINT ((ACPI_DB_OK,

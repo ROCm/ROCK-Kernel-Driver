@@ -287,8 +287,6 @@ void __exit i2c_bitlp_exit(void)
 #endif
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for Philips parallel port adapter");
 MODULE_LICENSE("GPL");

@@ -230,14 +230,14 @@ static unsigned long maxsectors (int major,int minor)
 {
 	unsigned long lba = 0;
 	kdev_t dev;
-	ide_drive_t *ideinfo;
-	
+	struct ata_device *ideinfo;
+
 	dev = mk_kdev(major,minor);
 	ideinfo = get_info_ptr (dev);
 	if (ideinfo==NULL)
 		return 0;
-	
-	
+
+
 	/* first sector of the last cluster */
 	if (ideinfo->head==0) 
 		return 0;

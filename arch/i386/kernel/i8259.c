@@ -243,9 +243,9 @@ static struct device device_i8259A = {
 	bus_id:		"0020",
 };
 
-static void __init init_8259A_devicefs(void)
+static int __init init_8259A_devicefs(void)
 {
-	register_sys_device(&device_i8259A);
+	return register_sys_device(&device_i8259A);
 }
 
 __initcall(init_8259A_devicefs);
@@ -407,7 +407,7 @@ void __init init_IRQ(void)
 
 	/* thermal monitor LVT interrupt */
 #ifdef CONFIG_X86_MCE_P4THERMAL
-	set_intr_gate(THERMAL_APIC_VECTOR, smp_thermal_interrupt);
+	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
 #endif
 #endif
 

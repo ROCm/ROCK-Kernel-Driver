@@ -27,7 +27,6 @@
 #include <linux/proc_fs.h>
 
 #include <video/fbcon.h>
-#include <video/fbcon-cfb4.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -87,42 +86,13 @@ clps7111fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 
 	return 0;
 }
-		    
+
 /*
- *    Set the User Defined Part of the Display
- */
+ * Validate the purposed mode.
+ */	
 static int
-clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
-		   struct fb_info *info)
+clps7111fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	struct display *display;
-	unsigned int lcdcon, syscon;
-	int chgvar = 0;
-
-	if (var->activate & FB_ACTIVATE_TEST)
-		return 0;
-
-	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
-		return -EINVAL;
-
-	if (info->var.xres != var->xres)
-		chgvar = 1;
-	if (info->var.yres != var->yres)
-		chgvar = 1;
-	if (info->var.xres_virtual != var->xres_virtual)
-		chgvar = 1;
-	if (info->var.yres_virtual != var->yres_virtual)
-		chgvar = 1;
-	if (info->var.bits_per_pixel != var->bits_per_pixel)
-		chgvar = 1;
-
-	if (con < 0) {
-		display = info->disp;
-		chgvar = 0;
-	} else {
-		display = fb_display + con;
-	}
-
 	var->transp.msb_right	= 0;
 	var->transp.offset	= 0;
 	var->transp.length	= 0;
@@ -132,70 +102,37 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	var->green		= var->red;
 	var->blue		= var->red;
 
+	if (var->bits_per_pixel > 4) 
+		return -EINVAL;
+}
+
+/*
+ * Set the hardware state.
+ */ 
+static int 
+clps7111fb_set_par(struct fb_info *info)
+{
+	unsigned int lcdcon, syscon;
+
 	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_MFB
 	case 1:
 		info->fix.visual	= FB_VISUAL_MONO01;
-		display->dispsw		= &fbcon_mfb;
-		display->dispsw_data	= NULL;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB2
 	case 2:
 		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
-		display->dispsw		= &fbcon_cfb2;
-		display->dispsw_data	= NULL;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB4
 	case 4:
 		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
-		display->dispsw		= &fbcon_cfb4;
-		display->dispsw_data	= NULL;
 		break;
-#endif
-	default:
-		return -EINVAL;
 	}
 
-	display->next_line	= var->xres_virtual * var->bits_per_pixel / 8;
-
-	info->fix.line_length = display->next_line;
-
-	display->line_length	= info->fix.line_length;
-	display->visual		= info->fix.visual;
-	display->type		= info->fix.type;
-	display->type_aux	= info->fix.type_aux;
-	display->ypanstep	= info->fix.ypanstep;
-	display->ywrapstep	= info->fix.ywrapstep;
-	display->can_soft_blank = 1;
-	display->inverse	= 0;
-
-	info->var		= *var;
-	info->var.activate	&= ~FB_ACTIVATE_ALL;
-
-	/*
-	 * Update the old var.  The fbcon drivers still use this.
-	 * Once they are using cfb->var, this can be dropped.
-	 *                                      --rmk
-	 */
-	display->var		= info->var;
-
-	/*
-	 * If we are setting all the virtual consoles, also set the
-	 * defaults used to create new consoles.
-	 */
-	if (var->activate & FB_ACTIVATE_ALL)
-		info->disp->var = info->var;
-
-	if (chgvar && info && info->changevar)
-		info->changevar(con);
+	info->fix.line_length = info->var.xres_virtual * info->var.bits_per_pixel / 8;
 
 	/*
 	 * LCDCON must only be changed while the LCD is disabled
 	 */
-	lcdcon = (var->xres_virtual * var->yres_virtual * var->bits_per_pixel) / 128 - 1;
-	lcdcon |= ((var->xres_virtual / 16) - 1) << 13;
+	lcdcon = (info->var.xres_virtual * info->var.yres_virtual * info->var.bits_per_pixel) / 128 - 1;
+	lcdcon |= ((info->var.xres_virtual / 16) - 1) << 13;
 	lcdcon |= 2 << 19;
 	lcdcon |= 13 << 25;
 	lcdcon |= LCDCON_GSEN;
@@ -205,65 +142,7 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	clps_writel(syscon & ~SYSCON1_LCDEN, SYSCON1);
 	clps_writel(lcdcon, LCDCON);
 	clps_writel(syscon | SYSCON1_LCDEN, SYSCON1);
-
-	fb_set_cmap(&info->cmap, 1, info);
-
 	return 0;
-}
-
-static struct fb_ops clps7111fb_ops = {
-	owner:		THIS_MODULE,
-	fb_set_var:	clps7111fb_set_var,
-	fb_set_cmap:	gen_set_cmap,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_setcolreg:	clps7111fb_setcolreg,
-	fb_blank:	clps7111fb_blank,
-};
-
-static int clps7111fb_switch(int con, struct fb_info *info)
-{
-	struct display *disp;
-	struct fb_cmap *cmap;
-
-	if (info->currcon >= 0) {
-		disp = fb_display + info->currcon;
-
-		/*
-		 * Save the old colormap and video mode.
-		 */
-		disp->var = info->var;
-		if (disp->cmap.len)
-			fb_copy_cmap(&info->cmap, &disp->cmap, 0);
-	}
-
-	info->currcon = con;
-	disp = fb_display + con;
-
-	/*
-	 * Install the new colormap and change the video mode.  By default,
-	 * fbcon sets all the colormaps and video modes to the default
-	 * values at bootup.
-	 */
-	if (disp->cmap.len)
-		cmap = &disp->cmap;
-	else
-		cmap = fb_default_cmap(CMAP_SIZE);
-
-	fb_copy_cmap(cmap, &info->cmap, 0);
-
-	info->var = disp->var;
-	info->var.activate = FB_ACTIVATE_NOW;
-
-	clps7111fb_set_var(&info->var, con, info);
-
-	return 0;
-}
-
-static int clps7111fb_updatevar(int con, struct fb_info *info)
-{
-	return -EINVAL;
 }
 
 static int clps7111fb_blank(int blank, struct fb_info *info)
@@ -279,7 +158,7 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
 			clps_writeb(clps_readb(PDDR) & ~EDB_PD1_LCD_DC_DC_EN, PDDR);
 
 			/* Delay for a little while (half a second). */
-			for (i=0; i<65536*4; i++);
+			udelay(100);
 
 			/* Power off the LCD panel. */
 			clps_writeb(clps_readb(PDDR) & ~EDB_PD2_LCDEN, PDDR);
@@ -290,28 +169,41 @@ static int clps7111fb_blank(int blank, struct fb_info *info)
 		}
 	} else {
 		if (machine_is_edb7211()) {
-				int i;
+			int i;
 
-				/* Power up the LCD controller. */
-				clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
-						SYSCON1);
+			/* Power up the LCD controller. */
+			clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN,
+					SYSCON1);
 
-				/* Power up the LCD panel. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
+			/* Power up the LCD panel. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
 
-				/* Delay for a little while. */
-				for (i=0; i<65536*4; i++);
+			/* Delay for a little while. */
+			udelay(100);
 
-				/* Power up the LCD DC-DC converter. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN,
-						PDDR);
+			/* Power up the LCD DC-DC converter. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN,
+					PDDR);
 
-				/* Turn on the LCD backlight. */
-				clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
+			/* Turn on the LCD backlight. */
+			clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 		}
 	}
 	return 0;
 }
+
+static struct fb_ops clps7111fb_ops = {
+	owner:		THIS_MODULE,
+	fb_check_var:	clps7111fb_check_var,
+	fb_set_par:	clps7111fb_set_par,
+	fb_set_var:	gen_set_var,
+	fb_set_cmap:	gen_set_cmap,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
+	fb_get_cmap:	gen_get_cmap,
+	fb_setcolreg:	clps7111fb_setcolreg,
+	fb_blank:	clps7111fb_blank,
+};
 
 static int 
 clps7111fb_proc_backlight_read(char *page, char **start, off_t off,
@@ -395,8 +287,8 @@ int __init clps711xfb_init(void)
 
 	cfb->fbops		= &clps7111fb_ops;
 	cfb->changevar	= NULL;
-	cfb->switch_con	= clps7111fb_switch;
-	cfb->updatevar	= clps7111fb_updatevar;
+	cfb->switch_con	= gen_switch;
+	cfb->updatevar	= gen_update_var;
 	cfb->flags		= FBINFO_FLAG_DEFAULT;
 	cfb->disp		= (struct display *)(cfb + 1);
 
@@ -430,7 +322,7 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD2_LCDEN, PDDR);
 
 		/* Delay for a little while. */
-		for (i=0; i<65536*4; i++);
+		udelay(100);
 
 		/* Power up the LCD DC-DC converter. */
 		clps_writeb(clps_readb(PDDR) | EDB_PD1_LCD_DC_DC_EN, PDDR);
@@ -439,7 +331,7 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 	}
 
-	clps7111fb_set_var(&cfb->var, -1, cfb);
+	gen_set_var(&cfb->var, -1, cfb);
 	err = register_framebuffer(cfb);
 
 out:	return err;
@@ -463,3 +355,7 @@ static void __exit clps711xfb_exit(void)
 module_init(clps711xfb_init);
 #endif
 module_exit(clps711xfb_exit);
+
+MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
+MODULE_DESCRIPTION("CLPS711x framebuffer driver");
+MODULE_LICENSE("GPL");

@@ -13,14 +13,11 @@
 # uncompression can be done without blocking on allocation).
 #
 
-O_TARGET    := zlib_inflate.o
-
 export-objs := inflate_syms.o
 
-obj-y := infblock.o infcodes.o inffast.o inflate.o \
-	 inftrees.o infutil.o inflate_syms.o
-obj-m := $(O_TARGET)
+obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate.o
 
-EXTRA_CFLAGS += -I $(TOPDIR)/lib/zlib_inflate
+zlib_inflate-objs := infblock.o infcodes.o inffast.o inflate.o \
+		     inftrees.o infutil.o inflate_syms.o
 
 include $(TOPDIR)/Rules.make

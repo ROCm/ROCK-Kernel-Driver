@@ -276,4 +276,3 @@ module_init(mixcomwd_init);
 module_exit(mixcomwd_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

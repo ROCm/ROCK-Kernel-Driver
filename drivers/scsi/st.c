@@ -86,8 +86,6 @@ MODULE_PARM_DESC(max_buffers, "Maximum number of buffer allocated at initialisat
 MODULE_PARM(max_sg_segs, "i");
 MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (32)");
 
-EXPORT_NO_SYMBOLS;
-
 #ifndef MODULE
 static struct st_dev_parm {
 	char *name;

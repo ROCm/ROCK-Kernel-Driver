@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _rme9652.o
-
 export-objs  := rme9652_mem.o
 
 snd-rme9652-mem-objs := rme9652_mem.o

@@ -71,8 +71,6 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(flickerless, "i");
 MODULE_PARM_DESC(flickerless, "Net frequency to adjust exposure time to (0/50/60)");
 MODULE_PARM(video_nr, "i");
-EXPORT_NO_SYMBOLS;
-
 
 static struct usb_driver se401_driver;
 

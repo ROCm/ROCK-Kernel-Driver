@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfobj - Public interfaces to the ACPI subsystem
  *                         ACPI Object oriented interfaces
- *              $Revision: 108 $
+ *              $Revision: 112 $
  *
  ******************************************************************************/
 
@@ -26,13 +26,104 @@
 
 
 #include "acpi.h"
-#include "acinterp.h"
 #include "acnamesp.h"
-#include "acdispat.h"
 
 
 #define _COMPONENT          ACPI_NAMESPACE
 	 ACPI_MODULE_NAME    ("nsxfobj")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_evaluate_object_typed
+ *
+ * PARAMETERS:  Handle              - Object handle (optional)
+ *              *Pathname           - Object pathname (optional)
+ *              **External_params   - List of parameters to pass to method,
+ *                                    terminated by NULL.  May be NULL
+ *                                    if no parameters are being passed.
+ *              *Return_buffer      - Where to put method's return value (if
+ *                                    any).  If NULL, no value is returned.
+ *              Return_type         - Expected type of return object
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Find and evaluate the given object, passing the given
+ *              parameters if necessary.  One of "Handle" or "Pathname" must
+ *              be valid (non-null)
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_evaluate_object_typed (
+	acpi_handle             handle,
+	acpi_string             pathname,
+	acpi_object_list        *external_params,
+	acpi_buffer             *return_buffer,
+	acpi_object_type        return_type)
+{
+	acpi_status             status;
+	u8                      must_free = FALSE;
+
+
+	ACPI_FUNCTION_TRACE ("Acpi_evaluate_object_typed");
+
+
+	/* Return buffer must be valid */
+
+	if (!return_buffer) {
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	if (return_buffer->length == ACPI_ALLOCATE_BUFFER) {
+		must_free = TRUE;
+	}
+
+	/* Evaluate the object */
+
+	status = acpi_evaluate_object (handle, pathname, external_params, return_buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Type ANY means "don't care" */
+
+	if (return_type == ACPI_TYPE_ANY) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	if (return_buffer->length == 0) {
+		/* Error because caller specifically asked for a return value */
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"No return value\n"));
+
+		return_ACPI_STATUS (AE_NULL_OBJECT);
+	}
+
+	/* Examine the object type returned from Evaluate_object */
+
+	if (((acpi_object *) return_buffer->pointer)->type == return_type) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
+	/* Return object type does not match requested type */
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+		"Incorrect return type [%s] requested [%s]\n",
+		acpi_ut_get_type_name (((acpi_object *) return_buffer->pointer)->type),
+		acpi_ut_get_type_name (return_type)));
+
+	if (must_free) {
+		/* Caller used ACPI_ALLOCATE_BUFFER, free the return buffer */
+
+		acpi_os_free (return_buffer->pointer);
+		return_buffer->pointer = NULL;
+	}
+
+	return_buffer->length = 0;
+	return_ACPI_STATUS (AE_TYPE);
+}
 
 
 /*******************************************************************************
@@ -82,7 +173,7 @@ acpi_evaluate_object (
 		 * Allocate a new parameter block for the internal objects
 		 * Add 1 to count to allow for null terminated internal list
 		 */
-		internal_params = ACPI_MEM_CALLOCATE ((external_params->count + 1) *
+		internal_params = ACPI_MEM_CALLOCATE (((ACPI_SIZE) external_params->count + 1) *
 				  sizeof (void *));
 		if (!internal_params) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
@@ -198,7 +289,7 @@ acpi_evaluate_object (
 						 */
 						ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 							"Needed buffer size %X, %s\n",
-							buffer_space_needed, acpi_format_exception (status)));
+							(u32) buffer_space_needed, acpi_format_exception (status)));
 					}
 					else {
 						/*
@@ -602,8 +693,8 @@ acpi_ns_get_device_callback (
 		}
 	}
 
-	info->user_function (obj_handle, nesting_level, info->context, return_value);
-	return (AE_OK);
+	status = info->user_function (obj_handle, nesting_level, info->context, return_value);
+	return (status);
 }
 
 

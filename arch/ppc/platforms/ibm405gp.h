@@ -36,6 +36,13 @@
  *
  *	Version 1.1 02/01/17 - A. Kuster
  *	Moved offsets to ibm405.h
+ *
+ *	Version 1.2 05/01/02 - Armin
+ *	 added IIC_PORT_DFNS
+ *
+ *	Version 1.3 - armin
+ *	  removed iic & uart num defines
+ *	  and IIC_PORT_DFNS
  */
 
 #ifdef __KERNEL__
@@ -88,30 +95,36 @@
 #define UART1_INT	1
 
 #define PCIL0_BASE	0xEF400000
-#define UART0_IO_BASE	(u8 *) 0xEF600300
-#define UART1_IO_BASE	(u8 *) 0xEF600400
+#define UART0_IO_BASE	0xEF600300
+#define UART1_IO_BASE	0xEF600400
 #define IIC0_BASE	0xEF600500
 #define OPB0_BASE	0xEF600600
 #define GPIO0_BASE	0xEF600700
 #define EMAC0_BASE	0xEF600800
 
 #define EMAC_NUMS	1
-#define UART_NUMS	2
+#define IIC0_IRQ	2
+#define IIC1_IRQ	0
+
+#define IIC_OWN		0x55
+#define IIC_CLOCK	50
 #define BD_EMAC_ADDR(e,i) bi_enetaddr[i]
 
 #define STD_UART_OP(num)					\
 	{ 0, BASE_BAUD, 0, UART##num##_INT,			\
 		(ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST),	\
-		iomem_base: UART##num##_IO_BASE,		\
+		iomem_base: (u8 *)UART##num##_IO_BASE,		\
 		io_type: SERIAL_IO_MEM},
 
 #if defined(CONFIG_UART0_TTYS0)
+#define SERIAL_DEBUG_IO_BASE	UART0_IO_BASE
 #define SERIAL_PORT_DFNS	\
 	STD_UART_OP(0)		\
 	STD_UART_OP(1)
 #endif
 
 #if defined(CONFIG_UART0_TTYS1)
+#define SERIAL_DEBUG_IO_BASE	UART1_IO_BASE
 #define SERIAL_PORT_DFNS	\
 	STD_UART_OP(1)		\
 	STD_UART_OP(0)
@@ -122,6 +135,11 @@
 #define DCRN_CHPSR_BASE		0x0B4
 #define DCRN_CPMSR_BASE		0x0B8
 #define DCRN_CPMFR_BASE		0x0BA
+
+#define CHR0_U0EC	0x00000080	/* Select external clock for UART0 */
+#define CHR0_U1EC	0x00000040	/* Select external clock for UART1 */
+#define CHR0_UDIV	0x0000003E	/* UART internal clock divisor */
+#define CHR1_CETE	0x00800000	/* CPU external timer enable */
 
 #define DCRN_CHPSR_BASE         0x0B4
 #define  PSR_PLL_FWD_MASK        0xC0000000
@@ -169,6 +187,7 @@
 #define DCRN_POB0_BASE		0x0A0
 #define DCRN_SDRAM0_BASE	0x010
 #define DCRN_UIC0_BASE		0x0C0
+#define UIC0 DCRN_UIC0_BASE
 
 #include <platforms/ibm405.h>
 

@@ -426,4 +426,4 @@ module_init(cumanascsi_init);
 module_exit(cumanascsi_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

@@ -24,6 +24,7 @@
 
 #include "ext2.h"
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>		/* for fsync_inode_buffers() */
 
 
 /*

@@ -80,7 +80,6 @@ static spinlock_t microcode_update_lock = SPIN_LOCK_UNLOCKED;
 MODULE_DESCRIPTION("Intel CPU (IA-32) microcode update driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@veritas.com>");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 #define MICRO_DEBUG 0
 

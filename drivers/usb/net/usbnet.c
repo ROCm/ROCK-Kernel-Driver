@@ -2159,7 +2159,6 @@ static void __exit usbnet_exit (void)
 }
 module_exit (usbnet_exit);
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR ("David Brownell <dbrownell@users.sourceforge.net>");
 MODULE_DESCRIPTION ("USB Host-to-Host Link Drivers (numerous vendors)");
 MODULE_LICENSE ("GPL");

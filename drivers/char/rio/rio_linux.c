@@ -702,7 +702,7 @@ static int rio_fw_ioctl (struct inode *inode, struct file *filp,
   func_enter();
 
   /* The "dev" argument isn't used. */
-  rc = -riocontrol (p, 0, cmd, (void *)arg, capable(CAP_SYS_ADMIN));
+  rc = riocontrol (p, 0, cmd, (void *)arg, capable(CAP_SYS_ADMIN));
 
   func_exit ();
   return rc;

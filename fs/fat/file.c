@@ -10,6 +10,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #define PRINTK(x)
 #define Printk(x) printk x

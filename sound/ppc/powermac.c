@@ -29,7 +29,6 @@
 
 #define CHIP_NAME "PMac"
 
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("PowerMac");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Apple,PowerMac}}");

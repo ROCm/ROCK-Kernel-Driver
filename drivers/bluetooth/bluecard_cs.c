@@ -1120,5 +1120,3 @@ void __exit exit_bluecard_cs(void)
 
 module_init(init_bluecard_cs);
 module_exit(exit_bluecard_cs);
-
-EXPORT_NO_SYMBOLS;

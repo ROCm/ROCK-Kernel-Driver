@@ -2,46 +2,33 @@
 # This file contains rules which are shared between multiple Makefiles.
 #
 
-#
-# False targets.
-#
-.PHONY: dummy
+# Some standard vars
 
-#
-# Special variables which should not be exported
-#
-unexport EXTRA_AFLAGS
-unexport EXTRA_CFLAGS
-unexport EXTRA_LDFLAGS
-unexport EXTRA_ARFLAGS
-unexport SUBDIRS
-unexport SUB_DIRS
-unexport ALL_SUB_DIRS
-unexport MOD_SUB_DIRS
-unexport O_TARGET
+comma   := ,
+empty   :=
+space   := $(empty) $(empty)
 
-unexport obj-y
-unexport obj-m
-unexport obj-n
-unexport obj-
-unexport export-objs
-unexport subdir-y
-unexport subdir-m
-unexport subdir-n
-unexport subdir-
+# Figure out paths
+# ---------------------------------------------------------------------------
+# Find the path relative to the toplevel dir, $(RELDIR), and express
+# the toplevel dir as a relative path from this dir, $(TOPDIR_REL)
 
-comma	:= ,
+ifeq ($(findstring $(TOPDIR),$(CURDIR)),)
+  # Can only happen when something is built out of tree
+  RELDIR := $(CURDIR)
+  TOPDIR_REL := $(TOPDIR)
+else
+  RELDIR := $(subst $(TOPDIR)/,,$(CURDIR))
+  TOPDIR_REL := $(subst $(space),,$(foreach d,$(subst /, ,$(RELDIR)),../))
+endif
 
-#
+# Figure out what we need to build from the various variables
+# ===========================================================================
+
 # When an object is listed to be built compiled-in and modular,
 # only build the compiled-in version
-#
-obj-m := $(filter-out $(obj-y),$(obj-m))
 
-#
-# Get things started.
-#
-first_rule: all_targets
+obj-m := $(filter-out $(obj-y),$(obj-m))
 
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------
@@ -65,9 +52,45 @@ obj-m		:= $(filter-out %/, $(obj-m))
 # add it to $(subdir-m)
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
-SUB_DIRS	:= $(subdir-y)
+SUB_DIRS	:= $(subdir-y) $(if $(BUILD_MODULES),$(subdir-m))
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
+
+# export.o is never a composite object, since $(export-objs) has a
+# fixed meaning (== objects which EXPORT_SYMBOL())
+__obj-y = $(filter-out export.o,$(obj-y))
+__obj-m = $(filter-out export.o,$(obj-m))
+
+# if $(foo-objs) exists, foo.o is a composite object 
+__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
+__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
+
+# FIXME: Rip this out later
+# Backwards compatibility: if a composite object is listed in
+# $(list-multi), skip it here, since the Makefile will have an explicit
+# link rule for it
+
+multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
+multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
+
+# Build list of the parts of our composite objects, our composite
+# objects depend on those (obviously)
+multi-objs-y := $(foreach m, $(multi-used-y), $($(m:.o=-objs)))
+multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)))
+
+# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
+# in the local directory
+subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
+
+# Replace multi-part objects by their individual parts, look at local dir only
+real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
+real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+
+# ==========================================================================
+#
+# Get things started.
+#
+first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
 
 #
 # Common rules
@@ -76,56 +99,86 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # Compile C sources (.c)
 # ---------------------------------------------------------------------------
 
-# export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
+# FIXME: if we don't know if built-in or modular, assume built-in.
+# Only happens in Makefiles which override the default first_rule:
+modkern_cflags := $(CFLAGS_KERNEL)
 
-c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+$(real-objs-y)      : modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.i): modkern_cflags := $(CFLAGS_KERNEL)
+$(real-objs-y:.o=.s): modkern_cflags := $(CFLAGS_KERNEL)
 
-cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
+$(real-objs-m)      : modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.i): modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m:.o=.s): modkern_cflags := $(CFLAGS_MODULE)
 
-%.s: %.c dummy
+$(export-objs)      : export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.i): export_flags   := $(EXPORT_FLAGS)
+$(export-objs:.o=.s): export_flags   := $(EXPORT_FLAGS)
+
+c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+
+cmd_cc_s_c = $(CC) $(c_flags) -S -o $@ $< 
+
+%.s: %.c FORCE
 	$(call if_changed,cmd_cc_s_c)
 
-cmd_cc_i_c = $(CPP) $(c_flags) $< > $@
+cmd_cc_i_c = $(CPP) $(c_flags)   -o $@ $<
 
-%.i: %.c dummy
+%.i: %.c FORCE
 	$(call if_changed,cmd_cc_i_c)
 
 cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
-%.o: %.c dummy
+%.o: %.c FORCE
 	$(call if_changed,cmd_cc_o_c)
-
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
 
-a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+# FIXME (s.a.)
+modkern_aflags := $(AFLAGS_KERNEL)
 
-cmd_as_s_S = $(CPP) $(a_flags) $< > $@
+$(real-objs-y)      : modkern_aflags := $(AFLAGS_KERNEL)
+$(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 
-%.s: %.S dummy
+$(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
+$(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
+
+a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+
+cmd_as_s_S = $(CPP) $(a_flags)   -o $@ $< 
+
+%.s: %.S FORCE
 	$(call if_changed,cmd_as_s_S)
 
 cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 
-%.o: %.S dummy
+%.o: %.S FORCE
 	$(call if_changed,cmd_as_o_S)
 
-# ---------------------------------------------------------------------------
+# FIXME
 
 %.lst: %.c
 	$(CC) $(c_flags) -g -c -o $*.o $<
 	$(TOPDIR)/scripts/makelst $* $(TOPDIR) $(OBJDUMP)
-#
-#
-#
-all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
 
-# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
-# in the local directory
-subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
-# Do build these objects, we need to descend into the directories
-$(subdir-obj-y): sub_dirs
+
+# If a Makefile does define neither O_TARGET nor L_TARGET,
+# use a standard O_TARGET named "built-in.o"
+
+ifndef O_TARGET
+ifndef L_TARGET
+O_TARGET := built-in.o
+endif
+endif
+
+# Build the compiled-in targets
+# ---------------------------------------------------------------------------
+
+vmlinux: $(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS) sub_dirs
+
+# To build objects in subdirs, we need to descend into the directories
+$(sort $(subdir-obj-y)): sub_dirs ;
 
 #
 # Rule to compile a set of .o files into one .o file
@@ -136,7 +189,7 @@ cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
 		      rm -f $@; $(AR) rcs $@)
 
-$(O_TARGET): $(obj-y) dummy
+$(O_TARGET): $(obj-y) FORCE
 	$(call if_changed,cmd_link_o_target)
 endif # O_TARGET
 
@@ -146,7 +199,7 @@ endif # O_TARGET
 ifdef L_TARGET
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
-$(L_TARGET): $(obj-y) dummy
+$(L_TARGET): $(obj-y) FORCE
 	$(call if_changed,cmd_link_l_target)
 endif
 
@@ -154,26 +207,6 @@ endif
 # Rule to link composite objects
 #
 
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
-# if $(foo-objs) exists, foo.o is a composite object 
-__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(basename $(m))-objs), $(m))))
-__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(basename $(m))-objs), $(m))))
-
-# Backwards compatibility: if a composite object is listed in
-# $(list-multi), skip it here, since the Makefile will have an explicit
-# link rule for it
-
-multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
-multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
-
-# Build list of the parts of our composite objects, our composite
-# objects depend on those (obviously)
-multi-objs-y := $(foreach m, $(multi-used-y), $($(basename $(m))-objs))
-multi-objs-m := $(foreach m, $(multi-used-m), $($(basename $(m))-objs))
 
 cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
@@ -181,16 +214,16 @@ cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs)
 # 	foo.o: $(foo-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
-$(multi-used-y) : %.o: $(multi-objs-y) dummy
+$(multi-used-y) : %.o: $(multi-objs-y) FORCE
 	$(call if_changed,cmd_link_multi)
 
-$(multi-used-m) : %.o: $(multi-objs-m) dummy
+$(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
 
 #
 # This make dependencies quickly
 #
-fastdep: dummy
+fastdep: FORCE
 	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS]) > .depend
 ifdef ALL_SUB_DIRS
 	$(MAKE) $(patsubst %,_sfdep_%,$(ALL_SUB_DIRS)) _FASTDEP_ALL_SUB_DIRS="$(ALL_SUB_DIRS)"
@@ -206,53 +239,48 @@ endif
 # A rule to make subdirectories
 #
 subdir-list = $(sort $(patsubst %,_subdir_%,$(SUB_DIRS)))
-sub_dirs: dummy $(subdir-list)
+sub_dirs: FORCE $(subdir-list)
 
 ifdef SUB_DIRS
-$(subdir-list) : dummy
+$(subdir-list) : FORCE
 	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
 endif
 
 #
 # A rule to make modules
 #
-ifneq "$(strip $(obj-m))" ""
-MOD_DESTDIR := $(shell $(CONFIG_SHELL) $(TOPDIR)/scripts/pathdown.sh)
-endif
-
 ifneq "$(strip $(MOD_SUB_DIRS))" ""
 .PHONY: $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
-$(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS)) : dummy
+$(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS)) : FORCE
 	@$(MAKE) -C $(patsubst _modsubdir_%,%,$@) modules
 
 .PHONY: $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
-$(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : dummy
+$(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : FORCE
 	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
 endif
 
 .PHONY: modules
-modules: $(obj-m) dummy \
-	 $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
+modules: $(obj-m) FORCE $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
 
 .PHONY: _modinst__
-_modinst__: dummy
+_modinst__: FORCE
 ifneq "$(strip $(obj-m))" ""
-	mkdir -p $(MODLIB)/kernel/$(MOD_DESTDIR)
-	cp $(obj-m) $(MODLIB)/kernel/$(MOD_DESTDIR)
+	mkdir -p $(MODLIB)/kernel/$(RELDIR)
+	cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
 endif
 
 .PHONY: modules_install
-modules_install: _modinst__ \
-	 $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
+modules_install: _modinst__ $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 
-#
-# A rule to do nothing
-#
-dummy:
+
+# Add FORCE to the prequisites of a target to force it to be always rebuilt.
+# ---------------------------------------------------------------------------
+.PHONY: FORCE
+FORCE:
 
 #
 # This is useful for testing
-#
+# FIXME: really?
 script:
 	$(SCRIPT)
 
@@ -269,12 +297,9 @@ active-objs	:= $(sort $(multi-objs) $(obj-y) $(obj-m))
 ifdef CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
-MODINCL = $(TOPDIR)/include/linux/modules
-MODCURDIR = $(subst $(TOPDIR)/,,$(shell /bin/pwd))
-MODPREFIX = $(subst /,-,$(MODCURDIR))__
+MODINCL := $(TOPDIR)/include/linux/modules
+MODPREFIX := $(subst /,-,$(RELDIR))__
 
-# The -w option (enable warnings) for genksyms will return here in 2.1
-# So where has it gone?
 #
 # Added the SMP separator to stop module accidents between uniprocessor
 # and SMP Intel boxes - AC - from bits by Michael Chastain
@@ -301,29 +326,7 @@ $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver)): $(TOPDIR)/include/l
 # updates .ver files but not modversions.h
 fastdep: $(addprefix $(MODINCL)/$(MODPREFIX),$(export-objs:.o=.ver))
 
-# updates .ver files and modversions.h like before (is this needed?)
-dep: fastdep update-modverfile
-
 endif # export-objs 
-
-# update modversions.h, but only if it would change
-update-modverfile:
-	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
-	  echo "#define _LINUX_MODVERSIONS_H"; \
-	  echo "#include <linux/modsetver.h>"; \
-	  cd $(TOPDIR)/include/linux/modules; \
-	  for f in *.ver; do \
-	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
-	  done; \
-	  echo "#endif"; \
-	) > $(TOPDIR)/include/linux/modversions.h.tmp
-	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
-		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
-		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
-	else \
-		echo $(TOPDIR)/include/linux/modversions.h was updated; \
-		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
-	fi
 
 $(active-objs): $(TOPDIR)/include/linux/modversions.h
 
@@ -337,12 +340,10 @@ endif # CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
-$(export-objs): export_flags := -DEXPORT_SYMTAB
 
 endif
 
 endif # CONFIG_MODULES
-
 
 #
 # include dependency files if they exist

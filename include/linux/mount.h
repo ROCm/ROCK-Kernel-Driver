@@ -12,6 +12,8 @@
 #define _LINUX_MOUNT_H
 #ifdef __KERNEL__
 
+#include <linux/list.h>
+
 #define MNT_NOSUID	1
 #define MNT_NODEV	2
 #define MNT_NOEXEC	4

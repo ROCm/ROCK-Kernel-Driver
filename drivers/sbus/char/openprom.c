@@ -619,8 +619,6 @@ static struct miscdevice openprom_dev = {
 	SUN_OPENPROM_MINOR, "openprom", &openprom_fops
 };
 
-EXPORT_NO_SYMBOLS;
-
 static int __init openprom_init(void)
 {
 	unsigned long flags;

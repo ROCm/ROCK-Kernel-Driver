@@ -377,8 +377,6 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
@@ -685,20 +683,35 @@ static void __init ali15x3_init_dma(struct ata_channel *ch, unsigned long dmabas
 
 
 /* module data table */
-static struct ata_pci_device chipset __initdata = {
-	vendor: PCI_VENDOR_ID_AL,
-        device: PCI_DEVICE_ID_AL_M5229,
-	init_chipset: ali15x3_init_chipset,
-	ata66_check: ali15x3_ata66_check,
-	init_channel: ali15x3_init_channel,
-	init_dma: ali15x3_init_dma,
-	enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
-	bootable: ON_BOARD
+static struct ata_pci_device chipsets[] __initdata = {
+	{
+		vendor: PCI_VENDOR_ID_AL,
+	        device: PCI_DEVICE_ID_AL_M5219,
+		/* FIXME: Perhaps we should use the same init routines
+		 * as below here. */
+		enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX
+	},
+	{
+		vendor: PCI_VENDOR_ID_AL,
+	        device: PCI_DEVICE_ID_AL_M5229,
+		init_chipset: ali15x3_init_chipset,
+		ata66_check: ali15x3_ata66_check,
+		init_channel: ali15x3_init_channel,
+		init_dma: ali15x3_init_dma,
+		enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+		bootable: ON_BOARD
+	}
 };
 
 int __init init_ali15x3(void)
 {
-	ata_register_chipset(&chipset);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+		ata_register_chipset(&chipsets[i]);
+	}
 
         return 0;
 }

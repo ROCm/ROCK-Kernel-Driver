@@ -9,6 +9,7 @@
 #include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 static struct file_operations hpfs_file_ops =

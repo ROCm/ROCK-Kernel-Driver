@@ -314,6 +314,7 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
+#include <linux/atapi.h>
 #include "ide-cd.h"
 
 /****************************************************************************
@@ -870,9 +871,10 @@ int cdrom_read_check_ireason(struct ata_device *drive, struct request *rq, int l
 		/* Throw some data at the drive so it doesn't hang
 		   and quit this request. */
 		while (len > 0) {
-			int dum = 0;
-			atapi_write(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			u8 dummy[4];
+
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 	} else  if (ireason == 1) {
 		/* Some drives (ASUS) seem to tell us that status
@@ -1292,10 +1294,10 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
-			int dum = 0;
+			u8 dummy[4];
 
-			atapi_write(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 
 		/* Keep count of how much data we've moved. */
@@ -1311,9 +1313,10 @@ static ide_startstop_t cdrom_pc_intr(struct ata_device *drive, struct request *r
 		/* If we haven't moved enough data to satisfy the drive,
 		   add some padding. */
 		while (len > thislen) {
-			int dum = 0;
-			atapi_read(drive, &dum, sizeof (dum));
-			len -= sizeof (dum);
+			u8 dummy[4];
+
+			atapi_read(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 
 		/* Keep count of how much data we've moved. */
@@ -1455,9 +1458,9 @@ static inline int cdrom_write_check_ireason(struct ata_device *drive, struct req
 		/* Throw some data at the drive so it doesn't hang
 		   and quit this request. */
 		while (len > 0) {
-			int dum = 0;
-			atapi_write(drive, &dum, sizeof(dum));
-			len -= sizeof(dum);
+			u8 dummy[4];
+			atapi_write(drive, dummy, sizeof(dummy));
+			len -= sizeof(dummy);
 		}
 	} else {
 		/* Drive wants a command packet, or invalid ireason... */
@@ -2925,8 +2928,11 @@ int ide_cdrom_cleanup(struct ata_device *drive)
 	return 0;
 }
 
+static void ide_cdrom_attach(struct ata_device *drive);
+
 static struct ata_operations ide_cdrom_driver = {
 	owner:			THIS_MODULE,
+	attach:			ide_cdrom_attach,
 	cleanup:		ide_cdrom_cleanup,
 	standby:		NULL,
 	do_request:		ide_cdrom_do_request,
@@ -2942,67 +2948,63 @@ static struct ata_operations ide_cdrom_driver = {
 /* options */
 static char *ignore = NULL;
 
+static void ide_cdrom_attach(struct ata_device *drive)
+{
+	struct cdrom_info *info;
+	char *req;
+	struct ata_channel *channel;
+	int unit;
+
+	if (drive->type != ATA_ROM)
+		return;
+
+	req = drive->driver_req;
+	if (req[0] != '\0' && strcmp(req, "ide-cdrom"))
+		return;
+
+	/* skip drives that we were told to ignore */
+	if (ignore && !strcmp(ignore, drive->name)) {
+		printk(KERN_INFO "%s: ignored\n", drive->name);
+		return;
+	}
+	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
+	if (!info) {
+		printk(KERN_ERR "%s: Can't allocate a cdrom structure\n", drive->name);
+		return;
+	}
+	if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
+		printk(KERN_ERR "%s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (info);
+		return;
+	}
+
+
+	memset(info, 0, sizeof (struct cdrom_info));
+	drive->driver_data = info;
+
+	if (ide_cdrom_setup (drive)) {
+		if (ide_cdrom_cleanup (drive))
+			printk (KERN_ERR "%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
+		return;
+	}
+
+	channel = drive->channel;
+	unit = drive - channel->drives;
+
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+}
+
 MODULE_PARM(ignore, "s");
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 
 static void __exit ide_cdrom_exit(void)
 {
-	struct ata_device *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices(ATA_ROM, "ide-cdrom", &ide_cdrom_driver, failed)) != NULL)
-		if (ide_cdrom_cleanup (drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
+	unregister_ata_driver(&ide_cdrom_driver);
 }
 
 int ide_cdrom_init(void)
 {
-	struct ata_device *drive;
-	struct cdrom_info *info;
-	int failed = 0;
-
-	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ATA_ROM, "ide-cdrom", NULL, failed++)) != NULL) {
-		/* skip drives that we were told to ignore */
-		if (ignore != NULL) {
-			if (strstr(ignore, drive->name)) {
-				printk("ide-cd: ignoring drive %s\n", drive->name);
-				continue;
-			}
-		}
-		if (drive->scsi) {
-			printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
-		info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
-		if (info == NULL) {
-			printk ("%s: Can't allocate a cdrom structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
-			printk ("%s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (info);
-			continue;
-		}
-		memset(info, 0, sizeof (struct cdrom_info));
-		drive->driver_data = info;
-
-		MOD_INC_USE_COUNT;
-		if (ide_cdrom_setup (drive)) {
-			MOD_DEC_USE_COUNT;
-			if (ide_cdrom_cleanup (drive))
-				printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-			continue;
-		}
-		MOD_DEC_USE_COUNT;
-
-		failed--;
-	}
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-	return 0;
+	return ata_driver_module(&ide_cdrom_driver);
 }
 
 module_init(ide_cdrom_init);

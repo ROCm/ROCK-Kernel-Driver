@@ -61,7 +61,6 @@ extern int root_mountflags;
 extern int _stext, _text, _etext, _edata, _end;
 
 unsigned int processor_id;
-unsigned int compat;
 unsigned int __machine_arch_type;
 unsigned int system_rev;
 unsigned int system_serial_low;
@@ -289,11 +288,6 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
 	}
 
 	printk("Machine: %s\n", list->name);
-	if (compat)
-		printk(KERN_WARNING "Using compatibility code "
-			"scheduled for removal in v%d.%d.%d\n",
-			compat >> 24, (compat >> 12) & 0x3ff,
-			compat & 0x3ff);
 
 	return list;
 }
@@ -347,7 +341,7 @@ parse_cmdline(struct meminfo *mi, char **cmdline_p, char *from)
 	*cmdline_p = command_line;
 }
 
-void __init
+static void __init
 setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 {
 #ifdef CONFIG_BLK_DEV_RAM
@@ -365,7 +359,7 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 /*
  * initial ram disk
  */
-void __init setup_initrd(unsigned int start, unsigned int size)
+static void __init setup_initrd(unsigned int start, unsigned int size)
 {
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (start == 0)

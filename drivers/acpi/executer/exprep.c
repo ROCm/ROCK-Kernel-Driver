@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 115 $
+ *              $Revision: 117 $
  *
  *****************************************************************************/
 
@@ -29,7 +29,6 @@
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
-#include "acparser.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -57,16 +56,15 @@ acpi_ex_decode_field_access (
 	u32                     *return_byte_alignment)
 {
 	u32                     access;
-	u32                     length;
 	u8                      byte_alignment;
 	u8                      bit_length;
+/*    u32                     Length; */
 
 
 	ACPI_FUNCTION_NAME ("Ex_decode_field_access");
 
 
 	access = (field_flags & AML_FIELD_ACCESS_TYPE_MASK);
-	length = obj_desc->common_field.bit_length;
 
 	switch (access) {
 	case AML_FIELD_ACCESS_ANY:
@@ -85,6 +83,8 @@ acpi_ex_decode_field_access (
 		 */
 
 		/* Use the length to set the access type */
+
+		length = obj_desc->common_field.bit_length;
 
 		if (length <= 8) {
 			bit_length = 8;
@@ -135,7 +135,7 @@ acpi_ex_decode_field_access (
 		/* Invalid field access type */
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Unknown field access type %x\n",
+			"Unknown field access type %X\n",
 			access));
 		return (0);
 	}
@@ -410,6 +410,10 @@ acpi_ex_prep_field_value (
 			obj_desc->index_field.index_obj,
 			obj_desc->index_field.data_obj));
 		break;
+
+	default:
+		/* No other types should get here */
+		break;
 	}
 
 	/*
@@ -420,7 +424,7 @@ acpi_ex_prep_field_value (
 			  acpi_ns_get_type (info->field_node));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "set Named_obj %p (%4.4s) val = %p\n",
-			info->field_node, (char *) &(info->field_node->name), obj_desc));
+			info->field_node, info->field_node->name.ascii, obj_desc));
 
 	/* Remove local reference to the object */
 

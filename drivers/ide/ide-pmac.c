@@ -1247,9 +1247,6 @@ pmac_ide_mdma_enable(struct ata_device *drive, int idx)
 		return 0;
 	}
 
-	if (!drive->init_speed)
-		drive->init_speed = feature;
-
 	/* which drive is it ? */
 	if (drive->select.b.unit & 0x01)
 		timings = &pmac_ide[idx].timings[1];
@@ -1285,9 +1282,6 @@ pmac_ide_udma_enable(struct ata_device *drive, int idx, int high_speed)
 		printk(KERN_WARNING "%s: Failed !\n", drive->name);
 		return 0;
 	}
-
-	if (!drive->init_speed)
-		drive->init_speed = feature;
 
 	/* which drive is it ? */
 	if (drive->select.b.unit & 0x01)

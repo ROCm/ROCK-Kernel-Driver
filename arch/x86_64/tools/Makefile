@@ -14,11 +14,9 @@ $(TARGET): offset.h
 
 .PHONY : offset.h all modules modules_install
 
-offset.h: offset.sed offset.c FORCE_RECOMPILE
+offset.h: offset.sed offset.c FORCE
 	$(CC) $(CFLAGS) -S -o offset.tmp offset.c
 	sed -n -f offset.sed < offset.tmp > offset.h   
-
-FORCE_RECOMPILE:
 
 clean:
 	rm -f offset.[hs] $(TARGET).new offset.tmp

@@ -5,6 +5,7 @@
 #include <asm/uaccess.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>		/* for invalidate_buffers() */
 
 #include <linux/blk.h>
 #include <linux/blkpg.h>

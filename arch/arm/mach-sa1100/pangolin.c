@@ -15,19 +15,6 @@
 
 #include "generic.h"
 
-
-static void __init
-fixup_pangolin(struct machine_desc *desc, struct tag *tags,
-	       char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 128*1024*1024 );
-	mi->nr_banks = 1;
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 16384 );
-	setup_initrd( 0xc0800000, 3*1024*1024 );
-}
-
 static struct map_desc pangolin_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 0, 1, 0, 0 }, /* MQ200 */
@@ -52,7 +39,6 @@ static void __init pangolin_map_io(void)
 
 MACHINE_START(PANGOLIN, "Dialogue-Pangolin")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_pangolin)
 	MAPIO(pangolin_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

@@ -22,6 +22,7 @@
 struct linux_binprm{
 	char buf[BINPRM_BUF_SIZE];
 	struct page *page[MAX_ARG_PAGES];
+	struct mm_struct *mm;
 	unsigned long p; /* current top of mem */
 	int sh_bang;
 	struct file * file;

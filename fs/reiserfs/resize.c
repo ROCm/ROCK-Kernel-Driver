@@ -14,6 +14,7 @@
 #include <linux/errno.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/reiserfs_fs_sb.h>
+#include <linux/buffer_head.h>
 
 int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 {

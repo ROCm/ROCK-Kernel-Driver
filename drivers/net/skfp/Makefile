@@ -2,8 +2,6 @@
 # Makefile for the SysKonnect FDDI PCI adapter driver
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_SKFP) += skfp.o
 
 skfp-objs :=  skfddi.o    hwmtm.o    fplustm.o  smt.o      cfm.o     \

@@ -720,6 +720,8 @@ tlock_t *txLock(tid_t tid, struct inode *ip, metapage_t * mp, int type)
 			    le16_to_cpu(p->header.nextindex);
 		}
 		xtlck->lwm.length = 0;	/* ! */
+		xtlck->twm.offset = 0;
+		xtlck->hwm.offset = 0;
 
 		xtlck->index = 2;
 		break;
@@ -1868,6 +1870,7 @@ void xtLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 	 */
 	if (tlck->type & tlckTRUNCATE) {
 		pxd_t tpxd;	/* truncated extent of xad */
+		int twm;
 
 		/*
 		 * For truncation the entire linelock may be used, so it would
@@ -1881,6 +1884,7 @@ void xtLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 		if (lwm == 0)
 			lwm = XTPAGEMAXSLOT;
 		hwm = xtlck->hwm.offset;
+		twm = xtlck->twm.offset;
 
 		/*
 		 *      write log records
@@ -1906,9 +1910,9 @@ void xtLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 		}
 
 		/*
-		 * truncate entry XAD[hwm == next - 1]:
+		 * truncate entry XAD[twm == next - 1]:
 		 */
-		if (hwm == next - 1) {
+		if (twm == next - 1) {
 			/* init LOG_UPDATEMAP for logredo() to update bmap for
 			 * free of truncated delta extent of the truncated
 			 * entry XAD[next - 1]:
@@ -1975,9 +1979,9 @@ void xtLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 		}
 
 		/*
-		 * truncate entry XAD[hwm == next - 1]:
+		 * truncate entry XAD[twm == next - 1]:
 		 */
-		if (hwm == next - 1) {
+		if (twm == next - 1) {
 			pxdlock_t *pxdlock;
 
 			/* format a maplock for txUpdateMap() to update bmap

@@ -55,7 +55,7 @@ main.o: ksize.h
 
 bootp.o: ksize.h
 
-ksize.h: vmlinux.nh dummy
+ksize.h: vmlinux.nh FORCE
 	echo "#define KERNEL_SIZE `ls -l vmlinux.nh | awk '{print $$5}'`" > $@T
 ifdef INITRD
 	[ -f $(INITRD) ] || exit 1
@@ -98,4 +98,4 @@ clean:
 
 dep:
 
-dummy:
+FORCE:

@@ -56,16 +56,9 @@ struct vm_operations_struct   DRM(vm_sg_ops) = {
 	close:   DRM(vm_close),
 };
 
-#if LINUX_VERSION_CODE < 0x020317
-unsigned long DRM(vm_nopage)(struct vm_area_struct *vma,
-			     unsigned long address,
-			     int unused)
-#else
-				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 			    unsigned long address,
-			    int unused)
-#endif
+			    int write_access)
 {
 #if __REALLY_HAVE_AGP
 	drm_file_t *priv  = vma->vm_file->private_data;
@@ -122,11 +115,7 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 		DRM_DEBUG("baddr = 0x%lx page = 0x%p, offset = 0x%lx\n",
 			  baddr, __va(agpmem->memory->memory[offset]), offset);
 
-#if LINUX_VERSION_CODE < 0x020317
-		return page_address(page);
-#else
 		return page;
-#endif
         }
 vm_nopage_error:
 #endif /* __REALLY_HAVE_AGP */
@@ -134,22 +123,11 @@ vm_nopage_error:
 	return NOPAGE_SIGBUS;		/* Disallow mremap */
 }
 
-#if LINUX_VERSION_CODE < 0x020317
-unsigned long DRM(vm_shm_nopage)(struct vm_area_struct *vma,
-				 unsigned long address,
-				 int unused)
-#else
-				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
-				int unused)
-#endif
+				int write_access)
 {
-#if LINUX_VERSION_CODE >= 0x020300
 	drm_map_t	 *map	 = (drm_map_t *)vma->vm_private_data;
-#else
-	drm_map_t	 *map	 = (drm_map_t *)vma->vm_pte;
-#endif
 	unsigned long	 offset;
 	unsigned long	 i;
 	struct page	 *page;
@@ -165,11 +143,7 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	get_page(page);
 
 	DRM_DEBUG("shm_nopage 0x%lx\n", address);
-#if LINUX_VERSION_CODE < 0x020317
-	return page_address(page);
-#else
 	return page;
-#endif
 }
 
 /* Special close routine which deletes map information if we are the last
@@ -188,25 +162,14 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 
 	DRM_DEBUG("0x%08lx,0x%08lx\n",
 		  vma->vm_start, vma->vm_end - vma->vm_start);
-#if LINUX_VERSION_CODE < 0x020333
-	MOD_DEC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
 	atomic_dec(&dev->vma_count);
 
-#if LINUX_VERSION_CODE >= 0x020300
 	map = vma->vm_private_data;
-#else
-	map = vma->vm_pte;
-#endif
 
 	down(&dev->struct_sem);
 	for (pt = dev->vmalist, prev = NULL; pt; pt = next) {
 		next = pt->next;
-#if LINUX_VERSION_CODE >= 0x020300
 		if (pt->vma->vm_private_data == map) found_maps++;
-#else
-		if (pt->vma->vm_pte == map) found_maps++;
-#endif
 		if (pt->vma == vma) {
 			if (prev) {
 				prev->next = pt->next;
@@ -259,16 +222,9 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 	up(&dev->struct_sem);
 }
 
-#if LINUX_VERSION_CODE < 0x020317
-unsigned long DRM(vm_dma_nopage)(struct vm_area_struct *vma,
-				 unsigned long address,
-				 int unused)
-#else
-				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
-				int unused)
-#endif
+				int write_access)
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
 	drm_device_t	 *dev	 = priv->dev;
@@ -288,30 +244,15 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 
 	get_page(page);
 
-	DRM_DEBUG("dma_nopage 0x%lx (page %lu)\n", address, page_nr); 
-#if LINUX_VERSION_CODE < 0x020317
-	return page_address(page);
-#else
+	DRM_DEBUG("dma_nopage 0x%lx (page %lu)\n", address, page_nr);
 	return page;
-#endif
 }
 
-#if LINUX_VERSION_CODE < 0x020317
-unsigned long DRM(vm_sg_nopage)(struct vm_area_struct *vma,
-				unsigned long address,
-				int unused)
-#else
-				/* Return type changed in 2.3.23 */
 struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 			       unsigned long address,
-			       int unused)
-#endif
+			       int write_access)
 {
-#if LINUX_VERSION_CODE >= 0x020300
 	drm_map_t        *map    = (drm_map_t *)vma->vm_private_data;
-#else
-	drm_map_t        *map    = (drm_map_t *)vma->vm_pte;
-#endif
 	drm_file_t *priv = vma->vm_file->private_data;
 	drm_device_t *dev = priv->dev;
 	drm_sg_mem_t *entry = dev->sg;
@@ -331,11 +272,7 @@ struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 	page = entry->pagelist[page_offset];
 	get_page(page);
 
-#if LINUX_VERSION_CODE < 0x020317
-	return page_address(page);
-#else
 	return page;
-#endif
 }
 
 void DRM(vm_open)(struct vm_area_struct *vma)
@@ -347,10 +284,6 @@ void DRM(vm_open)(struct vm_area_struct *vma)
 	DRM_DEBUG("0x%08lx,0x%08lx\n",
 		  vma->vm_start, vma->vm_end - vma->vm_start);
 	atomic_inc(&dev->vma_count);
-#if LINUX_VERSION_CODE < 0x020333
-				/* The map can exist after the fd is closed. */
-	MOD_INC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
 
 	vma_entry = DRM(alloc)(sizeof(*vma_entry), DRM_MEM_VMAS);
 	if (vma_entry) {
@@ -371,9 +304,6 @@ void DRM(vm_close)(struct vm_area_struct *vma)
 
 	DRM_DEBUG("0x%08lx,0x%08lx\n",
 		  vma->vm_start, vma->vm_end - vma->vm_start);
-#if LINUX_VERSION_CODE < 0x020333
-	MOD_DEC_USE_COUNT; /* Needed before Linux 2.3.51 */
-#endif
 	atomic_dec(&dev->vma_count);
 
 	down(&dev->struct_sem);
@@ -412,13 +342,13 @@ int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 	unlock_kernel();
 
 	vma->vm_ops   = &DRM(vm_dma_ops);
-	vma->vm_flags |= VM_RESERVED; /* Don't swap */
 
-#if LINUX_VERSION_CODE < 0x020203 /* KERNEL_VERSION(2,2,3) */
-				/* In Linux 2.2.3 and above, this is
-				   handled in do_mmap() in mm/mmap.c. */
-	++filp->f_count;
+#if LINUX_VERSION_CODE <= 0x020414
+	vma->vm_flags |= VM_LOCKED | VM_SHM; /* Don't swap */
+#else
+	vma->vm_flags |= VM_RESERVED; /* Don't swap */
 #endif
+
 	vma->vm_file  =	 filp;	/* Needed for drm_vm_open() */
 	DRM(vm_open)(vma);
 	return 0;
@@ -521,12 +451,12 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		}
 		offset = DRIVER_GET_REG_OFS();
 #ifdef __sparc__
-		if (io_remap_page_range(vma, vma->vm_start,
+		if (io_remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
 					VM_OFFSET(vma) + offset,
 					vma->vm_end - vma->vm_start,
 					vma->vm_page_prot, 0))
 #else
-		if (remap_page_range(vma, vma->vm_start,
+		if (remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
 				     VM_OFFSET(vma) + offset,
 				     vma->vm_end - vma->vm_start,
 				     vma->vm_page_prot))
@@ -540,34 +470,33 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		break;
 	case _DRM_SHM:
 		vma->vm_ops = &DRM(vm_shm_ops);
-#if LINUX_VERSION_CODE >= 0x020300
 		vma->vm_private_data = (void *)map;
-#else
-		vma->vm_pte = (unsigned long)map;
-#endif
 				/* Don't let this area swap.  Change when
 				   DRM_KERNEL advisory is supported. */
+#if LINUX_VERSION_CODE <= 0x020414
+		vma->vm_flags |= VM_LOCKED;
+#else
 		vma->vm_flags |= VM_RESERVED;
+#endif
 		break;
 	case _DRM_SCATTER_GATHER:
 		vma->vm_ops = &DRM(vm_sg_ops);
-#if LINUX_VERSION_CODE >= 0x020300
 		vma->vm_private_data = (void *)map;
+#if LINUX_VERSION_CODE <= 0x020414
+		vma->vm_flags |= VM_LOCKED;
 #else
-		vma->vm_pte = (unsigned long)map;
+		vma->vm_flags |= VM_RESERVED;
 #endif
-                vma->vm_flags |= VM_RESERVED;
                 break;
 	default:
 		return -EINVAL;	/* This should never happen. */
 	}
+#if LINUX_VERSION_CODE <= 0x020414
+	vma->vm_flags |= VM_LOCKED | VM_SHM; /* Don't swap */
+#else
 	vma->vm_flags |= VM_RESERVED; /* Don't swap */
-
-#if LINUX_VERSION_CODE < 0x020203 /* KERNEL_VERSION(2,2,3) */
-				/* In Linux 2.2.3 and above, this is
-				   handled in do_mmap() in mm/mmap.c. */
-	++filp->f_count;
 #endif
+
 	vma->vm_file  =	 filp;	/* Needed for drm_vm_open() */
 	DRM(vm_open)(vma);
 	return 0;

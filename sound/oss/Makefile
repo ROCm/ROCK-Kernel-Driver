@@ -3,8 +3,6 @@
 # 18 Apr 1998, Michael Elizabeth Chastain, <mailto:mec@shout.net>
 # Rewritten to use lists instead of if-statements.
 
-O_TARGET	:= _oss.o
-
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
@@ -78,23 +76,9 @@ ifeq ($(CONFIG_MIDI_EMU10K1),y)
   obj-$(CONFIG_SOUND_EMU10K1)	+= sound.o
 endif
 
-subdir-$(CONFIG_SOUND_EMU10K1) += emu10k1
-subdir-$(CONFIG_SOUND_CS4281) += cs4281
-
-ifeq ($(CONFIG_SOUND_EMU10K1),y)
-  obj-y += emu10k1/_emu10k1.o
-endif
-
-ifeq ($(CONFIG_SOUND_CS4281),y)
-  obj-y += cs4281/_cs4281.o
-endif
-
-subdir-$(CONFIG_DMASOUND) += dmasound
-
-ifeq ($(CONFIG_DMASOUND),y)
-  obj-y += dmasound/_dmasound.o
-endif
-
+obj-$(CONFIG_SOUND_EMU10K1)	+= emu10k1/
+obj-$(CONFIG_SOUND_CS4281)	+= cs4281/
+obj-$(CONFIG_DMASOUND)		+= dmasound/
 
 # Declare multi-part drivers.
 
@@ -255,5 +239,5 @@ FILES_BOOT_CHANGED := $(strip \
 	maui_boot.h pss_boot.h trix_boot.h))
 
 ifneq ($(FILES_BOOT_CHANGED),)
-$(FILES_BOOT_CHANGED): dummy
+$(FILES_BOOT_CHANGED): FORCE
 endif

@@ -43,6 +43,9 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		if (get_user(flags, (int *) arg))
 			return -EFAULT;
 
+		if (!S_ISDIR(inode->i_mode))
+			flags &= ~EXT3_DIRSYNC_FL;
+
 		oldflags = ei->i_flags;
 
 		/* The JOURNAL_DATA flag is modifiable only by root */

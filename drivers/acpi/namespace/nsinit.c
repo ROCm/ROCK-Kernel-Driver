@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 43 $
+ *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -71,19 +71,20 @@ acpi_ns_initialize_objects (
 			  ACPI_UINT32_MAX, acpi_ns_init_one_object,
 			  &info, NULL);
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %x\n", status));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %s\n",
+			acpi_format_exception (status)));
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
-		"\n Initialized %d/%d Regions %d/%d Fields %d/%d Buffers %d/%d Packages (%d nodes)\n",
+		"\nInitialized %hd/%hd Regions %hd/%hd Fields %hd/%hd Buffers %hd/%hd Packages (%hd nodes)\n",
 		info.op_region_init, info.op_region_count,
 		info.field_init,    info.field_count,
 		info.buffer_init,   info.buffer_count,
 		info.package_init,  info.package_count, info.object_count));
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"%d Control Methods found\n", info.method_count));
+		"%hd Control Methods found\n", info.method_count));
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"%d Op Regions found\n", info.op_region_count));
+		"%hd Op Regions found\n", info.op_region_count));
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -130,11 +131,12 @@ acpi_ns_initialize_devices (
 			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %x\n", status));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %s\n",
+			acpi_format_exception (status)));
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
-		"\n%d Devices found containing: %d _STA, %d _INI methods\n",
+		"\n%hd Devices found containing: %hd _STA, %hd _INI methods\n",
 		info.device_count, info.num_STA, info.num_INI));
 
 	return_ACPI_STATUS (status);
@@ -259,13 +261,17 @@ acpi_ns_init_one_object (
 		info->package_init++;
 		status = acpi_ds_get_package_arguments (obj_desc);
 		break;
+
+	default:
+		/* No other types can get here */
+		break;
 	}
 
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Could not execute arguments for [%4.4s] (%s), %s\n",
-				(char *) &node->name, acpi_ut_get_type_name (type), acpi_format_exception (status)));
+				node->name.ascii, acpi_ut_get_type_name (type), acpi_format_exception (status)));
 	}
 
 	if (!(acpi_dbg_level & ACPI_LV_INIT)) {
@@ -357,30 +363,36 @@ acpi_ns_init_one_device (
 	 */
 	ACPI_DEBUG_EXEC (acpi_ut_display_init_pathname (obj_handle, "_INI [Method]"));
 	status = acpi_ns_evaluate_relative (obj_handle, "_INI", NULL, NULL);
-	if (AE_NOT_FOUND == status) {
-		/* No _INI means device requires no initialization */
+	if (ACPI_FAILURE (status)) {
+		/* No _INI (AE_NOT_FOUND) means device requires no initialization */
+
+		if (status != AE_NOT_FOUND) {
+			/* Ignore error and move on to next device */
+
+	#ifdef ACPI_DEBUG
+			NATIVE_CHAR *scope_name = acpi_ns_get_external_pathname (obj_handle);
+
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
+					scope_name, acpi_format_exception (status)));
+
+			ACPI_MEM_FREE (scope_name);
+	#endif
+		}
 
 		status = AE_OK;
 	}
-
-	else if (ACPI_FAILURE (status)) {
-		/* Ignore error and move on to next device */
-
-#ifdef ACPI_DEBUG
-		NATIVE_CHAR *scope_name = acpi_ns_get_external_pathname (obj_handle);
-
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "%s._INI failed: %s\n",
-				scope_name, acpi_format_exception (status)));
-
-		ACPI_MEM_FREE (scope_name);
-#endif
-	}
-
 	else {
 		/* Count of successful INIs */
 
 		info->num_INI++;
 	}
 
-	return_ACPI_STATUS (AE_OK);
+	if (acpi_gbl_init_handler) {
+		/* External initialization handler is present, call it */
+
+		status = acpi_gbl_init_handler (obj_handle, ACPI_INIT_DEVICE_INI);
+	}
+
+
+	return_ACPI_STATUS (status);
 }

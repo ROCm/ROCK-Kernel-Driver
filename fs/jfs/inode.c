@@ -17,6 +17,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_imap.h"
@@ -33,17 +34,18 @@ extern struct file_operations jfs_file_operations;
 struct address_space_operations jfs_aops;
 extern int freeZeroLink(struct inode *);
 
-void jfs_put_inode(struct inode *inode)
+struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 {
-	jFYI(1, ("In jfs_put_inode, inode = 0x%p\n", inode));
-}
+	struct inode *inode = iget_locked(sb, ino);
 
-void jfs_read_inode(struct inode *inode)
-{
-	jFYI(1, ("In jfs_read_inode, inode = 0x%p\n", inode));
+	if (!inode || !(inode->i_state & I_NEW))
+		return inode;
 
-	if (diRead(inode))
-		goto bad_inode;
+	if (diRead(inode)) { 
+		make_bad_inode(inode);
+		unlock_new_inode(inode);
+		return NULL;
+	}
 
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &jfs_file_inode_operations;
@@ -64,11 +66,8 @@ void jfs_read_inode(struct inode *inode)
 		init_special_inode(inode, inode->i_mode,
 				   kdev_t_to_nr(inode->i_rdev));
 	}
-
-	return;
-
-      bad_inode:
-	make_bad_inode(inode);
+	unlock_new_inode(inode);
+	return inode;
 }
 
 /* This define is from fs/open.c */

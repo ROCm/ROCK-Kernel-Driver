@@ -185,7 +185,7 @@ void show_regs(struct pt_regs * regs)
 		get_fs() == get_ds() ? "kernel" : "user");
 #if defined(CONFIG_CPU_32)
 	{
-		int ctrl, transbase, dac;
+		unsigned int ctrl, transbase, dac;
 		  __asm__ (
 		"	mrc p15, 0, %0, c1, c0\n"
 		"	mrc p15, 0, %1, c2, c0\n"
@@ -310,23 +310,21 @@ void release_thread(struct task_struct *dead_task)
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
-int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
-	unsigned long unused,
-	struct task_struct * p, struct pt_regs * regs)
+int
+copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
+	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
+	struct thread_info *thread = p->thread_info;
 	struct pt_regs *childregs;
-	struct cpu_context_save *save;
 
-	childregs = ((struct pt_regs *)((unsigned long)p->thread_info + THREAD_SIZE)) - 1;
+	childregs = ((struct pt_regs *)((unsigned long)thread + THREAD_SIZE - 8)) - 1;
 	*childregs = *regs;
 	childregs->ARM_r0 = 0;
 	childregs->ARM_sp = esp;
 
-	save = ((struct cpu_context_save *)(childregs)) - 1;
-	*save = INIT_CSS;
-	save->pc |= (unsigned long)ret_from_fork;
-
-	p->thread_info->cpu_context = save;
+	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
+	thread->cpu_context.sp = (unsigned long)childregs;
+	thread->cpu_context.pc = (unsigned long)ret_from_fork;
 
 	return 0;
 }
@@ -386,16 +384,16 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	pid_t __ret;
 
 	__asm__ __volatile__(
-	"orr	r0, %1, %2	@ kernel_thread sys_clone
-	mov	r1, #0
-	"__syscall(clone)"
-	movs	%0, r0		@ if we are the child
-	bne	1f
-	mov	fp, #0		@ ensure that fp is zero
-	mov	r0, %4
-	mov	lr, pc
-	mov	pc, %3
-	b	sys_exit
+	"orr	r0, %1, %2	@ kernel_thread sys_clone	\n\
+	mov	r1, #0						\n\
+	"__syscall(clone)"					\n\
+	movs	%0, r0		@ if we are the child		\n\
+	bne	1f						\n\
+	mov	fp, #0		@ ensure that fp is zero	\n\
+	mov	r0, %4						\n\
+	mov	lr, pc						\n\
+	mov	pc, %3						\n\
+	b	sys_exit					\n\
 1:	"
         : "=r" (__ret)
         : "Ir" (flags), "I" (CLONE_VM), "r" (fn), "r" (arg)

@@ -1001,8 +1001,6 @@ static int mcdx_talk(struct s_drive_stuff *stuffp,
 
 /* MODULE STUFF ***********************************************************/
 
-EXPORT_NO_SYMBOLS;
-
 int __mcdx_init(void)
 {
 	int i;

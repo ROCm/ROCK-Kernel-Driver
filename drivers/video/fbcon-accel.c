@@ -158,7 +158,7 @@ struct display_switch fbcon_accel = {
 	putcs:		fbcon_accel_putcs,
 	revc:		fbcon_accel_revc,
 	clear_margins:	fbcon_accel_clear_margins,
-	fontwidthmask:	FONTWIDTHRANGE(1, 32)	
+	fontwidthmask:	FONTWIDTHRANGE(1, 16)	
 };
 
 #ifdef MODULE

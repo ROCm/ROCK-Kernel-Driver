@@ -32,7 +32,6 @@
 
 #define chip_t ad1848_t
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Tugrul Galatali <galatalt@stuy.edu>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("AD1848/AD1847/CS4248");
 MODULE_LICENSE("GPL");

@@ -27,6 +27,10 @@
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
+ * ChangeLog:
+ *  2001-11-16	Torsten Duwe <duwe@caldera.de>
+ *		added context constructor/destructor hooks,
+ *		needed by SiS driver's memory management.
  */
 
 #define __NO_VERSION__
@@ -316,6 +320,10 @@ int DRM(addctx)( struct inode *inode, struct file *filp,
 				/* Should this return -EBUSY instead? */
 		return -ENOMEM;
 	}
+#ifdef DRIVER_CTX_CTOR
+	if ( ctx.handle != DRM_KERNEL_CONTEXT )
+		DRIVER_CTX_CTOR(ctx.handle); /* XXX: also pass dev ? */
+#endif
 
 	if ( copy_to_user( (drm_ctx_t *)arg, &ctx, sizeof(ctx) ) )
 		return -EFAULT;
@@ -390,6 +398,9 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 		priv->remove_auth_on_close = 1;
 	}
 	if ( ctx.handle != DRM_KERNEL_CONTEXT ) {
+#ifdef DRIVER_CTX_DTOR
+		DRIVER_CTX_DTOR(ctx.handle); /* XXX: also pass dev ? */
+#endif
 		DRM(ctxbitmap_free)( dev, ctx.handle );
 	}
 

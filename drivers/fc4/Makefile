@@ -2,8 +2,6 @@
 # Makefile for the Linux Fibre Channel device drivers.
 #
 
-L_TARGET := fc4.a
-
 export-objs := fc_syms.o
 
 fc4-objs := fc.o fc_syms.o

@@ -14,6 +14,8 @@
 
 #include "dir_f.h"
 
+struct buffer_head;
+
 /*
  * Directory handling
  */

@@ -32,6 +32,8 @@
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
+#include <linux/mpage.h>
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start
@@ -1326,16 +1328,28 @@ static int ext3_writepage(struct page *page)
 out_fail:
 	
 	unlock_kernel();
-	set_page_dirty(page);
+
+	/*
+	 * We have to fail this writepage to avoid cross-fs transactions.
+	 * Put the page back on mapping->dirty_pages, but leave its buffer's
+	 * dirty state as-is.
+	 */
+	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
 }
 
 static int ext3_readpage(struct file *file, struct page *page)
 {
-	return block_read_full_page(page,ext3_get_block);
+	return mpage_readpage(page, ext3_get_block);
 }
 
+static int
+ext3_readpages(struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+	return mpage_readpages(mapping, pages, nr_pages, ext3_get_block);
+}
 
 static int ext3_flushpage(struct page *page, unsigned long offset)
 {
@@ -1352,6 +1366,7 @@ static int ext3_releasepage(struct page *page, int wait)
 
 struct address_space_operations ext3_aops = {
 	readpage:	ext3_readpage,		/* BKL not held.  Don't need */
+	readpages:	ext3_readpages,		/* BKL not held.  Don't need */
 	writepage:	ext3_writepage,		/* BKL not held.  We take it */
 	sync_page:	block_sync_page,
 	prepare_write:	ext3_prepare_write,	/* BKL not held.  We take it */
@@ -1407,11 +1422,8 @@ static int ext3_block_truncate_page(handle_t *handle,
 
 	err = 0;
 	if (!buffer_mapped(bh)) {
-		/* Hole? Nothing to do */
-		if (buffer_uptodate(bh))
-			goto unlock;
 		ext3_get_block(inode, iblock, bh, 0);
-		/* Still unmapped? Nothing to do */
+		/* unmapped? It's a hole - nothing to do */
 		if (!buffer_mapped(bh))
 			goto unlock;
 	}
@@ -2148,23 +2160,14 @@ void ext3_read_inode(struct inode * inode)
 	} else 
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(iloc.raw_inode->i_block[0]));
-	/* inode->i_attr_flags = 0;				unused */
-	if (ei->i_flags & EXT3_SYNC_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_SYNCRONOUS; unused */
+	if (ei->i_flags & EXT3_SYNC_FL)
 		inode->i_flags |= S_SYNC;
-	}
-	if (ei->i_flags & EXT3_APPEND_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_APPEND;	unused */
+	if (ei->i_flags & EXT3_APPEND_FL)
 		inode->i_flags |= S_APPEND;
-	}
-	if (ei->i_flags & EXT3_IMMUTABLE_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_IMMUTABLE;	unused */
+	if (ei->i_flags & EXT3_IMMUTABLE_FL)
 		inode->i_flags |= S_IMMUTABLE;
-	}
-	if (ei->i_flags & EXT3_NOATIME_FL) {
-		/* inode->i_attr_flags |= ATTR_FLAG_NOATIME;	unused */
+	if (ei->i_flags & EXT3_NOATIME_FL)
 		inode->i_flags |= S_NOATIME;
-	}
 	return;
 	
 bad_inode:
@@ -2473,7 +2476,7 @@ ext3_mark_iloc_dirty(handle_t *handle,
 		/* ext3_do_update_inode() does journal_dirty_metadata */
 		brelse(iloc->bh);
 	} else {
-		printk(KERN_EMERG __FUNCTION__ ": called with no handle!\n");
+		printk(KERN_EMERG "%s: called with no handle!\n", __FUNCTION__);
 	}
 	return err;
 }
@@ -2561,7 +2564,8 @@ void ext3_dirty_inode(struct inode *inode)
 	if (current_handle &&
 		current_handle->h_transaction != handle->h_transaction) {
 		/* This task has a transaction open against a different fs */
-		printk(KERN_EMERG __FUNCTION__": transactions do not match!\n");
+		printk(KERN_EMERG "%s: transactions do not match!\n",
+		       __FUNCTION__);
 	} else {
 		jbd_debug(5, "marking dirty.  outer handle=%p\n",
 				current_handle);

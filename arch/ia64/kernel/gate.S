@@ -13,7 +13,7 @@
 #include <asm/unistd.h>
 #include <asm/page.h>
 
-	.section .text.gate,"ax"
+	.section .text.gate, "ax"
 
 #	define ARG0_OFF		(16 + IA64_SIGFRAME_ARG0_OFFSET)
 #	define ARG1_OFF		(16 + IA64_SIGFRAME_ARG1_OFFSET)
@@ -108,7 +108,7 @@ back_from_setup_rbs:
 	dep r8=0,r8,38,26			// clear EC0, CPL0 and reserved bits
 	adds base1=(FR6_OFF+16+SIGCONTEXT_OFF),sp
 	;;
-	.spillsp ar.pfs, CFM_OFF
+	.spillsp ar.pfs, CFM_OFF+SIGCONTEXT_OFF
 	st8 [base0]=r8				// save CFM0
 	adds base0=(FR6_OFF+SIGCONTEXT_OFF),sp
 	;;

@@ -690,7 +690,6 @@ static void irda_usb_net_timeout(struct net_device *netdev)
  * The way I see it is that if we submit more than one Rx URB at a
  * time, the Rx URB can be automatically re-submitted after the
  * completion handler is called.
- * We make sure to disable this feature by setting urb->next to NULL
  *
  * My take is that it's a questionable feature, and quite difficult
  * to control and to make work effectively.
@@ -754,7 +753,6 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
 	/* Note : unlink *must* be synchronous because of the code in 
 	 * irda_usb_net_close() -> free the skb - Jean II */
 	urb->status = 0;
-	urb->next = NULL;	/* Don't auto resubmit URBs */
 
 	/* Can be called from irda_usb_receive (irq handler) -> GFP_ATOMIC */
 	ret = usb_submit_urb(urb, GFP_ATOMIC);

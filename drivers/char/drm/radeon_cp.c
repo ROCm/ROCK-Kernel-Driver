@@ -459,6 +459,7 @@ int radeon_do_cp_idle( drm_radeon_private_t *dev_priv )
 	RADEON_WAIT_UNTIL_IDLE();
 
 	ADVANCE_RING();
+	COMMIT_RING();
 
 	return radeon_do_wait_for_idle( dev_priv );
 }
@@ -483,6 +484,7 @@ static void radeon_do_cp_start( drm_radeon_private_t *dev_priv )
 	RADEON_WAIT_UNTIL_IDLE();
 
 	ADVANCE_RING();
+	COMMIT_RING();
 }
 
 /* Reset the Command Processor.  This will not flush any pending
@@ -744,17 +746,17 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	 * and screwing with the clear operation.
 	 */
 	dev_priv->depth_clear.rb3d_cntl = (RADEON_PLANE_MASK_ENABLE |
-					   RADEON_Z_ENABLE |
 					   (dev_priv->color_fmt << 10) |
-					   RADEON_ZBLOCK16);
+					   (1<<15));
 
-	dev_priv->depth_clear.rb3d_zstencilcntl = (dev_priv->depth_fmt |
-						   RADEON_Z_TEST_ALWAYS |
-						   RADEON_STENCIL_TEST_ALWAYS |
-						   RADEON_STENCIL_S_FAIL_KEEP |
-						   RADEON_STENCIL_ZPASS_KEEP |
-						   RADEON_STENCIL_ZFAIL_KEEP |
-						   RADEON_Z_WRITE_ENABLE);
+	dev_priv->depth_clear.rb3d_zstencilcntl = 
+		(dev_priv->depth_fmt |
+		 RADEON_Z_TEST_ALWAYS |
+		 RADEON_STENCIL_TEST_ALWAYS |
+		 RADEON_STENCIL_S_FAIL_REPLACE |
+		 RADEON_STENCIL_ZPASS_REPLACE |
+		 RADEON_STENCIL_ZFAIL_REPLACE |
+		 RADEON_Z_WRITE_ENABLE);
 
 	dev_priv->depth_clear.se_cntl = (RADEON_FFACE_CULL_CW |
 					 RADEON_BFACE_SOLID |
@@ -964,9 +966,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	radeon_cp_load_microcode( dev_priv );
 	radeon_cp_init_ring_buffer( dev, dev_priv );
 
-#if ROTATE_BUFS
 	dev_priv->last_buf = 0;
-#endif
 
 	dev->dev_private = (void *)dev_priv;
 
@@ -1146,116 +1146,27 @@ int radeon_engine_reset( struct inode *inode, struct file *filp,
  * Fullscreen mode
  */
 
-static int radeon_do_init_pageflip( drm_device_t *dev )
-{
-	drm_radeon_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
-	dev_priv->crtc_offset =      RADEON_READ( RADEON_CRTC_OFFSET );
-	dev_priv->crtc_offset_cntl = RADEON_READ( RADEON_CRTC_OFFSET_CNTL );
-
-	RADEON_WRITE( RADEON_CRTC_OFFSET, dev_priv->front_offset );
-	RADEON_WRITE( RADEON_CRTC_OFFSET_CNTL,
-		      dev_priv->crtc_offset_cntl |
-		      RADEON_CRTC_OFFSET_FLIP_CNTL );
-
-	dev_priv->page_flipping = 1;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
-int radeon_do_cleanup_pageflip( drm_device_t *dev )
-{
-	drm_radeon_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "%s\n", __FUNCTION__ );
-
-	RADEON_WRITE( RADEON_CRTC_OFFSET,      dev_priv->crtc_offset );
-	RADEON_WRITE( RADEON_CRTC_OFFSET_CNTL, dev_priv->crtc_offset_cntl );
-
-	dev_priv->page_flipping = 0;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
+/* KW: Deprecated to say the least:
+ */
 int radeon_fullscreen( struct inode *inode, struct file *filp,
 		       unsigned int cmd, unsigned long arg )
 {
-        drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
-	drm_radeon_fullscreen_t fs;
-
-	LOCK_TEST_WITH_RETURN( dev );
-
-	if ( copy_from_user( &fs, (drm_radeon_fullscreen_t *)arg,
-			     sizeof(fs) ) )
-		return -EFAULT;
-
-	switch ( fs.func ) {
-	case RADEON_INIT_FULLSCREEN:
-		return radeon_do_init_pageflip( dev );
-	case RADEON_CLEANUP_FULLSCREEN:
-		return radeon_do_cleanup_pageflip( dev );
-	}
-
-	return -EINVAL;
+	return 0;
 }
 
 
 /* ================================================================
  * Freelist management
  */
-#define RADEON_BUFFER_USED	0xffffffff
-#define RADEON_BUFFER_FREE	0
 
-#if 0
-static int radeon_freelist_init( drm_device_t *dev )
-{
-	drm_device_dma_t *dma = dev->dma;
-	drm_radeon_private_t *dev_priv = dev->dev_private;
-	drm_buf_t *buf;
-	drm_radeon_buf_priv_t *buf_priv;
-	drm_radeon_freelist_t *entry;
-	int i;
-
-	dev_priv->head = DRM(alloc)( sizeof(drm_radeon_freelist_t),
-				     DRM_MEM_DRIVER );
-	if ( dev_priv->head == NULL )
-		return -ENOMEM;
-
-	memset( dev_priv->head, 0, sizeof(drm_radeon_freelist_t) );
-	dev_priv->head->age = RADEON_BUFFER_USED;
-
-	for ( i = 0 ; i < dma->buf_count ; i++ ) {
-		buf = dma->buflist[i];
-		buf_priv = buf->dev_private;
-
-		entry = DRM(alloc)( sizeof(drm_radeon_freelist_t),
-				    DRM_MEM_DRIVER );
-		if ( !entry ) return -ENOMEM;
-
-		entry->age = RADEON_BUFFER_FREE;
-		entry->buf = buf;
-		entry->prev = dev_priv->head;
-		entry->next = dev_priv->head->next;
-		if ( !entry->next )
-			dev_priv->tail = entry;
-
-		buf_priv->discard = 0;
-		buf_priv->dispatched = 0;
-		buf_priv->list_entry = entry;
-
-		dev_priv->head->next = entry;
-
-		if ( dev_priv->head->next )
-			dev_priv->head->next->prev = entry;
-	}
-
-	return 0;
-
-}
-#endif
+/* Original comment: FIXME: ROTATE_BUFS is a hack to cycle through
+ *   bufs until freelist code is used.  Note this hides a problem with
+ *   the scratch register * (used to keep track of last buffer
+ *   completed) being written to before * the last buffer has actually
+ *   completed rendering.  
+ *
+ * KW:  It's also a good way to find free buffers quickly.
+ */
 
 drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 {
@@ -1264,57 +1175,24 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 	drm_radeon_buf_priv_t *buf_priv;
 	drm_buf_t *buf;
 	int i, t;
-#if ROTATE_BUFS
 	int start;
-#endif
 
-	/* FIXME: Optimize -- use freelist code */
-
-	for ( i = 0 ; i < dma->buf_count ; i++ ) {
-		buf = dma->buflist[i];
-		buf_priv = buf->dev_private;
-		if ( buf->pid == 0 ) {
-			DRM_DEBUG( "  ret buf=%d last=%d pid=0\n",
-				   buf->idx, dev_priv->last_buf );
-			return buf;
-		}
-		DRM_DEBUG( "    skipping buf=%d pid=%d\n",
-			   buf->idx, buf->pid );
-	}
-
-#if ROTATE_BUFS
 	if ( ++dev_priv->last_buf >= dma->buf_count )
 		dev_priv->last_buf = 0;
+
 	start = dev_priv->last_buf;
-#endif
+
 	for ( t = 0 ; t < dev_priv->usec_timeout ; t++ ) {
-#if 0
-		/* FIXME: Disable this for now */
-		u32 done_age = dev_priv->scratch[RADEON_LAST_DISPATCH];
-#else
 		u32 done_age = RADEON_READ( RADEON_LAST_DISPATCH_REG );
-#endif
-#if ROTATE_BUFS
 		for ( i = start ; i < dma->buf_count ; i++ ) {
-#else
-		for ( i = 0 ; i < dma->buf_count ; i++ ) {
-#endif
 			buf = dma->buflist[i];
 			buf_priv = buf->dev_private;
-			if ( buf->pending && buf_priv->age <= done_age ) {
-				/* The buffer has been processed, so it
-				 * can now be used.
-				 */
+			if ( buf->pid == 0 || (buf->pending && 
+					       buf_priv->age <= done_age) ) {
 				buf->pending = 0;
-				DRM_DEBUG( "  ret buf=%d last=%d age=%d done=%d\n", buf->idx, dev_priv->last_buf, buf_priv->age, done_age );
 				return buf;
 			}
-			DRM_DEBUG( "    skipping buf=%d age=%d done=%d\n",
-				   buf->idx, buf_priv->age,
-				   done_age );
-#if ROTATE_BUFS
 			start = 0;
-#endif
 		}
 		udelay( 1 );
 	}
@@ -1326,14 +1204,10 @@ drm_buf_t *radeon_freelist_get( drm_device_t *dev )
 void radeon_freelist_reset( drm_device_t *dev )
 {
 	drm_device_dma_t *dma = dev->dma;
-#if ROTATE_BUFS
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-#endif
 	int i;
 
-#if ROTATE_BUFS
 	dev_priv->last_buf = 0;
-#endif
 	for ( i = 0 ; i < dma->buf_count ; i++ ) {
 		drm_buf_t *buf = dma->buflist[i];
 		drm_radeon_buf_priv_t *buf_priv = buf->dev_private;

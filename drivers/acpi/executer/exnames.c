@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
- *              $Revision: 90 $
+ *              $Revision: 91 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,6 @@
 #include "acpi.h"
 #include "acinterp.h"
 #include "amlcode.h"
-#include "acnamesp.h"
 
 #define _COMPONENT          ACPI_EXECUTER
 	 ACPI_MODULE_NAME    ("exnames")
@@ -148,10 +147,10 @@ acpi_ex_name_segment (
 	u8                      **in_aml_address,
 	NATIVE_CHAR             *name_string)
 {
-	u8                      *aml_address = *in_aml_address;
+	char                    *aml_address = (void *) *in_aml_address;
 	acpi_status             status = AE_OK;
 	u32                     index;
-	NATIVE_CHAR             char_buf[5];
+	char                    char_buf[5];
 
 
 	ACPI_FUNCTION_TRACE ("Ex_name_segment");
@@ -170,17 +169,17 @@ acpi_ex_name_segment (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "Bytes from stream:\n"));
 
-	for (index = 4;
-		(index > 0) && (acpi_ut_valid_acpi_character (*aml_address));
-		index--) {
-		char_buf[4 - index] = *aml_address++;
-		ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "%c\n", char_buf[4 - index]));
+	for (index = 0;
+		(index < ACPI_NAME_SIZE) && (acpi_ut_valid_acpi_character (*aml_address));
+		index++) {
+		char_buf[index] = *aml_address++;
+		ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, "%c\n", char_buf[index]));
 	}
 
 
 	/* Valid name segment  */
 
-	if (0 == index) {
+	if (index == 4) {
 		/* Found 4 valid characters */
 
 		char_buf[4] = '\0';
@@ -195,7 +194,7 @@ acpi_ex_name_segment (
 				"No Name string - %s \n", char_buf));
 		}
 	}
-	else if (4 == index) {
+	else if (index == 0) {
 		/*
 		 * First character was not a valid name character,
 		 * so we are looking at something other than a name.
@@ -213,7 +212,7 @@ acpi_ex_name_segment (
 			*aml_address, aml_address));
 	}
 
-	*in_aml_address = aml_address;
+	*in_aml_address = (u8 *) aml_address;
 	return_ACPI_STATUS (status);
 }
 

@@ -132,27 +132,18 @@ extern void pgtable_cache_init(void);
 #define PAGE_COPY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
 #define PAGE_READONLY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_ACCESSED)
 
-#define __PAGE_KERNEL \
+#define _PAGE_KERNEL \
 	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
-#define __PAGE_KERNEL_NOCACHE \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
-#define __PAGE_KERNEL_RO \
-	(_PAGE_PRESENT | _PAGE_DIRTY | _PAGE_ACCESSED)
 
-# define MAKE_GLOBAL(x)						\
-	({							\
-		pgprot_t __ret;					\
-								\
-		if (cpu_has_pge)				\
-			__ret = __pgprot((x) | _PAGE_GLOBAL);	\
-		else						\
-			__ret = __pgprot(x);			\
-		__ret;						\
-	})
+extern unsigned long __PAGE_KERNEL;
+#define __PAGE_KERNEL_RO	(__PAGE_KERNEL & ~_PAGE_RW)
+#define __PAGE_KERNEL_NOCACHE	(__PAGE_KERNEL | _PAGE_PCD)
+#define __PAGE_KERNEL_LARGE	(__PAGE_KERNEL | _PAGE_PSE)
 
-#define PAGE_KERNEL MAKE_GLOBAL(__PAGE_KERNEL)
-#define PAGE_KERNEL_RO MAKE_GLOBAL(__PAGE_KERNEL_RO)
-#define PAGE_KERNEL_NOCACHE MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
+#define PAGE_KERNEL		__pgprot(__PAGE_KERNEL)
+#define PAGE_KERNEL_RO		__pgprot(__PAGE_KERNEL_RO)
+#define PAGE_KERNEL_NOCACHE	__pgprot(__PAGE_KERNEL_NOCACHE)
+#define PAGE_KERNEL_LARGE	__pgprot(__PAGE_KERNEL_LARGE)
 
 /*
  * The i386 can't do page protection for execute, and considers that

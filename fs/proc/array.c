@@ -346,7 +346,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	read_unlock(&tasklist_lock);
 	res = sprintf(buffer,"%d (%s) %c %d %d %d %d %d %lu %lu \
 %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld %lu %lu %ld %lu %lu %lu %lu %lu \
-%lu %lu %lu %lu %lu %lu %lu %lu %d %d\n",
+%lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %lu\n",
 		task->pid,
 		task->comm,
 		state,
@@ -389,7 +389,9 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		task->nswap,
 		task->cnswap,
 		task->exit_signal,
-		task->thread_info->cpu);
+		task->thread_info->cpu,
+		task->rt_priority,
+		task->policy);
 	if(mm)
 		mmput(mm);
 	return res;

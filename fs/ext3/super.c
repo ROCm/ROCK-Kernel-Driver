@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_JBD_DEBUG
@@ -891,17 +892,17 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 
 		list_add(&EXT3_I(inode)->i_orphan, &EXT3_SB(sb)->s_orphan);
 		if (inode->i_nlink) {
-			printk(KERN_DEBUG __FUNCTION__
-				": truncating inode %ld to %Ld bytes\n",
-				inode->i_ino, inode->i_size);
+			printk(KERN_DEBUG
+				"%s: truncating inode %ld to %Ld bytes\n",
+				__FUNCTION__, inode->i_ino, inode->i_size);
 			jbd_debug(2, "truncating inode %ld to %Ld bytes\n",
 				  inode->i_ino, inode->i_size);
 			ext3_truncate(inode);
 			nr_truncates++;
 		} else {
-			printk(KERN_DEBUG __FUNCTION__
-				": deleting unreferenced inode %ld\n",
-				inode->i_ino);
+			printk(KERN_DEBUG
+				"%s: deleting unreferenced inode %ld\n",
+				__FUNCTION__, inode->i_ino);
 			jbd_debug(2, "deleting unreferenced inode %ld\n",
 				  inode->i_ino);
 			nr_orphans++;
@@ -1808,8 +1809,6 @@ static void __exit exit_ext3_fs(void)
 	unregister_filesystem(&ext3_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Remy Card, Stephen Tweedie, Andrew Morton, Andreas Dilger, Theodore Ts'o and others");
 MODULE_DESCRIPTION("Second Extended Filesystem with journaling extensions");

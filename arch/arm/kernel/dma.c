@@ -120,6 +120,10 @@ void set_dma_sg (dmach_t channel, struct scatterlist *sg, int nr_sg)
 {
 	dma_t *dma = dma_chan + channel;
 
+	if (dma->active)
+		printk(KERN_ERR "dma%d: altering DMA SG while "
+		       "DMA active\n", channel);
+
 	dma->sg = sg;
 	dma->sgcount = nr_sg;
 	dma->using_sg = 1;
@@ -216,6 +220,14 @@ void disable_dma (dmach_t channel)
 free_dma:
 	printk(KERN_ERR "dma%d: trying to disable free DMA\n", channel);
 	BUG();
+}
+
+/*
+ * Is the specified DMA channel active?
+ */
+int dma_channel_active(dmach_t channel)
+{
+	return dma_chan[channel].active;
 }
 
 void set_dma_page(dmach_t channel, char pagenr)

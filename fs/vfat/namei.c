@@ -22,6 +22,7 @@
 #include <linux/ctype.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #define DEBUG_LEVEL 0
 #if (DEBUG_LEVEL >= 1)
@@ -1020,16 +1021,12 @@ error:
 	unlock_kernel();
 	dentry->d_op = &vfat_dentry_ops[table];
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
-	if (inode) {
-		dentry = d_splice_alias(inode, dentry);
-		if (dentry) {
-			dentry->d_op = &vfat_dentry_ops[table];
-			dentry->d_time = dentry->d_parent->d_inode->i_version;
-		}
-		return dentry;
+	dentry = d_splice_alias(inode, dentry);
+	if (dentry) {
+		dentry->d_op = &vfat_dentry_ops[table];
+		dentry->d_time = dentry->d_parent->d_inode->i_version;
 	}
-	d_add(dentry,inode);
-	return NULL;
+	return dentry;
 }
 
 int vfat_create(struct inode *dir,struct dentry* dentry,int mode)

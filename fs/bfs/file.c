@@ -5,7 +5,7 @@
  */
 
 #include <linux/fs.h>
-#include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include "bfs.h"
 

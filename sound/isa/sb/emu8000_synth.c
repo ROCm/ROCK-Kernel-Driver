@@ -24,8 +24,6 @@
 #include <linux/init.h>
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Takashi Iwai, Steve Ratcliffe");
 MODULE_DESCRIPTION("Emu8000 synth plug-in routine");
 MODULE_LICENSE("GPL");

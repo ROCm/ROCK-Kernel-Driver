@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 74 $
+ *              $Revision: 77 $
  *
  ******************************************************************************/
 
@@ -26,7 +26,6 @@
 
 #include "acpi.h"
 #include "amlcode.h"
-#include "acinterp.h"
 #include "acnamesp.h"
 
 
@@ -55,7 +54,7 @@ acpi_ns_build_external_path (
 	ACPI_SIZE               size,
 	NATIVE_CHAR             *name_buffer)
 {
-	u32                     index;
+	ACPI_SIZE               index;
 	acpi_namespace_node     *parent_node;
 
 
@@ -97,7 +96,7 @@ acpi_ns_build_external_path (
 	if (index != 0) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not construct pathname; index=%X, size=%X, Path=%s\n",
-			index, size, &name_buffer[size]));
+			(u32) index, (u32) size, &name_buffer[size]));
 	}
 
 	return;
@@ -236,7 +235,7 @@ acpi_ns_handle_to_pathname (
 
 	acpi_ns_build_external_path (node, required_size, buffer->pointer);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s [%X] \n", (char *) buffer->pointer, required_size));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s [%X] \n", (char *) buffer->pointer, (u32) required_size));
 	return_ACPI_STATUS (AE_OK);
 }
 

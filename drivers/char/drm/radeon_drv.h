@@ -71,14 +71,7 @@ typedef struct drm_radeon_private {
 
    	drm_radeon_freelist_t *head;
    	drm_radeon_freelist_t *tail;
-/* FIXME: ROTATE_BUFS is a hask to cycle through bufs until freelist
-   code is used.  Note this hides a problem with the scratch register
-   (used to keep track of last buffer completed) being written to before
-   the last buffer has actually completed rendering. */
-#define ROTATE_BUFS 1
-#if ROTATE_BUFS
 	int last_buf;
-#endif
 	volatile u32 *scratch;
 
 	int usec_timeout;
@@ -120,10 +113,6 @@ typedef struct drm_radeon_private {
 
 typedef struct drm_radeon_buf_priv {
 	u32 age;
-	int prim;
-	int discard;
-	int dispatched;
-   	drm_radeon_freelist_t *list_entry;
 } drm_radeon_buf_priv_t;
 
 				/* radeon_cp.c */
@@ -176,6 +165,15 @@ extern int radeon_cp_stipple( struct inode *inode, struct file *filp,
 			      unsigned int cmd, unsigned long arg );
 extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 			       unsigned int cmd, unsigned long arg );
+extern int radeon_cp_vertex2( struct inode *inode, struct file *filp,
+			      unsigned int cmd, unsigned long arg );
+extern int radeon_cp_cmdbuf( struct inode *inode, struct file *filp,
+			      unsigned int cmd, unsigned long arg );
+extern int radeon_cp_getparam( struct inode *inode, struct file *filp,
+			      unsigned int cmd, unsigned long arg );
+extern int radeon_cp_flip( struct inode *inode, struct file *filp,
+			   unsigned int cmd, unsigned long arg );
+
 
 
 /* Register definitions, register access macros and drmAddMap constants
@@ -204,8 +202,6 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #	define RADEON_CRTC_OFFSET_FLIP_CNTL	(1 << 16)
 
 #define RADEON_RB3D_COLORPITCH		0x1c48
-#define RADEON_RB3D_DEPTHCLEARVALUE	0x1c30
-#define RADEON_RB3D_DEPTHXY_OFFSET	0x1c60
 
 #define RADEON_DP_GUI_MASTER_CNTL	0x146c
 #	define RADEON_GMC_SRC_PITCH_OFFSET_CNTL	(1 << 0)
@@ -290,9 +286,6 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #	define RADEON_ROP_ENABLE		(1 << 6)
 #	define RADEON_STENCIL_ENABLE		(1 << 7)
 #	define RADEON_Z_ENABLE			(1 << 8)
-#	define RADEON_DEPTH_XZ_OFFEST_ENABLE	(1 << 9)
-#	define RADEON_ZBLOCK8			(0 << 15)
-#	define RADEON_ZBLOCK16			(1 << 15)
 #define RADEON_RB3D_DEPTHOFFSET		0x1c24
 #define RADEON_RB3D_PLANEMASK		0x1d84
 #define RADEON_RB3D_STENCILREFMASK	0x1d7c
@@ -306,9 +299,9 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #	define RADEON_Z_TEST_MASK		(7 << 4)
 #	define RADEON_Z_TEST_ALWAYS		(7 << 4)
 #	define RADEON_STENCIL_TEST_ALWAYS	(7 << 12)
-#	define RADEON_STENCIL_S_FAIL_KEEP	(0 << 16)
-#	define RADEON_STENCIL_ZPASS_KEEP	(0 << 20)
-#	define RADEON_STENCIL_ZFAIL_KEEP	(0 << 20)
+#	define RADEON_STENCIL_S_FAIL_REPLACE	(2 << 16)
+#	define RADEON_STENCIL_ZPASS_REPLACE	(2 << 20)
+#	define RADEON_STENCIL_ZFAIL_REPLACE	(2 << 24)
 #	define RADEON_Z_WRITE_ENABLE		(1 << 30)
 #define RADEON_RBBM_SOFT_RESET		0x00f0
 #	define RADEON_SOFT_RESET_CP		(1 <<  0)
@@ -357,6 +350,16 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #define RADEON_SE_CNTL_STATUS		0x2140
 #define RADEON_SE_LINE_WIDTH		0x1db8
 #define RADEON_SE_VPORT_XSCALE		0x1d98
+#define RADEON_SE_ZBIAS_FACTOR		0x1db0
+#define RADEON_SE_TCL_MATERIAL_EMMISSIVE_RED 0x2210
+#define RADEON_SE_TCL_OUTPUT_VTX_FMT         0x2254
+#define RADEON_SE_TCL_VECTOR_INDX_REG        0x2200
+#       define RADEON_VEC_INDX_OCTWORD_STRIDE_SHIFT  16
+#       define RADEON_VEC_INDX_DWORD_COUNT_SHIFT     28
+#define RADEON_SE_TCL_VECTOR_DATA_REG       0x2204
+#define RADEON_SE_TCL_SCALAR_INDX_REG       0x2208
+#       define RADEON_SCAL_INDX_DWORD_STRIDE_SHIFT  16
+#define RADEON_SE_TCL_SCALAR_DATA_REG       0x220C
 #define RADEON_SURFACE_ACCESS_FLAGS	0x0bf8
 #define RADEON_SURFACE_ACCESS_CLR	0x0bfc
 #define RADEON_SURFACE_CNTL		0x0b00
@@ -457,8 +460,10 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #define RADEON_CP_PACKET3		0xC0000000
 #	define RADEON_3D_RNDR_GEN_INDX_PRIM	0x00002300
 #	define RADEON_WAIT_FOR_IDLE		0x00002600
+#	define RADEON_3D_DRAW_VBUF		0x00002800
 #	define RADEON_3D_DRAW_IMMD		0x00002900
-#	define RADEON_3D_CLEAR_ZMASK		0x00003200
+#	define RADEON_3D_DRAW_INDX		0x00002A00
+#	define RADEON_3D_LOAD_VBPNTR		0x00002F00
 #	define RADEON_CNTL_HOSTDATA_BLT		0x00009400
 #	define RADEON_CNTL_PAINT_MULTI		0x00009A00
 #	define RADEON_CNTL_BITBLT_MULTI		0x00009B00
@@ -470,6 +475,7 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #define RADEON_CP_PACKET1_REG1_MASK	0x003ff800
 
 #define RADEON_VTX_Z_PRESENT			(1 << 31)
+#define RADEON_VTX_PKCOLOR_PRESENT		(1 << 3)
 
 #define RADEON_PRIM_TYPE_NONE			(0 << 0)
 #define RADEON_PRIM_TYPE_POINT			(1 << 0)
@@ -482,6 +488,7 @@ extern int radeon_cp_indirect( struct inode *inode, struct file *filp,
 #define RADEON_PRIM_TYPE_RECT_LIST		(8 << 0)
 #define RADEON_PRIM_TYPE_3VRT_POINT_LIST	(9 << 0)
 #define RADEON_PRIM_TYPE_3VRT_LINE_LIST		(10 << 0)
+#define RADEON_PRIM_TYPE_MASK                   0xf
 #define RADEON_PRIM_WALK_IND			(1 << 4)
 #define RADEON_PRIM_WALK_LIST			(2 << 4)
 #define RADEON_PRIM_WALK_RING			(3 << 4)
@@ -699,7 +706,7 @@ do {									\
 
 #define RADEON_VERBOSE	0
 
-#define RING_LOCALS	int write; unsigned int mask; volatile u32 *ring;
+#define RING_LOCALS	int write, _nr; unsigned int mask; volatile u32 *ring;
 
 #define BEGIN_RING( n ) do {						\
 	if ( RADEON_VERBOSE ) {						\
@@ -707,9 +714,10 @@ do {									\
 			   n, __FUNCTION__ );				\
 	}								\
 	if ( dev_priv->ring.space <= (n) * sizeof(u32) ) {		\
+                COMMIT_RING();						\
 		radeon_wait_ring( dev_priv, (n) * sizeof(u32) );	\
 	}								\
-	dev_priv->ring.space -= (n) * sizeof(u32);			\
+	_nr = n; dev_priv->ring.space -= (n) * sizeof(u32);		\
 	ring = dev_priv->ring.start;					\
 	write = dev_priv->ring.tail;					\
 	mask = dev_priv->ring.tail_mask;				\
@@ -720,9 +728,17 @@ do {									\
 		DRM_INFO( "ADVANCE_RING() wr=0x%06x tail=0x%06x\n",	\
 			  write, dev_priv->ring.tail );			\
 	}								\
-	radeon_flush_write_combine();					\
-	dev_priv->ring.tail = write;					\
-	RADEON_WRITE( RADEON_CP_RB_WPTR, write );			\
+	if (((dev_priv->ring.tail + _nr) & mask) != write) {		\
+		DRM_ERROR( 						\
+			"ADVANCE_RING(): mismatch: nr: %x write: %x\n",	\
+			((dev_priv->ring.tail + _nr) & mask),		\
+			write);						\
+	} else								\
+		dev_priv->ring.tail = write;				\
+} while (0)
+
+#define COMMIT_RING() do {					    \
+	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		    \
 } while (0)
 
 #define OUT_RING( x ) do {						\
@@ -733,6 +749,35 @@ do {									\
 	ring[write++] = (x);						\
 	write &= mask;							\
 } while (0)
+
+#define OUT_RING_REG( reg, val ) do {					\
+	OUT_RING( CP_PACKET0( reg, 0 ) );				\
+	OUT_RING( val );						\
+} while (0)
+
+
+#define OUT_RING_USER_TABLE( tab, sz ) do {			\
+	int _size = (sz);					\
+	int *_tab = (tab);					\
+								\
+	if (write + _size > mask) {				\
+		int i = (mask+1) - write;			\
+		if (__copy_from_user( (int *)(ring+write),	\
+				      _tab, i*4 ))		\
+			return -EFAULT;				\
+		write = 0;					\
+		_size -= i;					\
+		_tab += i;					\
+	}							\
+								\
+	if (_size && __copy_from_user( (int *)(ring+write),	\
+			               _tab, _size*4 ))		\
+		return -EFAULT;					\
+								\
+	write += _size;						\
+	write &= mask;						\
+} while (0)
+
 
 #define RADEON_PERFORMANCE_BOXES	0
 

@@ -76,16 +76,14 @@ static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
 
 byte cs5530_proc = 0;
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 /*
  * Set a new transfer mode at the drive
  */
-int cs5530_set_xfer_mode (ide_drive_t *drive, byte mode)
+int cs5530_set_xfer_mode(struct ata_device *drive, byte mode)
 {
 	int error = 0;
 
-	printk("%s: cs5530_set_xfer_mode(%s)\n", drive->name, ide_xfer_verbose(mode));
+	printk("%s: cs5530_set_xfer_mode(%02x)\n", drive->name, mode);
 	error = ide_config_drive_speed(drive, mode);
 
 	return error;
@@ -113,7 +111,7 @@ static unsigned int cs5530_pio_timings[2][5] =
  * The ide_init_cs5530() routine guarantees that all drives
  * will have valid default PIO timings set up before we get here.
  */
-static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "autotune" */
+static void cs5530_tuneproc(struct ata_device *drive, byte pio)	/* pio=255 means "autotune" */
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int	format, basereg = CS5530_BASEREG(hwif);
@@ -134,12 +132,12 @@ static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "aut
  * cs5530_config_dma() handles selection/setting of DMA/UDMA modes
  * for both the chipset and drive.
  */
-static int cs5530_config_dma (ide_drive_t *drive)
+static int cs5530_config_dma(struct ata_device *drive)
 {
 	int			udma_ok = 1, mode = 0;
 	struct ata_channel *hwif = drive->channel;
 	int			unit = drive->select.b.unit;
-	ide_drive_t		*mate = &hwif->drives[unit^1];
+	struct ata_device		*mate = &hwif->drives[unit^1];
 	struct hd_driveid	*id = drive->id;
 	unsigned int		basereg, reg, timings;
 
@@ -376,7 +374,7 @@ static struct ata_pci_device chipset __initdata = {
 	init_chipset: pci_init_cs5530,
 	init_channel: ide_init_cs5530,
 	bootable: ON_BOARD,
-	flags: ATA_F_DMA
+	flags: ATA_F_DMA | ATA_F_FDMA
 };
 
 int __init init_cs5530(void)

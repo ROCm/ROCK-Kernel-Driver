@@ -17,6 +17,7 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/ioctl.h>
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
 #else
@@ -24,6 +25,7 @@
 #endif
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
+#include <linux/suspend.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
@@ -1063,6 +1065,8 @@ static int usb_hub_thread(void *__hub)
 	/* Send me a signal to get me die (for debugging) */
 	do {
 		usb_hub_events();
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 		wait_event_interruptible(khubd_wait, !list_empty(&hub_event_list)); 
 	} while (!signal_pending(current));
 

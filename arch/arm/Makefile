@@ -26,11 +26,14 @@ apcs-$(CONFIG_CPU_32)		:=-mapcs-32
 apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3 -Os
 
 # This selects which instruction set is used.
+# Note that GCC is lame - it doesn't numerically define an
+# architecture version macro, but instead defines a whole
+# series of macros.
 arch-y				:=
-arch-$(CONFIG_CPU_32v3)		:=-march=armv3
-arch-$(CONFIG_CPU_32v4)		:=-march=armv4
-arch-$(CONFIG_CPU_32v5)		:=-march=armv5
-arch-$(CONFIG_CPU_XSCALE)	:=-march=armv4 -Wa,-mxscale #-march=armv5te
+arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
+arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
+arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5
+arch-$(CONFIG_CPU_XSCALE)	:=-D__LINUX_ARM_ARCH__=5 -march=armv4 -Wa,-mxscale #-march=armv5te
 
 # This selects how we optimise for the processor.
 tune-y				:=
@@ -186,7 +189,7 @@ endif
 
 ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
 SUBDIRS		+=drivers/acorn/char
-DRIVERS		+=drivers/acorn/char/acorn-char.o
+DRIVERS		+=drivers/acorn/char/built-in.o
 endif
 
 MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
@@ -206,11 +209,8 @@ archsymlinks:
 
 vmlinux: arch/arm/vmlinux.lds
 
-arch/arm/vmlinux.lds: $(LDSCRIPT) dummy
+arch/arm/vmlinux.lds: $(LDSCRIPT) FORCE
 	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
-
-arch/arm/kernel arch/arm/mm arch/arm/lib: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 bzImage zImage zinstall Image bootpImage install: vmlinux
 	@$(MAKEBOOT) $@

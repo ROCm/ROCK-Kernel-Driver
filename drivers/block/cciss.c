@@ -281,7 +281,7 @@ static CommandList_struct * cmd_alloc(ctlr_info_t *h, int get_from_pool)
                 	i = find_first_zero_bit(h->cmd_pool_bits, NR_CMDS);
                         if (i == NR_CMDS)
                                 return NULL;
-                } while(test_and_set_bit(i & 31, h->cmd_pool_bits+(i/32)) != 0);
+                } while(test_and_set_bit(i & (BITS_PER_LONG - 1), h->cmd_pool_bits+(i/BITS_PER_LONG)) != 0);
 #ifdef CCISS_DEBUG
 		printk(KERN_DEBUG "cciss: using command buffer %d\n", i);
 #endif
@@ -327,7 +327,7 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
 	} else 
 	{
 		i = c - h->cmd_pool;
-		clear_bit(i%32, h->cmd_pool_bits+(i/32));
+		clear_bit(i&(BITS_PER_LONG-1), h->cmd_pool_bits+(i/BITS_PER_LONG));
                 h->nr_frees++;
         }
 }
@@ -338,7 +338,7 @@ static void cmd_free(ctlr_info_t *h, CommandList_struct *c, int got_from_pool)
 static void cciss_geninit( int ctlr)
 {
 	drive_info_struct *drv;
-	int i,j;
+	int i;
 	
 	/* Loop through each real device */ 
 	hba[ctlr]->gendisk.nr_real = 0; 
@@ -1883,6 +1883,7 @@ queue:
 
 	goto queue;
 startio:
+	blk_stop_queue(q);
 	start_io(h);
 }
 
@@ -1943,8 +1944,8 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	do_cciss_request(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
+	blk_start_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 }
 /* 
  *  We cannot read the structure directly, for portablity we must use 
@@ -2448,8 +2449,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		free_hba(i);
 		return(-1);
 	}
-	hba[i]->cmd_pool_bits = (__u32*)kmalloc(
-        	((NR_CMDS+31)/32)*sizeof(__u32), GFP_KERNEL);
+	hba[i]->cmd_pool_bits = kmalloc(((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long), GFP_KERNEL);
 	hba[i]->cmd_pool = (CommandList_struct *)pci_alloc_consistent(
 		hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct), 
 		&(hba[i]->cmd_pool_dhandle));
@@ -2484,7 +2484,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, hba[i]);
 	/* command and error info recs zeroed out before 
 			they are used */
-        memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+31)/32)*sizeof(__u32));
+        memset(hba[i]->cmd_pool_bits, 0, ((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long));
 
 #ifdef CCISS_DEBUG	
 	printk(KERN_DEBUG "Scanning for drives on controller cciss%d\n",i);
@@ -2608,7 +2608,6 @@ int __init cciss_init(void)
 
 }
 
-EXPORT_NO_SYMBOLS;
 static int __init init_cciss_module(void)
 {
 	return ( cciss_init());

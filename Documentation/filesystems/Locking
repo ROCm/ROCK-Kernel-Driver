@@ -132,7 +132,7 @@ prototypes:
 	int (*writepage)(struct page *);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
-	int (*writeback_mapping)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, int *nr_to_write);
 	int (*vm_writeback)(struct page *, int *nr_to_write);
 	int (*set_page_dirty)(struct page *page);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
@@ -148,8 +148,9 @@ locking rules:
 			BKL	PageLocked(page)
 writepage:		no	yes, unlocks
 readpage:		no	yes, unlocks
+readpages:		no
 sync_page:		no	maybe
-writeback_mapping:	no
+writepages:		no
 vm_writeback:		no	yes
 set_page_dirty		no	no
 prepare_write:		no	yes
@@ -163,6 +164,8 @@ may be called from the request handler (/dev/loop).
 
 	->readpage() unlocks the page, either synchronously or via I/O
 completion.
+
+	->readpages() populates the pagecache with the passed pages and starts I/O against them.  They come unlocked upon I/O completion.
 
 	->writepage() unlocks the page synchronously, before returning to
 the caller.  If the page has write I/O underway against it, writepage()
@@ -178,12 +181,12 @@ with lock on page, but that is not guaranteed. Considering the currently
 existing instances of this method ->sync_page() itself doesn't look
 well-defined...
 
-	->writeback_mapping() is used for periodic writeback and for
-systemcall-initiated sync operations. The address_space should start
-I/O against at least *nr_to_write pages.  *nr_to_write must be decremented
-for each page which is written.  *nr_to_write must not go negative (this
-will be relaxed later).  If nr_to_write is NULL, all dirty pages must
-be written.
+	->writepages() is used for periodic writeback and for syscall-initiated
+sync operations.  The address_space should start I/O against at least
+*nr_to_write pages.  *nr_to_write must be decremented for each page which is
+written.  The address_space implementation may write more (or less) pages
+than *nr_to_write asks for, but it should try to be reasonably close.  If
+nr_to_write is NULL, all dirty pages must be written.
 
 	->vm_writeback() is called from the VM.  The address_space should
 start I/O against at least *nr_to_write pages, including the passed page. As

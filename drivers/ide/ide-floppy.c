@@ -1,6 +1,4 @@
 /*
- * linux/drivers/ide/ide-floppy.c	Version 0.99	Feb 24 2002
- *
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
  * Copyright (C) 2000 - 2002 Paul Bristow <paul@paulbristow.net>
  */
@@ -1977,11 +1975,14 @@ static int idefloppy_cleanup(struct ata_device *drive)
 	return 0;
 }
 
+static void idefloppy_attach(struct ata_device *drive);
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static struct ata_operations idefloppy_driver = {
 	owner:			THIS_MODULE,
+	attach:			idefloppy_attach,
 	cleanup:		idefloppy_cleanup,
 	standby:		NULL,
 	do_request:		idefloppy_do_request,
@@ -1994,59 +1995,60 @@ static struct ata_operations idefloppy_driver = {
 	capacity:		idefloppy_capacity,
 };
 
+static void idefloppy_attach(struct ata_device *drive)
+{
+	idefloppy_floppy_t *floppy;
+	char *req;
+	struct ata_channel *channel;
+	int unit;
+
+	if (drive->type != ATA_FLOPPY)
+		return;
+
+	req = drive->driver_req;
+	if (req[0] != '\0' && strcmp(req, "ide-floppy"))
+		return;
+
+	if (!idefloppy_identify_device (drive, drive->id)) {
+		printk (KERN_ERR "ide-floppy: %s: not supported by this version of driver\n",
+				drive->name);
+		return;
+	}
+
+	if (drive->scsi) {
+		printk(KERN_INFO "ide-floppy: passing drive %s to ide-scsi emulation.\n",
+				drive->name);
+		return;
+	}
+	if (!(floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL))) {
+		printk(KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n",
+				drive->name);
+		return;
+	}
+	if (ide_register_subdriver(drive, &idefloppy_driver)) {
+		printk(KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (floppy);
+		return;
+	}
+
+	idefloppy_setup(drive, floppy);
+
+	channel = drive->channel;
+	unit = drive - channel->drives;
+
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+}
+
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
 
 static void __exit idefloppy_exit(void)
 {
-	struct ata_device *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices(ATA_FLOPPY, "ide-floppy", &idefloppy_driver, failed)) != NULL) {
-		if (idefloppy_cleanup(drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-	}
+	unregister_ata_driver(&idefloppy_driver);
 }
 
-/*
- *	idefloppy_init will register the driver for each floppy.
- */
-int idefloppy_init(void)
+int __init idefloppy_init(void)
 {
-	struct ata_device *drive;
-	idefloppy_floppy_t *floppy;
-	int failed = 0;
-
-	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
-	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ATA_FLOPPY, "ide-floppy", NULL, failed++)) != NULL) {
-		if (!idefloppy_identify_device (drive, drive->id)) {
-			printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
-			continue;
-		}
-		if (drive->scsi) {
-			printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
-		if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
-			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idefloppy_driver)) {
-			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (floppy);
-			continue;
-		}
-		MOD_INC_USE_COUNT;
-		idefloppy_setup (drive, floppy);
-		MOD_DEC_USE_COUNT;
-
-		failed--;
-	}
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-	return 0;
+	return ata_driver_module(&idefloppy_driver);
 }
 
 module_init(idefloppy_init);

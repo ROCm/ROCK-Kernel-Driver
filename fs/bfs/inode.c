@@ -11,13 +11,13 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 #include "bfs.h"
 
 MODULE_AUTHOR("Tigran A. Aivazian <tigran@veritas.com>");
 MODULE_DESCRIPTION("SCO UnixWare BFS filesystem for Linux");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 #undef DEBUG
 

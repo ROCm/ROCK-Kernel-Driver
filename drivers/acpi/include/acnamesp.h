@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 123 $
+ *       $Revision: 125 $
  *
  *****************************************************************************/
 
@@ -108,7 +108,7 @@ acpi_ns_get_next_node (
 	acpi_namespace_node     *parent,
 	acpi_namespace_node     *child);
 
-acpi_status
+void
 acpi_ns_delete_namespace_by_owner (
 	u16                     table_id);
 
@@ -139,7 +139,6 @@ acpi_ns_load_table_by_type (
  * Top-level namespace access - nsaccess
  */
 
-
 acpi_status
 acpi_ns_root_initialize (
 	void);
@@ -159,7 +158,6 @@ acpi_ns_lookup (
  * Named object allocation/deallocation - nsalloc
  */
 
-
 acpi_namespace_node *
 acpi_ns_create_node (
 	u32                     name);
@@ -168,7 +166,7 @@ void
 acpi_ns_delete_node (
 	acpi_namespace_node     *node);
 
-acpi_status
+void
 acpi_ns_delete_namespace_subtree (
 	acpi_namespace_node     *parent_handle);
 
@@ -220,9 +218,23 @@ acpi_ns_print_pathname (
 	u32                     num_segments,
 	char                    *pathname);
 
+acpi_status
+acpi_ns_dump_one_device (
+	acpi_handle             obj_handle,
+	u32                     level,
+	void                    *context,
+	void                    **return_value);
+
 void
 acpi_ns_dump_root_devices (
 	void);
+
+acpi_status
+acpi_ns_dump_one_object (
+	acpi_handle             obj_handle,
+	u32                     level,
+	void                    *context,
+	void                    **return_value);
 
 void
 acpi_ns_dump_objects (
@@ -288,6 +300,12 @@ acpi_ns_exist_downstream_sibling (
 u32
 acpi_ns_opens_scope (
 	acpi_object_type        type);
+
+void
+acpi_ns_build_external_path (
+	acpi_namespace_node     *node,
+	ACPI_SIZE               size,
+	NATIVE_CHAR             *name_buffer);
 
 NATIVE_CHAR *
 acpi_ns_get_external_pathname (
@@ -408,7 +426,7 @@ acpi_status
 acpi_ns_build_internal_name (
 	acpi_namestring_info    *info);
 
-acpi_status
+void
 acpi_ns_get_internal_name_length (
 	acpi_namestring_info    *info);
 

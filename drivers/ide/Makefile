@@ -8,25 +8,20 @@
 # In the future, some of these should be built conditionally.
 #
 
-O_TARGET := idedriver.o
-
-export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o tcq.o \
+export-objs	:= ide-taskfile.o main.o ide.o probe.o quirks.o pcidma.o tcq.o \
 		   atapi.o ataraid.o
-
-obj-y		:=
-obj-m		:=
-ide-obj-y	:=
 
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o
 obj-$(CONFIG_BLK_DEV_IDECS)     += ide-cs.o
 obj-$(CONFIG_BLK_DEV_IDEDISK)   += ide-disk.o
-obj-$(CONFIG_ATAPI)		+= atapi.o
+# obj-$(CONFIG_ATAPI)		+= atapi.o
 obj-$(CONFIG_BLK_DEV_IDECD)     += ide-cd.o
 obj-$(CONFIG_BLK_DEV_IDETAPE)   += ide-tape.o
 obj-$(CONFIG_BLK_DEV_IDEFLOPPY) += ide-floppy.o
 
 obj-$(CONFIG_BLK_DEV_IT8172)    += it8172.o
+obj-$(CONFIG_BLK_DEV_QD65XX)    += qd65xx.o
 
 ide-obj-$(CONFIG_BLK_DEV_AEC62XX)	+= aec62xx.o
 ide-obj-$(CONFIG_BLK_DEV_ALI14XX)	+= ali14xx.o
@@ -58,7 +53,6 @@ ide-obj-$(CONFIG_BLK_DEV_SVWKS)		+= serverworks.o
 ide-obj-$(CONFIG_BLK_DEV_PDC202XX)	+= pdc202xx.o
 ide-obj-$(CONFIG_BLK_DEV_PDC4030)	+= pdc4030.o
 ide-obj-$(CONFIG_BLK_DEV_PIIX)		+= piix.o
-ide-obj-$(CONFIG_BLK_DEV_QD65XX)	+= qd65xx.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_RAPIDE)	+= rapide.o
 ide-obj-$(CONFIG_BLK_DEV_RZ1000)	+= rz1000.o
 ide-obj-$(CONFIG_BLK_DEV_SIS5513)	+= sis5513.o
@@ -74,6 +68,7 @@ obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
-ide-mod-objs	:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
+ide-mod-objs	:= ide-taskfile.o main.o ide.o probe.o \
+		   ioctl.o atapi.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make

@@ -3,8 +3,6 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _instr.o
-
 export-objs  := ainstr_fm.o ainstr_simple.o ainstr_gf1.o ainstr_iw.o
 
 snd-ainstr-fm-objs := ainstr_fm.o
@@ -42,7 +40,5 @@ obj-$(CONFIG_SND_FM801) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_TRIDENT) += snd-ainstr-simple.o
 obj-$(CONFIG_SND_YMFPCI) += snd-ainstr-fm.o
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

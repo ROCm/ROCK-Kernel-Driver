@@ -67,7 +67,7 @@ extern int CRT_tstc(void);
 extern unsigned long serial_init(int chan, void *ignored);
 extern void serial_close(unsigned long com_port);
 extern void gunzip(void *, int, unsigned char *, int *);
-extern void setup_legacy(void);
+extern void serial_fixups(void);
 
 struct bi_record *
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
@@ -76,7 +76,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	char *cp, ch;
 	struct bi_record *rec, *birecs;
 
-	setup_legacy();
+	serial_fixups();
 	com_port = serial_init(0, NULL);
 
 	/* assume the chunk below 8M is free */

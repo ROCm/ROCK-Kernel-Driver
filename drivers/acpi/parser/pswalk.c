@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 63 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -25,11 +25,8 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acparser.h"
 #include "acdispat.h"
-#include "acnamesp.h"
-#include "acinterp.h"
 
 #define _COMPONENT          ACPI_PARSER
 	 ACPI_MODULE_NAME    ("pswalk")
@@ -84,12 +81,12 @@ acpi_ps_get_next_walk_op (
 		 * No more children, this Op is complete.  Save Next and Parent
 		 * in case the Op object gets deleted by the callback routine
 		 */
-		next    = op->next;
-		parent  = op->parent;
+		next    = op->common.next;
+		parent  = op->common.parent;
 
 		walk_state->op    = op;
-		walk_state->op_info = acpi_ps_get_opcode_info (op->opcode);
-		walk_state->opcode = op->opcode;
+		walk_state->op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
+		walk_state->opcode = op->common.aml_opcode;
 
 		status = ascending_callback (walk_state);
 
@@ -142,12 +139,12 @@ acpi_ps_get_next_walk_op (
 	while (parent) {
 		/* We are moving up the tree, therefore this parent Op is complete */
 
-		grand_parent = parent->parent;
-		next        = parent->next;
+		grand_parent = parent->common.parent;
+		next        = parent->common.next;
 
 		walk_state->op    = parent;
-		walk_state->op_info = acpi_ps_get_opcode_info (parent->opcode);
-		walk_state->opcode = parent->opcode;
+		walk_state->op_info = acpi_ps_get_opcode_info (parent->common.aml_opcode);
+		walk_state->opcode = parent->common.aml_opcode;
 
 		status = ascending_callback (walk_state);
 
@@ -238,6 +235,7 @@ acpi_ps_delete_parse_tree (
 {
 	acpi_walk_state         *walk_state;
 	ACPI_THREAD_STATE       *thread;
+	acpi_status             status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ps_delete_parse_tree", subtree_root);
@@ -253,7 +251,6 @@ acpi_ps_delete_parse_tree (
 	if (!thread) {
 		return_VOID;
 	}
-
 
 	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, thread);
 	if (!walk_state) {
@@ -274,13 +271,16 @@ acpi_ps_delete_parse_tree (
 	/* Visit all nodes in the subtree */
 
 	while (walk_state->next_op) {
-		acpi_ps_get_next_walk_op (walk_state, walk_state->next_op,
+		status = acpi_ps_get_next_walk_op (walk_state, walk_state->next_op,
 				 acpi_ps_delete_completed_op);
+		if (ACPI_FAILURE (status)) {
+			break;
+		}
 	}
 
 	/* We are done with this walk */
 
-	acpi_ut_delete_generic_state ((acpi_generic_state *) thread);
+	acpi_ut_delete_generic_state (ACPI_CAST_PTR (acpi_generic_state, thread));
 	acpi_ds_delete_walk_state (walk_state);
 
 	return_VOID;

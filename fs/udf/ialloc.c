@@ -27,6 +27,7 @@
 #include <linux/fs.h>
 #include <linux/quotaops.h>
 #include <linux/udf_fs.h>
+#include <linux/sched.h>
 
 #include "udf_i.h"
 #include "udf_sb.h"

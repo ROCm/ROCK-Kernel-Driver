@@ -21,6 +21,7 @@
 #include <linux/blk.h>
 #include <linux/init.h>
 #include <linux/raid/md.h>
+#include <linux/buffer_head.h>	/* for invalidate_bdev() */
 
 #include "check.h"
 
@@ -223,15 +224,11 @@ void add_gd_partition(struct gendisk *hd, int minor, int start, int size)
 static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
 {
 	devfs_handle_t de = NULL;
-	static int first_time = 1;
 	unsigned long first_sector;
 	struct block_device *bdev;
 	char buf[64];
 	int i;
 
-	if (first_time)
-		printk(KERN_INFO "Partition check:\n");
-	first_time = 0;
 	first_sector = hd->part[minor(dev)].start_sect;
 
 	/*
@@ -254,12 +251,17 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 	bdev->bd_contains = bdev;
 	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
 	if (!bdev->bd_openers) {
+		struct blk_dev_struct *p = blk_dev + major(dev);
 		unsigned bsize = bdev_hardsect_size(bdev);
 		while (bsize < PAGE_CACHE_SIZE) {
 			if (bdev->bd_inode->i_size & bsize)
 				break;
 			bsize <<= 1;
 		}
+		if (p->queue)
+			bdev->bd_queue =  p->queue(dev);
+		else
+			bdev->bd_queue = &p->request_queue;
 		bdev->bd_block_size = bsize;
 		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
 	}

@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _mpu401.o
-
 export-objs  := mpu401_uart.o
 
 snd-mpu401-objs := mpu401.o
@@ -41,7 +39,5 @@ obj-$(CONFIG_SND_VIA686) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_ALI5451) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_TRIDENT) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_YMFPCI) += snd-mpu401-uart.o
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

@@ -67,9 +67,6 @@
 #define DPRINTK(a,b...)
 #endif 
 
-#define PICOS2KHZ(a) (1000000000UL/(a))
-#define KHZ2PICOS(a) (1000000000UL/(a))
-
 /*
  * The _DEFINITIVE_ memory mapping/unmapping functions.
  * This is due to the fact that they're changing soooo often...

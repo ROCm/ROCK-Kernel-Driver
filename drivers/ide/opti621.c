@@ -137,7 +137,7 @@ int reg_base;
 
 /* there are stored pio numbers from other calls of opti621_tune_drive */
 
-static void compute_pios(ide_drive_t *drive, byte pio)
+static void compute_pios(struct ata_device *drive, byte pio)
 /* Store values into drive->drive_data
  *	second_contr - 0 for primary controller, 1 for secondary
  *	slave_drive - 0 -> pio is for master, 1 -> pio is for slave
@@ -245,7 +245,7 @@ static void compute_clocks(int pio, pio_clocks_t *clks)
 }
 
 /* Main tune procedure, called from tuneproc. */
-static void opti621_tune_drive (ide_drive_t *drive, byte pio)
+static void opti621_tune_drive(struct ata_device *drive, byte pio)
 {
 	/* primary and secondary drives share some registers,
 	 * so we have to program both drives

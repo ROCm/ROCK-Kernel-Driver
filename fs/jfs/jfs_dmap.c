@@ -782,8 +782,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 				nblocks);
 		}
 
-		IWRITE_UNLOCK(ipbmap);
-		return (rc);
+		goto write_unlock;
 	}
 
 	/* we would like to allocate close to the hint.  adjust the
@@ -829,12 +828,12 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 
 		/* get the buffer for the dmap containing the hint.
 		 */
+		rc = EIO;
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL) {
-			IREAD_UNLOCK(ipbmap);
-			return (EIO);
-		}
+		if (mp == NULL)
+			goto read_unlock;
+
 		dp = (dmap_t *) mp->data;
 
 		/* first, try to satisfy the allocation request with the
@@ -847,14 +846,11 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 				*results = blkno;
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
 					*results, nblocks);
-				write_metapage(mp);
-			} else {
-				assert(rc == EIO);
-				release_metapage(mp);
+				mark_metapage_dirty(mp);
 			}
 
-			IREAD_UNLOCK(ipbmap);
-			return (rc);
+			release_metapage(mp);
+			goto read_unlock;
 		}
 
 		/* next, try to satisfy the allocation request with blocks
@@ -869,10 +865,9 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 					*results, nblocks);
 				mark_metapage_dirty(mp);
 			}
-			release_metapage(mp);
 
-			IREAD_UNLOCK(ipbmap);
-			return (rc);
+			release_metapage(mp);
+			goto read_unlock;
 		}
 
 		/* try to satisfy the allocation request with blocks within
@@ -886,10 +881,9 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 					*results, nblocks);
 				mark_metapage_dirty(mp);
 			}
-			release_metapage(mp);
 
-			IREAD_UNLOCK(ipbmap);
-			return (rc);
+			release_metapage(mp);
+			goto read_unlock;
 		}
 
 		release_metapage(mp);
@@ -910,7 +904,13 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		DBALLOC(bmp->db_DBmap, bmp->db_mapsize, *results, nblocks);
 	}
 
+      write_unlock:
 	IWRITE_UNLOCK(ipbmap);
+
+	return (rc);
+
+      read_unlock:
+	IREAD_UNLOCK(ipbmap);
 
 	return (rc);
 }

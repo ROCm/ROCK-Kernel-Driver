@@ -1242,11 +1242,6 @@ static int sd_init()
 	}
 
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		request_queue_t *q = blk_get_queue(mk_kdev(SD_MAJOR(k), 0));
-		blk_queue_hardsect_size(q, 512);
- 	}
-
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
 		int N = SCSI_DISKS_PER_MAJOR;
 
 		sd_gendisks[k] = sd_gendisk;

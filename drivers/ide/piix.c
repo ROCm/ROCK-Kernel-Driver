@@ -351,8 +351,6 @@ static int piix_set_drive(struct ata_device *drive, unsigned char speed)
 
 	piix_set_speed(drive->channel->pci_dev, drive->dn, &t, umul);
 
-	if (!drive->init_speed)	
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return 0;

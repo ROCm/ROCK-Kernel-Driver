@@ -20,6 +20,7 @@
 #include <linux/mm.h>
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
 
 /**
  *	__mark_inode_dirty -	internal function
@@ -113,13 +114,13 @@ static void write_inode(struct inode *inode, int sync)
  * from *nr_to_write.
  *
  * Normally it is not legal for a single process to lock more than one
- * page at a time, due to ab/ba deadlock problems.  But writeback_mapping()
+ * page at a time, due to ab/ba deadlock problems.  But writepages()
  * does want to lock a large number of pages, without immediately submitting
  * I/O against them (starting I/O is a "deferred unlock_page").
  *
  * However it *is* legal to lock multiple pages, if this is only ever performed
  * by a single process.  We provide that exclusion via locking in the
- * filesystem's ->writeback_mapping a_op. This ensures that only a single
+ * filesystem's ->writepages a_op. This ensures that only a single
  * process is locking multiple pages against this inode.  And as I/O is
  * submitted against all those locked pages, there is no deadlock.
  *
@@ -145,7 +146,7 @@ static void __sync_single_inode(struct inode *inode, int wait, int *nr_to_write)
 	mapping->dirtied_when = 0;	/* assume it's whole-file writeback */
 	spin_unlock(&inode_lock);
 
-	writeback_mapping(mapping, nr_to_write);
+	do_writepages(mapping, nr_to_write);
 
 	/* Don't write the inode if only I_DIRTY_PAGES was set */
 	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
@@ -256,7 +257,7 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 		if (current_is_pdflush())
 			writeback_release(bdi);
 
-		if (nr_to_write && *nr_to_write == 0)
+		if (nr_to_write && *nr_to_write <= 0)
 			break;
 	}
 out:
@@ -300,7 +301,7 @@ void writeback_unlocked_inodes(int *nr_to_write, int sync_mode,
 					older_than_this);
 			spin_lock(&sb_lock);
 		}
-		if (nr_to_write && *nr_to_write == 0)
+		if (nr_to_write && *nr_to_write <= 0)
 			break;
 	}
 	spin_unlock(&sb_lock);
@@ -324,11 +325,21 @@ static void __wait_on_locked(struct list_head *head)
  * writeback and wait upon the filesystem's dirty inodes.  The caller will
  * do this in two passes - one to write, and one to wait.  WB_SYNC_HOLD is
  * used to park the written inodes on sb->s_dirty for the wait pass.
+ *
+ * A finite limit is set on the number of pages which will be written.
+ * To prevent infinite livelock of sys_sync().
  */
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
+	struct page_state ps;
+	int nr_to_write;
+
+	get_page_state(&ps);
+	nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
+
 	spin_lock(&inode_lock);
-	sync_sb_inodes(sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD, NULL, NULL);
+	sync_sb_inodes(sb, wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
+				&nr_to_write, NULL);
 	if (wait)
 		__wait_on_locked(&sb->s_locked_inodes);
 	spin_unlock(&inode_lock);

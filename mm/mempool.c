@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/mempool.h>
+#include <linux/buffer_head.h>		/* for wakeup_bdflush() */
 
 static void add_element(mempool_t *pool, void *element)
 {
@@ -219,7 +220,7 @@ repeat_alloc:
 	if (gfp_mask == gfp_nowait)
 		return NULL;
 
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	add_wait_queue_exclusive(&pool->wait, &wait);
 	set_task_state(current, TASK_UNINTERRUPTIBLE);

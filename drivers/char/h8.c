@@ -1177,4 +1177,3 @@ static void h8_clear_event_mask(int mask)
 }
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

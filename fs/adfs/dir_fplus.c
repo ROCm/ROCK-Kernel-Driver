@@ -14,6 +14,7 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/spinlock.h>
+#include <linux/buffer_head.h>
 
 #include "adfs.h"
 #include "dir_fplus.h"

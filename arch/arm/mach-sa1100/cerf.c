@@ -35,33 +35,6 @@ static void __init cerf_init_irq(void)
 	set_irq_type(IRQ_GPIO_UCB1200_IRQ, IRQT_RISING);
 }
 
-static void __init
-fixup_cerf(struct machine_desc *desc, struct tag *tags,
-	   char **cmdline, struct meminfo *mi)
-{
-#if defined(CONFIG_SA1100_CERF_64MB)
-	SET_BANK( 0, 0xc0000000, 64*1024*1024 );
-	mi->nr_banks = 1;
-#elif defined(CONFIG_SA1100_CERF_32MB)
-	SET_BANK( 0, 0xc0000000, 32*1024*1024 );
-	mi->nr_banks = 1;
-#elif defined(CONFIG_SA1100_CERF_16MB)
-	SET_BANK( 0, 0xc0000000, 8*1024*1024 );
-	SET_BANK( 1, 0xc8000000, 8*1024*1024 );
-	mi->nr_banks = 2;
-#elif defined(CONFIG_SA1100_CERF_8MB)
-	SET_BANK( 0, 0xc0000000, 8*1024*1024 );
-	mi->nr_banks = 1;
-#else
-#error "Undefined memory size for Cerfboard."
-#endif
-
-//	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-//	setup_ramdisk(1,  0, 0, 8192);
-//	// Save 2Meg for RAMDisk
-//	setup_initrd(0xc0500000, 3*1024*1024);
-}
-
 static struct map_desc cerf_io_desc[] __initdata = {
   /* virtual	 physical    length	 domain     r  w  c  b */
   { 0xf0000000, 0x08000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Crystal Ethernet Chip */
@@ -96,7 +69,6 @@ static void __init cerf_map_io(void)
 MACHINE_START(CERF, "Intrinsyc's Cerf Family of Products")
 	MAINTAINER("support@intrinsyc.com")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_cerf)
 	MAPIO(cerf_map_io)
 	INITIRQ(cerf_init_irq)
 MACHINE_END

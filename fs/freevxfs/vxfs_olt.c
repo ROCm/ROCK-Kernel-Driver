@@ -33,6 +33,7 @@
  * Veritas filesystem driver - object location table support.
  */
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/kernel.h>
 
 #include "vxfs.h"

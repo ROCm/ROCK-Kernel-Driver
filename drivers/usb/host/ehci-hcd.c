@@ -65,6 +65,7 @@
  *
  * HISTORY:
  *
+ * 2002-05-24	Preliminary FS/LS interrupts, using scheduling shortcuts
  * 2002-05-11	Clear TT errors for FS/LS ctrl/bulk.  Fill in some other
  *	missing pieces:  enabling 64bit dma, handoff from BIOS/SMM.
  * 2002-05-07	Some error path cleanups to report better errors; wmb();
@@ -82,7 +83,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-May-11"
+#define DRIVER_VERSION "2002-May-24"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -622,7 +623,10 @@ dbg ("wait for dequeue: state %d, reclaim %p, hcd state %d",
 		return 0;
 
 	case PIPE_INTERRUPT:
-		intr_deschedule (ehci, urb->start_frame, qh, urb->interval);
+		intr_deschedule (ehci, urb->start_frame, qh,
+			(urb->dev->speed == USB_SPEED_HIGH)
+			    ? urb->interval
+			    : (urb->interval << 3));
 		if (ehci->hcd.state == USB_STATE_HALT)
 			urb->status = -ESHUTDOWN;
 		qh_completions (ehci, qh, 1);
@@ -780,7 +784,6 @@ static struct pci_driver ehci_pci_driver = {
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION (DRIVER_INFO);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_LICENSE ("GPL");

@@ -18,6 +18,7 @@
 
 #include <linux/fs.h>
 #include <linux/init.h>
+#include <linux/buffer_head.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -241,13 +242,10 @@ static void add_to_hash(metapage_t * mp, metapage_t ** hash_ptr)
 	mp->hash_prev = NULL;
 	mp->hash_next = *hash_ptr;
 	*hash_ptr = mp;
-	list_add(&mp->inode_list, &JFS_IP(mp->mapping->host)->mp_list);
 }
 
 static void remove_from_hash(metapage_t * mp, metapage_t ** hash_ptr)
 {
-	list_del(&mp->inode_list);
-
 	if (mp->hash_prev)
 		mp->hash_prev->hash_next = mp->hash_next;
 	else {
@@ -381,6 +379,8 @@ metapage_t *__get_metapage(struct inode *inode,
 		mp->page = 0;
 		mp->logical_size = size;
 		add_to_hash(mp, hash_ptr);
+		if (!absolute)
+			list_add(&mp->inode_list, &JFS_IP(inode)->mp_list);
 		spin_unlock(&meta_lock);
 
 		if (new) {
@@ -389,11 +389,7 @@ metapage_t *__get_metapage(struct inode *inode,
 			mp->page = grab_cache_page(mapping, page_index);
 			if (!mp->page) {
 				jERROR(1, ("grab_cache_page failed!\n"));
-				spin_lock(&meta_lock);
-				remove_from_hash(mp, hash_ptr);
-				__free_metapage(mp);
-				spin_unlock(&meta_lock);
-				return NULL;
+				goto freeit;
 			} else {
 				INCREMENT(mpStat.pagealloc);
 				unlock_page(mp->page);
@@ -401,24 +397,27 @@ metapage_t *__get_metapage(struct inode *inode,
 		} else {
 			jFYI(1,
 			     ("__get_metapage: Calling read_cache_page\n"));
-			mp->page =
-			    read_cache_page(mapping, lblock,
-					    (filler_t *) mapping->a_ops->
-					    readpage, NULL);
+			mp->page = read_cache_page(mapping, lblock,
+				    (filler_t *)mapping->a_ops->readpage, NULL);
 			if (IS_ERR(mp->page)) {
 				jERROR(1, ("read_cache_page failed!\n"));
-				spin_lock(&meta_lock);
-				remove_from_hash(mp, hash_ptr);
-				__free_metapage(mp);
-				spin_unlock(&meta_lock);
-				return NULL;
+				goto freeit;
 			} else
 				INCREMENT(mpStat.pagealloc);
 		}
-		mp->data = (void *) (kmap(mp->page) + page_offset);
+		mp->data = kmap(mp->page) + page_offset;
 	}
 	jFYI(1, ("__get_metapage: returning = 0x%p\n", mp));
 	return mp;
+
+freeit:
+	spin_lock(&meta_lock);
+	remove_from_hash(mp, hash_ptr);
+	if (!absolute)
+		list_del(&mp->inode_list);
+	__free_metapage(mp);
+	spin_unlock(&meta_lock);
+	return NULL;
 }
 
 void hold_metapage(metapage_t * mp, int force)
@@ -522,6 +521,8 @@ void release_metapage(metapage_t * mp)
 		spin_unlock(&meta_lock);
 	} else {
 		remove_from_hash(mp, meta_hash(mp->mapping, mp->index));
+		if (!test_bit(META_absolute, &mp->flag))
+			list_del(&mp->inode_list);
 		spin_unlock(&meta_lock);
 
 		if (mp->page) {
@@ -585,9 +586,6 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 		if (mp) {
 			set_bit(META_discard, &mp->flag);
 			spin_unlock(&meta_lock);
-			/*
-			 * If in the metapage cache, we've got the page locked
-			 */
 			lock_page(mp->page);
 			block_flushpage(mp->page, 0);
 			unlock_page(mp->page);

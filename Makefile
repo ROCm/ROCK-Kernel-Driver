@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 17
+SUBLEVEL = 19
 EXTRAVERSION =
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
@@ -37,14 +37,21 @@ OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
+PERL		= perl
 MODFLAGS	= -DMODULE
+CFLAGS_MODULE   = $(MODFLAGS)
+AFLAGS_MODULE   =
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
-PERL		= perl
+EXPORT_FLAGS    =
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
+
+export CPPFLAGS EXPORT_FLAGS
+export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
+export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 all:	do-it-all
 
@@ -92,6 +99,10 @@ CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
+ifdef CONFIG_MODULES
+EXPORT_FLAGS := -DEXPORT_SYMTAB
+endif
+
 INIT		=init/init.o
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
@@ -99,63 +110,13 @@ NETWORKS	=net/network.o
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=init kernel lib drivers mm fs net ipc sound
 
-DRIVERS-n :=
-DRIVERS-y :=
-DRIVERS-m :=
-DRIVERS-  :=
-
-DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
-DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
-DRIVERS-$(CONFIG_PARPORT) += drivers/parport/driver.o
-DRIVERS-y += drivers/base/base.o \
-	drivers/char/char.o \
-	drivers/block/block.o \
-	drivers/misc/misc.o \
-	drivers/net/net.o \
-	drivers/media/media.o
-DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
-DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
-DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
-DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
-DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
-DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
-DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
-
-ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
-DRIVERS-y += drivers/cdrom/driver.o
-endif
-
+DRIVERS-y 	= drivers/built-in.o
 DRIVERS-$(CONFIG_SOUND) += sound/sound.o
-DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
-DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
-DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
-DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
-DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_PNP) += drivers/pnp/pnp.o
-DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/sgi.a
-DRIVERS-$(CONFIG_VT) += drivers/video/video.o
-DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/paride.a
-DRIVERS-$(CONFIG_TC) += drivers/tc/tc.a
-DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
-DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
-DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
-DRIVERS-$(CONFIG_SERIO) += drivers/input/serio/seriodrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/message/message.o
-DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
-DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
-DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
-DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
-DRIVERS-$(CONFIG_HOTPLUG_PCI) += drivers/hotplug/vmlinux-obj.o
-DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 
 DRIVERS := $(DRIVERS-y)
 
 
 include arch/$(ARCH)/Makefile
-
-export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
@@ -163,7 +124,7 @@ export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 # ---------------------------------------------------------------------------
 
 boot: vmlinux
-	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
+	@$(MAKE) -C arch/$(ARCH)/boot
 
 # Build vmlinux
 # ---------------------------------------------------------------------------
@@ -193,29 +154,40 @@ define rule_link_vmlinux
 	echo Generating build number
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C init
+	$(MAKE) -C init
 	echo $(cmd_link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
+vmlinux: $(CONFIGURATION) $(vmlinux-objs) FORCE
 	$(call if_changed_rule,link_vmlinux)
 
-#	The actual objects are generated when descending, make sure
-#	no implicit rule kicks in
+#	The actual objects are generated when descending, 
+#	make sure no implicit rule kicks in
 
-$(sort $(vmlinux-objs)): linuxsubdirs
-	@
+$(sort $(vmlinux-objs)): $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
-.PHONY: linuxsubdirs
-linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
+.PHONY: $(SUBDIRS)
+$(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
+	@$(MAKE) -C $@
 
-$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+# Single targets
+# ---------------------------------------------------------------------------
+
+%.s: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.i: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.o: %.c FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.s: %.S FORCE
+	@$(MAKE) -C $(@D) $(@F)
+%.o: %.S FORCE
+	@$(MAKE) -C $(@D) $(@F)
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -257,7 +229,10 @@ include/linux/version.h: ./Makefile
 	@echo Generating $@
 	@. scripts/mkversion_h $@ $(KERNELRELEASE) $(VERSION) $(PATCHLEVEL) $(SUBLEVEL)
 
-comma	:= ,
+# helpers built in scripts/
+
+scripts/mkdep scripts/split-include : FORCE
+	@$(MAKE) -C scripts
 
 # ---------------------------------------------------------------------------
 # Generate dependencies
@@ -266,10 +241,33 @@ depend dep: dep-files
 
 dep-files: scripts/mkdep archdep include/linux/version.h
 	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
-	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
+	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
 ifdef CONFIG_MODVERSIONS
 	$(MAKE) update-modverfile
 endif
+
+.PHONY: $(patsubst %,_sfdep_%,$(SUBDIRS))
+$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
+	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
+
+# update modversions.h, but only if it would change
+update-modverfile:
+	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
+	  echo "#define _LINUX_MODVERSIONS_H"; \
+	  echo "#include <linux/modsetver.h>"; \
+	  cd $(TOPDIR)/include/linux/modules; \
+	  for f in *.ver; do \
+	    if [ -f $$f ]; then echo "#include <linux/modules/$${f}>"; fi; \
+	  done; \
+	  echo "#endif"; \
+	) > $(TOPDIR)/include/linux/modversions.h.tmp
+	@if [ -r $(TOPDIR)/include/linux/modversions.h ] && cmp -s $(TOPDIR)/include/linux/modversions.h $(TOPDIR)/include/linux/modversions.h.tmp; then \
+		echo $(TOPDIR)/include/linux/modversions.h was not updated; \
+		rm -f $(TOPDIR)/include/linux/modversions.h.tmp; \
+	else \
+		echo $(TOPDIR)/include/linux/modversions.h was updated; \
+		mv -f $(TOPDIR)/include/linux/modversions.h.tmp $(TOPDIR)/include/linux/modversions.h; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Modules
@@ -287,7 +285,7 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
+	@$(MAKE) -C $(patsubst _mod_%, %, $@) modules
 
 #	Install modules
 
@@ -324,7 +322,7 @@ else # CONFIG_MODULES
 # ---------------------------------------------------------------------------
 # Modules not configured
 
-modules modules_install: dummy
+modules modules_install: FORCE
 	@echo
 	@echo "The present kernel configuration has modules disabled."
 	@echo "Type 'make config' and enable loadable module support."
@@ -333,19 +331,6 @@ modules modules_install: dummy
 	@exit 1
 
 endif # CONFIG_MODULES
-
-# ---------------------------------------------------------------------------
-
-include Rules.make
-
-# Build helpers in scripts/
-# FIXME: do that in scripts/Makefile?
-
-scripts/mkdep: scripts/mkdep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/mkdep scripts/mkdep.c
-
-scripts/split-include: scripts/split-include.c
-	$(HOSTCC) $(HOSTCFLAGS) -o scripts/split-include scripts/split-include.c
 
 # Cleaning up
 # ---------------------------------------------------------------------------
@@ -471,24 +456,17 @@ checkincludes:
 
 # Generate tags for editors
 
-TAGS: dummy
+TAGS: FORCE
 	{ find include/asm-${ARCH} -name '*.h' -print ; \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
 	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
-tags: dummy
+tags: FORCE
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
 	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Targets which will only descend into one subdir, not trying
-# to link vmlinux afterwards
-# FIXME: anybody still using this?
-
-fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 # Make a backup
 # FIXME anybody still using this?
@@ -511,3 +489,4 @@ if_changed_rule = $(if $(strip $? \
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
 	               @$(rule_$(1)))
 
+FORCE:

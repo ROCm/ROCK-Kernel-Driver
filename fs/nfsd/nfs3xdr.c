@@ -9,6 +9,8 @@
 #include <linux/types.h>
 #include <linux/time.h>
 #include <linux/nfs3.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
 

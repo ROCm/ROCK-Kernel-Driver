@@ -21,6 +21,7 @@
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/cramfs_fs_sb.h>
+#include <linux/buffer_head.h>
 #include <asm/semaphore.h>
 
 #include <asm/uaccess.h>

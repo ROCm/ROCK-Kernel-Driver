@@ -49,10 +49,6 @@
 #define PFX "sb16: "
 #endif
 
-#ifndef SNDRV_SBAWE
-EXPORT_NO_SYMBOLS;
-#endif
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

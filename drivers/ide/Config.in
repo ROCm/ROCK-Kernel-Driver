@@ -40,9 +40,8 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
          int '      Default queue depth' CONFIG_BLK_DEV_IDE_TCQ_DEPTH 32
       fi
       dep_bool '    Good-Bad DMA Model-Firmware (EXPERIMENTAL)' CONFIG_IDEDMA_NEW_DRIVE_LISTINGS $CONFIG_EXPERIMENTAL
-      dep_bool '    AEC62XX chip set support' CONFIG_BLK_DEV_AEC62XX $CONFIG_BLK_DEV_IDEDMA_PCI
-      dep_mbool '      AEC62XX Tuning support' CONFIG_AEC62XX_TUNING $CONFIG_BLK_DEV_AEC62XX
-      dep_mbool '      AEC6280 Burst mode' CONFIG_AEC6280_BURST $CONFIG_BLK_DEV_AEC62XX
+      dep_bool '    Acard (Artop) chipset support' CONFIG_BLK_DEV_AEC62XX $CONFIG_BLK_DEV_IDEDMA_PCI
+      dep_mbool '      ATP865 burst mode' CONFIG_AEC6280_BURST $CONFIG_BLK_DEV_AEC62XX
       dep_bool '    ALI M15x3 chipset support' CONFIG_BLK_DEV_ALI15X3 $CONFIG_BLK_DEV_IDEDMA_PCI
       dep_mbool '      ALI M15x3 WDC support (DANGEROUS)' CONFIG_WDC_ALI15X3 $CONFIG_BLK_DEV_ALI15X3 $CONFIG_EXPERIMENTAL
       dep_bool '    AMD and nVidia chipset support' CONFIG_BLK_DEV_AMD74XX $CONFIG_BLK_DEV_IDEDMA_PCI
@@ -122,7 +121,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       if [ "$CONFIG_BLK_DEV_IDEDISK" = "y" -a "$CONFIG_EXPERIMENTAL" = "y" ]; then
 	 bool '    PROMISE DC4030 support (EXPERIMENTAL)' CONFIG_BLK_DEV_PDC4030
       fi
-      bool '    QDI QD65xx support' CONFIG_BLK_DEV_QD65XX
+      dep_tristate '    QDI QD65xx support' CONFIG_BLK_DEV_QD65XX $CONFIG_BLK_DEV_IDE
       bool '    UMC-8672 support' CONFIG_BLK_DEV_UMC8672
    fi
    if [ "$CONFIG_BLK_DEV_IDEDMA_PCI" = "y" -o \
@@ -131,12 +130,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       bool '  IGNORE word93 Validation BITS' CONFIG_IDEDMA_IVB
    fi
    
-   if [ "$CONFIG_BLK_DEV_IDECD" != "n" -o \
-        "$CONFIG_BLK_DEV_IDETAPE" != "n" -o \
-        "$CONFIG_BLK_DEV_IDEFLOPPY" != "n" -o \
-        "$CONFIG_BLK_DEV_IDESCSI" != "n" ]; then
-	define_bool  CONFIG_ATAPI y
-   fi
+   define_bool  CONFIG_ATAPI y
 else
    bool 'Old hard disk (MFM/RLL/IDE) driver' CONFIG_BLK_DEV_HD_ONLY
    define_bool CONFIG_BLK_DEV_HD $CONFIG_BLK_DEV_HD_ONLY

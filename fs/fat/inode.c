@@ -17,6 +17,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 
 //#include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -871,7 +872,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!silent)
 		printk("FAT: Using codepage %s\n", sbi->nls_disk->charset);
 
-	if (sbi->options.isvfat && !sbi->options.utf8) {
+	/* FIXME: utf8 is using iocharset for upper/lower conversion */
+	if (sbi->options.isvfat) {
 		if (sbi->options.iocharset != NULL) {
 			sbi->nls_io = load_nls(sbi->options.iocharset);
 			if (!sbi->nls_io) {

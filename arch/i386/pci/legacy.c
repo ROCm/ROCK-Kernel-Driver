@@ -42,11 +42,14 @@ static int __init pci_legacy_init(void)
 		return 0;
 	}
 
+	if (pcibios_scanned++)
+		return 0;
+
 	printk("PCI: Probing PCI hardware\n");
 	pci_root_bus = pcibios_scan_root(0);
 
-	if (!pci_use_acpi_routing)
-		pcibios_fixup_peer_bridges();
+	pcibios_fixup_peer_bridges();
+
 	return 0;
 }
 

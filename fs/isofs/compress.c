@@ -36,6 +36,7 @@
 #include <linux/blkdev.h>
 #include <linux/vmalloc.h>
 #include <linux/zlib.h>
+#include <linux/buffer_head.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>

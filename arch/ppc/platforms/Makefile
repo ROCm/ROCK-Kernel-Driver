@@ -3,23 +3,16 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
-ifdef CONFIG_4xx
+ifdef CONFIG_40x
 EXTRA_AFLAGS		:= -Wa,-m405
 endif
 
 # Extra CFLAGS so we don't have to do relative includes
 CFLAGS_pmac_setup.o	+= -I$(TOPDIR)/arch/$(ARCH)/mm
-
-all: platform.o
 
 O_TARGET := platform.o
 

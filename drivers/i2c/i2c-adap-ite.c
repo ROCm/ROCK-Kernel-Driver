@@ -292,8 +292,6 @@ static void iic_ite_exit(void)
         iic_ite_release();
 }
 
-EXPORT_NO_SYMBOLS;
-
 /* If modules is NOT defined when this file is compiled, then the MODULE_*
  * macros will resolve to nothing
  */

@@ -18,8 +18,6 @@
 LIST_HEAD(pci_root_buses);
 LIST_HEAD(pci_devices);
 
-extern struct device_driver pci_device_driver;
-
 /*
  * Translate the low bits of the PCI base
  * to the resource type
@@ -151,7 +149,6 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		res->flags = (io_base_lo & PCI_IO_RANGE_TYPE_MASK) | IORESOURCE_IO;
 		res->start = base;
 		res->end = limit + 0xfff;
-		res->name = child->name;
 	} else {
 		/*
 		 * Ugh. We don't know enough about this bridge. Just assume
@@ -170,7 +167,6 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM;
 		res->start = base;
 		res->end = limit + 0xfffff;
-		res->name = child->name;
 	} else {
 		/* See comment above. Same thing */
 		printk(KERN_ERR "Unknown bridge resource %d: assuming transparent\n", 1);
@@ -201,7 +197,6 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM | IORESOURCE_PREFETCH;
 		res->start = base;
 		res->end = limit + 0xfffff;
-		res->name = child->name;
 	} else {
 		/* See comments above */
 		printk(KERN_ERR "Unknown bridge resource %d: assuming transparent\n", 2);
@@ -248,9 +243,11 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 	child->primary = parent->secondary;
 	child->subordinate = 0xff;
 
-	/* Set up default resource pointers.. */
-	for (i = 0; i < 4; i++)
+	/* Set up default resource pointers and names.. */
+	for (i = 0; i < 4; i++) {
 		child->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
+		child->resource[i]->name = child->name;
+	}
 
 	return child;
 }
@@ -512,7 +509,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	dev0.bus = bus;
 	dev0.sysdata = bus->sysdata;
 	dev0.dev.parent = bus->dev;
-	dev0.dev.driver = &pci_device_driver;
+	dev0.dev.bus = &pci_bus_type;
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8) {

@@ -597,17 +597,7 @@ void update_process_times(int user_tick)
  */
 static unsigned long count_active_tasks(void)
 {
-	struct task_struct *p;
-	unsigned long nr = 0;
-
-	read_lock(&tasklist_lock);
-	for_each_task(p) {
-		if ((p->state == TASK_RUNNING ||
-		     (p->state & TASK_UNINTERRUPTIBLE)))
-			nr += FIXED_1;
-	}
-	read_unlock(&tasklist_lock);
-	return nr;
+	return (nr_running() + nr_uninterruptible()) * FIXED_1;
 }
 
 /*

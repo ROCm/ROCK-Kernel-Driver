@@ -532,7 +532,7 @@ NORET_TYPE void do_exit(long code)
 	del_timer_sync(&tsk->real_timer);
 
 	if (unlikely(preempt_get_count()))
-		printk(KERN_ERR "error: %s[%d] exited with preempt_count %d\n",
+		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
 				current->comm, current->pid,
 				preempt_get_count());
 

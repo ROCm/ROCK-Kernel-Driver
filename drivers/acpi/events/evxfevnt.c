@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 51 $
+ *              $Revision: 55 $
  *
  *****************************************************************************/
 
@@ -25,11 +25,7 @@
 
 
 #include "acpi.h"
-#include "achware.h"
-#include "acnamesp.h"
 #include "acevents.h"
-#include "amlcode.h"
-#include "acinterp.h"
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evxfevnt")
@@ -118,7 +114,7 @@ acpi_disable (void)
 
 	/* Unload the SCI interrupt handler  */
 
-	acpi_ev_remove_sci_handler ();
+	status = acpi_ev_remove_sci_handler ();
 	return_ACPI_STATUS (status);
 }
 
@@ -144,6 +140,7 @@ acpi_enable_event (
 	u32                     flags)
 {
 	acpi_status             status = AE_OK;
+	u32                     value;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_enable_event");
@@ -156,7 +153,7 @@ acpi_enable_event (
 
 		/* Decode the Fixed Event */
 
-		if (event > ACPI_NUM_FIXED_EVENTS) {
+		if (event > ACPI_EVENT_MAX) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
@@ -164,13 +161,21 @@ acpi_enable_event (
 		 * Enable the requested fixed event (by writing a one to the
 		 * enable register bit)
 		 */
-		acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[event].enable_register_id,
-				1, ACPI_MTX_LOCK);
+		status = acpi_set_register (acpi_gbl_fixed_event_info[event].enable_register_id,
+				 1, ACPI_MTX_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 
 		/* Make sure that the hardware responded */
 
-		if (1 != acpi_hw_bit_register_read (acpi_gbl_fixed_event_info[event].enable_register_id,
-				  ACPI_MTX_LOCK)) {
+		status = acpi_get_register (acpi_gbl_fixed_event_info[event].enable_register_id,
+				  &value, ACPI_MTX_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+
+		if (value != 1) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Could not enable %s event\n", acpi_ut_get_event_name (event)));
 			return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
@@ -188,7 +193,10 @@ acpi_enable_event (
 
 		/* Enable the requested GPE number */
 
-		acpi_hw_enable_gpe (event);
+		status = acpi_hw_enable_gpe (event);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 
 		if (flags & ACPI_EVENT_WAKE_ENABLE) {
 			acpi_hw_enable_gpe_for_wakeup (event);
@@ -226,6 +234,7 @@ acpi_disable_event (
 	u32                     flags)
 {
 	acpi_status             status = AE_OK;
+	u32                     value;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_disable_event");
@@ -238,7 +247,7 @@ acpi_disable_event (
 
 		/* Decode the Fixed Event */
 
-		if (event > ACPI_NUM_FIXED_EVENTS) {
+		if (event > ACPI_EVENT_MAX) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
@@ -246,11 +255,19 @@ acpi_disable_event (
 		 * Disable the requested fixed event (by writing a zero to the
 		 * enable register bit)
 		 */
-		acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[event].enable_register_id,
-				0, ACPI_MTX_LOCK);
+		status = acpi_set_register (acpi_gbl_fixed_event_info[event].enable_register_id,
+				 0, ACPI_MTX_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 
-		if (0 != acpi_hw_bit_register_read (acpi_gbl_fixed_event_info[event].enable_register_id,
-				 ACPI_MTX_LOCK)) {
+		status = acpi_get_register (acpi_gbl_fixed_event_info[event].enable_register_id,
+				 &value, ACPI_MTX_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+
+		if (value != 0) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Could not disable %s events\n", acpi_ut_get_event_name (event)));
 			return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
@@ -275,7 +292,7 @@ acpi_disable_event (
 			acpi_hw_disable_gpe_for_wakeup (event);
 		}
 		else {
-			acpi_hw_disable_gpe (event);
+			status = acpi_hw_disable_gpe (event);
 		}
 		break;
 
@@ -319,7 +336,7 @@ acpi_clear_event (
 
 		/* Decode the Fixed Event */
 
-		if (event > ACPI_NUM_FIXED_EVENTS) {
+		if (event > ACPI_EVENT_MAX) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
@@ -327,7 +344,7 @@ acpi_clear_event (
 		 * Clear the requested fixed event (By writing a one to the
 		 * status register bit)
 		 */
-		acpi_hw_bit_register_write (acpi_gbl_fixed_event_info[event].status_register_id,
+		status = acpi_set_register (acpi_gbl_fixed_event_info[event].status_register_id,
 				1, ACPI_MTX_LOCK);
 		break;
 
@@ -340,7 +357,7 @@ acpi_clear_event (
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
-		acpi_hw_clear_gpe (event);
+		status = acpi_hw_clear_gpe (event);
 		break;
 
 
@@ -393,14 +410,14 @@ acpi_get_event_status (
 
 		/* Decode the Fixed Event */
 
-		if (event > ACPI_NUM_FIXED_EVENTS) {
+		if (event > ACPI_EVENT_MAX) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 		/* Get the status of the requested fixed event */
 
-		*event_status = acpi_hw_bit_register_read (acpi_gbl_fixed_event_info[event].status_register_id,
-				   ACPI_MTX_LOCK);
+		status = acpi_get_register (acpi_gbl_fixed_event_info[event].status_register_id,
+				  event_status, ACPI_MTX_LOCK);
 		break;
 
 
@@ -414,7 +431,7 @@ acpi_get_event_status (
 
 		/* Obtain status on the requested GPE number */
 
-		acpi_hw_get_gpe_status (event, event_status);
+		status = acpi_hw_get_gpe_status (event, event_status);
 		break;
 
 

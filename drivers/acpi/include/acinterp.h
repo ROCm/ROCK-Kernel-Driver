@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 133 $
+ *       $Revision: 137 $
  *
  *****************************************************************************/
 
@@ -36,6 +36,11 @@ acpi_ex_resolve_operands (
 	acpi_operand_object     **stack_ptr,
 	acpi_walk_state         *walk_state);
 
+acpi_status
+acpi_ex_check_object_type (
+	acpi_object_type        type_needed,
+	acpi_object_type        this_type,
+	void                    *object);
 
 /*
  * exxface - External interpreter interfaces
@@ -83,6 +88,11 @@ acpi_ex_convert_to_target_type (
 	acpi_operand_object     **result_desc,
 	acpi_walk_state         *walk_state);
 
+u32
+acpi_ex_convert_to_ascii (
+	acpi_integer            integer,
+	u32                     base,
+	u8                      *string);
 
 /*
  * exfield - ACPI AML (p-code) execution - field manipulation
@@ -171,6 +181,12 @@ acpi_ex_opcode_3A_1T_1R (
 acpi_status
 acpi_ex_opcode_6A_0T_1R (
 	acpi_walk_state         *walk_state);
+
+u8
+acpi_ex_do_match (
+	u32                     match_op,
+	acpi_integer            package_value,
+	acpi_integer            match_value);
 
 acpi_status
 acpi_ex_get_object_reference (
@@ -283,7 +299,7 @@ acpi_ex_release_mutex (
 	acpi_operand_object     *obj_desc,
 	acpi_walk_state         *walk_state);
 
-acpi_status
+void
 acpi_ex_release_all_mutexes (
 	ACPI_THREAD_STATE       *thread);
 
@@ -423,13 +439,6 @@ acpi_ex_resolve_object_to_value (
  */
 
 void
-acpi_ex_show_hex_value (
-	u32                     byte_count,
-	u8                      *aml_start,
-	u32                     lead_space);
-
-
-acpi_status
 acpi_ex_dump_operand (
 	acpi_operand_object     *entry_desc);
 
@@ -448,11 +457,30 @@ acpi_ex_dump_object_descriptor (
 	acpi_operand_object     *object,
 	u32                     flags);
 
-
 void
 acpi_ex_dump_node (
 	acpi_namespace_node     *node,
 	u32                     flags);
+
+void
+acpi_ex_out_string (
+	char                    *title,
+	char                    *value);
+
+void
+acpi_ex_out_pointer (
+	char                    *title,
+	void                    *value);
+
+void
+acpi_ex_out_integer (
+	char                    *title,
+	u32                     value);
+
+void
+acpi_ex_out_address (
+	char                    *title,
+	ACPI_PHYSICAL_ADDRESS   value);
 
 
 /*
@@ -586,7 +614,7 @@ u8
 acpi_ex_acquire_global_lock (
 	u32                     rule);
 
-acpi_status
+void
 acpi_ex_release_global_lock (
 	u8                      locked);
 
@@ -595,12 +623,12 @@ acpi_ex_digits_needed (
 	acpi_integer            value,
 	u32                     base);
 
-acpi_status
+void
 acpi_ex_eisa_id_to_string (
 	u32                     numeric_id,
 	NATIVE_CHAR             *out_string);
 
-acpi_status
+void
 acpi_ex_unsigned_integer_to_string (
 	acpi_integer            value,
 	NATIVE_CHAR             *out_string);

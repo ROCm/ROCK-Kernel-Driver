@@ -373,7 +373,6 @@ struct _snd_korg1212 {
         u16 rightADCInSens;          // ADC right channel input sensitivity
 };
 
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("korg1212");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

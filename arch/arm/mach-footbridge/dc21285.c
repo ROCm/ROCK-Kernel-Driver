@@ -1,7 +1,8 @@
 /*
  *  linux/arch/arm/kernel/dec21285.c: PCI functions for DC21285
  *
- *  Copyright (C) 1998-2000 Russell King, Phil Blundell
+ *  Copyright (C) 1998-2001 Russell King
+ *  Copyright (C) 1998-2000 Phil Blundell
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -261,31 +262,45 @@ static void dc21285_parity_irq(int irq, void *dev_id, struct pt_regs *regs)
 	add_timer(timer);
 }
 
-void __init dc21285_setup_resources(struct resource **resource)
+int __init dc21285_setup(int nr, struct pci_sys_data *sys)
 {
-	struct resource *busmem, *busmempf;
+	struct resource *res;
 
-	busmem = kmalloc(sizeof(*busmem), GFP_KERNEL);
-	busmempf = kmalloc(sizeof(*busmempf), GFP_KERNEL);
-	memset(busmem, 0, sizeof(*busmem));
-	memset(busmempf, 0, sizeof(*busmempf));
+	if (nr || !footbridge_cfn_mode())
+		return 0;
 
-	busmem->flags = IORESOURCE_MEM;
-	busmem->name  = "Footbridge non-prefetch";
-	busmempf->flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
-	busmempf->name  = "Footbridge prefetch";
+	res = kmalloc(sizeof(struct resource) * 2, GFP_KERNEL);
+	if (!res) {
+		printk("out of memory for root bus resources");
+		return 0;
+	}
 
-	allocate_resource(&iomem_resource, busmempf, 0x20000000,
-			  0x80000000, 0xffffffff, 0x20000000, NULL, NULL);
-	allocate_resource(&iomem_resource, busmem, 0x40000000,
+	memset(res, 0, sizeof(struct resource) * 2);
+
+	res[0].flags = IORESOURCE_MEM;
+	res[0].name  = "Footbridge non-prefetch";
+	res[1].flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
+	res[1].name  = "Footbridge prefetch";
+
+	allocate_resource(&iomem_resource, &res[1], 0x20000000,
+			  0xa0000000, 0xffffffff, 0x20000000, NULL, NULL);
+	allocate_resource(&iomem_resource, &res[0], 0x40000000,
 			  0x80000000, 0xffffffff, 0x40000000, NULL, NULL);
 
-	resource[0] = &ioport_resource;
-	resource[1] = busmem;
-	resource[2] = busmempf;
+	sys->resource[0] = &ioport_resource;
+	sys->resource[1] = &res[0];
+	sys->resource[2] = &res[1];
+	sys->mem_offset  = DC21285_PCI_MEM;
+
+	return 1;
 }
 
-void __init dc21285_init(void *sysdata)
+struct pci_bus * __init dc21285_scan_bus(int nr, struct pci_sys_data *sys)
+{
+	return pci_scan_bus(0, &dc21285_ops, sys);
+}
+
+void __init dc21285_preinit(void)
 {
 	unsigned int mem_size, mem_mask;
 	int cfn_mode;
@@ -313,17 +328,13 @@ void __init dc21285_init(void *sysdata)
 		"central function" : "addin");
 
 	if (cfn_mode) {
-		static struct resource csrmem, csrio;
+		static struct resource csrio;
 
 		csrio.flags  = IORESOURCE_IO;
 		csrio.name   = "Footbridge";
-		csrmem.flags = IORESOURCE_MEM;
-		csrmem.name  = "Footbridge";
 
 		allocate_resource(&ioport_resource, &csrio, 128,
 				  0xff00, 0xffff, 128, NULL, NULL);
-		allocate_resource(&iomem_resource, &csrmem, 128,
-				  0xf4000000, 0xf8000000, 128, NULL, NULL);
 
 		/*
 		 * Map our SDRAM at a known address in PCI space, just in case
@@ -331,22 +342,12 @@ void __init dc21285_init(void *sysdata)
 		 * necessary, since some VGA cards forcefully use PCI addresses
 		 * in the range 0x000a0000 to 0x000c0000. (eg, S3 cards).
 		 */
-		*CSR_PCICSRBASE       = csrmem.start;
+		*CSR_PCICSRBASE       = 0xf4000000;
 		*CSR_PCICSRIOBASE     = csrio.start;
 		*CSR_PCISDRAMBASE     = __virt_to_bus(PAGE_OFFSET);
 		*CSR_PCIROMBASE       = 0;
 		*CSR_PCICMD = PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |
 			      PCI_COMMAND_INVALIDATE | PCICMD_ERROR_BITS;
-
-		pci_scan_bus(0, &dc21285_ops, sysdata);
-
-		/*
-		 * Clear any existing errors - we aren't
-		 * interested in historical data...
-		 */
-		*CSR_SA110_CNTL	= (*CSR_SA110_CNTL & 0xffffde07) |
-				  SA110_CNTL_RXSERR;
-		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
 	} else if (footbridge_cfn_mode() != 0) {
 		/*
 		 * If we are not compiled to accept "add-in" mode, then
@@ -356,6 +357,19 @@ void __init dc21285_init(void *sysdata)
 		 */
 		panic("PCI: this kernel is compiled for central "
 			"function mode only");
+	}
+}
+
+void __init dc21285_postinit(void)
+{
+	if (footbridge_cfn_mode()) {
+		/*
+		 * Clear any existing errors - we aren't
+		 * interested in historical data...
+		 */
+		*CSR_SA110_CNTL	= (*CSR_SA110_CNTL & 0xffffde07) |
+				  SA110_CNTL_RXSERR;
+		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
 	}
 
 	/*

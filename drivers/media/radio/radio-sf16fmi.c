@@ -331,8 +331,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the SF16MI card (0x284 or 0x384)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit fmi_cleanup_module(void)
 {
 	video_unregister_device(&fmi_radio);

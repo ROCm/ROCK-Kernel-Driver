@@ -29,7 +29,6 @@
  */
 static int nfs_symlink_filler(struct inode *inode, struct page *page)
 {
-	void *buffer = kmap(page);
 	int error;
 
 	/* We place the length at the beginning of the page,
@@ -37,19 +36,16 @@ static int nfs_symlink_filler(struct inode *inode, struct page *page)
 	 * XDR response verification will NULL terminate it.
 	 */
 	lock_kernel();
-	error = NFS_PROTO(inode)->readlink(inode, buffer,
-					   PAGE_CACHE_SIZE - sizeof(u32)-4);
+	error = NFS_PROTO(inode)->readlink(inode, page);
 	unlock_kernel();
 	if (error < 0)
 		goto error;
 	SetPageUptodate(page);
-	kunmap(page);
 	unlock_page(page);
 	return 0;
 
 error:
 	SetPageError(page);
-	kunmap(page);
 	unlock_page(page);
 	return -EIO;
 }

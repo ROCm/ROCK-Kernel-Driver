@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 105 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -26,11 +26,9 @@
 
 #include "acpi.h"
 #include "acparser.h"
-#include "acnamesp.h"
 #include "acinterp.h"
 #include "acevents.h"
 #include "amlcode.h"
-#include "acdispat.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
