@@ -32,13 +32,17 @@
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
+	ICH5_PMR		= 0x90, /* port mapping register */
 	ICH5_PCS		= 0x92,	/* port control and status */
 
 	PIIX_FLAG_CHECKINTR	= (1 << 29), /* make sure PCI INTx enabled */
 	PIIX_FLAG_COMBINED	= (1 << 30), /* combined mode possible */
 
-	PIIX_COMB_PRI		= (1 << 0), /* combined mode, PATA primary */
-	PIIX_COMB_SEC		= (1 << 1), /* combined mode, PATA secondary */
+	/* combined mode.  if set, PATA is channel 0.
+	 * if clear, PATA is channel 1.
+	 */
+	PIIX_COMB_PATA_P0	= (1 << 1),
+	PIIX_COMB		= (1 << 2), /* combined mode enabled? */
 
 	PIIX_80C_PRI		= (1 << 5) | (1 << 4),
 	PIIX_80C_SEC		= (1 << 7) | (1 << 6),
@@ -452,31 +456,6 @@ static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
 	}
 }
 
-/**
- *	piix_probe_combined - Determine if PATA and SATA are combined
- *	@pdev: PCI device to examine
- *	@mask: (output) zero, %PIIX_COMB_PRI or %PIIX_COMB_SEC
- *
- *	Determine if BIOS has secretly stuffed a PATA port into our
- *	otherwise-beautiful SATA PCI device.
- *
- *	LOCKING:
- *	Inherited from PCI layer (may sleep).
- */
-static void piix_probe_combined (struct pci_dev *pdev, unsigned int *mask)
-{
-	u8 tmp;
-
-	pci_read_config_byte(pdev, 0x90, &tmp); /* combined mode reg */
-	tmp &= 0x6; 	/* interesting bits 2:1, PATA primary/secondary */
-
-	/* backwards from what one might expect */
-	if (tmp == 0x4)	/* bits 10x */
-		*mask |= PIIX_COMB_SEC;
-	if (tmp == 0x6)	/* bits 11x */
-		*mask |= PIIX_COMB_PRI;
-}
-
 /* move to PCI layer, integrate w/ MSI stuff */
 static void pci_enable_intx(struct pci_dev *pdev)
 {
@@ -509,7 +488,7 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int printed_version;
 	struct ata_port_info *port_info[2];
 	unsigned int combined = 0, n_ports = 1;
-	unsigned int pata_comb = 0, sata_comb = 0;
+	unsigned int pata_chan = 0, sata_chan = 0;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -520,8 +499,19 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	port_info[0] = &piix_port_info[ent->driver_data];
 	port_info[1] = NULL;
-	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED)
-		piix_probe_combined(pdev, &combined);
+
+	if (port_info[0]->host_flags & PIIX_FLAG_COMBINED) {
+		u8 tmp;
+		pci_read_config_byte(pdev, ICH5_PMR, &tmp);
+
+		if (tmp & PIIX_COMB) {
+			combined = 1;
+			if (tmp & PIIX_COMB_PATA_P0)
+				sata_chan = 1;
+			else
+				pata_chan = 1;
+		}
+	}
 
 	/* On ICH5, some BIOSen disable the interrupt using the
 	 * PCI_COMMAND_INTX_DISABLE bit added in PCI 2.3.
@@ -532,15 +522,10 @@ static int piix_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (port_info[0]->host_flags & PIIX_FLAG_CHECKINTR)
 		pci_enable_intx(pdev);
 
-	if (combined & PIIX_COMB_PRI)
-		sata_comb = 1;
-	else if (combined & PIIX_COMB_SEC)
-		pata_comb = 1;
-
-	if (pata_comb || sata_comb) {
-		port_info[sata_comb] = &piix_port_info[ent->driver_data];
-		port_info[sata_comb]->host_flags |= ATA_FLAG_SLAVE_POSS; /* sigh */
-		port_info[pata_comb] = &piix_port_info[ich5_pata]; /*ich5-specific*/
+	if (combined) {
+		port_info[sata_chan] = &piix_port_info[ent->driver_data];
+		port_info[sata_chan]->host_flags |= ATA_FLAG_SLAVE_POSS;
+		port_info[pata_chan] = &piix_port_info[ich5_pata];
 		n_ports++;
 
 		printk(KERN_WARNING DRV_NAME ": combined mode detected\n");
