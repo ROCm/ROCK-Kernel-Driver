@@ -513,7 +513,6 @@ rebalance:
 	if (!wait)
 		goto nopage;
 
-	inc_page_state(allocstall);
 	current->flags |= PF_MEMALLOC;
 	try_to_free_pages(classzone, gfp_mask, order);
 	current->flags &= ~PF_MEMALLOC;
@@ -1354,6 +1353,7 @@ static char *vmstat_text[] = {
 	"kswapd_steal",
 	"pageoutrun",
 	"allocstall",
+	"pgrotated",
 };
 
 static void *vmstat_start(struct seq_file *m, loff_t *pos)

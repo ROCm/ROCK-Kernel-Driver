@@ -797,7 +797,7 @@ try_to_free_pages(struct zone *classzone,
 	const int nr_pages = SWAP_CLUSTER_MAX;
 	int nr_reclaimed = 0;
 
-	inc_page_state(pageoutrun);
+	inc_page_state(allocstall);
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int total_scanned = 0;
@@ -852,6 +852,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int to_free = nr_pages;
 	int priority;
 	int i;
+
+	inc_page_state(pageoutrun);
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
 		int all_zones_ok = 1;
