@@ -1023,3 +1023,7 @@ CONFIG_BOOT_LOAD_BOOL
   which has a small amount of memory.
 
   Say N here unless you know what you are doing.
+
+CONFIG_DEBUG_SPINLOCK
+  Say Y here and to CONFIG_SMP to include code to check for missing
+  spinlock initialization and some other common spinlock errors.

@@ -605,6 +605,7 @@ mainmenu_option next_comment
 comment 'Kernel hacking'
 
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 bool 'Include kgdb kernel debugger' CONFIG_KGDB
 if [ "$CONFIG_KGDB" = "y" ]; then
    choice 'Serial Port'			\
