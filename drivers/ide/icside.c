@@ -27,7 +27,6 @@
 #include <asm/io.h>
 
 extern char *ide_xfer_verbose (byte xfer_rate);
-extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
 
 /*
  * Maximum number of interfaces per card
@@ -467,8 +466,7 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	case ide_dma_timeout:
 	default:
-		printk("icside_dmaproc: unsupported %s func: %d\n",
-			ide_dmafunc_verbose(func), func);
+		printk("icside_dmaproc: unsupported function: %d\n", func);
 	}
 	return 1;
 }

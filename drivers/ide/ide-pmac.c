@@ -52,7 +52,6 @@
 #endif
 #include "ata-timing.h"
 
-extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
 extern spinlock_t ide_lock;
 
 #undef IDE_PMAC_DEBUG
@@ -1460,10 +1459,10 @@ int pmac_ide_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	case ide_dma_retune:
 	case ide_dma_lostirq:
 	case ide_dma_timeout:
-		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported %s func only: %d\n", ide_dmafunc_verbose(func),  func);
+		printk(KERN_WARNING "ide_pmac_dmaproc: chipset supported func only: %d\n", func);
 		return 1;
 	default:
-		printk(KERN_WARNING "ide_pmac_dmaproc: unsupported %s func: %d\n", ide_dmafunc_verbose(func), func);
+		printk(KERN_WARNING "ide_pmac_dmaproc: unsupported func: %d\n", func);
 		return 1;
 	}
 	return 0;

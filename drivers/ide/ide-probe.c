@@ -189,6 +189,21 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	if (drive->channel->quirkproc)
 		drive->quirk_list = drive->channel->quirkproc(drive);
 
+	/*
+	 * it's an ata drive, build command list
+	 */
+#ifndef CONFIG_BLK_DEV_IDE_TCQ
+	drive->queue_depth = 1;
+#else
+	drive->queue_depth = drive->id->queue_depth + 1;
+	if (drive->queue_depth > CONFIG_BLK_DEV_IDE_TCQ_DEPTH)
+		drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;
+	if (drive->queue_depth < 1 || drive->queue_depth > IDE_MAX_TAG)
+		drive->queue_depth = IDE_MAX_TAG;
+#endif
+	if (ide_build_commandlist(drive))
+		goto err_misc;
+
 	return;
 
 err_misc:
@@ -593,10 +608,10 @@ static void ide_init_queue(ide_drive_t *drive)
 	blk_queue_max_sectors(q, max_sectors);
 
 	/* IDE DMA can do PRD_ENTRIES number of segments. */
-	blk_queue_max_hw_segments(q, PRD_ENTRIES);
+	blk_queue_max_hw_segments(q, PRD_SEGMENTS);
 
 	/* This is a driver limit and could be eliminated. */
-	blk_queue_max_phys_segments(q, PRD_ENTRIES);
+	blk_queue_max_phys_segments(q, PRD_SEGMENTS);
 }
 
 #if MAX_HWIFS > 1

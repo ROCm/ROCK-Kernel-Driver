@@ -291,7 +291,8 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 
 static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_taskfile *args = rq->special;
+	struct ata_request *ar = rq->special;
+	struct ata_taskfile *args = &ar->ar_task;
 	ide_startstop_t startstop;
 
 	/*
@@ -434,11 +435,35 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 		if (args->prehandler != NULL)
 			return args->prehandler(drive, rq);
 	} else {
-		/* for dma commands we down set the handler */
-		if (drive->using_dma &&
-		!(drive->channel->dmaproc(((args->taskfile.command == WIN_WRITEDMA)
-					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
-					? ide_dma_write : ide_dma_read, drive)));
+		ide_dma_action_t dmaaction;
+		u8 command;
+
+		if (!drive->using_dma)
+			return ide_started;
+
+		command = args->taskfile.command;
+
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		if (drive->using_tcq) {
+			if (command == WIN_READDMA_QUEUED
+			    || command == WIN_READDMA_QUEUED_EXT
+			    || command == WIN_WRITEDMA_QUEUED
+			    || command == WIN_READDMA_QUEUED_EXT)
+				return ide_start_tag(ide_dma_queued_start, drive, rq->special);
+		}
+#endif
+
+		if (command == WIN_WRITEDMA || command == WIN_WRITEDMA_EXT)
+			dmaaction = ide_dma_write;
+		else if (command == WIN_READDMA || command == WIN_READDMA_EXT)
+			dmaaction = ide_dma_read;
+		else
+			return ide_stopped;
+
+		if (!drive->channel->dmaproc(dmaaction, drive))
+			return ide_started;
+
+		return ide_stopped;
 	}
 
 	return ide_started;
@@ -495,8 +520,9 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
  */
 ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 {
-	struct ata_taskfile *args = HWGROUP(drive)->rq->special;
-	byte stat		= GET_STAT();
+	struct ata_request *ar = HWGROUP(drive)->rq->special;
+	struct ata_taskfile *args = &ar->ar_task;
+	u8 stat = GET_STAT();
 
 	ide__sti();	/* local CPU only */
 
@@ -555,7 +581,8 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 {
-	struct ata_taskfile *args = rq->special;
+	struct ata_request *ar = rq->special;
+	struct ata_taskfile *args = &ar->ar_task;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
@@ -644,7 +671,7 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 
 		pBuf = ide_map_rq(rq, &flags);
 
-		DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
+		DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %d\n",
 			pBuf, nsect, rq->current_nr_sectors);
 		drive->io_32bit = 0;
 		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
@@ -858,7 +885,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
-static void init_taskfile_request(struct request *rq)
+void init_taskfile_request(struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
 	rq->flags = REQ_DRIVE_TASKFILE;
@@ -875,23 +902,24 @@ static void init_taskfile_request(struct request *rq)
 int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf)
 {
 	struct request rq;
-	/* FIXME: This is on stack! */
-	struct ata_taskfile args;
+	struct ata_request ar;
+	struct ata_taskfile *args = &ar.ar_task;
 
-	memset(&args, 0, sizeof(args));
+	ata_ar_init(drive, &ar);
 
-	args.taskfile = *taskfile;
-	args.hobfile = *hobfile;
+	memcpy(&args->taskfile, taskfile, sizeof(*taskfile));
+	if (hobfile)
+		memcpy(&args->hobfile, hobfile, sizeof(*hobfile));
 
 	init_taskfile_request(&rq);
 
 	/* This is kept for internal use only !!! */
-	ide_cmd_type_parser(&args);
-	if (args.command_type != IDE_DRIVE_TASK_NO_DATA)
+	ide_cmd_type_parser(args);
+	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors = (hobfile->sector_count << 8) | taskfile->sector_count;
 
 	rq.buffer = buf;
-	rq.special = &args;
+	rq.special = &ar;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
@@ -899,15 +927,19 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
+	struct ata_request ar;
+
+	ata_ar_init(drive, &ar);
 	init_taskfile_request(&rq);
 	rq.buffer = buf;
+	memcpy(&ar.ar_task, args, sizeof(*args));
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
 		rq.current_nr_sectors = rq.nr_sectors
 			= (args->hobfile.sector_count << 8)
 			| args->taskfile.sector_count;
 
-	rq.special = args;
+	rq.special = &ar;
 
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
