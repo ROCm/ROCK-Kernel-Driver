@@ -390,6 +390,11 @@ struct pci_dev {
 					   or supports 64-bit transfers.  */
 	struct list_head pools;		/* pci_pools tied to this device */
 
+	u64		consistent_dma_mask;/* Like dma_mask, but for
+					       pci_alloc_consistent mappings as
+					       not all hardware supports
+					       64 bit addresses for consistent
+					       allocations such descriptors. */
 	u32             current_state;  /* Current operating state. In ACPI-speak,
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
@@ -623,6 +628,7 @@ int pci_set_mwi(struct pci_dev *dev);
 void pci_clear_mwi(struct pci_dev *dev);
 int pci_set_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask);
+int pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_assign_resource(struct pci_dev *dev, int i);
 
 /* Power management related routines */

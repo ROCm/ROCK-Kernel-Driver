@@ -276,8 +276,8 @@ void nr_disconnect(struct sock *sk, int reason)
 	sk->err       = reason;
 	sk->shutdown |= SEND_SHUTDOWN;
 
-	if (!test_bit(SOCK_DEAD, &sk->flags))
+	if (!sock_flag(sk, SOCK_DEAD)) {
 		sk->state_change(sk);
-
-	__set_bit(SOCK_DEAD, &sk->flags);
+		sock_set_flag(sk, SOCK_DEAD);
+	}
 }

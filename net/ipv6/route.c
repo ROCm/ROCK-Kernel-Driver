@@ -253,13 +253,15 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 				}
 			}
 			for (sprt = rt;
-			     !match && sprt && sprt != rt6_dflt_pointer; 
+			     !match && sprt;
 			     sprt = sprt->u.next) {
 				if (sprt->u.dst.obsolete <= 0 &&
 				    sprt->u.dst.error == 0) {
 					match = sprt;
 					break;
 				}
+				if (sprt == rt6_dflt_pointer)
+					break;
 			}
 		}
 	}

@@ -6400,8 +6400,7 @@ static int __devinit tg3_do_test_dma(struct tg3 *tp, u32 *buf, dma_addr_t buf_dm
 	tw32(BUFMGR_MODE, 0);
 	tw32(FTQ_RESET, 0);
 
-	/* pci_alloc_consistent gives only non-DAC addresses */
-	test_desc.addr_hi = 0;
+	test_desc.addr_hi = ((u64) buf_dma) >> 32;
 	test_desc.addr_lo = buf_dma & 0xffffffff;
 	test_desc.nic_mbuf = 0x00002100;
 	test_desc.len = size;
@@ -6743,6 +6742,12 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	/* Configure DMA attributes. */
 	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff)) {
 		pci_using_dac = 1;
+		if (pci_set_consistent_dma_mask(pdev,
+						(u64) 0xffffffffffffffff)) {
+			printk(KERN_ERR PFX "Unable to obtain 64 bit DMA "
+			       "for consistent allocations\n");
+			goto err_out_free_res;
+		}
 	} else {
 		err = pci_set_dma_mask(pdev, (u64) 0xffffffff);
 		if (err) {
