@@ -485,7 +485,7 @@ status=`awk '/^state: / { print $2 }' /proc/acpi/ac_adapter/AC/state`
 case $status in
         "on-line")
                 echo "Setting HD spindown to 2 hours"
-                /sbin/laptop-mode stop
+                /sbin/laptop_mode stop
                 /sbin/hdparm -S $ACAD_HD /dev/hda > /dev/null 2>&1
                 /sbin/hdparm -B 255 /dev/hda > /dev/null 2>&1
                 #echo -n $ACAD_CPU:$ACAD_THR > /proc/acpi/processor/CPU0/limit
@@ -493,7 +493,7 @@ case $status in
         ;;
         "off-line")
                 echo "Setting HD spindown to 20 seconds"
-                /sbin/laptop-mode start
+                /sbin/laptop_mode start
                 /sbin/hdparm -S $BATT_HD /dev/hda > /dev/null 2>&1
                 /sbin/hdparm -B 1 /dev/hda > /dev/null 2>&1
                 #echo -n $BATT_CPU:$BATT_THR > /proc/acpi/processor/CPU0/limit
