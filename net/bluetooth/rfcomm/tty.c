@@ -97,10 +97,16 @@ static void rfcomm_dev_destruct(struct rfcomm_dev *dev)
 	rfcomm_dlc_unlock(dlc);
 
 	rfcomm_dlc_put(dlc);
+
+	/* Refcount should only hit zero when called from rfcomm_dev_del()
+	   which will have taken us off the list. Everything else are
+	   refcounting bugs. */
+	BUG_ON(!list_empty(&dev->list));
+
 	kfree(dev);
 
 	/* It's safe to call module_put() here because socket still 
-	 holds refference to this module. */
+	   holds reference to this module. */
 	module_put(THIS_MODULE);
 }
 
@@ -111,6 +117,13 @@ static inline void rfcomm_dev_hold(struct rfcomm_dev *dev)
 
 static inline void rfcomm_dev_put(struct rfcomm_dev *dev)
 {
+	/* The reason this isn't actually a race, as you no
+	   doubt have a little voice screaming at you in your
+	   head, is that the refcount should never actually
+	   reach zero unless the device has already been taken
+	   off the list, in rfcomm_dev_del(). And if that's not
+	   true, we'll hit the BUG() in rfcomm_dev_destruct()
+	   anyway. */
 	if (atomic_dec_and_test(&dev->refcnt))
 		rfcomm_dev_destruct(dev);
 }
@@ -134,10 +147,13 @@ static inline struct rfcomm_dev *rfcomm_dev_get(int id)
 	struct rfcomm_dev *dev;
 
 	read_lock(&rfcomm_dev_lock);
+
 	dev = __rfcomm_dev_get(id);
+	if (dev)
+		rfcomm_dev_hold(dev);
+
 	read_unlock(&rfcomm_dev_lock);
 
-	if (dev) rfcomm_dev_hold(dev);
 	return dev;
 }
 
@@ -214,8 +230,9 @@ static int rfcomm_dev_add(struct rfcomm_dev_req *req, struct rfcomm_dlc *dlc)
 	rfcomm_dlc_unlock(dlc);
 
 	/* It's safe to call __module_get() here because socket already 
-	 holds refference to this module. */
+	   holds reference to this module. */
 	__module_get(THIS_MODULE);
+
 out:
 	write_unlock_bh(&rfcomm_dev_lock);
 
@@ -486,7 +503,8 @@ static void rfcomm_dev_state_change(struct rfcomm_dlc *dlc, int err)
 				rfcomm_dev_del(dev);
 
 				/* We have to drop DLC lock here, otherwise
-				 * rfcomm_dev_put() will dead lock if it's the last refference */
+				   rfcomm_dev_put() will dead lock if it's
+				   the last reference. */
 				rfcomm_dlc_unlock(dlc);
 				rfcomm_dev_put(dev);
 				rfcomm_dlc_lock(dlc);
@@ -541,6 +559,10 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 	BT_DBG("tty %p id %d", tty, id);
 
+	/* We don't leak this refcount. For reasons which are not entirely
+	   clear, the TTY layer will call our ->close() method even if the
+	   open fails. We decrease the refcount there, and decreasing it
+	   here too would cause breakage. */
 	dev = rfcomm_dev_get(id);
 	if (!dev)
 		return -ENODEV;
@@ -561,10 +583,8 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	set_bit(RFCOMM_TTY_ATTACHED, &dev->flags);
 
 	err = rfcomm_dlc_open(dlc, &dev->src, &dev->dst, dev->channel);
-	if (err < 0) {
-		rfcomm_dev_put(dev);
+	if (err < 0)
 		return err;
-	}
 
 	/* Wait for DLC to connect */
 	add_wait_queue(&dev->wait, &wait);
@@ -588,9 +608,6 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&dev->wait, &wait);
-
-	if (err < 0)
-		rfcomm_dev_put(dev);
 
 	return err;
 }
