@@ -400,7 +400,16 @@ e1000_probe(struct pci_dev *pdev,
 		goto err_eeprom;
 
 	e1000_read_part_num(&adapter->hw, &(adapter->part_num));
+
 	e1000_get_bus_info(&adapter->hw);
+
+	if((adapter->hw.mac_type == e1000_82544) &&
+	   (adapter->hw.bus_type == e1000_bus_type_pcix))
+
+		adapter->max_data_per_txd = 4096;
+	else
+		adapter->max_data_per_txd = MAX_JUMBO_FRAME_SIZE;
+
 
 	init_timer(&adapter->watchdog_timer);
 	adapter->watchdog_timer.function = &e1000_watchdog;
@@ -569,6 +578,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->tbi_compatibility_en = TRUE;
 
 	atomic_set(&adapter->irq_sem, 1);
+	spin_lock_init(&adapter->tx_lock);
 	spin_lock_init(&adapter->stats_lock);
 }
 
@@ -676,7 +686,6 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 	}
 	memset(txdr->desc, 0, txdr->size);
 
-	atomic_set(&txdr->unused, txdr->count);
 	txdr->next_to_use = 0;
 	txdr->next_to_clean = 0;
 
@@ -728,26 +737,23 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	/* Set the Tx Interrupt Delay register */
 
-	E1000_WRITE_REG(&adapter->hw, TIDV, adapter->tx_int_delay);
+	E1000_WRITE_REG(&adapter->hw, TIDV, 64);
 
 	/* Program the Transmit Control Register */
 
-	tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
-	       (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
+	tctl = E1000_READ_REG(&adapter->hw, TCTL);
 
-	if(adapter->link_duplex == FULL_DUPLEX) {
-		tctl |= E1000_FDX_COLLISION_DISTANCE << E1000_COLD_SHIFT;
-	} else {
-		tctl |= E1000_HDX_COLLISION_DISTANCE << E1000_COLD_SHIFT;
-	}
+	tctl &= ~E1000_TCTL_CT;	
+	tctl |= E1000_TCTL_EN | E1000_TCTL_PSP |
+	       (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT);
 
 	E1000_WRITE_REG(&adapter->hw, TCTL, tctl);
 
-	/* Setup Transmit Descriptor Settings for this adapter */
-	adapter->txd_cmd = E1000_TXD_CMD_IFCS;
+	e1000_config_collision_dist(&adapter->hw);
 
-	if(adapter->tx_int_delay > 0)
-		adapter->txd_cmd |= E1000_TXD_CMD_IDE;
+	/* Setup Transmit Descriptor Settings for this adapter */
+	adapter->txd_cmd = E1000_TXD_CMD_IFCS | E1000_TXD_CMD_IDE;
+
 	if(adapter->hw.report_tx_early == 1)
 		adapter->txd_cmd |= E1000_TXD_CMD_RS;
 	else
@@ -794,7 +800,6 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	memset(rxdr->desc, 0, rxdr->size);
 
 	rxdr->next_to_clean = 0;
-	rxdr->unused_count = rxdr->count;
 	rxdr->next_to_use = 0;
 
 	return 0;
@@ -959,7 +964,6 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 
 	memset(adapter->tx_ring.desc, 0, adapter->tx_ring.size);
 
-	atomic_set(&adapter->tx_ring.unused, adapter->tx_ring.count);
 	adapter->tx_ring.next_to_use = 0;
 	adapter->tx_ring.next_to_clean = 0;
 
@@ -1029,7 +1033,6 @@ e1000_clean_rx_ring(struct e1000_adapter *adapter)
 
 	memset(adapter->rx_ring.desc, 0, adapter->rx_ring.size);
 
-	adapter->rx_ring.unused_count = adapter->rx_ring.count;
 	adapter->rx_ring.next_to_clean = 0;
 	adapter->rx_ring.next_to_use = 0;
 
@@ -1248,163 +1251,178 @@ e1000_watchdog(unsigned long data)
 
 	/* Reset the timer */
 	mod_timer(&adapter->watchdog_timer, jiffies + 2 * HZ);
-
-	return;
 }
 
-/**
- * e1000_xmit_frame - Transmit entry point
- * @skb: buffer with frame data to transmit
- * @netdev: network interface device structure
- *
- * Returns 0 on success, 1 on error
- *
- * e1000_xmit_frame is called by the stack to initiate a transmit.
- * The out of resource condition is checked after each successful Tx
- * so that the stack can be notified, preventing the driver from
- * ever needing to drop a frame.  The atomic operations on
- * tx_ring.unused are used to syncronize with the transmit
- * interrupt processing code without the need for a spinlock.
- **/
+#define E1000_TX_FLAGS_CSUM		0x00000001
 
-#define TXD_USE_COUNT(x) (((x) >> 12) + ((x) & 0x0fff ? 1 : 0))
-
-#define SETUP_TXD_PAGE(L, P, O) do { \
-	tx_ring->buffer_info[i].length = (L); \
-	tx_ring->buffer_info[i].dma = \
-		pci_map_page(pdev, (P), (O), (L), PCI_DMA_TODEVICE); \
-	tx_desc->buffer_addr = cpu_to_le64(tx_ring->buffer_info[i].dma); \
-	tx_desc->lower.data = cpu_to_le32(txd_lower | (L)); \
-	tx_desc->upper.data = cpu_to_le32(txd_upper); \
-} while (0)
-
-#define SETUP_TXD_PTR(L, P) \
-	SETUP_TXD_PAGE((L), virt_to_page(P), (unsigned long)(P) & ~PAGE_MASK)
-
-#define QUEUE_TXD() do { i = (i + 1) % tx_ring->count; \
-                         atomic_dec(&tx_ring->unused); } while (0)
-
-
-static int
-e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
+static inline boolean_t
+e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
-	struct e1000_adapter *adapter = netdev->priv;
-	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
-	struct pci_dev *pdev = adapter->pdev;
-	struct e1000_tx_desc *tx_desc;
-	int f, len, offset, txd_needed;
-	skb_frag_t *frag;
-
-	int i = tx_ring->next_to_use;
-	uint32_t txd_upper = 0;
-	uint32_t txd_lower = adapter->txd_cmd;
-
-
-	/* If controller appears hung, force transmit timeout */
-
-	if (time_after(netdev->trans_start, adapter->trans_finish + HZ) &&
-	    /* If transmitting XOFFs, we're not really hung */
-	    !(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_TXOFF)) {
-		adapter->trans_finish = jiffies;
-		netif_stop_queue(netdev);
-		return 1;
-	}
-
-	txd_needed = TXD_USE_COUNT(skb->len - skb->data_len);
-
-	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++) {
-		frag = &skb_shinfo(skb)->frags[f];
-		txd_needed += TXD_USE_COUNT(frag->size);
-	}
-
-	if(skb->ip_summed == CHECKSUM_HW)
-		txd_needed += 1;
-
-	/* make sure there are enough Tx descriptors available in the ring */
-
-	if(atomic_read(&tx_ring->unused) <= (txd_needed + 1)) {
-		adapter->net_stats.tx_dropped++;
-		netif_stop_queue(netdev);
-		return 1;
-	}
+	struct e1000_context_desc *context_desc;
+	int i;
+	uint8_t css, cso;
 
 	if(skb->ip_summed == CHECKSUM_HW) {
-		struct e1000_context_desc *context_desc;
-		uint8_t css = skb->h.raw - skb->data;
-		uint8_t cso = (skb->h.raw + skb->csum) - skb->data;
+		css = skb->h.raw - skb->data;
+		cso = (skb->h.raw + skb->csum) - skb->data;
 
-		context_desc = E1000_CONTEXT_DESC(*tx_ring, i);
+		i = adapter->tx_ring.next_to_use;
+		context_desc = E1000_CONTEXT_DESC(adapter->tx_ring, i);
 
 		context_desc->upper_setup.tcp_fields.tucss = css;
 		context_desc->upper_setup.tcp_fields.tucso = cso;
 		context_desc->upper_setup.tcp_fields.tucse = 0;
 		context_desc->tcp_seg_setup.data = 0;
 		context_desc->cmd_and_length =
-			cpu_to_le32(txd_lower | E1000_TXD_CMD_DEXT);
+			cpu_to_le32(adapter->txd_cmd | E1000_TXD_CMD_DEXT);
 
-		QUEUE_TXD();
+		i = (i + 1) % adapter->tx_ring.count;
+		adapter->tx_ring.next_to_use = i;
 
-		txd_upper |= E1000_TXD_POPTS_TXSM << 8;
-		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
+		return TRUE;
 	}
 
-	tx_desc = E1000_TX_DESC(*tx_ring, i);
+	return FALSE;
+}
+
+static inline int
+e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
+{
+	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
+	int len, offset, size, count, i;
+
+	int f;
 	len = skb->len - skb->data_len;
+
+	i = (tx_ring->next_to_use + tx_ring->count - 1) % tx_ring->count;
+	count = 0;
+
 	offset = 0;
 
-	while(len > 4096) {
-		SETUP_TXD_PTR(4096, skb->data + offset);
-		QUEUE_TXD();
+	while(len) {
+		i = (i + 1) % tx_ring->count;
+		size = min(len, adapter->max_data_per_txd);
+		tx_ring->buffer_info[i].length = size;
+		tx_ring->buffer_info[i].dma =
+			pci_map_single(adapter->pdev,
+				skb->data + offset,
+				size,
+				PCI_DMA_TODEVICE);
 
-		tx_desc = E1000_TX_DESC(*tx_ring, i);
-		len -= 4096;
-		offset += 4096;
+		len -= size;
+		offset += size;
+		count++;
 	}
 
-	SETUP_TXD_PTR(len, skb->data + offset);
-
 	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++) {
+		struct skb_frag_struct *frag;
+
 		frag = &skb_shinfo(skb)->frags[f];
-
-		QUEUE_TXD();
-
-		tx_desc = E1000_TX_DESC(*tx_ring, i);
 		len = frag->size;
 		offset = 0;
 
-		while(len > 4096) {
-			SETUP_TXD_PAGE(4096, frag->page,
-			               frag->page_offset + offset);
-			QUEUE_TXD();
+		while(len) {
+			i = (i + 1) % tx_ring->count;
+			size = min(len, adapter->max_data_per_txd);
+			tx_ring->buffer_info[i].length = size;
+			tx_ring->buffer_info[i].dma =
+				pci_map_page(adapter->pdev,
+					frag->page,
+					frag->page_offset + offset,
+					size,
+					PCI_DMA_TODEVICE);
 
-			tx_desc = E1000_TX_DESC(*tx_ring, i);
-			len -= 4096;
-			offset += 4096;
+			len -= size;
+			offset += size;
+			count++;
 		}
-		SETUP_TXD_PAGE(len, frag->page, frag->page_offset + offset);
 	}
-
-	/* EOP and SKB pointer go with the last fragment */
-
-	tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP);
 	tx_ring->buffer_info[i].skb = skb;
 
-	QUEUE_TXD();
+	return count;
+}
+
+static inline void
+e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
+{
+	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
+	struct e1000_tx_desc *tx_desc = NULL;
+	uint32_t txd_upper, txd_lower;
+	int i;
+
+	txd_upper = 0;
+	txd_lower = adapter->txd_cmd;
+
+	if(tx_flags & E1000_TX_FLAGS_CSUM) {
+		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
+		txd_upper |= E1000_TXD_POPTS_TXSM << 8;
+	}
+
+	i = tx_ring->next_to_use;
+
+	while(count--) {
+		tx_desc = E1000_TX_DESC(*tx_ring, i);
+		tx_desc->buffer_addr = cpu_to_le64(tx_ring->buffer_info[i].dma);
+		tx_desc->lower.data =
+			cpu_to_le32(txd_lower | tx_ring->buffer_info[i].length);
+		tx_desc->upper.data = cpu_to_le32(txd_upper);
+		i = (i + 1) % tx_ring->count;
+	}
+
+	tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP);
 
 	tx_ring->next_to_use = i;
-
-	/* Move the HW Tx Tail Pointer */
-
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
+}
+
+#define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
+
+static int
+e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	unsigned long flags;
+	int tx_flags = 0, count;
+
+	int f;
+
+
+	if(time_after(netdev->trans_start, adapter->trans_finish + HZ) &&
+	   !(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_TXOFF)) {
+
+		adapter->trans_finish = jiffies;
+		netif_stop_queue(netdev);
+		return 1;
+	}
+
+	count = TXD_USE_COUNT(skb->len - skb->data_len,
+	                      adapter->max_data_per_txd);
+	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++)
+		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
+		                       adapter->max_data_per_txd);
+	if(skb->ip_summed == CHECKSUM_HW)
+		count++;
+
+	spin_lock_irqsave(&adapter->tx_lock, flags);
+	e1000_clean_tx_irq(adapter);
+	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
+		netif_stop_queue(netdev);
+		spin_unlock_irqrestore(&adapter->tx_lock, flags);
+		return 1;
+	}
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
+
+	if(e1000_tx_csum(adapter, skb))
+		tx_flags |= E1000_TX_FLAGS_CSUM;
+
+	count = e1000_tx_map(adapter, skb);
+
+	e1000_tx_queue(adapter, count, tx_flags);
 
 	netdev->trans_start = jiffies;
 
 	return 0;
 }
-
-#undef TXD_USE_COUNT
-#undef SETUP_TXD
-#undef QUEUE_TXD
 
 /**
  * e1000_tx_timeout - Respond to a Tx Hang
@@ -1672,11 +1690,15 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		}
 
 		e1000_clean_rx_irq(adapter);
-		e1000_clean_tx_irq(adapter);
-		i--;
-	}
 
-	return;
+		if((icr & E1000_ICR_TXDW) && spin_trylock(&adapter->tx_lock)) {
+			e1000_clean_tx_irq(adapter);
+			spin_unlock(&adapter->tx_lock);
+		}
+
+		i--;
+
+	}
 }
 
 /**
@@ -1710,7 +1732,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 		if(tx_ring->buffer_info[i].skb) {
 
-			dev_kfree_skb_irq(tx_ring->buffer_info[i].skb);
+			dev_kfree_skb_any(tx_ring->buffer_info[i].skb);
 
 			tx_ring->buffer_info[i].skb = NULL;
 		}
@@ -1718,7 +1740,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 		memset(tx_desc, 0, sizeof(struct e1000_tx_desc));
 		mb();
 
-		atomic_inc(&tx_ring->unused);
 		i = (i + 1) % tx_ring->count;
 		tx_desc = E1000_TX_DESC(*tx_ring, i);
 
@@ -1728,7 +1749,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	tx_ring->next_to_clean = i;
 
 	if(netif_queue_stopped(netdev) && netif_carrier_ok(netdev) &&
-	   (atomic_read(&tx_ring->unused) > E1000_TX_QUEUE_WAKE)) {
+	   (E1000_DESC_UNUSED(tx_ring) > E1000_TX_QUEUE_WAKE)) {
 
 		netif_wake_queue(netdev);
 	}
@@ -1777,8 +1798,6 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			mb();
 			rx_ring->buffer_info[i].skb = NULL;
 
-			rx_ring->unused_count++;
-
 			i = (i + 1) % rx_ring->count;
 
 			rx_desc = E1000_RX_DESC(*rx_ring, i);
@@ -1808,7 +1827,6 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 				mb();
 				rx_ring->buffer_info[i].skb = NULL;
 
-				rx_ring->unused_count++;
 				i = (i + 1) % rx_ring->count;
 
 				rx_desc = E1000_RX_DESC(*rx_ring, i);
@@ -1828,8 +1846,6 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
 		mb();
 		rx_ring->buffer_info[i].skb = NULL;
-
-		rx_ring->unused_count++;
 
 		i = (i + 1) % rx_ring->count;
 
@@ -1897,8 +1913,6 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 
 		/* move tail */
 		E1000_WRITE_REG(&adapter->hw, RDT, i);
-
-		atomic_dec(&rx_ring->unused);
 
 		i = (i + 1) % rx_ring->count;
 	}

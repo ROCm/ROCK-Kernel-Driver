@@ -161,10 +161,6 @@ struct e1000_desc_ring {
 	unsigned int size;
 	/* number of descriptors in the ring */
 	unsigned int count;
-	/* (atomic) number of desc with no buffer */
-	atomic_t unused;
-	/* number of desc with no buffer */
-	unsigned int unused_count;
 	/* next descriptor to associate a buffer with */
 	unsigned int next_to_use;
 	/* next descriptor to check for DD status bit */
@@ -173,14 +169,13 @@ struct e1000_desc_ring {
 	struct e1000_buffer *buffer_info;
 };
 
-#define E1000_RX_DESC(ring, i) \
-	(&(((struct e1000_rx_desc *)((ring).desc))[i]))
+#define E1000_DESC_UNUSED(R) \
+((((R)->next_to_clean + (R)->count) - ((R)->next_to_use + 1)) % ((R)->count))
 
-#define E1000_TX_DESC(ring, i) \
-	(&(((struct e1000_tx_desc *)((ring).desc))[i]))
-
-#define E1000_CONTEXT_DESC(ring, i) \
-	(&(((struct e1000_context_desc *)((ring).desc))[i]))
+#define E1000_GET_DESC(R, i, type)	(&(((struct type *)((R).desc))[i]))
+#define E1000_RX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_rx_desc)
+#define E1000_TX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_tx_desc)
+#define E1000_CONTEXT_DESC(R, i)	E1000_GET_DESC(R, i, e1000_context_desc)
 
 /* board specific private data structure */
 
@@ -204,8 +199,9 @@ struct e1000_adapter {
 	/* TX */
 	struct e1000_desc_ring tx_ring;
 	unsigned long trans_finish;
-	uint32_t tx_int_delay;
+	spinlock_t tx_lock;
 	uint32_t txd_cmd;
+	int max_data_per_txd;
 
 	/* RX */
 	struct e1000_desc_ring rx_ring;

@@ -192,15 +192,6 @@ E1000_PARAM(FlowControl, "Flow Control setting");
 
 E1000_PARAM(XsumRX, "Disable or enable Receive Checksum offload");
 
-/* Transmit Interrupt Delay in units of 1.024 microseconds
- *
- * Valid Range: 0-65535
- *
- * Default Value: 64
- */
-
-E1000_PARAM(TxIntDelay, "Transmit Interrupt Delay");
-
 /* Receive Interrupt Delay in units of 1.024 microseconds
  *
  * Valid Range: 0-65535
@@ -250,10 +241,6 @@ E1000_PARAM(DisablePolarityCorrection,
 #define MAX_RXD                      256
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096
-
-#define DEFAULT_TIDV                  64
-#define MAX_TIDV                  0xFFFF
-#define MIN_TIDV                       0
 
 #define DEFAULT_RDTR                  64
 #define DEFAULT_RADV                 128
@@ -422,18 +409,6 @@ e1000_check_options(struct e1000_adapter *adapter)
 		int fc = FlowControl[bd];
 		e1000_validate_option(&fc, &opt);
 		adapter->hw.fc = adapter->hw.original_fc = fc;
-	}
-	{ /* Transmit Interrupt Delay */
-		struct e1000_option opt = {
-			type: range_option,
-			name: "Transmit Interrupt Delay",
-			err:  "using default of " __MODULE_STRING(DEFAULT_TIDV),
-			def:  DEFAULT_TIDV,
-			arg: { r: { min: MIN_TIDV, max: MAX_TIDV }}
-		};
-
-		adapter->tx_int_delay = TxIntDelay[bd];
-		e1000_validate_option(&adapter->tx_int_delay, &opt);
 	}
 	{ /* Receive Interrupt Delay */
 		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
