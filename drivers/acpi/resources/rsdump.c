@@ -551,6 +551,11 @@ acpi_rs_dump_address16 (
 					  "Invalid range attribute\n");
 			break;
 		}
+
+		acpi_os_printf (" Type Specific: %s Translation\n",
+			ACPI_SPARSE_TRANSLATION ==
+			address16_data->attribute.io.translation_attribute ?
+			"Sparse" : "Dense");
 		break;
 
 	case ACPI_BUS_NUMBER_RANGE:
@@ -673,26 +678,31 @@ acpi_rs_dump_address32 (
 		acpi_os_printf ("  Resource Type: Io Range\n");
 
 		switch (address32_data->attribute.io.range_attribute) {
-			case ACPI_NON_ISA_ONLY_RANGES:
-				acpi_os_printf ("  Type Specific: "
-						  "Non-ISA Io Addresses\n");
-				break;
+		case ACPI_NON_ISA_ONLY_RANGES:
+			acpi_os_printf ("  Type Specific: "
+					  "Non-ISA Io Addresses\n");
+			break;
 
-			case ACPI_ISA_ONLY_RANGES:
-				acpi_os_printf ("  Type Specific: "
-						  "ISA Io Addresses\n");
-				break;
+		case ACPI_ISA_ONLY_RANGES:
+			acpi_os_printf ("  Type Specific: "
+					  "ISA Io Addresses\n");
+			break;
 
-			case ACPI_ENTIRE_RANGE:
-				acpi_os_printf ("  Type Specific: "
-						  "ISA and non-ISA Io Addresses\n");
-				break;
+		case ACPI_ENTIRE_RANGE:
+			acpi_os_printf ("  Type Specific: "
+					  "ISA and non-ISA Io Addresses\n");
+			break;
 
-			default:
-				acpi_os_printf ("  Type Specific: "
-						  "Invalid Range attribute");
-				break;
-			}
+		default:
+			acpi_os_printf ("  Type Specific: "
+					  "Invalid Range attribute");
+			break;
+		}
+
+		acpi_os_printf (" Type Specific: %s Translation\n",
+			ACPI_SPARSE_TRANSLATION ==
+			address32_data->attribute.io.translation_attribute ?
+			"Sparse" : "Dense");
 		break;
 
 	case ACPI_BUS_NUMBER_RANGE:
@@ -815,26 +825,31 @@ acpi_rs_dump_address64 (
 		acpi_os_printf ("  Resource Type: Io Range\n");
 
 		switch (address64_data->attribute.io.range_attribute) {
-			case ACPI_NON_ISA_ONLY_RANGES:
-				acpi_os_printf ("  Type Specific: "
-						  "Non-ISA Io Addresses\n");
-				break;
+		case ACPI_NON_ISA_ONLY_RANGES:
+			acpi_os_printf ("  Type Specific: "
+					  "Non-ISA Io Addresses\n");
+			break;
 
-			case ACPI_ISA_ONLY_RANGES:
-				acpi_os_printf ("  Type Specific: "
-						  "ISA Io Addresses\n");
-				break;
+		case ACPI_ISA_ONLY_RANGES:
+			acpi_os_printf ("  Type Specific: "
+					  "ISA Io Addresses\n");
+			break;
 
-			case ACPI_ENTIRE_RANGE:
-				acpi_os_printf ("  Type Specific: "
-						  "ISA and non-ISA Io Addresses\n");
-				break;
+		case ACPI_ENTIRE_RANGE:
+			acpi_os_printf ("  Type Specific: "
+					  "ISA and non-ISA Io Addresses\n");
+			break;
 
-			default:
-				acpi_os_printf ("  Type Specific: "
-						  "Invalid Range attribute");
-				break;
-			}
+		default:
+			acpi_os_printf ("  Type Specific: "
+					  "Invalid Range attribute");
+			break;
+		}
+
+		acpi_os_printf (" Type Specific: %s Translation\n",
+			ACPI_SPARSE_TRANSLATION ==
+			address64_data->attribute.io.translation_attribute ?
+			"Sparse" : "Dense");
 		break;
 
 	case ACPI_BUS_NUMBER_RANGE:

@@ -130,6 +130,8 @@ acpi_rs_address16_resource (
 		if (ACPI_IO_RANGE == output_struct->data.address16.resource_type) {
 			output_struct->data.address16.attribute.io.range_attribute =
 				(u16) (temp8 & 0x03);
+			output_struct->data.address16.attribute.io.translation_attribute =
+				(u16) ((temp8 >> 4) & 0x03);
 		}
 		else {
 			/* BUS_NUMBER_RANGE == Address16.Data->resource_type */
@@ -328,6 +330,9 @@ acpi_rs_address16_stream (
 		temp8 = (u8)
 			(linked_list->data.address16.attribute.io.range_attribute &
 			 0x03);
+		temp8 |=
+			(linked_list->data.address16.attribute.io.translation_attribute &
+			 0x03) << 4;
 	}
 
 	*buffer = temp8;
@@ -516,6 +521,8 @@ acpi_rs_address32_resource (
 		if (ACPI_IO_RANGE == output_struct->data.address32.resource_type) {
 			output_struct->data.address32.attribute.io.range_attribute =
 				(u16) (temp8 & 0x03);
+			output_struct->data.address32.attribute.io.translation_attribute =
+				(u16) ((temp8 >> 4) & 0x03);
 		}
 		else {
 			/* BUS_NUMBER_RANGE == output_struct->Data.Address32.resource_type */
@@ -712,6 +719,9 @@ acpi_rs_address32_stream (
 		temp8 = (u8)
 			(linked_list->data.address32.attribute.io.range_attribute &
 			 0x03);
+		temp8 |=
+			(linked_list->data.address32.attribute.io.translation_attribute &
+			 0x03) << 4;
 	}
 
 	*buffer = temp8;
@@ -899,6 +909,8 @@ acpi_rs_address64_resource (
 		if (ACPI_IO_RANGE == output_struct->data.address64.resource_type) {
 			output_struct->data.address64.attribute.io.range_attribute =
 				(u16) (temp8 & 0x03);
+			output_struct->data.address64.attribute.io.translation_attribute =
+				(u16) ((temp8 >> 4) & 0x03);
 		}
 		else {
 			/* BUS_NUMBER_RANGE == output_struct->Data.Address64.resource_type */
@@ -1099,6 +1111,9 @@ acpi_rs_address64_stream (
 		temp8 = (u8)
 			(linked_list->data.address64.attribute.io.range_attribute &
 			 0x03);
+		temp8 |=
+			(linked_list->data.address64.attribute.io.range_attribute &
+			 0x03) << 4;
 	}
 
 	*buffer = temp8;

@@ -877,6 +877,8 @@ struct acpi_mem_space_context
 #define ACPI_ISA_ONLY_RANGES            (u8) 0x02
 #define ACPI_ENTIRE_RANGE               (ACPI_NON_ISA_ONLY_RANGES | ACPI_ISA_ONLY_RANGES)
 
+#define ACPI_SPARSE_TRANSLATION         (u8) 0x03
+
 /*
  *  IO Port Descriptor Decode
  */
@@ -1026,7 +1028,7 @@ struct acpi_memory_attribute
 struct acpi_io_attribute
 {
 	u16                                 range_attribute;
-	u16                                 reserved;
+	u16                                 translation_attribute;
 };
 
 struct acpi_bus_attribute
