@@ -37,7 +37,7 @@ int hp_slot_thread(void* ptr)
 
 	lock_kernel ();
 	daemonize ("amdshpc_slot");
-	reparent_to_init ();
+	
 	unlock_kernel ();
 
 	slot_context = (struct slot_context*) ptr;
