@@ -1534,7 +1534,7 @@ static struct _ac97_rate_regs nforce_ac97_rate_regs[] __devinitdata = {
 	{ NVD_PCMOUT, { AC97_PCM_FRONT_DAC_RATE, AC97_PCM_SURR_DAC_RATE, AC97_PCM_LFE_DAC_RATE }, AC97_RATES_FRONT_DAC },
 	{ NVD_PCMIN, { AC97_PCM_LR_ADC_RATE, 0, 0 }, AC97_RATES_ADC },
 	{ NVD_MIC, { AC97_PCM_MIC_ADC_RATE, 0, 0 }, AC97_RATES_MIC_ADC },
-	{ NVD_SPBAR, { AC97_SPDIF, AC97_PCM_FRONT_DAC_RATE, 0 }, AC97_RATES_SPDIF },
+	{ NVD_SPBAR, { AC97_SPDIF, AC97_PCM_FRONT_DAC_RATE, 0 }, -1 }, /* spdif is 48k only */
 };
 
 static struct _ac97_rate_regs ali_ac97_rate_regs[] __devinitdata = {
