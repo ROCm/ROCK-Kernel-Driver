@@ -329,7 +329,7 @@ static int snd_emu10k1_gpr_ctl_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	snd_emu10k1_fx8010_ctl_t *ctl = (snd_emu10k1_fx8010_ctl_t *)kcontrol->private_value;
 	unsigned long flags;
-	int i;
+	unsigned int i;
 	
 	spin_lock_irqsave(&emu->reg_lock, flags);
 	for (i = 0; i < ctl->vcount; i++)
@@ -344,7 +344,8 @@ static int snd_emu10k1_gpr_ctl_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	snd_emu10k1_fx8010_ctl_t *ctl = (snd_emu10k1_fx8010_ctl_t *)kcontrol->private_value;
 	unsigned long flags;
 	unsigned int nval, val;
-	int i, j, change = 0;
+	unsigned int i, j;
+	int change = 0;
 	
 	spin_lock_irqsave(&emu->reg_lock, flags);
 	for (i = 0; i < ctl->vcount; i++) {
@@ -572,7 +573,7 @@ static int snd_emu10k1_fx8010_playback_hw_free(snd_pcm_substream_t * substream)
 {
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < pcm->channels; i++)
 		snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + 0x80 + pcm->etram[i], 0, 0);
@@ -585,7 +586,7 @@ static int snd_emu10k1_fx8010_playback_prepare(snd_pcm_substream_t * substream)
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	int i;
+	unsigned int i;
 	
 	// printk("prepare: etram_pages = 0x%p, dma_area = 0x%x, buffer_size = 0x%x (0x%x)\n", emu->fx8010.etram_pages, runtime->dma_area, runtime->buffer_size, runtime->buffer_size << 2);
 	pcm->sw_data = pcm->sw_io = pcm->sw_ready = 0;
@@ -914,7 +915,7 @@ static snd_emu10k1_fx8010_ctl_t *snd_emu10k1_look_for_ctl(emu10k1_t *emu, snd_ct
 
 static int snd_emu10k1_verify_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
-	int i;
+	unsigned int i;
 	snd_ctl_elem_id_t *_id, id;
 	emu10k1_fx8010_control_gpr_t *_gctl, gctl;
 	
@@ -958,7 +959,7 @@ static void snd_emu10k1_ctl_private_free(snd_kcontrol_t *kctl)
 
 static void snd_emu10k1_add_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
-	int i, j;
+	unsigned int i, j;
 	emu10k1_fx8010_control_gpr_t *_gctl, gctl;
 	snd_emu10k1_fx8010_ctl_t *ctl, nctl;
 	snd_kcontrol_new_t knew;
@@ -1020,7 +1021,7 @@ static void snd_emu10k1_add_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 
 static void snd_emu10k1_del_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
-	int i;
+	unsigned int i;
 	snd_ctl_elem_id_t *_id, id;
 	snd_emu10k1_fx8010_ctl_t *ctl;
 	
@@ -1036,7 +1037,7 @@ static void snd_emu10k1_del_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 
 static int snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
-	int i = 0, j;
+	unsigned int i = 0, j;
 	unsigned int total = 0;
 	emu10k1_fx8010_control_gpr_t *_gctl, gctl;
 	snd_emu10k1_fx8010_ctl_t *ctl;
@@ -1123,7 +1124,8 @@ static int snd_emu10k1_icode_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 
 static int snd_emu10k1_ipcm_poke(emu10k1_t *emu, emu10k1_fx8010_pcm_t *ipcm)
 {
-	int err = 0, i;
+	unsigned int i;
+	int err = 0;
 	snd_emu10k1_fx8010_pcm_t *pcm;
 
 	if (ipcm->substream >= EMU10K1_FX8010_PCM_COUNT)
@@ -1167,7 +1169,8 @@ static int snd_emu10k1_ipcm_poke(emu10k1_t *emu, emu10k1_fx8010_pcm_t *ipcm)
 
 static int snd_emu10k1_ipcm_peek(emu10k1_t *emu, emu10k1_fx8010_pcm_t *ipcm)
 {
-	int err = 0, i;
+	unsigned int i;
+	int err = 0;
 	snd_emu10k1_fx8010_pcm_t *pcm;
 
 	if (ipcm->substream >= EMU10K1_FX8010_PCM_COUNT)

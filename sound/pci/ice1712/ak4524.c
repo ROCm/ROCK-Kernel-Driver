@@ -112,7 +112,7 @@ void snd_ice1712_ak4524_write(ice1712_t *ice, int chip,
 
 void snd_ice1712_ak4524_reset(ice1712_t *ice, int state)
 {
-	int chip;
+	unsigned int chip;
 	unsigned char reg;
 	ak4524_t *ak = &ice->ak4524;
 	
@@ -341,7 +341,8 @@ static int snd_ice1712_ak4524_deemphasis_put(snd_kcontrol_t *kcontrol, snd_ctl_e
 
 int __devinit snd_ice1712_ak4524_build_controls(ice1712_t *ice)
 {
-	int err, idx;
+	unsigned int idx;
+	int err;
 	ak4524_t *ak = &ice->ak4524;
 
 	for (idx = 0; idx < ak->num_dacs; ++idx) {

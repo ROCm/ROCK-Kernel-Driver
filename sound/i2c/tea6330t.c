@@ -281,7 +281,8 @@ int snd_tea6330t_update_mixer(snd_card_t * card,
 	snd_i2c_device_t *device;
 	tea6330t_t *tea;
 	snd_kcontrol_new_t *knew;
-	int idx, err = -ENOMEM;
+	unsigned int idx;
+	int err = -ENOMEM;
 	u8 default_treble, default_bass;
 	unsigned char bytes[7];
 

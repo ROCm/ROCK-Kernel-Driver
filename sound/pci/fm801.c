@@ -130,7 +130,7 @@ struct _snd_fm801 {
 	struct resource *res_port;
 	unsigned int multichannel: 1,	/* multichannel support */
 		     secondary: 1;	/* secondary codec */
-	unsigned char secondary_addr;	/* addres of the secondary codec */
+	unsigned char secondary_addr;	/* address of the secondary codec */
 
 	unsigned short ply_ctrl; /* playback control */
 	unsigned short cap_ctrl; /* capture control */
@@ -293,7 +293,7 @@ static snd_pcm_hw_constraint_list_t hw_constraints_channels = {
  *  Sample rate routines
  */
 
-static unsigned short snd_fm801_rate_bits(int rate)
+static unsigned short snd_fm801_rate_bits(unsigned int rate)
 {
 	unsigned int idx;
 
@@ -855,7 +855,8 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
 	ac97_t ac97;
-	int err, i;
+	unsigned int i;
+	int err;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.write = snd_fm801_codec_write;

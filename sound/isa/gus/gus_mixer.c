@@ -172,7 +172,8 @@ ICS_DOUBLE("CD Playback Volume", 0, SNDRV_ICS_CD_DEV)
 int snd_gf1_new_mixer(snd_gus_card_t * gus)
 {
 	snd_card_t *card;
-	int idx, err, max;
+	unsigned int idx, max;
+	int err;
 
 	snd_assert(gus != NULL, return -EINVAL);
 	card = gus->card;

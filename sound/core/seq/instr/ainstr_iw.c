@@ -76,7 +76,7 @@ static int snd_seq_iwffff_copy_env_from_stream(__u32 req_stype,
 	ep->index = ex->index;
 	rp_last = NULL;
 	while (1) {
-		if (*len < sizeof(__u32))
+		if (*len < (long)sizeof(__u32))
 			return -EINVAL;
 		if (copy_from_user(&stype, data, sizeof(stype)))
 			return -EFAULT;
@@ -87,7 +87,7 @@ static int snd_seq_iwffff_copy_env_from_stream(__u32 req_stype,
 			    stype == IWFFFF_STRU_ENV_RECV)
 				return 0;
 		}
-		if (*len < sizeof(rx))
+		if (*len < (long)sizeof(rx))
 			return -EINVAL;
 		if (copy_from_user(&rx, *data, sizeof(rx)))
 			return -EFAULT;
@@ -136,7 +136,7 @@ static int snd_seq_iwffff_copy_wave_from_stream(snd_iwffff_ops_t *ops,
 	unsigned int real_size;
 	
 	gfp_mask = atomic ? GFP_ATOMIC : GFP_KERNEL;
-	if (*len < sizeof(xp))
+	if (*len < (long)sizeof(xp))
 		return -EINVAL;
 	if (copy_from_user(&xp, *data, sizeof(xp)))
 		return -EFAULT;
@@ -162,7 +162,7 @@ static int snd_seq_iwffff_copy_wave_from_stream(snd_iwffff_ops_t *ops,
 	wp->high_note = xp.high_note;
 	real_size = snd_seq_iwffff_size(wp->size, wp->format);
 	if (!(wp->format & IWFFFF_WAVE_ROM)) {
-		if (real_size > *len) {
+		if ((long)real_size > *len) {
 			kfree(wp);
 			return -ENOMEM;
 		}
@@ -243,7 +243,7 @@ static int snd_seq_iwffff_put(void *private_data, snd_seq_kinstr_t *instr,
 		return -EINVAL;
 	gfp_mask = atomic ? GFP_ATOMIC : GFP_KERNEL;
 	/* copy instrument data */
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -EINVAL;
 	if (copy_from_user(&ix, instr_data, sizeof(ix)))
 		return -EFAULT;
@@ -262,7 +262,7 @@ static int snd_seq_iwffff_put(void *private_data, snd_seq_kinstr_t *instr,
 	/* copy layers */
 	prev_lp = NULL;
 	while (len > 0) {
-		if (len < sizeof(iwffff_xlayer_t)) {
+		if (len < (long)sizeof(iwffff_xlayer_t)) {
 			snd_seq_iwffff_instr_free(ops, ip, atomic);
 			return -EINVAL;
 		}
@@ -315,7 +315,7 @@ static int snd_seq_iwffff_put(void *private_data, snd_seq_kinstr_t *instr,
 			snd_seq_iwffff_instr_free(ops, ip, atomic);
 			return err;
 		}
-		while (len > sizeof(__u32)) {
+		while (len > (long)sizeof(__u32)) {
 			__u32 stype;
 
 			if (copy_from_user(&stype, instr_data, sizeof(stype)))
@@ -363,7 +363,7 @@ static int snd_seq_iwffff_copy_env_to_stream(__u32 req_stype,
 	ex->mode = ep->mode;
 	ex->index = ep->index;
 	for (rp = ep->record; rp; rp = rp->next) {
-		if (*len < sizeof(rx))
+		if (*len < (long)sizeof(rx))
 			return -ENOMEM;
 		memset(&rx, 0, sizeof(rx));
 		rx.stype = req_stype;
@@ -405,7 +405,7 @@ static int snd_seq_iwffff_copy_wave_to_stream(snd_iwffff_ops_t *ops,
 	unsigned int real_size;
 	
 	for (wp = lp->wave; wp; wp = wp->next) {
-		if (*len < sizeof(xp))
+		if (*len < (long)sizeof(xp))
 			return -ENOMEM;
 		memset(&xp, 0, sizeof(xp));
 		xp.stype = IWFFFF_STRU_WAVE;
@@ -431,7 +431,7 @@ static int snd_seq_iwffff_copy_wave_to_stream(snd_iwffff_ops_t *ops,
 		*len -= sizeof(xp);
 		real_size = snd_seq_iwffff_size(wp->size, wp->format);
 		if (!(wp->format & IWFFFF_WAVE_ROM)) {
-			if (*len < real_size)
+			if (*len < (long)real_size)
 				return -ENOMEM;
 		}
 		if (ops->get_sample) {
@@ -461,7 +461,7 @@ static int snd_seq_iwffff_get(void *private_data, snd_seq_kinstr_t *instr,
 	
 	if (cmd != SNDRV_SEQ_INSTR_GET_CMD_FULL)
 		return -EINVAL;
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -ENOMEM;
 	memset(&ix, 0, sizeof(ix));
 	ip = (iwffff_instrument_t *)KINSTR_DATA(instr);
@@ -478,7 +478,7 @@ static int snd_seq_iwffff_get(void *private_data, snd_seq_kinstr_t *instr,
 	instr_data += sizeof(ix);
 	len -= sizeof(ix);
 	for (lp = ip->layer; lp; lp = lp->next) {
-		if (len < sizeof(lx))
+		if (len < (long)sizeof(lx))
 			return -ENOMEM;
 		memset(&lx, 0, sizeof(lx));
 		lx.stype = IWFFFF_STRU_LAYER;

@@ -120,9 +120,6 @@ int max_queued_signals = 1024;
 #define SIG_KERNEL_STOP_MASK (\
 	M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
 
-#define SIG_KERNEL_CONT_MASK (\
-	M(SIGCONT)   |  M(SIGKILL)   )
-
 #define SIG_KERNEL_COREDUMP_MASK (\
         M(SIGQUIT)   |  M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   | \
         M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGBUS)    |  M(SIGSYS)    | \
@@ -139,8 +136,6 @@ int max_queued_signals = 1024;
 		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_IGNORE_MASK))
 #define sig_kernel_stop(sig) \
 		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_STOP_MASK))
-#define sig_kernel_cont(sig) \
-		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_CONT_MASK))
 
 #define sig_user_defined(t, signr) \
 	(((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_DFL) &&	\
@@ -487,6 +482,8 @@ int dequeue_signal(sigset_t *mask, siginfo_t *info)
  */
 inline void signal_wake_up(struct task_struct *t, int resume)
 {
+	unsigned int mask;
+
 	set_tsk_thread_flag(t,TIF_SIGPENDING);
 
 	/*
@@ -508,8 +505,10 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	 * By calling wake_up_process any time resume is set, we ensure
 	 * the process will wake up and handle its stop or death signal.
 	 */
-	if ((t->state & TASK_INTERRUPTIBLE) ||
-	    (resume && t->state < TASK_ZOMBIE)) {
+	mask = TASK_INTERRUPTIBLE;
+	if (resume)
+		mask |= TASK_STOPPED;
+	if (t->state & mask) {
 		wake_up_process(t);
 		return;
 	}
@@ -591,8 +590,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			rm_from_queue(sigmask(SIGCONT), &t->pending);
 			t = next_thread(t);
 		} while (t != p);
-	}
-	else if (sig_kernel_cont(sig)) {
+	} else if (sig == SIGCONT) {
 		/*
 		 * Remove all stop signals from all queues,
 		 * and wake all threads.
@@ -637,17 +635,13 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * running the handler.  With the TIF_SIGPENDING
 			 * flag set, the thread will pause and acquire the
 			 * siglock that we hold now and until we've queued
-			 * the pending signal.  For SIGKILL, we likewise
-			 * don't want anybody doing anything but taking the
-			 * SIGKILL.  The only case in which a thread would
-			 * not already be in the signal dequeuing loop is
-			 * non-signal (e.g. syscall) ptrace tracing, so we
-			 * don't worry about an unnecessary trip through
-			 * the signal code and just keep this code path
-			 * simpler by unconditionally setting the flag.
+			 * the pending signal. 
 			 */
-			set_tsk_thread_flag(t, TIF_SIGPENDING);
-			wake_up_process(t);
+			if (!(t->flags & PF_EXITING)) {
+				if (!sigismember(&t->blocked, SIGCONT))
+					set_tsk_thread_flag(t, TIF_SIGPENDING);
+				wake_up_process(t);
+			}
 			t = next_thread(t);
 		} while (t != p);
 	}
@@ -789,15 +783,17 @@ force_sig_specific(int sig, struct task_struct *t)
  * as soon as they're available, so putting the signal on the shared queue
  * will be equivalent to sending it to one such thread.
  */
-#define wants_signal(sig, p)	(!sigismember(&(p)->blocked, sig) \
-				 && (p)->state < TASK_STOPPED \
-				 && !((p)->flags & PF_EXITING) \
-				 && (task_curr(p) || !signal_pending(p)))
+#define wants_signal(sig, p, mask) 			\
+	(!sigismember(&(p)->blocked, sig)		\
+	 && !((p)->state & mask)			\
+	 && !((p)->flags & PF_EXITING)			\
+	 && (task_curr(p) || !signal_pending(p)))
 
 static inline int
 __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	struct task_struct *t;
+	unsigned int mask;
 	int ret;
 
 #if CONFIG_SMP
@@ -815,6 +811,14 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 		return 0;
 
 	/*
+	 * Don't bother zombies and stopped tasks (but
+	 * SIGKILL will punch through stopped state)
+	 */
+	mask = TASK_DEAD | TASK_ZOMBIE;
+	if (sig != SIGKILL)
+		mask |= TASK_STOPPED;
+
+	/*
 	 * Put this signal on the shared-pending queue, or fail with EAGAIN.
 	 * We always use the shared queue for process-wide signals,
 	 * to avoid several races.
@@ -829,7 +833,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * If the main thread wants the signal, it gets first crack.
 	 * Probably the least surprising to the average bear.
 	 */
-	if (wants_signal(sig, p))
+	if (wants_signal(sig, p, mask))
 		t = p;
 	else if (thread_group_empty(p))
 		/*
@@ -847,7 +851,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 			t = p->signal->curr_target = p;
 		BUG_ON(t->tgid != p->tgid);
 
-		while (!wants_signal(sig, t)) {
+		while (!wants_signal(sig, t, mask)) {
 			t = next_thread(t);
 			if (t == p->signal->curr_target)
 				/*

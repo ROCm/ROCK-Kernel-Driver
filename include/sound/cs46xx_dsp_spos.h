@@ -196,8 +196,8 @@ typedef struct _dsp_spos_instance_t {
 	u16 spdif_input_volume_left;
 	/* spdif channel status,
 	   left right and user validity bits */
-	int spdif_csuv_default;
-	int spdif_csuv_stream;
+	unsigned int spdif_csuv_default;
+	unsigned int spdif_csuv_stream;
 
 	/* SPDIF input sample rate converter */
 	dsp_scb_descriptor_t * spdif_in_src;

@@ -221,7 +221,8 @@ int snd_device_free_all(snd_card_t *card, snd_device_cmd_t cmd)
 {
 	snd_device_t *dev;
 	struct list_head *list;
-	int err, range_low, range_high;
+	int err;
+	unsigned int range_low, range_high;
 
 	snd_assert(card != NULL, return -ENXIO);
 	range_low = cmd * SNDRV_DEV_TYPE_RANGE_SIZE;

@@ -357,7 +357,8 @@ static u8 snd_ak4531_initial_map[0x19 + 1] = {
 
 int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 {
-	int idx, err;
+	unsigned int idx;
+	int err;
 	ak4531_t * ak4531;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ak4531_dev_free,

@@ -54,7 +54,7 @@ static wide_opcode_t wide_opcodes[] = {
 
 static int shadow_and_reallocate_code (cs46xx_t * chip,u32 * data,u32 size, u32 overlay_begin_address)
 {
-	int i = 0,j, nreallocated = 0;
+	unsigned int i = 0, j, nreallocated = 0;
 	u32 hival,loval,address;
 	u32 mop_operands,mop_type,wide_op;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
@@ -569,7 +569,7 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
 	/*dsp_spos_instance_t * ins = chip->dsp_spos_instance; */
-	int i,col = 0;
+	unsigned int i,col = 0;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
 	symbol_entry_t * symbol; 
 
@@ -585,7 +585,7 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 		}
 
 		if (col == 0) {
-			snd_iprintf(buffer, "%04X ",i / sizeof(u32));
+			snd_iprintf(buffer, "%04X ", i / (unsigned int)sizeof(u32));
 		}
 
 		snd_iprintf(buffer,"%08X ",readl(dst + i));

@@ -405,7 +405,7 @@ snd_nm256_load_coefficient(nm256_t *chip, int stream, int number)
 
 
 /* The actual rates supported by the card. */
-static int samplerates[8] = {
+static unsigned int samplerates[8] = {
 	8000, 11025, 16000, 22050, 24000, 32000, 44100, 48000,
 };
 #define NUM_SAMPLERATES (sizeof(samplerates) / sizeof(samplerates[0]))
@@ -419,9 +419,9 @@ static snd_pcm_hw_constraint_list_t constraints_rates = {
  * return the index of the target rate
  */
 static int
-snd_nm256_fixed_rate(int rate)
+snd_nm256_fixed_rate(unsigned int rate)
 {
-	int i;
+	unsigned int i;
 	for (i = 0; i < NUM_SAMPLERATES; i++) {
 		if (rate == samplerates[i])
 			return i;
@@ -1533,7 +1533,7 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 	if ((err = snd_nm256_pcm(chip, 0)) < 0)
 		goto __error;
 	
-	if ((err = snd_nm256_mixer(chip) < 0))
+	if ((err = snd_nm256_mixer(chip)) < 0)
 		goto __error;
 
 	// pci_set_master(pci); /* needed? */

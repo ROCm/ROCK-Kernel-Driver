@@ -610,8 +610,7 @@ subscribers_t *snd_seq_port_get_subscription(port_subs_info_t *src_grp,
 /* exported */
 int snd_seq_event_port_attach(int client,
 			      snd_seq_port_callback_t *pcbp,
-			      int cap,
-			      int type,
+			      int cap, int type, int midi_channels,
 			      char *portname)
 {
 	snd_seq_port_info_t portinfo;
@@ -628,6 +627,7 @@ int snd_seq_event_port_attach(int client,
 	portinfo.capability = cap;
 	portinfo.type = type;
 	portinfo.kernel = pcbp;
+	portinfo.midi_channels = midi_channels;
 
 	/* Create it */
 	ret = snd_seq_kernel_client_ctl(client,
