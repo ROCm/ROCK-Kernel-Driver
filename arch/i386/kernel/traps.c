@@ -26,6 +26,7 @@
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
 #include <linux/version.h>
+#include <linux/kprobes.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -464,7 +465,9 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
+#ifndef CONFIG_KPROBES
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
+#endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
@@ -628,6 +631,20 @@ void unset_nmi_callback(void)
 {
 	nmi_callback = dummy_nmi_callback;
 }
+
+#ifdef CONFIG_KPROBES
+asmlinkage int do_int3(struct pt_regs *regs, long error_code)
+{
+	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
+			== NOTIFY_OK)
+		return 1;
+	/* This is an interrupt gate, because kprobes wants interrupts
+	disabled.  Normal trap handlers don't. */
+	restore_interrupts(regs);
+	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
+	return 0;
+}
+#endif
 
 /*
  * Our handling of the processor debug registers is non-trivial.
@@ -950,6 +967,14 @@ void set_intr_gate(unsigned int n, void *addr)
 	_set_gate(idt_table+n,14,0,addr,__KERNEL_CS);
 }
 
+/*
+ * This routine sets up an interrupt gate at directory privilege level 3.
+ */
+static inline void set_system_intr_gate(unsigned int n, void *addr)
+{
+	_set_gate(idt_table+n, 14, 3, addr, __KERNEL_CS);
+}
+
 static void __init set_trap_gate(unsigned int n, void *addr)
 {
 	_set_gate(idt_table+n,15,0,addr,__KERNEL_CS);
@@ -986,7 +1011,7 @@ void __init trap_init(void)
 	set_trap_gate(0,&divide_error);
 	set_intr_gate(1,&debug);
 	set_intr_gate(2,&nmi);
-	set_system_gate(3,&int3);	/* int3-5 can be called from all */
+	set_system_intr_gate(3, &int3); /* int3-5 can be called from all */
 	set_system_gate(4,&overflow);
 	set_system_gate(5,&bounds);
 	set_trap_gate(6,&invalid_op);
