@@ -72,6 +72,11 @@
  *   with the id.  The value is returned in the "id" field.  idr_get_new()
  *   returns a value in the range 0 ... 0x7fffffff
 
+ * int idr_get_new_above(struct idr *idp, void *ptr, int start_id, int *id);
+
+ *   Like idr_get_new(), but the returned id is guaranteed to be at or
+ *   above start_id.
+
  * void *idr_find(struct idr *idp, int id);
  
  *   returns the "ptr", given the id.  A NULL return indicates that the
@@ -112,7 +117,7 @@ static struct idr_layer *alloc_layer(struct idr *idp)
 
 	spin_lock(&idp->lock);
 	if (!(p = idp->id_free))
-		BUG();
+		return NULL;
 	idp->id_free = p->ary[0];
 	idp->id_free_cnt--;
 	p->ary[0] = 0;
@@ -178,8 +183,8 @@ static int sub_alloc(struct idr *idp, void *ptr, int *starting_id)
 			sh = IDR_BITS*l;
 			id = ((id >> sh) ^ n ^ m) << sh;
 		}
-		if (id >= MAX_ID_BIT)
-			return -1;
+		if ((id >= MAX_ID_BIT) || (id < 0))
+			return -3;
 		if (l == 0)
 			break;
 		/*
@@ -217,7 +222,7 @@ static int sub_alloc(struct idr *idp, void *ptr, int *starting_id)
 	return(id);
 }
 
-int idr_get_new_above(struct idr *idp, void *ptr, int starting_id)
+static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 {
 	struct idr_layer *p, *new;
 	int layers, v, id;
@@ -235,7 +240,7 @@ build_up:
 	 * Add a new layer to the top of the tree if the requested
 	 * id is larger than the currently allocated space.
 	 */
-	while (id >= (1 << (layers*IDR_BITS))) {
+	while ((layers < MAX_LEVEL) && (id >= (1 << (layers*IDR_BITS)))) {
 		layers++;
 		if (!p->count)
 			continue;
@@ -265,27 +270,39 @@ build_up:
 		goto build_up;
 	return(v);
 }
-EXPORT_SYMBOL(idr_get_new_above);
 
-static int idr_full(struct idr *idp)
-{
-	return ((idp->layers >= MAX_LEVEL)
-		&& (idp->top->bitmap == TOP_LEVEL_FULL));
-}
-
-int idr_get_new(struct idr *idp, void *ptr, int *id)
+int idr_get_new_above(struct idr *idp, void *ptr, int starting_id, int *id)
 {
 	int rv;
-	rv = idr_get_new_above(idp, ptr, 0);
+	rv = idr_get_new_above_int(idp, ptr, starting_id);
 	/*
 	 * This is a cheap hack until the IDR code can be fixed to
 	 * return proper error values.
 	 */
-	if (rv == -1) {
-		if (idr_full(idp))
-			return -ENOSPC;
-		else
+	if (rv < 0) {
+		if (rv == -1)
 			return -EAGAIN;
+		else /* Will be -3 */
+			return -ENOSPC;
+	}
+	*id = rv;
+	return 0;
+}
+EXPORT_SYMBOL(idr_get_new_above);
+
+int idr_get_new(struct idr *idp, void *ptr, int *id)
+{
+	int rv;
+	rv = idr_get_new_above_int(idp, ptr, 0);
+	/*
+	 * This is a cheap hack until the IDR code can be fixed to
+	 * return proper error values.
+	 */
+	if (rv < 0) {
+		if (rv == -1)
+			return -EAGAIN;
+		else /* Will be -3 */
+			return -ENOSPC;
 	}
 	*id = rv;
 	return 0;

@@ -14,15 +14,17 @@
 #if BITS_PER_LONG == 32
 # define IDR_BITS 5
 # define IDR_FULL 0xfffffffful
-/* We can only use half the bits in the top level because there are
-   only four possible bits in the top level (5 bits * 4 levels = 25
-   bits, but you only use 24 bits in the id). */
-# define TOP_LEVEL_FULL (IDR_FULL >> 16)
+/* We can only use two of the bits in the top level because there is
+   only one possible bit in the top level (5 bits * 7 levels = 35
+   bits, but you only use 31 bits in the id). */
+# define TOP_LEVEL_FULL (IDR_FULL >> 30)
 #elif BITS_PER_LONG == 64
 # define IDR_BITS 6
 # define IDR_FULL 0xfffffffffffffffful
-/* We can use all the bits in a 64-bit long at the top level. */
-# define TOP_LEVEL_FULL IDR_FULL
+/* We can only use two of the bits in the top level because there is
+   only one possible bit in the top level (6 bits * 6 levels = 36
+   bits, but you only use 31 bits in the id). */
+# define TOP_LEVEL_FULL (IDR_FULL >> 62)
 #else
 # error "BITS_PER_LONG is not 32 or 64"
 #endif
@@ -71,6 +73,7 @@ struct idr {
 void *idr_find(struct idr *idp, int id);
 int idr_pre_get(struct idr *idp, unsigned gfp_mask);
 int idr_get_new(struct idr *idp, void *ptr, int *id);
+int idr_get_new_above(struct idr *idp, void *ptr, int starting_id, int *id);
 void idr_remove(struct idr *idp, int id);
 void idr_init(struct idr *idp);
 
