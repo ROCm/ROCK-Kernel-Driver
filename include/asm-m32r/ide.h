@@ -25,11 +25,21 @@
 # endif
 #endif
 
+#if defined(CONFIG_PLAT_M32700UT)
+#include <asm/irq.h>
+#include <asm/m32700ut/m32700ut_pld.h>
+#endif
+
 #define IDE_ARCH_OBSOLETE_DEFAULTS
 
 static __inline__ int ide_default_irq(unsigned long base)
 {
 	switch (base) {
+#if defined(CONFIG_PLAT_M32700UT)
+		case 0x1f0: return PLD_IRQ_CFIREQ;
+		default:
+			return 0;
+#else
 		case 0x1f0: return 14;
 		case 0x170: return 15;
 		case 0x1e8: return 11;
@@ -38,6 +48,7 @@ static __inline__ int ide_default_irq(unsigned long base)
 		case 0x160: return 12;
 		default:
 			return 0;
+#endif
 	}
 }
 

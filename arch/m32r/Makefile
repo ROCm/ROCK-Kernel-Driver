@@ -34,7 +34,23 @@ LIBGCC	:= $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 libs-y	+= arch/m32r/lib/ $(LIBGCC)
 core-y	+= arch/m32r/kernel/	\
 	   arch/m32r/mm/	\
-	   arch/m32r/boot/	\
-	   arch/m32r/drivers/
+	   arch/m32r/boot/
+
+drivers-y			+= arch/m32r/drivers/
 drivers-$(CONFIG_OPROFILE)	+= arch/m32r/oprofile/
 
+boot := arch/m32r/boot
+
+.PHONY: zImage
+
+zImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+
+compressed: zImage
+
+archclean:
+	$(Q)$(MAKE) $(clean)=$(boot)
+
+define archhelp
+	@echo '  zImage			- Compressed kernel image (arch/m32r/boot/zImage)'
+endef

@@ -334,14 +334,14 @@ extern void __put_user_bad(void);
 #define __put_user_u64(x, addr, err)                                    \
         __asm__ __volatile__(                                           \
                 "       .fillinsn\n"                                    \
-                "1:     st %2,@%3\n"                                    \
+                "1:     st %L1,@%2\n"                                    \
                 "       .fillinsn\n"                                    \
-                "2:     st %1,@(4,%3)\n"                                \
+                "2:     st %H1,@(4,%2)\n"                                \
                 "       .fillinsn\n"                                    \
                 "3:\n"                                                  \
                 ".section .fixup,\"ax\"\n"                              \
                 "       .balign 4\n"                                    \
-                "4:     ldi %0,%4\n"                                    \
+                "4:     ldi %0,%3\n"                                    \
                 "       seth r14,#high(3b)\n"                           \
                 "       or3 r14,r14,#low(3b)\n"                         \
                 "       jmp r14\n"                                      \
@@ -352,23 +352,21 @@ extern void __put_user_bad(void);
                 "       .long 2b,4b\n"                                  \
                 ".previous"                                             \
                 : "=r"(err)                                             \
-                : "r"((unsigned long)((unsigned long long)x >> 32)),    \
-                  "r"((unsigned long)x ),                               \
-                  "r"(addr), "i"(-EFAULT), "0"(err)                     \
+                : "r"(x), "r"(addr), "i"(-EFAULT), "0"(err)		\
                 : "r14", "memory")
 
 #elif defined(__BIG_ENDIAN__)
 #define __put_user_u64(x, addr, err)					\
 	__asm__ __volatile__(						\
 		"	.fillinsn\n"					\
-		"1:	st %1,@%3\n"					\
+		"1:	st %H1,@%2\n"					\
 		"	.fillinsn\n"					\
-		"2:	st %2,@(4,%3)\n"				\
+		"2:	st %L1,@(4,%2)\n"				\
 		"	.fillinsn\n"					\
 		"3:\n"							\
 		".section .fixup,\"ax\"\n"				\
 		"	.balign 4\n"					\
-		"4:	ldi %0,%4\n"					\
+		"4:	ldi %0,%3\n"					\
 		"	seth r14,#high(3b)\n"				\
 		"	or3 r14,r14,#low(3b)\n"				\
 		"	jmp r14\n"					\
@@ -379,9 +377,7 @@ extern void __put_user_bad(void);
 		"	.long 2b,4b\n"					\
 		".previous"						\
 		: "=r"(err)						\
-		: "r"((unsigned long)((unsigned long long)x >> 32)),	\
-		  "r"((unsigned long)x ),				\
-		  "r"(addr), "i"(-EFAULT), "0"(err)			\
+		: "r"(x), "r"(addr), "i"(-EFAULT), "0"(err)		\
 		: "r14", "memory")
 #else
 #error no endian defined

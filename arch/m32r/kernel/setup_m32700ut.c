@@ -381,7 +381,6 @@ void __init init_IRQ(void)
 	disable_m32700ut_pld_irq(PLD_IRQ_SIO0_SND);
 #endif  /* CONFIG_SERIAL_M32R_PLDSIO */
 
-#if defined(CONFIG_M32R_CFC)
 	/* INT#1: CFC IREQ on PLD */
 	irq_desc[PLD_IRQ_CFIREQ].status = IRQ_DISABLED;
 	irq_desc[PLD_IRQ_CFIREQ].handler = &m32700ut_pld_irq_type;
@@ -405,8 +404,6 @@ void __init init_IRQ(void)
 	irq_desc[PLD_IRQ_CFC_EJECT].depth = 1;	/* disable nested irq */
 	pld_icu_data[irq2pldirq(PLD_IRQ_CFC_EJECT)].icucr = PLD_ICUCR_IEN|PLD_ICUCR_ISMOD02;	/* 'H' edge sense */
 	disable_m32700ut_pld_irq(PLD_IRQ_CFC_EJECT);
-#endif /* CONFIG_M32R_CFC */
-
 
 	/*
 	 * INT0# is used for LAN, DIO

@@ -11,10 +11,11 @@
 
 void putc(char c);
 
-void puts(char *s)
+int puts(const char *s)
 {
 	char c;
 	while ((c = *s++)) putc(c);
+	return 0;
 }
 
 #if defined(CONFIG_PLAT_M32700UT_Alpha) || defined(CONFIG_PLAT_M32700UT)
@@ -28,6 +29,8 @@ void puts(char *s)
 #define BOOT_SIO0STS	(volatile unsigned short *)(0x02c00000 + 0x20006)
 #define BOOT_SIO0TXB	(volatile unsigned short *)(0x02c00000 + 0x2000c)
 #else
+#undef PLD_BASE
+#define PLD_BASE	0xa4c00000
 #define BOOT_SIO0STS	PLD_ESIO0STS
 #define BOOT_SIO0TXB	PLD_ESIO0TXB
 #endif

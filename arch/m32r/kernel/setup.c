@@ -32,7 +32,6 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 
-extern void init_IRQ(void);
 #ifdef CONFIG_MMU
 extern void init_mmu(void);
 #endif
@@ -103,16 +102,8 @@ static __inline__ void parse_mem_cmdline(char ** cmdline_p)
 	memcpy(saved_command_line, COMMAND_LINE, COMMAND_LINE_SIZE);
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 
-	/*
-	 * Due to prefetching and similar mechanism the CPU sometimes
-	 * generates addresses beyond the end of memory.  We leave the size
-	 * of one cache line at the end of memory unused to make shure we
-	 * don't catch this type of bus errors.
-	 */
 	memory_start = (unsigned long)CONFIG_MEMORY_START+PAGE_OFFSET;
 	memory_end = memory_start+(unsigned long)CONFIG_MEMORY_SIZE;
-	memory_end -= 128;
-	memory_end &= PAGE_MASK;
 
 	for ( ; ; ) {
 		if (c == ' ' && !memcmp(from, "mem=", 4)) {
@@ -278,8 +269,6 @@ void __init setup_arch(char **cmdline_p)
 	setup_memory();
 
 	paging_init();
-
-	init_IRQ();
 }
 
 #ifdef CONFIG_PROC_FS

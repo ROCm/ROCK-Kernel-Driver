@@ -138,9 +138,10 @@ loop1:
  * AP startup routine
  */
 	.text
+	.global	eit_vector
 ENTRY(startup_AP)
 ;; setup EVB
-	LDIMM  (r4, _RE)
+	LDIMM  (r4, eit_vector)
 	mvtc   r4, cr5
 
 ;; enable MMU

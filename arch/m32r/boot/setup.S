@@ -60,7 +60,7 @@
 /*------------------------------------------------------------------------
  * Kernel entry
  */
-	.section .boot,"ax"
+	.section .boot, "ax"
 ENTRY(boot)
 
 /* Set cache mode */
@@ -69,74 +69,12 @@ ENTRY(boot)
 	ldi	r1, #0x0101		; cache on (with invalidation)
 ;	ldi	r1, #0x00		; cache off
 	sth	r1, @r0
-#elif defined(CONFIG_CHIP_VDEC2)
-	; cache condition is controlled by loader
-	; r13 = pointer to kernel parameter passed from loader
-	beqz	r13, param_skip
-	ldi	r2, #4096				; size
-	seth	r1, #high(empty_zero_page)
-	or3	r1, r1, #low(empty_zero_page)
-	seth	r3, #high(__PAGE_OFFSET)
-	or3	r3, r3, #low(__PAGE_OFFSET)
-	not	r3, r3
-	and	r1, r3
-	addi	r1, #-4
-param_loop:
-	ld	r3, @r13+
-	st	r3, @+r1
-	addi	r2, #-4
-	bnez	r2, param_loop
-	bra	param_end
-param_skip:
-	ldi	r0, #-1              ;LDIMM	(r0, M32R_MCCR)
-	ldi	r1, #0x63      		; cache on
-;	ldi	r1, #0x00		; cache off
-	stb	r1, @r0
-param_end:
-
-#elif defined(CONFIG_CHIP_M32700) && (defined(CONFIG_PLAT_M32700UT) \
-	|| defined(CONFIG_PLAT_USRV)) || \
-	defined(CONFIG_CHIP_OPSP) && defined(CONFIG_PLAT_OPSPUT)
-	; cache condition is controlled by loader
-	; r13 = pointer to kernel parameter passed from loader
-	ldi     r0, #-4
-	ldi     r1, #0x63		;  cache Ion/Don
-	st      r1, @r0
-#if defined(CONFIG_SMP) && !defined(CONFIG_PLAT_USRV)
-	seth    r5, #high(M32R_CPUID_PORTL)
-	or3     r5, r5, #low(M32R_CPUID_PORTL)
-	ld      r5, @r5
-	bnez    r5, param_end
-		;;  boot AP
-	ld24    r5, #0xeff2f8		;  IPICR7
-	ldi     r6, #0x2		;  IPI to CPU1
-	st      r6, @r5
-#endif
-	beqz	r13, param_end
-	ldi	r2, #4096				; size
-	seth	r1, #high(empty_zero_page)
-	or3	r1, r1, #low(empty_zero_page)
-	seth	r3, #high(__PAGE_OFFSET)
-	or3	r3, r3, #low(__PAGE_OFFSET)
-	not	r3, r3
-	and	r1, r3
-	addi	r1, #-4
-param_loop:
-	ld	r3, @r13+
-	st	r3, @+r1
-	addi	r2, #-4
-	bnez	r2, param_loop
-param_end:
-#elif defined(CONFIG_CHIP_M32700) || defined(CONFIG_CHIP_OPSP)
-	ldi	r0, #-4			;LDIMM	(r0, M32R_MCCR)
-	ldi	r1, #0x63		; cache Ion/Don (with invalidation)
+#elif defined(CONFIG_CHIP_M32700) || defined(CONFIG_CHIP_VDEC2) \
+    || defined(CONFIG_CHIP_OPSP)
+	ldi	r0, #-4              ;LDIMM	(r0, M32R_MCCR)
+	ldi	r1, #0x73		; cache on (with invalidation)
 ;	ldi	r1, #0x00		; cache off
 	st	r1, @r0
-#elif defined(CONFIG_CHIP_M32102)
-        ldi     r0, #-4                 ;LDIMM  (r0, M32R_MCCR)
-        ldi     r1, #0x101              ; cache Ion (with invalidation)
-;       ldi     r1, #0x00               ; cache off
-        st      r1, @r0
 #else
 #error unknown chip configuration
 #endif
@@ -146,6 +84,12 @@ param_end:
 	seth	r5, #shigh(M32R_CPUID_PORTL)
 	ld      r5, @(low(M32R_CPUID_PORTL), r5)
 	bnez	r5, AP_loop
+#if !defined(CONFIG_PLAT_USRV)
+	;; boot AP
+	ld24	r5, #0xeff2f8		; IPICR7
+	ldi	r6, #0x2		; IPI to CPU1
+	st	r6, @r5
+#endif
 #endif
 
 /*
@@ -153,11 +97,12 @@ param_end:
  *        if with MMU,    TLB on.
  *        if with no MMU, only jump.
  */
+ 	.global	eit_vector
 mmu_on:
 	LDIMM	(r13, stext)
 #ifdef CONFIG_MMU
 	bl	init_tlb
-	LDIMM	(r2, _RE)			; set EVB(cr5)
+	LDIMM	(r2, eit_vector)		; set EVB(cr5)
 	mvtc    r2, cr5
 	seth	r0, #high(MMU_REG_BASE)		; Set MMU_REG_BASE higher
 	or3     r0, r0, #low(MMU_REG_BASE)	; Set MMU_REG_BASE lower

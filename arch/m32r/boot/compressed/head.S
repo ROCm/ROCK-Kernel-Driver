@@ -3,6 +3,7 @@
  *
  *  Copyright (c) 2001-2003	Hiroyuki Kondo, Hirokazu Takata,
  *				Hitoshi Yamamoto, Takeo Takahashi
+ *  Copyright (c) 2004		Hirokazu Takata
  */
 
 	.text
@@ -11,7 +12,6 @@
 #include <asm/addrspace.h>
 #include <asm/page.h>
 #include <asm/assembler.h>
-#include "boot.h"
 
 	.global	startup
 	__ALIGN
@@ -85,118 +85,31 @@ startup:
  * decompress the kernel
  */
 	bl	decompress_kernel
-	mv	r12, r0 		/* size of decompressed kernel */
 
-/*
- * relocate copy routine & jump routine
- */
-	LDIMM	(r1, BOOT_RELOC_ADDR)
-	mv	r5, r1		; save reloc addr to jump
-
-	LDIMM	(r2, startup_reloc)
-	LDIMM	(r3, exit_reloc)
-	sub	r3, r2		; relocated code size in bytes
-	mv	r4, r3
-	srli	r4, #2		; R4 = code size in longwords (rounded down)
-	addi	r1, #-4		; account for pre-inc store
-	beqz	r4, 2f		; any more to go?
-	.fillinsn
-1:
-	ld	r6, @r2+	; code to be relocated
-	st	r6, @+r1	; relocate code
-	addi	r4, #-1		; decrement count
-	bnez	r4, 1b		; go do some more
-	.fillinsn
-2:
-	and3	r4, r3, #3	; get no. of remaining bytes
-	addi	r1, #4		; account for pre-inc store
-	beqz	r4, 4f		; any more to go?
-	.fillinsn
-3:
-	ldb	r6, @r2		; code to be relocated
-	stb	r6, @r1		; relocate code
-	addi	r1, #1		; bump address
-	addi	r2, #1		; bump address
-	addi	r4, #-1		; decrement count
-	bnez	r4, 3b		; go do some more
-	.fillinsn
-4:
-	jmp	r5		; jump to relocated code
-
-/*
- * startup_reloc runs on BOOT_RELOC_ADDR.
- * copy decompressed kernel to original location
- */
-	.text
-	__ALIGN
-startup_reloc:
-	LDIMM	(r1, CONFIG_MEMORY_START)
-	LDIMM	(r2, KERNEL_DECOMPRESS_ADDR)
-	mv	r4, r12		; r12 holds size of decompressed kernel
-	srli	r4, #2		; R4 = code size in longwords (rounded down)
-	addi	r1, #-4		; account for pre-inc store
-	beqz	r4, 2f		; any more to go?
-	.fillinsn
-1:
-	ld	r6, @r2+	; code to be relocated
-	st	r6, @+r1	; relocate code
-	addi	r4, #-1		; decrement count
-	bnez	r4, 1b		; go do some more
-	.fillinsn
-2:
-	and3	r4, r12, #3	; get no. of remaining bytes
-	addi	r1, #4		; account for pre-inc store
-	beqz	r4, 4f		; any more to go?
-	.fillinsn
-3:
-	ldb	r6, @r2		; code to be relocated
-	stb	r6, @r1		; relocate code
-	addi	r1, #1		; bump address
-	addi	r2, #1		; bump address
-	addi	r4, #-1		; decrement count
-	bnez	r4, 3b		; go do some more
-	.fillinsn
-4:
-	/*
-	 * invalidate i-cache before jump to kernel
-	 */
-#if defined(CONFIG_CHIP_VDEC2)
-	ldi	r0, #-1
-	ldi	r1, #0xc0	; invalidate i-cache
-	stb	r1, @r0
-#elif defined(CONFIG_CHIP_XNUX2)
-	ldi	r0, #-2
-	ldi	r1, #0x0100	; invalidate
-	sth	r1, @r0
-#elif defined(CONFIG_CHIP_M32700)
-	ldi	r0, #-1		; MCCR(cache control register)
-	ldi	r1, #0xc0	; invalidate i-cache
+#if defined(CONFIG_CHIP_M32700)
+	/* Cache flush */
+	ldi	r0, -1
+	ldi	r1, 0xd0	; invalidate i-cache, copy back d-cache
 	stb	r1, @r0
 #else
-#error unknown chip configuration
+#error "put your cache flush function, please"
 #endif
-	LDIMM	(r0, KERNEL_ENTRY)
-	jmp	r0				/* jump to kernel */
+        seth	r0, #high(CONFIG_MEMORY_START)
+        or3	r0, r0, #0x2000
+        jmp	r0
 
-	__ALIGN
-exit_reloc:
-
-	.balign 4096
-.fake_empty_zero_page:
-	/* FIXME: correct table value */
-	.word	0
+	.balign 512
+fake_headers_as_bzImage:
+	.short	0
 	.ascii	"HdrS"
-	.word	0x0202
-	.word	0
-	.word	0
-	.word	0x1000
-	.word	0
+	.short	0x0202
+	.short	0
+	.short	0
+	.byte	0x00, 0x10
+	.short	0
 	.byte	0
 	.byte	1
-	.word	0x8000
+	.byte	0x00, 0x80
 	.long	0
-	.long	0
-
-	.section	.fake_eit_vector, "aw"
 	.long	0
 

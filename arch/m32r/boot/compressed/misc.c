@@ -15,8 +15,7 @@
  */
 
 #include <linux/config.h>
-#include <asm/uaccess.h>
-#include "boot.h"
+#include <linux/string.h>
 
 /*
  * gzip declarations
@@ -91,7 +90,7 @@ static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
 
-extern void puts(const char *);
+extern int puts(const char *);
 
 extern int _text;		/* Defined in vmlinux.lds.S */
 extern int _end;
@@ -212,7 +211,7 @@ long decompress_kernel(void)
 	bytes_out = 0;
 	outcnt = 0;
 	output_data = 0;
-	output_ptr = (unsigned long)KERNEL_DECOMPRESS_ADDR;
+	output_ptr = CONFIG_MEMORY_START + 0x2000;
 	free_mem_ptr = (unsigned long)&_end;
 	free_mem_end_ptr = free_mem_ptr + HEAP_SIZE;
 

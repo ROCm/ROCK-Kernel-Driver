@@ -30,122 +30,18 @@
 
 #include <linux/module.h>
 
-#if defined(CONFIG_MMU)
-#define PIE_HANDLER "pie_handler"
-#define ACE_HANDLER "ace_handler"
-#define TME_HANDLER "tme_handler"
-#else
-#define PIE_HANDLER "default_eit_handler"
-#define ACE_HANDLER "default_eit_handler"
-#define TME_HANDLER "default_eit_handler"
-#endif
-
 asmlinkage void alignment_check(void);
 asmlinkage void ei_handler(void);
 asmlinkage void rie_handler(void);
 asmlinkage void debug_trap(void);
 asmlinkage void cache_flushing_handler(void);
 
-asm (
-	"	.section .eit_vector,\"ax\"	\n"
-	"	.balign 4			\n"
-	"	.global _RE			\n"
-	"	.global default_eit_handler	\n"
-	"	.global system_call		\n"
-	"	.global " PIE_HANDLER "		\n"
-	"	.global " ACE_HANDLER "		\n"
-	"	.global " TME_HANDLER "		\n"
-	"_RE:	seth	r0, 0x01		\n"
-	"	bra	default_eit_handler	\n"
-	"	.long	0,0			\n"
-	"_SBI:	seth	r0, 0x10		\n"
-	"	bra	default_eit_handler	\n"
-	"	.long	0,0			\n"
-	"_RIE:	bra	rie_handler		\n"
-	"	.long	0,0,0			\n"
-	"_AE:	bra	alignment_check		\n"
-	"	.long	0,0,0			\n"
-	"_TRAP0:				\n"
-	"	bra	_TRAP0			\n"
-	"_TRAP1:				\n"
-	"	bra	debug_trap		\n"
-	"_TRAP2:				\n"
-	"	bra	system_call		\n"
-	"_TRAP3:				\n"
-	"	bra	_TRAP3			\n"
-	"_TRAP4:				\n"
-	"	bra	_TRAP4			\n"
-	"_TRAP5:				\n"
-	"	bra	_TRAP5			\n"
-	"_TRAP6:				\n"
-	"	bra	_TRAP6			\n"
-	"_TRAP7:				\n"
-	"	bra	_TRAP7			\n"
-	"_TRAP8:				\n"
-	"	bra	_TRAP8			\n"
-	"_TRAP9:				\n"
-	"	bra	_TRAP9			\n"
-	"_TRAP10:				\n"
-	"	bra	_TRAP10			\n"
-	"_TRAP11:				\n"
-	"	bra	_TRAP11			\n"
-	"_TRAP12:				\n"
-	"	bra	cache_flushing_handler	\n"
-	"_TRAP13:				\n"
-	"	bra	_TRAP13			\n"
-	"_TRAP14:				\n"
-	"	bra	_TRAP14			\n"
-	"_TRAP15:				\n"
-	"	bra	_TRAP15			\n"
-	"_EI:	bra	ei_handler		\n"
-	"	.long   0,0,0			\n"
-	"	.previous			\n"
-);
-
-asm (
-	"	.section .eit_vector1,\"ax\"	\n"
-	"_BRA_SYSCAL:				\n"
-	"	bra	system_call		\n"
-	"	.long	0,0,0			\n"
-	"	.previous			\n"
-);
-
-asm (
-	"	.section .eit_vector2,\"ax\"	\n"
-	"_PIE:					\n"
-	"	bra	" PIE_HANDLER "		\n"
-	"	.long   0,0,0			\n"
-	"_TLB_ACE:				\n"
-	"	bra	" ACE_HANDLER "		\n"
-	"	.long   0,0,0			\n"
-	"_TLB_MIS:				\n"
-	"	bra	" TME_HANDLER "		\n"
-	"	.long   0,0,0			\n"
-	"	.previous 			\n"
-);
-
 #ifdef CONFIG_SMP
-/*
- * for IPI
- */
-asm (
-	"	.section .eit_vector3,\"ax\"		\n"
-	"	.global smp_reschedule_interrupt	\n"
-	"	.global smp_invalidate_interrupt	\n"
-	"	.global smp_call_function_interrupt	\n"
-	"	.global smp_ipi_timer_interrupt		\n"
-	"	.global smp_flush_cache_all_interrupt	\n"
-	"	.global _EI_VEC_TABLE			\n"
-	"_EI_VEC_TABLE:					\n"
-	"	.fill 56, 4, 0				\n"
-	"	.long smp_reschedule_interrupt		\n"
-	"	.long smp_invalidate_interrupt		\n"
-	"	.long smp_call_function_interrupt	\n"
-	"	.long smp_ipi_timer_interrupt		\n"
-	"	.long smp_flush_cache_all_interrupt	\n"
-	"	.fill 4, 4, 0				\n"
-	"	.previous				\n"
-);
+extern void smp_reschedule_interrupt(void);
+extern void smp_invalidate_interrupt(void);
+extern void smp_call_function_interrupt(void);
+extern void smp_ipi_timer_interrupt(void);
+extern void smp_flush_cache_all_interrupt(void);
 
 /*
  * for Boot AP function
@@ -161,7 +57,58 @@ asm (
 );
 #endif  /* CONFIG_SMP */
 
-#define	set_eit_vector_entries(void)	do { } while (0)
+extern unsigned long	eit_vector[];
+#define BRA_INSN(func, entry)	\
+	((unsigned long)func - (unsigned long)eit_vector - entry*4)/4 \
+	+ 0xff000000UL
+
+void	set_eit_vector_entries(void)
+{
+	extern void default_eit_handler(void);
+	extern void system_call(void);
+	extern void pie_handler(void);
+	extern void ace_handler(void);
+	extern void tme_handler(void);
+	extern void _flush_cache_copyback_all(void);
+
+	eit_vector[0] = 0xd0c00001; /* seth r0, 0x01 */
+	eit_vector[1] = BRA_INSN(default_eit_handler, 1);
+	eit_vector[4] = 0xd0c00010; /* seth r0, 0x10 */
+	eit_vector[5] = BRA_INSN(default_eit_handler, 5);
+	eit_vector[8] = BRA_INSN(rie_handler, 8);
+	eit_vector[12] = BRA_INSN(alignment_check, 12);
+	eit_vector[16] = 0xff000000UL;
+	eit_vector[17] = BRA_INSN(debug_trap, 17);
+	eit_vector[18] = BRA_INSN(system_call, 18);
+	eit_vector[19] = 0xff000000UL;
+	eit_vector[20] = 0xff000000UL;
+	eit_vector[21] = 0xff000000UL;
+	eit_vector[22] = 0xff000000UL;
+	eit_vector[23] = 0xff000000UL;
+	eit_vector[24] = 0xff000000UL;
+	eit_vector[25] = 0xff000000UL;
+	eit_vector[26] = 0xff000000UL;
+	eit_vector[27] = 0xff000000UL;
+	eit_vector[28] = BRA_INSN(cache_flushing_handler, 28);
+	eit_vector[29] = 0xff000000UL;
+	eit_vector[30] = 0xff000000UL;
+	eit_vector[31] = 0xff000000UL;
+	eit_vector[32] = BRA_INSN(ei_handler, 32);
+	eit_vector[64] = BRA_INSN(pie_handler, 64);
+	eit_vector[68] = BRA_INSN(ace_handler, 68);
+	eit_vector[72] = BRA_INSN(tme_handler, 72);
+#ifdef CONFIG_SMP
+	eit_vector[184] = (unsigned long)smp_reschedule_interrupt;
+	eit_vector[185] = (unsigned long)smp_invalidate_interrupt;
+	eit_vector[186] = (unsigned long)smp_call_function_interrupt;
+	eit_vector[187] = (unsigned long)smp_ipi_timer_interrupt;
+	eit_vector[188] = (unsigned long)smp_flush_cache_all_interrupt;
+	eit_vector[189] = 0;
+	eit_vector[190] = 0;
+	eit_vector[191] = 0;
+#endif
+	_flush_cache_copyback_all();
+}
 
 void __init trap_init(void)
 {

@@ -4,10 +4,8 @@ OUTPUT_ARCH(m32r)
 ENTRY(startup)
 SECTIONS
 {
-  . = CONFIG_MEMORY_START;
-  .fake_eit_vector : { *(.fake_eit_vector) }
+  . = CONFIG_MEMORY_START + 0x00400000;
 
-  . = ALIGN(4096);
   _text = .;
   .text : { *(.text) } = 0
   .rodata : { *(.rodata) }

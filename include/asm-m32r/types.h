@@ -1,6 +1,8 @@
 #ifndef _ASM_M32R_TYPES_H
 #define _ASM_M32R_TYPES_H
 
+#ifndef __ASSEMBLY__
+
 /* $Id$ */
 
 /* orig : i386 2.4.18 */
@@ -25,11 +27,16 @@ typedef unsigned int __u32;
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
 #endif
+#endif /* __ASSEMBLY__ */
 
 /*
  * These aren't exported outside the kernel to avoid name space clashes
  */
 #ifdef __KERNEL__
+
+#define BITS_PER_LONG 32
+
+#ifndef __ASSEMBLY__
 
 typedef signed char s8;
 typedef unsigned char u8;
@@ -43,14 +50,14 @@ typedef unsigned int u32;
 typedef signed long long s64;
 typedef unsigned long long u64;
 
-#define BITS_PER_LONG 32
-
 /* DMA addresses are 32-bits wide.  */
 
 typedef u32 dma_addr_t;
 typedef u64 dma64_addr_t;
 
 typedef unsigned short kmem_bufctl_t;
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */
 

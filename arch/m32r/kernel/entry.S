@@ -297,6 +297,10 @@ syscall_badsys:
 	st	r4, R0(sp)
 	bra	resume_userspace
 
+	.global	eit_vector
+
+	.equ ei_vec_table, eit_vector + 0x0200
+
 /*
  * EI handler routine
  */
@@ -335,7 +339,7 @@ ENTRY(ei_handler)
 	bc	2f
 	cmpi	r0, #((M32R_IRQ_IPI7+1)<<2)	; ISN > IPI7 check
 	bnc	2f
-	LDIMM	(r2, _EI_VEC_TABLE)
+	LDIMM	(r2, ei_vec_table)
 	add	r2, r0
 	ld	r2, @r2
 	beqz	r2, 1f			; if (no IPI handler) goto exit

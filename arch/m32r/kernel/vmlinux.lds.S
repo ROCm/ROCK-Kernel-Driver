@@ -15,30 +15,15 @@ ENTRY(startup_32)
 #endif
 SECTIONS
 {
-#if defined(CONFIG_PLAT_MAPPI) || defined(CONFIG_PLAT_USRV) \
-	|| defined(CONFIG_PLAT_M32700UT) || defined(CONFIG_PLAT_OAKS32R) \
-	|| defined(CONFIG_PLAT_MAPPI2) || defined(CONFIG_PLAT_OPSPUT)
-  . = CONFIG_MEMORY_START + __PAGE_OFFSET + 0x00000000;
-  .eit_vector : { *(.eit_vector) }
-  . = CONFIG_MEMORY_START + __PAGE_OFFSET + 0x00000100;
-  .eit_vector2 : { *(.eit_vector2) }
-#if defined(CONFIG_SMP)
-  . = CONFIG_MEMORY_START + __PAGE_OFFSET + 0x00000200;
-  .eit_vector3 : { *(.eit_vector3) }
-#endif
-  . = CONFIG_MEMORY_START + __PAGE_OFFSET + 0x00001000;
-#else
-#error "Unknown platform"
-#endif
+  . = CONFIG_MEMORY_START + __PAGE_OFFSET;
+  eit_vector = .;
 
-  _boot = .;
-  .boot : { *(.boot) } = 0
-
-  . = ALIGN(4096);
+  . = . + 0x1000;
   .empty_zero_page : { *(.empty_zero_page) } = 0
 
   /* read-only */
   _text = .;			/* Text and read-only data */
+  .boot : { *(.boot) } = 0
   .text : {
 	*(.text)
 	SCHED_TEXT
