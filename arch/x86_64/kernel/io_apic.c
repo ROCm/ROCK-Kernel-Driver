@@ -67,8 +67,8 @@ static struct irq_pin_list {
 	short apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
+int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
 #ifdef CONFIG_PCI_USE_VECTOR
-int vector_irq[NR_IRQS] = { [0 ... NR_IRQS -1] = -1};
 #define vector_to_irq(vector) 	\
 	(platform_legacy_irq(vector) ? vector : vector_irq[vector])
 #else
@@ -656,10 +656,14 @@ static inline int IO_APIC_irq_trigger(int irq)
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQ_VECTORS] = { FIRST_DEVICE_VECTOR , 0 };
 
-#ifndef CONFIG_PCI_USE_VECTOR
+#ifdef CONFIG_PCI_USE_VECTOR
+int assign_irq_vector(int irq)
+#else
 int __init assign_irq_vector(int irq)
+#endif
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+
 	BUG_ON(irq >= NR_IRQ_VECTORS);
 	if (IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
@@ -668,18 +672,19 @@ next:
 	if (current_vector == IA32_SYSCALL_VECTOR)
 		goto next;
 
-	if (current_vector > FIRST_SYSTEM_VECTOR) {
+	if (current_vector >= FIRST_SYSTEM_VECTOR) {
 		offset++;
+		if (!(offset%8))
+			return -ENOSPC;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
 	}
 
-	if (current_vector == FIRST_SYSTEM_VECTOR)
-		panic("ran out of interrupt sources!");
+	vector_irq[current_vector] = irq;
+	if (irq != AUTO_ASSIGN)
+		IO_APIC_VECTOR(irq) = current_vector;
 
-	IO_APIC_VECTOR(irq) = current_vector;
 	return current_vector;
 }
-#endif
 
 extern void (*interrupt[NR_IRQS])(void);
 static struct hw_interrupt_type ioapic_level_type;
@@ -925,12 +930,17 @@ void __init print_IO_APIC(void)
 		);
 	}
 	}
+	if (use_pci_vector())
+		printk(KERN_INFO "Using vector-based indexing\n");
 	printk(KERN_DEBUG "IRQ to pin mappings:\n");
 	for (i = 0; i < NR_IRQS; i++) {
 		struct irq_pin_list *entry = irq_2_pin + i;
 		if (entry->pin < 0)
 			continue;
-		printk(KERN_DEBUG "IRQ%d ", i);
+ 		if (use_pci_vector() && !platform_legacy_irq(i))
+			printk(KERN_DEBUG "IRQ%d ", IO_APIC_VECTOR(i));
+		else
+			printk(KERN_DEBUG "IRQ%d ", i);
 		for (;;) {
 			printk("-> %d:%d", entry->apic, entry->pin);
 			if (!entry->next)

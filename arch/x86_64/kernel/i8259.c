@@ -47,6 +47,12 @@
 	BI(x,8) BI(x,9) BI(x,a) BI(x,b) \
 	BI(x,c) BI(x,d) BI(x,e) BI(x,f)
 
+#define BUILD_14_IRQS(x) \
+	BI(x,0) BI(x,1) BI(x,2) BI(x,3) \
+	BI(x,4) BI(x,5) BI(x,6) BI(x,7) \
+	BI(x,8) BI(x,9) BI(x,a) BI(x,b) \
+	BI(x,c) BI(x,d)
+
 /*
  * ISA PIC or low IO-APIC triggered (INTA-cycle or APIC) interrupts:
  * (these are usually mapped to vectors 0x20-0x2f)
@@ -68,9 +74,15 @@ BUILD_16_IRQS(0x0)
 BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
 BUILD_16_IRQS(0x8) BUILD_16_IRQS(0x9) BUILD_16_IRQS(0xa) BUILD_16_IRQS(0xb)
 BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd)
+
+#ifdef CONFIG_PCI_USE_VECTOR
+	BUILD_14_IRQS(0xe)
+#endif
+
 #endif
 
 #undef BUILD_16_IRQS
+#undef BUILD_14_IRQS
 #undef BI
 
 
@@ -83,6 +95,12 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd)
 	IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
 	IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 
+#define IRQLIST_14(x) \
+	IRQ(x,0), IRQ(x,1), IRQ(x,2), IRQ(x,3), \
+	IRQ(x,4), IRQ(x,5), IRQ(x,6), IRQ(x,7), \
+	IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
+	IRQ(x,c), IRQ(x,d)
+
 void (*interrupt[NR_IRQS])(void) = {
 	IRQLIST_16(0x0),
 
@@ -91,11 +109,17 @@ void (*interrupt[NR_IRQS])(void) = {
 	IRQLIST_16(0x4), IRQLIST_16(0x5), IRQLIST_16(0x6), IRQLIST_16(0x7),
 	IRQLIST_16(0x8), IRQLIST_16(0x9), IRQLIST_16(0xa), IRQLIST_16(0xb),
 	IRQLIST_16(0xc), IRQLIST_16(0xd)
+
+#ifdef CONFIG_PCI_USE_VECTOR
+	, IRQLIST_14(0xe)
+#endif
+
 #endif
 };
 
 #undef IRQ
 #undef IRQLIST_16
+#undef IRQLIST_14
 
 /*
  * This is the 'legacy' 8259A Programmable Interrupt Controller,

@@ -1411,12 +1411,17 @@ void __init print_IO_APIC(void)
 		);
 	}
 	}
+	if (use_pci_vector())
+		printk(KERN_INFO "Using vector-based indexing\n");
 	printk(KERN_DEBUG "IRQ to pin mappings:\n");
 	for (i = 0; i < NR_IRQS; i++) {
 		struct irq_pin_list *entry = irq_2_pin + i;
 		if (entry->pin < 0)
 			continue;
-		printk(KERN_DEBUG "IRQ%d ", i);
+ 		if (use_pci_vector() && !platform_legacy_irq(i))
+			printk(KERN_DEBUG "IRQ%d ", IO_APIC_VECTOR(i));
+		else
+			printk(KERN_DEBUG "IRQ%d ", i);
 		for (;;) {
 			printk("-> %d:%d", entry->apic, entry->pin);
 			if (!entry->next)
