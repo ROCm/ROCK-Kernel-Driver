@@ -78,6 +78,7 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/types.h>
+#include <asm/fpu.h>
 
 /*
  * Data types needed to pass information into PAL procedures and
@@ -649,12 +650,43 @@ extern struct ia64_pal_retval ia64_pal_call_static (u64, u64, u64, u64, u64);
 extern struct ia64_pal_retval ia64_pal_call_stacked (u64, u64, u64, u64);
 extern struct ia64_pal_retval ia64_pal_call_phys_static (u64, u64, u64, u64);
 extern struct ia64_pal_retval ia64_pal_call_phys_stacked (u64, u64, u64, u64);
+extern void ia64_save_scratch_fpregs (struct ia64_fpreg *);
+extern void ia64_load_scratch_fpregs (struct ia64_fpreg *);
 
-#define PAL_CALL(iprv,a0,a1,a2,a3)		iprv = ia64_pal_call_static(a0, a1, a2, a3, 0)
-#define PAL_CALL_IC_OFF(iprv,a0,a1,a2,a3)	iprv = ia64_pal_call_static(a0, a1, a2, a3, 1)
-#define PAL_CALL_STK(iprv,a0,a1,a2,a3)		iprv = ia64_pal_call_stacked(a0, a1, a2, a3)
-#define PAL_CALL_PHYS(iprv,a0,a1,a2,a3)		iprv = ia64_pal_call_phys_static(a0, a1, a2, a3)
-#define PAL_CALL_PHYS_STK(iprv,a0,a1,a2,a3)	iprv = ia64_pal_call_phys_stacked(a0, a1, a2, a3)
+#define PAL_CALL(iprv,a0,a1,a2,a3) do {			\
+	struct ia64_fpreg fr[6];			\
+	ia64_save_scratch_fpregs(fr);			\
+	iprv = ia64_pal_call_static(a0, a1, a2, a3, 0);	\
+	ia64_load_scratch_fpregs(fr);			\
+} while (0)
+
+#define PAL_CALL_IC_OFF(iprv,a0,a1,a2,a3) do {		\
+	struct ia64_fpreg fr[6];			\
+	ia64_save_scratch_fpregs(fr);			\
+	iprv = ia64_pal_call_static(a0, a1, a2, a3, 1);	\
+	ia64_load_scratch_fpregs(fr);			\
+} while (0)
+
+#define PAL_CALL_STK(iprv,a0,a1,a2,a3) do {		\
+	struct ia64_fpreg fr[6];			\
+	ia64_save_scratch_fpregs(fr);			\
+	iprv = ia64_pal_call_stacked(a0, a1, a2, a3);	\
+	ia64_load_scratch_fpregs(fr);			\
+} while (0)
+
+#define PAL_CALL_PHYS(iprv,a0,a1,a2,a3) do {			\
+	struct ia64_fpreg fr[6];				\
+	ia64_save_scratch_fpregs(fr);				\
+	iprv = ia64_pal_call_phys_static(a0, a1, a2, a3);	\
+	ia64_load_scratch_fpregs(fr);				\
+} while (0)
+
+#define PAL_CALL_PHYS_STK(iprv,a0,a1,a2,a3) do {		\
+	struct ia64_fpreg fr[6];				\
+	ia64_save_scratch_fpregs(fr);				\
+	iprv = ia64_pal_call_phys_stacked(a0, a1, a2, a3);	\
+	ia64_load_scratch_fpregs(fr);				\
+} while (0)
 
 typedef int (*ia64_pal_handler) (u64, ...);
 extern ia64_pal_handler ia64_pal;
