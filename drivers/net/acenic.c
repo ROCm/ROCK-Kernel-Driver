@@ -1378,7 +1378,7 @@ static int __init ace_init(struct net_device *dev)
 	 * On this platform, we know what the best dma settings
 	 * are.  We use 64-byte maximum bursts, because if we
 	 * burst larger than the cache line size (or even cross
-	 * a 64byte boundry in a single burst) the UltraSparc
+	 * a 64byte boundary in a single burst) the UltraSparc
 	 * PCI controller will disconnect at 64-byte multiples.
 	 *
 	 * Read-multiple will be properly enabled above, and when

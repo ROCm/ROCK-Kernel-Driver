@@ -647,7 +647,7 @@ static void lance_piocopy_to_skb(struct sk_buff *skb, volatile void *piobuf, int
 	u8 *p8;
 	unsigned long pbuf = (unsigned long) piobuf;
 
-	/* We know here that both src and dest are on a 16bit boundry. */
+	/* We know here that both src and dest are on a 16bit boundary. */
 	*p16++ = sbus_readw(pbuf);
 	p32 = (u32 *) p16;
 	pbuf += 2;

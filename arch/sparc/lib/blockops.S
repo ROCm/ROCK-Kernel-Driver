@@ -38,7 +38,7 @@
 	 * and (2 * PAGE_SIZE) (for kernel stacks)
 	 * and with a second arg of zero.  We assume in
 	 * all of these cases that the buffer is aligned
-	 * on at least an 8 byte boundry.
+	 * on at least an 8 byte boundary.
 	 *
 	 * Therefore we special case them to make them
 	 * as fast as possible.

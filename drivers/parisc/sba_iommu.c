@@ -1114,7 +1114,7 @@ sba_fill_pdir(
 
 /*
 ** Two address ranges are DMA contiguous *iff* "end of prev" and
-** "start of next" are both on a page boundry.
+** "start of next" are both on a page boundary.
 **
 ** (shift left is a quick trick to mask off upper bits)
 */

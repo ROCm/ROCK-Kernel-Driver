@@ -5941,7 +5941,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 
 	/* Force memory write invalidate off.  If we leave it on,
 	 * then on 5700_BX chips we have to enable a workaround.
-	 * The workaround is to set the TG3PCI_DMA_RW_CTRL boundry
+	 * The workaround is to set the TG3PCI_DMA_RW_CTRL boundary
 	 * to match the cacheline size.  The Broadcom driver have this
 	 * workaround but turns MWI off all the times so never uses
 	 * it.  This seems to suggest that the workaround is insufficient.

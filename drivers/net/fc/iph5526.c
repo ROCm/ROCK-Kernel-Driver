@@ -499,7 +499,7 @@ u_char *addr;
 		fi->q.ptr_tachyon_header[i] = fi->q.ptr_tachyon_header_base + 16*i;
 	
 	/* Allocate memory for indices.
-	 * Indices should be aligned on 32 byte boundries. 
+	 * Indices should be aligned on 32 byte boundaries. 
 	 */
 	fi->q.host_ocq_cons_indx = kmalloc(2*32, GFP_KERNEL);
 	if (fi->q.host_ocq_cons_indx == NULL){ 

@@ -114,11 +114,11 @@ static inline int get_order(unsigned long size)
 
 #endif /* __ASSEMBLY__ */
 
-/* align addr on a size boundry - adjust address up/down if needed */
+/* align addr on a size boundary - adjust address up/down if needed */
 #define _ALIGN_UP(addr,size)	(((addr)+((size)-1))&(~((size)-1)))
 #define _ALIGN_DOWN(addr,size)	((addr)&(~((size)-1)))
 
-/* align addr on a size boundry - adjust address up if needed */
+/* align addr on a size boundary - adjust address up if needed */
 #define _ALIGN(addr,size)     _ALIGN_UP(addr,size)
 
 /* to align the pointer to the (next) double word boundary */

@@ -12,7 +12,7 @@ static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
 
-/* .text section in head.S is aligned at 2 page boundry and this gets linked
+/* .text section in head.S is aligned at 2 page boundary and this gets linked
  * right after that so that the init_thread_union is aligned properly as well.
  * We really don't need this special alignment like the Intel does, but
  * I do it anyways for completeness.

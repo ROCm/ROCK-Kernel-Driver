@@ -533,7 +533,7 @@ static inline void sun4c_init_ss2_cache_bug(void)
 	}
 }
 
-/* Addr is always aligned on a page boundry for us already. */
+/* Addr is always aligned on a page boundary for us already. */
 static void sun4c_map_dma_area(unsigned long va, u32 addr, int len)
 {
 	unsigned long page, end;

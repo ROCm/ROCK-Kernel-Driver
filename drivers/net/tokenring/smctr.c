@@ -417,7 +417,7 @@ static int smctr_alloc_shared_memory(struct net_device *dev)
         tp->tx_buff_end[BUG_QUEUE] = (__u16 *)smctr_malloc(dev, 0);
 
         /* Allocate MAC receive data buffers.
-         * MAC Rx buffer doesn't have to be on a 256 byte boundry.
+         * MAC Rx buffer doesn't have to be on a 256 byte boundary.
          */
         tp->rx_buff_head[MAC_QUEUE] = (__u16 *)smctr_malloc(dev,
                 RX_DATA_BUFFER_SIZE * tp->num_rx_bdbs[MAC_QUEUE]);
@@ -438,7 +438,7 @@ static int smctr_alloc_shared_memory(struct net_device *dev)
          * To guarantee a minimum of 256 contigous memory to
          * UM_Receive_Packet's lookahead pointer, before a page
          * change or ring end is encountered, place each rx buffer on
-         * a 256 byte boundry.
+         * a 256 byte boundary.
          */
         smctr_malloc(dev, TO_256_BYTE_BOUNDRY(tp->sh_mem_used));
         tp->rx_buff_head[NON_MAC_QUEUE] = (__u16 *)smctr_malloc(dev,
@@ -1331,7 +1331,7 @@ static unsigned int smctr_get_num_rx_bdbs(struct net_device *dev)
         mem_used += tp->tx_buff_size[BUG_QUEUE];
 
         /* Allocate MAC receive data buffers.
-         * MAC receive buffers don't have to be on a 256 byte boundry.
+         * MAC receive buffers don't have to be on a 256 byte boundary.
          */
         mem_used += RX_DATA_BUFFER_SIZE * tp->num_rx_bdbs[MAC_QUEUE];
 
@@ -1348,7 +1348,7 @@ static unsigned int smctr_get_num_rx_bdbs(struct net_device *dev)
          *
          * Make sure the mem_used offset at this point is the
          * same as in allocate_shared memory or the following
-         * boundry adjustment will be incorrect (i.e. not allocating
+         * boundary adjustment will be incorrect (i.e. not allocating
          * the non-mac receive buffers above cannot change the 256
          * byte offset).
          *
@@ -3930,7 +3930,7 @@ static int smctr_process_rx_packet(MAC_HEADER *rmf, __u16 size,
         return (err);
 }
 
-/* Adapter RAM test. Incremental word ODD boundry data test. */
+/* Adapter RAM test. Incremental word ODD boundary data test. */
 static int smctr_ram_memory_test(struct net_device *dev)
 {
         struct net_local *tp = (struct net_local *)dev->priv;
@@ -3947,7 +3947,7 @@ static int smctr_ram_memory_test(struct net_device *dev)
         pages_of_ram    = tp->ram_size / tp->ram_usable;
         pword           = tp->ram_access;
 
-        /* Incremental word ODD boundry test. */
+        /* Incremental word ODD boundary test. */
         for(page = 0; (page < pages_of_ram) && (~err);
                 page++, start_pattern += 0x8000)
         {
