@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/iq80310-irq.c
+ * linux/arch/arm/mach-iop3xx/iq80310-irq.c
  *
  * IRQ hadling/demuxing for IQ80310 board
  *

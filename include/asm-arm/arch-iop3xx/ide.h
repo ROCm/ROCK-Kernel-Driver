@@ -1,5 +1,5 @@
 /*
- * include/asm-arm/arch-iop310/ide.h
+ * include/asm-arm/arch-iop3xx/ide.h
  *
  * Generic IDE functions for IOP310 systems
  *

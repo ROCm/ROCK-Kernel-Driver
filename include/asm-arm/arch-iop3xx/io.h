@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-iop310/io.h
+ * linux/include/asm-arm/arch-iop3xx/io.h
  *
  *  Copyright (C) 2001  MontaVista Software, Inc.
  *

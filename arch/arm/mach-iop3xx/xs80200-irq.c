@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/xs80200-irq.c
+ * linux/arch/arm/mach-iop3xx/xs80200-irq.c
  *
  * Generic IRQ handling for the XS80200 XScale core.
  *

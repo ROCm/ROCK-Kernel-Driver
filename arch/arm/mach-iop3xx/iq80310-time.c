@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/time-iq80310.c
+ * linux/arch/arm/mach-iop3xx/time-iq80310.c
  *
  * Timer functions for IQ80310 onboard timer
  *
