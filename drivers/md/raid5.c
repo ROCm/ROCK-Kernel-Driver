@@ -1739,15 +1739,18 @@ static int raid5_spare_active(mddev_t *mddev)
 	/*
 	 * do the switch finally
 	 */
-	spare_rdev = find_rdev_nr(mddev, spare_desc->number);
-	failed_rdev = find_rdev_nr(mddev, failed_desc->number);
+	spare_rdev = find_rdev_nr(mddev, spare_disk);
+	failed_rdev = find_rdev_nr(mddev, failed_disk);
 
 	/* There must be a spare_rdev, but there may not be a
 	 * failed_rdev.  That slot might be empty...
 	 */
 	spare_rdev->desc_nr = failed_desc->number;
-	if (failed_rdev)
+	spare_rdev->raid_disk = failed_disk;
+	if (failed_rdev) {
 		failed_rdev->desc_nr = spare_desc->number;
+		failed_rdev->raid_disk = spare_disk;
+	}
 	
 	xchg_values(*spare_desc, *failed_desc);
 	xchg_values(*fdisk, *sdisk);

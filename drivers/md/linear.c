@@ -52,7 +52,7 @@ static int linear_run (mddev_t *mddev)
 	conf->smallest = NULL;
 	cnt = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		int j = rdev->sb->this_disk.raid_disk;
+		int j = rdev->raid_disk;
 		dev_info_t *disk = conf->disks + j;
 
 		if (j < 0 || j > mddev->sb->raid_disks || disk->bdev) {

@@ -242,7 +242,7 @@ mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr)
 	struct list_head *tmp;
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->desc_nr == nr)
+		if (rdev->raid_disk == nr)
 			return rdev;
 	}
 	return NULL;
@@ -1178,8 +1178,11 @@ static int analyze_sbs(mddev_t * mddev)
 		if (sb->level == LEVEL_MULTIPATH) {
 			rdev->alias_device = !!i;
 			rdev->desc_nr = i++;
-		} else
+			rdev->raid_disk = rdev->desc_nr;
+		} else {
 			rdev->desc_nr = rdev->sb->this_disk.number;
+			rdev->raid_disk = sb->disks[rdev->desc_nr].raid_disk;
+		}
 	}
 	/*
 	 * Fix up changed device names ... but only if this disk has a
@@ -2106,6 +2109,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		}
 		rdev->old_dev = dev;
 		rdev->desc_nr = info->number;
+		rdev->raid_disk = info->raid_disk;
 
 		bind_rdev_to_array(rdev, mddev);
 

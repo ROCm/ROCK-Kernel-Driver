@@ -159,6 +159,7 @@ struct mdk_rdev_s
 	int alias_device;		/* device alias to the same disk */
 	int faulty;			/* if faulty do not issue IO requests */
 	int desc_nr;			/* descriptor index in the superblock */
+	int raid_disk;			/* role of device in array */
 };
 
 typedef struct mdk_personality_s mdk_personality_t;
