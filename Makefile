@@ -280,10 +280,6 @@ CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
 
-# Disable unit-at-a-time.
-check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1 ; then echo "$(1)"; else echo "$(2)"; fi)
-CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
-
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
@@ -454,6 +450,9 @@ endif
 
 # warn about C99 declaration after statement
 CFLAGS += $(call check_gcc,-Wdeclaration-after-statement,)
+
+# Disable unit-at-a-time.
+CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
 
 #
 # INSTALL_PATH specifies where to place the updated kernel and system map
