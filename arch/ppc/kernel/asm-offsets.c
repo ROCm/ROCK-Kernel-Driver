@@ -8,7 +8,6 @@
  * #defines from the assembly-language output.
  */
 
-#include <stddef.h>
 #include <linux/config.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -34,7 +33,9 @@
 #endif /* CONFIG_PPC_ISERIES */
 
 #define DEFINE(sym, val) \
-	asm volatile("\n#define\t" #sym "\t%0" : : "i" (val))
+	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
+
+#define BLANK() asm volatile("\n->" : : )
 
 int
 main(void)

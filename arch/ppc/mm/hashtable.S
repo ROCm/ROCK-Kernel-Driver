@@ -30,7 +30,7 @@
 #include <asm/cputable.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include "asm-offsets.h"
+#include <asm/offsets.h>
 
 #ifdef CONFIG_SMP
 	.comm	mmu_hash_lock,4
@@ -144,9 +144,7 @@ retry:
 #endif
 
 	/* Return from the exception */
-	lwz	r4,_LINK(r11)
 	lwz	r5,_CTR(r11)
-	mtlr	r4
 	mtctr	r5
 	lwz	r0,GPR0(r11)
 	lwz	r7,GPR7(r11)

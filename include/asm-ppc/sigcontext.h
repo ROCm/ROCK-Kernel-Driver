@@ -4,7 +4,7 @@
 #include <asm/ptrace.h>
 
 
-struct sigcontext_struct {
+struct sigcontext {
 	unsigned long	_unused[4];
 	int		signal;
 	unsigned long	handler;

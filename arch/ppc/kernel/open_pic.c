@@ -150,11 +150,11 @@ struct hw_interrupt_type open_pic_ipi = {
     if (irq < open_pic_irq_offset || irq >= NumSources+open_pic_irq_offset \
 	|| ISR[irq - open_pic_irq_offset] == 0) { \
       printk("open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
-      show_stack(NULL); }
+      dump_stack(); }
 #define check_arg_cpu(cpu) \
     if (cpu < 0 || cpu >= NumProcessors){ \
 	printk("open_pic.c:%d: illegal cpu %d\n", __LINE__, cpu); \
-	show_stack(NULL); }
+	dump_stack(); }
 #else
 #define check_arg_ipi(ipi)	do {} while (0)
 #define check_arg_timer(timer)	do {} while (0)
@@ -317,7 +317,7 @@ void __init openpic_init(int linux_irq_offset)
 	openpic_reset();
 #endif
 
-	if (ppc_md.progress) ppc_md.progress("openpic enter", 0x122);
+	if (ppc_md.progress) ppc_md.progress("openpic: enter", 0x122);
 
 	t = openpic_read(&OpenPIC->Global.Feature_Reporting0);
 	switch (t & OPENPIC_FEATURE_VERSION_MASK) {
@@ -351,7 +351,7 @@ void __init openpic_init(int linux_irq_offset)
 	open_pic_irq_offset = linux_irq_offset;
 
 	/* Initialize timer interrupts */
-	if ( ppc_md.progress ) ppc_md.progress("openpic timer",0x3ba);
+	if ( ppc_md.progress ) ppc_md.progress("openpic: timer",0x3ba);
 	for (i = 0; i < OPENPIC_NUM_TIMERS; i++) {
 		/* Disabled, Priority 0 */
 		openpic_inittimer(i, 0, OPENPIC_VEC_TIMER+i+linux_irq_offset);
@@ -361,7 +361,7 @@ void __init openpic_init(int linux_irq_offset)
 
 #ifdef CONFIG_SMP
 	/* Initialize IPI interrupts */
-	if ( ppc_md.progress ) ppc_md.progress("openpic ipi",0x3bb);
+	if ( ppc_md.progress ) ppc_md.progress("openpic: ipi",0x3bb);
 	for (i = 0; i < OPENPIC_NUM_IPI; i++) {
 		/* Disabled, Priority 10..13 */
 		openpic_initipi(i, 10+i, OPENPIC_VEC_IPI+i+linux_irq_offset);
@@ -374,7 +374,7 @@ void __init openpic_init(int linux_irq_offset)
 #endif
 
 	/* Initialize external interrupts */
-	if (ppc_md.progress) ppc_md.progress("openpic ext",0x3bc);
+	if (ppc_md.progress) ppc_md.progress("openpic: external",0x3bc);
 
 	openpic_set_priority(0xf);
 
@@ -389,7 +389,7 @@ void __init openpic_init(int linux_irq_offset)
 		openpic_disable_irq(i+linux_irq_offset);
 
 		/*
-		 * We find the vale from either the InitSenses table
+		 * We find the value from either the InitSenses table
 		 * or assume a negative polarity level interrupt.
 		 */
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
@@ -410,7 +410,7 @@ void __init openpic_init(int linux_irq_offset)
 		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
-	if (ppc_md.progress) ppc_md.progress("openpic spurious",0x3bd);
+	if (ppc_md.progress) ppc_md.progress("openpic: spurious",0x3bd);
 	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+linux_irq_offset);
 
 	/* Initialize the cascade */
@@ -426,7 +426,7 @@ void __init openpic_init(int linux_irq_offset)
 #endif
 	openpic_set_priority(0);
 
-	if (ppc_md.progress) ppc_md.progress("openpic exit",0x222);
+	if (ppc_md.progress) ppc_md.progress("openpic: exit",0x222);
 }
 
 #ifdef notused
