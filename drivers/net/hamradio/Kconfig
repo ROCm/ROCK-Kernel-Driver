@@ -72,8 +72,8 @@ config DMASCC
 	  certain parameters, such as channel access timing, clock mode, and
 	  DMA channel. This is accomplished with a small utility program,
 	  dmascc_cfg, available at
-	  <http://www.nt.tuwien.ac.at/~kkudielk/Linux/>. Please be sure to get
-	  at least version 1.27 of dmascc_cfg, as older versions will not
+	  <http://cacofonix.nt.tuwien.ac.at/~oe1kib/Linux/>. Please be sure to
+	  get at least version 1.27 of dmascc_cfg, as older versions will not
 	  work with the current driver.
 
 config SCC
@@ -96,8 +96,9 @@ config SCC_DELAY
 	help
 	  Say Y here if you experience problems with the SCC driver not
 	  working properly; please read
-	  <file:Documentation/networking/z8530drv.txt> for details. If unsure,
-	  say N.
+	  <file:Documentation/networking/z8530drv.txt> for details.
+
+	  If unsure, say N.
 
 config SCC_TRXECHO
 	bool "support for TRX that feedback the tx signal to rx"
@@ -105,7 +106,9 @@ config SCC_TRXECHO
 	help
 	  Some transmitters feed the transmitted signal back to the receive
 	  line.  Say Y here to foil this by explicitly disabling the receiver
-	  during data transmission.  If in doubt, say Y.
+	  during data transmission.
+
+	  If in doubt, say Y.
 
 config BAYCOM_SER_FDX
 	tristate "BAYCOM ser12 fullduplex driver for AX.25"
