@@ -233,18 +233,6 @@ static struct file_operations status_fops =
 	release:	seq_release,
 };
 
-static void *single_start(struct seq_file *p, loff_t *pos)
-{
-	return *pos == 0 ? p->private : NULL;
-}
-static void *single_next(struct seq_file *p, void *v, loff_t *pos)
-{
-	++*pos;
-	return NULL;
-}
-static void single_stop(struct seq_file *p, void *v)
-{
-}
 static int wandev_show(struct seq_file *m, void *v)
 {
 	wan_device_t *wandev = v;
@@ -306,20 +294,10 @@ static int wandev_show(struct seq_file *m, void *v)
 		"aborted frames transmitted", wandev->stats.tx_aborted_errors);
 	return 0;
 }
-static struct seq_operations wandev_op = {
-	start:	single_start,
-	next:	single_next,
-	stop:	single_stop,
-	show:	wandev_show,
-};
+
 static int wandev_open(struct inode *inode, struct file *file)
 {
-	int ret = seq_open(file, &wandev_op);
-	if (!ret) {
-		struct seq_file *m = file->private_data;
-		m->private = PDE(inode)->data;
-	}
-	return ret;
+	return single_open(file, wandev_show, PDE(inode)->data);
 }
 
 static struct file_operations wandev_fops =
@@ -327,7 +305,7 @@ static struct file_operations wandev_fops =
 	open:		wandev_open,
 	read:		seq_read,
 	llseek:		seq_lseek,
-	release:	seq_release,
+	release:	single_release,
 	ioctl:		wanrouter_ioctl,
 };
 
