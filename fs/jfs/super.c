@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -164,7 +164,8 @@ static void jfs_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
-static int parse_options(char *options, struct super_block *sb, s64 *newLVSize)
+static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
+			 int *flag)
 {
 	void *nls_map = NULL;
 	char *this_char;
@@ -180,7 +181,11 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize)
 			continue;
 		if ((value = strchr(this_char, '=')) != NULL)
 			*value++ = 0;
-		if (!strcmp(this_char, "iocharset")) {
+		if (!strcmp(this_char, "integrity")) {
+			*flag &= ~JFS_NOINTEGRITY;
+		} else 	if (!strcmp(this_char, "nointegrity")) {
+			*flag |= JFS_NOINTEGRITY;
+		} else if (!strcmp(this_char, "iocharset")) {
 			if (!value || !*value)
 				goto needs_arg;
 			if (nls_map)	/* specified iocharset twice! */
@@ -231,8 +236,9 @@ int jfs_remount(struct super_block *sb, int *flags, char *data)
 {
 	s64 newLVSize = 0;
 	int rc = 0;
+	int flag = JFS_SBI(sb)->flag;
 
-	if (!parse_options(data, sb, &newLVSize)) {
+	if (!parse_options(data, sb, &newLVSize, &flag)) {
 		return -EINVAL;
 	}
 	if (newLVSize) {
@@ -246,10 +252,24 @@ int jfs_remount(struct super_block *sb, int *flags, char *data)
 			return rc;
 	}
 
-	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY))
+	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
+		JFS_SBI(sb)->flag = flag;
 		return jfs_mount_rw(sb, 1);
-	else if ((!(sb->s_flags & MS_RDONLY)) && (*flags & MS_RDONLY))
-		return jfs_umount_rw(sb);
+	}
+	if ((!(sb->s_flags & MS_RDONLY)) && (*flags & MS_RDONLY)) {
+		rc = jfs_umount_rw(sb);
+		JFS_SBI(sb)->flag = flag;
+		return rc;
+	}
+	if ((JFS_SBI(sb)->flag & JFS_NOINTEGRITY) != (flag & JFS_NOINTEGRITY))
+		if (!(sb->s_flags & MS_RDONLY)) {
+			rc = jfs_umount_rw(sb);
+			if (rc)
+				return rc;
+			JFS_SBI(sb)->flag = flag;
+			return jfs_mount_rw(sb, 1);
+		}
+	JFS_SBI(sb)->flag = flag;
 
 	return 0;
 }
@@ -260,6 +280,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *inode;
 	int rc;
 	s64 newLVSize = 0;
+	int flag;
 
 	jfs_info("In jfs_read_super: s_flags=0x%lx", sb->s_flags);
 
@@ -269,10 +290,12 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	memset(sbi, 0, sizeof (struct jfs_sb_info));
 	sb->s_fs_info = sbi;
 
-	if (!parse_options((char *) data, sb, &newLVSize)) {
+	flag = 0;
+	if (!parse_options((char *) data, sb, &newLVSize, &flag)) {
 		kfree(sbi);
 		return -EINVAL;
 	}
+	sbi->flag = flag;
 
 	if (newLVSize) {
 		printk(KERN_ERR "resize option for remount only\n");

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -1241,6 +1241,15 @@ int lmLogInit(struct jfs_log * log)
 	log->page = le32_to_cpu(logsuper->end) / LOGPSIZE;
 	log->eor = le32_to_cpu(logsuper->end) - (LOGPSIZE * log->page);
 
+	/* check for disabled journaling to disk */
+	if (JFS_SBI(log->sb)->flag & JFS_NOINTEGRITY) {
+		log->no_integrity = 1;
+		log->ni_page = log->page;
+		log->ni_eor = log->eor;
+	}
+	else
+		log->no_integrity = 0;
+
 	/*
 	 * initialize for log append write mode
 	 */
@@ -1524,6 +1533,14 @@ int lmLogShutdown(struct jfs_log * log)
 	lrd.type = cpu_to_le16(LOG_SYNCPT);
 	lrd.length = 0;
 	lrd.log.syncpt.sync = 0;
+	
+	/* check for disabled journaling to disk */
+	if (JFS_SBI(log->sb)->flag & JFS_NOINTEGRITY) {
+		log->no_integrity = 0;
+		log->page = log->ni_page;
+		log->eor = log->ni_eor;
+	}
+
 	lsn = lmWriteRecord(log, NULL, &lrd, NULL);
 	bp = log->bp;
 	lp = (struct logpage *) bp->l_ldata;
@@ -1985,10 +2002,18 @@ static void lbmStartIO(struct lbuf * bp)
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
 
-	submit_bio(WRITE, bio);
-
-	INCREMENT(lmStat.submitted);
-	blk_run_queues();
+	/* check if journaling to disk has been disabled */
+	if (!log->no_integrity) {
+		submit_bio(WRITE, bio);
+		INCREMENT(lmStat.submitted);
+		blk_run_queues();
+	}
+	else {
+		bio->bi_size = 0;
+		lbmIODone(bio, 0, 0); /* 2nd argument appears to not be used => 0
+				       *  3rd argument appears to not be used => 0
+				       */
+	}
 }
 
 

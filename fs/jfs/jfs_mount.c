@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -420,12 +420,20 @@ int updateSuper(struct super_block *sb, uint state)
 	struct buffer_head *bh;
 	int rc;
 
-	/*
-	 * Only fsck can fix dirty state
-	 */
-	if (sbi->state == FM_DIRTY)
+	if (sbi->flag & JFS_NOINTEGRITY) {
+		if (state == FM_DIRTY) {
+			sbi->p_state = state;
+			return 0;
+		} else if (state == FM_MOUNT) {
+			sbi->p_state = sbi->state;
+			state = FM_DIRTY;
+		} else if (state == FM_CLEAN) {
+			state = sbi->p_state;
+		} else
+			jfs_err("updateSuper: bad state");
+	} else if (sbi->state == FM_DIRTY)
 		return 0;
-
+	
 	if ((rc = readSuper(sb, &bh)))
 		return rc;
 

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -2736,7 +2736,7 @@ void txLazyCommit(struct tblock * tblk)
 		/* We must have gotten ahead of the user thread
 		 */
 		jfs_info("jfs_lazycommit: tblk 0x%p not unlocked", tblk);
-		schedule();
+		yield();
 	}
 
 	jfs_info("txLazyCommit: processing tblk 0x%p", tblk);
