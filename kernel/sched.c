@@ -4436,6 +4436,7 @@ static int update_sched_domains(struct notifier_block *nfb,
 		return NOTIFY_OK;
 
 	case CPU_UP_CANCELED:
+	case CPU_DOWN_FAILED:
 	case CPU_ONLINE:
 	case CPU_DEAD:
 		/*
