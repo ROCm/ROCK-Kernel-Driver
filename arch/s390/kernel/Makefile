@@ -10,7 +10,7 @@ obj-y	:=  bitmap.o traps.o time.o process.o \
 
 extra-$(CONFIG_ARCH_S390_31)	+= head.o 
 extra-$(CONFIG_ARCH_S390X)	+= head64.o 
-extra-y				+= init_task.o vmlinux.lds.s
+extra-y				+= init_task.o vmlinux.lds
 
 obj-$(CONFIG_MODULES)		+= s390_ksyms.o module.o
 obj-$(CONFIG_SMP)		+= smp.o
