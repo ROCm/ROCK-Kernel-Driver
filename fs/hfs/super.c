@@ -31,6 +31,7 @@
 #include <linux/blkdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 MODULE_LICENSE("GPL");
 

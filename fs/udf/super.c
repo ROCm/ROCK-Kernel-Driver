@@ -55,6 +55,7 @@
 #include <linux/stat.h>
 #include <linux/cdrom.h>
 #include <linux/nls.h>
+#include <linux/smp_lock.h>
 #include <asm/byteorder.h>
 
 #include <linux/udf_fs.h>

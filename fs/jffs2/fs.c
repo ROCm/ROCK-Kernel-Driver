@@ -44,6 +44,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 int jffs2_statfs(struct super_block *sb, struct statfs *buf)
