@@ -397,8 +397,6 @@ static int __init b1pci_init(void)
 {
 	int retval;
 
-	MOD_INC_USE_COUNT;
-
 	b1_set_revision(&b1pci_driver, revision);
         attach_capi_driver(&b1pci_driver);
 
@@ -422,7 +420,6 @@ static int __init b1pci_init(void)
 	detach_capi_driver(&b1pciv4_driver);
 #endif
  out:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 

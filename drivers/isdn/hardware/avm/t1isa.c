@@ -516,8 +516,6 @@ static int __init t1isa_init(void)
 	int i, retval;
 	int found = 0;
 
-	MOD_INC_USE_COUNT;
-
 	b1_set_revision(&t1isa_driver, revision);
         attach_capi_driver(&t1isa_driver);
 
@@ -541,7 +539,6 @@ static int __init t1isa_init(void)
  err:
 	detach_capi_driver(&t1isa_driver);
  out:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
