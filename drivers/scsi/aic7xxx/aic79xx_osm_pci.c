@@ -311,7 +311,7 @@ ahd_pci_map_registers(struct ahd_softc *ahd)
 			       ahd_get_pci_bus(ahd->dev_softc),
 			       ahd_get_pci_slot(ahd->dev_softc),
 			       ahd_get_pci_function(ahd->dev_softc));
-			iounmap((void *)((u_long)maddr & PAGE_MASK));
+			iounmap(maddr);
 			release_mem_region(ahd->platform_data->mem_busaddr,
 					   0x1000);
 			ahd->bshs[0].maddr = NULL;

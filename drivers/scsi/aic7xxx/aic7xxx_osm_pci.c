@@ -329,21 +329,10 @@ ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 				 uint8_t __iomem **maddr)
 {
 	u_long	start;
-	u_long	base_page;
-	u_long	base_offset;
 	int	error;
 
 	error = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	start = pci_resource_start(ahc->dev_softc, 1);
-	base_page = start & PAGE_MASK;
-	base_offset = start - base_page;
-#else
-	start = ahc_pci_read_config(ahc->dev_softc, PCIR_MAPS+4, 4);
-	base_offset = start & PCI_BASE_ADDRESS_MEM_MASK;
-	base_page = base_offset & PAGE_MASK;
-	base_offset -= base_page;
-#endif
 	if (start != 0) {
 		*bus_addr = start;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -351,14 +340,13 @@ ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 			error = ENOMEM;
 #endif
 		if (error == 0) {
-			*maddr = ioremap_nocache(base_page, base_offset + 256);
+			*maddr = ioremap_nocache(start, 256);
 			if (*maddr == NULL) {
 				error = ENOMEM;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 				release_mem_region(start, 0x1000);
 #endif
-			} else
-				*maddr += base_offset;
+			}
 		}
 	} else
 		error = ENOMEM;
@@ -399,7 +387,7 @@ ahc_pci_map_registers(struct ahc_softc *ahc)
 			       ahc_get_pci_bus(ahc->dev_softc),
 			       ahc_get_pci_slot(ahc->dev_softc),
 			       ahc_get_pci_function(ahc->dev_softc));
-			iounmap((void *)((u_long)maddr & PAGE_MASK));
+			iounmap(maddr);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 			release_mem_region(ahc->platform_data->mem_busaddr,
 					   0x1000);

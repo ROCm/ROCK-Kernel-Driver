@@ -1932,11 +1932,7 @@ ahc_platform_free(struct ahc_softc *ahc)
 			release_region(ahc->bsh.ioport, 256);
 		if (ahc->tag == BUS_SPACE_MEMIO
 		 && ahc->bsh.maddr != NULL) {
-			u_long base_addr;
-
-			base_addr = (u_long)ahc->bsh.maddr;
-			base_addr &= PAGE_MASK;
-			iounmap((void *)base_addr);
+			iounmap(ahc->bsh.maddr);
 			release_mem_region(ahc->platform_data->mem_busaddr,
 					   0x1000);
 		}
