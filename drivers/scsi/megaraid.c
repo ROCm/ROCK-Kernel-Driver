@@ -3815,7 +3815,8 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 
 			umc = MBOX_P(uiocp);
 
-			upthru = (mega_passthru *)umc->xferaddr;
+			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
+				return (-EFAULT);
 
 			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
 				return (-EFAULT);
@@ -3831,7 +3832,8 @@ mega_n_to_m(void *arg, megacmd_t *mc)
 
 			umc = (megacmd_t *)uioc_mimd->mbox;
 
-			upthru = (mega_passthru *)umc->xferaddr;
+			if (get_user(upthru, (mega_passthru **)&umc->xferaddr))
+				return (-EFAULT);
 
 			if( put_user(mc->status, (u8 *)&upthru->scsistatus) )
 				return (-EFAULT);
