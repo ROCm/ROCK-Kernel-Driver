@@ -3,10 +3,16 @@
 #
 comment 'USB Human Interface Devices (HID)'
 dep_tristate '  USB Human Interface Device (full HID) support' CONFIG_USB_HID $CONFIG_USB
+
 if [ "$CONFIG_INPUT" = "n" ]; then
    comment '    Input core support is needed for USB HID input layer or HIDBP support'
 fi
+
 dep_mbool '    HID input layer support' CONFIG_USB_HIDINPUT $CONFIG_INPUT $CONFIG_USB_HID
+dep_mbool '      Force feedback support' CONFIG_HID_FF $CONFIG_USB_HIDINPUT
+dep_mbool '        PID Devices' CONFIG_HID_PID $CONFIG_USB_HID $CONFIG_HID_FF
+dep_mbool '        Logitech RumblePad support' CONFIG_LOGITECH_RUMBLE $CONFIG_USB_HID $CONFIG_HID_FF
+dep_mbool '        Logitech WingMan Force 3D support' CONFIG_LOGITECH_3D $CONFIG_USB_HID $CONFIG_HID_FF
 dep_mbool '    /dev/hiddev raw HID device support' CONFIG_USB_HIDDEV $CONFIG_USB_HID
 
 if [ "$CONFIG_USB_HID" != "y" ]; then
@@ -16,4 +22,5 @@ fi
 
 dep_tristate '  Aiptek 6000U/8000U tablet support' CONFIG_USB_AIPTEK $CONFIG_USB $CONFIG_INPUT
 dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
-   
+dep_tristate '  Griffin PowerMate and Contour Jog support' CONFIG_USB_POWERMATE $CONFIG_USB $CONFIG_INPUT
+

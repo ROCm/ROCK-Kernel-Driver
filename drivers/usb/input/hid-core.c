@@ -1,5 +1,5 @@
 /*
- * $Id: hid-core.c,v 1.42 2002/01/27 00:22:46 vojtech Exp $
+ * $Id: hid-core.c,v 1.6 2002/06/09 17:34:55 jdeneux Exp $
  *
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2001 Vojtech Pavlik
@@ -108,11 +108,10 @@ static struct hid_field *hid_register_field(struct hid_report *report, unsigned 
 	memset(field, 0, sizeof(struct hid_field) + usages * sizeof(struct hid_usage)
 		+ values * sizeof(unsigned));
 
-	report->field[report->maxfield] = field;
+	report->field[report->maxfield++] = field;
 	field->usage = (struct hid_usage *)(field + 1);
 	field->value = (unsigned *)(field->usage + usages);
 	field->report = report;
-	field->index = report->maxfield++;
 
 	return field;
 }
@@ -517,6 +516,8 @@ static void hid_free_report(struct hid_report *report)
 static void hid_free_device(struct hid_device *device)
 {
 	unsigned i,j;
+
+	hid_ff_exit(device);
 
 	for (i = 0; i < HID_REPORT_TYPES; i++) {
 		struct hid_report_enum *report_enum = device->report_enum + i;
@@ -1171,8 +1172,8 @@ int hid_wait_io(struct hid_device *hid)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	add_wait_queue(&hid->wait, &wait);
 
-	while (timeout && test_bit(HID_CTRL_RUNNING, &hid->iofl) &&
-			  test_bit(HID_OUT_RUNNING, &hid->iofl))
+	while (timeout && (test_bit(HID_CTRL_RUNNING, &hid->iofl) ||
+			   test_bit(HID_OUT_RUNNING, &hid->iofl)))
 		timeout = schedule_timeout(timeout);
 
 	set_current_state(TASK_RUNNING);
@@ -1223,6 +1224,7 @@ void hid_init_reports(struct hid_device *hid)
 	struct hid_report *report;
 	struct list_head *list;
 	int len;
+	int err, ret;
 
 	report_enum = hid->report_enum + HID_INPUT_REPORT;
 	list = report_enum->report_list.next;
@@ -1240,7 +1242,16 @@ void hid_init_reports(struct hid_device *hid)
 		list = list->next;
 	}
 
-	if (hid_wait_io(hid)) {
+	err = 0;
+	while ((ret = hid_wait_io(hid))) {
+		err |= ret;
+		if (test_bit(HID_CTRL_RUNNING, &hid->iofl))
+			usb_unlink_urb(hid->urbctrl);
+		if (test_bit(HID_OUT_RUNNING, &hid->iofl))
+			usb_unlink_urb(hid->urbout);
+	}
+
+	if (err) {
 		warn("timeout initializing reports\n");
 		return;
 	}
@@ -1299,7 +1310,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	struct hid_descriptor *hdesc;
 	struct hid_device *hid;
 	unsigned quirks = 0, rsize = 0;
-	char *buf;
+	char *buf, *rdesc;
 	int n;
 
 	for (n = 0; hid_blacklist[n].idVendor; n++)
@@ -1325,27 +1336,31 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 		return NULL;
 	}
 
-	{
-		__u8 rdesc[rsize];
-
-		if ((n = hid_get_class_descriptor(dev, interface->bInterfaceNumber, HID_DT_REPORT, rdesc, rsize)) < 0) {
-			dbg("reading report descriptor failed");
-			return NULL;
-		}
-
-#ifdef DEBUG_DATA
-		printk(KERN_DEBUG __FILE__ ": report descriptor (size %u, read %d) = ", rsize, n);
-		for (n = 0; n < rsize; n++)
-			printk(" %02x", (unsigned) rdesc[n]);
-		printk("\n");
-#endif
-
-		if (!(hid = hid_parse_report(rdesc, rsize))) {
-			dbg("parsing report descriptor failed");
-			return NULL;
-		}
+	if (!(rdesc = kmalloc(rsize, GFP_KERNEL))) {
+		dbg("couldn't allocate rdesc memory");
+		return NULL;
 	}
 
+	if ((n = hid_get_class_descriptor(dev, interface->bInterfaceNumber, HID_DT_REPORT, rdesc, rsize)) < 0) {
+		dbg("reading report descriptor failed");
+		kfree(rdesc);
+		return NULL;
+	}
+
+#ifdef DEBUG_DATA
+	printk(KERN_DEBUG __FILE__ ": report descriptor (size %u, read %d) = ", rsize, n);
+	for (n = 0; n < rsize; n++)
+		printk(" %02x", (unsigned) rdesc[n]);
+	printk("\n");
+#endif
+
+	if (!(hid = hid_parse_report(rdesc, rsize))) {
+		dbg("parsing report descriptor failed");
+		kfree(rdesc);
+		return NULL;
+	}
+
+	kfree(rdesc);
 	hid->quirks = quirks;
 
 	for (n = 0; n < interface->bNumEndpoints; n++) {
@@ -1439,6 +1454,8 @@ static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
 	hid_init_reports(hid);
 	hid_dump_device(hid);
 
+	hid_ff_init(hid);
+
 	if (!hidinput_connect(hid))
 		hid->claimed |= HID_CLAIMED_INPUT;
 	if (!hiddev_connect(hid))
@@ -1477,20 +1494,20 @@ static void hid_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct hid_device *hid = ptr;
 
-	dbg("cleanup called");
 	usb_unlink_urb(hid->urbin);
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
+
+	if (hid->claimed & HID_CLAIMED_INPUT)
+		hidinput_disconnect(hid);
+	if (hid->claimed & HID_CLAIMED_HIDDEV)
+		hiddev_disconnect(hid);
 
 	usb_free_urb(hid->urbin);
 	usb_free_urb(hid->urbctrl);
 	if (hid->urbout)
 		usb_free_urb(hid->urbout);
 
-	if (hid->claimed & HID_CLAIMED_INPUT)
-		hidinput_disconnect(hid);
-	if (hid->claimed & HID_CLAIMED_HIDDEV)
-		hiddev_disconnect(hid);
 	hid_free_device(hid);
 }
 
