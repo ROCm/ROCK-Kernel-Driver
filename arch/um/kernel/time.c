@@ -93,6 +93,7 @@ void do_gettimeofday(struct timeval *tv)
 	gettimeofday(tv, NULL);
 	timeradd(tv, &local_offset, tv);
 	time_unlock(flags);
+	clock_was_set();
 }
 
 EXPORT_SYMBOL(do_gettimeofday);

@@ -535,6 +535,7 @@ int do_settimeofday(struct timespec *tv)
 	write_seqlock_irq(&xtime_lock);
 	ret = bus_do_settimeofday(tv);
 	write_sequnlock_irq(&xtime_lock);
+	clock_was_set();
 	return ret;
 }
 
