@@ -10,13 +10,13 @@
 #ifndef __ASM_PARAM_H
 #define __ASM_PARAM_H
 
-#include <asm/arch/param.h>	/* for HZ */
-
-#ifndef __KERNEL_HZ
-#define __KERNEL_HZ	100
-#endif
-
 #ifdef __KERNEL__
+# include <asm/arch/param.h>		/* for __KERNEL_HZ */
+
+# ifndef __KERNEL_HZ
+# define __KERNEL_HZ	100
+# endif
+
 # define HZ		__KERNEL_HZ	/* Internal kernel timer frequency */
 # define USER_HZ	100		/* User interfaces are in "ticks" */
 # define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
