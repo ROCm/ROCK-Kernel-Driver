@@ -64,7 +64,8 @@ static int ipip6_fb_tunnel_init(struct net_device *dev);
 static int ipip6_tunnel_init(struct net_device *dev);
 
 static struct net_device ipip6_fb_tunnel_dev = {
-	"sit0", 0x0, 0x0, 0x0, 0x0, 0, 0, 0, 0, 0, NULL, ipip6_fb_tunnel_init,
+	name: "sit0",
+	init: ipip6_fb_tunnel_init
 };
 
 static struct ip_tunnel ipip6_fb_tunnel = {
