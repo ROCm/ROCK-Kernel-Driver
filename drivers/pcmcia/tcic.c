@@ -115,20 +115,20 @@ static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs);
 static void tcic_timer(u_long data);
 static struct pccard_operations tcic_operations;
 
-typedef struct socket_info_t {
+struct tcic_socket {
     u_short	psock;
     void	(*handler)(void *info, u_int events);
     void	*info;
     u_char	last_sstat;
     u_char	id;
     struct pcmcia_socket	socket;
-} socket_info_t;
+};
 
 static struct timer_list poll_timer;
 static int tcic_timer_pending;
 
 static int sockets;
-static socket_info_t socket_table[2];
+static struct tcic_socket socket_table[2];
 
 static socket_cap_t tcic_cap = {
 	/* only 16-bit cards, memory windows must be size-aligned */
@@ -646,7 +646,7 @@ static void tcic_timer(u_long data)
 
 static int tcic_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     socket_table[psock].handler = handler;
     socket_table[psock].info = info;
     return 0;
@@ -656,7 +656,7 @@ static int tcic_register_callback(struct pcmcia_socket *sock, void (*handler)(vo
 
 static int tcic_get_status(struct pcmcia_socket *sock, u_int *value)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
 
     tcic_setl(TCIC_ADDR, (psock << TCIC_ADDR_SS_SHFT)
@@ -690,7 +690,7 @@ static int tcic_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
 
 static int tcic_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
     u_short scf1, scf2;
     
@@ -743,7 +743,7 @@ static int tcic_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 
 static int tcic_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_char reg;
     u_short scf1, scf2;
 
@@ -818,7 +818,7 @@ static int tcic_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 
 static int tcic_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_int addr;
     u_short base, len, ioctl;
     
@@ -855,7 +855,7 @@ static int tcic_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
 
 static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *mem)
 {
-    u_short psock = container_of(sock, socket_info_t, socket)->psock;
+    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
     u_short addr, ctl;
     u_long base, len, mmap;
 
