@@ -55,8 +55,7 @@ all:	do-it-all
 
 ifeq (.config,$(wildcard .config))
 include .config
-ifeq (.depend,$(wildcard .depend))
-include .depend
+ifeq (.hdepend,$(wildcard .hdepend))
 do-it-all:	vmlinux
 else
 CONFIGURATION = depend
@@ -93,11 +92,12 @@ CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
+INIT		=init/init.o
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
 
 LIBS		=$(TOPDIR)/lib/lib.a
-SUBDIRS		=kernel lib drivers mm fs net ipc sound
+SUBDIRS		=init kernel lib drivers mm fs net ipc sound
 
 DRIVERS-n :=
 DRIVERS-y :=
@@ -165,8 +165,8 @@ export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
-vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o init/do_mounts.o linuxsubdirs
-	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o init/do_mounts.o \
+vmlinux: include/linux/version.h $(CONFIGURATION) linuxsubdirs
+	$(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
 		$(LIBS) \
@@ -220,11 +220,6 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # Generate some files
 
 $(TOPDIR)/include/linux/version.h: include/linux/version.h
-$(TOPDIR)/include/linux/compile.h: include/linux/compile.h
-
-include/linux/compile.h: $(CONFIGURATION) include/linux/version.h
-	@echo Generating $@
-	@. scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
 
 include/linux/version.h: ./Makefile
 	@echo Generating $@
@@ -233,25 +228,11 @@ include/linux/version.h: ./Makefile
 comma	:= ,
 
 # ---------------------------------------------------------------------------
-# Build files in init
-# FIXME should be moved to init/Makefile
-
-init/version.o: init/version.c include/linux/compile.h include/config/MARKER
-	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o init/version.o init/version.c
-
-init/main.o: init/main.c include/config/MARKER
-	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
-
-init/do_mounts.o: init/do_mounts.c include/config/MARKER
-	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
-
-# ---------------------------------------------------------------------------
 # Generate dependencies
 
 depend dep: dep-files
 
 dep-files: scripts/mkdep archdep include/linux/version.h
-	scripts/mkdep -- init/*.c > .depend
 	scripts/mkdep -- `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
 	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
 ifdef CONFIG_MODVERSIONS
@@ -487,4 +468,3 @@ backup: mrproper
 
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
-
