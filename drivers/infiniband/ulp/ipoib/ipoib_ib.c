@@ -630,7 +630,7 @@ static void ipoib_pkey_dev_check_presence(struct net_device *dev)
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	u16 pkey_index = 0;
 
-	if (ib_cached_pkey_find(priv->ca, priv->port, priv->pkey, &pkey_index))
+	if (ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index))
 		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 	else
 		set_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);

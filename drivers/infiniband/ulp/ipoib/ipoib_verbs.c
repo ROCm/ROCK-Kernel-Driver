@@ -49,7 +49,7 @@ int ipoib_mcast_attach(struct net_device *dev, u16 mlid, union ib_gid *mgid)
 	if (!qp_attr)
 		goto out;
 
-	if (ib_cached_pkey_find(priv->ca, priv->port, priv->pkey, &pkey_index)) {
+	if (ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index)) {
 		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 		ret = -ENXIO;
 		goto out;
@@ -104,7 +104,7 @@ int ipoib_qp_create(struct net_device *dev)
 	 * The port has to be assigned to the respective IB partition in
 	 * advance.
 	 */
-	ret = ib_cached_pkey_find(priv->ca, priv->port, priv->pkey, &pkey_index);
+	ret = ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index);
 	if (ret) {
 		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 		return ret;

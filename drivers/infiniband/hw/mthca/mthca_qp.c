@@ -1190,11 +1190,11 @@ static int build_mlx_header(struct mthca_dev *dev, struct mthca_sqp *sqp,
 		sqp->ud_header.lrh.source_lid = 0xffff;
 	sqp->ud_header.bth.solicited_event = !!(wr->send_flags & IB_SEND_SOLICITED);
 	if (!sqp->qp.ibqp.qp_num)
-		ib_cached_pkey_get(&dev->ib_dev, sqp->port,
+		ib_get_cached_pkey(&dev->ib_dev, sqp->port,
 				   sqp->pkey_index,
 				   &sqp->ud_header.bth.pkey);
 	else
-		ib_cached_pkey_get(&dev->ib_dev, sqp->port,
+		ib_get_cached_pkey(&dev->ib_dev, sqp->port,
 				   wr->wr.ud.pkey_index,
 				   &sqp->ud_header.bth.pkey);
 	cpu_to_be16s(&sqp->ud_header.bth.pkey);
