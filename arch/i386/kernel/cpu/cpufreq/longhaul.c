@@ -275,8 +275,17 @@ static int __init longhaul_get_ranges (void)
 	case 4:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
-		//TODO: Nehemiah may have borken MaxMHzBR.
-		// need to extrapolate from FSB.
+		/*
+		 * TODO: This code works, but raises a lot of questions.
+		 * - Some Nehemiah's seem to have broken Min/MaxMHzBR's.
+		 *   We get around this by using a hardcoded multiplier of 5.0x
+		 *   for the minimimum speed, and the speed we booted up at for the max.
+		 *   This is done in longhaul_get_cpu_mult() by reading the EBLCR register.
+		 * - According to some VIA documentation EBLCR is only
+		 *   in pre-Nehemiah C3s. How this still works is a mystery.
+		 *   We're possibly using something undocumented and unsupported,
+		 *   But it works, so we don't grumble.
+		 */
 		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
