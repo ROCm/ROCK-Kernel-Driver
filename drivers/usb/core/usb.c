@@ -11,7 +11,7 @@
  	more docs, etc)
  * (C) Copyright Yggdrasil Computing, Inc. 2000
  *     (usb_device_id matching changes by Adam J. Richter)
- * (C) Copyright Greg Kroah-Hartman 2002
+ * (C) Copyright Greg Kroah-Hartman 2002-2003
  *
  * NOTE! This is not actually a driver at all, rather this is
  * just a collection of helper routines that implement the
@@ -75,6 +75,8 @@ static struct device_driver usb_generic_driver = {
 	.probe = generic_probe,
 	.remove = generic_remove,
 };
+
+static int usb_generic_driver_data;
 
 /* needs to be called with BKL held */
 int usb_device_probe(struct device *dev)
@@ -535,7 +537,9 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	if (!dev)
 		return -ENODEV;
 
-	if (dev->driver == &usb_generic_driver)
+	/* Must check driver_data here, as on remove driver is always NULL */
+	if ((dev->driver == &usb_generic_driver) || 
+	    (dev->driver_data == &usb_generic_driver_data))
 		return 0;
 
 	intf = to_usb_interface(dev);
@@ -994,6 +998,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
 	dev->dev.release = usb_release_dev;
+	dev->dev.driver_data = &usb_generic_driver_data;
 	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
