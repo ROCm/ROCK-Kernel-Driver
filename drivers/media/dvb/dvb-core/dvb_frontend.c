@@ -134,6 +134,7 @@ static void dvb_bend_frequency (struct dvb_frontend_data *this_fe, int recursive
 {
 	struct list_head *entry;
 	int stepsize = this_fe->info->frequency_stepsize;
+	int this_fe_adap_num = this_fe->frontend.i2c->adapter->num;
 	int frequency;
 
 	if (!stepsize || recursive > 10) {
@@ -156,6 +157,9 @@ static void dvb_bend_frequency (struct dvb_frontend_data *this_fe, int recursive
 		int f;
 
 		fe = list_entry (entry, struct dvb_frontend_data, list_head);
+
+		if (fe->frontend.i2c->adapter->num != this_fe_adap_num)
+			continue;
 
 		f = fe->parameters.frequency;
 		f += fe->lnb_drift;
