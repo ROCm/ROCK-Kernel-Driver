@@ -35,28 +35,30 @@ svc_create(struct svc_program *prog, unsigned int bufsize)
 	if (!(serv = (struct svc_serv *) kmalloc(sizeof(*serv), GFP_KERNEL)))
 		return NULL;
 	memset(serv, 0, sizeof(*serv));
+	serv->sv_name      = prog->pg_name;
 	serv->sv_program   = prog;
 	serv->sv_nrthreads = 1;
 	serv->sv_stats     = prog->pg_stats;
 	serv->sv_bufsz	   = bufsize? bufsize : 4096;
-	prog->pg_lovers = prog->pg_nvers-1;
 	xdrsize = 0;
-	for (vers=0; vers<prog->pg_nvers ; vers++)
-		if (prog->pg_vers[vers]) {
-			prog->pg_hivers = vers;
-			if (prog->pg_lovers > vers)
-				prog->pg_lovers = vers;
-			if (prog->pg_vers[vers]->vs_xdrsize > xdrsize)
-				xdrsize = prog->pg_vers[vers]->vs_xdrsize;
-		}
+	while (prog) {
+		prog->pg_lovers = prog->pg_nvers-1;
+		for (vers=0; vers<prog->pg_nvers ; vers++)
+			if (prog->pg_vers[vers]) {
+				prog->pg_hivers = vers;
+				if (prog->pg_lovers > vers)
+					prog->pg_lovers = vers;
+				if (prog->pg_vers[vers]->vs_xdrsize > xdrsize)
+					xdrsize = prog->pg_vers[vers]->vs_xdrsize;
+			}
+		prog = prog->pg_next;
+	}
 	serv->sv_xdrsize   = xdrsize;
 	INIT_LIST_HEAD(&serv->sv_threads);
 	INIT_LIST_HEAD(&serv->sv_sockets);
 	INIT_LIST_HEAD(&serv->sv_tempsocks);
 	INIT_LIST_HEAD(&serv->sv_permsocks);
 	spin_lock_init(&serv->sv_lock);
-
-	serv->sv_name      = prog->pg_name;
 
 	/* Remove any stale portmap registrations */
 	svc_register(serv, 0, 0);
@@ -221,22 +223,27 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 
 	progp = serv->sv_program;
 
-	dprintk("RPC: svc_register(%s, %s, %d)\n",
-		progp->pg_name, proto == IPPROTO_UDP? "udp" : "tcp", port);
-
 	if (!port)
 		clear_thread_flag(TIF_SIGPENDING);
 
-	for (i = 0; i < progp->pg_nvers; i++) {
-		if (progp->pg_vers[i] == NULL)
-			continue;
-		error = rpc_register(progp->pg_prog, i, proto, port, &dummy);
-		if (error < 0)
-			break;
-		if (port && !dummy) {
-			error = -EACCES;
-			break;
+	while (progp) {
+		dprintk("RPC: svc_register(%s, %s, %d)\n",
+			progp->pg_name,
+			proto == IPPROTO_UDP?  "udp" : "tcp",
+			port);
+
+		for (i = 0; i < progp->pg_nvers; i++) {
+			if (progp->pg_vers[i] == NULL)
+				continue;
+			error = rpc_register(progp->pg_prog, i, proto, port, &dummy);
+			if (error < 0)
+				break;
+			if (port && !dummy) {
+				error = -EACCES;
+				break;
+			}
 		}
+		progp = progp->pg_next;
 	}
 
 	if (!port) {
@@ -332,7 +339,10 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		goto sendit;
 	}
 		
-	if (prog != progp->pg_prog)
+	for (progp = serv->sv_program; progp; progp = progp->pg_next)
+		if (prog == progp->pg_prog)
+			break;
+	if (progp == NULL)
 		goto err_bad_prog;
 
 	if (vers >= progp->pg_nvers ||
@@ -445,8 +455,8 @@ err_bad_auth:
 
 err_bad_prog:
 #ifdef RPC_PARANOIA
-	if (prog != 100227 || progp->pg_prog != 100003)
-		printk("svc: unknown program %d (me %d)\n", prog, progp->pg_prog);
+	if (prog != 100227 || serv->sv_program->pg_prog != 100003)
+		printk("svc: unknown program %d (me %d)\n", prog, serv->sv_program->pg_prog);
 	/* else it is just a Solaris client seeing if ACLs are supported */
 #endif
 	serv->sv_stats->rpcbadfmt++;

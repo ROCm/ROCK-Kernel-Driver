@@ -32,6 +32,13 @@ static unsigned long		next_gc;
 static int			nrhosts;
 static DECLARE_MUTEX(nlm_host_sema);
 
+/*
+ * Function pointers - will reference either the
+ * "standard" statd functions that do upcalls to user land,
+ * or the kernel statd functions.
+ */
+int				(*nsm_monitor)(struct nlm_host *);
+int				(*nsm_unmonitor)(struct nlm_host *);
 
 static void			nlm_gc_hosts(void);
 
@@ -62,6 +69,7 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 					int proto, int version)
 {
 	struct nlm_host	*host, **hp;
+	struct nsm_handle *nsm = NULL;
 	u32		addr;
 	int		hash;
 
@@ -77,6 +85,13 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 		nlm_gc_hosts();
 
 	for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
+		if (!nlm_cmp_addr(&host->h_addr, sin))
+			continue;
+
+		/* See if we have an NSM handle for this client */
+		if (!nsm && (nsm = host->h_nsmhandle) != 0)
+			atomic_inc(&nsm->sm_count);
+
 		if (host->h_proto != proto)
 			continue;
 		if (host->h_version != version)
@@ -84,22 +99,21 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 		if (host->h_server != server)
 			continue;
 
-		if (nlm_cmp_addr(&host->h_addr, sin)) {
-			if (hp != nlm_hosts + hash) {
-				*hp = host->h_next;
-				host->h_next = nlm_hosts[hash];
-				nlm_hosts[hash] = host;
-			}
-			nlm_get_host(host);
-			up(&nlm_host_sema);
-			return host;
+		if (hp != nlm_hosts + hash) {
+			*hp = host->h_next;
+			host->h_next = nlm_hosts[hash];
+			nlm_hosts[hash] = host;
 		}
+		nlm_get_host(host);
+		goto out;
 	}
 
 	/* Ooops, no host found, create it */
 	dprintk("lockd: creating host entry\n");
 
-	if (!(host = (struct nlm_host *) kmalloc(sizeof(*host), GFP_KERNEL)))
+	/* Allocate NLM struct and NSM handle. */
+	if ((!nsm && !(nsm = nsm_alloc(sin)))
+	 || !(host = (struct nlm_host *) kmalloc(sizeof(*host), GFP_KERNEL)))
 		goto nohost;
 	memset(host, 0, sizeof(*host));
 
@@ -119,6 +133,7 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	init_waitqueue_head(&host->h_gracewait);
 	host->h_state      = 0;			/* pseudo NSM state */
 	host->h_nsmstate   = 0;			/* real NSM state */
+	host->h_nsmhandle  = nsm;
 	host->h_server	   = server;
 	host->h_next       = nlm_hosts[hash];
 	nlm_hosts[hash]    = host;
@@ -128,25 +143,33 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	if (++nrhosts > NLM_HOST_MAX)
 		next_gc = 0;
 
-nohost:
+out:
 	up(&nlm_host_sema);
 	return host;
+
+nohost:
+	if (host) {
+		kfree(host);
+		host = NULL;
+	}
+	nsm_release(nsm);
+	goto out;
 }
 
 struct nlm_host *
 nlm_find_client(void)
 {
-	/* find a nlm_host for a client for which h_killed == 0.
-	 * and return it
+	/* Find the next NLM client host and remove it from the
+	 * list. The caller is supposed to release all resources
+	 * held by this client, and release the nlm_host afterwards.
 	 */
 	int hash;
 	down(&nlm_host_sema);
 	for (hash = 0 ; hash < NLM_HOST_NRHASH; hash++) {
 		struct nlm_host *host, **hp;
 		for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
-			if (host->h_server &&
-			    host->h_killed == 0) {
-				nlm_get_host(host);
+			if (host->h_server) {
+			    	*hp = host->h_next;
 				up(&nlm_host_sema);
 				return host;
 			}
@@ -252,6 +275,59 @@ void nlm_release_host(struct nlm_host *host)
 }
 
 /*
+ * Given an IP address, initiate recovery and ditch all locks.
+ */
+void
+nlm_host_rebooted(struct sockaddr_in *sin, u32 new_state)
+{
+	struct nlm_host	*host, **hp;
+	int		hash;
+
+	dprintk("lockd: nlm_host_rebooted(%u.%u.%u.%u)\n",
+			NIPQUAD(sin->sin_addr));
+
+	hash = NLM_ADDRHASH(sin->sin_addr.s_addr);
+
+	/* Lock hash table */
+	down(&nlm_host_sema);
+	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+		if (nlm_cmp_addr(&host->h_addr, sin)) {
+			if (host->h_nsmhandle)
+				host->h_nsmhandle->sm_monitored = 0;
+			host->h_rebooted = 1;
+		}
+	}
+
+again:
+	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+		if (nlm_cmp_addr(&host->h_addr, sin) && host->h_rebooted) {
+			host->h_rebooted = 0;
+			atomic_inc(&host->h_count);
+			up(&nlm_host_sema);
+
+			/* If we're server for this guy, just ditch
+			 * all the locks he held.
+			 * If he's the server, initiate lock recovery.
+			 */
+			if (host->h_server) {
+				nlmsvc_free_host_resources(host);
+			} else {
+				nlmclnt_recovery(host, new_state);
+			}
+
+			down(&nlm_host_sema);
+			nlm_release_host(host);
+
+			/* Host table may have changed in the meanwhile,
+			 * start over */
+			goto again;
+		}
+	}
+
+	up(&nlm_host_sema);
+}
+
+/*
  * Shut down the hosts module.
  * Note that this routine is called only at server shutdown time.
  */
@@ -323,9 +399,12 @@ nlm_gc_hosts(void)
 			}
 			dprintk("lockd: delete host %s\n", host->h_name);
 			*q = host->h_next;
-			/* Don't unmonitor hosts that have been invalidated */
-			if (host->h_monitored && !host->h_killed)
-				nsm_unmonitor(host);
+
+			/* Release the NSM handle. Unmonitor unless
+			 * host was invalidated (i.e. lockd restarted)
+			 */
+			nsm_unmonitor(host);
+
 			if ((clnt = host->h_rpcclnt) != NULL) {
 				if (atomic_read(&clnt->cl_users)) {
 					printk(KERN_WARNING
@@ -342,5 +421,34 @@ nlm_gc_hosts(void)
 	}
 
 	next_gc = jiffies + NLM_HOST_COLLECT;
+}
+
+/*
+ * Allocate an NSM handle
+ */
+struct nsm_handle *
+nsm_alloc(struct sockaddr_in *sin)
+{
+	struct nsm_handle *nsm;
+
+	nsm = (struct nsm_handle *) kmalloc(sizeof(*nsm), GFP_KERNEL);
+	if (nsm == NULL)
+		return NULL;
+
+	memset(nsm, 0, sizeof(*nsm));
+	memcpy(&nsm->sm_addr, sin, sizeof(nsm->sm_addr));
+	atomic_set(&nsm->sm_count, 1);
+
+	return nsm;
+}
+
+/*
+ * Release an NSM handle
+ */
+void
+nsm_release(struct nsm_handle *nsm)
+{
+	if (nsm && atomic_dec_and_test(&nsm->sm_count))
+		kfree(nsm);
 }
 

@@ -397,11 +397,9 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 		return -ENOLCK;
 
 	if (NFS_PROTO(inode)->version != 4) {
-		/* Fake OK code if mounted without NLM support */
+		/* If mounted NONLM, tell VFS to use local locking only. */
 		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM) {
-			if (IS_GETLK(cmd))
-				return LOCK_USE_CLNT;
-			return 0;
+			return LOCK_USE_CLNT;
 		}
 	}
 
