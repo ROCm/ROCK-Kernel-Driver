@@ -177,7 +177,7 @@ static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_
 		agp_bridge.dev = dev;
 		agp_bridge.capndx = cap_ptr;
 		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode)
+		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode)
 		agp_register_driver(dev);
 		return 0;
 	}

@@ -34,6 +34,8 @@
 #include <linux/miscdevice.h>
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/vmalloc.h>
+#include <asm/io.h>
 #include "agp.h"
 
 /* Due to XFree86 brain-damage, we can't go to 1.0 until they
