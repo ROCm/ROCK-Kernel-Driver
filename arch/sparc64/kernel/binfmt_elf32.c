@@ -151,4 +151,7 @@ MODULE_AUTHOR("Eric Youngdale, David S. Miller, Jakub Jelinek");
 #undef MODULE_DESCRIPTION
 #undef MODULE_AUTHOR
 
+#undef TASK_SIZE
+#define TASK_SIZE 0xf0000000
+
 #include "../../../fs/binfmt_elf.c"
