@@ -57,7 +57,7 @@ static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;
 static unsigned long next_heartbeat;
 static unsigned long wdt_is_open;
-static int wdt_expect_close;
+static char wdt_expect_close;
 static struct pci_dev *alim7101_pmu;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -144,7 +144,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 	if(ppos != &file->f_pos)
 		return -ESPIPE;
 
-	/* See if we got the magic character */
+	/* See if we got the magic character 'V' and reload the timer */
 	if(count) {
 		if (!nowayout) {
 			size_t ofs;
@@ -183,6 +183,7 @@ static int fop_close(struct inode * inode, struct file * file)
 	if(wdt_expect_close == 42)
 		wdt_turnoff();
 	else {
+		/* wim: shouldn't there be a: del_timer(&timer); */
 		printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
 	}
 	clear_bit(0, &wdt_is_open);
@@ -194,7 +195,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 {
 	static struct watchdog_info ident =
 	{
-		.options = WDIOF_MAGICCLOSE,
+		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity = "ALiM7101",
 	};
@@ -203,11 +204,33 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 	{
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
+		case WDIOC_GETSTATUS:
+		case WDIOC_GETBOOTSTATUS:
+			return put_user(0, (int *)arg);
 		case WDIOC_KEEPALIVE:
 			next_heartbeat = jiffies + WDT_HEARTBEAT;
 			return 0;
+		case WDIOC_SETOPTIONS:
+		{
+			int new_options, retval = -EINVAL;
+
+			if(get_user(new_options, (int *)arg))
+				return -EFAULT;
+
+			if(new_options & WDIOS_DISABLECARD) {
+				wdt_turnoff();
+				retval = 0;
+			}
+
+			if(new_options & WDIOS_ENABLECARD) {
+				wdt_startup();
+				retval = 0;
+			}
+
+			return retval;
+		}
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 	}
 }
 
