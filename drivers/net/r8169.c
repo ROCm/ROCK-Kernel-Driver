@@ -508,7 +508,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	spin_lock_init(&tp->lock);
 
-	pdev->driver_data = dev;
+	pci_set_drvdata(pdev, dev);
 
 	printk(KERN_INFO "%s: %s at 0x%lx, "
 	       "%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x, "
@@ -618,7 +618,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 static void __devexit
 rtl8169_remove_one(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = (struct rtl8169_private *) (dev->priv);
 
 	assert(dev != NULL);
@@ -633,7 +633,7 @@ rtl8169_remove_one(struct pci_dev *pdev)
 	       sizeof (struct net_device) + sizeof (struct rtl8169_private));
 
 	kfree(dev);
-	pdev->driver_data = NULL;
+	pci_set_drvdata(pdev, NULL);
 }
 
 static int

@@ -12,31 +12,36 @@ network devices.
 struct net_device synchronization rules
 =======================================
 dev->open:
-	Locking: Inside rtnl_lock() semaphore.
-	Sleeping: OK
+	Synchronization: rtnl_lock() semaphore.
+	Context: process
 
 dev->stop:
-	Locking: Inside rtnl_lock() semaphore.
-	Sleeping: OK
+	Synchronization: rtnl_lock() semaphore.
+	Context: process
+	Notes: netif_running() is guaranteed false when this is called
 
 dev->do_ioctl:
-	Locking: Inside rtnl_lock() semaphore.
-	Sleeping: OK
+	Synchronization: rtnl_lock() semaphore.
+	Context: process
 
 dev->get_stats:
-	Locking: Inside dev_base_lock spinlock.
-	Sleeping: NO
+	Synchronization: dev_base_lock rwlock.
+	Context: nominally process, but don't sleep inside an rwlock
 
 dev->hard_start_xmit:
-	Locking: Inside dev->xmit_lock spinlock.
-	Sleeping: NO
+	Synchronization: dev->xmit_lock spinlock.
+	Context: BHs disabled
 
 dev->tx_timeout:
-	Locking: Inside dev->xmit_lock spinlock.
-	Sleeping: NO
+	Synchronization: dev->xmit_lock spinlock.
+	Context: BHs disabled
 
 dev->set_multicast_list:
-	Locking: Inside dev->xmit_lock spinlock.
-	Sleeping: NO
+	Synchronization: dev->xmit_lock spinlock.
+	Context: BHs disabled
 
+dev->poll:
+	Synchronization: __LINK_STATE_RX_SCHED bit in dev->state.  See
+		dev_close code and comments in net/core/dev.c for more info.
+	Context: softirq
 
