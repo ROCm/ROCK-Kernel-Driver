@@ -240,15 +240,24 @@ static void led_work (void *__hub)
 		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
 }
 
+/* use a short timeout for hub/port status fetches */
+#define	USB_STS_TIMEOUT		1
+#define	USB_STS_RETRIES		5
+
 /*
  * USB 2.0 spec Section 11.24.2.6
  */
 static int get_hub_status(struct usb_device *hdev,
 		struct usb_hub_status *data)
 {
-	return usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_HUB, 0, 0,
-		data, sizeof(*data), HZ * USB_CTRL_GET_TIMEOUT);
+	int i, status = -ETIMEDOUT;
+
+	for (i = 0; i < USB_STS_RETRIES && status == -ETIMEDOUT; i++) {
+		status = usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
+			USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_HUB, 0, 0,
+			data, sizeof(*data), HZ * USB_STS_TIMEOUT);
+	}
+	return status;
 }
 
 /*
@@ -257,9 +266,14 @@ static int get_hub_status(struct usb_device *hdev,
 static int get_port_status(struct usb_device *hdev, int port,
 		struct usb_port_status *data)
 {
-	return usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_PORT, 0, port,
-		data, sizeof(*data), HZ * USB_CTRL_GET_TIMEOUT);
+	int i, status = -ETIMEDOUT;
+
+	for (i = 0; i < USB_STS_RETRIES && status == -ETIMEDOUT; i++) {
+		status = usb_control_msg(hdev, usb_rcvctrlpipe(hdev, 0),
+			USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_PORT, 0, port,
+			data, sizeof(*data), HZ * USB_STS_TIMEOUT);
+	}
+	return status;
 }
 
 static void kick_khubd(struct usb_hub *hub)
@@ -2163,6 +2177,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 	for (i = 0; i < GET_DESCRIPTOR_TRIES; (++i, msleep(100))) {
 		if (USE_NEW_SCHEME(retry_counter)) {
 			struct usb_device_descriptor *buf;
+			int r = 0;
 
 #define GET_DESCRIPTOR_BUFSIZE	64
 			buf = kmalloc(GET_DESCRIPTOR_BUFSIZE, GFP_NOIO);
@@ -2176,13 +2191,20 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 			 * so that recalcitrant full-speed devices with
 			 * 8- or 16-byte ep0-maxpackets won't slow things
 			 * down tremendously by NAKing the unexpectedly
-			 * early status stage.
+			 * early status stage.  Also, retry on length 0
+			 * or stall; some devices are flakey.
 			 */
-			j = usb_control_msg(udev, usb_rcvaddr0pipe(),
+			for (j = 0; j < 3; ++j) {
+				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					(i ? HZ * USB_CTRL_GET_TIMEOUT : HZ));
+				if (r == 0 || r == -EPIPE)
+					continue;
+				if (r < 0)
+					break;
+			}
 			udev->descriptor.bMaxPacketSize0 =
 					buf->bMaxPacketSize0;
 			kfree(buf);
@@ -2202,7 +2224,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 			default:
 				dev_err(&udev->dev, "device descriptor "
 						"read/%s, error %d\n",
-						"64", j);
+						"64", r);
 				retval = -EMSGSIZE;
 				continue;
 			}
@@ -2245,14 +2267,16 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 	if (retval)
 		goto fail;
 
-	/* Should we verify that the value is valid? */
-	/* (YES!) */
-	if (udev->ep0.desc.wMaxPacketSize
-			!= udev->descriptor.bMaxPacketSize0) {
-		udev->ep0.desc.wMaxPacketSize
-				= udev->descriptor.bMaxPacketSize0;
-		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n",
-				udev->ep0.desc.wMaxPacketSize);
+	i = udev->descriptor.bMaxPacketSize0;
+	if (udev->ep0.desc.wMaxPacketSize != i) {
+		if (udev->speed != USB_SPEED_FULL ||
+				!(i == 8 || i == 16 || i == 32 || i == 64)) {
+			dev_err(&udev->dev, "ep0 maxpacket = %d\n", i);
+			retval = -EMSGSIZE;
+			goto fail;
+		}
+		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
+		udev->ep0.desc.wMaxPacketSize = i;
 		ep0_reinit(udev);
 	}
   
