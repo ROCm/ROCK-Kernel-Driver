@@ -123,7 +123,7 @@ typedef struct {
  * Define the version numbers for both perfmon as a whole and the sampling buffer format.
  */
 #define PFM_VERSION_MAJ		1U
-#define PFM_VERSION_MIN		0U
+#define PFM_VERSION_MIN		1U
 #define PFM_VERSION		(((PFM_VERSION_MAJ&0xffff)<<16)|(PFM_VERSION_MIN & 0xffff))
 
 #define PFM_SMPL_VERSION_MAJ	1U

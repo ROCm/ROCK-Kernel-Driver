@@ -199,10 +199,8 @@ ia64_save_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
 
-# ifdef CONFIG_SMP
 	if (__get_cpu_var(pfm_syst_wide))
 		pfm_syst_wide_update_task(task, 0);
-# endif
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -221,9 +219,8 @@ ia64_load_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
 
-# ifdef CONFIG_SMP
-	if (__get_cpu_var(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
-# endif
+	if (__get_cpu_var(pfm_syst_wide)) 
+		pfm_syst_wide_update_task(task, 1);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
