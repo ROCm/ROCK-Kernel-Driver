@@ -484,15 +484,17 @@ int __init pnpbios_init(void)
 	pnpbios_calls_init(pnp_bios_install);
 
 	/* read the node info */
-	if (pnp_bios_dev_node_info(&node_info)) {
+	ret = pnp_bios_dev_node_info(&node_info);
+	if (ret) {
 		printk(KERN_ERR "PnPBIOS: Unable to get node info.  Aborting.\n");
-		return -EIO;
+		return ret;
 	}
 
 	/* register with the pnp layer */
-	if (pnp_register_protocol(&pnpbios_protocol)) {
+	ret = pnp_register_protocol(&pnpbios_protocol);
+	if (ret) {
 		printk(KERN_ERR "PnPBIOS: Unable to register driver.  Aborting.\n");
-		return -EIO;
+		return ret;
 	}
 
 	/* start the proc interface */
