@@ -3295,10 +3295,9 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 {
 	int error;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
@@ -3335,16 +3334,14 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	sctp_lock_sock(sk);
 
 ready:
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 	return 0;
 
 interrupted:
 	error = sock_intr_errno(*timeo_p);
 
 out:
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 	*err = error;
 	return error;
 }
@@ -3522,18 +3519,18 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	long current_timeo = *timeo_p;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	SCTP_DEBUG_PRINTK("wait_for_sndbuf: asoc=%p, timeo=%ld, msg_len=%d\n",
 	                  asoc, (long)(*timeo_p), msg_len);
 
-	/* Wait on the association specific sndbuf space. */
-	add_wait_queue_exclusive(&asoc->wait, &wait);
-
 	/* Increment the association's refcnt.  */
 	sctp_association_hold(asoc);
+
+	/* Wait on the association specific sndbuf space. */
 	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(&asoc->wait, &wait,
+					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
 		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
@@ -3555,12 +3552,11 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 	}
 
 out:
-	remove_wait_queue(&asoc->wait, &wait);
+	finish_wait(&asoc->wait, &wait);
 
 	/* Release the association's refcnt.  */
 	sctp_association_put(asoc);
 
-	__set_current_state(TASK_RUNNING);
 	return err;
 
 do_error:
@@ -3618,18 +3614,17 @@ static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
 	long current_timeo = *timeo_p;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	SCTP_DEBUG_PRINTK("%s: asoc=%p, timeo=%ld\n", __FUNCTION__, asoc,
 			  (long)(*timeo_p));
-
-	add_wait_queue_exclusive(&asoc->wait, &wait);
 
 	/* Increment the association's refcnt.  */
 	sctp_association_hold(asoc);
 
 	for (;;) {
-		__set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(&asoc->wait, &wait,
+					  TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
 		if (sk->shutdown & RCV_SHUTDOWN)
@@ -3654,12 +3649,10 @@ static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 	}
 
 out:
-	remove_wait_queue(&asoc->wait, &wait);
+	finish_wait(&asoc->wait, &wait);
 
 	/* Release the association's refcnt.  */
 	sctp_association_put(asoc);
-
-	__set_current_state(TASK_RUNNING);
 
 	return err;
 
@@ -3680,14 +3673,14 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 {
 	struct sctp_endpoint *ep;
 	int err = 0;
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 
 	ep = sctp_sk(sk)->ep;
 
-	add_wait_queue_exclusive(sk->sleep, &wait);
 
 	for (;;) {
-		__set_current_state(TASK_INTERRUPTIBLE);
+		prepare_to_wait_exclusive(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+
 		if (list_empty(&ep->asocs)) {
 			sctp_release_sock(sk);
 			timeo = schedule_timeout(timeo);
@@ -3711,8 +3704,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 			break;
 	}
 
-	remove_wait_queue(sk->sleep, &wait);
-	__set_current_state(TASK_RUNNING);
+	finish_wait(sk->sleep, &wait);
 
 	return err;
 }
