@@ -16,11 +16,6 @@
   * along with this program; if not, write to the Free Software
   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
   */
-
-
-/* Change Activity: */
-/* End Change Activity */
-
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #ifndef _ISERIES_PROC_H
@@ -31,14 +26,13 @@ static struct proc_dir_entry *iSeries_proc_root;
 static int iSeries_proc_initializationDone;
 static spinlock_t iSeries_proc_lock;
 
-struct iSeries_proc_registration
-{
+struct iSeries_proc_registration {
 	struct iSeries_proc_registration *next;
 	iSeriesProcFunction functionMember;
 };
 
-
 struct iSeries_proc_registration preallocated[16];
+
 #define MYQUEUETYPE(T) struct MYQueue##T
 #define MYQUEUE(T) \
 MYQUEUETYPE(T) \
@@ -68,9 +62,9 @@ do { \
 	if ((q)->tail == NULL) \
 		(q)->head = NULL; \
 } while(0)
+
 MYQUEUE(iSeries_proc_registration);
 typedef MYQUEUETYPE(iSeries_proc_registration) aQueue;
-
 
 aQueue iSeries_free;
 aQueue iSeries_queued;
@@ -79,15 +73,15 @@ void iSeries_proc_early_init(void)
 {
 	int i = 0;
 	unsigned long flags;
+
 	iSeries_proc_initializationDone = 0;
 	spin_lock_init(&iSeries_proc_lock);
 	MYQUEUECTOR(&iSeries_free);
 	MYQUEUECTOR(&iSeries_queued);
 
 	spin_lock_irqsave(&iSeries_proc_lock, flags);
-	for (i = 0; i < 16; ++i) {
-		MYQUEUEENQ(&iSeries_free, preallocated+i);
-	}
+	for (i = 0; i < 16; ++i)
+		MYQUEUEENQ(&iSeries_free, preallocated + i);
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
 
@@ -117,26 +111,19 @@ out:
 void iSeries_proc_callback(iSeriesProcFunction initFunction)
 {
 	unsigned long flags;
-	spin_lock_irqsave(&iSeries_proc_lock, flags);
 
-	if (iSeries_proc_initializationDone) {
+	spin_lock_irqsave(&iSeries_proc_lock, flags);
+	if (iSeries_proc_initializationDone)
 		(*initFunction)(iSeries_proc_root);
-	} else {
+	else {
 		struct iSeries_proc_registration *reg = NULL;
 
 		MYQUEUEDEQ(&iSeries_free, reg);
-
 		if (reg != NULL) {
-			/* printk("Registering %p in reg %p\n", initFunction, reg); */
 			reg->functionMember = initFunction;
-
 			MYQUEUEENQ(&iSeries_queued, reg);
-		} else {
+		} else
 			printk("Couldn't get a queue entry\n");
-		}
 	}
-
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
-
-

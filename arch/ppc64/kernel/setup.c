@@ -147,7 +147,9 @@ void __init disable_early_printk(void)
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
+#ifdef CONFIG_PPC_PSERIES
         unsigned int ret, i;
+#endif
 
 #ifdef CONFIG_XMON_DEFAULT
 	debugger = xmon;

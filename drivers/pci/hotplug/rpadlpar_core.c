@@ -2,6 +2,8 @@
  * Interface for Dynamic Logical Partitioning of I/O Slots
  *
  * John Rose <johnrose@austin.ibm.com>
+ * Linda Xie <lxie@us.ibm.com>
+ * 
  * October 2003
  *
  * Copyright (C) 2003 IBM.

@@ -148,6 +148,9 @@ static int smp_iSeries_numProcs(void)
         for (i=0; i < NR_CPUS; ++i) {
                 lpPaca = paca[i].xLpPacaPtr;
                 if ( lpPaca->xDynProcStatus < 2 ) {
+			cpu_set(i, cpu_available_map);
+			cpu_set(i, cpu_possible_map);
+			cpu_set(i, cpu_present_at_boot);
                         ++np;
                 }
         }

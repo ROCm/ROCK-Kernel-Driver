@@ -46,40 +46,35 @@ extern long poll_pending(void);
 int (*idle_loop)(void);
 
 #ifdef CONFIG_PPC_ISERIES
+unsigned long maxYieldTime = 0;
+unsigned long minYieldTime = 0xffffffffffffffffUL;
+
 static void yield_shared_processor(void)
 {
-	struct paca_struct *lpaca = get_paca();
+	unsigned long tb;
+	unsigned long yieldTime;
 
 	HvCall_setEnabledInterrupts(HvCall_MaskIPI |
 				    HvCall_MaskLpEvent |
 				    HvCall_MaskLpProd |
 				    HvCall_MaskTimeout);
 
-	if (!ItLpQueue_isLpIntPending(paca->lpQueuePtr)) {
-		/* 
-		 * Compute future tb value when yield should expire.
-		 * We want to be woken up when the next decrementer is
-		 * to fire.  
-		 */
+	tb = get_tb();
+	/* Compute future tb value when yield should expire */
+	HvCall_yieldProcessor(HvCall_YieldTimed, tb+tb_ticks_per_jiffy);
 
-		local_irq_disable(); 
-		lpaca->yielded = 1;        /* Indicate a prod is desired */
-		lpaca->xLpPaca.xIdle = 1;  /* Inform the HV we are idle  */
+	yieldTime = get_tb() - tb;
+	if (yieldTime > maxYieldTime)
+		maxYieldTime = yieldTime;
 
-		HvCall_yieldProcessor(HvCall_YieldTimed, 
-				      lpaca->next_jiffy_update_tb);	  
-
-		lpaca->yielded = 0;        /* Back to IPI's */
-		local_irq_enable(); 
+	if (yieldTime < minYieldTime)
+		minYieldTime = yieldTime;
 	
-		/*
-		 * The decrementer stops during the yield.  Force a fake 
-		 * decrementer here and let the timer_interrupt code sort 
-		 * out the actual time.
-		 */
-		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 1;
-	}
-	  
+	/*
+	 * The decrementer stops during the yield.  Force a fake decrementer
+	 * here and let the timer_interrupt code sort out the actual time.
+	 */
+	get_paca()->xLpPaca.xIntDword.xFields.xDecrInt = 1;
 	process_iSeries_events();
 }
 

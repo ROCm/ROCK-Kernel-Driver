@@ -75,6 +75,11 @@
 #define H_SET_PPP		0xF0
 #define H_SET_PURR		0xF4
 #define H_PIC		        0xF8
+#define H_REG_CRQ		0xFC
+#define H_FREE_CRQ		0x100
+#define H_VIO_SIGNAL		0x104
+#define H_SEND_CRQ		0x108
+#define H_COPY_RDMA             0x110
 #define H_POLL_PENDING	        0x1D8
 
 /* plpar_hcall() -- Generic call interface using above opcodes

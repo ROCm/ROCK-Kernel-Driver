@@ -257,7 +257,7 @@ static ssize_t ofdt_write(struct file *file, const char __user *buf, size_t coun
 	tmp++;
 
 	if (!strcmp(kbuf, "add_node"))
-		rv = do_add_node(tmp, 1 + count - (tmp - kbuf));
+		rv = do_add_node(tmp, count - (tmp - kbuf));
 	else if (!strcmp(kbuf, "remove_node"))
 		rv = do_remove_node(tmp);
 	else
@@ -337,11 +337,12 @@ static struct property *new_property(const char *name, const int length, const u
 
 	if (!(new->name = kmalloc(strlen(name) + 1, GFP_KERNEL)))
 		goto cleanup;
-	if (!(new->value = kmalloc(length, GFP_KERNEL)))
+	if (!(new->value = kmalloc(length + 1, GFP_KERNEL)))
 		goto cleanup;
 
 	strcpy(new->name, name);
 	memcpy(new->value, value, length);
+	*(((char *)new->value) + length) = 0;
 	new->length = length;
 	new->next = last;
 	return new;

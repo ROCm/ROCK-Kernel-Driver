@@ -415,14 +415,6 @@ static void internal_register_disk(int diskno)
 		return;
 	registered[diskno] = 1;
 
-	if (diskno == 0) {
-		printk(KERN_INFO_VIO "%s: Currently %d disks connected\n",
-		       VIOD_DEVICE_NAME, (int)viodasd_max_disk + 1);
-		if (viodasd_max_disk > (MAX_DISKNO - 1))
-			printk(KERN_INFO_VIO "Only examining the first %d\n",
-			       MAX_DISKNO);
-	}
-
 	printk(KERN_INFO_VIO
 	       "%s: Disk %2.2d size %dM, sectors %d, heads %d, cylinders %d\n", 
                VIOD_DEVICE_NAME, diskno,
@@ -495,12 +487,17 @@ static int internal_open(int device_no, u16 flags)
 		return -err->errno;
 	}
 	
+	/* Bump the use count */
+	viodasd_devices[device_no].useCount++;
+
 	/*
 	 * If this is the first open of this device, update the device
 	 * information.  If this is NOT the first open, assume that it
 	 * isn't changing
 	 */
 	gendisk = viodasd_devices[device_no].disk;
+	if (gendisk == NULL)
+		return 0;
 	if (viodasd_devices[device_no].useCount == 0) {
 		if (viodasd_devices[device_no].size > 0)
                         set_capacity(gendisk,
@@ -518,8 +515,6 @@ static int internal_open(int device_no, u16 flags)
 
 	internal_register_disk(device_no);
 
-	/* Bump the use count */
-	viodasd_devices[device_no].useCount++;
 	return 0;
 }
 
@@ -636,7 +631,6 @@ static int viodasd_ioctl(struct inode *ino, struct file *fil,
 	int device_no;
 	int err;
 	struct hd_struct *partition;
-	DECLARE_MUTEX_LOCKED(Semaphore);
 
 	/* Sanity checks */
 	if (!ino) {
@@ -693,8 +687,10 @@ static int viodasd_ioctl(struct inode *ino, struct file *fil,
 		put_user(heads, &geo->heads);
 		put_user(cylinders, &geo->cylinders);
 
-		put_user(partition->start_sect,
-			 (long *) &geo->start);
+		if (partition)
+			put_user(partition->start_sect, &geo->start);
+		else
+			put_user(0, &geo->start);
 
 		return 0;
 	}
@@ -747,6 +743,8 @@ static int send_request(struct request *req)
 	int sgindex;
 	int statindex;
         int device_no = DEVICE_NO(req->rq_disk->private_data);
+
+	start = (u64)req->sector << 9;
 
 	/* More paranoia checks */
 	if ((req->sector + req->nr_sectors) > get_capacity(req->rq_disk)) {
@@ -858,6 +856,8 @@ static int send_request(struct request *req)
  */
 static void do_viodasd_request(request_queue_t *q)
 {
+	if (q == NULL)
+		return;
 	for (;;) {
 		struct request *req;
 		struct gendisk *gendisk;
@@ -997,7 +997,7 @@ static struct request *find_request_with_token(u64 token)
 {
 	struct request *req = blkdev_entry_to_request(reqlist.next);
 	while ((&req->queuelist != &reqlist) &&
-	       ((u64) (unsigned long)req != token))
+			((u64) (unsigned long)req != token))
 		req = blkdev_entry_to_request(req->queuelist.next);
 	if (&req->queuelist == &reqlist)
 		return NULL;
@@ -1070,13 +1070,8 @@ static int viodasd_handleReadWrite(struct vioblocklpevent *bevent)
 		printk(KERN_WARNING_VIO "read/write error %d:0x%04x (%s)\n",
 				event->xRc, bevent->mSubTypeRc, err->msg);
 		viodasd_end_request(req, 0, 0);
-	} else {
-		if (num_sect != req->current_nr_sectors)
-			printk(KERN_WARNING_VIO
-			       "Yikes...# sect doesn't match %d %d!!!\n",
-			       num_sect, req->current_nr_sectors);
+	} else
 		viodasd_end_request(req, 1, num_sect);
-	}
 
 	/* Finally, try to get more requests off of this device's queue */
 	viodasd_restart_all_queues_starting_from(major);
@@ -1224,6 +1219,7 @@ static void viodasd_cleanup_major(int major)
 static int __init viodasd_init_major(int major)
 {
 	struct gendisk *gendisk;
+        struct request_queue *q;
 	int i;
 
         /* register the block device */
@@ -1237,11 +1233,12 @@ static int __init viodasd_init_major(int major)
 
 		/* create the request queue for the disk */
 		spin_lock_init(&viodasd_devices[deviceno].q_lock);
-		viodasd_devices[deviceno].queue =
-			blk_init_queue(do_viodasd_request,
+		q = blk_init_queue(do_viodasd_request,
 				&viodasd_devices[deviceno].q_lock);
-		if (viodasd_devices[deviceno].queue == NULL)
+		if (q == NULL)
 			return -ENOMEM;
+		blk_queue_max_hw_segments(q, VIOMAXBLOCKDMA);
+		viodasd_devices[deviceno].queue = q;
 
 		/* inialize the struct */
         	gendisk = alloc_disk(1 << PARTITION_SHIFT);
@@ -1249,17 +1246,15 @@ static int __init viodasd_init_major(int major)
 			return -ENOMEM;
         	viodasd_devices[deviceno].disk = gendisk;
 		gendisk->major = major;
-        	gendisk->first_minor= i * (1 << PARTITION_SHIFT);
+        	gendisk->first_minor = i * (1 << PARTITION_SHIFT);
         	strncpy(gendisk->disk_name, disk_names(deviceno),
 				MAX_DISK_NAME);
         	strncpy(gendisk->devfs_name, disk_names(deviceno),
 				MAX_DISK_NAME);
         	gendisk->fops = &viodasd_fops;
-		gendisk->queue = viodasd_devices[deviceno].queue;
-		gendisk->flags = 0;
+		gendisk->queue = q;
         	gendisk->private_data = (void *)&viodasd_devices[deviceno];
-		/* to be assigned later */
-		set_capacity(gendisk, 0);
+		set_capacity(gendisk, viodasd_devices[deviceno].size >> 9);
 	
 		/* register us in the global list */
 		add_disk(gendisk);
@@ -1307,15 +1302,6 @@ static int __init viodasd_init(void)
 	 */
 	vio_setHandler(viomajorsubtype_blockio, vioHandleBlockEvent);
 
-	for (i = 0; i < NUM_MAJORS; ++i) {
-		int init_rc = viodasd_init_major(major_table[i]);
-		if (init_rc < 0) {
-			for (j = 0; j <= i; ++j)
-				viodasd_cleanup_major(major_table[j]);
-			return init_rc;
-		}
-	}
-
 	viodasd_max_disk = MAX_DISKNO - 1;
 	for (i = 0; (i <= viodasd_max_disk) && (i < MAX_DISKNO); i++) {
 		// Note that internal_open has side effects:
@@ -1324,6 +1310,21 @@ static int __init viodasd_init(void)
 		//  c) it registers the disk if it has not done so already
 		if (internal_open(i, vioblockflags_ro) == 0)
 			internal_release(i, vioblockflags_ro);
+	}
+
+	printk(KERN_INFO_VIO "%s: Currently %d disks connected\n",
+	       VIOD_DEVICE_NAME, (int)viodasd_max_disk + 1);
+	if (viodasd_max_disk > (MAX_DISKNO - 1))
+		printk(KERN_INFO_VIO "Only examining the first %d\n",
+		       MAX_DISKNO);
+
+	for (i = 0; i < NUM_MAJORS; ++i) {
+		int init_rc = viodasd_init_major(major_table[i]);
+		if (init_rc < 0) {
+			for (j = 0; j <= i; ++j)
+				viodasd_cleanup_major(major_table[j]);
+			return init_rc;
+		}
 	}
 
 	/* 
