@@ -2,6 +2,7 @@
  * scan.c - support for transforming the ACPI namespace into individual objects
  */
 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/acpi.h>
 
@@ -34,7 +35,49 @@ static void acpi_device_release(struct kobject * kobj)
 	kfree(dev);
 }
 
+struct acpi_device_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct acpi_device *, char *);
+	ssize_t (*store)(struct acpi_device *, const char *, size_t);
+};
+
+typedef void acpi_device_sysfs_files(struct kobject *,
+				const struct attribute *);
+
+static void setup_sys_fs_device_files(struct acpi_device *dev,
+		acpi_device_sysfs_files *func);
+
+#define create_sysfs_device_files(dev)	\
+	setup_sys_fs_device_files(dev, (acpi_device_sysfs_files *)&sysfs_create_file)
+#define remove_sysfs_device_files(dev)	\
+	setup_sys_fs_device_files(dev, (acpi_device_sysfs_files *)&sysfs_remove_file)
+
+
+#define to_acpi_device(n) container_of(n, struct acpi_device, kobj)
+#define to_handle_attr(n) container_of(n, struct acpi_device_attribute, attr);
+
+static ssize_t acpi_device_attr_show(struct kobject *kobj,
+		struct attribute *attr, char *buf)
+{
+	struct acpi_device *device = to_acpi_device(kobj);
+	struct acpi_device_attribute *attribute = to_handle_attr(attr);
+	return attribute->show ? attribute->show(device, buf) : 0;
+}
+static ssize_t acpi_device_attr_store(struct kobject *kobj,
+		struct attribute *attr, const char *buf, size_t len)
+{
+	struct acpi_device *device = to_acpi_device(kobj);
+	struct acpi_device_attribute *attribute = to_handle_attr(attr);
+	return attribute->store ? attribute->store(device, buf, len) : len;
+}
+
+static struct sysfs_ops acpi_device_sysfs_ops = {
+	.show	= acpi_device_attr_show,
+	.store	= acpi_device_attr_store,
+};
+
 static struct kobj_type ktype_acpi_ns = {
+	.sysfs_ops	= &acpi_device_sysfs_ops,
 	.release	= acpi_device_release,
 };
 
@@ -76,6 +119,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	device->kobj.ktype = &ktype_acpi_ns;
 	device->kobj.kset = &acpi_namespace_kset;
 	kobject_add(&device->kobj);
+	create_sysfs_device_files(device);
 }
 
 static int
@@ -95,6 +139,7 @@ acpi_device_unregister (
 	spin_unlock(&acpi_device_lock);
 
 	acpi_detach_data(device->handle, acpi_bus_data_handler);
+	remove_sysfs_device_files(device);
 	kobject_unregister(&device->kobj);
 	return 0;
 }
@@ -291,6 +336,114 @@ end:
 		device->flags.wake_capable = 0;
 	return 0;
 }
+
+/* --------------------------------------------------------------------------
+		ACPI hotplug sysfs device file support
+   -------------------------------------------------------------------------- */
+static ssize_t acpi_eject_store(struct acpi_device *device, 
+		const char *buf, size_t count);
+
+#define ACPI_DEVICE_ATTR(_name,_mode,_show,_store) \
+static struct acpi_device_attribute acpi_device_attr_##_name = \
+		__ATTR(_name, _mode, _show, _store)
+
+ACPI_DEVICE_ATTR(eject, 0200, NULL, acpi_eject_store);
+
+/**
+ * setup_sys_fs_device_files - sets up the device files under device namespace
+ * @@dev:	acpi_device object
+ * @@func:	function pointer to create or destroy the device file
+ */
+static void
+setup_sys_fs_device_files (
+	struct acpi_device *dev,
+	acpi_device_sysfs_files *func)
+{
+	if (dev->flags.ejectable == 1)
+		(*(func))(&dev->kobj,&acpi_device_attr_eject.attr);
+}
+
+static int
+acpi_eject_operation(acpi_handle handle, int lockable)
+{
+	struct acpi_object_list arg_list;
+	union acpi_object arg;
+	acpi_status status = AE_OK;
+
+	/*
+	 * TBD: evaluate _PS3?
+	 */
+
+	if (lockable) {
+		arg_list.count = 1;
+		arg_list.pointer = &arg;
+		arg.type = ACPI_TYPE_INTEGER;
+		arg.integer.value = 0;
+		acpi_evaluate_object(handle, "_LCK", &arg_list, NULL);
+	}
+
+	arg_list.count = 1;
+	arg_list.pointer = &arg;
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = 1;
+
+	/*
+	 * TBD: _EJD support.
+	 */
+
+	status = acpi_evaluate_object(handle, "_EJ0", &arg_list, NULL);
+	if (ACPI_FAILURE(status)) {
+		return(-ENODEV);
+	}
+
+	return(0);
+}
+
+
+static ssize_t
+acpi_eject_store(struct acpi_device *device, const char *buf, size_t count)
+{
+	int	result;
+	int	ret = count;
+	int	islockable;
+	acpi_status	status;
+	acpi_handle	handle;
+	acpi_object_type	type = 0;
+
+	if ((!count) || (buf[0] != '1')) {
+		return -EINVAL;
+	}
+
+#ifndef FORCE_EJECT
+	if (device->driver == NULL) {
+		ret = -ENODEV;
+		goto err;
+	}
+#endif
+	status = acpi_get_type(device->handle, &type);
+	if (ACPI_FAILURE(status) || (!device->flags.ejectable) ) {
+		ret = -ENODEV;
+		goto err;
+	}
+
+	islockable = device->flags.lockable;
+	handle = device->handle;
+
+	if (type == ACPI_TYPE_PROCESSOR)
+		result = acpi_bus_trim(device, 0);
+	else
+		result = acpi_bus_trim(device, 1);
+
+	if (!result)
+		result = acpi_eject_operation(handle, islockable);
+
+	if (result) {
+		ret = -EBUSY;
+	}
+err:
+	return ret;
+}
+
 
 /* --------------------------------------------------------------------------
                               Performance Management
