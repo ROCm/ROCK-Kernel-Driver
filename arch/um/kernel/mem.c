@@ -79,7 +79,7 @@ void mem_init(void)
 	uml_reserved = brk_end;
 
 	/* Fill in any hole at the start of the binary */
-	start = (unsigned long) &__binary_start;
+	start = (unsigned long) &__binary_start & PAGE_MASK;
 	if(uml_physmem != start){
 		map_memory(uml_physmem, __pa(uml_physmem), start - uml_physmem,
 			   1, 1, 0);
