@@ -89,7 +89,7 @@ static char *tw_aen_string[] = {
 	[0x02D] = "ERROR: Encountered bad sector during rebuild: Port #",
 	[0x02E] = "ERROR: Replacement drive is too small: Port #",
 	[0x02F] = "WARNING: Verify error: Unit not previously initialized: Unit #",
-	[0x030] = "ERROR: Drive not supported: Port #",
+	[0x030] = "ERROR: Drive not supported: Port #"
 };
 
 /*
@@ -109,10 +109,10 @@ static unsigned char tw_sense_table[][4] =
   {0xd0, 0x0b, 0x00, 0x00}, // Device busy                  Aborted command
   {0xd1, 0x0b, 0x00, 0x00}, // Device busy                  Aborted command
   {0x37, 0x02, 0x04, 0x00}, // Unit offline                 Not ready
+  {0x09, 0x02, 0x04, 0x00}, // Unrecovered disk error       Not ready
 
   /* Codes for older firmware */
                             // 3ware Error                  SCSI Error
-  {0x09, 0x0b, 0x00, 0x00}, // Unrecovered disk error       Aborted command
   {0x51, 0x0b, 0x00, 0x00}  // Unspecified                  Aborted command
 };
 
@@ -229,7 +229,7 @@ static unsigned char tw_sense_table[][4] =
 #define TW_ISR_DONT_COMPLETE                  2
 #define TW_ISR_DONT_RESULT                    3
 #define TW_IOCTL_TIMEOUT                      25 /* 25 seconds */
-#define TW_IOCTL_CHRDEV_TIMEOUT               25 /* 25 seconds */
+#define TW_IOCTL_CHRDEV_TIMEOUT               60 /* 60 seconds */
 #define TW_IOCTL_CHRDEV_FREE                  -1
 
 /* Macros */
@@ -486,6 +486,7 @@ int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size,
 		  unsigned char *val);
 int tw_setup_irq(TW_Device_Extension *tw_dev);
 int tw_shutdown_device(TW_Device_Extension *tw_dev);
+int tw_slave_configure(Scsi_Device *SDptr);
 void tw_soft_reset(TW_Device_Extension *tw_dev);
 int tw_state_request_finish(TW_Device_Extension *tw_dev,int request_id);
 int tw_state_request_start(TW_Device_Extension *tw_dev, int *request_id);
