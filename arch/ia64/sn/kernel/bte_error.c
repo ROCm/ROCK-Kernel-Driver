@@ -15,6 +15,7 @@
 #include "xtalk/xwidgetdev.h"
 #include "xtalk/hubdev.h"
 #include <asm/sn/bte.h>
+#include <asm/param.h>
 
 /*
  * Bte error handling is done in two parts.  The first captures

@@ -183,7 +183,9 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 
 			sn_irq_info = sn_irq_info->irq_next;
 
+#ifdef CONFIG_SMP
 			set_irq_affinity_info((irq & 0xff), cpuphys, 0);
+#endif
 		} else {
 			break;	/* snp_affinity failed the intr_alloc */
 		}
