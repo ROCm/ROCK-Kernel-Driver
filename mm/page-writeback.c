@@ -493,7 +493,6 @@ int __set_page_dirty_buffers(struct page *page)
 		buffer_error();
 
 	spin_lock(&mapping->private_lock);
-
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
 		struct buffer_head *bh = head;
@@ -506,6 +505,7 @@ int __set_page_dirty_buffers(struct page *page)
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
+	spin_unlock(&mapping->private_lock);
 
 	if (!TestSetPageDirty(page)) {
 		write_lock(&mapping->page_lock);
@@ -519,7 +519,6 @@ int __set_page_dirty_buffers(struct page *page)
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
 	
-	spin_unlock(&mapping->private_lock);
 out:
 	return ret;
 }
