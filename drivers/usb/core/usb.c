@@ -1511,20 +1511,40 @@ int usb_disabled(void)
  */
 static int __init usb_init(void)
 {
+	int retval;
 	if (nousb) {
 		pr_info ("%s: USB support disabled\n", usbcore_name);
 		return 0;
 	}
 
-	bus_register(&usb_bus_type);
+	retval = bus_register(&usb_bus_type);
+	if (retval) 
+		goto out;
 	usb_host_init();
-	usb_major_init();
-	usbfs_init();
-	usb_hub_init();
+	retval = usb_major_init();
+	if (retval)
+		goto major_init_failed;
+	retval = usbfs_init();
+	if (retval)
+		goto fs_init_failed;
+	retval = usb_hub_init();
+	if (retval)
+		goto hub_init_failed;
 
-	driver_register(&usb_generic_driver);
+	retval = driver_register(&usb_generic_driver);
+	if (!retval)
+		goto out;
 
-	return 0;
+	usb_hub_cleanup();
+hub_init_failed:
+	usbfs_cleanup();
+fs_init_failed:
+	usb_major_cleanup();	
+major_init_failed:
+	usb_host_cleanup();
+	bus_unregister(&usb_bus_type);
+out:
+	return retval;
 }
 
 /*
