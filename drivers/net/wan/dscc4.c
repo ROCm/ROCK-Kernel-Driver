@@ -892,17 +892,14 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 
 	for (i = 0; i < dev_per_card; i++) {
 		root[i].dev = alloc_hdlcdev(root + i);
-		if (!root[i].dev) {
-			while (i--)
-				free_netdev(root[i].dev);
+		if (!root[i].dev)
 			goto err_free_dev;
-		}
 	}
 
 	ppriv = (struct dscc4_pci_priv *) kmalloc(sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
 		printk(KERN_ERR "%s: can't allocate private data\n", DRV_NAME);
-		goto err_free_dev2;
+		goto err_free_dev;
 	}
 	memset(ppriv, 0, sizeof(struct dscc4_pci_priv));
 
@@ -958,15 +955,15 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 	return ret;
 
 err_unregister:
-	while (--i >= 0) {
+	while (i-- > 0) {
 		dscc4_release_ring(root + i);
 		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 	}
 	kfree(ppriv);
-err_free_dev2:
-	for (i = 0; i < dev_per_card; i++)
-		free_netdev(root[i].dev);
+	i = dev_per_card;
 err_free_dev:
+	while (i-- > 0)
+		free_netdev(root[i].dev);
 	kfree(root);
 err_out:
 	return ret;
