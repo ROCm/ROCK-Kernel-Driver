@@ -54,7 +54,7 @@
  *
  * FUNCTION:    acpi_ev_system_memory_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle              - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
@@ -108,7 +108,7 @@ acpi_ev_system_memory_region_setup (
  *
  * FUNCTION:    acpi_ev_io_space_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle              - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
@@ -144,7 +144,7 @@ acpi_ev_io_space_region_setup (
  *
  * FUNCTION:    acpi_ev_pci_config_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle             - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
@@ -317,7 +317,7 @@ acpi_ev_pci_config_region_setup (
  *
  * FUNCTION:    acpi_ev_pci_bar_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle              - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
@@ -348,7 +348,7 @@ acpi_ev_pci_bar_region_setup (
  *
  * FUNCTION:    acpi_ev_cmos_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle              - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
@@ -379,7 +379,7 @@ acpi_ev_cmos_region_setup (
  *
  * FUNCTION:    acpi_ev_default_region_setup
  *
- * PARAMETERS:  region_obj          - Region we are interested in
+ * PARAMETERS:  Handle              - Region we are interested in
  *              Function            - Start or stop
  *              handler_context     - Address space handler context
  *              region_context      - Region specific context
