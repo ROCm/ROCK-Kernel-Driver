@@ -1306,6 +1306,10 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	return -ENOSYS;
 }
+int generic_file_readonly_mmap(struct file * file, struct vm_area_struct * vma)
+{
+	return -ENOSYS;
+}
 #endif /* CONFIG_MMU */
 
 static inline struct page *__read_cache_page(struct address_space *mapping,

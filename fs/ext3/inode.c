@@ -40,13 +40,6 @@
 #include "acl.h"
 
 /*
- * SEARCH_FROM_ZERO forces each block allocation to search from the start
- * of the filesystem.  This is to force rapid reallocation of recently-freed
- * blocks.  The file fragmentation is horrendous.
- */
-#undef SEARCH_FROM_ZERO
-
-/*
  * Test whether an inode is a fast symlink.
  */
 static inline int ext3_inode_is_fast_symlink(struct inode *inode)
@@ -462,14 +455,22 @@ no_block:
  *	  + if pointer will live in indirect block - allocate near that block.
  *	  + if pointer will live in inode - allocate in the same
  *	    cylinder group. 
+ *
+ * In the latter case we colour the starting block by the callers PID to
+ * prevent it from clashing with concurrent allocations for a different inode
+ * in the same block group.   The PID is used here so that functionally related
+ * files will be close-by on-disk.
+ *
  *	Caller must make sure that @ind is valid and will stay that way.
  */
 
-static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
+static unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 {
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	u32 *start = ind->bh ? (u32*) ind->bh->b_data : ei->i_data;
 	u32 *p;
+	unsigned long bg_start;
+	unsigned long colour;
 
 	/* Try to find previous block */
 	for (p = ind->p - 1; p >= start; p--)
@@ -484,8 +485,11 @@ static inline unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
 	 * It is going to be refered from inode itself? OK, just put it into
 	 * the same cylinder group then.
 	 */
-	return (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
-	       le32_to_cpu(EXT3_SB(inode->i_sb)->s_es->s_first_data_block);
+	bg_start = (ei->i_block_group * EXT3_BLOCKS_PER_GROUP(inode->i_sb)) +
+		le32_to_cpu(EXT3_SB(inode->i_sb)->s_es->s_first_data_block);
+	colour = (current->pid % 16) *
+			(EXT3_BLOCKS_PER_GROUP(inode->i_sb) / 16);
+	return bg_start + colour;
 }
 
 /**
@@ -510,10 +514,6 @@ static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 		ei->i_next_alloc_block++;
 		ei->i_next_alloc_goal++;
 	}
-#ifdef SEARCH_FROM_ZERO
-	ei->i_next_alloc_block = 0;
-	ei->i_next_alloc_goal = 0;
-#endif
 	/* Writer: end */
 	/* Reader: pointers, ->i_next_alloc* */
 	if (verify_chain(chain, partial)) {
@@ -525,9 +525,6 @@ static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 			*goal = ei->i_next_alloc_goal;
 		if (!*goal)
 			*goal = ext3_find_near(inode, partial);
-#ifdef SEARCH_FROM_ZERO
-		*goal = 0;
-#endif
 		return 0;
 	}
 	/* Reader: end */
@@ -673,10 +670,6 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 	*where->p = where->key;
 	ei->i_next_alloc_block = block;
 	ei->i_next_alloc_goal = le32_to_cpu(where[num-1].key);
-#ifdef SEARCH_FROM_ZERO
-	ei->i_next_alloc_block = 0;
-	ei->i_next_alloc_goal = 0;
-#endif
 	/* Writer: end */
 
 	/* We are done with atomic stuff, now do the rest of housekeeping */

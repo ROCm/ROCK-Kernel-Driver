@@ -227,6 +227,10 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 	}
 
 	if (!move_page_tables(vma, new_addr, addr, old_len)) {
+		unsigned long must_fault_in;
+		unsigned long fault_in_start;
+		unsigned long fault_in_end;
+
 		if (allocated_vma) {
 			*new_vma = *vma;
 			INIT_LIST_HEAD(&new_vma->shared);
@@ -251,7 +255,13 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 		} else
 			vma = NULL;		/* nothing more to do */
 
+		must_fault_in = new_vma->vm_flags & VM_LOCKED;
+		fault_in_start = new_vma->vm_start;
+		fault_in_end = new_vma->vm_end;
+
 		do_munmap(current->mm, addr, old_len);
+
+		/* new_vma could have been invalidated by do_munmap */
 
 		/* Restore VM_ACCOUNT if one or two pieces of vma left */
 		if (vma) {
@@ -259,11 +269,11 @@ static unsigned long move_vma(struct vm_area_struct * vma,
 			if (split)
 				vma->vm_next->vm_flags |= VM_ACCOUNT;
 		}
+
 		current->mm->total_vm += new_len >> PAGE_SHIFT;
-		if (new_vma->vm_flags & VM_LOCKED) {
+		if (must_fault_in) {
 			current->mm->locked_vm += new_len >> PAGE_SHIFT;
-			make_pages_present(new_vma->vm_start,
-					   new_vma->vm_end);
+			make_pages_present(fault_in_start, fault_in_end);
 		}
 		return new_addr;
 	}

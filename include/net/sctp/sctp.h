@@ -123,8 +123,8 @@ extern sctp_protocol_t sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
 extern int sctp_copy_local_addr_list(sctp_protocol_t *, sctp_bind_addr_t *,
 				     sctp_scope_t, int priority, int flags);
-extern sctp_pf_t *sctp_get_pf_specific(int family);
-extern void sctp_set_pf_specific(int family, sctp_pf_t *);
+extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
+extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
 
 /*
  * sctp_socket.c

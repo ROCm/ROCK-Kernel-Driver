@@ -14,6 +14,7 @@
 #include <asm/types.h>
 #include <asm/sigcontext.h>
 #include <asm/cpufeature.h>
+#include <asm/msr.h>
 #include <linux/cache.h>
 #include <linux/config.h>
 #include <linux/threads.h>
@@ -77,6 +78,7 @@ struct cpuinfo_x86 {
  */
 
 extern struct cpuinfo_x86 boot_cpu_data;
+extern struct cpuinfo_x86 new_cpu_data;
 extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_SMP
@@ -385,6 +387,7 @@ struct thread_struct {
 	struct vm86_struct	* vm86_info;
 	unsigned long		screen_bitmap;
 	unsigned long		v86flags, v86mask, saved_esp0;
+	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
 };
@@ -414,6 +417,21 @@ struct thread_struct {
 	GDT_ENTRY_LDT,0, /* ldt */					\
 	0, INVALID_IO_BITMAP_OFFSET, /* tace, bitmap */		\
 	{~0, } /* ioperm */					\
+}
+
+static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)
+{
+	tss->esp0 = esp0;
+	if (cpu_has_sep) {
+		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
+		wrmsr(MSR_IA32_SYSENTER_ESP, esp0, 0);
+	}
+}
+
+static inline void disable_sysenter(void)
+{
+	if (cpu_has_sep)  
+		wrmsr(MSR_IA32_SYSENTER_CS, 0, 0);
 }
 
 #define start_thread(regs, new_eip, new_esp) do {		\

@@ -187,12 +187,9 @@ void * mempool_alloc(mempool_t *pool, int gfp_mask)
 	unsigned long flags;
 	DEFINE_WAIT(wait);
 	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
-	int pf_flags = current->flags;
 
 repeat_alloc:
-	current->flags |= PF_NOWARN;
-	element = pool->alloc(gfp_nowait, pool->pool_data);
-	current->flags = pf_flags;
+	element = pool->alloc(gfp_nowait|__GFP_NOWARN, pool->pool_data);
 	if (likely(element != NULL))
 		return element;
 

@@ -18,6 +18,8 @@ struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
 
+extern int disable_pse;
+
 static void default_init(struct cpuinfo_x86 * c)
 {
 	/* Not much we can do here... */
@@ -305,12 +307,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	else
 		generic_identify(c);
 
-	printk(KERN_DEBUG "CPU: Before vendor init, caps: %08lx %08lx %08lx, vendor = %d\n",
-	       c->x86_capability[0],
-	       c->x86_capability[1],
-	       c->x86_capability[2],
-	       c->x86_vendor);
-
 	/*
 	 * Vendor-specific initialization.  In this section we
 	 * canonicalize the feature flags, meaning if there are
@@ -327,12 +323,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	/* Disable the PN if appropriate */
 	squash_the_stupid_serial_number(c);
 
-	printk(KERN_DEBUG "CPU: After vendor init, caps: %08lx %08lx %08lx %08lx\n",
-	       c->x86_capability[0],
-	       c->x86_capability[1],
-	       c->x86_capability[2],
-	       c->x86_capability[3]);
-
 	/*
 	 * The vendor-specific functions might have changed features.  Now
 	 * we do "generic changes."
@@ -347,6 +337,9 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_FXSR, c->x86_capability);
 		clear_bit(X86_FEATURE_XMM, c->x86_capability);
 	}
+
+	if (disable_pse)
+		clear_bit(X86_FEATURE_PSE, c->x86_capability);
 
 	/* If the model name is still unset, do table lookup. */
 	if ( !c->x86_model_id[0] ) {
@@ -379,12 +372,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		for ( i = 0 ; i < NCAPINTS ; i++ )
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
-
-	printk(KERN_DEBUG "CPU:             Common caps: %08lx %08lx %08lx %08lx\n",
-	       boot_cpu_data.x86_capability[0],
-	       boot_cpu_data.x86_capability[1],
-	       boot_cpu_data.x86_capability[2],
-	       boot_cpu_data.x86_capability[3]);
 
 	/* Init Machine Check Exception if available. */
 #ifdef CONFIG_X86_MCE
@@ -516,7 +503,7 @@ void __init cpu_init (void)
 		BUG();
 	enter_lazy_tlb(&init_mm, current, cpu);
 
-	t->esp0 = thread->esp0;
+	load_esp0(t, thread->esp0);
 	set_tss_desc(cpu,t);
 	cpu_gdt_table[cpu][GDT_ENTRY_TSS].b &= 0xfffffdff;
 	load_TR_desc();

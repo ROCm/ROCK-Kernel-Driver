@@ -137,12 +137,10 @@ inline void bio_init(struct bio *bio)
  **/
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
-	int pf_flags = current->flags;
 	struct bio_vec *bvl = NULL;
 	unsigned long idx;
 	struct bio *bio;
 
-	current->flags |= PF_NOWARN;
 	bio = mempool_alloc(bio_pool, gfp_mask);
 	if (unlikely(!bio))
 		goto out;
@@ -160,7 +158,6 @@ noiovec:
 		bio->bi_io_vec = bvl;
 		bio->bi_destructor = bio_destructor;
 out:
-		current->flags = pf_flags;
 		return bio;
 	}
 

@@ -605,7 +605,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 		 * interface.
 		 */
 		if ((regs->xcs & 3) == 0)
-			goto clear_TF;
+			goto clear_TF_reenable;
 		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
 			goto clear_TF;
 	}
@@ -637,6 +637,8 @@ debug_vm86:
 	handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, 1);
 	return;
 
+clear_TF_reenable:
+	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
 clear_TF:
 	regs->eflags &= ~TF_MASK;
 	return;

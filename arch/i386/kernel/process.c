@@ -219,8 +219,8 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.ebx = (unsigned long) fn;
 	regs.edx = (unsigned long) arg;
 
-	regs.xds = __KERNEL_DS;
-	regs.xes = __KERNEL_DS;
+	regs.xds = __USER_DS;
+	regs.xes = __USER_DS;
 	regs.orig_eax = -1;
 	regs.eip = (unsigned long) kernel_thread_helper;
 	regs.xcs = __KERNEL_CS;
@@ -443,7 +443,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
-	tss->esp0 = next->esp0;
+	load_esp0(tss, next->esp0);
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.

@@ -511,6 +511,7 @@ static inline void scsi_proc_host_rm(struct Scsi_Host *);
  */
 extern int scsi_add_single_device(uint, uint, uint, uint);
 extern int scsi_remove_single_device(uint, uint, uint, uint);
+extern u64 scsi_calculate_bounce_limit(struct Scsi_Host *);
 
 /*
  * Prototypes for functions in constants.c

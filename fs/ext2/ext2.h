@@ -14,8 +14,29 @@ struct ext2_inode_info {
 	__u32	i_file_acl;
 	__u32	i_dir_acl;
 	__u32	i_dtime;
+
+	/*
+	 * i_block_group is the number of the block group which contains
+	 * this file's inode.  Constant across the lifetime of the inode,
+	 * it is ued for making block allocation decisions - we try to
+	 * place a file's data blocks near its inode block, and new inodes
+	 * near to their parent directory's inode.
+	 */
 	__u32	i_block_group;
+
+	/*
+	 * i_next_alloc_block is the logical (file-relative) number of the
+	 * most-recently-allocated block in this file.  Yes, it is misnamed.
+	 * We use this for detecting linearly ascending allocation requests.
+	 */
 	__u32	i_next_alloc_block;
+
+	/*
+	 * i_next_alloc_goal is the *physical* companion to i_next_alloc_block.
+	 * it the the physical block number of the block which was most-recently
+	 * allocated to this file.  This give us the goal (target) for the next
+	 * allocation when we detect linearly ascending requests.
+	 */
 	__u32	i_next_alloc_goal;
 	__u32	i_prealloc_block;
 	__u32	i_prealloc_count;

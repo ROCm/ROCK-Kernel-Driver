@@ -18,6 +18,7 @@
 #define __GFP_HIGHIO	0x80	/* Can start high mem physical IO? */
 #define __GFP_FS	0x100	/* Can call down to low-level FS? */
 #define __GFP_COLD	0x200	/* Cache-cold page required */
+#define __GFP_NOWARN	0x400	/* Suppress page allocation failure warning */
 
 #define GFP_NOHIGHIO	(             __GFP_WAIT | __GFP_IO)
 #define GFP_NOIO	(             __GFP_WAIT)

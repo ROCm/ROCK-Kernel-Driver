@@ -124,8 +124,8 @@ EXPORT_SYMBOL(copy_to_user);
 EXPORT_SYMBOL(__copy_to_user);
 EXPORT_SYMBOL(strnlen_user);
 
-EXPORT_SYMBOL(pci_alloc_consistent);
-EXPORT_SYMBOL(pci_free_consistent);
+EXPORT_SYMBOL(dma_alloc_coherent);
+EXPORT_SYMBOL(dma_free_coherent);
 
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pcibios_penalize_isa_irq);

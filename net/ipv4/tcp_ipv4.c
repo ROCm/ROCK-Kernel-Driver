@@ -2236,6 +2236,7 @@ get_sk:
 			goto get_req;
 		}
 		read_unlock_bh(&tp->syn_wait_lock);
+		sk = sk->next;
 	}
 	if (++st->bucket < TCP_LHTABLE_SIZE) {
 		sk = tcp_listening_hash[st->bucket];

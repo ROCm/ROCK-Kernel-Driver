@@ -327,7 +327,7 @@ static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 /* Is this a wildcard address?  */
 int sctp_is_any(const union sctp_addr *addr)
 {
-	struct sctp_func *af = sctp_get_af_specific(addr->sa.sa_family);
+	struct sctp_af *af = sctp_get_af_specific(addr->sa.sa_family);
 	if (!af)
 		return 0;
 	return af->is_any(addr);
@@ -362,7 +362,7 @@ int sctp_in_scope(const union sctp_addr *addr, sctp_scope_t scope)
 /* What is the scope of 'addr'?  */
 sctp_scope_t sctp_scope(const union sctp_addr *addr)
 {
-	struct sctp_func *af;
+	struct sctp_af *af;
 
 	af = sctp_get_af_specific(addr->sa.sa_family);
 	if (!af)

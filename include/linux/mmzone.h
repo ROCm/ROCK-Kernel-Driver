@@ -193,16 +193,6 @@ typedef struct pglist_data {
 extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
-static inline int
-memclass(struct zone *pgzone, struct zone *classzone)
-{
-	if (pgzone->zone_pgdat != classzone->zone_pgdat)
-		return 0;
-	if (pgzone > classzone)
-		return 0;
-	return 1;
-}
-
 void get_zone_counts(unsigned long *active, unsigned long *inactive);
 void build_all_zonelists(void);
 void wakeup_kswapd(struct zone *zone);
@@ -335,11 +325,6 @@ static inline unsigned int num_online_memblks(void)
 #define num_online_memblks()		1
 
 #endif /* CONFIG_DISCONTIGMEM || CONFIG_NUMA */
-
-
-#define MAP_ALIGN(x)	((((x) % sizeof(struct page)) == 0) ? (x) : ((x) + \
-		sizeof(struct page) - ((x) % sizeof(struct page))))
-
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MMZONE_H */

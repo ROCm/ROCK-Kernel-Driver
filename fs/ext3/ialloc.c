@@ -356,24 +356,38 @@ static int find_group_other(struct super_block *sb, struct inode *parent)
 	 */
 	group = parent_group;
 	desc = ext3_get_group_desc (sb, group, &bh);
-	if (desc && le16_to_cpu(desc->bg_free_inodes_count))
+	if (desc && le16_to_cpu(desc->bg_free_inodes_count) &&
+			le16_to_cpu(desc->bg_free_blocks_count))
 		return group;
 
 	/*
-	 * Use a quadratic hash to find a group with a
-	 * free inode
+	 * We're going to place this inode in a different blockgroup from its
+	 * parent.  We want to cause files in a common directory to all land in
+	 * the same blockgroup.  But we want files which are in a different
+	 * directory which shares a blockgroup with our parent to land in a
+	 * different blockgroup.
+	 *
+	 * So add our directory's i_ino into the starting point for the hash.
+	 */
+	group = (group + parent->i_ino) % ngroups;
+
+	/*
+	 * Use a quadratic hash to find a group with a free inode and some free
+	 * blocks.
 	 */
 	for (i = 1; i < ngroups; i <<= 1) {
 		group += i;
 		if (group >= ngroups)
 			group -= ngroups;
 		desc = ext3_get_group_desc (sb, group, &bh);
-		if (desc && le16_to_cpu(desc->bg_free_inodes_count))
+		if (desc && le16_to_cpu(desc->bg_free_inodes_count) &&
+				le16_to_cpu(desc->bg_free_blocks_count))
 			return group;
 	}
 
 	/*
-	 * That failed: try linear search for a free inode
+	 * That failed: try linear search for a free inode, even if that group
+	 * has no free blocks.
 	 */
 	group = parent_group + 1;
 	for (i = 2; i < ngroups; i++) {

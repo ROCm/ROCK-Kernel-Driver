@@ -1022,7 +1022,10 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 		 * they could clobber root hub response data.
 		 */
 		urb->transfer_flags |= URB_NO_DMA_MAP;
-		return rh_urb_enqueue (hcd, urb);
+		status = rh_urb_enqueue (hcd, urb);
+		if (status)
+			urb_unlink (urb);
+		return status;
 	}
 
 	/* lower level hcd code should use *_dma exclusively */
@@ -1043,7 +1046,10 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 					    : PCI_DMA_TODEVICE);
 	}
 
-	return hcd->driver->urb_enqueue (hcd, urb, mem_flags);
+	status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
+	if (status)
+		urb_unlink (urb);
+	return status;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1137,7 +1143,7 @@ static int hcd_unlink_urb (struct urb *urb)
 	 * FIXME use better explicit urb state
 	 */
 	if (urb->status != -EINPROGRESS) {
-		retval = -EINVAL;
+		retval = -EBUSY;
 		goto done;
 	}
 
