@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdint.h>
 #include <ctype.h>
 #include <errno.h>
