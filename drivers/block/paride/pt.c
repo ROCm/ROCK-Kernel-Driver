@@ -285,8 +285,20 @@ void pt_init_units( void )
         }
 }
 
-#define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
-#define	RR(c,r)		(pi_read_regr(PI,c,r))
+static inline int status_reg(int unit)
+{
+	return pi_read_regr(PI, 1, 6);
+}
+
+static inline int read_reg(int unit, int reg)
+{
+	return pi_read_regr(PI, 0, reg);
+}
+
+static inline void write_reg(int unit, int reg, int val)
+{
+	pi_write_regr(PI, 0, reg, val);
+}
 
 #define DRIVE           (0xa0+0x10*PT.drive)
 
@@ -295,13 +307,13 @@ static int pt_wait( int unit, int go, int stop, char * fun, char * msg )
 {       int j, r, e, s, p;
 
         j = 0;
-        while ((((r=RR(1,6))&go)||(stop&&(!(r&stop))))&&(j++<PT_SPIN))
+        while ((((r=status_reg(unit))&go)||(stop&&(!(r&stop))))&&(j++<PT_SPIN))
                 udelay(PT_SPIN_DEL);
 
         if ((r&(STAT_ERR&stop))||(j>=PT_SPIN)) {
-           s = RR(0,7);
-           e = RR(0,1);
-           p = RR(0,2);
+           s = read_reg(unit, 7);
+           e = read_reg(unit, 1);
+           p = read_reg(unit, 2);
            if (j >= PT_SPIN) e |= 0x100;
            if (fun) printk("%s: %s %s: alt=0x%x stat=0x%x err=0x%x"
                            " loop=%d phase=%d\n",
@@ -315,23 +327,23 @@ static int pt_command( int unit, char * cmd, int dlen, char * fun )
 
 {       pi_connect(PI);
 
-        WR(0,6,DRIVE);
+        write_reg(unit, 6,DRIVE);
 
         if (pt_wait(unit,STAT_BUSY|STAT_DRQ,0,fun,"before command")) {
                 pi_disconnect(PI);
                 return -1;
         }
 
-        WR(0,4,dlen % 256);
-        WR(0,5,dlen / 256);
-        WR(0,7,0xa0);          /* ATAPI packet command */
+        write_reg(unit, 4,dlen % 256);
+        write_reg(unit, 5,dlen / 256);
+        write_reg(unit, 7,0xa0);          /* ATAPI packet command */
 
         if (pt_wait(unit,STAT_BUSY,STAT_DRQ,fun,"command DRQ")) {
                 pi_disconnect(PI);
                 return -1;
         }
 
-        if (RR(0,2) != 1) {
+        if (read_reg(unit, 2) != 1) {
            printk("%s: %s: command phase error\n",PT.name,fun);
            pi_disconnect(PI);
            return -1;
@@ -349,9 +361,9 @@ static int pt_completion( int unit, char * buf, char * fun )
         r = pt_wait(unit,STAT_BUSY,STAT_DRQ|STAT_READY|STAT_ERR,
 			fun,"completion");
 
-        if (RR(0,7)&STAT_DRQ) { 
-           n = (((RR(0,4)+256*RR(0,5))+3)&0xfffc);
-	   p = RR(0,2)&3;
+        if (read_reg(unit, 7)&STAT_DRQ) { 
+           n = (((read_reg(unit, 4)+256*read_reg(unit, 5))+3)&0xfffc);
+	   p = read_reg(unit, 2)&3;
 	   if (p == 0) pi_write_block(PI,buf,n);
 	   if (p == 2) pi_read_block(PI,buf,n);
         }
@@ -409,9 +421,9 @@ static int pt_poll_dsc( int unit, int pause, int tmo, char *msg )
 		pt_sleep(pause);
 		k++;
 		pi_connect(PI);
-		WR(0,6,DRIVE);
-		s = RR(0,7);
-		e = RR(0,1);
+		write_reg(unit, 6,DRIVE);
+		s = read_reg(unit, 7);
+		e = read_reg(unit, 1);
 		pi_disconnect(PI);
 		if (s & (STAT_ERR|STAT_SEEK)) break;
 	}
@@ -456,21 +468,21 @@ static int pt_reset( int unit )
 	int	expect[5] = {1,1,1,0x14,0xeb};
 
 	pi_connect(PI);
-	WR(0,6,DRIVE);
-	WR(0,7,8);
+	write_reg(unit, 6,DRIVE);
+	write_reg(unit, 7,8);
 
 	pt_sleep(20*HZ/1000);
 
         k = 0;
-        while ((k++ < PT_RESET_TMO) && (RR(1,6)&STAT_BUSY))
+        while ((k++ < PT_RESET_TMO) && (status_reg(unit)&STAT_BUSY))
                 pt_sleep(HZ/10);
 
 	flg = 1;
-	for(i=0;i<5;i++) flg &= (RR(0,i+1) == expect[i]);
+	for(i=0;i<5;i++) flg &= (read_reg(unit, i+1) == expect[i]);
 
 	if (verbose) {
 		printk("%s: Reset (%d) signature = ",PT.name,k);
-		for (i=0;i<5;i++) printk("%3x",RR(0,i+1));
+		for (i=0;i<5;i++) printk("%3x",read_reg(unit, i+1));
 		if (!flg) printk(" (incorrect)");
 		printk("\n");
 	}
@@ -767,12 +779,12 @@ static ssize_t pt_read(struct file * filp, char * buf,
 
 	        if (r) PT.flags |= PT_EOF; 
 
-	        s = RR(0,7);
+	        s = read_reg(unit, 7);
 
 	        if (!(s & STAT_DRQ)) break;
 
-	    	n = (RR(0,4)+256*RR(0,5));
-	    	p = (RR(0,2)&3);
+	    	n = (read_reg(unit, 4)+256*read_reg(unit, 5));
+	    	p = (read_reg(unit, 2)&3);
 	    	if (p != 2) {
 		    pi_disconnect(PI);
 		    printk("%s: Phase error on read: %d\n",PT.name,p);
@@ -856,12 +868,12 @@ static ssize_t pt_write(struct file * filp, const char * buf,
 
                 if (r) PT.flags |= PT_EOF;
 
-	        s = RR(0,7);
+	        s = read_reg(unit, 7);
 
 	        if (!(s & STAT_DRQ)) break;
 
-                n = (RR(0,4)+256*RR(0,5));
-                p = (RR(0,2)&3);
+                n = (read_reg(unit, 4)+256*read_reg(unit, 5));
+                p = (read_reg(unit, 2)&3);
                 if (p != 0) {
                     pi_disconnect(PI);
                     printk("%s: Phase error on write: %d \n",PT.name,p);
