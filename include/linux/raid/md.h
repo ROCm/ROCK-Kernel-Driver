@@ -62,21 +62,6 @@
 #define MD_MINOR_VERSION                90
 #define MD_PATCHLEVEL_VERSION           0
 
-/*
- * XXX(hch): This function is broken.  Someone who understands the md
- * code needs to go through all callers, check whether bdev could
- * be NULL and replace it with direct calls to bdevmame.
- *
- * This would also fix the returns buffer on stack issue nicely :)
- */
-static inline const char *bdev_partition_name (struct block_device *bdev)
-{
-	char b[BDEVNAME_SIZE];
-
-	if (!bdev)
-		return __bdevname(0, b);
-	return bdevname(bdev, b);
-}
 extern int register_md_personality (int p_num, mdk_personality_t *p);
 extern int unregister_md_personality (int p_num);
 extern mdk_thread_t * md_register_thread (void (*run) (mddev_t *mddev),

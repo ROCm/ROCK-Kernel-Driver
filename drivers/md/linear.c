@@ -254,12 +254,13 @@ static void linear_status (struct seq_file *seq, mddev_t *mddev)
 	seq_printf(seq, "      ");
 	for (j = 0; j < conf->nr_zones; j++)
 	{
+		char b[BDEVNAME_SIZE];
 		seq_printf(seq, "[%s",
-			bdev_partition_name(conf->hash_table[j].dev0->rdev->bdev));
+			   bdevname(conf->hash_table[j].dev0->rdev->bdev,b));
 
 		if (conf->hash_table[j].dev1)
 			seq_printf(seq, "/%s] ",
-			  bdev_partition_name(conf->hash_table[j].dev1->rdev->bdev));
+				   bdevname(conf->hash_table[j].dev1->rdev->bdev,b));
 		else
 			seq_printf(seq, "] ");
 	}

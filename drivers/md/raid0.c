@@ -36,6 +36,7 @@ static int create_strip_zones (mddev_t *mddev)
 	struct list_head *tmp1, *tmp2;
 	struct strip_zone *zone;
 	int cnt;
+	char b[BDEVNAME_SIZE];
  
 	/*
 	 * The number of 'same size groups'
@@ -44,14 +45,15 @@ static int create_strip_zones (mddev_t *mddev)
  
 	ITERATE_RDEV(mddev,rdev1,tmp1) {
 		printk("raid0: looking at %s\n",
-			bdev_partition_name(rdev1->bdev));
+			bdevname(rdev1->bdev,b));
 		c = 0;
 		ITERATE_RDEV(mddev,rdev2,tmp2) {
-			printk("raid0:   comparing %s(%llu) with %s(%llu)\n",
-				bdev_partition_name(rdev1->bdev),
-				(unsigned long long)rdev1->size,
-				bdev_partition_name(rdev2->bdev),
-				(unsigned long long)rdev2->size);
+			printk("raid0:   comparing %s(%llu)",
+			       bdevname(rdev1->bdev,b),
+			       (unsigned long long)rdev1->size);
+			printk(" with %s(%llu)\n",
+			       bdevname(rdev2->bdev,b),
+			       (unsigned long long)rdev2->size);
 			if (rdev2 == rdev1) {
 				printk("raid0:   END\n");
 				break;
@@ -138,8 +140,9 @@ static int create_strip_zones (mddev_t *mddev)
 		c = 0;
 
 		for (j=0; j<cnt; j++) {
+			char b[BDEVNAME_SIZE];
 			rdev = conf->strip_zone[0].dev[j];
-			printk("raid0: checking %s ...", bdev_partition_name(rdev->bdev));
+			printk("raid0: checking %s ...", bdevname(rdev->bdev,b));
 			if (rdev->size > current_offset)
 			{
 				printk(" contained as device %d\n", c);
@@ -404,6 +407,7 @@ static void raid0_status (struct seq_file *seq, mddev_t *mddev)
 #undef MD_DEBUG
 #ifdef MD_DEBUG
 	int j, k, h;
+	char b[BDEVNAME_SIZE];
 	raid0_conf_t *conf = mddev_to_conf(mddev);
   
 	h = 0;
@@ -413,8 +417,8 @@ static void raid0_status (struct seq_file *seq, mddev_t *mddev)
 			seq_printf("(h%d)", h++);
 		seq_printf(seq, "=[");
 		for (k = 0; k < conf->strip_zone[j].nb_dev; k++)
-			seq_printf (seq, "%s/", bdev_partition_name(
-				conf->strip_zone[j].dev[k]->bdev));
+			seq_printf (seq, "%s/", bdevname(
+				conf->strip_zone[j].dev[k]->bdev,b));
 
 		seq_printf (seq, "] zo=%d do=%d s=%d\n",
 				conf->strip_zone[j].zone_offset,

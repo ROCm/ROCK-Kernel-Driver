@@ -457,6 +457,7 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 
 static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
+	char b[BDEVNAME_SIZE];
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	PRINTK("raid5: error called\n");
 
@@ -476,7 +477,7 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		printk (KERN_ALERT
 			"raid5: Disk failure on %s, disabling device."
 			" Operation continuing on %d devices\n",
-			bdev_partition_name(rdev->bdev), conf->working_disks);
+			bdevname(rdev->bdev,b), conf->working_disks);
 	}
 }	
 
@@ -1486,8 +1487,9 @@ static int run (mddev_t *mddev)
 		disk->rdev = rdev;
 
 		if (rdev->in_sync) {
+			char b[BDEVNAME_SIZE];
 			printk(KERN_INFO "raid5: device %s operational as raid"
-				" disk %d\n", bdev_partition_name(rdev->bdev),
+				" disk %d\n", bdevname(rdev->bdev,b),
 				raid_disk);
 			conf->working_disks++;
 		}
@@ -1663,11 +1665,12 @@ static void print_raid5_conf (raid5_conf_t *conf)
 		 conf->working_disks, conf->failed_disks);
 
 	for (i = 0; i < conf->raid_disks; i++) {
+		char b[BDEVNAME_SIZE];
 		tmp = conf->disks + i;
 		if (tmp->rdev)
 		printk(" disk %d, o:%d, dev:%s\n",
 			i, !tmp->rdev->faulty,
-			bdev_partition_name(tmp->rdev->bdev));
+			bdevname(tmp->rdev->bdev,b));
 	}
 }
 

@@ -308,8 +308,9 @@ static int raid1_end_request(struct bio *bio, unsigned int bytes_done, int error
 			/*
 			 * oops, read error:
 			 */
+			char b[BDEVNAME_SIZE];
 			printk(KERN_ERR "raid1: %s: rescheduling sector %llu\n",
-				bdev_partition_name(conf->mirrors[mirror].rdev->bdev), (unsigned long long)r1_bio->sector);
+				bdevname(conf->mirrors[mirror].rdev->bdev,b), (unsigned long long)r1_bio->sector);
 			reschedule_retry(r1_bio);
 		}
 	} else {
@@ -597,6 +598,7 @@ static void status(struct seq_file *seq, mddev_t *mddev)
 
 static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
+	char b[BDEVNAME_SIZE];
 	conf_t *conf = mddev_to_conf(mddev);
 
 	/*
@@ -625,7 +627,7 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 	mddev->sb_dirty = 1;
 	printk(KERN_ALERT "raid1: Disk failure on %s, disabling device. \n"
 		"	Operation continuing on %d devices\n",
-		bdev_partition_name(rdev->bdev), conf->working_disks);
+		bdevname(rdev->bdev,b), conf->working_disks);
 }
 
 static void print_conf(conf_t *conf)
@@ -642,11 +644,12 @@ static void print_conf(conf_t *conf)
 		conf->raid_disks);
 
 	for (i = 0; i < conf->raid_disks; i++) {
+		char b[BDEVNAME_SIZE];
 		tmp = conf->mirrors + i;
 		if (tmp->rdev)
 			printk(" disk %d, wo:%d, o:%d, dev:%s\n",
 				i, !tmp->rdev->in_sync, !tmp->rdev->faulty,
-				bdev_partition_name(tmp->rdev->bdev));
+				bdevname(tmp->rdev->bdev,b));
 	}
 }
 
@@ -814,9 +817,10 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 * There is no point trying a read-for-reconstruct as
 		 * reconstruct is about to be aborted
 		 */
+		char b[BDEVNAME_SIZE];
 		printk(KERN_ALERT "raid1: %s: unrecoverable I/O read error"
 			" for block %llu\n",
-			bdev_partition_name(bio->bi_bdev), 
+			bdevname(bio->bi_bdev,b), 
 			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
 		put_buf(r1_bio);
@@ -906,6 +910,7 @@ static void raid1d(mddev_t *mddev)
 	md_handle_safemode(mddev);
 	
 	for (;;) {
+		char b[BDEVNAME_SIZE];
 		spin_lock_irqsave(&retry_list_lock, flags);
 		if (list_empty(head))
 			break;
@@ -925,14 +930,14 @@ static void raid1d(mddev_t *mddev)
 			if (map(mddev, &rdev) == -1) {
 				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
 				" read error for block %llu\n",
-				bdev_partition_name(bio->bi_bdev), 
+				bdevname(bio->bi_bdev,b),
 				(unsigned long long)r1_bio->sector);
 				raid_end_bio_io(r1_bio);
 				break;
 			}
 			printk(KERN_ERR "raid1: %s: redirecting sector %llu to"
 				" another mirror\n",
-				bdev_partition_name(rdev->bdev), 
+				bdevname(rdev->bdev,b),
 				(unsigned long long)r1_bio->sector);
 			bio->bi_bdev = rdev->bdev;
 			bio->bi_sector = r1_bio->sector + rdev->data_offset;
