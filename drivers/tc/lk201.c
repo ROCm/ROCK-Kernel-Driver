@@ -36,12 +36,9 @@ static void __init lk201_info(struct dec_serial *);
 static void lk201_kbd_rx_char(unsigned char, unsigned char);
 
 struct zs_hook lk201_kbdhook = {
-	init_channel:   lk201_init,
-	init_info:      lk201_info,
-	rx_char:        NULL,
-	poll_rx_char:   NULL,
-	poll_tx_char:   NULL,
-	cflags:         B4800 | CS8 | CSTOPB | CLOCAL
+	.init_channel   = lk201_init,
+	.init_info      = lk201_info,
+	.cflags         = B4800 | CS8 | CSTOPB | CLOCAL
 };
 
 /*
