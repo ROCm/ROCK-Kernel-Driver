@@ -59,7 +59,6 @@ extern ia64_mv_pci_map_sg		sn_pci_map_sg;
 extern ia64_mv_pci_unmap_sg		sn_pci_unmap_sg;
 extern ia64_mv_pci_dma_sync_single	sn_pci_dma_sync_single;
 extern ia64_mv_pci_dma_sync_sg		sn_pci_dma_sync_sg;
-extern ia64_mv_pci_dma_address		sn_dma_address;
 extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
 
 /*
@@ -98,7 +97,6 @@ extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
 #define platform_pci_unmap_sg		sn_pci_unmap_sg
 #define platform_pci_dma_sync_single	sn_pci_dma_sync_single
 #define platform_pci_dma_sync_sg	sn_pci_dma_sync_sg
-#define platform_pci_dma_address	sn_dma_address
 #define platform_pci_dma_supported	sn_pci_dma_supported
 
 #endif /* _ASM_IA64_MACHVEC_SN2_H */

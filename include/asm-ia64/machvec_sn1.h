@@ -52,7 +52,6 @@ extern ia64_mv_pci_map_sg		sn1_pci_map_sg;
 extern ia64_mv_pci_unmap_sg		sn1_pci_unmap_sg;
 extern ia64_mv_pci_dma_sync_single	sn1_pci_dma_sync_single;
 extern ia64_mv_pci_dma_sync_sg		sn1_pci_dma_sync_sg;
-extern ia64_mv_pci_dma_address		sn1_dma_address;
 
 /*
  * This stuff has dual use!
@@ -82,6 +81,5 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
 #define platform_pci_unmap_sg		sn1_pci_unmap_sg
 #define platform_pci_dma_sync_single	sn1_pci_dma_sync_single
 #define platform_pci_dma_sync_sg	sn1_pci_dma_sync_sg
-#define platform_pci_dma_address	sn1_dma_address
 
 #endif /* _ASM_IA64_MACHVEC_SN1_h */
