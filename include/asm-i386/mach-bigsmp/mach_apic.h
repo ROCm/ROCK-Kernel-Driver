@@ -10,7 +10,7 @@
 		((phys_apic) & (~0xf)) )
 #endif
 
-#define no_balance_irq (1)
+#define NO_BALANCE_IRQ (1)
 #define esr_disable (1)
 
 static inline int apic_id_registered(void)

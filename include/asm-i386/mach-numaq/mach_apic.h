@@ -5,7 +5,7 @@
 
 #define TARGET_CPUS (0xf)
 
-#define no_balance_irq (1)
+#define NO_BALANCE_IRQ (1)
 #define esr_disable (1)
 
 #define INT_DELIVERY_MODE dest_LowestPrio
