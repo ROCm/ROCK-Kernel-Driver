@@ -561,6 +561,10 @@ cifs_write(struct file * file, const char *write_data,
 	}
 	open_file = (struct cifsFileInfo *) file->private_data;
 
+	if(file->f_dentry->d_inode == NULL) {
+		FreeXid(xid);
+		return -EBADF;
+	}
 
 	if (*poffset > file->f_dentry->d_inode->i_size)
 		long_op = 2;  /* writes past end of file can take a long time */
@@ -571,7 +575,16 @@ cifs_write(struct file * file, const char *write_data,
 	     total_written += bytes_written) {
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
+			if(file->private_data == NULL) {
+				/* file has been closed on us */
+				FreeXid(xid);
+				return total_written;
+			}
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
+				if((file->f_dentry == NULL) || (file->f_dentry->d_inode == NULL)) {
+					FreeXid(xid);
+					return total_written;
+				}
 				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
 				if(rc != 0)
 					break;
@@ -594,13 +607,19 @@ cifs_write(struct file * file, const char *write_data,
 			*poffset += bytes_written;
 		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
 	}
-	file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
-		CURRENT_TIME;
-	if (bytes_written > 0) {
-		if (*poffset > file->f_dentry->d_inode->i_size)
-			i_size_write(file->f_dentry->d_inode, *poffset);
+
+	/* since the write may have blocked check these pointers again */
+	if(file->f_dentry) {
+		if(file->f_dentry->d_inode) {
+			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
+				CURRENT_TIME;
+			if (bytes_written > 0) {
+				if (*poffset > file->f_dentry->d_inode->i_size)
+					i_size_write(file->f_dentry->d_inode, *poffset);
+			}
+			mark_inode_dirty_sync(file->f_dentry->d_inode);
+		}
 	}
-	mark_inode_dirty_sync(file->f_dentry->d_inode);
 	FreeXid(xid);
 	return total_written;
 }

@@ -27,6 +27,7 @@
 #include <linux/ipv6.h>
 #include <linux/pagemap.h>
 #include <linux/ctype.h>
+#include <linux/utsname.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 #include "cifspdu.h"
