@@ -927,11 +927,17 @@ static void hvsi_close(struct tty_struct *tty, struct file *filp)
 static void hvsi_hangup(struct tty_struct *tty)
 {
 	struct hvsi_struct *hp = tty->driver_data;
+	unsigned long flags;
 
 	pr_debug("%s\n", __FUNCTION__);
 
+	spin_lock_irqsave(&hp->lock, flags);
+
 	hp->count = 0;
+	hp->n_outbuf = 0;
 	hp->tty = NULL;
+
+	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
 /* called with hp->lock held */
