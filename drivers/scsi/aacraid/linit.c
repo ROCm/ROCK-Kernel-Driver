@@ -128,7 +128,7 @@ static int aac_eh_device_reset(Scsi_Cmnd* cmd);
 static int aac_eh_bus_reset(Scsi_Cmnd* cmd);
 static int aac_eh_reset(Scsi_Cmnd* cmd);
 
-static int aac_slave_attach(Scsi_Device *);
+static int aac_slave_configure(Scsi_Device *);
 
 /**
  *	aac_detect	-	Probe for aacraid cards
@@ -518,13 +518,13 @@ static int aac_biosparm(struct scsi_device *sdev, struct block_device *bdev,
 }
 
 /**
- *	aac_slave_attach	-	do device specific setup
+ *	aac_slave_configure	-	do device specific setup
  *	@dev:	SCSI device we are attaching
  *
  * 	Currently, all we do is set the queue depth on the device.
  */
 
-static int aac_slave_attach(Scsi_Device * dev )
+static int aac_slave_configure(Scsi_Device * dev )
 {
 
 	if(dev->tagged_supported)
@@ -685,7 +685,7 @@ static Scsi_Host_Template driver_template = {
 	ioctl:          	aac_ioctl,
 	queuecommand:   	aac_queuecommand,
 	bios_param:     	aac_biosparm,	
-	slave_attach:		aac_slave_attach,
+	slave_configure:	aac_slave_configure,
 	can_queue:      	AAC_NUM_IO_FIB,	
 	this_id:        	16,
 	sg_tablesize:   	16,

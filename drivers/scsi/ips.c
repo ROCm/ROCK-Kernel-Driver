@@ -433,7 +433,7 @@ int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
 int ips_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
-int ips_slave_attach(Scsi_Device *);
+int ips_slave_configure(Scsi_Device *);
 const char * ips_info(struct Scsi_Host *);
 void do_ipsintr(int, void *, struct pt_regs *);
 static int ips_hainit(ips_ha_t *);
@@ -1866,7 +1866,7 @@ ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
 
 /****************************************************************************/
 /*                                                                          */
-/* Routine Name: ips_slave_attach                                           */
+/* Routine Name: ips_slave_configure                                        */
 /*                                                                          */
 /* Routine Description:                                                     */
 /*                                                                          */
@@ -1874,7 +1874,7 @@ ips_select_queue_depth(struct Scsi_Host *host, Scsi_Device *scsi_devs) {
 /*                                                                          */
 /****************************************************************************/
 int
-ips_slave_attach(Scsi_Device *SDptr)
+ips_slave_configure(Scsi_Device *SDptr)
 {
    ips_ha_t    *ha;
    int          min;

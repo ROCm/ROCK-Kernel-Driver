@@ -381,7 +381,7 @@ static void qla1280_done(struct scsi_qla_host *, srb_t **, srb_t **);
 static void qla1280_next(struct scsi_qla_host *, scsi_lu_t *, int);
 static void qla1280_putq_t(scsi_lu_t *, srb_t *);
 static void qla1280_done_q_put(srb_t *, srb_t **, srb_t **);
-static int qla1280_slave_attach(Scsi_Device *);
+static int qla1280_slave_configure(Scsi_Device *);
 #if STOP_ON_ERROR
 static void qla1280_panic(char *, struct Scsi_Host *host);
 #endif
@@ -1794,7 +1794,7 @@ qla1280_do_dpc(void *p)
 }
 
 /**************************************************************************
- *   qla1280_slave_attach
+ *   qla1280_slave_configure
  *
  * Description:
  *   Determines the queue depth for a given device.  There are two ways
@@ -1805,7 +1805,7 @@ qla1280_do_dpc(void *p)
  *   default queue depth (dependent on the number of hardware SCBs).
  **************************************************************************/
 static int
-qla1280_slave_attach(Scsi_Device * device)
+qla1280_slave_configure(Scsi_Device * device)
 {
 	struct scsi_qla_host *p = (struct scsi_qla_host *)device->host->hostdata;
 	int bus = device->channel;

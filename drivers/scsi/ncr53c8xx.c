@@ -8496,7 +8496,7 @@ static void __init ncr_getclock (ncb_p np, int mult)
 **   Linux select queue depths function
 */
 
-int ncr53c8xx_slave_attach(Scsi_Device *device)
+int ncr53c8xx_slave_configure(Scsi_Device *device)
 {
 	struct Scsi_Host *host = device->host;
 	ncb_p np;

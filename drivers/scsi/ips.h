@@ -61,7 +61,7 @@
    extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
    extern int ips_biosparam(struct scsi_device *, struct block_device *,
 		   sector_t, int *);
-   extern int ips_slave_attach(Scsi_Device *);
+   extern int ips_slave_configure(Scsi_Device *);
    extern const char * ips_info(struct Scsi_Host *);
    extern void do_ips(int, void *, struct pt_regs *);
 
@@ -471,7 +471,7 @@
     queuecommand : ips_queue,             \
     eh_abort_handler : ips_eh_abort,      \
     eh_host_reset_handler : ips_eh_reset, \
-    slave_attach : ips_slave_attach,      \
+    slave_configure : ips_slave_configure,\
     bios_param : ips_biosparam,           \
     can_queue : 0,                        \
     this_id: -1,                          \

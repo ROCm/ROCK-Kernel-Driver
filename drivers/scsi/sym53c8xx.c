@@ -13525,7 +13525,7 @@ static int device_queue_depth(ncb_p np, int target, int lun)
 	return DEF_DEPTH;
 }
 
-int sym53c8xx_slave_attach(Scsi_Device *device)
+int sym53c8xx_slave_configure(Scsi_Device *device)
 {
 	struct Scsi_Host *host = device->host;
 	ncb_p np;

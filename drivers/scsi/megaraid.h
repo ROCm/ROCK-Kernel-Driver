@@ -974,13 +974,11 @@ static void mega_build_kernel_sg (char *barea, ulong xfersize, mega_scb * pScb,
 			   mega_ioctl_mbox * mbox);
 #endif
 
-static int megadev_open (struct inode *, struct file *);
 static int megadev_ioctl_entry (struct inode *, struct file *,
 				unsigned int, unsigned long);
 static int megadev_ioctl (struct inode *, struct file *,
 			  unsigned int, unsigned long);
 static mega_scb *megadev_doioctl (mega_host_config *, Scsi_Cmnd *);
-static int megadev_close (struct inode *, struct file *);
 static void megadev_ioctl_done (Scsi_Cmnd *);
 static int mega_init_scb (mega_host_config *);
 static void enq_scb_freelist (mega_host_config *, mega_scb *,

@@ -297,7 +297,7 @@ static void aha152x_config_cs(dev_link_t *link)
     for (host = scsi_host_get_next(NULL); host;
 	 host = scsi_host_get_next(host))
 	if (host->hostt == &driver_template)
-	    for (dev = host->host_queue; dev; dev = dev->next) {
+	    list_for_each_entry (dev, &host->my_devices, siblings) {
 	    u_long arg[2], id;
 	    kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
 	    id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +

@@ -81,11 +81,11 @@ int eata_pio_proc_info(char *buffer, char **start, off_t offset, int length,
 	goto stop_output;
     
     size = sprintf(buffer+len,"Attached devices: %s\n", 
-		   (HBA_ptr->host_queue)?"":"none");
+		   (!list_empty(&HBA_ptr->my_devices))?"":"none");
     len += size; 
     pos = begin + len;
     
-    for(scd = HBA_ptr->host_queue; scd; scd = scd->next) {
+    list_for_each_entry(scd, &HBA_ptr->my_devices; siblings) {
 	    proc_print_scsidevice(scd, buffer, &size, len);
 	    len += size; 
 	    pos = begin + len;

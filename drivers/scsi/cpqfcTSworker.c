@@ -3487,7 +3487,6 @@ static void RevalidateSEST( struct Scsi_Host *HostAdapter,
 static void UnblockScsiDevice( struct Scsi_Host *HostAdapter, 
 		        PFC_LOGGEDIN_PORT pLoggedInPort)
 {
-//  Scsi_Device *sdev = HostAdapter->host_queue;
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   Scsi_Cmnd* *SCptr = &cpqfcHBAdata->LinkDnCmnd[0];
   Scsi_Cmnd *Cmnd;

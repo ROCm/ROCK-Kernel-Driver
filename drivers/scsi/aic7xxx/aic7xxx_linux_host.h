@@ -72,7 +72,7 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
 	eh_abort_handler: ahc_linux_abort,			\
 	eh_device_reset_handler: ahc_linux_dev_reset,		\
 	eh_bus_reset_handler: ahc_linux_bus_reset,		\
-	slave_attach: ahc_linux_slave_attach,			\
+	slave_configure: ahc_linux_slave_configure,		\
 	bios_param: AIC7XXX_BIOSPARAM,				\
 	can_queue: 253,		/* max simultaneous cmds      */\
 	this_id: -1,		/* scsi id of host adapter    */\

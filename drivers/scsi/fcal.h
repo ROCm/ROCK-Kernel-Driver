@@ -23,7 +23,7 @@ struct fcal {
 int fcal_detect(Scsi_Host_Template *);
 int fcal_release(struct Scsi_Host *);
 int fcal_proc_info (char *, char **, off_t, int, int, int);
-int fcal_slave_attach(Scsi_Device *);
+int fcal_slave_configure(Scsi_Device *);
 
 #define FCAL {							\
 	name:			"Fibre Channel Arbitrated Loop",\
@@ -31,7 +31,7 @@ int fcal_slave_attach(Scsi_Device *);
 	release:		fcal_release,			\
 	proc_info:		fcal_proc_info,			\
 	queuecommand:		fcp_scsi_queuecommand,		\
-	slave_attach:		fcal_slave_attach,		\
+	slave_configure:	fcal_slave_configure,		\
 	can_queue:		FCAL_CAN_QUEUE,			\
 	this_id:		-1,				\
 	sg_tablesize:		1,				\

@@ -73,7 +73,7 @@ static void proc_delete_inode(struct inode *inode)
 	de = PROC_I(inode)->pde;
 	if (de) {
 		if (de->owner)
-			__MOD_DEC_USE_COUNT(de->owner);
+			module_put(de->owner);
 		de_put(de);
 	}
 }
@@ -200,8 +200,8 @@ printk("proc_iget: using deleted entry %s, count=%d\n", de->name, atomic_read(&d
 			inode->i_size = de->size;
 		if (de->nlink)
 			inode->i_nlink = de->nlink;
-		if (de->owner)
-			__MOD_INC_USE_COUNT(de->owner);
+		if (!try_module_get(de->owner))
+			goto out_fail;
 		if (de->proc_iops)
 			inode->i_op = de->proc_iops;
 		if (de->proc_fops)

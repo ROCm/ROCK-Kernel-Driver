@@ -428,7 +428,7 @@ static void ahc_linux_freeze_sim_queue(struct ahc_softc *ahc);
 static void ahc_linux_release_sim_queue(u_long arg);
 static int  ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 static void ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc);
-static int  ahc_linux_slave_attach(Scsi_Device *device);
+static int  ahc_linux_slave_configure(Scsi_Device *device);
 static void ahc_linux_device_queue_depth(struct ahc_softc *ahc,
 					 Scsi_Device *device);
 static struct ahc_linux_target*	ahc_linux_alloc_target(struct ahc_softc*,
@@ -1446,7 +1446,7 @@ ahc_platform_abort_scbs(struct ahc_softc *ahc, int target, char channel,
  * off the input host adapter.
  */
 static int
-ahc_linux_slave_attach(Scsi_Device * device)
+ahc_linux_slave_configure(Scsi_Device * device)
 {
 	struct	ahc_softc *ahc;
 	u_long	flags;

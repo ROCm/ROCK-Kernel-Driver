@@ -347,6 +347,33 @@ void scsi_release_request(Scsi_Request * req)
 }
 
 /*
+ * FIXME(eric) - this is not at all optimal.  Given that
+ * single lun devices are rare and usually slow
+ * (i.e. CD changers), this is good enough for now, but
+ * we may want to come back and optimize this later.
+ *
+ * Scan through all of the devices attached to this
+ * host, and see if any are active or not.  If so,
+ * we need to defer this command.
+ *
+ * We really need a busy counter per device.  This would
+ * allow us to more easily figure out whether we should
+ * do anything here or not.
+ */
+static int check_all_luns(struct Scsi_Host *shost, struct scsi_device *myself)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &myself->same_target_siblings,
+		       	same_target_siblings) {
+		if (atomic_read(&sdev->device_active))
+			return 1;
+	}
+
+	return 0;
+}
+
+/*
  * Function:    scsi_allocate_device
  *
  * Purpose:     Allocate a command descriptor.
@@ -372,172 +399,87 @@ void scsi_release_request(Scsi_Request * req)
  *              This function is deprecated, and drivers should be
  *              rewritten to use Scsi_Request instead of Scsi_Cmnd.
  */
-
-Scsi_Cmnd *scsi_allocate_device(Scsi_Device * device, int wait, 
-                                int interruptable)
+struct scsi_cmnd *scsi_allocate_device(struct scsi_device *sdev, int wait)
 {
- 	struct Scsi_Host *host;
-  	Scsi_Cmnd *SCpnt = NULL;
-	Scsi_Device *SDpnt;
+	DECLARE_WAITQUEUE(wq, current);
+	struct Scsi_Host *shost = sdev->host;
+	struct scsi_cmnd *scmnd;
 	unsigned long flags;
-  
-  	if (!device)
-  		panic("No device passed to scsi_allocate_device().\n");
-  
-  	host = device->host;
-  
+
 	spin_lock_irqsave(&device_request_lock, flags);
- 
-	while (1 == 1) {
-		SCpnt = NULL;
-		if (!device->device_blocked) {
-			if (device->single_lun) {
-				/*
-				 * FIXME(eric) - this is not at all optimal.  Given that
-				 * single lun devices are rare and usually slow
-				 * (i.e. CD changers), this is good enough for now, but
-				 * we may want to come back and optimize this later.
-				 *
-				 * Scan through all of the devices attached to this
-				 * host, and see if any are active or not.  If so,
-				 * we need to defer this command.
-				 *
-				 * We really need a busy counter per device.  This would
-				 * allow us to more easily figure out whether we should
-				 * do anything here or not.
-				 */
-				for (SDpnt = host->host_queue;
-				     SDpnt;
-				     SDpnt = SDpnt->next) {
-					/*
-					 * Only look for other devices on the same bus
-					 * with the same target ID.
-					 */
-					if (SDpnt->channel != device->channel
-					    || SDpnt->id != device->id
-					    || SDpnt == device) {
- 						continue;
-					}
-                                        if( atomic_read(&SDpnt->device_active) != 0)
-                                        {
-                                                break;
-                                        }
-				}
-				if (SDpnt) {
-					/*
-					 * Some other device in this cluster is busy.
-					 * If asked to wait, we need to wait, otherwise
-					 * return NULL.
-					 */
-					SCpnt = NULL;
-					goto busy;
-				}
-			}
-			/*
-			 * Now we can check for a free command block for this device.
-			 */
-			for (SCpnt = device->device_queue; SCpnt; SCpnt = SCpnt->next) {
-				if (SCpnt->request == NULL)
-					break;
-			}
-		}
+	while (1) {
+		if (sdev->device_blocked)
+			goto busy;
+		if (sdev->single_lun && check_all_luns(shost, sdev))
+			goto busy;
+
 		/*
-		 * If we couldn't find a free command block, and we have been
-		 * asked to wait, then do so.
+		 * Now we can check for a free command block for this device.
 		 */
-		if (SCpnt) {
-			break;
-		}
-      busy:
+		for (scmnd = sdev->device_queue; scmnd; scmnd = scmnd->next)
+			if (!scmnd->request)
+				goto found;
+
+busy:
+		if (!wait)
+			goto fail;
+
 		/*
-		 * If we have been asked to wait for a free block, then
-		 * wait here.
+		 * We need to wait for a free commandblock.  We need to
+		 * insert ourselves into the list before we release the
+		 * lock.  This way if a block were released the same
+		 * microsecond that we released the lock, the call
+		 * to schedule() wouldn't block (well, it might switch,
+		 * but the current task will still be schedulable.
 		 */
-		if (wait) {
-                        DECLARE_WAITQUEUE(wait, current);
+		add_wait_queue(&sdev->scpnt_wait, &wq);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 
-                        /*
-                         * We need to wait for a free commandblock.  We need to
-                         * insert ourselves into the list before we release the
-                         * lock.  This way if a block were released the same
-                         * microsecond that we released the lock, the call
-                         * to schedule() wouldn't block (well, it might switch,
-                         * but the current task will still be schedulable.
-                         */
-                        add_wait_queue(&device->scpnt_wait, &wait);
-                        if( interruptable ) {
-                                set_current_state(TASK_INTERRUPTIBLE);
-                        } else {
-                                set_current_state(TASK_UNINTERRUPTIBLE);
-                        }
+		spin_unlock_irqrestore(&device_request_lock, flags);
+		schedule();
+		spin_lock_irqsave(&device_request_lock, flags);
 
-                        spin_unlock_irqrestore(&device_request_lock, flags);
-
-			/*
-			 * This should block until a device command block
-			 * becomes available.
-			 */
-                        schedule();
-
-			spin_lock_irqsave(&device_request_lock, flags);
-
-                        remove_wait_queue(&device->scpnt_wait, &wait);
-                        /*
-                         * FIXME - Isn't this redundant??  Someone
-                         * else will have forced the state back to running.
-                         */
-                        set_current_state(TASK_RUNNING);
-                        /*
-                         * In the event that a signal has arrived that we need
-                         * to consider, then simply return NULL.  Everyone
-                         * that calls us should be prepared for this
-                         * possibility, and pass the appropriate code back
-                         * to the user.
-                         */
-                        if( interruptable ) {
-                                if (signal_pending(current)) {
-                                        spin_unlock_irqrestore(&device_request_lock, flags);
-                                        return NULL;
-                                }
-                        }
-		} else {
-                        spin_unlock_irqrestore(&device_request_lock, flags);
-			return NULL;
-		}
+		remove_wait_queue(&sdev->scpnt_wait, &wq);
+		set_current_state(TASK_RUNNING);
 	}
 
-	SCpnt->request = NULL;
-	atomic_inc(&SCpnt->host->host_active);
-	atomic_inc(&SCpnt->device->device_active);
+found:
+	scmnd->request = NULL;
+	atomic_inc(&scmnd->host->host_active);
+	atomic_inc(&scmnd->device->device_active);
 
-	SCpnt->buffer  = NULL;
-	SCpnt->bufflen = 0;
-	SCpnt->request_buffer = NULL;
-	SCpnt->request_bufflen = 0;
+	scmnd->buffer  = NULL;
+	scmnd->bufflen = 0;
+	scmnd->request_buffer = NULL;
+	scmnd->request_bufflen = 0;
 
-	SCpnt->use_sg = 0;	/* Reset the scatter-gather flag */
-	SCpnt->old_use_sg = 0;
-	SCpnt->transfersize = 0;	/* No default transfer size */
-	SCpnt->cmd_len = 0;
+	scmnd->use_sg = 0;	/* Reset the scatter-gather flag */
+	scmnd->old_use_sg = 0;
+	scmnd->transfersize = 0;	/* No default transfer size */
+	scmnd->cmd_len = 0;
 
-	SCpnt->sc_data_direction = SCSI_DATA_UNKNOWN;
-	SCpnt->sc_request = NULL;
-	SCpnt->sc_magic = SCSI_CMND_MAGIC;
+	scmnd->sc_data_direction = SCSI_DATA_UNKNOWN;
+	scmnd->sc_request = NULL;
+	scmnd->sc_magic = SCSI_CMND_MAGIC;
 
-        SCpnt->result = 0;
-	SCpnt->underflow = 0;	/* Do not flag underflow conditions */
-	SCpnt->old_underflow = 0;
-	SCpnt->resid = 0;
-	SCpnt->state = SCSI_STATE_INITIALIZING;
-	SCpnt->owner = SCSI_OWNER_HIGHLEVEL;
+	scmnd->result = 0;
+	scmnd->underflow = 0;	/* Do not flag underflow conditions */
+	scmnd->old_underflow = 0;
+	scmnd->resid = 0;
+	scmnd->state = SCSI_STATE_INITIALIZING;
+	scmnd->owner = SCSI_OWNER_HIGHLEVEL;
 
 	spin_unlock_irqrestore(&device_request_lock, flags);
 
 	SCSI_LOG_MLQUEUE(5, printk("Activating command for device %d (%d)\n",
-				   SCpnt->target,
-				atomic_read(&SCpnt->host->host_active)));
+				scmnd->target,
+				atomic_read(&scmnd->host->host_active)));
 
-	return SCpnt;
+	return scmnd;
+
+fail:
+	spin_unlock_irqrestore(&device_request_lock, flags);
+	return NULL;
 }
 
 inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
@@ -1662,6 +1604,58 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 }
 
 /*
+ * Function:	scsi_track_queue_full()
+ *
+ * Purpose:	This function will track successive QUEUE_FULL events on a
+ * 		specific SCSI device to determine if and when there is a
+ * 		need to adjust the queue depth on the device.
+ *
+ * Arguments:	SDpnt	- SCSI Device in question
+ * 		depth	- Current number of outstanding SCSI commands on
+ * 			  this device, not counting the one returned as
+ * 			  QUEUE_FULL.
+ *
+ * Returns:	0 - No change needed
+ * 		>0 - Adjust queue depth to this new depth
+ * 		-1 - Drop back to untagged operation using host->cmd_per_lun
+ * 			as the untagged command depth
+ *
+ * Lock Status:	None held on entry
+ *
+ * Notes:	Low level drivers may call this at any time and we will do
+ * 		"The Right Thing."  We are interrupt context safe.
+ */
+int scsi_track_queue_full(Scsi_Device *SDptr, int depth)
+{
+	if((jiffies >> 4) != SDptr->last_queue_full_time) {
+		SDptr->last_queue_full_time = (jiffies >> 4);
+		if(SDptr->last_queue_full_depth == depth)
+			SDptr->last_queue_full_count++;
+		else {
+			SDptr->last_queue_full_count = 1;
+			SDptr->last_queue_full_depth = depth;
+		}
+		if(SDptr->last_queue_full_count > 10) {
+			if(SDptr->last_queue_full_depth < 8) {
+				/* Drop back to untagged */
+				scsi_adjust_queue_depth(SDptr, 0 /* untagged */,
+						SDptr->host->cmd_per_lun);
+				return -1;
+			}
+			if(SDptr->ordered_tags)
+				scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG,
+						depth);
+			else
+				scsi_adjust_queue_depth(SDptr, MSG_SIMPLE_TAG,
+						depth);
+			return depth;
+		}
+	}
+	return 0;
+}
+
+
+/*
  * scsi_strcpy_devinfo: called from scsi_dev_info_list_add to copy into
  * devinfo vendor and model strings.
  */
@@ -1961,8 +1955,8 @@ int scsi_slave_attach(struct scsi_device *sdev)
 			       " configured\n");
 			return 1;
 		}
-		if (sdev->host->hostt->slave_attach != NULL) {
-			if (sdev->host->hostt->slave_attach(sdev) != 0) {
+		if (sdev->host->hostt->slave_configure != NULL) {
+			if (sdev->host->hostt->slave_configure(sdev) != 0) {
 				printk(KERN_INFO "scsi: failed low level driver"
 				       " attach, some SCSI device might not be"
 				       " configured\n");
@@ -1989,8 +1983,6 @@ int scsi_slave_attach(struct scsi_device *sdev)
 void scsi_slave_detach(struct scsi_device *sdev)
 {
 	if (--sdev->attached == 0) {
-		if (sdev->host->hostt->slave_detach != NULL)
-			sdev->host->hostt->slave_detach(sdev);
 		scsi_release_commandblocks(sdev);
 	}
 }
@@ -2033,19 +2025,9 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	driver_register(&tpnt->scsi_driverfs_driver);
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->attach)
-				/*
-				 * XXX check result when the upper level
-				 * attach return values are fixed, and
-				 * stop attaching on failure.
-				 */
-				(*tpnt->attach) (SDpnt);
-
-		}
-	}
+	     shpnt = scsi_host_get_next(shpnt)) 
+		list_for_each_entry (SDpnt, &shpnt->my_devices, siblings)
+			(*tpnt->attach) (SDpnt);
 
 	return 0;
 }
@@ -2063,11 +2045,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->detach)
-				(*tpnt->detach) (SDpnt);
-		}
+		list_for_each_entry(SDpnt, &shpnt->my_devices, siblings)
+			(*tpnt->detach) (SDpnt);
 	}
 	/*
 	 * Extract the template from the linked list.

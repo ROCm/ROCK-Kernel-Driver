@@ -1779,7 +1779,7 @@ static void nsp_cs_config(dev_link_t *link)
 	for (host = scsi_hostlist; host != NULL; host = host->next) {
 #endif
 		if (host->hostt == &driver_template) {
-			for (dev = host->host_queue; dev != NULL; dev = dev->next) {
+	    		list_for_each_entry (dev, &host->my_devices, siblings) {
 				u_long arg[2], id;
 				kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
 				id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +

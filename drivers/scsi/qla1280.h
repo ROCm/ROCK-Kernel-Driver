@@ -1315,7 +1315,7 @@ int qla1280_abort(Scsi_Cmnd *);
 int qla1280_reset(Scsi_Cmnd *, unsigned int);
 int qla1280_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
-static int qla1280_slave_attach(Scsi_Device *);
+static int qla1280_slave_configure(Scsi_Device *);
 void qla1280_intr_handler(int, void *, struct pt_regs *);
 void qla1280_setup(char *s, int *dummy);
 
@@ -1334,7 +1334,7 @@ void qla1280_setup(char *s, int *dummy);
 /*	use_new_eh_code: 0, */					\
 	abort: qla1280_abort,					\
 	reset: qla1280_reset,					\
-	slave_attach: qla1280_slave_attach,			\
+	slave_configure: qla1280_slave_configure,		\
 	bios_param: qla1280_biosparam,				\
 	can_queue: 255,		/* max simultaneous cmds      */\
 	this_id: -1,		/* scsi id of host adapter    */\
