@@ -844,19 +844,6 @@ static void __init md_run_setup(void);
 void prepare_namespace(void)
 {
 	int is_floppy;
-	if (saved_root_name[0]) {
-		char *p = saved_root_name;
-		ROOT_DEV = name_to_dev_t(p);
-		if (strncmp(p, "/dev/", 5) == 0)
-			p += 5;
-		strcpy(root_device_name, p);
-	}
-	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (!initrd_start)
-		mount_initrd = 0;
-	real_root_dev = ROOT_DEV;
-#endif
 
 #ifdef CONFIG_DEVFS_FS
 	sys_mount("devfs", "/dev", "devfs", 0, NULL);
@@ -864,6 +851,22 @@ void prepare_namespace(void)
 #endif
 
 	md_run_setup();
+
+	if (saved_root_name[0]) {
+		char *p = saved_root_name;
+		ROOT_DEV = name_to_dev_t(p);
+		if (strncmp(p, "/dev/", 5) == 0)
+			p += 5;
+		strcpy(root_device_name, p);
+	}
+
+	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (!initrd_start)
+		mount_initrd = 0;
+	real_root_dev = ROOT_DEV;
+#endif
 
 	create_dev("/dev/root", ROOT_DEV, NULL);
 
@@ -1277,7 +1280,7 @@ __setup("md=", md_setup);
 static void __init md_run_setup(void)
 {
 #ifdef CONFIG_BLK_DEV_MD
-	create_dev("md0", MKDEV(MD_MAJOR, 0), "md/0");
+	create_dev("/dev/md0", MKDEV(MD_MAJOR, 0), "md/0");
 	if (raid_setup_args.noautodetect)
 		printk(KERN_INFO "md: Skipping autodetection of RAID arrays. (raid=noautodetect)\n");
 	else {
