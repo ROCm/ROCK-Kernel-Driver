@@ -72,7 +72,6 @@
 #include <linux/mount.h>
 #include <linux/suspend.h>
 #include <linux/writeback.h>
-#include <linux/smp_lock.h>
 
 STATIC struct quotactl_ops linvfs_qops;
 STATIC struct super_operations linvfs_sops;
@@ -279,14 +278,11 @@ xfs_blkdev_get(
 {
 	int			error = 0;
 
-	lock_kernel();
 	*bdevp = open_bdev_excl(name, 0, mp);
 	if (IS_ERR(*bdevp)) {
 		error = PTR_ERR(*bdevp);
 		printk("XFS: Invalid device [%s], error=%d\n", name, error);
 	}
-	(*bdevp)->bd_exclusive = 1;
-	unlock_kernel();
 
 	return -error;
 }
@@ -295,10 +291,8 @@ void
 xfs_blkdev_put(
 	struct block_device	*bdev)
 {
-	if (bdev) { 
-		bdev->bd_exclusive = 0;
+	if (bdev)
 		close_bdev_excl(bdev);
-	}
 }
 
 
@@ -476,7 +470,6 @@ linvfs_put_super(
 	}
 
 	vfs_deallocate(vfsp);
-	sb->s_bdev->bd_exclusive = 0;
 }
 
 STATIC void
@@ -733,15 +726,6 @@ linvfs_fill_super(
 	struct kstatfs		statvfs;
 	int			error, error2;
 
-	/* temporary hack to protect the user against data corruption */
-	lock_kernel();
-	if (sb->s_bdev->bd_exclusive) {
-		error = EBUSY; 
-		goto fail_vfsop;
-	}
-	sb->s_bdev->bd_exclusive = 1;
-	unlock_kernel();
-
 	vfsp->vfs_super = sb;
 	LINVFS_SET_VFS(sb, vfsp);
 	if (sb->s_flags & MS_RDONLY)
@@ -810,7 +794,6 @@ fail_unmount:
 fail_vfsop:
 	vfs_deallocate(vfsp);
 	kmem_free(args, sizeof(*args));
-	sb->s_bdev->bd_exclusive = 0;
 	return -error;
 }
 

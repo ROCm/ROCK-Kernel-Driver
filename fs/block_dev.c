@@ -554,18 +554,8 @@ static int do_open(struct block_device *bdev, struct file *file)
 	int ret = -ENXIO;
 	int part;
 
-	lock_kernel();
-
-	/* Special hack for XFS. It cannot tolerate someone else
-	   opening the block device it has mounted. This should
-	   be handled by bd_claim, but isn't currently. */
-	if (bdev->bd_exclusive) {
-		unlock_kernel();
-		bdput(bdev);
-		return -EBUSY;
-	}
-
 	file->f_mapping = bdev->bd_inode->i_mapping;
+	lock_kernel();
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk) {
 		unlock_kernel();
