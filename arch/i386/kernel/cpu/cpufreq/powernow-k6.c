@@ -140,6 +140,7 @@ static int powernow_k6_target (struct cpufreq_policy *policy,
 static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned int i;
+	int result;
 
 	if (policy->cpu != 0)
 		return -ENODEV;
@@ -161,7 +162,13 @@ static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = busfreq * max_multiplier;
 
-	return cpufreq_frequency_table_cpuinfo(policy, &clock_ratio[0]);
+	result = cpufreq_frequency_table_cpuinfo(policy, clock_ratio);
+	if (result)
+		return (result);
+
+	cpufreq_frequency_table_get_attr(clock_ratio, policy->cpu);
+
+	return 0;
 }
 
 
@@ -172,9 +179,14 @@ static int powernow_k6_cpu_exit(struct cpufreq_policy *policy)
 		if (i==max_multiplier)
 			powernow_k6_set_state(i);
 	}
-	return 0;
+	cpufreq_frequency_table_put_attr(policy->cpu);
+ 	return 0;
 }
 
+static struct freq_attr* powernow_k6_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver powernow_k6_driver = {
 	.verify 	= powernow_k6_verify,
@@ -183,6 +195,7 @@ static struct cpufreq_driver powernow_k6_driver = {
 	.exit		= powernow_k6_cpu_exit,
 	.name		= "powernow-k6",
 	.owner		= THIS_MODULE,
+	.attr		= powernow_k6_attr,
 };
 
 
