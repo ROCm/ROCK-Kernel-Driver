@@ -269,6 +269,7 @@ static void	DumpLong(char*, int);
 
 /* global variables *********************************************************/
 static SK_BOOL DoPrintInterfaceChange = SK_TRUE;
+extern  struct ethtool_ops SkGeEthtoolOps;
 
 /* local variables **********************************************************/
 static uintptr_t TxQueueAddr[SK_MAX_MACS][2] = {{0x680, 0x600},{0x780, 0x700}};
@@ -4956,6 +4957,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 #endif
 	dev->flags &= 		~IFF_RUNNING;
 	SET_NETDEV_DEV(dev, &pdev->dev);
+	SET_ETHTOOL_OPS(dev, &SkGeEthtoolOps);
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
@@ -5028,6 +5030,8 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		dev->do_ioctl           = &SkGeIoctl;
 		dev->change_mtu         = &SkGeChangeMtu;
 		dev->flags             &= ~IFF_RUNNING;
+		SET_NETDEV_DEV(dev, &pdev->dev);
+		SET_ETHTOOL_OPS(dev, &SkGeEthtoolOps);
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM

@@ -13,6 +13,7 @@
 obj-$(CONFIG_SK98LIN) += sk98lin.o
 sk98lin-objs    :=	\
 		skge.o		\
+		skethtool.o	\
 		skdim.o		\
 		skaddr.o	\
 		skgehwt.o	\
