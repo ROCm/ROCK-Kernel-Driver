@@ -224,9 +224,6 @@ struct usb_se401 {
 
 	wait_queue_head_t wq;	/* Processes waiting */
 
-	/* proc interface */
-	struct proc_dir_entry *proc_entry;	/* /proc/se401/videoX */
-
 	int nullpackets;
 };
 
