@@ -154,7 +154,7 @@ exit:
 }
 
 /*
- * count() counts the number of arguments/envelopes
+ * count() counts the number of strings in array ARGV.
  */
 static int count(char ** argv, int max)
 {
@@ -177,7 +177,7 @@ static int count(char ** argv, int max)
 }
 
 /*
- * 'copy_strings()' copies argument/envelope strings from user
+ * 'copy_strings()' copies argument/environment strings from user
  * memory to free pages in kernel mem. These are in a format ready
  * to be put directly into the top of new user memory.
  */
