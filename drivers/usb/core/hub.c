@@ -537,7 +537,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	dev_set_drvdata (&intf->dev, hub);
 
 	if (usb_hub_configure(hub, endpoint) >= 0) {
-		strcpy (intf->dev.name, "Hub/Port Status Changes");
+		strcpy (intf->dev.name, "Hub");
 		return 0;
 	}
 
