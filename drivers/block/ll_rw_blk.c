@@ -1467,9 +1467,6 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
 	}
 
-	if (elevator_init(q, chosen_elevator))
-		goto out_elv;
-
 	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
 	q->front_merge_fn      	= ll_front_merge_fn;
@@ -1487,8 +1484,12 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
-	return q;
-out_elv:
+	/*
+	 * all done
+	 */
+	if (!elevator_init(q, chosen_elevator))
+		return q;
+
 	blk_cleanup_queue(q);
 out_init:
 	kmem_cache_free(requestq_cachep, q);
