@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.60 $
+ *   $Revision: 1.70 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -229,7 +229,7 @@ online_show (struct device *dev, char *buf)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 
-	return sprintf(buf, cdev->online ? "yes\n" : "no\n");
+	return sprintf(buf, cdev->online ? "1\n" : "0\n");
 }
 
 void
@@ -537,8 +537,7 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	init_timer(&cdev->private->timer);
 
 	/* Set an initial name for the device. */
-	snprintf (cdev->dev.name, DEVICE_NAME_SIZE,"ccw device");
-	snprintf (cdev->dev.bus_id, DEVICE_ID_SIZE, "0:%04x",
+	snprintf (cdev->dev.bus_id, BUS_ID_SIZE, "0.0.%04x",
 		  sch->schib.pmcw.dev);
 
 	/* Increase counter of devices currently in recognition. */
@@ -679,6 +678,7 @@ ccw_device_probe_console(void)
 		console_cdev_in_use = 0;
 		return ERR_PTR(ret);
 	}
+	console_cdev.online = 1;
 	return &console_cdev;
 }
 #endif
@@ -702,10 +702,12 @@ get_ccwdev_by_busid(struct ccw_driver *cdrv, const char *bus_id)
 	list_for_each_entry(d, &drv->devices, driver_list) {
 		dev = get_device(d);
 
-		if (dev && !strncmp(bus_id, dev->bus_id, DEVICE_ID_SIZE))
+		if (dev && !strncmp(bus_id, dev->bus_id, BUS_ID_SIZE))
 			break;
-		else
+		else if (dev) {
 			put_device(dev);
+			dev = NULL;
+		}
 	}
 	up_read(&drv->bus->subsys.rwsem);
 	put_driver(drv);

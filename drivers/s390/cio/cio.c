@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.100 $
+ *   $Revision: 1.105 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -277,11 +277,6 @@ cio_halt(struct subchannel *sch)
 	if (!sch)
 		return -ENODEV;
 
-	/*
-	 * we ignore the halt_io() request if ending_status was received but
-	 *  a SENSE operation is waiting for completion.
-	 */
-
 	sprintf (dbf_txt, "haltIO%x", sch->irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
 
@@ -316,10 +311,6 @@ cio_clear(struct subchannel *sch)
 
 	if (!sch)
 		return -ENODEV;
-	/*
-	 * we ignore the clear_io() request if ending_status was received but
-	 *  a SENSE operation is waiting for completion.
-	 */
 
 	sprintf (dbf_txt, "clearIO%x", sch->irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
@@ -380,7 +371,7 @@ cio_cancel (struct subchannel *sch)
 }
 
 /*
- * Function: cio_cancel
+ * Function: cio_modify
  * Issues a "Modify Subchannel" on the specified subchannel
  */
 static int
@@ -469,11 +460,6 @@ cio_disable_subchannel (struct subchannel *sch)
 	sprintf (dbf_txt, "dissch%x", sch->irq);
 	CIO_TRACE_EVENT (2, dbf_txt);
 
-	/*
-	 * If device isn't operational we have to perform delayed
-	 *  disabling when the next interrupt occurs - unless the
-	 *  irq is re-requested prior to the interrupt to occur.
-	 */
 	ccode = stsch (sch->irq, &sch->schib);
 	if (ccode == 3)		/* Not operational. */
 		return -ENODEV;

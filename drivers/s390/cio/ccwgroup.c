@@ -1,11 +1,12 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.7 $
+ *   $Revision: 1.15 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
  *    Author(s): Arnd Bergmann (arndb@de.ibm.com)
+ *               Cornelia Huck (cohuck@de.ibm.com)
  */
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -14,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
+#include <linux/dcache.h>
 
 #include <asm/semaphore.h>
 #include <asm/ccwdev.h>
@@ -56,6 +58,45 @@ static struct bus_type ccwgroup_bus_type = {
 	.hotplug = ccwgroup_hotplug,
 };
 
+static inline void
+__ccwgroup_remove_symlinks(struct ccwgroup_device *gdev)
+{
+	int i;
+	char str[8];
+
+	for (i = 0; i < gdev->count; i++) {
+		sprintf(str, "cdev%d", i);
+		sysfs_remove_link(&gdev->dev.kobj, str);
+		/* Hack: Make sure we act on still valid subdirs. */
+		if (atomic_read(&gdev->cdev[i]->dev.kobj.dentry->d_count))
+			sysfs_remove_link(&gdev->cdev[i]->dev.kobj,
+					  "group_device");
+	}
+	
+}
+
+/*
+ * Provide an 'ungroup' attribute so the user can remove group devices no
+ * longer needed or accidentially created. Saves memory :)
+ */
+static ssize_t
+ccwgroup_ungroup_store(struct device *dev, const char *buf, size_t count)
+{
+	struct ccwgroup_device *gdev;
+
+	gdev = to_ccwgroupdev(dev);
+
+	if (gdev->state != CCWGROUP_OFFLINE)
+		return -EINVAL;
+
+	__ccwgroup_remove_symlinks(gdev);
+	device_unregister(dev);
+
+	return count;
+}
+
+static DEVICE_ATTR(ungroup, 0200, NULL, ccwgroup_ungroup_store);
+
 static void
 ccwgroup_release (struct device *dev)
 {
@@ -67,6 +108,40 @@ ccwgroup_release (struct device *dev)
 	for (i = 0; i < gdev->count; i++)
 		put_device(&gdev->cdev[i]->dev);
 	kfree(gdev);
+}
+
+static inline int
+__ccwgroup_create_symlinks(struct ccwgroup_device *gdev)
+{
+	char str[8];
+	int i, rc;
+
+	for (i = 0; i < gdev->count; i++) {
+		rc = sysfs_create_link(&gdev->cdev[i]->dev.kobj, &gdev->dev.kobj,
+				       "group_device");
+		if (rc) {
+			for (--i; i >= 0; i--)
+				sysfs_remove_link(&gdev->cdev[i]->dev.kobj,
+						  "group_device");
+			return rc;
+		}
+	}
+	for (i = 0; i < gdev->count; i++) {
+		sprintf(str, "cdev%d", i);
+		rc = sysfs_create_link(&gdev->dev.kobj, &gdev->cdev[i]->dev.kobj,
+				       str);
+		if (rc) {
+			for (--i; i >= 0; i--) {
+				sprintf(str, "cdev%d", i);
+				sysfs_remove_link(&gdev->dev.kobj, str);
+			}
+			for (i = 0; i < gdev->count; i++)
+				sysfs_remove_link(&gdev->cdev[i]->dev.kobj,
+						  "group_device");
+			return rc;
+		}
+	}
+	return 0;
 }
 
 /*
@@ -82,6 +157,7 @@ ccwgroup_create(struct device *root,
 {
 	struct ccwgroup_device *gdev;
 	int i;
+	int rc;
 
 	if (argc > 256) /* disallow dumb users */
 		return -EINVAL;
@@ -90,6 +166,8 @@ ccwgroup_create(struct device *root,
 	if (!gdev)
 		return -ENOMEM;
 
+	memset(gdev, 0, sizeof(*gdev) + argc*sizeof(gdev->cdev[0]));
+
 	for (i = 0; i < argc; i++) {
 		gdev->cdev[i] = get_ccwdev_by_busid(cdrv, argv[i]);
 
@@ -97,8 +175,10 @@ ccwgroup_create(struct device *root,
 		 * order to be grouped */
 		if (!gdev->cdev[i]
 		    || gdev->cdev[i]->id.driver_info !=
-		       gdev->cdev[0]->id.driver_info)
+		    gdev->cdev[0]->id.driver_info) {
+			rc = -EINVAL;
 			goto error;
+		}
 	}
 
 	*gdev = (struct ccwgroup_device) {
@@ -114,9 +194,24 @@ ccwgroup_create(struct device *root,
 	snprintf (gdev->dev.bus_id, BUS_ID_SIZE, "%s",
 			gdev->cdev[0]->dev.bus_id);
 
-	/* TODO: make symlinks for sysfs */
-	return device_register(&gdev->dev);
+	rc = device_register(&gdev->dev);
+	
+	if (rc)
+		goto error;
 
+	rc = device_create_file(&gdev->dev, &dev_attr_ungroup);
+
+	if (rc) {
+		device_unregister(&gdev->dev);
+		goto error;
+	}
+
+	rc = __ccwgroup_create_symlinks(gdev);
+	if (!rc)
+		return 0;
+
+	device_remove_file(&gdev->dev, &dev_attr_ungroup);
+	device_unregister(&gdev->dev);
 error:
 	for (i = 0; i < argc; i++)
 		if (gdev->cdev[i])
@@ -124,7 +219,7 @@ error:
 
 	kfree(gdev);
 
-	return -EINVAL;
+	return rc;
 }
 
 static int __init
@@ -213,7 +308,7 @@ ccwgroup_online_show (struct device *dev, char *buf)
 
 	online = (to_ccwgroupdev(dev)->state == CCWGROUP_ONLINE);
 
-	return sprintf(buf, online ? "yes\n" : "no\n");
+	return sprintf(buf, online ? "1\n" : "0\n");
 }
 
 static DEVICE_ATTR(online, 0644, ccwgroup_online_show, ccwgroup_online_store);
@@ -286,9 +381,59 @@ ccwgroup_probe_ccwdev(struct ccw_device *cdev)
 	return 0;
 }
 
+static inline struct ccwgroup_device *
+__ccwgroup_get_gdev_by_cdev(struct ccw_device *cdev)
+{
+	struct ccwgroup_device *gdev;
+	struct list_head *entry;
+	struct device *dev;
+	int i, found;
+
+	/*
+	 * Find groupdevice cdev belongs to.
+	 * Unfortunately, we can't use bus_for_each_dev() because of the
+	 * semaphore (and return value of fn() is int).
+	 */
+	if (!get_bus(&ccwgroup_bus_type))
+		return NULL;
+
+	gdev = NULL;
+	down_read(&ccwgroup_bus_type.subsys.rwsem);
+
+	list_for_each(entry, &ccwgroup_bus_type.devices.list) {
+		dev = get_device(container_of(entry, struct device, bus_list));
+		found = 0;
+		if (!dev)
+			continue;
+		gdev = to_ccwgroupdev(dev);
+		for (i = 0; i < gdev->count && (!found); i++) {
+			if (gdev->cdev[i] == cdev)
+				found = 1;
+		}
+		if (found)
+			break;
+		put_device(dev);
+		gdev = NULL;
+	}
+	up_read(&ccwgroup_bus_type.subsys.rwsem);
+	put_bus(&ccwgroup_bus_type);
+
+	return gdev;
+}
+
 int
 ccwgroup_remove_ccwdev(struct ccw_device *cdev)
 {
+	struct ccwgroup_device *gdev;
+
+	/* If one of its devices is gone, the whole group is done for. */
+	gdev = __ccwgroup_get_gdev_by_cdev(cdev);
+	if (gdev) {
+		ccwgroup_set_offline(gdev);
+		__ccwgroup_remove_symlinks(gdev);
+		device_unregister(&gdev->dev);
+		put_device(&gdev->dev);
+	}
 	return 0;
 }
 
