@@ -144,7 +144,7 @@ static struct proc_dir_entry *maint_proc_entry = NULL;
 static ssize_t
 maint_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
-	diva_dbg_entry_head_t *pmsg = 0;
+	diva_dbg_entry_head_t *pmsg = NULL;
 	diva_os_spin_lock_magic_t old_irql;
 	word size;
 	char *pstr, *dli_label = "UNK";
@@ -264,13 +264,13 @@ maint_read(struct file *file, char *buf, size_t count, loff_t * off)
 
 	if (diva_os_copy_to_user(NULL, buf, pstr, str_length)) {
 		diva_os_free_tbuffer(0, str_msg);
-		file->private_data = 0;
+		file->private_data = NULL;
 		return (-EFAULT);
 	}
 	str_msg[1] += str_length;
 	if ((str_msg[0] - str_msg[1]) <= 0) {
 		diva_os_free_tbuffer(0, str_msg);
-		file->private_data = 0;
+		file->private_data = NULL;
 	}
 
 	return (str_length);
@@ -304,7 +304,7 @@ static int maint_open(struct inode *ino, struct file *filep)
 	opened++;
 	up(&opened_sem);
 
-	filep->private_data = 0;
+	filep->private_data = NULL;
 
 	return (0);
 }
@@ -313,7 +313,7 @@ static int maint_close(struct inode *ino, struct file *filep)
 {
 	if (filep->private_data) {
 		diva_os_free_tbuffer(0, filep->private_data);
-		filep->private_data = 0;
+		filep->private_data = NULL;
 	}
 
 	down(&opened_sem);
@@ -416,7 +416,7 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 {
 	char tmprev[50];
 	int ret = 0;
-	void *buffer = 0;
+	void *buffer = NULL;
 
 	do_gettimeofday(&start_time);
 	init_waitqueue_head(&msgwaitq);

@@ -102,7 +102,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
 			req.didd_notify.info.callback = (void *)didd_callback;
-			req.didd_notify.info.context = 0;
+			req.didd_notify.info.context = NULL;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff)
 				return (0);
@@ -228,7 +228,7 @@ int maint_read_write(void *buf, int count)
 			diva_os_spin_lock_magic_t old_irql;
 			word size;
 			diva_dbg_entry_head_t *pmsg;
-			byte *pbuf = 0;
+			byte *pbuf = NULL;
 			int written = 0;
 
 			if (mask < 4096) {

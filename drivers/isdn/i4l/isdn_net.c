@@ -396,8 +396,8 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 	if (p) {
 		isdn_net_local *lp = p->local;
 #ifdef CONFIG_ISDN_X25
-		struct concap_proto *cprot = lp -> netdev -> cprot;
-		struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+		struct concap_proto *cprot = lp->netdev->cprot;
+		struct concap_proto_ops *pops = cprot ? cprot->pops : NULL;
 #endif
 		switch (cmd) {
 			case ISDN_STAT_BSENT:
@@ -617,7 +617,7 @@ isdn_net_dial(void)
 						s = "dial suppressed: isdn system stopped";
 					else
 						s = "dial suppressed: dialmode `off'";
-					isdn_net_unreachable(&p->dev, 0, s);
+					isdn_net_unreachable(&p->dev, NULL, s);
 					isdn_net_hangup(&p->dev);
 					break;
 				}
@@ -645,7 +645,7 @@ isdn_net_dial(void)
 						if (time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
 							lp->dialwait_timer = jiffies + lp->dialwait;
 							lp->dialstarted = 0;
-							isdn_net_unreachable(&p->dev, 0, "dial: timed out");
+							isdn_net_unreachable(&p->dev, NULL, "dial: timed out");
 							isdn_net_hangup(&p->dev);
 							break;
 						}
@@ -675,7 +675,7 @@ isdn_net_dial(void)
 							if (lp->dialtimeout == 0) {
 								lp->dialwait_timer = jiffies + lp->dialwait;
 								lp->dialstarted = 0;
-								isdn_net_unreachable(&p->dev, 0, "dial: tried all numbers dialmax times");
+								isdn_net_unreachable(&p->dev, NULL, "dial: tried all numbers dialmax times");
 							}
 							isdn_net_hangup(&p->dev);
 							break;
@@ -827,8 +827,8 @@ isdn_net_hangup(struct net_device *d)
 	isdn_net_local *lp = (isdn_net_local *) d->priv;
 	isdn_ctrl cmd;
 #ifdef CONFIG_ISDN_X25
-	struct concap_proto *cprot = lp -> netdev -> cprot;
-	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
+	struct concap_proto *cprot = lp->netdev->cprot;
+	struct concap_proto_ops *pops = cprot ? cprot->pops : NULL;
 #endif
 
 	if (lp->flags & ISDN_NET_CONNECTED) {
@@ -1416,11 +1416,10 @@ isdn_net_ciscohdlck_alloc_skb(isdn_net_local *lp, int len)
 	struct sk_buff *skb;
 
 	skb = alloc_skb(hl + len, GFP_ATOMIC);
-	if (!skb) {
+	if (skb)
+		skb_reserve(skb, hl);
+	else 
 		printk("isdn out of mem at %s:%d!\n", __FILE__, __LINE__);
-		return 0;
-	}
-	skb_reserve(skb, hl);
 	return skb;
 }
 
@@ -2182,7 +2181,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			    *my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */
                         else
-                                my_eaz = 0; /* force non match */
+                                my_eaz = NULL; /* force non match */
                 } else { /* it's a DATA call, check if we allow it */
                         if (*my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */

@@ -959,7 +959,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			interruptible_sleep_on(&(dev->info_waitq));
 		}
 		p = isdn_statstr();
-		file->private_data = 0;
+		file->private_data = NULL;
 		if ((len = strlen(p)) <= count) {
 			if (copy_to_user(buf, p, len)) {
 				retval = -EFAULT;
@@ -992,7 +992,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			retval = -ENOMEM;
 			goto out;
 		}
-		len = isdn_readbchan(drvidx, chidx, p, 0, count,
+		len = isdn_readbchan(drvidx, chidx, p, NULL, count,
 				     &dev->drv[drvidx]->rcv_waitq[chidx]);
 		*off += len;
 		if (copy_to_user(buf,p,len)) 

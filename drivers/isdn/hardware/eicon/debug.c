@@ -89,7 +89,7 @@ static void queueInit (MSG_QUEUE *Q, byte *Buffer, dword sizeBuffer) {
 	Q->Size = sizeBuffer;
 	Q->Base = Q->Head = Q->Tail = Buffer;
 	Q->High = Buffer + sizeBuffer;
-	Q->Wrap = 0;
+	Q->Wrap = NULL;
 	Q->Count= 0;
 }
 
@@ -107,7 +107,7 @@ static byte *queueAllocMsg (MSG_QUEUE *Q, word size) {
 
 	if (Q->Tail == Q->Head) {
 		if (Q->Wrap || need > Q->Size) {
-			return(0); /* full */
+			return NULL; /* full */
 		}
 		goto alloc; /* empty */
 	}
@@ -115,7 +115,7 @@ static byte *queueAllocMsg (MSG_QUEUE *Q, word size) {
 	if (Q->Tail > Q->Head) {
 		if (Q->Tail + need <= Q->High) goto alloc; /* append */
 		if (Q->Base + need > Q->Head) {
-			return (0); /* too much */
+			return NULL; /* too much */
 		}
 		/* wraparound the queue (but not the message) */
 		Q->Wrap = Q->Tail;
@@ -124,7 +124,7 @@ static byte *queueAllocMsg (MSG_QUEUE *Q, word size) {
 	}
 
 	if (Q->Tail + need > Q->Head) {
-		return (0); /* too much */
+		return NULL; /* too much */
 	}
 
 alloc:
@@ -151,7 +151,7 @@ static void queueFreeMsg (MSG_QUEUE *Q) {
 	if (Q->Wrap) {
 		if (Q->Head >= Q->Wrap) {
 			Q->Head = Q->Base;
-			Q->Wrap = 0;
+			Q->Wrap = NULL;
 		}
 	} else if (Q->Head >= Q->Tail) {
 		Q->Head = Q->Tail = Q->Base;
@@ -167,7 +167,7 @@ static byte *queuePeekMsg (MSG_QUEUE *Q, word *size) {
 
 	if (((byte *)Msg == Q->Tail && !Q->Wrap) ||
 	    (Msg->Size & MSG_INCOMPLETE)) {
-		return (0);
+		return NULL;
 	} else {
 		*size = Msg->Size;
 		return ((byte *)(Msg + 1));
@@ -177,13 +177,13 @@ static byte *queuePeekMsg (MSG_QUEUE *Q, word *size) {
 /*
   Message queue header
   */
-static MSG_QUEUE*          dbg_queue = 0;
-static byte*               dbg_base  = 0;
-static int                 external_dbg_queue = 0;
+static MSG_QUEUE*          dbg_queue;
+static byte*               dbg_base;
+static int                 external_dbg_queue;
 static diva_os_spin_lock_t dbg_q_lock;
 static diva_os_spin_lock_t dbg_adapter_lock;
-static int                 dbg_q_busy = 0;
-static volatile dword      dbg_sequence = 0;
+static int                 dbg_q_busy;
+static volatile dword      dbg_sequence;
 static dword               start_sec;
 static dword               start_usec;
 
@@ -235,16 +235,16 @@ int diva_maint_init (byte* base, unsigned long length, int do_init) {
 
 
 	if (diva_os_initialize_spin_lock (&dbg_q_lock, "dbg_init")) {
-    dbg_queue = 0;
-    dbg_base = 0;
+    dbg_queue = NULL;
+    dbg_base = NULL;
     external_dbg_queue = 0;
 		return (-1);
   }
 
 	if (diva_os_initialize_spin_lock (&dbg_adapter_lock, "dbg_init")) {
     diva_os_destroy_spin_lock(&dbg_q_lock, "dbg_init");
-    dbg_queue = 0;
-    dbg_base = 0;
+    dbg_queue = NULL;
+    dbg_base = NULL;
     external_dbg_queue = 0;
 		return (-1);
   }
@@ -263,8 +263,8 @@ void* diva_maint_finit (void) {
   void* ret = (void*)dbg_base;
   int i;
 
-  dbg_queue = 0;
-  dbg_base  = 0;
+  dbg_queue = NULL;
+  dbg_base  = NULL;
 
   if (ret) {
     diva_os_destroy_spin_lock(&dbg_q_lock, "dbg_finit");
@@ -272,7 +272,7 @@ void* diva_maint_finit (void) {
   }
 
   if (external_dbg_queue) {
-    ret = 0;
+    ret = NULL;
   }
   external_dbg_queue = 0;
 
@@ -300,12 +300,12 @@ dword diva_dbg_q_length (void) {
   */
 diva_dbg_entry_head_t* diva_maint_get_message (word* size,
                                                diva_os_spin_lock_magic_t* old_irql) {
-  diva_dbg_entry_head_t*     pmsg = 0;
+  diva_dbg_entry_head_t*     pmsg = NULL;
 
   diva_os_enter_spin_lock_hard (&dbg_q_lock, old_irql, "read");
   if (dbg_q_busy) {
     diva_os_leave_spin_lock_hard (&dbg_q_lock, old_irql, "read_busy");
-    return (0);
+    return NULL;
   }
   dbg_q_busy = 1;
 
@@ -406,7 +406,7 @@ static void DI_register (void *arg) {
   }
 
   if (free_id != -1) {
-    diva_dbg_entry_head_t* pmsg = 0;
+    diva_dbg_entry_head_t* pmsg = NULL;
     int len;
     char tmp[256];
     word size;
@@ -476,7 +476,7 @@ static void DI_deregister (pDbgHandle hDbg) {
   dword sec, usec;
   int i;
   word size;
-  byte* pmem = 0;
+  byte* pmem = NULL;
 
   diva_os_get_time (&sec, &usec);
 
@@ -489,24 +489,24 @@ static void DI_deregister (pDbgHandle hDbg) {
       char tmp[256];
       int len;
 
-      clients[i].hDbg = 0;
+      clients[i].hDbg = NULL;
 
       hDbg->id       = -1;
       hDbg->dbgMask  = 0;
-      hDbg->dbg_end  = 0;
-      hDbg->dbg_prt  = 0;
-      hDbg->dbg_irq  = 0;
+      hDbg->dbg_end  = NULL;
+      hDbg->dbg_prt  = NULL;
+      hDbg->dbg_irq  = NULL;
       if (hDbg->Version > 0)
-        hDbg->dbg_old = 0;
+        hDbg->dbg_old = NULL;
       hDbg->Registered = 0;
-      hDbg->next     = 0;
+      hDbg->next     = NULL;
 
       if (clients[i].pIdiLib) {
         (*(clients[i].pIdiLib->DivaSTraceLibraryFinit))(clients[i].pIdiLib->hLib);
-        clients[i].pIdiLib = 0;
+        clients[i].pIdiLib = NULL;
 
         pmem = clients[i].pmem;
-        clients[i].pmem = 0;
+        clients[i].pmem = NULL;
       }
 
       /*
@@ -565,7 +565,7 @@ static void DI_format (int do_lock,
                        va_list ap) {
   diva_os_spin_lock_magic_t old_irql;
   dword sec, usec;
-  diva_dbg_entry_head_t* pmsg = 0;
+  diva_dbg_entry_head_t* pmsg = NULL;
   dword length;
   word size;
   static char fmtBuf[MSG_FRAME_MAX_SIZE+sizeof(*pmsg)+1];
@@ -843,7 +843,7 @@ void diva_mnt_add_xdi_adapter (const DESCRIPTOR* d) {
   dword sec, usec, logical, serial, org_mask;
   int id, best_id = 0, free_id = -1;
   char tmp[256];
-  diva_dbg_entry_head_t* pmsg = 0;
+  diva_dbg_entry_head_t* pmsg = NULL;
   int len;
   word size;
   byte* pmem;
@@ -938,7 +938,7 @@ void diva_mnt_add_xdi_adapter (const DESCRIPTOR* d) {
       if (((*(clients[id].pIdiLib->DivaSTraceLibraryStart))(clients[id].pIdiLib->hLib))) {
         diva_mnt_internal_dprintf (0, DLI_ERR, "Adapter(%d) Start failed", (int)logical);
         (*(clients[id].pIdiLib->DivaSTraceLibraryFinit))(clients[id].pIdiLib->hLib);
-        clients[id].pIdiLib = 0;
+        clients[id].pIdiLib = NULL;
       }
     } else {
       diva_mnt_internal_dprintf (0, DLI_ERR, "A(%d) management init failed", (int)logical);
@@ -946,9 +946,9 @@ void diva_mnt_add_xdi_adapter (const DESCRIPTOR* d) {
   }
 
   if (!clients[id].pIdiLib) {
-    clients[id].request = 0;
+    clients[id].request = NULL;
     clients[id].request_pending = 0;
-    clients[id].hDbg    = 0;
+    clients[id].hDbg    = NULL;
     diva_os_leave_spin_lock_hard (&dbg_q_lock, &old_irql, "register");
     diva_os_leave_spin_lock_hard (&dbg_adapter_lock, &old_irql1, "register");
     diva_os_free (0, pmem);
@@ -1008,7 +1008,7 @@ void diva_mnt_remove_xdi_adapter (const DESCRIPTOR* d) {
   dword sec, usec;
   int i;
   word size;
-  byte* pmem = 0;
+  byte* pmem = NULL;
 
   diva_os_get_time (&sec, &usec);
 
@@ -1023,14 +1023,14 @@ void diva_mnt_remove_xdi_adapter (const DESCRIPTOR* d) {
 
       if (clients[i].pIdiLib) {
         (*(clients[i].pIdiLib->DivaSTraceLibraryFinit))(clients[i].pIdiLib->hLib);
-        clients[i].pIdiLib = 0;
+        clients[i].pIdiLib = NULL;
 
         pmem = clients[i].pmem;
-        clients[i].pmem = 0;
+        clients[i].pmem = NULL;
       }
 
-      clients[i].hDbg    = 0;
-      clients[i].request = 0;
+      clients[i].hDbg    = NULL;
+      clients[i].request = NULL;
       clients[i].request_pending = 0;
 
       /*
@@ -1092,7 +1092,7 @@ void* SuperTraceOpenAdapter   (int AdapterNumber) {
     }
   }
 
-  return (0);
+  return NULL;
 }
 
 int SuperTraceCloseAdapter  (void* AdapterHandle) {
@@ -1741,7 +1741,7 @@ int diva_mnt_shutdown_xdi_adapters (void) {
 
 
   for (i = 1; i < (sizeof(clients)/sizeof(clients[0])); i++) {
-    pmem = 0;
+    pmem = NULL;
 
     diva_os_enter_spin_lock_hard (&dbg_adapter_lock, &old_irql1, "unload");
     diva_os_enter_spin_lock_hard (&dbg_q_lock, &old_irql, "unload");
@@ -1753,13 +1753,13 @@ int diva_mnt_shutdown_xdi_adapters (void) {
           */
         if (clients[i].pIdiLib) {
           (*(clients[i].pIdiLib->DivaSTraceLibraryFinit))(clients[i].pIdiLib->hLib);
-          clients[i].pIdiLib = 0;
+          clients[i].pIdiLib = NULL;
 
           pmem = clients[i].pmem;
-          clients[i].pmem = 0;
+          clients[i].pmem = NULL;
         }
-        clients[i].hDbg    = 0;
-        clients[i].request = 0;
+        clients[i].hDbg    = NULL;
+        clients[i].request = NULL;
         clients[i].request_pending = 0;
       } else {
         fret = -1;

@@ -1586,7 +1586,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cards[i].protocol = protocol;
 	sprintf(id, "%s%d", name, i);
 	nrcards++;
-	retval = checkcard(i, id, 0, hisax_d_if->owner);
+	retval = checkcard(i, id, NULL, hisax_d_if->owner);
 	if (retval == 0) { // yuck
 		cards[i].typ = 0;
 		nrcards--;

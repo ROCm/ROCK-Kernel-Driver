@@ -414,7 +414,7 @@ word api_put(APPL   * appl, CAPI_MSG   * msg)
   }
   
   a = &adapter[controller];
-  plci = 0;
+  plci = NULL;
   if ((msg->header.plci != 0) && (msg->header.plci <= a->max_plci) && !a->adapter_disabled)
   {
     dbug(1,dprintf("plci=%x",msg->header.plci));
@@ -547,7 +547,7 @@ word api_put(APPL   * appl, CAPI_MSG   * msg)
     }
     else
     {
-      plci = 0;
+      plci = NULL;
     }
   }
   dbug(1,dprintf("com=%x",msg->header.command));
@@ -629,7 +629,7 @@ word api_parse(byte   * msg, word length, byte * format, API_PARSE * parms)
 
     if(p>length) return TRUE;
   }
-  if(parms) parms[i].info = 0;
+  if(parms) parms[i].info = NULL;
   return FALSE;
 }
 
@@ -661,7 +661,7 @@ void api_save_msg(API_PARSE   *in, byte *format, API_SAVE   *out)
     for (j = 0; j < n; j++)
       *(p++) = in[i].info[j];
   }
-  out->parms[i].info = 0;
+  out->parms[i].info = NULL;
   out->parms[i].length = 0;
 }
 
@@ -725,7 +725,7 @@ void init_internal_command_queue (PLCI   *plci)
 
   plci->internal_command = 0;
   for (i = 0; i < MAX_INTERNAL_COMMAND_LEVELS; i++)
-    plci->internal_command_queue[i] = 0;
+    plci->internal_command_queue[i] = NULL;
 }
 
 
@@ -759,16 +759,16 @@ void next_internal_command (dword Id, PLCI   *plci)
     UnMapId (Id), (char   *)(FILE_), __LINE__));
 
   plci->internal_command = 0;
-  plci->internal_command_queue[0] = 0;
+  plci->internal_command_queue[0] = NULL;
   while (plci->internal_command_queue[1] != 0)
   {
     for (i = 0; i < MAX_INTERNAL_COMMAND_LEVELS - 1; i++)
       plci->internal_command_queue[i] = plci->internal_command_queue[i+1];
-    plci->internal_command_queue[MAX_INTERNAL_COMMAND_LEVELS - 1] = 0;
+    plci->internal_command_queue[MAX_INTERNAL_COMMAND_LEVELS - 1] = NULL;
     (*(plci->internal_command_queue[0]))(Id, plci, OK);
     if (plci->internal_command != 0)
       return;
-    plci->internal_command_queue[0] = 0;
+    plci->internal_command_queue[0] = NULL;
   }
 }
 
@@ -1085,7 +1085,7 @@ void plci_remove(PLCI   * plci)
   plci_free_msg_in_queue (plci);
 
   plci->channels = 0;
-  plci->appl = 0;
+  plci->appl = NULL;
   if ((plci->State == INC_CON_PENDING) || (plci->State == INC_CON_ALERT))
     plci->State = OUTG_DIS_PENDING;
 }
@@ -1715,7 +1715,7 @@ byte info_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plci, APP
 {
   word i;
   API_PARSE * ai;
-  PLCI   * rc_plci = 0;
+  PLCI   * rc_plci = NULL;
     API_PARSE ai_parms[5];
   word Info = 0;
 
@@ -2195,7 +2195,7 @@ byte facility_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * plci,
               relatedadapter = &adapter[MapController ((byte)(relatedPLCIvalue & 0x7f))-1];
               relatedPLCIvalue >>=8;
               /* find PLCI PTR*/
-              for(i=0,rplci=0;i<relatedadapter->max_plci;i++)
+              for(i=0,rplci=NULL;i<relatedadapter->max_plci;i++)
               {
                 if(relatedadapter->plci[i].Id == (byte)relatedPLCIvalue)
                 {
@@ -4355,7 +4355,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
         if(rc!=OK)
         {
           Info = 0x300E; /* not supported */
-          plci->relatedPTYPLCI = 0;
+          plci->relatedPTYPLCI = NULL;
           plci->ptyState = 0;
         }
         sendf(rplci->appl,
@@ -4376,7 +4376,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
         if(rc!=OK)
         {
           Info = 0x300E; /* not supported */
-          plci->relatedPTYPLCI = 0;
+          plci->relatedPTYPLCI = NULL;
           plci->ptyState = 0;
         }
         sendf(rplci->appl,
@@ -4560,7 +4560,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
         if(rc!=OK)
         {
           Info = 0x300E; /* not supported */
-          plci->relatedPTYPLCI = 0;
+          plci->relatedPTYPLCI = NULL;
           plci->ptyState = 0;
         }
         sendf(rplci->appl,
@@ -4722,7 +4722,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
           dbug(1,dprintf("Auto-Law assign failed"));
           a->automatic_law = 3;
           plci->internal_command = 0;
-          a->automatic_lawPLCI = 0;
+          a->automatic_lawPLCI = NULL;
         }
         break;
       }
@@ -4739,7 +4739,7 @@ void control_rc(PLCI   * plci, byte req, byte rc, byte ch, byte global_req, byte
         plci->internal_command = 0;
         sig_req(plci,REMOVE,0);
         send_req(plci);
-        a->automatic_lawPLCI = 0;
+        a->automatic_lawPLCI = NULL;
       }
       break;
     }
@@ -4839,7 +4839,7 @@ void sig_ind(PLCI   * plci)
     byte   *esc_profile = "";
 
     byte facility[256];
-  PLCI   * tplci = 0;
+  PLCI   * tplci = NULL;
   byte chi[] = "\x02\x18\x01";
   byte voice_cai[]  = "\x06\x14\x00\x00\x00\x00\x08";
     byte resume_cau[] = "\x05\x05\x00\x02\x00\x00";
@@ -4981,7 +4981,7 @@ void sig_ind(PLCI   * plci)
         plci->internal_command = 0;
         sig_req(plci,REMOVE,0);
         send_req(plci);
-        a->automatic_lawPLCI = 0;
+        a->automatic_lawPLCI = NULL;
       }
     }
     if (esc_profile[0])
@@ -5073,7 +5073,7 @@ void sig_ind(PLCI   * plci)
   {
     force_mt_info =  SendMultiIE(plci,Id,multi_fac_parms, FTY, 0x20, 0);
     force_mt_info |= SendMultiIE(plci,Id,multi_pi_parms, PI, 0x210, 0);
-    SendSSExtInd(0,plci,Id,multi_ssext_parms);
+    SendSSExtInd(NULL,plci,Id,multi_ssext_parms);
     SendInfo(plci,Id, parms, force_mt_info);
 
     VSwitchReqInd(plci,Id,multi_vswitch_parms);
@@ -5144,7 +5144,7 @@ void sig_ind(PLCI   * plci)
       {
         WRITE_WORD(&SS_Ind[4],0x300E);
       }
-      plci->relatedPTYPLCI = 0;
+      plci->relatedPTYPLCI = NULL;
       plci->ptyState = 0;
       sendf(tplci->appl,_FACILITY_I,rId,0,"ws",3, SS_Ind);
       break;
@@ -5298,7 +5298,7 @@ void sig_ind(PLCI   * plci)
           break;
       case CONF_ADD:
           WRITE_WORD(&CONF_Ind[1],S_CONF_ADD);
-          plci->relatedPTYPLCI = 0;
+          plci->relatedPTYPLCI = NULL;
           tplci=plci->relatedPTYPLCI;
           if(tplci) tplci->ptyState = CONNECTED;
           plci->ptyState = CONNECTED;
@@ -5342,7 +5342,7 @@ void sig_ind(PLCI   * plci)
         {
 
         plci->ptyState = IDLE;
-        plci->relatedPTYPLCI = 0;
+        plci->relatedPTYPLCI = NULL;
         plci->ptyState = 0;
 
         }
@@ -5364,7 +5364,7 @@ void sig_ind(PLCI   * plci)
 
         case S_3PTY_END:
           plci->ptyState = IDLE;
-          plci->relatedPTYPLCI = 0;
+          plci->relatedPTYPLCI = NULL;
           plci->ptyState = 0;
           dbug(1,dprintf("3PTY OFF"));
           break;
@@ -5904,7 +5904,7 @@ void sig_ind(PLCI   * plci)
           /* and signal '+'.Appl must decide */
           /* with connect_res if call must   */
           /* accepted or not                 */
-          for(i=0, tplci=0;i<max_appl;i++){
+          for(i=0, tplci=NULL;i<max_appl;i++){
             if(a->codec_listen[i]
             && (a->codec_listen[i]->State==INC_CON_PENDING
               ||a->codec_listen[i]->State==INC_CON_ALERT) ){
@@ -5927,7 +5927,7 @@ void sig_ind(PLCI   * plci)
               add_p(tplci, CAI, voice_cai);
               add_p(tplci, OAD, a->TelOAD);
               add_p(tplci, OSA, a->TelOSA);
-              add_p(tplci,SHIFT|6,0);
+              add_p(tplci,SHIFT|6,NULL);
               add_p(tplci,SIN,"\x02\x01\x00");
               add_p(tplci,UID,"\x06\x43\x61\x70\x69\x32\x30");
               sig_req(tplci,ASSIGN,DSIG_ID);
@@ -6080,7 +6080,7 @@ void sig_ind(PLCI   * plci)
     break;
 
   case SSEXT_IND:
-    SendSSExtInd(0,plci,Id,multi_ssext_parms);
+    SendSSExtInd(NULL,plci,Id,multi_ssext_parms);
     break;
 
   case VSWITCH_REQ:
@@ -6218,7 +6218,7 @@ void SendInfo(PLCI   * plci, dword Id, byte   * * parms, byte iesent)
         Info_Number = 0x0008;
         Info_Mask = 0x00;
         cause[2] = ie[2];
-        Info_Element = 0;
+        Info_Element = NULL;
         break;
       case 8:  /* display      */
         dbug(1,dprintf("display(%d)",i));
@@ -7273,8 +7273,8 @@ word get_plci(DIVA_CAPI_ADAPTER   * a)
   plci->sig_req = 0;
   plci->nl_req = 0;
 
-  plci->appl = 0;
-  plci->relatedPTYPLCI = 0;
+  plci->appl = NULL;
+  plci->relatedPTYPLCI = NULL;
   plci->State = IDLE;
   plci->SuppState = IDLE;
   plci->channels = 0;
@@ -8899,7 +8899,7 @@ void listen_check(DIVA_CAPI_ADAPTER   * a)
         add_p(plci,CAI,"\x01\xc0");
         add_p(plci,UID,"\x06\x43\x61\x70\x69\x32\x30");
         add_p(plci,LLI,"\x01\xc4");                  /* support Dummy CR FAC + MWI + SpoofNotify */       
-        add_p(plci,SHIFT|6,0);
+        add_p(plci,SHIFT|6,NULL);
         add_p(plci,SIN,"\x02\x00\x00");
         plci->internal_command = LISTEN_SIG_ASSIGN_PEND;     /* do indicate_req if OK  */
         sig_req(plci,ASSIGN,DSIG_ID);
@@ -9216,10 +9216,10 @@ void CodecIdCheck(DIVA_CAPI_ADAPTER   *a, PLCI   *plci)
       dbug(1,dprintf("remove temp codec PLCI"));
       plci_remove(a->AdvCodecPLCI);
       a->AdvCodecFLAG  = 0;
-      a->AdvCodecPLCI  = 0;
-      a->AdvSignalAppl = 0;
+      a->AdvCodecPLCI  = NULL;
+      a->AdvSignalAppl = NULL;
     }
-    a->AdvSignalPLCI = 0;
+    a->AdvSignalPLCI = NULL;
   }
 }
 
@@ -9351,7 +9351,7 @@ word CapiRelease(word Id)
       a->Info_Mask[Id-1] = 0;
       a->CIP_Mask[Id-1] = 0;
       a->Notification_Mask[Id-1] = 0;
-      a->codec_listen[Id-1] = 0;
+      a->codec_listen[Id-1] = NULL;
       a->requested_options_table[Id-1] = 0;
       for(j=0; j<a->max_plci; j++)           /* and all PLCIs connected */
       {                                      /* with this application   */
@@ -9386,7 +9386,7 @@ word CapiRelease(word Id)
           }
           if(plci->appl==this)
           {
-            plci->appl = 0;
+            plci->appl = NULL;
             plci_remove(plci);
             plci->State = IDLE;
           }
@@ -9405,7 +9405,7 @@ word CapiRelease(word Id)
             add_p(plci,OAD,"\x01\xfd");
             add_p(plci,CAI,"\x01\x80");
             add_p(plci,UID,"\x06\x43\x61\x70\x69\x32\x30");
-            add_p(plci,SHIFT|6,0);
+            add_p(plci,SHIFT|6,NULL);
             add_p(plci,SIN,"\x02\x00\x00");
             plci->internal_command = REM_L1_SIG_ASSIGN_PEND;
             sig_req(plci,ASSIGN,DSIG_ID);
@@ -9424,10 +9424,10 @@ word CapiRelease(word Id)
           a->AdvCodecPLCI->tel = 0;
           a->AdvCodecPLCI->adv_nl = 0;
         }
-        a->AdvSignalAppl = 0;
-        a->AdvSignalPLCI = 0;
+        a->AdvSignalAppl = NULL;
+        a->AdvSignalPLCI = NULL;
         a->AdvCodecFLAG = 0;
-        a->AdvCodecPLCI = 0;
+        a->AdvCodecPLCI = NULL;
       }
     }
   }
@@ -9458,7 +9458,7 @@ static word plci_remove_check(PLCI   *plci)
         plci->Id = 0;
         plci->State = IDLE;
         plci->channels = 0;
-        plci->appl = 0;
+        plci->appl = NULL;
         plci->notifiedcall = 0;
       }
       listen_check(plci->adapter);
@@ -10265,8 +10265,8 @@ static word dtmf_parameter_restore_config (dword Id, PLCI   *plci, byte Rc)
 /*------------------------------------------------------------------*/
 
 
-LI_CONFIG   *li_config_table = 0;
-word li_total_channels = 0;
+LI_CONFIG   *li_config_table;
+word li_total_channels;
 
 
 /*------------------------------------------------------------------*/
@@ -14948,7 +14948,7 @@ word CapiRegister(word id)
             add_p(plci,OAD,"\x01\xfd");
             add_p(plci,CAI,"\x01\x80");
             add_p(plci,UID,"\x06\x43\x61\x70\x69\x32\x30");
-            add_p(plci,SHIFT|6,0);
+            add_p(plci,SHIFT|6,NULL);
             add_p(plci,SIN,"\x02\x00\x00");
             plci->internal_command = START_L1_SIG_ASSIGN_PEND;
             sig_req(plci,ASSIGN,DSIG_ID);
@@ -15068,7 +15068,7 @@ static int diva_get_dma_descriptor (PLCI   *plci, dword   *dma_magic) {
 
   pReq->xdi_dma_descriptor_operation.info.operation =     IDI_SYNC_REQ_DMA_DESCRIPTOR_ALLOC;
   pReq->xdi_dma_descriptor_operation.info.descriptor_number  = -1;
-  pReq->xdi_dma_descriptor_operation.info.descriptor_address = 0;
+  pReq->xdi_dma_descriptor_operation.info.descriptor_address = NULL;
   pReq->xdi_dma_descriptor_operation.info.descriptor_magic   = 0;
 
   e.user[0] = plci->adapter->Id - 1;
@@ -15102,7 +15102,7 @@ static void diva_free_dma_descriptor (PLCI   *plci, int nr) {
 
   pReq->xdi_dma_descriptor_operation.info.operation =                                                IDI_SYNC_REQ_DMA_DESCRIPTOR_FREE;
   pReq->xdi_dma_descriptor_operation.info.descriptor_number  = nr;
-  pReq->xdi_dma_descriptor_operation.info.descriptor_address = 0;
+  pReq->xdi_dma_descriptor_operation.info.descriptor_address = NULL;
   pReq->xdi_dma_descriptor_operation.info.descriptor_magic   = 0;
 
   e.user[0] = plci->adapter->Id - 1;

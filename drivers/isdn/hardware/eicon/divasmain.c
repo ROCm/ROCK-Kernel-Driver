@@ -556,7 +556,7 @@ void diva_os_remove_soft_isr(diva_os_soft_isr_t * psoft_isr)
 		tasklet_kill(&pdpc->divas_task);
 		flush_scheduled_work();
 		mem = psoft_isr->object;
-		psoft_isr->object = 0;
+		psoft_isr->object = NULL;
 		diva_os_free(0, mem);
 	}
 }
@@ -703,7 +703,7 @@ static int DIVA_INIT_FUNCTION divas_register_chrdev(void)
 static int __devinit divas_init_one(struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
 {
-	void *pdiva = 0;
+	void *pdiva = NULL;
 	u8 pci_latency;
 	u8 new_latency = 32;
 

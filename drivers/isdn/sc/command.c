@@ -215,7 +215,7 @@ int startproc(int card)
        	status = sendmessage(card, CMPID,cmReqType2,
 			  cmReqClass0,
 			  cmReqStartProc,
-			  0,0,0);
+			  0,0,NULL);
 	pr_debug("%s: Sent startProc\n", sc_adapter[card]->devicename);
 	
 	return status;

@@ -152,7 +152,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the switch type from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, 
-			ceReqCallGetSwitchType, 0, 0, 0, rcvmsg, SAR_TIMEOUT);
+			ceReqCallGetSwitchType, 0, 0, NULL, rcvmsg, SAR_TIMEOUT);
 		if (!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCGETSWITCH: command successful\n",
 					sc_adapter[card]->devicename);
@@ -193,7 +193,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the spid from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, ceReqCallGetSPID,
-					data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
+					data->channel, 0, NULL, rcvmsg, SAR_TIMEOUT);
 		if (!status) {
 			pr_debug("%s: SCIOCGETSPID: command successful\n",
 					sc_adapter[card]->devicename);
@@ -269,7 +269,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the dn from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, ceReqCallGetMyNumber,
-					data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
+					data->channel, 0, NULL, rcvmsg, SAR_TIMEOUT);
 		if (!status) {
 			pr_debug("%s: SCIOCGETDN: command successful\n",
 					sc_adapter[card]->devicename);
@@ -385,7 +385,7 @@ int sc_ioctl(int card, scs_ioctl *data)
 		 * Get the speed from the board
 		 */
 		status = send_and_receive(card, CEPID, ceReqTypeCall, ceReqClass0, 
-			ceReqCallGetCallType, data->channel, 0, 0, rcvmsg, SAR_TIMEOUT);
+			ceReqCallGetCallType, data->channel, 0, NULL, rcvmsg, SAR_TIMEOUT);
 		if (!status && !(rcvmsg->rsp_status)) {
 			pr_debug("%s: SCIOCGETSPEED: command successful\n",
 				sc_adapter[card]->devicename);

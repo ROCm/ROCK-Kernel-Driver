@@ -112,7 +112,7 @@ diva_strace_library_interface_t* DivaSTraceLibraryCreateInstance (int Adapter,
 	int i;
 
 	if (!pLib) {
-		return (0);
+		return NULL;
 	}
 
   pmem += sizeof(*pLib);
@@ -161,7 +161,7 @@ diva_strace_library_interface_t* DivaSTraceLibraryCreateInstance (int Adapter,
 
 	if (!(pLib->hAdapter = SuperTraceOpenAdapter (Adapter))) {
     diva_mnt_internal_dprintf (0, DLI_ERR, "Can not open XDI adapter");
-		return (0);
+		return NULL;
 	}
 	pLib->Channels = SuperTraceGetNumberOfChannels (pLib->hAdapter);
 
@@ -1170,13 +1170,13 @@ static diva_man_var_header_t* get_next_var (diva_man_var_header_t* pVar) {
 	byte* start;
 	int msg_length;
 
-	if (*msg != ESC) return (0);
+	if (*msg != ESC) return NULL;
 
 	start = msg + 2;
 	msg_length = *(msg+1);
 	msg = (start+msg_length);
 
-	if (*msg != ESC) return (0);
+	if (*msg != ESC) return NULL;
 
 	return ((diva_man_var_header_t*)msg);
 }
