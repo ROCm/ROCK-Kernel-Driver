@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.43 2003/09/22 08:57:31 schindler Exp $
+/* $Id: divasmain.c,v 1.46 2003/10/10 12:28:14 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -41,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.43 $";
+static char *main_revision = "$Revision: 1.46 $";
 
 static int major;
 
@@ -69,7 +69,7 @@ extern int divasfunc_init(int dbgmask);
 extern void divasfunc_exit(void);
 
 typedef struct _diva_os_thread_dpc {
-	struct tasklet_struct divas_task;
+	struct work_struct divas_task;
 	struct work_struct trap_script_task;
 	diva_os_soft_isr_t *psoft_isr;
 	int card_failed;
@@ -552,7 +552,7 @@ void diva_os_remove_irq(void *context, byte irq)
 /* --------------------------------------------------------------------------
     DPC framework implementation
    -------------------------------------------------------------------------- */
-static void diva_os_dpc_proc(unsigned long context)
+static void diva_os_dpc_proc(void *context)
 {
 	diva_os_thread_dpc_t *psoft_isr = (diva_os_thread_dpc_t *) context;
 	diva_os_soft_isr_t *pisr = psoft_isr->psoft_isr;
@@ -575,8 +575,7 @@ int diva_os_initialize_soft_isr(diva_os_soft_isr_t * psoft_isr,
 	psoft_isr->callback_context = callback_context;
 	pdpc->psoft_isr = psoft_isr;
 	INIT_WORK(&pdpc->trap_script_task, diva_adapter_trapped, pdpc);
-	tasklet_init(&pdpc->divas_task, diva_os_dpc_proc,
-		     (unsigned long) pdpc);
+	INIT_WORK(&pdpc->divas_task, diva_os_dpc_proc, pdpc);
 
 	return (0);
 }
@@ -587,7 +586,7 @@ int diva_os_schedule_soft_isr(diva_os_soft_isr_t * psoft_isr)
 		diva_os_thread_dpc_t *pdpc =
 		    (diva_os_thread_dpc_t *) psoft_isr->object;
 
-		tasklet_schedule(&pdpc->divas_task);
+		schedule_work(&pdpc->divas_task);
 	}
 
 	return (1);
@@ -595,26 +594,18 @@ int diva_os_schedule_soft_isr(diva_os_soft_isr_t * psoft_isr)
 
 int diva_os_cancel_soft_isr(diva_os_soft_isr_t * psoft_isr)
 {
-	if (psoft_isr && psoft_isr->object) {
-		diva_os_thread_dpc_t *pdpc =
-		    (diva_os_thread_dpc_t *) psoft_isr->object;
-		tasklet_kill(&pdpc->divas_task);
-	}
+	flush_scheduled_work();
 	return (0);
 }
 
 void diva_os_remove_soft_isr(diva_os_soft_isr_t * psoft_isr)
 {
 	if (psoft_isr && psoft_isr->object) {
-		diva_os_thread_dpc_t *pdpc =
-		    (diva_os_thread_dpc_t *) psoft_isr->object;
 		void *mem;
 
-		tasklet_kill(&pdpc->divas_task);
-
+		flush_scheduled_work();
 		mem = psoft_isr->object;
 		psoft_isr->object = 0;
-		flush_scheduled_work();
 		diva_os_free(0, mem);
 	}
 }

@@ -20,7 +20,7 @@ static struct posix_acl *
 ext3_acl_from_disk(const void *value, size_t size)
 {
 	const char *end = (char *)value + size;
-	size_t n, count;
+	int n, count;
 	struct posix_acl *acl;
 
 	if (!value)

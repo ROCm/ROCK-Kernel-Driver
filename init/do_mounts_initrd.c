@@ -9,6 +9,8 @@
 
 #include "do_mounts.h"
 
+unsigned long initrd_start, initrd_end;
+int initrd_below_start_ok;
 unsigned int real_root_dev;	/* do_proc_dointvec cannot handle kdev_t */
 static int __initdata old_fd, root_fd;
 static int __initdata mount_initrd = 1;
@@ -99,18 +101,20 @@ static void __init handle_initrd(void)
 
 int __init initrd_load(void)
 {
-	if (!mount_initrd)
-		return 0;
-
-	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
-	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
-	/* Load the initrd data into /dev/ram0. Execute it as initrd unless
-	 * /dev/ram0 is supposed to be our actual root device, in
-	 * that case the ram disk is just set up here, and gets
-	 * mounted in the normal path. */
-	if (rd_load_image("/dev/initrd") && ROOT_DEV != Root_RAM0) {
-		handle_initrd();
-		return 1;
+	if (mount_initrd) {
+		create_dev("/dev/ram", Root_RAM0, NULL);
+		/*
+		 * Load the initrd data into /dev/ram0. Execute it as initrd
+		 * unless /dev/ram0 is supposed to be our actual root device,
+		 * in that case the ram disk is just set up here, and gets
+		 * mounted in the normal path.
+		 */
+		if (rd_load_image("/dev/initrd") && ROOT_DEV != Root_RAM0) {
+			sys_unlink("/dev/initrd");
+			handle_initrd();
+			return 1;
+		}
 	}
+	sys_unlink("/dev/initrd");
 	return 0;
 }
