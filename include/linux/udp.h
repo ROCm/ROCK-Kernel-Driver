@@ -57,4 +57,7 @@ struct udp_sock {
 
 #define udp_sk(__sk) (&((struct udp_sock *)__sk)->udp)
 
+extern int udp_proc_init(void);
+extern void udp_proc_exit(void);
+
 #endif	/* _LINUX_UDP_H */

@@ -66,8 +66,7 @@
  *		Alexey Kuznetsov:	new arp state machine;
  *					now it is in net/core/neighbour.c.
  *		Krzysztof Halasa:	Added Frame Relay ARP support.
- *		Arnaldo C. Melo :	move proc stuff to seq_file and
- *					net/ipv4/ip_proc.c
+ *		Arnaldo C. Melo :	convert /proc/net/arp to seq_file
  */
 
 #include <linux/types.h>
@@ -87,6 +86,8 @@
 #include <linux/if_arp.h>
 #include <linux/trdevice.h>
 #include <linux/skbuff.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/init.h>
 #ifdef CONFIG_SYSCTL
@@ -919,7 +920,7 @@ int arp_req_set(struct arpreq *r, struct net_device * dev)
 	return err;
 }
 
-unsigned arp_state_to_flags(struct neighbour *neigh)
+static unsigned arp_state_to_flags(struct neighbour *neigh)
 {
 	unsigned flags = 0;
 	if (neigh->nud_state&NUD_PERMANENT)
@@ -1087,13 +1088,293 @@ static struct packet_type arp_packet_type = {
 	.data =	(void*) 1, /* understand shared skbs */
 };
 
+static int arp_proc_init(void);
+
 void __init arp_init(void)
 {
 	neigh_table_init(&arp_tbl);
 
 	dev_add_pack(&arp_packet_type);
+	arp_proc_init();
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_register(NULL, &arp_tbl.parms, NET_IPV4,
 			      NET_IPV4_NEIGH, "ipv4");
 #endif
 }
+
+#ifdef CONFIG_PROC_FS
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
+
+/* ------------------------------------------------------------------------ */
+/*
+ *	ax25 -> ASCII conversion
+ */
+static char *ax2asc2(ax25_address *a, char *buf)
+{
+	char c, *s;
+	int n;
+
+	for (n = 0, s = buf; n < 6; n++) {
+		c = (a->ax25_call[n] >> 1) & 0x7F;
+
+		if (c != ' ') *s++ = c;
+	}
+	
+	*s++ = '-';
+
+	if ((n = ((a->ax25_call[6] >> 1) & 0x0F)) > 9) {
+		*s++ = '1';
+		n -= 10;
+	}
+	
+	*s++ = n + '0';
+	*s++ = '\0';
+
+	if (*buf == '\0' || *buf == '-')
+	   return "*";
+
+	return buf;
+
+}
+#endif /* CONFIG_AX25 */
+
+struct arp_iter_state {
+	int is_pneigh, bucket;
+};
+
+static __inline__ struct neighbour *neigh_get_bucket(struct seq_file *seq,
+						     loff_t *pos)
+{
+	struct neighbour *n = NULL;
+	struct arp_iter_state* state = seq->private;
+	loff_t l = *pos;
+	int i;
+
+	for (; state->bucket <= NEIGH_HASHMASK; ++state->bucket)
+		for (i = 0, n = arp_tbl.hash_buckets[state->bucket]; n;
+		     ++i, n = n->next)
+			/* Do not confuse users "arp -a" with magic entries */
+			if ((n->nud_state & ~NUD_NOARP) && !l--) {
+				*pos = i;
+				goto out;
+			}
+out:
+	return n;
+}
+
+static __inline__ struct pneigh_entry *pneigh_get_bucket(struct seq_file *seq,
+							 loff_t *pos)
+{
+	struct pneigh_entry *n = NULL;
+	struct arp_iter_state* state = seq->private;
+	loff_t l = *pos;
+	int i;
+
+	for (; state->bucket <= PNEIGH_HASHMASK; ++state->bucket)
+		for (i = 0, n = arp_tbl.phash_buckets[state->bucket]; n;
+		     ++i, n = n->next)
+			if (!l--) {
+				*pos = i;
+				goto out;
+			}
+out:
+	return n;
+}
+
+static __inline__ void *arp_get_bucket(struct seq_file *seq, loff_t *pos)
+{
+	void *rc = neigh_get_bucket(seq, pos);
+
+	if (!rc) {
+		struct arp_iter_state* state = seq->private;
+
+		read_unlock_bh(&arp_tbl.lock);
+		state->is_pneigh = 1;
+		state->bucket	 = 0;
+		*pos		 = 0;
+		rc = pneigh_get_bucket(seq, pos);
+	}
+	return rc;
+}
+
+static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock_bh(&arp_tbl.lock);
+	return *pos ? arp_get_bucket(seq, pos) : (void *)1;
+}
+
+static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	void *rc;
+	struct arp_iter_state* state;
+
+	if (v == (void *)1) {
+		rc = arp_get_bucket(seq, pos);
+		goto out;
+	}
+
+	state = seq->private;
+	if (!state->is_pneigh) {
+		struct neighbour *n = v;
+
+		rc = n = n->next;
+		if (n)
+			goto out;
+		*pos = 0;
+		++state->bucket;
+		rc = neigh_get_bucket(seq, pos);
+		if (rc)
+			goto out;
+		read_unlock_bh(&arp_tbl.lock);
+		state->is_pneigh = 1;
+		state->bucket	 = 0;
+		*pos		 = 0;
+		rc = pneigh_get_bucket(seq, pos);
+	} else {
+		struct pneigh_entry *pn = v;
+
+		pn = pn->next;
+		if (!pn) {
+			++state->bucket;
+			*pos = 0;
+			pn   = pneigh_get_bucket(seq, pos);
+		}
+		rc = pn;
+	}
+out:
+	++*pos;
+	return rc;
+}
+
+static void arp_seq_stop(struct seq_file *seq, void *v)
+{
+	struct arp_iter_state* state = seq->private;
+
+	if (!state->is_pneigh)
+		read_unlock_bh(&arp_tbl.lock);
+}
+
+#define HBUFFERLEN 30
+
+static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
+					      struct neighbour *n)
+{
+	char hbuffer[HBUFFERLEN];
+	const char hexbuf[] = "0123456789ABCDEF";
+	int k, j;
+	char tbuf[16];
+	struct net_device *dev = n->dev;
+	int hatype = dev->type;
+
+	read_lock(&n->lock);
+	/* Convert hardware address to XX:XX:XX:XX ... form. */
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
+	if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
+		ax2asc2((ax25_address *)n->ha, hbuffer);
+	else {
+#endif
+	for (k = 0, j = 0; k < HBUFFERLEN - 3 && j < dev->addr_len; j++) {
+		hbuffer[k++] = hexbuf[(n->ha[j] >> 4) & 15];
+		hbuffer[k++] = hexbuf[n->ha[j] & 15];
+		hbuffer[k++] = ':';
+	}
+	hbuffer[--k] = 0;
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
+	}
+#endif
+	sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->primary_key));
+	seq_printf(seq, "%-16s 0x%-10x0x%-10x%s     *        %s\n",
+		   tbuf, hatype, arp_state_to_flags(n), hbuffer, dev->name);
+	read_unlock(&n->lock);
+}
+
+static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
+					       struct pneigh_entry *n)
+{
+
+	struct net_device *dev = n->dev;
+	int hatype = dev ? dev->type : 0;
+	char tbuf[16];
+
+	sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->key));
+	seq_printf(seq, "%-16s 0x%-10x0x%-10x%s     *        %s\n",
+		   tbuf, hatype, ATF_PUBL | ATF_PERM, "00:00:00:00:00:00",
+		   dev ? dev->name : "*");
+}
+
+static int arp_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void *)1)
+		seq_puts(seq, "IP address       HW type     Flags       "
+			      "HW address            Mask     Device\n");
+	else {
+		struct arp_iter_state* state = seq->private;
+
+		if (state->is_pneigh)
+			arp_format_pneigh_entry(seq, v);
+		else
+			arp_format_neigh_entry(seq, v);
+	}
+
+	return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static struct seq_operations arp_seq_ops = {
+	.start  = arp_seq_start,
+	.next   = arp_seq_next,
+	.stop   = arp_seq_stop,
+	.show   = arp_seq_show,
+};
+
+static int arp_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct arp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &arp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations arp_seq_fops = {
+	.open           = arp_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= ip_seq_release,
+};
+
+static int __init arp_proc_init(void)
+{
+	int rc = 0;
+	struct proc_dir_entry *p = create_proc_entry("arp", S_IRUGO, proc_net);
+
+        if (p)
+		p->proc_fops = &arp_seq_fops;
+	else
+		rc = -ENOMEM;
+	return rc;
+}
+
+#else /* CONFIG_PROC_FS */
+
+static int __init arp_proc_init(void)
+{
+	return 0;
+}
+
+#endif /* CONFIG_PROC_FS */

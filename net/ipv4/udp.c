@@ -1366,8 +1366,20 @@ int __init udp_proc_init(void)
 		rc = -ENOMEM;
 	return rc;
 }
+
+void __init udp_proc_exit(void)
+{
+	remove_proc_entry("udp", proc_net);
+}
+
 #else /* CONFIG_PROC_FS */
+
 int __init udp_proc_init(void)
+{
+	return 0;
+}
+
+void __init udp_proc_exit(void)
 {
 	return 0;
 }
