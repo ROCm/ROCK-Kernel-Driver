@@ -204,6 +204,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 {
 	struct scsi_device *sdev, *device;
 	unsigned long flags;
+	int display_failure_msg = 1, ret;
 
 	sdev = kmalloc(sizeof(*sdev) + shost->transportt->size, GFP_ATOMIC);
 	if (!sdev)
@@ -252,8 +253,16 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 
 	if (shost->hostt->slave_alloc) {
-		if (shost->hostt->slave_alloc(sdev))
+		ret = shost->hostt->slave_alloc(sdev);
+		if (ret) {
+			/*
+			 * if LLDD reports slave not present, don't clutter
+			 * console with alloc failure messages
+			 */
+			if (ret == -ENXIO)
+				display_failure_msg = 0;
 			goto out_free_queue;
+		}
 	}
 
 	if (shost->transportt->setup) {
@@ -325,7 +334,8 @@ out_free_queue:
 out_free_dev:
 	kfree(sdev);
 out:
-	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+	if (display_failure_msg)
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	return NULL;
 }
 
