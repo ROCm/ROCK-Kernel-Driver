@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.54 $
+ * $Revision: 1.55 $
  */
 
 #ifndef DASD_INT_H
@@ -485,6 +485,8 @@ struct dasd_device *dasd_create_device(struct ccw_device *);
 void dasd_delete_device(struct dasd_device *);
 
 int dasd_add_sysfs_files(struct ccw_device *);
+void dasd_remove_sysfs_files(struct ccw_device *);
+
 struct dasd_device *dasd_device_from_cdev(struct ccw_device *);
 struct dasd_device *dasd_device_from_devindex(int);
 

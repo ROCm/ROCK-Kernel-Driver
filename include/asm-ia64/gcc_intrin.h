@@ -23,6 +23,8 @@
 extern void ia64_bad_param_for_setreg (void);
 extern void ia64_bad_param_for_getreg (void);
 
+register unsigned long ia64_r13 asm ("r13");
+
 #define ia64_setreg(regnum, val)						\
 ({										\
 	switch (regnum) {							\
@@ -67,10 +69,7 @@ extern void ia64_bad_param_for_getreg (void);
 		asm volatile ("mov %0=psr" : "=r"(ia64_intri_res));		\
 		break;								\
 	case _IA64_REG_TP:	/* for current() */				\
-		{								\
-			register __u64 ia64_r13 asm ("r13");			\
-			ia64_intri_res = ia64_r13;				\
-		}								\
+		ia64_intri_res = ia64_r13;					\
 		break;								\
 	case _IA64_REG_AR_KR0 ... _IA64_REG_AR_EC:				\
 		asm volatile ("mov %0=ar%1" : "=r" (ia64_intri_res)		\

@@ -432,6 +432,9 @@ pgm_per:
 pgm_per_std:
 	SAVE_ALL __LC_PGM_OLD_PSW,1
 	GET_THREAD_INFO
+	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(4,%r9),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
 	la	%r4,0x7f
 	l	%r3,__LC_PGM_ILC	 # load program interruption code
         nr      %r4,%r3                  # clear per-event-bit and ilc
@@ -445,7 +448,7 @@ pgm_per_only:
 	la      %r2,SP_PTREGS(15)	 # address of register-save area
         l       %r1,BASED(.Lhandle_per)  # load adr. of per handler
         la      %r14,BASED(sysc_return)  # load adr. of system return
-        br      %r1			 # branch to handle_per_exception
+        br      %r1			 # branch to do_debugger_trap
 
 #
 # it was a single stepped SVC that is causing all the trouble
@@ -455,6 +458,9 @@ pgm_svcper:
 	lh	%r7,0x8a	  # get svc number from lowcore
         stosm   24(%r15),0x03     # reenable interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
+	mvc	__THREAD_per+__PER_atmid(2,%r9),__LC_PER_ATMID
+	mvc	__THREAD_per+__PER_address(4,%r9),__LC_PER_ADDRESS
+	mvc	__THREAD_per+__PER_access_id(1,%r9),__LC_PER_ACCESS_ID
         sla     %r7,2             # *4 and test for svc 0
 	bnz	BASED(pgm_svcstd) # svc number > 0 ?
 	# svc 0: system call number in %r1
@@ -473,18 +479,18 @@ pgm_svcstd:
 
 pgm_svcret:
 	tm	__TI_flags+3(%r9),_TIF_SIGPENDING
-	bo	BASED(pgm_svcper_nosig)
+	bno	BASED(pgm_svcper_nosig)
 	la	%r2,SP_PTREGS(%r15) # load pt_regs
 	sr	%r3,%r3		  # clear *oldset
 	l	%r1,BASED(.Ldo_signal)
-	basr	%r4,%r1		  # call do_signal
+	basr	%r14,%r1	  # call do_signal
 	
 pgm_svcper_nosig:
         mvi     SP_TRAP+3(%r15),0x28     # set trap indication to pgm check
 	la      %r2,SP_PTREGS(15)        # address of register-save area
         l       %r1,BASED(.Lhandle_per)  # load adr. of per handler
         la      %r14,BASED(sysc_return)  # load adr. of system return
-        br      %r1                      # branch to handle_per_exception
+        br      %r1                      # branch to do_debugger_trap
 #
 # call trace before and after sys_call
 #
@@ -690,7 +696,7 @@ restart_go:
 .Ldo_softirq:  .long  do_softirq
 .Lentry_base:  .long  entry_base
 .Lext_hash:    .long  ext_int_hash
-.Lhandle_per:  .long  handle_per_exception
+.Lhandle_per:  .long  do_debugger_trap
 .Ljump_table:  .long  pgm_check_table
 .Lschedule:    .long  schedule
 .Lclone:       .long  sys_clone

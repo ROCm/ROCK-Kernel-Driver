@@ -22,6 +22,10 @@ int main(void)
 	DEFINE(__THREAD_ksp, offsetof(struct task_struct, thread.ksp),);
 	DEFINE(__THREAD_per, offsetof(struct task_struct, thread.per_info),);
 	BLANK();
+	DEFINE(__PER_atmid, offsetof(per_struct, lowcore.words.perc_atmid),);
+	DEFINE(__PER_address, offsetof(per_struct, lowcore.words.address),);
+	DEFINE(__PER_access_id, offsetof(per_struct, lowcore.words.access_id),);
+	BLANK();
 	DEFINE(__TI_task, offsetof(struct thread_info, task),);
 	DEFINE(__TI_domain, offsetof(struct thread_info, exec_domain),);
 	DEFINE(__TI_flags, offsetof(struct thread_info, flags),);

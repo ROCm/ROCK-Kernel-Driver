@@ -844,7 +844,6 @@ EXPORT_SYMBOL(probe_hwif);
 int hwif_init (ide_hwif_t *hwif);
 int probe_hwif_init (ide_hwif_t *hwif)
 {
-	hwif->initializing = 1;
 	probe_hwif(hwif);
 	hwif_init(hwif);
 
@@ -860,7 +859,6 @@ int probe_hwif_init (ide_hwif_t *hwif)
 			}
 		}
 	}
-	hwif->initializing = 0;
 	return 0;
 }
 

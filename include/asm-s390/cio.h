@@ -132,6 +132,7 @@ struct ccw1 {
 #define CCW_CMD_SENSE_PGID	0x34
 #define CCW_CMD_SUSPEND_RECONN	0x5B
 #define CCW_CMD_RDC		0x64
+#define CCW_CMD_RELEASE		0x94
 #define CCW_CMD_SET_PGID	0xAF
 #define CCW_CMD_SENSE_ID	0xE4
 #define CCW_CMD_DCTL		0xF3

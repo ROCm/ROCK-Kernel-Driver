@@ -2,8 +2,8 @@
  * Common code for the sigreturn entry points on the vsyscall page.
  * So far this code is the same for both int80 and sysenter versions.
  * This file is #include'd by vsyscall-*.S to define them after the
- * vsyscall entry point.  The addresses we get for these entry points
- * by doing ".balign 32" must match in both versions of the page.
+ * vsyscall entry point.  The kernel assumes that the addresses of these
+ * routines are constant for all vsyscall implementations.
  */
 
 #include <asm/unistd.h>
@@ -15,7 +15,7 @@
 */
 
 	.text
-	.balign 32
+	.org	__kernel_vsyscall+32
 	.globl __kernel_sigreturn
 	.type __kernel_sigreturn,@function
 __kernel_sigreturn:

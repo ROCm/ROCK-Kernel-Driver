@@ -200,7 +200,7 @@ static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
 {
 	BUG_ON(direction == PCI_DMA_NONE);
 
-	consistent_sync_for_cpu(bus_to_virt(dma_handle), size, direction);
+	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
 static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
@@ -209,7 +209,7 @@ static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
 {
 	BUG_ON(direction == PCI_DMA_NONE);
 
-	consistent_sync_for_device(bus_to_virt(dma_handle), size, direction);
+	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
 /* Make physical memory consistent for a set of streaming
@@ -227,8 +227,8 @@ static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	for (i = 0; i < nelems; i++, sg++)
-		consistent_sync_page_for_cpu(sg->page, sg->offset,
-					     sg->length, direction);
+		consistent_sync_page(sg->page, sg->offset,
+				     sg->length, direction);
 }
 
 static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
@@ -240,8 +240,8 @@ static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	for (i = 0; i < nelems; i++, sg++)
-		consistent_sync_page_for_device(sg->page, sg->offset,
-						sg->length, direction);
+		consistent_sync_page(sg->page, sg->offset,
+				     sg->length, direction);
 }
 
 /* Return whether the given PCI device DMA address mask can

@@ -335,8 +335,8 @@ sclp_sync_wait(void)
 	unsigned long psw_mask;
 	unsigned long cr0, cr0_sync;
 
-	/* Need to irq_enter() to prevent BH from executing. */
-	irq_enter();
+	/* Prevent BH from executing. */
+	local_bh_disable();
 	/*
 	 * save cr0
 	 * enable service signal external interruption (cr0.22)
@@ -365,7 +365,7 @@ sclp_sync_wait(void)
 
 	/* restore cr0 */
 	__ctl_load(cr0, 0, 0);
-	irq_exit();
+	__local_bh_enable();
 }
 
 /*

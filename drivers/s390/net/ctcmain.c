@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.56 2004/02/27 17:53:26 mschwide Exp $
+ * $Id: ctcmain.c,v 1.57 2004/03/02 15:34:01 mschwide Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.56 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.57 $
  *
  */
 
@@ -319,7 +319,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.56 $";
+	char vbuf[] = "$Revision: 1.57 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -3043,23 +3043,10 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 		privptr->channel[direction]->protocol = privptr->protocol;
 		privptr->channel[direction]->max_bufsize = CTC_BUFSIZE_DEFAULT;
 	}
+	/* sysfs magic */
+	SET_NETDEV_DEV(dev, &cgdev->dev);
+
 	if (ctc_netdev_register(dev) != 0) {
-		ctc_free_netdevice(dev, 1);
-		goto out;
-	}
-	/* Create symlinks. */
-	if (sysfs_create_link(&cgdev->dev.kobj, &dev->class_dev.kobj,
-			      dev->name)) {
-		ctc_netdev_unregister(dev);
-		dev->priv = 0;
-		ctc_free_netdevice(dev, 1);
-		goto out;
-	}
-	if (sysfs_create_link(&dev->class_dev.kobj, &cgdev->dev.kobj,
-			      cgdev->dev.bus_id)) {
-		sysfs_remove_link(&cgdev->dev.kobj, dev->name);
-		ctc_netdev_unregister(dev);
-		dev->priv = 0;
 		ctc_free_netdevice(dev, 1);
 		goto out;
 	}
@@ -3118,8 +3105,6 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 		channel_free(priv->channel[WRITE]);
 
 	if (ndev) {
-		sysfs_remove_link(&ndev->class_dev.kobj, cgdev->dev.bus_id);
-		sysfs_remove_link(&cgdev->dev.kobj, ndev->name);
 		ctc_netdev_unregister(ndev);
 		ndev->priv = NULL;
 		ctc_free_netdevice(ndev, 1);

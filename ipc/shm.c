@@ -656,7 +656,10 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 			if (shmflg & SHM_RND)
 				addr &= ~(SHMLBA-1);	   /* round down */
 			else
-				return -EINVAL;
+#ifndef __ARCH_FORCE_SHMLBA
+				if (addr & ~PAGE_MASK)
+#endif
+					return -EINVAL;
 		}
 		flags = MAP_SHARED | MAP_FIXED;
 	} else {

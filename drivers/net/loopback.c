@@ -123,7 +123,7 @@ static void emulate_large_send_offload(struct sk_buff *skb)
  */
 static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = netdev_priv(dev);
+	struct net_device_stats *stats = dev->priv;
 
 	skb_orphan(skb);
 

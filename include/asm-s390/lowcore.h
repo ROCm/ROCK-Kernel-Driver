@@ -44,6 +44,10 @@
 #define __LC_PGM_ILC                    0x08C
 #define __LC_PGM_INT_CODE               0x08E
 
+#define __LC_PER_ATMID			0x096
+#define __LC_PER_ADDRESS		0x098
+#define __LC_PER_ACCESS_ID		0x0A1
+
 #define __LC_SUBCHANNEL_ID              0x0B8
 #define __LC_SUBCHANNEL_NR              0x0BA
 #define __LC_IO_INT_PARM                0x0BC

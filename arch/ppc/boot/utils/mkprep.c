@@ -219,6 +219,8 @@ void write_prep_partition(int in, int out)
   pe.number_of_sectors = cpu_to_le32(2*18*80-1);
 #endif /* __i386__ */
 
+  memcpy(&block[0x1BE], &pe, sizeof(pe));
+
   write( out, block, sizeof(block) );
   write( out, entry, sizeof(*entry) );
   write( out, length, sizeof(*length) );

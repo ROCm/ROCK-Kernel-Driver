@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.74 $"
+#define VERSION_QDIO_C "$Revision: 1.78 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -545,6 +545,7 @@ inline static void
 qdio_kick_outbound_q(struct qdio_q *q)
 {
 	int result;
+	char dbf_text[15];
 
 	QDIO_DBF_TEXT4(0,trace,"kickoutq");
 	QDIO_DBF_HEX4(0,trace,&q,sizeof(void*));
@@ -552,15 +553,75 @@ qdio_kick_outbound_q(struct qdio_q *q)
 	if (!q->siga_out)
 		return;
 
+	/* here's the story with cc=2 and busy bit set (thanks, Rick):
+	 * VM's CP could present us cc=2 and busy bit set on SIGA-write
+	 * during reconfiguration of their Guest LAN (only in HIPERS mode,
+	 * QDIO mode is asynchronous -- cc=2 and busy bit there will take
+	 * the queues down immediately; and not being under VM we have a
+	 * problem on cc=2 and busy bit set right away).
+	 *
+	 * Therefore qdio_siga_output will try for a short time constantly,
+	 * if such a condition occurs. If it doesn't change, it will
+	 * increase the busy_siga_counter and save the timestamp, and
+	 * schedule the queue for later processing (via mark_q, using the
+	 * queue tasklet). __qdio_outbound_processing will check out the
+	 * counter. If non-zero, it will call qdio_kick_outbound_q as often
+	 * as the value of the counter. This will attempt further SIGA
+	 * instructions. For each successful SIGA, the counter is
+	 * decreased, for failing SIGAs the counter remains the same, after
+	 * all.
+	 * After some time of no movement, qdio_kick_outbound_q will
+	 * finally fail and reflect corresponding error codes to call
+	 * the upper layer module and have it take the queues down.
+	 *
+	 * Note that this is a change from the original HiperSockets design
+	 * (saying cc=2 and busy bit means take the queues down), but in
+	 * these days Guest LAN didn't exist... excessive cc=2 with busy bit
+	 * conditions will still take the queues down, but the threshold is
+	 * higher due to the Guest LAN environment.
+	 */
+
+
 	result=qdio_siga_output(q);
 
-	if (!result)
-		return;
+		switch (result) {
+		case 0:
+		/* went smooth this time, reset timestamp */
+			QDIO_DBF_TEXT3(0,trace,"cc2reslv");
+			sprintf(dbf_text,"%4x%2x%2x",q->irq,q->q_no,
+				atomic_read(&q->busy_siga_counter));
+			QDIO_DBF_TEXT3(0,trace,dbf_text);
+			q->timing.busy_start=0;
+			break;
+		case (2|QDIO_SIGA_ERROR_B_BIT_SET):
+			/* cc=2 and busy bit: */
+		atomic_inc(&q->busy_siga_counter);
 
-	if (q->siga_error)
-		q->error_status_flags|=QDIO_STATUS_MORE_THAN_ONE_SIGA_ERROR;
-	q->error_status_flags |= QDIO_STATUS_LOOK_FOR_ERROR;
-	q->siga_error=result;
+			/* if the last siga was successful, save
+			 * timestamp here */
+			if (!q->timing.busy_start)
+				q->timing.busy_start=NOW;
+
+			/* if we're in time, don't touch error_status_flags
+			 * and siga_error */
+			if (NOW-q->timing.busy_start<QDIO_BUSY_BIT_GIVE_UP) {
+				qdio_mark_q(q);
+				break;
+			}
+			QDIO_DBF_TEXT2(0,trace,"cc2REPRT");
+			sprintf(dbf_text,"%4x%2x%2x",q->irq,q->q_no,
+				atomic_read(&q->busy_siga_counter));
+			QDIO_DBF_TEXT3(0,trace,dbf_text);
+			/* else fallthrough and report error */
+		default:
+			/* for plain cc=1, 2 or 3: */
+			if (q->siga_error)
+				q->error_status_flags|=
+					QDIO_STATUS_MORE_THAN_ONE_SIGA_ERROR;
+			q->error_status_flags|=
+				QDIO_STATUS_LOOK_FOR_ERROR;
+			q->siga_error=result;
+		}
 }
 
 inline static void
@@ -599,6 +660,8 @@ qdio_kick_outbound_handler(struct qdio_q *q)
 static inline void
 __qdio_outbound_processing(struct qdio_q *q)
 {
+	int siga_attempts;
+
 	QDIO_DBF_TEXT4(0,trace,"qoutproc");
 	QDIO_DBF_HEX4(0,trace,&q,sizeof(void*));
 
@@ -618,6 +681,14 @@ __qdio_outbound_processing(struct qdio_q *q)
 	o_p_nc++;
 	perf_stats.tl_runs++;
 #endif /* QDIO_PERFORMANCE_STATS */
+
+	/* see comment in qdio_kick_outbound_q */
+	siga_attempts=atomic_read(&q->busy_siga_counter);
+	while (siga_attempts) {
+		atomic_dec(&q->busy_siga_counter);
+		qdio_kick_outbound_q(q);
+		siga_attempts--;
+	}
 
 	if (qdio_has_outbound_q_moved(q))
 		qdio_kick_outbound_handler(q);
@@ -1368,6 +1439,10 @@ qdio_fill_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 			((irq_ptr->is_thinint_irq)?&tiqdio_inbound_processing:
 			 &qdio_inbound_processing);
 
+		/* actually this is not used for inbound queues. yet. */
+		atomic_set(&q->busy_siga_counter,0);
+		q->timing.busy_start=0;
+
 /*		for (j=0;j<QDIO_STATS_NUMBER;j++)
 			q->timing.last_transfer_times[j]=(qdio_get_micros()/
 							  QDIO_STATS_NUMBER)*j;
@@ -1431,6 +1506,9 @@ qdio_fill_qs(struct qdio_irq *irq_ptr, struct ccw_device *cdev,
 		q->tasklet.data=(unsigned long)q;
 		q->tasklet.func=(void(*)(unsigned long))
 			&qdio_outbound_processing;
+
+		atomic_set(&q->busy_siga_counter,0);
+		q->timing.busy_start=0;
 
 		/* fill in slib */
 		if (i>0) irq_ptr->output_qs[i-1]->slib->nsliba=
@@ -2134,7 +2212,7 @@ qdio_cleanup(struct ccw_device *cdev, int how)
 	QDIO_DBF_TEXT0(0,setup,dbf_text);
 
 	rc = qdio_shutdown(cdev, how);
-	if (rc == 0)
+	if ((rc == 0) || (rc == -EINPROGRESS))
 		rc = qdio_free(cdev);
 	return rc;
 }
@@ -2145,6 +2223,7 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	struct qdio_irq *irq_ptr;
 	int i;
 	int result = 0;
+	int rc;
 	unsigned long flags;
 	int timeout;
 	char dbf_text[15];
@@ -2191,27 +2270,23 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 			result=-EINPROGRESS;
 	}
 
-	if (result)
-		goto out;
-
 	/* cleanup subchannel */
 	spin_lock_irqsave(get_ccwdev_lock(cdev),flags);
 	if (how&QDIO_FLAG_CLEANUP_USING_CLEAR) {
-		result = ccw_device_clear(cdev, QDIO_DOING_CLEANUP);
+		rc = ccw_device_clear(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_CLEAR_TIMEOUT;
 	} else if (how&QDIO_FLAG_CLEANUP_USING_HALT) {
-		result = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
+		rc = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_HALT_TIMEOUT;
 	} else { /* default behaviour */
-		result = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
+		rc = ccw_device_halt(cdev, QDIO_DOING_CLEANUP);
 		timeout=QDIO_CLEANUP_HALT_TIMEOUT;
 	}
-	if (result == -ENODEV) {
+	if (rc == -ENODEV) {
 		/* No need to wait for device no longer present. */
 		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
-		result = 0; /* No error. */
 		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
-	} else if (result == 0) {
+	} else if (rc == 0) {
 		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_CLEANUP);
 		ccw_device_set_timeout(cdev, timeout);
 		spin_unlock_irqrestore(get_ccwdev_lock(cdev),flags);
@@ -2223,6 +2298,7 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 		QDIO_PRINT_INFO("ccw_device_{halt,clear} returned %d for "
 				"device %s\n", result, cdev->dev.bus_id);
 		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+		result = rc;
 		goto out;
 	}
 	if (irq_ptr->is_thinint_irq) {

@@ -278,7 +278,6 @@ CONFIG_MD_RAID5=y
 # CONFIG_MD_RAID6 is not set
 # CONFIG_MD_MULTIPATH is not set
 CONFIG_BLK_DEV_DM=y
-CONFIG_DM_IOCTL_V4=y
 # CONFIG_DM_CRYPT is not set
 
 #
@@ -613,7 +612,6 @@ CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_ALI15X3 is not set
 # CONFIG_I2C_AMD756 is not set
 # CONFIG_I2C_AMD8111 is not set
-# CONFIG_I2C_ELV is not set
 # CONFIG_I2C_I801 is not set
 # CONFIG_I2C_I810 is not set
 # CONFIG_I2C_ISA is not set
@@ -626,7 +624,6 @@ CONFIG_I2C_KEYWEST=y
 # CONFIG_I2C_SIS5595 is not set
 # CONFIG_I2C_SIS630 is not set
 # CONFIG_I2C_SIS96X is not set
-# CONFIG_I2C_VELLEMAN is not set
 # CONFIG_I2C_VIA is not set
 # CONFIG_I2C_VIAPRO is not set
 # CONFIG_I2C_VOODOO3 is not set

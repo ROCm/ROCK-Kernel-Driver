@@ -148,6 +148,7 @@ ccw_device_handle_oper(struct ccw_device *cdev)
 	struct subchannel *sch;
 
 	sch = to_subchannel(cdev->dev.parent);
+	cdev->private->flags.recog_done = 1;
 	/*
 	 * Check if cu type and device type still match. If
 	 * not, it is certainly another device and we have to
@@ -217,6 +218,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		__recover_lost_chpids(sch, old_lpm);
 	if (cdev->private->state == DEV_STATE_DISCONNECTED_SENSE_ID) {
 		if (state == DEV_STATE_NOT_OPER) {
+			cdev->private->flags.recog_done = 1;
 			cdev->private->state = DEV_STATE_DISCONNECTED;
 			return;
 		}
@@ -393,6 +395,7 @@ ccw_device_recognition(struct ccw_device *cdev)
 	 * timeout (or if sense pgid during path verification detects the device
 	 * is locked, as may happen on newer devices).
 	 */
+	cdev->private->flags.recog_done = 0;
 	cdev->private->state = DEV_STATE_SENSE_ID;
 	ccw_device_sense_id_start(cdev);
 	return 0;

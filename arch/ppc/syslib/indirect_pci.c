@@ -44,8 +44,8 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 			cfg_type = 1;
 
 	PCI_CFG_OUT(hose->cfg_addr, 					 
-		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
-		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+		 (0x80000000 | ((bus->number - hose->bus_offset) << 16)
+		  | (devfn << 8) | ((offset & 0xfc) | cfg_type)));
 
 	/*
 	 * Note: the caller has already checked that offset is
@@ -83,8 +83,8 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 			cfg_type = 1;
 
 	PCI_CFG_OUT(hose->cfg_addr, 					 
-		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
-		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+		 (0x80000000 | ((bus->number - hose->bus_offset) << 16)
+		  | (devfn << 8) | ((offset & 0xfc) | cfg_type)));
 
 	/*
 	 * Note: the caller has already checked that offset is
