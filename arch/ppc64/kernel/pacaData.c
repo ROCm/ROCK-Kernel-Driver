@@ -62,8 +62,6 @@ struct systemcfg *systemcfg;
 		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
 		.xSize = sizeof(struct ItLpRegSave)			    \
 	},								    \
-	.exception_sp =							    \
-		(&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,	    \
 }
 
 struct paca_struct paca[] __page_aligned = {

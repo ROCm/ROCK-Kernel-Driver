@@ -80,36 +80,45 @@ static int store_updates_sp(struct pt_regs *regs)
  *  - DSISR for a non-SLB data access fault,
  *  - SRR1 & 0x08000000 for a non-SLB instruction access fault
  *  - 0 any SLB fault.
+ * The return value is 0 if the fault was handled, or the signal
+ * number if this is a kernel fault that can't be handled here.
  */
-void do_page_fault(struct pt_regs *regs, unsigned long address,
-		   unsigned long error_code)
+int do_page_fault(struct pt_regs *regs, unsigned long address,
+		  unsigned long error_code)
 {
 	struct vm_area_struct * vma;
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
 	unsigned long is_write = error_code & 0x02000000;
+	unsigned long trap = TRAP(regs);
 
-	if (regs->trap == 0x300 || regs->trap == 0x380) {
+	if (trap == 0x300 || trap == 0x380) {
 		if (debugger_fault_handler(regs))
-			return;
+			return 0;
 	}
 
 	/* On a kernel SLB miss we can only check for a valid exception entry */
-	if (!user_mode(regs) && (regs->trap == 0x380)) {
-		bad_page_fault(regs, address, SIGSEGV);
-		return;
-	}
+	if (!user_mode(regs) && (trap == 0x380 || address >= TASK_SIZE))
+		return SIGSEGV;
 
 	if (error_code & 0x00400000) {
 		if (debugger_dabr_match(regs))
-			return;
+			return 0;
 	}
 
 	if (in_atomic() || mm == NULL) {
-		bad_page_fault(regs, address, SIGSEGV);
-		return;
+		if (!user_mode(regs))
+			return SIGSEGV;
+		/* in_atomic() in user mode is really bad,
+		   as is current->mm == NULL. */
+		printk(KERN_EMERG "Page fault in user mode with"
+		       "in_atomic() = %d mm = %p\n", in_atomic(), mm);
+		printk(KERN_EMERG "NIP = %lx  MSR = %lx\n",
+		       regs->nip, regs->msr);
+		die("Weird page fault", regs, SIGSEGV);
 	}
+
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -195,7 +204,7 @@ good_area:
 	}
 
 	up_read(&mm->mmap_sem);
-	return;
+	return 0;
 
 bad_area:
 	up_read(&mm->mmap_sem);
@@ -207,11 +216,10 @@ bad_area:
 		info.si_code = code;
 		info.si_addr = (void *) address;
 		force_sig_info(SIGSEGV, &info, current);
-		return;
+		return 0;
 	}
 
-	bad_page_fault(regs, address, SIGSEGV);
-	return;
+	return SIGSEGV;
 
 /*
  * We ran out of memory, or some other thing happened to us that made
@@ -227,18 +235,19 @@ out_of_memory:
 	printk("VM: killing process %s\n", current->comm);
 	if (user_mode(regs))
 		do_exit(SIGKILL);
-	bad_page_fault(regs, address, SIGKILL);
-	return;
+	return SIGKILL;
 
 do_sigbus:
 	up_read(&mm->mmap_sem);
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
-	force_sig_info (SIGBUS, &info, current);
-	if (!user_mode(regs))
-		bad_page_fault(regs, address, SIGBUS);
+	if (user_mode(regs)) {
+		info.si_signo = SIGBUS;
+		info.si_errno = 0;
+		info.si_code = BUS_ADRERR;
+		info.si_addr = (void *)address;
+		force_sig_info(SIGBUS, &info, current);
+		return 0;
+	}
+	return SIGBUS;
 }
 
 /*

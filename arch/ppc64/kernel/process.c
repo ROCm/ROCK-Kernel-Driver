@@ -219,6 +219,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 void show_regs(struct pt_regs * regs)
 {
 	int i;
+	unsigned long trap;
 
 	printk("NIP: %016lX XER: %016lX LR: %016lX\n",
 	       regs->nip, regs->xer, regs->link);
@@ -229,7 +230,8 @@ void show_regs(struct pt_regs * regs)
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
 	       regs->msr&MSR_IR ? 1 : 0,
 	       regs->msr&MSR_DR ? 1 : 0);
-	if (regs->trap == 0x300 || regs->trap == 0x380 || regs->trap == 0x600)
+	trap = TRAP(regs);
+	if (trap == 0x300 || trap == 0x380 || trap == 0x600)
 		printk("DAR: %016lx, DSISR: %016lx\n", regs->dar, regs->dsisr);
 	printk("TASK: %p[%d] '%s' THREAD: %p",
 	       current, current->pid, current->comm, current->thread_info);
@@ -244,6 +246,8 @@ void show_regs(struct pt_regs * regs)
 		}
 
 		printk("%016lX ", regs->gpr[i]);
+		if (i == 13 && !FULL_REGS(regs))
+			break;
 	}
 	printk("\n");
 	/*

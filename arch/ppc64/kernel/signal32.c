@@ -932,7 +932,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 
 	ka = (signr == 0)? NULL: &current->sighand->action[signr-1];
 
-	if (regs->trap == 0x0C00		/* System Call! */
+	if (TRAP(regs) == 0x0C00		/* System Call! */
 	    && regs->ccr & 0x10000000		/* error signalled */
 	    && ((ret = regs->gpr[3]) == ERESTARTSYS
 		|| ret == ERESTARTNOHAND || ret == ERESTARTNOINTR

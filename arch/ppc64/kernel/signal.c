@@ -528,13 +528,13 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		struct k_sigaction *ka = &current->sighand->action[signr-1];
 
 		/* Whee!  Actually deliver the signal.  */
-		if (regs->trap == 0x0C00)
+		if (TRAP(regs) == 0x0C00)
 			syscall_restart(regs, ka);
 		handle_signal(signr, ka, &info, oldset, regs);
 		return 1;
 	}
 
-	if (regs->trap == 0x0C00) {	/* System Call! */
+	if (TRAP(regs) == 0x0C00) {	/* System Call! */
 		if ((int)regs->result == -ERESTARTNOHAND ||
 		    (int)regs->result == -ERESTARTSYS ||
 		    (int)regs->result == -ERESTARTNOINTR) {

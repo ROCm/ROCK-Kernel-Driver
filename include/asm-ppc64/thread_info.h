@@ -26,6 +26,8 @@ struct thread_info {
 	int		cpu;			/* cpu we're on */
 	int		preempt_count;
 	struct restart_block restart_block;
+	/* set by force_successful_syscall_return */
+	unsigned char	syscall_noerror;
 };
 
 /*
@@ -84,8 +86,6 @@ static inline struct thread_info *current_thread_info(void)
 
 /*
  * thread information flag bit numbers
- * N.B. If TIF_SIGPENDING or TIF_NEED_RESCHED are changed
- * to be >= 4, code in entry.S will need to be changed.
  */
 #define TIF_SYSCALL_TRACE	0	/* syscall trace active */
 #define TIF_NOTIFY_RESUME	1	/* resumption notification requested */
