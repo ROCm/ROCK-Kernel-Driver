@@ -152,6 +152,10 @@ struct usb_operations {
 			void *addr, dma_addr_t dma);
 
 	void (*disable)(struct usb_device *udev, int bEndpointAddress);
+
+	/* global suspend/resume of bus */
+	int (*hub_suspend)(struct usb_bus *);
+	int (*hub_resume)(struct usb_bus *);
 };
 
 /* each driver provides one of these, and hardware init support */
@@ -173,6 +177,9 @@ struct hc_driver {
 	int	(*reset) (struct usb_hcd *hcd);
 	int	(*start) (struct usb_hcd *hcd);
 
+	/* NOTE:  these suspend/resume calls relate to the HC as
+	 * a whole, not just the root hub; they're for bus glue.
+	 */
 	/* called after all devices were suspended */
 	int	(*suspend) (struct usb_hcd *hcd, u32 state);
 
@@ -203,6 +210,8 @@ struct hc_driver {
 	int		(*hub_control) (struct usb_hcd *hcd,
 				u16 typeReq, u16 wValue, u16 wIndex,
 				char *buf, u16 wLength);
+	int		(*hub_suspend)(struct usb_hcd *);
+	int		(*hub_resume)(struct usb_hcd *);
 };
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);

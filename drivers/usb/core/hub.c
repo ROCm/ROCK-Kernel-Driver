@@ -1237,6 +1237,33 @@ static int hub_port_disable(struct usb_device *hdev, int port)
 	return ret;
 }
 
+#ifdef	CONFIG_USB_SUSPEND
+
+	/* no USB_SUSPEND yet! */
+
+#else	/* !CONFIG_USB_SUSPEND */
+
+int usb_suspend_device(struct usb_device *udev, u32 state)
+{
+	return 0;
+}
+
+int usb_resume_device(struct usb_device *udev)
+{
+	return 0;
+}
+
+#define	hub_suspend		0
+#define	hub_resume		0
+#define	remote_wakeup(x)	0
+
+#endif	/* CONFIG_USB_SUSPEND */
+
+EXPORT_SYMBOL(usb_suspend_device);
+EXPORT_SYMBOL(usb_resume_device);
+
+
+
 /* USB 2.0 spec, 7.1.7.3 / fig 7-29:
  *
  * Between connect detection and reset signaling there must be a delay
@@ -1336,8 +1363,11 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 	/* root hub ports have a slightly longer reset period
 	 * (from USB 2.0 spec, section 7.1.7.5)
 	 */
-	if (!hdev->parent)
+	if (!hdev->parent) {
 		delay = HUB_ROOT_RESET_TIME;
+		if (port + 1 == hdev->bus->otg_port)
+			hdev->bus->b_hnp_enable = 0;
+	}
 
 	/* Some low speed devices have problems with the quick delay, so */
 	/*  be a bit pessimistic with those devices. RHbug #23670 */
@@ -1508,16 +1538,25 @@ hub_power_remaining (struct usb_hub *hub)
 
 	for (i = 0; i < hdev->maxchild; i++) {
 		struct usb_device	*udev = hdev->children[i];
-		int			delta;
+		int			delta, ceiling;
 
 		if (!udev)
 			continue;
 
+		/* 100mA per-port ceiling, or 8mA for OTG ports */
+		if (i != (udev->bus->otg_port - 1) || hdev->parent)
+			ceiling = 50;
+		else
+			ceiling = 4;
+
 		if (udev->actconfig)
 			delta = udev->actconfig->desc.bMaxPower;
 		else
-			delta = 50;
+			delta = ceiling;
 		// dev_dbg(&udev->dev, "budgeted %dmA\n", 2 * delta);
+		if (delta > ceiling)
+			dev_warn(&udev->dev, "%dmA over %dmA budget!\n",
+				2 * (delta - ceiling), 2 * ceiling);
 		remaining -= delta;
 	}
 	if (remaining < 0) {
@@ -1814,11 +1853,17 @@ static void hub_events(void)
 			}
 
 			if (portchange & USB_PORT_STAT_C_SUSPEND) {
+				clear_port_feature(hdev, i + 1,
+					USB_PORT_FEAT_C_SUSPEND);
+				if (hdev->children[i])
+					ret = remote_wakeup(hdev->children[i]);
+				else
+					ret = -ENODEV;
 				dev_dbg (hub_dev,
-					"suspend change on port %d\n",
-					i + 1);
-				clear_port_feature(hdev,
-					i + 1,  USB_PORT_FEAT_C_SUSPEND);
+					"resume on port %d, status %d\n",
+					i + 1, ret);
+				if (ret < 0)
+					ret = hub_port_disable(hdev, i);
 			}
 			
 			if (portchange & USB_PORT_STAT_C_OVERCURRENT) {
@@ -1905,6 +1950,8 @@ static struct usb_driver hub_driver = {
 	.name =		"hub",
 	.probe =	hub_probe,
 	.disconnect =	hub_disconnect,
+	.suspend =	hub_suspend,
+	.resume =	hub_resume,
 	.ioctl =	hub_ioctl,
 	.id_table =	hub_id_table,
 };

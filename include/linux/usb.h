@@ -241,6 +241,9 @@ struct usb_bus {
 	struct device *controller;	/* host/master side hardware */
 	int busnum;			/* Bus number (in order of reg) */
 	char *bus_name;			/* stable id (PCI slot_name etc) */
+	u8 otg_port;			/* 0, or number of OTG/HNP port */
+	unsigned is_b_host:1;		/* true during some HNP roleswitches */
+	unsigned b_hnp_enable:1;	/* OTG: did A-Host enable HNP? */
 
 	int devnum_next;		/* Next open device number in round-robin allocation */
 
@@ -935,6 +938,11 @@ extern int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 extern int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	void *data, int len, int *actual_length,
 	int timeout);
+
+/* selective suspend/resume */
+extern int usb_suspend_device(struct usb_device *dev, u32 state);
+extern int usb_resume_device(struct usb_device *dev);
+
 
 /* wrappers around usb_control_msg() for the most common standard requests */
 extern int usb_get_descriptor(struct usb_device *dev, unsigned char desctype,

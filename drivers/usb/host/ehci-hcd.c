@@ -647,7 +647,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
-	(void) usb_suspend_device (hcd->self.root_hub);
+	(void) usb_suspend_device (hcd->self.root_hub, state);
 #else
 	/* FIXME lock root hub */
 	(void) ehci_hub_suspend (hcd);
@@ -1036,6 +1036,8 @@ static const struct hc_driver ehci_driver = {
 	 */
 	.hub_status_data =	ehci_hub_status_data,
 	.hub_control =		ehci_hub_control,
+	.hub_suspend =		ehci_hub_suspend,
+	.hub_resume =		ehci_hub_resume,
 };
 
 /*-------------------------------------------------------------------------*/

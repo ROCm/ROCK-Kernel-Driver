@@ -1381,6 +1381,32 @@ rescan:
 
 /*-------------------------------------------------------------------------*/
 
+#ifdef	CONFIG_USB_SUSPEND
+
+static int hcd_hub_suspend (struct usb_bus *bus)
+{
+	struct usb_hcd		*hcd;
+
+	hcd = container_of (bus, struct usb_hcd, self);
+	if (hcd->driver->hub_suspend)
+		return hcd->driver->hub_suspend (hcd);
+	return 0;
+}
+
+static int hcd_hub_resume (struct usb_bus *bus)
+{
+	struct usb_hcd		*hcd;
+
+	hcd = container_of (bus, struct usb_hcd, self);
+	if (hcd->driver->hub_resume)
+		return hcd->driver->hub_resume (hcd);
+	return 0;
+}
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+
 /* called by khubd, rmmod, apmd, or other thread for hcd-private cleanup.
  * we're guaranteed that the device is fully quiesced.  also, that each
  * endpoint has been hcd_endpoint_disabled.
@@ -1435,6 +1461,10 @@ struct usb_operations usb_hcd_operations = {
 	.buffer_alloc =		hcd_buffer_alloc,
 	.buffer_free =		hcd_buffer_free,
 	.disable =		hcd_endpoint_disable,
+#ifdef	CONFIG_USB_SUSPEND
+	.hub_suspend =		hcd_hub_suspend,
+	.hub_resume =		hcd_hub_resume,
+#endif
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 
