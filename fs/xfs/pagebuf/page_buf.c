@@ -985,6 +985,7 @@ pagebuf_get_no_daddr(
 	}
 	/* otherwise pagebuf_free just ignores it */
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
+	PB_CLEAR_OWNER(pb);
 	up(&PBP(pb)->pb_sema);	/* Return unlocked pagebuf */
 
 	PB_TRACE(pb, PB_TRACE_REC(no_daddr), rmem);
@@ -1926,14 +1927,14 @@ STATIC ctl_table pagebuf_table[] = {
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
 
-	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[3],
+	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[2],
 	sizeof(ulong), 0644, NULL, &pb_stats_clear_handler,
-	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
+	&sysctl_intvec, NULL, &pagebuf_min[2], &pagebuf_max[2]},
 
 #ifdef PAGEBUF_TRACE
-	{PB_DEBUG, "debug", &pb_params.data[4],
+	{PB_DEBUG, "debug", &pb_params.data[3],
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
-	&sysctl_intvec, NULL, &pagebuf_min[4], &pagebuf_max[4]},
+	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
 #endif
 	{0}
 };
