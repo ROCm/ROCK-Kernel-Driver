@@ -33,6 +33,7 @@
 
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_driver.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"

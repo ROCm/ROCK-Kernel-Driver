@@ -19,6 +19,7 @@
 #include <asm/dma.h>
 
 #include "scsi.h"
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
 #include "scsi_logging.h"
