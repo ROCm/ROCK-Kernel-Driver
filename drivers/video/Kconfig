@@ -376,19 +376,19 @@ config FB_SUN3
 	bool "Sun3 framebuffer support"
 	depends on FB && (SUN3 || SUN3X)
 
-config FB_BWTWO
+config FB_BW2
 	bool "BWtwo support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help
 	  This is the frame buffer device driver for the BWtwo frame buffer.
 
-config FB_CGTHREE
+config FB_CG3
 	bool "CGthree support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help
 	  This is the frame buffer device driver for the CGthree frame buffer.
 
-config FB_CGSIX
+config FB_CG6
 	bool "CGsix (GX,TurboGX) support"
 	depends on FB && ((SPARC32 || SPARC64) && FB_SBUS || (SUN3 || SUN3X) && FB_SUN3)
 	help
@@ -809,30 +809,30 @@ config FB_SBUS
 	help
 	  Say Y if you want support for SBUS or UPA based frame buffer device.
 
-config FB_CREATOR
-	bool "Creator/Creator3D support"
+config FB_FFB
+	bool "Creator/Creator3D/Elite3D support"
 	depends on FB_SBUS && SPARC64
 	help
-	  This is the frame buffer device driver for the Creator and Creator3D
-	  graphics boards.
+	  This is the frame buffer device driver for the Creator, Creator3D,
+	  and Elite3D graphics boards.
 
 config FB_TCX
 	bool "TCX (SS4/SS5 only) support"
-	depends on FB_SBUS && SPARC32
+	depends on FB_SBUS
 	help
 	  This is the frame buffer device driver for the TCX 24/8bit frame
 	  buffer.
 
-config FB_CGFOURTEEN
+config FB_CG14
 	bool "CGfourteen (SX) support"
-	depends on FB_SBUS && SPARC32
+	depends on FB_SBUS
 	help
 	  This is the frame buffer device driver for the CGfourteen frame
 	  buffer on Desktop SPARCsystems with the SX graphics option.
 
 config FB_P9100
 	bool "P9100 (Sparcbook 3 only) support"
-	depends on FB_SBUS && SPARC32
+	depends on FB_SBUS
 	help
 	  This is the frame buffer device driver for the P9100 card
 	  supported on Sparcbook 3 machines.
