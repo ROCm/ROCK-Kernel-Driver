@@ -67,6 +67,8 @@ struct jfs_inode_info {
 	 * inode is blocked in txBegin or TxBeginAnon
 	 */
 	struct semaphore commit_sem;
+	/* xattr_sem allows us to access the xattrs without taking i_sem */
+	struct rw_semaphore xattr_sem;
 	lid_t	xtlid;		/* lid of xtree lock on directory */
 #ifdef CONFIG_JFS_POSIX_ACL
 	struct posix_acl *i_acl;
