@@ -3730,8 +3730,8 @@ static int wv_check_ioaddr(unsigned long ioaddr, u8 * mac)
 	int i;			/* Loop counter */
 
 	/* Check if the base address if available. */
-	if (check_region(ioaddr, sizeof(ha_t)))
-		return -EADDRINUSE;	/* ioaddr already used */
+	if (!request_region(ioaddr, sizeof(ha_t), "wavelan probe"))
+		return -EBUSY;		/* ioaddr already used */
 
 	/* Reset host interface */
 	wv_hacr_reset(ioaddr);
@@ -3739,6 +3739,8 @@ static int wv_check_ioaddr(unsigned long ioaddr, u8 * mac)
 	/* Read the MAC address from the parameter storage area. */
 	psa_read(ioaddr, HACR_DEFAULT, psaoff(0, psa_univ_mac_addr),
 		 mac, 6);
+
+	release_region(ioaddr, sizeof(ha_t));
 
 	/*
 	 * Check the first three octets of the address for the manufacturer's code.
