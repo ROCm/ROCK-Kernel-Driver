@@ -382,7 +382,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	 * to be the owner of the tty, or have CAP_SYS_TTY_CONFIG.
 	 */
 	perm = 0;
-	if (current->tty == tty || capable(CAP_SYS_TTY_CONFIG))
+	if (current->signal->tty == tty || capable(CAP_SYS_TTY_CONFIG))
 		perm = 1;
  
 	kbd = kbd_table + console;
@@ -1221,4 +1221,3 @@ void change_console(unsigned int new_console)
 
 	complete_change_console(new_console);
 }
-

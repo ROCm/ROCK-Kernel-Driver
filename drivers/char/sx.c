@@ -1420,7 +1420,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 
 	line = tty->index;
 	sx_dprintk (SX_DEBUG_OPEN, "%d: opening line %d. tty=%p ctty=%p, np=%d)\n", 
-	            current->pid, line, tty, current->tty, sx_nports);
+	            current->pid, line, tty, current->signal->tty, sx_nports);
 
 	if ((line < 0) || (line >= SX_NPORTS) || (line >= sx_nports))
 		return -ENODEV;

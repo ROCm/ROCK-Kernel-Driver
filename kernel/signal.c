@@ -588,7 +588,8 @@ static int check_kill_permission(int sig, struct siginfo *info,
 	error = -EPERM;
 	if ((!info || ((unsigned long)info != 1 &&
 			(unsigned long)info != 2 && SI_FROMUSER(info)))
-	    && ((sig != SIGCONT) || (current->session != t->session))
+	    && ((sig != SIGCONT) ||
+		(current->signal->session != t->signal->session))
 	    && (current->euid ^ t->suid) && (current->euid ^ t->uid)
 	    && (current->uid ^ t->suid) && (current->uid ^ t->uid)
 	    && !capable(CAP_KILL))
@@ -1103,7 +1104,7 @@ kill_sl_info(int sig, struct siginfo *info, pid_t sid)
 	retval = -ESRCH;
 	read_lock(&tasklist_lock);
 	for_each_task_pid(sid, PIDTYPE_SID, p, l, pid) {
-		if (!p->leader)
+		if (!p->signal->leader)
 			continue;
 		err = group_send_sig_info(sig, info, p);
 		if (retval)

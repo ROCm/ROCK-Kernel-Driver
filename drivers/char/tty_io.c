@@ -321,7 +321,7 @@ struct tty_driver *get_tty_driver(dev_t device, int *index)
  */
 int tty_check_change(struct tty_struct * tty)
 {
-	if (current->tty != tty)
+	if (current->signal->tty != tty)
 		return 0;
 	if (tty->pgrp <= 0) {
 		printk(KERN_WARNING "tty_check_change: tty->pgrp <= 0!\n");
@@ -486,17 +486,14 @@ void do_tty_hangup(void *data)
 	if (tty->session > 0) {
 		struct list_head *l;
 		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
-			task_t *task = p;
-			do {
-				if (task->tty == tty)
-					task->tty = NULL;
-				if (task->leader) {
-					send_group_sig_info(SIGHUP, SEND_SIG_PRIV, task);
-					send_group_sig_info(SIGCONT, SEND_SIG_PRIV, task);
-				}
-			} while_each_thread(p, task);
+			if (p->signal->tty == tty)
+				p->signal->tty = NULL;
+			if (!p->signal->leader)
+				continue;
+			send_group_sig_info(SIGHUP, SEND_SIG_PRIV, p);
+			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
 			if (tty->pgrp > 0)
-				p->tty_old_pgrp = tty->pgrp;
+				p->signal->tty_old_pgrp = tty->pgrp;
 		}
 	}
 	read_unlock(&tasklist_lock);
@@ -575,15 +572,15 @@ void disassociate_ctty(int on_exit)
 
 	lock_kernel();
 
-	tty = current->tty;
+	tty = current->signal->tty;
 	if (tty) {
 		tty_pgrp = tty->pgrp;
 		if (on_exit && tty->driver->type != TTY_DRIVER_TYPE_PTY)
 			tty_vhangup(tty);
 	} else {
-		if (current->tty_old_pgrp) {
-			kill_pg(current->tty_old_pgrp, SIGHUP, on_exit);
-			kill_pg(current->tty_old_pgrp, SIGCONT, on_exit);
+		if (current->signal->tty_old_pgrp) {
+			kill_pg(current->signal->tty_old_pgrp, SIGHUP, on_exit);
+			kill_pg(current->signal->tty_old_pgrp, SIGCONT, on_exit);
 		}
 		unlock_kernel();	
 		return;
@@ -594,17 +591,13 @@ void disassociate_ctty(int on_exit)
 			kill_pg(tty_pgrp, SIGCONT, on_exit);
 	}
 
-	current->tty_old_pgrp = 0;
+	current->signal->tty_old_pgrp = 0;
 	tty->session = 0;
 	tty->pgrp = -1;
 
 	read_lock(&tasklist_lock);
-	for_each_task_pid(current->session, PIDTYPE_SID, p, l, pid) {
-		task_t *task = p;
-		do {
-			task->tty = NULL;
-		} while_each_thread(p, task);
-	}
+	for_each_task_pid(current->signal->session, PIDTYPE_SID, p, l, pid)
+		p->signal->tty = NULL;
 	read_unlock(&tasklist_lock);
 	unlock_kernel();
 }
@@ -1257,20 +1250,11 @@ static void release_dev(struct file * filp)
 		struct pid *pid;
 
 		read_lock(&tasklist_lock);
-		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
-			task_t *task = p;
-			do {
-				task->tty = NULL;
-			} while_each_thread(p, task);
-		}
-		if (o_tty) {
-			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid) {
-				task_t *task = p;
-				do {
-					task->tty = NULL;
-				} while_each_thread(p, task);
-			}
-		}
+		for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+			p->signal->tty = NULL;
+		if (o_tty)
+			for_each_task_pid(o_tty->session, PIDTYPE_SID, p,l, pid)
+				p->signal->tty = NULL;
 		read_unlock(&tasklist_lock);
 	}
 
@@ -1341,10 +1325,10 @@ static int tty_open(struct inode * inode, struct file * filp)
 retry_open:
 	noctty = filp->f_flags & O_NOCTTY;
 	if (device == MKDEV(TTYAUX_MAJOR,0)) {
-		if (!current->tty)
+		if (!current->signal->tty)
 			return -ENXIO;
-		driver = current->tty->driver;
-		index = current->tty->index;
+		driver = current->signal->tty->driver;
+		index = current->signal->tty->index;
 		filp->f_flags |= O_NONBLOCK; /* Don't let /dev/tty block */
 		/* noctty = 1; */
 		goto got_driver;
@@ -1445,14 +1429,14 @@ got_driver:
 		goto retry_open;
 	}
 	if (!noctty &&
-	    current->leader &&
-	    !current->tty &&
+	    current->signal->leader &&
+	    !current->signal->tty &&
 	    tty->session == 0) {
 	    	task_lock(current);
-		current->tty = tty;
+		current->signal->tty = tty;
 		task_unlock(current);
-		current->tty_old_pgrp = 0;
-		tty->session = current->session;
+		current->signal->tty_old_pgrp = 0;
+		tty->session = current->signal->session;
 		tty->pgrp = process_group(current);
 	}
 	return 0;
@@ -1510,7 +1494,7 @@ static int tiocsti(struct tty_struct *tty, char * arg)
 {
 	char ch, mbz = 0;
 
-	if ((current->tty != tty) && !capable(CAP_SYS_ADMIN))
+	if ((current->signal->tty != tty) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	if (get_user(ch, arg))
 		return -EFAULT;
@@ -1601,14 +1585,14 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 	struct pid *pid;
 	task_t *p;
 
-	if (current->leader &&
-	    (current->session == tty->session))
+	if (current->signal->leader &&
+	    (current->signal->session == tty->session))
 		return 0;
 	/*
 	 * The process must be a session leader and
 	 * not have a controlling tty already.
 	 */
-	if (!current->leader || current->tty)
+	if (!current->signal->leader || current->signal->tty)
 		return -EPERM;
 	if (tty->session > 0) {
 		/*
@@ -1621,21 +1605,17 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 			 */
 
 			read_lock(&tasklist_lock);
-			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid) {
-				task_t *task = p;
-				do {
-					task->tty = NULL;
-				} while_each_thread(p, task);
-			}
+			for_each_task_pid(tty->session, PIDTYPE_SID, p, l, pid)
+				p->signal->tty = NULL;
 			read_unlock(&tasklist_lock);
 		} else
 			return -EPERM;
 	}
 	task_lock(current);
-	current->tty = tty;
+	current->signal->tty = tty;
 	task_unlock(current);
-	current->tty_old_pgrp = 0;
-	tty->session = current->session;
+	current->signal->tty_old_pgrp = 0;
+	tty->session = current->signal->session;
 	tty->pgrp = process_group(current);
 	return 0;
 }
@@ -1646,7 +1626,7 @@ static int tiocgpgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 	 * (tty == real_tty) is a cheap way of
 	 * testing if the tty is NOT a master pty.
 	 */
-	if (tty == real_tty && current->tty != real_tty)
+	if (tty == real_tty && current->signal->tty != real_tty)
 		return -ENOTTY;
 	return put_user(real_tty->pgrp, arg);
 }
@@ -1660,15 +1640,15 @@ static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t 
 		return -ENOTTY;
 	if (retval)
 		return retval;
-	if (!current->tty ||
-	    (current->tty != real_tty) ||
-	    (real_tty->session != current->session))
+	if (!current->signal->tty ||
+	    (current->signal->tty != real_tty) ||
+	    (real_tty->session != current->signal->session))
 		return -ENOTTY;
 	if (get_user(pgrp, (pid_t *) arg))
 		return -EFAULT;
 	if (pgrp < 0)
 		return -EINVAL;
-	if (session_of_pgrp(pgrp) != current->session)
+	if (session_of_pgrp(pgrp) != current->signal->session)
 		return -EPERM;
 	real_tty->pgrp = pgrp;
 	return 0;
@@ -1680,7 +1660,7 @@ static int tiocgsid(struct tty_struct *tty, struct tty_struct *real_tty, pid_t *
 	 * (tty == real_tty) is a cheap way of
 	 * testing if the tty is NOT a master pty.
 	*/
-	if (tty == real_tty && current->tty != real_tty)
+	if (tty == real_tty && current->signal->tty != real_tty)
 		return -ENOTTY;
 	if (real_tty->session <= 0)
 		return -ENOTTY;
@@ -1838,12 +1818,12 @@ int tty_ioctl(struct inode * inode, struct file * file,
 			clear_bit(TTY_EXCLUSIVE, &tty->flags);
 			return 0;
 		case TIOCNOTTY:
-			if (current->tty != tty)
+			if (current->signal->tty != tty)
 				return -ENOTTY;
-			if (current->leader)
+			if (current->signal->leader)
 				disassociate_ctty(0);
 			task_lock(current);
-			current->tty = NULL;
+			current->signal->tty = NULL;
 			task_unlock(current);
 			return 0;
 		case TIOCSCTTY:
@@ -1947,9 +1927,9 @@ static void __do_SAK(void *arg)
 		tty->driver->flush_buffer(tty);
 	read_lock(&tasklist_lock);
 	for_each_task_pid(session, PIDTYPE_SID, p, l, pid) {
-		if (p->tty == tty || session > 0) {
+		if (p->signal->tty == tty || session > 0) {
 			printk(KERN_NOTICE "SAK: killed process %d"
-			    " (%s): p->session==tty->session\n",
+			    " (%s): p->signal->session==tty->session\n",
 			    p->pid, p->comm);
 			send_sig(SIGKILL, p, 1);
 			continue;

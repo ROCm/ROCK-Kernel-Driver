@@ -2278,7 +2278,7 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 
 	if (tty->driver->type != TTY_DRIVER_TYPE_CONSOLE)
 		return -EINVAL;
-	if (current->tty != tty && !capable(CAP_SYS_ADMIN))
+	if (current->signal->tty != tty && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 	if (get_user(type, (char *)arg))
 		return -EFAULT;

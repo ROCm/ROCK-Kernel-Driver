@@ -46,7 +46,7 @@ static void print_string(char *str)
 	struct tty_struct *my_tty;
 
 	/* The tty for the current task */
-	my_tty = current->tty;
+	my_tty = current->signal->tty;
 	if (my_tty != NULL) {
 		my_tty->driver->write(my_tty, 0, str, strlen(str));
 		my_tty->driver->write(my_tty, 0, "\015\012", 2);

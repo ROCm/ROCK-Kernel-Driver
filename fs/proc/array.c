@@ -168,7 +168,7 @@ static inline char * task_state(struct task_struct *p, char *buffer)
 		p->pid && p->ptrace ? p->parent->pid : 0,
 		p->uid, p->euid, p->suid, p->fsuid,
 		p->gid, p->egid, p->sgid, p->fsgid);
-	read_unlock(&tasklist_lock);	
+	read_unlock(&tasklist_lock);
 	task_lock(p);
 	buffer += sprintf(buffer,
 		"FDSize:\t%d\n"
@@ -301,7 +301,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	sigset_t sigign, sigcatch;
 	char state;
 	int res;
-	pid_t ppid;
+ 	pid_t ppid, pgid = -1, sid = -1;
 	int num_threads = 0;
 	struct mm_struct *mm;
 
@@ -311,10 +311,6 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	mm = task->mm;
 	if(mm)
 		mm = mmgrab(mm);
-	if (task->tty) {
-		tty_pgrp = task->tty->pgrp;
-		tty_nr = new_encode_dev(tty_devnum(task->tty));
-	}
 	task_unlock(task);
 	if (mm) {
 		down_read(&mm->mmap_sem);
@@ -335,7 +331,15 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		collect_sigign_sigcatch(task, &sigign, &sigcatch);
 		spin_unlock_irq(&task->sighand->siglock);
 	}
-	read_unlock(&tasklist_lock);		
+	if (task->signal) {
+		if (task->signal->tty) {
+			tty_pgrp = task->signal->tty->pgrp;
+			tty_nr = new_encode_dev(tty_devnum(task->signal->tty));
+		}
+		pgid = process_group(task);
+		sid = task->signal->session;
+	}
+	read_unlock(&tasklist_lock);
 
 	/* scale priority and nice values from timeslices to -20..20 */
 	/* to make it look like a "normal" Unix priority/nice value  */
@@ -352,8 +356,8 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		task->comm,
 		state,
 		ppid,
-		process_group(task),
-		task->session,
+		pgid,
+		sid,
 		tty_nr,
 		tty_pgrp,
 		task->flags,
