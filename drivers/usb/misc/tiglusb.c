@@ -476,7 +476,7 @@ tiglusb_init (void)
 	}
 
 	/* register device */
-	if (devfs_register_chrdev (TIUSB_MAJOR, "tiglusb", &tiglusb_fops)) {
+	if (register_chrdev (TIUSB_MAJOR, "tiglusb", &tiglusb_fops)) {
 		err ("unable to get major %d", TIUSB_MAJOR);
 		return -EIO;
 	}
@@ -487,7 +487,7 @@ tiglusb_init (void)
 	/* register USB module */
 	result = usb_register (&tiglusb_driver);
 	if (result < 0) {
-		devfs_unregister_chrdev (TIUSB_MAJOR, "tiglusb");
+		unregister_chrdev (TIUSB_MAJOR, "tiglusb");
 		return -1;
 	}
 
@@ -501,7 +501,7 @@ tiglusb_cleanup (void)
 {
 	usb_deregister (&tiglusb_driver);
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev (TIUSB_MAJOR, "tiglusb");
+	unregister_chrdev (TIUSB_MAJOR, "tiglusb");
 }
 
 /* --------------------------------------------------------------------- */

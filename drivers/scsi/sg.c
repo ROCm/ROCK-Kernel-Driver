@@ -1348,8 +1348,7 @@ static int sg_init()
 
     write_lock_irqsave(&sg_dev_arr_lock, iflags);
     if(!sg_registered) {
-	if (devfs_register_chrdev(SCSI_GENERIC_MAJOR,"sg",&sg_fops))
-        {
+	if (register_chrdev(SCSI_GENERIC_MAJOR,"sg",&sg_fops)) {
             printk(KERN_ERR "Unable to get major %d for generic SCSI device\n",
                    SCSI_GENERIC_MAJOR);
 	    write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
@@ -1611,7 +1610,7 @@ static void __exit exit_sg( void)
     sg_proc_cleanup();
 #endif  /* CONFIG_PROC_FS */
     scsi_unregister_device(&sg_template);
-    devfs_unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
+    unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
     if(sg_dev_arr != NULL) {
 	kfree((char *)sg_dev_arr);
         sg_dev_arr = NULL;

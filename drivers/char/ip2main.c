@@ -531,12 +531,7 @@ cleanup_module(void)
 	if ( ( err = tty_unregister_driver ( &ip2_callout_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister callout driver (%d)\n", err);
 	}
-#ifdef	CONFIG_DEVFS_FS
-	if ( ( err = devfs_unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) )
-#else
-	if ( ( err = unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) )
-#endif
-	{
+	if ( ( err = unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister IPL driver (%d)\n", err);
 	}
 	remove_proc_entry("ip2mem", &proc_root);
@@ -866,12 +861,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		printk(KERN_ERR "IP2: failed to register callout driver (%d)\n", err);
 	} else
 	/* Register the IPL driver. */
-#ifdef	CONFIG_DEVFS_FS
-	if (( err = devfs_register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl )))
-#else
-	if ( ( err = register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl ) ) )
-#endif
-	{
+	if ( ( err = register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl ) ) ) {
 		printk(KERN_ERR "IP2: failed to register IPL device (%d)\n", err );
 	} else
 	/* Register the read_procmem thing */

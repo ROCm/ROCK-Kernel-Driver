@@ -94,11 +94,10 @@ extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
 extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
 extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
-extern int devfs_register_chrdev (unsigned int major, const char *name,
-				  struct file_operations *fops);
+extern int devfs_should_register_chrdev (void);
 extern int devfs_register_blkdev (unsigned int major, const char *name,
 				  struct block_device_operations *bdops);
-extern int devfs_unregister_chrdev (unsigned int major, const char *name);
+extern int devfs_should_unregister_chrdev (void);
 extern int devfs_unregister_blkdev (unsigned int major, const char *name);
 
 extern void devfs_register_tape (devfs_handle_t de);
@@ -239,19 +238,18 @@ static inline const char *devfs_get_name (devfs_handle_t de,
 {
     return NULL;
 }
-static inline int devfs_register_chrdev (unsigned int major, const char *name,
-					 struct file_operations *fops)
+static inline int devfs_should_register_chrdev (void)
 {
-    return register_chrdev (major, name, fops);
+    return 0;
 }
 static inline int devfs_register_blkdev (unsigned int major, const char *name,
 					 struct block_device_operations *bdops)
 {
     return register_blkdev (major, name, bdops);
 }
-static inline int devfs_unregister_chrdev (unsigned int major,const char *name)
+static inline int devfs_unregister_chrdev (void)
 {
-    return unregister_chrdev (major, name);
+    return 0;
 }
 static inline int devfs_unregister_blkdev (unsigned int major,const char *name)
 {

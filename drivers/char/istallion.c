@@ -869,7 +869,7 @@ void cleanup_module()
 		return;
 	}
 	devfs_unregister (devfs_handle);
-	if ((i = devfs_unregister_chrdev(STL_SIOMEMMAJOR, "staliomem")))
+	if ((i = unregister_chrdev(STL_SIOMEMMAJOR, "staliomem")))
 		printk("STALLION: failed to un-register serial memory device, "
 			"errno=%d\n", -i);
 	if (stli_tmpwritebuf != (char *) NULL)
@@ -5329,7 +5329,7 @@ int __init stli_init(void)
  *	Set up a character driver for the shared memory region. We need this
  *	to down load the slave code image. Also it is a useful debugging tool.
  */
-	if (devfs_register_chrdev(STL_SIOMEMMAJOR, "staliomem", &stli_fsiomem))
+	if (register_chrdev(STL_SIOMEMMAJOR, "staliomem", &stli_fsiomem))
 		printk(KERN_ERR "STALLION: failed to register serial memory "
 				"device\n");
 

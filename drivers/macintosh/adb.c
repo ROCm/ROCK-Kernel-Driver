@@ -815,7 +815,7 @@ static struct file_operations adb_fops = {
 static void
 adbdev_init(void)
 {
-	if (devfs_register_chrdev(ADB_MAJOR, "adb", &adb_fops))
+	if (register_chrdev(ADB_MAJOR, "adb", &adb_fops))
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
 	else
 		devfs_register (NULL, "adb", DEVFS_FL_DEFAULT,

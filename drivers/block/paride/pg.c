@@ -637,7 +637,7 @@ static int __init pg_init(void)
 	if (pg_detect())
 		return -1;
 
-	if (devfs_register_chrdev(major,name,&pg_fops)) {
+	if (register_chrdev(major,name,&pg_fops)) {
 		printk("pg_init: unable to get major number %d\n",
 			major);
 		for (unit=0;unit<PG_UNITS;unit++)
@@ -656,7 +656,7 @@ static void __exit pg_exit(void)
 	int unit;
 
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(major,name);
+	unregister_chrdev(major,name);
 
 	for (unit=0;unit<PG_UNITS;unit++)
 		if (PG.present) pi_release(PI);

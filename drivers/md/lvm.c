@@ -388,9 +388,9 @@ static struct gendisk lvm_gendisk =
  */
 int lvm_init(void)
 {
-	if (devfs_register_chrdev(LVM_CHAR_MAJOR,
+	if (register_chrdev(LVM_CHAR_MAJOR,
 				  lvm_name, &lvm_chr_fops) < 0) {
-		printk(KERN_ERR "%s -- devfs_register_chrdev failed\n",
+		printk(KERN_ERR "%s -- register_chrdev failed\n",
 		       lvm_name);
 		return -EIO;
 	}
@@ -398,9 +398,9 @@ int lvm_init(void)
 	if (devfs_register_blkdev(MAJOR_NR, lvm_name, &lvm_blk_dops) < 0)
 	{
 		printk("%s -- devfs_register_blkdev failed\n", lvm_name);
-		if (devfs_unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
+		if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
 			printk(KERN_ERR
-			       "%s -- devfs_unregister_chrdev failed\n",
+			       "%s -- unregister_chrdev failed\n",
 			       lvm_name);
 		return -EIO;
 	}
@@ -442,8 +442,8 @@ int lvm_init(void)
  */
 static void lvm_cleanup(void)
 {
-	if (devfs_unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
-		printk(KERN_ERR "%s -- devfs_unregister_chrdev failed\n",
+	if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0)
+		printk(KERN_ERR "%s -- unregister_chrdev failed\n",
 		       lvm_name);
 	if (devfs_unregister_blkdev(MAJOR_NR, lvm_name) < 0)
 		printk(KERN_ERR "%s -- devfs_unregister_blkdev failed\n",
