@@ -413,145 +413,46 @@ int vio_disable_interrupts(struct vio_dev *dev)
 }
 EXPORT_SYMBOL(vio_disable_interrupts);
 
-
 dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
 			  size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-	dma_addr_t dma_handle = DMA_ERROR_CODE;
-	unsigned long uaddr;
-	unsigned int npages;
-
-	BUG_ON(direction == DMA_NONE);
-
-	uaddr = (unsigned long)vaddr;
-	npages = PAGE_ALIGN( uaddr + size ) - ( uaddr & PAGE_MASK );
-	npages >>= PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-
-	if (tbl) {
-		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
-		dma_handle |= (uaddr & ~PAGE_MASK);
-	}
-
-	return dma_handle;
+	return iommu_map_single(dev->iommu_table, vaddr, size, direction);
 }
 EXPORT_SYMBOL(vio_map_single);
 
 void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
 		      size_t size, enum dma_data_direction direction)
 {
-	struct iommu_table * tbl;
-	unsigned int npages;
-
-	BUG_ON(direction == DMA_NONE);
-
-	npages = PAGE_ALIGN( dma_handle + size ) - ( dma_handle & PAGE_MASK );
-	npages >>= PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-	if(tbl)
-		iommu_free(tbl, dma_handle, npages);
+	iommu_unmap_single(dev->iommu_table, dma_handle, size, direction);
 }
 EXPORT_SYMBOL(vio_unmap_single);
 
 int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	       enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-
-	BUG_ON(direction == DMA_NONE);
-
-	if (nelems == 0)
-		return 0;
-
-	tbl = vdev->iommu_table;
-	if (!tbl)
-		return 0;
-
-	return iommu_alloc_sg(tbl, &vdev->dev, sglist, nelems, direction);
+	return iommu_map_sg(&vdev->dev, vdev->iommu_table, sglist,
+			nelems, direction);
 }
 EXPORT_SYMBOL(vio_map_sg);
 
 void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 		  enum dma_data_direction direction)
 {
-	struct iommu_table *tbl;
-
-	BUG_ON(direction == DMA_NONE);
-
-	tbl = vdev->iommu_table;
-	if (tbl)
-		iommu_free_sg(tbl, sglist, nelems);
+	iommu_unmap_sg(vdev->iommu_table, sglist, nelems, direction);
 }
 EXPORT_SYMBOL(vio_unmap_sg);
 
 void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			   dma_addr_t *dma_handle)
 {
-	struct iommu_table * tbl;
-	void *ret = NULL;
-	unsigned int npages, order;
-	dma_addr_t tce;
-
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-	order = get_order(size);
-
- 	/* Client asked for way to much space.  This is checked later anyway */
-	/* It is easier to debug here for the drivers than in the tce tables.*/
- 	if(order >= IOMAP_MAX_ORDER) {
- 		printk("VIO_DMA: vio_alloc_consistent size too large: 0x%lx \n", size);
- 		return NULL;
- 	}
-
-	tbl = dev->iommu_table;
-
-	if (tbl) {
-		/* Alloc enough pages (and possibly more) */
-		ret = (void *)__get_free_pages(GFP_ATOMIC, order);
-		if (ret) {
-			/* Page allocation succeeded */
-			memset(ret, 0, npages << PAGE_SHIFT);
-			/* Set up tces to cover the allocated range */
-			tce = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL);
-			if (tce == DMA_ERROR_CODE) {
-				PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: iommu_alloc failed\n" );
-				free_pages((unsigned long)ret, order);
-				ret = NULL;
-			} else {
-				*dma_handle = tce;
-			}
-		}
-		else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: __get_free_pages failed for size = %d\n", size);
-	}
-	else PPCDBG(PPCDBG_TCE, "vio_alloc_consistent: get_iommu_table failed for 0x%016lx\n", dev);
-
-	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: dma_handle = 0x%16.16lx\n", *dma_handle);
-	PPCDBG(PPCDBG_TCE, "\tvio_alloc_consistent: return     = 0x%16.16lx\n", ret);
-	return ret;
+	return iommu_alloc_consistent(dev->iommu_table, size, dma_handle);
 }
 EXPORT_SYMBOL(vio_alloc_consistent);
 
 void vio_free_consistent(struct vio_dev *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	struct iommu_table *tbl;
-	unsigned int npages;
-
-	PPCDBG(PPCDBG_TCE, "vio_free_consistent:\n");
-	PPCDBG(PPCDBG_TCE, "\tdev = 0x%16.16lx, size = 0x%16.16lx, dma_handle = 0x%16.16lx, vaddr = 0x%16.16lx\n", dev, size, dma_handle, vaddr);
-
-	size = PAGE_ALIGN(size);
-	npages = size >> PAGE_SHIFT;
-
-	tbl = dev->iommu_table;
-
-	if ( tbl ) {
-		iommu_free(tbl, dma_handle, npages);
-		free_pages((unsigned long)vaddr, get_order(size));
-	}
+	iommu_free_consistent(dev->iommu_table, size, vaddr, dma_handle);
 }
 EXPORT_SYMBOL(vio_free_consistent);
 

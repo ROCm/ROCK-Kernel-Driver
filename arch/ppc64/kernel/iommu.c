@@ -140,7 +140,7 @@ static unsigned long iommu_range_alloc(struct iommu_table *tbl, unsigned long np
 	return n;
 }
 
-dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
+static dma_addr_t iommu_alloc(struct iommu_table *tbl, void *page,
 		       unsigned int npages, enum dma_data_direction direction)
 {
 	unsigned long entry, flags;
@@ -206,7 +206,7 @@ static void __iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 		__clear_bit(free_entry+i, tbl->it_map);
 }
 
-void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr, 
+static void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 		unsigned int npages)
 {
 	unsigned long flags;
@@ -225,15 +225,20 @@ void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr,
 	spin_unlock_irqrestore(&(tbl->it_lock), flags);
 }
 
-int iommu_alloc_sg(struct iommu_table *tbl, struct device *dev,
-		   struct scatterlist *sglist, int nelems,
-		   enum dma_data_direction direction)
+int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
+		struct scatterlist *sglist, int nelems,
+		enum dma_data_direction direction)
 {
 	dma_addr_t dma_next, dma_addr;
 	unsigned long flags;
 	struct scatterlist *s, *outs, *segstart;
 	int outcount;
 	unsigned long handle;
+
+	BUG_ON(direction == DMA_NONE);
+
+	if ((nelems == 0) || !tbl)
+		return 0;
 
 	outs = s = segstart = &sglist[0];
 	outcount = 1;
@@ -349,10 +354,15 @@ int iommu_alloc_sg(struct iommu_table *tbl, struct device *dev,
 }
 
 
-void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist,
-		   int nelems)
+void iommu_unmap_sg(struct iommu_table *tbl, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
 	unsigned long flags;
+
+	BUG_ON(direction == DMA_NONE);
+
+	if (!tbl)
+		return;
 
 	spin_lock_irqsave(&(tbl->it_lock), flags);
 
@@ -413,4 +423,105 @@ struct iommu_table *iommu_init_table(struct iommu_table *tbl)
 	}
 
 	return tbl;
+}
+
+/* Creates TCEs for a user provided buffer.  The user buffer must be
+ * contiguous real kernel storage (not vmalloc).  The address of the buffer
+ * passed here is the kernel (virtual) address of the buffer.  The buffer
+ * need not be page aligned, the dma_addr_t returned will point to the same
+ * byte within the page as vaddr.
+ */
+dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
+		size_t size, enum dma_data_direction direction)
+{
+	dma_addr_t dma_handle = DMA_ERROR_CODE;
+	unsigned long uaddr;
+	unsigned int npages;
+
+	BUG_ON(direction == DMA_NONE);
+
+	uaddr = (unsigned long)vaddr;
+	npages = PAGE_ALIGN(uaddr + size) - (uaddr & PAGE_MASK);
+	npages >>= PAGE_SHIFT;
+
+	if (tbl) {
+		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
+		if (dma_handle == DMA_ERROR_CODE) {
+			if (printk_ratelimit())  {
+				printk(KERN_INFO "iommu_alloc failed, "
+						"tbl %p vaddr %p npages %d\n",
+						tbl, vaddr, npages);
+			}
+		} else
+			dma_handle |= (uaddr & ~PAGE_MASK);
+	}
+
+	return dma_handle;
+}
+
+void iommu_unmap_single(struct iommu_table *tbl, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction direction)
+{
+	BUG_ON(direction == DMA_NONE);
+
+	if (tbl)
+		iommu_free(tbl, dma_handle, (PAGE_ALIGN(dma_handle + size) -
+					(dma_handle & PAGE_MASK)) >> PAGE_SHIFT);
+}
+
+/* Allocates a contiguous real buffer and creates mappings over it.
+ * Returns the virtual address of the buffer and sets dma_handle
+ * to the dma address (mapping) of the first page.
+ */
+void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
+		dma_addr_t *dma_handle)
+{
+	void *ret = NULL;
+	dma_addr_t mapping;
+	unsigned int npages, order;
+
+	size = PAGE_ALIGN(size);
+	npages = size >> PAGE_SHIFT;
+	order = get_order(size);
+
+ 	/*
+	 * Client asked for way too much space.  This is checked later
+	 * anyway.  It is easier to debug here for the drivers than in
+	 * the tce tables.
+	 */
+	if (order >= IOMAP_MAX_ORDER) {
+		printk("iommu_alloc_consistent size too large: 0x%lx\n", size);
+		return (void *)DMA_ERROR_CODE;
+	}
+
+	if (!tbl)
+		return NULL;
+
+	/* Alloc enough pages (and possibly more) */
+	ret = (void *)__get_free_pages(GFP_ATOMIC, order);
+	if (!ret)
+		return NULL;
+	memset(ret, 0, size);
+
+	/* Set up tces to cover the allocated range */
+	mapping = iommu_alloc(tbl, ret, npages, DMA_BIDIRECTIONAL);
+	if (mapping == DMA_ERROR_CODE) {
+		free_pages((unsigned long)ret, order);
+		ret = NULL;
+	} else
+		*dma_handle = mapping;
+	return ret;
+}
+
+void iommu_free_consistent(struct iommu_table *tbl, size_t size,
+			 void *vaddr, dma_addr_t dma_handle)
+{
+	unsigned int npages;
+
+	if (tbl) {
+		size = PAGE_ALIGN(size);
+		npages = size >> PAGE_SHIFT;
+		iommu_free(tbl, dma_handle, npages);
+		free_pages((unsigned long)vaddr, get_order(size));
+	}
 }

@@ -19,8 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#ifndef _PCI_DMA_H
-#define _PCI_DMA_H
+#ifndef _ASM_IOMMU_H
+#define _ASM_IOMMU_H
 
 #include <asm/types.h>
 #include <linux/spinlock.h>
@@ -131,20 +131,20 @@ extern void iommu_devnode_init(struct iSeries_Device_Node *dn);
  */
 extern struct iommu_table *iommu_init_table(struct iommu_table * tbl);
 
-/* allocates a range of tces and sets them to the pages  */
-extern dma_addr_t iommu_alloc(struct iommu_table *, void *page, 
-			      unsigned int numPages,
-			      enum dma_data_direction direction);
-extern void iommu_free(struct iommu_table *tbl, dma_addr_t dma_addr, 
-		       unsigned int npages);
+extern int iommu_map_sg(struct device *dev, struct iommu_table *tbl,
+		struct scatterlist *sglist, int nelems,
+		enum dma_data_direction direction);
+extern void iommu_unmap_sg(struct iommu_table *tbl, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction);
 
-/* same with sg lists */
-extern int iommu_alloc_sg(struct iommu_table *table, struct device *dev,
-			  struct scatterlist *sglist, int nelems,
-			  enum dma_data_direction direction);
-extern void iommu_free_sg(struct iommu_table *tbl, struct scatterlist *sglist,
-			  int nelems);
-
+extern void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
+		dma_addr_t *dma_handle);
+extern void iommu_free_consistent(struct iommu_table *tbl, size_t size,
+		void *vaddr, dma_addr_t dma_handle);
+extern dma_addr_t iommu_map_single(struct iommu_table *tbl, void *vaddr,
+		size_t size, enum dma_data_direction direction);
+extern void iommu_unmap_single(struct iommu_table *tbl, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction direction);
 
 extern void tce_init_pSeries(void);
 extern void tce_init_iSeries(void);
@@ -154,4 +154,4 @@ extern void pci_dma_init_direct(void);
 
 extern int ppc64_iommu_off;
 
-#endif
+#endif /* _ASM_IOMMU_H */
