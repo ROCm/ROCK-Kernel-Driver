@@ -110,7 +110,7 @@ void bio_destructor(struct bio *bio)
 inline void bio_init(struct bio *bio)
 {
 	bio->bi_next = NULL;
-	bio->bi_flags = 0;
+	bio->bi_flags = 1 << BIO_UPTODATE;
 	bio->bi_rw = 0;
 	bio->bi_vcnt = 0;
 	bio->bi_idx = 0;
@@ -523,12 +523,30 @@ out:
 	end_kio_request(kio, !err);
 }
 
+/**
+ * bio_endio - end I/O on a bio
+ * @bio:	bio
+ * @bytes_done:	number of bytes completed
+ * @error:	error, if any
+ *
+ * Description:
+ *   bio_endio() will end I/O @bytes_done number of bytes. This may be just
+ *   a partial part of the bio, or it may be the whole bio. bio_endio() is
+ *   the preferred way to end I/O on a bio, it takes care of decrementing
+ *   bi_size and clearing BIO_UPTODATE on error. @error is 0 on success, and
+ *   and one of the established -Exxxx (-EIO, for instance) error values in
+ *   case something went wrong.
+ **/
 int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 {
-	if (!error)
-		set_bit(BIO_UPTODATE, &bio->bi_flags);
-	else
+	if (error)
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
+
+	if (unlikely(bytes_done > bio->bi_size)) {
+		printk("%s: want %u bytes done, only %u left\n", __FUNCTION__,
+						bytes_done, bio->bi_size);
+		bytes_done = bio->bi_size;
+	}
 
 	bio->bi_size -= bytes_done;
 	return bio->bi_end_io(bio, bytes_done, error);
