@@ -5334,7 +5334,7 @@ int __init stli_init(void)
 		printk(KERN_ERR "STALLION: failed to register serial memory "
 				"device\n");
 
-	devfs_mk_dir (NULL, "staliomem", NULL);
+	devfs_mk_dir("staliomem");
 	for (i = 0; i < 4; i++) {
 		char name[16];
 		sprintf(name, "staliomem/%d", i);

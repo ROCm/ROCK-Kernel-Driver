@@ -22,8 +22,6 @@ typedef struct devfs_entry * devfs_handle_t;
 
 #ifdef CONFIG_DEVFS_FS
 
-extern void devfs_remove(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
-
 struct unique_numspace
 {
     spinlock_t init_lock;
@@ -42,8 +40,10 @@ extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      umode_t mode, void *ops, void *info);
 extern void devfs_unregister (devfs_handle_t de);
 extern int devfs_mk_symlink (const char *name, const char *link);
-extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
-				    void *info);
+extern devfs_handle_t devfs_mk_dir(const char *fmt, ...)
+	__attribute__((format (printf, 1, 2)));
+extern void devfs_remove(const char *fmt, ...)
+	__attribute__((format (printf, 1, 2)));
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
@@ -80,8 +80,7 @@ static inline int devfs_mk_symlink (const char *name, const char *link)
 {
     return 0;
 }
-static inline devfs_handle_t devfs_mk_dir (devfs_handle_t dir,
-					   const char *name, void *info)
+static inline devfs_handle_t devfs_mk_dir(const char *fmt, ...)
 {
     return NULL;
 }

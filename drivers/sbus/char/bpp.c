@@ -1049,7 +1049,7 @@ static int __init bpp_init(void)
 		instances[idx].opened = 0;
 		probeLptPort(idx);
 	}
-	devfs_mk_dir (NULL, "bpp", NULL);
+	devfs_mk_dir("bpp");
 	for (idx = 0; idx < BPP_NO; idx++) {
 		char name[16];
 		sprintf(name, "bpp/%d", idx);

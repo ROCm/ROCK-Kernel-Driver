@@ -432,7 +432,7 @@ int __init pty_init(void)
 
 	/* Unix98 devices */
 #ifdef CONFIG_UNIX98_PTYS
-	devfs_mk_dir (NULL, "pts", NULL);
+	devfs_mk_dir("pts");
 	printk("pty: %d Unix98 ptys configured\n", UNIX98_NR_MAJORS*NR_PTYS);
 	for ( i = 0 ; i < UNIX98_NR_MAJORS ; i++ ) {
 		int j;

@@ -1682,10 +1682,8 @@ int devfs_mk_symlink(const char *from, const char *to)
 
 /**
  *	devfs_mk_dir - Create a directory in the devfs namespace.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
  *		new name is relative to the root of the devfs.
- *	@name: The name of the entry.
- *	@info: An arbitrary pointer which will be associated with the entry.
+ *	@fmt: The name of the entry.
  *
  *	Use of this function is optional. The devfs_register() function
  *	will automatically create intermediate directories as needed. This function
@@ -1694,36 +1692,42 @@ int devfs_mk_symlink(const char *from, const char *to)
  *	On failure %NULL is returned.
  */
 
-devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
+devfs_handle_t devfs_mk_dir(const char *fmt, ...)
 {
-    int err;
-    struct devfs_entry *de, *old;
+	struct devfs_entry *dir = NULL, *de = NULL, *old;
+	char buf[64];
+	va_list args;
+	int n;
 
-    if (name == NULL)
-    {
-	PRINTK ("(): NULL name pointer\n");
-	return NULL;
-    }
-    if ( ( de = _devfs_prepare_leaf (&dir, name, MODE_DIR) ) == NULL )
-    {
-	PRINTK ("(%s): could not prepare leaf\n", name);
-	return NULL;
-    }
-    de->info = info;
-    if ( ( err = _devfs_append_entry (dir, de, &old) ) != 0 )
-    {
-	PRINTK ("(%s): could not append to dir: %p \"%s\", err: %d\n",
-		name, dir, dir->name, err);
-	devfs_put (old);
-	devfs_put (dir);
-	return NULL;
-    }
-    DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
-	     name, de, dir, dir->name);
-    devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED, 0);
-    devfs_put (dir);
-    return de;
-}   /*  End Function devfs_mk_dir  */
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid argument.", __FUNCTION__);
+		return NULL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, MODE_DIR);
+	if (!de) {
+		PRINTK("(%s): could not prepare leaf\n", buf);
+		return NULL;
+	}
+
+	de->info = NULL;
+	if (_devfs_append_entry(dir, de, &old)) {
+		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
+				buf, dir, dir->name);
+		devfs_put(old);
+		goto out_put;
+	}
+	
+	DPRINTK(DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
+			buf, de, dir, dir->name);
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED, 0);
+
+ out_put:
+	devfs_put(dir);
+	return de;
+}
 
 
 void devfs_remove(const char *fmt, ...)

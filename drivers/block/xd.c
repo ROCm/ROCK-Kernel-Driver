@@ -173,7 +173,7 @@ static int __init xd_init(void)
 	if (register_blkdev(XT_DISK_MAJOR, "xd"))
 		goto out1;
 
-	devfs_mk_dir(NULL, "xd", NULL);
+	devfs_mk_dir("xd");
 	blk_init_queue(&xd_queue, do_xd_request, &xd_lock);
 	if (xd_detect(&controller,&address)) {
 

@@ -21,6 +21,7 @@
 #include <linux/fs_struct.h>
 #include <linux/mm.h>
 #include <linux/socket.h>
+#include <net/compat.h>
 
 #include <asm/oplib.h>
 #include <asm/delay.h>

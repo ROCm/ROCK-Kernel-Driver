@@ -3597,7 +3597,7 @@ int __init md_init(void)
 	if (register_blkdev(MAJOR_NR, "md"))
 		return -1;
 
-	devfs_mk_dir(NULL, "md", NULL);
+	devfs_mk_dir("md");
 	blk_register_region(MKDEV(MAJOR_NR, 0), MAX_MD_DEVS, THIS_MODULE,
 				md_probe, NULL, NULL);
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {

@@ -30,6 +30,7 @@
 #include <net/protocol.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/compat.h>
 #include <net/scm.h>
 
 

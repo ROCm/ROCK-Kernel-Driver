@@ -24,7 +24,7 @@ int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq)
 {
 	int offset, offset_seq;
 
-	switch (skb->nh.iph->protocol) {
+	switch (nexthdr) {
 	case IPPROTO_AH:
 		offset = offsetof(struct ip_auth_hdr, spi);
 		offset_seq = offsetof(struct ip_auth_hdr, seq_no);

@@ -123,8 +123,9 @@ int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir)
 	return nexthdr;
 }
 
-int xfrm6_rcv(struct sk_buff *skb)
+int xfrm6_rcv(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	int err;
 	u32 spi, seq;
 	struct xfrm_state *xfrm_vec[XFRM_MAX_DEPTH];
@@ -137,12 +138,8 @@ int xfrm6_rcv(struct sk_buff *skb)
 	u16 nh_offset = 0;
 	u8 nexthdr = 0;
 
-	if (hdr->nexthdr == IPPROTO_AH || hdr->nexthdr == IPPROTO_ESP) {
-		nh_offset = ((unsigned char*)&skb->nh.ipv6h->nexthdr) - skb->nh.raw;
-		hdr_len = sizeof(struct ipv6hdr);
-	} else {
-		hdr_len = skb->h.raw - skb->nh.raw;
-	}
+	nh_offset = ((unsigned char*)&skb->nh.ipv6h->nexthdr) - skb->nh.raw;
+	hdr_len = sizeof(struct ipv6hdr);
 
 	tmp_hdr = kmalloc(hdr_len, GFP_ATOMIC);
 	if (!tmp_hdr)
@@ -188,20 +185,6 @@ int xfrm6_rcv(struct sk_buff *skb)
 		spin_unlock(&x->lock);
 
 		xfrm_vec[xfrm_nr++] = x;
-
-		iph = skb->nh.ipv6h; /* ??? */ 
-
-		if (nexthdr == NEXTHDR_DEST) {
-			if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
-			    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
-				err = -EINVAL;
-				goto drop;
-			}
-			nexthdr = skb->h.raw[0];
-			nh_offset = skb->h.raw - skb->nh.raw;
-			skb_pull(skb, (skb->h.raw[1]+1)<<3);
-			skb->h.raw = skb->data;
-		}
 
 		if (x->props.mode) { /* XXX */
 			if (iph->nexthdr != IPPROTO_IPV6)
