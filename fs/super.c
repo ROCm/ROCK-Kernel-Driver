@@ -45,7 +45,7 @@ void put_filesystem(struct file_system_type *fs);
 struct file_system_type *get_fs_type(const char *name);
 
 LIST_HEAD(super_blocks);
-spinlock_t sb_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(sb_lock);
 
 /**
  *	alloc_super	-	create new superblock
@@ -590,7 +590,7 @@ void emergency_remount(void)
  */
 
 static struct idr unnamed_dev_idr;
-static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
+static DEFINE_SPINLOCK(unnamed_dev_lock);/* protects the above */
 
 int set_anon_super(struct super_block *s, void *data)
 {

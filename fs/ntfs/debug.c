@@ -26,7 +26,7 @@
  * to protect concurrent accesses to it.
  */
 static char err_buf[1024];
-static spinlock_t err_buf_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(err_buf_lock);
 
 /**
  * __ntfs_warning - output a warning to the syslog

@@ -80,7 +80,7 @@ static struct hlist_head *inode_hashtable;
  * NOTE! You also have to own the lock if you change
  * the i_state of an inode while it is in use..
  */
-spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(inode_lock);
 
 /*
  * iprune_sem provides exclusion between the kswapd or try_to_free_pages

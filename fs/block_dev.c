@@ -237,7 +237,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
  * pseudo-fs
  */
 
-static spinlock_t bdev_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(bdev_lock);
 static kmem_cache_t * bdev_cachep;
 
 static struct inode *bdev_alloc_inode(struct super_block *sb)

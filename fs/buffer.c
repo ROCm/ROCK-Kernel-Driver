@@ -537,7 +537,7 @@ static void free_more_memory(void)
  */
 static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
-	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(page_uptodate_lock);
 	unsigned long flags;
 	struct buffer_head *tmp;
 	struct page *page;
@@ -595,7 +595,7 @@ still_busy:
 void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 {
 	char b[BDEVNAME_SIZE];
-	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(page_uptodate_lock);
 	unsigned long flags;
 	struct buffer_head *tmp;
 	struct page *page;

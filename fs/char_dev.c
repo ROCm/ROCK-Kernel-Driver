@@ -28,7 +28,7 @@ static struct kobj_map *cdev_map;
 
 #define MAX_PROBE_HASH 255	/* random */
 
-static rwlock_t chrdevs_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(chrdevs_lock);
 
 static struct char_device_struct {
 	struct char_device_struct *next;
@@ -248,7 +248,7 @@ int unregister_chrdev(unsigned int major, const char *name)
 	return 0;
 }
 
-static spinlock_t cdev_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cdev_lock);
 
 static struct kobject *cdev_get(struct cdev *p)
 {

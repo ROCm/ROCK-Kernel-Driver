@@ -507,7 +507,7 @@ int send_sigurg(struct fown_struct *fown)
 	return ret;
 }
 
-static rwlock_t fasync_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fasync_lock);
 static kmem_cache_t *fasync_cache;
 
 /*

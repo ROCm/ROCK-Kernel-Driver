@@ -61,7 +61,7 @@ char core_pattern[65] = "core";
 /* The maximal length of core_pattern is also specified in sysctl.c */
 
 static struct linux_binfmt *formats;
-static rwlock_t binfmt_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(binfmt_lock);
 
 int register_binfmt(struct linux_binfmt * fmt)
 {
