@@ -394,11 +394,6 @@ static int hs_register_callback(unsigned int sock,
     	DPRINTK("hs_register_callback(%d)\n", sock);
 	sp->handler = handler;
 	sp->handler_info = info;
-	if (handler == 0) {
-	    MOD_DEC_USE_COUNT;
-	} else {
-	    MOD_INC_USE_COUNT;
-	}
 	return 0;
 }
 
@@ -891,18 +886,19 @@ static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 /*============================================================*/
 
 static struct pccard_operations hs_operations = {
-	hs_init,
-	hs_suspend,
-	hs_register_callback,
-	hs_inquire_socket,
-	hs_get_status,
-	hs_get_socket,
-	hs_set_socket,
-	hs_get_io_map,
-	hs_set_io_map,
-	hs_get_mem_map,
-	hs_set_mem_map,
-	hs_proc_setup
+	.owner			= THIS_MODULE,
+	.init			= hs_init,
+	.suspend		= hs_suspend,
+	.register_callback	= hs_register_callback,
+	.inquire_socket		= hs_inquire_socket,
+	.get_status		= hs_get_status,
+	.get_socket		= hs_get_socket,
+	.set_socket		= hs_set_socket,
+	.get_io_map		= hs_get_io_map,
+	.set_io_map		= hs_set_io_map,
+	.get_mem_map		= hs_get_mem_map,
+	.set_mem_map		= hs_set_mem_map,
+	.proc_setup		= hs_proc_setup,
 };
 
 static int hs_init_socket(hs_socket_t *sp, int irq, unsigned long mem_base,
