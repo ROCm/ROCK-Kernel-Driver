@@ -57,7 +57,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 
 	envp[i++] = scratch;
 	length += snprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
-			    pdev->slot_name);
+			    pci_name(pdev));
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
 

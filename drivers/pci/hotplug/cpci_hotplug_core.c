@@ -427,34 +427,6 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 	return 0;
 }
 
-struct slot *
-cpci_find_slot(struct pci_bus *bus, unsigned int devfn)
-{
-	struct slot *slot;
-	struct slot *found;
-	struct list_head *tmp;
-
-	if(!bus) {
-		return NULL;
-	}
-
-	spin_lock(&list_lock);
-	if(!slots) {
-		spin_unlock(&list_lock);
-		return NULL;
-	}
-	found = NULL;
-	list_for_each(tmp, &slot_list) {
-		slot = list_entry(tmp, struct slot, slot_list);
-		if(slot->bus == bus && slot->devfn == devfn) {
-			found = slot;
-			break;
-		}
-	}
-	spin_unlock(&list_lock);
-	return found;
-}
-
 /* This is the interrupt mode interrupt handler */
 irqreturn_t
 cpci_hp_intr(int irq, void *data, struct pt_regs *regs)
@@ -924,6 +896,5 @@ EXPORT_SYMBOL_GPL(cpci_hp_register_controller);
 EXPORT_SYMBOL_GPL(cpci_hp_unregister_controller);
 EXPORT_SYMBOL_GPL(cpci_hp_register_bus);
 EXPORT_SYMBOL_GPL(cpci_hp_unregister_bus);
-EXPORT_SYMBOL_GPL(cpci_find_slot);
 EXPORT_SYMBOL_GPL(cpci_hp_start);
 EXPORT_SYMBOL_GPL(cpci_hp_stop);
