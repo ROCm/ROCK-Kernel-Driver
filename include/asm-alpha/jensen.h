@@ -7,9 +7,6 @@
  * Defines for the AlphaPC EISA IO and memory address space.
  */
 
-/* The Jensen is strange */
-#define AUX_IRQ (9)
-
 /*
  * NOTE! The memory operations do not set any memory barriers, as it's
  * not needed for cases like a frame buffer that is essentially memory-like.
