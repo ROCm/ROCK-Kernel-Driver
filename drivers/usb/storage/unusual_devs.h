@@ -412,6 +412,28 @@ UNUSUAL_DEV(  0x0686, 0x4017, 0x0001, 0x0001,
                 "DIMAGE E223",
                 US_SC_SCSI, US_PR_DEVICE, NULL, 0 ),
 
+/* Following three Minolta cameras reported by Martin Pool
+ * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
+ * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
+ */
+UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
+             "Minolta",
+             "DiMAGE 7",
+             US_SC_SCSI, US_PR_DEVICE, NULL,
+             0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400b, 0x0001, 0x0001,
+             "Minolta",
+             "DiMAGE 7i",
+             US_SC_SCSI, US_PR_DEVICE, NULL,
+             0 ),
+
+UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
+             "Minolta",
+             "DiMAGE 7Hi",
+             US_SC_SCSI, US_PR_DEVICE, NULL,
+             0 ),
+
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
 		"FlashGate SmartMedia",
