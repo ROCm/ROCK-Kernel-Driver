@@ -435,7 +435,7 @@ static const char EP_INTR_IN_NAME [] = "ep3-bulk";
 #define LDBG(lun,fmt,args...) \
 	yprintk(lun , KERN_DEBUG , fmt , ## args)
 #define MDBG(fmt,args...) \
-	printk(KERN_DEBUG DRIVER_NAME ": " fmt, ## args)
+	printk(KERN_DEBUG DRIVER_NAME ": " fmt , ## args)
 #else
 #define DBG(fsg,fmt,args...) \
 	do { } while (0)
@@ -473,7 +473,7 @@ static const char EP_INTR_IN_NAME [] = "ep3-bulk";
 	yprintk(lun , KERN_INFO , fmt , ## args)
 
 #define MINFO(fmt,args...) \
-	printk(KERN_INFO DRIVER_NAME ": " fmt, ## args)
+	printk(KERN_INFO DRIVER_NAME ": " fmt , ## args)
 
 
 /*-------------------------------------------------------------------------*/
