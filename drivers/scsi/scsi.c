@@ -36,9 +36,6 @@
  *  out_of_space hacks, D. Gilbert (dpg) 990608
  */
 
-#define REVISION	"Revision: 1.00"
-#define VERSION		"Id: scsi.c 1.00 2000/09/26"
-
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -1499,6 +1496,7 @@ static int __init init_scsi(void)
 	scsi_host_init();
 	devfs_mk_dir(NULL, "scsi", NULL);
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
+	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
 cleanup_devlist:
@@ -1507,6 +1505,8 @@ cleanup_procfs:
 	scsi_exit_procfs();
 cleanup_queue:
 	scsi_exit_queue();
+	printk(KERN_ERR "SCSI subsystem failed to initialize, error = %d\n",
+	       -error);
 	return error;
 }
 
