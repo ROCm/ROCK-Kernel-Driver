@@ -413,26 +413,6 @@ static void capidev_free(struct capidev *cdev)
 	kmem_cache_free(capidev_cachep, cdev);
 }
 
-static struct capidev *capidev_find(u16 applid)
-{
-	// FIXME this doesn't guarantee that the device won't go away shortly
-	struct list_head *l;
-	struct capidev *p = NULL;
-
-	read_lock(&capidev_list_lock);
-	list_for_each(l, &capidev_list) {
-		p = list_entry(l, struct capidev, list);
-		if (p->applid == applid)
-			break;
-	}
-	read_unlock(&capidev_list_lock);
-	
-	if (l == &capidev_list)
-		return NULL;
-	
-	return p;
-}
-
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 /* -------- handle data queue --------------------------------------- */
 
@@ -605,6 +585,15 @@ static void capi_signal(u16 applid, void *param)
 		return;
 	}
 
+	BUG_ON(cdev->applid != applid);
+		
+	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
+		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
+		if (info == 0)
+			capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
+			
+	}
+
 	if (CAPIMSG_COMMAND(skb->data) != CAPI_DATA_B3) {
 		skb_queue_tail(&cdev->recvqueue, skb);
 		wake_up_interruptible(&cdev->recvwait);
@@ -753,6 +742,11 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		}
 	}
 	CAPIMSG_SETAPPID(skb->data, cdev->applid);
+
+	if (CAPIMSG_COMMAND(skb->data) == CAPI_DISCONNECT_B3_RESP) {
+		capincci_free(cdev, CAPIMSG_NCCI(skb->data));
+			
+	}
 
 	cdev->errcode = (*capifuncs->capi_put_message) (cdev->applid, skb);
 
@@ -1601,36 +1595,8 @@ static int __init alloc_init(void)
 	return 0;
 }
 
-static void lower_callback(unsigned int cmd, u32 contr, void *data)
-{
-	struct capi_ncciinfo *np;
-	struct capidev *cdev;
-
-	switch (cmd) {
-	case KCI_CONTRUP:
-		printk(KERN_INFO "capi: controller %hu up\n", contr);
-		break;
-	case KCI_CONTRDOWN:
-		printk(KERN_INFO "capi: controller %hu down\n", contr);
-		break;
-	case KCI_NCCIUP:
-		np = (struct capi_ncciinfo *)data;
-		if ((cdev = capidev_find(np->applid)) == 0)
-			return;
-		(void)capincci_alloc(cdev, np->ncci);
-		break;
-	case KCI_NCCIDOWN:
-		np = (struct capi_ncciinfo *)data;
-		if ((cdev = capidev_find(np->applid)) == 0)
-			return;
-		(void)capincci_free(cdev, np->ncci);
-		break;
-	}
-}
-
 static struct capi_interface_user cuser = {
 	name: "capi20",
-	callback: lower_callback,
 };
 
 static char rev[32];

@@ -653,46 +653,6 @@ static void notify_down(u32 contr)
 	spin_unlock(&users_lock);
 }
 
-/* -------- KCI_NCCIUP ---------------------------------------- */
-
-static void notify_ncciup(u32 contr, u16 applid, u32 ncci)
-{
-	struct list_head *l;
-	struct capi_interface_user *p;
-	struct capi_ncciinfo n;
-
-	n.applid = applid;
-	n.ncci = ncci;
-        /*printk(KERN_NOTICE "kcapi: notify up contr %d\n", contr);*/
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_NCCIUP, contr, &n);
-	}
-	spin_unlock(&users_lock);
-};
-
-/* -------- KCI_NCCIDOWN -------------------------------------- */
-
-static void notify_nccidown(u32 contr, u16 applid, u32 ncci)
-{
-	struct list_head *l;
-	struct capi_interface_user *p;
-	struct capi_ncciinfo n;
-
-	n.applid = applid;
-	n.ncci = ncci;
-        /*printk(KERN_NOTICE "kcapi: notify down contr %d\n", contr);*/
-	spin_lock(&users_lock);
-	list_for_each(l, &users) {
-		p = list_entry(l, struct capi_interface_user, user_list);
-		if (!p->callback) continue;
-		(*p->callback) (KCI_NCCIDOWN, contr, &n);
-	}
-	spin_unlock(&users_lock);
-};
-
 /* ------------------------------------------------------------ */
 
 static void inline notify_doit(struct capi_notifier *np)
@@ -703,12 +663,6 @@ static void inline notify_doit(struct capi_notifier *np)
 			break;
 		case KCI_CONTRDOWN:
 			notify_down(np->controller);
-			break;
-		case KCI_NCCIUP:
-			notify_ncciup(np->controller, np->applid, np->ncci);
-			break;
-		case KCI_NCCIDOWN:
-			notify_nccidown(np->controller, np->applid, np->ncci);
 			break;
 	}
 }
@@ -807,8 +761,6 @@ static void controllercb_new_ncci(struct capi_ctr * card,
 	ap->nccilist = np;
 	ap->nncci++;
 	printk(KERN_INFO "kcapi: appl %d ncci 0x%x up\n", appl, ncci);
-
-	notify_push(KCI_NCCIUP, card->cnr, appl, ncci);
 }
 
 static void controllercb_free_ncci(struct capi_ctr * card,
@@ -827,7 +779,6 @@ static void controllercb_free_ncci(struct capi_ctr * card,
 			kfree(np);
 			ap->nncci--;
 			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down\n", appl, ncci);
-			notify_push(KCI_NCCIDOWN, card->cnr, appl, ncci);
 			return;
 		}
 	}
@@ -976,7 +927,6 @@ static void controllercb_reseted(struct capi_ctr * card)
 				struct capi_ncci *np = *pp;
 				*pp = np->next;
 				printk(KERN_INFO "kcapi: appl %d ncci 0x%x forced down!\n", appl, np->ncci);
-				notify_push(KCI_NCCIDOWN, card->cnr, appl, np->ncci);
 				kfree(np);
 				nextpp = pp;
 			} else {
