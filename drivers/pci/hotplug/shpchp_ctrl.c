@@ -1572,7 +1572,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 
 			retval = p_slot->hpc_ops->check_cmd_status(ctrl);
 			if (retval) {
-				err("%s: Failed to disable slot, error code(%d)\n", __FUNCTION__, rc);
+				err("%s: Failed to disable slot, error code(%d)\n", __FUNCTION__, retval);
 				/* Done with exclusive hardware access */
 				up(&ctrl->crit_sect);
 				return retval;  
