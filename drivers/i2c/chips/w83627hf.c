@@ -923,6 +923,11 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 		kind = w83627thf;
 	else if(val == W637_DEVID)
 		kind = w83637hf;
+	else {
+		dev_info(&adapter->dev,
+			 "Unsupported chip (dev_id=0x%02X).\n", val);
+		goto ERROR1;
+	}
 
 	superio_select(W83627HF_LD_HWM);
 	if((val = 0x01 & superio_inb(WINB_ACT_REG)) == 0)
@@ -960,11 +965,6 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 		client_name = "w83697hf";
 	} else if (kind == w83637hf) {
 		client_name = "w83637hf";
-	} else {
-		dev_err(&new_client->dev, "Internal error: unknown "
-						"kind (%d)?!?", kind);
-		err = -ENODEV;
-		goto ERROR2;
 	}
 
 	/* Fill in the remaining client fields and put into the global list */

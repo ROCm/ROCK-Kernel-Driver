@@ -609,11 +609,6 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 		client_name = "lm78-j";
 	} else if (kind == lm79) {
 		client_name = "lm79";
-	} else {
-		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		err = -ENODEV;
-		goto ERROR2;
 	}
 
 	/* Fill in the remaining client fields and put into the global list */

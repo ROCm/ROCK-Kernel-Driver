@@ -966,7 +966,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 {
 	int i, val1 = 0, id;
 	int err;
-	const char *client_name;
+	const char *client_name = "";
 	struct w83781d_data *data = i2c_get_clientdata(new_client);
 
 	data->lm75[0] = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
@@ -1032,8 +1032,6 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		client_name = "w83627hf subclient";
 	else if (kind == as99127f)
 		client_name = "as99127f subclient";
-	else
-		client_name = "unknown subclient?";
 
 	for (i = 0; i <= 1; i++) {
 		/* store all data in w83781d */
@@ -1087,6 +1085,23 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		goto ERROR0;
 	}
 
+	/* Prevent users from forcing a kind for a bus it isn't supposed
+	   to possibly be on */
+	if (is_isa && (kind == as99127f || kind == w83783s)) {
+		dev_err(&adapter->dev,
+			"Cannot force I2C-only chip for ISA address 0x%02x.\n",
+			address);
+		err = -EINVAL;
+		goto ERROR0;
+	}
+	if (!is_isa && kind == w83697hf) {
+		dev_err(&adapter->dev,
+			"Cannot force ISA-only chip for I2C address 0x%02x.\n",
+			address);
+		err = -EINVAL;
+		goto ERROR0;
+	}
+	
 	if (is_isa)
 		if (!request_region(address, W83781D_EXTENT, "w83781d")) {
 			err = -EBUSY;
@@ -1240,11 +1255,6 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		client_name = "as99127f";
 	} else if (kind == w83697hf) {
 		client_name = "w83697hf";
-	} else {
-		dev_err(&new_client->dev, "Internal error: unknown "
-						"kind (%d)?!?", kind);
-		err = -ENODEV;
-		goto ERROR2;
 	}
 
 	/* Fill in the remaining client fields and put into the global list */

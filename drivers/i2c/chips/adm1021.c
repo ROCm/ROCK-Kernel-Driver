@@ -297,10 +297,6 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 		type_name = "gl523sm";
 	} else if (kind == mc1066) {
 		type_name = "mc1066";
-	} else {
-		dev_err(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		goto error1;
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */

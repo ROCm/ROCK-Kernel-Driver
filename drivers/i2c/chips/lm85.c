@@ -815,10 +815,6 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 		type_name = "adm1027";
 	} else if ( kind == adt7463 ) {
 		type_name = "adt7463";
-	} else {
-		dev_dbg(&adapter->dev, "Internal error, invalid kind (%d)!", kind);
-		err = -EFAULT ;
-		goto ERROR1;
 	}
 	strlcpy(new_client->name, type_name, I2C_NAME_SIZE);
 

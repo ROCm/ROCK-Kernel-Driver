@@ -116,7 +116,7 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct lm75_data *data;
 	int err = 0;
-	const char *name;
+	const char *name = "";
 
 	/* Make sure we aren't probing the ISA bus!! This is just a safety check
 	   at this moment; i2c_detect really won't call us. */
@@ -170,10 +170,6 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == lm75) {
 		name = "lm75";
-	} else {
-		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		goto exit_free;
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */

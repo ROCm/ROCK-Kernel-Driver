@@ -47,7 +47,7 @@ static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
 static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
-SENSORS_INSMOD_4(it87, it8705, it8712, sis950);
+SENSORS_INSMOD_1(it87);
 
 
 /* Update battery voltage after every reading if true */
@@ -600,12 +600,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == it87) {
 		name = "it87";
-	} /* else if (kind == it8712) {
-		name = "it8712";
-	} */ else {
-		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
-			kind);
-		goto ERROR1;
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
@@ -833,13 +827,7 @@ static struct it87_data *it87_update_device(struct device *dev)
 		}
 
 		/* The 8705 does not have VID capability */
-		/*if (data->type == it8712) {
-			data->vid = it87_read_value(client, IT87_REG_VID);
-			data->vid &= 0x1f;
-		}
-		else */ {
-			data->vid = 0x1f;
-		}
+		data->vid = 0x1f;
 
 		i = it87_read_value(client, IT87_REG_FAN_DIV);
 		data->fan_div[0] = i & 0x07;
