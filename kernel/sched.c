@@ -4560,10 +4560,12 @@ static void __devinit arch_init_sched_domains(void)
 	}
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
 static void __devinit arch_destroy_sched_domains(void)
 {
 	/* Do nothing: everything is statically allocated. */
 }
+#endif
 
 #undef SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
