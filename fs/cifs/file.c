@@ -283,7 +283,12 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		return 0;
 	}
 
-
+	if(file->f_dentry == NULL) {
+		up(&pCifsFile->fh_sem);
+		cFYI(1,("failed file reopen, no valid name if dentry freed"));
+		FreeXid(xid);
+		return -EBADF;
+	}
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 

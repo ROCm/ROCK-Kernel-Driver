@@ -38,7 +38,7 @@ renew_parental_timestamps(struct dentry *direntry)
 	do {
 		direntry->d_time = jiffies;
 		direntry = direntry->d_parent;
-	} while (!IS_ROOT(direntry));	/* BB for DFS case should stop at the root of share which could be lower than root of this mount due to implicit dfs connections */
+	} while (!IS_ROOT(direntry));	
 }
 
 /* Note: caller must free return buffer */
@@ -48,6 +48,11 @@ build_path_from_dentry(struct dentry *direntry)
 	struct dentry *temp;
 	int namelen = 0;
 	char *full_path;
+
+	if(direntry == NULL)
+		return NULL;  /* not much we can do if dentry is freed and
+		we need to reopen the file after it was closed implicitly
+		when the server crashed */
 
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen += (1 + temp->d_name.len);
