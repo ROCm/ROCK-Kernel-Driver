@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
@@ -356,7 +357,6 @@ alloc_shared_hugetlb_pages(int key, unsigned long addr, unsigned long len,
 	struct vm_area_struct *vma;
 	struct inode *inode;
 	struct address_space *mapping;
-	struct page *page;
 	int idx;
 	int retval = -ENOMEM;
 	int newalloc = 0;

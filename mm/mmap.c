@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/personality.h>
 #include <linux/security.h>
+#include <linux/hugetlb.h>
 #include <linux/profile.h>
 
 #include <asm/uaccess.h>

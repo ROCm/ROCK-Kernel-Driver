@@ -376,20 +376,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
 
-#ifdef CONFIG_HUGETLB_PAGE
-#define is_vm_hugetlb_page(vma) (vma->vm_flags & VM_HUGETLB)
-extern int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
-extern int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
-extern	int free_hugepages(struct vm_area_struct *);
-extern int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
-#else
-#define is_vm_hugetlb_page(vma) (0)
-#define follow_hugetlb_page(mm, vma, pages, vmas, start, len, i) (0)
-#define copy_hugetlb_page_range(dst, src, vma) (0)
-#define free_hugepages(mpnt)  do { } while(0)
-#endif
-
-
 /*
  * Prototype to add a shrinker callback for ageable caches.
  * 

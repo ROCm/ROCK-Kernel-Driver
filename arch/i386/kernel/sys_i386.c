@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/sem.h>
