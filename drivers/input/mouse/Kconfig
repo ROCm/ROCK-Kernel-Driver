@@ -119,7 +119,7 @@ config MOUSE_RISCPC
 	  module will be called rpcmouse.
 
 config MOUSE_VSXXXAA
-	tristate "DEC VSXXX-AA/GA mouse and tablet"
+	tristate "DEC VSXXX-AA/GA mouse and VSXXX-AB tablet"
 	depends on INPUT && INPUT_MOUSE
 	select SERIO
 	help
