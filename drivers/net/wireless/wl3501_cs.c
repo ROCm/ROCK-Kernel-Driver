@@ -940,7 +940,8 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 				    WL3501_BLKSZ -
 				    sizeof(struct wl3501_rx_hdr) + 6;
 			} else {
-				wl3501_get_from_wla(this, this->start_seg +
+				wl3501_get_from_wla(this,
+						    this->start_seg +
 						    sizeof(struct wl3501_rx_hdr)
 						    - 6, data, size);
 				size = 0;
@@ -1144,15 +1145,16 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 {
 	struct wl3501_md_ind sig;
 	struct sk_buff *skb;
-	int size;
-	u16 tmp, pkt_len;
+	u16 pkt_len;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 	this->start_seg = sig.data;
 
 	if (this->llc_type == 1) {
-		wl3501_get_from_wla(this, sig.data +
-				    sizeof(struct wl3501_rx_hdr) - 6,
+		u16 tmp;
+
+		wl3501_get_from_wla(this,
+				    sig.data + sizeof(struct wl3501_rx_hdr) - 6,
 				    &tmp, sizeof(tmp));
 		if (tmp == 0xaaaa) {
 			pkt_len = sig.size + 12 - 24 - 4 - 6;
@@ -1167,25 +1169,21 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 	} else
 		pkt_len = sig.size - 24 - 4;
 
-	size = pkt_len;
-	skb = dev_alloc_skb(size + 5);
+	skb = dev_alloc_skb(pkt_len + 5);
 
 	if (!skb) {
 		printk(KERN_WARNING "%s: Can't alloc a sk_buff of size %d.\n",
-		       dev->name, size);
-		/*
-		 * Must drop this packet to ensure interrupt will come again
-		 */
+		       dev->name, pkt_len);
 		this->stats.rx_dropped++;
 	} else {
 		skb->dev = dev;
 		skb_reserve(skb, 2);	/* IP headers on 16 bytes
 					   boundaries */
-		skb_put(skb, size);	/* Make room */
-		memcpy((char *)skb->data, (char *)&(sig.daddr), 12);
-		wl3501_receive(this, skb->data, size);
-		skb->protocol = eth_type_trans(skb, dev);
-		dev->last_rx = jiffies;
+		eth_copy_and_sum(skb, (unsigned char *)&sig.daddr, 12, 0);
+		wl3501_receive(this, skb->data, pkt_len);
+		skb_put(skb, pkt_len);
+		skb->protocol	= eth_type_trans(skb, dev);
+		dev->last_rx	= jiffies;
 		this->stats.rx_packets++;
 		this->stats.rx_bytes += skb->len;
 		netif_rx(skb);
