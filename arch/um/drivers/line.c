@@ -73,9 +73,8 @@ static int buffer_data(struct line *line, const char *buf, int len)
 	else {
 		memcpy(line->tail, buf, end);
 		buf += end;
-		len -= end;
-		memcpy(line->buffer, buf, len);
-		line->tail = line->buffer + len;
+		memcpy(line->buffer, buf, len - end);
+		line->tail = line->buffer + len - end;
 	}
 
 	return(len);
