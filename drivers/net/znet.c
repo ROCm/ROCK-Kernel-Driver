@@ -538,10 +538,18 @@ static int znet_send_packet(struct sk_buff *skb, struct net_device *dev)
 	int ioaddr = dev->base_addr;
 	struct znet_private *znet = dev->priv;
 	unsigned long flags;
+	short length = skb->len;
 
 	if (znet_debug > 4)
 		printk(KERN_DEBUG "%s: ZNet_send_packet.\n", dev->name);
 
+	if (length < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		length = ETH_ZLEN;
+	}
+	
 	netif_stop_queue (dev);
 	
 	/* Check that the part hasn't reset itself, probably from suspend. */
@@ -556,7 +564,6 @@ static int znet_send_packet(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (1) {
-		short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 		unsigned char *buf = (void *)skb->data;
 		ushort *tx_link = znet->tx_cur - 1;
 		ushort rnd_len = (length + 1)>>1;

@@ -484,8 +484,16 @@ static int smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * de
 	}
 	lp->saved_skb = skb;
 
-	length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+	length = skb->len;
 
+	if (length < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL) {
+			netif_wake_queue(dev);
+			return 0;
+		}
+		length = ETH_ZLEN;
+	}
 		
 	/*
 	** The MMU wants the number of pages to be the number of 256 bytes

@@ -1,9 +1,9 @@
 /*
  * include/asm-v850/module.h -- Architecture-specific module hooks
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
- *  Copyright (C) 2001  Rusty Russell
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,03  Rusty Russell
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -27,16 +27,28 @@ struct v850_plt_entry
 
 struct mod_arch_specific
 {
-	/* How much of the core is actually taken up with core (then
-           we know the rest is for the PLT).  */
-	unsigned int core_plt_offset;
-
-	/* Same for init.  */
-	unsigned int init_plt_offset;
+	/* Indices of PLT sections within module. */
+	unsigned int core_plt_section, init_plt_section;
 };
 
 #define Elf_Shdr Elf32_Shdr
 #define Elf_Sym Elf32_Sym
 #define Elf_Ehdr Elf32_Ehdr
+
+/* Make empty sections for module_frob_arch_sections to expand. */
+#ifdef MODULE
+asm(".section .plt,\"ax\",@nobits; .align 3; .previous");
+asm(".section .init.plt,\"ax\",@nobits; .align 3; .previous");
+#endif
+
+/* We don't do exception tables.  */
+struct exception_table_entry;
+static inline const struct exception_table_entry *
+search_extable(const struct exception_table_entry *first,
+	       const struct exception_table_entry *last,
+	       unsigned long value)
+{
+	return 0;
+}
 
 #endif /* __V850_MODULE_H__ */

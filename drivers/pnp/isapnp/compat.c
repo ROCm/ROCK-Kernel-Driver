@@ -8,10 +8,11 @@
  
 /* TODO: see if more isapnp functions are needed here */
 
-#include <linux/pnp.h>
+#include <linux/config.h>
+#include <linux/version.h>
+#include <linux/module.h>
 #include <linux/isapnp.h>
 #include <linux/string.h>
-#include <linux/module.h>
 
 static void pnp_convert_id(char *buf, unsigned short vendor, unsigned short device)
 {
@@ -29,8 +30,8 @@ struct pnp_card *pnp_find_card(unsigned short vendor,
 			       unsigned short device,
 			       struct pnp_card *from)
 {
-	char id[7];
-	char any[7];
+	char id[8];
+	char any[8];
 	struct list_head *list;
 	pnp_convert_id(id, vendor, device);
 	pnp_convert_id(any, ISAPNP_ANY_ID, ISAPNP_ANY_ID);
@@ -51,8 +52,8 @@ struct pnp_dev *pnp_find_dev(struct pnp_card *card,
 			     unsigned short function,
 			     struct pnp_dev *from)
 {
-	char id[7];
-	char any[7];
+	char id[8];
+	char any[8];
 	pnp_convert_id(id, vendor, function);
 	pnp_convert_id(any, ISAPNP_ANY_ID, ISAPNP_ANY_ID);
 	if (card == NULL) {	/* look for a logical device from all cards */

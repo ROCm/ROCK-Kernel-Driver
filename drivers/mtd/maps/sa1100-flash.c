@@ -74,15 +74,15 @@ static void sa1100_copy_to(struct map_info *map, unsigned long to, const void *f
 }
 
 static struct map_info sa1100_map __initdata = {
-	name:		"SA1100 flash",
-	read8:		sa1100_read8,
-	read16:		sa1100_read16,
-	read32:		sa1100_read32,
-	copy_from:	sa1100_copy_from,
-	write8:		sa1100_write8,
-	write16:	sa1100_write16,
-	write32:	sa1100_write32,
-	copy_to:	sa1100_copy_to,
+	.name		= "SA1100 flash",
+	.read8		= sa1100_read8,
+	.read16		= sa1100_read16,
+	.read32		= sa1100_read32,
+	.copy_from	= sa1100_copy_from,
+	.write8		= sa1100_write8,
+	.write16	= sa1100_write16,
+	.write32	= sa1100_write32,
+	.copy_to	= sa1100_copy_to,
 };
 
 
@@ -108,24 +108,24 @@ static struct map_info sa1100_map __initdata = {
 #ifdef CONFIG_SA1100_ADSBITSY
 static struct mtd_partition adsbitsy_partitions[] = {
 	{
-		name:		"bootROM",
-		size:		0x80000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "bootROM",
+		.size		= 0x80000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"zImage",
-		size:		0x100000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "zImage",
+		.size		= 0x100000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"ramdisk.gz",
-		size:		0x300000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "ramdisk.gz",
+		.size		= 0x300000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"User FS",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "User FS",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -134,38 +134,38 @@ static struct mtd_partition adsbitsy_partitions[] = {
 /* Phase 4 Assabet has two 28F160B3 flash parts in bank 0: */
 static struct mtd_partition assabet4_partitions[] = {
 	{
-		name:		"bootloader",
-		size:		0x00020000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader",
+		.size		= 0x00020000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"bootloader params",
-		size:		0x00020000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader params",
+		.size		= 0x00020000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"jffs",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "jffs",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 
 /* Phase 5 Assabet has two 28F128J3A flash parts in bank 0: */
 static struct mtd_partition assabet5_partitions[] = {
 	{
-		name:		"bootloader",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"bootloader params",
-		size:		0x00040000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader params",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"jffs",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "jffs",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 
@@ -180,21 +180,21 @@ static struct mtd_partition assabet5_partitions[] = {
  */
 static struct mtd_partition badge4_partitions[] = {
 	{
-		name:		"BLOB boot loader",
-		offset:		0,
-		size:		0x0000A000
+		.name		= "BLOB boot loader",
+		.offset		= 0,
+		.size		= 0x0000A000
 	}, {
-		name:		"params",
-		offset:		MTDPART_OFS_APPEND,
-		size:		0x00006000
+		.name		= "params",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x00006000
 	}, {
-		name:		"kernel",
-		offset:		MTDPART_OFS_APPEND,
-		size:		0x00100000
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0x00100000
 	}, {
-		name:		"root",
-		offset:		MTDPART_OFS_APPEND,
-		size:		MTDPART_SIZ_FULL
+		.name		= "root",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL
 	}
 };
 #endif
@@ -204,41 +204,41 @@ static struct mtd_partition badge4_partitions[] = {
 #ifdef CONFIG_SA1100_CERF_FLASH_32MB
 static struct mtd_partition cerf_partitions[] = {
 	{
-		name:		"firmware",
-		size:		0x00040000,
-		offset:		0,
+		.name		= "firmware",
+		.size		= 0x00040000,
+		.offset		= 0,
 	}, {
-		name:		"params",
-		size:		0x00040000,
-		offset:		0x00040000,
+		.name		= "params",
+		.size		= 0x00040000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"kernel",
-		size:		0x00100000,
-		offset:		0x00080000,
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00080000,
 	}, {
-		name:		"rootdisk",
-		size:		0x01E80000,
-		offset:		0x00180000,
+		.name		= "rootdisk",
+		.size		= 0x01E80000,
+		.offset		= 0x00180000,
 	}
 };
 #elif defined CONFIG_SA1100_CERF_FLASH_16MB
 static struct mtd_partition cerf_partitions[] = {
 	{
-		name:		"firmware",
-		size:		0x00020000,
-		offset:		0,
+		.name		= "firmware",
+		.size		= 0x00020000,
+		.offset		= 0,
 	}, {
-		name:		"params",
-		size:		0x00020000,
-		offset:		0x00020000,
+		.name		= "params",
+		.size		= 0x00020000,
+		.offset		= 0x00020000,
 	}, {
-		name:		"kernel",
-		size:		0x00100000,
-		offset:		0x00040000,
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"rootdisk",
-		size:		0x00EC0000,
-		offset:		0x00140000,
+		.name		= "rootdisk",
+		.size		= 0x00EC0000,
+		.offset		= 0x00140000,
 	}
 };
 #elif defined CONFIG_SA1100_CERF_FLASH_8MB
@@ -251,36 +251,36 @@ static struct mtd_partition cerf_partitions[] = {
 #ifdef CONFIG_SA1100_CONSUS
 static struct mtd_partition consus_partitions[] = {
 	{
-		name:		"Consus boot firmware",
-		offset: 	0,
-		size:		0x00040000,
-		mask_flags:	MTD_WRITABLE, /* force read-only */
+		.name		= "Consus boot firmware",
+		.offset		= 0,
+		.size		= 0x00040000,
+		.mask_flags	= MTD_WRITABLE, /* force read-only */
 	}, {
-		name:		"Consus kernel",
-		offset: 	0x00040000,
-		size:		0x00100000,
-		mask_flags:	0,
+		.name		= "Consus kernel",
+		.offset		= 0x00040000,
+		.size		= 0x00100000,
+		.mask_flags	= 0,
 	}, {
-		name:		"Consus disk",
-		offset: 	0x00140000,
+		.name		= "Consus disk",
+		.offset		= 0x00140000,
 		/* The rest (up to 16M) for jffs.  We could put 0 and
 		   make it find the size automatically, but right now
 		   i have 32 megs.  jffs will use all 32 megs if given
 		   the chance, and this leads to horrible problems
 		   when you try to re-flash the image because blob
 		   won't erase the whole partition. */
-		size:		0x01000000 - 0x00140000,
-		mask_flags:	0,
+		.size		= 0x01000000 - 0x00140000,
+		.mask_flags	= 0,
 	}, {
 		/* this disk is a secondary disk, which can be used as
 		   needed, for simplicity, make it the size of the other
 		   consus partition, although realistically it could be
 		   the remainder of the disk (depending on the file
 		   system used) */
-		 name:		"Consus disk2",
-		 offset:	0x01000000,
-		 size:		0x01000000 - 0x00140000,
-		 mask_flags:	0,
+		 .name		= "Consus disk2",
+		 .offset	= 0x01000000,
+		 .size		= 0x01000000 - 0x00140000,
+		 .mask_flags	= 0,
 	}
 };
 #endif
@@ -290,45 +290,45 @@ static struct mtd_partition consus_partitions[] = {
 #define FLEXANET_FLASH_SIZE		0x02000000
 static struct mtd_partition flexanet_partitions[] = {
 	{
-		name:		"bootloader",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"bootloader params",
-		size:		0x00040000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "bootloader params",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"kernel",
-		size:		0x000C0000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "kernel",
+		.size		= 0x000C0000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"altkernel",
-		size:		0x000C0000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "altkernel",
+		.size		= 0x000C0000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"root",
-		size:		0x00400000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "root",
+		.size		= 0x00400000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"free1",
-		size:		0x00300000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "free1",
+		.size		= 0x00300000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"free2",
-		size:		0x00300000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "free2",
+		.size		= 0x00300000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}, {
-		name:		"free3",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,
+		.name		= "free3",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
 	}
 };
 #endif
@@ -337,48 +337,48 @@ static struct mtd_partition flexanet_partitions[] = {
 static struct mtd_partition freebird_partitions[] = {
 #if CONFIG_SA1100_FREEBIRD_NEW
 	{
-		name:		"firmware",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "firmware",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"kernel",
-		size:		0x00080000,
-		offset:		0x00040000,
+		.name		= "kernel",
+		.size		= 0x00080000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"params",
-		size:		0x00040000,
-		offset:		0x000C0000,
+		.name		= "params",
+		.size		= 0x00040000,
+		.offset		= 0x000C0000,
 	}, {
-		name:		"initrd",
-		size:		0x00100000,
-		offset:		0x00100000,
+		.name		= "initrd",
+		.size		= 0x00100000,
+		.offset		= 0x00100000,
 	}, {
-		name:		"root cramfs",
-		size:		0x00300000,
-		offset:		0x00200000,
+		.name		= "root cramfs",
+		.size		= 0x00300000,
+		.offset		= 0x00200000,
 	}, {
-		name:		"usr cramfs",
-		size:		0x00C00000,
-		offset:		0x00500000,
+		.name		= "usr cramfs",
+		.size		= 0x00C00000,
+		.offset		= 0x00500000,
 	}, {
-		name:		"local",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x01100000,
+		.name		= "local",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x01100000,
 	}
 #else
 	{
-		size:		0x00040000,
-		offset:		0,
+		.size		= 0x00040000,
+		.offset		= 0,
 	}, {
-		size:		0x000c0000,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= 0x000c0000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		0x00400000,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= 0x00400000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 #endif
 };
@@ -389,29 +389,29 @@ static struct mtd_partition freebird_partitions[] = {
 static struct mtd_partition frodo_partitions[] =
 {
 	{
-		name:		"bootloader",
-		size:		0x00040000,
-		offset: 	0x00000000,
-		mask_flags:	MTD_WRITEABLE
+		.name		= "bootloader",
+		.size		= 0x00040000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE
 	}, {
-		name:		"bootloader params",
-		size:		0x00040000,
-		offset: 	MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE
+		.name		= "bootloader params",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE
 	}, {
-		name:		"kernel",
-		size:		0x00100000,
-		offset: 	MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE
 	}, {
-		name:		"ramdisk",
-		size:		0x00400000,
-		offset: 	MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE
+		.name		= "ramdisk",
+		.size		= 0x00400000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE
 	}, {
-		name:		"file system",
-		size:		MTDPART_SIZ_FULL,
-		offset: 	MTDPART_OFS_APPEND
+		.name		= "file system",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND
 	}
 };
 #endif
@@ -419,19 +419,19 @@ static struct mtd_partition frodo_partitions[] =
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 static struct mtd_partition graphicsclient_partitions[] = {
 	{
-		name:		"zImage",
-		size:		0x100000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "zImage",
+		.size		= 0x100000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"ramdisk.gz",
-		size:		0x300000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "ramdisk.gz",
+		.size		= 0x300000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"User FS",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "User FS",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -439,21 +439,21 @@ static struct mtd_partition graphicsclient_partitions[] = {
 #ifdef CONFIG_SA1100_GRAPHICSMASTER
 static struct mtd_partition graphicsmaster_partitions[] = {
 	{
-		name:		"zImage",
-		size:		0x100000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "zImage",
+		.size		= 0x100000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	},
 	{
-		name:		"ramdisk.gz",
-		size:		0x300000,
-		offset:		MTDPART_OFS_APPEND,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "ramdisk.gz",
+		.size		= 0x300000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	},
 	{
-		name:		"User FS",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "User FS",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -461,44 +461,44 @@ static struct mtd_partition graphicsmaster_partitions[] = {
 #ifdef CONFIG_SA1100_H3XXX
 static struct mtd_partition h3xxx_partitions[] = {
 	{
-		name:		"H3XXX boot firmware",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "H3XXX boot firmware",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
 #ifdef CONFIG_MTD_2PARTS_IPAQ
-		name:		"H3XXX root jffs2",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x00040000,
+		.name		= "H3XXX root jffs2",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x00040000,
 #else
-		name:		"H3XXX kernel",
-		size:		0x00080000,
-		offset:		0x00040000,
+		.name		= "H3XXX kernel",
+		.size		= 0x00080000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"H3XXX params",
-		size:		0x00040000,
-		offset:		0x000C0000,
+		.name		= "H3XXX params",
+		.size		= 0x00040000,
+		.offset		= 0x000C0000,
 	}, {
 #ifdef CONFIG_JFFS2_FS
-		name:		"H3XXX root jffs2",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x00100000,
+		.name		= "H3XXX root jffs2",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x00100000,
 #else
-		name:		"H3XXX initrd",
-		size:		0x00100000,
-		offset:		0x00100000,
+		.name		= "H3XXX initrd",
+		.size		= 0x00100000,
+		.offset		= 0x00100000,
 	}, {
-		name:		"H3XXX root cramfs",
-		size:		0x00300000,
-		offset:		0x00200000,
+		.name		= "H3XXX root cramfs",
+		.size		= 0x00300000,
+		.offset		= 0x00200000,
 	}, {
-		name:		"H3XXX usr cramfs",
-		size:		0x00800000,
-		offset:		0x00500000,
+		.name		= "H3XXX usr cramfs",
+		.size		= 0x00800000,
+		.offset		= 0x00500000,
 	}, {
-		name:		"H3XXX usr local",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x00d00000,
+		.name		= "H3XXX usr local",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x00d00000,
 #endif
 #endif
 	}
@@ -515,16 +515,16 @@ static void h3xxx_set_vpp(struct map_info *map, int vpp)
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 static struct mtd_partition huw_webpanel_partitions[] = {
 	{
-		name:		"Loader",
-		size:		0x00040000,
-		offset:		0,
+		.name		= "Loader",
+		.size		= 0x00040000,
+		.offset		= 0,
 	}, {
-		name:		"Sector 1",
-		size:		0x00040000,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "Sector 1",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -532,38 +532,38 @@ static struct mtd_partition huw_webpanel_partitions[] = {
 #ifdef CONFIG_SA1100_JORNADA720
 static struct mtd_partition jornada720_partitions[] = {
 	{
-		name:		"JORNADA720 boot firmware",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "JORNADA720 boot firmware",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"JORNADA720 kernel",
-		size:		0x000c0000,
-		offset:		0x00040000,
+		.name		= "JORNADA720 kernel",
+		.size		= 0x000c0000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"JORNADA720 params",
-		size:		0x00040000,
-		offset:		0x00100000,
+		.name		= "JORNADA720 params",
+		.size		= 0x00040000,
+		.offset		= 0x00100000,
 	}, {
-		name:		"JORNADA720 initrd",
-		size:		0x00100000,
-		offset:		0x00140000,
+		.name		= "JORNADA720 initrd",
+		.size		= 0x00100000,
+		.offset		= 0x00140000,
 	}, {
-		name:		"JORNADA720 root cramfs",
-		size:		0x00300000,
-		offset:		0x00240000,
+		.name		= "JORNADA720 root cramfs",
+		.size		= 0x00300000,
+		.offset		= 0x00240000,
 	}, {
-		name:		"JORNADA720 usr cramfs",
-		size:		0x00800000,
-		offset:		0x00540000,
+		.name		= "JORNADA720 usr cramfs",
+		.size		= 0x00800000,
+		.offset		= 0x00540000,
 	}, {
-		name:		"JORNADA720 usr local",
-		size:		0  /* will expand to the end of the flash */
-		offset:		0x00d00000,
+		.name		= "JORNADA720 usr local",
+		.size		= 0,  /* will expand to the end of the flash */
+		.offset		= 0x00d00000,
 	}
 };
 
-static void jornada720_set_vpp(int vpp)
+static void jornada720_set_vpp(struct map_info *map, int vpp)
 {
 	if (vpp)
 		PPSR |= 0x80;
@@ -578,22 +578,22 @@ static void jornada720_set_vpp(int vpp)
 #ifdef CONFIG_SA1100_PANGOLIN
 static struct mtd_partition pangolin_partitions[] = {
 	{
-		name:		"boot firmware",
-		size:		0x00080000,
-		offset:		0x00000000,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "boot firmware",
+		.size		= 0x00080000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"kernel",
-		size:		0x00100000,
-		offset:		0x00080000,
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00080000,
 	}, {
-		name:		"initrd",
-		size:		0x00280000,
-		offset:		0x00180000,
+		.name		= "initrd",
+		.size		= 0x00280000,
+		.offset		= 0x00180000,
 	}, {
-		name:		"initrd-test",
-		size:		0x03C00000,
-		offset:		0x00400000,
+		.name		= "initrd-test",
+		.size		= 0x03C00000,
+		.offset		= 0x00400000,
 	}
 };
 #endif
@@ -602,22 +602,22 @@ static struct mtd_partition pangolin_partitions[] = {
 /* erase size is 0x40000 == 256k partitions have to have this boundary */
 static struct mtd_partition system3_partitions[] = {
 	{
-		name:		"BLOB",
-		size:		0x00040000,
-		offset:		0x00000000,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "BLOB",
+		.size		= 0x00040000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"config",
-		size:		0x00040000,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "config",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		name:		"kernel",
-		size:		0x00100000,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		name:		"root",
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "root",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -625,19 +625,19 @@ static struct mtd_partition system3_partitions[] = {
 #ifdef CONFIG_SA1100_SHANNON
 static struct mtd_partition shannon_partitions[] = {
 	{
-		name: "BLOB boot loader",
-		offset: 0,
-		size: 0x20000
+		.name		= "BLOB boot loader",
+		.offset		= 0,
+		.size		= 0x20000
 	},
 	{
-		name: "kernel",
-		offset: MTDPART_OFS_APPEND,
-		size: 0xe0000
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0xe0000
 	},
 	{ 
-		name: "initrd",
-		offset: MTDPART_OFS_APPEND,	
-		size: MTDPART_SIZ_FULL
+		.name		= "initrd",
+		.offset		= MTDPART_OFS_APPEND,	
+		.size		= MTDPART_SIZ_FULL
 	}
 };
 
@@ -646,17 +646,17 @@ static struct mtd_partition shannon_partitions[] = {
 #ifdef CONFIG_SA1100_SHERMAN
 static struct mtd_partition sherman_partitions[] = {
 	{
-		size:		0x50000,
-		offset:		0,
+		.size		= 0x50000,
+		.offset		= 0,
 	}, {
-		size:		0x70000,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= 0x70000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		0x600000,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= 0x600000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		0xA0000,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= 0xA0000,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -664,35 +664,35 @@ static struct mtd_partition sherman_partitions[] = {
 #ifdef CONFIG_SA1100_SIMPAD
 static struct mtd_partition simpad_partitions[] = {
 	{
-		name:		"SIMpad boot firmware",
-		size:		0x00080000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "SIMpad boot firmware",
+		.size		= 0x00080000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"SIMpad kernel",
-		size:		0x00100000,
-		offset:		0x00080000,
+		.name		= "SIMpad kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00080000,
 	}, {
 #ifdef CONFIG_JFFS2_FS
-		name:		"SIMpad root jffs2",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x00180000,
+		.name		= "SIMpad root jffs2",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x00180000,
 #else
-		name:		"SIMpad initrd",
-		size:		0x00300000,
-		offset:		0x00180000,
+		.name		= "SIMpad initrd",
+		.size		= 0x00300000,
+		.offset		= 0x00180000,
 	}, {
-		name:		"SIMpad root cramfs",
-		size:		0x00300000,
-		offset:		0x00480000,
+		.name		= "SIMpad root cramfs",
+		.size		= 0x00300000,
+		.offset		= 0x00480000,
 	}, {
-		name:		"SIMpad usr cramfs",
-		size:		0x005c0000,
-		offset:		0x00780000,
+		.name		= "SIMpad usr cramfs",
+		.size		= 0x005c0000,
+		.offset		= 0x00780000,
 	}, {
-		name:		"SIMpad usr local",
-		size:		MTDPART_SIZ_FULL,
-		offset:		0x00d40000,
+		.name		= "SIMpad usr local",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= 0x00d40000,
 #endif
 	}
 };
@@ -701,39 +701,39 @@ static struct mtd_partition simpad_partitions[] = {
 #ifdef CONFIG_SA1100_STORK
 static struct mtd_partition stork_partitions[] = {
 	{
-		name:		"STORK boot firmware",
-		size:		0x00040000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "STORK boot firmware",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"STORK params",
-		size:		0x00040000,
-		offset:		0x00040000,
+		.name		= "STORK params",
+		.size		= 0x00040000,
+		.offset		= 0x00040000,
 	}, {
-		name:		"STORK kernel",
-		size:		0x00100000,
-		offset:		0x00080000,
+		.name		= "STORK kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00080000,
 	}, {
 #ifdef CONFIG_JFFS2_FS
-		name:		"STORK root jffs2",
-		offset:		0x00180000,
-		size:		MTDPART_SIZ_FULL,
+		.name		= "STORK root jffs2",
+		.offset		= 0x00180000,
+		.size		= MTDPART_SIZ_FULL,
 #else
-		name:		"STORK initrd",
-		size:		0x00100000,
-		offset:		0x00180000,
+		.name		= "STORK initrd",
+		.size		= 0x00100000,
+		.offset		= 0x00180000,
 	}, {
-		name:		"STORK root cramfs",
-		size:		0x00300000,
-		offset:		0x00280000,
+		.name		= "STORK root cramfs",
+		.size		= 0x00300000,
+		.offset		= 0x00280000,
 	}, {
-		name:		"STORK usr cramfs",
-		size:		0x00800000,
-		offset:		0x00580000,
+		.name		= "STORK usr cramfs",
+		.size		= 0x00800000,
+		.offset		= 0x00580000,
 	}, {
-		name:		"STORK usr local",
-		offset:		0x00d80000,
-		size:		MTDPART_SIZ_FULL,
+		.name		= "STORK usr local",
+		.offset		= 0x00d80000,
+		.size		= MTDPART_SIZ_FULL,
 #endif
 	}
 };
@@ -742,16 +742,16 @@ static struct mtd_partition stork_partitions[] = {
 #ifdef CONFIG_SA1100_TRIZEPS
 static struct mtd_partition trizeps_partitions[] = {
 	{
-		name:		"Bootloader & the kernel",
-		size:		0x00200000,
-		offset:		0,
+		.name		= "Bootloader & the kernel",
+		.size		= 0x00200000,
+		.offset		= 0,
 	}, {
-		name:		"Data",
-		size:		0x00400000,
-		offset:		MTDPART_OFS_APPEND,
+		.name		= "Data",
+		.size		= 0x00400000,
+		.offset		= MTDPART_OFS_APPEND,
 	}, {
-		size:		MTDPART_SIZ_FULL,
-		offset:		MTDPART_OFS_APPEND,
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
 };
 #endif
@@ -759,22 +759,22 @@ static struct mtd_partition trizeps_partitions[] = {
 #ifdef CONFIG_SA1100_YOPY
 static struct mtd_partition yopy_partitions[] = {
 	{
-		name:		"boot firmware",
-		size:		0x00040000,
-		offset:		0x00000000,
-		mask_flags:	MTD_WRITEABLE,  /* force read-only */
+		.name		= "boot firmware",
+		.size		= 0x00040000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
 	}, {
-		name:		"kernel",
-		size:		0x00080000,
-		offset:		0x00080000,
+		.name		= "kernel",
+		.size		= 0x00080000,
+		.offset		= 0x00080000,
 	}, {
-		name:		"initrd",
-		size:		0x00300000,
-		offset:		0x00100000,
+		.name		= "initrd",
+		.size		= 0x00300000,
+		.offset		= 0x00100000,
 	}, {
-		name:		"root",
-		size:		0x01000000,
-		offset:		0x00400000,
+		.name		= "root",
+		.size		= 0x01000000,
+		.offset		= 0x00400000,
 	}
 };
 #endif

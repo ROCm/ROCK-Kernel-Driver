@@ -319,7 +319,7 @@ struct address_space {
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
 	struct list_head	i_mmap_shared;	/* list of private mappings */
-	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
+	struct semaphore	i_shared_sem;	/* and sem protecting it */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */

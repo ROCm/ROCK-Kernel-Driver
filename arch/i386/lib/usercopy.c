@@ -417,7 +417,7 @@ do {									\
 } while (0)
 
 
-unsigned long __copy_to_user(void *to, const void *from, unsigned long n)
+unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n)
 {
 	if (movsl_is_ok(to, from, n))
 		__copy_user(to, from, n);
@@ -426,27 +426,11 @@ unsigned long __copy_to_user(void *to, const void *from, unsigned long n)
 	return n;
 }
 
-unsigned long __copy_from_user(void *to, const void *from, unsigned long n)
+unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n)
 {
 	if (movsl_is_ok(to, from, n))
 		__copy_user_zeroing(to, from, n);
 	else
 		n = __copy_user_zeroing_intel(to, from, n);
-	return n;
-}
-
-unsigned long copy_to_user(void *to, const void *from, unsigned long n)
-{
-	prefetch(from);
-	if (access_ok(VERIFY_WRITE, to, n))
-		n = __copy_to_user(to, from, n);
-	return n;
-}
-
-unsigned long copy_from_user(void *to, const void *from, unsigned long n)
-{
-	prefetchw(to);
-	if (access_ok(VERIFY_READ, from, n))
-		n = __copy_from_user(to, from, n);
 	return n;
 }

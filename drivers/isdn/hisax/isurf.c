@@ -132,8 +132,8 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&cs->lock);
 }
 
-void
-release_io_isurf(struct IsdnCardState *cs)
+static void
+isurf_release(struct IsdnCardState *cs)
 {
 	release_region(cs->hw.isurf.reset, 1);
 	iounmap((unsigned char *)cs->hw.isurf.isar);
@@ -156,21 +156,6 @@ reset_isurf(struct IsdnCardState *cs, u8 chips)
 static int
 ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_isurf(cs, ISURF_RESET);
-			return(0);
-		case CARD_RELEASE:
-			release_io_isurf(cs);
-			return(0);
-		case CARD_INIT:
-			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
-			initisac(cs);
-			initisar(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
@@ -190,8 +175,30 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 	return(isar_auxcmd(cs, ic));
 }
 
+static void
+isurf_init(struct IsdnCardState *cs)
+{
+	writeb(0, cs->hw.isurf.isar + ISAR_IRQBIT);
+	initisac(cs);
+	initisar(cs);
+}
+
+static int
+isurf_reset(struct IsdnCardState *cs)
+{
+	reset_isurf(cs, ISURF_RESET);
+	return 0;
+}
+
+static struct card_ops isurf_ops = {
+	.init     = isurf_init,
+	.reset    = isurf_reset,
+	.release  = isurf_release,
+	.irq_func = isurf_interrupt,
+};
+
 #ifdef __ISAPNP__
-static struct pci_bus *pnp_surf __devinitdata = NULL;
+static struct pnp_card *pnp_surf __devinitdata = NULL;
 #endif
 
 int __init
@@ -212,34 +219,40 @@ setup_isurf(struct IsdnCard *card)
 		cs->irq = card->para[0];
 	} else {
 #ifdef __ISAPNP__
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
 
 		if (isapnp_present()) {
 			cs->subtyp = 0;
-			if ((pb = isapnp_find_card(
+			if ((pb = pnp_find_card(
 				ISAPNP_VENDOR('S', 'I', 'E'),
 				ISAPNP_FUNCTION(0x0010), pnp_surf))) {
 				pnp_surf = pb;
 				pd = NULL;
-				if (!(pd = isapnp_find_dev(pnp_surf,
+				if (!(pd = pnp_find_dev(pnp_surf,
 					ISAPNP_VENDOR('S', 'I', 'E'),
 					ISAPNP_FUNCTION(0x0010), pd))) {
 					printk(KERN_ERR "ISurfPnP: PnP error card found, no device\n");
 					return (0);
 				}
-				pd->prepare(pd);
-				pd->deactivate(pd);
-				pd->activate(pd);
-				cs->hw.isurf.reset = pd->resource[0].start;
-				cs->hw.isurf.phymem = pd->resource[1].start;
-				cs->irq = pd->irq_resource[0].start;
-				if (!cs->irq || !cs->hw.isurf.reset || !cs->hw.isurf.phymem) {
-					printk(KERN_ERR "ISurfPnP:some resources are missing %d/%x/%lx\n",
-						cs->irq, cs->hw.isurf.reset, cs->hw.isurf.phymem);
-					pd->deactivate(pd);
+				if (pnp_device_attach(pd) < 0) {
+					printk(KERN_ERR "ISurfPnP: attach failed\n");
+					return 0;
+				}
+				if (pnp_activate_dev(pd, NULL) < 0) {
+					printk(KERN_ERR "ISurfPnP: activate failed\n");
+					pnp_device_detach(pd);
+					return 0;
+				}
+				if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0) || !pnp_port_valid(pd, 1)) {
+					printk(KERN_ERR "ISurfPnP:some resources are missing %ld/%lx/%lx\n",
+						pnp_irq(pd, 0), pnp_port_start(pd, 0), pnp_port_start(pd, 1));
+					pnp_device_detach(pd);
 					return(0);
 				}
+				cs->hw.isurf.reset = pnp_port_start(pd, 0);
+				cs->hw.isurf.phymem = pnp_port_start(pd, 1);
+				cs->irq = pnp_irq(pd, 0);
 			} else {
 				printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
 				return(0);
@@ -283,8 +296,8 @@ setup_isurf(struct IsdnCard *card)
 	       cs->irq);
 
 	cs->cardmsg = &ISurf_card_msg;
-	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
+	cs->card_ops = &isurf_ops;
 	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
@@ -296,7 +309,7 @@ setup_isurf(struct IsdnCard *card)
 	if (ver < 0) {
 		printk(KERN_WARNING
 			"ISurf: wrong ISAR version (ret = %d)\n", ver);
-		release_io_isurf(cs);
+		isurf_release(cs);
 		return (0);
 	}
 	return (1);

@@ -321,7 +321,7 @@ void svcauth_unix_purge(void)
 
 
 static int
-svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
+svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
 	struct iovec	*argv = &rqstp->rq_arg.head[0];
 	struct iovec	*resv = &rqstp->rq_res.head[0];
@@ -376,7 +376,7 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 		}
 	else rv = SVC_DROP;
 
-	if (rqstp->rq_client == NULL && proc != 0)
+	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		*authp = rpc_autherr_badcred;
 
 	return rv;
@@ -402,7 +402,7 @@ struct auth_ops svcauth_null = {
 
 
 int
-svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
+svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
 	struct iovec	*argv = &rqstp->rq_arg.head[0];
 	struct iovec	*resv = &rqstp->rq_res.head[0];
@@ -470,7 +470,7 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp, int proc)
 		}
 	else rv = SVC_DROP;
 
-	if (rqstp->rq_client == NULL && proc != 0)
+	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		goto badcred;
 	return rv;
 

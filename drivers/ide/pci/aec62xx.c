@@ -42,7 +42,7 @@ static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	for (i = 0; i < n_aec_devs; i++) {
 		struct pci_dev *dev	= aec_devs[i];
-		u32 iobase		= pci_resource_start(dev, 4);
+		unsigned long iobase = pci_resource_start(dev, 4);
 		u8 c0 = 0, c1 = 0, art	= 0;
 #ifdef DEBUG_AEC_REGS
 		u8 uart			= 0;
@@ -493,7 +493,7 @@ static void __init init_setup_aec62xx (struct pci_dev *dev, ide_pci_device_t *d)
 
 static void __init init_setup_aec6x80 (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	u32 bar4reg = pci_resource_start(dev, 4);
+	unsigned long bar4reg = pci_resource_start(dev, 4);
 
 	if (inb(bar4reg+2) & 0x10) {
 		strcpy(d->name, "AEC6880");

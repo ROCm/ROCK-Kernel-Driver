@@ -23,9 +23,6 @@
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 
-extern void unmap_page_range(mmu_gather_t *,struct vm_area_struct *vma, unsigned long address, unsigned long size);
-extern void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr);
-
 /*
  * WARNING: the debugging will use recursive algorithms so never enable this
  * unless you know what you are doing.
@@ -132,7 +129,9 @@ int vm_enough_memory(long pages)
 	return 0;
 }
 
-/* Remove one vm structure from the inode's i_mapping address space. */
+/*
+ * Remove one vm structure from the inode's i_mapping address space.
+ */
 static void remove_shared_vm_struct(struct vm_area_struct *vma)
 {
 	struct file *file = vma->vm_file;
@@ -140,11 +139,11 @@ static void remove_shared_vm_struct(struct vm_area_struct *vma)
 	if (file) {
 		struct inode *inode = file->f_dentry->d_inode;
 
-		spin_lock(&inode->i_mapping->i_shared_lock);
+		down(&inode->i_mapping->i_shared_sem);
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_inc(&inode->i_writecount);
 		list_del_init(&vma->shared);
-		spin_unlock(&inode->i_mapping->i_shared_lock);
+		up(&inode->i_mapping->i_shared_sem);
 	}
 }
 
@@ -346,12 +345,12 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
 
 	if (mapping)
-		spin_lock(&mapping->i_shared_lock);
+		down(&mapping->i_shared_sem);
 	spin_lock(&mm->page_table_lock);
 	__vma_link(mm, vma, prev, rb_link, rb_parent);
 	spin_unlock(&mm->page_table_lock);
 	if (mapping)
-		spin_unlock(&mapping->i_shared_lock);
+		up(&mapping->i_shared_sem);
 
 	mm->map_count++;
 	validate_mm(mm);
@@ -898,7 +897,7 @@ struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long add
  * "prev", if it exists, points to a vma before the one
  * we just free'd - but there's no telling how much before.
  */
-static void free_pgtables(mmu_gather_t *tlb, struct vm_area_struct *prev,
+static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 	unsigned long start, unsigned long end)
 {
 	unsigned long first = start & PGDIR_MASK;
@@ -955,7 +954,7 @@ no_mmaps:
  * By the time this function is called, the area struct has been
  * removed from the process mapping list.
  */
-void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
+static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 {
 	size_t len = area->vm_end - area->vm_start;
 
@@ -1001,60 +1000,45 @@ static void unmap_vma_list(struct mm_struct *mm,
  * Called with the page table lock held.
  */
 static void unmap_region(struct mm_struct *mm,
-	struct vm_area_struct *mpnt,
+	struct vm_area_struct *vma,
 	struct vm_area_struct *prev,
 	unsigned long start,
 	unsigned long end)
 {
-	mmu_gather_t *tlb;
+	struct mmu_gather *tlb;
+	unsigned long nr_accounted = 0;
 
+	lru_add_drain();
 	tlb = tlb_gather_mmu(mm, 0);
-
-	do {
-		unsigned long from, to, len;
-
-		from = start < mpnt->vm_start ? mpnt->vm_start : start;
-		to = end > mpnt->vm_end ? mpnt->vm_end : end;
-
-		unmap_page_range(tlb, mpnt, from, to);
-
-		if (mpnt->vm_flags & VM_ACCOUNT) {
-			len = to - from;
-			vm_unacct_memory(len >> PAGE_SHIFT);
-		}
-	} while ((mpnt = mpnt->vm_next) != NULL);
-
+	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted);
+	vm_unacct_memory(nr_accounted);
 	free_pgtables(tlb, prev, start, end);
 	tlb_finish_mmu(tlb, start, end);
 }
 
 /*
- * Create a list of vma's touched by the unmap,
- * removing them from the VM lists as we go..
+ * Create a list of vma's touched by the unmap, removing them from the mm's
+ * vma list as we go..
  *
  * Called with the page_table_lock held.
  */
-static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
-	struct vm_area_struct *mpnt,
-	struct vm_area_struct *prev,
-	unsigned long end)
+static void
+detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
+	struct vm_area_struct *prev, unsigned long end)
 {
-	struct vm_area_struct **npp, *touched;
+	struct vm_area_struct **insertion_point;
+	struct vm_area_struct *tail_vma = NULL;
 
-	npp = (prev ? &prev->vm_next : &mm->mmap);
-
-	touched = NULL;
+	insertion_point = (prev ? &prev->vm_next : &mm->mmap);
 	do {
-		struct vm_area_struct *next = mpnt->vm_next;
-		mpnt->vm_next = touched;
-		touched = mpnt;
-		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		rb_erase(&vma->vm_rb, &mm->mm_rb);
 		mm->map_count--;
-		mpnt = next;
-	} while (mpnt && mpnt->vm_start < end);
-	*npp = mpnt;
-	mm->mmap_cache = NULL;	/* Kill the cache. */
-	return touched;
+		tail_vma = vma;
+		vma = vma->vm_next;
+	} while (vma && vma->vm_start < end);
+	*insertion_point = vma;
+	tail_vma->vm_next = NULL;
+	mm->mmap_cache = NULL;		/* Kill the cache. */
 }
 
 /*
@@ -1150,7 +1134,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * Remove the vma's, and unmap the actual pages
 	 */
 	spin_lock(&mm->page_table_lock);
-	mpnt = touched_by_munmap(mm, mpnt, prev, end);
+	detach_vmas_to_be_unmapped(mm, mpnt, prev, end);
 	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
 
@@ -1273,43 +1257,28 @@ void build_mmap_rb(struct mm_struct * mm)
 }
 
 /* Release all mmaps. */
-void exit_mmap(struct mm_struct * mm)
+void exit_mmap(struct mm_struct *mm)
 {
-	mmu_gather_t *tlb;
-	struct vm_area_struct * mpnt;
+	struct mmu_gather *tlb;
+	struct vm_area_struct *vma;
+	unsigned long nr_accounted = 0;
 
 	profile_exit_mmap(mm);
  
+	lru_add_drain();
+
 	spin_lock(&mm->page_table_lock);
 
 	tlb = tlb_gather_mmu(mm, 1);
-
 	flush_cache_mm(mm);
-	mpnt = mm->mmap;
-	while (mpnt) {
-		unsigned long start = mpnt->vm_start;
-		unsigned long end = mpnt->vm_end;
-
-		/*
-		 * If the VMA has been charged for, account for its
-		 * removal
-		 */
-		if (mpnt->vm_flags & VM_ACCOUNT)
-			vm_unacct_memory((end - start) >> PAGE_SHIFT);
-
-		mm->map_count--;
-		unmap_page_range(tlb, mpnt, start, end);
-		mpnt = mpnt->vm_next;
-	}
-
-	/* This is just debugging */
-	if (mm->map_count)
-		BUG();
-
+	mm->map_count -= unmap_vmas(&tlb, mm, mm->mmap, 0,
+					TASK_SIZE, &nr_accounted);
+	vm_unacct_memory(nr_accounted);
+	BUG_ON(mm->map_count);	/* This is just debugging */
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
 	tlb_finish_mmu(tlb, 0, TASK_SIZE);
 
-	mpnt = mm->mmap;
+	vma = mm->mmap;
 	mm->mmap = mm->mmap_cache = NULL;
 	mm->mm_rb = RB_ROOT;
 	mm->rss = 0;
@@ -1322,24 +1291,24 @@ void exit_mmap(struct mm_struct * mm)
 	 * Walk the list again, actually closing and freeing it
 	 * without holding any MM locks.
 	 */
-	while (mpnt) {
-		struct vm_area_struct * next = mpnt->vm_next;
-		remove_shared_vm_struct(mpnt);
-		if (mpnt->vm_ops) {
-			if (mpnt->vm_ops->close)
-				mpnt->vm_ops->close(mpnt);
+	while (vma) {
+		struct vm_area_struct *next = vma->vm_next;
+		remove_shared_vm_struct(vma);
+		if (vma->vm_ops) {
+			if (vma->vm_ops->close)
+				vma->vm_ops->close(vma);
 		}
-		if (mpnt->vm_file)
-			fput(mpnt->vm_file);
-		kmem_cache_free(vm_area_cachep, mpnt);
-		mpnt = next;
+		if (vma->vm_file)
+			fput(vma->vm_file);
+		kmem_cache_free(vm_area_cachep, vma);
+		vma = next;
 	}
 		
 }
 
 /* Insert vm structure into process list sorted by address
  * and into the inode's i_mmap ring.  If vm_file is non-NULL
- * then the i_shared_lock must be held here.
+ * then i_shared_sem is taken here.
  */
 void insert_vm_struct(struct mm_struct * mm, struct vm_area_struct * vma)
 {

@@ -853,10 +853,11 @@ CallcFree(void)
 static void
 release_b_st(struct Channel *chanp)
 {
+	struct IsdnCardState *cs = chanp->cs;
 	struct PStack *st = chanp->b_st;
 
 	if(test_and_clear_bit(FLG_START_B, &chanp->Flags)) {
-		chanp->bcs->BC_Close(chanp->bcs);
+		cs->bc_l1_ops->close(chanp->bcs);
 		switch (chanp->l2_active_protocol) {
 			case (ISDN_PROTO_L2_X75I):
 				releasestack_isdnl2(st);
@@ -1297,7 +1298,7 @@ init_b_st(struct Channel *chanp, int incoming)
 			break;
 	}
 	chanp->bcs->conmsg = NULL;
-	if (chanp->bcs->BC_SetStack(st, chanp->bcs))
+	if (cs->bc_l1_ops->open(st, chanp->bcs))
 		return (-1);
 	st->l2.flag = 0;
 	test_and_set_bit(FLG_LAPB, &st->l2.flag);
@@ -1457,12 +1458,8 @@ lli_got_fac_req(struct Channel *chanp, capi_msg *cm) {
 
 void
 lli_got_manufacturer(struct Channel *chanp, struct IsdnCardState *cs, capi_msg *cm) {
-	if ((cs->typ == ISDN_CTYPE_ELSA) || (cs->typ == ISDN_CTYPE_ELSA_PNP) ||
-		(cs->typ == ISDN_CTYPE_ELSA_PCI)) {
-		if (cs->hw.elsa.MFlag) {
-			cs->cardmsg(cs, CARD_AUX_IND, cm->para);
-		}
-	}
+	if (cs->card_ops->aux_ind)
+		cs->card_ops->aux_ind(cs, cm->para);
 }
 
 

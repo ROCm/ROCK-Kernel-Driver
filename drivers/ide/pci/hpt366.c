@@ -659,7 +659,7 @@ static int hpt374_ide_dma_end (ide_drive_t *drive)
 static void hpt3xx_reset (ide_drive_t *drive)
 {
 #if 0
-	u32 high_16	= pci_resource_start(HWIF(drive)->pci_dev, 4);
+	unsigned long high_16	= pci_resource_start(HWIF(drive)->pci_dev, 4);
 	u8 reset	= (HWIF(drive)->channel) ? 0x80 : 0x40;
 	u8 reg59h	= 0;
 
@@ -818,7 +818,10 @@ static int __init init_hpt37x(struct pci_dev *dev)
 	} else {
 		pll = F_LOW_PCI_66;
 		if (hpt_minimum_revision(dev,8))
+		{
+			printk(KERN_ERR "HPT37x: 66MHz timings are not supported.\n");
 			return -EOPNOTSUPP;
+		}
 		else if (hpt_minimum_revision(dev,5))
 			pci_set_drvdata(dev, (void *) sixty_six_base_hpt372);
 		else if (hpt_minimum_revision(dev,4))

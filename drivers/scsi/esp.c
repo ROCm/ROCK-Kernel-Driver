@@ -1720,7 +1720,7 @@ after_nego_msg_built:
 		 *           ID bit on the data bus even though the ESP is
 		 *           at ID 7 and is the obvious winner for any
 		 *           arbitration.  The ESP is a poor sport and refuses
-		 *           to lose arbitration, it will continue indefinately
+		 *           to lose arbitration, it will continue indefinitely
 		 *           trying to arbitrate for the bus and can only be
 		 *           stopped via a chip reset or SCSI bus reset.
 		 *           Therefore _no_ disconnects for SCSI1 targets

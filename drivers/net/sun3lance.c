@@ -593,6 +593,9 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	head->misc = 0;
 
 	memcpy( PKTBUF_ADDR(head), (void *)skb->data, skb->len );
+	if (len != skb->len)
+		memset(PKTBUF_ADDR(head) + skb->len, 0, len-skb->len);
+
 	head->flag = TMD1_OWN_CHIP | TMD1_ENP | TMD1_STP;
 	lp->new_tx = (lp->new_tx + 1) & TX_RING_MOD_MASK;
 	lp->stats.tx_bytes += skb->len;

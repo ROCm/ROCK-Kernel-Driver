@@ -27,7 +27,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/isapnp.h>
+#include <linux/pnp.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/skbuff.h>
@@ -55,13 +55,11 @@ static struct pci_device_id fcpci_ids[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(pci, fcpci_ids);
 
-static struct isapnp_device_id fcpnp_ids[] __devinitdata = {
-	{ ISAPNP_VENDOR('A', 'V', 'M'), ISAPNP_FUNCTION(0x0900),
-	  ISAPNP_VENDOR('A', 'V', 'M'), ISAPNP_FUNCTION(0x0900), 
-	  (unsigned long) "Fritz!Card PnP" },
-	{ }
+static const struct pnp_card_id fcpnp_ids[] __devinitdata = {
+	{ .id = "AVM0900", .driver_data = (unsigned long) "Fritz!Card PnP",
+	  .devs = { { "AVM0900" } } }
 };
-MODULE_DEVICE_TABLE(isapnp, fcpnp_ids);
+MODULE_DEVICE_TABLE(pnpc, fcpnp_ids);
 
 static int protocol = 2;       /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");
@@ -908,50 +906,47 @@ static struct pci_driver fcpci_driver = {
 
 #ifdef __ISAPNP__
 
-static int __devinit fcpnp_probe(struct pci_dev *pdev,
-				 const struct isapnp_device_id *ent)
+static int __devinit fcpnp_probe(struct pnp_card *card,
+				 const struct pnp_card_id *card_id)
 {
 	struct fritz_adapter *adapter;
-	int retval;
+	struct pnp_dev *pnp_dev;
 
-	retval = -ENOMEM;
+	pnp_dev = pnp_request_card_device(card, card_id->devs[0], NULL);
+	if (pnp_dev == NULL)
+		return;
+
 	adapter = new_adapter(pdev);
 	if (!adapter)
-		goto err;
+		return -ENOMEM;
 
 	adapter->type = AVM_FRITZ_PNP;
 
-	pdev->prepare(pdev);
-	pdev->deactivate(pdev); // why?
-	pdev->activate(pdev);
-	adapter->io = pdev->resource[0].start;
-	adapter->irq = pdev->irq_resource[0].start;
+	if (!pnp_port_valid(pnp_dev, 0) || !pnp_irq_valid(pnp_dev, 0)) {
+		delete_adapter(adapter);
+	adapter->io = pnp_port_start(pnp_dev, 0);
+	adapter->irq = pnp_irq(pnp_dev, 0);
 
 	printk(KERN_INFO "hisax_fcpcipnp: found adapter %s at IO %#x irq %d\n",
-	       (char *) ent->driver_data, adapter->io, adapter->irq);
+		(char *) card_id->driver_data, adapter->io, adapter->irq);
 
 	retval = fcpcipnp_setup(adapter);
-	if (retval)
-		goto err_free;
-
+	if (retval) {
+		delete_adapter(adapter);
+		return retval;
+	}
 	return 0;
-	
- err_free:
-	delete_adapter(adapter);
- err:
-	return retval;
 }
 
-static void __devexit fcpnp_remove(struct pci_dev *pdev)
+static void __devexit fcpnp_remove(struct pnp_card *pcard)
 {
-	struct fritz_adapter *adapter = pci_get_drvdata(pdev);
+	struct fritz_adapter *adapter = pci_get_drvdata(pcard);
 
 	fcpcipnp_release(adapter);
-	pdev->deactivate(pdev);
 	delete_adapter(adapter);
 }
 
-static struct isapnp_driver fcpnp_driver = {
+static struct pnpc_driver fcpnp_driver = {
 	.name     = "fcpnp",
 	.probe    = fcpnp_probe,
 	.remove   = __devexit_p(fcpnp_remove),
@@ -972,7 +967,7 @@ static int __init hisax_fcpcipnp_init(void)
 	pci_nr_found = retval;
 
 #ifdef __ISAPNP__
-	retval = isapnp_register_driver(&fcpnp_driver);
+	retval = pnpc_register_driver(&fcpnp_driver);
 #else
 	retval = 0;
 #endif
@@ -990,7 +985,7 @@ static int __init hisax_fcpcipnp_init(void)
 #if !defined(CONFIG_HOTPLUG) || defined(MODULE)
  out_unregister_isapnp:
 #ifdef __ISAPNP__
-	isapnp_unregister_driver(&fcpnp_driver);
+	pnpc_unregister_driver(&fcpnp_driver);
 #endif
 #endif
  out_unregister_pci:

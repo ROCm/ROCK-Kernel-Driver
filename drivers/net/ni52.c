@@ -1169,7 +1169,11 @@ static int ni52_send_packet(struct sk_buff *skb, struct net_device *dev)
 #endif
 	{
 		memcpy((char *)p->xmit_cbuffs[p->xmit_count],(char *)(skb->data),skb->len);
-		len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
+		len = skb->len;
+		if (len < ETH_ZLEN) {
+			len = ETH_ZLEN;
+			memset((char *)p->xmit_cbuffs[p->xmit_count]+skb->len, 0, len - skb->len);
+		}
 
 #if (NUM_XMIT_BUFFS == 1)
 #	ifdef NO_NOPCOMMANDS

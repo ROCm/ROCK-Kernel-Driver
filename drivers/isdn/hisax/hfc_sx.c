@@ -308,8 +308,8 @@ read_fifo(struct IsdnCardState *cs, u8 fifo, int trans_max)
 /******************************************/
 /* free hardware resources used by driver */
 /******************************************/
-void
-release_io_hfcsx(struct IsdnCardState *cs)
+static void
+hfcsx_release(struct IsdnCardState *cs)
 {
 	cs->hw.hfcsx.int_m2 = 0;	/* interrupt output off ! */
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
@@ -347,8 +347,8 @@ static int set_fifo_size(struct IsdnCardState *cs)
 /* function called to reset the HFC SX chip. A complete software reset of chip */
 /* and fifos is done.                                                           */
 /********************************************************************************/
-static void
-reset_hfcsx(struct IsdnCardState *cs)
+static int
+hfcsx_reset(struct IsdnCardState *cs)
 {
 	cs->hw.hfcsx.int_m2 = 0;	/* interrupt output off ! */
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
@@ -415,6 +415,7 @@ reset_hfcsx(struct IsdnCardState *cs)
 	cs->hw.hfcsx.int_m2 = HFCSX_IRQ_ENABLE;
 	Write_hfc(cs, HFCSX_INT_M2, cs->hw.hfcsx.int_m2);
 	if (Read_hfc(cs, HFCSX_INT_S2));
+	return 0;
 }
 
 /***************************************************/
@@ -838,10 +839,11 @@ HFCSX_l1hw(struct PStack *st, int pr, void *arg)
 /***********************************************/
 /* called during init setting l1 stack pointer */
 /***********************************************/
-void
+static int
 setstack_hfcsx(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = HFCSX_l1hw;
+	return 0;
 }
 
 /***************************************************************/
@@ -1112,8 +1114,17 @@ hfcsx_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
-static struct bc_l1_ops hfcsx_l1_ops = {
+static struct bc_l1_ops hfcsx_bc_l1_ops = {
 	.fill_fifo = hfcsx_fill_fifo,
+	.open      = setstack_2b,
+	.close     = close_hfcsx,
+};
+
+static struct dc_l1_ops hfcsx_dc_l1_ops = {
+	.fill_fifo  = hfcsx_fill_dfifo,
+	.open       = setstack_hfcsx,
+	.bh_func    = hfcsx_bh,
+	.dbusy_func = hfcsx_dbusy_timer,
 };
 
 /********************************/
@@ -1122,17 +1133,8 @@ static struct bc_l1_ops hfcsx_l1_ops = {
 void __devinit
 inithfcsx(struct IsdnCardState *cs)
 {
-	cs->setstack_d = setstack_hfcsx;
-	cs->dbusytimer.function = (void *) hfcsx_dbusy_timer;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-	INIT_WORK(&cs->work, hfcsx_bh, cs);
-	cs->bc_l1_ops = &hfcsx_l1_ops;
-	cs->DC_Send_Data = hfcsx_fill_dfifo;
-	cs->bcs[0].BC_SetStack = setstack_2b;
-	cs->bcs[1].BC_SetStack = setstack_2b;
-	cs->bcs[0].BC_Close = close_hfcsx;
-	cs->bcs[1].BC_Close = close_hfcsx;
+	dc_l1_init(cs, &hfcsx_dc_l1_ops);
+	cs->bc_l1_ops = &hfcsx_bc_l1_ops;
 	mode_hfcsx(cs->bcs, 0, 0);
 	mode_hfcsx(cs->bcs + 1, 0, 1);
 }
@@ -1145,30 +1147,28 @@ inithfcsx(struct IsdnCardState *cs)
 static int
 hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCSX: card_msg %x", mt);
-	switch (mt) {
-		case CARD_RESET:
-			reset_hfcsx(cs);
-			return (0);
-		case CARD_RELEASE:
-			release_io_hfcsx(cs);
-			return (0);
-		case CARD_INIT:
-			inithfcsx(cs);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
-			/* now switch timer interrupt off */
-			cs->hw.hfcsx.int_m1 &= ~HFCSX_INTS_TIMER;
-			Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
-			/* reinit mode reg */
-			Write_hfc(cs, HFCSX_MST_MODE, cs->hw.hfcsx.mst_m);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
+
+static void
+hfcsx_init(struct IsdnCardState *cs)
+{
+	inithfcsx(cs);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
+	/* now switch timer interrupt off */
+	cs->hw.hfcsx.int_m1 &= ~HFCSX_INTS_TIMER;
+	Write_hfc(cs, HFCSX_INT_M1, cs->hw.hfcsx.int_m1);
+	/* reinit mode reg */
+	Write_hfc(cs, HFCSX_MST_MODE, cs->hw.hfcsx.mst_m);
+}
+
+static struct card_ops hfcsx_ops = {
+	.init     = hfcsx_init,
+	.reset    = hfcsx_reset,
+	.release  = hfcsx_release,
+	.irq_func = hfcsx_interrupt,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id hfc_ids[] __initdata = {
@@ -1179,7 +1179,7 @@ static struct isapnp_device_id hfc_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *hdev = &hfc_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 int __devinit
@@ -1192,29 +1192,38 @@ setup_hfcsx(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: HFC-SX driver Rev. %s\n", HiSax_getrev(tmp));
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev  *pd;
 
 		while(hdev->card_vendor) {
-			if ((pb = isapnp_find_card(hdev->card_vendor,
-				hdev->card_device, pnp_c))) {
+			if ((pb = pnp_find_card(hdev->card_vendor,
+						hdev->card_device,
+						pnp_c))) {
 				pnp_c = pb;
 				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					hdev->vendor, hdev->function, pd))) {
+				if ((pd = pnp_find_dev(pnp_c,
+						       hdev->vendor,
+						       hdev->function,
+						       pd))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)hdev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1]) {
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "HFC PnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd, NULL) < 0) {
+						printk(KERN_ERR "HFC PnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
 						printk(KERN_ERR "HFC PnP:some resources are missing %ld/%lx\n",
-						card->para[0], card->para[1]);
-						pd->deactivate(pd);
+							pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
 						return(0);
 					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
 					break;
 				} else {
 					printk(KERN_ERR "HFC PnP: PnP error card found, no device\n");
@@ -1288,16 +1297,15 @@ setup_hfcsx(struct IsdnCard *card)
 	} else
 		return (0);	/* no valid card type */
 
-	cs->irq_func = &hfcsx_interrupt;
-
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
 	cs->hw.hfcsx.timer.data = (long) cs;
 	cs->hw.hfcsx.b_fifo_size = 0; /* fifo size still unknown */
 	cs->hw.hfcsx.cirm = ccd_sp_irqtab[cs->irq & 0xF]; /* RAM not evaluated */
 	init_timer(&cs->hw.hfcsx.timer);
 
-	reset_hfcsx(cs);
+	hfcsx_reset(cs);
 	cs->cardmsg = &hfcsx_card_msg;
 	cs->auxcmd = &hfcsx_auxcmd;
+	cs->card_ops = &hfcsx_ops;
 	return (1);
 }

@@ -636,6 +636,7 @@ static void eexp_timeout(struct net_device *dev)
 static int eexp_xmit(struct sk_buff *buf, struct net_device *dev)
 {
 	struct net_local *lp = (struct net_local *)dev->priv;
+	short length = buf->len;
 #ifdef CONFIG_SMP
 	unsigned long flags;
 #endif
@@ -643,6 +644,13 @@ static int eexp_xmit(struct sk_buff *buf, struct net_device *dev)
 #if NET_DEBUG > 6
 	printk(KERN_DEBUG "%s: eexp_xmit()\n", dev->name);
 #endif
+
+	if (buf->len < ETH_ZLEN) {
+		buf = skb_padto(buf, ETH_ZLEN);
+		if (buf == NULL)
+			return 0;
+		length = buf->len;
+	}
 
 	disable_irq(dev->irq);
 
@@ -656,8 +664,6 @@ static int eexp_xmit(struct sk_buff *buf, struct net_device *dev)
 #endif
   
 	{
-		unsigned short length = (ETH_ZLEN < buf->len) ? buf->len :
-			ETH_ZLEN;
 		unsigned short *data = (unsigned short *)buf->data;
 
 		lp->stats.tx_bytes += length;

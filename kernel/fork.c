@@ -262,9 +262,9 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 				atomic_dec(&inode->i_writecount);
       
 			/* insert tmp into the share list, just after mpnt */
-			spin_lock(&inode->i_mapping->i_shared_lock);
+			down(&inode->i_mapping->i_shared_sem);
 			list_add_tail(&tmp->shared, &mpnt->shared);
-			spin_unlock(&inode->i_mapping->i_shared_lock);
+			up(&inode->i_mapping->i_shared_sem);
 		}
 
 		/*
@@ -399,17 +399,19 @@ void mmput(struct mm_struct *mm)
  * restoring the old one. . .
  * Eric Biederman 10 January 1998
  */
-void mm_release(void)
+void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 {
-	struct task_struct *tsk = current;
 	struct completion *vfork_done = tsk->vfork_done;
+
+	/* Get rid of any cached register state */
+	deactivate_mm(tsk, mm);
 
 	/* notify parent sleeping on vfork() */
 	if (vfork_done) {
 		tsk->vfork_done = NULL;
 		complete(vfork_done);
 	}
-	if (tsk->clear_child_tid) {
+	if (tsk->clear_child_tid && atomic_read(&mm->mm_users) > 1) {
 		int * tidptr = tsk->clear_child_tid;
 		tsk->clear_child_tid = NULL;
 

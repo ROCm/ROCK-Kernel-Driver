@@ -83,7 +83,7 @@ static struct pci_dev *bmide_dev;
 static int sc1200_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
-	u32 bibma = pci_resource_start(bmide_dev, 4);
+	unsigned long bibma = pci_resource_start(bmide_dev, 4);
 	u8  c0 = 0, c1 = 0;
 
 	/*
@@ -91,8 +91,8 @@ static int sc1200_get_info (char *buffer, char **addr, off_t offset, int count)
 	 * to investigate:
 	 */
 
-	c0 = inb_p((unsigned short)bibma + 0x02);
-	c1 = inb_p((unsigned short)bibma + 0x0a);
+	c0 = inb_p(bibma + 0x02);
+	c1 = inb_p(bibma + 0x0a);
 
 	p += sprintf(p, "\n                               National SCx200 Chipset.\n");
 	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");

@@ -41,7 +41,7 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 unsigned long highstart_pfn, highend_pfn;
 
 /*
@@ -71,12 +71,16 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
  */
 static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
-	pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-	set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
-	if (page_table != pte_offset_kernel(pmd, 0))
-		BUG();	
+	if (pmd_none(*pmd)) {
+		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
+		if (page_table != pte_offset_kernel(pmd, 0))
+			BUG();	
 
-	return page_table;
+		return page_table;
+	}
+	
+	return pte_offset_kernel(pmd, 0);
 }
 
 /*

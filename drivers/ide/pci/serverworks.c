@@ -61,7 +61,7 @@ static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	for (i = 0; i < n_svwks_devs; i++) {
 		struct pci_dev *dev = svwks_devs[i];
-		u32 bibma = pci_resource_start(dev, 4);
+		unsigned long bibma = pci_resource_start(dev, 4);
 		u32 reg40, reg44;
 		u16 reg48, reg56;
 		u8  reg54, c0=0, c1=0;
@@ -76,8 +76,8 @@ static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 		 * at that point bibma+0x2 et bibma+0xa are byte registers
 		 * to investigate:
 		 */
-		c0 = inb_p((unsigned short)bibma + 0x02);
-		c1 = inb_p((unsigned short)bibma + 0x0a);
+		c0 = inb_p(bibma + 0x02);
+		c1 = inb_p(bibma + 0x0a);
 
 		p += sprintf(p, "\n                            ServerWorks ");
 		switch(dev->device) {

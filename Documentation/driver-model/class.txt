@@ -91,9 +91,9 @@ with the core. A driver specifies the class it belongs to by setting
 the struct device_driver::devclass field. 
 
 
-driverfs directory structure
+sysfs directory structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There is a top-level driverfs directory named 'class'. 
+There is a top-level sysfs directory named 'class'. 
 
 Each class gets a directory in the class directory, along with two
 default subdirectories:
@@ -143,13 +143,13 @@ is equivalent to declaring:
 static devclass_attribute devclass_attr_debug;
 
 The bus driver can add and remove the attribute from the class's
-driverfs directory using:
+sysfs directory using:
 
 int devclass_create_file(struct device_class *, struct devclass_attribute *);
 void devclass_remove_file(struct device_class *, struct devclass_attribute *);
 
 In the example above, the file will be named 'debug' in placed in the
-class's directory in driverfs. 
+class's directory in sysfs. 
 
 
 Interfaces

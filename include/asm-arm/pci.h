@@ -40,13 +40,13 @@ static inline void pcibios_penalize_isa_irq(int irq)
 static inline void *
 pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handle)
 {
-	int gfp = GFP_KERNEL;
+	int gfp = GFP_ATOMIC;
 
 	if (hwdev == NULL || pcidev_is_sa1111(hwdev) ||
 	    hwdev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
 
-	return consistent_alloc(gfp, size, handle);
+	return consistent_alloc(gfp, size, handle, 0);
 }
 
 static inline void

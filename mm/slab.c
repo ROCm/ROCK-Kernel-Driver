@@ -502,7 +502,7 @@ static void cache_estimate (unsigned long gfporder, size_t size,
 
 #define slab_error(cachep, msg) __slab_error(__FUNCTION__, cachep, msg)
 
-static void __slab_error(char *function, kmem_cache_t *cachep, char *msg)
+static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
 {
 	printk(KERN_ERR "slab error in %s(): cache `%s': %s\n",
 		function, cachep->name, msg);

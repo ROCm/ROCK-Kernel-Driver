@@ -566,7 +566,7 @@ static inline void mmdrop(struct mm_struct * mm)
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
 /* Remove the current tasks stale references to the old mm_struct */
-extern void mm_release(void);
+extern void mm_release(struct task_struct *, struct mm_struct *);
 
 extern int  copy_thread(int, unsigned long, unsigned long, unsigned long, struct task_struct *, struct pt_regs *);
 extern void flush_thread(void);
@@ -724,33 +724,23 @@ static inline void cond_resched(void)
 		__cond_resched();
 }
 
-#ifdef CONFIG_PREEMPT
-
 /*
  * cond_resched_lock() - if a reschedule is pending, drop the given lock,
  * call schedule, and on return reacquire the lock.
  *
- * Note: this does not assume the given lock is the _only_ lock held.
- * The kernel preemption counter gives us "free" checking that we are
- * atomic -- let's use it.
+ * This works OK both with and without CONFIG_PREEMPT.  We do strange low-level
+ * operations here to prevent schedule() from being called twice (once via
+ * spin_unlock(), once by hand).
  */
 static inline void cond_resched_lock(spinlock_t * lock)
 {
-	if (need_resched() && preempt_count() == 1) {
+	if (need_resched()) {
 		_raw_spin_unlock(lock);
 		preempt_enable_no_resched();
 		__cond_resched();
 		spin_lock(lock);
 	}
 }
-
-#else
-
-static inline void cond_resched_lock(spinlock_t * lock)
-{
-}
-
-#endif
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.

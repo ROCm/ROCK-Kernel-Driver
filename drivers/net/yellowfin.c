@@ -862,6 +862,7 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct yellowfin_private *yp = dev->priv;
 	unsigned entry;
+	int len = skb->len;
 
 	netif_stop_queue (dev);
 
@@ -876,28 +877,36 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (gx_fix) {	/* Note: only works for paddable protocols e.g.  IP. */
 		int cacheline_end = ((unsigned long)skb->data + skb->len) % 32;
 		/* Fix GX chipset errata. */
-		if (cacheline_end > 24  || cacheline_end == 0)
-			skb->len += 32 - cacheline_end + 1;
+		if (cacheline_end > 24  || cacheline_end == 0) {
+			len = skb->len + 32 - cacheline_end + 1;
+			if (len != skb->len)
+				skb = skb_padto(skb, len);
+		}
+		if (skb == NULL) {
+			yp->tx_skbuff[entry] = NULL;
+			netif_wake_queue(dev);
+			return 0;
+		}
 	}
 #ifdef NO_TXSTATS
 	yp->tx_ring[entry].addr = cpu_to_le32(pci_map_single(yp->pci_dev, 
-		skb->data, skb->len, PCI_DMA_TODEVICE));
+		skb->data, len, PCI_DMA_TODEVICE));
 	yp->tx_ring[entry].result_status = 0;
 	if (entry >= TX_RING_SIZE-1) {
 		/* New stop command. */
 		yp->tx_ring[0].dbdma_cmd = cpu_to_le32(CMD_STOP);
 		yp->tx_ring[TX_RING_SIZE-1].dbdma_cmd =
-			cpu_to_le32(CMD_TX_PKT|BRANCH_ALWAYS | skb->len);
+			cpu_to_le32(CMD_TX_PKT|BRANCH_ALWAYS | len);
 	} else {
 		yp->tx_ring[entry+1].dbdma_cmd = cpu_to_le32(CMD_STOP);
 		yp->tx_ring[entry].dbdma_cmd =
-			cpu_to_le32(CMD_TX_PKT | BRANCH_IFTRUE | skb->len);
+			cpu_to_le32(CMD_TX_PKT | BRANCH_IFTRUE | len);
 	}
 	yp->cur_tx++;
 #else
-	yp->tx_ring[entry<<1].request_cnt = skb->len;
+	yp->tx_ring[entry<<1].request_cnt = len;
 	yp->tx_ring[entry<<1].addr = cpu_to_le32(pci_map_single(yp->pci_dev, 
-		skb->data, skb->len, PCI_DMA_TODEVICE));
+		skb->data, len, PCI_DMA_TODEVICE));
 	/* The input_last (status-write) command is constant, but we must 
 	   rewrite the subsequent 'stop' command. */
 
@@ -910,7 +919,7 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	yp->tx_ring[entry<<1].dbdma_cmd =
 		cpu_to_le32( ((entry % 6) == 0 ? CMD_TX_PKT|INTR_ALWAYS|BRANCH_IFTRUE :
-					  CMD_TX_PKT | BRANCH_IFTRUE) | skb->len);
+					  CMD_TX_PKT | BRANCH_IFTRUE) | len);
 #endif
 
 	/* Non-x86 Todo: explicitly flush cache lines here. */

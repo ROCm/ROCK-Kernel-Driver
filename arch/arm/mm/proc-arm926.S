@@ -403,8 +403,6 @@ ENTRY(cpu_arm926_set_pte)
 	mov	pc, lr
 
 
-cpu_manu_name:
-	.asciz	"ARM"
 ENTRY(cpu_arm926_name)
 	.ascii	"ARM926EJ-S"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
@@ -503,12 +501,6 @@ arm926_processor_functions:
 
 	.size	arm926_processor_functions, . - arm926_processor_functions
 
-	.type	cpu_arm926_info, #object
-cpu_arm926_info:
-	.long	cpu_manu_name
-	.long	cpu_arm926_name
-	.size	cpu_arm926_info, . - cpu_arm926_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
 	.asciz	"armv5tej"
@@ -532,7 +524,7 @@ __arm926_proc_info:
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | \
 		HWCAP_FAST_MULT | HWCAP_JAVA
-	.long	cpu_arm926_info
+	.long	cpu_arm926_name
 	.long	arm926_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	v4wb_user_fns

@@ -88,8 +88,8 @@ set_ect_tcp(struct sk_buff **pskb, struct iphdr *iph,
 	}
 	
 	if (diffs[0] != *tcpflags) {
-		diffs[0] = htons(diffs[0]) ^ 0xFFFF;
-		diffs[1] = htons(*tcpflags);
+		diffs[0] = diffs[0] ^ 0xFFFF;
+		diffs[1] = *tcpflags;
 		tcph->check = csum_fold(csum_partial((char *)diffs,
 		                                    sizeof(diffs),
 		                                    tcph->check^0xFFFF));

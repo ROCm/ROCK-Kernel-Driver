@@ -5,9 +5,9 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#define DISPLAY_VIPER_TIMINGS
+#define DISPLAY_AMD_TIMINGS
 
-#if defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS)
+#if defined(DISPLAY_AMD_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
@@ -23,7 +23,7 @@ static ide_pci_host_proc_t amd74xx_procs[] __initdata = {
 		.parent		= NULL,
 	},
 };
-#endif  /* defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS) */
+#endif  /* defined(DISPLAY_AMD_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 static unsigned int init_chipset_amd74xx(struct pci_dev *, const char *);
 static void init_hwif_amd74xx(ide_hwif_t *);
@@ -95,7 +95,22 @@ static ide_pci_device_t amd74xx_chipsets[] __devinitdata = {
 		.enablebits	= {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
 		.bootable	= ON_BOARD,
 		.extra		= 0
-	},{
+	},
+	{	/* 5 */
+		.vendor		= PCI_VENDOR_ID_NVIDIA,
+		.device		= PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
+		.name		= "NFORCE",
+		.init_chipset	= init_chipset_amd74xx,
+		.init_iops	= NULL,
+		.init_hwif	= init_hwif_amd74xx,
+		.init_dma	= init_dma_amd74xx,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
+		.bootable	= ON_BOARD,
+		.extra		= 0,
+	},
+	{
 		.vendor		= 0,
 		.device		= 0,
 		.channels	= 0,

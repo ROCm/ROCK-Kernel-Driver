@@ -141,6 +141,7 @@ struct vm_operations_struct {
 
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
 struct pte_chain;
+struct mmu_gather;
 
 /*
  * Each physical page in the system has a struct page associated with
@@ -357,15 +358,26 @@ extern struct page *mem_map;
 
 extern void show_free_areas(void);
 
-struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
+struct page *shmem_nopage(struct vm_area_struct * vma,
+			unsigned long address, int unused);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
-extern void shmem_lock(struct file * file, int lock);
-extern int shmem_zero_setup(struct vm_area_struct *);
+void shmem_lock(struct file * file, int lock);
+int shmem_zero_setup(struct vm_area_struct *);
 
-extern void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size);
-extern int copy_page_range(struct mm_struct *dst, struct mm_struct *src, struct vm_area_struct *vma);
-extern int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long to, unsigned long size, pgprot_t prot);
-extern int zeromap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long size, pgprot_t prot);
+void zap_page_range(struct vm_area_struct *vma, unsigned long address,
+			unsigned long size);
+int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
+		struct vm_area_struct *start_vma, unsigned long start_addr,
+		unsigned long end_addr, unsigned long *nr_accounted);
+void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
+			unsigned long address, unsigned long size);
+void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr);
+int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
+			struct vm_area_struct *vma);
+int remap_page_range(struct vm_area_struct *vma, unsigned long from,
+			unsigned long to, unsigned long size, pgprot_t prot);
+int zeromap_page_range(struct vm_area_struct *vma, unsigned long from,
+			unsigned long size, pgprot_t prot);
 
 extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
@@ -384,6 +396,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 int __set_page_dirty_buffers(struct page *page);
 int __set_page_dirty_nobuffers(struct page *page);
+int set_page_dirty_lock(struct page *page);
 
 /*
  * Prototype to add a shrinker callback for ageable caches.
@@ -529,7 +542,6 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 					     struct vm_area_struct **pprev);
 extern int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		     unsigned long addr, int new_below);
-extern void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area);
 
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */

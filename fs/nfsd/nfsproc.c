@@ -250,11 +250,11 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 					/* this is probably a permission check..
 					 * at least IRIX implements perm checking on
 					 *   echo thing > device-special-file-or-pipe
-					 * by does a CREATE with type==0
+					 * by doing a CREATE with type==0
 					 */
 					nfserr = nfsd_permission(newfhp->fh_export,
 								 newfhp->fh_dentry,
-								 MAY_WRITE);
+								 MAY_WRITE|MAY_LOCAL_ACCESS);
 					if (nfserr && nfserr != nfserr_rofs)
 						goto out_unlock;
 				}

@@ -113,47 +113,6 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
-teles3_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-#define MAXCOUNT 5
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-	int count = 0;
-
-	spin_lock(&cs->lock);
-	val = readreg(cs->hw.teles3.hscx[1], HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = readreg(cs->hw.teles3.isac, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	count++;
-	val = readreg(cs->hw.teles3.hscx[1], HSCX_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = readreg(cs->hw.teles3.isac, ISAC_ISTA);
-	if (val && count < MAXCOUNT) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	if (count >= MAXCOUNT)
-		printk(KERN_WARNING "Teles3: more than %d loops in teles3_interrupt\n", count);
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
 inline static void
 release_ioregs(struct IsdnCardState *cs, int mask)
 {
@@ -165,8 +124,8 @@ release_ioregs(struct IsdnCardState *cs, int mask)
 		release_region(cs->hw.teles3.hscx[1] + 32, 32);
 }
 
-void
-release_io_teles3(struct IsdnCardState *cs)
+static void
+teles3_release(struct IsdnCardState *cs)
 {
 	if (cs->typ == ISDN_CTYPE_TELESPCMCIA) {
 		release_region(cs->hw.teles3.hscx[1], 96);
@@ -183,7 +142,7 @@ release_io_teles3(struct IsdnCardState *cs)
 }
 
 static int
-reset_teles3(struct IsdnCardState *cs)
+teles3_reset(struct IsdnCardState *cs)
 {
 	u8 irqcfg;
 
@@ -241,21 +200,15 @@ reset_teles3(struct IsdnCardState *cs)
 static int
 Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			reset_teles3(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_teles3(cs);
-			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
+
+static struct card_ops teles3_ops = {
+	.init     = inithscxisac,
+	.reset    = teles3_reset,
+	.release  = teles3_release,
+	.irq_func = hscxisac_irq,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id teles_ids[] __initdata = {
@@ -272,7 +225,7 @@ static struct isapnp_device_id teles_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *tdev = &teles_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 int __devinit
@@ -290,31 +243,41 @@ setup_teles3(struct IsdnCard *card)
 
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pnp_card;
+		struct pnp_dev *pnp_dev;
 
 		while(tdev->card_vendor) {
-			if ((pb = isapnp_find_card(tdev->card_vendor,
-				tdev->card_device, pnp_c))) {
-				pnp_c = pb;
-				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					tdev->vendor, tdev->function, pd))) {
+			if ((pnp_card = pnp_find_card(tdev->card_vendor,
+						      tdev->card_device, pnp_c))) {
+				pnp_c = pnp_card;
+				pnp_dev = NULL;
+				if ((pnp_dev = pnp_find_dev(pnp_card,
+							    tdev->vendor,
+							    tdev->function,
+							    pnp_dev))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)tdev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[3] = pd->resource[2].start;
-					card->para[2] = pd->resource[1].start;
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1] || !card->para[2]) {
-						printk(KERN_ERR "Teles PnP:some resources are missing %ld/%lx/%lx\n",
-						card->para[0], card->para[1], card->para[2]);
-						pd->deactivate(pd);
-						return(0);
+					if (pnp_device_attach(pnp_dev) < 0) {
+						printk(KERN_ERR "Teles PnP: attach failed\n");
+						return 0;
 					}
+					if (pnp_activate_dev(pnp_dev, NULL) < 0) {
+						printk(KERN_ERR "Teles PnP: activate failed\n");
+						pnp_device_detach(pnp_dev);
+						return 0;
+					}
+					if (!pnp_irq_valid(pnp_dev, 0) ||
+					    !pnp_port_valid(pnp_dev, 0) ||
+					    !pnp_port_valid(pnp_dev, 1)) {
+						printk(KERN_ERR "Teles PnP: some resources are missing %ld/%lx/%lx\n",
+							pnp_irq(pnp_dev, 0), pnp_port_start(pnp_dev, 0), pnp_port_start(pnp_dev, 1));
+						pnp_device_detach(pnp_dev);
+						return 0;
+					}
+					card->para[3] = pnp_port_start(pnp_dev, 2);
+					card->para[2] = pnp_port_start(pnp_dev, 1);
+					card->para[1] = pnp_port_start(pnp_dev, 0);
+					card->para[0] = pnp_irq(pnp_dev, 0);
 					break;
 				} else {
 					printk(KERN_ERR "Teles PnP: PnP error card found, no device\n");
@@ -443,13 +406,13 @@ setup_teles3(struct IsdnCard *card)
 		if ((val = bytein(cs->hw.teles3.cfg_reg + 0)) != 0x51) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 0, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 		if ((val = bytein(cs->hw.teles3.cfg_reg + 1)) != 0x93) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 1, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 		val = bytein(cs->hw.teles3.cfg_reg + 2);/* 0x1e=without AB
@@ -462,7 +425,7 @@ setup_teles3(struct IsdnCard *card)
 		if (val != 0x46 && val != 0x39 && val != 0x38 && val != 0x1c && val != 0x1e && val != 0x1f) {
 			printk(KERN_WARNING "Teles: 16.3 Byte at %x is %x\n",
 			       cs->hw.teles3.cfg_reg + 2, val);
-			release_io_teles3(cs);
+			teles3_release(cs);
 			return (0);
 		}
 	}
@@ -474,20 +437,20 @@ setup_teles3(struct IsdnCard *card)
 	       "HiSax: hscx A:0x%X  hscx B:0x%X\n",
 	       cs->hw.teles3.hscx[0] + 32, cs->hw.teles3.hscx[1] + 32);
 
-	if (reset_teles3(cs)) {
+	if (teles3_reset(cs)) {
 		printk(KERN_WARNING "Teles3: wrong IRQ\n");
-		release_io_teles3(cs);
+		teles3_release(cs);
 		return (0);
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Teles_card_msg;
-	cs->irq_func = &teles3_interrupt;
+	cs->card_ops = &teles3_ops;
 	ISACVersion(cs, "Teles3:");
 	if (HscxVersion(cs, "Teles3:")) {
 		printk(KERN_WARNING
 		       "Teles3: wrong HSCX versions check IO address\n");
-		release_io_teles3(cs);
+		teles3_release(cs);
 		return (0);
 	}
 	return (1);

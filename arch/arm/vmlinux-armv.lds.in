@@ -75,6 +75,12 @@ SECTIONS
 		__stop___ex_table = .;
 	}
 
+	__gpl_ksymtab : {		/* GPL Kernel symbol table	*/
+		__start___gpl_ksymtab = .;
+			*(__gpl_ksymtab)
+		__stop___gpl_ksymtab = .;
+	}
+
 	__ksymtab : {			/* Kernel symbol table		*/
 		__start___ksymtab = .;
 			*(__ksymtab)

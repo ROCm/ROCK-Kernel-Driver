@@ -438,7 +438,7 @@ config WDC_ALI15X3
 	  SAY N!
 
 config BLK_DEV_AMD74XX
-	tristate "AMD Viper support"
+	tristate "AMD and nVidia IDE support"
 	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for AMD-7xx and AMD-8111 chips
@@ -446,16 +446,19 @@ config BLK_DEV_AMD74XX
 	  change PIO, DMA and UDMA speeds and to configure the chip to
 	  optimum performance.
 
-config AMD74XX_OVERRIDE
-	bool "AMD Viper ATA-66 Override"
-	depends on BLK_DEV_AMD74XX
-
 config BLK_DEV_CMD64X
 	tristate "CMD64{3|6|8|9} chipset support"
 	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  Say Y here if you have an IDE controller which uses any of these
 	  chipsets: CMD643, CMD646, or CMD648.
+
+config BLK_DEV_TRIFLEX
+	tristate "Compaq Triflex IDE support"
+	depends on BLK_DEV_IDEDMA_PCI
+	help
+	  Say Y here if you have a Compaq Triflex IDE controller, such
+	  as those commonly found on Compaq Pentium-Pro systems
 
 config BLK_DEV_CY82C693
 	tristate "CY82C693 chipset support"
@@ -556,10 +559,6 @@ config BLK_DEV_IT8172
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
 	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
-
-config BLK_DEV_NFORCE
-	tristate "nVidia NFORCE support"
-	depends on BLK_DEV_IDEDMA_PCI
 
 config BLK_DEV_NS87415
 	tristate "NS87415 chipset support"

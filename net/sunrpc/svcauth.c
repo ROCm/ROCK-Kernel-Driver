@@ -33,12 +33,11 @@ static struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR] = {
 };
 
 int
-svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp, int proc)
+svc_authenticate(struct svc_rqst *rqstp, u32 *authp)
 {
 	rpc_authflavor_t	flavor;
 	struct auth_ops		*aops;
 
-	*statp = rpc_success;
 	*authp = rpc_auth_ok;
 
 	flavor = ntohl(svc_getu32(&rqstp->rq_arg.head[0]));
@@ -46,25 +45,11 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *statp, u32 *authp, int proc)
 	dprintk("svc: svc_authenticate (%d)\n", flavor);
 	if (flavor >= RPC_AUTH_MAXFLAVOR || !(aops = authtab[flavor])) {
 		*authp = rpc_autherr_badcred;
-		return 0;
+		return SVC_DENIED;
 	}
 
 	rqstp->rq_authop = aops;
-	switch (aops->accept(rqstp, authp, proc)) {
-	case SVC_OK:
-		return 0;
-	case SVC_GARBAGE:
-		*statp = rpc_garbage_args;
-		return 0;
-	case SVC_SYSERR:
-		*statp = rpc_system_err;
-		return 0;
-	case SVC_DENIED:
-		return 0;
-	case SVC_DROP:
-		break;
-	}
-	return 1; /* drop the request */
+	return aops->accept(rqstp, authp);
 }
 
 /* A reqeust, which was authenticated, has now executed.
@@ -111,25 +96,6 @@ svc_auth_unregister(rpc_authflavor_t flavor)
  * If it finds the name does exist, but isn't AUTH_UNIX,
  * it will complain.
  */
-
-int hash_mem(char *buf, int len, int bits)
-{
-	int hash = 0;
-	unsigned long l;
-	while (len >= BITS_PER_LONG/8) {
-		l = *(unsigned long *)buf;
-		buf += BITS_PER_LONG/8;
-		len -= BITS_PER_LONG/8;
-		hash ^= hash_long(l, bits);
-	}
-	if (len) {
-		l=0;
-		memcpy((char*)&l, buf, len);
-		hash ^= hash_long(l, bits);
-	}
-	return hash;
-}
-
 
 /*
  * Auth auth_domain cache is somewhat different to other caches,

@@ -28,29 +28,30 @@
   #define tlb_fast_mode(tlb) 1
 #endif
 
-/* mmu_gather_t is an opaque type used by the mm code for passing around any
- * data needed by arch specific code for tlb_remove_page.  This structure can
- * be per-CPU or per-MM as the page table lock is held for the duration of TLB
- * shootdown.
+/* struct mmu_gather is an opaque type used by the mm code for passing around
+ * any data needed by arch specific code for tlb_remove_page.  This structure
+ * can be per-CPU or per-MM as the page table lock is held for the duration of
+ * TLB shootdown.
  */
-typedef struct free_pte_ctx {
+struct mmu_gather {
 	struct mm_struct	*mm;
 	unsigned int		nr;	/* set to ~0U means fast mode */
 	unsigned int		need_flush;/* Really unmapped some ptes? */
 	unsigned int		fullmm; /* non-zero means full mm flush */
 	unsigned long		freed;
 	struct page *		pages[FREE_PTE_NR];
-} mmu_gather_t;
+};
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
-extern mmu_gather_t	mmu_gathers[NR_CPUS];
+extern struct mmu_gather	mmu_gathers[NR_CPUS];
 
 /* tlb_gather_mmu
- *	Return a pointer to an initialized mmu_gather_t.
+ *	Return a pointer to an initialized struct mmu_gather.
  */
-static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
+static inline struct mmu_gather *
+tlb_gather_mmu(struct mm_struct *mm, unsigned int full_mm_flush)
 {
-	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
+	struct mmu_gather *tlb = &mmu_gathers[smp_processor_id()];
 
 	tlb->mm = mm;
 
@@ -63,7 +64,8 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int fu
 	return tlb;
 }
 
-static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
+static inline void
+tlb_flush_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	if (!tlb->need_flush)
 		return;
@@ -79,7 +81,8 @@ static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigne
  *	Called at the end of the shootdown operation to free up any resources
  *	that were required.  The page table lock is still held at this point.
  */
-static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
+static inline void
+tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	int freed = tlb->freed;
 	struct mm_struct *mm = tlb->mm;
@@ -95,12 +98,12 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
 }
 
 
-/* void tlb_remove_page(mmu_gather_t *tlb, pte_t *ptep, unsigned long addr)
+/* void tlb_remove_page(struct mmu_gather *tlb, pte_t *ptep, unsigned long addr)
  *	Must perform the equivalent to __free_pte(pte_get_and_clear(ptep)), while
  *	handling the additional races in SMP caused by other CPUs caching valid
  *	mappings in their TLBs.
  */
-static inline void tlb_remove_page(mmu_gather_t *tlb, struct page *page)
+static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 {
 	tlb->need_flush = 1;
 	if (tlb_fast_mode(tlb)) {

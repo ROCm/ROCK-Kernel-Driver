@@ -28,7 +28,6 @@ struct svc_sock {
 #define	SK_CLOSE	2			/* dead or dying */
 #define	SK_DATA		3			/* data pending */
 #define	SK_TEMP		4			/* temp (TCP) socket */
-#define	SK_QUED		5			/* on serv->sk_sockets */
 #define	SK_DEAD		6			/* socket closed */
 #define	SK_CHNGBUF	7			/* need to change snd/rcv buffer sizes */
 #define	SK_DEFERRED	8			/* request on sk_deferred */

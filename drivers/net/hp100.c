@@ -1555,6 +1555,12 @@ static int hp100_start_xmit_bm(struct sk_buff *skb, struct net_device *dev)
 
 	if (skb->len <= 0)
 		return 0;
+		
+	if (skb->len < ETH_ZLEN && lp->chip == HP100_CHIPID_SHASTA) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
 
 	/* Get Tx ring tail pointer */
 	if (lp->txrtail->next == lp->txrhead) {
@@ -2097,6 +2103,7 @@ static void hp100_misc_interrupt(struct net_device *dev)
 	struct hp100_private *lp = (struct hp100_private *) dev->priv;
 
 #ifdef HP100_DEBUG_B
+	int ioaddr = dev->base_addr;
 	hp100_outw(0x4216, TRACE);
 	printk("hp100: %s: misc_interrupt\n", dev->name);
 #endif
@@ -2536,6 +2543,11 @@ static int hp100_sense_lan(struct net_device *dev)
 		return HP100_LAN_10;
 
 	if (val_10 & HP100_AUI_ST) {	/* have we BNC or AUI onboard? */
+		/*
+		 * This can be overriden by dos utility, so if this has no effect,
+		 * perhaps you need to download that utility from HP and set card
+		 * back to "auto detect".
+		 */
 		val_10 |= HP100_AUI_SEL | HP100_LOW_TH;
 		hp100_page(MAC_CTRL);
 		hp100_outb(val_10, 10_LAN_CFG_1);

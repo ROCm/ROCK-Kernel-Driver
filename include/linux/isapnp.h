@@ -122,6 +122,15 @@ static inline isapnp_proc_done(void) { return 0; }
 /* init/main.c */
 int isapnp_init(void);
 
+/* compat */
+struct pnp_card *pnp_find_card(unsigned short vendor,
+			       unsigned short device,
+			       struct pnp_card *from);
+struct pnp_dev *pnp_find_dev(struct pnp_card *card,
+			     unsigned short vendor,
+			     unsigned short function,
+			     struct pnp_dev *from);
+
 #else /* !CONFIG_ISAPNP */
 
 /* lowlevel configuration */
@@ -138,6 +147,14 @@ static inline void isapnp_wake(unsigned char csn) { ; }
 static inline void isapnp_device(unsigned char device) { ; }
 static inline void isapnp_activate(unsigned char device) { ; }
 static inline void isapnp_deactivate(unsigned char device) { ; }
+
+static inline struct pnp_card *pnp_find_card(unsigned short vendor,
+					     unsigned short device,
+					     struct pnp_card *from) { return NULL; }
+static inline struct pnp_dev *pnp_find_dev(struct pnp_card *card,
+					   unsigned short vendor,
+					   unsigned short function,
+					   struct pnp_dev *from) { return NULL; }
 
 #endif /* CONFIG_ISAPNP */
 

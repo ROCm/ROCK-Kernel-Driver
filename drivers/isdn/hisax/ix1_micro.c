@@ -141,49 +141,13 @@ static struct bc_hw_ops hscx_ops = {
 };
 
 static void
-ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 val;
-
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
-}
-
-void
-release_io_ix1micro(struct IsdnCardState *cs)
+ix1_release(struct IsdnCardState *cs)
 {
 	if (cs->hw.ix1.cfg_reg)
 		release_region(cs->hw.ix1.cfg_reg, 4);
 }
 
-static void
+static int
 ix1_reset(struct IsdnCardState *cs)
 {
 	int cnt;
@@ -195,26 +159,21 @@ ix1_reset(struct IsdnCardState *cs)
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
+	return 0;
 }
 
 static int
 ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			ix1_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_ix1micro(cs);
-			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
+
+static struct card_ops ix1_ops = {
+	.init     = inithscxisac,
+	.reset    = ix1_reset,
+	.release  = ix1_release,
+	.irq_func = hscxisac_irq,
+};
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id itk_ids[] __initdata = {
@@ -228,7 +187,7 @@ static struct isapnp_device_id itk_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *idev = &itk_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 
@@ -245,29 +204,38 @@ setup_ix1micro(struct IsdnCard *card)
 
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
 
 		while(idev->card_vendor) {
-			if ((pb = isapnp_find_card(idev->card_vendor,
-				idev->card_device, pnp_c))) {
+			if ((pb = pnp_find_card(idev->card_vendor,
+						idev->card_device,
+						pnp_c))) {
 				pnp_c = pb;
 				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					idev->vendor, idev->function, pd))) {
+				if ((pd = pnp_find_dev(pnp_c,
+						       idev->vendor,
+						       idev->function,
+						       pd))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)idev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1]) {
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "ITK PnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd, NULL) < 0) {
+						printk(KERN_ERR "ITK PnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_port_valid(pd, 0) || !pnp_irq_valid(pd, 0)) {
 						printk(KERN_ERR "ITK PnP:some resources are missing %ld/%lx\n",
-						card->para[0], card->para[1]);
-						pd->deactivate(pd);
+							pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
 						return(0);
 					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
 					break;
 				} else {
 					printk(KERN_ERR "ITK PnP: PnP error card found, no device\n");
@@ -307,12 +275,12 @@ setup_ix1micro(struct IsdnCard *card)
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &ix1_card_msg;
-	cs->irq_func = &ix1micro_interrupt;
+	cs->card_ops = &ix1_ops;
 	ISACVersion(cs, "ix1-Micro:");
 	if (HscxVersion(cs, "ix1-Micro:")) {
 		printk(KERN_WARNING
 		    "ix1-Micro: wrong HSCX versions check IO address\n");
-		release_io_ix1micro(cs);
+		ix1_release(cs);
 		return (0);
 	}
 	return (1);

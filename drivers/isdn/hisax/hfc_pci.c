@@ -70,8 +70,8 @@ static const PCI_ENTRY id_list[] =
 /******************************************/
 /* free hardware resources used by driver */
 /******************************************/
-void
-release_io_hfcpci(struct IsdnCardState *cs)
+static void
+hfcpci_release(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: release hfcpci at %p\n",
 		cs->hw.hfcpci.pci_io);
@@ -91,8 +91,8 @@ release_io_hfcpci(struct IsdnCardState *cs)
 /* function called to reset the HFC PCI chip. A complete software reset of chip */
 /* and fifos is done.                                                           */
 /********************************************************************************/
-static void
-reset_hfcpci(struct IsdnCardState *cs)
+static int
+hfcpci_reset(struct IsdnCardState *cs)
 {
 	pci_disable_device(cs->hw.hfcpci.pdev);
 	cs->hw.hfcpci.int_m2 = 0;	/* interrupt output off ! */
@@ -159,6 +159,8 @@ reset_hfcpci(struct IsdnCardState *cs)
 	cs->hw.hfcpci.int_m2 = HFCPCI_IRQ_ENABLE;
 	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
 	if (Read_hfc(cs, HFCPCI_INT_S2));
+	
+	return 0;
 }
 
 /***************************************************/
@@ -1047,10 +1049,11 @@ HFCPCI_l1hw(struct PStack *st, int pr, void *arg)
 /***********************************************/
 /* called during init setting l1 stack pointer */
 /***********************************************/
-void
+static int
 setstack_hfcpci(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = HFCPCI_l1hw;
+	return 0;
 }
 
 /***************************************************************/
@@ -1335,8 +1338,17 @@ hfcpci_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
-static struct bc_l1_ops hfcpci_l1_ops = {
+static struct bc_l1_ops hfcpci_bc_l1_ops = {
 	.fill_fifo = hfcpci_fill_fifo,
+	.open      = setstack_2b,
+	.close     = close_hfcpci,
+};
+
+static struct dc_l1_ops hfcpci_dc_l1_ops = {
+	.fill_fifo  = hfcpci_fill_dfifo,
+	.open       = setstack_hfcpci,
+	.bh_func    = hfcpci_bh,
+	.dbusy_func = hfcpci_dbusy_timer,
 };
 
 /********************************/
@@ -1345,17 +1357,8 @@ static struct bc_l1_ops hfcpci_l1_ops = {
 void __init
 inithfcpci(struct IsdnCardState *cs)
 {
-	cs->setstack_d = setstack_hfcpci;
-	cs->dbusytimer.function = (void *) hfcpci_dbusy_timer;
-	cs->dbusytimer.data = (long) cs;
-	init_timer(&cs->dbusytimer);
-	INIT_WORK(&cs->work, hfcpci_bh, cs);
-	cs->bc_l1_ops = &hfcpci_l1_ops;
-	cs->DC_Send_Data = hfcpci_fill_dfifo;
-	cs->bcs[0].BC_SetStack = setstack_2b;
-	cs->bcs[1].BC_SetStack = setstack_2b;
-	cs->bcs[0].BC_Close = close_hfcpci;
-	cs->bcs[1].BC_Close = close_hfcpci;
+	dc_l1_init(cs, &hfcpci_dc_l1_ops);
+	cs->bc_l1_ops = &hfcpci_bc_l1_ops;
 	mode_hfcpci(cs->bcs, 0, 0);
 	mode_hfcpci(cs->bcs + 1, 0, 1);
 }
@@ -1368,30 +1371,28 @@ inithfcpci(struct IsdnCardState *cs)
 static int
 hfcpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "HFCPCI: card_msg %x", mt);
-	switch (mt) {
-		case CARD_RESET:
-			reset_hfcpci(cs);
-			return (0);
-		case CARD_RELEASE:
-			release_io_hfcpci(cs);
-			return (0);
-		case CARD_INIT:
-			inithfcpci(cs);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
-			/* now switch timer interrupt off */
-			cs->hw.hfcpci.int_m1 &= ~HFCPCI_INTS_TIMER;
-			Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
-			/* reinit mode reg */
-			Write_hfc(cs, HFCPCI_MST_MODE, cs->hw.hfcpci.mst_m);
-			return (0);
-		case CARD_TEST:
-			return (0);
-	}
 	return (0);
 }
+
+static void
+hfcpci_init(struct IsdnCardState *cs)
+{
+	inithfcpci(cs);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
+	/* now switch timer interrupt off */
+	cs->hw.hfcpci.int_m1 &= ~HFCPCI_INTS_TIMER;
+	Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
+	/* reinit mode reg */
+	Write_hfc(cs, HFCPCI_MST_MODE, cs->hw.hfcpci.mst_m);
+}
+
+static struct card_ops hfcpci_ops = {
+	.init     = hfcpci_init,
+	.reset    = hfcpci_reset,
+	.release  = hfcpci_release,
+	.irq_func = hfcpci_interrupt,
+};
 
 
 /* this variable is used as card index when more than one cards are present */
@@ -1476,16 +1477,16 @@ setup_hfcpci(struct IsdnCard *card)
 		return (0);	/* no valid card type */
 
 
-	cs->irq_func = &hfcpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 
 	cs->hw.hfcpci.timer.function = (void *) hfcpci_Timer;
 	cs->hw.hfcpci.timer.data = (long) cs;
 	init_timer(&cs->hw.hfcpci.timer);
 
-	reset_hfcpci(cs);
+	hfcpci_reset(cs);
 	cs->cardmsg = &hfcpci_card_msg;
 	cs->auxcmd = &hfcpci_auxcmd;
+	cs->card_ops = &hfcpci_ops;
 	return (1);
 #else
 	printk(KERN_WARNING "HFC-PCI: NO_PCI_BIOS\n");

@@ -830,6 +830,18 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	struct lance_tx_head *head;
 	unsigned long flags;
 
+	/* The old LANCE chips doesn't automatically pad buffers to min. size. */
+	len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
+	/* PAM-Card has a bug: Can only send packets with even number of bytes! */
+	if (lp->cardtype == PAM_CARD && (len & 1))
+		++len;
+
+	if (len > skb->len) {
+		skb = skb_padto(skb, len);
+		if (skb == NULL)
+			return 0;
+	}	
+
 	/* Transmitter timeout, serious problems. */
 	if (dev->tbusy) {
 		int tickssofar = jiffies - dev->trans_start;
@@ -915,12 +927,6 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	/* Caution: the write order is important here, set the "ownership" bits
 	 * last.
 	 */
-
-	/* The old LANCE chips doesn't automatically pad buffers to min. size. */
-	len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
-	/* PAM-Card has a bug: Can only send packets with even number of bytes! */
-	if (lp->cardtype == PAM_CARD && (len & 1))
-		++len;
 
 	head->length = -len;
 	head->misc = 0;

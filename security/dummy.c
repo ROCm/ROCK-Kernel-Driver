@@ -501,6 +501,15 @@ static int dummy_ipc_permission (struct kern_ipc_perm *ipcp, short flag)
 	return 0;
 }
 
+static int dummy_msg_msg_alloc_security (struct msg_msg *msg)
+{
+	return 0;
+}
+
+static void dummy_msg_msg_free_security (struct msg_msg *msg)
+{
+	return;
+}
 
 static int dummy_msg_queue_alloc_security (struct msg_queue *msq)
 {
@@ -510,6 +519,30 @@ static int dummy_msg_queue_alloc_security (struct msg_queue *msq)
 static void dummy_msg_queue_free_security (struct msg_queue *msq)
 {
 	return;
+}
+
+static int dummy_msg_queue_associate (struct msg_queue *msq, 
+				      int msqflg)
+{
+	return 0;
+}
+
+static int dummy_msg_queue_msgctl (struct msg_queue *msq, int cmd)
+{
+	return 0;
+}
+
+static int dummy_msg_queue_msgsnd (struct msg_queue *msq, struct msg_msg *msg,
+				   int msgflg)
+{
+	return 0;
+}
+
+static int dummy_msg_queue_msgrcv (struct msg_queue *msq, struct msg_msg *msg,
+				   struct task_struct *target, long type,
+				   int mode)
+{
+	return 0;
 }
 
 static int dummy_shm_alloc_security (struct shmid_kernel *shp)
@@ -522,6 +555,22 @@ static void dummy_shm_free_security (struct shmid_kernel *shp)
 	return;
 }
 
+static int dummy_shm_associate (struct shmid_kernel *shp, int shmflg)
+{
+	return 0;
+}
+
+static int dummy_shm_shmctl (struct shmid_kernel *shp, int cmd)
+{
+	return 0;
+}
+
+static int dummy_shm_shmat (struct shmid_kernel *shp, char *shmaddr,
+			    int shmflg)
+{
+	return 0;
+}
+
 static int dummy_sem_alloc_security (struct sem_array *sma)
 {
 	return 0;
@@ -530,6 +579,22 @@ static int dummy_sem_alloc_security (struct sem_array *sma)
 static void dummy_sem_free_security (struct sem_array *sma)
 {
 	return;
+}
+
+static int dummy_sem_associate (struct sem_array *sma, int semflg)
+{
+	return 0;
+}
+
+static int dummy_sem_semctl (struct sem_array *sma, int cmd)
+{
+	return 0;
+}
+
+static int dummy_sem_semop (struct sem_array *sma, 
+			    struct sembuf *sops, unsigned nsops, int alter)
+{
+	return 0;
 }
 
 static int dummy_register_security (const char *name, struct security_operations *ops)
@@ -640,12 +705,24 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, task_kmod_set_label);
 	set_to_dummy_if_null(ops, task_reparent_to_init);
 	set_to_dummy_if_null(ops, ipc_permission);
+	set_to_dummy_if_null(ops, msg_msg_alloc_security);
+	set_to_dummy_if_null(ops, msg_msg_free_security);
 	set_to_dummy_if_null(ops, msg_queue_alloc_security);
 	set_to_dummy_if_null(ops, msg_queue_free_security);
+	set_to_dummy_if_null(ops, msg_queue_associate);
+	set_to_dummy_if_null(ops, msg_queue_msgctl);
+	set_to_dummy_if_null(ops, msg_queue_msgsnd);
+	set_to_dummy_if_null(ops, msg_queue_msgrcv);
 	set_to_dummy_if_null(ops, shm_alloc_security);
 	set_to_dummy_if_null(ops, shm_free_security);
+	set_to_dummy_if_null(ops, shm_associate);
+	set_to_dummy_if_null(ops, shm_shmctl);
+	set_to_dummy_if_null(ops, shm_shmat);
 	set_to_dummy_if_null(ops, sem_alloc_security);
 	set_to_dummy_if_null(ops, sem_free_security);
+	set_to_dummy_if_null(ops, sem_associate);
+	set_to_dummy_if_null(ops, sem_semctl);
+	set_to_dummy_if_null(ops, sem_semop);
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
 }

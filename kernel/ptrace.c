@@ -115,7 +115,7 @@ int ptrace_attach(struct task_struct *task)
 	__ptrace_link(task, current);
 	write_unlock_irq(&tasklist_lock);
 
-	send_sig(SIGSTOP, task, 1);
+	force_sig_specific(SIGSTOP, task);
 	return 0;
 
 bad:

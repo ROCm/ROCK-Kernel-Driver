@@ -491,6 +491,10 @@ EXPORT_SYMBOL(do_settimeofday);
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 EXPORT_SYMBOL(__might_sleep);
 #endif
+#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
+EXPORT_SYMBOL(__preempt_spin_lock);
+EXPORT_SYMBOL(__preempt_write_lock);
+#endif
 #if !defined(__ia64__)
 EXPORT_SYMBOL(loops_per_jiffy);
 #endif

@@ -164,37 +164,6 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ipac_dc_read(struct IsdnCardState *cs, u8 offset)
-{
-	return readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset+0x80);
-}
-
-static void
-ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
-{
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset|0x80, value);
-}
-
-static void
-ipac_dc_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	readfifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0x80, data, size);
-}
-
-static void
-ipac_dc_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0x80, data, size);
-}
-
-static struct dc_hw_ops ipac_dc_ops = {
-	.read_reg   = ipac_dc_read,
-	.write_reg  = ipac_dc_write,
-	.read_fifo  = ipac_dc_read_fifo,
-	.write_fifo = ipac_dc_write_fifo,
-};
-
-static u8
 hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, 
@@ -227,55 +196,65 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static u8
-mem_ipac_dc_read(struct IsdnCardState *cs, u8 offset)
+static inline u8
+ipac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return memreadreg(cs->hw.diva.cfg_reg, offset+0x80);
+	return readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset);
 }
 
-static void
-mem_ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
+static inline void
+ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	memwritereg(cs->hw.diva.cfg_reg, offset|0x80, value);
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, value);
 }
 
-static void
-mem_ipac_dc_read_fifo(struct IsdnCardState *cs, u8 *data, int size)
+static inline void
+ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	readfifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, data, size);
+}
+
+static inline void
+ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
+{
+	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, offset, data, size);
+}
+
+/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
+ * above */
+
+BUILD_IPAC_OPS(ipac);
+
+static inline u8
+mem_ipac_read(struct IsdnCardState *cs, u8 offset)
+{
+	return memreadreg(cs->hw.diva.cfg_reg, offset);
+}
+
+static inline void
+mem_ipac_write(struct IsdnCardState *cs, u8 offset, u8 value)
+{
+	memwritereg(cs->hw.diva.cfg_reg, offset, value);
+}
+
+static inline void
+mem_ipac_readfifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
 {
 	while(size--)
-		*data++ = memreadreg(cs->hw.diva.cfg_reg, 0x80);
+		*data++ = memreadreg(cs->hw.diva.cfg_reg, offset);
 }
 
-static void
-mem_ipac_dc_write_fifo(struct IsdnCardState *cs, u8 *data, int size)
+static inline void
+mem_ipac_writefifo(struct IsdnCardState *cs, u8 offset, u8 *data, int size)
 {
 	while(size--)
-		memwritereg(cs->hw.diva.cfg_reg, 0x80, *data++);
+		memwritereg(cs->hw.diva.cfg_reg, offset, *data++);
 }
 
-static struct dc_hw_ops mem_ipac_dc_ops = {
-	.read_reg   = mem_ipac_dc_read,
-	.write_reg  = mem_ipac_dc_write,
-	.read_fifo  = mem_ipac_dc_read_fifo,
-	.write_fifo = mem_ipac_dc_write_fifo,
-};
+/* This will generate mem_ipac_dc_ops and mem_ipac_bc_ops using the functions
+ * above */
 
-static u8
-mem_hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
-{
-	return memreadreg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0));
-}
-
-static void
-mem_hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
-{
-	memwritereg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0), value);
-}
-
-static struct bc_hw_ops mem_hscx_ops = {
-	.read_reg   = mem_hscx_read,
-	.write_reg  = mem_hscx_write,
-};
+BUILD_IPAC_OPS(mem_ipac);
 
 /* IO-Functions for IPACX type cards */
 static u8
@@ -325,441 +304,158 @@ ipacx_bc_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
               (hscx ? IPACX_OFF_B2 : IPACX_OFF_B1), value);
 }
 
+static void
+ipacx_bc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
+{
+	int i;
+
+	for (i = 0; i < len ; i++)
+		*data++ = ipacx_bc_read(cs, hscx, IPACX_RFIFOB);
+}
+
 static struct bc_hw_ops ipacx_bc_ops = {
 	.read_reg   = ipacx_bc_read,
 	.write_reg  = ipacx_bc_write,
+	.read_fifo  = ipacx_bc_read_fifo,
 };
 
 static void
 diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 val, sval;
+	u8 sval;
 	int cnt=5;
 
-	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.diva.ctrl)) & DIVA_IRQ_REQ) && cnt) {
-		val = readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_ISTA + 0x40);
-		if (val)
-			hscx_int_main(cs, val);
-		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_ISTA);
-		if (val)
-			isac_interrupt(cs, val);
-		cnt--;
+		hscxisac_irq(intno, dev_id, regs);
 	}
 	if (!cnt)
 		printk(KERN_WARNING "Diva: IRQ LOOP\n");
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0xFF);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0x0);
-	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0x0);
-	spin_unlock(&cs->lock);
 }
 
 static void
-diva_irq_ipac_isa(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista,val;
-	int icnt=5;
-
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	ista = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ISTA);
-Start_IPACISA:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, HSCX_ISTA + 0x40);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			hscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = 0xfe & readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_ISTA + 0x80);
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPACISA;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "DIVA IPAC IRQ LOOP\n");
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xFF);
-	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xC0);
-}
-
-static inline void
-MemwaitforCEC(struct IsdnCardState *cs, int hscx)
-{
-	int to = 50;
-
-	while ((mem_hscx_read(cs, hscx, HSCX_STAR) & 0x04) && to) {
-		udelay(1);
-		to--;
-	}
-	if (!to)
-		printk(KERN_WARNING "HiSax: waitforCEC timeout\n");
-}
-
-
-static inline void
-MemwaitforXFW(struct IsdnCardState *cs, int hscx)
-{
-	int to = 50;
-
-	while ((!(mem_hscx_read(cs, hscx, HSCX_STAR) & 0x44) == 0x40) && to) {
-		udelay(1);
-		to--;
-	}
-	if (!to)
-		printk(KERN_WARNING "HiSax: waitforXFW timeout\n");
-}
-
-static inline void
-MemWriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u8 data)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&diva_lock, flags);
-	MemwaitforCEC(cs, hscx);
-	mem_hscx_write(cs, hscx, HSCX_CMDR, data);
-	spin_unlock_irqrestore(&diva_lock, flags);
-}
-
-static void
-Memhscx_empty_fifo(struct BCState *bcs, int count)
-{
-	u8 *ptr;
-	struct IsdnCardState *cs = bcs->cs;
-	unsigned long flags;
-	int cnt;
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hscx_empty_fifo");
-
-	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
-		if (cs->debug & L1_DEB_WARN)
-			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
-		MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-		bcs->hw.hscx.rcvidx = 0;
-		return;
-	}
-	spin_lock_irqsave(&diva_lock, flags);
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	cnt = count;
-	while (cnt--)
-		*ptr++ = memreadreg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0);
-	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
-	bcs->hw.hscx.rcvidx += count;
-	spin_unlock_irqrestore(&diva_lock, flags);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "hscx_empty_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
-}
-
-static void
-Memhscx_fill_fifo(struct BCState *bcs)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	int more, count;
-	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	unsigned char *p;
-
-	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
-	if (!p)
-		return;
-
-	MemwaitforXFW(cs, bcs->hw.hscx.hscx);
-	while (count--)
-		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
-			*p++);
-	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
-}
-
-static struct bc_l1_ops mem_hscx_l1_ops = {
-	.fill_fifo = Memhscx_fill_fifo,
-};
-
-static inline void
-Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
-{
-	u8 r;
-	struct BCState *bcs = cs->bcs + hscx;
-	struct sk_buff *skb;
-	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	int count;
-
-	if (!test_bit(BC_FLG_INIT, &bcs->Flag))
-		return;
-
-	if (val & 0x80) {	/* RME */
-		r = mem_hscx_read(cs, hscx, HSCX_RSTA);
-		if ((r & 0xf0) != 0xa0) {
-			if (!(r & 0x80))
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX invalid frame");
-			if ((r & 0x40) && bcs->mode)
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX RDO mode=%d",
-						bcs->mode);
-			if (!(r & 0x20))
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX CRC error");
-			MemWriteHSCXCMDR(cs, hscx, 0x80);
-		} else {
-			count = mem_hscx_read(cs, hscx, HSCX_RBCL) & (
-				test_bit(HW_IPAC, &cs->HW_Flags)? 0x3f: 0x1f);
-			if (count == 0)
-				count = fifo_size;
-			Memhscx_empty_fifo(bcs, count);
-			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
-				if (cs->debug & L1_DEB_HSCX_FIFO)
-					debugl1(cs, "HX Frame %d", count);
-				if (!(skb = dev_alloc_skb(count)))
-					printk(KERN_WARNING "HSCX: receive out of memory\n");
-				else {
-					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
-					skb_queue_tail(&bcs->rqueue, skb);
-				}
-			}
-		}
-		bcs->hw.hscx.rcvidx = 0;
-		sched_b_event(bcs, B_RCVBUFREADY);
-	}
-	if (val & 0x40) {	/* RPF */
-		Memhscx_empty_fifo(bcs, fifo_size);
-		if (bcs->mode == L1_MODE_TRANS) {
-			/* receive audio data */
-			if (!(skb = dev_alloc_skb(fifo_size)))
-				printk(KERN_WARNING "HiSax: receive out of memory\n");
-			else {
-				memcpy(skb_put(skb, fifo_size), bcs->hw.hscx.rcvbuf, fifo_size);
-				skb_queue_tail(&bcs->rqueue, skb);
-			}
-			bcs->hw.hscx.rcvidx = 0;
-			sched_b_event(bcs, B_RCVBUFREADY);
-		}
-	}
-	if (val & 0x10) {
-		xmit_xpr_b(bcs);/* XPR */
-	}
-}
-
-static void
-Memhscx_reset_xmit(struct BCState *bcs)
-{
-	MemWriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
-}
-
-static inline void
-Memhscx_int_main(struct IsdnCardState *cs, u8 val)
-{
-
-	u8 exval;
-	struct BCState *bcs;
-
-	if (val & 0x01) { // EXB
-		bcs = cs->bcs + 1;
-		exval = mem_hscx_read(cs, 1, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_HSCX)
-				debugl1(cs, "HSCX B EXIR %x", exval);
-			xmit_xdu_b(bcs, Memhscx_reset_xmit);
-		}
-	}
-	if (val & 0xf8) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX B interrupt %x", val);
-		Memhscx_interrupt(cs, val, 1);
-	}
-	if (val & 0x02) {	// EXA
-		bcs = cs->bcs;
-		exval = mem_hscx_read(cs, 0, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (cs->debug & L1_DEB_HSCX)
-				debugl1(cs, "HSCX A EXIR %x", exval);
-			xmit_xdu_b(bcs, Memhscx_reset_xmit);
-		}
-	}
-	if (val & 0x04) {	// ICA
-		exval = mem_hscx_read(cs, 0, HSCX_ISTA);
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX A interrupt %x", exval);
-		Memhscx_interrupt(cs, exval, 0);
-	}
-}
-
-static void
-diva_irq_ipac_pci(int intno, void *dev_id, struct pt_regs *regs)
-{
-	struct IsdnCardState *cs = dev_id;
-	u8 ista,val;
-	int icnt=5;
-	u8 *cfg;
-
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	cfg = (u8 *) cs->hw.diva.pci_cfg;
-	val = *cfg;
-	if (!(val & PITA_INT0_STATUS))
-		return; /* other shared IRQ */
-	*cfg = PITA_INT0_STATUS; /* Reset pending INT0 */
-	ista = memreadreg(cs->hw.diva.cfg_reg, IPAC_ISTA);
-Start_IPACPCI:
-	if (cs->debug & L1_DEB_IPAC)
-		debugl1(cs, "IPAC ISTA %02X", ista);
-	if (ista & 0x0f) {
-		val = memreadreg(cs->hw.diva.cfg_reg, HSCX_ISTA + 0x40);
-		if (ista & 0x01)
-			val |= 0x01;
-		if (ista & 0x04)
-			val |= 0x02;
-		if (ista & 0x08)
-			val |= 0x04;
-		if (val)
-			Memhscx_int_main(cs, val);
-	}
-	if (ista & 0x20) {
-		val = 0xfe & memreadreg(cs->hw.diva.cfg_reg, ISAC_ISTA + 0x80);
-		if (val) {
-			isac_interrupt(cs, val);
-		}
-	}
-	if (ista & 0x10) {
-		val = 0x01;
-		isac_interrupt(cs, val);
-	}
-	ista  = memreadreg(cs->hw.diva.cfg_reg, IPAC_ISTA);
-	if ((ista & 0x3f) && icnt) {
-		icnt--;
-		goto Start_IPACPCI;
-	}
-	if (!icnt)
-		printk(KERN_WARNING "DIVA IPAC PCI IRQ LOOP\n");
-	memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xFF);
-	memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xC0);
-}
-
-static void
-diva_irq_ipacx_pci(int intno, void *dev_id, struct pt_regs *regs)
+diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
-	u8 *cfg;
 
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
-	cfg = (u8 *) cs->hw.diva.pci_cfg;
-	val = *cfg;
-	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
-	interrupt_ipacx(cs);      // handler for chip
-	*cfg = PITA_INT0_STATUS;  // Reset PLX interrupt
-}
+	val = readb(cs->hw.diva.pci_cfg);
+	if (!(val & PITA_INT0_STATUS))
+		return; /* other shared IRQ */
+	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg); /* Reset pending INT0 */
 
-void
-release_io_diva(struct IsdnCardState *cs)
-{
-	int bytecnt;
-
-	if ((cs->subtyp == DIVA_IPAC_PCI) || 
-	    (cs->subtyp == DIVA_IPACX_PCI)   ) {
-		u_int *cfg = (unsigned int *)cs->hw.diva.pci_cfg;
-
-		*cfg = 0; /* disable INT0/1 */ 
-		*cfg = 2; /* reset pending INT0 */
-		iounmap((void *)cs->hw.diva.cfg_reg);
-		iounmap((void *)cs->hw.diva.pci_cfg);
-		return;
-	} else if (cs->subtyp != DIVA_IPAC_ISA) {
-		del_timer(&cs->hw.diva.tl);
-		if (cs->hw.diva.cfg_reg)
-			byteout(cs->hw.diva.ctrl, 0); /* LED off, Reset */
-	}
-	if ((cs->subtyp == DIVA_ISA) || (cs->subtyp == DIVA_IPAC_ISA))
-		bytecnt = 8;
-	else
-		bytecnt = 32;
-	if (cs->hw.diva.cfg_reg) {
-		release_region(cs->hw.diva.cfg_reg, bytecnt);
-	}
+	ipac_irq(intno, dev_id, regs);
 }
 
 static void
-reset_diva(struct IsdnCardState *cs)
+diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
-	if (cs->subtyp == DIVA_IPAC_ISA) {
-		writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_POTA2, 0x20);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_POTA2, 0x00);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xc0);
-	} else if (cs->subtyp == DIVA_IPAC_PCI) {
-		unsigned int *ireg = (unsigned int *)(cs->hw.diva.pci_cfg +
-					PITA_MISC_REG);
-		*ireg = PITA_PARA_SOFTRESET | PITA_PARA_MPX_MODE;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		*ireg = PITA_PARA_MPX_MODE;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xc0);
-	} else if (cs->subtyp == DIVA_IPACX_PCI) {
-		unsigned int *ireg = (unsigned int *)(cs->hw.diva.pci_cfg +
-					PITA_MISC_REG);
-		*ireg = PITA_PARA_SOFTRESET | PITA_PARA_MPX_MODE;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		*ireg = PITA_PARA_MPX_MODE | PITA_SER_SOFTRESET;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		ipacx_dc_write(cs, IPACX_MASK, 0xff); // Interrupts off
-	} else { /* DIVA 2.0 */
-		cs->hw.diva.ctrl_reg = 0;        /* Reset On */
-		byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		cs->hw.diva.ctrl_reg |= DIVA_RESET;  /* Reset Off */
-		byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((10*HZ)/1000);
-		if (cs->subtyp == DIVA_ISA)
-			cs->hw.diva.ctrl_reg |= DIVA_ISA_LED_A;
-		else {
-			/* Workaround PCI9060 */
-			byteout(cs->hw.diva.pci_cfg + 0x69, 9);
-			cs->hw.diva.ctrl_reg |= DIVA_PCI_LED_A;
-		}
-		byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
+	struct IsdnCardState *cs = dev_id;
+	u8 val;
+
+	val = readb(cs->hw.diva.pci_cfg);
+	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
+	interrupt_ipacx(cs);      // handler for chip
+	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg);  // Reset PLX interrupt
+}
+
+static void
+diva_release(struct IsdnCardState *cs)
+{
+	int bytecnt;
+
+	del_timer(&cs->hw.diva.tl);
+	if (cs->hw.diva.cfg_reg)
+		byteout(cs->hw.diva.ctrl, 0); /* LED off, Reset */
+
+	if (cs->subtyp == DIVA_ISA)
+		bytecnt = 8;
+	else
+		bytecnt = 32;
+	if (cs->hw.diva.cfg_reg)
+		release_region(cs->hw.diva.cfg_reg, bytecnt);
+}
+
+static void
+diva_ipac_isa_release(struct IsdnCardState *cs)
+{
+	if (cs->hw.diva.cfg_reg)
+		release_region(cs->hw.diva.cfg_reg, 8);
+}
+
+static void
+diva_ipac_pci_release(struct IsdnCardState *cs)
+{
+	writel(0, cs->hw.diva.pci_cfg); /* disable INT0/1 */ 
+	writel(2, cs->hw.diva.pci_cfg); /* reset pending INT0 */
+	iounmap((void *)cs->hw.diva.cfg_reg);
+	iounmap((void *)cs->hw.diva.pci_cfg);
+}
+
+static int
+diva_ipac_isa_reset(struct IsdnCardState *cs)
+{
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_POTA2, 0x20);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_POTA2, 0x00);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_MASK, 0xc0);
+	return 0;
+}
+
+static int
+diva_ipac_pci_reset(struct IsdnCardState *cs)
+{
+	unsigned long misc_reg = cs->hw.diva.pci_cfg + PITA_MISC_REG;
+
+	writel(PITA_PARA_SOFTRESET | PITA_PARA_MPX_MODE, misc_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writel(PITA_PARA_MPX_MODE, misc_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	memwritereg(cs->hw.diva.cfg_reg, IPAC_MASK, 0xc0);
+	return 0;
+}
+
+static int
+diva_ipacx_pci_reset(struct IsdnCardState *cs)
+{
+	unsigned long misc_reg = cs->hw.diva.pci_cfg + PITA_MISC_REG;
+
+	writel(PITA_PARA_SOFTRESET | PITA_PARA_MPX_MODE, misc_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	writel(PITA_PARA_MPX_MODE | PITA_SER_SOFTRESET, misc_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	ipacx_dc_write(cs, IPACX_MASK, 0xff); // Interrupts off
+	return 0;
+}
+
+static int
+diva_reset(struct IsdnCardState *cs)
+{
+	/* DIVA 2.0 */
+	cs->hw.diva.ctrl_reg = 0;        /* Reset On */
+	byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	cs->hw.diva.ctrl_reg |= DIVA_RESET;  /* Reset Off */
+	byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout((10*HZ)/1000);
+	if (cs->subtyp == DIVA_ISA) {
+		cs->hw.diva.ctrl_reg |= DIVA_ISA_LED_A;
+	} else {
+		/* Workaround PCI9060 */
+		byteout(cs->hw.diva.pci_cfg + 0x69, 9);
+		cs->hw.diva.ctrl_reg |= DIVA_PCI_LED_A;
 	}
+	byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
+	return 0;
 }
 
 #define DIVA_ASSIGN 1
@@ -805,30 +501,7 @@ diva_led_handler(struct IsdnCardState *cs)
 static int
 Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	u_int *ireg;
-
 	switch (mt) {
-		case CARD_RESET:
-			reset_diva(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_diva(cs);
-			return(0);
-		case CARD_INIT:
-			if (cs->subtyp == DIVA_IPACX_PCI) {
-				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-				*ireg = PITA_INT0_ENABLE;
-			  init_ipacx(cs, 3); // init chip and enable interrupts
-        return (0);
-			}
-			if (cs->subtyp == DIVA_IPAC_PCI) {
-				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
-				*ireg = PITA_INT0_ENABLE;
-			}
-			inithscxisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
 		case (MDL_REMOVE | REQUEST):
 			cs->hw.diva.status = 0;
 			break;
@@ -864,6 +537,48 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return(0);
 }
 
+static void
+diva_ipacx_pci_init(struct IsdnCardState *cs)
+{
+	writel(PITA_INT0_ENABLE, cs->hw.diva.pci_cfg);
+	init_ipacx(cs, 3); // init chip and enable interrupts
+}
+
+static void
+diva_ipac_pci_init(struct IsdnCardState *cs)
+{
+	writel(PITA_INT0_ENABLE, cs->hw.diva.pci_cfg);
+	ipac_init(cs);
+}
+
+static struct card_ops diva_ops = {
+	.init     = inithscxisac,
+	.reset    = diva_reset,
+	.release  = diva_release,
+	.irq_func = diva_interrupt,
+};
+
+static struct card_ops diva_ipac_isa_ops = {
+	.init     = ipac_init,
+	.reset    = diva_ipac_isa_reset,
+	.release  = diva_ipac_isa_release,
+	.irq_func = ipac_irq,
+};
+
+static struct card_ops diva_ipac_pci_ops = {
+	.init     = diva_ipac_pci_init,
+	.reset    = diva_ipac_pci_reset,
+	.release  = diva_ipac_pci_release,
+	.irq_func = diva_ipac_pci_irq,
+};
+
+static struct card_ops diva_ipacx_pci_ops = {
+	.init     = diva_ipacx_pci_init,
+	.reset    = diva_ipacx_pci_reset,
+	.release  = diva_ipac_pci_release,
+	.irq_func = diva_ipacx_pci_irq,
+};
+
 static struct pci_dev *dev_diva __initdata = NULL;
 static struct pci_dev *dev_diva_u __initdata = NULL;
 static struct pci_dev *dev_diva201 __initdata = NULL;
@@ -891,7 +606,7 @@ static struct isapnp_device_id diva_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *pdev = &diva_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 
@@ -921,7 +636,6 @@ setup_diva(struct IsdnCard *card)
 			cs->hw.diva.hscx = card->para[1] + DIVA_IPAC_DATA;
 			cs->hw.diva.isac_adr = card->para[1] + DIVA_IPAC_ADR;
 			cs->hw.diva.hscx_adr = card->para[1] + DIVA_IPAC_ADR;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 		} else {
 			cs->subtyp = DIVA_ISA;
 			cs->hw.diva.ctrl = card->para[1] + DIVA_ISA_CTRL;
@@ -934,31 +648,38 @@ setup_diva(struct IsdnCard *card)
 	} else {
 #ifdef __ISAPNP__
 		if (isapnp_present()) {
-			struct pci_bus *pb;
-			struct pci_dev *pd;
+			struct pnp_card *pb;
+			struct pnp_dev *pd;
 
 			while(pdev->card_vendor) {
-				if ((pb = isapnp_find_card(pdev->card_vendor,
-					pdev->card_device, pnp_c))) {
+				if ((pb = pnp_find_card(pdev->card_vendor,
+							pdev->card_device,
+							pnp_c))) {
 					pnp_c = pb;
 					pd = NULL;
-					if ((pd = isapnp_find_dev(pnp_c,
-						pdev->vendor, pdev->function, pd))) {
+					if ((pd = pnp_find_dev(pnp_c,
+							       pdev->vendor,
+							       pdev->function,
+							       pd))) {
 						printk(KERN_INFO "HiSax: %s detected\n",
 							(char *)pdev->driver_data);
-						pd->prepare(pd);
-						pd->deactivate(pd);
-						pd->activate(pd);
-						card->para[1] =
-							pd->resource[0].start;
-						card->para[0] =
-							pd->irq_resource[0].start;
-						if (!card->para[0] || !card->para[1]) {
+						if (pnp_device_attach(pd) < 0) {
+							printk(KERN_ERR "Diva PnP: attach failed\n");
+							return 0;
+						}
+						if (pnp_activate_dev(pd, NULL) < 0) {
+							printk(KERN_ERR "Diva PnP: activate failed\n");
+							pnp_device_detach(pd);
+							return 0;
+						}
+						if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
 							printk(KERN_ERR "Diva PnP:some resources are missing %ld/%lx\n",
-								card->para[0], card->para[1]);
-							pd->deactivate(pd);
+								pnp_irq(pd, 0), pnp_port_start(pd, 0));
+							pnp_device_detach(pd);
 							return(0);
 						}
+						card->para[1] = pnp_port_start(pd, 0);
+						card->para[0] = pnp_irq(pd, 0);
 						cs->hw.diva.cfg_reg  = card->para[1];
 						cs->irq = card->para[0];
 						if (pdev->function == ISAPNP_FUNCTION(0xA1)) {
@@ -972,7 +693,6 @@ setup_diva(struct IsdnCard *card)
 								card->para[1] + DIVA_IPAC_ADR;
 							cs->hw.diva.hscx_adr =
 								card->para[1] + DIVA_IPAC_ADR;
-							test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 						} else {
 							cs->subtyp = DIVA_ISA;
 							cs->hw.diva.ctrl =
@@ -1058,7 +778,6 @@ setup_diva(struct IsdnCard *card)
 			cs->hw.diva.hscx = 0;
 			cs->hw.diva.isac_adr = 0;
 			cs->hw.diva.hscx_adr = 0;
-			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 			bytecnt = 0;
 		} else {
 			cs->hw.diva.ctrl = cs->hw.diva.cfg_reg + DIVA_PCI_CTRL;
@@ -1097,38 +816,41 @@ ready:
 			request_region(cs->hw.diva.cfg_reg, bytecnt, "diva isdn");
 		}
 	}
-	reset_diva(cs);
-	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
+		diva_ipac_isa_reset(cs);
 		cs->dc_hw_ops = &ipac_dc_ops;
-		cs->irq_func = &diva_irq_ipac_isa;
+		cs->bc_hw_ops = &ipac_bc_ops;
+		cs->card_ops = &diva_ipac_isa_ops;
 		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
+		diva_ipac_pci_reset(cs);
 		cs->dc_hw_ops = &mem_ipac_dc_ops;
-		cs->bc_hw_ops = &mem_hscx_ops;
-		cs->bc_l1_ops = &mem_hscx_l1_ops;
-		cs->irq_func = &diva_irq_ipac_pci;
+		cs->bc_hw_ops = &mem_ipac_bc_ops;
+		cs->card_ops = &diva_ipac_pci_ops;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPACX_PCI) {
+		diva_ipacx_pci_reset(cs);
 		cs->dc_hw_ops = &ipacx_dc_ops;
 		cs->bc_hw_ops = &ipacx_bc_ops;
-		cs->irq_func = &diva_irq_ipacx_pci;
+		cs->card_ops = &diva_ipacx_pci_ops;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
 		       ipacx_dc_read(cs, IPACX_ID) &0x3F);
 	} else { /* DIVA 2.0 */
+		diva_reset(cs);
 		cs->hw.diva.tl.function = (void *) diva_led_handler;
 		cs->hw.diva.tl.data = (long) cs;
 		init_timer(&cs->hw.diva.tl);
 		cs->dc_hw_ops = &isac_ops;
-		cs->irq_func = &diva_interrupt;
+		cs->bc_hw_ops = &hscx_ops;
+		cs->card_ops = &diva_ops;
 		ISACVersion(cs, "Diva:");
 		if (HscxVersion(cs, "Diva:")) {
 			printk(KERN_WARNING
 		       "Diva: wrong HSCX versions check IO address\n");
-			release_io_diva(cs);
+			diva_release(cs);
 			return (0);
 		}
 	}

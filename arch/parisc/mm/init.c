@@ -23,7 +23,7 @@
 #include <asm/tlb.h>
 #include <asm/pdc_chassis.h>
 
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 
 extern char _text;	/* start of kernel code, defined by linker */
 extern int  data_start;

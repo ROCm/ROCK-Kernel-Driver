@@ -2,7 +2,7 @@
  * intf.c - class-specific interface management
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -66,8 +66,7 @@ int interface_add_data(struct intf_data * data)
 		kobject_register(&data->kobj);
 
 		list_add_tail(&data->dev_entry,&data->dev->intf_list);
-		intf_dev_link(data);
-		return 0;
+		return intf_dev_link(data);
 	}
 	return -EINVAL;
 }

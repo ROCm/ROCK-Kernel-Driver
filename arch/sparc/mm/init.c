@@ -34,7 +34,7 @@
 #include <asm/pgalloc.h>	/* bug in asm-generic/tlb.h: check_pgt_cache */
 #include <asm/tlb.h>
 
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 
 unsigned long *sparc_valid_addr_bitmap;
 

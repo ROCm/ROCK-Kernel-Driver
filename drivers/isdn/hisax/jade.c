@@ -33,21 +33,11 @@ jade_write_reg(struct IsdnCardState *cs, int jade, u8 addr, u8 val)
 }
 
 static inline void
-jade_read_fifo(struct BCState *bcs, u8 *p, int len)
-{
-	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
-
-	cs->bc_hw_ops->read_fifo(cs, hscx, p, len);
-}
-
-static inline void
 jade_write_fifo(struct BCState *bcs, u8 *p, int len)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_fifo(cs, hscx, p, len);
+	cs->bc_hw_ops->write_fifo(cs, bcs->unit, p, len);
 }
 
 int __init
@@ -112,7 +102,7 @@ void
 modejade(struct BCState *bcs, int mode, int bc)
 {
     struct IsdnCardState *cs = bcs->cs;
-    int jade = bcs->hw.hscx.hscx;
+    int jade = bcs->unit;
 
     if (cs->debug & L1_DEB_HSCX) {
 	char tmp[40];
@@ -199,53 +189,14 @@ jade_l2l1(struct PStack *st, int pr, void *arg)
 void
 close_jadestate(struct BCState *bcs)
 {
-    modejade(bcs, 0, bcs->channel);
-    if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-	if (bcs->hw.hscx.rcvbuf) {
-		kfree(bcs->hw.hscx.rcvbuf);
-		bcs->hw.hscx.rcvbuf = NULL;
-	}
-	if (bcs->blog) {
-		kfree(bcs->blog);
-		bcs->blog = NULL;
-	}
-	skb_queue_purge(&bcs->rqueue);
-	skb_queue_purge(&bcs->squeue);
-	if (bcs->tx_skb) {
-		dev_kfree_skb_any(bcs->tx_skb);
-		bcs->tx_skb = NULL;
-		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	}
-    }
+	modejade(bcs, 0, bcs->channel);
+	bc_close(bcs);
 }
 
 static int
 open_jadestate(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hscx.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-			       "HiSax: No memory for hscx.rcvbuf\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for bcs->blog\n");
-			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hscx.rcvbuf);
-			bcs->hw.hscx.rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-	}
-	bcs->tx_skb = NULL;
-	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	bcs->event = 0;
-	bcs->hw.hscx.rcvidx = 0;
-	bcs->tx_cnt = 0;
-	return (0);
+	return bc_open(bcs);;
 }
 
 
@@ -263,8 +214,12 @@ setstack_jade(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+static void jade_fill_fifo(struct BCState *bcs);
+
 static struct bc_l1_ops jade_l1_ops = {
 	.fill_fifo = jade_fill_fifo,
+	.open      = setstack_jade,
+	.close     = close_jadestate,
 };
 
 void __init
@@ -273,12 +228,8 @@ initjade(struct IsdnCardState *cs)
 	int val;
 
 	cs->bc_l1_ops = &jade_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_jade;
-	cs->bcs[1].BC_SetStack = setstack_jade;
-	cs->bcs[0].BC_Close = close_jadestate;
-	cs->bcs[1].BC_Close = close_jadestate;
-	cs->bcs[0].hw.hscx.hscx = 0;
-	cs->bcs[1].hw.hscx.hscx = 1;
+	cs->bcs[0].unit = 0;
+	cs->bcs[1].unit = 1;
 
 	jade_write_reg(cs, 0, jade_HDLC_IMR, 0x00);
 	jade_write_reg(cs, 1, jade_HDLC_IMR, 0x00);

@@ -34,19 +34,16 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 DECLARE_MUTEX (pools_lock);
 
 static ssize_t
-show_pools (struct device *dev, char *buf, size_t count, loff_t off)
+show_pools (struct device *dev, char *buf)
 {
 	struct pci_dev		*pdev;
 	unsigned		temp, size;
 	char			*next;
 	struct list_head	*i, *j;
 
-	if (off != 0)
-		return 0;
-
 	pdev = container_of (dev, struct pci_dev, dev);
 	next = buf;
-	size = count;
+	size = PAGE_SIZE;
 
 	temp = snprintf (next, size, "poolinfo - 0.1\n");
 	size -= temp;
@@ -77,7 +74,7 @@ show_pools (struct device *dev, char *buf, size_t count, loff_t off)
 	}
 	up (&pools_lock);
 
-	return count - size;
+	return PAGE_SIZE - size;
 }
 static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
 

@@ -1,5 +1,20 @@
+/*
+ * include/asm-v850/stat.h -- v850 stat structure
+ *
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
+ *
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License.  See the file COPYING in the main directory of this
+ * archive for more details.
+ *
+ * Written by Miles Bader <miles@gnu.org>
+ */
+
 #ifndef __V850_STAT_H__
 #define __V850_STAT_H__
+
+#include <asm/posix_types.h>
 
 struct stat {
 	__kernel_dev_t	st_dev;

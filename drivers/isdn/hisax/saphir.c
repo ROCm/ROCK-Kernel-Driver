@@ -136,42 +136,9 @@ static void
 saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u8 val;
 
-	spin_lock(&cs->lock);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-      Start_HSCX:
-	if (val)
-		hscx_int_main(cs, val);
-	val = isac_read(cs, ISAC_ISTA);
-      Start_ISAC:
-	if (val)
-		isac_interrupt(cs, val);
-	val = hscx_read(cs, 1, HSCX_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX IntStat after IntRoutine");
-		goto Start_HSCX;
-	}
-	val = isac_read(cs, ISAC_ISTA);
-	if (val) {
-		if (cs->debug & L1_DEB_ISAC)
-			debugl1(cs, "ISAC IntStat after IntRoutine");
-		goto Start_ISAC;
-	}
-	/* Watchdog */
-	if (cs->hw.saphir.timer.function) 
-		mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
-	else
-		printk(KERN_WARNING "saphir: Spurious timer!\n");
-
-	hscx_write(cs, 0, HSCX_MASK, 0xFF);
-	hscx_write(cs, 1, HSCX_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0xFF);
-	isac_write(cs, ISAC_MASK, 0x0);
-	hscx_write(cs, 0, HSCX_MASK, 0x0);
-	hscx_write(cs, 1, HSCX_MASK, 0x0);
-	spin_unlock(&cs->lock);
+	hscxisac_irq(intno, dev_id, regs);
+	mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 }
 
 static void
@@ -182,8 +149,8 @@ SaphirWatchDog(struct IsdnCardState *cs)
 	mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 }
 
-void
-release_io_saphir(struct IsdnCardState *cs)
+static void
+saphir_release(struct IsdnCardState *cs)
 {
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, 0xff);
 	del_timer_sync(&cs->hw.saphir.timer);
@@ -231,22 +198,15 @@ saphir_reset(struct IsdnCardState *cs)
 static int
 saphir_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
-	switch (mt) {
-		case CARD_RESET:
-			saphir_reset(cs);
-			return(0);
-		case CARD_RELEASE:
-			release_io_saphir(cs);
-			return(0);
-		case CARD_INIT:
-			inithscxisac(cs);
-			return(0);
-		case CARD_TEST:
-			return(0);
-	}
 	return(0);
 }
 
+static struct card_ops saphir_ops = {
+	.init     = inithscxisac,
+	.reset    = saphir_reset,
+	.release  = saphir_release,
+	.irq_func = saphir_interrupt,
+};
 
 int __init
 setup_saphir(struct IsdnCard *card)
@@ -285,18 +245,18 @@ setup_saphir(struct IsdnCard *card)
 	cs->hw.saphir.timer.expires = jiffies + 4*HZ;
 	add_timer(&cs->hw.saphir.timer);
 	if (saphir_reset(cs)) {
-		release_io_saphir(cs);
+		saphir_release(cs);
 		return (0);
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &saphir_card_msg;
-	cs->irq_func = &saphir_interrupt;
+	cs->card_ops = &saphir_ops;
 	ISACVersion(cs, "saphir:");
 	if (HscxVersion(cs, "saphir:")) {
 		printk(KERN_WARNING
 		    "saphir: wrong HSCX versions check IO address\n");
-		release_io_saphir(cs);
+		saphir_release(cs);
 		return (0);
 	}
 	return (1);

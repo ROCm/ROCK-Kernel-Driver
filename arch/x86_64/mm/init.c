@@ -40,7 +40,7 @@
 
 unsigned long start_pfn, end_pfn;
 
-mmu_gather_t mmu_gathers[NR_CPUS];
+struct mmu_gather mmu_gathers[NR_CPUS];
 
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the

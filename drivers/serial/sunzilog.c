@@ -924,7 +924,7 @@ sunzilog_set_termios(struct uart_port *port, struct termios *termios,
 	unsigned long flags;
 	int baud, brg;
 
-	baud = uart_get_baud_rate(port, termios);
+	baud = uart_get_baud_rate(port, termios, old, 1200, 76800);
 
 	spin_lock_irqsave(&up->port.lock, flags);
 

@@ -42,7 +42,7 @@
 #define DEV_AWC_INFO 	1
 #define DEV_AWC 	1
 
-spinlock_t driver_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t driver_lock = SPIN_LOCK_UNLOCKED;
 
 struct awc_proc_private{
 	struct ctl_table_header *	sysctl_header;

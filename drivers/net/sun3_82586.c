@@ -1010,8 +1010,12 @@ static int sun3_82586_send_packet(struct sk_buff *skb, struct net_device *dev)
 	else
 #endif
 	{
+		len = skb->len;
+		if (len < ETH_ZLEN) {
+			memset((char *)p->xmit_cbuffs[p->xmit_count], 0, ETH_ZLEN);
+			len = ETH_ZLEN;
+		}
 		memcpy((char *)p->xmit_cbuffs[p->xmit_count],(char *)(skb->data),skb->len);
-		len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
 
 #if (NUM_XMIT_BUFFS == 1)
 #	ifdef NO_NOPCOMMANDS

@@ -721,6 +721,23 @@ might come in, we attempt to re-add ourselves to the poll list.
 
 
 
+
+APPENDIX 3: Scheduling issues.
+==============================
+As seen NAPI moves processing to softirq level. Linux uses the ksoftirqd as the 
+general solution to schedule softirq's to run before next interrupt and by putting 
+them under scheduler control. Also this prevents consecutive softirq's from 
+monopolize the CPU. This also have the effect that the priority of ksoftirq needs 
+to be considered when running very CPU-intensive applications and networking to
+get the proper balance of softirq/user balance. Increasing ksoftirq priority to 0 
+(eventually more) is reported cure problems with low network performance at high 
+CPU load.
+
+Most used processes in a GIGE router:
+USER       PID %CPU %MEM  SIZE   RSS TTY STAT START   TIME COMMAND
+root         3  0.2  0.0     0     0  ?  RWN Aug 15 602:00 (ksoftirqd_CPU0)
+root       232  0.0  7.9 41400 40884  ?  S   Aug 15  74:12 gated 
+
 --------------------------------------------------------------------
 
 relevant sites:
