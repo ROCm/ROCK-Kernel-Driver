@@ -136,13 +136,15 @@ unsigned char __initdata boot_params[PARAM_SIZE];
 static struct resource data_resource = {
 	.name	= "Kernel data",
 	.start	= 0,
-	.end	= 0
+	.end	= 0,
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
 static struct resource code_resource = {
 	.name	= "Kernel code",
-	.start	= 0x100000,
-	.end	= 0
+	.start	= 0,
+	.end	= 0,
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
 static struct resource system_rom_resource = {
@@ -201,7 +203,7 @@ static struct resource video_rom_resource = {
 	.flags	= IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM
 };
 
-static struct resource vram_resource = {
+static struct resource video_ram_resource = {
 	.name	= "Video RAM area",
 	.start	= 0xa0000,
 	.end	= 0xbffff,
@@ -255,7 +257,7 @@ static struct resource standard_io_resources[] = { {
 
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
-static int __init checksum(unsigned char *rom, unsigned long length)
+static int __init romchecksum(unsigned char *rom, unsigned long length)
 {
 	unsigned char *p, sum = 0;
 
@@ -283,7 +285,7 @@ static void __init probe_roms(void)
 		length = rom[2] * 512;
 
 		/* if checksum okay, trust length byte */
-		if (length && checksum(rom, length))
+		if (length && romchecksum(rom, length))
 			video_rom_resource.end = start + length - 1;
 
 		request_resource(&iomem_resource, &video_rom_resource);
@@ -302,7 +304,7 @@ static void __init probe_roms(void)
 	rom = isa_bus_to_virt(extension_rom_resource.start);
 	if (romsignature(rom)) {
 		length = extension_rom_resource.end - extension_rom_resource.start + 1;
-		if (checksum(rom, length)) {
+		if (romchecksum(rom, length)) {
 			request_resource(&iomem_resource, &extension_rom_resource);
 			upper = extension_rom_resource.start;
 		}
@@ -318,7 +320,7 @@ static void __init probe_roms(void)
 		length = rom[2] * 512;
 
 		/* but accept any length that fits if checksum okay */
-		if (!length || start + length > upper || !checksum(rom, length))
+		if (!length || start + length > upper || !romchecksum(rom, length))
 			continue;
 
 		adapter_rom_resources[i].start = start;
@@ -1149,7 +1151,7 @@ static void __init register_memory(unsigned long max_low_pfn)
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
 	/* EFI systems may still have VGA */
-	request_resource(&iomem_resource, &vram_resource);
+	request_resource(&iomem_resource, &video_ram_resource);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
