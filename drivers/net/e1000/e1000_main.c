@@ -26,11 +26,21 @@
 
 *******************************************************************************/
 
-#define __E1000_MAIN__
 #include "e1000.h"
 
 /* Change Log
  *
+ * 4.4.19       11/27/02
+ *   o Feature: Added user-settable knob for interrupt throttle rate (ITR).
+ *   o Cleanup: removed large static array allocations.
+ *   o Cleanup: C99 struct initializer format.
+ *   o Bug fix: restore VLAN settings when interface is brought up.
+ *   o Bug fix: return cleanly in probe if error in detecting MAC type.
+ *   o Bug fix: Wake up on magic packet by default only if enabled in eeprom.
+ *   o Bug fix: Validate MAC address in set_mac.
+ *   o Bug fix: Throw away zero-length Tx skbs.
+ *   o Bug fix: Make ethtool EEPROM acceses work on older versions of ethtool.
+ * 
  * 4.4.12       10/15/02
  *   o Clean up: use members of pci_device rather than direct calls to
  *     pci_read_config_word.
@@ -43,30 +53,13 @@
  *   o Now setting netdev->mem_end in e1000_probe.
  *   o Clean up: Moved tx_timeout from interrupt context to process context
  *     using schedule_task.
- *
- *   o Feature: merged in modified NAPI patch from Robert Olsson
- *     <Robert.Olsson@its.uu.se> Uppsala Univeristy, Sweden.
- *
- * 4.3.15      8/9/02
- *   o Converted from Dual BSD/GPL license to GPL license.
- *   o Clean up: use pci_[clear|set]_mwi rather than direct calls to
- *     pci_write_config_word.
- *   o Bug fix: added read-behind-write calls to post writes before delays.
- *   o Bug fix: removed mdelay busy-waits in interrupt context.
- *   o Clean up: direct clear of descriptor bits rather than using memset.
- *   o Bug fix: added wmb() for ia-64 between descritor writes and advancing
- *     descriptor tail.
- *   o Feature: added locking mechanism for asf functionality.
- *   o Feature: exposed two Tx and one Rx interrupt delay knobs for finer
- *     control over interurpt rate tuning.
- *   o Misc ethtool bug fixes.
- *
- * 4.3.2       7/5/02
+ * 
+ * 4.3.15       8/9/02
  */
- 
+
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.4.12-k1";
+char e1000_driver_version[] = "4.4.19-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -175,6 +168,7 @@ static void e1000_tx_timeout_task(struct net_device *dev);
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
+static void e1000_restore_vlan(struct e1000_adapter *adapter);
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_notify_netdev(struct notifier_block *, unsigned long event, void *ptr);
@@ -274,6 +268,7 @@ e1000_up(struct e1000_adapter *adapter)
 	/* hardware has been reset, we need to reload some things */
 
 	e1000_set_multi(netdev);
+	e1000_restore_vlan(adapter);
 
 	e1000_configure_tx(adapter);
 	e1000_setup_rctl(adapter);
@@ -349,6 +344,7 @@ e1000_probe(struct pci_dev *pdev,
 	int mmio_len;
 	int pci_using_dac;
 	int i;
+	uint16_t eeprom_data;
 
 	if((i = pci_enable_device(pdev)))
 		return i;
@@ -501,8 +497,9 @@ e1000_probe(struct pci_dev *pdev,
 	 * enable the ACPI Magic Packet filter
 	 */
 
+	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG, &eeprom_data);
 	if((adapter->hw.mac_type >= e1000_82544) &&
-	   (E1000_READ_REG(&adapter->hw, WUC) & E1000_WUC_APME))
+	   (eeprom_data & E1000_EEPROM_APME))
 		adapter->wol |= E1000_WUFC_MAG;
 
 	/* reset the hardware with the new settings */
@@ -583,6 +580,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->subsystem_id = pdev->subsystem_device;
 
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &hw->revision_id);
+
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
 
 	adapter->rx_buffer_len = E1000_RXBUFFER_2048;
@@ -627,7 +625,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->adaptive_ifs = TRUE;
 
 	/* Copper options */
-	
+
 	if(hw->media_type == e1000_media_type_copper) {
 		hw->mdix = AUTO_ALL_MODES;
 		hw->disable_polarity_correction = FALSE;
@@ -1144,6 +1142,9 @@ e1000_set_mac(struct net_device *netdev, void *p)
 	struct e1000_adapter *adapter = netdev->priv;
 	struct sockaddr *addr = p;
 
+	if(!is_valid_ether_addr(addr->sa_data))
+		return -EADDRNOTAVAIL;
+
 	/* 82542 2.0 needs to be in reset to write receive address registers */
 
 	if(adapter->hw.mac_type == e1000_82542_rev2_0)
@@ -1400,7 +1401,6 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 
 	int f;
 	len = skb->len - skb->data_len;
-
 	i = (tx_ring->next_to_use + tx_ring->count - 1) % tx_ring->count;
 	count = 0;
 
@@ -1507,11 +1507,16 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 	int tx_flags = 0, count;
-
 	int f;
 
 	count = TXD_USE_COUNT(skb->len - skb->data_len,
 	                      adapter->max_data_per_txd);
+
+	if(count == 0) {
+		dev_kfree_skb_any(skb);
+		return 0;
+	}
+
 	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++)
 		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
 		                       adapter->max_data_per_txd);
@@ -2392,6 +2397,21 @@ e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid)
 	e1000_write_vfta(&adapter->hw, index, vfta);
 }
 
+static void
+e1000_restore_vlan(struct e1000_adapter *adapter)
+{
+	e1000_vlan_rx_register(adapter->netdev, adapter->vlgrp);
+
+	if(adapter->vlgrp) {
+		uint16_t vid;
+		for(vid = 0; vid < VLAN_GROUP_ARRAY_LEN; vid++) {
+			if(!adapter->vlgrp->vlan_devices[vid])
+				continue;
+			e1000_vlan_rx_add_vid(adapter->netdev, vid);
+		}
+	}
+}
+
 static int
 e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
@@ -2437,14 +2457,19 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-	uint32_t ctrl, ctrl_ext, rctl, manc;
+	uint32_t ctrl, ctrl_ext, rctl, manc, status;
+	uint32_t wufc = adapter->wol;
 
 	netif_device_detach(netdev);
 
 	if(netif_running(netdev))
 		e1000_down(adapter);
 
-	if(adapter->wol) {
+	status = E1000_READ_REG(&adapter->hw, STATUS);
+	if(status & E1000_STATUS_LU)
+		wufc &= ~E1000_WUFC_LNKC;
+
+	if(wufc) {
 		e1000_setup_rctl(adapter);
 		e1000_set_multi(netdev);
 
@@ -2474,7 +2499,7 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		}
 
 		E1000_WRITE_REG(&adapter->hw, WUC, E1000_WUC_PME_EN);
-		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
+		E1000_WRITE_REG(&adapter->hw, WUFC, wufc);
 		pci_enable_wake(pdev, 3, 1);
 		pci_enable_wake(pdev, 4, 1); /* 4 == D3 cold */
 	} else {

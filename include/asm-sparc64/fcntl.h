@@ -79,17 +79,6 @@ struct flock {
 };
 
 #ifdef __KERNEL__
-struct flock32 {
-	short l_type;
-	short l_whence;
-	__kernel_off_t32 l_start;
-	__kernel_off_t32 l_len;
-	__kernel_pid_t32 l_pid;
-	short __unused;
-};
-#endif
-
-#ifdef __KERNEL__
 #define flock64	flock
 #endif
 

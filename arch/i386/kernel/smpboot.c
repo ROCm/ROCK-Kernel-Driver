@@ -813,7 +813,8 @@ static void __init do_boot_cpu (int apicid)
 
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle->thread_info);
+	/* Stack for startup_32 can be just as for start_secondary onwards */
+	stack_start.esp = (void *) idle->thread.esp;
 
 	/*
 	 * This grunge runs the startup process for
@@ -882,7 +883,7 @@ static void __init do_boot_cpu (int apicid)
 			Dprintk("CPU has booted.\n");
 		} else {
 			boot_error= 1;
-			if (*((volatile unsigned char *)phys_to_virt(8192))
+			if (*((volatile unsigned char *)trampoline_base)
 					== 0xA5)
 				/* trampoline started but...? */
 				printk("Stuck ??\n");
@@ -904,7 +905,7 @@ static void __init do_boot_cpu (int apicid)
 	}
 
 	/* mark "stuck" area as not stuck */
-	*((volatile unsigned long *)phys_to_virt(8192)) = 0;
+	*((volatile unsigned long *)trampoline_base) = 0;
 
 	if(clustered_apic_mode) {
 		printk("Restoring NMI vector\n");

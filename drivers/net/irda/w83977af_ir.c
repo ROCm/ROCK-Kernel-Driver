@@ -1197,6 +1197,9 @@ static int w83977af_net_init(struct net_device *dev)
 {
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(dev);
+
 	/* Set up to be a normal IrDA network device driver */
 	irda_device_setup(dev);
 
@@ -1267,8 +1270,6 @@ static int w83977af_net_open(struct net_device *dev)
 	 */
 	self->irlap = irlap_open(dev, &self->qos, hwname);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -1316,8 +1317,6 @@ static int w83977af_net_close(struct net_device *dev)
 
 	/* Restore bank register */
 	outb(set, iobase+SSR);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

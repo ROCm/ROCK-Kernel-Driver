@@ -50,8 +50,8 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include <../drivers/scsi/scsi.h>
-#include <../drivers/scsi/hosts.h>
+#include "scsi.h"
+#include "hosts.h"
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>

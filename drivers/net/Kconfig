@@ -1222,6 +1222,20 @@ config PCNET32
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
+config AMD8111_ETH
+	tristate "AMD 8111 (new PCI lance) support"
+	depends on NET_PCI && PCI
+	help
+	  If you have an AMD 8111-based PCI lance ethernet card,
+	  answer Y here and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called amd8111e.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
 config ADAPTEC_STARFIRE
 	tristate "Adaptec Starfire/DuraLAN support"
 	depends on NET_PCI && PCI

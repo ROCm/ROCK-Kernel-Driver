@@ -15,6 +15,8 @@
 #ifndef  __nsp_cs__
 #define  __nsp_cs__
 
+#include <linux/version.h>
+
 /* for debugging */
 //#define PCMCIA_DEBUG 9
 

@@ -1223,6 +1223,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
 	lp->pdev = pdev;
 	memcpy((char *)&lp->srom,(char *)&bus.srom,sizeof(struct de4x5_srom));
 	lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+	init_timer(&lp->timer);
 	de4x5_parse_params(dev);
 
 	/*

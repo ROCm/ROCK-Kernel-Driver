@@ -164,6 +164,7 @@
 #include <linux/delay.h>
 #include <linux/rtnetlink.h>
 #include <linux/mii.h>
+#include <linux/crc32.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -1898,44 +1899,6 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-/**
- * dp83815_crc - computer CRC for hash table entries
- *
- * Note - this is, for some reason, *not* the same function
- * as ether_crc_le() or ether_crc(), though it uses the
- * same big-endian polynomial.
- */
-#define DP_POLYNOMIAL			0x04C11DB7
-static unsigned dp83815_crc(int length, unsigned char *data)
-{
-	u32 crc;
-	u8 cur_byte;
-	u8 msb;
-	u8 byte, bit;
-
-	crc = ~0;
-	for (byte=0; byte<length; byte++) {
-		cur_byte = *data++;
-		for (bit=0; bit<8; bit++) {
-			msb = crc >> 31;
-			crc <<= 1;
-			if (msb ^ (cur_byte & 1)) {
-				crc ^= DP_POLYNOMIAL;
-				crc |= 1;
-			}
-			cur_byte >>= 1;
-		}
-	}
-	crc >>= 23;
-
-	return (crc);
-}
-
-
-void set_bit_le(int offset, unsigned char * data)
-{
-	data[offset >> 3] |= (1 << (offset & 0x07));
-}
 #define HASH_TABLE	0x200
 static void __set_rx_mode(struct net_device *dev)
 {
@@ -1960,9 +1923,8 @@ static void __set_rx_mode(struct net_device *dev)
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 			 i++, mclist = mclist->next) {
-			set_bit_le(
-				dp83815_crc(ETH_ALEN, mclist->dmi_addr) & 0x1ff,
-				mc_filter);
+			int i = (ether_crc(ETH_ALEN, mclist->dmi_addr) >> 23) & 0x1ff;
+			mc_filter[i/8] |= (1 << (i & 0x07));
 		}
 		rx_mode = RxFilterEnable | AcceptBroadcast
 			| AcceptMulticast | AcceptMyPhys;

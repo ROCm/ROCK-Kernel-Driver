@@ -22,16 +22,6 @@ typedef long		       __kernel_loff_t32;
 typedef __kernel_fsid_t	       __kernel_fsid_t32;
 
 
-/* fcntl.h */
-struct flock32 {
-       short l_type;
-       short l_whence;
-       compat_off_t l_start;
-       compat_off_t l_len;
-       compat_pid_t l_pid;
-};
-
-
 struct ia32_flock64 {
 	short  l_type;
 	short  l_whence;

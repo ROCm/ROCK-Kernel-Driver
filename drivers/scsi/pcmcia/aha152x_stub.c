@@ -45,11 +45,10 @@
 #include <scsi/scsi.h>
 #include <linux/major.h>
 #include <linux/blk.h>
-
-#include <../drivers/scsi/scsi.h>
-#include <../drivers/scsi/hosts.h>
 #include <scsi/scsi_ioctl.h>
-#include <../drivers/scsi/aha152x.h>
+
+#include "scsi.h"
+#include "hosts.h"
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -112,7 +111,8 @@ static int aha152x_event(event_t event, int priority,
 static dev_link_t *aha152x_attach(void);
 static void aha152x_detach(dev_link_t *);
 
-static Scsi_Host_Template driver_template = AHA152X;
+#define driver_template aha152x_driver_template
+extern Scsi_Host_Template aha152x_driver_template;
 
 static dev_link_t *dev_list = NULL;
 
