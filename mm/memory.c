@@ -331,8 +331,11 @@ skip_copy_pte_range:
 				dst->rss++;
 
 				set_pte(dst_pte, pte);
-				pte_chain = page_add_rmap(page, dst_pte,
-							pte_chain);
+				if (PageAnon(page))
+					pte_chain = page_add_rmap(page,
+						dst_pte, pte_chain);
+				else
+					page_add_file_rmap(page);
 				if (pte_chain)
 					goto cont_copy_pte_range_noset;
 				pte_chain = pte_chain_alloc(GFP_ATOMIC | __GFP_NOWARN);
@@ -1489,6 +1492,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct pte_chain *pte_chain;
 	int sequence = 0;
 	int ret = VM_FAULT_MINOR;
+	int anon = 0;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
 		return do_anonymous_page(mm, vma, page_table,
@@ -1523,8 +1527,8 @@ retry:
 			goto oom;
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
-		lru_cache_add_active(page);
 		new_page = page;
+		anon = 1;
 	}
 
 	spin_lock(&mm->page_table_lock);
@@ -1562,7 +1566,12 @@ retry:
 		if (write_access)
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
 		set_pte(page_table, entry);
-		pte_chain = page_add_rmap(new_page, page_table, pte_chain);
+		if (anon) {
+			lru_cache_add_active(new_page);
+			pte_chain = page_add_rmap(new_page,
+						page_table, pte_chain);
+		} else
+			page_add_file_rmap(new_page);
 		pte_unmap(page_table);
 	} else {
 		/* One of our sibling threads was faster, back out. */

@@ -90,8 +90,10 @@ copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
-			page_remove_rmap(page, src);
-			*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
+			if (PageAnon(page)) {
+				page_remove_rmap(page, src);
+				*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
+			}
 		}
 	}
 }

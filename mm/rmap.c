@@ -113,6 +113,135 @@ pte_chain_encode(struct pte_chain *pte_chain, int idx)
  ** VM stuff below this comment
  **/
 
+/*
+ * At what user virtual address is pgoff expected in file-backed vma?
+ */
+static inline
+unsigned long vma_address(struct vm_area_struct *vma, pgoff_t pgoff)
+{
+	unsigned long address;
+
+	address = vma->vm_start + ((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+	return (address >= vma->vm_start && address < vma->vm_end)?
+		address: -EFAULT;
+}
+
+static int page_referenced_one(struct page *page,
+	struct mm_struct *mm, unsigned long address,
+	unsigned int *mapcount, int *failed)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte;
+	int referenced = 0;
+
+	if (!spin_trylock(&mm->page_table_lock)) {
+		/*
+		 * For debug we're currently warning if not all found,
+		 * but in this case that's expected: suppress warning.
+		 */
+		(*failed)++;
+		return 0;
+	}
+
+	pgd = pgd_offset(mm, address);
+	if (!pgd_present(*pgd))
+		goto out_unlock;
+
+	pmd = pmd_offset(pgd, address);
+	if (!pmd_present(*pmd))
+		goto out_unlock;
+
+	pte = pte_offset_map(pmd, address);
+	if (!pte_present(*pte))
+		goto out_unmap;
+
+	if (page_to_pfn(page) != pte_pfn(*pte))
+		goto out_unmap;
+
+	if (ptep_test_and_clear_young(pte))
+		referenced++;
+
+	(*mapcount)--;
+
+out_unmap:
+	pte_unmap(pte);
+
+out_unlock:
+	spin_unlock(&mm->page_table_lock);
+	return referenced;
+}
+
+/**
+ * page_referenced_file - referenced check for object-based rmap
+ * @page: the page we're checking references on.
+ *
+ * For an object-based mapped page, find all the places it is mapped and
+ * check/clear the referenced flag.  This is done by following the page->mapping
+ * pointer, then walking the chain of vmas it holds.  It returns the number
+ * of references it found.
+ *
+ * This function is only called from page_referenced for object-based pages.
+ *
+ * The semaphore address_space->i_shared_sem is tried.  If it can't be gotten,
+ * assume a reference count of 0, so try_to_unmap will then have a go.
+ */
+static inline int page_referenced_file(struct page *page)
+{
+	unsigned int mapcount = page->pte.mapcount;
+	struct address_space *mapping = page->mapping;
+	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	struct vm_area_struct *vma;
+	unsigned long address;
+	int referenced = 0;
+	int failed = 0;
+
+	if (down_trylock(&mapping->i_shared_sem))
+		return 0;
+
+	list_for_each_entry(vma, &mapping->i_mmap, shared) {
+		address = vma_address(vma, pgoff);
+		if (address == -EFAULT)
+			continue;
+		if ((vma->vm_flags & (VM_LOCKED|VM_MAYSHARE))
+				  == (VM_LOCKED|VM_MAYSHARE)) {
+			referenced++;
+			goto out;
+		}
+		if (vma->vm_mm->rss) {
+			referenced += page_referenced_one(page,
+				vma->vm_mm, address, &mapcount, &failed);
+			if (!mapcount)
+				goto out;
+		}
+	}
+
+	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+		if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
+			failed++;
+			continue;
+		}
+		address = vma_address(vma, pgoff);
+		if (address == -EFAULT)
+			continue;
+		if (vma->vm_flags & (VM_LOCKED|VM_RESERVED)) {
+			referenced++;
+			goto out;
+		}
+		if (vma->vm_mm->rss) {
+			referenced += page_referenced_one(page,
+				vma->vm_mm, address, &mapcount, &failed);
+			if (!mapcount)
+				goto out;
+		}
+	}
+
+	WARN_ON(!failed);
+out:
+	up(&mapping->i_shared_sem);
+	return referenced;
+}
+
 /**
  * page_referenced - test if the page was referenced
  * @page: the page to test
@@ -135,7 +264,10 @@ int fastcall page_referenced(struct page * page)
 	if (TestClearPageReferenced(page))
 		referenced++;
 
-	if (PageDirect(page)) {
+	if (!PageAnon(page)) {
+		if (page_mapped(page) && page->mapping)
+			referenced += page_referenced_file(page);
+	} else if (PageDirect(page)) {
 		pte_t *pte = rmap_ptep_map(page->pte.direct);
 		if (ptep_test_and_clear_young(pte))
 			referenced++;
@@ -170,7 +302,7 @@ int fastcall page_referenced(struct page * page)
 }
 
 /**
- * page_add_rmap - add reverse mapping entry to a page
+ * page_add_rmap - add reverse mapping entry to an anonymous page
  * @page: the page to add the mapping to
  * @ptep: the page table entry mapping this page
  *
@@ -191,10 +323,8 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
 		SetPageDirect(page);
-		if (!page->mapping) {
-			SetPageAnon(page);
-			page->mapping = ANON_MAPPING_DEBUG;
-		}
+		SetPageAnon(page);
+		page->mapping = ANON_MAPPING_DEBUG;
 		inc_page_state(nr_mapped);
 		goto out;
 	}
@@ -228,6 +358,25 @@ out:
 }
 
 /**
+ * page_add_file_rmap - add pte mapping to a file page
+ * @page: the page to add the mapping to
+ *
+ * The caller needs to hold the mm->page_table_lock.
+ */
+void fastcall page_add_file_rmap(struct page *page)
+{
+	BUG_ON(PageAnon(page));
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+		return;
+
+	page_map_lock(page);
+	if (!page_mapped(page))
+		inc_page_state(nr_mapped);
+	page->pte.mapcount++;
+	page_map_unlock(page);
+}
+
+/**
  * page_remove_rmap - take down reverse mapping to a page
  * @page: page to remove mapping from
  * @ptep: page table entry to remove
@@ -250,7 +399,9 @@ void fastcall page_remove_rmap(struct page *page, pte_t *ptep)
 	if (!page_mapped(page))
 		goto out_unlock;	/* remap_page_range() from a driver? */
 
-	if (PageDirect(page)) {
+	if (!PageAnon(page)) {
+		page->pte.mapcount--;
+	} else if (PageDirect(page)) {
 		if (page->pte.direct == pte_paddr) {
 			page->pte.direct = 0;
 			ClearPageDirect(page);
@@ -298,7 +449,7 @@ out_unlock:
 }
 
 /**
- * try_to_unmap_one - worker function for try_to_unmap
+ * try_to_unmap_anon_one - worker function for try_to_unmap
  * @page: page to unmap
  * @ptep: page table entry to unmap from page
  *
@@ -310,7 +461,7 @@ out_unlock:
  *		rmap lock		shrink_list()
  *		    mm->page_table_lock	try_to_unmap_one(), trylock
  */
-static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
+static int fastcall try_to_unmap_anon_one(struct page * page, pte_addr_t paddr)
 {
 	pte_t *ptep = rmap_ptep_map(paddr);
 	unsigned long address = ptep_to_address(ptep);
@@ -348,7 +499,7 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 	flush_cache_page(vma, address);
 	pte = ptep_clear_flush(vma, address, ptep);
 
-	if (PageAnon(page)) {
+	{
 		swp_entry_t entry = { .val = page->private };
 		/*
 		 * Store the swap location in the pte.
@@ -358,16 +509,6 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		swap_duplicate(entry);
 		set_pte(ptep, swp_entry_to_pte(entry));
 		BUG_ON(pte_file(*ptep));
-	} else {
-		/*
-		 * If a nonlinear mapping then store the file page offset
-		 * in the pte.
-		 */
-		BUG_ON(!page->mapping);
-		if (page->index != linear_page_index(vma, address)) {
-			set_pte(ptep, pgoff_to_pte(page->index));
-			BUG_ON(!pte_file(*ptep));
-		}
 	}
 
 	/* Move the dirty bit to the physical page now the pte is gone. */
@@ -381,6 +522,128 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 out_unlock:
 	rmap_ptep_unmap(ptep);
 	spin_unlock(&mm->page_table_lock);
+	return ret;
+}
+
+static int try_to_unmap_one(struct page *page,
+	struct mm_struct *mm, unsigned long address,
+	unsigned int *mapcount, struct vm_area_struct *vma)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *pte;
+	pte_t pteval;
+	int ret = SWAP_AGAIN;
+
+	/*
+	 * We need the page_table_lock to protect us from page faults,
+	 * munmap, fork, etc...
+	 */
+	if (!spin_trylock(&mm->page_table_lock))
+		goto out;
+
+	pgd = pgd_offset(mm, address);
+	if (!pgd_present(*pgd))
+		goto out_unlock;
+
+	pmd = pmd_offset(pgd, address);
+	if (!pmd_present(*pmd))
+		goto out_unlock;
+
+	pte = pte_offset_map(pmd, address);
+	if (!pte_present(*pte))
+		goto out_unmap;
+
+	if (page_to_pfn(page) != pte_pfn(*pte))
+		goto out_unmap;
+
+	(*mapcount)--;
+
+	/*
+	 * If the page is mlock()d, we cannot swap it out.
+	 * If it's recently referenced (perhaps page_referenced
+	 * skipped over this mm) then we should reactivate it.
+	 */
+	if ((vma->vm_flags & (VM_LOCKED|VM_RESERVED)) ||
+			ptep_test_and_clear_young(pte)) {
+		ret = SWAP_FAIL;
+		goto out_unmap;
+	}
+
+	/* Nuke the page table entry. */
+	flush_cache_page(vma, address);
+	pteval = ptep_clear_flush(vma, address, pte);
+
+	/* Move the dirty bit to the physical page now the pte is gone. */
+	if (pte_dirty(pteval))
+		set_page_dirty(page);
+
+	mm->rss--;
+	BUG_ON(!page->pte.mapcount);
+	page->pte.mapcount--;
+	page_cache_release(page);
+
+out_unmap:
+	pte_unmap(pte);
+
+out_unlock:
+	spin_unlock(&mm->page_table_lock);
+
+out:
+	return ret;
+}
+
+/**
+ * try_to_unmap_file - unmap file page using the object-based rmap method
+ * @page: the page to unmap
+ *
+ * Find all the mappings of a page using the mapping pointer and the vma chains
+ * contained in the address_space struct it points to.
+ *
+ * This function is only called from try_to_unmap for object-based pages.
+ *
+ * The semaphore address_space->i_shared_sem is tried.  If it can't be gotten,
+ * return a temporary error.
+ */
+static inline int try_to_unmap_file(struct page *page)
+{
+	unsigned int mapcount = page->pte.mapcount;
+	struct address_space *mapping = page->mapping;
+	pgoff_t pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	struct vm_area_struct *vma;
+	unsigned long address;
+	int ret = SWAP_AGAIN;
+
+	if (down_trylock(&mapping->i_shared_sem))
+		return ret;
+
+	list_for_each_entry(vma, &mapping->i_mmap, shared) {
+		if (vma->vm_mm->rss) {
+			address = vma_address(vma, pgoff);
+			if (address == -EFAULT)
+				continue;
+			ret = try_to_unmap_one(page,
+				vma->vm_mm, address, &mapcount, vma);
+			if (ret == SWAP_FAIL || !mapcount)
+				goto out;
+		}
+	}
+
+	list_for_each_entry(vma, &mapping->i_mmap_shared, shared) {
+		if (unlikely(vma->vm_flags & VM_NONLINEAR))
+			continue;
+		if (vma->vm_mm->rss) {
+			address = vma_address(vma, pgoff);
+			if (address == -EFAULT)
+				continue;
+			ret = try_to_unmap_one(page,
+				vma->vm_mm, address, &mapcount, vma);
+			if (ret == SWAP_FAIL || !mapcount)
+				goto out;
+		}
+	}
+out:
+	up(&mapping->i_shared_sem);
 	return ret;
 }
 
@@ -402,14 +665,17 @@ int fastcall try_to_unmap(struct page * page)
 	int ret = SWAP_SUCCESS;
 	int victim_i;
 
-	/* This page should not be on the pageout lists. */
-	if (PageReserved(page))
-		BUG();
-	if (!PageLocked(page))
-		BUG();
+	BUG_ON(PageReserved(page));
+	BUG_ON(!PageLocked(page));
+	BUG_ON(!page_mapped(page));
+
+	if (!PageAnon(page)) {
+		ret = try_to_unmap_file(page);
+		goto out;
+	}
 
 	if (PageDirect(page)) {
-		ret = try_to_unmap_one(page, page->pte.direct);
+		ret = try_to_unmap_anon_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
 			page->pte.direct = 0;
 			ClearPageDirect(page);
@@ -428,7 +694,7 @@ int fastcall try_to_unmap(struct page * page)
 		for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 			pte_addr_t pte_paddr = pc->ptes[i];
 
-			switch (try_to_unmap_one(page, pte_paddr)) {
+			switch (try_to_unmap_anon_one(page, pte_paddr)) {
 			case SWAP_SUCCESS:
 				/*
 				 * Release a slot.  If we're releasing the

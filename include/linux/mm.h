@@ -185,6 +185,7 @@ struct page {
 		struct pte_chain *chain;/* Reverse pte mapping pointer.
 					 * protected by PG_chainlock */
 		pte_addr_t direct;
+		unsigned int mapcount;	/* Count ptes mapped into mms */
 	} pte;
 	unsigned long private;		/* Mapping-private opaque data:
 					 * usually used for buffer_heads

@@ -49,7 +49,7 @@ static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * Install a page to a given virtual memory address, release any
+ * Install a file page to a given virtual memory address, release any
  * previously existing mapping.
  */
 int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -60,11 +60,13 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t pte_val;
-	struct pte_chain *pte_chain;
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain)
-		goto err;
+	/*
+	 * We use page_add_file_rmap below: if install_page is
+	 * ever extended to anonymous pages, this will warn us.
+	 */
+	BUG_ON(!page_mapping(page));
+
 	pgd = pgd_offset(mm, addr);
 	spin_lock(&mm->page_table_lock);
 
@@ -81,18 +83,14 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	mm->rss++;
 	flush_icache_page(vma, page);
 	set_pte(pte, mk_pte(page, prot));
-	pte_chain = page_add_rmap(page, pte, pte_chain);
+	page_add_file_rmap(page);
 	pte_val = *pte;
 	pte_unmap(pte);
 	update_mmu_cache(vma, addr, pte_val);
-	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-	return 0;
 
+	err = 0;
 err_unlock:
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-err:
 	return err;
 }
 EXPORT_SYMBOL(install_page);

@@ -27,6 +27,7 @@ static inline void pte_chain_free(struct pte_chain *pte_chain)
 
 struct pte_chain * fastcall
 	page_add_rmap(struct page *, pte_t *, struct pte_chain *);
+void fastcall page_add_file_rmap(struct page *);
 void fastcall page_remove_rmap(struct page *, pte_t *);
 
 /*
