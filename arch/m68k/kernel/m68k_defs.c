@@ -11,10 +11,10 @@
 #include <linux/stddef.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
-#include <linux/font.h>
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
 #include <asm/amigahw.h>
+#include <video/font.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n#define " #sym " %c0" : : "i" (val))
@@ -78,7 +78,7 @@ int main(void)
 	DEFINE(BIR_SIZE, offsetof(struct bi_record, size));
 	DEFINE(BIR_DATA, offsetof(struct bi_record, data));
 
-	/* offsets into font_desc (linux/font.h) */
+	/* offsets into font_desc (drivers/video/console/font.h) */
 	DEFINE(FONT_DESC_IDX, offsetof(struct font_desc, idx));
 	DEFINE(FONT_DESC_NAME, offsetof(struct font_desc, name));
 	DEFINE(FONT_DESC_WIDTH, offsetof(struct font_desc, width));

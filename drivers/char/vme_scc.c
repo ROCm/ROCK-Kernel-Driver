@@ -624,11 +624,10 @@ static void scc_disable_tx_interrupts(void *ptr)
 	unsigned long	flags;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	SCCmod(INT_AND_DMA_REG, ~IDR_TX_INT_ENAB, 0);
 	port->gs.flags &= ~GS_TX_INTEN;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -638,12 +637,11 @@ static void scc_enable_tx_interrupts(void *ptr)
 	unsigned long	flags;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	SCCmod(INT_AND_DMA_REG, 0xff, IDR_TX_INT_ENAB);
 	/* restart the transmitter */
 	scc_tx_int (0, port, 0);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -653,11 +651,10 @@ static void scc_disable_rx_interrupts(void *ptr)
 	unsigned long	flags;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	SCCmod(INT_AND_DMA_REG,
 	    ~(IDR_RX_INT_MASK|IDR_PARERR_AS_SPCOND|IDR_EXTSTAT_INT_ENAB), 0);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -667,11 +664,10 @@ static void scc_enable_rx_interrupts(void *ptr)
 	unsigned long	flags;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	SCCmod(INT_AND_DMA_REG, 0xff,
 		IDR_EXTSTAT_INT_ENAB|IDR_PARERR_AS_SPCOND|IDR_RX_INT_ALL);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -717,10 +713,9 @@ static int scc_set_real_termios (void *ptr)
 
 	if (baud == 0) {
 		/* speed == 0 -> drop DTR */
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		SCCmod(TX_CTRL_REG, ~TCR_DTR, 0);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return 0;
 	}
 	else if ((MACH_IS_MVME16x && (baud < 50 || baud > 38400)) ||
@@ -748,8 +743,7 @@ static int scc_set_real_termios (void *ptr)
 		brgval = (BVME_SCC_RTxC + baud/2) / (16 * 2 * baud) - 2;
 #endif
 	/* Now we have all parameters and can go to set them: */
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	/* receiver's character size and auto-enables */
 	SCCmod(RX_CTRL_REG, ~(RCR_CHSIZE_MASK|RCR_AUTO_ENAB_MODE),
@@ -773,7 +767,7 @@ static int scc_set_real_termios (void *ptr)
 	/* BRG enable, and clock source never changes */
 	SCCmod(DPLL_CTRL_REG, 0xff, DCR_BRG_ENAB);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 }
@@ -823,13 +817,12 @@ static void scc_setsignals(struct scc_port *port, int dtr, int rts)
 	unsigned char t;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	t = SCCread(TX_CTRL_REG);
 	if (dtr >= 0) t = dtr? (t | TCR_DTR): (t & ~TCR_DTR);
 	if (rts >= 0) t = rts? (t | TCR_RTS): (t & ~TCR_RTS);
 	SCCwrite(TX_CTRL_REG, t);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -914,8 +907,7 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	};
 #endif
 	if (!(port->gs.flags & ASYNC_INITIALIZED)) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 #if defined(CONFIG_MVME147_SCC) || defined(CONFIG_MVME162_SCC)
 		if (MACH_IS_MVME147 || MACH_IS_MVME16x) {
 			for (i=0; i<sizeof(mvme_init_tab)/sizeof(*mvme_init_tab); ++i)
@@ -934,7 +926,7 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 
 		port->c_dcd = 0;	/* Prevent initial 1->0 interrupt */
 		scc_setsignals (port, 1,1);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	tty->driver_data = port;
@@ -982,10 +974,9 @@ static void scc_throttle (struct tty_struct * tty)
 	SCC_ACCESS_INIT(port);
 
 	if (tty->termios->c_cflag & CRTSCTS) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		SCCmod(TX_CTRL_REG, ~TCR_RTS, 0);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	if (I_IXOFF(tty))
 		scc_send_xchar(tty, STOP_CHAR(tty));
@@ -999,10 +990,9 @@ static void scc_unthrottle (struct tty_struct * tty)
 	SCC_ACCESS_INIT(port);
 
 	if (tty->termios->c_cflag & CRTSCTS) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		SCCmod(TX_CTRL_REG, 0xff, TCR_RTS);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	if (I_IXOFF(tty))
 		scc_send_xchar(tty, START_CHAR(tty));
@@ -1022,11 +1012,10 @@ static void scc_break_ctl(struct tty_struct *tty, int break_state)
 	unsigned long	flags;
 	SCC_ACCESS_INIT(port);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	SCCmod(TX_CTRL_REG, ~TCR_SEND_BREAK, 
 			break_state ? TCR_SEND_BREAK : 0);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 
@@ -1069,8 +1058,7 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 {
 	unsigned long	flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	while (count--)
 	{
@@ -1078,7 +1066,7 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 			scc_ch_write ('\r');
 		scc_ch_write (*str++);
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static kdev_t scc_console_device(struct console *c)

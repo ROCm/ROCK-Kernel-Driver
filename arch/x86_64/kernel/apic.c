@@ -987,6 +987,7 @@ asmlinkage void smp_spurious_interrupt(void)
 		printk(KERN_INFO "spurious APIC interrupt on CPU#%d, %ld skipped.\n",
 		       smp_processor_id(), skipped);
 		last_warning = jiffies; 
+		skipped = 0;
 	} else { 
 		skipped++; 
 	} 

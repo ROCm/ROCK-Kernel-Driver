@@ -42,7 +42,6 @@ extern void sun3_get_model (char* model);
 extern void idprom_init (void);
 extern int sun3_hwclk(int set, struct rtc_time *t);
 
-extern void sun_serial_setup(void);
 volatile char* clock_va; 
 extern volatile unsigned char* sun3_intreg;
 extern unsigned long availmem;
@@ -173,10 +172,6 @@ void __init config_sun3(void)
         m68k_memory[0].size=*(romvec->pv_sun3mem);
 	
 	sun3_bootmem_alloc(memory_start, memory_end);
-
-#ifdef CONFIG_SUN3X_ZS
-	sun_serial_setup();
-#endif
 }
 
 void __init sun3_sched_init(void (*timer_routine)(int, void *, struct pt_regs *))

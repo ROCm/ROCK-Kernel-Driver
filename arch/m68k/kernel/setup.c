@@ -380,9 +380,6 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_SUN3X
 	if (MACH_IS_SUN3X) {
 		dvma_init();
-#ifdef CONFIG_SUN3X_ZS
-		sun_serial_setup();
-#endif
 	}
 #endif
 

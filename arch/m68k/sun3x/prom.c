@@ -37,9 +37,9 @@ extern e_vector vectors[256];  /* arch/m68k/kernel/traps.c */
 void sun3x_halt(void)
 {
     unsigned long flags;
-    
+
     /* Disable interrupts while we mess with things */
-    save_flags(flags); cli();
+    local_irq_save(flags);
 
     /* Restore prom vbr */
     __asm__ volatile ("movec %0,%%vbr" : : "r" ((void*)sun3x_prom_vbr));
@@ -56,13 +56,13 @@ void sun3x_halt(void)
     sun3_enable_irq(5);
 
     __asm__ volatile ("movec %0,%%vbr" : : "r" ((void*)vectors));
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 void sun3x_reboot(void)
 {
     /* This never returns, don't bother saving things */
-    cli();
+    local_irq_disable();
 
     /* Restore prom vbr */
     __asm__ volatile ("movec %0,%%vbr" : : "r" ((void*)sun3x_prom_vbr));

@@ -92,7 +92,7 @@ config AIC7XXX_DEBUG_MASK
 
 config AIC7XXX_REG_PRETTY_PRINT
         bool "Decode registers during diagnostics"
-        depends on SCSI_AIC7XXX
+        depends on SCSI_AIC7XXX && SCSI_AIC7XXX_BUILD_FIRMWARE
 	default y
         help
 	Compile in register value tables for the output of expanded register

@@ -276,15 +276,14 @@ void mac_init_IRQ(void)
 
 static inline void mac_insert_irq(irq_node_t **list, irq_node_t *node)
 {
-	unsigned long cpu_flags;
+	unsigned long flags;
 	irq_node_t *cur;
 
 	if (!node->dev_id)
 		printk("%s: Warning: dev_id of %s is zero\n",
 		       __FUNCTION__, node->devname);
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 
 	cur = *list;
 
@@ -309,27 +308,26 @@ static inline void mac_insert_irq(irq_node_t **list, irq_node_t *node)
 	node->next = cur;
 	*list = node;
 
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 }
 
 static inline void mac_delete_irq(irq_node_t **list, void *dev_id)
 {
-	unsigned long cpu_flags;
+	unsigned long flags;
 	irq_node_t *node;
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 
 	for (node = *list; node; list = &node->next, node = *list) {
 		if (node->dev_id == dev_id) {
 			*list = node->next;
 			/* Mark it as free. */
 			node->handler = NULL;
-			restore_flags(cpu_flags);
+			local_irq_restore(flags);
 			return;
 		}
 	}
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 	printk ("%s: tried to remove invalid irq\n", __FUNCTION__);
 }
 
@@ -343,7 +341,7 @@ static inline void mac_delete_irq(irq_node_t **list, void *dev_id)
 void mac_do_irq_list(int irq, struct pt_regs *fp)
 {
 	irq_node_t *node, *slow_nodes;
-	unsigned long cpu_flags;
+	unsigned long flags;
 
 	kstat_cpu(0).irqs[irq]++;
 
@@ -360,8 +358,8 @@ void mac_do_irq_list(int irq, struct pt_regs *fp)
 	     node = node->next)
 		node->handler(irq, node->dev_id, fp);
 	if (!node) return;
-	save_flags(cpu_flags);
-	restore_flags((cpu_flags & ~0x0700) | (fp->sr & 0x0700));
+	local_save_flags(flags);
+	local_irq_restore((flags & ~0x0700) | (fp->sr & 0x0700));
 	/* if slow handlers exists, serve them now */
 	slow_nodes = node;
 	for (; node; node = node->next) {
@@ -735,15 +733,15 @@ void mac_scc_dispatch(int irq, void *dev_id, struct pt_regs *regs)
 {
 	volatile unsigned char *scc = (unsigned char *) mac_bi_data.sccbase + 2;
 	unsigned char reg;
-	unsigned long cpu_flags;
+	unsigned long flags;
 
 	/* Read RR3 from the chip. Always do this on channel A */
 	/* This must be an atomic operation so disable irqs.   */
 
-	save_flags(cpu_flags); cli();
+	local_irq_save(flags);
 	*scc = 3;
 	reg = *scc;
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 
 	/* Now dispatch. Bits 0-2 are for channel B and */
 	/* bits 3-5 are for channel A. We can safely    */

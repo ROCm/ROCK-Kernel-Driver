@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/interrupt.h>
 
 #include <asm/irq.h>
 #include <asm/setup.h>

@@ -593,6 +593,7 @@ static void yenta_open_bh(void * data)
 	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->dev.name, socket)) {
 		/* No IRQ or request_irq failed. Poll */
 		socket->cb_irq = 0; /* But zero is a valid IRQ number. */
+		init_timer(&socket->poll_timer);
 		socket->poll_timer.function = yenta_interrupt_wrapper;
 		socket->poll_timer.data = (unsigned long)socket;
 		socket->poll_timer.expires = jiffies + HZ;

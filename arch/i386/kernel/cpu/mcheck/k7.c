@@ -1,5 +1,5 @@
 /*
- * Athlon specific Machine Check Exception Reporting
+ * Athlon/Hammer specific Machine Check Exception Reporting
  */
 
 #include <linux/init.h>
@@ -82,6 +82,9 @@ void __init amd_mcheck_init(struct cpuinfo_x86 *c)
 	nr_mce_banks = l & 0xff;
 
 	for (i=0; i<nr_mce_banks; i++) {
+		/* Don't enable northbridge MCE by default on Hammer */
+		if (boot_cpu_data.x86_model == 15 && i == 4) 
+			continue;
 		wrmsr (MSR_IA32_MC0_CTL+4*i, 0xffffffff, 0xffffffff);
 		wrmsr (MSR_IA32_MC0_STATUS+4*i, 0x0, 0x0);
 	}

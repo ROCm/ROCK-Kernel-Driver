@@ -18,6 +18,7 @@
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/seq_file.h>
+#include <linux/interrupt.h>
 
 #include <asm/rtc.h>
 #include <asm/ptrace.h>
@@ -374,7 +375,7 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 		      }
 		    if ( irq_tab[irq].state & IRQ_INPROGRESS )
 		      {
-		  /* some handlers do sti() for irq latency reasons, */
+		  /* some handlers do local_irq_enable() for irq latency reasons, */
 		  /* however reentering an active irq handler is not permitted */
 #ifdef IP_USE_DISABLE
 		  /* in theory this is the better way to do it because it still */

@@ -217,6 +217,7 @@ struct sx_period {
 struct WD33C93_hostdata {
     struct Scsi_Host *next;
     wd33c93_regs     regs;
+    spinlock_t       lock;
     uchar            clock_freq;
     uchar            chip;             /* what kind of wd33c93? */
     uchar            microcode;        /* microcode rev */

@@ -9,6 +9,7 @@
 #include "linux/smp_lock.h"
 #include "linux/security.h"
 #include "linux/ptrace.h"
+#include "linux/proc_mm.h"
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"
 #include "kern_util.h"
@@ -20,6 +21,11 @@
 void ptrace_disable(struct task_struct *child)
 { 
 }
+
+extern long do_mmap2(struct task_struct *task, unsigned long addr, 
+		     unsigned long len, unsigned long prot, 
+		     unsigned long flags, unsigned long fd,
+		     unsigned long pgoff);
 
 int sys_ptrace(long request, long pid, long addr, long data)
 {
@@ -182,13 +188,13 @@ int sys_ptrace(long request, long pid, long addr, long data)
 
 #ifdef PTRACE_GETREGS
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned *)data, 
+	  	if (!access_ok(VERIFY_WRITE, (unsigned long *)data, 
 			       FRAME_SIZE_OFFSET)) {
 			ret = -EIO;
 			break;
 		}
 		for ( i = 0; i < FRAME_SIZE_OFFSET; i += sizeof(long) ) {
-			__put_user(getreg(child, i),(unsigned long *) data);
+			__put_user(getreg(child, i), (unsigned long *) data);
 			data += sizeof(long);
 		}
 		ret = 0;
@@ -231,6 +237,57 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_SETFPXREGS: /* Set the child FPU state. */
 		ret = set_fpxregs(data, child);
 		break;
+#endif
+	case PTRACE_FAULTINFO: {
+		struct ptrace_faultinfo fault;
+
+		fault = ((struct ptrace_faultinfo) 
+			{ .is_write	= child->thread.err,
+			  .addr		= child->thread.cr2 });
+		ret = copy_to_user((unsigned long *) data, &fault, 
+				   sizeof(fault));
+		if(ret)
+			break;
+		break;
+	}
+	case PTRACE_SIGPENDING:
+		ret = copy_to_user((unsigned long *) data, 
+				   &child->pending.signal,
+				   sizeof(child->pending.signal));
+		break;
+
+	case PTRACE_LDT: {
+		struct ptrace_ldt ldt;
+
+		if(copy_from_user(&ldt, (unsigned long *) data, 
+				  sizeof(ldt))){
+			ret = -EIO;
+			break;
+		}
+
+		/* This one is confusing, so just punt and return -EIO for 
+		 * now
+		 */
+		ret = -EIO;
+		break;
+	}
+#ifdef CONFIG_PROC_MM
+	case PTRACE_SWITCH_MM: {
+		struct mm_struct *old = child->mm;
+		struct mm_struct *new = proc_mm_get_mm(data);
+
+		if(IS_ERR(new)){
+			ret = PTR_ERR(new);
+			break;
+		}
+
+		atomic_inc(&new->mm_users);
+		child->mm = new;
+		child->active_mm = new;
+		mmput(old);
+		ret = 0;
+		break;
+	}
 #endif
 	default:
 		ret = -EIO;

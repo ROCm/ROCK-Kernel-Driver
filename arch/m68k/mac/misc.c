@@ -165,11 +165,10 @@ static void via_pram_writebyte(__u8 data)
 
 static void via_pram_command(int command, __u8 *data)
 {
-	unsigned long cpu_flags;
+	unsigned long flags;
 	int	is_read;
 
-	save_flags(cpu_flags);
-	cli();
+	local_irq_save(flags);
 
 	/* Enable the RTC and make sure the strobe line is high */
 
@@ -193,7 +192,7 @@ static void via_pram_command(int command, __u8 *data)
 
 	via1[vBufB] |= VIA1B_vRTCEnb;
 
-	restore_flags(cpu_flags);
+	local_irq_restore(flags);
 }
 
 static __u8 via_read_pram(int offset)
@@ -405,7 +404,7 @@ void mac_poweroff(void)
 		pmu_shutdown();
 #endif
 	}
-	sti();
+	local_irq_enable();
 	printk("It is now safe to turn off your Macintosh.\n");
 	while(1);
 }
@@ -413,7 +412,7 @@ void mac_poweroff(void)
 void mac_reset(void)
 {
 	if (macintosh_config->adb_type == MAC_ADB_II) {
-		unsigned long cpu_flags;
+		unsigned long flags;
 
 		/* need ROMBASE in booter */
 		/* indeed, plus need to MAP THE ROM !! */
@@ -429,12 +428,11 @@ void mac_reset(void)
 			 * MSch: Machines known to crash on ROM reset ...
 			 */
 		} else {
-			save_flags(cpu_flags);
-			cli();
+			local_irq_save(flags);
 
 			rom_reset();
 
-			restore_flags(cpu_flags);
+			local_irq_restore(flags);
 		}
 #ifdef CONFIG_ADB_CUDA
 	} else if (macintosh_config->adb_type == MAC_ADB_CUDA) {
@@ -459,7 +457,7 @@ void mac_reset(void)
 		unsigned long virt = (unsigned long) mac_reset;
 		unsigned long phys = virt_to_phys(mac_reset);
 		unsigned long offset = phys-virt;
-		cli(); /* lets not screw this up, ok? */
+		local_irq_disable(); /* lets not screw this up, ok? */
 		__asm__ __volatile__(".chip 68030\n\t"
 				     "pmove %0,%/tt0\n\t"
 				     ".chip 68k"
@@ -495,7 +493,7 @@ void mac_reset(void)
 	}
 
 	/* should never get here */
-	sti();
+	local_irq_enable();
 	printk ("Restart failed.  Please restart manually.\n");
 	while(1);
 }

@@ -509,12 +509,11 @@ static void atari_heartbeat( int on )
     if (atari_dont_touch_floppy_select)
 	return;
     
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     sound_ym.rd_data_reg_sel = 14; /* Select PSG Port A */
     tmp = sound_ym.rd_data_reg_sel;
     sound_ym.wd_data = on ? (tmp & ~0x02) : (tmp | 0x02);
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 #endif
 
@@ -569,7 +568,7 @@ static void atari_reset (void)
     /* processor independent: turn off interrupts and reset the VBR;
      * the caches must be left enabled, else prefetching the final jump
      * instruction doesn't work. */
-    cli();
+    local_irq_disable();
     __asm__ __volatile__
 	("moveq	#0,%/d0\n\t"
 	 "movec	%/d0,%/vbr"

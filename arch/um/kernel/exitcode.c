@@ -42,7 +42,7 @@ static int write_proc_exitcode(struct file *file, const char *buffer,
 	return(count);
 }
 
-int make_proc_exitcode(void)
+static int make_proc_exitcode(void)
 {
 	struct proc_dir_entry *ent;
 

@@ -48,8 +48,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	switch (cmd) {
 	case RTC_RD_TIME:	/* Read the time/date from RTC	*/
 	{
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		/* Ensure clock and real-time-mode-register are accessible */
 		rtc->ctrl = RTC_READ;
 		wtime.tm_sec =  BCD2BIN(rtc->bcd_sec);
@@ -62,7 +61,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			wtime.tm_year += 100;
 		wtime.tm_wday = BCD2BIN(rtc->bcd_dow)-1;
 		rtc->ctrl = 0;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return copy_to_user((void *)arg, &wtime, sizeof wtime) ?
 								-EFAULT : 0;
 	}
@@ -102,8 +101,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (yrs >= 2070)
 			return -EINVAL;
 		
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		rtc->ctrl     = RTC_WRITE;
 
 		rtc->bcd_sec  = BIN2BCD(sec);
@@ -114,7 +112,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		rtc->bcd_year = BIN2BCD(yrs%100);
 
 		rtc->ctrl     = 0;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return 0;
 	}
 	default:
@@ -168,7 +166,6 @@ int __init rtc_MK48T08_init(void)
 		return -ENODEV;
 
 	printk(KERN_INFO "MK48T08 Real Time Clock Driver v%s\n", RTC_VERSION);
-	misc_register(&rtc_dev);
-	return 0;
+	return misc_register(&rtc_dev);
 }
 

@@ -92,7 +92,7 @@ int mcast_setup(char *str, char **mac_out, void *data)
 	
 	if(port_str != NULL){
 		n = simple_strtoul(port_str, &last, 10);
-		if(*last != '\0'){
+		if((*last != '\0') || (last == port_str)){
 			printk(KERN_ERR "mcast_setup - Bad port : '%s'\n", 
 			       port_str);
 			return(0);
@@ -102,7 +102,7 @@ int mcast_setup(char *str, char **mac_out, void *data)
 
 	if(ttl_str != NULL){
 		init->ttl = simple_strtoul(ttl_str, &last, 10);
-		if(*last != '\0'){
+		if((*last != '\0') || (last == ttl_str)){
 			printk(KERN_ERR "mcast_setup - Bad ttl : '%s'\n", 
 			       ttl_str);
 			return(0);

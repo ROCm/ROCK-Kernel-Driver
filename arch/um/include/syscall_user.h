@@ -1,16 +1,13 @@
 /* 
- * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
-#ifndef __SYSCALL_USER_H__
-#define __SYSCALL_USER_H__
+#ifndef __SYSCALL_USER_H
+#define __SYSCALL_USER_H
 
-#include <asm/sigcontext.h>
-
-extern void syscall_handler(int sig, struct uml_pt_regs *regs);
-extern void exit_kernel(int pid, void *task);
-extern int do_syscall(void *task, int pid);
+extern int record_syscall_start(int syscall);
+extern void record_syscall_end(int index, int result);
 
 #endif
 

@@ -1,3 +1,4 @@
+#include "linux/config.h"
 #include "linux/kernel.h"
 #include "linux/stddef.h"
 #include "linux/init.h"
@@ -24,21 +25,19 @@ void slip_init(struct net_device *dev, void *data)
 		{ name :	{ '\0' },
 		  addr:		NULL,
 		  gate_addr :	init->gate_addr,
-		  slave : 	0,
-		  buf : 	{ '\0' },
+		  slave : 	-1,
+		  ibuf : 	{ '\0' },
+		  obuf : 	{ '\0' },
 		  pos :		0,
 		  esc :		0,
 		  dev :		dev });
 
-	strncpy(dev->name, "umn", IFNAMSIZ);
 	dev->init = NULL;
 	dev->hard_header_len = 0;
 	dev->addr_len = 4;
 	dev->type = ARPHRD_ETHER;
 	dev->tx_queue_len = 256;
 	dev->flags = IFF_NOARP;
-	if(register_netdev(dev))
-		printk(KERN_ERR "Couldn't initialize umn\n");
 	printk("SLIP backend - SLIP IP = %s\n", spri->gate_addr);
 }
 

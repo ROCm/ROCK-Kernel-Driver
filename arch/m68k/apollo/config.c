@@ -6,6 +6,7 @@
 #include <linux/console.h>
 #include <linux/rtc.h>
 #include <linux/vt_kern.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/bootinfo.h>

@@ -76,6 +76,7 @@
 #include <linux/font.h>
 #include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>

@@ -24,7 +24,8 @@ static void *not_configged_init(char *str, int device, struct chan_opts *opts)
 	return(NULL);
 }
 
-static int not_configged_open(int input, int output, int primary, void *data)
+static int not_configged_open(int input, int output, int primary, void *data,
+			      char **dev_out)
 {
 	printk(KERN_ERR "Using a channel type which is configured out of "
 	       "UML\n");
@@ -112,7 +113,8 @@ static int open_one_chan(struct chan *chan, int input, int output, int primary)
 
 	if(chan->opened) return(0);
 	if(chan->ops->open == NULL) fd = 0;
-	else fd = (*chan->ops->open)(input, output, primary, chan->data);
+	else fd = (*chan->ops->open)(input, output, primary, chan->data,
+				     &chan->dev);
 	if(fd < 0) return(fd);
 	chan->fd = fd;
 
@@ -256,6 +258,66 @@ void free_chan(struct list_head *chans)
 		chan = list_entry(ele, struct chan, list);
 		free_one_chan(chan);
 	}
+}
+
+static int one_chan_config_string(struct chan *chan, char *str, int size,
+				  char **error_out)
+{
+	int n = 0;
+
+	CONFIG_CHUNK(str, size, n, chan->ops->type, 0);
+
+	if(chan->dev == NULL){
+		CONFIG_CHUNK(str, size, n, "", 1);
+		return(n);
+	}
+
+	CONFIG_CHUNK(str, size, n, ":", 0);
+	CONFIG_CHUNK(str, size, n, chan->dev, 0);
+
+	return(n);
+}
+
+static int chan_pair_config_string(struct chan *in, struct chan *out, 
+				   char *str, int size, char **error_out)
+{
+	int n;
+
+	n = one_chan_config_string(in, str, size, error_out);
+	str += n;
+	size -= n;
+
+	if(in == out){
+		CONFIG_CHUNK(str, size, n, "", 1);
+		return(n);
+	}
+
+	CONFIG_CHUNK(str, size, n, ",", 1);
+	n = one_chan_config_string(out, str, size, error_out);
+	str += n;
+	size -= n;
+	CONFIG_CHUNK(str, size, n, "", 1);
+
+	return(n);
+}
+
+int chan_config_string(struct list_head *chans, char *str, int size, 
+		       char **error_out)
+{
+	struct list_head *ele;
+	struct chan *chan, *in = NULL, *out = NULL;
+
+	list_for_each(ele, chans){
+		chan = list_entry(ele, struct chan, list);
+		if(!chan->primary)
+			continue;
+		if(chan->input)
+			in = chan;
+		if(chan->output)
+			out = chan;
+	}
+
+	return(chan_pair_config_string(in, out, str, size, error_out));
 }
 
 struct chan_type {
