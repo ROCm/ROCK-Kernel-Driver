@@ -470,7 +470,7 @@ EXPORT_SYMBOL_GPL(exit_fs);
  * Turn us into a lazy TLB process if we
  * aren't already..
  */
-static inline void __exit_mm(struct task_struct * tsk)
+void exit_mm(struct task_struct * tsk)
 {
 	struct mm_struct *mm = tsk->mm;
 
@@ -504,11 +504,6 @@ static inline void __exit_mm(struct task_struct * tsk)
 	enter_lazy_tlb(mm, current);
 	task_unlock(tsk);
 	mmput(mm);
-}
-
-void exit_mm(struct task_struct *tsk)
-{
-	__exit_mm(tsk);
 }
 
 static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
@@ -811,7 +806,7 @@ fastcall NORET_TYPE void do_exit(long code)
 	group_dead = atomic_dec_and_test(&tsk->signal->live);
 	if (group_dead)
 		acct_process(code);
-	__exit_mm(tsk);
+	exit_mm(tsk);
 
 	exit_sem(tsk);
 	__exit_files(tsk);
