@@ -109,7 +109,7 @@ static int pas106b_set_ctrl(struct sn9c102_device* cam,
 		err += sn9c102_i2c_write(cam, 0x0e, ctrl->value & 0x1f);
 		break;
 	case V4L2_CID_BRIGHTNESS:
-		err += sn9c102_i2c_write(cam, 0x0d, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x0d, 0x1f-(ctrl->value & 0x1f));
 		break;
 	case V4L2_CID_CONTRAST:
 		err += sn9c102_i2c_write(cam, 0x0f, ctrl->value & 0x03);
@@ -180,11 +180,11 @@ static struct sn9c102_sensor pas106b = {
 		{
 			.id = V4L2_CID_BRIGHTNESS,
 			.type = V4L2_CTRL_TYPE_INTEGER,
-			.name = "darkness",
+			.name = "brightness",
 			.minimum = 0x00,
 			.maximum = 0x1f,
 			.step = 0x01,
-			.default_value = 0x00,
+			.default_value = 0x1f,
 			.flags = 0,
 		},
 		{
