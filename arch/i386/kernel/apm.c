@@ -1745,7 +1745,6 @@ static int apm(void *unused)
 	daemonize("kapmd");
 
 	current->flags |= PF_IOTHREAD;
-	sigfillset(&current->blocked);
 
 #ifdef CONFIG_SMP
 	/* 2002/08/01 - WT
