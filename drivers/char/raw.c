@@ -30,6 +30,10 @@ static struct file_operations raw_ctl_fops;
 /*
  * Open/close code for raw IO.
  *
+ * We just rewrite the i_mapping for the /dev/raw/rawN file descriptor to
+ * point at the blockdev's address_space and set the file handle to use
+ * O_DIRECT.
+ *
  * Set the device's soft blocksize to the minimum possible.  This gives the
  * finest possible alignment and has no adverse impact on performance.
  */
@@ -56,7 +60,12 @@ static int raw_open(struct inode *inode, struct file *filp)
 		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
 		if (!err) {
 			err = set_blocksize(bdev, bdev_hardsect_size(bdev));
-			raw_devices[minor].inuse++;
+			if (err == 0) {
+				raw_devices[minor].inuse++;
+				filp->f_dentry->d_inode->i_mapping =
+					bdev->bd_inode->i_mapping;
+				filp->f_flags |= O_DIRECT;
+			}
 		}
 	}
 	up(&raw_mutex);
@@ -200,72 +209,22 @@ out:
 	return err;
 }
 
-static ssize_t
-rw_raw_dev(int rw, struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp)
+static ssize_t raw_file_write(struct file *file, const char *buf,
+				   size_t count, loff_t *ppos)
 {
-	const int minor = minor(filp->f_dentry->d_inode->i_rdev);
-	struct block_device *bdev = raw_devices[minor].binding;
-	struct inode *inode = bdev->bd_inode;
- 	size_t count = iov_length(iov, nr_segs); 
-	ssize_t ret = 0;
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
 
-	if (count == 0)
-		goto out;	
-
-	if ((ssize_t)count < 0)
-		return -EINVAL;	
-
-	if (*offp >= inode->i_size) 
-		return -ENXIO;
-
-	if (count + *offp > inode->i_size) {
-		count = inode->i_size - *offp;
-		nr_segs = iov_shorten((struct iovec *)iov, nr_segs, count);
-	}
-	ret = generic_file_direct_IO(rw, filp, iov, *offp, nr_segs);
-
-	if (ret > 0)
-		*offp += ret;
-out:
-	return ret;
-}
-
-static ssize_t
-raw_read(struct file *filp, char *buf, size_t size, loff_t *offp)
-{
-	struct iovec local_iov = { .iov_base = buf, .iov_len = size};
-
-	return rw_raw_dev(READ, filp, &local_iov, 1, offp);
-}
-
-static ssize_t
-raw_write(struct file *filp, const char *buf, size_t size, loff_t *offp)
-{
-	struct iovec local_iov = { .iov_base = (char *)buf, .iov_len = size};
-
-	return rw_raw_dev(WRITE, filp, &local_iov, 1, offp);
-}
-
-static ssize_t 
-raw_readv(struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp) 
-{
-	return rw_raw_dev(READ, filp, iov, nr_segs, offp);
-}
-
-static ssize_t 
-raw_writev(struct file *filp, const struct iovec *iov, unsigned long nr_segs, loff_t *offp) 
-{
-	return rw_raw_dev(WRITE, filp, iov, nr_segs, offp);
+	return generic_file_write_nolock(file, &local_iov, 1, ppos);
 }
 
 static struct file_operations raw_fops = {
-	.read	=	raw_read,
-	.write	=	raw_write,
+	.read	=	generic_file_read,
+	.write	=	raw_file_write,
 	.open	=	raw_open,
 	.release=	raw_release,
 	.ioctl	=	raw_ioctl,
-	.readv	= 	raw_readv,
-	.writev	= 	raw_writev,
+	.readv	= 	generic_file_readv,
+	.writev	= 	generic_file_writev,
 	.owner	=	THIS_MODULE,
 };
 
