@@ -75,30 +75,30 @@
 static struct fb_info fb_info;
 
 static struct fb_fix_screeninfo fb_fix __initdata = {
-	.id =		"G364 8plane",
-	.smem_start =	0x40000000,	/* physical address */
-	.type =		FB_TYPE_PACKED_PIXELS,
-	.visual =	FB_VISUAL_PSEUDOCOLOR,
-	.ypanstep =	1,
-	.accel =	FB_ACCEL_NONE,
+	.id 		= "G364 8plane",
+	.smem_start 	= 0x40000000,	/* physical address */
+	.type 		= FB_TYPE_PACKED_PIXELS,
+	.visual 	= FB_VISUAL_PSEUDOCOLOR,
+	.ypanstep 	= 1,
+	.accel 		= FB_ACCEL_NONE,
 };
 
 static struct fb_var_screeninfo fb_var __initdata = {
-	.bits_per_pixel =8,
-	.red =		{ 0, 8, 0 },
-      	green:		{ 0, 8, 0 },
-      	blue:		{ 0, 8, 0 },
-      	activate:FB_ACTIVATE_NOW,
-      	height:		-1,
-      	width:		-1,
-      	pixclock:39722,
-      	left_margin:	40,
-      	right_margin:	24,
-      	upper_margin:	32,
-      	lower_margin:	11,
-      	hsync_len:	96,
-      	vsync_len:	2,
-      	vmode:		FB_VMODE_NONINTERLACED,
+	.bits_per_pixel = 8,
+	.red 		= { 0, 8, 0 },
+      	.green 		= { 0, 8, 0 },
+      	.blue		= { 0, 8, 0 },
+      	.activate	= FB_ACTIVATE_NOW,
+      	.height		= -1,
+      	.width		= -1,
+      	.pixclock	= 39722,
+      	.left_margin	= 40,
+      	.right_margin	= 24,
+      	.upper_margin	= 32,
+      	.lower_margin	= 11,
+      	.hsync_len 	= 96,
+      	.vsync_len 	= 2,
+      	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 /*

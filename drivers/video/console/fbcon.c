@@ -681,7 +681,6 @@ static void fbcon_deinit(struct vc_data *vc)
 	p->conp = 0;
 }
 
-
 #define fontwidthvalid(p,w) ((p)->fontwidthmask & FONTWIDTH(w))
 
 static int fbcon_changevar(int con)
@@ -734,12 +733,14 @@ static int fbcon_changevar(int con)
 			p->fontdata = font->data;
 		}
 
+#ifdef FBCON_FONTWIDTH8_ONLY		
 		if (!fontwidthvalid(p, vc->vc_font.width)) {
 			/* ++Geert: changed from panic() to `correct and continue' */
 			printk(KERN_ERR
 		       		"fbcon_set_display: No support for fontwidth %d\n",
 		       		vc->vc_font.width);
 		}
+#endif		
 		updatescrollmode(p, vc);
 
 		old_cols = vc->vc_cols;
@@ -878,12 +879,14 @@ static void fbcon_set_display(int con, int init, int logo)
 		p->fontdata = font->data;
 	}
 
+#ifdef FBCON_FONTWIDTH8_ONLY		
 	if (!fontwidthvalid(p, vc->vc_font.width)) {
 		/* ++Geert: changed from panic() to `correct and continue' */
 		printk(KERN_ERR
 		       "fbcon_set_display: No support for fontwidth %d\n",
 		       vc->vc_font.width);
 	}
+#endif	
 	updatescrollmode(p, vc);
 
 	old_cols = vc->vc_cols;

@@ -52,25 +52,28 @@ struct pmag_ba_ramdac_regs {
 static struct fb_info pmagba_fb_info[3];
 
 static struct fb_var_screeninfo pmagbafb_defined = {
-	.xres =		1024,
-	.yres =		864,
-	.xres_virtual =	1024,
-	.yres_virtual =	864,
-	.bits_per_pixel =8,
-	.activate =	FB_ACTIVATE_NOW, 
-	.height =	274,	
-	.width =	195,
-	.accel =	FB_ACCEL_NONE,
-	.vmode =	FB_VMODE_NONINTERLACED,
-}
+	.xres 		= 1024,
+	.yres		= 864,
+	.xres_virtual 	= 1024,
+	.yres_virtual 	= 864,
+	.bits_per_pixel = 8,
+	.red.length	= 8,
+	.green.length	= 8,
+	.blue.length	= 8,
+	.activate 	= FB_ACTIVATE_NOW, 
+	.height 	= 274,	
+	.width 		= 195,
+	.accel 		= FB_ACCEL_NONE,
+	.vmode 		= FB_VMODE_NONINTERLACED,
+};
 
 static struct fb_fix_screeninfo pmagbafb_fix = {
-	.id =		"PMAG-BA",
-	.smem_len =	(1024 * 864),
-	.type =		FB_TYPE_PACKED_PIXELS,
-	.visual =	FB_VISUAL_PSEUDOCOLOR,
-	.line_length =	1024,
-}
+	.id 		= "PMAG-BA",
+	.smem_len 	= (1024 * 864),
+	.type 		= FB_TYPE_PACKED_PIXELS,
+	.visual 	= FB_VISUAL_PSEUDOCOLOR,
+	.line_length 	= 1024,
+};
 
 /*
  * Turn hardware cursor off
@@ -113,7 +116,7 @@ static struct fb_ops pmagbafb_ops = {
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 	.fb_cursor	= soft_cursor,
-}
+};
 
 int __init pmagbafb_init_one(int slot)
 {
@@ -168,11 +171,6 @@ int __init pmagbafb_init(void)
 	} else {
 		return -ENODEV;
 	}
-}
-
-int __init pmagbafb_setup(char *options)
-{
-	return 0;
 }
 
 MODULE_LICENSE("GPL");

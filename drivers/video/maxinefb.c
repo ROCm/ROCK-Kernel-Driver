@@ -43,24 +43,27 @@
 static struct fb_info fb_info;
 
 static struct fb_var_screeninfo maxinefb_defined = {
-	.xres =		1024,
-	.yres =		768,
-	.xres_virtual =	1024,
-	.yres_virtual =	768,
-	.bits_per_pixel =8,
-	.activate =	FB_ACTIVATE_NOW,
-	.height =	-1,
-	.width =	-1,
-	.vmode =	FB_VMODE_NONINTERLACED,
+	.xres 		= 1024,
+	.yres 		= 768,
+	.xres_virtual 	= 1024,
+	.yres_virtual 	= 768,
+	.bits_per_pixel = 8,
+	.red.length	= 8,
+	.green.length	= 8,
+	.blue.length	= 8,
+	.activate 	= FB_ACTIVATE_NOW,
+	.height 	= -1,
+	.width 		= -1,
+	.vmode 		= FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo maxinefb_fix = {
-	.id =		"Maxine onboard graphics 1024x768x8",
-	.smem_len =	(1024*768),
-	.type =		FB_TYPE_PACKED_PIXELS,
-	.visual =	FB_VISUAL_PSEUDOCOLOR,
-	.line_length =	1024,
-}
+	.id 		= "Maxine onboard graphics 1024x768x8",
+	.smem_len 	= (1024*768),
+	.type 		= FB_TYPE_PACKED_PIXELS,
+	.visual 	= FB_VISUAL_PSEUDOCOLOR,
+	.line_length 	= 1024,
+};
 
 /* Reference to machine type set in arch/mips/dec/prom/identify.c, KM */
 extern unsigned long mips_machtype;
