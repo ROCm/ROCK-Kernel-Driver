@@ -23,6 +23,19 @@ spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 #define to_dev(node) container_of(node,struct device,driver_list)
 
+static int probe(struct device * dev, struct device_driver * drv)
+{
+	dev->driver = drv;
+	return drv->probe ? drv->probe(dev) : 0;
+}
+
+static void attach(struct device * dev)
+{
+	spin_lock(&device_lock);
+	list_add_tail(&dev->driver_list,&dev->driver->devices);
+	spin_unlock(&device_lock);
+	devclass_add_device(dev);
+}
 
 /**
  * found_match - do actual binding of device to driver
@@ -43,25 +56,14 @@ static int found_match(struct device * dev, struct device_driver * drv)
 {
 	int error = 0;
 
-	dev->driver = get_driver(drv);
-	if (drv->probe)
-		if (drv->probe(dev))
-			goto ProbeFailed;
-
-	pr_debug("bound device '%s' to driver '%s'\n",
-		 dev->bus_id,drv->name);
-
-	spin_lock(&device_lock);
-	list_add_tail(&dev->driver_list,&drv->devices);
-	spin_unlock(&device_lock);
-	devclass_add_device(dev);
-
-	goto Done;
-
- ProbeFailed:
-	put_driver(drv);
-	dev->driver = NULL;
- Done:
+	if (!(error = probe(dev,get_driver(drv)))) {
+		pr_debug("bound device '%s' to driver '%s'\n",
+			 dev->bus_id,drv->name);
+		attach(dev);
+	} else {
+		put_driver(drv);
+		dev->driver = NULL;
+	}
 	return error;
 }
 
@@ -80,18 +82,19 @@ static int do_device_attach(struct device_driver * drv, void * data)
 	struct device * dev = (struct device *)data;
 	int error = 0;
 
-	if (!dev->driver) {
-		if (drv->bus->match && drv->bus->match(dev,drv))
-			error = found_match(dev,drv);
-	}
+	if (drv->bus->match && drv->bus->match(dev,drv))
+		error = found_match(dev,drv);
 	return error;
 }
 
 static int device_attach(struct device * dev)
 {
 	int error = 0;
-	if (dev->bus)
-		error = bus_for_each_drv(dev->bus,dev,do_device_attach);
+	if (!dev->driver) {
+		if (dev->bus)
+			error = bus_for_each_drv(dev->bus,dev,do_device_attach);
+	} else
+		attach(dev);
 	return error;
 }
 
@@ -103,7 +106,6 @@ static void device_detach(struct device * dev)
 		devclass_remove_device(dev);
 		if (drv && drv->remove)
 			drv->remove(dev);
-
 		dev->driver = NULL;
 	}
 }

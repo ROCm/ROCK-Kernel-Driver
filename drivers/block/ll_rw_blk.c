@@ -1175,7 +1175,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &q->elevator, elevator_linus))) {
+	if ((ret = elevator_init(q, &q->elevator, iosched_deadline))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
@@ -1233,24 +1233,23 @@ static struct request *get_request(request_queue_t *q, int rw)
  */
 static struct request *get_request_wait(request_queue_t *q, int rw)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 	struct request_list *rl = &q->rq[rw];
 	struct request *rq;
 
 	spin_lock_prefetch(q->queue_lock);
 
 	generic_unplug_device(q);
-	add_wait_queue_exclusive(&rl->wait, &wait);
 	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
+		prepare_to_wait_exclusive(&rl->wait, &wait,
+					TASK_UNINTERRUPTIBLE);
 		if (!rl->count)
 			schedule();
+		finish_wait(&rl->wait, &wait);
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
 	} while (rq == NULL);
-	remove_wait_queue(&rl->wait, &wait);
-	current->state = TASK_RUNNING;
 	return rq;
 }
 
@@ -1460,18 +1459,16 @@ void blk_put_request(struct request *req)
  */
 void blk_congestion_wait(int rw, long timeout)
 {
-	DECLARE_WAITQUEUE(wait, current);
+	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
 	if (atomic_read(&cs->nr_congested_queues) == 0)
 		return;
 	blk_run_queues();
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&cs->wqh, &wait);
+	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
 	if (atomic_read(&cs->nr_congested_queues) != 0)
 		schedule_timeout(timeout);
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&cs->wqh, &wait);
+	finish_wait(&cs->wqh, &wait);
 }
 
 /*

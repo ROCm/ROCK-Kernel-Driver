@@ -321,6 +321,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	struct page * page;
 	int freed, i;
 
+	if (gfp_mask & __GFP_WAIT)
+		might_sleep();
+
 	KERNEL_STAT_ADD(pgalloc, 1<<order);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
@@ -477,6 +480,17 @@ unsigned int nr_free_pages(void)
 		sum += zone->free_pages;
 
 	return sum;
+}
+
+unsigned int nr_used_zone_pages(void)
+{
+	unsigned int pages = 0;
+	struct zone *zone;
+
+	for_each_zone(zone)
+		pages += zone->nr_active + zone->nr_inactive;
+
+	return pages;
 }
 
 static unsigned int nr_free_zone_pages(int offset)

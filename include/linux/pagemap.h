@@ -74,9 +74,15 @@ static inline void ___add_to_page_cache(struct page *page,
 	inc_page_state(nr_pagecache);
 }
 
-extern void FASTCALL(lock_page(struct page *page));
+extern void FASTCALL(__lock_page(struct page *page));
 extern void FASTCALL(unlock_page(struct page *page));
 
+static inline void lock_page(struct page *page)
+{
+	if (TestSetPageLocked(page))
+		__lock_page(page);
+}
+	
 /*
  * This is exported only for wait_on_page_locked/wait_on_page_writeback.
  * Never use this directly!

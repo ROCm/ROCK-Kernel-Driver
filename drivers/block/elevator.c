@@ -157,114 +157,6 @@ inline int elv_try_last_merge(request_queue_t *q, struct request **req,
 	return ret;
 }
 
-static int bio_rq_before(struct bio *bio, struct request *rq)
-{
-	if (!kdev_same(to_kdev_t(bio->bi_bdev->bd_dev), rq->rq_dev))
-		return 0;
-	return bio->bi_sector < rq->sector;
-}
-
-/*
- * elevator_linux starts here
- */
-int elevator_linus_merge(request_queue_t *q, struct request **req,
-			 struct bio *bio)
-{
-	struct list_head *entry, *good;
-	struct request *__rq;
-	int ret;
-
-	if ((ret = elv_try_last_merge(q, req, bio)))
-		return ret;
-
-	entry = &q->queue_head;
-	good = &q->queue_head;
-	ret = ELEVATOR_NO_MERGE;
-	while ((entry = entry->prev) != &q->queue_head) {
-		__rq = list_entry_rq(entry);
-
-		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
-			break;
-		if (!(__rq->flags & REQ_CMD))
-			break;
-
-		if (bio_data_dir(bio) != rq_data_dir(__rq)) {
-			if (bio_data_dir(bio) == WRITE)
-				break;
-			good = entry->prev;
-			continue;
-		}
-
-		ret = elv_try_merge(__rq, bio);
-		if (ret) {
-			*req = __rq;
-			q->last_merge = &__rq->queuelist;
-			return ret;
-		}
-
-		if (bio_rq_before(bio, __rq))
-			good = entry->prev;
-
-	}
-
-	if (good != &q->queue_head)
-		*req = list_entry_rq(good);
-
-	return ELEVATOR_NO_MERGE;
-}
-
-void elevator_linus_merge_req(request_queue_t *q, struct request *req,
-			      struct request *next)
-{
-	if (elv_linus_sequence(next) < elv_linus_sequence(req))
-		elv_linus_sequence(req) = elv_linus_sequence(next);
-}
-
-void elevator_linus_add_request(request_queue_t *q, struct request *rq,
-				struct list_head *insert_here)
-{
-	elevator_t *e = &q->elevator;
-	int lat = 0, *latency = e->elevator_data;
-
-	if (!insert_here)
-		insert_here = q->queue_head.prev;
-
-	if (!(rq->flags & REQ_BARRIER))
-		lat = latency[rq_data_dir(rq)];
-
-	elv_linus_sequence(rq) = lat;
-
-	list_add(&rq->queuelist, insert_here);
-
-	/*
-	 * new merges must not precede this barrier
-	 */
-	if (rq->flags & REQ_BARRIER)
-		q->last_merge = NULL;
-	else if (!q->last_merge)
-		q->last_merge = &rq->queuelist;
-}
-
-int elevator_linus_init(request_queue_t *q, elevator_t *e)
-{
-	int *latency;
-
-	latency = kmalloc(2 * sizeof(int), GFP_KERNEL);
-	if (!latency)
-		return -ENOMEM;
-
-	latency[READ] = 1024;
-	latency[WRITE] = 2048;
-
-	e->elevator_data = latency;
-	return 0;
-}
-
-void elevator_linus_exit(request_queue_t *q, elevator_t *e)
-{
-	kfree(e->elevator_data);
-}
-
 /*
  * elevator noop
  *
@@ -442,15 +334,6 @@ inline struct list_head *elv_get_sort_head(request_queue_t *q,
 	return &q->queue_head;
 }
 
-elevator_t elevator_linus = {
-	elevator_merge_fn:		elevator_linus_merge,
-	elevator_merge_req_fn:		elevator_linus_merge_req,
-	elevator_next_req_fn:		elevator_noop_next_request,
-	elevator_add_req_fn:		elevator_linus_add_request,
-	elevator_init_fn:		elevator_linus_init,
-	elevator_exit_fn:		elevator_linus_exit,
-};
-
 elevator_t elevator_noop = {
 	elevator_merge_fn:		elevator_noop_merge,
 	elevator_next_req_fn:		elevator_noop_next_request,
@@ -459,7 +342,6 @@ elevator_t elevator_noop = {
 
 module_init(elevator_global_init);
 
-EXPORT_SYMBOL(elevator_linus);
 EXPORT_SYMBOL(elevator_noop);
 
 EXPORT_SYMBOL(__elv_add_request);

@@ -109,6 +109,8 @@ static inline void set_capacity(struct gendisk *disk, sector_t size)
 	disk->capacity = size;
 }
 
+extern struct device_class disk_devclass;
+
 #endif  /*  __KERNEL__  */
 
 #ifdef CONFIG_SOLARIS_X86_PARTITION

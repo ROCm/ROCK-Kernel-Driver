@@ -246,22 +246,28 @@ static int i8259A_resume(struct device *dev, u32 level)
 	return 0;
 }
 
-static struct device_driver driver_i8259A = {
+static struct device_driver i8259A_driver = {
+	.name		= "pic",
+	.bus		= &system_bus_type,
 	.resume		= i8259A_resume,
 };
 
-static struct device device_i8259A = {
-	.name	       	= "i8259A",
-	.bus_id		= "0020",
-	.driver		= &driver_i8259A,
+static struct sys_device device_i8259A = {
+	.name		= "pic",
+	.id		= 0,
+	.dev		= {
+		.name	= "i8259A PIC",
+		.driver	= &i8259A_driver,
+	},
 };
 
 static int __init init_8259A_devicefs(void)
 {
-	return register_sys_device(&device_i8259A);
+	driver_register(&i8259A_driver);
+	return sys_device_register(&device_i8259A);
 }
 
-__initcall(init_8259A_devicefs);
+device_initcall(init_8259A_devicefs);
 
 void init_8259A(int auto_eoi)
 {

@@ -119,6 +119,32 @@ static inline void __remove_wait_queue(wait_queue_head_t *head,
 		_raced;						\
 	})
 
+/*
+ * Waitqueue's which are removed from the waitqueue_head at wakeup time
+ */
+void FASTCALL(prepare_to_wait(wait_queue_head_t *q,
+				wait_queue_t *wait, int state));
+void FASTCALL(prepare_to_wait_exclusive(wait_queue_head_t *q,
+				wait_queue_t *wait, int state));
+void FASTCALL(finish_wait(wait_queue_head_t *q, wait_queue_t *wait));
+int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync);
+
+#define DEFINE_WAIT(name)						\
+	wait_queue_t name = {						\
+		.task		= current,				\
+		.func		= autoremove_wake_function,		\
+		.task_list	= {	.next = &name.task_list,	\
+					.prev = &name.task_list,	\
+				},					\
+	}
+
+#define init_wait(wait)							\
+	do {								\
+		wait->task = current;					\
+		wait->func = autoremove_wake_function;			\
+		INIT_LIST_HEAD(&wait->task_list);			\
+	} while (0)
+	
 #endif /* __KERNEL__ */
 
 #endif
