@@ -82,7 +82,8 @@ int sysctl_netrom_link_fails_count                = NR_DEFAULT_FAILS;
 
 static unsigned short circuit = 0x101;
 
-static struct sock *volatile nr_list;
+static struct sock *nr_list;
+static spinlock_t nr_list_lock;
 
 static struct proto_ops nr_proto_ops;
 
@@ -125,25 +126,25 @@ static void nr_remove_socket(struct sock *sk)
 	struct sock *s;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&nr_list_lock, flags);
 
 	if ((s = nr_list) == sk) {
 		nr_list = s->next;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&nr_list_lock, flags);
 		return;
 	}
 
 	while (s != NULL && s->next != NULL) {
 		if (s->next == sk) {
 			s->next = sk->next;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&nr_list_lock, flags);
 			return;
 		}
 
 		s = s->next;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 }
 
 /*
@@ -151,12 +152,15 @@ static void nr_remove_socket(struct sock *sk)
  */
 static void nr_kill_by_device(struct net_device *dev)
 {
+	unsigned long flags;
 	struct sock *s;
 
+	spin_lock_irqsave(&nr_list_lock, flags);
 	for (s = nr_list; s != NULL; s = s->next) {
 		if (nr_sk(s)->device == dev)
 			nr_disconnect(s, ENETUNREACH);
 	}
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 }
 
 /*
@@ -182,12 +186,10 @@ static void nr_insert_socket(struct sock *sk)
 {
 	unsigned long flags;
 
-	save_flags(flags); cli();
-
+	spin_lock_irqsave(&nr_list_lock, flags);
 	sk->next = nr_list;
 	nr_list  = sk;
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 }
 
 /*
@@ -199,18 +201,16 @@ static struct sock *nr_find_listener(ax25_address *addr)
 	unsigned long flags;
 	struct sock *s;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&nr_list_lock, flags);
 	for (s = nr_list; s != NULL; s = s->next) {
 		if (!ax25cmp(&nr_sk(s)->source_addr, addr) &&
 		    s->state == TCP_LISTEN) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&nr_list_lock, flags);
 			return s;
 		}
 	}
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 
-	restore_flags(flags);
 	return NULL;
 }
 
@@ -222,19 +222,16 @@ static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 	struct sock *s;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&nr_list_lock, flags);
 	for (s = nr_list; s != NULL; s = s->next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->my_index == index && nr->my_id == id) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&nr_list_lock, flags);
 			return s;
 		}
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 
 	return NULL;
 }
@@ -242,25 +239,23 @@ static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 /*
  *	Find a connected NET/ROM socket given their circuit IDs.
  */
-static struct sock *nr_find_peer(unsigned char index, unsigned char id, ax25_address *dest)
+static struct sock *nr_find_peer(unsigned char index, unsigned char id,
+	ax25_address *dest)
 {
-	struct sock *s;
 	unsigned long flags;
+	struct sock *s;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&nr_list_lock, flags);
 	for (s = nr_list; s != NULL; s = s->next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->your_index == index && nr->your_id == id &&
 		    !ax25cmp(&nr->dest_addr, dest)) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&nr_list_lock, flags);
 			return s;
 		}
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 
 	return NULL;
 }
@@ -301,17 +296,16 @@ static void nr_destroy_timer(unsigned long data)
 }
 
 /*
- *	This is called from user mode and the timers. Thus it protects itself against
- *	interrupt users but doesn't worry about being called during work.
- *	Once it is removed from the queue no interrupt or bottom half will
- *	touch it and we are (fairly 8-) ) safe.
+ *	This is called from user mode and the timers. Thus it protects itself
+ *	against interrupt users but doesn't worry about being called during
+ *	work. Once it is removed from the queue no interrupt or bottom half
+ *	will touch it and we are (fairly 8-) ) safe.
  */
-void nr_destroy_socket(struct sock *sk)	/* Not static as it's used by the timer */
+void nr_destroy_socket(struct sock *sk)
 {
 	struct sk_buff *skb;
-	unsigned long flags;
 
-	save_flags(flags); cli();
+	nr_remove_socket(sk);
 
 	nr_stop_heartbeat(sk);
 	nr_stop_t1timer(sk);
@@ -319,7 +313,6 @@ void nr_destroy_socket(struct sock *sk)	/* Not static as it's used by the timer 
 	nr_stop_t4timer(sk);
 	nr_stop_idletimer(sk);
 
-	nr_remove_socket(sk);
 	nr_clear_queues(sk);		/* Flush the queues */
 
 	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
@@ -342,8 +335,6 @@ void nr_destroy_socket(struct sock *sk)	/* Not static as it's used by the timer 
 	} else {
 		nr_free_sock(sk);
 	}
-
-	restore_flags(flags);
 }
 
 /*
@@ -785,7 +776,6 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	 *	hooked into the SABM we saved
 	 */
 	do {
-		cli();
 		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
 			if (flags & O_NONBLOCK) {
 				sti();
@@ -793,7 +783,6 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 			}
 			interruptible_sleep_on(sk->sleep);
 			if (signal_pending(current)) {
-				sti();
 				return -ERESTARTSYS;
 			}
 		}
@@ -803,7 +792,6 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	newsk->pair = NULL;
 	newsk->socket = newsock;
 	newsk->sleep = &newsock->wait;
-	sti();
 
 	/* Now attach up the new socket */
 	kfree_skb(skb);
@@ -1187,6 +1175,7 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 {
+	unsigned long flags;
 	struct sock *s;
 	struct net_device *dev;
 	const char *devname;
@@ -1194,7 +1183,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t pos = 0;
 	off_t begin = 0;
 
-	cli();
+	spin_lock_irqsave(&nr_list_lock, flags);
 
 	len += sprintf(buffer, "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
 
@@ -1247,15 +1236,16 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	sti();
+	spin_unlock_irqrestore(&nr_list_lock, flags);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
 
-	if (len > length) len = length;
+	if (len > length)
+		len = length;
 
-	return(len);
-} 
+	return len;
+}
 
 static struct net_proto_family nr_family_ops = {
 	.family =	PF_NETROM,
