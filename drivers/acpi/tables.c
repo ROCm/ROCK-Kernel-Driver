@@ -550,6 +550,14 @@ acpi_table_get_sdt (
 	return 0;
 }
 
+/*
+ * acpi_table_init()
+ *
+ * find RSDP, find and checksum SDT/XSDT.
+ * checksum all tables, print SDT/XSDT
+ * 
+ * result: sdt_entry[] is initialized
+ */
 
 int __init
 acpi_table_init (void)
