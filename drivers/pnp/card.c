@@ -26,8 +26,25 @@ static const struct pnp_card_device_id * match_card(struct pnp_card_driver * drv
 {
 	const struct pnp_card_device_id * drv_id = drv->id_table;
 	while (*drv_id->id){
-		if (compare_pnp_id(card->id,drv_id->id))
-			return drv_id;
+		if (compare_pnp_id(card->id,drv_id->id)) {
+			int i = 0;
+			for (;;) {
+				int found;
+				struct pnp_dev *dev;
+				if (i == PNP_MAX_DEVICES || ! *drv_id->devs[i].id)
+					return drv_id;
+				found = 0;
+				card_for_each_dev(card, dev) {
+					if (compare_pnp_id(dev->id, drv_id->devs[i].id)) {
+						found = 1;
+						break;
+					}
+				}
+				if (! found)
+					break;
+				i++;
+			}
+		}
 		drv_id++;
 	}
 	return NULL;
