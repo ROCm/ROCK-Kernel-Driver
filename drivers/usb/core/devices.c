@@ -569,7 +569,6 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *ski
 
 static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
-	struct list_head *buslist;
 	struct usb_bus *bus;
 	ssize_t ret, total_written = 0;
 	loff_t skip_bytes = *ppos;
@@ -581,12 +580,9 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 	if (!access_ok(VERIFY_WRITE, buf, nbytes))
 		return -EFAULT;
 
-	/* enumerate busses */
 	down (&usb_bus_list_lock);
-	list_for_each(buslist, &usb_bus_list) {
-		/* print devices for this bus */
-		bus = list_entry(buslist, struct usb_bus, bus_list);
-
+	/* print devices for all busses */
+	list_for_each_entry(bus, &usb_bus_list, bus_list) {
 		/* recurse through all children of the root hub */
 		if (!bus->root_hub)
 			continue;
