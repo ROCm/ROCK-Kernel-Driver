@@ -10974,7 +10974,8 @@ int
 aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[])
 {
-  int heads, sectors, cylinders, ret;
+  sector_t heads, sectors, cylinders;
+  int ret;
   struct aic7xxx_host *p;
   unsigned char *buf;
 
@@ -10991,18 +10992,26 @@ aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
   
   heads = 64;
   sectors = 32;
-  cylinders = (unsigned long)capacity / (heads * sectors);
+  cylinders = capacity >> 11;
 
   if ((p->flags & AHC_EXTEND_TRANS_A) && (cylinders > 1024))
   {
     heads = 255;
     sectors = 63;
-    cylinders = (unsigned long)capacity / (heads * sectors);
+    /* pull this crap because 64bit math in the kernel is a no-no as far
+     * as division is concerned, but 64bit multiplication can be done */
+    /* This shift approximates capacity / (heads * sectors) */
+    cylinders = capacity >> 14;
+    /* Now we brute force upping cylinders until we go over by 1 */
+    while( capacity >= (cylinders * sectors * heads))
+      cylinders++;
+    /* Then back it back down by one */
+    cylinders--;
   }
 
-  geom[0] = heads;
-  geom[1] = sectors;
-  geom[2] = cylinders;
+  geom[0] = (int)heads;
+  geom[1] = (int)sectors;
+  geom[2] = (int)cylinders;
 
   return (0);
 }
