@@ -21,7 +21,7 @@
  *
  *  $Id: devio.c,v 1.7 2000/02/01 17:28:48 fliegl Exp $
  *
- *  This file implements the usbdevfs/x/y files, where
+ *  This file implements the usbfs/x/y files, where
  *  x is the bus number and y the device number.
  *
  *  It allows user space programs/"drivers" to communicate directly
@@ -354,7 +354,7 @@ static void driver_disconnect(struct usb_interface *intf)
 	destroy_async_on_interface(ps, ifnum);
 }
 
-struct usb_driver usbdevfs_driver = {
+struct usb_driver usbfs_driver = {
 	.owner =	THIS_MODULE,
 	.name =		"usbfs",
 	.probe =	driver_probe,
@@ -379,7 +379,7 @@ static int claimintf(struct dev_state *ps, unsigned int ifnum)
 	if (!intf)
 		err = -ENOENT;
 	else
-		err = usb_driver_claim_interface(&usbdevfs_driver, intf, ps);
+		err = usb_driver_claim_interface(&usbfs_driver, intf, ps);
 	up_write(&usb_bus_type.subsys.rwsem);
 	if (err == 0)
 		set_bit(ifnum, &ps->ifclaimed);
@@ -402,7 +402,7 @@ static int releaseintf(struct dev_state *ps, unsigned int ifnum)
 	if (!intf)
 		err = -ENOENT;
 	else if (test_and_clear_bit(ifnum, &ps->ifclaimed)) {
-		usb_driver_release_interface(&usbdevfs_driver, intf);
+		usb_driver_release_interface(&usbfs_driver, intf);
 		err = 0;
 	}
 	up_write(&usb_bus_type.subsys.rwsem);
@@ -1315,7 +1315,7 @@ static unsigned int usbdev_poll(struct file *file, struct poll_table_struct *wai
 	return mask;
 }
 
-struct file_operations usbdevfs_device_file_operations = {
+struct file_operations usbfs_device_file_operations = {
 	.llseek =	usbdev_lseek,
 	.read =		usbdev_read,
 	.poll =		usbdev_poll,
