@@ -135,8 +135,14 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	}
 
 	/* Otherwise this is a UDP-style socket. */
-	asoc = (struct sctp_association *)id;
-	if (!sctp_assoc_valid(sk, asoc))
+	if (!id || (id == (sctp_assoc_t)-1))
+		return NULL;
+
+	spin_lock_bh(&sctp_assocs_id_lock);
+	asoc = (struct sctp_association *)idr_find(&sctp_assocs_id, (int)id);
+	spin_unlock_bh(&sctp_assocs_id_lock);
+
+	if (!asoc || (asoc->base.sk != sk) || asoc->base.dead)
 		return NULL;
 
 	return asoc;
@@ -1498,8 +1504,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 		 * rwnd by that amount. If all the data in the skb is read,
 		 * rwnd is updated when the event is freed.
 		 */
-		sctp_assoc_rwnd_increase(event->sndrcvinfo.sinfo_assoc_id,
-					 copied);
+		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
 	} else if ((event->msg_flags & MSG_NOTIFICATION) ||
 		   (event->msg_flags & MSG_EOR))
@@ -1943,6 +1948,9 @@ static int sctp_setsockopt_mappedv4(struct sock *sk, char *optval, int optlen)
  */
 static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 {
+	struct sctp_association *asoc;
+	struct list_head *pos;
+	struct sctp_opt *sp = sctp_sk(sk);
 	int val;
 
 	if (optlen < sizeof(int))
@@ -1951,7 +1959,15 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 		return -EFAULT;
 	if ((val < 8) || (val > SCTP_MAX_CHUNK_LEN))
 		return -EINVAL;
-	sctp_sk(sk)->user_frag = val;
+	sp->user_frag = val;
+
+	if (val) {
+		/* Update the frag_point of the existing associations. */
+		list_for_each(pos, &(sp->ep->asocs)) {
+			asoc = list_entry(pos, struct sctp_association, asocs);
+			asoc->frag_point = sctp_frag_point(sp, asoc->pmtu); 
+		}
+	}
 
 	return 0;
 }
@@ -2526,10 +2542,6 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_penddata = sctp_tsnmap_pending(&asoc->peer.tsn_map);
 	status.sstat_instrms = asoc->c.sinit_max_instreams;
 	status.sstat_outstrms = asoc->c.sinit_num_ostreams;
-	/* Just in time frag_point update. */
-	if (sctp_sk(sk)->user_frag)
-		asoc->frag_point
-			= min_t(int, asoc->frag_point, sctp_sk(sk)->user_frag);
 	status.sstat_fragmentation_point = asoc->frag_point;
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,
@@ -4477,7 +4489,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 */
 	sctp_skb_for_each(skb, &oldsk->sk_receive_queue, tmp) {
 		event = sctp_skb2event(skb);
-		if (event->sndrcvinfo.sinfo_assoc_id == assoc) {
+		if (event->asoc == assoc) {
 			__skb_unlink(skb, skb->list);
 			__skb_queue_tail(&newsk->sk_receive_queue, skb);
 		}
@@ -4506,7 +4518,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 		 */
 		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
 			event = sctp_skb2event(skb);
-			if (event->sndrcvinfo.sinfo_assoc_id == assoc) {
+			if (event->asoc == assoc) {
 				__skb_unlink(skb, skb->list);
 				__skb_queue_tail(queue, skb);
 			}

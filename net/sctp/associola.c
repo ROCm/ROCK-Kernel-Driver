@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -210,6 +210,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->next_tsn = asoc->c.initial_tsn;
 
 	asoc->ctsn_ack_point = asoc->next_tsn - 1;
+	asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
 	asoc->highest_sacked = asoc->ctsn_ack_point;
 	asoc->last_cwr_tsn = asoc->ctsn_ack_point;
 	asoc->unack_data = 0;
@@ -261,12 +262,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Create an output queue.  */
 	sctp_outq_init(asoc, &asoc->outqueue);
-	sctp_outq_set_output_handlers(&asoc->outqueue,
-				      sctp_packet_init,
-				      sctp_packet_config,
-				      sctp_packet_append_chunk,
-				      sctp_packet_transmit_chunk,
-				      sctp_packet_transmit);
 
 	if (!sctp_ulpq_init(&asoc->ulpq, asoc))
 		goto fail_init;
@@ -276,7 +271,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->need_ecne = 0;
 
-	asoc->eyecatcher = SCTP_ASSOC_EYECATCHER;
+	asoc->assoc_id = (sctp_assoc_t)-1;
 
 	/* Assume that peer would support both address types unless we are
 	 * told otherwise.
@@ -360,8 +355,6 @@ void sctp_association_free(struct sctp_association *asoc)
 		sctp_transport_free(transport);
 	}
 
-	asoc->eyecatcher = 0;
-
 	/* Free any cached ASCONF_ACK chunk. */
 	if (asoc->addip_last_asconf_ack)
 		sctp_chunk_free(asoc->addip_last_asconf_ack);
@@ -380,6 +373,12 @@ static void sctp_association_destroy(struct sctp_association *asoc)
 
 	sctp_endpoint_put(asoc->ep);
 	sock_put(asoc->base.sk);
+
+	if ((int)asoc->assoc_id != -1) {
+		spin_lock_bh(&sctp_assocs_id_lock);
+		idr_remove(&sctp_assocs_id, (int)asoc->assoc_id);
+		spin_unlock_bh(&sctp_assocs_id_lock);
+	}
 
 	if (asoc->base.malloced) {
 		kfree(asoc);
@@ -478,10 +477,8 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
 	 */
-	(asoc->outqueue.init_output)(&peer->packet,
-				     peer,
-				     asoc->base.bind_addr.port,
-				     asoc->peer.port);
+	sctp_packet_init(&peer->packet, peer, asoc->base.bind_addr.port,
+			 asoc->peer.port);
 
 	/* 7.2.1 Slow-Start
 	 *
@@ -856,26 +853,6 @@ out:
 	return transport;
 }
 
-/*  Is this a live association structure. */
-int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc)
-{
-
-	/* First, verify that this is a kernel address. */
-	if (!sctp_is_valid_kaddr((unsigned long) asoc))
-		return 0;
-
-	/* Verify that this _is_ an sctp_association
-	 * data structure and if so, that the socket matches.
-	 */
-	if (SCTP_ASSOC_EYECATCHER != asoc->eyecatcher)
-		return 0;
-	if (asoc->base.sk != sk)
-		return 0;
-
-	/* The association is valid. */
-	return 1;
-}
-
 /* Do delayed input processing.  This is scheduled by sctp_rcv(). */
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
@@ -891,6 +868,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	sk = asoc->base.sk;
 
 	inqueue = &asoc->base.inqueue;
+	sctp_association_hold(asoc);
 	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		state = asoc->state;
 		subtype = chunk->chunk_hdr->type;
@@ -913,14 +891,14 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 		/* Check to see if the association is freed in response to
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
-		if (!sctp_assoc_valid(sk, asoc))
+		if (asoc->base.dead)
 			break;
 
 		/* If there is an error on chunk, discard this packet. */
 		if (error && chunk)
 			chunk->pdiscard = 1;
 	}
-
+	sctp_association_put(asoc);
 }
 
 /* This routine moves an association from its old sk to a new sk.  */
@@ -982,6 +960,7 @@ void sctp_assoc_update(struct sctp_association *asoc,
 
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
+		asoc->adv_peer_ack_point = new->adv_peer_ack_point;
 
 		/* Reinitialize SSN for both local streams
 		 * and peer's streams.
@@ -990,6 +969,7 @@ void sctp_assoc_update(struct sctp_association *asoc,
 
 	} else {
 		asoc->ctsn_ack_point = asoc->next_tsn - 1;
+		asoc->adv_peer_ack_point = asoc->ctsn_ack_point;
 		if (!asoc->ssnmap) {
 			/* Move the ssnmap. */
 			asoc->ssnmap = new->ssnmap;
