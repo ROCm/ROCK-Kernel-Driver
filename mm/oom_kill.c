@@ -245,7 +245,6 @@ void out_of_memory(void)
 	 * If it's been a long time since last failure,
 	 * we're not oom.
 	 */
-	last = now;
 	if (since > 5*HZ)
 		goto reset;
 
