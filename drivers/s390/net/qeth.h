@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.98 $"
+#define VERSION_QETH_H 		"$Revision: 1.100 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -423,14 +423,12 @@ struct qeth_qdio_out_q {
 	struct qeth_qdio_out_buffer bufs[QDIO_MAX_BUFFERS_PER_Q];
 	int queue_no;
 	struct qeth_card *card;
-	struct tasklet_struct tasklet;
 	spinlock_t lock;
 	volatile int do_pack;
 	/*
 	 * index of buffer to be filled by driver; state EMPTY or PACKING
 	 */
 	volatile int next_buf_to_fill;
-	volatile int next_buf_to_flush;
 	/*
 	 * number of buffers that are currently filled (PRIMED)
 	 * -> these buffers are hardware-owned
@@ -447,7 +445,6 @@ struct qeth_qdio_info {
 	struct qeth_qdio_buffer_pool in_buf_pool;
 	struct qeth_qdio_buffer_pool init_pool;
 	int in_buf_size;
-	struct tasklet_struct in_tasklet;
 
 	/* output */
 	int no_out_queues;
