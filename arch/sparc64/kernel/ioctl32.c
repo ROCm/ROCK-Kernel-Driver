@@ -5265,7 +5265,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 {
 	int i;
 	if (!additional_ioctls) {
-		additional_ioctls = module_map(PAGE_SIZE);
+		additional_ioctls = vmalloc(PAGE_SIZE);
 		if (!additional_ioctls)
 			return -ENOMEM;
 		memset(additional_ioctls, 0, PAGE_SIZE);
