@@ -65,19 +65,9 @@
  *					clean up the APFDDI & gen. FDDI bits.
  *		Alexey Kuznetsov:	new arp state machine;
  *					now it is in net/core/neighbour.c.
+ *		Krzysztof Halasa:	Added Frame Relay ARP support.
  */
 
-/* RFC1122 Status:
-   2.3.2.1 (ARP Cache Validation):
-     MUST provide mechanism to flush stale cache entries (OK)
-     SHOULD be able to configure cache timeout (OK)
-     MUST throttle ARP retransmits (OK)
-   2.3.2.2 (ARP Packet Queue):
-     SHOULD save at least one packet from each "conversation" with an
-       unresolved IP address.  (OK)
-   950727 -- MS
-*/
-      
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -647,6 +637,20 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 			goto out;
 		break;
 #endif
+#ifdef CONFIG_NET_FC
+	case ARPHRD_IEEE802:
+		/*
+		 * According to RFC 2625, Fibre Channel devices (which are IEEE
+		 * 802 devices) should accept ARP hardware types of 6 (IEEE 802)
+		 * and 1 (Ethernet).
+		 */
+		if (arp->ar_hrd != __constant_htons(ARPHRD_ETHER) &&
+		    arp->ar_hrd != __constant_htons(ARPHRD_IEEE802))
+			goto out;
+		if (arp->ar_pro != __constant_htons(ETH_P_IP))
+			goto out;
+		break;
+#endif
 #if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
 	case ARPHRD_AX25:
 		if (arp->ar_pro != __constant_htons(AX25_P_IP))
@@ -687,6 +691,12 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
  */
 	if (LOOPBACK(tip) || MULTICAST(tip))
 		goto out;
+
+/*
+ *     Special case: We must set Frame Relay source Q.922 address
+ */
+	if (dev_type == ARPHRD_DLCI)
+		sha = dev->broadcast;
 
 /*
  *  Process entry.  The idea here is we want to send a reply if it is a

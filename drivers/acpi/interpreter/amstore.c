@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amstore - AML Interpreter object store support
- *              $Revision: 121 $
+ *              $Revision: 123 $
  *
  *****************************************************************************/
 
@@ -268,8 +268,7 @@ acpi_aml_store_object_to_index (
 				 * If the source is a package, copy the source to the new dest
 				 */
 				if (ACPI_TYPE_PACKAGE == obj_desc->common.type) {
-					status = acpi_aml_build_copy_internal_package_object (
-							 val_desc, obj_desc, walk_state);
+					status = acpi_cm_copy_ipackage_to_ipackage (val_desc, obj_desc, walk_state);
 					if (ACPI_FAILURE (status)) {
 						acpi_cm_remove_reference (obj_desc);
 						return (status);

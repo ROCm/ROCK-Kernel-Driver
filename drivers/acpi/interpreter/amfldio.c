@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: amfldio - Aml Field I/O
- *              $Revision: 37 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -416,7 +416,7 @@ acpi_aml_write_field_data_with_update_rule (
 		/* Check if update rule needs to be applied (not if mask is all ones) */
 
 		/* The left shift drops the bits we want to ignore. */
-	  	if ((~mask << (sizeof(mask)*8 - bit_granularity)) != 0) {
+		if ((~mask << (sizeof(mask)*8 - bit_granularity)) != 0) {
 			/*
 			 * Read the current contents of the byte/word/dword containing
 			 * the field, and merge with the new field value.

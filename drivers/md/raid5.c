@@ -19,7 +19,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/locks.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/raid/raid5.h>
 #include <asm/bitops.h>
 #include <asm/atomic.h>
@@ -381,7 +381,7 @@ static void raid5_end_read_request (struct buffer_head * bh, int uptodate)
 		if (bh == sh->bh_cache[i])
 			break;
 
-	PRINTK("end_read_request %lu/%d,  %d, count: %d, uptodate %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
+	PRINTK("end_read_request %lu/%d, count: %d, uptodate %d.\n", sh->sector, i, atomic_read(&sh->count), uptodate);
 	if (i == disks) {
 		BUG();
 		return;
@@ -680,7 +680,6 @@ static void compute_parity(struct stripe_head *sh, int method)
 
 	count = 1;
 	bh_ptr[0] = sh->bh_cache[pd_idx];
-	spin_lock_irq(&conf->device_lock);
 	switch(method) {
 	case READ_MODIFY_WRITE:
 		if (!buffer_uptodate(sh->bh_cache[pd_idx]))
@@ -707,13 +706,11 @@ static void compute_parity(struct stripe_head *sh, int method)
 				sh->bh_write[i] = sh->bh_write[i]->b_reqnext;
 				chosen[i]->b_reqnext = sh->bh_written[i];
 				sh->bh_written[i] = chosen[i];
-				check_xor();
 			}
 		break;
 	case CHECK_PARITY:
 		break;
 	}
-	spin_unlock_irq(&conf->device_lock);
 	if (count>1) {
 		xor_block(count, bh_ptr);
 		count = 1;
@@ -723,7 +720,6 @@ static void compute_parity(struct stripe_head *sh, int method)
 		if (chosen[i]) {
 			struct buffer_head *bh = sh->bh_cache[i];
 			char *bdata;
-			mark_buffer_clean(chosen[i]); /* NO FIXME */
 			bdata = bh_kmap(chosen[i]);
 			memcpy(bh->b_data,
 			       bdata,sh->size);
@@ -766,6 +762,7 @@ static void add_stripe_bh (struct stripe_head *sh, struct buffer_head *bh, int d
 	PRINTK("adding bh b#%lu to stripe s#%lu\n", bh->b_blocknr, sh->sector);
 
 
+	spin_lock(&sh->lock);
 	spin_lock_irq(&conf->device_lock);
 	bh->b_reqnext = NULL;
 	if (rw == READ)
@@ -778,6 +775,7 @@ static void add_stripe_bh (struct stripe_head *sh, struct buffer_head *bh, int d
 	}
 	*bhp = bh;
 	spin_unlock_irq(&conf->device_lock);
+	spin_unlock(&sh->lock);
 
 	PRINTK("added bh b#%lu to stripe s#%lu, disk %d.\n", bh->b_blocknr, sh->sector, dd_idx);
 }
@@ -827,7 +825,7 @@ static void handle_stripe(struct stripe_head *sh)
 
 	for (i=disks; i--; ) {
 		bh = sh->bh_cache[i];
-		PRINTK("check %d: state %lx read %p write %p written %p\n", i, bh->b_state, sh->bh_read[i], sh->bh_write[i], sh->bh_written[i]);
+		PRINTK("check %d: state 0x%lx read %p write %p written %p\n", i, bh->b_state, sh->bh_read[i], sh->bh_write[i], sh->bh_written[i]);
 		/* maybe we can reply to a read */
 		if (buffer_uptodate(bh) && sh->bh_read[i]) {
 			struct buffer_head *rbh, *rbh2;
@@ -867,7 +865,6 @@ static void handle_stripe(struct stripe_head *sh)
 	 * need to be failed
 	 */
 	if (failed > 1 && to_read+to_write) {
-		spin_lock_irq(&conf->device_lock);
 		for (i=disks; i--; ) {
 			/* fail all writes first */
 			if (sh->bh_write[i]) to_write--;
@@ -878,15 +875,16 @@ static void handle_stripe(struct stripe_head *sh)
 			}
 			/* fail any reads if this device is non-operational */
 			if (!conf->disks[i].operational) {
+				spin_lock_irq(&conf->device_lock);
 				if (sh->bh_read[i]) to_read--;
 				while ((bh = sh->bh_read[i])) {
 					sh->bh_read[i] = bh->b_reqnext;
 					bh->b_reqnext = return_fail;
 					return_fail = bh;
 				}
+				spin_unlock_irq(&conf->device_lock);
 			}
 		}
-		spin_unlock_irq(&conf->device_lock);
 		if (syncing) {
 			md_done_sync(conf->mddev, (sh->size>>10) - sh->sync_redone,0);
 			clear_bit(STRIPE_SYNCING, &sh->state);
@@ -911,10 +909,8 @@ static void handle_stripe(struct stripe_head *sh)
 			/* maybe we can return some write requests */
 			struct buffer_head *wbh, *wbh2;
 			PRINTK("Return write for disc %d\n", i);
-			spin_lock_irq(&conf->device_lock);
 			wbh = sh->bh_written[i];
 			sh->bh_written[i] = NULL;
-			spin_unlock_irq(&conf->device_lock);
 			while (wbh) {
 			    wbh2 = wbh->b_reqnext;
 			    wbh->b_reqnext = return_ok;
@@ -1092,8 +1088,6 @@ static void handle_stripe(struct stripe_head *sh)
 				bh->b_dev = conf->disks[i].dev;
 			else if (conf->spare && action[i] == WRITE+1)
 				bh->b_dev = conf->spare->dev;
-			else if (action[i] == READ+1)
-				BUG();
 			else skip=1;
 			if (!skip) {
 				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, action[i]-1, i);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: cmxface - External interfaces for "global" ACPI functions
- *              $Revision: 62 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -158,8 +158,7 @@ acpi_enable_subsystem (
 	if (!(flags & ACPI_NO_ACPI_ENABLE)) {
 		status = acpi_enable ();
 		if (ACPI_FAILURE (status)) {
-			/* TBD: workaround. Old Lions don't enable properly */
-			/*return (Status);*/
+			return (status);
 		}
 	}
 
@@ -180,12 +179,11 @@ acpi_enable_subsystem (
 
 	/*
 	 * Initialize all device objects in the namespace
-	 * This runs the _STA, _INI, and _HID methods, and detects
-	 * the PCI root bus(es)
+	 * This runs the _STA and _INI methods.
 	 */
 
 	if (!(flags & ACPI_NO_DEVICE_INIT)) {
-		status = acpi_ns_initialize_devices (flags & ACPI_NO_PCI_INIT);
+		status = acpi_ns_initialize_devices ();
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -193,7 +191,7 @@ acpi_enable_subsystem (
 
 
 	/*
-	 * Initialize the objects that remain unitialized.  This
+	 * Initialize the objects that remain uninitialized.  This
 	 * runs the executable AML that is part of the declaration of Op_regions
 	 * and Fields.
 	 */

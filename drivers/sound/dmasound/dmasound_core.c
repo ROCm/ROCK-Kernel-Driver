@@ -107,7 +107,7 @@
 
 
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sound.h>
 #include <linux/init.h>
 #include <linux/soundcard.h>

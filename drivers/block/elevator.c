@@ -46,6 +46,8 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 			break;
 		}
 
+		if (!*req && BHRQ_IN_ORDER(bh, __rq))
+			*req = __rq;
 		if (__rq->sem)
 			continue;
 		if (__rq->cmd != rw)
@@ -65,8 +67,7 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 			__rq->elevator_sequence -= count;
 			*req = __rq;
 			break;
-		} else if (!*req && BHRQ_IN_ORDER(bh, __rq))
-			*req = __rq;
+		}
 	}
 
 	return ret;

@@ -24,6 +24,8 @@
  * - parse returned data from _BST and _BIF
  * Andy Grover <andrew.grover@intel.com> 2000-12-8
  * - improved proc interface
+ * Pavel Machek <pavel@suse.cz> 2001-1-31
+ * - fixed oops on NULLs in return from _BIF
  */
 
 #include <linux/kernel.h>
@@ -43,6 +45,8 @@
 /* driver-specific defines */
 #define MAX_CM_BATTERIES	0x8
 #define MAX_BATT_STRLEN		0x20
+
+#define Xstrncpy(a, b, c) if (b) strncpy(a,b,c); else strncpy(a, "unknown", c)
 
 struct cmbatt_info
 {
@@ -163,9 +167,7 @@ acpi_get_battery_info(ACPI_HANDLE handle, struct cmbatt_info *result)
 	result->battery_capacity_granularity_1=objs[7].integer.value;
 	result->battery_capacity_granularity_2=objs[8].integer.value;
 
-#define Xstrncpy(a, b, c) if (b) strncpy(a,b,c); else strncpy(a, "unknown", c);
-
-	/* BUG: trailing NULL issue */
+ 	/* BUG: trailing NULL issue */
 	Xstrncpy(result->model_number, objs[9].string.pointer, MAX_BATT_STRLEN-1);
 	Xstrncpy(result->serial_number, objs[10].string.pointer, MAX_BATT_STRLEN-1);
 	Xstrncpy(result->battery_type, objs[11].string.pointer, MAX_BATT_STRLEN-1);
@@ -248,38 +250,32 @@ proc_read_batt_info(char *page, char **start, off_t off,
 		goto end;
 	}
 
-	if (info->last_full_capacity == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Unknown last full capacity\n");
-	else
-		p += sprintf(p, "Last Full Capacity %x %s /hr\n", 
+	if (info->last_full_capacity != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Last Full Capacity: %d %sh\n", 
 		     info->last_full_capacity, batt_list[batt_num].power_unit);
 
-	if (info->design_capacity == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Unknown Design Capacity\n");
-	else
-		p += sprintf(p, "Design Capacity %x %s /hr\n", 
+	if (info->design_capacity != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Design Capacity:    %d %sh\n", 
 		     info->design_capacity, batt_list[batt_num].power_unit);
 	
 	if (info->battery_technology)
-		p += sprintf(p, "Secondary Battery Technology\n");
+		p += sprintf(p, "Battery Technology: Secondary\n");
 	else
-		p += sprintf(p, "Primary Battery Technology\n");
+		p += sprintf(p, "Battery Technology: Primary\n");
 	
-	if (info->design_voltage == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Unknown Design Voltage\n");
-	else
-		p += sprintf(p, "Design Voltage %x mV\n", 
+	if (info->design_voltage != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Design Voltage:     %d mV\n", 
 		     info->design_voltage);
 	
-	p += sprintf(p, "Design Capacity Warning %d\n",
-		info->design_capacity_warning);
-	p += sprintf(p, "Design Capacity Low %d\n",
-		info->design_capacity_low);
-	p += sprintf(p, "Battery Capacity Granularity 1 %d\n",
+	p += sprintf(p, "Design Capacity Warning:    %d %sh\n",
+		info->design_capacity_warning, batt_list[batt_num].power_unit);
+	p += sprintf(p, "Design Capacity Low:        %d %sh\n",
+		info->design_capacity_low, batt_list[batt_num].power_unit);
+	p += sprintf(p, "Battery Capacity Granularity 1: %d\n",
 		info->battery_capacity_granularity_1);
-	p += sprintf(p, "Battery Capacity Granularity 2 %d\n",
+	p += sprintf(p, "Battery Capacity Granularity 2: %d\n",
 		info->battery_capacity_granularity_2);
-	p += sprintf(p, "model number %s\nserial number %s\nbattery type %s\nOEM info %s\n",
+	p += sprintf(p, "Model number; %s\nSerial number: %s\nBattery type: %s\nOEM info: %s\n",
 		info->model_number,info->serial_number,
 		info->battery_type,info->oem_info);
 end:
@@ -310,38 +306,28 @@ proc_read_batt_status(char *page, char **start, off_t off,
 		goto end;
 	}
 
-	printk("getting batt status\n");
-
 	if (acpi_get_battery_status(batt_list[batt_num].handle, &status) != AE_OK) {
 		printk(KERN_ERR "Cmbatt: acpi_get_battery_status failed\n");
 		goto end;
 	}
 
-	p += sprintf(p, "Remaining Capacity: %x\n", status.remaining_capacity);
+	p += sprintf(p, "Battery discharging:        %s\n",
+		     (status.state & 0x1)?"yes":"no");
+	p += sprintf(p, "Battery charging:           %s\n",
+		     (status.state & 0x2)?"yes":"no");
+	p += sprintf(p, "Battery critically low:     %s\n",
+		     (status.state & 0x4)?"yes":"no");
 
-	if (status.state & 0x1)
-		p += sprintf(p, "Battery discharging\n");
-	if (status.state & 0x2)
-		p += sprintf(p, "Battery charging\n");
-	if (status.state & 0x4)
-		p += sprintf(p, "Battery critically low\n");
+	if (status.present_rate != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Battery rate:               %d %s\n",
+			status.present_rate, batt_list[batt_num].power_unit);
 
-	if (status.present_rate == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Battery rate unknown\n");
-	else
-		p += sprintf(p, "Battery rate %x\n",
-			status.present_rate);
-
-	if (status.remaining_capacity == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Battery capacity unknown\n");
-	else
-		p += sprintf(p, "Battery capacity %x %s\n",
+	if (status.remaining_capacity != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Battery capacity:           %d %sh\n",
 			status.remaining_capacity, batt_list[batt_num].power_unit);
 
-	if (status.present_voltage == ACPI_BATT_UNKNOWN)
-		p += sprintf(p, "Battery voltage unknown\n");
-	else
-		p += sprintf(p, "Battery voltage %x volts\n",
+	if (status.present_voltage != ACPI_BATT_UNKNOWN)
+		p += sprintf(p, "Battery voltage:            %d mV\n",
 			status.present_voltage);
 
 end:

@@ -25,7 +25,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/config.h>
 
@@ -1277,31 +1277,14 @@ static int __init i2c_init(void)
 }
 
 #ifndef MODULE
-#ifdef CONFIG_I2C_CHARDEV
 	extern int i2c_dev_init(void);
-#endif
-#ifdef CONFIG_I2C_ALGOBIT
 	extern int i2c_algo_bit_init(void);
-#endif
-#ifdef CONFIG_I2C_BITLP
 	extern int i2c_bitlp_init(void);
-#endif
-#ifdef CONFIG_I2C_BITELV
 	extern int i2c_bitelv_init(void);
-#endif
-#ifdef CONFIG_I2C_BITVELLE
 	extern int i2c_bitvelle_init(void);
-#endif
-#ifdef CONFIG_I2C_BITVIA
 	extern int i2c_bitvia_init(void);
-#endif
-
-#ifdef CONFIG_I2C_ALGOPCF
 	extern int i2c_algo_pcf_init(void);	
-#endif
-#ifdef CONFIG_I2C_PCFISA
 	extern int i2c_pcfisa_init(void);
-#endif
 
 /* This is needed for automatic patch generation: sensors code starts here */
 /* This is needed for automatic patch generation: sensors code ends here   */

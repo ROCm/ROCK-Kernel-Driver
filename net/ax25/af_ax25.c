@@ -1782,10 +1782,9 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 	return(len);
 }
 
-static struct net_proto_family ax25_family_ops =
-{
-	PF_AX25,
-	ax25_create
+static struct net_proto_family ax25_family_ops = {
+	family:		PF_AX25,
+	create:		ax25_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(ax25_proto_ops) = {
@@ -1814,18 +1813,13 @@ SOCKOPS_WRAP(ax25_proto, PF_AX25);
 /*
  *	Called by socket.c on kernel start up
  */
-static struct packet_type ax25_packet_type =
-{
-	0,	/* MUTTER ntohs(ETH_P_AX25),*/
-	0,		/* copy */
-	ax25_kiss_rcv,
-	NULL,
-	NULL,
+static struct packet_type ax25_packet_type = {
+	type:		__constant_htons(ETH_P_AX25),
+	func:		ax25_kiss_rcv,
 };
 
 static struct notifier_block ax25_dev_notifier = {
-	ax25_device_event,
-	0
+	notifier_call:	ax25_device_event,
 };
 
 EXPORT_SYMBOL(ax25_encapsulate);
@@ -1846,10 +1840,11 @@ EXPORT_SYMBOL(asc2ax);
 EXPORT_SYMBOL(null_ax25_address);
 EXPORT_SYMBOL(ax25_display_timer);
 
+static const char banner[] __initdata = KERN_INFO "NET4: G4KLX/GW4PTS AX.25 for Linux. Version 0.37 for Linux NET4.0\n";
+
 static int __init ax25_init(void)
 {
 	sock_register(&ax25_family_ops);
-	ax25_packet_type.type = htons(ETH_P_AX25);
 	dev_add_pack(&ax25_packet_type);
 	register_netdevice_notifier(&ax25_dev_notifier);
 	ax25_register_sysctl();
@@ -1858,7 +1853,7 @@ static int __init ax25_init(void)
 	proc_net_create("ax25", 0, ax25_get_info);
 	proc_net_create("ax25_calls", 0, ax25_uid_get_info);
 
-	printk(KERN_INFO "NET4: G4KLX/GW4PTS AX.25 for Linux. Version 0.37 for Linux NET4.0\n");
+	printk(banner);
 	return 0;
 }
 module_init(ax25_init);
@@ -1879,7 +1874,6 @@ static void __exit ax25_exit(void)
 	ax25_unregister_sysctl();
 	unregister_netdevice_notifier(&ax25_dev_notifier);
 
-	ax25_packet_type.type = htons(ETH_P_AX25);
 	dev_remove_pack(&ax25_packet_type);
 
 	sock_unregister(PF_AX25);

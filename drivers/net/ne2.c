@@ -4,7 +4,7 @@
    modified by Wim Dumon (Apr 1996)
 
    This software may be used and distributed according to the terms
-   of the GNU Public License, incorporated herein by reference.
+   of the GNU General Public License, incorporated herein by reference.
 
    The author may be reached as wimpie@linux.cc.kuleuven.ac.be
 
@@ -45,6 +45,9 @@
 
    Mon Nov 16 15:28:23 CET 1998 (Wim Dumon)
    - pass 'dev' as last parameter of request_irq in stead of 'NULL'   
+
+   Wed Feb  7 21:24:00 CET 2001 (Alfred Arnold)
+   - added support for the D-Link DE-320CT
    
    *    WARNING
 	-------
@@ -67,7 +70,7 @@ static const char *version = "ne2.c:v0.91 Nov 16 1998 Wim Dumon <wimpie@kotnet.o
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -114,6 +117,11 @@ static unsigned int addresses[7] __initdata =
 		{0x1000, 0x2020, 0x8020, 0xa0a0, 0xb0b0, 0xc0c0, 0xc3d0};
 static int irqs[4] __initdata = {3, 4, 5, 9};
 
+/* From the D-Link ADF file: */
+static unsigned int dlink_addresses[4]=
+                {0x300, 0x320, 0x340, 0x360};
+static int dlink_irqs[8] = {3, 4, 5, 9, 10, 11, 14, 15};
+
 struct ne2_adapters_t {
 	unsigned int	id;
 	char		*name;
@@ -123,6 +131,7 @@ static struct ne2_adapters_t ne2_adapters[] __initdata = {
 	{ 0x6354, "Arco Ethernet Adapter AE/2" },
 	{ 0x70DE, "Compex ENET-16 MC/P" },
 	{ 0x7154, "Novell Ethernet Adapter NE/2" },
+        { 0x56ea, "D-Link DE-320CT" },
 	{ 0x0000, NULL }
 };
 
@@ -141,6 +150,98 @@ static void ne_block_input(struct net_device *dev, int count,
 static void ne_block_output(struct net_device *dev, const int count,
 		const unsigned char *buf, const int start_page);
 
+
+/*
+ * special code to read the DE-320's MAC address EEPROM.  In contrast to a 
+ * standard NE design, this is a serial EEPROM (93C46) that has to be read
+ * bit by bit.  The EEPROM cotrol port at base + 0x1e has the following 
+ * layout:
+ *
+ * Bit 0 = Data out (read from EEPROM)
+ * Bit 1 = Data in  (write to EEPROM)
+ * Bit 2 = Clock
+ * Bit 3 = Chip Select
+ * Bit 7 = ~50 kHz clock for defined delays
+ *
+ */
+
+static void dlink_put_eeprom(unsigned char value, unsigned int addr)
+{
+	int z;
+	unsigned char v1, v2;
+
+	/* write the value to the NIC EEPROM register */
+
+	outb(value, addr + 0x1e);
+
+	/* now wait the clock line to toggle twice.  Effectively, we are
+	   waiting (at least) for one clock cycle */
+
+	for (z = 0; z < 2; z++) {
+		do {
+			v1 = inb(addr + 0x1e);
+			v2 = inb(addr + 0x1e);
+		}
+		while (!((v1 ^ v2) & 0x80));
+	}
+}
+
+static void dlink_send_eeprom_bit(unsigned int bit, unsigned int addr)
+{
+	/* shift data bit into correct position */
+
+	bit = bit << 1;
+
+	/* write value, keep clock line high for two cycles */
+
+	dlink_put_eeprom(0x09 | bit, addr);
+	dlink_put_eeprom(0x0d | bit, addr);
+	dlink_put_eeprom(0x0d | bit, addr);
+	dlink_put_eeprom(0x09 | bit, addr);
+}
+
+static void dlink_send_eeprom_word(unsigned int value, unsigned int len, unsigned int addr)
+{
+	int z;
+
+	/* adjust bits so that they are left-aligned in a 16-bit-word */
+
+	value = value << (16 - len);
+
+	/* shift bits out to the EEPROM */
+
+	for (z = 0; z < len; z++) {
+		dlink_send_eeprom_bit((value & 0x8000) >> 15, addr);
+		value = value << 1;
+	}
+}
+
+static unsigned int dlink_get_eeprom(unsigned int eeaddr, unsigned int addr)
+{
+	int z;
+	unsigned int value = 0;
+ 
+	/* pull the CS line low for a moment.  This resets the EEPROM-
+	   internal logic, and makes it ready for a new command. */
+
+	dlink_put_eeprom(0x01, addr);
+	dlink_put_eeprom(0x09, addr);
+
+	/* send one start bit, read command (1 - 0), plus the address to
+           the EEPROM */
+
+	dlink_send_eeprom_word(0x0180 | (eeaddr & 0x3f), 9, addr);
+
+	/* get the data word.  We clock by sending 0s to the EEPROM, which
+	   get ignored during the read process */
+
+	for (z = 0; z < 16; z++) {
+		dlink_send_eeprom_bit(0, addr);
+		value = (value << 1) | (inb(addr + 0x1e) & 0x01);
+	}
+
+	return value;
+}
 
 /*
  * Note that at boot, this probe only picks up one card at a time.
@@ -221,12 +322,20 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 		return -ENODEV;
 	}
 
-	i = (POS & 0xE)>>1;
-	/* printk("Halleluja sdog, als er na de pijl een 1 staat is 1 - 1 == 0"
-	   " en zou het moeten werken -> %d\n", i);
-	   The above line was for remote testing, thanx to sdog ... */
-	base_addr = addresses[i - 1];
-	irq = irqs[(POS & 0x60)>>5];
+	/* handle different POS register structure for D-Link card */
+
+	if (mca_read_stored_pos(slot, 0) == 0xea) {
+		base_addr = dlink_addresses[(POS >> 5) & 0x03];
+		irq = dlink_irqs[(POS >> 2) & 0x07];
+	}
+        else {
+		i = (POS & 0xE)>>1;
+		/* printk("Halleluja sdog, als er na de pijl een 1 staat is 1 - 1 == 0"
+	   	" en zou het moeten werken -> %d\n", i);
+	   	The above line was for remote testing, thanx to sdog ... */
+		base_addr = addresses[i - 1];
+		irq = irqs[(POS & 0x60)>>5];
+	}
 
 	if (!request_region(base_addr, NE_IO_EXTENT, dev->name))
 		return -EBUSY;
@@ -307,6 +416,20 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 	}
 	for(i = 0; i < 6 /*sizeof(SA_prom)*/; i+=1) {
 		SA_prom[i] = inb(base_addr + NE_DATAPORT);
+	}
+
+	/* I don't know whether the previous sequence includes the general
+           board reset procedure, so better don't omit it and just overwrite
+           the garbage read from a DE-320 with correct stuff. */
+
+	if (mca_read_stored_pos(slot, 0) == 0xea) {
+		unsigned int v;
+
+		for (i = 0; i < 3; i++) {
+ 			v = dlink_get_eeprom(i, base_addr);
+			SA_prom[(i << 1)    ] = v & 0xff;
+			SA_prom[(i << 1) + 1] = (v >> 8) & 0xff;
+		}
 	}
 
 	start_page = NESM_START_PG;

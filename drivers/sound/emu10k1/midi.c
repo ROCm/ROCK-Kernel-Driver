@@ -32,7 +32,7 @@
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>

@@ -25,7 +25,7 @@
 
 #include <linux/types.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/in.h>
 #include <linux/utsname.h>
 

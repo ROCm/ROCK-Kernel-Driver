@@ -43,7 +43,7 @@
 #include <linux/console_struct.h>
 #include <linux/string.h>
 #include <linux/kd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
 #include <linux/spinlock.h>

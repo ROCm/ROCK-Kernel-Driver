@@ -10,7 +10,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/apb.h>
 #include <asm/pbm.h>

@@ -39,7 +39,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/jffs.h>
 #include <linux/fs.h>
 #include <linux/locks.h>

@@ -36,7 +36,7 @@ static char *_rioboot_c_sccs_ = "@(#)rioboot.c	1.3";
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <asm/system.h>

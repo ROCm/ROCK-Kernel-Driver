@@ -26,7 +26,7 @@
  */
 
 #include <linux/pci.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 
 #include <asm/io.h>

@@ -28,7 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/list.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/videodev.h>

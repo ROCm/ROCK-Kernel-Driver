@@ -26,7 +26,7 @@
 #include <linux/miscdevice.h>
 #include <linux/blkdev.h>
 #include <linux/pci.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/adb.h>
 #include <linux/pmu.h>

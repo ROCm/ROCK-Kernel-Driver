@@ -15,7 +15,7 @@
 #include <linux/stat.h>
 #include <linux/limits.h>
 #include <linux/umsdos_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pagemap.h>
 
 #define UMSDOS_SPECIAL_DIRFPOS	3

@@ -12,7 +12,7 @@
 #include <linux/fs.h>
 #include <linux/hpfs_fs.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/locks.h>

@@ -10,7 +10,7 @@
  *  Driver for PCF8583 RTC & RAM chip
  */
 #include <linux/i2c.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/mc146818rtc.h>
 #include <linux/init.h>

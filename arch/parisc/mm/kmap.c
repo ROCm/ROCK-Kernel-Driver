@@ -7,7 +7,7 @@
 #include <linux/string.h>
 #include <linux/pci.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 #include <asm/uaccess.h>

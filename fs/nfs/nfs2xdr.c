@@ -12,7 +12,7 @@
 #include <linux/param.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/utsname.h>
 #include <linux/errno.h>
 #include <linux/string.h>

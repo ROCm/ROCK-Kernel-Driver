@@ -8,7 +8,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/mtd/mtd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 /* The map stuff is very simple. You fill in your struct map_info with
    a handful of routines for accessing the device, making sure they handle

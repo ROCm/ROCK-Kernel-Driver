@@ -14,7 +14,7 @@
  */
 #include <linux/errno.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/sem.h>
 #include <linux/msg.h>

@@ -52,7 +52,7 @@
 /* These are only included once per module */
 #include <linux/version.h>
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 

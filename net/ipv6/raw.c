@@ -29,6 +29,7 @@
 #include <linux/if_arp.h>
 #include <linux/icmpv6.h>
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>

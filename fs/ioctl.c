@@ -9,6 +9,7 @@
 #include <linux/file.h>
 
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 
 static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 {

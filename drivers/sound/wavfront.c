@@ -2534,7 +2534,7 @@ static int __init detect_wavefront (int irq, int io_base)
 #define __KERNEL_SYSCALLS__
 #include <linux/fs.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/unistd.h>
 #include <asm/uaccess.h>
 

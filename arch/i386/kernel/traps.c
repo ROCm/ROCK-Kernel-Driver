@@ -127,6 +127,11 @@ void show_trace(unsigned long * stack)
 	printk("\n");
 }
 
+void show_trace_task(struct task_struct *tsk)
+{
+	show_trace(tsk->thread.esp);
+}
+
 void show_stack(unsigned long * esp)
 {
 	unsigned long *stack;

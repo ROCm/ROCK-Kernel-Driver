@@ -12,7 +12,7 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/user.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

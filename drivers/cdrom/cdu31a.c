@@ -164,7 +164,7 @@
 #include <linux/ioport.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 

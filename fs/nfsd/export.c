@@ -15,7 +15,7 @@
  */
 
 #include <linux/unistd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/in.h>
 

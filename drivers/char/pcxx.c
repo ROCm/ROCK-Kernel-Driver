@@ -63,7 +63,7 @@
 #include <linux/delay.h>
 #include <linux/serial.h>
 #include <linux/tty_driver.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/version.h>
 

@@ -70,7 +70,7 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 /* Some informational data */
 MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");

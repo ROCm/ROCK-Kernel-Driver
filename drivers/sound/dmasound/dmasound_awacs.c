@@ -10,12 +10,13 @@
 
 #include <linux/module.h>
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/soundcard.h>
 #include <linux/adb.h>
 #include <linux/nvram.h>
+#include <linux/tty.h>
 #include <linux/vt_kern.h>
 #ifdef CONFIG_ADB_CUDA
 #include <linux/cuda.h>

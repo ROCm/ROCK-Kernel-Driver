@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 53 $
+ *              $Revision: 54 $
  *
  ******************************************************************************/
 
@@ -115,6 +115,46 @@ acpi_ns_get_table_pathname (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_ns_get_pathname_length
+ *
+ * PARAMETERS:  Node        - Namespace node
+ *
+ * RETURN:      Length of path, including prefix
+ *
+ * DESCRIPTION: Get the length of the pathname string for this node
+ *
+ ******************************************************************************/
+
+u32
+acpi_ns_get_pathname_length (
+	ACPI_NAMESPACE_NODE     *node)
+{
+	u32                     size;
+	ACPI_NAMESPACE_NODE     *next_node;
+
+	/*
+	 * Compute length of pathname as 5 * number of name segments.
+	 * Go back up the parent tree to the root
+	 */
+	for (size = 0, next_node = node;
+		  acpi_ns_get_parent_object (next_node);
+		  next_node = acpi_ns_get_parent_object (next_node))
+	{
+		size += PATH_SEGMENT_LENGTH;
+	}
+
+	/* Special case for size still 0 - no parent for "special" nodes */
+
+	if (!size) {
+		size = PATH_SEGMENT_LENGTH;
+	}
+
+	return (size + 1);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_ns_handle_to_pathname
  *
  * PARAMETERS:  Target_handle           - Handle of named object whose name is
@@ -138,11 +178,10 @@ acpi_ns_handle_to_pathname (
 {
 	ACPI_STATUS             status = AE_OK;
 	ACPI_NAMESPACE_NODE     *node;
-	ACPI_NAMESPACE_NODE     *next_node;
 	u32                     path_length;
-	u32                     size;
 	u32                     user_buf_size;
 	ACPI_NAME               name;
+	u32                     size;
 
 
 	if (!acpi_gbl_root_node || !target_handle) {
@@ -159,26 +198,12 @@ acpi_ns_handle_to_pathname (
 		return (AE_BAD_PARAMETER);
 	}
 
-	/*
-	 * Compute length of pathname as 5 * number of name segments.
-	 * Go back up the parent tree to the root
-	 */
-	for (size = 0, next_node = node;
-		  acpi_ns_get_parent_object (next_node);
-		  next_node = acpi_ns_get_parent_object (next_node))
-	{
-		size += PATH_SEGMENT_LENGTH;
-	}
-
-	/* Special case for size still 0 - no parent for "special" nodes */
-
-	if (!size) {
-		size = PATH_SEGMENT_LENGTH;
-	}
 
 	/* Set return length to the required path length */
 
-	path_length = size + 1;
+	path_length = acpi_ns_get_pathname_length (node);
+	size = path_length - 1;
+
 	user_buf_size = *buf_size;
 	*buf_size = path_length;
 

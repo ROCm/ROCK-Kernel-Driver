@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 39 $
+ *       $Revision: 41 $
  *
  *****************************************************************************/
 
@@ -43,6 +43,7 @@ extern u8                       opt_disasm;
 extern u8                       opt_stats;
 extern u8                       opt_parse_jit;
 extern u8                       opt_verbose;
+extern u8                       opt_ini_methods;
 
 
 extern NATIVE_CHAR              *args[DB_MAX_ARGS];
@@ -196,6 +197,10 @@ acpi_db_set_scope (
 
 void
 acpi_db_find_references (
+	NATIVE_CHAR             *object_arg);
+
+void
+acpi_db_display_resources (
 	NATIVE_CHAR             *object_arg);
 
 

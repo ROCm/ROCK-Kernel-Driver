@@ -2,7 +2,7 @@
  *
  * Module Name: rscalc - Acpi_rs_calculate_byte_stream_length
  *                       Acpi_rs_calculate_list_length
- *              $Revision: 18 $
+ *              $Revision: 21 $
  *
  ******************************************************************************/
 
@@ -27,6 +27,8 @@
 
 #include "acpi.h"
 #include "acresrc.h"
+#include "amlcode.h"
+#include "acnamesp.h"
 
 #define _COMPONENT          RESOURCE_MANAGER
 	 MODULE_NAME         ("rscalc")
@@ -704,6 +706,7 @@ acpi_rs_calculate_list_length (
 				 */
 				bytes_consumed = 2;
 				structure_size = RESOURCE_LENGTH;
+				byte_stream_buffer_length = bytes_parsed;
 				break;
 
 
@@ -810,7 +813,10 @@ acpi_rs_calculate_pci_routing_table_length (
 		name_found = FALSE;
 
 		for (table_index = 0; table_index < 4 && !name_found; table_index++) {
-			if (ACPI_TYPE_STRING == (*sub_object_list)->common.type) {
+			if ((ACPI_TYPE_STRING == (*sub_object_list)->common.type) ||
+				((INTERNAL_TYPE_REFERENCE == (*sub_object_list)->common.type) &&
+					((*sub_object_list)->reference.op_code == AML_NAMEPATH_OP)))
+			{
 				name_found = TRUE;
 			}
 
@@ -822,17 +828,22 @@ acpi_rs_calculate_pci_routing_table_length (
 			}
 		}
 
-		temp_size_needed += (sizeof (PCI_ROUTING_TABLE) - 1);
+		temp_size_needed += (sizeof (PCI_ROUTING_TABLE) - 4);
 
 		/*
 		 * Was a String type found?
 		 */
 		if (TRUE == name_found) {
-			/*
-			 * The length String.Length field includes the
-			 * terminating NULL
-			 */
-			temp_size_needed += (*sub_object_list)->string.length;
+			if (ACPI_TYPE_STRING == (*sub_object_list)->common.type) {
+				/*
+				 * The length String.Length field includes the
+				 * terminating NULL
+				 */
+				temp_size_needed += (*sub_object_list)->string.length;
+			}
+			else {
+				temp_size_needed += acpi_ns_get_pathname_length ((*sub_object_list)->reference.node);
+			}
 		}
 
 		else {
@@ -855,7 +866,7 @@ acpi_rs_calculate_pci_routing_table_length (
 	}
 
 
-	*buffer_size_needed = temp_size_needed + sizeof (PCI_ROUTING_TABLE);
+	*buffer_size_needed = temp_size_needed;
 
 	return (AE_OK);
 }

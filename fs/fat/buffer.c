@@ -5,7 +5,7 @@
  */
 
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>

@@ -2,7 +2,7 @@
  *
  * Module Name: rslist - Acpi_rs_byte_stream_to_list
  *                       Acpi_list_to_byte_stream
- *              $Revision: 10 $
+ *              $Revision: 11 $
  *
  ******************************************************************************/
 
@@ -302,9 +302,7 @@ acpi_rs_byte_stream_to_list (
 	/*
 	 * Check the reason for exiting the while loop
 	 */
-	if (!(byte_stream_buffer_length == bytes_parsed) ||
-		 (TRUE != end_tag_processed))
-	{
+	if (TRUE != end_tag_processed) {
 		return (AE_AML_ERROR);
 	}
 

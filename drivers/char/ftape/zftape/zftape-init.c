@@ -29,7 +29,7 @@
 #include <linux/kernel.h>
 #include <linux/signal.h>
 #include <linux/major.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif

@@ -6,7 +6,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/page.h>
 #include <asm/oplib.h>

@@ -32,7 +32,7 @@
 #define MOUSEDEV_MINORS		32
 #define MOUSEDEV_MIX		31
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/module.h>
 #include <linux/init.h>

@@ -79,7 +79,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/kd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/major.h>
 #include <linux/mm.h>
 #include <linux/console.h>

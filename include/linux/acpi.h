@@ -82,13 +82,11 @@ typedef int acpi_dstate_t;
 /* PM_TMR masks */
 #define ACPI_TMR_VAL_EXT 0x00000100
 #define ACPI_TMR_MASK	 0x00ffffff
-#define ACPI_TMR_HZ	 3580000 /* 3.58 MHz */
+#define ACPI_TMR_HZ	 3579545 /* 3.58 MHz */
+#define ACPI_TMR_KHZ	 (ACPI_TMR_HZ / 1000)
 
-/* strangess to avoid integer overflow */
 #define ACPI_MICROSEC_TO_TMR_TICKS(val) \
-  (((val) * (ACPI_TMR_HZ / 10000)) / 100)
-#define ACPI_TMR_TICKS_TO_MICROSEC(ticks) \
-  (((ticks) * 100) / (ACPI_TMR_HZ / 10000))
+  (((val) * (ACPI_TMR_KHZ)) / 1000)
 
 /* PM2_CNT flags */
 #define ACPI_ARB_DIS 0x01
@@ -147,6 +145,9 @@ enum
 	ACPI_C1_TIME,
 	ACPI_C2_TIME,
 	ACPI_C3_TIME,
+	ACPI_C1_COUNT,
+	ACPI_C2_COUNT,
+	ACPI_C3_COUNT,
 	ACPI_S0_SLP_TYP,
 	ACPI_S1_SLP_TYP,
 	ACPI_S5_SLP_TYP,

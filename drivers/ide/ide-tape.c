@@ -399,7 +399,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/errno.h>
 #include <linux/genhd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/ide.h>
 #include <linux/smp_lock.h>

@@ -25,7 +25,7 @@
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/ebus.h>
 #include <asm/uaccess.h>

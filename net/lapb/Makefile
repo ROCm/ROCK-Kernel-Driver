@@ -17,5 +17,3 @@ obj-m    := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make
 
-tar:
-		tar -cvf /dev/f1 .

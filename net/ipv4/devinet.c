@@ -1,7 +1,7 @@
 /*
  *	NET3	IP device support routines.
  *
- *	Version: $Id: devinet.c,v 1.39 2000/12/10 22:24:11 davem Exp $
+ *	Version: $Id: devinet.c,v 1.40 2001/02/05 06:03:47 davem Exp $
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -50,9 +50,7 @@
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
-#ifdef CONFIG_KMOD
 #include <linux/kmod.h>
-#endif
 
 #include <net/ip.h>
 #include <net/route.h>

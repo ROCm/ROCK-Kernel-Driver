@@ -75,7 +75,7 @@
 #define TIMEOUT_VALUE (6 * HZ)
 #include <linux/blk.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static int *loop_sizes;

@@ -16,7 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/poll.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/random.h>
 #include <linux/miscdevice.h>

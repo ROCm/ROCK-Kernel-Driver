@@ -146,7 +146,7 @@ extern struct tasklet_head tasklet_hi_vec[NR_CPUS];
 
 #ifdef CONFIG_SMP
 #define tasklet_trylock(t) (!test_and_set_bit(TASKLET_STATE_RUN, &(t)->state))
-#define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { /* NOTHING */ }
+#define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
 #define tasklet_unlock(t) clear_bit(TASKLET_STATE_RUN, &(t)->state)
 #else
 #define tasklet_trylock(t) 1

@@ -14,8 +14,6 @@
  *	LAPB 002	Jonathan Naylor	New timer architecture.
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_LAPB) || defined(CONFIG_LAPB_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -189,5 +187,3 @@ static void lapb_t1timer_expiry(unsigned long param)
 
 	lapb_start_t1timer(lapb);
 }
-
-#endif

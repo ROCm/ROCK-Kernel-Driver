@@ -31,7 +31,7 @@
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 #include <linux/timer.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/random.h>
 #include <linux/poll.h>

@@ -28,7 +28,7 @@
 #ifdef __KERNEL__
 #include <linux/blkdev.h>
 #include <linux/locks.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/timer.h>
 #endif

@@ -24,7 +24,7 @@
 #include <linux/locks.h>
 #include <linux/file.h>
 #include <linux/fcntl.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 

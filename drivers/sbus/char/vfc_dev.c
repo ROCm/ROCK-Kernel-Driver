@@ -17,11 +17,12 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 #include <linux/spinlock.h>
 
 #include <asm/openprom.h>
@@ -29,7 +30,6 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/sbus.h>
-#include <asm/delay.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>

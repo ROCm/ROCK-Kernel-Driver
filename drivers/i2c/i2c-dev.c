@@ -34,7 +34,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/version.h>
 #if LINUX_KERNEL_VERSION >= KERNEL_VERSION(2,4,0)
 #include <linux/smp_lock.h>

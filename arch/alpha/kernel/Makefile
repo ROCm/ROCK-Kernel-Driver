@@ -30,9 +30,7 @@ ifdef CONFIG_VGA_HOSE
 obj-y	 += console.o
 endif
 
-
 obj-$(CONFIG_SMP)    += smp.o irq_smp.o
-
 obj-$(CONFIG_PCI)    += pci.o pci_iommu.o
 
 ifdef CONFIG_ALPHA_GENERIC
@@ -76,7 +74,7 @@ obj-y    += sys_eb64p.o
 endif
 
 obj-$(CONFIG_ALPHA_EIGER) += sys_eiger.o
-obj-$(CONFIG_ALPHA_JENSEN) += sys_jensen.o
+obj-$(CONFIG_ALPHA_JENSEN) += sys_jensen.o pci-noop.o
 obj-$(CONFIG_ALPHA_MIATA) += sys_miata.o
 obj-$(CONFIG_ALPHA_MIKASA) += sys_mikasa.o
 obj-$(CONFIG_ALPHA_NAUTILUS) += sys_nautilus.o

@@ -240,7 +240,7 @@
 #include <linux/major.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/init.h>

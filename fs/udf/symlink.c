@@ -32,7 +32,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/stat.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include "udf_i.h"

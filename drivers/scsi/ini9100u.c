@@ -136,7 +136,7 @@
 #include "scsi.h"
 #include "sd.h"
 #include "hosts.h"
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include "ini9100u.h"
 
 #ifdef DEBUG_i91u

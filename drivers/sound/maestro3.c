@@ -28,6 +28,8 @@
  * Shouts go out to Mike "DJ XPCom" Ang.
  *
  * History
+ *  v1.21 - Feb 04 2001 - Zach Brown <zab@zabbo.net>
+ *   fix up really dumb notifier -> suspend oops
  *  v1.20 - Jan 30 2001 - Zach Brown <zab@zabbo.net>
  *   get rid of pm callback and use pci_dev suspend/resume instead
  *   m3_probe cleanups, including pm oops think-o
@@ -147,7 +149,7 @@
 
 #define M_DEBUG 1
 
-#define DRIVER_VERSION      "1.20"
+#define DRIVER_VERSION      "1.21"
 #define M3_MODULE_NAME      "maestro3"
 #define PFX                 M3_MODULE_NAME ": "
 
@@ -2763,7 +2765,6 @@ static int m3_notifier(struct notifier_block *nb, unsigned long event, void *buf
 static void m3_suspend(struct pci_dev *pci_dev)
 {
     unsigned long flags;
-    int index;
     int i;
     struct m3_card *card = pci_dev->driver_data;
 
@@ -2788,15 +2789,18 @@ static void m3_suspend(struct pci_dev *pci_dev)
 
     m3_assp_halt(card);
 
-    index = 0;
-    DPRINTK(DPMOD, "saving code\n");
-    for(i = REV_B_CODE_MEMORY_BEGIN ; i <= REV_B_CODE_MEMORY_END; i++)
-        card->suspend_mem[index++] = 
-            m3_assp_read(card, MEMTYPE_INTERNAL_CODE, i);
-    DPRINTK(DPMOD, "saving data\n");
-    for(i = REV_B_DATA_MEMORY_BEGIN ; i <= REV_B_DATA_MEMORY_END; i++)
-        card->suspend_mem[index++] = 
-            m3_assp_read(card, MEMTYPE_INTERNAL_DATA, i);
+    if(card->suspend_mem) {
+        int index = 0;
+
+        DPRINTK(DPMOD, "saving code\n");
+        for(i = REV_B_CODE_MEMORY_BEGIN ; i <= REV_B_CODE_MEMORY_END; i++)
+            card->suspend_mem[index++] = 
+                m3_assp_read(card, MEMTYPE_INTERNAL_CODE, i);
+        DPRINTK(DPMOD, "saving data\n");
+        for(i = REV_B_DATA_MEMORY_BEGIN ; i <= REV_B_DATA_MEMORY_END; i++)
+            card->suspend_mem[index++] = 
+                m3_assp_read(card, MEMTYPE_INTERNAL_DATA, i);
+    }
 
     DPRINTK(DPMOD, "powering down apci regs\n");
     m3_outw(card, 0xffff, 0x54);

@@ -25,7 +25,7 @@
  */
 
 #include <asm/segment.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/wrapper.h>

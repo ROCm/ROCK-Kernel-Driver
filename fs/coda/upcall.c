@@ -519,7 +519,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
 
         /* build packet for Venus */
         if (data->vi.in_size > VC_MAXDATASIZE) {
-	        error = EINVAL;
+	        error = -EINVAL;
 		goto exit;
         }
 
@@ -539,7 +539,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
         /* get the data out of user space */
         if ( copy_from_user((char*)inp + (long)inp->coda_ioctl.data,
 			    data->vi.in, data->vi.in_size) ) {
-	        error = EINVAL;
+	        error = -EINVAL;
 	        goto exit;
 	}
 
@@ -557,7 +557,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
                 CDEBUG(D_FILE, "return len %d <= request len %d\n",
                       outp->coda_ioctl.len, 
                       data->vi.out_size);
-                error = EINVAL;
+                error = -EINVAL;
         } else {
 		error = verify_area(VERIFY_WRITE, data->vi.out, 
                                     data->vi.out_size);
@@ -566,7 +566,7 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
 		if (copy_to_user(data->vi.out, 
 				 (char *)outp + (long)outp->coda_ioctl.data, 
 				 data->vi.out_size)) {
-		        error = EINVAL;
+		        error = -EINVAL;
 			goto exit;
 		}
         }

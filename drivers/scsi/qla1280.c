@@ -220,7 +220,7 @@ END OF TERMS AND CONDITIONS
 #include "ql1280_fw.h"
 
 #include <linux/stat.h>
-#include <linux/malloc.h>        /* for kmalloc() */
+#include <linux/slab.h>        /* for kmalloc() */
 
 
 #ifndef KERNEL_VERSION

@@ -17,7 +17,7 @@
 #include <linux/config.h>
 #if defined(CONFIG_SYN_COOKIES) 
 #include <linux/tcp.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/random.h>
 #include <net/tcp.h>
 

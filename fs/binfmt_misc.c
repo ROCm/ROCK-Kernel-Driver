@@ -21,7 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/binfmts.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>

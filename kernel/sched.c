@@ -1115,11 +1115,11 @@ static void show_task(struct task_struct * p)
 	else
 		printk("\n");
 
-#ifdef CONFIG_X86
-/* This is very useful, but only works on x86 right now */
+#if defined(CONFIG_X86) || defined(CONFIG_SPARC64)
+/* This is very useful, but only works on x86 and sparc64 right now */
 	{
-		extern void show_trace(unsigned long);
-		show_trace(p->thread.esp);
+		extern void show_trace_task(struct task_struct *tsk);
+		show_trace_task(p);
 	}
 #endif
 }

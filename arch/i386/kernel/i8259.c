@@ -6,7 +6,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>

@@ -122,7 +122,7 @@
 #include <linux/hdreg.h>
 #include <linux/genhd.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 

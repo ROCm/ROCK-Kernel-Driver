@@ -67,7 +67,7 @@
 #include <linux/console.h>
 #include <linux/string.h>
 #include <linux/kd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fb.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>

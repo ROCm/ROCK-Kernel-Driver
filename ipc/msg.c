@@ -16,7 +16,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/msg.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>

@@ -176,7 +176,7 @@
 #include <linux/stddef.h>
 #include <linux/timer.h>
 #include <linux/fcntl.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 #include <linux/miscdevice.h>

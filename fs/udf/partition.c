@@ -30,7 +30,7 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/udf_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 inline Uint32 udf_get_pblock(struct super_block *sb, Uint32 block, Uint16 partition, Uint32 offset)
 {

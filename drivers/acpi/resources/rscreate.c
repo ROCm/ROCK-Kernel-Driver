@@ -3,7 +3,7 @@
  * Module Name: rscreate - Acpi_rs_create_resource_list
  *                         Acpi_rs_create_pci_routing_table
  *                         Acpi_rs_create_byte_stream
- *              $Revision: 24 $
+ *              $Revision: 25 $
  *
  ******************************************************************************/
 
@@ -28,6 +28,8 @@
 
 #include "acpi.h"
 #include "acresrc.h"
+#include "amlcode.h"
+#include "acnamesp.h"
 
 #define _COMPONENT          RESOURCE_MANAGER
 	 MODULE_NAME         ("rscreate")
@@ -157,6 +159,7 @@ acpi_rs_create_pci_routing_table (
 	u32                     number_of_elements = 0;
 	u32                     index = 0;
 	PCI_ROUTING_TABLE       *user_prt = NULL;
+	ACPI_NAMESPACE_NODE     *node;
 	ACPI_STATUS             status;
 
 
@@ -203,10 +206,10 @@ acpi_rs_create_pci_routing_table (
 			/*
 			 * Fill in the Length field with the information we
 			 * have at this point.
-			 * The minus one is to subtract the size of the
-			 * u8 Source[1] member because it is added below.
+			 * The minus four is to subtract the size of the
+			 * u8 Source[4] member because it is added below.
 			 */
-			user_prt->length = (sizeof (PCI_ROUTING_TABLE) - 1);
+			user_prt->length = (sizeof (PCI_ROUTING_TABLE) -4);
 
 			/*
 			 * Dereference the sub-package
@@ -221,11 +224,10 @@ acpi_rs_create_pci_routing_table (
 			sub_object_list = package_element->package.elements;
 
 			/*
-			 * Dereference the Address
+			 * 1) First subobject:  Dereference the Address
 			 */
 			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-				user_prt->data.address =
-						(*sub_object_list)->integer.value;
+				user_prt->address = (*sub_object_list)->integer.value;
 			}
 
 			else {
@@ -233,12 +235,12 @@ acpi_rs_create_pci_routing_table (
 			}
 
 			/*
-			 * Dereference the Pin
+			 * 2) Second subobject: Dereference the Pin
 			 */
 			sub_object_list++;
 
 			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-				user_prt->data.pin =
+				user_prt->pin =
 						(u32) (*sub_object_list)->integer.value;
 			}
 
@@ -247,37 +249,57 @@ acpi_rs_create_pci_routing_table (
 			}
 
 			/*
-			 * Dereference the Source Name
+			 * 3) Third subobject: Dereference the Source Name
 			 */
 			sub_object_list++;
 
-			if (ACPI_TYPE_STRING == (*sub_object_list)->common.type) {
-				STRCPY (user_prt->data.source,
+			switch ((*sub_object_list)->common.type)
+			{
+			case INTERNAL_TYPE_REFERENCE:
+				if ((*sub_object_list)->reference.op_code != AML_NAMEPATH_OP) {
+					return (AE_BAD_DATA);
+				}
+
+				node = (*sub_object_list)->reference.node;
+
+				/* TBD: use *remaining* length of the buffer! */
+
+				status = acpi_ns_handle_to_pathname ((ACPI_HANDLE *) node,
+						 output_buffer_length, user_prt->source);
+
+				user_prt->length += STRLEN (user_prt->source) + 1; /* include null terminator */
+				break;
+
+
+			case ACPI_TYPE_STRING:
+
+				STRCPY (user_prt->source,
 					  (*sub_object_list)->string.pointer);
 
 				/*
 				 * Add to the Length field the length of the string
 				 */
 				user_prt->length += (*sub_object_list)->string.length;
-			}
+				break;
 
-			else {
+
+			case ACPI_TYPE_INTEGER:
 				/*
 				 * If this is a number, then the Source Name
 				 * is NULL, since the entire buffer was zeroed
 				 * out, we can leave this alone.
 				 */
-				if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-					/*
-					 * Add to the Length field the length of
-					 * the u32 NULL
-					 */
-					user_prt->length += sizeof (u32);
-				}
+				/*
+				 * Add to the Length field the length of
+				 * the u32 NULL
+				 */
+				user_prt->length += sizeof (u32);
+				break;
 
-				else {
-					return (AE_BAD_DATA);
-				}
+
+			default:
+			   return (AE_BAD_DATA);
+			   break;
 			}
 
 			/* Now align the current length */
@@ -285,12 +307,12 @@ acpi_rs_create_pci_routing_table (
 			user_prt->length = ROUND_UP_TO_64_bITS (user_prt->length);
 
 			/*
-			 * Dereference the Source Index
+			 * 4) Fourth subobject: Dereference the Source Index
 			 */
 			sub_object_list++;
 
 			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
-				user_prt->data.source_index =
+				user_prt->source_index =
 						(u32) (*sub_object_list)->integer.value;
 			}
 

@@ -11,7 +11,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/list.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG

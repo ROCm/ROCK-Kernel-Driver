@@ -1509,15 +1509,16 @@ static inline void check_timer(void)
  * - IRQ2 is the cascade IRQ, and cannot be a io-apic IRQ.
  *   Linux doesn't really care, as it's not actually used
  *   for any interrupt handling anyway.
- * - IRQ13 is the FPU error IRQ, and may be connected
- *   directly from the FPU to the old PIC. Linux doesn't
- *   really care, because Linux doesn't want to use IRQ13
- *   anyway (exception 16 is the proper FPU error signal)
+ * - There used to be IRQ13 here as well, but all
+ *   MPS-compliant must not use it for FPU coupling and we
+ *   want to use exception 16 anyway.  And there are
+ *   systems who connect it to an I/O APIC for other uses.
+ *   Thus we don't mark it special any longer.
  *
  * Additionally, something is definitely wrong with irq9
  * on PIIX4 boards.
  */
-#define PIC_IRQS	((1<<2)|(1<<13))
+#define PIC_IRQS	(1<<2)
 
 void __init setup_IO_APIC(void)
 {

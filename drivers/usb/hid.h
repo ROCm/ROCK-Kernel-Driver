@@ -31,7 +31,7 @@
  */
 
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/list.h>
 
 /*

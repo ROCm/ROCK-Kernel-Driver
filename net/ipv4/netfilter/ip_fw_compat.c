@@ -9,6 +9,7 @@ struct notifier_block;
 #include <linux/inetdevice.h>
 #include <linux/netdevice.h>
 #include <linux/module.h>
+#include <asm/uaccess.h>
 #include <net/ip.h>
 #include <net/route.h>
 #include <linux/netfilter_ipv4/compat_firewall.h>
@@ -197,14 +198,28 @@ static unsigned int fw_confirm(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
-extern int ip_fw_ctl(int optval, void *user, unsigned int len);
+extern int ip_fw_ctl(int optval, void *m, unsigned int len);
 
 static int sock_fn(struct sock *sk, int optval, void *user, unsigned int len)
 {
+	/* MAX of:
+	   2.2: sizeof(struct ip_fwtest) (~14x4 + 3x4 = 17x4)
+	   2.2: sizeof(struct ip_fwnew) (~1x4 + 15x4 + 3x4 + 3x4 = 22x4)
+	   2.0: sizeof(struct ip_fw) (~25x4)
+
+	   We can't include both 2.0 and 2.2 headers, they conflict.
+	   Hence, 200 is a good number. --RR */
+	char tmp_fw[200];
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	return -ip_fw_ctl(optval, user, len);
+	if (len > sizeof(tmp_fw) || len < 1)
+		return -EINVAL;
+
+	if (copy_from_user(&tmp_fw, user, len))
+		return -EFAULT;
+
+	return -ip_fw_ctl(optval, &tmp_fw, len);
 }
 
 static struct nf_hook_ops preroute_ops

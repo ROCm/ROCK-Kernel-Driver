@@ -53,6 +53,7 @@
 #include <linux/acct.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
+#include <linux/tty.h>
 
 #include <asm/uaccess.h>
 

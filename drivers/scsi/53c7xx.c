@@ -246,7 +246,7 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>

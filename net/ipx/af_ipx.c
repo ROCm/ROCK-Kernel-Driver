@@ -64,6 +64,7 @@
  *	Revision 043:	Shared SKBs, don't mangle packets, some cleanups
  *			Arnaldo Carvalho de Melo <acme@conectiva.com.br>,
  *			December, 2000
+ *	Revision 044:	Call ipxitf_hold on NETDEV_UP (acme)
  *
  *	Protect the module by a MOD_INC_USE_COUNT/MOD_DEC_USE_COUNT
  *	pair. Also, now usage count is managed this way
@@ -443,19 +444,21 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 	struct net_device *dev = ptr;
 	ipx_interface *i, *tmp;
 
-	if (event != NETDEV_DOWN)
-		return NOTIFY_DONE;
+	if (event != NETDEV_DOWN && event != NETDEV_UP)
+		goto out;
 
 	spin_lock_bh(&ipx_interfaces_lock);
 	for (i = ipx_interfaces; i;) {
 		tmp = i->if_next;
 		if (i->if_dev == dev)
-			__ipxitf_put(i);
+			if (event == NETDEV_UP)
+				ipxitf_hold(i);
+			else
+				__ipxitf_put(i);
 		i = tmp;
-
 	}
 	spin_unlock_bh(&ipx_interfaces_lock);
-	return NOTIFY_DONE;
+out:	return NOTIFY_DONE;
 }
 
 static void ipxitf_def_skb_handler(struct sock *sock, struct sk_buff *skb)
@@ -1067,7 +1070,7 @@ static int ipxitf_create(ipx_interface_definition *idef)
 		intrfc->if_sklist 	= NULL;
 		intrfc->if_sknum 	= IPX_MIN_EPHEMERAL_SOCKET;
 		/* Setup primary if necessary */
-		if ((idef->ipx_special == IPX_PRIMARY))
+		if (idef->ipx_special == IPX_PRIMARY)
 			ipx_primary_net = intrfc;
 		intrfc->if_internal 	= 0;
 		intrfc->if_ipx_offset 	= dev->hard_header_len + datalink->header_length;
@@ -2407,8 +2410,8 @@ int ipx_unregister_spx(void)
  */
 
 static struct net_proto_family ipx_family_ops = {
-	PF_IPX,
-	ipx_create
+	family:		PF_IPX,
+	create:		ipx_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
@@ -2423,7 +2426,7 @@ static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
 	poll:		datagram_poll,
 	ioctl:		ipx_ioctl,
 	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown, /* FIXME: We have to really support shutdown. */
+	shutdown:	sock_no_shutdown, /* FIXME: have to support shutdown */
 	setsockopt:	ipx_setsockopt,
 	getsockopt:	ipx_getsockopt,
 	sendmsg:	ipx_sendmsg,
@@ -2437,26 +2440,20 @@ SOCKOPS_WRAP(ipx_dgram, PF_IPX);
 static struct packet_type ipx_8023_packet_type =
 
 {
-	__constant_htons(ETH_P_802_3),
-	NULL,		/* All devices */
-	ipx_rcv,
-	(void *) 1,	/* yap, I understand shared skbs :-) */
-	NULL,
+	type:		__constant_htons(ETH_P_802_3),
+	func:		ipx_rcv,
+	data:		(void *) 1,	/* yap, I understand shared skbs :-) */
 };
 
 static struct packet_type ipx_dix_packet_type =
 {
-	__constant_htons(ETH_P_IPX),
-	NULL,		/* All devices */
-	ipx_rcv,
-	(void *) 1,	/* yap, I understand shared skbs :-) */
-	NULL,
+	type:		__constant_htons(ETH_P_IPX),
+	func:		ipx_rcv,
+	data:		(void *) 1,	/* yap, I understand shared skbs :-) */
 };
 
-static struct notifier_block ipx_dev_notifier={
-	ipxitf_device_event,
-	NULL,
-	0
+static struct notifier_block ipx_dev_notifier = {
+	notifier_call:	ipxitf_device_event,
 };
 
 
@@ -2492,7 +2489,7 @@ static int __init ipx_init(void)
 	proc_net_create("ipx_interface", 0, ipx_interface_get_info);
 	proc_net_create("ipx_route", 0, ipx_rt_get_info);
 #endif
-	printk(KERN_INFO "NET4: Linux IPX 0.43 for NET4.0\n");
+	printk(KERN_INFO "NET4: Linux IPX 0.44 for NET4.0\n");
 	printk(KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n");
 	printk(KERN_INFO "IPX Portions Copyright (c) 2000 Conectiva, Inc.\n");
 	return 0;

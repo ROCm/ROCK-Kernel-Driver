@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: accommon.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 87 $
+ *       $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -26,6 +26,30 @@
 #ifndef _ACCOMMON_H
 #define _ACCOMMON_H
 
+
+typedef
+ACPI_STATUS (*ACPI_PKG_CALLBACK) (
+	u8                      object_type,
+	ACPI_OPERAND_OBJECT     *source_object,
+	ACPI_GENERIC_STATE      *state,
+	void                    *context);
+
+
+ACPI_STATUS
+acpi_cm_walk_package_tree (
+	ACPI_OPERAND_OBJECT     *source_object,
+	void                    *target_object,
+	ACPI_PKG_CALLBACK       walk_callback,
+	void                    *context);
+
+
+typedef struct acpi_pkg_info
+{
+	u8                      *free_space;
+	u32                     length;
+	u32                     object_space;
+	u32                     num_packages;
+} ACPI_PKG_INFO;
 
 #define REF_INCREMENT       (u16) 0
 #define REF_DECREMENT       (u16) 1
@@ -194,29 +218,30 @@ acpi_cm_build_package_object (
 	u32                     *space_used);
 
 ACPI_STATUS
-acpi_cm_build_external_object (
+acpi_cm_copy_iobject_to_eobject (
 	ACPI_OPERAND_OBJECT     *obj,
 	ACPI_BUFFER             *ret_buffer);
 
 ACPI_STATUS
-acpi_cm_build_internal_simple_object(
+acpi_cm_copy_esimple_to_isimple(
 	ACPI_OBJECT             *user_obj,
 	ACPI_OPERAND_OBJECT     *obj);
 
 ACPI_STATUS
-acpi_cm_build_internal_object (
+acpi_cm_copy_eobject_to_iobject (
 	ACPI_OBJECT             *obj,
 	ACPI_OPERAND_OBJECT     *internal_obj);
 
 ACPI_STATUS
-acpi_cm_copy_internal_simple_object (
+acpi_cm_copy_isimple_to_isimple (
 	ACPI_OPERAND_OBJECT     *source_obj,
 	ACPI_OPERAND_OBJECT     *dest_obj);
 
 ACPI_STATUS
-acpi_cm_build_copy_internal_package_object (
+acpi_cm_copy_ipackage_to_ipackage (
 	ACPI_OPERAND_OBJECT     *source_obj,
-	ACPI_OPERAND_OBJECT     *dest_obj);
+	ACPI_OPERAND_OBJECT     *dest_obj,
+	ACPI_WALK_STATE         *walk_state);
 
 
 /*
@@ -526,10 +551,23 @@ acpi_cm_create_update_state (
 	ACPI_OPERAND_OBJECT     *object,
 	u16                     action);
 
+ACPI_GENERIC_STATE *
+acpi_cm_create_pkg_state (
+	void                    *internal_object,
+	void                    *external_object,
+	u16                     index);
+
 ACPI_STATUS
 acpi_cm_create_update_state_and_push (
 	ACPI_OPERAND_OBJECT     *object,
 	u16                     action,
+	ACPI_GENERIC_STATE      **state_list);
+
+ACPI_STATUS
+acpi_cm_create_pkg_state_and_push (
+	void                    *internal_object,
+	void                    *external_object,
+	u16                     index,
 	ACPI_GENERIC_STATE      **state_list);
 
 ACPI_GENERIC_STATE *
@@ -563,6 +601,15 @@ acpi_cm_valid_acpi_character (
 ACPI_STATUS
 acpi_cm_resolve_package_references (
 	ACPI_OPERAND_OBJECT     *obj_desc);
+
+#ifdef ACPI_DEBUG
+
+void
+acpi_cm_display_init_pathname (
+	ACPI_HANDLE             obj_handle,
+	char                    *path);
+
+#endif
 
 
 /*

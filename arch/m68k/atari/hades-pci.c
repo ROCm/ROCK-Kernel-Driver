@@ -17,7 +17,7 @@
 
 #if defined(CONFIG_PCI) && defined(CONFIG_HADES)
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/pci.h>
 

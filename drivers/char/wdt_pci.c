@@ -43,7 +43,7 @@
 #include <linux/watchdog.h>
 #define WDT_IS_PCI
 #include "wd501p.h"
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 #include <asm/io.h>

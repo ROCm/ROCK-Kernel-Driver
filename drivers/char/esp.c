@@ -61,7 +61,7 @@
 #include <asm/bitops.h>
 
 #include <asm/dma.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 
 #include <linux/hayesesp.h>

@@ -7,7 +7,7 @@
  */
 
 #include <linux/iobuf.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/slab.h>
 
 static kmem_cache_t *kiobuf_cachep;

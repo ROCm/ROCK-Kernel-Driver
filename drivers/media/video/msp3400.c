@@ -42,7 +42,7 @@
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/videodev.h>
 #include <asm/semaphore.h>

@@ -28,7 +28,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/dio.h>
-#include <linux/malloc.h>                         /* kmalloc() */
+#include <linux/slab.h>                         /* kmalloc() */
 #include <linux/init.h>
 #include <asm/hwtest.h>                           /* hwreg_present() */
 #include <asm/io.h>                               /* readb() */

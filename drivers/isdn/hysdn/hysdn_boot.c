@@ -26,7 +26,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/vmalloc.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 
 #include "hysdn_defs.h"

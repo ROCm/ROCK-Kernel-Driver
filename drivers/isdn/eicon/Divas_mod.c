@@ -34,7 +34,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <errno.h>
 
 #include "adapter.h"

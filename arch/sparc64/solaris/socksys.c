@@ -16,7 +16,7 @@
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/poll.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/in.h>
 #include <linux/devfs_fs_kernel.h>
 

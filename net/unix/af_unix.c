@@ -8,7 +8,7 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  *
- * Version:	$Id: af_unix.c,v 1.109 2001/01/06 00:42:23 davem Exp $
+ * Version:	$Id: af_unix.c,v 1.111 2001/02/02 11:37:28 davem Exp $
  *
  * Fixes:
  *		Linus Torvalds	:	Assorted bug cures.
@@ -96,7 +96,7 @@
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
@@ -1316,9 +1316,12 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		size=len-sent;
 
 		/* Keep two messages in the pipe so it schedules better */
-		if (size > sk->sndbuf/2 - 16)
-			size = sk->sndbuf/2 - 16;
+		if (size > sk->sndbuf/2 - 64)
+			size = sk->sndbuf/2 - 64;
 
+		if (size > (128 * 1024) / 2)
+			size = (128 * 1024) / 2;
+			
 		/*
 		 *	Keep to page sized kmalloc()'s as various people
 		 *	have suggested. Big mallocs stress the vm too

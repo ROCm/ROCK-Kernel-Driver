@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 56 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -101,6 +101,7 @@ acpi_ds_init_one_object (
 	case ACPI_TYPE_METHOD:
 
 		info->method_count++;
+
 
 		/*
 		 * Set the execution data width (32 or 64) based upon the

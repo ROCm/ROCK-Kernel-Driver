@@ -17,7 +17,7 @@
 #ifndef _HFS_SYSDEP_H
 #define _HFS_SYSDEP_H
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/locks.h>
 #include <linux/fs.h>

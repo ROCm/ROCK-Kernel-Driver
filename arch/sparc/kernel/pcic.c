@@ -15,7 +15,7 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/ebus.h>
 #include <asm/sbus.h> /* for sanity check... */

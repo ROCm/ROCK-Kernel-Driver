@@ -36,7 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/hdreg.h>
 #include <linux/genhd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/mc146818rtc.h> /* CMOS defines */

@@ -31,7 +31,7 @@
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/errno.h>
 #include <linux/swap.h>

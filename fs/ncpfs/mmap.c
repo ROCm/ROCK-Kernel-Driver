@@ -14,7 +14,7 @@
 #include <linux/errno.h>
 #include <linux/mman.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/ncp_fs.h>
 

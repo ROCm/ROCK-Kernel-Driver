@@ -170,7 +170,7 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/sched.h>

@@ -10,7 +10,7 @@
  *
  * ------------------------------------------------------------------------- */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/file.h>

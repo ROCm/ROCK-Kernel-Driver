@@ -84,7 +84,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 

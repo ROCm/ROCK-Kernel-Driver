@@ -47,7 +47,7 @@
 
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/capability.h>
 #include <linux/sched.h>
 #include <linux/errno.h>

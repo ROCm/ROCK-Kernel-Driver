@@ -445,7 +445,7 @@ static const char *version = "de4x5.c:V0.545 1999/11/28 davies@maniac.ultranet.c
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -1662,6 +1662,7 @@ de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    STOP_DE4X5;
 	    printk("%s: Fatal bus error occurred, sts=%#8x, device stopped.\n",
 		   dev->name, sts);
+	    spin_unlock(&lp->lock);
 	    return;
 	}
     }
@@ -1733,6 +1734,7 @@ de4x5_rx(struct net_device *dev)
 		    netif_rx(skb);
 		    
 		    /* Update stats */
+		    dev->last_rx = jiffies;
 		    lp->stats.rx_packets++;
  		    lp->stats.rx_bytes += pkt_len;
 		    de4x5_local_stats(dev, skb->data, pkt_len);

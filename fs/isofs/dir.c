@@ -17,7 +17,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/config.h>

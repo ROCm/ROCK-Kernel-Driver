@@ -78,7 +78,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/major.h>

@@ -28,13 +28,14 @@
 #include <linux/udp.h>
 #include <linux/version.h>
 #include <linux/unistd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <net/ip.h>
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>

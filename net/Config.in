@@ -77,15 +77,15 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    tristate 'WAN router' CONFIG_WAN_ROUTER
    bool 'Fast switching (read help!)' CONFIG_NET_FASTROUTE
    bool 'Forwarding between high speed interfaces' CONFIG_NET_HW_FLOWCONTROL
-   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      mainmenu_option next_comment
-      comment 'QoS and/or fair queueing'
-      bool 'QoS and/or fair queueing (EXPERIMENTAL)' CONFIG_NET_SCHED
-      if [ "$CONFIG_NET_SCHED" = "y" ]; then
-	 source net/sched/Config.in
-      fi
-#      bool 'Network code profiler' CONFIG_NET_PROFILE
-      endmenu
-   fi
 fi
+
+mainmenu_option next_comment
+comment 'QoS and/or fair queueing'
+bool 'QoS and/or fair queueing (EXPERIMENTAL)' CONFIG_NET_SCHED
+if [ "$CONFIG_NET_SCHED" = "y" ]; then
+   source net/sched/Config.in
+fi
+#bool 'Network code profiler' CONFIG_NET_PROFILE
+endmenu
+
 endmenu

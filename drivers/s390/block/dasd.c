@@ -17,7 +17,7 @@
 
 #include <linux/tqueue.h>
 #include <linux/timer.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/genhd.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/hdreg.h>

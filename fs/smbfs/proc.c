@@ -9,7 +9,7 @@
 
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/stat.h>

@@ -18,7 +18,7 @@
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 

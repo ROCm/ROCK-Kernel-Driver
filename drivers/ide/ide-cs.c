@@ -19,7 +19,7 @@
     are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
 
     Alternatively, the contents of this file may be used under the
-    terms of the GNU Public License version 2 (the "GPL"), in which
+    terms of the GNU General Public License version 2 (the "GPL"), in which
     case the provisions of the GPL are applicable instead of the
     above.  If you wish to allow the use of your version of this file
     only under the terms of the GPL and not to allow others to use
@@ -36,7 +36,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
@@ -95,7 +95,7 @@ static void ide_release(u_long arg);
 static int ide_event(event_t event, int priority,
 		     event_callback_args_t *args);
 
-static dev_info_t dev_info = "ide_cs";
+static dev_info_t dev_info = "ide-cs";
 
 static dev_link_t *ide_attach(void);
 static void ide_detach(dev_link_t *);
@@ -387,6 +387,11 @@ void ide_release(u_long arg)
 	ide_unregister(info->hd);
 	MOD_DEC_USE_COUNT;
     }
+
+    request_region(link->io.BasePort1, link->io.NumPorts1,"ide-cs");
+    if (link->io.NumPorts2)
+	request_region(link->io.BasePort2, link->io.NumPorts2,"ide-cs");
+    
     info->ndev = 0;
     link->dev = NULL;
     

@@ -5,7 +5,7 @@
  *  Based upon code written by Linus Torvalds and others.
  */
  
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 #include <asm/uaccess.h>

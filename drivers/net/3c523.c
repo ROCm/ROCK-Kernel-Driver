@@ -3,7 +3,7 @@
 
 
    This is an extension to the Linux operating system, and is covered by the
-   same Gnu Public License that covers that work.
+   same GNU General Public License that covers that work.
 
    Copyright 1995, 1996 by Chris Beauregard (cpbeaure@undergrad.math.uwaterloo.ca)
 
@@ -91,7 +91,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/mca.h>
@@ -148,9 +148,9 @@ sizeof(nop_cmd) = 8;
 
 #define RECV_BUFF_SIZE 1524	/* slightly oversized */
 #define XMIT_BUFF_SIZE 1524	/* slightly oversized */
-#define NUM_XMIT_BUFFS 4	/* config for both, 8K and 16K shmem */
-#define NUM_RECV_BUFFS_8  1	/* config for 8K shared mem */
-#define NUM_RECV_BUFFS_16 6	/* config for 16K shared mem */
+#define NUM_XMIT_BUFFS 1	/* config for both, 8K and 16K shmem */
+#define NUM_RECV_BUFFS_8  4	/* config for 8K shared mem */
+#define NUM_RECV_BUFFS_16 9	/* config for 16K shared mem */
 
 #if (NUM_XMIT_BUFFS == 1)
 #define NO_NOPCOMMANDS		/* only possible with NUM_XMIT_BUFFS=1 */
@@ -197,6 +197,7 @@ struct priv {
 	struct net_device_stats stats;
 	unsigned long base;
 	char *memtop;
+	unsigned long mapped_start;		/* Start of ioremap */
 	volatile struct rfd_struct *rfd_last, *rfd_top, *rfd_first;
 	volatile struct scp_struct *scp;	/* volatile is important */
 	volatile struct iscp_struct *iscp;	/* volatile is important */
@@ -303,13 +304,13 @@ static int __init check586(struct net_device *dev, unsigned long where, unsigned
 	char *iscp_addrs[2];
 	int i = 0;
 
-	p->base = where + size - 0x01000000;
-	p->memtop = phys_to_virt(where) + size;
-	p->scp = (struct scp_struct *)phys_to_virt(p->base + SCP_DEFAULT_ADDRESS);
+	p->base = (unsigned long) bus_to_virt((unsigned long)where) + size - 0x01000000;
+	p->memtop = bus_to_virt((unsigned long)where) + size;
+	p->scp = (struct scp_struct *)(p->base + SCP_DEFAULT_ADDRESS);
 	memset((char *) p->scp, 0, sizeof(struct scp_struct));
 	p->scp->sysbus = SYSBUSVAL;	/* 1 = 8Bit-Bus, 0 = 16 Bit */
 
-	iscp_addrs[0] = phys_to_virt(where);
+	iscp_addrs[0] = bus_to_virt((unsigned long)where);
 	iscp_addrs[1] = (char *) p->scp - sizeof(struct iscp_struct);
 
 	for (i = 0; i < 2; i++) {
@@ -325,6 +326,7 @@ static int __init check586(struct net_device *dev, unsigned long where, unsigned
 
 		/* apparently, you sometimes have to kick the 82586 twice... */
 		elmc_id_attn586();
+		DELAY(1);
 
 		if (p->iscp->busy) {	/* i82586 clears 'busy' after successful init */
 			return 0;
@@ -344,8 +346,8 @@ void alloc586(struct net_device *dev)
 	elmc_id_reset586();
 	DELAY(2);
 
-	p->scp = (struct scp_struct *) phys_to_virt(p->base + SCP_DEFAULT_ADDRESS);
-	p->scb = (struct scb_struct *) phys_to_virt(dev->mem_start);
+	p->scp = (struct scp_struct *) (p->base + SCP_DEFAULT_ADDRESS);
+	p->scb = (struct scb_struct *) bus_to_virt(dev->mem_start);
 	p->iscp = (struct iscp_struct *) ((char *) p->scp - sizeof(struct iscp_struct));
 
 	memset((char *) p->iscp, 0, sizeof(struct iscp_struct));
@@ -409,6 +411,8 @@ int __init elmc_probe(struct net_device *dev)
 	u_char revision = 0;
 	int i = 0;
 	unsigned int size = 0;
+	int retval;
+	struct priv *pr;
 
 	SET_MODULE_OWNER(dev);
 	if (MCA_bus == 0) {
@@ -428,18 +432,24 @@ int __init elmc_probe(struct net_device *dev)
 		   Also reject it if the card is already in use.
 		 */
 
-		if((irq && irq != dev->irq) || (base_addr && base_addr != dev->base_addr)
-		   || check_region(dev->base_addr,ELMC_IO_EXTENT)) {
+		if ((irq && irq != dev->irq) || 
+		    (base_addr && base_addr != dev->base_addr)) {
 			slot = mca_find_adapter(ELMC_MCA_ID, slot + 1);
 			continue;
 		}
+		if (!request_region(dev->base_addr, ELMC_IO_EXTENT, dev->name)) {
+			slot = mca_find_adapter(ELMC_MCA_ID, slot + 1);
+			continue;
+		}
+
 		/* found what we're looking for... */
 		break;
 	}
 
 	/* we didn't find any 3c523 in the slots we checked for */
 	if (slot == MCA_NOTFOUND) {
-		return ((base_addr || irq) ? ENXIO : ENODEV);
+		retval = ((base_addr || irq) ? -ENXIO : -ENODEV);
+		goto err_out;
 	}
 	mca_set_adapter_name(slot, "3Com 3c523 Etherlink/MC");
 	mca_set_adapter_procfn(slot, (MCA_ProcFn) elmc_getinfo, dev);
@@ -479,15 +489,14 @@ int __init elmc_probe(struct net_device *dev)
 		break;
 	}
 
-	request_region(dev->base_addr, ELMC_IO_EXTENT, "3c523");
-
-	dev->priv = (void *) kmalloc(sizeof(struct priv), GFP_KERNEL);
+	pr = dev->priv = kmalloc(sizeof(struct priv), GFP_KERNEL);
 	if (dev->priv == NULL) {
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto err_out;
 	}
-	memset((char *) dev->priv, 0, sizeof(struct priv));
+	memset(pr, 0, sizeof(struct priv));
 
-	((struct priv *) (dev->priv))->slot = slot;
+	pr->slot = slot;
 
 	printk(KERN_INFO "%s: 3Com 3c523 Rev 0x%x at %#lx\n", dev->name, (int) revision,
 	       dev->base_addr);
@@ -513,18 +522,21 @@ int __init elmc_probe(struct net_device *dev)
 	if (!check586(dev, dev->mem_start, size)) {
 		printk(KERN_ERR "%s: memprobe, Can't find memory at 0x%lx!\n", dev->name,
 		       dev->mem_start);
-		release_region(dev->base_addr, ELMC_IO_EXTENT);
-		return -ENODEV;
+		kfree(dev->priv);
+		dev->priv = NULL;
+		retval = -ENODEV;
+		goto err_out;
 	}
 	dev->mem_end = dev->mem_start + size;	/* set mem_end showed by 'ifconfig' */
 
-	((struct priv *) (dev->priv))->base = dev->mem_start + size - 0x01000000;
+	((struct priv *) (dev->priv))->memtop = bus_to_virt(dev->mem_start) + size;
+	((struct priv *) (dev->priv))->base = (unsigned long) bus_to_virt(dev->mem_start) + size - 0x01000000;
 	alloc586(dev);
 
 	elmc_id_reset586();	/* make sure it doesn't generate spurious ints */
 
 	/* set number of receive-buffs according to memsize */
-	((struct priv *) dev->priv)->num_recv_buffs = NUM_RECV_BUFFS_16;
+	pr->num_recv_buffs = NUM_RECV_BUFFS_16;
 
 	/* dump all the assorted information */
 	printk(KERN_INFO "%s: IRQ %d, %sternal xcvr, memory %#lx-%#lx.\n", dev->name,
@@ -563,6 +575,9 @@ int __init elmc_probe(struct net_device *dev)
 #endif
 
 	return 0;
+err_out:
+	release_region(dev->base_addr, ELMC_IO_EXTENT);
+	return retval;
 }
 
 /**********************************************
@@ -944,9 +959,11 @@ static void elmc_rcv_int(struct net_device *dev)
 				if (skb != NULL) {
 					skb->dev = dev;
 					skb_reserve(skb, 2);	/* 16 byte alignment */
-					memcpy(skb_put(skb, totlen), (u8 *)phys_to_virt(p->base) + (unsigned long) rbd->buffer, totlen);
+					skb_put(skb,totlen);
+					eth_copy_and_sum(skb, (char *) p->base+(unsigned long) rbd->buffer,totlen,0);
 					skb->protocol = eth_type_trans(skb, dev);
 					netif_rx(skb);
+					dev->last_rx = jiffies;
 					p->stats.rx_packets++;
 					p->stats.rx_bytes += totlen;
 				} else {
@@ -1086,6 +1103,7 @@ static void elmc_timeout(struct net_device *dev)
 static int elmc_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
 	int len;
+	int i;
 #ifndef NO_NOPCOMMANDS
 	int next_nop;
 #endif

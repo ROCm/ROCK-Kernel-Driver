@@ -554,7 +554,7 @@ found_ec(
 
 	ec_cxt->need_global_lock = obj.integer.value;
 
-	printk(KERN_INFO "ACPI: found EC @ (0x%02x,0x%02x,gpe %d GL %d)\n",
+	printk(KERN_INFO "ACPI: found EC @ (0x%02x,0x%02x,GPE %d GL %d)\n",
 		ec_cxt->data_port, ec_cxt->status_port, ec_cxt->gpe_bit,
 		ec_cxt->need_global_lock);
 

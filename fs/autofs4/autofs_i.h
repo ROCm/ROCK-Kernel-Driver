@@ -20,7 +20,7 @@
 #define AUTOFS_IOC_COUNT     32
 
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/wait.h>

@@ -29,7 +29,7 @@
 #include <linux/sockios.h>
 #include <linux/net.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>

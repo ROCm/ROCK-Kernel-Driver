@@ -44,7 +44,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	u8 request, u8 requesttype, u16 value, u16 index,

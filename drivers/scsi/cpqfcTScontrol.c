@@ -35,7 +35,7 @@
 #include <linux/string.h>
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/sched.h>
-#include <linux/malloc.h>  // need "kfree" for ext. S/G pages
+#include <linux/slab.h>  // need "kfree" for ext. S/G pages
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>

@@ -35,7 +35,7 @@ Return value:
 #include <linux/kernel.h>
 
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/net.h>
 #include <linux/sched.h>
 #include <linux/skbuff.h>

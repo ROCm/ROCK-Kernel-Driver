@@ -37,10 +37,14 @@
 int acpi_cpu_init(void);
 u32 acpi_read_pm_timer(void);
 
-extern unsigned long acpi_c2_exit_latency;
-extern unsigned long acpi_c3_exit_latency;
-extern unsigned long acpi_c2_enter_latency;
-extern unsigned long acpi_c3_enter_latency;
+extern u32 acpi_c2_exit_latency;
+extern u32 acpi_c3_exit_latency;
+extern u32 acpi_c2_enter_latency;
+extern u32 acpi_c3_enter_latency;
+extern u32 acpi_use_idle;
+extern u32 acpi_c1_count;
+extern u32 acpi_c2_count;
+extern u32 acpi_c3_count;
 
 /*
  * driver.c

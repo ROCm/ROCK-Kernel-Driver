@@ -229,7 +229,7 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
 #include <linux/ioport.h>

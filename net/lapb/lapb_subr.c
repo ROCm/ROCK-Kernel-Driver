@@ -13,8 +13,6 @@
  *	LAPB 001	Jonathan Naylor	Started Coding
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_LAPB) || defined(CONFIG_LAPB_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -281,5 +279,3 @@ void lapb_transmit_frmr(lapb_cb *lapb)
 
 	lapb_transmit_buffer(lapb, skb, LAPB_RESPONSE);
 }
-
-#endif

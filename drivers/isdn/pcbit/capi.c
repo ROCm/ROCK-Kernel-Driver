@@ -37,7 +37,7 @@
 #include <linux/kernel.h>
 
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 
 #include <linux/tqueue.h>

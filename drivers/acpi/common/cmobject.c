@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: cmobject - ACPI object create/delete/size/cache routines
- *              $Revision: 35 $
+ *              $Revision: 36 $
  *
  *****************************************************************************/
 
@@ -35,7 +35,7 @@
 	 MODULE_NAME         ("cmobject")
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    _Cm_create_internal_object
  *
@@ -49,11 +49,11 @@
  *
  * DESCRIPTION: Create and initialize a new internal object.
  *
- * NOTE:
- *      We always allocate the worst-case object descriptor because these
- *      objects are cached, and we want them to be one-size-satisifies-any-request.
- *      This in itself may not be the most memory efficient, but the efficiency
- *      of the object cache should more than make up for this!
+ * NOTE:        We always allocate the worst-case object descriptor because
+ *              these objects are cached, and we want them to be
+ *              one-size-satisifies-any-request.  This in itself may not be
+ *              the most memory efficient, but the efficiency of the object
+ *              cache should more than make up for this!
  *
  ******************************************************************************/
 
@@ -91,7 +91,7 @@ _cm_create_internal_object (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_valid_internal_object
  *
@@ -99,7 +99,7 @@ _cm_create_internal_object (
  *
  * RETURN:      Validate a pointer to be an ACPI_OPERAND_OBJECT
  *
- *****************************************************************************/
+ ******************************************************************************/
 
 u8
 acpi_cm_valid_internal_object (
@@ -136,7 +136,7 @@ acpi_cm_valid_internal_object (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    _Cm_allocate_object_desc
  *
@@ -150,7 +150,7 @@ acpi_cm_valid_internal_object (
  * DESCRIPTION: Allocate a new object descriptor.  Gracefully handle
  *              error conditions.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 void *
 _cm_allocate_object_desc (
@@ -211,7 +211,7 @@ _cm_allocate_object_desc (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_delete_object_desc
  *
@@ -221,7 +221,7 @@ _cm_allocate_object_desc (
  *
  * DESCRIPTION: Free an ACPI object descriptor or add it to the object cache
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 void
 acpi_cm_delete_object_desc (
@@ -274,7 +274,7 @@ acpi_cm_delete_object_desc (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_delete_object_cache
  *
@@ -317,7 +317,7 @@ acpi_cm_delete_object_cache (
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_init_static_object
  *
@@ -329,7 +329,7 @@ acpi_cm_delete_object_cache (
  * DESCRIPTION: Initialize a static object.  Sets flags to disallow dynamic
  *              deletion of the object.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 void
 acpi_cm_init_static_object (
@@ -365,14 +365,14 @@ acpi_cm_init_static_object (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_get_simple_object_size
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are examining
- *              *Ret_length     - Where the length is returned
+ * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
+ *              *Ret_length         - Where the length is returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to determine the space required to
  *              contain a simple object for return to an API user.
@@ -384,7 +384,7 @@ acpi_cm_init_static_object (
 
 ACPI_STATUS
 acpi_cm_get_simple_object_size (
-	ACPI_OPERAND_OBJECT     *internal_obj,
+	ACPI_OPERAND_OBJECT     *internal_object,
 	u32                     *obj_length)
 {
 	u32                     length;
@@ -393,7 +393,7 @@ acpi_cm_get_simple_object_size (
 
 	/* Handle a null object (Could be a uninitialized package element -- which is legal) */
 
-	if (!internal_obj) {
+	if (!internal_object) {
 		*obj_length = 0;
 		return (AE_OK);
 	}
@@ -403,7 +403,7 @@ acpi_cm_get_simple_object_size (
 
 	length = sizeof (ACPI_OBJECT);
 
-	if (VALID_DESCRIPTOR_TYPE (internal_obj, ACPI_DESC_TYPE_NAMED)) {
+	if (VALID_DESCRIPTOR_TYPE (internal_object, ACPI_DESC_TYPE_NAMED)) {
 		/* Object is a named object (reference), just return the length */
 
 		*obj_length = (u32) ROUND_UP_TO_NATIVE_WORD (length);
@@ -419,18 +419,18 @@ acpi_cm_get_simple_object_size (
 	 * TBD:[Investigate] do strings and buffers require alignment also?
 	 */
 
-	switch (internal_obj->common.type)
+	switch (internal_object->common.type)
 	{
 
 	case ACPI_TYPE_STRING:
 
-		length += internal_obj->string.length + 1;
+		length += internal_object->string.length + 1;
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		length += internal_obj->buffer.length;
+		length += internal_object->buffer.length;
 		break;
 
 
@@ -450,7 +450,7 @@ acpi_cm_get_simple_object_size (
 		 * The only type that should be here is opcode AML_NAMEPATH_OP -- since
 		 * this means an object reference
 		 */
-		if (internal_obj->reference.op_code != AML_NAMEPATH_OP) {
+		if (internal_object->reference.op_code != AML_NAMEPATH_OP) {
 			status = AE_TYPE;
 		}
 		break;
@@ -475,149 +475,119 @@ acpi_cm_get_simple_object_size (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_get_package_object_size
+ * FUNCTION:    Acpi_cm_copy_package_to_internal
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are examining
- *              *Ret_length     - Where the length is returned
+ * PARAMETERS:  ACPI_PKG_CALLBACK
  *
  * RETURN:      Status          - the status of the call
  *
- * DESCRIPTION: This function is called to determine the space required to contain
- *              a package object for return to an API user.
+ * DESCRIPTION:
  *
- *              This is moderately complex since a package contains other objects
- *              including packages.
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_get_element_length (
+	u8                      object_type,
+	ACPI_OPERAND_OBJECT     *source_object,
+	ACPI_GENERIC_STATE      *state,
+	void                    *context)
+{
+	ACPI_STATUS             status = AE_OK;
+	ACPI_PKG_INFO           *info = (ACPI_PKG_INFO *) context;
+	u32                     object_space;
+
+
+	switch (object_type)
+	{
+	case 0:
+
+		/*
+		 * Simple object - just get the size (Null object/entry is handled
+		 * here also) and sum it into the running package length
+		 */
+		status = acpi_cm_get_simple_object_size (source_object, &object_space);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
+
+		info->length += object_space;
+		break;
+
+
+	case 1:
+		/* Package - nothing much to do here, let the walk handle it */
+
+		info->num_packages++;
+		state->pkg.this_target_obj = NULL;
+		break;
+
+	default:
+		return (AE_BAD_PARAMETER);
+	}
+
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_cm_get_package_object_size
+ *
+ * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
+ *              *Ret_length         - Where the length is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: This function is called to determine the space required to
+ *              contain a package object for return to an API user.
+ *
+ *              This is moderately complex since a package contains other
+ *              objects including packages.
  *
  ******************************************************************************/
 
 ACPI_STATUS
 acpi_cm_get_package_object_size (
-	ACPI_OPERAND_OBJECT     *internal_obj,
+	ACPI_OPERAND_OBJECT     *internal_object,
 	u32                     *obj_length)
 {
-
-	ACPI_OPERAND_OBJECT     *this_internal_obj;
-	ACPI_OPERAND_OBJECT     *parent_obj[MAX_PACKAGE_DEPTH];
-	ACPI_OPERAND_OBJECT     *this_parent;
-	u32                     this_index;
-	u32                     index[MAX_PACKAGE_DEPTH];
-	u32                     length = 0;
-	u32                     object_space;
-	u32                     current_depth = 0;
-	u32                     package_count = 1;
 	ACPI_STATUS             status;
+	ACPI_PKG_INFO           info;
 
 
-	/* Init the package stack TBD: replace with linked list */
+	info.length      = 0;
+	info.object_space = 0;
+	info.num_packages = 1;
 
-	MEMSET(parent_obj, 0, MAX_PACKAGE_DEPTH);
-	MEMSET(index, 0, MAX_PACKAGE_DEPTH);
+	status = acpi_cm_walk_package_tree (internal_object, NULL,
+			 acpi_cm_get_element_length, &info);
 
-	parent_obj[0] = internal_obj;
+	/*
+	 * We have handled all of the objects in all levels of the package.
+	 * just add the length of the package objects themselves.
+	 * Round up to the next machine word.
+	 */
+	info.length += ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT)) *
+			  info.num_packages;
 
-	while (1) {
-		this_parent     = parent_obj[current_depth];
-		this_index      = index[current_depth];
-		this_internal_obj = this_parent->package.elements[this_index];
+	/* Return the total package length */
 
-
-		/*
-		 * Check for 1) An uninitialized package element.  It is completely
-		 *              legal to declare a package and leave it uninitialized
-		 *           2) Any type other than a package.  Packages are handled
-		 *              below.
-		 */
-
-		if ((!this_internal_obj) ||
-			(!IS_THIS_OBJECT_TYPE (this_internal_obj, ACPI_TYPE_PACKAGE)))
-		{
-			/*
-			 * Simple object - just get the size (Null object/entry handled
-			 *  also)
-			 */
-
-			status =
-				acpi_cm_get_simple_object_size (this_internal_obj, &object_space);
-
-			if (ACPI_FAILURE (status)) {
-				return (status);
-			}
-
-			length += object_space;
-
-			index[current_depth]++;
-			while (index[current_depth] >=
-				parent_obj[current_depth]->package.count)
-			{
-				/*
-				 * We've handled all of the objects at
-				 * this level,  This means that we have
-				 * just completed a package.  That package
-				 * may have contained one or more packages
-				 * itself.
-				 */
-				if (current_depth == 0) {
-					/*
-					 * We have handled all of the objects
-					 * in the top level package just add the
-					 * length of the package objects and
-					 * get out. Round up to the next machine
-					 * word.
-					 */
-					length +=
-						ROUND_UP_TO_NATIVE_WORD (
-								sizeof (ACPI_OBJECT)) *
-								package_count;
-
-					*obj_length = length;
-
-					return (AE_OK);
-				}
-
-				/*
-				 * Go back up a level and move the index
-				 * past the just completed package object.
-				 */
-				current_depth--;
-				index[current_depth]++;
-			}
-		}
-
-		else {
-			/*
-			 * This object is a package
-			 * -- go one level deeper
-			 */
-			package_count++;
-			if (current_depth < MAX_PACKAGE_DEPTH-1) {
-				current_depth++;
-				parent_obj[current_depth] = this_internal_obj;
-				index[current_depth]    = 0;
-			}
-
-			else {
-				/*
-				 * Too many nested levels of packages for us
-				 * to handle
-				 */
-
-				return (AE_LIMIT);
-			}
-		}
-	}
+	*obj_length = info.length;
+	return (status);
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_get_object_size
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are examining
- *              *Ret_length     - Where the length will be returned
+ * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
+ *              *Ret_length         - Where the length will be returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to determine the space required to
  *              contain an object for return to an API user.
@@ -626,22 +596,20 @@ acpi_cm_get_package_object_size (
 
 ACPI_STATUS
 acpi_cm_get_object_size(
-	ACPI_OPERAND_OBJECT     *internal_obj,
+	ACPI_OPERAND_OBJECT     *internal_object,
 	u32                     *obj_length)
 {
 	ACPI_STATUS             status;
 
 
-	if ((VALID_DESCRIPTOR_TYPE (internal_obj, ACPI_DESC_TYPE_INTERNAL)) &&
-		(IS_THIS_OBJECT_TYPE (internal_obj, ACPI_TYPE_PACKAGE)))
+	if ((VALID_DESCRIPTOR_TYPE (internal_object, ACPI_DESC_TYPE_INTERNAL)) &&
+		(IS_THIS_OBJECT_TYPE (internal_object, ACPI_TYPE_PACKAGE)))
 	{
-		status =
-			acpi_cm_get_package_object_size (internal_obj, obj_length);
+		status = acpi_cm_get_package_object_size (internal_object, obj_length);
 	}
 
 	else {
-		status =
-			acpi_cm_get_simple_object_size (internal_obj, obj_length);
+		status = acpi_cm_get_simple_object_size (internal_object, obj_length);
 	}
 
 	return (status);

@@ -26,7 +26,7 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/bitops.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>  /* for in_interrupt() */
 #include <linux/kmod.h>
 #include <linux/init.h>

@@ -94,7 +94,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 #include <linux/mc146818rtc.h>
@@ -481,7 +481,8 @@ static void pc_set_checksum( void )
 #ifdef CONFIG_PROC_FS
 
 static char *floppy_types[] = {
-	"none", "5.25'' 360k", "5.25'' 1.2M", "3.5'' 720k", "3.5'' 1.44M", "3.5'' 2.88M"
+	"none", "5.25'' 360k", "5.25'' 1.2M", "3.5'' 720k", "3.5'' 1.44M",
+	"3.5'' 2.88M", "3.5'' 2.88M"
 };
 
 static char *gfx_types[] = {

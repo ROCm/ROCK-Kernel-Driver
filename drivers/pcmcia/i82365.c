@@ -41,7 +41,7 @@
 #include <linux/errno.h>
 #include <linux/timer.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>

@@ -287,11 +287,11 @@ void __init smp4d_boot_cpus(void)
 				smp_highest_cpu = i;
 			}
 		}
-		SMP_PRINTK(("Total of %d Processors activated (%lu.%02lu BogoMIPS).\n", cpucount + 1, (bogosum + 2500)/500000, ((bogosum + 2500)/5000)%100));
+		SMP_PRINTK(("Total of %d Processors activated (%lu.%02lu BogoMIPS).\n", cpucount + 1, bogosum/(500000/HZ), (bogosum/(5000/HZ))%100));
 		printk("Total of %d Processors activated (%lu.%02lu BogoMIPS).\n",
 		       cpucount + 1,
-		       (bogosum + 2500)/500000,
-		       ((bogosum + 2500)/5000)%100);
+		       bogosum/(500000/HZ),
+		       (bogosum/(5000/HZ))%100);
 		smp_activated = 1;
 		smp_num_cpus = cpucount + 1;
 	}

@@ -13,12 +13,13 @@
 #include <linux/miscdevice.h>
 #include <linux/tpqic02.h>
 #include <linux/ftape.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mman.h>
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/raw.h>
+#include <linux/tty.h>
 #include <linux/capability.h>
 
 #include <asm/uaccess.h>

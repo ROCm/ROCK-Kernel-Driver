@@ -31,7 +31,7 @@
  ********************************************************************** 
  */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include "hwaccess.h"
 #include "8010.h"

@@ -22,7 +22,7 @@
 
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/proc_fs.h>
 #include <linux/errno.h>
 #include <linux/stat.h>

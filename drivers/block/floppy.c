@@ -152,7 +152,7 @@ static int print_unex=1;
 #include <linux/hdreg.h>
 
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>

@@ -9,7 +9,7 @@
  */
 
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
@@ -454,6 +454,7 @@ find_fh_dentry(struct super_block *sb, ino_t ino, int generation, ino_t dirino, 
 		if (tmp != dentry) {
 			/* we lost a race,  try again
 			 */
+			dput(pdentry);
 			dput(tmp);
 			dput(dentry);
 			dput(result);	/* this will discard the whole free path, so we can up the semaphore */

@@ -7,7 +7,7 @@
  */
 
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/sunrpc/clnt.h>

@@ -2,6 +2,7 @@
  *  cpu.c - Processor handling
  *
  *  Copyright (C) 2000 Andrew Henroid
+ *  Copyright (C) 2001 Andrew Grover
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,19 +29,29 @@
 #define _COMPONENT	OS_DEPENDENT
 	MODULE_NAME	("cpu")
 
-unsigned long acpi_c2_exit_latency = ACPI_INFINITE;
-unsigned long acpi_c3_exit_latency = ACPI_INFINITE;
-unsigned long acpi_c2_enter_latency = ACPI_INFINITE;
-unsigned long acpi_c3_enter_latency = ACPI_INFINITE;
+u32 acpi_c2_exit_latency = ACPI_INFINITE;
+u32 acpi_c3_exit_latency = ACPI_INFINITE;
+u32 acpi_c2_enter_latency = ACPI_INFINITE;
+u32 acpi_c3_enter_latency = ACPI_INFINITE;
+u32 acpi_use_idle = TRUE;
 
-static unsigned long acpi_pblk = ACPI_INVALID;
+u32 acpi_c1_count = 0;
+u32 acpi_c2_count = 0;
+u32 acpi_c3_count = 0;
+
+static u32 acpi_pblk = ACPI_INVALID;
 static int acpi_c2_tested = 0;
 static int acpi_c3_tested = 0;
 static int acpi_max_c_state = 1;
-static int acpi_pm_tmr_len;
+static int acpi_pm_tmr_len = 24;
 
+#define CPU_POWER_STATES	3
 #define MAX_C2_LATENCY		100
 #define MAX_C3_LATENCY		1000
+
+#define ACPI_STATE_C1		0
+#define ACPI_STATE_C2		1
+#define ACPI_STATE_C3		2
 
 /*
  * Clear busmaster activity flag
@@ -48,7 +59,7 @@ static int acpi_pm_tmr_len;
 static inline void
 acpi_clear_bm_activity(void)
 {
-	acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_LOCK, BM_STS, 0);
+	acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_LOCK, BM_STS, 1);
 }
 
 /*
@@ -100,6 +111,7 @@ acpi_compare_pm_timers(u32 first, u32 second)
 	}
 }
 
+
 /*
  * Idle loop (uniprocessor only)
  */
@@ -109,14 +121,9 @@ acpi_idle(void)
 	static int sleep_level = 1;
 	FADT_DESCRIPTOR *fadt = &acpi_fadt;
 
-	if (!fadt
-	    || (STRNCMP(fadt->header.signature, ACPI_FADT_SIGNATURE, ACPI_SIG_LEN) != 0)
-	    || !fadt->Xpm_tmr_blk.address
-	    || !acpi_pblk)
-		goto not_initialized;
-
 	/*
-	 * start from the previous sleep level..
+	 * start from the previous sleep level.
+	 * if not initialized, we goto sleep1
 	 */
 	if (sleep_level == 1
 	    || acpi_max_c_state < 2)
@@ -126,7 +133,7 @@ acpi_idle(void)
 	    || acpi_max_c_state < 3)
 		goto sleep2;
 
-      sleep3:
+sleep3:
 	sleep_level = 3;
 	if (!acpi_c3_tested) {
 		DEBUG_PRINT(ACPI_INFO, ("C3 works\n"));
@@ -147,6 +154,7 @@ acpi_idle(void)
 			goto sleep2;
 
 		time = acpi_read_pm_timer();
+		acpi_c3_count++;
 		inb(acpi_pblk + ACPI_P_LVL3);
 		/* Dummy read, force synchronization with the PMU */
 		acpi_read_pm_timer();
@@ -154,10 +162,10 @@ acpi_idle(void)
 
 		__sti();
 		if (diff < acpi_c3_exit_latency)
-			goto sleep2;
+			goto sleep1;
 	}
 
-      sleep3_with_arbiter:
+sleep3_with_arbiter:
 	for (;;) {
 		unsigned long time;
 		unsigned long diff;
@@ -172,6 +180,7 @@ acpi_idle(void)
 		
 		/* Disable arbiter, park on CPU */
 		acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_LOCK, ARB_DIS, 1);
+		acpi_c3_count++;
 		inb(acpi_pblk + ACPI_P_LVL3);
 		/* Dummy read, force synchronization with the PMU */
 		acpi_read_pm_timer();
@@ -181,10 +190,10 @@ acpi_idle(void)
 
 		__sti();
 		if (diff < acpi_c3_exit_latency)
-			goto sleep2;
+			goto sleep1;
 	}
 
-      sleep2:
+sleep2:
 	sleep_level = 2;
 	if (!acpi_c2_tested) {
 		DEBUG_PRINT(ACPI_INFO, ("C2 works\n"));
@@ -200,6 +209,7 @@ acpi_idle(void)
 			goto out;
 
 		time = acpi_read_pm_timer();
+		acpi_c2_count++;
 		inb(acpi_pblk + ACPI_P_LVL2);
 		/* Dummy read, force synchronization with the PMU */
 		acpi_read_pm_timer();
@@ -217,7 +227,7 @@ acpi_idle(void)
 			goto sleep3;
 	}
 
-      sleep1:
+sleep1:
 	sleep_level = 1;
 	acpi_sleep_on_busmaster();
 	for (;;) {
@@ -228,6 +238,7 @@ acpi_idle(void)
 		if (current->need_resched)
 			goto out;
 		time = acpi_read_pm_timer();
+		acpi_c1_count++;
 		safe_halt();
 		diff = acpi_compare_pm_timers(time, acpi_read_pm_timer());
 		if (diff > acpi_c2_enter_latency
@@ -235,15 +246,7 @@ acpi_idle(void)
 			goto sleep2;
 	}
 
-      not_initialized:
-	for (;;) {
-		__cli();
-		if (current->need_resched)
-			goto out;
-		safe_halt();
-	}
-
-      out:
+out:
 	__sti();
 }
 
@@ -278,17 +281,17 @@ acpi_found_cpu(ACPI_HANDLE handle, u32 level, void *ctx, void **value)
 		acpi_c2_exit_latency
 			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl2_lat);
 		acpi_c2_enter_latency
-			= ACPI_MICROSEC_TO_TMR_TICKS(ACPI_TMR_HZ / 1000);
+			= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl2_lat * 4);
 		acpi_max_c_state = 2;
 
 		printk(KERN_INFO "ACPI: System firmware supports: C2");
-	
+			
 		if (acpi_fadt.plvl3_lat
 		    && acpi_fadt.plvl3_lat <= MAX_C3_LATENCY) {
 			acpi_c3_exit_latency
 				= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat);
 			acpi_c3_enter_latency
-				= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat * 5);
+				= ACPI_MICROSEC_TO_TMR_TICKS(acpi_fadt.plvl3_lat * 12);
 			acpi_max_c_state = 3;
 
 			printk(" C3");
@@ -296,6 +299,10 @@ acpi_found_cpu(ACPI_HANDLE handle, u32 level, void *ctx, void **value)
 
 		printk("\n");
 	}
+
+	printk(KERN_INFO "ACPI: plvl2lat=%d plvl3lat=%d\n", acpi_fadt.plvl2_lat, acpi_fadt.plvl3_lat);
+	printk(KERN_INFO "ACPI: C2 enter=%d C2 exit=%d\n", acpi_c2_enter_latency, acpi_c2_exit_latency);
+	printk(KERN_INFO "ACPI: C3 enter=%d C3 exit=%d\n", acpi_c3_enter_latency, acpi_c3_exit_latency);
 
 	return AE_OK;
 }
@@ -328,13 +335,19 @@ acpi_cpu_init(void)
 
 	acpi_pm_timer_init();
 
-
+	if (acpi_use_idle) {
 #ifdef CONFIG_SMP
-	if (smp_num_cpus == 1)
-		pm_idle = acpi_idle;
+		if (smp_num_cpus == 1)
+			pm_idle = acpi_idle;
 #else
-	pm_idle = acpi_idle;
+		pm_idle = acpi_idle;
 #endif
+		printk(KERN_INFO "ACPI: Using ACPI idle\n");
+		printk(KERN_INFO "ACPI: If experiencing system slowness, try adding \"acpi=no-idle\" to cmdline\n");
+	}
+	else {
+		printk(KERN_INFO "ACPI: Not using ACPI idle\n");
+	}
 
 	return 0;
 }

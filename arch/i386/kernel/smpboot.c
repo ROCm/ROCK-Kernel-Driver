@@ -389,6 +389,7 @@ void __init smp_callin(void)
 		 */
 		if (test_bit(cpuid, &cpu_callout_map))
 			break;
+		rep_nop();
 	}
 
 	if (!time_before(jiffies, timeout)) {

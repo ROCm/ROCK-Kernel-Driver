@@ -15,8 +15,6 @@
  *	2000-10-29	Henner Eisen	lapb_data_indication() return status.
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_LAPB) || defined(CONFIG_LAPB_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -641,5 +639,3 @@ void lapb_data_input(lapb_cb *lapb, struct sk_buff *skb)
 
 	lapb_kick(lapb);
 }
-
-#endif

@@ -1686,7 +1686,7 @@ int cpqfcTSGetLPSM( PTACHYON fcChip, char cErrorString[])
 
 
 
-#include "linux/malloc.h"
+#include "linux/slab.h"
 
 // Dynamic memory allocation alignment routines
 // HP's Tachyon Fibre Channel Controller chips require

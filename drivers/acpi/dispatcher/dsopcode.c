@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 30 $
+ *              $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -72,7 +72,6 @@ acpi_ds_get_field_unit_arguments (
 
 	extra_desc = obj_desc->field_unit.extra;
 	node = obj_desc->field_unit.node;
-
 
 	/*
 	 * Allocate a new parser op to be the root of the parsed

@@ -153,7 +153,7 @@ struct sk_buff {
 /*
  *	Handling routines are only of interest to the kernel
  */
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/system.h>
 

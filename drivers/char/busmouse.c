@@ -12,7 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/poll.h>

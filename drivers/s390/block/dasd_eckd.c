@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #endif				/* MODULE */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/dasd.h>
 #include <asm/io.h>
 

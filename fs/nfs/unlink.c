@@ -6,7 +6,7 @@
  * NOTE: we rely on holding the BKL for list manipulation protection.
  */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/dcache.h>
 #include <linux/sunrpc/sched.h>

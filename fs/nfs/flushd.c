@@ -24,7 +24,7 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
 

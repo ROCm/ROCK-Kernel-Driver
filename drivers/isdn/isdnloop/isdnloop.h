@@ -53,7 +53,7 @@ typedef struct isdnloop_sdef {
 #include <asm/io.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/ioport.h>

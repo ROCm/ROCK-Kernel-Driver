@@ -26,7 +26,7 @@
 #include <linux/errno.h>
 #include <asm/uaccess.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ioctl.h>
 #include <linux/sched.h>

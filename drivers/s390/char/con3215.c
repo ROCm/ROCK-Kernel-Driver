@@ -16,7 +16,7 @@
 #include <linux/console.h>
 #include <linux/interrupt.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/bootmem.h>
 #include <asm/io.h>
 #include <asm/ebcdic.h>

@@ -64,7 +64,7 @@ not be guaranteed. There are several ways to assure this:
 #include <linux/interrupt.h>
 #include <linux/time.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 

@@ -352,7 +352,7 @@ endmenu
 
 source drivers/ieee1394/Config.in
 
-source drivers/message/i2o/Config.in
+source drivers/i2o/Config.in
 
 mainmenu_option next_comment
 comment 'ISDN subsystem'

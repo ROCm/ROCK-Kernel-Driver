@@ -14,8 +14,6 @@
  *	LAPB 002	Jonathan Naylor	New timer architecture.
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_LAPB) || defined(CONFIG_LAPB_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -223,5 +221,3 @@ void lapb_check_need_response(lapb_cb *lapb, int type, int pf)
 	if (type == LAPB_COMMAND && pf)
 		lapb_enquiry_response(lapb);
 }
-
-#endif

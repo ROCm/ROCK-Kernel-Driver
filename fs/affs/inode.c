@@ -14,7 +14,7 @@
 #include <asm/div64.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/sched.h>
 #include <linux/affs_fs.h>

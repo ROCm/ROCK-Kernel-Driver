@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 12 $
+ *              $Revision: 15 $
  *
  *****************************************************************************/
 
@@ -89,13 +89,12 @@ acpi_ns_initialize_objects (
 
 ACPI_STATUS
 acpi_ns_initialize_devices (
-	u32                     flags)
+	void)
 {
 	ACPI_STATUS             status;
 	ACPI_DEVICE_WALK_INFO   info;
 
 
-	info.flags = flags;
 	info.device_count = 0;
 	info.num_STA = 0;
 	info.num_INI = 0;
@@ -168,6 +167,7 @@ acpi_ns_init_one_object (
 		info->op_region_init++;
 		status = acpi_ds_get_region_arguments (obj_desc);
 
+
 		break;
 
 
@@ -180,6 +180,8 @@ acpi_ns_init_one_object (
 
 		info->field_init++;
 		status = acpi_ds_get_field_unit_arguments (obj_desc);
+
+
 		break;
 
 	default:
@@ -198,7 +200,7 @@ acpi_ns_init_one_object (
  *
  * FUNCTION:    Acpi_ns_init_one_device
  *
- * PARAMETERS:  The usual "I'm a namespace callback" stuff
+ * PARAMETERS:  WALK_CALLBACK
  *
  * RETURN:      ACPI_STATUS
  *
@@ -219,6 +221,7 @@ acpi_ns_init_one_device (
 	ACPI_NAMESPACE_NODE    *node;
 	u32                     flags;
 	ACPI_DEVICE_WALK_INFO  *info = (ACPI_DEVICE_WALK_INFO *) context;
+
 
 
 	info->device_count++;
@@ -250,6 +253,7 @@ acpi_ns_init_one_device (
 		/* don't look at children of a not present device */
 		return(AE_CTRL_DEPTH);
 	}
+
 
 	/*
 	 * The device is present. Run _INI.

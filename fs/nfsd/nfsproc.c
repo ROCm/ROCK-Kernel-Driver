@@ -18,7 +18,7 @@
 #include <linux/in.h>
 #include <linux/version.h>
 #include <linux/unistd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -252,8 +252,19 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 	if (attr->ia_valid & ATTR_MODE) { 
 		type = attr->ia_mode & S_IFMT;
 		mode = attr->ia_mode & ~S_IFMT;
-		if (!type)	/* HP weirdness */
-			type = S_IFREG;
+		if (!type) {
+			/* no type, so if target exists, assume same as that,
+			 * else assume a file */
+			if (inode) {
+				type = inode->i_mode & S_IFMT;
+				if (type == S_IFCHR || type == S_IFBLK) {
+					/* reserve rdev for later checking */
+					attr->ia_size = inode->i_rdev;
+					attr->ia_valid |= ATTR_SIZE;
+				}
+			} else
+				type = S_IFREG;
+		}
 	} else if (inode) {
 		type = inode->i_mode & S_IFMT;
 		mode = inode->i_mode & ~S_IFMT;

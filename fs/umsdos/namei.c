@@ -20,7 +20,7 @@
 #include <linux/string.h>
 #include <linux/msdos_fs.h>
 #include <linux/umsdos_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #define UMSDOS_DIR_LOCK
 

@@ -19,7 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/locks.h>
 #include <linux/major.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/tty.h>
 #include <asm/bitops.h>

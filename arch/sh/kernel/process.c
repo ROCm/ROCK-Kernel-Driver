@@ -24,7 +24,7 @@
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/user.h>
 #include <linux/a.out.h>

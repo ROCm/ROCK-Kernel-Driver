@@ -17,7 +17,7 @@
 #include <linux/sysctl.h>
 #include <linux/swapctl.h>
 #include <linux/proc_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/ctype.h>
 #include <asm/bitops.h>

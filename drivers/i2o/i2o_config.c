@@ -31,7 +31,7 @@
 #include <linux/i2o.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/mm.h>
 #include <linux/spinlock.h>

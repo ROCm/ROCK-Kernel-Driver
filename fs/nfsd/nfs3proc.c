@@ -18,7 +18,7 @@
 #include <linux/in.h>
 #include <linux/version.h>
 #include <linux/unistd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/major.h>
 
 #include <linux/sunrpc/svc.h>

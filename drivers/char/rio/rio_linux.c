@@ -56,7 +56,7 @@
 #include <linux/tqueue.h>
 #include <linux/version.h>
 #include <linux/pci.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/miscdevice.h>
 
 #include <linux/compatmac.h>

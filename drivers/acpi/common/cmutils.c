@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: cmutils - common utility procedures
- *              $Revision: 23 $
+ *              $Revision: 27 $
  *
  ******************************************************************************/
 
@@ -340,6 +340,41 @@ acpi_cm_create_update_state_and_push (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_cm_create_pkg_state_and_push
+ *
+ * PARAMETERS:  *Object         - Object to be added to the new state
+ *              Action          - Increment/Decrement
+ *              State_list      - List the state will be added to
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Create a new state and push it
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_create_pkg_state_and_push (
+	void                    *internal_object,
+	void                    *external_object,
+	u16                     index,
+	ACPI_GENERIC_STATE      **state_list)
+{
+	ACPI_GENERIC_STATE       *state;
+
+
+	state = acpi_cm_create_pkg_state (internal_object, external_object, index);
+	if (!state) {
+		return (AE_NO_MEMORY);
+	}
+
+
+	acpi_cm_push_generic_state (state_list, state);
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_cm_push_generic_state
  *
  * PARAMETERS:  List_head           - Head of the state stack
@@ -500,6 +535,49 @@ acpi_cm_create_update_state (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_cm_create_pkg_state
+ *
+ * PARAMETERS:  Object              - Initial Object to be installed in the
+ *                                    state
+ *              Action              - Update action to be performed
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Create an "Update State" - a flavor of the generic state used
+ *              to update reference counts and delete complex objects such
+ *              as packages.
+ *
+ ******************************************************************************/
+
+ACPI_GENERIC_STATE *
+acpi_cm_create_pkg_state (
+	void                    *internal_object,
+	void                    *external_object,
+	u16                     index)
+{
+	ACPI_GENERIC_STATE      *state;
+
+
+	/* Create the generic state object */
+
+	state = acpi_cm_create_generic_state ();
+	if (!state) {
+		return (NULL);
+	}
+
+	/* Init fields specific to the update struct */
+
+	state->pkg.source_object = (ACPI_OPERAND_OBJECT *) internal_object;
+	state->pkg.dest_object  = external_object;
+	state->pkg.index        = index;
+	state->pkg.num_packages = 1;
+
+	return (state);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_cm_create_control_state
  *
  * PARAMETERS:  None
@@ -632,15 +710,19 @@ ACPI_STATUS
 acpi_cm_resolve_package_references (
 	ACPI_OPERAND_OBJECT     *obj_desc)
 {
-	u32                 count;
-	ACPI_OPERAND_OBJECT *sub_object;
+	u32                     count;
+	ACPI_OPERAND_OBJECT     *sub_object;
+
 
 	if (obj_desc->common.type != ACPI_TYPE_PACKAGE) {
-		/* Must be a package */
+		/* The object must be a package */
 
 		REPORT_ERROR (("Must resolve Package Refs on a Package\n"));
 		return(AE_ERROR);
 	}
+
+	/*
+	 * TBD: what about nested packages? */
 
 	for (count = 0; count < obj_desc->package.count; count++) {
 		sub_object = obj_desc->package.elements[count];
@@ -667,6 +749,130 @@ acpi_cm_resolve_package_references (
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_cm_walk_package_tree
+ *
+ * PARAMETERS:  Obj_desc        - The Package object on which to resolve refs
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Walk through a package
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_walk_package_tree (
+	ACPI_OPERAND_OBJECT     *source_object,
+	void                    *target_object,
+	ACPI_PKG_CALLBACK       walk_callback,
+	void                    *context)
+{
+	ACPI_STATUS             status = AE_OK;
+	ACPI_GENERIC_STATE      *state_list = NULL;
+	ACPI_GENERIC_STATE      *state;
+	u32                     this_index;
+	ACPI_OPERAND_OBJECT     *this_source_obj;
+
+
+	state = acpi_cm_create_pkg_state (source_object, target_object, 0);
+	if (!state) {
+		return (AE_NO_MEMORY);
+	}
+
+	while (state) {
+		this_index       = state->pkg.index;
+		this_source_obj  = (ACPI_OPERAND_OBJECT *)
+				   state->pkg.source_object->package.elements[this_index];
+
+		/*
+		 * Check for
+		 * 1) An uninitialized package element.  It is completely
+		 *      legal to declare a package and leave it uninitialized
+		 * 2) Not an internal object - can be a namespace node instead
+		 * 3) Any type other than a package.  Packages are handled in else case below.
+		 */
+		if ((!this_source_obj) ||
+			(!VALID_DESCRIPTOR_TYPE (
+					this_source_obj, ACPI_DESC_TYPE_INTERNAL)) ||
+			(!IS_THIS_OBJECT_TYPE (
+					this_source_obj, ACPI_TYPE_PACKAGE)))
+		{
+
+			status = walk_callback (0, this_source_obj, state, context);
+			if (ACPI_FAILURE (status)) {
+				/* TBD: must delete package created up to this point */
+
+				return (status);
+			}
+
+			state->pkg.index++;
+			while (state->pkg.index >= state->pkg.source_object->package.count) {
+				/*
+				 * We've handled all of the objects at this level,  This means
+				 * that we have just completed a package.  That package may
+				 * have contained one or more packages itself.
+				 *
+				 * Delete this state and pop the previous state (package).
+				 */
+				acpi_cm_delete_generic_state (state);
+				state = acpi_cm_pop_generic_state (&state_list);
+
+
+				/* Finished when there are no more states */
+
+				if (!state) {
+					/*
+					 * We have handled all of the objects in the top level
+					 * package just add the length of the package objects
+					 * and exit
+					 */
+					return (AE_OK);
+				}
+
+				/*
+				 * Go back up a level and move the index past the just
+				 * completed package object.
+				 */
+				state->pkg.index++;
+			}
+		}
+
+		else {
+			/* This is a sub-object of type package */
+
+			status = walk_callback (1, this_source_obj, state, context);
+			if (ACPI_FAILURE (status)) {
+				/* TBD: must delete package created up to this point */
+
+				return (status);
+			}
+
+
+			/*
+			 * The callback above returned a new target package object.
+			 */
+
+			/*
+			 * Push the current state and create a new one
+			 */
+			acpi_cm_push_generic_state (&state_list, state);
+			state = acpi_cm_create_pkg_state (this_source_obj, state->pkg.this_target_obj, 0);
+			if (!state) {
+				/* TBD: must delete package created up to this point */
+
+				return (AE_NO_MEMORY);
+			}
+		}
+	}
+
+	/* We should never get here */
+
+	return (AE_AML_INTERNAL);
+
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    _Report_error
  *
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
@@ -676,7 +882,7 @@ acpi_cm_resolve_package_references (
  *
  * RETURN:      None
  *
- * DESCRIPTION: Print error message from KD table
+ * DESCRIPTION: Print error message
  *
  ******************************************************************************/
 
@@ -703,7 +909,7 @@ _report_error (
  *
  * RETURN:      None
  *
- * DESCRIPTION: Print warning message from KD table
+ * DESCRIPTION: Print warning message
  *
  ******************************************************************************/
 
@@ -729,7 +935,7 @@ _report_warning (
  *
  * RETURN:      None
  *
- * DESCRIPTION: Print information message from KD table
+ * DESCRIPTION: Print information message
  *
  ******************************************************************************/
 

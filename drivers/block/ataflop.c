@@ -74,7 +74,7 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 
 #include <asm/setup.h>

@@ -8,7 +8,7 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
 #else

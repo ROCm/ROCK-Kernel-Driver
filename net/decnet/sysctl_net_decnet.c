@@ -127,7 +127,7 @@ static int dn_node_address_strategy(ctl_table *table, int *name, int nlen,
 				void *newval, size_t newlen,
 				void **context)
 {
-	int len;
+	size_t len;
 	dn_address addr;
 
 	if (oldval && oldlenp) {
@@ -161,7 +161,7 @@ static int dn_node_address_handler(ctl_table *table, int write,
 				void *buffer, size_t *lenp)
 {
 	char addr[DN_ASCBUF_LEN];
-	int len;
+	size_t len;
 	dn_address dnaddr;
 
 	if (!*lenp || (filp->f_pos && !write)) {
@@ -265,7 +265,7 @@ static int dn_def_dev_handler(ctl_table *table, int write,
 				struct file * filp,
 				void *buffer, size_t *lenp)
 {
-	int len;
+	size_t len;
 	struct net_device *dev = decnet_default_device;
 	char devname[17];
 

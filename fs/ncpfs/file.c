@@ -16,7 +16,7 @@
 #include <linux/stat.h>
 #include <linux/mm.h>
 #include <linux/locks.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 #include <linux/ncp_fs.h>

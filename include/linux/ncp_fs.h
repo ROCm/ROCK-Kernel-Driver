@@ -196,7 +196,7 @@ struct ncp_entry_info {
 
 #ifdef DEBUG_NCP_MALLOC
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 extern int ncp_malloced;
 extern int ncp_current_malloced;

@@ -103,6 +103,8 @@ EXPORT_SYMBOL(clear_page);
 
 EXPORT_SYMBOL(__direct_map_base);
 EXPORT_SYMBOL(__direct_map_size);
+
+#ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
 EXPORT_SYMBOL(pci_map_single);
@@ -110,6 +112,7 @@ EXPORT_SYMBOL(pci_unmap_single);
 EXPORT_SYMBOL(pci_map_sg);
 EXPORT_SYMBOL(pci_unmap_sg);
 EXPORT_SYMBOL(pci_dma_supported);
+#endif
 
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);

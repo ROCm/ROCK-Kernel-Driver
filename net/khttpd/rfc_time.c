@@ -27,7 +27,7 @@ Functions related to time:
 
 #include <linux/time.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ctype.h>
 
 

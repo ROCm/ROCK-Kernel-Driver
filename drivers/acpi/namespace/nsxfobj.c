@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfobj - Public interfaces to the ACPI subsystem
  *                         ACPI Object oriented interfaces
- *              $Revision: 78 $
+ *              $Revision: 80 $
  *
  ******************************************************************************/
 
@@ -117,9 +117,8 @@ acpi_evaluate_object (
 		 * internal object
 		 */
 		for (i = 0; i < count; i++) {
-			status =
-				acpi_cm_build_internal_object (&param_objects->pointer[i],
-						  param_ptr[i]);
+			status = acpi_cm_copy_eobject_to_iobject (&param_objects->pointer[i],
+					 param_ptr[i]);
 
 			if (ACPI_FAILURE (status)) {
 				acpi_cm_delete_internal_object_list (param_ptr);
@@ -236,7 +235,7 @@ acpi_evaluate_object (
 						/*
 						 *  We have enough space for the object, build it
 						 */
-						status = acpi_cm_build_external_object (return_obj,
+						status = acpi_cm_copy_iobject_to_eobject (return_obj,
 								  return_buffer);
 						return_buffer->length = buffer_space_needed;
 					}
@@ -580,12 +579,12 @@ acpi_ns_get_device_callback (
 	acpi_cm_acquire_mutex (ACPI_MTX_NAMESPACE);
 
 	node = acpi_ns_convert_handle_to_entry (obj_handle);
-	if (!node) {
-		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
-		return (AE_BAD_PARAMETER);
-	}
 
 	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+
+	if (!node) {
+		return (AE_BAD_PARAMETER);
+	}
 
 	/*
 	 * Run _STA to determine if device is present

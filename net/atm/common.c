@@ -26,6 +26,7 @@
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <asm/poll.h>
+#include <asm/ioctls.h>
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 #include <linux/atmlec.h>
@@ -376,6 +377,8 @@ int atm_recvmsg(struct socket *sock,struct msghdr *m,int total_len,
 	if (error <= 0) return error;
 	vcc->timestamp = skb->stamp;
 	eff_len = skb->len > size ? size : skb->len;
+	if (skb->len > size) /* Not fit ?  Report it... */
+		m->msg_flags |= MSG_TRUNC;
 	if (vcc->dev->ops->feedback)
 		vcc->dev->ops->feedback(vcc,skb,(unsigned long) skb->data,
 		    (unsigned long) buff,eff_len);

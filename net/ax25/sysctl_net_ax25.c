@@ -27,8 +27,8 @@ static int min_ds_timeout[] = {0},	max_ds_timeout[] = {65535 * HZ};
 
 static struct ctl_table_header *ax25_table_header;
 
-static ctl_table *ax25_table = NULL;
-static int ax25_table_size   = 0;
+static ctl_table *ax25_table;
+static int ax25_table_size;
 
 static ctl_table ax25_dir_table[] = {
 	{NET_AX25, "ax25", NULL, 0, 0555, NULL},

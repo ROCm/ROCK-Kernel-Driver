@@ -41,7 +41,7 @@
 
 
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>

@@ -21,7 +21,7 @@
 #include <linux/fcntl.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>

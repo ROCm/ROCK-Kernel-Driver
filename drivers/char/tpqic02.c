@@ -87,7 +87,7 @@
 #include <linux/ioport.h>
 #include <linux/tpqic02.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h> 

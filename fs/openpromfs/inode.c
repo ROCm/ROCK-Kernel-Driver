@@ -12,7 +12,7 @@
 #include <linux/openprom_fs.h>
 #include <linux/locks.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 
 #include <asm/openprom.h>

@@ -19,7 +19,7 @@
 #include <linux/module.h>
 
 #include <linux/raid/md.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <linux/raid/linear.h>
 

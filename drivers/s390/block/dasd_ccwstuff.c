@@ -7,7 +7,7 @@
 
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/dasd.h>
 #include <asm/atomic.h>
 

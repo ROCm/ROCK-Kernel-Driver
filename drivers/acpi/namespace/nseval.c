@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 81 $
+ *              $Revision: 83 $
  *
  ******************************************************************************/
 
@@ -253,8 +253,8 @@ acpi_ns_evaluate_by_handle (
 
 	node = acpi_ns_convert_handle_to_entry (handle);
 	if (!node) {
-		status = AE_BAD_PARAMETER;
-		goto unlock_and_exit;
+		acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
+		return (AE_BAD_PARAMETER);
 	}
 
 
@@ -316,12 +316,6 @@ acpi_ns_evaluate_by_handle (
 	 * so we just return
 	 */
 	return (status);
-
-
-unlock_and_exit:
-
-	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
-	return (status);
 }
 
 
@@ -354,14 +348,6 @@ acpi_ns_execute_control_method (
 	ACPI_OPERAND_OBJECT     *obj_desc;
 
 
-	/* Verify that there is a method associated with this object */
-
-	obj_desc = acpi_ns_get_attached_object ((ACPI_HANDLE) method_node);
-	if (!obj_desc) {
-		return (AE_ERROR);
-	}
-
-
 	/*
 	 * Unlock the namespace before execution.  This allows namespace access
 	 * via the external Acpi* interfaces while a method is being executed.
@@ -372,8 +358,16 @@ acpi_ns_execute_control_method (
 
 	acpi_cm_release_mutex (ACPI_MTX_NAMESPACE);
 
+	/* Verify that there is a method associated with this object */
+
+	obj_desc = acpi_ns_get_attached_object ((ACPI_HANDLE) method_node);
+	if (!obj_desc) {
+		return (AE_ERROR);
+	}
+
+
 	/*
-	 * Excecute the method via the interpreter
+	 * Execute the method via the interpreter
 	 */
 	status = acpi_aml_execute_method (method_node, params, return_obj_desc);
 

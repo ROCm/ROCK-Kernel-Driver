@@ -15,7 +15,7 @@
 #include <linux/parport.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 
 #ifndef MODULE

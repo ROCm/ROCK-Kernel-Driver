@@ -57,9 +57,9 @@
  *
  * Buffers for the md device that arrive via make_request are attached
  * to the appropriate stripe in one of two lists linked on b_reqnext.
- * One list for read requests, one for write.  There should never be
- * more than one buffer on the two lists together, but we are not
- * guaranteed of that so we allow for more.
+ * One list (bh_read) for read requests, one (bh_write) for write.
+ * There should never be more than one buffer on the two lists
+ * together, but we are not guaranteed of that so we allow for more.
  *
  * If a buffer is on the read list when the associated cache buffer is
  * Uptodate, the data is copied into the read buffer and it's b_end_io
@@ -70,16 +70,18 @@
  * that the Uptodate bit is set.  Once they have checked that they may
  * take buffers off the read queue.
  *
- * When a buffer on the write_list is committed for write, it is
- * marked clean, copied into the cache buffer, which is then marked
- * dirty, and moved onto a third list, the written list.  Once both
- * the parity block and the cached buffer are successfully written,
- * any buffer on a written list can be returned with b_end_io.
+ * When a buffer on the write list is committed for write is it copied
+ * into the cache buffer, which is then marked dirty, and moved onto a
+ * third list, the written list (bh_written).  Once both the parity
+ * block and the cached buffer are successfully written, any buffer on
+ * a written list can be returned with b_end_io.
  *
- * The write_list and read_list lists act as fifos.  They are protected by the
- * device_lock which can be claimed when a stripe_lock is held.
- * The device_lock is only for list manipulations and will only be held for a very
- * short time.  It can be claimed from interrupts.
+ * The write list and read list both act as fifos.  The read list is
+ * protected by the device_lock.  The write and written lists are
+ * protected by the stripe lock.  The device_lock, which can be
+ * claimed while the stipe lock is held, is only for list
+ * manipulations and will only be held for a very short time.  It can
+ * be claimed from interrupts.
  *
  *
  * Stripes in the stripe cache can be on one of two lists (or on

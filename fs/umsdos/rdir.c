@@ -14,7 +14,7 @@
 #include <linux/stat.h>
 #include <linux/limits.h>
 #include <linux/umsdos_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 

@@ -8,7 +8,7 @@
 
 #include <linux/string.h>
 #include <linux/nls.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/iso_fs.h>
 
 /*

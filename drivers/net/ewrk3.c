@@ -136,8 +136,6 @@
    =========================================================================
  */
 
-static const char *version = "ewrk3.c:v0.43 96/8/16 davies@maniac.ultranet.com\n";
-
 #include <linux/config.h>
 #include <linux/module.h>
 
@@ -147,7 +145,7 @@ static const char *version = "ewrk3.c:v0.43 96/8/16 davies@maniac.ultranet.com\n
 #include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -166,6 +164,9 @@ static const char *version = "ewrk3.c:v0.43 96/8/16 davies@maniac.ultranet.com\n
 #include <linux/ctype.h>
 
 #include "ewrk3.h"
+
+static const char version[] __initdata =
+"ewrk3.c:v0.43a 2001/02/04 davies@maniac.ultranet.com\n";
 
 #ifdef EWRK3_DEBUG
 static int ewrk3_debug = EWRK3_DEBUG;
@@ -273,9 +274,9 @@ struct ewrk3_private {
 	u_char mPage;		/* Maximum 2kB Page number */
 	u_char lemac;		/* Chip rev. level */
 	u_char hard_strapped;	/* Don't allow a full open */
-	u_char lock;		/* Lock the page register */
 	u_char txc;		/* Transmit cut through */
 	u_char *mctbl;		/* Pointer to the multicast table */
+	spinlock_t hw_lock;
 };
 
 /*
@@ -530,6 +531,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 							lp->shmem_length = shmem_length;
 							lp->lemac = lemac;
 							lp->hard_strapped = hard_strapped;
+							spin_lock_init(&lp->hw_lock);
 
 							lp->mPage = 64;
 							if (cmr & CMR_DRAM)
@@ -715,8 +717,6 @@ static void ewrk3_init(struct net_device *dev)
 		outb(page, EWRK3_FMQ);	/* to the Free Memory Queue */
 	}
 
-	lp->lock = 0;		/* Ensure there are no locks */
-
 	START_EWRK3;		/* Enable the TX and/or RX */
 }
 
@@ -760,111 +760,118 @@ static void ewrk3_timeout(struct net_device *dev)
 /*
    ** Writes a socket buffer to the free page queue
  */
-static int ewrk3_queue_pkt(struct sk_buff *skb, struct net_device *dev)
+static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 {
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
 	u_long iobase = dev->base_addr;
-	int status = 0;
+	u_long buf = 0;
 	u_char icr;
+	u_char page;
 
-	netif_stop_queue(dev);
-#ifdef CONFIG_SMP
-#error "This needs spinlocks"
-#endif
-	DISABLE_IRQs;	/* So that the page # remains correct */
+	spin_lock_irq (&lp->hw_lock);
+	DISABLE_IRQs;
+
+	/* if no resources available, exit, request packet be queued */
+	if (inb (EWRK3_FMQC) == 0) {
+		printk (KERN_WARNING "%s: ewrk3_queue_pkt(): No free resources...\n",
+			dev->name);
+		printk (KERN_WARNING "%s: ewrk3_queue_pkt(): CSR: %02x ICR: %02x FMQC: %02x\n",
+			dev->name, inb (EWRK3_CSR), inb (EWRK3_ICR),
+			inb (EWRK3_FMQC));
+		goto err_out;
+	}
 
 	/*
-	   ** Get a free page from the FMQ when resources are available
+	 ** Get a free page from the FMQ
 	 */
-	if (inb(EWRK3_FMQC) > 0) 
-	{
-		u_long buf = 0;
-		u_char page;
+	if ((page = inb (EWRK3_FMQ)) >= lp->mPage) {
+		printk ("ewrk3_queue_pkt(): Invalid free memory page (%d).\n",
+		     (u_char) page);
+		goto err_out;
+	}
 
-		if ((page = inb(EWRK3_FMQ)) < lp->mPage) {
-			/*
-			   ** Set up shared memory window and pointer into the window
-			 */
-			while (test_and_set_bit(0, (void *) &lp->lock) != 0);	/* Wait for lock to free */
-			if (lp->shmem_length == IO_ONLY) {
-				outb(page, EWRK3_IOPR);
-			} else if (lp->shmem_length == SHMEM_2K) {
-				buf = lp->shmem_base;
-				outb(page, EWRK3_MPR);
-			} else if (lp->shmem_length == SHMEM_32K) {
-				buf = ((((short) page << 11) & 0x7800) + lp->shmem_base);
-				outb((page >> 4), EWRK3_MPR);
-			} else if (lp->shmem_length == SHMEM_64K) {
-				buf = ((((short) page << 11) & 0xf800) + lp->shmem_base);
-				outb((page >> 5), EWRK3_MPR);
-			} else {
-				status = -1;
-				printk(KERN_ERR "%s: Oops - your private data area is hosed!\n", dev->name);
-			}
 
-			if (!status) {
-				/*
-				   ** Set up the buffer control structures and copy the data from
-				   ** the socket buffer to the shared memory .
-				 */
-					if (lp->shmem_length == IO_ONLY) {
-					int i;
-					u_char *p = skb->data;
-						outb((char) (TCR_QMODE | TCR_PAD | TCR_IFC), EWRK3_DATA);
-					outb((char) (skb->len & 0xff), EWRK3_DATA);
-					outb((char) ((skb->len >> 8) & 0xff), EWRK3_DATA);
-					outb((char) 0x04, EWRK3_DATA);
-					for (i = 0; i < skb->len; i++) {
-						outb(*p++, EWRK3_DATA);
-					}
-					outb(page, EWRK3_TQ);	/* Start sending pkt */
-				} else {
-					isa_writeb((char) (TCR_QMODE | TCR_PAD | TCR_IFC), buf);	/* ctrl byte */
-					buf += 1;
-					isa_writeb((char) (skb->len & 0xff), buf);		/* length (16 bit xfer) */
-					buf += 1;
-					if (lp->txc) {
-						isa_writeb((char) (((skb->len >> 8) & 0xff) | XCT), buf);
-						buf += 1;
-						isa_writeb(0x04, buf);	/* index byte */
-						buf += 1;
-						isa_writeb(0x00, (buf + skb->len));	/* Write the XCT flag */
-						isa_memcpy_toio(buf, skb->data, PRELOAD);	/* Write PRELOAD bytes */
-						outb(page, EWRK3_TQ);	/* Start sending pkt */
-						isa_memcpy_toio(buf + PRELOAD, skb->data + PRELOAD, skb->len - PRELOAD);
-						isa_writeb(0xff, (buf + skb->len));	/* Write the XCT flag */
-					} else {
-						isa_writeb((char) ((skb->len >> 8) & 0xff), buf);
-						buf += 1;
-						isa_writeb(0x04, buf);	/* index byte */
-						buf += 1;
-						isa_memcpy_toio(buf, skb->data, skb->len);		/* Write data bytes */
-						outb(page, EWRK3_TQ);	/* Start sending pkt */
-					}
-				}
-
-				lp->stats.tx_bytes += skb->len;
-				dev->trans_start = jiffies;
-				dev_kfree_skb(skb);
-			} else {	/* return unused page to the free memory queue */
-				outb(page, EWRK3_FMQ);
-			}
-			lp->lock = 0;	/* unlock the page register */
-		} else {
-			printk("ewrk3_queue_pkt(): Invalid free memory page (%d).\n",
-			       (u_char) page);
-		}
+	/*
+	 ** Set up shared memory window and pointer into the window
+	 */
+	if (lp->shmem_length == IO_ONLY) {
+		outb (page, EWRK3_IOPR);
+	} else if (lp->shmem_length == SHMEM_2K) {
+		buf = lp->shmem_base;
+		outb (page, EWRK3_MPR);
+	} else if (lp->shmem_length == SHMEM_32K) {
+		buf = ((((short) page << 11) & 0x7800) + lp->shmem_base);
+		outb ((page >> 4), EWRK3_MPR);
+	} else if (lp->shmem_length == SHMEM_64K) {
+		buf = ((((short) page << 11) & 0xf800) + lp->shmem_base);
+		outb ((page >> 5), EWRK3_MPR);
 	} else {
-		printk(KERN_WARNING "%s: ewrk3_queue_pkt(): No free resources...\n", dev->name);
-		printk(KERN_WARNING "%s: ewrk3_queue_pkt(): CSR: %02x ICR: %02x FMQC: %02x\n", dev->name, inb(EWRK3_CSR), inb(EWRK3_ICR), inb(EWRK3_FMQC));
+		printk (KERN_ERR "%s: Oops - your private data area is hosed!\n",
+			dev->name);
+		BUG ();
 	}
 
-	/* Check for free resources: clear 'tbusy' if there are some */
-	if (inb(EWRK3_FMQC) > 0) {
-		netif_wake_queue(dev);
+	/*
+	 ** Set up the buffer control structures and copy the data from
+	 ** the socket buffer to the shared memory .
+	 */
+	if (lp->shmem_length == IO_ONLY) {
+		int i;
+		u_char *p = skb->data;
+		outb ((char) (TCR_QMODE | TCR_PAD | TCR_IFC), EWRK3_DATA);
+		outb ((char) (skb->len & 0xff), EWRK3_DATA);
+		outb ((char) ((skb->len >> 8) & 0xff), EWRK3_DATA);
+		outb ((char) 0x04, EWRK3_DATA);
+		for (i = 0; i < skb->len; i++) {
+			outb (*p++, EWRK3_DATA);
+		}
+		outb (page, EWRK3_TQ);	/* Start sending pkt */
+	} else {
+		isa_writeb ((char) (TCR_QMODE | TCR_PAD | TCR_IFC), buf);	/* ctrl byte */
+		buf += 1;
+		isa_writeb ((char) (skb->len & 0xff), buf);	/* length (16 bit xfer) */
+		buf += 1;
+		if (lp->txc) {
+			isa_writeb ((char)
+				    (((skb->len >> 8) & 0xff) | XCT), buf);
+			buf += 1;
+			isa_writeb (0x04, buf);	/* index byte */
+			buf += 1;
+			isa_writeb (0x00, (buf + skb->len));	/* Write the XCT flag */
+			isa_memcpy_toio (buf, skb->data, PRELOAD);	/* Write PRELOAD bytes */
+			outb (page, EWRK3_TQ);	/* Start sending pkt */
+			isa_memcpy_toio (buf + PRELOAD,
+					 skb->data + PRELOAD,
+					 skb->len - PRELOAD);
+			isa_writeb (0xff, (buf + skb->len));	/* Write the XCT flag */
+		} else {
+			isa_writeb ((char)
+				    ((skb->len >> 8) & 0xff), buf);
+			buf += 1;
+			isa_writeb (0x04, buf);	/* index byte */
+			buf += 1;
+			isa_memcpy_toio (buf, skb->data, skb->len);	/* Write data bytes */
+			outb (page, EWRK3_TQ);	/* Start sending pkt */
+		}
 	}
+
 	ENABLE_IRQs;
-	return status;
+	spin_unlock_irq (&lp->hw_lock);
+
+	lp->stats.tx_bytes += skb->len;
+	dev->trans_start = jiffies;
+	dev_kfree_skb (skb);
+
+	/* Check for free resources: stop Tx queue if there are none */
+	if (inb (EWRK3_FMQC) == 0)
+		netif_stop_queue (dev);
+
+	return 0;
+
+err_out:
+	ENABLE_IRQs;
+	spin_unlock_irq (&lp->hw_lock);
+	return 1;
 }
 
 /*
@@ -886,6 +893,7 @@ static void ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 ** Mask the EWRK3 board interrupts and turn on the LED
 	 */
+	spin_lock(&lp->hw_lock);
 	DISABLE_IRQs;
 
 	cr = inb(EWRK3_CR);
@@ -917,6 +925,7 @@ static void ewrk3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cr &= ~CR_LED;
 	outb(cr, EWRK3_CR);
 	ENABLE_IRQs;
+	spin_unlock(&lp->hw_lock);
 }
 
 static int ewrk3_rx(struct net_device *dev)
@@ -924,22 +933,11 @@ static int ewrk3_rx(struct net_device *dev)
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
-	u_char page, tmpPage = 0, tmpLock = 0;
+	u_char page;
 	u_long buf = 0;
 
 	while (inb(EWRK3_RQC) && !status) {	/* Whilst there's incoming data */
 		if ((page = inb(EWRK3_RQ)) < lp->mPage) {	/* Get next entry's buffer page */
-			/*
-			   ** Preempt any process using the current page register. Check for
-			   ** an existing lock to reduce time taken in I/O transactions.
-			 */
-			if ((tmpLock = test_and_set_bit(0, (void *) &lp->lock)) == 1) {		/* Assert lock */
-				if (lp->shmem_length == IO_ONLY) {	/* Get existing page */
-					tmpPage = inb(EWRK3_IOPR);
-				} else {
-					tmpPage = inb(EWRK3_MPR);
-				}
-			}
 			/*
 			   ** Set up shared memory window and pointer into the window
 			 */
@@ -1045,15 +1043,6 @@ static int ewrk3_rx(struct net_device *dev)
 			   ** Return the received buffer to the free memory queue
 			 */
 			outb(page, EWRK3_FMQ);
-
-			if (tmpLock) {	/* If a lock was preempted */
-				if (lp->shmem_length == IO_ONLY) {	/* Replace old page */
-					outb(tmpPage, EWRK3_IOPR);
-				} else {
-					outb(tmpPage, EWRK3_MPR);
-				}
-			}
-			lp->lock = 0;	/* Unlock the page register */
 		} else {
 			printk("ewrk3_rx(): Illegal page number, page %d\n", page);
 			printk("ewrk3_rx(): CSR: %02x ICR: %02x FMQC: %02x\n", inb(EWRK3_CSR), inb(EWRK3_ICR), inb(EWRK3_FMQC));
@@ -1191,7 +1180,7 @@ static void SetMulticastFilter(struct net_device *dev)
 	u16 hashcode;
 	s32 crc, poly = CRC_POLYNOMIAL_LE;
 
-	while (test_and_set_bit(0, (void *) &lp->lock) != 0);	/* Wait for lock to free */
+	spin_lock_irq(&lp->hw_lock);
 
 	if (lp->shmem_length == IO_ONLY) {
 		outb(0, EWRK3_IOPR);
@@ -1258,9 +1247,7 @@ static void SetMulticastFilter(struct net_device *dev)
 		}
 	}
 
-	lp->lock = 0;		/* Unlock the page register */
-
-	return;
+	spin_unlock_irq(&lp->hw_lock);
 }
 
 /*
@@ -1710,24 +1697,22 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		break;
 	case EWRK3_GET_MCA:	/* Get the multicast address table */
-			while (test_and_set_bit(0, (void *) &lp->lock) != 0);	/* Wait for lock to free */
-			if (lp->shmem_length == IO_ONLY) {
-				outb(0, EWRK3_IOPR);
-				outw(PAGE0_HTE, EWRK3_PIR1);
-				for (i = 0; i < (HASH_TABLE_LEN >> 3); i++) {
-					tmp.addr[i] = inb(EWRK3_DATA);
-				}
-			} else {
-				outb(0, EWRK3_MPR);
-				isa_memcpy_fromio(tmp.addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
+		spin_lock_irq(&lp->hw_lock);
+		if (lp->shmem_length == IO_ONLY) {
+			outb(0, EWRK3_IOPR);
+			outw(PAGE0_HTE, EWRK3_PIR1);
+			for (i = 0; i < (HASH_TABLE_LEN >> 3); i++) {
+				tmp.addr[i] = inb(EWRK3_DATA);
 			}
-			ioc->len = (HASH_TABLE_LEN >> 3);
-			if (copy_to_user(ioc->data, tmp.addr, ioc->len)) {
-				status = -EFAULT;
-				break;
-			}
+		} else {
+			outb(0, EWRK3_MPR);
+			isa_memcpy_fromio(tmp.addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
+		}
+		spin_unlock_irq(&lp->hw_lock);
 
-		lp->lock = 0;	/* Unlock the page register */
+		ioc->len = (HASH_TABLE_LEN >> 3);
+		if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+			status = -EFAULT;
 
 		break;
 	case EWRK3_SET_MCA:	/* Set a multicast address */

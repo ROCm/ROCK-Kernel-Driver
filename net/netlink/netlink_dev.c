@@ -20,7 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 #include <linux/poll.h>

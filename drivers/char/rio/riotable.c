@@ -35,7 +35,7 @@ static char *_riotable_c_sccs_ = "@(#)riotable.c	1.2";
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <asm/io.h>
 #include <asm/system.h>

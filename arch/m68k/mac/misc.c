@@ -10,7 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/kd.h>
 #include <linux/mm.h>

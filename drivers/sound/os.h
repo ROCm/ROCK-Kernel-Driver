@@ -20,7 +20,7 @@
 #include <asm/param.h>
 #include <linux/ptrace.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <asm/page.h>
 #include <asm/system.h>

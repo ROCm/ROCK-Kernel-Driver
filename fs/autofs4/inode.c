@@ -11,7 +11,7 @@
  * ------------------------------------------------------------------------- */
 
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/locks.h>
 #include <asm/bitops.h>

@@ -12,7 +12,7 @@
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 
 #include <linux/sunrpc/svc.h>

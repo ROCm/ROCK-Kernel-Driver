@@ -20,7 +20,7 @@
 #include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>              /* printk()                         */
-#include <linux/malloc.h>              /* kmalloc()                        */
+#include <linux/slab.h>              /* kmalloc()                        */
 #include <linux/errno.h>               /* error codes                      */
 #include <linux/types.h>               /* size_t                           */
 #include <linux/interrupt.h>           /* mark_bh                          */

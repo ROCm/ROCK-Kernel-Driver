@@ -66,7 +66,7 @@ static const char *mcdx_c_version
 #include <linux/cdrom.h>
 #include <linux/ioport.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

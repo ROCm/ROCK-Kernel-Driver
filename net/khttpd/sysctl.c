@@ -25,7 +25,7 @@ Sysctl interface
 
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/net.h>
 #include <linux/sched.h>
 #include <linux/skbuff.h>
@@ -259,7 +259,7 @@ void EndSysctl(void)
 static int proc_dosecurestring(ctl_table *table, int write, struct file *filp,
 		  void *buffer, size_t *lenp)
 {
-	int len;
+	size_t len;
 	char *p, c=0;
 	char String[256];
 	

@@ -75,4 +75,4 @@
 #define I2C_PCF_INTREG	I2C_PCF_ES2
 #define I2C_PCF_CLKREG	I2C_PCF_ES1
 
-#endif I2C_PCF8584_H
+#endif /* I2C_PCF8584_H */

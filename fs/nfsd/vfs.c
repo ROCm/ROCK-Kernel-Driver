@@ -29,7 +29,7 @@
 #include <linux/fcntl.h>
 #include <linux/net.h>
 #include <linux/unistd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/in.h>
 #define __NO_VERSION__
 #include <linux/module.h>

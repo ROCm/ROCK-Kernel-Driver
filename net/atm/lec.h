@@ -72,7 +72,7 @@ struct atm_lane_ops {
  * 2. LLC Data frames whose total length, including LLC field and data,
  *    but not padding required to meet the minimum data frame length, 
  *    is less than 1536(0x0600) MUST be encoded by placing that length
- *    in the the h_type field. The LLC field follows header immediatelly.
+ *    in the h_type field. The LLC field follows header immediatelly.
  * 3. LLC data frames longer than this maximum MUST be encoded by placing
  *    the value 0 in the h_type field.
  *
@@ -154,5 +154,5 @@ void lec_push(struct atm_vcc *vcc, struct sk_buff *skb);
 
 void atm_lane_init(void);
 void atm_lane_init_ops(struct atm_lane_ops *ops);
-#endif _LEC_H_
+#endif /* _LEC_H_ */
 

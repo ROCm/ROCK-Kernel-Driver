@@ -18,7 +18,7 @@
 #include <asm/byteorder.h>
 
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/cfi.h>

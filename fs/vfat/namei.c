@@ -24,7 +24,7 @@
 #include <linux/ctype.h>
 #include <linux/stat.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include "../fat/msbuffer.h"
 

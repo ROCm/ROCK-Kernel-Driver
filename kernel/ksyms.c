@@ -10,7 +10,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/cdrom.h>
@@ -45,6 +45,7 @@
 #include <linux/highuid.h>
 #include <linux/brlock.h>
 #include <linux/fs.h>
+#include <linux/tty.h>
 
 #if defined(CONFIG_PROC_FS)
 #include <linux/proc_fs.h>

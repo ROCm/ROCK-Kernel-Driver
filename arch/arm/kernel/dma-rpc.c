@@ -10,7 +10,7 @@
  *  DMA functions specific to RiscPC architecture
  */
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mman.h>
 #include <linux/init.h>
 #include <linux/pci.h>

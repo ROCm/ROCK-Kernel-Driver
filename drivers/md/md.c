@@ -61,6 +61,10 @@ extern asmlinkage long sys_setsid(void);
 # define dprintk(x...) do { } while(0)
 #endif
 
+#ifndef MODULE
+static void autostart_arrays (void);
+#endif
+
 static mdk_personality_t *pers[MAX_PERSONALITY];
 
 /*
@@ -2030,70 +2034,6 @@ abort:
 #undef AUTOADDING
 #undef AUTORUNNING
 
-struct {
-	int set;
-	int noautodetect;
-} raid_setup_args md__initdata;
-
-void md_setup_drive (void) md__init;
-
-/*
- * Searches all registered partitions for autorun RAID arrays
- * at boot time.
- */
-static int detected_devices[128] md__initdata;
-static int dev_cnt;
-
-void md_autodetect_dev(kdev_t dev)
-{
-	if (dev_cnt >= 0 && dev_cnt < 127)
-		detected_devices[dev_cnt++] = dev;
-}
-
-
-static void autostart_arrays (void)
-{
-	mdk_rdev_t *rdev;
-	int i;
-
-	printk(KERN_INFO "autodetecting RAID arrays\n");
-
-	for (i=0; i<dev_cnt; i++) {
-		kdev_t dev = detected_devices[i];
-
-		if (md_import_device(dev,1)) {
-			printk(KERN_ALERT "could not import %s!\n",
-			       partition_name(dev));
-			continue;
-		}
-		/*
-		 * Sanity checks:
-		 */
-		rdev = find_rdev_all(dev);
-		if (!rdev) {
-			MD_BUG();
-			continue;
-		}
-		if (rdev->faulty) {
-			MD_BUG();
-			continue;
-		}
-		md_list_add(&rdev->pending, &pending_raid_disks);
-	}
-
-	autorun_devices(-1);
-}
-
-int md__init md_run_setup(void)
-{
-	if (raid_setup_args.noautodetect)
-		printk(KERN_INFO "skipping autodetection of RAID arrays\n");
-	else
-		autostart_arrays();
-	dev_cnt = -1; /* make sure further calls to md_autodetect_dev are ignored */
-	md_setup_drive();
-	return 0;
-}
 
 static int get_version (void * arg)
 {
@@ -2555,10 +2495,12 @@ static int md_ioctl (struct inode *inode, struct file *file,
 			md_print_devices();
 			goto done_unlock;
 
+#ifndef MODULE
 		case RAID_AUTORUN:
 			err = 0;
 			autostart_arrays();
 			goto done;
+#endif
 
 		case BLKGETSIZE:   /* Return device size */
 			if (!arg) {
@@ -3556,30 +3498,7 @@ struct notifier_block md_notifier = {
 	NULL,
 	0
 };
-#ifndef MODULE
-static int md__init raid_setup(char *str)
-{
-	int len, pos;
 
-	len = strlen(str) + 1;
-	pos = 0;
-
-	while (pos < len) {
-		char *comma = strchr(str+pos, ',');
-		int wlen;
-		if (comma)
-			wlen = (comma-str)-pos;
-		else	wlen = (len-1)-pos;
-
-		if (strncmp(str, "noautodetect", wlen) == 0)
-			raid_setup_args.noautodetect = 1;
-		pos += wlen+1;
-	}
-	raid_setup_args.set = 1;
-	return 1;
-}
-__setup("raid=", raid_setup);
-#endif
 static void md_geninit (void)
 {
 	int i;
@@ -3639,6 +3558,70 @@ int md__init md_init (void)
 
 	md_geninit();
 	return (0);
+}
+
+
+#ifndef MODULE
+
+/*
+ * When md (and any require personalities) are compiled into the kernel
+ * (not a module), arrays can be assembles are boot time using with AUTODETECT
+ * where specially marked partitions are registered with md_autodetect_dev(),
+ * and with MD_BOOT where devices to be collected are given on the boot line
+ * with md=.....
+ * The code for that is here.
+ */
+
+struct {
+	int set;
+	int noautodetect;
+} raid_setup_args md__initdata;
+
+/*
+ * Searches all registered partitions for autorun RAID arrays
+ * at boot time.
+ */
+static int detected_devices[128] md__initdata;
+static int dev_cnt;
+
+void md_autodetect_dev(kdev_t dev)
+{
+	if (dev_cnt >= 0 && dev_cnt < 127)
+		detected_devices[dev_cnt++] = dev;
+}
+
+
+static void autostart_arrays (void)
+{
+	mdk_rdev_t *rdev;
+	int i;
+
+	printk(KERN_INFO "autodetecting RAID arrays\n");
+
+	for (i=0; i<dev_cnt; i++) {
+		kdev_t dev = detected_devices[i];
+
+		if (md_import_device(dev,1)) {
+			printk(KERN_ALERT "could not import %s!\n",
+			       partition_name(dev));
+			continue;
+		}
+		/*
+		 * Sanity checks:
+		 */
+		rdev = find_rdev_all(dev);
+		if (!rdev) {
+			MD_BUG();
+			continue;
+		}
+		if (rdev->faulty) {
+			MD_BUG();
+			continue;
+		}
+		md_list_add(&rdev->pending, &pending_raid_disks);
+	}
+
+	autorun_devices(-1);
 }
 
 static struct {
@@ -3809,9 +3792,47 @@ void md__init md_setup_drive(void)
 	}
 }
 
+static int md__init raid_setup(char *str)
+{
+	int len, pos;
+
+	len = strlen(str) + 1;
+	pos = 0;
+
+	while (pos < len) {
+		char *comma = strchr(str+pos, ',');
+		int wlen;
+		if (comma)
+			wlen = (comma-str)-pos;
+		else	wlen = (len-1)-pos;
+
+		if (strncmp(str, "noautodetect", wlen) == 0)
+			raid_setup_args.noautodetect = 1;
+		pos += wlen+1;
+	}
+	raid_setup_args.set = 1;
+	return 1;
+}
+
+int md__init md_run_setup(void)
+{
+	if (raid_setup_args.noautodetect)
+		printk(KERN_INFO "skipping autodetection of RAID arrays\n");
+	else
+		autostart_arrays();
+	dev_cnt = -1; /* make sure further calls to md_autodetect_dev are ignored */
+	md_setup_drive();
+	return 0;
+}
+
+__setup("raid=", raid_setup);
 __setup("md=", md_setup);
 
-#ifdef MODULE
+__initcall(md_init);
+__initcall(md_run_setup);
+
+#else /* It is a MODULE */
+
 int init_module (void)
 {
 	return md_init();
@@ -3859,9 +3880,6 @@ void cleanup_module (void)
 
 }
 #endif
-
-__initcall(md_init);
-__initcall(md_run_setup);
 
 MD_EXPORT_SYMBOL(md_size);
 MD_EXPORT_SYMBOL(register_md_personality);

@@ -31,7 +31,7 @@
  **********************************************************************
  */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 
 #include "hwaccess.h"

@@ -24,7 +24,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
 #include <linux/netdevice.h>
@@ -125,7 +125,7 @@ int llc_mac_data_indicate(llcptr lp, struct sk_buff *skb)
 				free=0;
 				break;
 
-			default:
+			default:;
 				/*
 				 *	All other type 1 pdus ignored for now
 				 */

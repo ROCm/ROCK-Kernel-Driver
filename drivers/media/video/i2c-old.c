@@ -14,7 +14,7 @@
 #include <linux/delay.h>
 #include <linux/locks.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/i2c-old.h>
 
 #define REGPRINT(x)   if (verbose)   (x)

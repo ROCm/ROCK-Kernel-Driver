@@ -196,7 +196,7 @@ typedef struct {
 #include <asm/io.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/wait.h>
 #include <linux/tty.h>

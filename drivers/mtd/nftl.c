@@ -63,7 +63,7 @@
 #include <linux/miscdevice.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/blkpg.h>

@@ -18,7 +18,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
@@ -341,8 +341,7 @@ void prune_dcache(int count)
 		if (dentry->d_flags & DCACHE_REFERENCED) {
 			dentry->d_flags &= ~DCACHE_REFERENCED;
 			list_add(&dentry->d_lru, &dentry_unused);
-			count--;
-			continue;
+			goto next;
 		}
 		dentry_stat.nr_unused--;
 
@@ -351,6 +350,7 @@ void prune_dcache(int count)
 			BUG();
 
 		prune_one_dentry(dentry);
+	next:
 		if (!--count)
 			break;
 	}
@@ -691,7 +691,7 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 static inline struct list_head * d_hash(struct dentry * parent, unsigned long hash)
 {
 	hash += (unsigned long) parent / L1_CACHE_BYTES;
-	hash = hash ^ (hash >> D_HASHBITS) ^ (hash >> D_HASHBITS*2);
+	hash = hash ^ (hash >> D_HASHBITS);
 	return dentry_hashtable + (hash & D_HASHMASK);
 }
 

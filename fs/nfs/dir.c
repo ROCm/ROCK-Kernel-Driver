@@ -23,7 +23,7 @@
 #include <linux/fcntl.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs_fs.h>

@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/scatterlist.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>

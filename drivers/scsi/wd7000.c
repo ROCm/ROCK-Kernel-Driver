@@ -151,7 +151,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <asm/system.h>
 #include <asm/dma.h>

@@ -22,12 +22,13 @@
 
 #include <linux/config.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/fd.h>
 #include <linux/init.h>
+#include <linux/major.h>
 #include <linux/quotaops.h>
 #include <linux/acct.h>
 

@@ -36,8 +36,9 @@ static char *_riointr_c_sccs_ = "@(#)riointr.c	1.2";
 
 #define __NO_VERSION__
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/tty.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/string.h>

@@ -36,7 +36,7 @@
 #include <linux/mm.h>
 #include <linux/selection.h>
 #include <linux/tty.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/init.h>

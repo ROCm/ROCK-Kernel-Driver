@@ -28,7 +28,7 @@
 #include <linux/sched.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 #include <asm/io.h>

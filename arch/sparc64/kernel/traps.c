@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.68 2000/11/22 06:50:37 davem Exp $
+/* $Id: traps.c,v 1.70 2001/02/09 05:46:44 davem Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -636,6 +636,30 @@ void user_instruction_dump (unsigned int *pc)
 	printk("Instruction DUMP:");
 	for(i = 0; i < 9; i++)
 		printk("%c%08x%c",i==3?' ':'<',buf[i],i==3?' ':'>');
+	printk("\n");
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	unsigned long pc, fp;
+	unsigned long task_base = (unsigned long)tsk;
+	struct reg_window *rw;
+	int count = 0;
+
+	if (!tsk)
+		return;
+
+	fp = tsk->thread.ksp + STACK_BIAS;
+	do {
+		/* Bogus frame pointer? */
+		if (fp < (task_base + sizeof(struct task_struct)) ||
+		    fp >= (task_base + (2 * PAGE_SIZE)))
+			break;
+		rw = (struct reg_window *)fp;
+		pc = rw->ins[7];
+		printk("[%016lx] ", pc);
+		fp = rw->ins[6] + STACK_BIAS;
+	} while (++count < 16);
 	printk("\n");
 }
 

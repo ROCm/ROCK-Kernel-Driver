@@ -28,7 +28,7 @@ RFC related functions (headers and stuff)
 
 #include <linux/ctype.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/net.h>
 #include <linux/sched.h>
 #include <linux/skbuff.h>

@@ -576,8 +576,6 @@ inline void drive_stat_acct (kdev_t dev, int rw,
 static inline void add_request(request_queue_t * q, struct request * req,
 			       struct list_head *insert_here)
 {
-	int major;
-
 	drive_stat_acct(req->rq_dev, req->cmd, req->nr_sectors, 1);
 
 	if (!q->plugged && q->head_active && insert_here == &q->queue_head) {

@@ -9,7 +9,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 
 #include <asm/bitops.h>

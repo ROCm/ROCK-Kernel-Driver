@@ -7,11 +7,12 @@
 #include <linux/mm.h>
 #include <linux/file.h>
 #include <linux/poll.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 
 /*
  * We use a start+len construction, which provides full use of the 

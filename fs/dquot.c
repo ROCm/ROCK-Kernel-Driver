@@ -47,7 +47,7 @@
 #include <linux/stat.h>
 #include <linux/tty.h>
 #include <linux/file.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mount.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>

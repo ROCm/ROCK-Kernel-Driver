@@ -37,7 +37,7 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/init.h>

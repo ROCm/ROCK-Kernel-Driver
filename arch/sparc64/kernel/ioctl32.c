@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.105 2001/01/18 04:47:44 davem Exp $
+/* $Id: ioctl32.c,v 1.106 2001/01/30 01:04:28 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -16,7 +16,7 @@
 #include <linux/smp_lock.h>
 #include <linux/ioctl.h>
 #include <linux/if.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/raid/md.h>
 #include <linux/kd.h>
@@ -3770,7 +3770,7 @@ IOCTL_TABLE_END
 
 unsigned int ioctl32_hash_table[1024];
 
-extern inline unsigned long ioctl32_hash(unsigned long cmd)
+static inline unsigned long ioctl32_hash(unsigned long cmd)
 {
 	return ((cmd >> 6) ^ (cmd >> 4) ^ cmd) & 0x3ff;
 }

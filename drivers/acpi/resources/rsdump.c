@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsdump - Functions do dump out the resource structures.
- *              $Revision: 15 $
+ *              $Revision: 16 $
  *
  ******************************************************************************/
 
@@ -910,24 +910,24 @@ acpi_rs_dump_irq_list (
 
 
 	if (acpi_dbg_level & TRACE_RESOURCES && _COMPONENT & acpi_dbg_layer) {
-		prt_element = (PCI_ROUTING_TABLE *)buffer;
+		prt_element = (PCI_ROUTING_TABLE *) buffer;
 
 		while (!done) {
 			acpi_os_printf ("\t_pCI IRQ Routing Table structure %X.\n", count++);
 
 			acpi_os_printf ("\t\t_address: %X\n",
-					 prt_element->data.address);
+					 prt_element->address);
 
-			acpi_os_printf ("\t\t_pin: %X\n", prt_element->data.pin);
+			acpi_os_printf ("\t\t_pin: %X\n", prt_element->pin);
 
-			acpi_os_printf ("\t\t_source: %s\n", prt_element->data.source);
+			acpi_os_printf ("\t\t_source: %s\n", prt_element->source);
 
 			acpi_os_printf ("\t\t_source_index: %X\n",
-					 prt_element->data.source_index);
+					 prt_element->source_index);
 
 			buffer += prt_element->length;
 
-			prt_element = (PCI_ROUTING_TABLE *)buffer;
+			prt_element = (PCI_ROUTING_TABLE *) buffer;
 
 			if(0 == prt_element->length) {
 				done = TRUE;

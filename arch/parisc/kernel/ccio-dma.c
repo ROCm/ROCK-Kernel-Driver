@@ -36,7 +36,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/spinlock.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
 

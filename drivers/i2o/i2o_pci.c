@@ -24,7 +24,7 @@
 #include <linux/i2o.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 
 #ifdef CONFIG_MTRR

@@ -9,8 +9,9 @@
 #include <linux/mm.h>
 #include <linux/locks.h>
 #include <linux/fcntl.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/kmod.h>
+#include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
 

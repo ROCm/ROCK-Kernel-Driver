@@ -17,7 +17,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/qnx4_fs.h>
 #include <linux/fs.h>
 #include <linux/locks.h>

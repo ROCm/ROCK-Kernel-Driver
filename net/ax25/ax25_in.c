@@ -36,6 +36,7 @@
  *	AX.25 036	Jonathan(G4KLX)	Move DAMA code into own file.
  *			Joerg(DL1BKE)	Fixed DAMA Slave.
  *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ *			Thomas(DL9SAU)  Fixed missing initialization of skb->protocol.
  */
 
 #include <linux/config.h>
@@ -158,6 +159,7 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 		skb->nh.raw   = skb->data;
 		skb->dev      = ax25->ax25_dev->dev;
 		skb->pkt_type = PACKET_HOST;
+		skb->protocol = htons(ETH_P_IP);
 		ip_rcv(skb, skb->dev, NULL);	/* Wrong ptype */
 		return 1;
 	}
@@ -287,6 +289,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev, ax25_address *d
 				skb->nh.raw   = skb->data;
 				skb->dev      = dev;
 				skb->pkt_type = PACKET_HOST;
+				skb->protocol = htons(ETH_P_IP);
 				ip_rcv(skb, dev, ptype);	/* Note ptype here is the wrong one, fix me later */
 				break;
 
@@ -296,6 +299,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev, ax25_address *d
 				skb->nh.raw   = skb->data;
 				skb->dev      = dev;
 				skb->pkt_type = PACKET_HOST;
+				skb->protocol = htons(ETH_P_ARP);
 				arp_rcv(skb, dev, ptype);	/* Note ptype here is wrong... */
 				break;
 #endif

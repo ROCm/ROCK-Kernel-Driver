@@ -4,7 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/malloc.h> 
+#include <linux/slab.h> 
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/file.h>

@@ -115,7 +115,7 @@
  *  Stephen Rothwell <sfr@linuxcare.com>, June, 2000.
  */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>

@@ -276,4 +276,4 @@ static inline void fib_res_put(struct fib_result *res)
 }
 
 
-#endif  _NET_FIB_H
+#endif  /* _NET_FIB_H */

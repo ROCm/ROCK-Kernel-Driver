@@ -17,7 +17,7 @@
  *
  */
 #define __NO_VERSION__
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/jffs.h>
 #include "jffs_fm.h"

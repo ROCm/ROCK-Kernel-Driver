@@ -600,7 +600,7 @@ void tcp_update_metrics(struct sock *sk)
 /* Increase initial CWND conservatively: if estimated
  * RTT is low enough (<20msec) or if we have some preset ssthresh.
  *
- * Numbers are taken from RFC1414.
+ * Numbers are taken from RFC2414.
  */
 __u32 tcp_init_cwnd(struct tcp_opt *tp)
 {
@@ -2164,43 +2164,23 @@ extern __inline__ int tcp_paws_discard(struct tcp_opt *tp, struct sk_buff *skb)
 		!tcp_disordered_ack(tp, skb));
 }
 
-static int __tcp_sequence(struct tcp_opt *tp, u32 seq, u32 end_seq)
-{
-	u32 end_window = tp->rcv_wup + tp->rcv_wnd;
-#ifdef TCP_FORMAL_WINDOW
-	u32 rcv_wnd = tcp_receive_window(tp);
-#else
-	u32 rcv_wnd = tp->rcv_wnd;
-#endif
-
-	if (rcv_wnd &&
-	    after(end_seq, tp->rcv_nxt) &&
-	    before(seq, end_window))
-		return 1;
-	if (seq != end_window)
-		return 0;
-	return (seq == end_seq);
-}
-
-/* This functions checks to see if the tcp header is actually acceptable.
+/* Check segment sequence number for validity.
  *
- * Actually, our check is seriously broken, we must accept RST,ACK,URG
- * even on zero window effectively trimming data. It is RFC, guys.
- * But our check is so beautiful, that I do not want to repair it
- * now. However, taking into account those stupid plans to start to
- * send some texts with RST, we have to handle at least this case. --ANK
+ * Segment controls are considered valid, if the segment
+ * fits to the window after truncation to the window. Acceptability
+ * of data (and SYN, FIN, of course) is checked separately.
+ * See tcp_data_queue(), for example.
+ *
+ * Also, controls (RST is main one) are accepted using RCV.WUP instead
+ * of RCV.NXT. Peer still did not advance his SND.UNA when we
+ * delayed ACK, so that hisSND.UNA<=ourRCV.WUP.
+ * (borrowed from freebsd)
  */
-extern __inline__ int tcp_sequence(struct tcp_opt *tp, u32 seq, u32 end_seq, int rst)
-{
-#ifdef TCP_FORMAL_WINDOW
-	u32 rcv_wnd = tcp_receive_window(tp);
-#else
-	u32 rcv_wnd = tp->rcv_wnd;
-#endif
-	if (seq == tp->rcv_nxt)
-		return (rcv_wnd || (end_seq == seq) || rst);
 
-	return __tcp_sequence(tp, seq, end_seq);
+static inline int tcp_sequence(struct tcp_opt *tp, u32 seq, u32 end_seq)
+{
+	return	!before(end_seq, tp->rcv_wup) &&
+		!after(seq, tp->rcv_nxt + tcp_receive_window(tp));
 }
 
 /* When we get a reset we do this. */
@@ -2541,7 +2521,10 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	 *  Out of sequence packets to the out_of_order_queue.
 	 */
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
-		/* Ok. In sequence. */
+		if (tcp_receive_window(tp) == 0)
+			goto out_of_window;
+
+		/* Ok. In sequence. In window. */
 		if (tp->ucopy.task == current &&
 		    tp->copied_seq == tp->rcv_nxt &&
 		    tp->ucopy.len &&
@@ -2601,20 +2584,27 @@ queue_and_out:
 		return;
 	}
 
-#ifdef TCP_DEBUG
-	/* An old packet, either a retransmit or some packet got lost. */
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {
-		/* A retransmit, 2nd most common case.  Force an imediate ack.
-		 * 
-		 * It is impossible, seq is checked by top level.
-		 */
-		printk("BUG: retransmit in tcp_data_queue: seq %X\n", TCP_SKB_CB(skb)->seq);
+		/* A retransmit, 2nd most common case.  Force an immediate ack. */
+		NET_INC_STATS_BH(DelayedACKLost);
 		tcp_enter_quickack_mode(tp);
+		tcp_dsack_set(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
+
+out_of_window:
 		tcp_schedule_ack(tp);
 		__kfree_skb(skb);
 		return;
 	}
-#endif
+
+	/* Out of window. F.e. zero window probe.
+	 *
+	 * Note: it is highly possible that we may open window and enqueue
+	 * this segment now. However, this will be known only after we queue
+	 * it, which will result in queue full of successive 1 byte BSD
+	 * window probes, it is SWS in fact. So, always reject it and send ACK.
+	 */
+	if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt+tcp_receive_window(tp)))
+		goto out_of_window;
 
 	tcp_enter_quickack_mode(tp);
 
@@ -2625,6 +2615,12 @@ queue_and_out:
 			   TCP_SKB_CB(skb)->end_seq);
 
 		tcp_dsack_set(tp, TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
+		
+		/* If window is closed, drop tail of packet. But after
+		 * remembering D-SACK for its head made in previous line.
+		 */
+		if (!tcp_receive_window(tp))
+			goto out_of_window;
 		goto queue_and_out;
 	}
 
@@ -3333,7 +3329,7 @@ slow_path:
 	 *	Standard slow path.
 	 */
 
-	if (!tcp_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, th->rst)) {
+	if (!tcp_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq)) {
 		/* RFC793, page 37: "In all states except SYN-SENT, all reset
 		 * (RST) segments are validated by checking their SEQ-fields."
 		 * And page 69: "If an incoming segment is not acceptable,
@@ -3669,7 +3665,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 	}
 
 	/* step 1: check sequence number */
-	if (!tcp_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, th->rst)) {
+	if (!tcp_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq)) {
 		if (!th->rst)
 			tcp_send_dupack(sk, skb);
 		goto discard;

@@ -167,7 +167,7 @@ static int pg_drive_count;
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mtio.h>
 #include <linux/pg.h>
 #include <linux/wait.h>

@@ -24,7 +24,7 @@
  ********************************************************************/
 
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>

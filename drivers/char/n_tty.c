@@ -38,7 +38,7 @@
 #include <linux/kd.h>
 #include <linux/mm.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/poll.h>
 
 #include <asm/uaccess.h>

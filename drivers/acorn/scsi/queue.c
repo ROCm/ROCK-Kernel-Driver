@@ -18,7 +18,7 @@
 #include <linux/blk.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/init.h>

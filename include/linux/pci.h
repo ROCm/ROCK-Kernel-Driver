@@ -565,9 +565,9 @@ static inline int pcibios_find_class (unsigned int class_code, unsigned short in
 { 	return PCIBIOS_DEVICE_NOT_FOUND; }
 
 #define _PCI_NOP(o,s,t) \
-	static inline int pcibios_##o##_config_##s## (u8 bus, u8 dfn, u8 where, t val) \
+	static inline int pcibios_##o##_config_##s (u8 bus, u8 dfn, u8 where, t val) \
 		{ return PCIBIOS_FUNC_NOT_SUPPORTED; } \
-	static inline int pci_##o##_config_##s## (struct pci_dev *dev, int where, t val) \
+	static inline int pci_##o##_config_##s (struct pci_dev *dev, int where, t val) \
 		{ return PCIBIOS_FUNC_NOT_SUPPORTED; }
 #define _PCI_NOP_ALL(o,x)	_PCI_NOP(o,byte,u8 x) \
 				_PCI_NOP(o,word,u16 x) \

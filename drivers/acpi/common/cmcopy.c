@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: cmcopy - Internal to external object translation utilities
- *              $Revision: 62 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -27,51 +27,39 @@
 #include "acpi.h"
 #include "acinterp.h"
 #include "acnamesp.h"
+#include "amlcode.h"
 
 
 #define _COMPONENT          MISCELLANEOUS
 	 MODULE_NAME         ("cmcopy")
 
 
-typedef struct search_st
-{
-	ACPI_OPERAND_OBJECT         *internal_obj;
-	u32                         index;
-	ACPI_OBJECT                 *external_obj;
-
-} PKG_SEARCH_INFO;
-
-
-/* Used to traverse nested packages */
-
-PKG_SEARCH_INFO                 level[MAX_PACKAGE_DEPTH];
-
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_external_simple_object
+ * FUNCTION:    Acpi_cm_copy_isimple_to_esimple
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are examining
- *              *Buffer         - Where the object is returned
- *              *Space_used     - Where the data length is returned
+ * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
+ *              *Buffer             - Where the object is returned
+ *              *Space_used         - Where the data length is returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to place a simple object in a user
- *                  buffer.
+ *              buffer.
  *
  *              The buffer is assumed to have sufficient space for the object.
  *
  ******************************************************************************/
 
 static ACPI_STATUS
-acpi_cm_build_external_simple_object (
-	ACPI_OPERAND_OBJECT     *internal_obj,
-	ACPI_OBJECT             *external_obj,
+acpi_cm_copy_isimple_to_esimple (
+	ACPI_OPERAND_OBJECT     *internal_object,
+	ACPI_OBJECT             *external_object,
 	u8                      *data_space,
 	u32                     *buffer_space_used)
 {
 	u32                     length = 0;
-	u8                      *source_ptr = NULL;
+	ACPI_STATUS             status = AE_OK;
 
 
 	/*
@@ -79,116 +67,221 @@ acpi_cm_build_external_simple_object (
 	 * package element
 	 */
 
-	if (!internal_obj) {
+	if (!internal_object) {
 		*buffer_space_used = 0;
 		return (AE_OK);
 	}
 
 	/* Always clear the external object */
 
-	MEMSET (external_obj, 0, sizeof (ACPI_OBJECT));
+	MEMSET (external_object, 0, sizeof (ACPI_OBJECT));
 
 	/*
 	 * In general, the external object will be the same type as
 	 * the internal object
 	 */
 
-	external_obj->type = internal_obj->common.type;
+	external_object->type = internal_object->common.type;
 
 	/* However, only a limited number of external types are supported */
 
-	switch (external_obj->type)
+	switch (internal_object->common.type)
 	{
 
 	case ACPI_TYPE_STRING:
 
-		length = internal_obj->string.length + 1;
-		external_obj->string.length = internal_obj->string.length;
-		external_obj->string.pointer = (NATIVE_CHAR *) data_space;
-		source_ptr = (u8 *) internal_obj->string.pointer;
+		length = internal_object->string.length + 1;
+		external_object->string.length = internal_object->string.length;
+		external_object->string.pointer = (NATIVE_CHAR *) data_space;
+		MEMCPY ((void *) data_space, (void *) internal_object->string.pointer, length);
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		length = internal_obj->buffer.length;
-		external_obj->buffer.length = internal_obj->buffer.length;
-		external_obj->buffer.pointer = data_space;
-		source_ptr = (u8 *) internal_obj->buffer.pointer;
+		length = internal_object->buffer.length;
+		external_object->buffer.length = internal_object->buffer.length;
+		external_object->buffer.pointer = data_space;
+		MEMCPY ((void *) data_space, (void *) internal_object->buffer.pointer, length);
 		break;
 
 
 	case ACPI_TYPE_INTEGER:
 
-		external_obj->integer.value= internal_obj->integer.value;
+		external_object->integer.value= internal_object->integer.value;
 		break;
 
 
 	case INTERNAL_TYPE_REFERENCE:
 
 		/*
-		 * This is an object reference.  We use the object type of "Any"
-		 * to indicate a reference object containing a handle to an ACPI
-		 * named object.
+		 * This is an object reference.  Attempt to dereference it.
 		 */
 
-		external_obj->type = ACPI_TYPE_ANY;
-		external_obj->reference.handle = internal_obj->reference.node;
+		switch (internal_object->reference.op_code)
+		{
+		case AML_ZERO_OP:
+			external_object->type = ACPI_TYPE_INTEGER;
+			external_object->integer.value = 0;
+			break;
+
+		case AML_ONE_OP:
+			external_object->type = ACPI_TYPE_INTEGER;
+			external_object->integer.value = 1;
+			break;
+
+		case AML_ONES_OP:
+			external_object->type = ACPI_TYPE_INTEGER;
+			external_object->integer.value = ACPI_INTEGER_MAX;
+			break;
+
+		case AML_NAMEPATH_OP:
+			/*
+			 * This is a named reference, get the string.  We already know that
+			 * we have room for it, use max length
+			 */
+			length = MAX_STRING_LENGTH;
+			external_object->type = ACPI_TYPE_STRING;
+			external_object->string.pointer = (NATIVE_CHAR *) data_space;
+			status = acpi_ns_handle_to_pathname ((ACPI_HANDLE *) internal_object->reference.node,
+					 &length, (char *) data_space);
+			break;
+
+		default:
+			/*
+			 * Use the object type of "Any" to indicate a reference
+			 * to object containing a handle to an ACPI named object.
+			 */
+			external_object->type = ACPI_TYPE_ANY;
+			external_object->reference.handle = internal_object->reference.node;
+			break;
+		}
 		break;
 
 
 	case ACPI_TYPE_PROCESSOR:
 
-		external_obj->processor.proc_id =
-				 internal_obj->processor.proc_id;
-
-		external_obj->processor.pblk_address =
-				 internal_obj->processor.address;
-
-		external_obj->processor.pblk_length =
-				 internal_obj->processor.length;
+		external_object->processor.proc_id = internal_object->processor.proc_id;
+		external_object->processor.pblk_address = internal_object->processor.address;
+		external_object->processor.pblk_length = internal_object->processor.length;
 		break;
+
 
 	case ACPI_TYPE_POWER:
 
-		external_obj->power_resource.system_level =
-				   internal_obj->power_resource.system_level;
+		external_object->power_resource.system_level =
+				   internal_object->power_resource.system_level;
 
-		external_obj->power_resource.resource_order =
-				   internal_obj->power_resource.resource_order;
+		external_object->power_resource.resource_order =
+				   internal_object->power_resource.resource_order;
 		break;
+
 
 	default:
-		return (AE_CTRL_RETURN_VALUE);
-		break;
-	}
-
-
-	/* Copy data if necessary (strings or buffers) */
-
-	if (length) {
 		/*
-		 * Copy the return data to the caller's buffer
+		 * There is no corresponding external object type
 		 */
-		MEMCPY ((void *) data_space, (void *) source_ptr, length);
+		return (AE_SUPPORT);
+		break;
 	}
 
 
 	*buffer_space_used = (u32) ROUND_UP_TO_NATIVE_WORD (length);
 
-	return (AE_OK);
+	return (status);
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_external_package_object
+ * FUNCTION:    Acpi_cm_copy_ielement_to_eelement
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are returning
- *              *Buffer         - Where the object is returned
- *              *Space_used     - Where the object length is returned
+ * PARAMETERS:  ACPI_PKG_CALLBACK
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Copy one package element to another package element
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_copy_ielement_to_eelement (
+	u8                      object_type,
+	ACPI_OPERAND_OBJECT     *source_object,
+	ACPI_GENERIC_STATE      *state,
+	void                    *context)
+{
+	ACPI_STATUS             status = AE_OK;
+	ACPI_PKG_INFO           *info = (ACPI_PKG_INFO *) context;
+	u32                     object_space;
+	u32                     this_index;
+	ACPI_OBJECT             *target_object;
+
+
+	this_index      = state->pkg.index;
+	target_object   = (ACPI_OBJECT *)
+			   &((ACPI_OBJECT *)(state->pkg.dest_object))->package.elements[this_index];
+
+
+	switch (object_type)
+	{
+	case 0:
+
+		/*
+		 * This is a simple or null object -- get the size
+		 */
+
+		status = acpi_cm_copy_isimple_to_esimple (source_object,
+				  target_object, info->free_space, &object_space);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
+
+		break;
+
+	case 1:
+
+		/*
+		 * Build the package object
+		 */
+		target_object->type             = ACPI_TYPE_PACKAGE;
+		target_object->package.count    = source_object->package.count;
+		target_object->package.elements = (ACPI_OBJECT *) info->free_space;
+
+		/*
+		 * Pass the new package object back to the package walk routine
+		 */
+		state->pkg.this_target_obj = target_object;
+
+		/*
+		 * Save space for the array of objects (Package elements)
+		 * update the buffer length counter
+		 */
+		object_space = (u32) ROUND_UP_TO_NATIVE_WORD (
+				   target_object->package.count * sizeof (ACPI_OBJECT));
+		break;
+
+	default:
+		return (AE_BAD_PARAMETER);
+	}
+
+
+	info->free_space  += object_space;
+	info->length      += object_space;
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_cm_copy_ipackage_to_epackage
+ *
+ * PARAMETERS:  *Internal_object    - Pointer to the object we are returning
+ *              *Buffer             - Where the object is returned
+ *              *Space_used         - Where the object length is returned
+ *
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to place a package object in a user
  *              buffer.  A package object by definition contains other objects.
@@ -200,49 +293,33 @@ acpi_cm_build_external_simple_object (
  ******************************************************************************/
 
 static ACPI_STATUS
-acpi_cm_build_external_package_object (
-	ACPI_OPERAND_OBJECT     *internal_obj,
+acpi_cm_copy_ipackage_to_epackage (
+	ACPI_OPERAND_OBJECT     *internal_object,
 	u8                      *buffer,
 	u32                     *space_used)
 {
-	u8                      *free_space;
-	ACPI_OBJECT             *external_obj;
-	u32                     current_depth = 0;
+	ACPI_OBJECT             *external_object;
 	ACPI_STATUS             status;
-	u32                     length = 0;
-	u32                     this_index;
-	u32                     object_space;
-	ACPI_OPERAND_OBJECT     *this_internal_obj;
-	ACPI_OBJECT             *this_external_obj;
-	PKG_SEARCH_INFO         *level_ptr;
+	ACPI_PKG_INFO           info;
 
 
 	/*
 	 * First package at head of the buffer
 	 */
-	external_obj = (ACPI_OBJECT *) buffer;
+	external_object = (ACPI_OBJECT *) buffer;
 
 	/*
 	 * Free space begins right after the first package
 	 */
-	free_space = buffer + ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT));
+	info.length      = 0;
+	info.object_space = 0;
+	info.num_packages = 1;
+	info.free_space  = buffer + ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT));
 
 
-	/*
-	 * Initialize the working variables
-	 */
-
-	MEMSET ((void *) level, 0, sizeof (level));
-
-	level[0].internal_obj   = internal_obj;
-	level[0].external_obj   = external_obj;
-	level[0].index          = 0;
-	level_ptr               = &level[0];
-	current_depth           = 0;
-
-	external_obj->type              = internal_obj->common.type;
-	external_obj->package.count     = internal_obj->package.count;
-	external_obj->package.elements  = (ACPI_OBJECT *) free_space;
+	external_object->type              = internal_object->common.type;
+	external_object->package.count     = internal_object->package.count;
+	external_object->package.elements  = (ACPI_OBJECT *) info.free_space;
 
 
 	/*
@@ -250,136 +327,27 @@ acpi_cm_build_external_package_object (
 	 * and move the free space past it
 	 */
 
-	free_space += external_obj->package.count *
+	info.free_space += external_object->package.count *
 			  ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT));
 
 
-	while (1) {
-		this_index      = level_ptr->index;
-		this_internal_obj =
-				(ACPI_OPERAND_OBJECT  *)
-				level_ptr->internal_obj->package.elements[this_index];
-		this_external_obj =
-				(ACPI_OBJECT *)
-				&level_ptr->external_obj->package.elements[this_index];
+	status = acpi_cm_walk_package_tree (internal_object, external_object,
+			 acpi_cm_copy_ielement_to_eelement, &info);
 
+	*space_used = info.length;
 
-		/*
-		 * Check for
-		 * 1) Null object -- OK, this can happen if package
-		 *              element is never initialized
-		 * 2) Not an internal object - can be Node instead
-		 * 3) Any internal object other than a package.
-		 *
-		 * The more complex package case is handled later
-		 */
+	return (status);
 
-		if ((!this_internal_obj) ||
-			(!VALID_DESCRIPTOR_TYPE (
-				this_internal_obj, ACPI_DESC_TYPE_INTERNAL)) ||
-			(!IS_THIS_OBJECT_TYPE (
-				this_internal_obj, ACPI_TYPE_PACKAGE)))
-		{
-			/*
-			 * This is a simple or null object -- get the size
-			 */
-
-			status =
-				acpi_cm_build_external_simple_object (this_internal_obj,
-						   this_external_obj,
-						   free_space,
-						   &object_space);
-			if (ACPI_FAILURE (status)) {
-				return (status);
-			}
-
-			free_space  += object_space;
-			length      += object_space;
-
-			level_ptr->index++;
-			while (level_ptr->index >=
-					level_ptr->internal_obj->package.count)
-			{
-				/*
-				 * We've handled all of the objects at this
-				 * level.  This means that we have just
-				 * completed a package.  That package may
-				 * have contained one or more packages
-				 * itself
-				 */
-				if (current_depth == 0) {
-					/*
-					 * We have handled all of the objects
-					 * in the top level package just add
-					 * the length of the package objects
-					 * and get out
-					 */
-					*space_used = length;
-					return (AE_OK);
-				}
-
-				/*
-				 * go back up a level and move the index
-				 * past the just completed package object.
-				 */
-				current_depth--;
-				level_ptr = &level[current_depth];
-				level_ptr->index++;
-			}
-		}
-
-
-		else {
-			/*
-			 * This object is a package
-			 * -- we must go one level deeper
-			 */
-			if (current_depth >= MAX_PACKAGE_DEPTH-1) {
-				/*
-				 * Too many nested levels of packages
-				 * for us to handle
-				 */
-				return (AE_LIMIT);
-			}
-
-			/*
-			 * Build the package object
-			 */
-			this_external_obj->type = ACPI_TYPE_PACKAGE;
-			this_external_obj->package.count =
-					 this_internal_obj->package.count;
-			this_external_obj->package.elements =
-					  (ACPI_OBJECT *) free_space;
-
-			/*
-			 * Save space for the array of objects (Package elements)
-			 * update the buffer length counter
-			 */
-			object_space = (u32) ROUND_UP_TO_NATIVE_WORD (
-					   this_external_obj->package.count *
-					   sizeof (ACPI_OBJECT));
-
-			free_space              += object_space;
-			length                  += object_space;
-
-			current_depth++;
-			level_ptr               = &level[current_depth];
-			level_ptr->internal_obj = this_internal_obj;
-			level_ptr->external_obj = this_external_obj;
-			level_ptr->index        = 0;
-		}
-	}
 }
 
-
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_external_object
+ * FUNCTION:    Acpi_cm_copy_iobject_to_eobject
  *
- * PARAMETERS:  *Internal_obj   - The internal object to be converted
- *              *Buffer_ptr     - Where the object is returned
+ * PARAMETERS:  *Internal_object    - The internal object to be converted
+ *              *Buffer_ptr         - Where the object is returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function is called to build an API object to be returned to
  *              the caller.
@@ -387,35 +355,31 @@ acpi_cm_build_external_package_object (
  ******************************************************************************/
 
 ACPI_STATUS
-acpi_cm_build_external_object (
-	ACPI_OPERAND_OBJECT     *internal_obj,
+acpi_cm_copy_iobject_to_eobject (
+	ACPI_OPERAND_OBJECT     *internal_object,
 	ACPI_BUFFER             *ret_buffer)
 {
 	ACPI_STATUS             status;
 
 
-	if (IS_THIS_OBJECT_TYPE (internal_obj, ACPI_TYPE_PACKAGE)) {
+	if (IS_THIS_OBJECT_TYPE (internal_object, ACPI_TYPE_PACKAGE)) {
 		/*
-		 * Package objects contain other objects (which can be objects)
-		 * buildpackage does it all
+		 * Package object:  Copy all subobjects (including
+		 * nested packages)
 		 */
-		status =
-			acpi_cm_build_external_package_object (internal_obj,
-					 ret_buffer->pointer,
-					 &ret_buffer->length);
+		status = acpi_cm_copy_ipackage_to_epackage (internal_object,
+				  ret_buffer->pointer, &ret_buffer->length);
 	}
 
 	else {
 		/*
 		 * Build a simple object (no nested objects)
 		 */
-		status =
-			acpi_cm_build_external_simple_object (internal_obj,
-					  (ACPI_OBJECT *) ret_buffer->pointer,
-					  ((u8 *) ret_buffer->pointer +
-					  ROUND_UP_TO_NATIVE_WORD (
-							   sizeof (ACPI_OBJECT))),
-							&ret_buffer->length);
+		status = acpi_cm_copy_isimple_to_esimple (internal_object,
+				  (ACPI_OBJECT *) ret_buffer->pointer,
+				  ((u8 *) ret_buffer->pointer +
+				  ROUND_UP_TO_NATIVE_WORD (sizeof (ACPI_OBJECT))),
+				  &ret_buffer->length);
 		/*
 		 * build simple does not include the object size in the length
 		 * so we add it in here
@@ -427,14 +391,14 @@ acpi_cm_build_external_object (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_internal_simple_object
+ * FUNCTION:    Acpi_cm_copy_esimple_to_isimple
  *
- * PARAMETERS:  *External_obj   - The external object to be converted
- *              *Internal_obj   - Where the internal object is returned
+ * PARAMETERS:  *External_object   - The external object to be converted
+ *              *Internal_object   - Where the internal object is returned
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: This function copies an external object to an internal one.
  *              NOTE: Pointers can be copied, we don't need to copy data.
@@ -444,28 +408,28 @@ acpi_cm_build_external_object (
  ******************************************************************************/
 
 ACPI_STATUS
-acpi_cm_build_internal_simple_object (
-	ACPI_OBJECT             *external_obj,
-	ACPI_OPERAND_OBJECT     *internal_obj)
+acpi_cm_copy_esimple_to_isimple (
+	ACPI_OBJECT             *external_object,
+	ACPI_OPERAND_OBJECT     *internal_object)
 {
 
 
-	internal_obj->common.type = (u8) external_obj->type;
+	internal_object->common.type = (u8) external_object->type;
 
-	switch (external_obj->type)
+	switch (external_object->type)
 	{
 
 	case ACPI_TYPE_STRING:
 
-		internal_obj->string.length = external_obj->string.length;
-		internal_obj->string.pointer = external_obj->string.pointer;
+		internal_object->string.length = external_object->string.length;
+		internal_object->string.pointer = external_object->string.pointer;
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		internal_obj->buffer.length = external_obj->buffer.length;
-		internal_obj->buffer.pointer = external_obj->buffer.pointer;
+		internal_object->buffer.length = external_object->buffer.length;
+		internal_object->buffer.pointer = external_object->buffer.pointer;
 		break;
 
 
@@ -473,7 +437,7 @@ acpi_cm_build_internal_simple_object (
 		/*
 		 * Number is included in the object itself
 		 */
-		internal_obj->integer.value  = external_obj->integer.value;
+		internal_object->integer.value  = external_object->integer.value;
 		break;
 
 
@@ -491,11 +455,11 @@ acpi_cm_build_internal_simple_object (
 
 /* Code to convert packages that are parameters to control methods */
 
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_internal_package_object
+ * FUNCTION:    Acpi_cm_copy_epackage_to_ipackage
  *
- * PARAMETERS:  *Internal_obj   - Pointer to the object we are returning
+ * PARAMETERS:  *Internal_object   - Pointer to the object we are returning
  *              *Buffer         - Where the object is returned
  *              *Space_used     - Where the length of the object is returned
  *
@@ -511,26 +475,24 @@ acpi_cm_build_internal_simple_object (
  ******************************************************************************/
 
 static ACPI_STATUS
-acpi_cm_build_internal_package_object (
-	ACPI_OPERAND_OBJECT     *internal_obj,
+acpi_cm_copy_epackage_to_ipackage (
+	ACPI_OPERAND_OBJECT     *internal_object,
 	u8                      *buffer,
 	u32                     *space_used)
 {
 	u8                      *free_space;
-	ACPI_OBJECT             *external_obj;
-	u32                     current_depth = 0;
+	ACPI_OBJECT             *external_object;
 	u32                     length = 0;
 	u32                     this_index;
 	u32                     object_space = 0;
 	ACPI_OPERAND_OBJECT     *this_internal_obj;
 	ACPI_OBJECT             *this_external_obj;
-	PKG_SEARCH_INFO         *level_ptr;
 
 
 	/*
 	 * First package at head of the buffer
 	 */
-	external_obj = (ACPI_OBJECT *)buffer;
+	external_object = (ACPI_OBJECT *)buffer;
 
 	/*
 	 * Free space begins right after the first package
@@ -538,20 +500,9 @@ acpi_cm_build_internal_package_object (
 	free_space = buffer + sizeof(ACPI_OBJECT);
 
 
-	/*
-	 * Initialize the working variables
-	 */
-
-	MEMSET ((void *) level, 0, sizeof(level));
-
-	level[0].internal_obj   = internal_obj;
-	level[0].external_obj   = external_obj;
-	level_ptr               = &level[0];
-	current_depth           = 0;
-
-	external_obj->type              = internal_obj->common.type;
-	external_obj->package.count     = internal_obj->package.count;
-	external_obj->package.elements  = (ACPI_OBJECT *)free_space;
+	external_object->type              = internal_object->common.type;
+	external_object->package.count     = internal_object->package.count;
+	external_object->package.elements  = (ACPI_OBJECT *)free_space;
 
 
 	/*
@@ -559,100 +510,21 @@ acpi_cm_build_internal_package_object (
 	 * and move the free space past it
 	 */
 
-	free_space += external_obj->package.count * sizeof(ACPI_OBJECT);
+	free_space += external_object->package.count * sizeof(ACPI_OBJECT);
 
 
-	while (1) {
-		this_index      = level_ptr->index;
+	/* Call Walk_package */
 
-		this_internal_obj = (ACPI_OPERAND_OBJECT *)
-				 &level_ptr->internal_obj->package.elements[this_index];
-
-		this_external_obj = (ACPI_OBJECT *)
-				 &level_ptr->external_obj->package.elements[this_index];
-
-		if (IS_THIS_OBJECT_TYPE (this_internal_obj, ACPI_TYPE_PACKAGE)) {
-			/*
-			 * If this object is a package then we go one deeper
-			 */
-			if (current_depth >= MAX_PACKAGE_DEPTH-1) {
-				/*
-				 * Too many nested levels of packages for us to handle
-				 */
-				return (AE_LIMIT);
-			}
-
-			/*
-			 * Build the package object
-			 */
-			this_external_obj->type             = ACPI_TYPE_PACKAGE;
-			this_external_obj->package.count    = this_internal_obj->package.count;
-			this_external_obj->package.elements = (ACPI_OBJECT *) free_space;
-
-			/*
-			 * Save space for the array of objects (Package elements)
-			 * update the buffer length counter
-			 */
-			object_space            = this_external_obj->package.count *
-					   sizeof (ACPI_OBJECT);
-
-			free_space              += object_space;
-			length                  += object_space;
-
-			current_depth++;
-			level_ptr               = &level[current_depth];
-			level_ptr->internal_obj = this_internal_obj;
-			level_ptr->external_obj = this_external_obj;
-			level_ptr->index        = 0;
-
-		}   /* if object is a package */
-
-		else {
-			free_space  += object_space;
-			length      += object_space;
-
-			level_ptr->index++;
-			while (level_ptr->index >=
-					level_ptr->internal_obj->package.count)
-			{
-				/*
-				 * We've handled all of the objects at
-				 * this level,  This means that we have
-				 * just completed a package.  That package
-				 * may have contained one or more packages
-				 * itself
-				 */
-				if (current_depth == 0) {
-					/*
-					 * We have handled all of the objects
-					 * in the top level package just add
-					 * the length of the package objects
-					 * and get out
-					 */
-					*space_used = length;
-					return (AE_OK);
-				}
-
-				/*
-				 * go back up a level and move the index
-				 * past the just completed package object.
-				 */
-				current_depth--;
-				level_ptr = &level[current_depth];
-				level_ptr->index++;
-			}
-		}   /* else object is NOT a package */
-	}   /* while (1)  */
 }
 
 #endif /* Future implementation */
 
 
-/******************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_cm_build_internal_object
+ * FUNCTION:    Acpi_cm_copy_eobject_to_iobject
  *
- * PARAMETERS:  *Internal_obj   - The external object to be converted
+ * PARAMETERS:  *Internal_object   - The external object to be converted
  *              *Buffer_ptr     - Where the internal object is returned
  *
  * RETURN:      Status          - the status of the call
@@ -662,14 +534,14 @@ acpi_cm_build_internal_package_object (
  ******************************************************************************/
 
 ACPI_STATUS
-acpi_cm_build_internal_object (
-	ACPI_OBJECT             *external_obj,
-	ACPI_OPERAND_OBJECT     *internal_obj)
+acpi_cm_copy_eobject_to_iobject (
+	ACPI_OBJECT             *external_object,
+	ACPI_OPERAND_OBJECT     *internal_object)
 {
 	ACPI_STATUS             status;
 
 
-	if (external_obj->type == ACPI_TYPE_PACKAGE) {
+	if (external_object->type == ACPI_TYPE_PACKAGE) {
 		/*
 		 * Package objects contain other objects (which can be objects)
 		 * buildpackage does it all
@@ -679,7 +551,7 @@ acpi_cm_build_internal_object (
 		 * control methods only.  This is a very, very rare case.
 		 */
 /*
-		Status = Acpi_cm_build_internal_package_object(Internal_obj,
+		Status = Acpi_cm_copy_epackage_to_ipackage(Internal_object,
 				 Ret_buffer->Pointer,
 				 &Ret_buffer->Length);
 */
@@ -690,12 +562,146 @@ acpi_cm_build_internal_object (
 		/*
 		 * Build a simple object (no nested objects)
 		 */
-		status = acpi_cm_build_internal_simple_object (external_obj, internal_obj);
+		status = acpi_cm_copy_esimple_to_isimple (external_object, internal_object);
 		/*
 		 * build simple does not include the object size in the length
 		 * so we add it in here
 		 */
 	}
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_cm_copy_ielement_to_ielement
+ *
+ * PARAMETERS:  ACPI_PKG_CALLBACK
+ *
+ * RETURN:      Status          - the status of the call
+ *
+ * DESCRIPTION: Copy one package element to another package element
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_copy_ielement_to_ielement (
+	u8                      object_type,
+	ACPI_OPERAND_OBJECT     *source_object,
+	ACPI_GENERIC_STATE      *state,
+	void                    *context)
+{
+	ACPI_STATUS             status = AE_OK;
+	u32                     this_index;
+	ACPI_OPERAND_OBJECT     **this_target_ptr;
+	ACPI_OPERAND_OBJECT     *target_object;
+
+
+	this_index    = state->pkg.index;
+	this_target_ptr = (ACPI_OPERAND_OBJECT **)
+			   &state->pkg.dest_object->package.elements[this_index];
+
+	switch (object_type)
+	{
+	case 0:
+
+		/*
+		 * This is a simple object, just copy it
+		 */
+		target_object = acpi_cm_create_internal_object (source_object->common.type);
+		if (!target_object) {
+			return (AE_NO_MEMORY);
+		}
+
+		status = acpi_aml_store_object_to_object (source_object, target_object,
+				  (ACPI_WALK_STATE *) context);
+		if (ACPI_FAILURE (status)) {
+			return (status);
+		}
+
+		*this_target_ptr = target_object;
+		break;
+
+
+	case 1:
+		/*
+		 * This object is a package - go down another nesting level
+		 * Create and build the package object
+		 */
+		target_object = acpi_cm_create_internal_object (ACPI_TYPE_PACKAGE);
+		if (!target_object) {
+			/* TBD: must delete package created up to this point */
+
+			return (AE_NO_MEMORY);
+		}
+
+		target_object->package.count = source_object->package.count;
+
+		/*
+		 * Pass the new package object back to the package walk routine
+		 */
+		state->pkg.this_target_obj = target_object;
+
+		/*
+		 * Store the object pointer in the parent package object
+		 */
+		*this_target_ptr = target_object;
+		break;
+
+	default:
+		return (AE_BAD_PARAMETER);
+	}
+
+
+	return (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_cm_copy_ipackage_to_ipackage
+ *
+ * PARAMETERS:  *Source_obj     - Pointer to the source package object
+ *              *Dest_obj       - Where the internal object is returned
+ *
+ * RETURN:      Status          - the status of the call
+ *
+ * DESCRIPTION: This function is called to copy an internal package object
+ *              into another internal package object.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_cm_copy_ipackage_to_ipackage (
+	ACPI_OPERAND_OBJECT     *source_obj,
+	ACPI_OPERAND_OBJECT     *dest_obj,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status = AE_OK;
+
+
+	dest_obj->common.type   = source_obj->common.type;
+	dest_obj->package.count = source_obj->package.count;
+
+
+	/*
+	 * Create the object array and walk the source package tree
+	 */
+
+	dest_obj->package.elements = acpi_cm_callocate ((source_obj->package.count + 1) *
+			 sizeof (void *));
+	dest_obj->package.next_element = dest_obj->package.elements;
+
+	if (!dest_obj->package.elements) {
+		REPORT_ERROR (
+			("Aml_build_copy_internal_package_object: Package allocation failure\n"));
+		return (AE_NO_MEMORY);
+	}
+
+
+	status = acpi_cm_walk_package_tree (source_obj, dest_obj,
+			 acpi_cm_copy_ielement_to_ielement, walk_state);
 
 	return (status);
 }

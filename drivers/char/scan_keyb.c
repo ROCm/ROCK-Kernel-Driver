@@ -16,7 +16,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/kbd_kern.h>
 
 struct scan_keyboard {

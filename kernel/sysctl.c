@@ -19,7 +19,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sysctl.h>
 #include <linux/swapctl.h>
 #include <linux/proc_fs.h>

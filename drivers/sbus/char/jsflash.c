@@ -30,7 +30,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/poll.h>
 #include <linux/init.h>

@@ -65,7 +65,7 @@
 #include <linux/ctype.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/fb.h>
 #include <linux/delay.h>

@@ -15,7 +15,7 @@
 
 #include <linux/types.h>
 #ifdef __KERNEL__
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/tqueue.h>
 #endif
 

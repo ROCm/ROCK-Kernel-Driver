@@ -5,7 +5,7 @@
  */
 
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 
 #include <asm/pbm.h>

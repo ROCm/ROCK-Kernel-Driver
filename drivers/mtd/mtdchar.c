@@ -12,7 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>

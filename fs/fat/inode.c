@@ -27,7 +27,7 @@
 #include <linux/stat.h>
 #include <linux/locks.h>
 #include <linux/fat_cvf.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 
 #include "msbuffer.h"

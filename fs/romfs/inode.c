@@ -67,7 +67,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/romfs_fs.h>
 #include <linux/fs.h>
 #include <linux/locks.h>

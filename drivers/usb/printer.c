@@ -42,7 +42,7 @@
 #include <linux/signal.h>
 #include <linux/poll.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/lp.h>
 #undef DEBUG
 #include <linux/usb.h>

@@ -58,7 +58,7 @@
 
 #define __NO_VERSION__
 #include <linux/types.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/jffs.h>
 #include <linux/fs.h>
 #include <linux/stat.h>

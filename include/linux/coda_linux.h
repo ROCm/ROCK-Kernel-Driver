@@ -17,7 +17,7 @@
 #include <linux/sched.h> 
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/wait.h>		
 #include <linux/types.h>
 #include <linux/fs.h>

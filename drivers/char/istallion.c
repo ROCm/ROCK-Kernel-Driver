@@ -28,8 +28,9 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
 #include <linux/cdk.h>

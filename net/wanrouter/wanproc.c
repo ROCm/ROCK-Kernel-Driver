@@ -13,6 +13,7 @@
 *		as published by the Free Software Foundation; either version
 *		2 of the License, or (at your option) any later version.
 * ============================================================================
+* Jan 20, 2001  Arnaldo C.Melo  Fix leak on error in router_proc_read, cleanups
 * Jun 02, 1999  Gideon Hack	Updates for Linux 2.2.X kernels.
 * Jun 29, 1997	Alan Cox	Merged with 1.0.3 vendor code
 * Jan 29, 1997	Gene Kozin	v1.0.1. Implemented /proc read routines
@@ -25,7 +26,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
-#include <linux/malloc.h>	/* kmalloc(), kfree() */
+#include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/mm.h>		/* verify_area(), etc. */
 #include <linux/string.h>	/* inline mem*, str* functions */
 #include <linux/init.h>		/* __init et al. */
@@ -43,22 +44,8 @@
 #ifndef	min
 #define min(a,b) (((a)<(b))?(a):(b))
 #endif
-#ifndef	max
-#define max(a,b) (((a)>(b))?(a):(b))
-#endif
 
 #define	PROC_BUFSZ	4000	/* buffer size for printing proc info */
-
-
-/****** Data Types **********************************************************/
-
-typedef struct wan_stat_entry
-{
-	struct wan_stat_entry *next;
-	char *description;		/* description string */
-	void *data;			/* -> data */
-	unsigned data_type;		/* data type */
-} wan_stat_entry_t;
 
 /****** Function Prototypes *************************************************/
 
@@ -78,7 +65,7 @@ static int wandev_get_info(char* buf, char** start, off_t offs, int len);
 
 /*
  *	Structures for interfacing with the /proc filesystem.
- *	Router creates its own directory /proc/net/router with the folowing
+ *	Router creates its own directory /proc/net/wanrouter with the folowing
  *	entries:
  *	config		device configuration
  *	status		global device statistics
@@ -86,7 +73,7 @@ static int wandev_get_info(char* buf, char** start, off_t offs, int len);
  */
 
 /*
- *	Generic /proc/net/router/<file> file and inode operations 
+ *	Generic /proc/net/wanrouter/<file> file and inode operations 
  */
 static struct file_operations router_fops =
 {
@@ -99,7 +86,7 @@ static struct inode_operations router_inode =
 };
 
 /*
- *	/proc/net/router/<device> file operations
+ *	/proc/net/wanrouter/<device> file operations
  */
 
 static struct file_operations wandev_fops =
@@ -109,7 +96,7 @@ static struct file_operations wandev_fops =
 };
 
 /*
- *	/proc/net/router 
+ *	/proc/net/wanrouter 
  */
 
 static struct proc_dir_entry *proc_router;
@@ -251,13 +238,15 @@ static ssize_t router_proc_read(struct file* file, char* buf, size_t count,
 	offs = file->f_pos;
 	if (offs < pos) {
 		len = min(pos - offs, count);
-		if(copy_to_user(buf, (page + offs), len))
-			return -EFAULT;
+		if(copy_to_user(buf, (page + offs), len)) {
+			len = -EFAULT;
+			goto out;
+		}
 		file->f_pos += len;
 	}
 	else
 		len = 0;
-	kfree(page);
+out:	kfree(page);
 	return len;
 }
 

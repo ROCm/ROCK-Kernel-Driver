@@ -51,7 +51,7 @@
 #include <linux/i2o.h>
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/hdreg.h>
 
 #include <linux/notifier.h>

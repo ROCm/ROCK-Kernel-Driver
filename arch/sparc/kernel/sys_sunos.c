@@ -28,7 +28,7 @@
 #include <linux/utsname.h>
 #include <linux/major.h>
 #include <linux/stat.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/errno.h>
 #include <linux/smp.h>

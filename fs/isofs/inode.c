@@ -20,7 +20,7 @@
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/locks.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/cdrom.h>
 #include <linux/init.h>

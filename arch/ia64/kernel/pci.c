@@ -10,7 +10,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 

@@ -36,7 +36,7 @@
 
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/tqueue.h>

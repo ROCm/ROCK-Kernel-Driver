@@ -29,8 +29,9 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/version.h> /* for linux/stallion.h */
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
 #include <linux/cd1400.h>

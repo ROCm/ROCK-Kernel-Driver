@@ -13,7 +13,7 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/soundcard.h>
 #include <linux/delay.h>

@@ -162,7 +162,7 @@
 #include <linux/spinlock.h>
 #include <linux/pci.h>		/* pci cfg accessor functions  */
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>	/* irqaction */
 #include <linux/irq.h>		/* irq_region support */

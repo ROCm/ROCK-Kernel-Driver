@@ -53,7 +53,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioctl.h>
 #include <linux/fd.h>
 #include <linux/module.h>

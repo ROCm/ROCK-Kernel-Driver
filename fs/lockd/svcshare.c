@@ -9,7 +9,7 @@
 #include <linux/sched.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svc.h>

@@ -1,8 +1,6 @@
 #ifndef _LINUX_ELEVATOR_H
 #define _LINUX_ELEVATOR_H
 
-#define ELEVATOR_DEBUG
-
 typedef void (elevator_fn) (struct request *, elevator_t *,
 			    struct list_head *,
 			    struct list_head *, int);
@@ -68,8 +66,9 @@ extern void elevator_init(elevator_t *, elevator_t);
 	 (s1)->rq_dev < (s2)->rq_dev)
 
 #define BHRQ_IN_ORDER(bh, rq)			\
-	(((bh)->b_rdev == (rq)->rq_dev &&	\
-	  (bh)->b_rsector < (rq)->sector))
+	((((bh)->b_rdev == (rq)->rq_dev &&	\
+	   (bh)->b_rsector < (rq)->sector)) ||	\
+	 (bh)->b_rdev < (rq)->rq_dev)
 
 static inline int elevator_request_latency(elevator_t * elevator, int rw)
 {

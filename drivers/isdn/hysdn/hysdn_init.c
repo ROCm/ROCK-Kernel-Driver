@@ -27,7 +27,7 @@
 #include <linux/version.h>
 #include <linux/poll.h>
 #include <linux/vmalloc.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 
 #include "hysdn_defs.h"

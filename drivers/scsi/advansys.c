@@ -763,7 +763,7 @@
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #if LINUX_VERSION_CODE >= ASC_LINUX_VERSION(1,3,0)
 #include <linux/proc_fs.h>

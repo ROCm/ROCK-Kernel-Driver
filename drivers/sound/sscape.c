@@ -36,7 +36,7 @@
 #include <asm/io.h>
 #include <asm/segment.h>
 #include <linux/wait.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>

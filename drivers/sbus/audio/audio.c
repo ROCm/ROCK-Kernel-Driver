@@ -1,4 +1,4 @@
-/* $Id: audio.c,v 1.56 2000/10/19 00:50:02 davem Exp $
+/* $Id: audio.c,v 1.57 2001/02/02 08:36:55 davem Exp $
  * drivers/sbus/audio/audio.c
  *
  * Copyright 1996 Thomas K. Dyas (tdyas@noc.rutgers.edu)
@@ -28,13 +28,13 @@
 #include <linux/mm.h>
 #include <linux/tqueue.h>
 #include <linux/major.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/soundcard.h>
 #include <linux/version.h>
 #include <linux/devfs_fs_kernel.h>
-#include <asm/delay.h>
+#include <linux/delay.h>
 #include <asm/pgtable.h>
 
 #include <asm/audioio.h>
@@ -511,7 +511,7 @@ static int sparcaudio_mixer_ioctl(struct inode * inode, struct file * file,
                         m = drv->ops->get_input_balance(drv);
                 i = OSS_TO_GAIN(k);
                 j = OSS_TO_BAL(k);
-                oprintk((" for stereo to to %d (bal %d):", i, j));
+                oprintk((" for stereo to do %d (bal %d):", i, j));
                 if (drv->ops->set_input_volume)
                         drv->ops->set_input_volume(drv, i);
                 if (drv->ops->set_input_balance)

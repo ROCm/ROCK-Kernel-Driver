@@ -725,7 +725,7 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 static inline unsigned long hash(struct super_block *sb, unsigned long i_ino)
 {
 	unsigned long tmp = i_ino + ((unsigned long) sb / L1_CACHE_BYTES);
-	tmp = tmp + (tmp >> I_HASHBITS) + (tmp >> I_HASHBITS*2);
+	tmp = tmp + (tmp >> I_HASHBITS);
 	return tmp & I_HASHMASK;
 }
 

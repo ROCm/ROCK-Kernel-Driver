@@ -88,7 +88,7 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/version.h>
 #include <linux/soundcard.h>

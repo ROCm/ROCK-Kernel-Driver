@@ -121,7 +121,7 @@
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/fcntl.h>
 #include <linux/delay.h>
 #include <linux/poll.h>

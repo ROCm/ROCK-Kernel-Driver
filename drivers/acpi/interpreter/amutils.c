@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amutils - interpreter/scanner utilities
- *              $Revision: 68 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -34,21 +34,6 @@
 
 #define _COMPONENT          INTERPRETER
 	 MODULE_NAME         ("amutils")
-
-
-typedef struct internal_search_st
-{
-	ACPI_OPERAND_OBJECT         *dest_obj;
-	u32                         index;
-	ACPI_OPERAND_OBJECT         *source_obj;
-
-} INTERNAL_PKG_SEARCH_INFO;
-
-
-/* Used to traverse nested packages when copying*/
-/* TBD: This must be removed! */
-
-INTERNAL_PKG_SEARCH_INFO        copy_level[MAX_PACKAGE_DEPTH];
 
 
 /*******************************************************************************
@@ -380,156 +365,6 @@ acpi_aml_unsigned_integer_to_string (
 	}
 
 	return (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_aml_build_copy_internal_package_object
- *
- * PARAMETERS:  *Source_obj     - Pointer to the source package object
- *              *Dest_obj       - Where the internal object is returned
- *
- * RETURN:      Status          - the status of the call
- *
- * DESCRIPTION: This function is called to copy an internal package object
- *              into another internal package object.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-acpi_aml_build_copy_internal_package_object (
-	ACPI_OPERAND_OBJECT     *source_obj,
-	ACPI_OPERAND_OBJECT     *dest_obj,
-	ACPI_WALK_STATE         *walk_state)
-{
-	u32                         current_depth = 0;
-	ACPI_STATUS                 status = AE_OK;
-	u32                         length = 0;
-	u32                         this_index;
-	u32                         object_space = 0;
-	ACPI_OPERAND_OBJECT         *this_dest_obj;
-	ACPI_OPERAND_OBJECT         *this_source_obj;
-	INTERNAL_PKG_SEARCH_INFO    *level_ptr;
-
-
-	/*
-	 * Initialize the working variables
-	 */
-
-	MEMSET ((void *) copy_level, 0, sizeof(copy_level));
-
-	copy_level[0].dest_obj  = dest_obj;
-	copy_level[0].source_obj = source_obj;
-	level_ptr               = &copy_level[0];
-	current_depth           = 0;
-
-	dest_obj->common.type   = source_obj->common.type;
-	dest_obj->package.count = source_obj->package.count;
-
-
-	/*
-	 * Build an array of ACPI_OBJECTS in the buffer
-	 * and move the free space past it
-	 */
-
-	dest_obj->package.elements  = acpi_cm_callocate (
-			 (dest_obj->package.count + 1) *
-			 sizeof (void *));
-	if (!dest_obj->package.elements) {
-		/* Package vector allocation failure   */
-
-		REPORT_ERROR (("Aml_build_copy_internal_package_object: Package vector allocation failure\n"));
-		return (AE_NO_MEMORY);
-	}
-
-	dest_obj->package.next_element = dest_obj->package.elements;
-
-
-	while (1) {
-		this_index      = level_ptr->index;
-		this_dest_obj   = (ACPI_OPERAND_OBJECT *) level_ptr->dest_obj->package.elements[this_index];
-		this_source_obj = (ACPI_OPERAND_OBJECT *) level_ptr->source_obj->package.elements[this_index];
-
-		if (IS_THIS_OBJECT_TYPE (this_source_obj, ACPI_TYPE_PACKAGE)) {
-			/*
-			 * If this object is a package then we go one deeper
-			 */
-			if (current_depth >= MAX_PACKAGE_DEPTH-1) {
-				/*
-				 * Too many nested levels of packages for us to handle
-				 */
-				return (AE_LIMIT);
-			}
-
-			/*
-			 * Build the package object
-			 */
-			this_dest_obj = acpi_cm_create_internal_object (ACPI_TYPE_PACKAGE);
-			level_ptr->dest_obj->package.elements[this_index] = this_dest_obj;
-
-
-			this_dest_obj->common.type      = ACPI_TYPE_PACKAGE;
-			this_dest_obj->package.count    = this_dest_obj->package.count;
-
-			/*
-			 * Save space for the array of objects (Package elements)
-			 * update the buffer length counter
-			 */
-			object_space            = this_dest_obj->package.count *
-					  sizeof (ACPI_OPERAND_OBJECT);
-			length                  += object_space;
-			current_depth++;
-			level_ptr               = &copy_level[current_depth];
-			level_ptr->dest_obj     = this_dest_obj;
-			level_ptr->source_obj   = this_source_obj;
-			level_ptr->index        = 0;
-
-		}   /* if object is a package */
-
-		else {
-
-			this_dest_obj = acpi_cm_create_internal_object (
-					   this_source_obj->common.type);
-			level_ptr->dest_obj->package.elements[this_index] = this_dest_obj;
-
-			status = acpi_aml_store_object_to_object(this_source_obj, this_dest_obj, walk_state);
-
-			if (ACPI_FAILURE (status)) {
-				/*
-				 * Failure get out
-				 */
-				return (status);
-			}
-
-			length      +=object_space;
-
-			level_ptr->index++;
-			while (level_ptr->index >= level_ptr->dest_obj->package.count) {
-				/*
-				 * We've handled all of the objects at this level,  This means
-				 * that we have just completed a package.  That package may
-				 * have contained one or more packages itself
-				 */
-				if (current_depth == 0) {
-					/*
-					 * We have handled all of the objects in the top level
-					 * package just add the length of the package objects
-					 * and exit
-					 */
-					return (AE_OK);
-				}
-
-				/*
-				 * Go back up a level and move the index past the just
-				 * completed package object.
-				 */
-				current_depth--;
-				level_ptr = &copy_level[current_depth];
-				level_ptr->index++;
-			}
-		}   /* else object is NOT a package */
-	}   /* while (1)  */
 }
 
 

@@ -1,4 +1,4 @@
-/* $Id: dbri.c,v 1.23 2001/01/08 04:19:16 davem Exp $
+/* $Id: dbri.c,v 1.24 2001/02/02 08:36:55 davem Exp $
  * drivers/sbus/audio/dbri.c
  *
  * Copyright (C) 1997 Rudolf Koenig (rfkoenig@immd4.informatik.uni-erlangen.de)
@@ -47,14 +47,14 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 #include <asm/openprom.h>
 #include <asm/oplib.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/io.h>
-#include <asm/delay.h>
 #include <asm/sbus.h>
 #include <asm/pgtable.h>
 

@@ -59,7 +59,7 @@
 #include <linux/mm.h>
 #include <linux/major.h>
 #include <linux/blk.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <scsi/scsi.h> /* for SCSI_IOCTL_GET_IDLUN */
 typedef void Scsi_Device; /* hack to avoid including scsi.h */

@@ -31,7 +31,7 @@
 #include <linux/msg.h>
 #include <linux/mm.h>
 #include <linux/shm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/uio.h>
 #include <linux/nfs_fs.h>
 #include <linux/smb_fs.h>

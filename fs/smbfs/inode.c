@@ -16,7 +16,7 @@
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/locks.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/dcache.h>

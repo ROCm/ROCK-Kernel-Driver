@@ -6,11 +6,11 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/oplib.h>
-#include <asm/delay.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/sbus.h>

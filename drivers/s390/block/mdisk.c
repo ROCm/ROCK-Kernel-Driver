@@ -21,7 +21,7 @@ char kernel_version [] = UTS_RELEASE;
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>              /* printk()                         */
-#include <linux/malloc.h>              /* kmalloc()                        */
+#include <linux/slab.h>              /* kmalloc()                        */
 #include <linux/vmalloc.h>             /* vmalloc()                        */
 #include <linux/fs.h>                  /* everything...                    */
 #include <linux/errno.h>               /* error codes                      */

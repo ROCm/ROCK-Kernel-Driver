@@ -19,7 +19,7 @@
 #include <linux/kd.h>
 #include <linux/vt.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/major.h>
 #include <linux/fs.h>
 #include <linux/console.h>

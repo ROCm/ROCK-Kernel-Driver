@@ -60,6 +60,8 @@ static DECLARE_WAIT_QUEUE_HEAD(acpi_event_wait);
 
 static volatile int acpi_thread_pid = -1;
 
+static int acpi_start = 1;
+
 /************************************************/
 /* DECLARE_TASK_QUEUE is defined in             */
 /* /usr/src/linux/include/linux/tqueue.h        */
@@ -382,6 +384,19 @@ static struct ctl_table acpi_table[] =
 	 &acpi_c3_enter_latency, sizeof(acpi_c3_enter_latency),
 	 0644, NULL, &acpi_do_ulong},
 
+	{ACPI_C1_COUNT, "c1_count",
+	 &acpi_c1_count, sizeof(acpi_c1_count),
+	 0644, NULL, &acpi_do_ulong},
+
+	{ACPI_C2_COUNT, "c2_count",
+	 &acpi_c2_count, sizeof(acpi_c2_count),
+	 0644, NULL, &acpi_do_ulong},
+
+	{ACPI_C3_COUNT, "c3_count",
+	 &acpi_c3_count, sizeof(acpi_c3_count),
+	 0644, NULL, &acpi_do_ulong},
+
+	
 /* until it actually works */
 /*	{ACPI_SLEEP, "sleep", NULL, 0, 0600, NULL, &acpi_do_sleep},*/
 
@@ -540,10 +555,16 @@ acpi_thread(void *context)
 int __init
 acpi_init(void)
 {
-	acpi_thread_pid = kernel_thread(acpi_thread,
+	if (acpi_start) {
+		acpi_thread_pid = kernel_thread(acpi_thread,
 					NULL,
 					(CLONE_FS | CLONE_FILES
 					 | CLONE_SIGHAND | SIGCHLD));
+	}
+	else {
+		printk(KERN_INFO "ACPI: Disabled\n");
+	}
+
 	return ((acpi_thread_pid >= 0) ? 0:-ENODEV);
 }
 
@@ -571,3 +592,21 @@ acpi_exit(void)
 
 module_init(acpi_init);
 module_exit(acpi_exit);
+
+#ifndef MODULE
+static int __init acpi_setup(char *str)
+{
+	while ((str != NULL) && (*str != '\0')) {
+		if (strncmp(str, "no-idle", 7) == 0)
+			acpi_use_idle = 0;
+		if (strncmp(str, "off", 3) == 0)
+			acpi_start = 0;
+		str = strchr(str, ',');
+		if (str != NULL)
+			str += strspn(str, ", \t");
+	}
+	return 1;
+}
+
+__setup("acpi=", acpi_setup);
+#endif

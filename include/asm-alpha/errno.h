@@ -139,6 +139,4 @@
 #define ENOMEDIUM	129	/* No medium found */
 #define EMEDIUMTYPE	130	/* Wrong medium type */
 
-#define EHASHCOLLISION  131     /* Number of hash collisons exceeds maximum generation counter value.  */
-
 #endif

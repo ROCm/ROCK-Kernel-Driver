@@ -2,7 +2,7 @@
  *
  * Module Name: evevent - Fixed and General Purpose Acpi_event
  *                          handling and dispatch
- *              $Revision: 33 $
+ *              $Revision: 34 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@ acpi_ev_initialize (
 	ACPI_STATUS             status;
 
 
-	/* Make sure we've got ACPI tables */
+	/* Make sure we have ACPI tables */
 
 	if (!acpi_gbl_DSDT) {
 		return (AE_NO_ACPI_TABLES);
@@ -704,7 +704,7 @@ u32
 acpi_ev_gpe_dispatch (
 	u32                     gpe_number)
 {
-		ACPI_GPE_LEVEL_INFO     gpe_info;
+	ACPI_GPE_LEVEL_INFO     gpe_info;
 
 	/*DEBUG_INCREMENT_EVENT_COUNT (EVENT_GENERAL);*/
 
@@ -720,59 +720,58 @@ acpi_ev_gpe_dispatch (
 	 */
 	acpi_hw_disable_gpe (gpe_number);
 
-		gpe_info = acpi_gbl_gpe_info [gpe_number];
+	gpe_info = acpi_gbl_gpe_info [gpe_number];
 
-		/*
-		 * Edge-Triggered?
-		 * ---------------
-		 * If edge-triggered, clear the GPE status bit now.  Note that
-		 * level-triggered events are cleared after the GPE is serviced.
-		 */
-		if (gpe_info.type & ACPI_EVENT_EDGE_TRIGGERED) {
-				acpi_hw_clear_gpe (gpe_number);
-		}
-
+	/*
+	 * Edge-Triggered?
+	 * ---------------
+	 * If edge-triggered, clear the GPE status bit now.  Note that
+	 * level-triggered events are cleared after the GPE is serviced.
+	 */
+	if (gpe_info.type & ACPI_EVENT_EDGE_TRIGGERED) {
+		acpi_hw_clear_gpe (gpe_number);
+	}
 		/*
 		 * Function Handler (e.g. EC)?
 		 */
-		if (gpe_info.handler) {
-				/* Invoke function handler (at interrupt level). */
-				gpe_info.handler (gpe_info.context);
+	if (gpe_info.handler) {
+		/* Invoke function handler (at interrupt level). */
+		gpe_info.handler (gpe_info.context);
 
-				/* Level-Triggered? */
-				if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
-						acpi_hw_clear_gpe (gpe_number);
-				}
-
-				/* Enable GPE */
-				acpi_hw_enable_gpe (gpe_number);
+		/* Level-Triggered? */
+		if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
+			acpi_hw_clear_gpe (gpe_number);
 		}
-		/*
-		 * Method Handler (e.g. _Exx/_Lxx)?
-		 */
-		else if (gpe_info.method_handle) {
-				if (ACPI_FAILURE(acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
+
+		/* Enable GPE */
+		acpi_hw_enable_gpe (gpe_number);
+	}
+	/*
+	 * Method Handler (e.g. _Exx/_Lxx)?
+	 */
+	else if (gpe_info.method_handle) {
+		if (ACPI_FAILURE(acpi_os_queue_for_execution (OSD_PRIORITY_GPE,
 			acpi_ev_asynch_execute_gpe_method, (void*)(NATIVE_UINT)gpe_number)))
-				{
-						/*
-						 * Shoudn't occur, but if it does report an error. Note that
-						 * the GPE will remain disabled until the ACPI Core Subsystem
-						 * is restarted, or the handler is removed/reinstalled.
-						 */
-						REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE bit [%X]\n", gpe_number));
-				}
+		{
+			/*
+			 * Shoudn't occur, but if it does report an error. Note that
+			 * the GPE will remain disabled until the ACPI Core Subsystem
+			 * is restarted, or the handler is removed/reinstalled.
+			 */
+			REPORT_ERROR (("Acpi_ev_gpe_dispatch: Unable to queue handler for GPE bit [%X]\n", gpe_number));
 		}
-		/*
-		 * No Handler? Report an error and leave the GPE disabled.
-		 */
-		else {
-				REPORT_ERROR (("Acpi_ev_gpe_dispatch: No installed handler for GPE [%X]\n", gpe_number));
+	}
+	/*
+	 * No Handler? Report an error and leave the GPE disabled.
+	 */
+	else {
+		REPORT_ERROR (("Acpi_ev_gpe_dispatch: No installed handler for GPE [%X]\n", gpe_number));
 
-				/* Level-Triggered? */
-				if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
-						acpi_hw_clear_gpe (gpe_number);
-				}
+		/* Level-Triggered? */
+		if (gpe_info.type & ACPI_EVENT_LEVEL_TRIGGERED) {
+			acpi_hw_clear_gpe (gpe_number);
 		}
+	}
 
 	return (INTERRUPT_HANDLED);
 }

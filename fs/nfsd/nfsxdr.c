@@ -26,7 +26,7 @@
  * Mapping of S_IF* types to NFS file types
  */
 static u32	nfs_ftypes[] = {
-	NFNON,  NFFIFO, NFCHR, NFBAD,
+	NFNON,  NFCHR,  NFCHR, NFBAD,
 	NFDIR,  NFBAD,  NFBLK, NFBAD,
 	NFREG,  NFBAD,  NFLNK, NFBAD,
 	NFSOCK, NFBAD,  NFLNK, NFBAD,
@@ -136,20 +136,25 @@ decode_sattr(u32 *p, struct iattr *iap)
 static inline u32 *
 encode_fattr(struct svc_rqst *rqstp, u32 *p, struct inode *inode)
 {
+	int type = (inode->i_mode & S_IFMT);
 	if (!inode)
 		return 0;
-	*p++ = htonl(nfs_ftypes[(inode->i_mode & S_IFMT) >> 12]);
+	*p++ = htonl(nfs_ftypes[type >> 12]);
 	*p++ = htonl((u32) inode->i_mode);
 	*p++ = htonl((u32) inode->i_nlink);
 	*p++ = htonl((u32) nfsd_ruid(rqstp, inode->i_uid));
 	*p++ = htonl((u32) nfsd_rgid(rqstp, inode->i_gid));
-	if (S_ISLNK(inode->i_mode) && inode->i_size > NFS_MAXPATHLEN) {
+
+	if (S_ISLNK(type) && inode->i_size > NFS_MAXPATHLEN) {
 		*p++ = htonl(NFS_MAXPATHLEN);
 	} else {
 		*p++ = htonl((u32) inode->i_size);
 	}
 	*p++ = htonl((u32) inode->i_blksize);
-	*p++ = htonl((u32) inode->i_rdev);
+	if (S_ISCHR(type) || S_ISBLK(type))
+		*p++ = htonl((u32) inode->i_rdev);
+	else
+		*p++ = htonl(0xffffffff);
 	*p++ = htonl((u32) inode->i_blocks);
 	*p++ = htonl((u32) inode->i_dev);
 	*p++ = htonl((u32) inode->i_ino);

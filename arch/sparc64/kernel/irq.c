@@ -13,7 +13,7 @@
 #include <linux/signal.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/random.h> /* XXX ADD add_foo_randomness() calls... -DaveM */
 #include <linux/init.h>
 #include <linux/delay.h>

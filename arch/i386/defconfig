@@ -162,6 +162,11 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_BRIDGE is not set
 
 #
+# QoS and/or fair queueing
+#
+# CONFIG_NET_SCHED is not set
+
+#
 # Telephony Support
 #
 # CONFIG_PHONE is not set
@@ -628,6 +633,7 @@ CONFIG_SOUND=y
 CONFIG_SOUND_ES1371=y
 # CONFIG_SOUND_ESSSOLO1 is not set
 # CONFIG_SOUND_MAESTRO is not set
+# CONFIG_SOUND_MAESTRO3 is not set
 # CONFIG_SOUND_SONICVIBES is not set
 # CONFIG_SOUND_TRIDENT is not set
 # CONFIG_SOUND_MSNDCLAS is not set

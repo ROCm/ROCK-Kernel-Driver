@@ -140,7 +140,7 @@
 #include <linux/errno.h>
 #include <linux/genhd.h>
 #include <linux/blkpg.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #ifndef MODULE
 #include <linux/init.h>
 #endif /* MODULE */

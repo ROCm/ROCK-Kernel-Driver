@@ -13,6 +13,7 @@
 #include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
+#include <linux/tty.h>
 #include <linux/mount.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>

@@ -69,31 +69,9 @@
  *		2 of the License, or (at your option) any later version.
  */
  
-/* RFC1122 Status:
-   4.1.3.1 (Ports):
-     SHOULD send ICMP_PORT_UNREACHABLE in response to datagrams to 
-       an un-listened port. (OK)
-   4.1.3.2 (IP Options)
-     MUST pass IP options from IP -> application (OK)
-     MUST allow application to specify IP options (OK)
-   4.1.3.3 (ICMP Messages)
-     MUST pass ICMP error messages to application (OK -- except when SO_BSDCOMPAT is set)
-   4.1.3.4 (UDP Checksums)
-     MUST provide facility for checksumming (OK)
-     MAY allow application to control checksumming (OK)
-     MUST default to checksumming on (OK)
-     MUST discard silently datagrams with bad csums (OK, except during debugging)
-   4.1.3.5 (UDP Multihoming)
-     MUST allow application to specify source address (OK)
-     SHOULD be able to communicate the chosen src addr up to application
-       when application doesn't choose (DOES - use recvmsg cmsgs)
-   4.1.3.6 (Invalid Addresses)
-     MUST discard invalid source addresses (OK -- done in the new routing code)
-     MUST only send datagrams with one of our addresses (OK)
-*/
-
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/socket.h>
@@ -161,7 +139,7 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 		next:;
 		}
 		result = best;
-		for(;; result += UDP_HTABLE_SIZE) {
+		for(i = 0; i < (1 << 16) / UDP_HTABLE_SIZE; i++, result += UDP_HTABLE_SIZE) {
 			if (result > sysctl_local_port_range[1])
 				result = sysctl_local_port_range[0]
 					+ ((result - sysctl_local_port_range[0]) &
@@ -169,6 +147,8 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 			if (!udp_lport_inuse(result))
 				break;
 		}
+		if (i >= (1 << 16) / UDP_HTABLE_SIZE)
+			goto fail;
 gotit:
 		udp_port_rover = snum = result;
 	} else {

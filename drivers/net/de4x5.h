@@ -2,7 +2,7 @@
     Copyright 1994 Digital Equipment Corporation.
 
     This software may be used and distributed according to  the terms of the
-    GNU Public License, incorporated herein by reference.
+    GNU General Public License, incorporated herein by reference.
 
     The author may    be  reached as davies@wanton.lkg.dec.com  or   Digital
     Equipment Corporation, 550 King Street, Littleton MA 01460.

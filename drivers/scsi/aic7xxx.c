@@ -256,7 +256,7 @@
 #include <scsi/scsicam.h>
 
 #include <linux/stat.h>
-#include <linux/malloc.h>        /* for kmalloc() */
+#include <linux/slab.h>        /* for kmalloc() */
 
 #include <linux/config.h>        /* for CONFIG_PCI */
 

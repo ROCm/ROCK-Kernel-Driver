@@ -73,7 +73,7 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>

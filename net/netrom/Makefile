@@ -17,5 +17,3 @@ obj-$(CONFIG_SYSCTL) += sysctl_net_netrom.o
 
 include $(TOPDIR)/Rules.make
 
-tar:
-		tar -cvf /dev/f1 .

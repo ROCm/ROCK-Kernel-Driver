@@ -194,8 +194,13 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 		return NULL;
 	}
 
-	/* check if this inode is linked to a cnode */
 	cii = ITOC(inode);
+
+	/* The inode might already be purged due to memory pressure */
+	if ( coda_fideq(&cii->c_fid, &NullFID) ) {
+		iput(inode);
+		return NULL;
+	}
 
 	/* we shouldn't have inode collisions anymore */
 	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();

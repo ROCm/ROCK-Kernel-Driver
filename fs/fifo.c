@@ -10,7 +10,7 @@
  */
 
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/smp_lock.h>
 
 static void wait_for_partner(struct inode* inode, unsigned int* cnt)

@@ -17,7 +17,7 @@
 #include <linux/msg.h>
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/highuid.h>
 
 #if defined(CONFIG_SYSVIPC)

@@ -38,7 +38,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #define short_pack(lsb,msb) ( ((u16)(lsb)) | ( ((u16)(msb))<<8 ) )
 #define LSB_of(s) ((s)&0xFF)

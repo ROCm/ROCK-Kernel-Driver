@@ -19,11 +19,11 @@ target(struct sk_buff **pskb,
 	const struct ipt_tos_target_info *tosinfo = targinfo;
 
 	if ((iph->tos & IPTOS_TOS_MASK) != tosinfo->tos) {
-		u_int8_t diffs[2];
+		u_int16_t diffs[2];
 
-		diffs[0] = iph->tos;
+		diffs[0] = htons(iph->tos) ^ 0xFFFF;
 		iph->tos = (iph->tos & IPTOS_PREC_MASK) | tosinfo->tos;
-		diffs[1] = iph->tos;
+		diffs[1] = htons(iph->tos);
 		iph->check = csum_fold(csum_partial((char *)diffs,
 		                                    sizeof(diffs),
 		                                    iph->check^0xFFFF));

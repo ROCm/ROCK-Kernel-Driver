@@ -27,7 +27,7 @@
 #include <linux/errno.h>
 #include <linux/genhd.h>
 #include <linux/blkpg.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
@@ -189,6 +189,10 @@ int ide_driveid_update (ide_drive_t *drive)
 	__cli();		/* local CPU only; some systems need this */
 	SELECT_MASK(HWIF(drive), drive, 0);
 	id = kmalloc(SECTOR_WORDS*4, GFP_ATOMIC);
+	if (!id) {
+		__restore_flags(flags);	/* local CPU only */
+		return 0;
+	}
 	ide_input_data(drive, id, SECTOR_WORDS);
 	(void) GET_STAT();	/* clear drive IRQ */
 	ide__sti();		/* local CPU only */

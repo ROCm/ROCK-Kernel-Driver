@@ -21,7 +21,7 @@
 #include <linux/utsname.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ipc.h>
 #include <linux/personality.h>
 

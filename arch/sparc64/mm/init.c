@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/mm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/blk.h>
 #include <linux/swap.h>
 #include <linux/swapctl.h>

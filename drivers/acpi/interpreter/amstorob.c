@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: amstorob - AML Interpreter object store support, store to object
- *              $Revision: 22 $
+ *              $Revision: 23 $
  *
  *****************************************************************************/
 
@@ -64,6 +64,19 @@ acpi_aml_copy_buffer_to_buffer (
 	 */
 	buffer = (u8 *) source_desc->buffer.pointer;
 	length = source_desc->buffer.length;
+
+	/*
+	 * If target is a buffer of length zero, allocate a new
+	 * buffer of the proper length
+	 */
+	if (target_desc->buffer.length == 0) {
+		target_desc->buffer.pointer = acpi_cm_allocate (length);
+		if (!target_desc->buffer.pointer) {
+			return (AE_NO_MEMORY);
+		}
+
+		target_desc->buffer.length = length;
+	}
 
 	/*
 	 * Buffer is a static allocation,
@@ -141,11 +154,11 @@ acpi_aml_copy_string_to_string (
 		}
 
 		target_desc->string.pointer = acpi_cm_allocate (length + 1);
-		target_desc->string.length = length;
-
 		if (!target_desc->string.pointer) {
 			return (AE_NO_MEMORY);
 		}
+		target_desc->string.length = length;
+
 
 		MEMCPY(target_desc->string.pointer, buffer, length);
 	}

@@ -4,7 +4,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_private_stp.h,v 1.2 2000/10/30 22:03:20 davem Exp $
+ *	$Id: br_private_stp.h,v 1.3 2001/02/05 06:03:47 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -33,21 +33,21 @@ struct br_config_bpdu
 };
 
 /* br_stp.c */
-void br_become_root_bridge(struct net_bridge *br);
-void br_config_bpdu_generation(struct net_bridge *);
-void br_configuration_update(struct net_bridge *);
-int  br_is_designated_port(struct net_bridge_port *p);
-int  br_is_root_bridge(struct net_bridge *br);
-void br_port_state_selection(struct net_bridge *);
-void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *bpdu);
-void br_received_tcn_bpdu(struct net_bridge_port *p);
-void br_tick(unsigned long __data);
-void br_transmit_config(struct net_bridge_port *p);
-void br_transmit_tcn(struct net_bridge *br);
-void br_topology_change_detection(struct net_bridge *br);
+extern void br_become_root_bridge(struct net_bridge *br);
+extern void br_config_bpdu_generation(struct net_bridge *);
+extern void br_configuration_update(struct net_bridge *);
+extern int  br_is_designated_port(struct net_bridge_port *p);
+extern int  br_is_root_bridge(struct net_bridge *br);
+extern void br_port_state_selection(struct net_bridge *);
+extern void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *bpdu);
+extern void br_received_tcn_bpdu(struct net_bridge_port *p);
+extern void br_tick(unsigned long __data);
+extern void br_transmit_config(struct net_bridge_port *p);
+extern void br_transmit_tcn(struct net_bridge *br);
+extern void br_topology_change_detection(struct net_bridge *br);
 
 /* br_stp_bpdu.c */
-void br_send_config_bpdu(struct net_bridge_port *, struct br_config_bpdu *);
-void br_send_tcn_bpdu(struct net_bridge_port *);
+extern void br_send_config_bpdu(struct net_bridge_port *, struct br_config_bpdu *);
+extern void br_send_tcn_bpdu(struct net_bridge_port *);
 
 #endif

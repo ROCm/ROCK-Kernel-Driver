@@ -9,7 +9,7 @@
  * Intel i82586 Ethernet definitions
  *
  * This is an extension to the Linux operating system, and is covered by the
- * same Gnu Public License that covers that work.
+ * same GNU General Public License that covers that work.
  *
  * Copyright 1995 by Chris Beauregard (cpbeaure@undergrad.math.uwaterloo.ca)
  *

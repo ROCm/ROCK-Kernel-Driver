@@ -21,7 +21,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/keyboard.h>
 #include <asm/bitops.h>
