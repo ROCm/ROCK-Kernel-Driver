@@ -2,7 +2,7 @@
  *	Find I2O capable controllers on the PCI bus, and register/install
  *	them with the I2O layer
  *
- *	(C) Copyright 1999   Red Hat Software
+ *	(C) Copyright 1999-2002   Red Hat Software
  *	
  *	Written by Alan Cox, Building Number Three Ltd
  * 	Modified by Deepak Saxena <deepak@plexity.net>
@@ -13,8 +13,11 @@
  * 	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
+ *	Ported to Linux 2.5 by Alan Cox <alan@redhat.com>
+ *
  *	TODO:
  *		Support polled I2O PCI controllers. 
+ *		Finish verifying 64bit/bigendian clean
  */
 
 #include <linux/config.h>
@@ -31,21 +34,17 @@
 #include <asm/mtrr.h>
 #endif // CONFIG_MTRR
 
-#ifdef MODULE
-/*
- * Core function table
- * See <include/linux/i2o.h> for an explanation
- */
-static struct i2o_core_func_table *core;
+static int dpt = 0;
 
-/* Core attach function */
-extern int i2o_pci_core_attach(struct i2o_core_func_table *);
-extern void i2o_pci_core_detach(void);
-#endif /* MODULE */
 
-/*
- *	Free bus specific resources
+/**
+ *	i2o_pci_dispose		-	Free bus specific resources
+ *	@c: I2O controller
+ *
+ *	Disable interrupts and then free interrupt, I/O and mtrr resources 
+ *	used by this controller. Called by the I2O core on unload.
  */
+ 
 static void i2o_pci_dispose(struct i2o_controller *c)
 {
 	I2O_IRQ_WRITE32(c,0xFFFFFFFF);
@@ -61,9 +60,13 @@ static void i2o_pci_dispose(struct i2o_controller *c)
 #endif
 }
 
-/*
- *	No real bus specific handling yet (note that later we will
- *	need to 'steal' PCI devices on i960 mainboards)
+/**
+ *	i2o_pci_bind		-	Bind controller and devices
+ *	@c: i2o controller
+ *	@dev: i2o device
+ *
+ *	Bind a device driver to a controller. In the case of PCI all we need to do
+ *	is module housekeeping.
  */
  
 static int i2o_pci_bind(struct i2o_controller *c, struct i2o_device *dev)
@@ -72,20 +75,45 @@ static int i2o_pci_bind(struct i2o_controller *c, struct i2o_device *dev)
 	return 0;
 }
 
+/**
+ *	i2o_pci_unbind		-	Bind controller and devices
+ *	@c: i2o controller
+ *	@dev: i2o device
+ *
+ *	Unbind a device driver from a controller. In the case of PCI all we need to do
+ *	is module housekeeping.
+ */
+ 
+
 static int i2o_pci_unbind(struct i2o_controller *c, struct i2o_device *dev)
 {
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
-/*
- * Bus specific enable/disable functions
+/**
+ *	i2o_pci_enable		-	Enable controller
+ *	@c: controller
+ *
+ *	Called by the I2O core code in order to enable bus specific
+ *	resources for this controller. In our case that means unmasking the 
+ *	interrupt line.
  */
+
 static void i2o_pci_enable(struct i2o_controller *c)
 {
 	I2O_IRQ_WRITE32(c, 0);
 	c->enabled = 1;
 }
+
+/**
+ *	i2o_pci_disable		-	Enable controller
+ *	@c: controller
+ *
+ *	Called by the I2O core code in order to enable bus specific
+ *	resources for this controller. In our case that means masking the 
+ *	interrupt line.
+ */
 
 static void i2o_pci_disable(struct i2o_controller *c)
 {
@@ -93,30 +121,37 @@ static void i2o_pci_disable(struct i2o_controller *c)
 	c->enabled = 0;
 }
 
-/*
- *	Bus specific interrupt handler
+/**
+ *	i2o_pci_interrupt	-	Bus specific interrupt handler
+ *	@irq: interrupt line
+ *	@dev_id: cookie
+ *
+ *	Handle an interrupt from a PCI based I2O controller. This turns out
+ *	to be rather simple. We keep the controller pointer in the cookie.
  */
  
 static void i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
 {
 	struct i2o_controller *c = dev_id;
-#ifdef MODULE
-	core->run_queue(c);
-#else
 	i2o_run_queue(c);
-#endif /* MODULE */
 }	
 
-/*
- *	Install a PCI (or in theory AGP) i2o controller
+/**
+ *	i2o_pci_install		-	Install a PCI i2o controller
+ *	@dev: PCI device of the I2O controller
  *
- * TODO: Add support for polled controllers
+ *	Install a PCI (or in theory AGP) i2o controller. Devices are
+ *	initialized, configured and registered with the i2o core subsystem. Be
+ *	very careful with ordering. There may be pending interrupts.
+ *
+ *	To Do: Add support for polled controllers
  */
+
 int __init i2o_pci_install(struct pci_dev *dev)
 {
 	struct i2o_controller *c=kmalloc(sizeof(struct i2o_controller),
 						GFP_KERNEL);
-	u8 *mem;
+	unsigned long mem;
 	u32 memptr = 0;
 	u32 size;
 	
@@ -150,8 +185,8 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	/* Map the I2O controller */
 	
 	printk(KERN_INFO "i2o: PCI I2O controller at 0x%08X size=%d\n", memptr, size);
-	mem = ioremap(memptr, size);
-	if(mem==NULL)
+	mem = (unsigned long)ioremap(memptr, size);
+	if(mem==0)
 	{
 		printk(KERN_ERR "i2o: Unable to map controller.\n");
 		kfree(c);
@@ -159,17 +194,16 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	}
 
 	c->bus.pci.irq = -1;
-	c->bus.pci.queue_buggy = 0;
 	c->bus.pci.dpt = 0;
 	c->bus.pci.short_req = 0;
 	c->pdev = dev;
 
-	c->irq_mask = (volatile u32 *)(mem+0x34);
-	c->post_port = (volatile u32 *)(mem+0x40);
-	c->reply_port = (volatile u32 *)(mem+0x44);
+	c->irq_mask = mem+0x34;
+	c->post_port = mem+0x40;
+	c->reply_port = mem+0x44;
 
 	c->mem_phys = memptr;
-	c->mem_offset = (u32)mem;
+	c->mem_offset = mem;
 	c->destructor = i2o_pci_dispose;
 	
 	c->bind = i2o_pci_bind;
@@ -186,14 +220,12 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	 
 	if(dev->vendor == PCI_VENDOR_ID_NCR && dev->device == 0x0630)
 	{
-		c->bus.pci.short_req=1;
+		c->bus.pci.short_req = 1;
 		printk(KERN_INFO "I2O: Symbios FC920 workarounds activated.\n");
 	}
 	if(dev->subsystem_vendor == PCI_VENDOR_ID_PROMISE)
 	{
-		c->bus.pci.queue_buggy=1;
-		if (dev->subsystem_device == 0x0000) /* SX6000 ???? */
-			c->bus.pci.queue_buggy=2;
+		c->bus.pci.promise = 1;
 		printk(KERN_INFO "I2O: Promise workarounds activated.\n");
 	}
 
@@ -211,10 +243,11 @@ int __init i2o_pci_install(struct pci_dev *dev)
 #ifdef CONFIG_MTRR
 	c->bus.pci.mtrr_reg0 =
 		mtrr_add(c->mem_phys, size, MTRR_TYPE_WRCOMB, 1);
-/*
-* If it is an INTEL i960 I/O processor then set the first 64K to Uncacheable
-* since the region contains the Messaging unit which shouldn't be cached.
-*/
+	/*
+	 * If it is an INTEL i960 I/O processor then set the first 64K to
+	 * Uncacheable since the region contains the Messaging unit which
+	 * shouldn't be cached.
+	 */
 	c->bus.pci.mtrr_reg1 = -1;
 	if(dev->vendor == PCI_VENDOR_ID_INTEL || dev->vendor == PCI_VENDOR_ID_DPT)
 	{
@@ -232,17 +265,13 @@ int __init i2o_pci_install(struct pci_dev *dev)
 
 	I2O_IRQ_WRITE32(c,0xFFFFFFFF);
 
-#ifdef MODULE
-	i = core->install(c);
-#else
 	i = i2o_install_controller(c);
-#endif /* MODULE */
 	
 	if(i<0)
 	{
 		printk(KERN_ERR "i2o: Unable to install controller.\n");
 		kfree(c);
-		iounmap(mem);
+		iounmap((void *)mem);
 		return i;
 	}
 
@@ -256,12 +285,8 @@ int __init i2o_pci_install(struct pci_dev *dev)
 			printk(KERN_ERR "%s: unable to allocate interrupt %d.\n",
 				c->name, dev->irq);
 			c->bus.pci.irq = -1;
-#ifdef MODULE
-			core->delete(c);
-#else
 			i2o_delete_controller(c);
-#endif /* MODULE */	
-			iounmap(mem);
+			iounmap((void *)mem);
 			return -EBUSY;
 		}
 	}
@@ -272,6 +297,19 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	return 0;	
 }
 
+/**
+ *	i2o_pci_scan	-	Scan the pci bus for controllers
+ *	
+ *	Scan the PCI devices on the system looking for any device which is a 
+ *	memory of the Intelligent, I2O class. We attempt to set up each such device
+ *	and register it with the core.
+ *
+ *	Returns the number of controllers registered
+ *
+ *	Note; Do not change this to a hot plug interface. I2O 1.5 itself
+ *	does not support hot plugging.
+ */
+ 
 int __init i2o_pci_scan(void)
 {
 	struct pci_dev *dev;
@@ -283,7 +321,7 @@ int __init i2o_pci_scan(void)
 	{
 		if((dev->class>>8)!=PCI_CLASS_INTELLIGENT_I2O)
 			continue;
-		if(dev->vendor == PCI_VENDOR_ID_DPT)
+		if(dev->vendor == PCI_VENDOR_ID_DPT && !dpt)
 		{
 			if(dev->device == 0xA501 || dev->device == 0xA511)
 			{
@@ -300,6 +338,11 @@ int __init i2o_pci_scan(void)
 			continue;
 		printk(KERN_INFO "i2o: I2O controller on bus %d at %d.\n",
 			dev->bus->number, dev->devfn);
+		if(pci_set_dma_mask(dev, 0xffffffff))
+		{
+			printk(KERN_WARNING "I2O controller on bus %d at %d : No suitable DMA available\n", dev->bus->number, dev->devfn);
+		 	continue;
+		}
 		pci_set_master(dev);
 		if(i2o_pci_install(dev)==0)
 			count++;
@@ -310,84 +353,43 @@ int __init i2o_pci_scan(void)
 	return count?count:-ENODEV;
 }
 
-#ifdef I2O_HOTPLUG_SUPPORT
-/*
- * Activate a newly found PCI I2O controller
- * Not used now, but will be needed in future for
- * hot plug PCI support
+
+/**
+ *	i2o_pci_core_attach	-	PCI initialisation for I2O
+ *
+ *	Find any I2O controllers and if present initialise them and bring up
+ *	the I2O subsystem.
+ *
+ *	Returns 0 on success or an error code
  */
-static void i2o_pci_activate(i2o_controller * c)
-{
-	int i=0;
-	struct i2o_controller *c;
-	
-	if(c->type == I2O_TYPE_PCI)
-	{
-		I2O_IRQ_WRITE32(c,0);
-#ifdef MODULE
-		if(core->activate(c))
-#else
-		if(i2o_activate_controller(c))
-#endif /* MODULE */
-		{
-			printk("%s: Failed to initialize.\n", c->name);
-#ifdef MODULE
-			core->unlock(c);
-			core->delete(c);
-#else
-			i2o_unlock_controller(c);
-			i2o_delete_controller(c);
-#endif
-			continue;
-		}
-	}
-}
-#endif // I2O_HOTPLUG_SUPPORT
-
-#ifdef MODULE
-
-int i2o_pci_core_attach(struct i2o_core_func_table *table)
-{
-	MOD_INC_USE_COUNT;
-
-	core = table;
-
-	return i2o_pci_scan();
-}
-
-void i2o_pci_core_detach(void)
-{
-	core = NULL;
-
-	MOD_DEC_USE_COUNT;
-}
-
-int init_module(void)
-{
-	printk(KERN_INFO "Linux I2O PCI support (c) 1999 Red Hat Software.\n");
-	
-	core = NULL;
-
- 	return 0;
  
+static int i2o_pci_core_attach(void)
+{
+	printk(KERN_INFO "Linux I2O PCI support (c) 1999-2002 Red Hat.\n");
+	if(i2o_pci_scan()>0)
+	{
+		i2o_sys_init();
+		return 0;
+	}
+	return -ENODEV;
 }
 
-void cleanup_module(void)
+/**
+ *	i2o_pci_core_detach	-	PCI unload for I2O
+ *
+ *	Free up any resources not released when the controllers themselves were
+ *	shutdown and unbound from the bus and drivers
+ */
+ 
+static void i2o_pci_core_detach(void)
 {
 }
 
-EXPORT_SYMBOL(i2o_pci_core_attach);
-EXPORT_SYMBOL(i2o_pci_core_detach);
-
-MODULE_AUTHOR("Red Hat Software");
+MODULE_AUTHOR("Red Hat");
 MODULE_DESCRIPTION("I2O PCI Interface");
 MODULE_LICENSE("GPL");
 
-
-#else
-void __init i2o_pci_init(void)
-{
-	printk(KERN_INFO "Linux I2O PCI support (c) 1999 Red Hat Software.\n");
-	i2o_pci_scan();
-}
-#endif
+MODULE_PARM(dpt, "i");
+MODULE_PARM_DESC(dpt, "Set this if you want to drive DPT cards normally handled by dpt_i2o");
+module_init(i2o_pci_core_attach);
+module_exit(i2o_pci_core_detach);

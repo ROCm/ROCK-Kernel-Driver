@@ -8,6 +8,7 @@ dep_tristate 'Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x' CONFIG_SN
 if [ "$CONFIG_SND_CS46XX" != "n" ]; then
   bool       '  Cirrus Logic (Sound Fusion) MMAP support for OSS' CONFIG_SND_CS46XX_ACCEPT_VALID
 fi
+dep_tristate 'Cirrus Logic (Sound Fusion) CS4281' CONFIG_SND_CS4281 $CONFIG_SND
 dep_tristate 'EMU10K1 (SB Live!, E-mu APS)' CONFIG_SND_EMU10K1 $CONFIG_SND
 dep_tristate 'Korg 1212 IO' CONFIG_SND_KORG1212 $CONFIG_SND
 dep_tristate 'NeoMagic NM256AV/ZX' CONFIG_SND_NM256 $CONFIG_SND

@@ -759,7 +759,8 @@ static int snd_via8233_free(via8233_t *chip)
 	snd_via8233_channel_reset(chip, &chip->capture);
 	/* --- */
       __end_hw:
-	synchronize_irq();
+	if (chip->irq)
+		synchronize_irq(chip->irq);
 	if (chip->tables)
 		snd_free_pci_pages(chip->pci,
 				   VIA_NUM_OF_DMA_CHANNELS * sizeof(unsigned int) * VIA_MAX_FRAGS * 2,
@@ -817,7 +818,7 @@ static int __devinit snd_via8233_create(snd_card_t * card,
 	if (ac97_clock >= 8000 && ac97_clock <= 48000)
 		chip->ac97_clock = ac97_clock;
 	pci_read_config_byte(pci, PCI_REVISION_ID, &chip->revision);
-	synchronize_irq();
+	synchronize_irq(chip->irq);
 
 	/* initialize offsets */
 #if 0

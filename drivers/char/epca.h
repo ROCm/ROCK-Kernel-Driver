@@ -121,7 +121,7 @@ struct channel
 	int    close_delay;
 	int    count;
 	int    blocked_open;
-	int    event;
+	ulong  event;
 	int    asyncflags;
 	uint   dev;
 	long   session;

@@ -1,7 +1,7 @@
 /*
  * Core I2O structure management 
  * 
- * (C) Copyright 1999   Red Hat Software 
+ * (C) Copyright 1999-2002   Red Hat Software 
  *
  * Written by Alan Cox, Building Number Three Ltd 
  * 
@@ -19,10 +19,11 @@
  *		Auvo Häkkinen <Auvo.Hakkinen@cs.Helsinki.FI> 
  *		Deepak Saxena <deepak@plexity.net> 
  *		Boji T Kannanthanam <boji.t.kannanthanam@intel.com>
+ *
+ * Ported to Linux 2.5 by
+ *		Alan Cox	<alan@redhat.com>
  * 
  */
-
-#error Please convert me to Documentation/DMA-mapping.txt
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -72,7 +73,7 @@ int i2o_num_controllers;
 static int core_context;
 
 /* Initialization && shutdown functions */
-static void i2o_sys_init(void);
+void i2o_sys_init(void);
 static void i2o_sys_shutdown(void);
 static int i2o_reset_controller(struct i2o_controller *);
 static int i2o_reboot_event(struct notifier_block *, unsigned long , void *);
@@ -122,28 +123,6 @@ static int sys_tbl_len;
  */
 static spinlock_t i2o_dev_lock = SPIN_LOCK_UNLOCKED;
 
-#ifdef MODULE
-/* 
- * Function table to send to bus specific layers
- * See <include/linux/i2o.h> for explanation of this
- */
-#ifdef CONFIG_I2O_PCI_MODULE
-static struct i2o_core_func_table i2o_core_functions =
-{
-	i2o_install_controller,
-	i2o_activate_controller,
-	i2o_find_controller,
-	i2o_unlock_controller,
-	i2o_run_queue,
-	i2o_delete_controller
-};
-
-extern int i2o_pci_core_attach(struct i2o_core_func_table *);
-extern void i2o_pci_core_detach(void);
-#endif /* CONFIG_I2O_PCI_MODULE */
-
-#endif /* MODULE */
-
 /*
  * Structures and definitions for synchronous message posting.
  * See i2o_post_wait() for description.
@@ -156,11 +135,14 @@ struct i2o_post_wait_data
 	wait_queue_head_t *wq;	/* Wake up for caller (NULL for dead) */
 	struct i2o_post_wait_data *next;	/* Chain */
 	void *mem[2];		/* Memory blocks to recover on failure path */
+	dma_addr_t phys[2];	/* Physical address of blocks to recover */
+	u32 size[2];		/* Size of blocks to recover */
 };
+
 static struct i2o_post_wait_data *post_wait_queue;
 static u32 post_wait_id;	// Unique ID for each post_wait
 static spinlock_t post_wait_lock = SPIN_LOCK_UNLOCKED;
-static void i2o_post_wait_complete(u32, int);
+static void i2o_post_wait_complete(struct i2o_controller *, u32, int);
 
 /* OSM descriptor handler */ 
 static struct i2o_handler i2o_core_handler =
@@ -210,7 +192,7 @@ static spinlock_t i2o_evt_lock = SPIN_LOCK_UNLOCKED;
  
 static DECLARE_MUTEX(evt_sem);
 static DECLARE_COMPLETION(evt_dead);
-DECLARE_WAIT_QUEUE_HEAD(evt_wait);
+static DECLARE_WAIT_QUEUE_HEAD(evt_wait);
 
 static struct notifier_block i2o_reboot_notifier =
 {
@@ -269,7 +251,7 @@ static void i2o_core_reply(struct i2o_handler *h, struct i2o_controller *c,
 		else
 			status = I2O_POST_WAIT_OK;
 	
-		i2o_post_wait_complete(context, status);
+		i2o_post_wait_complete(c, context, status);
 		return;
 	}
 
@@ -503,7 +485,7 @@ int i2o_install_controller(struct i2o_controller *c)
 	{
 		if(i2o_controllers[i]==NULL)
 		{
-			c->dlct = (i2o_lct*)kmalloc(8192, GFP_KERNEL);
+			c->dlct = (i2o_lct*)pci_alloc_consistent(c->pdev, 8192, &c->dlct_phys);
 			if(c->dlct==NULL)
 			{
 				up(&i2o_configuration_lock);
@@ -613,13 +595,13 @@ int i2o_delete_controller(struct i2o_controller *c)
 				kfree(c->page_frame);
 			}
 			if(c->hrt)
-				kfree(c->hrt);
+				pci_free_consistent(c->pdev, c->hrt_len, c->hrt, c->hrt_phys);
 			if(c->lct)
-				kfree(c->lct);
+				pci_free_consistent(c->pdev, c->lct->table_size << 2, c->lct, c->lct_phys);
 			if(c->status_block)
-				kfree(c->status_block);
+				pci_free_consistent(c->pdev, sizeof(i2o_status_block), c->status_block, c->status_block_phys);
 			if(c->dlct)
-				kfree(c->dlct);
+				pci_free_consistent(c->pdev, 8192, c->dlct, c->dlct_phys);
 
 			i2o_controllers[c->unit]=NULL;
 			memcpy(name, c->name, strlen(c->name)+1);
@@ -1145,15 +1127,17 @@ static int i2o_dyn_lct(void *foo)
 		 */
 		if(c->lct->table_size < c->dlct->table_size)
 		{
+			dma_addr_t phys;
 			tmp = c->lct;
-			c->lct = kmalloc(c->dlct->table_size<<2, GFP_KERNEL);
+			c->lct = pci_alloc_consistent(c->pdev, c->dlct->table_size<<2, &phys);
 			if(!c->lct)
 			{
 				printk(KERN_ERR "%s: No memory for LCT!\n", c->name);
 				c->lct = tmp;
 				continue;
 			}
-			kfree(tmp);
+			pci_free_consistent(tmp, c->lct->table_size << 2, c->lct, c->lct_phys);
+			c->lct_phys = phys;
 		}
 		memcpy(c->lct, c->dlct, c->dlct->table_size<<2);
 	}
@@ -1186,7 +1170,8 @@ void i2o_run_queue(struct i2o_controller *c)
 	{
 		struct i2o_handler *i;
 		/* Map the message from the page frame map to kernel virtual */
-		m=(struct i2o_message *)(mv - (unsigned long)c->page_frame_map + (unsigned long)c->page_frame);
+		/* m=(struct i2o_message *)(mv - (unsigned long)c->page_frame_map + (unsigned long)c->page_frame); */
+		m=(struct i2o_message *)bus_to_virt(mv);
 		msg=(u32*)m;
 
 		/*
@@ -1665,6 +1650,7 @@ static int i2o_reset_controller(struct i2o_controller *c)
 	struct i2o_controller *iop;
 	u32 m;
 	u8 *status;
+	dma_addr_t status_phys;
 	u32 *msg;
 	long time;
 
@@ -1681,8 +1667,8 @@ static int i2o_reset_controller(struct i2o_controller *c)
 		return -ETIMEDOUT;
 	msg=(u32 *)(c->mem_offset+m);
 	
-	status=(void *)kmalloc(4, GFP_KERNEL);
-	if(status==NULL) {
+	status = pci_alloc_consistent(c->pdev, 4, &status_phys);
+	if(status == NULL) {
 		printk(KERN_ERR "IOP reset failed - no free memory.\n");
 		return -ENOMEM;
 	}
@@ -1694,7 +1680,7 @@ static int i2o_reset_controller(struct i2o_controller *c)
 	msg[3]=0;
 	msg[4]=0;
 	msg[5]=0;
-	msg[6]=virt_to_bus(status);
+	msg[6]=status_phys;
 	msg[7]=0;	/* 64bit host FIXME */
 
 	i2o_post_message(c,m);
@@ -1706,7 +1692,7 @@ static int i2o_reset_controller(struct i2o_controller *c)
 		if((jiffies-time)>=20*HZ)
 		{
 			printk(KERN_ERR "IOP reset timeout.\n");
-			// Better to leak this for safety: kfree(status);
+			// Better to leak this for safety: - status;
 			return -ETIMEDOUT;
 		}
 		schedule();
@@ -1762,7 +1748,7 @@ static int i2o_reset_controller(struct i2o_controller *c)
 		if (iop != c)
 			i2o_enable_controller(iop);
 
-	kfree(status);
+	pci_free_consistent(c->pdev, 4, status, status_phys);
 	return 0;
 }
 
@@ -1787,7 +1773,7 @@ int i2o_status_get(struct i2o_controller *c)
 	if (c->status_block == NULL) 
 	{
 		c->status_block = (i2o_status_block *)
-			kmalloc(sizeof(i2o_status_block),GFP_KERNEL);
+			pci_alloc_consistent(c->pdev, sizeof(i2o_status_block), &c->status_block_phys);
 		if (c->status_block == NULL)
 		{
 			printk(KERN_CRIT "%s: Get Status Block failed; Out of memory.\n",
@@ -1810,7 +1796,7 @@ int i2o_status_get(struct i2o_controller *c)
 	msg[3]=0;
 	msg[4]=0;
 	msg[5]=0;
-	msg[6]=virt_to_bus(c->status_block);
+	msg[6]=c->status_block_phys;
 	msg[7]=0;   /* 64bit host FIXME */
 	msg[8]=sizeof(i2o_status_block); /* always 88 bytes */
 
@@ -1826,7 +1812,7 @@ int i2o_status_get(struct i2o_controller *c)
 			printk(KERN_ERR "%s: Get status timeout.\n",c->name);
 			return -ETIMEDOUT;
 		}
-		schedule();
+		yield();
 		barrier();
 	}
 
@@ -1876,7 +1862,7 @@ int i2o_hrt_get(struct i2o_controller *c)
 
 	do  {
 		if (c->hrt == NULL) {
-			c->hrt=kmalloc(size, GFP_KERNEL);
+			c->hrt=pci_alloc_consistent(c->pdev, size, &c->hrt_phys);
 			if (c->hrt == NULL) {
 				printk(KERN_CRIT "%s: Hrt Get failed; Out of memory.\n", c->name);
 				return -ENOMEM;
@@ -1887,9 +1873,9 @@ int i2o_hrt_get(struct i2o_controller *c)
 		msg[1]= I2O_CMD_HRT_GET<<24 | HOST_TID<<12 | ADAPTER_TID;
 		msg[3]= 0;
 		msg[4]= (0xD0000000 | size);	/* Simple transaction */
-		msg[5]= virt_to_bus(c->hrt);	/* Dump it here */
+		msg[5]= c->hrt_phys;		/* Dump it here */
 
-		ret = i2o_post_wait_mem(c, msg, sizeof(msg), 20, c->hrt, NULL);
+		ret = i2o_post_wait_mem(c, msg, sizeof(msg), 20, c->hrt, NULL, c->hrt_phys, 0, size, 0);
 		
 		if(ret == -ETIMEDOUT)
 		{
@@ -1907,8 +1893,9 @@ int i2o_hrt_get(struct i2o_controller *c)
 		}
 
 		if (c->hrt->num_entries * c->hrt->entry_len << 2 > size) {
-			size = c->hrt->num_entries * c->hrt->entry_len << 2;
-			kfree(c->hrt);
+			int new_size = c->hrt->num_entries * c->hrt->entry_len << 2;
+			pci_free_consistent(c->pdev, size, c->hrt, c->hrt_phys);
+			size = new_size;
 			c->hrt = NULL;
 		}
 	} while (c->hrt == NULL);
@@ -1929,6 +1916,7 @@ int i2o_hrt_get(struct i2o_controller *c)
 static int i2o_systab_send(struct i2o_controller *iop)
 {
 	u32 msg[12];
+	dma_addr_t sys_tbl_phys;
 	int ret;
 	u32 *privbuf = kmalloc(16, GFP_KERNEL);
 	if(privbuf == NULL)
@@ -2009,17 +1997,23 @@ static int i2o_systab_send(struct i2o_controller *iop)
  	 * Provide three SGL-elements:
  	 * System table (SysTab), Private memory space declaration and 
  	 * Private i/o space declaration  
- 	 *
- 	 * FIXME: provide these for controllers needing them
+ 	 * 
+ 	 * Nasty one here. We can't use pci_alloc_consistent to send the
+ 	 * same table to everyone. We have to go remap it for them all
  	 */
-	msg[6] = 0x54000000 | sys_tbl_len;
-	msg[7] = virt_to_bus(sys_tbl);
-	msg[8] = 0x54000000 | 8;
-	msg[9] = virt_to_bus(privbuf);
-	msg[10] = 0xD4000000 | 8;
-	msg[11] = virt_to_bus(privbuf+2);
+ 	 
+ 	sys_tbl_phys = pci_map_single(iop->pdev, sys_tbl, sys_tbl_len, PCI_DMA_TODEVICE);
+	msg[6] = 0x54000000 | sys_tbl_phys;
 
-	ret=i2o_post_wait_mem(iop, msg, sizeof(msg), 120, privbuf, NULL);
+	msg[7] = sys_tbl_phys;
+	msg[8] = 0x54000000 | privbuf[1];
+	msg[9] = privbuf[0];
+	msg[10] = 0xD4000000 | privbuf[3];
+	msg[11] = privbuf[2];
+
+	ret=i2o_post_wait(iop, msg, sizeof(msg), 120);
+
+	pci_unmap_single(iop->pdev, sys_tbl_phys, sys_tbl_len, PCI_DMA_TODEVICE);
 	
 	if(ret==-ETIMEDOUT)
 	{
@@ -2045,7 +2039,7 @@ static int i2o_systab_send(struct i2o_controller *iop)
 /*
  * Initialize I2O subsystem.
  */
-static void __init i2o_sys_init(void)
+void __init i2o_sys_init(void)
 {
 	struct i2o_controller *iop, *niop = NULL;
 
@@ -2198,6 +2192,7 @@ int i2o_activate_controller(struct i2o_controller *iop)
 int i2o_init_outbound_q(struct i2o_controller *c)
 {
 	u8 *status;
+	dma_addr_t status_phys;
 	u32 m;
 	u32 *msg;
 	u32 time;
@@ -2208,7 +2203,7 @@ int i2o_init_outbound_q(struct i2o_controller *c)
 		return -ETIMEDOUT;
 	msg=(u32 *)(c->mem_offset+m);
 
-	status = kmalloc(4,GFP_KERNEL);
+	status = pci_alloc_consistent(c->pdev, 4, &status_phys);
 	if (status==NULL) {
 		printk(KERN_ERR "%s: Outbound Queue initialization failed - no free memory.\n",
 			c->name);
@@ -2221,11 +2216,10 @@ int i2o_init_outbound_q(struct i2o_controller *c)
 	msg[2]= core_context;
 	msg[3]= 0x0106;				/* Transaction context */
 	msg[4]= 4096;				/* Host page frame size */
-	/* Frame size is in words. Pick 128, its what everyone elses uses and
-		other sizes break some adapters. */
-	msg[5]= MSG_FRAME_SIZE<<16|0x80;	/* Outbound msg frame size and Initcode */
+	/* Frame size is in words. 256 bytes a frame for now */
+	msg[5]= MSG_FRAME_SIZE<<16|0x80;	/* Outbound msg frame size in words and Initcode */
 	msg[6]= 0xD0000004;			/* Simple SG LE, EOB */
-	msg[7]= virt_to_bus(status);
+	msg[7]= status_phys;
 
 	i2o_post_message(c,m);
 	
@@ -2241,20 +2235,20 @@ int i2o_init_outbound_q(struct i2o_controller *c)
 			else  
 				printk(KERN_ERR "%s: Outbound queue initialize timeout.\n",
 					c->name);
-			kfree(status);
+			pci_free_consistent(c->pdev, 4, status, status_phys);
 			return -ETIMEDOUT;
 		}  
-		schedule();
+		yield();
 		barrier();
 	}  
 
 	if(status[0] != I2O_CMD_COMPLETED)
 	{
 		printk(KERN_ERR "%s: IOP outbound initialise failed.\n", c->name);
-		kfree(status);
+		pci_free_consistent(c->pdev, 4, status, status_phys);
 		return -ETIMEDOUT;
 	}
-
+	pci_free_consistent(c->pdev, 4, status, status_phys);
 	return 0;
 }
 
@@ -2296,7 +2290,7 @@ int i2o_post_outbound_messages(struct i2o_controller *c)
 	for(i=0; i< NMBR_MSG_FRAMES; i++) {
 		I2O_REPLY_WRITE32(c,m);
 		mb();
-		m += MSG_FRAME_SIZE;
+		m += (MSG_FRAME_SIZE << 2);
 	}
 
 	return 0;
@@ -2312,7 +2306,7 @@ int i2o_lct_get(struct i2o_controller *c)
 
 	do {
 		if (c->lct == NULL) {
-			c->lct = kmalloc(size, GFP_KERNEL);
+			c->lct = pci_alloc_consistent(c->pdev, size, &c->lct_phys);
 			if(c->lct == NULL) {
 				printk(KERN_CRIT "%s: Lct Get failed. Out of memory.\n",
 					c->name);
@@ -2328,9 +2322,9 @@ int i2o_lct_get(struct i2o_controller *c)
 		msg[4] = 0xFFFFFFFF;	/* All devices */
 		msg[5] = 0x00000000;	/* Report now */
 		msg[6] = 0xD0000000|size;
-		msg[7] = virt_to_bus(c->lct);
+		msg[7] = c->lct_phys;
 
-		ret=i2o_post_wait_mem(c, msg, sizeof(msg), 120, c->lct, NULL);
+		ret=i2o_post_wait_mem(c, msg, sizeof(msg), 120, c->lct, NULL, c->lct_phys, 0, size, 0);
 		
 		if(ret == -ETIMEDOUT)
 		{
@@ -2346,8 +2340,9 @@ int i2o_lct_get(struct i2o_controller *c)
 		}
 
 		if (c->lct->table_size << 2 > size) {
-			size = c->lct->table_size << 2;
-			kfree(c->lct);
+			int new_size = c->lct->table_size << 2;
+			pci_free_consistent(c->pdev, size, c->lct, c->lct_phys);
+			size = new_size;
 			c->lct = NULL;
 		}
 	} while (c->lct == NULL);
@@ -2375,7 +2370,7 @@ int i2o_lct_notify(struct i2o_controller *c)
 	msg[4] = 0xFFFFFFFF;	/* All devices */
 	msg[5] = c->dlct->change_ind+1;	/* Next change */
 	msg[6] = 0xD0000000|8192;
-	msg[7] = virt_to_bus(c->dlct);
+	msg[7] = c->dlct_phys;
 
 	return i2o_post_this(c, msg, sizeof(msg));
 }
@@ -2480,9 +2475,8 @@ static int i2o_build_sys_table(void)
 		sys_tbl->iops[count].last_changed = sys_tbl_ind - 1; // ??
 		sys_tbl->iops[count].iop_capabilities = 
 				iop->status_block->iop_capabilities;
-		sys_tbl->iops[count].inbound_low = 
-				(u32)virt_to_bus(iop->post_port);
-		sys_tbl->iops[count].inbound_high = 0;	// TODO: 64-bit support
+		sys_tbl->iops[count].inbound_low = iop->post_port;
+		sys_tbl->iops[count].inbound_high = 0;	// FIXME: 64-bit support
 
 		count++;
 	}
@@ -2543,6 +2537,10 @@ int i2o_post_this(struct i2o_controller *c, u32 *data, int len)
  *	@timeout: time in seconds to wait
  *	@mem1: attached memory buffer 1
  *	@mem2: attached memory buffer 2
+ *	@phys1: physical address of buffer 1
+ *	@phys2: physical address of buffer 2
+ *	@size1: size of buffer 1
+ *	@size2: size of buffer 2
  *
  * 	This core API allows an OSM to post a message and then be told whether
  *	or not the system received a successful reply. 
@@ -2557,9 +2555,10 @@ int i2o_post_this(struct i2o_controller *c, u32 *data, int len)
  *	Pass NULL for unneeded buffers.
  */
  
-int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, void *mem1, void *mem2)
+int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, void *mem1, void *mem2, dma_addr_t phys1, dma_addr_t phys2, int size1, int size2)
 {
 	DECLARE_WAIT_QUEUE_HEAD(wq_i2o_post);
+	DECLARE_WAITQUEUE(wait, current);
 	int complete = 0;
 	int status;
 	unsigned long flags = 0;
@@ -2576,6 +2575,11 @@ int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, 
 	wait_data->complete = &complete;
 	wait_data->mem[0] = mem1;
 	wait_data->mem[1] = mem2;
+	wait_data->phys[0] = phys1;
+	wait_data->phys[1] = phys2;
+	wait_data->size[0] = size1;
+	wait_data->size[1] = size2;
+	
 	/* 
 	 *	Queue the event with its unique id
 	 */
@@ -2600,12 +2604,19 @@ int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, 
 	 *	complete will be zero.  From the point post_this returns
 	 *	the wait_data may have been deleted.
 	 */
+
+	add_wait_queue(&wq_i2o_post, &wait);
+	set_current_state(TASK_INTERRUPTIBLE);
 	if ((status = i2o_post_this(c, msg, len))==0) {
-		sleep_on_timeout(&wq_i2o_post, HZ * timeout);
+		schedule_timeout(HZ * timeout);
 	}  
 	else
+	{
+		remove_wait_queue(&wq_i2o_post, &wait);
 		return -EIO;
-		
+	}
+	remove_wait_queue(&wq_i2o_post, &wait);
+
 	if(signal_pending(current))
 		status = -EINTR;
 		
@@ -2650,7 +2661,7 @@ int i2o_post_wait_mem(struct i2o_controller *c, u32 *msg, int len, int timeout, 
  
 int i2o_post_wait(struct i2o_controller *c, u32 *msg, int len, int timeout)
 {
-	return i2o_post_wait_mem(c, msg, len, timeout, NULL, NULL);
+	return i2o_post_wait_mem(c, msg, len, timeout, NULL, NULL, 0, 0, 0, 0);
 }
 
 /*
@@ -2658,7 +2669,7 @@ int i2o_post_wait(struct i2o_controller *c, u32 *msg, int len, int timeout)
  * sleeping proccess. Called by core's reply handler.
  */
 
-static void i2o_post_wait_complete(u32 context, int status)
+static void i2o_post_wait_complete(struct i2o_controller *c, u32 context, int status)
 {
 	struct i2o_post_wait_data **p1, *q;
 	unsigned long flags;
@@ -2704,10 +2715,12 @@ static void i2o_post_wait_complete(u32 context, int status)
 				/*
 				 *	Free resources. Caller is dead
 				 */
+
 				if(q->mem[0])
-					kfree(q->mem[0]);
+					pci_free_consistent(c->pdev, q->size[0], q->mem[0], q->phys[0]);
 				if(q->mem[1])
-					kfree(q->mem[1]);
+					pci_free_consistent(c->pdev, q->size[1], q->mem[1], q->phys[1]);
+
 				printk(KERN_WARNING "i2o_post_wait event completed after timeout.\n");
 			}
 			kfree(q);
@@ -2728,6 +2741,7 @@ static void i2o_post_wait_complete(u32 context, int status)
  *	Note that the minimum sized reslist is 8 bytes and contains
  *	ResultCount, ErrorInfoSize, BlockStatus and BlockSize.
  */
+
 int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid, 
                 void *oplist, int oplen, void *reslist, int reslen)
 {
@@ -2738,17 +2752,18 @@ int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid,
 	int i = 0;
 	int wait_status;
 	u32 *opmem, *resmem;
+	dma_addr_t opmem_phys, resmem_phys;
 	
 	/* Get DMAable memory */
-	opmem = kmalloc(oplen, GFP_KERNEL);
+	opmem = pci_alloc_consistent(iop->pdev, oplen, &opmem_phys);
 	if(opmem == NULL)
 		return -ENOMEM;
 	memcpy(opmem, oplist, oplen);
 	
-	resmem = kmalloc(reslen, GFP_KERNEL);
+	resmem = pci_alloc_consistent(iop->pdev, reslen, &resmem_phys);
 	if(resmem == NULL)
 	{
-		kfree(opmem);
+		pci_free_consistent(iop->pdev, oplen, opmem, opmem_phys);
 		return -ENOMEM;
 	}
 	
@@ -2757,11 +2772,11 @@ int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid,
 	msg[3] = 0;
 	msg[4] = 0;
 	msg[5] = 0x54000000 | oplen;	/* OperationList */
-	msg[6] = virt_to_bus(opmem);
+	msg[6] = opmem_phys;
 	msg[7] = 0xD0000000 | reslen;	/* ResultList */
-	msg[8] = virt_to_bus(resmem);
+	msg[8] = resmem_phys;
 
-	wait_status = i2o_post_wait_mem(iop, msg, sizeof(msg), 10, opmem, resmem);
+	wait_status = i2o_post_wait_mem(iop, msg, sizeof(msg), 10, opmem, resmem, opmem_phys, resmem_phys, oplen, reslen);
 	
 	/*
 	 *	This only looks like a memory leak - don't "fix" it.	
@@ -2769,15 +2784,13 @@ int i2o_issue_params(int cmd, struct i2o_controller *iop, int tid,
 	if(wait_status == -ETIMEDOUT)
 		return wait_status;
 
+	memcpy(reslist, resmem, reslen);
+	pci_free_consistent(iop->pdev, reslen, resmem, resmem_phys);
+	pci_free_consistent(iop->pdev, oplen, opmem, opmem_phys);
+	
 	/* Query failed */
 	if(wait_status != 0)
-	{
-		kfree(resmem);
-		kfree(opmem);
-		return wait_status;
-	}
-	
-	memcpy(reslist, resmem, reslen);
+		return wait_status;		
 	/*
 	 * Calculate number of bytes of Result LIST
 	 * We need to loop through each Result BLOCK and grab the length
@@ -3407,8 +3420,9 @@ static int i2o_reboot_event(struct notifier_block *n, unsigned long code, void
 	{
 		if(i2o_quiesce_controller(c))
 		{
-			printk(KERN_WARNING "i2o: Could not quiesce %s."  "
-				Verify setup on next system power up.\n", c->name);
+			printk(KERN_WARNING "i2o: Could not quiesce %s.\n"
+			       "Verify setup on next system power up.\n",
+			       c->name);
 		}
 	}
 
@@ -3425,6 +3439,10 @@ EXPORT_SYMBOL(i2o_status_get);
 
 EXPORT_SYMBOL(i2o_install_handler);
 EXPORT_SYMBOL(i2o_remove_handler);
+
+EXPORT_SYMBOL(i2o_install_controller);
+EXPORT_SYMBOL(i2o_delete_controller);
+EXPORT_SYMBOL(i2o_run_queue);
 
 EXPORT_SYMBOL(i2o_claim_device);
 EXPORT_SYMBOL(i2o_release_device);
@@ -3450,37 +3468,27 @@ EXPORT_SYMBOL(i2o_dump_message);
 
 EXPORT_SYMBOL(i2o_get_class_name);
 
-#ifdef MODULE
+EXPORT_SYMBOL_GPL(i2o_sys_init);
 
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Core");
 MODULE_LICENSE("GPL");
 
-
-
-int init_module(void)
+static int i2o_core_init(void)
 {
 	printk(KERN_INFO "I2O Core - (C) Copyright 1999 Red Hat Software\n");
 	if (i2o_install_handler(&i2o_core_handler) < 0)
 	{
-		printk(KERN_ERR 
-			"i2o_core: Unable to install core handler.\nI2O stack not loaded!");
+		printk(KERN_ERR "i2o_core: Unable to install core handler.\nI2O stack not loaded!");
 		return 0;
 	}
 
 	core_context = i2o_core_handler.context;
 
 	/*
-	 * Attach core to I2O PCI transport (and others as they are developed)
-	 */
-#ifdef CONFIG_I2O_PCI_MODULE
-	if(i2o_pci_core_attach(&i2o_core_functions) < 0)
-		printk(KERN_INFO "i2o: No PCI I2O controllers found\n");
-#endif
-
-	/*
 	 * Initialize event handling thread
 	 */	
+
 	init_MUTEX_LOCKED(&evt_sem);
 	evt_pid = kernel_thread(i2o_core_evt, &evt_reply, CLONE_SIGHAND);
 	if(evt_pid < 0)
@@ -3500,7 +3508,7 @@ int init_module(void)
 	return 0;
 }
 
-void cleanup_module(void)
+static void i2o_core_exit(void)
 {
 	int stat;
 
@@ -3521,73 +3529,10 @@ void cleanup_module(void)
 		}
 		printk("done.\n");
 	}
-
-#ifdef CONFIG_I2O_PCI_MODULE
-	i2o_pci_core_detach();
-#endif
-
 	i2o_remove_handler(&i2o_core_handler);
-
 	unregister_reboot_notifier(&i2o_reboot_notifier);
 }
 
-#else
+module_init(i2o_core_init);
+module_exit(i2o_core_exit);
 
-extern int i2o_block_init(void);
-extern int i2o_config_init(void);
-extern int i2o_lan_init(void);
-extern int i2o_pci_init(void);
-extern int i2o_proc_init(void);
-extern int i2o_scsi_init(void);
-
-int __init i2o_init(void)
-{
-	printk(KERN_INFO "Loading I2O Core - (c) Copyright 1999 Red Hat Software\n");
-	
-	if (i2o_install_handler(&i2o_core_handler) < 0)
-	{
-		printk(KERN_ERR 
-			"i2o_core: Unable to install core handler.\nI2O stack not loaded!");
-		return 0;
-	}
-
-	core_context = i2o_core_handler.context;
-
-	/*
-	 * Initialize event handling thread
-	 * We may not find any controllers, but still want this as 
-	 * down the road we may have hot pluggable controllers that
-	 * need to be dealt with.
-	 */	
-	init_MUTEX_LOCKED(&evt_sem);
-	if((evt_pid = kernel_thread(i2o_core_evt, &evt_reply, CLONE_SIGHAND)) < 0)
-	{
-		printk(KERN_ERR "I2O: Could not create event handler kernel thread\n");
-		i2o_remove_handler(&i2o_core_handler);
-		return 0;
-	}
-
-
-#ifdef CONFIG_I2O_PCI
-	i2o_pci_init();
-#endif
-
-	if(i2o_num_controllers)
-		i2o_sys_init();
-
-	register_reboot_notifier(&i2o_reboot_notifier);
-
-	i2o_config_init();
-#ifdef CONFIG_I2O_BLOCK
-	i2o_block_init();
-#endif
-#ifdef CONFIG_I2O_LAN
-	i2o_lan_init();
-#endif
-#ifdef CONFIG_I2O_PROC
-	i2o_proc_init();
-#endif
-	return 0;
-}
-
-#endif

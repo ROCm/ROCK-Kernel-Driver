@@ -2178,7 +2178,7 @@ static int de_suspend (struct pci_dev *pdev, u32 state)
 		/* Update the error counts. */
 		__de_get_stats(de);
 
-		synchronize_irq();
+		synchronize_irq(dev->irq);
 		de_clean_rings(de);
 
 		de_adapter_sleep(de);

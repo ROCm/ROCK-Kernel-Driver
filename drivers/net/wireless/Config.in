@@ -33,7 +33,7 @@ if [ "$CONFIG_PCMCIA" != "n" ]; then
 
 # 802.11b cards
    dep_tristate '  Hermes PCMCIA card support' CONFIG_PCMCIA_HERMES $CONFIG_HERMES
-   tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS
+   dep_tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS $CONFIG_PCMCIA
 fi
 
 # yes, this works even when no drivers are selected
