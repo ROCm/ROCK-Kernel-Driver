@@ -429,6 +429,11 @@ static inline int sk_stream_wspace(struct sock *sk)
 
 extern void sk_stream_write_space(struct sock *sk);
 
+static inline int sk_stream_memory_free(struct sock *sk)
+{
+	return sk->sk_wmem_queued < sk->sk_sndbuf;
+}
+
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)				\
 do {	if (!(__sk)->sk_backlog.tail) {				\

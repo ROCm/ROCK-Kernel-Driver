@@ -670,11 +670,6 @@ static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
 	return 0;
 }
 
-static inline int tcp_memory_free(struct sock *sk)
-{
-	return sk->sk_wmem_queued < sk->sk_sndbuf;
-}
-
 /*
  *	Wait for more memory for a socket
  */
@@ -686,7 +681,7 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 	long current_timeo = *timeo;
 	DEFINE_WAIT(wait);
 
-	if (tcp_memory_free(sk))
+	if (sk_stream_memory_free(sk))
 		current_timeo = vm_wait = (net_random() % (HZ / 5)) + 2;
 
 	for (;;) {
@@ -701,13 +696,13 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 		if (signal_pending(current))
 			goto do_interrupted;
 		clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
-		if (tcp_memory_free(sk) && !vm_wait)
+		if (sk_stream_memory_free(sk) && !vm_wait)
 			break;
 
 		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
 		tp->write_pending++;
 		release_sock(sk);
-		if (!tcp_memory_free(sk) || vm_wait)
+		if (!sk_stream_memory_free(sk) || vm_wait)
 			current_timeo = schedule_timeout(current_timeo);
 		lock_sock(sk);
 		tp->write_pending--;
@@ -838,7 +833,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 
 		if (!tp->send_head || (copy = mss_now - skb->len) <= 0) {
 new_segment:
-			if (!tcp_memory_free(sk))
+			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
 			skb = tcp_alloc_pskb(sk, 0, tp->mss_cache,
@@ -1005,7 +1000,7 @@ new_segment:
 				/* Allocate new segment. If the interface is SG,
 				 * allocate skb fitting to single page.
 				 */
-				if (!tcp_memory_free(sk))
+				if (!sk_stream_memory_free(sk))
 					goto wait_for_sndbuf;
 
 				skb = tcp_alloc_pskb(sk, select_size(sk, tp),
