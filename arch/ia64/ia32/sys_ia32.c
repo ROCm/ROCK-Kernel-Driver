@@ -836,8 +836,9 @@ sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timev
 		}
 	}
 
+	size = FDS_BYTES(n);
 	ret = -EINVAL;
-	if (n < 0)
+	if (n < 0 || size < n)
 		goto out_nofds;
 
 	if (n > current->files->max_fdset)
@@ -849,7 +850,6 @@ sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timev
 	 * long-words.
 	 */
 	ret = -ENOMEM;
-	size = FDS_BYTES(n);
 	bits = kmalloc(6 * size, GFP_KERNEL);
 	if (!bits)
 		goto out_nofds;
