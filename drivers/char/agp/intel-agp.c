@@ -182,53 +182,56 @@ static int intel_i810_remove_entries(agp_memory * mem, off_t pg_start,
 	return 0;
 }
 
+/*
+ * The i810/i830 requires a physical address to program its mouse
+ * pointer into hardware.
+ * However the Xserver still writes to it through the agp aperture.
+ */
+static agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
+{
+	agp_memory *new;
+	void *addr;
+
+	if (pg_count != 1)
+		return NULL;
+
+	addr = agp_bridge->driver->agp_alloc_page();
+	if (addr == NULL)
+		return NULL;
+
+	new = agp_create_memory(1);
+	if (new == NULL)
+		return NULL;
+
+	new->memory[0] = virt_to_phys(addr);
+	new->page_count = 1;
+	new->num_scratch_pages = 1;
+	new->type = AGP_PHYS_MEMORY;
+	new->physical = new->memory[0];
+	return new;
+}
+
 static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 {
 	agp_memory *new;
 
 	if (type == AGP_DCACHE_MEMORY) {
-		if (pg_count != intel_i810_private.num_dcache_entries) {
-			return NULL;
-		}
-		new = agp_create_memory(1);
-
-		if (new == NULL) {
-			return NULL;
-		}
-		new->type = AGP_DCACHE_MEMORY;
-		new->page_count = pg_count;
-		new->num_scratch_pages = 0;
-		vfree(new->memory);
-		return new;
-	}
-	if(type == AGP_PHYS_MEMORY) {
-		void *addr;
-		/* The I810 requires a physical address to program
-		 * it's mouse pointer into hardware.  However the
-		 * Xserver still writes to it through the agp
-		 * aperture
-		 */
-		if (pg_count != 1)
+		if (pg_count != intel_i810_private.num_dcache_entries)
 			return NULL;
 
 		new = agp_create_memory(1);
 		if (new == NULL)
 			return NULL;
 
-		addr = agp_bridge->driver->agp_alloc_page();
-
-		if (addr == NULL) {
-			/* Free this structure */
-			agp_free_memory(new);
-			return NULL;
-		}
-		new->memory[0] = virt_to_phys(addr);
-		new->page_count = 1;
-		new->num_scratch_pages = 1;
-		new->type = AGP_PHYS_MEMORY;
-		new->physical = new->memory[0];
+		new->type = AGP_DCACHE_MEMORY;
+		new->page_count = pg_count;
+		new->num_scratch_pages = 0;
+		vfree(new->memory);
 		return new;
 	}
+	if (type == AGP_PHYS_MEMORY)
+		return(alloc_agpphysmem_i8xx(pg_count, type));
+
 	return NULL;
 }
 
@@ -346,7 +349,8 @@ static int intel_i830_create_gatt_table(void)
 	temp &= 0xfff80000;
 
 	intel_i830_private.registers = (volatile u8 *) ioremap(temp,128 * 4096);
-	if (!intel_i830_private.registers) return (-ENOMEM);
+	if (!intel_i830_private.registers)
+		return (-ENOMEM);
 
 	temp = INREG32(intel_i830_private.registers,I810_PGETBL_CTL) & 0xfffff000;
 	global_cache_flush();
@@ -493,41 +497,10 @@ static int intel_i830_remove_entries(agp_memory *mem,off_t pg_start,int type)
 
 static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 {
-	agp_memory *nw;
+	if (type == AGP_PHYS_MEMORY)
+		return(alloc_agpphysmem_i8xx(pg_count, type));
 
-	/* always return NULL for now */
-	if (type == AGP_DCACHE_MEMORY) return(NULL);
-
-	if (type == AGP_PHYS_MEMORY) {
-		void *addr;
-
-		/* The i830 requires a physical address to program
-		 * it's mouse pointer into hardware. However the
-		 * Xserver still writes to it through the agp
-		 * aperture
-		 */
-
-		if (pg_count != 1) return(NULL);
-
-		nw = agp_create_memory(1);
-
-		if (nw == NULL) return(NULL);
-
-		addr = agp_bridge->driver->agp_alloc_page();
-		if (addr == NULL) {
-			/* free this structure */
-			agp_free_memory(nw);
-			return(NULL);
-		}
-
-		nw->memory[0] = virt_to_phys(addr);
-		nw->page_count = 1;
-		nw->num_scratch_pages = 1;
-		nw->type = AGP_PHYS_MEMORY;
-		nw->physical = nw->memory[0];
-		return(nw);
-	}
-
+	/* always return NULL for other allocation types for now */
 	return(NULL);
 }
 
