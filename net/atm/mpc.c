@@ -252,11 +252,11 @@ void atm_mpoa_disp_qos(char *page, int *len)
 static struct net_device *find_lec_by_itfnum(int itf)
 {
 	struct net_device *dev;
-	if (!try_atm_lane_ops())
-		return NULL;
+	char name[IFNAMSIZ];
 
-	dev = atm_lane_ops->get_lec(itf);
-	module_put(atm_lane_ops->owner);
+	sprintf(name, "lec%d", itf);
+	dev = dev_get_by_name(name);
+	
 	return dev;
 }
 
