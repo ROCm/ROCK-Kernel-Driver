@@ -898,7 +898,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	 */
 	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
 	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
-	    netif_carrier_ok(tp->pdev)) {
+	    netif_carrier_ok(tp->dev)) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
 		tg3_readphy(tp, MII_BMSR, &bmsr);
 		if (!(bmsr & BMSR_LSTATUS))
@@ -1965,7 +1965,7 @@ static int tg3_rx(struct tg3 *tp, int budget)
 		if ((tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) &&
 		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM) &&
 		    (((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
-		      >> RXD_TCPCSUM_SHIFT) == 0xffff)) {
+		      >> RXD_TCPCSUM_SHIFT) == 0xffff))
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 		else
 			skb->ip_summed = CHECKSUM_NONE;
