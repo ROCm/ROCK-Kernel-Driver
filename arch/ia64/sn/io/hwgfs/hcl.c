@@ -82,8 +82,10 @@ int __init init_hcl(void)
 	 * Create the hwgraph_root.
 	 */
 	rv = hwgraph_path_add(NULL, EDGE_LBL_HW, &hwgraph_root);
-	if (rv)
-		printk ("WARNING: init_hcl: Failed to create hwgraph_root. Error = %d.\n", rv);
+	if (rv) {
+		printk("init_hcl: Failed to create hwgraph_root.\n");
+		return -1;
+	}
 
 	/*
 	 * Initialize the HCL string table.
@@ -96,8 +98,8 @@ int __init init_hcl(void)
 	 */
 	rv = hwgraph_path_add(hwgraph_root, EDGE_LBL_LINUX_BUS, &linux_busnum);
 	if (linux_busnum == NULL) {
-		panic("HCL: Unable to create %s\n", EDGE_LBL_LINUX_BUS);
-		return(0);
+		printk("HCL: Unable to create %s\n", EDGE_LBL_LINUX_BUS);
+		return -1;
 	}
 
 	pci_bus_cvlink_init();
@@ -108,8 +110,7 @@ int __init init_hcl(void)
 	 */
 	init_ioconfig_bus();
 
-	return(0);
-
+	return 0;
 }
 
 
