@@ -41,4 +41,9 @@ config X86_POWERNOW_K8
 
 	  If in doubt, say N.
 
+config X86_POWERNOW_K8_ACPI
+	bool
+	depends on ((X86_POWERNOW_K8 = "m" && ACPI_PROCESSOR) || (X86_POWERNOW_K8 = "y" && ACPI_PROCESSOR = "y"))
+	default y
+
 endmenu

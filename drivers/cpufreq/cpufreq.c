@@ -100,6 +100,88 @@ static void cpufreq_cpu_put(struct cpufreq_policy *data)
 }
 
 /*********************************************************************
+ *            EXTERNALLY AFFECTING FREQUENCY CHANGES                 *
+ *********************************************************************/
+
+/**
+ * adjust_jiffies - adjust the system "loops_per_jiffy"
+ *
+ * This function alters the system "loops_per_jiffy" for the clock
+ * speed change. Note that loops_per_jiffy cannot be updated on SMP
+ * systems as each CPU might be scaled differently. So, use the arch 
+ * per-CPU loops_per_jiffy value wherever possible.
+ */
+#ifndef CONFIG_SMP
+static unsigned long l_p_j_ref;
+static unsigned int  l_p_j_ref_freq;
+
+static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
+{
+	if (ci->flags & CPUFREQ_CONST_LOOPS)
+		return;
+
+	if (!l_p_j_ref_freq) {
+		l_p_j_ref = loops_per_jiffy;
+		l_p_j_ref_freq = ci->old;
+	}
+	if ((val == CPUFREQ_PRECHANGE  && ci->old < ci->new) ||
+	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new) ||
+	    (val == CPUFREQ_RESUMECHANGE))
+		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq, ci->new);
+}
+#else
+static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci) { return; }
+#endif
+
+
+/**
+ * cpufreq_notify_transition - call notifier chain and adjust_jiffies on frequency transition
+ *
+ * This function calls the transition notifiers and the "adjust_jiffies" function. It is called
+ * twice on all CPU frequency changes that have external effects. 
+ */
+void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
+{
+	BUG_ON(irqs_disabled());
+
+	freqs->flags = cpufreq_driver->flags;
+
+	down_read(&cpufreq_notifier_rwsem);
+	switch (state) {
+	case CPUFREQ_PRECHANGE:
+		/* detect if the driver reported a value as "old frequency" which
+		 * is not equal to what the cpufreq core thinks is "old frequency".
+		 */
+		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
+			if ((likely(cpufreq_cpu_data[freqs->cpu])) &&
+			    (likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
+			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
+			{
+				if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
+					panic("CPU Frequency is out of sync.");
+
+				printk(KERN_WARNING "Warning: CPU frequency is %u, "
+				       "cpufreq assumed %u kHz.\n", freqs->old, cpufreq_cpu_data[freqs->cpu]->cur);
+				freqs->old = cpufreq_cpu_data[freqs->cpu]->cur;
+			}
+		}
+		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_PRECHANGE, freqs);
+		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);
+		break;
+	case CPUFREQ_POSTCHANGE:
+		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
+		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
+		if (likely(cpufreq_cpu_data[freqs->cpu]))
+			cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
+		break;
+	}
+	up_read(&cpufreq_notifier_rwsem);
+}
+EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
+
+
+
+/*********************************************************************
  *                          SYSFS INTERFACE                          *
  *********************************************************************/
 
@@ -617,8 +699,8 @@ static int cpufreq_resume(struct sys_device * sysdev)
 			if (cpufreq_driver->flags & CPUFREQ_PANIC_RESUME_OUTOFSYNC)
 				panic("CPU Frequency is out of sync.");
 
-			printk(KERN_WARNING "Warning: CPU frequency out of sync: cpufreq and timing"
-			       "core thinks of %u, is %u kHz.\n", cpu_policy->cur, cur_freq);
+			printk(KERN_WARNING "Warning: CPU frequency is %u, "
+			       "cpufreq assumed %u kHz.\n", cur_freq, cpu_policy->cur);
 
 			freqs.cpu = cpu;
 			freqs.old = cpu_policy->cur;
@@ -626,6 +708,8 @@ static int cpufreq_resume(struct sys_device * sysdev)
 
 			notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_RESUMECHANGE, &freqs);
 			adjust_jiffies(CPUFREQ_RESUMECHANGE, &freqs);
+
+			cpu_policy->cur = cur_freq;
 		}
 	}
 
@@ -1003,87 +1087,6 @@ int cpufreq_update_policy(unsigned int cpu)
 	return ret;
 }
 EXPORT_SYMBOL(cpufreq_update_policy);
-
-
-/*********************************************************************
- *            EXTERNALLY AFFECTING FREQUENCY CHANGES                 *
- *********************************************************************/
-
-/**
- * adjust_jiffies - adjust the system "loops_per_jiffy"
- *
- * This function alters the system "loops_per_jiffy" for the clock
- * speed change. Note that loops_per_jiffy cannot be updated on SMP
- * systems as each CPU might be scaled differently. So, use the arch 
- * per-CPU loops_per_jiffy value wherever possible.
- */
-#ifndef CONFIG_SMP
-static unsigned long l_p_j_ref;
-static unsigned int  l_p_j_ref_freq;
-
-static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
-{
-	if (ci->flags & CPUFREQ_CONST_LOOPS)
-		return;
-
-	if (!l_p_j_ref_freq) {
-		l_p_j_ref = loops_per_jiffy;
-		l_p_j_ref_freq = ci->old;
-	}
-	if ((val == CPUFREQ_PRECHANGE  && ci->old < ci->new) ||
-	    (val == CPUFREQ_POSTCHANGE && ci->old > ci->new) ||
-	    (val == CPUFREQ_RESUMECHANGE))
-		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq, ci->new);
-}
-#else
-static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci) { return; }
-#endif
-
-
-/**
- * cpufreq_notify_transition - call notifier chain and adjust_jiffies on frequency transition
- *
- * This function calls the transition notifiers and the "adjust_jiffies" function. It is called
- * twice on all CPU frequency changes that have external effects. 
- */
-void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
-{
-	BUG_ON(irqs_disabled());
-
-	freqs->flags = cpufreq_driver->flags;
-
-	down_read(&cpufreq_notifier_rwsem);
-	switch (state) {
-	case CPUFREQ_PRECHANGE:
-		/* detect if the driver reported a value as "old frequency" which
-		 * is not equal to what the cpufreq core thinks is "old frequency".
-		 */
-		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
-			if ((likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
-			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
-			{
-				if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
-					panic("CPU Frequency is out of sync.");
-
-				printk(KERN_WARNING "Warning: CPU frequency out of sync: "
-				       "cpufreq and timing core thinks of %u, is %u kHz.\n", 
-				       cpufreq_cpu_data[freqs->cpu]->cur, freqs->old);
-				freqs->old = cpufreq_cpu_data[freqs->cpu]->cur;
-			}
-		}
-		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_PRECHANGE, freqs);
-		adjust_jiffies(CPUFREQ_PRECHANGE, freqs);
-		break;
-	case CPUFREQ_POSTCHANGE:
-		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
-		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
-		cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
-		break;
-	}
-	up_read(&cpufreq_notifier_rwsem);
-}
-EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
-
 
 
 /*********************************************************************
