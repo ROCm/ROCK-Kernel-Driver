@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
@@ -994,7 +995,6 @@ static void __init emergency_stack_init(void)
  */
 void __init setup_arch(char **cmdline_p)
 {
-	extern int panic_timeout;
 	extern void do_init_bootmem(void);
 
 	ppc64_boot_msg(0x12, "Setup Arch");

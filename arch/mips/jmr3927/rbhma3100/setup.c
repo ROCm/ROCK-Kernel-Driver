@@ -195,7 +195,6 @@ extern struct resource pci_mem_resource;
 
 static void __init jmr3927_setup(void)
 {
-	extern int panic_timeout;
 	char *argptr;
 
 	set_io_port_base(JMR3927_PORT_BASE + JMR3927_PCIIO);

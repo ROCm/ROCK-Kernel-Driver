@@ -876,8 +876,6 @@ static struct notifier_block wdog_reboot_notifier = {
 	0
 };
 
-extern int panic_timeout; /* Why isn't this defined anywhere? */
-
 static int wdog_panic_handler(struct notifier_block *this,
 			      unsigned long         event,
 			      void                  *unused)

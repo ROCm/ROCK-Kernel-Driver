@@ -47,8 +47,6 @@
 
 #include "pci.h"
 
-extern int panic_timeout;
-
 extern unsigned long io_page_mask;
 
 /*
