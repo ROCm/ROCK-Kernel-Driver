@@ -1432,8 +1432,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 {
 	struct sock *sk = sock->sk;
 
-	switch(cmd) 
-	{
+	switch(cmd) {
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->wmem_alloc);
@@ -1452,35 +1451,12 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			return put_user(amount, (int *)arg);
 		}
 		case SIOCGSTAMP:
-			if(sk->stamp.tv_sec==0)
+			if (sk->stamp.tv_sec==0)
 				return -ENOENT;
 			if (copy_to_user((void *)arg, &sk->stamp,
 					 sizeof(struct timeval)))
 				return -EFAULT;
 			break;
-		case SIOCGIFFLAGS:
-#ifndef CONFIG_INET
-		case SIOCSIFFLAGS:
-#endif
-		case SIOCGIFCONF:
-		case SIOCGIFMETRIC:
-		case SIOCSIFMETRIC:
-		case SIOCGIFMEM:
-		case SIOCSIFMEM:
-		case SIOCGIFMTU:
-		case SIOCSIFMTU:
-		case SIOCSIFLINK:
-		case SIOCGIFHWADDR:
-		case SIOCSIFHWADDR:
-		case SIOCSIFMAP:
-		case SIOCGIFMAP:
-		case SIOCSIFSLAVE:
-		case SIOCGIFSLAVE:
-		case SIOCGIFINDEX:
-		case SIOCGIFNAME:
-		case SIOCGIFCOUNT:
-		case SIOCSIFHWBROADCAST:
-			return(dev_ioctl(cmd,(void *) arg));
 
 #ifdef CONFIG_INET
 		case SIOCADDRT:
@@ -1501,7 +1477,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 #endif
 
 		default:
-			return -EOPNOTSUPP;
+			return dev_ioctl(cmd, (void *)arg);
 	}
 	return 0;
 }
