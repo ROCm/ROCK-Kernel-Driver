@@ -112,7 +112,6 @@ static int irda_usb_close(struct irda_usb_cb *self);
 static void speed_bulk_callback(struct urb *urb, struct pt_regs *regs);
 static void write_bulk_callback(struct urb *urb, struct pt_regs *regs);
 static void irda_usb_receive(struct urb *urb, struct pt_regs *regs);
-static int irda_usb_net_init(struct net_device *dev);
 static int irda_usb_net_open(struct net_device *dev);
 static int irda_usb_net_close(struct net_device *dev);
 static int irda_usb_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -901,24 +900,6 @@ static int irda_usb_is_receiving(struct irda_usb_cb *self)
  * be dealt with below...
  */
 
-/*------------------------------------------------------------------*/
-/*
- * Callback when a new IrDA device is created.
- */
-static int irda_usb_net_init(struct net_device *dev)
-{
-	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
-	
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Set up to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	return 0;
-}
 
 /*------------------------------------------------------------------*/
 /*
@@ -1195,15 +1176,18 @@ static inline int irda_usb_open(struct irda_usb_cb *self)
 	memset(self->speed_buff, 0, IRDA_USB_SPEED_MTU);
 
 	/* Create a network device for us */
-	if (!(netdev = dev_alloc("irda%d", &err))) {
-		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		return -1;
+	netdev = alloc_netdev(0, "irda%d",  irda_device_setup);
+	if (!netdev) {
+		ERROR("%s(), alloc_net_dev() failed!\n", __FUNCTION__);
+		return -ENOMEM;
 	}
+
+	SET_MODULE_OWNER(dev);
+
 	self->netdev = netdev;
  	netdev->priv = (void *) self;
 
 	/* Override the network functions we need to use */
-	netdev->init            = irda_usb_net_init;
 	netdev->hard_start_xmit = irda_usb_hard_xmit;
 	netdev->tx_timeout	= irda_usb_net_timeout;
 	netdev->watchdog_timeo  = 250*HZ/1000;	/* 250 ms > USB timeout */
@@ -1212,12 +1196,12 @@ static inline int irda_usb_open(struct irda_usb_cb *self)
 	netdev->get_stats	= irda_usb_net_get_stats;
 	netdev->do_ioctl        = irda_usb_net_ioctl;
 
-	rtnl_lock();
-	err = register_netdevice(netdev);
-	rtnl_unlock();
+	err = register_netdev(netdev);
 	if (err) {
 		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
-		return -1;
+		self->netdev = NULL;
+		free_netdev(netdev);
+		return err;
 	}
 	MESSAGE("IrDA: Registered device %s\n", netdev->name);
 
@@ -1236,9 +1220,11 @@ static inline int irda_usb_close(struct irda_usb_cb *self)
 	ASSERT(self != NULL, return -1;);
 
 	/* Remove netdevice */
-	if (self->netdev)
+	if (self->netdev) {
 		unregister_netdev(self->netdev);
-	self->netdev = NULL;
+		free_netdev(self->netdev);
+		self->netdev = NULL;
+	}
 
 	/* Remove the speed buffer */
 	if (self->speed_buff != NULL) {
