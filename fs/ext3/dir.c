@@ -103,7 +103,11 @@ static int ext3_readdir(struct file * filp,
 
 	sb = inode->i_sb;
 
-	if (is_dx(inode)) {
+#ifdef CONFIG_EXT3_INDEX
+	if (EXT3_HAS_COMPAT_FEATURE(inode->i_sb,
+				    EXT3_FEATURE_COMPAT_DIR_INDEX) &&
+	    ((EXT3_I(inode)->i_flags & EXT3_INDEX_FL) ||
+	     ((inode->i_size >> sb->s_blocksize_bits) == 1))) {
 		err = ext3_dx_readdir(filp, dirent, filldir);
 		if (err != ERR_BAD_DX_DIR) {
 			ret = err;
@@ -115,6 +119,7 @@ static int ext3_readdir(struct file * filp,
 		 */
 		EXT3_I(filp->f_dentry->d_inode)->i_flags &= ~EXT3_INDEX_FL;
 	}
+#endif
 	stored = 0;
 	bh = NULL;
 	offset = filp->f_pos & (sb->s_blocksize - 1);
@@ -434,6 +439,9 @@ static int ext3_dx_readdir(struct file * filp,
 		filp->private_data = info;
 	}
 
+	if (filp->f_pos == -1)
+		return 0;	/* EOF */
+
 	/* Some one has messed with f_pos; reset the world */
 	if (info->last_pos != filp->f_pos) {
 		free_rb_tree_fname(&info->root);
@@ -470,8 +478,10 @@ static int ext3_dx_readdir(struct file * filp,
 						   &info->next_hash);
 			if (ret < 0)
 				return ret;
-			if (ret == 0)
+			if (ret == 0) {
+				filp->f_pos = -1;
 				break;
+			}
 			info->curr_node = rb_first(&info->root);
 		}
 
@@ -483,6 +493,10 @@ static int ext3_dx_readdir(struct file * filp,
 
 		info->curr_node = rb_next(info->curr_node);
 		if (!info->curr_node) {
+			if (info->next_hash == ~0) {
+				filp->f_pos = -1;
+				break;
+			}
 			info->curr_hash = info->next_hash;
 			info->curr_minor_hash = 0;
 		}
