@@ -11,12 +11,20 @@
  * 2001-02-06: Cliff Brake         Initial code
  *
  * 2001-08-29:	Nicolas Pitre	Simplified.
+ *
+ * 2002-05-27:	Nicolas Pitre	Revisited, more cleanup and simplification.
+ *				Storage is on the stack now.
  */
 
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include <asm/hardware.h>
-#include "sleep.h"
+
+
+
+		.text
+
+
 
 /*
  * sa1100_cpu_suspend()
@@ -25,35 +33,24 @@
  *
  */
 
-	.text
-
-ENTRY(sleep_save)	.word	0		@ virtual address of parameter array
-ENTRY(sleep_save_p)	.word	0		@ physical address of parameter array
-
 ENTRY(sa1100_cpu_suspend)
 
-	@ save registers on stack
-	stmfd	sp!, {r4 - r12, lr}
+	stmfd	sp!, {r4 - r12, lr}		@ save registers on stack
 
-	@ load virtual address for sleep_save array
-	ldr	r4, sleep_save
+	@ get coprocessor registers
+	mrc 	p15, 0, r4, c3, c0, 0		@ domain ID
+	mrc 	p15, 0, r5, c2, c0, 0		@ translation table base addr
+	mrc	p15, 0, r6, c13, c0, 0		@ PID
+	mrc 	p15, 0, r7, c1, c0, 0		@ control reg
 
-	@ save stack pointer
-	str	sp, [r4, #(SLEEP_SAVE_SP*4)]
+	@ store them plus current virtual stack ptr on stack
+	stmfd	sp!, {r4 - r7, sp}
 
-	@ save coprocessor registers
-	mrc 	p15, 0, r1, c1, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R1*4)]
-	mrc 	p15, 0, r1, c2, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R2*4)]
-	mrc 	p15, 0, r1, c3, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R3*4)]
-	mrc 	p15, 0, r1, c5, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R5*4)]
-	mrc 	p15, 0, r1, c6, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R6*4)]
-	mrc 	p15, 0, r1, c13, c0, 0
-	str	r1, [r4, #(SLEEP_SAVE_CP15_R13*4)]
+	@ preserve phys address of stack
+	mov	r0, sp
+	bl	sleep_phys_sp
+	ldr	r1, =sleep_save_sp
+	str	r0, [r1]
 
 	@ clean data cache and invalidate WB
 	bl	cpu_sa1100_cache_clean_invalidate_all
@@ -79,25 +76,24 @@ ENTRY(sa1100_cpu_suspend)
 	mov	r0, #90
 	bl	udelay
 
-
-/* setup up register contents for jump to page containing SA1110 SDRAM controller bug fix suspend code
- *
- * r0 points to MSC0 register
- * r1 points to MSC1 register
- * r2 points to MSC2 register
- * r3 is MSC0 value
- * r4 is MSC1 value
- * r5 is MSC2 value
- * r6 points to MDREFR register
- * r7 is first MDREFR value
- * r8 is second MDREFR value
- * r9 is pointer to MDCNFG register
- * r10 is MDCNFG value
- * r11 is third MDREFR value
- * r12 is pointer to PMCR register
- * r13 is PMCR value (1)
- *
- */
+	/*
+	 * SA1110 SDRAM controller workaround.  register values:
+	 *
+	 * r0  = &MSC0
+	 * r1  = &MSC1
+	 * r2  = &MSC2
+	 * r3  = MSC0 value
+	 * r4  = MSC1 value
+	 * r5  = MSC2 value
+	 * r6  = &MDREFR
+	 * r7  = first MDREFR value
+	 * r8  = second MDREFR value
+	 * r9  = &MDCNFG
+	 * r10 = MDCNFG value
+	 * r11 = third MDREFR value
+	 * r12 = &PMCR
+	 * r13 = PMCR value (1)
+	 */
 
 	ldr	r0, =MSC0
 	ldr	r1, =MSC1
@@ -170,69 +166,49 @@ sa1110_sdram_controller_fix:
  *
  * entry point from bootloader into kernel during resume
  *
+ * Note: Yes, part of the following code is located into the .data section.
+ *       This is to allow sleep_save_sp to be accessed with a relative load
+ *       while we can't rely on any MMU translation.  We could have put
+ *       sleep_save_sp in the .text section as well, but some setups might
+ *       insist on it to be truely read-only.
  */
 
+	.data
 	.align 5
 ENTRY(sa1100_cpu_resume)
-
-	@ set SVC, irqs off
 	mov	r0, #PSR_F_BIT | PSR_I_BIT | MODE_SVC
-	msr	cpsr_c, r0
+	msr	cpsr_c, r0			@ set SVC, irqs off
 
-	@ load physical address of sleep_save
-	ldr	r4, sleep_save_p
-
-	@ restore cp15_r3, domain id
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R3*4)]
-	mcr 	p15, 0, r1, c3, c0 ,0
-
-	@ restore cp15_r2, translation table base address
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R2*4)]
-	mcr 	p15, 0, r1, c2, c0 ,0
+	ldr	r0, sleep_save_sp		@ stack phys addr
+	ldr	r2, =resume_after_mmu		@ its absolute virtual address
+	ldmfd	r0, {r4 - r7, sp}		@ CP regs + virt stack ptr
 
 	mov	r1, #0
 	mcr	p15, 0, r1, c8, c7, 0   	@ flush I+D TLBs
 	mcr	p15, 0, r1, c7, c7, 0		@ flush I&D cache
+	mcr	p15, 0, r1, c9, c0, 0		@ invalidate RB
+	mcr     p15, 0, r1, c9, c0, 5		@ allow user space to use RB
 
-	@ get saved cp15 r1 (control register)
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R1*4)]
-
-	@ get address to jump to after turning on MMU
-	ldr	r2, =resume_after_mmu
-
-	cmp	r2, #0
-
-	b	resume_turn_on_mmu
+	mcr 	p15, 0, r4, c3, c0, 0		@ domain ID
+	mcr 	p15, 0, r5, c2, c0, 0		@ translation table base addr
+	mcr	p15, 0, r6, c13, c0, 0		@ PID
+	b	resume_turn_on_mmu		@ cache align execution
 
 	.align 5
 resume_turn_on_mmu:
-
-	@ turn on mmu
-	mcr 	p15, 0, r1, c1, c0 ,0
-
-	@ jump to resume_after_mmu
-	mov	pc, r2
+	mcr 	p15, 0, r7, c1, c0, 0		@ turn on MMU, caches, etc.
+	nop
+	mov	pc, r2				@ jump to virtual addr
+	nop
 	nop
 	nop
 
-	.align 5
+sleep_save_sp:
+	.word	0				@ preserve stack phys ptr here
+
+	.text
 resume_after_mmu:
-
-	@ load virtual address for sleep_save array
-	ldr	r4, sleep_save
-
-	@ restore the rest of CPU state
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R13*4)]
-	mcr	p15, 0, r1, c13, c0, 0
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R5*4)]
-	mcr 	p15, 0, r1, c5, c0 ,0
-	ldr	r1, [r4, #(SLEEP_SAVE_CP15_R6*4)]
-	mcr 	p15, 0, r1, c6, c0 ,0
-
-	@ restore stack pointer
-	ldr	sp, [r4, #(SLEEP_SAVE_SP*4)]
-
-	@ return to caller
-	ldmfd	sp!, {r4 - r12, pc}
+	mcr     p15, 0, r1, c15, c1, 2		@ enable clock switching
+	ldmfd	sp!, {r4 - r12, pc}		@ return to caller
 
 
