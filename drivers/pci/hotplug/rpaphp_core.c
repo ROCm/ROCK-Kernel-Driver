@@ -224,7 +224,7 @@ static int get_children_props(struct device_node *dn, int **drc_indexes,
 
 	if (!indexes || !names || !types || !domains) {
 		/* Slot does not have dynamically-removable children */
-		return 1;
+		return -EINVAL;
 	}
 	if (drc_indexes)
 		*drc_indexes = indexes;
@@ -260,7 +260,7 @@ int rpaphp_get_drc_props(struct device_node *dn, int *drc_index,
 	}
 
 	rc = get_children_props(dn->parent, &indexes, &names, &types, &domains);
-	if (rc) {
+	if (rc < 0) {
 		return 1;
 	}
 
@@ -307,7 +307,7 @@ static int is_php_dn(struct device_node *dn, int **indexes, int **names,
 	int rc;
 
 	rc = get_children_props(dn, indexes, names, &drc_types, power_domains);
-	if (rc) {
+	if (rc >= 0) {
 		if (is_php_type((char *) &drc_types[1])) {
 			*types = drc_types;
 			return 1;
@@ -331,7 +331,7 @@ static int is_dr_dn(struct device_node *dn, int **indexes, int **names,
 
 	rc = get_children_props(dn->parent, indexes, names, types,
 				power_domains);
-	return (rc == 0);
+	return (rc >= 0);
 }
 
 static inline int is_vdevice_root(struct device_node *dn)
