@@ -98,7 +98,7 @@ static int neigh_blackhole(struct sk_buff *skb)
 /*
  * It is random distribution in the interval (1/2)*base...(3/2)*base.
  * It corresponds to default IPv6 settings and is not overridable,
- * because it is really reasonbale choice.
+ * because it is really reasonable choice.
  */
 
 unsigned long neigh_rand_reach_time(unsigned long base)
@@ -120,7 +120,7 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 		while ((n = *np) != NULL) {
 			/* Neighbour record may be discarded if:
 			   - nobody refers to it.
-			   - it is not premanent
+			   - it is not permanent
 			   - (NEW and probably wrong)
 			     INCOMPLETE entries are kept at least for
 			     n->parms->retrans_time, otherwise we could
@@ -510,7 +510,7 @@ static void neigh_suspect(struct neighbour *neigh)
 {
 	struct hh_cache *hh;
 
-	NEIGH_PRINTK2("neigh %p is suspecteded.\n", neigh);
+	NEIGH_PRINTK2("neigh %p is suspected.\n", neigh);
 
 	neigh->output = neigh->ops->output;
 
@@ -537,7 +537,7 @@ static void neigh_connect(struct neighbour *neigh)
 
 /*
    Transitions NUD_STALE <-> NUD_REACHABLE do not occur
-   when fast path is built: we have no timers assotiated with
+   when fast path is built: we have no timers associated with
    these states, we do not have time to check state when sending.
    neigh_periodic_timer check periodically neigh->confirmed
    time and moves NUD_REACHABLE -> NUD_STALE.
@@ -962,7 +962,7 @@ static void neigh_hh_init(struct neighbour *n, struct dst_entry *dst,
 
 /* This function can be used in contexts, where only old dev_queue_xmit
    worked, f.e. if you want to override normal output path (eql, shaper),
-   but resoltution is not made yet.
+   but resolution is not made yet.
  */
 
 int neigh_compat_output(struct sk_buff *skb)
