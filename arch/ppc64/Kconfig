@@ -40,13 +40,12 @@ config FRAME_POINTER
 	bool
 	default y
 
-# This badly named config option is actually max order + 1. This limits
-# the largest allocation we can do with get_free_pages. In order to make
-# the dentry and inode hashes big enough on machines with massive filesystems
-# we keep this quite high (1GB)
+# We optimistically allocate largepages from the VM, so make the limit
+# large enough (16MB). This badly named config option is actually
+# max order + 1
 config FORCE_MAX_ZONEORDER
 	int
-	default "19"
+	default "13"
 
 source "init/Kconfig"
 
