@@ -493,9 +493,13 @@ static void fn_lastcons(struct vc_data *vc, struct pt_regs *regs)
 
 static void fn_dec_console(struct vc_data *vc, struct pt_regs *regs)
 {
-	int i;
- 
-	for (i = fg_console-1; i != fg_console; i--) {
+	int i, cur = fg_console;
+
+	/* Currently switching?  Queue this next switch relative to that. */
+	if (want_console != -1)
+		cur = want_console;
+
+	for (i = cur-1; i != cur; i--) {
 		if (i == -1)
 			i = MAX_NR_CONSOLES-1;
 		if (vc_cons_allocated(i))
@@ -506,9 +510,13 @@ static void fn_dec_console(struct vc_data *vc, struct pt_regs *regs)
 
 static void fn_inc_console(struct vc_data *vc, struct pt_regs *regs)
 {
-	int i;
+	int i, cur = fg_console;
 
-	for (i = fg_console+1; i != fg_console; i++) {
+	/* Currently switching?  Queue this next switch relative to that. */
+	if (want_console != -1)
+		cur = want_console;
+
+	for (i = cur+1; i != cur; i++) {
 		if (i == MAX_NR_CONSOLES)
 			i = 0;
 		if (vc_cons_allocated(i))
