@@ -76,11 +76,13 @@ ENTRY(swsusp_arch_suspend)
 	movl saved_context_edx, %edx
 	movl saved_context_esi, %esi
 	movl saved_context_edi, %edi
-	call restore_processor_state
 	pushl saved_context_eflags ; popfl
 	call swsusp_resume
 .L1449:
-	popl %ebx
+	popl	%ebx
+	pushl	%eax
+	call	restore_processor_state
+	popl	%eax
 	ret
 
        .section .data.nosave
