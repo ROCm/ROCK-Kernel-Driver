@@ -613,7 +613,6 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 	char *page;
 	struct comx_hardware *hw = comx_channels;
 	struct comx_protocol *line = comx_lines;
-	char str[30];
 	int ret=0;
 
 	if (count > PAGE_SIZE) {
@@ -691,8 +690,7 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 		}
 #ifdef CONFIG_KMOD
 		if(!hw && comx_strcasecmp(HWNAME_NONE,page) != 0){
-			sprintf(str,"comx-hw-%s",page);
-			request_module(str);
+			request_module("comx-hw-%s",page);
 		}		
 		hw=comx_channels;
 		while (hw) {
@@ -734,8 +732,7 @@ static int comx_write_proc(struct file *file, const char *buffer, u_long count,
 		}
 #ifdef CONFIG_KMOD
 		if(!line && comx_strcasecmp(PROTONAME_NONE, page) != 0) {
-			sprintf(str,"comx-proto-%s",page);
-			request_module(str);
+			request_module("comx-proto-%s",page);
 		}		
 		line=comx_lines;
 		while (line) {

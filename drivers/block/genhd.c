@@ -367,9 +367,7 @@ extern int blk_dev_init(void);
 
 static struct gendisk *base_probe(dev_t dev, int *part, void *data)
 {
-	char name[30];
-	sprintf(name, "block-major-%d", MAJOR(dev));
-	request_module(name);
+	request_module("block-major-%d", MAJOR(dev));
 	return NULL;
 }
 

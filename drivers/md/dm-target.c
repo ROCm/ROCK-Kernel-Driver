@@ -58,14 +58,7 @@ static struct tt_internal *get_target_type(const char *name)
 
 static void load_module(const char *name)
 {
-	char module_name[DM_MOD_NAME_SIZE] = "dm-";
-
-	/* Length check for strcat() below */
-	if (strlen(name) > (DM_MOD_NAME_SIZE - 4))
-		return;
-
-	strcat(module_name, name);
-	request_module(module_name);
+	request_module("dm-%s", name);
 }
 
 struct target_type *dm_get_target_type(const char *name)

@@ -1034,14 +1034,12 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 #ifdef CONFIG_KMOD
 		}else{
 #define printable(c) (((c)=='\t') || ((c)=='\n') || (0x20<=(c) && (c)<=0x7e))
-			char modname[20];
 			if (printable(bprm->buf[0]) &&
 			    printable(bprm->buf[1]) &&
 			    printable(bprm->buf[2]) &&
 			    printable(bprm->buf[3]))
 				break; /* -ENOEXEC */
-			sprintf(modname, "binfmt-%04x", *(unsigned short *)(&bprm->buf[2]));
-			request_module(modname);
+			request_module("binfmt-%04x", *(unsigned short *)(&bprm->buf[2]));
 #endif
 		}
 	}

@@ -83,11 +83,8 @@ static int video_open(struct inode *inode, struct file *file)
 	down(&videodev_lock);
 	vfl=video_device[minor];
 	if(vfl==NULL) {
-		char modname[20];
-
 		up(&videodev_lock);
-		sprintf (modname, "char-major-%d-%d", VIDEO_MAJOR, minor);
-		request_module(modname);
+		request_module("char-major-%d-%d", VIDEO_MAJOR, minor);
 		down(&videodev_lock);
 		vfl=video_device[minor];
 		if (vfl==NULL) {

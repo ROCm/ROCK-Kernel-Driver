@@ -1948,9 +1948,6 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 	struct ppp_option_data data;
 	void *state, *ostate;
 	unsigned char ccp_option[CCP_MAX_OPTION_LENGTH];
-#ifdef CONFIG_KMOD
-	char modname[32];
-#endif
 
 	err = -EFAULT;
 	if (copy_from_user(&data, (void *) arg, sizeof(data))
@@ -1965,8 +1962,7 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 	cp = find_compressor(ccp_option[0]);
 #ifdef CONFIG_KMOD
 	if (cp == 0) {
-		sprintf(modname, "ppp-compress-%d", ccp_option[0]);
-		request_module(modname);
+		request_module("ppp-compress-%d", ccp_option[0]);
 		cp = find_compressor(ccp_option[0]);
 	}
 #endif /* CONFIG_KMOD */

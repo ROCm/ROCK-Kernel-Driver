@@ -136,7 +136,6 @@ client_t *snd_seq_client_use_ptr(int clientid)
 		static char card_requested[SNDRV_CARDS];
 		if (clientid < 64) {
 			int idx;
-			char name[32];
 			
 			if (! client_requested[clientid]) {
 				client_requested[clientid] = 1;
@@ -144,8 +143,7 @@ client_t *snd_seq_client_use_ptr(int clientid)
 					if (seq_client_load[idx] < 0)
 						break;
 					if (seq_client_load[idx] == clientid) {
-						sprintf(name, "snd-seq-client-%i", clientid);
-						request_module(name);
+						request_module("snd-seq-client-%i", clientid);
 						break;
 					}
 				}

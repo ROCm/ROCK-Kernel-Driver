@@ -99,9 +99,7 @@ static int bt_sock_create(struct socket *sock, int proto)
 
 #if defined(CONFIG_KMOD)
 	if (!bt_proto[proto]) {
-		char module_name[30];
-		sprintf(module_name, "bt-proto-%d", proto);
-		request_module(module_name);
+		request_module("bt-proto-%d", proto);
 	}
 #endif
 	err = -EPROTONOSUPPORT;

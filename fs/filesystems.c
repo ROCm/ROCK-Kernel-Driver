@@ -279,7 +279,7 @@ struct file_system_type *get_fs_type(const char *name)
 	if (fs && !try_module_get(fs->owner))
 		fs = NULL;
 	read_unlock(&file_systems_lock);
-	if (!fs && (request_module(name) == 0)) {
+	if (!fs && (request_module("%s", name) == 0)) {
 		read_lock(&file_systems_lock);
 		fs = *(find_filesystem(name));
 		if (fs && !try_module_get(fs->owner))

@@ -839,10 +839,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 #ifdef CONFIG_KMOD
 static void try_to_load(int fb)
 {
-	char modname[16];
-
-	sprintf(modname, "fb%d", fb);
-	request_module(modname);
+	request_module("fb%d", fb);
 }
 #endif /* CONFIG_KMOD */
 

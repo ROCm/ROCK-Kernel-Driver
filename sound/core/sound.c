@@ -79,7 +79,6 @@ static DECLARE_MUTEX(sound_mutex);
  */
 void snd_request_card(int card)
 {
-	char str[32];
 	int locked;
 
 	read_lock(&snd_card_rwlock);
@@ -89,8 +88,7 @@ void snd_request_card(int card)
 		return;
 	if (card < 0 || card >= cards_limit)
 		return;
-	sprintf(str, "snd-card-%i", card);
-	request_module(str);
+	request_module("snd-card-%i", card);
 }
 
 static void snd_request_other(int minor)

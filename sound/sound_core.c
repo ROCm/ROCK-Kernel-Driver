@@ -500,8 +500,6 @@ int soundcore_open(struct inode *inode, struct file *file)
 	if (s)
 		new_fops = fops_get(s->unit_fops);
 	if (!new_fops) {
-		char mod[32];
-	
 		spin_unlock(&sound_loader_lock);
 		/*
 		 *  Please, don't change this order or code.
@@ -510,10 +508,8 @@ int soundcore_open(struct inode *inode, struct file *file)
 		 *  ALSA toplevel modules for soundcards, thus we need
 		 *  load them at first.	  [Jaroslav Kysela <perex@jcu.cz>]
 		 */
-		sprintf(mod, "sound-slot-%i", unit>>4);
-		request_module(mod);
-		sprintf(mod, "sound-service-%i-%i", unit>>4, chain);
-		request_module(mod);
+		request_module("sound-slot-%i", unit>>4);
+		request_module("sound-service-%i-%i", unit>>4, chain);
 		spin_lock(&sound_loader_lock);
 		s = __look_for_unit(chain, unit);
 		if (s)

@@ -319,10 +319,7 @@ find_inlist_lock(struct list_head *head, const char *name, const char *prefix,
 
 	ret = find_inlist_lock_noload(head, name, error, mutex);
 	if (!ret) {
-		char modulename[EBT_FUNCTION_MAXNAMELEN + strlen(prefix) + 1];
-		strcpy(modulename, prefix);
-		strcat(modulename, name);
-		request_module(modulename);
+		request_module("%s%s", prefix, name);
 		ret = find_inlist_lock_noload(head, name, error, mutex);
 	}
 	return ret;

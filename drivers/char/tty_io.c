@@ -260,9 +260,7 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 	/* Eduardo Blanco <ejbs@cs.cs.com.uy> */
 	/* Cyrus Durgin <cider@speakeasy.org> */
 	if (!(ldiscs[ldisc].flags & LDISC_FLAG_DEFINED)) {
-		char modname [20];
-		sprintf(modname, "tty-ldisc-%d", ldisc);
-		request_module (modname);
+		request_module("tty-ldisc-%d", ldisc);
 	}
 	if (!(ldiscs[ldisc].flags & LDISC_FLAG_DEFINED))
 		return -EINVAL;

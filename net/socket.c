@@ -1034,9 +1034,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	 */
 	if (net_families[family]==NULL)
 	{
-		char module_name[30];
-		sprintf(module_name,"net-pf-%d",family);
-		request_module(module_name);
+		request_module("net-pf-%d",family);
 	}
 #endif
 

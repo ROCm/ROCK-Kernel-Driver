@@ -721,7 +721,7 @@ void netdev_state_change(struct net_device *dev)
 void dev_load(const char *name)
 {
 	if (!dev_get(name) && capable(CAP_SYS_MODULE))
-		request_module(name);
+		request_module("%s", name);
 }
 
 #else
