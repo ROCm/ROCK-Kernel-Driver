@@ -862,7 +862,7 @@ static inline int ioctl_private_call(struct net_device *	dev,
 				return -EFAULT;
 
 			/* Does it fits within bounds ? */
-			if(iwr->u.data.length > (descr->get_args &
+			if(iwr->u.data.length > (descr->set_args &
 						 IW_PRIV_SIZE_MASK))
 				return -E2BIG;
 		} else {
