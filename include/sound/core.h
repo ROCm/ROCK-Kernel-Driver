@@ -416,7 +416,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * not checked.
  */
 #define snd_assert(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
@@ -432,7 +432,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * CONFIG_SND_DEBUG is not set but without any error messages.
  */
 #define snd_runtime_check(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
