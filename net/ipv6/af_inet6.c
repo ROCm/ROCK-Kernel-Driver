@@ -675,6 +675,11 @@ static int __init inet6_init(void)
 	 */
 	inet6_register_protosw(&rawv6_protosw);
 
+	/* Register the family here so that the init calls below will
+	 * be able to create sockets. (?? is this dangerous ??)
+	 */
+	(void) sock_register(&inet6_family_ops);
+	
 	/*
 	 *	ipngwg API draft makes clear that the correct semantics
 	 *	for TCP and UDP is to consider one TCP and UDP instance
@@ -719,9 +724,6 @@ static int __init inet6_init(void)
 	udpv6_init();
 	tcpv6_init();
 
-	/* Now the userspace is allowed to create INET6 sockets. */
-	(void) sock_register(&inet6_family_ops);
-	
 	return 0;
 
 #ifdef CONFIG_PROC_FS
