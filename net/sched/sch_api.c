@@ -389,7 +389,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 {
 	int err;
 	struct rtattr *kind = tca[TCA_KIND-1];
-	struct Qdisc *sch = NULL;
+	void *p = NULL;
+	struct Qdisc *sch;
 	struct Qdisc_ops *ops;
 	int size;
 
@@ -407,20 +408,24 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	if (ops == NULL)
 		goto err_out;
 
-	size = sizeof(*sch) + ops->priv_size;
+	/* ensure that the Qdisc and the private data are 32-byte aligned */
+	size = ((sizeof(*sch) + QDISC_ALIGN_CONST) & ~QDISC_ALIGN_CONST);
+	size += ops->priv_size + QDISC_ALIGN_CONST;
 
-	sch = kmalloc(size, GFP_KERNEL);
+	p = kmalloc(size, GFP_KERNEL);
 	err = -ENOBUFS;
-	if (!sch)
+	if (!p)
 		goto err_out;
+	memset(p, 0, size);
+	sch = (struct Qdisc *)(((unsigned long)p + QDISC_ALIGN_CONST)
+	                       & ~QDISC_ALIGN_CONST);
+	sch->padded = (char *)sch - (char *)p;
 
 	/* Grrr... Resolve race condition with module unload */
 
 	err = -EINVAL;
 	if (ops != qdisc_lookup_ops(kind))
 		goto err_out;
-
-	memset(sch, 0, size);
 
 	INIT_LIST_HEAD(&sch->list);
 	skb_queue_head_init(&sch->q);
@@ -470,8 +475,8 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 
 err_out:
 	*errp = err;
-	if (sch)
-		kfree(sch);
+	if (p)
+		kfree(p);
 	return NULL;
 }
 
