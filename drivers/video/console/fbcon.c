@@ -491,7 +491,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 	gen_set_disp(unit, info);
 	fb_display[unit].conp = vc;
 	fb_display[unit].fb_info = info;
-	/* clear out the cmap so we don't have dangling pointers */
+
 	fbcon_set_display(unit, init, !init);
 }
 
@@ -566,8 +566,6 @@ static int fbcon_changevar(int con)
 		       		vc->vc_font.width);
 			p->dispsw = &fbcon_dummy;
 		}
-		if (p->dispsw->set_font)
-			p->dispsw->set_font(p, vc->vc_font.width, vc->vc_font.height);
 		updatescrollmode(p, vc);
 
 		old_cols = vc->vc_cols;
@@ -664,7 +662,6 @@ static void fbcon_set_display(int con, int init, int logo)
 {
 	struct display *p = &fb_display[con];
 	struct fb_info *info = p->fb_info;
-	struct vc_data *default_mode = info->display_fg;
 	struct vc_data *vc = p->conp;
 	int nr_rows, nr_cols;
 	int old_rows, old_cols;
@@ -721,8 +718,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		       vc->vc_font.width);
 		p->dispsw = &fbcon_dummy;
 	}
-	if (p->dispsw->set_font)
-		p->dispsw->set_font(p, vc->vc_font.width, vc->vc_font.height);
 	updatescrollmode(p, vc);
 
 	old_cols = vc->vc_cols;
@@ -988,8 +983,7 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 
 static void fbcon_cursor(struct vc_data *vc, int mode)
 {
-	int unit = vc->vc_num;
-	struct display *p = &fb_display[unit];
+	struct display *p = &fb_display[vc->vc_num];
 	int y = vc->vc_y;
 
 	if (mode & CM_SOFTBACK) {

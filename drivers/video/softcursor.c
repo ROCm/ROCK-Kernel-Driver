@@ -1,5 +1,5 @@
 /*
- * linux/drivers/video/cfbcursor.c -- Generic software cursor for frame buffer devices
+ * linux/drivers/video/softcursor.c -- Generic software cursor for frame buffer devices
  *
  *  Created 14 Nov 2002 by James Simmons 
  *
@@ -17,7 +17,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-int cfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
+int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	int i, size = ((cursor->image.width + 7) / 8) * cursor->image.height;
 	struct fb_image image;
@@ -55,7 +55,7 @@ int cfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	return 0;
 }
 
-EXPORT_SYMBOL(cfb_cursor);
+EXPORT_SYMBOL(soft_cursor);
 
 MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
 MODULE_DESCRIPTION("Generic software cursor");

@@ -405,7 +405,7 @@ static struct fb_ops aty128fb_ops = {
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 #endif
-	.fb_cursor	= cfb_cursor,
+	.fb_cursor	= soft_cursor,
 };
 
 #ifdef CONFIG_PMAC_BACKLIGHT

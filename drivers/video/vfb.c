@@ -100,7 +100,7 @@ static struct fb_ops vfb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
-	.fb_cursor	= cfb_cursor,
+	.fb_cursor	= soft_cursor,
 	.fb_mmap	= vfb_mmap,
 };
 
