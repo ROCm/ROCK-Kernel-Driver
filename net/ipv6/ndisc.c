@@ -1292,12 +1292,6 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	int hlen;
 
 	dev = skb->dev;
-	rt = rt6_lookup(&skb->nh.ipv6h->saddr, NULL, dev->ifindex, 1);
-
-	if (rt == NULL)
-		return;
-
-	dst = (struct dst_entry*)rt;
 
 	if (ipv6_get_lladdr(dev, &saddr_buf)) {
  		ND_PRINTK1("redirect: no link_local addr for dev\n");
@@ -1306,7 +1300,12 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_REDIRECT, &saddr_buf, &skb->nh.ipv6h->saddr);
 
+	rt = rt6_lookup(&skb->nh.ipv6h->saddr, NULL, dev->ifindex, 1);
+	if (rt == NULL)
+		return;
+	dst = &rt->u.dst;
 	dst_clone(dst);
+
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err) {
 		dst_release(dst);
