@@ -47,8 +47,10 @@
 /*
 ** This option allows cards capable of 64bit DMA to bypass the IOMMU.  If
 ** not defined, all DMA will be 32bit and go through the TLB.
+** There's potentially a conflict in the bio merge code with us
+** advertising an iommu, but then bypassing it.  Disabled for now.
 */
-#define ALLOW_IOV_BYPASS
+#undef ALLOW_IOV_BYPASS
 
 /*
 ** If a device prefetches beyond the end of a valid pdir entry, it will cause
