@@ -771,7 +771,7 @@ inserted:
 				error = ext3_journal_get_write_access(handle,
 								      new_bh);
 				if (error)
-					goto cleanup;
+					goto cleanup_dquot;
 				lock_buffer(new_bh);
 				BHDR(new_bh)->h_refcount = cpu_to_le32(1 +
 					le32_to_cpu(BHDR(new_bh)->h_refcount));
@@ -781,7 +781,7 @@ inserted:
 				error = ext3_journal_dirty_metadata(handle,
 								    new_bh);
 				if (error)
-					goto cleanup;
+					goto cleanup_dquot;
 			}
 			mb_cache_entry_release(ce);
 			ce = NULL;
@@ -840,6 +840,10 @@ cleanup:
 		kfree(s->base);
 
 	return error;
+
+cleanup_dquot:
+	DQUOT_FREE_BLOCK(inode, 1);
+	goto cleanup;
 
 bad_block:
 	ext3_error(inode->i_sb, __FUNCTION__,
