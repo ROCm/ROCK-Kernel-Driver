@@ -150,7 +150,7 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
     else
 	tooff = from->start-to->start;
     size = to->len-tooff;
-    if (size > from->len-fromoff)
+    if (size > (int) (from->len - fromoff))
 	size = from->len-fromoff;
     if (size <= 0)
 	return;

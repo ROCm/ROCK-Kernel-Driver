@@ -4,6 +4,7 @@
 #include <linux/config.h>
 
 #ifdef __KERNEL__
+#include <linux/mm.h>		/* for struct page */
 
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes

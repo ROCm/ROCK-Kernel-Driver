@@ -31,7 +31,7 @@ spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
  * @dev:	device 
  * @drv:	driver
  *
- * We're here because the bus's bind callback returned success for this 
+ * We're here because the bus's match callback returned success for this 
  * pair. We call the driver's probe callback to verify they're really a
  * match made in heaven.
  *
@@ -67,60 +67,74 @@ static int found_match(struct device * dev, struct device_driver * drv)
 }
 
 /**
- * bind_device - try to associated device with a driver
+ * device_attach - try to associated device with a driver
  * @drv:	current driver to try
  * @data:	device in disguise
  *
  * This function is used as a callback to bus_for_each_drv.
- * It calls the bus's ::bind callback to check if the driver supports
+ * It calls the bus's match callback to check if the driver supports
  * the device. If so, it calls the found_match() function above to 
  * take care of all the details.
  */
-static int do_device_bind(struct device_driver * drv, void * data)
+static int do_device_attach(struct device_driver * drv, void * data)
 {
 	struct device * dev = (struct device *)data;
 	int error = 0;
 
 	if (!dev->driver) {
-		if (drv->bus->bind && drv->bus->bind(dev,drv))
+		if (drv->bus->match && drv->bus->match(dev,drv))
 			error = found_match(dev,drv);
 	}
 	return error;
 }
 
-static int device_bind(struct device * dev)
+static int device_attach(struct device * dev)
 {
 	int error = 0;
 	if (dev->bus)
-		error = bus_for_each_drv(dev->bus,dev,do_device_bind);
+		error = bus_for_each_drv(dev->bus,dev,do_device_attach);
 	return error;
 }
 
-static void device_unbind(struct device * dev)
+static void device_detach(struct device * dev)
 {
-	/* unbind from driver */
-	if (dev->driver && dev->driver->remove)
-		dev->driver->remove(dev);
+	struct device_driver * drv; 
+
+	if (dev->driver) {
+		lock_device(dev);
+		drv = dev->driver;
+		dev->driver = NULL;
+		unlock_device(dev);
+
+		write_lock(&drv->lock);
+		list_del_init(&dev->driver_list);
+		write_unlock(&drv->lock);
+
+		/* detach from driver */
+		if (drv->remove)
+			drv->remove(dev);
+		put_driver(drv);
+	}
 }
 
-static int do_driver_bind(struct device * dev, void * data)
+static int do_driver_attach(struct device * dev, void * data)
 {
 	struct device_driver * drv = (struct device_driver *)data;
 	int error = 0;
 
 	if (!dev->driver) {
-		if (dev->bus->bind && dev->bus->bind(dev,drv))
+		if (dev->bus->match && dev->bus->match(dev,drv))
 			error = found_match(dev,drv);
 	}
 	return error;
 }
 
-int driver_bind(struct device_driver * drv)
+int driver_attach(struct device_driver * drv)
 {
-	return bus_for_each_dev(drv->bus,drv,do_driver_bind);
+	return bus_for_each_dev(drv->bus,drv,do_driver_attach);
 }
 
-static int do_driver_unbind(struct device * dev, struct device_driver * drv)
+static int do_driver_detach(struct device * dev, struct device_driver * drv)
 {
 	lock_device(dev);
 	if (dev->driver == drv) {
@@ -133,31 +147,32 @@ static int do_driver_unbind(struct device * dev, struct device_driver * drv)
 	return 0;
 }
 
-void driver_unbind(struct device_driver * drv)
+void driver_detach(struct device_driver * drv)
 {
 	struct device * next;
 	struct device * dev = NULL;
 	struct list_head * node;
 	int error = 0;
 
-	read_lock(&drv->lock);
+	write_lock(&drv->lock);
 	node = drv->devices.next;
 	while (node != &drv->devices) {
 		next = list_entry(node,struct device,driver_list);
 		get_device(next);
-		read_unlock(&drv->lock);
+		list_del_init(&next->driver_list);
+		write_unlock(&drv->lock);
 
 		if (dev)
 			put_device(dev);
 		dev = next;
-		if ((error = do_driver_unbind(dev,drv))) {
+		if ((error = do_driver_detach(dev,drv))) {
 			put_device(dev);
 			break;
 		}
-		read_lock(&drv->lock);
-		node = dev->driver_list.next;
+		write_lock(&drv->lock);
+		node = drv->devices.next;
 	}
-	read_unlock(&drv->lock);
+	write_unlock(&drv->lock);
 	if (dev)
 		put_device(dev);
 }
@@ -181,13 +196,13 @@ int device_register(struct device *dev)
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
-	spin_lock(&device_lock);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->g_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
+	spin_lock(&device_lock);
 	if (dev != &device_root) {
 		if (!dev->parent)
 			dev->parent = &device_root;
@@ -212,7 +227,7 @@ int device_register(struct device *dev)
 	bus_add_device(dev);
 
 	/* bind to driver */
-	device_bind(dev);
+	device_attach(dev);
 
 	/* notify platform of device entry */
 	if (platform_notify)
@@ -246,7 +261,7 @@ void put_device(struct device * dev)
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
 
-	device_unbind(dev);
+	device_detach(dev);
 	bus_remove_device(dev);
 
 	/* remove the driverfs directory */

@@ -7,13 +7,13 @@ mod-subdirs	:= matrox
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    := fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
-		  fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
-		  fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
-		  fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
-		  fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
-		  fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
-		  cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
+export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
+		   fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
+		   fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
+		   fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
+		   fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
+		   fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
+		   cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
 
 # Each configuration option enables a list of files.
 
@@ -43,18 +43,18 @@ obj-$(CONFIG_FB_ACORN)            += acornfb.o
 obj-$(CONFIG_FB_AMIGA)            += amifb.o
 obj-$(CONFIG_FB_PM2)              += pm2fb.o
 obj-$(CONFIG_FB_PM3)		  += pm3fb.o
-obj-$(CONFIG_FB_APOLLO)           += dnfb.o
+obj-$(CONFIG_FB_APOLLO)           += dnfb.o cfbfillrect.o cfbimgblt.o
 obj-$(CONFIG_FB_Q40)              += q40fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
 obj-$(CONFIG_FB_ATY128)           += aty128fb.o
 obj-$(CONFIG_FB_RADEON)		  += radeonfb.o
-obj-$(CONFIG_FB_NEOMAGIC)         += neofb.o
+obj-$(CONFIG_FB_NEOMAGIC)         += neofb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_IGA)              += igafb.o
 obj-$(CONFIG_FB_CONTROL)          += controlfb.o
 obj-$(CONFIG_FB_PLATINUM)         += platinumfb.o
 obj-$(CONFIG_FB_VALKYRIE)         += valkyriefb.o
 obj-$(CONFIG_FB_CT65550)          += chipsfb.o
-obj-$(CONFIG_FB_ANAKIN)           += anakinfb.o
+obj-$(CONFIG_FB_ANAKIN)           += anakinfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_CLPS711X)         += clps711xfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_CYBER)            += cyberfb.o
 obj-$(CONFIG_FB_CYBER2000)        += cyber2000fb.o
@@ -83,10 +83,10 @@ obj-$(CONFIG_FB_CGFOURTEEN)       += cgfourteenfb.o sbusfb.o
 obj-$(CONFIG_FB_P9100)            += p9100fb.o sbusfb.o
 obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
 obj-$(CONFIG_FB_STI)	          += stifb.o sticore.o
-obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o
-obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o
-obj-$(CONFIG_FB_MAXINE)           += maxinefb.o
-obj-$(CONFIG_FB_TX3912)           += tx3912fb.o
+obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_MAXINE)           += maxinefb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_TX3912)           += tx3912fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
 obj-$(CONFIG_FB_MATROX)		  += matrox/
 obj-$(CONFIG_FB_RIVA)		  += riva/

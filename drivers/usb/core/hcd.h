@@ -50,9 +50,9 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
 
-#ifdef	CONFIG_PCI
 	/* a few non-PCI controllers exist, mostly for OHCI */
 	struct pci_dev		*pdev;		/* pci is typical */
+#ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
 	u32			pci_state [16];	/* for PM state save */
 	atomic_t		resume_count;	/* multiple resumes issue */
@@ -161,6 +161,8 @@ struct hc_driver {
 };
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb);
+extern void usb_bus_init (struct usb_bus *bus);
+extern void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
 
 #ifdef CONFIG_PCI
 struct pci_dev;
@@ -178,6 +180,11 @@ extern int usb_hcd_pci_resume (struct pci_dev *dev);
 #endif /* CONFIG_PM */
 
 #endif /* CONFIG_PCI */
+
+/* generic bus glue, needed for host controllers that don't use PCI */
+extern struct usb_operations usb_hcd_operations;
+extern void usb_hcd_irq (int irq, void *__hcd, struct pt_regs *r);
+extern void usb_hc_died (struct usb_hcd *hcd);
 
 /* -------------------------------------------------------------------------- */
 

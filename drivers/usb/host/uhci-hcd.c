@@ -1502,10 +1502,6 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 		break;
 	case PIPE_ISOCHRONOUS:
 		if (urb->bandwidth == 0) {	/* not yet checked/allocated */
-			if (urb->number_of_packets <= 0) {
-				ret = -EINVAL;
-				break;
-			}
 			bustime = usb_check_bandwidth(urb->dev, urb);
 			if (bustime < 0) {
 				ret = bustime;
