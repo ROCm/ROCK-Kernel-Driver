@@ -1356,31 +1356,6 @@ static void cleanup_rbuf(struct sock *sk, int copied)
 		tcp_send_ack(sk);
 }
 
-/* Now socket state including sk->sk_err is changed only under lock,
- * hence we may omit checks after joining wait queue.
- * We check receive queue before schedule() only as optimization;
- * it is very likely that release_sock() added new data.
- */
-
-static long tcp_data_wait(struct sock *sk, long timeo)
-{
-	DEFINE_WAIT(wait);
-
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-
-	set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-	release_sock(sk);
-
-	if (skb_queue_empty(&sk->sk_receive_queue))
-		timeo = schedule_timeout(timeo);
-
-	lock_sock(sk);
-	clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-
-	finish_wait(sk->sk_sleep, &wait);
-	return timeo;
-}
-
 static void tcp_prequeue_process(struct sock *sk)
 {
 	struct sk_buff *skb;
@@ -1660,9 +1635,8 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			/* Do not sleep, just process backlog. */
 			release_sock(sk);
 			lock_sock(sk);
-		} else {
-			timeo = tcp_data_wait(sk, timeo);
-		}
+		} else
+			sk_wait_data(sk, &timeo);
 
 		if (user_recv) {
 			int chunk;

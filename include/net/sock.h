@@ -410,6 +410,20 @@ do {	if (!(__sk)->sk_backlog.tail) {				\
 	(__skb)->next = NULL;					\
 } while(0)
 
+#define sk_wait_event(__sk, __timeo, __condition)		\
+({	int rc;							\
+	release_sock(__sk);					\
+	rc = __condition;					\
+	if (!rc) {						\
+		*(__timeo) = schedule_timeout(*(__timeo));	\
+		rc = __condition;				\
+	}							\
+	lock_sock(__sk);					\
+	rc;							\
+})
+
+extern int sk_wait_data(struct sock *sk, long *timeo);
+
 /* IP protocol blocks we attach to sockets.
  * socket layer -> transport layer interface
  * transport -> network interface is defined by struct inet_proto
