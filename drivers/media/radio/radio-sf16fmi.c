@@ -36,7 +36,6 @@ struct fmi_device
 
 static int io = -1; 
 static int radio_nr = -1;
-static int users = 0;
 static struct pci_dev *dev = NULL;
 static struct semaphore lock;
 
@@ -133,121 +132,97 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	return (res & 2) ? 0 : 0xFFFF;
 }
 
-static int fmi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int fmi_ioctl(struct inode *inode, struct file *file,
+		     unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct fmi_device *fmi=dev->priv;
 	
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			strcpy(v.name, "SF16-FMx radio");
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			strcpy(v->name, "SF16-FMx radio");
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
+			struct video_tuner *v = arg;
 			int mult;
 
-			if(copy_from_user(&v, arg,sizeof(v))!=0)
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */
+			if(v->tuner)	/* Only 1 tuner */
 				return -EINVAL;
-			strcpy(v.name, "FM");
+			strcpy(v->name, "FM");
 			mult = (fmi->flags & VIDEO_TUNER_LOW) ? 1 : 1000;
-			v.rangelow = RSF16_MINFREQ/mult;
-			v.rangehigh = RSF16_MAXFREQ/mult;
-			v.flags=fmi->flags;
-			v.mode=VIDEO_MODE_AUTO;
-			v.signal = fmi_getsigstr(fmi);
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->rangelow = RSF16_MINFREQ/mult;
+			v->rangehigh = RSF16_MAXFREQ/mult;
+			v->flags=fmi->flags;
+			v->mode=VIDEO_MODE_AUTO;
+			v->signal = fmi_getsigstr(fmi);
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
-			fmi->flags = v.flags & VIDEO_TUNER_LOW;
+			fmi->flags = v->flags & VIDEO_TUNER_LOW;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
 		{
-			unsigned long tmp = fmi->curfreq;
+			unsigned long *freq = arg;
+			*freq = fmi->curfreq;
 			if (!(fmi->flags & VIDEO_TUNER_LOW))
-				tmp /= 1000;
-			if(copy_to_user(arg, &tmp, sizeof(tmp)))
-				return -EFAULT;
+			    *freq /= 1000;
 			return 0;
 		}
 		case VIDIOCSFREQ:
 		{
-			unsigned long tmp;
-			if(copy_from_user(&tmp, arg, sizeof(tmp)))
-				return -EFAULT;
+			unsigned long *freq = arg;
 			if (!(fmi->flags & VIDEO_TUNER_LOW))
-				tmp *= 1000;
-			if ( tmp<RSF16_MINFREQ || tmp>RSF16_MAXFREQ )
-			  return -EINVAL;
+				*freq *= 1000;
+			if (*freq < RSF16_MINFREQ || *freq > RSF16_MAXFREQ )
+				return -EINVAL;
 			/*rounding in steps of 800 to match th freq
 			  that will be used */
-			fmi->curfreq = (tmp/800)*800; 
+			fmi->curfreq = (*freq/800)*800; 
 			fmi_setfreq(fmi);
 			return 0;
 		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			v.audio=0;
-			v.volume=0;
-			v.bass=0;
-			v.treble=0;
-			v.flags=( (!fmi->curvol)*VIDEO_AUDIO_MUTE | VIDEO_AUDIO_MUTABLE);
-			strcpy(v.name, "Radio");
-			v.mode=VIDEO_SOUND_STEREO;
-			v.balance=0;
-			v.step=0; /* No volume, just (un)mute */
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = arg;
+			memset(v,0,sizeof(*v));
+			v->flags=( (!fmi->curvol)*VIDEO_AUDIO_MUTE | VIDEO_AUDIO_MUTABLE);
+			strcpy(v->name, "Radio");
+			v->mode=VIDEO_SOUND_STEREO;
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.audio)
+			struct video_audio *v = arg;
+			if(v->audio)
 				return -EINVAL;
-			fmi->curvol= v.flags&VIDEO_AUDIO_MUTE ? 0 : 1;
+			fmi->curvol= v->flags&VIDEO_AUDIO_MUTE ? 0 : 1;
 			fmi->curvol ? 
-			  fmi_unmute(fmi->port) : fmi_mute(fmi->port);
+				fmi_unmute(fmi->port) : fmi_mute(fmi->port);
 			return 0;
 		}
 	        case VIDIOCGUNIT:
 		{
-               		struct video_unit v;
-			v.video=VIDEO_NO_UNIT;
-			v.vbi=VIDEO_NO_UNIT;
-			v.radio=dev->minor;
-			v.audio=0; /* How do we find out this??? */
-			v.teletext=VIDEO_NO_UNIT;
-			if(copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
+               		struct video_unit *v = arg;
+			v->video=VIDEO_NO_UNIT;
+			v->vbi=VIDEO_NO_UNIT;
+			v->radio=dev->minor;
+			v->audio=0; /* How do we find out this??? */
+			v->teletext=VIDEO_NO_UNIT;
 			return 0;			
 		}
 		default:
@@ -255,20 +230,15 @@ static int fmi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int fmi_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void fmi_close(struct video_device *dev)
-{
-	users--;
-}
-
 static struct fmi_device fmi_unit;
+
+static struct file_operations fmi_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device fmi_radio=
 {
@@ -276,9 +246,8 @@ static struct video_device fmi_radio=
 	name:		"SF16FMx radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,
-	open:		fmi_open,
-	close:		fmi_close,
-	ioctl:		fmi_ioctl,
+	fops:           &fmi_fops,
+	kernel_ioctl:   fmi_ioctl,
 };
 
 /* ladis: this is my card. does any other types exist? */
