@@ -308,7 +308,7 @@ static inline int __interval_to_skel(int interval)
 	return 7;				/* int128 for 128-255 ms (Max.) */
 }
 
-#define hcd_to_uhci(hcd_ptr) list_entry(hcd_ptr, struct uhci_hcd, hcd)
+#define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
 
 /*
  * This describes the full uhci information.
@@ -319,18 +319,13 @@ static inline int __interval_to_skel(int interval)
 struct uhci_hcd {
 	struct usb_hcd hcd;
 
-	struct pci_dev *dev;
-
 #ifdef CONFIG_PROC_FS
 	/* procfs */
-	int num;
 	struct proc_dir_entry *proc_entry;
 #endif
 
 	/* Grabbed from PCI */
-	int irq;
 	unsigned int io_addr;
-	unsigned int io_size;
 
 	struct pci_pool *qh_pool;
 	struct pci_pool *td_pool;
@@ -362,7 +357,6 @@ struct uhci_hcd {
 	spinlock_t complete_list_lock;
 	struct list_head complete_list;		/* P: uhci->complete_list_lock */
 
-	struct usb_device *rh_dev;		/* Root hub */
 	int rh_numports;
 
 	struct timer_list stall_timer;
