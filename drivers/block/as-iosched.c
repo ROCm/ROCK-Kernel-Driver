@@ -833,10 +833,11 @@ static void as_update_iohist(struct as_io_context *aic, struct request *rq)
 							+ 2*1024*64);
 
 		aic->seek_samples += 256;
-		aic->seek_total += 256*seek_dist;
+		aic->seek_total += (u64)256*seek_dist;
 		if (aic->seek_samples) {
-			aic->seek_mean = aic->seek_total + 128;
-			sector_div(aic->seek_mean, aic->seek_samples);
+			u64 total = aic->seek_total + (aic->seek_samples>>1);
+			do_div(total, aic->seek_samples);
+			aic->seek_mean = (sector_t)total;
 		}
 		aic->seek_samples = (aic->seek_samples>>1)
 					+ (aic->seek_samples>>2);
