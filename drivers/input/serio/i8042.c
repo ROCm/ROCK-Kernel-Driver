@@ -231,21 +231,29 @@ static int i8042_open(struct serio *port)
 	if (request_irq(values->irq, i8042_interrupt,
 			SA_SHIRQ, "i8042", i8042_request_irq_cookie)) {
 		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
-		values->exists = 0;
-		serio_unregister_port(port);
-		return -1;
+		goto irq_fail;
 	}
 
 	i8042_ctr |= values->irqen;
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
-		printk(KERN_ERR "i8042.c: Can't write CTR while opening %s.\n", values->name);
-		return -1;
+		printk(KERN_ERR "i8042.c: Can't write CTR while opening %s, unregistering the port\n", values->name);
+		goto ctr_fail;
 	}
 
 	i8042_interrupt(0, NULL, NULL);
 
 	return 0;
+
+ctr_fail:
+	i8042_ctr &= ~values->irqen;
+	free_irq(values->irq, i8042_request_irq_cookie);
+
+irq_fail:
+	values->exists = 0;
+	serio_unregister_port(port);
+
+	return -1;
 }
 
 /*
@@ -691,13 +699,13 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 		return -1; 
 	}
 
-	serio_register_port(port);
-
 	printk(KERN_INFO "serio: i8042 %s port at %#lx,%#lx irq %d\n",
 	       values->name,
 	       (unsigned long) I8042_DATA_REG,
 	       (unsigned long) I8042_COMMAND_REG,
 	       values->irq);
+
+	serio_register_port(port);
 
 	return 0;
 }
