@@ -220,6 +220,8 @@ static int __init cpufreq_p4_init(void)
 			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!driver)
 		return -ENOMEM;
+	memset(driver, 0, sizeof(struct cpufreq_driver) +
+			NR_CPUS * sizeof(struct cpufreq_policy));
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
@@ -240,8 +242,6 @@ static int __init cpufreq_p4_init(void)
 
 	driver->verify        = &cpufreq_p4_verify;
 	driver->setpolicy     = &cpufreq_p4_setpolicy;
-	driver->init = NULL;
-	driver->exit = NULL;
 	strncpy(driver->name, "p4-clockmod", CPUFREQ_NAME_LEN);
 
 	for (i=0;i<NR_CPUS;i++) {

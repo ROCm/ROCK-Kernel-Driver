@@ -172,6 +172,8 @@ static int __init powernow_k6_init(void)
 		release_region (POWERNOW_IOPORT, 16);
 		return -ENOMEM;
 	}
+	memset(driver, 0, sizeof(struct cpufreq_driver) +
+			NR_CPUS * sizeof(struct cpufreq_policy));
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
 	/* table init */
@@ -184,8 +186,6 @@ static int __init powernow_k6_init(void)
 
 	driver->verify        = &powernow_k6_verify;
 	driver->setpolicy     = &powernow_k6_setpolicy;
-	driver->init = NULL;
-	driver->exit = NULL;
 	strncpy(driver->name, "powernow-k6", CPUFREQ_NAME_LEN);
 
 	/* cpuinfo and default policy values */
