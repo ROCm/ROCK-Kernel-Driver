@@ -703,6 +703,7 @@ CONFIG_MINIX_FS=m
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_DEBUG is not set
+# CONFIG_NTFS_RW is not set
 CONFIG_HPFS_FS=m
 CONFIG_PROC_FS=y
 # CONFIG_DEVFS_FS is not set
