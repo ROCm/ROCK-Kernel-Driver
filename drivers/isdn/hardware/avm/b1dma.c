@@ -64,7 +64,7 @@ static void b1dma_dispatch_tx(avmcard *card);
 #	define AVM_FLAG			0x30000000L
 
 #	define ANY_S5933_INT		0x00800000L
-#	define	READ_TC_INT		0x00080000L
+#	define READ_TC_INT		0x00080000L
 #	define WRITE_TC_INT		0x00040000L
 #	define	TX_TC_INT		READ_TC_INT
 #	define	RX_TC_INT		WRITE_TC_INT
@@ -83,12 +83,15 @@ static void b1dma_dispatch_tx(avmcard *card);
 
 /* ------------------------------------------------------------- */
 
-#define b1dmaoutmeml(addr, value)	writel(value, addr)
-#define b1dmainmeml(addr)	readl(addr)
-#define b1dmaoutmemw(addr, value)	writew(value, addr)
-#define b1dmainmemw(addr)	readw(addr)
-#define b1dmaoutmemb(addr, value)	writeb(value, addr)
-#define b1dmainmemb(addr)	readb(addr)
+static inline void b1dma_writel(avmcard *card, u32 value, int off)
+{
+	writel(value, card->mbase + off);
+}
+
+static inline u32 b1dma_readl(avmcard *card, int off)
+{
+	return readl(card->mbase + off);
+}
 
 /* ------------------------------------------------------------- */
 
@@ -215,19 +218,19 @@ static inline u32 _get_slice(void **pp, unsigned char *dp)
 void b1dma_reset(avmcard *card)
 {
 	card->csr = 0x0;
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
-	b1dmaoutmeml(card->mbase+AMCC_RXLEN, 0);
-	b1dmaoutmeml(card->mbase+AMCC_TXLEN, 0);
+	b1dma_writel(card, card->csr, AMCC_INTCSR);
+	b1dma_writel(card, 0, AMCC_MCSR);
+	b1dma_writel(card, 0, AMCC_RXLEN);
+	b1dma_writel(card, 0, AMCC_TXLEN);
 
 	t1outp(card->port, 0x10, 0x00);
 	t1outp(card->port, 0x07, 0x00);
 
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
+	b1dma_writel(card, 0, AMCC_MCSR);
 	mdelay(10);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0x0f000000); /* reset all */
+	b1dma_writel(card, 0x0f000000, AMCC_MCSR); /* reset all */
 	mdelay(10);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
+	b1dma_writel(card, 0, AMCC_MCSR);
 	if (card->cardtype == avm_t1pci)
 		mdelay(42);
 	else
@@ -238,31 +241,31 @@ void b1dma_reset(avmcard *card)
 
 int b1dma_detect(avmcard *card)
 {
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
+	b1dma_writel(card, 0, AMCC_MCSR);
 	mdelay(10);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0x0f000000); /* reset all */
+	b1dma_writel(card, 0x0f000000, AMCC_MCSR); /* reset all */
 	mdelay(10);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
+	b1dma_writel(card, 0, AMCC_MCSR);
 	mdelay(42);
 
-	b1dmaoutmeml(card->mbase+AMCC_RXLEN, 0);
-	b1dmaoutmeml(card->mbase+AMCC_TXLEN, 0);
+	b1dma_writel(card, 0, AMCC_RXLEN);
+	b1dma_writel(card, 0, AMCC_TXLEN);
 	card->csr = 0x0;
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+	b1dma_writel(card, card->csr, AMCC_INTCSR);
 
-	if (b1dmainmeml(card->mbase+AMCC_MCSR) != 0x000000E6)
+	if (b1dma_readl(card, AMCC_MCSR) != 0x000000E6)
 		return 1;
 
-	b1dmaoutmeml(card->mbase+AMCC_RXPTR, 0xffffffff);
-	b1dmaoutmeml(card->mbase+AMCC_TXPTR, 0xffffffff);
-	if (   b1dmainmeml(card->mbase+AMCC_RXPTR) != 0xfffffffc
-	    || b1dmainmeml(card->mbase+AMCC_TXPTR) != 0xfffffffc)
+	b1dma_writel(card, 0xffffffff, AMCC_RXPTR);
+	b1dma_writel(card, 0xffffffff, AMCC_TXPTR);
+	if (   b1dma_readl(card, AMCC_RXPTR) != 0xfffffffc
+	    || b1dma_readl(card, AMCC_TXPTR) != 0xfffffffc)
 		return 2;
 
-	b1dmaoutmeml(card->mbase+AMCC_RXPTR, 0x0);
-	b1dmaoutmeml(card->mbase+AMCC_TXPTR, 0x0);
-	if (   b1dmainmeml(card->mbase+AMCC_RXPTR) != 0x0
-	    || b1dmainmeml(card->mbase+AMCC_TXPTR) != 0x0)
+	b1dma_writel(card, 0x0, AMCC_RXPTR);
+	b1dma_writel(card, 0x0, AMCC_TXPTR);
+	if (   b1dma_readl(card, AMCC_RXPTR) != 0x0
+	    || b1dma_readl(card, AMCC_TXPTR) != 0x0)
 		return 3;
 
 	t1outp(card->port, 0x10, 0x00);
@@ -354,7 +357,7 @@ static void b1dma_queue_tx(avmcard *card, struct sk_buff *skb)
 
 	if (!(card->csr & EN_TX_TC_INT)) {
 		b1dma_dispatch_tx(card);
-		b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+		b1dma_writel(card, card->csr, AMCC_INTCSR);
 	}
 
 	spin_unlock_irqrestore(&card->lock, flags);
@@ -412,8 +415,8 @@ static void b1dma_dispatch_tx(avmcard *card)
 	}
 	txlen = (txlen + 3) & ~3;
 
-	b1dmaoutmeml(card->mbase+AMCC_TXPTR, dma->sendbuf.dmaaddr);
-	b1dmaoutmeml(card->mbase+AMCC_TXLEN, txlen);
+	b1dma_writel(card, dma->sendbuf.dmaaddr, AMCC_TXPTR);
+	b1dma_writel(card, txlen, AMCC_TXLEN);
 
 	card->csr |= EN_TX_TC_INT;
 
@@ -574,7 +577,7 @@ static void b1dma_handle_rx(avmcard *card)
 
 static void b1dma_handle_interrupt(avmcard *card)
 {
-	u32 status = b1dmainmeml(card->mbase+AMCC_INTCSR);
+	u32 status = b1dma_readl(card, AMCC_INTCSR);
 	u32 newcsr;
 
 	if ((status & ANY_S5933_INT) == 0) 
@@ -583,7 +586,7 @@ static void b1dma_handle_interrupt(avmcard *card)
         newcsr = card->csr | (status & ALL_INT);
 	if (status & TX_TC_INT) newcsr &= ~EN_TX_TC_INT;
 	if (status & RX_TC_INT) newcsr &= ~EN_RX_TC_INT;
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, newcsr);
+	b1dma_writel(card, newcsr, AMCC_INTCSR);
 
 	if ((status & RX_TC_INT) != 0) {
 		struct avmcard_dmainfo *dma = card->dma;
@@ -591,15 +594,13 @@ static void b1dma_handle_interrupt(avmcard *card)
 	   	if (card->dma->recvlen == 0) {
 			dma->recvlen = *((u32 *)dma->recvbuf.dmabuf);
 			rxlen = (dma->recvlen + 3) & ~3;
-			b1dmaoutmeml(card->mbase+AMCC_RXPTR,
-					dma->recvbuf.dmaaddr+4);
-			b1dmaoutmeml(card->mbase+AMCC_RXLEN, rxlen);
+			b1dma_writel(card, dma->recvbuf.dmaaddr+4, AMCC_RXPTR);
+			b1dma_writel(card, rxlen, AMCC_RXLEN);
 		} else {
 			b1dma_handle_rx(card);
 	   		dma->recvlen = 0;
-			b1dmaoutmeml(card->mbase+AMCC_RXPTR,
-					dma->recvbuf.dmaaddr);
-			b1dmaoutmeml(card->mbase+AMCC_RXLEN, 4);
+			b1dma_writel(card, dma->recvbuf.dmaaddr, AMCC_RXPTR);
+			b1dma_writel(card, 4, AMCC_RXLEN);
 		}
 	}
 
@@ -611,7 +612,7 @@ static void b1dma_handle_interrupt(avmcard *card)
 		else
 			b1dma_dispatch_tx(card);
 	}
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+	b1dma_writel(card, card->csr, AMCC_INTCSR);
 
 	spin_unlock(&card->lock);
 }
@@ -726,19 +727,18 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	}
 
 	card->csr = AVM_FLAG;
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
-	b1dmaoutmeml(card->mbase+AMCC_MCSR,
-		EN_A2P_TRANSFERS|EN_P2A_TRANSFERS
-		|A2P_HI_PRIORITY|P2A_HI_PRIORITY
-		|RESET_A2P_FLAGS|RESET_P2A_FLAGS);
+	b1dma_writel(card, card->csr, AMCC_INTCSR);
+	b1dma_writel(card, EN_A2P_TRANSFERS|EN_P2A_TRANSFERS|A2P_HI_PRIORITY|
+		     P2A_HI_PRIORITY|RESET_A2P_FLAGS|RESET_P2A_FLAGS, 
+		     AMCC_MCSR);
 	t1outp(card->port, 0x07, 0x30);
 	t1outp(card->port, 0x10, 0xF0);
 
 	card->dma->recvlen = 0;
-	b1dmaoutmeml(card->mbase+AMCC_RXPTR, card->dma->recvbuf.dmaaddr);
-	b1dmaoutmeml(card->mbase+AMCC_RXLEN, 4);
+	b1dma_writel(card, card->dma->recvbuf.dmaaddr, AMCC_RXPTR);
+	b1dma_writel(card, 4, AMCC_RXLEN);
 	card->csr |= EN_RX_TC_INT;
-	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
+	b1dma_writel(card, card->csr, AMCC_INTCSR);
 
         b1dma_send_init(card);
 
@@ -896,13 +896,13 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page+len, "%-16s %s\n", "cardname", cinfo->cardname);
 
-	txoff = (dma_addr_t)b1dmainmeml(card->mbase+0x2c)-card->dma->sendbuf.dmaaddr;
-	txlen = b1dmainmeml(card->mbase+0x30);
+	txoff = (dma_addr_t)b1dma_readl(card, AMCC_TXPTR)-card->dma->sendbuf.dmaaddr;
+	txlen = b1dma_readl(card, AMCC_TXLEN);
 
-	rxoff = (dma_addr_t)b1dmainmeml(card->mbase+0x24)-card->dma->recvbuf.dmaaddr;
-	rxlen = b1dmainmeml(card->mbase+0x28);
+	rxoff = (dma_addr_t)b1dma_readl(card, AMCC_RXPTR)-card->dma->recvbuf.dmaaddr;
+	rxlen = b1dma_readl(card, AMCC_RXLEN);
 
-	csr  = b1dmainmeml(card->mbase+AMCC_INTCSR);
+	csr  = b1dma_readl(card, AMCC_INTCSR);
 
         len += sprintf(page+len, "%-16s 0x%lx\n",
 				"csr (cached)", (unsigned long)card->csr);
