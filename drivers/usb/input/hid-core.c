@@ -1781,7 +1781,7 @@ MODULE_DEVICE_TABLE (usb, hid_usb_ids);
 
 static struct usb_driver hid_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"hid",
+	.name =		"usbhid",
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,
 	.id_table =	hid_usb_ids,
