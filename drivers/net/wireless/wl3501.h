@@ -194,12 +194,12 @@ enum wl3501_status {
 #define WL3501_MGMT_CAPABILITY_CF_POLL_REQUEST	0x0008  /*      - " -	   */
 #define WL3501_MGMT_CAPABILITY_PRIVACY		0x0010  /*      - " -	   */
 
-#define WL3501_FREQ_DOMAIN_FCC    0x10	/* Channel 1 to 11 */
-#define WL3501_FREQ_DOMAIN_IC     0x20	/* Channel 1 to 11 */
-#define WL3501_FREQ_DOMAIN_ETSI   0x30	/* Channel 1 to 13 */
-#define WL3501_FREQ_DOMAIN_SPAIN  0x31	/* Channel 10 to 11 */
-#define WL3501_FREQ_DOMAIN_FRANCE 0x32	/* Channel 10 to 13 */
-#define WL3501_FREQ_DOMAIN_MKK    0x40	/* Channel 14 */
+#define WL3501_REG_DOMAIN_FCC    0x10	/* Channel 1 to 11 */
+#define WL3501_REG_DOMAIN_IC     0x20	/* Channel 1 to 11 */
+#define WL3501_REG_DOMAIN_ETSI   0x30	/* Channel 1 to 13 */
+#define WL3501_REG_DOMAIN_SPAIN  0x31	/* Channel 10 to 11 */
+#define WL3501_REG_DOMAIN_FRANCE 0x32	/* Channel 10 to 13 */
+#define WL3501_REG_DOMAIN_MKK    0x40	/* Channel 14 */
 
 #define WL3501_ESSID_MAX_LEN (IW_ESSID_MAX_SIZE + 2)
 
@@ -528,7 +528,7 @@ struct wl3501_card {
 	u16				join_sta_bss;
 	unsigned char			rssi;
 	u8				adhoc_times;
-	u8				freq_domain;
+	u8				reg_domain;
 	u8				version[2];
 	struct wl3501_scan_confirm	bss_set[20];
 	struct net_device_stats 	stats;

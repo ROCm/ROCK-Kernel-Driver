@@ -175,7 +175,7 @@ static int wl3501_get_flash_mac_addr(struct wl3501_card *this)
 	WL3501_NOPLOOP(100);
 	this->mac_addr[5] = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
-	this->freq_domain = inb(base_addr + WL3501_NIC_IODPA);
+	this->reg_domain = inb(base_addr + WL3501_NIC_IODPA);
 	WL3501_NOPLOOP(100);
 	wl3501_outb(WL3501_BSS_FPAGE0, base_addr + WL3501_NIC_BSS);
 	wl3501_outb(0x04, base_addr + WL3501_NIC_LMAL);
@@ -2093,17 +2093,17 @@ static void wl3501_config(dev_link_t *link)
 	spin_lock_init(&this->lock);
 	init_waitqueue_head(&this->wait);
 
-	switch (this->freq_domain) {
-	case 0x31:
-	case 0x32:
+	switch (this->reg_domain) {
+	case WL3501_REG_DOMAIN_SPAIN:
+	case WL3501_REG_DOMAIN_FRANCE:
 		this->def_chan = 10;
 		break;
-	case 0x40:
+	case WL3501_REG_DOMAIN_MKK:
 		this->def_chan = 14;
 		break;
-	case 0x10:
-	case 0x20:
-	case 0x30:
+	case WL3501_REG_DOMAIN_FCC:
+	case WL3501_REG_DOMAIN_IC:
+	case WL3501_REG_DOMAIN_ETSI:
 	default:
 		this->def_chan = 1;
 		break;
