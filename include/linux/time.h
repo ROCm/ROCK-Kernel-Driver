@@ -194,6 +194,18 @@ static inline unsigned int jiffies_to_msecs(const unsigned long j)
 	return (j * 1000) / HZ;
 #endif
 }
+
+static inline unsigned int jiffies_to_usecs(const unsigned long j)
+{
+#if HZ <= 1000 && !(1000 % HZ)
+	return (1000000 / HZ) * j;
+#elif HZ > 1000 && !(HZ % 1000)
+	return (j*1000 + (HZ - 1000))/(HZ / 1000);
+#else
+	return (j * 1000000) / HZ;
+#endif
+}
+
 static inline unsigned long msecs_to_jiffies(const unsigned int m)
 {
 #if HZ <= 1000 && !(1000 % HZ)

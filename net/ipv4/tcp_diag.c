@@ -41,12 +41,6 @@ static struct sock *tcpnl;
    rta->rta_len = rtalen;                   \
    RTA_DATA(rta); })
 
-static inline unsigned int jiffies_to_usecs(const unsigned long j)
-{
-	return 1000*jiffies_to_msecs(j);
-}
-
-
 /* Return information about state of tcp endpoint in API format. */
 void tcp_get_info(struct sock *sk, struct tcp_info *info)
 {
