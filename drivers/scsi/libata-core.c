@@ -2386,6 +2386,41 @@ static inline unsigned int ata_host_intr (struct ata_port *ap,
 }
 
 /**
+ *	ata_chk_spurious_int - Check for spurious interrupts
+ *	@ap: port to which command is being issued
+ *
+ *	Examines the DMA status registers and clears
+ *      unexpected interrupts.  Created to work around
+ *	hardware bug on Intel ICH5, but is applied to all
+ *	chipsets using the standard irq handler, just for safety.
+ *	If the bug is not present, this is simply a single
+ *	PIO or MMIO read addition to the irq handler.
+ *
+ *	LOCKING:
+ */
+static inline void ata_chk_spurious_int(struct ata_port *ap) {
+	int host_stat;
+	
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+		host_stat = readb(mmio + ATA_DMA_STATUS);
+	} else
+		host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
+	
+	if ((host_stat & (ATA_DMA_INTR | ATA_DMA_ERR | ATA_DMA_ACTIVE)) == ATA_DMA_INTR) {
+		if (ap->flags & ATA_FLAG_MMIO) {
+			void *mmio = (void *) ap->ioaddr.bmdma_addr;
+			writeb(host_stat & ~ATA_DMA_ERR, mmio + ATA_DMA_STATUS);
+		} else
+			outb(host_stat & ~ATA_DMA_ERR, ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
+		
+		DPRINTK("ata%u: Caught spurious interrupt, status 0x%X\n", ap->id, host_stat);
+		udelay(1);
+	}
+}
+
+
+/**
  *	ata_interrupt -
  *	@irq:
  *	@dev_instance:
@@ -2417,6 +2452,7 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 			qc = ata_qc_from_tag(ap, ap->active_tag);
 			if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
 				handled += ata_host_intr(ap, qc);
+			ata_chk_spurious_int(ap);
 		}
 	}
 
