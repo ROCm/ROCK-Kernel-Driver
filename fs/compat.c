@@ -974,3 +974,234 @@ out:
 	fput(file);
 	return ret;
 }
+
+/*
+ * compat_count() counts the number of arguments/envelopes. It is basically
+ * a copy of count() from fs/exec.c, except that it works with 32 bit argv
+ * and envp pointers.
+ */
+static int compat_count(compat_uptr_t *argv, int max)
+{
+	int i = 0;
+
+	if (argv != NULL) {
+		for (;;) {
+			compat_uptr_t p;
+
+			if (get_user(p, argv))
+				return -EFAULT;
+			if (!p)
+				break;
+			argv++;
+			if(++i > max)
+				return -E2BIG;
+		}
+	}
+	return i;
+}
+
+/*
+ * compat_copy_strings() is basically a copy of copy_strings() from fs/exec.c
+ * except that it works with 32 bit argv and envp pointers.
+ */
+static int compat_copy_strings(int argc, compat_uptr_t __user *argv,
+				struct linux_binprm *bprm)
+{
+	struct page *kmapped_page = NULL;
+	char *kaddr = NULL;
+	int ret;
+
+	while (argc-- > 0) {
+		compat_uptr_t str;
+		int len;
+		unsigned long pos;
+
+		if (get_user(str, argv+argc) ||
+			!(len = strnlen_user(compat_ptr(str), bprm->p))) {
+			ret = -EFAULT;
+			goto out;
+		}
+
+		if (bprm->p < len)  {
+			ret = -E2BIG;
+			goto out;
+		}
+
+		bprm->p -= len;
+		/* XXX: add architecture specific overflow check here. */
+		pos = bprm->p;
+
+		while (len > 0) {
+			int i, new, err;
+			int offset, bytes_to_copy;
+			struct page *page;
+
+			offset = pos % PAGE_SIZE;
+			i = pos/PAGE_SIZE;
+			page = bprm->page[i];
+			new = 0;
+			if (!page) {
+				page = alloc_page(GFP_HIGHUSER);
+				bprm->page[i] = page;
+				if (!page) {
+					ret = -ENOMEM;
+					goto out;
+				}
+				new = 1;
+			}
+
+			if (page != kmapped_page) {
+				if (kmapped_page)
+					kunmap(kmapped_page);
+				kmapped_page = page;
+				kaddr = kmap(kmapped_page);
+			}
+			if (new && offset)
+				memset(kaddr, 0, offset);
+			bytes_to_copy = PAGE_SIZE - offset;
+			if (bytes_to_copy > len) {
+				bytes_to_copy = len;
+				if (new)
+					memset(kaddr+offset+len, 0,
+						PAGE_SIZE-offset-len);
+			}
+			err = copy_from_user(kaddr+offset, compat_ptr(str),
+						bytes_to_copy);
+			if (err) {
+				ret = -EFAULT;
+				goto out;
+			}
+
+			pos += bytes_to_copy;
+			str += bytes_to_copy;
+			len -= bytes_to_copy;
+		}
+	}
+	ret = 0;
+out:
+	if (kmapped_page)
+		kunmap(kmapped_page);
+	return ret;
+}
+
+#ifdef CONFIG_MMU
+
+#define free_arg_pages(bprm) do { } while (0)
+
+#else
+
+static inline void free_arg_pages(struct linux_binprm *bprm)
+{
+	int i;
+
+	for (i = 0; i < MAX_ARG_PAGES; i++) {
+		if (bprm->page[i])
+			__free_page(bprm->page[i]);
+		bprm->page[i] = NULL;
+	}
+}
+
+#endif /* CONFIG_MMU */
+
+/*
+ * compat_do_execve() is mostly a copy of do_execve(), with the exception
+ * that it processes 32 bit argv and envp pointers.
+ */
+int compat_do_execve(char * filename,
+	compat_uptr_t __user *argv,
+	compat_uptr_t __user *envp,
+	struct pt_regs * regs)
+{
+	struct linux_binprm bprm;
+	struct file *file;
+	int retval;
+	int i;
+
+	sched_balance_exec();
+
+	file = open_exec(filename);
+
+	retval = PTR_ERR(file);
+	if (IS_ERR(file))
+		return retval;
+
+	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
+
+	bprm.file = file;
+	bprm.filename = filename;
+	bprm.interp = filename;
+	bprm.sh_bang = 0;
+	bprm.loader = 0;
+	bprm.exec = 0;
+	bprm.security = NULL;
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm)
+		goto out_file;
+
+	retval = init_new_context(current, bprm.mm);
+	if (retval < 0)
+		goto out_mm;
+
+	bprm.argc = compat_count(argv, bprm.p / sizeof(compat_uptr_t));
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = compat_count(envp, bprm.p / sizeof(compat_uptr_t));
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
+
+	retval = security_bprm_alloc(&bprm);
+	if (retval)
+		goto out;
+
+	retval = prepare_binprm(&bprm);
+	if (retval < 0)
+		goto out;
+
+	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
+	if (retval < 0)
+		goto out;
+
+	bprm.exec = bprm.p;
+	retval = compat_copy_strings(bprm.envc, envp, &bprm);
+	if (retval < 0)
+		goto out;
+
+	retval = compat_copy_strings(bprm.argc, argv, &bprm);
+	if (retval < 0)
+		goto out;
+
+	retval = search_binary_handler(&bprm,regs);
+	if (retval >= 0) {
+		free_arg_pages(&bprm);
+
+		/* execve success */
+		security_bprm_free(&bprm);
+		return retval;
+	}
+
+out:
+	/* Something went wrong, return the inode and free the argument pages*/
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
+
+	if (bprm.security)
+		security_bprm_free(&bprm);
+
+out_mm:
+	if (bprm.mm)
+		mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
+		fput(bprm.file);
+	}
+
+	return retval;
+}

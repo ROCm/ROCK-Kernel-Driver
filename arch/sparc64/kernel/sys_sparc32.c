@@ -1386,8 +1386,6 @@ sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
-extern void check_pending(int signum);
-
 asmlinkage int sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *oact)
 {
         struct k_sigaction new_ka, old_ka;
@@ -1483,193 +1481,6 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
         return ret;
 }
 
-
-/*
- * count32() counts the number of arguments/envelopes
- */
-static int count32(u32 * argv, int max)
-{
-	int i = 0;
-
-	if (argv != NULL) {
-		for (;;) {
-			u32 p; int error;
-
-			error = get_user(p,argv);
-			if (error)
-				return error;
-			if (!p)
-				break;
-			argv++;
-			if (++i > max)
-				return -E2BIG;
-		}
-	}
-	return i;
-}
-
-/*
- * 'copy_string32()' copies argument/envelope strings from user
- * memory to free pages in kernel mem. These are in a format ready
- * to be put directly into the top of new user memory.
- */
-static int copy_strings32(int argc, u32 * argv, struct linux_binprm *bprm)
-{
-	while (argc-- > 0) {
-		u32 str;
-		int len;
-		unsigned long pos;
-
-		if (get_user(str, argv + argc) ||
-		    !str ||
-		    !(len = strnlen_user((char *)A(str), bprm->p)))
-			return -EFAULT;
-
-		if (bprm->p < len)
-			return -E2BIG;
-
-		bprm->p -= len;
-
-		pos = bprm->p;
-		while (len) {
-			char *kaddr;
-			struct page *page;
-			int offset, bytes_to_copy, new, err;
-
-			offset = pos % PAGE_SIZE;
-			page = bprm->page[pos / PAGE_SIZE];
-			new = 0;
-			if (!page) {
-				page = alloc_page(GFP_USER);
-				bprm->page[pos / PAGE_SIZE] = page;
-				if (!page)
-					return -ENOMEM;
-				new = 1;
-			}
-			kaddr = kmap(page);
-
-			if (new && offset)
-				memset(kaddr, 0, offset);
-			bytes_to_copy = PAGE_SIZE - offset;
-			if (bytes_to_copy > len) {
-				bytes_to_copy = len;
-				if (new)
-					memset(kaddr+offset+len, 0,
-					       PAGE_SIZE-offset-len);
-			}
-
-			err = copy_from_user(kaddr + offset, (char *)A(str),
-					     bytes_to_copy);
-			kunmap(page);
-
-			if (err)
-				return -EFAULT;
-
-			pos += bytes_to_copy;
-			str += bytes_to_copy;
-			len -= bytes_to_copy;
-		}
-	}
-	return 0;
-}
-
-/*
- * sys32_execve() executes a new program.
- */
-static inline int 
-do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
-{
-	struct linux_binprm bprm;
-	struct file * file;
-	int retval;
-	int i;
-
-	sched_balance_exec();
-
-	file = open_exec(filename);
-
-	retval = PTR_ERR(file);
-	if (IS_ERR(file))
-		return retval;
-
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
-
-	bprm.file = file;
-	bprm.filename = filename;
-	bprm.interp = filename;
-	bprm.sh_bang = 0;
-	bprm.loader = 0;
-	bprm.exec = 0;
-	bprm.security = NULL;
-	bprm.mm = mm_alloc();
-	retval = -ENOMEM;
-	if (!bprm.mm) 
-		goto out_file;
-
-	retval = init_new_context(current, bprm.mm);
-	if (retval < 0)
-		goto out_mm;
-
-	bprm.argc = count32(argv, bprm.p / sizeof(u32));
-	if ((retval = bprm.argc) < 0)
-		goto out_mm;
-
-	bprm.envc = count32(envp, bprm.p / sizeof(u32));
-	if ((retval = bprm.envc) < 0)
-		goto out_mm;
-
-	retval = security_bprm_alloc(&bprm);
-	if (retval)
-		goto out;
-
-	retval = prepare_binprm(&bprm);
-	if (retval < 0)
-		goto out;
-	
-	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
-	if (retval < 0)
-		goto out;
-
-	bprm.exec = bprm.p;
-	retval = copy_strings32(bprm.envc, envp, &bprm);
-	if (retval < 0)
-		goto out;
-
-	retval = copy_strings32(bprm.argc, argv, &bprm);
-	if (retval < 0)
-		goto out;
-
-	retval = search_binary_handler(&bprm, regs);
-	if (retval >= 0) {
-		/* execve success */
-		security_bprm_free(&bprm);
-		return retval;
-	}
-
-out:
-	/* Something went wrong, return the inode and free the argument pages*/
-	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		struct page * page = bprm.page[i];
-		if (page)
-			__free_page(page);
-	}
-
-	if (bprm.security)
-		security_bprm_free(&bprm);
-
-out_mm:
-	if (bprm.mm)
-		mmdrop(bprm.mm);
-
-out_file:
-	if (bprm.file) {
-		allow_write_access(bprm.file);
-		fput(bprm.file);
-	}
-	return retval;
-}
-
 /*
  * sparc32_execve() executes a new program after the asm stub has set
  * things up for us.  This should basically do what I want it to.
@@ -1689,9 +1500,9 @@ asmlinkage int sparc32_execve(struct pt_regs *regs)
 	error = PTR_ERR(filename);
         if(IS_ERR(filename))
                 goto out;
-        error = do_execve32(filename,
-        	(u32 *)AA((u32)regs->u_regs[base + UREG_I1]),
-        	(u32 *)AA((u32)regs->u_regs[base + UREG_I2]), regs);
+        error = compat_do_execve(filename,
+        	compat_ptr((u32)regs->u_regs[base + UREG_I1]),
+        	compat_ptr((u32)regs->u_regs[base + UREG_I2]), regs);
         putname(filename);
 
 	if(!error) {

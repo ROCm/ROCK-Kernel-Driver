@@ -123,5 +123,8 @@ asmlinkage ssize_t compat_sys_readv(unsigned long fd,
 asmlinkage ssize_t compat_sys_writev(unsigned long fd,
 		const struct compat_iovec __user *vec, unsigned long vlen);
 
+int compat_do_execve(char * filename, compat_uptr_t __user *argv,
+	        compat_uptr_t __user *envp, struct pt_regs * regs);
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

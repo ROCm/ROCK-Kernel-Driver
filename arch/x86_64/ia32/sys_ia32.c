@@ -1225,93 +1225,22 @@ long sys32_ustat(unsigned dev, struct ustat32 __user *u32p)
 	return ret;
 } 
 
-static int nargs(u32 src, char **dst) 
-{ 
-	int cnt;
-	u32 val; 
+asmlinkage long sys32_execve(char *name, compat_uptr_t __user *argv,
+			     compat_uptr_t __user *envp, struct pt_regs regs)
+{
+	long error;
+	char * filename;
 
-	cnt = 0; 
-	do { 		
-		int ret = get_user(val, (__u32 *)(u64)src); 
-		if (ret)
-			return ret;
-		if (dst)
-			dst[cnt] = (char *)(u64)val; 
-		cnt++;
-		src += 4; 	
-		if (cnt >= (MAX_ARG_PAGES*PAGE_SIZE)/sizeof(void*))
-			return -E2BIG; 
-	} while(val); 
-	if (dst)
-		dst[cnt-1] = 0; 
-	return cnt; 
-} 
-
-asmlinkage long sys32_execve(char *name, u32 argv, u32 envp, struct pt_regs regs)
-{ 
-	mm_segment_t oldseg; 
-	char **buf = NULL; 
-	int na = 0,ne = 0;
-	int ret;
-	unsigned sz = 0; 
-
-	if (argv) {
-	na = nargs(argv, NULL); 
-	if (na < 0) 
-		return -EFAULT; 
-	} 	
-	if (envp) { 
-	ne = nargs(envp, NULL); 
-	if (ne < 0) 
-		return -EFAULT; 
-	}
-
-	if (argv || envp) { 
-	sz = (na+ne)*sizeof(void *); 
-	if (sz > PAGE_SIZE) 
-		buf = vmalloc(sz); 
-	else
-		buf = kmalloc(sz, GFP_KERNEL); 
-	if (!buf)
-		return -ENOMEM; 
-	} 
-	
-	if (argv) { 
-	ret = nargs(argv, buf);
-	if (ret < 0)
-		goto free;
-	}
-
-	if (envp) { 
-	ret = nargs(envp, buf + na); 
-	if (ret < 0)
-		goto free; 
-	}
-
-	name = getname(name); 
-	ret = PTR_ERR(name); 
-	if (IS_ERR(name))
-		goto free; 
-
-	oldseg = get_fs(); 
-	set_fs(KERNEL_DS);
-	ret = do_execve(name, argv ? buf : NULL, envp ? buf+na : NULL, &regs);  
-	set_fs(oldseg); 
-
-	if (ret == 0)
+	filename = getname(name);
+	error = PTR_ERR(filename);
+	if (IS_ERR(filename))
+		return error;
+	error = compat_do_execve(filename, argv, envp, &regs);
+	if (error == 0)
 		current->ptrace &= ~PT_DTRACE;
-
-	putname(name);
- 
-free:
-	if (argv || envp) { 
-	if (sz > PAGE_SIZE)
-		vfree(buf); 
-	else
-	kfree(buf);
-	}
-	return ret; 
-} 
+	putname(filename);
+	return error;
+}
 
 asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp, struct pt_regs regs)
 {
