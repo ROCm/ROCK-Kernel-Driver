@@ -2,7 +2,7 @@
  * Compaq Hot Plug Controller Driver
  *
  * Copyright (c) 1995,2001 Compaq Computer Corporation
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (c) 2001 IBM Corp.
  *
  * All rights reserved.
@@ -36,27 +36,20 @@
 #include "cpqphp.h"
 
 
+/* A few routines that create sysfs entries for the hot plug controller */
 
-static struct proc_dir_entry *ctrl_proc_root;
-
-/* A few routines that create proc entries for the hot plug controller */
-
-static int read_ctrl (char *buf, char **start, off_t offset, int len, int *eof, void *data)
+static int show_ctrl (struct device *dev, char *buf)
 {
-	struct controller *ctrl = (struct controller *)data;
+	struct pci_dev *pci_dev;
+	struct controller *ctrl;
 	char * out = buf;
 	int index;
 	struct pci_resource *res;
 
-	if (offset > 0)	return 0; /* no partial requests */
-	len  = 0;
-	*eof = 1;
+	pci_dev = container_of (dev, struct pci_dev, dev);
+	ctrl = pci_get_drvdata(pci_dev);
 
-	out += sprintf(out, "hot plug ctrl Info Page\n");
-	out += sprintf(out, "bus = %d, device = %d, function = %d\n",
-		       ctrl->bus, PCI_SLOT(ctrl->pci_dev->devfn),
-		       PCI_FUNC(ctrl->pci_dev->devfn));
-	out += sprintf(out, "Free resources: memory\n");
+	out += sprintf(buf, "Free resources: memory\n");
 	index = 11;
 	res = ctrl->mem_head;
 	while (res && index--) {
@@ -85,29 +78,22 @@ static int read_ctrl (char *buf, char **start, off_t offset, int len, int *eof, 
 		res = res->next;
 	}
 
-	*start = buf;
-	len = out-buf;
-
-	return len;
+	return out - buf;
 }
+static DEVICE_ATTR (ctrl, S_IRUGO, show_ctrl, NULL);
 
-static int read_dev (char *buf, char **start, off_t offset, int len, int *eof, void *data)
+static int show_dev (struct device *dev, char *buf)
 {
-	struct controller *ctrl = (struct controller *)data;
+	struct pci_dev *pci_dev;
+	struct controller *ctrl;
 	char * out = buf;
 	int index;
 	struct pci_resource *res;
 	struct pci_func *new_slot;
 	struct slot *slot;
 
-	if (offset > 0)	return 0; /* no partial requests */
-	len  = 0;
-	*eof = 1;
-
-	out += sprintf(out, "hot plug ctrl Info Page\n");
-	out += sprintf(out, "bus = %d, device = %d, function = %d\n",
-		       ctrl->bus, PCI_SLOT(ctrl->pci_dev->devfn),
-		       PCI_FUNC(ctrl->pci_dev->devfn));
+	pci_dev = container_of (dev, struct pci_dev, dev);
+	ctrl = pci_get_drvdata(pci_dev);
 
 	slot=ctrl->slot;
 
@@ -146,52 +132,12 @@ static int read_dev (char *buf, char **start, off_t offset, int len, int *eof, v
 		slot=slot->next;
 	}
 
-	*start = buf;
-	len = out-buf;
-
-	return len;
+	return out - buf;
 }
+static DEVICE_ATTR (dev, S_IRUGO, show_dev, NULL);
 
-int cpqhp_proc_create_ctrl (struct controller *ctrl)
+void cpqhp_create_ctrl_files (struct controller *ctrl)
 {
-	strcpy(ctrl->proc_name, "hpca");
-	ctrl->proc_name[3] = 'a' + ctrl->bus;
-
-	ctrl->proc_entry = create_proc_entry(ctrl->proc_name, S_IFREG | S_IRUGO, ctrl_proc_root);
-	ctrl->proc_entry->data = ctrl;
-	ctrl->proc_entry->read_proc = &read_ctrl;
-
-	strcpy(ctrl->proc_name2, "slot_a");
-	ctrl->proc_name2[5] = 'a' + ctrl->bus;
-	ctrl->proc_entry2 = create_proc_entry(ctrl->proc_name2, S_IFREG | S_IRUGO, ctrl_proc_root);
-	ctrl->proc_entry2->data = ctrl;
-	ctrl->proc_entry2->read_proc = &read_dev;
-
-	return 0;
+	device_create_file (&ctrl->pci_dev->dev, &dev_attr_ctrl);
+	device_create_file (&ctrl->pci_dev->dev, &dev_attr_dev);
 }
-
-int cpqhp_proc_remove_ctrl (struct controller *ctrl)
-{
-	if (ctrl->proc_entry)
-		remove_proc_entry(ctrl->proc_name, ctrl_proc_root);
-	if (ctrl->proc_entry2)
-		remove_proc_entry(ctrl->proc_name2, ctrl_proc_root);
-
-	return 0;
-}
-	
-int cpqhp_proc_init_ctrl (void)
-{
-	ctrl_proc_root = proc_mkdir("hpc", proc_root_driver);
-	if (!ctrl_proc_root)
-		return -ENOMEM;
-	ctrl_proc_root->owner = THIS_MODULE;
-	return 0;
-}
-
-int cpqhp_proc_destroy_ctrl (void)
-{
-	remove_proc_entry("hpc", proc_root_driver);
-	return 0;
-}
-
