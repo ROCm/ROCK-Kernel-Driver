@@ -1307,8 +1307,6 @@ isdn_status_callback(isdn_ctrl * c)
 			restore_flags(flags);
 			break;
 #endif
-		case ISDN_STAT_L1ERR:
-			break;
 		case CAPI_PUT_MESSAGE:
 			return(isdn_capi_rec_hl_msg(&c->parm.cmsg));
 #ifdef CONFIG_ISDN_TTY_FAX

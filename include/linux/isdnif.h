@@ -208,7 +208,6 @@ typedef struct
 #define ISDN_STAT_REDIR   272    /* Redir result                          */
 #define ISDN_STAT_PROT    273    /* protocol IO specific callback         */
 #define ISDN_STAT_DISPLAY 274    /* deliver a received display message    */
-#define ISDN_STAT_L1ERR   275    /* Signal Layer-1 Error                  */
 #define ISDN_STAT_FAXIND  276    /* FAX indications from HL-driver        */
 #define ISDN_STAT_AUDIO   277    /* DTMF, DSP indications                 */
 #define ISDN_STAT_DISCH   278    /* Disable/Enable channel usage          */
@@ -218,12 +217,6 @@ typedef struct
  */
 #define ISDN_AUDIO_SETDD	0	/* Set DTMF detection           */
 #define ISDN_AUDIO_DTMF		1	/* Rx/Tx DTMF                   */
-
-/*
- * Values for errcode field
- */
-#define ISDN_STAT_L1ERR_SEND 1
-#define ISDN_STAT_L1ERR_RECV 2
 
 /*
  * Values for feature-field of interface-struct.
