@@ -12,6 +12,13 @@
 #define __ASM_SPINLOCK_H
 
 /*
+ * Grmph, take care of %&#! user space programs that include
+ * asm/spinlock.h. The diagnose is only available in kernel
+ * context.
+ */
+#include <asm/lowcore.h>
+
+/*
  * Simple spin lock operations.  There are two variants, one clears IRQ's
  * on the local processor, one does not.
  *
@@ -75,6 +82,8 @@ typedef struct {
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+
+#define rwlock_is_locked(x) ((x)->lock != 0)
 
 #define _raw_read_lock(rw)   \
         asm volatile("   lg    2,0(%1)\n"   \

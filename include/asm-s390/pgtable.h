@@ -176,6 +176,8 @@ extern char empty_zero_page[PAGE_SIZE];
 #define _SEGMENT_TABLE  (_USER_SEG_TABLE_LEN|0x80000000|0x100)
 #define _KERNSEG_TABLE  (_KERNEL_SEG_TABLE_LEN)
 
+#define USER_STD_MASK           0x00000080UL
+
 /*
  * No mapping available
  */

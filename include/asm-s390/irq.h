@@ -897,67 +897,6 @@ extern __inline__ int chsc( chsc_area_t * chsc_area)
 	return cc;
 }
 
-/*
- * Various low-level irq details needed by irq.c, process.c,
- * time.c, io_apic.c and smp.c
- *
- * Interrupt entry/exit code at both C and assembly level
- */
-
-#ifdef CONFIG_SMP
-
-#include <asm/atomic.h>
-
-static inline void irq_enter(int cpu, unsigned int irq)
-{
-        hardirq_enter(cpu);
-        while (atomic_read(&global_irq_lock) != 0) {
-                eieio();
-        }
-}
-
-static inline void irq_exit(int cpu, unsigned int irq)
-{
-        hardirq_exit(cpu);
-        release_irqlock(cpu);
-}
-
-
-#else
-
-#define irq_enter(cpu, irq)     (++local_irq_count(cpu))
-#define irq_exit(cpu, irq)      (--local_irq_count(cpu))
-
-#endif
-
-#define __STR(x) #x
-#define STR(x) __STR(x)
-
-/*
- * x86 profiling function, SMP safe. We might want to do this in
- * assembly totally?
- * is this ever used anyway?
- */
-extern char _stext;
-static inline void s390_do_profile (unsigned long addr)
-{
-        if (prof_buffer && current->pid) {
-#ifndef CONFIG_ARCH_S390X
-                addr &= 0x7fffffff;
-#endif
-                addr -= (unsigned long) &_stext;
-                addr >>= prof_shift;
-                /*
-                 * Don't ignore out-of-bounds EIP values silently,
-                 * put them into the last histogram slot, so if
-                 * present, they will show up as a sharp peak.
-                 */
-                if (addr > prof_len-1)
-                        addr = prof_len-1;
-                atomic_inc((atomic_t *)&prof_buffer[addr]);
-        }
-}
-
 #include <asm/s390io.h>
 
 #define get_irq_lock(irq) &ioinfo[irq]->irq_lock
