@@ -208,7 +208,7 @@ void usb_deregister(struct usb_driver *driver)
 {
 	info("deregistering driver %s", driver->name);
 
-	remove_driver (&driver->driver);
+	driver_unregister (&driver->driver);
 
 	usbfs_update_special();
 }
@@ -1394,7 +1394,7 @@ static void __exit usb_exit(void)
 	if (nousb)
 		return;
 
-	remove_driver(&usb_generic_driver);
+	driver_unregister(&usb_generic_driver);
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
