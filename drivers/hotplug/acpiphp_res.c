@@ -273,7 +273,7 @@ struct pci_resource *acpiphp_get_max_resource (struct pci_resource **head, u32 s
 
 	for (max = *head;max; max = max->next) {
 
-		/* If not big enough we could probably just bail, 
+		/* If not big enough we could probably just bail,
 		   instead we'll continue to the next. */
 		if (max->length < size)
 			continue;
@@ -370,13 +370,13 @@ struct pci_resource *acpiphp_get_resource (struct pci_resource **head, u32 size)
 		return NULL;
 
 	for (node = *head; node; node = node->next) {
-		dbg("%s: req_size =%x node=%p, base=%x, length=%x",
+		dbg("%s: req_size =%x node=%p, base=%x, length=%x\n",
 		    __FUNCTION__, size, node, (u32)node->base, node->length);
 		if (node->length < size)
 			continue;
 
 		if (node->base & (size - 1)) {
-			dbg("%s: not aligned", __FUNCTION__);
+			dbg("%s: not aligned\n", __FUNCTION__);
 			/* this one isn't base aligned properly
 			   so we'll make a new entry and split it up */
 			temp_qword = (node->base | (size-1)) + 1;
@@ -400,7 +400,7 @@ struct pci_resource *acpiphp_get_resource (struct pci_resource **head, u32 size)
 
 		/* Don't need to check if too small since we already did */
 		if (node->length > size) {
-			dbg("%s: too big", __FUNCTION__);
+			dbg("%s: too big\n", __FUNCTION__);
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
 			split_node = acpiphp_make_resource(node->base + size, node->length - size);
@@ -415,7 +415,7 @@ struct pci_resource *acpiphp_get_resource (struct pci_resource **head, u32 size)
 			node->next = split_node;
 		}  /* End of too big on top end */
 
-		dbg("%s: got one!!!", __FUNCTION__);
+		dbg("%s: got one!!!\n", __FUNCTION__);
 		/* If we got here, then it is the right size
 		   Now take it out of the list */
 		if (*head == node) {
@@ -437,7 +437,7 @@ struct pci_resource *acpiphp_get_resource (struct pci_resource **head, u32 size)
 /**
  * get_resource_with_base - get resource with specific base address
  *
- * this function 
+ * this function
  * returns the first node of "size" length located at specified base address.
  * If it finds a node larger than "size" it will split it up.
  *
@@ -458,7 +458,7 @@ struct pci_resource *acpiphp_get_resource_with_base (struct pci_resource **head,
 		return NULL;
 
 	for (node = *head; node; node = node->next) {
-		dbg(": 1st req_base=%x req_size =%x node=%p, base=%x, length=%x",
+		dbg(": 1st req_base=%x req_size =%x node=%p, base=%x, length=%x\n",
 		    (u32)base, size, node, (u32)node->base, node->length);
 		if (node->base > base)
 			continue;
@@ -467,7 +467,7 @@ struct pci_resource *acpiphp_get_resource_with_base (struct pci_resource **head,
 			continue;
 
 		if (node->base < base) {
-			dbg(": split 1");
+			dbg(": split 1\n");
 			/* this one isn't base aligned properly
 			   so we'll make a new entry and split it up */
 			temp_qword = base;
@@ -489,12 +489,12 @@ struct pci_resource *acpiphp_get_resource_with_base (struct pci_resource **head,
 			node->next = split_node;
 		}
 
-		dbg(": 2nd req_base=%x req_size =%x node=%p, base=%x, length=%x",
+		dbg(": 2nd req_base=%x req_size =%x node=%p, base=%x, length=%x\n",
 		    (u32)base, size, node, (u32)node->base, node->length);
 
 		/* Don't need to check if too small since we already did */
 		if (node->length > size) {
-			dbg(": split 2");
+			dbg(": split 2\n");
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
 			split_node = acpiphp_make_resource(node->base + size, node->length - size);
@@ -509,7 +509,7 @@ struct pci_resource *acpiphp_get_resource_with_base (struct pci_resource **head,
 			node->next = split_node;
 		}  /* End of too big on top end */
 
-		dbg(": got one!!!");
+		dbg(": got one!!!\n");
 		/* If we got here, then it is the right size
 		   Now take it out of the list */
 		if (*head == node) {
@@ -547,13 +547,13 @@ int acpiphp_resource_sort_and_combine (struct pci_resource **head)
 	if (!(*head))
 		return 1;
 
-	dbg("*head->next = %p",(*head)->next);
+	dbg("*head->next = %p\n",(*head)->next);
 
 	if (!(*head)->next)
 		return 0;	/* only one item on the list, already sorted! */
 
-	dbg("*head->base = 0x%x",(u32)(*head)->base);
-	dbg("*head->next->base = 0x%x", (u32)(*head)->next->base);
+	dbg("*head->base = 0x%x\n",(u32)(*head)->base);
+	dbg("*head->next->base = 0x%x\n", (u32)(*head)->next->base);
 	while (out_of_order) {
 		out_of_order = 0;
 
@@ -587,7 +587,7 @@ int acpiphp_resource_sort_and_combine (struct pci_resource **head)
 	while (node1 && node1->next) {
 		if ((node1->base + node1->length) == node1->next->base) {
 			/* Combine */
-			dbg("8..");
+			dbg("8..\n");
 			node1->length += node1->next->length;
 			node2 = node1->next;
 			node1->next = node1->next->next;
@@ -668,7 +668,7 @@ static void dump_resource(struct pci_resource *head)
 	cnt = 0;
 
 	while (p) {
-		dbg("[%02d] %08x - %08x",
+		dbg("[%02d] %08x - %08x\n",
 		    cnt++, (u32)p->base, (u32)p->base + p->length - 1);
 		p = p->next;
 	}
@@ -676,24 +676,24 @@ static void dump_resource(struct pci_resource *head)
 
 void acpiphp_dump_resource(struct acpiphp_bridge *bridge)
 {
-	dbg("I/O resource:");
+	dbg("I/O resource:\n");
 	dump_resource(bridge->io_head);
-	dbg("MEM resource:");
+	dbg("MEM resource:\n");
 	dump_resource(bridge->mem_head);
-	dbg("PMEM resource:");
+	dbg("PMEM resource:\n");
 	dump_resource(bridge->p_mem_head);
-	dbg("BUS resource:");
+	dbg("BUS resource:\n");
 	dump_resource(bridge->bus_head);
 }
 
 void acpiphp_dump_func_resource(struct acpiphp_func *func)
 {
-	dbg("I/O resource:");
+	dbg("I/O resource:\n");
 	dump_resource(func->io_head);
-	dbg("MEM resource:");
+	dbg("MEM resource:\n");
 	dump_resource(func->mem_head);
-	dbg("PMEM resource:");
+	dbg("PMEM resource:\n");
 	dump_resource(func->p_mem_head);
-	dbg("BUS resource:");
+	dbg("BUS resource:\n");
 	dump_resource(func->bus_head);
 }

@@ -107,7 +107,10 @@ xfs_dir2_mount(
 	mp->m_dirdatablk = XFS_DIR2_DB_TO_DA(mp, XFS_DIR2_DATA_FIRSTDB(mp));
 	mp->m_dirleafblk = XFS_DIR2_DB_TO_DA(mp, XFS_DIR2_LEAF_FIRSTDB(mp));
 	mp->m_dirfreeblk = XFS_DIR2_DB_TO_DA(mp, XFS_DIR2_FREE_FIRSTDB(mp));
-	mp->m_da_node_ents =
+	mp->m_attr_node_ents =
+		(mp->m_sb.sb_blocksize - (uint)sizeof(xfs_da_node_hdr_t)) /
+		(uint)sizeof(xfs_da_node_entry_t);
+	mp->m_dir_node_ents =
 		(mp->m_dirblksize - (uint)sizeof(xfs_da_node_hdr_t)) /
 		(uint)sizeof(xfs_da_node_entry_t);
 	mp->m_dir_magicpct = (mp->m_dirblksize * 37) / 100;

@@ -69,7 +69,7 @@ SECTIONS
 
   .init.ramfs ALIGN(8192): {
 	__initramfs_start = .;
-	*(.init.initramfs)
+	*(.init.ramfs)
 	__initramfs_end = .;
   }
 

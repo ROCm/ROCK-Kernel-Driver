@@ -61,7 +61,7 @@ static long mixcomwd_opened; /* long req'd for setbit --RR */
 
 static int watchdog_port;
 static int mixcomwd_timer_alive;
-static struct timer_list mixcomwd_timer;
+static struct timer_list mixcomwd_timer = TIMER_INITIALIZER(NULL, 0, 0);
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;

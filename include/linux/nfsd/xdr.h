@@ -57,6 +57,11 @@ struct nfsd_renameargs {
 	int			tlen;
 };
 
+struct nfsd_readlinkargs {
+	struct svc_fh		fh;
+	char *			buffer;
+};
+	
 struct nfsd_linkargs {
 	struct svc_fh		ffh;
 	struct svc_fh		tfh;
@@ -77,6 +82,7 @@ struct nfsd_readdirargs {
 	struct svc_fh		fh;
 	__u32			cookie;
 	__u32			count;
+	u32 *			buffer;
 };
 
 struct nfsd_attrstat {
@@ -128,7 +134,7 @@ union nfsd_xdrstore {
 
 
 int nfssvc_decode_void(struct svc_rqst *, u32 *, void *);
-int nfssvc_decode_fhandle(struct svc_rqst *, u32 *, struct svc_fh *);
+int nfssvc_decode_fhandle(struct svc_rqst *, u32 *, struct nfsd_fhandle *);
 int nfssvc_decode_sattrargs(struct svc_rqst *, u32 *,
 				struct nfsd_sattrargs *);
 int nfssvc_decode_diropargs(struct svc_rqst *, u32 *,
@@ -141,6 +147,8 @@ int nfssvc_decode_createargs(struct svc_rqst *, u32 *,
 				struct nfsd_createargs *);
 int nfssvc_decode_renameargs(struct svc_rqst *, u32 *,
 				struct nfsd_renameargs *);
+int nfssvc_decode_readlinkargs(struct svc_rqst *, u32 *,
+				struct nfsd_readlinkargs *);
 int nfssvc_decode_linkargs(struct svc_rqst *, u32 *,
 				struct nfsd_linkargs *);
 int nfssvc_decode_symlinkargs(struct svc_rqst *, u32 *,

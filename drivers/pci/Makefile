@@ -3,7 +3,7 @@
 #
 
 export-objs	:= access.o hotplug.o pci-driver.o pci.o pool.o \
-			probe.o proc.o search.o compat.o
+			probe.o proc.o search.o compat.o setup-bus.o
 
 obj-y		+= access.o probe.o pci.o pool.o quirks.o \
 			compat.o names.o pci-driver.o search.o hotplug.o
@@ -24,6 +24,11 @@ obj-$(CONFIG_SUPERH) += setup-bus.o setup-irq.o
 obj-$(CONFIG_PPC32) += setup-irq.o
 obj-$(CONFIG_DDB5476) += setup-bus.o
 obj-$(CONFIG_SGI_IP27) += setup-irq.o
+
+# CompactPCI hotplug requires the pbus_* functions
+ifdef CONFIG_HOTPLUG_PCI_CPCI
+obj-y += setup-bus.o
+endif
 
 ifndef CONFIG_X86
 obj-y += syscall.o

@@ -2,7 +2,7 @@
  *
  * A  PCMCIA client driver for the Raylink wireless LAN card.
  * The starting point for this module was the skeleton.c in the
- * PCMCIA 2.9.12 package written by David Hinds, dhinds@allegro.stanford.edu
+ * PCMCIA 2.9.12 package written by David Hinds, dahinds@users.sourceforge.net
  *
  *
  * Copyright (c) 1998  Corey Thomas (corey@world.std.com)

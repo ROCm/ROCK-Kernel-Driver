@@ -627,7 +627,6 @@ xfs_rename(
 	 */
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (target_ip != NULL) {
-		xfs_refcache_purge_ip(target_ip);
 		IRELE(target_ip);
 	}
 	/*

@@ -74,7 +74,7 @@
 #ifdef CONFIG_FS_EXT_ATTR
 # include <linux/ext_attr.h>
 
-# ifdef CONFIG_FS_POSIX_ACL
+# if 0 /* was a broken check for Posix ACLs */
 #  include <linux/posix_acl.h>
 # endif
 #endif
@@ -466,7 +466,7 @@ int lento_setattr(const char *name, struct iattr *iattr,
         struct dentry *dentry;
         struct presto_file_set *fset;
         int error;
-#ifdef  CONFIG_FS_POSIX_ACL
+#if 0 /* was a broken check for Posix ACLs */
         int (*set_posix_acl)(struct inode *, int type, posix_acl_t *)=NULL;
 #endif
 
@@ -507,7 +507,7 @@ int lento_setattr(const char *name, struct iattr *iattr,
                                  (dentry->d_inode->i_mode & ~S_IALLUGO);
                 CDEBUG(D_PIOCTL, "chmod: orig %#o, set %#o, result %#o\n",
                        dentry->d_inode->i_mode, set_mode, iattr->ia_mode);
-#ifdef CONFIG_FS_POSIX_ACL
+#if 0 /* was a broken check for Posix ACLs */
                 /* ACl code interacts badly with setattr 
                  * since it tries to modify the ACL using 
                  * set_ext_attr which recurses back into presto.  
@@ -535,7 +535,7 @@ int lento_setattr(const char *name, struct iattr *iattr,
                 }
         }
 
-#ifdef CONFIG_FS_POSIX_ACL
+#if 0 /* was a broken check for Posix ACLs */
         /* restore the inode_operations if we changed them*/
         if (iattr->ia_valid & ATTR_MODE) 
                 dentry->d_inode->i_op->set_posix_acl=set_posix_acl;
@@ -2252,7 +2252,7 @@ cleanup_dput:
 
 #ifdef CONFIG_FS_EXT_ATTR
 
-#ifdef CONFIG_FS_POSIX_ACL
+#if 0 /* was a broken check for Posix ACLs */
 /* Posix ACL code changes i_mode without using a notify_change (or
  * a mark_inode_dirty!). We need to duplicate this at the reintegrator
  * which is done by this function. This function also takes care of 
@@ -2395,7 +2395,7 @@ int presto_do_set_ext_attr(struct presto_file_set *fset,
                 goto exit;
         }
 
-#ifdef CONFIG_FS_POSIX_ACL
+#if 0 /* was a broken check for Posix ACLs */
         /* Reset mode if specified*/
         /* XXX: when we do native acl support, move this code out! */
         if (mode != NULL) {

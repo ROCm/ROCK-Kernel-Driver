@@ -10,18 +10,14 @@
 /* Common forward declarations for all Linux-versions: */
 
 /* Interfaces to the midlevel Linux SCSI driver */
-extern int ibmmca_proc_info (char *, char **, off_t, int, int, int);
-extern int ibmmca_detect (Scsi_Host_Template *);
-extern int ibmmca_release (struct Scsi_Host *);
-extern int ibmmca_command (Scsi_Cmnd *);
-extern int ibmmca_queuecommand (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-extern int ibmmca_abort (Scsi_Cmnd *);
-extern int ibmmca_reset (Scsi_Cmnd *, unsigned int);
-extern int ibmmca_biosparam (struct scsi_device *, struct block_device *,
-		sector_t, int *);
-
-/*structure for /proc filesystem */
-extern struct proc_dir_entry proc_scsi_ibmmca;
+static int ibmmca_proc_info (char *, char **, off_t, int, int, int);
+static int ibmmca_detect (Scsi_Host_Template *);
+static int ibmmca_release (struct Scsi_Host *);
+static int ibmmca_command (Scsi_Cmnd *);
+static int ibmmca_queuecommand (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
+static int ibmmca_abort (Scsi_Cmnd *);
+static int ibmmca_host_reset (Scsi_Cmnd *);
+static int ibmmca_biosparam (struct scsi_device *, struct block_device *, sector_t, int *);
 
 /*
  * 2/8/98
@@ -37,8 +33,8 @@ extern struct proc_dir_entry proc_scsi_ibmmca;
           release:        ibmmca_release,       /*release fn*/        \
           command:        ibmmca_command,       /*command fn*/        \
           queuecommand:   ibmmca_queuecommand,  /*queuecommand fn*/   \
-          abort:          ibmmca_abort,         /*abort fn*/          \
-          reset:          ibmmca_reset,         /*reset fn*/          \
+	  eh_abort_handler:ibmmca_abort,         /*abort fn*/          \
+	  eh_host_reset_handler:ibmmca_host_reset,         /*reset fn*/          \
           bios_param:     ibmmca_biosparam,     /*bios fn*/           \
           can_queue:      16,                   /*can_queue*/         \
           this_id:        7,                    /*set by detect*/     \

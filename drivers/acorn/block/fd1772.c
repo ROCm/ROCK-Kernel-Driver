@@ -378,23 +378,19 @@ static void do_fd_request(request_queue_t *);
 
 /************************* End of Prototypes **************************/
 
-static struct timer_list motor_off_timer = {
-	.function	= fd_motor_off_timer,
-};
+static struct timer_list motor_off_timer =
+	TIMER_INITIALIZER(fd_motor_off_timer, 0, 0);
 
 #ifdef TRACKBUFFER
-static struct timer_list readtrack_timer = {
-	.function 	= fd_readtrack_check,
-};
+static struct timer_list readtrack_timer =
+	TIMER_INITIALIZER(fd_readtrack_check, 0, 0);
 #endif
 
-static struct timer_list timeout_timer = {
-	.function	= fd_times_out,
-};
+static struct timer_list timeout_timer =
+	TIMER_INITIALIZER(fd_times_out, 0, 0);
 
-static struct timer_list fd_timer = {
-	.function	= check_change,
-};
+static struct timer_list fd_timer =
+	TIMER_INITIALIZER(check_change, 0, 0);
 
 /* DAG: Haven't got a clue what this is? */
 int stdma_islocked(void)

@@ -240,15 +240,16 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 		struct pb_target *,	/* inode for buffer		*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
-		page_buf_flags_t);	/* PBF_LOCK, PBF_READ, PBF_ALLOCATE, */
-					/* PBF_ASYNC,			*/	
+		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
+					/* PBF_ASYNC			*/	
 
 extern page_buf_t *pagebuf_lookup(
 		struct pb_target *,
 		struct inode *,
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
-		int);			/* PBF_ENTER_PAGES		*/
+		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
+					/* PBF_FORCEIO, _PBF_LOCKABLE	*/
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with */
 					/*  no memory or disk address	*/
@@ -272,7 +273,7 @@ extern void pagebuf_readahead(		/* read ahead into cache	*/
 		struct pb_target  *,	/* target for buffer (or NULL)	*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
-		int);			/* additional read flags	*/
+		page_buf_flags_t);	/* additional read flags	*/
 
 /* Writing and Releasing Buffers */
 
@@ -314,10 +315,9 @@ extern void pagebuf_ioerror(		/* mark buffer in error (or not) */
 
 extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		page_buf_t *,		/* buffer to start		*/
-		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
-					/* PBF_WRITE, PBF_ALLOCATE,	*/
-					/* PBF_DELWRI, 			*/
-					/* PBF_SYNC			*/
+		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC,		*/
+					/* PBF_READ, PBF_WRITE,		*/
+					/* PBF_DELWRI, PBF_SYNC		*/
 
 extern int pagebuf_iorequest(		/* start real I/O		*/
 		page_buf_t *);		/* buffer to convey to device	*/

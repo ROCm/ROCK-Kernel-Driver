@@ -7,7 +7,7 @@ static int u14_34f_release(struct Scsi_Host *);
 static int u14_34f_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int u14_34f_eh_abort(Scsi_Cmnd *);
 static int u14_34f_eh_host_reset(Scsi_Cmnd *);
-static int u14_34f_bios_param(Disk *, struct block_device *, int *);
+static int u14_34f_bios_param(struct scsi_device *, struct block_device *, sector_t, int *);
 static int u14_34f_slave_attach(Scsi_Device *);
 
 #define U14_34F_VERSION "8.00.00"
@@ -17,8 +17,6 @@ static int u14_34f_slave_attach(Scsi_Device *);
                 detect:                  u14_34f_detect,                     \
                 release:                 u14_34f_release,                    \
                 queuecommand:            u14_34f_queuecommand,               \
-                abort:                   NULL,                               \
-                reset:                   NULL,                               \
                 eh_abort_handler:        u14_34f_eh_abort,                   \
                 eh_device_reset_handler: NULL,                               \
                 eh_bus_reset_handler:    NULL,                               \

@@ -528,3 +528,40 @@ int dump_extended_fpu( struct pt_regs *regs, struct user_fxsr_struct *fpu )
 
 	return fpvalid;
 }
+
+int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
+{
+	int fpvalid = tsk->used_math;
+
+	if (fpvalid) {
+		if (tsk == current)
+			unlazy_fpu(tsk);
+		if (cpu_has_fxsr)
+			copy_fpu_fxsave(tsk, fpu);
+		else
+			copy_fpu_fsave(tsk, fpu);
+	}
+	return fpvalid;
+}
+
+int dump_task_extended_fpu(struct task_struct *tsk, struct user_fxsr_struct *fpu)
+{
+	int fpvalid = tsk->used_math && cpu_has_fxsr;
+
+	if (fpvalid) {
+		if (tsk == current)
+		       unlazy_fpu(tsk);
+		memcpy(fpu, &tsk->thread.i387.fxsave, sizeof(*fpu));
+	}
+	return fpvalid;
+}
+
+
+#ifdef CONFIG_SMP
+void dump_smp_unlazy_fpu(void)
+{
+	unlazy_fpu(current);
+	return;
+}
+#endif
+

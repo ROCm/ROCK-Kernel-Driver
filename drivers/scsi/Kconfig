@@ -85,23 +85,6 @@ config BLK_DEV_SR_VENDOR
 	  drives (and HP Writers). If you have such a drive and get the first
 	  session only, try saying Y here; everybody else says N.
 
-config SR_EXTRA_DEVS
-	int "Maximum number of CDROM devices that can be loaded as modules"
-	depends on BLK_DEV_SR
-	default "2"
-	---help---
-	  This controls the amount of additional space allocated in tables for
-	  drivers that are loaded as modules after the kernel is booted. In
-	  the event that the SCSI core itself was loaded as a module, this
-	  value is the number of additional CD-ROMs that can be loaded after
-	  the first host driver is loaded.
-
-	  Admittedly this isn't pretty, but there are tons of race conditions
-	  involved with resizing the internal arrays on the fly.  Someday this
-	  flag will go away, and everything will work automatically.
-
-	  If you don't understand what's going on, go with the default.
-
 config CHR_DEV_SG
 	tristate "SCSI generic support"
 	depends on SCSI

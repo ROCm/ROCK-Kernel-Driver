@@ -176,7 +176,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 	count = shortcount > leafcount ? shortcount : leafcount;
 	mp->m_dircook_elog = xfs_da_log2_roundup(count + 1);
 	ASSERT(mp->m_dircook_elog <= mp->m_sb.sb_blocklog);
-	mp->m_da_node_ents =
+	mp->m_dir_node_ents = mp->m_attr_node_ents =
 		(XFS_LBSIZE(mp) - (uint)sizeof(xfs_da_node_hdr_t)) /
 		(uint)sizeof(xfs_da_node_entry_t);
 	mp->m_dir_magicpct = (XFS_LBSIZE(mp) * 37) / 100;
@@ -734,6 +734,7 @@ xfs_dir_node_addname(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_dir_node_ents;
 
 	/*
 	 * Search to see if name already exists, and get back a pointer
@@ -787,6 +788,7 @@ xfs_dir_node_removename(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_dir_node_ents;
 
 	/*
 	 * Search to see if name exists, and get back a pointer to it.
@@ -835,6 +837,7 @@ xfs_dir_node_lookup(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_dir_node_ents;
 
 	/*
 	 * Search to see if name exists,
@@ -1019,6 +1022,7 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 	state->args = args;
 	state->mp = args->dp->i_mount;
 	state->blocksize = state->mp->m_sb.sb_blocksize;
+	state->node_ents = state->mp->m_dir_node_ents;
 	inum = args->inumber;
 
 	/*

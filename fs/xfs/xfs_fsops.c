@@ -563,9 +563,6 @@ xfs_fs_freeze(
 	/* Stop new writers */
 	xfs_start_freeze(mp, XFS_FREEZE_WRITE);
 
-	/* Flush the refcache */
-	xfs_refcache_purge_mp(mp);
-
 	/* Flush delalloc and delwri data */
 	VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, NULL, error);
 

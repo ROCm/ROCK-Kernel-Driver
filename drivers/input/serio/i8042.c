@@ -844,6 +844,7 @@ int __init i8042_init(void)
 
 	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 
+	init_timer(&i8042_timer);
 	i8042_timer.function = i8042_timer_func;
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 

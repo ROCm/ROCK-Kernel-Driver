@@ -109,6 +109,4 @@
 #include <xfs_utils.h>
 #include <xfs_dmapi.h>
 
-#include <linux/xfs_lrw.h>
-
 #endif	/* __XFS_H__ */

@@ -18,6 +18,7 @@
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/workqueue.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/major.h>
@@ -103,8 +104,6 @@ static unsigned char scc_inittab[] = {
 };
 #endif
 #define ZS_CLOCK         3686400 	/* Z8530 RTxC input clock rate */
-
-static DECLARE_TASK_QUEUE(tq_serial);
 
 static struct tty_driver serial_driver, callout_driver;
 static int serial_refcount;
@@ -372,8 +371,7 @@ static _INLINE_ void rs_sched_event(struct mac_serial *info,
 				  int event)
 {
 	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_serial);
-	mark_bh(MACSERIAL_BH);
+	schedule_work(&info->tqueue);
 }
 
 /* Work out the flag value for a z8530 status value. */
@@ -712,20 +710,6 @@ static void rs_start(struct tty_struct *tty)
 	restore_flags(flags);
 }
 
-/*
- * This routine is used to handle the "bottom half" processing for the
- * serial driver, known also the "software interrupt" processing.
- * This processing is done at the kernel interrupt level, after the
- * rs_interrupt() has returned, BUT WITH INTERRUPTS TURNED ON.  This
- * is where time-consuming activities which can not be done in the
- * interrupt driver proper are done; the interrupt driver schedules
- * them using rs_sched_event(), and they get done here.
- */
-static void do_serial_bh(void)
-{
-	run_task_queue(&tq_serial);
-}
-
 static void do_softint(void *private_)
 {
 	struct mac_serial	*info = (struct mac_serial *) private_;
@@ -876,7 +860,7 @@ more:
 out:
 	spin_unlock_irqrestore(&info->rx_dma_lock, flags);
 	if (do_queue)
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		tty_flip_buffer_push(tty);
 }
 
 static void poll_rxdma(unsigned long private_)
@@ -2572,9 +2556,6 @@ int macserial_init(void)
 	unsigned long flags;
 	struct mac_serial *info;
 
-	/* Setup base handler, and timer table. */
-	init_bh(MACSERIAL_BH, do_serial_bh);
-
 	/* Find out how many Z8530 SCCs we have */
 	if (zs_chain == 0)
 		probe_sccs();
@@ -2741,9 +2722,8 @@ no_dma:
 		info->event = 0;
 		info->count = 0;
 		info->blocked_open = 0;
-		info->tqueue.routine = do_softint;
-		info->tqueue.data = info;
-		info->callout_termios =callout_driver.init_termios;
+		INIT_WORK(&info->tqueue, do_softint, info);
+		info->callout_termios = callout_driver.init_termios;
 		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
@@ -2865,33 +2845,9 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Don't disable the transmitter. */
 }
 
-/*
- *	Receive character from the serial port
- */
-static int serial_console_wait_key(struct console *co)
-{
-	struct mac_serial *info = zs_soft + co->index;
-	int           val;
-
-	/* Turn of interrupts and enable the transmitter. */
-	write_zsreg(info->zs_channel, R1, info->curregs[1] & ~INT_ALL_Rx);
-	write_zsreg(info->zs_channel, R3, info->curregs[3] | RxENABLE);
-
-	/* Wait for something in the receive buffer. */
-	while((read_zsreg(info->zs_channel, 0) & Rx_CH_AV) == 0)
-		eieio();
-	val = read_zsdata(info->zs_channel);
-
-	/* Restore the values in the registers. */
-	write_zsreg(info->zs_channel, R1, info->curregs[1]);
-	write_zsreg(info->zs_channel, R3, info->curregs[3]);
-
-	return val;
-}
-
 static kdev_t serial_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 /*
@@ -3079,7 +3035,6 @@ static struct console sercons = {
 	name:		"ttyS",
 	write:		serial_console_write,
 	device:		serial_console_device,
-	wait_key:	serial_console_wait_key,
 	setup:		serial_console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,

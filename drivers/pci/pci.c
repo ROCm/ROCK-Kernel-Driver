@@ -25,6 +25,49 @@
 #endif
 
 /**
+ * pci_bus_max_busnr - returns maximum PCI bus number of given bus' children
+ * @bus: pointer to PCI bus structure to search
+ *
+ * Given a PCI bus, returns the highest PCI bus number present in the set
+ * including the given PCI bus and its list of child PCI buses.
+ */
+unsigned char __devinit
+pci_bus_max_busnr(struct pci_bus* bus)
+{
+	struct list_head *tmp;
+	unsigned char max, n;
+
+	max = bus->number;
+	list_for_each(tmp, &bus->children) {
+		n = pci_bus_max_busnr(pci_bus_b(tmp));
+		if(n > max)
+			max = n;
+	}
+	return max;
+}
+
+/**
+ * pci_max_busnr - returns maximum PCI bus number
+ *
+ * Returns the highest PCI bus number present in the system global list of
+ * PCI buses.
+ */
+unsigned char __devinit
+pci_max_busnr(void)
+{
+	struct pci_bus* bus;
+	unsigned char max, n;
+
+	max = 0;
+	pci_for_each_bus(bus) {
+		n = pci_bus_max_busnr(bus);
+		if(n > max)
+			max = n;
+	}
+	return max;
+}
+
+/**
  * pci_find_capability - query for devices' capabilities 
  * @dev: PCI device to query
  * @cap: capability code
@@ -79,6 +122,49 @@ pci_find_capability(struct pci_dev *dev, int cap)
 	return 0;
 }
 
+/**
+ * pci_bus_find_capability - query for devices' capabilities 
+ * @dev: PCI device to query
+ * @cap: capability code
+ *
+ * Like pci_find_capability() but works for pci devices that do not have a
+ * pci_dev structure set up yet. 
+ * Returns the address of the requested capability structure within the
+ * device's PCI configuration space or 0 in case the device does not
+ * support it.
+ */
+int pci_bus_find_capability(struct pci_bus *bus, unsigned int devfn, int cap)
+{
+	u16 status;
+	u8 pos, id;
+	int ttl = 48;
+	struct pci_dev *dev = bus->self;
+
+	pci_bus_read_config_word(bus, devfn, PCI_STATUS, &status);
+	if (!(status & PCI_STATUS_CAP_LIST))
+		return 0;
+	switch (dev->hdr_type) {
+	case PCI_HEADER_TYPE_NORMAL:
+	case PCI_HEADER_TYPE_BRIDGE:
+		pci_bus_read_config_byte(bus, devfn, PCI_CAPABILITY_LIST, &pos);
+		break;
+	case PCI_HEADER_TYPE_CARDBUS:
+		pci_bus_read_config_byte(bus, devfn, PCI_CB_CAPABILITY_LIST, &pos);
+		break;
+	default:
+		return 0;
+	}
+	while (ttl-- && pos >= 0x40) {
+		pos &= ~3;
+		pci_bus_read_config_byte(bus, devfn, pos + PCI_CAP_LIST_ID, &id);
+		if (id == 0xff)
+			break;
+		if (id == cap)
+			return pos;
+		pci_bus_read_config_byte(bus, devfn, pos + PCI_CAP_LIST_NEXT, &pos);
+	}
+	return 0;
+}
 
 /**
  * pci_find_parent_resource - return resource region of parent bus of given region
@@ -649,7 +735,10 @@ EXPORT_SYMBOL(isa_bridge);
 
 EXPORT_SYMBOL(pci_enable_device);
 EXPORT_SYMBOL(pci_disable_device);
+EXPORT_SYMBOL(pci_max_busnr);
+EXPORT_SYMBOL(pci_bus_max_busnr);
 EXPORT_SYMBOL(pci_find_capability);
+EXPORT_SYMBOL(pci_bus_find_capability);
 EXPORT_SYMBOL(pci_release_regions);
 EXPORT_SYMBOL(pci_request_regions);
 EXPORT_SYMBOL(pci_release_region);

@@ -1486,16 +1486,16 @@ static int u14_34f_eh_host_reset(Scsi_Cmnd *SCarg) {
    return SUCCESS;
 }
 
-static int u14_34f_bios_param(Disk *disk, struct block_device *bdev,
-                                                          int *dkinfo) {
+static int u14_34f_bios_param(struct scsi_device *disk, struct block_device *bdev,
+	sector_t capacity, int *dkinfo) {
    unsigned int j = 0;
-   int size = disk->capacity;
+   unsigned int size = capacity;
 
    dkinfo[0] = HD(j)->heads;
    dkinfo[1] = HD(j)->sectors;
    dkinfo[2] = size / (HD(j)->heads * HD(j)->sectors);
 
-   if (ext_tran && (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
+   if (ext_tran && (scsicam_bios_param(bdev, capacity, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);

@@ -513,10 +513,9 @@ static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 #define EXT3_FEATURE_INCOMPAT_META_BG		0x0010
 
 #define EXT3_FEATURE_COMPAT_SUPP	EXT2_FEATURE_COMPAT_EXT_ATTR
-#define EXT2_FEATURE_INCOMPAT_SUPP	(EXT2_FEATURE_INCOMPAT_FILETYPE| \
-					 EXT2_FEATURE_INCOMPAT_META_BG)
 #define EXT3_FEATURE_INCOMPAT_SUPP	(EXT3_FEATURE_INCOMPAT_FILETYPE| \
-					 EXT3_FEATURE_INCOMPAT_RECOVER)
+					 EXT3_FEATURE_INCOMPAT_RECOVER| \
+					 EXT3_FEATURE_INCOMPAT_META_BG)
 #define EXT3_FEATURE_RO_COMPAT_SUPP	(EXT3_FEATURE_RO_COMPAT_SPARSE_SUPER| \
 					 EXT3_FEATURE_RO_COMPAT_LARGE_FILE| \
 					 EXT3_FEATURE_RO_COMPAT_BTREE_DIR)
@@ -689,7 +688,7 @@ extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 extern int ext3_check_dir_entry(const char *, struct inode *,
 				struct ext3_dir_entry_2 *,
 				struct buffer_head *, unsigned long);
-extern void ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
+extern int ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 				    __u32 minor_hash,
 				    struct ext3_dir_entry_2 *dirent);
 extern void ext3_htree_free_dir_info(struct dir_private_info *p);

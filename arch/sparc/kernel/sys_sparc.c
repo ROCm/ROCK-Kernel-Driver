@@ -269,6 +269,21 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	return do_mmap2(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
 }
 
+extern int sys_remap_file_pages(unsigned long start, unsigned long size,
+				unsigned long prot, unsigned long pgoff,
+				unsigned long flags);
+
+int sparc_remap_file_pages(unsigned long start, unsigned long size,
+			   unsigned long prot, unsigned long pgoff,
+			   unsigned long flags)
+{
+	/* This works on an existing mmap so we don't need to validate
+	 * the range as that was done at the original mmap call.
+	 */
+	return sys_remap_file_pages(start, size, prot,
+				    (pgoff >> (PAGE_SHIFT - 12)), flags);
+}
+
 extern unsigned long do_mremap(unsigned long addr,
 	unsigned long old_len, unsigned long new_len,
 	unsigned long flags, unsigned long new_addr);

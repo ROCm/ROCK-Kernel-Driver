@@ -5,6 +5,7 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#include <asm/timer.h>
 
 #include "cpu.h"
 
@@ -170,7 +171,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		c->coma_bug = 1;
 		break;
 
-	case 4: /* MediaGX/GXm */
+	case 4: /* MediaGX/GXm or Geode GXM/GXLV/GX1 */
 #ifdef CONFIG_PCI
 		/* It isn't really a PCI quirk directly, but the cure is the
 		   same. The MediaGX has deep magic SMM stuff that handles the
@@ -188,29 +189,26 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		isa_dma_bridge_buggy = 2;
 #endif		
 		c->x86_cache_size=16;	/* Yep 16K integrated cache thats it */
+ 
+		/*
+		 *  The 5510/5520 companion chips have a funky PIT.
+		 */  
+		if (pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5510, NULL) ||
+		    pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL))
+			pit_latch_buggy = 1;
 
 		/* GXm supports extended cpuid levels 'ala' AMD */
 		if (c->cpuid_level == 2) {
-			/* Enable Natsemi MMX extensions */
-			setCx86(CX86_CCR7, getCx86(CX86_CCR7) | 1);
+			/* Enable cxMMX extensions (GX1 Datasheet 54) */
+			setCx86(CX86_CCR7, getCx86(CX86_CCR7)|1);
 
 			get_model_name(c);  /* get CPU marketing name */
-			/*
-			 *  The 5510/5520 companion chips have a funky PIT
-			 *  that breaks the TSC synchronizing, so turn it off
-			 */
-			if (pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5510, NULL) ||
-				pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL))
-				clear_bit(X86_FEATURE_TSC, c->x86_capability);
 			return;
 		}
 		else {  /* MediaGX */
 			Cx86_cb[2] = (dir0_lsn & 1) ? '3' : '4';
 			p = Cx86_cb+2;
 			c->x86_model = (dir1 & 0x20) ? 1 : 2;
-#ifndef CONFIG_CS5520
-			clear_bit(X86_FEATURE_TSC, c->x86_capability);
-#endif
 		}
 		break;
 

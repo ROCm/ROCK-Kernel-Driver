@@ -1385,7 +1385,7 @@ static int ext3_readpage(struct file *file, struct page *page)
 }
 
 static int
-ext3_readpages(struct address_space *mapping,
+ext3_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
 	return mpage_readpages(mapping, pages, nr_pages, ext3_get_block);
@@ -2248,7 +2248,6 @@ void ext3_read_inode(struct inode * inode)
 					 * (for stat), not the fs block
 					 * size */  
 	inode->i_blocks = le32_to_cpu(raw_inode->i_blocks);
-	inode->i_version = ++event;
 	ei->i_flags = le32_to_cpu(raw_inode->i_flags);
 #ifdef EXT3_FRAGMENTS
 	ei->i_faddr = le32_to_cpu(raw_inode->i_faddr);

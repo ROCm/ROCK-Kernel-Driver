@@ -173,12 +173,6 @@ static inline void put_buf(r1bio_t *r1_bio)
 	struct bio *bio = r1_bio->master_bio;
 	unsigned long flags;
 
-	spin_lock_irqsave(&conf->resync_lock, flags);
-	if (!--conf->nr_pending) {
-		wake_up(&conf->wait_idle);
-		wake_up(&conf->wait_resume);
-	}
-	spin_unlock_irqrestore(&conf->resync_lock, flags);
 	/*
 	 * undo any possible partial request fixup magic:
 	 */
@@ -186,6 +180,19 @@ static inline void put_buf(r1bio_t *r1_bio)
 		bio->bi_io_vec[bio->bi_vcnt-1].bv_len = PAGE_SIZE;
 	put_all_bios(conf, r1_bio);
 	mempool_free(r1_bio, conf->r1buf_pool);
+
+	spin_lock_irqsave(&conf->resync_lock, flags);
+	if (!conf->barrier)
+		BUG();
+	--conf->barrier;
+	wake_up(&conf->wait_resume);
+	wake_up(&conf->wait_idle);
+
+	if (!--conf->nr_pending) {
+		wake_up(&conf->wait_idle);
+		wake_up(&conf->wait_resume);
+	}
+	spin_unlock_irqrestore(&conf->resync_lock, flags);
 }
 
 static int map(mddev_t *mddev, mdk_rdev_t **rdevp)
@@ -442,17 +449,6 @@ static void device_barrier(conf_t *conf, sector_t sect)
 	spin_unlock_irq(&conf->resync_lock);
 }
 
-static void resume_device(conf_t *conf)
-{
-	spin_lock_irq(&conf->resync_lock);
-	if (!conf->barrier)
-		BUG();
-	--conf->barrier;
-	wake_up(&conf->wait_resume);
-	wake_up(&conf->wait_idle);
-	spin_unlock_irq(&conf->resync_lock);
-}
-
 static int make_request(request_queue_t *q, struct bio * bio)
 {
 	mddev_t *mddev = q->queuedata;
@@ -664,7 +660,6 @@ static void close_sync(conf_t *conf)
 
 	if (conf->barrier) BUG();
 	if (waitqueue_active(&conf->wait_idle)) BUG();
-	if (waitqueue_active(&conf->wait_resume)) BUG();
 
 	mempool_destroy(conf->r1buf_pool);
 	conf->r1buf_pool = NULL;
@@ -802,7 +797,6 @@ static int end_sync_write(struct bio *bio, unsigned int bytes_done, int error)
 
 	if (atomic_dec_and_test(&r1_bio->remaining)) {
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, uptodate);
-		resume_device(conf);
 		put_buf(r1_bio);
 	}
 	atomic_dec(&conf->mirrors[mirror].rdev->nr_pending);
@@ -829,7 +823,6 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		 */
 		printk(IO_ERROR, bdev_partition_name(bio->bi_bdev), (unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
-		resume_device(conf);
 		put_buf(r1_bio);
 		return;
 	}
@@ -881,7 +874,6 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		printk(KERN_ALERT "raid1: sync aborting as there is nowhere to write sector %llu\n", 
 			(unsigned long long)r1_bio->sector);
 		md_done_sync(mddev, r1_bio->master_bio->bi_size >> 9, 0);
-		resume_device(conf);
 		put_buf(r1_bio);
 		return;
 	}
@@ -1021,7 +1013,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	atomic_inc(&conf->mirrors[disk].rdev->nr_pending);
 	spin_unlock_irq(&conf->device_lock);
 
-	mirror = conf->mirrors + conf->last_used;
+	mirror = conf->mirrors + disk;
 
 	r1_bio = mempool_alloc(conf->r1buf_pool, GFP_NOIO);
 
@@ -1032,6 +1024,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	r1_bio->mddev = mddev;
 	r1_bio->sector = sector_nr;
 	r1_bio->cmd = SPECIAL;
+	r1_bio->read_disk = disk;
 
 	bio = r1_bio->master_bio;
 	nr_sectors = RESYNC_BLOCK_SIZE >> 9;
@@ -1155,6 +1148,8 @@ static int run(mddev_t *mddev)
 	conf->raid_disks = mddev->raid_disks;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	if (conf->working_disks == 1)
+		mddev->state |= (1 << MD_SB_CLEAN);
 
 	conf->resync_lock = SPIN_LOCK_UNLOCKED;
 	init_waitqueue_head(&conf->wait_idle);

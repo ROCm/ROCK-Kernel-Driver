@@ -17,8 +17,8 @@ config CRC32
 #
 config ZLIB_INFLATE
 	tristate
-	default m if CRAMFS!=y && PPP_DEFLATE!=y && JFFS2_FS!=y && ZISOFS_FS!=y && (CRAMFS=m || PPP_DEFLATE=m || JFFS2_FS=m || ZISOFS_FS=m)
-	default y if CRAMFS=y || PPP_DEFLATE=y || JFFS2_FS=y || ZISOFS_FS=y
+	default y if CRAMFS=y || PPP_DEFLATE=y || JFFS2_FS=y || ZISOFS_FS=y || BINFMT_ZFLAT=y
+	default m if CRAMFS=m || PPP_DEFLATE=m || JFFS2_FS=m || ZISOFS_FS=m || BINFMT_ZFLAT=m
 
 config ZLIB_DEFLATE
 	tristate

@@ -63,6 +63,8 @@ extern struct page * grab_cache_page_nowait(struct address_space *mapping,
 extern struct page * read_cache_page(struct address_space *mapping,
 				unsigned long index, filler_t *filler,
 				void *data);
+extern int read_cache_pages(struct address_space *mapping,
+		struct list_head *pages, filler_t *filler, void *data);
 
 extern int add_to_page_cache(struct page *page,
 		struct address_space *mapping, unsigned long index);

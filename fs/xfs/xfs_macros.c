@@ -854,14 +854,6 @@ xfs_da_make_cookie(xfs_mount_t *mp, xfs_dablk_t bno, int entry,
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_NODE_ENTRIES)
-int
-xfs_da_node_entries(xfs_mount_t *mp)
-{
-	return XFS_DA_NODE_ENTRIES(mp);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DADDR_TO_AGBNO)
 xfs_agblock_t
 xfs_daddr_to_agbno(xfs_mount_t *mp, xfs_daddr_t d)

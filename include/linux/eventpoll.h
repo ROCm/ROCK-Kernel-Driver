@@ -14,15 +14,18 @@
 #ifndef _LINUX_EVENTPOLL_H
 #define _LINUX_EVENTPOLL_H
 
-/* Forward declarations to avoid compiler errors */
-struct file;
-struct pollfd;
-
 
 /* Valid opcodes to issue to sys_epoll_ctl() */
 #define EP_CTL_ADD 1
 #define EP_CTL_DEL 2
 #define EP_CTL_MOD 3
+
+
+#ifdef __KERNEL__
+
+/* Forward declarations to avoid compiler errors */
+struct file;
+struct pollfd;
 
 
 /* Kernel space functions implementing the user space "epoll" API */
@@ -34,6 +37,7 @@ asmlinkage int sys_epoll_wait(int epfd, struct pollfd *events, int maxevents,
 /* Used in fs/file_table.c:__fput() to unlink files from the eventpoll interface */
 void ep_notify_file_close(struct file *file);
 
+#endif /* #ifdef __KERNEL__ */
 
-#endif
+#endif /* #ifndef _LINUX_EVENTPOLL_H */
 

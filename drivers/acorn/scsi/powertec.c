@@ -38,6 +38,7 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 
+#include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "fas216.h"
 #include "scsi.h"

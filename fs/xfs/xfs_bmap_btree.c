@@ -1874,7 +1874,7 @@ xfs_bmbt_delete(
  * xfs_bmbt_get_startblock, xfs_bmbt_get_blockcount and xfs_bmbt_get_state.
  */
 
-static __inline__ void
+STATIC __inline__ void
 __xfs_bmbt_get_all(
 		__uint64_t l0,
 		__uint64_t l1,
@@ -2514,10 +2514,10 @@ xfs_bmbt_set_allf(
 #if XFS_BIG_FILESYSTEMS
 	r->l0 = ((xfs_bmbt_rec_base_t)extent_flag << 63) |
 		((xfs_bmbt_rec_base_t)o << 9) |
-		((xfs_bmbt_rec_base_t)b >> 43));
+		((xfs_bmbt_rec_base_t)b >> 43);
 	r->l1 = ((xfs_bmbt_rec_base_t)b << 21) |
 		((xfs_bmbt_rec_base_t)c &
-		(xfs_bmbt_rec_base_t)XFS_MASK64LO(21)));
+		(xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
 #else	/* !XFS_BIG_FILESYSTEMS */
 	if (ISNULLSTARTBLOCK(b)) {
 		r->l0 = ((xfs_bmbt_rec_base_t)extent_flag << 63) |

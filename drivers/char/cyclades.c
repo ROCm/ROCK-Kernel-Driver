@@ -883,8 +883,7 @@ static void cyz_poll(unsigned long);
 static long cyz_polling_cycle = CZ_DEF_POLL;
 
 static int cyz_timeron = 0;
-static struct timer_list cyz_timerlist = {
-    function: cyz_poll
+static struct timer_list cyz_timerlist = TIMER_INITIALIZER(cyz_poll, 0, 0);
 };
 #else /* CONFIG_CYZ_INTR */
 static void cyz_rx_restart(unsigned long);
@@ -5667,6 +5666,7 @@ cy_init(void)
                     info->jiffies[2] = 0;
                     info->rflush_count = 0;
 #ifdef CONFIG_CYZ_INTR
+		    init_timer(&cyz_rx_full_timer[port]);
 		    cyz_rx_full_timer[port].function = NULL;
 #endif
                 }

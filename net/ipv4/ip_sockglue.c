@@ -36,6 +36,7 @@
 #include <linux/route.h>
 #include <linux/mroute.h>
 #include <net/route.h>
+#include <net/xfrm.h>
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 #include <net/transp_v6.h>
 #endif
@@ -624,6 +625,10 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 			inet->freebind = !!val; 
 	                break;			
  
+		case IP_IPSEC_POLICY:
+			err = xfrm_user_policy(sk, optname, optval, optlen);
+			break;
+
 		default:
 #ifdef CONFIG_NETFILTER
 			err = nf_setsockopt(sk, PF_INET, optname, optval, 

@@ -254,11 +254,11 @@ static char pg_scratch[512];            /* scratch block buffer */
 /* kernel glue structures */
 
 static struct file_operations pg_fops = {
-	owner:		THIS_MODULE,
-	read:		pg_read,
-	write:		pg_write,
-	open:		pg_open,
-	release:	pg_release,
+	.owner =	THIS_MODULE,
+	.read =		pg_read,
+	.write =	pg_write,
+	.open =		pg_open,
+	.release =	pg_release,
 };
 
 void pg_init_units( void )

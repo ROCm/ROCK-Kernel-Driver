@@ -48,12 +48,10 @@ static void idt77105_stats_timer_func(unsigned long);
 static void idt77105_restart_timer_func(unsigned long);
 
 
-static struct timer_list stats_timer = {
-    function:	&idt77105_stats_timer_func
-};
-static struct timer_list restart_timer = {
-    function:	&idt77105_restart_timer_func
-};
+static struct timer_list stats_timer =
+    TIMER_INITIALIZER(idt77105_stats_timer_func, 0, 0);
+static struct timer_list restart_timer =
+    TIMER_INITIALIZER(idt77105_restart_timer_func, 0, 0);
 static int start_timer = 1;
 static struct idt77105_priv *idt77105_all = NULL;
 

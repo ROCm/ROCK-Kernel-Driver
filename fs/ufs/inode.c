@@ -519,7 +519,7 @@ void ufs_read_inode (struct inode * inode)
 	inode->i_mtime = fs32_to_cpu(sb, ufs_inode->ui_mtime.tv_sec);
 	inode->i_blocks = fs32_to_cpu(sb, ufs_inode->ui_blocks);
 	inode->i_blksize = PAGE_SIZE;   /* This is the optimal IO size (for stat) */
-	inode->i_version = ++event;
+	inode->i_version++;
 	ufsi->i_flags = fs32_to_cpu(sb, ufs_inode->ui_flags);
 	ufsi->i_gen = fs32_to_cpu(sb, ufs_inode->ui_gen);
 	ufsi->i_shadow = fs32_to_cpu(sb, ufs_inode->ui_u3.ui_sun.ui_shadow);
