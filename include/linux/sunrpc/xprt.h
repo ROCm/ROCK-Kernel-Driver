@@ -14,6 +14,7 @@
 #include <linux/in.h>
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/xdr.h>
+#include <asm/atomic.h>
 
 /*
  * The transport code maintains an estimate on the maximum number of out-
@@ -152,6 +153,8 @@ struct rpc_xprt {
 				nocong	   : 1,	/* no congestion control */
 				resvport   : 1, /* use a reserved port */
 				stream     : 1;	/* TCP */
+	atomic_t		users;		/* Number of clients using
+						   his transport */
 
 	/*
 	 * State of TCP reply receive stuff

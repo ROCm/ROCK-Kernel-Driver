@@ -190,7 +190,7 @@ int vfs_permission(struct inode * inode, int mask)
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
 	 */
-	if ((mask & (MAY_READ|MAY_WRITE)) || (inode->i_mode & S_IXUGO))
+	if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
