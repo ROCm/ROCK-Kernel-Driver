@@ -115,20 +115,20 @@ static int __devinit com20020pci_probe(struct pci_dev *pdev, const struct pci_de
 		BUGMSG(D_NORMAL, "IO address %Xh was reported by PCI BIOS, "
 		       "but seems empty!\n", ioaddr);
 		err = -EIO;
-		goto out_priv;
+		goto out_port;
 	}
 	if (com20020_check(dev)) {
 		err = -EIO;
-		goto out_priv;
+		goto out_port;
 	}
 
-	release_region(ioaddr, ARCNET_TOTAL_SIZE);
-
 	if ((err = com20020_found(dev, SA_SHIRQ)) != 0)
-	        goto out_priv;
+	        goto out_port;
 
 	return 0;
 
+out_port:
+	release_region(ioaddr, ARCNET_TOTAL_SIZE);
 out_priv:
 	kfree(dev->priv);
 out_dev:
@@ -138,7 +138,9 @@ out_dev:
 
 static void __devexit com20020pci_remove(struct pci_dev *pdev)
 {
-	com20020_remove(pci_get_drvdata(pdev));
+	struct net_device *dev = pci_get_drvdata(pdev);
+	com20020_remove(dev);
+	release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
 }
 
 static struct pci_device_id com20020pci_id_table[] = {
