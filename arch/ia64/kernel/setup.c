@@ -372,6 +372,7 @@ setup_arch (char **cmdline_p)
 	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 
 	efi_init();
+	find_memory();
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
@@ -384,8 +385,6 @@ setup_arch (char **cmdline_p)
 	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
 # endif
 #endif /* CONFIG_APCI_BOOT */
-
-	find_memory();
 
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
