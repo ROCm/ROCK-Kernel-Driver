@@ -224,13 +224,18 @@ aiptek_close(struct input_dev *dev)
 		usb_unlink_urb(aiptek->irq);
 }
 
-/* 
- * FIXME, either remove this call, or talk the maintainer into 
- * adding usb_set_report back into the core.
- */
-#if 0
+#define USB_REQ_SET_REPORT	0x09
+static int
+usb_set_report(struct usb_device *dev, struct usb_host_interface *inter, unsigned char type,
+		unsigned char id, void *buf, int size)
+{
+	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+		USB_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+		(type << 8) + id, inter->desc.bInterfaceNumber, buf, size, HZ);
+}
+
 static void
-aiptek_command(struct usb_device *dev, unsigned int ifnum,
+aiptek_command(struct usb_device *dev, struct usb_host_interface *inter,
 	       unsigned char command, unsigned char data)
 {
 	__u8 buf[3];
@@ -239,17 +244,17 @@ aiptek_command(struct usb_device *dev, unsigned int ifnum,
 	buf[1] = command;
 	buf[2] = data;
 
-	if (usb_set_report(dev, ifnum, 3, 2, buf, 3) != 3) {
+	if (usb_set_report(dev, inter, 3, 2, buf, 3) != 3) {
 		dbg("aiptek_command: 0x%x 0x%x\n", command, data);
 	}
 }
-#endif
 
 static int 
 aiptek_probe(struct usb_interface *intf,
 	     const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
+	struct usb_host_interface *interface = intf->altsetting + 0;
 	struct usb_endpoint_descriptor *endpoint;
 	struct aiptek *aiptek;
 
@@ -271,11 +276,11 @@ aiptek_probe(struct usb_interface *intf,
 		return -ENOMEM;
 	}
 
-	// Resolution500LPI
-//	aiptek_command(dev, ifnum, 0x18, 0x04);
+	/* Resolution500LPI */
+	aiptek_command(dev, interface, 0x18, 0x04);
 
-	// SwitchToTablet
-//	aiptek_command(dev, ifnum, 0x10, 0x01);
+	/* SwitchToTablet */
+	aiptek_command(dev, interface, 0x10, 0x01);
 
 	aiptek->features = aiptek_features + id->driver_info;
 
