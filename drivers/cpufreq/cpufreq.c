@@ -162,6 +162,7 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 		 */
 		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
 			if ((likely(cpufreq_cpu_data[freqs->cpu])) &&
+			    (likely(cpufreq_cpu_data[freqs->cpu]->cpu == freqs->cpu)) &&
 			    (likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
 			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
 			{
@@ -176,7 +177,8 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	case CPUFREQ_POSTCHANGE:
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
-		if (likely(cpufreq_cpu_data[freqs->cpu]))
+		if ((likely(cpufreq_cpu_data[freqs->cpu])) && 
+		    (likely(cpufreq_cpu_data[freqs->cpu]->cpu == freqs->cpu)))
 			cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
 		break;
 	}
@@ -464,6 +466,18 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 	struct cpufreq_policy *policy;
 	struct freq_attr **drv_attr;
 	unsigned long flags;
+	unsigned int j;
+
+#ifdef CONFIG_SMP
+	/* check whether a different CPU already registered this
+	 * CPU because it is in the same boat. */
+	policy = cpufreq_cpu_get(cpu);
+	if (unlikely(policy)) {
+		cpu_sys_devices[cpu] = sys_dev;
+		sysfs_create_link(&sys_dev->kobj, &policy->kobj, "cpufreq");
+		return 0;
+	}
+#endif
 
 	if (!try_module_get(cpufreq_driver->owner))
 		return -EINVAL;
@@ -512,7 +526,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		sysfs_create_file(&policy->kobj, &scaling_cur_freq.attr);
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
-	cpufreq_cpu_data[cpu] = policy;
+	for_each_cpu_mask(j, policy->cpus)
+		cpufreq_cpu_data[j] = policy;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 	policy->governor = NULL; /* to assure that the starting sequence is
 				  * run in cpufreq_set_policy */
@@ -531,7 +546,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 
 err_out_unregister:
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
-	cpufreq_cpu_data[cpu] = NULL;
+	for_each_cpu_mask(j, policy->cpus)
+		cpufreq_cpu_data[j] = NULL;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	kobject_unregister(&policy->kobj);
@@ -556,21 +572,69 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	unsigned int cpu = sys_dev->id;
 	unsigned long flags;
 	struct cpufreq_policy *data;
-
-	cpu_sys_devices[cpu] = NULL;
+#ifdef CONFIG_SMP
+	unsigned int j;
+#endif
 
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	data = cpufreq_cpu_data[cpu];
 
 	if (!data) {
 		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		cpu_sys_devices[cpu] = NULL;
 		return -EINVAL;
 	}
 	cpufreq_cpu_data[cpu] = NULL;
+
+
+#ifdef CONFIG_SMP
+	/* if this isn't the CPU which is the parent of the kobj, we
+	 * only need to unlink, put and exit 
+	 */
+	if (unlikely(cpu != data->cpu)) {
+		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+		sysfs_remove_link(&sys_dev->kobj, "cpufreq");
+		cpu_sys_devices[cpu] = NULL;
+		cpufreq_cpu_put(data);
+		return 0;
+	}
+#endif
+
+	cpu_sys_devices[cpu] = NULL;
+
+	if (!kobject_get(&data->kobj)) {
+		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ 		return -EFAULT;
+	}
+
+#ifdef CONFIG_SMP
+	/* if we have other CPUs still registered, we need to unlink them,
+	 * or else wait_for_completion below will lock up. Clean the
+	 * cpufreq_cpu_data[] while holding the lock, and remove the sysfs
+	 * links afterwards.
+	 */
+	if (unlikely(cpus_weight(data->cpus) > 1)) {
+		for_each_cpu_mask(j, data->cpus) {
+			if (j == cpu)
+				continue;
+			cpufreq_cpu_data[j] = NULL;
+		}
+	}
+
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
-	if (!kobject_get(&data->kobj))
-		return -EFAULT;
+	if (unlikely(cpus_weight(data->cpus) > 1)) {
+		for_each_cpu_mask(j, data->cpus) {
+			if (j == cpu)
+				continue;
+			
+			sysfs_remove_link(&cpu_sys_devices[j]->kobj, "cpufreq");
+			cpufreq_cpu_put(data);
+		}
+	}
+#else
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+#endif
 
 	if (cpufreq_driver->target)
 		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
@@ -688,6 +752,12 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	cpu_policy = cpufreq_cpu_get(cpu);
 	if (!cpu_policy)
 		return -EINVAL;
+
+	/* only handle each CPU group once */
+	if (unlikely(cpu_policy->cpu != cpu)) {
+		cpufreq_cpu_put(cpu_policy);
+		return 0;
+	}
 
 	if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
 		unsigned int cur_freq = 0;
