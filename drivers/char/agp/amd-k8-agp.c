@@ -1,5 +1,5 @@
 /* 
- * Copyright 2001,2002 SuSE Labs
+ * Copyright 2001-2003 SuSE Labs
  * Distributed under the GNU public license, v2.
  * 
  * This is a GART driver for the AMD K8 northbridge and the AMD 8151 
@@ -265,7 +265,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	/* If not enough, go to AGP v2 setup */
 	if (v3_devs<2) {
 		printk (KERN_INFO "AGP: Only %d devices found, not enough, trying AGPv2\n", v3_devs);
-		return agp_generic_agp_enable(mode);
+		return agp_generic_enable(mode);
 	} else {
 		printk (KERN_INFO "AGP: Enough AGPv3 devices found, setting up...\n");
 	}

@@ -141,7 +141,7 @@ config AGP_ALPHA_CORE
 
 # Put AGP 3.0 entries below here.
 
-config AGP_I7505
+config AGP_I7x05
 	tristate "Intel 7205/7505 support (AGP 3.0)"
 	depends on AGP3
 	help

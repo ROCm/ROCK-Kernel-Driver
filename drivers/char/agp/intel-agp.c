@@ -1026,7 +1026,7 @@ static int __init intel_generic_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_cleanup;
 	agp_bridge->tlb_flush = intel_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1055,7 +1055,7 @@ static int __init intel_815_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1085,7 +1085,7 @@ static int __init intel_820_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_820_cleanup;
 	agp_bridge->tlb_flush = intel_820_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1114,7 +1114,7 @@ static int __init intel_830mp_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1143,7 +1143,7 @@ static int __init intel_840_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1172,7 +1172,7 @@ static int __init intel_845_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1201,7 +1201,7 @@ static int __init intel_850_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
@@ -1230,7 +1230,7 @@ static int __init intel_860_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = intel_8xx_cleanup;
 	agp_bridge->tlb_flush = intel_8xx_tlbflush;
 	agp_bridge->mask_memory = intel_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;

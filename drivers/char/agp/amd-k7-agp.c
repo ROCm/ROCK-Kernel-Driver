@@ -368,7 +368,7 @@ static int __init amd_irongate_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = amd_irongate_cleanup;
 	agp_bridge->tlb_flush = amd_irongate_tlbflush;
 	agp_bridge->mask_memory = amd_irongate_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = amd_create_gatt_table;
 	agp_bridge->free_gatt_table = amd_free_gatt_table;
