@@ -313,7 +313,7 @@ define rule_vmlinux__
 	set -e
 	$(if $(filter .tmp_kallsyms%,$^),,
 	  echo '  Generating build number'
-	  . scripts/mkversion > .tmp_version
+	  . $(src)/scripts/mkversion > .tmp_version
 	  mv -f .tmp_version .version
 	  $(Q)$(MAKE) -f scripts/Makefile.build obj=init
 	)
@@ -329,7 +329,7 @@ endef
 ifdef CONFIG_SMP
 define rule_vmlinux
 	$(rule_vmlinux_no_percpu)
-	$(AWK) -f scripts/per-cpu-check.awk < System.map
+	$(AWK) -f $(srctree)/scripts/per-cpu-check.awk < System.map
 endef
 else
 define rule_vmlinux
@@ -619,7 +619,7 @@ rpm:	clean spec
 	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
 	rm $(KERNELPATH) ; \
 	cd $(TOPDIR) ; \
-	. scripts/mkversion > .version ; \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .version ; \
 	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
