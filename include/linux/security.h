@@ -53,7 +53,7 @@ extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
 extern int cap_vm_enough_memory (long pages);
 
-static inline int cap_netlink_send (struct sk_buff *skb)
+static inline int cap_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
 	NETLINK_CB (skb).eff_cap = current->cap_effective;
 	return 0;
@@ -639,9 +639,12 @@ struct swap_info_struct;
  *	Save security information for a netlink message so that permission
  *	checking can be performed when the message is processed.  The security
  *	information can be saved using the eff_cap field of the
- *      netlink_skb_parms structure.
+ *      netlink_skb_parms structure.  Also may be used to provide fine
+ *	grained control over message transmission.
+ *	@sk associated sock of task sending the message.,
  *	@skb contains the sk_buff structure for the netlink message.
- *	Return 0 if the information was successfully saved.
+ *	Return 0 if the information was successfully saved and message
+ *	is allowed to be transmitted.
  * @netlink_recv:
  *	Check permission before processing the received netlink message in
  *	@skb.
@@ -1181,7 +1184,7 @@ struct security_operations {
 	int (*sem_semop) (struct sem_array * sma, 
 			  struct sembuf * sops, unsigned nsops, int alter);
 
-	int (*netlink_send) (struct sk_buff * skb);
+	int (*netlink_send) (struct sock * sk, struct sk_buff * skb);
 	int (*netlink_recv) (struct sk_buff * skb);
 
 	/* allow module stacking */
@@ -1873,9 +1876,9 @@ static inline int security_setprocattr(struct task_struct *p, char *name, void *
 	return security_ops->setprocattr(p, name, value, size);
 }
 
-static inline int security_netlink_send(struct sk_buff * skb)
+static inline int security_netlink_send(struct sock *sk, struct sk_buff * skb)
 {
-	return security_ops->netlink_send(skb);
+	return security_ops->netlink_send(sk, skb);
 }
 
 static inline int security_netlink_recv(struct sk_buff * skb)
@@ -2501,9 +2504,9 @@ static inline int security_setprocattr(struct task_struct *p, char *name, void *
  * (rather than hooking into the capability module) to reduce overhead
  * in the networking code.
  */
-static inline int security_netlink_send (struct sk_buff *skb)
+static inline int security_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
-	return cap_netlink_send (skb);
+	return cap_netlink_send (sk, skb);
 }
 
 static inline int security_netlink_recv (struct sk_buff *skb)

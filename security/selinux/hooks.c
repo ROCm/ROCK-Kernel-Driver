@@ -1567,7 +1567,7 @@ static int selinux_vm_enough_memory(long pages)
 	return -ENOMEM;
 }
 
-static int selinux_netlink_send(struct sk_buff *skb)
+static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
 	if (capable(CAP_NET_ADMIN))
 		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);

@@ -734,7 +734,7 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 		goto out;
 	}
 
-	err = security_netlink_send(skb);
+	err = security_netlink_send(sk, skb);
 	if (err) {
 		kfree_skb(skb);
 		goto out;
