@@ -659,8 +659,7 @@ static void __init
 setup_bandit(struct pci_controller* hose, struct reg_property* addr)
 {
 	hose->ops = &macrisc_pci_ops;
-	hose->cfg_addr = (volatile unsigned int *)
-		ioremap(addr->address + 0x800000, 0x1000);
+	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
 	init_bandit(hose);
 }
@@ -670,8 +669,7 @@ setup_chaos(struct pci_controller* hose, struct reg_property* addr)
 {
 	/* assume a `chaos' bridge */
 	hose->ops = &chaos_pci_ops;
-	hose->cfg_addr = (volatile unsigned int *)
-		ioremap(addr->address + 0x800000, 0x1000);
+	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
 	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
 }
 
