@@ -556,7 +556,7 @@ static struct net_device_stats *nv_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-static int nv_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int nv_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	u8 *base = get_hwbase(dev);
@@ -634,7 +634,7 @@ static int nv_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return nv_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return nv_ethtool_ioctl(dev, rq->ifr_data);
 
 	default:
 		return -EOPNOTSUPP;

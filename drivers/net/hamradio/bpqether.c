@@ -331,7 +331,7 @@ static int bpq_set_mac_address(struct net_device *dev, void *addr)
  */
 static int bpq_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct bpq_ethaddr *ethaddr = (struct bpq_ethaddr *)ifr->ifr_data;
+	struct bpq_ethaddr __user *ethaddr = ifr->ifr_data;
 	struct bpqdev *bpq = dev->priv;
 	struct bpq_req req;
 

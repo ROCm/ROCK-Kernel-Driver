@@ -1369,7 +1369,7 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 }
 
 
-static int xircom_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd ecmd;
 	struct xircom_private *tp = dev->priv;
@@ -1477,7 +1477,7 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return xircom_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return xircom_ethtool_ioctl(dev, rq->ifr_data);
 
 	/* Legacy mii-diag interface */
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */

@@ -1113,7 +1113,7 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = pegasus_ethtool_ioctl(net, (void __user *)rq->ifr_data);
+		res = pegasus_ethtool_ioctl(net, rq->ifr_data);
 		break;
 	case SIOCDEVPRIVATE:
 		data[0] = pegasus->phy;

@@ -147,7 +147,7 @@ struct ifreq
 		struct  ifmap ifru_map;
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
-		char __user *	ifru_data;
+		void __user *	ifru_data;
 		struct	if_settings ifru_settings;
 	} ifr_ifru;
 };

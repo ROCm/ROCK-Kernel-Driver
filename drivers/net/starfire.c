@@ -1997,7 +1997,7 @@ static void set_rx_mode(struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct ethtool_cmd ecmd;
 	struct netdev_private *np = dev->priv;
@@ -2086,7 +2086,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return -EINVAL;
 
 	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	else {
 		spin_lock_irq(&np->lock);

@@ -1651,12 +1651,12 @@ static struct net_device_stats *eth_get_stats (struct net_device *net)
 	return &((struct eth_dev *) net->priv)->stats;
 }
 
-static int eth_ethtool_ioctl (struct net_device *net, void *useraddr)
+static int eth_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 {
 	struct eth_dev	*dev = (struct eth_dev *) net->priv;
 	u32		cmd;
 
-	if (get_user (cmd, (u32 *)useraddr))
+	if (get_user (cmd, (u32 __user *)useraddr))
 		return -EFAULT;
 	switch (cmd) {
 
@@ -1694,7 +1694,7 @@ static int eth_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return eth_ethtool_ioctl (net, (void *)rq->ifr_data);
+		return eth_ethtool_ioctl(net, rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}

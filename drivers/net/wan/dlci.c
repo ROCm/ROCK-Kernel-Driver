@@ -229,7 +229,7 @@ static int dlci_transmit(struct sk_buff *skb, struct net_device *dev)
 	return(ret);
 }
 
-static int dlci_config(struct net_device *dev, struct dlci_conf *conf, int get)
+static int dlci_config(struct net_device *dev, struct dlci_conf __user *conf, int get)
 {
 	struct dlci_conf	config;
 	struct dlci_local	*dlp;
@@ -286,7 +286,7 @@ static int dlci_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			if (!*(short *)(dev->dev_addr))
 				return(-EINVAL);
 
-			return(dlci_config(dev, (struct dlci_conf *) ifr->ifr_data, cmd == DLCI_GET_CONF));
+			return(dlci_config(dev, ifr->ifr_data, cmd == DLCI_GET_CONF));
 			break;
 
 		default: 

@@ -362,7 +362,7 @@ ixgb_ethtool_geeprom(struct ixgb_adapter *adapter,
 
 static int
 ixgb_ethtool_seeprom(struct ixgb_adapter *adapter,
-		     struct ethtool_eeprom *eeprom, void *user_data)
+		     struct ethtool_eeprom *eeprom, void __user *user_data)
 {
 	struct ixgb_hw *hw = &adapter->hw;
 	uint16_t eeprom_buff[256];
@@ -457,10 +457,10 @@ ixgb_ethtool_led_blink(struct ixgb_adapter *adapter, struct ethtool_value *id)
 int ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
-	void *addr = ifr->ifr_data;
+	void __user *addr = ifr->ifr_data;
 	uint32_t cmd;
 
-	if (get_user(cmd, (uint32_t *) addr))
+	if (get_user(cmd, (uint32_t __user *) addr))
 		return -EFAULT;
 
 	switch (cmd) {
