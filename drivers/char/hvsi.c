@@ -29,11 +29,6 @@
  * the OS cannot change the speed of the port through this protocol.
  */
 
-/* TODO:
- * test FSP reset
- * add udbg support for xmon/kdb
- */
-
 #undef DEBUG
 
 #include <linux/console.h>
@@ -54,6 +49,7 @@
 #include <asm/prom.h>
 #include <asm/uaccess.h>
 #include <asm/vio.h>
+#include <asm/param.h>
 
 #define HVSI_MAJOR	229
 #define HVSI_MINOR	128
@@ -74,6 +70,7 @@
 
 struct hvsi_struct {
 	struct work_struct writer;
+	struct work_struct handshaker;
 	wait_queue_head_t emptyq; /* woken when outbuf is emptied */
 	wait_queue_head_t stateq; /* woken when HVSI state changes */
 	spinlock_t lock;
@@ -109,6 +106,7 @@ enum HVSI_PROTOCOL_STATE {
 	HVSI_WAIT_FOR_VER_QUERY,
 	HVSI_OPEN,
 	HVSI_WAIT_FOR_MCTRL_RESPONSE,
+	HVSI_FSP_DIED,
 };
 #define HVSI_CONSOLE 0x1
 
@@ -172,6 +170,13 @@ struct hvsi_query_response {
 	} u;
 } __attribute__((packed));
 
+
+
+static inline int is_console(struct hvsi_struct *hp)
+{
+	return hp->flags & HVSI_CONSOLE;
+}
+
 static inline int is_open(struct hvsi_struct *hp)
 {
 	/* if we're waiting for an mctrl then we're already open */
@@ -188,6 +193,7 @@ static inline void print_state(struct hvsi_struct *hp)
 		"HVSI_WAIT_FOR_VER_QUERY",
 		"HVSI_OPEN",
 		"HVSI_WAIT_FOR_MCTRL_RESPONSE",
+		"HVSI_FSP_DIED",
 	};
 	const char *name = state_names[hp->state];
 
@@ -296,14 +302,9 @@ static int hvsi_read(struct hvsi_struct *hp, char *buf, int count)
 	return 0;
 }
 
-/*
- * we can't call tty_hangup() directly here because we need to call that
- * outside of our lock
- */
-static struct tty_struct *hvsi_recv_control(struct hvsi_struct *hp,
-		uint8_t *packet)
+static void hvsi_recv_control(struct hvsi_struct *hp, uint8_t *packet,
+	struct tty_struct **to_hangup, struct hvsi_struct **to_handshake)
 {
-	struct tty_struct *to_hangup = NULL;
 	struct hvsi_control *header = (struct hvsi_control *)packet;
 
 	switch (header->verb) {
@@ -313,15 +314,14 @@ static struct tty_struct *hvsi_recv_control(struct hvsi_struct *hp,
 				pr_debug("hvsi%i: CD dropped\n", hp->index);
 				hp->mctrl &= TIOCM_CD;
 				if (!(hp->tty->flags & CLOCAL))
-					to_hangup = hp->tty;
+					*to_hangup = hp->tty;
 			}
 			break;
 		case VSV_CLOSE_PROTOCOL:
-			printk(KERN_DEBUG
-				"hvsi%i: service processor closed connection!\n", hp->index);
-			__set_state(hp, HVSI_CLOSED);
-			to_hangup = hp->tty;
-			hp->tty = NULL;
+			pr_debug("hvsi%i: service processor came back\n", hp->index);
+			if (hp->state != HVSI_CLOSED) {
+				*to_handshake = hp;
+			}
 			break;
 		default:
 			printk(KERN_WARNING "hvsi%i: unknown HVSI control packet: ",
@@ -329,8 +329,6 @@ static struct tty_struct *hvsi_recv_control(struct hvsi_struct *hp,
 			dump_packet(packet);
 			break;
 	}
-
-	return to_hangup;
 }
 
 static void hvsi_recv_response(struct hvsi_struct *hp, uint8_t *packet)
@@ -388,8 +386,8 @@ static void hvsi_recv_query(struct hvsi_struct *hp, uint8_t *packet)
 
 	switch (hp->state) {
 		case HVSI_WAIT_FOR_VER_QUERY:
-			__set_state(hp, HVSI_OPEN);
 			hvsi_version_respond(hp, query->seqno);
+			__set_state(hp, HVSI_OPEN);
 			break;
 		default:
 			printk(KERN_ERR "hvsi%i: unexpected query: ", hp->index);
@@ -467,17 +465,20 @@ static struct tty_struct *hvsi_recv_data(struct hvsi_struct *hp,
  * incoming data).
  */
 static int hvsi_load_chunk(struct hvsi_struct *hp, struct tty_struct **flip,
-		struct tty_struct **hangup)
+		struct tty_struct **hangup, struct hvsi_struct **handshake)
 {
 	uint8_t *packet = hp->inbuf;
 	int chunklen;
 
 	*flip = NULL;
 	*hangup = NULL;
+	*handshake = NULL;
 
 	chunklen = hvsi_read(hp, hp->inbuf_end, HVSI_MAX_READ);
-	if (chunklen == 0)
+	if (chunklen == 0) {
+		pr_debug("%s: 0-length read\n", __FUNCTION__);
 		return 0;
+	}
 
 	pr_debug("%s: got %i bytes\n", __FUNCTION__, chunklen);
 	dbg_dump_hex(hp->inbuf_end, chunklen);
@@ -509,7 +510,7 @@ static int hvsi_load_chunk(struct hvsi_struct *hp, struct tty_struct **flip,
 				*flip = hvsi_recv_data(hp, packet);
 				break;
 			case VS_CONTROL_PACKET_HEADER:
-				*hangup = hvsi_recv_control(hp, packet);
+				hvsi_recv_control(hp, packet, hangup, handshake);
 				break;
 			case VS_QUERY_RESPONSE_PACKET_HEADER:
 				hvsi_recv_response(hp, packet);
@@ -526,8 +527,8 @@ static int hvsi_load_chunk(struct hvsi_struct *hp, struct tty_struct **flip,
 
 		packet += len_packet(packet);
 
-		if (*hangup) {
-			pr_debug("%s: hangup\n", __FUNCTION__);
+		if (*hangup || *handshake) {
+			pr_debug("%s: hangup or handshake\n", __FUNCTION__);
 			/*
 			 * we need to send the hangup now before receiving any more data.
 			 * If we get "data, hangup, data", we can't deliver the second
@@ -560,16 +561,15 @@ static irqreturn_t hvsi_interrupt(int irq, void *arg, struct pt_regs *regs)
 	struct hvsi_struct *hp = (struct hvsi_struct *)arg;
 	struct tty_struct *flip;
 	struct tty_struct *hangup;
+	struct hvsi_struct *handshake;
 	unsigned long flags;
-	irqreturn_t handled = IRQ_NONE;
 	int again = 1;
 
 	pr_debug("%s\n", __FUNCTION__);
 
 	while (again) {
 		spin_lock_irqsave(&hp->lock, flags);
-		again = hvsi_load_chunk(hp, &flip, &hangup);
-		handled = IRQ_HANDLED;
+		again = hvsi_load_chunk(hp, &flip, &hangup, &handshake);
 		spin_unlock_irqrestore(&hp->lock, flags);
 
 		/*
@@ -587,6 +587,11 @@ static irqreturn_t hvsi_interrupt(int irq, void *arg, struct pt_regs *regs)
 		if (hangup) {
 			tty_hangup(hangup);
 		}
+
+		if (handshake) {
+			pr_debug("hvsi%i: attempting re-handshake\n", handshake->index);
+			schedule_work(&handshake->handshaker);
+		}
 	}
 
 	spin_lock_irqsave(&hp->lock, flags);
@@ -603,7 +608,7 @@ static irqreturn_t hvsi_interrupt(int irq, void *arg, struct pt_regs *regs)
 		tty_flip_buffer_push(flip);
 	}
 
-	return handled;
+	return IRQ_HANDLED;
 }
 
 /* for boot console, before the irq handler is running */
@@ -757,6 +762,23 @@ static int hvsi_handshake(struct hvsi_struct *hp)
 	return 0;
 }
 
+static void hvsi_handshaker(void *arg)
+{
+	struct hvsi_struct *hp = (struct hvsi_struct *)arg;
+
+	if (hvsi_handshake(hp) >= 0)
+		return;
+
+	printk(KERN_ERR "hvsi%i: re-handshaking failed\n", hp->index);
+	if (is_console(hp)) {
+		/*
+		 * ttys will re-attempt the handshake via hvsi_open, but
+		 * the console will not.
+		 */
+		printk(KERN_ERR "hvsi%i: lost console!\n", hp->index);
+	}
+}
+
 static int hvsi_put_chars(struct hvsi_struct *hp, const char *buf, int count)
 {
 	struct hvsi_data packet __ALIGNED__;
@@ -808,6 +830,10 @@ static int hvsi_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = hp;
 	tty->low_latency = 1; /* avoid throttle/tty_flip_buffer_push race */
 
+	mb();
+	if (hp->state == HVSI_FSP_DIED)
+		return -EIO;
+
 	spin_lock_irqsave(&hp->lock, flags);
 	hp->tty = tty;
 	hp->count++;
@@ -815,7 +841,7 @@ static int hvsi_open(struct tty_struct *tty, struct file *filp)
 	h_vio_signal(hp->vtermno, VIO_IRQ_ENABLE);
 	spin_unlock_irqrestore(&hp->lock, flags);
 
-	if (hp->flags & HVSI_CONSOLE)
+	if (is_console(hp))
 		return 0; /* this has already been handshaked as the console */
 
 	ret = hvsi_handshake(hp);
@@ -889,7 +915,7 @@ static void hvsi_close(struct tty_struct *tty, struct file *filp)
 		hp->inbuf_end = hp->inbuf; /* discard remaining partial packets */
 
 		/* only close down connection if it is not the console */
-		if (!(hp->flags & HVSI_CONSOLE)) {
+		if (!is_console(hp)) {
 			h_vio_signal(hp->vtermno, VIO_IRQ_DISABLE); /* no more irqs */
 			__set_state(hp, HVSI_CLOSED);
 			/*
@@ -949,12 +975,13 @@ static void hvsi_push(struct hvsi_struct *hp)
 		return;
 
 	n = hvsi_put_chars(hp, hp->outbuf, hp->n_outbuf);
-	if (n != 0) {
-		/*
-		 * either all data was sent or there was an error, and we throw away
-		 * data on error.
-		 */
+	if (n > 0) {
+		/* success */
+		pr_debug("%s: wrote %i chars\n", __FUNCTION__, n);
 		hp->n_outbuf = 0;
+	} else if (n == -EIO) {
+		__set_state(hp, HVSI_FSP_DIED);
+		printk(KERN_ERR "hvsi%i: service processor died\n", hp->index);
 	}
 }
 
@@ -972,6 +999,19 @@ static void hvsi_write_worker(void *arg)
 
 	spin_lock_irqsave(&hp->lock, flags);
 
+	pr_debug("%s: %i chars in buffer\n", __FUNCTION__, hp->n_outbuf);
+
+	if (!is_open(hp)) {
+		/*
+		 * We could have a non-open connection if the service processor died
+		 * while we were busily scheduling ourselves. In that case, it could
+		 * be minutes before the service processor comes back, so only try
+		 * again once a second.
+		 */
+		schedule_delayed_work(&hp->writer, HZ);
+		goto out;
+	}
+
 	hvsi_push(hp);
 	if (hp->n_outbuf > 0)
 		schedule_delayed_work(&hp->writer, 10);
@@ -988,6 +1028,7 @@ static void hvsi_write_worker(void *arg)
 		wake_up_interruptible(&hp->tty->write_wait);
 	}
 
+out:
 	spin_unlock_irqrestore(&hp->lock, flags);
 }
 
@@ -1015,6 +1056,8 @@ static int hvsi_write(struct tty_struct *tty,
 	int origcount = count;
 
 	spin_lock_irqsave(&hp->lock, flags);
+
+	pr_debug("%s: %i chars in buffer\n", __FUNCTION__, hp->n_outbuf);
 
 	if (!is_open(hp)) {
 		/* we're either closing or not yet open; don't accept data */
@@ -1285,6 +1328,7 @@ static int __init hvsi_console_init(void)
 
 		hp = &hvsi_ports[hvsi_count];
 		INIT_WORK(&hp->writer, hvsi_write_worker, hp);
+		INIT_WORK(&hp->handshaker, hvsi_handshaker, hp);
 		init_waitqueue_head(&hp->emptyq);
 		init_waitqueue_head(&hp->stateq);
 		hp->lock = SPIN_LOCK_UNLOCKED;
