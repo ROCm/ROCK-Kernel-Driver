@@ -74,6 +74,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
+static int dxs_support[SNDRV_CARDS];
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for VIA 82xx bridge.");
@@ -90,6 +91,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
 MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
+MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only)");
+MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,3}},dialog:list");
 
 
 /* pci ids */
@@ -435,6 +439,7 @@ struct _snd_via82xx {
 	unsigned int playback_devno, multi_devno, capture_devno;
 	viadev_t devs[VIA_MAX_DEVS];
 	struct via_rate_lock rates[2]; /* playback and capture */
+	unsigned int dxs_fixed: 1;	/* DXS channel accepts only 48kHz */
 
 	snd_rawmidi_t *rmidi;
 
@@ -876,6 +881,8 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 		return rate_changed;
 	if (rate_changed) {
 		snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, runtime->rate);
+		snd_ac97_set_rate(chip->ac97, AC97_PCM_SURR_DAC_RATE, runtime->rate);
+		snd_ac97_set_rate(chip->ac97, AC97_PCM_LFE_DAC_RATE, runtime->rate);
 		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
 	if (chip->chip_type == TYPE_VIA8233A)
@@ -1000,6 +1007,19 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	int err;
 	unsigned long flags;
 	struct via_rate_lock *ratep;
+	struct ratetbl {
+		int rate;
+		unsigned int bit;
+	} ratebits[] = {
+		{8000, SNDRV_PCM_RATE_8000},
+		{11025, SNDRV_PCM_RATE_11025},
+		{16000, SNDRV_PCM_RATE_16000},
+		{22050, SNDRV_PCM_RATE_22050},
+		{32000, SNDRV_PCM_RATE_32000},
+		{44100, SNDRV_PCM_RATE_44100},
+		{48000, SNDRV_PCM_RATE_48000},
+	};
+	int i;
 
 	runtime->hw = snd_via82xx_hw;
 	
@@ -1007,14 +1027,33 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	ratep = &chip->rates[viadev->direction];
 	spin_lock_irqsave(&ratep->lock, flags);
 	ratep->used++;
-	if (! ratep->rate) {
+	if (chip->dxs_fixed) {
+		runtime->hw.rates = SNDRV_PCM_RATE_48000;
+		runtime->hw.rate_min = runtime->hw.rate_max = 48000;
+	} else if (! ratep->rate) {
 		int idx = viadev->direction ? AC97_RATES_ADC : AC97_RATES_FRONT_DAC;
 		runtime->hw.rates = chip->ac97->rates[idx];
-		if (runtime->hw.rates & SNDRV_PCM_RATE_8000)
-			runtime->hw.rate_min = 8000;
+		for (i = 0; i < (int)ARRAY_SIZE(ratebits); i++) {
+			if (runtime->hw.rates & ratebits[i].bit) {
+				runtime->hw.rate_min = ratebits[i].rate;
+				break;
+			}
+		}
+		for (i = ARRAY_SIZE(ratebits) - 1; i >= 0; i--) {
+			if (runtime->hw.rates & ratebits[i].bit) {
+				runtime->hw.rate_max = ratebits[i].rate;
+				break;
+			}
+		}
 	} else {
 		/* a fixed rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_KNOT;
+		for (i = 0; i < (int)ARRAY_SIZE(ratebits); i++) {
+			if (ratep->rate == ratebits[i].rate) {
+				runtime->hw.rates = ratebits[i].bit;
+				break;
+			}
+		}
 		runtime->hw.rate_max = runtime->hw.rate_min = ratep->rate;
 	}
 	spin_unlock_irqrestore(&ratep->lock, flags);
@@ -1038,8 +1077,11 @@ static int snd_via82xx_playback_open(snd_pcm_substream_t * substream)
 {
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
 	viadev_t *viadev = &chip->devs[chip->playback_devno + substream->number];
+	int err;
 
-	return snd_via82xx_pcm_open(chip, viadev, substream);
+	if ((err = snd_via82xx_pcm_open(chip, viadev, substream)) < 0)
+		return err;
+	return 0;
 }
 
 /*
@@ -1639,6 +1681,28 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 
 
 /*
+ * proc interface
+ */
+static void snd_via82xx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
+{
+	via82xx_t *chip = snd_magic_cast(via82xx_t, entry->private_data, return);
+	int i;
+	
+	snd_iprintf(buffer, "%s\n\n", chip->card->longname);
+	for (i = 0; i < 0xa0; i += 4) {
+		snd_iprintf(buffer, "%02x: %08x", i, inl(chip->port + i));
+	}
+}
+
+static void __devinit snd_via82xx_proc_init(via82xx_t *chip)
+{
+	snd_info_entry_t *entry;
+
+	if (! snd_card_proc_new(chip->card, "via82xx", &entry))
+		snd_info_set_text_ops(entry, chip, snd_via82xx_proc_read);
+}
+
+/*
  *
  */
 
@@ -1736,6 +1800,19 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 		outl(0, VIAREG(chip, GPI_INTR));
 	}
 
+	if (chip->chip_type != TYPE_VIA686) {
+		/* Workaround for Award BIOS bug:
+		 * DXS channels don't work properly with VRA if MC97 is disabled.
+		 */
+		struct pci_dev *pci;
+		pci = pci_find_device(0x1106, 0x3068, NULL); /* MC97 */
+		if (pci) {
+			unsigned char data;
+			pci_read_config_byte(pci, 0x44, &data);
+			pci_write_config_byte(pci, 0x44, data | 0x40);
+		}
+	}
+
 	return 0;
 }
 
@@ -1816,7 +1893,7 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	if (request_irq(pci->irq, snd_via82xx_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			card->driver, (void *)chip)) {
 		snd_via82xx_free(chip);
-		snd_printk("unable to grab IRQ %d\n", chip->irq);
+		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
@@ -1896,6 +1973,13 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				break;
 			}
 		}
+		/* force to use VIA8233 or 8233A model according to
+		 * dxs_support module option
+		 */
+		if (dxs_support[dev] == 1)
+			chip_type = TYPE_VIA8233;
+		else if (dxs_support[dev] == 2)
+			chip_type = TYPE_VIA8233A;
 		if (chip_type == TYPE_VIA8233A)
 			strcpy(card->driver, "VIA8233A");
 		else
@@ -1909,7 +1993,6 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		
 	if ((err = snd_via82xx_create(card, pci, chip_type, revision, ac97_clock[dev], &chip)) < 0)
 		goto __error;
-
 	if ((err = snd_via82xx_mixer_new(chip)) < 0)
 		goto __error;
 
@@ -1924,6 +2007,8 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		} else {
 			if ((err = snd_via8233_pcm_new(chip)) < 0)
 				goto __error;
+			if (dxs_support[dev] == 3)
+				chip->dxs_fixed = 1;
 		}
 		if ((err = snd_via8233_init_misc(chip, dev)) < 0)
 			goto __error;
@@ -1934,6 +2019,8 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 
 	sprintf(card->longname, "%s at 0x%lx, irq %d",
 		card->shortname, chip->port, chip->irq);
+
+	snd_via82xx_proc_init(chip);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

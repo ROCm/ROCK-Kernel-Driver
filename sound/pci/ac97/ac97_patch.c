@@ -51,52 +51,60 @@ int patch_yamaha_ymf753(ac97_t * ac97)
 	return 0;
 }
 
-int patch_wolfson00(ac97_t * ac97)
-{
-	/* This sequence is suspect because it was designed for
-	   the WM9704, and is known to fail when applied to the
-	   WM9707.  If you're having trouble initializing a
-	   WM9700, this is the place to start looking.
-	   Randolph Bentson <bentson@holmsjoen.com> */
+/*
+ * May 2, 2003 Liam Girdwood <liam.girdwood@wolfsonmicro.com>
+ *  removed broken wolfson00 patch.
+ *  added support for WM9705,WM9708,WM9709,WM9710,WM9711,WM9712 and WM9717.
+ */
 
-	// WM9701A
-	snd_ac97_write_cache(ac97, 0x72, 0x0808);
-	snd_ac97_write_cache(ac97, 0x74, 0x0808);
-
-	// patch for DVD noise
-	snd_ac97_write_cache(ac97, 0x5a, 0x0200);
-
-	// init vol
-	snd_ac97_write_cache(ac97, 0x70, 0x0808);
-
-	snd_ac97_write_cache(ac97, AC97_SURROUND_MASTER, 0x0000);
-	return 0;
-}
-
+#define AC97_WM97XX_FMIXER_VOL	0x72
+#define AC97_WM9704_RMIXER_VOL	0x74
+#define AC97_WM9704_TEST	0x5a
+#define AC97_WM9704_RPCM_VOL	0x70
+#define AC97_WM9711_OUT3VOL	0x16
+ 
 int patch_wolfson03(ac97_t * ac97)
 {
 	/* This is known to work for the ViewSonic ViewPad 1000
 	   Randolph Bentson <bentson@holmsjoen.com> */
 
-	// WM9703/9707
-	snd_ac97_write_cache(ac97, 0x72, 0x0808);
-	snd_ac97_write_cache(ac97, 0x20, 0x8000);
+	// WM9703/9707/9708/9717
+	snd_ac97_write_cache(ac97, AC97_WM97XX_FMIXER_VOL, 0x0808);
+	snd_ac97_write_cache(ac97, AC97_GENERAL_PURPOSE, 0x8000);
+	return 0;
+}
+  
+int patch_wolfson04(ac97_t * ac97)
+{
+	// WM9704M/9704Q
+	// set front and rear mixer volume
+	snd_ac97_write_cache(ac97, AC97_WM97XX_FMIXER_VOL, 0x0808);
+	snd_ac97_write_cache(ac97, AC97_WM9704_RMIXER_VOL, 0x0808);
+	
+	// patch for DVD noise
+	snd_ac97_write_cache(ac97, AC97_WM9704_TEST, 0x0200);
+ 
+	// init vol
+	snd_ac97_write_cache(ac97, AC97_WM9704_RPCM_VOL, 0x0808);
+ 
+	// set rear surround volume
+	snd_ac97_write_cache(ac97, AC97_SURROUND_MASTER, 0x0000);
+	return 0;
+}
+  
+int patch_wolfson05(ac97_t * ac97)
+{
+	// WM9705, WM9710
+	// set front mixer volume
+	snd_ac97_write_cache(ac97, AC97_WM97XX_FMIXER_VOL, 0x0808);
 	return 0;
 }
 
-int patch_wolfson04(ac97_t * ac97)
+int patch_wolfson11(ac97_t * ac97)
 {
-	// WM9704
-	snd_ac97_write_cache(ac97, 0x72, 0x0808);
-	snd_ac97_write_cache(ac97, 0x74, 0x0808);
-
-	// patch for DVD noise
-	snd_ac97_write_cache(ac97, 0x5a, 0x0200);
-
-	// init vol
-	snd_ac97_write_cache(ac97, 0x70, 0x0808);
-
-	snd_ac97_write_cache(ac97, AC97_SURROUND_MASTER, 0x0000);
+	// WM9711, WM9712
+	// set out3 volume
+	snd_ac97_write_cache(ac97, AC97_WM9711_OUT3VOL, 0x0808);
 	return 0;
 }
 
@@ -360,10 +368,21 @@ int patch_ad1980(ac97_t * ac97)
 int patch_alc650(ac97_t * ac97)
 {
 	unsigned short val;
+	int spdif = 0;
+
+	/* FIXME: set the above 1 if we can detect the chip rev.E correctly.
+	 *        this is used for switching mic and center/lfe, which needs
+	 *        resetting GPIO0 level on the older revision.
+	 */
+	ac97->spec.dev_flags = 0;
 
 	/* check spdif */
-	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-	if (val & AC97_EA_SPCV) {
+	if (ac97->spec.dev_flags) {
+		val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+		if (val & AC97_EA_SPCV)
+			spdif = 1;
+	}
+	if (spdif) {
 		/* enable spdif in */
 		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
 				     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
@@ -373,6 +392,25 @@ int patch_alc650(ac97_t * ac97)
 	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
 	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
 	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
+
+	if (! ac97->spec.dev_flags) {
+		/* set GPIO */
+		int mic_off;
+		mic_off = snd_ac97_read(ac97, AC97_ALC650_MULTICH) & (1 << 10);
+		/* GPIO0 direction */
+		val = snd_ac97_read(ac97, 0x76);
+		if (mic_off)
+			val &= ~0x01;
+		else
+			val |= 0x01;
+		snd_ac97_write_cache(ac97, 0x76, val);
+		val = snd_ac97_read(ac97, 0x78);
+		if (mic_off)
+			val &= ~0x100;
+		else
+			val = val | 0x100;
+		snd_ac97_write_cache(ac97, 0x78, val);
+	}
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);

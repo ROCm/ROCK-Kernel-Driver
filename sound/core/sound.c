@@ -35,11 +35,12 @@
 
 #define SNDRV_OS_MINORS 256
 
-int major = CONFIG_SND_MAJOR;
+static int major = CONFIG_SND_MAJOR;
+int snd_major;
 static int cards_limit = SNDRV_CARDS;
-int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
-int device_gid = 0;
-int device_uid = 0;
+#ifdef CONFIG_DEVFS_FS
+static int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
+#endif
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture driver for soundcards.");
@@ -52,15 +53,11 @@ MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 MODULE_PARM(cards_limit, "i");
 MODULE_PARM_DESC(cards_limit, "Count of soundcards installed in the system.");
 MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
+#ifdef CONFIG_DEVFS_FS
 MODULE_PARM(device_mode, "i");
-MODULE_PARM_DESC(device_mode, "Device file permission mask for sound dynamic device filesystem.");
+MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
 MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
-MODULE_PARM(device_gid, "i");
-MODULE_PARM_DESC(device_gid, "Device file GID for sound dynamic device filesystem.");
-MODULE_PARM_SYNTAX(device_gid, "default:0");
-MODULE_PARM(device_uid, "i");
-MODULE_PARM_DESC(device_uid, "Device file UID for sound dynamic device filesystem.");
-MODULE_PARM_SYNTAX(device_uid, "default:0");
+#endif
 
 int snd_ecards_limit;
 
@@ -210,22 +207,25 @@ int snd_register_device(int type, snd_card_t * card, int dev, snd_minor_t * reg,
 
 	if (minor < 0)
 		return minor;
-	preg = (snd_minor_t *)kmalloc(sizeof(snd_minor_t), GFP_KERNEL);
+	snd_assert(name, return -EINVAL);
+	preg = (snd_minor_t *)kmalloc(sizeof(snd_minor_t) + strlen(name) + 1, GFP_KERNEL);
 	if (preg == NULL)
 		return -ENOMEM;
 	*preg = *reg;
 	preg->number = minor;
 	preg->device = dev;
-	preg->dev = NULL;
+	strcpy(preg->name, name);
 	down(&sound_mutex);
 	if (snd_minor_search(minor)) {
 		up(&sound_mutex);
 		kfree(preg);
 		return -EBUSY;
 	}
-	if (name)
-		preg->dev = snd_info_create_device(name, minor, 0);
 	list_add_tail(&preg->list, &snd_minors_hash[SNDRV_MINOR_CARD(minor)]);
+#ifdef CONFIG_DEVFS_FS
+	if (strncmp(name, "controlC", 8))     /* created in sound.c */
+		devfs_mk_cdev(MKDEV(major, minor), S_IFCHR | device_mode, "snd/%s", name);
+#endif
 	up(&sound_mutex);
 	return 0;
 }
@@ -253,8 +253,10 @@ int snd_unregister_device(int type, snd_card_t * card, int dev)
 		up(&sound_mutex);
 		return -EINVAL;
 	}
-	if (mptr->dev)
-		snd_info_free_device(mptr->dev);
+#ifdef CONFIG_DEVFS_FS
+	if (strncmp(mptr->name, "controlC", 8))	/* created in sound.c */
+		devfs_remove("snd/%s", mptr->name);
+#endif
 	list_del(&mptr->list);
 	up(&sound_mutex);
 	kfree(mptr);
@@ -321,10 +323,15 @@ int __exit snd_minor_info_done(void)
 
 static int __init alsa_sound_init(void)
 {
+#ifdef CONFIG_DEVFS_FS
 	short controlnum;
-	int err = 0;
+#endif
+#ifdef CONFIG_SND_OSSEMUL
+	int err;
+#endif
 	int card;
 
+	snd_major = major;
 	snd_ecards_limit = cards_limit;
 	for (card = 0; card < SNDRV_CARDS; card++)
 		INIT_LIST_HEAD(&snd_minors_hash[card]);
@@ -335,6 +342,7 @@ static int __init alsa_sound_init(void)
 	devfs_mk_dir("snd");
 	if (register_chrdev(major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
+		devfs_remove("snd");
 		return -EIO;
 	}
 #ifdef CONFIG_SND_DEBUG_MEMORY
@@ -344,24 +352,24 @@ static int __init alsa_sound_init(void)
 #ifdef CONFIG_SND_DEBUG_MEMORY
 		snd_memory_done();
 #endif
+		unregister_chrdev(major, "alsa");
+		devfs_remove("snd");
 		return -ENOMEM;
 	}
 #ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_register();
 #endif
-
-	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
-		devfs_mk_cdev(MKDEV(major, controlnum<<5),
-			device_mode | S_IFCHR, "snd/controlC%d", controlnum);
-	}
-
+#ifdef CONFIG_DEVFS_FS
+	for (controlnum = 0; controlnum < cards_limit; controlnum++) 
+		devfs_mk_cdev(MKDEV(major, controlnum<<5), S_IFCHR | device_mode, "snd/controlC%d", controlnum);
+#endif
 #ifndef MODULE
 	printk(KERN_INFO "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n");
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) && defined(CONFIG_APM)
 	pm_init();
 #endif
-	return err;
+	return 0;
 }
 
 static void __exit alsa_sound_exit(void)
@@ -390,6 +398,7 @@ module_init(alsa_sound_init)
 module_exit(alsa_sound_exit)
 
   /* sound.c */
+EXPORT_SYMBOL(snd_major);
 EXPORT_SYMBOL(snd_ecards_limit);
 #if defined(CONFIG_KMOD)
 EXPORT_SYMBOL(snd_request_card);
@@ -453,8 +462,6 @@ EXPORT_SYMBOL(snd_info_get_str);
 EXPORT_SYMBOL(snd_info_create_module_entry);
 EXPORT_SYMBOL(snd_info_create_card_entry);
 EXPORT_SYMBOL(snd_info_free_entry);
-EXPORT_SYMBOL(snd_info_create_device);
-EXPORT_SYMBOL(snd_info_free_device);
 EXPORT_SYMBOL(snd_info_register);
 EXPORT_SYMBOL(snd_info_unregister);
 EXPORT_SYMBOL(snd_card_proc_new);

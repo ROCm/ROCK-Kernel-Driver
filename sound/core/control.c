@@ -396,10 +396,6 @@ static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 			continue;
 		if (kctl->id.index + kctl->count <= id->index)
 			continue;
-		if (kctl->id.index != id->index) {
-			printk("BOOOR: %i, %i, %i\n", kctl->id.index, kctl->count, id->index);
-			continue;
-		}
 		return kctl;
 	}
 	return NULL;
@@ -772,9 +768,9 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			return -EPERM;
 #ifdef CONFIG_PM
 		if (card->set_power_state) {
-		    snd_power_lock(card);
-		    err = card->set_power_state(card, err);
-		    snd_power_unlock(card);
+			snd_power_lock(card);
+			err = card->set_power_state(card, err);
+			snd_power_unlock(card);
 		} else
 #endif
 			err = -ENOPROTOOPT;

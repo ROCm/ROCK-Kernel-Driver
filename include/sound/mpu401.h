@@ -22,7 +22,6 @@
  *
  */
 
-#include <linux/interrupt.h>
 #include "rawmidi.h"
 #include <linux/interrupt.h>
 
@@ -50,8 +49,6 @@
 #define MPU401_MODE_BIT_OUTPUT		1
 #define MPU401_MODE_BIT_INPUT_TRIGGER	2
 #define MPU401_MODE_BIT_OUTPUT_TRIGGER	3
-#define MPU401_MODE_BIT_RX_LOOP		4
-#define MPU401_MODE_BIT_TX_LOOP		5
 
 #define MPU401_MODE_INPUT		(1<<MPU401_MODE_BIT_INPUT)
 #define MPU401_MODE_OUTPUT		(1<<MPU401_MODE_BIT_OUTPUT)
@@ -88,6 +85,9 @@ struct _snd_mpu401 {
 	spinlock_t input_lock;
 	spinlock_t output_lock;
 	spinlock_t timer_lock;
+	
+	atomic_t rx_loop;
+	atomic_t tx_loop;
 
 	struct timer_list timer;
 
