@@ -188,7 +188,7 @@ config ALPHA_MIATA
 	help
 	  The Digital PersonalWorkStation (PWS 433a, 433au, 500a, 500au, 600a,
 	  or 600au).  There is an Installation HOWTO for this hardware at
-	  <http://members.brabant.chello.nl/~s.vandereijk/miata.html>.
+	  <http://eijk.homelinux.org/~stefan/miata.html>.
 
 config ALPHA_MIKASA
 	bool "Mikasa"
