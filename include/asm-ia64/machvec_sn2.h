@@ -37,6 +37,7 @@ extern ia64_mv_setup_t sn_setup;
 extern ia64_mv_cpu_init_t sn_cpu_init;
 extern ia64_mv_irq_init_t sn_irq_init;
 extern ia64_mv_send_ipi_t sn2_send_IPI;
+extern ia64_mv_timer_interrupt_t sn_timer_interrupt;
 extern ia64_mv_global_tlb_purge_t sn2_global_tlb_purge;
 extern ia64_mv_irq_desc sn_irq_desc;
 extern ia64_mv_irq_to_vector sn_irq_to_vector;
@@ -73,6 +74,7 @@ extern ia64_mv_dma_supported		sn_dma_supported;
 #define platform_cpu_init		sn_cpu_init
 #define platform_irq_init		sn_irq_init
 #define platform_send_ipi		sn2_send_IPI
+#define platform_timer_interrupt	sn_timer_interrupt
 #define platform_global_tlb_purge       sn2_global_tlb_purge
 #define platform_pci_fixup		sn_pci_fixup
 #define platform_inb			__sn_inb
