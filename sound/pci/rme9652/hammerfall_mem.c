@@ -25,7 +25,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
-    $Id: hammerfall_mem.c,v 1.4 2002/10/21 18:28:25 perex Exp $
+    $Id: hammerfall_mem.c,v 1.5 2002/11/04 09:11:42 perex Exp $
 
 
     Tue Oct 17 2000  Jaroslav Kysela <perex@suse.cz>
@@ -34,7 +34,6 @@
     
 */
 
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/pci.h>

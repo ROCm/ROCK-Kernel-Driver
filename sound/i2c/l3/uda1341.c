@@ -16,7 +16,7 @@
  * 2002-04-12	Tomas Kasparek	Proc interface update, code cleanup
  */
 
-/* $Id: uda1341.c,v 1.4 2002/08/15 12:13:06 perex Exp $ */
+/* $Id: uda1341.c,v 1.5 2002/11/09 13:12:19 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -341,7 +341,7 @@ static void snd_uda1341_proc_read(snd_info_entry_t *entry,
 	
 	snd_iprintf(buffer, "Automatic Gain Ctrl : %s\n", uda->cfg[CMD_AGC] ? "on" : "off");
 	snd_iprintf(buffer, "AGC attack time     : %d ms\n", AGC_atime[uda->cfg[CMD_AGC_TIME]]);
-	snd_iprintf(buffer, "AGC decay time      : %d ns\n", AGC_dtime[uda->cfg[CMD_AGC_TIME]]);
+	snd_iprintf(buffer, "AGC decay time      : %d ms\n", AGC_dtime[uda->cfg[CMD_AGC_TIME]]);
 	snd_iprintf(buffer, "AGC output level    : %s dB\n\n", AGC_level[uda->cfg[CMD_AGC_LEVEL]]);
 
 	snd_iprintf(buffer, "Mute                : %s\n", uda->cfg[CMD_MUTE] ? "on" : "off");

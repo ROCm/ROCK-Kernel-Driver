@@ -105,7 +105,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL },
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL },
 { 0x414c4710, 0xfffffff0, "ALC200/200P",	NULL },
-{ 0x414c4720, 0xfffffff0, "ALC650",		NULL },
+{ 0x414c4720, 0xfffffff0, "ALC650",		patch_alc650 },
 { 0x414c4730, 0xffffffff, "ALC101",		NULL },
 { 0x414c4740, 0xfffffff0, "ALC202",		NULL },
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL },
@@ -915,6 +915,25 @@ AD18XX_PCM_BITS("LFE Playback Volume", 2, 0, 31)
 };
 
 /*
+ * ALC650
+ */
+static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
+	AC97_SINGLE("Duplicate Front", AC97_ALC650_MULTICH, 0, 1, 0),
+	AC97_SINGLE("Surround Down Mix", AC97_ALC650_MULTICH, 1, 1, 0),
+	AC97_SINGLE("Center/LFE Down Mix", AC97_ALC650_MULTICH, 2, 1, 0),
+	AC97_SINGLE("Exchange Center/LFE", AC97_ALC650_MULTICH, 3, 1, 0),
+	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
+	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
+	AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
+	AC97_SINGLE("Analog to IEC958 Output", AC97_ALC650_MULTICH, 12, 1, 0),
+	AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 13, 1, 0),
+#if 0 /* always set in patch_alc650 */
+	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
+	AC97_SINGLE("IEC958 Input Pin Enable", AC97_ALC650_CLOCK, 1, 1, 0),
+#endif
+};
+
+/*
  *
  */
 
@@ -1340,7 +1359,7 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 	}
 	
 	/* build S/PDIF controls */
-	if (ac97->ext_id & AC97_EA_SPDIF) {
+	if (ac97->ext_id & AC97_EI_SPDIF) {
 		if (ac97->flags & AC97_CS_SPDIF) {
 			for (idx = 0; idx < 3; idx++)
 				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_spdif[idx], ac97))) < 0)
@@ -1379,7 +1398,7 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 		ac97->spdif_status = SNDRV_PCM_DEFAULT_CON_SPDIF;
 	}
 	
-	/* build Sigmatel specific controls */
+	/* build chip specific controls */
 	switch (ac97->id) {
 	case AC97_ID_STAC9700:
 	case AC97_ID_STAC9708:
@@ -1393,6 +1412,12 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 		if (snd_ac97_try_bit(ac97, AC97_SIGMATEL_ANALOG, 0))
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_sigmatel_controls[1], ac97))) < 0)
 				return err;
+		break;
+	case AC97_ID_ALC650:
+		for (idx = 0; idx < ARRAY_SIZE(snd_ac97_controls_alc650); idx++)
+			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_alc650[idx], ac97))) < 0)
+				return err;
+		break;
 	default:
 		/* nothing */
 		break;

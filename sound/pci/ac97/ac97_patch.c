@@ -168,7 +168,7 @@ int patch_cirrus_spdif(ac97_t * ac97)
 
 	ac97->flags |= AC97_CS_SPDIF; 
 	ac97->rates[AC97_RATES_SPDIF] &= ~SNDRV_PCM_RATE_32000;
-        ac97->ext_id |= AC97_EA_SPDIF;	/* force the detection of spdif */
+        ac97->ext_id |= AC97_EI_SPDIF;	/* force the detection of spdif */
 	snd_ac97_write_cache(ac97, AC97_CSR_ACMODE, 0x0080);
 	return 0;
 }
@@ -184,7 +184,7 @@ int patch_cirrus_cs4299(ac97_t * ac97)
 int patch_conexant(ac97_t * ac97)
 {
 	ac97->flags |= AC97_CX_SPDIF;
-        ac97->ext_id |= AC97_EA_SPDIF;	/* force the detection of spdif */
+        ac97->ext_id |= AC97_EI_SPDIF;	/* force the detection of spdif */
 	return 0;
 }
 
@@ -334,5 +334,13 @@ int patch_ad1980(ac97_t * ac97)
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x0420);
+	return 0;
+}
+
+int patch_alc650(ac97_t * ac97)
+{
+	/* enable spdif in */
+	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
+			     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
 	return 0;
 }
