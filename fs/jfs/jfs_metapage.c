@@ -31,7 +31,7 @@
 static spinlock_t meta_lock = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_JFS_STATISTICS
-struct {
+static struct {
 	uint	pagealloc;	/* # of page allocations */
 	uint	pagefree;	/* # of page frees */
 	uint	lockwait;	/* # of sleeping lock_metapage() calls */
