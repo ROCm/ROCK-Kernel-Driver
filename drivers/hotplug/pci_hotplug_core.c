@@ -396,7 +396,7 @@ static struct super_block *pcihpfs_get_sb(struct file_system_type *fs_type,
 
 static struct file_system_type pcihpfs_type = {
 	owner:		THIS_MODULE,
-	name:		"pchihpfs",
+	name:		"pcihpfs",
 	get_sb:		pcihpfs_get_sb,
 	fs_flags:	FS_LITTER,
 };
