@@ -29,10 +29,6 @@ config AGP_GART
 	bool "/dev/agpgart (AGP Support)"
 	depends on GART_IOMMU
 
-config AGP3
-	bool "AGP 3.0 compliance (EXPERIMENTAL)"
-	depends on AGP
-
 config AGP_INTEL
 	tristate "Intel 440LX/BX/GX, I8xx and E7x05 support"
 	depends on AGP

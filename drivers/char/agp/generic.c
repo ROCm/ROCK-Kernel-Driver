@@ -402,7 +402,6 @@ void agp_generic_enable(u32 mode)
 	minor = (ncapid >> 16) & 0xf;
 	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device.\n",major, minor);
 
-#ifdef CONFIG_AGP3
 	if(major >= 3) {
 		u32 agp_3_0;
 
@@ -415,7 +414,6 @@ void agp_generic_enable(u32 mode)
 			printk (KERN_INFO PFX "not in AGP 3.0 mode, falling back to 2.x\n");
 		}
 	}
-#endif
 
 	/* AGP v<3 */
 	pci_read_config_dword(agp_bridge->dev,

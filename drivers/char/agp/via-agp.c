@@ -101,7 +101,6 @@ static struct gatt_mask via_generic_masks[] =
 };
 
 
-#ifdef CONFIG_AGP3
 static int via_fetch_size_agp3(void)
 {
 	int i;
@@ -206,18 +205,10 @@ static int __init via_generic_agp3_setup (struct pci_dev *pdev)
 	agp_bridge->cant_use_aperture = 0;
 	return 0;
 }
-#else
-static int __init via_generic_agp3_setup (struct pci_dev *pdev)
-{
-	printk (KERN_INFO PFX "Bridge in AGP3 mode, but CONFIG_AGP3=n\n");
-	return -ENODEV;
-}
-#endif	/* CONFIG_AGP3 */
 
 
 static int __init via_generic_setup (struct pci_dev *pdev)
 {
-#ifdef CONFIG_AGP3
 	/* Garg, there are KT400s with KT266 IDs. */
 	if (pdev->device == PCI_DEVICE_ID_VIA_8367_0) {
 
@@ -235,7 +226,6 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 			/* Its in 2.0 mode, drop through. */
 		}
 	}
-#endif
 
 	agp_bridge->masks = via_generic_masks;
 	agp_bridge->aperture_sizes = (void *) via_generic_sizes;
