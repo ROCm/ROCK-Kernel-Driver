@@ -19,8 +19,9 @@ struct chan_opts {
 enum chan_init_pri { INIT_STATIC, INIT_ALL, INIT_ONE };
 
 struct chan_ops {
+	char *type;
 	void *(*init)(char *, int, struct chan_opts *);
-	int (*open)(int, int, int, void *);
+	int (*open)(int, int, int, void *, char **);
 	void (*close)(int, void *);
 	int (*read)(int, char *, void *);
 	int (*write)(int, const char *, int, void *);

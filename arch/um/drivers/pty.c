@@ -19,6 +19,7 @@ struct pty_chan {
 	int dev;
 	int raw;
 	struct termios tt;
+	char dev_name[sizeof("/dev/pts/0123456\0")];
 };
 
 void *pty_chan_init(char *str, int device, struct chan_opts *opts)
@@ -32,9 +33,10 @@ void *pty_chan_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
-int pts_open(int input, int output, int primary, void *d)
+int pts_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct pty_chan *data = d;
+	char *dev;
 	int fd;
 
 	if((fd = get_pty()) < 0){
@@ -45,7 +47,11 @@ int pts_open(int input, int output, int primary, void *d)
 		tcgetattr(fd, &data->tt);
 		raw(fd, 0);
 	}
-	if(data->announce) (*data->announce)(ptsname(fd), data->dev);
+
+	dev = ptsname(fd);
+	sprintf(data->dev_name, "%s", dev);
+	*dev_out = data->dev_name;
+	if(data->announce) (*data->announce)(dev, data->dev);
 	return(fd);
 }
 
@@ -94,7 +100,7 @@ static void grantpt_cb(void *arg)
 	info->err = errno;
 }
 
-int pty_open(int input, int output, int primary, void *d)
+int pty_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct pty_chan *data = d;
 	int fd;
@@ -110,6 +116,9 @@ int pty_open(int input, int output, int primary, void *d)
 
 	if(data->raw) raw(fd, 0);
 	if(data->announce) (*data->announce)(dev, data->dev);
+
+	sprintf(data->dev_name, "%s", dev);
+	*dev_out = data->dev_name;
 	return(fd);
 }
 
@@ -121,6 +130,7 @@ int pty_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops pty_ops = {
+	type:		"pty",
 	init:		pty_chan_init,
 	open:		pty_open,
 	close:		generic_close,
@@ -133,6 +143,7 @@ struct chan_ops pty_ops = {
 };
 
 struct chan_ops pts_ops = {
+	type:		"pts",
 	init:		pty_chan_init,
 	open:		pts_open,
 	close:		generic_close,

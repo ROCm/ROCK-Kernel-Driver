@@ -27,6 +27,7 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "irq_user.h"
+#include "mconsole_kern.h"
 #include "init.h"
 #include "2_5compat.h"
 
@@ -41,6 +42,7 @@ static struct tty_driver console_driver;
 static int console_refcount = 0;
 
 static struct chan_ops init_console_ops = {
+	type:		"you shouldn't see this",
 	init : 		NULL,
 	open : 		NULL,
 	close :		NULL,
@@ -78,6 +80,10 @@ static struct chan_opts opts = {
 	in_kernel :	1,
 };
 
+static int con_config(char *str);
+static int con_get_config(char *dev, char *str, int size, char **error_out);
+static int con_remove(char *str);
+
 static struct line_driver driver = {
 	name :			"UML console",
 	devfs_name :		"vc/%d",
@@ -91,6 +97,12 @@ static struct line_driver driver = {
 	write_irq_name :	"console-write",
 	symlink_from :		"ttys",
 	symlink_to :		"vc",
+	mc : {
+		name : 		"con",
+		config :	con_config,
+		get_config :	con_get_config,
+		remove :	con_remove,
+	},
 };
 
 static struct lines console_lines = LINES_INIT(MAX_TTYS);
@@ -101,6 +113,22 @@ static struct lines console_lines = LINES_INIT(MAX_TTYS);
 struct line vts[MAX_TTYS] = { LINE_INIT(CONFIG_CON_ZERO_CHAN, &driver),
 			      [ 1 ... MAX_TTYS - 1 ] = 
 			      LINE_INIT(CONFIG_CON_CHAN, &driver) };
+
+static int con_config(char *str)
+{
+	return(line_config(vts, sizeof(vts)/sizeof(vts[0]), str));
+}
+
+static int con_get_config(char *dev, char *str, int size, char **error_out)
+{
+	return(line_get_config(dev, vts, sizeof(vts)/sizeof(vts[0]), str, 
+			       size, error_out));
+}
+
+static int con_remove(char *str)
+{
+	return(line_remove(vts, sizeof(vts)/sizeof(vts[0]), str));
+}
 
 static int open_console(struct tty_struct *tty)
 {
@@ -195,7 +223,7 @@ void stdio_console_init(void)
 
 static int console_chan_setup(char *str)
 {
-	line_setup(vts, sizeof(vts)/sizeof(vts[0]), str);
+	line_setup(vts, sizeof(vts)/sizeof(vts[0]), str, 1);
 	return(1);
 }
 
