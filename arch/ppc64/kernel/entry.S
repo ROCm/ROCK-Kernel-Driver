@@ -198,7 +198,6 @@ _GLOBAL(ret_from_syscall_1)
 	blrl			/* Call handler */
 _GLOBAL(ret_from_syscall_2)
 	std	r3,RESULT(r1)	/* Save result */	
-	std	r3,GPR0(r1)	/* temporary gross hack to make strace work */
 	li	r10,-_LAST_ERRNO
 	cmpl	0,r3,r10
 	blt	60f
