@@ -1,5 +1,5 @@
 /*
- * $Id: konicawc.c,v 1.12 2002/02/07 23:18:53 spse Exp $
+ * $Id$
  *
  * konicawc.c - konica webcam driver
  *
@@ -18,17 +18,18 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#define DEBUG
-
 #include "usbvideo.h"
 
 #define MAX_BRIGHTNESS	108
 #define MAX_CONTRAST	108
 #define MAX_SATURATION	108
 #define MAX_SHARPNESS	108
-#define MAX_WHITEBAL	363
+#define MAX_WHITEBAL	372
+#define MAX_SPEED	6
+#define MAX_CAMERAS	1
 
-#define MAX_CAMERAS 1
+#define DRIVER_VERSION	"v1.1"
+#define DRIVER_DESC	"Konica Webcam driver"
 
 enum ctrl_req {
 	SetWhitebal	= 0x01,
@@ -40,7 +41,7 @@ enum ctrl_req {
 
 
 enum frame_sizes {
-	SIZE_160X130	= 0,
+	SIZE_160X136	= 0,
 	SIZE_176X144	= 1,
 	SIZE_320X240	= 2,
 };
@@ -53,12 +54,30 @@ static usbvideo_t *cams;
 
 static int debug;
 static enum frame_sizes size;	
+static int speed = 6;		/* Speed (fps) 0 (slowest) to 6 (fastest) */
 static int brightness =	MAX_BRIGHTNESS/2;
 static int contrast =	MAX_CONTRAST/2;
 static int saturation =	MAX_SATURATION/2;
 static int sharpness =	MAX_SHARPNESS/2;
 static int whitebal =	3*(MAX_WHITEBAL/4);
 
+static int speed_to_interface[] = { 1, 0, 3, 2, 4, 5, 6 };
+
+/* These FPS speeds are from the windows config box. They are
+ * indexed on size (0-2) and speed (0-6). Divide by 3 to get the
+ * real fps.
+ */
+
+static int speed_to_fps[3][7] = { { 24, 40, 48, 60, 72, 80, 100 },
+				  { 18, 30, 36, 45, 54, 60, 75  },
+				  { 6,  10, 12, 15, 18, 20, 25  } };
+
+
+static int camera_sizes[][2] = { { 160, 136 },
+				 { 176, 144 },
+				 { 320, 240 },
+				 { } /* List terminator */
+};
 
 struct konicawc {
 	u8 brightness;		/* camera uses 0 - 9, x11 for real value */
@@ -66,12 +85,12 @@ struct konicawc {
 	u8 saturation;		/* as above */
 	u8 sharpness;		/* as above */
 	u8 white_bal;		/* 0 - 33, x11 for real value */
-	u8 fps;			/* Stored as fps * 3 */
+	u8 speed;		/* Stored as 0 - 6, used as index in speed_to_* (above) */
 	u8 size;		/* Frame Size */
 	int height;
 	int width;
-	struct urb *sts_urb[USBVIDEO_NUMFRAMES];
-	u8 sts_buf[USBVIDEO_NUMFRAMES][FRAMES_PER_DESC];
+	struct urb *sts_urb[USBVIDEO_NUMSBUF];
+	u8 sts_buf[USBVIDEO_NUMSBUF][FRAMES_PER_DESC];
 	struct urb *last_data_urb;
 	int lastframe;
 };
@@ -97,19 +116,19 @@ static int konicawc_setup_on_open(uvd_t *uvd)
 
 	konicawc_set_misc(uvd, 0x2, 0, 0x0b);
 	dbg("setting brightness to %d (%d)", cam->brightness,
-	    cam->brightness*11);
+	    cam->brightness * 11);
 	konicawc_set_value(uvd, cam->brightness, SetBrightness);
 	dbg("setting white balance to %d (%d)", cam->white_bal,
-	    cam->white_bal*11);
+	    cam->white_bal * 11);
 	konicawc_set_value(uvd, cam->white_bal, SetWhitebal);
 	dbg("setting contrast to %d (%d)", cam->contrast,
-	    cam->contrast*11);
-	konicawc_set_value(uvd, cam->brightness, SetBrightness);
+	    cam->contrast * 11);
+	konicawc_set_value(uvd, cam->contrast, SetContrast);
 	dbg("setting saturation to %d (%d)", cam->saturation,
-	    cam->saturation*11);
+	    cam->saturation * 11);
 	konicawc_set_value(uvd, cam->saturation, SetSaturation);
 	dbg("setting sharpness to %d (%d)", cam->sharpness,
-	    cam->sharpness*11);
+	    cam->sharpness * 11);
 	konicawc_set_value(uvd, cam->sharpness, SetSharpness);
 	dbg("setting size %d", cam->size);
 	switch(cam->size) {
@@ -131,6 +150,30 @@ static int konicawc_setup_on_open(uvd_t *uvd)
 }
 
 
+static void konicawc_adjust_picture(uvd_t *uvd)
+{
+	struct konicawc *cam = (struct konicawc *)uvd->user_data;
+
+	dbg("new brightness: %d", uvd->vpic.brightness);
+	uvd->vpic.brightness = (uvd->vpic.brightness > MAX_BRIGHTNESS) ? MAX_BRIGHTNESS : uvd->vpic.brightness;
+	if(cam->brightness != uvd->vpic.brightness / 11) {
+	   cam->brightness = uvd->vpic.brightness / 11;
+	   dbg("setting brightness to %d (%d)", cam->brightness,
+	       cam->brightness * 11);
+	   konicawc_set_value(uvd, cam->brightness, SetBrightness);
+	}
+
+	dbg("new contrast: %d", uvd->vpic.contrast);
+	uvd->vpic.contrast = (uvd->vpic.contrast > MAX_CONTRAST) ? MAX_CONTRAST : uvd->vpic.contrast;
+	if(cam->contrast != uvd->vpic.contrast / 11) {
+		cam->contrast = uvd->vpic.contrast / 11;
+		dbg("setting contrast to %d (%d)", cam->contrast,
+		    cam->contrast * 11);
+		konicawc_set_value(uvd, cam->contrast, SetContrast);
+	}
+}
+
+
 static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *stsurb)
 {
 	char *cdata;
@@ -138,7 +181,7 @@ static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *st
 	unsigned char *status = stsurb->transfer_buffer;
 	int keep = 0, discard = 0, bad = 0;
 	static int buttonsts = 0;
-	
+
 	for (i = 0; i < dataurb->number_of_packets; i++) {
 		int button = buttonsts;
 		unsigned char sts;
@@ -228,7 +271,7 @@ static void konicawc_isoc_irq(struct urb *urb)
 	int i, len = 0;
 	uvd_t *uvd = urb->context;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
- 
+
 	/* We don't want to do anything if we are about to be removed! */
 	if (!CAMERA_IS_OPERATIONAL(uvd))
 		return;
@@ -236,7 +279,6 @@ static void konicawc_isoc_irq(struct urb *urb)
 	if (urb->actual_length > 32) {
 		cam->last_data_urb = urb;
 		return;
-
 	}
 
 	if (!uvd->streaming) {
@@ -244,7 +286,7 @@ static void konicawc_isoc_irq(struct urb *urb)
 			info("Not streaming, but interrupt!");
 		return;
 	}
-	
+
 	uvd->stats.urb_count++;
 	if (urb->actual_length <= 0)
 		goto urb_done_with;
@@ -329,7 +371,8 @@ static int konicawc_start_data(uvd_t *uvd)
 		}
 	}
 
-
+	cam->last_data_urb = NULL;
+	
 	/* Link URBs into a ring so that they invoke each other infinitely */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
 		if ((i+1) < USBVIDEO_NUMSBUF) {
@@ -362,10 +405,13 @@ static int konicawc_start_data(uvd_t *uvd)
 static void konicawc_stop_data(uvd_t *uvd)
 {
 	int i, j;
-	struct konicawc *cam = (struct konicawc *)uvd->user_data;
+	struct konicawc *cam;
 
 	if ((uvd == NULL) || (!uvd->streaming) || (uvd->dev == NULL))
 		return;
+
+	cam = (struct konicawc *)uvd->user_data;
+	cam->last_data_urb = NULL;
 
 	/* Unschedule all of the iso td's */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
@@ -476,9 +522,9 @@ static void konicawc_process_isoc(uvd_t *uvd, usbvideo_frame_t *frame)
 static int konicawc_calculate_fps(uvd_t *uvd)
 {
 	struct konicawc *t = uvd->user_data;
-	dbg("");
+	dbg("fps = %d", speed_to_fps[t->size][t->speed]/3);
 
-	return (t->fps)/3;
+	return speed_to_fps[t->size][t->speed]/3;
 }
 
 
@@ -515,10 +561,10 @@ static void konicawc_configure_video(uvd_t *uvd)
 	uvd->vcap.type = VID_TYPE_CAPTURE;
 	uvd->vcap.channels = 1;
 	uvd->vcap.audios = 0;
-	uvd->vcap.maxwidth = cam->width;
-	uvd->vcap.maxheight = cam->height;
-	uvd->vcap.minwidth = cam->width;
-	uvd->vcap.minheight = cam->height;
+	uvd->vcap.minwidth = camera_sizes[cam->size][0];
+	uvd->vcap.minheight = camera_sizes[cam->size][1];
+	uvd->vcap.maxwidth = camera_sizes[cam->size][0];
+	uvd->vcap.maxheight = camera_sizes[cam->size][1];
 
 	memset(&uvd->vchan, 0, sizeof(uvd->vchan));
 	uvd->vchan.flags = 0 ;
@@ -540,7 +586,7 @@ static void konicawc_configure_video(uvd_t *uvd)
 }
 
 
-static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const struct usb_device_id *devid)
+static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *devid)
 {
 	uvd_t *uvd = NULL;
 	int i, nas;
@@ -555,6 +601,7 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const st
 		return NULL;
 
 	info("Konica Webcam (rev. 0x%04x)", dev->descriptor.bcdDevice);
+	RESTRICT_TO_RANGE(speed, 0, MAX_SPEED);
 
 	/* Validate found interface: must have one ISO endpoint */
 	nas = dev->actconfig->interface[ifnum].num_altsetting;
@@ -600,56 +647,58 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const st
 				return NULL;
 			}
 		} else {
-			if (actInterface < 0) {
+			if (i == speed_to_interface[speed]) {
+				/* This one is the requested one */
 				actInterface = i;
 				maxPS = endpoint->wMaxPacketSize;
-				if (debug > 0)
-					info("Active setting=%d. maxPS=%d.",
+				if (debug > 0) {
+					info("Selecting requested active setting=%d. maxPS=%d.",
 					     i, maxPS);
-			} else {
-				/* Got another active alt. setting */
-				if (maxPS < endpoint->wMaxPacketSize) {
-					/* This one is better! */
-					actInterface = i;
-					maxPS = endpoint->wMaxPacketSize;
-					if (debug > 0) {
-						info("Even better active setting=%d. maxPS=%d.",
-						     i, maxPS);
-					}
 				}
 			}
 		}
 	}
+	if(actInterface == -1) {
+		err("Cant find required endpoint");
+		return NULL;
+	}
+
 
 	/* Code below may sleep, need to lock module while we are here */
 	MOD_INC_USE_COUNT;
 	uvd = usbvideo_AllocateDevice(cams);
 	if (uvd != NULL) {
-		struct konicawc *konicawc_data = (struct konicawc *)(uvd->user_data);
+		struct konicawc *cam = (struct konicawc *)(uvd->user_data);
 		/* Here uvd is a fully allocated uvd_t object */
-
 		for(i = 0; i < USBVIDEO_NUMSBUF; i++) {
-			konicawc_data->sts_urb[i] = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
+			cam->sts_urb[i] = usb_alloc_urb(FRAMES_PER_DESC, GFP_KERNEL);
+			if(cam->sts_urb[i] == NULL) {
+				while(i--) {
+					usb_free_urb(cam->sts_urb[i]);
+				}
+				err("cant allocate urbs");
+				return NULL;
+			}
 		}
-
+		cam->speed = speed;
 		switch(size) {
-		case SIZE_160X130:
+		case SIZE_160X136:
 		default:
-			konicawc_data->height = 136;
-			konicawc_data->width = 160;
-			konicawc_data->size = SIZE_160X130;
+			cam->height = 136;
+			cam->width = 160;
+			cam->size = SIZE_160X136;
 			break;
 
 		case SIZE_176X144:
-			konicawc_data->height = 144;
-			konicawc_data->width = 176;
-			konicawc_data->size = SIZE_176X144;
+			cam->height = 144;
+			cam->width = 176;
+			cam->size = SIZE_176X144;
 			break;
 
 		case SIZE_320X240:
-			konicawc_data->height = 240;
-			konicawc_data->width = 320;
-			konicawc_data->size = SIZE_320X240;
+			cam->height = 240;
+			cam->width = 320;
+			cam->size = SIZE_320X240;
 			break;
 		}
 
@@ -663,14 +712,14 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const st
 		uvd->iso_packet_len = maxPS;
 		uvd->paletteBits = 1L << VIDEO_PALETTE_YUV420P;
 		uvd->defaultPalette = VIDEO_PALETTE_YUV420P;
-		uvd->canvas = VIDEOSIZE(konicawc_data->width, konicawc_data->height);
+		uvd->canvas = VIDEOSIZE(cam->width, cam->height);
 		uvd->videosize = uvd->canvas;
 
 		/* Initialize konicawc specific data */
 		konicawc_configure_video(uvd);
 
 		i = usbvideo_RegisterVideoDevice(uvd);
-		uvd->max_frame_size = (konicawc_data->width * konicawc_data->height * 3)/2;
+		uvd->max_frame_size = (cam->width * cam->height * 3)/2;
 		if (i != 0) {
 			err("usbvideo_RegisterVideoDevice() failed.");
 			uvd = NULL;
@@ -681,9 +730,28 @@ static void *konicawc_probe(struct usb_device *dev, unsigned int ifnum ,const st
 }
 
 
+static void konicawc_free_uvd(uvd_t *uvd)
+{
+	int i;
+	struct konicawc *cam = (struct konicawc *)uvd->user_data;
+
+	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
+		usb_free_urb(cam->sts_urb[i]);
+		cam->sts_urb[i] = NULL;
+	}
+}
+
+
+static struct usb_device_id id_table[] = {
+	{ USB_DEVICE(0x04c8, 0x0720) }, /* Intel YC 76 */
+	{ }  /* Terminating entry */
+};
+
+
 static int __init konicawc_init(void)
 {
 	usbvideo_cb_t cbTbl;
+	info(DRIVER_DESC " " DRIVER_VERSION);
 	memset(&cbTbl, 0, sizeof(cbTbl));
 	cbTbl.probe = konicawc_probe;
 	cbTbl.setupOnOpen = konicawc_setup_on_open;
@@ -691,6 +759,8 @@ static int __init konicawc_init(void)
 	cbTbl.getFPS = konicawc_calculate_fps;
 	cbTbl.startDataPump = konicawc_start_data;
 	cbTbl.stopDataPump = konicawc_stop_data;
+	cbTbl.adjustPicture = konicawc_adjust_picture;
+	cbTbl.userFree = konicawc_free_uvd;
 	return usbvideo_register(
 		&cams,
 		MAX_CAMERAS,
@@ -706,19 +776,14 @@ static void __exit konicawc_cleanup(void)
 	usbvideo_Deregister(&cams);
 }
 
-#if defined(usb_device_id_ver)
-
-static __devinitdata struct usb_device_id id_table[] = {
-	{ USB_DEVICE(0x04c8, 0x0720) }, /* Intel YC 76 */
-	{ }  /* Terminating entry */
-};
 
 MODULE_DEVICE_TABLE(usb, id_table);
-#endif /* defined(usb_device_id_ver) */
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Simon Evans <spse@secret.org.uk>");
-MODULE_DESCRIPTION("Konica Webcam driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_PARM(speed, "i");
+MODULE_PARM_DESC(speed, "FPS speed: 0 (slowest) - 6 (fastest)");
 MODULE_PARM(size, "i");
 MODULE_PARM_DESC(size, "Frame Size 0: 160x136 1: 176x144 2: 320x240");
 MODULE_PARM(brightness, "i");
