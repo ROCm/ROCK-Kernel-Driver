@@ -107,9 +107,9 @@ static void inet6_sock_destruct(struct sock *sk)
 
 static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
 {
-	const struct ipv6_sk_offset *offset = sk->sk_prot->af_specific;
+	const int offset = sk->sk_prot->slab_obj_size - sizeof(struct ipv6_pinfo);
 
-	return (struct ipv6_pinfo *)(((u8 *)sk) + offset->offset);
+	return (struct ipv6_pinfo *)(((u8 *)sk) + offset);
 }
 
 static int inet6_create(struct socket *sock, int protocol)

@@ -178,7 +178,7 @@ extern inline struct ip6t_target *
 ip6t_find_target_lock(const char *name, int *error, struct semaphore *mutex);
 extern inline struct arpt_target *
 arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
+extern void (*ip_ct_attach)(struct sk_buff *, struct sk_buff *);
 
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);

@@ -1372,10 +1372,10 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 		    SCHIZO_PCICTRL_RTRY_ERR |
 		    SCHIZO_PCICTRL_SBH_ERR |
 		    SCHIZO_PCICTRL_SERR |
-		    SCHIZO_PCICTRL_SBH_INT |
 		    SCHIZO_PCICTRL_EEN);
 
-	err_no_mask = SCHIZO_PCICTRL_DTO_ERR;
+	err_no_mask = (SCHIZO_PCICTRL_DTO_ERR |
+		       SCHIZO_PCICTRL_SBH_INT);
 
 	/* Enable PCI Error interrupts and clear error
 	 * bits for each PBM.

@@ -42,7 +42,7 @@
  */
 #define MMC_SHIFT	3
 
-static int mmc_major;
+static int major;
 
 /*
  * There is one mmc_blk_data per slot.
@@ -323,7 +323,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 		md->queue.issue_fn = mmc_blk_issue_rq;
 		md->queue.data = md;
 
-		md->disk->major	= mmc_major;
+		md->disk->major	= major;
 		md->disk->first_minor = devidx << MMC_SHIFT;
 		md->disk->fops = &mmc_bdops;
 		md->disk->private_data = md;
@@ -462,14 +462,14 @@ static int __init mmc_blk_init(void)
 {
 	int res = -ENOMEM;
 
-	res = register_blkdev(mmc_major, "mmc");
+	res = register_blkdev(major, "mmc");
 	if (res < 0) {
 		printk(KERN_WARNING "Unable to get major %d for MMC media: %d\n",
-		       mmc_major, res);
+		       major, res);
 		goto out;
 	}
-	if (mmc_major == 0)
-		mmc_major = res;
+	if (major == 0)
+		major = res;
 
 	devfs_mk_dir("mmc");
 	return mmc_register_driver(&mmc_driver);
@@ -482,7 +482,7 @@ static void __exit mmc_blk_exit(void)
 {
 	mmc_unregister_driver(&mmc_driver);
 	devfs_remove("mmc");
-	unregister_blkdev(mmc_major, "mmc");
+	unregister_blkdev(major, "mmc");
 }
 
 module_init(mmc_blk_init);
@@ -490,3 +490,6 @@ module_exit(mmc_blk_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Multimedia Card (MMC) block device driver");
+
+module_param(major, int, 0444);
+MODULE_PARM_DESC(major, "specify the major device number for MMC block driver");

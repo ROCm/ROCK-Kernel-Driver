@@ -19,6 +19,13 @@ struct arch_thread {
 
 #include "asm/arch/user.h"
 
+/*
+ * Default implementation of macro that returns current
+ * instruction pointer ("program counter"). Stolen
+ * from asm-i386/processor.h
+ */
+#define current_text_addr() ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
+
 #include "asm/processor-generic.h"
 
 #endif

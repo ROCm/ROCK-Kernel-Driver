@@ -292,15 +292,27 @@
 #define __NR_mq_timedreceive    (__NR_mq_open+3)
 #define __NR_mq_notify          (__NR_mq_open+4)
 #define __NR_mq_getsetattr      (__NR_mq_open+5)
-#define __NR_kexec_load		283
+#define __NR_sys_kexec_load    283
+#define __NR_waitid            284
+#define __NR_perfctr_info      285
+#define __NR_vperfctr_open     (__NR_perfctr_info+1)
+#define __NR_vperfctr_control  (__NR_perfctr_info+2)
+#define __NR_vperfctr_unlink   (__NR_perfctr_info+3)
+#define __NR_vperfctr_iresume  (__NR_perfctr_info+4)
+#define __NR_vperfctr_read     (__NR_perfctr_info+5)
+#define __NR_add_key           291
+#define __NR_request_key       292
+#define __NR_keyctl            293
 
-#define NR_syscalls     284
+#define NR_syscalls 294
 
-/* user-visible error numbers are in the range -1 - -124: see <asm-m32r/errno.h> */
+/* user-visible error numbers are in the range -1 - -128: see
+ * <asm-m32r/errno.h>
+ */
 
 #define __syscall_return(type, res) \
 do { \
-	if ((unsigned long)(res) >= (unsigned long)(-125)) { \
+	if ((unsigned long)(res) >= (unsigned long)(-(128 + 1))) { \
 	/* Avoid using "res" which is declared to be in register r0; \
 	   errno might expand to a function call and clobber it.  */ \
 		int __err = -(res); \

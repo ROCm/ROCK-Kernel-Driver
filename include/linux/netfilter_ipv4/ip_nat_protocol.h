@@ -9,8 +9,6 @@ struct ip_nat_range;
 
 struct ip_nat_protocol
 {
-	struct list_head list;
-
 	/* Protocol name */
 	const char *name;
 
@@ -47,9 +45,23 @@ struct ip_nat_protocol
 				    const struct ip_nat_range *range);
 };
 
+#define MAX_IP_NAT_PROTO 256
+extern struct ip_nat_protocol *ip_nat_protos[MAX_IP_NAT_PROTO];
+
 /* Protocol registration. */
 extern int ip_nat_protocol_register(struct ip_nat_protocol *proto);
 extern void ip_nat_protocol_unregister(struct ip_nat_protocol *proto);
+
+static inline struct ip_nat_protocol *ip_nat_find_proto(u_int8_t protocol)
+{
+	return ip_nat_protos[protocol];
+}
+
+/* Built-in protocols. */
+extern struct ip_nat_protocol ip_nat_protocol_tcp;
+extern struct ip_nat_protocol ip_nat_protocol_udp;
+extern struct ip_nat_protocol ip_nat_protocol_icmp;
+extern struct ip_nat_protocol ip_nat_unknown_protocol;
 
 extern int init_protocols(void) __init;
 extern void cleanup_protocols(void);

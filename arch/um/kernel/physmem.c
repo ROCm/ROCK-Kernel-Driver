@@ -336,9 +336,14 @@ void map_memory(unsigned long virt, unsigned long phys, unsigned long len,
 
 	fd = phys_mapping(phys, &offset);
 	err = os_map_memory((void *) virt, fd, offset, len, r, w, x);
-	if(err)
+	if(err) {
+		if(err == -ENOMEM)
+			printk("try increasing the host's "
+			       "/proc/sys/vm/max_map_count to <physical "
+			       "memory size>/4096\n");
 		panic("map_memory(0x%lx, %d, 0x%llx, %ld, %d, %d, %d) failed, "
 		      "err = %d\n", virt, fd, offset, len, r, w, x, err);
+	}
 }
 
 #define PFN_UP(x) (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)

@@ -687,7 +687,7 @@ _GLOBAL(kernel_thread)
 	ld	r30,-16(r1)
 	blr
 
-#ifndef CONFIG_PPC_PSERIE	/* hack hack hack */
+#ifndef CONFIG_PPC_PSERIES	/* hack hack hack */
 #define ppc_rtas	sys_ni_syscall
 #endif
 

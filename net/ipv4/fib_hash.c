@@ -43,6 +43,8 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 
+#include "fib_lookup.h"
+
 static kmem_cache_t *fn_hash_kmem;
 static kmem_cache_t *fn_alias_kmem;
 
@@ -51,17 +53,6 @@ struct fib_node {
 	struct list_head	fn_alias;
 	u32			fn_key;
 };
-
-struct fib_alias {
-	struct list_head	fa_list;
-	struct fib_info		*fa_info;
-	u8			fa_tos;
-	u8			fa_type;
-	u8			fa_scope;
-	u8			fa_state;
-};
-
-#define FN_S_ACCESSED	1
 
 struct fn_zone {
 	struct fn_zone		*fz_next;	/* Next not empty zone	*/
@@ -265,32 +256,14 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 
 		head = &fz->fz_hash[fn_hash(k, fz)];
 		hlist_for_each_entry(f, node, head, fn_hash) {
-			struct fib_alias *fa;
-
 			if (f->fn_key != k)
 				continue;
 
-			list_for_each_entry(fa, &f->fn_alias, fa_list) {
-				if (fa->fa_tos &&
-				    fa->fa_tos != flp->fl4_tos)
-					continue;
-				if (fa->fa_scope < flp->fl4_scope)
-					continue;
-
-				fa->fa_state |= FN_S_ACCESSED;
-
-				err = fib_semantic_match(fa->fa_type,
-							 fa->fa_info,
-							 flp, res);
-				if (err == 0) {
-					res->type = fa->fa_type;
-					res->scope = fa->fa_scope;
-					res->prefixlen = fz->fz_order;
-					goto out;
-				}
-				if (err < 0)
-					goto out;
-			}
+			err = fib_semantic_match(&f->fn_alias,
+						 flp, res,
+						 fz->fz_order);
+			if (err <= 0)
+				goto out;
 		}
 	}
 	err = 1;
@@ -358,7 +331,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 			if (!next_fi->fib_nh[0].nh_gw ||
 			    next_fi->fib_nh[0].nh_scope != RT_SCOPE_LINK)
 				continue;
-			fa->fa_state |= FN_S_ACCESSED;
+			fa->fa_state |= FA_S_ACCESSED;
 
 			if (fi == NULL) {
 				if (next_fi != res->fi)
@@ -438,17 +411,15 @@ static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
 {
 	if (fn) {
 		struct list_head *head = &fn->fn_alias;
-		struct fib_alias *fa, *prev_fa;
+		struct fib_alias *fa;
 
-		prev_fa = NULL;
 		list_for_each_entry(fa, head, fa_list) {
-			if (fa->fa_tos != tos)
+			if (fa->fa_tos > tos)
 				continue;
-			prev_fa = fa;
-			if (prio <= fa->fa_info->fib_priority)
-				break;
+			if (fa->fa_info->fib_priority >= prio ||
+			    fa->fa_tos < tos)
+				return fa;
 		}
-		return prev_fa;
 	}
 	return NULL;
 }
@@ -505,7 +476,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	 * and we need to allocate a new one of those as well.
 	 */
 
-	if (fa &&
+	if (fa && fa->fa_tos == tos &&
 	    fa->fa_info->fib_priority == fi->fib_priority) {
 		struct fib_alias *fa_orig;
 
@@ -523,11 +494,11 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 			fa->fa_type = type;
 			fa->fa_scope = r->rtm_scope;
 			state = fa->fa_state;
-			fa->fa_state &= ~FN_S_ACCESSED;
+			fa->fa_state &= ~FA_S_ACCESSED;
 			write_unlock_bh(&fib_hash_lock);
 
 			fib_release_info(fi_drop);
-			if (state & FN_S_ACCESSED)
+			if (state & FA_S_ACCESSED)
 				rt_cache_flush(-1);
 			return 0;
 		}
@@ -537,7 +508,8 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 * information.
 		 */
 		fa_orig = fa;
-		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
+		fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+		list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 			if (fa->fa_tos != tos)
 				break;
 			if (fa->fa_info->fib_priority != fi->fib_priority)
@@ -585,7 +557,7 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	write_lock_bh(&fib_hash_lock);
 	if (new_f)
 		fib_insert_node(fz, new_f);
-	list_add(&new_fa->fa_list,
+	list_add_tail(&new_fa->fa_list,
 		 (fa ? &fa->fa_list : &f->fn_alias));
 	write_unlock_bh(&fib_hash_lock);
 
@@ -611,7 +583,6 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	struct fn_hash *table = (struct fn_hash*)tb->tb_data;
 	struct fib_node *f;
 	struct fib_alias *fa, *fa_to_delete;
-	struct list_head *fa_head;
 	int z = r->rtm_dst_len;
 	struct fn_zone *fz;
 	u32 key;
@@ -637,8 +608,8 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		return -ESRCH;
 
 	fa_to_delete = NULL;
-	fa_head = fa->fa_list.prev;
-	list_for_each_entry(fa, fa_head, fa_list) {
+	fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+	list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 		struct fib_info *fi = fa->fa_info;
 
 		if (fa->fa_tos != tos)
@@ -671,7 +642,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		}
 		write_unlock_bh(&fib_hash_lock);
 
-		if (fa->fa_state & FN_S_ACCESSED)
+		if (fa->fa_state & FA_S_ACCESSED)
 			rt_cache_flush(-1);
 		fn_free_alias(fa);
 		if (kill_fn) {

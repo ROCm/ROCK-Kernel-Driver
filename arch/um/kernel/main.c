@@ -220,14 +220,19 @@ void __wrap_free(void *ptr)
 	 * If kmalloc is not yet possible, then the kernel memory regions
 	 * may not be set up yet, and the variables not initialized.  So,
 	 * free is called.
+	 *
+	 * CAN_KMALLOC is checked because it would be bad to free a buffer
+	 * with kmalloc/vmalloc after they have been turned off during
+	 * shutdown.
 	 */
-	if(CAN_KMALLOC()){
-		if((addr >= uml_physmem) && (addr <= high_physmem))
+
+	if((addr >= uml_physmem) && (addr < high_physmem)){
+		if(CAN_KMALLOC())
 			kfree(ptr);
-		else if((addr >= start_vm) && (addr <= end_vm))
+	}
+	else if((addr >= start_vm) && (addr < end_vm)){
+		if(CAN_KMALLOC())
 			vfree(ptr);
-		else
-			__real_free(ptr);
 	}
 	else __real_free(ptr);
 }

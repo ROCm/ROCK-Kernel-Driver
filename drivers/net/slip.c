@@ -672,7 +672,9 @@ static int slip_receive_room(struct tty_struct *tty)
  * Handle the 'receiver data ready' interrupt.
  * This function is called by the 'tty_io' module in the kernel when
  * a block of SLIP data has been received, which can now be decapsulated
- * and sent on to some IP layer for further processing.
+ * and sent on to some IP layer for further processing. This will not
+ * be re-entered while running but other ldisc functions may be called
+ * in parallel
  */
  
 static void slip_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count)
@@ -841,9 +843,11 @@ sl_alloc(dev_t line)
  * SLIP line discipline is called for.  Because we are
  * sure the tty line exists, we only have to link it to
  * a free SLIP channel...
+ *
+ * Called in process context serialized from other ldisc calls.
  */
-static int
-slip_open(struct tty_struct *tty)
+
+static int slip_open(struct tty_struct *tty)
 {
 	struct slip *sl;
 	int err;
@@ -876,11 +880,11 @@ slip_open(struct tty_struct *tty)
 	tty->disc_data = sl;
 	sl->line = tty_devnum(tty);
 	sl->pid = current->pid;
+	
+	/* FIXME: already done before we were called - seems this can go */
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
-
+		
 	if (!test_bit(SLF_INUSE, &sl->flags)) {
 		/* Perform the low-level SLIP initialization. */
 		if ((err = sl_alloc_bufs(sl, SL_MTU)) != 0)
@@ -923,6 +927,9 @@ err_exit:
 }
 
 /*
+
+  FIXME: 1,2 are fixed 3 was never true anyway.
+  
    Let me to blame a bit.
    1. TTY module calls this funstion on soft interrupt.
    2. TTY module calls this function WITH MASKED INTERRUPTS!
@@ -941,9 +948,8 @@ err_exit:
 
 /*
  * Close down a SLIP channel.
- * This means flushing out any pending queues, and then restoring the
- * TTY line discipline to what it was before it got hooked to SLIP
- * (which usually is TTY again).
+ * This means flushing out any pending queues, and then returning. This
+ * call is serialized against other ldisc functions.
  */
 static void
 slip_close(struct tty_struct *tty)

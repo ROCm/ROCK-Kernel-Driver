@@ -277,6 +277,11 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.19:
+	- Minor bugfix in handling of the default upcase table.
+	- Many internal cleanups and improvements.  Many thanks to Linus
+	  Torvalds and Al Viro for the help and advice with the sparse
+	  annotations and cleanups.
 2.1.18:
 	- Fix scheduling latencies at mount time.  (Ingo Molnar)
 	- Fix endianness bug in a little traversed portion of the attribute

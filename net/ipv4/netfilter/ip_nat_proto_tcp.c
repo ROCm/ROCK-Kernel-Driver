@@ -162,7 +162,7 @@ tcp_print_range(char *buffer, const struct ip_nat_range *range)
 }
 
 struct ip_nat_protocol ip_nat_protocol_tcp
-= { { NULL, NULL }, "TCP", IPPROTO_TCP,
+= { "TCP", IPPROTO_TCP,
     tcp_manip_pkt,
     tcp_in_range,
     tcp_unique_tuple,

@@ -1203,7 +1203,7 @@ lock_retry_remap:
  * Warning: Never use @val when looking for attribute types which can be
  *	    non-resident as this most likely will result in a crash!
  */
-static int ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
+static int ntfs_attr_find(const ATTR_TYPE type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
 {
@@ -1475,7 +1475,7 @@ err_out:
  * On actual error, ntfs_external_attr_find() returns -EIO.  In this case
  * @ctx->attr is undefined and in particular do not rely on it not changing.
  */
-static int ntfs_external_attr_find(const ATTR_TYPES type,
+static int ntfs_external_attr_find(const ATTR_TYPE type,
 		const ntfschar *name, const u32 name_len,
 		const IGNORE_CASE_BOOL ic, const VCN lowest_vcn,
 		const u8 *val, const u32 val_len, ntfs_attr_search_ctx *ctx)
@@ -1620,7 +1620,8 @@ static int ntfs_external_attr_find(const ATTR_TYPES type,
 			} else {
 				/* We want an extent record. */
 				ctx->mrec = map_extent_mft_record(base_ni,
-						al_entry->mft_reference, &ni);
+						le64_to_cpu(
+						al_entry->mft_reference), &ni);
 				ctx->ntfs_ino = ni;
 				if (IS_ERR(ctx->mrec)) {
 					ntfs_error(vol->sb, "Failed to map "
@@ -1799,7 +1800,7 @@ not_found:
  * When -errno != -ENOENT, an error occured during the lookup.  @ctx->attr is
  * then undefined and in particular you should not rely on it not changing.
  */
-int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
+int ntfs_attr_lookup(const ATTR_TYPE type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		ntfs_attr_search_ctx *ctx)

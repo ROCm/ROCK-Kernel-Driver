@@ -71,9 +71,9 @@
  *
  */
 
-#ifdef CONFIG_PMAC_DART
+#ifdef CONFIG_U3_DART
 extern unsigned long dart_tablebase;
-#endif /* CONFIG_PMAC_DART */
+#endif /* CONFIG_U3_DART */
 
 HTAB htab_data = {NULL, 0, 0, 0, 0};
 
@@ -203,7 +203,7 @@ void __init htab_initialize(void)
 
 		DBG("creating mapping for region: %lx : %lx\n", base, size);
 
-#ifdef CONFIG_PMAC_DART
+#ifdef CONFIG_U3_DART
 		/* Do not map the DART space. Fortunately, it will be aligned
 		 * in such a way that it will not cross two lmb regions and will
 		 * fit within a single 16Mb page.
@@ -223,7 +223,7 @@ void __init htab_initialize(void)
 						   mode_rw, use_largepages);
 			continue;
 		}
-#endif /* CONFIG_PMAC_DART */
+#endif /* CONFIG_U3_DART */
 		create_pte_mapping(base, base + size, mode_rw, use_largepages);
 	}
 	DBG(" <- htab_initialize()\n");

@@ -80,27 +80,18 @@ struct ip_nat_info_manip
 /* Protects NAT hash tables, and NAT-private part of conntracks. */
 DECLARE_RWLOCK_EXTERN(ip_nat_lock);
 
-/* Hashes for by-source and IP/protocol. */
-struct ip_nat_hash
-{
-	struct list_head list;
-
-	/* conntrack we're embedded in: NULL if not in hash. */
-	struct ip_conntrack *conntrack;
-};
-
 /* The structure embedded in the conntrack structure. */
 struct ip_nat_info
 {
 	/* Set to zero when conntrack created: bitmask of maniptypes */
-	int initialized;
+	u_int16_t initialized;
 
-	unsigned int num_manips;
+	u_int16_t num_manips;
 
 	/* Manipulations to be done on this conntrack. */
 	struct ip_nat_info_manip manips[IP_NAT_MAX_MANIPS];
 
-	struct ip_nat_hash bysource, byipsproto;
+	struct list_head bysource, byipsproto;
 
 	/* Helper (NULL if none). */
 	struct ip_nat_helper *helper;

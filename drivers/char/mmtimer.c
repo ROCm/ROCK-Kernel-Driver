@@ -184,6 +184,9 @@ static struct miscdevice mmtimer_miscdev = {
  */
 static int __init mmtimer_init(void)
 {
+	if (!ia64_platform_is("sn2"))
+		return -1;
+
 	/*
 	 * Sanity check the cycles/sec variable
 	 */

@@ -130,7 +130,7 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 		if (!ni->name)
 			return -ENOMEM;
 		memcpy(ni->name, na->name, i);
-		ni->name[i] = cpu_to_le16(L'\0');
+		ni->name[i] = 0;
 	}
 	return 0;
 }
@@ -214,7 +214,7 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
  * value with IS_ERR() and if true, the function failed and the error code is
  * obtained from PTR_ERR().
  */
-struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPE type,
 		ntfschar *name, u32 name_len)
 {
 	struct inode *vi;
@@ -680,7 +680,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 			goto unm_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
-		ni->attr_list_size = (u32)attribute_value_length(ctx->attr);
+		ni->attr_list_size = (u32)ntfs_attr_size(ctx->attr);
 		ni->attr_list = ntfs_malloc_nofs(ni->attr_list_size);
 		if (!ni->attr_list) {
 			ntfs_error(vi->i_sb, "Not enough memory to allocate "
@@ -1794,7 +1794,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 			goto put_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
-		ni->attr_list_size = (u32)attribute_value_length(ctx->attr);
+		ni->attr_list_size = (u32)ntfs_attr_size(ctx->attr);
 		ni->attr_list = ntfs_malloc_nofs(ni->attr_list_size);
 		if (!ni->attr_list) {
 			ntfs_error(sb, "Not enough memory to allocate buffer "
@@ -2270,16 +2270,71 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  *
  * We don't support i_size changes yet.
  *
- * Called with ->i_sem held.
+ * The kernel guarantees that @vi is a regular file (S_ISREG() is true) and
+ * that the change is allowed.
+ *
+ * This implies for us that @vi is a file inode rather than a directory, index,
+ * or attribute inode as well as that @vi is a base inode.
+ *
+ * Called with ->i_sem held.  In all but one case ->i_alloc_sem is held for
+ * writing.  The only case where ->i_alloc_sem is not held is
+ * mm/filemap.c::generic_file_buffered_write() where vmtruncate() is called
+ * with the current i_size as the offset which means that it is a noop as far
+ * as ntfs_truncate() is concerned.
  */
 void ntfs_truncate(struct inode *vi)
 {
-	// TODO: Implement...
-	ntfs_warning(vi->i_sb, "Eeek: i_size may have changed! If you see "
-			"this right after a message from "
-			"ntfs_{prepare,commit}_{,nonresident_}write() then "
-			"just ignore it. Otherwise it is bad news.");
-	// TODO: reset i_size now!
+	ntfs_inode *ni = NTFS_I(vi);
+	ntfs_attr_search_ctx *ctx;
+	MFT_RECORD *m;
+	int err;
+
+	m = map_mft_record(ni);
+	if (IS_ERR(m)) {
+		ntfs_error(vi->i_sb, "Failed to map mft record for inode 0x%lx "
+				"(error code %ld).", vi->i_ino, PTR_ERR(m));
+		if (PTR_ERR(m) != ENOMEM)
+			make_bad_inode(vi);
+		return;
+	}
+	ctx = ntfs_attr_get_search_ctx(ni, m);
+	if (unlikely(!ctx)) {
+		ntfs_error(vi->i_sb, "Failed to allocate a search context: "
+				"Not enough memory");
+		// FIXME: We can't report an error code upstream.  So what do
+		// we do?!?  make_bad_inode() seems a bit harsh...
+		unmap_mft_record(ni);
+		return;
+	}
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(vi->i_sb, "Open attribute is missing from "
+					"mft record.  Inode 0x%lx is corrupt.  "
+					"Run chkdsk.", vi->i_ino);
+			make_bad_inode(vi);
+		} else {
+			ntfs_error(vi->i_sb, "Failed to lookup attribute in "
+					"inode 0x%lx (error code %d).",
+					vi->i_ino, err);
+			// FIXME: We can't report an error code upstream.  So
+			// what do we do?!?  make_bad_inode() seems a bit
+			// harsh...
+		}
+		goto out;
+	}
+	/* If the size has not changed there is nothing to do. */
+	if (ntfs_attr_size(ctx->attr) == i_size_read(vi))
+		goto out;
+	// TODO: Implement the truncate...
+	ntfs_error(vi->i_sb, "Inode size has changed but this is not "
+			"implemented yet.  Resetting inode size to old value. "
+			" This is most likely a bug in the ntfs driver!");
+	i_size_write(vi, ntfs_attr_size(ctx->attr)); 
+out:
+	ntfs_attr_put_search_ctx(ctx);
+	unmap_mft_record(ni);
 	return;
 }
 
@@ -2289,67 +2344,62 @@ void ntfs_truncate(struct inode *vi)
  * @attr:	structure describing the attributes and the changes
  *
  * We have to trap VFS attempts to truncate the file described by @dentry as
- * soon as possible, because we do not implement changes in i_size yet. So we
+ * soon as possible, because we do not implement changes in i_size yet.  So we
  * abort all i_size changes here.
  *
- * Called with ->i_sem held.
+ * We also abort all changes of user, group, and mode as we do not implement
+ * the NTFS ACLs yet.
+ *
+ * Called with ->i_sem held.  For the ATTR_SIZE (i.e. ->truncate) case, also
+ * called with ->i_alloc_sem held for writing.
  *
  * Basically this is a copy of generic notify_change() and inode_setattr()
  * functionality, except we intercept and abort changes in i_size.
  */
 int ntfs_setattr(struct dentry *dentry, struct iattr *attr)
 {
-	struct inode *vi;
+	struct inode *vi = dentry->d_inode;
 	int err;
 	unsigned int ia_valid = attr->ia_valid;
-
-	vi = dentry->d_inode;
 
 	err = inode_change_ok(vi, attr);
 	if (err)
 		return err;
 
-	if ((ia_valid & ATTR_UID && attr->ia_uid != vi->i_uid) ||
-			(ia_valid & ATTR_GID && attr->ia_gid != vi->i_gid)) {
-		err = DQUOT_TRANSFER(vi, attr) ? -EDQUOT : 0;
-		if (err)
-			return err;
+	/* We do not support NTFS ACLs yet. */
+	if (ia_valid & (ATTR_UID | ATTR_GID | ATTR_MODE)) {
+		ntfs_warning(vi->i_sb, "Changes in user/group/mode are not "
+				"supported yet, ignoring.");
+		err = -EOPNOTSUPP;
+		goto out;
 	}
-
-	lock_kernel();
 
 	if (ia_valid & ATTR_SIZE) {
-		ntfs_error(vi->i_sb, "Changes in i_size are not supported "
-				"yet. Sorry.");
-		// TODO: Implement...
-		// err = vmtruncate(vi, attr->ia_size);
-		err = -EOPNOTSUPP;
-		if (err)
-			goto trunc_err;
+		if (attr->ia_size != i_size_read(vi)) {
+			ntfs_warning(vi->i_sb, "Changes in inode size are not "
+					"supported yet, ignoring.");
+			err = -EOPNOTSUPP;
+			// TODO: Implement...
+			// err = vmtruncate(vi, attr->ia_size);
+			if (err || ia_valid == ATTR_SIZE)
+				goto out;
+		} else {
+			/*
+			 * We skipped the truncate but must still update
+			 * timestamps.
+			 */
+			ia_valid |= ATTR_MTIME|ATTR_CTIME;
+		}
 	}
 
-	if (ia_valid & ATTR_UID)
-		vi->i_uid = attr->ia_uid;
-	if (ia_valid & ATTR_GID)
-		vi->i_gid = attr->ia_gid;
 	if (ia_valid & ATTR_ATIME)
 		vi->i_atime = attr->ia_atime;
 	if (ia_valid & ATTR_MTIME)
 		vi->i_mtime = attr->ia_mtime;
 	if (ia_valid & ATTR_CTIME)
 		vi->i_ctime = attr->ia_ctime;
-	if (ia_valid & ATTR_MODE) {
-		vi->i_mode = attr->ia_mode;
-		if (!in_group_p(vi->i_gid) &&
-				!capable(CAP_FSETID))
-			vi->i_mode &= ~S_ISGID;
-	}
 	mark_inode_dirty(vi);
-
-trunc_err:
-
-	unlock_kernel();
-
+out:
 	return err;
 }
 
@@ -2373,7 +2423,7 @@ trunc_err:
  */
 int ntfs_write_inode(struct inode *vi, int sync)
 {
-	s64 nt;
+	sle64 nt;
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;

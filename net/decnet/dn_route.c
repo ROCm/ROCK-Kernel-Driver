@@ -996,7 +996,7 @@ source_ok:
 		 * here
 		 */
 		if (!try_hard) {
-			neigh = dn_neigh_lookup(&dn_neigh_table, &fl.fld_dst);
+			neigh = neigh_lookup_nodev(&dn_neigh_table, &fl.fld_dst);
 			if (neigh) {
 				if ((oldflp->oif && 
 				    (neigh->dev->ifindex != oldflp->oif)) ||
