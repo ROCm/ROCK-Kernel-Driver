@@ -455,6 +455,9 @@ void rtas_os_term(char *str)
 {
 	int status;
 
+	if (RTAS_UNKNOWN_SERVICE == rtas_token("ibm,os-term"))
+		return;
+
 	snprintf(rtas_os_term_buf, 2048, "OS panic: %s", str);
 
 	do {
