@@ -77,8 +77,6 @@
 #define dprintk(flags, fmt...) do { \
 	if (debugflags & (flags)) printk(KERN_DEBUG fmt); \
 } while (0)
-#define DBG_OPEN        0x0001
-#define DBG_RELEASE     0x0002
 #define DBG_IOCTL       0x0004
 #define DBG_INIT        0x0010
 #define DBG_EXIT        0x0020
@@ -521,33 +519,6 @@ static void do_nbd_request(request_queue_t * q)
 	return;
 }
 
-static int nbd_open(struct inode *inode, struct file *file)
-{
-	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
-
-	dprintk(DBG_OPEN, "%s: nbd_open refcnt=%d\n", lo->disk->disk_name,
-			lo->refcnt);
-	lo->refcnt++;
-	return 0;
-}
-
-static int nbd_release(struct inode *inode, struct file *file)
-{
-	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
-
-#ifdef PARANOIA
-	if (lo->refcnt <= 0) {
-		printk(KERN_ALERT "%s: nbd_release: refcount(%d) <= 0\n",
-				lo->disk->disk_name, lo->refcnt);
-		BUG();
-	}
-#endif
-	lo->refcnt--;
-	dprintk(DBG_RELEASE, "%s: nbd_release: refcnt=%d\n",
-			lo->disk->disk_name, lo->refcnt);
-	return 0;
-}
-
 static int nbd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -555,6 +526,8 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	int error;
 	struct request sreq ;
 
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
 #ifdef PARANOIA
 	BUG_ON(lo->magic != LO_MAGIC);
 #endif
@@ -562,8 +535,6 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	dprintk(DBG_IOCTL, "%s: nbd_ioctl cmd=%s(0x%x) arg=%lu\n",
 			lo->disk->disk_name, ioctl_cmd_to_ascii(cmd), cmd, arg);
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
 	switch (cmd) {
 	case NBD_DISCONNECT:
 	        printk(KERN_INFO "%s: NBD_DISCONNECT\n", lo->disk->disk_name);
@@ -678,8 +649,6 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 static struct block_device_operations nbd_fops =
 {
 	.owner =	THIS_MODULE,
-	.open =		nbd_open,
-	.release =	nbd_release,
 	.ioctl =	nbd_ioctl,
 };
 
@@ -730,7 +699,6 @@ static int __init nbd_init(void)
 	devfs_mk_dir("nbd");
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
-		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
 #ifdef PARANOIA
 		nbd_dev[i].magic = LO_MAGIC;

@@ -36,7 +36,6 @@ enum {
 #define PARANOIA
 
 struct nbd_device {
-	int refcnt;	
 	int flags;
 	int harderror;		/* Code of hard error			*/
 #define NBD_READ_ONLY 0x0001
