@@ -656,8 +656,9 @@ static int hci_usb_fw_load(struct usb_device *udev)
 
 #endif /* CONFIG_BLUEZ_USB_FW_LOAD */
 
-static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
+static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_endpoint_descriptor *bulk_out_ep[HCI_MAX_IFACE_NUM];
 	struct usb_endpoint_descriptor *isoc_out_ep[HCI_MAX_IFACE_NUM];
 	struct usb_endpoint_descriptor *bulk_in_ep[HCI_MAX_IFACE_NUM];
@@ -670,11 +671,11 @@ static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const s
 	struct hci_dev *hdev;
 	int i, a, e, size, ifn, isoc_ifnum, isoc_alts;
 
-	BT_DBG("udev %p ifnum %d", udev, ifnum);
+	BT_DBG("intf %p", intf);
 
 	/* Check number of endpoints */
-	if (udev->actconfig->interface[ifnum].altsetting[0].bNumEndpoints < 3)
-		return NULL;
+	if (intf->altsetting[0].bNumEndpoints < 3)
+		return -ENODEV;
 
 	MOD_INC_USE_COUNT;
 
@@ -794,24 +795,27 @@ static void * hci_usb_probe(struct usb_device *udev, unsigned int ifnum, const s
 		goto probe_error;
 	}
 
-	return husb;
+	dev_set_drvdata(&intf->dev, husb);
+	return 0;
 
 probe_error:
 	kfree(husb);
 
 done:
 	MOD_DEC_USE_COUNT;
-	return NULL;
+	return -EIO;
 }
 
-static void hci_usb_disconnect(struct usb_device *udev, void *ptr)
+static void hci_usb_disconnect(struct usb_interface *intf)
 {
-	struct hci_usb *husb = (struct hci_usb *) ptr;
-	struct hci_dev *hdev = &husb->hdev;
+	struct hci_usb *husb = dev_get_drvdata(&intf->dev);
+	struct hci_dev *hdev;
 
+	dev_set_drvdata(&intf->dev, NULL);
 	if (!husb)
 		return;
 
+	hdev = &husb->hdev;
 	BT_DBG("%s", hdev->name);
 
 	hci_usb_close(hdev);

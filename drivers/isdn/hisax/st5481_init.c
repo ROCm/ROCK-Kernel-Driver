@@ -59,10 +59,10 @@ static LIST_HEAD(adapter_list);
  * This function will be called when the adapter is plugged
  * into the USB bus.
  */
-static void * __devinit probe_st5481(struct usb_device *dev,
-				     unsigned int ifnum,
-				     const struct usb_device_id *id)
+static int probe_st5481(struct usb_interface *intf
+			const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev(intf);
 	struct st5481_adapter *adapter;
 	struct hisax_b_if *b_if[2];
 	int retval, i;
@@ -73,7 +73,7 @@ static void * __devinit probe_st5481(struct usb_device *dev,
 
 	adapter = kmalloc(sizeof(struct st5481_adapter), GFP_KERNEL);
 	if (!adapter)
-		return NULL;
+		return -ENOMEM;
 
 	memset(adapter, 0, sizeof(struct st5481_adapter));
 
@@ -114,6 +114,7 @@ static void * __devinit probe_st5481(struct usb_device *dev,
 	hisax_register(&adapter->hisax_d_if, b_if, "st5481_usb", protocol);
 	st5481_start(adapter);
 
+	dev_set_drvdata(&intf->dev, adapter);
 	return adapter;
 
  err_b:
@@ -123,18 +124,22 @@ static void * __devinit probe_st5481(struct usb_device *dev,
  err_usb:
 	st5481_release_usb(adapter);
  err:
-	return NULL;
+	return -EIO;
 }
 
 /*
  * This function will be called when the adapter is removed
  * from the USB bus.
  */
-static void __devexit disconnect_st5481(struct usb_device *dev, void *arg)
+static void disconnect_st5481(struct usb_interface *intf)
 {
-	struct st5481_adapter *adapter = arg;
+	struct st5481_adapter *adapter = dev_get_drvdata(&intf->dev);
 
 	DBG(1,"");
+
+	dev_set_drvdata(&intf->dev, NULL);
+	if (!adapter)
+		return;
 
 	list_del(&adapter->list);
 
@@ -176,10 +181,10 @@ static struct usb_device_id st5481_ids[] = {
 MODULE_DEVICE_TABLE (usb, st5481_ids);
 
 static struct usb_driver st5481_usb_driver = {
-	.name = "st5481_usb",
-	.probe = probe_st5481,
-	.disconnect = __devexit_p(disconnect_st5481),
-	.id_table = st5481_ids,
+	.name =		"st5481_usb",
+	.probe =	probe_st5481,
+	.disconnect =	disconnect_st5481,
+	.id_table =	st5481_ids,
 };
 
 static int __init st5481_usb_init(void)
