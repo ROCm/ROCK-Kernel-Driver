@@ -7,16 +7,12 @@
 #include <linux/net.h>		/* struct socket, struct proto_ops */
 #include <linux/atm.h>		/* ATM stuff */
 #include <linux/atmdev.h>	/* ATM devices */
-#include <linux/atmclip.h>	/* Classical IP over ATM */
 #include <linux/errno.h>	/* error codes */
 #include <linux/kernel.h>	/* printk */
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
 #include <net/sock.h>		/* for sock_no_* */
-#ifdef CONFIG_ATM_CLIP
-#include <net/atmclip.h>
-#endif
 
 #include "resources.h"		/* devs and vccs */
 #include "common.h"		/* common for PVCs and SVCs */
@@ -129,9 +125,6 @@ static int __init atmpvc_init(void)
 		printk(KERN_ERR "ATMPVC: can't register (%d)",error);
 		return error;
 	}
-#ifdef CONFIG_ATM_CLIP
-	atm_clip_init();
-#endif
 #ifdef CONFIG_PROC_FS
 	error = atm_proc_init();
 	if (error) printk("atm_proc_init fails with %d\n",error);

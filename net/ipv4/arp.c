@@ -108,8 +108,9 @@
 #include <net/netrom.h>
 #endif
 #endif
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 #include <net/atmclip.h>
+struct neigh_table *clip_tbl_hook;
 #endif
 
 #include <asm/system.h>
@@ -443,8 +444,8 @@ int arp_bind_neighbour(struct dst_entry *dst)
 		if (dev->flags&(IFF_LOOPBACK|IFF_POINTOPOINT))
 			nexthop = 0;
 		n = __neigh_lookup_errno(
-#ifdef CONFIG_ATM_CLIP
-		    dev->type == ARPHRD_ATM ? &clip_tbl :
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+		    dev->type == ARPHRD_ATM ? clip_tbl_hook :
 #endif
 		    &arp_tbl, &nexthop, dev);
 		if (IS_ERR(n))

@@ -57,6 +57,36 @@ EXPORT_SYMBOL(atm_tcp_ops);
 #endif
 #endif
 
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+#include <net/atmclip.h>
+struct atm_clip_ops *atm_clip_ops;
+static DECLARE_MUTEX(atm_clip_ops_mutex);
+
+void atm_clip_ops_set(struct atm_clip_ops *hook)
+{
+	down(&atm_clip_ops_mutex);
+	atm_clip_ops = hook;
+	up(&atm_clip_ops_mutex);
+}
+
+int try_atm_clip_ops(void)
+{
+	down(&atm_clip_ops_mutex);
+	if (atm_clip_ops && try_module_get(atm_clip_ops->owner)) {
+		up(&atm_clip_ops_mutex);
+		return 1;
+	}
+	up(&atm_clip_ops_mutex);
+	return 0;
+}
+
+#ifdef CONFIG_ATM_CLIP_MODULE
+EXPORT_SYMBOL(atm_clip_ops);
+EXPORT_SYMBOL(atm_clip_ops_mutex);
+EXPORT_SYMBOL(atm_clip_ops_set);
+#endif
+#endif
+
 #if defined(CONFIG_PPPOATM) || defined(CONFIG_PPPOATM_MODULE)
 int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
 EXPORT_SYMBOL(pppoatm_ioctl_hook);
@@ -623,39 +653,67 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 			if (!error) sock->state = SS_CONNECTED;
 			ret_val = error;
 			goto done;
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 		case SIOCMKCLIP:
-			if (!capable(CAP_NET_ADMIN))
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else 
-				ret_val = clip_create(arg);
+				goto done;
+			}
+			if (try_atm_clip_ops()) {
+				ret_val = atm_clip_ops->clip_create(arg);
+				module_put(atm_clip_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 		case ATMARPD_CTRL:
 			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
 				goto done;
 			}
-			error = atm_init_atmarp(vcc);
-			if (!error) sock->state = SS_CONNECTED;
-			ret_val = error;
+#if defined(CONFIG_ATM_CLIP_MODULE)
+			if (!atm_clip_ops)
+				request_module("clip");
+#endif
+			if (try_atm_clip_ops()) {
+				error = atm_clip_ops->atm_init_atmarp(vcc);
+				if (!error)
+					sock->state = SS_CONNECTED;
+				ret_val = error;
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 		case ATMARP_MKIP:
-			if (!capable(CAP_NET_ADMIN)) 
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else 
-				ret_val = clip_mkip(vcc,arg);
+				goto done;
+			}
+			if (try_atm_clip_ops()) {
+				ret_val = atm_clip_ops->clip_mkip(vcc, arg);
+				module_put(atm_clip_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 		case ATMARP_SETENTRY:
-			if (!capable(CAP_NET_ADMIN)) 
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else
-				ret_val = clip_setentry(vcc,arg);
+				goto done;
+			}
+			if (try_atm_clip_ops()) {
+				ret_val = atm_clip_ops->clip_setentry(vcc, arg);
+				module_put(atm_clip_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 		case ATMARP_ENCAP:
-			if (!capable(CAP_NET_ADMIN)) 
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else
-				ret_val = clip_encap(vcc,arg);
+				goto done;
+			}
+			if (try_atm_clip_ops()) {
+				ret_val = atm_clip_ops->clip_encap(vcc, arg);
+				module_put(atm_clip_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 #endif
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)

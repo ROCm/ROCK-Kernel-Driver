@@ -45,6 +45,9 @@ extern __u32 sysctl_rmem_max;
 #include <linux/ip.h>
 #include <net/protocol.h>
 #include <net/arp.h>
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+#include <net/atmclip.h>
+#endif
 #include <net/ip.h>
 #include <net/udp.h>
 #include <net/tcp.h>
@@ -526,6 +529,9 @@ EXPORT_SYMBOL(xrlim_allow);
 EXPORT_SYMBOL(ip_rcv);
 EXPORT_SYMBOL(arp_rcv);
 EXPORT_SYMBOL(arp_tbl);
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+EXPORT_SYMBOL(clip_tbl_hook);
+#endif
 EXPORT_SYMBOL(arp_find);
 
 #endif  /* CONFIG_INET */

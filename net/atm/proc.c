@@ -39,10 +39,9 @@
 #include "common.h" /* atm_proc_init prototype */
 #include "signaling.h" /* to get sigd - ugly too */
 
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 #include <net/atmclip.h>
 #include "ipcommon.h"
-extern void clip_push(struct atm_vcc *vcc,struct sk_buff *skb);
 #endif
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
@@ -91,7 +90,7 @@ static void dev_info(const struct atm_dev *dev,char *buf)
 }
 
 
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 
 
 static int svc_addr(char *buf,struct sockaddr_atmsvc *addr)
@@ -180,16 +179,21 @@ static void pvc_info(struct atm_vcc *vcc,char *buf)
 	    aal_name[vcc->qos.aal],vcc->qos.rxtp.min_pcr,
 	    class_name[vcc->qos.rxtp.traffic_class],vcc->qos.txtp.min_pcr,
 	    class_name[vcc->qos.txtp.traffic_class]);
-#ifdef CONFIG_ATM_CLIP
-	if (vcc->push == clip_push) {
-		struct clip_vcc *clip_vcc = CLIP_VCC(vcc);
-		struct net_device *dev;
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+	if (try_atm_clip_ops()) {
+		if (vcc->push == atm_clip_ops->clip_push) {
+			struct clip_vcc *clip_vcc = CLIP_VCC(vcc);
+			struct net_device *dev;
 
-		dev = clip_vcc->entry ? clip_vcc->entry->neigh->dev : NULL;
-		off += sprintf(buf+off,"CLIP, Itf:%s, Encap:",
-		    dev ? dev->name : "none?");
-		if (clip_vcc->encap) off += sprintf(buf+off,"LLC/SNAP");
-		else off += sprintf(buf+off,"None");
+			dev = clip_vcc->entry ? clip_vcc->entry->neigh->dev : NULL;
+			off += sprintf(buf+off,"CLIP, Itf:%s, Encap:",
+			    dev ? dev->name : "none?");
+			if (clip_vcc->encap)
+				off += sprintf(buf+off,"LLC/SNAP");
+			else
+				off += sprintf(buf+off,"None");
+		}
+		module_put(atm_clip_ops->owner);
 	}
 #endif
 	strcpy(buf+off,"\n");
@@ -409,7 +413,7 @@ static int atm_svc_info(loff_t pos,char *buf)
 	return 0;
 }
 
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 static int atm_arp_info(loff_t pos,char *buf)
 {
 	struct neighbour *n;
@@ -419,28 +423,33 @@ static int atm_arp_info(loff_t pos,char *buf)
 		return sprintf(buf,"IPitf TypeEncp Idle IP address      "
 		    "ATM address\n");
 	}
+	if (!try_atm_clip_ops())
+		return 0;
 	count = pos;
-	read_lock_bh(&clip_tbl.lock);
+	read_lock_bh(&clip_tbl_hook->lock);
 	for (i = 0; i <= NEIGH_HASHMASK; i++)
-		for (n = clip_tbl.hash_buckets[i]; n; n = n->next) {
+		for (n = clip_tbl_hook->hash_buckets[i]; n; n = n->next) {
 			struct atmarp_entry *entry = NEIGH2ENTRY(n);
 			struct clip_vcc *vcc;
 
 			if (!entry->vccs) {
 				if (--count) continue;
 				atmarp_info(n->dev,entry,NULL,buf);
-				read_unlock_bh(&clip_tbl.lock);
+				read_unlock_bh(&clip_tbl_hook->lock);
+				module_put(atm_clip_ops->owner);
 				return strlen(buf);
 			}
 			for (vcc = entry->vccs; vcc;
 			    vcc = vcc->next) {
 				if (--count) continue;
 				atmarp_info(n->dev,entry,vcc,buf);
-				read_unlock_bh(&clip_tbl.lock);
+				read_unlock_bh(&clip_tbl_hook->lock);
+				module_put(atm_clip_ops->owner);
 				return strlen(buf);
 			}
 		}
-	read_unlock_bh(&clip_tbl.lock);
+	read_unlock_bh(&clip_tbl_hook->lock);
+	module_put(atm_clip_ops->owner);
 	return 0;
 }
 #endif
@@ -612,7 +621,7 @@ int __init atm_proc_init(void)
 	CREATE_ENTRY(pvc);
 	CREATE_ENTRY(svc);
 	CREATE_ENTRY(vc);
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 	CREATE_ENTRY(arp);
 #endif
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
