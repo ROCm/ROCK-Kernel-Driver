@@ -2,7 +2,7 @@
 
 static int max_memory = 32;
 
-MODULE_PARM(max_memory,"i");
+module_param(max_memory, int, 0644);
 MODULE_PARM_DESC(max_memory, "maximum memory usage for capture buffers (default: 32Mb)");
 
 #define IS_CAPTURE_ACTIVE(fh) \

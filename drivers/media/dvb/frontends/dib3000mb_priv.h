@@ -1,5 +1,5 @@
 /*
- * dib3000mb.h
+ * dib3000mb_priv.h
  *
  * Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de)
  *
@@ -7,20 +7,11 @@
  *	modify it under the terms of the GNU General Public License as
  *	published by the Free Software Foundation, version 2.
  *
- * 
- *
  * for more information see dib3000mb.c .
  */
 
-#ifndef __DIB3000MB_H_INCLUDED__
-#define __DIB3000MB_H_INCLUDED__
-
-/* info and err, taken from usb.h, if there is anything available like by default,
- * please change !
- */
-#define err(format, arg...) printk(KERN_ERR "%s: " format "\n" , __FILE__ , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format "\n" , __FILE__ , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format "\n" , __FILE__ , ## arg)
+#ifndef __DIB3000MB_PRIV_H_INCLUDED__
+#define __DIB3000MB_PRIV_H_INCLUDED__
 
 /* register addresses and some of their default values */
 
@@ -34,37 +25,18 @@
 
 /* FFT size */
 #define DIB3000MB_REG_FFT				(     1)
-#define DIB3000MB_FFT_2K					(     0)
-#define DIB3000MB_FFT_8K					(     1)
-#define DIB3000MB_FFT_AUTO					(     1)
 
 /* Guard time */
 #define DIB3000MB_REG_GUARD_TIME		(     2)
-#define DIB3000MB_GUARD_TIME_1_32			(     0)
-#define DIB3000MB_GUARD_TIME_1_16			(     1)
-#define DIB3000MB_GUARD_TIME_1_8			(     2)
-#define DIB3000MB_GUARD_TIME_1_4			(     3)
-#define DIB3000MB_GUARD_TIME_AUTO			(     0)
 
 /* QAM */
 #define DIB3000MB_REG_QAM				(     3)
-#define DIB3000MB_QAM_QPSK					(     0)
-#define DIB3000MB_QAM_QAM16					(     1)
-#define DIB3000MB_QAM_QAM64					(     2)
-#define DIB3000MB_QAM_RESERVED				(     3)
 
 /* Alpha coefficient high priority Viterbi algorithm */
 #define DIB3000MB_REG_VIT_ALPHA			(     4)
-#define DIB3000MB_VIT_ALPHA_OFF				(     0)
-#define DIB3000MB_VIT_ALPHA_1				(     1)
-#define DIB3000MB_VIT_ALPHA_2				(     2)
-#define DIB3000MB_VIT_ALPHA_4				(     4)
-#define DIB3000MB_VIT_ALPHA_AUTO			(     7)
 
 /* spectrum inversion */
 #define DIB3000MB_REG_DDS_INV			(     5)
-#define DIB3000MB_DDS_INV_OFF				(     0)
-#define DIB3000MB_DDS_INV_ON				(     1)
 
 /* DDS frequency value (IF position) ad ? values don't match reg_3000mb.txt */
 #define DIB3000MB_REG_DDS_FREQ_MSB		(     6)
@@ -73,12 +45,7 @@
 #define DIB3000MB_DDS_FREQ_LSB				(  8990)
 
 /* timing frequency (carrier spacing) */
-#define DIB3000MB_REG_TIMING_FREQ_MSB	(     8)
-#define DIB3000MB_REG_TIMING_FREQ_LSB	(     9)
-
-static u16 dib3000mb_reg_timing_freq[] = {
-	DIB3000MB_REG_TIMING_FREQ_MSB, DIB3000MB_REG_TIMING_FREQ_LSB
-};
+static u16 dib3000mb_reg_timing_freq[] = { 8,9 };
 static u16 dib3000mb_timing_freq[][2] = {
 	{ 126 , 48873 }, /* 6 MHz */
 	{ 147 , 57019 }, /* 7 MHz */
@@ -86,26 +53,15 @@ static u16 dib3000mb_timing_freq[][2] = {
 };
 
 /* impulse noise parameter */
-#define DIB3000MB_REG_IMPNOISE_10		(    10)
-#define DIB3000MB_REG_IMPNOISE_11		(    11)
-#define DIB3000MB_REG_IMPNOISE_12		(    12)
-#define DIB3000MB_REG_IMPNOISE_13		(    13)
-#define DIB3000MB_REG_IMPNOISE_14		(    14)
-#define DIB3000MB_REG_IMPNOISE_15		(    15)
 /* 36 ??? */
-#define DIB3000MB_REG_IMPNOISE_36		(    36)
+
+static u16 dib3000mb_reg_impulse_noise[] = { 10,11,12,15,36 };
 
 enum dib3000mb_impulse_noise_type {
 	DIB3000MB_IMPNOISE_OFF,
 	DIB3000MB_IMPNOISE_MOBILE,
 	DIB3000MB_IMPNOISE_FIXED,
 	DIB3000MB_IMPNOISE_DEFAULT
-};
-
-static u16 dib3000mb_reg_impulse_noise[] = {
- DIB3000MB_REG_IMPNOISE_10, DIB3000MB_REG_IMPNOISE_11,
- DIB3000MB_REG_IMPNOISE_12, DIB3000MB_REG_IMPNOISE_15,
- DIB3000MB_REG_IMPNOISE_36
 };
 
 static u16 dib3000mb_impulse_noise_values[][5] = {
@@ -122,74 +78,26 @@ static u16 dib3000mb_impulse_noise_values[][5] = {
  */
 
 /* also from 16 to 18 */
-#define DIB3000MB_REG_AGC_GAIN_19		(    19)
-#define DIB3000MB_REG_AGC_GAIN_20		(    20)
-#define DIB3000MB_REG_AGC_GAIN_21		(    21)
-#define DIB3000MB_REG_AGC_GAIN_22		(    22)
-#define DIB3000MB_REG_AGC_GAIN_23		(    23)
-#define DIB3000MB_REG_AGC_GAIN_24		(    24)
-#define DIB3000MB_REG_AGC_GAIN_25		(    25)
-#define DIB3000MB_REG_AGC_GAIN_26		(    26)
-#define DIB3000MB_REG_AGC_GAIN_27		(    27)
-#define DIB3000MB_REG_AGC_GAIN_28		(    28)
-#define DIB3000MB_REG_AGC_GAIN_29		(    29)
-#define DIB3000MB_REG_AGC_GAIN_30		(    30)
-#define DIB3000MB_REG_AGC_GAIN_31		(    31)
-#define DIB3000MB_REG_AGC_GAIN_32		(    32)
-
 static u16 dib3000mb_reg_agc_gain[] = {
-  DIB3000MB_REG_AGC_GAIN_19, DIB3000MB_REG_AGC_GAIN_20, DIB3000MB_REG_AGC_GAIN_21,
-  DIB3000MB_REG_AGC_GAIN_22, DIB3000MB_REG_AGC_GAIN_23, DIB3000MB_REG_AGC_GAIN_24,
-  DIB3000MB_REG_AGC_GAIN_25, DIB3000MB_REG_AGC_GAIN_26, DIB3000MB_REG_AGC_GAIN_27,
-  DIB3000MB_REG_AGC_GAIN_28, DIB3000MB_REG_AGC_GAIN_29, DIB3000MB_REG_AGC_GAIN_30,
-  DIB3000MB_REG_AGC_GAIN_31, DIB3000MB_REG_AGC_GAIN_32 };
+	19,20,21,22,23,24,25,26,27,28,29,30,31,32
+};
 
 static u16 dib3000mb_default_agc_gain[] =
 	{ 0x0001, 52429,   623, 128, 166, 195, 61,   /* RF ??? */
 	  0x0001, 53766, 38011,   0,  90,  33, 23 }; /* IF ??? */
 
 /* phase noise */
-#define DIB3000MB_REG_PHASE_NOISE_33		(    33)
-#define DIB3000MB_REG_PHASE_NOISE_34		(    34)
-#define DIB3000MB_REG_PHASE_NOISE_35		(    35)
-#define DIB3000MB_REG_PHASE_NOISE_36		(    36)
-#define DIB3000MB_REG_PHASE_NOISE_37		(    37)
-#define DIB3000MB_REG_PHASE_NOISE_38		(    38)
-
-/* DIB3000MB_REG_PHASE_NOISE_36 is set when setting the impulse noise */
-static u16 dib3000mb_reg_phase_noise[] = {
-	DIB3000MB_REG_PHASE_NOISE_33, DIB3000MB_REG_PHASE_NOISE_34, DIB3000MB_REG_PHASE_NOISE_35,
-	DIB3000MB_REG_PHASE_NOISE_37, DIB3000MB_REG_PHASE_NOISE_38
-};
+/* 36 is set when setting the impulse noise */
+static u16 dib3000mb_reg_phase_noise[] = { 33,34,35,37,38 };
 
 static u16 dib3000mb_default_noise_phase[] = { 2, 544, 0, 5, 4 };
 
 /* lock duration */
-#define DIB3000MB_REG_LOCK_DURATION_39	(    39)
-#define DIB3000MB_REG_LOCK_DURATION_40	(    40)
-
-static u16 dib3000mb_reg_lock_duration[] = {
-	DIB3000MB_REG_LOCK_DURATION_39, DIB3000MB_REG_LOCK_DURATION_40
-};
-
+static u16 dib3000mb_reg_lock_duration[] = { 39,40 };
 static u16 dib3000mb_default_lock_duration[] = { 135, 135 };
 
 /* AGC loop bandwidth */
-
-#define DIB3000MB_REG_AGC_BW_43			(    43)
-#define DIB3000MB_REG_AGC_BW_44			(    44)
-#define DIB3000MB_REG_AGC_BW_45			(    45)
-#define DIB3000MB_REG_AGC_BW_46			(    46)
-#define DIB3000MB_REG_AGC_BW_47			(    47)
-#define DIB3000MB_REG_AGC_BW_48			(    48)
-#define DIB3000MB_REG_AGC_BW_49			(    49)
-#define DIB3000MB_REG_AGC_BW_50			(    50)
-
-static u16 dib3000mb_reg_agc_bandwidth[] = {
-	DIB3000MB_REG_AGC_BW_43, DIB3000MB_REG_AGC_BW_44, DIB3000MB_REG_AGC_BW_45,
-	DIB3000MB_REG_AGC_BW_46, DIB3000MB_REG_AGC_BW_47, DIB3000MB_REG_AGC_BW_48,
-	DIB3000MB_REG_AGC_BW_49, DIB3000MB_REG_AGC_BW_50
-};
+static u16 dib3000mb_reg_agc_bandwidth[] = { 43,44,45,46,47,48,49,50 };
 
 static u16 dib3000mb_agc_bandwidth_low[]  =
 	{ 2088, 10, 2088, 10, 3448, 5, 3448, 5 };
@@ -224,42 +132,8 @@ static u16 dib3000mb_agc_bandwidth_high[] =
  */
 #define DIB3000MB_REG_SEQ				(    54)
 
-/* all values have been set manually */
-static u16 dib3000mb_seq[2][2][2] = 	/* fft,gua,   inv   */
-	{ /* fft */
-		{ /* gua */
-			{ 0, 1 },					/*  0   0   { 0,1 } */
-			{ 3, 9 },					/*  0   1   { 0,1 } */
-		},
-		{
-			{ 2, 5 },					/*  1   0   { 0,1 } */
-			{ 6, 11 },					/*  1   1   { 0,1 } */
-		}
-	};
-
 /* bandwidth */
-#define DIB3000MB_REG_BW_55				(    55)
-#define DIB3000MB_REG_BW_56				(    56)
-#define DIB3000MB_REG_BW_57				(    57)
-#define DIB3000MB_REG_BW_58				(    58)
-#define DIB3000MB_REG_BW_59				(    59)
-#define DIB3000MB_REG_BW_60				(    60)
-#define DIB3000MB_REG_BW_61				(    61)
-#define DIB3000MB_REG_BW_62				(    62)
-#define DIB3000MB_REG_BW_63				(    63)
-#define DIB3000MB_REG_BW_64				(    64)
-#define DIB3000MB_REG_BW_65				(    65)
-#define DIB3000MB_REG_BW_66				(    66)
-#define DIB3000MB_REG_BW_67				(    67)
-
-static u16 dib3000mb_reg_bandwidth[] = {
-	DIB3000MB_REG_BW_55, DIB3000MB_REG_BW_56, DIB3000MB_REG_BW_57,
-	DIB3000MB_REG_BW_58, DIB3000MB_REG_BW_59, DIB3000MB_REG_BW_60,
-	DIB3000MB_REG_BW_61, DIB3000MB_REG_BW_62, DIB3000MB_REG_BW_63,
-	DIB3000MB_REG_BW_64, DIB3000MB_REG_BW_65, DIB3000MB_REG_BW_66,
-	DIB3000MB_REG_BW_67
-};
-
+static u16 dib3000mb_reg_bandwidth[] = { 55,56,57,58,59,60,61,62,63,64,65,66,67 };
 static u16 dib3000mb_bandwidth_6mhz[] =
 	{ 0, 33, 53312, 112, 46635, 563, 36565, 0, 1000, 0, 1010, 1, 45264 };
 
@@ -309,7 +183,7 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 
 /* mobile mode ??? */
 #define DIB3000MB_REG_MOBILE_MODE		(   101)
-#define DIB3000MB_MOBILE_MODE_ON				(     1)
+#define DIB3000MB_MOBILE_MODE_ON			(     1)
 #define DIB3000MB_MOBILE_MODE_OFF			(     0)
 
 #define DIB3000MB_REG_UNK_106			(   106)
@@ -331,7 +205,7 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 
 /* QAM for mobile mode */
 #define DIB3000MB_REG_MOBILE_MODE_QAM	(   126)
-#define DIB3000MB_MOBILE_MODE_QAM_64			(     3)
+#define DIB3000MB_MOBILE_MODE_QAM_64		(     3)
 #define DIB3000MB_MOBILE_MODE_QAM_QPSK_16	(     1)
 #define DIB3000MB_MOBILE_MODE_QAM_OFF		(     0)
 
@@ -345,23 +219,12 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 
 /* vit hrch */
 #define DIB3000MB_REG_VIT_HRCH			(   128)
-#define DIB3000MB_VIT_HRCH_ON				(     1)
-#define DIB3000MB_VIT_HRCH_OFF				(     0)
 
 /* vit code rate */
 #define DIB3000MB_REG_VIT_CODE_RATE		(   129)
 
-/* forward error correction code rates */
-#define DIB3000MB_FEC_1_2					(     1)
-#define DIB3000MB_FEC_2_3					(     2)
-#define DIB3000MB_FEC_3_4					(     3)
-#define DIB3000MB_FEC_5_6					(     5)
-#define DIB3000MB_FEC_7_8					(     7)
-
 /* vit select hp */
 #define DIB3000MB_REG_VIT_HP			(   130)
-#define DIB3000MB_VIT_LP					(     0)
-#define DIB3000MB_VIT_HP					(     1)
 
 /* time frame for Bit-Error-Rate calculation */
 #define DIB3000MB_REG_BERLEN			(   135)
@@ -382,8 +245,9 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 #define DIB3000MB_MPEG2_OUT_MODE_204		(     0)
 #define DIB3000MB_MPEG2_OUT_MODE_188		(     1)
 
-#define DIB3000MB_REG_FIFO_144			(   144)
-#define DIB3000MB_FIFO_144					(     1)
+#define DIB3000MB_REG_PID_PARSE			(   144)
+#define DIB3000MB_PID_PARSE_INHIBIT		(     0)
+#define DIB3000MB_PID_PARSE_ACTIVATE	(     1)
 
 #define DIB3000MB_REG_FIFO				(   145)
 #define DIB3000MB_FIFO_INHIBIT				(     1)
@@ -399,25 +263,11 @@ static u16 dib3000mb_bandwidth_8mhz[] =
  * pidfilter
  * it is not a hardware pidfilter but a filter which drops all pids
  * except the ones set. Necessary because of the limited USB1.1 bandwidth.
+ * regs 153-168
  */
-#define DIB3000MB_REG_FILTER_PID_0		(   153)
-#define DIB3000MB_REG_FILTER_PID_1		(   154)
-#define DIB3000MB_REG_FILTER_PID_2		(   155)
-#define DIB3000MB_REG_FILTER_PID_3		(   156)
-#define DIB3000MB_REG_FILTER_PID_4		(   157)
-#define DIB3000MB_REG_FILTER_PID_5		(   158)
-#define DIB3000MB_REG_FILTER_PID_6		(   159)
-#define DIB3000MB_REG_FILTER_PID_7		(   160)
-#define DIB3000MB_REG_FILTER_PID_8		(   161)
-#define DIB3000MB_REG_FILTER_PID_9		(   162)
-#define DIB3000MB_REG_FILTER_PID_10		(   163)
-#define DIB3000MB_REG_FILTER_PID_11		(   164)
-#define DIB3000MB_REG_FILTER_PID_12		(   165)
-#define DIB3000MB_REG_FILTER_PID_13		(   166)
-#define DIB3000MB_REG_FILTER_PID_14		(   167)
-#define DIB3000MB_REG_FILTER_PID_15		(   168)
 
-#define DIB3000MB_ACTIVATE_FILTERING			(0x2000)
+#define DIB3000MB_REG_FIRST_PID			(   153)
+#define DIB3000MB_NUM_PIDS				(    16)
 
 /*
  * output mode
@@ -436,40 +286,10 @@ static u16 dib3000mb_bandwidth_8mhz[] =
 #define DIB3000MB_IRQ_EVENT_MASK				(     0)
 
 /* filter coefficients */
-#define DIB3000MB_REG_FILTER_COEF_171	(   171)
-#define DIB3000MB_REG_FILTER_COEF_172	(   172)
-#define DIB3000MB_REG_FILTER_COEF_173	(   173)
-#define DIB3000MB_REG_FILTER_COEF_174	(   174)
-#define DIB3000MB_REG_FILTER_COEF_175	(   175)
-#define DIB3000MB_REG_FILTER_COEF_176	(   176)
-#define DIB3000MB_REG_FILTER_COEF_177	(   177)
-#define DIB3000MB_REG_FILTER_COEF_178	(   178)
-#define DIB3000MB_REG_FILTER_COEF_179	(   179)
-#define DIB3000MB_REG_FILTER_COEF_180	(   180)
-#define DIB3000MB_REG_FILTER_COEF_181	(   181)
-#define DIB3000MB_REG_FILTER_COEF_182	(   182)
-#define DIB3000MB_REG_FILTER_COEF_183	(   183)
-#define DIB3000MB_REG_FILTER_COEF_184	(   184)
-#define DIB3000MB_REG_FILTER_COEF_185	(   185)
-#define DIB3000MB_REG_FILTER_COEF_186	(   186)
-#define DIB3000MB_REG_FILTER_COEF_187	(   187)
-#define DIB3000MB_REG_FILTER_COEF_188	(   188)
-#define DIB3000MB_REG_FILTER_COEF_189	(   189)
-#define DIB3000MB_REG_FILTER_COEF_190	(   190)
-#define DIB3000MB_REG_FILTER_COEF_191	(   191)
-#define DIB3000MB_REG_FILTER_COEF_192	(   192)
-#define DIB3000MB_REG_FILTER_COEF_193	(   193)
-#define DIB3000MB_REG_FILTER_COEF_194	(   194)
-
 static u16 dib3000mb_reg_filter_coeffs[] = {
-	DIB3000MB_REG_FILTER_COEF_171, DIB3000MB_REG_FILTER_COEF_172, DIB3000MB_REG_FILTER_COEF_173,
-	DIB3000MB_REG_FILTER_COEF_174, DIB3000MB_REG_FILTER_COEF_175, DIB3000MB_REG_FILTER_COEF_176,
-	DIB3000MB_REG_FILTER_COEF_177, DIB3000MB_REG_FILTER_COEF_178, DIB3000MB_REG_FILTER_COEF_179,
-	DIB3000MB_REG_FILTER_COEF_180, DIB3000MB_REG_FILTER_COEF_181, DIB3000MB_REG_FILTER_COEF_182,
-	DIB3000MB_REG_FILTER_COEF_183, DIB3000MB_REG_FILTER_COEF_184, DIB3000MB_REG_FILTER_COEF_185,
-	DIB3000MB_REG_FILTER_COEF_186,                                DIB3000MB_REG_FILTER_COEF_188,
-	DIB3000MB_REG_FILTER_COEF_189, DIB3000MB_REG_FILTER_COEF_190, DIB3000MB_REG_FILTER_COEF_191,
-	DIB3000MB_REG_FILTER_COEF_192,                                DIB3000MB_REG_FILTER_COEF_194
+	171, 172, 173, 174, 175, 176, 177, 178,
+	179, 180, 181, 182, 183, 184, 185, 186,
+	188, 189, 190, 191, 192, 194
 };
 
 static u16 dib3000mb_filter_coeffs[] = {
@@ -504,13 +324,6 @@ static u16 dib3000mb_filter_coeffs[] = {
 #define DIB3000MB_RESET_DEVICE				(0x812c)
 #define DIB3000MB_RESET_DEVICE_RST			(     0)
 
-/* identification registers, manufactor an the device */
-#define DIB3000MB_REG_MANUFACTOR_ID		(  1025)
-#define DIB3000MB_MANUFACTOR_ID_DIBCOM		(0x01B3)
-
-#define DIB3000MB_REG_DEVICE_ID			(  1026)
-#define DIB3000MB_DEVICE_ID					(0x3000)
-
 /* hardware clock configuration */
 #define DIB3000MB_REG_CLOCK				(  1027)
 #define DIB3000MB_CLOCK_DEFAULT				(0x9000)
@@ -528,9 +341,6 @@ static u16 dib3000mb_filter_coeffs[] = {
 
 /* set the tuner i2c address */
 #define DIB3000MB_REG_TUNER				(  1089)
-#define DIB3000MB_TUNER_ADDR_DEFAULT		(   194)
-#define DIB3000MB_ACTIVATE_TUNER_XFER(a)	(0xffff & (a << 7))
-#define DIB3000MB_DEACTIVATE_TUNER_XFER(a)	(0xffff & ((a << 7) + 0x80))
 
 /* monitoring registers (read only) */
 

@@ -898,7 +898,7 @@ unsigned int ata_scsiop_inq_80(struct ata_scsi_args *args, u8 *rbuf,
 	};
 	memcpy(rbuf, hdr, sizeof(hdr));
 
-	if (buflen > (ATA_SERNO_LEN + 4))
+	if (buflen > (ATA_SERNO_LEN + 4 - 1))
 		ata_dev_id_string(args->id, (unsigned char *) &rbuf[4],
 				  ATA_ID_SERNO_OFS, ATA_SERNO_LEN);
 
@@ -927,7 +927,7 @@ unsigned int ata_scsiop_inq_83(struct ata_scsi_args *args, u8 *rbuf,
 	rbuf[3] = 4 + strlen(inq_83_str);	/* page len */
 
 	/* our one and only identification descriptor (vendor-specific) */
-	if (buflen > (strlen(inq_83_str) + 4 + 4)) {
+	if (buflen > (strlen(inq_83_str) + 4 + 4 - 1)) {
 		rbuf[4 + 0] = 2;	/* code set: ASCII */
 		rbuf[4 + 3] = strlen(inq_83_str);
 		memcpy(rbuf + 4 + 4, inq_83_str, strlen(inq_83_str));

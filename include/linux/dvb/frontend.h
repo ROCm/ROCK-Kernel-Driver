@@ -78,7 +78,7 @@ struct dvb_frontend_info {
 	__u32      symbol_rate_min;
         __u32      symbol_rate_max;
 	__u32      symbol_rate_tolerance;     /* ppm */
-	__u32      notifier_delay;            /* ms */
+	__u32      notifier_delay;		/* DEPRECATED */
 	fe_caps_t  caps;
 };
 

@@ -4361,23 +4361,6 @@ static void __devinit arch_init_sched_domains(void)
 						&cpu_to_phys_group);
 	}
 
-        /* Initialize isolated CPU (physical) domains and groups */
-	for_each_cpu_mask(i, cpu_isolated_map) {
-		struct sched_domain *sd;
-		int group;
-
-		sd = &per_cpu(phys_domains, i);
-		group = cpu_to_phys_group(i);
-		*sd = SD_CPU_INIT;
-		cpu_set(i, sd->span);
-		sd->flags = 0;
-		sd->balance_interval = INT_MAX;
-		sd->groups = &sched_group_phys[group];
-		init_sched_build_groups(sched_group_phys, sd->span,
-						&cpu_to_phys_group);
-		sd->groups->cpu_power = SCHED_LOAD_SCALE;
-	}
-
 #ifdef CONFIG_NUMA
 	/* Set up node groups */
 	init_sched_build_groups(sched_group_nodes, cpu_default_map,
@@ -4463,6 +4446,7 @@ static void sched_domain_debug(void)
 				if (sd->parent)
 					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
 				printk("\n");
+				break;
 			}
 
 			printk("span %s\n", str);
@@ -4471,8 +4455,6 @@ static void sched_domain_debug(void)
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
 			if (!cpu_isset(i, group->cpumask))
 				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
-			if (!group->cpu_power)
-				printk(KERN_DEBUG "ERROR domain->cpu_power not set\n");
 
 			printk(KERN_DEBUG);
 			for (j = 0; j < level + 2; j++)
@@ -4483,6 +4465,9 @@ static void sched_domain_debug(void)
 					printk(" ERROR: NULL");
 					break;
 				}
+				
+				if (!group->cpu_power)
+					printk(KERN_DEBUG "ERROR group->cpu_power not set\n");
 
 				if (!cpus_weight(group->cpumask))
 					printk(" ERROR empty group:");
