@@ -82,9 +82,11 @@ int pciehp_unconfigure_device(struct pci_func* func)
 {
 	int rc = 0;
 	int j;
+	struct pci_bus *pbus;
 
 	dbg("%s: bus/dev/func = %x/%x/%x\n", __FUNCTION__, func->bus,
 				func->device, func->function);
+	pbus = func->pci_dev->bus;
 
 	for (j=0; j<8 ; j++) {
 		struct pci_dev* temp = pci_find_slot(func->bus,
@@ -93,6 +95,12 @@ int pciehp_unconfigure_device(struct pci_func* func)
 			pci_remove_bus_device(temp);
 		}
 	}
+	/* 
+	 * Some PCI Express root ports require fixup after hot-plug operation.
+	 */
+	if (pcie_mch_quirk) 
+		pci_fixup_device(pci_fixup_final, pbus->self);
+	
 	return rc;
 }
 
