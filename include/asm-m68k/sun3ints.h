@@ -26,17 +26,17 @@
 void sun3_enable_irq(unsigned int irq);
 void sun3_disable_irq(unsigned int irq);
 int sun3_request_irq(unsigned int irq,
-                     void (*handler)(int, void *, struct pt_regs *),
+                     irqreturn_t (*handler)(int, void *, struct pt_regs *),
                      unsigned long flags, const char *devname, void *dev_id
 		    );
 extern void sun3_init_IRQ (void);
-extern void (*sun3_default_handler[]) (int, void *, struct pt_regs *);
-extern void (*sun3_inthandler[]) (int, void *, struct pt_regs *);
+extern irqreturn_t (*sun3_default_handler[]) (int, void *, struct pt_regs *);
+extern irqreturn_t (*sun3_inthandler[]) (int, void *, struct pt_regs *);
 extern void sun3_free_irq (unsigned int irq, void *dev_id);
 extern void sun3_enable_interrupts (void);
 extern void sun3_disable_interrupts (void);
 extern int show_sun3_interrupts(struct seq_file *, void *);
-extern void sun3_process_int(int, struct pt_regs *);
+extern irqreturn_t sun3_process_int(int, struct pt_regs *);
 extern volatile unsigned char* sun3_intreg;
 
 /* master list of VME vectors -- don't fuck with this */
