@@ -303,10 +303,6 @@ sandpoint_setup_arch(void)
 	/* Lookup PCI host bridges */
 	sandpoint_find_bridges();
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	printk(KERN_INFO "Motorola SPS Sandpoint Test Platform\n");
 	printk(KERN_INFO "Port by MontaVista Software, Inc. (source@mvista.com)\n");
 

@@ -361,10 +361,6 @@ ebony_setup_arch(void)
 		ROOT_DEV = Root_HDA1;
 #endif
 
-#ifdef CONFIG_VT
-	conswitchp = &dummy_con;
-#endif
-
 	ebony_early_serial_map();
 
 	ibm4xxPIC_InitSenses = ebony_IRQ_initsenses;

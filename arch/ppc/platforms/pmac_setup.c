@@ -318,9 +318,6 @@ pmac_setup_arch(void)
 #ifdef CONFIG_NVRAM
 	pmac_nvram_init();
 #endif
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;

@@ -309,10 +309,6 @@ static void __init prpmc800_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	printk(KERN_INFO "Port by MontaVista Software, Inc. "
 			 "(source@mvista.com)\n");
 }

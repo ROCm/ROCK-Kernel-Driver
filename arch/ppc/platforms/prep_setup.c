@@ -79,6 +79,7 @@ extern void prep_find_bridges(void);
 
 int _prep_type;
 
+extern void prep_residual_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_sandalfoot_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_thinkpad_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
 extern void prep_carolina_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
@@ -193,9 +194,8 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		seq_printf(m, "bad");
 	seq_printf(m, "\n");
 
-#ifdef CONFIG_PREP_RESIDUAL
 	/* print info about SIMMs */
-	if (res->ResidualLength != 0) {
+	if (have_residual_data) {
 		int i;
 		seq_printf(m, "simms\t\t: ");
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
@@ -207,7 +207,13 @@ prep_ibm_cpuinfo(struct seq_file *m)
 		}
 		seq_printf(m, "\n");
 	}
-#endif
+}
+
+static int __prep
+prep_gen_cpuinfo(struct seq_file *m)
+{
+	prep_ibm_cpuinfo(m);
+	return 0;
 }
 
 static int __prep
@@ -431,9 +437,8 @@ prep_mot_cpuinfo(struct seq_file *m)
 	}
 
 no_l2:
-#ifdef CONFIG_PREP_RESIDUAL
 	/* print info about SIMMs */
-	if (res->ResidualLength != 0) {
+	if (have_residual_data) {
 		int i;
 		seq_printf(m, "simms\t\t: ");
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
@@ -445,15 +450,8 @@ no_l2:
 		}
 		seq_printf(m, "\n");
 	}
-#endif
 
 	return 0;
-}
-
-static void __prep
-prep_tiger1_progress(char *msg, unsigned short code)
-{
-	outw(code, PREP_IBM_DISP);
 }
 
 static void __prep
@@ -561,14 +559,12 @@ prep_show_percpuinfo(struct seq_file *m, int i)
 {
 	/* PREP's without residual data will give incorrect values here */
 	seq_printf(m, "clock\t\t: ");
-#ifdef CONFIG_PREP_RESIDUAL
-	if (res->ResidualLength)
+	if (have_residual_data)
 		seq_printf(m, "%ldMHz\n",
 			   (res->VitalProductData.ProcessorHz > 1024) ?
 			   res->VitalProductData.ProcessorHz / 1000000 :
 			   res->VitalProductData.ProcessorHz);
 	else
-#endif /* CONFIG_PREP_RESIDUAL */
 		seq_printf(m, "???\n");
 
 	return 0;
@@ -598,9 +594,10 @@ static void __init prep_init_sound(void)
 	 * Get the needed resource informations from residual data.
 	 *
 	 */
-#ifdef CONFIG_PREP_RESIDUAL
-	audiodevice = residual_find_device(~0, NULL, MultimediaController,
-			AudioController, -1, 0);
+	if (have_residual_data)
+		audiodevice = residual_find_device(~0, NULL,
+				MultimediaController, AudioController, -1, 0);
+
 	if (audiodevice != NULL) {
 		PnP_TAG_PACKET *pkt;
 
@@ -613,7 +610,6 @@ static void __init prep_init_sound(void)
 		if (pkt != NULL)
 			ppc_cs4232_dma2 = masktoint(pkt->S5_Pack.DMAMask);
 	}
-#endif
 
 	/*
 	 * These are the PReP specs' defaults for the cs4231.  We use these
@@ -649,13 +645,14 @@ static void __init prep_init_sound(void)
 static void __init
 prep_init_vesa(void)
 {
-#if defined(CONFIG_PREP_RESIDUAL) && \
-	(defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA_16_MODULE) || \
+#if     (defined(CONFIG_FB_VGA16) || defined(CONFIG_FB_VGA_16_MODULE) || \
 	 defined(CONFIG_FB_VESA))
-	PPC_DEVICE *vgadev;
+	PPC_DEVICE *vgadev = NULL;
 
-	vgadev = residual_find_device(~0, NULL, DisplayController, SVGAController,
-									-1, 0);
+	if (have_residual_data)
+		vgadev = residual_find_device(~0, NULL, DisplayController,
+							SVGAController, -1, 0);
+
 	if (vgadev != NULL) {
 		PnP_TAG_PACKET *pkt;
 
@@ -680,7 +677,112 @@ prep_init_vesa(void)
 			}
 		}
 	}
-#endif /* CONFIG_PREP_RESIDUAL */
+#endif
+}
+
+/*
+ * Set DBAT 2 to access 0x80000000 so early progress messages will work
+ */
+static __inline__ void
+prep_set_bat(void)
+{
+	/* wait for all outstanding memory access to complete */
+	mb();
+
+	/* setup DBATs */
+	mtspr(DBAT2U, 0x80001ffe);
+	mtspr(DBAT2L, 0x8000002a);
+
+	/* wait for updates */
+	mb();
+}
+
+/*
+ * IBM 3-digit status LED
+ */
+static unsigned int ibm_statusled_base __prepdata;
+
+static void __prep
+ibm_statusled_progress(char *s, unsigned short hex);
+
+static int __prep
+ibm_statusled_panic(struct notifier_block *dummy1, unsigned long dummy2,
+		    void * dummy3)
+{
+	ibm_statusled_progress(NULL, 0x505); /* SOS */
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ibm_statusled_block __prepdata = {
+	ibm_statusled_panic,
+	NULL,
+	INT_MAX /* try to do it first */
+};
+
+static void __prep
+ibm_statusled_progress(char *s, unsigned short hex)
+{
+	static int notifier_installed;
+	/*
+	 * Progress uses 4 digits and we have only 3.  So, we map 0xffff to
+	 * 0xfff for display switch off.  Out of range values are mapped to
+	 * 0xeff, as I'm told 0xf00 and above are reserved for hardware codes.
+	 * Install the panic notifier when the display is first switched off.
+	 */
+	if (hex == 0xffff) {
+		hex = 0xfff;
+		if (!notifier_installed) {
+			++notifier_installed;
+			notifier_chain_register(&panic_notifier_list,
+						&ibm_statusled_block);
+		}
+	}
+	else
+		if (hex > 0xfff)
+			hex = 0xeff;
+
+	mb();
+	outw(hex, ibm_statusled_base);
+}
+
+static void __init
+ibm_statusled_init(void)
+{
+	/*
+	 * The IBM 3-digit LED display is specified in the residual data
+	 * as an operator panel device, type "System Status LED".  Find
+	 * that device and determine its address.  We validate all the
+	 * other parameters on the off-chance another, similar device
+	 * exists.
+	 */
+	if (have_residual_data) {
+		PPC_DEVICE *led;
+		PnP_TAG_PACKET *pkt;
+
+		led = residual_find_device(~0, NULL, SystemPeripheral,
+					   OperatorPanel, SystemStatusLED, 0);
+		if (!led)
+			return;
+
+		pkt = PnP_find_packet((unsigned char *)
+		       &res->DevicePnPHeap[led->AllocatedOffset], S8_Packet, 0);
+		if (!pkt)
+			return;
+
+		if (pkt->S8_Pack.IOInfo != ISAAddr16bit)
+			return;
+		if (*(unsigned short *)pkt->S8_Pack.RangeMin !=
+		    *(unsigned short *)pkt->S8_Pack.RangeMax)
+			return;
+		if (pkt->S8_Pack.IOAlign != 2)
+			return;
+		if (pkt->S8_Pack.IONum != 2)
+			return;
+
+		ibm_statusled_base = ld_le16((unsigned short *)
+					     (pkt->S8_Pack.RangeMin));
+		ppc_md.progress = ibm_statusled_progress;
+	}
 }
 
 static void __init
@@ -706,7 +808,7 @@ prep_setup_arch(void)
 	{
 	case _PREP_IBM:
 		reg = inb(PREP_IBM_PLANAR);
-		printk(KERN_INFO "IBM planar ID: %08x", reg);
+		printk(KERN_INFO "IBM planar ID: %02x", reg);
 		switch (reg) {
 			case PREP_IBM_SANDALFOOT:
 				prep_gen_enable_l2();
@@ -721,7 +823,16 @@ prep_setup_arch(void)
 				ppc_md.show_cpuinfo = prep_thinkpad_cpuinfo;
 				break;
 			default:
-				printk(" -- unknown! Assuming Carolina");
+				if (have_residual_data) {
+					prep_gen_enable_l2();
+					setup_ibm_pci = prep_residual_setup_pci;
+					ppc_md.power_off = prep_halt;
+					ppc_md.show_cpuinfo = prep_gen_cpuinfo;
+					break;
+				}
+				else
+					printk(" - unknown! Assuming Carolina");
+					/* fall through */
 			case PREP_IBM_CAROLINA_IDE_0:
 			case PREP_IBM_CAROLINA_IDE_1:
 			case PREP_IBM_CAROLINA_IDE_2:
@@ -745,7 +856,6 @@ prep_setup_arch(void)
 				setup_ibm_pci = prep_tiger1_setup_pci;
 				ppc_md.power_off = prep_sig750_poweroff;
 				ppc_md.show_cpuinfo = prep_tiger1_cpuinfo;
-				ppc_md.progress = prep_tiger1_progress;
 				break;
 		}
 		printk("\n");
@@ -808,8 +918,6 @@ prep_setup_arch(void)
 	/* vgacon.c needs to know where we mapped IO memory in io_block_mapping() */
 	vgacon_remap_base = 0xf0000000;
 	conswitchp = &vga_con;
-#elif defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
 #endif
 }
 
@@ -821,18 +929,19 @@ prep_setup_arch(void)
 static void __init
 prep_calibrate_decr(void)
 {
-#ifdef CONFIG_PREP_RESIDUAL
-	unsigned long freq, divisor = 4;
+	if (have_residual_data) {
+		unsigned long freq, divisor = 4;
 
-	if ( res->VitalProductData.ProcessorBusHz ) {
-		freq = res->VitalProductData.ProcessorBusHz;
-		printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
-				(freq/divisor)/1000000,
-				(freq/divisor)%1000000);
-		tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
-		tb_ticks_per_jiffy = freq / HZ / divisor;
-	} else
-#endif
+		if ( res->VitalProductData.ProcessorBusHz ) {
+			freq = res->VitalProductData.ProcessorBusHz;
+			printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
+					(freq/divisor)/1000000,
+					(freq/divisor)%1000000);
+			tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
+			tb_ticks_per_jiffy = freq / HZ / divisor;
+		}
+	}
+	else
 		todc_calibrate_decr();
 }
 
@@ -863,6 +972,12 @@ prep_init_IRQ(void)
 	}
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
+
+	if (have_residual_data) {
+		i8259_init(residual_isapic_addr());
+		return;
+	}
+
 	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory
 	 * controller, we poll (as they have a different int-ack address). */
 	early_read_config_dword(NULL, 0, 0, PCI_VENDOR_ID, &pci_viddid);
@@ -1000,17 +1115,26 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	DMA_MODE_WRITE = 0x48;
 
 	/* figure out what kind of prep workstation we are */
-#ifdef CONFIG_PREP_RESIDUAL
-	if ( res->ResidualLength != 0 ) {
+	if (have_residual_data) {
 		if ( !strncmp(res->VitalProductData.PrintableModel,"IBM",3) )
 			_prep_type = _PREP_IBM;
 		else
 			_prep_type = _PREP_Motorola;
-	} else /* assume motorola if no residual (netboot?) */
-#endif
-	{
+	}
+	else {
+		/* assume motorola if no residual (netboot?) */
 		_prep_type = _PREP_Motorola;
 	}
+
+#ifdef CONFIG_PREP_PRESIDUAL
+	/* Switch off all residual data processing if the user requests it */
+	if (strstr(cmd_line, "noresidual") != NULL)
+			res = NULL;
+#endif
+
+	/* Initialise progress early to get maximum benefit */
+	prep_set_bat();
+	ibm_statusled_init();
 
 	ppc_md.setup_arch     = prep_setup_arch;
 	ppc_md.show_percpuinfo = prep_show_percpuinfo;

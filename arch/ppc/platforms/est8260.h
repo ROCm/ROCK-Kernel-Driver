@@ -10,6 +10,9 @@
 
 #define BOOTROM_RESTART_ADDR	((uint)0xff000104)
 
+/* For our show_cpuinfo hooks. */
+#define CPUINFO_VENDOR		"EST Corporation"
+#define CPUINFO_MACHINE		"SBC8260 PowerPC"
 
 /* A Board Information structure that is given to a program when
  * prom starts it up.

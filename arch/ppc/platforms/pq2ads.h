@@ -23,6 +23,10 @@
 
 #define BOOTROM_RESTART_ADDR	((uint)0xff000104)
 
+/* For our show_cpuinfo hooks. */
+#define CPUINFO_VENDOR		"Motorola"
+#define CPUINFO_MACHINE		"PQ2 ADS PowerPC"
+
 /* The ADS8260 has 16, 32-bit wide control/status registers, accessed
  * only on word boundaries.
  * Not all are used (yet), or are interesting to us (yet).

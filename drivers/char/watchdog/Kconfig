@@ -319,6 +319,12 @@ config MACHZ_WDT
 	  To compile this driver as a module, choose M here: the
 	  module will be called machzwd.
 
+# PowerPC Architecture
+
+config 8xx_WDT
+	tristate "MPC8xx Watchdog Timer"
+	depends on WATCHDOG && 8xx
+
 # MIPS Architecture
 
 config INDYDOG
