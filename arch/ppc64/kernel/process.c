@@ -1,5 +1,5 @@
 /*
- *  linux/arch/ppc/kernel/process.c
+ *  linux/arch/ppc64/kernel/process.c
  *
  *  Derived from "arch/i386/kernel/process.c"
  *    Copyright (C) 1995  Linus Torvalds
@@ -45,18 +45,17 @@
 #include <asm/iSeries/HvCallHpt.h>
 #include <asm/Naca.h>
 
+#include "ppc_defs.h"
+
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
-extern unsigned long _get_SP(void);
 
 struct task_struct *last_task_used_math = NULL;
 
 struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
                                ,page_table_lock : SPIN_LOCK_UNLOCKED };
 
-char *sysmap = NULL; 
+char *sysmap = NULL;
 unsigned long sysmap_size = 0;
-
-extern char __toc_start;
 
 void
 enable_kernel_fp(void)
@@ -84,10 +83,7 @@ void
 _switch_to(struct task_struct *prev, struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
-	unsigned long s;
-	
-	__save_flags(s);
-	__cli();
+	unsigned long flags;
 
 #ifdef CONFIG_SMP
 	/* avoid complexity of lazy save/restore of fpu
@@ -99,14 +95,16 @@ _switch_to(struct task_struct *prev, struct task_struct *new)
 	 * every switch, just a save.
 	 *  -- Cort
 	 */
-	if ( prev->thread.regs && (prev->thread.regs->msr & MSR_FP) )
+	if (prev->thread.regs && (prev->thread.regs->msr & MSR_FP))
 		giveup_fpu(prev);
 #endif /* CONFIG_SMP */
 
 	new_thread = &new->thread;
 	old_thread = &current->thread;
+
+	__save_and_cli(flags);
 	_switch(old_thread, new_thread);
-	__restore_flags(s);
+	__restore_flags(flags);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -172,45 +170,50 @@ release_thread(struct task_struct *t)
 int
 copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
-	    struct task_struct * p, struct pt_regs * regs)
+	    struct task_struct *p, struct pt_regs *regs)
 {
-	unsigned long msr;
 	struct pt_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
-
-	/* XXX get rid of the -2 Anton */
+	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 
 	/* Copy registers */
-	childregs = ((struct pt_regs *)
-		     ((unsigned long)p->thread_info + THREAD_SIZE 
-		      - STACK_FRAME_OVERHEAD)) - 2;
+	sp -= sizeof(struct pt_regs);
+	childregs = (struct pt_regs *) sp;
 	*childregs = *regs;
+	if ((childregs->msr & MSR_PR) == 0) {
+		/* for kernel thread, set `current' and stackptr in new task */
+		childregs->gpr[1] = sp + sizeof(struct pt_regs);
+		childregs->gpr[13] = (unsigned long) p;
+		p->thread.regs = NULL;	/* no user register state */
+		clear_ti_thread_flag(p->thread_info, TIF_32BIT);
+#ifdef CONFIG_PPC_ISERIES
+		set_ti_thread_flag(p->thread_info, TIF_RUN_LIGHT);
+#endif
+	} else
+		p->thread.regs = childregs;
 	childregs->gpr[3] = 0;  /* Result from fork() */
-	p->thread.regs = childregs;
-	p->thread.ksp = (unsigned long) childregs - STACK_FRAME_OVERHEAD;
-	p->thread.ksp -= sizeof(struct pt_regs ) + STACK_FRAME_OVERHEAD;
-	kregs = (struct pt_regs *)(p->thread.ksp + STACK_FRAME_OVERHEAD);
-	/* The PPC64 compiler makes use of a TOC to contain function 
+	sp -= STACK_FRAME_OVERHEAD;
+
+	/*
+	 * The way this works is that at some point in the future
+	 * some task will call _switch to switch to the new task.
+	 * That will pop off the stack frame created below and start
+	 * the new task running at ret_from_fork.  The new task will
+	 * do some house keeping and then return from the fork or clone
+	 * system call, using the stack frame created above.
+	 */
+	sp -= sizeof(struct pt_regs);
+	kregs = (struct pt_regs *) sp;
+	sp -= STACK_FRAME_OVERHEAD;
+	p->thread.ksp = sp;
+
+	/*
+	 * The PPC64 ABI makes use of a TOC to contain function 
 	 * pointers.  The function (ret_from_except) is actually a pointer
 	 * to the TOC entry.  The first entry is a pointer to the actual
 	 * function.
  	 */
 	kregs->nip = *((unsigned long *)ret_from_fork);
-	asm volatile("mfmsr %0" : "=r" (msr):);
-	kregs->msr = msr;
-	kregs->gpr[1] = (unsigned long)childregs - STACK_FRAME_OVERHEAD;
-	kregs->gpr[2] = (((unsigned long)&__toc_start) + 0x8000);
-
-	if (usp >= (unsigned long) regs) {
-		/* Stack is in kernel space - must adjust */
-		childregs->gpr[1] = (unsigned long)(childregs + 1);
-		*((unsigned long *) childregs->gpr[1]) = 0;
-		childregs->gpr[13] = (unsigned long) p;
-	} else {
-		/* Provided stack is in user space */
-		childregs->gpr[1] = usp;
-	}
-	p->thread.last_syscall = -1;
 
 	/*
 	 * copy fpu info - assume lazy fpu switch now always
@@ -222,6 +225,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	}
 	memcpy(&p->thread.fpr, &current->thread.fpr, sizeof(p->thread.fpr));
 	p->thread.fpscr = current->thread.fpscr;
+
+	p->thread.last_syscall = -1;
 
 	return 0;
 }
@@ -239,7 +244,6 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	unsigned long *entry = (unsigned long *)nip;
 	unsigned long *toc   = entry + 1;
 
-
 	set_fs(USER_DS);
 	memset(regs->gpr, 0, sizeof(regs->gpr));
 	memset(&regs->ctr, 0, 4 * sizeof(regs->ctr));
@@ -252,53 +256,27 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 	current->thread.fpscr = 0;
 }
 
-asmlinkage int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
-			 struct pt_regs *regs)
+int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
+	      struct pt_regs *regs)
 {
-	unsigned long clone_flags = p1;
-	int res;
-
-	res = do_fork(clone_flags, regs->gpr[1], regs, 0);
-#ifdef CONFIG_SMP
-	/* When we clone the idle task we keep the same pid but
-	 * the return value of 0 for both causes problems.
-	 * -- Cort
-	 */
-	if ((current->pid == 0) && (current == &init_task))
-		res = 1;
-#endif /* CONFIG_SMP */
-
-	return res;
+	return do_fork(p1, regs->gpr[1], regs, 0);
 }
 
-asmlinkage int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
-			struct pt_regs *regs)
+int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
+	     struct pt_regs *regs)
 {
-	int res;
-	
-	res = do_fork(SIGCHLD, regs->gpr[1], regs, 0);
-  
-#ifdef CONFIG_SMP
-	/* When we clone the idle task we keep the same pid but
-	 * the return value of 0 for both causes problems.
-	 * -- Cort
-	 */
-	if ((current->pid == 0) && (current == &init_task))
-		res = 1;
-#endif /* CONFIG_SMP */
-	
-	return res;
+	return do_fork(SIGCHLD, regs->gpr[1], regs, 0);
 }
 
-asmlinkage int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
+int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 			 struct pt_regs *regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0);
 }
 
-asmlinkage int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
-			  unsigned long a3, unsigned long a4, unsigned long a5,
-			  struct pt_regs *regs)
+int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
+	       unsigned long a3, unsigned long a4, unsigned long a5,
+	       struct pt_regs *regs)
 {
 	int error;
 	char * filename;

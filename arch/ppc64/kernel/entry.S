@@ -42,10 +42,19 @@ show_syscalls_task:
 	.long	-1
 #endif
 
+	.section	".toc","aw"
+.SYS_CALL_TABLE:
+	.tc .sys_call_table[TC],.sys_call_table
+
+.SYS_CALL_TABLE32:
+	.tc .sys_call_table32[TC],.sys_call_table32
+
+	.section	".text"
+	.align 3
+
 /*
  * Handle a system call.
  */
-	.text
 _GLOBAL(DoSyscall)
 	std	r0,THREAD+LAST_SYSCALL(r13)
 	ld	r11,_CCR(r1)	/* Clear SO bit in CR */
@@ -94,7 +103,7 @@ _GLOBAL(DoSyscall)
 #ifdef CONFIG_BINFMT_ELF32
 	andi.	r11,r10,_TIF_32BIT
 	beq-	15f
-	LOADADDR(r10,.sys_call_table32)
+	ld	r10,.SYS_CALL_TABLE32@toc(2)
 /*
  * Now mung the first 4 parameters into shape, by making certain that
  * the high bits (most significant 32 bits in 64 bit reg) are 0
@@ -111,7 +120,7 @@ _GLOBAL(DoSyscall)
 	b	17f
 15:
 #endif
-	LOADADDR(r10,.sys_call_table)
+	ld	r10,.SYS_CALL_TABLE@toc(2)
 17:	slwi	r0,r0,3
 	ldx	r10,r10,r0	/* Fetch system call handler [ptr] */
 	mtlr	r10
@@ -167,7 +176,7 @@ _GLOBAL(ret_from_syscall_1)
 	ld	r10,TI_FLAGS(r10)
 	andi.	r11,r10,_TIF_32BIT
 	beq-	55f
-	LOADADDR(r10,.sys_call_table32)
+	ld	r10,.SYS_CALL_TABLE32@toc(2)
 /*
  * Now mung the first 4 parameters into shape, by making certain that
  * the high bits (most significant 32 bits in 64 bit reg) are 0
@@ -184,7 +193,7 @@ _GLOBAL(ret_from_syscall_1)
 	b	57f
 55:
 #endif
-	LOADADDR(r10,.sys_call_table)
+	ld	r10,.SYS_CALL_TABLE@toc(2)
 57:
 	slwi	r0,r0,3
 	ldx	r10,r10,r0	/* Fetch system call handler [ptr] */
@@ -255,38 +264,33 @@ _GLOBAL(ppc64_rt_sigreturn)
  * Note: there are two ways to get to the "going out" portion
  * of this code; either by coming in via the entry (_switch)
  * or via "fork" which must set up an environment equivalent
- * to the "_switch" path.  If you change this (or in particular, the
- * SAVE_REGS macro), you'll have to change the fork code also.
+ * to the "_switch" path.  If you change this you'll have to change
+ * the fork code also.
  *
  * The code which creates the new task context is in 'copy_thread'
- * in arch/ppc/kernel/process.c
+ * in arch/ppc64/kernel/process.c
  */
 _GLOBAL(_switch)
-	stdu	r1,-INT_FRAME_SIZE(r1)
-	ld	r6,0(r1)
-	std	r6,GPR1(r1)
+	mflr	r0
+	std	r0,16(r1)
+	stdu	r1,-SWITCH_FRAME_SIZE(r1)
 	/* r3-r13 are caller saved -- Cort */
-	SAVE_GPR(2, r1)
 	SAVE_8GPRS(14, r1)
 	SAVE_10GPRS(22, r1)
 	mflr	r20		/* Return to switch caller */
 	mfmsr	r22
+	andi.	r21, r22, MSR_FP
+	beq+	1f
 	li	r6,MSR_FP	/* Disable floating-point */
 	andc	r22,r22,r6
 	mtmsrd	r22
 	isync
-	std	r20,_NIP(r1)
-	std	r22,_MSR(r1)
-	std	r20,_LINK(r1)
-	mfcr	r20
-	std	r20,_CCR(r1)
-	li	r6,0x0ff0
-	std	r6,TRAP(r1)
+1:	std	r20,_NIP(r1)
+	mfcr	r23
+	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
 
 	mfspr	r5,SPRG3	/* Get Paca */
-	/* XXX remove - Anton */
-	addi	r3,r3,-THREAD	/* old 'current' for return value */
 	addi	r13,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r13,PACACURRENT(r5)	/* Set new 'current' */
 
@@ -298,6 +302,7 @@ _GLOBAL(_switch)
 	insrdi	r9,r7,1,63	/* Insert run light into CTRL */
 	mtspr	CTRLT,r9
 #endif
+
 	ld	r1,KSP(r4)	/* Load new stack pointer */
 	ld	r6,_CCR(r1)
 	mtcrf	0xFF,r6
@@ -306,8 +311,8 @@ _GLOBAL(_switch)
 	REST_10GPRS(22, r1)
 
 	ld	r7,_NIP(r1)	/* Return to _switch caller in new task */
-	ld	r1,GPR1(r1)
 	mtlr	r7
+	addi	r1,r1,SWITCH_FRAME_SIZE
 	blr
 
 _GLOBAL(ret_from_fork)
@@ -377,6 +382,7 @@ restore:
 	mtlr	r0
 	ld	r3,_XER(r1)
 	mtspr	XER,r3
+
 	REST_8GPRS(5, r1)
 	REST_10GPRS(14, r1)
 	REST_8GPRS(24, r1)
