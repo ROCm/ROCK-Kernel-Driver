@@ -1,4 +1,4 @@
-/* $Id: tg3.c,v 1.43.2.80 2002/03/14 00:10:04 davem Exp $
+/*
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
@@ -54,8 +54,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.2a"
-#define DRV_MODULE_RELDATE	"Dec 9, 2002"
+#define DRV_MODULE_VERSION	"1.4"
+#define DRV_MODULE_RELDATE	"Feb 1, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2026,6 +2026,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 
 	spin_lock_irqsave(&tp->lock, flags);
 
+	/* handle link change and other phy events */
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
 	       TG3_FLAG_POLL_SERDES))) {
@@ -2036,12 +2037,14 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		}
 	}
 
+	/* run TX completion thread */
 	if (sblk->idx[0].tx_consumer != tp->tx_cons) {
 		spin_lock(&tp->tx_lock);
 		tg3_tx(tp);
 		spin_unlock(&tp->tx_lock);
 	}
 
+	/* run RX thread, within the bounds set by NAPI */
 	done = 1;
 	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
 		int orig_budget = *budget;
@@ -2059,6 +2062,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 			done = 0;
 	}
 
+	/* if no more work, tell net stack and NIC we're done */
 	if (done) {
 		netif_rx_complete(netdev);
 		tg3_enable_ints(tp);
@@ -2074,12 +2078,14 @@ static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 	struct tg3_hw_status *sblk = tp->hw_status;
 	unsigned int work_exists = 0;
 
+	/* check for phy events */
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
 	       TG3_FLAG_POLL_SERDES))) {
 		if (sblk->status & SD_STATUS_LINK_CHG)
 			work_exists = 1;
 	}
+	/* check for RX/TX work to do */
 	if (sblk->idx[0].tx_consumer != tp->tx_cons ||
 	    sblk->idx[0].rx_producer != tp->rx_rcb_ptr)
 		work_exists = 1;
@@ -2097,14 +2103,28 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(&tp->lock, flags);
 
 	if (sblk->status & SD_STATUS_UPDATED) {
+		/*
+		 * writing any value to intr-mbox-0 clears PCI INTA# and
+		 * chip-internal interrupt pending events.
+		 * writing non-zero to intr-mbox-0 additional tells the
+		 * NIC to stop sending us irqs, engaging "in-intr-handler"
+		 * event coalescing.
+		 */
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     0x00000001);
+		/*
+		 * Flush PCI write.  This also guarantees that our
+		 * status block has been flushed to host memory.
+		 */
 		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 		sblk->status &= ~SD_STATUS_UPDATED;
 
 		if (likely(tg3_has_work(dev, tp)))
-			netif_rx_schedule(dev);
+			netif_rx_schedule(dev);		/* schedule NAPI poll */
 		else {
+			/* no work, shared interrupt perhaps?  re-enable
+			 * interrupts, and flush that PCI write
+			 */
 			tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     	0x00000000);
 			tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
@@ -2208,11 +2228,6 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 		dev_kfree_skb(skb);
 		return -1;
 	}
-
-	/* NOTE: Broadcom's driver botches this case up really bad.
-	 *       This is especially true if any of the frag pages
-	 *       are in highmem.  It will instantly oops in that case.
-	 */
 
 	/* New SKB is guarenteed to be linear. */
 	entry = *start;
@@ -6137,10 +6152,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->split_mode_max_reqs = SPLIT_MODE_5704_MAX_REQ;
 	}
 
-	/* ROFL, you should see Broadcom's driver code implementing
-	 * this, stuff like "if (a || b)" where a and b are always
-	 * mutually exclusive.  DaveM finds like 6 bugs today, hello!
-	 */
+	/* this one is limited to 10/100 only */
 	if (grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5702FE)
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
@@ -6203,17 +6215,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* 5700 chips can get confused if TX buffers straddle the
 	 * 4GB address boundary in some cases.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700) {
-		/* ROFL!  Latest Broadcom driver disables NETIF_F_HIGHDMA
-		 * in this case instead of fixing their workaround code.
-		 *
-		 * Like, hey, there is this skb_copy() thing guys,
-		 * use it.  Oh I can't stop laughing...
-		 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700)
 		tp->dev->hard_start_xmit = tg3_start_xmit_4gbug;
-	} else {
+	else
 		tp->dev->hard_start_xmit = tg3_start_xmit;
-	}
 
 	tp->rx_offset = 2;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
