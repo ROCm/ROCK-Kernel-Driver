@@ -228,6 +228,7 @@ struct rbce_private_data {
 };
 
 #define RBCE_DATA(tsk) ((struct rbce_private_data*)((tsk)->ce_data))
+#define RBCE_DATAP(tsk) ((tsk)->ce_data)
 
 /* ======================= DEBUG  Functions ========================= */
 
@@ -1325,7 +1326,7 @@ reclassify_pid(int pid)
         }
 
         if (unlikely(!RBCE_DATA(tsk))) {
-                RBCE_DATA(tsk) = create_private_data(NULL,0);
+                RBCE_DATAP(tsk) = create_private_data(NULL,0);
                 if (!RBCE_DATA(tsk)) {
                         return -ENOMEM;
                 }
@@ -1357,7 +1358,7 @@ set_tasktag(int pid, char *tag)
 	}
 
 	if (unlikely(!RBCE_DATA(tsk))) {
-		RBCE_DATA(tsk) = create_private_data(NULL,0);
+		RBCE_DATAP(tsk) = create_private_data(NULL,0);
 		if (!RBCE_DATA(tsk)) {
 			kfree(tp);
 			return -ENOMEM;
@@ -1911,7 +1912,7 @@ free_all_private_data(void)
 		struct rbce_private_data *pdata;
 		
 		pdata = RBCE_DATA(thread);
-		RBCE_DATA(thread) = NULL;
+		RBCE_DATAP(thread) = NULL;
 		free_private_data(pdata);
 	} while_each_thread(proc, thread);
 	read_unlock(&tasklist_lock);
@@ -1972,7 +1973,7 @@ rbce_classify(struct task_struct *tsk, struct ckrm_net_struct *ns, unsigned long
 					new_pdata->app_tag  = pdata->app_tag;
 					free_private_data(pdata);
 				}
-				pdata = RBCE_DATA(tsk) = new_pdata;
+				pdata = RBCE_DATAP(tsk) = new_pdata;
 				termflag = RBCE_TERMFLAG_ALL;  // need to evaluate them all
 			} else {
 				// we shouldn't free the pdata as it has more details than
@@ -2097,7 +2098,7 @@ rbce_tc_manual(struct task_struct *tsk)
 	read_lock(&global_rwlock);
 
 	if (!RBCE_DATA(tsk)) {
-		RBCE_DATA(tsk) = (void*) create_private_data(RBCE_DATA(tsk->parent),0);
+		RBCE_DATAP(tsk) = (void*) create_private_data(RBCE_DATA(tsk->parent),0);
 	}
 	if (RBCE_DATA(tsk)) {
 		RBCE_DATA(tsk)->evaluate = 0;
@@ -2137,7 +2138,7 @@ rbce_tc_forkcb(struct task_struct *tsk)
 	struct ckrm_core_class *cls;
 	read_lock(&global_rwlock);
 	// dup ce_data
-	RBCE_DATA(tsk) = (void*) create_private_data(RBCE_DATA(tsk->parent),0);
+	RBCE_DATAP(tsk) = (void*) create_private_data(RBCE_DATA(tsk->parent),0);
 	read_unlock(&global_rwlock);
 
 	if (RBCE_DATA(tsk->parent)) {
@@ -2163,7 +2164,7 @@ rbce_tc_exitcb(struct task_struct *tsk)
 	send_exit_notification(tsk);
 
 	pdata = RBCE_DATA(tsk);		
-	RBCE_DATA(tsk) = NULL;
+	RBCE_DATAP(tsk) = NULL;
 	if (pdata) {
 		if (pdata->app_tag) {
 			kfree(pdata->app_tag);

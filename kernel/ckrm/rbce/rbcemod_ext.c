@@ -436,7 +436,7 @@ static void add_all_private_data(void)
         write_lock(&tasklist_lock);
         do_each_thread(proc, thread) {
 		if (RBCE_DATA(thread) == NULL)
-			RBCE_DATA(thread) = create_private_data(NULL,0);
+			RBCE_DATAP(thread) = create_private_data(NULL,0);
         } while_each_thread(proc, thread);
         write_unlock(&tasklist_lock);
 }
