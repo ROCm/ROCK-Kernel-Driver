@@ -176,6 +176,17 @@ config S390_TAPE_34XX
 	  tape subsystems and 100% compatibles.
 	  It is safe to say "Y" here.
 
+
+
+config VMLOGRDR
+	tristate "Support for the z/VM recording system services (VM only)"
+	depends on IUCV
+	help
+	  Select this option if you want to be able to receive records collected
+	  by the z/VM recording system services, eg. from *LOGREC, *ACCOUNT or
+	  *SYMPTOM.
+	  This driver depends on the IUCV support driver.
+
 endmenu
 
 menu "Cryptographic devices"

@@ -222,6 +222,7 @@ CONFIG_S390_TAPE_BLOCK=y
 # S/390 tape hardware support
 #
 CONFIG_S390_TAPE_34XX=m
+# CONFIG_VMLOGRDR is not set
 
 #
 # Cryptographic devices

@@ -18,6 +18,7 @@ obj-$(CONFIG_SCLP_VT220_TTY) += sclp_vt220.o
 obj-$(CONFIG_SCLP_CPI) += sclp_cpi.o
 
 obj-$(CONFIG_ZVM_WATCHDOG) += vmwatchdog.o
+obj-$(CONFIG_VMLOGRDR) += vmlogrdr.o
 
 tape-$(CONFIG_S390_TAPE_BLOCK) += tape_block.o
 tape-$(CONFIG_PROC_FS) += tape_proc.o
