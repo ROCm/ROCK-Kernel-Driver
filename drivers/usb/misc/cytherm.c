@@ -119,12 +119,12 @@ static ssize_t set_brightness(struct device *dev, const char *buf,
 	retval = vendor_command(cytherm->udev, WRITE_RAM, BRIGHTNESS, 
 				cytherm->brightness, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 	/* Inform µC that we have changed the brightness setting */
 	retval = vendor_command(cytherm->udev, WRITE_RAM, BRIGHTNESS_SEM,
 				0x01, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
    
 	kfree(buffer);
    
@@ -158,13 +158,13 @@ static ssize_t show_temp(struct device *dev, char *buf)
 	/* read temperature */
 	retval = vendor_command(cytherm->udev, READ_RAM, TEMP, 0, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 	temp = buffer[1];
    
 	/* read sign */
 	retval = vendor_command(cytherm->udev, READ_RAM, SIGN, 0, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 	sign = buffer[1];
 
 	kfree(buffer);
@@ -202,7 +202,7 @@ static ssize_t show_button(struct device *dev, char *buf)
 	/* check button */
 	retval = vendor_command(cytherm->udev, READ_RAM, BUTTON, 0, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
    
 	retval = buffer[1];
 
@@ -239,7 +239,7 @@ static ssize_t show_port0(struct device *dev, char *buf)
 
 	retval = vendor_command(cytherm->udev, READ_PORT, 0, 0, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 
 	retval = buffer[1];
 
@@ -274,7 +274,7 @@ static ssize_t set_port0(struct device *dev, const char *buf, size_t count)
 	retval = vendor_command(cytherm->udev, WRITE_PORT, 0,
 				tmp, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 
 	kfree(buffer);
 
@@ -299,7 +299,7 @@ static ssize_t show_port1(struct device *dev, char *buf)
 
 	retval = vendor_command(cytherm->udev, READ_PORT, 1, 0, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
    
 	retval = buffer[1];
 
@@ -334,7 +334,7 @@ static ssize_t set_port1(struct device *dev, const char *buf, size_t count)
 	retval = vendor_command(cytherm->udev, WRITE_PORT, 1,
 				tmp, buffer, 8);
 	if (retval)
-		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
+		dev_dbg(&cytherm->udev->dev, "retval = %d\n", retval);
 
 	kfree(buffer);
 
