@@ -79,9 +79,9 @@ static struct usb_device_id pwc_device_table [] = {
 	{ USB_DEVICE(0x046D, 0x08B0) }, /* Logitech QuickCam Pro 3000 */
 	{ USB_DEVICE(0x046D, 0x08B1) }, /* Logitech QuickCam Notebook Pro */
 	{ USB_DEVICE(0x046D, 0x08B2) }, /* Logitech QuickCam Pro 4000 */
-	{ USB_DEVICE(0x046D, 0x08B3) }, /* Logitech QuickCam Zoom */
-	{ USB_DEVICE(0x046D, 0x08B4) }, /* Logitech (reserved) */
-	{ USB_DEVICE(0x046D, 0x08B5) }, /* Logitech (reserved) */
+	{ USB_DEVICE(0x046D, 0x08B3) }, /* Logitech QuickCam Zoom (old model) */
+	{ USB_DEVICE(0x046D, 0x08B4) }, /* Logitech QuickCam Zoom (new model) */
+	{ USB_DEVICE(0x046D, 0x08B5) }, /* Logitech QuickCam Orbit/Sphere */
 	{ USB_DEVICE(0x046D, 0x08B6) }, /* Logitech (reserved) */
 	{ USB_DEVICE(0x046D, 0x08B7) }, /* Logitech (reserved) */
 	{ USB_DEVICE(0x046D, 0x08B8) }, /* Logitech (reserved) */
@@ -129,6 +129,7 @@ static struct {
 
 static int pwc_video_open(struct inode *inode, struct file *file);
 static int pwc_video_close(struct inode *inode, struct file *file);
+static int pwc_video_release(struct video_device *);			  
 static ssize_t pwc_video_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos);
 static unsigned int pwc_video_poll(struct file *file, poll_table *wait);
@@ -918,21 +919,32 @@ static void pwc_isoc_cleanup(struct pwc_device *pdev)
 
 int pwc_try_video_mode(struct pwc_device *pdev, int width, int height, int new_fps, int new_compression, int new_snapshot)
 {
-	int ret;
+	int ret, start;
 
 	/* Stop isoc stuff */
 	pwc_isoc_cleanup(pdev);
 	/* Reset parameters */
 	pwc_reset_buffers(pdev);
 	/* Try to set video mode... */
-	ret = pwc_set_video_mode(pdev, width, height, new_fps, new_compression, new_snapshot);
-	if (ret) /* That failed... restore old mode (we know that worked) */
-		ret = pwc_set_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, pdev->vcompression, pdev->vsnapshot);
-	if (!ret)
-		if (pwc_isoc_init(pdev) < 0)
-			Info("Failed to restart ISOC transfer in pwc_try_video_mode.\n");
+	start = ret = pwc_set_video_mode(pdev, width, height, new_fps, new_compression, new_snapshot);
+	if (ret) { 
+	        Trace(TRACE_FLOW, "pwc_set_video_mode attempt 1 failed.\n");
+		/* That failed... restore old mode (we know that worked) */
+		start = pwc_set_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, pdev->vcompression, pdev->vsnapshot);
+		if (start) {
+		        Trace(TRACE_FLOW, "pwc_set_video_mode attempt 2 failed.\n");
+		}
+	}
+	if (start == 0) 
+	{
+		if (pwc_isoc_init(pdev) < 0) 
+		{
+			Info("Failed to restart ISOC transfers in pwc_try_video_mode.\n");
+			ret = -EAGAIN; /* let's try again, who knows if it works a second time */
+		}
+	}
 	pdev->drop_frames++; /* try to avoid garbage during switch */
-	return ret;
+	return ret; /* Return original error code */
 }
 
 
@@ -997,6 +1009,7 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 #if PWC_DEBUG	
 	Debug("Found decompressor for %d at 0x%p\n", pdev->type, pdev->decompressor);
 #endif
+	pwc_construct(pdev); /* set min/max sizes correct */
 
 	/* So far, so good. Allocate memory. */
 	i = pwc_allocate_buffers(pdev);
@@ -1018,6 +1031,7 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 #if PWC_DEBUG
 	pdev->sequence = 0;
 #endif
+	pwc_construct(pdev); /* set min/max sizes correct */
 
 	/* Set some defaults */
 	pdev->vsnapshot = 0;
@@ -1104,6 +1118,12 @@ static int pwc_video_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static int pwc_video_release(struct video_device *vfd)
+{
+	Trace(TRACE_OPEN, "pwc_video_release() called. Now what?\n");
+}
+		
+
 /*
  *	FIXME: what about two parallel reads ????
  *      ANSWER: Not supported. You can't open the device more than once,
@@ -1124,7 +1144,7 @@ static ssize_t pwc_video_read(struct file *file, char *buf,
 	int noblock = file->f_flags & O_NONBLOCK;
 	DECLARE_WAITQUEUE(wait, current);
 
-	Trace(TRACE_READ, "video_read(0x%p, %p, %Zd) called.\n", vdev, buf, count);
+	Trace(TRACE_READ, "video_read(0x%p, %p, %d) called.\n", vdev, buf, count);
 	if (vdev == NULL)
 		return -EFAULT;
 	pdev = vdev->priv;
@@ -1568,6 +1588,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	struct pwc_device *pdev = NULL;
 	int vendor_id, product_id, type_id;
 	int i, hint;
+	int features = 0;
 	int video_nr = -1; /* default: use next available device */
 	char serial_number[30], *name;
 
@@ -1677,8 +1698,17 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 			name = "Logitech QuickCam Zoom";
 			type_id = 740; /* CCD sensor */
 			break;
-		case 0x08b4:
+		case 0x08B4:
+			Info("Logitech QuickCam Zoom (new model) USB webcam detected.\n");
+			name = "Logitech QuickCam Zoom";
+			type_id = 740; /* CCD sensor */
+			break;
 		case 0x08b5:
+			Info("Logitech QuickCam Orbit/Sphere USB webcam detected.\n");
+			name = "Logitech QuickCam Orbit";
+			type_id = 740; /* CCD sensor */
+			features |= FEATURE_MOTOR_PANTILT;
+			break;
 		case 0x08b6:
 		case 0x08b7:
 		case 0x08b8:
@@ -1776,9 +1806,22 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	}
 	memset(pdev, 0, sizeof(struct pwc_device));
 	pdev->type = type_id;
-	pwc_construct(pdev);
 	pdev->vsize = default_size;
 	pdev->vframes = default_fps;
+	pdev->features = features;
+	if (vendor_id == 0x046D && product_id == 0x08B5)
+	{
+		/* Logitech QuickCam Orbit
+	           The ranges have been determined experimentally; they may differ from cam to cam.
+	           Also, the exact ranges left-right and up-down are different for my cam
+	          */
+		pdev->angle_range.pan_min  = -7000;
+		pdev->angle_range.pan_max  =  7000;
+		pdev->angle_range.tilt_min = -3000;
+		pdev->angle_range.tilt_max =  2500;
+		pdev->angle_range.zoom_min = -1;
+		pdev->angle_range.zoom_max = -1;
+	}
 
 	init_MUTEX(&pdev->modlock);
 	pdev->ptrlock = SPIN_LOCK_UNLOCKED;
@@ -1791,7 +1834,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	strcpy(pdev->vdev.name, name);
 	pdev->vdev.owner = THIS_MODULE;
 	pdev->vdev.priv = pdev;
-
+	
 	pdev->release = udev->descriptor.bcdDevice;
 	Trace(TRACE_PROBE, "Release: %04x\n", pdev->release);
 
@@ -1809,6 +1852,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 		}
 	}
 
+	pdev->vdev.release = pwc_video_release;
 	i = video_register_device(&pdev->vdev, VFL_TYPE_GRABBER, video_nr);
 	if (i < 0) {
 		Err("Failed to register as video device (%d).\n", i);
@@ -1818,6 +1862,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	else {
 		Info("Registered as /dev/video%d.\n", pdev->vdev.minor & 0x3F);
 	}
+
 	/* occupy slot */
 	if (hint < MAX_DEV_HINTS) 
 		device_hint[hint].pdev = pdev;

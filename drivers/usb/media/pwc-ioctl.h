@@ -112,6 +112,43 @@ struct pwc_imagesize
 	int height;
 };
 
+/* Defines and structures for Motorized Pan & Tilt */
+#define PWC_MPT_PAN		0x01
+#define PWC_MPT_TILT		0x02
+#define PWC_MPT_TIMEOUT		0x04 /* for status */
+
+/* Set angles; when absolute = 1, the angle is absolute and the 
+   driver calculates the relative offset for you. This can only
+   be used with VIDIOCPWCSANGLE; VIDIOCPWCGANGLE always returns
+   absolute angles.
+ */   
+struct pwc_mpt_angles
+{
+	int absolute;		/* write-only */
+	int pan;		/* degrees * 100 */
+	int tilt;		/* degress * 100 */
+	int zoom;		/* N/A, set to -1 */
+};
+
+/* Range of angles of the camera, both horizontally and vertically.
+   The zoom is not used, maybe in the future...
+
+ */
+struct pwc_mpt_range
+{
+	int pan_min, pan_max;		/* degrees * 100 */
+	int tilt_min, tilt_max;
+	int zoom_min, zoom_max;		/* -1, -1 */
+};
+
+struct pwc_mpt_status
+{
+	int status;
+	int time_pan;
+	int time_tilt;
+};
+
+
  /* Restore user settings */
 #define VIDIOCPWCRUSER		_IO('v', 192)
  /* Save user settings */
@@ -181,5 +218,12 @@ struct pwc_imagesize
 
  /* Real image size as used by the camera; tells you whether or not there's a gray border around the image */
 #define VIDIOCPWCGREALSIZE	_IOR('v', 210, struct pwc_imagesize)
+
+ /* Motorized pan & tilt functions */ 
+#define VIDIOCPWCMPTRESET	_IOW('v', 211, int)
+#define VIDIOCPWCMPTGRANGE	_IOR('v', 211, struct pwc_mpt_range)
+#define VIDIOCPWCMPTSANGLE	_IOW('v', 212, struct pwc_mpt_angles)
+#define VIDIOCPWCMPTGANGLE	_IOR('v', 212, struct pwc_mpt_angles)
+#define VIDIOCPWCMPTSTATUS	_IOR('v', 213, struct pwc_mpt_status)
  
 #endif

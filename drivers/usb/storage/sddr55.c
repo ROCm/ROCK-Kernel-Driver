@@ -25,7 +25,6 @@
  */
 
 #include "transport.h"
-#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -155,7 +154,7 @@ static int sddr55_read_data(struct us_data *us,
 		unsigned int lba,
 		unsigned int page,
 		unsigned short sectors,
-		unsigned char *content,
+		unsigned char *buffer,
 		int use_sg) {
 
 	int result = USB_STOR_TRANSPORT_GOOD;
@@ -167,17 +166,24 @@ static int sddr55_read_data(struct us_data *us,
 	unsigned long address;
 
 	unsigned short pages;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
-	int len;
+	unsigned int len, index, offset;
 
-	len = sectors * PAGESIZE;
+	// Since we only read in one block at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
-	buffer = (use_sg ? kmalloc(len, GFP_NOIO) : content);
-	if (buffer == NULL)
-		return USB_STOR_TRANSPORT_ERROR; /* out of memory */
-
-	ptr = buffer;
+	if (use_sg) {
+		len = min((unsigned int) sectors,
+				(unsigned int) info->blocksize >>
+					info->smallpageshift) * PAGESIZE;
+		buffer = kmalloc(len, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR; /* out of memory */
+	}
+	index = offset = 0;
 
 	while (sectors>0) {
 
@@ -189,9 +195,9 @@ static int sddr55_read_data(struct us_data *us,
 
 		// Read as many sectors as possible in this block
 
-		pages = info->blocksize - page;
-		if (pages > (sectors << info->smallpageshift))
-			pages = (sectors << info->smallpageshift);
+		pages = min((unsigned int) sectors << info->smallpageshift,
+				info->blocksize - page);
+		len = pages << info->pageshift;
 
 		US_DEBUGP("Read %02X pages, from PBA %04X"
 			" (LBA %04X) page %02X\n",
@@ -199,7 +205,7 @@ static int sddr55_read_data(struct us_data *us,
 
 		if (pba == NOT_ALLOCATED) {
 			/* no pba for this lba, fill with zeroes */
-			memset (ptr, 0, pages << info->pageshift);
+			memset (buffer, 0, len);
 		} else {
 
 			address = (pba << info->blockshift) + page;
@@ -228,8 +234,7 @@ static int sddr55_read_data(struct us_data *us,
 
 			/* read data */
 			result = sddr55_bulk_transport(us,
-				SCSI_DATA_READ, ptr,
-				pages<<info->pageshift);
+				SCSI_DATA_READ, buffer, len);
 
 			if (result != USB_STOR_XFER_GOOD) {
 				result = USB_STOR_TRANSPORT_ERROR;
@@ -253,13 +258,18 @@ static int sddr55_read_data(struct us_data *us,
 			}
 		}
 
+		// Store the data (s-g) or update the pointer (!s-g)
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&index, &offset, TO_XFER_BUF);
+		else
+			buffer += len;
+
 		page = 0;
 		lba++;
 		sectors -= pages >> info->smallpageshift;
-		ptr += (pages << info->pageshift);
 	}
 
-	us_copy_to_sgbuf_all(buffer, len, content, use_sg);
 	result = USB_STOR_TRANSPORT_GOOD;
 
 leave:
@@ -273,7 +283,7 @@ static int sddr55_write_data(struct us_data *us,
 		unsigned int lba,
 		unsigned int page,
 		unsigned short sectors,
-		unsigned char *content,
+		unsigned char *buffer,
 		int use_sg) {
 
 	int result = USB_STOR_TRANSPORT_GOOD;
@@ -286,9 +296,8 @@ static int sddr55_write_data(struct us_data *us,
 	unsigned long address;
 
 	unsigned short pages;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
-	int i, len;
+	int i;
+	unsigned int len, index, offset;
 
 	/* check if we are allowed to write */
 	if (info->read_only || info->force_read_only) {
@@ -296,13 +305,22 @@ static int sddr55_write_data(struct us_data *us,
 		return USB_STOR_TRANSPORT_FAILED;
 	}
 
-	len = sectors * PAGESIZE;
+	// Since we only write one block at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
-	buffer = us_copy_from_sgbuf_all(content, len, use_sg);
-	if (buffer == NULL)
-		return USB_STOR_TRANSPORT_ERROR;
-
-	ptr = buffer;
+	if (use_sg) {
+		len = min((unsigned int) sectors,
+				(unsigned int) info->blocksize >>
+					info->smallpageshift) * PAGESIZE;
+		buffer = kmalloc(len, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
+	}
+	index = offset = 0;
 
 	while (sectors > 0) {
 
@@ -314,9 +332,14 @@ static int sddr55_write_data(struct us_data *us,
 
 		// Write as many sectors as possible in this block
 
-		pages = info->blocksize - page;
-		if (pages > (sectors << info->smallpageshift))
-			pages = (sectors << info->smallpageshift);
+		pages = min((unsigned int) sectors << info->smallpageshift,
+				info->blocksize - page);
+		len = pages << info->pageshift;
+
+		// Get the data from the transfer buffer (s-g)
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&index, &offset, FROM_XFER_BUF);
 
 		US_DEBUGP("Write %02X pages, to PBA %04X"
 			" (LBA %04X) page %02X\n",
@@ -400,8 +423,7 @@ static int sddr55_write_data(struct us_data *us,
 
 		/* send the data */
 		result = sddr55_bulk_transport(us,
-			SCSI_DATA_WRITE, ptr,
-			pages<<info->pageshift);
+			SCSI_DATA_WRITE, buffer, len);
 
 		if (result != USB_STOR_XFER_GOOD) {
 			US_DEBUGP("Result for send_data in write_data %d\n",
@@ -458,10 +480,12 @@ static int sddr55_write_data(struct us_data *us,
 		/* update the pba<->lba maps for new_pba */
 		info->pba_to_lba[new_pba] = lba % 1000;
 
+		// Update the transfer buffer pointer (!s-g)
+		if (!use_sg)
+			buffer += len;
 		page = 0;
 		lba++;
 		sectors -= pages >> info->smallpageshift;
-		ptr += (pages << info->pageshift);
 	}
 	result = USB_STOR_TRANSPORT_GOOD;
 
