@@ -29,6 +29,7 @@
 static int isdn_tty_edit_at(const char *, int, modem_info *, int);
 static void isdn_tty_escape_timer(unsigned long data);
 static void isdn_tty_ring_timer(unsigned long data);
+static void isdn_tty_connect_timer(unsigned long data);
 static void isdn_tty_check_esc(struct modem_info *info, 
 			       const unsigned char *p, int count);
 static void isdn_tty_modem_reset_regs(modem_info *, int);
@@ -785,9 +786,8 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 		}
 #endif
 		info->dialing = 1;
-		info->emu.carrierwait = 0;
 		isdn_slot_dial(info->isdn_slot, &dial);
-		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
+		mod_timer(&info->connect_timer, jiffies + info->emu.mdmreg[REG_WAITC] * HZ); 
 	}
 }
 
@@ -974,7 +974,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 //		strcpy(dev->num[i], n);
 		isdn_info_update();
 		isdn_slot_command(info->isdn_slot, CAPI_PUT_MESSAGE, &cmd);
-		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
+		mod_timer(&info->connect_timer, jiffies + info->emu.mdmreg[REG_WAITC] * HZ); 
 	}
 }
 
@@ -2138,6 +2138,9 @@ isdn_tty_init(void)
 		init_timer(&info->ring_timer);
 		info->ring_timer.data = (unsigned long) info;
 		info->ring_timer.function = isdn_tty_ring_timer;
+		init_timer(&info->connect_timer);
+		info->connect_timer.data = (unsigned long) info;
+		info->connect_timer.function = isdn_tty_connect_timer;
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -3313,9 +3316,8 @@ isdn_tty_cmd_ATA(modem_info * info)
 #endif
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL3, &cmd);
 		info->dialing = 16;
-		info->emu.carrierwait = 0;
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
-		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
+		mod_timer(&info->connect_timer, jiffies + info->emu.mdmreg[REG_WAITC] * HZ); 
 	} else
 		isdn_tty_modem_result(RESULT_NO_ANSWER, info);
 }
@@ -4018,27 +4020,14 @@ isdn_tty_modem_xmit(void)
 	isdn_timer_ctrl(ISDN_TIMER_MODEMXMIT, ton);
 }
 
-/*
- * Check all channels if we have a 'no carrier' timeout.
- * Timeout value is set by Register S7.
- */
-void
-isdn_tty_carrier_timeout(void)
+static void
+isdn_tty_connect_timer(unsigned long data)
 {
-	int ton = 0;
-	int i;
+	struct modem_info *info = (struct modem_info *) data;
 
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &isdn_mdm.info[i];
-		if (info->dialing) {
-			if (info->emu.carrierwait++ > info->emu.mdmreg[REG_WAITC]) {
-				info->dialing = 0;
-				isdn_tty_modem_result(RESULT_NO_CARRIER, info);
-				isdn_tty_modem_hup(info, 1);
-			}
-			else
-				ton = 1;
-		}
+	if (info->dialing) {
+		info->dialing = 0;
+		isdn_tty_modem_result(RESULT_NO_CARRIER, info);
+		isdn_tty_modem_hup(info, 1);
 	}
-	isdn_timer_ctrl(ISDN_TIMER_CARRIER, ton);
 }

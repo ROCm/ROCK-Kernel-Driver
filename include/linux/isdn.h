@@ -237,13 +237,9 @@ typedef struct {
 
 /* Timer-delays and scheduling-flags */
 #define ISDN_TIMER_RES         4                         /* Main Timer-Resolution   */
-#define ISDN_TIMER_02SEC       (HZ/ISDN_TIMER_RES/5)     /* Slow-Timer1 .2 sec      */
-#define ISDN_TIMER_1SEC        (HZ/ISDN_TIMER_RES)       /* Slow-Timer2 1 sec       */
 #define ISDN_TIMER_MODEMREAD   1
 #define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
 #define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMXMIT)
-#define ISDN_TIMER_SLOW      (ISDN_TIMER_CARRIER)
 
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
@@ -300,7 +296,6 @@ typedef struct atemu {
 	int          mdmcmdl;                    /* Length of Modem-Commandbuffer      */
 	int          pluscount;                  /* Counter for +++ sequence           */
 	int          lastplus;                   /* Timestamp of last +                */
-	int	     carrierwait;                /* Seconds of carrier waiting         */
 	char         mdmcmd[255];                /* Modem-Commandbuffer                */
 	unsigned int charge;                     /* Charge units of current connection */
 } atemu;
@@ -360,6 +355,7 @@ typedef struct modem_info {
   atemu                 emu;             /* AT-emulator data               */
   struct timer_list     escape_timer;    /* to recognize +++ escape        */
   struct timer_list     ring_timer;      /* for writing 'RING' responses   */
+  struct timer_list     connect_timer;   /* waiting for CONNECT            */
   struct termios	normal_termios;  /* For saving termios structs     */
   struct termios	callout_termios;
   wait_queue_head_t	open_wait, close_wait;
