@@ -533,7 +533,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	}
 
 	/* Transfer information from mft record into vfs and ntfs inodes. */
-	ni->seq_no = le16_to_cpu(m->sequence_number);
+	vi->i_generation = ni->seq_no = le16_to_cpu(m->sequence_number);
 
 	/*
 	 * FIXME: Keep in mind that link_count is two for files which have both
@@ -1109,7 +1109,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	vi->i_mtime	= base_vi->i_mtime;
 	vi->i_ctime	= base_vi->i_ctime;
 	vi->i_atime	= base_vi->i_atime;
-	ni->seq_no	= base_ni->seq_no;
+	vi->i_generation = ni->seq_no = base_ni->seq_no;
 
 	/* Set inode type to zero but preserve permissions. */
 	vi->i_mode	= base_vi->i_mode & ~S_IFMT;
@@ -1414,7 +1414,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 	}
 
 	/* Need this to sanity check attribute list references to $MFT. */
-	ni->seq_no = le16_to_cpu(m->sequence_number);
+	vi->i_generation = ni->seq_no = le16_to_cpu(m->sequence_number);
 
 	/* Provides readpage() and sync_page() for map_mft_record(). */
 	vi->i_mapping->a_ops = &ntfs_mft_aops;
