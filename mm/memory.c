@@ -874,7 +874,6 @@ static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned 
 		end = PMD_SIZE;
 	pfn = phys_addr >> PAGE_SHIFT;
 	do {
-		struct page *page;
 		pte_t oldpage = ptep_get_and_clear(pte);
 
 		if (!pfn_valid(pfn) || PageReserved(pfn_to_page(pfn)))
@@ -1043,7 +1042,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 bad_wp_page:
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
-	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
+	printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n", address);
 	return -1;
 no_mem:
 	page_cache_release(old_page);
