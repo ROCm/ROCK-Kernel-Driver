@@ -882,6 +882,7 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 #define OHCI_CTRL_IR		(1 << 8)	/* interrupt routing */
 #define OHCI_INTR_OC		(1 << 30)	/* ownership change */
 
+#ifndef __powerpc__
 static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 {
 
@@ -927,6 +928,7 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 		iounmap(base);
 	}
 }
+#endif
 
 /*
  *  The main table of quirks.
@@ -1044,7 +1046,9 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	  quirk_intel_ide_combined },
 #endif /* CONFIG_SCSI_SATA */
 
+#ifndef __powerpc__
 	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			quirk_usb_disable_smm_bios },
+#endif
 
 	{ 0 }
 };
