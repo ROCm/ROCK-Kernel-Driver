@@ -434,7 +434,7 @@ config MODULE_SRCVERSION_ALL
 	depends on MODULES
 	help
 	  Modules which contain a MODULE_VERSION get an extra "srcversion"
-	  field inserting into their modinfo section, which contains a
+	  field inserted into their modinfo section, which contains a
     	  sum of the source files which made it.  This helps maintainers
 	  see exactly which source was used to build a module (since
 	  others sometimes change the module source without updating
