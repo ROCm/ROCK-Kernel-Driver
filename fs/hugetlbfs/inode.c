@@ -450,10 +450,19 @@ static int hugetlbfs_symlink(struct inode * dir, struct dentry *dentry, const ch
 	return error;
 }
 
+/*
+ * For direct-IO reads into hugetlb pages
+ */
+int hugetlbfs_set_page_dirty(struct page *page)
+{
+	return 0;
+}
+
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
 	.prepare_write	= hugetlbfs_prepare_write,
-	.commit_write	= hugetlbfs_commit_write
+	.commit_write	= hugetlbfs_commit_write,
+	.set_page_dirty	= hugetlbfs_set_page_dirty,
 };
 
 struct file_operations hugetlbfs_file_operations = {
