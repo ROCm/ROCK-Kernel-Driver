@@ -38,8 +38,6 @@
 #include "i2c-algo-pcf.h"
 
 
-/* ----- global defines ----------------------------------------------- */
-#define DEB(x) if (i2c_debug>=1) x
 #define DEB2(x) if (i2c_debug>=2) x
 #define DEB3(x) if (i2c_debug>=3) x /* print several statistical values*/
 #define DEBPROTO(x) if (i2c_debug>=9) x;
@@ -48,7 +46,7 @@
 
 /* module parameters:
  */
-static int i2c_debug=0;
+static int i2c_debug;
 
 /* --- setting states on the bus with the right timing: ---------------	*/
 
@@ -466,6 +464,6 @@ MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus PCF8584 algorithm");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(i2c_debug,"i");
+module_param(i2c_debug, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(i2c_debug,
         "debug level - 0 off; 1 normal; 2,3 more verbose; 9 pcf-protocol");

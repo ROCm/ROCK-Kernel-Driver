@@ -56,8 +56,8 @@ static inline u8 _rtc8564_ctrl2(struct i2c_client *client)
 #define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
 #define BIN_TO_BCD(val) ((((val)/10)<<4) + (val)%10)
 
-static int debug = 0;
-MODULE_PARM(debug, "i");
+static int debug;;
+module_param(debug, int, S_IRUGO | S_IWUSR);
 
 static struct i2c_driver rtc8564_driver;
 

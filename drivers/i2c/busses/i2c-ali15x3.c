@@ -126,8 +126,8 @@
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the device at the given address. */
-static int force_addr = 0;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr = 0;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Initialize the base address of the i2c controller");
 

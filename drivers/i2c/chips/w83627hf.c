@@ -46,12 +46,12 @@
 #include <asm/io.h>
 #include "lm75.h"
 
-static int force_addr;
-MODULE_PARM(force_addr, "i");
+static u16 force_addr;
+module_param(force_addr, ushort, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Initialize the base address of the sensors");
-static int force_i2c = 0x1f;
-MODULE_PARM(force_i2c, "i");
+static u8 force_i2c = 0x1f;
+module_param(force_i2c, byte, 0);
 MODULE_PARM_DESC(force_i2c,
 		 "Initialize the i2c address of the sensors");
 
@@ -65,7 +65,7 @@ static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 SENSORS_INSMOD_4(w83627hf, w83627thf, w83697hf, w83637hf);
 
 static int init = 1;
-MODULE_PARM(init, "i");
+module_param(init, bool, 0);
 MODULE_PARM_DESC(init, "Set to zero to bypass chip initialization");
 
 /* modified from kernel/include/traps.c */

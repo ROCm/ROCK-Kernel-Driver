@@ -94,11 +94,11 @@
 #define SIS630_BLOCK_DATA	0x05
 
 /* insmod parameters */
-static int high_clock = 0;
-static int force = 0;
-MODULE_PARM(high_clock, "i");
+static int high_clock;
+static int force;
+module_param(high_clock, bool, 0);
 MODULE_PARM_DESC(high_clock, "Set Host Master Clock to 56KHz (default 14KHz).");
-MODULE_PARM(force, "i");
+module_param(force, bool, 0);
 MODULE_PARM_DESC(force, "Forcibly enable the SIS630. DANGEROUS!");
 
 /* acpi base address */
@@ -145,7 +145,7 @@ static int sis630_transaction_start(struct i2c_adapter *adap, int size, u8 *oldc
 	dev_dbg(&adap->dev, "saved clock 0x%02x\n", *oldclock);
 
 	/* disable timeout interrupt , set Host Master Clock to 56KHz if requested */
-	if (high_clock > 0)
+	if (high_clock)
 		sis630_write(SMB_CNT, 0x20);
 	else
 		sis630_write(SMB_CNT, (*oldclock & ~0x40));
@@ -210,7 +210,7 @@ static void sis630_transaction_end(struct i2c_adapter *adap, u8 oldclock)
 	 * restore old Host Master Clock if high_clock is set
 	 * and oldclock was not 56KHz
 	 */
-	if (high_clock > 0 && !(oldclock & 0x20))
+	if (high_clock && !(oldclock & 0x20))
 		sis630_write(SMB_CNT,(sis630_read(SMB_CNT) & ~0x20));
 
 	dev_dbg(&adap->dev, "SMB_CNT after clock restore 0x%02x\n", sis630_read(SMB_CNT));
@@ -401,7 +401,7 @@ static int sis630_setup(struct pci_dev *sis630_dev)
 	if (dummy) {
 		pci_dev_put(dummy);
 	}
-        else if (force > 0) {
+        else if (force) {
 		dev_err(&sis630_dev->dev, "WARNING: Can't detect SIS630 compatible device, but "
 			"loading because of force option enabled\n");
  	}

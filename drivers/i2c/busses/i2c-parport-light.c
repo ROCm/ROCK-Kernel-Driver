@@ -36,8 +36,8 @@
 
 #define DEFAULT_BASE 0x378
 
-static int base;
-MODULE_PARM(base, "i");
+static u16 base;
+module_param(base, ushort, 0);
 MODULE_PARM_DESC(base, "Base I/O address");
 
 /* ----- Low-level parallel port access ----------------------------------- */

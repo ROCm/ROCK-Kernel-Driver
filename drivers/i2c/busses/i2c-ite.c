@@ -54,10 +54,10 @@
 #define DEFAULT_CLOCK 0x1b0e	/* default 16MHz/(27+14) = 400KHz */
 #define DEFAULT_OWN   0x55
 
-static int base  = 0;
-static int irq   = 0;
-static int clock = 0;
-static int own   = 0;
+static int base;
+static int irq;
+static int clock;
+static int own;
 
 static struct iic_ite gpi;
 static wait_queue_head_t iic_wait;
@@ -246,10 +246,10 @@ MODULE_AUTHOR("MontaVista Software <www.mvista.com>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for ITE IIC bus adapter");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(base, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(clock, "i");
-MODULE_PARM(own, "i");
+module_param(base, int, 0);
+module_param(irq, int, 0);
+module_param(clock, int, 0);
+module_param(own, int, 0);
 
 
 /* Called when module is loaded or when kernel is initialized.

@@ -938,9 +938,9 @@ static void __exit sm_it87_exit(void)
 
 MODULE_AUTHOR("Chris Gauthron <chrisg@0-in.com>");
 MODULE_DESCRIPTION("IT8705F, IT8712F, Sis950 driver");
-MODULE_PARM(update_vbat, "i");
+module_param(update_vbat, bool, 0);
 MODULE_PARM_DESC(update_vbat, "Update vbat if set else return powerup value");
-MODULE_PARM(reset, "i");
+module_param(reset, bool, 0);
 MODULE_PARM_DESC(reset, "Reset the chip's registers, default no");
 MODULE_LICENSE("GPL");
 

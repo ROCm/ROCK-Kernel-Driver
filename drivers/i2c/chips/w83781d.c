@@ -60,7 +60,7 @@ I2C_CLIENT_MODULE_PARM(force_subclients, "List of subclient addresses: "
 		    "{bus, clientaddr, subclientaddr1, subclientaddr2}");
 
 static int init = 1;
-MODULE_PARM(init, "i");
+module_param(init, bool, 0);
 MODULE_PARM_DESC(init, "Set to zero to bypass chip initialization");
 
 /* Constants specified below */
