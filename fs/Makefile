@@ -52,7 +52,6 @@ subdir-$(CONFIG_SYSV_FS)	+= sysv
 subdir-$(CONFIG_SMB_FS)		+= smbfs
 subdir-$(CONFIG_NCP_FS)		+= ncpfs
 subdir-$(CONFIG_HPFS_FS)	+= hpfs
-subdir-$(CONFIG_NTFS_FS)	+= ntfs
 subdir-$(CONFIG_UFS_FS)		+= ufs
 subdir-$(CONFIG_EFS_FS)		+= efs
 subdir-$(CONFIG_JFFS_FS)	+= jffs
