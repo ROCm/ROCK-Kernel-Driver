@@ -91,15 +91,15 @@ static int regoff[] = {
 	PT_REG(	   pc)
 };
 
-static long zero;
+static unsigned long zero;
 
 /*
  * Get address of register REGNO in task TASK.
  */
-static long *
+static unsigned long *
 get_reg_addr(struct task_struct * task, unsigned long regno)
 {
-	long *addr;
+	unsigned long *addr;
 
 	if (regno == 30) {
 		addr = &task->thread_info->pcb.usp;
@@ -109,7 +109,7 @@ get_reg_addr(struct task_struct * task, unsigned long regno)
 		zero = 0;
 		addr = &zero;
 	} else {
-		addr = (long *)((long)task->thread_info + regoff[regno]);
+		addr = (void *)task->thread_info + regoff[regno];
 	}
 	return addr;
 }
@@ -117,7 +117,7 @@ get_reg_addr(struct task_struct * task, unsigned long regno)
 /*
  * Get contents of register REGNO in task TASK.
  */
-static long
+static unsigned long
 get_reg(struct task_struct * task, unsigned long regno)
 {
 	/* Special hack for fpcr -- combine hardware and software bits.  */
@@ -135,7 +135,7 @@ get_reg(struct task_struct * task, unsigned long regno)
  * Write contents of register REGNO in task TASK.
  */
 static int
-put_reg(struct task_struct *task, unsigned long regno, long data)
+put_reg(struct task_struct *task, unsigned long regno, unsigned long data)
 {
 	if (regno == 63) {
 		task->thread_info->ieee_state
@@ -168,11 +168,11 @@ int
 ptrace_set_bpt(struct task_struct * child)
 {
 	int displ, i, res, reg_b, nsaved = 0;
-	u32 insn, op_code;
+	unsigned int insn, op_code;
 	unsigned long pc;
 
 	pc  = get_reg(child, REG_PC);
-	res = read_int(child, pc, &insn);
+	res = read_int(child, pc, (int *) &insn);
 	if (res < 0)
 		return res;
 
@@ -203,7 +203,8 @@ ptrace_set_bpt(struct task_struct * child)
 
 	/* install breakpoints: */
 	for (i = 0; i < nsaved; ++i) {
-		res = read_int(child, child->thread_info->bpt_addr[i], &insn);
+		res = read_int(child, child->thread_info->bpt_addr[i],
+			       (int *) &insn);
 		if (res < 0)
 			return res;
 		child->thread_info->bpt_insn[i] = insn;
