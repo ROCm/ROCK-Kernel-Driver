@@ -695,6 +695,123 @@ struct inode *igrab(struct inode *inode)
 	return inode;
 }
 
+/**
+ * ifind - internal function, you want ilookup5() or iget5().
+ * @sb:		super block of file system to search
+ * @hashval:	hash value (usually inode number) to search for
+ * @test:	callback used for comparisons between inodes
+ * @data:	opaque data pointer to pass to @test
+ *
+ * ifind() searches for the inode specified by @hashval and @data in the inode
+ * cache. This is a generalized version of ifind_fast() for file systems where
+ * the inode number is not sufficient for unique identification of an inode.
+ *
+ * If the inode is in the cache, the inode is returned with an incremented
+ * reference count.
+ *
+ * Otherwise NULL is returned.
+ *
+ * Note, @test is called with the inode_lock held, so can't sleep.
+ */
+static inline struct inode *ifind(struct super_block *sb,
+		struct list_head *head, int (*test)(struct inode *, void *),
+		void *data)
+{
+	struct inode *inode;
+
+	spin_lock(&inode_lock);
+	inode = find_inode(sb, head, test, data);
+	if (inode) {
+		__iget(inode);
+		spin_unlock(&inode_lock);
+		wait_on_inode(inode);
+		return inode;
+	}
+	spin_unlock(&inode_lock);
+	return NULL;
+}
+
+/**
+ * ifind_fast - internal function, you want ilookup() or iget().
+ * @sb:		super block of file system to search
+ * @ino:	inode number to search for
+ *
+ * ifind_fast() searches for the inode @ino in the inode cache. This is for
+ * file systems where the inode number is sufficient for unique identification
+ * of an inode.
+ *
+ * If the inode is in the cache, the inode is returned with an incremented
+ * reference count.
+ *
+ * Otherwise NULL is returned.
+ */
+static inline struct inode *ifind_fast(struct super_block *sb,
+		struct list_head *head, unsigned long ino)
+{
+	struct inode *inode;
+
+	spin_lock(&inode_lock);
+	inode = find_inode_fast(sb, head, ino);
+	if (inode) {
+		__iget(inode);
+		spin_unlock(&inode_lock);
+		wait_on_inode(inode);
+		return inode;
+	}
+	spin_unlock(&inode_lock);
+	return NULL;
+}
+
+/**
+ * ilookup5 - search for an inode in the inode cache
+ * @sb:		super block of file system to search
+ * @hashval:	hash value (usually inode number) to search for
+ * @test:	callback used for comparisons between inodes
+ * @data:	opaque data pointer to pass to @test
+ *
+ * ilookup5() uses ifind() to search for the inode specified by @hashval and
+ * @data in the inode cache. This is a generalized version of ilookup() for
+ * file systems where the inode number is not sufficient for unique
+ * identification of an inode.
+ *
+ * If the inode is in the cache, the inode is returned with an incremented
+ * reference count.
+ *
+ * Otherwise NULL is returned.
+ *
+ * Note, @test is called with the inode_lock held, so can't sleep.
+ */
+struct inode *ilookup5(struct super_block *sb, unsigned long hashval,
+		int (*test)(struct inode *, void *), void *data)
+{
+	struct list_head *head = inode_hashtable + hash(sb, hashval);
+
+	return ifind(sb, head, test, data);
+}
+EXPORT_SYMBOL(ilookup5);
+
+/**
+ * ilookup - search for an inode in the inode cache
+ * @sb:		super block of file system to search
+ * @ino:	inode number to search for
+ *
+ * ilookup() uses ifind_fast() to search for the inode @ino in the inode cache.
+ * This is for file systems where the inode number is sufficient for unique
+ * identification of an inode.
+ *
+ * If the inode is in the cache, the inode is returned with an incremented
+ * reference count.
+ *
+ * Otherwise NULL is returned.
+ */
+struct inode *ilookup(struct super_block *sb, unsigned long ino)
+{
+	struct list_head *head = inode_hashtable + hash(sb, ino);
+
+	return ifind_fast(sb, head, ino);
+}
+EXPORT_SYMBOL(ilookup);
+
 /*
  * This is iget without the read_inode portion of get_new_inode
  * the filesystem gets back a new locked and hashed inode and gets
