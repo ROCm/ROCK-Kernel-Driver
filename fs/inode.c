@@ -81,6 +81,16 @@ static LIST_HEAD(anon_hash_chain); /* for inodes with NULL i_sb */
 spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
 
 /*
+ * iprune_sem provides exclusion between the kswapd or try_to_free_pages
+ * icache shrinking path, and the umount path.  Without this exclusion,
+ * by the time prune_icache calls iput for the inode whose pages it has
+ * been invalidating, or by the time it calls clear_inode & destroy_inode
+ * from its final dispose_list, the struct super_block they refer to
+ * (for inode->i_sb->s_op) may already have been freed and reused.
+ */
+static DECLARE_MUTEX(iprune_sem);
+
+/*
  * Statistics gathering..
  */
 struct inodes_stat_t inodes_stat;
@@ -320,6 +330,7 @@ int invalidate_inodes(struct super_block * sb)
 	int busy;
 	LIST_HEAD(throw_away);
 
+	down(&iprune_sem);
 	spin_lock(&inode_lock);
 	busy = invalidate_list(&inode_in_use, sb, &throw_away);
 	busy |= invalidate_list(&inode_unused, sb, &throw_away);
@@ -328,6 +339,7 @@ int invalidate_inodes(struct super_block * sb)
 	spin_unlock(&inode_lock);
 
 	dispose_list(&throw_away);
+	up(&iprune_sem);
 
 	return busy;
 }
@@ -395,6 +407,7 @@ static void prune_icache(int nr_to_scan)
 	int nr_scanned;
 	unsigned long reap = 0;
 
+	down(&iprune_sem);
 	spin_lock(&inode_lock);
 	for (nr_scanned = 0; nr_scanned < nr_to_scan; nr_scanned++) {
 		struct inode *inode;
@@ -429,7 +442,10 @@ static void prune_icache(int nr_to_scan)
 	}
 	inodes_stat.nr_unused -= nr_pruned;
 	spin_unlock(&inode_lock);
+
 	dispose_list(&freeable);
+	up(&iprune_sem);
+
 	if (current_is_kswapd)
 		mod_page_state(kswapd_inodesteal, reap);
 	else
