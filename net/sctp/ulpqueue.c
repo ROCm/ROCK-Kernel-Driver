@@ -49,10 +49,10 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers.  */
-static inline struct sctp_ulpevent * sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
-						     struct sctp_ulpevent *);
-static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *,
-						    struct sctp_ulpevent *);
+static struct sctp_ulpevent * sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
+						struct sctp_ulpevent *);
+static struct sctp_ulpevent * sctp_ulpq_order(struct sctp_ulpq *,
+						struct sctp_ulpevent *);
 
 /* 1st Level Abstractions */
 
@@ -97,12 +97,12 @@ void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
 	struct sk_buff *skb;
 	struct sctp_ulpevent *event;
 
-	while ((skb = __skb_dequeue(&ulpq->lobby))) {
+	while ((skb = __skb_dequeue(&ulpq->lobby)) != NULL) {
 		event = sctp_skb2event(skb);
 		sctp_ulpevent_free(event);
 	}
 
-	while ((skb = __skb_dequeue(&ulpq->reasm))) {
+	while ((skb = __skb_dequeue(&ulpq->reasm)) != NULL) {
 		event = sctp_skb2event(skb);
 		sctp_ulpevent_free(event);
 	}
@@ -466,8 +466,8 @@ done:
 /* Helper function to reassemble chunks.  Hold chunks on the reasm queue that
  * need reassembling.
  */
-static inline struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
-						   struct sctp_ulpevent *event)
+static struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
+						struct sctp_ulpevent *event)
 {
 	struct sctp_ulpevent *retval = NULL;
 
@@ -645,8 +645,8 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 
 }
 
-static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
-					struct sctp_ulpevent *event)
+static struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
+						struct sctp_ulpevent *event)
 {
 	__u16 sid, ssn;
 	struct sctp_stream *in;
@@ -756,7 +756,7 @@ static __u16 sctp_ulpq_renege_order(struct sctp_ulpq *ulpq, __u16 needed)
 
 	tsnmap = &ulpq->asoc->peer.tsn_map;
 
-	while ((skb = __skb_dequeue_tail(&ulpq->lobby))) {
+	while ((skb = __skb_dequeue_tail(&ulpq->lobby)) != NULL) {
 		freed += skb_headlen(skb);
 		event = sctp_skb2event(skb);
 		tsn = event->tsn;
@@ -782,7 +782,7 @@ static __u16 sctp_ulpq_renege_frags(struct sctp_ulpq *ulpq, __u16 needed)
 	tsnmap = &ulpq->asoc->peer.tsn_map;
 
 	/* Walk backwards through the list, reneges the newest tsns. */
-	while ((skb = __skb_dequeue_tail(&ulpq->reasm))) {
+	while ((skb = __skb_dequeue_tail(&ulpq->reasm)) != NULL) {
 		freed += skb_headlen(skb);
 		event = sctp_skb2event(skb);
 		tsn = event->tsn;

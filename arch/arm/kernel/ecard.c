@@ -841,7 +841,7 @@ static void __init ecard_init_resources(struct expansion_card *ec)
 	} else
 #endif
 
-	for (i = 0; i < ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
+	for (i = 0; i <= ECARD_RES_IOCSYNC - ECARD_RES_IOCSLOW; i++) {
 		ec_set_resource(ec, i + ECARD_RES_IOCSLOW,
 				base + (slot << 14) + (i << 19),
 				PODSLOT_IOC_SIZE, IORESOURCE_MEM);

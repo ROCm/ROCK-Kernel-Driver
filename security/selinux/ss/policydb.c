@@ -99,7 +99,7 @@ static struct policydb_compat_info *policydb_lookup_compat(int version)
  */
 int roles_init(struct policydb *p)
 {
-	char *key = 0;
+	char *key = NULL;
 	int rc;
 	struct role_datum *role;
 
@@ -402,7 +402,7 @@ static int common_destroy(void *key, void *datum, void *p)
 
 	kfree(key);
 	comdatum = datum;
-	hashtab_map(comdatum->permissions.table, perm_destroy, 0);
+	hashtab_map(comdatum->permissions.table, perm_destroy, NULL);
 	hashtab_destroy(comdatum->permissions.table);
 	kfree(datum);
 	return 0;
@@ -416,7 +416,7 @@ static int class_destroy(void *key, void *datum, void *p)
 
 	kfree(key);
 	cladatum = datum;
-	hashtab_map(cladatum->permissions.table, perm_destroy, 0);
+	hashtab_map(cladatum->permissions.table, perm_destroy, NULL);
 	hashtab_destroy(cladatum->permissions.table);
 	constraint = cladatum->constraints;
 	while (constraint) {
@@ -498,7 +498,7 @@ void policydb_destroy(struct policydb *p)
 	int i;
 
 	for (i = 0; i < SYM_NUM; i++) {
-		hashtab_map(p->symtab[i].table, destroy_f[i], 0);
+		hashtab_map(p->symtab[i].table, destroy_f[i], NULL);
 		hashtab_destroy(p->symtab[i].table);
 	}
 
@@ -669,7 +669,7 @@ out:
 
 static int perm_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct perm_datum *perdatum;
 	int rc;
 	u32 *buf, len;
@@ -718,7 +718,7 @@ bad:
 
 static int common_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct common_datum *comdatum;
 	u32 *buf, len, nel;
 	int i, rc;
@@ -776,7 +776,7 @@ bad:
 
 static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct class_datum *cladatum;
 	struct constraint_node *c, *lc;
 	struct constraint_expr *e, *le;
@@ -943,7 +943,7 @@ bad:
 
 static int role_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct role_datum *role;
 	int rc;
 	u32 *buf, len;
@@ -1008,7 +1008,7 @@ bad:
 
 static int type_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct type_datum *typdatum;
 	int rc;
 	u32 *buf, len;
@@ -1055,7 +1055,7 @@ bad:
 
 static int user_read(struct policydb *p, struct hashtab *h, void *fp)
 {
-	char *key = 0;
+	char *key = NULL;
 	struct user_datum *usrdatum;
 	int rc;
 	u32 *buf, len;

@@ -252,7 +252,7 @@ tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int
 	}
 
 	spin_lock_init(&p->lock);
-	p->stats.lock = &p->lock;
+	p->stats_lock = &p->lock;
 	p->index = parm->index ? : tcf_hash_new_index();
 	p->tm.install = jiffies;
 	p->tm.lastuse = jiffies;

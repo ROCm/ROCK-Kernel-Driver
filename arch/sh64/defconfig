@@ -29,6 +29,7 @@ CONFIG_SYSCTL=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
@@ -50,10 +51,6 @@ CONFIG_IOSCHED_CFQ=y
 CONFIG_SH_CAYMAN=y
 # CONFIG_SH_ROMRAM is not set
 # CONFIG_SH_HARP is not set
-
-#
-# Processor type and features
-#
 CONFIG_CPU_SH5=y
 CONFIG_CPU_SUBTYPE_SH5_101=y
 # CONFIG_CPU_SUBTYPE_SH5_103 is not set
@@ -121,6 +118,7 @@ CONFIG_BINFMT_ELF=y
 #
 # Generic Driver Options
 #
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 
 #
 # Memory Technology Devices (MTD)
@@ -147,7 +145,7 @@ CONFIG_BINFMT_ELF=y
 CONFIG_BLK_DEV_LOOP=y
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_CARMEL is not set
+# CONFIG_BLK_DEV_SX8 is not set
 CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_SIZE=4096
 # CONFIG_BLK_DEV_INITRD is not set
@@ -235,6 +233,7 @@ CONFIG_IP_PNP=y
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -298,6 +297,7 @@ CONFIG_NET_PCI=y
 # CONFIG_SUNDANCE is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
+# CONFIG_VIA_VELOCITY is not set
 
 #
 # Ethernet (1000 Mbit)
@@ -478,6 +478,7 @@ CONFIG_WATCHDOG=y
 # Graphics support
 #
 CONFIG_FB=y
+# CONFIG_FB_CIRRUS is not set
 # CONFIG_FB_PM2 is not set
 # CONFIG_FB_CYBER2000 is not set
 # CONFIG_FB_ASILIANT is not set
@@ -631,6 +632,12 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_NLS is not set
 
 #
+# Profiling support
+#
+CONFIG_PROFILING=y
+# CONFIG_OPROFILE is not set
+
+#
 # Kernel hacking
 #
 CONFIG_MAGIC_SYSRQ=y
@@ -656,5 +663,6 @@ CONFIG_FRAME_POINTER=y
 #
 # Library routines
 #
+# CONFIG_CRC16 is not set
 CONFIG_CRC32=y
 # CONFIG_LIBCRC32C is not set

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 7
-EXTRAVERSION =
+SUBLEVEL = 8
+EXTRAVERSION =-rc1
 NAME=Zonked Quokka
 
 # *DOCUMENTATION*
@@ -332,8 +332,8 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
 # Files to ignore in find ... statements
 
-RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
-RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CVS
+RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS -o -name .pc \) -prune -o
+RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CVS --exclude .pc
 
 # ===========================================================================
 # Rules shared between *config targets and build targets

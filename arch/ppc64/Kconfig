@@ -225,7 +225,7 @@ config SCANLOG
 	depends on PPC_RTAS
 
 config LPARCFG
-	bool "LPAR Configuration Data"
+	tristate "LPAR Configuration Data"
 	help
 	Provide system capacity information via human readable 
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.

@@ -277,7 +277,7 @@ static inline unsigned long isofs_get_ino(unsigned long block,
  * and "offset" will hold normalized values.  Only directories are
  * affected making it safe to call even for non-directory file
  * types. */
-static void inline
+static inline void
 isofs_normalize_block_and_offset(struct iso_directory_record* de,
 				 unsigned long *block,
 				 unsigned long *offset)

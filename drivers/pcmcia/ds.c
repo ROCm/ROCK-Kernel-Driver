@@ -973,10 +973,10 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_resume_card(s->parent);
 	break;
     case DS_EJECT_CARD:
-	ret = pcmcia_eject_card(s->parent);
+	err = pcmcia_eject_card(s->parent);
 	break;
     case DS_INSERT_CARD:
-	ret = pcmcia_insert_card(s->parent);
+	err = pcmcia_insert_card(s->parent);
 	break;
     case DS_ACCESS_CONFIGURATION_REGISTER:
 	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))

@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.2"
+#define VERSION "2.3"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -718,8 +718,7 @@ fail:
 	return err;
 }
 
-static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, 
-			      struct msghdr *msg, size_t len)
+static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -1444,7 +1443,7 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	struct l2cap_conn_rsp *rsp = (struct l2cap_conn_rsp *) data;
 	u16 scid, dcid, result, status;
 	struct sock *sk;
-	char req[128];
+	u8 req[128];
 
 	scid   = __le16_to_cpu(rsp->scid);
 	dcid   = __le16_to_cpu(rsp->dcid);
@@ -1481,7 +1480,7 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 {
 	struct l2cap_conf_req *req = (struct l2cap_conf_req *) data;
 	u16 dcid, flags;
-	u8  rsp[64];
+	u8 rsp[64];
 	struct sock *sk;
 	int result;
 
@@ -1633,6 +1632,35 @@ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn, struct l2cap_cmd
 	return 0;
 }
 
+static inline int l2cap_info_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
+{
+	struct l2cap_info_req *req = (struct l2cap_info_req *) data;
+	struct l2cap_info_rsp rsp;
+	u16 type;
+
+	type = __le16_to_cpu(req->type);
+
+	BT_DBG("type 0x%4.4x", type);
+
+	rsp.type   = __cpu_to_le16(type);
+	rsp.result = __cpu_to_le16(L2CAP_IR_NOTSUPP);
+	l2cap_send_rsp(conn, cmd->ident, L2CAP_INFO_RSP, sizeof(rsp), &rsp);
+	return 0;
+}
+
+static inline int l2cap_info_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hdr *cmd, u8 *data)
+{
+	struct l2cap_info_rsp *rsp = (struct l2cap_info_rsp *) data;
+	u16 type, result;
+
+	type   = __le16_to_cpu(rsp->type);
+	result = __le16_to_cpu(rsp->result);
+
+	BT_DBG("type 0x%4.4x result 0x%2.2x", type, result);
+
+	return 0;
+}
+
 static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *skb)
 {
 	u8 *data = skb->data;
@@ -1657,6 +1685,10 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 		}
 
 		switch (cmd.code) {
+		case L2CAP_COMMAND_REJ:
+			/* FIXME: We should process this */
+			break;
+
 		case L2CAP_CONN_REQ:
 			err = l2cap_connect_req(conn, &cmd, data);
 			break;
@@ -1681,17 +1713,19 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 			err = l2cap_disconnect_rsp(conn, &cmd, data);
 			break;
 
-		case L2CAP_COMMAND_REJ:
-			/* FIXME: We should process this */
-			break;
-
 		case L2CAP_ECHO_REQ:
 			l2cap_send_rsp(conn, cmd.ident, L2CAP_ECHO_RSP, cmd.len, data);
 			break;
 
 		case L2CAP_ECHO_RSP:
+			break;
+
 		case L2CAP_INFO_REQ:
+			err = l2cap_info_req(conn, &cmd, data);
+			break;
+
 		case L2CAP_INFO_RSP:
+			err = l2cap_info_rsp(conn, &cmd, data);
 			break;
 
 		default:
@@ -1704,7 +1738,7 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 			struct l2cap_cmd_rej rej;
 			BT_DBG("error %d", err);
 
-			/* FIXME: Map err to a valid reason. */
+			/* FIXME: Map err to a valid reason */
 			rej.reason = __cpu_to_le16(0);
 			l2cap_send_rsp(conn, cmd.ident, L2CAP_COMMAND_REJ, sizeof(rej), &rej);
 		}
@@ -1737,7 +1771,7 @@ static inline int l2cap_data_channel(struct l2cap_conn *conn, u16 cid, struct sk
 	/* If socket recv buffers overflows we drop data here
 	 * which is *bad* because L2CAP has to be reliable.
 	 * But we don't have any other choice. L2CAP doesn't
-	 * provide flow control mechanism */
+	 * provide flow control mechanism. */
 
 	if (!sock_queue_rcv_skb(sk, skb))
 		goto done;
@@ -2210,7 +2244,7 @@ EXPORT_SYMBOL(l2cap_load);
 module_init(l2cap_init);
 module_exit(l2cap_exit);
 
-MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth L2CAP ver " VERSION);
 MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

@@ -282,6 +282,7 @@ sysc_reschedule:
 # _TIF_SIGPENDING is set, call do_signal
 #
 sysc_sigpending:     
+	ni	__TI_flags+7(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
         la      %r2,SP_PTREGS(%r15) # load pt_regs
         sgr     %r3,%r3           # clear *oldset
 	brasl	%r14,do_signal    # call do_signal
@@ -301,7 +302,7 @@ sysc_restart:
 	j	sysc_do_restart        # restart svc
 
 #
-# _TIF_SINGLE_STEP is set, call do_debugger_trap
+# _TIF_SINGLE_STEP is set, call do_single_step
 #
 sysc_singlestep:
 	ni	__TI_flags+7(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
@@ -309,7 +310,7 @@ sysc_singlestep:
 	sth	%r0,SP_TRAP(%r15)	# set trap indication to pgm check
 	la	%r2,SP_PTREGS(%r15)	# address of register-save area
 	larl	%r14,sysc_return	# load adr. of system return
-	jg	do_debugger_trap	# branch to do_debugger_trap
+	jg	do_single_step		# branch to do_sigtrap
 
 
 __critical_end:
@@ -497,6 +498,7 @@ pgm_check_handler:
 	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
 	lghi	%r8,0x7f
 	ngr	%r8,%r3
+pgm_do_call:
         sll     %r8,3
 	GET_THREAD_INFO
         larl    %r1,pgm_check_table
@@ -527,19 +529,12 @@ pgm_per_std:
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
 	mvc	__THREAD_per+__PER_address(8,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
-	lghi    %r4,0x7f
+	oi	__TI_flags+7(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
 	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
-        nr      %r4,%r3			 # clear per-event-bit and ilc
-        je      pgm_per_only		 # only per of per+check ?
-        sll     %r4,3
-        larl    %r1,pgm_check_table
-        lg      %r1,0(%r4,%r1)		 # load address of handler routine
-        la      %r2,SP_PTREGS(%r15)	 # address of register-save area
-        basr    %r14,%r1		 # branch to interrupt-handler
-pgm_per_only:
-        la      %r2,SP_PTREGS(15)	 # address of register-save area
-        larl    %r14,sysc_return	 # load adr. of system return
-        jg      do_debugger_trap
+	lghi	%r8,0x7f
+	ngr	%r8,%r3			 # clear per-event-bit and ilc
+	je	sysc_return
+	j	pgm_do_call
 
 #
 # it was a single stepped SVC that is causing all the trouble

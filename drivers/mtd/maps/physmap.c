@@ -66,7 +66,7 @@ const char *part_probes[] = {"cmdlinepart", "RedBoot", NULL};
 
 int __init init_physmap(void)
 {
-	static const char *rom_probe_types[] = { "cfi_probe", "jedec_probe", "map_rom", 0 };
+	static const char *rom_probe_types[] = { "cfi_probe", "jedec_probe", "map_rom", NULL };
 	const char **type;
 
        	printk(KERN_NOTICE "physmap flash device: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
@@ -79,7 +79,7 @@ int __init init_physmap(void)
 
 	simple_map_init(&physmap_map);
 
-	mymtd = 0;
+	mymtd = NULL;
 	type = rom_probe_types;
 	for(; !mymtd && *type; type++) {
 		mymtd = do_map_probe(*type, &physmap_map);

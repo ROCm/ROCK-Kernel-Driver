@@ -264,7 +264,10 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 		goto err;
 
 	wait_for_completion(&socket->thread_done);
-	BUG_ON(!socket->thread);
+	if(!socket->thread) {
+		printk(KERN_WARNING "PCMCIA: warning: socket thread for socket %p did not start\n", socket);
+		return -EIO;
+	}
 	pcmcia_parse_events(socket, SS_DETECT);
 
 	return 0;
@@ -678,9 +681,8 @@ static int pccardd(void *__skt)
 	int ret;
 
 	daemonize("pccardd");
-	skt->thread = current;
-	complete(&skt->thread_done);
 
+	skt->thread = current;
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
 	skt->ops->set_socket(skt, &skt->socket);
@@ -690,7 +692,10 @@ static int pccardd(void *__skt)
 	if (ret) {
 		printk(KERN_WARNING "PCMCIA: unable to register socket 0x%p\n",
 			skt);
+		skt->thread = NULL;
+		complete_and_exit(&skt->thread_done, 0);
 	}
+	complete(&skt->thread_done);
 
 	add_wait_queue(&skt->thread_wait, &wait);
 	for (;;) {
@@ -2031,16 +2036,18 @@ int pcmcia_eject_card(struct pcmcia_socket *skt)
 	down(&skt->skt_sem);
 	do {
 		if (!(skt->state & SOCKET_PRESENT)) {
-			ret = CS_NO_CARD;
+			ret = -ENODEV;
 			break;
 		}
 
 		ret = send_event(skt, CS_EVENT_EJECTION_REQUEST, CS_EVENT_PRI_LOW);
-		if (ret != 0)
+		if (ret != 0) {
+			ret = -EINVAL;
 			break;
+		}
 
 		socket_remove(skt);
-		ret = CS_SUCCESS;
+		ret = 0;
 	} while (0);
 	up(&skt->skt_sem);
 
@@ -2056,14 +2063,14 @@ int pcmcia_insert_card(struct pcmcia_socket *skt)
 	down(&skt->skt_sem);
 	do {
 		if (skt->state & SOCKET_PRESENT) {
-			ret = CS_IN_USE;
+			ret = -EBUSY;
 			break;
 		}
 		if (socket_insert(skt) == CS_NO_CARD) {
-			ret = CS_NO_CARD;
+			ret = -ENODEV;
 			break;
 		}
-		ret = CS_SUCCESS;
+		ret = 0;
 	} while (0);
 	up(&skt->skt_sem);
 
@@ -2161,16 +2168,21 @@ EXPORT_SYMBOL(pcmcia_socket_class);
 
 static int __init init_pcmcia_cs(void)
 {
-    printk(KERN_INFO "%s\n", release);
-    printk(KERN_INFO "  %s\n", options);
+	int ret;
+	printk(KERN_INFO "%s\n", release);
+	printk(KERN_INFO "  %s\n", options);
 
-    return class_register(&pcmcia_socket_class);
+	ret = class_register(&pcmcia_socket_class);
+	if (ret)
+		return (ret);
+	return class_interface_register(&pccard_sysfs_interface);
 }
 
 static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
     release_resource_db();
+    class_interface_unregister(&pccard_sysfs_interface);
     class_unregister(&pcmcia_socket_class);
 }
 

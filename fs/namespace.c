@@ -60,6 +60,7 @@ struct vfsmount *alloc_vfsmnt(const char *name)
 		INIT_LIST_HEAD(&mnt->mnt_child);
 		INIT_LIST_HEAD(&mnt->mnt_mounts);
 		INIT_LIST_HEAD(&mnt->mnt_list);
+		INIT_LIST_HEAD(&mnt->mnt_fslink);
 		if (name) {
 			int size = strlen(name)+1;
 			char *newname = kmalloc(size, GFP_KERNEL);
@@ -106,13 +107,9 @@ struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
 
 EXPORT_SYMBOL(lookup_mnt);
 
-static int check_mnt(struct vfsmount *mnt)
+static inline int check_mnt(struct vfsmount *mnt)
 {
-	spin_lock(&vfsmount_lock);
-	while (mnt->mnt_parent != mnt)
-		mnt = mnt->mnt_parent;
-	spin_unlock(&vfsmount_lock);
-	return mnt == current->namespace->root;
+	return mnt->mnt_namespace == current->namespace;
 }
 
 static void detach_mnt(struct vfsmount *mnt, struct nameidata *old_nd)
@@ -164,6 +161,14 @@ clone_mnt(struct vfsmount *old, struct dentry *root)
 		mnt->mnt_root = dget(root);
 		mnt->mnt_mountpoint = mnt->mnt_root;
 		mnt->mnt_parent = mnt;
+		mnt->mnt_namespace = old->mnt_namespace;
+
+		/* stick the duplicate mount on the same expiry list
+		 * as the original if that was on one */
+		spin_lock(&vfsmount_lock);
+		if (!list_empty(&old->mnt_fslink))
+			list_add(&mnt->mnt_fslink, &old->mnt_fslink);
+		spin_unlock(&vfsmount_lock);
 	}
 	return mnt;
 }
@@ -346,6 +351,7 @@ void umount_tree(struct vfsmount *mnt)
 	while (!list_empty(&kill)) {
 		mnt = list_entry(kill.next, struct vfsmount, mnt_list);
 		list_del_init(&mnt->mnt_list);
+		list_del_init(&mnt->mnt_fslink);
 		if (mnt->mnt_parent == mnt) {
 			spin_unlock(&vfsmount_lock);
 		} else {
@@ -367,6 +373,24 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	retval = security_sb_umount(mnt, flags);
 	if (retval)
 		return retval;
+
+	/*
+	 * Allow userspace to request a mountpoint be expired rather than
+	 * unmounting unconditionally. Unmount only happens if:
+	 *  (1) the mark is already set (the mark is cleared by mntput())
+	 *  (2) the usage count == 1 [parent vfsmount] + 1 [sys_umount]
+	 */
+	if (flags & MNT_EXPIRE) {
+		if (mnt == current->fs->rootmnt ||
+		    flags & (MNT_FORCE | MNT_DETACH))
+			return -EINVAL;
+
+		if (atomic_read(&mnt->mnt_count) != 2)
+			return -EBUSY;
+
+		if (!xchg(&mnt->mnt_expiry_mark, 1))
+			return -EAGAIN;
+	}
 
 	/*
 	 * If we may have to abort operations to get out of this
@@ -461,7 +485,7 @@ asmlinkage long sys_umount(char __user * name, int flags)
 
 	retval = do_umount(nd.mnt, flags);
 dput_and_out:
-	path_release(&nd);
+	path_release_on_umount(&nd);
 out:
 	return retval;
 }
@@ -618,6 +642,11 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 	}
 
 	if (mnt) {
+		/* stop bind mounts from expiring */
+		spin_lock(&vfsmount_lock);
+		list_del_init(&mnt->mnt_fslink);
+		spin_unlock(&vfsmount_lock);
+
 		err = graft_tree(mnt, nd);
 		if (err) {
 			spin_lock(&vfsmount_lock);
@@ -638,7 +667,8 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
  * on it - tough luck.
  */
 
-static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
+static int do_remount(struct nameidata *nd, int flags, int mnt_flags,
+		      void *data)
 {
 	int err;
 	struct super_block * sb = nd->mnt->mnt_sb;
@@ -710,6 +740,10 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 
 	detach_mnt(old_nd.mnt, &parent_nd);
 	attach_mnt(old_nd.mnt, nd);
+
+	/* if the mount is moved, it should no longer be expire
+	 * automatically */
+	list_del_init(&old_nd.mnt->mnt_fslink);
 out2:
 	spin_unlock(&vfsmount_lock);
 out1:
@@ -722,11 +756,14 @@ out:
 	return err;
 }
 
-static int do_add_mount(struct nameidata *nd, char *type, int flags,
+/*
+ * create a new mount for userspace and request it to be added into the
+ * namespace's tree
+ */
+static int do_new_mount(struct nameidata *nd, char *type, int flags,
 			int mnt_flags, char *name, void *data)
 {
 	struct vfsmount *mnt;
-	int err;
 
 	if (!type || !memchr(type, 0, PAGE_SIZE))
 		return -EINVAL;
@@ -736,9 +773,20 @@ static int do_add_mount(struct nameidata *nd, char *type, int flags,
 		return -EPERM;
 
 	mnt = do_kern_mount(type, flags, name, data);
-	err = PTR_ERR(mnt);
 	if (IS_ERR(mnt))
-		goto out;
+		return PTR_ERR(mnt);
+
+	return do_add_mount(mnt, nd, mnt_flags, NULL);
+}
+
+/*
+ * add a mount into a namespace's mount tree
+ * - provide the option of adding the new mount to an expiration list
+ */
+int do_add_mount(struct vfsmount *newmnt, struct nameidata *nd,
+		 int mnt_flags, struct list_head *fslist)
+{
+	int err;
 
 	down_write(&current->namespace->sem);
 	/* Something was mounted here while we slept */
@@ -750,21 +798,142 @@ static int do_add_mount(struct nameidata *nd, char *type, int flags,
 
 	/* Refuse the same filesystem on the same mount point */
 	err = -EBUSY;
-	if (nd->mnt->mnt_sb == mnt->mnt_sb && nd->mnt->mnt_root == nd->dentry)
+	if (nd->mnt->mnt_sb == newmnt->mnt_sb &&
+	    nd->mnt->mnt_root == nd->dentry)
 		goto unlock;
 
 	err = -EINVAL;
-	if (S_ISLNK(mnt->mnt_root->d_inode->i_mode))
+	if (S_ISLNK(newmnt->mnt_root->d_inode->i_mode))
 		goto unlock;
 
-	mnt->mnt_flags = mnt_flags;
-	err = graft_tree(mnt, nd);
+	newmnt->mnt_flags = mnt_flags;
+	err = graft_tree(newmnt, nd);
+
+	if (err == 0 && fslist) {
+		/* add to the specified expiration list */
+		spin_lock(&vfsmount_lock);
+		list_add_tail(&newmnt->mnt_fslink, fslist);
+		spin_unlock(&vfsmount_lock);
+	}
+
 unlock:
 	up_write(&current->namespace->sem);
-	mntput(mnt);
-out:
+	mntput(newmnt);
 	return err;
 }
+
+EXPORT_SYMBOL_GPL(do_add_mount);
+
+/*
+ * process a list of expirable mountpoints with the intent of discarding any
+ * mountpoints that aren't in use and haven't been touched since last we came
+ * here
+ */
+void mark_mounts_for_expiry(struct list_head *mounts)
+{
+	struct namespace *namespace;
+	struct list_head graveyard, *_p, *_n;
+	struct vfsmount *mnt;
+
+	if (list_empty(mounts))
+		return;
+
+	INIT_LIST_HEAD(&graveyard);
+
+	spin_lock(&vfsmount_lock);
+
+	/* extract from the expiration list every vfsmount that matches the
+	 * following criteria:
+	 * - only referenced by its parent vfsmount
+	 * - still marked for expiry (marked on the last call here; marks are
+	 *   cleared by mntput())
+	 */
+	list_for_each_safe(_p, _n, mounts) {
+		mnt = list_entry(_p, struct vfsmount, mnt_fslink);
+
+		if (!xchg(&mnt->mnt_expiry_mark, 1) ||
+		    atomic_read(&mnt->mnt_count) != 1)
+			continue;
+
+		mntget(mnt);
+		list_move(&mnt->mnt_fslink, &graveyard);
+	}
+
+	/*
+	 * go through the vfsmounts we've just consigned to the graveyard to
+	 * - check that they're still dead
+	 * - delete the vfsmount from the appropriate namespace under lock
+	 * - dispose of the corpse
+	 */
+	while (!list_empty(&graveyard)) {
+		mnt = list_entry(graveyard.next, struct vfsmount, mnt_fslink);
+		list_del_init(&mnt->mnt_fslink);
+
+		/* don't do anything if the namespace is dead - all the
+		 * vfsmounts from it are going away anyway */
+		namespace = mnt->mnt_namespace;
+		if (!namespace || atomic_read(&namespace->count) <= 0)
+			continue;
+		get_namespace(namespace);
+
+		spin_unlock(&vfsmount_lock);
+		down_write(&namespace->sem);
+		spin_lock(&vfsmount_lock);
+
+		/* check that it is still dead: the count should now be 2 - as
+		 * contributed by the vfsmount parent and the mntget above */
+		if (atomic_read(&mnt->mnt_count) == 2) {
+			struct vfsmount *xdmnt;
+			struct dentry *xdentry;
+
+			/* delete from the namespace */
+			list_del_init(&mnt->mnt_list);
+			list_del_init(&mnt->mnt_child);
+			list_del_init(&mnt->mnt_hash);
+			mnt->mnt_mountpoint->d_mounted--;
+
+			xdentry = mnt->mnt_mountpoint;
+			mnt->mnt_mountpoint = mnt->mnt_root;
+			xdmnt = mnt->mnt_parent;
+			mnt->mnt_parent = mnt;
+
+			spin_unlock(&vfsmount_lock);
+
+			mntput(xdmnt);
+			dput(xdentry);
+
+			/* now lay it to rest if this was the last ref on the
+			 * superblock */
+			if (atomic_read(&mnt->mnt_sb->s_active) == 1) {
+				/* last instance - try to be smart */
+				lock_kernel();
+				DQUOT_OFF(mnt->mnt_sb);
+				acct_auto_close(mnt->mnt_sb);
+				unlock_kernel();
+			}
+
+			mntput(mnt);
+		}
+		else {
+			/* someone brought it back to life whilst we didn't
+			 * have any locks held so return it to the expiration
+			 * list */
+			list_add_tail(&mnt->mnt_fslink, mounts);
+			spin_unlock(&vfsmount_lock);
+		}
+
+		up_write(&namespace->sem);
+
+		mntput(mnt);
+		put_namespace(namespace);
+
+		spin_lock(&vfsmount_lock);
+	}
+
+	spin_unlock(&vfsmount_lock);
+}
+
+EXPORT_SYMBOL_GPL(mark_mounts_for_expiry);
 
 int copy_mount_options (const void __user *data, unsigned long *where)
 {
@@ -860,7 +1029,7 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	else if (flags & MS_MOVE)
 		retval = do_move_mount(&nd, dev_name);
 	else
-		retval = do_add_mount(&nd, type_page, flags, mnt_flags,
+		retval = do_new_mount(&nd, type_page, flags, mnt_flags,
 				      dev_name, data_page);
 dput_out:
 	path_release(&nd);
@@ -1185,6 +1354,7 @@ static void __init init_mount_tree(void)
 	init_rwsem(&namespace->sem);
 	list_add(&mnt->mnt_list, &namespace->list);
 	namespace->root = mnt;
+	mnt->mnt_namespace = namespace;
 
 	init_task.namespace = namespace;
 	read_lock(&tasklist_lock);
@@ -1252,8 +1422,15 @@ void __init mnt_init(unsigned long mempages)
 
 void __put_namespace(struct namespace *namespace)
 {
+	struct vfsmount *mnt;
+
 	down_write(&namespace->sem);
 	spin_lock(&vfsmount_lock);
+
+	list_for_each_entry(mnt, &namespace->list, mnt_list) {
+		mnt->mnt_namespace = NULL;
+	}
+
 	umount_tree(namespace->root);
 	spin_unlock(&vfsmount_lock);
 	up_write(&namespace->sem);

@@ -241,11 +241,11 @@ struct ex_ecid {
 
 	unsigned char	r_country;
 
-	unsigned char	r_irqmask;
-	unsigned char	r_irqoff[3];
-
 	unsigned char	r_fiqmask;
 	unsigned char	r_fiqoff[3];
+
+	unsigned char	r_irqmask;
+	unsigned char	r_irqoff[3];
 };
 
 /*

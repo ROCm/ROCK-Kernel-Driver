@@ -9,27 +9,17 @@ include scripts/Makefile.lib
 
 #
 
-__modules := $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod))
+__modules := $(sort $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod)))
 modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
 
 .PHONY: $(modules)
 __modinst: $(modules)
 	@:
 
-# Modules built within the kernel tree
-
 quiet_cmd_modules_install = INSTALL $@
-      cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(@D); \
-			    cp $@ $(MODLIB)/kernel/$(@D)
+      cmd_modules_install = mkdir -p $(2); cp $@ $(2)
 
-$(filter-out ../% /%,$(modules)):
-	$(call cmd,modules_install)
+modinst_dir = $(MODLIB)/$(if $(filter ../% /%,$@),extra/,kernel/$(@D))
 
-# Modules built outside just go into extra
-
-quiet_cmd_modules_install_extra = INSTALL $(obj-m:.o=.ko)
-      cmd_modules_install_extra = mkdir -p $(MODLIB)/extra; \
-			    	  cp $@ $(MODLIB)/extra
-
-$(filter     ../% /%,$(modules)):
-	$(call cmd,modules_install_extra)
+$(modules):
+	$(call cmd,modules_install,$(modinst_dir))

@@ -308,7 +308,7 @@ int security_compute_av(u32 ssid,
 			u32 requested,
 			struct av_decision *avd)
 {
-	struct context *scontext = 0, *tcontext = 0;
+	struct context *scontext = NULL, *tcontext = NULL;
 	int rc = 0;
 
 	if (!ss_initialized) {
@@ -355,7 +355,7 @@ int context_struct_to_string(struct context *context, char **scontext, u32 *scon
 {
 	char *scontextp;
 
-	*scontext = 0;
+	*scontext = NULL;
 	*scontext_len = 0;
 
 	/* Compute the size of the context. */
@@ -600,8 +600,8 @@ static int security_compute_sid(u32 ssid,
 				u32 specified,
 				u32 *out_sid)
 {
-	struct context *scontext = 0, *tcontext = 0, newcontext;
-	struct role_trans *roletr = 0;
+	struct context *scontext = NULL, *tcontext = NULL, newcontext;
+	struct role_trans *roletr = NULL;
 	struct avtab_key avkey;
 	struct avtab_datum *avdatum;
 	struct avtab_node *node;

@@ -32,7 +32,7 @@ static struct amd76xrom_map_info amd76xrom_map = {
 		.size = 0,
 		.buswidth = 1,
 	},
-	.mtd = 0,
+	.mtd = NULL,
 	.window_addr = 0,
 };
 
@@ -53,7 +53,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 	static const u32 rom_probe_sizes[] = { 
 		5*1024*1024, 4*1024*1024, 2*1024*1024, 1024*1024, 512*1024, 
 		256*1024, 128*1024, 64*1024, 0};
-	static char *rom_probe_types[] = { "cfi_probe", "jedec_probe", 0 };
+	static char *rom_probe_types[] = { "cfi_probe", "jedec_probe", NULL };
 	u8 byte;
 	struct amd76xrom_map_info *info = &amd76xrom_map;
 	struct rom_window *window;
@@ -96,7 +96,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 		printk(KERN_ERR "Failed to ioremap\n");
 		goto err_out_free_mmio_region;
 	}
-	info->mtd = 0;
+	info->mtd = NULL;
 	for(i = 0; (rom_size = rom_probe_sizes[i]); i++) {
 		char **chip_type;
 		if (rom_size > window->size) {
@@ -145,7 +145,7 @@ static void __devexit amd76xrom_remove_one (struct pci_dev *pdev)
 
 	del_mtd_device(info->mtd);
 	map_destroy(info->mtd);
-	info->mtd = 0;
+	info->mtd = NULL;
 	info->map.virt = 0;
 
 	iounmap((void *)(info->window_addr));
@@ -184,9 +184,9 @@ int __init init_amd76xrom(void)
 {
 	struct pci_dev *pdev;
 	struct pci_device_id *id;
-	pdev = 0;
+	pdev = NULL;
 	for(id = amd76xrom_pci_tbl; id->vendor; id++) {
-		pdev = pci_find_device(id->vendor, id->device, 0);
+		pdev = pci_find_device(id->vendor, id->device, NULL);
 		if (pdev) {
 			break;
 		}
