@@ -1966,8 +1966,11 @@ void journal_file_buffer(struct journal_head *jh,
  * dropping it from its current transaction entirely.  If the buffer has
  * already started to be used by a subsequent transaction, refile the
  * buffer on that transaction's metadata list.
+ *
+ * Called under journal_datalist_lock
+ *
+ * Called under jbd_lock_bh_state(jh2bh(jh))
  */
-
 void __journal_refile_buffer(struct journal_head *jh)
 {
 	int was_dirty;
