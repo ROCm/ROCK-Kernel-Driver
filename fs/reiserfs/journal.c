@@ -1657,6 +1657,7 @@ static int do_journal_release(struct reiserfs_transaction_handle *th, struct sup
 
   reiserfs_mounted_fs_count-- ;
   /* wait for all commits to finish */
+  cancel_delayed_work(&SB_JOURNAL(p_s_sb)->j_work);
   flush_workqueue(commit_wq);
   if (!reiserfs_mounted_fs_count) {
     destroy_workqueue(commit_wq);
