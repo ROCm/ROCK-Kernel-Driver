@@ -12,7 +12,7 @@
 #include <linux/stat.h>
 #include <linux/nls.h>
 #include <linux/buffer_head.h>
-#include <linux/statfs.h>
+#include <linux/vfs.h>
 
 #include "befs.h"
 #include "btree.h"
