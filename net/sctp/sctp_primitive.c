@@ -46,7 +46,6 @@
  */
 static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_primitive.c,v 1.6 2002/08/21 18:34:04 jgrimm Exp $";
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/list.h> /* For struct list_head */
 #include <linux/socket.h>
@@ -56,40 +55,39 @@ static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_primitive.c,v 1.6 2002
 #include <net/sctp/sctp.h>
 #include <net/sctp/sctp_sm.h>
 
-
 #define DECLARE_PRIMITIVE(name) \
 /* This is called in the code as sctp_primitive_ ## name.  */ \
-int \
-sctp_primitive_ ## name(sctp_association_t *asoc, \
-                         void *arg) { \
-        int error = 0; \
-        sctp_event_t event_type; sctp_subtype_t subtype; \
+int sctp_primitive_ ## name(sctp_association_t *asoc, \
+			    void *arg) { \
+	int error = 0; \
+	sctp_event_t event_type; sctp_subtype_t subtype; \
 	sctp_state_t state; \
-        sctp_endpoint_t *ep; \
+	sctp_endpoint_t *ep; \
 	\
-        event_type = SCTP_EVENT_T_PRIMITIVE; \
-        subtype = SCTP_ST_PRIMITIVE(SCTP_PRIMITIVE_ ## name); \
-        state = asoc ? asoc->state : SCTP_STATE_CLOSED; \
-        ep = asoc ? asoc->ep : NULL; \
-        \
-        error = sctp_do_sm(event_type, subtype, state, ep, asoc, arg, GFP_KERNEL); \
-        return error; \
-} /* sctp_primitive_ ## name() */
+	event_type = SCTP_EVENT_T_PRIMITIVE; \
+	subtype = SCTP_ST_PRIMITIVE(SCTP_PRIMITIVE_ ## name); \
+	state = asoc ? asoc->state : SCTP_STATE_CLOSED; \
+	ep = asoc ? asoc->ep : NULL; \
+	\
+	error = sctp_do_sm(event_type, subtype, state, ep, asoc, \
+			   arg, GFP_KERNEL); \
+ 	return error; \
+}
 
 /* 10.1 ULP-to-SCTP
  * B) Associate
- * 
- * Format: ASSOCIATE(local SCTP instance name, destination transport addr, 
- *         outbound stream count) 
+ *
+ * Format: ASSOCIATE(local SCTP instance name, destination transport addr,
+ *         outbound stream count)
  * -> association id [,destination transport addr list] [,outbound stream
- *    count] 
- * 
+ *    count]
+ *
  * This primitive allows the upper layer to initiate an association to a
- * specific peer endpoint. 
+ * specific peer endpoint.
  *
  * This version assumes that asoc is fully populated with the initial
  * parameters.  We then return a traditional kernel indicator of
- * success or failure. 
+ * success or failure.
  */
 
 /* This is called in the code as sctp_primitive_ASSOCIATE.  */
@@ -98,10 +96,10 @@ DECLARE_PRIMITIVE(ASSOCIATE)
 
 /* 10.1 ULP-to-SCTP
  * C) Shutdown
- * 
+ *
  * Format: SHUTDOWN(association id)
- * -> result 
- * 
+ * -> result
+ *
  * Gracefully closes an association. Any locally queued user data
  * will be delivered to the peer. The association will be terminated only
  * after the peer acknowledges all the SCTP packets sent.  A success code
@@ -114,10 +112,10 @@ DECLARE_PRIMITIVE(SHUTDOWN);
 
 /* 10.1 ULP-to-SCTP
  * C) Abort
- * 
+ *
  * Format: Abort(association id [, cause code])
- * -> result 
- * 
+ * -> result
+ *
  * Ungracefully closes an association. Any locally queued user data
  * will be discarded and an ABORT chunk is sent to the peer. A success
  * code will be returned on successful abortion of the association. If
@@ -129,83 +127,79 @@ DECLARE_PRIMITIVE(ABORT);
 
 /* 10.1 ULP-to-SCTP
  * E) Send
- * 
+ *
  * Format: SEND(association id, buffer address, byte count [,context]
- *         [,stream id] [,life time] [,destination transport address] 
+ *         [,stream id] [,life time] [,destination transport address]
  *         [,unorder flag] [,no-bundle flag] [,payload protocol-id] )
  * -> result
- * 
- * This is the main method to send user data via SCTP. 
- * 
+ *
+ * This is the main method to send user data via SCTP.
+ *
  * Mandatory attributes:
- * 
+ *
  *  o association id - local handle to the SCTP association
- * 
+ *
  *  o buffer address - the location where the user message to be
  *    transmitted is stored;
- * 
+ *
  *  o byte count - The size of the user data in number of bytes;
- * 
+ *
  * Optional attributes:
- * 
+ *
  *  o context - an optional 32 bit integer that will be carried in the
  *    sending failure notification to the ULP if the transportation of
  *    this User Message fails.
- * 
+ *
  *  o stream id - to indicate which stream to send the data on. If not
  *    specified, stream 0 will be used.
- * 
+ *
  *  o life time - specifies the life time of the user data. The user data
  *    will not be sent by SCTP after the life time expires. This
  *    parameter can be used to avoid efforts to transmit stale
  *    user messages. SCTP notifies the ULP if the data cannot be
  *    initiated to transport (i.e. sent to the destination via SCTP's
  *    send primitive) within the life time variable. However, the
- *    user data will be transmitted if SCTP has attempted to transmit a 
+ *    user data will be transmitted if SCTP has attempted to transmit a
  *    chunk before the life time expired.
- * 
+ *
  *  o destination transport address - specified as one of the destination
  *    transport addresses of the peer endpoint to which this packet
  *    should be sent. Whenever possible, SCTP should use this destination
  *    transport address for sending the packets, instead of the current
- *    primary path. 
- * 
+ *    primary path.
+ *
  *  o unorder flag - this flag, if present, indicates that the user
- *    would like the data delivered in an unordered fashion to the peer 
- *    (i.e., the U flag is set to 1 on all DATA chunks carrying this 
+ *    would like the data delivered in an unordered fashion to the peer
+ *    (i.e., the U flag is set to 1 on all DATA chunks carrying this
  *    message).
- * 
+ *
  *  o no-bundle flag - instructs SCTP not to bundle this user data with
- *    other outbound DATA chunks. SCTP MAY still bundle even when 
+ *    other outbound DATA chunks. SCTP MAY still bundle even when
  *    this flag is present, when faced with network congestion.
- * 
- *  o payload protocol-id - A 32 bit unsigned integer that is to be 
- *    passed to the peer indicating the type of payload protocol data 
+ *
+ *  o payload protocol-id - A 32 bit unsigned integer that is to be
+ *    passed to the peer indicating the type of payload protocol data
  *    being transmitted. This value is passed as opaque data by SCTP.
  */
 
 DECLARE_PRIMITIVE(SEND);
 
-
 /* COMMENT BUG.  Find out where this is mentioned in the spec.  */
-int
-sctp_other_icmp_unreachfrag(sctp_association_t *asoc, void *arg)
+int sctp_other_icmp_unreachfrag(sctp_association_t *asoc, void *arg)
 {
-        int error = 0;
-        sctp_event_t event_type;
+	int error = 0;
+	sctp_event_t event_type;
 	sctp_subtype_t subtype;
 	sctp_state_t state;
-        sctp_endpoint_t *ep;
+	sctp_endpoint_t *ep;
 
-        event_type = SCTP_EVENT_T_OTHER;
-        subtype = SCTP_ST_OTHER(SCTP_EVENT_ICMP_UNREACHFRAG);
-        state = asoc ? asoc->state : SCTP_STATE_CLOSED;
-        ep = asoc ? asoc->ep : NULL;
+	event_type = SCTP_EVENT_T_OTHER;
+	subtype = SCTP_ST_OTHER(SCTP_EVENT_ICMP_UNREACHFRAG);
+	state = asoc ? asoc->state : SCTP_STATE_CLOSED;
+	ep = asoc ? asoc->ep : NULL;
 
-        error = sctp_do_sm(event_type, subtype, state, ep, asoc, arg,
-                           GFP_ATOMIC);
+	error = sctp_do_sm(event_type, subtype, state, ep,
+			   asoc, arg, GFP_ATOMIC);
 
-        return error;
-
-} /* sctp_other_icmp_unreachfrag() */
-
+	return error;
+}

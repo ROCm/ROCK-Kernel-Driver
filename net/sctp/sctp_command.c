@@ -42,82 +42,67 @@
 
 static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_command.c,v 1.4 2002/04/24 16:33:39 jgrimm Exp $";
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <net/sctp/sctp.h>
 #include <net/sctp/sctp_sm.h>
 
 /* Create a new sctp_command_sequence.  */
-sctp_cmd_seq_t *
-sctp_new_cmd_seq(int priority)
+sctp_cmd_seq_t *sctp_new_cmd_seq(int priority)
 {
-	sctp_cmd_seq_t *retval;
+	sctp_cmd_seq_t *retval = t_new(sctp_cmd_seq_t, priority);
 
-	retval = t_new(sctp_cmd_seq_t, priority);
-
+	/* XXX Check for NULL? -DaveM */
 	sctp_init_cmd_seq(retval);
 
 	return retval;
-
-} /* sctp_new_cmd_seq() */
+}
 
 /* Initialize a block of memory as a command sequence. */
-int
-sctp_init_cmd_seq(sctp_cmd_seq_t *seq)
+int sctp_init_cmd_seq(sctp_cmd_seq_t *seq)
 {
 	memset(seq, 0, sizeof(sctp_cmd_seq_t));
 	return 1;		/* We always succeed.  */
-
-} /* sctp_init_cmd_seq() */
+}
 
 /* Add a command to a sctp_cmd_seq_t.
  * Return 0 if the command sequence is full.
  */
-int
-sctp_add_cmd(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj)
+int sctp_add_cmd(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj)
 {
-	if (seq->next_free_slot >= SCTP_MAX_NUM_COMMANDS) {
+	if (seq->next_free_slot >= SCTP_MAX_NUM_COMMANDS)
 		goto fail;
-	}
 
 	seq->cmds[seq->next_free_slot].verb = verb;
 	seq->cmds[seq->next_free_slot++].obj = obj;
 
 	return 1;
- fail:
-	return 0;
 
-} /* sctp_add_cmd() */
+fail:
+	return 0;
+}
 
 /* Rewind an sctp_cmd_seq_t to iterate from the start.  */
-int
-sctp_rewind_sequence(sctp_cmd_seq_t *seq)
+int sctp_rewind_sequence(sctp_cmd_seq_t *seq)
 {
 	seq->next_cmd = 0;
 	return 1;		/* We always succeed. */
-
-} /* sctp_rewind_sequence() */
+}
 
 /* Return the next command structure in a sctp_cmd_seq.
  * Returns NULL at the end of the sequence.
  */
-sctp_cmd_t *
-sctp_next_cmd(sctp_cmd_seq_t *seq)
+sctp_cmd_t *sctp_next_cmd(sctp_cmd_seq_t *seq)
 {
 	sctp_cmd_t *retval = NULL;
 
-	if (seq->next_cmd < seq->next_free_slot) {
+	if (seq->next_cmd < seq->next_free_slot)
 		retval = &seq->cmds[seq->next_cmd++];
-	}
 
 	return retval;
-
-} /* sctp_next_cmd() */
+}
 
 /* Dispose of a command sequence.  */
-void
-sctp_free_cmd_seq(sctp_cmd_seq_t *seq)
+void sctp_free_cmd_seq(sctp_cmd_seq_t *seq)
 {
 	kfree(seq);
-
-} /* sctp_free_cmd_seq() */
+}

@@ -52,7 +52,6 @@
  */
 
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/compiler.h>
 #include <linux/sched.h>
@@ -91,11 +90,11 @@ typedef sctp_disposition_t (sctp_state_fn_t) (const sctp_endpoint_t *,
 					      sctp_cmd_seq_t *);
 typedef void (sctp_timer_event_t) (unsigned long);
 typedef struct {
-        sctp_state_fn_t *fn;
-        char *name;
+	sctp_state_fn_t *fn;
+	char *name;
 } sctp_sm_table_entry_t;
 
-/* A naming convention of "sctp_sf_xxx" applies to all the state functions 
+/* A naming convention of "sctp_sf_xxx" applies to all the state functions
  * currently in use.
  */
 
@@ -113,7 +112,7 @@ sctp_state_fn_t sctp_sf_cookie_echoed_abort;
 sctp_state_fn_t sctp_sf_do_5_1B_init;
 sctp_state_fn_t sctp_sf_do_5_1C_ack;
 sctp_state_fn_t sctp_sf_do_5_1D_ce;
-sctp_state_fn_t sctp_sf_do_5_1E_ca ;
+sctp_state_fn_t sctp_sf_do_5_1E_ca;
 sctp_state_fn_t sctp_sf_do_4_C;
 sctp_state_fn_t sctp_sf_eat_data_6_2;
 sctp_state_fn_t sctp_sf_eat_data_fast_4_4;
@@ -162,10 +161,10 @@ sctp_state_fn_t sctp_sf_do_6_2_sack;
 sctp_state_fn_t sctp_sf_autoclose_timer_expire;
 
 
-/* These are state functions which are either obsolete or not in use yet. 
+/* These are state functions which are either obsolete or not in use yet.
  * If any of these functions needs to be revived, it should be renamed with
  * the "sctp_sf_xxx" prefix, and be moved to the above prototype groups.
- */ 
+ */
 
 /* Prototypes for chunk state functions.  Not in use. */
 sctp_state_fn_t sctp_sf_do_5_2_6_stale;
@@ -189,7 +188,7 @@ sctp_state_fn_t sctp_addip_do_asconf;
 sctp_state_fn_t sctp_addip_do_asconf_ack;
 
 /* Prototypes for utility support functions.  */
-uint8_t sctp_get_chunk_type(sctp_chunk_t *chunk);
+__u8 sctp_get_chunk_type(sctp_chunk_t *chunk);
 sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 					    sctp_state_t state,
 					    sctp_subtype_t event_subtype);
@@ -198,13 +197,11 @@ time_t timeval_sub(struct timeval *, struct timeval *);
 sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *,
 					sctp_chunk_t *,
 					const int priority);
-uint32_t sctp_generate_verification_tag(void);
+__u32 sctp_generate_verification_tag(void);
 sctpParam_t sctp_get_my_addrs_raw(const sctp_association_t *,
 				  const int priority, int *addrs_len);
 
-void sctp_populate_tie_tags(uint8_t *cookie, uint32_t curTag, uint32_t hisTag);
-
-
+void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 
 /* Prototypes for chunk-building functions.  */
 sctp_chunk_t *sctp_make_init(const sctp_association_t *,
@@ -218,36 +215,36 @@ sctp_chunk_t *sctp_make_cookie_echo(const sctp_association_t *,
 sctp_chunk_t *sctp_make_cookie_ack(const sctp_association_t *,
 				   const sctp_chunk_t *);
 sctp_chunk_t *sctp_make_cwr(const sctp_association_t *,
-				 const uint32_t lowest_tsn,
+				 const __u32 lowest_tsn,
 				 const sctp_chunk_t *);
 sctp_chunk_t *sctp_make_datafrag(sctp_association_t *,
 				 const struct sctp_sndrcvinfo *sinfo,
-				 int len, const uint8_t *data,
-				 uint8_t flags, uint16_t ssn);
+				 int len, const __u8 *data,
+				 __u8 flags, __u16 ssn);
 sctp_chunk_t * sctp_make_datafrag_empty(sctp_association_t *,
 					const struct sctp_sndrcvinfo *sinfo,
-					int len, const uint8_t flags, 
-					uint16_t ssn);
+					int len, const __u8 flags,
+					__u16 ssn);
 sctp_chunk_t *sctp_make_data(sctp_association_t *,
 			     const struct sctp_sndrcvinfo *sinfo,
-			     int len, const uint8_t *data);
+			     int len, const __u8 *data);
 sctp_chunk_t *sctp_make_data_empty(sctp_association_t *,
 				   const struct sctp_sndrcvinfo *, int len);
 sctp_chunk_t *sctp_make_ecne(const sctp_association_t *,
-				  const uint32_t);
+				  const __u32);
 sctp_chunk_t *sctp_make_sack(const sctp_association_t *);
 sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc);
 sctp_chunk_t *sctp_make_shutdown_ack(const sctp_association_t *asoc,
 					  const sctp_chunk_t *);
 sctp_chunk_t *sctp_make_shutdown_complete(const sctp_association_t *,
 					  const sctp_chunk_t *);
-void sctp_init_cause(sctp_chunk_t *, uint16_t cause, const void *, size_t);
+void sctp_init_cause(sctp_chunk_t *, __u16 cause, const void *, size_t);
 sctp_chunk_t *sctp_make_abort(const sctp_association_t *,
 			      const sctp_chunk_t *,
 			      const size_t hint);
 sctp_chunk_t *sctp_make_abort_no_data(const sctp_association_t *,
 				      const sctp_chunk_t *,
-				      uint32_t tsn);
+				      __u32 tsn);
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
 				  const sctp_transport_t *,
 				  const void *payload,
@@ -258,7 +255,7 @@ sctp_chunk_t *sctp_make_heartbeat_ack(const sctp_association_t *,
 				      const size_t paylen);
 sctp_chunk_t *sctp_make_op_error(const sctp_association_t *,
 				 const sctp_chunk_t *chunk,
-				 uint16_t cause_code,
+				 __u16 cause_code,
 				 const void *payload,
 				 size_t paylen);
 void sctp_chunk_assign_tsn(sctp_chunk_t *);
@@ -305,20 +302,20 @@ sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *);
 sctp_cookie_param_t *
 sctp_pack_cookie(const sctp_endpoint_t *, const sctp_association_t *,
 		 const sctp_chunk_t *, int *cookie_len,
-		 const uint8_t *, int addrs_len);
-sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *, 
+		 const __u8 *, int addrs_len);
+sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *,
 				       const sctp_association_t *,
 				       sctp_chunk_t *, int priority, int *err);
 int sctp_addip_addr_config(sctp_association_t *, sctp_param_t,
 			   struct sockaddr_storage*, int);
 
 /* 3rd level prototypes */
-uint32_t sctp_generate_tag(const sctp_endpoint_t *);
-uint32_t sctp_generate_tsn(const sctp_endpoint_t *);
+__u32 sctp_generate_tag(const sctp_endpoint_t *);
+__u32 sctp_generate_tsn(const sctp_endpoint_t *);
 
 /* 4th level prototypes */
 void sctp_param2sockaddr(sockaddr_storage_t *addr, const sctpParam_t param,
-			 uint16_t port);
+			 __u16 port);
 int sctp_addr2sockaddr(const sctpParam_t, sockaddr_storage_t *);
 int sockaddr2sctp_addr(const sockaddr_storage_t *, sctpParam_t);
 
@@ -336,17 +333,15 @@ extern sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES];
 
 
 /* Get the size of a DATA chunk payload. */
-static inline uint16_t
-sctp_data_size(sctp_chunk_t *chunk)
+static inline __u16 sctp_data_size(sctp_chunk_t *chunk)
 {
-	uint16_t size;
+	__u16 size;
 
 	size = ntohs(chunk->chunk_hdr->length);
 	size -= sizeof(sctp_data_chunk_t);
 
-	return(size);
-
-} /* sctp_data_size( ) */
+	return size;
+}
 
 /* Compare two TSNs */
 
@@ -366,12 +361,12 @@ sctp_data_size(sctp_chunk_t *chunk)
  * s2, and
  *
  *      (i1 < i2 and i2 - i1 > 2^(SERIAL_BITS - 1)) or
- *      (i1 > i2 and i1 - i2 < 2^(SERIAL_BITS - 1)) 
+ *      (i1 > i2 and i1 - i2 < 2^(SERIAL_BITS - 1))
  */
 
 /*
  * RFC 2960
- *  1.6 Serial Number Arithmetic 
+ *  1.6 Serial Number Arithmetic
  *
  * Comparisons and arithmetic on TSNs in this document SHOULD use Serial
  * Number Arithmetic as defined in [RFC1982] where SERIAL_BITS = 32.
@@ -381,14 +376,12 @@ enum {
 	TSN_SIGN_BIT = (1<<31)
 };
 
-static inline int
-TSN_lt(__u32 s, __u32 t)
+static inline int TSN_lt(__u32 s, __u32 t)
 {
 	return (((s) - (t)) & TSN_SIGN_BIT);
 }
 
-static inline int
-TSN_lte(__u32 s, __u32 t)
+static inline int TSN_lte(__u32 s, __u32 t)
 {
 	return (((s) == (t)) || (((s) - (t)) & TSN_SIGN_BIT));
 }
@@ -397,37 +390,31 @@ TSN_lte(__u32 s, __u32 t)
 
 /*
  * RFC 2960
- *  1.6 Serial Number Arithmetic 
+ *  1.6 Serial Number Arithmetic
  *
- * Comparisons and arithmetic on Stream Sequence Numbers in this document 
- * SHOULD use Serial Number Arithmetic as defined in [RFC1982] where 
+ * Comparisons and arithmetic on Stream Sequence Numbers in this document
+ * SHOULD use Serial Number Arithmetic as defined in [RFC1982] where
  * SERIAL_BITS = 16.
  */
 enum {
 	SSN_SIGN_BIT = (1<<15)
 };
 
-static inline int
-SSN_lt(__u16 s, __u16 t)
+static inline int SSN_lt(__u16 s, __u16 t)
 {
 	return (((s) - (t)) & SSN_SIGN_BIT);
 }
 
-static inline int
-SSN_lte(__u16 s, __u16 t)
+static inline int SSN_lte(__u16 s, __u16 t)
 {
 	return (((s) == (t)) || (((s) - (t)) & SSN_SIGN_BIT));
 }
 
 /* Run sctp_add_cmd() generating a BUG() if there is a failure.  */
-static inline void
-sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj)
+static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj)
 {
-        if (unlikely(!sctp_add_cmd(seq, verb, obj))) {
+	if (unlikely(!sctp_add_cmd(seq, verb, obj)))
 		BUG();
-	}
-
-} /* sctp_add_cmd_sf() */
-
+}
 
 #endif /* __sctp_sm_h__ */

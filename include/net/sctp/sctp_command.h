@@ -73,21 +73,21 @@ typedef enum {
 	SCTP_CMD_SET_BIND_ADDR, /* Set the association bind_addr.  */
 	SCTP_CMD_STRIKE,	/* Mark a strike against a transport.  */
 	SCTP_CMD_TRANSMIT,      /* Transmit the outqueue. */
-        SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers.  */
+	SCTP_CMD_HB_TIMERS_START,    /* Start the heartbeat timers.  */
 	SCTP_CMD_TRANSPORT_RESET,    /* Reset the status of a transport. */
-        SCTP_CMD_TRANSPORT_ON,       /* Mark the transport as active. */
+	SCTP_CMD_TRANSPORT_ON,       /* Mark the transport as active. */
 	SCTP_CMD_REPORT_ERROR,   /* Pass this error back out of the sm. */
 	SCTP_CMD_REPORT_BAD_TAG, /* Verification tags didn't match. */
 	SCTP_CMD_PROCESS_CTSN,   /* Sideeffect from shutdown. */
-	SCTP_CMD_ASSOC_FAILED,	 /* Handle association failure. */ 
+	SCTP_CMD_ASSOC_FAILED,	 /* Handle association failure. */
 	SCTP_CMD_DISCARD_PACKET, /* Discard the whole packet. */
-	SCTP_CMD_GEN_SHUTDOWN,   /* Generate a SHUTDOWN chunk. */    
+	SCTP_CMD_GEN_SHUTDOWN,   /* Generate a SHUTDOWN chunk. */
 	SCTP_CMD_UPDATE_ASSOC,   /* Update association information. */
 	SCTP_CMD_PURGE_OUTQUEUE, /* Purge all data waiting to be sent. */
 	SCTP_CMD_SETUP_T2,       /* Hi-level, setup T2-shutdown parms.  */
 
 	SCTP_CMD_LAST
-} sctp_verb_t; /* enum */
+} sctp_verb_t;
 
 #define SCTP_CMD_MAX		(SCTP_CMD_LAST - 1)
 #define SCTP_CMD_NUM_VERBS	(SCTP_CMD_MAX + 1)
@@ -100,10 +100,10 @@ typedef enum {
 #define SCTP_MAX_NUM_COMMANDS 14
 
 typedef union {
-	int32_t i32;
-	uint32_t u32;
-	uint16_t u16;
-	uint8_t u8;
+	__s32 i32;
+	__u32 u32;
+	__u16 u16;
+	__u8 u8;
 	int error;
 	sctp_state_t state;
 	sctp_event_timeout_t to;
@@ -120,41 +120,38 @@ typedef union {
 } sctp_arg_t;
 
 /* We are simulating ML type constructors here.
- * 
+ *
  * SCTP_ARG_CONSTRUCTOR(NAME, TYPE, ELT) builds a function called
  * SCTP_NAME() which takes an argument of type TYPE and returns an
  * sctp_arg_t.  It does this by inserting the sole argument into the
  * ELT union element of a local sctp_arg_t.
  *
- * E.g., SCTP_ARG_CONSTRUCTOR(I32, int32_t, i32) builds SCTP_I32(arg),
- * which takes an int32_t and returns a sctp_arg_t containing the
- * int32_t.  So, after foo = SCTP_I32(arg), foo.i32 == arg.
+ * E.g., SCTP_ARG_CONSTRUCTOR(I32, __s32, i32) builds SCTP_I32(arg),
+ * which takes an __s32 and returns a sctp_arg_t containing the
+ * __s32.  So, after foo = SCTP_I32(arg), foo.i32 == arg.
  */
-static inline sctp_arg_t
-SCTP_NULL(void)
+static inline sctp_arg_t SCTP_NULL(void)
 {
-	sctp_arg_t retval; retval.ptr = NULL; return(retval);
+	sctp_arg_t retval; retval.ptr = NULL; return retval;
 }
-static inline sctp_arg_t
-SCTP_NOFORCE(void)
+static inline sctp_arg_t SCTP_NOFORCE(void)
 {
-	sctp_arg_t retval; retval.i32 = 0; return(retval);
+	sctp_arg_t retval; retval.i32 = 0; return retval;
 }
-static inline sctp_arg_t
-SCTP_FORCE(void)
+static inline sctp_arg_t SCTP_FORCE(void)
 {
-	sctp_arg_t retval; retval.i32 = 1; return(retval);
+	sctp_arg_t retval; retval.i32 = 1; return retval;
 }
 
 #define SCTP_ARG_CONSTRUCTOR(name, type, elt) \
 static inline sctp_arg_t	\
 SCTP_## name (type arg)		\
-{ sctp_arg_t retval; retval.elt = arg; return(retval); }
+{ sctp_arg_t retval; retval.elt = arg; return retval; }
 
-SCTP_ARG_CONSTRUCTOR(I32,	int32_t, i32)
-SCTP_ARG_CONSTRUCTOR(U32,	int32_t, u32)
-SCTP_ARG_CONSTRUCTOR(U16,	int32_t, u16)
-SCTP_ARG_CONSTRUCTOR(U8,	int32_t, u8)
+SCTP_ARG_CONSTRUCTOR(I32,	__s32, i32)
+SCTP_ARG_CONSTRUCTOR(U32,	__u32, u32)
+SCTP_ARG_CONSTRUCTOR(U16,	__u16, u16)
+SCTP_ARG_CONSTRUCTOR(U8,	__u8, u8)
 SCTP_ARG_CONSTRUCTOR(ERROR,     int, error)
 SCTP_ARG_CONSTRUCTOR(STATE,	sctp_state_t, state)
 SCTP_ARG_CONSTRUCTOR(COUNTER,	sctp_counter_t, counter)
@@ -176,12 +173,12 @@ typedef struct {
 
 typedef struct {
 	sctp_cmd_t cmds[SCTP_MAX_NUM_COMMANDS];
-	uint8_t next_free_slot;
-	uint8_t next_cmd;
+	__u8 next_free_slot;
+	__u8 next_cmd;
 } sctp_cmd_seq_t;
 
 
-/* Create a new sctp_command_sequence. 
+/* Create a new sctp_command_sequence.
  * Return NULL if creating a new sequence fails.
  */
 sctp_cmd_seq_t *sctp_new_cmd_seq(int priority);

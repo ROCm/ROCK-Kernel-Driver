@@ -31,28 +31,26 @@
 #ifndef __SLA1_h__
 #define __SLA1_h__
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+struct SLA_1_Context {
+	unsigned int A;
+	unsigned int B;
+	unsigned int C;
+	unsigned int D;
+	unsigned int E;
+	unsigned int H0;
+	unsigned int H1;
+	unsigned int H2;
+	unsigned int H3;
+	unsigned int H4;
+	unsigned int words[80];
+	unsigned int TEMP;
 
-struct SLA_1_Context{
-  unsigned int A;
-  unsigned int B;
-  unsigned int C;
-  unsigned int D;
-  unsigned int E;
-  unsigned int H0;
-  unsigned int H1;
-  unsigned int H2;
-  unsigned int H3;
-  unsigned int H4;
-  unsigned int words[80];	
-  unsigned int TEMP;
-  /* block I am collecting to process */
-  char SLAblock[64];
-  /* collected so far */
-  int howManyInBlock;
-  unsigned int runningTotal;
+	/* block I am collecting to process */
+	char SLAblock[64];
+
+	/* collected so far */
+	int howManyInBlock;
+	unsigned int runningTotal;
 };
 
 
@@ -61,7 +59,7 @@ struct SLA_1_Context{
 #define F3(B,C,D) ((B & C) | (B & D) | (C & D)) /* 40 <= t <= 59 */
 #define F4(B,C,D) (B ^ C ^ D)                   /*600 <= t <= 79 */
 /* circular shift */
-      
+
 #define CSHIFT(A,B) ((B << A) | (B >> (32-A)))
 
 #define K1 0x5a827999       /* 0  <= t <= 19 */
@@ -78,10 +76,5 @@ struct SLA_1_Context{
 extern void SLA1_Init(struct SLA_1_Context *);
 extern void SLA1_Process(struct SLA_1_Context *, const unsigned char *, int);
 extern void SLA1_Final(struct SLA_1_Context *, unsigned char *);
-
-
-#ifdef	__cplusplus
-}
-#endif
 
 #endif

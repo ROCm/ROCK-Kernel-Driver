@@ -47,21 +47,21 @@ static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_adler32.c,v 1.5 2002/0
 /* This is an entry point for external calls
  * Define this function in the header file. This is
  * direct from rfc1950, ...
-
+ *
  * The following C code computes the Adler-32 checksum of a data buffer.
-   It is written for clarity, not for speed.  The sample code is in the
-   ANSI C programming language. Non C users may find it easier to read
-   with these hints:
-
-      &      Bitwise AND operator.
-      >>     Bitwise right shift operator. When applied to an
-             unsigned quantity, as here, right shift inserts zero bit(s)
-             at the left.
-      <<     Bitwise left shift operator. Left shift inserts zero
-             bit(s) at the right.
-      ++     "n++" increments the variable n.
-      %      modulo operator: a % b is the remainder of a divided by b.
-
+ * It is written for clarity, not for speed.  The sample code is in the
+ * ANSI C programming language. Non C users may find it easier to read
+ * with these hints:
+ *
+ *    &      Bitwise AND operator.
+ *    >>     Bitwise right shift operator. When applied to an
+ *           unsigned quantity, as here, right shift inserts zero bit(s)
+ *           at the left.
+ *    <<     Bitwise left shift operator. Left shift inserts zero
+ *           bit(s) at the right.
+ *    ++     "n++" increments the variable n.
+ *    %      modulo operator: a % b is the remainder of a divided by b.
+ *
  * Well, the above is a bit of a lie, I have optimized this a small
  * tad, but I have commented the original lines below
  */
@@ -81,71 +81,70 @@ static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_adler32.c,v 1.5 2002/0
  * it back and we will incorporate it :-)
  */
 
-
 unsigned long update_adler32(unsigned long adler,
 			     unsigned char *buf, int len)
 {
-        uint32_t s1 = adler & 0xffff;
-        uint32_t s2 = (adler >> 16) & 0xffff;
+	__u32 s1 = adler & 0xffff;
+	__u32 s2 = (adler >> 16) & 0xffff;
         int n;
-        
-        for (n = 0; n < len; n++,buf++) {
-                
-                /* s1 = (s1 + buf[n]) % BASE */
-                /* first we add */
-                s1 = (s1 + *buf);
-                /* Now if we need to, we do a mod by
-                 * subtracting. It seems a bit faster
-                 * since I really will only ever do
-                 * one subtract at the MOST, since buf[n]
-                 * is a max of 255.
-                 */
-                if(s1 >= BASE){
-                        s1 -= BASE;
-                }
-                /* s2 = (s2 + s1) % BASE */
-                /* first we add */
-                s2 = (s2 + s1);
-                /* again, it is more efficent (it seems) to 
-                 * subtract since the most s2 will ever be
-                 * is (BASE-1 + BASE-1) in the worse case.
-                 * This would then be (2 * BASE) - 2, which
-                 * will still only do one subtract. On Intel
-                 * this is much better to do this way and
-                 * avoid the divide. Have not -pg'd on 
-                 * sparc.
-                 */
-                if(s2 >= BASE){
-                        /*      s2 %= BASE;*/
-                        s2 -= BASE;
-                }
-        }
-        /* Return the adler32 of the bytes buf[0..len-1] */
-        return (s2 << 16) + s1;
+
+	for (n = 0; n < len; n++,buf++) {
+		/* s1 = (s1 + buf[n]) % BASE */
+		/* first we add */
+		s1 = (s1 + *buf);
+
+		/* Now if we need to, we do a mod by
+		 * subtracting. It seems a bit faster
+		 * since I really will only ever do
+		 * one subtract at the MOST, since buf[n]
+		 * is a max of 255.
+		 */
+		if(s1 >= BASE)
+			s1 -= BASE;
+
+		/* s2 = (s2 + s1) % BASE */
+		/* first we add */
+		s2 = (s2 + s1);
+
+		/* again, it is more efficent (it seems) to
+		 * subtract since the most s2 will ever be
+		 * is (BASE-1 + BASE-1) in the worse case.
+		 * This would then be (2 * BASE) - 2, which
+		 * will still only do one subtract. On Intel
+		 * this is much better to do this way and
+		 * avoid the divide. Have not -pg'd on 
+		 * sparc.
+		 */
+		if (s2 >= BASE) {
+			/*      s2 %= BASE;*/
+			s2 -= BASE;
+		}
+	}
+
+	/* Return the adler32 of the bytes buf[0..len-1] */
+	return (s2 << 16) + s1;
 }
 
-uint32_t
-count_crc(uint8_t *ptr,
-	  uint16_t  count)
+__u32 count_crc(__u8 *ptr, __u16 count)
 {
-        /*
-         * Update a running Adler-32 checksum with the bytes
-         * buf[0..len-1] and return the updated checksum. The Adler-32
-         * checksum should be initialized to 1.
-         */
-        uint32_t adler = 1L;
-	uint32_t zero = 0L;
+	/*
+	 * Update a running Adler-32 checksum with the bytes
+	 * buf[0..len-1] and return the updated checksum. The Adler-32
+	 * checksum should be initialized to 1.
+	 */
+	__u32 adler = 1L;
+	__u32 zero = 0L;
 
 	/* Calculate the CRC up to the checksum field. */
-        adler = update_adler32(adler, ptr, 
-			       sizeof(struct sctphdr) - sizeof(uint32_t));
+	adler = update_adler32(adler, ptr, 
+			       sizeof(struct sctphdr) - sizeof(__u32));
 	/* Skip over the checksum field. */
-	adler = update_adler32(adler, &zero, sizeof(uint32_t));
+	adler = update_adler32(adler, &zero, sizeof(__u32));
 	ptr += sizeof(struct sctphdr);
 	count -= sizeof(struct sctphdr);
+
 	/* Calculate the rest of the Adler-32. */
 	adler = update_adler32(adler, ptr, count);
-	
-        return(adler);
-}
 
+        return adler;
+}

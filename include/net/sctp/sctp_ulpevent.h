@@ -45,8 +45,8 @@
 #define __sctp_ulpevent_h__
 
 /* A structure to carry information to the ULP (e.g. Sockets API) */
-/* Warning: This sits inside an skb.cb[] area.  Be very careful of 
- * growing this structure as it is at the maximum limit now. 
+/* Warning: This sits inside an skb.cb[] area.  Be very careful of
+ * growing this structure as it is at the maximum limit now.
  */
 typedef struct sctp_ulpevent {
 	int malloced;
@@ -58,83 +58,73 @@ typedef struct sctp_ulpevent {
 } sctp_ulpevent_t;
 
 
-sctp_ulpevent_t *
-sctp_ulpevent_new(int size, int msg_flags, int priority);
+sctp_ulpevent_t *sctp_ulpevent_new(int size, int msg_flags, int priority);
 
-sctp_ulpevent_t *
-sctp_ulpevent_init(sctp_ulpevent_t *event, struct sk_buff *skb, int msg_flags);
+sctp_ulpevent_t *sctp_ulpevent_init(sctp_ulpevent_t *event, struct sk_buff *skb, int msg_flags);
 
-void
-sctp_ulpevent_free(sctp_ulpevent_t *event);
+void sctp_ulpevent_free(sctp_ulpevent_t *event);
 
+int sctp_ulpevent_is_notification(const sctp_ulpevent_t *event);
 
-int 
-sctp_ulpevent_is_notification(const sctp_ulpevent_t *event);
-
-sctp_ulpevent_t *
-sctp_ulpevent_make_assoc_change(const struct SCTP_association *asoc,
-				uint16_t flags,
-				uint16_t state,
-				uint16_t error,			      
-				uint16_t outbound,
-				uint16_t inbound,
+sctp_ulpevent_t *sctp_ulpevent_make_assoc_change(
+				const struct SCTP_association *asoc,
+				__u16 flags,
+				__u16 state,
+				__u16 error,
+				__u16 outbound,
+				__u16 inbound,
 				int priority);
 
-sctp_ulpevent_t *
-sctp_ulpevent_make_peer_addr_change(const struct SCTP_association *asoc,
-				    const struct sockaddr_storage *aaddr,
-				    int flags,
-				    int state,
-				    int error,
-				    int priority);
+sctp_ulpevent_t *sctp_ulpevent_make_peer_addr_change(
+				const struct SCTP_association *asoc,
+				const struct sockaddr_storage *aaddr,
+				int flags,
+				int state,
+				int error,
+				int priority);
 
-sctp_ulpevent_t *
-sctp_ulpevent_make_remote_error(const struct SCTP_association *asoc,
+sctp_ulpevent_t *sctp_ulpevent_make_remote_error(
+				const struct SCTP_association *asoc,
 				struct SCTP_chunk *chunk,
-				uint16_t flags,
+				__u16 flags,
 				int priority);
-sctp_ulpevent_t *
-sctp_ulpevent_make_send_failed(const struct SCTP_association *asoc,
-			       struct SCTP_chunk *chunk,
-			       uint16_t flags,
-			       uint32_t error,
-			       int priority);
+sctp_ulpevent_t *sctp_ulpevent_make_send_failed(
+				const struct SCTP_association *asoc,
+				struct SCTP_chunk *chunk,
+				__u16 flags,
+				__u32 error,
+				int priority);
 
-sctp_ulpevent_t *
-sctp_ulpevent_make_shutdown_event(const struct SCTP_association *asoc,
-				  uint16_t flags,
-				  int priority);
+sctp_ulpevent_t *sctp_ulpevent_make_shutdown_event(
+				const struct SCTP_association *asoc,
+				__u16 flags,
+				int priority);
 
-sctp_ulpevent_t *
-sctp_ulpevent_make_rcvmsg(struct SCTP_association *asoc,
-			  struct SCTP_chunk *chunk,
-			  int priority);
+sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(struct SCTP_association *asoc,
+					   struct SCTP_chunk *chunk,
+					   int priority);
 
-void 
-sctp_ulpevent_read_sndrcvinfo(const sctp_ulpevent_t *event,
-			      struct msghdr *msghdr);
+void sctp_ulpevent_read_sndrcvinfo(const sctp_ulpevent_t *event,
+				   struct msghdr *msghdr);
 
-uint16_t 
-sctp_ulpevent_get_notification_type(const sctp_ulpevent_t *event);
+__u16 sctp_ulpevent_get_notification_type(const sctp_ulpevent_t *event);
 
 
 
 /* Given an event subscription, is this event enabled? */
-static inline int 
-sctp_ulpevent_is_enabled(const sctp_ulpevent_t *event, 
-			 const struct sctp_event_subscribe *mask)
+static inline int sctp_ulpevent_is_enabled(const sctp_ulpevent_t *event,
+					   const struct sctp_event_subscribe *mask)
 {
-	const char *amask = (const char *)mask;
-	uint16_t sn_type;
-
+	const char *amask = (const char *) mask;
+	__u16 sn_type;
 	int enabled = 1;
+
 	if (sctp_ulpevent_is_notification(event)) {
 		sn_type = sctp_ulpevent_get_notification_type(event);
 		enabled = amask[sn_type - SCTP_SN_TYPE_BASE];
 	}
-	return(enabled);
-
-} /* sctp_ulpevent_is_enabled() */
+	return enabled;
+}
 
 
 #endif /* __sctp_ulpevent_h__ */

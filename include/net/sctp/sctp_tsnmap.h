@@ -52,77 +52,76 @@
  */
 typedef struct sctp_tsnmap {
 
-       
+
 	/* This array counts the number of chunks with each TSN.
 	 * It points at one of the two buffers with which we will
-	 * ping-pong between.  
+	 * ping-pong between.
 	 */
-	uint8_t *tsn_map;
+	__u8 *tsn_map;
 
 	/* This marks the tsn which overflows the tsn_map, when the
 	 * cumulative ack point reaches this point we know we can switch
 	 * maps (tsn_map and overflow_map swap).
 	 */
-	uint32_t overflow_tsn;
+	__u32 overflow_tsn;
 
 	/* This is the overflow array for tsn_map.
 	 * It points at one of the other ping-pong buffers.
 	 */
-	uint8_t *overflow_map;
+	__u8 *overflow_map;
 
 	/* This is the TSN at tsn_map[0].  */
-	uint32_t base_tsn;
+	__u32 base_tsn;
 
-        /* Last Rcvd   : This is the last TSN received in
+	/* Last Rcvd   : This is the last TSN received in
 	 * TSN	       : sequence. This value is set initially by
 	 *             : taking the peer's Initial TSN, received in
 	 *             : the INIT or INIT ACK chunk, and subtracting
-	 *             : one from it. 
+	 *             : one from it.
 	 *
 	 * Throughout most of the specification this is called the
 	 * "Cumulative TSN ACK Point".  In this case, we
 	 * ignore the advice in 12.2 in favour of the term
 	 * used in the bulk of the text.
-	 */ 
-	uint32_t cumulative_tsn_ack_point;
+	 */
+	__u32 cumulative_tsn_ack_point;
 
 	/* This is the minimum number of TSNs we can track.  This corresponds
-	 * to the size of tsn_map.   Note: the overflow_map allows us to 
-	 * potentially track more than this quantity.  
+	 * to the size of tsn_map.   Note: the overflow_map allows us to
+	 * potentially track more than this quantity.
 	 */
-	uint16_t len;
+	__u16 len;
 
 	/* This is the highest TSN we've marked.  */
-	uint32_t max_tsn_seen;
+	__u32 max_tsn_seen;
 
 	/* No. of data chunks pending receipt. used by SCTP_STATUS sockopt */
-	uint16_t pending_data;
+	__u16 pending_data;
 
 	int malloced;
 
-	uint8_t raw_map[0];
+	__u8 raw_map[0];
 } sctp_tsnmap_t;
 
 typedef struct sctp_tsnmap_iter {
-	uint32_t start;
+	__u32 start;
 } sctp_tsnmap_iter_t;
 
 
 /* Create a new tsnmap.  */
-sctp_tsnmap_t *sctp_tsnmap_new(uint16_t len, uint32_t initial_tsn,
+sctp_tsnmap_t *sctp_tsnmap_new(__u16 len, __u32 initial_tsn,
 			       int priority);
 
 /* Dispose of a tsnmap.  */
 void sctp_tsnmap_free(sctp_tsnmap_t *map);
 
-/* This macro assists in creation of external storage for variable length 
+/* This macro assists in creation of external storage for variable length
  * internal buffers.  We double allocate so the overflow map works.
  */
-#define sctp_tsnmap_storage_size(count) (sizeof(uint8_t) * (count) * 2)
+#define sctp_tsnmap_storage_size(count) (sizeof(__u8) * (count) * 2)
 
 /* Initialize a block of memory as a tsnmap.  */
-sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, uint16_t len,
-				uint32_t initial_tsn);
+sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, __u16 len, __u32 initial_tsn);
 
 
 
@@ -132,16 +131,16 @@ sctp_tsnmap_t *sctp_tsnmap_init(sctp_tsnmap_t *map, uint16_t len,
  *  >0 if the TSN has been seen (duplicate)
  *  <0 if the TSN is invalid (too large to track)
  */
-int sctp_tsnmap_check(const sctp_tsnmap_t *map, uint32_t tsn);
+int sctp_tsnmap_check(const sctp_tsnmap_t *map, __u32 tsn);
 
 /* Mark this TSN as seen.  */
-void sctp_tsnmap_mark(sctp_tsnmap_t *map, uint32_t tsn);
+void sctp_tsnmap_mark(sctp_tsnmap_t *map, __u32 tsn);
 
 /* Retrieve the Cumulative TSN ACK Point.  */
-uint32_t sctp_tsnmap_get_ctsn(const sctp_tsnmap_t *map);
+__u32 sctp_tsnmap_get_ctsn(const sctp_tsnmap_t *map);
 
 /* Retrieve the highest TSN we've seen.  */
-uint32_t sctp_tsnmap_get_max_tsn_seen(const sctp_tsnmap_t *map);
+__u32 sctp_tsnmap_get_max_tsn_seen(const sctp_tsnmap_t *map);
 
 /* Is there a gap in the TSN map? */
 int sctp_tsnmap_has_gap(const sctp_tsnmap_t *map);
@@ -152,9 +151,8 @@ void sctp_tsnmap_iter_init(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter);
 /* Get the next gap ack blocks.  We return 0 if there are no more
  * gap ack blocks.
  */
-int 
-sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
-			 uint16_t *start, uint16_t *end);
+int sctp_tsnmap_next_gap_ack(const sctp_tsnmap_t *map, sctp_tsnmap_iter_t *iter,
+			     __u16 *start, __u16 *end);
 
 
 #endif /* __sctp_tsnmap_h__ */

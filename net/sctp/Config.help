@@ -17,6 +17,11 @@ CONFIG_IP_SCTP
    -- network-level fault tolerance through supporting of multi-
       homing at either or both ends of an association."
 
+  This protocol support is also available as a module ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want). The module will be called sctp.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
   If in doubt, say N.
 
 CONFIG_SCTP_ADLER32

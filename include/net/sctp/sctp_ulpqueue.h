@@ -50,47 +50,40 @@ typedef struct sctp_ulpqueue {
 	sctp_association_t *asoc;
 	struct sk_buff_head reasm;
 	struct sk_buff_head lobby;
-	uint16_t ssn[0];
+	__u16 ssn[0];
 } sctp_ulpqueue_t;
 
-/* This macro assists in creation of external storage for variable length 
- * internal buffers. 
+/* This macro assists in creation of external storage for variable length
+ * internal buffers.
  */
-#define sctp_ulpqueue_storage_size(inbound) (sizeof(uint16_t) * (inbound))
+#define sctp_ulpqueue_storage_size(inbound) (sizeof(__u16) * (inbound))
 
-sctp_ulpqueue_t *
-sctp_ulpqueue_new(sctp_association_t *asoc,
-		  uint16_t inbound,
-		  int priority);
+sctp_ulpqueue_t *sctp_ulpqueue_new(sctp_association_t *asoc,
+				   __u16 inbound,
+				   int priority);
 
-sctp_ulpqueue_t *
-sctp_ulpqueue_init(sctp_ulpqueue_t *ulpq,
-		   sctp_association_t *asoc,
-		   uint16_t inbound);
+sctp_ulpqueue_t *sctp_ulpqueue_init(sctp_ulpqueue_t *ulpq,
+				    sctp_association_t *asoc,
+				    __u16 inbound);
 
-void
-sctp_ulpqueue_free(sctp_ulpqueue_t *);
+void sctp_ulpqueue_free(sctp_ulpqueue_t *);
 
 
 /* Add a new DATA chunk for processing. */
-int
-sctp_ulpqueue_tail_data(sctp_ulpqueue_t *, 
-			sctp_chunk_t *chunk,
-			int priority);
+int sctp_ulpqueue_tail_data(sctp_ulpqueue_t *,
+			    sctp_chunk_t *chunk,
+			    int priority);
 
 
 /* Add a new event for propogation to the ULP. */
-int 
-sctp_ulpqueue_tail_event(sctp_ulpqueue_t *, 
-			 sctp_ulpevent_t *event);
+int sctp_ulpqueue_tail_event(sctp_ulpqueue_t *, 
+			     sctp_ulpevent_t *event);
 
 
 /* Is the ulpqueue empty. */
-int
-sctp_ulpqueue_is_empty(sctp_ulpqueue_t *);
+int sctp_ulpqueue_is_empty(sctp_ulpqueue_t *);
 
-int
-sctp_ulpqueue_is_data_empty(sctp_ulpqueue_t *);
+int sctp_ulpqueue_is_data_empty(sctp_ulpqueue_t *);
 
 #endif /* __sctp_ulpqueue_h__ */
 

@@ -62,8 +62,8 @@
 /* What a hack!  Jiminy Cricket!  */
 enum { SCTP_MAX_STREAM = 10 };
 
-/* Define the amount of space to reserve for SCTP, IP, LL. 
- * There is a little bit of waste that we are always allocating 
+/* Define the amount of space to reserve for SCTP, IP, LL.
+ * There is a little bit of waste that we are always allocating
  * for ipv6 headers, but this seems worth the simplicity.
  */
 
@@ -71,8 +71,8 @@ enum { SCTP_MAX_STREAM = 10 };
                           + sizeof(struct ipv6hdr)\
                           + MAX_HEADER))
 
-/* Define the amount of space to reserve for SCTP, IP, LL. 
- * There is a little bit of waste that we are always allocating 
+/* Define the amount of space to reserve for SCTP, IP, LL.
+ * There is a little bit of waste that we are always allocating
  * for ipv6 headers, but this seems worth the simplicity.
  */
 
@@ -93,10 +93,10 @@ enum { SCTP_MAX_STREAM = 10 };
 /* These are the different flavours of event.  */
 typedef enum {
 
-        SCTP_EVENT_T_CHUNK = 1,
-        SCTP_EVENT_T_TIMEOUT,
-        SCTP_EVENT_T_OTHER,
-        SCTP_EVENT_T_PRIMITIVE
+	SCTP_EVENT_T_CHUNK = 1,
+	SCTP_EVENT_T_TIMEOUT,
+	SCTP_EVENT_T_OTHER,
+	SCTP_EVENT_T_PRIMITIVE
 
 } sctp_event_t;
 
@@ -127,8 +127,8 @@ typedef enum {
 
 typedef enum {
 
-        SCTP_EVENT_NO_PENDING_TSN = 0,
-        SCTP_EVENT_ICMP_UNREACHFRAG,
+	SCTP_EVENT_NO_PENDING_TSN = 0,
+	SCTP_EVENT_ICMP_UNREACHFRAG,
 
 } sctp_event_other_t;
 
@@ -138,22 +138,22 @@ typedef enum {
 /* These are primitive requests from the ULP.  */
 typedef enum {
 
-        SCTP_PRIMITIVE_INITIALIZE = 0,
-        SCTP_PRIMITIVE_ASSOCIATE,
-        SCTP_PRIMITIVE_SHUTDOWN,
-        SCTP_PRIMITIVE_ABORT,
-        SCTP_PRIMITIVE_SEND,
-        SCTP_PRIMITIVE_SETPRIMARY,
-        SCTP_PRIMITIVE_RECEIVE,
-        SCTP_PRIMITIVE_STATUS,
-        SCTP_PRIMITIVE_CHANGEHEARTBEAT,
-        SCTP_PRIMITIVE_REQUESTHEARTBEAT,
-        SCTP_PRIMITIVE_GETSRTTREPORT,
-        SCTP_PRIMITIVE_SETFAILURETHRESHOLD,
-        SCTP_PRIMITIVE_SETPROTOPARAMETERS,
-        SCTP_PRIMITIVE_RECEIVE_UNSENT,
-        SCTP_PRIMITIVE_RECEIVE_UNACKED,
-        SCTP_PRIMITIVE_DESTROY,
+	SCTP_PRIMITIVE_INITIALIZE = 0,
+	SCTP_PRIMITIVE_ASSOCIATE,
+	SCTP_PRIMITIVE_SHUTDOWN,
+	SCTP_PRIMITIVE_ABORT,
+	SCTP_PRIMITIVE_SEND,
+	SCTP_PRIMITIVE_SETPRIMARY,
+	SCTP_PRIMITIVE_RECEIVE,
+	SCTP_PRIMITIVE_STATUS,
+	SCTP_PRIMITIVE_CHANGEHEARTBEAT,
+	SCTP_PRIMITIVE_REQUESTHEARTBEAT,
+	SCTP_PRIMITIVE_GETSRTTREPORT,
+	SCTP_PRIMITIVE_SETFAILURETHRESHOLD,
+	SCTP_PRIMITIVE_SETPROTOPARAMETERS,
+	SCTP_PRIMITIVE_RECEIVE_UNSENT,
+	SCTP_PRIMITIVE_RECEIVE_UNACKED,
+	SCTP_PRIMITIVE_DESTROY,
 
 } sctp_event_primitive_t;
 
@@ -167,7 +167,7 @@ typedef enum {
  */
 
 typedef union {
-	
+
 	sctp_cid_t chunk;
 	sctp_event_timeout_t timeout;
 	sctp_event_other_t other;
@@ -178,7 +178,7 @@ typedef union {
 #define SCTP_SUBTYPE_CONSTRUCTOR(_name, _type, _elt) \
 static inline sctp_subtype_t	\
 SCTP_ST_## _name (_type _arg)		\
-{ sctp_subtype_t _retval; _retval._elt = _arg; return(_retval); }
+{ sctp_subtype_t _retval; _retval._elt = _arg; return _retval; }
 
 SCTP_SUBTYPE_CONSTRUCTOR(CHUNK,		sctp_cid_t,		chunk)
 SCTP_SUBTYPE_CONSTRUCTOR(TIMEOUT,	sctp_event_timeout_t,	timeout)
@@ -204,18 +204,18 @@ extern const char *sctp_param_tbl[];
 /* Internal error codes */
 typedef enum {
 
-	SCTP_IERROR_NO_ERROR	        = 0, 
-        SCTP_IERROR_BASE		= 1000,
-        SCTP_IERROR_NO_COOKIE,
-        SCTP_IERROR_BAD_SIG,
-        SCTP_IERROR_STALE_COOKIE,
-        SCTP_IERROR_NOMEM,
-        SCTP_IERROR_MALFORMED,
-        SCTP_IERROR_BAD_TAG,
-        SCTP_IERROR_BIG_GAP,
-        SCTP_IERROR_DUP_TSN,
+	SCTP_IERROR_NO_ERROR	        = 0,
+	SCTP_IERROR_BASE		= 1000,
+	SCTP_IERROR_NO_COOKIE,
+	SCTP_IERROR_BAD_SIG,
+	SCTP_IERROR_STALE_COOKIE,
+	SCTP_IERROR_NOMEM,
+	SCTP_IERROR_MALFORMED,
+	SCTP_IERROR_BAD_TAG,
+	SCTP_IERROR_BIG_GAP,
+	SCTP_IERROR_DUP_TSN,
 
-} sctp_ierror_t; /* enum */
+} sctp_ierror_t;
 
 
 
@@ -232,7 +232,7 @@ typedef enum {
 	SCTP_STATE_SHUTDOWN_RECEIVED	= 7,
 	SCTP_STATE_SHUTDOWN_ACK_SENT	= 8,
 
-} sctp_state_t; /* enum */
+} sctp_state_t;
 
 #define SCTP_STATE_MAX			SCTP_STATE_SHUTDOWN_ACK_SENT
 #define SCTP_STATE_NUM_STATES		(SCTP_STATE_MAX + 1)
@@ -262,7 +262,7 @@ const char *sctp_oname(const sctp_subtype_t);	/* other events */
 const char *sctp_tname(const sctp_subtype_t);	/* timeouts */
 const char *sctp_pname(const sctp_subtype_t);	/* primitives */
 
-/* This is a table of printable names of sctp_state_t's.  */		
+/* This is a table of printable names of sctp_state_t's.  */
 extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
 
 /* SCTP reachability state for each address */
@@ -281,7 +281,7 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
  * NEVER make this more than 32767 (2^15-1).  The Gap Ack Blocks in a
  * SACK (see  section 3.3.4) are only 16 bits, so 2*SCTP_TSN_MAP_SIZE
  * must be less than 65535 (2^16 - 1), or we will have overflow
- * problems creating SACK's. 
+ * problems creating SACK's.
  */
 #define SCTP_TSN_MAP_SIZE 2048
 #define SCTP_TSN_MAX_GAP  65535
@@ -289,20 +289,19 @@ extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
 /* We will not record more than this many duplicate TSNs between two
  * SACKs.  The minimum PMTU is 576.  Remove all the headers and there
  * is enough room for 131 duplicate reports.  Round down to the
- * nearest power of 2.  
+ * nearest power of 2.
  */
 #define SCTP_MAX_DUP_TSNS 128
 
 typedef enum {
 	SCTP_COUNTER_INIT_ERROR,
-} sctp_counter_t; 
+} sctp_counter_t;
 
 /* How many counters does an association need? */
 #define SCTP_NUMBER_COUNTERS	5
 
 
-/* Here we define the default timers. 
- */
+/* Here we define the default timers.  */
 
 /* cookie timer def = ? seconds */
 #define SCTP_DEFAULT_TIMEOUT_T1_COOKIE	(3 * HZ)
@@ -355,7 +354,7 @@ typedef enum {
 					 */
 #define SCTP_DEFAULT_MINSEGMENT 512	/* MTU size ... if no mtu disc */
 #define SCTP_HOW_MANY_SECRETS 2		/* How many secrets I keep */
-#define SCTP_HOW_LONG_COOKIE_LIVE 3600	/* How many seconds the current 
+#define SCTP_HOW_LONG_COOKIE_LIVE 3600	/* How many seconds the current
 					 * secret will live?
 					 */
 #define SCTP_SECRET_SIZE 32		/* Number of octets in a 256 bits. */
@@ -370,10 +369,10 @@ typedef enum {
  * routines which form the lower interface to SCTP_outqueue.
  */
 typedef enum {
-        SCTP_XMIT_OK,
-        SCTP_XMIT_PMTU_FULL,
-        SCTP_XMIT_RWND_FULL,
-        SCTP_XMIT_MUST_FRAG,
+	SCTP_XMIT_OK,
+	SCTP_XMIT_PMTU_FULL,
+	SCTP_XMIT_RWND_FULL,
+	SCTP_XMIT_MUST_FRAG,
 } sctp_xmit_t;
 
 /* These are the commands for manipulating transports.  */
@@ -383,9 +382,9 @@ typedef enum {
 } sctp_transport_cmd_t;
 
 /* These are the address scopes defined mainly for IPv4 addresses
- * based on draft of SCTP IPv4 scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>. 
- * These scopes are hopefully generic enough to be used on scoping both 
- * IPv4 and IPv6 addresses in SCTP.  
+ * based on draft of SCTP IPv4 scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>.
+ * These scopes are hopefully generic enough to be used on scoping both
+ * IPv4 and IPv6 addresses in SCTP.
  * At this point, the IPv6 scopes will be mapped to these internal scopes
  * as much as possible.
  */
@@ -397,10 +396,10 @@ typedef enum {
 	SCTP_SCOPE_UNUSABLE,		/* IPv4 unusable addresses */
 } sctp_scope_t;
 
-/* Based on IPv4 scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>, 
- * SCTP IPv4 unusable addresses: 0.0.0.0/8, 224.0.0.0/4, 198.18.0.0/24, 
+/* Based on IPv4 scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>,
+ * SCTP IPv4 unusable addresses: 0.0.0.0/8, 224.0.0.0/4, 198.18.0.0/24,
  * 192.88.99.0/24.
- * Also, RFC 8.4, non-unicast addresses are not considered valid SCTP 
+ * Also, RFC 8.4, non-unicast addresses are not considered valid SCTP
  * addresses.
  */
 #define IS_IPV4_UNUSABLE_ADDRESS(a) \
@@ -436,7 +435,7 @@ typedef enum {
 
 /* Flags used for the bind address copy functions.  */
 #define SCTP_ADDR6_ALLOWED	0x00000001	/* IPv6 address is allowed by
-						  local sock family */
+						   local sock family */
 #define SCTP_ADDR4_PEERSUPP	0x00000002	/* IPv4 address is supported by
 						   peer */
 #define SCTP_ADDR6_PEERSUPP	0x00000004	/* IPv6 address is supported by

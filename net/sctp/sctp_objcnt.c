@@ -43,11 +43,11 @@ static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_objcnt.c,v 1.5 2002/07
 
 #include <net/sctp/sctp.h>
 
-/* 
- * Global counters to count raw object allocation counts. 
+/*
+ * Global counters to count raw object allocation counts.
  * To add new counters, choose a unique suffix for the variable
  * name as the helper macros key off this suffix to make
- * life easier for the programmer.  
+ * life easier for the programmer.
  */
 
 SCTP_DBG_OBJCNT(sock);
@@ -59,7 +59,7 @@ SCTP_DBG_OBJCNT(chunk);
 SCTP_DBG_OBJCNT(addr);
 
 /* An array to make it easy to pretty print the debug information
- * to the proc fs.  
+ * to the proc fs.
  */
 sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(sock),
@@ -71,15 +71,14 @@ sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(addr),
 };
 
-/* Callback from procfs to read out objcount information. 
+/* Callback from procfs to read out objcount information.
  * Walk through the entries in the sctp_dbg_objcnt array, dumping
  * the raw object counts for each monitored type.
- * 
+ *
  * This code was modified from similar code in route.c
  */
-static int 
-sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset, 
-			 int length, int *eof, void *data)
+static int sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset,
+				int length, int *eof, void *data)
 {
 	int len = 0;
 	off_t pos = 0;
@@ -90,10 +89,10 @@ sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset,
 	/* How many entries? */
 	entries = sizeof(sctp_dbg_objcnt)/sizeof(sctp_dbg_objcnt[0]);
 
-	/* Walk the entries and print out the debug information 
+	/* Walk the entries and print out the debug information
 	 * for proc fs.
 	 */
-	for(i = 0; i < entries; i++) {
+	for (i = 0; i < entries; i++) {
 		pos += 128;
 
 		/* Skip ahead. */
@@ -102,41 +101,36 @@ sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset,
 			continue;
 		}
 		/* Print out each entry. */
-                sprintf(temp, "%s: %d", 
+		sprintf(temp, "%s: %d",
 			sctp_dbg_objcnt[i].label,
 			atomic_read(sctp_dbg_objcnt[i].counter));
 
 		sprintf(buffer + len, "%-127s\n", temp);
 		len += 128;
-		if (pos >= offset+length) {
+		if (pos >= offset+length)
 			goto done;
-		}
-
 	}
 
 done:
-  	*start = buffer + len - (pos - offset);
-  	len = pos - offset;
-  	if (len > length)
-  		len = length;
+	*start = buffer + len - (pos - offset);
+	len = pos - offset;
+	if (len > length)
+		len = length;
 
-  	return len;       
+  	return len;
+}
 
-} /* sctp_dbg_objcnt_read() */
-
-/* Initialize the objcount in the proc filesystem. */
+/* Initialize the objcount in the proc filesystem.  */
 void sctp_dbg_objcnt_init(void)
 {
 	create_proc_read_entry("sctp_dbg_objcnt", 0, proc_net_sctp,
 			       sctp_dbg_objcnt_read, NULL);
+}
 
-} /* sctp_dbg_objcnt_init() */
-
-/* Cleanup the objcount entry in the proc filesystem. */
+/* Cleanup the objcount entry in the proc filesystem.  */
 void sctp_dbg_objcnt_exit(void)
 {
 	remove_proc_entry("sctp_dbg_objcount", proc_net_sctp);
-
-} /* sctp_dbg_objcnt_exit() */
+}
 
 

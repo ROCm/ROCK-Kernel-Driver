@@ -57,7 +57,6 @@ static char *cvs_id __attribute__ ((unused)) = "$Id: sctp_debug.c,v 1.10 2002/07
 int sctp_debug_flag = 1;	/* Initially enable DEBUG */
 #endif	/* SCTP_DEBUG */
 
-
 /* These are printable forms of Chunk ID's from section 3.1.  */
 static const char *sctp_cid_tbl[SCTP_NUM_BASE_CHUNK_TYPES] = {
 	"DATA",
@@ -75,33 +74,31 @@ static const char *sctp_cid_tbl[SCTP_NUM_BASE_CHUNK_TYPES] = {
 	"ECN_ECNE",
 	"ECN_CWR",
 	"SHUTDOWN_COMPLETE",
-}; /* char *sctp_cid_tbl[] */
+};
 
 /* Lookup "chunk type" debug name. */
-const char *
-sctp_cname(const sctp_subtype_t cid)
+const char *sctp_cname(const sctp_subtype_t cid)
 {
-	if ( cid.chunk < 0 ) {
+	if (cid.chunk < 0)
 		return "illegal chunk id";
-	}
-
-	if ( cid.chunk <= SCTP_CID_BASE_MAX ) {
+	if (cid.chunk <= SCTP_CID_BASE_MAX)
 		return sctp_cid_tbl[cid.chunk];
-	}
 	
-	switch ( cid.chunk ) {
-	case SCTP_CID_ASCONF : return "ASCONF";
-	case SCTP_CID_ASCONF_ACK : return "ASCONF_ACK";
+	switch (cid.chunk) {
+	case SCTP_CID_ASCONF:
+		return "ASCONF";
+
+	case SCTP_CID_ASCONF_ACK:
+		return "ASCONF_ACK";
+
 	default:
 		return "unknown chunk";
-	}
-
+	};
 	return "unknown chunk";
+}
 
-} /* sctp_cname() */
-	
 /* These are printable form of variable-length parameters. */
-const char *sctp_param_tbl[SCTP_PARAM_ECN_CAPABLE+1] = {
+const char *sctp_param_tbl[SCTP_PARAM_ECN_CAPABLE + 1] = {
 	"",
 	"PARAM_HEATBEAT_INFO",
 	"",
@@ -115,8 +112,7 @@ const char *sctp_param_tbl[SCTP_PARAM_ECN_CAPABLE+1] = {
 	"",
 	"PARAM_HOST_NAME_ADDRESS",
 	"PARAM_SUPPORTED_ADDRESS_TYPES",
-}; /* char *sctp_param_tbl[] */
-
+};
 
 /* These are printable forms of the states.  */
 const char *sctp_state_tbl[SCTP_STATE_NUM_STATES] = {
@@ -129,7 +125,7 @@ const char *sctp_state_tbl[SCTP_STATE_NUM_STATES] = {
 	"STATE_SHUTDOWN_SENT",
 	"STATE_SHUTDOWN_RECEIVED",
 	"STATE_SHUTDOWN_ACK_SENT",
-}; /* char *sctp_state_tbl[] */
+};
 
 /* Events that could change the state of an association.  */
 const char *sctp_evttype_tbl[] = {
@@ -174,20 +170,14 @@ static const char *sctp_primitive_tbl[SCTP_NUM_PRIMITIVE_TYPES] = {
 };
 
 /* Lookup primitive debug name. */
-const char *
-sctp_pname(const sctp_subtype_t id)
+const char *sctp_pname(const sctp_subtype_t id)
 {
-	if ( id.primitive < 0 ) {
+	if (id.primitive < 0)
 		return "illegal primitive";
-	}
-
-	if ( id.primitive <= SCTP_EVENT_PRIMITIVE_MAX ) {
+	if (id.primitive <= SCTP_EVENT_PRIMITIVE_MAX)
 		return sctp_primitive_tbl[id.primitive];
-	}
-
 	return "unknown_primitive";
-
-} /* sctp_pname() */
+}
 
 static const char *sctp_other_tbl[] = {
 	"NO_PENDING_TSN",
@@ -195,19 +185,14 @@ static const char *sctp_other_tbl[] = {
 };
 
 /* Lookup "other" debug name. */
-const char *
-sctp_oname(const sctp_subtype_t id)
+const char *sctp_oname(const sctp_subtype_t id)
 {
-	if ( id.other < 0 ) {
+	if (id.other < 0)
 		return "illegal 'other' event";
-	}
-	
-	if ( id.other < SCTP_EVENT_OTHER_MAX ) {
+	if (id.other < SCTP_EVENT_OTHER_MAX)
 		return sctp_other_tbl[id.other];
-	}
-
 	return "unknown 'other' event";
-} /* sctp_oname() */
+}
 
 static const char *sctp_timer_tbl[] = {
 	"TIMEOUT_NONE",
@@ -223,19 +208,11 @@ static const char *sctp_timer_tbl[] = {
 };
 
 /* Lookup timer debug name. */
-const char *
-sctp_tname(const sctp_subtype_t id)
+const char *sctp_tname(const sctp_subtype_t id)
 {
-	if ( id.timeout < 0 ) {
+	if (id.timeout < 0)
 		return "illegal 'timer' event";
-	}
-
-	if ( id.timeout <= SCTP_EVENT_TIMEOUT_MAX ) {
+	if (id.timeout <= SCTP_EVENT_TIMEOUT_MAX)
 		return sctp_timer_tbl[id.timeout];
-	}
-
 	return "unknown_timer";
-
-} /* sctp_tname() */
-
-
+}
