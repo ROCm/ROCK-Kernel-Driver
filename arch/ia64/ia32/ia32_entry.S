@@ -234,7 +234,7 @@ ia32_syscall_table:
 	data8 sys_rmdir		  /* 40 */
 	data8 sys_dup
 	data8 sys32_pipe
-	data8 sys32_times
+	data8 compat_sys_times
 	data8 sys32_ni_syscall	  /* old prof syscall holder */
 	data8 sys32_brk		  /* 45 */
 	data8 sys_setgid	/* 16-bit version */

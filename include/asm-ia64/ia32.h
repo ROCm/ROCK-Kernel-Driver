@@ -6,14 +6,13 @@
 #ifdef CONFIG_IA32_SUPPORT
 
 #include <linux/binfmts.h>
+#include <linux/compat.h>
 
 /*
  * 32 bit structures for IA32 support.
  */
 
 /* 32bit compatibility types */
-typedef int		__kernel_ptrdiff_t32;
-typedef int		__kernel_clock_t32;
 typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
 typedef unsigned short	__kernel_uid_t32;
@@ -36,7 +35,6 @@ typedef __kernel_fsid_t	__kernel_fsid_t32;
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
-#define IA32_TICK(tick)		((unsigned long long)(tick) * IA32_CLOCKS_PER_SEC / CLOCKS_PER_SEC)
 
 /* fcntl.h */
 struct flock32 {
@@ -305,8 +303,8 @@ typedef struct siginfo32 {
 			unsigned int _pid;	/* which child */
 			unsigned int _uid;	/* sender's uid */
 			int _status;		/* exit code */
-			__kernel_clock_t32 _utime;
-			__kernel_clock_t32 _stime;
+			compat_clock_t _utime;
+			compat_clock_t _stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */

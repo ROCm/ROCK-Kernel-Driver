@@ -2589,37 +2589,6 @@ sys32_getrusage (int who, struct rusage32 *ru)
 	return ret;
 }
 
-struct tms32 {
-	__kernel_clock_t32 tms_utime;
-	__kernel_clock_t32 tms_stime;
-	__kernel_clock_t32 tms_cutime;
-	__kernel_clock_t32 tms_cstime;
-};
-
-extern asmlinkage long sys_times (struct tms * tbuf);
-
-asmlinkage long
-sys32_times (struct tms32 *tbuf)
-{
-	mm_segment_t old_fs = get_fs();
-	struct tms t;
-	long ret;
-	int err;
-
-	set_fs(KERNEL_DS);
-	ret = sys_times(tbuf ? &t : NULL);
-	set_fs(old_fs);
-	if (tbuf) {
-		err = put_user (IA32_TICK(t.tms_utime), &tbuf->tms_utime);
-		err |= put_user (IA32_TICK(t.tms_stime), &tbuf->tms_stime);
-		err |= put_user (IA32_TICK(t.tms_cutime), &tbuf->tms_cutime);
-		err |= put_user (IA32_TICK(t.tms_cstime), &tbuf->tms_cstime);
-		if (err)
-			ret = -EFAULT;
-	}
-	return IA32_TICK(ret);
-}
-
 static unsigned int
 ia32_peek (struct pt_regs *regs, struct task_struct *child, unsigned long addr, unsigned int *val)
 {
