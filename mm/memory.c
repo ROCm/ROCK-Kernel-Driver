@@ -407,7 +407,7 @@ static void zap_pte_range(struct mmu_gather *tlb,
 				set_pte(ptep, pgoff_to_pte(page->index));
 			if (pte_dirty(pte))
 				set_page_dirty(page);
-			if (pte_young(pte) && page_mapping(page))
+			if (pte_young(pte) && !PageAnon(page))
 				mark_page_accessed(page);
 			tlb->freed++;
 			page_remove_rmap(page);
