@@ -239,6 +239,7 @@ struct usb_device {
 
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
+	int present;			/* if device is present or not */
 
 	void *hcpriv;			/* Host Controller private data */
 	
