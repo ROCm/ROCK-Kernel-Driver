@@ -28,8 +28,6 @@
 #define _SER_IRQ0	IRQ_ISA_UART
 #define _SER_IRQ1	IRQ_ISA_UART2
 
-#define RS_TABLE_SIZE	16
-
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
      /* UART CLK        PORT  IRQ     FLAGS        */

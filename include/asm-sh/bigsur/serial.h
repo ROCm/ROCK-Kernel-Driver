@@ -11,9 +11,6 @@
 
 #define BASE_BAUD (3379200 / 16)
 
-/* Leave 2 spare for possible PCMCIA serial cards */
-#define RS_TABLE_SIZE  3
-
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
 

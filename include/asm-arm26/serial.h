@@ -27,8 +27,6 @@
 
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
-#define RS_TABLE_SIZE   16
-
 #if defined(CONFIG_ARCH_A5K)
      /* UART CLK        PORT  IRQ     FLAGS        */
 

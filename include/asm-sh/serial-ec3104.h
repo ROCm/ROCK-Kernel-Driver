@@ -4,8 +4,6 @@
  * guess.  */
 #define BASE_BAUD (16800000 / 16)
 
-#define RS_TABLE_SIZE  3
-
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST)
 
 /* there is a fourth serial port with the expected values as well, but
