@@ -219,12 +219,10 @@ repeat_locked:
 		needed += journal->j_committing_transaction->
 					t_outstanding_credits;
 	
-	if (log_space_left(journal) < needed) {
+	if (__log_space_left(journal) < needed) {
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
-		spin_unlock(&journal->j_state_lock);
-		log_wait_for_space(journal, needed);
-		spin_lock(&journal->j_state_lock);
+		__log_wait_for_space(journal, needed);
 		goto repeat_locked;
 	}
 
@@ -237,7 +235,7 @@ repeat_locked:
 	transaction->t_handle_count++;
 	jbd_debug(4, "Handle %p given %d credits (total %d, free %d)\n",
 		  handle, nblocks, transaction->t_outstanding_credits,
-		  log_space_left(journal));
+		  __log_space_left(journal));
 	spin_unlock(&transaction->t_handle_lock);
 	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
@@ -330,14 +328,16 @@ int journal_extend(handle_t *handle, int nblocks)
 	int result;
 	int wanted;
 
-	lock_journal (journal);
+	lock_journal(journal);
 
 	result = -EIO;
 	if (is_handle_aborted(handle))
 		goto error_out;
 
 	result = 1;
-	       
+
+	spin_lock(&journal->j_state_lock);
+
 	/* Don't extend a locked-down transaction! */
 	if (handle->h_transaction->t_state != T_RUNNING) {
 		jbd_debug(3, "denied handle %p %d blocks: "
@@ -345,7 +345,6 @@ int journal_extend(handle_t *handle, int nblocks)
 		goto error_out;
 	}
 
-	lock_kernel();
 	spin_lock(&transaction->t_handle_lock);
 	wanted = transaction->t_outstanding_credits + nblocks;
 	
@@ -355,7 +354,7 @@ int journal_extend(handle_t *handle, int nblocks)
 		goto unlock;
 	}
 
-	if (wanted > log_space_left(journal)) {
+	if (wanted > __log_space_left(journal)) {
 		jbd_debug(3, "denied handle %p %d blocks: "
 			  "insufficient log space\n", handle, nblocks);
 		goto unlock;
@@ -368,9 +367,9 @@ int journal_extend(handle_t *handle, int nblocks)
 	jbd_debug(3, "extended handle %p by %d\n", handle, nblocks);
 unlock:
 	spin_unlock(&transaction->t_handle_lock);
-	unlock_kernel();
 error_out:
-	unlock_journal (journal);
+	spin_unlock(&journal->j_state_lock);
+	unlock_journal(journal);
 	return result;
 }
 

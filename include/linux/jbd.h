@@ -1000,18 +1000,19 @@ extern int	   journal_test_revoke(journal_t *, unsigned long, tid_t);
 extern void	   journal_clear_revoke(journal_t *);
 extern void	   journal_brelse_array(struct buffer_head *b[], int n);
 
-/* The log thread user interface:
+/*
+ * The log thread user interface:
  *
  * Request space in the current transaction, and force transaction commit
  * transitions on demand.
  */
 
-extern int	log_space_left (journal_t *); /* Called with journal locked */
+int __log_space_left(journal_t *); /* Called with journal locked */
 extern tid_t	log_start_commit (journal_t *, transaction_t *);
 extern int	log_wait_commit (journal_t *, tid_t);
 extern int	log_do_checkpoint (journal_t *, int);
 
-extern void	log_wait_for_space(journal_t *, int nblocks);
+void __log_wait_for_space(journal_t *, int nblocks);
 extern void	__journal_drop_transaction(journal_t *, transaction_t *);
 extern int	cleanup_journal_tail(journal_t *);
 

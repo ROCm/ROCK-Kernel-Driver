@@ -70,25 +70,33 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
 }
 
 /*
- * log_wait_for_space: wait until there is space in the journal.
+ * __log_wait_for_space: wait until there is space in the journal.
  *
- * Called with the journal already locked, but it will be unlocked if we have
- * to wait for a checkpoint to free up some space in the log.
+ * Called under j-state_lock *only*.  It will be unlocked if we have to wait
+ * for a checkpoint to free up some space in the log.
  */
 
-void log_wait_for_space(journal_t *journal, int nblocks)
+void __log_wait_for_space(journal_t *journal, int nblocks)
 {
-	while (log_space_left(journal) < nblocks) {
+	assert_spin_locked(&journal->j_state_lock);
+
+	while (__log_space_left(journal) < nblocks) {
 		if (journal->j_flags & JFS_ABORT)
 			return;
 		unlock_journal(journal);
+		spin_unlock(&journal->j_state_lock);
 		down(&journal->j_checkpoint_sem);
 		lock_journal(journal);
 		
-		/* Test again, another process may have checkpointed
-		 * while we were waiting for the checkpoint lock */
-		if (log_space_left(journal) < nblocks) {
+		/*
+		 * Test again, another process may have checkpointed while we
+		 * were waiting for the checkpoint lock
+		 */
+		spin_lock(&journal->j_state_lock);
+		if (__log_space_left(journal) < nblocks) {
+			spin_unlock(&journal->j_state_lock);
 			log_do_checkpoint(journal, nblocks);
+			spin_lock(&journal->j_state_lock);
 		}
 		up(&journal->j_checkpoint_sem);
 	}
@@ -275,7 +283,7 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
  * Perform an actual checkpoint.  We don't write out only enough to
  * satisfy the current blocked requests: rather we submit a reasonably
  * sized chunk of the outstanding data to disk at once for
- * efficiency.  log_wait_for_space() will retry if we didn't free enough.
+ * efficiency.  __log_wait_for_space() will retry if we didn't free enough.
  * 
  * However, we _do_ take into account the amount requested so that once
  * the IO has been queued, we can return as soon as enough of it has

@@ -392,17 +392,23 @@ repeat:
  */
 
 /*
- * log_space_left: Return the number of free blocks left in the journal.
+ * __log_space_left: Return the number of free blocks left in the journal.
  *
  * Called with the journal already locked.
+ *
+ * Called under j_state_lock
  */
 
-int log_space_left (journal_t *journal)
+int __log_space_left(journal_t *journal)
 {
 	int left = journal->j_free;
 
-	/* Be pessimistic here about the number of those free blocks
-	 * which might be required for log descriptor control blocks. */
+	assert_spin_locked(&journal->j_state_lock);
+
+	/*
+	 * Be pessimistic here about the number of those free blocks which
+	 * might be required for log descriptor control blocks.
+	 */
 
 #define MIN_LOG_RESERVED_BLOCKS 32 /* Allow for rounding errors */
 
