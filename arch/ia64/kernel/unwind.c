@@ -2051,6 +2051,8 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	find_save_locs(info);
 }
 
+EXPORT_SYMBOL(unw_init_frame_info);
+
 void
 unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 {
