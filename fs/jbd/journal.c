@@ -1076,7 +1076,7 @@ void journal_destroy(journal_t *journal)
 	spin_lock(&journal->j_list_lock);
 	while (journal->j_checkpoint_transactions != NULL) {
 		spin_unlock(&journal->j_list_lock);
-		log_do_checkpoint(journal, 1);
+		log_do_checkpoint(journal);
 		spin_lock(&journal->j_list_lock);
 	}
 
@@ -1284,7 +1284,7 @@ int journal_flush(journal_t *journal)
 	spin_lock(&journal->j_list_lock);
 	while (!err && journal->j_checkpoint_transactions != NULL) {
 		spin_unlock(&journal->j_list_lock);
-		err = log_do_checkpoint(journal, journal->j_maxlen);
+		err = log_do_checkpoint(journal);
 		spin_lock(&journal->j_list_lock);
 	}
 	spin_unlock(&journal->j_list_lock);
