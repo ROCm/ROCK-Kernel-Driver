@@ -178,28 +178,6 @@ static inline void *__va(unsigned long x)
 #define virt_addr_valid(kaddr)	((void *)(kaddr) >= (void *)PAGE_OFFSET && (void *)(kaddr) < high_memory)
 #define pfn_valid(pfn)		virt_addr_valid(pfn_to_virt(pfn))
 
-#ifdef CONFIG_DEBUG_BUGVERBOSE
-#ifndef CONFIG_SUN3
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	asm volatile("illegal"); \
-} while (0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	panic("BUG!"); \
-} while (0)
-#endif
-#else
-#define BUG() do { \
-	asm volatile("illegal"); \
-} while (0)
-#endif
-
-#define PAGE_BUG(page) do { \
-	BUG(); \
-} while (0)
-
 #endif /* __ASSEMBLY__ */
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \

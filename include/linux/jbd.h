@@ -194,6 +194,7 @@ typedef struct journal_superblock_s
 
 #include <linux/fs.h>
 #include <linux/sched.h>
+#include <asm/bug.h>
 
 #define JBD_ASSERTIONS
 #ifdef JBD_ASSERTIONS
@@ -778,14 +779,6 @@ static inline void journal_abort_handle(handle_t *handle)
 {
 	handle->h_aborted = 1;
 }
-
-/* Not all architectures define BUG() */
-#ifndef BUG
- #define BUG() do { \
-        printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	* ((char *) 0) = 0; \
- } while (0)
-#endif /* BUG */
 
 #endif /* __KERNEL__   */
 

@@ -14,9 +14,6 @@
 #define KERNELBASE	PAGE_OFFSET
 
 #ifndef __ASSEMBLY__
-#include <asm/processor.h>	/* for BUG definition */
-
-#define PAGE_BUG(page) do { BUG(); } while (0)
 
 #define STRICT_MM_TYPECHECKS
 

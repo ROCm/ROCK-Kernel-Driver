@@ -14,6 +14,7 @@
 #include <linux/compiler.h>
 #include <linux/threads.h>
 #include <asm/smp.h>
+#include <asm/bug.h>
 
 /*
  * main cross-CPU interfaces, handles INIT, TLB flush, STOP, etc.
@@ -86,7 +87,6 @@ int cpu_up(unsigned int cpu);
 void smp_prepare_boot_cpu(void);
 
 #else /* !SMP */
-#include <asm/page.h> /* For BUG() */
 
 /*
  *	These macros fold the SMP functionality into a single CPU system

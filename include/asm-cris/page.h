@@ -70,18 +70,6 @@ typedef unsigned long pgprot_t;
 #define PAGE_OFFSET		KSEG_C   /* kseg_c is mapped to physical ram */
 #endif
 
-#ifndef __ASSEMBLY__
-
-#define BUG() do { \
-  printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-} while (0)
-
-#define PAGE_BUG(page) do { \
-         BUG(); \
-} while (0)
-
-#endif /* __ASSEMBLY__ */
-
 /* macros to convert between really physical and virtual addresses
  * by stripping a selected bit, we can convert between KSEG_x and 0x40000000 where
  * the DRAM really resides

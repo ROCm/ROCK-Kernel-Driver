@@ -125,14 +125,6 @@ typedef union ia64_va {
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 #endif
 
-#if (__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
-# define ia64_abort()	__builtin_trap()
-#else
-# define ia64_abort()	(*(volatile int *) 0 = 0)
-#endif
-#define BUG() do { printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); ia64_abort(); } while (0)
-#define PAGE_BUG(page) do { BUG(); } while (0)
-
 static __inline__ int
 get_order (unsigned long size)
 {

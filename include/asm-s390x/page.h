@@ -60,15 +60,6 @@ static inline void copy_page(void *to, void *from)
 #define clear_user_page(page, vaddr, pg)    clear_page(page)
 #define copy_user_page(to, from, vaddr, pg) copy_page(to, from)
 
-#define BUG() do { \
-        printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-        __asm__ __volatile__(".long 0"); \
-} while (0)                                       
-
-#define PAGE_BUG(page) do { \
-        BUG(); \
-} while (0)                      
-
 /* Pure 2^n version of get_order */
 extern __inline__ int get_order(unsigned long size)
 {
