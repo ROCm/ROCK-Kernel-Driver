@@ -156,6 +156,23 @@ Drivers that need support
 - do IDE cdroms need some kind of support?
 - IDE CD-RW -- how to deal with that?
 
+FAQ:
+
+Q: well, suspending a server is IMHO a really stupid thing,
+but... (Diego Zuccato):
+
+A: You bought new UPS for your server. How do you install it without
+bringing machine down? Suspend to disk, rearrange power cables,
+resume.
+
+You have your server on UPS. Power died, and UPS is indicating 30
+seconds to failure. What do you do? Suspend to disk.
+
+Ethernet card in your server died. You want to replace it. Your
+server is not hotplug capable. What do you do? Suspend to disk,
+replace ethernet card, resume. If you are fast your users will not
+even see broken connections.
+
 Any other idea you might have tell me!
 
 Contacting the author

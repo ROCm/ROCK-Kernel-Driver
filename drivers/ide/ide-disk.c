@@ -544,6 +544,7 @@ static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned 
  */
 static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
+	BUG_ON(drive->blocked);
 	if (!blk_fs_request(rq)) {
 		blk_dump_rq_flags(rq, "do_rw_disk - bad command");
 		ide_end_request(drive, 0, 0);
@@ -1495,8 +1496,70 @@ static void idedisk_add_settings(ide_drive_t *drive)
  	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 }
 
+static int idedisk_suspend(struct device *dev, u32 state, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+
+	printk("Suspending device %lx\n", dev->driver_data);
+
+	/* I hope that every freeze operation from the upper levels have
+	 * already been done...
+	 */
+
+	if (level != SUSPEND_SAVE_STATE)
+		return 0;
+	BUG_ON(in_interrupt());
+
+	printk("Waiting for commands to finish\n");
+
+	/* wait until all commands are finished */
+	/* FIXME: waiting for spinlocks should be done instead. */
+	if (!(HWGROUP(drive)))
+		printk("No hwgroup?\n");
+	while (HWGROUP(drive)->handler)
+		yield();
+
+	/* set the drive to standby */
+	printk(KERN_INFO "suspending: %s ", drive->name);
+	if (drive->driver) {
+		if (drive->driver->standby)
+			drive->driver->standby(drive);
+	}
+	drive->blocked = 1;
+
+	while (HWGROUP(drive)->handler)
+		yield();
+
+	return 0;
+}
+
+static int idedisk_resume(struct device *dev, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+
+	if (level != RESUME_RESTORE_STATE)
+		return 0;
+	if (!drive->blocked)
+		panic("ide: Resume but not suspended?\n");
+
+	drive->blocked = 0;
+	return 0;
+}
+
+
+/* This is just a hook for the overall driver tree.
+ */
+
+static struct device_driver idedisk_devdrv = {
+	.bus = &ide_bus_type,
+	.name = "IDE disk driver",
+
+	.suspend = idedisk_suspend,
+	.resume = idedisk_resume,
+};
+
 static int idedisk_ioctl (ide_drive_t *drive, struct inode *inode,
-		struct file *file, unsigned int cmd, unsigned long arg)
+	struct file *file, unsigned int cmd, unsigned long arg)
 {
 #if 0
 HDIO_GET_ADDRESS
@@ -1539,6 +1602,11 @@ static void idedisk_setup (ide_drive_t *drive)
 		if (id->model[0] != 'W' || id->model[1] != 'D') {
 			drive->doorlocking = 1;
 		}
+	}
+	{
+		sprintf(drive->disk->disk_dev.name, "ide-disk");
+		drive->disk->disk_dev.driver = &idedisk_devdrv;
+		drive->disk->disk_dev.driver_data = drive;
 	}
 
 #if 1
@@ -1623,6 +1691,8 @@ static void idedisk_setup (ide_drive_t *drive)
 static int idedisk_cleanup (ide_drive_t *drive)
 {
 	struct gendisk *g = drive->disk;
+
+	put_device(&drive->disk->disk_dev);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1721,6 +1791,7 @@ static void __exit idedisk_exit (void)
 static int idedisk_init (void)
 {
 	ide_register_driver(&idedisk_driver);
+	driver_register(&idedisk_devdrv);
 	return 0;
 }
 
