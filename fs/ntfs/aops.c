@@ -1788,3 +1788,12 @@ struct address_space_operations ntfs_aops = {
 #endif
 };
 
+/**
+ * ntfs_mst_aops - general address space operations for mst protecteed inodes
+ *		   and attributes
+ */
+struct address_space_operations ntfs_mst_aops = {
+	.readpage	= ntfs_readpage,	/* Fill page with data. */
+	.sync_page	= block_sync_page,	/* Currently, just unplugs the
+						   disk request queue. */
+};
