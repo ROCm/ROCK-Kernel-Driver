@@ -221,6 +221,9 @@ static int __init vesafb_probe(struct device *device)
 	struct platform_device *dev = to_platform_device(device);
 	struct fb_info *info;
 	int i, err;
+	unsigned int size_vmode;
+	unsigned int size_remap;
+	unsigned int size_total;
 
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
 		return -ENXIO;
@@ -232,32 +235,41 @@ static int __init vesafb_probe(struct device *device)
 	vesafb_defined.xres = screen_info.lfb_width;
 	vesafb_defined.yres = screen_info.lfb_height;
 	vesafb_fix.line_length = screen_info.lfb_linelength;
-
-	/* Allocate enough memory for double buffering */
-	vesafb_fix.smem_len = screen_info.lfb_width * screen_info.lfb_height * vesafb_defined.bits_per_pixel >> 2;
-
-	/* check that we don't remap more memory than old cards have */
-	if (vesafb_fix.smem_len > (screen_info.lfb_size * 65536))
-		vesafb_fix.smem_len = screen_info.lfb_size * 65536;
-
-	/* Set video size according to vram boot option */
-	if (vram)
-		vesafb_fix.smem_len = vram * 1024 * 1024;
-
 	vesafb_fix.visual   = (vesafb_defined.bits_per_pixel == 8) ?
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
 
-	/* limit framebuffer size to 16 MB.  Otherwise we'll eat tons of
-	 * kernel address space for nothing if the gfx card has alot of
-	 * memory (>= 128 MB isn't uncommon these days ...) */
-	if (vesafb_fix.smem_len > 16 * 1024 * 1024)
-		vesafb_fix.smem_len = 16 * 1024 * 1024;
+	/*   size_vmode -- that is the amount of memory needed for the
+	 *                 used video mode, i.e. the minimum amount of
+	 *                 memory we need. */
+	size_vmode = (vesafb_defined.xres * vesafb_defined.yres *
+		vesafb_defined.bits_per_pixel) >> 3;
+
+	/*   size_total -- all video memory we have. Used for mtrr
+	 *                 entries and bounds checking. */
+	size_total = screen_info.lfb_size * 65536;
+	if (size_total < size_vmode)
+		size_total = size_vmode;
+	if (vram)
+		size_total = vram * 1024 * 1024;
+
+	/*   size_remap -- the amount of video memory we are going to
+	 *                 use for vesafb.  With modern cards it is no
+	 *                 option to simply use size_total as that
+	 *                 wastes plenty of kernel address space. */
+#ifdef CONFIG_BOOTSPLASH
+	size_remap  = size_vmode * 4;	// some more for the images
+#else
+	size_remap  = size_vmode * 2;
+#endif
+	if (size_remap > size_total)
+		size_remap = size_total;
+	vesafb_fix.smem_len = size_remap;
 
 #ifndef __i386__
 	screen_info.vesapm_seg = 0;
 #endif
 
-	if (!request_mem_region(vesafb_fix.smem_start, vesafb_fix.smem_len, "vesafb")) {
+	if (!request_mem_region(vesafb_fix.smem_start, size_total, "vesafb")) {
 		printk(KERN_WARNING
 		       "vesafb: abort, cannot reserve video memory at 0x%lx\n",
 			vesafb_fix.smem_start);
@@ -282,8 +294,10 @@ static int __init vesafb_probe(struct device *device)
 		goto err;
 	}
 
-	printk(KERN_INFO "vesafb: framebuffer at 0x%lx, mapped to 0x%p, size %dk\n",
-	       vesafb_fix.smem_start, info->screen_base, vesafb_fix.smem_len/1024);
+	printk(KERN_INFO "vesafb: framebuffer at 0x%lx, mapped to 0x%p, "
+	       "using %dk, total %dk\n",
+	       vesafb_fix.smem_start, info->screen_base,
+	       size_remap/1024, size_total/1024);
 	printk(KERN_INFO "vesafb: mode is %dx%dx%d, linelength=%d, pages=%d\n",
 	       vesafb_defined.xres, vesafb_defined.yres, vesafb_defined.bits_per_pixel, vesafb_fix.line_length, screen_info.pages);
 
@@ -367,7 +381,7 @@ static int __init vesafb_probe(struct device *device)
 	request_region(0x3c0, 32, "vesafb");
 
 	if (mtrr) {
-		int temp_size = vesafb_fix.smem_len;
+		int temp_size = size_total;
 		/* Find the largest power-of-two */
 		while (temp_size & (temp_size - 1))
                 	temp_size &= (temp_size - 1);
@@ -398,7 +412,7 @@ static int __init vesafb_probe(struct device *device)
 	return 0;
 err:
 	framebuffer_release(info);
-	release_mem_region(vesafb_fix.smem_start, vesafb_fix.smem_len);
+	release_mem_region(vesafb_fix.smem_start, size_total);
 	return err;
 }
 
