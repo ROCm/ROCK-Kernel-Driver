@@ -21,26 +21,6 @@
  * 1+ (800) 334-5454
  */
 
-/*
- * Options :
- *
- * PARITY - enable parity checking.  Not supported.
- *
- * SCSI2 - enable support for SCSI-II tagged queueing.  Untested.
- *
- * USLEEP - enable support for devices that don't disconnect.  Untested.
- */
-
-/*
- * $Log: ecoscsi.c,v $
- * Revision 1.2  1998/03/08 05:49:47  davem
- * Merge to 2.1.89
- *
- * Revision 1.1  1998/02/23 02:45:24  davem
- * Merge to 2.1.88
- *
- */
-
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -94,71 +74,8 @@ static void ecoscsi_write(struct Scsi_Host *instance, int reg, int value)
  *
  */
 
-void ecoscsi_setup(char *str, int *ints) {
-}
-
-/*
- * Function : int ecoscsi_detect(Scsi_Host_Template * tpnt)
- *
- * Purpose : initializes ecoscsi NCR5380 driver based on the
- *	command line / compile time port and irq definitions.
- *
- * Inputs : tpnt - template for this SCSI adapter.
- *
- * Returns : 1 if a host adapter was found, 0 if not.
- *
- */
-
-int ecoscsi_detect(Scsi_Host_Template * tpnt)
+void ecoscsi_setup(char *str, int *ints)
 {
-	struct Scsi_Host *host;
-
-	tpnt->proc_name = "ecoscsi";
-
-	host = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
-	if (!host)
-		return 0;
-
-	host->io_port = 0x80ce8000;
-	host->n_io_port = 144;
-	host->irq = IRQ_NONE;
-
-	if ( !(request_region(host->io_port, host->n_io_port, "ecoscsi")) )
-		goto unregister_scsi;
-
-	ecoscsi_write (host, MODE_REG, 0x20);		/* Is it really SCSI? */
-	if (ecoscsi_read (host, MODE_REG) != 0x20) /* Write to a reg.    */
-		goto release_reg;
-
-	ecoscsi_write( host, MODE_REG, 0x00 );		/* it back.	      */
-	if (ecoscsi_read (host, MODE_REG) != 0x00)
-		goto release_reg;
-
-	NCR5380_init(host, 0);
-
-	printk("scsi%d: at port 0x%08lx irqs disabled", host->host_no, host->io_port);
-	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-		host->can_queue, host->cmd_per_lun, ECOSCSI_PUBLIC_RELEASE);
-	printk("\nscsi%d:", host->host_no);
-	NCR5380_print_options(host);
-	printk("\n");
-
-	return 1;
-
-release_reg:
-	release_region(host->io_port, host->n_io_port);
-unregister_scsi:
-	scsi_unregister(host);
-	return 0;
-}
-
-int ecoscsi_release (struct Scsi_Host *shpnt)
-{
-	if (shpnt->irq != IRQ_NONE)
-		free_irq (shpnt->irq, NULL);
-	if (shpnt->io_port)
-		release_region (shpnt->io_port, shpnt->n_io_port);
-	return 0;
 }
 
 const char * ecoscsi_info (struct Scsi_Host *spnt)
@@ -241,8 +158,7 @@ printk("reading %p len %d\n",addr, len);
 static Scsi_Host_Template ecoscsi_template =  {
 	.module		= THIS_MODULE,
 	.name		= "Serial Port EcoSCSI NCR5380",
-	.detect		= ecoscsi_detect,
-	.release	= ecoscsi_release,
+	.proc_name	= "ecoscsi",
 	.info		= ecoscsi_info,
 	.queuecommand	= ecoscsi_queue_command,
 	.eh_abort_handler	= NCR5380_abort,
@@ -256,19 +172,60 @@ static Scsi_Host_Template ecoscsi_template =  {
 	.use_clustering	= DISABLE_CLUSTERING
 };
 
+static struct Scsi_Host *host;
+
 static int __init ecoscsi_init(void)
 {
-	scsi_register_host(&ecoscsi_template);
-	if (ecoscsi_template.present)
+
+	host = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
+	if (!host)
 		return 0;
 
-	scsi_unregister_host(&ecoscsi_template);
+	host->io_port = 0x80ce8000;
+	host->n_io_port = 144;
+	host->irq = IRQ_NONE;
+
+	if (!(request_region(host->io_port, host->n_io_port, "ecoscsi")) )
+		goto unregister_scsi;
+
+	ecoscsi_write(host, MODE_REG, 0x20);		/* Is it really SCSI? */
+	if (ecoscsi_read(host, MODE_REG) != 0x20) /* Write to a reg.    */
+		goto release_reg;
+
+	ecoscsi_write(host, MODE_REG, 0x00 );		/* it back.	      */
+	if (ecoscsi_read(host, MODE_REG) != 0x00)
+		goto release_reg;
+
+	NCR5380_init(host, 0);
+
+	printk("scsi%d: at port 0x%08lx irqs disabled", host->host_no, host->io_port);
+	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
+		host->can_queue, host->cmd_per_lun, ECOSCSI_PUBLIC_RELEASE);
+	printk("\nscsi%d:", host->host_no);
+	NCR5380_print_options(host);
+	printk("\n");
+
+	scsi_add_host(host, NULL);
+	return 0;
+
+release_reg:
+	release_region(host->io_port, host->n_io_port);
+unregister_scsi:
+	scsi_unregister(host);
 	return -ENODEV;
 }
 
 static void __exit ecoscsi_exit(void)
 {
-	scsi_unregister_host(&ecoscsi_template);
+	scsi_remove_host(host);
+
+	if (shpnt->irq != IRQ_NONE)
+		free_irq(shpnt->irq, NULL);
+	if (shpnt->io_port)
+		release_region(shpnt->io_port, shpnt->n_io_port);
+
+	scsi_unregister(host);
+	return 0;
 }
 
 module_init(ecoscsi_init);

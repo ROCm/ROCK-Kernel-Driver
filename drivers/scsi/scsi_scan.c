@@ -1098,22 +1098,29 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 				    uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev;
-	int error = -ENODEV, res;
+	int res;
 
 	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev);
-	if (res == SCSI_SCAN_LUN_PRESENT)
-		error = scsi_attach_device(sdev);
-
-	if (error)
-		sdev = ERR_PTR(error);
+	if (res != SCSI_SCAN_LUN_PRESENT)
+		sdev = ERR_PTR(-ENODEV);
 	return sdev;
 }
 
 int scsi_remove_device(struct scsi_device *sdev)
 {
-	scsi_detach_device(sdev);
 	scsi_device_unregister(sdev);
 	return 0;
+}
+
+void scsi_rescan_device(struct device *dev)
+{
+	struct scsi_driver *drv = to_scsi_driver(dev->driver);
+
+	if (try_module_get(drv->owner)) {
+		if (drv->rescan)
+			drv->rescan(dev);
+		module_put(drv->owner);
+	}
 }
 
 /**

@@ -316,6 +316,7 @@ extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
  */
 
 struct scsi_device {
+	struct class_device	sdev_classdev;
 	/*
 	 * This information is private to the scsi mid-layer.
 	 */

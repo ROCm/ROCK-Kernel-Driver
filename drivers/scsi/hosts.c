@@ -234,27 +234,18 @@ int scsi_remove_host(struct Scsi_Host *shost)
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
 	Scsi_Host_Template *sht = shost->hostt;
-	struct scsi_device *sdev;
-	int error = 0, saved_error = 0;
+	int error;
 
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
 	error = scsi_sysfs_add_host(shost, dev);
-	if (error)
-		return error;
-
-	scsi_proc_host_add(shost);
-
-	scsi_scan_host(shost);
+	if (!error) {
+		scsi_proc_host_add(shost);
+		scsi_scan_host(shost);
+	};
 			
-	list_for_each_entry (sdev, &shost->my_devices, siblings) {
-		error = scsi_attach_device(sdev);
-		if (error)
-			saved_error = error;
-	}
-
-	return saved_error;
+	return error;
 }
 
 /**
@@ -500,48 +491,33 @@ int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 }
 
 /**
- * *scsi_host_get_next - get scsi host and inc ref count
- * @shost:	pointer to a Scsi_Host or NULL to start.
+ * scsi_host_lookup - get a reference to a Scsi_Host by host no
+ *
+ * @hostnum:	host number to locate
  *
  * Return value:
- * 	A pointer to next Scsi_Host in list or NULL.
+ *	A pointer to located Scsi_Host or NULL.
  **/
-struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *shost)
+struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
 {
-	struct list_head *lh = NULL;
+	struct class *class = class_get(&shost_class);
+	struct class_device *cdev;
+	struct Scsi_Host *shost = NULL, *p;
 
-	spin_lock(&scsi_host_list_lock);
-	if (shost) {
-		/* XXX Dec ref on cur shost */
-		lh = shost->sh_list.next;
-	} else {
-		lh = scsi_host_list.next;
+	if (class) {
+		down_read(&class->subsys.rwsem);
+		list_for_each_entry(cdev, &class->children, node) {
+			p = class_to_shost(cdev);
+			if (p->host_no == hostnum) {
+				scsi_host_get(p);
+				shost = p;
+				break;
+			}
+		}
+		up_read(&class->subsys.rwsem);
 	}
 
-	if (lh == &scsi_host_list) {
-		shost = (struct Scsi_Host *)NULL;
-		goto done;
-	}
-
-	shost = list_entry(lh, struct Scsi_Host, sh_list);
-	/* XXX Inc ref count */
-
-done:
-	spin_unlock(&scsi_host_list_lock);
 	return shost;
-}
-
-/**
- * scsi_host_hn_get - get a Scsi_Host by host no and inc ref count
- * @host_no:	host number to locate
- *
- * Return value:
- * 	A pointer to located Scsi_Host or NULL.
- **/
-struct Scsi_Host *scsi_host_hn_get(unsigned short host_no)
-{
-	/* XXX Inc ref count */
-	return scsi_find_host_by_num(host_no);
 }
 
 /**
@@ -550,10 +526,8 @@ struct Scsi_Host *scsi_host_hn_get(unsigned short host_no)
  **/
 void scsi_host_get(struct Scsi_Host *shost)
 {
-
 	get_device(&shost->host_gendev);
 	class_device_get(&shost->class_dev);
-	return;
 }
 
 /**
@@ -565,7 +539,6 @@ void scsi_host_put(struct Scsi_Host *shost)
 
 	class_device_put(&shost->class_dev);
 	put_device(&shost->host_gendev);
-	return;
 }
 
 /**
