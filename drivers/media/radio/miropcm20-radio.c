@@ -258,7 +258,6 @@ static int __init pcm20_init(void)
 
 MODULE_AUTHOR("Ruurd Reitsma");
 MODULE_DESCRIPTION("A driver for the Miro PCM20 radio card.");
-MODULE_LICENSE("GPL");
 
 static void __exit pcm20_cleanup(void)
 {

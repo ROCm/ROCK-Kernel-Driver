@@ -91,8 +91,6 @@ MODULE_PARM(synchronous, "i");
 MODULE_PARM(reset_delay, "i");
 MODULE_PARM(ext_trans, "i");
 
-MODULE_LICENSE("Dual MPL/GPL");
-
 /*====================================================================*/
 
 typedef struct scsi_info_t {
