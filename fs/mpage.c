@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/prefetch.h>
 #include <linux/mpage.h>
+#include <linux/pagevec.h>
 
 /*
  * The largest-sized BIO which this code will assemble, in bytes.  Set this
@@ -522,12 +523,14 @@ mpage_writepages(struct address_space *mapping,
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
 	int done = 0;
+	struct pagevec pvec;
 	int (*writepage)(struct page *);
 
 	writepage = NULL;
 	if (get_block == NULL)
 		writepage = mapping->a_ops->writepage;
 
+	pagevec_init(&pvec);
 	write_lock(&mapping->page_lock);
 
 	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
@@ -557,21 +560,16 @@ mpage_writepages(struct address_space *mapping,
 
 		if (page->mapping && !PageWriteback(page) &&
 					TestClearPageDirty(page)) {
-			/* FIXME: batch this up */
-			if (!PageActive(page) && PageLRU(page)) {
-				spin_lock(&pagemap_lru_lock);
-				if (!PageActive(page) && PageLRU(page)) {
-					list_del(&page->lru);
-					list_add(&page->lru, &inactive_list);
-				}
-				spin_unlock(&pagemap_lru_lock);
-			}
-
 			if (writepage) {
 				ret = (*writepage)(page);
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
 						&last_block_in_bio, &ret);
+			}
+			if (!PageActive(page) && PageLRU(page)) {
+				if (!pagevec_add(&pvec, page))
+					pagevec_deactivate_inactive(&pvec);
+				page = NULL;
 			}
 			if (ret || (nr_to_write && --(*nr_to_write) <= 0))
 				done = 1;
@@ -579,7 +577,8 @@ mpage_writepages(struct address_space *mapping,
 			unlock_page(page);
 		}
 
-		page_cache_release(page);
+		if (page)
+			page_cache_release(page);
 		write_lock(&mapping->page_lock);
 	}
 	/*
@@ -587,6 +586,7 @@ mpage_writepages(struct address_space *mapping,
 	 */
 	list_splice_init(&mapping->io_pages, mapping->dirty_pages.prev);
 	write_unlock(&mapping->page_lock);
+	pagevec_deactivate_inactive(&pvec);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;
