@@ -66,8 +66,10 @@ MODULE_DEVICES("{{Sun,CS4231}}");
 typedef struct snd_cs4231 {
 	spinlock_t		lock;
 	unsigned long		port;
-	unsigned long		eb2c;
-	unsigned long		eb2p;
+#ifdef EBUS_SUPPORT
+	struct ebus_dma_info	eb2c;
+	struct ebus_dma_info	eb2p;
+#endif
 
 	u32			flags;
 #define CS4231_FLAG_EBUS	0x00000001
@@ -77,7 +79,9 @@ typedef struct snd_cs4231 {
 	snd_card_t		*card;
 	snd_pcm_t		*pcm;
 	snd_pcm_substream_t	*playback_substream;
+	unsigned int		p_periods_sent;
 	snd_pcm_substream_t	*capture_substream;
+	unsigned int		c_periods_sent;
 	snd_timer_t		*timer;
 
 	unsigned short mode;
@@ -87,13 +91,11 @@ typedef struct snd_cs4231 {
 #define CS4231_MODE_TIMER	0x0004
 #define CS4231_MODE_OPEN	(CS4231_MODE_PLAY|CS4231_MODE_RECORD|CS4231_MODE_TIMER)
 
-	unsigned char image[32];	/* registers image */
-	int mce_bit;
-	int calibrate_mute;
-	unsigned int p_dma_size;
-	unsigned int c_dma_size;
-	struct semaphore mce_mutex;
-	struct semaphore open_mutex;
+	unsigned char		image[32];	/* registers image */
+	int			mce_bit;
+	int			calibrate_mute;
+	struct semaphore	mce_mutex;
+	struct semaphore	open_mutex;
 
 	union {
 #ifdef SBUS_SUPPORT
@@ -119,6 +121,7 @@ static cs4231_t *cs4231_list;
 
 #define CS4231P(chip, x)	((chip)->port + c_d_c_CS4231##x)
 
+/* XXX offsets are different than PC ISA chips... */
 #define c_d_c_CS4231REGSEL	0x0
 #define c_d_c_CS4231REG		0x4
 #define c_d_c_CS4231STATUS	0x8
@@ -336,7 +339,7 @@ static unsigned char snd_cs4231_original_image[32] =
 	0x00,			/* 0a/10 - pc */
 	0x00,			/* 0b/11 - ti */
 	CS4231_MODE2,		/* 0c/12 - mi */
-	0xfc,			/* 0d/13 - lbc */
+	0x00,			/* 0d/13 - lbc */
 	0x00,			/* 0e/14 - pbru */
 	0x00,			/* 0f/15 - pbrl */
 	0x80,			/* 10/16 - afei */
@@ -349,7 +352,7 @@ static unsigned char snd_cs4231_original_image[32] =
 	0x00,			/* 17/23 - ra3mic/reserved */
 	0x00,			/* 18/24 - afs */
 	0x00,			/* 19/25 - lamoc/version */
-	0xcf,			/* 1a/26 - mioc */
+	0x00,			/* 1a/26 - mioc */
 	0x00,			/* 1b/27 - ramoc/reserved */
 	0x20,			/* 1c/28 - cdfr */
 	0x00,			/* 1d/29 - res4 */
@@ -425,7 +428,7 @@ static void snd_cs4231_dout(cs4231_t *chip, unsigned char reg, unsigned char val
 	for (timeout = 250;
 	     timeout > 0 && (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT);
 	     timeout--)
-	     	udelay(10);
+	     	udelay(100);
 	__cs4231_writeb(chip, chip->mce_bit | reg, CS4231P(chip, REGSEL));
 	__cs4231_writeb(chip, value, CS4231P(chip, REG));
 	mb();
@@ -511,8 +514,8 @@ void snd_cs4231_debug(cs4231_t *chip)
 	printk("  0x0d: loopback        = 0x%02x  ", snd_cs4231_in(chip, 0x0d));
 	printk("  0x1d: var freq (PnP)  = 0x%02x\n", snd_cs4231_in(chip, 0x1d));
 	printk("  0x0e: ply upr count   = 0x%02x  ", snd_cs4231_in(chip, 0x0e));
-	printk("  0x1e: ply lwr count   = 0x%02x\n", snd_cs4231_in(chip, 0x1e));
-	printk("  0x0f: rec upr count   = 0x%02x  ", snd_cs4231_in(chip, 0x0f));
+	printk("  0x1e: rec upr count   = 0x%02x\n", snd_cs4231_in(chip, 0x1e));
+	printk("  0x0f: ply lwr count   = 0x%02x  ", snd_cs4231_in(chip, 0x0f));
 	printk("  0x1f: rec lwr count   = 0x%02x\n", snd_cs4231_in(chip, 0x1f));
 }
 
@@ -533,7 +536,7 @@ static void snd_cs4231_busy_wait(cs4231_t *chip)
 	for (timeout = 250;
 	     timeout > 0 && (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT);
 	     timeout--)
-	     	udelay(10);
+	     	udelay(100);
 }
 
 static void snd_cs4231_mce_up(cs4231_t *chip)
@@ -586,7 +589,7 @@ static void snd_cs4231_mce_down(cs4231_t *chip)
 	/* calibration process */
 
 	for (timeout = 500; timeout > 0 && (snd_cs4231_in(chip, CS4231_TEST_INIT) & CS4231_CALIB_IN_PROGRESS) == 0; timeout--)
-		udelay(10);
+		udelay(100);
 	if ((snd_cs4231_in(chip, CS4231_TEST_INIT) & CS4231_CALIB_IN_PROGRESS) == 0) {
 		snd_printd("cs4231_mce_down - auto calibration time out (1)\n");
 		spin_unlock_irqrestore(&chip->lock, flags);
@@ -627,6 +630,7 @@ static void snd_cs4231_mce_down(cs4231_t *chip)
 #endif
 }
 
+#if 0 /* Unused for now... */
 static unsigned int snd_cs4231_get_count(unsigned char format, unsigned int size)
 {
 	switch (format & 0xe0) {
@@ -641,15 +645,70 @@ static unsigned int snd_cs4231_get_count(unsigned char format, unsigned int size
 		size >>= 1;
 	return size;
 }
+#endif
+
+#ifdef EBUS_SUPPORT
+static void snd_cs4231_ebus_advance_dma(struct ebus_dma_info *p, snd_pcm_substream_t *substream, unsigned int *periods_sent)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	while (1) {
+		unsigned int dma_size = snd_pcm_lib_period_bytes(substream);
+		unsigned int offset = dma_size * (*periods_sent);
+
+		if (dma_size >= (1 << 24))
+			BUG();
+
+		if (ebus_dma_request(p, runtime->dma_addr + offset, dma_size))
+			return;
+#if 0
+		printk("ebus_advance: Sent period %u (size[%x] offset[%x])\n",
+		       (*periods_sent), dma_size, offset);
+#endif
+		(*periods_sent) = ((*periods_sent) + 1) % runtime->periods;
+	}
+}
+#endif
+
+static void cs4231_dma_trigger(cs4231_t *chip, unsigned int what, int on)
+{
+#ifdef EBUS_SUPPORT
+	if (chip->flags & CS4231_FLAG_EBUS) {
+		if (what & CS4231_PLAYBACK_ENABLE) {
+			if (on) {
+				ebus_dma_prepare(&chip->eb2p, 0);
+				ebus_dma_enable(&chip->eb2p, 1);
+				snd_cs4231_ebus_advance_dma(&chip->eb2p,
+					chip->playback_substream,
+					&chip->p_periods_sent);
+			} else {
+				ebus_dma_enable(&chip->eb2p, 0);
+			}
+		}
+		if (what & CS4231_RECORD_ENABLE) {
+			if (on) {
+				ebus_dma_prepare(&chip->eb2c, 1);
+				ebus_dma_enable(&chip->eb2c, 1);
+				snd_cs4231_ebus_advance_dma(&chip->eb2c,
+					chip->capture_substream,
+					&chip->c_periods_sent);
+			} else {
+				ebus_dma_enable(&chip->eb2c, 0);
+			}
+		}
+	} else {
+#endif
+#ifdef SBUS_SUPPORT
+#endif
+#ifdef EBUS_SUPPORT
+	}
+#endif
+}
 
 static int snd_cs4231_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
 	int result = 0;
-
-#if 0
-	printk("codec trigger!!! - what = %i, enable = %i, status = 0x%x\n", what, enable, __cs4231_readb(chip, CS4231P(card, STATUS)));
-#endif
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -657,6 +716,8 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream, int cmd)
 	{
 		unsigned int what = 0;
 		snd_pcm_substream_t *s = substream;
+		unsigned long flags;
+
 		do {
 			if (s == chip->playback_substream) {
 				what |= CS4231_PLAYBACK_ENABLE;
@@ -667,13 +728,31 @@ static int snd_cs4231_trigger(snd_pcm_substream_t *substream, int cmd)
 			}
 			s = s->link_next;
 		} while (s != substream);
-		spin_lock(&chip->lock);
-		if (cmd == SNDRV_PCM_TRIGGER_START)
+
+#if 0
+		printk("TRIGGER: what[%x] on(%d)\n",
+		       what, (cmd == SNDRV_PCM_TRIGGER_START));
+#endif
+
+		spin_lock_irqsave(&chip->lock, flags);
+		if (cmd == SNDRV_PCM_TRIGGER_START) {
+			cs4231_dma_trigger(chip, what, 1);
 			chip->image[CS4231_IFACE_CTRL] |= what;
-		else
+			if (what & CS4231_PLAYBACK_ENABLE) {
+				snd_cs4231_out(chip, CS4231_PLY_LWR_CNT, 0xff);
+				snd_cs4231_out(chip, CS4231_PLY_UPR_CNT, 0xff);
+			}
+			if (what & CS4231_RECORD_ENABLE) {
+				snd_cs4231_out(chip, CS4231_REC_LWR_CNT, 0xff);
+				snd_cs4231_out(chip, CS4231_REC_UPR_CNT, 0xff);
+			}
+		} else {
+			cs4231_dma_trigger(chip, what, 0);
 			chip->image[CS4231_IFACE_CTRL] &= ~what;
-		snd_cs4231_out(chip, CS4231_IFACE_CTRL, chip->image[CS4231_IFACE_CTRL]);
-		spin_unlock(&chip->lock);
+		}
+		snd_cs4231_out(chip, CS4231_IFACE_CTRL,
+			       chip->image[CS4231_IFACE_CTRL]);
+		spin_unlock_irqrestore(&chip->lock, flags);
 		break;
 	}
 	default:
@@ -942,8 +1021,7 @@ static int snd_cs4231_open(cs4231_t *chip, unsigned int mode)
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, 0);
 	__cs4231_writeb(chip, 0, CS4231P(chip, STATUS));	/* clear IRQ */
 	__cs4231_writeb(chip, 0, CS4231P(chip, STATUS));	/* clear IRQ */
-	chip->image[CS4231_PIN_CTRL] |= CS4231_IRQ_ENABLE;
-	snd_cs4231_out(chip, CS4231_PIN_CTRL, chip->image[CS4231_PIN_CTRL]);
+
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, CS4231_PLAYBACK_IRQ |
 		       CS4231_RECORD_IRQ |
 		       CS4231_TIMER_IRQ);
@@ -972,8 +1050,6 @@ static void snd_cs4231_close(cs4231_t *chip, unsigned int mode)
 	snd_cs4231_out(chip, CS4231_IRQ_STATUS, 0);
 	__cs4231_writeb(chip, 0, CS4231P(chip, STATUS));	/* clear IRQ */
 	__cs4231_writeb(chip, 0, CS4231P(chip, STATUS));	/* clear IRQ */
-	chip->image[CS4231_PIN_CTRL] &= ~CS4231_IRQ_ENABLE;
-	snd_cs4231_out(chip, CS4231_PIN_CTRL, chip->image[CS4231_PIN_CTRL]);
 
 	/* now disable record & playback */
 
@@ -1064,48 +1140,13 @@ static int snd_cs4231_playback_hw_free(snd_pcm_substream_t *substream)
 static int snd_cs4231_playback_prepare(snd_pcm_substream_t *substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long flags;
-	unsigned int size = snd_pcm_lib_buffer_bytes(substream);
-	unsigned int count = snd_pcm_lib_period_bytes(substream);
 
 	spin_lock_irqsave(&chip->lock, flags);
-	chip->p_dma_size = size;
 	chip->image[CS4231_IFACE_CTRL] &= ~(CS4231_PLAYBACK_ENABLE |
 					    CS4231_PLAYBACK_PIO);
-
-#ifdef EBUS_SUPPORT
-	if (chip->flags & CS4231_FLAG_EBUS) {
-		writel(EBUS_DCSR_RESET, chip->eb2p + EBDMA_CSR);
-		writel(EBUS_DCSR_BURST_SZ_16, chip->eb2p + EBDMA_CSR);
-
-		writel(size, chip->eb2p + EBDMA_COUNT);
-		writel(runtime->dma_addr, chip->eb2p + EBDMA_ADDR);
-
-		writel((EBUS_DCSR_BURST_SZ_16 |
-			EBUS_DCSR_EN_DMA |
-			EBUS_DCSR_INT_EN), chip->eb2p + EBDMA_CSR);
-	} else {
-#endif
-#ifdef SBUS_SUPPORT
-		sbus_writel(runtime->dma_addr, chip->port + APCPNVA);
-		sbus_writel(size, chip->port + APCPNC);
-		sbus_writel(((sbus_readl(chip->port + APCCSR)
-			      & ~APC_PPAUSE)
-			     | APC_PDMA_READY), chip->port + APCCSR);
-#endif
-#ifdef EBUS_SUPPORT
-	}
-#endif
-
-	count = snd_cs4231_get_count(chip->image[CS4231_PLAYBK_FORMAT], count) - 1;
-	snd_cs4231_out(chip, CS4231_PLY_LWR_CNT, (unsigned char) count);
-	snd_cs4231_out(chip, CS4231_PLY_UPR_CNT, (unsigned char) (count >> 8));
 	spin_unlock_irqrestore(&chip->lock, flags);
 
-#if 0
-	snd_cs4231_debug(chip);
-#endif
 	return 0;
 }
 
@@ -1135,43 +1176,11 @@ static int snd_cs4231_capture_hw_free(snd_pcm_substream_t *substream)
 static int snd_cs4231_capture_prepare(snd_pcm_substream_t *substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned long flags;
-	unsigned int size = snd_pcm_lib_buffer_bytes(substream);
-	unsigned int count = snd_pcm_lib_period_bytes(substream);
 
 	spin_lock_irqsave(&chip->lock, flags);
-	chip->c_dma_size = size;
-	chip->image[CS4231_IFACE_CTRL] &= ~(CS4231_RECORD_ENABLE | CS4231_RECORD_PIO);
-
-#ifdef EBUS_SUPPORT
-	if (chip->flags & CS4231_FLAG_EBUS) {
-		writel(EBUS_DCSR_RESET, chip->eb2c + EBDMA_CSR);
-		writel(EBUS_DCSR_BURST_SZ_16, chip->eb2c + EBDMA_CSR);
-
-		writel(size, chip->eb2c + EBDMA_COUNT);
-		writel(runtime->dma_addr, chip->eb2c + EBDMA_ADDR);
-
-		writel((EBUS_DCSR_BURST_SZ_16 |
-			EBUS_DCSR_EN_DMA |
-			EBUS_DCSR_WRITE |
-			EBUS_DCSR_INT_EN), chip->eb2c + EBDMA_CSR);
-	} else {
-#endif
-#ifdef SBUS_SUPPORT
-		sbus_writel(runtime->dma_addr, chip->port + APCCNVA);
-		sbus_writel(size, chip->port + APCCNC);
-		sbus_writel(((sbus_readl(chip->port + APCCSR)
-			      & ~APC_CPAUSE) |
-			     APC_CDMA_READY), chip->port + APCCSR);
-#endif
-#ifdef EBUS_SUPPORT
-	}
-#endif
-
-	count = snd_cs4231_get_count(chip->image[CS4231_REC_FORMAT], count) - 1;
-	snd_cs4231_out(chip, CS4231_REC_LWR_CNT, (unsigned char) count);
-	snd_cs4231_out(chip, CS4231_REC_UPR_CNT, (unsigned char) (count >> 8));
+	chip->image[CS4231_IFACE_CTRL] &= ~(CS4231_RECORD_ENABLE |
+					    CS4231_RECORD_PIO);
 
 	spin_unlock_irqrestore(&chip->lock, flags);
 
@@ -1193,9 +1202,13 @@ static void snd_cs4231_overrange(cs4231_t *chip)
 
 static void snd_cs4231_generic_interrupt(cs4231_t *chip)
 {
+	unsigned long flags;
 	unsigned char status;
 
 	status = snd_cs4231_in(chip, CS4231_IRQ_STATUS);
+	if (!status)
+		return;
+
 	if (status & CS4231_TIMER_IRQ) {
 		if (chip->timer)
 			snd_timer_interrupt(chip->timer, chip->timer->sticks);
@@ -1208,9 +1221,9 @@ static void snd_cs4231_generic_interrupt(cs4231_t *chip)
 	}
 
 	/* ACK the CS4231 interrupt. */
-	spin_lock(&chip->lock);
+	spin_lock_irqsave(&chip->lock, flags);
 	snd_cs4231_outm(chip, CS4231_IRQ_STATUS, ~CS4231_ALL_IRQS | ~status, 0);
-	spin_unlock(&chip->lock);
+	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 #ifdef SBUS_SUPPORT
@@ -1236,47 +1249,41 @@ static void snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_regs *reg
 #endif
 
 #ifdef EBUS_SUPPORT
-static void snd_cs4231_ebus_play_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void snd_cs4231_ebus_play_callback(struct ebus_dma_info *p, int event, void *cookie)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
-	u32 csr;
+	cs4231_t *chip = snd_magic_cast(cs4231_t, cookie, return);
 
-	csr = readl(chip->eb2p + EBDMA_CSR);
-	if (!(csr & EBUS_DCSR_INT_PEND))
-		return;
-
-	/* ACK the EBUS playback DMA interrupt. */
-	writel(csr, chip->eb2p + EBDMA_CSR);
-
-	snd_cs4231_generic_interrupt(chip);
+	if (chip->image[CS4231_IFACE_CTRL] & CS4231_PLAYBACK_ENABLE) {
+		snd_pcm_period_elapsed(chip->playback_substream);
+		snd_cs4231_ebus_advance_dma(p, chip->playback_substream,
+					    &chip->p_periods_sent);
+	}
 }
 
-static void snd_cs4231_ebus_capture_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void snd_cs4231_ebus_capture_callback(struct ebus_dma_info *p, int event, void *cookie)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
-	u32 csr;
+	cs4231_t *chip = snd_magic_cast(cs4231_t, cookie, return);
 
-	csr = readl(chip->eb2c + EBDMA_CSR);
-	if (!(csr & EBUS_DCSR_INT_PEND))
-		return;
-
-	/* ACK the EBUS capture DMA interrupt. */
-	writel(csr, chip->eb2c + EBDMA_CSR);
-
-	snd_cs4231_generic_interrupt(chip);
+	if (chip->image[CS4231_IFACE_CTRL] & CS4231_RECORD_ENABLE) {
+		snd_pcm_period_elapsed(chip->capture_substream);
+		snd_cs4231_ebus_advance_dma(p, chip->capture_substream,
+					    &chip->c_periods_sent);
+	}
 }
 #endif
 
 static snd_pcm_uframes_t snd_cs4231_playback_pointer(snd_pcm_substream_t *substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
-	size_t ptr, residue;
+	size_t ptr, residue, period_bytes;
 
 	if (!(chip->image[CS4231_IFACE_CTRL] & CS4231_PLAYBACK_ENABLE))
 		return 0;
+	period_bytes = snd_pcm_lib_period_bytes(substream);
+	ptr = period_bytes * chip->p_periods_sent;
 #ifdef EBUS_SUPPORT
 	if (chip->flags & CS4231_FLAG_EBUS) {
-		residue = readl(chip->eb2p + EBDMA_COUNT);
+		residue = ebus_dma_residue(&chip->eb2p);
 	} else {
 #endif
 #ifdef SBUS_SUPPORT
@@ -1285,20 +1292,22 @@ static snd_pcm_uframes_t snd_cs4231_playback_pointer(snd_pcm_substream_t *substr
 #ifdef EBUS_SUPPORT
 	}
 #endif
-	ptr = chip->p_dma_size - residue;
+	ptr += (period_bytes - residue);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
 static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substream)
 {
 	cs4231_t *chip = snd_pcm_substream_chip(substream);
-	size_t ptr, residue;
+	size_t ptr, residue, period_bytes;
 	
 	if (!(chip->image[CS4231_IFACE_CTRL] & CS4231_RECORD_ENABLE))
 		return 0;
+	period_bytes = snd_pcm_lib_period_bytes(substream);
+	ptr = period_bytes * chip->c_periods_sent;
 #ifdef EBUS_SUPPORT
 	if (chip->flags & CS4231_FLAG_EBUS) {
-		residue = readl(chip->eb2c + EBDMA_COUNT);
+		residue = ebus_dma_residue(&chip->eb2c);
 	} else {
 #endif
 #ifdef SBUS_SUPPORT
@@ -1307,7 +1316,7 @@ static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substr
 #ifdef EBUS_SUPPORT
 	}
 #endif
-	ptr = chip->c_dma_size - residue;
+	ptr += (period_bytes - residue);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1318,13 +1327,13 @@ static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substr
 static int snd_cs4231_probe(cs4231_t *chip)
 {
 	unsigned long flags;
-	int i, id;
+	int i, id, vers;
 	unsigned char *ptr;
 
 #if 0
 	snd_cs4231_debug(chip);
 #endif
-	id = 0;
+	id = vers = 0;
 	for (i = 0; i < 50; i++) {
 		mb();
 		if (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT)
@@ -1333,6 +1342,7 @@ static int snd_cs4231_probe(cs4231_t *chip)
 			spin_lock_irqsave(&chip->lock, flags);
 			snd_cs4231_out(chip, CS4231_MISC_INFO, CS4231_MODE2);
 			id = snd_cs4231_in(chip, CS4231_MISC_INFO) & 0x0f;
+			vers = snd_cs4231_in(chip, CS4231_VERSION);
 			spin_unlock_irqrestore(&chip->lock, flags);
 			if (id == 0x0a)
 				break;	/* this is valid value */
@@ -1344,15 +1354,11 @@ static int snd_cs4231_probe(cs4231_t *chip)
 
 	spin_lock_irqsave(&chip->lock, flags);
 
+
 	/* Reset DMA engine.  */
 #ifdef EBUS_SUPPORT
 	if (chip->flags & CS4231_FLAG_EBUS) {
-                writel(EBUS_DCSR_RESET, chip->eb2p + EBDMA_CSR);
-                writel(EBUS_DCSR_RESET, chip->eb2c + EBDMA_CSR);
-                writel(EBUS_DCSR_BURST_SZ_16 |
-		       EBUS_DCSR_INT_EN, chip->eb2p + EBDMA_CSR);
-                writel(EBUS_DCSR_BURST_SZ_16 |
-		       EBUS_DCSR_INT_EN, chip->eb2c + EBDMA_CSR);
+		/* Done by ebus_dma_register */
 	} else {
 #endif
 #ifdef SBUS_SUPPORT
@@ -1385,6 +1391,8 @@ static int snd_cs4231_probe(cs4231_t *chip)
 		chip->image[CS4231_IFACE_CTRL] & ~CS4231_SINGLE_DMA;
 	chip->image[CS4231_ALT_FEATURE_1] = 0x80;
 	chip->image[CS4231_ALT_FEATURE_2] = 0x01;
+	if (vers & 0x20)
+		chip->image[CS4231_ALT_FEATURE_2] |= 0x02;
 
 	ptr = (unsigned char *) &chip->image;
 
@@ -1419,9 +1427,9 @@ static snd_pcm_hardware_t snd_cs4231_playback =
 	rate_max:		48000,
 	channels_min:		1,
 	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
+	buffer_bytes_max:	(32*1024),
+	period_bytes_min:	4096,
+	period_bytes_max:	(32*1024),
 	periods_min:		1,
 	periods_max:		1024,
 	fifo_size:		0,
@@ -1440,9 +1448,9 @@ static snd_pcm_hardware_t snd_cs4231_capture =
 	rate_max:		48000,
 	channels_min:		1,
 	channels_max:		2,
-	buffer_bytes_max:	(128*1024),
-	period_bytes_min:	64,
-	period_bytes_max:	(128*1024),
+	buffer_bytes_max:	(32*1024),
+	period_bytes_min:	4096,
+	period_bytes_max:	(32*1024),
 	periods_min:		1,
 	periods_max:		1024,
 	fifo_size:		0,
@@ -1461,6 +1469,7 @@ static int snd_cs4231_playback_open(snd_pcm_substream_t *substream)
 		return err;
 	}
 	chip->playback_substream = substream;
+	chip->p_periods_sent = 0;
 	snd_pcm_set_sync(substream);
 	snd_cs4231_xrate(runtime);
 
@@ -1480,6 +1489,7 @@ static int snd_cs4231_capture_open(snd_pcm_substream_t *substream)
 		return err;
 	}
 	chip->capture_substream = substream;
+	chip->c_periods_sent = 0;
 	snd_pcm_set_sync(substream);
 	snd_cs4231_xrate(runtime);
 
@@ -2035,18 +2045,17 @@ static int cs4231_sbus_attach(struct sbus_dev *sdev)
 #ifdef EBUS_SUPPORT
 static int snd_cs4231_ebus_free(cs4231_t *chip)
 {
-	if (chip->irq[0])
-		free_irq(chip->irq[0], chip);
-	if (chip->irq[1])
-		free_irq(chip->irq[1], chip);
+	if (chip->eb2c.regs) {
+		ebus_dma_unregister(&chip->eb2c);
+		iounmap(chip->eb2c.regs);
+	}
+	if (chip->eb2p.regs) {
+		ebus_dma_unregister(&chip->eb2p);
+		iounmap(chip->eb2p.regs);
+	}
 
 	if (chip->port)
 		iounmap(chip->port);
-	if (chip->eb2p)
-		iounmap(chip->eb2p);
-	if (chip->eb2c)
-		iounmap(chip->eb2c);
-
 	if (chip->timer)
 		snd_device_free(chip->card, chip->timer);
 
@@ -2080,6 +2089,8 @@ static int __init snd_cs4231_ebus_create(snd_card_t *card,
 		return -ENOMEM;
 
 	spin_lock_init(&chip->lock);
+	spin_lock_init(&chip->eb2c.lock);
+	spin_lock_init(&chip->eb2p.lock);
 	init_MUTEX(&chip->mce_mutex);
 	init_MUTEX(&chip->open_mutex);
 	chip->flags |= CS4231_FLAG_EBUS;
@@ -2087,35 +2098,47 @@ static int __init snd_cs4231_ebus_create(snd_card_t *card,
 	chip->dev_u.pdev = edev->bus->self;
 	memcpy(&chip->image, &snd_cs4231_original_image,
 	       sizeof(snd_cs4231_original_image));
+	strcpy(chip->eb2c.name, "cs4231(capture)");
+	chip->eb2c.flags = EBUS_DMA_FLAG_USE_EBDMA_HANDLER;
+	chip->eb2c.callback = snd_cs4231_ebus_capture_callback;
+	chip->eb2c.client_cookie = chip;
+	chip->eb2c.irq = edev->irqs[0];
+	strcpy(chip->eb2p.name, "cs4231(play)");
+	chip->eb2p.flags = EBUS_DMA_FLAG_USE_EBDMA_HANDLER;
+	chip->eb2p.callback = snd_cs4231_ebus_play_callback;
+	chip->eb2p.client_cookie = chip;
+	chip->eb2p.irq = edev->irqs[1];
 
 	chip->port = (unsigned long) ioremap(edev->resource[0].start, 0x10);
-	chip->eb2p = (unsigned long) ioremap(edev->resource[1].start, 0x10);
-	chip->eb2c = (unsigned long) ioremap(edev->resource[2].start, 0x10);
-	if (!chip->port || !chip->eb2p || !chip->eb2c) {
+	chip->eb2p.regs = (unsigned long) ioremap(edev->resource[1].start, 0x10);
+	chip->eb2c.regs = (unsigned long) ioremap(edev->resource[2].start, 0x10);
+	if (!chip->port || !chip->eb2p.regs || !chip->eb2c.regs) {
 		snd_cs4231_ebus_free(chip);
 		snd_printk("cs4231-%d: Unable to map chip registers.\n", dev);
 		return -EIO;
 	}
 
-	if (request_irq(edev->irqs[0], snd_cs4231_ebus_capture_interrupt,
-			SA_SHIRQ, "cs4231(capture)", chip)) {
+	if (ebus_dma_register(&chip->eb2c)) {
 		snd_cs4231_ebus_free(chip);
-		snd_printk("cs4231-%d: Unable to grab EBUS capture IRQ %s\n",
-			   dev,
-			   __irq_itoa(edev->irqs[0]));
+		snd_printk("cs4231-%d: Unable to register EBUS capture DMA\n", dev);
 		return -EBUSY;
 	}
-	chip->irq[0] = edev->irqs[0];
+	if (ebus_dma_irq_enable(&chip->eb2c, 1)) {
+		snd_cs4231_ebus_free(chip);
+		snd_printk("cs4231-%d: Unable to enable EBUS capture IRQ\n", dev);
+		return -EBUSY;
+	}
 
-	if (request_irq(edev->irqs[1], snd_cs4231_ebus_play_interrupt,
-			SA_SHIRQ, "cs4231(play)", chip)) {
+	if (ebus_dma_register(&chip->eb2p)) {
 		snd_cs4231_ebus_free(chip);
-		snd_printk("cs4231-%d: Unable to grab EBUS play IRQ %s\n",
-			   dev,
-			   __irq_itoa(edev->irqs[0]));
+		snd_printk("cs4231-%d: Unable to register EBUS play DMA\n", dev);
 		return -EBUSY;
 	}
-	chip->irq[1] = edev->irqs[1];
+	if (ebus_dma_irq_enable(&chip->eb2p, 1)) {
+		snd_cs4231_ebus_free(chip);
+		snd_printk("cs4231-%d: Unable to enable EBUS play IRQ\n", dev);
+		return -EBUSY;
+	}
 
 	if (snd_cs4231_probe(chip) < 0) {
 		snd_cs4231_ebus_free(chip);
