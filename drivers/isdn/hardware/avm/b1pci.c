@@ -46,15 +46,6 @@ static struct capi_driver_interface *di;
 
 /* ------------------------------------------------------------- */
 
-static void b1pci_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
-{
-	avmcard *card = devptr;
-
-	b1_handle_interrupt(card);
-}
-
-/* ------------------------------------------------------------- */
-
 static char *b1pci_procinfo(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -121,7 +112,7 @@ static int b1pci_add_card(struct capi_driver *driver,
 	b1_reset(card->port);
 	b1_getrevision(card);
 	
-	retval = request_irq(card->irq, b1pci_interrupt, SA_SHIRQ, card->name, card);
+	retval = request_irq(card->irq, b1_interrupt, SA_SHIRQ, card->name, card);
 	if (retval) {
 		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
 		       driver->name, card->irq);

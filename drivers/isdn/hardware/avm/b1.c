@@ -438,8 +438,9 @@ void b1_parse_version(avmctrl_info *cinfo)
 
 /* ------------------------------------------------------------- */
 
-void b1_handle_interrupt(avmcard * card)
+void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
+	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	unsigned char b1cmd;
@@ -713,7 +714,7 @@ EXPORT_SYMBOL(b1_release_appl);
 EXPORT_SYMBOL(b1_send_message);
 
 EXPORT_SYMBOL(b1_parse_version);
-EXPORT_SYMBOL(b1_handle_interrupt);
+EXPORT_SYMBOL(b1_interrupt);
 
 EXPORT_SYMBOL(b1ctl_read_proc);
 

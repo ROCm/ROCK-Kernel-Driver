@@ -549,7 +549,7 @@ void b1_register_appl(struct capi_ctr *ctrl, u16 appl,
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl);
 void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
 void b1_parse_version(avmctrl_info *card);
-void b1_handle_interrupt(avmcard * card);
+void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs);
 
 int b1ctl_read_proc(char *page, char **start, off_t off,
         		int count, int *eof, struct capi_ctr *ctrl);

@@ -34,15 +34,6 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static void b1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
-{
-	avmcard *card = (avmcard *) devptr;
-
-	b1_handle_interrupt(card);
-}
-
-/* ------------------------------------------------------------- */
-
 static struct capi_driver_interface *di;
 
 /* ------------------------------------------------------------- */
@@ -136,7 +127,7 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 
 	request_region(p->port, AVMB1_PORTLEN, card->name);
 
-	retval = request_irq(card->irq, b1isa_interrupt, 0, card->name, card);
+	retval = request_irq(card->irq, b1_interrupt, 0, card->name, card);
 	if (retval) {
 		printk(KERN_ERR "b1isa: unable to get IRQ %d.\n", card->irq);
 		release_region(card->port, AVMB1_PORTLEN);
