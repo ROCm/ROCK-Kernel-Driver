@@ -1,3 +1,8 @@
+Version 0.92
+------------
+Active smb transactions should never go negative (fix double FreeXid). Fix
+list processing in file routines. Check return code on kmalloc in open.
+
 Version 0.91
 ------------
 Fix oops in reopen_files when invalid dentry. drop dentry on server rename 
