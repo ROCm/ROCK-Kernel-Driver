@@ -382,11 +382,6 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		return;
 	}
 
-	if (rate == ice->cur_rate) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
-		return;
-	}
-
 	switch (rate) {
 	case 8000: val = 6; break;
 	case 9600: val = 3; break;
@@ -409,6 +404,11 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		break;
 	}
 	outb(val, ICEMT1724(ice, RATE));
+	if (rate == ice->cur_rate) {
+		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		return;
+	}
+
 	ice->cur_rate = rate;
 
 	/* check MT02 */
@@ -482,8 +482,6 @@ static int snd_vt1724_playback_pro_prepare(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-#define CHECK_INVALID_PTR
-
 static snd_pcm_uframes_t snd_vt1724_playback_pro_pointer(snd_pcm_substream_t * substream)
 {
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
@@ -491,19 +489,27 @@ static snd_pcm_uframes_t snd_vt1724_playback_pro_pointer(snd_pcm_substream_t * s
 
 	if (!(inl(ICEMT1724(ice, DMA_CONTROL)) & VT1724_PDMA0_START))
 		return 0;
+#if 0 /* read PLAYBACK_ADDR */
 	ptr = inl(ICEMT1724(ice, PLAYBACK_ADDR));
-#ifdef CHECK_INVALID_PTR
 	if (ptr < substream->runtime->dma_addr) {
 		snd_printd("ice1724: invalid negative ptr\n");
 		return 0;
 	}
-#endif
 	ptr -= substream->runtime->dma_addr;
 	ptr = bytes_to_frames(substream->runtime, ptr);
-#ifdef CHECK_INVALID_PTR
 	if (ptr >= substream->runtime->buffer_size) {
 		snd_printd("ice1724: invalid ptr %d (size=%d)\n", (int)ptr, (int)substream->runtime->period_size);
 		return 0;
+	}
+#else /* read PLAYBACK_SIZE */
+	ptr = inl(ICEMT1724(ice, PLAYBACK_SIZE)) & 0xffffff;
+	ptr = (ptr + 1) << 2;
+	ptr = bytes_to_frames(substream->runtime, ptr);
+	if (ptr <= substream->runtime->buffer_size)
+		ptr = substream->runtime->buffer_size - ptr;
+	else {
+		snd_printd("ice1724: invalid ptr %d (size=%d)\n", (int)ptr, (int)substream->runtime->buffer_size);
+		ptr = 0;
 	}
 #endif
 	return ptr;
@@ -536,9 +542,22 @@ static snd_pcm_uframes_t snd_vt1724_pcm_pointer(snd_pcm_substream_t *substream, 
 
 	if (!(inl(ICEMT1724(ice, DMA_CONTROL)) & reg->start))
 		return 0;
+#if 0 /* use ADDR register */
 	ptr = inl(ice->profi_port + reg->addr);
 	ptr -= substream->runtime->dma_addr;
 	return bytes_to_frames(substream->runtime, ptr);
+#else /* use SIZE register */
+	ptr = inw(ice->profi_port + reg->size);
+	ptr = (ptr + 1) << 2;
+	ptr = bytes_to_frames(substream->runtime, ptr);
+	if (ptr <= substream->runtime->buffer_size)
+		ptr = substream->runtime->buffer_size - ptr;
+	else {
+		snd_printd("ice1724: invalid ptr %d (size=%d)\n", (int)ptr, (int)substream->runtime->buffer_size);
+		ptr = 0;
+	}
+	return ptr;
+#endif
 }
 
 const static struct vt1724_pcm_reg vt1724_capture_pro_reg = {

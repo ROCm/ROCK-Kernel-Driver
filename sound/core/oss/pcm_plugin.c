@@ -646,6 +646,7 @@ snd_pcm_sframes_t snd_pcm_plug_client_channels_buf(snd_pcm_plug_t *plug,
 	nchannels = format->channels;
 	snd_assert(plugin->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED || format->channels <= 1, return -ENXIO);
 	for (channel = 0; channel < nchannels; channel++, v++) {
+		v->frames = count;
 		v->enabled = 1;
 		v->wanted = (stream == SNDRV_PCM_STREAM_CAPTURE);
 		v->area.addr = buf;
