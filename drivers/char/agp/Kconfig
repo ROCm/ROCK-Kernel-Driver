@@ -31,7 +31,7 @@ config AGP_GART
 
 config AGP_INTEL
 	tristate "Intel 440LX/BX/GX, I8xx and E7x05 support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860
@@ -44,7 +44,7 @@ config AGP_INTEL
 
 #config AGP_I810
 #	tristate "Intel I810/I815/I830M (on-board) support"
-#	depends on AGP && !X86_64
+#	depends on AGP && X86 && !X86_64
 #	help
 #	  This option gives you AGP support for the Xserver on the Intel 810
 #	  815 and 830m chipset boards for their on-board integrated graphics. This
@@ -52,7 +52,7 @@ config AGP_INTEL
 
 config AGP_VIA
 	tristate "VIA chipset support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
@@ -62,7 +62,7 @@ config AGP_VIA
 
 config AGP_AMD
 	tristate "AMD Irongate, 761, and 762 support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on AMD Irongate, 761, and 762 chipsets.
@@ -72,7 +72,7 @@ config AGP_AMD
 
 config AGP_SIS
 	tristate "Generic SiS support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of the "soon
 	  to be released" XFree86 4.x on Silicon Integrated Systems [SiS]
@@ -85,7 +85,7 @@ config AGP_SIS
 
 config AGP_ALI
 	tristate "ALI chipset support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	---help---
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on the following ALi chipsets.  The supported chipsets
@@ -103,14 +103,22 @@ config AGP_ALI
 
 config AGP_SWORKS
 	tristate "Serverworks LE/HE support"
-	depends on AGP && !X86_64
+	depends on AGP && X86 && !X86_64
 	help
 	  Say Y here to support the Serverworks AGP card.  See 
 	  <http://www.serverworks.com/> for product descriptions and images.
 
+config AGP_NVIDIA
+	tristate "NVIDIA nForce/nForce2 chipset support"
+	depends on AGP && X86 && !X86_64
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on the following NVIDIA chipsets.  The supported chipsets
+	  include nForce and nForce2
+
 config AGP_AMD_8151
 	tristate "AMD 8151 support"
-	depends on AGP
+	depends on AGP && X86
 	default GART_IOMMU
 	help
 	  Say Y here to support the AMD 8151 AGP bridge and the builtin

@@ -40,6 +40,14 @@
 #include <asm/pgtable.h>
 #include "agp.h"
 
+//#define DEBUG
+
+#ifdef DEBUG
+#define DBG(x,y...) printk (KERN_DEBUG "agpgart: %s: " x "\n", __FUNCTION__ , ## y)
+#else
+#define DBG(x,y...) do { } while (0)
+#endif
+
 static struct agp_front_data agp_fe;
 
 static agp_memory *agp_find_mem_by_key(int key)
@@ -53,11 +61,12 @@ static agp_memory *agp_find_mem_by_key(int key)
 
 	while (curr != NULL) {
 		if (curr->key == key)
-			return curr;
+			break;
 		curr = curr->next;
 	}
 
-	return NULL;
+	DBG("key=%d -> mem=%p", key, curr);
+	return curr;
 }
 
 static void agp_remove_from_pool(agp_memory * temp)
@@ -67,6 +76,7 @@ static void agp_remove_from_pool(agp_memory * temp)
 
 	/* Check to see if this is even in the memory pool */
 
+	DBG("mem=%p", temp);
 	if (agp_find_mem_by_key(temp->key) != NULL) {
 		next = temp->next;
 		prev = temp->prev;
@@ -119,10 +129,16 @@ static agp_segment_priv *agp_find_seg_in_client(const agp_client * client,
 
 static void agp_remove_seg_from_client(agp_client * client)
 {
+	DBG("client=%p", client);
+
 	if (client->segments != NULL) {
-		if (*(client->segments) != NULL)
+		if (*(client->segments) != NULL) {
+			DBG("Freeing %p from client", *(client->segments), client);
 			kfree(*(client->segments));
+		}
+		DBG("Freeing %p from client %p", client->segments, client);
 		kfree(client->segments);
+		client->segments = NULL;
 	}
 }
 
@@ -136,6 +152,7 @@ static void agp_add_seg_to_client(agp_client * client,
 	if (prev_seg != NULL)
 		agp_remove_seg_from_client(client);
 
+	DBG("Adding seg %p (%d segments) to client %p", seg, num_segments, client);
 	client->num_segments = num_segments;
 	client->segments = seg;
 }
@@ -181,6 +198,7 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 	seg = kmalloc((sizeof(agp_segment_priv) * region->seg_count), GFP_KERNEL);
 	if (seg == NULL) {
 		kfree(region->seg_list);
+		region->seg_list = NULL;
 		return -ENOMEM;
 	}
 	memset(seg, 0, (sizeof(agp_segment_priv) * region->seg_count));
@@ -191,14 +209,15 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 		seg[i].pg_count = user_seg[i].pg_count;
 		seg[i].prot = agp_convert_mmap_flags(user_seg[i].prot);
 	}
+	kfree(region->seg_list);
+	region->seg_list = NULL;
+
 	ret_seg = kmalloc(sizeof(void *), GFP_KERNEL);
 	if (ret_seg == NULL) {
-		kfree(region->seg_list);
 		kfree(seg);
 		return -ENOMEM;
 	}
 	*ret_seg = seg;
-	kfree(region->seg_list);
 	agp_add_seg_to_client(client, ret_seg, region->seg_count);
 	return 0;
 }
@@ -586,7 +605,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	agp_file_private *priv = (agp_file_private *) file->private_data;
 	agp_kern_info kerninfo;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (agp_fe.backend_acquired != TRUE)
 		goto out_eperm;
@@ -599,6 +618,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	current_size = kerninfo.aper_size;
 	current_size = current_size * 0x100000;
 	offset = vma->vm_pgoff << PAGE_SHIFT;
+	DBG("%lx:%lx", offset, offset+size);
 
 	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags)) {
 		if ((size + offset) > current_size)
@@ -612,6 +632,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (!agp_find_seg_in_client(client, offset, size, vma->vm_page_prot))
 			goto out_inval;
 
+		DBG("client vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
 		} else if (remap_page_range(vma, vma->vm_start, 
@@ -619,7 +640,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
@@ -627,6 +648,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (size != current_size)
 			goto out_inval;
 
+		DBG("controller vm_ops=%p", kerninfo.vm_ops);
 		if (kerninfo.vm_ops) {
 			vma->vm_ops = kerninfo.vm_ops;
 		} else if (remap_page_range(vma, vma->vm_start, 
@@ -634,20 +656,20 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
 out_eperm:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EPERM;
 
 out_inval:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EINVAL;
 
 out_again:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EAGAIN;
 }
 
@@ -655,7 +677,9 @@ static int agp_release(struct inode *inode, struct file *file)
 {
 	agp_file_private *priv = (agp_file_private *) file->private_data;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
+
+	DBG("priv=%p", priv);
 
 	if (test_bit(AGP_FF_IS_CONTROLLER, &priv->access_flags)) {
 		agp_controller *controller;
@@ -668,14 +692,17 @@ static int agp_release(struct inode *inode, struct file *file)
 							       priv);
 			}
 			agp_remove_controller(controller);
+			controller = NULL;
 		}
 	}
-	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags)) {
+
+	if (test_bit(AGP_FF_IS_CLIENT, &priv->access_flags))
 		agp_remove_client(priv->my_pid);
-	}
+
 	agp_remove_file_private(priv);
 	kfree(priv);
-	AGP_UNLOCK();
+	(agp_file_private *) file->private_data = NULL;
+	up(&(agp_fe.agp_mutex));
 	return 0;
 }
 
@@ -686,7 +713,7 @@ static int agp_open(struct inode *inode, struct file *file)
 	agp_client *client;
 	int rc = -ENXIO;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (minor != AGPGART_MINOR)
 		goto err_out;
@@ -711,13 +738,14 @@ static int agp_open(struct inode *inode, struct file *file)
 	}
 	file->private_data = (void *) priv;
 	agp_insert_file_private(priv);
-	AGP_UNLOCK();
+	DBG("private=%p, client=%p", priv, client);
+	up(&(agp_fe.agp_mutex));
 	return 0;
 
 err_out_nomem:
 	rc = -ENOMEM;
 err_out:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return rc;
 }
 
@@ -760,8 +788,10 @@ static int agpioc_info_wrap(agp_file_private * priv, unsigned long arg)
 static int agpioc_acquire_wrap(agp_file_private * priv, unsigned long arg)
 {
 	int ret;
-
 	agp_controller *controller;
+
+	DBG("");
+
 	if (!(test_bit(AGP_FF_ALLOW_CONTROLLER, &priv->access_flags)))
 		return -EPERM;
 
@@ -797,6 +827,7 @@ static int agpioc_acquire_wrap(agp_file_private * priv, unsigned long arg)
 
 static int agpioc_release_wrap(agp_file_private * priv, unsigned long arg)
 {
+	DBG("");
 	agp_controller_release_current(agp_fe.current_controller, priv);
 	return 0;
 }
@@ -805,9 +836,10 @@ static int agpioc_setup_wrap(agp_file_private * priv, unsigned long arg)
 {
 	agp_setup mode;
 
-	if (copy_from_user(&mode, (void *) arg, sizeof(agp_setup))) {
+	DBG("");
+	if (copy_from_user(&mode, (void *) arg, sizeof(agp_setup)))
 		return -EFAULT;
-	}
+
 	agp_enable(mode.agp_mode);
 	return 0;
 }
@@ -818,6 +850,7 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 	agp_client *client;
 	agp_file_private *client_priv;
 
+	DBG("");
 	if (copy_from_user(&reserve, (void *) arg, sizeof(agp_region)))
 		return -EFAULT;
 
@@ -831,10 +864,8 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 		client_priv = agp_find_private(reserve.pid);
 
 		if (client_priv != NULL) {
-			set_bit(AGP_FF_IS_CLIENT,
-				&client_priv->access_flags);
-			set_bit(AGP_FF_IS_VALID,
-				&client_priv->access_flags);
+			set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+			set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 		}
 		if (client == NULL) {
 			/* client is already removed */
@@ -846,7 +877,7 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 
 		if (reserve.seg_count >= 16384)
 			return -EINVAL;
-			
+
 		segment = kmalloc((sizeof(agp_segment) * reserve.seg_count),
 				  GFP_KERNEL);
 
@@ -871,15 +902,11 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 			client_priv = agp_find_private(reserve.pid);
 
 			if (client_priv != NULL) {
-				set_bit(AGP_FF_IS_CLIENT,
-					&client_priv->access_flags);
-				set_bit(AGP_FF_IS_VALID,
-					&client_priv->access_flags);
+				set_bit(AGP_FF_IS_CLIENT, &client_priv->access_flags);
+				set_bit(AGP_FF_IS_VALID, &client_priv->access_flags);
 			}
-			return agp_create_segment(client, &reserve);
-		} else {
-			return agp_create_segment(client, &reserve);
 		}
+		return agp_create_segment(client, &reserve);
 	}
 	/* Will never really happen */
 	return -EINVAL;
@@ -887,6 +914,7 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 
 static int agpioc_protect_wrap(agp_file_private * priv, unsigned long arg)
 {
+	DBG("");
 	/* This function is not currently implemented */
 	return -EINVAL;
 }
@@ -896,6 +924,7 @@ static int agpioc_allocate_wrap(agp_file_private * priv, unsigned long arg)
 	agp_memory *memory;
 	agp_allocate alloc;
 
+	DBG("");
 	if (copy_from_user(&alloc, (void *) arg, sizeof(agp_allocate)))
 		return -EFAULT;
 
@@ -918,6 +947,7 @@ static int agpioc_deallocate_wrap(agp_file_private * priv, unsigned long arg)
 {
 	agp_memory *memory;
 
+	DBG("");
 	memory = agp_find_mem_by_key((int) arg);
 
 	if (memory == NULL)
@@ -932,6 +962,7 @@ static int agpioc_bind_wrap(agp_file_private * priv, unsigned long arg)
 	agp_bind bind_info;
 	agp_memory *memory;
 
+	DBG("");
 	if (copy_from_user(&bind_info, (void *) arg, sizeof(agp_bind)))
 		return -EFAULT;
 
@@ -948,6 +979,7 @@ static int agpioc_unbind_wrap(agp_file_private * priv, unsigned long arg)
 	agp_memory *memory;
 	agp_unbind unbind;
 
+	DBG("");
 	if (copy_from_user(&unbind, (void *) arg, sizeof(agp_unbind)))
 		return -EFAULT;
 
@@ -965,7 +997,8 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	agp_file_private *curr_priv = (agp_file_private *) file->private_data;
 	int ret_val = -ENOTTY;
 
-	AGP_LOCK();
+	DBG("priv=%p, cmd=%x", curr_priv, cmd);
+	down(&(agp_fe.agp_mutex));
 
 	if ((agp_fe.current_controller == NULL) &&
 	    (cmd != AGPIOC_ACQUIRE)) {
@@ -1034,7 +1067,8 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	}
 
 ioctl_out:
-	AGP_UNLOCK();
+	DBG("ioctl returns %d\n", ret_val);
+	up(&(agp_fe.agp_mutex));
 	return ret_val;
 }
 
@@ -1060,7 +1094,7 @@ static struct miscdevice agp_miscdev =
 int agp_frontend_initialize(void)
 {
 	memset(&agp_fe, 0, sizeof(struct agp_front_data));
-	AGP_LOCK_INIT();
+	sema_init(&(agp_fe.agp_mutex), 1);
 
 	if (misc_register(&agp_miscdev)) {
 		printk(KERN_ERR PFX "unable to get minor: %d\n", AGPGART_MINOR);

@@ -81,7 +81,7 @@ static void alpha_core_agp_tlbflush(agp_memory *mem)
 static unsigned long alpha_core_agp_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static void alpha_core_agp_enable(u32 mode)
@@ -109,7 +109,7 @@ static int alpha_core_agp_insert_memory(agp_memory *mem, off_t pg_start,
 
 	status = agp->ops->bind(agp, pg_start, mem);
 	mb();
-	agp_bridge->tlb_flush(mem);
+	alpha_core_agp_tlbflush(mem);
 
 	return status;
 }
@@ -121,29 +121,57 @@ static int alpha_core_agp_remove_memory(agp_memory *mem, off_t pg_start,
 	int status;
 
 	status = agp->ops->unbind(agp, pg_start, mem);
-	agp_bridge->tlb_flush(mem);
+	alpha_core_agp_tlbflush(mem);
 	return status;
 }
 
-
-static struct agp_driver alpha_core_agp_driver = {
-	.owner = THIS_MODULE,
+struct agp_bridge_driver alpha_core_agp_driver = {
+	.owner			= THIS_MODULE,
+	.masks			= alpha_core_agp_masks,
+	.aperture_sizes		= aper_size,
+	.current_size		= aper_size,	/* only one entry */
+	.size_type		= FIXED_APER_SIZE,
+	.num_aperture_sizes	= 1,
+	.configure		= alpha_core_agp_configure,
+	.fetch_size		= alpha_core_agp_fetch_size,
+	.cleanup		= alpha_core_agp_cleanup,
+	.tlb_flush		= alpha_core_agp_tlbflush,
+	.mask_memory		= alpha_core_agp_mask_memory,
+	.agp_enable		= alpha_core_agp_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= alpha_core_agp_nop,
+	.free_gatt_table	= alpha_core_agp_nop,
+	.insert_memory		= alpha_core_agp_insert_memory,
+	.remove_memory		= alpha_core_agp_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.mode			= agp->capability.lw,
+	.cant_use_aperture	= 1,
+	.vm_ops			= &alpha_core_agp_vm_ops,
 };
+
+struct agp_bridge_data *alpha_bridge;
 
 int __init
 alpha_core_agp_setup(void)
 {
 	alpha_agp_info *agp = alpha_mv.agp_info();
+	struct pci_dev *pdev;	/* faked */
 	struct aper_size_info_fixed *aper_size;
 
-	if (!agp) return -ENODEV;
-	if (agp->ops->setup(agp)) return -ENODEV;
+	if (!agp)
+		return -ENODEV;
+	if (agp->ops->setup(agp))
+		return -ENODEV;
 
 	/*
 	 * Build the aperture size descriptor
 	 */
 	aper_size = alpha_core_agp_sizes;
-	if (!aper_size) return -ENOMEM;
+	if (!aper_size)
+		return -ENOMEM;
 	aper_size->size = agp->aperture.size / (1024 * 1024);
 	aper_size->num_entries = agp->aperture.size / PAGE_SIZE;
 	aper_size->page_order = ffs(aper_size->num_entries / 1024) - 1;
@@ -151,63 +179,40 @@ alpha_core_agp_setup(void)
 	/*
 	 * Build a fake pci_dev struct
 	 */
-	if (!(agp_bridge->dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL))) {
+	pdev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
+	if (!pdev)
 		return -ENOMEM;
-	}
-	agp_bridge->dev->vendor = 0xffff;
-	agp_bridge->dev->device = 0xffff;
-	agp_bridge->dev->sysdata = agp->hose;
+	pdev->vendor = 0xffff;
+	pdev->device = 0xffff;
+	pdev->sysdata = agp->hose;
 
-	/*
-	 * Fill in the rest of the agp_bridge struct
-	 */
-	agp_bridge->masks = alpha_core_agp_masks;
-	agp_bridge->aperture_sizes = aper_size;
-	agp_bridge->current_size = aper_size;	/* only one entry */
-	agp_bridge->size_type = FIXED_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 1;
-	agp_bridge->dev_private_data = agp;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = alpha_core_agp_configure;
-	agp_bridge->fetch_size = alpha_core_agp_fetch_size;
-	agp_bridge->cleanup = alpha_core_agp_cleanup;
-	agp_bridge->tlb_flush = alpha_core_agp_tlbflush;
-	agp_bridge->mask_memory = alpha_core_agp_mask_memory;
-	agp_bridge->agp_enable = alpha_core_agp_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = alpha_core_agp_nop;
-	agp_bridge->free_gatt_table = alpha_core_agp_nop;
-	agp_bridge->insert_memory = alpha_core_agp_insert_memory;
-	agp_bridge->remove_memory = alpha_core_agp_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->mode = agp->capability.lw;
-	agp_bridge->cant_use_aperture = 1;
-	agp_bridge->vm_ops =  &alpha_core_agp_vm_ops;
+	alpha_bridge = agp_alloc_bridge();
+	if (!alpha_bridge)
+		goto fail;
 
-	alpha_core_agp_driver.dev = agp_bridge->dev;
-	agp_register_driver(&alpha_core_agp_driver);
+	alpha_bridge->driver = &alpha_core_agp_driver;
+	alpha_bridge->dev_private_data = agp;
+	alpha_bridge->dev = pdev;
+
 	printk(KERN_INFO "Detected AGP on hose %d\n", agp->hose->index);
-	return 0;
+	return agp_add_bridge(alpha_bridge);
+
+ fail:
+	kfree(pdev);
+	return -ENOMEM;
 }
 
 static int __init agp_alpha_core_init(void)
 {
-	int ret_val = -ENODEV;
-	if (alpha_mv.agp_info) {
-		agp_bridge->type = ALPHA_CORE_AGP;
-		ret_val = alpha_core_agp_setup();
-	}
-
-	return ret_val;
+	if (alpha_mv.agp_info)
+		return alpha_core_agp_setup();
+	return -ENODEV;
 }
 
 static void __exit agp_alpha_core_cleanup(void)
 {
-	agp_unregister_driver(&alpha_core_agp_driver);
-	/* no pci driver for core */
+	agp_remove_bridge(alpha_bridge);
+	agp_put_bridge(alpha_bridge);
 }
 
 module_init(agp_alpha_core_init);
