@@ -5,8 +5,6 @@
 # Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
 #
 
-USE_STANDARD_AS_RULE := true
-
 all: dig.a
 
 O_TARGET := dig.a

@@ -4,8 +4,6 @@
 
 USE_STANDARD_AS_RULE := true
 
-EXTRA_AFLAGS := $(AFLAGS_KERNEL)
-
 all: kernel.o head.o init_task.o
 
 O_TARGET := kernel.o

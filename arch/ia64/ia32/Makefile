@@ -4,8 +4,6 @@
 
 USE_STANDARD_AS_RULE := true
 
-EXTRA_AFLAGS := $(AFLAGS_KERNEL)
-
 all: ia32.o
 
 O_TARGET := ia32.o
