@@ -2679,11 +2679,24 @@ static struct usb_serial_device_type edgeport_2port_device = {
 
 static int __init edgeport_init(void)
 {
-	usb_serial_register (&edgeport_1port_device);
-	usb_serial_register (&edgeport_2port_device);
-	usb_register (&io_driver);
+	int retval;
+	retval = usb_serial_register(&edgeport_1port_device);
+	if (retval)
+		goto failed_1port_device_register;
+	retval = usb_serial_register(&edgeport_2port_device);
+	if (retval)
+		goto failed_2port_device_register;
+	retval = usb_register(&io_driver);
+	if (retval) 
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&edgeport_2port_device);
+failed_2port_device_register:
+	usb_serial_deregister(&edgeport_1port_device);
+failed_1port_device_register:
+	return retval;
 }
 
 static void __exit edgeport_exit (void)
