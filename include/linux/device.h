@@ -377,6 +377,11 @@ extern void platform_device_unregister(struct platform_device *);
 extern struct bus_type platform_bus_type;
 extern struct device platform_bus;
 
+extern struct resource *platform_get_resource(struct platform_device *, unsigned int, unsigned int);
+extern int platform_get_irq(struct platform_device *, unsigned int);
+extern int platform_add_device(struct platform_device *);
+extern int platform_add_devices(struct platform_device **, int);
+
 /* drivers/base/power.c */
 extern void device_shutdown(void);
 
