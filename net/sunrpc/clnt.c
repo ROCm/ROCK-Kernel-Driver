@@ -196,7 +196,15 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	memcpy(new, clnt, sizeof(*new));
 	atomic_set(&new->cl_count, 1);
 	atomic_set(&new->cl_users, 0);
-	atomic_inc(&new->cl_parent->cl_count);
+	new->cl_parent = clnt;
+	atomic_inc(&clnt->cl_count);
+	/* Duplicate portmapper */
+	rpc_init_wait_queue(&new->cl_pmap_default.pm_bindwait, "bindwait");
+	/* Turn off autobind on clones */
+	new->cl_autobind = 0;
+	new->cl_oneshot = 0;
+	new->cl_dead = 0;
+	rpc_init_rtt(&new->cl_rtt_default, clnt->cl_xprt->timeout.to_initval);
 	if (new->cl_auth)
 		atomic_inc(&new->cl_auth->au_count);
 	return new;
