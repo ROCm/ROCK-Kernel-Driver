@@ -8,8 +8,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 all: kernel.o head.o
 
 O_TARGET := kernel.o

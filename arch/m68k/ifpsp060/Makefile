@@ -4,8 +4,6 @@
 # License.  See the file "README.legal" in the main directory of this archive
 # for more details.
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := -traditional
 
 OS_TARGET := ifpsp.o

@@ -4,8 +4,6 @@
 # Copyright (C) 1995-2000 Russell King
 #
 
-USE_STANDARD_AS_RULE := true
-
 L_TARGET	:= lib.a
 
 obj-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \

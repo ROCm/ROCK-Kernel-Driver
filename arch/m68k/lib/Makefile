@@ -2,8 +2,6 @@
 # Makefile for m68k-specific library files..
 #
 
-USE_STANDARD_AS_RULE := true
-
 L_TARGET = lib.a
 
 EXTRA_AFLAGS := -traditional
