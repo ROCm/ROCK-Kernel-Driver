@@ -804,7 +804,8 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	result = usbat_read(us, USBAT_ATA, 0x17, &status);
 	US_DEBUGP("Status = %02X\n", status);
-
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 	if (srb->cmnd[0] == TEST_UNIT_READY)
 		transferred = 0;
 

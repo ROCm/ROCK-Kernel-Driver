@@ -660,6 +660,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         switch (bcs.Status) {
         case US_BULK_STAT_OK:
                 /* command good -- note that we could be short on data */
+		if (srb->resid > 0)
+			return ISD200_TRANSPORT_SHORT;
                 return ISD200_TRANSPORT_GOOD;
 
         case US_BULK_STAT_FAIL:
@@ -764,7 +766,8 @@ static int isd200_action( struct us_data *us, int action,
 	}
 
 	status = isd200_Bulk_transport(us, &srb, &ata, sizeof(ata.generic));
-	if (status != ISD200_TRANSPORT_GOOD) {
+	if (status != ISD200_TRANSPORT_GOOD &&
+			status != ISD200_TRANSPORT_SHORT) {
 		US_DEBUGP("   isd200_action(0x%02x) error: %d\n",action,status);
 		status = ISD200_ERROR;
 		/* need to reset device here */
@@ -846,6 +849,7 @@ void isd200_invoke_transport( struct us_data *us,
 		break;
 
 	case ISD200_TRANSPORT_SHORT:
+		srb->result = GOOD << 1;
 		if (!((srb->cmnd[0] == REQUEST_SENSE) ||
 		      (srb->cmnd[0] == INQUIRY) ||
 		      (srb->cmnd[0] == MODE_SENSE) ||
