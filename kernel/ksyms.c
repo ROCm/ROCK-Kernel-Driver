@@ -129,6 +129,7 @@ EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 #endif
+EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
 EXPORT_SYMBOL(def_blk_fops);
