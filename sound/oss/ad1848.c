@@ -2987,7 +2987,7 @@ static struct pnp_dev *activate_dev(char *devname, char *resname, struct pnp_dev
 	if(dev->active)
 		return(dev);
 
-	if((err = pnp_activate_dev(dev)) < 0) {
+	if((err = pnp_activate_dev(dev,NULL)) < 0) {
 		printk(KERN_ERR "ad1848: %s %s config failed (out of resources?)[%d]\n", devname, resname, err);
 
 		pnp_disable_dev(dev);

@@ -284,12 +284,11 @@ pnp_set_current_resources(struct device * dmdev, const char * buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char	command[20];
-	char	type[20];
 	int	num_args;
 	int	error = 0;
-	int	depnum, mode = 0;
+	int	depnum;
 
-	num_args = sscanf(buf,"%10s %i %10s",command,&depnum,type);
+	num_args = sscanf(buf,"%10s %i",command,&depnum);
 	if (!num_args)
 		goto done;
 	if (!strnicmp(command,"lock",4)) {
@@ -317,11 +316,9 @@ pnp_set_current_resources(struct device * dmdev, const char * buf)
 		goto done;
 	}
 	if (!strnicmp(command,"manual",6)) {
-		if (num_args != 3)
+		if (num_args != 2)
 			goto done;
-		if (!strnicmp(type,"static",6))
-			mode = PNP_STATIC;
-		error = pnp_raw_set_dev(dev,depnum,NULL,mode);
+		error = pnp_raw_set_dev(dev,depnum,NULL);
 		goto done;
 	}
  done:

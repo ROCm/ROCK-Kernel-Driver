@@ -750,7 +750,7 @@ static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
 		dma = dma->next;
 	}
 	return config;
-	
+
 	fail:
 	kfree(config);
 	return NULL;
@@ -772,13 +772,13 @@ int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template)
 	if (!dev)
 		return -EINVAL;
         max = pnp_get_max_depnum(dev);
-	if (dev->active)
+	if (!pnp_can_configure(dev))
 		return -EBUSY;
-	if (pnp_dev_has_driver(dev)){
+	if (dev->status != PNP_READY && dev->status != PNP_ATTACHED){
 		printk(KERN_INFO "pnp: Automatic configuration failed because the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
-	if (!dev->protocol->get || !dev->protocol->set)
+	if (!pnp_can_write(dev))
 		return -EINVAL;
 	if (max == 0)
 		return 0;
@@ -796,8 +796,8 @@ int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template)
 
 	done:
 	pnp_dbg("the device '%s' has been activated", dev->dev.bus_id);
-	dev->protocol->set(dev,config,0);
-	if (dev->protocol->get)
+	dev->protocol->set(dev,config);
+	if (pnp_can_read(dev))
 		dev->protocol->get(dev);
 	kfree(config);
 	return 0;
@@ -814,13 +814,13 @@ int pnp_disable_dev(struct pnp_dev *dev)
 {
         if (!dev)
                 return -EINVAL;
-	if (pnp_dev_has_driver(dev)){
+	if (dev->status != PNP_READY){
 		printk(KERN_INFO "pnp: Disable failed becuase the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
 	if (dev->lock_resources)
 		return -EPERM;
-	if (!dev->protocol->disable || !dev->active)
+	if (!pnp_can_disable(dev) || !dev->active)
 		return -EINVAL;
 	pnp_dbg("the device '%s' has been disabled", dev->dev.bus_id);
 	return dev->protocol->disable(dev);
@@ -834,16 +834,16 @@ int pnp_disable_dev(struct pnp_dev *dev)
  *
  */
 
-int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template, int mode)
+int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template)
 {
 	struct pnp_cfg *config;
 	if (!dev)
 		return -EINVAL;
-	if (pnp_dev_has_driver(dev)){
+	if (dev->status != PNP_READY){
 		printk(KERN_INFO "pnp: Unable to set resources because the PnP device '%s' is busy\n", dev->dev.bus_id);
 		return -EINVAL;
 	}
-	if (!dev->protocol->get || !dev->protocol->set)
+	if (!pnp_can_write(dev) || !pnp_can_configure(dev))
 		return -EINVAL;
         config = pnp_generate_config(dev,depnum);
 	if (!config)
@@ -855,8 +855,8 @@ int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *templat
 	return -ENOENT;
 
 	done:
-	dev->protocol->set(dev,config,mode);
-	if (dev->protocol->get)
+	dev->protocol->set(dev,config);
+	if (pnp_can_read(dev))
 		dev->protocol->get(dev);
 	kfree(config);
 	return 0;
