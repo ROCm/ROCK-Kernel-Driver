@@ -180,9 +180,10 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
 		}
 		qh_put (ehci, qh);
-		urb->hcpriv = 0;
 	}
 
+	spin_lock (&urb->lock);
+	urb->hcpriv = 0;
 	switch (urb->status) {
 	case -EINPROGRESS:		/* success */
 		urb->status = 0;
@@ -199,6 +200,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 		COUNT (ehci->stats.unlink);
 		break;
 	}
+	spin_unlock (&urb->lock);
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
@@ -686,7 +688,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	head = ehci->async;
 	if (ehci->async_idle)
 		del_timer (&ehci->watchdog);
-	else if (!head->qh_next.qh) {
+	if (!head->qh_next.qh) {
 		u32	cmd = readl (&ehci->regs->command);
 
 		if (!(cmd & CMD_ASE)) {
