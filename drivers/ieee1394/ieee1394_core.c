@@ -1004,6 +1004,7 @@ static int __init ieee1394_init(void)
 
 	bus_register(&ieee1394_bus_type);
 	bus_create_file(&ieee1394_bus_type, &bus_attr_destroy);
+	class_register(&hpsb_host_class);
 
 	if (init_csr())
 		return -ENOMEM;
@@ -1023,6 +1024,7 @@ static void __exit ieee1394_cleanup(void)
 
 	cleanup_csr();
 
+	class_unregister(&hpsb_host_class);
 	bus_remove_file(&ieee1394_bus_type, &bus_attr_destroy);
 	bus_unregister(&ieee1394_bus_type);
 

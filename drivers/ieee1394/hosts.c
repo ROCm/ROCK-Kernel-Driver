@@ -29,7 +29,6 @@
 #include "csr.h"
 
 
-
 static void delayed_reset_bus(unsigned long __reset_info)
 {
 	struct hpsb_host *host = (struct hpsb_host*)__reset_info;
@@ -161,7 +160,14 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 	memcpy(&h->device, &nodemgr_dev_template_host, sizeof(h->device));
 	h->device.parent = dev;
 	snprintf(h->device.bus_id, BUS_ID_SIZE, "fw-host%d", h->id);
+
+	h->class_dev.dev = &h->device;
+	h->class_dev.class = &hpsb_host_class;
+	snprintf(h->class_dev.class_id, BUS_ID_SIZE, "fw-host%d", h->id);
+
 	device_register(&h->device);
+	class_device_register(&h->class_dev);
+	get_device(&h->device);
 
 	return h;
 }
@@ -178,6 +184,7 @@ void hpsb_remove_host(struct hpsb_host *host)
 
         highlevel_remove_host(host);
 
+	class_device_unregister(&host->class_dev);
 	device_unregister(&host->device);
 }
 

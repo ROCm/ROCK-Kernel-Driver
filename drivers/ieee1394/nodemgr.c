@@ -127,6 +127,16 @@ struct bus_type ieee1394_bus_type = {
 	.hotplug	= nodemgr_hotplug,
 };
 
+static void host_cls_release(struct class_device *class_dev)
+{
+	put_device(&container_of((class_dev), struct hpsb_host, class_dev)->device);
+}
+
+struct class hpsb_host_class = {
+	.name		= "ieee1394_host",
+	.release	= host_cls_release,
+};
+
 static struct hpsb_highlevel nodemgr_highlevel;
 
 static int nodemgr_platform_data_ne;
