@@ -3724,8 +3724,7 @@ xlog_do_log_recovery(
 {
 	int		error;
 
-	if (head_blk == tail_blk)
-		return 0;
+	ASSERT(head_blk != tail_blk);
 
 	/*
 	 * First do a pass to find all of the cancelled buf log items.
