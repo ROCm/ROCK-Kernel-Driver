@@ -1,0 +1,16 @@
+mainmenu_option next_comment
+comment 'Block Devices'
+
+bool 'Virtual block device' CONFIG_BLK_DEV_UBD
+dep_bool '  Always do synchronous disk IO for UBD' CONFIG_BLK_DEV_UBD_SYNC $CONFIG_BLK_DEV_UBD
+tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
+tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
+	int '   Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
+fi
+dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
+
+tristate 'Example IO memory driver' CONFIG_MMAPPER
+
+endmenu
