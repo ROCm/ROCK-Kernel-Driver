@@ -143,8 +143,8 @@ static void tx4927_irq_pic_end(unsigned int irq);
  * Kernel structs for all pic's
  */
 
-static spinlock_t tx4927_cp0_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t tx4927_pic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tx4927_cp0_lock);
+static DEFINE_SPINLOCK(tx4927_pic_lock);
 
 #define TX4927_CP0_NAME "TX4927-CP0"
 static struct hw_interrupt_type tx4927_irq_cp0_type = {

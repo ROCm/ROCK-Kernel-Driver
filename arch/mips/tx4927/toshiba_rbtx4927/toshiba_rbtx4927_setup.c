@@ -727,7 +727,7 @@ void toshiba_rbtx4927_restart(char *command)
 	reg_wr08(RBTX4927_SW_RESET_DO, RBTX4927_SW_RESET_DO_SET);
 
 	/* do something passive while waiting for reset */
-	cli();
+	local_irq_disable();
 	while (1)
 		asm_wait();
 
@@ -738,7 +738,7 @@ void toshiba_rbtx4927_restart(char *command)
 void toshiba_rbtx4927_halt(void)
 {
 	printk(KERN_NOTICE "System Halted\n");
-	cli();
+	local_irq_disable();
 	while (1) {
 		asm_wait();
 	}
