@@ -640,6 +640,8 @@ extern int i2o_delete_controller(struct i2o_controller *);
 #define HOST_TID		1
 
 #define MSG_FRAME_SIZE		64	/* i2o_scsi assumes >= 32 */
+#define REPLY_FRAME_SIZE	17
+#define SG_TABLESIZE		30
 #define NMBR_MSG_FRAMES		128
 
 #define MSG_POOL_SIZE		(MSG_FRAME_SIZE*NMBR_MSG_FRAMES*sizeof(u32))
