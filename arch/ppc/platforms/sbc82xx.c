@@ -57,6 +57,7 @@ sbc82xx_setup_arch(void)
 	callback_setup_arch();
 }
 
+#ifdef CONFIG_GEN_RTC
 TODC_ALLOC();
 
 /*
@@ -64,16 +65,17 @@ TODC_ALLOC();
  * directly use ioremap() at that time.
  * late_time_init() is call after paging init.
  */
-#ifdef CONFIG_GEN_RTC
+
 static void sbc82xx_time_init(void)
 {
 	volatile memctl_cpm2_t *mc = &cpm2_immr->im_memctl;
-	TODC_INIT(TODC_TYPE_MK48T59, 0, 0, SBC82xx_TODC_NVRAM_ADDR, 0);
 
 	/* Set up CS11 for RTC chip */
 	mc->memc_br11=0;
 	mc->memc_or11=0xffff0836;
-	mc->memc_br11=0x80000801;
+	mc->memc_br11=SBC82xx_TODC_NVRAM_ADDR | 0x0801;
+
+	TODC_INIT(TODC_TYPE_MK48T59, 0, 0, SBC82xx_TODC_NVRAM_ADDR, 0);
 
 	todc_info->nvram_data =
 		(unsigned int)ioremap(todc_info->nvram_data, 0x2000);
