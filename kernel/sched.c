@@ -2569,17 +2569,16 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 
 static void show_task(task_t * p)
 {
-	unsigned long free = 0;
 	task_t *relative;
-	int state;
-	static const char * stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
+	unsigned state;
+	static const char *stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
 
 	printk("%-13.13s ", p->comm);
 	state = p->state ? __ffs(p->state) + 1 : 0;
-	if (((unsigned) state) < sizeof(stat_nam)/sizeof(char *))
+	if (state < ARRAY_SIZE(stat_nam))
 		printk(stat_nam[state]);
 	else
-		printk(" ");
+		printk("?");
 #if (BITS_PER_LONG == 32)
 	if (p == current)
 		printk(" current  ");
@@ -2591,13 +2590,7 @@ static void show_task(task_t * p)
 	else
 		printk(" %016lx ", thread_saved_pc(p));
 #endif
-	{
-		unsigned long * n = (unsigned long *) (p->thread_info+1);
-		while (!*n)
-			n++;
-		free = (unsigned long) n - (unsigned long)(p->thread_info+1);
-	}
-	printk("%5lu %5d %6d ", free, p->pid, p->parent->pid);
+	printk("%5d %6d ", p->pid, p->parent->pid);
 	if ((relative = eldest_child(p)))
 		printk("%5d ", relative->pid);
 	else
@@ -2624,12 +2617,12 @@ void show_state(void)
 
 #if (BITS_PER_LONG == 32)
 	printk("\n"
-	       "                         free                        sibling\n");
-	printk("  task             PC    stack   pid father child younger older\n");
+	       "                                               sibling\n");
+	printk("  task             PC      pid father child younger older\n");
 #else
 	printk("\n"
-	       "                                 free                        sibling\n");
-	printk("  task                 PC        stack   pid father child younger older\n");
+	       "                                                       sibling\n");
+	printk("  task                 PC          pid father child younger older\n");
 #endif
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
