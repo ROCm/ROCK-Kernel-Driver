@@ -962,8 +962,12 @@ static void storage_disconnect(struct usb_interface *intf)
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(ss->dev_semaphore));
 
-	/* TODO: complete all pending commands with
-	 * cmd->result = DID_ERROR << 16 */
+	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
+	 * Since we only queue one command at a time, this is pretty easy. */
+	if (ss->srb) {
+		ss->srb->result = DID_ERROR << 16;
+		ss->srb->scsi_done(ss->srb);
+	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */
