@@ -527,8 +527,6 @@ static inline int pci_present(void)
 	return !list_empty(&pci_devices);
 }
 
-#define pci_for_each_dev(dev) \
-	for(dev = pci_dev_g(pci_devices.next); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.next))
 #define pci_for_each_dev_reverse(dev) \
 	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
 #define pci_for_each_bus(bus) \
@@ -551,25 +549,17 @@ static inline struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *s
 {
 	return pci_scan_bus_parented(NULL, bus, ops, sysdata);
 }
-struct pci_bus *pci_alloc_primary_bus_parented(struct device * parent, int bus);
-static inline struct pci_bus *pci_alloc_primary_bus(int bus)
-{
-	return pci_alloc_primary_bus_parented(NULL, bus);
-}
 int pci_scan_slot(struct pci_bus *bus, int devfn);
 void pci_bus_add_devices(struct pci_bus *bus);
-int pci_proc_attach_device(struct pci_dev *dev);
-int pci_proc_detach_device(struct pci_dev *dev);
-int pci_proc_attach_bus(struct pci_bus *bus);
-int pci_proc_detach_bus(struct pci_bus *bus);
 void pci_name_device(struct pci_dev *dev);
 char *pci_class_name(u32 class);
 void pci_read_bridge_bases(struct pci_bus *child);
 struct resource *pci_find_parent_resource(const struct pci_dev *dev, struct resource *res);
-int pci_setup_device(struct pci_dev *dev);
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
 extern struct pci_dev *pci_get_dev(struct pci_dev *dev);
 extern void pci_put_dev(struct pci_dev *dev);
+
+extern void pci_remove_bus_device(struct pci_dev *dev);
 
 /* Generic PCI functions exported to card drivers */
 
@@ -578,12 +568,8 @@ struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
 				 unsigned int ss_vendor, unsigned int ss_device,
 				 const struct pci_dev *from);
 struct pci_dev *pci_find_class (unsigned int class, const struct pci_dev *from);
-struct pci_bus *pci_find_bus(unsigned char busnr);
 struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
-unsigned char pci_bus_max_busnr(struct pci_bus* bus);
-unsigned char pci_max_busnr(void);
 int pci_find_capability (struct pci_dev *dev, int cap);
-int pci_bus_find_capability (struct pci_bus *bus, unsigned int devfn, int cap);
 
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
@@ -617,8 +603,6 @@ static inline int pci_write_config_dword(struct pci_dev *dev, int where, u32 val
 	return pci_bus_write_config_dword (dev->bus, dev->devfn, where, val);
 }
 
-extern spinlock_t pci_lock;
-
 int pci_enable_device(struct pci_dev *dev);
 int pci_enable_device_bars(struct pci_dev *dev, int mask);
 void pci_disable_device(struct pci_dev *dev);
@@ -638,7 +622,6 @@ int pci_set_power_state(struct pci_dev *dev, int state);
 int pci_enable_wake(struct pci_dev *dev, u32 state, int enable);
 
 /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
-
 void pci_bus_assign_resources(struct pci_bus *bus);
 void pci_bus_size_bridges(struct pci_bus *bus);
 int pci_claim_resource(struct pci_dev *, int);
@@ -654,24 +637,14 @@ int pci_request_region(struct pci_dev *, int, char *);
 void pci_release_region(struct pci_dev *, int);
 
 /* drivers/pci/bus.c */
-
-int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
-			   unsigned long size, unsigned long align,
-			   unsigned long min, unsigned int type_mask,
-			   void (*alignf)(void *, struct resource *,
-					  unsigned long, unsigned long),
-			   void *alignf_data);
 void pci_enable_bridges(struct pci_bus *bus);
 
 /* New-style probing supporting hot-pluggable devices */
 int pci_register_driver(struct pci_driver *);
 void pci_unregister_driver(struct pci_driver *);
-void pci_remove_bus_device(struct pci_dev *);
 void pci_remove_behind_bridge(struct pci_dev *);
 struct pci_driver *pci_dev_driver(const struct pci_dev *);
 const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev);
-unsigned int pci_do_scan_bus(struct pci_bus *bus);
-struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr);
 int pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass);
 
 /* kmem_cache style wrapper around pci_alloc_consistent() */
@@ -685,42 +658,6 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
 extern struct pci_dev *isa_bridge;
 #endif
-
-/* Some worker functions that PCI Hotplug drivers find useful */
-struct pci_dev_wrapped {
-	struct pci_dev	*dev;
-	void		*data;
-};
-
-struct pci_bus_wrapped {
-	struct pci_bus	*bus;
-	void		*data;
-};
-
-struct pci_visit {
-	int (* pre_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-	int (* post_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-
-	int (* pre_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* visit_pci_dev)		(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* post_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-};
-
-extern int pci_visit_dev(struct pci_visit *fn,
-			 struct pci_dev_wrapped *wrapped_dev,
-			 struct pci_bus_wrapped *wrapped_parent);
-extern int pci_remove_device_safe(struct pci_dev *dev);
-
-static inline void
-pci_dynids_set_use_driver_data(struct pci_driver *pdrv, int val)
-{
-	pdrv->dynids.use_driver_data = val;
-}
 
 #endif /* CONFIG_PCI */
 
@@ -770,16 +707,12 @@ static inline void pci_unregister_driver(struct pci_driver *drv) { }
 static inline int scsi_to_pci_dma_dir(unsigned char scsi_dir) { return scsi_dir; }
 static inline int pci_find_capability (struct pci_dev *dev, int cap) {return 0; }
 static inline const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev) { return NULL; }
-static inline void pci_dynids_set_use_driver_data(struct pci_driver *pdrv, int val) { }
 
 /* Power management related routines */
 static inline int pci_save_state(struct pci_dev *dev, u32 *buffer) { return 0; }
 static inline int pci_restore_state(struct pci_dev *dev, u32 *buffer) { return 0; }
 static inline int pci_set_power_state(struct pci_dev *dev, int state) { return 0; }
 static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { return 0; }
-
-#define pci_for_each_dev(dev) \
-	for(dev = NULL; 0; )
 
 #define	isa_bridge	((struct pci_dev *)NULL)
 

@@ -1171,7 +1171,7 @@ Powerplus_Map_Non0(struct pci_dev *dev)
 void __init
 prep_pcibios_fixup(void)
 {
-        struct pci_dev *dev;
+        struct pci_dev *dev = NULL;
         extern unsigned char *Motherboard_map;
         extern unsigned char *Motherboard_routes;
 
@@ -1180,7 +1180,7 @@ prep_pcibios_fixup(void)
 	printk("Setting PCI interrupts for a \"%s\"\n", Motherboard_map_name);
 	if (OpenPIC_Addr) {
 		/* PCI interrupts are controlled by the OpenPIC */
-		pci_for_each_dev(dev) {
+		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 			if (dev->bus->number == 0) {
                        		dev->irq = openpic_to_irq(Motherboard_map[PCI_SLOT(dev->devfn)]);
 				pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
@@ -1196,7 +1196,8 @@ prep_pcibios_fixup(void)
 		return;
 	}
 
-	pci_for_each_dev(dev) {
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
 		 * Use our old hard-coded kludge to figure out what
 		 * irq this device uses.  This is necessary on things

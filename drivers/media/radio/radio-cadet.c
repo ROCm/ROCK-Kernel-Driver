@@ -389,9 +389,6 @@ static int cadet_do_ioctl(struct inode *inode, struct file *file,
 				        v->flags|=VIDEO_TUNER_STEREO_ON;
 			        }
 				v->flags|=cadet_getrds();
-			        if(copy_to_user(arg,&v, sizeof(v))) {
-				        return -EFAULT;
-			        }
 			        break;
 			        case 1:
 			        strcpy(v->name,"AM");
@@ -402,9 +399,6 @@ static int cadet_do_ioctl(struct inode *inode, struct file *file,
 			        v->mode=0;
 			        v->mode|=VIDEO_MODE_AUTO;
 			        v->signal=sigstrength;
-			        if(copy_to_user(arg,&v, sizeof(v))) {
-				        return -EFAULT;
-			        }
 			        break;
 			}
 			return 0;

@@ -162,37 +162,19 @@ extern unsigned char e100lpslaveprog;
  * (detachable devices only).
  */
 static int __init
-etrax_ethernet_lpslave_init(struct net_device *dev)
+etrax_ethernet_lpslave_init(void)
 {
-	int i;
+	struct net_device *dev;
+	int i, err;
 	int anOffset = 0;
 
 	printk("Etrax/100 lpslave ethernet driver v0.3, (c) 1999 Axis Communications AB\n");
 
-	dev->base_addr = 2;
-
-	printk("%s initialized\n", dev->name);
-
-	/* make Linux aware of the new hardware  */
-
-	if (!dev) {
-		printk(KERN_WARNING "%s: dev == NULL. Should this happen?\n",
-                       cardname);
-		dev = init_etherdev(dev, sizeof(struct net_local));
-		if (!dev)
-			panic("init_etherdev failed\n");
-	}
-
-	/* setup generic handlers and stuff in the dev struct */
-
-	ether_setup(dev);
-
-	/* make room for the local structure containing stats etc */
-
-	dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL)
+	dev = alloc_etherdev(sizeof(struct net_lock));
+	if (!dev)
 		return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_local));
+
+	dev->base_addr = 2;
 
 	/* now setup our etrax specific stuff */
 
@@ -242,7 +224,11 @@ etrax_ethernet_lpslave_init(struct net_device *dev)
 	TxDescList[0].buf = virt_to_phys(&host_command);
 	TxDescList[0].next = virt_to_phys(&TxDescList[1]);
 
-	return 0;
+	err = register_netdev(dev);
+	if (err)
+		kfree(dev);
+
+	return err;
 }
 
 /* set MAC address of the interface. called from the core after a
@@ -1017,19 +1003,10 @@ dump_parport_status(void)
 }
 #endif /* ETHDEBUG */
 
-static struct net_device dev_etrax_slave_ethernet;
-
 static int
 etrax_init_module(void)
 {
-	struct net_device *d = &dev_etrax_slave_ethernet;
-
-	d->init = etrax_ethernet_lpslave_init;
-
-	if(register_netdev(d) == 0)
-		return 0;
-	else
-		return -ENODEV;
+	return etrax_ethernet_lpslave_init();
 }
 
 module_init(etrax_init_module);

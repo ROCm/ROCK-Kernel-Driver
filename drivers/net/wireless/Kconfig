@@ -149,7 +149,7 @@ config PCMCIA_RAYCS
 	  unsure, say N.
 
 comment "Wireless 802.11b ISA/PCI cards support"
-	depends on NET_RADIO && (ISA || PCI || ALL_PPC || PCMCIA)
+	depends on NET_RADIO && (ISA || PCI || PPC_PMAC || PCMCIA)
 
 config AIRO
 	tristate "Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards"
@@ -169,7 +169,7 @@ config AIRO
 
 config HERMES
 	tristate "Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)"
-	depends on NET_RADIO && (ALL_PPC || PCI || PCMCIA)
+	depends on NET_RADIO && (PPC_PMAC || PCI || PCMCIA)
 	---help---
 	  A driver for 802.11b wireless cards based based on the "Hermes" or
 	  Intersil HFA384x (Prism 2) MAC controller.  This includes the vast
@@ -191,7 +191,7 @@ config HERMES
 
 config APPLE_AIRPORT
 	tristate "Apple Airport support (built-in)"
-	depends on ALL_PPC && HERMES
+	depends on PPC_PMAC && HERMES
 	help
 	  Say Y here to support the Airport 802.11b wireless Ethernet hardware
 	  built into the Macintosh iBook and other recent PowerPC-based
@@ -284,7 +284,7 @@ config AIRO_CS
 # yes, this works even when no drivers are selected
 config NET_WIRELESS
 	bool
-	depends on NET_RADIO && (ISA || PCI || ALL_PPC || PCMCIA)
+	depends on NET_RADIO && (ISA || PCI || PPC_PMAC || PCMCIA)
 	default y
 
 endmenu

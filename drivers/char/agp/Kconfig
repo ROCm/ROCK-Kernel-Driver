@@ -134,7 +134,7 @@ config AGP_ALPHA_CORE
 
 config AGP_UNINORTH
 	tristate "Apple UniNorth AGP support"
-	depends on AGP && ALL_PPC
+	depends on AGP && PPC_PMAC
 	help
 	  This option gives you AGP support for Apple machines with a
 	  UniNorth bridge.

@@ -1,9 +1,6 @@
 /*
- *  linux/arch/arm/mach-integrator/mm.c
+ *  linux/arch/arm/mach-integrator/arch.c
  *
- *  Extra MM routines for the ARM Integrator board
- *
- *  Copyright (C) 1999,2000 Arm Limited
  *  Copyright (C) 2000 Deep Blue Solutions Ltd
  *
  * This program is free software; you can redistribute it and/or modify
@@ -20,13 +17,34 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <linux/config.h>
+#include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/list.h>
+#include <linux/device.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
- 
+#include <asm/irq.h>
+#include <asm/setup.h>
+#include <asm/mach-types.h>
+
+#include <asm/mach/arch.h>
+#include <asm/mach/irq.h>
 #include <asm/mach/map.h>
+
+/* 
+ * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
+ * is the (PA >> 12).
+ *
+ * Setup a VA for the Integrator interrupt controller (for header #0,
+ * just for now).
+ */
+#define VA_IC_BASE	IO_ADDRESS(INTEGRATOR_IC_BASE) 
+#define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_IC_OFFSET
 
 /*
  * Logical      Physical
@@ -64,7 +82,54 @@ static struct map_desc integrator_io_desc[] __initdata = {
  { PCI_IO_VADDR,                      PHYS_PCI_IO_BASE,      SZ_64K, MT_DEVICE }
 };
 
-void __init integrator_map_io(void)
+static void __init integrator_map_io(void)
 {
 	iotable_init(integrator_io_desc, ARRAY_SIZE(integrator_io_desc));
 }
+
+#define ALLPCI ( (1 << IRQ_PCIINT0) | (1 << IRQ_PCIINT1) | (1 << IRQ_PCIINT2) | (1 << IRQ_PCIINT3) ) 
+
+static void sc_mask_irq(unsigned int irq)
+{
+	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_CLEAR);
+}
+
+static void sc_unmask_irq(unsigned int irq)
+{
+	writel(1 << irq, VA_IC_BASE + IRQ_ENABLE_SET);
+}
+
+static struct irqchip sc_chip = {
+	.ack	= sc_mask_irq,
+	.mask	= sc_mask_irq,
+	.unmask = sc_unmask_irq,
+};
+ 
+static void __init integrator_init_irq(void)
+{
+	unsigned int i;
+
+	/* Disable all interrupts initially. */
+	/* Do the core module ones */
+	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
+
+	/* do the header card stuff next */
+	writel(-1, VA_IC_BASE + IRQ_ENABLE_CLEAR);
+	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
+
+	for (i = 0; i < NR_IRQS; i++) {
+		if (((1 << i) && INTEGRATOR_SC_VALID_INT) != 0) {
+			set_irq_chip(i, &sc_chip);
+			set_irq_handler(i, do_level_IRQ);
+			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+		}
+	}
+}
+
+MACHINE_START(INTEGRATOR, "ARM-Integrator")
+	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
+	BOOT_MEM(0x00000000, 0x16000000, 0xf1600000)
+	BOOT_PARAMS(0x00000100)
+	MAPIO(integrator_map_io)
+	INITIRQ(integrator_init_irq)
+MACHINE_END

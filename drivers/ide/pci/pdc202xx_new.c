@@ -579,7 +579,7 @@ static void __init init_setup_pdcnew (struct pci_dev *dev, ide_pci_device_t *d)
 
 static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	struct pci_dev *findev;
+	struct pci_dev *findev = NULL;
 
 	if ((dev->bus->self &&
 	     dev->bus->self->vendor == PCI_VENDOR_ID_DEC) &&
@@ -588,7 +588,7 @@ static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d
 			return;
 		}
 		d->extra = 0;
-		pci_for_each_dev(findev) {
+		while ((findev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, findev)) != NULL) {
 			if ((findev->vendor == dev->vendor) &&
 			    (findev->device == dev->device) &&
 			    (PCI_SLOT(findev->devfn) & 2)) {

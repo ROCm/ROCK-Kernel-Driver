@@ -723,8 +723,6 @@ static int qcam_do_ioctl(struct inode *inode, struct file *file,
 			/* Good question.. its composite or SVHS so.. */
 			v->type = VIDEO_TYPE_CAMERA;
 			strcpy(v->name, "Camera");
-			if(copy_to_user(arg, &v, sizeof(v)))
-				return -EFAULT;
 			return 0;
 		}
 		case VIDIOCSCHAN:

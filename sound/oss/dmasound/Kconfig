@@ -14,7 +14,7 @@ config DMASOUND_ATARI
 
 config DMASOUND_AWACS
 	tristate "PowerMac DMA sound support"
-	depends on ALL_PPC && SOUND
+	depends on PPC_PMAC && SOUND
 	help
 	  If you want to use the internal audio of your PowerMac in Linux,
 	  answer Y to this question. This will provide a Sun-like /dev/audio,

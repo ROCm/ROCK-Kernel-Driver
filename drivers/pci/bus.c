@@ -94,9 +94,7 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 
 		device_add(&dev->dev);
 		list_add_tail(&dev->global_list, &pci_devices);
-#ifdef CONFIG_PROC_FS
 		pci_proc_attach_device(dev);
-#endif
 		pci_create_sysfs_dev_files(dev);
 
 	}
@@ -129,6 +127,5 @@ void pci_enable_bridges(struct pci_bus *bus)
 	}
 }
 
-EXPORT_SYMBOL(pci_bus_alloc_resource);
 EXPORT_SYMBOL(pci_bus_add_devices);
 EXPORT_SYMBOL(pci_enable_bridges);

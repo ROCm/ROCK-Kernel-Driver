@@ -42,7 +42,7 @@
  */
 struct sa1111 {
 	struct device	*dev;
-	struct resource	res;
+	unsigned long	phys;
 	int		irq;
 	spinlock_t	lock;
 	void		*base;
@@ -60,7 +60,6 @@ static struct sa1111_dev usb_dev = {
 	},
 	.skpcr_mask	= SKPCR_UCLKEN,
 	.devid		= SA1111_DEVID_USB,
-	.dma_mask	= 0xffffffffLL,
 	.irq = {
 		IRQ_USBPWR,
 		IRQ_HCIM,
@@ -470,6 +469,17 @@ static void sa1111_wake(struct sa1111 *sachip)
 
 #ifdef CONFIG_ARCH_SA1100
 
+static u32 sa1111_dma_mask[] = {
+	~0,
+	~(1 << 20),
+	~(1 << 23),
+	~(1 << 24),
+	~(1 << 25),
+	~(1 << 20),
+	~(1 << 20),
+	0,
+};
+
 /*
  * Configure the SA1111 shared memory controller.
  */
@@ -483,26 +493,43 @@ sa1111_configure_smc(struct sa1111 *sachip, int sdram, unsigned int drac,
 		smcr |= SMCR_CLAT;
 
 	sa1111_writel(smcr, sachip->base + SA1111_SMCR);
+
+	/*
+	 * Now clear the bits in the DMA mask to work around the SA1111
+	 * DMA erratum (Intel StrongARM SA-1111 Microprocessor Companion
+	 * Chip Specification Update, June 2000, Erratum #7).
+	 */
+	if (sachip->dev->dma_mask)
+		*sachip->dev->dma_mask &= sa1111_dma_mask[drac >> 2];
 }
 
 #endif
 
 static void
-sa1111_init_one_child(struct sa1111 *sachip, struct sa1111_dev *sadev, unsigned int offset)
+sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
+		      struct sa1111_dev *sadev, unsigned int offset)
 {
 	snprintf(sadev->dev.bus_id, sizeof(sadev->dev.bus_id),
 		 "%4.4x", offset);
 
+	/*
+	 * If the parent device has a DMA mask associated with it,
+	 * propagate it down to the children.
+	 */
+	if (sachip->dev->dma_mask) {
+		sadev->dma_mask = *sachip->dev->dma_mask;
+		sadev->dev.dma_mask = &sadev->dma_mask;
+	}
+
 	sadev->dev.parent = sachip->dev;
 	sadev->dev.bus    = &sa1111_bus_type;
-	sadev->dev.dma_mask = &sadev->dma_mask;
-	sadev->res.start  = sachip->res.start + offset;
+	sadev->res.start  = sachip->phys + offset;
 	sadev->res.end    = sadev->res.start + 511;
 	sadev->res.name   = sadev->dev.name;
 	sadev->res.flags  = IORESOURCE_MEM;
 	sadev->mapbase    = sachip->base + offset;
 
-	if (request_resource(&sachip->res, &sadev->res)) {
+	if (request_resource(parent, &sadev->res)) {
 		printk("SA1111: failed to allocate resource for %s\n",
 			sadev->res.name);
 		return;
@@ -524,7 +551,7 @@ sa1111_init_one_child(struct sa1111 *sachip, struct sa1111_dev *sadev, unsigned 
  *	%0		successful.
  */
 static int __init
-__sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
+__sa1111_probe(struct device *me, struct resource *mem, int irq)
 {
 	struct sa1111 *sachip;
 	unsigned long id;
@@ -542,24 +569,17 @@ __sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
 	sachip->dev = me;
 	dev_set_drvdata(sachip->dev, sachip);
 
-	sachip->res.name  = me->name;
-	sachip->res.start = phys_addr;
-	sachip->res.end   = phys_addr + 0x2000;
+	sachip->phys = mem->start;
 	sachip->irq = irq;
-
-	if (request_resource(&iomem_resource, &sachip->res)) {
-		ret = -EBUSY;
-		goto out;
-	}
 
 	/*
 	 * Map the whole region.  This also maps the
 	 * registers for our children.
 	 */
-	sachip->base = ioremap(phys_addr, PAGE_SIZE * 2);
+	sachip->base = ioremap(mem->start, PAGE_SIZE * 2);
 	if (!sachip->base) {
 		ret = -ENOMEM;
-		goto release;
+		goto out;
 	}
 
 	/*
@@ -611,9 +631,11 @@ __sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
 	 * The interrupt controller must be initialised before any
 	 * other device to ensure that the interrupts are available.
 	 */
-	int_dev.irq[0] = irq;
-	sa1111_init_one_child(sachip, &int_dev, SA1111_INTC);
-	sa1111_init_irq(&int_dev);
+	if (irq != NO_IRQ) {
+		int_dev.irq[0] = irq;
+		sa1111_init_one_child(sachip, mem, &int_dev, SA1111_INTC);
+		sa1111_init_irq(&int_dev);
+	}
 
 	g_sa1111 = sachip;
 
@@ -626,14 +648,12 @@ __sa1111_probe(struct device *me, unsigned long phys_addr, int irq)
 
 	for (i = 0; i < ARRAY_SIZE(devs); i++)
 		if (has_devs & (1 << i))
-			sa1111_init_one_child(sachip, devs[i], dev_offset[i]);
+			sa1111_init_one_child(sachip, mem, devs[i], dev_offset[i]);
 
 	return 0;
 
  unmap:
 	iounmap(sachip->base);
- release:
-	release_resource(&sachip->res);
  out:
 	kfree(sachip);
 	return ret;
@@ -649,7 +669,6 @@ static void __sa1111_remove(struct sa1111 *sachip)
 	}
 
 	iounmap(sachip->base);
-	release_resource(&sachip->res);
 	kfree(sachip);
 }
 
@@ -874,7 +893,17 @@ static int sa1111_resume(struct device *dev, u32 level)
 
 static int sa1111_probe(struct device *dev)
 {
-	return -ENODEV;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct resource *mem = NULL, *irq = NULL;
+	int i;
+
+	for (i = 0; i < pdev->num_resources; i++) {
+		if (pdev->resource[i].flags & IORESOURCE_MEM)
+			mem = &pdev->resource[i];
+		if (pdev->resource[i].flags & IORESOURCE_IRQ)
+			irq = &pdev->resource[i];
+	}
+	return __sa1111_probe(dev, mem, irq ? irq->start : NO_IRQ);
 }
 
 static int sa1111_remove(struct device *dev)
@@ -903,7 +932,7 @@ static int sa1111_remove(struct device *dev)
  */
 static struct device_driver sa1111_device_driver = {
 	.name		= "sa1111",
-	.bus		= &system_bus_type,
+	.bus		= &platform_bus_type,
 	.probe		= sa1111_probe,
 	.remove		= sa1111_remove,
 	.suspend	= sa1111_suspend,
@@ -920,29 +949,6 @@ static int sa1111_driver_init(void)
 }
 
 arch_initcall(sa1111_driver_init);
-
-static struct sys_device sa1111_device = {
-	.name		= "SA1111",
-	.id		= 0,
-	.root		= NULL,
-	.dev = {
-		.name	= "Intel Corporation SA1111",
-		.driver	= &sa1111_device_driver,
-	},
-};
-
-int sa1111_init(unsigned long phys, unsigned int irq)
-{
-	int ret;
-
-	snprintf(sa1111_device.dev.bus_id, sizeof(sa1111_device.dev.bus_id), "%8.8lx", phys);
-
-	ret = sys_device_register(&sa1111_device);
-	if (ret)
-		printk("sa1111 device_register failed: %d\n", ret);
-
-	return __sa1111_probe(&sa1111_device.dev, phys, irq);
-}
 
 /*
  *	Get the parent device driver (us) structure

@@ -11,6 +11,7 @@
 #include <linux/mm.h>
 #include <linux/random.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <net/flow.h>
 #include <asm/atomic.h>
 

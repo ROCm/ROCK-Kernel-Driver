@@ -117,7 +117,7 @@ _exception(int signr, struct pt_regs *regs)
  */
 static inline int check_io_access(struct pt_regs *regs)
 {
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 	unsigned long msr = regs->msr;
 	const struct exception_table_entry *entry;
 	unsigned int *nip = (unsigned int *)regs->nip;
@@ -150,7 +150,7 @@ static inline int check_io_access(struct pt_regs *regs)
 			return 1;
 		}
 	}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 	return 0;
 }
 

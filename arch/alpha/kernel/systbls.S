@@ -433,6 +433,15 @@ sys_call_table:
 	.quad sys_set_tid_address
 	.quad sys_restart_syscall
 	.quad sys_fadvise64
+	.quad sys_timer_create
+	.quad sys_timer_settime			/* 415 */
+	.quad sys_timer_gettime
+	.quad sys_timer_getoverrun
+	.quad sys_timer_delete
+	.quad sys_clock_settime
+	.quad sys_clock_gettime			/* 420 */
+	.quad sys_clock_getres
+	.quad sys_clock_nanosleep
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

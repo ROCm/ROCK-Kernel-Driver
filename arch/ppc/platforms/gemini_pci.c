@@ -13,9 +13,9 @@
 void __init gemini_pcibios_fixup(void)
 {
 	int i;
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		for(i = 0; i < 6; i++) {
 			if (dev->resource[i].flags & IORESOURCE_IO) {
 				dev->resource[i].start |= (0xfe << 24);

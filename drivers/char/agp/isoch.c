@@ -316,7 +316,7 @@ static void agp_3_5_nonisochronous_node_enable(struct agp_bridge_data *bridge,
  */
 int agp_3_5_enable(struct agp_bridge_data *bridge)
 {
-	struct pci_dev *td = bridge->dev, *dev;
+	struct pci_dev *td = bridge->dev, *dev = NULL;
 	u8 mcapndx;
 	u32 isoch, arqsz;
 	u32 tstatus, mstatus, ncapid;
@@ -347,7 +347,7 @@ int agp_3_5_enable(struct agp_bridge_data *bridge)
 	INIT_LIST_HEAD(head);
 
 	/* Find all AGP devices, and add them to dev_list. */
-	pci_for_each_dev(dev) { 
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 		if (mcapndx == 0)
 			continue;

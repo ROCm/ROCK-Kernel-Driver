@@ -252,7 +252,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	return ctx;
 
 out_cleanup:
-	atomic_sub(ctx->max_reqs, &aio_nr);	/* undone by __put_ioctx */
+	atomic_sub(ctx->max_reqs, &aio_nr);
 	ctx->max_reqs = 0;	/* prevent __put_ioctx from sub'ing aio_nr */
 	__put_ioctx(ctx);
 	return ERR_PTR(-EAGAIN);
@@ -405,9 +405,6 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		list_add(&req->ki_list, &ctx->active_reqs);
 		get_ioctx(ctx);
 		ctx->reqs_active++;
-		req->ki_user_obj = NULL;
-		req->ki_ctx = ctx;
-		req->ki_users = 1;
 		okay = 1;
 	}
 	kunmap_atomic(ring, KM_USER0);
@@ -949,7 +946,7 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t *ctxp)
 		goto out;
 
 	ret = -EINVAL;
-	if (unlikely(ctx || !nr_events || (int)nr_events < 0)) {
+	if (unlikely(ctx || (int)nr_events <= 0)) {
 		pr_debug("EINVAL: io_setup: ctx or nr_events > max\n");
 		goto out;
 	}
@@ -984,9 +981,7 @@ asmlinkage long sys_io_destroy(aio_context_t ctx)
 	return -EINVAL;
 }
 
-int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
-				  struct iocb *iocb));
-int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
+int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 			 struct iocb *iocb)
 {
 	struct kiocb *req;
@@ -1098,7 +1093,7 @@ out_put_req:
  *	fail with -ENOSYS if not implemented.
  */
 asmlinkage long sys_io_submit(aio_context_t ctx_id, long nr,
-			      struct iocb **iocbpp)
+			      struct iocb __user **iocbpp)
 {
 	struct kioctx *ctx;
 	long ret = 0;
@@ -1116,8 +1111,13 @@ asmlinkage long sys_io_submit(aio_context_t ctx_id, long nr,
 		return -EINVAL;
 	}
 
+	/*
+	 * AKPM: should this return a partial result if some of the IOs were
+	 * successfully submitted?
+	 */
 	for (i=0; i<nr; i++) {
-		struct iocb *user_iocb, tmp;
+		struct iocb __user *user_iocb;
+		struct iocb tmp;
 
 		if (unlikely(__get_user(user_iocb, iocbpp + i))) {
 			ret = -EFAULT;
