@@ -139,10 +139,12 @@
 
 #include <asm/io.h>
 
+#include "trm290.h"
+
 static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	unsigned int reg;
+	u16 reg = 0;
 	unsigned long flags;
 
 	/* select PIO or DMA */
@@ -153,15 +155,16 @@ static void trm290_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 	if (reg != hwif->select_data) {
 		hwif->select_data = reg;
 		/* set PIO/DMA */
-		OUT_BYTE(0x51|(hwif->channel<<3), hwif->config_data+1);
-		OUT_WORD(reg & 0xff, hwif->config_data);
+		hwif->OUTB(0x51|(hwif->channel<<3), hwif->config_data+1);
+		hwif->OUTW(reg & 0xff, hwif->config_data);
 	}
 
 	/* enable IRQ if not probing */
 	if (drive->present) {
-		reg = IN_WORD(hwif->config_data+3) & 0x13;
+		reg = hwif->INW(hwif->config_data + 3);
+		reg &= 0x13;
 		reg &= ~(1 << hwif->channel);
-		OUT_WORD(reg, hwif->config_data+3);
+		hwif->OUTW(reg, hwif->config_data+3);
 	}
 
 	local_irq_restore(flags);
@@ -173,116 +176,185 @@ static void trm290_selectproc (ide_drive_t *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int trm290_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int trm290_ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-//	ide_task_t *args = HWGROUP(drive)->rq->special;
+	ide_hwif_t *hwif	= HWIF(drive);
+	struct request *rq	= HWGROUP(drive)->rq;
+//	ide_task_t *args	= rq->special;
+	task_ioreg_t command	= WIN_NOP;
 	unsigned int count, reading = 2, writing = 0;
 
-	switch (func) {
-		case ide_dma_write:
-			reading = 0;
-			writing = 1;
+	reading = 0;
+	writing = 1;
 #ifdef TRM290_NO_DMA_WRITES
-			break;	/* always use PIO for writes */
-#endif
-		case ide_dma_read:
-			if (!(count = ide_build_dmatable(drive, func)))
-				/* try PIO instead of DMA */
-				break;
-			/* select DMA xfer */
-			trm290_prepare_drive(drive, 1);
-			outl(hwif->dmatable_dma|reading|writing, hwif->dma_base);
-			drive->waiting_for_dma = 1;
-			/* start DMA */
-			OUT_WORD((count * 2) - 1, hwif->dma_base+2);
-			if (drive->media != ide_disk)
-				return 0;
-			if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-				BUG();
-			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-/*
- * FIX ME to use only ACB ide_task_t args Struct
- */
-#if 0
-		{
-			ide_task_t *args = HWGROUP(drive)->rq->special;
-			OUT_BYTE(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-		}
-#else
-			if (HWGROUP(drive)->rq->flags == REQ_DRIVE_TASKFILE) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
-				OUT_BYTE(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-			} else if (drive->addressing == 1)
-				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			else
-				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-#endif
-			return HWIF(drive)->dmaproc(ide_dma_begin, drive);
-		case ide_dma_begin:
-			return 0;
-		case ide_dma_end:
-			drive->waiting_for_dma = 0;
-			/* purge DMA mappings */
-			ide_destroy_dmatable(drive);
-			return (IN_WORD(hwif->dma_base+2) != 0x00ff);
-		case ide_dma_test_irq:
-			return (IN_WORD(hwif->dma_base+2) == 0x00ff);
-		default:
-			return ide_dmaproc(func, drive);
-	}
+	/* always use PIO for writes */
 	trm290_prepare_drive(drive, 0);	/* select PIO xfer */
 	return 1;
+#endif
+	if (!(count = ide_build_dmatable(drive, rq))) {
+		/* try PIO instead of DMA */
+		trm290_prepare_drive(drive, 0); /* select PIO xfer */
+		return 1;
+	}
+	/* select DMA xfer */
+	trm290_prepare_drive(drive, 1);
+	hwif->OUTL(hwif->dmatable_dma|reading|writing, hwif->dma_command);
+	drive->waiting_for_dma = 1;
+	/* start DMA */
+	hwif->OUTW((count * 2) - 1, hwif->dma_status);
+	if (drive->media != ide_disk)
+		return 0;
+	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
+		BUG();
+	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+	/*
+	 * FIX ME to use only ACB ide_task_t args Struct
+	 */
+#if 0
+	{
+		ide_task_t *args = rq->special;
+		command = args->tfRegister[IDE_COMMAND_OFFSET];
+	}
+#else
+	command = /* (lba48) ? WIN_READDMA_EXT : */ WIN_READDMA;
+	if (rq->flags & REQ_DRIVE_TASKFILE) {
+		ide_task_t *args = rq->special;
+		command = args->tfRegister[IDE_COMMAND_OFFSET];
+	}
+#endif
+	/* issue cmd to drive */
+	hwif->OUTB(command, IDE_COMMAND_REG);
+	return HWIF(drive)->ide_dma_count(drive);
+}
+
+static int trm290_ide_dma_read (ide_drive_t *drive  /*, struct request *rq */)
+{
+	ide_hwif_t *hwif	= HWIF(drive);
+	struct request *rq	= HWGROUP(drive)->rq;
+//	ide_task_t *args	= rq->special;
+	task_ioreg_t command	= WIN_NOP;
+	unsigned int count, reading = 2, writing = 0;
+
+	if (!(count = ide_build_dmatable(drive, rq))) {
+		/* try PIO instead of DMA */
+		trm290_prepare_drive(drive, 0); /* select PIO xfer */
+		return 1;
+	}
+	/* select DMA xfer */
+	trm290_prepare_drive(drive, 1);
+	hwif->OUTL(hwif->dmatable_dma|reading|writing, hwif->dma_command);
+	drive->waiting_for_dma = 1;
+	/* start DMA */
+	hwif->OUTW((count * 2) - 1, hwif->dma_status);
+	if (drive->media != ide_disk)
+		return 0;
+	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
+		BUG();
+	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+	/*
+	 * FIX ME to use only ACB ide_task_t args Struct
+	 */
+#if 0
+	{
+		ide_task_t *args = rq->special;
+		command = args->tfRegister[IDE_COMMAND_OFFSET];
+	}
+#else
+	command = /* (lba48) ? WIN_WRITEDMA_EXT : */ WIN_WRITEDMA;
+	if (rq->flags & REQ_DRIVE_TASKFILE) {
+		ide_task_t *args = rq->special;
+		command = args->tfRegister[IDE_COMMAND_OFFSET];
+	}
+#endif
+	/* issue cmd to drive */
+	hwif->OUTB(command, IDE_COMMAND_REG);
+	return HWIF(drive)->ide_dma_count(drive);
+}
+
+static int trm290_ide_dma_begin (ide_drive_t *drive)
+{
+	return 0;
+}
+
+static int trm290_ide_dma_end (ide_drive_t *drive)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+	u16 status = 0;;
+
+	drive->waiting_for_dma = 0;
+	/* purge DMA mappings */
+	ide_destroy_dmatable(drive);
+	status = hwif->INW(hwif->dma_status);
+	return (status != 0x00ff);
+}
+
+static int trm290_ide_dma_test_irq (ide_drive_t *drive)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+	u16 status = 0;
+
+	status = hwif->INW(hwif->dma_status);
+	return (status == 0x00ff);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __init ide_init_trm290 (ide_hwif_t *hwif)
+void __init init_hwif_trm290 (ide_hwif_t *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;
-	byte reg;
+	u8 reg = 0;
 	struct pci_dev *dev = hwif->pci_dev;
 
+	hwif->addressing = 1;
 	hwif->chipset = ide_trm290;
 	cfgbase = pci_resource_start(dev, 4);
 	if ((dev->class & 5) && cfgbase) {
 		hwif->config_data = cfgbase;
-		printk("TRM290: chip config base at 0x%04lx\n",
+		printk(KERN_INFO "TRM290: chip config base at 0x%04lx\n",
 			hwif->config_data);
 	} else {
 		hwif->config_data = 0x3df0;
-		printk("TRM290: using default config base at 0x%04lx\n",
+		printk(KERN_INFO "TRM290: using default config base at 0x%04lx\n",
 			hwif->config_data);
 	}
 
 	local_irq_save(flags);
 	/* put config reg into first byte of hwif->select_data */
-	OUT_BYTE(0x51|(hwif->channel<<3), hwif->config_data+1);
+	hwif->OUTB(0x51|(hwif->channel<<3), hwif->config_data+1);
 	/* select PIO as default */
 	hwif->select_data = 0x21;
-	OUT_BYTE(hwif->select_data, hwif->config_data);
+	hwif->OUTB(hwif->select_data, hwif->config_data);
 	/* get IRQ info */
-	reg = IN_BYTE(hwif->config_data+3);
+	reg = hwif->INB(hwif->config_data+3);
 	/* mask IRQs for both ports */
 	reg = (reg & 0x10) | 0x03;
-	OUT_BYTE(reg, hwif->config_data+3);
+	hwif->OUTB(reg, hwif->config_data+3);
 	local_irq_restore(flags);
 
 	if ((reg & 0x10))
-		hwif->irq = hwif->channel ? 15 : 14;	/* legacy mode */
+		/* legacy mode */
+		hwif->irq = hwif->channel ? 15 : 14;
 	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
-		hwif->irq = hwif->mate->irq;		/* sharing IRQ with mate */
+		/* sharing IRQ with mate */
+		hwif->irq = hwif->mate->irq;
+
 	ide_setup_dma(hwif, (hwif->config_data + 4) ^ (hwif->channel ? 0x0080 : 0x0000), 3);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->dmaproc = &trm290_dmaproc;
+	hwif->ide_dma_write = &trm290_ide_dma_write;
+	hwif->ide_dma_read = &trm290_ide_dma_read;
+	hwif->ide_dma_begin = &trm290_ide_dma_begin;
+	hwif->ide_dma_end = &trm290_ide_dma_end;
+	hwif->ide_dma_test_irq = &trm290_ide_dma_test_irq;
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	hwif->selectproc = &trm290_selectproc;
-	hwif->autodma = 0;			/* play it safe for now */
+	hwif->autodma = 0;		/* play it safe for now */
+	hwif->drives[0].autodma = hwif->autodma;
+	hwif->drives[1].autodma = hwif->autodma;
 #if 1
 	{
 	/*
@@ -290,26 +362,60 @@ void __init ide_init_trm290 (ide_hwif_t *hwif)
 	 * for the control basereg, so this kludge ensures that we use only
 	 * values that are known to work.  Ugh.		-ml
 	 */
-		unsigned short old, compat = hwif->channel ? 0x374 : 0x3f4;
-		static unsigned short next_offset = 0;
+		u16 new, old, compat = hwif->channel ? 0x374 : 0x3f4;
+		static u16 next_offset = 0;
+		u8 old_mask;
 
-		OUT_BYTE(0x54|(hwif->channel<<3), hwif->config_data+1);
-		old = IN_WORD(hwif->config_data) & ~1;
-		if (old != compat && IN_BYTE(old+2) == 0xff) {
-			compat += (next_offset += 0x400);	/* leave lower 10 bits untouched */
-#if 1
-			if (ide_check_region(compat + 2, 1))
-				printk("Aieee %s: ide_check_region failure at 0x%04x\n", hwif->name, (compat + 2));
+		hwif->OUTB(0x54|(hwif->channel<<3), hwif->config_data+1);
+		old = hwif->INW(hwif->config_data);
+		old &= ~1;
+		old_mask = hwif->INB(old+2);
+		if (old != compat && old_mask == 0xff) {
+			/* leave lower 10 bits untouched */
+			compat += (next_offset += 0x400);
+#  if 1
+			if (check_region(compat + 2, 1))
+				printk(KERN_ERR "%s: check_region failure at 0x%04x\n",
+					hwif->name, (compat + 2));
 			/*
 			 * The region check is not needed; however.........
 			 * Since this is the checked in ide-probe.c,
 			 * this is only an assignment.
 			 */
-#endif
+#  endif
 			hwif->io_ports[IDE_CONTROL_OFFSET] = compat + 2;
-			OUT_WORD(compat|1, hwif->config_data);
-			printk("%s: control basereg workaround: old=0x%04x, new=0x%04x\n", hwif->name, old, IN_WORD(hwif->config_data) & ~1);
+			hwif->OUTW(compat|1, hwif->config_data);
+			new = hwif->INW(hwif->config_data);
+			printk(KERN_INFO "%s: control basereg workaround: "
+				"old=0x%04x, new=0x%04x\n",
+				hwif->name, old, new & ~1);
 		}
 	}
 #endif
 }
+
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+
+void __init init_setup_trm290 (struct pci_dev *dev, ide_pci_device_t *d)
+{
+	ide_setup_pci_device(dev, d);
+}
+
+int __init trm290_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_TEKRAM)
+		return 0;
+
+	for (d = trm290_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
+		}
+	}
+	return 0;
+}
+
