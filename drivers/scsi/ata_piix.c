@@ -3,8 +3,8 @@
     ata_piix.c - Intel PATA/SATA controllers
 
 
-	Copyright 2003 Red Hat Inc
-	Copyright 2003 Jeff Garzik
+	Copyright 2003-2004 Red Hat Inc
+	Copyright 2003-2004 Jeff Garzik
 
 
 	Copyright header from piix.c:
@@ -28,7 +28,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"
-#define DRV_VERSION	"0.95"
+#define DRV_VERSION	"1.00"
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */

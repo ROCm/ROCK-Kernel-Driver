@@ -1,8 +1,8 @@
 /*
    libata.h - helper library for ATA
 
-   Copyright 2003 Red Hat, Inc.  All rights reserved.
-   Copyright 2003 Jeff Garzik
+   Copyright 2003-2004 Red Hat, Inc.  All rights reserved.
+   Copyright 2003-2004 Jeff Garzik
 
    The contents of this file are subject to the Open
    Software License version 1.1 that can be found at
@@ -26,7 +26,7 @@
 #define __LIBATA_H__
 
 #define DRV_NAME	"libata"
-#define DRV_VERSION	"0.81"	/* must be exactly four chars */
+#define DRV_VERSION	"1.00"	/* must be exactly four chars */
 
 struct ata_scsi_args {
 	struct ata_port		*ap;
