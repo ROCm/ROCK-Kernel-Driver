@@ -354,11 +354,8 @@ static void __exit nicstar_module_exit(void)
 
       card = cards[i];
 
-#ifdef CONFIG_ATM_NICSTAR_USE_IDT77105
-      if (card->max_pcr == ATM_25_PCR) {
-        idt77105_stop(card->atmdev);
-      }
-#endif /* CONFIG_ATM_NICSTAR_USE_IDT77105 */
+      if (card->atmdev->phy && card->atmdev->phy->stop)
+        card->atmdev->phy->stop(card->atmdev);
 
       /* Stop everything */
       writel(0x00000000, card->membase + CFG);
@@ -905,22 +902,13 @@ static int __init ns_init_card(int i, struct pci_dev *pcidev)
    card->atmdev->phy = NULL;
 
 #ifdef CONFIG_ATM_NICSTAR_USE_SUNI
-   if (card->max_pcr == ATM_OC3_PCR) {
+   if (card->max_pcr == ATM_OC3_PCR)
       suni_init(card->atmdev);
-
-      MOD_INC_USE_COUNT;
-      /* Can't remove the nicstar driver or the suni driver would oops */
-   }
 #endif /* CONFIG_ATM_NICSTAR_USE_SUNI */
 
 #ifdef CONFIG_ATM_NICSTAR_USE_IDT77105
-   if (card->max_pcr == ATM_25_PCR) {
+   if (card->max_pcr == ATM_25_PCR)
       idt77105_init(card->atmdev);
-      /* Note that for the IDT77105 PHY we don't need the awful
-       * module count hack that the SUNI needs because we can
-       * stop the '105 when the nicstar module is cleaned up.
-       */
-   }
 #endif /* CONFIG_ATM_NICSTAR_USE_IDT77105 */
 
    if (card->atmdev->phy && card->atmdev->phy->start)

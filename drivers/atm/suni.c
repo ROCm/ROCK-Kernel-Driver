@@ -307,24 +307,6 @@ int suni_init(struct atm_dev *dev)
 	return 0;
 }
 
-
 EXPORT_SYMBOL(suni_init);
 
-
 MODULE_LICENSE("GPL");
-
-#ifdef MODULE
-
-
-int init_module(void)
-{
-	return 0;
-}
-
-
-void cleanup_module(void)
-{
-	/* Nay */
-}
-
-#endif
