@@ -738,7 +738,7 @@ static int get_iso_range (
 	}
 
 	/* explicit start frame? */
-	if (!(urb->transfer_flags & USB_ISO_ASAP)) {
+	if (!(urb->transfer_flags & URB_ISO_ASAP)) {
 		unsigned	temp;
 
 		/* sanity check: must be in range */

@@ -450,7 +450,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 		}
 		
 		/* set up our urb */
-		FILL_BULK_URB(port->write_urb, serial->dev,
+		usb_fill_bulk_urb(port->write_urb, serial->dev,
 			      usb_sndbulkpipe(serial->dev,
 					      port->bulk_out_endpointAddress),
 			      port->write_urb->transfer_buffer, size,

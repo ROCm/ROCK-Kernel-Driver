@@ -381,10 +381,10 @@ static int konicawc_start_data(struct uvd *uvd)
 	int i, errFlag;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	int pktsz;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 
 	interface = &dev->actconfig->interface[uvd->iface].altsetting[spd_to_iface[cam->speed]];
-	pktsz = interface->endpoint[1].wMaxPacketSize;
+	pktsz = interface->endpoint[1].desc.wMaxPacketSize;
 	DEBUG(1, "pktsz = %d", pktsz);
 	if (!CAMERA_IS_OPERATIONAL(uvd)) {
 		err("Camera is not operational");
@@ -408,7 +408,7 @@ static int konicawc_start_data(struct uvd *uvd)
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);
 		urb->interval = 1;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = uvd->sbuf[i].data;
 		urb->complete = konicawc_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;
@@ -423,7 +423,7 @@ static int konicawc_start_data(struct uvd *uvd)
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp-1);
 		urb->interval = 1;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = cam->sts_buf[i];
 		urb->complete = konicawc_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;
@@ -742,17 +742,17 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 	}
 	/* Validate all alternate settings */
 	for (i=0; i < nas; i++) {
-		const struct usb_interface_descriptor *interface;
+		const struct usb_host_interface *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
 		interface = &intf->altsetting[i];
-		if (interface->bNumEndpoints != 2) {
+		if (interface->desc.bNumEndpoints != 2) {
 			err("Interface %d. has %u. endpoints!",
-			    interface->bInterfaceNumber,
-			    (unsigned)(interface->bNumEndpoints));
+			    interface->desc.bInterfaceNumber,
+			    (unsigned)(interface->desc.bNumEndpoints));
 			return -ENODEV;
 		}
-		endpoint = &interface->endpoint[1];
+		endpoint = &interface->endpoint[1].desc;
 		DEBUG(1, "found endpoint: addr: 0x%2.2x maxps = 0x%4.4x",
 		    endpoint->bEndpointAddress, endpoint->wMaxPacketSize);
 		if (video_ep == 0)
@@ -763,12 +763,12 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		}
 		if ((endpoint->bmAttributes & 0x03) != 0x01) {
 			err("Interface %d. has non-ISO endpoint!",
-			    interface->bInterfaceNumber);
+			    interface->desc.bInterfaceNumber);
 			return -ENODEV;
 		}
 		if ((endpoint->bEndpointAddress & 0x80) == 0) {
 			err("Interface %d. has ISO OUT endpoint!",
-			    interface->bInterfaceNumber);
+			    interface->desc.bInterfaceNumber);
 			return -ENODEV;
 		}
 		if (endpoint->wMaxPacketSize == 0) {
@@ -819,7 +819,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		uvd->flags = 0;
 		uvd->debug = debug;
 		uvd->dev = dev;
-		uvd->iface = intf->altsetting->bInterfaceNumber;
+		uvd->iface = intf->altsetting->desc.bInterfaceNumber;
 		uvd->ifaceAltInactive = inactInterface;
 		uvd->ifaceAltActive = actInterface;
 		uvd->video_endp = video_ep;

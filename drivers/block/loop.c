@@ -437,7 +437,7 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	if (bio->bi_size)
 		return 1;
 
-	if (!err || bio_rw(bio) == WRITE) {
+	if (err || bio_rw(bio) == WRITE) {
 		bio_endio(rbh, rbh->bi_size, err);
 		if (atomic_dec_and_test(&lo->lo_pending))
 			up(&lo->lo_bh_mutex);
@@ -688,7 +688,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
-		lo_blocksize = inode->i_blocksize;
+		lo_blocksize = inode->i_blksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
 		error = 0;
 	} else

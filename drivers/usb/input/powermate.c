@@ -290,14 +290,14 @@ static void powermate_free_buffers(struct usb_device *udev, struct powermate_dev
 static int powermate_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev (intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct powermate_device *pm;
 	int pipe, maxp;
 	char path[64];
 
 	interface = intf->altsetting + 0;
-	endpoint = interface->endpoint + 0;
+	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80))
 		return -EIO;
 	if ((endpoint->bmAttributes & 3) != 3)
@@ -305,7 +305,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 
 	usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 		0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		0, interface->bInterfaceNumber, NULL, 0,
+		0, interface->desc.bInterfaceNumber, NULL, 0,
 		HZ * USB_CTRL_SET_TIMEOUT);
 
 	if (!(pm = kmalloc(sizeof(struct powermate_device), GFP_KERNEL)))

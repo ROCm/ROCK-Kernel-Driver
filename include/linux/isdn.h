@@ -1,10 +1,9 @@
-/* $Id: isdn.h,v 1.111.6.9 2001/09/23 22:25:05 kai Exp $
- *
- * Main header for the Linux ISDN subsystem (linklevel).
+/* Linux ISDN subsystem, main header
  *
  * Copyright 1994,95,96 by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
  * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ * Copyright 2000-2002  by Kai Germaschewski (kai@germaschewski.name)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -15,9 +14,7 @@
 #define __ISDN_H__
 
 #include <linux/ioctl.h>
-
-// FIXME!!!
-#include <../drivers/isdn/i4l/isdn_fsm.h>
+#include <linux/isdn/fsm.h>
 
 #ifdef CONFIG_COBALT_MICRO_SERVER
 /* Save memory */
@@ -238,209 +235,8 @@ typedef struct {
 #define USG_MODEMORVOICE(x) (((x & ISDN_USAGE_MASK)==ISDN_USAGE_MODEM) || \
                              ((x & ISDN_USAGE_MASK)==ISDN_USAGE_VOICE)     )
 
-/* Timer-delays and scheduling-flags */
-#define ISDN_TIMER_RES         4                         /* Main Timer-Resolution   */
-#define ISDN_TIMER_02SEC       (HZ/ISDN_TIMER_RES/5)     /* Slow-Timer1 .2 sec      */
-#define ISDN_TIMER_1SEC        (HZ/ISDN_TIMER_RES)       /* Slow-Timer2 1 sec       */
-#define ISDN_TIMER_RINGING     5 /* tty RINGs = ISDN_TIMER_1SEC * this factor       */
-#define ISDN_TIMER_KEEPINT    10 /* Cisco-Keepalive = ISDN_TIMER_1SEC * this factor */
-#define ISDN_TIMER_MODEMREAD   1
-#define ISDN_TIMER_MODEMPLUS   2
-#define ISDN_TIMER_MODEMRING   4
-#define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
-#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
-                              ISDN_TIMER_MODEMXMIT)
-#define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_CARRIER)
-
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
-
-/*=================== Start of ip-over-ISDN stuff =========================*/
-
-/* Feature- and status-flags for a net-interface */
-#define ISDN_NET_SECURE     0x02       /* Accept calls from phonelist only  */
-#define ISDN_NET_CALLBACK   0x04       /* activate callback                 */
-#define ISDN_NET_CBHUP      0x08       /* hangup before callback            */
-#define ISDN_NET_CBOUT      0x10       /* remote machine does callback      */
-
-#define ISDN_NET_MAGIC      0x49344C02 /* for paranoia-checking             */
-
-/* Phone-list-element */
-struct isdn_net_phone {
-	struct list_head list;
-	char num[ISDN_MSNLEN];
-};
-
-/*
-   Principles when extending structures for generic encapsulation protocol
-   ("concap") support:
-   - Stuff which is hardware specific (here i4l-specific) goes in 
-     the netdev -> local structure (here: isdn_net_local)
-   - Stuff which is encapsulation protocol specific goes in the structure
-     which holds the linux device structure (here: isdn_net_device)
-*/
-
-struct isdn_net_dev_s;
-struct isdn_net_local_s;
-
-struct isdn_netif_ops {
-	int			(*hard_start_xmit) (struct sk_buff *skb,
-						    struct net_device *dev);
-	int			(*hard_header) (struct sk_buff *skb,
-						struct net_device *dev,
-						unsigned short type,
-						void *daddr,
-						void *saddr,
-						unsigned len);
-	int			(*do_ioctl)(struct net_device *dev,
-					    struct ifreq *ifr, int cmd);
-
-	unsigned short		flags;	/* interface flags (a la BSD)	*/
-	unsigned short		type;	/* interface hardware type	*/
-	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_local_s *,
-					   struct isdn_net_dev_s *,
-					   struct sk_buff *);
-	void                    (*connected)(struct isdn_net_dev_s *);
-	void                    (*disconnected)(struct isdn_net_dev_s *);
-	int                     (*bind)(struct isdn_net_dev_s *);
-	void                    (*unbind)(struct isdn_net_dev_s *);
-	int                     (*init)(struct isdn_net_local_s *);
-	void                    (*cleanup)(struct isdn_net_local_s *);
-	int                     (*open)(struct isdn_net_local_s *);
-	void                    (*close)(struct isdn_net_local_s *);
-};
-
-/* Local interface-data */
-typedef struct isdn_net_local_s {
-  ulong                  magic;
-  struct net_device_stats stats;       /* Ethernet Statistics              */
-  int                    flags;        /* Connection-flags                 */
-  int                    dialmax;      /* Max. Number of Dial-retries      */
-  int	        	 dialtimeout;  /* How long shall we try on dialing */
-  int			 dialwait;     /* wait after failed attempt        */
-
-  int                    cbdelay;      /* Delay before Callback starts     */
-  char                   msn[ISDN_MSNLEN]; /* MSNs/EAZs for this interface */
-
-  u_char                 cbhup;        /* Flag: Reject Call before Callback*/
-  int                    hupflags;     /* Flags for charge-unit-hangup:    */
-  int                    onhtime;      /* Time to keep link up             */
-
-  u_char                 p_encap;      /* Packet encapsulation             */
-  u_char                 l2_proto;     /* Layer-2-protocol                 */
-  u_char                 l3_proto;     /* Layer-3-protocol                 */
-
-  ulong                  slavedelay;   /* Dynamic bundling delaytime       */
-  int                    triggercps;   /* BogoCPS needed for trigger slave */
-  struct list_head       phone[2];     /* List of remote-phonenumbers      */
-				       /* phone[0] = Incoming Numbers      */
-				       /* phone[1] = Outgoing Numbers      */
-
-  struct list_head       slaves;       /* list of all bundled channels    
-					  protected by serializing config
-					  ioctls / no change allowed when
-					  interface is running             */
-  struct list_head       online;       /* list of all bundled channels 
-					  which can be used for actual
-					  data (IP) transfer              
-					  protected by xmit_lock           */
-
-  spinlock_t             xmit_lock;    /* used to protect the xmit path of 
-					  a net_device, including all
-					  associated channels's frame_cnt  */
-  struct list_head       running_devs; /* member of global running_devs    */
-  atomic_t               refcnt;       /* references held by ISDN code     */
-
-#ifdef CONFIG_ISDN_X25
-  struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
-#endif
-#ifdef CONFIG_ISDN_PPP
-  unsigned int           mpppcfg;
-  long                   mp_seqno;
-  struct ippp_ccp        *ccp;
-  unsigned long          debug;
-#ifdef CONFIG_ISDN_PPP_VJ
-  unsigned char         *cbuf;
-  struct slcompress     *slcomp;
-#endif
-#endif
-
-  /* use an own struct for that in later versions */
-  ulong cisco_myseq;                   /* Local keepalive seq. for Cisco   */
-  ulong cisco_mineseen;                /* returned keepalive seq. from remote */
-  ulong cisco_yourseq;                 /* Remote keepalive seq. for Cisco  */
-  int cisco_keepalive_period;		/* keepalive period */
-  ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
-  char cisco_line_state;		/* state of line according to keepalive packets */
-  char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
-
-  struct timer_list       cisco_timer;
-
-  struct isdn_netif_ops  *ops;
-
-  struct net_device       dev;          /* interface to upper levels        */
-} isdn_net_local;
-
-/* the interface itself */
-typedef struct isdn_net_dev_s {
-  int                    isdn_slot;    /* Index to isdn device/channel     */
-  int                    pre_device;   /* Preselected isdn-device          */
-  int                    pre_channel;  /* Preselected isdn-channel         */
-  int                    exclusive;    /* -1 if non excl./idx to excl chan */
-
-  struct timer_list      dial_timer;   /* dial events timer                */
-  struct fsm_inst        fi;           /* call control state machine       */
-  int                    dial_event;   /* event in case of timer expiry    */
-  int                    dial;         /* # of phone number just dialed    */
-  int                    outgoing;     /* Flag: outgoing call              */
-  int                    dialretry;    /* Counter for Dialout-retries      */
-
-  int                    cps;          /* current speed of this interface  */
-  int                    transcount;   /* byte-counter for cps-calculation */
-  int                    last_jiffies; /* when transcount was reset        */
-  int                    sqfull;       /* Flag: netdev-queue overloaded    */
-  ulong                  sqfull_stamp; /* Start-Time of overload           */
-
-  int                    huptimer;     /* Timeout-counter for auto-hangup  */
-  int                    charge;       /* Counter for charging units       */
-  int                    charge_state; /* ChargeInfo state machine         */
-  unsigned long          chargetime;   /* Timer for Charging info          */
-  int                    chargeint;    /* Interval between charge-infos    */
-
-  int                    pppbind;      /* ippp device for bindings         */
-  struct ipppd          *ipppd;        /* /dev/ipppX which controls us     */
-
-  struct sk_buff_head    super_tx_queue; /* List of supervisory frames to  */
-	                               /* be transmitted asap              */
-  int                    frame_cnt;    /* number of frames currently       */
-                        	       /* queued in HL driver              */
-  struct tasklet_struct  tlet;
-
-  isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
-
-  struct list_head       slaves;       /* member of local->slaves          */
-  struct list_head       online;       /* member of local->online          */
-
-  char                   name[10];     /* Name of device                   */
-  struct list_head       global_list;  /* global list of all isdn_net_devs */
-#ifdef CONFIG_ISDN_PPP
-  unsigned int           pppcfg;
-  unsigned int           pppseq;       /* last seq no seen                 */
-  struct ippp_ccp        *ccp;
-  unsigned long          debug;
-
-  ippp_bundle * pb;		/* pointer to the common bundle structure
-   			         * with the per-bundle data */
-#endif
-#ifdef CONFIG_ISDN_X25
-  struct concap_proto  *cprot; /* connection oriented encapsulation protocol */
-#endif
-
-} isdn_net_dev;
-
-/*===================== End of ip-over-ISDN stuff ===========================*/
 
 /*======================= Start of ISDN-tty stuff ===========================*/
 
@@ -494,7 +290,6 @@ typedef struct atemu {
 	int          mdmcmdl;                    /* Length of Modem-Commandbuffer      */
 	int          pluscount;                  /* Counter for +++ sequence           */
 	int          lastplus;                   /* Timestamp of last +                */
-	int	     carrierwait;                /* Seconds of carrier waiting         */
 	char         mdmcmd[255];                /* Modem-Commandbuffer                */
 	unsigned int charge;                     /* Charge units of current connection */
 } atemu;
@@ -516,7 +311,9 @@ typedef struct modem_info {
 					 /* 2 = B-Channel is up, deliver d.*/
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
-  int                   isdn_slot;	 /* Index to isdn-driver/channel   */
+  struct isdn_slot     *isdn_slot;	 /* Ptr to isdn-driver/channel     */
+  struct sk_buff_head   rpqueue;         /* Queue of recv'd packets        */
+  int                   rcvcount;        /* Byte-counters for B rx         */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */
   unsigned char         last_cause[8];   /* Last cause message             */
   unsigned char         last_num[ISDN_MSNLEN];
@@ -533,6 +330,7 @@ typedef struct modem_info {
   struct sk_buff_head   xmit_queue;      /* transmit queue                 */
   atomic_t              xmit_lock;       /* Semaphore for isdn_tty_write   */
 #ifdef CONFIG_ISDN_AUDIO
+  unsigned long         DLEflag;         /* Insert DLE at next read     */
   int                   vonline;         /* Voice-channel status           */
 					 /* Bit 0 = recording              */
 					 /* Bit 1 = playback               */
@@ -549,6 +347,10 @@ typedef struct modem_info {
 #endif
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
   atemu                 emu;             /* AT-emulator data               */
+  struct timer_list     escape_timer;    /* to recognize +++ escape        */
+  struct timer_list     ring_timer;      /* for writing 'RING' responses   */
+  struct timer_list     connect_timer;   /* waiting for CONNECT            */
+  struct timer_list     read_timer;      /* read incoming data             */
   struct termios	normal_termios;  /* For saving termios structs     */
   struct termios	callout_termios;
   wait_queue_head_t	open_wait, close_wait;
@@ -556,17 +358,6 @@ typedef struct modem_info {
 } modem_info;
 
 #define ISDN_MODEM_WINSIZE 8
-
-/* Description of one ISDN-tty */
-typedef struct {
-  int                refcount;			   /* Number of opens        */
-  struct tty_driver  tty_modem;			   /* tty-device             */
-  struct tty_driver  cua_modem;			   /* cua-device             */
-  struct tty_struct  *modem_table[ISDN_MAX_CHANNELS]; /* ?? copied from Orig */
-  struct termios     *modem_termios[ISDN_MAX_CHANNELS];
-  struct termios     *modem_termios_locked[ISDN_MAX_CHANNELS];
-  modem_info         info[ISDN_MAX_CHANNELS];	   /* Private data           */
-} modem;
 
 /*======================= End of ISDN-tty stuff ============================*/
 
@@ -602,37 +393,10 @@ typedef struct {
 	char *private;
 } infostruct;
 
-#define DRV_FLAG_RUNNING 1
-#define DRV_FLAG_REJBUS  2
-#define DRV_FLAG_LOADED  4
-
-/* Description of hardware-level-driver */
-typedef struct {
-	ulong               online;           /* Channel-Online flags             */
-	ulong               flags;            /* Misc driver Flags                */
-	int                 locks;            /* Number of locks for this driver  */
-	int                 channels;         /* Number of channels               */
-	wait_queue_head_t   st_waitq;         /* Wait-Queue for status-read's     */
-	int                 maxbufsize;       /* Maximum Buffersize supported     */
-	unsigned long       pktcount;         /* Until now: unused                */
-	int                 stavail;          /* Chars avail on Status-device     */
-	isdn_if            *interface;        /* Interface to driver              */
-	int                *rcverr;           /* Error-counters for B-Ch.-receive */
-	int                *rcvcount;         /* Byte-counters for B-Ch.-receive  */
-#ifdef CONFIG_ISDN_AUDIO
-	unsigned long      DLEflag;           /* Flags: Insert DLE at next read   */
-#endif
-	struct sk_buff_head *rpqueue;         /* Pointers to start of Rcv-Queue   */
-	wait_queue_head_t  *rcv_waitq;       /* Wait-Queues for B-Channel-Reads  */
-	wait_queue_head_t  *snd_waitq;       /* Wait-Queue for B-Channel-Send's  */
-	char               msn2eaz[10][ISDN_MSNLEN];  /* Mapping-Table MSN->EAZ   */
-} driver;
-
 /* Main driver-data */
 typedef struct isdn_devt {
 	unsigned short    flags;		       /* Bitmapped Flags:           */
 	/*                            */
-	int               drivers;		       /* Current number of drivers  */
 	int               channels;		       /* Current number of channels */
 	int               net_verbose;               /* Verbose-Flag               */
 	int               modempoll;		       /* Flag: tty-read active      */
@@ -641,11 +405,7 @@ typedef struct isdn_devt {
 	int               global_flags;
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
-	struct timer_list timer;		       /* Misc.-function Timer       */
-	driver            *drv[ISDN_MAX_DRIVERS];    /* Array of drivers           */
-	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
-	modem             mdm;		       /* tty-driver-data            */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;
 #ifdef CONFIG_DEVFS_FS

@@ -344,11 +344,11 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 		dbg("%s - endpoint %d flip %d", __FUNCTION__, usb_pipeendpoint(this_urb->pipe), flip);
 
 		if (this_urb->status == -EINPROGRESS) {
-			if (this_urb->transfer_flags & USB_ASYNC_UNLINK)
+			if (this_urb->transfer_flags & URB_ASYNC_UNLINK)
 				break;
 			if (jiffies - p_priv->tx_start_time[flip] < 10 * HZ)
 				break;
-			this_urb->transfer_flags |= USB_ASYNC_UNLINK;
+			this_urb->transfer_flags |= URB_ASYNC_UNLINK;
 			usb_unlink_urb(this_urb);
 			break;
 		}
@@ -368,7 +368,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 		/* send the data out the bulk port */
 		this_urb->transfer_buffer_length = todo + 1;
 
-		this_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+		this_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 		this_urb->dev = port->serial->dev;
 		if ((err = usb_submit_urb(this_urb, GFP_ATOMIC)) != 0) {
 			dbg("usb_submit_urb(write bulk) failed (%d)", err);
@@ -912,7 +912,7 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 static inline void stop_urb(struct urb *urb)
 {
 	if (urb && urb->status == -EINPROGRESS) {
-		urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+		urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 		usb_unlink_urb(urb);
 	}
 }
@@ -1085,7 +1085,7 @@ static struct urb *keyspan_setup_urb (struct usb_serial *serial, int endpoint,
 	}
 
 		/* Fill URB using supplied data. */
-	FILL_BULK_URB(urb, serial->dev,
+	usb_fill_bulk_urb(urb, serial->dev,
 		      usb_sndbulkpipe(serial->dev, endpoint) | dir,
 		      buf, len, callback, ctx);
 

@@ -64,7 +64,7 @@ static devfs_handle_t devfs_handle;
 static inline int
 clear_device (struct usb_device *dev)
 {
-	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
+	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
 		err ("clear_device failed");
 		return -1;
 	}
@@ -351,7 +351,7 @@ tiglusb_probe (struct usb_interface *intf,
 	    && (dev->descriptor.idVendor != 0x451))
 		return -ENODEV;
 
-	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
+	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
 		err ("tiglusb_probe: set_configuration failed");
 		return -ENODEV;
 	}

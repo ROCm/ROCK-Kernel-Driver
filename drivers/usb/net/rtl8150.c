@@ -174,7 +174,7 @@ static int async_set_registers(rtl8150_t * dev, u16 indx, u16 size, void *data)
 	dev->dr.wIndex = 0;
 	dev->dr.wLength = cpu_to_le16(size);
 	dev->ctrl_urb->transfer_buffer_length = size;
-	FILL_CONTROL_URB(dev->ctrl_urb, dev->udev,
+	usb_fill_control_urb(dev->ctrl_urb, dev->udev,
 			 usb_sndctrlpipe(dev->udev, 0), (char *) &dev->dr,
 			 &dev->rx_creg, size, ctrl_callback, dev);
 	if ((ret = usb_submit_urb(dev->ctrl_urb, GFP_ATOMIC)))
@@ -387,7 +387,7 @@ static void read_bulk_callback(struct urb *urb)
 
 	dev->rx_skb = skb;
 goon:
-	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
+	usb_fill_bulk_urb(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
 	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC)) {
 		set_bit(RX_URB_FAIL, &dev->flags);
@@ -420,7 +420,7 @@ static void rx_fixup(unsigned long data)
 	if (skb == NULL)
 		goto tlsched;
 	dev->rx_skb = skb;
-	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
+	usb_fill_bulk_urb(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
 try_again:
 	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC)) {
@@ -573,7 +573,7 @@ static void rtl8150_tx_timeout(struct net_device *netdev)
 	if (!dev)
 		return;
 	warn("%s: Tx timeout.", netdev->name);
-	dev->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	dev->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb(dev->tx_urb);
 	dev->stats.tx_errors++;
 }
@@ -610,7 +610,7 @@ static int rtl8150_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	count = (skb->len < 60) ? 60 : skb->len;
 	count = (count & 0x3f) ? count : count + 1;
 	dev->tx_skb = skb;
-	FILL_BULK_URB(dev->tx_urb, dev->udev, usb_sndbulkpipe(dev->udev, 2),
+	usb_fill_bulk_urb(dev->tx_urb, dev->udev, usb_sndbulkpipe(dev->udev, 2),
 		      skb->data, count, write_bulk_callback, dev);
 	if ((res = usb_submit_urb(dev->tx_urb, GFP_ATOMIC))) {
 		warn("failed tx_urb %d\n", res);
@@ -640,11 +640,11 @@ static int rtl8150_open(struct net_device *netdev)
 		return -ENOMEM;
 
 	down(&dev->sem);
-	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
+	usb_fill_bulk_urb(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
 	if ((res = usb_submit_urb(dev->rx_urb, GFP_KERNEL)))
 		warn("%s: rx_urb submit failed: %d", __FUNCTION__, res);
-	FILL_INT_URB(dev->intr_urb, dev->udev, usb_rcvintpipe(dev->udev, 3),
+	usb_fill_int_urb(dev->intr_urb, dev->udev, usb_rcvintpipe(dev->udev, 3),
 		     dev->intr_buff, sizeof(dev->intr_buff), intr_callback,
 		     dev, dev->intr_interval);
 	if ((res = usb_submit_urb(dev->intr_urb, GFP_KERNEL)))
@@ -789,7 +789,7 @@ static int rtl8150_probe(struct usb_interface *intf,
 	rtl8150_t *dev;
 	struct net_device *netdev;
 
-	if (usb_set_configuration(udev, udev->config[0].bConfigurationValue)) {
+	if (usb_set_configuration(udev, udev->config[0].desc.bConfigurationValue)) {
 		err("usb_set_configuration() failed");
 		return -EIO;
 	}

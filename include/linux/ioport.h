@@ -85,7 +85,6 @@ extern struct resource iomem_resource;
 
 extern int get_resource_list(struct resource *, char *buf, int size);
 
-extern int check_resource(struct resource *root, unsigned long, unsigned long);
 extern int request_resource(struct resource *root, struct resource *new);
 extern int release_resource(struct resource *new);
 extern int allocate_resource(struct resource *root, struct resource *new,

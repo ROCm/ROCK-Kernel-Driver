@@ -26,37 +26,36 @@
 #include "netjet.h"
 
 const char *NETjet_revision = "$Revision: 1.24.6.6 $";
+static spinlock_t netjet_lock = SPIN_LOCK_UNLOCKED;
 
 /* Interface functions */
 
 u_char
 NETjet_ReadIC(struct IsdnCardState *cs, u_char offset)
 {
-	long flags;
+	unsigned long flags;
 	u_char ret;
 	
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&netjet_lock, flags);
 	cs->hw.njet.auxd &= 0xfc;
 	cs->hw.njet.auxd |= (offset>>4) & 3;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	ret = bytein(cs->hw.njet.isac + ((offset & 0xf)<<2));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&netjet_lock, flags);
 	return(ret);
 }
 
 void
 NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	long flags;
+	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&netjet_lock, flags);
 	cs->hw.njet.auxd &= 0xfc;
 	cs->hw.njet.auxd |= (offset>>4) & 3;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	byteout(cs->hw.njet.isac + ((offset & 0xf)<<2), value);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&netjet_lock, flags);
 }
 
 void
@@ -434,7 +433,7 @@ static void got_frame(struct BCState *bcs, int count) {
 		skb_queue_tail(&bcs->rqueue, skb);
 	}
 	bcs->event |= 1 << B_RCVBUFREADY;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 	
 	if (bcs->cs->debug & L1_DEB_RECEIVE_FRAME)
 		printframe(bcs->cs, bcs->hw.tiger.rcvbuf, count, "rec");
@@ -790,7 +789,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 							cnt - s_cnt);
 				}
 				bcs->event |= 1 << B_XMTBUFREADY;
-				schedule_work(&bcs->tqueue);
+				schedule_work(&bcs->work);
 			}
 		}
 	} else if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {
@@ -839,19 +838,18 @@ static void
 tiger_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&netjet_lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&netjet_lock, flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&netjet_lock, flags);
 			}
 			break;
 		case (PH_PULL | INDICATION):
@@ -859,11 +857,10 @@ tiger_l2l1(struct PStack *st, int pr, void *arg)
 				printk(KERN_WARNING "tiger_l2l1: this shouldn't happen\n");
 				break;
 			}
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&netjet_lock, flags);
 			st->l1.bcs->tx_skb = skb;
 			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&netjet_lock, flags);
 			break;
 		case (PH_PULL | REQUEST):
 			if (!st->l1.bcs->tx_skb) {

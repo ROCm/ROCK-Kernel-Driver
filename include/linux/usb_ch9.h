@@ -6,7 +6,7 @@
  *
  * - the master/host side Linux-USB kernel driver API;
  * - the "usbfs" user space API; and
- * - (eventually) a Linux slave/device side driver API.
+ * - (eventually) a Linux "gadget" slave/device side driver API.
  *
  * USB 2.0 adds an additional "On The Go" (OTG) mode, which lets systems
  * act either as a USB master/host or as a USB slave/device.  That means
@@ -101,7 +101,8 @@ struct usb_ctrlrequest {
  * (rarely) accepted by SET_DESCRIPTOR.
  *
  * Note that all multi-byte values here are encoded in little endian
- * byte order.
+ * byte order "on the wire".  But when exposed through Linux-USB APIs,
+ * they've been converted to cpu byte order.
  */
 
 /*
@@ -123,10 +124,13 @@ struct usb_descriptor_header {
 } __attribute__ ((packed));
 
 
+/*-------------------------------------------------------------------------*/
+
 /* USB_DT_DEVICE: Device descriptor */
 struct usb_device_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
+
 	__u16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;
@@ -141,10 +145,12 @@ struct usb_device_descriptor {
 	__u8  bNumConfigurations;
 } __attribute__ ((packed));
 
+#define USB_DT_DEVICE_SIZE		18
+
 
 /*
  * Device and/or Interface Class codes
- * as found in device and interface descriptors
+ * as found in bDeviceClass or bInterfaceClass
  * and defined by www.usb.org documents
  */
 #define USB_CLASS_PER_INTERFACE		0	/* for DeviceClass */
@@ -162,18 +168,88 @@ struct usb_device_descriptor {
 #define USB_CLASS_APP_SPEC		0xfe
 #define USB_CLASS_VENDOR_SPEC		0xff
 
-// FIXME include struct usb_config_descriptor
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_CONFIG: Configuration descriptor information.
+ *
+ * USB_DT_OTHER_SPEED_CONFIG is the same descriptor, except that the
+ * descriptor type is different.  Highspeed-capable devices can look
+ * different depending on what speed they're currently running.  Only
+ * devices with a USB_DT_DEVICE_QUALIFIER have any OTHER_SPEED_CONFIG
+ * descriptors.
+ */
+struct usb_config_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u16 wTotalLength;
+	__u8  bNumInterfaces;
+	__u8  bConfigurationValue;
+	__u8  iConfiguration;
+	__u8  bmAttributes;
+	__u8  bMaxPower;
+} __attribute__ ((packed));
+
+#define USB_DT_CONFIG_SIZE		9
+
+/* from config descriptor bmAttributes */
+#define USB_CONFIG_ATT_ONE		(1 << 7)	/* must be set */
+#define USB_CONFIG_ATT_SELFPOWER	(1 << 6)	/* self powered */
+#define USB_CONFIG_ATT_WAKEUP		(1 << 5)	/* can wakeup */
+
+/*-------------------------------------------------------------------------*/
 
 /* USB_DT_STRING: String descriptor */
 struct usb_string_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
+
 	__u16 wData[1];		/* UTF-16LE encoded */
 } __attribute__ ((packed));
 
-// FIXME include struct usb_interface_descriptor
+/* note that "string" zero is special, it holds language codes that
+ * the device supports, not Unicode characters.
+ */
 
-// FIXME include struct usb_endpoint_descriptor
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_INTERFACE: Interface descriptor */
+struct usb_interface_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u8  bInterfaceNumber;
+	__u8  bAlternateSetting;
+	__u8  bNumEndpoints;
+	__u8  bInterfaceClass;
+	__u8  bInterfaceSubClass;
+	__u8  bInterfaceProtocol;
+	__u8  iInterface;
+} __attribute__ ((packed));
+
+#define USB_DT_INTERFACE_SIZE		9
+
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_ENDPOINT: Endpoint descriptor */
+struct usb_endpoint_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u8  bEndpointAddress;
+	__u8  bmAttributes;
+	__u16 wMaxPacketSize;
+	__u8  bInterval;
+
+	// NOTE:  these two are _only_ in audio endpoints.
+	// use USB_DT_ENDPOINT*_SIZE in bLength, not sizeof.
+	__u8  bRefresh;
+	__u8  bSynchAddress;
+} __attribute__ ((packed));
+
+#define USB_DT_ENDPOINT_SIZE		7
+#define USB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
+
 
 /*
  * Endpoints
@@ -188,10 +264,13 @@ struct usb_string_descriptor {
 #define USB_ENDPOINT_XFER_INT		3
 
 
+/*-------------------------------------------------------------------------*/
+
 /* USB_DT_DEVICE_QUALIFIER: Device Qualifier descriptor */
 struct usb_qualifier_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
+
 	__u16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;

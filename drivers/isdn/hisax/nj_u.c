@@ -16,6 +16,7 @@
 #include "netjet.h"
 
 const char *NETjet_U_revision = "$Revision: 2.8.6.6 $";
+static spinlock_t nj_u_lock = SPIN_LOCK_UNLOCKED;
 
 static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
 {
@@ -31,7 +32,7 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u_char val, sval;
-	long flags;
+	unsigned long flags;
 
 	if (!cs) {
 		printk(KERN_WARNING "NETspider-U: Spurious interrupt!\n");
@@ -48,8 +49,7 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			NETjet_WriteIC(cs, ICC_MASK, 0x0);
 		}
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&nj_u_lock, flags);
 	/* start new code 13/07/00 GE */
 	/* set bits in sval to indicate which page is free */
 	if (inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR) <
@@ -67,11 +67,11 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (sval != cs->hw.njet.last_is0) /* we have a DMA interrupt */
 	{
 		if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&nj_u_lock, flags);
 			return;
 		}
 		cs->hw.njet.irqstat0 = sval;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&nj_u_lock, flags);
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) != 
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_READ))
 			/* we have a read dma int */
@@ -83,7 +83,7 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		/* end new code 13/07/00 GE */
 		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
 	} else
-		restore_flags(flags);
+		spin_unlock_irqrestore(&nj_u_lock, flags);
 
 /*	if (!testcnt--) {
 		cs->hw.njet.dmactrl = 0;
@@ -196,7 +196,6 @@ setup_netjet_u(struct IsdnCard *card)
 
 		save_flags(flags);
 		sti();
-
 		cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 		byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 

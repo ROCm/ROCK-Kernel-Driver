@@ -463,7 +463,7 @@ qh_urb_transaction (
 			token ^= 0x0100;	/* "in" <--> "out"  */
 			token |= QTD_TOGGLE;	/* force DATA1 */
 		} else if (usb_pipebulk (urb->pipe)
-				&& (urb->transfer_flags & USB_ZERO_PACKET)
+				&& (urb->transfer_flags & URB_ZERO_PACKET)
 				&& !(urb->transfer_buffer_length % maxpacket)) {
 			one_more = 1;
 		}

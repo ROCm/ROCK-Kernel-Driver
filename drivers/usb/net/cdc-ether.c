@@ -125,7 +125,7 @@ static void read_bulk_callback( struct urb *urb )
 
 goon:
 	// Prep the USB to wait for another frame
-	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
@@ -259,7 +259,7 @@ static void CDCEther_tx_timeout( struct net_device *net )
 	warn("%s: Tx timed out.", net->name);
 	
 	// Tear the waiting frame off the list
-	ether_dev->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	ether_dev->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb( ether_dev->tx_urb );
 	
 	// Update statistics
@@ -293,7 +293,7 @@ static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 	memcpy(ether_dev->tx_buff, skb->data, skb->len);
 
 	// Fill in the URB for shipping it out.
-	FILL_BULK_URB( ether_dev->tx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->tx_urb, ether_dev->usb,
 			usb_sndbulkpipe(ether_dev->usb, ether_dev->data_ep_out),
 			ether_dev->tx_buff, ether_dev->wMaxSegmentSize, 
 			write_bulk_callback, ether_dev );
@@ -344,7 +344,7 @@ static int CDCEther_open(struct net_device *net)
 	}
 
 	// Prep a receive URB
-	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
+	usb_fill_bulk_urb( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
@@ -723,9 +723,9 @@ static int parse_ethernet_class_information( unsigned char *data, int length, et
 
 static int find_and_parse_ethernet_class_information( struct usb_device *device, ether_dev_t *ether_dev )
 {
-	struct usb_config_descriptor *conf = NULL;
+	struct usb_host_config *conf = NULL;
 	struct usb_interface *comm_intf_group = NULL;
-	struct usb_interface_descriptor *comm_intf = NULL;
+	struct usb_host_interface *comm_intf = NULL;
 	int rc = -1;
 	// The assumption here is that find_ethernet_comm_interface
 	// and find_valid_configuration 
@@ -760,9 +760,9 @@ static int find_and_parse_ethernet_class_information( struct usb_device *device,
 
 static int get_data_interface_endpoints( struct usb_device *device, ether_dev_t *ether_dev )
 {
-	struct usb_config_descriptor *conf = NULL;
+	struct usb_host_config *conf = NULL;
 	struct usb_interface *data_intf_group = NULL;
-	struct usb_interface_descriptor *data_intf = NULL;
+	struct usb_host_interface *data_intf = NULL;
 	
 	// Walk through and get to the data interface we are checking.
 	conf = &( device->config[ether_dev->configuration_num] );
@@ -774,30 +774,30 @@ static int get_data_interface_endpoints( struct usb_device *device, ether_dev_t 
 	ether_dev->data_ep_out = 0;
 	
 	// If these are not BULK endpoints, we don't want them
-	if ( data_intf->endpoint[0].bmAttributes != 0x02 ) {
+	if ( data_intf->endpoint[0].desc.bmAttributes != 0x02 ) {
 		return -1;
-	} if ( data_intf->endpoint[1].bmAttributes != 0x02 ) {
+	} if ( data_intf->endpoint[1].desc.bmAttributes != 0x02 ) {
 		return -1;
 	}
 
 	// Check the first endpoint to see if it is IN or OUT
-	if ( data_intf->endpoint[0].bEndpointAddress & 0x80 ) {
+	if ( data_intf->endpoint[0].desc.bEndpointAddress & 0x80 ) {
 		// This endpoint is IN
-		ether_dev->data_ep_in = data_intf->endpoint[0].bEndpointAddress & 0x7F;
+		ether_dev->data_ep_in = data_intf->endpoint[0].desc.bEndpointAddress & 0x7F;
 	} else {
 		// This endpoint is OUT
-		ether_dev->data_ep_out = data_intf->endpoint[0].bEndpointAddress & 0x7F;
-		ether_dev->data_ep_out_size = data_intf->endpoint[0].wMaxPacketSize;
+		ether_dev->data_ep_out = data_intf->endpoint[0].desc.bEndpointAddress & 0x7F;
+		ether_dev->data_ep_out_size = data_intf->endpoint[0].desc.wMaxPacketSize;
 	}
 
 	// Check the second endpoint to see if it is IN or OUT
-	if ( data_intf->endpoint[1].bEndpointAddress & 0x80 ) {
+	if ( data_intf->endpoint[1].desc.bEndpointAddress & 0x80 ) {
 		// This endpoint is IN
-		ether_dev->data_ep_in = data_intf->endpoint[1].bEndpointAddress & 0x7F;
+		ether_dev->data_ep_in = data_intf->endpoint[1].desc.bEndpointAddress & 0x7F;
 	} else	{
 		// This endpoint is OUT
-		ether_dev->data_ep_out = data_intf->endpoint[1].bEndpointAddress & 0x7F;
-		ether_dev->data_ep_out_size = data_intf->endpoint[1].wMaxPacketSize;
+		ether_dev->data_ep_out = data_intf->endpoint[1].desc.bEndpointAddress & 0x7F;
+		ether_dev->data_ep_out_size = data_intf->endpoint[1].desc.wMaxPacketSize;
 	}
 	
 	// Now make sure we got both an IN and an OUT
@@ -811,7 +811,7 @@ static int get_data_interface_endpoints( struct usb_device *device, ether_dev_t 
 
 static int verify_ethernet_data_interface( struct usb_device *device, ether_dev_t *ether_dev )
 {
-	struct usb_config_descriptor *conf = NULL;
+	struct usb_host_config *conf = NULL;
 	struct usb_interface *data_intf_group = NULL;
 	struct usb_interface_descriptor *data_intf = NULL;
 	int rc = -1;
@@ -834,7 +834,7 @@ static int verify_ethernet_data_interface( struct usb_device *device, ether_dev_
 	// Walk through every possible setting for this interface until
 	// we find what makes us happy.
 	for ( altset_num = 0; altset_num < data_intf_group->num_altsetting; altset_num++ ) {
-		data_intf = &( data_intf_group->altsetting[altset_num] );
+		data_intf = &( data_intf_group->altsetting[altset_num].desc );
 
 		// Is this a data interface we like?
 		if ( ( data_intf->bInterfaceClass == 0x0A )
@@ -875,7 +875,7 @@ static int verify_ethernet_data_interface( struct usb_device *device, ether_dev_
 
 static int find_ethernet_comm_interface( struct usb_device *device, ether_dev_t *ether_dev )
 {
-	struct usb_config_descriptor *conf = NULL;
+	struct usb_host_config *conf = NULL;
 	struct usb_interface *comm_intf_group = NULL;
 	struct usb_interface_descriptor *comm_intf = NULL;
 	int intf_num;
@@ -886,12 +886,12 @@ static int find_ethernet_comm_interface( struct usb_device *device, ether_dev_t 
 
 	// We need to check and see if any of these interfaces are something we want.
 	// Walk through each interface one at a time
-	for ( intf_num = 0; intf_num < conf->bNumInterfaces; intf_num++ ) {
+	for ( intf_num = 0; intf_num < conf->desc.bNumInterfaces; intf_num++ ) {
 		comm_intf_group = &( conf->interface[intf_num] );
 		// Now for each of those interfaces, check every possible
 		// alternate setting.
 		for ( altset_num = 0; altset_num < comm_intf_group->num_altsetting; altset_num++ ) {
-			comm_intf = &( comm_intf_group->altsetting[altset_num] );
+			comm_intf = &( comm_intf_group->altsetting[altset_num].desc);
 
 			// Is this a communication class of interface of the
 			// ethernet subclass variety.
@@ -944,7 +944,7 @@ static int find_ethernet_comm_interface( struct usb_device *device, ether_dev_t 
 
 static int find_valid_configuration( struct usb_device *device, ether_dev_t *ether_dev )
 {
-	struct usb_config_descriptor *conf = NULL;
+	struct usb_host_config *conf = NULL;
 	int conf_num;
 	int rc;
 
@@ -953,7 +953,7 @@ static int find_valid_configuration( struct usb_device *device, ether_dev_t *eth
 		conf = &( device->config[conf_num] );
 
 		// Our first requirement : 2 interfaces
-		if ( conf->bNumInterfaces != 2 ) {
+		if ( conf->desc.bNumInterfaces != 2 ) {
 			// I currently don't know how to handle devices with any number of interfaces
 			// other than 2.
 			continue;
@@ -962,7 +962,7 @@ static int find_valid_configuration( struct usb_device *device, ether_dev_t *eth
 		// This one passed our first check, fill in some 
 		// useful data
 		ether_dev->configuration_num = conf_num;
-		ether_dev->bConfigurationValue = conf->bConfigurationValue;
+		ether_dev->bConfigurationValue = conf->desc.bConfigurationValue;
 
 		// Now run it through the ringers and see what comes
 		// out the other side.
@@ -983,14 +983,14 @@ static int find_valid_configuration( struct usb_device *device, ether_dev_t *eth
 // has claimed any of the devices interfaces /////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-static int check_for_claimed_interfaces( struct usb_config_descriptor *config )
+static int check_for_claimed_interfaces( struct usb_host_config *config )
 {
 	struct usb_interface *comm_intf_group;
 	int intf_num;
 
 	// Go through all the interfaces and make sure none are 
 	// claimed by anybody else.
-	for ( intf_num = 0; intf_num < config->bNumInterfaces; intf_num++ ) {
+	for ( intf_num = 0; intf_num < config->desc.bNumInterfaces; intf_num++ ) {
 		comm_intf_group = &( config->interface[intf_num] );
 		if ( usb_interface_claimed( comm_intf_group ) )	{
 			// Somebody has beat us to this guy.

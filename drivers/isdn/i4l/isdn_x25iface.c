@@ -1,10 +1,10 @@
-/* $Id: isdn_x25iface.c,v 1.9.6.1 2001/09/23 22:24:32 kai Exp $
- *
- * Linux ISDN subsystem, X.25 related functions
+/* * Linux ISDN subsystem, X.25 related functions
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
+ */
+
+/*
  * stuff needed to support the Linux X.25 PLP code on top of devices that
  * can provide a lab_b service using the concap_proto mechanism.
  * This module supports a network interface wich provides lapb_sematics
@@ -17,7 +17,6 @@
  *
  */
 
-/* #include <linux/isdn.h> */
 #include <linux/netdevice.h>
 #include <linux/concap.h>
 #include <linux/wanrouter.h>

@@ -575,7 +575,7 @@ static void td_submit_urb (
 			info |= TD_R;
 		td_fill (info, data, data_len, urb, cnt);
 		cnt++;
-		if ((urb->transfer_flags & USB_ZERO_PACKET)
+		if ((urb->transfer_flags & URB_ZERO_PACKET)
 				&& cnt < urb_priv->length) {
 			td_fill (info, 0, 0, urb, cnt);
 			cnt++;
@@ -736,42 +736,39 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 	 */
 	ed->hwINFO |= ED_SKIP;
 	wmb ();
-	td->ed->hwHeadP &= ~ED_H; 
+	ed->hwHeadP &= ~ED_H; 
 
+	/* put any later tds from this urb onto the donelist, after 'td',
+	 * order won't matter here: no errors, and nothing was transferred.
+	 * also patch the ed so it looks as if those tds completed normally.
+	 */
 	while (tmp != &ed->td_list) {
 		struct td	*next;
+		u32		info;
 
 		next = list_entry (tmp, struct td, td_list);
 		tmp = next->td_list.next;
 
-		/* move other tds from this urb to the donelist, after 'td'.
-		 * order won't matter here: no errors, nothing transferred.
-		 *
-		 * NOTE: this "knows" short control reads won't need fixup:
-		 * hc went from the (one) data TD to the status td. that'll
-		 * change if multi-td control DATA segments are supported,
-		 * and we want to send the status packet.
+		if (next->urb != urb)
+			break;
+
+		/* NOTE: if multi-td control DATA segments get supported,
+		 * this urb had one of them, this td wasn't the last td
+		 * in that segment (TD_R clear), this ed halted because
+		 * of a short read, _and_ URB_SHORT_NOT_OK is clear ...
+		 * then we need to leave the control STATUS packet queued
+		 * and clear ED_SKIP.
 		 */
-		if (next->urb == urb) {
-			u32	info = next->hwINFO;
+		info = next->hwINFO;
+		info |= cpu_to_le32 (TD_DONE);
+		info &= ~cpu_to_le32 (TD_CC);
+		next->hwINFO = info;
 
-			info |= cpu_to_le32 (TD_DONE);
-			info &= ~cpu_to_le32 (TD_CC);
-			next->hwINFO = info;
-			next->next_dl_td = rev;	
-			rev = next;
-			continue;
-		}
+		next->next_dl_td = rev;	
+		rev = next;
 
-		/* restart ed with first td of this next urb */
-		ed->hwHeadP = cpu_to_le32 (next->td_dma) | toggle;
-		tmp = 0;
-		break;
+		ed->hwHeadP = next->hwNextTD | toggle;
 	}
-
-	/* no urbs queued? then ED is empty. */
-	if (tmp)
-		ed->hwHeadP = cpu_to_le32 (ed->dummy->td_dma) | toggle;
 
 	/* help for troubleshooting: */
 	dbg ("urb %p usb-%s-%s ep-%d-%s cc %d --> status %d",

@@ -588,10 +588,10 @@ static int TIChooseConfiguration (struct usb_device *dev)
 	// we want. However, we just support one config at this point,
 	// configuration # 1, which is Config Descriptor 0.
 
-	dbg ("%s - Number of Interfaces = %d", __FUNCTION__, dev->config->bNumInterfaces);
-	dbg ("%s - MAX Power            = %d", __FUNCTION__, dev->config->MaxPower*2);
+	dbg ("%s - Number of Interfaces = %d", __FUNCTION__, dev->config->desc.bNumInterfaces);
+	dbg ("%s - MAX Power            = %d", __FUNCTION__, dev->config->desc.bMaxPower*2);
 
-	if (dev->config->bNumInterfaces != 1) {
+	if (dev->config->desc.bNumInterfaces != 1) {
 		err ("%s - bNumInterfaces is not 1, ERROR!", __FUNCTION__);
 		return -ENODEV;
 	}
@@ -980,7 +980,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 	if (status)
 		return status;
 
-	interface = serial->serial->dev->config->interface->altsetting;
+	interface = &serial->serial->dev->config->interface->altsetting->desc;
 	if (!interface) {
 		err ("%s - no interface set, error!", __FUNCTION__);
 		return -ENODEV;

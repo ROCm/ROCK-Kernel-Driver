@@ -381,7 +381,7 @@ static void catc_tx_done(struct urb *urb)
 
 	if (urb->status == -ECONNRESET) {
 		dbg("Tx Reset.");
-		urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+		urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 		urb->status = 0;
 		catc->netdev->trans_start = jiffies;
 		catc->stats.tx_errors++;
@@ -443,7 +443,7 @@ static void catc_tx_timeout(struct net_device *netdev)
 	struct catc *catc = netdev->priv;
 
 	warn("Transmit timed out.");
-	catc->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	catc->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb(catc->tx_urb);
 }
 
@@ -783,7 +783,8 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	u8 broadcast[6];
 	int i, pktsz;
 
-	if (usb_set_interface(usbdev, intf->altsetting->bInterfaceNumber, 1)) {
+	if (usb_set_interface(usbdev,
+			intf->altsetting->desc.bInterfaceNumber, 1)) {
                 err("Can't set altsetting 1.");
 		return -EIO;
 	}
@@ -847,16 +848,16 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 		pktsz = RX_MAX_BURST * (PKT_SZ + 2);
 	}
 	
-	FILL_CONTROL_URB(catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
+	usb_fill_control_urb(catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
 		NULL, NULL, 0, catc_ctrl_done, catc);
 
-	FILL_BULK_URB(catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
+	usb_fill_bulk_urb(catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
 		NULL, 0, catc_tx_done, catc);
 
-	FILL_BULK_URB(catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
+	usb_fill_bulk_urb(catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
 		catc->rx_buf, pktsz, catc_rx_done, catc);
 
-	FILL_INT_URB(catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
+	usb_fill_int_urb(catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
                 catc->irq_buf, 2, catc_irq_done, catc, 1);
 
 	if (!catc->is_f5u011) {

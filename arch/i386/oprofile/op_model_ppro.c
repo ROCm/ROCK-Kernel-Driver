@@ -90,17 +90,16 @@ static int ppro_check_ctrs(unsigned int const cpu,
 {
 	unsigned int low, high;
 	int i;
-	int handled = 0;
  
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
 			oprofile_add_sample(regs->eip, i, cpu);
 			CTR_WRITE(reset_value[i], msrs, i);
-			handled = 1;
+			return 1;
 		}
 	}
-	return handled;
+	return 0;
 }
 
  

@@ -23,6 +23,7 @@
 
 extern const char *CardType[];
 static const char *avm_pci_rev = "$Revision: 1.22.6.6 $";
+static spinlock_t avm_pci_lock = SPIN_LOCK_UNLOCKED;
 
 #define  AVM_FRITZ_PCI		1
 #define  AVM_FRITZ_PNP		2
@@ -80,13 +81,12 @@ ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
 	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
 	register u_char val;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
 	val = inb(cs->hw.avm.isac + (offset & 0xf));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 	return (val);
 }
 
@@ -94,13 +94,12 @@ static void
 WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
 	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
 	outb(value, cs->hw.avm.isac + (offset & 0xf));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 static void
@@ -122,13 +121,12 @@ ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
 {
 	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
 	register u_int val;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
 	val = inl(cs->hw.avm.isac + offset);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 	return (val);
 }
 
@@ -136,13 +134,12 @@ static inline void
 WriteHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset, u_int value)
 {
 	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
 	outl(value, cs->hw.avm.isac + offset);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 static inline u_char
@@ -150,13 +147,12 @@ ReadHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset)
 {
 	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
 	register u_char val;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
 	val = inb(cs->hw.avm.isac + offset);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 	return (val);
 }
 
@@ -164,13 +160,12 @@ static inline void
 WriteHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
 {
 	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register long flags;
+	register unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
 	outb(value, cs->hw.avm.isac + offset);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 static u_char
@@ -200,7 +195,7 @@ void inline
 hdlc_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 }
 
 void
@@ -390,11 +385,10 @@ hdlc_fill_fifo(struct BCState *bcs)
 static void
 fill_hdlc(struct BCState *bcs)
 {
-	long flags;
-	save_flags(flags);
-	cli();
+	unsigned long flags;
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	hdlc_fill_fifo(bcs);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 static inline void
@@ -493,8 +487,7 @@ HDLC_irq_main(struct IsdnCardState *cs)
 	long  flags;
 	struct BCState *bcs;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&avm_pci_lock, flags);
 	if (cs->subtyp == AVM_FRITZ_PCI) {
 		stat = ReadHDLCPCI(cs, 0, HDLC_STATUS);
 	} else {
@@ -523,27 +516,26 @@ HDLC_irq_main(struct IsdnCardState *cs)
 		} else
 			HDLC_irq(bcs, stat);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 void
 hdlc_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&avm_pci_lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&avm_pci_lock, flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				st->l1.bcs->hw.hdlc.count = 0;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&avm_pci_lock, flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
 			break;
@@ -716,11 +708,7 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 static void
 reset_avmpcipnp(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
-	save_flags(flags);
-	sti();
 	outb(AVM_STATUS0_RESET | AVM_STATUS0_DIS_TIMER, cs->hw.avm.cfg_reg + 2);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000); /* Timeout 10ms */

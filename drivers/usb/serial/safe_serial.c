@@ -270,7 +270,7 @@ static void safe_read_bulk_callback (struct urb *urb)
 	}
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB (urb, serial->dev,
+	usb_fill_bulk_urb (urb, serial->dev,
 		       usb_rcvbulkpipe (serial->dev, port->bulk_in_endpointAddress),
 		       urb->transfer_buffer, urb->transfer_buffer_length,
 		       safe_read_bulk_callback, port);
@@ -393,7 +393,7 @@ static int safe_write_room (struct usb_serial_port *port)
 
 static int safe_startup (struct usb_serial *serial)
 {
-	switch (serial->interface->altsetting->bInterfaceProtocol) {
+	switch (serial->interface->altsetting->desc.bInterfaceProtocol) {
 	case LINEO_SAFESERIAL_CRC:
 		break;
 	case LINEO_SAFESERIAL_CRC_PADDED:

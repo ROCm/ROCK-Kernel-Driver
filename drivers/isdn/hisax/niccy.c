@@ -25,6 +25,7 @@
 
 extern const char *CardType[];
 const char *niccy_revision = "$Revision: 1.15.6.6 $";
+static spinlock_t niccy_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -50,13 +51,12 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&niccy_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&niccy_lock, flags);
 	return (ret);
 }
 
@@ -73,13 +73,12 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&niccy_lock, flags);
 	byteout(ale, off);
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&niccy_lock, flags);
 }
 
 static inline void

@@ -609,7 +609,7 @@ static int se401_start_stream(struct usb_se401 *se401)
 		if(!urb)
 			return -ENOMEM;
 
-		FILL_BULK_URB(urb, se401->dev,
+		usb_fill_bulk_urb(urb, se401->dev,
 			usb_rcvbulkpipe(se401->dev, SE401_VIDEO_ENDPOINT),
 			se401->sbuf[i].data, SE401_PACKETSIZE,
 			se401_video_irq,
@@ -1420,7 +1420,7 @@ static int se401_init(struct usb_se401 *se401, int button)
 			info("Allocation of inturb failed");
 			return 1;
 		}
-		FILL_INT_URB(se401->inturb, se401->dev,
+		usb_fill_int_urb(se401->inturb, se401->dev,
 		    usb_rcvintpipe(se401->dev, SE401_BUTTON_ENDPOINT),
 		    &se401->button, sizeof(se401->button),
 		    se401_button_irq,
@@ -1456,7 +1456,7 @@ static int se401_probe(struct usb_interface *intf,
         if (dev->descriptor.bNumConfigurations != 1)
                 return -ENODEV;
 
-        interface = &intf->altsetting[0];
+        interface = &intf->altsetting[0].desc;
 
         /* Is it an se401? */
         if (dev->descriptor.idVendor == 0x03e8 &&
