@@ -362,7 +362,7 @@ static int getequalizer(int __user *arg,
 static int aci_mixer_ioctl (int dev, unsigned int cmd, void __user * arg)
 {
 	int vol, buf;
-	int __user *p;
+	int __user *p = arg;
 
 	switch (cmd) {
 	case SOUND_MIXER_WRITE_VOLUME:
