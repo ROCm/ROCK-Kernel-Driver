@@ -470,10 +470,10 @@ got_block:
 
 	ext2_debug ("allocating block %d. ", block);
 
+	*err = 0;
 out_release:
 	group_release_blocks(desc, gdp_bh, group_alloc);
 	release_blocks(sb, es_alloc);
-	*err = 0;
 out_unlock:
 	unlock_super (sb);
 	DQUOT_FREE_BLOCK(inode, dq_alloc);
