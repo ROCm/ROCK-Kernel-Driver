@@ -373,8 +373,7 @@ static int __init ds1620_init(void)
 	th_start.hi = 1;
 	ds1620_write_state(&th_start);
 
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(2*HZ);
+	msleep(2000);
 
 	ds1620_write_state(&th);
 
