@@ -1370,7 +1370,7 @@ static void __init calculate_zone_totalpages(struct pglist_data *pgdat,
 		for (i = 0; i < MAX_NR_ZONES; i++)
 			realtotalpages -= zholes_size[i];
 	pgdat->node_present_pages = realtotalpages;
-	printk("On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
+	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id, realtotalpages);
 }
 
 
@@ -1476,7 +1476,7 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 			pcp->batch = 1 * batch;
 			INIT_LIST_HEAD(&pcp->list);
 		}
-		printk("  %s zone: %lu pages, LIFO batch:%lu\n",
+		printk(KERN_DEBUG "  %s zone: %lu pages, LIFO batch:%lu\n",
 				zone_names[j], realsize, batch);
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
