@@ -159,7 +159,14 @@ static inline u8 FAN_TO_REG(long rpm, int div)
 				205-(val)*5)
 #define ALARMS_FROM_REG(val) (val)
 
-#define DIV_TO_REG(val) ((val)==8?3:(val)==4?2:(val)==1?0:1)
+static int log2(int val)
+{
+	int answer = 0;
+	while ((val >>= 1))
+		answer++;
+	return answer;
+}
+#define DIV_TO_REG(val) log2(val)
 #define DIV_FROM_REG(val) (1 << (val))
 
 /* Initial limits. Use the config file to set better limits. */
@@ -520,10 +527,25 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
-	int old = it87_read_value(client, IT87_REG_FAN_DIV);
-	data->fan_div[nr] = DIV_TO_REG(val);
-	old = (old & 0x0f) | (data->fan_div[1] << 6) | (data->fan_div[0] << 4);
-	it87_write_value(client, IT87_REG_FAN_DIV, old);
+	u8 old = it87_read_value(client, IT87_REG_FAN_DIV);
+
+	switch (nr) {
+	case 0:
+	case 1:
+		data->fan_div[nr] = DIV_TO_REG(val);
+		break;
+	case 2:
+		if (val < 8)
+			data->fan_div[nr] = 1;
+		else
+			data->fan_div[nr] = 3;
+	}
+	val = old & 0x100;
+	val |= (data->fan_div[0] & 0x07);
+	val |= (data->fan_div[1] & 0x07) << 3;
+	if (data->fan_div[2] == 3)
+		val |= 0x1 << 6;
+	it87_write_value(client, IT87_REG_FAN_DIV, val);
 	return count;
 }
 
@@ -961,7 +983,7 @@ static void it87_update_client(struct i2c_client *client)
 		i = it87_read_value(client, IT87_REG_FAN_DIV);
 		data->fan_div[0] = i & 0x07;
 		data->fan_div[1] = (i >> 3) & 0x07;
-		data->fan_div[2] = 1;
+		data->fan_div[2] = (i & 0x40) ? 3 : 1;
 
 		data->alarms =
 			it87_read_value(client, IT87_REG_ALARM1) |
