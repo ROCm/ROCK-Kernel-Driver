@@ -23,103 +23,48 @@
 #include <linux/in.h>
 #include <linux/init.h>
 #include <net/p8022.h>
+#include <net/llc_sap.h>
 
-extern void llc_register_sap(unsigned char sap,
-			     int (*rcvfunc)(struct sk_buff *,
-					    struct net_device *,
-					    struct packet_type *));
-extern void llc_unregister_sap(unsigned char sap);
-
-static struct datalink_proto *p8022_list;
-/*
- *	We don't handle the loopback SAP stuff, the extended
- *	802.2 command set, multicast SAP identifiers and non UI
- *	frames. We have the absolute minimum needed for IPX,
- *	IP and Appletalk phase 2. See the llc_* routines for
- *	support libraries if your protocol needs these.
- */
-static struct datalink_proto *find_8022_client(unsigned char type)
+static int p8022_request(struct datalink_proto *dl, struct sk_buff *skb,
+			 unsigned char *dest)
 {
-	struct datalink_proto *proto = p8022_list;
+	union llc_u_prim_data prim_data;
+	struct llc_prim_if_block prim;
 
-	while (proto && *(proto->type) != type)
-		proto = proto->next;
-	return proto;
-}
-
-int p8022_rcv(struct sk_buff *skb, struct net_device *dev,
-	      struct packet_type *pt)
-{
-	struct datalink_proto *proto;
-	int rc = 0;
-
-	proto = find_8022_client(*(skb->h.raw));
-	if (!proto) {
-		skb->sk = NULL;
-		kfree_skb(skb);
-		goto out;
-	}
-	skb->h.raw += 3;
-	skb->nh.raw += 3;
-	skb_pull(skb, 3);
-	rc = proto->rcvfunc(skb, dev, pt);
-out:	return rc;
-}
-
-static void p8022_datalink_header(struct datalink_proto *dl,
-				  struct sk_buff *skb, unsigned char *dest_node)
-{
-	struct net_device *dev = skb->dev;
-	unsigned char *rawp = skb_push(skb, 3);
-
-	*rawp++ = dl->type[0];
-	*rawp++ = dl->type[0];
-	*rawp	= 0x03;	/* UI */
-	dev->hard_header(skb, dev, ETH_P_802_3, dest_node, NULL, skb->len);
+	prim.data                 = &prim_data;
+	prim.sap                  = dl->sap;
+	prim.prim                 = LLC_DATAUNIT_PRIM;
+	prim_data.test.skb        = skb;
+	prim_data.test.saddr.lsap = dl->sap->laddr.lsap;
+	prim_data.test.daddr.lsap = dl->sap->laddr.lsap;
+	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(prim_data.test.daddr.mac, dest, IFHWADDRLEN);
+	return dl->sap->req(&prim);
 }
 
 struct datalink_proto *register_8022_client(unsigned char type,
-					    int (*rcvfunc)(struct sk_buff *,
-						    	   struct net_device *,
-							  struct packet_type *))
+			  int (*indicate)(struct llc_prim_if_block *prim))
 {
-	struct datalink_proto *proto = NULL;
+	struct datalink_proto *proto;
 
-	if (find_8022_client(type))
-		goto out;
 	proto = kmalloc(sizeof(*proto), GFP_ATOMIC);
 	if (proto) {
 		proto->type[0]		= type;
-		proto->type_len		= 1;
-		proto->rcvfunc		= rcvfunc;
 		proto->header_length	= 3;
-		proto->datalink_header	= p8022_datalink_header;
-		proto->string_name	= "802.2";
-		proto->next		= p8022_list;
-		p8022_list		= proto;
-		llc_register_sap(type, p8022_rcv);
+		proto->request		= p8022_request;
+		proto->sap = llc_sap_open(indicate, NULL, type);
+		if (!proto->sap) {
+			kfree(proto);
+			proto = NULL;
+		}
 	}
-out:	return proto;
+	return proto;
 }
 
-void unregister_8022_client(unsigned char type)
+void unregister_8022_client(struct datalink_proto *proto)
 {
-	struct datalink_proto *tmp, **clients = &p8022_list;
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
-	while (*clients) {
-		tmp = *clients;
-		if (tmp->type[0] == type) {
-			*clients = tmp->next;
-			kfree(tmp);
-			llc_unregister_sap(type);
-			break;
-		}
-		clients = &tmp->next;
-	}
-	restore_flags(flags);
+	llc_sap_close(proto->sap);
+	kfree(proto);
 }
 
 EXPORT_SYMBOL(register_8022_client);

@@ -169,13 +169,8 @@ void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
  */
 static void llc_sap_free_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	if (ev->type == LLC_SAP_EV_TYPE_PDU) {
-		struct llc_pdu_un *pdu =
-				(struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
-
-		if (LLC_U_PDU_CMD(pdu) != LLC_1_PDU_CMD_UI)
-			kfree_skb(ev->data.pdu.skb);
-	}
+	if (ev->type == LLC_SAP_EV_TYPE_PDU)
+		kfree_skb(ev->data.pdu.skb);
 	kfree(ev);
 }
 

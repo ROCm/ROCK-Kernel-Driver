@@ -82,7 +82,7 @@ int llc_conn_send_ev(struct sock *sk, struct llc_conn_state_ev *ev)
 	/* check if the connection was freed by the state machine by
 	 * means of llc_conn_disc */
 	if (rc == 2) {
-		printk(KERN_INFO __FUNCTION__ ": rc == 2\n");
+		printk(KERN_INFO "%s: rc == 2\n", __FUNCTION__);
 		rc = -ECONNABORTED;
 		goto out;
 	}

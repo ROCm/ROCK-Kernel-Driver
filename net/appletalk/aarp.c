@@ -163,11 +163,8 @@ static void __aarp_send_query(struct aarp_entry *a)
 	eah->pa_dst_net	 = a->target_addr.s_net;
 	eah->pa_dst_node = a->target_addr.s_node;
 	
-	/* Add ELAP headers and set target to the AARP multicast */
-	aarp_dl->datalink_header(aarp_dl, skb, aarp_eth_multicast);	
-
 	/* Send it */	
-	dev_queue_xmit(skb);
+	aarp_dl->request(aarp_dl, skb, aarp_eth_multicast);
 	/* Update the sending count */
 	a->xmit_count++;
 }
@@ -213,10 +210,8 @@ static void aarp_send_reply(struct net_device *dev, struct atalk_addr *us,
 	eah->pa_dst_net	 = them->s_net;
 	eah->pa_dst_node = them->s_node;
 	
-	/* Add ELAP headers and set target to the AARP multicast */
-	aarp_dl->datalink_header(aarp_dl, skb, sha);	
 	/* Send it */	
-	dev_queue_xmit(skb);
+	aarp_dl->request(aarp_dl, skb, sha);
 }
 
 /*
@@ -261,10 +256,8 @@ void aarp_send_probe(struct net_device *dev, struct atalk_addr *us)
 	eah->pa_dst_net	 = us->s_net;
 	eah->pa_dst_node = us->s_node;
 
-	/* Add ELAP headers and set target to the AARP multicast */
-	aarp_dl->datalink_header(aarp_dl, skb, aarp_eth_multicast);
 	/* Send it */
-	dev_queue_xmit(skb);
+	aarp_dl->request(aarp_dl, skb, aarp_eth_multicast);
 }
 	
 /*
@@ -602,8 +595,9 @@ int aarp_send_ddp(struct net_device *dev,struct sk_buff *skb,
 	
 	/* Do we have a resolved entry? */
 	if (sa->s_node == ATADDR_BCAST) {
-		ddp_dl->datalink_header(ddp_dl, skb, ddp_eth_multicast);
-		goto sendit;
+		/* Send it */
+		ddp_dl->request(ddp_dl, skb, ddp_eth_multicast);
+		goto sent;
 	}
 
 	spin_lock_bh(&aarp_lock);
@@ -611,9 +605,9 @@ int aarp_send_ddp(struct net_device *dev,struct sk_buff *skb,
 
 	if (a) { /* Return 1 and fill in the address */
 		a->expires_at = jiffies + (sysctl_aarp_expiry_time * 10);
-		ddp_dl->datalink_header(ddp_dl, skb, a->hwaddr);
+		ddp_dl->request(ddp_dl, skb, a->hwaddr);
 		spin_unlock_bh(&aarp_lock);
-		goto sendit;
+		goto sent;
 	}
 
 	/* Do we have an unresolved entry: This is the less common path */
@@ -663,6 +657,7 @@ sendit:
 	if (skb->sk)
 		skb->priority = skb->sk->priority;
 	dev_queue_xmit(skb);
+sent:
 	return 1;
 }
 
@@ -690,10 +685,7 @@ static void __aarp_resolved(struct aarp_entry **list, struct aarp_entry *a,
 			while ((skb = skb_dequeue(&a->packet_queue)) != NULL) {
 				a->expires_at = jiffies +
 						sysctl_aarp_expiry_time * 10;
-				ddp_dl->datalink_header(ddp_dl, skb, a->hwaddr);
-				if (skb->sk)
-					skb->priority = skb->sk->priority;
-				dev_queue_xmit(skb);
+				ddp_dl->request(ddp_dl, skb, a->hwaddr);
 			}
 		} else 
 			list = &((*list)->next);
@@ -989,7 +981,7 @@ void aarp_cleanup_module(void)
 {
 	del_timer(&aarp_timer);
 	unregister_netdevice_notifier(&aarp_notifier);
-	unregister_snap_client(aarp_snap_id);
+	unregister_snap_client(aarp_dl);
 }
 #endif  /* MODULE */
 #ifdef CONFIG_PROC_FS
