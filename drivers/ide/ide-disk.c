@@ -72,8 +72,6 @@
 
 #include "legacy/pdc4030.h"
 
-static int driver_blocked;
-
 static inline u32 idedisk_read_24 (ide_drive_t *drive)
 {
 	u8 hcyl = HWIF(drive)->INB(IDE_HCYL_REG);
@@ -132,7 +130,23 @@ static int lba_capacity_is_ok (struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
+static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
+{
+	unsigned long flags;
+	int ret = 1;
+
+	spin_lock_irqsave(&ide_lock, flags);
+
+	if (ata_pending_commands(drive) < drive->queue_depth)
+		ret = blk_queue_start_tag(&drive->queue, rq);
+
+	spin_unlock_irqrestore(&ide_lock, flags);
+	return ret;
+}
+
 #ifndef CONFIG_IDE_TASKFILE_IO
+
+static int driver_blocked;
 
 /*
  * read_intr() is the handler for disk read/multread interrupts
@@ -342,20 +356,6 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 		return ide_stopped;
 	}
 	return DRIVER(drive)->error(drive, "multwrite_intr", stat);
-}
-
-static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
-{
-	unsigned long flags;
-	int ret = 1;
-
-	spin_lock_irqsave(&ide_lock, flags);
-
-	if (ata_pending_commands(drive) < drive->queue_depth)
-		ret = blk_queue_start_tag(&drive->queue, rq);
-
-	spin_unlock_irqrestore(&ide_lock, flags);
-	return ret;
 }
 
 /*
@@ -744,7 +744,7 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 		args.tfRegister[IDE_FEATURE_OFFSET] = sectors;
 		args.tfRegister[IDE_NSECTOR_OFFSET] = rq->tag << 3;
 		args.hobRegister[IDE_FEATURE_OFFSET_HOB] = sectors >> 8;
-		args.hobRegister[IDE_NSECT_OFFSET_HOB] = 0;
+		args.hobRegister[IDE_NSECTOR_OFFSET_HOB] = 0;
 	} else {
 		args.tfRegister[IDE_NSECTOR_OFFSET] = sectors;
 		args.hobRegister[IDE_NSECTOR_OFFSET_HOB] = sectors >> 8;
