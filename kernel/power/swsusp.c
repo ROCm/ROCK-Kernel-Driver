@@ -874,7 +874,7 @@ int software_suspend(void)
 /*
  * Returns true if given address/order collides with any orig_address 
  */
-static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
+static int __init does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
 		int order)
 {
 	int i;
@@ -892,7 +892,7 @@ static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-static int check_pagedir(void)
+static int __init check_pagedir(void)
 {
 	int i;
 
@@ -910,7 +910,7 @@ static int check_pagedir(void)
 	return 0;
 }
 
-static int relocate_pagedir(void)
+int __init swsusp_pagedir_relocate(void)
 {
 	/*
 	 * We have to avoid recursion (not to overflow kernel stack),
@@ -953,7 +953,7 @@ static int relocate_pagedir(void)
 		free_pages((unsigned long)f, pagedir_order);
 	}
 	printk("|\n");
-	return ret;
+	return check_pagedir();
 }
 
 /*
@@ -1089,9 +1089,7 @@ static int __init __read_suspend_image(struct block_device *bdev, union diskpage
 	}
 	BUG_ON (next.val);
 
-	if (relocate_pagedir())
-		return -ENOMEM;
-	if (check_pagedir())
+	if (swsusp_pagedir_relocate())
 		return -ENOMEM;
 
 	printk( "Reading image data (%d pages): ", nr_copy_pages );

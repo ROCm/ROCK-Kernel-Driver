@@ -732,93 +732,6 @@ int pmdisk_resume(void)
 
 /* More restore stuff */
 
-#define does_collide(addr) does_collide_order(pm_pagedir_nosave, addr, 0)
-
-/*
- * Returns true if given address/order collides with any orig_address 
- */
-static int __init does_collide_order(suspend_pagedir_t *pagedir, 
-				     unsigned long addr, int order)
-{
-	int i;
-	unsigned long addre = addr + (PAGE_SIZE<<order);
-	
-	for(i=0; i < pmdisk_pages; i++)
-		if((pagedir+i)->orig_address >= addr &&
-			(pagedir+i)->orig_address < addre)
-			return 1;
-
-	return 0;
-}
-
-/*
- * We check here that pagedir & pages it points to won't collide with pages
- * where we're going to restore from the loaded pages later
- */
-static int __init check_pagedir(void)
-{
-	int i;
-
-	for(i=0; i < pmdisk_pages; i++) {
-		unsigned long addr;
-
-		do {
-			addr = get_zeroed_page(GFP_ATOMIC);
-			if(!addr)
-				return -ENOMEM;
-		} while (does_collide(addr));
-
-		(pm_pagedir_nosave+i)->address = addr;
-	}
-	return 0;
-}
-
-static int __init relocate_pagedir(void)
-{
-	/*
-	 * We have to avoid recursion (not to overflow kernel stack),
-	 * and that's why code looks pretty cryptic 
-	 */
-	suspend_pagedir_t *old_pagedir = pm_pagedir_nosave;
-	void **eaten_memory = NULL;
-	void **c = eaten_memory, *m, *f;
-	int err;
-
-	pr_debug("pmdisk: Relocating pagedir\n");
-
-	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
-		pr_debug("pmdisk: Relocation not necessary\n");
-		return 0;
-	}
-
-	err = -ENOMEM;
-	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order)) != NULL) {
-		if (!does_collide_order(old_pagedir, (unsigned long)m,
-					pagedir_order)) {
-			pm_pagedir_nosave =
-				memcpy(m, old_pagedir,
-				       PAGE_SIZE << pagedir_order);
-			err = 0;
-			break;
-		}
-		eaten_memory = m;
-		printk( "." ); 
-		*eaten_memory = c;
-		c = eaten_memory;
-	}
-
-	c = eaten_memory;
-	while(c) {
-		printk(":");
-		f = c;
-		c = *c;
-		free_pages((unsigned long)f, pagedir_order);
-	}
-	printk("|\n");
-	return err;
-}
-
-
 static struct block_device * resume_bdev;
 
 
@@ -1041,9 +954,7 @@ static int __init read_suspend_image(void)
 		return error;
 	if ((error = read_pagedir()))
 		return error;
-	if ((error = relocate_pagedir()))
-		goto FreePagedir;
-	if ((error = check_pagedir()))
+	if ((error = swsusp_pagedir_relocate()))
 		goto FreePagedir;
 	if ((error = read_image_data()))
 		goto FreePagedir;
