@@ -574,7 +574,7 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
 
 /*
  * This is a generic file read routine, and uses the
- * inode->i_op->readpage() function for the actual low-level
+ * mapping->a_ops->readpage() function for the actual low-level
  * stuff.
  *
  * This is really ugly. But the goto's actually try to clarify some
