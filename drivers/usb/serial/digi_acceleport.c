@@ -1397,8 +1397,7 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 	}
 
 	/* further sanity checks */
-	if( port_paranoia_check( port, __FUNCTION__ )
-	|| serial_paranoia_check( serial, __FUNCTION__ ) )
+	if (serial_paranoia_check(serial, __FUNCTION__))
 		return;
 
 	/* try to send any buffered data on this port, if it is open */
@@ -1851,11 +1850,6 @@ static int digi_read_inb_callback( struct urb *urb )
 	unsigned char *data = ((unsigned char *)urb->transfer_buffer)+3;
 	int flag,throttled;
 
-
-	/* sanity check */
-	if( port_paranoia_check( port, __FUNCTION__ ) )
-		return( -1 );
-
 	/* do not process callbacks on closed ports */
 	/* but do continue the read chain */
 	if( port->open_count == 0 )
@@ -1980,9 +1974,8 @@ opcode, line, status, val );
 
 		port = serial->port[line];
 
-		if( port_paranoia_check( port, __FUNCTION__ )
-		|| (priv=usb_get_serial_port_data(port)) == NULL )
-			return( -1 );
+		if ((priv=usb_get_serial_port_data(port)) == NULL )
+			return -1;
 
 		if( opcode == DIGI_CMD_READ_INPUT_SIGNALS ) {
 

@@ -249,11 +249,6 @@ static void keyspan_pda_rx_interrupt (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	
-	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
-
 	serial = port->serial;
 	if (serial_paranoia_check (serial, "keyspan_pda_rx_interrupt")) {
 		return;
@@ -637,10 +632,6 @@ static void keyspan_pda_write_bulk_callback (struct urb *urb, struct pt_regs *re
 	struct keyspan_pda_private *priv;
 
 	priv = usb_get_serial_port_data(port);
-
-	if (port_paranoia_check (port, "keyspan_pda_rx_interrupt")) {
-		return;
-	}
 
 	serial = port->serial;
 	if (serial_paranoia_check (serial, "keyspan_pda_rx_interrupt")) {

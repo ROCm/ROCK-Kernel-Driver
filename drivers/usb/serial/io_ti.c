@@ -1685,11 +1685,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 	dbg ("%s - port_number %d, function %d, info 0x%x",
 	     __FUNCTION__, port_number, function, data[1]);
 	port = edge_serial->serial->port[port_number];
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		dbg ("%s - change found for port that is not present",
-		     __FUNCTION__);
-		return;
-	}
 	edge_port = usb_get_serial_port_data(port);
 	if (!edge_port) {
 		dbg ("%s - edge_port not found", __FUNCTION__);
@@ -1743,9 +1738,6 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 	int port_number;
 
 	dbg("%s", __FUNCTION__);
-
-	if (port_paranoia_check (edge_port->port, __FUNCTION__))
-		return;
 
 	if (urb->status) {
 		dbg ("%s - nonzero read bulk status received: %d",
@@ -1848,9 +1840,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	u16 open_settings;
 	u8 transaction_timeout;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (edge_port == NULL)
@@ -1999,9 +1988,6 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	int port_number;
 	int status;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial (port, __FUNCTION__);

@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- *	Copyright (C) 1999 - 2003
+ *	Copyright (C) 1999 - 2004
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -309,27 +309,10 @@ static inline int serial_paranoia_check (struct usb_serial *serial, const char *
 	return 0;
 }
 
-
-static inline int port_paranoia_check (struct usb_serial_port *port, const char *function)
-{
-	if (!port) {
-		dbg("%s - port == NULL", function);
-		return -1;
-	}
-	if (!port->serial) {
-		dbg("%s - port->serial == NULL", function);
-		return -1;
-	}
-
-	return 0;
-}
-
-
 static inline struct usb_serial* get_usb_serial (struct usb_serial_port *port, const char *function) 
 { 
 	/* if no port was specified, or it fails a paranoia check */
 	if (!port || 
-		port_paranoia_check (port, function) ||
 		serial_paranoia_check (port->serial, function)) {
 		/* then say that we don't have a valid usb_serial thing, which will
 		 * end up genrating -ENODEV return values */ 

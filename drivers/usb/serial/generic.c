@@ -83,9 +83,6 @@ int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* force low_latency on so that our tty_push actually forces the data through, 

@@ -283,9 +283,6 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	char *buffer;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (buffer_size) {
@@ -330,9 +327,6 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 {
 	struct usb_serial *serial;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial (port, __FUNCTION__);
@@ -411,9 +405,6 @@ static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
@@ -437,9 +428,6 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 

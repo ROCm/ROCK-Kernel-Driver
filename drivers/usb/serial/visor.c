@@ -396,9 +396,6 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->read_urb) {
@@ -449,9 +446,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	struct usb_serial *serial;
 	unsigned char *transfer_buffer;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial (port, __FUNCTION__);
@@ -571,9 +565,6 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status)
@@ -592,9 +583,6 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 

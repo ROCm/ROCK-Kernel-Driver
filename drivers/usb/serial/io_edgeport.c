@@ -825,19 +825,17 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 			txCredits = data[position] | (data[position+1] << 8);
 			if (txCredits) {
 				port = edge_serial->serial->port[portNumber];
-				if (port_paranoia_check (port, __FUNCTION__) == 0) {
-					edge_port = usb_get_serial_port_data(port);
-					if (edge_port->open) {
-						edge_port->txCredits += txCredits;
-						dbg("%s - txcredits for port%d = %d", __FUNCTION__, portNumber, edge_port->txCredits);
+				edge_port = usb_get_serial_port_data(port);
+				if (edge_port->open) {
+					edge_port->txCredits += txCredits;
+					dbg("%s - txcredits for port%d = %d", __FUNCTION__, portNumber, edge_port->txCredits);
 
-						/* tell the tty driver that something has changed */
-						if (edge_port->port->tty)
-							wake_up_interruptible(&edge_port->port->tty->write_wait);
+					/* tell the tty driver that something has changed */
+					if (edge_port->port->tty)
+						wake_up_interruptible(&edge_port->port->tty->write_wait);
 
-						// Since we have more credit, check if more data can be sent
-						send_more_port_data(edge_serial, edge_port);
-					}
+					// Since we have more credit, check if more data can be sent
+					send_more_port_data(edge_serial, edge_port);
 				}
 			}
 			position += 2;
@@ -916,10 +914,6 @@ static void edge_bulk_out_data_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (port_paranoia_check (edge_port->port, __FUNCTION__)) {
-		return;
-	}
-
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 	}
@@ -969,10 +963,6 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 	/* Free the command urb */
 	usb_free_urb (urb);
 
-	if (port_paranoia_check (edge_port->port, __FUNCTION__)) {
-		return;
-	}
-
 	if (status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, status);
 		return;
@@ -1009,9 +999,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	int response;
 	int timeout;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (edge_port == NULL)
@@ -1245,9 +1232,6 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 	struct edgeport_port *edge_port;
 	int status;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial (port, __FUNCTION__);
@@ -2071,24 +2055,22 @@ static int process_rcvd_data (struct edgeport_serial *edge_serial, unsigned char
 				/* spit this data back into the tty driver if this port is open */
 				if (rxLen) {
 					port = edge_serial->serial->port[edge_serial->rxPort];
-					if (port_paranoia_check (port, __FUNCTION__) == 0) {
-        					edge_port = usb_get_serial_port_data(port);
-						if (edge_port->open) {
-							tty = edge_port->port->tty;
-							if (tty) {
-								dbg("%s - Sending %d bytes to TTY for port %d", __FUNCTION__, rxLen, edge_serial->rxPort);
-								for (i = 0; i < rxLen ; ++i) {
-									/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
-									if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
-										tty_flip_buffer_push(tty);
-									}
-									/* this doesn't actually push the data through unless tty->low_latency is set */
-									tty_insert_flip_char(tty, buffer[i], 0);
+					edge_port = usb_get_serial_port_data(port);
+					if (edge_port->open) {
+						tty = edge_port->port->tty;
+						if (tty) {
+							dbg("%s - Sending %d bytes to TTY for port %d", __FUNCTION__, rxLen, edge_serial->rxPort);
+							for (i = 0; i < rxLen ; ++i) {
+								/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
+								if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
+									tty_flip_buffer_push(tty);
 								}
-								tty_flip_buffer_push(tty);
+								/* this doesn't actually push the data through unless tty->low_latency is set */
+								tty_insert_flip_char(tty, buffer[i], 0);
 							}
-							edge_port->icount.rx += rxLen;
+							tty_flip_buffer_push(tty);
 						}
+						edge_port->icount.rx += rxLen;
 					}
 					buffer += rxLen;
 				}
@@ -2124,9 +2106,6 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 
 	/* switch the port pointer to the one being currently talked about */
 	port = edge_serial->serial->port[edge_serial->rxPort];
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
         edge_port = usb_get_serial_port_data(port);
 	if (edge_port == NULL) {
 		dev_err(&edge_serial->serial->dev->dev, "%s - edge_port == NULL for port %d\n", __FUNCTION__, edge_serial->rxPort);

@@ -156,9 +156,6 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	struct omninet_data	*od;
 	int			result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	serial = get_usb_serial (port, __FUNCTION__);
@@ -192,9 +189,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	struct usb_serial 	*serial;
 	struct usb_serial_port 	*wport;
 	struct omninet_data 	*od;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -347,11 +341,6 @@ static void omninet_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	struct usb_serial 	*serial;
 
 //	dbg("omninet_write_bulk_callback, port %0x\n", port);
-
-
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
 
 	serial = port->serial;
 	if (serial_paranoia_check (serial, __FUNCTION__)) {

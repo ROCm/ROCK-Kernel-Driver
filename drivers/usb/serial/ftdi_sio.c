@@ -1513,9 +1513,6 @@ static void ftdi_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
@@ -1577,9 +1574,6 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
 	if (port->open_count <= 0)
 		return;
 

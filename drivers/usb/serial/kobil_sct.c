@@ -230,9 +230,6 @@ static int kobil_open (struct usb_serial_port *port, struct file *filp)
 	priv = usb_get_serial_port_data(port);
 	priv->line_state = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	// someone sets the dev to 0 if the close method has been called
 	port->interrupt_in_urb->dev = port->serial->dev;
 

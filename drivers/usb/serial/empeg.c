@@ -157,9 +157,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* Force default termio settings */
@@ -191,9 +188,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 static void empeg_close (struct usb_serial_port *port, struct file * filp)
 {
 	struct usb_serial *serial;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -353,9 +347,6 @@ static void empeg_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (urb->status) {
@@ -375,9 +366,6 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 

@@ -246,9 +246,6 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	serial = get_usb_serial (port, __FUNCTION__);
 	if (!serial)
 		return;
@@ -287,9 +284,6 @@ static void belkin_sa_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
 		goto exit;
 	}
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	serial = port->serial;
 

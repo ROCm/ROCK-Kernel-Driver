@@ -181,10 +181,6 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	int			i, result = 0;
 	int			retries = KP_RETRIES;
 
-	if (port_paranoia_check(port, __FUNCTION__)) {
-		return -ENODEV;
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	bytes_in = 0;
@@ -291,10 +287,6 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	struct usb_serial	*serial;
 	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
-	if (port_paranoia_check(port, __FUNCTION__)) {
-		return; 
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial(port, __FUNCTION__);
@@ -322,9 +314,6 @@ static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	struct tty_struct	*tty;
 	unsigned char		*data = urb->transfer_buffer;
 	int			i, result;
-
-	if (port_paranoia_check(port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -488,10 +477,6 @@ static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	unsigned long		flags;
 	int			result;
 
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {

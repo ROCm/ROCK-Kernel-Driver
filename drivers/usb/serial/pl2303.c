@@ -411,9 +411,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	unsigned char *buf;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-		
 	dbg("%s -  port %d", __FUNCTION__, port->number);
 
 	usb_clear_halt(serial->dev, port->write_urb->pipe);
@@ -480,8 +477,6 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	unsigned int c_cflag;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 	serial = get_usb_serial (port, __FUNCTION__);
 	if (!serial)
 		return;
@@ -723,9 +718,6 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	u8 status;
 	char tty_flag;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!serial) {
@@ -807,9 +799,6 @@ static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {

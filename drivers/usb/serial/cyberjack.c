@@ -155,9 +155,6 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	unsigned long flags;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	dbg("%s - usb_clear_halt", __FUNCTION__ );
@@ -324,9 +321,6 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
