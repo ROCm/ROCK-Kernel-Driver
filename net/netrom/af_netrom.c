@@ -264,6 +264,9 @@ void nr_destroy_socket(struct sock *sk)
 
 		kfree_skb(skb);
 	}
+	while ((skb = skb_dequeue(&sk->sk_write_queue)) != NULL) {
+		kfree_skb(skb);
+	}
 
 	if (atomic_read(&sk->sk_wmem_alloc) ||
 	    atomic_read(&sk->sk_rmem_alloc)) {
