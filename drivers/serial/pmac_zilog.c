@@ -1946,6 +1946,8 @@ static void pmz_console_write(struct console *con, const char *s, unsigned int c
 	unsigned long flags;
 	int i;
 
+	if (ZS_IS_ASLEEP(uap))
+		return;
 	spin_lock_irqsave(&uap->port.lock, flags);
 
 	/* Turn of interrupts and enable the transmitter. */

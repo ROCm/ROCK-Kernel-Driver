@@ -244,6 +244,10 @@
 #define L2CR_L2DF		0x00004000	/* L2 differential clock */
 #define L2CR_L2BYP		0x00002000	/* L2 DLL bypass */
 #define L2CR_L2IP		0x00000001	/* L2 GI in progress */
+#define L2CR_L2IO_745x		0x00100000	/* L2 instr. only (745x) */
+#define L2CR_L2DO_745x		0x00010000	/* L2 data only (745x) */
+#define L2CR_L2REP_745x		0x00001000	/* L2 repl. algorithm (745x) */
+#define L2CR_L2HWF_745x		0x00000800	/* L2 hardware flush (745x) */
 #define SPRN_L3CR		0x3FA	/* Level 3 Cache Control Regsiter */
 #define L3CR_L3E		0x80000000	/* L3 enable */
 #define L3CR_L3PE		0x40000000	/* L3 data parity enable */
