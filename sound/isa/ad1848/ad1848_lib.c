@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/pm.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <sound/core.h>
@@ -625,6 +626,95 @@ static snd_pcm_uframes_t snd_ad1848_capture_pointer(snd_pcm_substream_t * substr
 
  */
 
+static void snd_ad1848_thinkpad_twiddle(ad1848_t *chip, int on) {
+
+	int tmp;
+
+	if (!chip->thinkpad_flag) return;
+
+	outb(0x1c, AD1848_THINKPAD_CTL_PORT1);
+	tmp = inb(AD1848_THINKPAD_CTL_PORT2);
+
+	if (on)
+		/* turn it on */
+		tmp |= AD1848_THINKPAD_CS4248_ENABLE_BIT;
+	else
+		/* turn it off */
+		tmp &= ~AD1848_THINKPAD_CS4248_ENABLE_BIT;
+	
+	outb(tmp, AD1848_THINKPAD_CTL_PORT2);
+
+}
+
+#ifdef CONFIG_PM
+static void snd_ad1848_suspend(ad1848_t *chip) {
+
+	snd_card_t *card = chip->card;
+
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		return;
+
+	snd_pcm_suspend_all(chip->pcm);
+	/* FIXME: save registers? */
+
+	if (chip->thinkpad_flag)
+		snd_ad1848_thinkpad_twiddle(chip, 0);
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+}
+
+static void snd_ad1848_resume(ad1848_t *chip) {
+
+	snd_card_t *card = chip->card;
+
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		return;
+
+	if (chip->thinkpad_flag)
+		snd_ad1848_thinkpad_twiddle(chip, 1);
+
+	/* FIXME: restore registers? */
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+}
+
+/* callback for control API */
+static int snd_ad1848_set_power_state(snd_card_t *card, unsigned int power_state)
+{
+	ad1848_t *chip = (ad1848_t *) card->power_state_private_data;
+	switch (power_state) {
+	case SNDRV_CTL_POWER_D0:
+	case SNDRV_CTL_POWER_D1:
+	case SNDRV_CTL_POWER_D2:
+		snd_ad1848_resume(chip);
+		break;
+	case SNDRV_CTL_POWER_D3hot:
+	case SNDRV_CTL_POWER_D3cold:
+		snd_ad1848_suspend(chip);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int snd_ad1848_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+{
+	ad1848_t *chip = snd_magic_cast(ad1848_t, dev->data, return 0);
+
+	switch (rqst) {
+	case PM_SUSPEND:
+		snd_ad1848_suspend(chip);
+		break;
+	case PM_RESUME:
+		snd_ad1848_resume(chip);
+		break;
+	}
+	return 0;
+}
+
+#endif /* CONFIG_PM */
+
 static int snd_ad1848_probe(ad1848_t * chip)
 {
 	unsigned long flags;
@@ -799,6 +889,10 @@ static int snd_ad1848_capture_close(snd_pcm_substream_t * substream)
 
 static int snd_ad1848_free(ad1848_t *chip)
 {
+#ifdef CONFIG_PM
+        if (chip->thinkpad_pmstate)
+                pm_unregister(chip->thinkpad_pmstate);
+#endif
 	if (chip->res_port) {
 		release_resource(chip->res_port);
 		kfree_nocheck(chip->res_port);
@@ -869,6 +963,20 @@ int snd_ad1848_create(snd_card_t * card,
 		return -EBUSY;
 	}
 	chip->dma = dma;
+
+	if (hardware == AD1848_HW_THINKPAD) {
+		chip->thinkpad_flag = 1;
+		chip->hardware = AD1848_HW_DETECT; /* reset */
+		snd_ad1848_thinkpad_twiddle(chip, 1);
+#ifdef CONFIG_PM
+		chip->thinkpad_pmstate = pm_register(PM_ISA_DEV, 0, snd_ad1848_pm_callback);
+		if (chip->thinkpad_pmstate) {
+			chip->thinkpad_pmstate->data = chip;
+			card->set_power_state = snd_ad1848_set_power_state; /* callback */
+			card->power_state_private_data = chip;
+		}
+#endif
+	}
 
 	if (snd_ad1848_probe(chip) < 0) {
 		snd_ad1848_free(chip);

@@ -106,7 +106,7 @@ static int snd_gus_free(snd_gus_card_t *gus)
 {
 	if (gus->gf1.res_port2 == NULL)
 		goto __hw_end;
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (gus->seq_dev) {
 		snd_device_free(gus->card, gus->seq_dev);
 		gus->seq_dev = NULL;
@@ -434,7 +434,7 @@ int snd_gus_initialize(snd_gus_card_t *gus)
 	}
 	if ((err = snd_gus_init_dma_irq(gus, 1)) < 0)
 		return err;
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (snd_seq_device_new(gus->card, 1, SNDRV_SEQ_DEV_ID_GUS,
 			       sizeof(snd_gus_card_t*), &gus->seq_dev) >= 0) {
 		strcpy(gus->seq_dev->name, "GUS");

@@ -809,7 +809,7 @@ static snd_kcontrol_new_t midi_mixer_ctl = {
  */
 static unsigned __devinit get_irq_config(int irq)
 {
-	const int valid_irq[] __devinitdata = { 9, 5, 7, 10 };
+	static const int valid_irq[] = { 9, 5, 7, 10 };
 	unsigned cfg;
 
 	for (cfg = 0; cfg < ARRAY_SIZE(valid_irq); ++cfg) {

@@ -1583,8 +1583,8 @@ static int __devinit snd_vt1724_read_eeprom(ice1712_t *ice)
 	struct snd_ice1712_card_info **tbl, *c;
 
 	if ((inb(ICEREG1724(ice, I2C_CTRL)) & VT1724_I2C_EEPROM) == 0) {
-		snd_printk("ICE1724 has not detected EEPROM\n");
-		return -EIO;
+		snd_printk(KERN_WARNING "ICE1724 has not detected EEPROM\n");
+		// return -EIO;
 	}
 	ice->eeprom.subvendor = (snd_vt1724_read_i2c(ice, dev, 0x00) << 0) |
 				(snd_vt1724_read_i2c(ice, dev, 0x01) << 8) | 

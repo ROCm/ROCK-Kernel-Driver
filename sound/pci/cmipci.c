@@ -1186,7 +1186,7 @@ static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
 #ifndef USE_AES_IEC958
 	u16 *srcp = src, val;
 #else
-	char buf[1920];         /* bits can be divided by 20, 24, 16 */
+	char buf[480];         /* bits can be divided by 20, 24, 16 */
 	size_t bytes = frames_to_bytes(runtime, count);
 #endif
 
@@ -1245,7 +1245,7 @@ static int snd_cmipci_ac3_silence(snd_pcm_substream_t *subs, int channel,
 	snd_pcm_uframes_t offset;
 	snd_pcm_runtime_t *runtime = subs->runtime;
 # ifdef USE_AES_IEC958
-	char buf[1920];		/* bits can be divided by 20, 24, 16 */
+	char buf[480];		/* bits can be divided by 20, 24, 16 */
 	size_t bytes = frames_to_bytes(runtime, count);
 # endif
 	if (! cm->channel[CM_CH_PLAY].ac3_shift)

@@ -239,8 +239,10 @@
     <section id="file-tree-drivers-directory">
       <title>drivers directory</title>
       <para>
-        This directory contains the non-architecture-specific
-      codes. For example, the dummy pcm driver and the serial MIDI
+        This directory contains the codes shared among different drivers
+      on the different architectures.  They are hence supposed not to be
+      architecture-specific.
+      For example, the dummy pcm driver and the serial MIDI
       driver are found in this directory. In the sub-directories,
       there are the codes for components which are independent from
       bus and cpu architectures. 
@@ -254,9 +256,9 @@
       </section>
 
       <section id="file-tree-drivers-directory-opl3">
-        <title>drivers/opl3</title>
+        <title>drivers/opl3 and opl4</title>
         <para>
-          The OPL3 FM-synth stuff is found here.
+          The OPL3 and OPL4 FM-synth stuff is found here.
         </para>
       </section>
     </section>
@@ -268,9 +270,9 @@
       </para>
 
       <para>
-        Although there is a standard i2c layer on Linux, ALSA uses its
+        Although there is a standard i2c layer on Linux, ALSA has its
       own i2c codes for some cards, because the soundcard needs only a
-      simple operation and the standard API is too complicated for
+      simple operation and the standard i2c API is too complicated for
       such a purpose. 
       </para>
 
@@ -298,7 +300,7 @@
       <title>pci directory</title>
       <para>
         This and its sub-directories hold the top-level card modules
-      for PCI soundcards. 
+      for PCI soundcards and the codes specific to the PCI BUS.
       </para>
 
       <para>
@@ -320,7 +322,7 @@
       <title>arm, ppc, and sparc directories</title>
       <para>
         These are for the top-level card modules which are
-      architecture specific. 
+      specific to each given architecture. 
       </para>
     </section>
 
@@ -3283,13 +3285,6 @@ struct _snd_pcm_runtime {
       <function>udelay()</function> or <function>mdelay()</function>.
       </para>
 
-      <para>
-      This atomicity problem appears also in the initialization of the
-      hardware when the power-management is supported.  The functions
-      for suspending and resuming the chip must be atomic, i.e. no
-      mutex nor sleep can be used in them.
-      </para>
-
     </section>
     <section id="pcm-interface-constraints">
       <title>Constraints</title>
@@ -4079,8 +4074,7 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-      These callbacks are non-atomic like the callbacks of control API
-      unless they are called during suspend/resume phase.
+      These callbacks are non-atomic like the callbacks of control API.
       </para>
 
       <para>
@@ -4094,8 +4088,6 @@ struct _snd_pcm_runtime {
         The <structfield>reset</structfield> callback is used to reset
       the codec. If the chip requires a special way of reset, you can
       define this callback. 
-      This callback must be atomic when it's called in the suspend
-      mode.
       </para>
 
       <para>
@@ -5212,6 +5204,13 @@ struct _snd_pcm_runtime {
     </para>
 
     <para>
+      For keeping the readability of 2.5 source code, it's recommended to
+      separate the above ifdef condition as the patch file in alsa-driver
+      directory.
+      See <filename>alsa-driver/pci/ali5451.c</filename> for example.
+   </para>
+
+    <para>
       The scheme of the real suspend job is as following.
 
       <orderedlist>
@@ -5383,15 +5382,6 @@ struct _snd_pcm_runtime {
       </informalexample>
     </para>
 
-    <para>
-      Last but not least: Please keep in mind that you cannot call
-    <function>schedule()</function> during the suspend and the resume
-    callbacks. If any delay is necessary, you have to use
-    <function>mdelay()</function> or <function>udelay()</function>
-    instead of <function>schedule_timeout()</function>! 
-    Of course, semaphores cannot be used, too, which will invoke sleep
-    inside.
-    </para>
   </chapter>
 
 

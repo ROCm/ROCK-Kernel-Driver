@@ -31,6 +31,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <pcmcia/version.h>
 #include "vxpocket.h"
