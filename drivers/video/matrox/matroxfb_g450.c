@@ -33,38 +33,9 @@ static int matroxfb_g450_program(void* md) {
 	return 0;
 }
 
-static int matroxfb_g450_start(void* md) {
-	return 0;
-}
-
-static void matroxfb_g450_incuse(void* md) {
-	MOD_INC_USE_COUNT;
-}
-
-static void matroxfb_g450_decuse(void* md) {
-	MOD_DEC_USE_COUNT;
-}
-
-static int matroxfb_g450_set_mode(void* md, u_int32_t arg) {
-	if (arg == MATROXFB_OUTPUT_MODE_MONITOR) {
-		return 1;
-	}
-	return -EINVAL;
-}
-
-static int matroxfb_g450_get_mode(void* md, u_int32_t* arg) {
-	*arg = MATROXFB_OUTPUT_MODE_MONITOR;
-	return 0;
-}
-
 static struct matrox_altout matroxfb_g450_altout = {
-	matroxfb_g450_compute,
-	matroxfb_g450_program,
-	matroxfb_g450_start,
-	matroxfb_g450_incuse,
-	matroxfb_g450_decuse,
-	matroxfb_g450_set_mode,
-	matroxfb_g450_get_mode
+	.compute	= matroxfb_g450_compute,
+	.program	= matroxfb_g450_program,
 };
 
 void matroxfb_g450_connect(WPMINFO2) {

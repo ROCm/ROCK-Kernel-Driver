@@ -33,7 +33,6 @@
 struct maven_data {
 	struct matrox_fb_info*		primary_head;
 	struct i2c_client*		client;
-	int				mode;
 	int				version;
 };
 
@@ -326,8 +325,9 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 		0x00,	/* 3E written multiple times */
 		0x00,	/* never written */
 	}, MODE_NTSC, 525, 60 };
-
-	if (md->mode & MODE_PAL)
+	MINFO_FROM(md->primary_head);
+	
+	if (ACCESS_FBINFO(altout.mode) == MODE_PAL)
 		*data = palregs;
 	else
 		*data = ntscregs;
@@ -583,9 +583,10 @@ static inline int maven_compute_timming(struct maven_data* md,
 		struct mavenregs* m) {
 	unsigned int tmpi;
 	unsigned int a, bv, c;
+	MINFO_FROM(md->primary_head);
 
-	m->mode = md->mode;
-	if (MODE_TV(md->mode)) {
+	m->mode = ACCESS_FBINFO(altout.mode);
+	if (MODE_TV(m->mode)) {
 		unsigned int lmargin;
 		unsigned int umargin;
 		unsigned int vslen;
@@ -855,20 +856,14 @@ static inline int maven_resync(struct maven_data* md) {
 	return 0;
 }
 
-static int maven_set_output_mode(struct maven_data* md, u_int32_t arg) {
+static int maven_verify_output_mode(struct maven_data* md, u_int32_t arg) {
 	switch (arg) {
 		case MATROXFB_OUTPUT_MODE_PAL:
 		case MATROXFB_OUTPUT_MODE_NTSC:
 		case MATROXFB_OUTPUT_MODE_MONITOR:
-			md->mode = arg;
-			return 1;
+			return 0;
 	}
 	return -EINVAL;
-}
-
-static int maven_get_output_mode(struct maven_data* md, u_int32_t *arg) {
-	*arg = md->mode;
-	return 0;
 }
 
 /******************************************************/
@@ -893,32 +888,15 @@ static int maven_out_start(void* md) {
 	return maven_resync(md);
 }
 
-static void maven_out_incuse(void* md) {
-	if (md)
-		i2c_inc_use_client(((struct maven_data*)md)->client);
-}
-
-static void maven_out_decuse(void* md) {
-	if (md)
-		i2c_dec_use_client(((struct maven_data*)md)->client);
-}
-
-static int maven_out_set_mode(void* md, u_int32_t arg) {
-	return maven_set_output_mode(md, arg);
-}
-
-static int maven_out_get_mode(void* md, u_int32_t* arg) {
-	return maven_get_output_mode(md, arg);
+static int maven_out_verify_mode(void* md, u_int32_t arg) {
+	return maven_verify_output_mode(md, arg);
 }
 
 static struct matrox_altout maven_altout = {
-	maven_out_compute,
-	maven_out_program,
-	maven_out_start,
-	maven_out_incuse,
-	maven_out_decuse,
-	maven_out_set_mode,
-	maven_out_get_mode
+	.compute	= maven_out_compute,
+	.program	= maven_out_program,
+	.start		= maven_out_start,
+	.verifymode	= maven_out_verify_mode,
 };
 
 static int maven_init_client(struct i2c_client* clnt) {
@@ -926,7 +904,7 @@ static int maven_init_client(struct i2c_client* clnt) {
 	struct maven_data* md = clnt->data;
 	MINFO_FROM(((struct i2c_bit_adapter*)a)->minfo);
 
-	md->mode = MODE_MONITOR;
+	ACCESS_FBINFO(altout.mode) = MODE_MONITOR;
 	md->primary_head = MINFO;
 	md->client = clnt;
 	down_write(&ACCESS_FBINFO(altout.lock));

@@ -420,34 +420,34 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		pos += m2info->video.offbase;
 		DAC1064_global_init(PMINFO2);
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout))
+			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->compute)
 				ACCESS_FBINFO(primout)->compute(MINFO, &mt);
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output))
+			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->compute)
 				ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt);
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		matroxfb_dh_restore(m2info, &mt, p, mode, pos);
 		DAC1064_global_restore(PMINFO2);
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout))
+			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->program)
 				ACCESS_FBINFO(primout)->program(MINFO);
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output))
+			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->program)
 				ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device));
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout))
+			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->start)
 				ACCESS_FBINFO(primout)->start(MINFO);
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output))
+			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->start)
 				ACCESS_FBINFO(altout.output)->start(ACCESS_FBINFO(altout.device));
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}

@@ -399,10 +399,7 @@ struct matrox_altout {
 	int		(*compute)(void* altout_dev, struct my_timming* input);
 	int		(*program)(void* altout_dev);
 	int		(*start)(void* altout_dev);
-	void		(*incuse)(void* altout_dev);
-	void		(*decuse)(void* altout_dev);
-	int		(*setmode)(void* altout_dev, u_int32_t mode);
-	int		(*getmode)(void* altout_dev, u_int32_t* mode);
+	int		(*verifymode)(void* altout_dev, u_int32_t mode);
 };
 
 enum mga_chip { MGA_2064, MGA_2164, MGA_1064, MGA_1164, MGA_G100, MGA_G200, MGA_G400, MGA_G450, MGA_G550 };
@@ -452,6 +449,7 @@ struct matrox_fb_info {
 	struct matrox_altout*	output;
 	void*			device;
 	struct rw_semaphore	lock;
+	unsigned int		mode;
 			      } altout;
 
 #define MATROXFB_MAX_FB_DRIVERS		5

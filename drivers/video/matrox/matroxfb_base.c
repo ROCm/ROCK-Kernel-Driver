@@ -825,34 +825,34 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			hw->CRTCEXT[0] = (hw->CRTCEXT[0] & 0xF0) | ((pos >> 16) & 0x0F) | ((pos >> 14) & 0x40);
 			hw->CRTCEXT[8] = pos >> 21;
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
-				if (ACCESS_FBINFO(primout))
+				if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->compute)
 					ACCESS_FBINFO(primout)->compute(MINFO, &mt);
 			}
 			if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 				down_read(&ACCESS_FBINFO(altout.lock));
-				if (ACCESS_FBINFO(altout.output))
+				if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->compute)
 					ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt);
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
 			ACCESS_FBINFO(hw_switch->restore(PMINFO display));
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
-				if (ACCESS_FBINFO(primout))
+				if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->program)
 					ACCESS_FBINFO(primout)->program(MINFO);
 			}
 			if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 				down_read(&ACCESS_FBINFO(altout.lock));
-				if (ACCESS_FBINFO(altout.output))
+				if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->program)
 					ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device));
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
 			ACCESS_FBINFO(cursor.redraw) = 1;
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
-				if (ACCESS_FBINFO(primout))
+				if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->start)
 					ACCESS_FBINFO(primout)->start(MINFO);
 			}
 			if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 				down_read(&ACCESS_FBINFO(altout.lock));
-				if (ACCESS_FBINFO(altout.output))
+				if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->start)
 					ACCESS_FBINFO(altout.output)->start(ACCESS_FBINFO(altout.device));
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
@@ -1006,11 +1006,21 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 					case MATROXFB_OUTPUT_SECONDARY:
 						val = -EINVAL;
 						down_read(&ACCESS_FBINFO(altout.lock));
-						if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.device))
-							val = ACCESS_FBINFO(altout.output)->setmode(ACCESS_FBINFO(altout.device), mom.mode);
+						if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.device)) {
+							if (ACCESS_FBINFO(altout.output)->verifymode) {
+								val = ACCESS_FBINFO(altout.output)->verifymode(ACCESS_FBINFO(altout.device), mom.mode);
+							} else {
+								if (mom.mode == MATROXFB_OUTPUT_MODE_MONITOR) {
+									val = 0;
+								}
+							}
+						}
 						up_read(&ACCESS_FBINFO(altout.lock));
-						if (val != 1)
+						if (val != 0)
 							return val;
+						if (ACCESS_FBINFO(altout.mode) == mom.mode)
+							return 0;
+						ACCESS_FBINFO(altout.mode) = mom.mode;
 						if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY)
 							matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), info);
 						if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
@@ -1051,8 +1061,10 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 					case MATROXFB_OUTPUT_SECONDARY:
 						val = -EINVAL;
 						down_read(&ACCESS_FBINFO(altout.lock));
-						if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.device))
-							val = ACCESS_FBINFO(altout.output)->getmode(ACCESS_FBINFO(altout.device), &mom.mode);
+						if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.device)) {
+							mom.mode = ACCESS_FBINFO(altout.mode);
+							val = 0;
+						}
 						up_read(&ACCESS_FBINFO(altout.lock));
 						if (val)
 							return val;

@@ -504,37 +504,8 @@ static int m1064_compute(void* outdev, struct my_timming* m) {
 	return 0;
 }
 
-static int m1064_program(void* outdev) {
-	/* nothing, hardware is set in m1064_compute */
-	return 0;
-}
-
-static int m1064_start(void* outdev) {
-	/* nothing */
-	return 0;
-}
-
-static void m1064_incuse(void* outdev) {
-	/* nothing yet; MODULE_INC_USE in future... */
-}
-
-static void m1064_decuse(void* outdev) {
-	/* nothing yet; MODULE_DEC_USE in future... */
-}
-
-static int m1064_setmode(void* outdev, u_int32_t mode) {
-	if (mode != MATROXFB_OUTPUT_MODE_MONITOR)
-		return -EINVAL;
-	return 0;
-}
-
 static struct matrox_altout m1064 = {
-	m1064_compute,
-	m1064_program,
-	m1064_start,
-	m1064_incuse,
-	m1064_decuse,
-	m1064_setmode
+	.compute	= m1064_compute,
 };
 
 #endif /* NEED_DAC1064 */
