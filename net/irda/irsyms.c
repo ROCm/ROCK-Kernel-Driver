@@ -42,6 +42,7 @@
 #include <net/irda/wrapper.h>
 #include <net/irda/timer.h>
 #include <net/irda/parameters.h>
+#include <net/irda/crc.h>
 
 extern struct proc_dir_entry *proc_irda;
 
@@ -163,6 +164,7 @@ EXPORT_SYMBOL(irda_task_delete);
 
 EXPORT_SYMBOL(async_wrap_skb);
 EXPORT_SYMBOL(async_unwrap_char);
+EXPORT_SYMBOL(irda_calc_crc16);
 EXPORT_SYMBOL(irda_start_timer);
 EXPORT_SYMBOL(setup_dma);
 EXPORT_SYMBOL(infrared_mode);
