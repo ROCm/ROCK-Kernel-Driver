@@ -165,6 +165,8 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 #include "adsbitsy.h"
 #endif
 
+#include "stork.h"
+
 #include "system3.h"
 
 #ifdef CONFIG_SA1101
