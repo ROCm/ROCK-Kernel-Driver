@@ -31,11 +31,7 @@ struct file_operations afs_mntpt_file_operations = {
 struct inode_operations afs_mntpt_inode_operations = {
 	.lookup		= afs_mntpt_lookup,
 	.readlink	= page_readlink,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	.getattr	= afs_inode_getattr,
-#else
-	.revalidate	= afs_inode_revalidate,
-#endif
 };
 
 /*****************************************************************************/
@@ -70,7 +66,7 @@ int afs_mntpt_check_symlink(afs_vnode_t *vnode)
 
 	/* examine the symlink's contents */
 	size = vnode->status.size;
-	_debug("symlink to %*.*s",size,size,buf);
+	_debug("symlink to %*.*s",size,(int)size,buf);
 
 	if (size>2 &&
 	    (buf[0]=='%' || buf[0]=='#') &&

@@ -27,11 +27,7 @@ struct afs_rxfs_fetch_descriptor;
  */
 struct afs_vnode
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	struct inode		vfs_inode;	/* the VFS's inode record */
-#else
-	struct inode		*inode;		/* the VFS's inode */
-#endif
 
 	afs_volume_t		*volume;	/* volume on which vnode resides */
 	afs_fid_t		fid;		/* the file identifier for this inode */
@@ -59,20 +55,12 @@ struct afs_vnode
 
 static inline afs_vnode_t *AFS_FS_I(struct inode *inode)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-	return list_entry(inode,afs_vnode_t,vfs_inode);
-#else
-	return inode->u.generic_ip;
-#endif
+	return container_of(inode,afs_vnode_t,vfs_inode);
 }
 
 static inline struct inode *AFS_VNODE_TO_I(afs_vnode_t *vnode)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	return &vnode->vfs_inode;
-#else
-	return vnode->inode;
-#endif
 }
 
 extern int afs_vnode_fetch_status(afs_vnode_t *vnode);

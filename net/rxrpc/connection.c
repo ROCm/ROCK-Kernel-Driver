@@ -121,7 +121,7 @@ int rxrpc_create_connection(struct rxrpc_transport *trans,
 	conn->out_epoch		= rxrpc_epoch;
 	conn->in_clientflag	= 0;
 	conn->out_clientflag	= RXRPC_CLIENT_INITIATED;
-	conn->conn_id		= htonl((unsigned) conn & RXRPC_CIDMASK);
+	conn->conn_id		= htonl((unsigned long) conn & RXRPC_CIDMASK);
 	conn->service_id	= htons(service_id);
 
 	/* attach to peer */
@@ -547,7 +547,7 @@ int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg)
 	msghdr.msg_controllen	= 0;
 	msghdr.msg_flags	= MSG_CONFIRM|MSG_DONTWAIT;
 
-	_net("Sending message type %d of %d bytes to %08x:%d",
+	_net("Sending message type %d of %Zd bytes to %08x:%d",
 	     msg->hdr.type,
 	     msg->dsize,
 	     htonl(conn->addr.sin_addr.s_addr),

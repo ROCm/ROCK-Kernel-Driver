@@ -9,8 +9,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#ifndef _H_DB712916_5113_11D6_9A6D_0002B3163499
-#define _H_DB712916_5113_11D6_9A6D_0002B3163499
+#ifndef _LINUX_AFS_ERRORS_H
+#define _LINUX_AFS_ERRORS_H
 
 #include "types.h"
 
@@ -31,4 +31,4 @@ typedef enum {
 
 extern int afs_abort_to_error(int abortcode);
 
-#endif /* _H_DB712916_5113_11D6_9A6D_0002B3163499 */
+#endif /* _LINUX_AFS_ERRORS_H */

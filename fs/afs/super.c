@@ -39,12 +39,8 @@ static inline char *strdup(const char *s)
 
 static void afs_i_init_once(void *foo, kmem_cache_t *cachep, unsigned long flags);
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static struct super_block *afs_get_sb(struct file_system_type *fs_type,
 				      int flags, char *dev_name, void *data);
-#else
-static struct super_block *afs_read_super(struct super_block *sb, void *data, int);
-#endif
 
 static struct inode *afs_alloc_inode(struct super_block *sb);
 
@@ -55,30 +51,20 @@ static void afs_destroy_inode(struct inode *inode);
 static struct file_system_type afs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "afs",
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	.get_sb		= afs_get_sb,
 	.kill_sb	= kill_anon_super,
-#else
-	.read_super	= afs_read_super,
-#endif
 };
 
 static struct super_operations afs_super_ops = {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	.statfs		= simple_statfs,
 	.alloc_inode	= afs_alloc_inode,
 	.drop_inode	= generic_delete_inode,
 	.destroy_inode	= afs_destroy_inode,
-#else
-	.read_inode2	= afs_read_inode2,
-#endif
 	.clear_inode	= afs_clear_inode,
 	.put_super	= afs_put_super,
 };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static kmem_cache_t *afs_inode_cachep;
-#endif
 
 /*****************************************************************************/
 /*
@@ -90,23 +76,6 @@ int __init afs_fs_init(void)
 
 	kenter("");
 
-	/* open the cache */
-#if 0
-	ret = -EINVAL;
-	if (!cachedev) {
-		printk(KERN_NOTICE "kAFS: No cache device specified as module parm\n");
-		printk(KERN_NOTICE "kAFS: Set with \"cachedev=<devname>\" on insmod's cmdline\n");
-		return ret;
-	}
-
-	ret = afs_cache_open(cachedev,&afs_cache);
-	if (ret<0) {
-		printk(KERN_NOTICE "kAFS: Failed to open cache device\n");
-		return ret;
-	}
-#endif
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	/* create ourselves an inode cache */
 	ret = -ENOMEM;
 	afs_inode_cachep = kmem_cache_create("afs_inode_cache",
@@ -117,22 +86,13 @@ int __init afs_fs_init(void)
 						NULL);
 	if (!afs_inode_cachep) {
 		printk(KERN_NOTICE "kAFS: Failed to allocate inode cache\n");
-#if 0
-		afs_put_cache(afs_cache);
-#endif
 		return ret;
 	}
-#endif
 
 	/* now export our filesystem to lesser mortals */
 	ret = register_filesystem(&afs_fs_type);
 	if (ret<0) {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 		kmem_cache_destroy(afs_inode_cachep);
-#endif
-#if 0
-		afs_put_cache(afs_cache);
-#endif
 		kleave(" = %d",ret);
 		return ret;
 	}
@@ -148,16 +108,10 @@ int __init afs_fs_init(void)
 void __exit afs_fs_exit(void)
 {
 	/* destroy our private inode cache */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	kmem_cache_destroy(afs_inode_cachep);
-#endif
 
 	unregister_filesystem(&afs_fs_type);
 
-#if 0
-	if (afs_cache)
-		afs_put_cache(afs_cache);
-#endif
 } /* end afs_fs_exit() */
 
 /*****************************************************************************/
@@ -453,7 +407,6 @@ static int afs_fill_super(struct super_block *sb, void *_data, int silent)
  * get an AFS superblock
  * - TODO: don't use get_sb_nodev(), but rather call sget() directly
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static struct super_block *afs_get_sb(struct file_system_type *fs_type,
 				      int flags,
 				      char *dev_name,
@@ -482,39 +435,6 @@ static struct super_block *afs_get_sb(struct file_system_type *fs_type,
 	_leave("");
 	return sb;
 } /* end afs_get_sb() */
-#endif
-
-/*****************************************************************************/
-/*
- * read an AFS superblock
- */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static struct super_block *afs_read_super(struct super_block *sb, void *options, int silent)
-{
-	void *data[2] = { NULL, options };
-	int ret;
-
-	_enter(",,%s",(char*)options);
-
-	/* start the cache manager */
-	ret = afscm_start();
-	if (ret<0) {
-		_leave(" = NULL (%d)",ret);
-		return NULL;
-	}
-
-	/* allocate a deviceless superblock */
-	ret = afs_fill_super(sb,data,silent);
-	if (ret<0) {
-		afscm_stop();
-		_leave(" = NULL (%d)",ret);
-		return NULL;
-	}
-
-	_leave(" = %p",sb);
-	return sb;
-} /* end afs_read_super() */
-#endif
 
 /*****************************************************************************/
 /*
@@ -540,7 +460,6 @@ static void afs_put_super(struct super_block *sb)
 /*
  * initialise an inode cache slab element prior to any use
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static void afs_i_init_once(void *_vnode, kmem_cache_t *cachep, unsigned long flags)
 {
 	afs_vnode_t *vnode = (afs_vnode_t *) _vnode;
@@ -556,13 +475,11 @@ static void afs_i_init_once(void *_vnode, kmem_cache_t *cachep, unsigned long fl
 	}
 
 } /* end afs_i_init_once() */
-#endif
 
 /*****************************************************************************/
 /*
  * allocate an AFS inode struct from our slab cache
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static struct inode *afs_alloc_inode(struct super_block *sb)
 {
 	afs_vnode_t *vnode;
@@ -580,16 +497,13 @@ static struct inode *afs_alloc_inode(struct super_block *sb)
 
 	return &vnode->vfs_inode;
 } /* end afs_alloc_inode() */
-#endif
 
 /*****************************************************************************/
 /*
  * destroy an AFS inode struct
  */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 static void afs_destroy_inode(struct inode *inode)
 {
 	_enter("{%lu}",inode->i_ino);
 	kmem_cache_free(afs_inode_cachep, AFS_FS_I(inode));
 } /* end afs_destroy_inode() */
-#endif
