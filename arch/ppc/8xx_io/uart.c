@@ -85,7 +85,7 @@ static char *serial_version = "0.03";
 
 static DECLARE_TASK_QUEUE(tq_serial);
 
-static struct tty_driver serial_driver;
+static struct tty_driver *serial_driver;
 static int serial_console_setup(struct console *co, char *options);
 
 static void serial_console_write(struct console *c, const char *s,
@@ -2459,7 +2459,7 @@ void kgdb_map_scc(void)
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 /*
@@ -2475,6 +2475,26 @@ console_initcall(console_8xx_init);
 /* Index in baud rate table of the default console baud rate.
 */
 static	int	baud_idx;
+
+static struct tty_operations rs_8xx_ops = {
+	.open = rs_8xx_open,
+	.close = rs_8xx_close,
+	.write = rs_8xx_write,
+	.put_char = rs_8xx_put_char,
+	.write_room = rs_8xx_write_room,
+	.chars_in_buffer = rs_8xx_chars_in_buffer,
+	.flush_buffer = rs_8xx_flush_buffer,
+	.ioctl = rs_8xx_ioctl,
+	.throttle = rs_8xx_throttle,
+	.unthrottle = rs_8xx_unthrottle,
+	.send_xchar = rs_8xx_send_xchar,
+	.set_termios = rs_8xx_set_termios,
+	.stop = rs_8xx_stop,
+	.start = rs_8xx_start,
+	.hangup = rs_8xx_hangup,
+	.wait_until_sent = rs_8xx_wait_until_sent,
+	.read_proc = rs_8xx_read_proc,
+};
 
 /*
  * The serial driver boot-time initialization code!
@@ -2493,6 +2513,10 @@ int __init rs_8xx_init(void)
 	volatile	scc_t		*scp;
 	volatile	scc_uart_t	*sup;
 	volatile	immap_t		*immap;
+
+	serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!serial_driver)
+		return -ENOMEM;
 	
 	init_bh(SERIAL_BH, do_serial_bh);
 
@@ -2500,40 +2524,20 @@ int __init rs_8xx_init(void)
 
 	/* Initialize the tty_driver structure */
 	
-	__clear_user(&serial_driver,sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.driver_name = "serial";
-	serial_driver.devfs_name = "tts/";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->driver_name = "serial";
+	serial_driver->devfs_name = "tts/";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		baud_idx | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	serial_driver.open = rs_8xx_open;
-	serial_driver.close = rs_8xx_close;
-	serial_driver.write = rs_8xx_write;
-	serial_driver.put_char = rs_8xx_put_char;
-	serial_driver.write_room = rs_8xx_write_room;
-	serial_driver.chars_in_buffer = rs_8xx_chars_in_buffer;
-	serial_driver.flush_buffer = rs_8xx_flush_buffer;
-	serial_driver.ioctl = rs_8xx_ioctl;
-	serial_driver.throttle = rs_8xx_throttle;
-	serial_driver.unthrottle = rs_8xx_unthrottle;
-	serial_driver.send_xchar = rs_8xx_send_xchar;
-	serial_driver.set_termios = rs_8xx_set_termios;
-	serial_driver.stop = rs_8xx_stop;
-	serial_driver.start = rs_8xx_start;
-	serial_driver.hangup = rs_8xx_hangup;
-	serial_driver.wait_until_sent = rs_8xx_wait_until_sent;
-	serial_driver.read_proc = rs_8xx_read_proc;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &rs_8xx_ops);
 	
-	if (tty_register_driver(&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 	
 	cp = cpmp;	/* Get pointer to Communication Processor */
