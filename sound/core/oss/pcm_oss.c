@@ -955,6 +955,9 @@ static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
 	runtime = substream->runtime;
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&runtime->sleep, &wait);
+#ifdef OSS_DEBUG
+	printk("sync1: size = %li\n", size);
+#endif
 	while (1) {
 		result = snd_pcm_oss_write2(substream, runtime->oss.buffer, size, 1);
 		if (result > 0) {
@@ -996,16 +999,21 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_format_t format;
 	unsigned long width;
-	size_t size, size1;
+	size_t size;
 
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream != NULL) {
+		runtime = substream->runtime;
+		if (atomic_read(&runtime->mmap_count))
+			goto __direct;
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
-		runtime = substream->runtime;
 		format = snd_pcm_oss_format_from(runtime->oss.format);
 		width = snd_pcm_format_physical_width(format);
 		if (runtime->oss.buffer_used > 0) {
+#ifdef OSS_DEBUG
+			printk("sync: buffer_used\n");
+#endif
 			size = (8 * (runtime->oss.period_bytes - runtime->oss.buffer_used) + 7) / width;
 			snd_pcm_format_set_silence(format,
 						   runtime->oss.buffer + runtime->oss.buffer_used,
@@ -1014,6 +1022,9 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 			if (err < 0)
 				return err;
 		} else if (runtime->oss.period_ptr > 0) {
+#ifdef OSS_DEBUG
+			printk("sync: period_ptr\n");
+#endif
 			size = runtime->oss.period_bytes - runtime->oss.period_ptr;
 			snd_pcm_format_set_silence(format,
 						   runtime->oss.buffer,
@@ -1022,17 +1033,35 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 			if (err < 0)
 				return err;
 		}
-		size = runtime->oss.period_bytes;
-		size1 = frames_to_bytes(runtime, runtime->period_size);
-		while (size < size1) {
-			snd_pcm_format_set_silence(format,
-						   runtime->oss.buffer,
-						   (8 * runtime->oss.period_bytes + 7) / width);
-			err = snd_pcm_oss_sync1(substream, runtime->oss.period_bytes);
-			if (err < 0)
-				return err;
-			size += runtime->oss.period_bytes;
+		/*
+		 * The ALSA's period might be a bit large than OSS one.
+		 * Fill the remain portion of ALSA period with zeros.
+		 */
+		size = runtime->control->appl_ptr % runtime->period_size;
+		if (size > 0) {
+			size = runtime->period_size - size;
+			if (runtime->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED) {
+				size = (runtime->frame_bits * size) / 8;
+				while (size > 0) {
+					size_t size1 = size < runtime->oss.period_bytes ? size : runtime->oss.period_bytes;
+					size -= size1;
+					size1 *= 8;
+					size1 /= runtime->sample_bits;
+					snd_pcm_format_set_silence(runtime->format,
+								   runtime->oss.buffer,
+								   size1);
+					snd_pcm_lib_write(substream, runtime->oss.buffer, size1);
+				}
+			} else if (runtime->access == SNDRV_PCM_ACCESS_RW_NONINTERLEAVED) {
+				void *buffers[runtime->channels];
+				memset(buffers, 0, runtime->channels * sizeof(void *));
+				snd_pcm_lib_writev(substream, (void **)buffers, size);
+			}
 		}
+		/*
+		 * finish sync: drain the buffer
+		 */
+	      __direct:
 		saved_f_flags = substream->ffile->f_flags;
 		substream->ffile->f_flags &= ~O_NONBLOCK;
 		err = snd_pcm_kernel_playback_ioctl(substream, SNDRV_PCM_IOCTL_DRAIN, 0);
