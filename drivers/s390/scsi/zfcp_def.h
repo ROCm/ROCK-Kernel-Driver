@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.73 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.75 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -47,6 +47,8 @@
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_transport.h>
+#include <scsi/scsi_transport_fc.h>
 #include "../../fc4/fc.h"
 #include "zfcp_fsf.h"
 #include <asm/ccwdev.h>
@@ -509,14 +511,14 @@ struct zfcp_ls_rnid_acc {
 
 /* all log-level defaults are combined to generate initial log-level */
 #define ZFCP_LOG_LEVEL_DEFAULTS \
-	(ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_OTHER) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_SCSI) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_FSF) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_CONFIG) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_CIO) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_QDIO) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_ERP) | \
-	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_INFO, ZFCP_LOG_AREA_FC))
+	(ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_OTHER) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_SCSI) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_FSF) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_CONFIG) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_CIO) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_QDIO) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_ERP) | \
+	 ZFCP_SET_LOG_NIBBLE(ZFCP_LOG_LEVEL_NORMAL, ZFCP_LOG_AREA_FC))
 
 /* check whether we have the right level for logging */
 #define ZFCP_LOG_CHECK(level) \

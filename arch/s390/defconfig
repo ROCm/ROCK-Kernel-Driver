@@ -124,7 +124,7 @@ CONFIG_SCSI_LOGGING=y
 # SCSI Transport Attributes
 #
 # CONFIG_SCSI_SPI_ATTRS is not set
-# CONFIG_SCSI_FC_ATTRS is not set
+CONFIG_SCSI_FC_ATTRS=y
 
 #
 # SCSI low-level drivers
