@@ -266,8 +266,9 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 
 			/* magic dummy for short reads; won't advance */
 			if (IS_SHORT_READ (token)
+					&& !(token & QTD_STS_HALT)
 					&& ehci->async->hw_alt_next
-						== qh->hw_current)
+						== qh->hw_alt_next)
 				goto halt;
 
 		/* stop scanning when we reach qtds the hc is using */
