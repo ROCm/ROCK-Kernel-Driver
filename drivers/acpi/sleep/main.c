@@ -217,7 +217,8 @@ static int __init acpi_sleep_init(void)
 				sleep_states[i] = 1;
 				printk(" S4bios");
 				acpi_pm_ops.pm_disk_mode = PM_DISK_FIRMWARE;
-			} else if (sleep_states[i])
+			}
+			if (sleep_states[i])
 				acpi_pm_ops.pm_disk_mode = PM_DISK_PLATFORM;
 		}
 	}
