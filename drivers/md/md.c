@@ -601,18 +601,6 @@ static void export_array(mddev_t *mddev)
 	mddev->raid_disks = 0;
 }
 
-static void free_mddev(mddev_t *mddev)
-{
-	if (!mddev) {
-		MD_BUG();
-		return;
-	}
-
-	export_array(mddev);
-	md_size[mdidx(mddev)] = 0;
-	set_capacity(disks[mdidx(mddev)], 0);
-}
-
 #undef BAD_CSUM
 #undef BAD_MAGIC
 #undef OUT_OF_MEM
@@ -1530,7 +1518,6 @@ static int do_md_stop(mddev_t * mddev, int ro)
 {
 	int err = 0;
 	kdev_t dev = mddev_to_kdev(mddev);
-	struct gendisk *disk;
 
 	if (atomic_read(&mddev->active)>1) {
 		printk(STILL_IN_USE, mdidx(mddev));
@@ -1579,21 +1566,25 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		if (ro)
 			set_device_ro(dev, 1);
 	}
-	disk = disks[mdidx(mddev)];
-	disks[mdidx(mddev)] = NULL;
-
-	if (disk) {
-		del_gendisk(disk);
-		kfree(disk->major_name);
-		kfree(disk);
-	}
-
 	/*
 	 * Free resources if final stop
 	 */
 	if (!ro) {
+		struct gendisk *disk;
 		printk(KERN_INFO "md: md%d stopped.\n", mdidx(mddev));
-		free_mddev(mddev);
+
+		export_array(mddev);
+
+		md_size[mdidx(mddev)] = 0;
+		disk = disks[mdidx(mddev)];
+		disks[mdidx(mddev)] = NULL;
+
+		if (disk) {
+			del_gendisk(disk);
+			kfree(disk->major_name);
+			kfree(disk);
+		}
+
 	} else
 		printk(KERN_INFO "md: md%d switched to read-only mode.\n", mdidx(mddev));
 	err = 0;
