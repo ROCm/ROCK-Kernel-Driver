@@ -2690,7 +2690,7 @@ int md_thread(void * arg)
 void md_wakeup_thread(mdk_thread_t *thread)
 {
 	if (thread) {
-		dprintk("md: waking up MD thread %p.\n", thread);
+		dprintk("md: waking up MD thread %s.\n", thread->tsk->comm);
 		set_bit(THREAD_WAKEUP, &thread->flags);
 		wake_up(&thread->wqueue);
 	}
@@ -2751,12 +2751,6 @@ void md_unregister_thread(mdk_thread_t *thread)
 
 void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
-	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
-		MD_MAJOR,mdidx(mddev),
-		MAJOR(rdev->bdev->bd_dev), MINOR(rdev->bdev->bd_dev),
-		__builtin_return_address(0),__builtin_return_address(1),
-		__builtin_return_address(2),__builtin_return_address(3));
-
 	if (!mddev) {
 		MD_BUG();
 		return;
@@ -2764,6 +2758,13 @@ void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	if (!rdev || rdev->faulty)
 		return;
+
+	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
+		MD_MAJOR,mdidx(mddev),
+		MAJOR(rdev->bdev->bd_dev), MINOR(rdev->bdev->bd_dev),
+		__builtin_return_address(0),__builtin_return_address(1),
+		__builtin_return_address(2),__builtin_return_address(3));
+
 	if (!mddev->pers->error_handler)
 		return;
 	mddev->pers->error_handler(mddev,rdev);
