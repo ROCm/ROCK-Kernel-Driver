@@ -28,6 +28,7 @@
 #include <asm/leds.h>
 #include <asm/system.h>
 #include <asm/mach-types.h>
+#include <asm/arch/cm.h>
 
 static int saved_leds;
 
@@ -35,9 +36,6 @@ static void integrator_leds_event(led_event_t ledevt)
 {
 	unsigned long flags;
 	const unsigned int dbg_base = IO_ADDRESS(INTEGRATOR_DBG_BASE);
-	const unsigned int hdr_ctrl = IO_ADDRESS(INTEGRATOR_HDR_BASE) +
-					INTEGRATOR_HDR_CTRL_OFFSET;
-	unsigned int ctrl;
 	unsigned int update_alpha_leds;
 	
 	// yup, change the LEDs
@@ -46,15 +44,11 @@ static void integrator_leds_event(led_event_t ledevt)
 
 	switch(ledevt) {
 	case led_idle_start:
-		ctrl = __raw_readl(hdr_ctrl);
-		ctrl &= ~INTEGRATOR_HDR_CTRL_LED;
-		__raw_writel(ctrl, hdr_ctrl);
+		cm_control(CM_CTRL_LED, 0);
 		break;
 
 	case led_idle_end:
-		ctrl = __raw_readl(hdr_ctrl);
-		ctrl |= INTEGRATOR_HDR_CTRL_LED;
-		__raw_writel(ctrl, hdr_ctrl);
+		cm_control(CM_CTRL_LED, CM_CTRL_LED);
 		break;
 
 	case led_timer:

@@ -11,10 +11,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/spinlock.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/io.h>
 #include <asm/hardware/amba.h>
+#include <asm/arch/cm.h>
 
 static struct amba_device rtc_device = {
 	.dev		= {
@@ -102,3 +105,25 @@ static int __init integrator_init(void)
 }
 
 arch_initcall(integrator_init);
+
+#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET
+
+static spinlock_t cm_lock;
+
+/**
+ * cm_control - update the CM_CTRL register.
+ * @mask: bits to change
+ * @set: bits to set
+ */
+void cm_control(u32 mask, u32 set)
+{
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&cm_lock, flags);
+	val = readl(CM_CTRL) & ~mask;
+	writel(val | set, CM_CTRL);
+	spin_unlock_irqrestore(&cm_lock, flags);
+}
+
+EXPORT_SYMBOL(cm_control);
