@@ -366,6 +366,7 @@
  *
  * 0.4.14  2003-07-15
  *    - Fixed race between open and probe (Oliver Neukum).
+ *    - Added vendor/product ids for Avision, Canon, HP, Microtek and Relisys scanners.
  *
  * TODO
  *    - Performance
