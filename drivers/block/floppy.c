@@ -2263,10 +2263,9 @@ static struct cont_t format_cont={
 	bad_flp_intr,
 	generic_done };
 
-static int do_format(kdev_t device, struct format_descr *tmp_format_req)
+static int do_format(int drive, struct format_descr *tmp_format_req)
 {
 	int ret;
-	int drive=DRIVE(device);
 
 	LOCK_FDC(drive,1);
 	set_floppy(drive);
@@ -3556,7 +3555,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case FDFMTTRK:
 			if (UDRS->fd_ref != 1)
 				return -EBUSY;
-			return do_format(device, &inparam.f);
+			return do_format(drive, &inparam.f);
 		case FDFMTEND:
 		case FDFLUSH:
 			LOCK_FDC(drive,1);
