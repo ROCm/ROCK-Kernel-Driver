@@ -98,11 +98,6 @@ typedef enum {
 
 #define VNODE_TO_FIRST_BHV(vp)		(BHV_HEAD_FIRST(&(vp)->v_bh))
 #define VN_BHV_HEAD(vp)			((bhv_head_t *)(&((vp)->v_bh)))
-#define VN_BHV_READ_LOCK(bhp)		BHV_READ_LOCK(bhp)
-#define VN_BHV_READ_UNLOCK(bhp)		BHV_READ_UNLOCK(bhp)
-#define VN_BHV_WRITE_LOCK(bhp)		BHV_WRITE_LOCK(bhp)
-#define VN_BHV_NOT_READ_LOCKED(bhp)	BHV_NOT_READ_LOCKED(bhp)
-#define VN_BHV_NOT_WRITE_LOCKED(bhp)	BHV_NOT_WRITE_LOCKED(bhp)
 #define vn_bhv_head_init(bhp,name)	bhv_head_init(bhp,name)
 #define vn_bhv_remove(bhp,bdp)		bhv_remove(bhp,bdp)
 #define vn_bhv_lookup(bhp,ops)		bhv_lookup(bhp,ops)
@@ -274,187 +269,130 @@ typedef struct vnodeops {
 
 #define VOP_READ(vp,file,iov,segs,offset,cr,rv)				\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_read, vp)((vp)->v_fbhv,file,iov,segs,offset,cr); \
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_WRITE(vp,file,iov,segs,offset,cr,rv)			\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,iov,segs,offset,cr);\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_SENDFILE(vp,f,of,cnt,act,targ,cr,rv)			\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_sendfile, vp)((vp)->v_fbhv,f,of,cnt,act,targ,cr);\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_BMAP(vp,of,sz,rw,b,n,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_bmap, vp)((vp)->v_fbhv,of,sz,rw,b,n);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_OPEN(vp, cr, rv)						\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_open, vp)((vp)->v_fbhv, cr);			\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_GETATTR(vp, vap, f, cr, rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_getattr, vp)((vp)->v_fbhv, vap, f, cr);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_SETATTR(vp, vap, f, cr, rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_setattr, vp)((vp)->v_fbhv, vap, f, cr);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_ACCESS(vp, mode, cr, rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_access, vp)((vp)->v_fbhv, mode, cr);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_LOOKUP(vp,d,vpp,f,rdir,cr,rv)				\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_lookup, vp)((vp)->v_fbhv,d,vpp,f,rdir,cr);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_CREATE(dvp,d,vap,vpp,cr,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
 	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,d,vap,vpp,cr);	\
-	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
 #define VOP_REMOVE(dvp,d,cr,rv)						\
 {									\
-	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
 	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,d,cr);		\
-	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
 #define VOP_LINK(tdvp,fvp,d,cr,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(tdvp)->v_bh);				\
 	rv = _VOP_(vop_link, tdvp)((tdvp)->v_fbhv,fvp,d,cr);		\
-	VN_BHV_READ_UNLOCK(&(tdvp)->v_bh);				\
 }
 #define VOP_RENAME(fvp,fnm,tdvp,tnm,cr,rv)				\
 {									\
-	VN_BHV_READ_LOCK(&(fvp)->v_bh);					\
 	rv = _VOP_(vop_rename, fvp)((fvp)->v_fbhv,fnm,tdvp,tnm,cr);	\
-	VN_BHV_READ_UNLOCK(&(fvp)->v_bh);				\
 }
 #define VOP_MKDIR(dp,d,vap,vpp,cr,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
 	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,d,vap,vpp,cr);		\
-	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
 #define	VOP_RMDIR(dp,d,cr,rv)	 					\
 {									\
-	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
 	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,d,cr);			\
-	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
 #define VOP_READDIR(vp,uiop,cr,eofp,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_readdir, vp)((vp)->v_fbhv,uiop,cr,eofp);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv)				\
 {									\
-	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr); \
-	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
+	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr);	\
 }
 #define VOP_READLINK(vp,uiop,cr,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,cr);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_FSYNC(vp,f,cr,b,e,rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_fsync, vp)((vp)->v_fbhv,f,cr,b,e);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_INACTIVE(vp, cr, rv)					\
-{	/* vnode not reference-able, so no need to lock chain */	\
+{									\
 	rv = _VOP_(vop_inactive, vp)((vp)->v_fbhv, cr);			\
 }
 #define VOP_RELEASE(vp, rv)						\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_release, vp)((vp)->v_fbhv);			\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_FID2(vp, fidp, rv)						\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_fid2, vp)((vp)->v_fbhv, fidp);			\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_RWLOCK(vp,i)						\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	(void)_VOP_(vop_rwlock, vp)((vp)->v_fbhv, i);			\
-	/* "allow" is done by rwunlock */				\
 }
 #define VOP_RWLOCK_TRY(vp,i)						\
 	_VOP_(vop_rwlock, vp)((vp)->v_fbhv, i)
 
 #define VOP_RWUNLOCK(vp,i)						\
-{	/* "prevent" was done by rwlock */				\
+{									\
 	(void)_VOP_(vop_rwunlock, vp)((vp)->v_fbhv, i);			\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_RECLAIM(vp, rv)						\
-{	/* vnode not reference-able, so no need to lock chain */	\
+{									\
 	rv = _VOP_(vop_reclaim, vp)((vp)->v_fbhv);			\
 }
 #define VOP_ATTR_GET(vp, name, val, vallenp, fl, cred, rv)		\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_attr_get, vp)((vp)->v_fbhv,name,val,vallenp,fl,cred); \
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_ATTR_SET(vp, name, val, vallen, fl, cred, rv)		\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_attr_set, vp)((vp)->v_fbhv,name,val,vallen,fl,cred); \
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_ATTR_REMOVE(vp, name, flags, cred, rv)			\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_attr_remove, vp)((vp)->v_fbhv,name,flags,cred);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_ATTR_LIST(vp, buf, buflen, fl, cursor, cred, rv)		\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_attr_list, vp)((vp)->v_fbhv,buf,buflen,fl,cursor,cred);\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_LINK_REMOVED(vp, dvp, linkzero)				\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	(void)_VOP_(vop_link_removed, vp)((vp)->v_fbhv, dvp, linkzero); \
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_VNODE_CHANGE(vp, cmd, val)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	(void)_VOP_(vop_vnode_change, vp)((vp)->v_fbhv,cmd,val);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 /*
  * These are page cache functions that now go thru VOPs.
@@ -462,39 +400,29 @@ typedef struct vnodeops {
  */
 #define VOP_TOSS_PAGES(vp, first, last, fiopt)				\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	_VOP_(vop_tosspages, vp)((vp)->v_fbhv,first, last, fiopt);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 /*
  * 'last' parameter is unused and left in for IRIX compatibility
  */
 #define VOP_FLUSHINVAL_PAGES(vp, first, last, fiopt)			\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	_VOP_(vop_flushinval_pages, vp)((vp)->v_fbhv,first,last,fiopt); \
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 /*
  * 'last' parameter is unused and left in for IRIX compatibility
  */
 #define VOP_FLUSH_PAGES(vp, first, last, flags, fiopt, rv)		\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt);\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_IOCTL(vp, inode, filp, cmd, arg, rv)			\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,cmd,arg);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_IFLUSH(vp, flags, rv)					\
 {									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv, flags);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 
 /*

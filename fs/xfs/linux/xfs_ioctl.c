@@ -130,7 +130,6 @@ xfs_find_handle(
 		int		lock_mode;
 
 		/* need to get access to the xfs_inode to read the generation */
-		VN_BHV_READ_LOCK(&(vp)->v_bh);
 		bhv = VNODE_TO_FIRST_BHV(vp);
 		ASSERT(bhv);
 		ip = XFS_BHVTOI(bhv);
@@ -145,7 +144,6 @@ xfs_find_handle(
 		handle.ha_fid.xfs_fid_ino = ip->i_ino;
 
 		xfs_iunlock_map_shared(ip, lock_mode);
-		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
 
 		hsize = XFS_HSIZE(handle);
 	}
