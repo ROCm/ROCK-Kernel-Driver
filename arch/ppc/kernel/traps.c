@@ -114,7 +114,7 @@ void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 	info.si_signo = signr;
 	info.si_errno = 0;
 	info.si_code = code;
-	info.si_addr = (void *) addr;
+	info.si_addr = (void __user *) addr;
 	force_sig_info(signr, &info, current);
 }
 

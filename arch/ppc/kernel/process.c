@@ -544,7 +544,7 @@ int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 #endif
 	else
 		val = __unpack_fe01(tsk->thread.fpexc_mode);
-	return put_user(val, (unsigned int *) adr);
+	return put_user(val, (unsigned int __user *) adr);
 }
 
 int sys_clone(unsigned long clone_flags, unsigned long usp,
