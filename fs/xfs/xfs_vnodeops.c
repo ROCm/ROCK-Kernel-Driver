@@ -4337,8 +4337,10 @@ xfs_free_file_space(
 		nimap = 1;
 		error = xfs_bmapi(NULL, ip, startoffset_fsb, 1, 0, NULL, 0,
 			&imap, &nimap, NULL);
-		if (error)
+		if (error) {
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			return error;
+		}
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
 			xfs_daddr_t	block;
@@ -4352,8 +4354,10 @@ xfs_free_file_space(
 		nimap = 1;
 		error = xfs_bmapi(NULL, ip, endoffset_fsb - 1, 1, 0, NULL, 0,
 			&imap, &nimap, NULL);
-		if (error)
+		if (error) {
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			return error;
+		}
 		ASSERT(nimap == 0 || nimap == 1);
 		if (nimap && imap.br_startblock != HOLESTARTBLOCK) {
 			ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
