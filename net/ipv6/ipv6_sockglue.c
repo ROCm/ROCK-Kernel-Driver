@@ -230,11 +230,6 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 		retv = 0;
 		break;
 
-	case IPV6_AUTHHDR:
-		np->rxopt.bits.authhdr = valbool;
-		retv = 0;
-		break;
-
 	case IPV6_DSTOPTS:
 		np->rxopt.bits.dstopts = valbool;
 		retv = 0;
@@ -621,10 +616,6 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 
 	case IPV6_HOPOPTS:
 		val = np->rxopt.bits.hopopts;
-		break;
-
-	case IPV6_AUTHHDR:
-		val = np->rxopt.bits.authhdr;
 		break;
 
 	case IPV6_DSTOPTS:
