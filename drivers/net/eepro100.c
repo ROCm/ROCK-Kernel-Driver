@@ -1759,6 +1759,7 @@ speedo_rx(struct net_device *dev)
 	int entry = sp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = sp->dirty_rx + RX_RING_SIZE - sp->cur_rx;
 	int alloc_ok = 1;
+	int npkts = 0;
 
 	if (netif_msg_intr(sp))
 		printk(KERN_DEBUG " In speedo_rx().\n");
@@ -1825,6 +1826,7 @@ speedo_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), sp->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				npkts++;
 			} else {
 				/* Pass up the already-filled skbuff. */
 				skb = sp->rx_skbuff[entry];
@@ -1835,6 +1837,7 @@ speedo_rx(struct net_device *dev)
 				}
 				sp->rx_skbuff[entry] = NULL;
 				skb_put(skb, pkt_len);
+				npkts++;
 				sp->rx_ringp[entry] = NULL;
 				pci_unmap_single(sp->pdev, sp->rx_ring_dma[entry],
 						PKT_BUF_SZ + sizeof(struct RxFD), PCI_DMA_FROMDEVICE);
@@ -1856,7 +1859,8 @@ speedo_rx(struct net_device *dev)
 	/* Try hard to refill the recently taken buffers. */
 	speedo_refill_rx_buffers(dev, 1);
 
-	sp->last_rx_time = jiffies;
+	if (npkts)
+		sp->last_rx_time = jiffies;
 
 	return 0;
 }
