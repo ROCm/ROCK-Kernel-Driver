@@ -8,6 +8,8 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <kernel/config.h>
+
 /*
  * Force an unresolved reference if someone tries to use
  * ia64_fetch_and_add() with a bad value.
