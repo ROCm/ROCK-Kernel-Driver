@@ -112,7 +112,6 @@ enum {
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
 	ATA_QCFLAG_ATAPI	= (1 << 3), /* is ATAPI packet command? */
 	ATA_QCFLAG_SG		= (1 << 4), /* have s/g table? */
-	ATA_QCFLAG_POLL		= (1 << 5), /* polling, no interrupts */
 
 	/* various lengths of time */
 	ATA_TMOUT_EDD		= 5 * HZ,	/* hueristic */
@@ -483,7 +482,6 @@ static inline u8 ata_wait_idle(struct ata_port *ap)
 
 static inline void ata_qc_set_polling(struct ata_queued_cmd *qc)
 {
-	qc->flags |= ATA_QCFLAG_POLL;
 	qc->flags &= ~ATA_QCFLAG_DMA;
 	qc->tf.ctl |= ATA_NIEN;
 }

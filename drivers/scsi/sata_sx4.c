@@ -748,7 +748,7 @@ static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_re
 			struct ata_queued_cmd *qc;
 
 			qc = ata_qc_from_tag(ap, ap->active_tag);
-			if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
+			if (qc && (!(qc->tf.ctl & ATA_NIEN)))
 				handled += pdc20621_host_intr(ap, qc, (i > 4),
 							      mmio_base);
 		}
