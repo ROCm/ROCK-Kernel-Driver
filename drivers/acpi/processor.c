@@ -2488,7 +2488,6 @@ acpi_processor_init (void)
 	ACPI_FUNCTION_TRACE("acpi_processor_init");
 
 	memset(&processors, 0, sizeof(processors));
-	memset(&errata, 0, sizeof(errata));
 
 	acpi_processor_dir = proc_mkdir(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 	if (!acpi_processor_dir)
