@@ -229,7 +229,8 @@ udbg_read(char *buf, int buflen) {
 	char c, *p = buf;
 	int i;
 	if (!ppc_md.udbg_putc)
-		for (;;);	/* stop here for cpuctl */
+		return 0;
+
 	for (i = 0; i < buflen; ++i) {
 		do {
 			c = ppc_md.udbg_getc();
