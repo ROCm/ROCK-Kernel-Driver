@@ -8,6 +8,7 @@
 #include "linux/version.h"
 #include "linux/sys.h"
 #include "linux/swap.h"
+#include "linux/sysctl.h"
 #include "asm/signal.h"
 #include "sysdep/syscalls.h"
 #include "kern_util.h"
