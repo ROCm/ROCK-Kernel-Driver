@@ -1627,8 +1627,15 @@ static int do_md_run(mddev_t * mddev)
 	md_wakeup_thread(mddev->thread);
 	set_capacity(disk, mddev->array_size<<1);
 
-	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
+	/* If we call blk_queue_make_request here, it will
+	 * re-initialise max_sectors etc which may have been
+	 * refined inside -> run.  So just set the bits we need to set.
+	 * Most initialisation happended when we called
+	 * blk_queue_make_request(..., md_fail_request)
+	 * earlier.
+	 */
 	mddev->queue->queuedata = mddev;
+	mddev->queue->make_request_fn = mddev->pers->make_request;
 
 	return 0;
 }
