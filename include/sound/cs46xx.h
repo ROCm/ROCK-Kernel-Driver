@@ -1646,9 +1646,7 @@
 typedef struct _snd_cs46xx cs46xx_t;
 
 typedef struct _snd_cs46xx_pcm_t {
-	unsigned char *hw_area;
-	dma_addr_t hw_addr;	/* PCI bus address, not accessible */
-	unsigned long hw_size;
+	struct snd_dma_buffer hw_buf;
   
 	unsigned int ctl;
 	unsigned int shift;	/* Shift count to trasform frames in bytes */
@@ -1693,9 +1691,7 @@ struct _snd_cs46xx {
 	unsigned int mode;
 	
 	struct {
-		unsigned char *hw_area;
-		dma_addr_t hw_addr;	/* PCI bus address, not accessible */
-		unsigned long hw_size;
+		struct snd_dma_buffer hw_buf;
 
 		unsigned int ctl;
 		unsigned int shift;	/* Shift count to trasform frames in bytes */
@@ -1726,6 +1722,8 @@ struct _snd_cs46xx {
 	spinlock_t reg_lock;
 	unsigned int midcr;
 	unsigned int uartm;
+
+	struct snd_dma_device dma_dev;
 
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);

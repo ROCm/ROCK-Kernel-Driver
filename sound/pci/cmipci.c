@@ -2087,7 +2087,8 @@ static int __devinit snd_cmipci_pcm_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI DAC/ADC");
 	cm->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
@@ -2109,7 +2110,8 @@ static int __devinit snd_cmipci_pcm2_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI 2nd DAC");
 	cm->pcm2 = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
@@ -2139,7 +2141,8 @@ static int __devinit snd_cmipci_pcm_spdif_new(cmipci_t *cm, int device)
 	strcpy(pcm->name, "C-Media PCI IEC958");
 	cm->pcm_spdif = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(cm->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      cm->pci, 64*1024, 128*1024);
 
 	return 0;
 }
@@ -3151,7 +3154,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 #ifdef SUPPORT_JOYSTICK
 	if (joystick_port[dev] > 0) {
 		if (joystick_port[dev] == 1) { /* auto-detect */
-			static int ports[] = { 0x200, 0x201, 0 };
+			static int ports[] = { 0x201, 0x200, 0 }; /* FIXME: majority is 0x201? */
 			int i;
 			for (i = 0; ports[i]; i++) {
 				joystick_port[dev] = ports[i];

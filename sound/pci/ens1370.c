@@ -434,8 +434,8 @@ struct _snd_ensoniq {
 	unsigned int spdif_stream;
 
 #ifdef CHIP1370
-	unsigned char *bugbuf;
-	dma_addr_t bugbuf_addr;
+	struct snd_dma_device dma_dev;
+	struct snd_dma_buffer dma_bug;
 #endif
 
 #ifdef SUPPORT_JOYSTICK
@@ -1250,7 +1250,8 @@ static int __devinit snd_ensoniq_pcm(ensoniq_t * ensoniq, int device, snd_pcm_t 
 #endif
 	ensoniq->pcm1 = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(ensoniq->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      ensoniq->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1294,7 +1295,8 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
 #endif
 	ensoniq->pcm2 = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(ensoniq->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      ensoniq->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1829,8 +1831,8 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	pci_set_power_state(ensoniq->pci, 3);
       __hw_end:
 #ifdef CHIP1370
-	if (ensoniq->bugbuf)
-		snd_free_pci_pages(ensoniq->pci, 16, ensoniq->bugbuf, ensoniq->bugbuf_addr);
+	if (ensoniq->dma_bug.area)
+		snd_dma_free_pages(&ensoniq->dma_dev, &ensoniq->dma_bug);
 #endif
 	if (ensoniq->res_port) {
 		release_resource(ensoniq->res_port);
@@ -1911,8 +1913,11 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	}
 	ensoniq->irq = pci->irq;
 #ifdef CHIP1370
-	if ((ensoniq->bugbuf = snd_malloc_pci_pages(pci, 16, &ensoniq->bugbuf_addr)) == NULL) {
-		snd_printk("unable to allocate space for phantom area - bugbuf\n");
+	memset(&ensoniq->dma_dev, 0, sizeof(ensoniq->dma_dev));
+	ensoniq->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	ensoniq->dma_dev.dev.pci = pci;
+	if (snd_dma_alloc_pages(&ensoniq->dma_dev, 16, &ensoniq->dma_bug) < 0) {
+		snd_printk("unable to allocate space for phantom area - dma_bug\n");
 		snd_ensoniq_free(ensoniq);
 		return -EBUSY;
 	}
@@ -1936,7 +1941,7 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
 	outl(ensoniq->sctrl, ES_REG(ensoniq, SERIAL));
 	outl(ES_MEM_PAGEO(ES_PAGE_ADC), ES_REG(ensoniq, MEM_PAGE));
-	outl(ensoniq->bugbuf_addr, ES_REG(ensoniq, PHANTOM_FRAME));
+	outl(ensoniq->dma_bug.addr, ES_REG(ensoniq, PHANTOM_FRAME));
 	outl(0, ES_REG(ensoniq, PHANTOM_COUNT));
 #else
 	ensoniq->ctrl = 0;

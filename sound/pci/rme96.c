@@ -1718,7 +1718,11 @@ snd_rme96_create(rme96_t *rme96)
 
 	rme96->spdif_pcm->info_flags = 0;
 
-	snd_pcm_lib_preallocate_pages_for_all(rme96->spdif_pcm, RME96_BUFFER_SIZE, RME96_BUFFER_SIZE, GFP_KERNEL);
+	snd_pcm_lib_preallocate_pages_for_all(rme96->spdif_pcm,
+					      SNDRV_DMA_TYPE_CONTINUOUS,
+					      snd_pcm_dma_flags(GFP_KERNEL),
+					      RME96_BUFFER_SIZE,
+					      RME96_BUFFER_SIZE);
 
 	/* set up ALSA pcm device for ADAT */
 	if (pci->device == PCI_DEVICE_ID_DIGI96) {
@@ -1738,7 +1742,11 @@ snd_rme96_create(rme96_t *rme96)
 		
 		rme96->adat_pcm->info_flags = 0;
 
-		snd_pcm_lib_preallocate_pages_for_all(rme96->adat_pcm, RME96_BUFFER_SIZE, RME96_BUFFER_SIZE, GFP_KERNEL);
+		snd_pcm_lib_preallocate_pages_for_all(rme96->adat_pcm,
+						      SNDRV_DMA_TYPE_CONTINUOUS,
+						      snd_pcm_dma_flags(GFP_KERNEL),
+						      RME96_BUFFER_SIZE,
+						      RME96_BUFFER_SIZE);
 	}
 
 	rme96->playback_periodsize = 0;

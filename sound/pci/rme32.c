@@ -1378,9 +1378,10 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 	rme32->spdif_pcm->info_flags = 0;
 
 	snd_pcm_lib_preallocate_pages_for_all(rme32->spdif_pcm,
+					      SNDRV_DMA_TYPE_CONTINUOUS,
+					      snd_pcm_dma_flags(GFP_KERNEL),
 					      RME32_BUFFER_SIZE,
-					      RME32_BUFFER_SIZE,
-					      GFP_KERNEL);
+					      RME32_BUFFER_SIZE);
 
 	/* set up ALSA pcm device for ADAT */
 	if ((pci->device == PCI_DEVICE_ID_DIGI32) ||
@@ -1405,9 +1406,10 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 		rme32->adat_pcm->info_flags = 0;
 
 		snd_pcm_lib_preallocate_pages_for_all(rme32->adat_pcm, 
+						      SNDRV_DMA_TYPE_CONTINUOUS,
+						      snd_pcm_dma_flags(GFP_KERNEL),
 						      RME32_BUFFER_SIZE, 
-						      RME32_BUFFER_SIZE, 
-						      GFP_KERNEL);
+						      RME32_BUFFER_SIZE);
 	}
 
 

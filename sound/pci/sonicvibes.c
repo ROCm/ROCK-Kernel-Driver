@@ -886,7 +886,8 @@ static int __devinit snd_sonicvibes_pcm(sonicvibes_t * sonic, int device, snd_pc
 	strcpy(pcm->name, "S3 SonicVibes");
 	sonic->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(sonic->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+					      sonic->pci, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

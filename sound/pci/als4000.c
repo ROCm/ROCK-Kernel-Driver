@@ -99,9 +99,11 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
+#ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
 MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
+#endif
 
 #define chip_t sb_t
 
@@ -521,7 +523,8 @@ static int __devinit snd_als4000_pcm(sb_t *chip, int device)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_als4000_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_als4000_capture_ops);
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, chip->pci,
+					      64*1024, 64*1024);
 
 	chip->pcm = pcm;
 

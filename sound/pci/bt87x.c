@@ -167,8 +167,8 @@ struct snd_bt87x {
 	long opened;
 	snd_pcm_substream_t *substream;
 
-	u32 *risc;
-	dma_addr_t risc_dma;
+	struct snd_dma_device dma_dev;
+	struct snd_dma_buffer dma_risc;
 	unsigned int line_bytes;
 	unsigned int lines;
 
@@ -195,13 +195,14 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 	unsigned int i, offset;
 	u32 *risc;
 
-	if (!chip->risc) {
-		chip->risc = (u32*)snd_malloc_pci_pages
-			(chip->pci, PAGE_ALIGN(MAX_RISC_SIZE), &chip->risc_dma);
-		if (!chip->risc)
+	if (chip->dma_risc.area == NULL) {
+		memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+		chip->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+		chip->dma_dev.dev.pci = chip->pci;
+		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
 			return -ENOMEM;
 	}
-	risc = chip->risc;
+	risc = (u32 *)chip->dma_risc.area;
 	offset = 0;
 	*risc++ = cpu_to_le32(RISC_SYNC | RISC_SYNC_FM1);
 	*risc++ = cpu_to_le32(0);
@@ -233,7 +234,7 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 	*risc++ = cpu_to_le32(RISC_SYNC | RISC_SYNC_VRO);
 	*risc++ = cpu_to_le32(0);
 	*risc++ = cpu_to_le32(RISC_JUMP);
-	*risc++ = cpu_to_le32(chip->risc_dma);
+	*risc++ = cpu_to_le32(chip->dma_risc.addr);
 	chip->line_bytes = period_bytes;
 	chip->lines = periods;
 	return 0;
@@ -241,10 +242,9 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 
 static void snd_bt87x_free_risc(bt87x_t *chip)
 {
-	if (chip->risc) {
-		snd_free_pci_pages(chip->pci, PAGE_ALIGN(MAX_RISC_SIZE),
-				   chip->risc, chip->risc_dma);
-		chip->risc = NULL;
+	if (chip->dma_risc.area) {
+		snd_dma_free_pages(&chip->dma_dev, &chip->dma_risc);
+		chip->dma_risc.area = NULL;
 	}
 }
 
@@ -459,7 +459,7 @@ static int snd_bt87x_start(bt87x_t *chip)
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->current_line = 0;
 	chip->reg_control |= CTL_FIFO_ENABLE | CTL_RISC_ENABLE | CTL_ACAP_EN;
-	snd_bt87x_writel(chip, REG_RISC_STRT_ADD, chip->risc_dma);
+	snd_bt87x_writel(chip, REG_RISC_STRT_ADD, chip->dma_risc.addr);
 	snd_bt87x_writel(chip, REG_PACKET_LEN,
 			 chip->line_bytes | (chip->lines << 16));
 	snd_bt87x_writel(chip, REG_INT_MASK, MY_INTERRUPTS);
@@ -681,7 +681,9 @@ static int __devinit snd_bt87x_pcm(bt87x_t *chip, int device, char *name)
 	pcm->private_data = chip;
 	strcpy(pcm->name, name);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_bt87x_pcm_ops);
-	return snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm,
+	return snd_pcm_lib_preallocate_pages_for_all(pcm,
+							SNDRV_DMA_TYPE_PCI_SG,
+							chip->pci,
 							128 * 1024,
 							(255 * 4092 + 1023) & ~1023);
 }

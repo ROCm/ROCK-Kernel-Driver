@@ -929,8 +929,8 @@ static void tumbler_resume(pmac_t *chip)
 		snapper_set_mix_vol(mix, VOL_IDX_PCM);
 		snapper_set_mix_vol(mix, VOL_IDX_PCM2);
 		snapper_set_mix_vol(mix, VOL_IDX_ADC);
-		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
-		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+		tumbler_set_mono_volume(mix, &snapper_bass_vol_info);
+		tumbler_set_mono_volume(mix, &snapper_treble_vol_info);
 		snapper_set_drc(mix);
 	}
 	tumbler_set_master_volume(mix);

@@ -3,17 +3,41 @@
 menu "Generic devices"
 	depends on SND!=n
 
+
+config SND_MPU401_UART
+        tristate
+	select SND_TIMER
+        select SND_RAWMIDI
+
+config SND_OPL3_LIB
+	tristate
+	select SND_TIMER
+	select SND_HWDEP
+
+config SND_OPL4_LIB
+	tristate
+	select SND_TIMER
+	select SND_HWDEP
+
+config SND_VX_LIB
+	tristate
+	select SND_HWDEP
+	select SND_PCM
+
+
 config SND_DUMMY
 	tristate "Dummy (/dev/null) soundcard"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include dummy driver. This driver does nothing, but
 	  emulates various mixer controls and PCM devices.
-	  
 
 config SND_VIRMIDI
 	tristate "Virtual MIDI soundcard"
 	depends on SND_SEQUENCER
+	select SND_TIMER
+	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include virtual MIDI driver. This driver allows to
 	  connect applications using raw MIDI devices to sequencer.
@@ -21,6 +45,8 @@ config SND_VIRMIDI
 config SND_MTPAV
 	tristate "MOTU MidiTimePiece AV multiport MIDI"
 	depends on SND
+	select SND_TIMER
+	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include support for MOTU MidiTimePiece AV multiport
 	  MIDI adapter.
@@ -28,6 +54,8 @@ config SND_MTPAV
 config SND_SERIAL_U16550
 	tristate "UART16550 - MIDI only driver"
 	depends on SND
+	select SND_TIMER
+	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include support for MIDI serial port driver. It works
 	  with serial UARTs 16550 and better.
@@ -35,8 +63,8 @@ config SND_SERIAL_U16550
 config SND_MPU401
 	tristate "Generic MPU-401 UART driver"
 	depends on SND
+	select SND_MPU401_UART
 	help
 	  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
 
 endmenu
-

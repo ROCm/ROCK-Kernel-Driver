@@ -3769,14 +3769,20 @@ struct _snd_pcm_runtime {
             <programlisting>
 <![CDATA[
   static int snd_myctl_info(snd_kcontrol_t *kcontrol,
-  static char *texts[4] = {
-          "First", "Second", "Third", "Fourth"
-  };
-  uinfo->value.enumerated.items = 4;
-  if (uinfo->value.enumerated.item > 3)
-          uinfo->value.enumerated.item = 3;
-  strcpy(uinfo->value.enumerated.name,
-         texts[uinfo->value.enumerated.item]);
+                          snd_ctl_elem_info_t *uinfo)
+  {
+          static char *texts[4] = {
+                  "First", "Second", "Third", "Fourth"
+          };
+          uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+          uinfo->count = 1;
+          uinfo->value.enumerated.items = 4;
+          if (uinfo->value.enumerated.item > 3)
+                  uinfo->value.enumerated.item = 3;
+          strcpy(uinfo->value.enumerated.name,
+                 texts[uinfo->value.enumerated.item]);
+          return 0;
+  }
 ]]>
             </programlisting>
           </informalexample>
