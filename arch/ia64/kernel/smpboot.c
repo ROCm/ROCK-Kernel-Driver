@@ -534,8 +534,8 @@ smp_prepare_cpus (unsigned int max_cpus)
 		printk(KERN_INFO "SMP mode deactivated.\n");
 		cpus_clear(cpu_online_map);
 		cpus_clear(phys_cpu_present_map);
-		cpu_set(1, cpu_online_map);
-		cpu_set(1, phys_cpu_present_map);
+		cpu_set(0, cpu_online_map);
+		cpu_set(0, phys_cpu_present_map);
 		return;
 	}
 }
