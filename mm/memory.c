@@ -127,9 +127,6 @@ void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr)
 		free_one_pgd(tlb, page_dir);
 		page_dir++;
 	} while (--nr);
-
-	/* keep the page table cache within bounds */
-	check_pgt_cache();
 }
 
 pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
