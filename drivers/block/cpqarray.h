@@ -105,7 +105,7 @@ struct ctlr_info {
 	cmdlist_t *cmd_pool;
 	dma_addr_t cmd_pool_dhandle;
 	unsigned long *cmd_pool_bits;
-	struct request_queue queue;
+	struct request_queue *queue;
 	spinlock_t lock;
 
 	unsigned int Qdepth;

@@ -722,7 +722,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 	tx.tx_command = CMD_TX | CMD_INTR;
 	tx.tx_link = nopaddr;
 	tx.tx_tbdoffset = tbdaddr;
-	tbd.tbd_opts = TBD_EOL | len;
+	tbd.tbd_opts = TBD_EOL | skb->len;
 	tbd.tbd_link = I82586_NULL;
 	tbd.tbd_bufl = dataddr;
 	tbd.tbd_bufh = 0;
@@ -1013,7 +1013,7 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	ether1_banner();
 
-	dev = init_etherdev(NULL, sizeof(struct ether1_priv));
+	dev = alloc_etherdev(sizeof(struct ether1_priv));
 	if (!dev) {
 		ret = -ENOMEM;
 		goto out;
@@ -1057,13 +1057,16 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->tx_timeout		= ether1_timeout;
 	dev->watchdog_timeo	= 5 * HZ / 100;
 
+	ret = register_netdev(dev);
+	if (ret)
+		goto release;
+
 	ecard_set_drvdata(ec, dev);
 	return 0;
 
 release:
 	release_region(dev->base_addr, 16);
 	release_region(dev->base_addr + 0x800, 4096);
-	unregister_netdev(dev);
 	kfree(dev);
 out:
 	return ret;

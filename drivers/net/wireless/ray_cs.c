@@ -94,7 +94,7 @@ MODULE_PARM(pc_debug, "i");
 #endif
 /** Prototypes based on PCMCIA skeleton driver *******************************/
 static void ray_config(dev_link_t *link);
-static void ray_release(u_long arg);
+static void ray_release(dev_link_t *link);
 static int ray_event(event_t event, int priority, event_callback_args_t *args);
 static dev_link_t *ray_attach(void);
 static void ray_detach(dev_link_t *);
@@ -374,10 +374,6 @@ static dev_link_t *ray_attach(void)
     memset(dev, 0, sizeof(struct net_device));
     memset(local, 0, sizeof(ray_dev_t));
 
-    init_timer(&link->release);
-    link->release.function = &ray_release;
-    link->release.data = (u_long)link;
-
     /* The io structure describes IO port mapping. None used here */
     link->io.NumPorts1 = 0;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
@@ -482,9 +478,8 @@ static void ray_detach(dev_link_t *link)
       the release() function is called, that will trigger a proper
       detach().
     */
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG) {
-        ray_release((u_long)link);
+        ray_release(link);
         if(link->state & DEV_STALE_CONFIG) {
             link->state |= DEV_STALE_LINK;
             return;
@@ -602,14 +597,14 @@ static void ray_config(dev_link_t *link)
     DEBUG(3,"ray_config rmem=%p\n",local->rmem);
     DEBUG(3,"ray_config amem=%p\n",local->amem);
     if (ray_init(dev) < 0) {
-        ray_release((u_long)link);
+        ray_release(link);
         return;
     }
 
     i = register_netdev(dev);
     if (i != 0) {
         printk("ray_config register_netdev() failed\n");
-        ray_release((u_long)link);
+        ray_release(link);
         return;
     }
 
@@ -627,7 +622,7 @@ static void ray_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 
-    ray_release((u_long)link);
+    ray_release(link);
 } /* ray_config */
 /*===========================================================================*/
 static int ray_init(struct net_device *dev)
@@ -898,9 +893,8 @@ static void join_net(u_long data)
     device, and release the PCMCIA configuration.  If the device is
     still open, this will be postponed until it is closed.
 =============================================================================*/
-static void ray_release(u_long arg)
+static void ray_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     struct net_device *dev = link->priv; 
     ray_dev_t *local = dev->priv;
     int i;
@@ -959,7 +953,7 @@ static int ray_event(event_t event, int priority,
         link->state &= ~DEV_PRESENT;
         netif_device_detach(dev);
         if (link->state & DEV_CONFIG) {
-            mod_timer(&link->release, jiffies + HZ/20);
+	    ray_release(link);
             del_timer(&local->timer);
         }
         break;
@@ -1769,7 +1763,7 @@ static int ray_dev_close(struct net_device *dev)
     link->open--;
     netif_stop_queue(dev);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	    ray_release(link);
 
     /* In here, we should stop the hardware (stop card from beeing active)
      * and set local->card_status to CARD_AWAITING_PARAM, so that while the

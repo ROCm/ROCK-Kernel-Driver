@@ -1295,7 +1295,7 @@ static void raid5_unplug_device(void *data)
 static inline void raid5_plug_device(raid5_conf_t *conf)
 {
 	spin_lock_irq(&conf->device_lock);
-	blk_plug_device(&conf->mddev->queue);
+	blk_plug_device(conf->mddev->queue);
 	spin_unlock_irq(&conf->device_lock);
 }
 
@@ -1411,7 +1411,7 @@ static void raid5d (mddev_t *mddev)
 
 		if (list_empty(&conf->handle_list) &&
 		    atomic_read(&conf->preread_active_stripes) < IO_THRESHOLD &&
-		    !blk_queue_plugged(&mddev->queue) &&
+		    !blk_queue_plugged(mddev->queue) &&
 		    !list_empty(&conf->delayed_list))
 			raid5_activate_delayed(conf);
 
@@ -1473,7 +1473,7 @@ static int run (mddev_t *mddev)
 	atomic_set(&conf->active_stripes, 0);
 	atomic_set(&conf->preread_active_stripes, 0);
 
-	mddev->queue.unplug_fn = raid5_unplug_device;
+	mddev->queue->unplug_fn = raid5_unplug_device;
 
 	PRINTK("raid5: run(md%d) called.\n", mdidx(mddev));
 

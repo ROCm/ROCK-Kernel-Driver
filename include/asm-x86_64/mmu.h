@@ -2,6 +2,7 @@
 #define __x86_64_MMU_H
 
 #include <linux/spinlock.h>
+#include <asm/semaphore.h>
 
 /*
  * The x86_64 doesn't have a mmu context, but

@@ -14,6 +14,8 @@
 #include <asm/core_titan.h>
 #include <asm/hwrpb.h>
 #include <asm/smp.h>
+#include <asm/err_common.h>
+#include <asm/err_ev6.h>
 
 #include "err_impl.h"
 #include "proto.h"
@@ -567,6 +569,8 @@ titan_register_error_handlers(void)
 		cdl_register_subpacket_annotation(&el_titan_annotations[i]);
 
 	cdl_register_subpacket_handler(&titan_subpacket_handler);
+
+	ev6_register_error_handlers();
 }
 
 

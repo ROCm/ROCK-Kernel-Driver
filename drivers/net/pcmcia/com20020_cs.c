@@ -126,7 +126,7 @@ MODULE_LICENSE("GPL");
 /*====================================================================*/
 
 static void com20020_config(dev_link_t *link);
-static void com20020_release(u_long arg);
+static void com20020_release(dev_link_t *link);
 static int com20020_event(event_t event, int priority,
                        event_callback_args_t *args);
 
@@ -205,9 +205,6 @@ static dev_link_t *com20020_attach(void)
     memset(link, 0, sizeof(struct dev_link_t));
     dev->priv = lp;
 
-    init_timer(&link->release);
-    link->release.function = &com20020_release;
-    link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.NumPorts1 = 16;
     link->io.IOAddrLines = 16;
@@ -292,7 +289,7 @@ static void com20020_detach(dev_link_t *link)
     dev = info->dev;
 
     if (link->state & DEV_CONFIG) {
-        com20020_release((u_long)link);
+        com20020_release(link);
         if (link->state & DEV_STALE_CONFIG) {
             link->state |= DEV_STALE_LINK;
             return;
@@ -456,7 +453,7 @@ cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
     DEBUG(1,"com20020_config failed...\n");
-    com20020_release((u_long)link);
+    com20020_release(link);
 } /* com20020_config */
 
 /*======================================================================
@@ -467,9 +464,8 @@ failed:
 
 ======================================================================*/
 
-static void com20020_release(u_long arg)
+static void com20020_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
 
     DEBUG(1,"release...\n");
 
@@ -513,9 +509,7 @@ static int com20020_event(event_t event, int priority,
         link->state &= ~DEV_PRESENT;
         if (link->state & DEV_CONFIG) {
             netif_device_detach(dev);
-            link->release.expires = jiffies + HZ/20;
             link->state |= DEV_RELEASE_PENDING;
-            add_timer(&link->release);
         }
         break;
     case CS_EVENT_CARD_INSERTION:

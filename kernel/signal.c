@@ -1003,7 +1003,7 @@ void zap_other_threads(struct task_struct *p)
 		/*
 		 * Don't bother with already dead threads
 		 */
-		if (t->state == TASK_ZOMBIE)
+		if (t->state & (TASK_ZOMBIE|TASK_DEAD))
 			continue;
 
 		/*

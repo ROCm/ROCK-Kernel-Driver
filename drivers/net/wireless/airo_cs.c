@@ -94,7 +94,7 @@ void stop_airo_card( struct net_device *, int );
 int reset_airo_card( struct net_device * );
 
 static void airo_config(dev_link_t *link);
-static void airo_release(u_long arg);
+static void airo_release(dev_link_t *link);
 static int airo_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
@@ -208,9 +208,6 @@ static dev_link_t *airo_attach(void)
 		return NULL;
 	}
 	memset(link, 0, sizeof(struct dev_link_t));
-	init_timer(&link->release);
-	link->release.function = &airo_release;
-	link->release.data = (u_long)link;
 	
 	/* Interrupt setup */
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
@@ -286,10 +283,9 @@ static void airo_detach(dev_link_t *link)
 	if (*linkp == NULL)
 		return;
 	
-	del_timer(&link->release);
-	if ( link->state & DEV_CONFIG ) {
-		airo_release( (int)link );
-		if ( link->state & DEV_STALE_CONFIG ) {
+	if (link->state & DEV_CONFIG) {
+		airo_release(link);
+		if (link->state & DEV_STALE_CONFIG) {
 			link->state |= DEV_STALE_LINK;
 			return;
 		}
@@ -513,7 +509,7 @@ static void airo_config(dev_link_t *link)
 	
  cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
-	airo_release((u_long)link);
+	airo_release(link);
 	
 } /* airo_config */
 
@@ -525,10 +521,8 @@ static void airo_config(dev_link_t *link)
   
   ======================================================================*/
 
-static void airo_release(u_long arg)
+static void airo_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
-	
 	DEBUG(0, "airo_release(0x%p)\n", link);
 	
 	/*
@@ -588,7 +582,7 @@ static int airo_event(event_t event, int priority,
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			netif_device_detach(local->eth_dev);
-			mod_timer(&link->release, jiffies + HZ/20);
+			airo_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -639,7 +633,7 @@ static void airo_cs_cleanup(void)
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
-			airo_release((u_long)dev_list);
+			airo_release(dev_list);
 		airo_detach(dev_list);
 	}
 }

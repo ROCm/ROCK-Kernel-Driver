@@ -309,6 +309,8 @@ static inline int d_mountpoint(struct dentry *dentry)
 }
 
 extern struct vfsmount *lookup_mnt(struct vfsmount *, struct dentry *);
+extern struct dentry *lookup_create(struct nameidata *nd, int is_dir);
+
 #endif /* __KERNEL__ */
 
 #endif	/* __LINUX_DCACHE_H */

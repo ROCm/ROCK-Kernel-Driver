@@ -166,12 +166,6 @@ ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	return 0;
 }
 
-static ssize_t
-ibwdt_read(struct file *file, char *buf, size_t count, loff_t *ppos)
-{
-	return -EINVAL;
-}
-
 static int
 ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	  unsigned long arg)
@@ -280,7 +274,6 @@ ibwdt_notify_sys(struct notifier_block *this, unsigned long code,
 
 static struct file_operations ibwdt_fops = {
 	.owner		= THIS_MODULE,
-	.read		= ibwdt_read,
 	.write		= ibwdt_write,
 	.ioctl		= ibwdt_ioctl,
 	.open		= ibwdt_open,

@@ -154,7 +154,7 @@ static ide_startstop_t ide_tcq_nop_handler(ide_drive_t *drive)
 static void ide_tcq_invalidate_queue(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	request_queue_t *q = &drive->queue;
+	request_queue_t *q = drive->queue;
 	struct request *rq;
 	unsigned long flags;
 
@@ -343,7 +343,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 
 	spin_lock_irqsave(&ide_lock, flags);
 
-	if ((rq = blk_queue_find_tag(&drive->queue, tag))) {
+	if ((rq = blk_queue_find_tag(drive->queue, tag))) {
 		HWGROUP(drive)->rq = rq;
 
 		/*
@@ -589,14 +589,14 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 		if (itb->max_sectors > HWIF(drive)->rqsize)
 			itb->max_sectors = HWIF(drive)->rqsize;
 
-		blk_queue_max_sectors(&drive->queue, itb->max_sectors);
+		blk_queue_max_sectors(drive->queue, itb->max_sectors);
 	}
 
 	/*
 	 * enable block tagging
 	 */
-	if (!blk_queue_tagged(&drive->queue))
-		blk_queue_init_tags(&drive->queue, IDE_MAX_TAG);
+	if (!blk_queue_tagged(drive->queue))
+		blk_queue_init_tags(drive->queue, IDE_MAX_TAG);
 
 	/*
 	 * check auto-poll support

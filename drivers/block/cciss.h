@@ -68,7 +68,7 @@ struct ctlr_info
 	unsigned int maxQsinceinit;
 	unsigned int maxSG;
 	spinlock_t lock;
-	struct request_queue queue;
+	struct request_queue *queue;
 
 	//* pointers to command and error info pool */ 
 	CommandList_struct 	*cmd_pool;
@@ -246,7 +246,7 @@ struct board_type {
 	struct access_method *access;
 };
 
-#define CCISS_LOCK(i)	(hba[i]->queue.queue_lock)
+#define CCISS_LOCK(i)	(hba[i]->queue->queue_lock)
 
 #endif /* CCISS_H */
 

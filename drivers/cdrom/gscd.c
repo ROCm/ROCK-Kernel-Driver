@@ -149,7 +149,7 @@ static int AudioEnd_f;
 
 static struct timer_list gscd_timer = TIMER_INITIALIZER(NULL, 0, 0);
 static spinlock_t gscd_lock = SPIN_LOCK_UNLOCKED;
-struct request_queue gscd_queue;
+static struct request_queue *gscd_queue;
 
 static struct block_device_operations gscd_fops = {
 	.owner		= THIS_MODULE,
@@ -256,7 +256,7 @@ static void __do_gscd_request(unsigned long dummy)
 	unsigned int nsect;
 
 repeat:
-	req = elv_next_request(&gscd_queue);
+	req = elv_next_request(gscd_queue);
 	if (!req)
 		return;
 
@@ -888,7 +888,7 @@ static void __exit gscd_exit(void)
 		printk("What's that: can't unregister GoldStar-module\n");
 		return;
 	}
-	blk_cleanup_queue(&gscd_queue);
+	blk_cleanup_queue(gscd_queue);
 	release_region(gscd_port, GSCD_IO_EXTENT);
 	printk(KERN_INFO "GoldStar-module released.\n");
 }
@@ -963,17 +963,23 @@ static int __init gscd_init(void)
 		goto err_out2;
 	}
 
-	blk_init_queue(&gscd_queue, do_gscd_request, &gscd_lock);
+	gscd_queue = blk_init_queue(do_gscd_request, &gscd_lock);
+	if (!gscd_queue) {
+		ret -ENOMEM;
+		goto err_out3;
+	}
 
 	disk_state = 0;
 	gscdPresent = 1;
 
-	gscd_disk->queue = &gscd_queue;
+	gscd_disk->queue = gscd_queue;
 	add_disk(gscd_disk);
 
 	printk(KERN_INFO "GSCD: GoldStar CD-ROM Drive found.\n");
 	return 0;
 
+err_out3:
+	unregister_blkdev(MAJOR_NR, "gscd");
 err_out2:
 	put_disk(gscd_disk);
 err_out1:

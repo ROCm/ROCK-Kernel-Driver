@@ -51,6 +51,7 @@
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_IOSAPIC
 extern void __init iosapic_system_init (int pcat_compat);
 extern void __init iosapic_init (unsigned long address,
 				    unsigned int gsi_base);
@@ -72,6 +73,14 @@ extern int __init iosapic_register_platform_intr (u32 int_type,
 extern unsigned int iosapic_version (char *addr);
 
 extern void iosapic_pci_fixup (int);
+#else
+#define iosapic_system_init(pcat_compat)			do { } while (0)
+#define iosapic_init(address,gsi_base)				do { } while (0)
+#define iosapic_register_intr(gsi,polarity,trigger)		(gsi)
+#define iosapic_override_isa_irq(isa_irq,gsi,polarity,trigger)	do { } while (0)
+#define iosapic_register_platform_intr(type,gsi,pmi,eid,id, \
+	polarity,trigger)					(gsi)
+#endif
 
 # endif /* !__ASSEMBLY__ */
 #endif /* __ASM_IA64_IOSAPIC_H */

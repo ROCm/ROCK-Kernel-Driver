@@ -1,3 +1,25 @@
+Version 0.87
+------------
+Fix oops on big endian readdir.  Set blksize to be even power of two (2**blkbits) to fix
+allocation size miscalculation. After oplock token lost do not read through
+cache. 
+
+Version 0.86
+------------
+Fix oops on empty file readahead.  Fix for file size handling for locally cached files.
+
+Version 0.85
+------------
+Fix oops in mkdir when server fails to return inode info. Fix oops in reopen_files
+during auto reconnection to server after server recovered from failure.
+
+Version 0.84
+------------
+Finish support for Linux 2.5 open/create changes, which removes the
+redundant NTCreate/QPathInfo/close that was sent during file create.
+Enable oplock by default. Enable packet signing by default (needed to 
+access many recent Windows servers)
+
 Version 0.83
 ------------
 Fix oops when mounting to long server names caused by inverted parms to kmalloc.

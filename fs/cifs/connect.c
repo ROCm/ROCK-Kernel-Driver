@@ -251,7 +251,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						/*  iov.iov_base = smb_buffer+total_read;
 						   iov.iov_len =  pdu_length-total_read; */
 						length = sock_recvmsg(csocket, &smb_msg, 
-                                 pdu_length - total_read, 0);
+							pdu_length - total_read, 0);
          /* cERROR(1,("For iovlen %d Length received: %d with total read %d",
 						   iov.iov_len, length,total_read));       */
 						if (length == 0) {

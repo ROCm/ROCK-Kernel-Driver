@@ -75,9 +75,9 @@ typedef void Scsi_Device; /* hack to avoid including scsi.h */
 #include <asm/atari_stram.h>
 
 static void (*do_acsi)(void) = NULL;
-static struct request_queue acsi_queue;
-#define QUEUE (&acsi_queue)
-#define CURRENT elv_next_request(&acsi_queue)
+static struct request_queue *acsi_queue;
+#define QUEUE (acsi_queue)
+#define CURRENT elv_next_request(acsi_queue)
 
 #define DEBUG
 #undef DEBUG_DETECT
@@ -1635,7 +1635,11 @@ int acsi_init( void )
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
-	blk_init_queue(&acsi_queue, do_acsi_request, &acsi_lock);
+	acsi_queue = blk_init_queue(do_acsi_request, &acsi_lock);
+	if (!acsi_queue) {
+		err = -ENOMEM;
+		goto out2a;
+	}
 #ifdef CONFIG_ATARI_SLM
 	err = slm_init();
 #endif
@@ -1732,7 +1736,7 @@ int acsi_init( void )
 		disk->fops = &acsi_fops;
 		disk->private_data = &acsi_info[i];
 		set_capacity(disk, acsi_info[i].size);
-		disk->queue = &acsi_queue;
+		disk->queue = acsi_queue;
 		add_disk(disk);
 	}
 	return 0;
@@ -1740,7 +1744,8 @@ out4:
 	while (i--)
 		put_disk(acsi_gendisk[i]);
 out3:
-	blk_cleanup_queue(&acsi_queue);
+	blk_cleanup_queue(acsi_queue);
+out2a:
 	atari_stram_free( acsi_buffer );
 out2:
 	unregister_blkdev( ACSI_MAJOR, "ad" );
@@ -1767,7 +1772,7 @@ void cleanup_module(void)
 {
 	int i;
 	del_timer( &acsi_timer );
-	blk_cleanup_queue(&acsi_queue);
+	blk_cleanup_queue(acsi_queue);
 	atari_stram_free( acsi_buffer );
 
 	if (unregister_blkdev( ACSI_MAJOR, "ad" ) != 0)

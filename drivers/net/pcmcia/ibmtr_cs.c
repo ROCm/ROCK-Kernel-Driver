@@ -114,7 +114,7 @@ MODULE_LICENSE("GPL");
 
 static void ibmtr_config(dev_link_t *link);
 static void ibmtr_hw_setup(struct net_device *dev, u_int mmiobase);
-static void ibmtr_release(u_long arg);
+static void ibmtr_release(dev_link_t *link);
 static int ibmtr_event(event_t event, int priority,
                        event_callback_args_t *args);
 
@@ -216,9 +216,6 @@ static dev_link_t *ibmtr_attach(void)
     link = &info->link;
     link->priv = info;
 
-    init_timer(&link->release);
-    link->release.function = &ibmtr_release;
-    link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.NumPorts1 = 4;
     link->io.IOAddrLines = 16;
@@ -295,9 +292,8 @@ static void ibmtr_detach(dev_link_t *link)
 	struct tok_info *ti = (struct tok_info *)dev->priv;
 	del_timer_sync(&(ti->tr_timer));
     }
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-        ibmtr_release((u_long)link);
+        ibmtr_release(link);
         if (link->state & DEV_STALE_CONFIG) {
             link->state |= DEV_STALE_LINK;
             return;
@@ -434,7 +430,7 @@ static void ibmtr_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    ibmtr_release((u_long)link);
+    ibmtr_release(link);
 } /* ibmtr_config */
 
 /*======================================================================
@@ -445,9 +441,8 @@ failed:
 
 ======================================================================*/
 
-static void ibmtr_release(u_long arg)
+static void ibmtr_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     ibmtr_dev_t *info = link->priv;
     struct net_device *dev = info->dev;
 
@@ -499,7 +494,7 @@ static int ibmtr_event(event_t event, int priority,
 	    /* set flag to bypass normal interrupt code */
 	    ((struct tok_info *)dev->priv)->sram_virt |= 1;
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    ibmtr_release(link);
         }
         break;
     case CS_EVENT_CARD_INSERTION:

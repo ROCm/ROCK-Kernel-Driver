@@ -97,7 +97,6 @@ extern void setup_replication_mask(int maxnodes);
 /* init.c */
 extern cnodeid_t get_compact_nodeid(void);	/* get compact node id */
 extern void init_platform_nodepda(nodepda_t *npda, cnodeid_t node);
-extern void per_cpu_init(void);
 extern int is_fine_dirmode(void);
 extern void update_node_information(cnodeid_t);
  
@@ -177,7 +176,7 @@ typedef struct hubinfo_s {
 	/* structures for PIO management */
 	xwidgetnum_t			h_widgetid;	/* my widget # (as viewed from xbow) */
 	struct hub_piomap_s		h_small_window_piomap[HUB_WIDGET_ID_MAX+1];
-	sv_t				h_bwwait;	/* wait for big window to free */
+	wait_queue_head_t		h_bwwait;	/* wait for big window to free */
 	spinlock_t			h_bwlock;	/* guard big window piomap's */
 	spinlock_t			h_crblock;      /* gaurd CRB error handling */
 	int				h_num_big_window_fixed;	/* count number of FIXED maps */

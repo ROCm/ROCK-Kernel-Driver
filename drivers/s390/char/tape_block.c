@@ -208,7 +208,7 @@ int
 tapeblock_setup_device(struct tape_device * device)
 {
 	struct tape_blk_data *d = &device->blk_data;
-	request_queue_t *q = &d->request_queue;
+	request_queue_t *q;
 	struct gendisk *disk = alloc_disk(1);
 	int rc;
 
@@ -218,10 +218,11 @@ tapeblock_setup_device(struct tape_device * device)
 	tasklet_init(&d->tasklet, tapeblock_tasklet, (unsigned long)device);
 
 	spin_lock_init(&d->request_queue_lock);
-	rc = blk_init_queue(q, tapeblock_request_fn, &d->request_queue_lock);
-	if (rc)
+	q = blk_init_queue(tapeblock_request_fn, &d->request_queue_lock);
+	if (!q)
 		goto put_disk;
 
+	d->request_queue = q;
 	elevator_exit(q);
 	rc = elevator_init(q, &elevator_noop);
 	if (rc)
@@ -262,7 +263,7 @@ tapeblock_cleanup_device(struct tape_device *device)
 
 	del_gendisk(d->disk);
 	put_disk(d->disk);
-	blk_cleanup_queue(&d->request_queue);
+	blk_cleanup_queue(d->request_queue);
 
 	tasklet_kill(&d->tasklet);
 }

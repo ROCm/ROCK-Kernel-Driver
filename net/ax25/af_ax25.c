@@ -349,7 +349,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 			ax25->timer.data     = (unsigned long)ax25;
 			add_timer(&ax25->timer);
 		} else {
-			sk_free(ax25->sk);
+			sock_put(ax25->sk);
 		}
 	} else {
 		ax25_free_cb(ax25);
@@ -944,15 +944,13 @@ static int ax25_release(struct socket *sock)
 		switch (ax25->state) {
 		case AX25_STATE_0:
 			ax25_disconnect(ax25, 0);
-			ax25_destroy_socket(ax25);
-			break;
+			goto drop;
 
 		case AX25_STATE_1:
 		case AX25_STATE_2:
 			ax25_send_control(ax25, AX25_DISC, AX25_POLLON, AX25_COMMAND);
 			ax25_disconnect(ax25, 0);
-			ax25_destroy_socket(ax25);
-			break;
+			goto drop;
 
 		case AX25_STATE_3:
 		case AX25_STATE_4:
@@ -995,13 +993,16 @@ static int ax25_release(struct socket *sock)
 		sk->sk_shutdown |= SEND_SHUTDOWN;
 		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
-		ax25_destroy_socket(ax25);
+		goto drop;
 	}
 
 	sock->sk   = NULL;
 	sk->sk_socket = NULL;	/* Not used, but we should do this */
 	release_sock(sk);
-
+	return 0;
+ drop:
+	release_sock(sk);
+	ax25_destroy_socket(ax25);
 	return 0;
 }
 

@@ -11,9 +11,9 @@
 #include <linux/miscdevice.h>
 #include <linux/init.h>
 #include <linux/wait.h>
-#include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/dm-ioctl.h>
 
 #include <asm/uaccess.h>
 
@@ -594,7 +594,7 @@ static int dev_rename(struct dm_ioctl *param, size_t param_size)
 	return dm_hash_rename(param->name, new_name);
 }
 
-static int suspend(struct dm_ioctl *param)
+static int do_suspend(struct dm_ioctl *param)
 {
 	int r = 0;
 	struct mapped_device *md;
@@ -613,7 +613,7 @@ static int suspend(struct dm_ioctl *param)
 	return r;
 }
 
-static int resume(struct dm_ioctl *param)
+static int do_resume(struct dm_ioctl *param)
 {
 	int r = 0;
 	struct hash_cell *hc;
@@ -676,9 +676,9 @@ static int resume(struct dm_ioctl *param)
 static int dev_suspend(struct dm_ioctl *param, size_t param_size)
 {
 	if (param->flags & DM_SUSPEND_FLAG)
-		return suspend(param);
+		return do_suspend(param);
 
-	return resume(param);
+	return do_resume(param);
 }
 
 /*

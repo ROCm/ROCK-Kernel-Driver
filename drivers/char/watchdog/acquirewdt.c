@@ -96,13 +96,6 @@ static ssize_t acq_write(struct file *file, const char *buf, size_t count, loff_
 	return 0;
 }
 
-static ssize_t acq_read(struct file *file, char *buf, size_t count, loff_t *ppos)
-{
-	return -EINVAL;
-}
-
-
-
 static int acq_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -193,7 +186,6 @@ static int acq_notify_sys(struct notifier_block *this, unsigned long code,
  
 static struct file_operations acq_fops = {
 	.owner		= THIS_MODULE,
-	.read		= acq_read,
 	.write		= acq_write,
 	.ioctl		= acq_ioctl,
 	.open		= acq_open,

@@ -298,7 +298,7 @@ void add_save_link (struct reiserfs_transaction_handle * th,
     }
 
     /* body of "save" link */
-    link = cpu_to_le32 (INODE_PKEY (inode)->k_dir_id);
+    link = INODE_PKEY (inode)->k_dir_id;
 
     /* put "save" link inot tree */
     retval = reiserfs_insert_item (th, &path, &key, &ih, (char *)&link);

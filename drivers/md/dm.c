@@ -8,6 +8,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/blkpg.h>
 #include <linux/bio.h>
 #include <linux/mempool.h>
@@ -43,7 +44,7 @@ struct mapped_device {
 
 	unsigned long flags;
 
-	request_queue_t queue;
+	request_queue_t *queue;
 	struct gendisk *disk;
 
 	/*
@@ -600,13 +601,20 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	init_rwsem(&md->lock);
 	atomic_set(&md->holders, 1);
 
-	md->queue.queuedata = md;
-	blk_queue_make_request(&md->queue, dm_request);
+	md->queue = blk_alloc_queue(GFP_KERNEL);
+	if (!md->queue) {
+		kfree(md);
+		return NULL;
+	}
+
+	md->queue->queuedata = md;
+	blk_queue_make_request(md->queue, dm_request);
 
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
 	if (!md->io_pool) {
 		free_minor(minor);
+		blk_put_queue(md->queue);
 		kfree(md);
 		return NULL;
 	}
@@ -615,6 +623,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	if (!md->disk) {
 		mempool_destroy(md->io_pool);
 		free_minor(minor);
+		blk_put_queue(md->queue);
 		kfree(md);
 		return NULL;
 	}
@@ -622,7 +631,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	md->disk->major = _major;
 	md->disk->first_minor = minor;
 	md->disk->fops = &dm_blk_dops;
-	md->disk->queue = &md->queue;
+	md->disk->queue = md->queue;
 	md->disk->private_data = md;
 	sprintf(md->disk->disk_name, "dm-%d", minor);
 	add_disk(md->disk);
@@ -640,6 +649,7 @@ static void free_dev(struct mapped_device *md)
 	mempool_destroy(md->io_pool);
 	del_gendisk(md->disk);
 	put_disk(md->disk);
+	blk_put_queue(md->queue);
 	kfree(md);
 }
 
@@ -658,7 +668,7 @@ static void event_callback(void *context)
 
 static int __bind(struct mapped_device *md, struct dm_table *t)
 {
-	request_queue_t *q = &md->queue;
+	request_queue_t *q = md->queue;
 	sector_t size;
 	md->map = t;
 
@@ -916,7 +926,7 @@ struct block_device_operations dm_blk_dops = {
 module_init(dm_init);
 module_exit(dm_exit);
 
-MODULE_PARM(major, "i");
+module_param(major, uint, 0);
 MODULE_PARM_DESC(major, "The major number of the device mapper");
 MODULE_DESCRIPTION(DM_NAME " driver");
 MODULE_AUTHOR("Joe Thornber <thornber@sistina.com>");

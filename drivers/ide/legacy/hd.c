@@ -95,11 +95,11 @@
 #define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
 
 static spinlock_t hd_lock = SPIN_LOCK_UNLOCKED;
-static struct request_queue hd_queue;
+static struct request_queue *hd_queue;
 
 #define MAJOR_NR HD_MAJOR
-#define QUEUE (&hd_queue)
-#define CURRENT elv_next_request(&hd_queue)
+#define QUEUE (hd_queue)
+#define CURRENT elv_next_request(hd_queue)
 
 #define TIMEOUT_VALUE	(6*HZ)
 #define	HD_DELAY	0
@@ -713,11 +713,16 @@ static int __init hd_init(void)
 	if (register_blkdev(MAJOR_NR,"hd"))
 		return -1;
 
-	blk_init_queue(&hd_queue, do_hd_request, &hd_lock);
-	blk_queue_max_sectors(&hd_queue, 255);
+	hd_queue = blk_init_queue(do_hd_request, &hd_lock);
+	if (!hd_queue) {
+		unegister_blkdev(MAJOR_NR,"hd");
+		return -ENOMEM;
+	}
+
+	blk_queue_max_sectors(hd_queue, 255);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;
-	blk_queue_hardsect_size(&hd_queue, 512);
+	blk_queue_hardsect_size(hd_queue, 512);
 
 #ifdef __i386__
 	if (!NR_HD) {
@@ -799,7 +804,7 @@ static int __init hd_init(void)
 		sprintf(disk->disk_name, "hd%c", 'a'+drive);
 		disk->private_data = p;
 		set_capacity(disk, p->head * p->sect * p->cyl);
-		disk->queue = &hd_queue;
+		disk->queue = hd_queue;
 		p->unit = drive;
 		hd_gendisk[drive] = disk;
 		printk ("%s: %luMB, CHS=%d/%d/%d\n",
@@ -838,7 +843,7 @@ out1:
 out:
 	del_timer(&device_timer);
 	unregister_blkdev(MAJOR_NR,"hd");
-	blk_cleanup_queue(&hd_queue);
+	blk_cleanup_queue(hd_queue);
 	return -1;
 Enomem:
 	while (drive--)

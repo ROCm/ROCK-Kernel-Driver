@@ -1626,7 +1626,7 @@ static int idefloppy_get_format_progress(ide_drive_t *drive, int *arg)
 /*
  *	Return the current floppy capacity to ide.c.
  */
-static unsigned long idefloppy_capacity (ide_drive_t *drive)
+static sector_t idefloppy_capacity (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	unsigned long capacity = floppy->blocks * floppy->bs_factor;
@@ -1798,7 +1798,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 		set_bit(IDEFLOPPY_ZIP_DRIVE, &floppy->flags);
 		/* This value will be visible in the /proc/ide/hdx/settings */
 		floppy->ticks = IDEFLOPPY_TICKS_DELAY;
-		blk_queue_max_sectors(&drive->queue, 64);
+		blk_queue_max_sectors(drive->queue, 64);
 	}
 
 	/*
@@ -1807,7 +1807,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	*      it, so please don't remove this.
 	*/
 	if (strncmp(drive->id->model, "IOMEGA Clik!", 11) == 0) {
-		blk_queue_max_sectors(&drive->queue, 64);
+		blk_queue_max_sectors(drive->queue, 64);
 		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
 	}
 
@@ -2006,7 +2006,12 @@ static int idefloppy_media_changed(struct gendisk *disk)
 {
 	ide_drive_t *drive = disk->private_data;
 	idefloppy_floppy_t *floppy = drive->driver_data;
-	
+
+	/* do not scan partitions twice if this is a removable device */
+	if (drive->attach) {
+		drive->attach = 0;
+		return 0;
+	}
 	return test_and_clear_bit(IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
 }
 
@@ -2061,6 +2066,7 @@ static int idefloppy_attach (ide_drive_t *drive)
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->fops = &idefloppy_ops;
+	drive->attach = 1;
 	add_disk(g);
 	return 0;
 failed:

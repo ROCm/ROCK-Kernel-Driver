@@ -2107,14 +2107,16 @@ S: Germany
 
 N: Arnaldo Carvalho de Melo
 E: acme@conectiva.com.br
+E: acme@kernel.org
 E: acme@gnu.org
-W: http://bazar.conectiva.com.br/~acme
+W: http://bazar2.conectiva.com.br/~acme
 W: http://advogato.org/person/acme
 P: 1024D/9224DF01 D5DF E3BB E3C8 BCBB F8AD  841A B6AB 4681 9224 DF01
 D: wanrouter hacking
 D: misc Makefile, Config.in, drivers and network stacks fixes
-D: IPX Maintainer
+D: IPX & LLC network stacks maintainer
 D: Cyclom 2X synchronous card driver
+D: wl3501 PCMCIA wireless card driver
 D: i18n for minicom, net-tools, util-linux, fetchmail, etc
 S: Conectiva S.A.
 S: R. Tocantins, 89 - Cristo Rei
@@ -2359,6 +2361,15 @@ D: /proc/scsi and assorted other snippets
 S: Zum Schiersteiner Grund 2
 S: 55127 Mainz
 S: Germany
+
+N: Gustavo Niemeyer
+E: niemeyer@conectiva.com
+W: https://moin.conectiva.com.br/GustavoNiemeyer
+D: wl3501 PCMCIA wireless card initial support for wireless extensions in 2.4
+S: Conectiva S.A.
+S: R. Tocantins 89
+S: 80050-430  Curitiba PR
+S: Brazil
 
 N: David C. Niemi
 E: niemi@tux.org

@@ -144,7 +144,7 @@ static struct timer_list xd_watchdog_int;
 static volatile u_char xd_error;
 static int nodma = XD_DONT_USE_DMA;
 
-static struct request_queue xd_queue;
+static struct request_queue *xd_queue;
 
 /* xd_init: register the block device number and set up pointer tables */
 static int __init xd_init(void)
@@ -177,8 +177,12 @@ static int __init xd_init(void)
 	if (register_blkdev(XT_DISK_MAJOR, "xd"))
 		goto out1;
 
+	err = -ENOMEM;
+	xd_queue = blk_init_queue(do_xd_request, &xd_lock);
+	if (!xd_queue)
+		goto out1a;
+
 	devfs_mk_dir("xd");
-	blk_init_queue(&xd_queue, do_xd_request, &xd_lock);
 	if (xd_detect(&controller,&address)) {
 
 		printk("Detected a%s controller (type %d) at address %06x\n",
@@ -211,7 +215,7 @@ static int __init xd_init(void)
 		sprintf(disk->disk_name, "xd%c", i+'a');
 		disk->fops = &xd_fops;
 		disk->private_data = p;
-		disk->queue = &xd_queue;
+		disk->queue = xd_queue;
 		set_capacity(disk, p->heads * p->cylinders * p->sectors);
 		printk(" %s: CHS=%d/%d/%d\n", disk->disk_name,
 			p->cylinders, p->heads, p->sectors);
@@ -230,7 +234,7 @@ static int __init xd_init(void)
 	}
 
 	/* xd_maxsectors depends on controller - so set after detection */
-	blk_queue_max_sectors(&xd_queue, xd_maxsectors);
+	blk_queue_max_sectors(xd_queue, xd_maxsectors);
 
 	for (i = 0; i < xd_drives; i++)
 		add_disk(xd_gendisk[i]);
@@ -246,7 +250,8 @@ out3:
 	release_region(xd_iobase,4);
 out2:
 	devfs_remove("xd");
-	blk_cleanup_queue(&xd_queue);
+	blk_cleanup_queue(xd_queue);
+out1a:
 	unregister_blkdev(XT_DISK_MAJOR, "xd");
 out1:
 	if (xd_dma_buffer)
@@ -1057,7 +1062,7 @@ void cleanup_module(void)
 		del_gendisk(xd_gendisk[i]);
 		put_disk(xd_gendisk[i]);
 	}
-	blk_cleanup_queue(&xd_queue);
+	blk_cleanup_queue(xd_queue);
 	release_region(xd_iobase,4);
 	devfs_remove("xd");
 	if (xd_drives) {

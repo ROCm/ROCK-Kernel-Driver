@@ -133,7 +133,7 @@ static __inline__ void *
 compat_alloc_user_space (long len)
 {
 	struct pt_regs *regs = ia64_task_regs(current);
-	return (void *) ((regs->r12 & -16) - len);
+	return (void *) (((regs->r12 & 0xffffffff) & -16) - len);
 }
 
 #endif /* _ASM_IA64_COMPAT_H */

@@ -232,7 +232,7 @@ static char mii_preamble_required = 0;
 /* Index of functions. */
 
 static void tc574_config(dev_link_t *link);
-static void tc574_release(unsigned long arg);
+static void tc574_release(dev_link_t *link);
 static int tc574_event(event_t event, int priority,
 					   event_callback_args_t *args);
 
@@ -298,9 +298,6 @@ static dev_link_t *tc574_attach(void)
 	link->priv = dev;
 
 	spin_lock_init(&lp->window_lock);
-	init_timer(&link->release);
-	link->release.function = &tc574_release;
-	link->release.data = (unsigned long)link;
 	link->io.NumPorts1 = 32;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
@@ -374,9 +371,8 @@ static void tc574_detach(dev_link_t *link)
 	if (*linkp == NULL)
 	return;
 
-	del_timer_sync(&link->release);
 	if (link->state & DEV_CONFIG) {
-		tc574_release((unsigned long)link);
+		tc574_release(link);
 		if (link->state & DEV_STALE_CONFIG) {
 			link->state |= DEV_STALE_LINK;
 			return;
@@ -555,7 +551,7 @@ static void tc574_config(dev_link_t *link)
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 failed:
-	tc574_release((unsigned long)link);
+	tc574_release(link);
 	return;
 
 } /* tc574_config */
@@ -566,10 +562,8 @@ failed:
 	still open, this will be postponed until it is closed.
 */
 
-static void tc574_release(unsigned long arg)
+static void tc574_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
-
 	DEBUG(0, "3c574_release(0x%p)\n", link);
 
 	if (link->open) {
@@ -607,7 +601,7 @@ static int tc574_event(event_t event, int priority,
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			netif_device_detach(dev);
-			mod_timer(&link->release, jiffies + HZ/20);
+			tc574_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -1323,7 +1317,7 @@ static int el3_close(struct net_device *dev)
 	netif_stop_queue(dev);
 	del_timer_sync(&lp->media);
 	if (link->state & DEV_STALE_CONFIG)
-		mod_timer(&link->release, jiffies + HZ/20);
+		tc574_release(link);
 	return 0;
 }
 

@@ -52,7 +52,6 @@ void
 hub_error_clear(nasid_t nasid)
 {
 	int i;
-	hubreg_t idsr;
 
     /*
      * Make sure spurious write response errors are cleared

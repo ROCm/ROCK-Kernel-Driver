@@ -80,10 +80,10 @@ typedef struct {
 	io7_csr	POx_MEM_ADR_EXT;	/* 0x0100 */
 	io7_csr POx_XCAL_CTRL;
 	io7_csr rsvd1[2];	/* ?? spec doesn't show 0x180 */
-	io7_csr POx_DM_SOURCE;		/* ox0200 */
+	io7_csr POx_DM_SOURCE;		/* 0x0200 */
 	io7_csr POx_DM_DEST;
 	io7_csr POx_DM_SIZE;
-	io7_csr POx_DM_STATE;
+	io7_csr POx_DM_CTRL;
 	io7_csr rsvd2[4];		/* 0x0300 */
 
 	/* AGP Control Registers -- port 3 only */

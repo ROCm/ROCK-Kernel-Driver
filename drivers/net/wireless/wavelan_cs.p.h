@@ -761,7 +761,7 @@ static inline void
 static inline int
 	wv_pcmcia_config(dev_link_t *);	/* Configure the pcmcia interface */
 static void
-	wv_pcmcia_release(u_long),	/* Remove a device */
+	wv_pcmcia_release(dev_link_t *),/* Remove a device */
 	wv_flush_stale_links(void);	/* "detach" all possible devices */
 /* ---------------------- INTERRUPT HANDLING ---------------------- */
 static irqreturn_t
