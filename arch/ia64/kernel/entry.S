@@ -595,12 +595,12 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 (pKStk)	cmp4.eq	p6,p0=r21,r0		// p6 <- preempt_count == 0
 	;;
-#else // CONFIG_PREEMPT
+#else /* CONFIG_PREEMPT */
 (pUStk)	rsm psr.i
 	;;
 (pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
-#endif // CONFIG_PREEMPT
+#endif /* CONFIG_PREEMPT */
 .work_processed:
 (p6)	ld4 r18=[r17]				// load current_thread_info()->flags
 	adds r2=PT(R8)+16,r12
@@ -827,7 +827,7 @@ skip_rbs_switch:
 (pKStk) st4 [r20]=r21
 	ssm  psr.i		// enable interrupts
 #endif
-	
+
 #if __GNUC__ < 3
 	br.call.spnt.many rp=invoke_schedule
 #else
@@ -840,7 +840,7 @@ skip_rbs_switch:
 #if CONFIG_PREEMPT
 (pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
-(pKStk)	st4 [r20]=r0	// preempt_count() <- 0
+(pKStk)	st4 [r20]=r0		// preempt_count() <- 0
 #endif
 	br.cond.sptk.many .work_processed		// re-check
 

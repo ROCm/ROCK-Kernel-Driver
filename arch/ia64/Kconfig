@@ -891,7 +891,7 @@ config DEBUG_SPINLOCK_SLEEP
 	  bool "Sleep-inside-spinlock checking"
 	  help
 	    If you say Y here, various routines which may sleep will become very
-	    noisy if they are called with a spinlock held.        
+	    noisy if they are called with a spinlock held.
 
 config IA64_DEBUG_CMPXCHG
 	bool "Turn on compare-and-exchange bug checking (slow!)"
