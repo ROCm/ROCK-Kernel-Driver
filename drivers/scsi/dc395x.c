@@ -59,6 +59,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/pci.h>
 
 /*---------------------------------------------------------------------------
                                   Features
