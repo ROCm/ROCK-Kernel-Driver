@@ -221,6 +221,9 @@ int fsync_super(struct super_block *sb)
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
+	if (sb->s_op && sb->s_op->sync_fs) {
+		sb->s_op->sync_fs(sb, 1);
+	}
 	unlock_super(sb);
 	sync_blockdev(sb->s_bdev);
 	sync_inodes_sb(sb, 1);
@@ -251,10 +254,12 @@ int fsync_bdev(struct block_device *bdev)
 asmlinkage long sys_sync(void)
 {
 	wakeup_bdflush(0);
-	sync_inodes(0);	/* All mappings and inodes, including block devices */
+	sync_inodes(0);		/* All mappings, inodes and their blockdevs */
 	DQUOT_SYNC(NULL);
-	sync_supers();	/* Write the superblocks */
-	sync_inodes(1);	/* All the mappings and inodes, again. */
+	sync_supers();		/* Write the superblocks */
+	sync_filesystems(0);	/* Start syncing the filesystems */
+	sync_filesystems(1);	/* Waitingly sync the filesystems */
+	sync_inodes(1);		/* Mappings, inodes and blockdevs, again. */
 	return 0;
 }
 

@@ -189,6 +189,8 @@ void generic_shutdown_super(struct super_block *sb)
 		if (sop) {
 			if (sop->write_super && sb->s_dirt)
 				sop->write_super(sb);
+			if (sop->sync_fs)
+				sop->sync_fs(sb, 1);
 			if (sop->put_super)
 				sop->put_super(sb);
 		}
@@ -266,8 +268,8 @@ void drop_super(struct super_block *sb)
 static inline void write_super(struct super_block *sb)
 {
 	lock_super(sb);
-	if (sb->s_root && sb->s_dirt)
-		if (sb->s_op && sb->s_op->write_super)
+	if (sb->s_op && sb->s_root && sb->s_dirt)
+		if (sb->s_op->write_super)
 			sb->s_op->write_super(sb);
 	unlock_super(sb);
 }
@@ -293,6 +295,46 @@ restart:
 			goto restart;
 		} else
 			sb = sb_entry(sb->s_list.next);
+	spin_unlock(&sb_lock);
+}
+
+/*
+ * Call the ->sync_fs super_op against all filesytems which are r/w and
+ * which implement it.
+ */
+void sync_filesystems(int wait)
+{
+	struct super_block * sb;
+
+	spin_lock(&sb_lock);
+	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
+			sb = sb_entry(sb->s_list.next)) {
+		if (!sb->s_op)
+			continue;
+		if (!sb->s_op->sync_fs);
+			continue;
+		if (sb->s_flags & MS_RDONLY)
+			continue;
+		sb->s_need_sync_fs = 1;
+	}
+	spin_unlock(&sb_lock);
+
+restart:
+	spin_lock(&sb_lock);
+	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
+			sb = sb_entry(sb->s_list.next)) {
+		if (!sb->s_need_sync_fs)
+			continue;
+		sb->s_need_sync_fs = 0;
+		if (sb->s_flags & MS_RDONLY)
+			continue;	/* hm.  Was remounted r/w meanwhile */
+		sb->s_count++;
+		spin_unlock(&sb_lock);
+		down_read(&sb->s_umount);
+		sb->s_op->sync_fs(sb, wait);
+		drop_super(sb);
+		goto restart;
+	}
 	spin_unlock(&sb_lock);
 }
 

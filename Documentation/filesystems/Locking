@@ -92,6 +92,7 @@ prototypes:
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
+	void (*sync_fs) (struct super_block *sb, int wait);
 	int (*statfs) (struct super_block *, struct statfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);
@@ -108,6 +109,7 @@ delete_inode:	no
 clear_inode:	no	
 put_super:	yes	yes	maybe		(see below)
 write_super:	no	yes	maybe		(see below)
+sync_fs:	no	no	maybe		(see below)
 statfs:		no	no	no
 remount_fs:	yes	yes	maybe		(see below)
 umount_begin:	yes	no	maybe		(see below)
