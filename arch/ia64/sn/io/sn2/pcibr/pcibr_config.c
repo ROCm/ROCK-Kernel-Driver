@@ -22,22 +22,11 @@ void              pcibr_config_set(vertex_hdl_t, unsigned, unsigned, uint64_t);
 void       	  do_pcibr_config_set(cfg_p, unsigned, unsigned, uint64_t);
 
 /*
- * on sn-ia we need to twiddle the the addresses going out
- * the pci bus because we use the unswizzled synergy space
- * (the alternative is to use the swizzled synergy space
- * and byte swap the data)
+ * fancy snia bit twiddling....
  */
-#define CB(b,r) (((volatile uint8_t *) b)[((r)^4)])
-#define CS(b,r) (((volatile uint16_t *) b)[((r^4)/2)])
-#define CW(b,r) (((volatile uint32_t *) b)[((r^4)/4)])
-
 #define	CBP(b,r) (((volatile uint8_t *) b)[(r)])
 #define	CSP(b,r) (((volatile uint16_t *) b)[((r)/2)])
 #define	CWP(b,r) (((volatile uint32_t *) b)[(r)/4])
-
-#define SCB(b,r) (((volatile uint8_t *) b)[((r)^3)])
-#define SCS(b,r) (((volatile uint16_t *) b)[((r^2)/2)])
-#define SCW(b,r) (((volatile uint32_t *) b)[((r)/4)])
 
 /*
  * Return a config space address for given slot / func / offset.  Note the
