@@ -1,6 +1,6 @@
 /* de2104x.c: A Linux PCI Ethernet driver for Intel/Digital 21040/1 chips. */
 /*
-	Copyright 2001 Jeff Garzik <jgarzik@pobox.com>
+	Copyright 2001,2003 Jeff Garzik <jgarzik@pobox.com>
 
 	Copyright 1994, 1995 Digital Equipment Corporation.	    [de4x5.c]
 	Written/copyright 1994-2001 by Donald Becker.		    [tulip.c]
@@ -28,8 +28,8 @@
  */
 
 #define DRV_NAME		"de2104x"
-#define DRV_VERSION		"0.5.4"
-#define DRV_RELDATE		"Jan 1, 2002"
+#define DRV_VERSION		"0.6"
+#define DRV_RELDATE		"Sep 1, 2003"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -1464,7 +1464,7 @@ static void de_tx_timeout (struct net_device *dev)
 	netif_wake_queue(dev);
 }
 
-static int de_get_regs(struct de_private *de, u8 *buf)
+static void __de_get_regs(struct de_private *de, u8 *buf)
 {
 	int i;
 	u32 *rbuf = (u32 *)buf;
@@ -1475,11 +1475,9 @@ static int de_get_regs(struct de_private *de, u8 *buf)
 
 	/* handle self-clearing RxMissed counter, CSR8 */
 	de_rx_missed(de, rbuf[8]);
-
-	return 0;
 }
 
-static int de_ethtool_gset(struct de_private *de, struct ethtool_cmd *ecmd)
+static int __de_get_settings(struct de_private *de, struct ethtool_cmd *ecmd)
 {
 	ecmd->supported = de->media_supported;
 	ecmd->transceiver = XCVR_INTERNAL;
@@ -1516,7 +1514,7 @@ static int de_ethtool_gset(struct de_private *de, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
-static int de_ethtool_sset(struct de_private *de, struct ethtool_cmd *ecmd)
+static int __de_set_settings(struct de_private *de, struct ethtool_cmd *ecmd)
 {
 	u32 new_media;
 	unsigned int media_lock;
@@ -1584,168 +1582,120 @@ static int de_ethtool_sset(struct de_private *de, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
-static int de_ethtool_ioctl (struct de_private *de, void *useraddr)
-{
-	u32 ethcmd;
-
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
-
-	if (get_user(ethcmd, (u32 *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, pci_name(de->pdev));
-		info.eedump_len = DE_EEPROM_SIZE;
-		info.regdump_len = DE_REGS_SIZE;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&de->lock);
-		de_ethtool_gset(de, &ecmd);
-		spin_unlock_irq(&de->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd ecmd;
-		int r;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&de->lock);
-		r = de_ethtool_sset(de, &ecmd);
-		spin_unlock_irq(&de->lock);
-		return r;
-	}
-
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		u32 status;
-
-		if (de->media_type != DE_MEDIA_TP_AUTO)
-			return -EINVAL;
-		if (netif_carrier_ok(de->dev))
-			de_link_down(de);
-
-		status = dr32(SIAStatus);
-		dw32(SIAStatus, (status & ~NWayState) | NWayRestart);
-		if (netif_msg_link(de))
-			printk(KERN_INFO "%s: link nway restart, status %x,%x\n",
-			       de->dev->name, status, dr32(SIAStatus));
-		return 0;
-	}
-
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		edata.data = (netif_carrier_ok(de->dev)) ? 1 : 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = de->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		de->msg_enable = edata.data;
-		return 0;
-	}
-
-	/* get registers */
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u8 regbuf[DE_REGS_SIZE];
-		int r;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-		
-		if (regs.len > DE_REGS_SIZE) {
-			regs.len = DE_REGS_SIZE;
-		}
-		regs.version = (DE_REGS_VER << 2) | de->de21040;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-
-		spin_lock_irq(&de->lock);
-		r = de_get_regs(de, regbuf);
-		spin_unlock_irq(&de->lock);
-
-		if (r)
-			return r;
-		if (copy_to_user(useraddr, regbuf, regs.len))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get SROM dump */
-	case ETHTOOL_GEEPROM: {
-		struct ethtool_eeprom eeprom;
-
-		if (!de->ee_data)
-			break;
-		if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
-			return -EFAULT;
-		if ((eeprom.offset != 0) || (eeprom.magic != 0) ||
-		    (eeprom.len != DE_EEPROM_SIZE))
-			return -EINVAL;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-		if (copy_to_user(useraddr, de->ee_data, DE_EEPROM_SIZE))
-			return -EFAULT;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
-}
-
-
-static int de_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+static void de_get_drvinfo (struct net_device *dev,struct ethtool_drvinfo *info)
 {
 	struct de_private *de = dev->priv;
-	int rc = 0;
 
-	if (!netif_running(dev))
-		return -EINVAL;
-		
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return de_ethtool_ioctl(de, (void *) rq->ifr_data);
+	strcpy (info->driver, DRV_NAME);
+	strcpy (info->version, DRV_VERSION);
+	strcpy (info->bus_info, pci_name(de->pdev));
+	info->eedump_len = DE_EEPROM_SIZE;
+}
 
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
+static int de_get_regs_len(struct net_device *dev)
+{
+	return DE_REGS_SIZE;
+}
+
+static int de_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct de_private *de = dev->priv;
+	int rc;
+
+	spin_lock_irq(&de->lock);
+	rc = __de_get_settings(de, ecmd);
+	spin_unlock_irq(&de->lock);
 
 	return rc;
 }
+
+static int de_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct de_private *de = dev->priv;
+	int rc;
+
+	spin_lock_irq(&de->lock);
+	rc = __de_set_settings(de, ecmd);
+	spin_unlock_irq(&de->lock);
+
+	return rc;
+}
+
+static u32 de_get_msglevel(struct net_device *dev)
+{
+	struct de_private *de = dev->priv;
+
+	return de->msg_enable;
+}
+
+static void de_set_msglevel(struct net_device *dev, u32 msglvl)
+{
+	struct de_private *de = dev->priv;
+
+	de->msg_enable = msglvl;
+}
+
+static int de_get_eeprom(struct net_device *dev,
+			 struct ethtool_eeprom *eeprom, u8 *data)
+{
+	struct de_private *de = dev->priv;
+
+	if (!de->ee_data)
+		return -EOPNOTSUPP;
+	if ((eeprom->offset != 0) || (eeprom->magic != 0) ||
+	    (eeprom->len != DE_EEPROM_SIZE))
+		return -EINVAL;
+	memcpy(data, de->ee_data, eeprom->len);
+
+	return 0;
+}
+
+static int de_nway_reset(struct net_device *dev)
+{
+	struct de_private *de = dev->priv;
+	u32 status;
+
+	if (de->media_type != DE_MEDIA_TP_AUTO)
+		return -EINVAL;
+	if (netif_carrier_ok(de->dev))
+		de_link_down(de);
+
+	status = dr32(SIAStatus);
+	dw32(SIAStatus, (status & ~NWayState) | NWayRestart);
+	if (netif_msg_link(de))
+		printk(KERN_INFO "%s: link nway restart, status %x,%x\n",
+		       de->dev->name, status, dr32(SIAStatus));
+	return 0;
+}
+
+static void de_get_regs(struct net_device *dev, struct ethtool_regs *regs,
+			void *data)
+{
+	struct de_private *de = dev->priv;
+
+	if (regs->len > DE_REGS_SIZE)
+		regs->len = DE_REGS_SIZE;
+	regs->version = (DE_REGS_VER << 2) | de->de21040;
+
+	spin_lock_irq(&de->lock);
+	__de_get_regs(de, data);
+	spin_unlock_irq(&de->lock);
+}
+
+static struct ethtool_ops de_ethtool_ops = {
+	.get_link		= ethtool_op_get_link,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+	.get_drvinfo		= de_get_drvinfo,
+	.get_regs_len		= de_get_regs_len,
+	.get_settings		= de_get_settings,
+	.set_settings		= de_set_settings,
+	.get_msglevel		= de_get_msglevel,
+	.set_msglevel		= de_set_msglevel,
+	.get_eeprom		= de_get_eeprom,
+	.nway_reset		= de_nway_reset,
+	.get_regs		= de_get_regs,
+};
 
 static void __init de21040_get_mac_address (struct de_private *de)
 {
@@ -2011,7 +1961,7 @@ static int __init de_init_one (struct pci_dev *pdev,
 	dev->set_multicast_list = de_set_rx_mode;
 	dev->hard_start_xmit = de_start_xmit;
 	dev->get_stats = de_get_stats;
-	dev->do_ioctl = de_ioctl;
+	dev->ethtool_ops = &de_ethtool_ops;
 	dev->tx_timeout = de_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
