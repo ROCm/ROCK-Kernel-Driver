@@ -195,11 +195,6 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	   uses the normal dma_mask for alloc_consistent. */
 	dma_mask &= hwdev->dma_mask;
 
-#if 0
-	/* workaround */
-	dma_mask &= 0xffffffff;
-#endif
-
  again:
 	memory = (void *)__get_free_pages(gfp, get_order(size));
 	if (memory == NULL)
@@ -748,7 +743,7 @@ static int __init pci_iommu_init(void)
 
 	if (swiotlb) { 
 		no_iommu = 1;
-		printk(KERN_INFO "PCI-DMA: Using SWIOTLB :-(\n"); 
+		printk(KERN_INFO "PCI-DMA: Using software bounce buffering for  IO (SWIOTLB)\n"); 
 		return -1; 
 	} 
 	
@@ -852,6 +847,7 @@ fs_initcall(pci_iommu_init);
    forcesac For SAC mode for masks <40bits  (experimental)
    fullflush Flush IOMMU on each allocation (default) 
    nofullflush Don't use IOMMU fullflush
+   soft	 Use software bounce buffering (default for Intel machines)
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -891,6 +887,8 @@ __init int iommu_setup(char *opt)
 		    iommu_fullflush = 1;
 	    if (!memcmp(p, "nofullflush", 11))
 		    iommu_fullflush = 0;
+	    if (!memcmp(p, "soft", 4))
+		    swiotlb = 1;
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

@@ -454,7 +454,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifndef CONFIG_SMP
 	/* Temporary hack: disable the IO-APIC for UP Nvidia and VIA. */
-	check_ioapic();
+		check_ioapic();
 #endif
 #ifdef CONFIG_ACPI_BOOT
        /*

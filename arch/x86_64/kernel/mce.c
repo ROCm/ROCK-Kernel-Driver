@@ -257,13 +257,12 @@ static void mce_init(void *dummy)
 static void __init mce_cpu_quirks(struct cpuinfo_x86 *c) 
 { 
 	/* This should be disabled by the BIOS, but isn't always */
-	if (c->x86_vendor == X86_VENDOR_AMD && 
-	    c->x86_model == 15) { 
+	if (c->x86_vendor == X86_VENDOR_AMD && c->x86 == 15) {
 		/* disable GART TBL walk error reporting, which trips off 
 		   incorrectly with the IOMMU & 3ware & Cerberus. */
 		clear_bit(10, &bank[4]);
-	} 
-} 
+	}
+}			
 
 /* 
  * Called for each booted CPU to set up machine checks.
