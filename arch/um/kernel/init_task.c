@@ -3,6 +3,7 @@
  * Licensed under the GPL
  */
 
+#include "linux/config.h"
 #include "linux/mm.h"
 #include "linux/sched.h"
 #include "linux/init_task.h"
@@ -37,17 +38,16 @@ union thread_union init_thread_union
 __attribute__((__section__(".data.init_task"))) = 
 { INIT_THREAD_INFO(init_task) };
 
-struct task_struct *alloc_task_struct(void){
-	struct task_struct *task;
-
-	task = (struct task_struct *) __get_free_pages(GFP_KERNEL, 2);
-	if(task == NULL) return(NULL);
-	return(task);
+struct task_struct *alloc_task_struct(void)
+{
+	return((struct task_struct *) 
+	       __get_free_pages(GFP_KERNEL, CONFIG_KERNEL_STACK_ORDER));
 }
 
 void unprotect_stack(unsigned long stack)
 {
-	protect_memory(stack, 4 * PAGE_SIZE, 1, 1, 0, 1);
+	protect_memory(stack, (1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE, 
+		       1, 1, 0, 1);
 }
 
 void free_task_struct(struct task_struct *task)
@@ -55,7 +55,7 @@ void free_task_struct(struct task_struct *task)
 	/* free_pages decrements the page counter and only actually frees
 	 * the pages if they are now not accessed by anything.
 	 */
-	free_pages((unsigned long) task, 2);
+	free_pages((unsigned long) task, CONFIG_KERNEL_STACK_ORDER);
 }
 
 /*

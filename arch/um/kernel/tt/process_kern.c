@@ -367,11 +367,14 @@ __uml_setup("jail", jail_setup,
 static void mprotect_kernel_mem(int w)
 {
 	unsigned long start, end;
+	int pages;
 
 	if(!jail || (current == &init_task)) return;
 
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
+
 	start = (unsigned long) current->thread_info + PAGE_SIZE;
-	end = (unsigned long) current->thread_info + PAGE_SIZE * 4;
+	end = (unsigned long) current + PAGE_SIZE * pages;
 	protect_memory(uml_reserved, start - uml_reserved, 1, w, 1, 1);
 	protect_memory(end, high_physmem - end, 1, w, 1, 1);
 
@@ -470,8 +473,10 @@ void clear_singlestep(void *t)
 int start_uml_tt(void)
 {
 	void *sp;
+	int pages;
 
-	sp = (void *) init_task.thread.kernel_stack + 2 * PAGE_SIZE - 
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+	sp = (void *) init_task.thread.kernel_stack + pages * PAGE_SIZE - 
 		sizeof(unsigned long);
 	return(tracer(start_kernel_proc, sp));
 }
