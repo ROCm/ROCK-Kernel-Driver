@@ -120,6 +120,14 @@ static int via_configure_agp3(void)
 	/* attbase - aperture GATT base */
 	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_ATTBASE,
 		agp_bridge->gatt_bus_addr & 0xfffff000);
+
+	/* 1. Enable GTLB in RX90<7>, all AGP aperture access needs to fetch 
+	 *    translation table first.
+	 * 2. Enable AGP aperture in RX91<0>. This bit controls the enabling of the
+	 *    graphics AGP aperture for the AGP3.0 port.
+	 */
+	pci_read_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp | (3<<7));		
 	return 0;
 }
 
