@@ -193,11 +193,11 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	if (rc == 0) {
 		server->secMode = pSMBr->SecurityMode;	
 		server->secType = NTLM; /* BB override default for NTLMv2 or krb*/
-        /* one byte - no need to convert this or EncryptionKeyLen from le,*/
+		/* one byte - no need to convert this or EncryptionKeyLen from le,*/
 		server->maxReq = le16_to_cpu(pSMBr->MaxMpxCount);
 		/* probably no need to store and check maxvcs */
 		server->maxBuf =
-		    min(le32_to_cpu(pSMBr->MaxBufferSize),
+			min(le32_to_cpu(pSMBr->MaxBufferSize),
 			(__u32) CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE);
 		server->maxRw = le32_to_cpu(pSMBr->MaxRawSize);
 		cFYI(0, ("Max buf = %d ", ses->server->maxBuf));
@@ -245,7 +245,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 							 pSMBr->ByteCount -
 							 16, &server->secType);
 			}
-
 		} else
 			server->capabilities &= ~CAP_EXTENDED_SECURITY;
 		if(sign_CIFS_PDUs == FALSE) {        
@@ -351,8 +350,8 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
 
-        if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-                pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (rc) {
 		up(&ses->sesSem);
@@ -627,9 +626,9 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	if (rc)
 		return rc;
 
-        /* tcon and ses pointer are checked in smb_init */
-        if (tcon->ses->server == NULL)
-                return -ECONNABORTED;
+	/* tcon and ses pointer are checked in smb_init */
+	if (tcon->ses->server == NULL)
+		return -ECONNABORTED;
 
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = netfid;
@@ -2526,7 +2525,7 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	if (pSMB)
 		buf_release(pSMB);
 
- 	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
 		since file handle passed in no longer valid */
 
 	return rc;

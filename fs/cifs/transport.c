@@ -251,8 +251,12 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		} else {
 			cFYI(1,("No response buffer"));
 			if(midQ->midState == MID_REQUEST_SUBMITTED) {
+				if(ses->server->tcpStatus == CifsExiting)
+					rc = -EHOSTDOWN;
+				else {
 				ses->server->tcpStatus = CifsNeedReconnect;
 				midQ->midState = MID_RETRY_NEEDED;
+				}
 			}
 
 			if(midQ->midState == MID_RETRY_NEEDED) {

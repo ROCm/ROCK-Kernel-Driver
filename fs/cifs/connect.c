@@ -347,8 +347,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			}
 		}
 	}
-	/* BB add code to lock SMB sessions while releasing */
-        server->tsk = NULL;
+   
+	server->tcpStatus = CifsExiting;
+	server->tsk = NULL;
 	if(server->ssocket) {
 		sock_release(csocket);
 		server->ssocket = NULL;
@@ -370,12 +371,21 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			}
 		}
 		kfree(server);
-	} else	/* BB need to more gracefully handle the rare negative session 
-			   response case because response will be still outstanding */
-		cERROR(1, ("Active MIDs in queue while exiting - can not delete mid_q_entries or TCP_Server_Info structure due to pending requests MEMORY LEAK!!"));
-	/* BB wake up waitors, and/or wait and/or free stale mids and try again? BB */
-	/* BB Need to fix bug in error path above - perhaps wait until smb requests
-   time out and then free the tcp per server struct BB */
+	} else {
+		spin_lock(&GlobalMid_Lock);
+		list_for_each(tmp, &server->pending_mid_q) {
+		mid_entry = list_entry(tmp, struct mid_q_entry, qhead);
+			if ((mid_entry->mid == smb_buffer->Mid) && (mid_entry->midState == MID_REQUEST_SUBMITTED)) {
+				cFYI(1,
+					 (" Clearing Mid 0x%x - waking up ",mid_entry->mid));
+				task_to_wake = mid_entry->tsk;
+				if(task_to_wake) {
+					wake_up_process(task_to_wake);
+				}
+			}
+		}
+		spin_unlock(&GlobalMid_Lock);
+	}
 	read_unlock(&GlobalSMBSeslock);
 
 	cFYI(1, ("About to exit from demultiplex thread"));

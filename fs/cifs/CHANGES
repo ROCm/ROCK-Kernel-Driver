@@ -1,3 +1,9 @@
+Version 1.00
+------------
+Gracefully clean up failed mounts when attempting to mount to servers such as
+Windows 98 that terminate tcp sessions during prototocol negotiation.  Handle
+embedded commas in mount parsing of passwords.
+
 Version 0.99
 ------------
 Invalidate local inode cached pages on oplock break and when last file
