@@ -382,6 +382,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
 			longhaul_version=1;
+			/* Note, this is not a typo, early Samuel2's had Samuel1 ratios. */
 			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
