@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 58 $
+ *              $Revision: 59 $
  *
  *****************************************************************************/
 
@@ -64,7 +64,7 @@ acpi_ex_check_object_type (
 		return (AE_OK);
 	}
 
-	if (type_needed == INTERNAL_TYPE_REFERENCE) {
+	if (type_needed == ACPI_TYPE_LOCAL_REFERENCE) {
 		/*
 		 * Allow the AML "Constant" opcodes (Zero, One, etc.) to be reference
 		 * objects and thus allow them to be targets.  (As per the ACPI
@@ -183,14 +183,14 @@ acpi_ex_resolve_operands (
 
 			/* Check for bad acpi_object_type */
 
-			if (!acpi_ex_validate_object_type (object_type)) {
+			if (!acpi_ut_valid_object_type (object_type)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Bad operand object type [%X]\n",
 					object_type));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 			}
 
-			if (object_type == (u8) INTERNAL_TYPE_REFERENCE) {
+			if (object_type == (u8) ACPI_TYPE_LOCAL_REFERENCE) {
 				/*
 				 * Decode the Reference
 				 */
@@ -267,13 +267,13 @@ acpi_ex_resolve_operands (
 		case ARGI_FIXED_TARGET:         /* No implicit conversion before store to target */
 		case ARGI_SIMPLE_TARGET:        /* Name, Local, or Arg - no implicit conversion  */
 
-			/* Need an operand of type INTERNAL_TYPE_REFERENCE */
+			/* Need an operand of type ACPI_TYPE_LOCAL_REFERENCE */
 
 			if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) /* Node (name) ptr OK as-is */ {
 				goto next_operand;
 			}
 
-			status = acpi_ex_check_object_type (INTERNAL_TYPE_REFERENCE,
+			status = acpi_ex_check_object_type (ACPI_TYPE_LOCAL_REFERENCE,
 					  object_type, obj_desc);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
@@ -300,7 +300,7 @@ acpi_ex_resolve_operands (
 			 * -- All others must be resolved below.
 			 */
 			if ((opcode == AML_STORE_OP) &&
-				(ACPI_GET_OBJECT_TYPE (*stack_ptr) == INTERNAL_TYPE_REFERENCE) &&
+				(ACPI_GET_OBJECT_TYPE (*stack_ptr) == ACPI_TYPE_LOCAL_REFERENCE) &&
 				((*stack_ptr)->reference.opcode == AML_INDEX_OP)) {
 				goto next_operand;
 			}
@@ -351,13 +351,6 @@ acpi_ex_resolve_operands (
 			/* Need an operand of type ACPI_TYPE_REGION */
 
 			type_needed = ACPI_TYPE_REGION;
-			break;
-
-		case ARGI_IF:   /* If */
-
-			/* Need an operand of type INTERNAL_TYPE_IF */
-
-			type_needed = INTERNAL_TYPE_IF;
 			break;
 
 		case ARGI_PACKAGE:   /* Package */
@@ -502,7 +495,7 @@ acpi_ex_resolve_operands (
 			case ACPI_TYPE_PACKAGE:
 			case ACPI_TYPE_STRING:
 			case ACPI_TYPE_BUFFER:
-			case INTERNAL_TYPE_REFERENCE:
+			case ACPI_TYPE_LOCAL_REFERENCE:
 
 				/* Valid operand */
 				break;

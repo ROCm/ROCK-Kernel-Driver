@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdisasm.h - AML disassembler
- *       $Revision: 3 $
+ *       $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -106,10 +106,6 @@ acpi_dm_validate_name (
 u32
 acpi_dm_dump_name (
 	char                    *name);
-
-void
-acpi_dm_string (
-	char                    *string);
 
 void
 acpi_dm_unicode (

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 89 $
+ *              $Revision: 92 $
  *
  ******************************************************************************/
 
@@ -37,14 +37,15 @@
  * FUNCTION:    Acpi_ns_search_node
  *
  * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
- *              *Node               - Starting table where search will begin
+ *              *Node               - Starting node where search will begin
  *              Type                - Object type to match
  *              **Return_node       - Where the matched Named obj is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Search a single namespace table.  Performs a simple search,
- *              does not add entries or search parents.
+ * DESCRIPTION: Search a single level of the namespace.  Performs a
+ *              simple search of the specified level, and does not add
+ *              entries or search parents.
  *
  *
  *      Named object lists are built (and subsequently dumped) in the
@@ -77,7 +78,7 @@ acpi_ns_search_node (
 
 		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s [%p] For %4.4s (type %s)\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s [%p] For %4.4s (%s)\n",
 				scope_name, node, (char *) &target_name, acpi_ut_get_type_name (type)));
 
 			ACPI_MEM_FREE (scope_name);
@@ -86,8 +87,8 @@ acpi_ns_search_node (
 #endif
 
 	/*
-	 * Search for name in this table, which is to say that we must search
-	 * for the name among the children of this object
+	 * Search for name at this namespace level, which is to say that we
+	 * must search for the name among the children of this object
 	 */
 	next_node = node->child;
 	while (next_node) {
@@ -95,30 +96,8 @@ acpi_ns_search_node (
 
 		if (next_node->name.integer == target_name) {
 			/*
-			 * Found matching entry.  Capture the type if appropriate, before
-			 * returning the entry.
-			 *
-			 * The Def_field_defn and Bank_field_defn cases are actually looking up
-			 * the Region in which the field will be defined
+			 * Found matching entry.
 			 */
-			if ((INTERNAL_TYPE_FIELD_DEFN == type) ||
-				(INTERNAL_TYPE_BANK_FIELD_DEFN == type)) {
-				type = ACPI_TYPE_REGION;
-			}
-
-			/*
-			 * Scope, Def_any, and Index_field_defn are bogus "types" which do not
-			 * actually have anything to do with the type of the name being
-			 * looked up.  For any other value of Type, if the type stored in
-			 * the entry is Any (i.e. unknown), save the actual type.
-			 */
-			if (type != INTERNAL_TYPE_SCOPE &&
-				type != INTERNAL_TYPE_DEF_ANY &&
-				type != INTERNAL_TYPE_INDEX_FIELD_DEFN &&
-				next_node->type == ACPI_TYPE_ANY) {
-				next_node->type = (u8) type;
-			}
-
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Name %4.4s Type [%s] found at %p\n",
 				(char *) &target_name, acpi_ut_get_type_name (next_node->type), next_node));
@@ -142,7 +121,7 @@ acpi_ns_search_node (
 		next_node = next_node->peer;
 	}
 
-	/* Searched entire table, not found */
+	/* Searched entire namespace level, not found */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Name %4.4s Type [%s] not found at %p\n",
 		(char *) &target_name, acpi_ut_get_type_name (type), next_node));
@@ -156,14 +135,14 @@ acpi_ns_search_node (
  * FUNCTION:    Acpi_ns_search_parent_tree
  *
  * PARAMETERS:  *Target_name        - Ascii ACPI name to search for
- *              *Node               - Starting table where search will begin
+ *              *Node               - Starting node where search will begin
  *              Type                - Object type to match
  *              **Return_node       - Where the matched Named Obj is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Called when a name has not been found in the current namespace
- *              table.  Before adding it or giving up, ACPI scope rules require
+ *              level.  Before adding it or giving up, ACPI scope rules require
  *              searching enclosing scopes in cases identified by Acpi_ns_local().
  *
  *              "A name is located by finding the matching name in the current
@@ -193,22 +172,19 @@ acpi_ns_search_parent_tree (
 	parent_node = acpi_ns_get_parent_node (node);
 
 	/*
-	 * If there is no parent (at the root) or type is "local", we won't be
-	 * searching the parent tree.
+	 * If there is no parent (i.e., we are at the root) or
+	 * type is "local", we won't be searching the parent tree.
 	 */
-	if ((acpi_ns_local (type)) ||
-		(!parent_node)) {
-		if (!parent_node) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] has no parent\n",
-				(char *) &target_name));
-		}
+	if (!parent_node) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] has no parent\n",
+			(char *) &target_name));
+		 return_ACPI_STATUS (AE_NOT_FOUND);
+	}
 
-		if (acpi_ns_local (type)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"[%4.4s] type [%s] must be local to this scope (no parent search)\n",
-				(char *) &target_name, acpi_ut_get_type_name (type)));
-		}
-
+	if (acpi_ns_local (type)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+			"[%4.4s] type [%s] must be local to this scope (no parent search)\n",
+			(char *) &target_name, acpi_ut_get_type_name (type)));
 		return_ACPI_STATUS (AE_NOT_FOUND);
 	}
 
@@ -251,8 +227,8 @@ acpi_ns_search_parent_tree (
  *
  * PARAMETERS:  Target_name         - Ascii ACPI name to search for (4 chars)
  *              Walk_state          - Current state of the walk
- *              *Node               - Starting table where search will begin
- *              Interpreter_mode    - Add names only in MODE_Load_pass_x.
+ *              *Node               - Starting node where search will begin
+ *              Interpreter_mode    - Add names only in ACPI_MODE_LOAD_PASS_x.
  *                                    Otherwise,search only.
  *              Type                - Object type to match
  *              Flags               - Flags describing the search restrictions
@@ -260,12 +236,12 @@ acpi_ns_search_parent_tree (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Search for a name segment in a single name table,
+ * DESCRIPTION: Search for a name segment in a single namespace level,
  *              optionally adding it if it is not found.  If the passed
  *              Type is not Any and the type previously stored in the
  *              entry was Any (i.e. unknown), update the stored type.
  *
- *              In IMODE_EXECUTE, search only.
+ *              In ACPI_IMODE_EXECUTE, search only.
  *              In other modes, search and add if not found.
  *
  ******************************************************************************/
@@ -300,14 +276,12 @@ acpi_ns_search_and_enter (
 	/* Name must consist of printable characters */
 
 	if (!acpi_ut_valid_acpi_name (target_name)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "*** Bad character in name: %08x *** \n",
+		ACPI_REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name: %X\n",
 			target_name));
-
-		ACPI_REPORT_ERROR (("Ns_search_and_enter: Bad character in ACPI Name\n"));
 		return_ACPI_STATUS (AE_BAD_CHARACTER);
 	}
 
-	/* Try to find the name in the table specified by the caller */
+	/* Try to find the name in the namespace level specified by the caller */
 
 	*return_node = ACPI_ENTRY_NOT_FOUND;
 	status = acpi_ns_search_node (target_name, node, type, return_node);
@@ -340,7 +314,7 @@ acpi_ns_search_and_enter (
 	if ((interpreter_mode != ACPI_IMODE_LOAD_PASS1) &&
 		(flags & ACPI_NS_SEARCH_PARENT)) {
 		/*
-		 * Not found in table - search parent tree according
+		 * Not found at this level - search parent tree according
 		 * to ACPI specification
 		 */
 		status = acpi_ns_search_parent_tree (target_name, node,

@@ -21,6 +21,12 @@ if [ "$CONFIG_X86" = "y" ]; then
          tristate '  Button' CONFIG_ACPI_BUTTON
          tristate '  Fan' CONFIG_ACPI_FAN
          tristate '  Processor'	CONFIG_ACPI_PROCESSOR
+         if [ "$CONFIG_ACPI_PROCESSOR" != "n" ]; then
+            bool '     Processor Performance States' CONFIG_ACPI_PROCESSOR_PERF
+            if [ "$CONFIG_CPU_FREQ" != "y" ]; then
+               define_bool CONFIG_CPU_FREQ $CONFIG_ACPI_PROCESSOR_PERF
+            fi
+         fi
          dep_tristate '  Thermal Zone' CONFIG_ACPI_THERMAL $CONFIG_ACPI_PROCESSOR
          if [ "$CONFIG_NUMA" = "y" ]; then
             dep_bool '  NUMA support' CONFIG_ACPI_NUMA $CONFIG_NUMA
