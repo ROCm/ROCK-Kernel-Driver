@@ -429,8 +429,6 @@ static inline int pci_map_cont(struct scatterlist *sg, int start, int stopat,
 	return __pci_map_cont(sg, start, stopat, sout, pages);
 }
 		
-#define PCI_NO_MERGE 0
-		
 /*
  * DMA map all entries in a scatterlist.
  * Merge chunks that have page aligned sizes into a continuous mapping. 
@@ -463,7 +461,7 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 			struct scatterlist *ps = &sg[i-1];
 			/* Can only merge when the last chunk ends on a page 
 			   boundary. */
-			if (PCI_NO_MERGE || !need || (i-1 > start && ps->offset) ||
+			if (!force_iommu || !need || (i-1 > start && ps->offset) ||
 			    (ps->offset + ps->length) % PAGE_SIZE) { 
 				if (pci_map_cont(sg, start, i, sg+out, pages, 
 						 need) < 0)

@@ -1170,35 +1170,6 @@ sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
-asmlinkage long sys_utimes(char *, struct timeval *);
-
-asmlinkage long
-sys32_utimes(char *filename, struct compat_timeval *tvs)
-{
-	char *kfilename;
-	struct timeval ktvs[2];
-	mm_segment_t old_fs;
-	int ret;
-
-	kfilename = getname(filename);
-	ret = PTR_ERR(kfilename);
-	if (!IS_ERR(kfilename)) {
-		if (tvs) {
-			if (get_tv32(&ktvs[0], tvs) ||
-			    get_tv32(&ktvs[1], 1+tvs))
-				return -EFAULT;
-		}
-
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = sys_utimes(kfilename, &ktvs[0]);
-		set_fs(old_fs);
-
-		putname(kfilename);
-	}
-	return ret;
-}
-
 /* These are here just in case some old ia32 binary calls it. */
 asmlinkage long
 sys32_pause(void)
@@ -2025,6 +1996,17 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	set_fs(oldfs); 
 	
 	return err; 
+} 
+
+extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
+
+long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high, 
+			__u32 len_low, __u32 len_high, int advice)
+{ 
+	return sys_fadvise64_64(fd,
+			       (((u64)offset_high)<<32) | offset_low,
+			       (((u64)len_high)<<32) | len_low,
+			       advice); 
 } 
 
 long sys32_vm86_warning(void)

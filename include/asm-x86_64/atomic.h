@@ -195,7 +195,7 @@ __asm__ __volatile__(LOCK "andl %0,%1" \
 
 #define atomic_set_mask(mask, addr) \
 __asm__ __volatile__(LOCK "orl %0,%1" \
-: : "r" ((unsigned)mask),"m" (*addr) : "memory")
+: : "r" ((unsigned)mask),"m" (*(addr)) : "memory")
 
 /* Atomic operations are already serializing on x86 */
 #define smp_mb__before_atomic_dec()	barrier()

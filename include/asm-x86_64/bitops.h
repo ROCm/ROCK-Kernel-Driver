@@ -270,7 +270,7 @@ static __inline__ int variable_test_bit(int nr, volatile const void * addr)
  * Returns the bit-number of the first zero bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_zero_bit(void * addr, unsigned size)
+static __inline__ int find_first_zero_bit(const unsigned long * addr, unsigned size)
 {
 	int d0, d1, d2;
 	int res;
@@ -299,7 +299,7 @@ static __inline__ int find_first_zero_bit(void * addr, unsigned size)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
+static __inline__ int find_next_zero_bit (const unsigned long * addr, int size, int offset)
 {
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long set = 0;
@@ -321,7 +321,7 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
 	/*
 	 * No zero yet, search remaining full words for a zero
 	 */
-	res = find_first_zero_bit (p, size - 64 * (p - (unsigned long *) addr));
+	res = find_first_zero_bit ((const unsigned long *)p, size - 64 * (p - (unsigned long *) addr));
 	return (offset + set + res);
 }
 
@@ -334,7 +334,7 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
  * Returns the bit-number of the first set bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_bit(void * addr, unsigned size)
+static __inline__ int find_first_bit(const unsigned long * addr, unsigned size)
 {
 	int d0, d1;
 	int res;
@@ -361,7 +361,7 @@ static __inline__ int find_first_bit(void * addr, unsigned size)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_bit(void * addr, int size, int offset)
+static __inline__ int find_next_bit(const unsigned long * addr, int size, int offset)
 {
 	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
@@ -382,7 +382,7 @@ static __inline__ int find_next_bit(void * addr, int size, int offset)
 	/*
 	 * No set bit yet, search remaining full words for a bit
 	 */
-	res = find_first_bit (p, size - 32 * (p - (unsigned int *) addr));
+	res = find_first_bit ((const unsigned long *)p, size - 32 * (p - (unsigned int *) addr));
 	return (offset + set + res);
 }
 
@@ -442,7 +442,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
 
 #ifdef __KERNEL__
 
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	if (b[0])
 		return __ffs(b[0]);

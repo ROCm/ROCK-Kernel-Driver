@@ -9,6 +9,7 @@
 	#include <asm/current.h>
 	#include <asm/offset.h>
 	#include <asm/thread_info.h>
+	#include <asm/cpufeature.h>
 
 /* Standard copy_to_user with segment limit checking */		
 	.globl copy_to_user
@@ -20,7 +21,23 @@ copy_to_user:
 	jc  bad_to_user
 	cmpq threadinfo_addr_limit(%rax),%rcx
 	jae bad_to_user
-	jmp copy_user_generic
+2:	
+	.byte 0xe9	/* 32bit jump */
+	.long .Lcug-1f
+1:
+
+	.section .altinstr_replacement,"ax"
+3:	.byte 0xe9			/* replacement jmp with 8 bit immediate */
+	.long copy_user_generic_c-1b	/* offset */
+	.previous
+	.section .altinstructions,"a"
+	.align 8
+	.quad  2b
+	.quad  3b
+	.byte  X86_FEATURE_K8_C
+	.byte  5
+	.byte  5
+	.previous
 
 /* Standard copy_from_user with segment limit checking */	
 	.globl copy_from_user
@@ -46,6 +63,7 @@ bad_to_user:
 	ret
 	.previous
 	
+		
 /*
  * copy_user_generic - memory copy with exception handling.
  * 	
@@ -60,9 +78,22 @@ bad_to_user:
 	.globl copy_user_generic	
 	.p2align 4
 copy_user_generic:	
-	/* Put the first cacheline into cache. This should handle
-	   the small movements in ioctls etc., but not penalize the bigger
-	   filesystem data copies too much. */
+	.byte 0x66,0x66,0x90	/* 5 byte nop for replacement jump */	
+	.byte 0x66,0x90
+1:		
+	.section .altinstr_replacement,"ax"
+2:	.byte 0xe9	             /* near jump with 32bit immediate */
+	.long copy_user_generic_c-1b /* offset */
+	.previous
+	.section .altinstructions,"a"
+	.align 8
+	.quad  copy_user_generic
+	.quad  2b
+	.byte  X86_FEATURE_K8_C
+	.byte  5
+	.byte  5
+	.previous
+.Lcug:	
 	pushq %rbx
 	xorl %eax,%eax		/*zero for the exception handler */
 
@@ -232,3 +263,34 @@ copy_user_generic:
 .Le_zero:		
 	movq %rdx,%rax
 	jmp .Lende
+
+	/* C stepping K8 run faster using the string copy instructions.
+	   This is also a lot simpler. Use them when possible.
+	   Patch in jmps to this code instead of copying it fully
+	   to avoid unwanted aliasing in the exception tables. */
+		
+ /* rdi	destination
+  * rsi source
+  * rdx count
+  *
+  * Output:		
+  * eax uncopied bytes or 0 if successfull.
+  */			
+copy_user_generic_c:
+	movl %edx,%ecx
+	shrl $3,%ecx
+	andl $7,%edx	
+1:	rep 
+	movsq 
+	movl %edx,%ecx
+2:	rep
+	movsb
+4:	movl %ecx,%eax
+	ret
+3:	lea (%rdx,%rcx,8),%rax
+	ret
+	
+	.section __ex_table,"a"
+	.quad 1b,3b
+	.quad 2b,4b
+	.previous

@@ -277,6 +277,7 @@
 #define __NR_ia32_fstatfs64		269
 #define __NR_ia32_tgkill		270
 #define __NR_ia32_utimes		271
+#define __NR_ia32_fadvise64_64		272
 
 #define IA32_NR_syscalls 275	/* must be > than biggest syscall! */	
 

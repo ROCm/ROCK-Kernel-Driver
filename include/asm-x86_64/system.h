@@ -126,6 +126,17 @@ extern void load_gs_index(unsigned);
 		:"r" ((unsigned long) value))
 
 
+#ifdef __KERNEL__
+struct alt_instr { 
+	__u8 *instr; 		/* original instruction */
+	__u8 *replacement;
+	__u8  cpuid;		/* cpuid bit set for replacement */
+	__u8  instrlen;		/* length of original instruction */
+	__u8  replacementlen; 	/* length of new instruction, <= instrlen */ 
+	__u8  pad[5];
+}; 
+#endif
+
 /*
  * Clear and set 'TS' bit respectively
  */
