@@ -255,7 +255,7 @@ static inline struct zone *next_zone(struct zone *zone)
 #define MAX_NR_MEMBLKS	1
 #endif /* CONFIG_NUMA */
 
-#include <asm/topology.h>
+#include <linux/topology.h>
 /* Returns the number of the current Node. */
 #define numa_node_id()		(cpu_to_node(smp_processor_id()))
 
