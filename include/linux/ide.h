@@ -796,7 +796,7 @@ typedef struct hwif_s {
 	struct pci_dev  *pci_dev;	/* for pci chipsets */
 	struct ide_pci_device_s	*cds;	/* chipset device struct */
 
-	ide_startstop_t (*rw_disk)(ide_drive_t *, struct request *, sector_t);
+	void (*rw_disk)(ide_drive_t *, struct request *);
 
 #if 0
 	ide_hwif_ops_t	*hwifops;
@@ -933,9 +933,9 @@ typedef struct hwgroup_s {
 		/* BOOL: protects all fields below */
 	volatile int busy;
 		/* BOOL: wake us up on timer expiry */
-	int sleeping	: 1;
+	unsigned int sleeping	: 1;
 		/* BOOL: polling active & poll_timeout field valid */
-	int polling	: 1;
+	unsigned int polling	: 1;
 		/* current drive */
 	ide_drive_t *drive;
 		/* ptr to current hwif in linked-list */
@@ -1318,7 +1318,6 @@ extern int set_transfer(ide_drive_t *, ide_task_t *);
 extern int taskfile_lib_get_identify(ide_drive_t *drive, u8 *);
 
 extern int ide_wait_not_busy(ide_hwif_t *hwif, unsigned long timeout);
-ide_startstop_t __ide_do_rw_disk(ide_drive_t *drive, struct request *rq, sector_t block);
 
 /*
  * ide_stall_queue() can be used by a drive to give excess bandwidth back

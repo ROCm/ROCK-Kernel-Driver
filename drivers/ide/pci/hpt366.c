@@ -1018,32 +1018,25 @@ static void hpt372n_set_clock(ide_drive_t *drive, int mode)
 }
 
 /**
- *	hpt372n_rw_disk		-	wrapper for I/O
+ *	hpt372n_rw_disk		-	prepare for I/O
  *	@drive: drive for command
  *	@rq: block request structure
- *	@block: block number
  *
- *	This is called when a disk I/O is issued to the 372N instead
- *	of the default functionality. We need it because of the clock
- *	switching
- *
+ *	This is called when a disk I/O is issued to the 372N.
+ *	We need it because of the clock switching.
  */
- 
-static ide_startstop_t hpt372n_rw_disk(ide_drive_t *drive, struct request *rq, sector_t block)
+
+static void hpt372n_rw_disk(ide_drive_t *drive, struct request *rq)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	int wantclock;
-	
-	if(rq_data_dir(rq) == READ)
-		wantclock = 0x21;
-	else
-		wantclock = 0x23;
-		
-	if(HWIF(drive)->config_data != wantclock)
-	{
+
+	wantclock = rq_data_dir(rq) ? 0x23 : 0x21;
+
+	if (hwif->config_data != wantclock) {
 		hpt372n_set_clock(drive, wantclock);
-		HWIF(drive)->config_data = wantclock;
+		hwif->config_data = wantclock;
 	}
-	return __ide_do_rw_disk(drive, rq, block);
 }
 
 /*
