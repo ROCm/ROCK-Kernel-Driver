@@ -473,6 +473,11 @@ struct input_absinfo {
 #define KEY_TEEN		0x19e
 #define KEY_TWEN		0x19f
 
+#define KEY_DEL_EOL		0x1c0
+#define KEY_DEL_EOS		0x1c1
+#define KEY_INS_LINE		0x1c2
+#define KEY_DEL_LINE		0x1c3
+
 #define KEY_MAX			0x1ff
 
 /*
