@@ -165,11 +165,6 @@
  * addresses:
  */
 
-/*
- * Given a pointer to an mem_map[] entry, return the kernel virtual
- * address corresponding to that page.
- */
-#define page_address(page)	((page)->virtual)
 
 /* Quick test to see if ADDR is a (potentially) valid physical address. */
 static inline long

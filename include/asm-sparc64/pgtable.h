@@ -243,8 +243,7 @@ extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 #define pte_mkold(pte)		(__pte(((pte_val(pte)<<1UL)>>1UL) & ~_PAGE_ACCESSED))
 
 /* Permanent address of a page. */
-#define __page_address(page)	((page)->virtual)
-#define page_address(page)	({ __page_address(page); })
+#define __page_address(page)	page_address(page)
 
 #define pte_page(x) (mem_map+(((pte_val(x)&_PAGE_PADDR)-phys_base)>>PAGE_SHIFT))
 

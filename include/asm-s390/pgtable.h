@@ -239,10 +239,6 @@ extern inline void set_pte(pte_t *pteptr, pte_t pteval)
 	*pteptr = pteval;
 }
 
-/*
- * Permanent address of a page.
- */
-#define page_address(page) ((page)->virtual)
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
 /*

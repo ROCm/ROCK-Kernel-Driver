@@ -208,11 +208,6 @@ extern unsigned long empty_zero_page[1024];
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
 
-/*
- * Permanent address of a page. Obviously must never be
- * called on a highmem page.
- */
-#define page_address(page)  ((page)->virtual) /* P1 address of the page */
 #define pages_to_mb(x)	((x) >> (20-PAGE_SHIFT))
 #define pte_page(x) 	phys_to_page(pte_val(x)&PTE_PHYS_MASK)
 

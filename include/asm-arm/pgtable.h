@@ -99,7 +99,6 @@ extern struct page *empty_zero_page;
 /*
  * Permanent address of a page. We never have highmem, so this is trivial.
  */
-#define page_address(page)	((page)->virtual)
 #define pages_to_mb(x)		((x) >> (20 - PAGE_SHIFT))
 
 /*

@@ -370,11 +370,6 @@ extern inline void pgd_clear(pgd_t *pgdp)
 	pgd_val(*pgdp) = ((unsigned long) invalid_pmd_table);
 }
 
-/*
- * Permanent address of a page.  On MIPS64 we never have highmem, so this
- * is simple.
- */
-#define page_address(page)	((page)->virtual)
 #ifndef CONFIG_DISCONTIGMEM
 #define pte_page(x)		(mem_map+(unsigned long)((pte_val(x) >> PAGE_SHIFT)))
 #else

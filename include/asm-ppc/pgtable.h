@@ -389,10 +389,6 @@ extern unsigned long empty_zero_page[1024];
 #define	pmd_present(pmd)	((pmd_val(pmd) & PAGE_MASK) != 0)
 #define	pmd_clear(pmdp)		do { pmd_val(*(pmdp)) = 0; } while (0)
 
-/*
- * Permanent address of a page.
- */
-#define page_address(page)	((page)->virtual)
 #define pte_page(x)		(mem_map+(unsigned long)((pte_val(x)-PPC_MEMSTART) >> PAGE_SHIFT))
 
 #ifndef __ASSEMBLY__

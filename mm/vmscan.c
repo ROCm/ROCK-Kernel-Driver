@@ -59,7 +59,7 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 		return 0;
 
 	/* Don't bother replenishing zones not under pressure.. */
-	if (!memclass(page->zone, classzone))
+	if (!memclass(page_zone(page), classzone))
 		return 0;
 
 	if (TryLockPage(page))
@@ -372,7 +372,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 		if (unlikely(!page_count(page)))
 			continue;
 
-		if (!memclass(page->zone, classzone))
+		if (!memclass(page_zone(page), classzone))
 			continue;
 
 		/* Racy check to avoid trylocking when not worthwhile */
