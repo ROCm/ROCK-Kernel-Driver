@@ -768,7 +768,8 @@ static void __devexit pci_remove_one(struct pci_dev *dev)
 		for (i = 0; i < priv->nr; i++)
 			unregister_serial(priv->line[i]);
 
-		priv->board->init_fn(dev, priv->board, 0);
+		if (priv->board->init_fn)
+			priv->board->init_fn(dev, priv->board, 0);
 
 		pci_disable_device(dev);
 
