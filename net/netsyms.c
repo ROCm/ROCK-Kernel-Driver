@@ -286,15 +286,6 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
 
 
-#ifdef CONFIG_IPV6
-EXPORT_SYMBOL(ipv6_addr_type);
-EXPORT_SYMBOL(icmpv6_send);
-EXPORT_SYMBOL(ndisc_mc_map);
-EXPORT_SYMBOL(register_inet6addr_notifier);
-EXPORT_SYMBOL(unregister_inet6addr_notifier);
-#include <net/ip6_route.h>
-EXPORT_SYMBOL(ip6_route_output);
-#endif
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_KHTTPD) || defined (CONFIG_KHTTPD_MODULE)
 /* inet functions common to v4 and v6 */
 EXPORT_SYMBOL(inet_release);
@@ -399,11 +390,6 @@ extern int sysctl_tcp_tw_recycle;
 #ifdef CONFIG_SYSCTL
 EXPORT_SYMBOL(sysctl_tcp_tw_recycle); 
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
-#endif
-
-#if defined (CONFIG_IPV6_MODULE)
-EXPORT_SYMBOL(secure_tcpv6_sequence_number);
-EXPORT_SYMBOL(secure_ipv6_id);
 #endif
 
 #endif
