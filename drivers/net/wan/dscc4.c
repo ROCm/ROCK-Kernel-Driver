@@ -112,6 +112,11 @@ static const char version[] = "$Id: dscc4.c,v 1.159 2002/04/10 22:05:17 romieu E
 static int debug;
 static int quartz;
 
+#ifdef CONFIG_DSCC4_PCI_RST
+static DECLARE_MUTEX(dscc4_sem);
+static u32 dscc4_pci_config_store[16];
+#endif
+
 #define	DRV_NAME	"dscc4"
 
 #undef DSCC4_POLLING
@@ -263,6 +268,10 @@ struct dscc4_dev_priv {
 #define IMR     0x54
 #define ISR     0x58
 
+#define GPDIR	0x0400
+#define GPDATA	0x0404
+#define GPIM	0x0408
+
 /* Bit masks */
 #define EncodingMask	0x00700000
 #define CrcMask		0x00000003
@@ -328,10 +337,13 @@ struct dscc4_dev_priv {
 #define Arf		0x00000002
 #define ArAck		0x00000001
 
-/* Misc */
+/* State flags */
+#define Ready		0x00000000
 #define NeedIDR		0x00000001
 #define NeedIDT		0x00000002
 #define RdoSet		0x00000004
+#define FakeReset	0x00000008
+
 /* Don't mask RDO. Ever. */
 #ifdef DSCC4_POLLING
 #define EventsMask	0xfffeef7f
@@ -581,15 +593,18 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
-/* Requires protection against interrupt */
 static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&dpriv->pci_priv->lock, flags);
 	/* Cf errata DS5 p.6 */
 	writel(0x00000000, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
 	scc_patchl(PowerUp, 0, dpriv, dev, CCR0);
 	readl(dev->base_addr + CH0LRDA + dpriv->dev_id*4);
 	writel(MTFi|Rdr, dev->base_addr + dpriv->dev_id*0x0c + CH0CFG);
 	writel(Action, dev->base_addr + GCMDR);
+	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
 }
 
 static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
@@ -893,6 +908,10 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
+		if (dscc4_init_ring(d)) {
+			unregister_hdlc_device(hdlc);
+			goto err_unregister;
+		}
 	}
 	if (dscc4_set_quartz(root, quartz) < 0)
 		goto err_unregister;
@@ -902,8 +921,10 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	return 0;
 
 err_unregister:
-	while (--i >= 0)
+	while (--i >= 0) {
+		dscc4_release_ring(root + i);
 		unregister_hdlc_device(&root[i].hdlc);
+	}
 	kfree(ppriv);
 err_free_dev:
 	kfree(root);
@@ -942,6 +963,46 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
 	return 0;
 }
 
+#ifdef CONFIG_DSCC4_PCI_RST
+/*
+ * Some DSCC4-based cards wires the GPIO port and the PCI #RST pin together
+ * so as to provide a safe way to reset the asic while not the whole machine
+ * rebooting.
+ *
+ * This code doesn't need to be efficient. Keep It Simple
+ */
+static void dscc4_pci_reset(struct pci_dev *pdev, u32 ioaddr)
+{
+	int i;
+
+	down(&dscc4_sem);
+	for (i = 0; i < 16; i++)
+		pci_read_config_dword(pdev, i << 2, dscc4_pci_config_store + i);
+
+	/* Maximal LBI clock divider (who cares ?) and whole GPIO range. */
+	writel(0x001c0000, ioaddr + GMODE);
+	/* Configure GPIO port as output */
+	writel(0x0000ffff, ioaddr + GPDIR);
+	/* Disable interruption */
+	writel(0x0000ffff, ioaddr + GPIM);
+
+	writel(0x0000ffff, ioaddr + GPDATA);
+	writel(0x00000000, ioaddr + GPDATA);
+
+	/* Flush posted writes */
+	readl(ioaddr + GSTAR);
+
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(10);
+
+	for (i = 0; i < 16; i++)
+		pci_write_config_dword(pdev, i << 2, dscc4_pci_config_store[i]);
+	up(&dscc4_sem);
+}
+#else
+#define dscc4_pci_reset(pdev,ioaddr)	do {} while (0)
+#endif /* CONFIG_DSCC4_PCI_RST */
+
 static int dscc4_open(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
@@ -957,8 +1018,23 @@ static int dscc4_open(struct net_device *dev)
 
 	ppriv = dpriv->pci_priv;
 
-	if ((ret = dscc4_init_ring(dev)))
-		goto err_out;
+	/*
+	 * Due to various bugs, there is no way to reliably reset a
+	 * specific port (manufacturer's dependant special PCI #RST wiring
+	 * apart: it affects all ports). Thus the device goes in the best
+	 * silent mode possible at dscc4_close() time and simply claims to
+	 * be up if it's opened again. It still isn't possible to change
+	 * the HDLC configuration without rebooting but at least the ports
+	 * can be up/down ifconfig'ed without killing the host.
+	 */
+	if (dpriv->flags & FakeReset) {
+		dpriv->flags &= ~FakeReset;
+		scc_patchl(0, PowerUp, dpriv, dev, CCR0);
+		scc_patchl(0, 0x00050000, dpriv, dev, CCR2);
+		scc_writel(EventsMask, dpriv, dev, IMR);
+		printk(KERN_INFO "%s: up again.\n", dev->name);
+		goto done;
+	}
 
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
@@ -975,7 +1051,7 @@ static int dscc4_open(struct net_device *dev)
 	if (scc_readl_star(dpriv, dev) & SccBusy) {
 		printk(KERN_ERR "%s busy. Try later\n", dev->name);
 		ret = -EAGAIN;
-		goto err_free_ring;
+		goto err_out;
 	} else
 		printk(KERN_INFO "%s: available. Good\n", dev->name);
 
@@ -1002,6 +1078,7 @@ static int dscc4_open(struct net_device *dev)
 	if (debug > 2)
 		dscc4_tx_print(dev, dpriv, "Open");
 
+done:
 	netif_start_queue(dev);
 
         init_timer(&dpriv->timer);
@@ -1072,19 +1149,15 @@ static int dscc4_close(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	hdlc_device *hdlc = dev_to_hdlc(dev);
-	unsigned long flags;
 
 	del_timer_sync(&dpriv->timer);
 	netif_stop_queue(dev);
 
-	spin_lock_irqsave(&dpriv->pci_priv->lock, flags);
-	dscc4_rx_reset(dpriv, dev);
-	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
-
-	dscc4_tx_reset(dpriv, dev);
-
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
+	scc_patchl(0x00050000, 0, dpriv, dev, CCR2);
 	scc_writel(0xffffffff, dpriv, dev, IMR);
+
+	dpriv->flags |= FakeReset;
 
 	hdlc_close(hdlc);
 	dscc4_release_ring(dpriv);
@@ -1228,6 +1301,11 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
+		if (dpriv->flags & FakeReset) {
+			printk(KERN_INFO "%s: please reset the device"
+			       "before this command\n", dev->name);
+			return -EPERM;
+		}
 		if (copy_from_user(&dpriv->settings, line, size))
 			return -EFAULT;
 		ret = dscc4_set_iface(dpriv, dev);
@@ -1878,12 +1956,16 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 	root = ppriv->root;
 
 	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
+
+	dscc4_pci_reset(pdev, ioaddr);
+
 	free_irq(pdev->irq, root);
 	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), ppriv->iqcfg,
 			    ppriv->iqcfg_dma);
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
 
+		dscc4_release_ring(dpriv);
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqrx, dpriv->iqrx_dma);
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
