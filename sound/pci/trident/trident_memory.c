@@ -471,7 +471,7 @@ int snd_trident_synth_bzero(trident_t *trident, snd_util_memblk_t *blk, int offs
 /*
  * copy_from_user(blk + offset, data, size)
  */
-int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk, int offset, const char *data, int size)
+int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk, int offset, const char __user *data, int size)
 {
 	int page, nextofs, end_offset, temp, temp1;
 
