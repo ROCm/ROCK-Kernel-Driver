@@ -47,20 +47,19 @@ struct prio_sched_data
 };
 
 
-struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch,int *r)
+struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch, int *r)
 {
 	struct prio_sched_data *q = (struct prio_sched_data *)sch->data;
 	struct tcf_result res;
 	u32 band;
-	int result = 0;
 
 	band = skb->priority;
 
 	if (TC_H_MAJ(skb->priority) != sch->handle) {
 #ifdef CONFIG_NET_CLS_ACT
-		*r = result = tc_classify(skb, q->filter_list, &res);
+		*r = tc_classify(skb, q->filter_list, &res);
 
-		switch (result) {
+		switch (*r) {
 			case TC_ACT_SHOT:
 			case TC_ACT_STOLEN:
 			case TC_ACT_QUEUED:
@@ -70,22 +69,22 @@ struct Qdisc *prio_classify(struct sk_buff *skb, struct Qdisc *sch,int *r)
 			case TC_ACT_OK:
 			case TC_ACT_UNSPEC:
 			default:
-			break;
+				break;
 		};
 
-		if (!q->filter_list ) {
+		if (!q->filter_list) {
 #else
 		if (!q->filter_list || tc_classify(skb, q->filter_list, &res)) {
 #endif
 			if (TC_H_MAJ(band))
 				band = 0;
-			return q->queues[q->prio2band[band&TC_PRIO_MAX]];
+			return q->queues[q->prio2band[band & TC_PRIO_MAX]];
 		}
 		band = res.classid;
 	}
 	band = TC_H_MIN(band) - 1;
 	if (band > q->bands)
-		return q->queues[q->prio2band[0]];
+		band = q->prio2band[0];
 
 	return q->queues[band];
 }
@@ -112,17 +111,16 @@ prio_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	}
 
 dropped:
+
 #ifdef CONFIG_NET_CLS_ACT
-	if (TC_ACT_SHOT == ret || NET_XMIT_DROP == ret) {
-#endif
-		sch->stats.drops++;
-		return NET_XMIT_DROP;
-#ifdef CONFIG_NET_CLS_ACT
-	} else {
-		sch->stats.overlimits++; /* abuse, but noone uses it */
-		return NET_XMIT_BYPASS; /* we dont want to confuse TCP */
+	if (ret != TC_ACT_SHOT && ret != NET_XMIT_DROP) {
+		sch->stats.overlimits++;	/* abuse, but noone uses it */
+		return NET_XMIT_BYPASS;		/* we dont want to confuse TCP */
 	}
 #endif
+
+	sch->stats.drops++;
+	return NET_XMIT_DROP;
 }
 
 
