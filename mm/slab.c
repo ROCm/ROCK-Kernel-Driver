@@ -914,7 +914,7 @@ static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 		printk("\n");
 	}
 	realobj = (char*)objp+obj_dbghead(cachep);
-	size = cachep->objsize;
+	size = obj_reallen(cachep);
 	for (i=0; i<size && lines;i+=16, lines--) {
 		int limit;
 		limit = 16;
