@@ -101,8 +101,8 @@ relocate:
 	GETSYM(r4, __relocate_start)
 	GETSYM(r5, do_relocate)
 
-	sub	r4,r5,r4	/* Get entry point for do_relocate in
-	add	r6,r6,r4	* relocated section */
+	sub	r4,r5,r4	/* Get entry point for do_relocate in */
+	add	r6,r6,r4	/* relocated section */
 
 	/* This will return to the relocated do_relocate */
 	mtlr	r6
