@@ -3990,8 +3990,8 @@ static void move_task_off_dead_cpu(int dead_cpu, struct task_struct *tsk)
 	__migrate_task(tsk, dead_cpu, dest_cpu);
 }
 
-/* migrate_all_tasks - function to migrate all tasks from the dead cpu. */
-static void migrate_all_tasks(int src_cpu)
+/* Run through task list and migrate tasks from the dead cpu. */
+static void migrate_live_tasks(int src_cpu)
 {
 	struct task_struct *tsk, *t;
 
@@ -4033,6 +4033,47 @@ void sched_idle_next(void)
 
 	spin_unlock_irqrestore(&rq->lock, flags);
 }
+
+static void migrate_dead(unsigned int dead_cpu, task_t *tsk)
+{
+	struct runqueue *rq = cpu_rq(dead_cpu);
+
+	/* Must be exiting, otherwise would be on tasklist. */
+	BUG_ON(tsk->state != TASK_ZOMBIE && tsk->state != TASK_DEAD);
+
+	/* Cannot have done final schedule yet: would have vanished. */
+	BUG_ON(tsk->flags & PF_DEAD);
+
+	get_task_struct(tsk);
+
+	/*
+	 * Drop lock around migration; if someone else moves it,
+	 * that's OK.  No task can be added to this CPU, so iteration is
+	 * fine.
+	 */
+	spin_unlock_irq(&rq->lock);
+	move_task_off_dead_cpu(dead_cpu, tsk);
+	spin_lock_irq(&rq->lock);
+
+	put_task_struct(tsk);
+}
+
+/* release_task() removes task from tasklist, so we won't find dead tasks. */
+static void migrate_dead_tasks(unsigned int dead_cpu)
+{
+	unsigned arr, i;
+	struct runqueue *rq = cpu_rq(dead_cpu);
+
+	for (arr = 0; arr < 2; arr++) {
+		for (i = 0; i < MAX_PRIO; i++) {
+			struct list_head *list = &rq->arrays[arr].queue[i];
+			while (!list_empty(list))
+				migrate_dead(dead_cpu,
+					     list_entry(list->next, task_t,
+							run_list));
+		}
+	}
+}
 #endif /* CONFIG_HOTPLUG_CPU */
 
 /*
@@ -4072,7 +4113,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		cpu_rq(cpu)->migration_thread = NULL;
 		break;
 	case CPU_DEAD:
-		migrate_all_tasks(cpu);
+		migrate_live_tasks(cpu);
 		rq = cpu_rq(cpu);
 		kthread_stop(rq->migration_thread);
 		rq->migration_thread = NULL;
@@ -4081,6 +4122,7 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		deactivate_task(rq->idle, rq);
 		rq->idle->static_prio = MAX_PRIO;
 		__setscheduler(rq->idle, SCHED_NORMAL, 0);
+		migrate_dead_tasks(cpu);
 		task_rq_unlock(rq, &flags);
 		BUG_ON(rq->nr_running != 0);
 
