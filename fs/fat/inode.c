@@ -740,6 +740,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	    SLAB_CTOR_CONSTRUCTOR) {
 		spin_lock_init(&ei->cache_lru_lock);
 		ei->nr_caches = 0;
+		ei->cache_valid_id = FAT_CACHE_VALID + 1;
 		INIT_LIST_HEAD(&ei->cache_lru);
 		INIT_HLIST_NODE(&ei->i_fat_hash);
 		inode_init_once(&ei->vfs_inode);
