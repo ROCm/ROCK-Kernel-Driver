@@ -32,9 +32,11 @@ int mca_register_driver(struct mca_driver *mca_drv)
 {
 	int r;
 
-	mca_drv->driver.bus = &mca_bus_type;
-	if ((r = driver_register(&mca_drv->driver)) < 0)
-		return r;
+	if (MCA_bus) {
+		mca_drv->driver.bus = &mca_bus_type;
+		if ((r = driver_register(&mca_drv->driver)) < 0)
+			return r;
+	}
 
 	return 0;
 }
@@ -42,6 +44,7 @@ EXPORT_SYMBOL(mca_register_driver);
 
 void mca_unregister_driver(struct mca_driver *mca_drv)
 {
-	driver_unregister(&mca_drv->driver);
+	if (MCA_bus)
+		driver_unregister(&mca_drv->driver);
 }
 EXPORT_SYMBOL(mca_unregister_driver);
