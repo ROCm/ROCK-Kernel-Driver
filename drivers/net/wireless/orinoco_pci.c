@@ -6,14 +6,14 @@
  * Specifically here we're talking about the Linksys WMP11
  *
  * Some of this code is borrowed from orinoco_plx.c
- *	Copyright (C) 2001 Daniel Barlow <dan@telent.net>
+ *	Copyright (C) 2001 Daniel Barlow <dan AT telent.net>
  * Some of this code is "inspired" by linux-wlan-ng-0.1.10, but nothing
  * has been copied from it. linux-wlan-ng-0.1.10 is originally :
  *	Copyright (C) 1999 AbsoluteValue Systems, Inc.  All Rights Reserved.
  * This file originally written by:
- *	Copyright (C) 2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *	Copyright (C) 2001 Jean Tourrilhes <jt AT hpl.hp.com>
  * And is now maintained by:
- *	Copyright (C) 2002 David Gibson, IBM Corporation <herme@gibson.dropbear.id.au>
+ *	Copyright (C) 2002 David Gibson, IBM Corporation <herme AT gibson.dropbear.id.au>
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in

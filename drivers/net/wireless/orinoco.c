@@ -3,15 +3,16 @@
  * A driver for Hermes or Prism 2 chipset based PCMCIA wireless
  * adaptors, with Lucent/Agere, Intersil or Symbol firmware.
  *
- * Copyright (C) 2000 David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2000 David Gibson, Linuxcare Australia <hermes AT gibson.dropbear.id.au>
  *	With some help from :
- * Copyright (C) 2001 Jean Tourrilhes, HP Labs <jt@hpl.hp.com>
- * Copyright (C) 2001 Benjamin Herrenschmidt <benh@kernel.crashing.org>
+ * Copyright (C) 2001 Jean Tourrilhes, HP Labs <jt AT hpl.hp.com>
+ * Copyright (C) 2001 Benjamin Herrenschmidt <benh AT kernel.crashing.org>
  *
  * Based on dummy_cs.c 1.27 2000/06/12 21:27:25
  *
- * Portions based on wvlan_cs.c 1.0.6, Copyright Andreas Neuhaus <andy@fasta.fh-dortmund.de>
- *      http://www.fasta.fh-dortmund.de/users/andy/wvlan/
+ * Portions based on wvlan_cs.c 1.0.6, Copyright Andreas Neuhaus <andy
+ * AT fasta.fh-dortmund.de>
+ * http://www.fasta.fh-dortmund.de/users/andy/wvlan/
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -24,7 +25,7 @@
  * limitations under the License.
  *
  * The initial developer of the original code is David A. Hinds
- * <dahinds@users.sourceforge.net>.  Portions created by David
+ * <dahinds AT users.sourceforge.net>.  Portions created by David
  * A. Hinds are Copyright (C) 1999 David A. Hinds.  All Rights
  * Reserved.
  *
@@ -82,7 +83,7 @@
  *	o Clean up RID definitions in hermes.h, other cleanups
  *
  * v0.04b -> v0.04c - 24/4/2001 - Jean II
- *	o Tim Hurley <timster@seiki.bliztech.com> reported a D-Link card
+ *	o Tim Hurley <timster AT seiki.bliztech.com> reported a D-Link card
  *	  with vendor 02 and firmware 0.08. Added in the capabilities...
  *	o Tested Lucent firmware 7.28, everything works...
  *
@@ -106,14 +107,14 @@
  *
  * v0.05c -> v0.05d - 5/5/2001 - Jean II
  *	o Workaround to SNAP decapsulate frame from LinkSys AP
- *	  original patch from : Dong Liu <dliu@research.bell-labs.com>
+ *	  original patch from : Dong Liu <dliu AT research.bell-labs.com>
  *	  (note : the memcmp bug was mine - fixed)
  *	o Remove set_retry stuff, no firmware support it (bloat--).
  *
  * v0.05d -> v0.06 - 25/5/2001 - Jean II
- *		Original patch from "Hong Lin" <alin@redhat.com>,
- *		"Ian Kinner" <ikinner@redhat.com>
- *		and "David Smith" <dsmith@redhat.com>
+ *		Original patch from "Hong Lin" <alin AT redhat.com>,
+ *		"Ian Kinner" <ikinner AT redhat.com>
+ *		and "David Smith" <dsmith AT redhat.com>
  *	o Init of priv->tx_rate_ctrl in firmware specific section.
  *	o Prism2/Symbol rate, upto should be 0xF and not 0x15. Doh !
  *	o Spectrum card always need cor_reset (for every reset)
@@ -137,7 +138,7 @@
  *        wishes to reduce the number of unecessary messages.
  *	o Removed bogus message on CRC error.
  *	o Merged fixeds for v0.08 Prism 2 firmware from William Waghorn
- *	  <willwaghorn@yahoo.co.uk>
+ *	  <willwaghorn AT yahoo.co.uk>
  *	o Slight cleanup/re-arrangement of firmware detection code.
  *
  * v0.06d -> v0.06e - 1/8/2001 - David Gibson
@@ -159,7 +160,7 @@
  * v0.07 -> v0.07a - 1/10/3001 - Jean II
  *	o Add code to read Symbol firmware revision, inspired by latest code
  *	  in Spectrum24 by Lee John Keyser-Allen - Thanks Lee !
- *	o Thanks to Jared Valentine <hidden@xmission.com> for "providing" me
+ *	o Thanks to Jared Valentine <hidden AT xmission.com> for "providing" me
  *	  a 3Com card with a recent firmware, fill out Symbol firmware
  *	  capabilities of latest rev (2.20), as well as older Symbol cards.
  *	o Disable Power Management in newer Symbol firmware, the API 

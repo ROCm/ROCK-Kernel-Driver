@@ -3,7 +3,7 @@
  * Driver for Prism II devices which would usually be driven by orinoco_cs,
  * but are connected to the PCI bus by a PLX9052. 
  *
- * Copyright (C) 2001 Daniel Barlow <dan@telent.net>
+ * Copyright (C) 2001 Daniel Barlow <dan AT telent.net>
  *
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -311,9 +311,9 @@ static struct pci_device_id orinoco_plx_pci_id_table[] = {
 	{0x16ab, 0x1102, PCI_ANY_ID, PCI_ANY_ID,},	/* Linksys WDT11 */
 	{0x16ec, 0x3685, PCI_ANY_ID, PCI_ANY_ID,},	/* USR 2415 */
 	{0xec80, 0xec00, PCI_ANY_ID, PCI_ANY_ID,},	/* Belkin F5D6000 tested by
-							   Brendan W. McAdams <rit@jacked-in.org> */
+							   Brendan W. McAdams <rit AT jacked-in.org> */
 	{0x10b7, 0x7770, PCI_ANY_ID, PCI_ANY_ID,},	/* 3Com AirConnect PCI tested by
-							   Damien Persohn <damien@persohn.net> */
+							   Damien Persohn <damien AT persohn.net> */
 	{0,},
 };
 
