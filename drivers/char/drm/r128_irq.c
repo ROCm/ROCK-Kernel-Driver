@@ -50,6 +50,7 @@ void r128_dma_service( DRM_IRQ_ARGS )
 		R128_WRITE( R128_GEN_INT_STATUS, R128_CRTC_VBLANK_INT_AK );
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
+		DRM(vbl_send_signals)( dev );
 	}
 }
 
@@ -64,7 +65,7 @@ int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
 	 */
 	DRM_WAIT_ON( ret, dev->vbl_queue, 3*DRM_HZ, 
 		     ( ( ( cur_vblank = atomic_read(&dev->vbl_received ) )
-			 + ~*sequence + 1 ) <= (1<<23) ) );
+			 - *sequence ) <= (1<<23) ) );
 
 	*sequence = cur_vblank;
 
