@@ -26,6 +26,7 @@
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
+#include <net/iw_handler.h>
 #include <linux/list.h>
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
@@ -110,6 +111,8 @@ typedef struct {
 	 */
 	struct iw_statistics local_iwstatistics;
 	struct iw_statistics iwstatistics;
+
+	struct iw_spy_data spy_data; /* iwspy support */
 
 	struct islpci_acl acl;
 

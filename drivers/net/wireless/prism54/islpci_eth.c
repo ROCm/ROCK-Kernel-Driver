@@ -1,7 +1,7 @@
 /*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
- *
+ *  Copyright (C) 2004 Aurelien Alleaume <slts@free.fr>
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License
@@ -266,7 +266,8 @@ islpci_eth_receive(islpci_private *priv)
 	index = priv->free_data_rx % ISL38XX_CB_RX_QSIZE;
 	size = le16_to_cpu(control_block->rx_data_low[index].size);
 	skb = priv->data_low_rx[index];
-	offset = ((unsigned long) le32_to_cpu(control_block->rx_data_low[index].address) -
+	offset = ((unsigned long)
+		  le32_to_cpu(control_block->rx_data_low[index].address) -
 		  (unsigned long) skb->data) & 3;
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
@@ -320,15 +321,34 @@ islpci_eth_receive(islpci_private *priv)
 		 * header and without the FCS. But there a is a bit that
 		 * indicates if the packet is corrupted :-) */
 		if (skb->data[8] & 0x01)
-			/* This one is bad. Drop it !*/
+			/* This one is bad. Drop it ! */
 			discard = 1;
 		skb_pull(skb, 20);
 		skb->protocol = htons(ETH_P_802_2);
 		skb->mac.raw = skb->data;
 		skb->pkt_type = PACKET_OTHERHOST;
-	} else
+	} else {
+		if (skb->data[2 * ETH_ALEN] == 0) {
+			/* The packet has a rx_annex. Read it for spy monitoring, Then
+			 * remove it, while keeping the 2 leading MAC addr.
+			 */
+			struct iw_quality wstats;
+			struct obj_rx_annex *annex =
+			    (struct obj_rx_annex *) skb->data;
+			wstats.level = annex->rssi;
+			/* The noise value can be a bit outdated if nobody's 
+			 * reading wireless stats... */
+			wstats.noise = priv->iwstatistics.qual.noise;
+			wstats.qual = wstats.level - wstats.noise;
+			wstats.updated = 0x07;
+			/* Update spy records */
+			wireless_spy_update(ndev, annex->addr2, &wstats);
+			/* 20 = sizeof(struct obj_rx_annex) - 2*ETH_ALEN */
+			memcpy(skb->data + 20, skb->data, 2 * ETH_ALEN);
+			skb_pull(skb, 20);
+		}
 		skb->protocol = eth_type_trans(skb, ndev);
-
+	}
 	skb->ip_summed = CHECKSUM_NONE;
 	priv->statistics.rx_packets++;
 	priv->statistics.rx_bytes += size;
@@ -343,8 +363,7 @@ islpci_eth_receive(islpci_private *priv)
 	if (discard) {
 		dev_kfree_skb(skb);
 		skb = NULL;
-	}
-	else
+	} else
 		netif_rx(skb);
 
 	/* increment the read index for the rx data low queue */
@@ -395,7 +414,7 @@ islpci_eth_receive(islpci_private *priv)
 		wmb();
 
 		/* increment the driver read pointer */
-		add_le32p((u32 *) & control_block->
+		add_le32p((u32 *) &control_block->
 			  driver_curr_frag[ISL38XX_CB_RX_DATA_LQ], 1);
 	}
 
@@ -423,7 +442,7 @@ islpci_eth_tx_timeout(struct net_device *ndev)
 	/* increment the transmit error counter */
 	statistics->tx_errors++;
 
-	if(!priv->reset_task_pending) {
+	if (!priv->reset_task_pending) {
 		priv->reset_task_pending = 1;
 		netif_stop_queue(ndev);
 		schedule_work(&priv->reset_task);

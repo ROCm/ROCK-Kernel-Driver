@@ -570,6 +570,17 @@ mgt_set(islpci_private *priv, enum oid_num_t n, void *data)
 	mgt_cpu_to_le(isl_oid[n].flags & OID_FLAG_TYPE, priv->mib[n]);
 }
 
+void
+mgt_get(islpci_private *priv, enum oid_num_t n, void *res)
+{
+	BUG_ON(OID_NUM_LAST <= n);
+	BUG_ON(priv->mib[n] == NULL);
+	BUG_ON(res == NULL);
+
+	memcpy(res, priv->mib[n], isl_oid[n].size);
+	mgt_le_to_cpu(isl_oid[n].flags & OID_FLAG_TYPE, res);
+}
+
 /* Commits the cache. Lock outside. */
 
 static enum oid_num_t commit_part1[] = {

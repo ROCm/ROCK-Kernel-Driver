@@ -91,6 +91,19 @@ struct obj_frequencies {
 	u16 mhz[0];
 } __attribute__ ((packed));
 
+struct obj_rx_annex {
+	u8 addr1[ETH_ALEN];
+	u8 addr2[ETH_ALEN];
+	u32 something0;
+	u32 time;
+	u16 something1;
+	u16 rate;
+	u16 freq;
+	u16 something2;
+	u8 rssi;
+	u8 pad[3];
+} __attribute__ ((packed));
+
 /* 
  * in case everything's ok, the inlined function below will be
  * optimized away by the compiler...

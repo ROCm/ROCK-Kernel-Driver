@@ -2098,6 +2098,31 @@ prism54_debug_set_oid(struct net_device *ndev, struct iw_request_info *info,
 	return ret;
 }
 
+static int
+prism54_set_spy(struct net_device *ndev,
+		struct iw_request_info *info,
+		union iwreq_data *uwrq, char *extra)
+{
+	islpci_private *priv = netdev_priv(ndev);
+	u32 u, oid = OID_INL_CONFIG;
+
+	down_write(&priv->mib_sem);
+	mgt_get(priv, OID_INL_CONFIG, &u);
+
+	if ((uwrq->data.length == 0) && (priv->spy_data.spy_number > 0))
+		/* disable spy */
+		u &= ~INL_CONFIG_RXANNEX;
+	else if ((uwrq->data.length > 0) && (priv->spy_data.spy_number == 0))
+		/* enable spy */
+		u |= INL_CONFIG_RXANNEX;
+
+	mgt_set(priv, OID_INL_CONFIG, &u);
+	mgt_commit_list(priv, &oid, 1);
+	up_write(&priv->mib_sem);
+
+	return iw_handler_set_spy(ndev, info, uwrq, extra);
+}
+
 static const iw_handler prism54_handler[] = {
 	(iw_handler) prism54_commit,	/* SIOCSIWCOMMIT */
 	(iw_handler) prism54_get_name,	/* SIOCGIWNAME */
@@ -2115,7 +2140,7 @@ static const iw_handler prism54_handler[] = {
 	(iw_handler) NULL,	/* SIOCGIWPRIV */
 	(iw_handler) NULL,	/* SIOCSIWSTATS */
 	(iw_handler) NULL,	/* SIOCGIWSTATS */
-	iw_handler_set_spy,	/* SIOCSIWSPY */
+	prism54_set_spy,	/* SIOCSIWSPY */
 	iw_handler_get_spy,	/* SIOCGIWSPY */
 	iw_handler_set_thrspy,	/* SIOCSIWTHRSPY */
 	iw_handler_get_thrspy,	/* SIOCGIWTHRSPY */
@@ -2181,7 +2206,6 @@ static const iw_handler prism54_handler[] = {
 #define IWPRIV_U32(n,x)		IWPRIV_SET_U32(n,x), IWPRIV_GET(n,x)
 #define IWPRIV_SSID(n,x)	IWPRIV_SET_SSID(n,x), IWPRIV_GET(n,x)
 #define IWPRIV_ADDR(n,x)	IWPRIV_SET_ADDR(n,x), IWPRIV_GET(n,x)
-
 
 /* Note : limited to 128 private ioctls */
 
@@ -2261,7 +2285,7 @@ static const struct iw_priv_args prism54_private_args[] = {
 	IWPRIV_GET(DOT11_OID_FREQUENCYACTIVITY, "freqactivity"),
 	IWPRIV_U32(DOT11_OID_NONERPPROTECTION, "nonerpprotec"),
 	IWPRIV_U32(DOT11_OID_PROFILES, "profile"),
-	IWPRIV_GET(DOT11_OID_EXTENDEDRATES,"extrates"),
+	IWPRIV_GET(DOT11_OID_EXTENDEDRATES, "extrates"),
 	IWPRIV_U32(DOT11_OID_MLMEAUTOLEVEL, "mlmelevel"),
 
 	IWPRIV_GET(DOT11_OID_BSSS, "bsss"),
@@ -2308,20 +2332,13 @@ const struct iw_handler_def prism54_handler_def = {
 	.standard = (iw_handler *) prism54_handler,
 	.private = (iw_handler *) prism54_private_handler,
 	.private_args = (struct iw_priv_args *) prism54_private_args,
+	.spy_offset = offsetof(islpci_private, spy_data),
 };
 
-/* These ioctls won't work with the new API */
+/* For ioctls that don't work with the new API */
 
 int
 prism54_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 {
-	/*struct iwreq *wrq = (struct iwreq *) rq;
-	   islpci_private *priv = netdev_priv(ndev);
-	   int ret = 0;
-
-	   switch (cmd) {
-
-	   }
-	 */
 	return -EOPNOTSUPP;
 }
