@@ -39,7 +39,7 @@ int suspend_device(struct device * dev, u32 state)
 {
 	int error = 0;
 
-	if (dev->bus && dev->bus->suspend)
+	if (dev->bus && dev->bus->suspend && !dev->power.power_state)
 		error = dev->bus->suspend(dev,state);
 
 	return error;
