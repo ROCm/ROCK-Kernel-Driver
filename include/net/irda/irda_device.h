@@ -243,8 +243,6 @@ struct irda_task *irda_task_execute(void *instance,
 				    struct irda_task *parent, void *param);
 void irda_task_next_state(struct irda_task *task, IRDA_TASK_STATE state);
 
-extern const char *infrared_mode[];
-
 /*
  * Function irda_get_mtt (skb)
  *

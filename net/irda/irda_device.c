@@ -60,13 +60,6 @@ static void __irda_task_delete(struct irda_task *task);
 static hashbin_t *dongles = NULL;
 static hashbin_t *tasks = NULL;
 
-const char *infrared_mode[] = {
-	"IRDA_IRLAP",
-	"IRDA_RAW",
-	"SHARP_ASK",
-	"TV_REMOTE",
-};
-
 #ifdef CONFIG_IRDA_DEBUG
 static const char *task_state[] = {
 	"IRDA_TASK_INIT",
