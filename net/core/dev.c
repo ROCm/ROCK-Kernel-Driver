@@ -704,7 +704,7 @@ void dev_load(const char *name)
 	dev = __dev_get_by_name(name);
 	read_unlock(&dev_base_lock);
 
-	if (dev && capable(CAP_SYS_MODULE))
+	if (!dev && capable(CAP_SYS_MODULE))
 		request_module("%s", name);
 }
 
