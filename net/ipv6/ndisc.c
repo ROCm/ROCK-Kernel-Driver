@@ -1194,7 +1194,6 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 out:
 	if (rt)
 		dst_release(&rt->u.dst);
-	inet6_ifra_notify(RTM_NEWRA, in6_dev, ra_msg);
 	in6_dev_put(in6_dev);
 }
 

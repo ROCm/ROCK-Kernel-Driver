@@ -2924,62 +2924,6 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_PREFIX, GFP_ATOMIC);
 }
 
-static int inet6_fill_ifra(struct sk_buff *skb, struct inet6_dev *idev,
-			   struct ra_msg *ra_msg, u32 pid, u32 seq, int event)
-{
-	struct iframsg		*ifra;
-	struct nlmsghdr 	*nlh;
-	unsigned char		*b = skb->tail;
-	__u32			mtu = idev->dev->mtu;
-	struct ifra_cacheinfo	ci;
-
-	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*ifra));
-	
-	if (pid) 
-		nlh->nlmsg_flags |= NLM_F_MULTI;
-	
-	ifra = NLMSG_DATA(nlh);
-	ifra->ifra_family = AF_INET6;
-	ifra->ifra_index = idev->dev->ifindex;
-	ifra->ifra_flags = idev->if_flags;
-
-	RTA_PUT(skb, IFRA_LMTU, sizeof(mtu), &mtu);
-
-	ci.hop_limit = ra_msg->icmph.icmp6_hop_limit;
-	ci.lifetime = ntohs(ra_msg->icmph.icmp6_rt_lifetime);
-	ci.reachable_time = ntohl(ra_msg->reachable_time);
-	ci.retrans_time = ntohl(ra_msg->retrans_timer);
-	RTA_PUT(skb, IFRA_CACHEINFO, sizeof(ci), &ci);
-
-	nlh->nlmsg_len = skb->tail - b;
-	return skb->len;
-
-nlmsg_failure:
-rtattr_failure:
-	skb_trim(skb, b - skb->data);
-	return -1;
-}
-
-void inet6_ifra_notify(int event, struct inet6_dev *idev, 
-			      struct ra_msg *ra_msg)
-{
-	struct sk_buff *skb;
-	int size = NLMSG_SPACE(sizeof(struct iframsg)+128);
-
-	skb = alloc_skb(size, GFP_ATOMIC);
-	if (!skb) {
-		netlink_set_err(rtnl, 0, RTMGRP_IPV6_IFRA, ENOBUFS);
-		return;
-	}
-	if (inet6_fill_ifra(skb, idev, ra_msg, 0, 0, event) < 0) {
-		kfree_skb(skb);
-		netlink_set_err(rtnl, 0, RTMGRP_IPV6_IFRA, EINVAL);
-		return;
-	}
-	NETLINK_CB(skb).dst_groups = RTMGRP_IPV6_IFRA;
-	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_IFRA, GFP_ATOMIC);
-}
-
 static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
 	[RTM_GETLINK - RTM_BASE] = { .dumpit	= inet6_dump_ifinfo, },
 	[RTM_NEWADDR - RTM_BASE] = { .doit	= inet6_rtm_newaddr, },
