@@ -4234,14 +4234,14 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 #endif
 		return (-EBUSY);
 	}
-	if (!try_module_get(STp->device->host->hostt->module)) {
+
+	if (!scsi_device_get(STp->device)) {
 		write_unlock(&os_scsi_tapes_lock);
 #if DEBUG
-                printk(OSST_DEB_MSG "%s:D: Failed try_module_get.\n", name);
+                printk(OSST_DEB_MSG "%s:D: Failed scsi_device_get.\n", name);
 #endif
 		return (-ENXIO);
 	}
-	STp->device->access_count++;
 	filp->private_data = STp;
 	STp->in_use = 1;
 	write_unlock(&os_scsi_tapes_lock);
@@ -4589,9 +4589,7 @@ err_out:
 	normalize_buffer(STp->buffer);
 	STp->header_ok = 0;
 	STp->in_use = 0;
-	STp->device->access_count--;
-
-	module_put(STp->device->host->hostt->module);
+	scsi_device_put(STp->device);
 
 	return retval;
 }
@@ -4719,9 +4717,8 @@ static int os_scsi_tape_close(struct inode * inode, struct file * filp)
 	write_lock(&os_scsi_tapes_lock);
 	STp->in_use = 0;
 	write_unlock(&os_scsi_tapes_lock);
-	STp->device->access_count--;
 
-	module_put(STp->device->host->hostt->module);
+	scsi_device_put(STp->device);
 
 	return result;
 }

@@ -1877,20 +1877,12 @@ int scsi_attach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list)
-		if (sdt->attach) {
-			/*
-			 * XXX check result when the upper level attach
-			 * return values are fixed, and on failure goto
-			 * fail.
-			 */
-			if(try_module_get(sdt->module)) {
-				(*sdt->attach)(sdev);
-				module_put(sdt->module);
-			} else {
-				printk(KERN_WARNING "SCSI module %s not ready, skipping attach.\n", sdt->name);
-			}
-		}
+	list_for_each_entry(sdt, &scsi_devicelist, list) {
+		if (!try_module_get(sdt->module))
+			continue;
+		(*sdt->attach)(sdev);
+		module_put(sdt->module);
+	}
 	up_read(&scsi_devicelist_mutex);
 	return 0;
 }
@@ -1900,16 +1892,28 @@ void scsi_detach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list)
-		if (sdt->detach) {
-			if(try_module_get(sdt->module)) {
-				(*sdt->detach)(sdev);
-				module_put(sdt->module);
-			} else {
-				printk(KERN_WARNING "SCSI module %s not ready, skipping detach.\n", sdt->name);
-			}
-		}
+	list_for_each_entry(sdt, &scsi_devicelist, list) {
+		if (!try_module_get(sdt->module))
+			continue;
+		(*sdt->detach)(sdev);
+		module_put(sdt->module);
+	}
 	up_read(&scsi_devicelist_mutex);
+}
+
+int scsi_device_get(struct scsi_device *sdev)
+{
+	if (!try_module_get(sdev->host->hostt->module))
+		return -ENXIO;
+
+	sdev->access_count++;
+	return 0;
+}
+
+void scsi_device_put(struct scsi_device *sdev)
+{
+	sdev->access_count--;
+	module_put(sdev->host->hostt->module);
 }
 
 /*
@@ -1935,7 +1939,7 @@ int scsi_slave_attach(struct scsi_device *sdev)
 			printk(KERN_ERR "scsi: Allocation failure during"
 			       " attach, some SCSI devices might not be"
 			       " configured\n");
-			return 1;
+			return -ENOMEM;
 		}
 		if (sdev->host->hostt->slave_configure != NULL) {
 			if (sdev->host->hostt->slave_configure(sdev) != 0) {
@@ -1943,7 +1947,7 @@ int scsi_slave_attach(struct scsi_device *sdev)
 				       " attach, some SCSI device might not be"
 				       " configured\n");
 				scsi_release_commandblocks(sdev);
-				return 1;
+				return -ENOMEM;
 			}
 		} else if (sdev->host->cmd_per_lun != 0)
 			scsi_adjust_queue_depth(sdev, 0,

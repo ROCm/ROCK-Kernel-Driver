@@ -87,6 +87,8 @@ static LIST_HEAD(sr_devlist);
 static spinlock_t sr_devlist_lock = SPIN_LOCK_UNLOCKED;
 
 static int sr_open(struct cdrom_device_info *, int);
+static void sr_release(struct cdrom_device_info *);
+
 static void get_sectorsize(struct scsi_cd *);
 static void get_capabilities(struct scsi_cd *);
 
@@ -122,16 +124,6 @@ static inline void sr_devlist_remove(Scsi_CD *cd)
 	spin_lock(&sr_devlist_lock);
 	list_del(&cd->list);
 	spin_unlock(&sr_devlist_lock);
-}
-
-static void sr_release(struct cdrom_device_info *cdi)
-{
-	struct scsi_cd *cd = cdi->handle;
-
-	if (cd->device->sector_size > 2048)
-		sr_set_blocklength(cd, 2048);
-	cd->device->access_count--;
-	module_put(cd->device->host->hostt->module);
 }
 
 static struct cdrom_device_ops sr_dops = {
@@ -460,43 +452,59 @@ struct block_device_operations sr_bdops =
 static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
 	struct scsi_cd *cd = cdi->handle;
+	struct scsi_device *sdev = cd->device;
+	int retval;
 
-	if (!cd->device)
-		return -ENXIO;	/* No such device */
+	retval = scsi_device_get(sdev);
+	if (retval)
+		return retval;
+	
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
 	 */
-	if (!scsi_block_when_processing_errors(cd->device)) {
-		return -ENXIO;
-	}
-	if(!try_module_get(cd->device->host->hostt->module))
-		return -ENXIO;
-	cd->device->access_count++;
+	retval = -ENXIO;
+	if (!scsi_block_when_processing_errors(sdev))
+		goto error_out;
 
-	/* If this device did not have media in the drive at boot time, then
+	/*
+	 * If this device did not have media in the drive at boot time, then
 	 * we would have been unable to get the sector size.  Check to see if
 	 * this is the case, and try again.
 	 */
-
 	if (cd->needs_sector_size)
 		get_sectorsize(cd);
-
 	return 0;
+
+error_out:
+	scsi_device_put(sdev);
+	return retval;	
+}
+
+static void sr_release(struct cdrom_device_info *cdi)
+{
+	struct scsi_cd *cd = cdi->handle;
+
+	if (cd->device->sector_size > 2048)
+		sr_set_blocklength(cd, 2048);
+
+	scsi_device_put(cd->device);
 }
 
 static int sr_attach(struct scsi_device *sdev)
 {
 	struct gendisk *disk;
 	struct scsi_cd *cd;
-	int minor;
+	int minor, error;
 
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
 		return 1;
 
-	if (scsi_slave_attach(sdev))
-		return 1;
+	error = scsi_slave_attach(sdev);
+	if (error)
+		return error;
 
+	error = -ENOMEM;
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd)
 		goto fail;
@@ -566,7 +574,7 @@ fail_free:
 	kfree(cd);
 fail:
 	scsi_slave_detach(sdev);
-	return 1;
+	return error;
 }
 
 

@@ -1340,7 +1340,7 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	return SCSI_SCAN_LUN_PRESENT;
 }
 
-static int scsi_remove_lun(struct scsi_device *sdev)
+static void scsi_remove_lun(struct scsi_device *sdev)
 {
 	devfs_unregister(sdev->de);
 	scsi_device_unregister(sdev);
