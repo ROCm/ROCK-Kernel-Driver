@@ -360,6 +360,14 @@ static int cdrom_log_sense(ide_drive_t *drive, struct request *rq,
 				break;
 			log = 1;
 			break;
+		case ILLEGAL_REQUEST:
+			/*
+			 * don't log START_STOP unit with LoEj set, since
+			 * we cannot reliably check if drive can auto-close
+			 */
+			if (rq->cmd[0] == GPCMD_START_STOP_UNIT && sense->asc == 0x24)
+				log = 0;
+			break;
 		case UNIT_ATTENTION:
 			/*
 			 * Make good and sure we've seen this potential media
@@ -2152,6 +2160,7 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 		       struct request_sense *sense)
 {
 	struct request req;
+	char loej = 0;
 
 	if (CDROM_CONFIG_FLAGS(drive)->no_eject && !ejectflag)
 		return -EDRIVE_CANT_DO_THIS;
@@ -2162,9 +2171,13 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 
 	cdrom_prepare_request(&req);
 
+	/* only tell drive to close tray if open, if it can do that */
+	if (ejectflag && CDROM_CONFIG_FLAGS(drive)->close_tray)
+		loej = 0x02;
+
 	req.sense = sense;
 	req.cmd[0] = GPCMD_START_STOP_UNIT;
-	req.cmd[4] = 0x02 + (ejectflag != 0);
+	req.cmd[4] = loej | (ejectflag != 0);
 	return cdrom_queue_packet_command(drive, &req);
 }
 
