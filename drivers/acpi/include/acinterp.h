@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 142 $
+ *       $Revision: 144 $
  *
  *****************************************************************************/
 
@@ -92,7 +92,8 @@ u32
 acpi_ex_convert_to_ascii (
 	acpi_integer            integer,
 	u32                     base,
-	u8                      *string);
+	u8                      *string,
+	u8                      max_length);
 
 /*
  * exfield - ACPI AML (p-code) execution - field manipulation
@@ -454,10 +455,10 @@ void
 acpi_ex_dump_operands (
 	acpi_operand_object     **operands,
 	acpi_interpreter_mode   interpreter_mode,
-	NATIVE_CHAR             *ident,
+	char                    *ident,
 	u32                     num_levels,
-	NATIVE_CHAR             *note,
-	NATIVE_CHAR             *module_name,
+	char                    *note,
+	char                    *module_name,
 	u32                     line_number);
 
 void
@@ -495,7 +496,7 @@ acpi_ex_out_address (
  * exnames - interpreter/scanner name load/execute
  */
 
-NATIVE_CHAR *
+char *
 acpi_ex_allocate_name_string (
 	u32                     prefix_count,
 	u32                     num_name_segs);
@@ -507,13 +508,13 @@ acpi_ex_good_char (
 acpi_status
 acpi_ex_name_segment (
 	u8                      **in_aml_address,
-	NATIVE_CHAR             *name_string);
+	char                    *name_string);
 
 acpi_status
 acpi_ex_get_name_string (
 	acpi_object_type        data_type,
 	u8                      *in_aml_address,
-	NATIVE_CHAR             **out_name_string,
+	char                    **out_name_string,
 	u32                     *out_name_length);
 
 acpi_status
@@ -629,12 +630,12 @@ acpi_ex_digits_needed (
 void
 acpi_ex_eisa_id_to_string (
 	u32                     numeric_id,
-	NATIVE_CHAR             *out_string);
+	char                    *out_string);
 
 void
 acpi_ex_unsigned_integer_to_string (
 	acpi_integer            value,
-	NATIVE_CHAR             *out_string);
+	char                    *out_string);
 
 
 /*

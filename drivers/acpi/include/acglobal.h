@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 134 $
+ *       $Revision: 135 $
  *
  *****************************************************************************/
 
@@ -141,9 +141,9 @@ ACPI_EXTERN u8                          acpi_gbl_events_initialized;
 extern u8                               acpi_gbl_shutdown;
 extern u32                              acpi_gbl_startup_flags;
 extern const u8                         acpi_gbl_decode_to8bit[8];
-extern const NATIVE_CHAR               *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
+extern const char                      *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT];
 extern const acpi_opcode_info           acpi_gbl_aml_op_info[AML_NUM_OPCODES];
-extern const NATIVE_CHAR               *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
+extern const char                      *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
 
 
 /*****************************************************************************
@@ -257,21 +257,21 @@ extern      u8                          acpi_gbl_abort_method;
 extern      u8                          acpi_gbl_db_terminate_threads;
 
 ACPI_EXTERN int                         optind;
-ACPI_EXTERN NATIVE_CHAR                *optarg;
+ACPI_EXTERN char                       *optarg;
 
 ACPI_EXTERN u8                          acpi_gbl_db_opt_tables;
 ACPI_EXTERN u8                          acpi_gbl_db_opt_stats;
 ACPI_EXTERN u8                          acpi_gbl_db_opt_ini_methods;
 
 
-ACPI_EXTERN NATIVE_CHAR                *acpi_gbl_db_args[ACPI_DEBUGGER_MAX_ARGS];
-ACPI_EXTERN NATIVE_CHAR                 acpi_gbl_db_line_buf[80];
-ACPI_EXTERN NATIVE_CHAR                 acpi_gbl_db_parsed_buf[80];
-ACPI_EXTERN NATIVE_CHAR                 acpi_gbl_db_scope_buf[40];
-ACPI_EXTERN NATIVE_CHAR                 acpi_gbl_db_debug_filename[40];
+ACPI_EXTERN char                       *acpi_gbl_db_args[ACPI_DEBUGGER_MAX_ARGS];
+ACPI_EXTERN char                        acpi_gbl_db_line_buf[80];
+ACPI_EXTERN char                        acpi_gbl_db_parsed_buf[80];
+ACPI_EXTERN char                        acpi_gbl_db_scope_buf[40];
+ACPI_EXTERN char                        acpi_gbl_db_debug_filename[40];
 ACPI_EXTERN u8                          acpi_gbl_db_output_to_file;
-ACPI_EXTERN NATIVE_CHAR                *acpi_gbl_db_buffer;
-ACPI_EXTERN NATIVE_CHAR                *acpi_gbl_db_filename;
+ACPI_EXTERN char                       *acpi_gbl_db_buffer;
+ACPI_EXTERN char                       *acpi_gbl_db_filename;
 ACPI_EXTERN u32                         acpi_gbl_db_debug_level;
 ACPI_EXTERN u32                         acpi_gbl_db_console_debug_level;
 ACPI_EXTERN acpi_table_header          *acpi_gbl_db_table_ptr;

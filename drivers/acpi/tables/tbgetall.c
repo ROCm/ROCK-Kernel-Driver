@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbgetall - Get all required ACPI tables
- *              $Revision: 3 $
+ *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -212,7 +212,7 @@ acpi_tb_get_required_tables (
 	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
 		/* Get the table addresss from the common internal XSDT */
 
-		address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_XSDT->table_offset_entry[i]);
+		address.pointer.value = acpi_gbl_XSDT->table_offset_entry[i];
 
 		/*
 		 * Get the tables needed by this subsystem (FADT and any SSDTs).
@@ -247,7 +247,7 @@ acpi_tb_get_required_tables (
 	/*
 	 * Get the FACS (Pointed to by the FADT)
 	 */
-	address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_FADT->Xfirmware_ctrl);
+	address.pointer.value = acpi_gbl_FADT->Xfirmware_ctrl;
 
 	status = acpi_tb_get_secondary_table (&address, FACS_SIG, &table_info);
 	if (ACPI_FAILURE (status)) {
@@ -268,7 +268,7 @@ acpi_tb_get_required_tables (
 	/*
 	 * Get/install the DSDT (Pointed to by the FADT)
 	 */
-	address.pointer.value = ACPI_GET_ADDRESS (acpi_gbl_FADT->Xdsdt);
+	address.pointer.value = acpi_gbl_FADT->Xdsdt;
 
 	status = acpi_tb_get_secondary_table (&address, DSDT_SIG, &table_info);
 	if (ACPI_FAILURE (status)) {

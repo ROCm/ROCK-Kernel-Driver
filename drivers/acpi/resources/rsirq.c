@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 30 $
+ *              $Revision: 31 $
  *
  ******************************************************************************/
 
@@ -386,7 +386,7 @@ acpi_rs_extended_irq_resource (
 		 * Point the String pointer to the end of this structure.
 		 */
 		output_struct->data.extended_irq.resource_source.string_ptr =
-				(NATIVE_CHAR *)(output_struct + struct_size);
+				(char *)(output_struct + struct_size);
 
 		temp_ptr = (u8 *) output_struct->data.extended_irq.resource_source.string_ptr;
 
@@ -460,7 +460,7 @@ acpi_rs_extended_irq_stream (
 	u16                     *length_field;
 	u8                      temp8 = 0;
 	u8                      index;
-	NATIVE_CHAR             *temp_pointer = NULL;
+	char                    *temp_pointer = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_extended_irq_stream");
@@ -527,7 +527,7 @@ acpi_rs_extended_irq_stream (
 		*buffer = (u8) linked_list->data.extended_irq.resource_source.index;
 		buffer += 1;
 
-		temp_pointer = (NATIVE_CHAR *) buffer;
+		temp_pointer = (char *) buffer;
 
 		/*
 		 * Copy the string

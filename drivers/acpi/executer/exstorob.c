@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 47 $
+ *              $Revision: 49 $
  *
  *****************************************************************************/
 
@@ -55,7 +55,7 @@ acpi_ex_store_buffer_to_buffer (
 	u8                      *buffer;
 
 
-	ACPI_FUNCTION_NAME ("Ex_store_buffer_to_buffer");
+	ACPI_FUNCTION_TRACE_PTR ("Ex_store_buffer_to_buffer", source_desc);
 
 
 	/*
@@ -72,7 +72,7 @@ acpi_ex_store_buffer_to_buffer (
 		(target_desc->common.flags & AOPOBJ_STATIC_POINTER)) {
 		target_desc->buffer.pointer = ACPI_MEM_ALLOCATE (length);
 		if (!target_desc->buffer.pointer) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
@@ -103,7 +103,7 @@ acpi_ex_store_buffer_to_buffer (
 	/* Copy flags */
 
 	target_desc->buffer.flags = source_desc->buffer.flags;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -129,7 +129,7 @@ acpi_ex_store_string_to_string (
 	u8                      *buffer;
 
 
-	ACPI_FUNCTION_ENTRY ();
+	ACPI_FUNCTION_TRACE_PTR ("Ex_store_string_to_string", source_desc);
 
 
 	/*
@@ -166,7 +166,7 @@ acpi_ex_store_string_to_string (
 
 		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
 		if (!target_desc->string.pointer) {
-			return (AE_NO_MEMORY);
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
 		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
@@ -176,7 +176,7 @@ acpi_ex_store_string_to_string (
 	/* Set the new target length */
 
 	target_desc->string.length = length;
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

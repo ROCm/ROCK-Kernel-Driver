@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utalloc - local cache and memory allocation routines
- *              $Revision: 128 $
+ *              $Revision: 130 $
  *
  *****************************************************************************/
 
@@ -305,10 +305,6 @@ acpi_ut_initialize_buffer (
 		if (buffer->length < required_length) {
 			status = AE_BUFFER_OVERFLOW;
 		}
-
-		/* Clear the buffer */
-
-		ACPI_MEMSET (buffer->pointer, 0, required_length);
 		break;
 	}
 
@@ -336,7 +332,7 @@ void *
 acpi_ut_allocate (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	void                    *allocation;
@@ -386,7 +382,7 @@ void *
 acpi_ut_callocate (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	void                    *allocation;
@@ -451,7 +447,7 @@ void *
 acpi_ut_allocate_and_track (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	acpi_debug_mem_block    *allocation;
@@ -497,7 +493,7 @@ void *
 acpi_ut_callocate_and_track (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	acpi_debug_mem_block    *allocation;
@@ -547,7 +543,7 @@ void
 acpi_ut_free_and_track (
 	void                    *allocation,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	acpi_debug_mem_block    *debug_block;
@@ -652,7 +648,7 @@ acpi_ut_track_allocation (
 	ACPI_SIZE               size,
 	u8                      alloc_type,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	ACPI_MEMORY_LIST        *mem_list;
@@ -735,7 +731,7 @@ acpi_ut_remove_allocation (
 	u32                     list_id,
 	acpi_debug_mem_block    *allocation,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line)
 {
 	ACPI_MEMORY_LIST        *mem_list;
@@ -863,7 +859,7 @@ acpi_ut_dump_allocation_info (
 void
 acpi_ut_dump_allocations (
 	u32                     component,
-	NATIVE_CHAR             *module)
+	char                    *module)
 {
 	acpi_debug_mem_block    *element;
 	ACPI_DESCRIPTOR         *descriptor;

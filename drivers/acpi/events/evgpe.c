@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evgpe - General Purpose Event handling and dispatch
- *              $Revision: 1 $
+ *              $Revision: 3 $
  *
  *****************************************************************************/
 
@@ -92,14 +92,14 @@ acpi_ev_gpe_initialize (void)
 	 * If EITHER the register length OR the block address are zero, then that
 	 * particular block is not supported.
 	 */
-	if (acpi_gbl_FADT->Xgpe0_blk.register_bit_width && ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe0_blk.address)) {
+	if (acpi_gbl_FADT->Xgpe0_blk.register_bit_width && acpi_gbl_FADT->Xgpe0_blk.address) {
 		/* GPE block 0 exists (has both length and address > 0) */
 
 		acpi_gbl_gpe_block_info[0].register_count = (u16) (acpi_gbl_FADT->Xgpe0_blk.register_bit_width / (ACPI_GPE_REGISTER_WIDTH * 2));
 		acpi_gbl_gpe_number_max               = (acpi_gbl_gpe_block_info[0].register_count * ACPI_GPE_REGISTER_WIDTH) - 1;
 	}
 
-	if (acpi_gbl_FADT->Xgpe1_blk.register_bit_width && ACPI_GET_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address)) {
+	if (acpi_gbl_FADT->Xgpe1_blk.register_bit_width && acpi_gbl_FADT->Xgpe1_blk.address) {
 		/* GPE block 1 exists (has both length and address > 0) */
 
 		acpi_gbl_gpe_block_info[1].register_count = (u16) (acpi_gbl_FADT->Xgpe1_blk.register_bit_width / (ACPI_GPE_REGISTER_WIDTH * 2));
@@ -205,11 +205,11 @@ acpi_ev_gpe_initialize (void)
 					   + (i * ACPI_GPE_REGISTER_WIDTH));
 
 			ACPI_STORE_ADDRESS (gpe_register_info->status_address.address,
-					   (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address)
+					   (acpi_gbl_gpe_block_info[gpe_block].block_address->address
 							  + i));
 
 			ACPI_STORE_ADDRESS (gpe_register_info->enable_address.address,
-					   (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address)
+					   (acpi_gbl_gpe_block_info[gpe_block].block_address->address
 							  + i
 							  + acpi_gbl_gpe_block_info[gpe_block].register_count));
 
@@ -253,8 +253,8 @@ acpi_ev_gpe_initialize (void)
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE Block%d: %X registers at %8.8X%8.8X\n",
 				(s32) gpe_block, acpi_gbl_gpe_block_info[0].register_count,
-				ACPI_HIDWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address)),
-				ACPI_LODWORD (ACPI_GET_ADDRESS (acpi_gbl_gpe_block_info[gpe_block].block_address->address))));
+				ACPI_HIDWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address),
+				ACPI_LODWORD (acpi_gbl_gpe_block_info[gpe_block].block_address->address)));
 
 			ACPI_REPORT_INFO (("GPE Block%d defined as GPE%d to GPE%d\n",
 				(s32) gpe_block,
@@ -309,7 +309,7 @@ acpi_ev_save_method_info (
 {
 	u32                     gpe_number;
 	u32                     gpe_number_index;
-	NATIVE_CHAR             name[ACPI_NAME_SIZE + 1];
+	char                    name[ACPI_NAME_SIZE + 1];
 	u8                      type;
 	acpi_status             status;
 
@@ -476,8 +476,8 @@ acpi_ev_gpe_detect (void)
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
 			"GPE block at %8.8X%8.8X - Values: Enable %02X Status %02X\n",
-			ACPI_HIDWORD (ACPI_GET_ADDRESS (gpe_register_info->enable_address.address)),
-			ACPI_LODWORD (ACPI_GET_ADDRESS (gpe_register_info->enable_address.address)),
+			ACPI_HIDWORD (gpe_register_info->enable_address.address),
+			ACPI_LODWORD (gpe_register_info->enable_address.address),
 			gpe_register_info->enable,
 			gpe_register_info->status));
 
