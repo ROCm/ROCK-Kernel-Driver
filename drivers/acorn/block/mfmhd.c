@@ -1257,14 +1257,14 @@ static struct gendisk mfm_gendisk[2] = {
 {
 	major:		MAJOR_NR,
 	first_minor:	0,
-	major_name:	"mfm",
+	major_name:	"mfma",
 	minor_shift:	6,
 	part:		mfm,
 },
 {
 	major:		MAJOR_NR,
 	first_minor:	64,
-	major_name:	"mfm",
+	major_name:	"mfmb",
 	minor_shift:	6,
 	part:		mfm + 64,
 };

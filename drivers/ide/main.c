@@ -493,6 +493,7 @@ void ide_unregister(struct ata_channel *ch)
 		int i;
 		for (i = 0; i < MAX_DRIVES; i++)
 			del_gendisk(gd + i);
+		kfree(gd->major_name);
 		kfree(gd->part);
 		if (gd->de_arr)
 			kfree (gd->de_arr);

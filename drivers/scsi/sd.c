@@ -1318,6 +1318,7 @@ static int sd_attach(Scsi_Device * sdp)
 		devfs_handle_t de;
 		struct device *dev;
 		char flags;
+		char name[5];
 	} *p;
 	struct gendisk *gd;
 
@@ -1368,10 +1369,14 @@ static int sd_attach(Scsi_Device * sdp)
         gd->driverfs_dev_arr[0] = &sdp->sdev_driverfs_dev;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
-	gd->major_name = "sd";
 	gd->minor_shift = 4;
 	gd->part = sd + (dsk_nr << 4);
 	gd->fops = &sd_fops;
+	if (dsk_nr > 26)
+		sprintf(p->name, "sd%c%c", 'a'+dsk_nr/26-1, 'a'+dsk_nr%26);
+	else
+		sprintf(p->name, "sd%c", 'a'+dsk_nr%26);
+	gd->major_name = p->name;
         if (sdp->removable)
 		gd->flags[0] |= GENHD_FL_REMOVABLE;
 	sd_disks[dsk_nr] = gd;

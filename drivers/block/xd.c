@@ -166,7 +166,7 @@ int __init xd_init (void)
 		printk("xd: Unable to get major number %d\n",MAJOR_NR);
 		return -1;
 	}
-	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
+	devfs_handle = devfs_mk_dir (NULL, "xd", NULL);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
 	add_gendisk(&xd_gendisk);
 	xd_geninit();

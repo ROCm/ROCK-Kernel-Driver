@@ -712,14 +712,14 @@ static struct gendisk hd_gendisk[2] = {
 {
 	.major =	MAJOR_NR,
 	.first_minor =	0,
-	.major_name =	"hd",
+	.major_name =	"hda",
 	.minor_shift =	6,
 	.part =		hd,
 	.fops =		&hd_fops,
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
-	.major_name =	"hd",
+	.major_name =	"hdb",
 	.minor_shift =	6,
 	.part =		hd + 64,
 	.fops =		&hd_fops,

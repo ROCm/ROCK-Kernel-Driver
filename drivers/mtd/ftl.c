@@ -125,6 +125,7 @@ MODULE_PARM(shuffle_freq, "i");
 /* Each memory region corresponds to a minor device */
 typedef struct partition_t {
     struct mtd_info	*mtd;
+    struct gndisk	*disk;
     u_int32_t		state;
     u_int32_t		*VirtualBlockMap;
     u_int32_t		*VirtualPageMap;
@@ -175,13 +176,6 @@ static struct mtd_notifier ftl_notifier = {
 #define XFER_FAILED	0x04
 
 static struct hd_struct ftl_hd[MINOR_NR(MAX_DEV, 0, 0)];
-
-static struct gendisk ftl_gendisk = {
-    major:		FTL_MAJOR,
-    major_name:		"ftl",
-    minor_shift:	PART_BITS,
-    part:		ftl_hd,
-};
 
 /*====================================================================*/
 
@@ -850,7 +844,7 @@ static int ftl_open(struct inode *inode, struct file *file)
     if (partition->state != FTL_FORMATTED)
 	return -ENXIO;
     
-    if (ftl_gendisk.part[minor].nr_sects == 0)
+    if (partition->disk->part[0].nr_sects == 0)
 	return -ENXIO;
 
     if (!get_mtd_device(partition->mtd, -1))
@@ -1181,15 +1175,13 @@ static void do_ftl_request(request_arg_t)
 	  
 	  switch (CURRENT->cmd) {
 	  case READ:
-	    ret = ftl_read(part, CURRENT->buffer,
-			   CURRENT->sector+ftl_hd[minor].start_sect,
+	    ret = ftl_read(part, CURRENT->buffer, CURRENT->sector,
 			   CURRENT->current_nr_sectors);
 	    if (ret) printk("ftl_read returned %d\n", ret);
 	    break;
 	    
 	  case WRITE:
-	    ret = ftl_write(part, CURRENT->buffer,
-			    CURRENT->sector+ftl_hd[minor].start_sect,
+	    ret = ftl_write(part, CURRENT->buffer, CURRENT->sector,
 			    CURRENT->current_nr_sectors);
 	    if (ret) printk("ftl_write returned %d\n", ret);
 	    break;
@@ -1241,6 +1233,8 @@ void ftl_freepart(partition_t *part)
 static void ftl_notify_add(struct mtd_info *mtd)
 {
 	partition_t *partition;
+	struct gendisk *disk;
+	char *name;
 	int device;
 
 	for (device=0; device < MAX_MTD_DEVICES && myparts[device]; device++)
@@ -1253,30 +1247,48 @@ static void ftl_notify_add(struct mtd_info *mtd)
 	}
 
 	partition = kmalloc(sizeof(partition_t), GFP_KERNEL);
+	disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
+	name = kmalloc(4, GFP_KERNEL);
 		
-	if (!partition) {
+	if (!partition||!disk||!name) {
 		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
-		       mtd->name);
+			mtd->name);
+		kfree(partition);
+		kfree(disk);
+		kfree(name);
 		return;
 	}    
 
 	memset(partition, 0, sizeof(partition_t));
-
+	memset(disk, 0, sizeof(struct gendisk));
+	sprintf(name, "ftl%c", 'a' + device);
+	disk->major = FTL_MAJOR;
+	disk->first_minor = device << 4;
+	disk->major_name = name;
+	disk->minor_shift = PART_BITS;
+	disk->part = ftl_hd + (device << 4);
+	disk->fops = &ftl_blk_fops;
+	disk->nr_real = 1;
 	partition->mtd = mtd;
+	partition->disk = disk;
 
 	if ((scan_header(partition) == 0) && (build_maps(partition) == 0)) {
 		partition->state = FTL_FORMATTED;
 		atomic_set(&partition->open, 0);
 		myparts[device] = partition;
-		register_disk(&ftl_gendisk, mk_kdev(MAJOR_NR, device << 4),
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(MAJOR_NR, device << 4),
 			      MAX_PART, &ftl_blk_fops,
 			      le32_to_cpu(partition->header.FormattedSize)/SECTOR_SIZE);
 #ifdef PCMCIA_DEBUG
 		printk(KERN_INFO "ftl_cs: opening %d kb FTL partition\n",
 		       le32_to_cpu(partition->header.FormattedSize) >> 10);
 #endif
-	} else
+	} else {
 		kfree(partition);
+		kfree(disk);
+		kfree(name);
+	}
 }
 
 static void ftl_notify_remove(struct mtd_info *mtd)
@@ -1300,10 +1312,10 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 				ftl_freepart(myparts[i]);
 			
 			myparts[i]->state = 0;
-			for (j=0; j<16; j++) {
-				ftl_gendisk.part[j].nr_sects=0;
-				ftl_gendisk.part[j].start_sect=0;
-			}
+			wipe_partitions(mk_kdev(MAJOR_NR, i<<4));
+			del_gendisk(myparts[i]->disk);
+			kfree(myparts[i]->disk->name);
+			kfree(myparts[i]->disk);
 			kfree(myparts[i]);
 			myparts[i] = NULL;
 		}
@@ -1312,9 +1324,6 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 int init_ftl(void)
 {
     int i;
-
-    memset(myparts, 0, sizeof(myparts));
-    
     DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
     
     if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
@@ -1322,15 +1331,7 @@ int init_ftl(void)
 	       "device number!\n");
 	return -EAGAIN;
     }
-    
-    for (i = 0; i < MAX_DEV*MAX_PART; i++) {
-	ftl_hd[i].nr_sects = 0;
-	ftl_hd[i].start_sect = 0;
-    }
-    ftl_gendisk.major = FTL_MAJOR;
     blk_init_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR), &do_ftl_request);
-    add_gendisk(&ftl_gendisk);
-    
     register_mtd_user(&ftl_notifier);
     
     return 0;
@@ -1339,12 +1340,9 @@ int init_ftl(void)
 static void __exit cleanup_ftl(void)
 {
     unregister_mtd_user(&ftl_notifier);
-
     unregister_blkdev(FTL_MAJOR, "ftl");
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR));
     blk_clear(FTL_MAJOR);
-
-    del_gendisk(&ftl_gendisk);
 }
 
 module_init(init_ftl);
