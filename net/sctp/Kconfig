@@ -16,7 +16,7 @@ config IP_SCTP
 	---help---
 	  Stream Control Transmission Protocol
 
-	  From RFC 2960 (http://www.ietf.org/rfc/rfc2960.txt)
+	  From RFC 2960 <http://www.ietf.org/rfc/rfc2960.txt>.
 
 	  "SCTP is a reliable transport protocol operating on top of a
 	  connectionless packet network such as IP.  It offers the following
@@ -36,19 +36,6 @@ config IP_SCTP
 	  module will be called sctp.
 
 	  If in doubt, say N.
-
-config SCTP_ADLER32
-	bool "SCTP: Use old checksum (Adler-32)"
-	depends on IP_SCTP
-	help
-	  RFC2960 currently specifies the Adler-32 checksum algorithm for SCTP.
-	  This has been deprecated and replaced by an algorithm now referred
-	  to as crc32c.
-
-	  If you say Y, this will use the Adler-32 algorithm, this might be 
-	  useful for interoperation with downlevel peers. 
-
-	  If unsure, say N.  
 
 config SCTP_DBG_MSG
 	bool "SCTP: Debug messages"

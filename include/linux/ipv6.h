@@ -185,7 +185,6 @@ struct inet6_skb_parm
 	int			iif;
 	__u16			ra;
 	__u16			hop;
-	__u16			auth;
 	__u16			dst0;
 	__u16			srcrt;
 	__u16			dst1;
@@ -211,7 +210,6 @@ struct ipv6_pinfo {
 				rxhlim:1,
 				hopopts:1,
 				dstopts:1,
-                                authhdr:1,
                                 rxflow:1;
 		} bits;
 		__u8		all;
