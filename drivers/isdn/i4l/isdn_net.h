@@ -46,7 +46,7 @@ extern int isdn_net_getphones(isdn_net_ioctl_phone *, char *);
 extern int isdn_net_getpeer(isdn_net_ioctl_phone *, isdn_net_ioctl_phone *);
 extern int isdn_net_delphone(isdn_net_ioctl_phone *);
 extern int isdn_net_find_icall(int, int, int, setup_parm *);
-extern void isdn_net_hangup(isdn_net_local *);
+extern void isdn_net_hangup(isdn_net_dev *);
 extern void isdn_net_hangup_all(void);
 extern int isdn_net_force_hangup(char *);
 extern int isdn_net_force_dial(char *);

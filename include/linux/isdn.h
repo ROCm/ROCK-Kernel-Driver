@@ -312,7 +312,6 @@ typedef struct isdn_net_local_s {
   ulong                  magic;
   spinlock_t             lock;
   struct net_device_stats stats;       /* Ethernet Statistics              */
-  int			 ppp_slot;     /* PPPD device slot number          */
   int                    flags;        /* Connection-flags                 */
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
@@ -372,7 +371,6 @@ typedef struct isdn_net_local_s {
                                        /* a particular channel (including  */
                                        /* the frame_cnt                    */
 
-  int  pppbind;                        /* ippp device for bindings         */
   int					dialtimeout;	/* How long shall we try on dialing? (jiffies) */
   int					dialwait;		/* How long shall we wait after failed attempt? (jiffies) */
   ulong					dialstarted;	/* jiffies of first dialing-attempt */
@@ -408,6 +406,8 @@ typedef struct isdn_net_dev_s {
   int                    dialstate;    /* State for dialing                */
   struct timer_list      hup_timer;    /* auto hangup timer                */
 
+  int                    pppbind;      /* ippp device for bindings         */
+  int			 ppp_slot;     /* PPPD device slot number          */
 
   isdn_net_local         *queue;       /* circular list of all bundled
 					  channels, which are currently

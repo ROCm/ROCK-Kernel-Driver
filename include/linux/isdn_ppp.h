@@ -212,7 +212,7 @@ struct ippp_struct {
   unsigned int mpmru;
   unsigned int mpmtu;
   unsigned int maxcid;
-  struct isdn_net_local_s *lp;
+  struct isdn_net_dev_s *idev;
   int unit;
   int minor;
   unsigned int last_link_seqno;
