@@ -72,7 +72,7 @@ int Bind = BIND_BY_PORT_NAME;
 
 int ql2xsuspendcount = SUSPEND_COUNT;
 
-int ql2xdoinitscan = 0;
+int ql2xdoinitscan = 1;
 
 int qla2x00_retryq_dmp;
 

@@ -5,6 +5,9 @@
  *
  * Revision History
  *
+ *  Rev  8.00.00b8	December 5, 2003	AV
+ *	- Instruct mid-layer to perform initial scan.
+ *
  *  Rev  8.00.00b7	December 5, 2003	AV
  *	- Resync with Linux Kernel 2.6.0-test11.
  *	- Add basic NVRAM parser (extras/qla_nvr).
