@@ -393,26 +393,10 @@ static void devfs_remove_partitions(struct gendisk *dev)
 #endif
 }
 
-/*
- * This function will re-read the partition tables for a given device,
- * and set things back up again.  There are some important caveats,
- * however.  You must ensure that no one is using the device, and no one
- * can start using the device while this function is being executed.
- *
- * Much of the cleanup from the old partition tables should have already been
- * done
- */
-
-void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
-	struct block_device_operations *ops, long size)
+/* Not exported, helper to add_disk(). */
+void register_disk(struct gendisk *disk)
 {
 	struct block_device *bdev;
-
-	if (!disk)
-		return;
-
-	set_capacity(disk, size);
-
 	if (disk->flags & GENHD_FL_CD)
 		devfs_create_cdrom(disk);
 
@@ -421,10 +405,10 @@ void register_disk(struct gendisk *disk, kdev_t dev, unsigned minors,
 		return;
 
 	/* No such device (e.g., media were just removed) */
-	if (!size)
+	if (!get_capacity(disk))
 		return;
 
-	bdev = bdget(kdev_t_to_nr(dev));
+	bdev = bdget(MKDEV(disk->major, disk->first_minor));
 	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
 		return;
 	check_partition(disk, bdev);

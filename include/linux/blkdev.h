@@ -286,7 +286,7 @@ struct sec_size {
 
 extern struct sec_size * blk_sec[MAX_BLKDEV];
 extern struct blk_dev_struct blk_dev[MAX_BLKDEV];
-extern void register_disk(struct gendisk *dev, kdev_t first, unsigned minors, struct block_device_operations *ops, long size);
+extern void register_disk(struct gendisk *dev);
 extern void generic_make_request(struct bio *bio);
 extern inline request_queue_t *bdev_get_queue(struct block_device *bdev);
 extern void blk_put_request(struct request *);

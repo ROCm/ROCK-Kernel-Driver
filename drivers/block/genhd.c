@@ -85,8 +85,7 @@ static void add_gendisk(struct gendisk *gp)
 void add_disk(struct gendisk *disk)
 {
 	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-			1<<disk->minor_shift, disk->fops, get_capacity(disk));
+	register_disk(disk);
 }
 
 EXPORT_SYMBOL(add_disk);
