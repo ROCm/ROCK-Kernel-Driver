@@ -81,8 +81,6 @@ static int   paletteEnabled = 0;
 MODULE_AUTHOR("(c) 2001-2002  Denis Oliver Kropp <dok@directfb.org>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FBDev driver for S3 Savage PCI/AGP Chips");
-MODULE_PARM(disabled, "i");
-MODULE_PARM_DESC(disabled, "Disable this driver's initialization.");
 
 #endif
 
