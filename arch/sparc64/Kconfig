@@ -162,9 +162,14 @@ config CPU_FREQ_PROC_INTF
 	  
 	  If in doubt, say N.
 
+config CPU_FREQ_TABLE
+       tristate
+       default y
+
+
 config US3_FREQ
 	tristate "UltraSPARC-III CPU Frequency driver"
-	depends on CPU_FREQ
+	depends on CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
 

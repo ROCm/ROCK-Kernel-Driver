@@ -297,6 +297,7 @@ enum {
 
 #endif /* CONFIG_CPU_FREQ_24_API */
 
+#if defined(CONFIG_CPU_FREQ_TABLE) || defined(CONFIG_CPU_FREQ_TABLE_MODULE)
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *
  *********************************************************************/
@@ -325,5 +326,7 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   unsigned int target_freq,
 				   unsigned int relation,
 				   unsigned int *index);
+
+#endif /* CONFIG_CPU_FREQ_TABLE */
 
 #endif /* _LINUX_CPUFREQ_H */
