@@ -83,8 +83,6 @@ extern int create_cow_file(char *cow_file, char *backing_file,
 			   unsigned long *bitmap_len_out,
 			   int *data_offset_out);
 extern int read_cow_bitmap(int fd, void *buf, int offset, int len);
-extern int read_ubd_fs(int fd, void *buffer, int len);
-extern int write_ubd_fs(int fd, char *buffer, int len);
 extern void do_io(struct io_thread_req *req);
 
 static inline int ubd_test_bit(__u64 bit, unsigned char *data)
@@ -323,7 +321,7 @@ static int ubd_setup_common(char *str, int *index_out)
 		}
 
 		if(!strcmp(str, "sync")){
-			global_openflags.s = 1;
+			global_openflags = of_sync(global_openflags);
 			return(0);
 		}
 		major = simple_strtoul(str, &end, 0);
@@ -513,7 +511,7 @@ static void ubd_handler(void)
 
 	do_ubd = NULL;
 	intr_count++;
-	n = read_ubd_fs(thread_fd, &req, sizeof(req));
+	n = os_read_file(thread_fd, &req, sizeof(req));
 	if(n != sizeof(req)){
 		printk(KERN_ERR "Pid %d - spurious interrupt in ubd_handler, "
 		       "err = %d\n", os_getpid(), -n);
@@ -1155,7 +1153,7 @@ static void do_ubd_request(request_queue_t *q)
 		err = prepare_request(req, &io_req);
 		if(!err){
 			do_ubd = ubd_handler;
-			n = write_ubd_fs(thread_fd, (char *) &io_req, 
+			n = os_write_file(thread_fd, (char *) &io_req,
 					 sizeof(io_req));
 			if(n != sizeof(io_req))
 				printk("write to io thread failed, "
@@ -1436,7 +1434,7 @@ int open_ubd_file(char *file, struct openflags *openflags,
 		if((fd == -ENOENT) && (create_cow_out != NULL))
 			*create_cow_out = 1;
                 if(!openflags->w ||
-                   ((errno != EROFS) && (errno != EACCES))) return(-errno);
+                   ((fd != -EROFS) && (fd != -EACCES))) return(fd);
 		openflags->w = 0;
 		fd = os_open_file(file, *openflags, mode);
 		if(fd < 0)
@@ -1511,17 +1509,6 @@ int create_cow_file(char *cow_file, char *backing_file, struct openflags flags,
 	os_close_file(fd);
  out:
 	return(err);
-}
-
-/* XXX Just trivial wrappers around os_read_file and os_write_file */
-int read_ubd_fs(int fd, void *buffer, int len)
-{
-	return(os_read_file(fd, buffer, len));
-}
-
-int write_ubd_fs(int fd, char *buffer, int len)
-{
-	return(os_write_file(fd, buffer, len));
 }
 
 static int update_bitmap(struct io_thread_req *req)
