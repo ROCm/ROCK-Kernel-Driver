@@ -647,9 +647,12 @@ cifs_revalidate(struct dentry *direntry)
 		}
 	}
 
-
+	/* can not grab this sem since kernel filesys locking
+		documentation indicates i_sem may be taken by the kernel 
+		on lookup and rename which could deadlock if we grab
+		the i_sem here as well */
+/*	down(&direntry->d_inode->i_sem);*/
 	/* need to write out dirty pages here  */
-	down(&direntry->d_inode->i_sem);
 	if(direntry->d_inode->i_mapping) {
 		/* do we need to lock inode until after invalidate completes below? */
 		filemap_fdatawrite(direntry->d_inode->i_mapping);
@@ -663,9 +666,7 @@ cifs_revalidate(struct dentry *direntry)
 			invalidate_remote_inode(direntry->d_inode);
 		}
 	}
-
-
-	up(&direntry->d_inode->i_sem);
+/*	up(&direntry->d_inode->i_sem);*/
 	
 	if (full_path)
 		kfree(full_path);

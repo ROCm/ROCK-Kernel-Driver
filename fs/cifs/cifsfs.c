@@ -31,6 +31,7 @@
 #include <linux/list.h>
 #include <linux/seq_file.h>
 #include <linux/vfs.h>
+#include <linux/mempool.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
 #define DECLARE_GLOBALS_HERE
@@ -39,7 +40,9 @@
 #include "cifs_debug.h"
 #include "cifs_fs_sb.h"
 #include <linux/mm.h>
-#define CIFS_MAGIC_NUMBER 0xFF534D42	/* the first four bytes of all SMB PDUs */
+#define CIFS_MAGIC_NUMBER 0xFF534D42	/* the first four bytes of SMB PDUs */
+/* BB when mempool_resize is added back in, we will resize pool on new mount */
+#define CIFS_MIN_RCV_POOL 11 /* enough for progress to five servers */
 
 #ifdef CIFS_QUOTA
 static struct quotactl_ops cifs_quotactl_ops;
@@ -209,9 +212,11 @@ static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 }
 
 static kmem_cache_t *cifs_inode_cachep;
-kmem_cache_t *cifs_req_cachep;
-kmem_cache_t *cifs_mid_cachep;
+static kmem_cache_t *cifs_req_cachep;
+static kmem_cache_t *cifs_mid_cachep;
 kmem_cache_t *cifs_oplock_cachep;
+mempool_t *cifs_req_poolp;
+mempool_t *cifs_mid_poolp;
 
 static struct inode *
 cifs_alloc_inode(struct super_block *sb)
@@ -593,12 +598,23 @@ cifs_init_request_bufs(void)
 	if (cifs_req_cachep == NULL)
 		return -ENOMEM;
 
+	cifs_req_poolp = mempool_create(CIFS_MIN_RCV_POOL,
+					mempool_alloc_slab,
+					mempool_free_slab,
+					cifs_req_cachep);
+
+	if(cifs_req_poolp == NULL) {
+		kmem_cache_destroy(cifs_req_cachep);
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 
 static void
 cifs_destroy_request_bufs(void)
 {
+	mempool_destroy(cifs_req_poolp);
 	if (kmem_cache_destroy(cifs_req_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_request_cache: error not all structures were freed\n");
@@ -612,11 +628,22 @@ cifs_init_mids(void)
 				SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_mid_cachep == NULL)
 		return -ENOMEM;
+
+	cifs_mid_poolp = mempool_create(3 /* a reasonable min simultan opers */,
+					mempool_alloc_slab,
+					mempool_free_slab,
+					cifs_mid_cachep);
+	if(cifs_mid_poolp == NULL) {
+		kmem_cache_destroy(cifs_mid_cachep);
+		return -ENOMEM;
+	}
+
 	cifs_oplock_cachep = kmem_cache_create("cifs_oplock_structs",
 				sizeof (struct oplock_q_entry), 0,
 				SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_oplock_cachep == NULL) {
 		kmem_cache_destroy(cifs_mid_cachep);
+		mempool_destroy(cifs_mid_poolp);
 		return -ENOMEM;
 	}
 
@@ -626,9 +653,11 @@ cifs_init_mids(void)
 static void
 cifs_destroy_mids(void)
 {
+	mempool_destroy(cifs_mid_poolp);
 	if (kmem_cache_destroy(cifs_mid_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_mids: error not all structures were freed\n");
+
 	if (kmem_cache_destroy(cifs_oplock_cachep))
 		printk(KERN_WARNING
 		       "error not all oplock structures were freed\n");

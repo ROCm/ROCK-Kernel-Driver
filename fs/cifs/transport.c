@@ -25,12 +25,13 @@
 #include <linux/net.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
+#include <linux/mempool.h>
 #include "cifspdu.h"
 #include "cifsglob.h"
 #include "cifsproto.h"
 #include "cifs_debug.h"
   
-extern kmem_cache_t *cifs_mid_cachep;
+extern mempool_t *cifs_mid_poolp;
 extern kmem_cache_t *cifs_oplock_cachep;
 
 struct mid_q_entry *
@@ -47,8 +48,7 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		return NULL;
 	}
 	
-	temp = (struct mid_q_entry *) kmem_cache_alloc(cifs_mid_cachep,
-						       SLAB_KERNEL);
+	temp = (struct mid_q_entry *) mempool_alloc(cifs_mid_poolp,SLAB_KERNEL | SLAB_NOFS);
 	if (temp == NULL)
 		return temp;
 	else {
@@ -79,7 +79,7 @@ DeleteMidQEntry(struct mid_q_entry *midEntry)
 	atomic_dec(&midCount);
 	spin_unlock(&GlobalMid_Lock);
 	cifs_buf_release(midEntry->resp_buf);
-	kmem_cache_free(cifs_mid_cachep, midEntry);
+	mempool_free(midEntry, cifs_mid_poolp);
 }
 
 struct oplock_q_entry *
