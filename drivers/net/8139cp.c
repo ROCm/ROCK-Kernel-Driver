@@ -24,17 +24,17 @@
 		PCI suspend/resume  - Felipe Damasio <felipewd@terra.com.br>
 			
 	TODO, in rough priority order:
+	* Test Tx checksumming thoroughly
+	* support 64-bit PCI DMA
 	* dev->tx_timeout
 	* LinkChg interrupt
 	* Support forcing media type with a module parameter,
 	  like dl2k.c/sundance.c
 	* Constants (module parms?) for Rx work limit
-	* support 64-bit PCI DMA
 	* Complete reset on PciErr
 	* Consider Rx interrupt mitigation using TimerIntr
 	* Implement 8139C+ statistics dump; maybe not...
 	  h/w stats can be reset only by software reset
-	* Tx checksumming
 	* Handle netif_rx return value
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
@@ -50,8 +50,8 @@
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.1.0"
-#define DRV_RELDATE		"Jun 14, 2002"
+#define DRV_VERSION		"0.2.0"
+#define DRV_RELDATE		"Aug 9, 2002"
 
 
 #include <linux/config.h>
@@ -67,9 +67,15 @@
 #include <linux/mii.h>
 #include <linux/if_vlan.h>
 #include <linux/crc32.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+/* experimental TX checksumming feature enable/disable */
+#undef CP_TX_CHECKSUM
+
+/* VLAN tagging feature enable/disable */
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define CP_VLAN_TAG_USED 1
 #define CP_VLAN_TX_TAG(tx_desc,vlan_tag_value) \
@@ -778,12 +784,22 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		wmb();
 
 #ifdef CP_TX_CHECKSUM
-		txd->opts1 = cpu_to_le32(eor | len | DescOwn | FirstFrag |
-			LastFrag | IPCS | UDPCS | TCPCS);
-#else
-		txd->opts1 = cpu_to_le32(eor | len | DescOwn | FirstFrag |
-			LastFrag);
+		if (skb->ip_summed == CHECKSUM_HW) {
+			const struct iphdr *ip = skb->nh.iph;
+			if (ip->protocol == IPPROTO_TCP)
+				txd->opts1 = cpu_to_le32(eor | len | DescOwn |
+							 FirstFrag | LastFrag |
+							 IPCS | TCPCS);
+			else if (ip->protocol == IPPROTO_UDP)
+				txd->opts1 = cpu_to_le32(eor | len | DescOwn |
+							 FirstFrag | LastFrag |
+							 IPCS | UDPCS);
+			else
+				BUG();
+		} else
 #endif
+			txd->opts1 = cpu_to_le32(eor | len | DescOwn |
+						 FirstFrag | LastFrag);
 		wmb();
 
 		cp->tx_skb[entry].skb = skb;
@@ -794,6 +810,9 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		struct cp_desc *txd;
 		u32 first_len, first_mapping;
 		int frag, first_entry = entry;
+#ifdef CP_TX_CHECKSUM
+		const struct iphdr *ip = skb->nh.iph;
+#endif
 
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
@@ -818,10 +837,18 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 						 len, PCI_DMA_TODEVICE);
 			eor = (entry == (CP_TX_RING_SIZE - 1)) ? RingEnd : 0;
 #ifdef CP_TX_CHECKSUM
-			ctrl = eor | len | DescOwn | IPCS | UDPCS | TCPCS;
-#else
-			ctrl = eor | len | DescOwn;
+			if (skb->ip_summed == CHECKSUM_HW) {
+				ctrl = eor | len | DescOwn | IPCS;
+				if (ip->protocol == IPPROTO_TCP)
+					ctrl |= TCPCS;
+				else if (ip->protocol == IPPROTO_UDP)
+					ctrl |= UDPCS;
+				else
+					BUG();
+			} else
 #endif
+				ctrl = eor | len | DescOwn;
+
 			if (frag == skb_shinfo(skb)->nr_frags - 1)
 				ctrl |= LastFrag;
 
@@ -845,10 +872,19 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		wmb();
 
 #ifdef CP_TX_CHECKSUM
-		txd->opts1 = cpu_to_le32(first_len | FirstFrag | DescOwn | IPCS | UDPCS | TCPCS);
-#else
-		txd->opts1 = cpu_to_le32(first_len | FirstFrag | DescOwn);
+		if (skb->ip_summed == CHECKSUM_HW) {
+			if (ip->protocol == IPPROTO_TCP)
+				txd->opts1 = cpu_to_le32(first_len | FirstFrag |
+							DescOwn | IPCS | TCPCS);
+			else if (ip->protocol == IPPROTO_UDP)
+				txd->opts1 = cpu_to_le32(first_len | FirstFrag |
+							DescOwn | IPCS | UDPCS);
+			else
+				BUG();
+		} else
 #endif
+			txd->opts1 = cpu_to_le32(first_len | FirstFrag |
+						 DescOwn);
 		wmb();
 	}
 	cp->tx_head = entry;
@@ -1173,6 +1209,7 @@ static int cp_close (struct net_device *dev)
 	return 0;
 }
 
+#ifdef BROKEN
 static int cp_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct cp_private *cp = dev->priv;
@@ -1206,6 +1243,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 
 	return rc;
 }
+#endif /* BROKEN */
 
 static char mii_2_8139_map[8] = {
 	BasicModeCtrl,
@@ -1805,7 +1843,9 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	dev->hard_start_xmit = cp_start_xmit;
 	dev->get_stats = cp_get_stats;
 	dev->do_ioctl = cp_ioctl;
+#ifdef BROKEN
 	dev->change_mtu = cp_change_mtu;
+#endif
 #if 0
 	dev->tx_timeout = cp_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
