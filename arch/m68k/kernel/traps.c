@@ -646,7 +646,7 @@ static inline void bus_error030 (struct frame *fp)
 			if (do_page_fault (&fp->ptregs, addr, errorcode) < 0)
 				return;
 		} else if (!(mmusr & MMU_I)) {
-			/* propably a 020 cas fault */
+			/* probably a 020 cas fault */
 			if (!(ssw & RM))
 				printk("unexpected bus error (%#x,%#x)\n", ssw, mmusr);
 		} else if (mmusr & (MMU_B|MMU_L|MMU_S)) {
