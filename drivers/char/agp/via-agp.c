@@ -384,6 +384,7 @@ found:
 
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
+	bridge->driver = &via_driver;
 
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_VIA_8367_0:
@@ -409,7 +410,6 @@ found:
 		}
 		/*FALLTHROUGH*/
 	default:
-		bridge->driver = &via_driver;
 		break;
 	}
 
