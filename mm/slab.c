@@ -2292,7 +2292,7 @@ unsigned int ksize(const void *objp)
 	unsigned long flags;
 	unsigned int size = 0;
 
-	if (likely(objp)) {
+	if (likely(objp != NULL)) {
 		local_irq_save(flags);
 		c = GET_PAGE_CACHE(virt_to_page(objp));
 		size = kmem_cache_size(c);
