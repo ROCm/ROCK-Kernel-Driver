@@ -26,6 +26,7 @@
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
+#include "nodemgr.h"
 
 
 struct hl_host_info {
@@ -227,10 +228,17 @@ struct hpsb_host *hpsb_get_host_bykey(struct hpsb_highlevel *hl, unsigned long k
 	return host;
 }
 
+static int highlevel_for_each_host_reg(struct hpsb_host *host, void *__data)
+{
+	struct hpsb_highlevel *hl = __data;
+
+	hl->add_host(host);
+
+	return 0;
+}
 
 void hpsb_register_highlevel(struct hpsb_highlevel *hl)
 {
-	struct list_head *lh;
 	unsigned long flags;
 
         INIT_LIST_HEAD(&hl->addr_list);
@@ -242,21 +250,25 @@ void hpsb_register_highlevel(struct hpsb_highlevel *hl)
         list_add_tail(&hl->hl_list, &hl_drivers);
 	write_unlock_irqrestore(&hl_drivers_lock, flags);
 
-	if (hl->add_host) {
-		down(&hpsb_hosts_lock);
-		list_for_each (lh, &hpsb_hosts) {
-			struct hpsb_host *host = list_entry(lh, struct hpsb_host, host_list);
-			hl->add_host(host);
-		}
-		up(&hpsb_hosts_lock);
-	}
+	if (hl->add_host)
+		nodemgr_for_each_host(hl, highlevel_for_each_host_reg);
 
         return;
 }
 
+static int highlevel_for_each_host_unreg(struct hpsb_host *host, void *__data)
+{
+	struct hpsb_highlevel *hl = __data;
+
+	hl->remove_host(host);
+	hpsb_destroy_hostinfo(hl, host);
+
+	return 0;
+}
+
 void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
 {
-        struct list_head *lh, *next;
+	struct list_head *lh, *next;
         struct hpsb_address_serve *as;
 	unsigned long flags;
 
@@ -272,16 +284,8 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
         list_del(&hl->hl_list);
 	write_unlock_irqrestore(&hl_drivers_lock, flags);
 
-        if (hl->remove_host) {
-		down(&hpsb_hosts_lock);
-		list_for_each(lh, &hpsb_hosts) {
-			struct hpsb_host *host = list_entry(lh, struct hpsb_host, host_list);
-
-			hl->remove_host(host);
-			hpsb_destroy_hostinfo(hl, host);
-		}
-		up(&hpsb_hosts_lock);
-	}
+        if (hl->remove_host)
+		nodemgr_for_each_host(hl, highlevel_for_each_host_unreg);
 }
 
 int hpsb_register_addrspace(struct hpsb_highlevel *hl,

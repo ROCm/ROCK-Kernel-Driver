@@ -40,11 +40,6 @@ struct hpsb_packet {
         unsigned expect_response:1;
         unsigned no_waiter:1;
 
-        /* Data big endianness flag - may vary from request to request.  The
-         * header is always in machine byte order.
-         * Not really used currently.  */
-        unsigned data_be:1;
-
         /* Speed to transmit with: 0 = 100Mbps, 1 = 200Mbps, 2 = 400Mbps */
         unsigned speed_code:2;
 
@@ -63,9 +58,6 @@ struct hpsb_packet {
 
         struct hpsb_host *host;
         unsigned int generation;
-
-        /* Very core internal, don't care. */
-        struct semaphore state_change;
 
 	/* Function (and possible data to pass to it) to call when this
 	 * packet is completed.  */
@@ -90,8 +82,8 @@ static inline struct hpsb_packet *driver_packet(struct list_head *l)
 void abort_timedouts(unsigned long __opaque);
 void abort_requests(struct hpsb_host *host);
 
-struct hpsb_packet *alloc_hpsb_packet(size_t data_size);
-void free_hpsb_packet(struct hpsb_packet *packet);
+struct hpsb_packet *hpsb_alloc_packet(size_t data_size);
+void hpsb_free_packet(struct hpsb_packet *packet);
 
 
 /*
@@ -108,14 +100,22 @@ static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
 }
 
 /*
- * Send a PHY configuration packet.
+ * Send a PHY configuration packet, return 0 on success, negative
+ * errno on failure.
  */
 int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt);
 
 /*
- * Queue packet for transmitting, return 0 for failure.
+ * Queue packet for transmitting, return 0 on success, negative errno
+ * on failure.
  */
 int hpsb_send_packet(struct hpsb_packet *packet);
+
+/*
+ * Queue packet for transmitting, and block until the transaction
+ * completes. Return 0 on success, negative errno on failure.
+ */
+int hpsb_send_packet_and_wait(struct hpsb_packet *packet);
 
 /* Initiate bus reset on the given host.  Returns 1 if bus reset already in
  * progress, 0 otherwise. */

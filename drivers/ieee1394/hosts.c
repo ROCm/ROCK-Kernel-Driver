@@ -16,14 +16,14 @@
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/pci.h>
 
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
+#include "nodemgr.h"
 
-LIST_HEAD(hpsb_hosts);
-DECLARE_MUTEX(hpsb_hosts_lock);
 
 static int dummy_transmit_packet(struct hpsb_host *h, struct hpsb_packet *p)
 {
@@ -46,54 +46,14 @@ static struct hpsb_host_driver dummy_driver = {
 	.isoctl =          dummy_isoctl
 };
 
-/**
- * hpsb_ref_host - increase reference count for host controller.
- * @host: the host controller
- *
- * Increase the reference count for the specified host controller.
- * When holding a reference to a host, the memory allocated for the
- * host struct will not be freed and the host is guaranteed to be in a
- * consistent state.  The driver may be unloaded or the controller may
- * be removed (PCMCIA), but the host struct will remain valid.
- */
-
-int hpsb_ref_host(struct hpsb_host *host)
+static int alloc_hostnum_cb(struct hpsb_host *host, void *__data)
 {
-        struct list_head *lh;
-        int retval = 0;
+	int *hostnum = __data;
 
-	down(&hpsb_hosts_lock);
-        list_for_each(lh, &hpsb_hosts) {
-                if (host == list_entry(lh, struct hpsb_host, host_list)) {
-			if (try_module_get(host->driver->owner)) {
-				atomic_inc(&host->refcount);
-				retval = 1;
-			}
-			break;
-        	}
-        }
-	up(&hpsb_hosts_lock);
+	if (host->id == *hostnum)
+		return 1;
 
-        return retval;
-}
-
-/**
- * hpsb_unref_host - decrease reference count for host controller.
- * @host: the host controller
- *
- * Decrease the reference count for the specified host controller.
- * When the reference count reaches zero, the memory allocated for the
- * &hpsb_host will be freed.
- */
-
-void hpsb_unref_host(struct hpsb_host *host)
-{
-	module_put(host->driver->owner);
-
-	down(&hpsb_hosts_lock);
-        if (atomic_dec_and_test(&host->refcount) && host->is_shutdown)
-		device_unregister(&host->device);
-	up(&hpsb_hosts_lock);
+	return 0;
 }
 
 /**
@@ -108,19 +68,16 @@ void hpsb_unref_host(struct hpsb_host *host)
  * driver specific parts, enable the controller and make it available
  * to the general subsystem using hpsb_add_host().
  *
- * The &hpsb_host is allocated with an single initial reference
- * belonging to the driver.  Once the driver is done with the struct,
- * for example, when the driver is unloaded, it should release this
- * reference using hpsb_unref_host().
- *
  * Return Value: a pointer to the &hpsb_host if succesful, %NULL if
  * no memory was available.
  */
 
-struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
+struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
+				  struct device *dev)
 {
         struct hpsb_host *h;
 	int i;
+	int hostnum = 0;
 
         h = kmalloc(sizeof(struct hpsb_host) + extra, SLAB_KERNEL);
         if (!h) return NULL;
@@ -128,7 +85,6 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
 	h->hostdata = h + 1;
         h->driver = drv;
-	atomic_set(&h->refcount, 1);
 
         INIT_LIST_HEAD(&h->pending_packets);
         spin_lock_init(&h->pending_pkt_lock);
@@ -146,53 +102,35 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
         h->topology_map = h->csr.topology_map + 3;
         h->speed_map = (u8 *)(h->csr.speed_map + 2);
 
-	return h;
-}
-
-static int alloc_hostnum(void)
-{
-	int hostnum = 0;
-
 	while (1) {
-		struct list_head *lh;
-		int found = 0;
-
-		list_for_each(lh, &hpsb_hosts) {
-			struct hpsb_host *host = list_entry(lh, struct hpsb_host, host_list);
-
-			if (host->id == hostnum) {
-				found = 1;
-				break;
-			}
+		if (!nodemgr_for_each_host(&hostnum, alloc_hostnum_cb)) {
+			h->id = hostnum;
+			break;
 		}
-
-		if (!found)
-			return hostnum;
 
 		hostnum++;
 	}
 
-	return 0;
+	memcpy(&h->device, &nodemgr_dev_template_host, sizeof(h->device));
+	h->device.parent = dev;
+	snprintf(h->device.bus_id, BUS_ID_SIZE, "fw-host%d", h->id);
+	device_register(&h->device);
+
+	return h;
 }
 
 void hpsb_add_host(struct hpsb_host *host)
 {
-	down(&hpsb_hosts_lock);
-	host->id = alloc_hostnum();
-        list_add_tail(&host->host_list, &hpsb_hosts);
-	up(&hpsb_hosts_lock);
-
         highlevel_add_host(host);
         host->driver->devctl(host, RESET_BUS, LONG_RESET);
 }
 
 void hpsb_remove_host(struct hpsb_host *host)
 {
-	down(&hpsb_hosts_lock);
         host->is_shutdown = 1;
         host->driver = &dummy_driver;
-	list_del(&host->host_list);
-	up(&hpsb_hosts_lock);
 
         highlevel_remove_host(host);
+
+	device_unregister(&host->device);
 }

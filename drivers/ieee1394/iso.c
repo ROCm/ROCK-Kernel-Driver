@@ -40,6 +40,7 @@ static struct hpsb_iso* hpsb_iso_common_init(struct hpsb_host *host, enum hpsb_i
 					     unsigned int data_buf_size,
 					     unsigned int buf_packets,
 					     int channel,
+					     int dma_mode,
 					     int irq_interval,
 					     void (*callback)(struct hpsb_iso*))
 {
@@ -58,8 +59,13 @@ static struct hpsb_iso* hpsb_iso_common_init(struct hpsb_host *host, enum hpsb_i
 	if (buf_packets < 2)
 		buf_packets = 2;
 
-	if (irq_interval < 1 || irq_interval > buf_packets / 2)
-		irq_interval = buf_packets / 2;
+	if ((dma_mode < HPSB_ISO_DMA_DEFAULT) || (dma_mode > HPSB_ISO_DMA_PACKET_PER_BUFFER))
+		dma_mode=HPSB_ISO_DMA_DEFAULT;
+
+	if (irq_interval == 0)     /* really interrupt for each packet*/
+		irq_interval = 1;
+	else if ((irq_interval < 0) || (irq_interval > buf_packets / 4))
+ 		irq_interval = buf_packets / 4;
 
 	if (channel < -1 || channel >= 64)
 		return NULL;
@@ -83,6 +89,7 @@ static struct hpsb_iso* hpsb_iso_common_init(struct hpsb_host *host, enum hpsb_i
 	init_waitqueue_head(&iso->waitq);
 	iso->channel = channel;
 	iso->irq_interval = irq_interval;
+	iso->dma_mode = dma_mode;
 	dma_region_init(&iso->data_buf);
 	iso->buf_size = round_up_to_page(data_buf_size);
 	iso->buf_packets = buf_packets;
@@ -136,7 +143,7 @@ struct hpsb_iso* hpsb_iso_xmit_init(struct hpsb_host *host,
 {
 	struct hpsb_iso *iso = hpsb_iso_common_init(host, HPSB_ISO_XMIT,
 						    data_buf_size, buf_packets,
-						    channel, irq_interval, callback);
+						    channel, HPSB_ISO_DMA_DEFAULT, irq_interval, callback);
 	if (!iso)
 		return NULL;
 
@@ -158,12 +165,13 @@ struct hpsb_iso* hpsb_iso_recv_init(struct hpsb_host *host,
 				    unsigned int data_buf_size,
 				    unsigned int buf_packets,
 				    int channel,
+				    int dma_mode,
 				    int irq_interval,
 				    void (*callback)(struct hpsb_iso*))
 {
 	struct hpsb_iso *iso = hpsb_iso_common_init(host, HPSB_ISO_RECV,
 						    data_buf_size, buf_packets,
-						    channel, irq_interval, callback);
+						    channel, dma_mode, irq_interval, callback);
 	if (!iso)
 		return NULL;
 

@@ -521,10 +521,6 @@ static void send_next(struct ti_lynx *lynx, int what)
                 break;
         }                
 
-        if (!packet->data_be) {
-                pcl.buffer[1].control |= PCL_BIGENDIAN;
-        }
-
         put_pcl(lynx, d->pcl, &pcl);
         run_pcl(lynx, d->pcl_start, d->channel);
 }
@@ -540,7 +536,7 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
         if (packet->data_size >= 4096) {
                 PRINT(KERN_ERR, lynx->id, "transmit packet data too big (%Zd)",
                       packet->data_size);
-                return 0;
+                return -EOVERFLOW;
         }
 
         switch (packet->type) {
@@ -554,7 +550,7 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
         default:
                 PRINT(KERN_ERR, lynx->id, "invalid packet type %d",
                       packet->type);
-                return 0;
+                return -EINVAL;
         }
 
         if (packet->tcode == TCODE_WRITEQ
@@ -570,7 +566,7 @@ static int lynx_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 
         spin_unlock_irqrestore(&d->queue_lock, flags);
 
-        return 1;
+        return 0;
 }
 
 
@@ -1120,7 +1116,7 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
         retval = copy_to_user(buffer, md->lynx->mem_dma_buffer, count);
         up(&md->lynx->mem_dma_mutex);
 
-        if (retval < 0) return retval;
+	if (retval) return -EFAULT;
         *offset += count;
         return count;
 }
@@ -1141,14 +1137,17 @@ static ssize_t mem_write(struct file *file, const char *buffer, size_t count,
         /* FIXME: dereferencing pointers to PCI mem doesn't work everywhere */
         switch (md->type) {
         case aux:
-                copy_from_user(md->lynx->aux_port+(*offset), buffer, count);
+		if (copy_from_user(md->lynx->aux_port+(*offset), buffer, count))
+			return -EFAULT;
                 break;
         case ram:
-                copy_from_user(md->lynx->local_ram+(*offset), buffer, count);
+		if (copy_from_user(md->lynx->local_ram+(*offset), buffer, count))
+			return -EFAULT;
                 break;
         case rom:
                 /* the ROM may be writeable */
-                copy_from_user(md->lynx->local_rom+(*offset), buffer, count);
+		if (copy_from_user(md->lynx->local_rom+(*offset), buffer, count))
+			return -EFAULT;
                 break;
         }
 
@@ -1443,11 +1442,14 @@ static void iso_rcv_bh(struct ti_lynx *lynx)
 static void remove_card(struct pci_dev *dev)
 {
         struct ti_lynx *lynx;
+	struct device *lynx_dev;
         int i;
 
         lynx = pci_get_drvdata(dev);
         if (!lynx) return;
         pci_set_drvdata(dev, NULL);
+
+	lynx_dev = get_device(&lynx->host->device);
 
         switch (lynx->state) {
         case is_host:
@@ -1498,7 +1500,9 @@ static void remove_card(struct pci_dev *dev)
         }
 
 	tasklet_kill(&lynx->iso_rcv.tq);
-	hpsb_unref_host(lynx->host);
+
+	if (lynx_dev)
+		put_device(lynx_dev);
 }
 
 
@@ -1535,7 +1539,7 @@ static int __devinit add_card(struct pci_dev *dev,
 
         error = -ENOMEM;
 
-	host = hpsb_alloc_host(&lynx_driver, sizeof(struct ti_lynx));
+	host = hpsb_alloc_host(&lynx_driver, sizeof(struct ti_lynx), &dev->dev);
         if (!host) FAIL("failed to allocate control structure memory");
 
         lynx = host->hostdata;
