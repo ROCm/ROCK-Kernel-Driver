@@ -2334,28 +2334,27 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *
 
 	/* find the lockowner */
         status = nfs_ok;
-	for (i=0; i < LOCK_HASH_SIZE; i++) {
-		list_for_each_entry(local, &lock_ownerstr_hashtbl[i], so_strhash) {
-			if(cmp_owner_str(local, owner, clid))
-				break;
-		}
-	}
-	if (local) {
-		struct nfs4_stateid *stp;
+	for (i=0; i < LOCK_HASH_SIZE; i++)
+		list_for_each_entry(local, &lock_ownerstr_hashtbl[i], so_strhash)
+			if(cmp_owner_str(local, owner, clid)) {
+				struct nfs4_stateid *stp;
 
-		/* check for any locks held by any stateid associated with the
-		 * (lock) stateowner */
-		status = nfserr_locks_held;
-		list_for_each_entry(stp, &local->so_perfilestate, st_perfilestate) {
-			if(stp->st_vfs_set) {
-				if (check_for_locks(&stp->st_vfs_file, local))
-					goto out;
+				/* check for any locks held by any stateid
+				 * associated with the (lock) stateowner */
+				status = nfserr_locks_held;
+				list_for_each_entry(stp, &local->so_perfilestate,
+						    st_perfilestate) {
+					if(stp->st_vfs_set) {
+						if (check_for_locks(&stp->st_vfs_file,
+								    local))
+							goto out;
+					}
+				}
+				/* no locks held by (lock) stateowner */
+				status = nfs_ok;
+				release_stateowner(local);
+				goto out;
 			}
-		}
-		/* no locks held by (lock) stateowner */
-		status = nfs_ok;
-		release_stateowner(local);
-	}
 out:
 	nfs4_unlock_state();
 	return status;
