@@ -185,6 +185,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82546EB_COPPER:
     case E1000_DEV_ID_82546EB_FIBER:
+    case E1000_DEV_ID_82546EB_QUAD_COPPER:
         hw->mac_type = e1000_82546;
         break;
     case E1000_DEV_ID_82541EI:
@@ -288,9 +289,7 @@ e1000_reset_hw(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
     }
 
@@ -737,9 +736,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
 
         if(hw->autoneg_advertised == ADVERTISE_1000_FULL) {
@@ -2293,9 +2290,7 @@ e1000_phy_hw_reset(struct e1000_hw *hw)
         /* Configure activity LED after PHY reset */
         led_ctrl = E1000_READ_REG(hw, LEDCTL);
         led_ctrl &= IGP_ACTIVITY_LED_MASK;
-        led_ctrl |= IGP_ACTIVITY_LED_ENABLE;
-        if(hw->mac_type == e1000_82547)
-            led_ctrl |= IGP_LED3_MODE;
+        led_ctrl |= (IGP_ACTIVITY_LED_ENABLE | IGP_LED3_MODE);
         E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
     }
 }
@@ -3801,6 +3796,7 @@ e1000_setup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
     case E1000_DEV_ID_82546EB_COPPER:
+    case E1000_DEV_ID_82546EB_QUAD_COPPER:
     case E1000_DEV_ID_82541EI:
     case E1000_DEV_ID_82541EP:
     case E1000_DEV_ID_82547EI:
@@ -3842,6 +3838,7 @@ e1000_cleanup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82545EM_FIBER:
     case E1000_DEV_ID_82546EB_COPPER:
     case E1000_DEV_ID_82546EB_FIBER:
+    case E1000_DEV_ID_82546EB_QUAD_COPPER:
     case E1000_DEV_ID_82541EI:
     case E1000_DEV_ID_82541EP:
     case E1000_DEV_ID_82547EI:
@@ -3896,6 +3893,7 @@ e1000_led_on(struct e1000_hw *hw)
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
     case E1000_DEV_ID_82546EB_COPPER:
+    case E1000_DEV_ID_82546EB_QUAD_COPPER:
     case E1000_DEV_ID_82541EI:
     case E1000_DEV_ID_82541EP:
     case E1000_DEV_ID_82547EI:
@@ -3949,6 +3947,7 @@ e1000_led_off(struct e1000_hw *hw)
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
     case E1000_DEV_ID_82546EB_COPPER:
+    case E1000_DEV_ID_82546EB_QUAD_COPPER:
     case E1000_DEV_ID_82541EI:
     case E1000_DEV_ID_82541EP:
     case E1000_DEV_ID_82547EI:
@@ -4206,7 +4205,11 @@ e1000_get_bus_info(struct e1000_hw *hw)
     status = E1000_READ_REG(hw, STATUS);
     hw->bus_type = (status & E1000_STATUS_PCIX_MODE) ?
                    e1000_bus_type_pcix : e1000_bus_type_pci;
-    if(hw->bus_type == e1000_bus_type_pci) {
+
+    if(hw->device_id == E1000_DEV_ID_82546EB_QUAD_COPPER) {
+        hw->bus_speed = (hw->bus_type == e1000_bus_type_pci) ?
+                        e1000_bus_speed_66 : e1000_bus_speed_120;
+    } else if(hw->bus_type == e1000_bus_type_pci) {
         hw->bus_speed = (status & E1000_STATUS_PCI66) ?
                         e1000_bus_speed_66 : e1000_bus_speed_33;
     } else {
