@@ -46,8 +46,6 @@ static struct inode_operations sysfs_dir_inode_operations;
 static struct address_space_operations sysfs_aops;
 
 static struct vfsmount *sysfs_mount;
-static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
-static int mount_count = 0;
 
 static struct backing_dev_info sysfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
@@ -132,18 +130,16 @@ static struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 static int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode *inode;
-	int error = -ENOSPC;
+	int error = 0;
 
-	if (dentry->d_inode)
-		return -EEXIST;
-
-	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
-	 * comes from the sysfs API below. */
-	inode = sysfs_get_inode(dir->i_sb, mode, dev);
-	if (inode) {
-		d_instantiate(dentry, inode);
-		error = 0;
-	}
+	if (!dentry->d_inode) {
+		inode = sysfs_get_inode(dir->i_sb, mode, dev);
+		if (inode)
+			d_instantiate(dentry, inode);
+		else
+			error = -ENOSPC;
+	} else
+		error = -EEXIST;
 	return error;
 }
 
@@ -450,60 +446,20 @@ static struct file_system_type sysfs_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
-static int get_mount(void)
-{
-	struct vfsmount * mnt;
-
-	spin_lock(&mount_lock);
-	if (sysfs_mount) {
-		mntget(sysfs_mount);
-		++mount_count;
-		spin_unlock(&mount_lock);
-		goto go_ahead;
-	}
-
-	spin_unlock(&mount_lock);
-	mnt = kern_mount(&sysfs_fs_type);
-
-	if (IS_ERR(mnt)) {
-		printk(KERN_ERR "sysfs: could not mount!\n");
-		return -ENODEV;
-	}
-
-	spin_lock(&mount_lock);
-	if (!sysfs_mount) {
-		sysfs_mount = mnt;
-		++mount_count;
-		spin_unlock(&mount_lock);
-		goto go_ahead;
-	}
-
-	mntget(sysfs_mount);
-	++mount_count;
-	spin_unlock(&mount_lock);
-
- go_ahead:
-	pr_debug("sysfs: mount_count = %d\n",mount_count);
-	return 0;
-}
-
-static void put_mount(void)
-{
-	struct vfsmount * mnt;
-
-	spin_lock(&mount_lock);
-	mnt = sysfs_mount;
-	--mount_count;
-	if (!mount_count)
-		sysfs_mount = NULL;
-	spin_unlock(&mount_lock);
-	mntput(mnt);
-	pr_debug("sysfs: mount_count = %d\n",mount_count);
-}
-
 static int __init sysfs_init(void)
 {
-	return register_filesystem(&sysfs_fs_type);
+	int err;
+
+	err = register_filesystem(&sysfs_fs_type);
+	if (!err) {
+		sysfs_mount = kern_mount(&sysfs_fs_type);
+		if (IS_ERR(sysfs_mount)) {
+			printk(KERN_ERR "sysfs: could not mount!\n");
+			err = PTR_ERR(sysfs_mount);
+			sysfs_mount = NULL;
+		}
+	}
+	return err;
 }
 
 core_initcall(sysfs_init);
@@ -534,18 +490,14 @@ sysfs_create_dir(struct driver_dir_entry * entry,
 	if (!entry)
 		return -EINVAL;
 
-	get_mount();
-
 	parent_dentry = parent ? parent->dentry : NULL;
 
 	if (!parent_dentry)
 		if (sysfs_mount && sysfs_mount->mnt_sb)
 			parent_dentry = sysfs_mount->mnt_sb->s_root;
 
-	if (!parent_dentry) {
-		put_mount();
+	if (!parent_dentry)
 		return -EFAULT;
-	}
 
 	down(&parent_dentry->d_inode->i_sem);
 	dentry = get_dentry(parent_dentry,entry->name);
@@ -557,8 +509,6 @@ sysfs_create_dir(struct driver_dir_entry * entry,
 		error = PTR_ERR(dentry);
 	up(&parent_dentry->d_inode->i_sem);
 
-	if (error)
-		put_mount();
 	return error;
 }
 
@@ -577,10 +527,8 @@ sysfs_create_file(struct attribute * entry,
 	if (!entry || !parent)
 		return -EINVAL;
 
-	if (!parent->dentry) {
-		put_mount();
+	if (!parent->dentry)
 		return -EINVAL;
-	}
 
 	down(&parent->dentry->d_inode->i_sem);
 	dentry = get_dentry(parent->dentry,entry->name);
@@ -606,13 +554,9 @@ int sysfs_create_symlink(struct driver_dir_entry * parent,
 	struct dentry * dentry;
 	int error = 0;
 
-	if (!parent)
+	if (!parent || !parent->dentry)
 		return -EINVAL;
 
-	if (!parent->dentry) {
-		put_mount();
-		return -EINVAL;
-	}
 	down(&parent->dentry->d_inode->i_sem);
 	dentry = get_dentry(parent->dentry,name);
 	if (!IS_ERR(dentry))
@@ -664,7 +608,7 @@ void sysfs_remove_dir(struct driver_dir_entry * dir)
 	struct dentry * parent;
 
 	if (!dentry)
-		goto done;
+		return;
 
 	parent = dget(dentry->d_parent);
 	down(&parent->d_inode->i_sem);
@@ -688,8 +632,6 @@ void sysfs_remove_dir(struct driver_dir_entry * dir)
 
 	up(&parent->d_inode->i_sem);
 	dput(parent);
- done:
-	put_mount();
 }
 
 EXPORT_SYMBOL(sysfs_create_file);
