@@ -273,9 +273,9 @@ ia32_syscall_table:
 	data8 sys32_sigsuspend
 	data8 compat_sys_sigpending
 	data8 sys_sethostname
-	data8 sys32_setrlimit	  /* 75 */
-	data8 sys32_old_getrlimit
-	data8 sys32_getrusage
+	data8 compat_sys_setrlimit	  /* 75 */
+	data8 compat_sys_old_getrlimit
+	data8 compat_sys_getrusage
 	data8 sys32_gettimeofday
 	data8 sys32_settimeofday
 	data8 sys32_getgroups16	  /* 80 */
@@ -312,7 +312,7 @@ ia32_syscall_table:
 	data8 sys_vhangup
 	data8 sys32_ni_syscall		/* used to be sys_idle */
 	data8 sys32_ni_syscall
-	data8 sys32_wait4
+	data8 compat_sys_wait4
 	data8 sys_swapoff	  /* 115 */
 	data8 sys32_sysinfo
 	data8 sys32_ipc
@@ -389,7 +389,7 @@ ia32_syscall_table:
 	data8 sys32_ni_syscall		  /* streams1 */
 	data8 sys32_ni_syscall		  /* streams2 */
 	data8 sys32_vfork	  /* 190 */
-	data8 sys32_getrlimit
+	data8 compat_sys_getrlimit
 	data8 sys32_mmap2
 	data8 sys32_truncate64
 	data8 sys32_ftruncate64
