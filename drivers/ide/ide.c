@@ -288,8 +288,8 @@ u8 ata_dump(struct ata_device *drive, struct request * rq, const char *msg)
 	u8 err = 0;
 
 	/* FIXME:  --bzolnier */
-	__save_flags (flags);	/* local CPU only */
-	ide__sti();		/* local CPU only */
+	__save_flags(flags);
+	local_irq_enable();
 
 	printk("%s: %s: status=0x%02x", drive->name, msg, drive->status);
 	dump_bits(ata_status_msgs, ARRAY_SIZE(ata_status_msgs), drive->status);
@@ -337,7 +337,8 @@ u8 ata_dump(struct ata_device *drive, struct request * rq, const char *msg)
 #endif
 		printk("\n");
 	}
-	__restore_flags (flags);	/* local CPU only */
+	__restore_flags (flags);
+
 	return err;
 }
 
@@ -522,7 +523,7 @@ static void do_request(struct ata_channel *channel)
 	unsigned int unit;
 	ide_startstop_t ret;
 
-	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
+	local_irq_disable();	/* necessary paranoia */
 
 	/*
 	 * Select the next device which will be serviced.  This selects
@@ -683,7 +684,8 @@ static void do_request(struct ata_channel *channel)
 		drive->rq = rq;
 
 		spin_unlock(ch->lock);
-		ide__sti();	/* allow other IRQs while we start this request */
+		/* allow other IRQs while we start this request */
+		local_irq_enable();
 
 		/*
 		 * This initiates handling of a new I/O request.
@@ -837,8 +839,8 @@ void ide_timer_expiry(unsigned long data)
 #else
 		disable_irq(ch->irq);	/* disable_irq_nosync ?? */
 #endif
-		/* FIXME: IRQs are already disabled by spin_lock_irqsave()  --bzolnier */
-		__cli();	/* local CPU only, as if we were handling an interrupt */
+
+		local_irq_disable();
 		if (ch->poll_timeout) {
 			ret = handler(drive, drive->rq);
 		} else if (ata_status_irq(drive)) {
@@ -906,7 +908,7 @@ void ide_timer_expiry(unsigned long data)
  * drive enters "idle", "standby", or "sleep" mode, so if the status looks
  * "good", we just ignore the interrupt completely.
  *
- * This routine assumes __cli() is in effect when called.
+ * This routine assumes IRQ are disabled on entry.
  *
  * If an unexpected interrupt happens on irq15 while we are handling irq14
  * and if the two interfaces are "serialized" (CMD640), then it looks like
@@ -955,7 +957,7 @@ static void unexpected_irq(int irq)
 }
 
 /*
- * Entry point for all interrupts, caller does __cli() for us.
+ * Entry point for all interrupts. Aussumes disabled IRQs.
  */
 void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 {
@@ -1024,7 +1026,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	spin_unlock(ch->lock);
 
 	if (ch->unmask)
-		ide__sti();
+		local_irq_enable();
 
 	/*
 	 * Service this interrupt, this may setup handler for next interrupt.
@@ -1185,12 +1187,12 @@ static int ide_check_media_change(kdev_t i_rdev)
 }
 
 struct block_device_operations ide_fops[] = {{
-	owner:			THIS_MODULE,
-	open:			ide_open,
-	release:		ide_release,
-	ioctl:			ata_ioctl,
-	check_media_change:	ide_check_media_change,
-	revalidate:		ata_revalidate
+	.owner =		THIS_MODULE,
+	.open =			ide_open,
+	.release =		ide_release,
+	.ioctl =		ata_ioctl,
+	.check_media_change =	ide_check_media_change,
+	.revalidate =		ata_revalidate
 }};
 
 EXPORT_SYMBOL(ide_fops);

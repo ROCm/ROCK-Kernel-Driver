@@ -697,75 +697,75 @@ void __init ide_scan_pcibus(int scan_direction)
  */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_PCTECH,
-		device: PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_PCTECH,
+		.device = PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_CMD,
-		device: PCI_DEVICE_ID_CMD_640,
-		init_channel: ATA_PCI_IGNORE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_CMD,
+		.device = PCI_DEVICE_ID_CMD_640,
+		.init_channel = ATA_PCI_IGNORE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_NS,
-		device: PCI_DEVICE_ID_NS_87410,
-		enablebits: {{0x43,0x08,0x08}, {0x47,0x08,0x08}},
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_NS,
+		.device = PCI_DEVICE_ID_NS_87410,
+		.enablebits = {{0x43,0x08,0x08}, {0x47,0x08,0x08}},
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_HINT,
-		device: PCI_DEVICE_ID_HINT_VXPROII_IDE,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_HINT,
+		.device = PCI_DEVICE_ID_HINT_VXPROII_IDE,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_HOLTEK,
-		device: PCI_DEVICE_ID_HOLTEK_6565,
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_HOLTEK,
+		.device = PCI_DEVICE_ID_HOLTEK_6565,
+		.bootable = ON_BOARD
 	},
 	{
-		vendor: PCI_VENDOR_ID_INTEL,
-		device: PCI_DEVICE_ID_INTEL_82371MX,
-		enablebits: {{0x6D,0x80,0x80}, {0x00,0x00,0x00}},
-		bootable: ON_BOARD,
-		flags: ATA_F_NODMA
+		.vendor = PCI_VENDOR_ID_INTEL,
+		.device = PCI_DEVICE_ID_INTEL_82371MX,
+		.enablebits = {{0x6D,0x80,0x80}, {0x00,0x00,0x00}},
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NODMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8673F,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8673F,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8886A,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8886A,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_UMC,
-		device: PCI_DEVICE_ID_UMC_UM8886BF,
-		bootable: ON_BOARD,
-		flags: ATA_F_FIXIRQ
+		.vendor = PCI_VENDOR_ID_UMC,
+		.device = PCI_DEVICE_ID_UMC_UM8886BF,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_FIXIRQ
 	},
 	{
-		vendor: PCI_VENDOR_ID_VIA,
-		device: PCI_DEVICE_ID_VIA_82C561,
-		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C561,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NOADMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_VIA,
-		device: PCI_DEVICE_ID_VIA_82C586_1,
-		bootable: ON_BOARD,
-		flags: ATA_F_NOADMA
+		.vendor = PCI_VENDOR_ID_VIA,
+		.device = PCI_DEVICE_ID_VIA_82C586_1,
+		.bootable = ON_BOARD,
+		.flags = ATA_F_NOADMA
 	},
 	{
-		vendor: PCI_VENDOR_ID_TTI,
-		device: PCI_DEVICE_ID_TTI_HPT366,
-		bootable: OFF_BOARD,
-		extra: 240,
-		flags: ATA_F_IRQ | ATA_F_HPTHACK
+		.vendor = PCI_VENDOR_ID_TTI,
+		.device = PCI_DEVICE_ID_TTI_HPT366,
+		.bootable = OFF_BOARD,
+		.extra = 240,
+		.flags = ATA_F_IRQ | ATA_F_HPTHACK
 	}
 };
 

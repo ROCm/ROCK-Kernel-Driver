@@ -127,8 +127,7 @@ static void ht6560b_selectproc(struct ata_device *drive)
 	static u8 current_timing = 0;
 	u8 select, timing;
 
-	__save_flags (flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 
 	select = HT_CONFIG(drive);
 	timing = HT_TIMING(drive);
@@ -152,7 +151,7 @@ static void ht6560b_selectproc(struct ata_device *drive)
 		printk("ht6560b: %s: select=%#x timing=%#x\n", drive->name, select, timing);
 #endif
 	}
-	__restore_flags (flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 /*

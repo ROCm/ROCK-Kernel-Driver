@@ -318,10 +318,11 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 	if (ata_status(drive, 0, DRQ_STAT)) {	/* No more interrupts */
 		if (test_bit(IDESCSI_LOG_CMD, &scsi->log))
 			printk (KERN_INFO "Packet command completed, %d bytes transferred\n", pc->actually_transferred);
-		ide__sti();
+		local_irq_enable();
 		if (drive->status & ERR_STAT)
 			rq->errors++;
 		idescsi_end_request(drive, rq, 1);
+
 		return ATA_OP_FINISHED;
 	}
 	bcount = IN_BYTE (IDE_BCOUNTH_REG) << 8 | IN_BYTE (IDE_BCOUNTL_REG);

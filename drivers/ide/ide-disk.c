@@ -1443,18 +1443,18 @@ static void idedisk_attach(struct ata_device *drive);
  * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
-	owner:			THIS_MODULE,
-	attach:			idedisk_attach,
-	cleanup:		idedisk_cleanup,
-	standby:		idedisk_standby,
-	do_request:		idedisk_do_request,
-	end_request:		NULL,
-	ioctl:			idedisk_ioctl,
-	open:			idedisk_open,
-	release:		idedisk_release,
-	check_media_change:	idedisk_check_media_change,
-	revalidate:		NULL, /* use default method */
-	capacity:		idedisk_capacity,
+	.owner =		THIS_MODULE,
+	.attach =		idedisk_attach,
+	.cleanup =		idedisk_cleanup,
+	.standby =		idedisk_standby,
+	.do_request =		idedisk_do_request,
+	.end_request =		NULL,
+	.ioctl =		idedisk_ioctl,
+	.open =			idedisk_open,
+	.release =		idedisk_release,
+	.check_media_change =	idedisk_check_media_change,
+	.revalidate =		NULL, /* use default method */
+	.capacity =		idedisk_capacity,
 };
 
 static void idedisk_attach(struct ata_device *drive)

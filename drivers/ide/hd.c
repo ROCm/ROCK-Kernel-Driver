@@ -693,12 +693,12 @@ static int hd_release(struct inode * inode, struct file * file)
 extern struct block_device_operations hd_fops;
 
 static struct gendisk hd_gendisk = {
-	major:		MAJOR_NR,
-	major_name:	"hd",
-	minor_shift:	6,
-	part:		hd,
-	sizes:		hd_sizes,
-	fops:		&hd_fops,
+	.major =	MAJOR_NR,
+	.major_name =	"hd",
+	.minor_shift =	6,
+	.part =		hd,
+	.sizes =	hd_sizes,
+	.fops =		&hd_fops,
 };
 	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -714,9 +714,9 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct block_device_operations hd_fops = {
-	open:		hd_open,
-	release:	hd_release,
-	ioctl:		hd_ioctl,
+	.open =		hd_open,
+	.release =	hd_release,
+	.ioctl =	hd_ioctl,
 };
 
 /*

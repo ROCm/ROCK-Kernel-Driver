@@ -22,8 +22,6 @@
 #define MAX_HWIFS	2
 #endif
 
-#define ide__sti()	__sti()
-
 static __inline__ int ide_default_irq_hp600(ide_ioreg_t base)
 {
 	switch (base) {

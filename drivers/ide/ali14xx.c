@@ -46,11 +46,12 @@
 
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4
-static int ports[ALI_NUM_PORTS] __initdata = { 0x074, 0x0f4, 0x034, 0x0e4 };
+static int ports[ALI_NUM_PORTS] __initdata =
+    { 0x074, 0x0f4, 0x034, 0x0e4 };
 
 /* register initialization data */
 struct reg_initializer {
-	u8 reg, data; 
+	u8 reg, data;
 };
 
 static struct reg_initializer init_data[] __initdata = {
@@ -67,17 +68,21 @@ static struct reg_initializer init_data[] __initdata = {
 static struct {
 	u8 reg1, reg2, reg3, reg4;
 } reg_tab[4] = {
-	{ 0x03, 0x26, 0x04, 0x27 },	/* drive 0 */
-	{ 0x05, 0x28, 0x06, 0x29 },	/* drive 1 */
-	{ 0x2b, 0x30, 0x2c, 0x31 },	/* drive 2 */
-	{ 0x2d, 0x32, 0x2e, 0x33 },	/* drive 3 */
+	{
+	0x03, 0x26, 0x04, 0x27},	/* drive 0 */
+	{
+	0x05, 0x28, 0x06, 0x29},	/* drive 1 */
+	{
+	0x2b, 0x30, 0x2c, 0x31},	/* drive 2 */
+	{
+	0x2d, 0x32, 0x2e, 0x33},	/* drive 3 */
 };
 
-static int base_port;	/* base port address */
-static int reg_port;	/* port for register number */
-static int data_port;	/* port for register data */
-static u8 reg_on;	/* output to base port to access registers */
-static u8 reg_off;	/* output to base port to close registers */
+static int base_port;		/* base port address */
+static int reg_port;		/* port for register number */
+static int data_port;		/* port for register data */
+static u8 reg_on;		/* output to base port to access registers */
+static u8 reg_off;		/* output to base port to close registers */
 
 /*
  * Read a controller register.
@@ -121,13 +126,16 @@ static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 	time1 = t->cycle;
 	time2 = t->active;
 	param3 = param1 = (time2 * system_bus_speed + 999999) / 1000000;
-	param4 = param2 = (time1 * system_bus_speed + 999999) / 1000000 - param1;
+	param4 = param2 =
+	    (time1 * system_bus_speed + 999999) / 1000000 - param1;
 	if (pio < XFER_PIO_3) {
 		param3 += 8;
 		param4 += 8;
 	}
-	printk(KERN_DEBUG "%s: PIO mode%d, t1=%dns, t2=%dns, cycles = %d+%d, %d+%d\n",
-		drive->name, pio - XFER_PIO_0, time1, time2, param1, param2, param3, param4);
+	printk(KERN_DEBUG
+	       "%s: PIO mode%d, t1=%dns, t2=%dns, cycles = %d+%d, %d+%d\n",
+	       drive->name, pio - XFER_PIO_0, time1, time2, param1, param2,
+	       param3, param4);
 
 	/* stuff timing parameters into controller registers */
 	drive_num = (drive->channel->index << 1) + drive->select.b.unit;
@@ -150,8 +158,7 @@ static int __init find_port(void)
 	int i;
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	for (i = 0; i < ALI_NUM_PORTS; i++) {
 		base_port = ports[i];
 		reg_off = inb(base_port);
@@ -163,7 +170,7 @@ static int __init find_port(void)
 				data_port = base_port + 8;
 				t = in_reg(0) & 0xf0;
 				outb_p(reg_off, base_port);
-				__restore_flags(flags);	/* local CPU only */
+				local_irq_restore(flags);
 				if (t != 0x50)
 					return 0;
 				return 1;	/* success */
@@ -171,7 +178,8 @@ static int __init find_port(void)
 		}
 		outb_p(reg_off, base_port);
 	}
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
+
 	return 0;
 }
 
@@ -184,15 +192,15 @@ static int __init init_registers(void)
 	unsigned long flags;
 	u8 t;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	outb_p(reg_on, base_port);
 	for (p = init_data; p->reg != 0; ++p)
 		out_reg(p->data, p->reg);
 	outb_p(0x01, reg_port);
 	t = inb(reg_port) & 0x01;
 	outb_p(reg_off, base_port);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
+
 	return t;
 }
 
@@ -205,7 +213,7 @@ void __init init_ali14xx(void)
 	}
 
 	printk(KERN_DEBUG "ali14xx: base=%#03x, reg_on=%#02x\n",
-		base_port, reg_on);
+	       base_port, reg_on);
 	ide_hwifs[0].chipset = ide_ali14xx;
 	ide_hwifs[1].chipset = ide_ali14xx;
 	ide_hwifs[0].tuneproc = &ali14xx_tune_drive;

@@ -57,7 +57,7 @@ static const int pcide_offsets[IDE_NR_PORTS] = {
 
 static int q40ide_default_irq(q40ide_ioreg_t base)
 {
-           switch (base) { 
+           switch (base) {
 	            case 0x1f0: return 14;
 		    case 0x170: return 15;
 		    case 0x1e8: return 11;
@@ -66,12 +66,9 @@ static int q40ide_default_irq(q40ide_ioreg_t base)
 	   }
 }
 
-
-
-    /*
-     *  Probe for Q40 IDE interfaces
-     */
-
+/*
+ *  Probe for Q40 IDE interfaces
+ */
 void q40ide_init(void)
 {
     int i;

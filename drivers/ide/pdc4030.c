@@ -106,26 +106,24 @@ static void read_vlb(struct ata_device *drive, void *buffer, unsigned int wcount
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	insl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void write_vlb(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	unsigned long flags;
 
-	__save_flags(flags);	/* local CPU only */
-	__cli();		/* local CPU only */
+	local_irq_save(flags);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	inb(IDE_NSECTOR_REG);
 	outsl(IDE_DATA_REG, buffer, wcount);
-	__restore_flags(flags);	/* local CPU only */
+	local_irq_restore(flags);
 }
 
 static void read_16(struct ata_device *drive, void *buffer, unsigned int wcount)
@@ -701,7 +699,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 			return ret;
 		}
 		if (!drive->channel->unmask)
-			__cli();	/* local CPU only */
+			local_irq_disable();
 
 		return promise_do_write(drive, rq);
 	}

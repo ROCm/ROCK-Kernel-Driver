@@ -73,10 +73,10 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 		if (r_clc >= 16)
 			r_clc = 0;
 	}
-	__save_flags(flags);
-	__cli();
-	
-	/* 
+
+	local_irq_save(flags);
+
+	/*
 	 * PIO mode => ATA FIFO on, ATAPI FIFO off
 	 */
 	pci_read_config_byte(dev, portFIFO, &cd_dma_fifo);
@@ -96,7 +96,8 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 
 	pci_write_config_byte(dev, port, s_clc);
 	pci_write_config_byte(dev, port+drive->select.b.unit+2, (a_clc << 4) | r_clc);
-	__restore_flags(flags);
+
+	local_irq_restore(flags);
 }
 
 static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
@@ -216,8 +217,7 @@ static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 	unsigned long flags;
 	byte tmpbyte;
 
-	__save_flags(flags);
-	__cli();
+	local_irq_save(flags);
 
 	if (m5229_revision >= 0xC2) {
 		/*
@@ -297,9 +297,9 @@ static unsigned int __init ali15x3_ata66_check(struct ata_channel *hwif)
 
 	pci_write_config_byte(dev, 0x53, tmpbyte);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
-	return(ata66);
+	return (ata66);
 }
 
 static void __init ali15x3_init_channel(struct ata_channel *hwif)
@@ -374,22 +374,22 @@ static void __init ali15x3_init_dma(struct ata_channel *ch, unsigned long dmabas
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_AL,
-	        device: PCI_DEVICE_ID_AL_M5219,
+		.vendor = PCI_VENDOR_ID_AL,
+	        .device = PCI_DEVICE_ID_AL_M5219,
 		/* FIXME: Perhaps we should use the same init routines
 		 * as below here. */
-		enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
-		bootable: ON_BOARD,
-		flags: ATA_F_SIMPLEX
+		.enablebits = { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+		.bootable = ON_BOARD,
+		.flags = ATA_F_SIMPLEX
 	},
 	{
-		vendor: PCI_VENDOR_ID_AL,
-	        device: PCI_DEVICE_ID_AL_M5229,
-		init_chipset: ali15x3_init_chipset,
-		init_channel: ali15x3_init_channel,
-		init_dma: ali15x3_init_dma,
-		enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
-		bootable: ON_BOARD
+		.vendor = PCI_VENDOR_ID_AL,
+	        .device = PCI_DEVICE_ID_AL_M5229,
+		.init_chipset = ali15x3_init_chipset,
+		.init_channel = ali15x3_init_channel,
+		.init_dma = ali15x3_init_dma,
+		.enablebits = { {0x00,0x00,0x00}, {0x00,0x00,0x00} },
+		.bootable = ON_BOARD
 	}
 };
 
@@ -397,9 +397,8 @@ int __init init_ali15x3(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
         return 0;
 }

@@ -143,7 +143,7 @@ static ide_startstop_t special_intr(struct ata_device *drive, struct request *rq
 	struct ata_taskfile *ar = rq->special;
 	ide_startstop_t ret = ATA_OP_FINISHED;
 
-	ide__sti();
+	local_irq_enable();
 
 	if (rq->buffer && ar->taskfile.sector_number) {
 		if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {

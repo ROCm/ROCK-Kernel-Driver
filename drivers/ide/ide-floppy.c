@@ -593,9 +593,9 @@ static ide_startstop_t idefloppy_pc_intr(struct ata_device *drive, struct reques
 #if IDEFLOPPY_DEBUG_LOG
 		printk (KERN_INFO "Packet command completed, %d bytes transferred\n", pc->actually_transferred);
 #endif /* IDEFLOPPY_DEBUG_LOG */
-		clear_bit (PC_DMA_IN_PROGRESS, &pc->flags);
+		clear_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 
-		ide__sti();	/* local CPU only */
+		local_irq_enable();
 
 		if (status.b.check || test_bit(PC_DMA_ERROR, &pc->flags)) {	/* Error detected */
 #if IDEFLOPPY_DEBUG_LOG
@@ -1345,18 +1345,18 @@ static int idefloppy_get_format_progress(struct ata_device *drive,
 			progress_indication=floppy->progress_indication;
 		}
 		/* Else assume format_unit has finished, and we're
-		** at 0x10000 */
+		 * at 0x10000
+		 */
 	}
 	else
 	{
 		atapi_status_reg_t status;
 		unsigned long flags;
 
-		__save_flags(flags);
-		__cli();
+		local_irq_save(flags);
 		ata_status(drive, 0, 0);
 		status.all = drive->status;
-		__restore_flags(flags);
+		local_irq_restore(flags);
 
 		progress_indication= !status.b.dsc ? 0:0x10000;
 	}
@@ -1735,18 +1735,18 @@ static void idefloppy_attach(struct ata_device *drive);
  *	IDE subdriver functions, registered with ide.c
  */
 static struct ata_operations idefloppy_driver = {
-	owner:			THIS_MODULE,
-	attach:			idefloppy_attach,
-	cleanup:		idefloppy_cleanup,
-	standby:		NULL,
-	do_request:		idefloppy_do_request,
-	end_request:		idefloppy_end_request,
-	ioctl:			idefloppy_ioctl,
-	open:			idefloppy_open,
-	release:		idefloppy_release,
-	check_media_change:	idefloppy_check_media_change,
-	revalidate:		NULL, /* use default method */
-	capacity:		idefloppy_capacity,
+	.owner =		THIS_MODULE,
+	.attach =		idefloppy_attach,
+	.cleanup =		idefloppy_cleanup,
+	.standby =		NULL,
+	.do_request =		idefloppy_do_request,
+	.end_request =		idefloppy_end_request,
+	.ioctl =		idefloppy_ioctl,
+	.open =			idefloppy_open,
+	.release =		idefloppy_release,
+	.check_media_change =	idefloppy_check_media_change,
+	.revalidate =		NULL, /* use default method */
+	.capacity =		idefloppy_capacity,
 };
 
 static void idefloppy_attach(struct ata_device *drive)

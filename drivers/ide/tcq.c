@@ -61,7 +61,7 @@ static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request 
 	struct ata_taskfile *args = rq->special;
 	struct ata_channel *ch = drive->channel;
 
-	ide__sti();
+	local_irq_enable();
 
 	spin_lock_irqsave(ch->lock, flags);
 

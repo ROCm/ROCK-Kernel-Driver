@@ -84,24 +84,24 @@ struct pdc_bit_messages {
 };
 
 static struct pdc_bit_messages pdc_reg_A[] = {
-	{ 0x80, "SYNC_IN" },
-	{ 0x40, "ERRDY_EN" },
-	{ 0x20, "IORDY_EN" },
-	{ 0x10, "PREFETCH_EN" },
+	{0x80, "SYNC_IN"},
+	{0x40, "ERRDY_EN"},
+	{0x20, "IORDY_EN"},
+	{0x10, "PREFETCH_EN"},
 	/* PA3-PA0 - PIO "A" timing */
 };
 
 static struct pdc_bit_messages pdc_reg_B[] = {
 	/* MB2-MB0 - DMA "B" timing */
-	{ 0x10, "PIO_FORCED/PB4" },	/* PIO_FORCE 1:0 */
+	{0x10, "PIO_FORCED/PB4"},	/* PIO_FORCE 1:0 */
 	/* PB3-PB0 - PIO "B" timing */
 };
 
 static struct pdc_bit_messages pdc_reg_C[] = {
-	{ 0x80, "DMARQp" },
-	{ 0x40, "IORDYp" },
-	{ 0x20, "DMAR_EN" },
-	{ 0x10, "DMAW_EN" },
+	{0x80, "DMARQp"},
+	{0x40, "IORDYp"},
+	{0x20, "DMAR_EN"},
+	{0x10, "DMAW_EN"},
 	/* MC3-MC0 - DMA "C" timing */
 };
 
@@ -117,9 +117,9 @@ static void pdc_dump_bits(struct pdc_bit_messages *msgs, byte bits)
 
 	printk(KERN_DEBUG " }\n");
 }
-#endif /* PDC202XX_DECODE_REGISTER_INFO */
+#endif				/* PDC202XX_DECODE_REGISTER_INFO */
 
-static struct ata_device* drives[4];
+static struct ata_device *drives[4];
 
 int check_in_drive_lists(struct ata_device *drive)
 {
@@ -135,7 +135,7 @@ int check_in_drive_lists(struct ata_device *drive)
 		NULL
 	};
 
-	const char**list = pdc_quirk_drives;
+	const char **list = pdc_quirk_drives;
 	struct hd_driveid *id = drive->id;
 
 	while (*list)
@@ -148,25 +148,27 @@ static int __init pdc202xx_modes_map(struct ata_channel *ch)
 {
 	int map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA;
 
-	switch(ch->pci_dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20271:
-		case PCI_DEVICE_ID_PROMISE_20269:
-			map |= XFER_UDMA_133;
-		case PCI_DEVICE_ID_PROMISE_20268R:
-		case PCI_DEVICE_ID_PROMISE_20268:
-			map &= ~XFER_SWDMA;
-		case PCI_DEVICE_ID_PROMISE_20267:
-		case PCI_DEVICE_ID_PROMISE_20265:
-			map |= XFER_UDMA_100;
-		case PCI_DEVICE_ID_PROMISE_20262:
-			map |= XFER_UDMA_66;
+	switch (ch->pci_dev->device) {
+	case PCI_DEVICE_ID_PROMISE_20276:
+	case PCI_DEVICE_ID_PROMISE_20275:
+	case PCI_DEVICE_ID_PROMISE_20271:
+	case PCI_DEVICE_ID_PROMISE_20269:
+		map |= XFER_UDMA_133;
+	case PCI_DEVICE_ID_PROMISE_20268R:
+	case PCI_DEVICE_ID_PROMISE_20268:
+		map &= ~XFER_SWDMA;
+	case PCI_DEVICE_ID_PROMISE_20267:
+	case PCI_DEVICE_ID_PROMISE_20265:
+		map |= XFER_UDMA_100;
+	case PCI_DEVICE_ID_PROMISE_20262:
+		map |= XFER_UDMA_66;
 
-			if (!ch->udma_four) {
-				printk(KERN_WARNING "%s: 40-pin cable, speed reduced to UDMA(33) mode.\n", ch->name);
-				map &= ~XFER_UDMA_80W;
-			}
+		if (!ch->udma_four) {
+			printk(KERN_WARNING
+			       "%s: 40-pin cable, speed reduced to UDMA(33) mode.\n",
+			       ch->name);
+			map &= ~XFER_UDMA_80W;
+		}
 	}
 
 	return map;
@@ -191,38 +193,89 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	pci_read_config_byte(dev, drive_pci + 1, &BP);
 	pci_read_config_byte(dev, drive_pci + 2, &CP);
 
-	switch(speed) {
+	switch (speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
-		case XFER_UDMA_5:
-		case XFER_UDMA_4:	TB = 0x20; TC = 0x01; break;
-		case XFER_UDMA_3:	TB = 0x40; TC = 0x02; break;
-		case XFER_UDMA_2:	TB = 0x20; TC = 0x01; break;
-		case XFER_UDMA_1:	TB = 0x40; TC = 0x02; break;
-		case XFER_UDMA_0:	TB = 0x60; TC = 0x03; break;
-		case XFER_MW_DMA_2:	TB = 0x60; TC = 0x03; break;
-		case XFER_MW_DMA_1:	TB = 0x60; TC = 0x04; break;
-		case XFER_MW_DMA_0:	TB = 0x60; TC = 0x05; break;
-		case XFER_SW_DMA_2:	TB = 0x60; TC = 0x05; break;
-		case XFER_SW_DMA_1:	TB = 0x80; TC = 0x06; break;
-		case XFER_SW_DMA_0:	TB = 0xC0; TC = 0x0B; break;
+	case XFER_UDMA_5:
+	case XFER_UDMA_4:
+		TB = 0x20;
+		TC = 0x01;
+		break;
+	case XFER_UDMA_3:
+		TB = 0x40;
+		TC = 0x02;
+		break;
+	case XFER_UDMA_2:
+		TB = 0x20;
+		TC = 0x01;
+		break;
+	case XFER_UDMA_1:
+		TB = 0x40;
+		TC = 0x02;
+		break;
+	case XFER_UDMA_0:
+		TB = 0x60;
+		TC = 0x03;
+		break;
+	case XFER_MW_DMA_2:
+		TB = 0x60;
+		TC = 0x03;
+		break;
+	case XFER_MW_DMA_1:
+		TB = 0x60;
+		TC = 0x04;
+		break;
+	case XFER_MW_DMA_0:
+		TB = 0x60;
+		TC = 0x05;
+		break;
+	case XFER_SW_DMA_2:
+		TB = 0x60;
+		TC = 0x05;
+		break;
+	case XFER_SW_DMA_1:
+		TB = 0x80;
+		TC = 0x06;
+		break;
+	case XFER_SW_DMA_0:
+		TB = 0xC0;
+		TC = 0x0B;
+		break;
 #endif
-		case XFER_PIO_4:	TA = 0x01; TB = 0x04; break;
-		case XFER_PIO_3:	TA = 0x02; TB = 0x06; break;
-		case XFER_PIO_2:	TA = 0x03; TB = 0x08; break;
-		case XFER_PIO_1:	TA = 0x05; TB = 0x0C; break;
-		case XFER_PIO_0:
-		default:		TA = 0x09; TB = 0x13; break;
+	case XFER_PIO_4:
+		TA = 0x01;
+		TB = 0x04;
+		break;
+	case XFER_PIO_3:
+		TA = 0x02;
+		TB = 0x06;
+		break;
+	case XFER_PIO_2:
+		TA = 0x03;
+		TB = 0x08;
+		break;
+	case XFER_PIO_1:
+		TA = 0x05;
+		TB = 0x0C;
+		break;
+	case XFER_PIO_0:
+	default:
+		TA = 0x09;
+		TB = 0x13;
+		break;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-        if (speed >= XFER_SW_DMA_0) {
-		pci_write_config_byte(dev, drive_pci + 1, (BP & ~0xf0) | TB);
-		pci_write_config_byte(dev, drive_pci + 2, (CP & ~0x0f) | TC);
+	if (speed >= XFER_SW_DMA_0) {
+		pci_write_config_byte(dev, drive_pci + 1,
+				      (BP & ~0xf0) | TB);
+		pci_write_config_byte(dev, drive_pci + 2,
+				      (CP & ~0x0f) | TC);
 	} else
 #endif
 	{
 		pci_write_config_byte(dev, drive_pci, (AP & ~0x0f) | TA);
-		pci_write_config_byte(dev, drive_pci + 1, (BP & ~0x07) | TB);
+		pci_write_config_byte(dev, drive_pci + 1,
+				      (BP & ~0x07) | TB);
 	}
 
 #if PDC202XX_DECODE_REGISTER_INFO
@@ -235,7 +288,7 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	pdc_dump_bits(pdc_reg_A, AP);
 
 	printk(KERN_DEBUG "BP(%x): DMA(B) = %d PIO(B) = %d\n",
-			  BP, (BP & 0xe0) >> 5, BP & 0x0f);
+	       BP, (BP & 0xe0) >> 5, BP & 0x0f);
 	pdc_dump_bits(pdc_reg_B, BP);
 
 	printk(KERN_DEBUG "CP(%x): DMA(C) = %d\n", CP, CP & 0x0f);
@@ -246,9 +299,8 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 
 #if PDC202XX_DEBUG_DRIVE_INFO
 	printk("%s: %02x drive%d 0x%08x ",
-		drive->name, speed,
-		drive->dn, drive_conf);
-		pci_read_config_dword(dev, drive_pci, &drive_conf);
+	       drive->name, speed, drive->dn, drive_conf);
+	pci_read_config_dword(dev, drive_pci, &drive_conf);
 	printk("0x%08x\n", drive_conf);
 #endif
 
@@ -282,9 +334,9 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 	}
 #endif
 
-	for (i = 0 ; i < 2 ; i++)
+	for (i = 0; i < 2; i++)
 		if (hwif->drives[i].present)
-			drives[i+j] = &hwif->drives[i];
+			drives[i + j] = &hwif->drives[i];
 
 	err = ide_config_drive_speed(drive, speed);
 
@@ -293,7 +345,7 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 		return err;
 
 	/* We need to adjust timings to ATA133 clock if ATA133 drives exist */
-	for (i = 0 ; i < 4 ; i++) {
+	for (i = 0; i < 4; i++) {
 		if (!drives[i])
 			continue;
 
@@ -306,81 +358,81 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 
 		switch (drives[i]->current_speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
-			case XFER_UDMA_6:
-				set_2regs(0x10, 0x1a);
-				set_2regs(0x11, 0x01);
-				set_2regs(0x12, 0xcb);
-				break;
-			case XFER_UDMA_5:
-				set_2regs(0x10, 0x1a);
-				set_2regs(0x11, 0x02);
-				set_2regs(0x12, 0xcb);
-				break;
-			case XFER_UDMA_4:
-				set_2regs(0x10, 0x1a);
-				set_2regs(0x11, 0x03);
-				set_2regs(0x12, 0xcd);
-				break;
-			case XFER_UDMA_3:
-				set_2regs(0x10, 0x1a);
-				set_2regs(0x11, 0x05);
-				set_2regs(0x12, 0xcd);
-				break;
-			case XFER_UDMA_2:
-				set_2regs(0x10, 0x2a);
-				set_2regs(0x11, 0x07);
-				set_2regs(0x12, 0xcd);
-				break;
-			case XFER_UDMA_1:
-				set_2regs(0x10, 0x3a);
-				set_2regs(0x11, 0x0a);
-				set_2regs(0x12, 0xd0);
-				break;
-			case XFER_UDMA_0:
-				set_2regs(0x10, 0x4a);
-				set_2regs(0x11, 0x0f);
-				set_2regs(0x12, 0xd5);
-				break;
-			case XFER_MW_DMA_2:
-				set_2regs(0x0e, 0x69);
-				set_2regs(0x0f, 0x25);
-				break;
-			case XFER_MW_DMA_1:
-				set_2regs(0x0e, 0x6b);
-				set_2regs(0x0f, 0x27);
-				break;
-			case XFER_MW_DMA_0:
-				set_2regs(0x0e, 0xdf);
-				set_2regs(0x0f, 0x5f);
-				break;
+		case XFER_UDMA_6:
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x01);
+			set_2regs(0x12, 0xcb);
+			break;
+		case XFER_UDMA_5:
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x02);
+			set_2regs(0x12, 0xcb);
+			break;
+		case XFER_UDMA_4:
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x03);
+			set_2regs(0x12, 0xcd);
+			break;
+		case XFER_UDMA_3:
+			set_2regs(0x10, 0x1a);
+			set_2regs(0x11, 0x05);
+			set_2regs(0x12, 0xcd);
+			break;
+		case XFER_UDMA_2:
+			set_2regs(0x10, 0x2a);
+			set_2regs(0x11, 0x07);
+			set_2regs(0x12, 0xcd);
+			break;
+		case XFER_UDMA_1:
+			set_2regs(0x10, 0x3a);
+			set_2regs(0x11, 0x0a);
+			set_2regs(0x12, 0xd0);
+			break;
+		case XFER_UDMA_0:
+			set_2regs(0x10, 0x4a);
+			set_2regs(0x11, 0x0f);
+			set_2regs(0x12, 0xd5);
+			break;
+		case XFER_MW_DMA_2:
+			set_2regs(0x0e, 0x69);
+			set_2regs(0x0f, 0x25);
+			break;
+		case XFER_MW_DMA_1:
+			set_2regs(0x0e, 0x6b);
+			set_2regs(0x0f, 0x27);
+			break;
+		case XFER_MW_DMA_0:
+			set_2regs(0x0e, 0xdf);
+			set_2regs(0x0f, 0x5f);
+			break;
 #endif
-			case XFER_PIO_4:
-				set_2regs(0x0c, 0x23);
-				set_2regs(0x0d, 0x09);
-				set_2regs(0x13, 0x25);
-				break;
-			case XFER_PIO_3:
-				set_2regs(0x0c, 0x27);
-				set_2regs(0x0d, 0x0d);
-				set_2regs(0x13, 0x35);
-				break;
-			case XFER_PIO_2:
-				set_2regs(0x0c, 0x23);
-				set_2regs(0x0d, 0x26);
-				set_2regs(0x13, 0x64);
-				break;
-			case XFER_PIO_1:
-				set_2regs(0x0c, 0x46);
-				set_2regs(0x0d, 0x29);
-				set_2regs(0x13, 0xa4);
-				break;
-			case XFER_PIO_0:
-				set_2regs(0x0c, 0xfb);
-				set_2regs(0x0d, 0x2b);
-				set_2regs(0x13, 0xac);
-				break;
-			default:
-				;
+		case XFER_PIO_4:
+			set_2regs(0x0c, 0x23);
+			set_2regs(0x0d, 0x09);
+			set_2regs(0x13, 0x25);
+			break;
+		case XFER_PIO_3:
+			set_2regs(0x0c, 0x27);
+			set_2regs(0x0d, 0x0d);
+			set_2regs(0x13, 0x35);
+			break;
+		case XFER_PIO_2:
+			set_2regs(0x0c, 0x23);
+			set_2regs(0x0d, 0x26);
+			set_2regs(0x13, 0x64);
+			break;
+		case XFER_PIO_1:
+			set_2regs(0x0c, 0x46);
+			set_2regs(0x0d, 0x29);
+			set_2regs(0x13, 0xa4);
+			break;
+		case XFER_PIO_0:
+			set_2regs(0x0c, 0xfb);
+			set_2regs(0x0d, 0x2b);
+			set_2regs(0x13, 0xac);
+			break;
+		default:
+			;
 		}
 	}
 
@@ -400,7 +452,8 @@ static void pdc202xx_tune_drive(struct ata_device *drive, u8 pio)
 
 	if (pio == 255)
 		speed = ata_best_pio_mode(drive);
-	else	speed = XFER_PIO_0 + min_t(byte, pio, 4);
+	else
+		speed = XFER_PIO_0 + min_t(byte, pio, 4);
 
 	pdc202xx_tune_chipset(drive, speed);
 }
@@ -419,7 +472,7 @@ static int pdc202xx_tx_udma_setup(struct ata_device *drive, int map)
 
 	/* IORDY_EN & PREFETCH_EN */
 	if (id->capability & 4)
-		set_2regs(0x13, (IN_BYTE(datareg)|0x03));
+		set_2regs(0x13, (IN_BYTE(datareg) | 0x03));
 
 	return udma_generic_setup(drive, map);
 }
@@ -428,7 +481,7 @@ static int pdc202xx_udma_setup(struct ata_device *drive, int map)
 {
 	struct hd_driveid *id = drive->id;
 	struct ata_channel *hwif = drive->channel;
-	struct hd_driveid *mate_id = hwif->drives[!(drive->dn%2)].id;
+	struct hd_driveid *mate_id = hwif->drives[!(drive->dn % 2)].id;
 	struct pci_dev *dev = hwif->pci_dev;
 	u32 high_16 = pci_resource_start(dev, 4);
 	u32 drive_conf;
@@ -467,30 +520,32 @@ static int pdc202xx_udma_setup(struct ata_device *drive, int map)
 		goto chipset_is_set;
 
 	/* FIXME: what if SYNC_ERRDY is enabled for slave
-		  and disabled for master? --bkz */
+	   and disabled for master? --bkz */
 	pci_read_config_byte(dev, drive_pci, &AP);
 	/* enable SYNC_ERRDY for master and slave (if enabled for master) */
 	if (!(AP & SYNC_ERRDY_EN)) {
 		if (!(drive->dn % 2)) {
-			pci_write_config_byte(dev, drive_pci, AP|SYNC_ERRDY_EN);
+			pci_write_config_byte(dev, drive_pci,
+					      AP | SYNC_ERRDY_EN);
 		} else {
 			pci_read_config_byte(dev, drive_pci - 4, &tmp);
 			if (tmp & SYNC_ERRDY_EN)
-				pci_write_config_byte(dev, drive_pci, AP|SYNC_ERRDY_EN);
+				pci_write_config_byte(dev, drive_pci,
+						      AP | SYNC_ERRDY_EN);
 		}
 	}
 
-chipset_is_set:
+      chipset_is_set:
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
 	pci_read_config_byte(dev, drive_pci, &AP);
-	if (id->capability & 4)		/* IORDY_EN */
-		pci_write_config_byte(dev, drive_pci, AP|IORDY_EN);
+	if (id->capability & 4)	/* IORDY_EN */
+		pci_write_config_byte(dev, drive_pci, AP | IORDY_EN);
 	pci_read_config_byte(dev, drive_pci, &AP);
 	if (drive->type == ATA_DISK)	/* PREFETCH_EN */
-		pci_write_config_byte(dev, drive_pci, AP|PREFETCH_EN);
+		pci_write_config_byte(dev, drive_pci, AP | PREFETCH_EN);
 
 	map = hwif->modes_map;
 
@@ -507,7 +562,8 @@ chipset_is_set:
 	return udma_generic_setup(drive, map);
 }
 
-static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
+static void pdc202xx_udma_start(struct ata_device *drive,
+				struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	u32 high_16 = pci_resource_start(ch->pci_dev, 4);
@@ -521,7 +577,8 @@ static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 
 		OUT_BYTE(clock | (ch->unit ? 0x08 : 0x02), clockreg);
 		word_count = (rq->nr_sectors << 8);
-		hankval = (rq_data_dir(rq) == READ) ? 0x05 << 24 : 0x06 << 24;
+		hankval =
+		    (rq_data_dir(rq) == READ) ? 0x05 << 24 : 0x06 << 24;
 		hankval |= word_count;
 		outl(hankval, atapi_port);
 	}
@@ -531,7 +588,7 @@ static void pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 	 * when we do this part before issuing the drive cmd.
 	 */
 
-	outb(inb(ch->dma_base) | 1, ch->dma_base); /* start DMA */
+	outb(inb(ch->dma_base) | 1, ch->dma_base);	/* start DMA */
 }
 
 static int pdc202xx_udma_stop(struct ata_device *drive)
@@ -547,15 +604,15 @@ static int pdc202xx_udma_stop(struct ata_device *drive)
 		u32 clockreg = high_16 + PDC_CLK;
 		u8 clock;
 
-		outl(0, atapi_port);		/* zero out extra */
+		outl(0, atapi_port);	/* zero out extra */
 		clock = IN_BYTE(clockreg);
 		OUT_BYTE(clock & ~(ch->unit ? 0x08 : 0x02), clockreg);
 	}
 
-	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-	dma_stat = inb(dma_base+2);		/* get DMA status */
-	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
-	udma_destroy_table(ch);			/* purge DMA mappings */
+	outb(inb(dma_base) & ~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base + 2);	/* get DMA status */
+	outb(dma_stat | 6, dma_base + 2);	/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);	/* purge DMA mappings */
 
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
@@ -577,7 +634,7 @@ static void pdc202xx_reset(struct ata_device *drive)
 	udelay(10);
 	outb(0x00, drive->channel->io_ports[IDE_CONTROL_OFFSET]);
 	printk(KERN_INFO "PDC202XX: %s channel reset.\n",
-			 drive->channel->unit ? "Secondary" : "Primary");
+	       drive->channel->unit ? "Secondary" : "Primary");
 }
 
 /*
@@ -623,28 +680,33 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 	set_reg_and_wait(burst & ~0x10, burstreg, 2000);
 
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
-		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
+		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
+				       dev->resource[PCI_ROM_RESOURCE].
+				       start | PCI_ROM_ADDRESS_ENABLE);
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n", dev->name,
+		       dev->resource[PCI_ROM_RESOURCE].start);
 	}
-
 #if 0
 	switch (dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20267:
-		case PCI_DEVICE_ID_PROMISE_20265:
-		case PCI_DEVICE_ID_PROMISE_20262:
-			pdc202xx_reset_host(dev);
-			break;
-		default:
-			if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
-				byte irq = 0, irq2 = 0;
-				pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-				pci_read_config_byte(dev, (PCI_INTERRUPT_LINE)|0x80, &irq2);	/* 0xbc */
-				if (irq != irq2) {
-					pci_write_config_byte(dev, (PCI_INTERRUPT_LINE)|0x80, irq);	/* 0xbc */
-					printk("%s: pci-config space interrupt mirror fixed.\n", dev->name);
-				}
+	case PCI_DEVICE_ID_PROMISE_20267:
+	case PCI_DEVICE_ID_PROMISE_20265:
+	case PCI_DEVICE_ID_PROMISE_20262:
+		pdc202xx_reset_host(dev);
+		break;
+	default:
+		if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
+			byte irq = 0, irq2 = 0;
+			pci_read_config_byte(dev, PCI_INTERRUPT_LINE,
+					     &irq);
+			pci_read_config_byte(dev, (PCI_INTERRUPT_LINE) | 0x80, &irq2);	/* 0xbc */
+			if (irq != irq2) {
+				pci_write_config_byte(dev, (PCI_INTERRUPT_LINE) | 0x80, irq);	/* 0xbc */
+				printk
+				    ("%s: pci-config space interrupt mirror fixed.\n",
+				     dev->name);
 			}
-			break;
+		}
+		break;
 	}
 #endif
 
@@ -656,10 +718,10 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 	}
 #endif
 	printk(KERN_INFO "%s: (U)DMA BURST %sabled, "
-			 "primary %s mode, secondary %s mode.\n",
+	       "primary %s mode, secondary %s mode.\n",
 	       dev->name, (burst & 1) ? "en" : "dis",
 	       (IN_BYTE(high_16 + PDC_PRIMARY) & 1) ? "MASTER" : "PCI",
-	       (IN_BYTE(high_16 + PDC_SECONDARY) & 1) ? "MASTER" : "PCI" );
+	       (IN_BYTE(high_16 + PDC_SECONDARY) & 1) ? "MASTER" : "PCI");
 
 	return dev->irq;
 }
@@ -669,8 +731,11 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 static unsigned int __init pdc202xx_tx_init_chipset(struct pci_dev *dev)
 {
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
-		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk(KERN_INFO "%s: ROM enabled at 0x%08lx.\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
+		pci_write_config_dword(dev, PCI_ROM_ADDRESS,
+				       dev->resource[PCI_ROM_RESOURCE].
+				       start | PCI_ROM_ADDRESS_ENABLE);
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx.\n",
+		       dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 	return dev->irq;
 }
@@ -693,46 +758,46 @@ static unsigned int __init pdc202xx_tx_ata66_check(struct ata_channel *ch)
 
 static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 {
-	hwif->tuneproc  = &pdc202xx_tune_drive;
+	hwif->tuneproc = &pdc202xx_tune_drive;
 	hwif->quirkproc = &check_in_drive_lists;
 	hwif->resetproc = &pdc202xx_reset;
 
-        switch(hwif->pci_dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20271:
-		case PCI_DEVICE_ID_PROMISE_20269:
-		case PCI_DEVICE_ID_PROMISE_20268:
-		case PCI_DEVICE_ID_PROMISE_20268R:
-			hwif->udma_four = pdc202xx_tx_ata66_check(hwif);
+	switch (hwif->pci_dev->device) {
+	case PCI_DEVICE_ID_PROMISE_20276:
+	case PCI_DEVICE_ID_PROMISE_20275:
+	case PCI_DEVICE_ID_PROMISE_20271:
+	case PCI_DEVICE_ID_PROMISE_20269:
+	case PCI_DEVICE_ID_PROMISE_20268:
+	case PCI_DEVICE_ID_PROMISE_20268R:
+		hwif->udma_four = pdc202xx_tx_ata66_check(hwif);
 
-			hwif->speedproc = &pdc202xx_new_tune_chipset;
+		hwif->speedproc = &pdc202xx_new_tune_chipset;
 #ifdef CONFIG_BLK_DEV_IDEDMA
-			if (hwif->dma_base)
-				hwif->udma_setup = pdc202xx_tx_udma_setup;
+		if (hwif->dma_base)
+			hwif->udma_setup = pdc202xx_tx_udma_setup;
 #endif
-			break;
-		case PCI_DEVICE_ID_PROMISE_20267:
-		case PCI_DEVICE_ID_PROMISE_20265:
+		break;
+	case PCI_DEVICE_ID_PROMISE_20267:
+	case PCI_DEVICE_ID_PROMISE_20265:
 #ifdef CONFIG_BLK_DEV_IDEDMA
-			/* we need special functions for lba48 */
-			if (hwif->dma_base) {
-				hwif->udma_start = pdc202xx_udma_start;
-				hwif->udma_stop = pdc202xx_udma_stop;
-			}
+		/* we need special functions for lba48 */
+		if (hwif->dma_base) {
+			hwif->udma_start = pdc202xx_udma_start;
+			hwif->udma_stop = pdc202xx_udma_stop;
+		}
 #endif
 		/* PDC20262 doesn't support LBA48 */
-		case PCI_DEVICE_ID_PROMISE_20262:
-			hwif->udma_four = pdc202xx_ata66_check(hwif);
+	case PCI_DEVICE_ID_PROMISE_20262:
+		hwif->udma_four = pdc202xx_ata66_check(hwif);
 
-		case PCI_DEVICE_ID_PROMISE_20246:
+	case PCI_DEVICE_ID_PROMISE_20246:
 #ifdef CONFIG_BLK_DEV_IDEDMA
-			if (hwif->dma_base)
-				hwif->udma_setup = pdc202xx_udma_setup;
+		if (hwif->dma_base)
+			hwif->udma_setup = pdc202xx_udma_setup;
 #endif
-			hwif->speedproc = &pdc202xx_tune_chipset;
-		default:
-			break;
+		hwif->speedproc = &pdc202xx_tune_chipset;
+	default:
+		break;
 	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -753,107 +818,97 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 /* module data table */
 static struct ata_pci_device chipsets[] __initdata = {
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20246,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20246,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+	 .enablebits = {{0x50, 0x02, 0x02}, {0x50, 0x04, 0x04}},
 #endif
-		bootable: OFF_BOARD,
-		extra: 16,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .bootable = OFF_BOARD,
+	 .extra = 16,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20262,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20262,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+	 .enablebits = {{0x50, 0x02, 0x02}, {0x50, 0x04, 0x04}},
 #endif
-		bootable: OFF_BOARD,
-		extra: 48,
-		flags: ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA
-	},
+	 .bootable = OFF_BOARD,
+	 .extra = 48,
+	 .flags = ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20265,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20265,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
-		bootable: OFF_BOARD,
+	 .enablebits = {{0x50, 0x02, 0x02}, {0x50, 0x04, 0x04}},
+	 .bootable = OFF_BOARD,
 #else
-		bootable: ON_BOARD,
+	 .bootable = ON_BOARD,
 #endif
-		extra: 48,
-		flags: ATA_F_IRQ | ATA_F_PHACK  | ATA_F_DMA
-	},
+	 .extra = 48,
+	 .flags = ATA_F_IRQ | ATA_F_PHACK | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20267,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20267,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
 #ifndef CONFIG_PDC202XX_FORCE
-		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+	 .enablebits = {{0x50, 0x02, 0x02}, {0x50, 0x04, 0x04}},
 #endif
-		bootable: OFF_BOARD,
-		extra: 48,
-		flags: ATA_F_IRQ  | ATA_F_DMA
-	},
+	 .bootable = OFF_BOARD,
+	 .extra = 48,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20268,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20268,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	/* Promise used a different PCI identification for the raid card
 	 * apparently to try and prevent Linux detecting it and using our own
 	 * raid code. We want to detect it for the ataraid drivers, so we have
 	 * to list both here.. */
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20268R,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ  | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20268R,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20269,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20269,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20271,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20271,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20275,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20275,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 	{
-		vendor: PCI_VENDOR_ID_PROMISE,
-		device: PCI_DEVICE_ID_PROMISE_20276,
-		init_chipset: pdc202xx_init_chipset,
-		init_channel: ide_init_pdc202xx,
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	 .vendor = PCI_VENDOR_ID_PROMISE,
+	 .device = PCI_DEVICE_ID_PROMISE_20276,
+	 .init_chipset = pdc202xx_init_chipset,
+	 .init_channel = ide_init_pdc202xx,
+	 .bootable = OFF_BOARD,
+	 .flags = ATA_F_IRQ | ATA_F_DMA},
 };
 
 int __init init_pdc202xx(void)
@@ -863,5 +918,5 @@ int __init init_pdc202xx(void)
 	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
 
-        return 0;
+	return 0;
 }

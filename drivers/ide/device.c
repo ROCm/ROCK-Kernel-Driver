@@ -151,7 +151,7 @@ int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
 		unsigned long flags;
 
 		__save_flags(flags);
-		ide__sti();
+		local_irq_enable();
 		timeout += jiffies;
 		while (!ata_status(drive, 0, BUSY_STAT)) {
 			if (time_after(jiffies, timeout)) {
