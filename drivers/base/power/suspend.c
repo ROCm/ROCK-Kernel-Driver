@@ -232,4 +232,4 @@ int device_suspend(u32 state, u32 level)
 	dump_stack();
 	return -EFAULT;
 }
-
+EXPORT_SYMBOL(device_suspend);

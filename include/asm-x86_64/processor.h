@@ -178,10 +178,11 @@ static inline void clear_in_cr4 (unsigned long mask)
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
 
 /*
- * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
+ * Size of io_bitmap, covering ports 0 to 0x3ff.
  */
-#define IO_BITMAP_SIZE	32
-#define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
+#define IO_BITMAP_BITS  1024
+#define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
+#define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
@@ -213,8 +214,18 @@ struct tss_struct {
 	u32 reserved3;
 	u32 reserved4;
 	u16 reserved5;
-	u16 io_map_base;
-	u32 io_bitmap[IO_BITMAP_SIZE];
+	u16 io_bitmap_base;
+	/*
+	 * The extra 1 is there because the CPU will access an
+	 * additional byte beyond the end of the IO permission
+	 * bitmap. The extra byte must be all 1 bits, and must
+	 * be within the limit. Thus we have:
+	 *
+	 * 128 bytes, the bitmap itself, for ports 0..0x3ff
+	 * 8 bytes, for an extra "long" of ~0UL
+	 */
+	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
+	u32 __cacheline_filler[4];      /* size is 0x100 */
 } __attribute__((packed)) ____cacheline_aligned;
 
 struct thread_struct {
@@ -238,7 +249,7 @@ struct thread_struct {
 /* IO permissions. the bitmap could be moved into the GDT, that would make
    switch faster for a limited number of ioperm using tasks. -AK */
 	int		ioperm;
-	u32	*io_bitmap_ptr;
+	unsigned long	*io_bitmap_ptr;
 /* cached TLS descriptors. */
 	u64 tls_array[GDT_ENTRY_TLS_ENTRIES];
 };

@@ -140,7 +140,7 @@ config IKCONFIG
 
 config IKCONFIG_PROC
 	bool "Enable access to .config through /proc/ikconfig"
-	depends on IKCONFIG
+	depends on IKCONFIG && PROC_FS
 	---help---
 	  This option enables access to kernel configuration file and build
 	  information through /proc/ikconfig.

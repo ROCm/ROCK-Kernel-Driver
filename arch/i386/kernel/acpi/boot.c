@@ -34,6 +34,7 @@
 #if defined (CONFIG_X86_LOCAL_APIC)
 #include <mach_apic.h>
 #include <mach_mpparse.h>
+#include <asm/io_apic.h>
 #endif
 
 #define PREFIX			"ACPI: "

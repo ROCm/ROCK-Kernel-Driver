@@ -142,8 +142,6 @@ static struct tty_driver *pcxe_driver;
 
 static struct timer_list pcxx_timer;
 
-DECLARE_TASK_QUEUE(tq_pcxx);
-
 static void pcxxpoll(unsigned long dummy);
 static void fepcmd(struct channel *, int, int, int, int, int);
 static void pcxe_put_char(struct tty_struct *, unsigned char);
@@ -161,7 +159,6 @@ static void receive_data(struct channel *);
 static void pcxxparam(struct tty_struct *, struct channel *ch);
 static void do_softint(void *);
 static inline void pcxe_sched_event(struct channel *, int);
-static void do_pcxe_bh(void);
 static void pcxe_start(struct tty_struct *);
 static void pcxe_stop(struct tty_struct *);
 static void pcxe_throttle(struct tty_struct *);
@@ -220,7 +217,6 @@ static void pcxe_cleanup()
 	save_flags(flags);
 	cli();
 	del_timer_sync(&pcxx_timer);
-	remove_bh(DIGI_BH);
 
 	if ((e1 = tty_unregister_driver(pcxe_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n", e1);
@@ -312,8 +308,7 @@ static inline void assertmemoff(struct channel *ch)
 static inline void pcxe_sched_event(struct channel *info, int event)
 {
 	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_pcxx);
-	mark_bh(DIGI_BH);
+	schedule_work(&info->tqueue);
 }
 
 static void pcxx_error(int line, char *msg)
@@ -1150,8 +1145,6 @@ int __init pcxe_init(void)
 	}
 	memset(digi_channels, 0, sizeof(struct channel) * nbdevs);
 
-	init_bh(DIGI_BH,do_pcxe_bh);
-
 	init_timer(&pcxx_timer);
 	pcxx_timer.function = pcxxpoll;
 
@@ -1450,8 +1443,7 @@ load_fep:
 			}
 			ch->brdchan = bc;
 			ch->mailbox = gd;
-			ch->tqueue.routine = do_softint;
-			ch->tqueue.data = ch;
+			INIT_WORK(&ch->tqueue, do_softint, ch);
 			ch->board = &boards[crd];
 #ifdef DEFAULT_HW_FLOW
 			ch->digiext.digi_flags = RTSPACE|CTSPACE;
@@ -2253,11 +2245,6 @@ static void pcxe_set_termios(struct tty_struct *tty, struct termios *old_termios
 	}
 }
 
-
-static void do_pcxe_bh(void)
-{
-	run_task_queue(&tq_pcxx);
-}
 
 
 static void do_softint(void *private_)
