@@ -605,10 +605,7 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 DEVICE FILESYSTEM
-P:	Richard Gooch
-M:	rgooch@atnf.csiro.au
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Obsolete
 
 DIGI INTL. EPCA DRIVER
 P:	Digi International, Inc

@@ -8,12 +8,16 @@ obj-$(CONFIG_IA32_EMULATION) := ia32entry.o sys_ia32.o ia32_ioctl.o \
 
 $(obj)/syscall32.o: $(src)/syscall32.c $(obj)/vsyscall.so
 
-# The DSO images are built using a special linker script.
-$(obj)/vsyscall.so: $(src)/vsyscall.lds $(obj)/vsyscall.o
-	$(CC) -m32 -nostdlib -shared -s -Wl,-soname=linux-gate.so.1 \
-		-o $@ -Wl,-T,$^
+# Teach kbuild about targets
+targets := vsyscall.o vsyscall.so
 
-clean-files += vsyscall.so
+# The DSO images are built using a special linker script
+quiet_cmd_vsyscall = SYSCALL $@
+      cmd_vsyscall = $(CC) -m32 -nostdlib -shared -s \
+			   -Wl,-soname=linux-gate.so.1 -o $@ \
+			   -Wl,-T,$(filter-out FORCE,$^)
+$(obj)/vsyscall.so: $(src)/vsyscall.lds $(obj)/vsyscall.o FORCE
+	$(call if_changed,vsyscall)
 
 AFLAGS_vsyscall.o = -m32
 CFLAGS_ia32_ioctl.o += -Ifs/

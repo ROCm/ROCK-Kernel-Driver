@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/k2.h
- * 
+ *
  * Definitions for SBS K2 board support
  *
  * Author: Matt Porter <mporter@mvista.com>

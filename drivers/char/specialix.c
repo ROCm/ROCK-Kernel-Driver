@@ -1362,7 +1362,6 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	int error;
 	struct specialix_port * port;
 	struct specialix_board * bp;
-	unsigned long flags;
 	
 	board = SX_BOARD(tty->index);
 
@@ -2205,7 +2204,7 @@ void specialix_setup(char *str, int * ints)
 /* 
  * This routine must be called by kernel at boot time 
  */
-int specialix_init(void) 
+static int __init specialix_init(void)
 {
 	int i;
 	int found = 0;
@@ -2263,7 +2262,6 @@ int specialix_init(void)
 	return 0;
 }
 
-#ifdef MODULE
 int iobase[SX_NBOARD]  = {0,};
 
 int irq [SX_NBOARD] = {0,};
@@ -2280,7 +2278,7 @@ MODULE_PARM(irq,"1-" __MODULE_STRING(SX_NBOARD) "i");
  * only use 4 different interrupts. 
  *
  */
-int init_module(void) 
+static int __init specialix_init_module(void)
 {
 	int i;
 
@@ -2294,8 +2292,7 @@ int init_module(void)
 	return specialix_init();
 }
 	
-
-void cleanup_module(void)
+static void __exit specialix_exit_module(void)
 {
 	int i;
 	
@@ -2308,6 +2305,8 @@ void cleanup_module(void)
 #endif
 	
 }
-#endif /* MODULE */
+
+module_init(specialix_init_module);
+module_exit(specialix_exit_module);
 
 MODULE_LICENSE("GPL");

@@ -58,7 +58,7 @@ ocotea_calibrate_decr(void)
 	unsigned int freq;
 
 	freq = OCOTEA_SYSCLK;
-	
+
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
 
@@ -86,7 +86,7 @@ ocotea_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
 	static char pci_irq_table[][4] =
 	/*
-	 *	PCI IDSEL/INTPIN->INTLINE 
+	 *	PCI IDSEL/INTPIN->INTLINE
 	 * 	   A   B   C   D
 	 */
 	{
@@ -133,7 +133,7 @@ ocotea_setup_pcix(void)
 	PCIX_WRITEL(0, PCIX0_PIM1SA);
 	PCIX_WRITEL(0, PCIX0_PIM2SA);
 	PCIX_WRITEL(0, PCIX0_PIM2SAH);
-	
+
 	/* Setup 2GB PLB->PCI outbound mem window (3_8000_0000->0_8000_0000) */
 	PCIX_WRITEL(0x00000003, PCIX0_POM0LAH);
 	PCIX_WRITEL(0x80000000, PCIX0_POM0LAL);
@@ -263,7 +263,7 @@ ocotea_setup_arch(void)
 
 	/* Setup PCI host bridge */
 	ocotea_setup_hose();
-	
+
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;

@@ -1,7 +1,7 @@
 /*
  * FILE NAME: ocp_ids.h
  *
- * BRIEF MODULE DESCRIPTION: 
+ * BRIEF MODULE DESCRIPTION:
  * OCP device ids based on the ideas from PCI
  *
  * Maintained by: Armin <akuster@mvista.com>
@@ -60,40 +60,40 @@
 #define OCP_FUNC_RTC		0x0021
 
 /* Serial 0x0030 - 0x006F*/
-#define OCP_FUNC_16550		0x0031 
+#define OCP_FUNC_16550		0x0031
 #define OCP_FUNC_SSP		0x0032 /* sync serial port */
 #define OCP_FUNC_SCP		0x0033 	/* serial controller port */
 #define OCP_FUNC_SCC		0x0034 	/* serial contoller */
 #define OCP_FUNC_SCI		0x0035 	/* Smart card */
-#define OCP_FUNC_IIC		0x0040 
-#define OCP_FUNC_USB		0x0050 
-#define OCP_FUNC_IR		0x0060		
+#define OCP_FUNC_IIC		0x0040
+#define OCP_FUNC_USB		0x0050
+#define OCP_FUNC_IR		0x0060	
 
 /* Memory devices 0x0090 - 0x009F */
 #define	OCP_FUNC_SDRAM		0x0091
 #define OCP_FUNC_DMA		0x0092
 
 /* Display 0x00A0 - 0x00AF */
-#define OCP_FUNC_VIDEO		0x00A0 
+#define OCP_FUNC_VIDEO		0x00A0
 #define OCP_FUNC_LED		0x00A1
 #define	OCP_FUNC_LCD		0x00A2
 
 /* Sound 0x00B0 - 0x00BF */
-#define OCP_FUNC_AUDIO		0x00B0 
+#define OCP_FUNC_AUDIO		0x00B0
 
 /* Mass Storage 0x00C0 - 0xxCF */
-#define OCP_FUNC_IDE		0x00C0 
+#define OCP_FUNC_IDE		0x00C0
 
 /* Misc 0x00D0 - 0x00DF*/
-#define OCP_FUNC_GPIO		0x00D0 
+#define OCP_FUNC_GPIO		0x00D0
 #define OCP_FUNC_ZMII		0x00D1
 
 /* Network 0x0200 - 0x02FF */
-#define OCP_FUNC_EMAC		0x0200 
+#define OCP_FUNC_EMAC		0x0200
 
 /* Bridge devices 0xE00 - 0xEFF */
-#define OCP_FUNC_HOST		0x0E00 
-#define OCP_FUNC_DCR		0x0E01 
+#define OCP_FUNC_HOST		0x0E00
+#define OCP_FUNC_DCR		0x0E01
 #define OCP_FUNC_OPB		0x0E02
 #define OCP_FUNC_PHY		0x0E03
 #define OCP_FUNC_EXT		0x0E04

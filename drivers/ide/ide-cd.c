@@ -2498,7 +2498,7 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	req.sense = cgc->sense;
 	cgc->stat = cdrom_queue_packet_command(drive, &req);
 	if (!cgc->stat)
-		cgc->buflen = req.data_len;
+		cgc->buflen -= req.data_len;
 	return cgc->stat;
 }
 

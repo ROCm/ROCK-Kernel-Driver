@@ -1,4 +1,3 @@
- 
 /*
  * Copyright (C) Paul Mackerras 1997.
  * Copyright (C) Leigh Brown 2002.
@@ -22,7 +21,7 @@ map(unsigned int phys, unsigned int virt, unsigned int size)
 	int nargs;
 	int nret;
 	char *method;
-	ihandle mmu_ihandle;    
+	ihandle mmu_ihandle;
 	int misc;
 	unsigned int phys;
 	unsigned int virt;

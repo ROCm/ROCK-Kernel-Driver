@@ -33,7 +33,7 @@
 #define	__XFS_ERROR_H__
 
 #define prdev(fmt,dev,args...) \
-	printk("XFS: device 0x%x- " fmt "\n", (unsigned)dev, ## args)
+	printk("XFS: device %u:%u- " fmt "\n", MAJOR(dev), MINOR(dev), ## args)
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */

@@ -13,7 +13,7 @@
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
  *
- * Console I/O support for Early kernel bringup. 
+ * Console I/O support for Early kernel bringup.
  */
 
 #include <linux/config.h>
@@ -55,7 +55,7 @@ static int ppc405_sercons_setup(struct console *co, char *options)
 */
 
 
-#ifdef  CONFIG_IBM405GP_INTERNAL_CLOCK 
+#ifdef  CONFIG_IBM405GP_INTERNAL_CLOCK
     /* ftr revisit
     ** why is bit 19 of chcr0 (0x1000) being set?
     */
@@ -78,7 +78,7 @@ static int ppc405_sercons_setup(struct console *co, char *options)
 static void
 ppc405_sercons_write(struct console *co, const char *ptr,
             unsigned nb)
-{ 
+{
     int i;
 
 #ifdef CONFIG_UART0_DEBUG_CONSOLE
@@ -102,7 +102,7 @@ ppc405_sercons_write(struct console *co, const char *ptr,
 	if (ptr[i] == '\n') {
 
 	    /* add a carriage return */
-	
+
 	    /* wait for transmit reg (possibly fifo) to empty */
 	    while ((*uart_lsr & 0x40) == 0)
 		;
@@ -117,7 +117,7 @@ ppc405_sercons_write(struct console *co, const char *ptr,
 
 static int
 ppc405_sercons_read(struct console *co, char *ptr, unsigned nb)
-{ 
+{
 #ifdef CONFIG_UART0_DEBUG_CONSOLE
     volatile unsigned char *uart_rcv  = (char *)0xef600300;
     volatile unsigned char *uart_lsr  = (char *)0xef600305;
@@ -157,7 +157,7 @@ static struct console ppc405_sercons = {
 void
 register_debug_console(void)
 {
-	register_console(&ppc405_sercons); 
+	register_console(&ppc405_sercons);
 }
 
 void

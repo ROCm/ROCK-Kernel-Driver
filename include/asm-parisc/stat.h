@@ -4,13 +4,13 @@
 #include <linux/types.h>
 
 struct stat {
-	dev_t		st_dev;		/* dev_t is 32 bits on parisc */
+	unsigned int	st_dev;		/* dev_t is 32 bits on parisc */
 	ino_t		st_ino;		/* 32 bits */
 	mode_t		st_mode;	/* 16 bits */
 	nlink_t		st_nlink;	/* 16 bits */
 	unsigned short	st_reserved1;	/* old st_uid */
 	unsigned short	st_reserved2;	/* old st_gid */
-	dev_t		st_rdev;
+	unsigned int	st_rdev;
 	off_t		st_size;
 	time_t		st_atime;
 	unsigned int	st_atime_nsec;
@@ -21,12 +21,12 @@ struct stat {
 	int		st_blksize;
 	int		st_blocks;
 	unsigned int	__unused1;	/* ACL stuff */
-	dev_t		__unused2;	/* network */
+	unsigned int	__unused2;	/* network */
 	ino_t		__unused3;	/* network */
 	unsigned int	__unused4;	/* cnodes */
 	unsigned short	__unused5;	/* netsite */
 	short		st_fstype;
-	dev_t		st_realdev;
+	unsigned int	st_realdev;
 	unsigned short	st_basemode;
 	unsigned short	st_spareshort;
 	uid_t		st_uid;
@@ -39,13 +39,13 @@ struct stat {
 typedef __kernel_off64_t	off64_t;
 
 struct hpux_stat64 {
-	dev_t		st_dev;		/* dev_t is 32 bits on parisc */
+	unsigned int	st_dev;		/* dev_t is 32 bits on parisc */
 	ino_t           st_ino;         /* 32 bits */
 	mode_t		st_mode;	/* 16 bits */
 	nlink_t		st_nlink;	/* 16 bits */
 	unsigned short	st_reserved1;	/* old st_uid */
 	unsigned short	st_reserved2;	/* old st_gid */
-	dev_t		st_rdev;
+	unsigned int	st_rdev;
 	off64_t		st_size;
 	time_t		st_atime;
 	unsigned int	st_spare1;
@@ -56,12 +56,12 @@ struct hpux_stat64 {
 	int		st_blksize;
 	__u64		st_blocks;
 	unsigned int	__unused1;	/* ACL stuff */
-	dev_t		__unused2;	/* network */
+	unsigned int	__unused2;	/* network */
 	ino_t           __unused3;      /* network */
 	unsigned int	__unused4;	/* cnodes */
 	unsigned short	__unused5;	/* netsite */
 	short		st_fstype;
-	dev_t		st_realdev;
+	unsigned int	st_realdev;
 	unsigned short	st_basemode;
 	unsigned short	st_spareshort;
 	uid_t		st_uid;

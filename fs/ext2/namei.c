@@ -142,7 +142,7 @@ static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_
 	struct inode * inode;
 	int err;
 
-	if (!old_valid_dev(rdev))
+	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
 	inode = ext2_new_inode (dir, mode);

@@ -164,7 +164,7 @@ ppc405_uic_enable(unsigned int irq)
 		else
 		/* lets hope this works since in linux/irq.h
 		 * there is no define for EDGE and it's assumed
-		 * once you set status to LEVEL you would not 
+		 * once you set status to LEVEL you would not
 		 * want to change it - Armin
 		 */
 		desc->status = desc->status & ~IRQ_LEVEL;
@@ -176,7 +176,7 @@ ppc405_uic_enable(unsigned int irq)
 		else
 		/* lets hope this works since in linux/irq.h
 		 * there is no define for EDGE and it's assumed
-		 * once you set status to LEVEL you would not 
+		 * once you set status to LEVEL you would not
 		 * want to change it - Armin
 		 */
 		desc->status = desc->status & ~IRQ_LEVEL;
@@ -340,7 +340,7 @@ ppc405_pic_get_irq(struct pt_regs *regs)
 void __init
 ppc4xx_extpic_init(void)
 {
-	/* set polarity 
+	/* set polarity
 	 * 1 = default/pos/rising  , 0= neg/falling internal
 	 * 1 = neg/falling , 0= pos/rising external
 	 * Sense
@@ -427,7 +427,7 @@ ppc4xx_pic_init(void)
 #endif
 	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
 	mtdcr(DCRN_UIC_CR(UIC0), 0);
-	
+
 	if (ibm4xxPIC_InitSenses != NULL)
 		ppc4xx_extpic_init();
 

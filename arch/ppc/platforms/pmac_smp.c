@@ -3,7 +3,7 @@
  *
  * We support both the old "powersurge" SMP architecture
  * and the current Core99 (G4 PowerMac) machines.
- * 
+ *
  * Note that we don't support the very first rev. of
  * Apple/DayStar 2 CPUs board, the one with the funky
  * watchdog. Hopefully, none of these should be there except
@@ -461,13 +461,13 @@ smp_core99_kick_cpu(int nr)
 
 	local_irq_save(flags);
 	local_irq_disable();
-	
+
 	/* Save reset vector */
 	save_vector = *vector;
-	
-	/* Setup fake reset vector that does	  
+
+	/* Setup fake reset vector that does	
 	 *   b __secondary_start_psurge - KERNELBASE
-	 */  
+	 */
 	switch(nr) {
 		case 1:
 			new_vector = (unsigned long)__secondary_start_psurge;
@@ -480,24 +480,24 @@ smp_core99_kick_cpu(int nr)
 			break;
 	}
 	*vector = 0x48000002 + new_vector - KERNELBASE;
-	
+
 	/* flush data cache and inval instruction cache */
 	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
-	
+
 	/* Put some life in our friend */
 	pmac_call_feature(PMAC_FTR_RESET_CPU, NULL, nr, 0);
-	
+
 	/* FIXME: We wait a bit for the CPU to take the exception, I should
 	 * instead wait for the entry code to set something for me. Well,
 	 * ideally, all that crap will be done in prom.c and the CPU left
 	 * in a RAM-based wait loop like CHRP.
 	 */
 	mdelay(1);
-	
+
 	/* Restore our exception vector */
 	*vector = save_vector;
 	flush_icache_range((unsigned long) vector, (unsigned long) vector + 4);
-	
+
 	local_irq_restore(flags);
 	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
 }
@@ -508,7 +508,7 @@ smp_core99_setup_cpu(int cpu_nr)
 	/* Setup some registers */
 	if (cpu_nr != 0)
 		core99_init_caches(cpu_nr);
-	
+
 	/* Setup openpic */
 	do_openpic_setup_cpu();
 

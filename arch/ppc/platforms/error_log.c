@@ -1,6 +1,6 @@
 /*
  *  arch/ppc/kernel/error_log.c
- *  
+ *
  *  Copyright (c) 2000 Tilmann Bitterberg
  *  (tilmann@bitterberg.de)
  *
@@ -15,10 +15,10 @@
 #include "error_log.h"
 
 /* ****************************************************************** */
-/* 
+/*
  * EVENT-SCAN
  * The whole stuff below here doesn't take any action when it found
- * an error, it just prints as much information as possible and 
+ * an error, it just prints as much information as possible and
  * then its up to the user to decide what to do.
  *
  * Returns 0 if no errors were found
@@ -92,7 +92,7 @@ useful information, which leads to the solution of the problem."
 #endif /* VERBOSE_ERRORS */
 };
 
-const char *_errlog_initiator[] = { 
+const char *_errlog_initiator[] = {
 	"Unknown or not applicable",
 	"CPU",
 	"PCI",
@@ -101,7 +101,7 @@ const char *_errlog_initiator[] = {
 	"Power management"
 };
 
-const char *_errlog_target[] = { 
+const char *_errlog_target[] = {
 	"Unknown or not applicable",
 	"CPU",
 	"PCI",
@@ -128,7 +128,7 @@ const char *_errlog_target[] = {
 		return 0;
 	}
 	if (error_log.version != 1)
-		printk(KERN_WARNING "Unknown version (%d), please implement me\n", 
+		printk(KERN_WARNING "Unknown version (%d), please implement me\n",
 				error_log.version);
 
 	switch (error_log.disposition) {
@@ -139,19 +139,19 @@ const char *_errlog_target[] = {
 			printk("We have a really serious Problem!\n");
 		case DISP_LIMITED_RECOVERY:
 			printk("Error classification\n");
-			printk("Severity  : %s\n", 
+			printk("Severity  : %s\n",
 					ppc_rtas_errorlog_check_severity (error_log));
-			printk("Initiator : %s\n", 
+			printk("Initiator : %s\n",
 					ppc_rtas_errorlog_check_initiator (error_log));
-			printk("Target    : %s\n", 
+			printk("Target    : %s\n",
 					ppc_rtas_errorlog_check_target (error_log));
-			printk("Type      : %s\n", 
+			printk("Type      : %s\n",
 					ppc_rtas_errorlog_check_type (error_log));
-			printk("Ext. log  : %s\n", 
+			printk("Ext. log  : %s\n",
 					ppc_rtas_errorlog_check_extended (error_log));
 			if (error_log.extended)
 				ppc_rtas_errorlog_disect_extended (logdata);
-			return 1;	
+			return 1;
 		default:
 			/* nothing */
 			break;
@@ -174,8 +174,8 @@ const char * ppc_rtas_errorlog_check_type (rtas_error_log error_log)
 		"uncorrectable ECC error",
 		"corrected ECC error"			/* 10 */
 	};
-	if (error_log.type == TYPE_EPOW) 
-		return "EPOW"; 
+	if (error_log.type == TYPE_EPOW)
+		return "EPOW";
 	if (error_log.type >= TYPE_PMGM_POWER_SW_ON)
 		return "PowerMGM Event (not handled right now)";
 	return _errlog_type[error_log.type];

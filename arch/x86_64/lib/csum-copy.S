@@ -64,21 +64,9 @@ csum_partial_copy_generic:
 	ignore
 	prefetch 1*64(%rdi)
 	ignore
-	prefetch 2*64(%rdi)
-	ignore
-	prefetch 3*64(%rdi)
-	ignore
-	prefetch 4*64(%rdi)
-	ignore
 	prefetchw (%rsi)
 	ignore
 	prefetchw 1*64(%rsi)
-	ignore
-	prefetchw 2*64(%rsi)
-	ignore
-	prefetchw 3*64(%rsi)
-	ignore
-	prefetchw 4*64(%rsi)
 
 .Lignore:		
 	subq  $7*8,%rsp

@@ -32,6 +32,7 @@ head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
 head-$(CONFIG_44x)		:= arch/ppc/kernel/head_44x.o
 
 head-$(CONFIG_6xx)		+= arch/ppc/kernel/idle_6xx.o
+head-$(CONFIG_POWER4)		+= arch/ppc/kernel/idle_power4.o
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
@@ -66,7 +67,7 @@ prepare: include/asm-$(ARCH)/offsets.h checkbin
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s 
+include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 ifdef CONFIG_6xx

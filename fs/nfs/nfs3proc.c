@@ -651,7 +651,8 @@ nfs3_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	default:	return -EINVAL;
 	}
 
-	dprintk("NFS call  mknod %s %x\n", name->name, (unsigned)rdev);
+	dprintk("NFS call  mknod %s %u:%u\n", name->name,
+			MAJOR(rdev), MINOR(rdev));
 	dir_attr.valid = 0;
 	fattr->valid = 0;
 	status = rpc_call(NFS_CLIENT(dir), NFS3PROC_MKNOD, &arg, &res, 0);

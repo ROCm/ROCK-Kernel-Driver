@@ -318,7 +318,7 @@ void __exit agp_exit(void)
 {
 }
 
-#ifdef MODULE
+#ifndef MODULE
 static __init int agp_setup(char *s)
 {
 	if (!strcmp(s,"off"))

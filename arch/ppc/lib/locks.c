@@ -1,6 +1,6 @@
 /*
- * Locks for smp ppc 
- * 
+ * Locks for smp ppc
+ *
  * Written by Cort Dougan (cort@cs.nmt.edu)
  */
 
@@ -70,7 +70,7 @@ int _raw_spin_trylock(spinlock_t *lock)
 {
 	if (__spin_trylock(&lock->lock))
 		return 0;
-	lock->owner_cpu = smp_processor_id(); 
+	lock->owner_cpu = smp_processor_id();
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	return 1;
 }
@@ -101,7 +101,7 @@ void _raw_read_lock(rwlock_t *rw)
 	unsigned long stuck = INIT_STUCK;
 	int cpu = smp_processor_id();
 
-again:	
+again:
 	/* get our read lock in there */
 	atomic_inc((atomic_t *) &(rw)->lock);
 	if ( (signed long)((rw)->lock) < 0) /* someone has a write lock */
@@ -153,7 +153,7 @@ again:
 		}
 		goto again;
 	}
-	
+
 	if ( (rw)->lock & ~(1<<31)) /* someone has a read lock */
 	{
 		/* clear our write lock and wait for reads to go away */

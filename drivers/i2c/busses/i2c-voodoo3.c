@@ -33,6 +33,7 @@
 #include <linux/pci.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/io.h>
 
 /* the only registers we use */
 #define REG		0x78

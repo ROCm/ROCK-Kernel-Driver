@@ -109,7 +109,7 @@ extern int call_rtas(const char *service, int nargs, int nret,
 		     unsigned long *outputs, ...);
 
 /*
- * PCI <-> OF matching functions 
+ * PCI <-> OF matching functions
  */
 struct pci_bus;
 struct pci_dev;

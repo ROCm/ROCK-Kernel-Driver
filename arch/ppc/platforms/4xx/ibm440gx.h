@@ -12,7 +12,7 @@
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
- * 
+ *
  */
 
 #ifdef __KERNEL__
@@ -109,7 +109,7 @@
 				| IBM_CPM_TMRCLK | IBM_CPM_DMA | IBM_CPM_PCI \
 				| IBM_CPM_TAHOE0 | IBM_CPM_TAHOE1 \
 				| IBM_CPM_EMAC0 | IBM_CPM_EMAC1 \
-			  	| IBM_CPM_EMAC2 | IBM_CPM_EMAC3 )	
+			  	| IBM_CPM_EMAC2 | IBM_CPM_EMAC3 )
 
 /* OPB */
 #define PPC440GX_OPB_BASE_START	0x0000000140000000ULL

@@ -3300,7 +3300,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   Command->SegmentCount = blk_rq_map_sg(Controller->RequestQueue,
 		  Command->Request, Command->cmd_sglist);
   /* pci_map_sg MAY change the value of SegCount */
-  Command->SegmentCount = pci_map_sg(Command->PciDevice, Command->cmd_sglist,
+  Command->SegmentCount = pci_map_sg(Controller->PCIDevice, Command->cmd_sglist,
 		 Command->SegmentCount, Command->DmaDirection);
 
   DAC960_QueueReadWriteCommand(Command);
@@ -3336,7 +3336,7 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
   (void)blk_rq_map_sg(Controller->RequestQueue, Command->Request,
                                         Command->cmd_sglist);
 
-  (void)pci_map_sg(Command->PciDevice, Command->cmd_sglist, 1,
+  (void)pci_map_sg(Controller->PCIDevice, Command->cmd_sglist, 1,
 		                        Command->DmaDirection);
   /*
    * Resubmitting the request sector at a time is really tedious.
@@ -3377,7 +3377,7 @@ static inline boolean DAC960_ProcessCompletedRequest(DAC960_Command_T *Command,
 	if (SuccessfulIO)
 		UpToDate = 1;
 
-	pci_unmap_sg(Command->PciDevice, Command->cmd_sglist,
+	pci_unmap_sg(Command->Controller->PCIDevice, Command->cmd_sglist,
 		Command->SegmentCount, Command->DmaDirection);
 
 	 if (!end_that_request_first(Request, UpToDate, Command->BlockCount)) {

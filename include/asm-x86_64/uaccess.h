@@ -147,7 +147,7 @@ extern void __put_user_bad(void);
 ({							\
 	int __pu_err = -EFAULT;				\
 	__typeof__(*(ptr)) *__pu_addr = (ptr);		\
-	if (access_ok(VERIFY_WRITE,__pu_addr,size))	\
+	if (likely(access_ok(VERIFY_WRITE,__pu_addr,size)))	\
 		__put_user_size((x),__pu_addr,(size),__pu_err);	\
 	__pu_err;					\
 })
@@ -255,12 +255,12 @@ static inline int __copy_from_user(void *dst, const void *src, unsigned size)
 		return ret; 
 	case 10:
 	       	__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
-		if (ret) return ret;
+		if (unlikely(ret)) return ret;
 		__get_user_asm(*(u16*)(8+(char*)dst),(u16*)(8+(char*)src),ret,"w","w","=r",2);
 		return ret; 
 	case 16:
 		__get_user_asm(*(u64*)dst,(u64*)src,ret,"q","","=r",16);
-		if (ret) return ret;
+		if (unlikely(ret)) return ret;
 		__get_user_asm(*(u64*)(8+(char*)dst),(u64*)(8+(char*)src),ret,"q","","=r",8);
 		return ret; 
 	default:
@@ -284,13 +284,13 @@ static inline int __copy_to_user(void *dst, const void *src, unsigned size)
 		return ret; 
 	case 10:
 		__put_user_asm(*(u64*)src,(u64*)dst,ret,"q","","ir",10);
-		if (ret) return ret;
+		if (unlikely(ret)) return ret;
 		asm("":::"memory");
 		__put_user_asm(4[(u16*)src],4+(u16*)dst,ret,"w","w","ir",2);
 		return ret; 
 	case 16:
 		__put_user_asm(*(u64*)src,(u64*)dst,ret,"q","","ir",16);
-		if (ret) return ret;
+		if (unlikely(ret)) return ret;
 		asm("":::"memory");
 		__put_user_asm(1[(u64*)src],1+(u64*)dst,ret,"q","","ir",8);
 		return ret; 
@@ -309,14 +309,14 @@ static inline int __copy_in_user(void *dst, const void *src, unsigned size)
 	case 1: { 
 		u8 tmp;
 		__get_user_asm(tmp,(u8 *)src,ret,"b","b","=q",1); 
-		if (!ret)
+		if (likely(!ret))
 			__put_user_asm(tmp,(u8 *)dst,ret,"b","b","iq",1); 
 		return ret;
 	}
 	case 2: { 
 		u16 tmp;
 		__get_user_asm(tmp,(u16 *)src,ret,"w","w","=r",2); 
-		if (!ret)
+		if (likely(!ret))
 			__put_user_asm(tmp,(u16 *)dst,ret,"w","w","ir",2); 
 		return ret;
 	}
@@ -324,14 +324,14 @@ static inline int __copy_in_user(void *dst, const void *src, unsigned size)
 	case 4: { 
 		u32 tmp;
 		__get_user_asm(tmp,(u32 *)src,ret,"l","k","=r",4); 
-		if (!ret)
+		if (likely(!ret))
 			__put_user_asm(tmp,(u32 *)dst,ret,"l","k","ir",4); 
 		return ret;
 	}
 	case 8: { 
 		u64 tmp;
 		__get_user_asm(tmp,(u64 *)src,ret,"q","","=r",8); 
-		if (!ret)
+		if (likely(!ret))
 			__put_user_asm(tmp,(u64 *)dst,ret,"q","","ir",8); 
 		return ret;
 	}

@@ -661,7 +661,7 @@ smb_make_node(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	attr.ia_uid = current->euid;
 	attr.ia_gid = current->egid;
 
-	if (!old_valid_dev(dev))
+	if (!new_valid_dev(dev))
 		return -EINVAL;
 
 	smb_invalid_dir_cache(dir);

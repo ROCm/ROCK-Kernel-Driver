@@ -4,6 +4,7 @@ config 4xx
 	default y
 
 menu "IBM 4xx options"
+	depends on 4xx
 
 choice
 	prompt "Machine Type"

@@ -1,8 +1,8 @@
 /*
  * Routines for handling backlight control on PowerBooks
- * 
+ *
  * For now, implementation resides in arch/ppc/kernel/pmac_support.c
- * 
+ *
  */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_BACKLIGHT_H

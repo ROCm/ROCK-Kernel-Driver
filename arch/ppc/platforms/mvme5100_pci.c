@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/mvme5100_pci.c
- * 
+ *
  * PCI setup routines for the Motorola MVME5100.
  *
  * Author: Matt Porter <mporter@mvista.com>
@@ -31,7 +31,7 @@ mvme5100_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 
 	static char pci_irq_table[][4] =
 	/*
-	 *	PCI IDSEL/INTPIN->INTLINE 
+	 *	PCI IDSEL/INTPIN->INTLINE
 	 * 	   A   B   C   D
 	 */
 	{
@@ -52,7 +52,7 @@ mvme5100_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/* If lookup is zero, always return 0 */
 	if (!irq)
 		return 0;
-	else 
+	else
 #ifdef CONFIG_MVME5100_IPMC761_PRESENT
 	/* If IPMC761 present, return table value */
 	return irq;

@@ -2565,8 +2565,12 @@ void ext3_read_inode(struct inode * inode)
 		}
 	} else {
 		inode->i_op = &ext3_special_inode_operations;
-		init_special_inode(inode, inode->i_mode,
+		if (raw_inode->i_block[0])
+			init_special_inode(inode, inode->i_mode,
 			   old_decode_dev(le32_to_cpu(raw_inode->i_block[0])));
+		else 
+			init_special_inode(inode, inode->i_mode,
+			   new_decode_dev(le32_to_cpu(raw_inode->i_block[1])));
 	}
 	brelse (iloc.bh);
 	ext3_set_inode_flags(inode);
@@ -2666,10 +2670,17 @@ static int ext3_do_update_inode(handle_t *handle,
 		}
 	}
 	raw_inode->i_generation = cpu_to_le32(inode->i_generation);
-	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		raw_inode->i_block[0] =
-			cpu_to_le32(old_encode_dev(inode->i_rdev));
-	else for (block = 0; block < EXT3_N_BLOCKS; block++)
+	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
+		if (old_valid_dev(inode->i_rdev)) {
+			raw_inode->i_block[0] =
+				cpu_to_le32(old_encode_dev(inode->i_rdev));
+			raw_inode->i_block[1] = 0;
+		} else {
+			raw_inode->i_block[0] = 0;
+			raw_inode->i_block[1] =
+				cpu_to_le32(new_encode_dev(inode->i_rdev));
+		}
+	} else for (block = 0; block < EXT3_N_BLOCKS; block++)
 		raw_inode->i_block[block] = ei->i_data[block];
 
 	BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");

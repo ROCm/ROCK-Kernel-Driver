@@ -83,7 +83,7 @@ static char *pmc1_lookup(unsigned long mmcr0)
 	default:
 		return "unknown";
 	}
-}	
+}
 
 static char *pmc2_lookup(unsigned long mmcr0)
 {
@@ -102,7 +102,7 @@ static char *pmc2_lookup(unsigned long mmcr0)
 	default:
 		return "unknown";
 	}
-}	
+}
 
 /*
  * print some useful info about the hash table.  This function
@@ -162,7 +162,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		else
 			uptes++;
 	}
-	
+
 	n += sprintf( buffer + n,
 		      "PTE Hash Table Information\n"
 		      "Size\t\t: %luKb\n"
@@ -234,7 +234,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			asm volatile ("mtspr %0, %3 \n\t"
 			    "mtspr %1, %3 \n\t"
-			    "mtspr %2, %3 \n\t"			    
+			    "mtspr %2, %3 \n\t"			
 			    :: "i" (MMCR0), "i" (PMC1), "i" (PMC2), "r" (0));
 		}
 	}
@@ -285,7 +285,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 				"i" (PMC1),  "r" (0), "i"(PMC2) );
 		}
 	}
-	
+
 	/* PMC1 values */
 	if ( !strncmp( buffer, "dtlb", 4) )
 	{
@@ -300,7 +300,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 				:: "r" (tmp), "i" (MMCR0), "i" (MMCR0_PMC1_DTLB),
 				"i" (PMC1),  "r" (0) );
 		}
-	}	
+	}
 
 	if ( !strncmp( buffer, "ic miss", 7) )
 	{
@@ -315,7 +315,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 				:: "r" (tmp), "i" (MMCR0),
 				"i" (MMCR0_PMC1_ICACHEMISS), "i" (PMC1),  "r" (0));
 		}
-	}	
+	}
 
 	/* PMC2 values */
 	if ( !strncmp( buffer, "load miss time", 14) )
@@ -333,7 +333,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			       "i" (PMC2),  "r" (0) );
 		}
 	}
-	
+
 	if ( !strncmp( buffer, "itlb", 4) )
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
@@ -364,8 +364,8 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			       : "i" (MMCR0), "i" (MMCR0_PMC2_DCACHEMISS),
 			       "i" (PMC2),  "r" (0) );
 		}
-	}	
-	
+	}
+
 	return count;
 #else /* CONFIG_PPC_STD_MMU */
 	return 0;
@@ -416,12 +416,12 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return -EFAULT;
-	
+
 	if ( /*!table->maxlen ||*/ (filp->f_pos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
-	
+
 	vleft = table->maxlen / sizeof(int);
 	left = *lenp;
 
@@ -475,9 +475,9 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 			p += sprintf(p, "%s", (val>>15)&1 ? ", DLL slow" : "");
 			p += sprintf(p, "%s", (val>>14)&1 ? ", diff clock" :"");
 			p += sprintf(p, "%s", (val>>13)&1 ? ", DLL bypass" :"");
-			
+
 			p += sprintf(p,"\n");
-			
+
 			len = strlen(buf);
 			if (len > left)
 				len = left;

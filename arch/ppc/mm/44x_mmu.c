@@ -5,7 +5,7 @@
  * This file contains the routines for initializing the MMU
  * on the 4xx series of chips.
  *  -- paulus
- * 
+ *
  *  Derived from arch/ppc/mm/init.c:
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *

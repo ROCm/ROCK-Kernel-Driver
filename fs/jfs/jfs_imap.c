@@ -3044,7 +3044,7 @@ static int copy_from_dinode(struct dinode * dip, struct inode *ip)
 
 	if (S_ISCHR(ip->i_mode) || S_ISBLK(ip->i_mode)) {
 		jfs_ip->dev = le32_to_cpu(dip->di_rdev);
-		ip->i_rdev = old_decode_dev(jfs_ip->dev);
+		ip->i_rdev = new_decode_dev(jfs_ip->dev);
 	}
 
 	if (S_ISDIR(ip->i_mode)) {

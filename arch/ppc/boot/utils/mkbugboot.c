@@ -1,8 +1,8 @@
 /*
  * arch/ppc/pp3boot/mkbugboot.c
- * 
- * Makes a Motorola PPCBUG ROM bootable image which can be flashed 
- * into one of the FLASH banks on a Motorola PowerPlus board. 
+ *
+ * Makes a Motorola PPCBUG ROM bootable image which can be flashed
+ * into one of the FLASH banks on a Motorola PowerPlus board.
  *
  * Author: Matt Porter <mporter@mvista.com>
  *
@@ -95,7 +95,7 @@ void write_bugboot_header(int32_t out_fd, uint32_t boot_size)
 {
   uint8_t header_block[HEADER_SIZE];
   bug_boot_header_t *bbh = (bug_boot_header_t *)&header_block[0];
-  
+
   bzero(header_block, HEADER_SIZE);
 
   /* Fill in the PPCBUG ROM boot header */
@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
   }
 
   /* Get file args */
-  
+
   /* kernel image file */
     if ((image_fd = open( argv[argptr] , 0)) < 0)
       exit(-1);
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
   bugboot_fd = open(bugbootname, O_RDWR);
 
   /* Calculate checksum */
-  checksum = calc_checksum(bugboot_fd);  
+  checksum = calc_checksum(bugboot_fd);
 
   /* Write out the calculated checksum */
   write(bugboot_fd, &checksum, 2);

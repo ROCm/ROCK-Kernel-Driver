@@ -2,6 +2,7 @@
 # Automatically generated make config: don't edit
 #
 CONFIG_X86_64=y
+CONFIG_64BIT=y
 CONFIG_X86=y
 CONFIG_MMU=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
@@ -14,7 +15,8 @@ CONFIG_GENERIC_ISA_DMA=y
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
-# CONFIG_BROKEN is not set
+CONFIG_CLEAN_COMPILE=y
+CONFIG_STANDALONE=y
 
 #
 # General setup
@@ -110,7 +112,6 @@ CONFIG_PCI_DIRECT=y
 #
 # Executable file formats / Emulations
 #
-CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 CONFIG_IA32_EMULATION=y
@@ -215,6 +216,7 @@ CONFIG_IDEDMA_AUTO=y
 # SCSI device support
 #
 CONFIG_SCSI=y
+# CONFIG_SCSI_PROC_FS is not set
 
 #
 # SCSI support type (disk, tape, CD-ROM)
@@ -243,7 +245,6 @@ CONFIG_BLK_DEV_SD=y
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_AIC79XX is not set
 # CONFIG_SCSI_ADVANSYS is not set
-# CONFIG_SCSI_AM53C974 is not set
 # CONFIG_SCSI_MEGARAID is not set
 # CONFIG_SCSI_BUSLOGIC is not set
 # CONFIG_SCSI_CPQFCTS is not set
@@ -253,17 +254,12 @@ CONFIG_BLK_DEV_SD=y
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
 # CONFIG_SCSI_GDTH is not set
 CONFIG_SCSI_IPS=m
-# CONFIG_SCSI_INITIO is not set
 # CONFIG_SCSI_INIA100 is not set
 # CONFIG_SCSI_SYM53C8XX_2 is not set
-# CONFIG_SCSI_SYM53C8XX is not set
-# CONFIG_SCSI_PCI2000 is not set
-# CONFIG_SCSI_PCI2220I is not set
 # CONFIG_SCSI_QLOGIC_ISP is not set
 # CONFIG_SCSI_QLOGIC_FC is not set
 # CONFIG_SCSI_QLOGIC_1280 is not set
 # CONFIG_SCSI_DC395x is not set
-# CONFIG_SCSI_DC390T is not set
 # CONFIG_SCSI_NSP32 is not set
 # CONFIG_SCSI_DEBUG is not set
 
@@ -357,7 +353,6 @@ CONFIG_NETDEVICES=y
 # CONFIG_BONDING is not set
 # CONFIG_EQUALIZER is not set
 # CONFIG_TUN is not set
-# CONFIG_ETHERTAP is not set
 
 #
 # Ethernet (10 or 100Mbit)
@@ -559,7 +554,6 @@ CONFIG_RTC=y
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_FTAPE is not set
 CONFIG_AGP=y
 CONFIG_AGP_AMD64=y
 # CONFIG_DRM is not set
@@ -716,8 +710,6 @@ CONFIG_SOUND_ICH=y
 # CONFIG_SOUND_RME96XX is not set
 # CONFIG_SOUND_SONICVIBES is not set
 # CONFIG_SOUND_TRIDENT is not set
-# CONFIG_SOUND_MSNDCLAS is not set
-# CONFIG_SOUND_MSNDPIN is not set
 # CONFIG_SOUND_VIA82CXXX is not set
 # CONFIG_SOUND_OSS is not set
 # CONFIG_SOUND_ALI5455 is not set

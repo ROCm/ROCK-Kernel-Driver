@@ -222,6 +222,8 @@ void unregister_ip_vs_app(struct ip_vs_app *app)
 		ip_vs_app_inc_release(inc);
 	}
 
+	list_del(&app->a_list);
+
 	up(&__ip_vs_app_mutex);
 
 	/* decrease the module use count */

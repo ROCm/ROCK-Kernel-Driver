@@ -54,6 +54,9 @@
  * vector that will be called by the ROM on wakeup
  */
 _GLOBAL(low_sleep_handler)
+#ifndef CONFIG_6xx
+	blr
+#else
 	mflr	r0
 	stw	r0,4(r1)
 	stwu	r1,-SL_SIZE(r1)
@@ -76,7 +79,7 @@ _GLOBAL(low_sleep_handler)
 	mftbu	r3
 	cmpw	r3,r4
 	bne	1b
-	
+
 	/* Save SPRGs */
 	mfsprg	r4,0
 	stw	r4,SL_SPRG0(r1)
@@ -164,7 +167,7 @@ _GLOBAL(low_sleep_handler)
 	sync
 	mtspr	SPRN_HID0,r3
 	sync
-	
+
 	/* Turn off data relocation. */
 	mfmsr	r3		/* Save MSR in r7 */
 	rlwinm	r3,r3,0,28,26	/* Turn off DR bit */
@@ -199,7 +202,7 @@ _GLOBAL(low_sleep_handler)
 	isync
 	b	1b
 
-/* 
+/*
  * Here is the resume code.
  */
 
@@ -219,7 +222,7 @@ _GLOBAL(core99_wake_up)
 	/* Won't that cause problems on CPU that doesn't support it ? */
 	lis	r3, 0
 	mtspr	SPRN_MMCR0, r3
-	
+
 	/* sanitize MSR */
 	mfmsr	r3
 	ori	r3,r3,MSR_EE|MSR_IP
@@ -237,11 +240,11 @@ _GLOBAL(core99_wake_up)
 	lwz	r1,0(r3)
 
 	/* Pass thru to older resume code ... */
-/* 
+/*
  * Here is the resume code for older machines.
  * r1 has the physical address of SL_PC(sp).
  */
-	
+
 grackle_wake_up:
 	/* Invalidate & enable L1 cache, we don't care about
 	 * whatever the ROM may have tried to write to memory
@@ -262,7 +265,7 @@ grackle_wake_up:
 	bdnz	3b
 	sync
 	isync
-	
+
 	subi	r1,r1,SL_PC
 
 	/* Restore various CPU config stuffs */
@@ -342,7 +345,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_HIGH_BATS)
 
 	/* restore the MSR and turn on the MMU */
 	lwz	r3,SL_MSR(r1)
-	bl	turn_on_mmu	
+	bl	turn_on_mmu
 
 	/* get back the stack pointer */
 	tovirt(r1,r1)
@@ -381,4 +384,6 @@ turn_on_mmu:
 sleep_storage:
 	.long 0
 	.balign	L1_CACHE_LINE_SIZE, 0
+
+#endif /* CONFIG_6xx */
 	.section .text
