@@ -33,7 +33,7 @@
 }
 
 static int debug;
-module_param(debug, int, 0x644);
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "set debugging level (1=info,ts=2,ctrl=4 (or-able)).");
 
 #define deb_info(args...) dprintk(0x01,args)
@@ -89,8 +89,18 @@ struct usb_b2c2_usb {
 
 /* request types */
 typedef enum {
+
+/* something is wrong with this part
 	RTYPE_READ_DW         = (1 << 6),
 	RTYPE_WRITE_DW_1      = (3 << 6),
+	RTYPE_READ_V8_MEMORY  = (6 << 6),
+	RTYPE_WRITE_V8_MEMORY = (7 << 6),
+	RTYPE_WRITE_V8_FLASH  = (8 << 6),
+	RTYPE_GENERIC         = (9 << 6),
+*/
+	RTYPE_READ_DW = (3 << 6),
+	RTYPE_WRITE_DW_1 = (1 << 6),
+	
 	RTYPE_READ_V8_MEMORY  = (6 << 6),
 	RTYPE_WRITE_V8_MEMORY = (7 << 6),
 	RTYPE_WRITE_V8_FLASH  = (8 << 6),
@@ -391,9 +401,9 @@ static int b2c2_init_usb(struct usb_b2c2_usb *b2c2)
 		}
 	/* initialising and submitting iso urbs */
 	for (i = 0; i < B2C2_USB_NUM_ISO_URB; i++) {
-		deb_info("initializing and submitting urb no. %d (buf_offset: %d).\n",i,buffer_offset);
 		int frame_offset = 0;
 		struct urb *urb = b2c2->iso_urb[i];
+		deb_info("initializing and submitting urb no. %d (buf_offset: %d).\n",i,buffer_offset);
 
 		urb->dev = b2c2->udev;
 		urb->context = b2c2;
