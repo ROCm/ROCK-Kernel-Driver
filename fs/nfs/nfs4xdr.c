@@ -1253,9 +1253,9 @@ static int nfs4_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct n
 		goto out;
 	if ((status = encode_create(&xdr, args)) != 0)
 		goto out;
-	if ((status = encode_getfattr(&xdr, args->bitmask)) != 0)
+	if ((status = encode_getfh(&xdr)) != 0)
 		goto out;
-	status = encode_getfh(&xdr);
+	status = encode_getfattr(&xdr, args->bitmask);
 out:
 	return status;
 }
@@ -1326,10 +1326,10 @@ static int nfs4_xdr_enc_open(struct rpc_rqst *req, uint32_t *p, struct nfs_opena
 	status = encode_open(&xdr, args);
 	if (status)
 		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
+	status = encode_getfh(&xdr);
 	if (status)
 		goto out;
-	status = encode_getfh(&xdr);
+	status = encode_getfattr(&xdr, args->bitmask);
 out:
 	return status;
 }
@@ -3221,9 +3221,11 @@ static int nfs4_xdr_dec_create(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_
 		goto out;
 	if ((status = decode_create(&xdr,&res->dir_cinfo)) != 0)
 		goto out;
-	if ((status = decode_getfattr(&xdr, res->fattr, res->server)) != 0)
+	if ((status = decode_getfh(&xdr, res->fh)) != 0)
 		goto out;
-	status = decode_getfh(&xdr, res->fh);
+	status = decode_getfattr(&xdr, res->fattr, res->server);
+	if (status == NFS4ERR_DELAY)
+		status = 0;
 out:
 	return status;
 }
@@ -3299,10 +3301,12 @@ static int nfs4_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_ope
         status = decode_open(&xdr, res);
         if (status)
                 goto out;
-	status = decode_getfattr(&xdr, res->f_attr, res->server);
-        if (status)
-                goto out;
 	status = decode_getfh(&xdr, &res->fh);
+        if (status)
+		goto out;
+	status = decode_getfattr(&xdr, res->f_attr, res->server);
+	if (status == NFS4ERR_DELAY)
+		status = 0;
 out:
         return status;
 }
@@ -3348,6 +3352,8 @@ static int nfs4_xdr_dec_open_reclaim(struct rpc_rqst *rqstp, uint32_t *p, struct
         if (status)
                 goto out;
 	status = decode_getfattr(&xdr, res->f_attr, res->server);
+	if (status == NFS4ERR_DELAY)
+		status = 0;
 out:
         return status;
 }
@@ -3372,6 +3378,8 @@ static int nfs4_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_
         if (status)
                 goto out;
 	status = decode_getfattr(&xdr, res->fattr, res->server);
+	if (status == NFS4ERR_DELAY)
+		status = 0;
 out:
         return status;
 }
