@@ -379,6 +379,9 @@ static int sctp_send_asconf_add_ip(struct sock		*sk,
 	int 				i;
 	int 				retval = 0;
 
+	if (!sctp_addip_enable)
+		return retval;
+
 	sp = sctp_sk(sk);
 	ep = sp->ep;
 
@@ -563,6 +566,9 @@ static int sctp_send_asconf_del_ip(struct sock		*sk,
 	struct list_head	*pos;
 	int 			i;
 	int 			retval = 0;
+
+	if (!sctp_addip_enable)
+		return retval;
 
 	sp = sctp_sk(sk);
 	ep = sp->ep;

@@ -924,11 +924,13 @@ const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid,
 	if (cid >= 0 && cid <= SCTP_CID_BASE_MAX)
 		return &chunk_event_table[cid][state];
 
-	if (cid == SCTP_CID_ASCONF)
-		return &addip_chunk_event_table[0][state];
+	if (sctp_addip_enable) {
+		if (cid == SCTP_CID_ASCONF)
+			return &addip_chunk_event_table[0][state];
 
-	if (cid == SCTP_CID_ASCONF_ACK)
-		return &addip_chunk_event_table[1][state];
+		if (cid == SCTP_CID_ASCONF_ACK)
+			return &addip_chunk_event_table[1][state];
+	}
 
 	return &chunk_event_table_unknown[state];
 }

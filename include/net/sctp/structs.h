@@ -190,6 +190,9 @@ extern struct sctp_globals {
 	 */
 	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
+	
+	/* Flag to indicate if addip is enabled. */
+	int addip_enable;
 } sctp_globals;
 
 #define sctp_rto_initial		(sctp_globals.rto_initial)
@@ -217,6 +220,7 @@ extern struct sctp_globals {
 #define sctp_port_hashtable		(sctp_globals.port_hashtable)
 #define sctp_local_addr_list		(sctp_globals.local_addr_list)
 #define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
+#define sctp_addip_enable		(sctp_globals.addip_enable)
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
