@@ -80,8 +80,6 @@ EXPORT_SYMBOL(irda_param_pack);
 EXPORT_SYMBOL(irda_param_unpack);
 
 /* IrLAP */
-EXPORT_SYMBOL(irda_init_max_qos_capabilies);
-EXPORT_SYMBOL(irda_qos_bits_to_value);
 
 
 #ifdef CONFIG_IRDA_DEBUG
