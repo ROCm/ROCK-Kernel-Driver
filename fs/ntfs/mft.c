@@ -25,8 +25,6 @@
 
 #include "ntfs.h"
 
-#define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-
 /**
  * __format_mft_record - initialize an empty mft record
  * @m:		mapped, pinned and locked for writing mft record

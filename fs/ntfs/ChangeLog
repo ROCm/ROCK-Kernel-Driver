@@ -28,6 +28,10 @@ ToDo:
 
 	- Remove much of the NULL struct element initializers.
 	- Various updates to make compatible with recent kernels.
+	- Remove defines of MAX_BUF_PER_PAGE and include linux/buffer_head.h
+	  in fs/ntfs/ntfs.h instead.
+	- Remove no longer needed KERNEL_VERSION checks. We are now in the
+	  kernel proper so they are no longer needed.
 
 2.0.6 - Major bugfix to make compatible with other kernel changes.
 
