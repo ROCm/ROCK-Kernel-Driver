@@ -27,7 +27,6 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ide.h>
-#include <linux/suspend.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 
 #include <asm/byteorder.h>
