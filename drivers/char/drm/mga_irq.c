@@ -30,7 +30,6 @@
  *    Eric Anholt <anholt@FreeBSD.org>
  */
 
-#include "mga.h"
 #include "drmP.h"
 #include "drm.h"
 #include "mga_drm.h"
@@ -50,7 +49,7 @@ irqreturn_t mga_driver_irq_handler( DRM_IRQ_ARGS )
 		MGA_WRITE( MGA_ICLEAR, MGA_VLINEICLR );
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
-		DRM(vbl_send_signals)( dev );
+		drm_vbl_send_signals( dev );
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;

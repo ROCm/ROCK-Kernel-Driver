@@ -52,7 +52,7 @@
 # define ATI_MAX_PCIGART_PAGES		8192	/**< 32 MB aperture, 4K pages */
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 
-static unsigned long DRM(ati_alloc_pcigart_table)( void )
+static unsigned long drm_ati_alloc_pcigart_table( void )
 {
 	unsigned long address;
 	struct page *page;
@@ -75,7 +75,7 @@ static unsigned long DRM(ati_alloc_pcigart_table)( void )
 	return address;
 }
 
-static void DRM(ati_free_pcigart_table)( unsigned long address )
+static void drm_ati_free_pcigart_table( unsigned long address )
 {
 	struct page *page;
 	int i;
@@ -91,7 +91,7 @@ static void DRM(ati_free_pcigart_table)( unsigned long address )
 	free_pages( address, ATI_PCIGART_TABLE_ORDER );
 }
 
-int DRM(ati_pcigart_init)( drm_device_t *dev,
+int drm_ati_pcigart_init( drm_device_t *dev,
 			   unsigned long *addr,
 			   dma_addr_t *bus_addr)
 {
@@ -106,7 +106,7 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 		goto done;
 	}
 
-	address = DRM(ati_alloc_pcigart_table)();
+	address = drm_ati_alloc_pcigart_table();
 	if ( !address ) {
 		DRM_ERROR( "cannot allocate PCI GART page!\n" );
 		goto done;
@@ -122,7 +122,7 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 				  PCI_DMA_TODEVICE);
 	if (bus_address == 0) {
 		DRM_ERROR( "unable to map PCIGART pages!\n" );
-		DRM(ati_free_pcigart_table)( address );
+		drm_ati_free_pcigart_table( address );
 		address = 0;
 		goto done;
 	}
@@ -142,7 +142,7 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 					   PCI_DMA_TODEVICE);
 		if (entry->busaddr[i] == 0) {
 			DRM_ERROR( "unable to map PCIGART pages!\n" );
-			DRM(ati_pcigart_cleanup)( dev, address, bus_address );
+			drm_ati_pcigart_cleanup( dev, address, bus_address );
 			address = 0;
 			bus_address = 0;
 			goto done;
@@ -169,7 +169,7 @@ done:
 	return ret;
 }
 
-int DRM(ati_pcigart_cleanup)( drm_device_t *dev,
+int drm_ati_pcigart_cleanup( drm_device_t *dev,
 			      unsigned long addr,
 			      dma_addr_t bus_addr)
 {
@@ -199,7 +199,7 @@ int DRM(ati_pcigart_cleanup)( drm_device_t *dev,
 	}
 
 	if ( addr ) {
-		DRM(ati_free_pcigart_table)( addr );
+		drm_ati_free_pcigart_table( addr );
 	}
 
 	return 1;

@@ -10,6 +10,28 @@
 #ifndef _I915_DRV_H_
 #define _I915_DRV_H_
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"Tungsten Graphics, Inc."
+
+#define DRIVER_NAME		"i915"
+#define DRIVER_DESC		"Intel Graphics"
+#define DRIVER_DATE		"20040405"
+
+/* Interface history:
+ *
+ * 1.1: Original.
+ */
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		1
+#define DRIVER_PATCHLEVEL	0
+
+/* We use our own dma mechanisms, not the drm template code.  However,
+ * the shared IRQ code is useful to us:
+ */
+#define __HAVE_PM		1
+
 typedef struct _drm_i915_ring_buffer {
 	int tail_mask;
 	unsigned long Start;
@@ -66,6 +88,8 @@ extern int i915_getparam(DRM_IOCTL_ARGS);
 extern int i915_setparam(DRM_IOCTL_ARGS);
 extern int i915_cmdbuffer(DRM_IOCTL_ARGS);
 extern void i915_kernel_lost_context(drm_device_t * dev);
+extern void i915_driver_pretakedown(drm_device_t *dev);
+extern void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp);
 
 /* i915_irq.c */
 extern int i915_irq_emit(DRM_IOCTL_ARGS);

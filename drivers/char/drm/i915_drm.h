@@ -61,18 +61,31 @@ typedef struct _drm_i915_sarea {
 /* I915 specific ioctls
  * The device specific ioctl range is 0x40 to 0x79.
  */
-#define DRM_IOCTL_I915_INIT		DRM_IOW( 0x40, drm_i915_init_t)
-#define DRM_IOCTL_I915_FLUSH		DRM_IO ( 0x41)
-#define DRM_IOCTL_I915_FLIP		DRM_IO ( 0x42)
-#define DRM_IOCTL_I915_BATCHBUFFER	DRM_IOW( 0x43, drm_i915_batchbuffer_t)
-#define DRM_IOCTL_I915_IRQ_EMIT         DRM_IOWR(0x44, drm_i915_irq_emit_t)
-#define DRM_IOCTL_I915_IRQ_WAIT         DRM_IOW( 0x45, drm_i915_irq_wait_t)
-#define DRM_IOCTL_I915_GETPARAM         DRM_IOWR(0x46, drm_i915_getparam_t)
-#define DRM_IOCTL_I915_SETPARAM         DRM_IOW( 0x47, drm_i915_setparam_t)
-#define DRM_IOCTL_I915_ALLOC            DRM_IOWR(0x48, drm_i915_mem_alloc_t)
-#define DRM_IOCTL_I915_FREE             DRM_IOW( 0x49, drm_i915_mem_free_t)
-#define DRM_IOCTL_I915_INIT_HEAP        DRM_IOW( 0x4a, drm_i915_mem_init_heap_t)
-#define DRM_IOCTL_I915_CMDBUFFER	DRM_IOW( 0x4b, drm_i915_cmdbuffer_t)
+#define DRM_I915_INIT		0x00
+#define DRM_I915_FLUSH		0x01
+#define DRM_I915_FLIP		0x02
+#define DRM_I915_BATCHBUFFER	0x03
+#define DRM_I915_IRQ_EMIT	0x04
+#define DRM_I915_IRQ_WAIT	0x05
+#define DRM_I915_GETPARAM	0x06
+#define DRM_I915_SETPARAM	0x07
+#define DRM_I915_ALLOC		0x08
+#define DRM_I915_FREE		0x09
+#define DRM_I915_INIT_HEAP	0x0a
+#define DRM_I915_CMDBUFFER	0x0b
+
+#define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
+#define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
+#define DRM_IOCTL_I915_FLIP		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLIP)
+#define DRM_IOCTL_I915_BATCHBUFFER	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_BATCHBUFFER, drm_i915_batchbuffer_t)
+#define DRM_IOCTL_I915_IRQ_EMIT         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_IRQ_EMIT, drm_i915_irq_emit_t)
+#define DRM_IOCTL_I915_IRQ_WAIT         DRM_IOW( DRM_COMMAND_BASE + DRM_I915_IRQ_WAIT, drm_i915_irq_wait_t)
+#define DRM_IOCTL_I915_GETPARAM         DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GETPARAM, drm_i915_getparam_t)
+#define DRM_IOCTL_I915_SETPARAM         DRM_IOW( DRM_COMMAND_BASE + DRM_I915_SETPARAM, drm_i915_setparam_t)
+#define DRM_IOCTL_I915_ALLOC            DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_ALLOC, drm_i915_mem_alloc_t)
+#define DRM_IOCTL_I915_FREE             DRM_IOW( DRM_COMMAND_BASE + DRM_I915_FREE, drm_i915_mem_free_t)
+#define DRM_IOCTL_I915_INIT_HEAP        DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT_HEAP, drm_i915_mem_init_heap_t)
+#define DRM_IOCTL_I915_CMDBUFFER	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_CMDBUFFER, drm_i915_cmdbuffer_t)
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.

@@ -28,7 +28,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#include "r128.h"
 #include "drmP.h"
 #include "drm.h"
 #include "r128_drm.h"
@@ -355,7 +354,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 	DRM_DEBUG( "\n" );
 
-	dev_priv = DRM(alloc)( sizeof(drm_r128_private_t), DRM_MEM_DRIVER );
+	dev_priv = drm_alloc( sizeof(drm_r128_private_t), DRM_MEM_DRIVER );
 	if ( dev_priv == NULL )
 		return DRM_ERR(ENOMEM);
 
@@ -544,7 +543,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle
 			      + init->ring_size / sizeof(u32));
 	dev_priv->ring.size = init->ring_size;
-	dev_priv->ring.size_l2qw = DRM(order)( init->ring_size / 8 );
+	dev_priv->ring.size_l2qw = drm_order( init->ring_size / 8 );
 
 	dev_priv->ring.tail_mask =
 		(dev_priv->ring.size / sizeof(u32)) - 1;
@@ -561,7 +560,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 #if __OS_HAS_AGP
 	if ( dev_priv->is_pci ) {
 #endif
-		if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
+		if (!drm_ati_pcigart_init( dev, &dev_priv->phys_pci_gart,
      					    &dev_priv->bus_pci_gart) ) {
 			DRM_ERROR( "failed to init PCI GART!\n" );
 			dev->dev_private = (void *)dev_priv;
@@ -590,7 +589,7 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) drm_irq_uninstall(dev);
 
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;
@@ -606,13 +605,13 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 		} else
 #endif
 		{
-			if (!DRM(ati_pcigart_cleanup)( dev,
+			if (!drm_ati_pcigart_cleanup( dev,
 						dev_priv->phys_pci_gart,
 						dev_priv->bus_pci_gart ))
 				DRM_ERROR( "failed to cleanup PCI GART!\n" );
 		}
 
-		DRM(free)( dev->dev_private, sizeof(drm_r128_private_t),
+		drm_free( dev->dev_private, sizeof(drm_r128_private_t),
 			   DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 	}
@@ -771,7 +770,7 @@ static int r128_freelist_init( drm_device_t *dev )
 	drm_r128_freelist_t *entry;
 	int i;
 
-	dev_priv->head = DRM(alloc)( sizeof(drm_r128_freelist_t),
+	dev_priv->head = drm_alloc( sizeof(drm_r128_freelist_t),
 				     DRM_MEM_DRIVER );
 	if ( dev_priv->head == NULL )
 		return DRM_ERR(ENOMEM);
@@ -783,7 +782,7 @@ static int r128_freelist_init( drm_device_t *dev )
 		buf = dma->buflist[i];
 		buf_priv = buf->dev_private;
 
-		entry = DRM(alloc)( sizeof(drm_r128_freelist_t),
+		entry = drm_alloc( sizeof(drm_r128_freelist_t),
 				    DRM_MEM_DRIVER );
 		if ( !entry ) return DRM_ERR(ENOMEM);
 

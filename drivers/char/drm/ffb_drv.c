@@ -210,9 +210,7 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-#include "drm_core.h"
-
-/* This functions must be here since it references DRM(numdevs)
+/* This functions must be here since it references drm_numdevs)
  * which drm_drv.h declares.
  */
 static int ffb_presetup(drm_device_t *dev)
@@ -227,13 +225,13 @@ static int ffb_presetup(drm_device_t *dev)
 		return -ENODEV;
 
 	/* Find our instance number by finding our device in dev structure */
-	for (i = 0; i < DRM(numdevs); i++) {
-		temp_dev = &(DRM(device)[i]);
+	for (i = 0; i < drm_numdevs; i++) {
+		temp_dev = &(drm_device[i]);
 		if(temp_dev == dev)
 			break;
 	}
 
-	if (i == DRM(numdevs))
+	if (i == drm_numdevs)
 		return -ENODEV;
 
 	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);

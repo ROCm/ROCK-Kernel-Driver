@@ -26,7 +26,6 @@
  *
  */
 
-#include "i830.h"
 #include "drmP.h"
 #include "drm.h"
 #include "i830_drm.h"

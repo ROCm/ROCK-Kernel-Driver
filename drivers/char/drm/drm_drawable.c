@@ -36,7 +36,7 @@
 #include "drmP.h"
 
 /** No-op. */
-int DRM(adddraw)(struct inode *inode, struct file *filp,
+int drm_adddraw(struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
 	drm_draw_t draw;
@@ -49,7 +49,7 @@ int DRM(adddraw)(struct inode *inode, struct file *filp,
 }
 
 /** No-op. */
-int DRM(rmdraw)(struct inode *inode, struct file *filp,
+int drm_rmdraw(struct inode *inode, struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
 	return 0;		/* NOOP */

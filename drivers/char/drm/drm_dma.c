@@ -43,11 +43,11 @@
  *
  * Allocate and initialize a drm_device_dma structure.
  */
-int DRM(dma_setup)( drm_device_t *dev )
+int drm_dma_setup( drm_device_t *dev )
 {
 	int i;
 
-	dev->dma = DRM(alloc)( sizeof(*dev->dma), DRM_MEM_DRIVER );
+	dev->dma = drm_alloc( sizeof(*dev->dma), DRM_MEM_DRIVER );
 	if ( !dev->dma )
 		return -ENOMEM;
 
@@ -67,7 +67,7 @@ int DRM(dma_setup)( drm_device_t *dev )
  * Free all pages associated with DMA buffers, the buffers and pages lists, and
  * finally the the drm_device::dma structure itself.
  */
-void DRM(dma_takedown)(drm_device_t *dev)
+void drm_dma_takedown(drm_device_t *dev)
 {
 	drm_device_dma_t  *dma = dev->dma;
 	int		  i, j;
@@ -84,12 +84,12 @@ void DRM(dma_takedown)(drm_device_t *dev)
 				  dma->bufs[i].seg_count);
 			for (j = 0; j < dma->bufs[i].seg_count; j++) {
 				if (dma->bufs[i].seglist[j]) {
-					DRM(free_pages)(dma->bufs[i].seglist[j],
+					drm_free_pages(dma->bufs[i].seglist[j],
 							dma->bufs[i].page_order,
 							DRM_MEM_DMA);
 				}
 			}
-			DRM(free)(dma->bufs[i].seglist,
+			drm_free(dma->bufs[i].seglist,
 				  dma->bufs[i].seg_count
 				  * sizeof(*dma->bufs[0].seglist),
 				  DRM_MEM_SEGS);
@@ -97,12 +97,12 @@ void DRM(dma_takedown)(drm_device_t *dev)
 	   	if (dma->bufs[i].buf_count) {
 		   	for (j = 0; j < dma->bufs[i].buf_count; j++) {
 				if (dma->bufs[i].buflist[j].dev_private) {
-					DRM(free)(dma->bufs[i].buflist[j].dev_private,
+					drm_free(dma->bufs[i].buflist[j].dev_private,
 						  dma->bufs[i].buflist[j].dev_priv_size,
 						  DRM_MEM_BUFS);
 				}
 			}
-		   	DRM(free)(dma->bufs[i].buflist,
+		   	drm_free(dma->bufs[i].buflist,
 				  dma->bufs[i].buf_count *
 				  sizeof(*dma->bufs[0].buflist),
 				  DRM_MEM_BUFS);
@@ -110,17 +110,17 @@ void DRM(dma_takedown)(drm_device_t *dev)
 	}
 
 	if (dma->buflist) {
-		DRM(free)(dma->buflist,
+		drm_free(dma->buflist,
 			  dma->buf_count * sizeof(*dma->buflist),
 			  DRM_MEM_BUFS);
 	}
 
 	if (dma->pagelist) {
-		DRM(free)(dma->pagelist,
+		drm_free(dma->pagelist,
 			  dma->page_count * sizeof(*dma->pagelist),
 			  DRM_MEM_PAGES);
 	}
-	DRM(free)(dev->dma, sizeof(*dev->dma), DRM_MEM_DRIVER);
+	drm_free(dev->dma, sizeof(*dev->dma), DRM_MEM_DRIVER);
 	dev->dma = NULL;
 }
 
@@ -133,7 +133,7 @@ void DRM(dma_takedown)(drm_device_t *dev)
  * 
  * Resets the fields of \p buf.
  */
-void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
+void drm_free_buffer(drm_device_t *dev, drm_buf_t *buf)
 {
 	if (!buf) return;
 
@@ -154,7 +154,7 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
  *
  * Frees each buffer associated with \p filp not already on the hardware.
  */
-void DRM(core_reclaim_buffers)( struct file *filp )
+void drm_core_reclaim_buffers( struct file *filp )
 {
 	drm_file_t    *priv   = filp->private_data;
 	drm_device_t  *dev    = priv->dev;
@@ -166,7 +166,7 @@ void DRM(core_reclaim_buffers)( struct file *filp )
 		if (dma->buflist[i]->filp == filp) {
 			switch (dma->buflist[i]->list) {
 			case DRM_LIST_NONE:
-				DRM(free_buffer)(dev, dma->buflist[i]);
+				drm_free_buffer(dev, dma->buflist[i]);
 				break;
 			case DRM_LIST_WAIT:
 				dma->buflist[i]->list = DRM_LIST_RECLAIM;
@@ -178,4 +178,5 @@ void DRM(core_reclaim_buffers)( struct file *filp )
 		}
 	}
 }
+EXPORT_SYMBOL(drm_core_reclaim_buffers);
 

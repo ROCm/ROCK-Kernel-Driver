@@ -49,18 +49,18 @@
  * Creates and initializes a drm_file structure for the file private data in \p
  * filp and add it into the double linked list in \p dev.
  */
-int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
+int drm_open_helper(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
 	int	     minor = iminor(inode);
 	drm_file_t   *priv;
 	int ret;
 
 	if (filp->f_flags & O_EXCL)   return -EBUSY; /* No exclusive opens */
-	if (!DRM(cpu_valid)())        return -EINVAL;
+	if (!drm_cpu_valid())        return -EINVAL;
 
 	DRM_DEBUG("pid = %d, minor = %d\n", current->pid, minor);
 
-	priv		    = DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+	priv		    = drm_alloc(sizeof(*priv), DRM_MEM_FILES);
 	if(!priv) return -ENOMEM;
 
 	memset(priv, 0, sizeof(*priv));
@@ -73,8 +73,8 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->authenticated = capable(CAP_SYS_ADMIN);
 	priv->lock_count    = 0;
 
-	if (dev->fn_tbl.open_helper) {
-		ret=dev->fn_tbl.open_helper(dev, priv);
+	if (dev->fn_tbl->open_helper) {
+		ret=dev->fn_tbl->open_helper(dev, priv);
 		if (ret < 0)
 			goto out_free;
 	}
@@ -113,13 +113,13 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 
 	return 0;
 out_free:
-	DRM(free)(priv, sizeof(*priv), DRM_MEM_FILES);
+	drm_free(priv, sizeof(*priv), DRM_MEM_FILES);
 	filp->private_data=NULL;
 	return ret;
 }
 
 /** No-op. */
-int DRM(flush)(struct file *filp)
+int drm_flush(struct file *filp)
 {
 	drm_file_t    *priv   = filp->private_data;
 	drm_device_t  *dev    = priv->dev;
@@ -128,9 +128,10 @@ int DRM(flush)(struct file *filp)
 		  current->pid, (long)old_encode_dev(dev->device), dev->open_count);
 	return 0;
 }
+EXPORT_SYMBOL(drm_flush);
 
 /** No-op. */
-int DRM(fasync)(int fd, struct file *filp, int on)
+int drm_fasync(int fd, struct file *filp, int on)
 {
 	drm_file_t    *priv   = filp->private_data;
 	drm_device_t  *dev    = priv->dev;
@@ -141,16 +142,17 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 	if (retcode < 0) return retcode;
 	return 0;
 }
+EXPORT_SYMBOL(drm_fasync);
 
 /** No-op. */
-unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
+unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait)
 {
 	return 0;
 }
 
 
 /** No-op. */
-ssize_t DRM(read)(struct file *filp, char __user *buf, size_t count, loff_t *off)
+ssize_t drm_read(struct file *filp, char __user *buf, size_t count, loff_t *off)
 {
 	return 0;
 }

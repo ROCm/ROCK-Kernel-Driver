@@ -28,6 +28,17 @@
 #ifndef _SIS_DRV_H_
 #define _SIS_DRV_H_
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"SIS"
+#define DRIVER_NAME		"sis"
+#define DRIVER_DESC		"SIS 300/630/540"
+#define DRIVER_DATE		"20030826"
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		1
+#define DRIVER_PATCHLEVEL	0
+
 #include "sis_ds.h"
 
 typedef struct drm_sis_private {
@@ -41,5 +52,8 @@ extern int sis_ioctl_agp_init( DRM_IOCTL_ARGS );
 extern int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS );
 extern int sis_ioctl_agp_free( DRM_IOCTL_ARGS );
 extern int sis_fb_init( DRM_IOCTL_ARGS );
+
+extern int sis_init_context(drm_device_t *dev, int context);
+extern int sis_final_context(drm_device_t *dev, int context);
 
 #endif

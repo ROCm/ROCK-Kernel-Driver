@@ -33,7 +33,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
-#include "mga.h"
 #include "drmP.h"
 #include "drm.h"
 #include "mga_drm.h"
@@ -308,7 +307,7 @@ static int mga_freelist_init( drm_device_t *dev, drm_mga_private_t *dev_priv )
 	int i;
 	DRM_DEBUG( "count=%d\n", dma->buf_count );
 
-	dev_priv->head = DRM(alloc)( sizeof(drm_mga_freelist_t),
+	dev_priv->head = drm_alloc( sizeof(drm_mga_freelist_t),
 				     DRM_MEM_DRIVER );
 	if ( dev_priv->head == NULL )
 		return DRM_ERR(ENOMEM);
@@ -320,7 +319,7 @@ static int mga_freelist_init( drm_device_t *dev, drm_mga_private_t *dev_priv )
 		buf = dma->buflist[i];
 	        buf_priv = buf->dev_private;
 
-		entry = DRM(alloc)( sizeof(drm_mga_freelist_t),
+		entry = drm_alloc( sizeof(drm_mga_freelist_t),
 				    DRM_MEM_DRIVER );
 		if ( entry == NULL )
 			return DRM_ERR(ENOMEM);
@@ -357,7 +356,7 @@ static void mga_freelist_cleanup( drm_device_t *dev )
 	entry = dev_priv->head;
 	while ( entry ) {
 		next = entry->next;
-		DRM(free)( entry, sizeof(drm_mga_freelist_t), DRM_MEM_DRIVER );
+		drm_free( entry, sizeof(drm_mga_freelist_t), DRM_MEM_DRIVER );
 		entry = next;
 	}
 
@@ -458,7 +457,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	int ret;
 	DRM_DEBUG( "\n" );
 
-	dev_priv = DRM(alloc)( sizeof(drm_mga_private_t), DRM_MEM_DRIVER );
+	dev_priv = drm_alloc( sizeof(drm_mga_private_t), DRM_MEM_DRIVER );
 	if ( !dev_priv )
 		return DRM_ERR(ENOMEM);
 
@@ -634,7 +633,7 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
-	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
+	if ( dev->irq_enabled ) drm_irq_uninstall(dev);
 
 	if ( dev->dev_private ) {
 		drm_mga_private_t *dev_priv = dev->dev_private;
@@ -650,7 +649,7 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 			mga_freelist_cleanup( dev );
 		}
 
-		DRM(free)( dev->dev_private, sizeof(drm_mga_private_t),
+		drm_free( dev->dev_private, sizeof(drm_mga_private_t),
 			   DRM_MEM_DRIVER );
 		dev->dev_private = NULL;
 	}
@@ -798,30 +797,13 @@ int mga_dma_buffers( DRM_IOCTL_ARGS )
 	return ret;
 }
 
-static void mga_driver_pretakedown(drm_device_t *dev)
+void mga_driver_pretakedown(drm_device_t *dev)
 {
 	mga_do_cleanup_dma( dev );
 }
 
-static int mga_driver_dma_quiescent(drm_device_t *dev)
+int mga_driver_dma_quiescent(drm_device_t *dev)
 {
 	drm_mga_private_t *dev_priv = dev->dev_private;
 	return mga_do_wait_for_idle( dev_priv );
-}
-
-void mga_driver_register_fns(drm_device_t *dev)
-{
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL;
-	dev->fn_tbl.pretakedown = mga_driver_pretakedown;
-	dev->fn_tbl.dma_quiescent = mga_driver_dma_quiescent;
-	dev->fn_tbl.vblank_wait = mga_driver_vblank_wait;
-	dev->fn_tbl.irq_preinstall = mga_driver_irq_preinstall;
-	dev->fn_tbl.irq_postinstall = mga_driver_irq_postinstall;
-	dev->fn_tbl.irq_uninstall = mga_driver_irq_uninstall;
-	dev->fn_tbl.irq_handler = mga_driver_irq_handler;
-	
-	dev->counters += 3;
-	dev->types[6] = _DRM_STAT_IRQ;
-	dev->types[7] = _DRM_STAT_PRIMARY;
-	dev->types[8] = _DRM_STAT_SECONDARY;
 }

@@ -37,7 +37,7 @@
 
 #define DEBUG_SCATTER 0
 
-void DRM(sg_cleanup)( drm_sg_mem_t *entry )
+void drm_sg_cleanup( drm_sg_mem_t *entry )
 {
 	struct page *page;
 	int i;
@@ -50,18 +50,18 @@ void DRM(sg_cleanup)( drm_sg_mem_t *entry )
 
 	vfree( entry->virtual );
 
-	DRM(free)( entry->busaddr,
+	drm_free( entry->busaddr,
 		   entry->pages * sizeof(*entry->busaddr),
 		   DRM_MEM_PAGES );
-	DRM(free)( entry->pagelist,
+	drm_free( entry->pagelist,
 		   entry->pages * sizeof(*entry->pagelist),
 		   DRM_MEM_PAGES );
-	DRM(free)( entry,
+	drm_free( entry,
 		   sizeof(*entry),
 		   DRM_MEM_SGLISTS );
 }
 
-int DRM(sg_alloc)( struct inode *inode, struct file *filp,
+int drm_sg_alloc( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -82,7 +82,7 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 	if ( copy_from_user( &request, argp, sizeof(request) ) )
 		return -EFAULT;
 
-	entry = DRM(alloc)( sizeof(*entry), DRM_MEM_SGLISTS );
+	entry = drm_alloc( sizeof(*entry), DRM_MEM_SGLISTS );
 	if ( !entry )
 		return -ENOMEM;
 
@@ -92,22 +92,22 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 	DRM_DEBUG( "sg size=%ld pages=%ld\n", request.size, pages );
 
 	entry->pages = pages;
-	entry->pagelist = DRM(alloc)( pages * sizeof(*entry->pagelist),
+	entry->pagelist = drm_alloc( pages * sizeof(*entry->pagelist),
 				     DRM_MEM_PAGES );
 	if ( !entry->pagelist ) {
-		DRM(free)( entry, sizeof(*entry), DRM_MEM_SGLISTS );
+		drm_free( entry, sizeof(*entry), DRM_MEM_SGLISTS );
 		return -ENOMEM;
 	}
 
 	memset(entry->pagelist, 0, pages * sizeof(*entry->pagelist));
 
-	entry->busaddr = DRM(alloc)( pages * sizeof(*entry->busaddr),
+	entry->busaddr = drm_alloc( pages * sizeof(*entry->busaddr),
 				     DRM_MEM_PAGES );
 	if ( !entry->busaddr ) {
-		DRM(free)( entry->pagelist,
+		drm_free( entry->pagelist,
 			   entry->pages * sizeof(*entry->pagelist),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry,
+		drm_free( entry,
 			   sizeof(*entry),
 			   DRM_MEM_SGLISTS );
 		return -ENOMEM;
@@ -116,13 +116,13 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 
 	entry->virtual = vmalloc_32( pages << PAGE_SHIFT );
 	if ( !entry->virtual ) {
-		DRM(free)( entry->busaddr,
+		drm_free( entry->busaddr,
 			   entry->pages * sizeof(*entry->busaddr),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry->pagelist,
+		drm_free( entry->pagelist,
 			   entry->pages * sizeof(*entry->pagelist),
 			   DRM_MEM_PAGES );
-		DRM(free)( entry,
+		drm_free( entry,
 			   sizeof(*entry),
 			   DRM_MEM_SGLISTS );
 		return -ENOMEM;
@@ -148,7 +148,7 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 	request.handle = entry->handle;
 
 	if ( copy_to_user( argp, &request, sizeof(request) ) ) {
-		DRM(sg_cleanup)( entry );
+		drm_sg_cleanup( entry );
 		return -EFAULT;
 	}
 
@@ -197,11 +197,11 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 	return 0;
 
  failed:
-	DRM(sg_cleanup)( entry );
+	drm_sg_cleanup( entry );
 	return -ENOMEM;
 }
 
-int DRM(sg_free)( struct inode *inode, struct file *filp,
+int drm_sg_free( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
@@ -225,7 +225,7 @@ int DRM(sg_free)( struct inode *inode, struct file *filp,
 
 	DRM_DEBUG( "sg free virtual  = %p\n", entry->virtual );
 
-	DRM(sg_cleanup)( entry );
+	drm_sg_cleanup( entry );
 
 	return 0;
 }

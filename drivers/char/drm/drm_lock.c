@@ -36,7 +36,7 @@
 #include "drmP.h"
 
 /** No-op ioctl. */
-int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
+int drm_noop(struct inode *inode, struct file *filp, unsigned int cmd,
 	       unsigned long arg)
 {
 	DRM_DEBUG("\n");
@@ -52,7 +52,7 @@ int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
  *
  * Attempt to mark the lock as held by the given context, via the \p cmpxchg instruction.
  */
-int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
+int drm_lock_take(__volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
 
@@ -90,7 +90,7 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
  * Resets the lock file pointer.
  * Marks the lock as held by the given context, via the \p cmpxchg instruction.
  */
-int DRM(lock_transfer)(drm_device_t *dev,
+int drm_lock_transfer(drm_device_t *dev,
 		       __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
@@ -115,7 +115,7 @@ int DRM(lock_transfer)(drm_device_t *dev,
  * Marks the lock as not held, via the \p cmpxchg instruction. Wakes any task
  * waiting on the lock queue.
  */
-int DRM(lock_free)(drm_device_t *dev,
+int drm_lock_free(drm_device_t *dev,
 		   __volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
@@ -147,7 +147,7 @@ int DRM(lock_free)(drm_device_t *dev,
  * \return one if the signal should be delivered normally, or zero if the
  * signal should be blocked.
  */
-int DRM(notifier)(void *priv)
+int drm_notifier(void *priv)
 {
 	drm_sigdata_t *s = (drm_sigdata_t *)priv;
 	unsigned int  old, new, prev;

@@ -28,11 +28,24 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *    Michel Dänzer <daenzerm@student.ethz.ch>
+ *    Michel Dï¿½zer <daenzerm@student.ethz.ch>
  */
 
 #ifndef __R128_DRV_H__
 #define __R128_DRV_H__
+
+/* General customization:
+ */
+#define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
+
+#define DRIVER_NAME		"r128"
+#define DRIVER_DESC		"ATI Rage 128"
+#define DRIVER_DATE		"20030725"
+
+#define DRIVER_MAJOR		2
+#define DRIVER_MINOR		5
+#define DRIVER_PATCHLEVEL	0
+
 
 #define GET_RING_HEAD(dev_priv)		R128_READ( R128_PM4_BUFFER_DL_RPTR )
 
@@ -148,6 +161,8 @@ extern irqreturn_t r128_driver_irq_handler( DRM_IRQ_ARGS );
 extern void r128_driver_irq_preinstall( drm_device_t *dev );
 extern void r128_driver_irq_postinstall( drm_device_t *dev );
 extern void r128_driver_irq_uninstall( drm_device_t *dev );
+extern void r128_driver_pretakedown(drm_device_t *dev);
+extern void r128_driver_prerelease(drm_device_t *dev, DRMFILE filp);
 
 /* Register definitions, register access macros and drmAddMap constants
  * for Rage 128 kernel driver.
