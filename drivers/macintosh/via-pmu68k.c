@@ -1052,8 +1052,10 @@ static struct miscdevice pmu_device = {
 
 void pmu_device_init(void)
 {
-	if (via)
-		misc_register(&pmu_device);
+	if (!via)
+		return;
+	if (misc_register(&pmu_device) < 0)
+		printk(KERN_ERR "via-pmu68k: cannot register misc device.\n");
 }
 #endif /* CONFIG_PMAC_PBOOK */
 
