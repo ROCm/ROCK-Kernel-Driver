@@ -216,7 +216,12 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * fill in request structure
 	 */
 	rq->cmd_len = hdr->cmd_len;
-	memcpy(rq->cmd, hdr->cmdp, hdr->cmd_len);
+
+	if (copy_from_user(rq->cmd, hdr->cmdp, hdr->cmd_len)) {
+		blk_put_request(rq);
+		return -EFAULT;
+	}
+
 	if (sizeof(rq->cmd) != hdr->cmd_len)
 		memset(rq->cmd + hdr->cmd_len, 0, sizeof(rq->cmd) - hdr->cmd_len);
 

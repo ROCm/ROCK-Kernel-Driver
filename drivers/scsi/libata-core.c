@@ -3224,8 +3224,6 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 		scsi_host_put(ap->host); /* FIXME: check return val */
 	}
 
-	kfree(host_set);
-
 	pci_release_regions(pdev);
 
 	for (i = 0; i < host_set->n_ports; i++) {
@@ -3242,6 +3240,7 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 		}
 	}
 
+	kfree(host_set);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
