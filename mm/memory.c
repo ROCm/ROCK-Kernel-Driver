@@ -389,20 +389,33 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
 /*
  * Do a quick page-table lookup for a single page. 
  */
-static struct page * follow_page(unsigned long address) 
+static struct page * follow_page(unsigned long address, int write) 
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
+	pte_t *ptep, pte;
 
 	pgd = pgd_offset(current->mm, address);
+	if (pgd_none(*pgd) || pgd_bad(*pgd))
+		goto out;
+
 	pmd = pmd_offset(pgd, address);
-	if (pmd) {
-		pte_t * pte = pte_offset(pmd, address);
-		if (pte && pte_present(*pte))
-			return pte_page(*pte);
+	if (pmd_none(*pmd) || pmd_bad(*pmd))
+		goto out;
+
+	ptep = pte_offset(pmd, address);
+	if (!ptep)
+		goto out;
+
+	pte = *ptep;
+	if (pte_present(pte)) {
+		if (!write ||
+		    (pte_write(pte) && pte_dirty(pte)))
+			return pte_page(pte);
 	}
-	
-	return NULL;
+
+out:
+	return 0;
 }
 
 /* 
@@ -476,15 +489,22 @@ int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 				goto out_unlock;
 			}
 		}
-		if (handle_mm_fault(current->mm, vma, ptr, datain) <= 0) 
-			goto out_unlock;
 		spin_lock(&mm->page_table_lock);
-		map = follow_page(ptr);
-		if (!map) {
+		while (!(map = follow_page(ptr, datain))) {
+			int ret;
+
 			spin_unlock(&mm->page_table_lock);
-			dprintk (KERN_ERR "Missing page in map_user_kiobuf\n");
-			goto out_unlock;
-		}
+			ret = handle_mm_fault(current->mm, vma, ptr, datain);
+			if (ret <= 0) {
+				if (!ret)
+					goto out_unlock;
+				else {
+					err = -ENOMEM;
+					goto out_unlock;
+				}
+			}
+			spin_lock(&mm->page_table_lock);
+		}			
 		map = get_page_map(map);
 		if (map) {
 			flush_dcache_page(map);
@@ -509,6 +529,37 @@ int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 	return err;
 }
 
+/*
+ * Mark all of the pages in a kiobuf as dirty 
+ *
+ * We need to be able to deal with short reads from disk: if an IO error
+ * occurs, the number of bytes read into memory may be less than the
+ * size of the kiobuf, so we have to stop marking pages dirty once the
+ * requested byte count has been reached.
+ */
+
+void mark_dirty_kiobuf(struct kiobuf *iobuf, int bytes)
+{
+	int index, offset, remaining;
+	struct page *page;
+	
+	index = iobuf->offset >> PAGE_SHIFT;
+	offset = iobuf->offset & ~PAGE_MASK;
+	remaining = bytes;
+	if (remaining > iobuf->length)
+		remaining = iobuf->length;
+	
+	while (remaining > 0 && index < iobuf->nr_pages) {
+		page = iobuf->maplist[index];
+		
+		if (!PageReserved(page))
+			SetPageDirty(page);
+
+		remaining -= (PAGE_SIZE - offset);
+		offset = 0;
+		index++;
+	}
+}
 
 /*
  * Unmap all of the pages referenced by a kiobuf.  We release the pages,
@@ -559,7 +610,6 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 
 		if (iobuf->locked)
 			continue;
-		iobuf->locked = 1;
 
 		ppage = iobuf->maplist;
 		for (j = 0; j < iobuf->nr_pages; ppage++, j++) {
@@ -567,9 +617,16 @@ int lock_kiovec(int nr, struct kiobuf *iovec[], int wait)
 			if (!page)
 				continue;
 			
-			if (TryLockPage(page))
+			if (TryLockPage(page)) {
+				while (j--) {
+					page = *(--ppage);
+					if (page)
+						UnlockPage(page);
+				}
 				goto retry;
+			}
 		}
+		iobuf->locked = 1;
 	}
 
 	return 0;

@@ -112,12 +112,6 @@ ide_pio_timings_t ide_pio_clocks[6];
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 #endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 extern char saved_command_line[256];
 
 extern unsigned long find_available_memory(void);

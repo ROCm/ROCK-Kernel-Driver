@@ -1,6 +1,8 @@
 #ifndef _REISER_FS_I
 #define _REISER_FS_I
 
+#include <linux/list.h>
+
 /* these are used to keep track of the pages that need
 ** flushing before the current transaction can commit
 */
@@ -52,7 +54,8 @@ struct reiserfs_inode_info {
   //For preallocation
   int i_prealloc_block;
   int i_prealloc_count;
-
+  struct list_head i_prealloc_list;	/* per-transaction list of inodes which
+				 * have preallocated blocks */
 				/* I regret that you think the below
                                    is a comment you should make.... -Hans */
   //nopack-attribute

@@ -52,12 +52,6 @@ struct sh_cpuinfo boot_cpu_data = { CPU_SH_NONE, 0, 0, 0, };
 struct screen_info screen_info;
 unsigned char aux_device_present = 0xaa;
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 #if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_UNKNOWN)
 struct sh_machine_vector sh_mv;
 #endif

@@ -8,6 +8,7 @@
 #include <linux/reiserfs_fs.h>
 #include <linux/locks.h>
 #include <asm/bitops.h>
+#include <linux/list.h>
 
 #else
 
@@ -580,6 +581,12 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   if (p_s_inode->u.reiserfs_i.i_prealloc_count > 0) {
     p_s_inode->u.reiserfs_i.i_prealloc_count--;
     *free_blocknrs = p_s_inode->u.reiserfs_i.i_prealloc_block++;
+
+    /* if no more preallocated blocks, remove inode from list */
+    if (! p_s_inode->u.reiserfs_i.i_prealloc_count) {
+      list_del(&p_s_inode->u.reiserfs_i.i_prealloc_list);
+    }
+    
     return ret;
   }
 
@@ -633,6 +640,11 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   *free_blocknrs = p_s_inode->u.reiserfs_i.i_prealloc_block;
   p_s_inode->u.reiserfs_i.i_prealloc_block++;
 
+  /* if inode has preallocated blocks, link him to list */
+  if (p_s_inode->u.reiserfs_i.i_prealloc_count) {
+    list_add(&p_s_inode->u.reiserfs_i.i_prealloc_list,
+	     &SB_JOURNAL(th->t_super)->j_prealloc_list);
+  } 
   /* we did actually manage to get 1 block */
   if (ret != CARRY_ON && allocated[0] > 0) {
     return CARRY_ON ;
@@ -664,16 +676,43 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
 // a portion of this function, was derived from minix or ext2's
 // analog. You should be able to tell which portion by looking at the
 // ext2 code and comparing. 
+static void __discard_prealloc (struct reiserfs_transaction_handle * th,
+				struct inode * inode)
+{
+  while (inode->u.reiserfs_i.i_prealloc_count > 0) {
+    reiserfs_free_block(th,inode->u.reiserfs_i.i_prealloc_block);
+    inode->u.reiserfs_i.i_prealloc_block++;
+    inode->u.reiserfs_i.i_prealloc_count --;
+  }
+  list_del (&(inode->u.reiserfs_i.i_prealloc_list));
+}
+
 
 void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th, 
 				struct inode * inode)
 {
-    if (inode->u.reiserfs_i.i_prealloc_count > 0) {
-      while (inode->u.reiserfs_i.i_prealloc_count--) {
-	reiserfs_free_block(th,inode->u.reiserfs_i.i_prealloc_block);
-	inode->u.reiserfs_i.i_prealloc_block++;
-      }
+#ifdef CONFIG_REISERFS_CHECK
+  if (inode->u.reiserfs_i.i_prealloc_count < 0)
+     reiserfs_warning("zam-4001:" __FUNCTION__ ": inode has negative prealloc blocks count.\n");
+#endif  
+  if (inode->u.reiserfs_i.i_prealloc_count > 0) {
+    __discard_prealloc(th, inode);
+  }
+}
+
+void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
+{
+  struct list_head * plist = &SB_JOURNAL(th->t_super)->j_prealloc_list;
+  struct inode * inode;
+  
+  while (!list_empty(plist)) {
+    inode = list_entry(plist->next, struct inode, u.reiserfs_i.i_prealloc_list);
+#ifdef CONFIG_REISERFS_CHECK
+    if (!inode->u.reiserfs_i.i_prealloc_count) {
+      reiserfs_warning("zam-4001:" __FUNCTION__ ": inode is in prealloc list but has no preallocated blocks.\n");
     }
-    inode->u.reiserfs_i.i_prealloc_count = 0;
+#endif    
+    __discard_prealloc(th, inode);
+  }
 }
 #endif

@@ -173,6 +173,12 @@ static int ipt_snat_checkentry(const char *tablename,
 		return 0;
 	}
 
+	/* Only allow these for NAT. */
+	if (strcmp(tablename, "nat") != 0) {
+		DEBUGP("SNAT: wrong table %s\n", tablename);
+		return 0;
+	}
+
 	if (hook_mask & ~(1 << NF_IP_POST_ROUTING)) {
 		DEBUGP("SNAT: hook mask 0x%x bad\n", hook_mask);
 		return 0;
@@ -199,6 +205,12 @@ static int ipt_dnat_checkentry(const char *tablename,
 					  * (mr->rangesize - 1))))) {
 		DEBUGP("DNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
+		return 0;
+	}
+
+	/* Only allow these for NAT. */
+	if (strcmp(tablename, "nat") != 0) {
+		DEBUGP("SNAT: wrong table %s\n", tablename);
 		return 0;
 	}
 

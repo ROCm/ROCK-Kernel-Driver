@@ -326,21 +326,24 @@ char * strtok(char * s,const char * ct)
  * @ct: The characters to search for
  *
  * strsep() updates @s to point after the token, ready for the next call.
+ *
+ * It returns empty tokens, too, behaving exactly like the libc function
+ * of that name. In fact, it was stolen from glibc2 and de-fancy-fied.
+ * Same semantics, slimmer shape. ;)
  */
-char * strsep(char **s, const char * ct)
+char * strsep(char **s, const char *ct)
 {
-	char *sbegin=*s;
-	if (!sbegin) 
+	char *sbegin = *s, *end;
+
+	if (sbegin == NULL)
 		return NULL;
-	
-	sbegin += strspn(sbegin,ct);
-	if (*sbegin == '\0') 
-		return NULL;
-	
-	*s = strpbrk( sbegin, ct);
-	if (*s && **s != '\0')
-		*(*s)++ = '\0';
-	return (sbegin);
+
+	end = strpbrk(sbegin, ct);
+	if (end)
+		*end++ = '\0';
+	*s = end;
+
+	return sbegin;
 }
 #endif
 

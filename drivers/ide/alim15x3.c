@@ -640,11 +640,11 @@ unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
 
 void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 {
+#ifndef CONFIG_SPARC64
 	byte ideic, inmir;
 	byte irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
 				      1, 11, 0, 12, 0, 14, 0, 15 };
 
-#ifndef CONFIG_SPARC64
 	hwif->irq = hwif->channel ? 15 : 14;
 
 	if (isa_dev) {

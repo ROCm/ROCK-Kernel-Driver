@@ -8867,6 +8867,7 @@ aic7xxx_alloc(Scsi_Host_Template *sht, struct aic7xxx_host *temp)
     }
     DRIVER_LOCK_INIT
   }
+  scsi_set_pci_device(host, p->pdev);
   return (p);
 }
 

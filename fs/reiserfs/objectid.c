@@ -18,8 +18,8 @@
 
 // find where objectid map starts
 #define objectid_map(s,rs) (old_format_only (s) ? \
-                         (__u32 *)((struct reiserfs_super_block_v1 *)rs + 1) :\
-			 (__u32 *)(rs + 1))
+                         (__u32 *)((struct reiserfs_super_block_v1 *)(rs) + 1) :\
+			 (__u32 *)((rs) + 1))
 
 
 #ifdef CONFIG_REISERFS_CHECK
@@ -27,7 +27,8 @@
 static void check_objectid_map (struct super_block * s, __u32 * map)
 {
     if (le32_to_cpu (map[0]) != 1)
-	reiserfs_panic (s, "vs-15010: check_objectid_map: map corrupted");
+	reiserfs_panic (s, "vs-15010: check_objectid_map: map corrupted: %lx",
+			le32_to_cpu (map[0]));
 
     // FIXME: add something else here
 }

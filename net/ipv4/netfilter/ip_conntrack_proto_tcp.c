@@ -206,8 +206,8 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 }
 
 /* Called when a new connection for this protocol found. */
-static unsigned long tcp_new(struct ip_conntrack *conntrack,
-			     struct iphdr *iph, size_t len)
+static int tcp_new(struct ip_conntrack *conntrack,
+		   struct iphdr *iph, size_t len)
 {
 	enum tcp_conntrack newconntrack;
 	struct tcphdr *tcph = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
@@ -224,7 +224,7 @@ static unsigned long tcp_new(struct ip_conntrack *conntrack,
 	}
 
 	conntrack->proto.tcp.state = newconntrack;
-	return tcp_timeouts[conntrack->proto.tcp.state];
+	return 1;
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp

@@ -574,7 +574,6 @@ asmlinkage void __init start_kernel(void)
 #if defined(CONFIG_ARCH_S390)
 	ccwcache_init();
 #endif
-	kiobuf_setup();
 	signals_init();
 	bdev_init();
 	inode_init(mempages);

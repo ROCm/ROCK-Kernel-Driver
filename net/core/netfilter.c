@@ -553,6 +553,12 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 	return;
 }
 
+/* This does not belong here, but ipt_REJECT needs it if connection
+   tracking in use: without this, connection may not be in hash table,
+   and hence manufactured ICMP or RST packets will not be associated
+   with it. */
+void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
+
 void __init netfilter_init(void)
 {
 	int i, h;

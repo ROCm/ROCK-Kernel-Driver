@@ -72,22 +72,25 @@ static int icmp_packet(struct ip_conntrack *ct,
 		       struct iphdr *iph, size_t len,
 		       enum ip_conntrack_info ctinfo)
 {
-	/* FIXME: Should keep count of orig - reply packets: if == 0,
-           destroy --RR */
-	/* Delete connection immediately on reply: won't actually
-           vanish as we still have skb */
+	/* Try to delete connection immediately after all replies:
+           won't actually vanish as we still have skb, and del_timer
+           means this will only run once even if count hits zero twice
+           (theoretically possible with SMP) */
 	if (CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY) {
-		if (del_timer(&ct->timeout))
+		if (atomic_dec_and_test(&ct->proto.icmp.count)
+		    && del_timer(&ct->timeout))
 			ct->timeout.function((unsigned long)ct);
-	} else
+	} else {
+		atomic_inc(&ct->proto.icmp.count);
 		ip_ct_refresh(ct, ICMP_TIMEOUT);
+	}
 
 	return NF_ACCEPT;
 }
 
 /* Called when a new connection for this protocol found. */
-static unsigned long icmp_new(struct ip_conntrack *conntrack,
-			      struct iphdr *iph, size_t len)
+static int icmp_new(struct ip_conntrack *conntrack,
+		    struct iphdr *iph, size_t len)
 {
 	static u_int8_t valid_new[]
 		= { [ICMP_ECHO] = 1,
@@ -103,7 +106,8 @@ static unsigned long icmp_new(struct ip_conntrack *conntrack,
 		DUMP_TUPLE(&conntrack->tuplehash[0].tuple);
 		return 0;
 	}
-	return ICMP_TIMEOUT;
+	atomic_set(&conntrack->proto.icmp.count, 0);
+	return 1;
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_icmp

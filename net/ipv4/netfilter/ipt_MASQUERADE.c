@@ -127,14 +127,32 @@ device_cmp(const struct ip_conntrack *i, void *ifindex)
 	return ret;
 }
 
-int masq_device_event(struct notifier_block *this,
-		      unsigned long event,
-		      void *ptr)
+static int masq_device_event(struct notifier_block *this,
+			     unsigned long event,
+			     void *ptr)
 {
 	struct net_device *dev = ptr;
 
-	if (event == NETDEV_DOWN || event == NETDEV_CHANGEADDR) {
-		/* Device was downed/changed (diald)  Search entire table for
+	if (event == NETDEV_DOWN) {
+		/* Device was downed.  Search entire table for
+		   conntracks which were associated with that device,
+		   and forget them. */
+		IP_NF_ASSERT(dev->ifindex != 0);
+
+		ip_ct_selective_cleanup(device_cmp, (void *)(long)dev->ifindex);
+	}
+
+	return NOTIFY_DONE;
+}
+
+static int masq_inet_event(struct notifier_block *this,
+			   unsigned long event,
+			   void *ptr)
+{
+	struct net_device *dev = ((struct in_ifaddr *)ptr)->ifa_dev->dev;
+
+	if (event == NETDEV_DOWN) {
+		/* IP address was deleted.  Search entire table for
 		   conntracks which were associated with that device,
 		   and forget them. */
 		IP_NF_ASSERT(dev->ifindex != 0);
@@ -147,6 +165,12 @@ int masq_device_event(struct notifier_block *this,
 
 static struct notifier_block masq_dev_notifier = {
 	masq_device_event,
+	NULL,
+	0
+};
+
+static struct notifier_block masq_inet_notifier = {
+	masq_inet_event,
 	NULL,
 	0
 };
@@ -164,6 +188,8 @@ static int __init init(void)
 	if (ret == 0) {
 		/* Register for device down reports */
 		register_netdevice_notifier(&masq_dev_notifier);
+		/* Register IP address change reports */
+		register_inetaddr_notifier(&masq_inet_notifier);
 	}
 
 	return ret;
@@ -173,6 +199,7 @@ static void __exit fini(void)
 {
 	ipt_unregister_target(&masquerade);
 	unregister_netdevice_notifier(&masq_dev_notifier);
+	unregister_inetaddr_notifier(&masq_inet_notifier);	
 }
 
 module_init(init);

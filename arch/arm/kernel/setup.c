@@ -241,7 +241,7 @@ void __init
 setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 {
 #ifdef CONFIG_BLK_DEV_RAM
-	extern int rd_doload, rd_prompt, rd_image_start, rd_size;
+	extern int rd_size;
 
 	rd_image_start = image_start;
 	rd_prompt = prompt;

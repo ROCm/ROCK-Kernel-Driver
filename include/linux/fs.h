@@ -655,9 +655,11 @@ struct super_block {
 	unsigned long		s_flags;
 	unsigned long		s_magic;
 	struct dentry		*s_root;
+	struct rw_semaphore	s_umount;
 	wait_queue_head_t	s_wait;
 
 	struct list_head	s_dirty;	/* dirty inodes */
+	struct list_head	s_locked_inodes;/* inodes being synced */
 	struct list_head	s_files;
 
 	struct block_device	*s_bdev;
@@ -1090,9 +1092,12 @@ extern void invalidate_inode_buffers(struct inode *);
 #define destroy_buffers(dev)	__invalidate_buffers((dev), 1)
 extern void __invalidate_buffers(kdev_t dev, int);
 extern void sync_inodes(kdev_t);
+extern void sync_unlocked_inodes(void);
 extern void write_inode_now(struct inode *, int);
 extern void sync_dev(kdev_t);
 extern int fsync_dev(kdev_t);
+extern int fsync_super(struct super_block *);
+extern void sync_inodes_sb(struct super_block *);
 extern int fsync_inode_buffers(struct inode *);
 extern int osync_inode_buffers(struct inode *);
 extern int inode_has_buffers(struct inode *);

@@ -97,7 +97,6 @@ static struct super_block * coda_read_super(struct super_block *sb,
 	struct coda_sb_info *sbi = NULL;
 	struct venus_comm *vc = NULL;
         ViceFid fid;
-	kdev_t dev = sb->s_dev;
         int error;
 	int idx;
 	ENTRY;
@@ -139,7 +138,6 @@ static struct super_block * coda_read_super(struct super_block *sb,
         sb->s_blocksize = 1024;	/* XXXXX  what do we put here?? */
         sb->s_blocksize_bits = 10;
         sb->s_magic = CODA_SUPER_MAGIC;
-        sb->s_dev = dev;
         sb->s_op = &coda_super_operations;
 
 	/* get root fid from Venus: this needs the root inode */

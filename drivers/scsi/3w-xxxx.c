@@ -717,6 +717,7 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 				continue;
 			}
 
+			scsi_set_pci_device(host, tw_pci_dev);
 			status_reg_value = inl(tw_dev->registers.status_reg_addr);
 
 			dprintk(KERN_NOTICE "scsi%d : Found a 3ware Storage Controller at 0x%x, IRQ: %d P-chip: %d.%d\n", host->host_no,

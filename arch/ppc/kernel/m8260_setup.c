@@ -67,12 +67,6 @@ extern unsigned long loops_per_jiffy;
 unsigned char __res[sizeof(bd_t)];
 unsigned long empty_zero_page[1024];
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 extern char saved_command_line[256];
 
 extern unsigned long find_available_memory(void);

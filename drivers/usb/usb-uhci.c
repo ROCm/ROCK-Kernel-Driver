@@ -16,7 +16,7 @@
  * (C) Copyright 1999 Randy Dunlap
  * (C) Copyright 1999 Gregory P. Smith
  *
- * $Id: usb-uhci.c,v 1.251 2000/11/30 09:47:54 acher Exp $
+ * $Id: usb-uhci.c,v 1.259 2001/03/30 14:51:59 acher Exp $
  */
 
 #include <linux/config.h>
@@ -52,7 +52,7 @@
 /* This enables an extra UHCI slab for memory debugging */
 #define DEBUG_SLAB
 
-#define VERSTR "$Revision: 1.251 $ time " __TIME__ " " __DATE__
+#define VERSTR "$Revision: 1.259 $ time " __TIME__ " " __DATE__
 
 #include <linux/usb.h>
 #include "usb-uhci.h"
@@ -803,7 +803,7 @@ _static int uhci_submit_bulk_urb (urb_t *urb, urb_t *bulk_urb)
 {
 	uhci_t *s = (uhci_t*) urb->dev->bus->hcpriv;
 	urb_priv_t *urb_priv = urb->hcpriv;
-	uhci_desc_t *qh, *td, *nqh, *bqh, *first_td=NULL;
+	uhci_desc_t *qh, *td, *nqh=NULL, *bqh=NULL, *first_td=NULL;
 	unsigned long destination, status;
 	char *data;
 	unsigned int pipe = urb->pipe;
@@ -900,8 +900,8 @@ _static int uhci_submit_bulk_urb (urb_t *urb, urb_t *bulk_urb)
 
 		data += pktsze;
 		len -= pktsze;
-
-		last = (len == 0 && (usb_pipein(pipe) || pktsze < maxsze || !(urb->transfer_flags & USB_DISABLE_SPD)));
+		// Use USB_ZERO_PACKET to finish bulk OUTs always with a zero length packet
+		last = (len == 0 && (usb_pipein(pipe) || pktsze < maxsze || !(urb->transfer_flags & USB_ZERO_PACKET)));
 
 		if (last)
 			td->hw.td.status |= TD_CTRL_IOC;	// last one generates INT
@@ -1178,6 +1178,9 @@ _static void uhci_cleanup_unlink(uhci_t *s, int force)
 		urb_priv = (urb_priv_t*)urb->hcpriv;
 		q = urb->urb_list.next;
 		
+		if (!urb_priv) // avoid crash when URB is corrupted
+			break;
+			
 		if (force ||
  		    ((urb_priv->started != 0xffffffff) && (urb_priv->started != now))) {
 			async_dbg("async cleanup %p",urb);
@@ -1205,7 +1208,8 @@ _static void uhci_cleanup_unlink(uhci_t *s, int force)
 			pipe = urb->pipe;		// completion may destroy all...
 			dev = urb->dev;
 			urb_priv = urb->hcpriv;
-
+			list_del (&urb->urb_list);
+			
 			if (urb->complete) {
 				spin_unlock(&s->urb_list_lock);
 				urb->dev = NULL;
@@ -1229,7 +1233,6 @@ _static void uhci_cleanup_unlink(uhci_t *s, int force)
 			kfree (urb_priv);
 #endif
 
-			list_del (&urb->urb_list);
 		}
 	}
 }
@@ -2282,8 +2285,11 @@ _static int process_transfer (uhci_t *s, urb_t *urb, int mode)
 	for (; p != &qh->vertical; p = p->next) {
 		desc = list_entry (p, uhci_desc_t, vertical);
 
-		if (desc->hw.td.status & TD_CTRL_ACTIVE)	// do not process active TDs
+		if (desc->hw.td.status & TD_CTRL_ACTIVE) {	// do not process active TDs
+			if (mode==2) // if called from async_unlink
+				uhci_clean_transfer(s, urb, qh, mode);
 			return ret;
+		}
 	
 		actual_length = (desc->hw.td.status + 1) & 0x7ff;		// extract transfer parameters from TD
 		maxlength = (((desc->hw.td.info >> 21) & 0x7ff) + 1) & 0x7ff;
@@ -2625,19 +2631,22 @@ _static int process_urb (uhci_t *s, struct list_head *p)
 
 			// Completion
 			if (urb->complete) {
+				int was_unlinked = (urb->status == -ENOENT);
 				urb->dev = NULL;
 				spin_unlock(&s->urb_list_lock);
 				urb->complete ((struct urb *) urb);
 				// Re-submit the URB if ring-linked
-				if (is_ring && (urb->status != -ENOENT) && !contains_killed) {
+				if (is_ring && !was_unlinked && !contains_killed) {
 					urb->dev=usb_dev;
 					uhci_submit_urb (urb);
-				}
+				} else
+					urb = 0;
 				spin_lock(&s->urb_list_lock);
 			}
 			
 			usb_dec_dev_use (usb_dev);
-			spin_unlock(&urb->lock);		
+			if (urb)
+				spin_unlock(&urb->lock);		
 		}
 	}
 
@@ -2942,6 +2951,8 @@ uhci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
 	
+	pci_set_master(dev);
+
 	/* Search for the IO base address.. */
 	for (i = 0; i < 6; i++) {
 
@@ -2955,8 +2966,7 @@ uhci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 			break;
 		/* disable legacy emulation */
 		pci_write_config_word (dev, USBLEGSUP, 0);
-
-		pci_set_master(dev);
+	
 		return alloc_uhci(dev, dev->irq, io_addr, io_size);
 	}
 	return -ENODEV;

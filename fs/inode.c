@@ -133,28 +133,26 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block * sb = inode->i_sb;
 
-	if (sb) {
-		/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
-		if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
-			if (sb->s_op && sb->s_op->dirty_inode)
-				sb->s_op->dirty_inode(inode);
-		}
-
-		/* avoid the locking if we can */
-		if ((inode->i_state & flags) == flags)
-			return;
-
-		spin_lock(&inode_lock);
-		if ((inode->i_state & flags) != flags) {
-			inode->i_state |= flags;
-			/* Only add valid (ie hashed) inodes to the dirty list */
-			if (!list_empty(&inode->i_hash)) {
-				list_del(&inode->i_list);
-				list_add(&inode->i_list, &sb->s_dirty);
-			}
-		}
-		spin_unlock(&inode_lock);
+	/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
+	if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
+		if (sb->s_op && sb->s_op->dirty_inode)
+			sb->s_op->dirty_inode(inode);
 	}
+
+	/* avoid the locking if we can */
+	if ((inode->i_state & flags) == flags)
+		return;
+
+	spin_lock(&inode_lock);
+	if ((inode->i_state & flags) != flags) {
+		inode->i_state |= flags;
+		/* Only add valid (ie hashed) inodes to the dirty list */
+		if (!(inode->i_state & I_LOCK) && !list_empty(&inode->i_hash)) {
+			list_del(&inode->i_list);
+			list_add(&inode->i_list, &sb->s_dirty);
+		}
+	}
+	spin_unlock(&inode_lock);
 }
 
 static void __wait_on_inode(struct inode * inode)
@@ -192,7 +190,7 @@ static inline void __iget(struct inode * inode)
 		return;
 	}
 	atomic_inc(&inode->i_count);
-	if (!(inode->i_state & I_DIRTY)) {
+	if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
 		list_del(&inode->i_list);
 		list_add(&inode->i_list, &inode_in_use);
 	}
@@ -204,9 +202,10 @@ static inline void __sync_one(struct inode *inode, int sync)
 	unsigned dirty;
 
 	list_del(&inode->i_list);
-	list_add(&inode->i_list, atomic_read(&inode->i_count)
-						? &inode_in_use
-						: &inode_unused);
+	list_add(&inode->i_list, &inode->i_sb->s_locked_inodes);
+
+	if (inode->i_state & I_LOCK)
+		BUG();
 
 	/* Set I_LOCK, reset I_DIRTY */
 	dirty = inode->i_state & I_DIRTY;
@@ -224,6 +223,17 @@ static inline void __sync_one(struct inode *inode, int sync)
 
 	spin_lock(&inode_lock);
 	inode->i_state &= ~I_LOCK;
+	if (!(inode->i_state & I_FREEING)) {
+		struct list_head *to;
+		if (inode->i_state & I_DIRTY)
+			to = &inode->i_sb->s_dirty;
+		else if (atomic_read(&inode->i_count))
+			to = &inode_in_use;
+		else
+			to = &inode_unused;
+		list_del(&inode->i_list);
+		list_add(&inode->i_list, to);
+	}
 	wake_up(&inode->i_wait);
 }
 
@@ -245,7 +255,37 @@ static inline void sync_list(struct list_head *head)
 	struct list_head * tmp;
 
 	while ((tmp = head->prev) != head) 
-		sync_one(list_entry(tmp, struct inode, i_list), 0);
+		__sync_one(list_entry(tmp, struct inode, i_list), 0);
+}
+
+static inline int wait_on_dirty(struct list_head *head)
+{
+	struct list_head * tmp;
+	list_for_each(tmp, head) {
+		struct inode *inode = list_entry(tmp, struct inode, i_list);
+		if (!inode->i_state & I_DIRTY)
+			continue;
+		__iget(inode);
+		spin_unlock(&inode_lock);
+		__wait_on_inode(inode);
+		iput(inode);
+		spin_lock(&inode_lock);
+		return 1;
+	}
+	return 0;
+}
+
+static inline void wait_on_locked(struct list_head *head)
+{
+	struct list_head * tmp;
+	while ((tmp = head->prev) != head) {
+		struct inode *inode = list_entry(tmp, struct inode, i_list);
+		__iget(inode);
+		spin_unlock(&inode_lock);
+		__wait_on_inode(inode);
+		iput(inode);
+		spin_lock(&inode_lock);
+	}
 }
 
 static inline int try_to_sync_unused_list(struct list_head *head)
@@ -256,8 +296,7 @@ static inline int try_to_sync_unused_list(struct list_head *head)
 	while ((tmp = tmp->prev) != head) {
 		inode = list_entry(tmp, struct inode, i_list);
 
-		if (!(inode->i_state & I_LOCK) 
-				&& !atomic_read(&inode->i_count)) {
+		if (!atomic_read(&inode->i_count)) {
 			/* 
 			 * We're under PF_MEMALLOC here, and syncing the 
 			 * inode may have to allocate memory. To avoid
@@ -287,7 +326,31 @@ static inline int try_to_sync_unused_list(struct list_head *head)
  *	sync_inodes goes through the super block's dirty list, 
  *	writes them out, and puts them back on the normal list.
  */
+
+/*
+ * caller holds exclusive lock on sb->s_umount
+ */
  
+void sync_inodes_sb(struct super_block *sb)
+{
+	spin_lock(&inode_lock);
+	sync_list(&sb->s_dirty);
+	wait_on_locked(&sb->s_locked_inodes);
+	spin_unlock(&inode_lock);
+}
+
+void sync_unlocked_inodes(void)
+{
+	struct super_block * sb = sb_entry(super_blocks.next);
+	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
+		if (!list_empty(&sb->s_dirty)) {
+			spin_lock(&inode_lock);
+			sync_list(&sb->s_dirty);
+			spin_unlock(&inode_lock);
+		}
+	}
+}
+
 void sync_inodes(kdev_t dev)
 {
 	struct super_block * sb = sb_entry(super_blocks.next);
@@ -295,19 +358,23 @@ void sync_inodes(kdev_t dev)
 	/*
 	 * Search the super_blocks array for the device(s) to sync.
 	 */
-	spin_lock(&inode_lock);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
 		if (!sb->s_dev)
 			continue;
 		if (dev && sb->s_dev != dev)
 			continue;
-
-		sync_list(&sb->s_dirty);
-
+		down_read(&sb->s_umount);
+		if (sb->s_dev && (sb->s_dev == dev || !dev)) {
+			spin_lock(&inode_lock);
+			do {
+				sync_list(&sb->s_dirty);
+			} while (wait_on_dirty(&sb->s_locked_inodes));
+			spin_unlock(&inode_lock);
+		}
+		up_read(&sb->s_umount);
 		if (dev)
 			break;
 	}
-	spin_unlock(&inode_lock);
 }
 
 /*
@@ -517,6 +584,7 @@ int invalidate_inodes(struct super_block * sb)
 	busy = invalidate_list(&inode_in_use, sb, &throw_away);
 	busy |= invalidate_list(&inode_unused, sb, &throw_away);
 	busy |= invalidate_list(&sb->s_dirty, sb, &throw_away);
+	busy |= invalidate_list(&sb->s_locked_inodes, sb, &throw_away);
 	spin_unlock(&inode_lock);
 
 	dispose_list(&throw_away);
@@ -557,7 +625,7 @@ free_unused:
 
 		entry = entry->prev;
 		inode = INODE(tmp);
-		if (inode->i_state & (I_FREEING|I_CLEAR))
+		if (inode->i_state & (I_FREEING|I_CLEAR|I_LOCK))
 			BUG();
 		if (!CAN_UNUSE(inode))
 			continue;
@@ -940,10 +1008,9 @@ void iput(struct inode *inode)
 				BUG();
 		} else {
 			if (!list_empty(&inode->i_hash)) {
-				if (!(inode->i_state & I_DIRTY)) {
+				if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
 					list_del(&inode->i_list);
-					list_add(&inode->i_list,
-						 &inode_unused);
+					list_add(&inode->i_list, &inode_unused);
 				}
 				inodes_stat.nr_unused++;
 				spin_unlock(&inode_lock);
@@ -1086,23 +1153,25 @@ void remove_dquot_ref(kdev_t dev, short type)
 	/* We have to be protected against other CPUs */
 	spin_lock(&inode_lock);
  
-	for (act_head = inode_in_use.next; act_head != &inode_in_use; act_head = act_head->next) {
+	list_for_each(act_head, &inode_in_use) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb != sb || !IS_QUOTAINIT(inode))
-			continue;
-		remove_inode_dquot_ref(inode, type, &tofree_head);
+		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+			remove_inode_dquot_ref(inode, type, &tofree_head);
 	}
-	for (act_head = inode_unused.next; act_head != &inode_unused; act_head = act_head->next) {
+	list_for_each(act_head, &inode_unused) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (inode->i_sb != sb || !IS_QUOTAINIT(inode))
-			continue;
-		remove_inode_dquot_ref(inode, type, &tofree_head);
+		if (inode->i_sb == sb && IS_QUOTAINIT(inode))
+			remove_inode_dquot_ref(inode, type, &tofree_head);
 	}
-	for (act_head = sb->s_dirty.next; act_head != &sb->s_dirty; act_head = act_head->next) {
+	list_for_each(act_head, &sb->s_dirty) {
 		inode = list_entry(act_head, struct inode, i_list);
-		if (!IS_QUOTAINIT(inode))
-			continue;
-  		remove_inode_dquot_ref(inode, type, &tofree_head);
+		if (IS_QUOTAINIT(inode))
+			remove_inode_dquot_ref(inode, type, &tofree_head);
+	}
+	list_for_each(act_head, &sb->s_locked_inodes) {
+		inode = list_entry(act_head, struct inode, i_list);
+		if (IS_QUOTAINIT(inode))
+			remove_inode_dquot_ref(inode, type, &tofree_head);
 	}
 	spin_unlock(&inode_lock);
 

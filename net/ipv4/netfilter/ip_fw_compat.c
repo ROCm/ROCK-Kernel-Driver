@@ -69,21 +69,6 @@ int unregister_firewall(int pf, struct firewall_ops *fw)
 	return 0;
 }
 
-static inline void
-confirm_connection(struct sk_buff *skb)
-{
-	if (skb->nfct) {
-		struct ip_conntrack *ct
-			= (struct ip_conntrack *)skb->nfct->master;
-		/* ctinfo is the index of the nfct inside the conntrack */
-		enum ip_conntrack_info ctinfo = skb->nfct - ct->infos;
-
-		if ((ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED)
-		    && !(ct->status & IPS_CONFIRMED))
-			ip_conntrack_confirm(ct);
-	}
-}
-
 static unsigned int
 fw_in(unsigned int hooknum,
       struct sk_buff **pskb,
@@ -137,7 +122,10 @@ fw_in(unsigned int hooknum,
 						   (struct net_device *)out,
 						   (*pskb)->nh.raw, &redirpt,
 						   pskb);
-			confirm_connection(*pskb);
+
+			/* ip_conntrack_confirm return NF_DROP or NF_ACCEPT */
+			if (ip_conntrack_confirm(*pskb) == NF_DROP)
+				ret = FW_BLOCK;
 		}
 		break;
 	}
@@ -195,8 +183,7 @@ static unsigned int fw_confirm(unsigned int hooknum,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *))
 {
-	confirm_connection(*pskb);
-	return NF_ACCEPT;
+	return ip_conntrack_confirm(*pskb);
 }
 
 extern int ip_fw_ctl(int optval, void *m, unsigned int len);

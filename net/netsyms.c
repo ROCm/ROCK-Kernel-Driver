@@ -374,8 +374,6 @@ EXPORT_SYMBOL(sysctl_tcp_ecn);
 EXPORT_SYMBOL(tcp_cwnd_application_limited);
 EXPORT_SYMBOL(tcp_sendpage);
 
-EXPORT_SYMBOL(xrlim_allow);
-
 EXPORT_SYMBOL(tcp_write_xmit);
 
 EXPORT_SYMBOL(tcp_v4_remember_stamp); 
@@ -434,6 +432,7 @@ EXPORT_SYMBOL(dev_open);
 
 /* Used by other modules */
 EXPORT_SYMBOL(in_ntoa);
+EXPORT_SYMBOL(xrlim_allow);
 
 EXPORT_SYMBOL(ip_rcv);
 EXPORT_SYMBOL(arp_rcv);
@@ -561,6 +560,7 @@ EXPORT_SYMBOL(nf_hook_slow);
 EXPORT_SYMBOL(nf_hooks);
 EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_getsockopt);
+EXPORT_SYMBOL(ip_ct_attach);
 #endif
 
 EXPORT_SYMBOL(register_gifconf);

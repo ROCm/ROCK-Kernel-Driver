@@ -27,6 +27,7 @@
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
+#include <linux/pci.h>
 
 /* It is senseless to set SG_ALL any higher than this - the performance
  *  does not get any better, and it wastes memory
@@ -414,6 +415,12 @@ struct Scsi_Host
     void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
 
     /*
+     * For SCSI hosts which are PCI devices, set pci_dev so that
+     * we can do BIOS EDD 3.0 mappings
+     */
+    struct pci_dev *pci_dev;
+
+    /*
      * We should ensure that this is aligned, both for better performance
      * and also because some compilers (m68k) don't automatically force
      * alignment to a long boundary.
@@ -465,6 +472,13 @@ extern void scsi_unregister(struct Scsi_Host * i);
 
 extern void scsi_register_blocked_host(struct Scsi_Host * SHpnt);
 extern void scsi_deregister_blocked_host(struct Scsi_Host * SHpnt);
+
+static inline void scsi_set_pci_device(struct Scsi_Host *SHpnt,
+                                       struct pci_dev *pdev)
+{
+	SHpnt->pci_dev = pdev;
+}
+
 
 /*
  * Prototypes for functions/data in scsi_scan.c

@@ -34,7 +34,6 @@
 #endif
 	
 DECLARE_LOCK(ip_nat_seqofs_lock);
-LIST_HEAD(helpers);
 			 
 static inline int 
 ip_nat_resize_packet(struct sk_buff **skb,

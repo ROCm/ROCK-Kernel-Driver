@@ -1787,6 +1787,7 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		shpnt->io_port = base_io;
 		shpnt->n_io_port = 0x40;	/* Number of bytes of I/O space used */
 		shpnt->irq = irq;
+		scsi_set_pci_device(shpnt, pdev[h]);
 		restore_flags(flags);
 		request_region(base_io, 0x40, "atp870u");       /* Register the IO ports that we use */
 		count++;

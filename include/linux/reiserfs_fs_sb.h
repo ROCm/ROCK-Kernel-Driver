@@ -254,6 +254,7 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_hash_table[JOURNAL_HASH_SIZE] ; 	    /* hash table for real buffer heads in current trans */ 
   struct reiserfs_journal_cnode *j_list_hash_table[JOURNAL_HASH_SIZE] ; /* hash table for all the real buffer heads in all 
   										the transactions */
+  struct list_head j_prealloc_list;     /* list of inodes which have preallocated blocks */
 };
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */

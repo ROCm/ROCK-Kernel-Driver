@@ -165,3 +165,94 @@ int __down_trylock(struct semaphore * sem)
 	spin_unlock_irqrestore(&semaphore_lock, flags);
 	return 1;
 }
+
+/*
+ * The semaphore operations have a special calling sequence that
+ * allow us to do a simpler in-line version of them. These routines
+ * need to convert that sequence back into the C sequence when
+ * there is contention on the semaphore.
+ *
+ * ip contains the semaphore pointer on entry. Save the C-clobbered
+ * registers (r0 to r3 and lr), but not ip, as we use it as a return
+ * value in some cases..
+ */
+#ifdef CONFIG_CPU_26
+asm("	.section	.text.lock, \"ax\"
+	.align	5
+	.globl	__down_failed
+__down_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down
+	ldmfd	sp!, {r0 - r3, pc}^
+
+	.align	5
+	.globl	__down_interruptible_failed
+__down_interruptible_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down_interruptible
+	mov	ip, r0
+	ldmfd	sp!, {r0 - r3, pc}^
+
+	.align	5
+	.globl	__down_trylock_failed
+__down_trylock_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down_trylock
+	mov	ip, r0
+	ldmfd	sp!, {r0 - r3, pc}^
+
+	.align	5
+	.globl	__up_wakeup
+__up_wakeup:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__up
+	ldmfd	sp!, {r0 - r3, pc}^
+
+	.previous
+	");
+
+#else
+/* 32 bit version */
+asm("	.section	.text.lock, \"ax\"
+	.align	5
+	.globl	__down_failed
+__down_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down
+	ldmfd	sp!, {r0 - r3, pc}
+
+	.align	5
+	.globl	__down_interruptible_failed
+__down_interruptible_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down_interruptible
+	mov	ip, r0
+	ldmfd	sp!, {r0 - r3, pc}
+
+	.align	5
+	.globl	__down_trylock_failed
+__down_trylock_failed:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__down_trylock
+	mov	ip, r0
+	ldmfd	sp!, {r0 - r3, pc}
+
+	.align	5
+	.globl	__up_wakeup
+__up_wakeup:
+	stmfd	sp!, {r0 - r3, lr}
+	mov	r0, ip
+	bl	__up
+	ldmfd	sp!, {r0 - r3, pc}
+
+	.previous
+	");
+
+#endif

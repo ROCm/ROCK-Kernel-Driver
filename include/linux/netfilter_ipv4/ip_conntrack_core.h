@@ -33,10 +33,17 @@ struct ip_conntrack_tuple_hash *
 ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 		      const struct ip_conntrack *ignored_conntrack);
 
-/* Confirm a connection */
-void ip_conntrack_confirm(struct ip_conntrack *ct);
+extern int __ip_conntrack_confirm(struct nf_ct_info *nfct);
 
-extern unsigned int ip_conntrack_htable_size;
+/* Confirm a connection: returns NF_DROP if packet must be dropped. */
+static inline int ip_conntrack_confirm(struct sk_buff *skb)
+{
+	if (skb->nfct
+	    && !is_confirmed((struct ip_conntrack *)skb->nfct->master))
+		return __ip_conntrack_confirm(skb->nfct);
+	return NF_ACCEPT;
+}
+
 extern struct list_head *ip_conntrack_hash;
 extern struct list_head expect_list;
 DECLARE_RWLOCK_EXTERN(ip_conntrack_lock);

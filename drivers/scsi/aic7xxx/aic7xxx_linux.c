@@ -1094,6 +1094,7 @@ aic7xxx_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 		ahc_set_name(ahc, new_name);
 	}
 	host->unique_id = ahc->unit;
+	scsi_set_pci_device(host, ahc->dev_softc);
 	aic7xxx_initialize_scsi_bus(ahc);
 	ahc_unlock(ahc, &s);
 	return (0);

@@ -95,12 +95,6 @@ static int max_width;
 
 unsigned long empty_zero_page[1024];
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 static const char *gg2_memtypes[4] = {
 	"FPM", "SDRAM", "EDO", "BEDO"
 };

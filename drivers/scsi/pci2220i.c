@@ -2553,6 +2553,7 @@ int Pci2220i_Detect (Scsi_Host_Template *tpnt)
 		if ( GetRegs (pshost, FALSE, pcidev) )
 			goto unregister;
 
+		scsi_set_pci_device(pshost, pcidev);
 		pshost->max_id = padapter->numberOfDrives;
 		for ( z = 0;  z < padapter->numberOfDrives;  z++ )
 			{
@@ -2656,6 +2657,7 @@ unregister:;
 		for ( z = 0;  z < BIGD_MAXDRIVES;  z++ )
 			DiskMirror[z].status = inb_p (padapter->regScratchPad + BIGD_RAID_0_STATUS + z);		
 
+		scsi_set_pci_info(pshost, pcidev);
 		pshost->max_id = padapter->numberOfDrives;
 		padapter->failRegister = inb_p (padapter->regScratchPad + BIGD_ALARM_IMAGE);
 		for ( z = 0;  z < padapter->numberOfDrives;  z++ )

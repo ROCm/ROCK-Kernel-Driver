@@ -616,7 +616,6 @@ int __init chr_dev_init(void)
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 	memory_devfs_register();
 	rand_initialize();
-	raw_init();
 #ifdef CONFIG_I2C
 	i2c_init_all();
 #endif

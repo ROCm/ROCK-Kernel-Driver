@@ -814,6 +814,7 @@ qla1280_detect(Scsi_Host_Template *template)
 			printk(KERN_WARNING "qla1280: Failed to register host, aborting.\n");
                         return 0;
                 }
+		scsi_set_pci_device(host, pdev);
 		ha = (scsi_qla_host_t *) host->hostdata;
 		/* Clear our data area */
 		for( j =0, cp = (char *)ha;  j < sizeof(scsi_qla_host_t); j++)

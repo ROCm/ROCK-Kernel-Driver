@@ -1572,7 +1572,7 @@ extern wait_queue_head_t reiserfs_commit_thread_wait ;
 #define JOURNAL_MAX_BATCH   900 /* max blocks to batch into one transaction, don't make this any bigger than 900 */
 #define JOURNAL_MAX_COMMIT_AGE 30 
 #define JOURNAL_MAX_TRANS_AGE 30
-#define JOURNAL_PER_BALANCE_CNT 12   /* must be >= (5 + 2 * (MAX_HEIGHT-2) + 1) */
+#define JOURNAL_PER_BALANCE_CNT (3 * (MAX_HEIGHT-2) + 9)
 
 /* both of these can be as low as 1, or as high as you want.  The min is the
 ** number of 4k bitmap nodes preallocated on mount. New nodes are allocated
@@ -1950,6 +1950,7 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
 
 void reiserfs_discard_prealloc (struct reiserfs_transaction_handle *th, 
 				struct inode * inode);
+void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th);
 #endif
 
 /* hashes.c */

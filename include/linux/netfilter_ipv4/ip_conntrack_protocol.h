@@ -38,9 +38,9 @@ struct ip_conntrack_protocol
 		      enum ip_conntrack_info ctinfo);
 
 	/* Called when a new connection for this protocol found;
-	 * returns timeout.  If so, packet() called next. */
-	unsigned long (*new)(struct ip_conntrack *conntrack,
-			     struct iphdr *iph, size_t len);
+	 * returns TRUE if it's OK.  If so, packet() called next. */
+	int (*new)(struct ip_conntrack *conntrack, struct iphdr *iph,
+		   size_t len);
 
 	/* Module (if any) which this is connected to. */
 	struct module *me;

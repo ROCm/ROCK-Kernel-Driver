@@ -207,6 +207,10 @@ static inline void bounce_end_io (struct buffer_head *bh, int uptodate)
 
 	bh_orig->b_end_io(bh_orig, uptodate);
 	__free_page(bh->b_page);
+#ifdef HIGHMEM_DEBUG
+	/* Don't clobber the constructed slab cache */
+	init_waitqueue_head(&bh->b_wait);
+#endif
 	kmem_cache_free(bh_cachep, bh);
 }
 
@@ -260,12 +264,14 @@ repeat_page:
 	bh->b_count = bh_orig->b_count;
 	bh->b_rdev = bh_orig->b_rdev;
 	bh->b_state = bh_orig->b_state;
+#ifdef HIGHMEM_DEBUG
 	bh->b_flushtime = jiffies;
 	bh->b_next_free = NULL;
 	bh->b_prev_free = NULL;
 	/* bh->b_this_page */
 	bh->b_reqnext = NULL;
 	bh->b_pprev = NULL;
+#endif
 	/* bh->b_page */
 	if (rw == WRITE) {
 		bh->b_end_io = bounce_end_io_write;
@@ -274,7 +280,9 @@ repeat_page:
 		bh->b_end_io = bounce_end_io_read;
 	bh->b_private = (void *)bh_orig;
 	bh->b_rsector = bh_orig->b_rsector;
+#ifdef HIGHMEM_DEBUG
 	memset(&bh->b_wait, -1, sizeof(bh->b_wait));
+#endif
 
 	return bh;
 }

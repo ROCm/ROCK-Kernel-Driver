@@ -462,11 +462,11 @@ svc_udp_init(struct svc_sock *svsk)
 }
 
 /*
- * A state change on a listening socket means there's a connection
- * pending.
+ * A data_ready event on a listening socket means there's a connection
+ * pending. Do not use state_change as a substitute for it.
  */
 static void
-svc_tcp_state_change1(struct sock *sk)
+svc_tcp_listen_data_ready(struct sock *sk, int count_unused)
 {
 	struct svc_sock	*svsk;
 
@@ -494,7 +494,7 @@ svc_tcp_state_change1(struct sock *sk)
  * A state change on a connected socket means it's dying or dead.
  */
 static void
-svc_tcp_state_change2(struct sock *sk)
+svc_tcp_state_change(struct sock *sk)
 {
 	struct svc_sock	*svsk;
 
@@ -777,10 +777,10 @@ svc_tcp_init(struct svc_sock *svsk)
 
 	if (sk->state == TCP_LISTEN) {
 		dprintk("setting up TCP socket for listening\n");
-		sk->state_change = svc_tcp_state_change1;
+		sk->data_ready = svc_tcp_listen_data_ready;
 	} else {
 		dprintk("setting up TCP socket for reading\n");
-		sk->state_change = svc_tcp_state_change2;
+		sk->state_change = svc_tcp_state_change;
 		sk->data_ready = svc_tcp_data_ready;
 
 		svsk->sk_reclen = 0;

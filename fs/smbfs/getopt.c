@@ -30,8 +30,10 @@ int smb_getopt(char *caller, char **options, struct option *opts,
 	char *val;
 	int i;
 
-	if ( (token = strsep(options, ",")) == NULL)
-		return 0;
+	do {
+		if ((token = strsep(options, ",")) == NULL)
+			return 0;
+	} while (*token == '\0');
 	*optopt = token;
 
 	*optarg = NULL;

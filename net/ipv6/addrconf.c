@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.61 2001/04/25 20:46:34 davem Exp $
+ *	$Id: addrconf.c,v 1.62 2001/04/26 19:11:59 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -285,9 +285,9 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev)
 	if ((idev = __in6_dev_get(dev)) == NULL) {
 		if ((idev = ipv6_add_dev(dev)) == NULL)
 			return NULL;
-		if (dev->flags&IFF_UP)
-			ipv6_mc_up(idev);
 	}
+	if (dev->flags&IFF_UP)
+		ipv6_mc_up(idev);
 	return idev;
 }
 

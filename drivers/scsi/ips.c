@@ -879,6 +879,7 @@ ips_detect(Scsi_Host_Template *SHT) {
          sh->cmd_per_lun = sh->hostt->cmd_per_lun;
          sh->unchecked_isa_dma = sh->hostt->unchecked_isa_dma;
          sh->use_clustering = sh->hostt->use_clustering;
+         scsi_set_pci_device(sh, dev[i]);
 
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,32)
          sh->wish_block = FALSE;

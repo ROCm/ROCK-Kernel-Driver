@@ -711,6 +711,7 @@ int Pci2000_Detect (Scsi_Host_Template *tpnt)
 			goto unregister;
 			}
 		
+		scsi_set_pci_device(pshost, pdev);
 		pshost->irq = pdev->irq;
 		setirq = 1;
 		padapter->irqOwned = 0;

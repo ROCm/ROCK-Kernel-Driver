@@ -386,8 +386,6 @@ EXPORT_SYMBOL(__br_write_unlock);
 #endif
 
 /* Kiobufs */
-EXPORT_SYMBOL(kiobuf_init);
-
 EXPORT_SYMBOL(alloc_kiovec);
 EXPORT_SYMBOL(free_kiovec);
 EXPORT_SYMBOL(expand_kiobuf);

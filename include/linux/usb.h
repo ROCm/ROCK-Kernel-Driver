@@ -424,6 +424,7 @@ struct usb_driver {
 #define USB_ASYNC_UNLINK        0x0008
 #define USB_QUEUE_BULK          0x0010
 #define USB_NO_FSBR		0x0020
+#define USB_ZERO_PACKET         0x0040  // Finish bulk OUTs always with zero length packet
 #define USB_TIMEOUT_KILLED	0x1000	// only set by HCD!
 
 typedef struct

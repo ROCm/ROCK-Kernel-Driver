@@ -2510,6 +2510,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		if (!host)
 			goto err_unmap;
 
+		scsi_set_pci_device(host, pdev);
 		megaCfg = (mega_host_config *) host->hostdata;
 		memset (megaCfg, 0, sizeof (mega_host_config));
 

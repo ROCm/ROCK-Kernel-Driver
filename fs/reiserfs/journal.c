@@ -1925,8 +1925,11 @@ int journal_init(struct super_block *p_s_sb) {
     free_journal_ram(p_s_sb) ;
     return 1 ;
   }
-  SB_JOURNAL_LIST_INDEX(p_s_sb) = 0 ; /* once the read is done, we can set this where it belongs */
+  SB_JOURNAL_LIST_INDEX(p_s_sb) = 0 ; /* once the read is done, we can set this
+                                         where it belongs */
 
+  INIT_LIST_HEAD (&SB_JOURNAL(p_s_sb)->j_prealloc_list);
+  
   if (reiserfs_dont_log (p_s_sb))
     return 0;
 
@@ -2983,6 +2986,11 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
     flush = 1 ;
   }
 
+#ifdef REISERFS_PREALLOCATE
+  reiserfs_discard_all_prealloc(th); /* it should not involve new blocks into
+				      * the transaction */
+#endif
+  
   rs = SB_DISK_SUPER_BLOCK(p_s_sb) ;
   /* setup description block */
   d_bh = getblk(p_s_sb->s_dev, reiserfs_get_journal_block(p_s_sb) + SB_JOURNAL(p_s_sb)->j_start, p_s_sb->s_blocksize) ; 

@@ -142,12 +142,6 @@ struct e820map e820;
 
 unsigned char aux_device_present;
 
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
-extern int rd_image_start;	/* starting block # of image */
-#endif
-
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 extern unsigned long cpu_khz;

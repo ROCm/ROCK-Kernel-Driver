@@ -246,7 +246,6 @@ int lvm_write_COW_table_block(vg_t * vg, lv_t * lv_snap)
 	int length_tmp;
 	ulong snap_pe_start, COW_table_sector_offset,
 	      COW_entries_per_pe, COW_chunks_per_pe, COW_entries_per_block;
-	ulong blocks[1];
 	const char * reason;
 	kdev_t snap_phys_dev;
 	struct kiobuf * iobuf = lv_snap->lv_iobuf;
@@ -274,7 +273,7 @@ int lvm_write_COW_table_block(vg_t * vg, lv_t * lv_snap)
 	COW_table_sector_offset = (idx % COW_entries_per_pe) / (SECTOR_SIZE / sizeof(lv_COW_table_disk_t));
 
         /* COW table block to write next */
-	blocks[0] = (snap_pe_start + COW_table_sector_offset) >> (blksize_snap >> 10);
+	iobuf->blocks[0] = (snap_pe_start + COW_table_sector_offset) >> (blksize_snap >> 10);
 
 	/* store new COW_table entry */
 	lv_COW_table[idx_COW_table].pv_org_number = cpu_to_le64(lvm_pv_get_number(vg, lv_snap->lv_block_exception[idx].rdev_org));
@@ -290,7 +289,7 @@ int lvm_write_COW_table_block(vg_t * vg, lv_t * lv_snap)
 	iobuf->nr_pages = 1;
 
 	if (brw_kiovec(WRITE, 1, &iobuf, snap_phys_dev,
-		       blocks, blksize_snap) != blksize_snap)
+		       iobuf->blocks, blksize_snap) != blksize_snap)
 		goto fail_raw_write;
 
 
@@ -309,11 +308,11 @@ int lvm_write_COW_table_block(vg_t * vg, lv_t * lv_snap)
 			snap_phys_dev = lv_snap->lv_block_exception[idx].rdev_new;
 			snap_pe_start = lv_snap->lv_block_exception[idx - (idx % COW_entries_per_pe)].rsector_new - lv_snap->lv_chunk_size;
 			blksize_snap = lvm_get_blksize(snap_phys_dev);
-			blocks[0] = snap_pe_start >> (blksize_snap >> 10);
-		} else blocks[0]++;
+			iobuf->blocks[0] = snap_pe_start >> (blksize_snap >> 10);
+		} else iobuf->blocks[0]++;
 
 		if (brw_kiovec(WRITE, 1, &iobuf, snap_phys_dev,
-			       blocks, blksize_snap) != blksize_snap)
+			       iobuf->blocks, blksize_snap) != blksize_snap)
 			goto fail_raw_write;
 	}
 
@@ -352,7 +351,6 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 	unsigned long org_start, snap_start, snap_phys_dev, virt_start, pe_off;
 	int idx = lv_snap->lv_remap_ptr, chunk_size = lv_snap->lv_chunk_size;
 	struct kiobuf * iobuf;
-	unsigned long blocks[KIO_MAX_SECTORS];
 	int blksize_snap, blksize_org, min_blksize, max_blksize;
 	int max_sectors, nr_sectors;
 
@@ -402,16 +400,16 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 
 		iobuf->length = nr_sectors << 9;
 
-		lvm_snapshot_prepare_blocks(blocks, org_start,
+		lvm_snapshot_prepare_blocks(iobuf->blocks, org_start,
 					    nr_sectors, blksize_org);
 		if (brw_kiovec(READ, 1, &iobuf, org_phys_dev,
-			       blocks, blksize_org) != (nr_sectors<<9))
+			       iobuf->blocks, blksize_org) != (nr_sectors<<9))
 			goto fail_raw_read;
 
-		lvm_snapshot_prepare_blocks(blocks, snap_start,
+		lvm_snapshot_prepare_blocks(iobuf->blocks, snap_start,
 					    nr_sectors, blksize_snap);
 		if (brw_kiovec(WRITE, 1, &iobuf, snap_phys_dev,
-			       blocks, blksize_snap) != (nr_sectors<<9))
+			       iobuf->blocks, blksize_snap) != (nr_sectors<<9))
 			goto fail_raw_write;
 	}
 

@@ -13,11 +13,4 @@ struct raw_config_request
 	__u64	block_minor;
 };
 
-#ifdef __KERNEL__
-
-/* drivers/char/raw.c */
-extern void raw_init(void);
-
-#endif /* __KERNEL__ */
-
 #endif /* __LINUX_RAW_H */

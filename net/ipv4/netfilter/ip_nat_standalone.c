@@ -68,17 +68,21 @@ ip_nat_fn(unsigned int hooknum,
 		(*pskb)->ip_summed = CHECKSUM_NONE;
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
-	/* Can't track?  Maybe out of memory: this would make NAT
-           unreliable. */
+	/* Can't track?  It's not due to stress, or conntrack would
+	   have dropped it.  Hence it's the user's responsibilty to
+	   packet filter it out, or implement conntrack/NAT for that
+	   protocol. 8) --RR */
 	if (!ct) {
-		if (net_ratelimit())
-			printk(KERN_DEBUG "NAT: %u dropping untracked packet %p %u %u.%u.%u.%u -> %u.%u.%u.%u\n",
-			       hooknum,
-			       *pskb,
-			       (*pskb)->nh.iph->protocol,
-			       NIPQUAD((*pskb)->nh.iph->saddr),
-			       NIPQUAD((*pskb)->nh.iph->daddr));
-		return NF_DROP;
+		/* Exception: ICMP redirect to new connection (not in
+                   hash table yet).  We must not let this through, in
+                   case we're doing NAT to the same network. */
+		struct iphdr *iph = (*pskb)->nh.iph;
+		struct icmphdr *hdr = (struct icmphdr *)
+			((u_int32_t *)iph + iph->ihl);
+		if (iph->protocol == IPPROTO_ICMP
+		    && hdr->type == ICMP_REDIRECT)
+			return NF_DROP;
+		return NF_ACCEPT;
 	}
 
 	switch (ctinfo) {

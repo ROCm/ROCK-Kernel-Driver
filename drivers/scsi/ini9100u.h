@@ -276,6 +276,7 @@ typedef struct Ha_Ctrl_Struc {
 	spinlock_t HCS_AvailLock;
 	spinlock_t HCS_SemaphLock;
 	spinlock_t pSRB_lock;
+	struct pci_dev *pci_dev;
 } HCS;
 
 /* Bit Definition for HCB_Flags */

@@ -8,9 +8,7 @@
 
 #include <linux/iobuf.h>
 #include <linux/slab.h>
-
-static kmem_cache_t *kiobuf_cachep;
-
+#include <linux/vmalloc.h>
 
 void end_kio_request(struct kiobuf *kiobuf, int uptodate)
 {
@@ -24,23 +22,37 @@ void end_kio_request(struct kiobuf *kiobuf, int uptodate)
 	}
 }
 
-
-void __init kiobuf_setup(void)
-{
-	kiobuf_cachep =  kmem_cache_create("kiobuf",
-					   sizeof(struct kiobuf),
-					   0,
-					   SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if(!kiobuf_cachep)
-		panic("Cannot create kernel iobuf cache\n");
-}
-
-void kiobuf_init(struct kiobuf *iobuf)
+static void kiobuf_init(struct kiobuf *iobuf)
 {
 	memset(iobuf, 0, sizeof(*iobuf));
 	init_waitqueue_head(&iobuf->wait_queue);
 	iobuf->array_len = KIO_STATIC_PAGES;
 	iobuf->maplist   = iobuf->map_array;
+}
+
+int alloc_kiobuf_bhs(struct kiobuf * kiobuf)
+{
+	int i;
+
+	for (i = 0; i < KIO_MAX_SECTORS; i++)
+		if (!(kiobuf->bh[i] = kmem_cache_alloc(bh_cachep, SLAB_KERNEL))) {
+			while (i--) {
+				kmem_cache_free(bh_cachep, kiobuf->bh[i]);
+				kiobuf->bh[i] = NULL;
+			}
+			return -ENOMEM;
+		}
+	return 0;
+}
+
+void free_kiobuf_bhs(struct kiobuf * kiobuf)
+{
+	int i;
+
+	for (i = 0; i < KIO_MAX_SECTORS; i++) {
+		kmem_cache_free(bh_cachep, kiobuf->bh[i]);
+		kiobuf->bh[i] = NULL;
+	}
 }
 
 int alloc_kiovec(int nr, struct kiobuf **bufp)
@@ -49,12 +61,17 @@ int alloc_kiovec(int nr, struct kiobuf **bufp)
 	struct kiobuf *iobuf;
 	
 	for (i = 0; i < nr; i++) {
-		iobuf = kmem_cache_alloc(kiobuf_cachep, SLAB_KERNEL);
+		iobuf = vmalloc(sizeof(struct kiobuf));
 		if (!iobuf) {
 			free_kiovec(i, bufp);
 			return -ENOMEM;
 		}
 		kiobuf_init(iobuf);
+ 		if (alloc_kiobuf_bhs(iobuf)) {
+			vfree(iobuf);
+ 			free_kiovec(i, bufp);
+ 			return -ENOMEM;
+ 		}
 		bufp[i] = iobuf;
 	}
 	
@@ -72,7 +89,8 @@ void free_kiovec(int nr, struct kiobuf **bufp)
 			unlock_kiovec(1, &iobuf);
 		if (iobuf->array_len > KIO_STATIC_PAGES)
 			kfree (iobuf->maplist);
-		kmem_cache_free(kiobuf_cachep, bufp[i]);
+		free_kiobuf_bhs(iobuf);
+		vfree(bufp[i]);
 	}
 }
 
@@ -115,11 +133,12 @@ void kiobuf_wait_for_io(struct kiobuf *kiobuf)
 
 	add_wait_queue(&kiobuf->wait_queue, &wait);
 repeat:
-	run_task_queue(&tq_disk);
 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	if (atomic_read(&kiobuf->io_count) != 0) {
+		run_task_queue(&tq_disk);
 		schedule();
-		goto repeat;
+		if (atomic_read(&kiobuf->io_count) != 0)
+			goto repeat;
 	}
 	tsk->state = TASK_RUNNING;
 	remove_wait_queue(&kiobuf->wait_queue, &wait);

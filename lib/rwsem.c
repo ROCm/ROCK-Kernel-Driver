@@ -202,9 +202,9 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 	return sem;
 }
 
-EXPORT_SYMBOL(rwsem_down_read_failed);
-EXPORT_SYMBOL(rwsem_down_write_failed);
-EXPORT_SYMBOL(rwsem_wake);
+EXPORT_SYMBOL_NOVERS(rwsem_down_read_failed);
+EXPORT_SYMBOL_NOVERS(rwsem_down_write_failed);
+EXPORT_SYMBOL_NOVERS(rwsem_wake);
 #if RWSEM_DEBUG
 EXPORT_SYMBOL(rwsemtrace);
 #endif

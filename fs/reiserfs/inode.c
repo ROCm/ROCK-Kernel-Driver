@@ -1185,11 +1185,17 @@ struct inode * reiserfs_iget (struct super_block * s, struct cpu_key * key)
     if (!inode) 
       return inode ;
 
-    //    if (comp_short_keys (INODE_PKEY (inode), key)) {
     if (is_bad_inode (inode)) {
 	reiserfs_warning ("vs-13048: reiserfs_iget: "
 			  "bad_inode. Stat data of (%lu %lu) not found\n",
 			  key->on_disk_key.k_dir_id, key->on_disk_key.k_objectid);
+	iput (inode);
+	inode = 0;
+    } else if (comp_short_keys (INODE_PKEY (inode), key)) {
+	reiserfs_warning ("vs-13049: reiserfs_iget: "
+			  "Looking for (%lu %lu), found inode of (%lu %lu)\n",
+			  key->on_disk_key.k_dir_id, key->on_disk_key.k_objectid,
+			  INODE_PKEY (inode)->k_dir_id, INODE_PKEY (inode)->k_objectid);
 	iput (inode);
 	inode = 0;
     }

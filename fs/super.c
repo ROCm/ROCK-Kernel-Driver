@@ -712,10 +712,12 @@ static struct super_block *get_empty_super(void)
 		nr_super_blocks++;
 		memset(s, 0, sizeof(struct super_block));
 		INIT_LIST_HEAD(&s->s_dirty);
+		INIT_LIST_HEAD(&s->s_locked_inodes);
 		list_add (&s->s_list, super_blocks.prev);
 		init_waitqueue_head(&s->s_wait);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_mounts);
+		init_rwsem(&s->s_umount);
 	}
 	return s;
 }
@@ -895,13 +897,14 @@ static void kill_super(struct super_block *sb, int umount_root)
 	struct file_system_type *fs = sb->s_type;
 	struct super_operations *sop = sb->s_op;
 
+	down_write(&sb->s_umount);
 	sb->s_root = NULL;
 	/* Need to clean after the sucker */
 	if (fs->fs_flags & FS_LITTER)
 		d_genocide(root);
 	shrink_dcache_parent(root);
 	dput(root);
-	fsync_dev(sb->s_dev);
+	fsync_super(sb);
 	lock_super(sb);
 	if (sop) {
 		if (sop->write_super && sb->s_dirt)
@@ -923,6 +926,7 @@ static void kill_super(struct super_block *sb, int umount_root)
 	put_filesystem(fs);
 	sb->s_type = NULL;
 	unlock_super(sb);
+	up_write(&sb->s_umount);
 	if (umount_root) {
 		/* special: the old device driver is going to be
 		   a ramdisk and the point of this call is to free its

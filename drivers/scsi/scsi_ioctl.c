@@ -352,6 +352,26 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 }
 
 /*
+ * The scsi_ioctl_get_pci() function places into arg the value
+ * pci_dev::slot_name (8 characters) for the PCI device (if any).
+ * Returns: 0 on success
+ *          -ENXIO if there isn't a PCI device pointer
+ *                 (could be because the SCSI driver hasn't been
+ *                  updated yet, or because it isn't a SCSI
+ *                  device)
+ *          any copy_to_user() error on failure there
+ */
+static int
+scsi_ioctl_get_pci(Scsi_Device * dev, void *arg)
+{
+
+        if (!dev->host->pci_dev) return -ENXIO;
+        return copy_to_user(arg, dev->host->pci_dev->slot_name,
+                            sizeof(dev->host->pci_dev->slot_name));
+}
+
+
+/*
  * the scsi_ioctl() function differs from most ioctls in that it does
  * not take a major/minor number as the dev field.  Rather, it takes
  * a pointer to a scsi_devices[] element, a structure. 
@@ -453,6 +473,9 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,
 				     START_STOP_TIMEOUT, NORMAL_RETRIES);
 		break;
+        case SCSI_IOCTL_GET_PCI:
+                return scsi_ioctl_get_pci(dev, arg);
+                break;
 	default:
 		if (dev->host->hostt->ioctl)
 			return dev->host->hostt->ioctl(dev, cmd, arg);

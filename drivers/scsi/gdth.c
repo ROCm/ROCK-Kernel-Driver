@@ -3290,6 +3290,7 @@ int __init gdth_detect(Scsi_Host_Template *shtp)
                 scsi_unregister(shp);
                 continue;
             }
+	    scsi_set_pci_device(shp, pcistr[ctr].pdev);
             shp->unchecked_isa_dma = 0;
             shp->irq = ha->irq;
             shp->dma_channel = 0xff;

@@ -805,7 +805,7 @@ static int fdomain_isa_detect( int *irq, int *iobase )
    the PCI configuration registers. */
 
 #ifdef CONFIG_PCI
-static int fdomain_pci_bios_detect( int *irq, int *iobase )
+static int fdomain_pci_bios_detect( int *irq, int *iobase, struct pci_dev **ret_pdev )
 {
    unsigned int     pci_irq;                /* PCI interrupt line */
    unsigned long    pci_base;               /* PCI I/O base address */
@@ -849,6 +849,7 @@ static int fdomain_pci_bios_detect( int *irq, int *iobase )
 
    *irq    = pci_irq;
    *iobase = pci_base;
+   *ret_pdev = pdev;
 
 #if DEBUG_DETECT
    printk( "scsi: <fdomain> TMC-3260 detect:"
@@ -875,6 +876,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 {
    int              retcode;
    struct Scsi_Host *shpnt;
+   struct pci_dev *pdev = NULL;
 #if DO_DETECT
    int i = 0;
    int j = 0;
@@ -910,7 +912,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
 
 #ifdef CONFIG_PCI
 				/* Try PCI detection first */
-      flag = fdomain_pci_bios_detect( &interrupt_level, &port_base );
+      flag = fdomain_pci_bios_detect( &interrupt_level, &port_base, &pdev );
 #endif
       if (!flag) {
 				/* Then try ISA bus detection */
@@ -969,6 +971,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
    	return 0;
    shpnt->irq = interrupt_level;
    shpnt->io_port = port_base;
+   scsi_set_pci_device(shpnt->pci_dev, pdev);
    shpnt->n_io_port = 0x10;
    print_banner( shpnt );
 

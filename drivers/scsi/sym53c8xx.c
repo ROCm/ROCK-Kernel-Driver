@@ -5905,6 +5905,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->dma_channel	= 0;
 	instance->cmd_per_lun	= MAX_TAGS;
 	instance->can_queue	= (MAX_START-4);
+	scsi_set_pci_device(instance, device->pdev);
 
 	np->check_integrity       = 0;
 

@@ -3715,6 +3715,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->cmd_per_lun	= MAX_TAGS;
 	instance->can_queue	= (MAX_START-4);
 	instance->select_queue_depths = ncr53c8xx_select_queue_depths;
+	scsi_set_pci_device(instance, device->pdev);
 
 #ifdef SCSI_NCR_INTEGRITY_CHECKING
 	np->check_integrity	  = 0;

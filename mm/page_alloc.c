@@ -295,8 +295,7 @@ struct page * __alloc_pages(zonelist_t *zonelist, unsigned long order)
 	 * Can we take pages directly from the inactive_clean
 	 * list?
 	 */
-	if (order == 0 && (gfp_mask & __GFP_WAIT) &&
-			!(current->flags & PF_MEMALLOC))
+	if (order == 0 && (gfp_mask & __GFP_WAIT))
 		direct_reclaim = 1;
 
 	/*

@@ -466,40 +466,42 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     /* find the proper place for the new entry */
     memset (bit_string, 0, sizeof (bit_string));
     de.de_gen_number_bit_string = (char *)bit_string;
-    if (reiserfs_find_entry (dir, name, namelen, &path, &de) == NAME_FOUND) {
+    retval = reiserfs_find_entry (dir, name, namelen, &path, &de);
+    if (retval != NAME_NOT_FOUND) {
 	if (buffer != small_buf)
 	    reiserfs_kfree (buffer, buflen, dir->i_sb);
 	pathrelse (&path);
+	
+	if (retval != NAME_FOUND) {
+	    reiserfs_warning ("zam-7002:" __FUNCTION__ ": \"reiserfs_find_entry\" has returned"
+			      " unexpected value (%d)\n", retval);
+	}
+	
 	return -EEXIST;
     }
 
-    if (find_first_nonzero_bit (bit_string, MAX_GENERATION_NUMBER + 1) < MAX_GENERATION_NUMBER + 1) {
-	/* there are few names with given hash value */
-	gen_number = find_first_zero_bit (bit_string, MAX_GENERATION_NUMBER + 1);
-	if (gen_number > MAX_GENERATION_NUMBER) {
-	    /* there is no free generation number */
-	    reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
-	    if (buffer != small_buf)
-		reiserfs_kfree (buffer, buflen, dir->i_sb);
-	    pathrelse (&path);
-	    return -EBUSY; //HASHCOLLISION;//EBADSLT
-	}
-	/* adjust offset of directory enrty */
-	deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (deh_offset (deh), gen_number));
-	set_cpu_key_k_offset (&entry_key, le32_to_cpu (deh->deh_offset));
+    gen_number = find_first_zero_bit (bit_string, MAX_GENERATION_NUMBER + 1);
+    if (gen_number > MAX_GENERATION_NUMBER) {
+	/* there is no free generation number */
+	reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
+	if (buffer != small_buf)
+	    reiserfs_kfree (buffer, buflen, dir->i_sb);
+	pathrelse (&path);
+	return -EBUSY;
+    }
+    /* adjust offset of directory enrty */
+    deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (deh_offset (deh), gen_number));
+    set_cpu_key_k_offset (&entry_key, le32_to_cpu (deh->deh_offset));
 
-	/* find place for new entry */
-	if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) == NAME_FOUND) {
+    if (gen_number != 0) {	/* we need to re-search for the insertion point */
+	if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
 	    reiserfs_warning ("vs-7032: reiserfs_add_entry: "
-			      "entry with this key (%k) already exists", &entry_key);
+			      "entry with this key (%k) already exists\n", &entry_key);
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
 	    pathrelse (&path);
 	    return -EBUSY;
 	}
-    } else {
-	deh->deh_offset = cpu_to_le32 (SET_GENERATION_NUMBER (le32_to_cpu (deh->deh_offset), 0));
-	set_cpu_key_k_offset (&entry_key, le32_to_cpu (deh->deh_offset));
     }
   
     /* perform the insertion of the entry that we have prepared */
