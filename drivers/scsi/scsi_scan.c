@@ -715,7 +715,7 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 
 		scsi_wait_req (SRpnt, (void *) scsi_cmd,
 			  (void *) scsi_result,
-			  256, SCSI_TIMEOUT+4*HZ, 3);
+			  scsi_cmd[4], SCSI_TIMEOUT+4*HZ, 3);
 		/* assume successful */
 	}
 	SDpnt->inquiry_len = possible_inq_resp_len;
