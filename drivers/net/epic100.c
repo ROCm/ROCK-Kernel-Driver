@@ -973,7 +973,7 @@ static int epic_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct epic_private *ep = dev->priv;
 	int entry, free_count;
 	u32 ctrl_word;
-	long flags;
+	unsigned long flags;
 	
 	if (skb->len < ETH_ZLEN) {
 		skb = skb_padto(skb, ETH_ZLEN);

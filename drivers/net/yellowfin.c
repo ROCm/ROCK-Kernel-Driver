@@ -406,7 +406,7 @@ static void yellowfin_timer(unsigned long data);
 static void yellowfin_tx_timeout(struct net_device *dev);
 static void yellowfin_init_ring(struct net_device *dev);
 static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int yellowfin_rx(struct net_device *dev);
 static void yellowfin_error(struct net_device *dev, int intr_status);
 static int yellowfin_close(struct net_device *dev);
@@ -942,17 +942,18 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
 	struct yellowfin_private *yp;
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
+	unsigned int handled = 0;
 
 #ifndef final_version			/* Can never occur. */
 	if (dev == NULL) {
 		printk (KERN_ERR "yellowfin_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 #endif
 
@@ -970,6 +971,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 
 		if (intr_status == 0)
 			break;
+		handled = 1;
 
 		if (intr_status & (IntrRxDone | IntrEarlyRx)) {
 			yellowfin_rx(dev);
@@ -1091,7 +1093,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 			   dev->name, inw(ioaddr + IntrStatus));
 
 	spin_unlock (&yp->lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /* This routine is logically part of the interrupt handler, but separated
@@ -1371,18 +1373,20 @@ static void set_rx_mode(struct net_device *dev)
 		memset(hash_table, 0, sizeof(hash_table));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 			 i++, mclist = mclist->next) {
+			unsigned int bit;
+
 			/* Due to a bug in the early chip versions, multiple filter
 			   slots must be set for each address. */
 			if (yp->drv_flags & HasMulticastBug) {
-				set_bit((ether_crc_le(3, mclist->dmi_addr) >> 3) & 0x3f,
-						hash_table);
-				set_bit((ether_crc_le(4, mclist->dmi_addr) >> 3) & 0x3f,
-						hash_table);
-				set_bit((ether_crc_le(5, mclist->dmi_addr) >> 3) & 0x3f,
-						hash_table);
+				bit = (ether_crc_le(3, mclist->dmi_addr) >> 3) & 0x3f;
+				hash_table[bit >> 4] |= (1 << bit);
+				bit = (ether_crc_le(4, mclist->dmi_addr) >> 3) & 0x3f;
+				hash_table[bit >> 4] |= (1 << bit);
+				bit = (ether_crc_le(5, mclist->dmi_addr) >> 3) & 0x3f;
+				hash_table[bit >> 4] |= (1 << bit);
 			}
-			set_bit((ether_crc_le(6, mclist->dmi_addr) >> 3) & 0x3f,
-					hash_table);
+			bit = (ether_crc_le(6, mclist->dmi_addr) >> 3) & 0x3f;
+			hash_table[bit >> 4] |= (1 << bit);
 		}
 		/* Copy the hash table to the chip. */
 		for (i = 0; i < 4; i++)

@@ -789,7 +789,7 @@ static void	check_duplex(struct net_device *dev);
 static void	tx_timeout(struct net_device *dev);
 static void	init_ring(struct net_device *dev);
 static int	start_tx(struct sk_buff *skb, struct net_device *dev);
-static void	intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void	netdev_error(struct net_device *dev, int intr_status);
 static int	__netdev_rx(struct net_device *dev, int *quota);
 static void	refill_rx_ring(struct net_device *dev);
@@ -1491,7 +1491,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
 	struct netdev_private *np;
@@ -1499,6 +1499,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	int boguscnt = max_interrupt_work;
 	int consumer;
 	int tx_status;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1512,6 +1513,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (intr_status == 0 || intr_status == (u32) -1)
 			break;
+
+		handled = 1;
 
 		if (intr_status & (IntrRxDone | IntrRxEmpty))
 			netdev_rx(dev, ioaddr);
@@ -1591,6 +1594,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	if (debug > 4)
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#8.8x.\n",
 		       dev->name, (int) readl(ioaddr + IntrStatus));
+	return IRQ_RETVAL(handled);
 }
 
 

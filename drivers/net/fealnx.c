@@ -438,7 +438,7 @@ static void netdev_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int start_tx(struct sk_buff *skb, struct net_device *dev);
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static int netdev_rx(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
@@ -1412,12 +1412,13 @@ void reset_rx_descriptors(struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
 	struct netdev_private *np = dev->priv;
 	long ioaddr, boguscnt = max_interrupt_work;
 	unsigned int num_tx = 0;
+	int handled = 0;
 
 	writel(0, dev->base_addr + IMR);
 
@@ -1436,6 +1437,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (!(intr_status & np->imrvalue))
 			break;
+
+		handled = 1;
 
 // 90/1/16 delete,
 //
@@ -1559,7 +1562,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 	writel(np->imrvalue, ioaddr + IMR);
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 
@@ -1739,8 +1742,9 @@ static void set_rx_mode(struct net_device *dev)
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 		     i++, mclist = mclist->next) {
-			set_bit((ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26) ^ 0x3F,
-				mc_filter);
+			unsigned int bit;
+			bit = (ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26) ^ 0x3F;
+			mc_filter[bit >> 5] |= (1 << bit);
 		}
 		rx_mode = AB | AM;
 	}
