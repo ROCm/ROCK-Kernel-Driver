@@ -169,21 +169,21 @@ int cmd640_vlb = 0;
 /*
  * Registers and masks for easy access by drive index:
  */
-static byte prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
-static byte prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
+static u8 prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
+static u8 prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
 
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 
-static byte arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
-static byte drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
+static u8 arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
+static u8 drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
 
 /*
  * Current cmd640 timing values for each drive.
  * The defaults for each are the slowest possible timings.
  */
-static byte setup_counts[4]    = {4, 4, 4, 4};     /* Address setup count (in clocks) */
-static byte active_counts[4]   = {16, 16, 16, 16}; /* Active count   (encoded) */
-static byte recovery_counts[4] = {16, 16, 16, 16}; /* Recovery count (encoded) */
+static u8 setup_counts[4]    = {4, 4, 4, 4};     /* Address setup count (in clocks) */
+static u8 active_counts[4]   = {16, 16, 16, 16}; /* Active count   (encoded) */
+static u8 recovery_counts[4] = {16, 16, 16, 16}; /* Recovery count (encoded) */
 
 #endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
 
@@ -197,8 +197,8 @@ static ide_drive_t *cmd_drives[4];
  * Interface to access cmd640x registers
  */
 static unsigned int cmd640_key;
-static void (*put_cmd640_reg)(unsigned short reg, byte val);
-static byte (*get_cmd640_reg)(unsigned short reg);
+static void (*put_cmd640_reg)(u16 reg, u8 val);
+static u8 (*get_cmd640_reg)(u16 reg);
 
 /*
  * This is read from the CFR reg, and is used in several places.
@@ -213,7 +213,7 @@ static unsigned int cmd640_chip_version;
 
 /* PCI method 1 access */
 
-static void put_cmd640_reg_pci1 (unsigned short reg, byte val)
+static void put_cmd640_reg_pci1 (u16 reg, u8 val)
 {
 	unsigned long flags;
 
@@ -223,9 +223,9 @@ static void put_cmd640_reg_pci1 (unsigned short reg, byte val)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static byte get_cmd640_reg_pci1 (unsigned short reg)
+static u8 get_cmd640_reg_pci1 (u16 reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -237,7 +237,7 @@ static byte get_cmd640_reg_pci1 (unsigned short reg)
 
 /* PCI method 2 access (from CMD datasheet) */
 
-static void put_cmd640_reg_pci2 (unsigned short reg, byte val)
+static void put_cmd640_reg_pci2 (u16 reg, u8 val)
 {
 	unsigned long flags;
 
@@ -248,9 +248,9 @@ static void put_cmd640_reg_pci2 (unsigned short reg, byte val)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static byte get_cmd640_reg_pci2 (unsigned short reg)
+static u8 get_cmd640_reg_pci2 (u16 reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -263,7 +263,7 @@ static byte get_cmd640_reg_pci2 (unsigned short reg)
 
 /* VLB access */
 
-static void put_cmd640_reg_vlb (unsigned short reg, byte val)
+static void put_cmd640_reg_vlb (u16 reg, u8 val)
 {
 	unsigned long flags;
 
@@ -273,9 +273,9 @@ static void put_cmd640_reg_vlb (unsigned short reg, byte val)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-static byte get_cmd640_reg_vlb (unsigned short reg)
+static u8 get_cmd640_reg_vlb (u16 reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -287,7 +287,7 @@ static byte get_cmd640_reg_vlb (unsigned short reg)
 
 static int __init match_pci_cmd640_device (void)
 {
-	const byte ven_dev[4] = {0x95, 0x10, 0x40, 0x06};
+	const u8 ven_dev[4] = {0x95, 0x10, 0x40, 0x06};
 	unsigned int i;
 	for (i = 0; i < 4; i++) {
 		if (get_cmd640_reg(i) != ven_dev[i])
@@ -337,7 +337,7 @@ static int __init probe_for_cmd640_pci2 (void)
  */
 static int __init probe_for_cmd640_vlb (void)
 {
-	byte b;
+	u8 b;
 
 	get_cmd640_reg = get_cmd640_reg_vlb;
 	put_cmd640_reg = put_cmd640_reg_vlb;
@@ -380,7 +380,7 @@ static int __init secondary_port_responding (void)
 /*
  * Dump out all cmd640 registers.  May be called from ide.c
  */
-void cmd640_dump_regs (void)
+static void cmd640_dump_regs (void)
 {
 	unsigned int reg = cmd640_vlb ? 0x50 : 0x00;
 
@@ -402,7 +402,7 @@ void cmd640_dump_regs (void)
 static void __init check_prefetch (unsigned int index)
 {
 	ide_drive_t *drive = cmd_drives[index];
-	byte b = get_cmd640_reg(prefetch_regs[index]);
+	u8 b = get_cmd640_reg(prefetch_regs[index]);
 
 	if (b & prefetch_masks[index]) {	/* is prefetch off? */
 		drive->no_unmask = 0;
@@ -450,7 +450,7 @@ static void set_prefetch_mode (unsigned int index, int mode)
 {
 	ide_drive_t *drive = cmd_drives[index];
 	int reg = prefetch_regs[index];
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
@@ -477,7 +477,7 @@ static void set_prefetch_mode (unsigned int index, int mode)
  */
 static void display_clocks (unsigned int index)
 {
-	byte active_count, recovery_count;
+	u8 active_count, recovery_count;
 
 	active_count = active_counts[index];
 	if (active_count == 1)
@@ -494,7 +494,7 @@ static void display_clocks (unsigned int index)
  * Pack active and recovery counts into single byte representation
  * used by controller
  */
-inline static byte pack_nibbles (byte upper, byte lower)
+inline static u8 pack_nibbles (u8 upper, u8 lower)
 {
 	return ((upper & 0x0f) << 4) | (lower & 0x0f);
 }
@@ -504,7 +504,7 @@ inline static byte pack_nibbles (byte upper, byte lower)
  */
 static void __init retrieve_drive_counts (unsigned int index)
 {
-	byte b;
+	u8 b;
 
 	/*
 	 * Get the internal setup timing, and convert to clock count
@@ -534,9 +534,9 @@ static void __init retrieve_drive_counts (unsigned int index)
 static void program_drive_counts (unsigned int index)
 {
 	unsigned long flags;
-	byte setup_count    = setup_counts[index];
-	byte active_count   = active_counts[index];
-	byte recovery_count = recovery_counts[index];
+	u8 setup_count    = setup_counts[index];
+	u8 active_count   = active_counts[index];
+	u8 recovery_count = recovery_counts[index];
 
 	/*
 	 * Set up address setup count and drive read/write timing registers.
@@ -585,10 +585,10 @@ static void program_drive_counts (unsigned int index)
 /*
  * Set a specific pio_mode for a drive
  */
-static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cycle_time)
+static void cmd640_set_mode (unsigned int index, u8 pio_mode, unsigned int cycle_time)
 {
 	int setup_time, active_time, recovery_time, clock_time;
-	byte setup_count, active_count, recovery_count, recovery_count2, cycle_count;
+	u8 setup_count, active_count, recovery_count, recovery_count2, cycle_count;
 	int bus_speed = system_bus_clock();
 
 	if (pio_mode > 5)
@@ -640,9 +640,9 @@ static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cyc
 /*
  * Drive PIO mode selection:
  */
-static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
+static void cmd640_tune_drive (ide_drive_t *drive, u8 mode_wanted)
 {
-	byte b;
+	u8 b;
 	ide_pio_data_t  d;
 	unsigned int index = 0;
 
@@ -691,7 +691,7 @@ static int pci_conf1(void)
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	OUT_BYTE(0x01, 0xCFB);
+	outb(0x01, 0xCFB);
 	tmp = inl(0xCF8);
 	outl(0x80000000, 0xCF8);
 	if (inl(0xCF8) == 0x80000000) {
@@ -709,10 +709,10 @@ static int pci_conf2(void)
 	unsigned long flags;
 
 	spin_lock_irqsave(&ide_lock, flags);
-	OUT_BYTE(0x00, 0xCFB);
-	OUT_BYTE(0x00, 0xCF8);
-	OUT_BYTE(0x00, 0xCFA);
-	if (IN_BYTE(0xCF8) == 0x00 && IN_BYTE(0xCF8) == 0x00) {
+	outb(0x00, 0xCFB);
+	outb(0x00, 0xCF8);
+	outb(0x00, 0xCFA);
+	if (inb(0xCF8) == 0x00 && inb(0xCF8) == 0x00) {
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return 1;
 	}
@@ -731,7 +731,7 @@ int __init ide_probe_for_cmd640x (void)
 	int second_port_cmd640 = 0;
 	const char *bus_type, *port2;
 	unsigned int index;
-	byte b, cfr;
+	u8 b, cfr;
 
 	if (cmd640_vlb && probe_for_cmd640_vlb()) {
 		bus_type = "VLB";
