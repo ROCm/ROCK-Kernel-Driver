@@ -651,14 +651,19 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	pte = *ptep;
 	pte_unmap(ptep);
 	if (pte_present(pte)) {
-		if (!write || (pte_write(pte) && pte_dirty(pte))) {
-			pfn = pte_pfn(pte);
-			if (pfn_valid(pfn)) {
-				struct page *page = pfn_to_page(pfn);
-
-				mark_page_accessed(page);
-				return page;
-			}
+		if (write && !pte_write(pte))
+			goto out;
+		if (write && !pte_dirty(pte)) {
+			struct page *page = pte_page(pte);
+			if (!PageDirty(page))
+				set_page_dirty(page);
+		}
+		pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
+			
+			mark_page_accessed(page);
+			return page;
 		}
 	}
 
