@@ -6,6 +6,7 @@
  *
  * $Id: cfi_cmdset_0001.c,v 1.160 2004/11/01 06:02:24 nico Exp $
  * (+ suspend fix from v1.162)
+ * (+ partition detection fix from v1.163)
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
  * 	- completely revamped method functions so they are aware and
@@ -62,7 +63,7 @@ static void cfi_intelext_destroy(struct mtd_info *);
 struct mtd_info *cfi_cmdset_0001(struct map_info *, int);
 
 static struct mtd_info *cfi_intelext_setup (struct mtd_info *);
-static int cfi_intelext_partition_fixup(struct map_info *, struct cfi_private **);
+static int cfi_intelext_partition_fixup(struct mtd_info *, struct cfi_private **);
 
 static int cfi_intelext_point (struct mtd_info *mtd, loff_t from, size_t len,
 		     size_t *retlen, u_char **mtdbuf);
@@ -212,6 +213,66 @@ static struct cfi_fixup fixup_table[] = {
 	{ 0, 0, NULL, NULL }
 };
 
+static inline struct cfi_pri_intelext *
+read_pri_intelext(struct map_info *map, __u16 adr)
+{
+	struct cfi_pri_intelext *extp;
+	unsigned int extp_size = sizeof(*extp);
+
+ again:
+	extp = (struct cfi_pri_intelext *)cfi_read_pri(map, adr, extp_size, "Intel/Sharp");
+	if (!extp)
+		return NULL;
+
+	/* Do some byteswapping if necessary */
+	extp->FeatureSupport = le32_to_cpu(extp->FeatureSupport);
+	extp->BlkStatusRegMask = le16_to_cpu(extp->BlkStatusRegMask);
+	extp->ProtRegAddr = le16_to_cpu(extp->ProtRegAddr);
+
+	if (extp->MajorVersion == '1' && extp->MinorVersion == '3') {
+		unsigned int extra_size = 0;
+		int nb_parts, i;
+
+		/* Protection Register info */
+		extra_size += (extp->NumProtectionFields - 1) * (4 + 6);
+
+		/* Burst Read info */
+		extra_size += 6;
+
+		/* Number of hardware-partitions */
+		extra_size += 1;
+		if (extp_size < sizeof(*extp) + extra_size)
+			goto need_more;
+		nb_parts = extp->extra[extra_size - 1];
+
+		for (i = 0; i < nb_parts; i++) {
+			struct cfi_intelext_regioninfo *rinfo;
+			rinfo = (struct cfi_intelext_regioninfo *)&extp->extra[extra_size];
+			extra_size += sizeof(*rinfo);
+			if (extp_size < sizeof(*extp) + extra_size)
+				goto need_more;
+			rinfo->NumIdentPartitions=le16_to_cpu(rinfo->NumIdentPartitions);
+			extra_size += (rinfo->NumBlockTypes - 1)
+				      * sizeof(struct cfi_intelext_blockinfo);
+		}
+
+		if (extp_size < sizeof(*extp) + extra_size) {
+			need_more:
+			extp_size = sizeof(*extp) + extra_size;
+			kfree(extp);
+			if (extp_size > 4096) {
+				printk(KERN_ERR
+					"%s: cfi_pri_intelext is too fat\n",
+					__FUNCTION__);
+				return NULL;
+			}
+			goto again;
+		}
+	}
+		
+	return extp;
+}
+
 /* This routine is made available to other mtd code via
  * inter_module_register.  It must only be accessed through
  * inter_module_get which will bump the use count of this module.  The
@@ -255,22 +316,17 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *map, int primary)
 		__u16 adr = primary?cfi->cfiq->P_ADR:cfi->cfiq->A_ADR;
 		struct cfi_pri_intelext *extp;
 
-		extp = (struct cfi_pri_intelext*)cfi_read_pri(map, adr, sizeof(*extp), "Intel/Sharp");
+		extp = read_pri_intelext(map, adr);
 		if (!extp) {
 			kfree(mtd);
 			return NULL;
 		}
-		
-		/* Do some byteswapping if necessary */
-		extp->FeatureSupport = le32_to_cpu(extp->FeatureSupport);
-		extp->BlkStatusRegMask = le16_to_cpu(extp->BlkStatusRegMask);
-		extp->ProtRegAddr = le16_to_cpu(extp->ProtRegAddr);
 
 		/* Install our own private info structure */
 		cfi->cmdset_priv = extp;	
 
 		cfi_fixup(mtd, cfi_fixup_table);
-			
+
 #ifdef DEBUG_CFI_FEATURES
 		/* Tell the user about it in lots of lovely detail */
 		cfi_tell_features(extp);
@@ -355,7 +411,7 @@ static struct mtd_info *cfi_intelext_setup(struct mtd_info *mtd)
 
 	/* This function has the potential to distort the reality
 	   a bit and therefore should be called last. */
-	if (cfi_intelext_partition_fixup(map, &cfi) != 0)
+	if (cfi_intelext_partition_fixup(mtd, &cfi) != 0)
 		goto setup_err;
 
 	__module_get(THIS_MODULE);
@@ -371,19 +427,15 @@ static struct mtd_info *cfi_intelext_setup(struct mtd_info *mtd)
 	return NULL;
 }
 
-static int cfi_intelext_partition_fixup(struct map_info *map,
+static int cfi_intelext_partition_fixup(struct mtd_info *mtd,
 					struct cfi_private **pcfi)
 {
+	struct map_info *map = mtd->priv;
 	struct cfi_private *cfi = *pcfi;
 	struct cfi_pri_intelext *extp = cfi->cmdset_priv;
 
 	/*
 	 * Probing of multi-partition flash ships.
-	 *
-	 * This is extremely crude at the moment and should probably be
-	 * extracted entirely from the Intel extended query data instead.
-	 * Right now a L18 flash is assumed if multiple operations is
-	 * detected.
 	 *
 	 * To support multiple partitions when available, we simply arrange
 	 * for each of them to have their own flchip structure even if they
@@ -393,20 +445,49 @@ static int cfi_intelext_partition_fixup(struct map_info *map,
 	 * arrangement at this point. This can be rearranged in the future
 	 * if someone feels motivated enough.  --nico
 	 */
-	if (extp && extp->FeatureSupport & (1 << 9)) {
+	if (extp && extp->MajorVersion == '1' && extp->MinorVersion == '3'
+	    && extp->FeatureSupport & (1 << 9)) {
 		struct cfi_private *newcfi;
 		struct flchip *chip;
 		struct flchip_shared *shared;
-		int numparts, partshift, numvirtchips, i, j;
+		int offs, numregions, numparts, partshift, numvirtchips, i, j;
+
+		/* Protection Register info */
+		offs = (extp->NumProtectionFields - 1) * (4 + 6);
+
+		/* Burst Read info */
+		offs += 6;
+
+		/* Number of partition regions */
+		numregions = extp->extra[offs];
+		offs += 1;
+
+		/* Number of hardware partitions */
+		numparts = 0;
+		for (i = 0; i < numregions; i++) {
+			struct cfi_intelext_regioninfo *rinfo;
+			rinfo = (struct cfi_intelext_regioninfo *)&extp->extra[offs];
+			numparts += rinfo->NumIdentPartitions;
+			offs += sizeof(*rinfo)
+				+ (rinfo->NumBlockTypes - 1) *
+				  sizeof(struct cfi_intelext_blockinfo);
+		}
 
 		/*
-		 * The L18 flash memory array is divided
-		 * into multiple 8-Mbit partitions.
+		 * All functions below currently rely on all chips having
+		 * the same geometry so we'll just assume that all hardware
+		 * partitions are of the same size too.
 		 */
-		numparts = 1 << (cfi->cfiq->DevSize - 20);
-		partshift = 20 + __ffs(cfi->interleave);
-		numvirtchips = cfi->numchips * numparts;
+		partshift = cfi->chipshift - __ffs(numparts);
 
+		if ((1 << partshift) < mtd->erasesize) {
+			printk( KERN_ERR
+				"%s: bad number of hw partitions (%d)\n",
+				__FUNCTION__, numparts);
+			return -EINVAL;
+		}
+
+		numvirtchips = cfi->numchips * numparts;
 		newcfi = kmalloc(sizeof(struct cfi_private) + numvirtchips * sizeof(struct flchip), GFP_KERNEL);
 		if (!newcfi)
 			return -ENOMEM;
@@ -436,10 +517,10 @@ static int cfi_intelext_partition_fixup(struct map_info *map,
 			}
 		}
 
-		printk(KERN_DEBUG "%s: %d sets of %d interleaved chips "
-				  "--> %d partitions of %#x bytes\n",
+		printk(KERN_DEBUG "%s: %d set(s) of %d interleaved chips "
+				  "--> %d partitions of %d KiB\n",
 				  map->name, cfi->numchips, cfi->interleave,
-				  newcfi->numchips, 1<<newcfi->chipshift);
+				  newcfi->numchips, 1<<(newcfi->chipshift-10));
 
 		map->fldrv_priv = newcfi;
 		*pcfi = newcfi;
