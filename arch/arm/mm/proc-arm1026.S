@@ -365,6 +365,7 @@ ENTRY(cpu_arm1026_set_pte)
 
 	__INIT
 
+	.type	__arm1026_setup, #function
 __arm1026_setup:
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
@@ -402,6 +403,9 @@ __arm1026_setup:
 	orr	r0, r0, #0x1000 		@ ...I............
 #endif
 	mov	pc, lr
+	.size	__arm1026_setup, . - __arm1026_setup
+
+	__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -409,7 +413,7 @@ __arm1026_setup:
  */
 	.type	arm1026_processor_functions, #object
 arm1026_processor_functions:
-	.word	ev5t_early_abort
+	.word	v5t_early_abort
 	.word	cpu_arm1026_proc_init
 	.word	cpu_arm1026_proc_fin
 	.word	cpu_arm1026_reset
@@ -417,7 +421,6 @@ arm1026_processor_functions:
 	.word	cpu_arm1026_dcache_clean_area
 	.word	cpu_arm1026_switch_mm
 	.word	cpu_arm1026_set_pte
-
 	.size	arm1026_processor_functions, . - arm1026_processor_functions
 
 	.section .rodata
@@ -434,7 +437,7 @@ cpu_elf_name:
 	.align
 
 	.type	cpu_arm1026_name, #object
-ENTRY(cpu_arm1026_name)
+cpu_arm1026_name:
 	.ascii	"ARM1026EJ-S"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
 	.ascii	"i"
@@ -454,8 +457,9 @@ ENTRY(cpu_arm1026_name)
 	.ascii	"RR"
 #endif
 	.ascii	"\0"
-	.align
 	.size	cpu_arm1026_name, . - cpu_arm1026_name
+
+	.align
 
 	.section ".proc.info", #alloc, #execinstr
 

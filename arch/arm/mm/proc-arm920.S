@@ -360,25 +360,9 @@ ENTRY(cpu_arm920_set_pte)
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
-
-ENTRY(cpu_arm920_name)
-	.ascii	"ARM920T"
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	.ascii	"i"
-#endif
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	.ascii	"d"
-#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
-	.ascii	"(wt)"
-#else
-	.ascii	"(wb)"
-#endif
-#endif
-	.ascii	"\0"
-	.align
-
 	__INIT
 
+	.type	__arm920_setup, #function
 __arm920_setup:
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
@@ -409,8 +393,9 @@ __arm920_setup:
 	orr	r0, r0, #0x1000			@ ...1 .... .... ....
 #endif
 	mov	pc, lr
+	.size	__arm920_setup, . - __arm920_setup
 
-	.text
+	__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -428,6 +413,8 @@ arm920_processor_functions:
 	.word	cpu_arm920_set_pte
 	.size	arm920_processor_functions, . - arm920_processor_functions
 
+	.section ".rodata"
+
 	.type	cpu_arch_name, #object
 cpu_arch_name:
 	.asciz	"armv4t"
@@ -437,6 +424,24 @@ cpu_arch_name:
 cpu_elf_name:
 	.asciz	"v4"
 	.size	cpu_elf_name, . - cpu_elf_name
+
+	.type	cpu_arm920_name, #object
+cpu_arm920_name:
+	.ascii	"ARM920T"
+#ifndef CONFIG_CPU_ICACHE_DISABLE
+	.ascii	"i"
+#endif
+#ifndef CONFIG_CPU_DCACHE_DISABLE
+	.ascii	"d"
+#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+	.ascii	"(wt)"
+#else
+	.ascii	"(wb)"
+#endif
+#endif
+	.ascii	"\0"
+	.size	cpu_arm920_name, . - cpu_arm920_name
+
 	.align
 
 	.section ".proc.info", #alloc, #execinstr

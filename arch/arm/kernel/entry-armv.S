@@ -729,7 +729,7 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
  * This routine must not corrupt r9
  */
 #ifdef MULTI_ABORT
-		ldr	r4, .LCprocfns			@ pass r0, r3 to
+		ldr	r4, .LCprocfns			@ pass r2, r3 to
 		mov	lr, pc				@ processor code
 		ldr	pc, [r4]			@ call processor specific code
 #else
@@ -871,7 +871,7 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		alignment_trap r7, r7, __temp_abt
 		zero_fp
 #ifdef MULTI_ABORT
-		ldr	r4, .LCprocfns			@ pass r0, r3 to
+		ldr	r4, .LCprocfns			@ pass r2, r3 to
 		mov	lr, pc				@ processor code
 		ldr	pc, [r4]			@ call processor specific code
 #else

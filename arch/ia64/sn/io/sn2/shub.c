@@ -34,6 +34,8 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/sndrv.h>
+#include <asm/sn/sn2/shubio.h>
+#include <asm/sn/sn2/shub_mmr.h>
 
 /*
  * Shub WAR for Xbridge Little Endian problem:

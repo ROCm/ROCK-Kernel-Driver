@@ -58,8 +58,10 @@ ENTRY(v3_clear_user_page)
 	bne	1b				@ 1
 	ldr	pc, [sp], #4
 
-	__INIT
+	__INITDATA
 
+	.type	v3_user_fns, #object
 ENTRY(v3_user_fns)
 	.long	v3_clear_user_page
 	.long	v3_copy_user_page
+	.size	v3_user_fns, . - v3_user_fns
