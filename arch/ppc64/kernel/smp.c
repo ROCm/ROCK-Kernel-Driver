@@ -271,13 +271,13 @@ void __cpu_die(unsigned int cpu)
 	int cpu_status;
 	unsigned int pcpu = get_hard_smp_processor_id(cpu);
 
-	for (tries = 0; tries < 5; tries++) {
+	for (tries = 0; tries < 25; tries++) {
 		cpu_status = query_cpu_stopped(pcpu);
 
 		if (cpu_status == 0)
 			break;
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
+		schedule_timeout(HZ/5);
 	}
 	if (cpu_status != 0) {
 		printk("Querying DEAD? cpu %i (%i) shows %i\n",
