@@ -394,131 +394,40 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	return res;
 }
 		
-static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned long size, int * pages, int * shared, int * dirty, int * total)
+int proc_pid_statm(task_t *task, char *buffer)
 {
-	unsigned long end, pmd_end;
-	pte_t *pte;
-
-	if (pmd_none(*pmd))
-		return;
-	if (pmd_bad(*pmd)) {
-		pmd_ERROR(*pmd);
-		pmd_clear(pmd);
-		return;
-	}
-	preempt_disable();
-	pte = pte_offset_map(pmd, address);
-	end = address + size;
-	pmd_end = (address + PMD_SIZE) & PMD_MASK;
-	if (end > pmd_end)
-		end = pmd_end;
-	do {
-		pte_t page = *pte;
-		struct page *ptpage;
-		unsigned long pfn;
-
-		address += PAGE_SIZE;
-		pte++;
-		if (pte_none(page))
-			continue;
-		++*total;
-		if (!pte_present(page))
-			continue;
-		pfn = pte_pfn(page);
-		if (!pfn_valid(pfn))
-			continue;
-		ptpage = pfn_to_page(pfn);
-		if (PageReserved(ptpage))
-			continue;
-		++*pages;
-		if (pte_dirty(page))
-			++*dirty;
-		if (page_count(pte_page(page)) > 1)
-			++*shared;
-	} while (address < end);
-	pte_unmap(pte - 1);
-	preempt_enable();
-}
-
-static inline void statm_pmd_range(pgd_t * pgd, unsigned long address, unsigned long size,
-	int * pages, int * shared, int * dirty, int * total)
-{
-	pmd_t * pmd;
-	unsigned long end;
-
-	if (pgd_none(*pgd))
-		return;
-	if (pgd_bad(*pgd)) {
-		pgd_ERROR(*pgd);
-		pgd_clear(pgd);
-		return;
-	}
-	pmd = pmd_offset(pgd, address);
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-	do {
-		statm_pte_range(pmd, address, end - address, pages, shared, dirty, total);
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address < end);
-}
-
-static void statm_pgd_range(pgd_t * pgd, unsigned long address, unsigned long end,
-	int * pages, int * shared, int * dirty, int * total)
-{
-	while (address < end) {
-		statm_pmd_range(pgd, address, end - address, pages, shared, dirty, total);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		pgd++;
-	}
-}
-
-int proc_pid_statm(struct task_struct *task, char * buffer)
-{
-	int size=0, resident=0, share=0, trs=0, lrs=0, drs=0, dt=0;
+	int size, resident, shared, text, lib, data, dirty;
 	struct mm_struct *mm = get_task_mm(task);
+	struct vm_area_struct * vma;
 
-	if (mm) {
-		struct vm_area_struct * vma;
-		down_read(&mm->mmap_sem);
-		vma = mm->mmap;
-		while (vma) {
-			pgd_t *pgd = pgd_offset(mm, vma->vm_start);
-			int pages = 0, shared = 0, dirty = 0, total = 0;
-			if (is_vm_hugetlb_page(vma)) {
-				int num_pages = ((vma->vm_end - vma->vm_start)/PAGE_SIZE);
+	size = resident = shared = text = lib = data = dirty = 0;
 
-				resident += num_pages;
-				if (!(vma->vm_flags & VM_DONTCOPY))
-					share += num_pages;
-				if (vma->vm_flags & VM_WRITE)
-					dt += num_pages;
-				drs += num_pages;
-				vma = vma->vm_next;
-				continue;
-			}
-			statm_pgd_range(pgd, vma->vm_start, vma->vm_end, &pages, &shared, &dirty, &total);
-			resident += pages;
-			share += shared;
-			dt += dirty;
-			size += total;
-			if (vma->vm_flags & VM_EXECUTABLE)
-				trs += pages;	/* text */
-			else if (vma->vm_flags & VM_GROWSDOWN)
-				drs += pages;	/* stack */
-			else if (vma->vm_end > 0x60000000)
-				lrs += pages;	/* library */
-			else
-				drs += pages;
-			vma = vma->vm_next;
+	if (!mm)
+		goto out;
+
+	down_read(&mm->mmap_sem);
+	resident = mm->rss;
+	for (vma = mm->mmap; vma; vma = vma->vm_next) {
+		int pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+
+		size += pages;
+		if (is_vm_hugetlb_page(vma)) {
+			if (!(vma->vm_flags & VM_DONTCOPY))
+				shared += pages;
+			continue;
 		}
-		up_read(&mm->mmap_sem);
-		mmput(mm);
+		if (vma->vm_flags & VM_SHARED || !list_empty(&vma->shared))
+			shared += pages;
+		if (vma->vm_flags & VM_EXECUTABLE)
+			text += pages;
+		else
+			data += pages;
 	}
+	up_read(&mm->mmap_sem);
+	mmput(mm);
+out:
 	return sprintf(buffer,"%d %d %d %d %d %d %d\n",
-		       size, resident, share, trs, lrs, drs, dt);
+		       size, resident, shared, text, lib, data, dirty);
 }
 
 /*
