@@ -418,6 +418,10 @@ static int tcp_tw_death_row_slot = 0;
 
 static void tcp_twkill(unsigned long);
 
+/* TIME_WAIT reaping mechanism. */
+#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
+#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
+
 static struct tcp_tw_bucket *tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);

@@ -362,10 +362,6 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define MAX_TCP_KEEPCNT		127
 #define MAX_TCP_SYNCNT		127
 
-/* TIME_WAIT reaping mechanism. */
-#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
-#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
-
 #define TCP_SYNQ_INTERVAL	(HZ/5)	/* Period of SYNACK timer */
 #define TCP_SYNQ_HSIZE		512	/* Size of SYNACK hash table */
 
