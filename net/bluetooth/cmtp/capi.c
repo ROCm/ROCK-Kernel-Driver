@@ -139,6 +139,19 @@ static int cmtp_msgnum_get(struct cmtp_session *session)
 	return session->msgnum;
 }
 
+static void cmtp_send_capimsg(struct cmtp_session *session, struct sk_buff *skb)
+{
+	struct cmtp_scb *scb = (void *) skb->cb;
+
+	BT_DBG("session %p skb %p len %d", session, skb, skb->len);
+
+	scb->id = -1;
+	scb->data = (CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3);
+
+	skb_queue_tail(&session->transmit, skb);
+
+	cmtp_schedule(session);
+}
 
 static void cmtp_send_interopmsg(struct cmtp_session *session,
 					__u8 subcmd, __u16 appl, __u16 msgnum,
@@ -336,21 +349,6 @@ void cmtp_recv_capimsg(struct cmtp_session *session, struct sk_buff *skb)
 
 	capi_ctr_handle_message(ctrl, appl, skb);
 }
-
-void cmtp_send_capimsg(struct cmtp_session *session, struct sk_buff *skb)
-{
-	struct cmtp_scb *scb = (void *) skb->cb;
-
-	BT_DBG("session %p skb %p len %d", session, skb, skb->len);
-
-	scb->id = -1;
-	scb->data = (CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3);
-
-	skb_queue_tail(&session->transmit, skb);
-
-	cmtp_schedule(session);
-}
-
 
 static int cmtp_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 {
