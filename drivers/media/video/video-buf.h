@@ -28,11 +28,12 @@
 struct scatterlist* videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages);
 
 /*
- * Return a scatterlist for a locked iobuf (NULL on errors).  Memory
+ * Return a scatterlist for a an array of userpages (NULL on errors).  Memory
  * for the scatterlist is allocated using kmalloc.  The caller must
  * free the memory.
  */
-struct scatterlist* videobuf_iobuf_to_sg(struct kiobuf *iobuf);
+struct scatterlist *videobuf_pages_to_sg(struct page **pages, int nr_pages,
+					 int offset);
 
 /* --------------------------------------------------------------------- */
 
@@ -57,7 +58,8 @@ struct scatterlist* videobuf_iobuf_to_sg(struct kiobuf *iobuf);
 
 struct videobuf_dmabuf {
 	/* for userland buffer */
-	struct kiobuf       *iobuf;
+	struct page         **pages;
+	int                 offset;
 
 	/* for kernel buffers */
 	void                *vmalloc;

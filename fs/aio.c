@@ -9,6 +9,7 @@
  *	See ../COPYING for licensing terms.
  */
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/aio_abi.h>
@@ -21,15 +22,9 @@
 #include <linux/file.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
-#include <linux/vmalloc.h>
-#include <linux/iobuf.h>
 #include <linux/slab.h>
 #include <linux/timer.h>
-#include <linux/brlock.h>
 #include <linux/aio.h>
-#include <linux/smp_lock.h>
-#include <linux/compiler.h>
-#include <linux/brlock.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/workqueue.h>
