@@ -706,11 +706,29 @@ embed_config(bd_t **bdp)
 #endif
 
 #ifdef CONFIG_EP405
+#include <linux/serial_reg.h>
+
 void
 embed_config(bd_t **bdp)
 {
+	u32 chcr0;
 	u_char *cp;
 	bd_t	*bd;
+
+	/* Different versions of the PlanetCore firmware vary in how
+	   they set up the serial port - in particular whether they
+	   use the internal or external serial clock for UART0.  Make
+	   sure the UART is in a known state. */
+	/* FIXME: We should use the board's 11.0592MHz external serial
+	   clock - it will be more accurate for serial rates.  For
+	   now, however the baud rates in ep405.h are for the internal
+	   clock. */
+	chcr0 = mfdcr(DCRN_CHCR0);
+	if ( (chcr0 & 0x1fff) != 0x103e ) {
+		mtdcr(DCRN_CHCR0, (chcr0 & 0xffffe000) | 0x103e);
+		/* The following tricks serial_init() into resetting the baud rate */
+		writeb(0, UART0_IO_BASE + UART_LCR);
+	}
 
 	bd = &bdinfo;
 	*bdp = bd;
