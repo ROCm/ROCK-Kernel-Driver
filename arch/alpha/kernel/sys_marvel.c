@@ -33,13 +33,6 @@
 # error NR_IRQS < MARVEL_NR_IRQS !!!
 #endif
 
-/* ??? Should probably be generic.  */
-#ifdef CONFIG_PCI_NAMES
-#define pci_pretty_name(x) ((x)->pretty_name)
-#else
-#define pci_pretty_name(x) ""
-#endif
-
 
 /*
  * Interrupt handling.
