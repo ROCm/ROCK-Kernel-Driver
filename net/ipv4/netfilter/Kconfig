@@ -105,6 +105,16 @@ config IP_NF_MATCH_LIMIT
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+config IP_NF_MATCH_IPRANGE
+	tristate "IP range match support"
+	depends on IP_NF_IPTABLES
+	help
+	  This option makes possible to match IP addresses against IP address
+	  ranges.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config IP_NF_MATCH_MAC
 	tristate "MAC address match support"
 	depends on IP_NF_IPTABLES
@@ -354,6 +364,28 @@ config IP_NF_TARGET_REDIRECT
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+config IP_NF_TARGET_NETMAP
+	tristate "NETMAP target support"
+	depends on IP_NF_NAT
+	help
+	  NETMAP is an implementation of static 1:1 NAT mapping of network
+	  addresses. It maps the network address part, while keeping the host
+	  address part intact. It is similar to Fast NAT, except that
+	  Netfilter's connection tracking doesn't work well with Fast NAT.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_TARGET_SAME
+	tristate "SAME target support"
+	depends on IP_NF_NAT
+	help
+	  This option adds a `SAME' target, which works like the standard SNAT
+	  target, but attempts to give clients the same IP for all connections.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
 config IP_NF_NAT_LOCAL
 	bool "NAT of local connections (READ HELP)"
 	depends on IP_NF_NAT
@@ -469,6 +501,19 @@ config IP_NF_TARGET_MARK
 	  the routing method (see `Use netfilter MARK value as routing
 	  key') and can also be used by other subsystems to change their
 	  behavior.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_TARGET_CLASSIFY
+	tristate "CLASSIFY target support"
+	depends on IP_NF_MANGLE
+	help
+	  This option adds a `CLASSIFY' target, which enables the user to set
+	  the priority of a packet. Some qdiscs can use this value for
+	  classification, among these are:
+
+  	  atm, cbq, dsmark, pfifo_fast, htb, prio
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
